@@ -1,4 +1,4 @@
-** NOT YET RELEASED**
+**NOT YET RELEASED**
 
 **Fibratus** is a tool which is able to capture the most of the Windows kernel activity - process/thread creation and termination, 
 file system I/O, registry, network activity, DLL loading/unloading and much more. 
