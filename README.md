@@ -7,4 +7,4 @@ set kernel event filters or run the lightweight Python modules called **filament
 
 #### Running Fibratus
 
-Fibratus is composed of a single binary which can be run from the terminal console. For better use experience a more sophisticated terminal emulators like ConEmu or Cmder are recommended.
+Fibratus is composed of a single binary which can be run from the terminal console. For better user experience a more sophisticated terminal emulators like ConEmu or Cmder are recommended.
