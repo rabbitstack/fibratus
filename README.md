@@ -12,4 +12,19 @@ set kernel event filters or run the lightweight Python modules called **filament
 
 #### Running Fibratus
 
-Fibratus is composed of a single binary which can be run from terminal console. Although default Windows console would suffice, for better user experience a more sophisticated terminal emulators like [ConEmu](https://conemu.github.io) or [Cmder](http://cmder.net) are recommended.
+Fibratus is composed of a single binary which can be run from terminal console. Although default Windows console would suffice, for better user experience a more sophisticated terminal emulators like [ConEmu](https://conemu.github.io) or [Cmder](http://cmder.net) are recommended. Run `fibratus --help` for usage instructions.
+
+```
+Usage:
+    fibratus run ([--filament=<filament>] | [--filters <kevents>...])
+    fibratus list-kevents
+    fibratus list-filaments
+    fibratus -h | --help
+    fibratus --version
+
+Options:
+    -h --help                 Show this screen.
+    --filament=<filament>     Specify the filament to execute.
+    --version                 Show version.
+```
+
