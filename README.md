@@ -1,3 +1,5 @@
+![alt text]( https://github.com/rabbitstack/fibratus/blob/master/fibratus.png "fibratus logo" )
+
 **NOT YET RELEASED**
 
 **Fibratus** is a tool which is able to capture the most of the Windows kernel activity - process/thread creation and termination, 
