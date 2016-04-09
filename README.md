@@ -51,7 +51,7 @@ To capture all of the supported kernel events, execute `fibratus run` command wi
 
 Every line contains the information of the kernel event according to the following format:
 
-* `id`
+* `id` - unique incremental kernel event's identifier. 
 * `timestamp`
 * `cpu`
 * `process`
