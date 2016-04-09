@@ -46,3 +46,16 @@ To capture all of the supported kernel events, execute `fibratus run` command wi
 5641 20:28:17.300000 3 taskmgr.exe (3532) - RegOpenKey (hive=REGISTRY\MACHINE\SYSTEM, node=ControlSet001\Control\Nls\Locale\SOFTWARE\Microsoft\CTF\KnownClasses, pid=3532, status=3221225524, tid=4324)
 5642 20:28:17.302000 2 taskmgr.exe (3532) - UnloadImage (base=0x7fefab90000, checksum=204498, image=xmllite.dll, path=\Windows\System32\xmllite.dll, pid=3532, size=212.0)
 ````
+
+Every line contains the information of the kernel event according to the following format:
+
+* `id`
+* `timestamp`
+* `cpu`
+* `process`
+* `pid`
+* `kevent`
+* `params`
+
+
+
