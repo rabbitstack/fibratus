@@ -80,6 +80,7 @@ Every line contains the information of the kernel event according to the followi
 | Accept       |   |
 | Connect       |   |
 | Disconnect       |   |
+| RegCreateKey       |   |
 | RegQueryKey       |   |
 | RegOpenKey       |   |
 | RegDeleteKey       |   |
