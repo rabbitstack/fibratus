@@ -59,5 +59,9 @@ Every line contains the information of the kernel event according to the followi
 * `kevent` - name of the kernel event.
 * `params` - event's parameters.
 
+### Filtering kernel events
 
+| Kernel event        | Description                     | 
+| ------------------- |:------------------------------- | 
+| CreateProcess       | A new process has been created  |
 
