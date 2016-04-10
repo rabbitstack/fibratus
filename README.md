@@ -59,7 +59,9 @@ Every line contains the information of the kernel event according to the followi
 * `kevent` - name of the kernel event.
 * `params` - event's parameters.
 
-### Filtering kernel events
+### Filtering
+
+Fibratus supports basic filtering capabilities on kernel event names. To capture the specified kernel events, use `fibratus run --filters` command. For example, `fibratus run --filters CreateProcess Send` will capture the events related to process creation and data sending over a connected sockets. For a full list of kernel events see the table below.
 
 | Kernel event        | Description                     | 
 | ------------------- |:------------------------------- | 
