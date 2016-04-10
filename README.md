@@ -65,12 +65,12 @@ Fibratus supports basic filtering capabilities on kernel event names. To capture
 
 | Kernel event        | Description                     | 
 | ------------------- |:------------------------------- | 
-| CreateProcess       | A new process has been created  |
-| TerminateProcess       |   |
-| CreateThread       |   |
-| TerminateThread       |   |
-| LoadImage       |   |
-| UnloadImage       |   |
+| CreateProcess       | Creates a new process and its primary thread  |
+| CreateThread        | Creates a thread to execute within the virtual address space of the calling process |
+| TerminateProcess    | Terminates the process and all of its threads   |
+| TerminateThread     | Terminates a thread  |
+| LoadImage           | Loads the module into the address space of the calling process |
+| UnloadImage         | Frees the loaded module from the address space of the calling process |
 | CreateFile       |   |
 | CloseFile       |   |
 | DeleteFile       |   |
