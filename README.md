@@ -54,7 +54,7 @@ Every line contains the information of the kernel event according to the followi
 * `id` - kernel event's incremental identifier. The value of the identifier is reseted on every single execution.
 * `timestamp` - temporal occurrence of the event.
 * `cpu` - the CPU core where the event has been generated.
-* `process` - process name which trigger the kernel's event.
+* `process` - process name which triggered the kernel's event.
 * `pid` - the identifier of the after-mentioned process.
 * `kevent` - name of the kernel event.
 * `params` - event's parameters.
