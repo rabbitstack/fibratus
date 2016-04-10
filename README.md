@@ -29,7 +29,7 @@ Options:
     --filament=<filament>     Specify the filament to execute.
     --version                 Show version.
 ```
-To capture all of the supported kernel events, execute `fibratus run` command without any argument. After the collector has been initialized, the continuous stream of kernel events are written to standard output.
+To capture all of the supported kernel events, execute `fibratus run` command without any argument. After the collector has been initialized, the continuous stream of kernel events will began to be written on the standard output.
 
 ```
 5550 20:28:14.882000 3 cmd.exe (4396) - UnloadImage (base=0x77950000, checksum=1313154, image=ntdll.dll, path=\Device\HarddiskVolume2\Windows\SysWOW64\ntdll.dll, pid=4396, size=1536.0)
@@ -51,13 +51,13 @@ To capture all of the supported kernel events, execute `fibratus run` command wi
 
 Every line contains the information of the kernel event according to the following format:
 
-* `id` - unique incremental kernel event's identifier. 
-* `timestamp`
-* `cpu`
-* `process`
-* `pid`
-* `kevent`
-* `params`
+* `id` - kernel event's incremental identifier. The value of the identifier is reseted on every single execution.
+* `timestamp` - temporal occurrence of the event.
+* `cpu` - the CPU core where the event has been generated.
+* `process` - process name which trigger the kernel's event.
+* `pid` - the identifier of the after-mentioned process.
+* `kevent` - name of the kernel event.
+* `params` - event's parameters.
 
 
 
