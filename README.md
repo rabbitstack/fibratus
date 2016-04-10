@@ -78,6 +78,11 @@ Every line contains the information of the kernel event according to the followi
 | Recv       |   |
 | Accept       |   |
 | Connect       |   |
-| CreateFile       |   |
-| CreateFile       |   |
+| Disconnect       |   |
+| RegQueryKey       |   |
+| RegOpenKey       |   |
+| RegDeleteKey       |   |
+| RegQueryValue       |   |
+| RegSetValue       |   |
+| RegDeleteValue       |   |
 
