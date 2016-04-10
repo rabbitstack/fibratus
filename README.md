@@ -91,3 +91,4 @@ Fibratus supports basic filtering capabilities on kernel event names. To capture
 | RegSetValue       |   |
 | RegDeleteValue       |   |
 
+### Executing filaments
