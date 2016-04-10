@@ -82,6 +82,7 @@ Fibratus supports basic filtering capabilities on kernel event names. To capture
 | Accept       |   |
 | Connect       |   |
 | Disconnect       |   |
+| Reconnect       |   |
 | RegCreateKey       |   |
 | RegQueryKey       |   |
 | RegOpenKey       |   |
