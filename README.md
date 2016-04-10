@@ -64,4 +64,20 @@ Every line contains the information of the kernel event according to the followi
 | Kernel event        | Description                     | 
 | ------------------- |:------------------------------- | 
 | CreateProcess       | A new process has been created  |
+| TerminateProcess       |   |
+| CreateThread       |   |
+| TerminateThread       |   |
+| LoadImage       |   |
+| UnloadImage       |   |
+| CreateFile       |   |
+| DeleteFile       |   |
+| RenameFile       |   |
+| ReadFile       |   |
+| WriteFile       |   |
+| Send       |   |
+| Recv       |   |
+| Accept       |   |
+| Connect       |   |
+| CreateFile       |   |
+| CreateFile       |   |
 
