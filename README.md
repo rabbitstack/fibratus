@@ -70,6 +70,7 @@ Every line contains the information of the kernel event according to the followi
 | LoadImage       |   |
 | UnloadImage       |   |
 | CreateFile       |   |
+| CloseFile       |   |
 | DeleteFile       |   |
 | RenameFile       |   |
 | ReadFile       |   |
