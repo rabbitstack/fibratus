@@ -61,7 +61,7 @@ Every line contains the information of the kernel event according to the followi
 
 ### Filtering
 
-Fibratus supports basic filtering capabilities on kernel event names. To capture the specified kernel events, use `fibratus run --filters` command. For example, `fibratus run --filters CreateProcess Send` will capture the events related to process creation and data sending over a connected sockets. For a full list of kernel events see the table below.
+Fibratus supports basic filtering capabilities on kernel event names. To capture the specified kernel events, use `fibratus run --filters` command. For example, `fibratus run --filters CreateProcess Send` would capture the events related to process creation and data sending over a connected sockets. For a full list of kernel events see the table below.
 
 | Kernel event        | Description                     | 
 | ------------------- |:------------------------------- | 
