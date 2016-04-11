@@ -61,7 +61,7 @@ Every line contains the information of the kernel event according to the followi
 
 ### Filtering
 
-Fibratus supports basic filtering capabilities on kernel event names. To capture the specified kernel events, use `fibratus run --filters` command. For example, `fibratus run --filters CreateProcess Send` would capture the events related to process creation and data sending over a connected sockets. For a full list of kernel events see the table below.
+Fibratus supports basic filtering capabilities on kernel event names. To capture the specified kernel events, use `fibratus run --filters` command. For example, `fibratus run --filters CreateProcess Send` would capture the events related to process creation and data sending over network sockets. For a full list of kernel events see the table below.
 
 | Kernel event        | Description                     | 
 | ------------------- |:------------------------------- | 
@@ -71,24 +71,24 @@ Fibratus supports basic filtering capabilities on kernel event names. To capture
 | TerminateThread     | Terminates a thread  |
 | LoadImage           | Loads the module into the address space of the calling process |
 | UnloadImage         | Frees the loaded module from the address space of the calling process |
-| CreateFile       |   |
-| CloseFile       |   |
-| DeleteFile       |   |
-| RenameFile       |   |
-| ReadFile       |   |
-| WriteFile       |   |
-| Send       |   |
-| Recv       |   |
-| Accept       |   |
-| Connect       |   |
-| Disconnect       |   |
-| Reconnect       |   |
-| RegCreateKey       |   |
-| RegQueryKey       |   |
-| RegOpenKey       |   |
-| RegDeleteKey       |   |
-| RegQueryValue       |   |
-| RegSetValue       |   |
-| RegDeleteValue       |   |
+| CreateFile          | Creates or opens a file or I/O device |
+| CloseFile           | Closes the file or I/O device |
+| DeleteFile          | Deletes an existing file or directory |
+| RenameFile          | Renames a file or directory |
+| ReadFile            | Reads data from the file or I/O device   |
+| WriteFile           | Writes data to the file or I/O device  |
+| Send                | Sends data on a connected socket |
+| Recv                | Receives data from a connected socket  |
+| Accept              | Initiates the connection attempt from the remote or local TCP socket |
+| Connect             | Establishes the connection to a TCP socket  |
+| Disconnect          | Closes the connection to a TCP socket |
+| Reconnect           | Reconnects to a TCP socket |
+| RegCreateKey        | Creates the registry key or open it if the key already exists  |
+| RegQueryKey         | Retrieves information about the registry key ||
+| RegOpenKey          | Opens the registry key |
+| RegDeleteKey        | Deletes a subkey and its values |
+| RegQueryValue       | Retrieves the type and data of the value associated with an open registry key |
+| RegSetValue         | Sets the data and type of a value under a registry key |
+| RegDeleteValue      | Removes a value from the registry key |
 
 ### Executing filaments
