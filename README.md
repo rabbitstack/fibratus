@@ -125,3 +125,6 @@ def on_next_kevent(kevent):
 ```
 The `on_init` method is invoked upon Fibratus initialization just before the kernel event stream is being opened. 
 
+## Compiling kevent collector
+
+Compiling the kernel event collector requires at least **Visual C++ 2012** installed and **Cython >=0.23.4**. To build the Cython extension run `python setup.py build_ext --inplace` from the **kstream** directory.
