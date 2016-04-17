@@ -96,3 +96,32 @@ Fibratus supports basic filtering capabilities on kernel event names. To capture
 Filaments are a micro modules written in Python that run on top of Fibratus. They often perform aggregations, filtering, groupings, counting or any kind of custom logic on a kernel event stream. To execute a filament, pass the filament name via `--filament` argument, for example `fibratus run --filament=top_hives_io`. To get more information on how to create filaments, see [Building filaments](#building-filaments). 
 
 ## Building filaments
+
+Creating a new filament is as easy as providing a Python module with `on_init` and `on_next_kevent` methods as follows:
+
+```python
+"""
+Shows top TCP / UDP connections
+"""
+connections = {}
+
+def on_init():
+    set_filter('Send')
+    columns(["Port", "IP", "Count"])
+    sort_by('Count')
+
+def on_next_kevent(kevent):
+    k = (kevent.params.dport, kevent.params.ip_dst)
+    if k in connections:
+        count = connections[k]
+        connections[k] = count + 1
+    else:
+        connections[k] = 1
+
+    for t, count in connections.items():
+        add_row([t[0], t[1], count])
+
+    render_tabular()
+```
+The `on_init` method is invoked upon Fibratus initialization just before the kernel event stream is being opened. 
+
