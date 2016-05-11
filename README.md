@@ -29,7 +29,7 @@ Options:
     --filament=<filament>     Specify the filament to execute.
     --version                 Show version.
 ```
-To capture all of the supported kernel events, execute `fibratus run` command without any argument. After the collector has been initialized, the continuous stream of kernel events will began to be written on the standard output.
+To capture all of the supported kernel events, execute `fibratus run` command without any argument. After the collector has been initialized, the continuous stream of kernel events will render on the standard output.
 
 ```
 5550 20:28:14.882000 3 cmd.exe (4396) - UnloadImage (base=0x77950000, checksum=1313154, image=ntdll.dll, path=\Device\HarddiskVolume2\Windows\SysWOW64\ntdll.dll, pid=4396, size=1536.0)
