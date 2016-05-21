@@ -1,0 +1,8 @@
+cython==0.23.4
+docopt==0.6.2
+ptable==0.9.2
+logbook==0.12.5
+apscheduler==3.0.5
+
+pytest==2.9.1
+pytest-cov==2.2.1
