@@ -6,6 +6,7 @@ environment:
 
 install:
   - "SET PATH=%PYTHON%;%PYTHON%\\Scripts;%PATH%"
+  - "SET VS90COMNTOOLS=%VS130COMNTOOLS%"
 
   - "pip install -r requirements.txt"
 
