@@ -11,7 +11,7 @@ install:
 
 build_script:
   - ps: "cd kstream"
-  - "%CMD_IN_ENV% python setup.py build_ext --inplace"
+  - "python setup.py build_ext --inplace"
 
 test_script:
   - py.test tests/"
