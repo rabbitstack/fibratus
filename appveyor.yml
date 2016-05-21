@@ -1,0 +1,18 @@
+environment:
+
+  matrix:
+    - PYTHON: "C:\\Python34-x64"
+      DISTUTILS_USE_SDK: "1"
+
+install:
+  - "SET PATH=%PYTHON%;%PYTHON%\\Scripts;%PATH%"
+
+  - "pip install -r requirements.txt"
+
+build: off
+
+test_script:
+  - py.test tests/"
+
+artifacts:
+  - path: dist\*
