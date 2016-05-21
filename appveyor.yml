@@ -14,7 +14,7 @@ install:
   - "pip install -r requirements.txt"
 
 build_script:
-  - call "C:\Program Files (x86)\Microsoft Visual Studio 15.0\VC\vcvarsall.bat" x64"
+  - call "C:\Program Files\Microsoft Visual Studio 15.0\VC\vcvarsall.bat" x64"
   - ps: "cd kstream"
   - "python setup.py build_ext --inplace"
 
