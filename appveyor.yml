@@ -1,5 +1,8 @@
 environment:
 
+  global:
+    CMD_IN_ENV: "cmd /E:ON /V:ON /C .\\run_with_env.cmd"
+
   matrix:
     - PYTHON: "C:\\Python34-x64"
       DISTUTILS_USE_SDK: "1"
@@ -9,7 +12,9 @@ install:
 
   - "pip install -r requirements.txt"
 
-build: off
+build_script:
+  - ps: "cd kstream"
+  - "%CMD_IN_ENV% python setup.py build_ext --inplace"
 
 test_script:
   - py.test tests/"
