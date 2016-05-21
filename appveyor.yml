@@ -1,7 +1,7 @@
 environment:
 
   global:
-    CMD_IN_ENV: "cmd /E:ON /V:ON /C \\run_with_env.cmd"
+    CMD_IN_ENV: "cmd /C run_with_env.cmd"
 
   matrix:
     - PYTHON: "C:\\Python34-x64"
