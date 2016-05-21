@@ -25,3 +25,6 @@ test_script:
 
 artifacts:
   - path: dist\*
+
+on_success:
+  - "coveralls"
