@@ -3,8 +3,6 @@ Fibratus
 
 ![fibratus logo]( https://github.com/rabbitstack/fibratus/blob/master/fibratus.png "fibratus logo" )
 
-**NOT YET RELEASED**
-
 **Fibratus** is a tool which is able to capture the most of the Windows kernel activity - process/thread creation and termination, 
 file system I/O, registry, network activity, DLL loading/unloading and much more. 
 Fibratus has a very simple CLI which encapsulates the machinery to start the kernel event stream collector, 
@@ -15,11 +13,11 @@ set kernel event filters or run the lightweight Python modules called **filament
 To produce the executable binary Fibratus is compiled into C++ code using [Nuitka](http://nuitka.net/pages/overview.html). Install the required dependencies before running the Nuitka compiler:
 
 ```
-pip install -r requirements.txt
-cd fibratus
-nuitka --recurse-all --standalone --output-dir=<build-dir> --verbose cli.py
-cd <build-dir>
-ren cli.exe fibratus.exe
+$ pip install -r requirements.txt
+$ cd fibratus
+$ nuitka --recurse-all --standalone --output-dir=<build-dir> --verbose cli.py
+$ cd <build-dir>
+$ ren cli.exe fibratus.exe
 ```
 
 ## Running Fibratus
