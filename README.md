@@ -4,6 +4,7 @@ Fibratus
 ![fibratus logo]( https://github.com/rabbitstack/fibratus/blob/master/fibratus.png "fibratus logo" )
 
 [![Build status](https://ci.appveyor.com/api/projects/status/dlvxhc0j026ikcyv?svg=true)](https://ci.appveyor.com/project/rabbitstack/fibratus)
+[![Coverage Status](https://coveralls.io/repos/github/rabbitstack/fibratus/badge.svg?branch=HEAD)](https://coveralls.io/github/rabbitstack/fibratus?branch=HEAD)
 
 **Fibratus** is a tool which is able to capture the most of the Windows kernel activity - process/thread creation and termination, 
 file system I/O, registry, network activity, DLL loading/unloading and much more. 
