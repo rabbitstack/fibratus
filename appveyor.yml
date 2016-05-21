@@ -1,8 +1,5 @@
 environment:
 
-  global:
-    CMD_IN_ENV: "cmd /C .\run_with_env.cmd"
-
   matrix:
     - PYTHON: "C:\\Python34-x64"
       DISTUTILS_USE_SDK: "1"
