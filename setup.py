@@ -4,7 +4,7 @@ from Cython.Distutils import build_ext
 
 setup(
     ext_modules=[Extension("kstreamc",
-                ["kstreamc.pyx"],
+                ["kstream/kstreamc.pyx"],
         libraries=["tdh", "advapi32", "ole32"])],
     cmdclass={"build_ext": build_ext}
 )
