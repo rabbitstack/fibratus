@@ -1,13 +1,11 @@
 environment:
 
   matrix:
-    - PYTHON: "C:\\Python34-x64"
+    - PYTHON: "C:\\Python35-x64"
       DISTUTILS_USE_SDK: "1"
 
 install:
   - "SET PATH=%PYTHON%;%PYTHON%\\Scripts;%PATH%"
-  - "SET VS90COMNTOOLS=%VS130COMNTOOLS%"
-
   - "pip install -r requirements.txt"
 
 build_script:
