@@ -2,6 +2,9 @@ environment:
 
   MSVS_VERSION: 2015
 
+  COVERALLS_REPO_TOKEN:
+    secure: Z89061A4jMdBCbbKafOFlRCO1iz+fLvZ0AopcSBT+RhKFJMkBUeeYjXXfyx0TeMn
+
   matrix:
     - PYTHON: "C:\\Python35-x64"
       DISTUTILS_USE_SDK: "1"
