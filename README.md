@@ -18,6 +18,8 @@ To produce the executable binary Fibratus is compiled into C++ code using [Nuitk
 pip install -r requirements.txt
 cd fibratus
 nuitka --recurse-all --standalone --output-dir=<build-dir> --verbose cli.py
+cd <build-dir>
+ren cli.exe fibratus.exe
 ```
 
 ## Running Fibratus
