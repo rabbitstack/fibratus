@@ -1,8 +1,13 @@
 environment:
 
+  MSVS_VERSION: 2015
+
   matrix:
     - PYTHON: "C:\\Python35-x64"
       DISTUTILS_USE_SDK: "1"
+
+platform:
+  - x64
 
 install:
   - "SET PATH=%PYTHON%;%PYTHON%\\Scripts;%PATH%"
