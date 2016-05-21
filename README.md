@@ -10,7 +10,15 @@ file system I/O, registry, network activity, DLL loading/unloading and much more
 Fibratus has a very simple CLI which encapsulates the machinery to start the kernel event stream collector, 
 set kernel event filters or run the lightweight Python modules called **filaments**. You can use filaments to extend Fibratus with your own arsenal of tools.
 
-## Installation
+## Building
+
+To produce the executable binary Fibratus is compiled into C++ code using [Nuitka](http://nuitka.net/pages/overview.html). Install the required dependencies before running nuitka:
+
+```
+pip install -r requirements.txt
+cd fibratus
+nuitka --recurse-all --standalone --output-dir=<build-dir> --verbose cli.py
+```
 
 ## Running Fibratus
 
