@@ -12,7 +12,7 @@ set kernel event filters or run the lightweight Python modules called **filament
 
 ## Building
 
-To produce the executable binary Fibratus is compiled into C++ code using [Nuitka](http://nuitka.net/pages/overview.html). Install the required dependencies before running nuitka:
+To produce the executable binary Fibratus is compiled into C++ code using [Nuitka](http://nuitka.net/pages/overview.html). Install the required dependencies before running the Nuitka compiler:
 
 ```
 pip install -r requirements.txt
