@@ -5,7 +5,7 @@ Fibratus
 
 [![Build status](https://ci.appveyor.com/api/projects/status/dlvxhc0j026ikcyv?svg=true)](https://ci.appveyor.com/project/rabbitstack/fibratus)
 [![Coverage Status](https://coveralls.io/repos/github/rabbitstack/fibratus/badge.svg?branch=HEAD)](https://coveralls.io/github/rabbitstack/fibratus?branch=HEAD)
-[![Code Climate](https://codeclimate.com/github/rabbitstack/fibratus/badges/gpa.svg)](https://codeclimate.com/github/rabbitstack/fibratus)
+[![Code Health](https://landscape.io/github/rabbitstack/fibratus/master/landscape.svg?style=flat)](https://landscape.io/github/rabbitstack/fibratus/master)
 
 **Fibratus** is a tool which is able to capture the most of the Windows kernel activity - process/thread creation and termination, 
 file system I/O, registry, network activity, DLL loading/unloading and much more. 
@@ -150,4 +150,3 @@ Licensed under the Apache License, Version 2.0 (the "License"); you may not use 
 http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
-
