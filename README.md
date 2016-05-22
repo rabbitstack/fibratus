@@ -14,7 +14,7 @@ set kernel event filters or run the lightweight Python modules called **filament
 
 ## Building
 
-To produce the executable binary Fibratus is compiled into C++ code using [Nuitka](http://nuitka.net/pages/overview.html). Install the required dependencies before running the Nuitka compiler:
+Compiling Fibratus from sources requires the [Nuitka](http://nuitka.net/pages/overview.html) Python compiler. Make sure all  dependencies are satisfied before running Nuitka:
 
 ```
 $ pip install -r requirements.txt
@@ -139,7 +139,7 @@ The `on_init` method is invoked upon Fibratus initialization just before the ker
 
 ## Compiling kevent collector
 
-Compiling the kernel event collector requires at least **Visual C++ 2012** installed and **Cython >=0.23.4**. To build the Cython extension run `python setup.py build_ext --inplace` from the **kstream** directory.
+Compiling the kernel event collector requires at least **Visual C++ 2012** installed and **Cython >=0.23.4**. To build the Cython extension run `python setup.py build_ext --inplace`.
 
 ## License
 
