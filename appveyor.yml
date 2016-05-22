@@ -3,8 +3,7 @@ environment:
   MSVS_VERSION: 2015
 
   COVERALLS_REPO_TOKEN:
-    secure: 
-YbzGEHbZG/jMLNzgHxNZ3MpU2QTnrjTY4noj1tCZtBaU1Ea1O+N4GwzI/C4Xpos3
+    secure: YbzGEHbZG/jMLNzgHxNZ3MpU2QTnrjTY4noj1tCZtBaU1Ea1O+N4GwzI/C4Xpos3
 
   matrix:
     - PYTHON: "C:\\Python35-x64"
