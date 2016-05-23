@@ -52,7 +52,7 @@ To capture all of the supported kernel events, execute `fibratus run` command wi
 5633 20:28:17.288000 2 taskmgr.exe (3532) - CreateFile (file=\Device\HarddiskVolume2\Windows\system32\xmllite.dll, file_type=REPARSE_POINT, operation=OPEN, share_mask=rwd, tid=4324)
 5634 20:28:17.288000 2 taskmgr.exe (3532) - CloseFile (file=\Device\HarddiskVolume2\Windows\system32\xmllite.dll, tid=4324)
 5635 20:28:17.288000 2 taskmgr.exe (3532) - CreateFile (file=\Device\HarddiskVolume2\Windows\system32\xmllite.dll, file_type=FILE, operation=OPEN, share_mask=r-d, tid=4324)
-5636 20:28:17.288000 2 taskmgr.exe (3532) - LoadImage (base=0x7fefab90000, checksum=204498, image=xmllite.dll, path=\Windows\System32\xmllite.dll, pid=3532, size=217088)
+5636 20:28:17.288000 2 taskmgr.exe (3531) - LoadImage (base=0x7fefab90000, checksum=204498, image=xmllite.dll, path=\Windows\System32\xmllite.dll, pid=3532, size=217088)
 5637 20:28:17.288000 2 taskmgr.exe (3532) - CloseFile (file=\Device\HarddiskVolume2\Windows\system32\xmllite.dll, tid=4324)
 5638 20:28:17.300000 2 taskmgr.exe (3532) - RegQueryKey (hive=REGISTRY\MACHINE\SYSTEM, key=ControlSet001\Control\Nls\Locale\, pid=3532, status=0, tid=4324)
 5639 20:28:17.300000 2 taskmgr.exe (3532) - RegOpenKey (hive=REGISTRY\MACHINE\SYSTEM, key=ControlSet001\Control\Nls\Locale\SOFTWARE\Microsoft\CTF\KnownClasses, pid=3532, status=3221225524, tid=4324)
