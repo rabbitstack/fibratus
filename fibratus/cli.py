@@ -102,6 +102,8 @@ if __name__ == '__main__':
         else:
             if len(filament_filters) > 0:
                 fibratus.add_filters(filament_filters)
+            else:
+                fibratus.add_filters([])
         try:
             fibratus.run()
         except KeyboardInterrupt:
