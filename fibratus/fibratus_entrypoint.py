@@ -75,6 +75,7 @@ class Fibratus():
         self.dll_repository = DllRepository(self.kevent)
 
         self.requires_render = {}
+        self.filters_count = 0
 
     def run(self):
 
@@ -107,48 +108,50 @@ class Fibratus():
         self.kevt_streamc.close_kstream()
 
     def add_filters(self, kevent_filters):
-        # include the basic filters
-        # that are essential to the
-        # rest of kernel events
-        self.kevt_streamc.add_kevent_filter(ENUM_PROCESS)
-        self.kevt_streamc.add_kevent_filter(ENUM_THREAD)
-        self.kevt_streamc.add_kevent_filter(ENUM_IMAGE)
-        self.kevt_streamc.add_kevent_filter(REG_CREATE_KCB)
-        self.kevt_streamc.add_kevent_filter(REG_DELETE_KCB)
+        if len(kevent_filters) > 0:
+            self.filters_count = len(kevent_filters)
+            # include the basic filters
+            # that are essential to the
+            # rest of kernel events
+            self.kevt_streamc.add_kevent_filter(ENUM_PROCESS)
+            self.kevt_streamc.add_kevent_filter(ENUM_THREAD)
+            self.kevt_streamc.add_kevent_filter(ENUM_IMAGE)
+            self.kevt_streamc.add_kevent_filter(REG_CREATE_KCB)
+            self.kevt_streamc.add_kevent_filter(REG_DELETE_KCB)
 
-        # these kevents are necessary for consistent state
-        # of the trace. If the user doesn't include them
-        # in a filter list, then we do the job but set the
-        # kernel event type as not eligible for rendering
-        if not KEvents.CREATE_PROCESS in kevent_filters:
-            self.kevt_streamc.add_kevent_filter(CREATE_PROCESS)
-            self.requires_render[CREATE_PROCESS] = False
-        else:
-            self.requires_render[CREATE_PROCESS] = True
-
-        if not KEvents.CREATE_THREAD in kevent_filters:
-            self.kevt_streamc.add_kevent_filter(CREATE_THREAD)
-            self.requires_render[CREATE_THREAD] = False
-        else:
-            self.requires_render[CREATE_THREAD] = True
-
-        if not KEvents.CREATE_FILE in kevent_filters:
-            self.kevt_streamc.add_kevent_filter(CREATE_FILE)
-            self.requires_render[CREATE_FILE] = False
-        else:
-            self.requires_render[CREATE_FILE] = True
-
-        for kevent_filter in kevent_filters:
-            ktuple = kname_to_tuple(kevent_filter)
-            if isinstance(ktuple, list):
-                for kt in ktuple:
-                    self.kevt_streamc.add_kevent_filter(kt)
-                    if not kt in self.requires_render:
-                        self.requires_render[kt] = True
+            # these kevents are necessary for consistent state
+            # of the trace. If the user doesn't include them
+            # in a filter list, then we do the job but set the
+            # kernel event type as not eligible for rendering
+            if not KEvents.CREATE_PROCESS in kevent_filters:
+                self.kevt_streamc.add_kevent_filter(CREATE_PROCESS)
+                self.requires_render[CREATE_PROCESS] = False
             else:
-                self.kevt_streamc.add_kevent_filter(ktuple)
-                if not ktuple in self.requires_render:
-                    self.requires_render[ktuple] = True
+                self.requires_render[CREATE_PROCESS] = True
+
+            if not KEvents.CREATE_THREAD in kevent_filters:
+                self.kevt_streamc.add_kevent_filter(CREATE_THREAD)
+                self.requires_render[CREATE_THREAD] = False
+            else:
+                self.requires_render[CREATE_THREAD] = True
+
+            if not KEvents.CREATE_FILE in kevent_filters:
+                self.kevt_streamc.add_kevent_filter(CREATE_FILE)
+                self.requires_render[CREATE_FILE] = False
+            else:
+                self.requires_render[CREATE_FILE] = True
+
+            for kevent_filter in kevent_filters:
+                ktuple = kname_to_tuple(kevent_filter)
+                if isinstance(ktuple, list):
+                    for kt in ktuple:
+                        self.kevt_streamc.add_kevent_filter(kt)
+                        if not kt in self.requires_render:
+                            self.requires_render[kt] = True
+                else:
+                    self.kevt_streamc.add_kevent_filter(ktuple)
+                    if not ktuple in self.requires_render:
+                        self.requires_render[ktuple] = True
 
     def _on_next_kevent(self, ktype, cpuid, ts, kparams):
         """Callback which fires when new kernel event arrives.
@@ -262,3 +265,5 @@ class Fibratus():
                 rr = self.requires_render[ktype]
                 if rr:
                     self.kevent.render()
+            elif self.filters_count == 0:
+                self.kevent.render()
