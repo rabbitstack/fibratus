@@ -14,7 +14,7 @@ set kernel event filters or run the lightweight Python modules called **filament
 
 ## Building
 
-To produce the executable binary Fibratus is compiled into C++ code using [Nuitka](http://nuitka.net/pages/overview.html). Install the required dependencies before running the Nuitka compiler:
+Compiling Fibratus from sources requires the [Nuitka](http://nuitka.net/pages/overview.html) Python compiler. Make sure all  dependencies are satisfied before running Nuitka:
 
 ```
 $ pip install -r requirements.txt
@@ -52,7 +52,7 @@ To capture all of the supported kernel events, execute `fibratus run` command wi
 5633 20:28:17.288000 2 taskmgr.exe (3532) - CreateFile (file=\Device\HarddiskVolume2\Windows\system32\xmllite.dll, file_type=REPARSE_POINT, operation=OPEN, share_mask=rwd, tid=4324)
 5634 20:28:17.288000 2 taskmgr.exe (3532) - CloseFile (file=\Device\HarddiskVolume2\Windows\system32\xmllite.dll, tid=4324)
 5635 20:28:17.288000 2 taskmgr.exe (3532) - CreateFile (file=\Device\HarddiskVolume2\Windows\system32\xmllite.dll, file_type=FILE, operation=OPEN, share_mask=r-d, tid=4324)
-5636 20:28:17.288000 2 taskmgr.exe (3532) - LoadImage (base=0x7fefab90000, checksum=204498, image=xmllite.dll, path=\Windows\System32\xmllite.dll, pid=3532, size=217088)
+5636 20:28:17.288000 2 taskmgr.exe (3531) - LoadImage (base=0x7fefab90000, checksum=204498, image=xmllite.dll, path=\Windows\System32\xmllite.dll, pid=3532, size=217088)
 5637 20:28:17.288000 2 taskmgr.exe (3532) - CloseFile (file=\Device\HarddiskVolume2\Windows\system32\xmllite.dll, tid=4324)
 5638 20:28:17.300000 2 taskmgr.exe (3532) - RegQueryKey (hive=REGISTRY\MACHINE\SYSTEM, key=ControlSet001\Control\Nls\Locale\, pid=3532, status=0, tid=4324)
 5639 20:28:17.300000 2 taskmgr.exe (3532) - RegOpenKey (hive=REGISTRY\MACHINE\SYSTEM, key=ControlSet001\Control\Nls\Locale\SOFTWARE\Microsoft\CTF\KnownClasses, pid=3532, status=3221225524, tid=4324)
@@ -139,11 +139,14 @@ The `on_init` method is invoked upon Fibratus initialization just before the ker
 
 ## Compiling kevent collector
 
-Compiling the kernel event collector requires at least **Visual C++ 2012** installed and **Cython >=0.23.4**. To build the Cython extension run `python setup.py build_ext --inplace` from the **kstream** directory.
+Compiling the kernel event collector requires at least **Visual C++ 2012** installed and **Cython >=0.23.4**. To build the Cython extension run `python setup.py build_ext --inplace`.
 
 ## License
 
-Copyright 2015/2016 by Nedim Sabic (RabbitStack) All Rights Reserved. http://rabbitstack.github.io
+Copyright 2015/2016 by Nedim Sabic (RabbitStack) 
+All Rights Reserved. 
+
+http://rabbitstack.github.io
 
 Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at
 
