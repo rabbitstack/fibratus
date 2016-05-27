@@ -112,10 +112,13 @@ Filaments are micro modules written in Python that run on top of Fibratus. They 
 Creating a new filament is as easy as providing a Python module with `on_init` and `on_next_kevent` methods as follows:
 
 ```python
+import collections
+
 """
 Shows top TCP / UDP connections
 """
-connections = {}
+
+connections = collections.Counter()
 
 def on_init():
     set_filter('Send')
@@ -123,12 +126,7 @@ def on_init():
     sort_by('Count')
 
 def on_next_kevent(kevent):
-    k = (kevent.params.dport, kevent.params.ip_dst)
-    if k in connections:
-        count = connections[k]
-        connections[k] = count + 1
-    else:
-        connections[k] = 1
+    connections.update((kevent.params.dport, kevent.params.ip_dst))
 
     for t, count in connections.items():
         add_row([t[0], t[1], count])
