@@ -282,6 +282,8 @@ cdef class KEventStreamCollector:
         except Exception as e:
             with self.file_handler.applicationbound():
                 self.logger.error(e)
+        except KeyboardInterrupt:
+            pass
         # claim the allocated memory
         free(<void*> info)
         # check for pending signals
