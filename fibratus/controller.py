@@ -56,22 +56,22 @@ class KTraceProps():
     def enable_kflags(self, syscall=False, cswitch=False):
         # enable the basic set of flags
         # for the kernel events
-        self._props.contents.enable_flags = EVENT_TRACE_FLAG_PROCESS |\
-            EVENT_TRACE_FLAG_REGISTRY |\
-            EVENT_TRACE_FLAG_THREAD |\
-            EVENT_TRACE_FLAG_DISK_IO |\
-            EVENT_TRACE_FLAG_DISK_FILE_IO |\
-            EVENT_TRACE_FLAG_FILE_IO |\
-            EVENT_TRACE_FLAG_FILE_IO_INIT |\
-            EVENT_TRACE_FLAG_IMAGE_LOAD |\
-            EVENT_TRACE_FLAG_NETWORK_TCPIP
+        self._props.contents.enable_flags = (EVENT_TRACE_FLAG_PROCESS
+            | EVENT_TRACE_FLAG_REGISTRY
+            | EVENT_TRACE_FLAG_THREAD
+            | EVENT_TRACE_FLAG_DISK_IO
+            | EVENT_TRACE_FLAG_DISK_FILE_IO
+            | EVENT_TRACE_FLAG_FILE_IO
+            | EVENT_TRACE_FLAG_FILE_IO_INIT
+            | EVENT_TRACE_FLAG_IMAGE_LOAD
+            | EVENT_TRACE_FLAG_NETWORK_TCPIP)
 
         # syscall / cswitch flags generate a LOT of kevents
         # and they are disabled by default
         if syscall:
-            self._props.contents.enable_flags = self._props.contents.enable_flags | EVENT_TRACE_FLAG_SYSTEMCALL
+            self._props.contents.enable_flags |= EVENT_TRACE_FLAG_SYSTEMCALL
         if cswitch:
-            self._props.contents.enable_flags = self._props.contents.enable_flags | EVENT_TRACE_FLAG_CSWITCH
+            self._props.contents.enable_flags |= EVENT_TRACE_FLAG_CSWITCH
 
     def get(self):
         return self._props
@@ -151,8 +151,7 @@ class KTraceController():
         kprops: KTraceProps
             an instance of the kernel trace properties
         """
-        if kprops is None:
-            kprops = KTraceProps()
+        kprops = kprops or KTraceProps()
 
         handle = self._handle
         self._handle = TRACEHANDLE()
