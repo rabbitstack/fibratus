@@ -14,11 +14,11 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-import collections
-
 """
 Shows top TCP / UDP connections
 """
+
+import collections
 
 connections = collections.Counter()
 
@@ -34,6 +34,7 @@ def on_next_kevent(kevent):
         add_row([t[0], t[1], count])
 
     render_tabular()
+
 
 def on_stop():
     pass
