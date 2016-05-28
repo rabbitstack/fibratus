@@ -107,7 +107,7 @@ zw_query_system_information = declarer.declare(declarer.NT, 'ZwQuerySystemInform
 # memory alloc/free functions
 malloc = declarer.declare(declarer.C, 'malloc', [c_size_t], c_void_p)
 realloc = declarer.declare(declarer.C, 'realloc', [c_void_p, c_size_t], c_void_p)
-free = declarer.declare(declarer.C, 'free', [], None)
+free = declarer.declare(declarer.C, 'free', [c_void_p], None)
 
 # object handle cleanup
 close_handle = declarer.declare(declarer.KERNEL, 'CloseHandle', [HANDLE], BOOL)
