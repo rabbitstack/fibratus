@@ -16,14 +16,17 @@
 from importlib.machinery import SourceFileLoader
 import inspect
 import os
+
+import sys
 from apscheduler.executors.pool import ThreadPoolExecutor
 from apscheduler.schedulers.background import BackgroundScheduler
 from prettytable import PrettyTable
 
+from fibratus.common import IO
 from fibratus.errors import FilamentError
 from fibratus.term import AnsiTerm
 
-FILAMENTS_DIR = os.path.join(os.path.dirname(__file__), '..', 'filaments')
+FILAMENTS_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'filaments')
 
 
 class Filament():
@@ -52,6 +55,9 @@ class Filament():
         self._on_stop = None
 
     def load_filament(self, name):
+        if not os.path.exists(FILAMENTS_DIR):
+            IO.write_console('fibratus run: ERROR - filaments path %s does not exist.' % FILAMENTS_DIR)
+            sys.exit(0)
         [filament_path] = [os.path.join(FILAMENTS_DIR, filament) for filament in os.listdir(FILAMENTS_DIR)
                            if filament.endswith('.py') and name == filament[:-3]] or [None]
         if filament_path:
