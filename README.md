@@ -22,6 +22,7 @@ $ python setup.py build_ext --inplace
 Make sure all  dependencies are satisfied before running Nuitka:
 
 ```
+$ pip install -U nuitka
 $ pip install -r requirements.txt
 $ nuitka --recurse-all --standalone --output-dir=<build-dir> --verbose fibratus\cli.py
 $ cd <build-dir>
