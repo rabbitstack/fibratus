@@ -14,12 +14,16 @@ set kernel event filters or run the lightweight Python modules called **filament
 
 ## Building
 
-Compiling Fibratus from sources requires the [Nuitka](http://nuitka.net/pages/overview.html) Python compiler. Make sure all  dependencies are satisfied before running Nuitka:
+Compiling Fibratus from sources requires the [Nuitka](http://nuitka.net/pages/overview.html) Python compiler. In the first place compile the kernel event stream collecto (it requires **Visual C++ 2012+** and **Cython >=0.23.4**). 
+
+```
+$ python setup.py build_ext --inplace
+```
+Make sure all  dependencies are satisfied before running Nuitka:
 
 ```
 $ pip install -r requirements.txt
-$ cd fibratus
-$ nuitka --recurse-all --standalone --output-dir=<build-dir> --verbose cli.py
+$ nuitka --recurse-all --standalone --output-dir=<build-dir> --verbose fibratus\cli.py
 $ cd <build-dir>
 $ ren cli.exe fibratus.exe
 ```
@@ -134,10 +138,6 @@ def on_next_kevent(kevent):
     render_tabular()
 ```
 The `on_init` method is invoked upon Fibratus initialization just before the kernel event stream is being opened. 
-
-## Compiling kevent collector
-
-Compiling the kernel event collector requires at least **Visual C++ 2012** installed and **Cython >=0.23.4**. To build the Cython extension run `python setup.py build_ext --inplace`.
 
 ## License
 
