@@ -90,7 +90,7 @@ cdef class KEventStreamCollector:
         self.ketypes = {}
         self.kefilters = []
         self.logger = Logger(KEventStreamCollector.__name__)
-        self.file_handler = FileHandler(os.path.join(os.path.abspath(__file__), '..', 'fibratus.log'), mode='w')
+        self.file_handler = FileHandler(os.path.join(os.path.abspath(__file__), '..', '..', 'fibratus.log'), mode='w')
         self.fibratus_pid = os.getpid()
         self.exclude_props = ['process_id', 'parent_id', 'pid', 'ttid']
         self.exclude_tids = []
