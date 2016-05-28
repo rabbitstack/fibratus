@@ -28,6 +28,7 @@ Options:
     --version                 Show version.
 """
 import sys
+import os
 
 from docopt import docopt
 from prettytable import PrettyTable
@@ -39,6 +40,8 @@ from fibratus.kevent import KEvents
 from fibratus.version import VERSION
 from fibratus.fibratus_entrypoint import Fibratus
 from fibratus.filament import Filament
+
+os.environ["PYTHONIOENCODING"] = 'utf-8'
 
 args = docopt(__doc__, version=VERSION)
 
