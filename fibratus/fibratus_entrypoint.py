@@ -45,8 +45,8 @@ class Fibratus():
     def __init__(self, filament):
 
         self.logger = Logger(Fibratus.__name__)
-        self.file_handler = FileHandler(os.path.join(os.path.abspath(__file__), '..', 'fibratus.log'), mode='w+')
-
+        self.file_handler = FileHandler(os.path.join(os.path.abspath(__file__), '..', '..', '..', 'fibratus.log'),
+                                        mode='w+')
         self.kevt_streamc = KEventStreamCollector(etw.KERNEL_LOGGER_NAME.encode())
         self.kcontroller = KTraceController()
         self.ktrace_props = KTraceProps()
