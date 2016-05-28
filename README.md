@@ -14,7 +14,7 @@ set kernel event filters or run the lightweight Python modules called **filament
 
 ## Building
 
-Compiling Fibratus from sources requires the [Nuitka](http://nuitka.net/pages/overview.html) Python compiler. In the first place, compile the kernel event stream collector (it requires **Visual C++ 2012+** and **Cython >=0.23.4**). 
+Compiling Fibratus from sources requires the [Nuitka](http://nuitka.net/pages/overview.html) Python compiler. In the first place, compile the kernel event stream collector (**Visual C++ 2012+** and **Cython >=0.23.4** should be installed). 
 
 ```
 $ python setup.py build_ext --inplace
