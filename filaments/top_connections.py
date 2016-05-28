@@ -22,10 +22,12 @@ import collections
 
 connections = collections.Counter()
 
+
 def on_init():
     set_filter('Send')
     columns(["Port", "IP", "Count"])
     sort_by('Count')
+
 
 def on_next_kevent(kevent):
     connections.update((kevent.params.dport, kevent.params.ip_dst))
