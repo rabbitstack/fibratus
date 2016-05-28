@@ -14,12 +14,17 @@ set kernel event filters or run the lightweight Python modules called **filament
 
 ## Building
 
-Compiling Fibratus from sources requires the [Nuitka](http://nuitka.net/pages/overview.html) Python compiler. Make sure all  dependencies are satisfied before running Nuitka:
+Compiling Fibratus from sources requires the [Nuitka](http://nuitka.net/pages/overview.html) Python compiler. In the first place, compile the kernel event stream collector (**Visual C++ 2012+** and **Cython >=0.23.4** should be installed). 
 
 ```
+$ python setup.py build_ext --inplace
+```
+Make sure all  dependencies are satisfied before running Nuitka:
+
+```
+$ pip install -U nuitka
 $ pip install -r requirements.txt
-$ cd fibratus
-$ nuitka --recurse-all --standalone --output-dir=<build-dir> --verbose cli.py
+$ nuitka --recurse-all --standalone --output-dir=<build-dir> --verbose fibratus\cli.py
 $ cd <build-dir>
 $ ren cli.exe fibratus.exe
 ```
@@ -60,6 +65,7 @@ To capture all of the supported kernel events, execute `fibratus run` command wi
 5641 20:28:17.300000 3 taskmgr.exe (3532) - RegOpenKey (hive=REGISTRY\MACHINE\SYSTEM, key=ControlSet001\Control\Nls\Locale\SOFTWARE\Microsoft\CTF\KnownClasses, pid=3532, status=3221225524, tid=4324)
 5642 20:28:17.302000 2 taskmgr.exe (3532) - UnloadImage (base=0x7fefab90000, checksum=204498, image=xmllite.dll, path=\Windows\System32\xmllite.dll, pid=3532, size=212.0)
 ````
+Hit <kbd>Ctrl</kbd>+<kbd>C</kbd> to stop Fibratus. Note that depending on the system load, you might have to hit <kbd>Ctrl</kbd>+<kbd>C</kbd> **multiple** times until kernel event buffers are consumed.
 
 Every line contains the information of the kernel event according to the following format:
 
@@ -134,10 +140,6 @@ def on_next_kevent(kevent):
     render_tabular()
 ```
 The `on_init` method is invoked upon Fibratus initialization just before the kernel event stream is being opened. 
-
-## Compiling kevent collector
-
-Compiling the kernel event collector requires at least **Visual C++ 2012** installed and **Cython >=0.23.4**. To build the Cython extension run `python setup.py build_ext --inplace`.
 
 ## License
 
