@@ -12,6 +12,9 @@ file system I/O, registry, network activity, DLL loading/unloading and much more
 Fibratus has a very simple CLI which encapsulates the machinery to start the kernel event stream collector, 
 set kernel event filters or run the lightweight Python modules called **filaments**. You can use filaments to extend Fibratus with your own arsenal of tools.
 
+## Installation
+[Download](https://github.com/rabbitstack/fibratus/releases) the latest installer and in a blink of an eye you are ready to go.
+
 ## Building
 
 Compiling Fibratus from sources requires the [Nuitka](http://nuitka.net/pages/overview.html) Python compiler. In the first place, compile the kernel event stream collector (**Visual C++ 2012+** and **Cython >=0.23.4** should be installed). 
