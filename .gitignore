@@ -1,0 +1,15 @@
+/fibratus/__pycache__
+/.cache
+/.idea
+/build
+/kstream/build
+/kstream/*.pyd
+/kstream/*.c
+/tests/.cache
+/tests/__pycache__
+/tests/*/__pycache__
+/tests/*/.cache
+/tests/htmlcov
+/tests/.coverage
+/tests/unit/.coverage
+/tests/*/htmlcov
