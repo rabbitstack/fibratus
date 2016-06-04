@@ -28,7 +28,6 @@ Options:
     --version                 Show version.
 """
 import sys
-import os
 
 from docopt import docopt
 
@@ -41,8 +40,6 @@ from fibratus.version import VERSION
 from fibratus.fibratus_entrypoint import Fibratus
 from fibratus.filament import Filament
 
-
-os.environ["PYTHONIOENCODING"] = 'utf-8'
 
 args = docopt(__doc__, version=VERSION)
 
@@ -112,12 +109,14 @@ if __name__ == '__main__':
             fibratus.run()
         except KeyboardInterrupt:
             set_console_ctrl_handler(handle_ctrl_c, False)
+
     elif args['list-filaments']:
         filaments = Tabular(['Filament', 'Description'], 'Description',
                             sort_by='Filament')
         for filament, desc in Filament.list_filaments().items():
             filaments.add_row([filament, desc])
         filaments.draw()
+
     elif args['list-kevents']:
         kevents = Tabular(['KEvent', 'Category', 'Description'], 'Description',
                           sort_by='Category')
