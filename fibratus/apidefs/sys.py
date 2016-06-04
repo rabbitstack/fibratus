@@ -142,6 +142,9 @@ get_console_cursor_info = declarer.declare(declarer.KERNEL, 'GetConsoleCursorInf
 set_console_cursor_info = declarer.declare(declarer.KERNEL, 'SetConsoleCursorInfo',
                                            [HANDLE, POINTER(CURSOR_INFO)], BOOL)
 
+write_console_unicode = declarer.declare(declarer.KERNEL, 'WriteConsoleW',
+                                         [HANDLE, c_void_p, DWORD, LPDWORD, LPVOID], BOOL)
+
 
 PHANDLER_ROUTINE = WINFUNCTYPE(BOOL, DWORD)
 set_console_ctrl_handler = declarer.declare(declarer.KERNEL, 'SetConsoleCtrlHandler',
