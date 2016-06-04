@@ -31,15 +31,16 @@ import sys
 import os
 
 from docopt import docopt
-from prettytable import PrettyTable
 
 from fibratus.apidefs.sys import set_console_ctrl_handler, PHANDLER_ROUTINE
+from fibratus.asciiart.tabular import Tabular
 from fibratus.common import IO
 from fibratus.errors import FilamentError
 from fibratus.kevent import KEvents
 from fibratus.version import VERSION
 from fibratus.fibratus_entrypoint import Fibratus
 from fibratus.filament import Filament
+
 
 os.environ["PYTHONIOENCODING"] = 'utf-8'
 
@@ -112,18 +113,14 @@ if __name__ == '__main__':
         except KeyboardInterrupt:
             set_console_ctrl_handler(handle_ctrl_c, False)
     elif args['list-filaments']:
-        filaments = Filament.list_filaments()
-        table = PrettyTable(['Filament', 'Description'])
-        table.align['Description'] = 'l'
-        table.sortby = 'Filament'
-        for filament, desc in filaments.items():
-            table.add_row([filament, desc])
-        IO.write_console(table.get_string())
+        filaments = Tabular(['Filament', 'Description'], 'Description',
+                            sort_by='Filament')
+        for filament, desc in Filament.list_filaments().items():
+            filaments.add_row([filament, desc])
+        filaments.draw()
     elif args['list-kevents']:
-        kevent_types = KEvents.meta_info()
-        table = PrettyTable(['KEvent', 'Category', 'Description'])
-        table.align['Description'] = 'l'
-        table.sortby = 'Category'
-        for kevent, meta in kevent_types.items():
-            table.add_row([kevent, meta[0].name, meta[1]])
-        IO.write_console(table.get_string())
+        kevents = Tabular(['KEvent', 'Category', 'Description'], 'Description',
+                          sort_by='Category')
+        for kevent, meta in KEvents.meta_info().items():
+            kevents.add_row([kevent, meta[0].name, meta[1]])
+        kevents.draw()
