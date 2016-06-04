@@ -55,9 +55,7 @@ class Filament():
         self._on_stop = None
 
     def load_filament(self, name):
-        if not os.path.exists(FILAMENTS_DIR):
-            IO.write_console('fibratus run: ERROR - filaments path %s does not exist.' % FILAMENTS_DIR)
-            sys.exit(0)
+        Filament._assert_root_dir()
         [filament_path] = [os.path.join(FILAMENTS_DIR, filament) for filament in os.listdir(FILAMENTS_DIR)
                            if filament.endswith('.py') and name == filament[:-3]] or [None]
         if filament_path:
@@ -175,23 +173,31 @@ class Filament():
 
     @classmethod
     def exists(cls, filament):
+        Filament._assert_root_dir()
         return os.path.exists(os.path.join(FILAMENTS_DIR, '%s.py' % filament))
 
     @classmethod
     def list_filaments(cls):
+        Filament._assert_root_dir()
         filaments = {}
-        for filament in os.listdir(FILAMENTS_DIR):
-            path = os.path.join(FILAMENTS_DIR, filament)
-            if path.endswith('.py'):
-                name = os.path.basename(filament)[:-3]
-                loader = SourceFileLoader(name, path)
-                film = loader.load_module()
-                filaments[name] = inspect.getdoc(film)
+        paths = [os.path.join(FILAMENTS_DIR, path) for path in os.listdir(FILAMENTS_DIR)
+                 if path.endswith('.py')]
+        for path in paths:
+            filament_name = os.path.basename(path)[:-3]
+            loader = SourceFileLoader(filament_name, path)
+            filament = loader.load_module()
+            filaments[filament_name] = inspect.getdoc(filament)
         return filaments
 
     @property
     def filters(self):
         return self._filters
+
+    @classmethod
+    def _assert_root_dir(cls):
+        if not os.path.exists(FILAMENTS_DIR):
+            IO.write_console('fibratus run: ERROR - %s path does not exist.' % FILAMENTS_DIR)
+            sys.exit(0)
 
     def _find_func(self, func_name):
         functions = inspect.getmembers(self._filament, predicate=inspect.isfunction)
