@@ -21,5 +21,6 @@ from fibratus.kevent import KEvent
 def dll_repo():
     return DllRepository(Mock(spec_set=KEvent))
 
+
 class TestDllRepository():
     pass
