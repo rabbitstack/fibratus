@@ -48,7 +48,7 @@ filament_name = args['--filament'] if args['--filament'] else None
 
 
 def _check_kevent(kevent):
-    if not kevent in KEvents.all():
+    if kevent not in KEvents.all():
         IO.write_console('fibratus run: ERROR - %s is not a valid kernel event. Run list-kevents to see'
                          ' the available kernel events' % kevent)
         sys.exit()
