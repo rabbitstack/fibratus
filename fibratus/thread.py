@@ -27,7 +27,7 @@ from fibratus.apidefs.sys import close_handle, malloc, free
 from fibratus.common import DotD as ddict, NA
 
 
-class ThreadRegistry:
+class ThreadRegistry(object):
 
     def __init__(self, handle_repository, handles):
         self._threads = {}
@@ -329,7 +329,7 @@ class ThreadRegistry:
         return info
 
 
-class ThreadInfo:
+class ThreadInfo(object):
     """Represents the state of thread or process.
     """
     def __init__(self, pid, tid, ppid, name, comm, suid):

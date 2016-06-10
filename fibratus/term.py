@@ -37,7 +37,7 @@ DARK_CYAN = DARK_GREEN | DARK_BLUE
 LIGHT_WHITE = GRAY | HIGH_INTENSITY
 
 
-class AnsiTerm():
+class AnsiTerm(object):
     """Terminal's low level interface.
 
     Provides a set of methods to interact

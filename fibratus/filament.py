@@ -29,7 +29,7 @@ from fibratus.term import AnsiTerm
 FILAMENTS_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'filaments')
 
 
-class Filament():
+class Filament(object):
     """Filament initialization and execution engine.
 
     Filaments are lightweight Python modules which run
