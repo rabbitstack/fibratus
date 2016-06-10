@@ -79,38 +79,38 @@ EVENT_CONTROL_CODE_CAPTURE_STATE = 2
 
 class WNODE_HEADER(Structure):
     _fields_ = [('buffer_size', c_ulong),
-              ('provider_id', c_ulong),
-              ('historical_context', c_uint64),
-              ('timestamp', LARGE_INTEGER),
-              ('guid', GUID),
-              ('client_context', c_ulong),
-              ('flags', c_ulong)]
+                ('provider_id', c_ulong),
+                ('historical_context', c_uint64),
+                ('timestamp', LARGE_INTEGER),
+                ('guid', GUID),
+                ('client_context', c_ulong),
+                ('flags', c_ulong)]
 
 
 class EVENT_TRACE_PROPERTIES(Structure):
     _fields_ = [('wnode', WNODE_HEADER),
-              ('buffer_size', c_ulong),
-              ('minimum_buffers', c_ulong),
-              ('maximum_buffers', c_ulong),
-              ('maximum_file_size', c_ulong),
-              ('log_file_mode', c_ulong),
-              ('flush_timer', c_ulong),
-              ('enable_flags', c_ulong),
-              ('age_limit', c_long),
-              ('number_of_buffers', c_ulong),
-              ('free_buffers', c_ulong),
-              ('events_lost', c_ulong),
-              ('buffers_written', c_ulong),
-              ('log_buffers_lost', c_ulong),
-              ('real_time_buffer_lost', c_ulong),
-              ('logger_thread_id', HANDLE),
-              ('log_file_name_offset', c_ulong),
-              ('logger_name_offset', c_ulong)]
+                ('buffer_size', c_ulong),
+                ('minimum_buffers', c_ulong),
+                ('maximum_buffers', c_ulong),
+                ('maximum_file_size', c_ulong),
+                ('log_file_mode', c_ulong),
+                ('flush_timer', c_ulong),
+                ('enable_flags', c_ulong),
+                ('age_limit', c_long),
+                ('number_of_buffers', c_ulong),
+                ('free_buffers', c_ulong),
+                ('events_lost', c_ulong),
+                ('buffers_written', c_ulong),
+                ('log_buffers_lost', c_ulong),
+                ('real_time_buffer_lost', c_ulong),
+                ('logger_thread_id', HANDLE),
+                ('log_file_name_offset', c_ulong),
+                ('logger_name_offset', c_ulong)]
 
 
 class TRACE_GUID_REGISTRATION(Structure):
     _fields_ = [('guid', POINTER(GUID)),
-               ('reg_handle', HANDLE)]
+                ('reg_handle', HANDLE)]
 
 
 class EVENT_FILTER_DESCRIPTOR(Structure):
