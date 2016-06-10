@@ -78,7 +78,7 @@ EVENT_CONTROL_CODE_CAPTURE_STATE = 2
 
 
 class WNODE_HEADER(Structure):
-  _fields_ = [('buffer_size', c_ulong),
+    _fields_ = [('buffer_size', c_ulong),
               ('provider_id', c_ulong),
               ('historical_context', c_uint64),
               ('timestamp', LARGE_INTEGER),
@@ -88,7 +88,7 @@ class WNODE_HEADER(Structure):
 
 
 class EVENT_TRACE_PROPERTIES(Structure):
-  _fields_ = [('wnode', WNODE_HEADER),
+    _fields_ = [('wnode', WNODE_HEADER),
               ('buffer_size', c_ulong),
               ('minimum_buffers', c_ulong),
               ('maximum_buffers', c_ulong),
@@ -109,7 +109,7 @@ class EVENT_TRACE_PROPERTIES(Structure):
 
 
 class TRACE_GUID_REGISTRATION(Structure):
-  _fields_ = [('guid', POINTER(GUID)),
+    _fields_ = [('guid', POINTER(GUID)),
                ('reg_handle', HANDLE)]
 
 
