@@ -123,19 +123,19 @@ class Fibratus(object):
             # of the trace. If the user doesn't include them
             # in a filter list, then we do the job but set the
             # kernel event type as not eligible for rendering
-            if not KEvents.CREATE_PROCESS in kevent_filters:
+            if KEvents.CREATE_PROCESS not in kevent_filters:
                 self.kevt_streamc.add_kevent_filter(CREATE_PROCESS)
                 self.requires_render[CREATE_PROCESS] = False
             else:
                 self.requires_render[CREATE_PROCESS] = True
 
-            if not KEvents.CREATE_THREAD in kevent_filters:
+            if KEvents.CREATE_THREAD not in kevent_filters:
                 self.kevt_streamc.add_kevent_filter(CREATE_THREAD)
                 self.requires_render[CREATE_THREAD] = False
             else:
                 self.requires_render[CREATE_THREAD] = True
 
-            if not KEvents.CREATE_FILE in kevent_filters:
+            if KEvents.CREATE_FILE not in kevent_filters:
                 self.kevt_streamc.add_kevent_filter(CREATE_FILE)
                 self.requires_render[CREATE_FILE] = False
             else:
@@ -146,11 +146,11 @@ class Fibratus(object):
                 if isinstance(ktuple, list):
                     for kt in ktuple:
                         self.kevt_streamc.add_kevent_filter(kt)
-                        if not kt in self.requires_render:
+                        if kt not in self.requires_render:
                             self.requires_render[kt] = True
                 else:
                     self.kevt_streamc.add_kevent_filter(ktuple)
-                    if not ktuple in self.requires_render:
+                    if ktuple not in self.requires_render:
                         self.requires_render[ktuple] = True
 
     def _on_next_kevent(self, ktype, cpuid, ts, kparams):
