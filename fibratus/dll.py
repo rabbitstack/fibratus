@@ -16,7 +16,7 @@
 import os
 
 
-class DllRepository():
+class DllRepository(object):
 
     def __init__(self, kevent):
         self.dlls = {}
@@ -103,7 +103,7 @@ class DllRepository():
         return self.dlls[pid] if pid in self.dlls else []
 
 
-class Dll():
+class Dll(object):
 
     def __init__(self, pid, path, image, size, checksum, base):
         self._pid = pid
