@@ -23,7 +23,7 @@ from fibratus.apidefs.registry import *
 from fibratus.apidefs.sys import malloc, free
 
 
-class HiveParser():
+class HiveParser(object):
 
     def __init__(self, kevent, thread_registry):
         self._kcblocks = {}
@@ -265,7 +265,7 @@ class HiveParser():
             return None
 
 
-class Kcb():
+class Kcb(object):
     """The container for the Key Control Block data.
     """
     def __init__(self, handle, key, index,

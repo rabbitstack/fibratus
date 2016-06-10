@@ -53,7 +53,7 @@ class FileType(Enum):
     UNKNOWN = 3
 
 
-class FsIO():
+class FsIO(object):
 
     def __init__(self, kevent, handles):
         self._kevent = kevent

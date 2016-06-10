@@ -11099,11 +11099,13 @@ _IANA_PORTS_UDP = {
     48619: "iqobject",
     48653: "robotraconteur"}
 
+
 def port_to_proto(port, l4_proto):
     if 'TCP' in l4_proto:
         return _IANA_PORTS_TCP[port] if port in _IANA_PORTS_TCP else NA
     else:
         return _IANA_PORTS_UDP[port] if port in _IANA_PORTS_UDP else NA
+
 
 class IpVer(Enum):
 
@@ -11111,7 +11113,7 @@ class IpVer(Enum):
     IPV6 = 1
 
 
-class TcpIpParser():
+class TcpIpParser(object):
 
     def __init__(self, kevent):
         """TCP/IP kernel event parser.

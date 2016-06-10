@@ -25,7 +25,7 @@ from fibratus.common import IO
 from fibratus.errors import FibratusError
 
 
-class KTraceProps():
+class KTraceProps(object):
 
     def __init__(self, buffer_size=1024):
         """Builds the tracing session properties.
@@ -91,7 +91,7 @@ class KTraceProps():
         memmove(logger,  c_wchar_p(logger_name), sizeof(c_wchar) * name_len)
 
 
-class KTraceController():
+class KTraceController(object):
     """Controls the life cycle of the kernel traces.
 
     """

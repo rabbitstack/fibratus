@@ -38,7 +38,7 @@ class Category(Enum):
     OTHER = 10
 
 
-class KEvents():
+class KEvents(object):
     """Available kernel event names.
     """
     CREATE_PROCESS = 'CreateProcess'
@@ -141,7 +141,7 @@ class KEvents():
 __kevents__ = KEvents.meta_info()
 
 
-class KEvent():
+class KEvent(object):
 
     def __init__(self, thread_registry):
         self._id = 0

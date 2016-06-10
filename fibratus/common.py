@@ -51,7 +51,7 @@ class DotD(dict):
     __setitem__ = __setattr__
 
 
-class IO():
+class IO(object):
 
     _stdout_handle = get_std_handle(STD_OUTPUT_HANDLE)
     assert _stdout_handle, 'could not acquire the standard output stream handle'

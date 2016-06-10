@@ -32,7 +32,7 @@ from fibratus.tcpip import TcpIpParser
 from fibratus.thread import ThreadRegistry
 
 
-class Fibratus():
+class Fibratus(object):
 
     """Fibratus entrypoint.
 
