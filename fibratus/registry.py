@@ -116,8 +116,8 @@ class HiveParser(object):
                 # to find the key name
                 thread = self.thread_registry.get_thread(pid)
                 if thread:
-                    key_handles = [kh for kh in thread.handles if not kh.handle_type is None
-                                   and kh.handle_type == HandleType.KEY]
+                    key_handles = [kh for kh in thread.handles if kh.handle_type is not None and
+                                   kh.handle_type == HandleType.KEY]
                     for khandle in key_handles:
                         if ketype in [REG_CREATE_KEY,
                                       REG_DELETE_KEY,
