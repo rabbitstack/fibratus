@@ -169,7 +169,7 @@ class FsIO(object):
             params = dict(file=file,
                           tid=tid)
             self._kevent.params = params
-            if not NA in file:
+            if NA not in file:
                 self.file_pool[obj] = file
 
     def _query_file_name(self, fobj, remove=False):

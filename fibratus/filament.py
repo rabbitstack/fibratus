@@ -100,7 +100,7 @@ class Filament(object):
             def sort_by(col, sort_desc=True):
                 if len(self._cols) == 0:
                     raise FilamentError('Expected at least 1 column but 0 found')
-                if not col in self._cols:
+                if col not in self._cols:
                     raise FilamentError('%s column does not exist' % col)
                 self._sort_by = col
                 self._sort_desc = sort_desc
