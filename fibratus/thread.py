@@ -387,7 +387,7 @@ class ThreadInfo(object):
         head, _ = os.path.split(comm[0:comm.rfind('exe')])
         self._exe = '%s\%s' % (head, name)
 
-        self._name = name.lower() if not NA in name else NA
+        self._name = name.lower() if NA not in name else NA
         self._comm = comm
         # the command line arguments
         # are separated by blank space
