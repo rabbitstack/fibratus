@@ -16,10 +16,6 @@
 from fibratus.errors import UnknownKeventTypeError
 from fibratus.kevent import KEvents
 
-"""
-Kernel event types as determined by the GUID/opcode tuple
-which is forwarded from the kernel event stream collector.
-"""
 
 # start process event
 CREATE_PROCESS = ('3d6fa8d0-fe05-11d0-9dda-00c04fd7ba7c', 1)
