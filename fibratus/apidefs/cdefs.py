@@ -18,12 +18,6 @@ from ctypes import c_void_p, c_ubyte, c_ushort, c_ulong, c_size_t, c_wchar_p
 import re
 import ctypes
 
-"""
-This module contains the common API
-declarations that can be reused accross
-modules.
-"""
-
 # undefined ctypes wintypes
 LPVOID = c_void_p
 PVOID = c_void_p
