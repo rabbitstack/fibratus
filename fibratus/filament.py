@@ -26,7 +26,7 @@ from fibratus.common import IO
 from fibratus.errors import FilamentError
 from fibratus.term import AnsiTerm
 
-FILAMENTS_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'filaments')
+FILAMENTS_DIR = os.getenv('FILAMENTS_PATH', os.path.join(os.path.dirname(__file__), '..', '..', 'filaments'))
 
 
 class Filament(object):
