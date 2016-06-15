@@ -247,8 +247,13 @@ class Fibratus(object):
             # to process the next
             # kernel event from the stream
             if ktype not in [ENUM_PROCESS,
-                             ENUM_THREAD, ENUM_IMAGE]:
-                if self.kevent.name:
+                             ENUM_THREAD,
+                             ENUM_IMAGE,
+                             REG_CREATE_KCB,
+                             REG_DELETE_KCB]:
+                rr = self.requires_render[ktype] if ktype in self.requires_render \
+                    else False
+                if self.kevent.name and rr:
                     self._filament.process(self.kevent)
 
     def _render(self, ktype):
