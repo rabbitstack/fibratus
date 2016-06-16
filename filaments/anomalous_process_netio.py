@@ -20,11 +20,11 @@ the incoming connection.
 """
 
 from filaments.support.alarm import SmtpAlarm
-
-processes = ['notepad.exe', 'calc.exe', 'mspaint.exe']
-activations = []
-
 smtp_alarm = SmtpAlarm('smtp.live.com', port=587)
+
+activations = []
+processes = ['notepad.exe', 'calc.exe', 'mspaint.exe']
+
 from_addr = 'from@domain.com'
 to_addrs = ['to@domain.com']
 
