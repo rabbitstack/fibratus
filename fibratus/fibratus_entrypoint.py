@@ -74,7 +74,7 @@ class Fibratus(object):
         self.tcpip_parser = TcpIpParser(self.kevent)
         self.dll_repository = DllRepository(self.kevent)
 
-        self.requires_render = {}
+        self.output_kevents = {}
         self.filters_count = 0
 
     def run(self):
@@ -125,33 +125,33 @@ class Fibratus(object):
             # kernel event type as not eligible for rendering
             if KEvents.CREATE_PROCESS not in kevent_filters:
                 self.kevt_streamc.add_kevent_filter(CREATE_PROCESS)
-                self.requires_render[CREATE_PROCESS] = False
+                self.output_kevents[CREATE_PROCESS] = False
             else:
-                self.requires_render[CREATE_PROCESS] = True
+                self.output_kevents[CREATE_PROCESS] = True
 
             if KEvents.CREATE_THREAD not in kevent_filters:
                 self.kevt_streamc.add_kevent_filter(CREATE_THREAD)
-                self.requires_render[CREATE_THREAD] = False
+                self.output_kevents[CREATE_THREAD] = False
             else:
-                self.requires_render[CREATE_THREAD] = True
+                self.output_kevents[CREATE_THREAD] = True
 
             if KEvents.CREATE_FILE not in kevent_filters:
                 self.kevt_streamc.add_kevent_filter(CREATE_FILE)
-                self.requires_render[CREATE_FILE] = False
+                self.output_kevents[CREATE_FILE] = False
             else:
-                self.requires_render[CREATE_FILE] = True
+                self.output_kevents[CREATE_FILE] = True
 
             for kevent_filter in kevent_filters:
                 ktuple = kname_to_tuple(kevent_filter)
                 if isinstance(ktuple, list):
                     for kt in ktuple:
                         self.kevt_streamc.add_kevent_filter(kt)
-                        if kt not in self.requires_render:
-                            self.requires_render[kt] = True
+                        if kt not in self.output_kevents:
+                            self.output_kevents[kt] = True
                 else:
                     self.kevt_streamc.add_kevent_filter(ktuple)
-                    if ktuple not in self.requires_render:
-                        self.requires_render[ktuple] = True
+                    if ktuple not in self.output_kevents:
+                        self.output_kevents[ktuple] = True
 
     def _on_next_kevent(self, ktype, cpuid, ts, kparams):
         """Callback which fires when new kernel event arrives.
@@ -251,9 +251,9 @@ class Fibratus(object):
                              ENUM_IMAGE,
                              REG_CREATE_KCB,
                              REG_DELETE_KCB]:
-                rr = self.requires_render[ktype] if ktype in self.requires_render \
+                ok = self.output_kevents[ktype] if ktype in self.output_kevents \
                     else False
-                if self.kevent.name and rr:
+                if self.kevent.name and ok:
                     self._filament.process(self.kevent)
 
     def _render(self, ktype):
@@ -266,9 +266,8 @@ class Fibratus(object):
             Identifier of the kernel event
         """
         if not self._filament:
-            if ktype in self.requires_render:
-                rr = self.requires_render[ktype]
-                if rr:
+            if ktype in self.output_kevents:
+                if self.output_kevents[ktype]:
                     self.kevent.render()
             elif self.filters_count == 0:
                 self.kevent.render()
