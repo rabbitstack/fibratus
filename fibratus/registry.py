@@ -180,12 +180,9 @@ class HiveParser(object):
                                                tid=tid,
                                                pid=pid)
                 else:
-                    self._kevent.params = dict(hive=hive, key=key,
-                                               value_type=NA,
-                                               value=NA,
-                                               status=status,
-                                               tid=tid,
-                                               pid=pid)
+                    self._kevent.params = dict(hive=hive, key=key, value_type=NA,
+                                               value=NA, status=status,
+                                               tid=tid, pid=pid)
 
             else:
                 self._kevent.params = dict(hive=hive, key=key,
