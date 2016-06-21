@@ -2,11 +2,6 @@ environment:
 
   MSVS_VERSION: 2015
 
-  COVERALLS_REPO_TOKEN:
-    secure: YbzGEHbZG/jMLNzgHxNZ3MpU2QTnrjTY4noj1tCZtBaU1Ea1O+N4GwzI/C4Xpos3
-
-  CODECOV_TOKEN: 535129b8-2051-4f29-a691-1d7de8048d5f
-
   matrix:
     - PYTHON: "C:\\Python35-x64"
       DISTUTILS_USE_SDK: "1"
@@ -33,5 +28,4 @@ artifacts:
   - path: dist\*
 
 on_success:
-  - "coveralls"
   - "codecov"
