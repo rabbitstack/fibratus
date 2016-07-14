@@ -144,6 +144,14 @@ def on_next_kevent(kevent):
 ```
 The `on_init` method is invoked upon Fibratus initialization just before the kernel event stream is being opened. 
 
+## Contributing
+
+Please use Github's pull-request model to submit your contributions. You should consider these facts:
+
+* the code has to be in harmony with the **Zen Of Python** principles
+* you need to test the code (fibratus uses the `pytest` unit testing framework)
+* make sure your code satisfy the **PEP** coding style
+
 ## License
 
 Copyright 2015/2016 by Nedim Sabic (RabbitStack) 
