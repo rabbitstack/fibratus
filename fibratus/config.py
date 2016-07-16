@@ -35,7 +35,8 @@ class YamlConfig(object):
 
     @property
     def output_adapters(self):
-        return self._yaml['output'].pop('adapters', None)
+        adapters = self._yaml['output']
+        return adapters['adapters'] if adapters else None
 
     @property
     def yaml(self):
