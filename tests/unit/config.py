@@ -37,6 +37,7 @@ class TestYamlConfig():
         config = YamlConfig()
         adapter_names = ['amqp']
         output_adapters = config.output_adapters
-        for output_adapter in output_adapters:
-            adapter_name = next(iter(list(output_adapter.keys())), None)
-            assert adapter_name in adapter_names
+        if output_adapters:
+            for output_adapter in output_adapters:
+                adapter_name = next(iter(list(output_adapter.keys())), None)
+                assert adapter_name in adapter_names
