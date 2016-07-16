@@ -151,3 +151,7 @@ set_console_ctrl_handler = declarer.declare(declarer.KERNEL, 'SetConsoleCtrlHand
                                             [PHANDLER_ROUTINE, BOOL], BOOL)
 
 
+# event objects
+create_event = declarer.declare(declarer.KERNEL, 'CreateEventW', [c_void_p, BOOL, BOOL, LPTSTR], HANDLE)
+
+
