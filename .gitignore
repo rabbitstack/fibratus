@@ -1,5 +1,7 @@
 /fibratus/__pycache__
 /.cache
+.coverage
+coverage.xml
 /.idea
 /build
 /kstream/build
