@@ -44,7 +44,7 @@ class HandleType(Enum):
     JOB = 11
 
 
-class HandleRepository():
+class HandleRepository(object):
     """Stores open handle objects.
     """
 
@@ -182,6 +182,9 @@ class HandleRepository():
         free(buff)
 
         return handles
+
+    def _async_query_object(self):
+        pass
 
     def _query_handle(self, handle, klass, object_info_type):
         """Gets the object handle info.
