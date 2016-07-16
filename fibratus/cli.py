@@ -16,7 +16,7 @@
 
 """
 Usage:
-    fibratus run ([--filament=<filament>] | [--filters <kevents>...])
+    fibratus run ([--filament=<filament>] | [--filters <kevents>...]) [--no-enum-handles]
     fibratus list-kevents
     fibratus list-filaments
     fibratus -h | --help
@@ -25,6 +25,7 @@ Usage:
 Options:
     -h --help                 Show this screen.
     --filament=<filament>     Specify the filament to execute.
+    --no-enum-handles         Avoids enumerating the system handles.
     --version                 Show version.
 """
 import sys
@@ -35,11 +36,10 @@ from fibratus.apidefs.sys import set_console_ctrl_handler, PHANDLER_ROUTINE
 from fibratus.asciiart.tabular import Tabular
 from fibratus.common import IO
 from fibratus.errors import FilamentError
-from fibratus.kevent import KEvents
-from fibratus.version import VERSION
 from fibratus.fibratus_entrypoint import Fibratus
 from fibratus.filament import Filament
-
+from fibratus.kevent import KEvents
+from fibratus.version import VERSION
 
 args = docopt(__doc__, version=VERSION)
 
@@ -59,14 +59,15 @@ if __name__ == '__main__':
             for kfilter in kevent_filters:
                 _check_kevent(kfilter)
 
+        enum_handles = False if args['--no-enum-handles'] else True
         filament = None
         filament_filters = []
         if not filament_name:
             IO.write_console('Starting fibratus...', False)
         else:
             if not Filament.exists(filament_name):
-                IO.write_console('fibratus run: ERROR - %s filament does not exist. Run list-filaments to see'
-                                 ' the availble filaments' % filament_name)
+                IO.write_console('fibratus run: ERROR - %s filament does not exist. Run list-filaments to see '
+                                 'the availble filaments' % filament_name)
                 sys.exit()
             filament = Filament()
             try:
@@ -75,16 +76,17 @@ if __name__ == '__main__':
                 IO.write_console('fibratus run: ERROR - %s' % e)
                 sys.exit()
 
-            filament.initialize_filament()
             filament_filters = filament.filters
 
             if len(filament_filters) > 0:
                 for kfilter in filament_filters:
                     _check_kevent(kfilter)
+
             filament.render_tabular()
 
+
         try:
-            fibratus = Fibratus(filament)
+            fibratus = Fibratus(filament, enum_handles=enum_handles)
         except KeyboardInterrupt:
             # the user has stopped command execution
             # before opening the kernel event stream
