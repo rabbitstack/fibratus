@@ -15,6 +15,10 @@
 from unittest.mock import patch
 from fibratus.config import YamlConfig
 
+import os
+
+__CONFIG_PATH__ = os.path.join(os.path.dirname(__file__), '..', 'fixtures', 'fibratus.yml')
+
 
 class TestYamlConfig():
 
@@ -28,14 +32,14 @@ class TestYamlConfig():
             sys_exit.assert_called_once()
 
     def test_output_adapters(self):
-        config = YamlConfig()
+        config = YamlConfig(__CONFIG_PATH__)
         assert config.output_adapters
         assert isinstance(config.output_adapters, list)
         assert len(config.output_adapters) > 0
 
     def test_enum_output_adapters(self):
         config = YamlConfig()
-        adapter_names = ['amqp']
+        adapter_names = ['amqp', 'smtp']
         output_adapters = config.output_adapters
         if output_adapters:
             for output_adapter in output_adapters:
