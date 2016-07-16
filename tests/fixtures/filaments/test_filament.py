@@ -25,3 +25,8 @@ def on_init():
 
 def on_next_kevent(kevent):
     pass
+
+
+def on_stop():
+    pass
+
