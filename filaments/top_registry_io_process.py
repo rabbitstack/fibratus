@@ -1,4 +1,4 @@
-# Copyright 2015/2016 by Nedim Sabic (RabbitStack)
+# Copyright 2016 by Nedim Sabic (RabbitStack)
 # All Rights Reserved.
 # http://rabbitstack.github.io
 
@@ -15,23 +15,28 @@
 # under the License.
 
 """
-Monitors the files created by processes
+Shows top processes by registry I/O activity.
 """
 
-files = []
+import collections
+
+processes_registry_io = collections.Counter()
 
 
 def on_init():
-    set_filter('CreateFile')
-    columns(["Process", "File"])
+    set_filter('RegOpenKey', 'RegQueryKey', 'RegCreateKey', 'RegQueryValue', 'RegSetValue', 'RegDeleteValue')
+    columns(["Process", "#Ops"])
+    sort_by('#Ops')
+    set_interval(1)
+    limit(20)
 
 
 def on_next_kevent(kevent):
-    if kevent.params.operation == 'CREATE' \
-            and kevent.params.file_type == 'FILE':
-        files.append((kevent.thread.name, kevent.params.file, ))
-        for f in files:
-            add_row([f[0], f[1]])
-        render_tabular()
+    process = ['%s (%d)' % (kevent.thread.name, kevent.thread.pid)]
+    processes_registry_io.update(process)
 
 
+def on_interval():
+    for process, io in processes_registry_io.items():
+        add_row([process, io])
+    render_tabular()

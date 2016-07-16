@@ -19,17 +19,12 @@ Triggers when a process creates the registry value which
 would enable it to execute on system startup.
 """
 
-from filaments.support.alarm import SmtpAlarm
-smtp_alarm = SmtpAlarm('smtp.live.com', port=587)
 
 keys = ['Run', 'RunOnce', 'RunServices', 'RunServicesOnce', 'Userinit']
 
-from_addr = 'from@domain.com'
-to_addrs = ['to@domain.com']
-
 
 def on_init():
-    set_filter('RegSetValue')
+    set_filter('CreateProcess')
 
 
 def on_next_kevent(kevent):
@@ -37,13 +32,10 @@ def on_next_kevent(kevent):
         process_name = kevent.thread.name
         key = kevent.params.key
         if key in keys:
-            # compose the message
             message = 'The process %s has created a ' \
                       'persistent registry value , ' \
                       'under %s with content %s' \
                        % (process_name,
                           '%s/%s' % (kevent.params.hive, key),
                           kevent.params.value)
-            # send the alarm via smtp transport
-            smtp_alarm.emit('Registry persistence detected',
-                            message, from_addr=from_addr, to_addrs=to_addrs)
+            smtp.emit(message, subject='Registry persistence detected')

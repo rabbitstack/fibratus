@@ -1,4 +1,4 @@
-# Copyright 2015/2016 by Nedim Sabic (RabbitStack)
+# Copyright 2016 by Nedim Sabic (RabbitStack)
 # All Rights Reserved.
 # http://rabbitstack.github.io
 
@@ -15,23 +15,28 @@
 # under the License.
 
 """
-Monitors the files created by processes
+Shows top registry hives by I/O activity.
 """
 
-files = []
+import collections
+
+hives = collections.Counter()
 
 
 def on_init():
-    set_filter('CreateFile')
-    columns(["Process", "File"])
+    set_filter('RegOpenKey', 'RegQueryKey', 'RegCreateKey')
+    columns(["Hive", "#Ops"])
+    sort_by('#Ops')
+    set_interval(1)
 
 
 def on_next_kevent(kevent):
-    if kevent.params.operation == 'CREATE' \
-            and kevent.params.file_type == 'FILE':
-        files.append((kevent.thread.name, kevent.params.file, ))
-        for f in files:
-            add_row([f[0], f[1]])
-        render_tabular()
+    if '<NA>' not in kevent.params.hive:
+        hive = (kevent.params.hive, )
+        hives.update(hive)
 
 
+def on_interval():
+    for hive, count in hives.items():
+        add_row([hive, count])
+    render_tabular()

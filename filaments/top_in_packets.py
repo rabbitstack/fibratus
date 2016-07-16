@@ -1,4 +1,4 @@
-# Copyright 2015/2016 by Nedim Sabic (RabbitStack)
+# Copyright 2016 by Nedim Sabic (RabbitStack)
 # All Rights Reserved.
 # http://rabbitstack.github.io
 
@@ -15,23 +15,29 @@
 # under the License.
 
 """
-Monitors the files created by processes
+Shows the top TCP / UDP incoming packets.
 """
 
-files = []
+import collections
+
+connections = collections.Counter()
 
 
 def on_init():
-    set_filter('CreateFile')
-    columns(["Process", "File"])
+    set_filter('Recv')
+    columns(["Source", "Count"])
+    sort_by('Count')
+    set_interval(1)
+    title('Top incoming TCP/UDP packets')
 
 
 def on_next_kevent(kevent):
-    if kevent.params.operation == 'CREATE' \
-            and kevent.params.file_type == 'FILE':
-        files.append((kevent.thread.name, kevent.params.file, ))
-        for f in files:
-            add_row([f[0], f[1]])
-        render_tabular()
+    src = ['%s:%d' % (kevent.params.ip_dst, kevent.params.dport)]
+    connections.update(src)
 
+
+def on_interval():
+    for ip, count in connections.items():
+        add_row([ip, count])
+    render_tabular()
 

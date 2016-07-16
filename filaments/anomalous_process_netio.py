@@ -19,14 +19,8 @@ An unusual process attempts to make a network request or it accepts
 the incoming connection.
 """
 
-from filaments.support.alarm import SmtpAlarm
-smtp_alarm = SmtpAlarm('smtp.live.com', port=587)
-
 activations = []
 processes = ['notepad.exe', 'calc.exe', 'mspaint.exe']
-
-from_addr = 'from@domain.com'
-to_addrs = ['to@domain.com']
 
 
 def on_init():
@@ -39,7 +33,6 @@ def on_next_kevent(kevent):
         if process_name in processes:
             triggered = True if process_name in activations else False
             if not triggered:
-                # compose the message
                 message = 'Unusual network activity of kind %s ' \
                           'detected from %s process. ' \
                           'The source ip address is %s and ' \
@@ -47,7 +40,5 @@ def on_next_kevent(kevent):
                            % (kevent.name, process_name,
                               kevent.params.ip_src,
                               kevent.params.ip_dst)
-                # send the alarm via smtp transport
-                smtp_alarm.emit('Anomalous network activity detected',
-                                message, from_addr=from_addr, to_addrs=to_addrs)
+                smtp.emit(message, subject='Anomalous network activity detected')
                 activations.append(process_name)
