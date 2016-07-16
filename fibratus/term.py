@@ -14,12 +14,13 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 from _ctypes import byref
+from ctypes import c_ulong
 
 from fibratus.apidefs.sys import CONSOLE_SCREEN_BUFFER_INFO, INVALID_HANDLE_VALUE, get_std_handle, STD_OUTPUT_HANDLE, \
     create_console_screen_buffer, GENERIC_READ, GENERIC_WRITE, FILE_SHARE_READ, FILE_SHARE_WRITE, \
     CONSOLE_TEXTMODE_BUFFER, get_console_screen_buffer_info, COORD, SMALL_RECT, CHAR_INFO, \
     set_console_active_screen_buffer, write_console_output, CURSOR_INFO, get_console_cursor_info, \
-    set_console_cursor_info
+    set_console_cursor_info, write_console_unicode
 from fibratus.errors import TermInitializationError
 
 
@@ -41,97 +42,152 @@ class AnsiTerm(object):
     """Terminal's low level interface.
 
     Provides a set of methods to interact
-    with the Windows terminals.
+    with the Windows terminals. By writing the chars
+    directly to the screen buffer can prevent the
+    annoying screen flickering.
     """
 
     def __init__(self):
-        self.backbuffer_info = CONSOLE_SCREEN_BUFFER_INFO()
-        self.cursor_info = CURSOR_INFO()
-        self.cols = 0
-        self.rows = 0
-        self.console_handle = INVALID_HANDLE_VALUE
-        self.backbuffer_handle = INVALID_HANDLE_VALUE
-        self.rect = None
-        self.char_buffer = None
-        self.coord = COORD(0, 0)
-        self.size = COORD(0, 0)
+        """Creates a new instance of the terminal.
+        """
+        self._cursor_info = CURSOR_INFO()
+        self._console = INVALID_HANDLE_VALUE
+        self._framebuffer = INVALID_HANDLE_VALUE
+        self._char_buffer = None
+        self._cols = 0
+        self._rows = 0
+        self._rect = None
+        self._coord = COORD(0, 0)
+        self._size = COORD(0, 0)
+        self._term_ready = False
 
-    def init_console(self):
-        self.console_handle = get_std_handle(STD_OUTPUT_HANDLE)
-        if self.console_handle == INVALID_HANDLE_VALUE:
+    def setup_console(self):
+        """Initializes the screen frame buffer.
+
+        Swaps the current screen buffer with a
+        brand new created back buffer where the
+        characters can be written to the flicker-free
+        rectangular region.
+
+        """
+        self._console = get_std_handle(STD_OUTPUT_HANDLE)
+        # could not get the standard
+        # console handle, raise an exception
+        if self._console == INVALID_HANDLE_VALUE:
             raise TermInitializationError()
 
-        get_console_screen_buffer_info(self.console_handle, byref(self.backbuffer_info))
-        get_console_cursor_info(self.console_handle, byref(self.cursor_info))
-        self._show_cursor(False)
+        buffer_info = CONSOLE_SCREEN_BUFFER_INFO()
+        get_console_screen_buffer_info(self._console, byref(buffer_info))
+        get_console_cursor_info(self._console, byref(self._cursor_info))
+        self._cursor_info.visible = False
 
-        self.cols = self.backbuffer_info.size.x
-        self.rows = self.backbuffer_info.size.y
-        self.size = COORD(self.cols, self.rows)
-        self.rect = SMALL_RECT(0, 0, self.cols - 1, self.rows - 1)
-
-        self.char_buffer = (CHAR_INFO * (self.size.x * self.size.y))()
-
-        self.backbuffer_handle = create_console_screen_buffer(GENERIC_READ | GENERIC_WRITE,
-                                                              FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                                              None,
-                                                              CONSOLE_TEXTMODE_BUFFER,
-                                                              None)
-        if self.backbuffer_handle == INVALID_HANDLE_VALUE:
+        self._cols = buffer_info.size.x
+        self._rows = buffer_info.size.y
+        self._size = COORD(self._cols, self._rows)
+        self._rect = SMALL_RECT(0, 0, self._cols - 1, self._rows - 1)
+        self._char_buffer = (CHAR_INFO * (self._size.x * self._size.y))()
+        self._framebuffer = create_console_screen_buffer(GENERIC_READ | GENERIC_WRITE,
+                                                         FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                                         None,
+                                                         CONSOLE_TEXTMODE_BUFFER,
+                                                         None)
+        if self._framebuffer == INVALID_HANDLE_VALUE:
             raise TermInitializationError()
-        set_console_active_screen_buffer(self.backbuffer_handle)
+        # hide the cursor and swap
+        # the console active screen buffer
+        set_console_cursor_info(self._framebuffer, byref(self._cursor_info))
+        set_console_active_screen_buffer(self._framebuffer)
+
+        self._term_ready = True
 
     def restore_console(self):
-        if self.console_handle:
-            self._show_cursor(True)
-            set_console_active_screen_buffer(self.console_handle)
+        if self._console:
+            set_console_active_screen_buffer(self._console)
+            self._cursor_info.visible = True
+            self._term_ready = False
+            set_console_cursor_info(self._console,
+                                    byref(self._cursor_info))
 
-    def write(self, char_seq):
+    def write_output(self, charseq, color=LIGHT_WHITE):
+        """Writes character and color attribute data to the frame buffer.
+
+        The data to be written is taken from a correspondingly sized rectangular
+        block at a specified location in the source buffer.
+
+        Parameters
+        ----------
+
+        charseq: str
+            the sequence of characters to be written on the frame buffer
+
+        color: int
+            the terminal output color
+        """
         col = 0
-        index = 0
-        line_feed = False
+        x = 0
+        crlf = False
 
-        for char in char_seq:
+        for char in charseq:
             if char == '\n':
-                line_feed = True
+                crlf = True
             col += 1
-            if col == self.cols:
+            # the last column has been reached.
+            # If there was a carriage return
+            # then stop the iteration
+            if col == self._cols:
                 col = 0
-                if line_feed:
-                    line_feed = False
+                if crlf:
+                    crlf = False
                     continue
 
-            if line_feed:
-                line_feed = False
-                blank_index = col
-                while blank_index <= self.cols:
-                    self.char_buffer[blank_index - 1].char.unicode_char = ' '
-                    blank_index += 1
-                    index += 1
+            if crlf:
+                crlf = False
+                space = col
+                # keep filling the rectangle with spaces
+                # until we reach the last column
+                while space <= self._cols:
+                    self._char_buffer[space - 1].char.unicode_char = ' '
+                    space += 1
+                    x += 1
+                # reset the column and
+                # stop the current iteration
                 col = 0
                 continue
+            self._char_buffer[x].char.unicode_char = char
+            self._char_buffer[x].attributes = color
 
-            self.char_buffer[index].char.unicode_char = char
-            self.char_buffer[index].attributes = LIGHT_WHITE
-            index += 1
+            x += 1
+        # write the character attribute data
+        # to the screen buffer
+        write_console_output(self._framebuffer,
+                             self._char_buffer,
+                             self._size,
+                             self._coord,
+                             byref(self._rect))
 
-        write_console_output(self.backbuffer_handle,
-                             self.char_buffer,
-                             self.size,
-                             self.coord,
-                             byref(self.rect))
+    def write_console(self, charseq):
+        """Writes a string to a console frame buffer
+        beginning at the current cursor location.
+
+        charseq: str
+            the string to be written on the frame buffer
+        """
+        write_console_unicode(self._framebuffer, charseq, len(charseq), byref(c_ulong()), None)
 
     def cls(self):
-        for y in range(self.rows):
-            for x in range(self.cols):
-                i = (y * self.cols) + x
-                self.char_buffer[i].char.unicode_char = ' '
-        write_console_output(self.backbuffer_handle,
-                             self.char_buffer,
-                             self.coord,
-                             self.size,
-                             byref(self.rect))
+        """Clears the current screen buffer.
+        """
+        for y in range(self._rows):
+            for x in range(self._cols):
+                i = (y * self._cols) + x
+                self._char_buffer[i].char.unicode_char = ' '
+        write_console_output(self._framebuffer,
+                             self._char_buffer,
+                             self._coord,
+                             self._size,
+                             byref(self._rect))
 
-    def _show_cursor(self, visible=True):
-        self.cursor_info.visible = visible
-        set_console_cursor_info(self.console_handle, byref(self.cursor_info))
+    @property
+    def term_ready(self):
+        return self._term_ready
+
