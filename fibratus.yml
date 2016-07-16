@@ -6,6 +6,8 @@ output:
         username: guest
         password: guest
         vhost: /
+        exchange: amq.direct
+        routingkey: fibratus
     - smtp:
         host: smtp.gmail.com
         port: 587
