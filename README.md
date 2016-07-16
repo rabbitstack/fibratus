@@ -20,7 +20,7 @@ Download the latest version [here](https://github.com/rabbitstack/fibratus/relea
 Compiling Fibratus from source requires the [Nuitka](http://nuitka.net/pages/overview.html) Python compiler. In the first place, compile the kernel event stream collector (**Visual C++ 2012+** and **Cython >=0.23.4** should be installed). 
 
 ```
-$ python setup.py build_ext --inplace
+$ python setup.py build_ext install
 ```
 Make sure all  dependencies are satisfied before running Nuitka:
 
@@ -124,22 +124,27 @@ Creating a new filament is as easy as providing a Python module with `on_init` a
 import collections
 
 """
-Shows top TCP / UDP connections
+Shows the top TCP / UDP outbound packets.
 """
-
 connections = collections.Counter()
+
 
 def on_init():
     set_filter('Send')
-    columns(["Port", "IP", "Count"])
+    columns(["Destination", "Count"])
     sort_by('Count')
+    set_interval(1)
+    title('Top outbound TCP/UDP packets')
+
 
 def on_next_kevent(kevent):
-    connections.update((kevent.params.dport, kevent.params.ip_dst))
+    dst = ['%s:%d' % (kevent.params.ip_dst, kevent.params.dport)]
+    connections.update(dst)
 
-    for t, count in connections.items():
-        add_row([t[0], t[1], count])
 
+def on_interval():
+    for ip, count in connections.items():
+        add_row([ip, count])
     render_tabular()
 ```
 The `on_init` method is invoked upon Fibratus initialization just before the kernel event stream is being opened. 
