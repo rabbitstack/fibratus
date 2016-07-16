@@ -3,7 +3,7 @@ environment:
   MSVS_VERSION: 2015
 
   matrix:
-    - PYTHON: "C:\\Python35-x64"
+    - PYTHON: "C:\\Python34-x64"
       DISTUTILS_USE_SDK: "1"
 
 platform:
