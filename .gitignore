@@ -13,3 +13,7 @@
 /tests/.coverage
 /tests/unit/.coverage
 /tests/*/htmlcov
+/tests/coverage.xml
+/tests/*/coverage.xml
+/kstreamc.pyd
+/htmlcov
