@@ -203,12 +203,6 @@ class Filament(Process):
         if on_init and self._zero_args(on_init):
             self._filament_module.on_init()
 
-        # call the close method. You can put
-        # your cleanup logic here.
-        on_stop = self._find_filament_func('on_stop')
-        if on_stop and self._zero_args(on_stop):
-            self._filament_module.on_stop = on_stop
-
     def setup_adapters(self, output_adapters):
         """Creates the filament adapters accessors.
 
@@ -266,7 +260,8 @@ class Filament(Process):
             _ansi_term.write_output(tabular)
 
     def close(self):
-        if self._find_filament_func('on_stop'):
+        on_stop = self._find_filament_func('on_stop')
+        if on_stop and self._zero_args(on_stop):
             self._filament_module.on_stop()
         if self.scheduler.running:
             self.scheduler.shutdown()
