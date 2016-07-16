@@ -86,7 +86,6 @@ class Filament(Process):
         self._interval = 1
         self._sort_by = None
         self._sort_desc = True
-        self._on_stop = None
         self._log_path = None
         self._logger = None
         self.scheduler = BackgroundScheduler()
@@ -267,8 +266,8 @@ class Filament(Process):
             _ansi_term.write_output(tabular)
 
     def close(self):
-        if self._on_stop:
-            self._on_stop()
+        if self._find_filament_func('on_stop'):
+            self._filament_module.on_stop()
         if self.scheduler.running:
             self.scheduler.shutdown()
         _ansi_term.restore_console()
