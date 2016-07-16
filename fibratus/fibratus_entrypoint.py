@@ -19,7 +19,10 @@ from logbook import Logger, FileHandler
 
 import atexit
 import os
+from multiprocess import Queue
+
 import fibratus.apidefs.etw as etw
+from fibratus.config import YamlConfig
 from fibratus.controller import KTraceController, KTraceProps
 from fibratus.dll import DllRepository
 from fibratus.fs import FsIO
@@ -27,6 +30,8 @@ from fibratus.handle import HandleRepository
 from fibratus.kevent import KEvent
 from fibratus.kevent_types import *
 from fibratus.common import DotD as ddict, IO
+from fibratus.output.adapter.amqp import AmqpAdapter
+from fibratus.output.adapter.smtp import SmtpAdapter
 from fibratus.registry import HiveParser
 from fibratus.tcpip import TcpIpParser
 from fibratus.thread import ThreadRegistry
@@ -42,23 +47,29 @@ class Fibratus(object):
     enumerated.
 
     """
-    def __init__(self, filament):
+    def __init__(self, filament, **kwargs):
 
+        log_path = os.path.join(os.path.abspath(__file__), '..', '..', '..', 'fibratus.log')
+        FileHandler(log_path, mode='w+').push_application()
         self.logger = Logger(Fibratus.__name__)
-        self.file_handler = FileHandler(os.path.join(os.path.abspath(__file__), '..', '..', '..', 'fibratus.log'),
-                                        mode='w+')
+
+        self._config = YamlConfig()
+
+        self.logger.info('Starting fibratus...')
+
         self.kevt_streamc = KEventStreamCollector(etw.KERNEL_LOGGER_NAME.encode())
         self.kcontroller = KTraceController()
         self.ktrace_props = KTraceProps()
         self.ktrace_props.enable_kflags()
         self.ktrace_props.logger_name = etw.KERNEL_LOGGER_NAME
 
+        enum_handles = kwargs.pop('enum_handles', True)
+
         self.handle_repository = HandleRepository()
         self._handles = []
         # query for handles on the
-        # start of kernel trace
-        with self.file_handler.applicationbound():
-            self.logger.info('Starting fibratus...')
+        # start of the kernel trace
+        if enum_handles:
             self.logger.info('Enumerating system handles...')
             self._handles = self.handle_repository.query_handles()
             self.logger.info('%s handles found' % len(self._handles))
@@ -66,7 +77,15 @@ class Fibratus(object):
         self.thread_registry = ThreadRegistry(self.handle_repository, self._handles)
 
         self.kevent = KEvent(self.thread_registry)
+        self.keventq = Queue()
 
+        self._adapter_classes = dict(smtp=SmtpAdapter, amqp=AmqpAdapter)
+        self._output_adapters = self._construct_adapters()
+
+        if filament:
+            filament.keventq = self.keventq
+            filament.logger = log_path
+            filament.setup_adapters(self._output_adapters)
         self._filament = filament
 
         self.fsio = FsIO(self.kevent, self._handles)
@@ -85,6 +104,9 @@ class Fibratus(object):
 
         self.kcontroller.start_ktrace(etw.KERNEL_LOGGER_NAME, self.ktrace_props)
 
+        if self._filament:
+            self._filament.start()
+
         def on_kstream_open():
             if self._filament is None:
                 IO.write_console('Done!                               ')
@@ -95,10 +117,29 @@ class Fibratus(object):
         try:
             self.kevt_streamc.open_kstream(self._on_next_kevent)
         except Exception as e:
-            with self.file_handler.applicationbound():
-                self.logger.error(e)
+            self.logger.error(e)
         except KeyboardInterrupt:
             self.stop_ktrace()
+
+    def _construct_adapters(self):
+        """Instantiates the adapter classes.
+
+        Builds the dictionary with instances
+        of the output adapter classes.
+        """
+        adapters = {}
+        output_adapters = self._config.output_adapters
+        if output_adapters:
+            for output_adapter in output_adapters:
+                name = next(iter(list(output_adapter.keys())), None)
+                if name and \
+                        name in self._adapter_classes.keys():
+                    # get the adapter configuration
+                    # and instantiate its class
+                    adapter_class = self._adapter_classes[name]
+                    adapter_config = output_adapter[name]
+                    adapters[name] = adapter_class(**adapter_config)
+        return adapters
 
     def stop_ktrace(self):
         IO.write_console('Stopping fibratus...')
@@ -178,6 +219,7 @@ class Fibratus(object):
         self.kevent.cpuid = cpuid
         self.kevent.name = ktuple_to_name(ktype)
         kparams = ddict(kparams)
+
         # thread / process kernel events
         if ktype in [CREATE_PROCESS,
                      CREATE_THREAD,
@@ -243,9 +285,9 @@ class Fibratus(object):
             self._render(ktype)
 
         if self._filament:
-            # call filament method
-            # to process the next
-            # kernel event from the stream
+            # put the event on the queue
+            # from where the filaments process
+            # will poll for kernel events
             if ktype not in [ENUM_PROCESS,
                              ENUM_THREAD,
                              ENUM_IMAGE,
@@ -254,7 +296,22 @@ class Fibratus(object):
                 ok = self.output_kevents[ktype] if ktype in self.output_kevents \
                     else False
                 if self.kevent.name and ok:
-                    self._filament.process(self.kevent)
+                    thread = self.kevent.thread
+                    # push the kernel event dict
+                    # to processing queue
+                    kevt = dict(params=self.kevent.params,
+                                name=self.kevent.name,
+                                pid=self.kevent.pid,
+                                tid=self.kevent.tid,
+                                timestamp=self.kevent.ts,
+                                cpuid=self.kevent.cpuid,
+                                category=self.kevent.category,
+                                thread=dict(name=thread.name,
+                                            exe=thread.exe,
+                                            comm=thread.comm,
+                                            pid=thread.pid,
+                                            ppid=thread.ppid))
+                    self._filament.keventq.put(kevt)
 
     def _render(self, ktype):
         """Renders the kevent to the standard output stream.
