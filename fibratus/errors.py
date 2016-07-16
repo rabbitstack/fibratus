@@ -45,4 +45,7 @@ class HandleEnumError(Exception):
                            % status)
 
 
+class InvalidAmqpPayloadError(Exception):
+    pass
+
 
