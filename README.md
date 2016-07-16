@@ -4,7 +4,7 @@ Fibratus
 ![fibratus logo]( https://github.com/rabbitstack/fibratus/blob/master/fibratus.png "fibratus logo" )
 
 [![Build status](https://ci.appveyor.com/api/projects/status/dlvxhc0j026ikcyv?svg=true)](https://ci.appveyor.com/project/rabbitstack/fibratus)
-[![Coverage Status](https://coveralls.io/repos/github/rabbitstack/fibratus/badge.svg?branch=HEAD)](https://coveralls.io/github/rabbitstack/fibratus?branch=HEAD)
+[![Coverage Status](https://codecov.io/gh/rabbitstack/fibratus/branch/master/graph/badge.svg)](https://codecov.io/gh/rabbitstack/fibratus)
 [![Code Health](https://landscape.io/github/rabbitstack/fibratus/master/landscape.svg?style=flat)](https://landscape.io/github/rabbitstack/fibratus/master)
 
 **Fibratus** is a tool which is able to capture the most of the Windows kernel activity - process/thread creation and termination, 
@@ -13,7 +13,7 @@ Fibratus has a very simple CLI which encapsulates the machinery to start the ker
 set kernel event filters or run the lightweight Python modules called **filaments**. You can use filaments to extend Fibratus with your own arsenal of tools.
 
 ## Installation
-[Download](https://github.com/rabbitstack/fibratus/releases) the latest installer and in a blink of an eye you are ready to go.
+Download the latest version [here](https://github.com/rabbitstack/fibratus/releases).
 
 ## Building
 
@@ -143,6 +143,14 @@ def on_next_kevent(kevent):
     render_tabular()
 ```
 The `on_init` method is invoked upon Fibratus initialization just before the kernel event stream is being opened. 
+
+## Contributing
+
+Please use Github's pull-request model to submit your contributions. You should consider these facts:
+
+* the code has to be in harmony with the **Zen Of Python** principles
+* you need to test the code (fibratus uses the `pytest` unit testing framework)
+* make sure your code satisfy the **PEP** coding style
 
 ## License
 
