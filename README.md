@@ -126,12 +126,13 @@ import collections
 """
 Shows the top TCP / UDP outbound packets.
 """
+
 connections = collections.Counter()
 
 
 def on_init():
     set_filter('Send')
-    columns(["Destination", "Count"])
+    columns(['Destination', 'Count'])
     sort_by('Count')
     set_interval(1)
     title('Top outbound TCP/UDP packets')
