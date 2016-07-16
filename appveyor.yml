@@ -6,10 +6,6 @@ environment:
     - PYTHON: "C:\\Python35-x64"
       DISTUTILS_USE_SDK: "1"
 
-skip_commits:
-
-  message: /Updated.*\.(md)/
-
 platform:
   - x64
 
