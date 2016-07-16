@@ -23,7 +23,7 @@ __CONFIG_PATH__ = os.path.join(os.path.dirname(__file__), '..', 'fixtures', 'fib
 class TestYamlConfig():
 
     def test_load_yaml(self):
-        config = YamlConfig()
+        config = YamlConfig(__CONFIG_PATH__)
         assert config.yaml
 
     def test_load_yaml_not_found(self):
@@ -38,7 +38,7 @@ class TestYamlConfig():
         assert len(config.output_adapters) > 0
 
     def test_enum_output_adapters(self):
-        config = YamlConfig()
+        config = YamlConfig(__CONFIG_PATH__)
         adapter_names = ['amqp', 'smtp']
         output_adapters = config.output_adapters
         if output_adapters:
