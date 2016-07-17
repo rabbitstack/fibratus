@@ -114,7 +114,7 @@ Fibratus supports basic filtering capabilities on kernel event names. To capture
 
 ### Executing filaments
 
-Filaments are micro modules written in Python that run on top of Fibratus in it's own execution context. They often perform aggregations, filtering, groupings, counting or any kind of custom logic on a kernel event stream. To execute a filament, pass the filament name via `--filament` argument, for example `fibratus run --filament=top_hives_io`. To get more information on how to create filaments, see [Building filaments](#building-filaments). 
+Filaments are micro modules written in Python that run on top of Fibratus in its own execution context. They often perform aggregations, filtering, groupings, counting or any kind of custom logic on a kernel event stream. To execute a filament, pass the filament name via `--filament` argument, for example `fibratus run --filament=top_hives_io`. To get more information on how to create filaments, see [Building filaments](#building-filaments). 
 
 ## Building filaments
 
