@@ -150,6 +150,32 @@ def on_interval():
 ```
 The `on_init` method is invoked upon Fibratus initialization just before the kernel event stream is being opened. When a new kernel event arrives, it is delivered to the filament via `on_next_kevent` function. To report the information on a periodic basis the filament module provides the `on_interval` callback.
 
+### Streaming kernel events
+
+Fibratus has a set of built-in adapters for emitting the kernel events to external endpoints. You can choose between these transports:
+
+- AMQP 
+```python
+
+def on_next_kevent(kevent):
+    body = {'ip_dst': kevent.params.ip_dst, 'dport': kevent.params.dport}
+    amqp.emit(body)
+    # overrides the default exchange and the routing key
+    amqp.emit(body, exchange='amqp.direct', routingkey='net')
+```
+
+- SMTP
+```python
+
+import json
+
+def on_next_kevent(kevent):
+    body = json.dumps({'ip_dst': kevent.params.ip_dst, 'dport': kevent.params.dport})
+    smtp.emit(body, subject='network packet received from %s' % kevent.params.ip_src)
+```
+
+For more details see the `fibratus.yml` configuration file.
+
 ## Contributing
 
 Please use Github's pull-request model to submit your contributions. Before you send the pull-request you should keep in mind:
