@@ -12,7 +12,7 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
-from _ctypes import Structure, POINTER
+from ctypes import Structure, POINTER
 from ctypes import c_uint64, c_ulong, c_long, c_ulonglong, c_wchar_p, c_ubyte
 from ctypes.wintypes import LARGE_INTEGER, HANDLE
 

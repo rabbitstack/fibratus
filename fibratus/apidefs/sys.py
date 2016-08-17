@@ -13,7 +13,7 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
-from _ctypes import POINTER
+from ctypes import POINTER
 from ctypes import c_int, c_byte, WINFUNCTYPE
 from ctypes.wintypes import DWORD, ULONG, PULONG, USHORT, HANDLE, BOOL, SHORT, WCHAR, CHAR, WORD, LPDWORD
 

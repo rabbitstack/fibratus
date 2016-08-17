@@ -13,7 +13,7 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
-from _ctypes import Structure
+from ctypes import Structure
 from ctypes import c_void_p, c_ubyte, c_ushort, c_ulong, c_size_t, c_wchar_p
 import re
 import ctypes

@@ -13,7 +13,7 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
-from _ctypes import POINTER
+from ctypes import POINTER
 from ctypes.wintypes import DWORD, BOOL, HANDLE, ULONG, PULONG, BYTE, PDWORD
 
 from fibratus.apidefs.cdefs import *
