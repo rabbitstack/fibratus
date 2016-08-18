@@ -114,7 +114,7 @@ Fibratus supports basic filtering capabilities on kernel event names. To capture
 
 ### Executing filaments
 
-Filaments are micro modules written in Python that run on top of Fibratus. They often perform aggregations, filtering, groupings, counting or any kind of custom logic on a kernel event stream. To execute a filament, pass the filament name via `--filament` argument, for example `fibratus run --filament=top_hives_io`. To get more information on how to create filaments, see [Building filaments](#building-filaments). 
+Filaments are micro modules written in Python that run on top of Fibratus in its own execution context. They often perform aggregations, filtering, groupings, counting or any kind of custom logic on a kernel event stream. To execute a filament, pass the filament name via `--filament` argument, for example `fibratus run --filament=top_hives_io`. To get more information on how to create filaments, see [Building filaments](#building-filaments). 
 
 ## Building filaments
 
@@ -126,12 +126,13 @@ import collections
 """
 Shows the top TCP / UDP outbound packets.
 """
+
 connections = collections.Counter()
 
 
 def on_init():
     set_filter('Send')
-    columns(["Destination", "Count"])
+    columns(['Destination', 'Count'])
     sort_by('Count')
     set_interval(1)
     title('Top outbound TCP/UDP packets')
@@ -147,11 +148,37 @@ def on_interval():
         add_row([ip, count])
     render_tabular()
 ```
-The `on_init` method is invoked upon Fibratus initialization just before the kernel event stream is being opened. 
+The `on_init` method is invoked upon Fibratus initialization just before the kernel event stream is being opened. When a new kernel event arrives, it is delivered to the filament via `on_next_kevent` function. To report the information on a periodic basis the filament module provides the `on_interval` callback.
+
+### Streaming kernel events
+
+Fibratus has a set of built-in adapters for emitting the kernel events to external endpoints. You can choose between these transports:
+
+- AMQP 
+```python
+
+def on_next_kevent(kevent):
+    body = {'ip_dst': kevent.params.ip_dst, 'dport': kevent.params.dport}
+    amqp.emit(body)
+    # overrides the default exchange and the routing key
+    amqp.emit(body, exchange='amqp.direct', routingkey='net')
+```
+
+- SMTP
+```python
+
+import json
+
+def on_next_kevent(kevent):
+    body = json.dumps({'ip_dst': kevent.params.ip_dst, 'dport': kevent.params.dport})
+    smtp.emit(body, subject='network packet received from %s' % kevent.params.ip_src)
+```
+
+For more details see the `fibratus.yml` configuration file.
 
 ## Contributing
 
-Please use Github's pull-request model to submit your contributions. You should consider these facts:
+Please use Github's pull-request model to submit your contributions. Before you send the pull-request you should keep in mind:
 
 * the code has to be in harmony with the **Zen Of Python** principles
 * you need to test the code (fibratus uses the `pytest` unit testing framework)
