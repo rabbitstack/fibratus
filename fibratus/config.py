@@ -19,7 +19,7 @@ import sys
 
 from fibratus.common import IO
 
-__DEFAULT_CONFIG_PATH__ = os.path.join(os.path.abspath(__file__), '..', '..', 'fibratus.yml')
+__DEFAULT_CONFIG_PATH__ = os.path.join(os.getcwd(), '..', 'fibratus.yml')
 
 
 class YamlConfig(object):
@@ -30,7 +30,7 @@ class YamlConfig(object):
         try:
             self._yaml = anyconfig.load(path, ignore_missing=False)
         except FileNotFoundError:
-            IO.write_console('%s configuration file could not be found' % path)
+            IO.write_console('ERROR - %s configuration file does not exist' % path)
             sys.exit()
 
     @property

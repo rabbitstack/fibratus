@@ -19,6 +19,7 @@ from logbook import Logger, FileHandler
 
 import atexit
 import os
+import sys
 from multiprocess import Queue
 
 import fibratus.apidefs.etw as etw
@@ -49,8 +50,12 @@ class Fibratus(object):
     """
     def __init__(self, filament, **kwargs):
 
-        log_path = os.path.join(os.path.abspath(__file__), '..', '..', '..', 'fibratus.log')
-        FileHandler(log_path, mode='w+').push_application()
+        try:
+            log_path = os.path.join(os.getcwd(), '..', 'fibratus.log')
+            FileHandler(log_path, mode='w+').push_application()
+        except PermissionError:
+            IO.write_console("ERROR - Unable to open log file for writing due to permissions error")
+            sys.exit(0)
         self.logger = Logger(Fibratus.__name__)
 
         self._config = YamlConfig()

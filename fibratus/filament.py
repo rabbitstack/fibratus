@@ -13,29 +13,27 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-from importlib.machinery import SourceFileLoader
 import inspect
 import os
 import sys
-import traceback
+from importlib.machinery import SourceFileLoader
 
 from apscheduler.executors.pool import ThreadPoolExecutor
 from apscheduler.schedulers.background import BackgroundScheduler
 from logbook import FileHandler
-from multiprocess import Process
 from logbook import Logger
+from multiprocess import Process
 
 from fibratus.asciiart.tabular import Tabular
-from fibratus.common import IO
 from fibratus.common import DotD as ddict
+from fibratus.common import IO
 from fibratus.errors import FilamentError, TermInitializationError
 from fibratus.term import AnsiTerm
-
 
 _ansi_term = AnsiTerm()
 
 
-FILAMENTS_DIR = os.getenv('FILAMENTS_PATH', os.path.join(os.path.dirname(__file__), '..', '..', 'filaments'))
+FILAMENTS_DIR = os.getenv('FILAMENTS_PATH', os.path.join(os.getcwd(), '..', 'filaments'))
 
 
 class AdapterMetaVariable(object):
