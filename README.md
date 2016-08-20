@@ -13,32 +13,18 @@ Fibratus has a very simple CLI which encapsulates the machinery to start the ker
 set kernel event filters or run the lightweight Python modules called **filaments**. You can use filaments to extend Fibratus with your own arsenal of tools.
 
 ## Installation
-Download the latest version [here](https://github.com/rabbitstack/fibratus/releases).
 
-## Building
+Fibratus can be installed via the pip package manager:
 
-Compiling Fibratus from source requires the [Nuitka](http://nuitka.net/pages/overview.html) Python compiler. In the first place, compile the kernel event stream collector (**Visual C++ 2012+** and **Cython >=0.23.4** should be installed). 
-
-```
-$ python setup.py build_ext install
-```
-Make sure all  dependencies are satisfied before running Nuitka:
-
-```
-$ pip install -U nuitka
-$ pip install -r requirements.txt
-$ nuitka --recurse-all --standalone --output-dir=<build-dir> --verbose fibratus\cli.py
-$ cd <build-dir>
-$ ren cli.exe fibratus.exe
-```
+`pip install fibratus`
 
 ## Running Fibratus
 
-Fibratus is composed of a single binary which can be run from terminal console. Although default Windows console would suffice, for better user experience a more sophisticated terminal emulators like [ConEmu](https://conemu.github.io) or [Cmder](http://cmder.net) are recommended. Run `fibratus --help` for usage instructions.
+Run `fibratus --help` for usage instructions.
 
 ```
 Usage:
-    fibratus run ([--filament=<filament>] | [--filters <kevents>...])
+    fibratus run ([--filament=<filament>] | [--filters <kevents>...]) [--no-enum-handles]
     fibratus list-kevents
     fibratus list-filaments
     fibratus -h | --help
@@ -47,6 +33,7 @@ Usage:
 Options:
     -h --help                 Show this screen.
     --filament=<filament>     Specify the filament to execute.
+    --no-enum-handles         Avoids enumerating the system handles.
     --version                 Show version.
 ```
 To capture all of the supported kernel events, execute `fibratus run` command without any argument. After the collector has been initialized, the continuous stream of kernel events will render on the standard output.
