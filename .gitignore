@@ -19,3 +19,5 @@ coverage.xml
 /tests/*/coverage.xml
 /kstreamc.pyd
 /htmlcov
+dist
+fibratus.egg-info
