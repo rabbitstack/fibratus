@@ -51,10 +51,10 @@ class Fibratus(object):
     def __init__(self, filament, **kwargs):
 
         try:
-            log_path = os.path.join(os.getcwd(), '..', 'fibratus.log')
+            log_path = os.path.join(os.path.expanduser('~'), '.fibratus', 'fibratus.log')
             FileHandler(log_path, mode='w+').push_application()
         except PermissionError:
-            IO.write_console("ERROR - Unable to open log file for writing due to permissions error")
+            IO.write_console("ERROR - Unable to open log file for writing due to permission error")
             sys.exit(0)
         self.logger = Logger(Fibratus.__name__)
 

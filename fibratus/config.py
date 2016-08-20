@@ -19,7 +19,7 @@ import sys
 
 from fibratus.common import IO
 
-__DEFAULT_CONFIG_PATH__ = os.path.join(os.getcwd(), '..', 'fibratus.yml')
+__DEFAULT_CONFIG_PATH__ = os.path.join(os.path.expanduser('~'), '.fibratus', 'fibratus.yml')
 
 
 class YamlConfig(object):

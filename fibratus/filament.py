@@ -33,7 +33,7 @@ from fibratus.term import AnsiTerm
 _ansi_term = AnsiTerm()
 
 
-FILAMENTS_DIR = os.getenv('FILAMENTS_PATH', os.path.join(os.getcwd(), '..', 'filaments'))
+FILAMENTS_DIR = os.getenv('FILAMENTS_PATH', os.path.join(os.path.expanduser('~'), '.fibratus', 'filaments'))
 
 
 class AdapterMetaVariable(object):

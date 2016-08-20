@@ -53,7 +53,8 @@ def _check_kevent(kevent):
                          ' the available kernel events' % kevent)
         sys.exit()
 
-if __name__ == '__main__':
+
+def main():
     if args['run']:
         if len(kevent_filters) > 0 and not filament_name:
             for kfilter in kevent_filters:
