@@ -26,7 +26,7 @@ from fibratus.errors import FilamentError
 from fibratus.filament import Filament
 from fibratus.output.adapter.amqp import AmqpAdapter
 from fibratus.term import AnsiTerm
-from fixtures.filaments import test_filament
+from tests.fixtures.filaments import test_filament
 
 
 @pytest.fixture(scope='module')

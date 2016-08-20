@@ -1,4 +1,4 @@
-# Copyright 2015 by Nedim Sabic (RabbitStack)
+# Copyright 2016 by Nedim Sabic (RabbitStack)
 # All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
