@@ -14,7 +14,7 @@ set kernel event filters or run the lightweight Python modules called **filament
 
 ## Installation
 
-Install via the pip package manager.
+Install via the pip package manager
 
 `pip install fibratus`
 
