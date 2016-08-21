@@ -12,7 +12,6 @@ file system I/O, registry, network activity, DLL loading/unloading and much more
 Fibratus has a very simple CLI which encapsulates the machinery to start the kernel event stream collector, 
 set kernel event filters or run the lightweight Python modules called **filaments**. You can use filaments to extend Fibratus with your own arsenal of tools.
 
-![fibratus in action](https://github.com/rabbitstack/fibratus/blob/master/static/fibratus-in-action.png "fibratus in action" )
 ## Installation
 
 Install via the pip package manager:
