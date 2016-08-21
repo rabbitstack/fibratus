@@ -14,13 +14,13 @@ set kernel event filters or run the lightweight Python modules called **filament
 
 ## Installation
 
-Install via the pip package manager
+Install via the pip package manager:
 
 `pip install fibratus`
 
 ## Running Fibratus
 
-Run `fibratus --help` for usage instructions.
+Run `fibratus --help` for usage instructions:
 
 ```
 Usage:
