@@ -15,6 +15,11 @@ set kernel event filters or run the lightweight Python modules called **filament
 ![fibratus]( https://github.com/rabbitstack/fibratus/blob/master/static/fibratus.png "fibratus" )
 ![filaments]( https://github.com/rabbitstack/fibratus/blob/master/static/filaments.png "filaments" )
 
+## Requirements
+
+- Python 3.4
+- Visual C++ 2012 or above 
+- Cython >=0.23.4
 
 ## Installation
 
