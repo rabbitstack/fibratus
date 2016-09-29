@@ -87,7 +87,7 @@ SYSCALL_ENTER = ('ce1dbfb4-137e-4da6-87b0-3f59aa102cbc', 51)
 SYSCALL_EXIT = ('ce1dbfb4-137e-4da6-87b0-3f59aa102cbc', 52)
 
 # context switch event
-CONTEXT_SWITCH = ()
+CONTEXT_SWITCH = ('3d6fa8d1-fe05-11d0-9dda-00c04fd7ba7c', 36)
 
 # starts an incoming connection attempt on socket
 ACCEPT_SOCKET_TCPV4 = ('9a280ac0-c8e0-11d1-84e2-00c04fb998a2', 15)
@@ -151,6 +151,9 @@ def kname_to_tuple(name):
     elif name == KEvents.UNLOAD_IMAGE:
         return UNLOAD_IMAGE
 
+    elif name == KEvents.CONTEXT_SWITCH:
+        return CONTEXT_SWITCH
+
     elif name == KEvents.SEND:
         return [SEND_SOCKET_UDPV4, SEND_SOCKET_TCPV4]
     elif name == KEvents.RECEIVE:
@@ -208,6 +211,9 @@ def ktuple_to_name(ktuple):
         return KEvents.LOAD_IMAGE
     elif ktuple == UNLOAD_IMAGE:
         return KEvents.UNLOAD_IMAGE
+
+    elif ktuple == CONTEXT_SWITCH:
+        return KEvents.CONTEXT_SWITCH
 
     elif ktuple == SEND_SOCKET_UDPV4 or\
             ktuple == SEND_SOCKET_TCPV4:

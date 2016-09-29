@@ -74,7 +74,7 @@ class KEvents(object):
     SYSCALL_ENTER = 'SyscallEnter'
     SYSCALL_EXIT = 'SyscallExit'
 
-    CONTEXT_SWITCH = 'CSwitch'
+    CONTEXT_SWITCH = 'ContextSwitch'
 
     @classmethod
     def all(cls):
@@ -102,7 +102,8 @@ class KEvents(object):
                 cls.ACCEPT,
                 cls.CONNECT,
                 cls.RECONNECT,
-                cls.DISCONNECT]
+                cls.DISCONNECT,
+                cls.CONTEXT_SWITCH]
 
     @classmethod
     def meta_info(cls):
@@ -135,7 +136,9 @@ class KEvents(object):
             KEvents.ACCEPT: (Category.NET, 'Initiates the connection attempt from the remote or local TCP socket', ),
             KEvents.CONNECT: (Category.NET, 'Establishes the connection to a TCP socket', ),
             KEvents.RECONNECT: (Category.NET, 'Reconnects to a TCP socket', ),
-            KEvents.DISCONNECT: (Category.NET, 'Closes the connection to a TCP socket', )}
+            KEvents.DISCONNECT: (Category.NET, 'Closes the connection to a TCP socket', ),
+
+            KEvents.CONTEXT_SWITCH: (Category.THREAD, 'Scheduler selects a new thread to execute',)}
         return kevents
 
 __kevents__ = KEvents.meta_info()
@@ -236,7 +239,7 @@ class KEvent(object):
             self._thread = self.thread_registry.get_thread(self._tid)
 
     def render(self):
-        """Renders the kevent to standard output stream.
+        """Renders the kevent to the standard output stream.
 
         Uses the default output format to render the
         kernel event to standard output stream.
