@@ -69,7 +69,7 @@ class KTraceProps(object):
         # syscall / cswitch flags generate a LOT of kevents
         # and they are disabled by default
         if syscall:
-            self._props.contents.enable_flags |= EVENT_TRACE_FLAG_SYSTEMCALL
+            self._props.contents.enable_flags |= (EVENT_TRACE_FLAG_SYSTEMCALL | EVENT_TRACE_FLAG_CSWITCH)
         if cswitch:
             self._props.contents.enable_flags |= EVENT_TRACE_FLAG_CSWITCH
 
