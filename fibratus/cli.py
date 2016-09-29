@@ -16,7 +16,7 @@
 
 """
 Usage:
-    fibratus run ([--filament=<filament>] | [--filters <kevents>...]) [--no-enum-handles]
+    fibratus run ([--filament=<filament>] | [--filters <kevents>...]) [--no-enum-handles] [--cswitch]
     fibratus list-kevents
     fibratus list-filaments
     fibratus -h | --help
@@ -26,6 +26,7 @@ Options:
     -h --help                 Show this screen.
     --filament=<filament>     Specify the filament to execute.
     --no-enum-handles         Avoids enumerating the system handles.
+    --cswitch                 Enables context switch kernel events.
     --version                 Show version.
 """
 import sys
@@ -61,8 +62,11 @@ def main():
                 _check_kevent(kfilter)
 
         enum_handles = False if args['--no-enum-handles'] else True
+        cswitch = True if args['--cswitch'] else False
+
         filament = None
         filament_filters = []
+
         if not filament_name:
             IO.write_console('Starting fibratus...', False)
         else:
@@ -85,9 +89,8 @@ def main():
 
             filament.render_tabular()
 
-
         try:
-            fibratus = Fibratus(filament, enum_handles=enum_handles)
+            fibratus = Fibratus(filament, enum_handles=enum_handles, cswitch=cswitch)
         except KeyboardInterrupt:
             # the user has stopped command execution
             # before opening the kernel event stream
