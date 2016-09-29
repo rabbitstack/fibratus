@@ -13,7 +13,13 @@ Fibratus has a very simple CLI which encapsulates the machinery to start the ker
 set kernel event filters or run the lightweight Python modules called **filaments**. You can use filaments to extend Fibratus with your own arsenal of tools.
 
 ![fibratus]( https://github.com/rabbitstack/fibratus/blob/master/static/fibratus.png "fibratus" )
+![filaments]( https://github.com/rabbitstack/fibratus/blob/master/static/filaments.png "filaments" )
 
+## Requirements
+
+- Python 3.4
+- Visual C++ 2012 or above 
+- Cython >=0.23.4
 
 ## Installation
 
@@ -186,3 +192,8 @@ Licensed under the Apache License, Version 2.0 (the "License"); you may not use 
 http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
+
+## Support on Beerpay
+Hey dude! Help me out for a couple of :beers:!
+
+[![Beerpay](https://beerpay.io/rabbitstack/fibratus/badge.svg?style=beer-square)](https://beerpay.io/rabbitstack/fibratus)  [![Beerpay](https://beerpay.io/rabbitstack/fibratus/make-wish.svg?style=flat-square)](https://beerpay.io/rabbitstack/fibratus?focus=wish)
