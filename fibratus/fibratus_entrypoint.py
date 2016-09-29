@@ -24,6 +24,7 @@ from multiprocess import Queue
 
 import fibratus.apidefs.etw as etw
 from fibratus.config import YamlConfig
+from fibratus.context_switch import ContextSwitchRegistry
 from fibratus.controller import KTraceController, KTraceProps
 from fibratus.dll import DllRepository
 from fibratus.fs import FsIO
@@ -62,10 +63,12 @@ class Fibratus(object):
 
         self.logger.info('Starting fibratus...')
 
+        enable_cswitch = kwargs.pop('cswitch', False)
+
         self.kevt_streamc = KEventStreamCollector(etw.KERNEL_LOGGER_NAME.encode())
         self.kcontroller = KTraceController()
         self.ktrace_props = KTraceProps()
-        self.ktrace_props.enable_kflags()
+        self.ktrace_props.enable_kflags(cswitch=enable_cswitch)
         self.ktrace_props.logger_name = etw.KERNEL_LOGGER_NAME
 
         enum_handles = kwargs.pop('enum_handles', True)
@@ -97,6 +100,7 @@ class Fibratus(object):
         self.hive_parser = HiveParser(self.kevent, self.thread_registry)
         self.tcpip_parser = TcpIpParser(self.kevent)
         self.dll_repository = DllRepository(self.kevent)
+        self.context_switch_registry = ContextSwitchRegistry(self.thread_registry, self.kevent)
 
         self.output_kevents = {}
         self.filters_count = 0
@@ -287,6 +291,11 @@ class Fibratus(object):
                        DISCONNECT_SOCKET_TCPV4,
                        RECONNECT_SOCKET_TCPV4]:
             self.tcpip_parser.parse_tcpip(ktype, kparams)
+            self._render(ktype)
+
+        # context switch events
+        elif ktype == CONTEXT_SWITCH:
+            self.context_switch_registry.next_cswitch(cpuid, ts, kparams)
             self._render(ktype)
 
         if self._filament:
