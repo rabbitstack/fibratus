@@ -33,7 +33,7 @@ Run `fibratus --help` for usage instructions:
 
 ```
 Usage:
-    fibratus run ([--filament=<filament>] | [--filters <kevents>...]) [--no-enum-handles]
+    fibratus run ([--filament=<filament>] | [--filters <kevents>...]) [--no-enum-handles] [--cswitch]
     fibratus list-kevents
     fibratus list-filaments
     fibratus -h | --help
@@ -43,6 +43,7 @@ Options:
     -h --help                 Show this screen.
     --filament=<filament>     Specify the filament to execute.
     --no-enum-handles         Avoids enumerating the system handles.
+    --cswitch                 Enables context switch kernel events.
     --version                 Show version.
 ```
 To capture all of the supported kernel events, execute `fibratus run` command without any argument. After the collector has been initialized, the continuous stream of kernel events will render on the standard output.
@@ -82,6 +83,7 @@ Fibratus supports basic filtering capabilities on kernel event names. To capture
 
 | Kernel event        | Description                     | 
 | ------------------- |:------------------------------- | 
+| ContextSwitch       | Scheduler selects a new thread to run  |
 | CreateProcess       | Creates a new process and its primary thread  |
 | CreateThread        | Creates a thread to execute within the virtual address space of the calling process |
 | TerminateProcess    | Terminates the process and all of its threads   |
