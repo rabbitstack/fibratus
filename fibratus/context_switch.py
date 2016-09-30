@@ -106,7 +106,7 @@ class ContextSwitchRegistry(object):
 
         self._kevent.tid = new_thread_id
         self._kevent.pid = next_pid
-        self._kevent.params = dict(next_proc_name=cs.next_proc_name, prev_proc_name=cs.prev_proc_name,
+        self._kevent.params = dict(next_proc_name=cs.next_proc_name, prev_proc_name=cs.prev_proc_name, cpu=cpu,
                                    next_thread_id=new_thread_id, prev_thread_id=old_thread_id,
                                    next_thread_prio=cs.next_thread_prio,
                                    prev_thread_prio=cs.prev_thread_prio,
