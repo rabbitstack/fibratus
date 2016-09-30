@@ -62,6 +62,7 @@ class ContextSwitchRegistry(object):
         next_thread = self._thread_registry.get_thread(new_thread_id)
         prev_thread = self._thread_registry.get_thread(old_thread_id)
 
+        next_pid = next_thread.pid if next_thread else None
         next_proc_name = next_thread.name if next_thread \
             else self._get_proc(new_thread_id)
         prev_proc_name = prev_thread.name if prev_thread \
@@ -79,7 +80,7 @@ class ContextSwitchRegistry(object):
             cs.prev_thread_prio = kcs.old_thread_priority
             cs.prev_thread_state = ContextSwitchRegistry._human_thread_state(kcs.old_thread_state)
             cs.prev_thread_wait_mode = ContextSwitchRegistry._human_wait_mode(kcs.old_thread_wait_mode)
-            cs.prev_thread_wait_reason = kcs.old_thread_wait_reason
+            cs.prev_thread_wait_reason = ContextSwitchRegistry._human_wait_reason(kcs.old_thread_wait_reason)
             cs.increment_count()
         else:
             # the new thread has been scheduled
@@ -93,7 +94,7 @@ class ContextSwitchRegistry(object):
                          kcs.old_thread_priority,
                          ContextSwitchRegistry._human_thread_state(kcs.old_thread_state),
                          ContextSwitchRegistry._human_wait_mode(kcs.old_thread_wait_mode),
-                         kcs.old_thread_wait_reason)
+                         ContextSwitchRegistry._human_wait_reason(kcs.old_thread_wait_reason))
             cs.increment_count()
             self._css[thread_cs] = cs
 
@@ -104,16 +105,15 @@ class ContextSwitchRegistry(object):
                 on_context_switch(cpu, kcs.new_thread_id)
 
         self._kevent.tid = new_thread_id
-        self._kevent.params = dict(next_proc_name=cs.next_proc_name,
-                                   prev_proc_name=cs.prev_proc_name,
-                                   next_thread_id=new_thread_id,
-                                   prev_thread_id=old_thread_id,
+        self._kevent.pid = next_pid
+        self._kevent.params = dict(next_proc_name=cs.next_proc_name, prev_proc_name=cs.prev_proc_name,
+                                   next_thread_id=new_thread_id, prev_thread_id=old_thread_id,
                                    next_thread_prio=cs.next_thread_prio,
                                    prev_thread_prio=cs.prev_thread_prio,
                                    prev_thread_state=cs.prev_thread_state.name,
                                    next_thread_wait_time=cs.next_thread_wait_time,
                                    prev_thread_wait_mode=cs.prev_thread_wait_mode.name,
-                                   prev_thread_wait_reason=cs.prev_thread_wait_reason)
+                                   prev_thread_wait_reason=cs.prev_thread_wait_reason.name)
 
     def context_switches(self):
         """Returns a dictionary of context switches.
@@ -160,17 +160,78 @@ class ContextSwitchRegistry(object):
             return ThreadState.TRANSITION
         elif thread_state == ThreadState.DEFERRED_READY.value:
             return ThreadState.DEFERRED_READY
-        else:
-            return thread_state
+
+    @classmethod
+    def _human_wait_reason(cls, wait_reason):
+        if wait_reason == WaitReason.EXECUTIVE.value or wait_reason == WaitReason.EXECUTIVE.value + 7:
+            return WaitReason.EXECUTIVE
+        elif wait_reason == WaitReason.FREE_PAGE.value or wait_reason == WaitReason.FREE_PAGE.value + 7:
+            return WaitReason.FREE_PAGE
+        elif wait_reason == WaitReason.PAGE_IN.value or wait_reason == WaitReason.PAGE_IN.value + 7:
+            return WaitReason.PAGE_IN
+        elif wait_reason == WaitReason.POOL_ALLOCATION.value or wait_reason == WaitReason.POOL_ALLOCATION.value + 7:
+            return WaitReason.POOL_ALLOCATION
+        elif wait_reason == WaitReason.DELAY_EXECUTION.value or wait_reason == WaitReason.DELAY_EXECUTION.value + 7:
+            return WaitReason.DELAY_EXECUTION
+        elif wait_reason == WaitReason.SUSPENDED.value or wait_reason == WaitReason.SUSPENDED.value + 7:
+            return WaitReason.SUSPENDED
+        elif wait_reason == WaitReason.USER_REQUEST or wait_reason == WaitReason.USER_REQUEST.value + 7:
+            return WaitReason.USER_REQUEST
+        elif wait_reason == WaitReason.EVENT_PAIR.value:
+            return WaitReason.EVENT_PAIR
+        elif wait_reason == WaitReason.QUEUE.value:
+            return WaitReason.QUEUE
+        elif wait_reason == WaitReason.LPC_RECEIVE.value:
+            return WaitReason.LPC_RECEIVE
+        elif wait_reason == WaitReason.LPC_REPLY.value:
+            return WaitReason.LPC_REPLY
+        elif wait_reason == WaitReason.VIRTUAL_MEMORY.value:
+            return WaitReason.VIRTUAL_MEMORY
+        elif wait_reason == WaitReason.PAGE_OUT.value:
+            return WaitReason.PAGE_OUT
+        elif wait_reason == WaitReason.RENDEZVOUS.value:
+            return WaitReason.RENDEZVOUS
+        elif wait_reason == WaitReason.KEYED_EVENT.value:
+            return WaitReason.KEYED_EVENT
+        elif wait_reason == WaitReason.TERMINATED.value:
+            return WaitReason.TERMINATED
+        elif wait_reason == WaitReason.PROCESS_IN_SWAP.value:
+            return WaitReason.PROCESS_IN_SWAP
+        elif wait_reason == WaitReason.CPU_WAIT_CONTROL.value:
+            return WaitReason.CPU_WAIT_CONTROL
+        elif wait_reason == WaitReason.CALLOUT_STACK.value:
+            return WaitReason.CALLOUT_STACK
+        elif wait_reason == WaitReason.KERNEL.value:
+            return WaitReason.KERNEL
+        elif wait_reason == WaitReason.RESOURCE.value:
+            return WaitReason.RESOURCE
+        elif wait_reason == WaitReason.PUSH_LOCK.value:
+            return WaitReason.PUSH_LOCK
+        elif wait_reason == WaitReason.MUTEX.value:
+            return WaitReason.MUTEX
+        elif wait_reason == WaitReason.QUANTUM_END.value:
+            return WaitReason.QUANTUM_END
+        elif wait_reason == WaitReason.DISPATCH_INT.value:
+            return WaitReason.DISPATCH_INT
+        elif wait_reason == WaitReason.PREEMPTED.value:
+            return WaitReason.PREEMPTED
+        elif wait_reason == WaitReason.YIELD_EXECUTION.value:
+            return WaitReason.YIELD_EXECUTION
+        elif wait_reason == WaitReason.FAST_MUTEX.value:
+            return WaitReason.FAST_MUTEX
+        elif wait_reason == WaitReason.GUARDED_MUTEX.value:
+            return WaitReason.GUARDED_MUTEX
+        elif wait_reason == WaitReason.RUNDOWN.value:
+            return WaitReason.RUNDOWN
+        elif wait_reason == WaitReason.MAXIMUM_WAIT_REASON.value:
+            return WaitReason.MAXIMUM_WAIT_REASON
 
     @classmethod
     def _human_wait_mode(cls, wait_mode):
-        if wait_mode == ThreadWaitMode.KERNEL.value:
-            return ThreadWaitMode.KERNEL
-        elif wait_mode == ThreadWaitMode.USER.value:
-            return ThreadWaitMode.USER
-        else:
-            return wait_mode
+        if wait_mode == WaitMode.KERNEL.value:
+            return WaitMode.KERNEL
+        elif wait_mode == WaitMode.USER.value:
+            return WaitMode.USER
 
 
 class CSwitch(object):
@@ -299,6 +360,40 @@ class ThreadState(Enum):
     DEFERRED_READY = 7
 
 
-class ThreadWaitMode(Enum):
+class WaitMode(Enum):
     KERNEL = 0
     USER = 1
+
+
+class WaitReason(Enum):
+    EXECUTIVE = 0
+    FREE_PAGE = 1
+    PAGE_IN = 2
+    POOL_ALLOCATION = 3
+    DELAY_EXECUTION = 4
+    SUSPENDED = 5
+    USER_REQUEST = 6
+    EVENT_PAIR = 14
+    QUEUE = 15
+    LPC_RECEIVE = 16
+    LPC_REPLY = 17
+    VIRTUAL_MEMORY = 18
+    PAGE_OUT = 19
+    RENDEZVOUS = 20
+    KEYED_EVENT = 21
+    TERMINATED = 22
+    PROCESS_IN_SWAP = 23
+    CPU_WAIT_CONTROL = 24
+    CALLOUT_STACK = 25
+    KERNEL = 26
+    RESOURCE = 27
+    PUSH_LOCK = 28
+    MUTEX = 29
+    QUANTUM_END = 30
+    DISPATCH_INT = 31
+    PREEMPTED = 32
+    YIELD_EXECUTION = 33
+    FAST_MUTEX = 34
+    GUARDED_MUTEX = 35
+    RUNDOWN = 36
+    MAXIMUM_WAIT_REASON = 37
