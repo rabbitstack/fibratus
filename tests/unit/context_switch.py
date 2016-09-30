@@ -17,7 +17,7 @@ from unittest.mock import Mock, call
 from datetime import datetime
 import pytest
 
-from fibratus.context_switch import ContextSwitchRegistry, ThreadState, ThreadWaitMode
+from fibratus.context_switch import ContextSwitchRegistry, ThreadState, WaitMode, WaitReason
 from fibratus.kevent import KEvent
 from fibratus.thread import ThreadRegistry, ThreadInfo
 from fibratus.common import DotD as ddict
@@ -69,18 +69,19 @@ class TestContextSwitchRegistry(object):
         assert cs.prev_thread_prio == 0
         assert cs.prev_thread_state is ThreadState.RUNNING
         assert cs.count == 1
-        assert cs.prev_thread_wait_mode is ThreadWaitMode.KERNEL
+        assert cs.prev_thread_wait_mode is WaitMode.KERNEL
+        assert cs.prev_thread_wait_reason is WaitReason.EXECUTIVE
 
     def test_next_cswitch_in_registry(self, thread_registry_empty_mock, kevent_mock):
         context_switch_registry = ContextSwitchRegistry(thread_registry_empty_mock, kevent_mock)
 
         kcs1 = ddict({'old_thread_wait_ideal_processor': 3, 'previous_c_state': 0, 'old_thread_state': 5,
                       'old_thread_priority': 8, 'reserved': 4294967294, 'spare_byte': 0,
-                      'old_thread_wait_reason': 17, 'new_thread_wait_time': '0x0', 'old_thread_wait_mode': 1,
+                      'old_thread_wait_reason': 8, 'new_thread_wait_time': '0x0', 'old_thread_wait_mode': 1,
                       'new_thread_priority': 8, 'new_thread_id': '0x1fc8', 'old_thread_id': '0x2348'})
         kcs2 = ddict({'old_thread_wait_ideal_processor': 3, 'previous_c_state': 0, 'old_thread_state': 3,
                       'old_thread_priority': 8, 'reserved': 4294967295, 'spare_byte': 0,
-                      'old_thread_wait_reason': 17, 'new_thread_wait_time': '0x0', 'old_thread_wait_mode': 1,
+                      'old_thread_wait_reason': 8, 'new_thread_wait_time': '0x0', 'old_thread_wait_mode': 1,
                       'new_thread_priority': 5, 'new_thread_id': '0x1fc8', 'old_thread_id': '0x2348'})
 
         context_switch_registry.next_cswitch(1, datetime.strptime("12:05:45.233", '%H:%M:%S.%f'), kcs1)
@@ -93,3 +94,4 @@ class TestContextSwitchRegistry(object):
         assert cs.next_thread_prio == 5
         assert cs.prev_thread_state is ThreadState.STANDBY
         assert cs.timestamp == datetime.strptime("12:05:45.234", '%H:%M:%S.%f')
+        assert cs.prev_thread_wait_reason is WaitReason.FREE_PAGE
