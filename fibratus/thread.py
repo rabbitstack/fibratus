@@ -137,7 +137,7 @@ class ThreadRegistry(object):
                                     process_id,
                                     name,
                                     comm,
-                                    None)
+                                    ())
                 thread.ustack_base = hex(kti.user_stack_base)
                 thread.kstack_base = hex(kti.stack_base)
                 thread.base_priority = kti.base_priority
@@ -147,7 +147,7 @@ class ThreadRegistry(object):
                                     ppid,
                                     name,
                                     comm,
-                                    None)
+                                    ())
                 # enumerate parent handles
                 parent.handles = self.handle_repository.query_handles(process_id)
 
@@ -321,7 +321,7 @@ class ThreadRegistry(object):
                     exe = exe.value
                     name = exe[exe.rfind('\\') + 1:]
                 info = ddict(name=name if name else NA,
-                             comm=exe,
+                             comm=exe if type(exe) is str else None,
                              parent_pid=ppid)
         if pbi_buff:
             free(pbi_buff)
