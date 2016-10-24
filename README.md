@@ -33,7 +33,7 @@ See the [wiki](https://github.com/rabbitstack/fibratus/wiki/Running).
 
 ## Running
 
-Execute `fibratus run` from the command prompt. If you are interested for a particular kernel event, use `--filters` command:
+Execute `fibratus run` from the command prompt. If you are interested in a particular kernel event, use `--filters` option:
 `fibratus run --filters CreateProcess`.
 
 ## Contributing
