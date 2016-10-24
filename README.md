@@ -31,11 +31,6 @@ Install via the pip package manager:
 
 See the [wiki](https://github.com/rabbitstack/fibratus/wiki/Running).
 
-## Running
-
-Execute `fibratus run` from the command prompt. If you are interested in a particular kernel event, use `--filters` option:
-`fibratus run --filters CreateProcess`.
-
 ## Contributing
 
 Please use Github's pull-request model to submit your contributions. Before you send the pull-request you should keep in mind:
