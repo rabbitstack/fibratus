@@ -35,8 +35,11 @@ class YamlConfig(object):
 
     @property
     def output_adapters(self):
-        adapters = self._yaml['output']
-        return adapters['adapters'] if adapters else None
+        return self._yaml.pop('output', None)
+
+    @property
+    def excluded_procs(self):
+        return self._yaml.pop('excluded_procs', [])
 
     @property
     def yaml(self):
