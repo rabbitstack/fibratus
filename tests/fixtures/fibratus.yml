@@ -1,16 +1,26 @@
+excluded_procs:
+  - svchost.exe
+  - smss.exe
+  - services.exe
+  - taskmgr.exe
+  - dwm.exe
+  - vprot.exe
+  - lsass.exe
+  - sihost.exe
+  - system
+
 output:
-  adapters:
-    - amqp:
-        host: 127.0.0.1
-        port: 5672
-        username: guest
-        password: guest
-        vhost: /
-    - smtp:
-        host: smtp.gmail.com
-        port: 587
-        from: fibratus@fibratus.io
-        password: secret
-        to:
-          - fibratus@fibratus.io
-          - netmutatus@netmutatus.io
+  - amqp:
+      host: 127.0.0.1
+      port: 5672
+      username: guest
+      password: guest
+      vhost: /
+  - smtp:
+      host: smtp.gmail.com
+      port: 587
+      from: fibratus@fibratus.io
+      password: secret
+      to:
+        - fibratus@fibratus.io
+        - netmutatus@netmutatus.io
