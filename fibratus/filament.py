@@ -14,6 +14,7 @@
 # under the License.
 
 import inspect
+import traceback
 import os
 import sys
 from importlib.machinery import SourceFileLoader
@@ -236,8 +237,8 @@ class Filament(Process):
                 kevent = self._keventq.get()
                 self._filament_module.on_next_kevent(ddict(kevent))
             except Exception:
-                self._logger.error('Unexpected filament error',
-                                   exc_info=sys.exc_info())
+                self._logger.error('Unexpected filament error %s',
+                                   traceback.format_exc())
 
     def render_tabular(self):
         """Renders the table to the console.
