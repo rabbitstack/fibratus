@@ -21,8 +21,13 @@ output:
   - smtp:
       host: smtp.gmail.com
       port: 587
-      from: fibratus@fibratus.io
+      from: info@github.io
       password: secret
       to:
-        - fibratus@fibratus.io
-        - netmutatus@netmutatus.io
+        - fibratus@github.io
+        - netmutatus@github.io
+  - elasticsearch:
+      hosts:
+        - localhost:9200
+      index: kernelstream
+      document: threads
