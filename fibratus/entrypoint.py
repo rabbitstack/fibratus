@@ -65,7 +65,6 @@ class Fibratus(object):
 
         enable_cswitch = kwargs.pop('cswitch', False)
 
-        self.kevt_streamc = KEventStreamCollector(etw.KERNEL_LOGGER_NAME.encode())
         self.kcontroller = KTraceController()
         self.ktrace_props = KTraceProps()
         self.ktrace_props.enable_kflags(cswitch=enable_cswitch)
@@ -83,6 +82,12 @@ class Fibratus(object):
             self.logger.info('%s handles found' % len(self._handles))
             self.handle_repository.free_buffers()
         self.thread_registry = ThreadRegistry(self.handle_repository, self._handles)
+
+        self.kevt_streamc = KEventStreamCollector(etw.KERNEL_LOGGER_NAME.encode(), self.thread_registry)
+        excluded_procs = self._config.excluded_procs
+        if len(excluded_procs) > 0:
+            self.logger.info("Excluding processes %s" % excluded_procs)
+        self.kevt_streamc.set_excluded_procs(excluded_procs)
 
         self.kevent = KEvent(self.thread_registry)
         self.keventq = Queue()
@@ -157,7 +162,7 @@ class Fibratus(object):
         self.kcontroller.stop_ktrace(self.ktrace_props)
         self.kevt_streamc.close_kstream()
 
-    def add_filters(self, kevent_filters):
+    def add_filters(self, kevent_filters, **kwargs):
         if len(kevent_filters) > 0:
             self.filters_count = len(kevent_filters)
             # include the basic filters
@@ -202,6 +207,8 @@ class Fibratus(object):
                     self.kevt_streamc.add_kevent_filter(ktuple)
                     if ktuple not in self.output_kevents:
                         self.output_kevents[ktuple] = True
+        if len(kwargs) > 0:
+            self.kevt_streamc.add_pid_filter(kwargs.pop('pid', None))
 
     def _on_next_kevent(self, ktype, cpuid, ts, kparams):
         """Callback which fires when new kernel event arrives.
