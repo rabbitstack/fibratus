@@ -33,9 +33,10 @@ class TestYamlConfig():
 
     def test_output_adapters(self):
         config = YamlConfig(__CONFIG_PATH__)
-        assert config.output_adapters
-        assert isinstance(config.output_adapters, list)
-        assert len(config.output_adapters) > 0
+        adapters = config.output_adapters
+        assert adapters
+        assert isinstance(adapters, list)
+        assert len(adapters) > 0
 
     def test_enum_output_adapters(self):
         config = YamlConfig(__CONFIG_PATH__)
@@ -45,3 +46,10 @@ class TestYamlConfig():
             for output_adapter in output_adapters:
                 adapter_name = next(iter(list(output_adapter.keys())), None)
                 assert adapter_name in adapter_names
+
+    def test_excluded_procs(self):
+        config = YamlConfig(__CONFIG_PATH__)
+        excluded_procs = config.excluded_procs
+        assert excluded_procs
+        assert isinstance(excluded_procs, list)
+        assert 'smss.exe' in excluded_procs
