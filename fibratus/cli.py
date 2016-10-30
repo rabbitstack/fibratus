@@ -106,10 +106,8 @@ def main():
         set_console_ctrl_handler(handle_ctrl_c, True)
 
         # add specific filters
-        filters = {}
-        pid = args['--pid'] if args['--pid'] else None
-        if pid:
-            filters['pid'] = pid
+        filters = dict()
+        filters['pid'] = args['--pid'] if args['--pid'] else None
 
         if not filament:
             if len(kevent_filters) > 0:
