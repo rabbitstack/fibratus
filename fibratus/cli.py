@@ -16,7 +16,8 @@
 
 """
 Usage:
-    fibratus run ([--filament=<filament>] | [--filters <kevents>...]) [--no-enum-handles] [--cswitch]
+    fibratus run ([--filament=<filament>] | [--filters <kevents>...])
+                 [--pid=<pid>] [--no-enum-handles] [--cswitch]
     fibratus list-kevents
     fibratus list-filaments
     fibratus -h | --help
@@ -26,6 +27,7 @@ Options:
     -h --help                 Show this screen.
     --filament=<filament>     Specify the filament to execute.
     --no-enum-handles         Avoids enumerating the system handles.
+    --pid=<pid>               Spy on a specific process identifier.
     --cswitch                 Enables context switch kernel events.
     --version                 Show version.
 """
@@ -37,7 +39,7 @@ from fibratus.apidefs.sys import set_console_ctrl_handler, PHANDLER_ROUTINE
 from fibratus.asciiart.tabular import Tabular
 from fibratus.common import IO
 from fibratus.errors import FilamentError
-from fibratus.fibratus_entrypoint import Fibratus
+from fibratus.entrypoint import Fibratus
 from fibratus.filament import Filament
 from fibratus.kevent import KEvents
 from fibratus.version import VERSION
@@ -50,8 +52,8 @@ filament_name = args['--filament'] if args['--filament'] else None
 
 def _check_kevent(kevent):
     if kevent not in KEvents.all():
-        IO.write_console('fibratus run: ERROR - %s is not a valid kernel event. Run list-kevents to see'
-                         ' the available kernel events' % kevent)
+        IO.write_console('fibratus run: ERROR - %s is not a valid kernel event. Run list-kevents to see '
+                         'the available kernel events' % kevent)
         sys.exit()
 
 
@@ -103,14 +105,22 @@ def main():
             return 0
         set_console_ctrl_handler(handle_ctrl_c, True)
 
+        # add specific filters
+        filters = {}
+        pid = args['--pid'] if args['--pid'] else None
+        if pid:
+            filters['pid'] = pid
+
         if not filament:
             if len(kevent_filters) > 0:
-                fibratus.add_filters(kevent_filters)
+                fibratus.add_filters(kevent_filters, **filters)
+            else:
+                fibratus.add_filters([], **filters)
         else:
             if len(filament_filters) > 0:
-                fibratus.add_filters(filament_filters)
+                fibratus.add_filters(filament_filters, **filters)
             else:
-                fibratus.add_filters([])
+                fibratus.add_filters([], **filters)
         try:
             fibratus.run()
         except KeyboardInterrupt:
