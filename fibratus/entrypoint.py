@@ -33,6 +33,7 @@ from fibratus.kevent import KEvent
 from fibratus.kevent_types import *
 from fibratus.common import DotD as ddict, IO
 from fibratus.output.adapter.amqp import AmqpAdapter
+from fibratus.output.adapter.elasticsearch import ElasticsearchAdapter
 from fibratus.output.adapter.smtp import SmtpAdapter
 from fibratus.registry import HiveParser
 from fibratus.tcpip import TcpIpParser
@@ -92,7 +93,9 @@ class Fibratus(object):
         self.kevent = KEvent(self.thread_registry)
         self.keventq = Queue()
 
-        self._adapter_classes = dict(smtp=SmtpAdapter, amqp=AmqpAdapter)
+        self._adapter_classes = dict(smtp=SmtpAdapter,
+                                     amqp=AmqpAdapter,
+                                     elasticsearch=ElasticsearchAdapter)
         self._output_adapters = self._construct_adapters()
 
         if filament:
@@ -207,8 +210,8 @@ class Fibratus(object):
                     self.kevt_streamc.add_kevent_filter(ktuple)
                     if ktuple not in self.output_kevents:
                         self.output_kevents[ktuple] = True
-        if len(kwargs) > 0:
-            self.kevt_streamc.add_pid_filter(kwargs.pop('pid', None))
+
+        self.kevt_streamc.add_pid_filter(kwargs.pop('pid', None))
 
     def _on_next_kevent(self, ktype, cpuid, ts, kparams):
         """Callback which fires when new kernel event arrives.
