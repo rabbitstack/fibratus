@@ -15,7 +15,7 @@
 import json
 import pika
 
-from fibratus.errors import InvalidAmqpPayloadError
+from fibratus.errors import InvalidPayloadError
 from fibratus.output.adapter.base import BaseAdapter
 
 
@@ -66,9 +66,9 @@ class AmqpAdapter(BaseAdapter):
 
         # the message body should be a dictionary
         if not isinstance(body, dict):
-            raise InvalidAmqpPayloadError('invalid payload for AMQP message. '
-                                          'dict expected but %s found'
-                                          % type(body))
+            raise InvalidPayloadError('invalid payload for AMQP message. '
+                                      'dict expected but %s found'
+                                      % type(body))
         body = json.dumps(body)
         self._channel.basic_publish(self._exchange,
                                     self._routingkey,

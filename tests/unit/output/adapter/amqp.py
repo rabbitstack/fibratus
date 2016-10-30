@@ -17,7 +17,7 @@ from unittest.mock import patch
 
 import pytest
 
-from fibratus.errors import InvalidAmqpPayloadError
+from fibratus.errors import InvalidPayloadError
 from fibratus.output.adapter.amqp import AmqpAdapter
 import pika
 
@@ -59,7 +59,7 @@ class TestAmqpAdapter(object):
     @patch('pika.BlockingConnection', spec_set=pika.BlockingConnection)
     def test_emit_invalid_payload(self, connection_mock, amqp_adapter):
         body = ['CrateProcess', 'TerminateProcess']
-        with pytest.raises(InvalidAmqpPayloadError) as e:
+        with pytest.raises(InvalidPayloadError) as e:
             connection_mock.channel.assert_called_once()
             amqp_adapter.emit(body)
         assert "invalid payload for AMQP message. dict expected but <class 'list'> found" == str(e.value)
