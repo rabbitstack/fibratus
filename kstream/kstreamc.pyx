@@ -19,6 +19,7 @@ import socket
 import struct
 import re
 import os
+import traceback
 
 from logbook import Logger, FileHandler
 
@@ -36,6 +37,12 @@ PID_PARAM_NAME = 'process_id'
 TID_PARAM_NAME = 'thread_id'
 
 REGISTRY_KEVENT_GUID = 'ae53722e-c863-11d2-8659-00c04fa321a1'
+
+ENUM_PROCESS = ('3d6fa8d0-fe05-11d0-9dda-00c04fd7ba7c', 3)
+ENUM_THREAD = ('3d6fa8d1-fe05-11d0-9dda-00c04fd7ba7c', 3)
+ENUM_IMAGE = ('2cb15d1d-5fc1-11d2-abe1-00a0c911f518', 3)
+REG_CREATE_KCB = ('ae53722e-c863-11d2-8659-00c04fa321a1', 22)
+REG_DELETE_KCB = ('ae53722e-c863-11d2-8659-00c04fa321a1', 23)
 
 
 cdef class KEventStreamCollector:
@@ -71,15 +78,18 @@ cdef class KEventStreamCollector:
     cdef pointer_size
     cdef property_regex
     cdef ketypes
-    cdef fibratus_pid
-    cdef exclude_props
-    cdef exclude_tids
+    cdef own_pid
     cdef kefilters
+    cdef exclude_pid_props
+    cdef exclude_from_filters
     cdef logger
     cdef file_handler
     cdef interrupted
+    cdef thread_registry
+    cdef _filters
+    cdef _excluded_procs
 
-    def __init__(self, klogger):
+    def __init__(self, klogger, thread_registry):
         self.klogger = klogger
         self.handle = 0
         self.next_kevt_callback = None
@@ -89,11 +99,14 @@ cdef class KEventStreamCollector:
         self.pointer_size = 8
         self.ketypes = {}
         self.kefilters = []
+        self._filters = []
+        self._excluded_procs = []
+        self.exclude_pid_props = ['process_id', 'parent_id', 'pid']
+        self.exclude_from_filters = [ENUM_PROCESS, ENUM_THREAD, ENUM_IMAGE, REG_CREATE_KCB, REG_DELETE_KCB]
         self.logger = Logger(KEventStreamCollector.__name__)
-        self.file_handler = FileHandler(os.path.join(os.path.abspath(__file__), '..', '..', 'fibratus.log'), mode='w')
-        self.fibratus_pid = os.getpid()
-        self.exclude_props = ['process_id', 'parent_id', 'pid', 'ttid']
-        self.exclude_tids = []
+        self.file_handler = FileHandler(os.path.join(os.path.expanduser('~'), '.fibratus', 'fibratus.log'), mode='a')
+        self.own_pid = os.getpid()
+        self.thread_registry = thread_registry
         self.interrupted = False
 
     def open_kstream(self, callback):
@@ -151,6 +164,13 @@ cdef class KEventStreamCollector:
     def add_kevent_filter(self, kefilter):
         self.kefilters.append(kefilter)
 
+    def add_pid_filter(self, pid):
+        if pid:
+            self._filters.append(lambda kpid: kpid != int(pid))
+
+    def set_excluded_procs(self, excluded_procs):
+        self._excluded_procs = excluded_procs
+
     def clear_kefilters(self):
         self.kefilters.clear()
 
@@ -178,7 +198,7 @@ cdef class KEventStreamCollector:
         cdef BYTE* property_buffer
         cdef ULONG property_size
         cdef PROPERTY_DATA_DESCRIPTOR descriptor
-        cdef discard = False
+        cdef dropped = False
 
         try:
             status = TdhGetEventInformation(kevent_trace,
@@ -191,109 +211,128 @@ cdef class KEventStreamCollector:
             opcode = <BYTE> kevent_trace.EventHeader.EventDescriptor.Opcode
             # the cpu where the event has been captured
             cpuid = <UCHAR> kevent_trace.BufferContext.ProcessorNumber
+            pid = <ULONG> kevent_trace.EventHeader.ProcessId
+            tid = <ULONG> kevent_trace.EventHeader.ThreadId
+
+            # we don't want to capture events
+            # coming from the fibratus process
+            # nor from the process we've declared
+            # in the excluded process list
+            if self.own_pid == pid or self._exclude_kevent(pid, tid):
+                free(<void*> info)
+                return
 
             # get the event type tuple
-            # and apply filters for the kernel event
+            # and apply filters if they
+            # are passed from the CLI
             kevt_type = self._assemble_type(info.EventGuid, opcode)
-            if len(self.kefilters) > 0:
-                if kevt_type not in self.kefilters:
-                    free(info)
-                    return
-            if (kevent_trace.EventHeader.Flags & EVENT_HEADER_FLAG_32_BIT_HEADER) == \
-                    EVENT_HEADER_FLAG_32_BIT_HEADER:
-                self.pointer_size = 4
-            else:
-                self.pointer_size = 8
+            if kevt_type not in self.exclude_from_filters:
+                if len(self.kefilters) > 0 and len(self._filters) == 0:
+                    if kevt_type not in self.kefilters:
+                        dropped = True
+                elif len(self.kefilters) > 0 and len(self._filters) > 0:
+                    for f in self._filters:
+                        dropped = f(pid)
+                elif len(self._filters) > 0:
+                    for f in self._filters:
+                        dropped = f(pid)
 
-            # the call has succeed. We loop over event properties
-            # and apply the parsing logic.
-            # It is very important to release the memory allocated for the
-            # `TRACE_EVENT_INFO` structure once we had
-            # parsed the event properties. Otherwise, memory leaks can occur
-            if status == ERROR_SUCCESS:
-                props = info.EventPropertyInfoArray
-                for i from 0 <= i < info.TopLevelPropertyCount:
-                    property = <EVENT_PROPERTY_INFO> props[i]
+                # we got an invalid pid from the header
+                # and we can't still drop the event
+                if pid == 0xFFFFFFFF:
+                    dropped = False
 
-                    property_name = <LPTSTR><BYTE*>info + property.NameOffset
+            if not dropped:
+                if (kevent_trace.EventHeader.Flags & EVENT_HEADER_FLAG_32_BIT_HEADER) == \
+                        EVENT_HEADER_FLAG_32_BIT_HEADER:
+                    self.pointer_size = 4
+                else:
+                    self.pointer_size = 8
 
-                    # initialize the descriptor
-                    # with the property name
-                    descriptor.PropertyName = <ULONGLONG><BYTE*>info + property.NameOffset
-                    descriptor.ArrayIndex = 0xFFFFFFFF
+                # the call has succeed. We loop over event properties
+                # and apply the parsing logic.
+                # It is very important to release the memory allocated for the
+                # `TRACE_EVENT_INFO` structure once we had
+                # parsed the event properties. Otherwise, memory leaks can occur
+                if status == ERROR_SUCCESS:
+                    props = info.EventPropertyInfoArray
+                    for i from 0 <= i < info.TopLevelPropertyCount:
+                        property = <EVENT_PROPERTY_INFO> props[i]
 
-                    # get the property size which
-                    # is used to allocate the buffer
-                    TdhGetPropertySize(kevent_trace, 0, NULL,
-                                       1,
-                                       &descriptor,
-                                       &property_size)
-                    property_buffer = <BYTE* > malloc(property_size)
+                        property_name = <LPTSTR><BYTE*>info + property.NameOffset
 
-                    # fill the property buffer
-                    status = TdhGetProperty(kevent_trace, 0, NULL,
-                                            1,
-                                            &descriptor,
-                                            property_size,
-                                            property_buffer)
-                    # get the property value and store
-                    # it in the parameter dictionary
-                    if status == ERROR_SUCCESS:
-                        param = self._parse_property(property.nonStructType.InType,
-                                                     property.nonStructType.OutType,
-                                                     property_buffer)
-                        # convert the property name from
-                        # camel case to underscore so we have
-                        # PEP 8 compliant coding style
-                        _property = self.property_regex.sub(r'_\1', property_name).lower()
+                        # initialize the descriptor
+                        # with the property name
+                        descriptor.PropertyName = <ULONGLONG><BYTE*>info + property.NameOffset
+                        descriptor.ArrayIndex = 0xFFFFFFFF
 
-                        # if the event is coming from  the fibratus pid, discard it
-                        if _property in self.exclude_props:
-                            if self.fibratus_pid == param:
-                                discard = True
-                            elif 'ttid' in _property:
-                                pass
-                        elif REGISTRY_KEVENT_GUID == kevt_type[0]:
-                            # registry events have a valid process/thread
-                            # id in the event header. Aggregate them to event payload
-                            pid = <ULONG> kevent_trace.EventHeader.ProcessId
-                            params[TID_PARAM_NAME] = <ULONG> kevent_trace.EventHeader.ThreadId
-                            params[PID_PARAM_NAME] = pid
+                        # get the property size which
+                        # is used to allocate the buffer
+                        TdhGetPropertySize(kevent_trace, 0, NULL,
+                                           1,
+                                           &descriptor,
+                                           &property_size)
+                        property_buffer = <BYTE* > malloc(property_size)
 
-                            if self.fibratus_pid == pid:
-                                discard = True
-                        if discard:
-                            # cleanup and stop processing
-                            free(<void*> property_buffer)
-                            free(<void*> info)
-                            return
-                        params[_property] = param
-                    # release property buffer memory
-                    free(<void*> property_buffer)
+                        # fill the property buffer
+                        status = TdhGetProperty(kevent_trace, 0, NULL,
+                                                1,
+                                                &descriptor,
+                                                property_size,
+                                                property_buffer)
+                        # get the property value and store
+                        # it in the parameter dictionary
+                        if status == ERROR_SUCCESS:
+                            param = self._parse_property(property.nonStructType.InType,
+                                                         property.nonStructType.OutType,
+                                                         property_buffer)
+                            # convert the property name from
+                            # camel case to underscore so we have
+                            # PEP 8 compliant coding style
+                            _property = self.property_regex.sub(r'_\1', property_name).lower()
+                            if _property in self.exclude_pid_props:
+                                if self.own_pid == param:
+                                    self._free_buffers(info, property_buffer)
+                                    return
+                                elif len(self._filters) > 0:
+                                    if kevt_type not in self.exclude_from_filters:
+                                        for f in self._filters:
+                                            if f(param):
+                                                self._free_buffers(info, property_buffer)
+                                                return
+                            self._aggregate_info(kevent_trace, kevt_type, params)
 
-                ts = self._filetime_to_systime(kevent_trace.EventHeader)
+                            params[_property] = param
+                        # release property buffer memory
+                        free(<void*> property_buffer)
 
-                # call the kernel event callback
-                # with the specified arguments
-                self.next_kevt_callback(kevt_type,
-                                        cpuid,
-                                        ts,
-                                        params)
+                    ts = self._filetime_to_systime(kevent_trace.EventHeader)
+
+                    # call the kernel event callback
+                    # with the specified arguments
+                    self.next_kevt_callback(kevt_type,
+                                            cpuid,
+                                            ts,
+                                            params)
         except Exception as e:
             with self.file_handler.applicationbound():
-                self.logger.error(e)
+                self.logger.error(traceback.format_exc())
         except KeyboardInterrupt:
             pass
         # claim the allocated memory
         free(<void*> info)
-        # check for pending signals
-        # the default behaviour is to
+        # check for pending signals.
+        # The default behaviour is to
         # raise `KeyboardInterrupt` exception
         # which will be propagated to the caller
         if PyErr_CheckSignals() > 0:
             self.interrupted = True
             self.close_kstream()
             return
+
+    cdef _free_buffers(self, TRACE_EVENT_INFO* info_buffer, BYTE* property_buffer):
+        free(property_buffer)
+        free(info_buffer)
 
     cdef _parse_property(self, USHORT in_type, USHORT out_type, BYTE* buf):
         """Parses the property value.
@@ -500,3 +539,31 @@ cdef class KEventStreamCollector:
         return '%d:%02d:%02d.%d' % (tzt.wHour, tzt.wMinute,
                                     tzt.wSecond,
                                     tzt.wMilliseconds)
+
+    cdef _exclude_kevent(self, pid, tid):
+        """Excludes the kernel event from the pid or tid
+
+        Parameters
+        ----------
+
+        pid: ULONG
+            the identifier of the process which emitted the event
+        tid: ULONG
+            the identifier of the thread which belongs to the process
+
+       """
+        if len(self._excluded_procs) == 0:
+            return False
+        thread = self.thread_registry.get_thread(pid) or \
+                 self.thread_registry.get_thread(tid)
+        return True if thread and thread.name \
+                                  in self._excluded_procs else False
+
+    cdef _aggregate_info(self, EVENT_RECORD* kevent_trace, kevt_type, params):
+        if REGISTRY_KEVENT_GUID == kevt_type[0]:
+            # registry events have a valid process/thread
+            # id in the event header.
+            # Aggregate them to event payload
+            params[TID_PARAM_NAME] = <ULONG> kevent_trace.EventHeader.ThreadId
+            params[PID_PARAM_NAME] = <ULONG> kevent_trace.EventHeader.ProcessId
+
