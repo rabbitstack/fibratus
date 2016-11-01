@@ -14,6 +14,7 @@
 # under the License.
 
 import elasticsearch
+import elasticsearch.helpers
 
 from fibratus.errors import InvalidPayloadError
 from fibratus.output.adapter.base import BaseAdapter
@@ -36,18 +37,29 @@ class ElasticsearchAdapter(BaseAdapter):
         self._hosts = [dict(host=host.split(':')[0], port=int(host.split(':')[1])) for host in hosts]
         self._index_name = kwargs.pop('index', None)
         self._document_type = kwargs.pop('document', '')
+        self._bulk = kwargs.pop('bulk', False)
         self._elasticsearch = None
 
     def emit(self, body, **kwargs):
         if not self._elasticsearch:
             self._elasticsearch = elasticsearch.Elasticsearch(self._hosts)
-        if not isinstance(body, dict):
-            raise InvalidPayloadError('invalid payload for document. '
-                                      'dict expected but %s found'
-                                      % type(body))
+        if self._bulk:
+            if not isinstance(body, list):
+                raise InvalidPayloadError('invalid payload for bulk indexing. '
+                                          'list expected but %s found'
+                                          % type(body))
+        else:
+            if not isinstance(body, dict):
+                raise InvalidPayloadError('invalid payload for document. '
+                                          'dict expected but %s found'
+                                          % type(body))
 
         self._index_name = kwargs.pop('index', self._index_name)
-        self._elasticsearch.index(self._index_name, self._document_type, body=body)
+        if self._bulk:
+            actions = [dict(_index=self._index_name, _type=self._document_type, _source=b) for b in body]
+            elasticsearch.helpers.bulk(self._elasticsearch, actions)
+        else:
+            self._elasticsearch.index(self._index_name, self._document_type, body=body)
 
     @property
     def hosts(self):
@@ -60,3 +72,7 @@ class ElasticsearchAdapter(BaseAdapter):
     @property
     def document_type(self):
         return self._document_type
+
+    @property
+    def bulk(self):
+        return self._bulk
