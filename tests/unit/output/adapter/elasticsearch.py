@@ -34,6 +34,20 @@ def elasticsearch_adapter():
     return ElasticsearchAdapter(**config)
 
 
+@pytest.fixture(scope='module')
+def elasticsearch_bulk_adapter():
+    config = {
+        'hosts': [
+            'localhost:9200',
+            'rabbitstack:9200'
+        ],
+        'index': 'kernelstream',
+        'document': 'threads',
+        'bulk': True
+    }
+    return ElasticsearchAdapter(**config)
+
+
 class TestElasticsearchAdapter(object):
 
     def test_init(self, elasticsearch_adapter):
@@ -42,6 +56,7 @@ class TestElasticsearchAdapter(object):
         assert {'host': 'localhost', 'port': 9200} in elasticsearch_adapter.hosts
         assert elasticsearch_adapter.index_name == 'kernelstream'
         assert elasticsearch_adapter.document_type == 'threads'
+        assert not elasticsearch_adapter.bulk
 
     def test_emit(self, elasticsearch_adapter):
         body = {'kevent_type': 'CreateProcess', 'params': {'name': 'smss.exe'}}
@@ -59,3 +74,25 @@ class TestElasticsearchAdapter(object):
             elasticsearch_adapter.emit(body)
         assert "invalid payload for document. dict expected but <class 'list'> found" == str(e.value)
         assert es_client_mock.index.assert_not_called()
+
+    @patch('elasticsearch.Elasticsearch', spec_set=elasticsearch.Elasticsearch)
+    @patch('elasticsearch.helpers.bulk')
+    def test_emit_bulk(self, es_bulk_mock, es_client_mock, elasticsearch_bulk_adapter):
+        body = [{'kevent_type': 'CreateProcess', 'params': {'name': 'smss.exe'}},
+                {'kevent_type': 'TerminateProcess', 'params': {'name': 'smss.exe'}}]
+        elasticsearch_bulk_adapter.emit(body)
+        expected_body = [{'_index': 'kernelstream', '_type': 'threads', '_source':
+                                    {'kevent_type': 'CreateProcess', 'params': {'name': 'smss.exe'}}},
+                         {'_index': 'kernelstream', '_type': 'threads', '_source':
+                                    {'kevent_type': 'TerminateProcess', 'params': {'name': 'smss.exe'}}}]
+        es_bulk_mock.assert_called_once_with(elasticsearch_bulk_adapter._elasticsearch, expected_body)
+
+    @patch('elasticsearch.Elasticsearch', spec_set=elasticsearch.Elasticsearch)
+    @patch('elasticsearch.helpers.bulk')
+    def test_emit_bulk_invalid_payload(self, es_bulk_mock, es_client_mock, elasticsearch_bulk_adapter):
+        body = ({'kevent_type': 'CreateProcess', 'params': {'name': 'smss.exe'}},
+                {'kevent_type': 'TerminateProcess', 'params': {'name': 'smss.exe'}},)
+        with pytest.raises(InvalidPayloadError) as e:
+            elasticsearch_bulk_adapter.emit(body)
+        assert "invalid payload for bulk indexing. list expected but <class 'tuple'> found" == str(e.value)
+        assert es_bulk_mock.assert_not_called()
