@@ -36,13 +36,19 @@ class ElasticsearchAdapter(BaseAdapter):
         hosts = kwargs.pop('hosts', [])
         self._hosts = [dict(host=host.split(':')[0], port=int(host.split(':')[1])) for host in hosts]
         self._index_name = kwargs.pop('index', None)
-        self._document_type = kwargs.pop('document', '')
+        self._document_type = kwargs.pop('document', None)
         self._bulk = kwargs.pop('bulk', False)
+        self._username = kwargs.pop('username', None)
+        self._password = kwargs.pop('password', None)
+        self._config = {}
+        if self._username and self._password:
+            self._config['http_auth'] = (self._username, self._password,)
+        self._config['use_ssl'] = kwargs.pop('ssl', False)
         self._elasticsearch = None
 
     def emit(self, body, **kwargs):
         if not self._elasticsearch:
-            self._elasticsearch = elasticsearch.Elasticsearch(self._hosts)
+            self._elasticsearch = elasticsearch.Elasticsearch(self._hosts, **self._config)
         if self._bulk:
             if not isinstance(body, list):
                 raise InvalidPayloadError('invalid payload for bulk indexing. '

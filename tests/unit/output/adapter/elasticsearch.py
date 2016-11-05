@@ -43,7 +43,9 @@ def elasticsearch_bulk_adapter():
         ],
         'index': 'kernelstream',
         'document': 'threads',
-        'bulk': True
+        'bulk': True,
+        'username': 'elastic',
+        'password': 'changeme'
     }
     return ElasticsearchAdapter(**config)
 
@@ -64,12 +66,12 @@ class TestElasticsearchAdapter(object):
         with patch('elasticsearch.Elasticsearch', spec_set=elasticsearch.Elasticsearch) as es_client_mock:
             elasticsearch_adapter.emit(body)
             es_client_mock.assert_called_with([{'host': 'localhost', 'port': 9200},
-                                               {'host': 'rabbitstack', 'port': 9200}])
+                                               {'host': 'rabbitstack', 'port': 9200}], use_ssl=False)
             elasticsearch_adapter._elasticsearch.index.assert_called_with('kernelstream', 'threads', body=body)
 
     @patch('elasticsearch.Elasticsearch', spec_set=elasticsearch.Elasticsearch)
     def test_emit_invalid_payload(self, es_client_mock, elasticsearch_adapter):
-        body = ['CrateProcess', 'TerminateProcess']
+        body = ['CreateProcess', 'TerminateProcess']
         with pytest.raises(InvalidPayloadError) as e:
             elasticsearch_adapter.emit(body)
         assert "invalid payload for document. dict expected but <class 'list'> found" == str(e.value)
@@ -81,6 +83,9 @@ class TestElasticsearchAdapter(object):
         body = [{'kevent_type': 'CreateProcess', 'params': {'name': 'smss.exe'}},
                 {'kevent_type': 'TerminateProcess', 'params': {'name': 'smss.exe'}}]
         elasticsearch_bulk_adapter.emit(body)
+        es_client_mock.assert_called_with([{'host': 'localhost', 'port': 9200},
+                                           {'host': 'rabbitstack', 'port': 9200}], use_ssl=False,
+                                          http_auth=('elastic', 'changeme',))
         expected_body = [{'_index': 'kernelstream', '_type': 'threads', '_source':
                                     {'kevent_type': 'CreateProcess', 'params': {'name': 'smss.exe'}}},
                          {'_index': 'kernelstream', '_type': 'threads', '_source':

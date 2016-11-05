@@ -32,3 +32,6 @@ output:
       index: kernelstream
       document: threads
       bulk: True
+      username: elastic
+      password: changeme
+      ssl: True
