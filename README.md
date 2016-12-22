@@ -42,6 +42,9 @@ Please use Github's pull-request model to submit your contributions. Before you 
 
 A lot of love and passion is put into Fibratus. If you want to support Fibratus, please consider a donation.
 
+[![Beerpay](https://beerpay.io/rabbitstack/fibratus/badge.svg?style=beer-square)](https://beerpay.io/rabbitstack/fibratus)  [![Beerpay](https://beerpay.io/rabbitstack/fibratus/make-wish.svg?style=flat-square)](https://beerpay.io/rabbitstack/fibratus?focus=wish)
+
+
 ### Backers
 Support us with a monthly donation and help us continue our activities. [[Become a backer](https://opencollective.com/fibratus#backer)]
 
@@ -109,5 +112,3 @@ Become a sponsor and get your logo on our README on Github with a link to your s
 <a href="https://opencollective.com/fibratus/sponsor/27/website" target="_blank"><img src="https://opencollective.com/fibratus/sponsor/27/avatar.svg"></a>
 <a href="https://opencollective.com/fibratus/sponsor/28/website" target="_blank"><img src="https://opencollective.com/fibratus/sponsor/28/avatar.svg"></a>
 <a href="https://opencollective.com/fibratus/sponsor/29/website" target="_blank"><img src="https://opencollective.com/fibratus/sponsor/29/avatar.svg"></a>
-
-[![Beerpay](https://beerpay.io/rabbitstack/fibratus/badge.svg?style=beer-square)](https://beerpay.io/rabbitstack/fibratus)  [![Beerpay](https://beerpay.io/rabbitstack/fibratus/make-wish.svg?style=flat-square)](https://beerpay.io/rabbitstack/fibratus?focus=wish)
