@@ -43,5 +43,4 @@ def declare(lib_name, function_name, args, restype):
                 function.restype = restype
         return function
     else:
-        raise AttributeError('The library %s cannot be loaded'
-                            % lib_name)
+        raise AttributeError('The library %s cannot be loaded' % lib_name)
