@@ -35,7 +35,8 @@ def copy_artifacts():
 
 kstreamc_ext = Extension('kstreamc',
                          ['kstream/kstreamc.pyx'],
-                         libraries=["tdh", "advapi32", "ole32"])
+                         libraries=["tdh", "advapi32", "ole32", "ws2_32"],
+                         language='c++')
 
 install_reqs = parse_requirements('requirements.txt', session=False)
 reqs = [str(ir.req) for ir in install_reqs if not re.match('pytest|codecov', str(ir.req))]
