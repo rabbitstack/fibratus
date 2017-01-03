@@ -14,42 +14,53 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-
-import socket
-import struct
 import re
 import os
 import traceback
 
-from logbook import Logger, FileHandler
-
+from libcpp.unordered_map cimport unordered_map
+from cython.operator cimport dereference as deref, preincrement as inc
+from libcpp.vector cimport vector
+from libcpp.utility cimport pair
 
 from cpython cimport PyBytes_AsString
-from cpython.exc cimport PyErr_CheckSignals
 
-from kstream.ktypedefs cimport *
+
+from kstream.includes.etw cimport *
+from kstream.includes.tdh cimport *
+from kstream.includes.windows cimport *
+from kstream.includes.python cimport *
+from kstream.includes.stdlib cimport *
+from kstream.includes.string cimport *
+from kstream.time cimport sys_time
+from kstream.ktuple cimport build_ktuple
+
 
 cdef enum:
-    GUID_LEN = 39
-    MAX_NAME = 256
+    GUID_LENGTH = 36
+    INVALID_PID = 4294967295
 
-PID_PARAM_NAME = 'process_id'
-TID_PARAM_NAME = 'thread_id'
+cdef PyObject* ENUM_PROCESS = build_ktuple(<PyObject*>'{3d6fa8d0-fe05-11d0-9dda-00c04fd7ba7c}', 3)
+cdef PyObject* ENUM_THREAD = build_ktuple(<PyObject*>'{3d6fa8d1-fe05-11d0-9dda-00c04fd7ba7c}', 3)
+cdef PyObject* ENUM_IMAGE = build_ktuple(<PyObject*>'{2cb15d1d-5fc1-11d2-abe1-00a0c911f518}', 3)
+cdef PyObject* REG_CREATE_KCB = build_ktuple(<PyObject*>'{ae53722e-c863-11d2-8659-00c04fa321a1}', 22)
+cdef PyObject* REG_DELETE_KCB = build_ktuple(<PyObject*>'{ae53722e-c863-11d2-8659-00c04fa321a1}', 23)
 
-REGISTRY_KEVENT_GUID = 'ae53722e-c863-11d2-8659-00c04fa321a1'
+cdef PyObject* CREATE_PROCESS = build_ktuple(<PyObject*>'{3d6fa8d0-fe05-11d0-9dda-00c04fd7ba7c}', 1)
+cdef PyObject* TERMINATE_PROCESS = build_ktuple(<PyObject*>'{3d6fa8d0-fe05-11d0-9dda-00c04fd7ba7c}', 2)
 
-ENUM_PROCESS = ('3d6fa8d0-fe05-11d0-9dda-00c04fd7ba7c', 3)
-ENUM_THREAD = ('3d6fa8d1-fe05-11d0-9dda-00c04fd7ba7c', 3)
-ENUM_IMAGE = ('2cb15d1d-5fc1-11d2-abe1-00a0c911f518', 3)
-REG_CREATE_KCB = ('ae53722e-c863-11d2-8659-00c04fa321a1', 22)
-REG_DELETE_KCB = ('ae53722e-c863-11d2-8659-00c04fa321a1', 23)
+cdef wstring PID_PROP = deref_prop("PID")
+cdef wstring PROCESS_ID_PROP = deref_prop("ProcessId")
+cdef wstring IMAGE_FILE_NAME_PROP = deref_prop("ImageFileName")
+
+REGISTRY_KGUID = '{ae53722e-c863-11d2-8659-00c04fa321a1}'
 
 
 cdef class KEventStreamCollector:
     """Kernel event stream collector.
 
 
-    Collects events the from kernel event stream and invokes
+    Collects events from the kernel event stream and invokes
     a python callback method for each event delivered
     to the collector.
 
@@ -64,50 +75,41 @@ cdef class KEventStreamCollector:
 
     Register a python callback:
 
-    def next_kevt(ketype, cpuid, ts, kparams):
+    def next_kevt(ktype, cpuid, ts, kparams):
         # your logic here
     kevt_stream_collector.open_kstream(next_kevt)
 
 
     """
-    cdef EVENT_TRACE_LOGFILE kevent_logfile
+    cdef EVENT_TRACE_LOGFILE ktrace
     cdef TRACEHANDLE handle
+    cdef int pointer_size
+
+    cdef vector[PyObject*]* ktuple_filters
+    cdef vector[wchar_t*]* skips
+    cdef unordered_map[ULONG, wchar_t*]* proc_map
+    cdef ULONG pid_filter
+
+    cdef ULONG own_pid
+
     cdef next_kevt_callback
     cdef on_kstream_open_callback
     cdef klogger
-    cdef pointer_size
-    cdef property_regex
-    cdef ketypes
-    cdef own_pid
-    cdef kefilters
-    cdef exclude_pid_props
-    cdef exclude_from_filters
-    cdef logger
-    cdef file_handler
-    cdef interrupted
-    cdef thread_registry
-    cdef _filters
-    cdef _excluded_procs
+    cdef regex
 
-    def __init__(self, klogger, thread_registry):
+    def __init__(self, klogger):
         self.klogger = klogger
         self.handle = 0
         self.next_kevt_callback = None
         self.on_kstream_open_callback = None
-        self.kevent_logfile.LoggerName = PyBytes_AsString(self.klogger)
-        self.property_regex = re.compile('((?<=[a-z0-9])[A-Z]|(?!^)[A-Z](?=[a-z]))')
+        self.ktrace.logger_name = PyBytes_AsString(self.klogger)
+        self.regex = re.compile('((?<=[a-z0-9])[A-Z]|(?!^)[A-Z](?=[a-z]))')
         self.pointer_size = 8
-        self.ketypes = {}
-        self.kefilters = []
-        self._filters = []
-        self._excluded_procs = []
-        self.exclude_pid_props = ['process_id', 'parent_id', 'pid']
-        self.exclude_from_filters = [ENUM_PROCESS, ENUM_THREAD, ENUM_IMAGE, REG_CREATE_KCB, REG_DELETE_KCB]
-        self.logger = Logger(KEventStreamCollector.__name__)
-        self.file_handler = FileHandler(os.path.join(os.path.expanduser('~'), '.fibratus', 'fibratus.log'), mode='a')
-        self.own_pid = os.getpid()
-        self.thread_registry = thread_registry
-        self.interrupted = False
+        self.ktuple_filters = new vector[PyObject*]()
+        self.proc_map = new unordered_map[ULONG, wchar_t*]()
+        self.skips = new vector[wchar_t*]()
+        self.pid_filter = 0
+        self.own_pid = <ULONG>os.getpid()
 
     def open_kstream(self, callback):
         """Initializes the kernel event stream.
@@ -126,63 +128,53 @@ cdef class KEventStreamCollector:
         """
         self.next_kevt_callback = callback
 
-        self.kevent_logfile.ProcessTraceMode = EVENT_TRACE_REAL_TIME_MODE | PROCESS_TRACE_MODE_EVENT_RECORD
-        self.kevent_logfile.EventRecordCallback = <PEVENT_RECORD_CALLBACK> self.process_kevent_callback
+        self.ktrace.trace_mode = EVENT_TRACE_REAL_TIME_MODE | PROCESS_TRACE_MODE_EVENT_RECORD
+        self.ktrace.callback = <PEVENT_RECORD_CALLBACK> self.process_kevent_callback
         # because `process_kevent` callback is the instance
         # method and the ETW API expects a callback function with
         # single parameter, the `self` argument refers to
         # an invalid context. We need to inject the reference
         # to this instance into `Context` member.
-        self.kevent_logfile.Context = <PVOID> self
+        self.ktrace.context = <PVOID> self
 
-        with self.file_handler.applicationbound():
-            self.logger.info('Opening kernel event stream')
-        self.handle = OpenTrace(&self.kevent_logfile)
+        self.handle = open_trace(&self.ktrace)
 
         if self.on_kstream_open_callback:
             self.on_kstream_open_callback()
 
         # foward the kernel event stream
         # to the consumer and start the processing
-        status = ProcessTrace(&self.handle,
-                              1,
-                              NULL,
-                              NULL)
-
+        status = process_trace(&self.handle, 1,
+                               NULL,
+                               NULL)
         if status != ERROR_SUCCESS or status != ERROR_CANCELLED:
             if status != INVALID_PROCESSTRACE_HANDLE:
-                CloseTrace(self.handle)
+                close_trace(self.handle)
             else:
                 raise RuntimeError('ERROR - Unable to open kernel event stream. Error %s' % status)
+
+    def close_kstream(self):
+        close_trace(self.handle)
 
     def set_kstream_open_callback(self, callback):
         self.on_kstream_open_callback = callback
 
-    def close_kstream(self):
-        CloseTrace(self.handle)
+    def set_excluded_procs(self, skips):
+        for skip in skips:
+            self.skips.push_back(_wchar_t(<PyObject*>skip))
 
-    def add_kevent_filter(self, kefilter):
-        self.kefilters.append(kefilter)
+    def add_kevent_filter(self, ktuple):
+        kguid, opcode = ktuple
+        self.ktuple_filters.push_back(build_ktuple(<PyObject*>kguid, <UCHAR>opcode))
 
     def add_pid_filter(self, pid):
-        if pid:
-            self._filters.append(lambda kpid: kpid != int(pid))
+        self.pid_filter = <ULONG>int(pid)
 
-    def set_excluded_procs(self, excluded_procs):
-        self._excluded_procs = excluded_procs
+    cdef process_kevent_callback(self, EVENT_RECORD* kevent_trace):
+        with nogil:
+            (<KEventStreamCollector>kevent_trace.user_ctx)._process_kevent(kevent_trace)
 
-    def clear_kefilters(self):
-        self.kefilters.clear()
-
-    cdef process_kevent_callback(self,  EVENT_RECORD* kevent_trace):
-        # remember we can`t use the `self` to refer to the instance
-        # of the class. In case the better approach to access
-        # the `self` exists, I would like to see it
-        cdef KEventStreamCollector cself = <KEventStreamCollector> kevent_trace.UserContext
-        if not cself.interrupted:
-            cself._process_kevent(kevent_trace)
-
-    cdef void _process_kevent(self, EVENT_RECORD* kevent_trace) except *:
+    cdef void _process_kevent(self, EVENT_RECORD* kevent_trace) nogil except *:
         """Kernel event stream callback.
 
         Parameters
@@ -193,148 +185,157 @@ cdef class KEventStreamCollector:
 
         """
         cdef TRACE_EVENT_INFO* info = <TRACE_EVENT_INFO*> malloc(4096)
-        cdef ULONG buffer_size = 4096
-        cdef params = {}
-        cdef BYTE* property_buffer
-        cdef ULONG property_size
-        cdef PROPERTY_DATA_DESCRIPTOR descriptor
-        cdef dropped = False
 
-        try:
-            status = TdhGetEventInformation(kevent_trace,
-                                            0,
-                                            NULL,
-                                            info,
-                                            &buffer_size)
-            # kernel event type within the
-            # scope of the event GUID
-            opcode = <BYTE> kevent_trace.EventHeader.EventDescriptor.Opcode
-            # the cpu where the event has been captured
-            cpuid = <UCHAR> kevent_trace.BufferContext.ProcessorNumber
-            pid = <ULONG> kevent_trace.EventHeader.ProcessId
-            tid = <ULONG> kevent_trace.EventHeader.ThreadId
-
-            # we don't want to capture events
-            # coming from the fibratus process
-            # nor from the process we've declared
-            # in the excluded process list
-            if self.own_pid == pid or self._exclude_kevent(pid, tid):
-                free(<void*> info)
-                return
-
-            # get the event type tuple
-            # and apply filters if they
-            # are passed from the CLI
-            kevt_type = self._assemble_type(info.EventGuid, opcode)
-            if kevt_type not in self.exclude_from_filters:
-                if len(self.kefilters) > 0 and len(self._filters) == 0:
-                    if kevt_type not in self.kefilters:
-                        dropped = True
-                elif len(self.kefilters) > 0 and len(self._filters) > 0:
-                    for f in self._filters:
-                        dropped = f(pid)
-                elif len(self._filters) > 0:
-                    for f in self._filters:
-                        dropped = f(pid)
-
-                # we got an invalid pid from the header
-                # and we can't still drop the event
-                if pid == 0xFFFFFFFF:
-                    dropped = False
-
-            if not dropped:
-                if (kevent_trace.EventHeader.Flags & EVENT_HEADER_FLAG_32_BIT_HEADER) == \
-                        EVENT_HEADER_FLAG_32_BIT_HEADER:
-                    self.pointer_size = 4
-                else:
-                    self.pointer_size = 8
-
-                # the call has succeed. We loop over event properties
-                # and apply the parsing logic.
-                # It is very important to release the memory allocated for the
-                # `TRACE_EVENT_INFO` structure once we had
-                # parsed the event properties. Otherwise, memory leaks can occur
-                if status == ERROR_SUCCESS:
-                    props = info.EventPropertyInfoArray
-                    for i from 0 <= i < info.TopLevelPropertyCount:
-                        property = <EVENT_PROPERTY_INFO> props[i]
-
-                        property_name = <LPTSTR><BYTE*>info + property.NameOffset
-
-                        # initialize the descriptor
-                        # with the property name
-                        descriptor.PropertyName = <ULONGLONG><BYTE*>info + property.NameOffset
-                        descriptor.ArrayIndex = 0xFFFFFFFF
-
-                        # get the property size which
-                        # is used to allocate the buffer
-                        TdhGetPropertySize(kevent_trace, 0, NULL,
-                                           1,
-                                           &descriptor,
-                                           &property_size)
-                        property_buffer = <BYTE* > malloc(property_size)
-
-                        # fill the property buffer
-                        status = TdhGetProperty(kevent_trace, 0, NULL,
-                                                1,
-                                                &descriptor,
-                                                property_size,
-                                                property_buffer)
-                        # get the property value and store
-                        # it in the parameter dictionary
-                        if status == ERROR_SUCCESS:
-                            param = self._parse_property(property.nonStructType.InType,
-                                                         property.nonStructType.OutType,
-                                                         property_buffer)
-                            # convert the property name from
-                            # camel case to underscore so we have
-                            # PEP 8 compliant coding style
-                            _property = self.property_regex.sub(r'_\1', property_name).lower()
-                            if _property in self.exclude_pid_props:
-                                if self.own_pid == param:
-                                    self._free_buffers(info, property_buffer)
-                                    return
-                                elif len(self._filters) > 0:
-                                    if kevt_type not in self.exclude_from_filters:
-                                        for f in self._filters:
-                                            if f(param):
-                                                self._free_buffers(info, property_buffer)
-                                                return
-                            self._aggregate_info(kevent_trace, kevt_type, params)
-
-                            params[_property] = param
-                        # release property buffer memory
-                        free(<void*> property_buffer)
-
-                    ts = self._filetime_to_systime(kevent_trace.EventHeader)
-
-                    # call the kernel event callback
-                    # with the specified arguments
-                    self.next_kevt_callback(kevt_type,
-                                            cpuid,
-                                            ts,
-                                            params)
-        except Exception as e:
-            with self.file_handler.applicationbound():
-                self.logger.error(traceback.format_exc())
-        except KeyboardInterrupt:
-            pass
-        # claim the allocated memory
-        free(<void*> info)
-        # check for pending signals.
-        # The default behaviour is to
-        # raise `KeyboardInterrupt` exception
-        # which will be propagated to the caller
-        if PyErr_CheckSignals() > 0:
-            self.interrupted = True
-            self.close_kstream()
+        # the allocation has failed probably
+        # because there is no enough memory
+        if info == NULL:
             return
 
-    cdef _free_buffers(self, TRACE_EVENT_INFO* info_buffer, BYTE* property_buffer):
-        free(property_buffer)
-        free(info_buffer)
+        cdef EVENT_HEADER kevt_hdr = kevent_trace.header
+        cdef ULONG buffer_size = 4096
+        cdef unordered_map[wstring, PyObject*] params
+        cdef ULONG property_size
+        cdef PROPERTY_DATA_DESCRIPTOR descriptor
+        cdef BOOL dropped = False
 
-    cdef _parse_property(self, USHORT in_type, USHORT out_type, BYTE* buf):
+        status = tdh_get_event_information(kevent_trace, 0,
+                                           NULL,
+                                           info,
+                                           &buffer_size)
+
+        cpuid = <UCHAR> kevent_trace.buffer_ctx.cpuid
+        opcode = <BYTE> kevt_hdr.descriptor.opcode
+        pid = <ULONG> kevt_hdr.process_id
+        tid = <ULONG> kevt_hdr.thread_id
+
+        ktuple = self.__wrap_ktuple(info.event_guid, opcode)
+        # this shouldn't happen, but just in
+        # case simply discard the kernel event
+        if ktuple == NULL:
+            free(info)
+            return
+        dropped = self.__apply_filters(pid, tid, ktuple, params)
+
+        if dropped:
+            with gil:
+                free(info)
+                Py_XDECREF(ktuple)
+            return
+
+        if (kevt_hdr.flags & EVENT_HEADER_FLAG_32_BIT_HEADER) == \
+                EVENT_HEADER_FLAG_32_BIT_HEADER:
+            self.pointer_size = 4
+        else:
+            self.pointer_size = 8
+
+        if status == ERROR_SUCCESS:
+            props = info.properties
+            for i from 0 <= i < info.property_count:
+                prop = <EVENT_PROPERTY_INFO> props[i]
+
+                property_name = <LPTSTR><BYTE*>info + prop.name_offset
+
+                descriptor.property_name = <ULONGLONG><BYTE*>info + \
+                                           prop.name_offset
+                descriptor.array_index = 0xFFFFFFFF
+
+                # get the property size which
+                # is used to allocate the buffer
+                tdh_get_property_size(kevent_trace, 0,
+                                      NULL,
+                                      1,
+                                      &descriptor,
+                                      &property_size)
+                property_buffer = <BYTE*> malloc(property_size)
+                if property_buffer == NULL:
+                    return
+
+                # fill the property buffer
+                status = tdh_get_property(kevent_trace, 0,
+                                          NULL,
+                                          1,
+                                          &descriptor,
+                                          property_size,
+                                          property_buffer)
+                # get the property value and store it in the map
+                if status == ERROR_SUCCESS:
+                    if property_name != NULL:
+                        mapk = new wstring(<wchar_t*>property_name)
+                        params[deref(mapk)] = \
+                            self.__parse_property(prop.non_struct_type.in_type,
+                                                  prop.non_struct_type.out_type,
+                                                  property_buffer)
+                        del mapk
+                    free(property_buffer)
+                else:
+                    if property_buffer != NULL:
+                        free(property_buffer)
+
+            free(info)
+            ts = sys_time(kevt_hdr.timestamp)
+
+            # build a tiny state machine around the
+            # currently running processes on the system
+            if self.__ktuple_equals(ktuple, ENUM_PROCESS) or \
+                self.__ktuple_equals(ktuple, CREATE_PROCESS):
+                k = new pair[ULONG, wchar_t*](<ULONG>wcstol(_wchar_t(params.at(PROCESS_ID_PROP)), NULL, 16),
+                                             _wchar_t(params.at(IMAGE_FILE_NAME_PROP)))
+                self.proc_map.insert(deref(k))
+                del k
+            elif self.__ktuple_equals(ktuple, TERMINATE_PROCESS):
+                prop_pid = <ULONG>wcstol(_wchar_t(params.at(PROCESS_ID_PROP)), NULL, 16)
+                self.proc_map.erase(prop_pid)
+
+            dropped = self.__apply_filters(pid, tid, ktuple, params)
+            if dropped:
+                with gil:
+                    Py_XDECREF(ktuple)
+                return
+
+            with gil:
+                try:
+                    timestamp = '%d-%d-%d %d:%02d:%02d.%d' % (ts.year, ts.month,
+                                                              ts.day, ts.hour,
+                                                              ts.minute, ts.second,
+                                                              ts.millis)
+                    # convert the property name from
+                    # camel case to underscore so we have
+                    # PEP 8 compliant coding style
+                    kparams = {self._underscore(self._decref(_wstring(kparam.first))): self._decref(kparam.second)
+                               for kparam in params
+                               if kparam.second != NULL}
+                    kguid, opc = <object>ktuple
+                    kguid = kguid[:-1]
+                    # registry events have a valid process/thread id
+                    # in the event header so we aggregate them
+                    if kguid in REGISTRY_KGUID:
+                        kparams['thread_id']  = tid
+                        kparams['process_id'] = pid
+                    if self.next_kevt_callback:
+                        self.next_kevt_callback((kguid, opc,), cpuid,
+                                                timestamp,
+                                                kparams)
+                except Exception as e:
+                    print(traceback.print_exc())
+                except KeyboardInterrupt:
+                    pass
+                finally:
+                    Py_XDECREF(ktuple)
+        else:
+            free(info)
+
+    cdef _decref(self, PyObject* o):
+        pyo = None
+        if o != NULL:
+            pyo = <object>o
+            Py_XDECREF(o)
+        return pyo
+
+    cdef _underscore(self, o):
+        return self.regex.sub(r'_\1', o).lower()
+
+    cdef PyObject* __parse_property(self, USHORT in_type, USHORT out_type,
+                                    BYTE* buf) nogil:
         """Parses the property value.
 
         Given the property input / output types,
@@ -344,226 +345,184 @@ cdef class KEventStreamCollector:
         ----------
 
         {in|out}_type : USHORT
-            The property input/output types. fAn input type can
+            The property input/output types. An input type can
             have multiple output types. For example, UINT16 input
             type can have HEXINT16 or PORT output types.
 
         buffer: BYTE
             The pointer to the property buffer.
-
         """
         if buf == NULL:
-            return None
+            return NULL
 
         if in_type == TDH_INTYPE_UNICODESTRING:
-            try:
-                return bytes(<LPTSTR>buf, 'utf-8').decode('utf-8')
-            except UnicodeDecodeError:
-                return ''
+            return _unicode(<wchar_t*>buf)
         elif in_type == TDH_INTYPE_ANSISTRING:
-            try:
-                return (<LPSTR>buf).decode('utf-8')
-            except UnicodeDecodeError:
-                return ''
-        elif in_type == TDH_INTYPE_INT8:
-            return (<CHAR*>buf)[0]
+            return _ansi(<char*>buf)
+        elif in_type == TDH_INTYPE_UNICODECHAR:
+            return _unicodec(buf)
+        elif in_type == TDH_INTYPE_ANSICHAR:
+            return _ansic(buf)
 
+        elif in_type == TDH_INTYPE_INT8:
+            return _i8(buf)
         elif in_type == TDH_INTYPE_UINT8:
             if out_type == TDH_OUTTYPE_HEXINT8:
-                return hex((<BYTE*>buf)[0])
+                return _u8_hex(buf)
             else:
-                return (<BYTE*>buf)[0]
+                return _u8(buf)
 
-        elif in_type == TDH_INTYPE_POINTER or in_type == TDH_INTYPE_SIZET:
-            if self.pointer_size == 8:
-                return (<ULONGLONG*>buf)[0]
-            else:
-                return (<ULONG*>buf)[0]
         elif in_type == TDH_INTYPE_INT16:
-            return (<SHORT*>buf)[0]
-
+            return _i16(buf)
         elif in_type == TDH_INTYPE_UINT16:
             if out_type == TDH_OUTTYPE_HEXINT16:
-                return hex((<USHORT*>buf)[0])
+                return _i16_hex(buf)
             elif out_type == TDH_OUTTYPE_PORT:
-                try:
-                    # we have to convert the integer
-                    # from network byte order to
-                    # host byte order
-                    return socket.ntohs((<USHORT *>buf)[0])
-                except TypeError:
-                    return '0'
+                return _ntohs(buf)
             else:
-                return (<USHORT*>buf)[0]
+                return _u16(buf)
 
         elif in_type == TDH_INTYPE_INT32:
-            return (<LONG*>buf)[0]
-
+            return _i32(buf)
         elif in_type == TDH_INTYPE_UINT32:
             if out_type == TDH_OUTTYPE_HEXINT32:
-                return hex((<ULONG*>buf)[0])
-            # IPv4 address
+                return _i32_hex(buf)
             elif out_type == TDH_OUTTYPE_IPV4:
-                try:
-                    # first convert the ip address
-                    # from network to host byte order
-                    ip = socket.htonl((<ULONG *>buf)[0])
-                    return socket.inet_ntoa(struct.pack('!L', ip))
-                except (TypeError, struct.error):
-                    return '0.0.0.0'
+                return ip_addr(buf)
             else:
-                return (<ULONG *>buf)[0]
+                return _u32(buf)
 
         elif in_type == TDH_INTYPE_INT64:
-            return (<LONGLONG*>buf)[0]
+            return _i64(buf)
         elif in_type == TDH_INTYPE_UINT64:
             if out_type == TDH_OUTTYPE_HEXINT64:
-                return hex((<ULONGLONG*>buf)[0])
+                return _i64_hex(buf)
             else:
-                return (<ULONGLONG*>buf)[0]
+                return _u64(buf)
 
         elif in_type == TDH_INTYPE_HEXINT32:
-             return hex((<ULONG*>buf)[0])
+            return _i32_hex(buf)
         elif in_type ==  TDH_INTYPE_HEXINT64:
-            return hex((<ULONGLONG*>buf)[0])
+            return  _i64_hex(buf)
 
         elif in_type == TDH_INTYPE_FLOAT:
-            return (<FLOAT*>buf)[0]
+            return _float(buf)
         elif in_type == TDH_INTYPE_DOUBLE:
-            return (<DOUBLE*>buf)[0]
-        elif in_type == TDH_INTYPE_UNICODECHAR:
-            return (<WCHAR*>buf)[0]
-        elif in_type == TDH_INTYPE_ANSICHAR:
-            return (<CHAR*>buf)[0]
+            return _double(buf)
 
-        elif in_type == TDH_INTYPE_SID:
-            # resolve account and domain name
-            # from the SID (Security Identifier)
-            return self._lookup_sid(buf, False)
-        elif in_type == TDH_INTYPE_WBEMSID:
-            # resolve account name and domain
-            # from the WBEM SID (TOKEN_USER + SID)
-            if (<ULONG*>buf)[0] > 0:
-                return self._lookup_sid(buf, True)
-
-    cdef _lookup_sid(self, BYTE* buf, BOOL wbem_sid):
-        cdef wchar_t user_name[MAX_NAME]
-        cdef wchar_t domain_name[MAX_NAME]
-        cdef DWORD user_name_size = MAX_NAME
-        cdef DWORD domain_name_size = MAX_NAME
-        cdef SID_NAME_USE sid_type
-
-        if wbem_sid:
-            # adjust the size of the TOKEN_USER structure
-            buf += self.pointer_size * 2
-
-        if LookupAccountSid(NULL, <SID*>buf,
-                            user_name,
-                            &user_name_size,
-                            domain_name,
-                            &domain_name_size,
-                            &sid_type):
-
-            pass
-            # I need help here ;(
+        elif in_type == TDH_INTYPE_POINTER or \
+                        in_type == TDH_INTYPE_SIZET:
+            if self.pointer_size == 8:
+                return _u64(buf)
+            else:
+                return _u32(buf)
         else:
-            return 'unknown'
+            return NULL
 
-    cdef _assemble_type(self, GUID guid, UCHAR opcode):
-        """Packs an event type into tuple.
+    cdef BOOL __apply_filters(self, ULONG pid, ULONG tid,
+                              PyObject* ktuple,
+                              unordered_map[wstring, PyObject*] params) nogil:
+        cdef BOOL drop = True
 
-        Casts the GUID to string representation and builds
-        the tuple which contains the event GUID and the
-        operational code. The tuple identifies the event
-        type.
+        # we don't want to capture any events
+        # coming from the fibratus process
+        # nor from the process we've declared
+        # in the excluded process list
+        if self.own_pid == pid:
+            return True
 
-        Parameters
-        ----------
-
-        guid: GUID
-            Global Unique Identifier for the
-            kernel event.
-        opcode: UCHAR
-            Operational code
-
-        """
-        cdef wchar_t buf[GUID_LEN]
-        kkey = '%s-%s-%s-%s-%d' % (guid.Data1, guid.Data2,
-                                   guid.Data3, guid.Data4,
-                                   opcode)
-        # lookup for resolved
-        # kernel event types
-        if kkey in self.ketypes:
-            return self.ketypes[kkey]
-        else:
-            # after the `StringFromGUID2` has been called,
-            # the `buf` should contain a GUID null terminated string
-            # including the enclosing braces
-            chars = StringFromGUID2(&guid, buf, GUID_LEN)
-            if chars < 0:
-                # the buffer is too small
-                return None
-            pystr = <object> PyUnicode_FromWideChar(buf, GUID_LEN)
-            # remove the braces/null terminator
-            # from the GUID string
-            pystr = pystr[1:-2].lower()
-            self.ketypes[kkey] = pystr, opcode
-            return pystr, opcode
-
-    cdef _filetime_to_systime(self, EVENT_HEADER kevt_header):
-        """Converts kernel event timestamp.
-
-        Converts an event timestamp given in file time
-        to zone local date and time.
-
-        Parameters
-        ----------
-
-        kevt_header: EVENT_HEADER
-            kernel event header
-
-        """
-        cdef FILETIME filet
-        cdef SYSTEMTIME syst
-        cdef SYSTEMTIME tzt
-
-        filet.dwHighDateTime = kevt_header.TimeStamp.HighPart
-        filet.dwLowDateTime = kevt_header.TimeStamp.LowPart
-
-        # convert to currently active
-        # time zone local date and time format
-        FileTimeToSystemTime(&filet, &syst)
-        SystemTimeToTzSpecificLocalTime(NULL,
-                                        &syst,
-                                        &tzt)
-        return '%d:%02d:%02d.%d' % (tzt.wHour, tzt.wMinute,
-                                    tzt.wSecond,
-                                    tzt.wMilliseconds)
-
-    cdef _exclude_kevent(self, pid, tid):
-        """Excludes the kernel event from the pid or tid
-
-        Parameters
-        ----------
-
-        pid: ULONG
-            the identifier of the process which emitted the event
-        tid: ULONG
-            the identifier of the thread which belongs to the process
-
-       """
-        if len(self._excluded_procs) == 0:
+        if self.__ktuple_equals(ktuple, ENUM_PROCESS) or \
+            self.__ktuple_equals(ktuple, ENUM_THREAD) or \
+            self.__ktuple_equals(ktuple, ENUM_IMAGE) or \
+            self.__ktuple_equals(ktuple, REG_CREATE_KCB) or \
+            self.__ktuple_equals(ktuple, REG_DELETE_KCB):
             return False
-        thread = self.thread_registry.get_thread(pid) or \
-                 self.thread_registry.get_thread(tid)
-        return True if thread and thread.name \
-                                  in self._excluded_procs else False
 
-    cdef _aggregate_info(self, EVENT_RECORD* kevent_trace, kevt_type, params):
-        if REGISTRY_KEVENT_GUID == kevt_type[0]:
-            # registry events have a valid process/thread
-            # id in the event header.
-            # Aggregate them to event payload
-            params[TID_PARAM_NAME] = <ULONG> kevent_trace.EventHeader.ThreadId
-            params[PID_PARAM_NAME] = <ULONG> kevent_trace.EventHeader.ProcessId
+        # apply skip list as defined
+        # in the configuration descriptor
+        drop = self.__apply_skips(pid)
+        if drop:
+            return True
+
+        for i from 0 <= i < self.ktuple_filters.size():
+            ktuple_filter = self.ktuple_filters.at(i)
+            if self.__ktuple_equals(ktuple, ktuple_filter):
+                drop = False
+                break
+
+        # apply pid filter
+        if self.pid_filter != 0 and self.pid_filter != pid:
+            drop = True
+            # we got an invalid pid from the header
+            # and we can't still drop the event
+            if pid == INVALID_PID:
+                drop = False
+        if drop:
+            return True
+        # now scan for the kernel event
+        # properties to find the pid value
+        drop = self.__apply_prop_filters(pid, params)
+
+        return drop
+
+    cdef inline BOOL __apply_skips(self, ULONG pid) nogil:
+        cdef BOOL ignored = False
+        cdef unordered_map[ULONG, wchar_t*].iterator proc_iterator = self.proc_map.find(pid)
+        if proc_iterator != self.proc_map.end():
+            for i from 0 <= i < self.skips.size():
+                skip = self.skips.at(i)
+                # compare the image name found
+                # on the proc map with the value
+                # as defined on the skip list
+                if wcscmp(_wcslwr(deref(proc_iterator).second),
+                          _wcslwr(skip)) == 0:
+                    ignored = True
+                    break
+        return ignored
+
+    cdef inline BOOL __apply_prop_filters(self, ULONG pid, unordered_map[wstring, PyObject*] params) nogil:
+        cdef unordered_map[wstring, PyObject*].iterator piter = params.begin()
+        cdef BOOL drop = False
+        cdef ULONG prop_pid = 0
+        while piter != params.end():
+            prop = deref(piter)
+            prop_name = prop.first
+
+            # get the value of the pid property
+            if prop_name.compare(PID_PROP) == 0:
+                prop_pid = PyLong_AsLong(prop.second)
+
+            # apply the filters. At this point
+            # we also check the kernel event
+            # not coming from the fibratus process
+            if prop_pid != 0:
+                if prop_pid == self.own_pid:
+                    drop = True
+                    break
+                elif self.pid_filter != 0 and self.pid_filter != prop_pid:
+                    drop = True
+                    break
+            inc(piter)
+        return drop
+
+    cdef PyObject* __wrap_ktuple(self, GUID guid, UCHAR opcode) nogil:
+        cdef wchar_t buf[39]
+
+        if string_from_guid(guid, buf, 39) > 0:
+            kguid = PyUnicode_FromWideChar(_wcslwr(buf), 39)
+            return build_ktuple(kguid, opcode)
+        else:
+            return NULL
+
+    cdef inline BOOL __ktuple_equals(self, PyObject* k1, PyObject* k2) nogil:
+        cdef BOOL ktuple_equals = False
+        if PyLong_AsLong(PyTuple_GetItem(k1, 1)) == PyLong_AsLong(PyTuple_GetItem(k2, 1)):
+            kguid1 = _wchar_t(PyTuple_GetItem(k1, 0))
+            kguid2 = _wchar_t(PyTuple_GetItem(k2, 0))
+            ktuple_equals = wcscmp(kguid1, kguid2) == 0
+            if kguid1 != NULL:
+                PyMem_Free(kguid1)
+            if kguid2 != NULL:
+                PyMem_Free(kguid2)
+        return ktuple_equals
 
