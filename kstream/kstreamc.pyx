@@ -461,7 +461,7 @@ cdef class KEventStreamCollector:
             return True
         # now scan for the kernel event
         # properties to find the pid value
-        drop = self.__apply_prop_filters(pid, params)
+        drop = self.__apply_prop_filters(params)
 
         return drop
 
@@ -480,26 +480,26 @@ cdef class KEventStreamCollector:
                     break
         return ignored
 
-    cdef inline BOOL __apply_prop_filters(self, ULONG pid, unordered_map[wstring, PyObject*] params) nogil:
+    cdef inline BOOL __apply_prop_filters(self, unordered_map[wstring, PyObject*] params) nogil:
         cdef unordered_map[wstring, PyObject*].iterator piter = params.begin()
         cdef BOOL drop = False
-        cdef ULONG prop_pid = 0
+        cdef ULONG pid = 0
         while piter != params.end():
             prop = deref(piter)
             prop_name = prop.first
 
             # get the value of the pid property
             if prop_name.compare(PID_PROP) == 0:
-                prop_pid = PyLong_AsLong(prop.second)
+                pid = PyLong_AsLong(prop.second)
 
             # apply the filters. At this point
             # we also check the kernel event
             # not coming from the fibratus process
-            if prop_pid != 0:
-                if prop_pid == self.own_pid:
+            if pid != 0:
+                if pid == self.own_pid:
                     drop = True
                     break
-                elif self.pid_filter != 0 and self.pid_filter != prop_pid:
+                elif self.pid_filter != 0 and self.pid_filter != pid:
                     drop = True
                     break
             inc(piter)
