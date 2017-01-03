@@ -1,11 +1,10 @@
 Fibratus
 ========
-
-![fibratus logo]( https://github.com/rabbitstack/fibratus/blob/master/fibratus.png "fibratus logo" )
-
 [![Build status](https://ci.appveyor.com/api/projects/status/dlvxhc0j026ikcyv?svg=true)](https://ci.appveyor.com/project/rabbitstack/fibratus)
 [![Coverage Status](https://codecov.io/gh/rabbitstack/fibratus/branch/master/graph/badge.svg)](https://codecov.io/gh/rabbitstack/fibratus)
 [![Code Health](https://landscape.io/github/rabbitstack/fibratus/master/landscape.svg?style=flat)](https://landscape.io/github/rabbitstack/fibratus/master)
+[![OpenCollective](https://opencollective.com/fibratus/backers/badge.svg)](#backers) 
+[![OpenCollective](https://opencollective.com/fibratus/sponsors/badge.svg)](#sponsors)
 
 **Fibratus** is a tool which is able to capture the most of the Windows kernel activity - process/thread creation and termination, 
 file system I/O, registry, network activity, DLL loading/unloading and much more. 
@@ -45,15 +44,71 @@ A lot of love and passion is put into Fibratus. If you want to support Fibratus,
 
 [![Beerpay](https://beerpay.io/rabbitstack/fibratus/badge.svg?style=beer-square)](https://beerpay.io/rabbitstack/fibratus)  [![Beerpay](https://beerpay.io/rabbitstack/fibratus/make-wish.svg?style=flat-square)](https://beerpay.io/rabbitstack/fibratus?focus=wish)
 
-## License
 
-Copyright 2015/2016 by Nedim Sabic (RabbitStack) 
-All Rights Reserved. 
+### Backers
+Support us with a monthly donation and help us continue our activities. [[Become a backer](https://opencollective.com/fibratus#backer)]
 
-http://rabbitstack.github.io
+<a href="https://opencollective.com/fibratus/backer/0/website" target="_blank"><img src="https://opencollective.com/fibratus/backer/0/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/backer/1/website" target="_blank"><img src="https://opencollective.com/fibratus/backer/1/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/backer/2/website" target="_blank"><img src="https://opencollective.com/fibratus/backer/2/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/backer/3/website" target="_blank"><img src="https://opencollective.com/fibratus/backer/3/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/backer/4/website" target="_blank"><img src="https://opencollective.com/fibratus/backer/4/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/backer/5/website" target="_blank"><img src="https://opencollective.com/fibratus/backer/5/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/backer/6/website" target="_blank"><img src="https://opencollective.com/fibratus/backer/6/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/backer/7/website" target="_blank"><img src="https://opencollective.com/fibratus/backer/7/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/backer/8/website" target="_blank"><img src="https://opencollective.com/fibratus/backer/8/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/backer/9/website" target="_blank"><img src="https://opencollective.com/fibratus/backer/9/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/backer/10/website" target="_blank"><img src="https://opencollective.com/fibratus/backer/10/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/backer/11/website" target="_blank"><img src="https://opencollective.com/fibratus/backer/11/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/backer/12/website" target="_blank"><img src="https://opencollective.com/fibratus/backer/12/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/backer/13/website" target="_blank"><img src="https://opencollective.com/fibratus/backer/13/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/backer/14/website" target="_blank"><img src="https://opencollective.com/fibratus/backer/14/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/backer/15/website" target="_blank"><img src="https://opencollective.com/fibratus/backer/15/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/backer/16/website" target="_blank"><img src="https://opencollective.com/fibratus/backer/16/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/backer/17/website" target="_blank"><img src="https://opencollective.com/fibratus/backer/17/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/backer/18/website" target="_blank"><img src="https://opencollective.com/fibratus/backer/18/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/backer/19/website" target="_blank"><img src="https://opencollective.com/fibratus/backer/19/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/backer/20/website" target="_blank"><img src="https://opencollective.com/fibratus/backer/20/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/backer/21/website" target="_blank"><img src="https://opencollective.com/fibratus/backer/21/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/backer/22/website" target="_blank"><img src="https://opencollective.com/fibratus/backer/22/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/backer/23/website" target="_blank"><img src="https://opencollective.com/fibratus/backer/23/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/backer/24/website" target="_blank"><img src="https://opencollective.com/fibratus/backer/24/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/backer/25/website" target="_blank"><img src="https://opencollective.com/fibratus/backer/25/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/backer/26/website" target="_blank"><img src="https://opencollective.com/fibratus/backer/26/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/backer/27/website" target="_blank"><img src="https://opencollective.com/fibratus/backer/27/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/backer/28/website" target="_blank"><img src="https://opencollective.com/fibratus/backer/28/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/backer/29/website" target="_blank"><img src="https://opencollective.com/fibratus/backer/29/avatar.svg"></a>
 
-Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at
+### Sponsors
+Become a sponsor and get your logo on our README on Github with a link to your site. [[Become a sponsor](https://opencollective.com/fibratus#sponsor)]
 
-http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
+<a href="https://opencollective.com/fibratus/sponsor/0/website" target="_blank"><img src="https://opencollective.com/fibratus/sponsor/0/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/sponsor/1/website" target="_blank"><img src="https://opencollective.com/fibratus/sponsor/1/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/sponsor/2/website" target="_blank"><img src="https://opencollective.com/fibratus/sponsor/2/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/sponsor/3/website" target="_blank"><img src="https://opencollective.com/fibratus/sponsor/3/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/sponsor/4/website" target="_blank"><img src="https://opencollective.com/fibratus/sponsor/4/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/sponsor/5/website" target="_blank"><img src="https://opencollective.com/fibratus/sponsor/5/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/sponsor/6/website" target="_blank"><img src="https://opencollective.com/fibratus/sponsor/6/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/sponsor/7/website" target="_blank"><img src="https://opencollective.com/fibratus/sponsor/7/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/sponsor/8/website" target="_blank"><img src="https://opencollective.com/fibratus/sponsor/8/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/sponsor/9/website" target="_blank"><img src="https://opencollective.com/fibratus/sponsor/9/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/sponsor/10/website" target="_blank"><img src="https://opencollective.com/fibratus/sponsor/10/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/sponsor/11/website" target="_blank"><img src="https://opencollective.com/fibratus/sponsor/11/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/sponsor/12/website" target="_blank"><img src="https://opencollective.com/fibratus/sponsor/12/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/sponsor/13/website" target="_blank"><img src="https://opencollective.com/fibratus/sponsor/13/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/sponsor/14/website" target="_blank"><img src="https://opencollective.com/fibratus/sponsor/14/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/sponsor/15/website" target="_blank"><img src="https://opencollective.com/fibratus/sponsor/15/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/sponsor/16/website" target="_blank"><img src="https://opencollective.com/fibratus/sponsor/16/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/sponsor/17/website" target="_blank"><img src="https://opencollective.com/fibratus/sponsor/17/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/sponsor/18/website" target="_blank"><img src="https://opencollective.com/fibratus/sponsor/18/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/sponsor/19/website" target="_blank"><img src="https://opencollective.com/fibratus/sponsor/19/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/sponsor/20/website" target="_blank"><img src="https://opencollective.com/fibratus/sponsor/20/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/sponsor/21/website" target="_blank"><img src="https://opencollective.com/fibratus/sponsor/21/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/sponsor/22/website" target="_blank"><img src="https://opencollective.com/fibratus/sponsor/22/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/sponsor/23/website" target="_blank"><img src="https://opencollective.com/fibratus/sponsor/23/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/sponsor/24/website" target="_blank"><img src="https://opencollective.com/fibratus/sponsor/24/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/sponsor/25/website" target="_blank"><img src="https://opencollective.com/fibratus/sponsor/25/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/sponsor/26/website" target="_blank"><img src="https://opencollective.com/fibratus/sponsor/26/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/sponsor/27/website" target="_blank"><img src="https://opencollective.com/fibratus/sponsor/27/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/sponsor/28/website" target="_blank"><img src="https://opencollective.com/fibratus/sponsor/28/avatar.svg"></a>
+<a href="https://opencollective.com/fibratus/sponsor/29/website" target="_blank"><img src="https://opencollective.com/fibratus/sponsor/29/avatar.svg"></a>
