@@ -88,8 +88,8 @@ cdef class KEventStreamCollector:
     cdef vector[PyObject*]* ktuple_filters
     cdef vector[wchar_t*]* skips
     cdef unordered_map[ULONG, wchar_t*]* proc_map
-    cdef ULONG pid_filter
 
+    cdef ULONG pid_filter
     cdef ULONG own_pid
 
     cdef next_kevt_callback
@@ -159,16 +159,15 @@ cdef class KEventStreamCollector:
     def set_kstream_open_callback(self, callback):
         self.on_kstream_open_callback = callback
 
-    def set_excluded_procs(self, skips):
-        for skip in skips:
-            self.skips.push_back(_wchar_t(<PyObject*>skip))
+    def add_skip(self, skip):
+        self.skips.push_back(_wchar_t(<PyObject*>skip))
 
-    def add_kevent_filter(self, ktuple):
+    def add_ktuple_filter(self, ktuple):
         kguid, opcode = ktuple
         self.ktuple_filters.push_back(build_ktuple(<PyObject*>kguid, <UCHAR>opcode))
 
     def add_pid_filter(self, pid):
-        self.pid_filter = <ULONG>int(pid)
+        self.pid_filter = <ULONG>int(pid) if pid else 0
 
     cdef process_kevent_callback(self, EVENT_RECORD* kevent_trace):
         with nogil:
