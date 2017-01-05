@@ -18,9 +18,7 @@ from enum import Enum
 
 from fibratus.apidefs.process import open_thread, THREAD_QUERY_INFORMATION, get_process_id_of_thread
 from fibratus.apidefs.sys import close_handle
-from fibratus.common import DotD as ddict, NA, IO
-
-RENDER_FORMAT = '%s %s %s %s (%s) - %s %s'
+from fibratus.common import DotD as ddict, NA
 
 
 class Category(Enum):
@@ -147,7 +145,7 @@ __kevents__ = KEvents.meta_info()
 class KEvent(object):
 
     def __init__(self, thread_registry):
-        self._id = 0
+        self._kid = 0
         self._ts = datetime.now()
         self._cpuid = 0
         self._name = None
@@ -155,7 +153,6 @@ class KEvent(object):
         self._params = {}
         self._tid = None
         self._pid = None
-        self._thread = None
         self.thread_registry = thread_registry
 
     @property
@@ -183,7 +180,7 @@ class KEvent(object):
 
     @ts.setter
     def ts(self, ts):
-        self._ts = datetime.strptime(ts, '%H:%M:%S.%f')
+        self._ts = datetime.strptime(ts, '%Y-%m-%d %H:%M:%S.%f')
 
     @property
     def cpuid(self):
@@ -214,59 +211,41 @@ class KEvent(object):
         self._tid = tid
 
     @property
-    def id(self):
-        return self._id
+    def kid(self):
+        return self._kid
 
     @property
     def thread(self):
-        self._get_thread()
-        return self._thread
+        return self._find_thread()
 
-    def _get_thread(self):
-        """Gets the current thread/process which has emitted the kernel event.
+    def _find_thread(self):
+        """Finds the current thread/process emitted by the kernel event.
         """
         if self._pid:
             # first lookup by process id
-            # if the process doesn't exist in thread registry
-            # then query the thread
-            self._thread = self.thread_registry.get_thread(self._pid)
-            if not self._thread and self._tid:
-                self._thread = self.thread_registry.get_thread(self._tid)
+            # if the process doesn't exist
+            # in the thread registry
+            # then query by the thread id
+            thread = self.thread_registry.get_thread(self._pid)
+            if not thread and self._tid:
+                thread = self.thread_registry.get_thread(self._tid)
         else:
             # we dont have the process id
             # try to find the thread from which
             # we can get the process
-            self._thread = self.thread_registry.get_thread(self._tid)
+            thread = self.thread_registry.get_thread(self._tid)
+        return thread
 
-    def render(self):
-        """Renders the kevent to the standard output stream.
-
-        Uses the default output format to render the
-        kernel event to standard output stream.
-
-        The default output format is as follows:
-
-        id  timestamp  cpu  process  (process id) - kevent (parameters)
-        --  ---------  ---  -------  -----------   ------- ------------
-
-        Example:
-
-        160 13:27:27.554 0 wmiprvse.exe (1012) - CloseFile (file=C:\\WINDOWS\\SYSTEM32\\RSAENH.DLL, tid=2668)
-
+    def get_thread(self):
+        """Gets the thread associated with the kernel event.
         """
-        self._thread = self.thread
-        if self._thread:
-            kevt = RENDER_FORMAT % (self._id,
-                                    self._ts.time(),
-                                    self._cpuid,
-                                    self._thread.name,
-                                    self._thread.pid,
-                                    self._name,
-                                    self._format_params())
+        thread = self._find_thread()
+        if thread:
+            return thread.pid, thread.name
         else:
             # figure out the process id from thread
             # if the process can't be found in
-            # thread registry
+            # the thread registry
             pid = NA
             if self._pid is None:
                 if self._tid:
@@ -279,26 +258,9 @@ class KEvent(object):
                         close_handle(handle)
             else:
                 pid = self._pid
-            kevt = RENDER_FORMAT % (self._id,
-                                    self._ts.time(),
-                                    self._cpuid,
-                                    NA,
-                                    pid,
-                                    self._name,
-                                    self._format_params())
-        IO.write_console(kevt)
-        self._id += 1
+            return pid, NA
 
-    def _format_params(self):
-        """Transforms the kevent parameters.
-
-        Apply the rendering format on the kevent payload
-        to transform it into more convenient structure
-        sorted by params keys.
-        """
-        kparams = self._params
-        fmt = ', '.join('%s=%s' % (k, kparams[k]) for k in sorted(kparams.keys()))\
-              .replace('\"', '')
-        return '(%s)' % fmt
+    def inc_kid(self):
+        self._kid += 1
 
 
