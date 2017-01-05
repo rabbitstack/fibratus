@@ -15,8 +15,6 @@
 # under the License.
 
 from libc.stddef cimport wchar_t
-from cpython.ref cimport PyObject
-# from .python cimport Py_BuildValue
 
 cdef extern from "windows.h":
     ctypedef unsigned long ULONG
@@ -103,7 +101,7 @@ cdef extern from "winsock.h":
     ULONG  htonl(ULONG hostlong) nogil
 
     ctypedef union S_un:
-        ULONG S_addr;
+        ULONG S_addr
     ctypedef struct in_addr:
         S_un S_un
 
