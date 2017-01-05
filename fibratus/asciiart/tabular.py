@@ -15,7 +15,6 @@
 # under the License.
 
 from prettytable import PrettyTable
-from fibratus.common import IO
 
 
 class Tabular(PrettyTable):
@@ -28,5 +27,5 @@ class Tabular(PrettyTable):
             self.sortby = sort_by
 
     def draw(self):
-        IO.write_console(self.get_string())
+        print(self.get_string())
 
