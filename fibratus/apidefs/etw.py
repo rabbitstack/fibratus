@@ -17,7 +17,7 @@ from ctypes import c_uint64, c_ulong, c_long, c_ulonglong, c_wchar_p, c_ubyte
 from ctypes.wintypes import LARGE_INTEGER, HANDLE
 
 from fibratus.apidefs.guiddef import GUID
-import fibratus.ctypes_declarer as declarer
+import fibratus.apidefs.declarer as declarer
 
 
 TRACEHANDLE = c_uint64
