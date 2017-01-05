@@ -14,12 +14,14 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 from unittest.mock import Mock
+
 import pytest
+
+from fibratus.common import DotD as dd
 from fibratus.kevent import KEvent
 from fibratus.kevent_types import SEND_SOCKET_TCPV4, SEND_SOCKET_UDPV4, RECV_SOCKET_TCPV4, RECV_SOCKET_UDPV4, \
     ACCEPT_SOCKET_TCPV4, CONNECT_SOCKET_TCPV4, DISCONNECT_SOCKET_TCPV4, RECONNECT_SOCKET_TCPV4
-from fibratus.tcpip import TcpIpParser
-from fibratus.common import DotD as dd
+from fibratus.tcpip.tcpip import TcpIpParser
 
 
 @pytest.fixture(scope='module')
@@ -53,7 +55,7 @@ class TestTcpIpParser():
         assert kparams['dport'] == ktcpip.dport
         assert kparams['packet_size'] == ktcpip.size
         assert kparams['l4_proto'] == l4_proto
-        assert kparams['application'] == l5_proto
+        assert kparams['protocol'] == l5_proto
 
     @pytest.mark.parametrize('ktcpip, l4_proto, l5_proto, kevent_type', [
         (dd({'seqnum': 0, 'connid': 0, 'sport': 49720, 'daddr': '91.226.88.5',
@@ -74,14 +76,14 @@ class TestTcpIpParser():
         assert kparams['dport'] == ktcpip.dport
         assert kparams['packet_size'] == ktcpip.size
         assert kparams['l4_proto'] == l4_proto
-        assert kparams['application'] == l5_proto
+        assert kparams['protocol'] == l5_proto
 
     def test_parse_recv_dport_na(self, tcpip_parser, kevent_mock):
         ktcpip = dd({'seqnum': 0, 'connid': 0, 'sport': 25, 'daddr': '91.226.88.5',
                     'saddr': '10.0.2.15', 'size': 266, 'pid': 1380, 'dport': 51234})
         tcpip_parser.parse_tcpip(RECV_SOCKET_TCPV4, ktcpip)
         kparams = kevent_mock.params
-        assert kparams['application'] == 'smtp'
+        assert kparams['protocol'] == 'smtp'
 
     def test_parse_accept(self, tcpip_parser, kevent_mock):
         ktcpip = dd({'connid': 0, 'sndwinscale': 0, 'rcvwinscale': 0, 'saddr': '10.0.2.15',
@@ -97,7 +99,7 @@ class TestTcpIpParser():
         assert kparams['sport'] == ktcpip.sport
         assert kparams['dport'] == ktcpip.dport
         assert kparams['rwin'] == ktcpip.rcvwin
-        assert kparams['application'] == 'ssh'
+        assert kparams['protocol'] == 'ssh'
 
     def test_parse_connect(self, tcpip_parser, kevent_mock):
         ktcpip = dd({'connid': 0, 'sndwinscale': 0, 'rcvwinscale': 0, 'saddr': '10.0.2.15',
@@ -113,7 +115,7 @@ class TestTcpIpParser():
         assert kparams['sport'] == ktcpip.sport
         assert kparams['dport'] == ktcpip.dport
         assert kparams['rwin'] == ktcpip.rcvwin
-        assert kparams['application'] == 'https'
+        assert kparams['protocol'] == 'https'
 
     def test_parse_disconnect(self, tcpip_parser, kevent_mock):
         ktcpip = dd({'connid': 0, 'saddr': '10.0.2.15',

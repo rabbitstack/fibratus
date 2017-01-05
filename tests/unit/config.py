@@ -31,25 +31,25 @@ class TestYamlConfig():
             YamlConfig('C:\\fibratus.yml')
             sys_exit.assert_called_once()
 
-    def test_output_adapters(self):
+    def test_outputs(self):
         config = YamlConfig(__CONFIG_PATH__)
-        adapters = config.output_adapters
-        assert adapters
-        assert isinstance(adapters, list)
-        assert len(adapters) > 0
+        outputs = config.outputs
+        assert outputs
+        assert isinstance(outputs, list)
+        assert len(outputs) > 0
 
-    def test_enum_output_adapters(self):
+    def test_enum_outputs(self):
         config = YamlConfig(__CONFIG_PATH__)
-        adapter_names = ['amqp', 'smtp']
-        output_adapters = config.output_adapters
-        if output_adapters:
-            for output_adapter in output_adapters:
-                adapter_name = next(iter(list(output_adapter.keys())), None)
-                assert adapter_name in adapter_names
+        output_names = ['amqp', 'smtp', 'console', 'elasticsearch']
+        outputs = config.outputs
+        if outputs:
+            for output in outputs:
+                output_name = next(iter(list(output.keys())), None)
+                assert output_name in output_names
 
-    def test_excluded_procs(self):
+    def test_image_skips(self):
         config = YamlConfig(__CONFIG_PATH__)
-        excluded_procs = config.excluded_procs
-        assert excluded_procs
-        assert isinstance(excluded_procs, list)
-        assert 'smss.exe' in excluded_procs
+        image_skips = config.image_skips
+        assert image_skips
+        assert isinstance(image_skips, list)
+        assert 'smss.exe' in image_skips

@@ -27,15 +27,14 @@ from fibratus.thread import ThreadRegistry, ThreadInfo
 def thread_registry_mock():
     thread_registry = Mock(spec_set=ThreadRegistry)
     thread_registry.get_thread.side_effect = [ThreadInfo(436, 1024, 23, 'svchost.exe',
-                                                         'C:\\Windows\\system32\\svchost.exe -k RPCSS', None),
+                                                         'C:\\Windows\\system32\\svchost.exe -k RPCSS'),
                                               None,
                                               None,
                                               ThreadInfo(836, 564, 23, 'svchost.exe',
-                                                         'C:\\Windows\\system32\\svchost.exe -k RPCSS', None),
+                                                         'C:\\Windows\\system32\\svchost.exe -k RPCSS'),
+                                              None,
                                               ThreadInfo(836, 564, 23, 'svchost.exe',
-                                                         'C:\\Windows\\system32\\svchost.exe -k RPCSS', None),
-                                              ThreadInfo(836, 564, 23, 'svchost.exe',
-                                                         'C:\\Windows\\system32\\svchost.exe -k RPCSS', None),
+                                                         'C:\\Windows\\system32\\svchost.exe -k RPCSS'),
                                               None, None]
     return thread_registry
 
@@ -68,28 +67,17 @@ class TestKEvent(object):
         assert kevent.thread
         thread_registry_mock.get_thread.assert_called_with(kevent.tid)
 
-    @patch('fibratus.kevent.IO.write_console')
-    def test_render(self, write_console_mock, kevent):
-        assert kevent.id == 0
-        kevent.render()
-        assert write_console_mock.called
-        assert kevent.id == 1
-
     @patch('fibratus.kevent.open_thread', return_value=25)
     @patch('fibratus.kevent.get_process_id_of_thread')
     @patch('fibratus.kevent.close_handle')
-    def test_render_pid_none(self, close_handle_mock, get_process_id_of_thread_mock, open_thread_mock,
-                             kevent):
+    def test_get_thread_pid_none(self, close_handle_mock, get_process_id_of_thread_mock, open_thread_mock,
+                                 kevent):
         kevent.tid = 245
-        kevent.render()
+        kevent.get_thread()
         open_thread_mock.assert_called_with(THREAD_QUERY_INFORMATION,
                                             False, kevent.tid)
         get_process_id_of_thread_mock.assert_called_with(25)
         close_handle_mock.assert_called_with(25)
-
-    def test_render_pid_not_found_in_registry(self, kevent):
-        kevent.pid = 836
-        kevent.render()
 
     def test_kevents_all(self):
         kevents = KEvents.all()
@@ -109,7 +97,7 @@ class TestKEvent(object):
         assert kevent.category == Category.PROCESS.name
 
     def test_set_kevent_ts(self, kevent):
-        kevent.ts = '12:31:48.210000'
+        kevent.ts = '2016-11-29 12:31:48.210000'
         assert kevent.ts.second == 48
         assert kevent.ts.minute == 31
         assert kevent.ts.hour == 12

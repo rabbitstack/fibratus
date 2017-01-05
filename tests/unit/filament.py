@@ -24,7 +24,7 @@ import fibratus.filament as fil
 import fibratus.filament as flmt
 from fibratus.errors import FilamentError
 from fibratus.filament import Filament
-from fibratus.output.adapter.amqp import AmqpAdapter
+from fibratus.output.amqp import AmqpOutput
 from fibratus.term import AnsiTerm
 from tests.fixtures.filaments import test_filament
 
@@ -156,8 +156,8 @@ class TestFilament(object):
     def test_setup_adapters(self, filament):
         with patch('os.listdir', return_value=['test_filament.py']):
             filament.load_filament('test_filament')
-            adapters = {'amqp': Mock(spec_set=AmqpAdapter)}
-            filament.setup_adapters(adapters)
+            outputs = {'amqp': Mock(spec_set=AmqpOutput)}
+            filament.setup_adapters(outputs)
             assert getattr(filament.filament_module, 'amqp')
 
     def test_set_columns_not_list(self, filament):

@@ -18,7 +18,7 @@ import elasticsearch
 import pytest
 
 from fibratus.errors import InvalidPayloadError
-from fibratus.output.adapter.elasticsearch import ElasticsearchAdapter
+from fibratus.output.elasticsearch import ElasticsearchOutput
 
 
 @pytest.fixture(scope='module')
@@ -31,7 +31,7 @@ def elasticsearch_adapter():
         'index': 'kernelstream',
         'document': 'threads'
     }
-    return ElasticsearchAdapter(**config)
+    return ElasticsearchOutput(**config)
 
 
 @pytest.fixture(scope='module')
@@ -47,10 +47,10 @@ def elasticsearch_bulk_adapter():
         'username': 'elastic',
         'password': 'changeme'
     }
-    return ElasticsearchAdapter(**config)
+    return ElasticsearchOutput(**config)
 
 
-class TestElasticsearchAdapter(object):
+class TestElasticsearchOutput(object):
 
     def test_init(self, elasticsearch_adapter):
         assert isinstance(elasticsearch_adapter.hosts, list)

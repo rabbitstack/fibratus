@@ -34,7 +34,7 @@ def kevent_mock():
 @pytest.fixture(scope='module')
 def thread_registry_mock():
     thread_registry = Mock(spec_set=ThreadRegistry)
-    thread_info = ThreadInfo(896, 2916, 22, 'explorer.exe', 'C:\\Windows\\EXPLORER.exe', None)
+    thread_info = ThreadInfo(896, 2916, 22, 'explorer.exe', 'C:\\Windows\\EXPLORER.exe')
     thread_info.handles.append(HandleInfo(836, 18446735964859105184, HandleType.KEY,
                                "\\REGISTRY\\USER\\S-1-5-21-2945379629-2233710143-2353048178-1000_CLASSES\\Local Settings"
                                "\\Software\Microsoft\\Windows\\Shell\\Bags\\59\\Shell\\{5C4F28B5-F869-4E84-8E60-F11DB97C5CC7}",

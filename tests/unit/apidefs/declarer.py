@@ -16,10 +16,10 @@
 from ctypes import c_uint
 import os
 
-import fibratus.ctypes_declarer as declarer
+import fibratus.apidefs.declarer as declarer
 
 
-class TestCtypesDeclarer():
+class TestDeclarer():
 
     def test_declare_function(self):
         get_current_process_id = declarer.declare(declarer.KERNEL, 'GetCurrentProcessId', [], c_uint)

@@ -105,8 +105,6 @@ class TestThreadRegistry():
         thread_registry.add_thread(CREATE_PROCESS, kti)
         process_id = int(kti.process_id, 16)
 
-        handle_repo_mock.query_handles.assert_called_with(process_id)
-
         t = thread_registry.get_thread(process_id)
 
         assert t
@@ -115,7 +113,6 @@ class TestThreadRegistry():
         assert t.name == kti.image_file_name
         assert t.exe == '\\SystemRoot\\System32\\smss.exe'
         assert t.comm == kti.command_line
-        assert len(t.handles) > 0
         assert len(t.args) == 0
 
     def test_create_thread(self, thread_registry):

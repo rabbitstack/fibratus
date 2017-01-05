@@ -15,11 +15,11 @@
 import json
 from unittest.mock import patch
 
+import pika
 import pytest
 
 from fibratus.errors import InvalidPayloadError
-from fibratus.output.adapter.amqp import AmqpAdapter
-import pika
+from fibratus.output.amqp import AmqpOutput
 
 
 @pytest.fixture(scope='module')
@@ -32,10 +32,10 @@ def amqp_adapter():
         'exchange': 'test',
         'routingkey': 'fibratus'
     }
-    return AmqpAdapter(**config)
+    return AmqpOutput(**config)
 
 
-class TestAmqpAdapter(object):
+class TestAmqpOutput(object):
 
     def test_init(self, amqp_adapter):
         assert 'fibratus' in amqp_adapter.username

@@ -26,8 +26,8 @@ from fibratus.common import DotD as ddict
 @pytest.fixture(scope='module')
 def thread_registry_mock():
     thread_registry = Mock(spec_set=ThreadRegistry)
-    thread_info1 = ThreadInfo(456, int('0x1054', 16), 22, 'explorer.exe', 'C:\\Windows\\EXPLORER.exe', None)
-    thread_info2 = ThreadInfo(1, int('0x0', 16), 2, 'system.exe', 'C:\\Windows\\system.exe', None)
+    thread_info1 = ThreadInfo(456, int('0x1054', 16), 22, 'explorer.exe', 'C:\\Windows\\EXPLORER.exe')
+    thread_info2 = ThreadInfo(1, int('0x0', 16), 2, 'system.exe', 'C:\\Windows\\system.exe')
     thread_registry.get_thread.side_effect = [thread_info1, thread_info2]
     return thread_registry
 

@@ -18,7 +18,7 @@ from unittest.mock import patch, Mock
 import pytest
 from logbook import Logger
 
-from fibratus.output.adapter.smtp import SmtpAdapter
+from fibratus.output.smtp import SmtpOutput
 
 
 @pytest.fixture(scope='module')
@@ -29,10 +29,10 @@ def smtp_adapter():
         'password': 'secret',
         'to': ['fibratus@fibratus.io', 'netmutatus@netmutatus.io']
     }
-    return SmtpAdapter(**config)
+    return SmtpOutput(**config)
 
 
-class TestSmtpAdapter(object):
+class TestSmtpOutput(object):
 
     def test_init(self, smtp_adapter):
         assert 'smtp.gmail.com' in smtp_adapter.host
