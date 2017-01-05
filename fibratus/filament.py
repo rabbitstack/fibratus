@@ -27,7 +27,7 @@ from multiprocess import Process
 
 from fibratus.asciiart.tabular import Tabular
 from fibratus.common import DotD as ddict
-from fibratus.common import IO
+from fibratus.common import panic
 from fibratus.errors import FilamentError, TermInitializationError
 from fibratus.term import AnsiTerm
 
@@ -237,6 +237,7 @@ class Filament(Process):
                 kevent = self._keventq.get()
                 self._filament_module.on_next_kevent(ddict(kevent))
             except Exception:
+                print( traceback.format_exc())
                 self._logger.error('Unexpected filament error %s'
                                    % traceback.format_exc())
 
@@ -254,7 +255,7 @@ class Filament(Process):
                 try:
                     _ansi_term.setup_console()
                 except TermInitializationError:
-                    IO.write_console('fibratus run: ERROR - console initialization failed')
+                    panic('fibratus run: ERROR - console initialization failed')
             _ansi_term.cls()
             _ansi_term.write_output(tabular)
 
@@ -292,8 +293,7 @@ class Filament(Process):
     @classmethod
     def _assert_root_dir(cls):
         if not os.path.exists(FILAMENTS_DIR):
-            IO.write_console('fibratus run: ERROR - %s path does not exist.' % FILAMENTS_DIR)
-            sys.exit(0)
+            panic('fibratus run: ERROR - %s path does not exist.' % FILAMENTS_DIR)
 
     @property
     def keventq(self):
