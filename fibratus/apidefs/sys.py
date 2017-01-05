@@ -18,7 +18,7 @@ from ctypes import c_int, c_byte, WINFUNCTYPE
 from ctypes.wintypes import DWORD, ULONG, PULONG, USHORT, HANDLE, BOOL, SHORT, WCHAR, CHAR, WORD, LPDWORD
 
 from fibratus.apidefs.cdefs import *
-import fibratus.ctypes_declarer as declarer
+import fibratus.apidefs.declarer as declarer
 
 
 SYSTEM_HANDLE_INFORMATION_CLASS = 16

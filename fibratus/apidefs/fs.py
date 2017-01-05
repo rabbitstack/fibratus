@@ -16,7 +16,7 @@
 from ctypes import Structure
 from ctypes.wintypes import HANDLE, DWORD, BOOL, WCHAR, LONG
 
-import fibratus.ctypes_declarer as declarer
+import fibratus.apidefs.declarer as declarer
 from fibratus.apidefs.cdefs import LPVOID, LPTSTR
 
 

@@ -17,7 +17,7 @@ from ctypes.wintypes import HKEY, DWORD, LPDWORD, LONG, LPCWSTR
 from enum import Enum
 
 from fibratus.apidefs.cdefs import *
-import fibratus.ctypes_declarer as declarer
+import fibratus.apidefs.declarer as declarer
 
 
 # query type flags

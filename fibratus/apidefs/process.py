@@ -18,7 +18,7 @@ from ctypes.wintypes import DWORD, BOOL, HANDLE, ULONG, PULONG, BYTE, PDWORD
 
 from fibratus.apidefs.cdefs import *
 from fibratus.apidefs.sys import malloc, free
-import fibratus.ctypes_declarer as declarer
+import fibratus.apidefs.declarer as declarer
 
 
 # process access rights
