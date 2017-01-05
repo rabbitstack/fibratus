@@ -16,14 +16,12 @@
 
 from ctypes import addressof, byref, cast, memmove, sizeof,  c_char, c_wchar
 from ctypes import ArgumentError, pointer
-import sys
 
 from fibratus.apidefs.cdefs import ERROR_ALREADY_EXISTS, ERROR_ACCESS_DENIED, ERROR_BAD_LENGTH, \
     ERROR_INVALID_PARAMETER, ERROR_SUCCESS
 from fibratus.apidefs.etw import *
-from fibratus.common import IO
 from fibratus.errors import FibratusError
-
+from fibratus.common import panic
 
 class KTraceProps(object):
 
@@ -134,8 +132,7 @@ class KTraceController(object):
             self._handle = handle
         elif status == ERROR_ACCESS_DENIED:
             # insufficient privileges
-            IO.write_console("ERROR - You don't have administrative privileges. Stopping fibratus...")
-            sys.exit()
+            panic("You don't have administrative privileges. Stopping fibratus...")
         elif status == ERROR_BAD_LENGTH:
             raise FibratusError('Incorrect buffer size for the trace buffer')
         elif status == ERROR_INVALID_PARAMETER:
