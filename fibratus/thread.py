@@ -56,17 +56,13 @@ class ThreadRegistry(object):
             thread_id = process_id
             name = kti.image_file_name
             comm = kti.command_line
-            suid = kti.user_sid
 
             thread = ThreadInfo(process_id, thread_id,
                                 parent_pid,
                                 name,
-                                comm,
-                                suid)
+                                comm)
             if ketype == ENUM_PROCESS:
                 thread.handles = [handle for handle in self._handles if handle.pid == process_id]
-            else:
-                thread.handles = self.handle_repository.query_handles(process_id)
             self._threads[process_id] = thread
         elif ketype == CREATE_THREAD or ketype == ENUM_THREAD:
             # new thread created in the
@@ -87,13 +83,11 @@ class ThreadRegistry(object):
 
                 name = pthread.name
                 comm = pthread.comm
-                suid = pthread.suid
 
                 thread = ThreadInfo(process_id, thread_id,
                                     parent_pid,
                                     name,
-                                    comm,
-                                    suid)
+                                    comm)
                 thread.ustack_base = hex(kti.user_stack_base)
                 thread.kstack_base = hex(kti.stack_base)
                 thread.base_priority = kti.base_priority
@@ -136,8 +130,7 @@ class ThreadRegistry(object):
                 thread = ThreadInfo(process_id, thread_id,
                                     process_id,
                                     name,
-                                    comm,
-                                    ())
+                                    comm)
                 thread.ustack_base = hex(kti.user_stack_base)
                 thread.kstack_base = hex(kti.stack_base)
                 thread.base_priority = kti.base_priority
@@ -146,8 +139,7 @@ class ThreadRegistry(object):
                 parent = ThreadInfo(process_id, process_id,
                                     ppid,
                                     name,
-                                    comm,
-                                    ())
+                                    comm)
                 # enumerate parent handles
                 parent.handles = self.handle_repository.query_handles(process_id)
 
@@ -332,7 +324,7 @@ class ThreadRegistry(object):
 class ThreadInfo(object):
     """Represents the state of thread or process.
     """
-    def __init__(self, pid, tid, ppid, name, comm, suid):
+    def __init__(self, pid, tid, ppid, name, comm):
         """Creates an instance of `ThreadInfo` class.
 
         Parameters
@@ -350,11 +342,6 @@ class ThreadInfo(object):
         comm: str
             the full command line of a process
             (C:\Windows\system32\cmd.exe /cdir /-C /W)
-        suid: tuple
-            the security identifier of the user who
-            created the process. It consists of a tuple
-            with user name and the domain.
-
 
         Attributes
         ----------
@@ -392,7 +379,6 @@ class ThreadInfo(object):
         # the command line arguments
         # are separated by blank space
         self._args = comm.split()[1:]
-        self._suid = suid
         self._child_count = 0
         self._handles = []
 
@@ -428,10 +414,6 @@ class ThreadInfo(object):
     @property
     def args(self):
         return self._args
-
-    @property
-    def suid(self):
-        return self._suid
 
     @property
     def child_count(self):
