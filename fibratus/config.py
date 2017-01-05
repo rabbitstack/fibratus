@@ -15,9 +15,7 @@
 
 import os
 import anyconfig
-import sys
-
-from fibratus.common import IO
+from fibratus.common import panic
 
 __DEFAULT_CONFIG_PATH__ = os.path.join(os.path.expanduser('~'), '.fibratus', 'fibratus.yml')
 
@@ -30,16 +28,16 @@ class YamlConfig(object):
         try:
             self._yaml = anyconfig.load(path, ignore_missing=False)
         except FileNotFoundError:
-            IO.write_console('ERROR - %s configuration file does not exist' % path)
-            sys.exit()
+            panic('ERROR - %s configuration file does not exist' % path)
 
     @property
-    def output_adapters(self):
+    def outputs(self):
         return self._yaml.pop('output', None)
 
     @property
-    def excluded_procs(self):
-        return self._yaml.pop('excluded_procs', [])
+    def image_skips(self):
+        skips = self._yaml.pop('skips', {})
+        return skips.pop('images', [])
 
     @property
     def yaml(self):
