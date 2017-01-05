@@ -7,6 +7,7 @@ coverage.xml
 /kstream/build
 /kstream/*.pyd
 /kstream/*.c
+/kstream/*.cpp
 /tests/.cache
 /tests/__pycache__
 /tests/*/__pycache__
