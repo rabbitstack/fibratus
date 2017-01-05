@@ -14,11 +14,14 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-from _ctypes import byref
-from ctypes import c_ulong
-from fibratus.apidefs.sys import write_console_unicode, get_std_handle, STD_OUTPUT_HANDLE, close_handle
+import sys
 
 NA = '<NA>'
+
+
+def panic(msg):
+    print(msg)
+    sys.exit()
 
 
 class DotD(dict):
@@ -50,31 +53,3 @@ class DotD(dict):
 
     __setitem__ = __setattr__
 
-
-class IO(object):
-
-    _stdout_handle = get_std_handle(STD_OUTPUT_HANDLE)
-    assert _stdout_handle, 'could not acquire the standard output stream handle'
-
-    @classmethod
-    def write_console(cls, charseq, new_line=True):
-        """Outputs to a Windows console using UNICODE charset.
-
-        Parameters
-        ----------
-
-        charseq: str
-            the sequence of characters to be written
-
-        new_line: bool
-            indicates if the output should be written on the new line
-        """
-        if new_line:
-            charseq += '\n'
-        else:
-            charseq += '\r'
-        write_console_unicode(cls._stdout_handle, charseq, len(charseq), byref(c_ulong()), None)
-
-    def __del__(self):
-        if self._stdout_handle:
-            close_handle(self._stdout_handle)
