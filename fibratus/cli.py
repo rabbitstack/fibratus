@@ -37,12 +37,12 @@ from docopt import docopt
 
 from fibratus.apidefs.sys import set_console_ctrl_handler, PHANDLER_ROUTINE
 from fibratus.asciiart.tabular import Tabular
-from fibratus.common import IO
 from fibratus.errors import FilamentError
 from fibratus.entrypoint import Fibratus
 from fibratus.filament import Filament
 from fibratus.kevent import KEvents
 from fibratus.version import VERSION
+from fibratus.common import panic
 
 args = docopt(__doc__, version=VERSION)
 
@@ -52,9 +52,8 @@ filament_name = args['--filament'] if args['--filament'] else None
 
 def _check_kevent(kevent):
     if kevent not in KEvents.all():
-        IO.write_console('fibratus run: ERROR - %s is not a valid kernel event. Run list-kevents to see '
-                         'the available kernel events' % kevent)
-        sys.exit()
+        panic('fibratus run: ERROR - %s is not a valid kernel event. Run list-kevents to see '
+              'the available kernel events' % kevent)
 
 
 def main():
@@ -70,18 +69,16 @@ def main():
         filament_filters = []
 
         if not filament_name:
-            IO.write_console('Starting fibratus...', False)
+            print('Starting fibratus...')
         else:
             if not Filament.exists(filament_name):
-                IO.write_console('fibratus run: ERROR - %s filament does not exist. Run list-filaments to see '
-                                 'the availble filaments' % filament_name)
-                sys.exit()
+                panic('fibratus run: ERROR - %s filament does not exist. Run list-filaments to see '
+                      'the availble filaments' % filament_name)
             filament = Filament()
             try:
                 filament.load_filament(filament_name)
             except FilamentError as e:
-                IO.write_console('fibratus run: ERROR - %s' % e)
-                sys.exit()
+                panic('fibratus run: ERROR - %s' % e)
 
             filament_filters = filament.filters
 
