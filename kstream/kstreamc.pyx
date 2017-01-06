@@ -24,7 +24,7 @@ from libcpp.vector cimport vector
 from libcpp.utility cimport pair
 
 from cpython cimport PyBytes_AsString
-
+from cpython.exc cimport PyErr_CheckSignals
 
 from kstream.includes.etw cimport *
 from kstream.includes.tdh cimport *
@@ -292,6 +292,13 @@ cdef class KEventStreamCollector:
                 return
 
             with gil:
+                # check for pending signals.
+                # The default behaviour is to
+                # raise `KeyboardInterrupt` exception
+                # which will be propagated to the caller
+                if PyErr_CheckSignals() > 0:
+                    self.close_kstream()
+                    return
                 try:
                     timestamp = '%d-%d-%d %d:%02d:%02d.%d' % (ts.year, ts.month,
                                                               ts.day, ts.hour,
