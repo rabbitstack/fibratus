@@ -22,6 +22,7 @@ from datetime import timedelta
 
 from kstreamc import KEventStreamCollector
 
+from fibratus.output.aggregator import OutputAggregator
 from fibratus.output.console import ConsoleOutput
 from fibratus.output.elasticsearch import ElasticsearchOutput
 from fibratus.output.smtp import SmtpOutput
@@ -105,6 +106,7 @@ class Fibratus(object):
                                     smtp=SmtpOutput,
                                     elasticsearch=ElasticsearchOutput)
         self._outputs = self._construct_outputs()
+        self.output_aggregator = OutputAggregator(self._outputs)
 
         if filament:
             filament.keventq = self.keventq
@@ -364,23 +366,7 @@ class Fibratus(object):
             if ktype in self.output_kevents:
                 if self.output_kevents[ktype]:
                     self.kevent.inc_kid()
-                    self._emit()
+                    self.output_aggregator.aggregate(self.kevent)
             elif self.filters_count == 0:
                 self.kevent.inc_kid()
-                self._emit()
-
-    def _emit(self):
-        for _, output in self._outputs.items():
-            if isinstance(output, ConsoleOutput):
-                output.emit(self.kevent)
-            else:
-                pid, proc = self.kevent.get_thread()
-                body = {'id': self.kevent.kid,
-                        'timestamp': self.kevent.ts.strftime('%Y-%m-%d %H:%M:%S.%f'),
-                        'cpuid': self.kevent.cpuid,
-                        'proc': proc,
-                        'pid': pid,
-                        'name': self.kevent.name,
-                        'category': self.kevent.category,
-                        'params': self.kevent.params}
-                output.emit(body)
+                self.output_aggregator.aggregate(self.kevent)
