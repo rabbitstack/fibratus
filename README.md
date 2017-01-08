@@ -3,8 +3,6 @@ Fibratus
 [![Build status](https://ci.appveyor.com/api/projects/status/dlvxhc0j026ikcyv?svg=true)](https://ci.appveyor.com/project/rabbitstack/fibratus)
 [![Coverage Status](https://codecov.io/gh/rabbitstack/fibratus/branch/master/graph/badge.svg)](https://codecov.io/gh/rabbitstack/fibratus)
 [![Code Health](https://landscape.io/github/rabbitstack/fibratus/master/landscape.svg?style=flat)](https://landscape.io/github/rabbitstack/fibratus/master)
-[![OpenCollective](https://opencollective.com/fibratus/backers/badge.svg)](#backers) 
-[![OpenCollective](https://opencollective.com/fibratus/sponsors/badge.svg)](#sponsors)
 
 **Fibratus** is a tool which is able to capture the most of the Windows kernel activity - process/thread creation and termination, 
 file system I/O, registry, network activity, DLL loading/unloading and much more. 
@@ -30,23 +28,11 @@ Install via the pip package manager:
 
 See the [wiki](https://github.com/rabbitstack/fibratus/wiki/Running).
 
-## Contributing
-
-Please use Github's pull-request model to submit your contributions. Before you send the pull-request you should keep in mind:
-
-* the code has to be in harmony with the **Zen Of Python** principles
-* you need to test the code (fibratus uses the `pytest` unit testing framework)
-* make sure your code satisfy the **PEP** coding style
-
 ## Support
 
-A lot of love and passion is put into Fibratus. If you want to support Fibratus, please consider a donation.
+If you want to support Fibratus, please consider a donation.
 
 [![Beerpay](https://beerpay.io/rabbitstack/fibratus/badge.svg?style=beer-square)](https://beerpay.io/rabbitstack/fibratus)  [![Beerpay](https://beerpay.io/rabbitstack/fibratus/make-wish.svg?style=flat-square)](https://beerpay.io/rabbitstack/fibratus?focus=wish)
-
-
-### Backers
-Support us with a monthly donation and help us continue our activities. [[Become a backer](https://opencollective.com/fibratus#backer)]
 
 <a href="https://opencollective.com/fibratus/backer/0/website" target="_blank"><img src="https://opencollective.com/fibratus/backer/0/avatar.svg"></a>
 <a href="https://opencollective.com/fibratus/backer/1/website" target="_blank"><img src="https://opencollective.com/fibratus/backer/1/avatar.svg"></a>
@@ -78,9 +64,6 @@ Support us with a monthly donation and help us continue our activities. [[Become
 <a href="https://opencollective.com/fibratus/backer/27/website" target="_blank"><img src="https://opencollective.com/fibratus/backer/27/avatar.svg"></a>
 <a href="https://opencollective.com/fibratus/backer/28/website" target="_blank"><img src="https://opencollective.com/fibratus/backer/28/avatar.svg"></a>
 <a href="https://opencollective.com/fibratus/backer/29/website" target="_blank"><img src="https://opencollective.com/fibratus/backer/29/avatar.svg"></a>
-
-### Sponsors
-Become a sponsor and get your logo on our README on Github with a link to your site. [[Become a sponsor](https://opencollective.com/fibratus#sponsor)]
 
 <a href="https://opencollective.com/fibratus/sponsor/0/website" target="_blank"><img src="https://opencollective.com/fibratus/sponsor/0/avatar.svg"></a>
 <a href="https://opencollective.com/fibratus/sponsor/1/website" target="_blank"><img src="https://opencollective.com/fibratus/sponsor/1/avatar.svg"></a>
