@@ -10,7 +10,6 @@ Fibratus has a very simple CLI which encapsulates the machinery to start the ker
 set kernel event filters or run the lightweight Python modules called **filaments**. You can use filaments to extend Fibratus with your own arsenal of tools.
 
 ![fibratus]( https://github.com/rabbitstack/fibratus/blob/master/static/fibratus.png "fibratus" )
-![filaments]( https://github.com/rabbitstack/fibratus/blob/master/static/filaments.png "filaments" )
 
 ## Requirements
 
