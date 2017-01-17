@@ -1,11 +1,11 @@
-Fibratus
+Fibratus [![PyPI version](https://badge.fury.io/py/fibratus.svg)](https://badge.fury.io/py/fibratus)
 ========
 [![Build status](https://ci.appveyor.com/api/projects/status/dlvxhc0j026ikcyv?svg=true)](https://ci.appveyor.com/project/rabbitstack/fibratus)
 [![Coverage Status](https://codecov.io/gh/rabbitstack/fibratus/branch/master/graph/badge.svg)](https://codecov.io/gh/rabbitstack/fibratus)
 [![Code Health](https://landscape.io/github/rabbitstack/fibratus/master/landscape.svg?style=flat)](https://landscape.io/github/rabbitstack/fibratus/master)
 
 **Fibratus** is a tool which is able to capture the most of the Windows kernel activity - process/thread creation and termination, 
-file system I/O, registry, network activity, DLL loading/unloading and much more. 
+file system I/O, registry, network activity, DLL loading/unloading and much more.
 Fibratus has a very simple CLI which encapsulates the machinery to start the kernel event stream collector, 
 set kernel event filters or run the lightweight Python modules called **filaments**. You can use filaments to extend Fibratus with your own arsenal of tools.
 
