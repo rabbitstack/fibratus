@@ -29,6 +29,6 @@ See the [wiki](https://github.com/rabbitstack/fibratus/wiki/Running).
 
 [![Beerpay](https://beerpay.io/rabbitstack/fibratus/badge.svg?style=beer-square)](https://beerpay.io/rabbitstack/fibratus) 
 [![Beerpay](https://beerpay.io/rabbitstack/fibratus/make-wish.svg?style=flat-square)](https://beerpay.io/rabbitstack/fibratus?focus=wish)
-[![OpenCollective](https://opencollective.com/fibratus/backers/badge.svg)](#backers) 
-[![OpenCollective](https://opencollective.com/fibratus/sponsors/badge.svg)](#sponsors)
+[![OpenCollective](https://opencollective.com/fibratus/backers/badge.svg)](https://opencollective.com/fibratus) 
+[![OpenCollective](https://opencollective.com/fibratus/sponsors/badge.svg)](https://opencollective.com/fibratus)
 
