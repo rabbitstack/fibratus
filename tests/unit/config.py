@@ -49,7 +49,7 @@ class TestYamlConfig():
 
     def test_image_skips(self):
         config = YamlConfig(__CONFIG_PATH__)
-        image_skips = config.image_skips
+        image_skips = config.skips.images
         assert image_skips
         assert isinstance(image_skips, list)
         assert 'smss.exe' in image_skips

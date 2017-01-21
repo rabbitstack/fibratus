@@ -15,10 +15,12 @@
 from unittest.mock import patch, Mock
 
 import pytest
+import os
 
 from fibratus.apidefs.cdefs import ERROR_ACCESS_DENIED
 from fibratus.apidefs.process import PROCESS_QUERY_INFORMATION, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_VM_READ
 from fibratus.handle import HandleRepository, HandleInfo
+from fibratus.image_meta import ImageMetaRegistry
 from fibratus.kevent_types import CREATE_PROCESS, CREATE_THREAD, ENUM_PROCESS, ENUM_THREAD, TERMINATE_THREAD, \
     TERMINATE_PROCESS
 from fibratus.common import DotD as dd
@@ -35,7 +37,12 @@ def handle_repo_mock():
 
 
 @pytest.fixture(scope='module')
-def thread_registry(handle_repo_mock):
+def image_meta_registry_mock():
+    return Mock(spec_set=ImageMetaRegistry)
+
+
+@pytest.fixture(scope='module')
+def thread_registry(handle_repo_mock, image_meta_registry_mock):
     p1 = {"session_id": 0, "command_line": "C:\\Windows\\system32\\services.exe", "process_id": "0x1e4",
           "unique_process_key": 18446738026492816176, "exit_status": 259,
           "parent_id": "0x17c",
@@ -53,7 +60,7 @@ def thread_registry(handle_repo_mock):
           "stack_base": 18446735827442450432, "user_stack_limit": 16547840,
           "thread_flags": 0, "affinity": 15, "sub_process_tag": "0x0"}
 
-    thread_registry = ThreadRegistry(handle_repo_mock, [])
+    thread_registry = ThreadRegistry(handle_repo_mock, [], image_meta_registry_mock)
     thread_registry.add_thread(ENUM_PROCESS, dd(p1))
     thread_registry.add_thread(ENUM_THREAD, dd(t1))
     thread_registry.add_thread(ENUM_THREAD, dd(t2))
@@ -106,12 +113,12 @@ class TestThreadRegistry():
         process_id = int(kti.process_id, 16)
 
         t = thread_registry.get_thread(process_id)
-
+        sys_root = os.path.expandvars("%SystemRoot%")
         assert t
         assert t.pid == process_id
         assert t.ppid == int(kti.parent_id, 16)
         assert t.name == kti.image_file_name
-        assert t.exe == '\\SystemRoot\\System32\\smss.exe'
+        assert t.exe == '%s\\System32\\smss.exe' % sys_root
         assert t.comm == kti.command_line
         assert len(t.args) == 0
 
