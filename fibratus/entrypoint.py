@@ -22,6 +22,7 @@ from datetime import timedelta
 
 from kstreamc import KEventStreamCollector
 
+from fibratus.image_meta import ImageMetaRegistry
 from fibratus.output.aggregator import OutputAggregator
 from fibratus.output.console import ConsoleOutput
 from fibratus.output.elasticsearch import ElasticsearchOutput
@@ -69,7 +70,7 @@ class Fibratus(object):
 
         self._config = YamlConfig()
 
-        self.logger.info('Starting...')
+        self.logger.info('Starting Fibratus...')
 
         enable_cswitch = kwargs.pop('cswitch', False)
 
@@ -89,10 +90,17 @@ class Fibratus(object):
             self._handles = self.handle_repository.query_handles()
             self.logger.info('%s handles found' % len(self._handles))
             self.handle_repository.free_buffers()
-        self.thread_registry = ThreadRegistry(self.handle_repository, self._handles)
+
+        image_meta_config = self._config.image_meta
+        self.image_meta_registry = ImageMetaRegistry(image_meta_config.enabled, image_meta_config.imports,
+                                                     image_meta_config.file_info)
+
+        self.thread_registry = ThreadRegistry(self.handle_repository, self._handles,
+                                              self.image_meta_registry)
 
         self.kevt_streamc = KEventStreamCollector(etw.KERNEL_LOGGER_NAME.encode())
-        image_skips = self._config.image_skips
+        skips = self._config.skips
+        image_skips = skips.images if 'images' in skips else []
         if len(image_skips) > 0:
             self.logger.info("Adding skips for images %s" % image_skips)
             for skip in image_skips:
@@ -163,7 +171,7 @@ class Fibratus(object):
                     name in self._output_classes.keys():
                 # get the output configuration
                 # and instantiate its class
-                self.logger.info("Initializing %s output" % name)
+                self.logger.info("Initializing output of type %s" % name)
                 output_class = self._output_classes[name]
                 output_config = output[name]
                 outputs[name] = output_class(**output_config)
