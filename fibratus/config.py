@@ -15,7 +15,7 @@
 
 import os
 import anyconfig
-from fibratus.common import panic
+from fibratus.common import panic, DotD as ddict
 
 __DEFAULT_CONFIG_PATH__ = os.path.join(os.path.expanduser('~'), '.fibratus', 'fibratus.yml')
 
@@ -31,13 +31,16 @@ class YamlConfig(object):
             panic('ERROR - %s configuration file does not exist' % path)
 
     @property
-    def outputs(self):
-        return self._yaml.pop('output', None)
+    def image_meta(self):
+        return ddict(self._yaml.pop('image_meta', {}))
 
     @property
-    def image_skips(self):
-        skips = self._yaml.pop('skips', {})
-        return skips.pop('images', [])
+    def skips(self):
+        return ddict(self._yaml.pop('skips', {}))
+
+    @property
+    def outputs(self):
+        return self._yaml.pop('output', None)
 
     @property
     def yaml(self):
