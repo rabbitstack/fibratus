@@ -25,8 +25,7 @@ from logbook import FileHandler
 from logbook import Logger
 from multiprocess import Process
 
-from fibratus.asciiart.tabular import Tabular
-from fibratus.common import DotD as ddict
+from fibratus.common import DotD as ddict, Tabular
 from fibratus.common import panic
 from fibratus.errors import FilamentError, TermInitializationError
 from fibratus.term import AnsiTerm
