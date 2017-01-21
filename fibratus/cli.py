@@ -36,13 +36,12 @@ import sys
 from docopt import docopt
 
 from fibratus.apidefs.sys import set_console_ctrl_handler, PHANDLER_ROUTINE
-from fibratus.asciiart.tabular import Tabular
 from fibratus.errors import FilamentError
 from fibratus.entrypoint import Fibratus
 from fibratus.filament import Filament
 from fibratus.kevent import KEvents
 from fibratus.version import VERSION
-from fibratus.common import panic
+from fibratus.common import panic, Tabular
 
 args = docopt(__doc__, version=VERSION)
 
