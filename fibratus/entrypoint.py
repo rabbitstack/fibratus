@@ -171,9 +171,11 @@ class Fibratus(object):
                     name in self._output_classes.keys():
                 # get the output configuration
                 # and instantiate its class
-                self.logger.info("Initializing output of type %s" % name)
-                output_class = self._output_classes[name]
                 output_config = output[name]
+                self.logger.info("Deploying [%s] output - [%s]"
+                                 % (name, {k: v for k, v in output_config.items()
+                                           if 'password' not in k}))
+                output_class = self._output_classes[name]
                 outputs[name] = output_class(**output_config)
         return outputs
 
