@@ -1,7 +1,7 @@
 image_meta:
   enabled: true
-  imports: true
-  file_info: true
+  imports: false
+  file_info: false
 
 skips:
   images:
