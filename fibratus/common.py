@@ -15,13 +15,50 @@
 # under the License.
 
 import sys
+import re
+from prettytable import PrettyTable
+
+__underscore_regex__ = re.compile('((?<=[a-z0-9])[A-Z]|(?!^)[A-Z](?=[a-z]))')
+
 
 NA = '<NA>'
 
 
 def panic(msg):
+    """Write the message on the console and terminates the process.
+
+    Parameters
+    ----------
+    msg: str
+        the message to be written on the standard output stream
+    """
     print(msg)
     sys.exit()
+
+
+def underscore_dict_keys(in_dict):
+    if type(in_dict) is dict:
+        out_dict = {}
+        for key, item in in_dict.items():
+            out_dict[__underscore_regex__.sub(r'_\1', key).lower()] = underscore_dict_keys(item)
+        return out_dict
+    elif type(in_dict) is list:
+        return [__underscore_regex__.sub(r'_\1', obj).lower() for obj in in_dict]
+    else:
+        return in_dict
+
+
+class Tabular(PrettyTable):
+
+    def __init__(self, columns, align_col=None, align_type='l', sort_by=None):
+        PrettyTable.__init__(self, columns)
+        if align_col:
+            self.align[align_col] = align_type
+        if sort_by:
+            self.sortby = sort_by
+
+    def draw(self):
+        print(self.get_string())
 
 
 class DotD(dict):
