@@ -29,10 +29,11 @@ from fibratus.common import DotD as ddict, NA
 
 class ThreadRegistry(object):
 
-    def __init__(self, handle_repository, handles):
+    def __init__(self, handle_repository, handles, image_meta_registry):
         self._threads = {}
         self.on_thread_added_callback = None
         self.handle_repository = handle_repository
+        self.image_meta_registry = image_meta_registry
         self._handles = handles
 
     def add_thread(self, ketype, kti):
@@ -63,7 +64,13 @@ class ThreadRegistry(object):
                                 comm)
             if ketype == ENUM_PROCESS:
                 thread.handles = [handle for handle in self._handles if handle.pid == process_id]
+            if ketype == CREATE_PROCESS:
+                image_meta = self.image_meta_registry.get_image_meta(thread.exe)
+                if not image_meta:
+                    image_meta = self.image_meta_registry.add_image_meta(thread.exe)
+                thread.image_meta = image_meta
             self._threads[process_id] = thread
+
         elif ketype == CREATE_THREAD or ketype == ENUM_THREAD:
             # new thread created in the
             # context of the existing process
@@ -211,11 +218,25 @@ class ThreadRegistry(object):
             pid = int(kti.process_id, 16)
             thread = self.get_thread(pid)
             if thread:
-                kevent.params = dict(pid=pid,
-                                     name=thread.name,
-                                     comm=thread.comm,
-                                     exe=thread.exe,
-                                     ppid=thread.ppid)
+                kparams = dict(pid=pid,
+                               name=thread.name,
+                               comm=thread.comm,
+                               exe=thread.exe,
+                               ppid=thread.ppid)
+                if thread.image_meta:
+                    # include image meta info
+                    image_meta = dict(arch=thread.image_meta.arch,
+                                      timestamp=thread.image_meta.timestamp,
+                                      num_sections=thread.image_meta.num_sections,
+                                      sections=thread.image_meta.sections,
+                                      imports=thread.image_meta.imports,
+                                      org=thread.image_meta.org,
+                                      description=thread.image_meta.description,
+                                      version=thread.image_meta.version,
+                                      internal_name=thread.image_meta.internal_name,
+                                      copyright=thread.image_meta.copyright)
+                    kparams['image_meta'] = image_meta
+                kevent.params = kparams
                 kevent.pid = thread.ppid
 
     def set_thread_added_callback(self, callback):
@@ -371,8 +392,14 @@ class ThreadInfo(object):
 
         # get the executable from the
         # full file system path
-        head, _ = os.path.split(comm[0:comm.rfind('exe')])
+        head, _ = os.path.split(comm[0:comm.find('exe')])
         self._exe = '%s\%s' % (head, name)
+        self._exe = self._exe.replace("\"", '')
+
+        if 'SystemRoot' in self._exe:
+            sys_root = os.path.expandvars("%SystemRoot%")
+            self._exe = self._exe.replace('%SystemRoot%', sys_root)\
+                .replace('\\SystemRoot', sys_root)
 
         self._name = name.lower() if NA not in name else NA
         self._comm = comm
@@ -386,6 +413,8 @@ class ThreadInfo(object):
         self._kstack_base = 0x0
         self._io_priority = 0
         self._base_priority = 0
+
+        self._image_meta = None
 
     @property
     def pid(self):
@@ -458,6 +487,14 @@ class ThreadInfo(object):
     @base_priority.setter
     def base_priority(self, base_priority):
         self._base_priority = base_priority
+
+    @property
+    def image_meta(self):
+        return self._image_meta
+
+    @image_meta.setter
+    def image_meta(self, image_meta):
+        self._image_meta = image_meta
 
     def increment_child_count(self):
         self._child_count += 1
