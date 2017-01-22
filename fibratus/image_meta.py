@@ -62,7 +62,7 @@ class ImageMetaRegistry(object):
         of the the image passed in the `path` parameter.
 
         It then extracts some basic headers present in the PE, as well
-        as sections which compromise the binary image.
+        as sections which form the binary image.
 
         Parameters
         ----------
