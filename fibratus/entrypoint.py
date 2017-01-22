@@ -18,7 +18,6 @@ import atexit
 import os
 import sys
 from datetime import datetime
-from datetime import timedelta
 
 from kstreamc import KEventStreamCollector
 
@@ -145,7 +144,8 @@ class Fibratus(object):
         def on_kstream_open():
             if self._filament is None:
                 delta = datetime.now() - self._start
-                self.logger.info('Started in %s' % str(timedelta(seconds=delta.seconds)))
+                self.logger.info('Started in %sm:%02ds.%s' % (int(delta.total_seconds() / 60), delta.seconds,
+                                                              int(delta.total_seconds() * 1000)))
         self.kevt_streamc.set_kstream_open_callback(on_kstream_open)
         self._open_kstream()
 
