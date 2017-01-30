@@ -67,12 +67,10 @@ def main():
         filament = None
         filament_filters = []
 
-        if not filament_name:
-            print('Starting fibratus...')
-        else:
+        if filament_name:
             if not Filament.exists(filament_name):
                 panic('fibratus run: ERROR - %s filament does not exist. Run list-filaments to see '
-                      'the availble filaments' % filament_name)
+                      'the available filaments' % filament_name)
             filament = Filament()
             try:
                 filament.load_filament(filament_name)
