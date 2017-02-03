@@ -54,6 +54,7 @@ cdef wstring PROCESS_ID_PROP = deref_prop("ProcessId")
 cdef wstring IMAGE_FILE_NAME_PROP = deref_prop("ImageFileName")
 
 REGISTRY_KGUID = '{ae53722e-c863-11d2-8659-00c04fa321a1}'
+FS_KGUID = '{90cbdc39-4a3e-11d1-84f4-0000f80464e3}'
 
 
 cdef class KEventStreamCollector:
@@ -317,6 +318,8 @@ cdef class KEventStreamCollector:
                     if kguid in REGISTRY_KGUID:
                         kparams['thread_id']  = tid
                         kparams['process_id'] = pid
+                    elif kguid in FS_KGUID:
+                        kparams['process_id']  = pid
                     if self.next_kevt_callback:
                         self.next_kevt_callback((kguid, opc,), cpuid,
                                                 timestamp,
