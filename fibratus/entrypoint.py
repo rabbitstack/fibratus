@@ -288,7 +288,9 @@ class Fibratus(object):
                        DELETE_FILE,
                        CLOSE_FILE,
                        READ_FILE,
-                       WRITE_FILE]:
+                       WRITE_FILE,
+                       RENAME_FILE,
+                       SET_FILE_INFORMATION]:
             self.fsio.parse_fsio(ktype, kparams)
             self._aggregate(ktype)
 
