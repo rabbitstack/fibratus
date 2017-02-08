@@ -58,6 +58,7 @@ class KEvents(object):
     READ_FILE = 'ReadFile'
     CLOSE_FILE = 'CloseFile'
     RENAME_FILE = 'RenameFile'
+    SET_FILE_INFORMATION = 'SetFileInformation'
 
     SEND = 'Send'
     RECEIVE = 'Recv'
@@ -86,6 +87,7 @@ class KEvents(object):
                 cls.WRITE_FILE,
                 cls.CLOSE_FILE,
                 cls.RENAME_FILE,
+                cls.SET_FILE_INFORMATION,
                 cls.REG_QUERY_KEY,
                 cls.REG_QUERY_VALUE,
                 cls.REG_CREATE_KEY,
@@ -116,6 +118,7 @@ class KEvents(object):
             KEvents.READ_FILE: (Category.FILE, 'Reads data from the file or I/O device', ),
             KEvents.WRITE_FILE: (Category.FILE, 'Writes data to the file or I/O device', ),
             KEvents.CLOSE_FILE: (Category.FILE, 'Closes the file or I/O device', ),
+            KEvents.SET_FILE_INFORMATION: (Category.FILE, 'Changes information for the specified file',),
             KEvents.RENAME_FILE: (Category.FILE, 'Renames a file or directory', ),
             KEvents.REG_QUERY_KEY: (Category.REGISTRY, 'Retrieves information about the registry key', ),
             KEvents.REG_OPEN_KEY: (Category.REGISTRY, 'Opens the registry key', ),

@@ -44,6 +44,8 @@ WRITE_FILE = ('{90cbdc39-4a3e-11d1-84f4-0000f80464e3}', 68)
 RENAME_FILE = ('{90cbdc39-4a3e-11d1-84f4-0000f80464e3}', 71)
 # enumerate directory event
 ENUM_DIRECTORY = ('{90cbdc39-4a3e-11d1-84f4-0000f80464e3}', 72)
+# set file information event
+SET_FILE_INFORMATION = ('{90cbdc39-4a3e-11d1-84f4-0000f80464e3}', 69)
 
 # disk read event
 DISK_IO_READ = ('{3d6fa8d4-fe05-11d0-9dda-00c04fd7ba7c}', 10)
@@ -145,6 +147,8 @@ def kname_to_tuple(name):
         return DELETE_FILE
     elif name == KEvents.RENAME_FILE:
         return RENAME_FILE
+    elif name == KEvents.SET_FILE_INFORMATION:
+        return SET_FILE_INFORMATION
 
     elif name == KEvents.LOAD_IMAGE:
         return LOAD_IMAGE
@@ -206,6 +210,10 @@ def ktuple_to_name(ktuple):
         return KEvents.WRITE_FILE
     elif ktuple == READ_FILE:
         return KEvents.READ_FILE
+    elif ktuple == RENAME_FILE:
+        return KEvents.RENAME_FILE
+    elif ktuple == SET_FILE_INFORMATION:
+        return KEvents.SET_FILE_INFORMATION
 
     elif ktuple == LOAD_IMAGE:
         return KEvents.LOAD_IMAGE
