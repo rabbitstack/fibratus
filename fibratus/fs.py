@@ -76,8 +76,10 @@ class FsIO(object):
 
         # thread which is perfoming the op
         tid = kfsio.ttid
+        pid = kfsio.process_id
         obj = kfsio.file_object
         self._kevent.tid = tid
+        self._kevent.pid = pid
         # creates or opens a file or the I/O device.
         # The device can be a file, file stream, directory,
         # physical disk, volume, console buffer, tape drive,
@@ -114,35 +116,17 @@ class FsIO(object):
             elif (co & FILE_OPEN_REPARSE_POINT) == FILE_OPEN_REPARSE_POINT:
                 file_type = FileType.REPARSE_POINT
 
-            # type of share access that
-            # the caller would like to use
-            # in the file.
-            # For example, FILE_SHARE_READ would allow other
-            # threads to open the file for read access
-            share_access = kfsio.share_access
-            if share_access == FILE_SHARE_READ:
-                share_mask = 'r--'
-            elif share_access == FILE_SHARE_WRITE:
-                share_mask = '-w-'
-            elif share_access == FILE_SHARE_DELETE:
-                share_mask = '--d'
-            elif share_access == (FILE_SHARE_READ | FILE_SHARE_WRITE):
-                share_mask = 'rw-'
-            elif share_access == (FILE_SHARE_READ | FILE_SHARE_DELETE):
-                share_mask = 'r-d'
-            elif share_access == (FILE_SHARE_WRITE | FILE_SHARE_DELETE):
-                share_mask = '-wd'
-            elif share_access == (FILE_SHARE_READ | FILE_SHARE_WRITE |
-                                  FILE_SHARE_DELETE):
-                share_mask = 'rwd'
-            else:
-                share_mask = '---'
-
-            self._kevent.params = dict(file=file,
-                                       file_type=file_type.name,
-                                       tid=tid,
-                                       operation=op.name,
-                                       share_mask=share_mask)
+            share_mask = self._resolve_share_mask(kfsio.share_access)
+            params = {
+                'file': file,
+                'file_type': file_type.name,
+                'file_object': obj,
+                'tid': tid,
+                'pid': pid,
+                'operation': op.name,
+                'share_mask': share_mask
+            }
+            self._kevent.params = params
 
             # index by file object pointer
             # so we can query the pool
@@ -151,26 +135,46 @@ class FsIO(object):
 
         elif ketype == DELETE_FILE or ketype == CLOSE_FILE:
             file = self._query_file_name(obj, True)
-            params = dict(file=file,
-                          tid=tid)
+            params = {
+                'file': file,
+                'file_object': obj,
+                'pid': pid,
+                'tid': tid
+            }
             self._kevent.params = params
-
         elif ketype == WRITE_FILE or ketype == READ_FILE:
             # the number of kb read/written
             io_size = kfsio.io_size / 1024
             file = self._query_file_name(obj)
-            params = dict(file=file,
-                          tid=tid,
-                          io_size=io_size)
+            params = {
+                'file': file,
+                'file_object': obj,
+                'pid': pid,
+                'tid': tid,
+                'io_size': io_size
+            }
             self._kevent.params = params
-
         elif ketype == RENAME_FILE:
             file = self._query_file_name(obj)
-            params = dict(file=file,
-                          tid=tid)
+            params = {
+                'file': file,
+                'file_object': obj,
+                'pid': pid,
+                'tid': tid
+            }
             self._kevent.params = params
             if NA not in file:
                 self.file_pool[obj] = file
+        elif ketype == SET_FILE_INFORMATION:
+            file = self._query_file_name(obj)
+            params = {
+                'file': file,
+                'file_object': obj,
+                'pid': pid,
+                'tid': tid,
+                'info_class': kfsio.info_class
+            }
+            self._kevent.params = params
 
     def _query_file_name(self, fobj, remove=False):
         if fobj in self.file_pool:
@@ -186,6 +190,38 @@ class FsIO(object):
                 return file if file else NA
             else:
                 return NA
+
+    def _resolve_share_mask(self, share_access):
+        """Resolves the share mask.
+
+         Resolves the type of share access that
+         the caller would like to use in the file.
+
+         For example, `FILE_SHARE_READ` would allow other
+         threads to open the file for read access.
+
+        :param str share_access: the value of the share access
+        :return: `str`
+        """
+
+        if share_access == FILE_SHARE_READ:
+            return 'r--'
+        elif share_access == FILE_SHARE_WRITE:
+            return '-w-'
+        elif share_access == FILE_SHARE_DELETE:
+            return '--d'
+        elif share_access == (FILE_SHARE_READ | FILE_SHARE_WRITE):
+            return 'rw-'
+        elif share_access == (FILE_SHARE_READ | FILE_SHARE_DELETE):
+            return 'r-d'
+        elif share_access == (FILE_SHARE_WRITE | FILE_SHARE_DELETE):
+            return '-wd'
+        elif share_access == (FILE_SHARE_READ | FILE_SHARE_WRITE |
+                              FILE_SHARE_DELETE):
+            return 'rwd'
+        else:
+            return '---'
+
 
 
 
