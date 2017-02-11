@@ -22,7 +22,7 @@ from fibratus.common import DotD as dd, NA
 from fibratus.fs import FsIO, FileOps
 from fibratus.handle import HandleInfo, HandleType
 from fibratus.kevent import KEvent
-from fibratus.kevent_types import CREATE_FILE, DELETE_FILE, WRITE_FILE, RENAME_FILE
+from fibratus.kevent_types import CREATE_FILE, DELETE_FILE, WRITE_FILE, RENAME_FILE, SET_FILE_INFORMATION
 from fibratus.thread import ThreadRegistry
 
 
@@ -49,26 +49,30 @@ class TestFsIO():
 
     @pytest.mark.parametrize('expected_op, kfsio',
                              [(FileOps.SUPERSEDE, dd({"file_object": 18446738026482168384, "ttid": 1484,
+                                                      "process_id": 859,
                                                       "create_options": 1223456,
                                          "open_path": "\\Device\\HarddiskVolume2\\Windows\\system32\\kernel32.dll",
                                          "irp_ptr": 18446738026471032392, "share_access": 1, "file_attributes": 0})),
-                              (FileOps.OPEN, dd({"file_object": 18446738026482168384, "ttid": 1484,
+                              (FileOps.OPEN, dd({"file_object": 18446738026482168384, "ttid": 1484, "process_id": 859,
                                                  "create_options": 18874368,
                                          "open_path": "\\Device\\HarddiskVolume2\\Windows\\system32\\kernel32.dll",
                                          "irp_ptr": 18446738026471032392, "share_access": 2, "file_attributes": 0})),
-                              (FileOps.CREATE, dd({"file_object": 18446738026482168384, "ttid": 1484,
+                              (FileOps.CREATE, dd({"file_object": 18446738026482168384, "ttid": 1484, "process_id": 859,
                                                    "create_options": 33554532,
                                          "open_path": "\\Device\\HarddiskVolume2\\Windows\\system32\\kernel32.dll",
                                          "irp_ptr": 18446738026471032392, "share_access": 4, "file_attributes": 0})),
                               (FileOps.OPEN_IF, dd({"file_object": 18446738026482168384, "ttid": 1484,
+                                                    "process_id": 859,
                                                     "create_options": 58651617,
                                          "open_path": "\\Device\\HarddiskVolume2\\Windows\\system32\\kernel32.dll",
                                          "irp_ptr": 18446738026471032392, "share_access": 3, "file_attributes": 0})),
                               (FileOps.OVERWRITE, dd({"file_object": 18446738026482168384, "ttid": 1484,
+                                                      "process_id": 859,
                                                       "create_options": 78874400,
                                          "open_path": "\\Device\\HarddiskVolume2\\Windows\\system32\\kernel32.dll",
                                          "irp_ptr": 18446738026471032392, "share_access": 5, "file_attributes": 0})),
                               (FileOps.OVERWRITE_IF, dd({"file_object": 18446738026482168384, "ttid": 1484,
+                                                         "process_id": 859,
                                                          "create_options": 83886112,
                                          "open_path": "\\Device\\HarddiskVolume2\\Windows\\system32\\kernel32.dll",
                                          "irp_ptr": 18446738026471032392, "share_access": 6, "file_attributes": 0}))])
@@ -79,52 +83,71 @@ class TestFsIO():
         kparams = kevent.params
         assert kparams.file == kfsio.open_path
         assert kparams.tid == kfsio.ttid
+        assert kparams.pid == kfsio.process_id
         assert kparams.operation == expected_op.name
 
     @pytest.mark.parametrize('expected_share_mask, kfsio',
                              [('r--', dd({"file_object": 18446738026482168384, "ttid": 1484, "create_options": 18874368,
                                          "open_path": "\\Device\\HarddiskVolume2\\Windows\\system32\\kernel32.dll",
+                                         "process_id": 859,
                                          "irp_ptr": 18446738026471032392, "share_access": 1, "file_attributes": 0})),
                               ('-w-', dd({"file_object": 18446738026482168384, "ttid": 1484, "create_options": 18874368,
                                          "open_path": "\\Device\\HarddiskVolume2\\Windows\\system32\\kernel32.dll",
+                                          "process_id": 859,
                                          "irp_ptr": 18446738026471032392, "share_access": 2, "file_attributes": 0})),
                               ('--d', dd({"file_object": 18446738026482168384, "ttid": 1484, "create_options": 18874368,
                                          "open_path": "\\Device\\HarddiskVolume2\\Windows\\system32\\kernel32.dll",
+                                         "process_id": 859,
                                          "irp_ptr": 18446738026471032392, "share_access": 4, "file_attributes": 0})),
                               ('rw-', dd({"file_object": 18446738026482168384, "ttid": 1484, "create_options": 18874368,
                                          "open_path": "\\Device\\HarddiskVolume2\\Windows\\system32\\kernel32.dll",
+                                         "process_id": 859,
                                          "irp_ptr": 18446738026471032392, "share_access": 3, "file_attributes": 0})),
                               ('r-d', dd({"file_object": 18446738026482168384, "ttid": 1484, "create_options": 18874368,
                                          "open_path": "\\Device\\HarddiskVolume2\\Windows\\system32\\kernel32.dll",
+                                         "process_id": 859,
                                          "irp_ptr": 18446738026471032392, "share_access": 5, "file_attributes": 0})),
                               ('-wd', dd({"file_object": 18446738026482168384, "ttid": 1484, "create_options": 18874368,
                                          "open_path": "\\Device\\HarddiskVolume2\\Windows\\system32\\kernel32.dll",
+                                         "process_id": 859,
                                          "irp_ptr": 18446738026471032392, "share_access": 6, "file_attributes": 0})),
                               ('rwd', dd({"file_object": 18446738026482168384, "ttid": 1484, "create_options": 18874368,
                                          "open_path": "\\Device\\HarddiskVolume2\\Windows\\system32\\kernel32.dll",
+                                         "process_id": 859,
                                          "irp_ptr": 18446738026471032392, "share_access": 7, "file_attributes": 0})),
                               ('---', dd({"file_object": 18446738026482168384, "ttid": 1484, "create_options": 18874368,
                                          "open_path": "\\Device\\HarddiskVolume2\\Windows\\system32\\kernel32.dll",
+                                         "process_id": 859,
                                          "irp_ptr": 18446738026471032392, "share_access": -1, "file_attributes": 0}))])
     def test_create_file_share_mask(self, expected_share_mask, kfsio, fsio, kevent):
         fsio.parse_fsio(CREATE_FILE, kfsio)
         assert kevent.params.share_mask == expected_share_mask
 
     def test_delete_file(self, fsio, kevent):
-        kfsio = dd({"file_object": 18446738026474426144, "ttid": 1956, "irp_ptr": 18446738026471032392})
+        kfsio = dd({"file_object": 18446738026474426144, "ttid": 1956, "process_id": 859, "irp_ptr": 18446738026471032392})
         fsio.parse_fsio(DELETE_FILE, kfsio)
         assert kevent.params.tid == kfsio.ttid
         assert kevent.params.file == '\\Device\\HarddiskVolume2\\fibratus.log'
 
     def test_write_file(self, fsio, kevent):
-        kfsio = dd({"file_object": 18446738026474426144, "io_flags": 0, "io_size": 8296, "offset": 75279, "ttid": 1956})
+        kfsio = dd({"file_object": 18446738026474426144, "process_id": 859, "io_flags": 0, "io_size": 8296,
+                    "offset": 75279, "ttid": 1956})
         fsio.parse_fsio(WRITE_FILE, kfsio)
         assert kevent.params.tid == kfsio.ttid
         assert kevent.params.file == NA
         assert kevent.params.io_size == kfsio.io_size / 1024
 
     def test_rename_file(self, fsio, kevent):
-        kfsio = dd({"file_object": 18446738023471035392, "ttid": 1956, "irp_ptr": 18446738026471032392})
+        kfsio = dd({"file_object": 18446738023471035392, "ttid": 1956, "process_id": 859, "irp_ptr": 18446738026471032392})
         fsio.parse_fsio(RENAME_FILE, kfsio)
         assert kevent.params.tid == kfsio.ttid
+        assert kevent.params.file == '\\Device\\HarddiskVolume2\\Windows\\system32\\rpcss.dll'
+
+    def test_set_file_information(self, fsio, kevent):
+        kfsio = dd(
+            {"file_object": 18446738023471035392, "ttid": 1956, "info_class": 20, "process_id": 859,
+             "irp_ptr": 18446738026471032392})
+        fsio.parse_fsio(SET_FILE_INFORMATION, kfsio)
+        assert kevent.params.tid == kfsio.ttid
+        assert kevent.params.info_class == 20
         assert kevent.params.file == '\\Device\\HarddiskVolume2\\Windows\\system32\\rpcss.dll'

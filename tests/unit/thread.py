@@ -38,7 +38,9 @@ def handle_repo_mock():
 
 @pytest.fixture(scope='module')
 def image_meta_registry_mock():
-    return Mock(spec_set=ImageMetaRegistry)
+    imeta_meta_registry_mock = Mock(spec_set=ImageMetaRegistry)
+    imeta_meta_registry_mock.get_image_meta.return_value = None
+    return imeta_meta_registry_mock
 
 
 @pytest.fixture(scope='module')
@@ -68,7 +70,7 @@ def thread_registry(handle_repo_mock, image_meta_registry_mock):
     return thread_registry
 
 
-class TestThreadRegistry():
+class TestThreadRegistry:
 
     def test_init_thread_registry(self, thread_registry):
 
