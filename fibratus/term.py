@@ -59,7 +59,6 @@ class AnsiTerm(object):
         self._rect = None
         self._coord = COORD(0, 0)
         self._size = COORD(0, 0)
-        self._term_ready = False
 
     def setup_console(self):
         """Initializes the screen frame buffer.
@@ -98,13 +97,10 @@ class AnsiTerm(object):
         set_console_cursor_info(self._framebuffer, byref(self._cursor_info))
         set_console_active_screen_buffer(self._framebuffer)
 
-        self._term_ready = True
-
     def restore_console(self):
         if self._console:
             set_console_active_screen_buffer(self._console)
             self._cursor_info.visible = True
-            self._term_ready = False
             set_console_cursor_info(self._console,
                                     byref(self._cursor_info))
 
@@ -186,8 +182,4 @@ class AnsiTerm(object):
                              self._coord,
                              self._size,
                              byref(self._rect))
-
-    @property
-    def term_ready(self):
-        return self._term_ready
 
