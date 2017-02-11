@@ -201,7 +201,7 @@ class FsIO(object):
          threads to open the file for read access.
 
         :param str share_access: the value of the share access
-        :return: `str`
+        :return: str: resolved share mask
         """
 
         if share_access == FILE_SHARE_READ:
@@ -221,7 +221,3 @@ class FsIO(object):
             return 'rwd'
         else:
             return '---'
-
-
-
-
