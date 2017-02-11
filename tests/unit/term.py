@@ -40,7 +40,6 @@ class TestAnsiTerm(object):
 
         with patch('fibratus.term.byref', side_effect=[1, 2, 3]):
             ansi_term = AnsiTerm()
-            assert not ansi_term.term_ready
             ansi_term.setup_console()
 
             get_std_handle_mock.assert_called_with(STD_OUTPUT_HANDLE)
@@ -56,8 +55,6 @@ class TestAnsiTerm(object):
             set_console_cursor_info_mock.assert_called_with(2, 3)
             set_console_active_screen_buffer_mock.assert_called_with(2)
 
-            assert ansi_term.term_ready
-
     @patch('fibratus.term.get_std_handle', return_value=INVALID_HANDLE_VALUE)
     def test_setup_console_invalid_std_console(self, get_std_handle_mock):
 
@@ -65,8 +62,6 @@ class TestAnsiTerm(object):
             with pytest.raises(TermInitializationError):
                 ansi_term.setup_console()
                 get_std_handle_mock.assert_called_with(STD_OUTPUT_HANDLE)
-
-            assert not ansi_term.term_ready
 
     @patch('fibratus.term.get_std_handle', return_value=1)
     @patch('fibratus.term.get_console_screen_buffer_info')
@@ -86,8 +81,6 @@ class TestAnsiTerm(object):
                                                                      CONSOLE_TEXTMODE_BUFFER,
                                                                      None)
 
-            assert not ansi_term.term_ready
-
     @patch('fibratus.term.get_std_handle', return_value=1)
     @patch('fibratus.term.get_console_screen_buffer_info')
     @patch('fibratus.term.get_console_cursor_info')
@@ -103,11 +96,9 @@ class TestAnsiTerm(object):
 
         ansi_term = AnsiTerm()
         ansi_term.setup_console()
-        assert ansi_term.term_ready
         with patch('fibratus.term.byref', return_value=2):
             ansi_term.restore_console()
             set_console_active_screen_buffer_mock.assert_called_with(1)
-            assert not ansi_term.term_ready
             set_console_cursor_info_mock.assert_called_with(1, 2)
 
     @patch('fibratus.term.get_std_handle', return_value=1)
