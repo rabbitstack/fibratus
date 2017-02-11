@@ -14,42 +14,36 @@
 # under the License.
 
 import inspect
-import traceback
 import os
 import sys
 from importlib.machinery import SourceFileLoader
 
 from apscheduler.executors.pool import ThreadPoolExecutor
 from apscheduler.schedulers.background import BackgroundScheduler
-from logbook import FileHandler
-from logbook import Logger
-from multiprocess import Process
 
 from fibratus.common import DotD as ddict, Tabular
 from fibratus.common import panic
 from fibratus.errors import FilamentError, TermInitializationError
 from fibratus.term import AnsiTerm
 
-_ansi_term = AnsiTerm()
-
 
 FILAMENTS_DIR = os.getenv('FILAMENTS_PATH', os.path.join(os.path.expanduser('~'), '.fibratus', 'filaments'))
 
 
-class AdapterMetaVariable(object):
-    """An accessor for the adapter meta variable.
+class OutputAccessor(object):
+    """An accessor for the output meta variable.
 
-    It represents an adapter accessor which is injected into
+    It represents an output accessor which is injected into
     every filament module.
     """
-    def __init__(self, adapter):
-        self._adapter = adapter
+    def __init__(self, output):
+        self._output = output
 
     def emit(self, body, **kwargs):
-        self._adapter.emit(body, **kwargs)
+        self._output.emit(body, **kwargs)
 
 
-class Filament(Process):
+class Filament(object):
     """Filament initialization and execution engine.
 
     Filaments are lightweight Python modules which run
@@ -57,9 +51,6 @@ class Filament(Process):
     functionality of Fibratus by performing any type of logic
     (aggregations, groupings, filters, counters, etc) on the
     kernel event stream.
-
-    Each filament runs in its own execution context, i.e. in
-    its own copy of the Python interpreter process.
 
     """
     def __init__(self):
@@ -70,13 +61,9 @@ class Filament(Process):
 
         filament_module: module
             module which contains the filament logic
-
-        keventq: Queue
-            queue where the main process pushes the kernel events
         """
-        Process.__init__(self)
         self._filament_module = None
-        self._keventq = None
+        self._name = None
         self._filters = []
         self._cols = []
         self._tabular = None
@@ -84,8 +71,8 @@ class Filament(Process):
         self._interval = 1
         self._sort_by = None
         self._sort_desc = True
-        self._log_path = None
         self._logger = None
+        self._ansi_term = AnsiTerm()
         self.scheduler = BackgroundScheduler()
 
     def load_filament(self, name):
@@ -102,6 +89,7 @@ class Filament(Process):
             name of the filament to load
 
         """
+        self._name = name
         Filament._assert_root_dir()
         filament_path = self._find_filament_path(name)
         if filament_path:
@@ -194,54 +182,52 @@ class Filament(Process):
         self._filament_module.add_row = add_row
         self._filament_module.render_tabular = self.render_tabular
 
-        # call filament initialization method.
-        # This is the right place to perform any
-        # initialization logic
         on_init = self._find_filament_func('on_init')
         if on_init and self._zero_args(on_init):
             self._filament_module.on_init()
-
-    def setup_adapters(self, output_adapters):
-        """Creates the filament adapters accessors.
-
-        Parameters
-        ----------
-
-        output_adapters: dict
-            output adapters
-        """
-        for name, adapter in output_adapters.items():
-            adapter_metavariable = AdapterMetaVariable(adapter)
-            setattr(self._filament_module,
-                    name,
-                    adapter_metavariable)
-
-    def run(self):
-        """Filament main routine.
-
-        Setups the interval repeating function and polls for
-        the kernel events from the queue.
-        """
-        on_interval = self._find_filament_func('on_interval')
-        if on_interval:
+        if self._find_filament_func('on_interval'):
             self.scheduler.add_executor(ThreadPoolExecutor(max_workers=4))
             self.scheduler.start()
-            self.scheduler.add_job(self._filament_module.on_interval,
+
+            def on_interval():
+                try:
+                    self._filament_module.on_interval()
+                except Exception as e:
+                    import traceback
+                    self._logger.error('Unexpected error on interval elapsed %s'
+                                       % traceback.format_exc())
+            self.scheduler.add_job(on_interval,
                                    'interval',
                                    seconds=self._interval,
                                    max_instances=4,
                                    misfire_grace_time=60)
-        while self._poll():
+        if len(self._cols) > 0:
             try:
-                kevent = self._keventq.get()
-                self._filament_module.on_next_kevent(ddict(kevent))
-            except Exception:
-                print( traceback.format_exc())
-                self._logger.error('Unexpected filament error %s'
-                                   % traceback.format_exc())
+                self._ansi_term.setup_console()
+            except TermInitializationError:
+                panic('fibratus run: ERROR - console initialization failed')
+
+    def do_output_accessors(self, outputs):
+        """Creates the filament's output accessors.
+
+        Parameters
+        ----------
+
+        outputs: dict
+            outputs initialized from the configuration
+            descriptor
+        """
+        for name, output in outputs.items():
+            setattr(self._filament_module, name, OutputAccessor(output))
+
+    def on_next_kevent(self, kevent):
+        try:
+            self._filament_module.on_next_kevent(ddict(kevent))
+        except Exception as e:
+            self._logger.error('Unexpected filament error %s' % e)
 
     def render_tabular(self):
-        """Renders the table to the console.
+        """Renders the table on the console.
         """
         if len(self._cols) > 0:
             tabular = self._tabular.get_string(start=1, end=self._limit)
@@ -250,13 +236,7 @@ class Filament(Process):
                                                    sortby=self._sort_by,
                                                    reversesort=self._sort_desc)
             self._tabular.clear_rows()
-            if not _ansi_term.term_ready:
-                try:
-                    _ansi_term.setup_console()
-                except TermInitializationError:
-                    panic('fibratus run: ERROR - console initialization failed')
-            _ansi_term.cls()
-            _ansi_term.write_output(tabular)
+            self._ansi_term.write_output(tabular)
 
     def close(self):
         on_stop = self._find_filament_func('on_stop')
@@ -264,12 +244,7 @@ class Filament(Process):
             self._filament_module.on_stop()
         if self.scheduler.running:
             self.scheduler.shutdown()
-        _ansi_term.restore_console()
-        if self.is_alive():
-            self.terminate()
-
-    def _poll(self):
-        return True
+        self._ansi_term.restore_console()
 
     @classmethod
     def exists(cls, filament):
@@ -295,14 +270,6 @@ class Filament(Process):
             panic('fibratus run: ERROR - %s path does not exist.' % FILAMENTS_DIR)
 
     @property
-    def keventq(self):
-        return self._keventq
-
-    @keventq.setter
-    def keventq(self, keventq):
-        self._keventq = keventq
-
-    @property
     def filters(self):
         return self._filters
 
@@ -311,14 +278,16 @@ class Filament(Process):
         return self._logger
 
     @logger.setter
-    def logger(self, log_path):
-        self._log_path = log_path
-        FileHandler(self._log_path).push_application()
-        self._logger = Logger(Filament.__name__)
+    def logger(self, logger):
+        self._logger = logger
 
     @property
     def filament_module(self):
         return self._filament_module
+
+    @property
+    def name(self):
+        return self._name
 
     def _find_filament_func(self, func_name):
         """Finds the function in the filament module.
