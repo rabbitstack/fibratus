@@ -27,7 +27,6 @@ from fibratus.output.console import ConsoleOutput
 from fibratus.output.elasticsearch import ElasticsearchOutput
 from fibratus.output.smtp import SmtpOutput
 from logbook import Logger, FileHandler, StreamHandler
-from multiprocess import Queue
 
 import fibratus.apidefs.etw as etw
 from fibratus.common import DotD as ddict, panic
@@ -61,7 +60,7 @@ class Fibratus(object):
         try:
             log_path = os.path.join(os.path.expanduser('~'), '.fibratus', 'fibratus.log')
             FileHandler(log_path, mode='w+').push_application()
-            StreamHandler(sys.stdout).push_application()
+            StreamHandler(sys.stdout, bubble=True).push_application()
         except PermissionError:
             panic("ERROR - Unable to open log file for writing due to permission error")
 
@@ -106,7 +105,6 @@ class Fibratus(object):
                 self.kevt_streamc.add_skip(skip)
 
         self.kevent = KEvent(self.thread_registry)
-        self.keventq = Queue()
 
         self._output_classes = dict(console=ConsoleOutput,
                                     amqp=AmqpOutput,
@@ -116,9 +114,8 @@ class Fibratus(object):
         self.output_aggregator = OutputAggregator(self._outputs)
 
         if filament:
-            filament.keventq = self.keventq
-            filament.logger = log_path
-            filament.setup_adapters(self._outputs)
+            filament.logger = self.logger
+            filament.do_output_accessors(self._outputs)
         self._filament = filament
 
         self.fsio = FsIO(self.kevent, self._handles)
@@ -138,14 +135,13 @@ class Fibratus(object):
 
         self.kcontroller.start_ktrace(etw.KERNEL_LOGGER_NAME, self.ktrace_props)
 
-        if self._filament:
-            self._filament.start()
-
         def on_kstream_open():
             if self._filament is None:
                 delta = datetime.now() - self._start
                 self.logger.info('Started in %sm:%02ds.%s' % (int(delta.total_seconds() / 60), delta.seconds,
                                                               int(delta.total_seconds() * 1000)))
+            else:
+                self.logger.info('Running [%s] filament...' % self._filament.name)
         self.kevt_streamc.set_kstream_open_callback(on_kstream_open)
         self._open_kstream()
 
@@ -337,9 +333,6 @@ class Fibratus(object):
             self._aggregate(ktype)
 
         if self._filament:
-            # put the event on the queue
-            # from where the filaments process
-            # will poll for kernel events
             if ktype not in [ENUM_PROCESS,
                              ENUM_THREAD,
                              ENUM_IMAGE,
@@ -349,21 +342,26 @@ class Fibratus(object):
                     else False
                 if self.kevent.name and ok:
                     thread = self.kevent.thread
-                    # push the kernel event dict
-                    # to processing queue
-                    kevt = dict(params=self.kevent.params,
-                                name=self.kevent.name,
-                                pid=self.kevent.pid,
-                                tid=self.kevent.tid,
-                                timestamp=self.kevent.ts,
-                                cpuid=self.kevent.cpuid,
-                                category=self.kevent.category,
-                                thread=dict(name=thread.name,
-                                            exe=thread.exe,
-                                            comm=thread.comm,
-                                            pid=thread.pid,
-                                            ppid=thread.ppid))
-                    self.keventq.put(kevt)
+                    kevent = {
+                        'params': self.kevent.params,
+                        'name': self.kevent.name,
+                        'pid': self.kevent.pid,
+                        'tid': self.kevent.tid,
+                        'timestamp': self.kevent.ts,
+                        'cpuid': self.kevent.cpuid,
+                        'category': self.kevent.category
+                    }
+                    if thread:
+                        kevent.update({
+                            'thread': {
+                                'name': thread.name,
+                                'exe': thread.exe,
+                                'comm': thread.comm,
+                                'pid': thread.pid,
+                                'ppid': thread.ppid
+                            }
+                        })
+                    self._filament.on_next_kevent(kevent)
 
     def _aggregate(self, ktype):
         """Aggregates the kernel event to the output sink.
