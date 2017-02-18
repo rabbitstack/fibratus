@@ -8,6 +8,8 @@ coverage.xml
 /kstream/*.pyd
 /kstream/*.c
 /kstream/*.cpp
+/pstream/*.c
+/pstream/*.cpp
 /tests/.cache
 /tests/__pycache__
 /tests/*/__pycache__
@@ -18,7 +20,6 @@ coverage.xml
 /tests/*/htmlcov
 /tests/coverage.xml
 /tests/*/coverage.xml
-/kstreamc.pyd
 /htmlcov
 dist
 fibratus.egg-info
