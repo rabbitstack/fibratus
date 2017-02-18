@@ -23,7 +23,56 @@ from fibratus.apidefs.etw import *
 from fibratus.errors import FibratusError
 from fibratus.common import panic
 
-class KTraceProps(object):
+
+class BaseProps(object):
+
+    def __init__(self):
+        # allocate buffer for the trace
+        self.max_string_len = 1024
+        self.buff_size = sizeof(EVENT_TRACE_PROPERTIES) + 2 * sizeof(c_wchar) * self.max_string_len
+
+        self._buff = (c_char * self.buff_size)()
+        self._props = cast(pointer(self._buff), POINTER(EVENT_TRACE_PROPERTIES))
+
+    @property
+    def logger_name(self):
+        return c_wchar_p(addressof(self._props.contents) +
+                         self._props.contents.logger_name_offset)
+
+    @logger_name.setter
+    def logger_name(self, logger_name):
+        name_len = len(logger_name) + 1
+        if self.max_string_len < name_len:
+            raise ArgumentError("Logger name %s is too long" % logger_name)
+        props = self._props
+        logger = c_wchar_p(addressof(props.contents) + props.contents.logger_name_offset)
+        memmove(logger, c_wchar_p(logger_name), sizeof(c_wchar) * name_len)
+
+    def get(self):
+        return self._props
+
+
+class PTraceProps(BaseProps):
+
+    def __init__(self, buffer_size=1024):
+        """Properties for the packet tracing session.
+
+         Parameters
+        ---------
+
+        buffer_size: int
+            the amount of memory allocated for each trace buffer
+        """
+        BaseProps.__init__(self)
+        self._props.contents.wnode.buffer_size = self.buff_size
+        self._props.contents.wnode.flags = WNODE_FLAG_TRACED_GUID
+        self._props.contents.logger_name_offset = sizeof(EVENT_TRACE_PROPERTIES)
+        self._props.contents.log_file_name_offset = 0
+        self._props.contents.log_file_mode = PROCESS_TRACE_MODE_REAL_TIME
+        self._props.contents.buffer_size = buffer_size
+
+
+class KTraceProps(BaseProps):
 
     def __init__(self, buffer_size=1024):
         """Builds the tracing session properties.
@@ -34,13 +83,7 @@ class KTraceProps(object):
         buffer_size: int
             the amount of memory allocated for each trace buffer
         """
-
-        # allocate buffer for the trace
-        self.max_string_len = 1024
-        self.buff_size = sizeof(EVENT_TRACE_PROPERTIES) + 2 * sizeof(c_wchar) * self.max_string_len
-
-        self._buff = (c_char * self.buff_size)()
-        self._props = cast(pointer(self._buff), POINTER(EVENT_TRACE_PROPERTIES))
+        BaseProps.__init__(self)
 
         # set trace properties
         self._props.contents.wnode.buffer_size = self.buff_size
@@ -70,23 +113,6 @@ class KTraceProps(object):
             self._props.contents.enable_flags |= (EVENT_TRACE_FLAG_SYSTEMCALL | EVENT_TRACE_FLAG_CSWITCH)
         if cswitch:
             self._props.contents.enable_flags |= EVENT_TRACE_FLAG_CSWITCH
-
-    def get(self):
-        return self._props
-
-    @property
-    def logger_name(self):
-        return c_wchar_p(addressof(self._props.contents) +
-                         self._props.contents.logger_name_offset)
-
-    @logger_name.setter
-    def logger_name(self, logger_name):
-        name_len = len(logger_name) + 1
-        if self.max_string_len < name_len:
-            raise ArgumentError("Logger name %s is too long" % logger_name)
-        props = self._props
-        logger = c_wchar_p(addressof(props.contents) + props.contents.logger_name_offset)
-        memmove(logger,  c_wchar_p(logger_name), sizeof(c_wchar) * name_len)
 
 
 class KTraceController(object):
