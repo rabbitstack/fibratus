@@ -12,9 +12,17 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
-from enum import Enum
 
+from _ctypes import byref
+import subprocess
+from enum import Enum
+from pstreamc import PStreamCollector
+
+from fibratus.apidefs.cdefs import ERROR_ALREADY_EXISTS
+from fibratus.apidefs.etw import TRACEHANDLE, start_trace, enable_trace_ex, EVENT_CONTROL_CODE_ENABLE_PROVIDER, \
+    control_trace, EVENT_TRACE_CONTROL_STOP, NDIS_LOGGER_NAME, NDIS_TRACE_CONTROL_GUID
 from fibratus.common import NA
+from fibratus.controller import PTraceProps
 from fibratus.kevent_types import SEND_SOCKET_TCPV4, SEND_SOCKET_UDPV4, RECV_SOCKET_TCPV4, RECV_SOCKET_UDPV4, \
     ACCEPT_SOCKET_TCPV4, CONNECT_SOCKET_TCPV4, DISCONNECT_SOCKET_TCPV4, RECONNECT_SOCKET_TCPV4
 
@@ -49,6 +57,48 @@ class TcpIpParser(object):
             kernel event representing the UDP / TCP request
         """
         self._kevent = kevent
+        self.pstreamc = PStreamCollector(NDIS_LOGGER_NAME.encode())
+
+    def start_packet_flow(self):
+
+        pprops = PTraceProps()
+        pprops.logger_name = NDIS_LOGGER_NAME
+
+        handle = TRACEHANDLE()
+        status = start_trace(byref(handle),
+                             NDIS_LOGGER_NAME,
+                             pprops.get())
+        if status == ERROR_ALREADY_EXISTS:
+            control_trace(handle,
+                          NDIS_LOGGER_NAME,
+                          pprops.get(),
+                          EVENT_TRACE_CONTROL_STOP)
+            start_trace(byref(handle),
+                        NDIS_LOGGER_NAME,
+                        pprops.get())
+
+        enable_trace_ex(handle, byref(NDIS_TRACE_CONTROL_GUID),
+                        EVENT_CONTROL_CODE_ENABLE_PROVIDER,
+                        5, 0,
+                        0,
+                        0,
+                        None)
+        # this attaches the NDIS mini filter driver
+        # to the physical network adapter
+        try:
+            subprocess.check_output(['netsh', 'trace', 'start',
+                                     'capture=yes', 'maxSize=1MB'],
+                                    stderr=subprocess.STDOUT,
+                                    shell=True)
+        except subprocess.CalledProcessError as e:
+            print(e.output, e.cmd, e.args)
+        self.pstreamc.open_packet_flow(self.__on_next_packet)
+
+    def stop_packet_flow(self):
+        pass
+
+    def __on_next_packet(self, layer, headers):
+        print(layer, headers)
 
     def parse_tcpip(self, ketype, ktcpip):
         """Parses the TCP/IP kernel events.
@@ -121,3 +171,8 @@ class TcpIpParser(object):
                                        ip_dst=ip_dst,
                                        sport=sport,
                                        dport=dport)
+
+
+if __name__ == '__main__':
+    parser = TcpIpParser(None)
+    parser.start_packet_flow()
