@@ -38,6 +38,12 @@ kstreamc_ext = Extension('kstreamc',
                          libraries=["tdh", "advapi32", "ole32", "ws2_32"],
                          language='c++')
 
+pstreamc_ext = Extension('pstreamc',
+                         ['pstream/pstreamc.pyx'],
+                         libraries=["tdh", "advapi32", "ole32", "ws2_32"],
+                         include_dirs=['pstream', '.'],
+                         language='c++')
+
 install_reqs = parse_requirements('requirements.txt', session=False)
 reqs = [str(ir.req) for ir in install_reqs if not re.match('pytest|codecov', str(ir.req))]
 
@@ -68,7 +74,7 @@ setup(
         'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4'
     ],
-    ext_modules=[kstreamc_ext],
+    ext_modules=[pstreamc_ext],
     cmdclass={"build_ext": build_ext},
     packages=find_packages(),
     install_requires=reqs,
