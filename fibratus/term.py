@@ -15,6 +15,7 @@
 # under the License.
 from _ctypes import byref
 from ctypes import c_ulong
+import os
 
 from fibratus.apidefs.sys import CONSOLE_SCREEN_BUFFER_INFO, INVALID_HANDLE_VALUE, get_std_handle, STD_OUTPUT_HANDLE, \
     create_console_screen_buffer, GENERIC_READ, GENERIC_WRITE, FILE_SHARE_READ, FILE_SHARE_WRITE, \
@@ -101,8 +102,7 @@ class AnsiTerm(object):
         if self._console:
             set_console_active_screen_buffer(self._console)
             self._cursor_info.visible = True
-            set_console_cursor_info(self._console,
-                                    byref(self._cursor_info))
+            set_console_cursor_info(self._console, byref(self._cursor_info))
 
     def write_output(self, charseq, color=LIGHT_WHITE):
         """Writes character and color attribute data to the frame buffer.
@@ -119,40 +119,46 @@ class AnsiTerm(object):
         color: int
             the terminal output color
         """
+
         col = 0
         x = 0
         crlf = False
 
-        for char in charseq:
-            if char == '\n':
-                crlf = True
-            col += 1
-            # the last column has been reached.
-            # If there was a carriage return
-            # then stop the iteration
-            if col == self._cols:
-                col = 0
+        if not charseq or len(charseq) <= 0:
+            return
+
+        try:
+            for char in charseq:
+                if char == '\n':
+                    crlf = True
+                col += 1
+                # the last column has been reached.
+                # If there was a carriage return
+                # then stop the iteration
+                if col == self._cols:
+                    col = 0
+                    if crlf:
+                        crlf = False
+                        continue
+
                 if crlf:
                     crlf = False
+                    space = col
+                    # keep filling the rectangle with spaces
+                    # until we reach the last column
+                    while space <= self._cols:
+                        self._char_buffer[space - 1].char.unicode_char = ' '
+                        space += 1
+                        x += 1
+                    # reset the column and
+                    # stop the current iteration
+                    col = 0
                     continue
-
-            if crlf:
-                crlf = False
-                space = col
-                # keep filling the rectangle with spaces
-                # until we reach the last column
-                while space <= self._cols:
-                    self._char_buffer[space - 1].char.unicode_char = ' '
-                    space += 1
-                    x += 1
-                # reset the column and
-                # stop the current iteration
-                col = 0
-                continue
-            self._char_buffer[x].char.unicode_char = char
-            self._char_buffer[x].attributes = color
-
-            x += 1
+                self._char_buffer[x].char.unicode_char = char
+                self._char_buffer[x].attributes = color
+                x += 1
+        except IndexError:
+            pass
         # write the character attribute data
         # to the screen buffer
         write_console_output(self._framebuffer,
