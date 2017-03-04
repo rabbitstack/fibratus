@@ -14,6 +14,7 @@
 # under the License.
 
 import inspect
+import traceback
 import os
 import sys
 from importlib.machinery import SourceFileLoader
@@ -192,8 +193,7 @@ class Filament(object):
             def on_interval():
                 try:
                     self._filament_module.on_interval()
-                except Exception as e:
-                    import traceback
+                except Exception:
                     self._logger.error('Unexpected error on interval elapsed %s'
                                        % traceback.format_exc())
             self.scheduler.add_job(on_interval,
