@@ -21,6 +21,7 @@ from importlib.machinery import SourceFileLoader
 
 from apscheduler.executors.pool import ThreadPoolExecutor
 from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.interval import IntervalTrigger
 
 from fibratus.common import DotD as ddict, Tabular
 from fibratus.common import panic
@@ -197,7 +198,7 @@ class Filament(object):
                     self._logger.error('Unexpected error on interval elapsed %s'
                                        % traceback.format_exc())
             self.scheduler.add_job(on_interval,
-                                   'interval',
+                                   IntervalTrigger(),
                                    seconds=self._interval,
                                    max_instances=4,
                                    misfire_grace_time=60)
