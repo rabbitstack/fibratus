@@ -21,6 +21,8 @@ from datetime import datetime
 
 from kstreamc import KEventStreamCollector
 
+from fibratus.binding.yar import YaraBinding
+from fibratus.errors import BindingError
 from fibratus.image_meta import ImageMetaRegistry
 from fibratus.output.aggregator import OutputAggregator
 from fibratus.output.console import ConsoleOutput
@@ -113,6 +115,9 @@ class Fibratus(object):
         self._outputs = self._construct_outputs()
         self.output_aggregator = OutputAggregator(self._outputs)
 
+        self._binding_classes = dict(yara=YaraBinding)
+        self._bindings = self._construct_bindings()
+
         if filament:
             filament.logger = self.logger
             filament.do_output_accessors(self._outputs)
@@ -161,6 +166,8 @@ class Fibratus(object):
         """
         outputs = {}
         output_configs = self._config.outputs
+        if not output_configs:
+            return outputs
         for output in output_configs:
             name = next(iter(list(output.keys())), None)
             if name and \
@@ -174,6 +181,35 @@ class Fibratus(object):
                 output_class = self._output_classes[name]
                 outputs[name] = output_class(**output_config)
         return outputs
+
+    def _construct_bindings(self):
+        """Builds binding classes.
+
+        :return: dict: dictionary with instances of the binding classes
+        """
+        bindings = {}
+        binding_configs = self._config.bindings
+        if not binding_configs:
+            return bindings
+        for b in binding_configs:
+            name = next(iter(list(b.keys())), None)
+            if name and \
+                    name in self._binding_classes.keys():
+                binding_config = b[name]
+                self.logger.info("Starting [%s] binding - [%s]" %
+                                 (name, binding_config))
+                binding_class = self._binding_classes[name]
+                try:
+                    binding = binding_class(self._outputs, self.logger,
+                                            **binding_config)
+                    bindings[name] = binding
+                except BindingError as e:
+                    self.logger.error("Couldn't start [%s] binding. Reason: %s" %
+                                      (name, e))
+        return bindings
+
+    def __find_binding(self, name):
+        return self._bindings[name] if name in self._bindings else None
 
     def stop_ktrace(self):
         self.logger.info('Stopping fibratus...')
@@ -272,6 +308,15 @@ class Fibratus(object):
                                                         ktype,
                                                         kparams)
                 self._aggregate(ktype)
+                # apply yara binding to match against
+                # the process's image path
+                if ktype == CREATE_PROCESS:
+                    yara_binding = self.__find_binding('yara')
+                    pid = int(kparams.process_id, 16)
+                    thread = self.thread_registry.get_thread(pid)
+                    if thread and yara_binding:
+                        yara_binding.run(exe=thread.exe, comm=thread.comm)
+
         elif ktype in [TERMINATE_PROCESS, TERMINATE_THREAD]:
             self.thread_registry.init_thread_kevent(self.kevent,
                                                     ktype,
