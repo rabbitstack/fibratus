@@ -5,7 +5,7 @@ Fibratus [![PyPI version](https://badge.fury.io/py/fibratus.svg)](https://badge.
 [![Code Health](https://landscape.io/github/rabbitstack/fibratus/master/landscape.svg?style=flat)](https://landscape.io/github/rabbitstack/fibratus/master)
 
 **Fibratus** is a tool which is able to capture the most of the Windows kernel activity - process/thread creation and termination, 
-context switches, file system I/O, registry, network activity, DLL loading/unloading and much more. The kernel events can be easly streamed to a number of output sinks like **AMQP** message brokers, **Elasticsearch** clusters or standard output stream.
+context switches, file system I/O, registry, network activity, DLL loading/unloading and much more. The kernel events can be easily streamed to a number of output sinks like **AMQP** message brokers, **Elasticsearch** clusters or standard output stream.
 You can use **filaments** (lightweight Python modules) to extend Fibratus with your own arsenal of tools and so leverage the power of the Python's ecosystem.
 
 ## Requirements
