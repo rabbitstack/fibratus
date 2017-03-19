@@ -43,5 +43,9 @@ class YamlConfig(object):
         return self._yaml.pop('output', None)
 
     @property
+    def bindings(self):
+        return self._yaml.pop('binding', None)
+
+    @property
     def yaml(self):
         return self._yaml
