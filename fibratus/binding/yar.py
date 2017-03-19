@@ -26,33 +26,32 @@ except ImportError:
 
 class YaraBinding(BaseBinding):
 
-    def __init__(self, path, outputs, logger, **config):
+    def __init__(self, outputs, logger, **config):
         """Creates an instance of the YARA binding.
 
         This binding integrates with YARA tool to provide real time classification and pattern matching of the
         process's binary images. The image path is extracted from the `ThreadInfo` class after `CreateProcess`
         kernel event has been captured.
 
-        :param str path: the path where YARA rules are stored
         :param dict outputs: declared output adapters
         :param logbook.Logger logger: reference to the logger implementation
         :param dict config: configuration for this binding
         """
 
         BaseBinding.__init__(self, outputs, logger)
-        self._path = path
+        self._path = config.pop('path', None)
         self._rules = None
         self._output = config.pop('output', 'console')
         if not yara:
             raise BindingError('yara-python package is not installed')
         if not os.path.exists(self._path) or not os.path.isdir(self._path):
-            raise FileNotFoundError('%s rules path does not exist' %
-                                    self._path)
+            raise BindingError('%s rules path does not exist' %
+                               self._path)
         try:
             for rule in os.listdir(self._path):
                 self._rules = yara.compile(os.path.join(self._path, rule))
         except yara.YaraSyntaxError as e:
-            self.logger.error("rule compilation error %s" % e)
+            raise BindingError("rule compilation error %s" % e)
 
     def run(self, **kwargs):
         """Apply the YARA rule set to process's image path.
