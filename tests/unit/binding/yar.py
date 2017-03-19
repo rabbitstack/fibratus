@@ -38,9 +38,21 @@ class TestYaraBinding(object):
                  patch('os.path.isdir', return_value=True), \
                  patch('os.listdir', return_value=['silent_banker.yar']), \
                  patch('yara.compile') as yara_compile_mock:
-                    YaraBinding('C:\\yara-rules', outputs,
-                                Mock(spec_set=Logger), output='amqp')
+                    YaraBinding(outputs,
+                                Mock(spec_set=Logger), output='amqp', path='C:\\yara-rules')
                     yara_compile_mock.assert_called_with(os.path.join('C:\\yara-rules', 'silent_banker.yar'))
+
+    def test_init_invalid_path(self, outputs):
+        with patch.dict('sys.modules', **{
+            'yara': None,
+        }):
+            from fibratus.binding.yar import YaraBinding
+            with patch('os.path.exists', return_value=False), \
+                 patch('os.path.isdir', return_value=False):
+                    with pytest.raises(BindingError) as e:
+                        YaraBinding(outputs,
+                                    Mock(spec_set=Logger), output='amqp', path='C:\\yara-rules-invalid')
+                        assert 'C:\\yara-rules-invalid rules path does not exist' in str(e.value)
 
     def test_init_yara_python_not_installed(self, outputs):
         with patch.dict('sys.modules', **{
@@ -48,8 +60,8 @@ class TestYaraBinding(object):
         }):
             from fibratus.binding.yar import YaraBinding
             with pytest.raises(BindingError) as e:
-                YaraBinding('C:\\yara-rules', outputs,
-                            Mock(spec_set=Logger), output='amqp')
+                YaraBinding(outputs,
+                            Mock(spec_set=Logger), output='amqp', path='C:\\yara-rules')
                 assert 'yara-python package is not installed' in str(e.value)
 
     def test_run(self, outputs):
@@ -61,8 +73,8 @@ class TestYaraBinding(object):
                  patch('os.path.isdir', return_value=True), \
                  patch('os.listdir', return_value=['silent_banker.yar']), \
                  patch('yara.compile'):
-                yara_binding = YaraBinding('C:\\yara-rules', outputs,
-                                           Mock(spec_set=Logger), output='amqp')
+                yara_binding = YaraBinding(outputs,
+                                           Mock(spec_set=Logger), output='amqp', path='C:\\yara-rules')
 
                 yara_binding.run(exe='C:\\Windows\\notepad.exe', comm='')
                 assert yara_binding._rules.match.called
