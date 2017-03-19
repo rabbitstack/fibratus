@@ -38,3 +38,8 @@ output:
       username: elastic
       password: changeme
       ssl: True
+
+binding:
+  - yara:
+      path: D:\\yara-rules
+      output: console

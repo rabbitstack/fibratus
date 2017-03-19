@@ -53,3 +53,13 @@ class TestYamlConfig():
         assert image_skips
         assert isinstance(image_skips, list)
         assert 'smss.exe' in image_skips
+
+    def test_bindings(self):
+        config = YamlConfig(__CONFIG_PATH__)
+        bindings = config.bindings
+        binding_names = ['yara']
+        assert bindings
+        for binding in bindings:
+            assert isinstance(binding, dict)
+            binding_name = next(iter(list(binding.keys())), None)
+            assert binding_name in binding_names
