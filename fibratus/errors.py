@@ -49,3 +49,6 @@ class InvalidPayloadError(Exception):
     pass
 
 
+class BindingError(Exception):
+    pass
+
