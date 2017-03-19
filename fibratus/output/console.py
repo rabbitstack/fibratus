@@ -57,23 +57,26 @@ class ConsoleOutput(Output):
             console adapter configuration
 
         """
-        pid, proc = kevent.get_thread()
-        if 'pretty' in self._fmt:
-            kevt = RENDER_FORMAT % (kevent.kid,
-                                    kevent.ts.time(),
-                                    kevent.cpuid,
-                                    proc,
-                                    pid,
-                                    kevent.name,
-                                    self._format_params(kevent.params))
+        if isinstance(kevent, dict):
+            kevt = json.dumps(kevent)
         else:
-            kevt = json.dumps(dict(id=kevent.kid,
-                                   timestamp=kevent.ts.strftime(self._timestamp_pattern),
-                                   cpuid=kevent.cpuid,
-                                   proc=proc,
-                                   pid=pid,
-                                   name=kevent.name,
-                                   params=kevent.params))
+            pid, proc = kevent.get_thread()
+            if 'pretty' in self._fmt:
+                kevt = RENDER_FORMAT % (kevent.kid,
+                                        kevent.ts.time(),
+                                        kevent.cpuid,
+                                        proc,
+                                        pid,
+                                        kevent.name,
+                                        self._format_params(kevent.params))
+            else:
+                kevt = json.dumps(dict(id=kevent.kid,
+                                       timestamp=kevent.ts.strftime(self._timestamp_pattern),
+                                       cpuid=kevent.cpuid,
+                                       proc=proc,
+                                       pid=pid,
+                                       name=kevent.name,
+                                       params=kevent.params))
 
         kevt += '\n'
         # write the output on the standard output stream
