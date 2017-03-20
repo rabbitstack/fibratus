@@ -12,7 +12,7 @@ You can use **filaments** (lightweight Python modules) to extend Fibratus with y
 
 1. Install the dependencies
   * [Download](https://www.python.org/ftp/python/3.4.0/python-3.4.0.amd64.msi) and install Python 3.4.
-  * Install Visual Studio 2015 (you'll only need the Visual C compiler to build the kstreamc extension). Make sure to export the `VS100COMNTOOLS` environment variable so it points to `%VS140COMNTOOLS%`. 
+  * Install Visual Studio 2015 (you'll only need the Visual C compiler to build the `kstreamc` extension). Make sure to export the `VS100COMNTOOLS` environment variable so it points to `%VS140COMNTOOLS%`. 
   * Get **cython**: `pip install Cython >=0.23.4`
 2. Install **fibratus** via the pip package manager:
 
