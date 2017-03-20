@@ -19,13 +19,6 @@ You can use **filaments** (lightweight Python modules) to extend Fibratus with y
 ```bash
 pip install fibratus
 ```
-## Running
-
-Open your favourite terminal emulator and type the following command:
-
-```bash
-fibratus run --filters CreateProcess CreateThread
-```
 ## Documentation
 
 See the [wiki](https://github.com/rabbitstack/fibratus/wiki/Running).
