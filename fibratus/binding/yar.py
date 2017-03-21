@@ -14,9 +14,9 @@
 # under the License.
 
 from fibratus.binding.base import BaseBinding
-import os
-
 from fibratus.errors import BindingError
+
+import os
 
 try:
     import yara
@@ -68,13 +68,27 @@ class YaraBinding(BaseBinding):
                 matches = data['matches']
                 if matches:
                     body = {
+                        'meta': data['meta'],
+                        'tags': data['tags'],
+                        'namespace': data['namespace'],
+                        'rule': data['rule'],
+                        'strings': [self.__string_meta(string) for string in data['strings']],
                         'exe': exe,
                         'comm': comm
                     }
-                    body.update(data)
                     self.outputs[self._output].emit(body)
                 return yara.CALLBACK_CONTINUE
-            try:
-                self._rules.match(exe, callback=yara_callback)
-            except yara.libyara_wrapper.YaraMatchError as e:
-                self.logger.error('rule match error. %s' % e)
+            self._rules.match(exe, callback=yara_callback)
+
+    def __string_meta(self, string):
+        """Unpacks the tuple with matching string data and transforms it to a dictionary.
+
+        :param tuple string: the tuple with matching string data
+        :return: dict:
+        """
+        offset, ident, data = string
+        return {
+            'offset': offset,
+            'identifier': ident,
+            'data': data.decode('utf-8')
+        }
