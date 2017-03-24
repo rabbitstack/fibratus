@@ -1,5 +1,5 @@
 image_meta:
-  enabled: true
+  enabled: false
   imports: false
   file_info: false
 
@@ -47,4 +47,3 @@ output:
 #binding:
 #  - yara:
 #      path: D:\yara-rules
-#      output: console
