@@ -14,12 +14,14 @@
 # under the License.
 from unittest.mock import Mock, patch, MagicMock
 
+from fibratus.kevent import KEvent
 from logbook import Logger
 import pytest
 import os
 
 from fibratus.errors import BindingError
 from fibratus.output.amqp import AmqpOutput
+from fibratus.thread import ThreadInfo
 
 
 @pytest.fixture(scope='module')
@@ -36,7 +38,7 @@ class TestYaraBinding(object):
             from fibratus.binding.yar import YaraBinding
             with patch('os.path.exists', return_value=True), \
                  patch('os.path.isdir', return_value=True), \
-                 patch('os.listdir', return_value=['silent_banker.yar']), \
+                 patch('glob.glob', return_value=['silent_banker.yar']), \
                  patch('yara.compile') as yara_compile_mock:
                     YaraBinding(outputs,
                                 Mock(spec_set=Logger), output='amqp', path='C:\\yara-rules')
@@ -71,10 +73,9 @@ class TestYaraBinding(object):
             from fibratus.binding.yar import YaraBinding
             with patch('os.path.exists', return_value=True), \
                  patch('os.path.isdir', return_value=True), \
-                 patch('os.listdir', return_value=['silent_banker.yar']), \
+                 patch('glob.glob', return_value=['silent_banker.yar']), \
                  patch('yara.compile'):
                 yara_binding = YaraBinding(outputs,
                                            Mock(spec_set=Logger), output='amqp', path='C:\\yara-rules')
-
-                yara_binding.run(exe='C:\\Windows\\notepad.exe', comm='')
+                yara_binding.run(thread_info=Mock(spec_set=ThreadInfo), kevent=Mock(spec_set=KEvent))
                 assert yara_binding._rules.match.called
