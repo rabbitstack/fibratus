@@ -17,6 +17,7 @@ from fibratus.binding.base import BaseBinding
 from fibratus.errors import BindingError
 
 import os
+import glob
 
 try:
     import yara
@@ -30,7 +31,7 @@ class YaraBinding(BaseBinding):
         """Creates an instance of the YARA binding.
 
         This binding integrates with YARA tool to provide real time classification and pattern matching of the
-        process's binary images. The image path is extracted from the `ThreadInfo` class after `CreateProcess`
+        process's binary images. The image path is extracted from the `ThreadInfo` instance after `CreateProcess`
         kernel event has been captured.
 
         :param dict outputs: declared output adapters
@@ -41,16 +42,15 @@ class YaraBinding(BaseBinding):
         BaseBinding.__init__(self, outputs, logger)
         self._path = config.pop('path', None)
         self._rules = None
-        self._output = config.pop('output', 'console')
         if not yara:
             raise BindingError('yara-python package is not installed')
         if not os.path.exists(self._path) or not os.path.isdir(self._path):
             raise BindingError('%s rules path does not exist' %
                                self._path)
         try:
-            for rule in os.listdir(self._path):
-                self._rules = yara.compile(os.path.join(self._path, rule))
-        except yara.YaraSyntaxError as e:
+            for file in glob.glob(os.path.join(self._path, '*.yar')):
+                self._rules = yara.compile(os.path.join(self._path, file))
+        except yara.SyntaxError as e:
             raise BindingError("rule compilation error %s" % e)
 
     def run(self, **kwargs):
@@ -59,26 +59,26 @@ class YaraBinding(BaseBinding):
         If a rule match occurs, the data with rule information, matching strings, process name, etc. is transported
         over provided output implementation. If output type is not specified, the console output stream is used.
 
-        :param dict kwargs: attributes of the spawned process
+        :param dict kwargs: parameters for the binding context
         """
-        exe = kwargs.pop('exe', None)
-        comm = kwargs.pop('comm', None)
-        if exe:
+        thread_info = kwargs.pop('thread_info', None)
+        kevent = kwargs.pop('kevent', None)
+        if thread_info:
             def yara_callback(data):
                 matches = data['matches']
                 if matches:
-                    body = {
-                        'meta': data['meta'],
-                        'tags': data['tags'],
-                        'namespace': data['namespace'],
-                        'rule': data['rule'],
-                        'strings': [self.__string_meta(string) for string in data['strings']],
-                        'exe': exe,
-                        'comm': comm
+                    rule_context = {
+                        'rule_info': {
+                            'meta': data['meta'],
+                            'tags': data['tags'],
+                            'namespace': data['namespace'],
+                            'rule': data['rule'],
+                            'strings': [self.__string_meta(string) for string in data['strings']]
+                        }
                     }
-                    self.outputs[self._output].emit(body)
+                    kevent.params.update(rule_context)
                 return yara.CALLBACK_CONTINUE
-            self._rules.match(exe, callback=yara_callback)
+            self._rules.match(thread_info.exe, callback=yara_callback)
 
     def __string_meta(self, string):
         """Unpacks the tuple with matching string data and transforms it to a dictionary.
