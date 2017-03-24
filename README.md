@@ -11,7 +11,7 @@ You can use **filaments** (lightweight Python modules) to extend Fibratus with y
 ## Installation
 [Download the latest release](https://github.com/rabbitstack/fibratus/releases/download/v0.7.0/fibratus-0.7.0.exe) (Windows installer)
 
-Alternatively, you can get fibratus from PyPI.
+Alternatively, you can get **fibratus** from PyPI.
 
 1. Install the dependencies
   * [Download](https://www.python.org/ftp/python/3.4.0/python-3.4.0.amd64.msi) and install Python 3.4.
