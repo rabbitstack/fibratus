@@ -307,15 +307,15 @@ class Fibratus(object):
                 self.thread_registry.init_thread_kevent(self.kevent,
                                                         ktype,
                                                         kparams)
-                self._aggregate(ktype)
-                # apply yara binding to match against
-                # the process's image path
+                # apply yara binding by matching against the process's image path
                 if ktype == CREATE_PROCESS:
                     yara_binding = self.__find_binding('yara')
                     pid = int(kparams.process_id, 16)
                     thread = self.thread_registry.get_thread(pid)
                     if thread and yara_binding:
-                        yara_binding.run(exe=thread.exe, comm=thread.comm)
+                        yara_binding.run(thread_info=thread,
+                                         kevent=self.kevent)
+                self._aggregate(ktype)
 
         elif ktype in [TERMINATE_PROCESS, TERMINATE_THREAD]:
             self.thread_registry.init_thread_kevent(self.kevent,
