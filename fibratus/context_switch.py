@@ -106,14 +106,20 @@ class ContextSwitchRegistry(object):
 
         self._kevent.tid = new_thread_id
         self._kevent.pid = next_pid
-        self._kevent.params = dict(next_proc_name=cs.next_proc_name, prev_proc_name=cs.prev_proc_name, cpu=cpu,
-                                   next_thread_id=new_thread_id, prev_thread_id=old_thread_id,
-                                   next_thread_prio=cs.next_thread_prio,
-                                   prev_thread_prio=cs.prev_thread_prio,
-                                   prev_thread_state=cs.prev_thread_state.name,
-                                   next_thread_wait_time=cs.next_thread_wait_time,
-                                   prev_thread_wait_mode=cs.prev_thread_wait_mode.name,
-                                   prev_thread_wait_reason=cs.prev_thread_wait_reason.name)
+        params = {
+            'next_proc_name': cs.next_proc_name,
+            'prev_proc_name': cs.prev_proc_name,
+            'cpu': cpu,
+            'next_thread_id': new_thread_id,
+            'prev_thread_id': old_thread_id,
+            'next_thread_prio': cs.next_thread_prio,
+            'prev_thread_prio': cs.prev_thread_prio,
+            'prev_thread_state': cs.prev_thread_state.name if cs.prev_thread_state else NA,
+            'next_thread_wait_time': cs.next_thread_wait_time,
+            'prev_thread_wait_mode': cs.prev_thread_wait_mode.name if cs.prev_thread_wait_mode else NA,
+            'prev_thread_wait_reason': cs.prev_thread_wait_reason.name if cs.prev_thread_wait_reason else NA
+        }
+        self._kevent.params = params
 
     def context_switches(self):
         """Returns a dictionary of context switches.
