@@ -24,7 +24,7 @@ keys = ['Run', 'RunOnce', 'RunServices', 'RunServicesOnce', 'Userinit']
 
 
 def on_init():
-    set_filter('CreateProcess')
+    set_filter('RegSetValue')
 
 
 def on_next_kevent(kevent):
