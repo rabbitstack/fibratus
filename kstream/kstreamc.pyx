@@ -34,6 +34,7 @@ from kstream.includes.stdlib cimport *
 from kstream.includes.string cimport *
 from kstream.time cimport sys_time
 from kstream.ktuple cimport build_ktuple
+from kstream.process cimport PROCESS_INFO
 
 
 cdef enum:
@@ -50,6 +51,7 @@ cdef PyObject* CREATE_PROCESS = build_ktuple(<PyObject*>'{3d6fa8d0-fe05-11d0-9dd
 cdef PyObject* TERMINATE_PROCESS = build_ktuple(<PyObject*>'{3d6fa8d0-fe05-11d0-9dda-00c04fd7ba7c}', 2)
 
 cdef wstring PID_PROP = deref_prop("PID")
+cdef wstring PPID_PROP = deref_prop("ParentId")
 cdef wstring PROCESS_ID_PROP = deref_prop("ProcessId")
 cdef wstring IMAGE_FILE_NAME_PROP = deref_prop("ImageFileName")
 
@@ -88,9 +90,10 @@ cdef class KEventStreamCollector:
 
     cdef vector[PyObject*]* ktuple_filters
     cdef vector[wchar_t*]* skips
-    cdef unordered_map[ULONG, wchar_t*]* proc_map
+    cdef unordered_map[ULONG, PROCESS_INFO]* proc_map
 
     cdef ULONG pid_filter
+    cdef wchar_t* image_filter
     cdef ULONG own_pid
 
     cdef next_kevt_callback
@@ -107,9 +110,10 @@ cdef class KEventStreamCollector:
         self.regex = re.compile('((?<=[a-z0-9])[A-Z]|(?!^)[A-Z](?=[a-z]))')
         self.pointer_size = 8
         self.ktuple_filters = new vector[PyObject*]()
-        self.proc_map = new unordered_map[ULONG, wchar_t*]()
+        self.proc_map = new unordered_map[ULONG, PROCESS_INFO]()
         self.skips = new vector[wchar_t*]()
         self.pid_filter = 0
+        self.image_filter = NULL
         self.own_pid = <ULONG>os.getpid()
 
     def open_kstream(self, callback):
@@ -170,6 +174,9 @@ cdef class KEventStreamCollector:
     def add_pid_filter(self, pid):
         self.pid_filter = <ULONG>int(pid) if pid else 0
 
+    def add_image_filter(self, image):
+        self.image_filter = _wchar_t(<PyObject*>image) if image else NULL
+
     cdef process_kevent_callback(self, EVENT_RECORD* kevent_trace):
         with nogil:
             (<KEventStreamCollector>kevent_trace.user_ctx)._process_kevent(kevent_trace)
@@ -197,6 +204,8 @@ cdef class KEventStreamCollector:
         cdef ULONG property_size
         cdef PROPERTY_DATA_DESCRIPTOR descriptor
         cdef BOOL dropped = False
+        cdef PROCESS_INFO pi
+        cdef BOOL b = False
 
         status = tdh_get_event_information(kevent_trace, 0,
                                            NULL,
@@ -214,7 +223,7 @@ cdef class KEventStreamCollector:
         if ktuple == NULL:
             free(info)
             return
-        dropped = self.__apply_filters(pid, tid, ktuple, params)
+        dropped = self.__apply_filters(pid, tid, ktuple, params, True)
 
         if dropped:
             with gil:
@@ -278,20 +287,30 @@ cdef class KEventStreamCollector:
             # currently running processes on the system
             if self.__ktuple_equals(ktuple, ENUM_PROCESS) or \
                 self.__ktuple_equals(ktuple, CREATE_PROCESS):
-                k = new pair[ULONG, wchar_t*](<ULONG>wcstol(_wchar_t(params.at(PROCESS_ID_PROP)), NULL, 16),
-                                             _wchar_t(params.at(IMAGE_FILE_NAME_PROP)))
+                pi.pid = <ULONG>wcstol(_wchar_t(params.at(PROCESS_ID_PROP)), NULL, 16)
+                pi.ppid = <ULONG>wcstol(_wchar_t(params.at(PPID_PROP)), NULL, 16)
+                pi.name = _wchar_t(params.at(IMAGE_FILE_NAME_PROP))
+                k = new pair[ULONG, PROCESS_INFO](<ULONG>wcstol(_wchar_t(params.at(PROCESS_ID_PROP)), NULL, 16),
+                                                 pi)
                 self.proc_map.insert(deref(k))
                 del k
             elif self.__ktuple_equals(ktuple, TERMINATE_PROCESS):
+                # defer the removal of the pid to be able to capture
+                # `TerminateProcess` if the image filter is set
+                if self.image_filter == NULL:
+                    prop_pid = <ULONG>wcstol(_wchar_t(params.at(PROCESS_ID_PROP)), NULL, 16)
+                    self.proc_map.erase(prop_pid)
+
+            dropped = self.__apply_filters(pid, tid, ktuple, params, False)
+            # now we can erase the pid
+            if self.image_filter != NULL and \
+                    self.__ktuple_equals(ktuple, TERMINATE_PROCESS):
                 prop_pid = <ULONG>wcstol(_wchar_t(params.at(PROCESS_ID_PROP)), NULL, 16)
                 self.proc_map.erase(prop_pid)
-
-            dropped = self.__apply_filters(pid, tid, ktuple, params)
             if dropped:
                 with gil:
                     Py_XDECREF(ktuple)
                 return
-
             with gil:
                 # check for pending signals.
                 # The default behaviour is to
@@ -430,7 +449,8 @@ cdef class KEventStreamCollector:
 
     cdef BOOL __apply_filters(self, ULONG pid, ULONG tid,
                               PyObject* ktuple,
-                              unordered_map[wstring, PyObject*] params) nogil:
+                              unordered_map[wstring, PyObject*] params,
+                              BOOL defer) nogil:
         cdef BOOL drop = True
 
         # we don't want to capture any events
@@ -452,6 +472,8 @@ cdef class KEventStreamCollector:
         drop = self.__apply_skips(pid)
         if drop:
             return True
+        elif self.image_filter != NULL:
+            drop = True
 
         for i from 0 <= i < self.ktuple_filters.size():
             ktuple_filter = self.ktuple_filters.at(i)
@@ -466,6 +488,23 @@ cdef class KEventStreamCollector:
             # and we can't still drop the event
             if pid == INVALID_PID:
                 drop = False
+        elif self.image_filter != NULL:
+            # apply image filter
+            if defer:
+                return False
+            if pid == INVALID_PID:
+                drop = False
+            else:
+                drop = self.__apply_image_filter(pid)
+                # this only apply to `CreateProcess` events where
+                # parent pid is mapped to an image which doesn't match
+                # the child pid's image
+                if drop and \
+                        self.__ktuple_equals(ktuple, CREATE_PROCESS):
+                    if params.size() > 0:
+                        image_name = _wchar_t(params.at(IMAGE_FILE_NAME_PROP))
+                        drop = wcscmp(_wcslwr(image_name),
+                                      _wcslwr(self.image_filter)) != 0
         if drop:
             return True
         # now scan for the kernel event
@@ -476,15 +515,15 @@ cdef class KEventStreamCollector:
 
     cdef inline BOOL __apply_skips(self, ULONG pid) nogil:
         cdef BOOL ignored = False
-        cdef unordered_map[ULONG, wchar_t*].iterator proc_iterator = self.proc_map.find(pid)
+        cdef unordered_map[ULONG, PROCESS_INFO].iterator proc_iterator = self.proc_map.find(pid)
         if proc_iterator != self.proc_map.end():
             for i from 0 <= i < self.skips.size():
                 skip = self.skips.at(i)
                 # compare the image name found
                 # on the proc map with the value
                 # as defined on the skip list
-                if wcscmp(_wcslwr(deref(proc_iterator).second),
-                          _wcslwr(skip)) == 0:
+                pi = deref(proc_iterator).second
+                if wcscmp(_wcslwr(pi.name), _wcslwr(skip)) == 0:
                     ignored = True
                     break
         return ignored
@@ -493,6 +532,7 @@ cdef class KEventStreamCollector:
         cdef unordered_map[wstring, PyObject*].iterator piter = params.begin()
         cdef BOOL drop = False
         cdef ULONG pid = 0
+
         while piter != params.end():
             prop = deref(piter)
             prop_name = prop.first
@@ -502,7 +542,7 @@ cdef class KEventStreamCollector:
                 pid = PyLong_AsLong(prop.second)
 
             # apply the filters. At this point
-            # we also check the kernel event
+            # we also check the kernel event is
             # not coming from the fibratus process
             if pid != 0:
                 if pid == self.own_pid:
@@ -511,7 +551,20 @@ cdef class KEventStreamCollector:
                 elif self.pid_filter != 0 and self.pid_filter != pid:
                     drop = True
                     break
+                elif self.image_filter != NULL:
+                    drop = self.__apply_image_filter(pid)
+                    if drop:
+                        break
             inc(piter)
+        return drop
+
+    cdef inline BOOL __apply_image_filter(self, ULONG pid) nogil:
+        cdef BOOL drop = True
+        proc_iterator = self.proc_map.find(pid)
+        if proc_iterator != self.proc_map.end():
+            pi = deref(proc_iterator).second
+            drop = wcscmp(_wcslwr(pi.name),
+                          _wcslwr(self.image_filter)) != 0
         return drop
 
     cdef PyObject* __wrap_ktuple(self, GUID guid, UCHAR opcode) nogil:
@@ -534,4 +587,3 @@ cdef class KEventStreamCollector:
             if kguid2 != NULL:
                 PyMem_Free(kguid2)
         return ktuple_equals
-
