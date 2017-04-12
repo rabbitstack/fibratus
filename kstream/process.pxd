@@ -17,6 +17,9 @@
 from kstream.includes.windows cimport UCHAR, ULONG, wchar_t
 
 cdef struct PROCESS_INFO:
+    # process identifier
     ULONG pid
+    # process parent identifier
     ULONG ppid
+    # name of the image file
     wchar_t* name
