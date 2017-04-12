@@ -17,7 +17,7 @@
 from cpython.ref cimport PyObject
 from libc.stddef cimport wchar_t
 from .windows cimport WCHAR, CHAR, BYTE, ULONGLONG, LONGLONG, ULONG, LONG, SHORT, USHORT, ntohs, htonl, inet_ntoa, \
-    in_addr, FLOAT, DOUBLE
+    in_addr, FLOAT, DOUBLE, DWORD, INT32
 from .string cimport wstring, sprintf
 from cython.operator cimport dereference as deref
 
@@ -81,15 +81,15 @@ cdef inline PyObject* _i64_hex(void* buf) nogil:
 
 
 cdef inline PyObject* _i64(void* buf) nogil:
-    return Py_BuildValue('i', (<LONGLONG*>buf)[0])
+    return Py_BuildValue('L', (<LONGLONG*>buf)[0])
 
 
 cdef inline PyObject* _u64(void* buf) nogil:
-    return Py_BuildValue('i', (<ULONGLONG*>buf)[0])
+    return Py_BuildValue('K', (<ULONGLONG*>buf)[0])
 
 
 cdef inline PyObject* _i32(void* buf) nogil:
-    return Py_BuildValue('i', (<LONG*>buf)[0])
+    return Py_BuildValue('i', (<INT32*>buf)[0])
 
 
 cdef inline PyObject* _i32_hex(void* buf) nogil:
@@ -99,7 +99,7 @@ cdef inline PyObject* _i32_hex(void* buf) nogil:
 
 
 cdef inline PyObject* _u32(void* buf) nogil:
-    return Py_BuildValue('i', (<ULONG*>buf)[0])
+    return Py_BuildValue('k', (<DWORD*>buf)[0])
 
 
 cdef inline PyObject* _i16(void* buf) nogil:
