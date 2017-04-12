@@ -220,6 +220,7 @@ class Fibratus(object):
 
     def add_filters(self, kevent_filters, **kwargs):
         self.kevt_streamc.add_pid_filter(kwargs.pop('pid', None))
+        self.kevt_streamc.add_image_filter(kwargs.pop('image', None))
         if len(kevent_filters) > 0:
             self.filters_count = len(kevent_filters)
             # include the basic filters
