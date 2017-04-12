@@ -205,7 +205,6 @@ cdef class KEventStreamCollector:
         cdef PROPERTY_DATA_DESCRIPTOR descriptor
         cdef BOOL dropped = False
         cdef PROCESS_INFO pi
-        cdef BOOL b = False
 
         status = tdh_get_event_information(kevent_trace, 0,
                                            NULL,
