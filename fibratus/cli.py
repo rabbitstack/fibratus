@@ -17,7 +17,7 @@
 """
 Usage:
     fibratus run ([--filament=<filament>] | [--filters <kevents>...])
-                 [--pid=<pid>] [--no-enum-handles] [--cswitch]
+                 [--pid=<pid>] [--image=<image>] [--no-enum-handles] [--cswitch]
     fibratus list-kevents
     fibratus list-filaments
     fibratus -h | --help
@@ -28,6 +28,7 @@ Options:
     --filament=<filament>     Specify the filament to execute.
     --no-enum-handles         Avoids enumerating the system handles.
     --pid=<pid>               Spy on a specific process identifier.
+    --image=<image>           Spy on a specific image name.
     --cswitch                 Enables context switch kernel events.
     --version                 Show version.
 """
@@ -102,6 +103,7 @@ def main():
         # add specific filters
         filters = dict()
         filters['pid'] = args['--pid'] if args['--pid'] else None
+        filters['image'] = args['--image'] if args['--image'] else None
 
         if not filament:
             if len(kevent_filters) > 0:
