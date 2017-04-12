@@ -20,6 +20,7 @@ cdef extern from "windows.h":
     ctypedef unsigned long ULONG
     ctypedef unsigned char BYTE
     ctypedef unsigned long DWORD
+    ctypedef signed int INT32
     ctypedef unsigned short WORD
     ctypedef float FLOAT
     ctypedef double DOUBLE
