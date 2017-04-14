@@ -21,6 +21,7 @@ from kstream.includes.windows cimport UCHAR
 
 cdef inline PyObject* build_ktuple(PyObject* kguid, UCHAR opcode) nogil:
     cdef PyObject* ktuple = PyTuple_New(2)
+    cdef PyObject* oco = Py_BuildValue('b', opcode)
     PyTuple_SetItem(ktuple, 0, kguid)
-    PyTuple_SetItem(ktuple, 1, Py_BuildValue('b', opcode))
+    PyTuple_SetItem(ktuple, 1, oco)
     return ktuple
