@@ -308,6 +308,9 @@ cdef class KEventStreamCollector:
                 self.proc_map.erase(prop_pid)
             if dropped:
                 with gil:
+                    # decrement references to avoid memory leaks
+                    if self.image_filter != NULL:
+                       self._decref_params(params)
                     Py_XDECREF(ktuple)
                 return
             with gil:
@@ -357,6 +360,12 @@ cdef class KEventStreamCollector:
             pyo = <object>o
             Py_XDECREF(o)
         return pyo
+
+    cdef _decref_params(self,  unordered_map[wstring, PyObject*] params):
+        for kparam in params:
+            Py_XDECREF(_wstring(kparam.first))
+            if kparam.second != NULL:
+                Py_XDECREF(kparam.second)
 
     cdef _underscore(self, o):
         return self.regex.sub(r'_\1', o).lower()
