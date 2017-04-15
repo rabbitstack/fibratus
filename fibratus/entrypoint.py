@@ -20,6 +20,7 @@ import sys
 from datetime import datetime
 
 from kstreamc import KEventStreamCollector
+from pykwalify.errors import SchemaError
 
 from fibratus.binding.yar import YaraBinding
 from fibratus.errors import BindingError
@@ -68,10 +69,14 @@ class Fibratus(object):
             panic("ERROR - Unable to open log file for writing due to permission error")
 
         self.logger = Logger(Fibratus.__name__)
+        self.logger.info('Starting Fibratus...')
 
         self._config = YamlConfig()
-
-        self.logger.info('Starting Fibratus...')
+        self.logger.info('Loading configuration from [%s]' % self._config.path)
+        try:
+            self._config.load()
+        except SchemaError as e:
+            panic('Invalid configuration file. %s' % e.msg)
 
         enable_cswitch = kwargs.pop('cswitch', False)
 
