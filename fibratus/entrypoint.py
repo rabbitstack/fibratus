@@ -27,6 +27,7 @@ from fibratus.image_meta import ImageMetaRegistry
 from fibratus.output.aggregator import OutputAggregator
 from fibratus.output.console import ConsoleOutput
 from fibratus.output.elasticsearch import ElasticsearchOutput
+from fibratus.output.fs import FsOutput
 from fibratus.output.smtp import SmtpOutput
 from logbook import Logger, FileHandler, StreamHandler
 
@@ -111,7 +112,8 @@ class Fibratus(object):
         self._output_classes = dict(console=ConsoleOutput,
                                     amqp=AmqpOutput,
                                     smtp=SmtpOutput,
-                                    elasticsearch=ElasticsearchOutput)
+                                    elasticsearch=ElasticsearchOutput,
+                                    fs=FsOutput)
         self._outputs = self._construct_outputs()
         self.output_aggregator = OutputAggregator(self._outputs)
 
