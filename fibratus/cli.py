@@ -17,7 +17,7 @@
 """
 Usage:
     fibratus run ([--filament=<filament>] | [--filters <kevents>...])
-                 [--pid=<pid>] [--image=<image>] [--no-enum-handles] [--cswitch]
+                 [--pid=<pid> | --image=<image>] [--no-enum-handles] [--cswitch]
     fibratus list-kevents
     fibratus list-filaments
     fibratus -h | --help
