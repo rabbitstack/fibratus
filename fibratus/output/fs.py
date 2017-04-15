@@ -28,7 +28,7 @@ class FsOutput(Output):
     """
 
     def __init__(self, **kwargs):
-        super(Output, self).__init__()
+        Output.__init__(self)
         self._path = kwargs.pop('path', None)
         self._fmt = kwargs.pop('format', 'json')
         self._mode = kwargs.pop('mode', 'a')
