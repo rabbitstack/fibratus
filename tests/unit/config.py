@@ -18,21 +18,29 @@ from fibratus.config import YamlConfig
 import os
 
 __CONFIG_PATH__ = os.path.join(os.path.dirname(__file__), '..', 'fixtures', 'fibratus.yml')
+__SCHEMA_FILE__ = os.path.join(os.path.dirname(__file__), '..', 'fixtures', 'schema.yml')
 
 
 class TestYamlConfig():
 
     def test_load_yaml(self):
         config = YamlConfig(__CONFIG_PATH__)
+        config.load(False)
         assert config.yaml
+
+    def test_load_validate(self):
+        config = YamlConfig(__CONFIG_PATH__)
+        config.default_schema_path = __SCHEMA_FILE__
+        config.load()
 
     def test_load_yaml_not_found(self):
         with patch('sys.exit') as sys_exit:
-            YamlConfig('C:\\fibratus.yml')
+            YamlConfig('C:\\fibratus.yml').load(False)
             sys_exit.assert_called_once()
 
     def test_outputs(self):
         config = YamlConfig(__CONFIG_PATH__)
+        config.load(False)
         outputs = config.outputs
         assert outputs
         assert isinstance(outputs, list)
@@ -40,7 +48,8 @@ class TestYamlConfig():
 
     def test_enum_outputs(self):
         config = YamlConfig(__CONFIG_PATH__)
-        output_names = ['amqp', 'smtp', 'console', 'elasticsearch']
+        config.load(False)
+        output_names = ['amqp', 'smtp', 'console', 'elasticsearch', 'fs']
         outputs = config.outputs
         if outputs:
             for output in outputs:
@@ -49,6 +58,7 @@ class TestYamlConfig():
 
     def test_image_skips(self):
         config = YamlConfig(__CONFIG_PATH__)
+        config.load(False)
         image_skips = config.skips.images
         assert image_skips
         assert isinstance(image_skips, list)
@@ -56,6 +66,7 @@ class TestYamlConfig():
 
     def test_bindings(self):
         config = YamlConfig(__CONFIG_PATH__)
+        config.load(False)
         bindings = config.bindings
         binding_names = ['yara']
         assert bindings
