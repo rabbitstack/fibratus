@@ -43,6 +43,10 @@ output:
 #      username: elastic
 #      password: changeme
 #      ssl: True
+#  - fs:
+#      path: D:\\
+#      mode: a
+#      format: json
 
 #binding:
 #  - yara:
