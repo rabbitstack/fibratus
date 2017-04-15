@@ -10,6 +10,7 @@ elasticsearch==5.0.0
 
 anyconfig==0.6.0
 pyaml==15.8.2
+pykwalify==1.6.0
 
 pytest==2.9.1
 pytest-cov==2.2.1
