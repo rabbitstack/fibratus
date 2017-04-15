@@ -25,21 +25,16 @@ class TestFsOutput(object):
 
     def test_init(self):
         with patch('io.open', return_value=Mock(spec_set=TextIOBase)) as stream_mock:
-            fs_output = FsOutput(path='D:\\', mode='a', format='json')
+            fs_output = FsOutput(path='C:\\', mode='a', format='json')
             filename = os.path.join(fs_output.path, '%s.fibra' % time.strftime('%x').replace('/', '-'))
             stream_mock.assert_called_with(filename, 'a')
-            assert 'D:\\' in fs_output.path
+            assert 'C:\\' in fs_output.path
             assert 'a' in fs_output.mode
             assert 'json' in fs_output.format
 
     def test_emit(self):
         with patch('io.open', return_value=Mock(spec_set=TextIOBase)):
-            fs_output = FsOutput(path='D:\\', mode='a', format='json')
+            fs_output = FsOutput(path='C:\\', mode='a', format='json')
             body = {'kevent_type': 'CreateProcess'}
             fs_output.emit(body)
             fs_output.stream.write.assert_called_with(json.dumps(body) + '\n')
-
-    def test_write(self):
-        fs_output = FsOutput(path='D:\\', mode='a', format='json')
-        body = {'kevent_type': 'CreateProcess'}
-        fs_output.emit(body)
