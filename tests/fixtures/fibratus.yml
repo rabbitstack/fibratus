@@ -1,3 +1,9 @@
+---
+image_meta:
+  enabled: false
+  imports: false
+  file_info: false
+
 skips:
   images:
     - svchost.exe
@@ -38,8 +44,11 @@ output:
       username: elastic
       password: changeme
       ssl: True
+  - fs:
+      path: D:\\
+      mode: a
+      format: json
 
 binding:
   - yara:
       path: D:\\yara-rules
-      output: console
