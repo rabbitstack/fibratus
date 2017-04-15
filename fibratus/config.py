@@ -14,21 +14,35 @@
 # under the License.
 
 import os
+import sys
 import anyconfig
 from fibratus.common import panic, DotD as ddict
-
-__DEFAULT_CONFIG_PATH__ = os.path.join(os.path.expanduser('~'), '.fibratus', 'fibratus.yml')
+from pykwalify.core import Core
 
 
 class YamlConfig(object):
+    """YAML based configuration reader.
+
+    Reads the configuration from YAML file, and ensures the content satisfies the structure
+    as defined in the schema file.
+    """
 
     def __init__(self, config_path=None):
-        path = os.getenv('FIBRATUS_CONFIG_PATH', __DEFAULT_CONFIG_PATH__)
-        path = config_path or path
+        self._default_config_path = os.path.join(os.path.expanduser('~'), '.fibratus', 'fibratus.yml')
+        self._default_schema_path = os.path.join(os.path.expanduser('~'), '.fibratus', 'schema.yml')
+        self.path = config_path or os.getenv('FIBRATUS_CONFIG_PATH', self._default_config_path)
+        self._yaml = None
+
+    def load(self, validate=True):
+        schema_file = os.path.join(sys._MEIPASS, 'schema.yml') \
+            if hasattr(sys, '_MEIPASS') else self._default_schema_path
         try:
-            self._yaml = anyconfig.load(path, ignore_missing=False)
+            self._yaml = anyconfig.load(self.path, ignore_missing=False)
         except FileNotFoundError:
-            panic('ERROR - %s configuration file does not exist' % path)
+            panic('ERROR - %s configuration file does not exist' % self.path)
+        if validate:
+            validator = Core(source_file=self.path, schema_files=[schema_file])
+            validator.validate(raise_exception=True)
 
     @property
     def image_meta(self):
@@ -49,3 +63,23 @@ class YamlConfig(object):
     @property
     def yaml(self):
         return self._yaml
+
+    @property
+    def default_config_path(self):
+        return self._default_config_path
+
+    @default_config_path.setter
+    def default_config_path(self, path):
+        self._default_config_path = path
+
+    @property
+    def default_schema_path(self):
+        return self._default_schema_path
+
+    @default_schema_path.setter
+    def default_schema_path(self, path):
+        self._default_schema_path = path
+
+    @property
+    def config_path(self):
+        return self.path
