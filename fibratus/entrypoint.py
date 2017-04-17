@@ -72,7 +72,7 @@ class Fibratus(object):
         self.logger.info('Starting Fibratus...')
 
         self._config = YamlConfig()
-        self.logger.info('Loading configuration from [%s]' % self._config.path)
+        self.logger.info('Loading configuration from [%s]' % self._config.config_path)
         try:
             self._config.load()
         except SchemaError as e:
