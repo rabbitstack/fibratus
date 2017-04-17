@@ -31,6 +31,7 @@ def copy_artifacts():
     if not os.path.exists(fibratus_dir):
         os.mkdir(fibratus_dir)
         shutil.copy(os.path.join(here, 'fibratus.yml'), fibratus_dir)
+        shutil.copy(os.path.join(here, 'schema.yml'), fibratus_dir)
         shutil.copytree(os.path.join(here, 'filaments'), os.path.join(fibratus_dir, 'filaments'))
 
 kstreamc_ext = Extension('kstreamc',
