@@ -150,11 +150,14 @@ class HiveParser(object):
                       REG_DELETE_KEY,
                       REG_OPEN_KEY,
                       REG_QUERY_KEY]:
-            self._kevent.params = dict(hive=hive,
-                                       key=key,
-                                       status=status,
-                                       tid=tid,
-                                       pid=pid)
+            params = {
+                'hive': hive,
+                'key': key,
+                'status': status,
+                'tid': tid,
+                'pid': pid
+            }
+            self._kevent.params = params
         elif ketype in [REG_SET_VALUE,
                         REG_DELETE_VALUE,
                         REG_QUERY_VALUE]:
