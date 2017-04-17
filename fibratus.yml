@@ -39,7 +39,7 @@ output:
 #        - localhost:9200
 #      index: kernelstream
 #      document: threads
-#      bulk: True
+#      bulk: False
 #      username: elastic
 #      password: changeme
 #      ssl: True
