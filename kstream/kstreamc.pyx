@@ -34,7 +34,7 @@ from kstream.includes.stdlib cimport *
 from kstream.includes.string cimport *
 from kstream.time cimport sys_time
 from kstream.ktuple cimport build_ktuple
-from kstream.process cimport PROCESS_INFO
+from kstream.process cimport PROCESS_INFO, pid_from_tid
 
 
 cdef enum:
@@ -50,9 +50,18 @@ cdef PyObject* REG_DELETE_KCB = build_ktuple(<PyObject*>'{ae53722e-c863-11d2-865
 cdef PyObject* CREATE_PROCESS = build_ktuple(<PyObject*>'{3d6fa8d0-fe05-11d0-9dda-00c04fd7ba7c}', 1)
 cdef PyObject* TERMINATE_PROCESS = build_ktuple(<PyObject*>'{3d6fa8d0-fe05-11d0-9dda-00c04fd7ba7c}', 2)
 
+cdef PyObject* CREATE_FILE = build_ktuple(<PyObject*>'{90cbdc39-4a3e-11d1-84f4-0000f80464e3}', 64)
+cdef PyObject* WRITE_FILE = build_ktuple(<PyObject*>'{90cbdc39-4a3e-11d1-84f4-0000f80464e3}', 68)
+cdef PyObject* READ_FILE = build_ktuple(<PyObject*>'{90cbdc39-4a3e-11d1-84f4-0000f80464e3}', 67)
+cdef PyObject* DELETE_FILE = build_ktuple(<PyObject*>'{90cbdc39-4a3e-11d1-84f4-0000f80464e3}', 70)
+cdef PyObject* CLOSE_FILE = build_ktuple(<PyObject*>'{90cbdc39-4a3e-11d1-84f4-0000f80464e3}', 66)
+cdef PyObject* RENAME_FILE = build_ktuple(<PyObject*>'{90cbdc39-4a3e-11d1-84f4-0000f80464e3}', 71)
+cdef PyObject* SET_FILE_INFORMATION = build_ktuple(<PyObject*>'{90cbdc39-4a3e-11d1-84f4-0000f80464e3}', 69)
+
 cdef wstring PID_PROP = deref_prop("PID")
 cdef wstring PPID_PROP = deref_prop("ParentId")
 cdef wstring PROCESS_ID_PROP = deref_prop("ProcessId")
+cdef wstring THREAD_ID_PROP = deref_prop("TTID")
 cdef wstring IMAGE_FILE_NAME_PROP = deref_prop("ImageFileName")
 
 REGISTRY_KGUID = '{ae53722e-c863-11d2-8659-00c04fa321a1}'
@@ -299,6 +308,21 @@ cdef class KEventStreamCollector:
                 if self.image_filter == NULL:
                     prop_pid = <ULONG>wcstol(_wchar_t(params.at(PROCESS_ID_PROP)), NULL, 16)
                     self.proc_map.erase(prop_pid)
+            elif self.__ktuple_equals(ktuple, CREATE_FILE) or \
+                self.__ktuple_equals(ktuple, WRITE_FILE) or \
+                self.__ktuple_equals(ktuple, READ_FILE) or \
+                self.__ktuple_equals(ktuple, DELETE_FILE) or \
+                self.__ktuple_equals(ktuple, CLOSE_FILE) or \
+                self.__ktuple_equals(ktuple, RENAME_FILE) or \
+                self.__ktuple_equals(ktuple, SET_FILE_INFORMATION):
+                # on some Windows versions the value of
+                # the PID attribute is invalid for the
+                # file system kernel events
+                if pid == INVALID_PID:
+                    prop_tid = params.at(THREAD_ID_PROP)
+                    if prop_tid != NULL:
+                        # try to resolve the pid from the thread id
+                        pid = pid_from_tid(PyLong_AsLong(prop_tid))
 
             dropped = self.__apply_filters(pid, tid, ktuple, params, False)
             # now we can erase the pid
@@ -340,7 +364,7 @@ cdef class KEventStreamCollector:
                         kparams['thread_id']  = tid
                         kparams['process_id'] = pid
                     elif kguid in FS_KGUID:
-                        kparams['process_id']  = pid
+                        kparams['process_id'] = pid
                     if self.next_kevt_callback:
                         self.next_kevt_callback((kguid, opc,), cpuid,
                                                 timestamp,
