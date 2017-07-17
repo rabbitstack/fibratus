@@ -14,7 +14,11 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-from kstream.includes.windows cimport UCHAR, ULONG, wchar_t
+from kstream.includes.windows cimport UCHAR, ULONG, wchar_t, get_process_id_of_thread, open_thread, close_handle, \
+    THREAD_QUERY_LIMITED_INFORMATION, HANDLE
+
+cdef enum:
+    INVALID_PID = 4294967295
 
 cdef struct PROCESS_INFO:
     # process identifier
@@ -23,3 +27,15 @@ cdef struct PROCESS_INFO:
     ULONG ppid
     # name of the image file
     wchar_t* name
+
+
+cdef inline ULONG pid_from_tid(ULONG tid) nogil:
+    cdef HANDLE thread = open_thread(THREAD_QUERY_LIMITED_INFORMATION,
+                                     False,
+                                     tid)
+    if thread != NULL:
+        pid = get_process_id_of_thread(thread)
+        close_handle(thread)
+        return pid
+    else:
+        return INVALID_PID
