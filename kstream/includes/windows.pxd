@@ -27,6 +27,8 @@ cdef extern from "windows.h":
     ctypedef char CHAR
     ctypedef unsigned char UCHAR
     ctypedef void VOID
+    ctypedef void* PVOID
+    ctypedef PVOID HANDLE
     ctypedef short SHORT
     ctypedef unsigned short USHORT
     ctypedef long long LONGLONG
@@ -48,6 +50,9 @@ cdef extern from "windows.h":
 
     enum: ERROR_SUCCESS
     enum: ERROR_CANCELLED
+
+    enum: THREAD_QUERY_INFORMATION
+    enum: THREAD_QUERY_LIMITED_INFORMATION
 
     ctypedef struct GUID:
         DWORD Data1
@@ -96,6 +101,12 @@ cdef extern from "windows.h":
     BOOL systemtime_to_tz_specific_localtime "SystemTimeToTzSpecificLocalTime"(TIME_ZONE_INFORMATION *zone,
                                                                                SYSTEMTIME *uni_time,
                                                                                SYSTEMTIME *local_time) nogil
+
+    HANDLE open_thread "OpenThread"(DWORD desired_access, BOOL inherit_handle, DWORD thread_id) nogil
+
+    DWORD get_process_id_of_thread "GetProcessIdOfThread"(HANDLE thread) nogil
+
+    BOOL close_handle "CloseHandle"(HANDLE handle) nogil
 
 cdef extern from "winsock.h":
     USHORT ntohs(USHORT netshort) nogil
