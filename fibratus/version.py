@@ -16,6 +16,6 @@
 
 _MAJOR_ = 0
 _MINOR_ = 7
-_REV_ = 1
+_REV_ = 2
 
 VERSION = '%s.%s.%s' % (_MAJOR_, _MINOR_, _REV_)
