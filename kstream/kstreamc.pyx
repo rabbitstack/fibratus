@@ -34,7 +34,7 @@ from kstream.includes.stdlib cimport *
 from kstream.includes.string cimport *
 from kstream.time cimport sys_time
 from kstream.ktuple cimport build_ktuple
-from kstream.process cimport PROCESS_INFO, pid_from_tid
+from kstream.process cimport PROCESS_INFO, THREAD_INFO, pid_from_tid
 
 
 cdef enum:
@@ -48,6 +48,8 @@ cdef PyObject* REG_CREATE_KCB = build_ktuple(<PyObject*>'{ae53722e-c863-11d2-865
 cdef PyObject* REG_DELETE_KCB = build_ktuple(<PyObject*>'{ae53722e-c863-11d2-8659-00c04fa321a1}', 23)
 
 cdef PyObject* CREATE_PROCESS = build_ktuple(<PyObject*>'{3d6fa8d0-fe05-11d0-9dda-00c04fd7ba7c}', 1)
+cdef PyObject* CREATE_THREAD = build_ktuple(<PyObject*>'{3d6fa8d1-fe05-11d0-9dda-00c04fd7ba7c}', 1)
+cdef PyObject* TERMINATE_THREAD = build_ktuple(<PyObject*>'{3d6fa8d1-fe05-11d0-9dda-00c04fd7ba7c}', 2)
 cdef PyObject* TERMINATE_PROCESS = build_ktuple(<PyObject*>'{3d6fa8d0-fe05-11d0-9dda-00c04fd7ba7c}', 2)
 
 cdef PyObject* CREATE_FILE = build_ktuple(<PyObject*>'{90cbdc39-4a3e-11d1-84f4-0000f80464e3}', 64)
@@ -58,10 +60,13 @@ cdef PyObject* CLOSE_FILE = build_ktuple(<PyObject*>'{90cbdc39-4a3e-11d1-84f4-00
 cdef PyObject* RENAME_FILE = build_ktuple(<PyObject*>'{90cbdc39-4a3e-11d1-84f4-0000f80464e3}', 71)
 cdef PyObject* SET_FILE_INFORMATION = build_ktuple(<PyObject*>'{90cbdc39-4a3e-11d1-84f4-0000f80464e3}', 69)
 
+cdef PyObject* UNLOAD_IMAGE =  build_ktuple(<PyObject*>'{2cb15d1d-5fc1-11d2-abe1-00a0c911f518}', 2)
+
 cdef wstring PID_PROP = deref_prop("PID")
 cdef wstring PPID_PROP = deref_prop("ParentId")
 cdef wstring PROCESS_ID_PROP = deref_prop("ProcessId")
-cdef wstring THREAD_ID_PROP = deref_prop("TTID")
+cdef wstring FS_THREAD_ID_PROP = deref_prop("TTID")
+cdef wstring THREAD_ID_PROP = deref_prop("TThreadId")
 cdef wstring IMAGE_FILE_NAME_PROP = deref_prop("ImageFileName")
 
 REGISTRY_KGUID = '{ae53722e-c863-11d2-8659-00c04fa321a1}'
@@ -100,6 +105,7 @@ cdef class KEventStreamCollector:
     cdef vector[PyObject*]* ktuple_filters
     cdef vector[wchar_t*]* skips
     cdef unordered_map[ULONG, PROCESS_INFO]* proc_map
+    cdef unordered_map[ULONG, THREAD_INFO]* thread_map
 
     cdef ULONG pid_filter
     cdef wchar_t* image_filter
@@ -120,6 +126,7 @@ cdef class KEventStreamCollector:
         self.pointer_size = 8
         self.ktuple_filters = new vector[PyObject*]()
         self.proc_map = new unordered_map[ULONG, PROCESS_INFO]()
+        self.thread_map = new unordered_map[ULONG, THREAD_INFO]()
         self.skips = new vector[wchar_t*]()
         self.pid_filter = 0
         self.image_filter = NULL
@@ -214,6 +221,7 @@ cdef class KEventStreamCollector:
         cdef PROPERTY_DATA_DESCRIPTOR descriptor
         cdef BOOL dropped = False
         cdef PROCESS_INFO pi
+        cdef THREAD_INFO ti
 
         status = tdh_get_event_information(kevent_trace, 0,
                                            NULL,
@@ -292,7 +300,7 @@ cdef class KEventStreamCollector:
             ts = sys_time(kevt_hdr.timestamp)
 
             # build a tiny state machine around the
-            # currently running processes on the system
+            # currently running processes/threads on the system
             if self.__ktuple_equals(ktuple, ENUM_PROCESS) or \
                 self.__ktuple_equals(ktuple, CREATE_PROCESS):
                 pi.pid = <ULONG>wcstol(_wchar_t(params.at(PROCESS_ID_PROP)), NULL, 16)
@@ -302,6 +310,17 @@ cdef class KEventStreamCollector:
                                                  pi)
                 self.proc_map.insert(deref(k))
                 del k
+            elif self.__ktuple_equals(ktuple, ENUM_THREAD) or \
+                self.__ktuple_equals(ktuple, CREATE_THREAD):
+                ti.tid = <ULONG>wcstol(_wchar_t(params.at(THREAD_ID_PROP)), NULL, 16)
+                ti.pid = <ULONG>wcstol(_wchar_t(params.at(PROCESS_ID_PROP)), NULL, 16)
+                tk = new pair[ULONG, THREAD_INFO](<ULONG>wcstol(_wchar_t(params.at(THREAD_ID_PROP)), NULL, 16),
+                                                  ti)
+                self.thread_map.insert(deref(tk))
+                del tk
+            elif self.__ktuple_equals(ktuple, TERMINATE_THREAD):
+                prop_tid = <ULONG>wcstol(_wchar_t(params.at(THREAD_ID_PROP)), NULL, 16)
+                self.thread_map.erase(prop_tid)
             elif self.__ktuple_equals(ktuple, TERMINATE_PROCESS):
                 # defer the removal of the pid to be able to capture
                 # `TerminateProcess` if the image filter is set
@@ -319,10 +338,18 @@ cdef class KEventStreamCollector:
                 # the PID attribute is invalid for the
                 # file system kernel events
                 if pid == INVALID_PID:
-                    prop_tid = params.at(THREAD_ID_PROP)
-                    if prop_tid != NULL:
+                    prop_fs_tid = params.at(FS_THREAD_ID_PROP)
+                    if prop_fs_tid != NULL:
                         # try to resolve the pid from the thread id
-                        pid = pid_from_tid(PyLong_AsLong(prop_tid))
+                        pid = pid_from_tid(PyLong_AsLong(prop_fs_tid),
+                                           self.thread_map)
+            elif self.__ktuple_equals(ktuple, UNLOAD_IMAGE):
+                # on Windows 7 the pid field of the event header
+                # is invalid, so use the pid found in the event params
+                if pid == INVALID_PID:
+                    p = params.at(PROCESS_ID_PROP)
+                    if p != NULL:
+                        pid = PyLong_AsLong(p)
 
             dropped = self.__apply_filters(pid, tid, ktuple, params, False)
             # now we can erase the pid
