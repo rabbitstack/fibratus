@@ -16,6 +16,8 @@
 
 from kstream.includes.windows cimport UCHAR, ULONG, wchar_t, get_process_id_of_thread, open_thread, close_handle, \
     THREAD_QUERY_LIMITED_INFORMATION, HANDLE
+from libcpp.unordered_map cimport unordered_map
+from cython.operator cimport dereference as deref
 
 cdef enum:
     INVALID_PID = 4294967295
@@ -28,14 +30,28 @@ cdef struct PROCESS_INFO:
     # name of the image file
     wchar_t* name
 
+cdef struct THREAD_INFO:
+    # thread identifier
+    ULONG tid
+    # process identifier
+    ULONG pid
 
-cdef inline ULONG pid_from_tid(ULONG tid) nogil:
-    cdef HANDLE thread = open_thread(THREAD_QUERY_LIMITED_INFORMATION,
-                                     False,
-                                     tid)
-    if thread != NULL:
-        pid = get_process_id_of_thread(thread)
-        close_handle(thread)
-        return pid
+cdef inline ULONG pid_from_tid(ULONG tid, unordered_map[ULONG, THREAD_INFO]* thread_map) nogil:
+    cdef unordered_map[ULONG, THREAD_INFO].iterator thread_iter = thread_map.find(tid)
+    # try to resolve pid from tid by
+    # querying the thread map
+    if thread_iter != thread_map.end():
+        ti = deref(thread_iter).second
+        return ti.pid
     else:
-        return INVALID_PID
+        # if not found, try to resolve via
+        # `GetProcessIdOfThread` Windows API function
+        thread = open_thread(THREAD_QUERY_LIMITED_INFORMATION,
+                             False,
+                             tid)
+        if thread != NULL:
+            pid = get_process_id_of_thread(thread)
+            close_handle(thread)
+            return pid
+        else:
+            return INVALID_PID
