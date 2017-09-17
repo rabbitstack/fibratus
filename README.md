@@ -10,7 +10,7 @@ context switches, file system I/O, registry, network activity, DLL loading/unloa
 You can use **filaments** (lightweight Python modules) to extend Fibratus with your own arsenal of tools and so leverage the power of the Python's ecosystem.
 
 ## Installation
-[Download the latest release](https://github.com/rabbitstack/fibratus/releases/download/v0.7.2/fibratus-0.7.2.exe) (Windows installer)
+[Download the latest release](https://github.com/rabbitstack/fibratus/releases/download/v0.7.2/fibratus-0.7.2.exe) (Windows installer). The changelog and older releases can be found [here](https://github.com/rabbitstack/fibratus/releases).
 
 Alternatively, you can get **fibratus** from PyPI.
 
