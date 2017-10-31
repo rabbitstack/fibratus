@@ -18,6 +18,7 @@ import elasticsearch.helpers
 
 from fibratus.errors import InvalidPayloadError
 from fibratus.output.base import Output
+from datetime import datetime
 
 
 class ElasticsearchOutput(Output):
@@ -35,7 +36,7 @@ class ElasticsearchOutput(Output):
 
         hosts = kwargs.pop('hosts', [])
         self._hosts = [dict(host=host.split(':')[0], port=int(host.split(':')[1])) for host in hosts]
-        self._index_name = kwargs.pop('index', None)
+        self._index_name = datetime.now().strftime('kernelstream-%Y.%m.%d')
         self._document_type = kwargs.pop('document', None)
         self._bulk = kwargs.pop('bulk', False)
         self._username = kwargs.pop('username', None)
