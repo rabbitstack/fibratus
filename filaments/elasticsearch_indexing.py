@@ -44,7 +44,7 @@ def on_next_kevent(kevent):
             'category': kevent.category,
             'name': kevent.name,
             'ts': '%s %s' % (datetime.now().strftime('%m/%d/%Y'),
-                             kevent.timestamp.strftime('%H:%M:%S.%f')),
+                             kevent.timestamp.strftime('%H:%M:%S')),
             'cpuid': kevent.cpuid,
             'params': kevent.params}
     documents.append(doco)
