@@ -22,7 +22,6 @@ from datetime import datetime
 
 
 class ElasticsearchOutput(Output):
-    dt = datetime.now()
 
     def __init__(self, **kwargs):
         """Creates an instance of the Elasticsearch output adapter.
@@ -37,7 +36,7 @@ class ElasticsearchOutput(Output):
 
         hosts = kwargs.pop('hosts', [])
         self._hosts = [dict(host=host.split(':')[0], port=int(host.split(':')[1])) for host in hosts]
-        self._index_name = dt.strftime('kernelstream-%Y.%m.%d')
+        self._index_name = datetime.now().strftime('kernelstream-%Y.%m.%d')
         self._document_type = kwargs.pop('document', None)
         self._bulk = kwargs.pop('bulk', False)
         self._username = kwargs.pop('username', None)
