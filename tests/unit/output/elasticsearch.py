@@ -13,9 +13,12 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 from unittest.mock import patch
+from datetime import datetime
 
+import time
 import elasticsearch
 import pytest
+from unittest.mock import Mock
 
 from fibratus.errors import InvalidPayloadError
 from fibratus.output.elasticsearch import ElasticsearchOutput
@@ -29,7 +32,7 @@ def elasticsearch_adapter():
             'rabbitstack:9200'
         ],
         'index': 'kernelstream',
-        'document': 'threads'
+        'document': 'threads',
     }
     return ElasticsearchOutput(**config)
 
@@ -50,6 +53,24 @@ def elasticsearch_bulk_adapter():
     return ElasticsearchOutput(**config)
 
 
+@pytest.fixture(scope='module')
+def elasticsearch_adapter_daily_index():
+    config = {
+        'hosts': [
+            'localhost:9200',
+            'rabbitstack:9200'
+        ],
+        'index': 'kernelstream',
+        'document': 'threads',
+        'index_type': 'daily'
+    }
+    return ElasticsearchOutput(**config)
+
+
+mock_time = Mock()
+mock_time.return_value = time.mktime(datetime(2017, 12, 16).timetuple())
+
+
 class TestElasticsearchOutput(object):
 
     def test_init(self, elasticsearch_adapter):
@@ -68,6 +89,17 @@ class TestElasticsearchOutput(object):
             es_client_mock.assert_called_with([{'host': 'localhost', 'port': 9200},
                                                {'host': 'rabbitstack', 'port': 9200}], use_ssl=False)
             elasticsearch_adapter._elasticsearch.index.assert_called_with('kernelstream', 'threads', body=body)
+
+    @patch('time.time', mock_time)
+    def test_emit_daily_index(self, elasticsearch_adapter_daily_index):
+        body = {'kevent_type': 'CreateProcess', 'params': {'name': 'smss.exe'}}
+        assert elasticsearch_adapter_daily_index._elasticsearch is None
+        assert elasticsearch_adapter_daily_index.index_type == 'daily'
+        with patch('elasticsearch.Elasticsearch', spec_set=elasticsearch.Elasticsearch) as es_client_mock:
+            elasticsearch_adapter_daily_index.emit(body)
+            es_client_mock.assert_called_with([{'host': 'localhost', 'port': 9200},
+                                               {'host': 'rabbitstack', 'port': 9200}], use_ssl=False)
+            elasticsearch_adapter_daily_index._elasticsearch.index.assert_called_with('kernelstream-2017.12.16', 'threads', body=body)
 
     @patch('elasticsearch.Elasticsearch', spec_set=elasticsearch.Elasticsearch)
     def test_emit_invalid_payload(self, es_client_mock, elasticsearch_adapter):
@@ -101,3 +133,5 @@ class TestElasticsearchOutput(object):
             elasticsearch_bulk_adapter.emit(body)
         assert "invalid payload for bulk indexing. list expected but <class 'tuple'> found" == str(e.value)
         assert es_bulk_mock.assert_not_called()
+
+

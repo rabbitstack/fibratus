@@ -18,7 +18,7 @@ import elasticsearch.helpers
 
 from fibratus.errors import InvalidPayloadError
 from fibratus.output.base import Output
-
+from datetime import datetime
 
 class ElasticsearchOutput(Output):
 
@@ -36,6 +36,8 @@ class ElasticsearchOutput(Output):
         hosts = kwargs.pop('hosts', [])
         self._hosts = [dict(host=host.split(':')[0], port=int(host.split(':')[1])) for host in hosts]
         self._index_name = kwargs.pop('index', None)
+        self._index_type = kwargs.pop('index_type', 'fixed')
+        self._daily_index_format = kwargs.pop('daily_index_format', '%Y.%m.%d')
         self._document_type = kwargs.pop('document', None)
         self._bulk = kwargs.pop('bulk', False)
         self._username = kwargs.pop('username', None)
@@ -61,6 +63,11 @@ class ElasticsearchOutput(Output):
                                           % type(body))
 
         self._index_name = kwargs.pop('index', self._index_name)
+
+        # build index name for daily index types
+        if 'daily' in self._index_type:
+            self._index_name = '%s-%s' % (self._index_name, datetime.now().strftime(self._daily_index_format))
+
         if self._bulk:
             actions = [dict(_index=self._index_name, _type=self._document_type, _source=b) for b in body]
             elasticsearch.helpers.bulk(self._elasticsearch, actions)
@@ -74,6 +81,10 @@ class ElasticsearchOutput(Output):
     @property
     def index_name(self):
         return self._index_name
+
+    @property
+    def index_type(self):
+        return self._index_type
 
     @property
     def document_type(self):
