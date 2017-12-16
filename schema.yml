@@ -86,6 +86,11 @@ mapping:
               index:
                 type: str
                 required: True
+              index_type:
+                type: str
+                enum: ['fixed', 'daily']
+              daily_index_format:
+                type: str
               document:
                 type: str
                 required: True

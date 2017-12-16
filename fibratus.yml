@@ -38,6 +38,8 @@ output:
 #      hosts:
 #        - localhost:9200
 #      index: kernelstream
+#      index_type: daily
+#      daily_index_format: %Y.%m.%d
 #      document: threads
 #      bulk: False
 #      username: elastic
