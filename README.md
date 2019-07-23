@@ -9,6 +9,8 @@ Fibratus [![PyPI version](https://badge.fury.io/py/fibratus.svg)](https://badge.
 context switches, file system I/O, registry, network activity, DLL loading/unloading and much more. The kernel events can be easily streamed to a number of output sinks like **AMQP** message brokers, **Elasticsearch** clusters or standard output stream.
 You can use **filaments** (lightweight Python modules) to extend Fibratus with your own arsenal of tools and so leverage the power of the Python's ecosystem.
 
+**Notice**: Fibratus is currently undergoing a ground up rework. After lots of dillemas I finally decided to rewrite the code base in Go language by incorporating a ton of improvements and some killer features.
+
 ## Installation
 [Download the latest release](https://github.com/rabbitstack/fibratus/releases/download/v0.7.2/fibratus-0.7.2.exe) (Windows installer). The changelog and older releases can be found [here](https://github.com/rabbitstack/fibratus/releases).
 
