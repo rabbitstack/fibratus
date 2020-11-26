@@ -1,4 +1,5 @@
-Copyright 2015/2016 by Nedim Sabic (RabbitStack)
+Copyright 2019-2020 by Nedim Sabic Sabic
+https://www.fibratus.io
 
 All Rights Reserved.
 
