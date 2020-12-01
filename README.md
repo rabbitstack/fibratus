@@ -3,7 +3,7 @@
 
 <p align="center">
   <a href="https://www.fibratus.io">
-    <img src="images/fibratus-term.gif" alt="Fibratus">
+    <img src="docs/images/fibratus-term.gif" alt="Fibratus">
   </a>
 </p>
 
