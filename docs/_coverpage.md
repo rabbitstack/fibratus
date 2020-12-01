@@ -1,3 +1,5 @@
+<!-- _coverpage.md -->
+
 # fibratus <small>1.0.0</small>
 
 > A modern tool for the Windows kernel exploration and observability
