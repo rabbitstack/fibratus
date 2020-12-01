@@ -10,5 +10,5 @@
 <a href="#/setup/installation"><ion-icon name="rocket"></ion-icon> Get Started</a>
 
 <div>
-  <img src='/images/fibratus-term.gif'></img>
+  <img src='images/fibratus-term.gif'></img>
 </div>
