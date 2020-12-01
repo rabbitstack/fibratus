@@ -1,3 +1,5 @@
+<!-- _coverpage.md -->
+
 # fibratus <small>1.0.0</small>
 
 > A modern tool for the Windows kernel exploration and observability
@@ -10,5 +12,5 @@
 <a href="#/setup/installation"><ion-icon name="rocket"></ion-icon> Get Started</a>
 
 <div>
-  <img src='/images/fibratus-term.gif'></img>
+  <img src='images/fibratus-term.gif'></img>
 </div>
