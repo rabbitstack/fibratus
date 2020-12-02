@@ -7,7 +7,7 @@
   </a>
 </p>
 
-<h3 align="center">Fibratus</h3>
+<h2 align="center">Fibratus</h2>
 
 <p align="center">
   A modern tool for the Windows kernel exploration and observability
@@ -28,7 +28,7 @@
 
 Fibratus is a tool for exploration and tracing of the **Windows** kernel. It lets you trap system-wide events such as process life-cycle, file system I/O, registry modifications or network requests among many other observability signals. In a nutshell, Fibratus allows for gaining deep operational visibility into the Windows kernel but also processes running on top of it.
 
-Events can be shipped to an array of [output sinks](https://www.fibratus.io/#/outputs/introduction) or dumped to [capture](https://www.fibratus.io/#/captures/introduction) files for local inspection and forensics analysis. The powerful [filtering](https://www.fibratus.io/#/filters/introduction] engine permits drilling into the event flux entrails.
+Events can be shipped to an array of [output sinks](https://www.fibratus.io/#/outputs/introduction) or dumped to [capture](https://www.fibratus.io/#/captures/introduction) files for local inspection and forensics analysis. The powerful [filtering](https://www.fibratus.io/#/filters/introduction) engine permits drilling into the event flux entrails.
 
 You can use [filaments](https://www.fibratus.io/#/filaments/introduction) to extend Fibratus with your own arsenal of tools and so leverage the power of the Python ecosystem.
 
