@@ -3,7 +3,7 @@
 
 <p align="center">
   <a href="https://www.fibratus.io">
-    <img src="docs/images/fibratus-term.gif" alt="Fibratus">
+    <img src="docs/images/fibratus-term.gif" width="500" height="350" alt="Fibratus">
   </a>
 </p>
 
@@ -26,7 +26,7 @@
 
 ### What is Fibratus?
 
-Fibratus is a tool for exploration and tracing of the **Windows** kernel. It lets you trap system-wide events such as process life-cycle, file system I/O, registry modifications or network requests among many other observability signals. In a nutshell, Fibratus allows for gaining deep operational visibility into the Windows kernel but also processes running on top of it.
+Fibratus is a tool for exploration and tracing of the **Windows** kernel. It lets you trap system-wide [events](https://www.fibratus.io/#/kevents/anatomy) such as process life-cycle, file system I/O, registry modifications or network requests among many other observability signals. In a nutshell, Fibratus allows for gaining deep operational visibility into the Windows kernel but also processes running on top of it.
 
 Events can be shipped to a wide array of [output sinks](https://www.fibratus.io/#/outputs/introduction) or dumped to [capture](https://www.fibratus.io/#/captures/introduction) files for local inspection and forensics analysis. The powerful [filtering](https://www.fibratus.io/#/filters/introduction) engine permits drilling into the event flux entrails.
 
