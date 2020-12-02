@@ -50,7 +50,8 @@ You can use [filaments](https://www.fibratus.io/#/filaments/introduction) to ext
 
 * [**Installation**](https://www.fibratus.io/#/setup/installation)
 * [**Building from source**](https://www.fibratus.io/#/setup/installation?id=building-from-source)
-* [**Running**](https://www.fibratus.io/#/setup/running)
+* [**Running as standalone binary**](https://www.fibratus.io/#/setup/running?id=standalone-binary)
+* [**Running as Windows Service**](https://www.fibratus.io/#/setup/running?id=windows-service)
 * [**CLI**](https://www.fibratus.io/#/setup/running?id=cli)
 * [**Configuration**](https://www.fibratus.io/#/setup/configuration)
 
