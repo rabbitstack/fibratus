@@ -34,4 +34,4 @@ Each event stores the process state that represents an extended information abou
 
 ### Metadata
 
-Metadata is an arbitrary sequence of tags in form of key/value pairs that you can squash into the event on behalf of [transformers](/transformers). A tag can be virtually any string data that you find meaningful to either identify the event or apply filtering/grouping once event is persisted in the data store.
+Metadata are an arbitrary sequence of tags in form of key/value pairs that you can squash into the event on behalf of [transformers](/transformers/introduction). A tag can be virtually any string data that you find meaningful to either identify the event or apply filtering/grouping once event is persisted in the data store.
