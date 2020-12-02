@@ -1,0 +1,476 @@
+###################### Fibratus Configuration File #####################################
+
+# =============================== Aggregator ==========================================
+
+# Aggregator is responsible for creating kernel event batches, applying transformers to each event
+# present in the batch, and forwarding those batches to the output sinks.
+aggregator:
+  # Determines the flush period that triggers the flushing of the kernel event batches to output sinks
+  flush-period: 500ms
+
+  # Represents the max time to wait before announcing failed flushing of enqueued events when fibratus
+  # is stopped
+  flush-timeout: 4s
+
+# =============================== Alert senders ========================================
+
+# Alert senders deal with emitting alerts via different channels.
+alertsenders:
+  # Mail sender transports the alerts via SMTP protocol.
+  mail:
+    # Enables/disables mail alert sender
+    enabled: false
+
+    # Represents the host of the SMTP server
+    #host:
+
+    # Represents the port of the SMTP server
+    #port: 25
+
+    # Specifies the user name when authenticating to the SMTP server
+    #user:
+
+    # Specifies the password when authenticating to the SMTP server
+    #password:
+
+    # Specifies the sender's address
+    #from:
+
+    # Specifies all the recipients that'll receive the alert
+    #to:
+    #  - ""
+
+  # Slack sender transports the alerts to the Slack workspace.
+  slack:
+    # Enables/disables Slack alert sender
+    enabled: false
+
+    # Represents the Webhook URL of the workspace where alerts will be dispatched
+    #url:
+
+    # Designates the Slack workspace where alerts will be routed
+    #workspace:
+
+    # Is the slack channel in which to post alerts
+    #channel:
+
+    # Represents the emoji icon surrounded in ':' characters for the Slack bot
+    #emoji: ""
+
+# =============================== API ==================================================
+
+# Settings that influence the behaviour of the HTTP server that exposes a number of endpoints such as
+# expvar metrics, internal state, and so on
+api:
+  # Specifies the underlying transport protocol for the API HTTP server. The transport can either be the
+  # named pipe or TCP socket. Default is named pipe but you can override it to expose the API server on
+  # TCP address, e.g. 192.168.1.32:8084.
+  transport: localhost:8482
+
+  # Represents the timeout interval for the HTTP server responses.
+  timeout: 5s
+
+# =============================== General ==============================================
+
+# Indicates whether debug privilege is set in Fibratus process' token. Enabling this security policy allows
+# Fibratus to obtain handles of protected processes for the purpose of querying the Process Environment Block
+# regions.
+debug-privilege: true
+
+
+# =============================== Filament =============================================
+
+# Filaments are lightweight Python scriplets that are executed on top of the kernel event stream. You can easily
+# extend Fibratus with custom features that is encapsulated in filaments. This section controls the behaviour of
+# the filament engine.
+filament:
+  # Specifies the name of the filament that is executed by the run command
+  name: ""
+
+  # The directory where all filaments are located. By default, filaments are stored in the ${PROGRAMFILES}/fibratus/filaments directory.
+  #path: ${PROGRAMFILES}/fibratus/filaments
+
+  # Determines how often event batches are propagated to the filament callback function
+  #flush-period: 200ms
+
+# =============================== Handle ===============================================
+
+# Indicates whether initial handle snapshot is built. The snapshot contains the state of system handles.
+handle:
+  init-snapshot: true
+
+# =============================== Kevent ===============================================
+
+# The following settings control the state of the kernel event.
+kevent:
+  # Indicates if threads are serialized as part of the process state
+  serialize-threads: false
+
+  # Indicates if modules such as Dynamic Linked Libraries are serialized as part of the process state
+  serialize-images: false
+
+  # Indicates if handles are serialized as part of the process state
+  serialize-handles: false
+
+  # Indicates if PE (Portable Executable) metadata are serialized as part of the process state
+  serialize-pe: false
+
+  # Indicates if environment variables are serialized as part of the process state
+  serialize-envs: false
+
+# =============================== Kcap =================================================
+
+# Contains the settings that dictate the behaviour of the kernel event captures.
+
+kcap:
+  # Specifies the name of the output kcap file. If not empty, capture files are always stored
+  # to this file by overwriting any existing capture file
+  file: ""
+
+# =============================== Kstream ==============================================
+
+# Tweaks for controlling the behaviour of the kernel stream consumer.
+kstream:
+  # Determines the maximum number of buffers allocated for the event tracing session's buffer pool
+  #max-buffers:
+
+  # Determines the minimum number of buffers allocated for the event tracing session's buffer pool
+  #min-buffers:
+
+  # Specifies how often the trace buffers are forcibly flushed
+  #flush-interval: 1s
+
+  # Represents the amount of memory allocated for each event tracing session buffer, in kilobytes.
+  # The buffer size affects the rate at which buffers fill and must be flushed (small buffer size requires
+  # less memory but it increases the rate at which buffers must be flushed)
+  #buffer-size:
+
+  # Determines whether thread kernel events are collected by Kernel Logger provider
+  #enable-thread: true
+
+  # Determines whether registry kernel events are collected by Kernel Logger provider
+  #enable-registry: true
+
+  # Determines whether network kernel events are collected by Kernel Logger provider
+  #enable-net: true
+
+  # Determines whether file kernel events are collected by Kernel Logger provider
+  #enable-fileio: true
+
+  # Determines whether image kernel events are collected by Kernel Logger provider
+  #enable-image: true
+
+  # Determines whether object manager kernel events (handle creation/destruction) are
+  # collected by Kernel Logger provider
+  #enable-handle: false
+
+  # Determines which events are dropped either by the event name or the process' image
+  # name that triggered the event.
+  blacklist:
+    # Contains a list of kernel event names that are dropped from the event stream
+    events:
+      - CloseFile
+    # Contains a list of case-insensitive process image names including the extension.
+    # Any event originated by the image specified in this list is dropped from the event stream
+    images:
+      - System
+
+
+# =============================== Logging ================================================
+
+# Contains the tweaks for fine-tuning the behaviour of the log files produced by Fibratus.
+logging:
+  # Specifies the minimum allowed log level. Anything logged below this log level will
+  # not get dumped to a file or stdout stream
+  level: info
+
+  # Represents the maximum number of days to retain old log files based on the timestamp
+  # encoded in their filename. By default, all log files are retained
+  # max-age: 0
+
+  # Specifies the maximum number of old log files to retain
+  #max-backups: 15
+
+  # Specifies the maximum size in megabytes of the log file before it gets rotated
+  #max-size: 100
+
+  # Represents the log file format. By default, Fibratus will dump the logs in JSON format
+  #formatter: json
+
+  # Represents the alternative paths for storing the logs. Logs are usually stored in the
+  # same directory where Fibratus was installed
+  #path:
+
+  # Indicates whether log lines are written to standard output in addition to writing them to log files
+  #log-stdout: false
+
+
+# =============================== Output ================================================
+
+# Outputs transport the event flowing through kernel event stream to its final destination. Only one output
+# can be active at the time. The following section contains available outputs and their preferences.
+output:
+  # Console output writes the event to standard output stream.
+  console:
+    # Indicates whether the console output is active
+    enabled: true
+
+    # Specifies the console output format. The "pretty" format dictates that formatting is accomplished
+    # by replacing the specifiers in the template. The "json" format outputs the event as a raw JSON string
+    format: pretty
+
+    # Template that's feed into event formatter. The default event formatter template is:
+    #
+    # {{ .Seq }} {{ .Timestamp }} - {{ .CPU }} {{ .Process }} ({{ .Pid }}) - {{ .Type }} ({{ .Kparams }})
+    #
+    #template:
+
+    # Specifies the separator that's rendered between the event parameter's key and its value.
+    #kv-delimiter:
+
+  # Elasticsearch output indexes event bulks into Elasticsearch clusters.
+  elasticsearch:
+    # Indicates whether the Elasticsearch output is enabled
+    enabled: false
+
+    # Defines the URL endpoints of the Elasticsearch nodes
+    #servers:
+    #  - http://localhost:9200
+
+    # Represents the initial HTTP connection timeout
+    #timeout: 5s
+
+    # Specifies when to flush the bulk at the end of the given interval
+    #flush-period: 1s
+
+    # Determines the number of workers that commit docs to Elasticsearch
+    #bulk-workers: 1
+
+    # Enables/disables nodes health checking
+    #healthcheck: true
+
+    # Specifies the interval for checking if the Elasticsearch nodes are available
+    #healthcheck-interval: 10s
+
+    # Specifies the timeout for periodic health checks
+    #healthcheck-timeout: 5s
+
+    # Identifies the user name for the basic HTTP authentication
+    #username:
+
+    # Identifies the password for the basic HTTP authentication
+    #password:
+
+    # Enables the discovery of all Elasticsearch nodes in the cluster. This avoids populating the list
+    # of available Elasticsearch nodes
+    #sniff: false
+
+    # Determines if the Elasticsearch trace log is enabled. Useful for troubleshooting
+    #trace-log: false
+
+    # Specifies if gzip compression is enabled
+    #gzip-compression: false
+
+    # Specifies the name of the index template
+    #template-name: fibratus
+
+    # Represents the target index for kernel events. It allows time specifiers to create indices per time frame.
+    # For example, fibratus-%Y-%m generates the index name with current year and and month time specifiers
+    #index-name: fibratus
+
+    # Contains the full JSON body of the index template. For more information refer to
+    # https://www.elastic.co/guide/en/elasticsearch/reference/current/index-templates.html
+    #template-config:
+
+    # Path to the public/private key file
+    #tls-key:
+
+    # Path to certificate file
+    #tls-cert:
+
+    # Represents the path of the certificate file that is associated with the Certification Authority (CA)
+    #tls-ca:
+
+    # Indicates if the chain and host verification stage is skipped
+    #tls-insecure-skip-verify: false
+
+  # Amqp output emits event batches to RabbitMQ brokers.
+  amqp:
+    # Indicates if the AMQP output is enabled
+    enabled: false
+
+    # Represents the AMQP connection string
+    #url: amqp://localhost:5672
+
+    # Specifies the AMQP connection timeout
+    #timeout: 5s
+
+    # Specifies target exchange name that receives inbound kernel events
+    #exchange: fibratus
+
+    # Represents  the AMQP exchange type. Available exchange type include common types are "direct", "fanout",
+    # "topic", "header", and "x-consistent-hash"
+    #exchange-type: topic
+
+    # Represents the static routing key to link exchanges with queues.
+    #routing-key: fibratus
+
+    # Represents the virtual host name
+    #vhost: /
+
+    # Indicates if the exchange is marked as durable. Durable exchanges can survive server restarts
+    #durable: false
+
+    # Indicates if the server checks whether the exchange already exists and raises an error if it doesn't exist
+    #passive: false
+
+    # Determines if a published message is persistent or transient
+    #delivery-mode: transient
+
+    # The username for the plain authentication method
+    #username:
+    # The password for the plain authentication method
+    #password:
+
+    # Designates static headers that are added to each published message
+    #headers:
+    #  env: dev
+
+    # Path to the public/private key file
+    #tls-key:
+
+    # Path to certificate file
+    #tls-cert:
+
+    # Represents the path of the certificate file that is associated with the Certification Authority (CA)
+    #tls-ca:
+
+    # Indicates if the chain and host verification stage is skipped
+    #tls-insecure-skip-verify: false
+
+# =============================== Portable Executable (PE) =============================
+
+# Tweaks for controlling the fetching of the PE (Portable Executable) metadata from the process' binary image.
+pe:
+  # Designates whether inspecting PE metadata is allowed.
+  enabled: false
+
+  # Contains a list of image names that are excluded from PE parsing
+  excluded-images:
+    - svchost.exe
+
+  # Determines if resources are read from the PE resource directory
+  #read-resources: false
+
+  # Indicates if symbols are read from the PE headers
+  #read-symbols: false
+
+  # Indicates if full section inspection is allowed. When se to true, section's individual bytes are
+  # consulted for computing section hashes, calculating the entropy, and so on
+  #read-sections: false
+
+# =============================== Transformers =========================================
+
+# Transformers are responsible for augmenting, parsing or enriching kernel events.
+transformers:
+  # Remove transformer deletes provided event parameters.
+  remove:
+    # Indicates if the remove transformer is enabled
+    enabled: false
+
+    # Represents the list of parameters that are removed from the event
+    #kparams:
+    #  - irp
+
+  # Rename transformer renames parameter from old to new name.
+  rename:
+    # Indicates if the rename transformer is enabled
+    enabled: false
+
+    # Contains the list of old/new mappings. Old represents the original
+    # parameter name, while new is the new parameter name
+    #kparams:
+    #  - old:
+    #    new:
+
+  # Replace transformer replaces all non-overlapping instances of old parameter's value with the new one.
+  replace:
+    # Indicates if the replace transformer is enabled
+    enabled: false
+
+    # Contains the list of parameter replacements. For each target event parameter, the old represent the substring
+    # that gets replaced by the new string.
+    #replacements:
+    #  - kparam:
+    #    old:
+    #    new:
+
+  # Tags transformer appends custom key/value pairs to event metadata.
+  tags:
+    # Indicates if the tags transformer is enabled
+    enabled: false
+
+    # Contains the list of tags that are appended to event metadata. Values can be fetched from environment
+    # variables by enclosing them in % symbols
+    #tags:
+    #  - key:
+    #    value:
+
+  # Trim transformer removes prefixes/suffixes from event parameter values.
+  trim:
+    # # Indicates if the trim transformer is enabled
+    enabled: false
+
+    # Contains the list of parameters associated with the prefix that is trimmed from the parameter's value
+    #prefixes:
+    #  - kparam:
+    #    trim:
+
+    # Contains the list of parameters associated with the suffix that is trimmed from the parameter's value
+    #suffixes:
+    #  - kparam:
+    #    trim:
+
+# =============================== YARA =================================================
+
+# Tweaks that influence the behaviour of the YARA scanner.
+yara:
+  # Indicates if the YARA scanner is enabled. When enabled, each newly created process is scanned for pattern matches.
+  enabled: false
+
+  # Contains rule paths and rule definition information
+  rule:
+    # Represents the paths within the file system along with the YARA namespace identifier
+    paths:
+      - path: ""
+        namespace: ""
+
+    # Represents the string with the rule definition along with the YARA namespace identifier
+    strings:
+      - string:
+        namespace:
+
+  # Indicates which sender is used to transport the alert generated by scanner
+  #alert-via: mail
+
+  # Specifies templates for the alert title and text in Go templating language (https://golang.org/pkg/text/template)
+  #alert-template:
+  #  title:
+  #  text:
+
+  # Determines when multiple matches of the same string can be avoided when not necessary
+  #fastscan: true
+
+  # Specifies the timeout for the scanner. If the timeout is reached, the scan operation is cancelled
+  #scan-timeout: 20s
+
+  # Indicates whether file scanning is disabled. This affects the scan triggered by the image loading events.
+  #skip-files: true
+
+  # Contains the list of file names that shouldn't be scanned
+  #excluded-files:
+  #  - kernel32.dll
+
+  # Contains the list of the process' image names that shouldn't be scanned
+  #excluded-procs:
+  #  - System

@@ -1,4 +1,4 @@
-# Copyright 2015 by Nedim Sabic (RabbitStack)
+# Copyright 2019-2020 by Nedim Sabic (RabbitStack)
 # All Rights Reserved.
 # http://rabbitstack.github.io
 
@@ -15,29 +15,29 @@
 # under the License.
 
 """
-Shows the top TCP / UDP outbound packets.
+Shows the top TCP / UDP outbound packets by IP/port tuple
 """
 
 import collections
+from utils.dotdict import dotdictify
 
-connections = collections.Counter()
+__connections__ = collections.Counter()
 
 
 def on_init():
-    set_filter('Send')
+    kfilter("kevt.name = 'Send'")
     columns(["Destination", "Count"])
     sort_by('Count')
-    set_interval(1)
-    title('Top outbound TCP/UDP packets')
+    interval(1)
 
 
+@dotdictify
 def on_next_kevent(kevent):
-    dst = ['%s:%d' % (kevent.params.ip_dst, kevent.params.dport)]
-    connections.update(dst)
+    dst = ['%s:%d' % (kevent.kparams.dip, kevent.kparams.dport)]
+    __connections__.update(dst)
 
 
 def on_interval():
-    for ip, count in connections.items():
+    for ip, count in __connections__.copy().items():
         add_row([ip, count])
-    render_tabular()
-
+    render_table()

@@ -1,0 +1,230 @@
+###################### Fibratus Configuration File #####################################
+
+# =============================== Aggregator ==========================================
+
+# Aggregator is responsible for creating kernel event batches, applying transformers to each event
+# present in the batch, and forwarding those batches to the output sinks.
+aggregator:
+  # Determines the flush period that triggers the flushing of the kernel event batches to output sinks.
+  flush-period: 230ms
+
+  # Represents the max time to wait before announcing failed flushing of enqueued events when fibratus
+  # is stopped.
+  flush-timeout: 8s
+
+# =============================== Alert senders ========================================
+
+# Alert senders deal with emitting alerts via different channels.
+alertsenders:
+  # Mail sender transports the alerts via SMTP protocol.
+  mail:
+    # Enables/disables mail alert sender.
+    enabled: true
+
+    # Represents the host of the SMTP server.
+    host: smtp.gmail.com
+
+    # Represents the port of the SMTP server.
+    port: 587
+
+    # Specifies the user name when authenticating to the SMTP server.
+    user: bunny
+
+    # Specifies the password when authenticating to the SMTP server.
+    password: changeit
+
+    # Specifies the sender's address.
+    from: bunny@gmail.com
+
+    # Specifies all the recipients that'll receive the alert.
+    to:
+      - bunny@gmail.com
+      - rabbit@gmail.com
+      - cuniculus@gmail.com
+
+  # Slack sender transports the alerts to the Slack workspace.
+  slack:
+    # Enables/disables Slack alert sender.
+    enabled: true
+
+    # Represents the Webhook URL of the workspace where alerts will be dispatched.
+    url: https://fibratus/232sfghagjhfasr
+
+    # Designates the Slack workspace where alerts will be routed.
+    workspace: fibratus
+
+    # Is the slack channel in which to post alerts.
+    channel: fibratus
+
+    # Represents the emoji icon surrounded in ':' characters for the Slack bot.
+    #emoji: ""
+
+# =============================== API ==================================================
+
+# Settings that influence the behaviour of the HTTP server that exposes a number of endpoints such as
+# expvar metrics, internal state, and so on.
+api:
+  # Specifies the underlying transport protocol for the API HTTP server. The transport can either be the
+  # named pipe or TCP socket. Default is named pipe but you can override it to expose theAPI server on
+  # TCP address, e.g. 192.168.1.32:8084.
+  transport: npipe:///fibratus
+
+  # Represents the timeout interval for the HTTP server responses.
+  timeout: 5s
+
+# =============================== General ==============================================
+
+# Indicates whether debug privilege is set in Fibratus process' token. Enabling this security policy allows
+# Fibratus to obtain handles of protected processes for the purpose of querying the Process Environment Block
+# regions.
+debug-privilege: true
+
+# =============================== Filament =============================================
+
+# Filaments are lightweight Python scriplets that are executed on top of the kernel event stream. You can easily
+# extend Fibratus with custom features that is encapsulated in filaments. This section controls the behaviour of
+# the filament engine.
+filament:
+  # Specifies the name of the filament that is executed with the run command.
+  name: top_netio
+
+  # The directory where all filaments are located. By default, they are stored within the fibratus program
+  # files directory.
+  path: $(PROGRAMFILES)/fibratus/filaments
+
+  flush-period: 300ms
+
+# =============================== Handle ===============================================
+
+# Indicates whether initial handle snapshot is taken.
+handle:
+  init-snapshot: true
+
+# =============================== Kcap =================================================
+
+kcap:
+  file: ""
+
+# =============================== Kevent ===============================================
+
+kevent:
+  serialize-threads: false
+  serialize-images: false
+  serialize-handles: false
+  serialize-pe: false
+
+# =============================== Kstream ==============================================
+
+kstream:
+  max-buffers: 2
+  min-buffers: 1
+  flush-interval: 1s
+  blacklist:
+    events:
+      - CreateThread
+      - CreateHandle
+      - CloseHandle
+    images:
+      - System
+
+
+# =============================== Logging ================================================
+
+logging:
+  level: info
+  # max-age:
+  # max-backups:
+  # max-size:
+  # formatter:
+  # path:
+  # log-stdout: false
+
+
+# =============================== Output ================================================
+
+output:
+  console:
+    enabled: false
+    format: json
+    template: ""
+
+
+  elasticsearch:
+    enabled: false
+    servers:
+      - http://localhost:9200
+    timeout: 5s
+
+  amqp:
+    enabled: true
+    url: amqp://localhost:5672
+    timeout: 5s
+    exchange-type: topic
+    routing-key: fibratus
+    vhost: /
+
+# =============================== Portable Executable (PE) =============================
+
+pe:
+  enabled: false
+  read-resources: true
+  read-symbols: true
+  read-sections: false
+
+# =============================== Transformers =========================================
+
+transformers:
+  remove:
+    enabled: true
+    kparams:
+      - disposition
+  rename:
+    enabled: true
+    kparams:
+      - old: "a"
+        new: "b"
+      - old: "c"
+        new: "d"
+  replace:
+    enabled: false
+    replacements:
+      - kparam: key_name
+        old: HKEY_CURRENT_USER
+        new: HCU
+  tags:
+    enabled: false
+    tags:
+      - key: foo
+        value: bar
+  trim:
+    enabled: false
+    prefixes:
+      - kparam: key_name
+        trim: CurrentControlSet
+    suffixes:
+      - kparam: file_name
+        trim: .exe
+
+# =============================== YARA =================================================
+
+yara:
+  enabled: true
+  rule:
+    paths:
+      - path: "C:\\yara-rules"
+        namespace: default
+    strings:
+      - string: "rule test : tag1 { meta: author = \"Hilko Bengen\" strings: $a = \"abc\" fullword condition: $a }"
+        namespace: default
+  alert-via: slack
+  alert-template:
+    title: ""
+    text: ""
+  fastscan: true
+  scan-timeout: 20s
+  skip-files: true
+  excluded-files:
+    - kernel32.dll
+  excluded-procs:
+    - system
+    - spotify.exe

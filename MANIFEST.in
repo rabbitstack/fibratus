@@ -1,8 +1,0 @@
-recursive-include filaments *
-recursive-include kstream *.pxd
-
-include fibratus.yml
-include requirements.txt
-include LICENSE.MD
-
-recursive-exclude * __pycache__

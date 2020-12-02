@@ -1,0 +1,29 @@
+kstream:
+  max-buffers: 10
+  min-buffers: 8
+  flush-interval: 1s
+  blacklist:
+    events:
+      - CreateThread
+
+filament: top_hives_io
+
+output.console:
+  format: pretty
+
+transformers.tags:
+  enabled: true
+  tags:
+    - key: 1
+      value: k
+
+transformers.remove:
+  enabled: true
+  kparams:
+    - key_handle
+
+transformers.rename:
+  enabled: true
+  kparams:
+    - old: key_handle
+      new: KeyHandle

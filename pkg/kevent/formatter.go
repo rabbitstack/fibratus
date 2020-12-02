@@ -1,0 +1,230 @@
+/*
+ * Copyright 2019-2020 by Nedim Sabic Sabic
+ * https://www.fibratus.io
+ * All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package kevent
+
+import (
+	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/util/fasttemplate"
+	"regexp"
+	"sort"
+	"strconv"
+	"strings"
+	"unicode"
+)
+
+const (
+	// startTag represents the leading tag surrounding field name
+	startTag = "{{"
+	// endTag represents the trailing tag surrounding field name
+	endTag = "}}"
+
+	seq           = ".Seq"
+	ts            = ".Timestamp"
+	pid           = ".Pid"
+	ppid          = ".Ppid"
+	cwd           = ".Cwd"
+	exe           = ".Exe"
+	comm          = ".Comm"
+	tid           = ".Tid"
+	sid           = ".Sid"
+	proc          = ".Process"
+	cat           = ".Category"
+	desc          = ".Description"
+	cpu           = ".CPU"
+	typ           = ".Type"
+	kparameters   = ".Kparams"
+	meta          = ".Meta"
+	host          = ".Host"
+	pe            = ".PE"
+	kparsAccessor = ".Kparams."
+)
+
+var (
+	// tmplRegexp defines the regular expression for parsing template fields.
+	tmplRegexp = regexp.MustCompile(`({{2}.*?}{2})`)
+	// tmplNormRegepx defines the regular expression for normalizing the template. This basically consists in removing
+	// the brackets and trailing/leading spaces from the field name.
+	tmplNormRegexp = regexp.MustCompile(`({{2}\s*([A-Za-z.]+)\s*}{2})`)
+	// tmplExpandKparamsRegexp determines whether Kparams. fields are expanded
+	tmplExpandKparamsRegexp = regexp.MustCompile(`{{\s*.Kparams.\S+}}`)
+)
+
+var kfields = map[string]bool{
+	seq:         true,
+	ts:          true,
+	pid:         true,
+	ppid:        true,
+	cwd:         true,
+	exe:         true,
+	comm:        true,
+	tid:         true,
+	sid:         true,
+	proc:        true,
+	cat:         true,
+	desc:        true,
+	cpu:         true,
+	typ:         true,
+	kparameters: true,
+	meta:        true,
+	host:        true,
+	pe:          true,
+}
+
+func hintFields() string {
+	s := make([]string, 0, len(kfields))
+	for field := range kfields {
+		s = append(s, field)
+	}
+	sort.Slice(s, func(i, j int) bool { return s[i] < s[j] })
+	return strings.Join(s, " ")
+}
+
+// Formatter deals with producing event's output that is dictated by the template.
+type Formatter struct {
+	t                *fasttemplate.Template
+	expandKparamsDot bool
+}
+
+// NewFormatter builds a new instance of event's formatter.
+func NewFormatter(template string) (*Formatter, error) {
+	// check basic template format and ensure all fields
+	// defined in the template are known to us
+	fields := tmplRegexp.FindAllStringSubmatch(template, -1)
+	if len(fields) == 0 {
+		return nil, fmt.Errorf("invalid template format: %q", template)
+	}
+	if ok, pos := isTemplateBalanced(template); !ok {
+		return nil, fmt.Errorf("template syntax error near field #%d: %q", pos, template)
+	}
+	for i, field := range fields {
+		if len(field) > 0 {
+			name := sanitize(field[0])
+			if strings.HasPrefix(name, kparsAccessor) {
+				continue
+			}
+			if name == "" {
+				return nil, fmt.Errorf("empty field found at position %d", i+1)
+			}
+			if _, ok := kfields[name]; !ok {
+				return nil, fmt.Errorf("%s is not a known field name. Maybe you meant one "+
+					"of the following fields: %s", name, hintFields())
+			}
+		}
+	}
+	// user might define the tag such as `{{ .Seq }}` or {{ .Seq}}`. We have to make sure
+	// inner spaces are removed before building the fast template instance
+	norm := normalizeTemplate(template)
+	t, err := fasttemplate.NewTemplate(norm, startTag, endTag)
+	if err != nil {
+		return nil, fmt.Errorf("invalid template format %q: %v", norm, err)
+	}
+	return &Formatter{
+		t:                t,
+		expandKparamsDot: tmplExpandKparamsRegexp.MatchString(norm),
+	}, nil
+}
+
+func sanitize(s string) string {
+	return strings.Map(func(r rune) rune {
+		if r == '{' || r == '}' || unicode.IsSpace(r) {
+			return -1
+		}
+		return r
+	},
+		s,
+	)
+}
+
+func normalizeTemplate(tmpl string) string { return tmplNormRegexp.ReplaceAllString(tmpl, "{{$2}}") }
+
+const expectedBracketsSeq = "{{}}"
+
+// isTemplateBalanced ensures the template string is balanced. This means that each tag in the template
+// has its pair of leading/trailing brackets.
+func isTemplateBalanced(tmpl string) (bool, int) {
+	// drop all but brackets
+	s := strings.Map(func(r rune) rune {
+		if r == '{' || r == '}' {
+			return r
+		}
+		return -1
+	},
+		tmpl,
+	)
+	// partition slice into 4 groups. Each group must follow
+	// the correct sequence, otherwise it is an invalid field
+	partSize := 4
+	partitions := len(s) / partSize
+	var i int
+	for ; i < partitions; i++ {
+		if s[i*partSize:(i+1)*partSize] != expectedBracketsSeq {
+			return false, i + 1
+		}
+	}
+	if len(s)%partSize != 0 {
+		if s[i*partSize:] != expectedBracketsSeq {
+			return false, i + 1
+		}
+	}
+	return true, -1
+}
+
+// Format applies the template on the provided kernel event.
+func (f *Formatter) Format(kevt *Kevent) []byte {
+	if kevt == nil {
+		return []byte{}
+	}
+	values := map[string]interface{}{
+		ts:          kevt.Timestamp.String(),
+		pid:         strconv.FormatUint(uint64(kevt.PID), 10),
+		tid:         strconv.FormatUint(uint64(kevt.Tid), 10),
+		seq:         strconv.FormatUint(kevt.Seq, 10),
+		cpu:         strconv.FormatUint(uint64(kevt.CPU), 10),
+		typ:         kevt.Name,
+		cat:         kevt.Category,
+		desc:        kevt.Description,
+		host:        kevt.Host,
+		meta:        kevt.Metadata.String(),
+		kparameters: kevt.Kparams.String(),
+	}
+
+	// add process' metadata
+	ps := kevt.PS
+	if ps != nil {
+		values[proc] = ps.Name
+		values[ppid] = strconv.FormatUint(uint64(ps.Ppid), 10)
+		values[cwd] = ps.Cwd
+		values[exe] = ps.Exe
+		values[comm] = ps.Comm
+		values[sid] = ps.SID
+		if ps.PE != nil {
+			values[pe] = ps.PE.String()
+		}
+	}
+
+	if f.expandKparamsDot {
+		// expand all parameters into the map so we can ask
+		// for specific parameter names in the template
+		for _, kpar := range kevt.Kparams {
+			values[".Kparams."+strings.Title(kpar.Name)] = kpar.String()
+		}
+	}
+
+	return f.t.ExecuteString(values)
+}

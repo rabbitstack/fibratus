@@ -1,0 +1,1 @@
+This is the minimal [GarageMQ](https://github.com/valinurovam/garagemq) server merely used for testing the AMQP output.

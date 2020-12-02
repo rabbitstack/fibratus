@@ -1,0 +1,83 @@
+/*
+ * Copyright 2019-2020 by Nedim Sabic Sabic
+ * https://www.fibratus.io
+ * All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package alertsender
+
+import "fmt"
+
+// Severity is the type alias for alert's severity level.
+type Severity uint8
+
+const (
+	// Normal designates alert's normal level
+	Normal Severity = iota
+	// Medium designates alert's medium level
+	Medium
+	// Critical designates alert's critical level
+	Critical
+)
+
+// String returns severity human-friendly name.
+func (s Severity) String() string {
+	switch s {
+	case Normal:
+		return "normal"
+	case Medium:
+		return "medium"
+	case Critical:
+		return "critical"
+	default:
+		return "unknown"
+	}
+}
+
+// ParseSeverityFromString parses the severity from the string representation.
+func ParseSeverityFromString(sever string) Severity {
+	switch sever {
+	case "normal", "Normal":
+		return Normal
+	case "medium", "Medium":
+		return Medium
+	case "critical", "Critical":
+		return Critical
+	default:
+		return Normal
+	}
+}
+
+// Alert encapsulates the state of an alert.
+type Alert struct {
+	// Title is the short title that summarizes the purpose of the alert.
+	Title string
+	// Text is the longer textual content that further explains what this alert is about.
+	Text string
+	// Tags contains a sequence of tags for categorizing the alerts.
+	Tags []string
+	// Severity determines the severity of this alert.
+	Severity Severity
+}
+
+// String returns the alert string representation.
+func (a Alert) String() string {
+	return fmt.Sprintf("Title: %s, Text: %s, Severity: %s, Tags: %v", a.Title, a.Text, a.Severity, a.Tags)
+}
+
+// NewAlert builds a new alert.
+func NewAlert(title, text string, tags []string, severity Severity) Alert {
+	return Alert{Title: title, Text: text, Tags: tags, Severity: severity}
+}

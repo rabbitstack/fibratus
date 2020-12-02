@@ -1,0 +1,55 @@
+{
+  "aggregator": {
+    "flush-period": "500ms",
+    "flush-timeout": "4s"
+  },
+
+  "alertsenders": {
+    "mail": {
+      "enabled": false
+    },
+
+    "slack": {
+      "enabled": false
+    }
+  },
+
+  "api": {
+    "transport": "localhost:8090",
+    "timeout": "5s"
+  },
+
+  "debug-privilege": true,
+
+  "filament": {
+    "name": "",
+    "flush-period": "200ms"
+  },
+
+  "handle": {
+    "init-snapshot": true
+  },
+
+  "kevent": {
+
+  },
+
+  "kcap": {
+
+  },
+
+  "kstream": {},
+  "logging": {},
+
+  "output": {
+    "console": {
+      "enabled": true,
+      "format": "pretty",
+      "kv-delimiter": "->"
+    }
+  },
+
+  "pe": {},
+  "transformers": {},
+  "yara": {}
+}
