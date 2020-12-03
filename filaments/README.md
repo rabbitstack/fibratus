@@ -2,6 +2,10 @@ Fibratus incorporates a framework for painlessly extending the functionality and
 These scripts are called **filaments**. You can also think of them as extension points with virtually endless possibilities. 
 Whatever you are allowed to craft in Python, you can also implement in filaments.
 
+Visit the [documentation](https://www.fibratus.io/#/filaments/writing) for a walkthrough on writing a filament from scratch.
+
+### Available filaments
+
 - `fishy_netio` alerts when atypical processes produce network requests
 - `registry_persistence` surfaces registry operations that would allow a process to execute on system startup
 - `top_in_packets` shows the top TCP / UDP inbound packets by IP/port tuple
