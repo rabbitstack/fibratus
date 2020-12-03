@@ -1,9 +1,9 @@
 
 ---
 
-<p align="center">
-  <a href="https://www.fibratus.io">
-    <img src="docs/images/fibratus-term.gif" width="500" height="350" alt="Fibratus">
+<p align="center" >
+  <a href="https://www.fibratus.io" >
+    <img src="docs/images/fibratus-term.gif" alt="Fibratus">
   </a>
 </p>
 
