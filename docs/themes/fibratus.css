@@ -37,39 +37,6 @@ footer {
 	text-align: center;
 }
 
-.grid {
-	display: grid;
-	margin-left: 100px;
-	grid-template-columns: 1fr 1fr;
-	grid-template-rows: auto;
-}
-
-.grid .grid-item h2 {
-	font-weight: 400;
-}
-
-.grid .grid-item p {
-	margin-top: -12px;
-}
-
-.grid-item {
-	padding: 10%;
-	border-bottom: 1px solid rgba(0,0,0,.03);
-}
-
-.grid-item:last-child, .grid-item:nth-last-child(2):nth-child(odd) {
-  border-bottom: none;
-}
-
-.grid-item:nth-child(odd) {
-  border-right: 1px solid rgba(0,0,0,.03);
-	padding-right: 40px;
-}
-
-.grid-item:nth-child(even) {
-	padding-left: 80px;
-}
-
 .search input {
 	background-color: #F7F7F7;
 	border-radius:5px;
@@ -213,6 +180,7 @@ li input[type=checkbox] {
 	background-color: #6da9e2;
 	width: 100%;
 	height: 0px;
+	display: none;
 }
 
 .app-nav.no-badge {
@@ -254,7 +222,7 @@ li input[type=checkbox] {
 }
 
 .sidebar-margin-nocover {
-	margin-top: 50px;
+	margin-top: 0px;
 }
 
 .app-nav a.active {
@@ -505,12 +473,12 @@ main.hidden {
 
 body.sticky .sidebar,
 body.sticky .sidebar-toggle {
-	margin-top: 50px;
+	margin-top: 0px;
 	position: fixed;
 }
 
 body.sticky .page_toc {
-	margin-top: 65px;
+	margin-top: 15px;
 }
 
 body.sticky .app-nav .logo {
@@ -549,7 +517,6 @@ body.sticky .app-nav .logo {
 	max-width: 890px;
 	padding: 70px 15px 40px;
 	position: relative;
-	left: 30px;
 }
 
 .markdown-section>* {
@@ -666,142 +633,69 @@ body.close .content {
 	}
 }
 
-@media screen and (max-width:1683px) {
-	.markdown-section {
-		max-width: 800px;
-	}
-	.sidebar {
-		width: 250px;
-	}
-}
-
-@media screen and (max-width:1505px) {
-	.markdown-section {
-		max-width: 700px;
-	}
-	.sidebar {
-		width: 200px;
-	}
-}
-
-@media screen and (max-width:1398px) {
-	.markdown-section {
-		max-width: 650px;
-	}
-	.sidebar {
-		width: 200px;
-	}
-}
-
-@media screen and (max-width:1398px) {
-	.markdown-section {
-		max-width: 630px;
-	}
-	.sidebar {
-		width: 200px;
-	}
-	.page_toc {
-		display: none;
-	}
-}
-
-@media screen and (max-width:1005px) {
-	.markdown-section {
-		max-width: 500px;
-	}
-	.sidebar {
-		width: 170px;
-	}
-	.page_toc {
-		display: none;
-	}
-}
-
-@media screen and (max-width:891px) {
-	.markdown-section {
-		max-width: 500px;
-	}
-	.sidebar {
-		width: 140px;
-	}
-	.page_toc {
-		display: none;
-	}
-}
-
-@media screen and (max-width:768px) {
-	.github-corner,
-	.sidebar,
-	.sidebar-toggle {
-		position: fixed;
-	}
-	.app-nav li ul {
-		top: 30px
-	}
-	main {
-		height: auto;
-		overflow-x: hidden
-	}
-	.sidebar {
-		left: -300px;
-		transition: transform .25s ease-out
-	}
-	.content {
-		left: 0;
-		max-width: 100vw;
-		position: static;
-		padding-top: 20px;
-		transition: transform .25s ease
-	}
-	.app-nav,
-	.github-corner {
-		transition: transform .25s ease-out
-	}
-	.sidebar-toggle {
-		background-color: transparent;
-		width: auto;
-		padding: 30px 30px 10px 10px
-	}
-	body.close .sidebar {
-		transform: translateX(300px);
-		width: 284px;
-	}
-	body.close .sidebar-toggle {
-		background-color: transparent;
-		transition: background-color 1s;
-		width: 284px;
-		padding: 10px
-	}
-	body.close .content {
-		transform: translateX(300px)
-	}
-	body.close .app-nav,
-	body.close .github-corner {
-		display: none
-	}
-	.github-corner:hover .octo-arm {
-		-webkit-animation: none;
-		animation: none
-	}
-	.github-corner .octo-arm {
-		-webkit-animation: octocat-wave .56s ease-in-out;
-		animation: octocat-wave .56s ease-in-out
-	}
-}
-
-@-webkit-keyframes octocat-wave {
-	0%,
-	to {
-		transform: rotate(0)
-	}
-	20%,
-	60% {
-		transform: rotate(-25deg)
-	}
-	40%,
-	80% {
-		transform: rotate(10deg)
-	}
+@media screen and (max-width: 768px) {
+    .github-corner,
+    .sidebar,
+    .sidebar-toggle {
+        position: fixed;
+    }
+    .app-nav {
+        margin-top: 16px;
+    }
+    .app-nav li ul {
+        top: 30px;
+    }
+    main {
+        height: auto;
+        overflow-x: hidden;
+    }
+    .sidebar {
+        left: -300px;
+        transition: transform 0.25s ease-out;
+    }
+    .content {
+        left: 0;
+        max-width: 100vw;
+        position: static;
+        padding-top: 20px;
+        transition: transform 0.25s ease;
+    }
+    .app-nav,
+    .github-corner {
+        transition: transform 0.25s ease-out;
+    }
+    .sidebar-toggle {
+        background-color: transparent;
+        width: auto;
+        padding: 30px 30px 10px 10px;
+    }
+    body.close .sidebar {
+        transform: translateX(300px);
+    }
+    body.close .sidebar-toggle {
+        background-color: hsla(0, 0%, 100%, 0.8);
+        transition: background-color 1s;
+        width: 284px;
+        padding: 10px;
+    }
+    body.close .content {
+        transform: translateX(300px);
+    }
+    body.close .app-nav,
+    body.close .github-corner {
+        display: none;
+    }
+    .github-corner:hover .octo-arm {
+        -webkit-animation: none;
+        animation: none;
+    }
+    .github-corner .octo-arm {
+        -webkit-animation: octocat-wave 0.56s ease-in-out;
+        animation: octocat-wave 0.56s ease-in-out;
+    }
+		.page_toc {
+			display: none;
+		}
 }
 
 @keyframes octocat-wave {
@@ -830,10 +724,7 @@ section.cover {
 
 section.cover.show {
 	display: flex;
-}
-
-section[style] {
-		background: linear-gradient(#6da9e2,#c7def4) !important;
+	background: linear-gradient(#6da9e2,#c7def4) !important;
 }
 
 section.cover.has-mask .mask {
