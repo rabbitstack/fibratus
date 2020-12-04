@@ -116,6 +116,7 @@ func NewBuffered(
 	return agg, nil
 }
 
+// Stop flushes pending event batches and instructs the aggregator to stop processing events.
 func (agg *BufferedAggregator) Stop() error {
 	agg.flusher.Stop()
 	// flush enqueued events

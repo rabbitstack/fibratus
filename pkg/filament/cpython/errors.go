@@ -80,7 +80,7 @@ func ClearError() {
 	C.PyErr_Clear()
 }
 
-// CheckSignal checks the signal queue.
+// CheckSignals checks the signal queue.
 func CheckSignals() bool {
 	return C.PyErr_CheckSignals() == -1
 }

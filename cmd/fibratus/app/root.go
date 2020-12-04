@@ -27,6 +27,7 @@ import (
 
 var sig = make(chan os.Signal, 2)
 
+// RootCmd is the entrance to Fibratus CLI
 var RootCmd = &cobra.Command{
 	Use:   "fibratus",
 	Short: "Modern tool for the kernel observability and exploration",

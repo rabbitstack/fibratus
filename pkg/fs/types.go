@@ -60,13 +60,19 @@ func (fd FileDisposition) String() string {
 type FileType uint8
 
 const (
-	// File represents the file, volume or hard disk device.
+	// File represents the file, volume or hard disk device
 	Regular FileType = iota
+	// Directory represents the directory
 	Directory
+	// Pipe represent the pipe
 	Pipe
+	// Console denotes the standard output stream
 	Console
+	// Mailslot denotes a mail slot file
 	Mailslot
+	// Other is the file type different from listed above
 	Other
+	// Unknown is the unknown file type
 	Unknown
 )
 

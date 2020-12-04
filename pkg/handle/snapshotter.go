@@ -123,6 +123,7 @@ func NewSnapshotter(config *config.Config, fn SnapshotBuildCompleted) Snapshotte
 	return s
 }
 
+// NewFromKcap builds the handle snapshotter from kcap state.
 func NewFromKcap(handles []htypes.Handle) Snapshotter {
 	handlesByObject := make(map[uint64]htypes.Handle)
 	for _, h := range handles {

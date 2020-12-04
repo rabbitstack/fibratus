@@ -22,6 +22,7 @@ package fs
 type FileAttr uint32
 
 const (
+	// FileDirectory indicates that the file is a directory.
 	FileDirectory FileAttr = 0x10
 	// FileArchive denotes a file or directory that is an archive file or directory. Applications typically use this attribute to mark files for backup or removal.
 	FileArchive FileAttr = 0x20

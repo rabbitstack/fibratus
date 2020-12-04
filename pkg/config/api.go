@@ -28,7 +28,7 @@ const (
 	timeout   = "api.timeout"
 )
 
-// Config contains API specific config options.
+// APIConfig contains API specific config options.
 type APIConfig struct {
 	// Transport specifies the underlying transport protocol for the API HTTP server.
 	Transport string `json:"api.transport" yaml:"api.transport"`

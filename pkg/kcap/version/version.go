@@ -22,17 +22,21 @@ package version
 type Version uint16
 
 const (
+	// KevtSecV1 is the v1 of the kernel event section
 	KevtSecV1 Version = iota + 1
 )
 
 const (
+	// ProcessSecV1 is the v1 of the process section
 	ProcessSecV1 Version = iota + 1
 )
 
 const (
+	// HandleSecV1 is the v1 of the handle section
 	HandleSecV1 Version = iota + 1
 )
 
 const (
+	// PESecV1 is the v1 of the PE section
 	PESecV1 Version = iota + 1
 )

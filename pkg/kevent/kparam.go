@@ -46,11 +46,11 @@ var kparamPool = sync.Pool{
 type ParamCaseStyle uint8
 
 const (
-	// Snake is the default parameter's name case style. Multi-word parameters are delimited by underscore symbol (e.g. process_object)
+	// SnakeCase is the default parameter's name case style. Multi-word parameters are delimited by underscore symbol (e.g. process_object)
 	SnakeCase ParamCaseStyle = 1
-	// Dot style uses a dot to separate multi-word parameter names (e.g. process.object)
+	// DotCase style uses a dot to separate multi-word parameter names (e.g. process.object)
 	DotCase ParamCaseStyle = 2
-	// Camel renders parameter name with pascal case naming style (e.g. ProcessObject)
+	// CamelCase renders parameter name with pascal case naming style (e.g. ProcessObject)
 	PascalCase ParamCaseStyle = 3
 	// CamelCase represents parameter names with camel case naming style (e.g. processObject)
 	CamelCase ParamCaseStyle = 4
@@ -115,6 +115,7 @@ func NewKparam(name string, typ kparams.Type, value kparams.Value) *Kparam {
 	return kparam
 }
 
+// NewKparamFromKcap builds a kparam instance from the restored state.
 func NewKparamFromKcap(name string, typ kparams.Type, value kparams.Value) *Kparam {
 	return &Kparam{Name: name, Type: typ, Value: value}
 }
@@ -182,6 +183,7 @@ func (kpars Kparams) Append(name string, typ kparams.Type, value kparams.Value) 
 	return kpars
 }
 
+// AppendFromKcap adds a new parameter with specified name, type and value from the kcap state.
 func (kpars Kparams) AppendFromKcap(name string, typ kparams.Type, value kparams.Value) Kparams {
 	kpars[name] = NewKparamFromKcap(name, typ, value)
 	return kpars
@@ -222,6 +224,7 @@ func (kpars Kparams) Get(name string) (kparams.Value, error) {
 	return kpar.Value, nil
 }
 
+// GetString returns the underlying string value from the parameter.
 func (kpars Kparams) GetString(name string) (string, error) {
 	kpar, err := kpars.findParam(name)
 	if err != nil {
@@ -233,10 +236,12 @@ func (kpars Kparams) GetString(name string) (string, error) {
 	return kpar.Value.(string), nil
 }
 
+// GetPid returns the pid from the parameter.
 func (kpars Kparams) GetPid() (uint32, error) {
 	return kpars.getPid(kparams.ProcessID)
 }
 
+// GetPpid returns the parent pid from the parameter.
 func (kpars Kparams) GetPpid() (uint32, error) {
 	return kpars.getPid(kparams.ProcessParentID)
 }
@@ -256,6 +261,7 @@ func (kpars Kparams) getPid(name string) (uint32, error) {
 	return v, nil
 }
 
+// GetTid returns the thread id from the parameter.
 func (kpars Kparams) GetTid() (uint32, error) {
 	kpar, err := kpars.findParam(kparams.ThreadID)
 	if err != nil {
@@ -271,6 +277,7 @@ func (kpars Kparams) GetTid() (uint32, error) {
 	return v, nil
 }
 
+// GetUint8 returns the underlying uint8 value from the parameter.
 func (kpars Kparams) GetUint8(name string) (uint8, error) {
 	kpar, err := kpars.findParam(name)
 	if err != nil {
@@ -283,6 +290,7 @@ func (kpars Kparams) GetUint8(name string) (uint8, error) {
 	return v, nil
 }
 
+// GetInt8 returns the underlying int8 value from the parameter.
 func (kpars Kparams) GetInt8(name string) (int8, error) {
 	kpar, err := kpars.findParam(name)
 	if err != nil {
@@ -296,6 +304,7 @@ func (kpars Kparams) GetInt8(name string) (int8, error) {
 
 }
 
+// GetUint16 returns the underlying int16 value from the parameter.
 func (kpars Kparams) GetUint16(name string) (uint16, error) {
 	kpar, err := kpars.findParam(name)
 	if err != nil {
@@ -308,6 +317,7 @@ func (kpars Kparams) GetUint16(name string) (uint16, error) {
 	return v, nil
 }
 
+// GetInt16 returns the underlying int16 value from the parameter.
 func (kpars Kparams) GetInt16(name string) (int16, error) {
 	kpar, err := kpars.findParam(name)
 	if err != nil {
@@ -320,6 +330,7 @@ func (kpars Kparams) GetInt16(name string) (int16, error) {
 	return v, nil
 }
 
+// GetUint32 returns the underlying uint32 value from the parameter.
 func (kpars Kparams) GetUint32(name string) (uint32, error) {
 	kpar, err := kpars.findParam(name)
 	if err != nil {
@@ -332,6 +343,7 @@ func (kpars Kparams) GetUint32(name string) (uint32, error) {
 	return v, nil
 }
 
+// GetInt32 returns the underlying int32 value from the parameter.
 func (kpars Kparams) GetInt32(name string) (int32, error) {
 	kpar, err := kpars.findParam(name)
 	if err != nil {
@@ -344,6 +356,7 @@ func (kpars Kparams) GetInt32(name string) (int32, error) {
 	return v, nil
 }
 
+// GetUint64 returns the underlying uint64 value from the parameter.
 func (kpars Kparams) GetUint64(name string) (uint64, error) {
 	kpar, err := kpars.findParam(name)
 	if err != nil {
@@ -356,6 +369,7 @@ func (kpars Kparams) GetUint64(name string) (uint64, error) {
 	return v, nil
 }
 
+// GetInt64 returns the underlying int64 value from the parameter.
 func (kpars Kparams) GetInt64(name string) (int64, error) {
 	kpar, err := kpars.findParam(name)
 	if err != nil {
@@ -368,6 +382,7 @@ func (kpars Kparams) GetInt64(name string) (int64, error) {
 	return v, nil
 }
 
+// GetFloat returns the underlying float value from the parameter.
 func (kpars Kparams) GetFloat(name string) (float32, error) {
 	kpar, err := kpars.findParam(name)
 	if err != nil {
@@ -380,6 +395,7 @@ func (kpars Kparams) GetFloat(name string) (float32, error) {
 	return v, nil
 }
 
+// GetDouble returns the underlying double (float64) value from the parameter.
 func (kpars Kparams) GetDouble(name string) (float64, error) {
 	kpar, err := kpars.findParam(name)
 	if err != nil {
@@ -393,6 +409,7 @@ func (kpars Kparams) GetDouble(name string) (float64, error) {
 
 }
 
+// GetHexAsUint32 returns the number hexadecimal representation as uint32 value.
 func (kpars Kparams) GetHexAsUint32(name string) (uint32, error) {
 	hex, err := kpars.GetHex(name)
 	if err != nil {
@@ -401,6 +418,7 @@ func (kpars Kparams) GetHexAsUint32(name string) (uint32, error) {
 	return hex.Uint32(), nil
 }
 
+// GetHexAsUint8 returns the number hexadecimal representation as uint8 value.
 func (kpars Kparams) GetHexAsUint8(name string) (uint8, error) {
 	hex, err := kpars.GetHex(name)
 	if err != nil {
@@ -409,6 +427,7 @@ func (kpars Kparams) GetHexAsUint8(name string) (uint8, error) {
 	return hex.Uint8(), nil
 }
 
+// GetHexAsUint64 returns the number hexadecimal representation as uint64 value.
 func (kpars Kparams) GetHexAsUint64(name string) (uint64, error) {
 	hex, err := kpars.GetHex(name)
 	if err != nil {
@@ -417,6 +436,7 @@ func (kpars Kparams) GetHexAsUint64(name string) (uint64, error) {
 	return hex.Uint64(), nil
 }
 
+// GetHex returns the generic hexadecimal type for the specified parameter name.
 func (kpars Kparams) GetHex(name string) (kparams.Hex, error) {
 	kpar, err := kpars.findParam(name)
 	if err != nil {
@@ -429,6 +449,7 @@ func (kpars Kparams) GetHex(name string) (kparams.Hex, error) {
 	return v, nil
 }
 
+// GetIPv4 returns the underlying IPv4 address from the parameter.
 func (kpars Kparams) GetIPv4(name string) (net.IP, error) {
 	kpar, err := kpars.findParam(name)
 	if err != nil {
@@ -444,6 +465,7 @@ func (kpars Kparams) GetIPv4(name string) (net.IP, error) {
 	return v, nil
 }
 
+// GetIPv6 returns the underlying IPv6 address from the parameter.
 func (kpars Kparams) GetIPv6(name string) (net.IP, error) {
 	kpar, err := kpars.findParam(name)
 	if err != nil {
@@ -459,6 +481,7 @@ func (kpars Kparams) GetIPv6(name string) (net.IP, error) {
 	return v, nil
 }
 
+// GetIP returns either the IPv4 or IPv6 address from the parameter.
 func (kpars Kparams) GetIP(name string) (net.IP, error) {
 	kpar, err := kpars.findParam(name)
 	if err != nil {
@@ -474,6 +497,7 @@ func (kpars Kparams) GetIP(name string) (net.IP, error) {
 	return v, nil
 }
 
+// GetTime returns the underlying time structure from the parameter.
 func (kpars Kparams) GetTime(name string) (time.Time, error) {
 	kpar, err := kpars.findParam(name)
 	if err != nil {
@@ -486,6 +510,7 @@ func (kpars Kparams) GetTime(name string) (time.Time, error) {
 	return v, nil
 }
 
+// GetStringSlice returns the string slice from the event parameter.
 func (kpars Kparams) GetStringSlice(name string) ([]string, error) {
 	kpar, err := kpars.findParam(name)
 	if err != nil {
@@ -498,6 +523,7 @@ func (kpars Kparams) GetStringSlice(name string) ([]string, error) {
 	return v, nil
 }
 
+// GetSlice returns the slice of generic values from the parameter.
 func (kpars Kparams) GetSlice(name string) (kparams.Value, error) {
 	kpar, err := kpars.findParam(name)
 	if err != nil {
@@ -509,6 +535,8 @@ func (kpars Kparams) GetSlice(name string) (kparams.Value, error) {
 	return kpar.Value, nil
 }
 
+// String returns the string representation of the event parameters. Parameter names are rendered according
+// to the currently active parameter style case.
 func (kpars Kparams) String() string {
 	var sb strings.Builder
 	// sort parameters by name

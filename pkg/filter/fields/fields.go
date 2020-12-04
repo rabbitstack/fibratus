@@ -30,10 +30,15 @@ var subfieldRegexp = regexp.MustCompile(`(pe.sections|pe.resources|ps.envs|ps.mo
 type Field string
 
 const (
+	// PsPid represents the process id field
 	PsPid         Field = "ps.pid"
+	// PsPpid represents the parent process id field
 	PsPpid        Field = "ps.ppid"
+	// PsName represents the process name field
 	PsName        Field = "ps.name"
+	// PsComm represents the process command line field
 	PsComm        Field = "ps.comm"
+	// PsExe represents the process image path field
 	PsExe         Field = "ps.exe"
 	PsArgs        Field = "ps.args"
 	PsCwd         Field = "ps.cwd"

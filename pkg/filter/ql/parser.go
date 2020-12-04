@@ -33,7 +33,7 @@ type Parser struct {
 	expr   string
 }
 
-// NewParsers builds a new parser instance from the expression string.
+// NewParser builds a new parser instance from the expression string.
 func NewParser(expr string) *Parser {
 	return &Parser{s: newBufScanner(strings.NewReader(expr)), expr: expr}
 }

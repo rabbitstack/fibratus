@@ -29,6 +29,7 @@ import (
 	"unsafe"
 )
 
+// Module encapsulates the Python module.
 type Module struct {
 	*PyObject
 	name string
@@ -57,8 +58,11 @@ func NewModule(name string) (*Module, error) {
 type MethFlags int
 
 const (
+	// MethVarArgs indicates that the method or function accepts positional arguments
 	MethVarArgs  MethFlags = C.METH_VARARGS
+	// MethKeyWords indicates that the method or function accepts keyword arguments
 	MethKeyWords MethFlags = C.METH_KEYWORDS
+	// MethNoArgs indicates that the method or function accepts no arguments
 	MethNoArgs   MethFlags = C.METH_NOARGS
 )
 

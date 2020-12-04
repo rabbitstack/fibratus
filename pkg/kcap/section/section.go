@@ -27,6 +27,7 @@ import (
 // Section represents the header describing the type, length and the version of each section.
 type Section [10]byte
 
+// String returns the string representation of the kcap section.
 func (s Section) String() string {
 	return fmt.Sprintf("type: %s, version: %d, len: %d, size: %d", s.Type(), s.Version(), s.Len(), s.Size())
 }
@@ -35,12 +36,17 @@ func (s Section) String() string {
 type Type uint8
 
 const (
+	// Process is the process header type
 	Process Type = iota + 1
+	// Handle is the handle header type
 	Handle
+	// Kevt is the kernel event header type
 	Kevt
+	// PE is the Portable Executable header type
 	PE
 )
 
+// String returns the type name.
 func (s Type) String() string {
 	switch s {
 	case Process:

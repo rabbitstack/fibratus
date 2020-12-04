@@ -153,11 +153,12 @@ func NewPyNone() *C.PyObject {
 	return C.Py_None
 }
 
+// NewPyLong creates a new 64-bit signed integer Python object.
 func NewPyLong(v int64) *C.PyObject {
 	return C.PyLong_FromLongLong(C.i64(v))
 }
 
-// NewPyObjectFromFmt builds a new Python object based on the underlying interface type.
+// NewPyObjectFromValue builds a new Python object based on the underlying interface type.
 func NewPyObjectFromValue(value interface{}) *PyObject {
 	var ob *C.PyObject
 	switch v := value.(type) {
@@ -318,7 +319,7 @@ func (ob *PyObject) Uint64() uint64 {
 	return uint64(C.PyLong_AsUnsignedLongLong(ob.rawptr))
 }
 
-// Uint64 returns an integer from the raw Python object.
+// Int returns an integer from the raw Python object.
 func (ob *PyObject) Int() int {
 	return int(C.PyLong_AsUnsignedLongLong(ob.rawptr))
 }

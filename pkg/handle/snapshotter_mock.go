@@ -24,18 +24,26 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+// SnapshotterMock is the mock handle snapshotter used in tests.
 type SnapshotterMock struct {
 	mock.Mock
 }
 
+// Write method
 func (s *SnapshotterMock) Write(kevt *kevent.Kevent) error                 { return nil }
+// Remove method
 func (s *SnapshotterMock) Remove(kevt *kevent.Kevent) error                { return nil }
+// FindHandles method
 func (s *SnapshotterMock) FindHandles(pid uint32) ([]htypes.Handle, error) { return nil, nil }
+// FindByObject method
 func (s *SnapshotterMock) FindByObject(object uint64) (htypes.Handle, bool) {
 	return htypes.Handle{}, false
 }
+// RegisterCreateCallback method
 func (s *SnapshotterMock) RegisterCreateCallback(fn CreateCallback)   {}
+// RegisterDestroyCallback method
 func (s *SnapshotterMock) RegisterDestroyCallback(fn DestroyCallback) {}
+// GetSnapshot method
 func (s *SnapshotterMock) GetSnapshot() []htypes.Handle {
 	handles := s.Called()
 	return handles.Get(0).([]htypes.Handle)
