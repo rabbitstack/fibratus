@@ -1,0 +1,23 @@
+; https://editorconfig.org/
+
+root = true
+
+[*]
+insert_final_newline = true
+charset = utf-8
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+[{go.mod,go.sum,*.go}]
+indent_style = tab
+indent_size = 8
+
+[*.md]
+indent_size = 4
+trim_trailing_whitespace = false
+
+[*.py]
+max_line_length = 119
+indent_style = space
+indent_size = 4
