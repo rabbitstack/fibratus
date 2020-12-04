@@ -262,10 +262,9 @@ func (s *scanner) scanNumber() (tok token, pos int, lit string) {
 				}
 			}
 			return duration, pos, buf.String()
-		} else {
-			s.r.unread()
-			return integer, pos, buf.String()
 		}
+		s.r.unread()
+		return integer, pos, buf.String()
 	}
 
 	return dec, pos, buf.String()

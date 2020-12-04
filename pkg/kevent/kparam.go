@@ -50,7 +50,7 @@ const (
 	SnakeCase ParamCaseStyle = 1
 	// DotCase style uses a dot to separate multi-word parameter names (e.g. process.object)
 	DotCase ParamCaseStyle = 2
-	// CamelCase renders parameter name with pascal case naming style (e.g. ProcessObject)
+	// PascalCase renders parameter name with pascal case naming style (e.g. ProcessObject)
 	PascalCase ParamCaseStyle = 3
 	// CamelCase represents parameter names with camel case naming style (e.g. processObject)
 	CamelCase ParamCaseStyle = 4

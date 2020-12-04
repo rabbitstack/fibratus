@@ -24,11 +24,17 @@ import "github.com/rabbitstack/fibratus/pkg/kevent"
 type InterceptorType uint8
 
 const (
+	// Ps represents the process interceptor.
 	Ps InterceptorType = iota
+	// Fs represents the file system interceptor.
 	Fs
+	// Registry represents the registry interceptor.
 	Registry
+	// Image represents the image interceptor.
 	Image
+	// Net represents the network interceptor.
 	Net
+	// Handle represents the handle interceptor.
 	Handle
 )
 

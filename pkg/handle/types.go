@@ -22,43 +22,43 @@ const (
 	// ALPCPort represents the ALPC (Advanced Local Procedure Call) object ports
 	ALPCPort = "ALPC Port"
 	// Directory designates directory objects. They exist only within the object manager scope and do not correspond to any directory on the disk.
-	Directory       = "Directory"
+	Directory = "Directory"
 	// EtwRegistration represents the ETW registration object
 	EtwRegistration = "EtwRegistration"
 	// EtwConsumer represents the ETW consumer object
-	EtwConsumer     = "EtwConsumer"
+	EtwConsumer = "EtwConsumer"
 	// Event denotest the event object
-	Event           = "Event"
+	Event = "Event"
 	// File designates file handles (e.g. pipe, device, mailslot)
-	File                 = "File"
+	File = "File"
 	// Key represents the registry key object
-	Key                  = "Key"
+	Key = "Key"
 	// Job represents the job object
-	Job                  = "Job"
+	Job = "Job"
 	// WaitCompletionPacket is the wait completion packet object
 	WaitCompletionPacket = "WaitCompletionPacket"
 	// IRTimer is the IR timer object
-	IRTimer              = "IRTimer"
+	IRTimer = "IRTimer"
 	// TpWorkerFactory represents the thread pool worker factory object
-	TpWorkerFactory      = "TpWorkerFactory"
+	TpWorkerFactory = "TpWorkerFactory"
 	// IoCompletion represents the IO completion object
-	IoCompletion         = "IoCompletion"
+	IoCompletion = "IoCompletion"
 	// Thread is the thread object
-	Thread               = "Thread"
+	Thread = "Thread"
 	// Semaphore represents the semaphore object
-	Semaphore            = "Semaphore"
+	Semaphore = "Semaphore"
 	// Section represents the section object
-	Section              = "Section"
+	Section = "Section"
 	// Mutant represents the mutant object
-	Mutant               = "Mutant"
+	Mutant = "Mutant"
 	// Desktop represents the desktop object
-	Desktop              = "Desktop"
+	Desktop = "Desktop"
 	// WindowStation represents the window station object
-	WindowStation        = "WindowStation"
+	WindowStation = "WindowStation"
 	// Token represents the token object
-	Token                = "Token"
+	Token = "Token"
 	// UserApcReserve represents the user APC reserve object
-	UserApcReserve       = "UserApcReserve"
+	UserApcReserve = "UserApcReserve"
 	// Process represents the process object
 	Process = "Process"
 	// Unknown is the unknown handle object

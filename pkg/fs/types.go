@@ -60,7 +60,7 @@ func (fd FileDisposition) String() string {
 type FileType uint8
 
 const (
-	// File represents the file, volume or hard disk device
+	// Regular represents the file, volume or hard disk device
 	Regular FileType = iota
 	// Directory represents the directory
 	Directory

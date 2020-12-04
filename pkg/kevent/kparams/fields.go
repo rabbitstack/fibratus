@@ -19,31 +19,49 @@
 package kparams
 
 const (
-	// Status is the parameter that identifies the NTSTATUS value.
+	// NTStatus is the parameter that identifies the NTSTATUS value.
 	NTStatus = "status"
 
 	// ProcessID represents the process identifier.
 	ProcessID = "pid"
 	// ProcessObject field represents the address of the process object in the kernel.
-	ProcessObject   = "kproc"
-	ThreadID        = "tid"
+	ProcessObject = "kproc"
+	// ThreadID field represents the thread identifier.
+	ThreadID = "tid"
+	// ProcessParentID field represents the parent process identifier.
 	ProcessParentID = "ppid"
-	SessionID       = "session_id"
-	UserSID         = "sid"
-	ProcessName     = "name"
-	Exe             = "exe"
-	Comm            = "comm"
-	DTB             = "directory_table_base"
-	ExitStatus      = "exit_status"
-	StartTime       = "start_time"
+	// SessionID fields represents the session identifier.
+	SessionID = "session_id"
+	// UserSID field is the security identifier associated to the process token under which it is run.
+	UserSID = "sid"
+	// ProcessName field denotes the process image name.
+	ProcessName = "name"
+	// Exe field denotes the full path of the executable.
+	Exe = "exe"
+	// Comm field represents the process command line.
+	Comm = "comm"
+	// DTB field denotes the address of the process directory table.
+	DTB = "directory_table_base"
+	// ExitStatus is the field that represents the process exit status.
+	ExitStatus = "exit_status"
+	// StartTime field denotes the process start time.
+	StartTime = "start_time"
 
-	BasePrio         = "base_prio"
-	IOPrio           = "io_prio"
-	PagePrio         = "page_prio"
-	KstackBase       = "kstack"
-	KstackLimit      = "kstack_limit"
-	UstackBase       = "ustack"
-	UstackLimit      = "ustack_limit"
+	// BasePrio field is the thread base priority assigned by the scheduler.
+	BasePrio = "base_prio"
+	// IOPrio represents the filed that indicates the thread I/O priority.
+	IOPrio = "io_prio"
+	// PagePrio field denotes page priority.
+	PagePrio = "page_prio"
+	// KstackBase field is the start address of the kernel space stack.
+	KstackBase = "kstack"
+	// KstackLimit field is the end address of the kernel space stack.
+	KstackLimit = "kstack_limit"
+	// UstackBase field is the start address of the user space stack.
+	UstackBase = "ustack"
+	// UstackLimit field is the end address of the user space stack.
+	UstackLimit = "ustack_limit"
+	// ThreadEntrypoint field is the address of the thread main function.
 	ThreadEntrypoint = "entrypoint"
 
 	// FileObject determines the field name for the file object pointer.
@@ -52,7 +70,7 @@ const (
 	FileName = "file_name"
 	// FileCreateOptions is the field that represents the values passed in the CreateDispositions parameter to the NtCreateFile function.
 	FileCreateOptions = "options"
-	// FileDisposition is the field that represents the values passed in the CreateOptions parameter to the NtCreateFile function.
+	// FileOperation is the field that represents the values passed in the CreateOptions parameter to the NtCreateFile function.
 	FileOperation = "operation"
 	// FileCreated represents the name for the file creation field.
 	FileCreated = "created"
@@ -140,7 +158,7 @@ const (
 	HandleObject = "handle_object"
 	// HandleObjectName identifies the parameter that represents the kernel object name.
 	HandleObjectName = "handle_name"
-	// HandleObjectType identifies the parameter that represents the kernel object type identifier.
+	// HandleObjectTypeID identifies the parameter that represents the kernel object type identifier.
 	HandleObjectTypeID = "type_id"
 	// HandleObjectTypeName identifies the parameter that represents the kernel object type name.
 	HandleObjectTypeName = "handle_type"

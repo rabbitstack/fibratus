@@ -59,11 +59,11 @@ type MethFlags int
 
 const (
 	// MethVarArgs indicates that the method or function accepts positional arguments
-	MethVarArgs  MethFlags = C.METH_VARARGS
+	MethVarArgs MethFlags = C.METH_VARARGS
 	// MethKeyWords indicates that the method or function accepts keyword arguments
 	MethKeyWords MethFlags = C.METH_KEYWORDS
 	// MethNoArgs indicates that the method or function accepts no arguments
-	MethNoArgs   MethFlags = C.METH_NOARGS
+	MethNoArgs MethFlags = C.METH_NOARGS
 )
 
 // DefaultMethFlags represents the default method flags

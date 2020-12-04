@@ -61,7 +61,7 @@ func (h Handle) Len() int {
 		case *MutantInfo:
 			l += 5
 		case *FileInfo:
-			l += 1
+			l++
 		}
 	}
 	return l

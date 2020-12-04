@@ -46,7 +46,7 @@ func (h Handle) Offset() uint16 {
 		case *MutantInfo:
 			offset += 5
 		case *FileInfo:
-			offset += 1
+			offset++
 		}
 	}
 	return offset

@@ -30,7 +30,7 @@ const (
 	commandLine      = "CommandLine"
 
 	tthreadID       = "TThreadId"
-	issuingThreadId = "IssuingThreadId"
+	issuingThreadID = "IssuingThreadId"
 	ttid            = "TTID"
 
 	pid = "PID"
@@ -97,7 +97,7 @@ func Ignored() map[string]bool {
 // to canonical parameter name.
 func Canonicalize(name string) string {
 	switch name {
-	case tthreadID, issuingThreadId, ttid:
+	case tthreadID, issuingThreadID, ttid:
 		return ThreadID
 	case processID, pid:
 		return ProcessID

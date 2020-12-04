@@ -89,14 +89,17 @@ type DataEntry struct {
 // Size returns the size in bytes of the resource data.
 func (e DataEntry) Size() int { return binary.Size(e) }
 
+// VersionInfo contains information about version entries.
 type VersionInfo struct {
 	Length      uint16
 	ValueLength uint16
 	Type        uint16
 }
 
+// Size returns the size of this structure.
 func (v VersionInfo) Size() int { return binary.Size(v) }
 
+// FixedFileinfo stores attributes that describe the FixedFileInformation entries.
 type FixedFileinfo struct {
 	Signature        uint32
 	StructVer        uint32
@@ -113,29 +116,38 @@ type FixedFileinfo struct {
 	FileDateLS       uint32
 }
 
+// Size returns the size of this structure in bytes.
 func (f FixedFileinfo) Size() int { return binary.Size(f) }
 
+// StringFileInfo contains information about string file info entries.
 type StringFileInfo struct {
 	Length      uint16
 	ValueLength uint16
 	Type        uint16
 }
 
-func (s StringFileInfo) Size() int  { return binary.Size(s) }
+// Size returns the size of this structure in bytes.
+func (s StringFileInfo) Size() int { return binary.Size(s) }
+
+// Skip decides whether to ignore processing the StringFileInfo entries.
 func (s StringFileInfo) Skip() bool { return (s.Type != 0 && s.Type != 1) && s.ValueLength != 0 }
 
+// StringTable contains information about string table entries.
 type StringTable struct {
 	Length      uint16
 	ValueLength uint16
 	Type        uint16
 }
 
+// Size returns the size of this structure in bytes.
 func (s StringTable) Size() int { return binary.Size(s) }
 
+// String contains information about string entries.
 type String struct {
 	Length      uint16
 	ValueLength uint16
 	Type        uint16
 }
 
+// Size returns the size of this structure.
 func (s String) Size() int { return binary.Size(s) }

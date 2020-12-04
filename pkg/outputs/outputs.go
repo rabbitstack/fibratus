@@ -32,6 +32,7 @@ var (
 	}
 )
 
+// Factory serves for constructing different output implementations from configuration.
 type Factory func(config Config) (OutputGroup, error)
 
 // Type is the alias for the output type.
@@ -40,8 +41,11 @@ type Type uint8
 const (
 	// Console represents the default terminal output.
 	Console Type = iota
+	// AMQP denotest the AMQP output.
 	AMQP
+	// Elasticsearch denotes the Elasticsearch output.
 	Elasticsearch
+	// Null is the null output.
 	Null
 )
 
@@ -61,18 +65,23 @@ func (t Type) String() string {
 	}
 }
 
+// OutputGroup is a collection of outputs that can be configured in a load-balanced fashion.
 type OutputGroup struct {
+	// Clients is the list of clients to which events are forwarded.
 	Clients []Client
 }
 
+// Success builds the output group from the provided clients.
 func Success(clients ...Client) OutputGroup {
 	return OutputGroup{Clients: clients}
 }
 
+// Fail returns an empty output group and an error signaling the failure that caused the output group initialization.
 func Fail(err error) (OutputGroup, error) {
 	return OutputGroup{}, err
 }
 
+// Register registers a new output implementation. Note this function should be only called once per output.
 func Register(typ Type, factory Factory) {
 	if _, ok := outputs[typ]; ok {
 		panic(fmt.Sprintf("output %q is already registered", typ))
@@ -85,6 +94,7 @@ func FindFactory(typ Type) Factory {
 	return outputs[typ]
 }
 
+// Load loads the specified output from configuration. The output must have been registered previously.
 func Load(typ Type, config Config) (OutputGroup, error) {
 	factory := FindFactory(typ)
 	if factory == nil {

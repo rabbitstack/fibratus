@@ -247,7 +247,7 @@ func (ps *PS) RLock() {
 	ps.mu.RLock()
 }
 
-// RLock releases a read mutex on the process sate.
+// RUnlock releases a read mutex on the process sate.
 func (ps *PS) RUnlock() {
 	ps.mu.RUnlock()
 }

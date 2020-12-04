@@ -18,7 +18,6 @@
 
 package hostname
 
-import "C"
 import (
 	"expvar"
 	"net"
@@ -33,7 +32,7 @@ var hostname string
 // hostnameErrors exposes host/fqdn resolution errors
 var hostnameErrors = expvar.NewMap("hostname.errors")
 
-const computerNamePhysicalDnsFullyQualified = 7
+const computerNamePhysicalDNSFullyQualified = 7
 
 var (
 	kernel32        = syscall.NewLazyDLL("kernel32.dll")
@@ -55,7 +54,7 @@ func Get() string {
 	maxComputerLength := 1024
 	buf := make([]uint16, maxComputerLength)
 	errno, _, err := getComputerName.Call(
-		uintptr(computerNamePhysicalDnsFullyQualified),
+		uintptr(computerNamePhysicalDNSFullyQualified),
 		uintptr(unsafe.Pointer(&buf[0])),
 		uintptr(unsafe.Pointer(&maxComputerLength)))
 	if errno == 0 {

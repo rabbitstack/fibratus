@@ -25,29 +25,43 @@ const (
 	// InvalidProcessTraceHandle designates an invalid trace handle reference
 	InvalidProcessTraceHandle uint64 = 0xffffffffffffffff
 	// InvalidPID indicates invalid process identifier value
-	InvalidPID               uint32 = 0xffffffff
-	StatusInfoLengthMismatch        = 0xC0000004
-	StatusBufferTooSmall            = 0xC0000023
+	InvalidPID uint32 = 0xffffffff
+	// StatusInfoLengthMismatch
+	StatusInfoLengthMismatch = 0xC0000004
+	// StatusBufferTooSmall
+	StatusBufferTooSmall = 0xC0000023
 	// StatusBufferOverflow indicates that the data was too small to fit in the buffer
 	StatusBufferOverflow = 0x80000005
 	// Success determines successful return code
-	Success             Errno = 0x0
-	InvalidParameter    Errno = 0x57
-	AlreadyExists       Errno = 0xb7
-	DiskFull            Errno = 0x70
-	AccessDenied        Errno = 0x5
-	NoSysResources      Errno = 0x5aa
-	BadLength           Errno = 0x18
+	Success Errno = 0x0
+	// InvalidParameter
+	InvalidParameter Errno = 0x57
+	// AlreadyExists
+	AlreadyExists Errno = 0xb7
+	// DiskFull
+	DiskFull Errno = 0x70
+	// AccessDenied
+	AccessDenied Errno = 0x5
+	// NoSysResources
+	NoSysResources Errno = 0x5aa
+	// BadLength
+	BadLength Errno = 0x18
+	// WMIInstanceNotFound
 	WMIInstanceNotFound Errno = 0x1069
-	Cancelled           Errno = 0x4c7
-	NoAccess            Errno = 0x3e6
-	InsufficientBuffer  Errno = 0x7a
-	NotFound            Errno = 0x490
+	// Cancelled
+	Cancelled Errno = 0x4c7
+	// NoAccess
+	NoAccess Errno = 0x3e6
+	// InsufficientBuffer
+	InsufficientBuffer Errno = 0x7a
+	// NotFound
+	NotFound Errno = 0x490
 	// CtxClosePending indicates that function will stop after it has processed all real-time events in
 	// its buffers (it will not receive any new events)
 	CtxClosePending Errno = 0x1B5F
 )
 
+// IsNotFound returns true is the underlying error is NotFound.
 func (e Errno) IsNotFound() bool {
 	return e == NotFound
 }

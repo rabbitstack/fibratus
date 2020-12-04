@@ -24,7 +24,7 @@ var ipv4Class *PyObject
 var ipv6Class *PyObject
 var ipaddressFn *PyObject
 
-func initializeIpFnAndClasses() error {
+func initializeIPFnAndClasses() error {
 	mod, err := NewModule("ipaddress")
 	if err != nil {
 		return err

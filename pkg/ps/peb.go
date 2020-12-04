@@ -62,6 +62,7 @@ func ReadPEB(handle handle.Handle) (*PEB, error) {
 	return &PEB{peb: (*process.PEB)(unsafe.Pointer(&peb[0])), handle: handle}, nil
 }
 
+// GetImage inspects the process image name by reading the memory buffer in the PEB.
 func (p PEB) GetImage() string {
 	params, err := p.readProcessParams()
 	if err != nil {
@@ -74,6 +75,7 @@ func (p PEB) GetImage() string {
 	return syscall.UTF16ToString(image)
 }
 
+// GetCommandLine inspects the process command line arguments by reading the memory buffer in the PEB.
 func (p PEB) GetCommandLine() string {
 	params, err := p.readProcessParams()
 	if err != nil {
@@ -86,6 +88,7 @@ func (p PEB) GetCommandLine() string {
 	return syscall.UTF16ToString(comm)
 }
 
+// GetCurrentWorkingDirectory reads the current working directory from the PEB.
 func (p PEB) GetCurrentWorkingDirectory() string {
 	params, err := p.readProcessParams()
 	if err != nil {
@@ -98,6 +101,7 @@ func (p PEB) GetCurrentWorkingDirectory() string {
 	return syscall.UTF16ToString(cwd)
 }
 
+// GetEnvs returns the map of environment variables that were mapped into the process PEB.
 func (p PEB) GetEnvs() map[string]string {
 	params, err := p.readProcessParams()
 	if err != nil {

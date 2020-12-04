@@ -24,21 +24,34 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+// SnapshotterMock is the process snapshotter mock used in tests.
 type SnapshotterMock struct {
 	mock.Mock
 }
 
-func (s *SnapshotterMock) Write(kevt *kevent.Kevent) error  { return nil }
+// Write method
+func (s *SnapshotterMock) Write(kevt *kevent.Kevent) error { return nil }
+
+// Remove method
 func (s *SnapshotterMock) Remove(kevt *kevent.Kevent) error { return nil }
+
+// Find method
 func (s *SnapshotterMock) Find(pid uint32) *pstypes.PS {
 	args := s.Called(pid)
 	return args.Get(0).(*pstypes.PS)
 }
+
+// Size method
 func (s *SnapshotterMock) Size() uint32 { args := s.Called(); return uint32(args.Int(0)) }
+
+// Close method
 func (s *SnapshotterMock) Close() error { return nil }
+
+// GetSnapshot method
 func (s *SnapshotterMock) GetSnapshot() []*pstypes.PS {
 	args := s.Called()
 	return args.Get(0).([]*pstypes.PS)
 }
 
+// WriteFromKcap method
 func (s *SnapshotterMock) WriteFromKcap(kevt *kevent.Kevent) error { return nil }

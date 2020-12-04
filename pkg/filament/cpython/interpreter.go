@@ -56,7 +56,7 @@ func Initialize() error {
 	// this calls into PyDateTime_IMPORT macro to initialize the PyDateTimeAPI
 	C.Py_DateTimeImport()
 
-	if err := initializeIpFnAndClasses(); err != nil {
+	if err := initializeIPFnAndClasses(); err != nil {
 		log.Warn(err)
 	}
 

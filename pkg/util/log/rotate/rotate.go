@@ -37,8 +37,8 @@ type Config struct {
 	Formatter  logrus.Formatter
 }
 
-// RotateFile represents the rotate file hook.
-type RotateFile struct {
+// File represents the rotate file hook.
+type File struct {
 	config       Config
 	w            io.Writer
 	depth        int
@@ -49,7 +49,7 @@ type RotateFile struct {
 
 // NewHook builds a new rotate file hook.
 func NewHook(config Config) (logrus.Hook, error) {
-	hook := RotateFile{
+	hook := File{
 		config:       config,
 		depth:        20,
 		skip:         5,
@@ -68,12 +68,12 @@ func NewHook(config Config) (logrus.Hook, error) {
 }
 
 // Levels determines log levels that for which the logs are written.
-func (hook *RotateFile) Levels() []logrus.Level {
+func (hook *File) Levels() []logrus.Level {
 	return logrus.AllLevels[:hook.config.Level+1]
 }
 
 // Fire is called by logrus when it is about to write the log entry.
-func (hook *RotateFile) Fire(entry *logrus.Entry) (err error) {
+func (hook *File) Fire(entry *logrus.Entry) (err error) {
 	modified := entry.WithField("source", hook.formatter(hook.findCaller()))
 	modified.Level = entry.Level
 	modified.Message = entry.Message
@@ -85,7 +85,7 @@ func (hook *RotateFile) Fire(entry *logrus.Entry) (err error) {
 	return err
 }
 
-func (hook *RotateFile) findCaller() (string, string, int) {
+func (hook *File) findCaller() (string, string, int) {
 	var (
 		pc       uintptr
 		file     string
@@ -107,7 +107,7 @@ func (hook *RotateFile) findCaller() (string, string, int) {
 	return file, function, line
 }
 
-func (hook *RotateFile) skipFile(file string) bool {
+func (hook *File) skipFile(file string) bool {
 	for i := range hook.skipPrefixes {
 		if strings.HasPrefix(file, hook.skipPrefixes[i]) {
 			return true

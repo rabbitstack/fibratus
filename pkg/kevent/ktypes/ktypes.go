@@ -70,7 +70,7 @@ var (
 	RegOpenKey = Pack(syscall.GUID{Data1: 0xae53722e, Data2: 0xc863, Data3: 0x11d2, Data4: [8]byte{0x86, 0x59, 0x0, 0xc0, 0x4f, 0xa3, 0x21, 0xa1}}, 11)
 	// RegDeleteKey represents registry key deletion kernel events
 	RegDeleteKey = Pack(syscall.GUID{Data1: 0xae53722e, Data2: 0xc863, Data3: 0x11d2, Data4: [8]byte{0x86, 0x59, 0x0, 0xc0, 0x4f, 0xa3, 0x21, 0xa1}}, 12)
-	// RegQueryValue represents registry query key kernel events
+	// RegQueryKey represents registry query key kernel events
 	RegQueryKey = Pack(syscall.GUID{Data1: 0xae53722e, Data2: 0xc863, Data3: 0x11d2, Data4: [8]byte{0x86, 0x59, 0x0, 0xc0, 0x4f, 0xa3, 0x21, 0xa1}}, 13)
 	// RegSetValue represents registry set value kernel events
 	RegSetValue = Pack(syscall.GUID{Data1: 0xae53722e, Data2: 0xc863, Data3: 0x11d2, Data4: [8]byte{0x86, 0x59, 0x0, 0xc0, 0x4f, 0xa3, 0x21, 0xa1}}, 14)
@@ -107,31 +107,48 @@ var (
 	// SendUDPv6 represents the UDPv6 kernel events for sending datagrams to connectionless sockets.
 	SendUDPv6 = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 26)
 
+	// RecvTCPv4 represents the TCP IPv4 network receive event.
 	RecvTCPv4 = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 11)
+	// RecvTCPv6 represents the TCP IPv6 network receive event.
 	RecvTCPv6 = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 27)
+	// RecvUDPv4 represents the UDP IPv4 network receive event.
 	RecvUDPv4 = Pack(syscall.GUID{Data1: 0xbf3a50c5, Data2: 0xa9c9, Data3: 0x4988, Data4: [8]byte{0xa0, 0x05, 0x2d, 0xc0, 0xb7, 0xc8, 0x0f, 0x80}}, 10)
+	// RecvUDPv6 represents the UDP IPv6 network receive event.
 	RecvUDPv6 = Pack(syscall.GUID{Data1: 0xbf3a50c5, Data2: 0xa9c9, Data3: 0x4988, Data4: [8]byte{0xa0, 0x05, 0x2d, 0xc0, 0xb7, 0xc8, 0x0f, 0x80}}, 27)
 
+	// ConnectTCPv4 represents the TCP IPv4 network connect event.
 	ConnectTCPv4 = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 12)
+	// ConnectTCPv6 represents the TCP IPv6 network connect event.
 	ConnectTCPv6 = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 28)
 
+	// DisconnectTCPv4 is the TCP IPv4 network disconnect event.
 	DisconnectTCPv4 = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 13)
+	// DisconnectTCPv6 is the TCP IPv6 network disconnect event.
 	DisconnectTCPv6 = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 29)
-	Disconnect      = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 42)
+	// Disconnect encompasses TCP IPv4/6 network disconnect events.
+	Disconnect = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 42)
 
+	// ReconnectTCPv4 is the TCP IPv4 network reconnect event.
 	ReconnectTCPv4 = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 16)
+	// ReconnectTCPv6 is the TCP IPv6 network reconnect event.
 	ReconnectTCPv6 = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 32)
 
+	// RetransmitTCPv4 is the TCP IPv4 network retransmit event.
 	RetransmitTCPv4 = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 14)
+	// RetransmitTCPv6 is the TCP IPv6 network retransmit event.
 	RetransmitTCPv6 = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 30)
 
 	// Accept represents the global kernel event type for both TCP v4/v6 connections. Note this is an artificial kernel event that is never published by the provider.
 	Accept = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 46)
 	// Send represents the global kernel event for all variants of sending data to sockets. Note this is an artificial kernel event that is never published by the provider.
-	Send       = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xa9c9, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 72)
-	Recv       = Pack(syscall.GUID{Data1: 0xbf3a50c5, Data2: 0xc8e0, Data3: 0x4988, Data4: [8]byte{0xa0, 0x05, 0x2d, 0xc0, 0xb7, 0xc8, 0x0f, 0x80}}, 75)
-	Connect    = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 40)
-	Reconnect  = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 47)
+	Send = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xa9c9, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 72)
+	// Recv represents the global kernel event for all variants of receiving data from sockets. Note this is an artificial kernel event that is never published by the provider.
+	Recv = Pack(syscall.GUID{Data1: 0xbf3a50c5, Data2: 0xc8e0, Data3: 0x4988, Data4: [8]byte{0xa0, 0x05, 0x2d, 0xc0, 0xb7, 0xc8, 0x0f, 0x80}}, 75)
+	// Connect represents the global kernel event for all variants of connecting to sockets sockets. Note this is an artificial kernel event that is never published by the provider.
+	Connect = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 40)
+	// Reconnect represents the global kernel event for all variants of reconnecting to sockets sockets. Note this is an artificial kernel event that is never published by the provider.
+	Reconnect = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 47)
+	// Retransmit represents the global kernel event for all variants of retransmitting TCP segments. Note this is an artificial kernel event that is never published by the provider.
 	Retransmit = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 44)
 
 	// CreateHandle represents handle creation kernel event

@@ -31,13 +31,13 @@ type Field string
 
 const (
 	// PsPid represents the process id field
-	PsPid         Field = "ps.pid"
+	PsPid Field = "ps.pid"
 	// PsPpid represents the parent process id field
-	PsPpid        Field = "ps.ppid"
+	PsPpid Field = "ps.ppid"
 	// PsName represents the process name field
-	PsName        Field = "ps.name"
+	PsName Field = "ps.name"
 	// PsComm represents the process command line field
-	PsComm        Field = "ps.comm"
+	PsComm Field = "ps.comm"
 	// PsExe represents the process image path field
 	PsExe         Field = "ps.exe"
 	PsArgs        Field = "ps.args"
