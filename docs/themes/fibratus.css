@@ -502,20 +502,20 @@ body.sticky .app-nav .logo {
 }
 
 .content {
-	padding-top: 2px;
+	padding-top: 30px;
 	position: absolute;
 	top: 0;
 	right: 0;
 	bottom: 0;
+	left: 300px;
 	transition: left .25s ease;
-	width: 100%;
 	background-color: #F7F7F7;
 }
 
 .markdown-section {
 	margin: 0 auto;
-	max-width: 890px;
-	padding: 70px 15px 40px;
+	max-width: 80%;
+	padding: 30px 15px 40px;
 	position: relative;
 }
 
@@ -633,6 +633,13 @@ body.close .content {
 	}
 }
 
+
+@media screen and (max-width: 1300px) {
+	.page_toc {
+		display: none;
+	}
+}
+
 @media screen and (max-width: 768px) {
     .github-corner,
     .sidebar,
@@ -693,9 +700,9 @@ body.close .content {
         -webkit-animation: octocat-wave 0.56s ease-in-out;
         animation: octocat-wave 0.56s ease-in-out;
     }
-		.page_toc {
-			display: none;
-		}
+	.page_toc {
+		display: none;
+	}
 }
 
 @keyframes octocat-wave {
