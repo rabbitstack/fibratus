@@ -23,7 +23,6 @@ package cpython
 */
 import "C"
 import (
-	"fmt"
 	"runtime"
 	"sync/atomic"
 )
@@ -80,6 +79,5 @@ func (g *GIL) Unlock() {
 
 // Locked indicates if the lock on the GIL was acquired.
 func (g *GIL) Locked() bool {
-	fmt.Println(atomic.LoadUint32(&g.locked) > 0)
 	return atomic.LoadUint32(&g.locked) > 0
 }
