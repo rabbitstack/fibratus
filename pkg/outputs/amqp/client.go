@@ -25,6 +25,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/streadway/amqp"
 	"net"
+	"sync"
 	"time"
 )
 
@@ -36,7 +37,9 @@ var (
 // client encapsulates the AMQP connection/channel and deals with configuring, establishing the connection
 // and publishing messages to the exchange.
 type client struct {
-	conn    *amqp.Connection
+	conn     *amqp.Connection
+	connLock sync.Mutex
+
 	channel *amqp.Channel
 	config  Config
 	quit    chan struct{}
@@ -62,6 +65,8 @@ func (c *client) connect(healthcheck bool) error {
 	}
 	amqpConfig.TLSClientConfig = tlsConfig
 
+	c.connLock.Lock()
+	defer c.connLock.Unlock()
 	c.conn, err = amqp.DialConfig(c.config.URL, amqpConfig)
 	if err != nil {
 		return err
@@ -82,6 +87,8 @@ func (c *client) connect(healthcheck bool) error {
 
 // declareExchange creates the exchange in the broker where messages are published.
 func (c *client) declareExchange() error {
+	c.connLock.Lock()
+	defer c.connLock.Unlock()
 	var err error
 	if c.config.Passive {
 		err = c.channel.ExchangeDeclarePassive(
@@ -137,6 +144,7 @@ func (c *client) doHealthcheck() {
 				if err != nil {
 					channelFailures.Add(1)
 					log.Warnf("channel error: %v. Trying to reopen...", err)
+					c.connLock.Lock()
 					if c.conn != nil && !c.conn.IsClosed() {
 						for {
 							var err error
@@ -150,6 +158,7 @@ func (c *client) doHealthcheck() {
 							time.Sleep(time.Millisecond * 500)
 						}
 					}
+					c.connLock.Unlock()
 				}
 			case <-c.quit:
 				return
@@ -167,7 +176,9 @@ func (c *client) doHealthcheck() {
 					e := c.connect(false)
 					if e == nil {
 						log.Info("connection recovered")
+						c.connLock.Lock()
 						notify = c.conn.NotifyClose(make(chan *amqp.Error))
+						c.connLock.Unlock()
 						break
 					}
 				}
@@ -185,6 +196,8 @@ func (c *client) close() error {
 	}
 	c.quit <- struct{}{}
 	c.quit <- struct{}{}
+	c.connLock.Lock()
+	defer c.connLock.Unlock()
 	err := c.conn.Close()
 	if err != nil && err != amqp.ErrClosed {
 		return err

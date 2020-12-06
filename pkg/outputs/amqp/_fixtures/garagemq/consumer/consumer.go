@@ -57,7 +57,9 @@ func generateTag(id uint64) string {
 
 // Start starting consumer to fetch messages from queue
 func (consumer *Consumer) Start() {
+	consumer.statusLock.Lock()
 	consumer.status = started
+	consumer.statusLock.Unlock()
 	go consumer.startConsume()
 	consumer.Consume()
 }

@@ -54,6 +54,9 @@ func TestPublishAmqpOutput(t *testing.T) {
 		ExchangeType: "topic",
 		RoutingKey:   "fibratus",
 	})}
+
+	time.AfterFunc(time.Second*4, func() { done <- struct{}{} })
+
 	require.NoError(t, q.Connect())
 	defer q.Close()
 
@@ -135,7 +138,6 @@ func consumeKevents(t *testing.T, amqpURI string, done chan struct{}) error {
 	); err != nil {
 		return err
 	}
-
 	deliveries, err := channel.Consume(
 		queue.Name,         // name
 		"kevents-consumer", // consumerTag,
@@ -145,7 +147,6 @@ func consumeKevents(t *testing.T, amqpURI string, done chan struct{}) error {
 		false,              // noWait
 		nil,                // arguments
 	)
-
 	go func() {
 		for d := range deliveries {
 			body := d.Body

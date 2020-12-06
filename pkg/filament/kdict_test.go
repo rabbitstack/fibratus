@@ -59,7 +59,7 @@ func TestProduceKdict(t *testing.T) {
 	assert.Equal(t, "file", dict.Get(cat).String())
 	assert.Equal(t, "archrabbit", dict.Get(host).String())
 	assert.Equal(t, "Creates or opens a new file, directory, I/O device, pipe, console", dict.Get(desc).String())
-	assert.Equal(t, fmt.Sprintf("%d-%0d-%02d %d:%d:%d.%d", now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second(), now.Nanosecond()/1000), dict.Get(ts).String())
+	assert.Equal(t, fmt.Sprintf("%d-%0d-%02d %d:%d:%02d.%d", now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second(), now.Nanosecond()/1000), dict.Get(ts).String())
 }
 
 func TestProduceKdictWithIPAddresses(t *testing.T) {

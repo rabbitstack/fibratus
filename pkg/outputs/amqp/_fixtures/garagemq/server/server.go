@@ -30,6 +30,7 @@ type Server struct {
 	listener     *net.TCPListener
 	connSeq      uint64
 	connLock     sync.Mutex
+	statusLock   sync.Mutex
 	connections  map[uint64]*Connection
 	config       *config.Config
 	users        map[string]string
@@ -66,8 +67,9 @@ func (srv *Server) Start() {
 	srv.initDefaultVirtualHosts()
 
 	go srv.listen()
-
+	srv.statusLock.Lock()
 	srv.status = Running
+	srv.statusLock.Unlock()
 	select {}
 }
 
@@ -75,7 +77,9 @@ func (srv *Server) Start() {
 func (srv *Server) Stop() {
 	srv.vhostsLock.Lock()
 	defer srv.vhostsLock.Unlock()
+	srv.statusLock.Lock()
 	srv.status = Stopping
+	srv.statusLock.Unlock()
 
 	// stop accept new connections
 	srv.listener.Close()
@@ -94,8 +98,9 @@ func (srv *Server) Stop() {
 	for _, virtualHost := range srv.vhosts {
 		virtualHost.Stop()
 	}
-
+	srv.statusLock.Lock()
 	srv.status = Stopped
+	srv.statusLock.Unlock()
 }
 
 func (srv *Server) getVhost(name string) *VirtualHost {
@@ -123,9 +128,12 @@ func (srv *Server) listen() {
 	for {
 		conn, err := srv.listener.AcceptTCP()
 		if err != nil {
+			srv.statusLock.Lock()
 			if srv.status != Running {
+				srv.statusLock.Unlock()
 				return
 			}
+			srv.statusLock.Unlock()
 			srv.stopWithError(err, "accepting connection")
 		}
 		log.WithFields(log.Fields{

@@ -51,6 +51,8 @@ func (channel *Channel) connectionStart() {
 	var method = amqp.ConnectionStart{VersionMajor: 0, VersionMinor: 9, ServerProperties: &serverProps, Mechanisms: []byte("PLAIN"), Locales: []byte("en_US")}
 	channel.SendMethod(&method)
 
+	channel.conn.statusLock.Lock()
+	defer channel.conn.statusLock.Unlock()
 	channel.conn.status = ConnStart
 }
 
@@ -79,12 +81,16 @@ func (channel *Channel) connectionStartOk(method *amqp.ConnectionStartOk) *amqp.
 		FrameMax:   channel.conn.maxFrameSize,
 		Heartbeat:  channel.conn.heartbeatInterval,
 	})
+	channel.conn.statusLock.Lock()
+	defer channel.conn.statusLock.Unlock()
 	channel.conn.status = ConnTune
 
 	return nil
 }
 
 func (channel *Channel) connectionTuneOk(method *amqp.ConnectionTuneOk) *amqp.Error {
+	channel.conn.statusLock.Lock()
+	defer channel.conn.statusLock.Unlock()
 	channel.conn.status = ConnTuneOK
 
 	if method.ChannelMax > channel.conn.maxChannels || method.FrameMax > channel.conn.maxFrameSize {
@@ -116,6 +122,8 @@ func (channel *Channel) connectionOpen(method *amqp.ConnectionOpen) *amqp.Error 
 	channel.conn.vhostName = method.VirtualHost
 
 	channel.SendMethod(&amqp.ConnectionOpenOk{})
+	channel.conn.statusLock.Lock()
+	defer channel.conn.statusLock.Unlock()
 	channel.conn.status = ConnOpenOK
 
 	channel.logger.Info("AMQP connection open")

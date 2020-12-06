@@ -61,17 +61,3 @@ func TestStartKtraceNoSysResources(t *testing.T) {
 
 	require.Error(t, err)
 }
-
-func TestStartKtraceBufferTooSmall(t *testing.T) {
-
-	startTrace = func(name string, props *etw.EventTraceProperties) (etw.TraceHandle, error) {
-		return etw.TraceHandle(0), nil
-	}
-
-	ktracec := NewKtraceController(config.KstreamConfig{EnableThreadKevents: true, BufferSize: 124})
-
-	err := ktracec.StartKtrace()
-
-	require.Error(t, err)
-	assert.EqualError(t, err, "buffer size of 124 KB is too small")
-}

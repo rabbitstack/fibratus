@@ -51,6 +51,7 @@ type Channel struct {
 	confirmQueue       []*amqp.ConfirmMeta
 	ackLock            sync.Mutex
 	ackStore           map[uint64]*UnackedMessage
+	statusLock         sync.Mutex
 
 	bufferPool *pool.BufferPool
 
@@ -336,6 +337,8 @@ func (channel *Channel) addConfirm(meta *amqp.ConfirmMeta) {
 	}
 	channel.confirmLock.Lock()
 	defer channel.confirmLock.Unlock()
+	channel.statusLock.Lock()
+	defer channel.statusLock.Unlock()
 
 	if channel.status == channelClosed {
 		return
@@ -345,6 +348,8 @@ func (channel *Channel) addConfirm(meta *amqp.ConfirmMeta) {
 
 func (channel *Channel) sendConfirms() {
 	tick := time.Tick(20 * time.Millisecond)
+	channel.statusLock.Lock()
+	defer channel.statusLock.Unlock()
 	for range tick {
 		if channel.status == channelClosed {
 			return
@@ -415,12 +420,16 @@ func (channel *Channel) close() {
 	if channel.id > 0 {
 		channel.handleReject(0, true, true, &amqp.BasicNack{})
 	}
+	channel.statusLock.Lock()
+	defer channel.statusLock.Unlock()
 	channel.status = channelClosed
 	channel.logger.Info("Channel closed")
 }
 
 func (channel *Channel) delete() {
 	channel.closeCh <- true
+	channel.statusLock.Lock()
+	defer channel.statusLock.Unlock()
 	channel.status = channelDelete
 }
 

@@ -68,6 +68,8 @@ type Connection struct {
 	heartbeatTimeout  uint16
 	heartbeatTimer    *time.Ticker
 
+	connLock sync.Mutex
+
 	lastOutgoingTS chan time.Time
 }
 
@@ -314,11 +316,13 @@ func (conn *Connection) handleIncoming() {
 			}
 			return
 		}
-
+		conn.statusLock.Lock()
 		if conn.status < ConnOpen && frame.ChannelID != 0 {
+			conn.statusLock.Unlock()
 			conn.logger.WithError(err).Error("Frame not allowed for unopened connection")
 			return
 		}
+		conn.statusLock.Unlock()
 
 		conn.channelsLock.RLock()
 		channel, ok := conn.channels[frame.ChannelID]
@@ -374,6 +378,7 @@ func (conn *Connection) heartBeater() {
 				}
 			}
 		}
+
 	}()
 
 	for tickTime := range conn.heartbeatTimer.C {
