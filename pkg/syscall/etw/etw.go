@@ -40,13 +40,18 @@ var (
 	enableTrace         = advapi32.NewProc("EnableTraceEx")
 )
 
+// TraceOperation is the type alias for the trace operation.
 type TraceOperation uint32
 
 const (
-	Query  TraceOperation = 0
-	Stop   TraceOperation = 1
+	// Query represents the query trace operation.
+	Query TraceOperation = 0
+	// Stop represents the stop trace operation.
+	Stop TraceOperation = 1
+	// Update represents the update trace operation.
 	Update TraceOperation = 2
-	Flush  TraceOperation = 3
+	// Flush represents the flush trace operation.
+	Flush TraceOperation = 3
 )
 
 // TraceHandle is an alias for trace handle type

@@ -39,94 +39,173 @@ const (
 	// PsComm represents the process command line field
 	PsComm Field = "ps.comm"
 	// PsExe represents the process image path field
-	PsExe         Field = "ps.exe"
-	PsArgs        Field = "ps.args"
-	PsCwd         Field = "ps.cwd"
-	PsSID         Field = "ps.sid"
-	PsSessionID   Field = "ps.sessionid"
-	PsEnvs        Field = "ps.envs"
-	PsHandles     Field = "ps.handles"
+	PsExe Field = "ps.exe"
+	// PsArgs represents the process command line arguments
+	PsArgs Field = "ps.args"
+	// PsCwd represents the process current working directory
+	PsCwd Field = "ps.cwd"
+	// PsSID represents the process security identifier
+	PsSID Field = "ps.sid"
+	// PsSessionID represents the session id bound to the process
+	PsSessionID Field = "ps.sessionid"
+	// PsEnvs represents the process environment variables
+	PsEnvs Field = "ps.envs"
+	// PsHandles represents the process handles
+	PsHandles Field = "ps.handles"
+	// PsHandleTypes represents the process handle types
 	PsHandleTypes Field = "ps.handle.types"
-	PsDTB         Field = "ps.dtb"
-	PsModules     Field = "ps.modules"
+	// PsDTB represents the process directory table base address
+	PsDTB Field = "ps.dtb"
+	// PsModules represents the process modules
+	PsModules Field = "ps.modules"
 
-	ThreadBasePrio    Field = "thread.prio"
-	ThreadIOPrio      Field = "thread.io.prio"
-	ThreadPagePrio    Field = "thread.page.prio"
-	ThreadKstackBase  Field = "thread.kstack.base"
+	// ThreadBasePrio is the base thread priority
+	ThreadBasePrio Field = "thread.prio"
+	// ThreadIOPrio is the thread I/O priority
+	ThreadIOPrio Field = "thread.io.prio"
+	// ThreadPagePrio is the thread page priority
+	ThreadPagePrio Field = "thread.page.prio"
+	// ThreadKstackBase is the thread kernel stack start address
+	ThreadKstackBase Field = "thread.kstack.base"
+	// ThreadKstackLimit is the thread kernel stack end address
 	ThreadKstackLimit Field = "thread.kstack.limit"
-	ThreadUstackBase  Field = "thread.ustack.base"
+	// ThreadUstackBase is the thread user stack start address
+	ThreadUstackBase Field = "thread.ustack.base"
+	// ThreadUstackLimit is the thead user stack end address
 	ThreadUstackLimit Field = "thread.ustack.limit"
-	ThreadEntrypoint  Field = "thread.entrypoint"
+	// ThreadEntrypoint is the thread entrypoint address
+	ThreadEntrypoint Field = "thread.entrypoint"
 
+	// PeNumSections represents the number of sections
 	PeNumSections Field = "pe.nsections"
-	PeSections    Field = "pe.sections"
-	PeNumSymbols  Field = "pe.nsymbols"
-	PeSymbols     Field = "pe.symbols"
-	PeImports     Field = "pe.imports"
-	PeTimestamp   Field = "pe.timestamp"
+	// PeSections represents distinct section inside PE
+	PeSections Field = "pe.sections"
+	// PeNumSymbols represents the number of exported symbols
+	PeNumSymbols Field = "pe.nsymbols"
+	// PeSymbols represents imported symbols
+	PeSymbols Field = "pe.symbols"
+	// PeImports represents imported libraries (e.g. kernel32.dll)
+	PeImports Field = "pe.imports"
+	// PeTimestamp is the PE build timestamp
+	PeTimestamp Field = "pe.timestamp"
+	// PeBaseAddress represents the base address when the binary is loaded
 	PeBaseAddress Field = "pe.address.base"
-	PeEntrypoint  Field = "pe.address.entrypoint"
-	PeResources   Field = "pe.resources"
+	// PeEntrypoint is the address of the entrypoint function
+	PeEntrypoint Field = "pe.address.entrypoint"
+	// PeResources represents PE resources
+	PeResources Field = "pe.resources"
 
-	KevtSeq         Field = "kevt.seq"
-	KevtPID         Field = "kevt.pid"
-	KevtTID         Field = "kevt.tid"
-	KevtCPU         Field = "kevt.cpu"
-	KevtDesc        Field = "kevt.desc"
-	KevtHost        Field = "kevt.host"
-	KevtTime        Field = "kevt.time"
-	KevtTimeHour    Field = "kevt.time.h"
-	KevtTimeMin     Field = "kevt.time.m"
-	KevtTimeSec     Field = "kevt.time.s"
-	KevtTimeNs      Field = "kevt.time.ns"
-	KevtDate        Field = "kevt.date"
-	KevtDateDay     Field = "kevt.date.d"
-	KevtDateMonth   Field = "kevt.date.m"
-	KevtDateYear    Field = "kevt.date.y"
-	KevtDateTz      Field = "kevt.date.tz"
-	KevtDateWeek    Field = "kevt.date.week"
+	// KevtSeq is the event sequence number
+	KevtSeq Field = "kevt.seq"
+	// KevtPID is the process identifier that generated the event
+	KevtPID Field = "kevt.pid"
+	// KevtTID is the thread identifier that generated the event
+	KevtTID Field = "kevt.tid"
+	// KevtCPU is the CPU core where the event was generated
+	KevtCPU Field = "kevt.cpu"
+	// KevtDesc represents the event description
+	KevtDesc Field = "kevt.desc"
+	// KevtHost represents the host where the event was produced
+	KevtHost Field = "kevt.host"
+	// KevtTime is the event time
+	KevtTime Field = "kevt.time"
+	// KevtTimeHour is the hour part of the event time
+	KevtTimeHour Field = "kevt.time.h"
+	// KevtTimeMin is the minute part of the event time
+	KevtTimeMin Field = "kevt.time.m"
+	// KevtTimeSec is the second part of the event time
+	KevtTimeSec Field = "kevt.time.s"
+	// KevtTimeNs is the nanosecond part of the event time
+	KevtTimeNs Field = "kevt.time.ns"
+	// KevtDate is the event date
+	KevtDate Field = "kevt.date"
+	// KevtDateDay is the day of event date
+	KevtDateDay Field = "kevt.date.d"
+	// KevtDateMonth is the month of event date
+	KevtDateMonth Field = "kevt.date.m"
+	// KevtDateYear is the year of event date
+	KevtDateYear Field = "kevt.date.y"
+	// KevtDateTz is the time zone of event timestamp
+	KevtDateTz Field = "kevt.date.tz"
+	// KevtDateWeek is the event week number
+	KevtDateWeek Field = "kevt.date.week"
+	// KevtDateWeekday is the event week day
 	KevtDateWeekday Field = "kevt.date.weekday"
-	KevtName        Field = "kevt.name"
-	KevtCategory    Field = "kevt.category"
-	KevtMeta        Field = "kevt.meta"
-	KevtNparams     Field = "kevt.nparams"
+	// KevtName is the event name
+	KevtName Field = "kevt.name"
+	// KevtCategory is the event category
+	KevtCategory Field = "kevt.category"
+	// KevtMeta is the event metadata
+	KevtMeta Field = "kevt.meta"
+	// KevtNparams is the number of event parameters
+	KevtNparams Field = "kevt.nparams"
 
-	HandleID     Field = "handle.id"
+	// HandleID represents the handle identifier within the process address space
+	HandleID Field = "handle.id"
+	// HandleObject represents the handle object address
 	HandleObject Field = "handle.object"
-	HandleName   Field = "handle.name"
-	HandleType   Field = "handle.type"
+	// HandleName represents the handle name
+	HandleName Field = "handle.name"
+	// HandleType represents the handle type (e.g. file)
+	HandleType Field = "handle.type"
 
-	NetDIP        Field = "net.dip"
-	NetSIP        Field = "net.sip"
-	NetDport      Field = "net.dport"
-	NetSport      Field = "net.sport"
-	NetDportName  Field = "net.dport.name"
-	NetSportName  Field = "net.sport.name"
-	NetL4Proto    Field = "net.l4.proto"
+	// NetDIP represents network destination IP address
+	NetDIP Field = "net.dip"
+	// NetSIP represents the source IP address
+	NetSIP Field = "net.sip"
+	// NetDport represents the destination port
+	NetDport Field = "net.dport"
+	// NetSport represents the source port
+	NetSport Field = "net.sport"
+	// NetDportName represents the destination port IANA name
+	NetDportName Field = "net.dport.name"
+	// NetSportName represents the source port IANA name
+	NetSportName Field = "net.sport.name"
+	// NetL4Proto represents the Layer4 protocol name (e.g. TCP)
+	NetL4Proto Field = "net.l4.proto"
+	// NetPacketSize represents the packet size
 	NetPacketSize Field = "net.size"
 
-	FileObject    Field = "file.object"
-	FileName      Field = "file.name"
+	// FileObject represents the address of the file object
+	FileObject Field = "file.object"
+	// FileName represents the fie name
+	FileName Field = "file.name"
+	// FileOperation represents the file operation (e.g. create)
 	FileOperation Field = "file.operation"
+	// FileShareMask represents the file share mask
 	FileShareMask Field = "file.share.mask"
-	FileIOSize    Field = "file.io.size"
-	FileOffset    Field = "file.offset"
-	FileType      Field = "file.type"
+	// FileIOSize represents the number of read/written bytes
+	FileIOSize Field = "file.io.size"
+	// FileOffset represents the read/write offset
+	FileOffset Field = "file.offset"
+	// FileType represents the file type
+	FileType Field = "file.type"
 
-	RegistryKeyName   Field = "registry.key.name"
+	// RegistryKeyName represents the registry key name
+	RegistryKeyName Field = "registry.key.name"
+	// RegistryKeyHandle represents the registry KCB address
 	RegistryKeyHandle Field = "registry.key.handle"
-	RegistryValue     Field = "registry.value"
+	// RegistryValue represents the registry value
+	RegistryValue Field = "registry.value"
+	// RegistryValueType represents the registry value type
 	RegistryValueType Field = "registry.value.type"
-	RegistryStatus    Field = "registry.status"
+	// RegistryStatus represent the registry operation status
+	RegistryStatus Field = "registry.status"
 
-	ImageBase           Field = "image.base.address"
-	ImageSize           Field = "image.size"
-	ImageChecksum       Field = "image.checksum"
+	// ImageBase is the module base address
+	ImageBase Field = "image.base.address"
+	// ImageSize is the module size
+	ImageSize Field = "image.size"
+	// ImageChecksum represents the module checksum hash
+	ImageChecksum Field = "image.checksum"
+	// ImageDefaultAddress represents the module address
 	ImageDefaultAddress Field = "image.default.address"
-	ImageName           Field = "image.name"
-	ImagePID            Field = "image.pid"
+	// ImageName is the module full name
+	ImageName Field = "image.name"
+	// ImagePID is the pid of the process where the image was loaded
+	ImagePID Field = "image.pid"
 
+	// None represents the unknown field
 	None Field = ""
 )
 
@@ -141,19 +220,29 @@ const (
 	SectionEntropy Subfield = "entropy"
 	// SectionMD5Hash refers to the section md5 sum
 	SectionMD5Hash Subfield = "md5"
-	SectionSize    Subfield = "size"
+	// SectionSize is the section size
+	SectionSize Subfield = "size"
 
-	ModuleSize           Subfield = "size"
-	ModuleChecksum       Subfield = "checksum"
-	ModuleLocation       Subfield = "location"
-	ModuleBaseAddress    Subfield = "address.base"
+	// ModuleSize is the module size
+	ModuleSize Subfield = "size"
+	// ModuleChecksum is the module checksum
+	ModuleChecksum Subfield = "checksum"
+	// ModuleLocation is the module location
+	ModuleLocation Subfield = "location"
+	// ModuleBaseAddress is the module base address
+	ModuleBaseAddress Subfield = "address.base"
+	// ModuleDefaultAddress is the module address
 	ModuleDefaultAddress Subfield = "address.default"
 )
 
 const (
-	PsEnvsSubfield      = "ps.envs["
-	PsModsSubfield      = "ps.modules["
-	PeSectionsSubfield  = "pe.sections["
+	// PsEnvsSubfield is the process environment variable indexeer
+	PsEnvsSubfield = "ps.envs["
+	// PsModsSubfield is the process module indexer
+	PsModsSubfield = "ps.modules["
+	// PeSectionsSubfield is the PE section indexer
+	PeSectionsSubfield = "pe.sections["
+	// PeResourcesSubfield is the PE resource indexer
 	PeResourcesSubfield = "pe.resources["
 )
 

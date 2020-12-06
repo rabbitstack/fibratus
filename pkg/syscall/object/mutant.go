@@ -26,9 +26,11 @@ import (
 
 var ntQueryMutant = nt.NewProc("NtQueryMutant")
 
+// MutantInformationClass is the type alias for the mutant information class.
 type MutantInformationClass uint8
 
 const (
+	// MutantBasicInfo is the information class for getting mutant basic information.
 	MutantBasicInfo MutantInformationClass = iota
 )
 

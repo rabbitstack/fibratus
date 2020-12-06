@@ -26,7 +26,8 @@ import (
 type ID uint32
 
 const (
-	Version ID = 16 // Version defines version resources
+	// Version defines version resources
+	Version ID = 16
 )
 
 // String yields a human-readable resource type name.

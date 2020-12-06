@@ -148,8 +148,10 @@ const (
 	// NetConnID is the parameter name that represents a unique connection identifier.
 	NetConnID = "connid"
 	// NetL4Proto is the parameter name that identifies the Layer 4 protocol name.
-	NetL4Proto   = "l4_proto"
+	NetL4Proto = "l4_proto"
+	// NetDportName is the field that denotes the destination port name.
 	NetDportName = "dport_name"
+	// NetSportName is the field that denotes the source port name.
 	NetSportName = "sport_name"
 
 	// HandleID identifies the parameter that specifies the handle identifier.

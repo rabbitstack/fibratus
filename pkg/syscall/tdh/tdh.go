@@ -57,6 +57,7 @@ func GetEventInformation(evt *etw.EventRecord, buffer []byte, size uint32) error
 	}
 }
 
+// GetPropertySize retrieves the size of one or more property values in the event data.
 func GetPropertySize(evt *etw.EventRecord, descriptor *PropertyDataDescriptor) (uint32, error) {
 	var size uint32
 	errno, _, err := tdhGetPropertySize.Call(
@@ -73,6 +74,7 @@ func GetPropertySize(evt *etw.EventRecord, descriptor *PropertyDataDescriptor) (
 	return size, nil
 }
 
+// GetProperty retrieves a property value from the event data.
 func GetProperty(evt *etw.EventRecord, descriptor *PropertyDataDescriptor, size uint32, buffer []byte) error {
 	errno, _, err := tdhGetProperty.Call(
 		uintptr(unsafe.Pointer(evt)),

@@ -62,10 +62,12 @@ type TypesInformation struct {
 	NumberOfTypes uint32
 }
 
+// NameInformation sotres object name information.
 type NameInformation struct {
 	ObjectName utf16.UnicodeString
 }
 
+// ProcessHandleTableEntryInfo is the structure that describes the process handle entry.
 type ProcessHandleTableEntryInfo struct {
 	Handle           handle.Handle
 	HandleCount      uintptr
@@ -76,12 +78,14 @@ type ProcessHandleTableEntryInfo struct {
 	reserved         uint32
 }
 
+// ProcessHandleSnapshotInformation is the structure that holds the process handle table.
 type ProcessHandleSnapshotInformation struct {
 	NumberOfHandles uintptr
 	reserved        uintptr
 	Handles         [1]ProcessHandleTableEntryInfo
 }
 
+// SystemHandleTableEntryInfoEx is the structure that describes the process handle entry.
 type SystemHandleTableEntryInfoEx struct {
 	Object                uint64
 	ProcessID             uintptr
@@ -93,6 +97,7 @@ type SystemHandleTableEntryInfoEx struct {
 	reserved              uint32
 }
 
+// SystemHandleInformationEx is the structures that holds the process handle table.
 type SystemHandleInformationEx struct {
 	NumberOfHandles uintptr
 	reserved        uintptr

@@ -181,7 +181,7 @@ func (kevt *Kevent) MarshalRaw() []byte {
 	return b
 }
 
-// Unmarshal recovers the state of the kernel event from the byte stream.
+// UnmarshalRaw recovers the state of the kernel event from the byte stream.
 func (kevt *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 	if len(b) < 34 {
 		return fmt.Errorf("expected at least 34 bytes but got %d bytes", len(b))

@@ -39,7 +39,8 @@ const (
 
 const (
 	// KernelLoggerSession represents the default session name for NT kernel logger
-	KernelLoggerSession        = "NT Kernel Logger"
+	KernelLoggerSession = "NT Kernel Logger"
+	// KernelLoggerRundownSession is the session name for the kernel rundown logger
 	KernelLoggerRundownSession = "Kernel Rundown Logger"
 	// WnodeTraceFlagGUID indicates that the structure contains event tracing information
 	WnodeTraceFlagGUID = 0x00020000
@@ -50,26 +51,46 @@ const (
 )
 
 const (
-	ALPC       EventTraceFlags = 0x00100000
-	Cswitch    EventTraceFlags = 0x00000010
-	DbgPrint   EventTraceFlags = 0x00040000
+	// ALPC flag activates ALPC events
+	ALPC EventTraceFlags = 0x00100000
+	// Cswitch flag enables context switch events
+	Cswitch EventTraceFlags = 0x00000010
+	// DbgPrint flag enables stack walk information
+	DbgPrint EventTraceFlags = 0x00040000
+	// DiskFileIO flag enables file system events
 	DiskFileIO EventTraceFlags = 0x00000200
-	DiskIO     EventTraceFlags = 0x00000100
+	// DiskIO flag enables disk I/O events
+	DiskIO EventTraceFlags = 0x00000100
+	// DiskIOInit flag enables start/end disk I/O events
 	DiskIOInit EventTraceFlags = 0x00000400
+	// Dispatcher flag activates dispatcher events
 	Dispatcher EventTraceFlags = 0x00000800
-	DPC        EventTraceFlags = 0x00000020
-	Driver     EventTraceFlags = 0x00800000
-	FileIO     EventTraceFlags = 0x02000000
+	// DPC flag enables Deferred Procedure Call events
+	DPC EventTraceFlags = 0x00000020
+	// Driver flag enables driver events
+	Driver EventTraceFlags = 0x00800000
+	// FileIO enables file I/O events.
+	FileIO EventTraceFlags = 0x02000000
+	// FileIOInit flag enables file start/end events.
 	FileIOInit EventTraceFlags = 0x04000000
-	ImageLoad  EventTraceFlags = 0x00000004
-	Handle     EventTraceFlags = 0x80000040
-	IRQ        EventTraceFlags = 0x00000040
-	Job        EventTraceFlags = 0x00080000
-	NetTCPIP   EventTraceFlags = 0x00010000
-	Process    EventTraceFlags = 0x00000001
-	Registry   EventTraceFlags = 0x00020000
-	Syscall    EventTraceFlags = 0x00000080
-	Thread     EventTraceFlags = 0x00000002
+	// ImageLoad flag enables image events.
+	ImageLoad EventTraceFlags = 0x00000004
+	// Handle flag enables handle events.
+	Handle EventTraceFlags = 0x80000040
+	// IRQ flag enables IRQ events.
+	IRQ EventTraceFlags = 0x00000040
+	// Job flag enables job events.
+	Job EventTraceFlags = 0x00080000
+	// NetTCPIP flag enables network events.
+	NetTCPIP EventTraceFlags = 0x00010000
+	// Process flag enables process events.
+	Process EventTraceFlags = 0x00000001
+	// Registry flag enable registry events.
+	Registry EventTraceFlags = 0x00020000
+	// Syscall flag enables syscall enter/exit events.
+	Syscall EventTraceFlags = 0x00000080
+	// Thread flag enables thread events.
+	Thread EventTraceFlags = 0x00000002
 )
 
 // String returns the string representation of enabled event trace flags.
@@ -417,8 +438,8 @@ type EventHeader struct {
 	ActivityID syscall.GUID
 }
 
-// ETWBufferContexts provides context information about the event.
-type ETWBufferContext struct {
+// BufferContext provides context information about the event.
+type BufferContext struct {
 	// ProcessorIndex is an union type that contains among other fields the number of the CPU on which
 	// the provider process was running.
 	ProcessorIndex [2]byte
@@ -450,7 +471,7 @@ type EventRecord struct {
 	// Header represents information about the event such as the time stamp for when it was written.
 	Header EventHeader
 	// BufferContext defines information such as the session that logged the event.
-	BufferContext ETWBufferContext
+	BufferContext BufferContext
 	// ExtendedDataCount is the number of extended data structures in the `ExtendedData` field.
 	ExtendedDataCount uint16
 	// UserDataLength represents the size, in bytes, of the data in the `UserData` field.

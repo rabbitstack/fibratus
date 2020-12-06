@@ -30,8 +30,10 @@ var (
 	resetEvent  = kernel32.NewProc("ResetEvent")
 )
 
+// Event is the type alias for event objects.
 type Event uintptr
 
+// NewEvent produces a new event with the specified flags.
 func NewEvent(manualReset, isSignaled bool) (Event, error) {
 	var reset uint8
 	var signaled uint8
@@ -48,10 +50,7 @@ func NewEvent(manualReset, isSignaled bool) (Event, error) {
 	return Event(handle), nil
 }
 
-func NewNamedEvent() {
-
-}
-
+// Set sets the event object to the signaled state.
 func (e Event) Set() error {
 	errno, _, err := setEvent.Call(uintptr(e))
 	if errno == 0 {
@@ -60,6 +59,7 @@ func (e Event) Set() error {
 	return nil
 }
 
+// Reset sets the event object to the nonsignaled state.
 func (e Event) Reset() error {
 	errno, _, err := resetEvent.Call(uintptr(e))
 	if errno == 0 {
@@ -68,6 +68,7 @@ func (e Event) Reset() error {
 	return nil
 }
 
+// Close closes the handle allocated by the event object.
 func (e Event) Close() error {
 	return syscall.Close(syscall.Handle(e))
 }

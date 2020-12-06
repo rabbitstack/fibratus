@@ -434,7 +434,7 @@ func (k *kstreamConsumer) produceParams(ktype ktypes.Ktype, evt *etw.EventRecord
 		// that we'll allocate to accommodate the property value
 		propp := unsafe.Pointer(uintptr(unsafe.Pointer(trace)) + uintptr(property.NameOffset))
 		if !ok {
-			kparName = utf16.UTF16PtrToString(propp)
+			kparName = utf16.PtrToString(propp)
 			offsets[hashKey] = kparName
 		}
 
@@ -489,7 +489,7 @@ func getParam(name string, buffer []byte, size uint32, nonStructType tdh.NonStru
 
 	switch nonStructType.InType {
 	case tdh.IntypeUnicodeString:
-		typ, value = kparams.UnicodeString, utf16.UTF16PtrToString(unsafe.Pointer(&buffer[0]))
+		typ, value = kparams.UnicodeString, utf16.PtrToString(unsafe.Pointer(&buffer[0]))
 	case tdh.IntypeAnsiString:
 		typ, value = kparams.AnsiString, string((*[1<<30 - 1]byte)(unsafe.Pointer(&buffer[0]))[:size-1:size-1])
 

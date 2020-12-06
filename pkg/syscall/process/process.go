@@ -38,7 +38,7 @@ var (
 	readProcessMemory         = kernel32.NewProc("ReadProcessMemory")
 	ntQueryInformationProcess = native.NewProc("NtQueryInformationProcess")
 	getProcessTimes           = kernel32.NewProc("GetProcessTimes")
-	getProcessIdOfThread      = kernel32.NewProc("GetProcessIdOfThread")
+	getProcessIDOfThread      = kernel32.NewProc("GetProcessIdOfThread")
 	getExitCodeProcess        = kernel32.NewProc("GetExitCodeProcess")
 )
 
@@ -62,7 +62,8 @@ type InfoClassFlags uint8
 
 const (
 	// BasicInformationClass returns basic process's information
-	BasicInformationClass  InfoClassFlags = 0
+	BasicInformationClass InfoClassFlags = 0
+	// HandleInformationClass returns allocated process handles
 	HandleInformationClass InfoClassFlags = 51
 )
 
@@ -119,6 +120,7 @@ func ReadMemory(handle handle.Handle, addr unsafe.Pointer, size uintptr) ([]byte
 	return nil, os.NewSyscallError("ReadProcessMemory", err)
 }
 
+// ReadMemoryUnicode reads data from an area of memory as a slice of Unicode code points.
 func ReadMemoryUnicode(handle handle.Handle, addr unsafe.Pointer, size uintptr) ([]uint16, error) {
 	buf := make([]uint16, size)
 	errno, _, err := readProcessMemory.Call(uintptr(handle), uintptr(addr), uintptr(unsafe.Pointer(&buf[0])), size, uintptr(0))
@@ -156,7 +158,7 @@ func GetStartTime(handle handle.Handle) (time.Time, error) {
 
 // GetPIDFromThread returns the pid to which the specified thread belongs.
 func GetPIDFromThread(handle handle.Handle) (uint32, error) {
-	pid, _, err := getProcessIdOfThread.Call(uintptr(handle))
+	pid, _, err := getProcessIDOfThread.Call(uintptr(handle))
 	if pid == 0 {
 		return uint32(0), os.NewSyscallError("GetProcessIdOfThread", err)
 	}

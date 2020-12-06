@@ -33,14 +33,20 @@ var (
 	ntQueryObject = nt.NewProc("NtQueryObject")
 )
 
+// InformationClass is the type alias for object information classes.
 type InformationClass uint8
 
 const (
-	NameInformationClass            InformationClass = 1
-	TypeInformationClass            InformationClass = 2
-	TypesInformationClass           InformationClass = 3
-	SystemHandleInformationClass                     = 16
-	SystemExtendedHandleInformation                  = 64
+	// NameInformationClass returns the object name information.
+	NameInformationClass InformationClass = 1
+	// TypeInformationClass returns the object type information.
+	TypeInformationClass InformationClass = 2
+	// TypesInformationClass returns handle object types.
+	TypesInformationClass InformationClass = 3
+	// SystemHandleInformationClass returns allocated system handles.
+	SystemHandleInformationClass = 16
+	// SystemExtendedHandleInformation returns extended allocated system handles.
+	SystemExtendedHandleInformation = 64
 )
 
 // Query retrieves specified information for the handle reference.

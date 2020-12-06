@@ -53,9 +53,9 @@ func StringToUTF16Ptr(s string) *uint16 {
 	return p
 }
 
-// UTF16PtrToString is like UTF16ToString, but takes *uint16
+// PtrToString is like UTF16ToString, but takes *uint16
 // as a parameter instead of []uint16.
-func UTF16PtrToString(p unsafe.Pointer) string {
+func PtrToString(p unsafe.Pointer) string {
 	if p == nil {
 		return ""
 	}
@@ -68,6 +68,6 @@ func UTF16PtrToString(p unsafe.Pointer) string {
 		hdr.Cap++
 		hdr.Len++
 	}
-	// Remove trailing NUL and decode into a Go string..
+	// Remove trailing NUL and decode into a Go string.
 	return string(utf16.Decode(s[:len(s)-1]))
 }

@@ -45,18 +45,17 @@ const (
 
 // Errors returned by AdjustTokenPrivileges.
 const (
-	ERROR_NOT_ALL_ASSIGNED syscall.Errno = 1300
+	// ErrorNotAllAsigned specifies that the token does not have one or more of the privileges specified in the state parameter.
+	ErrorNotAllAsigned syscall.Errno = 1300
 )
 
 // Attribute bits for privileges.
 const (
-	_SE_PRIVILEGE_ENABLED_BY_DEFAULT uint32 = 0x00000001
-	_SE_PRIVILEGE_ENABLED            uint32 = 0x00000002
-	_SE_PRIVILEGE_REMOVED            uint32 = 0x00000004
-	_SE_PRIVILEGE_USED_FOR_ACCESS    uint32 = 0x80000000
+	// PrivilegedEnabled enables the privilege.
+	PrivilegedEnabled uint32 = 0x00000002
 )
 
-func _LookupPrivilegeValue(systemName string, name string, luid *int64) (err error) {
+func lookupPrivilegeValue(systemName string, name string, luid *int64) (err error) {
 	var _p0 *uint16
 	_p0, err = syscall.UTF16PtrFromString(systemName)
 	if err != nil {
@@ -67,10 +66,10 @@ func _LookupPrivilegeValue(systemName string, name string, luid *int64) (err err
 	if err != nil {
 		return
 	}
-	return __LookupPrivilegeValue(_p0, _p1, luid)
+	return lookupPrivilegeValueW(_p0, _p1, luid)
 }
 
-func __LookupPrivilegeValue(systemName *uint16, name *uint16, luid *int64) (err error) {
+func lookupPrivilegeValueW(systemName *uint16, name *uint16, luid *int64) (err error) {
 	r1, _, e1 := syscall.Syscall(procLookupPrivilegeValueW.Addr(), 3, uintptr(unsafe.Pointer(systemName)), uintptr(unsafe.Pointer(name)), uintptr(unsafe.Pointer(luid)))
 	if r1 == 0 {
 		if e1 != 0 {
@@ -82,7 +81,7 @@ func __LookupPrivilegeValue(systemName *uint16, name *uint16, luid *int64) (err 
 	return
 }
 
-func _AdjustTokenPrivileges(token syscall.Token, releaseAll bool, input *byte, outputSize uint32, output *byte, requiredSize *uint32) (success bool, err error) {
+func adjustTokenPrivileges(token syscall.Token, releaseAll bool, input *byte, outputSize uint32, output *byte, requiredSize *uint32) (success bool, err error) {
 	var _p0 uint32
 	if releaseAll {
 		_p0 = 1
@@ -109,7 +108,7 @@ func mapPrivileges(names []string) ([]int64, error) {
 	for _, name := range names {
 		p, ok := privNames[name]
 		if !ok {
-			err := _LookupPrivilegeValue("", name, &p)
+			err := lookupPrivilegeValue("", name, &p)
 			if err != nil {
 				return nil, errors.Wrapf(err, "LookupPrivilegeValue failed on '%v'", name)
 			}
@@ -133,14 +132,14 @@ func EnableTokenPrivileges(token syscall.Token, privileges ...string) error {
 	binary.Write(&b, binary.LittleEndian, uint32(len(privValues)))
 	for _, p := range privValues {
 		binary.Write(&b, binary.LittleEndian, p)
-		binary.Write(&b, binary.LittleEndian, uint32(_SE_PRIVILEGE_ENABLED))
+		binary.Write(&b, binary.LittleEndian, uint32(PrivilegedEnabled))
 	}
 
-	success, err := _AdjustTokenPrivileges(token, false, &b.Bytes()[0], uint32(b.Len()), nil, nil)
+	success, err := adjustTokenPrivileges(token, false, &b.Bytes()[0], uint32(b.Len()), nil, nil)
 	if !success {
 		return err
 	}
-	if err == ERROR_NOT_ALL_ASSIGNED {
+	if err == ErrorNotAllAsigned {
 		return errors.Wrap(err, "error not all privileges were assigned")
 	}
 

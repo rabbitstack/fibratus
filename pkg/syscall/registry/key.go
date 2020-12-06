@@ -22,14 +22,20 @@ package registry
 type Key uint32
 
 const (
+	// InvalidKey designates invalid registry key.
 	InvalidKey Key = 0
 )
 
 const (
+	// ClassesRoot represents the HKEY_CLASSES_ROOT hive
 	ClassesRoot Key = 0x80000000 + iota
+	// CurrentUser represents the HKEY_CURRENT_USER hive
 	CurrentUser
+	// LocalMachine represents the HKEY_LOCAL_MACHINE hive
 	LocalMachine
+	// Users represents the HKEY_USERS hive
 	Users
+	// Hive represents the global hive that doesn't fall into category of any of the previous keys.
 	Hive
 )
 

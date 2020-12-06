@@ -255,6 +255,7 @@ func (m *Module) Marshal() []byte {
 	return b
 }
 
+// Unmarshal restores thead state from the byte slice.
 func (t *Thread) Unmarshal(b []byte) (uint16, error) {
 	if len(b) < 11 {
 		return 0, fmt.Errorf("expected at least 11 bytes but got %d", len(b))

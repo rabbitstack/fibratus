@@ -25,81 +25,123 @@ import (
 )
 
 const (
+	// IntypeNull represents the null property type
 	IntypeNull = iota
+	// IntypeUnicodeString represents a string of 16-bit characters. By default, assumed to have been encoded using UTF-16LE
 	IntypeUnicodeString
+	// IntypeAnsiString represents a string of 8-bit characters
 	IntypeAnsiString
+	// IntypeInt8 represents a signed 8-bit integer
 	IntypeInt8
+	// IntypeUint8 represents an unsigned 8-bit integer
 	IntypeUint8
+	// IntypeInt16 represents a signed 16-bit integer
 	IntypeInt16
+	// IntypeUint16 represents an unsigned 18-bit integer
 	IntypeUint16
+	// IntypeInt32 represents a signed 32-bit integer
 	IntypeInt32
+	// IntypeUint32 represents an unsigned 8-bit integer
 	IntypeUint32
+	// IntypeInt64 represents a signed 64-bit integer
 	IntypeInt64
+	// IntypeUint64 represents an unsigned 64-bit integer
 	IntypeUint64
+	// IntypeFloat represents an IEEE 4-byte floating-point number
 	IntypeFloat
+	// IntypeDouble represents an IEEE 8-byte floating-point number
 	IntypeDouble
+	// IntypeBoolean a 32-bit value where 0 is false and 1 is true
 	IntypeBoolean
+	// IntypeBinary represents a binary data of variable size
 	IntypeBinary
+	// IntypeGUID is a GUID structure. On output, the GUID is rendered in the registry string form, {xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx}
 	IntypeGUID
+	// IntypePointer represents an unsigned 32-bit or 64-bit pointer value. The size depends on the architecture of the computer logging the event
 	IntypePointer
+	// IntypeFiletime represents the file timestamp
 	IntypeFiletime
+	// IntypeSystime represents the system timestamp
 	IntypeSystime
+	// IntypeSID represents a security identifier (SID) structure that uniquely identifies a user or group
 	IntypeSID
+	// IntypeHexInt32 represents the hexadecimal representation of 32-bit integer
 	IntypeHexInt32
+	// IntypeHexInt64 represents the hexadecimal representation of 64-bit integer
 	IntypeHexInt64
-	IntypeCountedString             = 300
-	IntypeCountedAnsiString         = 301
-	IntypeReversedCountedString     = 302
-	IntypeReversedCountedAnsiString = 303
-	IntypeNoNullTerminatedString    = 304
-	IntypeNoNulTerminatedAnsiString = 305
-	IntypeUnicodeChar               = 306
-	IntypeAnsiChar                  = 307
-	IntypeSizet                     = 308
-	IntypeHexdump                   = 309
-	IntypeWbemSID                   = 310
+	// IntypeUnicodeChar represents the Unicode codepoint
+	IntypeUnicodeChar = 306
+	// IntypeAnsiChar represents the ASCII character
+	IntypeAnsiChar = 307
+	// IntypeSizet represents the architecture-variable size
+	IntypeSizet = 308
+	// IntypeHexdump represents the hexadecimal dump
+	IntypeHexdump = 309
+	// IntypeWbemSID represents the Web-Based Enterprise Management security identifier
+	IntypeWbemSID = 310
 )
 
 const (
+	// OutypeNull represents the null property type
 	OutypeNull = iota
+	// OutypeString represents a string value
 	OutypeString
+	// OutypeDatetime represents the timestamp value
 	OutypeDatetime
+	// OutypeByte represents a signed 8-bit value
 	OutypeByte
+	// OutypeUnsignedByte represents an unsigned 8-bit value
 	OutypeUnsignedByte
+	// OutypeShort represents a signed 16-bit value
 	OutypeShort
+	// OutypeUnsignedShort represents an unsigned 16-bit value
 	OutypeUnsignedShort
+	// OutypeInt represents a signed 32-bit value
 	OutypeInt
+	// OutypeUnsignedInt represents an unsigned 32-bit value
 	OutypeUnsignedInt
+	// OutypeLong represents a signed 64-bit value
 	OutypeLong
+	// OutypeUnsignedLong represents an unsigned 64-bit value
 	OutypeUnsignedLong
+	// OutypeFloat represents an IEEE 4-byte floating-point number
 	OutypeFloat
+	// OutypeDouble represents an IEEE 8-byte floating-point number
 	OutypeDouble
+	// OutypeBoolean a 32-bit value where 0 is false and 1 is true
 	OutypeBoolean
+	// OutypeGUID represents an unsigned 32-bit or 64-bit pointer value. The size depends on the architecture of the computer logging the event
 	OutypeGUID
+	// OutypeHexBinary represents a binary data of variable size in hexadecimal format
 	OutypeHexBinary
+	// OutypeHexInt8 represents the hexadecimal representation of 8-bit integer
 	OutypeHexInt8
+	// OutypeHexInt16 represents the hexadecimal representation of 16-bit integer
 	OutypeHexInt16
+	// OutypeHexInt32 represents the hexadecimal representation of 32-bit integer
 	OutypeHexInt32
+	// OutypeHexInt64 represents the hexadecimal representation of 64-bit integer
 	OutypeHexInt64
+	// OutypePID represents the process identifier
 	OutypePID
+	// OutypeTID represents the thread identifier
 	OutypeTID
+	// OutypePort represents the port
 	OutypePort
+	// OutypeIPv4 represents the IPv4 address
 	OutypeIPv4
+	// OutypeIPv6 represents the IPv6 address
 	OutypeIPv6
-	OutypeSocketAddress
-	OutypeCIMDatetime
-	OutypeETWTime
-	OutypeXML
-	OUTYTPEErrorCode
-	OutypeReducedString = 300
 )
 
+// NonStructType defines if the property is contained in a structure or array.
 type NonStructType struct {
 	InType        uint16
 	OutType       uint16
 	MapNameOffset uint32
 }
 
+// EventPropertyInfo provides information about a single property of the event or filter.
 type EventPropertyInfo struct {
 	Flags      int32
 	NameOffset uint32
@@ -109,6 +151,7 @@ type EventPropertyInfo struct {
 	Reserved   [4]byte
 }
 
+// TraceEventInfo defines the information about the event.
 type TraceEventInfo struct {
 	ProviderGUID           sc.GUID
 	EventGUID              sc.GUID
@@ -132,6 +175,7 @@ type TraceEventInfo struct {
 	EventPropertyInfoArray [1]EventPropertyInfo
 }
 
+// PropertyDataDescriptor defines the property to retrieve.
 type PropertyDataDescriptor struct {
 	PropertyName unsafe.Pointer
 	ArrayIndex   uint32

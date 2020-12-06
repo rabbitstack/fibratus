@@ -61,6 +61,7 @@ func Open(access DesiredAccess, inheritHandle bool, threadID uint32) (handle.Han
 	return handle.Handle(h), nil
 }
 
+// Create creates a thread to execute within the virtual address space of the calling process.
 func Create(ctx unsafe.Pointer, cb uintptr) (handle.Handle, uint32, error) {
 	var threadID uint32
 	h, _, err := createThread.Call(0, 0, cb, uintptr(ctx), 0, uintptr(unsafe.Pointer(&threadID)))
@@ -70,6 +71,7 @@ func Create(ctx unsafe.Pointer, cb uintptr) (handle.Handle, uint32, error) {
 	return handle.Handle(h), threadID, nil
 }
 
+// Terminate terminates the specified thread.
 func Terminate(handle handle.Handle, exitCode uint32) error {
 	errno, _, err := terminateThread.Call(uintptr(handle), uintptr(exitCode))
 	if errno == 0 {
