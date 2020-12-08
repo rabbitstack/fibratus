@@ -170,6 +170,8 @@ const (
 	FileObject Field = "file.object"
 	// FileName represents the fie name
 	FileName Field = "file.name"
+	// FileExtension represents the file extension (e.g. .exe or .dll)
+	FileExtension Field = "file.extension"
 	// FileOperation represents the file operation (e.g. create)
 	FileOperation Field = "file.operation"
 	// FileShareMask represents the file share mask
@@ -314,6 +316,7 @@ var fields = map[Field]FieldInfo{
 	FileIOSize:    {FileIOSize, "file I/O size", kparams.Uint32, []string{"file.io.size > 512"}},
 	FileOffset:    {FileOffset, "file offset", kparams.Uint64, []string{"file.offset = 1024"}},
 	FileType:      {FileType, "file type", kparams.AnsiString, []string{"file.type = 'directory'"}},
+	FileExtension: {FileExtension, "file extension", kparams.AnsiString, []string{"file.extension = '.dll'"}},
 
 	RegistryKeyName:   {RegistryKeyName, "fully qualified key name", kparams.UnicodeString, []string{"registry.key.name contains 'HKEY_LOCAL_MACHINE'"}},
 	RegistryKeyHandle: {RegistryKeyHandle, "registry key object address", kparams.HexInt64, []string{"registry.key.handle = 'FFFFB905D60C2268'"}},
