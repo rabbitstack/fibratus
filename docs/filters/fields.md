@@ -87,6 +87,10 @@ The following tables summarize available field names that can be used in filter 
 | file.io.size    | I/O read/write size | `file.io.size > 512`   |
 | file.offset     | Read/write position in the file | `file.offset = 1024`   |
 | file.type       | File type. Possible values are `file`, `directory`, `pipe`, `console`, `mailslot`, `other`, `unknown` | `file.type = 'directory'`   |
+| file.extension  | File extension | `file.extension = '.dll'`   |
+
+
+ represents the file extension (e.g. .exe or .dll)
 
 ### Registry
 | Field Name  | Description | Example     |

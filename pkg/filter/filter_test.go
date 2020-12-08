@@ -133,6 +133,48 @@ func TestFilterRunThreadKevent(t *testing.T) {
 	}
 }
 
+func TestFilterRunFileKevent(t *testing.T) {
+	kevt := &kevent.Kevent{
+		Type:        ktypes.CreateFile,
+		Tid:         2484,
+		PID:         859,
+		CPU:         1,
+		Seq:         2,
+		Name:        "CreateFile",
+		Category:    ktypes.File,
+		Host:        "archrabbit",
+		Description: "Creates or opens a new file, directory, I/O device, pipe, console",
+		Kparams: kevent.Kparams{
+			kparams.FileObject:    {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(12456738026482168384)},
+			kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
+			kparams.FileType:      {Name: kparams.FileType, Type: kparams.AnsiString, Value: "file"},
+			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.AnsiString, Value: "open"},
+		},
+		Metadata: map[string]string{"foo": "bar", "fooz": "barzz"},
+	}
+
+	var tests = []struct {
+		filter  string
+		matches bool
+	}{
+
+		{`file.name = 'C:\\Windows\\system32\\user32.dll'`, true},
+		{`file.extension  = '.dll'`, true},
+	}
+
+	for i, tt := range tests {
+		f := New(tt.filter)
+		err := f.Compile()
+		if err != nil {
+			t.Fatal(err)
+		}
+		matches := f.Run(kevt)
+		if matches != tt.matches {
+			t.Errorf("%d. %q file filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
+		}
+	}
+}
+
 func TestFilterRunKevent(t *testing.T) {
 	kevt := &kevent.Kevent{
 		Type:        ktypes.CreateFile,

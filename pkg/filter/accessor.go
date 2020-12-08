@@ -337,6 +337,12 @@ func (l *fileAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, 
 		return kevt.Kparams.GetUint64(kparams.FileObject)
 	case fields.FileType:
 		return kevt.Kparams.GetString(kparams.FileType)
+	case fields.FileExtension:
+		file, err := kevt.Kparams.GetString(kparams.FileName)
+		if err != nil {
+			return nil, err
+		}
+		return filepath.Ext(file), nil
 	}
 	return nil, nil
 }
