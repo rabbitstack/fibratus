@@ -12,3 +12,4 @@ Visit the [documentation](https://www.fibratus.io/#/filaments/writing) for a wal
 - `top_keys` shows the top registry keys by number of registry operations
 - `top_out_packets` shows the top TCP / UDP outbound packets by IP/port tuple
 - `watch_files` watches files and directories created in the file system
+- `teamviewer_remote_file_copy` identifies an executable or script file remotely downloaded via a TeamViewer transfer session
