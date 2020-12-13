@@ -114,7 +114,7 @@ type filament struct {
 	tick *time.Ticker
 	mod  *cpython.Module
 
-	config config.FilamentConfig
+	config *config.Config
 
 	psnap  ps.Snapshotter
 	hsnap  handle.Snapshotter
@@ -135,7 +135,7 @@ func New(
 	name string,
 	psnap ps.Snapshotter,
 	hsnap handle.Snapshotter,
-	config config.FilamentConfig,
+	config *config.Config,
 ) (Filament, error) {
 	if useEmbeddedPython {
 		exe, err := os.Executable()
@@ -154,10 +154,9 @@ func New(
 	if err := cpython.Initialize(); err != nil {
 		return nil, err
 	}
-
 	// set the PYTHON_PATH to the filaments directory so the interpreter
 	// is aware of our filament module prior to its loading
-	path := config.Path
+	path := config.Filament.Path
 	fstat, err := os.Stat(path)
 	if err != nil || !fstat.IsDir() {
 		return nil, errFilamentsDir(path)
@@ -329,7 +328,7 @@ func New(
 
 	// compile filter from the expression
 	if f.fexpr != "" {
-		f.filter = filter.New(f.fexpr)
+		f.filter = filter.New(f.fexpr, config)
 		if err := f.filter.Compile(); err != nil {
 			return nil, err
 		}

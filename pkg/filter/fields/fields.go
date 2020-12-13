@@ -238,13 +238,13 @@ const (
 )
 
 const (
-	// PsEnvsSubfield is the process environment variable indexeer
+	// PsEnvsSubfield is the process environment variable property indexer
 	PsEnvsSubfield = "ps.envs["
-	// PsModsSubfield is the process module indexer
+	// PsModsSubfield is the process module property indexer
 	PsModsSubfield = "ps.modules["
-	// PeSectionsSubfield is the PE section indexer
+	// PeSectionsSubfield is the PE section property indexer
 	PeSectionsSubfield = "pe.sections["
-	// PeResourcesSubfield is the PE resource indexer
+	// PeResourcesSubfield is the PE resource property indexer
 	PeResourcesSubfield = "pe.resources["
 )
 

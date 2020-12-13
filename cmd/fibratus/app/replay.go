@@ -58,7 +58,7 @@ func replay(cmd *cobra.Command, args []string) error {
 	if err := logger.InitFromConfig(replayConfig.Log); err != nil {
 		return err
 	}
-	kfilter, err := filter.NewFromCLI(args)
+	kfilter, err := filter.NewFromCLI(args, replayConfig)
 	if err != nil {
 		return err
 	}
@@ -75,15 +75,14 @@ func replay(cmd *cobra.Command, args []string) error {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	filamentConfig := replayConfig.Filament
-	filamentName := filamentConfig.Name
+	filamentName := replayConfig.Filament.Name
 	// we don't need the aggregator is user decided to replay the
 	// kcap on the filament. Otwherise, we setup the full-fledged
 	// buffered aggregator
 	var agg *aggregator.BufferedAggregator
 
 	if filamentName != "" {
-		f, err := filament.New(filamentName, psnap, hsnap, filamentConfig)
+		f, err := filament.New(filamentName, psnap, hsnap, replayConfig)
 		if err != nil {
 			return err
 		}

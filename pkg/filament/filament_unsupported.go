@@ -32,7 +32,7 @@ func New(
 	name string,
 	psnap ps.Snapshotter,
 	hsnap handle.Snapshotter,
-	config config.FilamentConfig,
+	config *config.Config,
 ) (Filament, error) {
 	return nil, kerrors.ErrFeatureUnsupported("filament")
 }

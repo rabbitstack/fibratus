@@ -98,7 +98,7 @@ func run(cmd *cobra.Command, args []string) error {
 	// build the filter from the CLI argument. If we got a valid expression the filter
 	// is linked to the kernel stream consumer so it can drop any events that don't match
 	// the filter criteria
-	kfilter, err := filter.NewFromCLI(args)
+	kfilter, err := filter.NewFromCLI(args, cfg)
 	if err != nil {
 		return err
 	}
@@ -115,7 +115,7 @@ func run(cmd *cobra.Command, args []string) error {
 	var f filament.Filament
 	filamentName := cfg.Filament.Name
 	if filamentName != "" {
-		f, err = filament.New(filamentName, psnap, hsnap, cfg.Filament)
+		f, err = filament.New(filamentName, psnap, hsnap, cfg)
 		if err != nil {
 			return err
 		}

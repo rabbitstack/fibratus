@@ -22,6 +22,7 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/config"
 	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/filter/ql"
@@ -51,40 +52,51 @@ type filter struct {
 
 // New creates a new filter with the specified filter expression. The consumers must ensure the expression is lexically
 // well-parsed before executing the filter. This is achieved by calling the`Compile` method after constructing the filter.
-func New(expr string) Filter {
+func New(expr string, config *config.Config) Filter {
+	accessors := []accessor{
+		// general event parameters
+		newKevtAccessor(),
+		// process state and parameters
+		newPSAccessor(),
+	}
+	kconfig := config.Kstream
+
+	if kconfig.EnableThreadKevents {
+		accessors = append(accessors, newThreadAccessor())
+	}
+	if kconfig.EnableImageKevents {
+		accessors = append(accessors, newImageAccessor())
+	}
+	if kconfig.EnableFileIOKevents {
+		accessors = append(accessors, newFileAccessor())
+	}
+	if kconfig.EnableRegistryKevents {
+		accessors = append(accessors, newRegistryAccessor())
+	}
+	if kconfig.EnableNetKevents {
+		accessors = append(accessors, newNetworkAccessor())
+	}
+	if kconfig.EnableHandleKevents {
+		accessors = append(accessors, newHandleAccessor())
+	}
+	if config.PE.Enabled {
+		accessors = append(accessors, newPEAccessor())
+	}
+
 	return &filter{
-		parser: ql.NewParser(expr),
-		accessors: []accessor{
-			// general event parameters
-			newKevtAccessor(),
-			// process state and parameters
-			newPSAccessor(),
-			// thread parameters
-			newThreadAccessor(),
-			// image parameters
-			newImageAccessor(),
-			// file parameters
-			newFileAccessor(),
-			// registry parameters
-			newRegistryAccessor(),
-			// network parameters
-			newNetAccessor(),
-			// handle parameters
-			newHandleAccessor(),
-			// PE attributes
-			newPEAccessor(),
-		},
-		fields: make([]fields.Field, 0),
+		parser:    ql.NewParser(expr),
+		accessors: accessors,
+		fields:    make([]fields.Field, 0),
 	}
 }
 
 // NewFromCLI builds and compiles a filter by joining all the command line arguments into the filter expression.
-func NewFromCLI(args []string) (Filter, error) {
+func NewFromCLI(args []string, config *config.Config) (Filter, error) {
 	expr := strings.Join(args, " ")
 	if expr == "" {
 		return nil, nil
 	}
-	filter := New(expr)
+	filter := New(expr, config)
 	if err := filter.Compile(); err != nil {
 		return nil, fmt.Errorf("bad filter: \n  %v", err)
 	}
@@ -92,12 +104,12 @@ func NewFromCLI(args []string) (Filter, error) {
 }
 
 func (f *filter) Compile() error {
-	expr, err := f.parser.ParseExpr()
+	var err error
+	f.expr, err = f.parser.ParseExpr()
 	if err != nil {
 		return err
 	}
-	f.expr = expr
-	ql.WalkFunc(expr, func(n ql.Node) {
+	ql.WalkFunc(f.expr, func(n ql.Node) {
 		if ex, ok := n.(*ql.BinaryExpr); ok {
 			if lhs, ok := ex.LHS.(*ql.FieldLiteral); ok {
 				f.fields = append(f.fields, fields.Field(lhs.Value))

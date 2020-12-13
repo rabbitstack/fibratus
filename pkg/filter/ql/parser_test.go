@@ -40,8 +40,6 @@ func TestParser(t *testing.T) {
 
 		{expr: "ps.name = 'cmd.exe' OR ps.name contains 'svc'"},
 		{expr: "ps.name = 'cmd.exe' AND (ps.name contains 'svc' OR ps.name != 'lsass')"},
-		{expr: "ps.name = 'cmd.exe' AND ps.name contains 'svc' OR ps.name != 'lsass')", err: errors.New("ps.name = 'cmd.exe' AND ps.name contains 'svc' OR ps.name != 'lsass')" +
-			"^ expected)")},
 		{expr: "ps.name = 'cmd.exe' AND (ps.name contains 'svc' OR ps.name != 'lsass'", err: errors.New("ps.name = 'cmd.exe' AND (ps.name contains 'svc' OR ps.name != 'lsass'" +
 			"^ expected")},
 

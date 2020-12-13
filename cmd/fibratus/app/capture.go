@@ -95,7 +95,7 @@ func capture(cmd *cobra.Command, args []string) error {
 	defer ktracec.CloseKtrace()
 
 	kstreamc := kstream.NewConsumer(ktracec, psnap, hsnap, captureConfig)
-	kfilter, err := filter.NewFromCLI(args)
+	kfilter, err := filter.NewFromCLI(args, captureConfig)
 	if err != nil {
 		return err
 	}

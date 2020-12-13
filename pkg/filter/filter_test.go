@@ -19,6 +19,7 @@
 package filter
 
 import (
+	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
@@ -30,14 +31,26 @@ import (
 	"time"
 )
 
+var cfg = &config.Config{
+	Kstream: config.KstreamConfig{
+		EnableHandleKevents:   true,
+		EnableNetKevents:      true,
+		EnableRegistryKevents: true,
+		EnableFileIOKevents:   true,
+		EnableImageKevents:    true,
+		EnableThreadKevents:   true,
+	},
+	PE: pe.Config{Enabled: true},
+}
+
 func TestFilterCompile(t *testing.T) {
-	f := New(`ps.name = 'cmd.exe'`)
+	f := New(`ps.name = 'cmd.exe'`, cfg)
 	require.NoError(t, f.Compile())
-	f = New(`'cmd.exe'`)
+	f = New(`'cmd.exe'`, cfg)
 	require.EqualError(t, f.Compile(), "expected at least one field or operator but zero found")
-	f = New(`ps.name`)
+	f = New(`ps.name`, cfg)
 	require.EqualError(t, f.Compile(), "expected at least one field or operator but zero found")
-	f = New(`ps.name =`)
+	f = New(`ps.name =`, cfg)
 	require.EqualError(t, f.Compile(), "ps.name =\n          ^ expected field, string, number, bool, ip")
 }
 
@@ -83,7 +96,7 @@ func TestFilterRunProcessKevent(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		f := New(tt.filter)
+		f := New(tt.filter, cfg)
 		err := f.Compile()
 		if err != nil {
 			t.Fatal(err)
@@ -121,7 +134,7 @@ func TestFilterRunThreadKevent(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		f := New(tt.filter)
+		f := New(tt.filter, cfg)
 		err := f.Compile()
 		if err != nil {
 			t.Fatal(err)
@@ -160,10 +173,12 @@ func TestFilterRunFileKevent(t *testing.T) {
 
 		{`file.name = 'C:\\Windows\\system32\\user32.dll'`, true},
 		{`file.extension  = '.dll'`, true},
+		{`file.extension not contains '.exe' and file.extension not contains '.com'`, true},
+		{`file.extension not in ('.exe', '.com')`, true},
 	}
 
 	for i, tt := range tests {
-		f := New(tt.filter)
+		f := New(tt.filter, cfg)
 		err := f.Compile()
 		if err != nil {
 			t.Fatal(err)
@@ -218,7 +233,7 @@ func TestFilterRunKevent(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		f := New(tt.filter)
+		f := New(tt.filter, cfg)
 		err := f.Compile()
 		if err != nil {
 			t.Fatal(err)
@@ -251,10 +266,11 @@ func TestFilterRunNetKevent(t *testing.T) {
 		{`net.dip = 216.58.201.174`, true},
 		{`net.dip != 216.58.201.174`, false},
 		{`net.dip != 116.58.201.174`, true},
+		{`net.dip not in ('116.58.201.172', '216.58.201.176')`, true},
 	}
 
 	for i, tt := range tests {
-		f := New(tt.filter)
+		f := New(tt.filter, cfg)
 		err := f.Compile()
 		if err != nil {
 			t.Fatal(err)
@@ -302,7 +318,7 @@ func TestFilterRunPE(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		f := New(tt.filter)
+		f := New(tt.filter, cfg)
 		err := f.Compile()
 		if err != nil {
 			t.Fatal(err)
@@ -317,7 +333,7 @@ func TestFilterRunPE(t *testing.T) {
 
 func BenchmarkFilterRun(b *testing.B) {
 	b.ReportAllocs()
-	f := New(`ps.name = 'mimikatz.exe' or ps.name contains 'svc'`)
+	f := New(`ps.name = 'mimikatz.exe' or ps.name contains 'svc'`, cfg)
 	require.NoError(b, f.Compile())
 
 	kpars := kevent.Kparams{

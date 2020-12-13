@@ -405,12 +405,12 @@ func (r *registryAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Val
 	return nil, nil
 }
 
-// netAccessor deals with extracting the network specific kernel event parameters.
-type netAccessor struct{}
+// networkAccessor deals with extracting the network specific kernel event parameters.
+type networkAccessor struct{}
 
-func newNetAccessor() accessor { return &netAccessor{} }
+func newNetworkAccessor() accessor { return &networkAccessor{} }
 
-func (n *netAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
+func (n *networkAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
 	switch f {
 	case fields.NetDIP:
 		return kevt.Kparams.GetIP(kparams.NetDIP)

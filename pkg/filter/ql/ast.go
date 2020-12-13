@@ -96,6 +96,12 @@ func (v *ValuerEval) Eval(expr Expr) interface{} {
 func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 	lhs := v.Eval(expr.LHS)
 	rhs := v.Eval(expr.RHS)
+	if expr.Op == not {
+		if val, ok := rhs.(bool); ok {
+			return !val
+		}
+		return false
+	}
 	if lhs == nil && rhs != nil {
 		// when the LHS is nil and the RHS is a boolean, implicitly cast the
 		// nil to false.
