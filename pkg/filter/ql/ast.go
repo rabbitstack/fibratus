@@ -80,7 +80,7 @@ func (v *ValuerEval) Eval(expr Expr) interface{} {
 			}
 			return nil
 		case *ParenExpr:
-			return v.Eval(expr.Expr)
+			return v.Eval(expr1.Expr)
 		default:
 			return nil
 		}
