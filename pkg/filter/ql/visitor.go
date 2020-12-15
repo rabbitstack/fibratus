@@ -36,6 +36,8 @@ func Walk(v Visitor, node Node) {
 	case *BinaryExpr:
 		Walk(v, n.LHS)
 		Walk(v, n.RHS)
+	case *NotExpr:
+		Walk(v, n.Expr)
 	}
 }
 

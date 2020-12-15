@@ -53,6 +53,9 @@ func TestParser(t *testing.T) {
 
 		{expr: "ps.none = 'cmd.exe'", err: errors.New("ps.none = 'cmd.exe'" +
 			"	^ expected field, string, number, bool, ip")},
+
+		{expr: "ps.name = 'cmd.exe' AND ps.name IN ('exe') ps.name", err: errors.New("ps.name = 'cmd.exe' AND ps.name IN ('exe') ps.name" +
+			"	^ expected operator")},
 	}
 
 	for i, tt := range tests {

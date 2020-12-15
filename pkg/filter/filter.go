@@ -50,8 +50,9 @@ type filter struct {
 	fields    []fields.Field
 }
 
-// New creates a new filter with the specified filter expression. The consumers must ensure the expression is lexically
-// well-parsed before executing the filter. This is achieved by calling the`Compile` method after constructing the filter.
+// New creates a new filter with the specified filter expression. The consumers must ensure
+// the expression is correctly parsed before executing the filter. This is achieved by calling the
+// Compile` method after constructing the filter.
 func New(expr string, config *config.Config) Filter {
 	accessors := []accessor{
 		// general event parameters
@@ -110,8 +111,8 @@ func (f *filter) Compile() error {
 		return err
 	}
 	ql.WalkFunc(f.expr, func(n ql.Node) {
-		if ex, ok := n.(*ql.BinaryExpr); ok {
-			if lhs, ok := ex.LHS.(*ql.FieldLiteral); ok {
+		if expr, ok := n.(*ql.BinaryExpr); ok {
+			if lhs, ok := expr.LHS.(*ql.FieldLiteral); ok {
 				f.fields = append(f.fields, fields.Field(lhs.Value))
 			}
 		}

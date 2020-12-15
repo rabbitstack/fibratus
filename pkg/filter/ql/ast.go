@@ -68,6 +68,22 @@ func (v *ValuerEval) Eval(expr Expr) interface{} {
 	switch expr := expr.(type) {
 	case *BinaryExpr:
 		return v.evalBinaryExpr(expr)
+	case *NotExpr:
+		switch expr1 := expr.Expr.(type) {
+		case *BinaryExpr:
+			v := v.evalBinaryExpr(expr1)
+			if v == nil {
+				return nil
+			}
+			if val, ok := v.(bool); ok {
+				return !val
+			}
+			return nil
+		case *ParenExpr:
+			return v.Eval(expr.Expr)
+		default:
+			return nil
+		}
 	case *IntegerLiteral:
 		return expr.Value
 	case *UnsignedLiteral:
@@ -96,12 +112,6 @@ func (v *ValuerEval) Eval(expr Expr) interface{} {
 func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 	lhs := v.Eval(expr.LHS)
 	rhs := v.Eval(expr.RHS)
-	if expr.Op == not {
-		if val, ok := rhs.(bool); ok {
-			return !val
-		}
-		return false
-	}
 	if lhs == nil && rhs != nil {
 		// when the LHS is nil and the RHS is a boolean, implicitly cast the
 		// nil to false.
@@ -552,6 +562,7 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 					return true
 				}
 			}
+			return false
 		case startswith:
 			rhs, ok := rhs.(string)
 			if !ok {
@@ -579,6 +590,17 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 				return false
 			}
 			return !lhs.Equal(rhs)
+		case in:
+			rhs, ok := rhs.([]string)
+			if !ok {
+				return false
+			}
+			for _, s := range rhs {
+				if net.ParseIP(s).Equal(lhs) {
+					return true
+				}
+			}
+			return false
 		}
 	case []string:
 		switch expr.Op {
@@ -592,6 +614,7 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 					return true
 				}
 			}
+			return false
 		case in:
 			rhs, ok := rhs.([]string)
 			if !ok {
@@ -604,6 +627,7 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 					}
 				}
 			}
+			return false
 		}
 	}
 

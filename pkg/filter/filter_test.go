@@ -173,8 +173,12 @@ func TestFilterRunFileKevent(t *testing.T) {
 
 		{`file.name = 'C:\\Windows\\system32\\user32.dll'`, true},
 		{`file.extension  = '.dll'`, true},
+		{`file.extension not contains '.exe'`, true},
+		{`file.extension not contains '.exe' and file.extension contains '.dll'`, true},
 		{`file.extension not contains '.exe' and file.extension not contains '.com'`, true},
+		{`file.extension not contains '.exe' and file.extension not contains '.com' and file.extension not in ('.vba', '.exe')`, true},
 		{`file.extension not in ('.exe', '.com')`, true},
+		{`file.extension not in ('.exe', '.dll')`, false},
 	}
 
 	for i, tt := range tests {
@@ -266,7 +270,7 @@ func TestFilterRunNetKevent(t *testing.T) {
 		{`net.dip = 216.58.201.174`, true},
 		{`net.dip != 216.58.201.174`, false},
 		{`net.dip != 116.58.201.174`, true},
-		{`net.dip not in ('116.58.201.172', '216.58.201.176')`, true},
+		{`net.dip not in ('116.58.201.172', '16.58.201.176')`, true},
 	}
 
 	for i, tt := range tests {

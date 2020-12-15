@@ -52,9 +52,19 @@ func (p *Parser) ParseExpr() (Expr, error) {
 	// loop over operations and unary exprs and build a tree based on precedence.
 	for {
 		// if the next token is NOT an operator then return the expression.
-		op, _, _ := p.scanIgnoreWhitespace()
+		op, pos, lit := p.scanIgnoreWhitespace()
 		if !op.isOperator() {
 			p.unscan()
+			if op != eof && op != rparen && op != field {
+				return nil, newParseError(tokstr(op, lit), []string{"operator", "field", ")"}, pos, p.expr)
+			}
+			if op == field {
+				op, pos, lit := p.scanIgnoreWhitespace()
+				p.unscan()
+				if !op.isOperator() {
+					return nil, newParseError(tokstr(op, lit), []string{"operator"}, pos, p.expr)
+				}
+			}
 			return root.RHS, nil
 		}
 
@@ -66,13 +76,13 @@ func (p *Parser) ParseExpr() (Expr, error) {
 				return nil, newParseError(tokstr(op, lit), []string{"operator"}, pos, p.expr)
 			}
 			// parse the next expression after operator
-			rhs, err = p.parseUnaryExpr()
+			rhs1, err := p.parseUnaryExpr()
 			if err != nil {
 				return nil, err
 			}
-			rhs = &BinaryExpr{LHS: rhs, Op: op1}
+			rhs = &BinaryExpr{RHS: rhs1, Op: op1}
 		} else {
-			// Otherwise parse the next expression.
+			// otherwise parse the next expression
 			rhs, err = p.parseUnaryExpr()
 			if err != nil {
 				return nil, err
@@ -86,6 +96,12 @@ func (p *Parser) ParseExpr() (Expr, error) {
 		for node := root; ; {
 			r, ok := node.RHS.(*BinaryExpr)
 			if !ok || r.Op.precedence() >= op.precedence() {
+				if op == not {
+					r := rhs.(*BinaryExpr)
+					r.LHS = node.RHS
+					node.RHS = &NotExpr{Expr: r}
+					break
+				}
 				// Add the new expression here and break.
 				node.RHS = &BinaryExpr{LHS: node.RHS, RHS: rhs, Op: op}
 				break

@@ -49,3 +49,11 @@ type BinaryExpr struct {
 func (e *BinaryExpr) String() string {
 	return fmt.Sprintf("%s %s %s", e.LHS.String(), e.Op.String(), e.RHS.String())
 }
+
+// NotExpr represents an unary not expression.
+type NotExpr struct {
+	Expr Expr
+}
+
+// String returns a string representation of the not expression.
+func (e *NotExpr) String() string { return fmt.Sprintf("(%s)", e.Expr.String()) }
