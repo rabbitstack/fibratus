@@ -58,7 +58,7 @@ func replay(cmd *cobra.Command, args []string) error {
 	if err := logger.InitFromConfig(replayConfig.Log); err != nil {
 		return err
 	}
-	kfilter, err := filter.NewFromCLI(args, replayConfig)
+	kfilter, err := filter.NewFromCLIWithAllAccessors(args)
 	if err != nil {
 		return err
 	}

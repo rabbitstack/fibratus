@@ -35,6 +35,9 @@ func TestParser(t *testing.T) {
 			"           ^ expected field, string, number, bool, ip")},
 		{expr: "ps.name = 123"},
 		{expr: "net.dip = 172.17.0.9"},
+		{expr: "net.dip = 172.17.0.9 and net.dip in ('172.15.9.2')"},
+		{expr: "net.dip = 172.17.0.9 and (net.dip not in ('172.15.9.2'))"},
+
 		{expr: "net.dip = 172.17.0", err: errors.New("net.dip = 172.17.0\n" +
 			"           ^ expected a valid IP address")},
 

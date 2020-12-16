@@ -104,6 +104,35 @@ func NewFromCLI(args []string, config *config.Config) (Filter, error) {
 	return filter, nil
 }
 
+// NewFromCLIWithAllAccessors builds and compiles a filter with all field accessors enabled.
+func NewFromCLIWithAllAccessors(args []string) (Filter, error) {
+	expr := strings.Join(args, " ")
+	if expr == "" {
+		return nil, nil
+	}
+	return &filter{
+		parser: ql.NewParser(expr),
+		accessors: []accessor{
+			newPSAccessor(),
+			newPEAccessor(),
+			newFileAccessor(),
+			newKevtAccessor(),
+			newImageAccessor(),
+			newThreadAccessor(),
+			newHandleAccessor(),
+			newNetworkAccessor(),
+			newRegistryAccessor(),
+		},
+		fields: make([]fields.Field, 0),
+	}, nil
+}
+
+// Compile parsers the filter expression and builds a binary expression tree
+// where leaf nodes represent constants/variables while internal nodes are
+// operators. Operators can be binary (=) or unary (not). Fields in filter
+// expressions are replaced with respective event parameters via map valuer.
+// Matching the filter involves descending the binary expression tree recursively
+// until all nodes are visited.
 func (f *filter) Compile() error {
 	var err error
 	f.expr, err = f.parser.ParseExpr()

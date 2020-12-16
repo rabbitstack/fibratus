@@ -21,6 +21,7 @@
 package ql
 
 import (
+	"github.com/rabbitstack/fibratus/pkg/util/wildcard"
 	"net"
 	"strings"
 )
@@ -79,8 +80,6 @@ func (v *ValuerEval) Eval(expr Expr) interface{} {
 				return !val
 			}
 			return nil
-		case *ParenExpr:
-			return v.Eval(expr1.Expr)
 		default:
 			return nil
 		}
@@ -575,6 +574,36 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 				return false
 			}
 			return strings.HasSuffix(lhs, rhs)
+		case matches:
+			pat, ok := rhs.(string)
+			if !ok {
+				pats, ok := rhs.([]string)
+				if !ok {
+					return false
+				}
+				for _, pat := range pats {
+					if wildcard.Match(pat, lhs) {
+						return true
+					}
+				}
+				return false
+			}
+			return wildcard.Match(pat, lhs)
+		case imatches:
+			pat, ok := rhs.(string)
+			if !ok {
+				pats, ok := rhs.([]string)
+				if !ok {
+					return false
+				}
+				for _, pat := range pats {
+					if wildcard.Match(strings.ToLower(pat), strings.ToLower(lhs)) {
+						return true
+					}
+				}
+				return false
+			}
+			return wildcard.Match(strings.ToLower(pat), strings.ToLower(lhs))
 		}
 	case net.IP:
 		switch expr.Op {

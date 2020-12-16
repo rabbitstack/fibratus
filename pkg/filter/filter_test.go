@@ -179,6 +179,9 @@ func TestFilterRunFileKevent(t *testing.T) {
 		{`file.extension not contains '.exe' and file.extension not contains '.com' and file.extension not in ('.vba', '.exe')`, true},
 		{`file.extension not in ('.exe', '.com')`, true},
 		{`file.extension not in ('.exe', '.dll')`, false},
+		{`file.name matches 'C:\\*\\user32.dll'`, true},
+		{`file.name not matches 'C:\\*.exe'`, true},
+		{`file.name imatches 'C:\\*\\USER32.dll'`, true},
 	}
 
 	for i, tt := range tests {

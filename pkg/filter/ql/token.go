@@ -51,6 +51,8 @@ const (
 	icontains  // icontains
 	startswith // startswith
 	endswith   // endswith
+	matches    // matches
+	imatches   // imatches
 	eq         // =
 	neq        // !=
 	lt         // <
@@ -69,7 +71,7 @@ var keywords map[string]token
 
 func init() {
 	keywords = make(map[string]token)
-	for _, tok := range []token{and, or, contains, icontains, in, not, startswith, endswith} {
+	for _, tok := range []token{and, or, contains, icontains, in, not, startswith, endswith, matches, imatches} {
 		keywords[strings.ToLower(tokens[tok])] = tok
 	}
 }
@@ -98,6 +100,8 @@ var tokens = [...]string{
 	not:        "NOT",
 	startswith: "STARTSWITH",
 	endswith:   "ENDSWITH",
+	matches:    "MATCHES",
+	imatches:   "IMATCHES",
 
 	eq:  "=",
 	neq: "!=",
@@ -134,7 +138,7 @@ func (tok token) precedence() int {
 		return 3
 	case eq, neq, lt, lte, gt, gte:
 		return 4
-	case in, contains, icontains, startswith, endswith:
+	case in, contains, icontains, startswith, endswith, matches, imatches:
 		return 5
 	}
 	return 0

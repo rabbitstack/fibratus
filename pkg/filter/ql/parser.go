@@ -55,15 +55,8 @@ func (p *Parser) ParseExpr() (Expr, error) {
 		op, pos, lit := p.scanIgnoreWhitespace()
 		if !op.isOperator() {
 			p.unscan()
-			if op != eof && op != rparen && op != field {
-				return nil, newParseError(tokstr(op, lit), []string{"operator", "field", ")"}, pos, p.expr)
-			}
-			if op == field {
-				op, pos, lit := p.scanIgnoreWhitespace()
-				p.unscan()
-				if !op.isOperator() {
-					return nil, newParseError(tokstr(op, lit), []string{"operator"}, pos, p.expr)
-				}
+			if op != eof && op != rparen {
+				return nil, newParseError(tokstr(op, lit), []string{"operator", ")"}, pos, p.expr)
 			}
 			return root.RHS, nil
 		}
@@ -115,7 +108,6 @@ func (p *Parser) ParseExpr() (Expr, error) {
 func (p *Parser) parseUnaryExpr() (Expr, error) {
 	// If the first token is a LPAREN then parse it as its own grouped expression.
 	if tok, _, _ := p.scanIgnoreWhitespace(); tok == lparen {
-
 		// parse a comma-separated list if this looks like a list
 		tagKeys, err := p.parseList()
 		if err != nil {
