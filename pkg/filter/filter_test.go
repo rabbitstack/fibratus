@@ -182,6 +182,8 @@ func TestFilterRunFileKevent(t *testing.T) {
 		{`file.name matches 'C:\\*\\user32.dll'`, true},
 		{`file.name not matches 'C:\\*.exe'`, true},
 		{`file.name imatches 'C:\\*\\USER32.dll'`, true},
+		{`file.name matches ('C:\\*\\user3?.dll', 'C:\\*\\user32.*')`, true},
+		{`file.name not matches ('C:\\*.exe', 'C:\\Windows\\*.com')`, true},
 	}
 
 	for i, tt := range tests {
