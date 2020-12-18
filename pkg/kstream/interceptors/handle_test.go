@@ -94,7 +94,6 @@ func TestHandleCoalescing(t *testing.T) {
 			kparams.HandleObjectName:   {Name: kparams.HandleObjectName, Type: kparams.UnicodeString, Value: ""},
 		},
 	}
-	kevtsc := make(chan *kevent.Kevent, 1)
 	devMapper := new(devMapperMock)
 
 	hsnapMock := new(handle.SnapshotterMock)
@@ -124,10 +123,9 @@ func TestHandleCoalescing(t *testing.T) {
 		},
 	}
 
-	_, _, err = hi.Intercept(kevt1)
+	ckevt, _, err := hi.Intercept(kevt1)
 	require.NoError(t, err)
 
-	ckevt := <-kevtsc
 	keyName, err := ckevt.Kparams.GetString(kparams.HandleObjectName)
 	require.NoError(t, err)
 	assert.Equal(t, `HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\Tcpip\Parameters\Interfaces\{b677c565-6ca5-45d3-b618-736b4e09b036}`, keyName)
@@ -151,7 +149,7 @@ func TestHandleCoalescingWaiting(t *testing.T) {
 			kparams.HandleObjectName:   {Name: kparams.HandleObjectName, Type: kparams.UnicodeString, Value: ""},
 		},
 	}
-	kevtsc := make(chan *kevent.Kevent, 1)
+
 	devMapper := new(devMapperMock)
 	objectTypeStore := new(objectTypeStoreMock)
 	hsnapMock := new(handle.SnapshotterMock)
@@ -182,10 +180,9 @@ func TestHandleCoalescingWaiting(t *testing.T) {
 
 	time.Sleep(time.Millisecond * 510)
 
-	_, _, err = hi.Intercept(kevt1)
+	ckevt, _, err := hi.Intercept(kevt1)
 	require.NoError(t, err)
 
-	ckevt := <-kevtsc
 	keyName, err := ckevt.Kparams.GetString(kparams.HandleObjectName)
 	require.NoError(t, err)
 	assert.Equal(t, kparams.NA, keyName)

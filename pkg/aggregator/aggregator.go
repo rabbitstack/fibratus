@@ -118,7 +118,8 @@ func NewBuffered(
 
 // Stop flushes pending event batches and instructs the aggregator to stop processing events.
 func (agg *BufferedAggregator) Stop() error {
-	agg.flusher.Stop()
+	agg.stop <- struct{}{}
+
 	// flush enqueued events
 	b := kevent.NewBatch(agg.kevts...)
 	if b.Len() > 0 {
@@ -136,7 +137,13 @@ func (agg *BufferedAggregator) Stop() error {
 		}
 	}
 
-	agg.stop <- struct{}{}
+	// sleep a bit before closing the clients
+	time.Sleep(time.Millisecond * 150)
+
+	err := agg.submitter.shutdown()
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -147,10 +154,7 @@ func (agg *BufferedAggregator) run() {
 	for {
 		select {
 		case <-agg.stop:
-			err := agg.submitter.shutdown()
-			if err != nil {
-				log.Warnf("fail to gracefully close the submitter: %v", err)
-			}
+			agg.flusher.Stop()
 			return
 		case <-agg.flusher.C:
 			if len(agg.kevts) == 0 {

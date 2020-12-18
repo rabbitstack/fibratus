@@ -61,7 +61,7 @@ func TestCreateFile(t *testing.T) {
 		Tid:  2484,
 		PID:  859,
 		Kparams: kevent.Kparams{
-			kparams.FileObject: {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(12456738026482168384)},
+			kparams.FileObject: {Name: kparams.FileObject, Type: kparams.Uint64, Value: kparams.Hex("12456738026482168384")},
 			kparams.FileName:   {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
 		},
 	})
@@ -72,7 +72,7 @@ func TestCreateFile(t *testing.T) {
 		Tid:  2484,
 		PID:  859,
 		Kparams: kevent.Kparams{
-			kparams.FileObject:        {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(18446738026482168384)},
+			kparams.FileObject:        {Name: kparams.FileObject, Type: kparams.Uint64, Value: kparams.Hex("18446738026482168384")},
 			kparams.ThreadID:          {Name: kparams.ThreadID, Type: kparams.Uint32, Value: uint32(1484)},
 			kparams.FileCreateOptions: {Name: kparams.FileCreateOptions, Type: kparams.Uint32, Value: uint32(1223456)},
 			kparams.FileName:          {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\kernel32.dll"},
@@ -123,7 +123,7 @@ func TestRundownFile(t *testing.T) {
 		Tid:  2484,
 		PID:  859,
 		Kparams: kevent.Kparams{
-			kparams.FileObject: {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(12456738026482168384)},
+			kparams.FileObject: {Name: kparams.FileObject, Type: kparams.Uint64, Value: kparams.Hex("12456738026482168384")},
 			kparams.FileName:   {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
 		},
 	})
@@ -154,7 +154,7 @@ func TestDeleteFile(t *testing.T) {
 		Tid:  2484,
 		PID:  859,
 		Kparams: kevent.Kparams{
-			kparams.FileObject: {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(12456738026482168384)},
+			kparams.FileObject: {Name: kparams.FileObject, Type: kparams.Uint64, Value: kparams.Hex("12456738026482168384")},
 			kparams.FileName:   {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
 		},
 	})
@@ -165,7 +165,7 @@ func TestDeleteFile(t *testing.T) {
 		Tid:  2484,
 		PID:  859,
 		Kparams: kevent.Kparams{
-			kparams.FileObject: {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(12456738026482168384)},
+			kparams.FileObject: {Name: kparams.FileObject, Type: kparams.Uint64, Value: kparams.Hex("12456738026482168384")},
 			kparams.ThreadID:   {Name: kparams.ThreadID, Type: kparams.Uint32, Value: uint32(1484)},
 		},
 	}

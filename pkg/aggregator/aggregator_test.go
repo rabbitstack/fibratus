@@ -32,11 +32,18 @@ import (
 )
 
 func TestNewBufferedAggregator(t *testing.T) {
-	keventsc := make(chan *kevent.Kevent, 4)
+	keventsc := make(chan *kevent.Kevent, 20)
 	errsc := make(chan error, 1)
-	agg, err := NewBuffered(keventsc, errsc, Config{FlushPeriod: time.Millisecond * 200}, outputs.Config{Type: outputs.Console, Output: console.Config{Format: "pretty"}}, nil, nil)
+	agg, err := NewBuffered(
+		keventsc,
+		errsc,
+		Config{FlushPeriod: time.Millisecond * 200},
+		outputs.Config{Type: outputs.Console, Output: console.Config{Format: "pretty"}},
+		nil,
+		nil,
+	)
 	require.NoError(t, err)
-	defer agg.Stop()
+	require.NotNil(t, agg)
 
 	for i := 0; i < 4; i++ {
 		kevt := &kevent.Kevent{
@@ -52,7 +59,7 @@ func TestNewBufferedAggregator(t *testing.T) {
 		}
 		keventsc <- kevt
 	}
-	<-time.After(time.Millisecond * 255)
+	<-time.After(time.Millisecond * 275)
 	assert.Equal(t, int64(4), batchEvents.Value())
 
 	for i := 0; i < 2; i++ {

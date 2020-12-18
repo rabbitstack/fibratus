@@ -183,7 +183,9 @@ func TestFilterRunFileKevent(t *testing.T) {
 		{`file.name not matches 'C:\\*.exe'`, true},
 		{`file.name imatches 'C:\\*\\USER32.dll'`, true},
 		{`file.name matches ('C:\\*\\user3?.dll', 'C:\\*\\user32.*')`, true},
+		{`file.name contains ('C:\\Windows\\system32\\kernel32.dll', 'C:\\Windows\\system32\\user32.dll')`, true},
 		{`file.name not matches ('C:\\*.exe', 'C:\\Windows\\*.com')`, true},
+		{`file.name endswith ('.exe', 'kernel32.dll', 'user32.dll')`, true},
 	}
 
 	for i, tt := range tests {
@@ -276,6 +278,44 @@ func TestFilterRunNetKevent(t *testing.T) {
 		{`net.dip != 216.58.201.174`, false},
 		{`net.dip != 116.58.201.174`, true},
 		{`net.dip not in ('116.58.201.172', '16.58.201.176')`, true},
+	}
+
+	for i, tt := range tests {
+		f := New(tt.filter, cfg)
+		err := f.Compile()
+		if err != nil {
+			t.Fatal(err)
+		}
+		matches := f.Run(kevt)
+		if matches != tt.matches {
+			t.Errorf("%d. %q net filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
+		}
+	}
+}
+
+func TestFilterRunRegistryKevent(t *testing.T) {
+	kevt := &kevent.Kevent{
+		Type: ktypes.RegSetValue,
+		Tid:  2484,
+		PID:  859,
+		Kparams: kevent.Kparams{
+			kparams.RegKeyName:   {Name: kparams.RegKeyName, Type: kparams.UnicodeString, Value: `HKEY_LOCAL_MACHINE\SYSTEM\Setup\Pid`},
+			kparams.RegValue:     {Name: kparams.RegValue, Type: kparams.Uint32, Value: 10234},
+			kparams.RegValueType: {Name: kparams.RegValueType, Type: kparams.AnsiString, Value: "DWORD"},
+			kparams.NTStatus:     {Name: kparams.NTStatus, Type: kparams.AnsiString, Value: "success"},
+			kparams.RegKeyHandle: {Name: kparams.RegKeyHandle, Type: kparams.HexInt64, Value: kparams.NewHex(uint64(18446666033449935464))},
+		},
+	}
+
+	var tests = []struct {
+		filter  string
+		matches bool
+	}{
+
+		{`registry.status startswith ('key not', 'succ')`, true},
+		{`registry.key.name icontains ('hkey_local_machine', 'HKEY_LOCAL')`, true},
+		{`registry.value = 10234`, true},
+		{`registry.value.type in ('DWORD', 'QWORD')`, true},
 	}
 
 	for i, tt := range tests {

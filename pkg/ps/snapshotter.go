@@ -490,7 +490,7 @@ func (s *snapshotter) Size() uint32 {
 }
 
 func unwrapParams(pid uint32, kevt *kevent.Kevent) (uint32, uint32, string, string, string, string, uint8) {
-	ppid, _ := kevt.Kparams.GetPid()
+	ppid, _ := kevt.Kparams.GetPpid()
 	name, _ := kevt.Kparams.GetString(kparams.ProcessName)
 	comm, _ := kevt.Kparams.GetString(kparams.Comm)
 	exe, _ := kevt.Kparams.GetString(kparams.Exe)

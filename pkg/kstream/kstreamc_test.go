@@ -116,24 +116,34 @@ func TestProcessKevent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	done := make(chan struct{}, 1)
+
+	go func() {
+		defer func() {
+			done <- struct{}{}
+		}()
+		kevt := <-kstreamc.Events()
+
+		assert.Equal(t, ktypes.Process, kevt.Category)
+		assert.Equal(t, uint32(9828), kevt.Tid)
+		assert.Equal(t, uint8(5), kevt.CPU)
+		assert.Equal(t, ktypes.CreateProcess, kevt.Type)
+		assert.Equal(t, "CreateProcess", kevt.Name)
+		assert.Equal(t, "Creates a new process and its primary thread", kevt.Description)
+
+		ts, err := time.Parse("2006-01-02 15:04:05.0000000 -0700 CEST", "2019-04-05 16:10:36.5225778 +0200 CEST")
+		require.NoError(t, err)
+		assert.Equal(t, ts, kevt.Timestamp)
+		assert.Len(t, kevt.Kparams, 9)
+
+		assert.True(t, kevt.Kparams.Contains(kparams.DTB))
+		assert.True(t, kevt.Kparams.Contains(kparams.ProcessName))
+	}()
+
 	err = kstreamc.(*kstreamConsumer).processKevent(&evt)
 	require.NoError(t, err)
 
-	kevt := <-kstreamc.Events()
-
-	assert.Equal(t, ktypes.Process, kevt.Category)
-	assert.Equal(t, uint32(9828), kevt.Tid)
-	assert.Equal(t, uint8(5), kevt.CPU)
-	assert.Equal(t, ktypes.CreateProcess, kevt.Type)
-	assert.Equal(t, "CreateProcess", kevt.Name)
-	assert.Equal(t, "Creates a new process and its primary thread", kevt.Description)
-
-	ts, err := time.Parse("2006-01-02 15:04:05.0000000 -0700 CEST", "2019-04-05 16:10:36.5225778 +0200 CEST")
-	assert.Equal(t, ts, kevt.Timestamp)
-	assert.Len(t, kevt.Kparams, 9)
-
-	assert.True(t, kevt.Kparams.Contains(kparams.DTB))
-	assert.True(t, kevt.Kparams.Contains(kparams.ProcessName))
+	<-done
 }
 
 func TestGetParamEmptyBuffer(t *testing.T) {
@@ -238,5 +248,5 @@ func TestGetParam(t *testing.T) {
 func TestGetParamUnknownType(t *testing.T) {
 	kpar, err := getParam("comm", []byte{99, 0, 109, 0, 100, 0, 92, 0, 102, 0, 105, 0, 98, 0, 114, 0, 97, 0, 116, 0, 117, 0, 115, 0, 92, 0, 102, 0, 105, 0, 98, 0, 114, 0, 97, 0, 116, 0, 117, 0, 115, 0, 46, 0, 101, 0, 120, 0, 101, 0, 32, 0, 32, 0, 0, 0}, 16, tdh.NonStructType{InType: tdh.IntypeFiletime})
 	require.Error(t, err)
-	assert.Equal(t, kparams.Unknown, kpar.Type)
+	require.Nil(t, kpar)
 }

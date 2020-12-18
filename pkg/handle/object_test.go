@@ -93,7 +93,7 @@ func TestQueryNameFileHandle(t *testing.T) {
 	f, err := syscall.Open("_fixtures/.fibratus", syscall.O_RDONLY, syscall.S_ISUID)
 	require.NoError(t, err)
 	defer syscall.Close(f)
-	handleName, _, err := QueryName(handle.Handle(f), File, false)
+	handleName, _, err := QueryName(handle.Handle(f), File, true)
 	require.NoError(t, err)
 	assert.Equal(t, ".fibratus", filepath.Base(handleName))
 }

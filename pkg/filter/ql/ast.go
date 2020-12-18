@@ -137,6 +137,67 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 		case neq:
 			return ok && (lhs != rhs)
 		}
+	case int:
+		switch rhs := rhs.(type) {
+		case float64:
+			lhs := float64(lhs)
+			switch expr.Op {
+			case eq:
+				return lhs == rhs
+			case neq:
+				return lhs != rhs
+			case lt:
+				return lhs < rhs
+			case lte:
+				return lhs <= rhs
+			case gt:
+				return lhs > rhs
+			case gte:
+				return lhs >= rhs
+			}
+		case int64:
+			switch expr.Op {
+			case eq:
+				return int64(lhs) == rhs
+			case neq:
+				return int64(lhs) != rhs
+			case lt:
+				return int64(lhs) < rhs
+			case lte:
+				return int64(lhs) <= rhs
+			case gt:
+				return int64(lhs) > rhs
+			case gte:
+				return int64(lhs) >= rhs
+			}
+		case uint64:
+			switch expr.Op {
+			case eq:
+				return uint64(lhs) == rhs
+			case neq:
+				return uint64(lhs) != rhs
+			case lt:
+				if lhs < 0 {
+					return true
+				}
+				return uint64(lhs) < rhs
+			case lte:
+				if lhs < 0 {
+					return true
+				}
+				return uint64(lhs) <= rhs
+			case gt:
+				if lhs < 0 {
+					return false
+				}
+				return uint64(lhs) > rhs
+			case gte:
+				if lhs < 0 {
+					return false
+				}
+				return uint64(lhs) >= rhs
+			}
+		}
 	case uint8:
 		switch rhs := rhs.(type) {
 		case float64:
@@ -540,17 +601,33 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			}
 			return lhs != rhs
 		case contains:
-			rhs, ok := rhs.(string)
-			if !ok {
+			switch rhs := rhs.(type) {
+			case string:
+				return strings.Contains(lhs, rhs)
+			case []string:
+				for _, s := range rhs {
+					if strings.Contains(lhs, s) {
+						return true
+					}
+				}
+				return false
+			default:
 				return false
 			}
-			return strings.Contains(lhs, rhs)
 		case icontains:
-			rhs, ok := rhs.(string)
-			if !ok {
+			switch rhs := rhs.(type) {
+			case string:
+				return strings.Contains(strings.ToLower(lhs), strings.ToLower(rhs))
+			case []string:
+				for _, s := range rhs {
+					if strings.Contains(strings.ToLower(lhs), strings.ToLower(s)) {
+						return true
+					}
+				}
+				return false
+			default:
 				return false
 			}
-			return strings.Contains(strings.ToLower(lhs), strings.ToLower(rhs))
 		case in:
 			rhs, ok := rhs.([]string)
 			if !ok {
@@ -563,47 +640,61 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			}
 			return false
 		case startswith:
-			rhs, ok := rhs.(string)
-			if !ok {
-				return false
-			}
-			return strings.HasPrefix(lhs, rhs)
-		case endswith:
-			rhs, ok := rhs.(string)
-			if !ok {
-				return false
-			}
-			return strings.HasSuffix(lhs, rhs)
-		case matches:
-			pat, ok := rhs.(string)
-			if !ok {
-				pats, ok := rhs.([]string)
-				if !ok {
-					return false
+			switch rhs := rhs.(type) {
+			case string:
+				return strings.HasPrefix(lhs, rhs)
+			case []string:
+				for _, s := range rhs {
+					if strings.HasPrefix(lhs, s) {
+						return true
+					}
 				}
-				for _, pat := range pats {
+				return false
+			default:
+				return false
+			}
+		case endswith:
+			switch rhs := rhs.(type) {
+			case string:
+				return strings.HasSuffix(lhs, rhs)
+			case []string:
+				for _, s := range rhs {
+					if strings.HasSuffix(lhs, s) {
+						return true
+					}
+				}
+				return false
+			default:
+				return false
+			}
+		case matches:
+			switch rhs := rhs.(type) {
+			case string:
+				return wildcard.Match(rhs, lhs)
+			case []string:
+				for _, pat := range rhs {
 					if wildcard.Match(pat, lhs) {
 						return true
 					}
 				}
 				return false
+			default:
+				return false
 			}
-			return wildcard.Match(pat, lhs)
 		case imatches:
-			pat, ok := rhs.(string)
-			if !ok {
-				pats, ok := rhs.([]string)
-				if !ok {
-					return false
-				}
-				for _, pat := range pats {
+			switch rhs := rhs.(type) {
+			case string:
+				return wildcard.Match(strings.ToLower(rhs), strings.ToLower(lhs))
+			case []string:
+				for _, pat := range rhs {
 					if wildcard.Match(strings.ToLower(pat), strings.ToLower(lhs)) {
 						return true
 					}
 				}
 				return false
+			default:
+				return false
 			}
-			return wildcard.Match(strings.ToLower(pat), strings.ToLower(lhs))
 		}
 	case net.IP:
 		switch expr.Op {

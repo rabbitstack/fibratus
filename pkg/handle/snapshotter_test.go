@@ -19,15 +19,21 @@
 package handle
 
 import (
-	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/stretchr/testify/require"
+	"os"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestInitSnapshot(t *testing.T) {
 	ch := make(chan bool)
-	snap := NewSnapshotter(&config.Config{}, func(total, known uint64) {
+	time.AfterFunc(time.Second*40, func() {
+		ch <- true
+		t.Fatal("snapshot callback was not triggered")
+	})
+	snap := NewSnapshotter(&config.Config{InitHandleSnapshot: true}, func(total, known uint64) {
 		ch <- true
 	})
 	require.NotNil(t, snap)
@@ -35,11 +41,17 @@ func TestInitSnapshot(t *testing.T) {
 }
 
 func TestFindHandles(t *testing.T) {
-	snap := NewSnapshotter(&config.Config{}, nil)
-	handles, err := snap.FindHandles(uint32(6716))
+	snap := NewSnapshotter(&config.Config{InitHandleSnapshot: true}, nil)
+	handles, err := snap.FindHandles(uint32(os.Getppid()))
 	require.NoError(t, err)
 	require.NotEmpty(t, handles)
+
+	var hasProcessHandle bool
 	for _, h := range handles {
-		fmt.Println(h)
+		if h.Type == "Process" && strings.Contains(h.Name, "fibratus_pkg_handle.exe") {
+			hasProcessHandle = true
+		}
 	}
+
+	require.True(t, hasProcessHandle)
 }

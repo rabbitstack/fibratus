@@ -35,8 +35,14 @@ type httpClient struct {
 }
 
 func (c *httpClient) Connect() error {
-	_, err := http.Get(c.url + "/connect")
-	return err
+	res, err := http.Get(c.url + "/connect")
+	if err != nil {
+		return err
+	}
+	if res.StatusCode != http.StatusOK {
+		return err
+	}
+	return nil
 }
 
 func (c *httpClient) Close() error { return nil }
@@ -81,22 +87,27 @@ func TestConnectClientBackoff(t *testing.T) {
 	q <- &kevent.Batch{}
 	q <- &kevent.Batch{}
 
+	fail := true
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/publish", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 	mux.HandleFunc("/connect", func(w http.ResponseWriter, r *http.Request) {
+		if fail {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 		w.WriteHeader(http.StatusOK)
 	})
 
-	srv := httptest.NewUnstartedServer(mux)
+	srv := httptest.NewServer(mux)
 	defer srv.Close()
 
 	client := &httpClient{url: srv.URL, wait: make(chan struct{}, 1), expectedPublished: 2}
 
 	go time.AfterFunc(time.Second*3, func() {
-		srv.Start()
-		client.url = srv.URL
+		fail = false
 	})
 
 	w := initWorker(q, client)

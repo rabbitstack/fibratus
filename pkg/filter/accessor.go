@@ -38,6 +38,21 @@ type accessor interface {
 	get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error)
 }
 
+// getAccessors initializes and returns all available accessors.
+func getAccessors() []accessor {
+	return []accessor{
+		newPSAccessor(),
+		newPEAccessor(),
+		newFileAccessor(),
+		newKevtAccessor(),
+		newImageAccessor(),
+		newThreadAccessor(),
+		newHandleAccessor(),
+		newNetworkAccessor(),
+		newRegistryAccessor(),
+	}
+}
+
 // kevtAccessor extracts kernel event specific values.
 type kevtAccessor struct{}
 

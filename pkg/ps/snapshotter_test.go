@@ -171,7 +171,7 @@ func TestSnapshotterWritePSThreadMissingProc(t *testing.T) {
 	ps := psnap.Find(pid)
 	require.NotNil(t, ps)
 	assert.Equal(t, pid, ps.PID)
-	assert.Contains(t, ps.Name, "TestSnapshotterWritePSThreadMissingProc_in_github_com_rabbitstack_fibratus_pkg_ps.exe")
+	assert.Contains(t, ps.Name, "ps.exe")
 	assert.True(t, len(ps.Envs) > 0)
 }
 
@@ -293,19 +293,6 @@ func TestRemove(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.True(t, psnap.Size() == 0)
-}
-
-func TestRemoveProcNotFound(t *testing.T) {
-	hsnap := new(handle.SnapshotterMock)
-	psnap := NewSnapshotter(hsnap, &config.Config{})
-
-	err := psnap.Remove(&kevent.Kevent{
-		Type: ktypes.TerminateProcess,
-		Kparams: kevent.Kparams{
-			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(4596)},
-		},
-	})
-	require.Error(t, err)
 }
 
 func TestRemoveNoPidInParams(t *testing.T) {

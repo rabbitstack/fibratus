@@ -110,21 +110,15 @@ func NewFromCLIWithAllAccessors(args []string) (Filter, error) {
 	if expr == "" {
 		return nil, nil
 	}
-	return &filter{
-		parser: ql.NewParser(expr),
-		accessors: []accessor{
-			newPSAccessor(),
-			newPEAccessor(),
-			newFileAccessor(),
-			newKevtAccessor(),
-			newImageAccessor(),
-			newThreadAccessor(),
-			newHandleAccessor(),
-			newNetworkAccessor(),
-			newRegistryAccessor(),
-		},
-		fields: make([]fields.Field, 0),
-	}, nil
+	filter := &filter{
+		parser:    ql.NewParser(expr),
+		accessors: getAccessors(),
+		fields:    make([]fields.Field, 0),
+	}
+	if err := filter.Compile(); err != nil {
+		return nil, fmt.Errorf("bad filter: \n  %v", err)
+	}
+	return filter, nil
 }
 
 // Compile parsers the filter expression and builds a binary expression tree
@@ -153,6 +147,9 @@ func (f *filter) Compile() error {
 }
 
 func (f *filter) Run(kevt *kevent.Kevent) bool {
+	if f.expr == nil {
+		return false
+	}
 	valuer := make(map[string]interface{})
 	// for each field present in the AST, we run the
 	// accessors and extract the field vales that are

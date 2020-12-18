@@ -45,7 +45,7 @@ func TestValidate(t *testing.T) {
                   host: smtp.gmail.com
                   port: 465
                   user: user
-                  pass: pas$
+                  password: pas$
                   from: from@mail.com
                   to:
                    - to@mail.com
@@ -70,7 +70,7 @@ func TestValidate(t *testing.T) {
                   url: https://slack.url
                   workspace: fibratus
                   channel: fibratus
-                  emoji: ""`, valid: false, errs: 3},
+                  emoji: ""`, valid: false, errs: 6},
 		{text: `api:
                  transport: "" 
                  timeout: 1s`, valid: false, errs: 1},
@@ -84,9 +84,9 @@ func TestValidate(t *testing.T) {
 		}
 		valid, errs := validate(m)
 		if valid != tt.valid {
-			t.Errorf("%d. valid mismatch: text=%q exp=%#v got=%#v", i, tt.text, tt.valid, valid)
+			t.Errorf("%d. valid mismatch: text=%q exp=%#v got=%#v errs=%#v", i, tt.text, tt.valid, valid, errs)
 		} else if len(errs) != tt.errs {
-			t.Errorf("%d. error count mismatch: text=%q exp=%#v got=%#v", i, tt.text, tt.errs, len(errs))
+			t.Errorf("%d. error count mismatch: text=%q exp=%#v got=%#v errs=%#v", i, tt.text, tt.errs, len(errs), errs)
 		}
 	}
 }
