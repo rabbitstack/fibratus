@@ -138,5 +138,5 @@ You can use [filaments](https://www.fibratus.io/#/filaments/introduction) to ext
   Developed with ❤️ by <strong>Nedim Šabić Šabić</strong>
 </p>
 <p align="center">
-  Logo designed by <strong><a target="_blank" href="https://github.com/karinkasweet/">Karina Slizova</a></strong>
+  Logo designed by <strong><a name="logo" target="_blank" href="https://github.com/karinkasweet/">Karina Slizova</a></strong>
 </p>
