@@ -3,7 +3,7 @@
 
 <p align="center" >
   <a href="https://www.fibratus.io" >
-    <img src="docs/images/fibratus-term.gif" alt="Fibratus">
+    <img src="logo.png" alt="Fibratus">
   </a>
 </p>
 
@@ -136,4 +136,7 @@ You can use [filaments](https://www.fibratus.io/#/filaments/introduction) to ext
 
 <p align="center">
   Developed with ❤️ by <strong>Nedim Šabić Šabić</strong>
+</p>
+<p align="center">
+  Logo designed by <strong><a target="_blank" href="https://github.com/karinkasweet/">Karina Slizova</a></strong>
 </p>
