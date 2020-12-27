@@ -27,6 +27,7 @@ jobs:
           install: >-
             base-devel
             mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-python
             git
       - name: Install libyara
         shell: msys2 {0}           
@@ -42,8 +43,6 @@ jobs:
         shell: bash
         run: |
           export PATH="c/msys64/mingw64/bin:/c/Strawberry/perl/bin:$PATH"
-          export PKG_CONFIG_PATH=$(pwd)/pkg-config
-          ln -s C:/hostedtoolcache/windows/Python/3.7.9/x64 C:/Python37
           go build -ldflags "-s -w -X github.com/rabbitstack/fibratus/cmd/fibratus/app.commit=$GITHUB_SHA" \
                    -tags $BUILD_TAGS -o ./cmd/fibratus/fibratus.exe ./cmd/fibratus
       - name: Lint
