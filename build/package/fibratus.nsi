@@ -101,8 +101,8 @@ Section "Install"
 	# Files for the install directory
 	SetOutPath $INSTDIR
 
-    # Create directories
-    CreateDirectory $INSTDIR\Logs
+  # Create directories
+  CreateDirectory $INSTDIR\Logs
 
 	# Files added here should be removed by the uninstaller
 	File /r "release\Bin"
@@ -142,14 +142,14 @@ Section "Uninstall"
 
 	# Remove uninstalled executable from PATH
 	EnVar::SetHKCU
-    EnVar::DeleteValue  "Path" "$INSTDIR\Bin\"
+  EnVar::DeleteValue  "Path" "$INSTDIR\Bin\"
 
 	# Remove files/directories
 	RMDir /r /REBOOTOK $INSTDIR\Bin
 	RMDir /r /REBOOTOK $INSTDIR\Logs
 	RMDir /r /REBOOTOK $INSTDIR\Config
-    RMDir /r /REBOOTOK $INSTDIR\Filaments
-    RMDir /r /REBOOTOK $INSTDIR\Python
+  RMDir /r /REBOOTOK $INSTDIR\Filaments
+  RMDir /r /REBOOTOK $INSTDIR\Python
 
 	# Always delete uninstaller as the last action
 	Delete /REBOOTOK $INSTDIR\uninstall.exe
