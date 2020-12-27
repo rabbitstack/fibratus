@@ -20,22 +20,22 @@ jobs:
         uses: actions/setup-go@v2
         with:
            go-version: 1.15.x
-     - name: Setup msys2
-       uses: msys2/setup-msys2@v2
-       with:
-         release: false
-         install: >-
-           base-devel
-           mingw-w64-x86_64-gcc
-           git
-     - name: Install libyara
-       shell: msys2 {0}           
-       run: |
-           git clone https://github.com/VirusTotal/yara.git
-           cd yara
-           autoreconf -fiv
-           ./configure --host=x86_64-w64-mingw32
-           make install
+      - name: Setup msys2
+        uses: msys2/setup-msys2@v2
+        with:
+          release: false
+          install: >-
+            base-devel
+            mingw-w64-x86_64-gcc
+            git
+      - name: Install libyara
+        shell: msys2 {0}           
+        run: |
+            git clone https://github.com/VirusTotal/yara.git
+            cd yara
+            autoreconf -fiv
+            ./configure --host=x86_64-w64-mingw32
+            make install
       - name: Checkout
         uses: actions/checkout@v2
       - name: Compile
