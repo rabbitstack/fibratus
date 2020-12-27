@@ -10,7 +10,7 @@ on:
       - "docs/**"
 
 env:
-  BUILD_TAGS: "kcap,filament,yara"
+  BUILD_TAGS: "kcap,filament"
            
 jobs:
   build:
