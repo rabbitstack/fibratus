@@ -58,8 +58,8 @@ To build Fibratus directly from source code you have satisfy the following requi
 
 1. Download the `msys2` installer and follow the instructions [here](https://www.msys2.org/).
   - open the `msys2` shell (by default located in `C:\msys2\msys2.exe`). You can also access it from the `MSYS2 64-bit` Start Menu item.
-  - install the `MinGW` compiler toolchain
-    - `pacman -S mingw-w64-x86_64-gcc`
+  - install the `MinGW` compiler toolchain and the `base-devel` package
+    - `pacman -S base-devel mingw-w64-x86_64-gcc`
 2. [Download](https://www.python.org/ftp/python/3.7.9/python-3.7.9-amd64.exe) and install the `Python 3.7`. Assuming the Python distribution was installed in `C:\Python37`, set the `PKG_CONFIG_PATH` environment variable to the location of the `pkg-config\python-37.pc` file within the `fibratus` directory.
   - `set PKG_CONFIG_PATH=<python-37.pc absolute path>`
 3. Build `libyara`
