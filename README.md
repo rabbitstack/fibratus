@@ -1,7 +1,3 @@
-<p align="center">
-   <img src="https://github.com/rabbitstack/fibratus/workflows/master/badge.svg"></img>
-</p>
-
 ---
 
 <p align="center" >
