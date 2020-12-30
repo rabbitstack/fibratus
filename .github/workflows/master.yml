@@ -10,7 +10,7 @@ on:
       - "docs/**"
 
 env:
-  BUILD_TAGS: "kcap,filament"
+  BUILD_TAGS: "kcap,filament,yara"
            
 jobs:
   build:
@@ -20,6 +20,8 @@ jobs:
         uses: actions/setup-go@v2
         with:
            go-version: 1.15.x
+      - name: Checkout
+        uses: actions/checkout@v2
       - name: Setup msys2
         uses: msys2/setup-msys2@v2
         with:
@@ -27,27 +29,50 @@ jobs:
           install: >-
             base-devel
             mingw-w64-x86_64-gcc
-            mingw-w64-x86_64-pkgconf
             git
-      - name: Install libyara
-        shell: msys2 {0}           
+      - name: Cache yara
+        uses: actions/cache@v2
+        id: cache
+        with:
+          path: |
+            **/yara
+          key: ${{ runner.os }}-yara-${{ hashFiles('**/pkg/yara') }}
+          restore-keys: |
+            ${{ runner.os }}-yara-${{ hashFiles('**/pkg/yara') }}
+      - name: Clone yara
+        if: steps.cache.outputs.cache-hit != 'true'
+        shell: bash
+        env:
+          VERSION: "4.0.2"
         run: |
-            git clone https://github.com/VirusTotal/yara.git
-            cd yara
-            autoreconf -fiv
-            ./configure --host=x86_64-w64-mingw32
-            make install
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Compile
+          git clone --depth 1 --branch v$VERSION https://github.com/VirusTotal/yara.git
+      - name: Configure yara
+        if: steps.cache.outputs.cache-hit != 'true'
+        shell: msys2 {0}
+        run: |
+          cd yara
+          autoreconf -fiv
+          ./configure --host=x86_64-w64-mingw32
+      - name: Install yara
+        shell: msys2 {0}
+        run: |
+          cd yara
+          make install
+      - name: Build
         shell: bash
         run: |
-          export PATH="c/msys64/mingw64/bin:/c/Strawberry/perl/bin:$PATH"
+          export PATH=/c/msys64/mingw64/bin:$PATH
           export PKG_CONFIG_PATH=$(pwd)/pkg-config
           ln -s C:/hostedtoolcache/windows/Python/3.7.9/x64 C:/Python37
-          go build -ldflags "-s -w -X github.com/rabbitstack/fibratus/cmd/fibratus/app.commit=$GITHUB_SHA" -tags $BUILD_TAGS -o ./cmd/fibratus/fibratus.exe ./cmd/fibratus
+          go build -ldflags "-s -w -X github.com/rabbitstack/fibratus/cmd/fibratus/app.commit=$GITHUB_SHA" \
+                   -tags $BUILD_TAGS \
+                   -o ./cmd/fibratus/fibratus.exe ./cmd/fibratus
       - name: Lint
         shell: bash
         run: |
           go get -v -u golang.org/x/lint/golint
           go list ./... | xargs -L1 $USERPROFILE/go/bin/golint -set_exit_status
+      - uses: actions/upload-artifact@v2
+        with:
+          name: "fibratus-amd64.exe"
+          path: "./cmd/fibratus/fibratus.exe"
