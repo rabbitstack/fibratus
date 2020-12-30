@@ -72,23 +72,22 @@ To build Fibratus directly from source code you have satisfy the following requi
 
 ### Building the executable {docsify-ignore}
 
-The **optional dependencies are only needed** if you'll be building features that interop with the C code. The Go compiler is instructed to build all features by default, but you can circumvent compiling certain features through build flags by setting the following values:
+The **optional dependencies are only needed** if you'll be building features that interop with the C code. The Go compiler is instructed to ignore all features that trigger the [cgo](https://golang.org/cmd/cgo/), but you can control which features are built into Fibratus through the following build flags:
 
 - `filament`: compiles Fibratus with filaments support
 - `kcap`: compiles Fibratus with support for capturing/replaying kcap files
 - `yara`: builds Fibratus with support for [Yara](https://virustotal.github.io/yara/) pattern matching
 
-To build the Fibratus binary with the filaments support, you would run the following commands within the `fibratus` directory:
+To build the Fibratus binary without filament, kcap nor yara features, run the following command from the `cmd` shell and within the`fibratus` directory:
 
 ```
-$ set TAGS=filament
 $ make
 ```
 
-To avoid triggering the [cgo](https://golang.org/cmd/cgo/) and thus producing pure Go code, run the following commands:
+To produce the Fibratus binary with the filaments support, you would run the following commands:
 
 ```
-$ set TAGS=""
+$ set TAGS=filament
 $ make
 ```
 
