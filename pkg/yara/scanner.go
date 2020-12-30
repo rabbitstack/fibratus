@@ -24,7 +24,7 @@ import (
 	"bytes"
 	"expvar"
 	"fmt"
-	"github.com/hillu/go-yara"
+	"github.com/hillu/go-yara/v4"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"

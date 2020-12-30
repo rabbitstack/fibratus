@@ -2,12 +2,11 @@ module github.com/rabbitstack/fibratus
 
 require (
 	github.com/Microsoft/go-winio v0.4.14
-	github.com/akavel/rsrc v0.9.0 // indirect
 	github.com/briandowns/spinner v1.11.1
 	github.com/dustin/go-humanize v1.0.0
 	github.com/go-openapi/strfmt v0.19.4 // indirect
 	github.com/hashicorp/go-version v1.2.1
-	github.com/hillu/go-yara v1.2.1
+	github.com/hillu/go-yara/v4 v4.0.4
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/jedib0t/go-pretty/v6 v6.0.1
 	github.com/magiconair/properties v1.8.1
