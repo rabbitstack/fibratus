@@ -28,7 +28,9 @@ set LDFLAGS="-s -w -X github.com/rabbitstack/fibratus/cmd/fibratus/app.version=%
 :: kcap: enables capture support
 :: filament: enables running filaments and thus interacting with the CPython interpreter
 :: yara: activates Yara process scanning
-set TAGS=""
+if NOT DEFINED TAGS (
+    set TAGS=""
+)
 
 set PKGS=
 :: Get the list of packages that we'll use to run tests/linter
