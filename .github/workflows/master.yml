@@ -10,7 +10,7 @@ on:
       - "docs/**"
 
 env:
-  BUILD_TAGS: "kcap,filament,yara"
+  BUILD_TAGS: "kcap,filament,yara,yara_static"
            
 jobs:
   build:
@@ -61,7 +61,7 @@ jobs:
       - name: Build
         shell: bash
         run: |
-          export PATH=/c/msys64/mingw64/bin:/c/msys64/usr/bin:$PATH
+          export PATH=/c/msys64/mingw64/bin:$PATH
           export PKG_CONFIG_PATH=$(pwd)/pkg-config
           ln -s C:/hostedtoolcache/windows/Python/3.7.9/x64 C:/Python37
           go build -ldflags "-s -w -X github.com/rabbitstack/fibratus/cmd/fibratus/app.commit=$GITHUB_SHA" \
