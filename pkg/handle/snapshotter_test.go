@@ -22,7 +22,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/stretchr/testify/require"
 	"os"
-	"strings"
 	"testing"
 	"time"
 )
@@ -48,7 +47,7 @@ func TestFindHandles(t *testing.T) {
 
 	var hasProcessHandle bool
 	for _, h := range handles {
-		if h.Type == "Process" && strings.Contains(h.Name, "fibratus_pkg_handle.exe") {
+		if h.Type == "Process" {
 			hasProcessHandle = true
 		}
 	}

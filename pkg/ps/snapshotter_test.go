@@ -171,7 +171,7 @@ func TestSnapshotterWritePSThreadMissingProc(t *testing.T) {
 	ps := psnap.Find(pid)
 	require.NotNil(t, ps)
 	assert.Equal(t, pid, ps.PID)
-	assert.Contains(t, ps.Name, "ps.exe")
+	assert.Contains(t, ps.Name, "ps")
 	assert.True(t, len(ps.Envs) > 0)
 }
 

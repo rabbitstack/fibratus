@@ -63,6 +63,7 @@ func TestCreateFile(t *testing.T) {
 		Kparams: kevent.Kparams{
 			kparams.FileObject: {Name: kparams.FileObject, Type: kparams.Uint64, Value: kparams.Hex("12456738026482168384")},
 			kparams.FileName:   {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
+			kparams.FileIrpPtr: {Name: kparams.FileIrpPtr, Type: kparams.Uint64, Value: kparams.Hex("1234543123112321")},
 		},
 	})
 	require.NoError(t, err)
@@ -77,36 +78,42 @@ func TestCreateFile(t *testing.T) {
 			kparams.FileCreateOptions: {Name: kparams.FileCreateOptions, Type: kparams.Uint32, Value: uint32(1223456)},
 			kparams.FileName:          {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\kernel32.dll"},
 			kparams.FileShareMask:     {Name: kparams.FileShareMask, Type: kparams.Uint32, Value: uint32(5)},
+			kparams.FileIrpPtr:        {Name: kparams.FileIrpPtr, Type: kparams.Uint64, Value: kparams.Hex("1234543123112321")},
 		},
 	}
 	devMapper.On("Convert", "\\Device\\HarddiskVolume2\\Windows\\system32\\kernel32.dll").Return(fmt.Sprintf("%s\\system32\\kernel32.dll", sysRoot))
 
 	_, _, err = fsi.Intercept(kevt1)
+	require.EqualErrorf(t, err, "cancel bubbling up the kernel event to upstream components", "")
+
+	pendingKevents := fsi.(*fsInterceptor).pendingKevents
+	require.Len(t, pendingKevents, 1)
+
+	opEnd := &kevent.Kevent{
+		Type: ktypes.FileOpEnd,
+		Tid:  2484,
+		PID:  859,
+		Kparams: kevent.Kparams{
+			kparams.FileObject:    {Name: kparams.FileObject, Type: kparams.Uint64, Value: kparams.Hex("18446738026482168384")},
+			kparams.ThreadID:      {Name: kparams.ThreadID, Type: kparams.Uint32, Value: uint32(1484)},
+			kparams.FileIrpPtr:    {Name: kparams.FileIrpPtr, Type: kparams.Uint64, Value: kparams.Hex("1234543123112321")},
+			kparams.FileExtraInfo: {Name: kparams.FileExtraInfo, Type: kparams.Uint8, Value: kparams.Hex("2")},
+		},
+	}
+	kevt1, _, err = fsi.Intercept(opEnd)
 	require.NoError(t, err)
+
 	dispo, err := kevt1.Kparams.Get(kparams.FileOperation)
 	require.NoError(t, err)
-	assert.Equal(t, fs.Supersede, dispo.(fs.FileDisposition))
+	assert.Equal(t, fs.Create, dispo.(fs.FileDisposition))
 	filename, err := kevt1.Kparams.GetString(kparams.FileName)
 	require.NoError(t, err)
 	assert.Equal(t, fmt.Sprintf("%s\\system32\\kernel32.dll", sysRoot), filename)
-	assert.True(t, kevt1.Kparams.Contains(kparams.FileCreated))
-	mask, err := kevt1.Kparams.GetString(kparams.FileShareMask)
-	assert.Equal(t, "r-d", mask)
+	mask, err := kevt1.Kparams.Get(kparams.FileShareMask)
+	assert.Equal(t, "r-d", mask.(fs.FileShareMode).String())
 
-	files := fsi.(*fsInterceptor).files
+	require.Empty(t, pendingKevents)
 
-	require.Len(t, files, 2)
-
-	fileinfo := files[18446738026482168384]
-	require.NotNil(t, fileinfo)
-
-	assert.True(t, kevt1.Kparams.Contains(kparams.FileCreated))
-	assert.Equal(t, fmt.Sprintf("%s\\system32\\kernel32.dll", sysRoot), fileinfo.name)
-	assert.Equal(t, fs.Regular, fileinfo.typ)
-
-	typ, err := kevt1.Kparams.GetString(kparams.FileType)
-	require.NoError(t, err)
-	assert.Equal(t, "file", typ)
 }
 
 func TestRundownFile(t *testing.T) {
@@ -123,17 +130,16 @@ func TestRundownFile(t *testing.T) {
 		Tid:  2484,
 		PID:  859,
 		Kparams: kevent.Kparams{
-			kparams.FileObject: {Name: kparams.FileObject, Type: kparams.Uint64, Value: kparams.Hex("12456738026482168384")},
+			kparams.FileObject: {Name: kparams.FileObject, Type: kparams.Uint64, Value: kparams.Hex("124567380264")},
 			kparams.FileName:   {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
 		},
 	})
 	require.NoError(t, err)
 
 	files := fsi.(*fsInterceptor).files
-
 	require.Len(t, files, 1)
 
-	fileinfo := files[12456738026482168384]
+	fileinfo := files[20089293767268]
 	require.NotNil(t, fileinfo)
 
 	assert.Equal(t, fmt.Sprintf("%s\\system32\\user32.dll", sysRoot), fileinfo.name)
@@ -166,6 +172,7 @@ func TestDeleteFile(t *testing.T) {
 		PID:  859,
 		Kparams: kevent.Kparams{
 			kparams.FileObject: {Name: kparams.FileObject, Type: kparams.Uint64, Value: kparams.Hex("12456738026482168384")},
+			kparams.FileKey:    {Name: kparams.FileKey, Type: kparams.Uint64, Value: kparams.Hex("12456738026482168384")},
 			kparams.ThreadID:   {Name: kparams.ThreadID, Type: kparams.Uint32, Value: uint32(1484)},
 		},
 	}
@@ -184,12 +191,6 @@ func TestDeleteFile(t *testing.T) {
 	assert.Equal(t, fmt.Sprintf("%s\\system32\\user32.dll", sysRoot), filename)
 	typ, err := kevt.Kparams.GetString(kparams.FileType)
 	assert.Equal(t, "file", typ)
-	created, err := kevt.Kparams.GetTime(kparams.FileCreated)
-	require.NoError(t, err)
-	assert.NotEmpty(t, created)
-	attrs, err := kevt.Kparams.GetSlice(kparams.FileAttributes)
-	require.NoError(t, err)
-	require.Contains(t, attrs.([]fs.FileAttr), fs.FileArchive)
 }
 
 func TestRundownFileDeadline(t *testing.T) {

@@ -185,7 +185,7 @@ func TestHandleCoalescingWaiting(t *testing.T) {
 
 	keyName, err := ckevt.Kparams.GetString(kparams.HandleObjectName)
 	require.NoError(t, err)
-	assert.Equal(t, kparams.NA, keyName)
+	assert.Empty(t, keyName)
 
 	assert.Len(t, hi.(*handleInterceptor).defers, 0)
 }

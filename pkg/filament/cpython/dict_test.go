@@ -32,5 +32,5 @@ func TestDict(t *testing.T) {
 	v := dict.Get(PyUnicodeFromString("filename"))
 	require.NotNil(t, v)
 
-	assert.Equal(t, `C:\\Windows\\System32\\kernel32.dll`, v.String())
+	assert.Equal(t, `C:\Windows\System32\kernel32.dll`, v.String())
 }

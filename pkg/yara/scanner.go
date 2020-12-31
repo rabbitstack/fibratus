@@ -48,7 +48,7 @@ const alertTextTmpl = `
 	{{ range . }}
 		Rule: {{ .Rule }}
 		Namespace: {{ .Namespace }}
-		Meta: {{ .Meta }}
+		Metas: {{ .Metas }}
 		Tags: {{ .Tags }}
 	{{ end }}
 	{{- end }}
@@ -140,8 +140,8 @@ const alertTextTmpl = `
 	{{ range . }}
 		Rule: {{ .Rule }}
 		Namespace: {{ .Namespace }}
-		Meta: {{ .Meta }}
-		Tags: {{ .Tags }}
+		Metas: {{ .Metas }}
+		Tags:  {{ .Tags }}
 	{{ end }}
 	{{ end }}
 

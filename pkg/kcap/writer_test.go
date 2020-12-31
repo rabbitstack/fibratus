@@ -53,7 +53,7 @@ func TestWrite(t *testing.T) {
 
 	hsnap.On("GetSnapshot").Return(handles)
 
-	w, err := NewWriter("_fixtures/cap1.kcap", psnap, hsnap)
+	w, err := NewWriter("_fixtures/cap.kcap", psnap, hsnap)
 	require.NoError(t, err)
 	require.NotNil(t, w)
 
@@ -156,8 +156,6 @@ func TestWrite(t *testing.T) {
 	case err := <-werrs:
 		t.Fatal(err)
 	case <-quit:
-		err := w.Close()
-		require.NoError(t, err)
 		return
 	}
 }

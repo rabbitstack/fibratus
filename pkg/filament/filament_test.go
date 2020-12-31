@@ -40,7 +40,7 @@ func init() {
 }
 
 func TestNewFilament(t *testing.T) {
-	filament, err := New("top_hives_io", nil, nil, config.FilamentConfig{Path: "_fixtures"})
+	filament, err := New("top_hives_io", nil, nil, &config.Config{Filament: config.FilamentConfig{Path: "_fixtures"}})
 	require.NoError(t, err)
 	require.NotNil(t, filament)
 	defer filament.Close()
@@ -52,20 +52,8 @@ func init() {
 	tableOutput = &buf
 }
 
-func TestFilamentTable(t *testing.T) {
-	filament, err := New("top_keys_io_table", nil, nil, config.FilamentConfig{Path: "_fixtures"})
-	require.NoError(t, err)
-	require.NotNil(t, filament)
-	defer filament.Close()
-
-	time.Sleep(time.Millisecond * 1020)
-	output := "╭──────────────────────────────────────────────────────────────────────────┬──────╮\n│ KEY                                                                      │ #OPS │\n├──────────────────────────────────────────────────────────────────────────┼──────┤\n│ HKLM\\SYSTEM\\ControlSet001\\Services\\WinSock2\\Parameters\\Protocol_Catalog9 │    3 │\n│ HKLM\\SYSTEM\\ControlSet001\\Control\\Nls\\Sorting\\Ids                        │    1 │\n╰──────────────────────────────────────────────────────────────────────────┴──────╯\n"
-
-	assert.Equal(t, output, buf.String())
-}
-
 func TestOnNextKevent(t *testing.T) {
-	filament, err := New("test_on_next_kevent", nil, nil, config.FilamentConfig{FlushPeriod: time.Millisecond * 250, Path: "_fixtures"})
+	filament, err := New("test_on_next_kevent", nil, nil, &config.Config{Filament: config.FilamentConfig{FlushPeriod: time.Millisecond * 250, Path: "_fixtures"}})
 	require.NoError(t, err)
 	require.NotNil(t, filament)
 	time.AfterFunc(time.Millisecond*1050, func() {
@@ -78,7 +66,7 @@ func TestOnNextKevent(t *testing.T) {
 		kevt := &kevent.Kevent{
 			Type:      ktypes.RegCreateKey,
 			Tid:       2484,
-			Pid:       859,
+			PID:       859,
 			Name:      "RegCreateKey",
 			Host:      "archrabbit",
 			CPU:       uint8(i / 2),
@@ -105,7 +93,7 @@ func TestOnNextKevent(t *testing.T) {
 }
 
 func TestFilamentFilter(t *testing.T) {
-	filament, err := New("test_filter", nil, nil, config.FilamentConfig{Path: "_fixtures"})
+	filament, err := New("test_filter", nil, nil, &config.Config{Filament: config.FilamentConfig{Path: "_fixtures"}})
 	require.NoError(t, err)
 	require.NotNil(t, filament)
 	defer filament.Close()

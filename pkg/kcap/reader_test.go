@@ -32,7 +32,7 @@ func TestRead(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer r.Close()
+
 	_, _, err = r.RecoverSnapshotters()
 	require.NoError(t, err)
 
