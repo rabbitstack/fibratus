@@ -204,7 +204,7 @@ func TestKeventMarshalJSON(t *testing.T) {
 }
 
 func TestUnmarshalHugeHandles(t *testing.T) {
-	b, err := ioutil.ReadFile("C:\\handles.json")
+	b, err := ioutil.ReadFile("_fixtures\\handles.json")
 	require.NoError(t, err)
 	handles := make([]htypes.Handle, 0)
 	err = json.Unmarshal(b, &handles)
