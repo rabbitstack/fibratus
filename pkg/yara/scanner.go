@@ -159,7 +159,7 @@ var (
 
 type scanner struct {
 	c      *yara.Compiler
-	s      *yara.Scanner
+	rules  *yara.Rules
 	config config.Config
 
 	psnap ps.Snapshotter
@@ -229,29 +229,34 @@ func NewScanner(psnap ps.Snapshotter, config config.Config) (Scanner, error) {
 		return nil, parseCompilerErrors(c.Errors)
 	}
 
-	r, err := c.GetRules()
+	rules, err := c.GetRules()
 	if err != nil {
 		return nil, fmt.Errorf("couldn't compile yara rules: %v", err)
 	}
-	s, err := yara.NewScanner(r)
+
+	return &scanner{
+		c:      c,
+		rules:  rules,
+		config: config,
+		psnap:  psnap,
+	}, nil
+}
+
+// scannerWithFlags creates a new instance of the Yara scanner.
+func (s scanner) scannerWithFlags() (*yara.Scanner, error) {
+	sn, err := yara.NewScanner(s.rules)
 	if err != nil {
 		return nil, fmt.Errorf("fail to create yara scanner: %v", err)
 	}
 
 	// set scan flags
 	var flags yara.ScanFlags
-	if config.FastScanMode {
+	if s.config.FastScanMode {
 		flags |= yara.ScanFlagsFastMode
 	}
-	s.SetFlags(flags)
-	s.SetTimeout(config.ScanTimeout)
-
-	return &scanner{
-		c:      c,
-		s:      s,
-		config: config,
-		psnap:  psnap,
-	}, nil
+	sn.SetFlags(flags)
+	sn.SetTimeout(s.config.ScanTimeout)
+	return sn, nil
 }
 
 func parseCompilerErrors(errors []yara.CompilerMessage) error {
@@ -272,7 +277,11 @@ func (s scanner) ScanProc(pid uint32) error {
 		return nil
 	}
 	var matches yara.MatchRules
-	err := s.s.SetCallback(&matches).ScanProc(int(pid))
+	sn, err := s.scannerWithFlags()
+	if err != nil {
+		return err
+	}
+	err = sn.SetCallback(&matches).ScanProc(int(pid))
 	if err != nil {
 		return fmt.Errorf("yara scan failed on proc %s (%d): %v", proc.Name, pid, err)
 	}
@@ -294,8 +303,12 @@ func (s scanner) ScanFile(filename string) error {
 	if s.config.SkipFiles || s.config.ShouldSkipFile(filename) {
 		return nil
 	}
+	sn, err := s.scannerWithFlags()
+	if err != nil {
+		return err
+	}
 	var matches yara.MatchRules
-	err := s.s.SetCallback(&matches).ScanFile(filename)
+	err = sn.SetCallback(&matches).ScanFile(filename)
 	if err != nil {
 		return fmt.Errorf("yara scan failed on %s file: %v", filename, err)
 	}
@@ -379,8 +392,5 @@ func tagsFromMatches(matches []yara.MatchRule) []string {
 func (s scanner) Close() {
 	if s.c != nil {
 		s.c.Destroy()
-	}
-	if s.s != nil {
-		s.s.Destroy()
 	}
 }
