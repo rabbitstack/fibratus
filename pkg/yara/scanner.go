@@ -271,8 +271,8 @@ func (s scanner) ScanProc(pid uint32) error {
 	if s.config.ShouldSkipProcess(proc.Name) {
 		return nil
 	}
-
-	matches, err := s.s.ScanProc(int(pid))
+	var matches yara.MatchRules
+	err := s.s.SetCallback(&matches).ScanProc(int(pid))
 	if err != nil {
 		return fmt.Errorf("yara scan failed on proc %s (%d): %v", proc.Name, pid, err)
 	}
@@ -294,7 +294,8 @@ func (s scanner) ScanFile(filename string) error {
 	if s.config.SkipFiles || s.config.ShouldSkipFile(filename) {
 		return nil
 	}
-	matches, err := s.s.ScanFile(filename)
+	var matches yara.MatchRules
+	err := s.s.SetCallback(&matches).ScanFile(filename)
 	if err != nil {
 		return fmt.Errorf("yara scan failed on %s file: %v", filename, err)
 	}
