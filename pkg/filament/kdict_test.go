@@ -19,7 +19,6 @@
 package filament
 
 import (
-	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/filament/cpython"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
@@ -59,7 +58,12 @@ func TestProduceKdict(t *testing.T) {
 	assert.Equal(t, "file", dict.Get(cat).String())
 	assert.Equal(t, "archrabbit", dict.Get(host).String())
 	assert.Equal(t, "Creates or opens a new file, directory, I/O device, pipe, console", dict.Get(desc).String())
-	assert.Equal(t, fmt.Sprintf("%d-%0d-%02d %d:%d:%02d.%d", now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second(), now.Nanosecond()/1000), dict.Get(ts).String())
+
+	timestamp, err := time.Parse("2006-01-02 15:04:05.000000", dict.Get(ts).String())
+	require.NoError(t, err)
+	assert.Equal(t, timestamp.Year(), now.Year())
+	assert.Equal(t, timestamp.Hour(), now.Hour())
+	assert.Equal(t, timestamp.Second(), now.Second())
 }
 
 func TestProduceKdictWithIPAddresses(t *testing.T) {
