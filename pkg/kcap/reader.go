@@ -39,6 +39,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 )
 
 var (
@@ -62,6 +63,7 @@ type reader struct {
 	hsnapshotter handle.Snapshotter
 	filter       filter.Filter
 	config       *config.Config
+	mu           sync.Mutex // guards the underlying zstd byte buffer
 }
 
 // NewReader builds a new instance of the kcap reader.
@@ -119,6 +121,8 @@ func (r *reader) Read(ctx context.Context) (chan *kevent.Kevent, chan error) {
 	errsc := make(chan error, 100)
 	keventsc := make(chan *kevent.Kevent, 55000)
 	go func() {
+		r.mu.Lock()
+		defer r.mu.Unlock()
 		for {
 			select {
 			case <-ctx.Done():
@@ -150,26 +154,13 @@ func (r *reader) Read(ctx context.Context) (chan *kevent.Kevent, chan error) {
 				kcapKeventUnmarshalErrors.Add(1)
 				continue
 			}
+			kcapReadBytes.Add(int64(len(buf)))
 			// update the state of the ps/handle snapshotters
 			if err := r.updateSnapshotters(kevt); err != nil {
 				log.Warn(err)
 			}
-
-			if kevt.Type.Dropped(false) {
-				continue
-			}
-			if r.filter != nil && !r.filter.Run(kevt) {
-				kcapDroppedByFilter.Add(1)
-				continue
-			}
-
-			select {
-			case keventsc <- kevt:
-				kcapReadKevents.Add(1)
-				kcapReadBytes.Add(int64(len(buf)))
-			default:
-				kcapDroppedKevents.Add(1)
-			}
+			// push the event
+			r.pushKevent(kevt, keventsc)
 		}
 	}()
 
@@ -177,6 +168,8 @@ func (r *reader) Read(ctx context.Context) (chan *kevent.Kevent, chan error) {
 }
 
 func (r *reader) Close() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	if r.zr != nil {
 		r.zr.Release()
 	}
@@ -184,6 +177,27 @@ func (r *reader) Close() error {
 		return r.f.Close()
 	}
 	return nil
+}
+
+func (r *reader) pushKevent(kevt *kevent.Kevent, keventsc chan *kevent.Kevent) {
+	if kevt.Type.Dropped(false) {
+		return
+	}
+	if r.filter != nil && !r.filter.Run(kevt) {
+		kcapDroppedByFilter.Add(1)
+		return
+	}
+	select {
+	case keventsc <- kevt:
+		kcapReadKevents.Add(1)
+	default:
+		kcapDroppedKevents.Add(1)
+	}
+}
+
+func (r *reader) isDropped(kevt *kevent.Kevent) bool {
+
+	return false
 }
 
 func (r *reader) updateSnapshotters(kevt *kevent.Kevent) error {

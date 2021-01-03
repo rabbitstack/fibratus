@@ -32,11 +32,11 @@ func TestRead(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
+	defer r.Close()
 	_, _, err = r.RecoverSnapshotters()
 	require.NoError(t, err)
 
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
 
 	kevtsc, errs := r.Read(ctx)
 	i := 0
@@ -46,11 +46,13 @@ func TestRead(t *testing.T) {
 			require.NotNil(t, kevt)
 			require.True(t, kevt.Seq > 0)
 			i++
-			if i == 100 {
+			if i == 90 {
+				cancel()
 				return
 			}
 		case err := <-errs:
 			t.Fatal(t, err)
 		}
 	}
+
 }

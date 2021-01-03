@@ -36,6 +36,8 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -69,11 +71,11 @@ func (s *stats) incKevts(kevt *kevent.Kevent) {
 	case ktypes.FileRundown, ktypes.RegCreateKCB, ktypes.FileOpEnd,
 		ktypes.EnumProcess, ktypes.EnumThread, ktypes.EnumImage, ktypes.RegKCBRundown:
 	default:
-		s.kevtsWritten++
+		atomic.AddUint64(&s.kevtsWritten, 1)
 	}
 }
-func (s *stats) incBytes(bytes uint64) { s.bytesWritten += bytes }
-func (s *stats) incHandles()           { s.handlesWritten++ }
+func (s *stats) incBytes(bytes uint64) { atomic.AddUint64(&s.bytesWritten, bytes) }
+func (s *stats) incHandles()           { atomic.AddUint64(&s.handlesWritten, 1) }
 func (s *stats) incProcs(kevt *kevent.Kevent) {
 	// EnumProcess events can arrive twice for the same kernel session, so we
 	// ignore incrementing the number of processes if we've already seen the process
@@ -85,7 +87,7 @@ func (s *stats) incProcs(kevt *kevent.Kevent) {
 		s.pids[pid] = true
 	}
 	if kevt.Type == ktypes.CreateProcess || kevt.Type == ktypes.EnumProcess {
-		s.procsWritten++
+		atomic.AddUint64(&s.procsWritten, 1)
 	}
 }
 
@@ -98,10 +100,10 @@ func (s *stats) printStats() {
 	t.AppendRow(table.Row{"File", filepath.Base(s.kcapFile)})
 	t.AppendSeparator()
 
-	t.AppendRow(table.Row{"Events written", s.kevtsWritten})
-	t.AppendRow(table.Row{"Bytes written", s.bytesWritten})
-	t.AppendRow(table.Row{"Processes written", s.procsWritten})
-	t.AppendRow(table.Row{"Handles written", s.handlesWritten})
+	t.AppendRow(table.Row{"Events written", atomic.LoadUint64(&s.kevtsWritten)})
+	t.AppendRow(table.Row{"Bytes written", atomic.LoadUint64(&s.bytesWritten)})
+	t.AppendRow(table.Row{"Processes written", atomic.LoadUint64(&s.procsWritten)})
+	t.AppendRow(table.Row{"Handles written", atomic.LoadUint64(&s.handlesWritten)})
 
 	f, err := os.Stat(s.kcapFile)
 	if err != nil {
@@ -123,6 +125,8 @@ type writer struct {
 	stop    chan struct{}
 	// stats contains the capture statistics
 	stats *stats
+	// mu protects the underlying zstd buffer
+	mu sync.Mutex
 }
 
 // NewWriter constructs a new instance of the kcap writer.
@@ -206,19 +210,12 @@ func (w *writer) Write(kevtsc chan *kevent.Kevent, errs chan error) chan error {
 				if l == 0 {
 					continue
 				}
-				if l > maxKevtSize {
-					overflowKevents.Add(1)
-					errsc <- fmt.Errorf("kevent size overflow by %d bytes", l-maxKevtSize)
+				// write event buffer
+				err := w.write(b)
+				if err != nil {
+					errs <- err
+					kevt.Release()
 					continue
-				}
-				if err := w.ws(section.Kevt, kcapver.KevtSecV1, 0, uint32(l)); err != nil {
-					kevtWriteErrors.Add(1)
-					errsc <- err
-					continue
-				}
-				if _, err := w.zw.Write(b); err != nil {
-					errsc <- err
-					kevtWriteErrors.Add(1)
 				}
 				// update stats
 				w.stats.incKevts(kevt)
@@ -237,7 +234,29 @@ func (w *writer) Write(kevtsc chan *kevent.Kevent, errs chan error) chan error {
 	return errsc
 }
 
+func (w *writer) write(b []byte) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	l := len(b)
+	if l > maxKevtSize {
+		overflowKevents.Add(1)
+		return fmt.Errorf("kevent size overflow by %d bytes", l-maxKevtSize)
+	}
+	if err := w.ws(section.Kevt, kcapver.KevtSecV1, 0, uint32(l)); err != nil {
+		kevtWriteErrors.Add(1)
+		return err
+	}
+	if _, err := w.zw.Write(b); err != nil {
+		kevtWriteErrors.Add(1)
+		return err
+	}
+	return nil
+}
+
 func (w *writer) Close() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
 	w.stats.printStats()
 
 	w.flusher.Stop()
@@ -258,7 +277,9 @@ func (w *writer) Close() error {
 func (w *writer) flush() {
 	for {
 		<-w.flusher.C
+		w.mu.Lock()
 		err := w.zw.Flush()
+		w.mu.Unlock()
 		if err != nil {
 			flusherErrors.Add(err.Error(), 1)
 		}

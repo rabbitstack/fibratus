@@ -56,6 +56,7 @@ func TestWrite(t *testing.T) {
 	w, err := NewWriter("_fixtures/cap.kcap", psnap, hsnap)
 	require.NoError(t, err)
 	require.NotNil(t, w)
+	defer w.Close()
 
 	kevtsc := make(chan *kevent.Kevent, 100)
 	errs := make(chan error, 10)
