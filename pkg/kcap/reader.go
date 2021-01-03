@@ -195,11 +195,6 @@ func (r *reader) pushKevent(kevt *kevent.Kevent, keventsc chan *kevent.Kevent) {
 	}
 }
 
-func (r *reader) isDropped(kevt *kevent.Kevent) bool {
-
-	return false
-}
-
 func (r *reader) updateSnapshotters(kevt *kevent.Kevent) error {
 	switch kevt.Type {
 	case ktypes.TerminateThread, ktypes.TerminateProcess, ktypes.UnloadImage:
