@@ -85,7 +85,7 @@ func (r *reader) Read(filename string) (*PE, error) {
 	// link time in PE header is represented as the number of seconds since January 1, 1970
 	linkTime := time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC).Add(time.Second * time.Duration(pefile.TimeDateStamp))
 
-	pex := &PE{
+	p := &PE{
 		NumberOfSections: pefile.NumberOfSections,
 		NumberOfSymbols:  pefile.NumberOfSymbols,
 		LinkTime:         linkTime,
@@ -98,12 +98,12 @@ func (r *reader) Read(filename string) (*PE, error) {
 	switch hdr := r.oh.(type) {
 	case *pe.OptionalHeader32:
 		resDir = hdr.DataDirectory[pe.IMAGE_DIRECTORY_ENTRY_RESOURCE]
-		pex.ImageBase = uintToHex(uint64(hdr.ImageBase))
-		pex.EntryPoint = uintToHex(uint64(hdr.AddressOfEntryPoint))
+		p.ImageBase = uintToHex(uint64(hdr.ImageBase))
+		p.EntryPoint = uintToHex(uint64(hdr.AddressOfEntryPoint))
 	case *pe.OptionalHeader64:
 		resDir = hdr.DataDirectory[pe.IMAGE_DIRECTORY_ENTRY_RESOURCE]
-		pex.ImageBase = uintToHex(hdr.ImageBase)
-		pex.EntryPoint = uintToHex(uint64(hdr.AddressOfEntryPoint))
+		p.ImageBase = uintToHex(hdr.ImageBase)
+		p.EntryPoint = uintToHex(uint64(hdr.AddressOfEntryPoint))
 	}
 
 	var wg sync.WaitGroup
@@ -112,7 +112,7 @@ func (r *reader) Read(filename string) (*PE, error) {
 		wg.Add(1)
 		go func(wg *sync.WaitGroup) {
 			defer wg.Done()
-			pex.VersionResources, err = r.readResources(resDir.VirtualAddress)
+			p.VersionResources, err = r.readResources(resDir.VirtualAddress)
 			if err != nil {
 				log.Warnf("fail to read %q PE resources: %v", filename, err)
 			}
@@ -136,8 +136,8 @@ func (r *reader) Read(filename string) (*PE, error) {
 					continue
 				}
 				symbol, lib := fields[0], fields[1]
-				pex.addImport(lib)
-				pex.addSymbol(symbol)
+				p.addImport(lib)
+				p.addSymbol(symbol)
 			}
 		}(&wg)
 	}
@@ -152,11 +152,11 @@ func (r *reader) Read(filename string) (*PE, error) {
 
 	select {
 	case <-done:
-		return pex, nil
+		return p, nil
 	case <-time.After(time.Second):
 		log.Warn("wait timeout reached during PE metadata parsing")
 		peReaderTimeouts.Add(1)
-		return pex, nil
+		return p, nil
 	}
 }
 
