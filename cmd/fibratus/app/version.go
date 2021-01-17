@@ -27,6 +27,7 @@ import (
 
 var version string
 var commit string
+var built string
 
 var versionCmd = &cobra.Command{
 	Use:   "version",
@@ -35,6 +36,11 @@ var versionCmd = &cobra.Command{
 		if version == "" {
 			version = "dev"
 		}
-		_, _ = fmt.Fprintln(os.Stdout, "Version:", version, "Commit:", commit, "Go compiler:", runtime.Version())
+		_, _ = fmt.Fprintln(
+			os.Stdout,
+			"Version:", version,
+			"Commit:", commit,
+			"Go compiler:", runtime.Version(),
+			"Built:", built)
 	},
 }
