@@ -15,7 +15,6 @@ env:
 jobs:
   build:
       runs-on: windows-latest
-      name: Build
       steps:
       - name: Install Go
         uses: actions/setup-go@v2
@@ -63,17 +62,34 @@ jobs:
         shell: bash
         run: |
           export PATH=/c/msys64/mingw64/bin:$PATH
-          export PKG_CONFIG_PATH=$(pwd)/pkg-config
+          export PKG_CONFIG_PATH
+          
           ln -s C:/hostedtoolcache/windows/Python/3.7.9/x64 C:/Python37
           go build -ldflags "-s -w -X github.com/rabbitstack/fibratus/cmd/fibratus/app.commit=$GITHUB_SHA" \
                    -tags $BUILD_TAGS \
                    -o ./cmd/fibratus/fibratus.exe ./cmd/fibratus
-      - name: Lint
-        shell: bash
-        run: |
-          go get -v -u golang.org/x/lint/golint
-          go list ./... | xargs -L1 $USERPROFILE/go/bin/golint -set_exit_status
       - uses: actions/upload-artifact@v2
         with:
           name: "fibratus-amd64.exe"
-          path: "./cmd/fibratus/fibratus.exe"
+          path: "./cmd/fibratus/fibratus.exe" 
+          
+  lint:
+    runs-on: windows-latest
+    needs: build
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Make Python symlink
+        shell: bash
+        run: ln -s C:/hostedtoolcache/windows/Python/3.7.9/x64 C:/Python37
+      - name: lint
+        env:
+          PKG_CONFIG_PATH: $(pwd)/pkg-config
+          PATH: /c/msys64/mingw64/bin:$PATH 
+        uses: golangci/golangci-lint-action@v2
+        with:
+          version: v2.3
+        
+
+  
