@@ -62,8 +62,7 @@ jobs:
         shell: bash
         run: |
           export PATH=/c/msys64/mingw64/bin:$PATH
-          export PKG_CONFIG_PATH
-          
+          export PKG_CONFIG_PATH=$(pwd)/pkg-config
           ln -s C:/hostedtoolcache/windows/Python/3.7.9/x64 C:/Python37
           go build -ldflags "-s -w -X github.com/rabbitstack/fibratus/cmd/fibratus/app.commit=$GITHUB_SHA" \
                    -tags $BUILD_TAGS \
