@@ -21,7 +21,10 @@ set GOVET=go vet
 set GOFMT=gofmt -e -s -l -w
 set GOLINT=%GOBIN%\golint -set_exit_status
 
-set LDFLAGS="-s -w -X github.com/rabbitstack/fibratus/cmd/fibratus/app.version=%VERSION% -X github.com/rabbitstack/fibratus/cmd/fibratus/app.commit=%COMMIT%"
+FOR /F "tokens=* USEBACKQ" %%F IN (`powershell -Command get-date -format "{dd-MM-yyyyHH:mm:ss}"`) DO (
+    SET BUILD_DATE=%%F
+)
+set LDFLAGS="-s -w -X github.com/rabbitstack/fibratus/cmd/fibratus/app.version=%VERSION% -X github.com/rabbitstack/fibratus/cmd/fibratus/app.commit=%COMMIT% -X github.com/rabbitstack/fibratus/cmd/fibratus/app.built=%BUILD_DATE%"
 
 :: In case you want to avoid CGO overhead or don't need a specific feature, try tweaking the following compilation tags:
 ::
@@ -35,6 +38,7 @@ if NOT DEFINED TAGS (
 set PKGS=
 :: Get the list of packages that we'll use to run tests/linter
 for /f %%p in ('go list .\...') do call set "PKGS=%%PKGS%% %%p"
+
 
 if "%~1"=="build" goto build
 if "%~1"=="test" goto test
@@ -51,7 +55,7 @@ go build -ldflags %LDFLAGS% -tags %TAGS% -o .\cmd\fibratus\fibratus.exe .\cmd\fi
 goto :EOF
 
 :test
-%GOTEST% %PKGS%
+%GOTEST% -tags %TAGS% %PKGS%
 goto :EOF
 
 :lint
