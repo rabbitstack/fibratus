@@ -82,13 +82,13 @@ jobs:
       - name: Make Python symlink
         shell: bash
         run: ln -s C:/hostedtoolcache/windows/Python/3.7.9/x64 C:/Python37
-      - name: lint
+      - name: Lint
         env:
           PKG_CONFIG_PATH: $(pwd)/pkg-config
           PATH: /c/msys64/mingw64/bin:$PATH 
         uses: golangci/golangci-lint-action@v2
         with:
-          version: v2.3
+          version: v1.29
         
 
   
