@@ -158,9 +158,4 @@ func (h *Handle) Unmarshal(b []byte) error {
 	return nil
 }
 
-func utob(u uint8) bool {
-	if u > 0 {
-		return true
-	}
-	return false
-}
+func utob(u uint8) bool { return u > 0 }

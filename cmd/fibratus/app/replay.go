@@ -31,6 +31,7 @@ import (
 	"github.com/spf13/cobra"
 	"os"
 	"os/signal"
+	"syscall"
 )
 
 var replayCmd = &cobra.Command{
@@ -74,6 +75,8 @@ func replay(cmd *cobra.Command, args []string) error {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
+	// stop kcap reader consumers
+	defer cancel()
 
 	filamentName := replayConfig.Filament.Name
 	// we don't need the aggregator is user decided to replay the
@@ -126,10 +129,8 @@ func replay(cmd *cobra.Command, args []string) error {
 	if err := api.StartServer(replayConfig); err != nil {
 		return err
 	}
-	signal.Notify(sig, os.Kill, os.Interrupt)
+	signal.Notify(sig, syscall.SIGTERM, os.Interrupt)
 	<-sig
-	// stop reader consumer goroutines
-	cancel()
 
 	if agg != nil {
 		if err := agg.Stop(); err != nil {

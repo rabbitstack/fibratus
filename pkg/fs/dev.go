@@ -38,7 +38,7 @@ type mapper struct {
 // NewDevMapper creates a new instance of the DOS device replacer.
 func NewDevMapper() DevMapper {
 	m := &mapper{
-		cache: make(map[string]string, 0),
+		cache: make(map[string]string),
 	}
 	// loop through logical drives and query the DOS device name
 	for _, drive := range file.GetLogicalDrives() {

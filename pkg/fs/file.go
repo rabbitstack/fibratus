@@ -40,8 +40,7 @@ const (
 	devMailslot  = 0x0000000c
 	devNamedPipe = 0x00000011
 
-	deviceVirtualDisk = 0x00000024
-	devConsole        = 0x00000050
+	devConsole = 0x00000050
 )
 
 // queryVolumeCalls represents the number of times the query volume function was called

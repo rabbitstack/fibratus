@@ -46,12 +46,17 @@ func installService(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	defer m.Disconnect()
+	defer func() {
+		_ = m.Disconnect()
+	}()
 	s, err := m.OpenService(svcName)
 	if err == nil {
-		s.Close()
+		if err := s.Close(); err != nil {
+			return err
+		}
 		return errServiceAlreadyInstalled
 	}
+
 	svccfg := mgr.Config{
 		DisplayName: "Fibratus Service",
 		Description: "Exploration and tracing of the Windows kernel",
@@ -60,7 +65,10 @@ func installService(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	defer s.Close()
+	defer func() {
+		_ = s.Close()
+	}()
+
 	err = eventlog.InstallAsEventCreate(svcName, eventlog.Error|eventlog.Warning|eventlog.Info)
 	if err != nil {
 		if err := s.Delete(); err != nil {

@@ -33,7 +33,9 @@ import (
 func TestGet(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/config", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("test"))
+		if _, err := w.Write([]byte("test")); err != nil {
+			t.Fatal(err)
+		}
 	})
 
 	srv := httptest.NewServer(mux)
@@ -55,7 +57,9 @@ func TestGetPipe(t *testing.T) {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/config", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("test"))
+		if _, err := w.Write([]byte("test")); err != nil {
+			t.Fatal(err)
+		}
 	})
 
 	srv := httptest.NewUnstartedServer(mux)

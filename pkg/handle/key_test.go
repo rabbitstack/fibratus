@@ -36,10 +36,12 @@ func TestFormatKey(t *testing.T) {
 	assert.Equal(t, `SYSTEM\ControlSet001\Services\Windows Workflow Foundation 4.0.0.0\Linkage`, key)
 
 	root, key = FormatKey(`\Registry\Machine\SYSTEM\ControlSet001\Services\Windows Workflow Foundation 4.0.0.0\Linkage`)
+	assert.Equal(t, registry.LocalMachine, root)
 	assert.Equal(t, `SYSTEM\ControlSet001\Services\Windows Workflow Foundation 4.0.0.0\Linkage`, key)
 
 	root, key = FormatKey(`\REGISTRY\MACHINE`)
 	assert.Equal(t, registry.LocalMachine, root)
+	assert.Empty(t, key)
 
 	root, key = FormatKey(`\REGISTRY\USER\S-1-5-21-2271034452-2606270099-984871569-500\Console`)
 	assert.Equal(t, registry.CurrentUser, root)

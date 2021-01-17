@@ -1,0 +1,6 @@
+run:
+  build-tags:
+    - kcap
+    - filament
+  skip-files:
+    - pkg/pe/entropy.go

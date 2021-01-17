@@ -86,6 +86,7 @@ func TestQueryTypeSmallBuffer(t *testing.T) {
 	h, err := process.Open(process.QueryInformation, false, uint32(os.Getpid()))
 	require.NoError(t, err)
 	typeName, err := QueryType(h)
+	require.NoError(t, err)
 	assert.Equal(t, Process, typeName)
 }
 

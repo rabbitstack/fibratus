@@ -242,8 +242,8 @@ func NewScanner(psnap ps.Snapshotter, config config.Config) (Scanner, error) {
 	}, nil
 }
 
-// scannerWithFlags creates a new instance of the Yara scanner.
-func (s scanner) scannerWithFlags() (*yara.Scanner, error) {
+// newInternalScanner creates a new instance of the go-yara scanner.
+func (s scanner) newInternalScanner() (*yara.Scanner, error) {
 	sn, err := yara.NewScanner(s.rules)
 	if err != nil {
 		return nil, fmt.Errorf("fail to create yara scanner: %v", err)
@@ -277,7 +277,7 @@ func (s scanner) ScanProc(pid uint32) error {
 		return nil
 	}
 	var matches yara.MatchRules
-	sn, err := s.scannerWithFlags()
+	sn, err := s.newInternalScanner()
 	if err != nil {
 		return err
 	}
@@ -303,7 +303,7 @@ func (s scanner) ScanFile(filename string) error {
 	if s.config.SkipFiles || s.config.ShouldSkipFile(filename) {
 		return nil
 	}
-	sn, err := s.scannerWithFlags()
+	sn, err := s.newInternalScanner()
 	if err != nil {
 		return err
 	}

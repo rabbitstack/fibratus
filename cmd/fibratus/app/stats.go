@@ -64,7 +64,6 @@ type Stats struct {
 	HandleTypeNameMisses                int            `json:"handle.type.name.misses"`
 	HandleWaitTimeouts                  int            `json:"handle.wait.timeouts"`
 	HostnameErrors                      map[string]int `json:"hostname.errors"`
-	KcapDroppedKevents                  int            `json:"kcap.dropped.kevents"`
 	KcapFlusherErrors                   map[string]int `json:"kcap.flusher.errors"`
 	KcapHandleWriteErrors               int            `json:"kcap.handle.write.errors"`
 	KcapKeventUnmarshalErrors           int            `json:"kcap.kevent.unmarshal.errors"`

@@ -213,9 +213,10 @@ func TestReapDeadProcesses(t *testing.T) {
 	var si syscall.StartupInfo
 	var pi syscall.ProcessInformation
 
-	argv := syscall.StringToUTF16Ptr(filepath.Join(os.Getenv("windir"), "notepad.exe"))
+	argv, err := syscall.UTF16PtrFromString(filepath.Join(os.Getenv("windir"), "notepad.exe"))
+	require.NoError(t, err)
 
-	err := syscall.CreateProcess(
+	err = syscall.CreateProcess(
 		nil,
 		argv,
 		nil,

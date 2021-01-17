@@ -35,6 +35,7 @@ import (
 	"github.com/spf13/cobra"
 	"os"
 	"os/signal"
+	"syscall"
 )
 
 var runCmd = &cobra.Command{
@@ -89,7 +90,9 @@ func run(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	defer ktracec.CloseKtrace()
+	defer func() {
+		_ = ktracec.CloseKtrace()
+	}()
 	// bootstrap essential components, including handle, process snapshotters
 	// and the kernel stream consumer that will actually collect all the events
 	hsnap := handle.NewSnapshotter(cfg, nil)
@@ -126,7 +129,9 @@ func run(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		defer kstreamc.CloseKstream()
+		defer func() {
+			_ = kstreamc.CloseKstream()
+		}()
 		// load alert senders so emitting alerts is possible from filaments
 		err = alertsender.LoadAll(cfg.Alertsenders)
 		if err != nil {
@@ -144,7 +149,9 @@ func run(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		defer kstreamc.CloseKstream()
+		defer func() {
+			_ = kstreamc.CloseKstream()
+		}()
 		// setup the aggregator that forwards events to outputs
 		agg, err := aggregator.NewBuffered(
 			kstreamc.Events(),
@@ -168,7 +175,7 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	// wait for signals
-	signal.Notify(sig, os.Interrupt, os.Kill)
+	signal.Notify(sig, syscall.SIGTERM, os.Interrupt)
 	<-sig
 	log.Infof("shutting down...")
 	// shutdown everything gracefully

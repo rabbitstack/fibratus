@@ -49,7 +49,10 @@ func TestElasticsearchConnect(t *testing.T) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 
-		w.Write([]byte(resp))
+		_, err = w.Write([]byte(resp))
+		if err != nil {
+			t.Fatal(err)
+		}
 	}))
 	defer srv.Close()
 
@@ -69,7 +72,10 @@ func TestElasticsearchConnectUnsupportedVersion(t *testing.T) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 
-		w.Write([]byte(resp))
+		_, err = w.Write([]byte(resp))
+		if err != nil {
+			t.Fatal(err)
+		}
 	}))
 	defer srv.Close()
 
@@ -103,7 +109,10 @@ func TestElasticsearchPublish(t *testing.T) {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
 
-			w.Write(resp)
+			_, err = w.Write([]byte(resp))
+			if err != nil {
+				t.Fatal(err)
+			}
 		} else {
 			ping := elastic.PingResult{
 				Name: "es",
@@ -114,7 +123,10 @@ func TestElasticsearchPublish(t *testing.T) {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
 
-			w.Write(resp)
+			_, err = w.Write([]byte(resp))
+			if err != nil {
+				t.Fatal(err)
+			}
 		}
 	}))
 	defer srv.Close()

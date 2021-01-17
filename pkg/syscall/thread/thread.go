@@ -20,7 +20,6 @@ package thread
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/syscall/handle"
-	"github.com/rabbitstack/fibratus/pkg/syscall/utf16"
 	"os"
 	"syscall"
 	"unsafe"
@@ -41,10 +40,6 @@ const (
 	// QueryLimitedInformation is required to get certain information from the thread objects (e.g. PID to which pertains some thread)
 	QueryLimitedInformation DesiredAccess = 0x0800
 )
-
-type threadNameInfo struct {
-	ThreadName utf16.UnicodeString
-}
 
 // Open opens an existing thread object.
 func Open(access DesiredAccess, inheritHandle bool, threadID uint32) (handle.Handle, error) {

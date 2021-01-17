@@ -129,10 +129,16 @@ func EnableTokenPrivileges(token syscall.Token, privileges ...string) error {
 	}
 
 	var b bytes.Buffer
-	binary.Write(&b, binary.LittleEndian, uint32(len(privValues)))
+	if err := binary.Write(&b, binary.LittleEndian, uint32(len(privValues))); err != nil {
+		return err
+	}
 	for _, p := range privValues {
-		binary.Write(&b, binary.LittleEndian, p)
-		binary.Write(&b, binary.LittleEndian, uint32(PrivilegedEnabled))
+		if err := binary.Write(&b, binary.LittleEndian, p); err != nil {
+			continue
+		}
+		if err := binary.Write(&b, binary.LittleEndian, uint32(PrivilegedEnabled)); err != nil {
+			continue
+		}
 	}
 
 	success, err := adjustTokenPrivileges(token, false, &b.Bytes()[0], uint32(b.Len()), nil, nil)

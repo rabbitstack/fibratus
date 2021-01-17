@@ -33,7 +33,7 @@ func init() {
 // InitNativeEndian figures out the endianness of the current machine (https://stackoverflow.com/questions/51332658/any-better-way-to-check-endianness-in-go)
 func InitNativeEndian(b []byte) {
 	buf := [8]byte{}
-	if b != nil && len(b) == 8 {
+	if len(b) == 8 {
 		copy(buf[:], b[:8])
 	} else {
 		*(*uint64)(unsafe.Pointer(&buf[0])) = uint64(0x6669627261747573)

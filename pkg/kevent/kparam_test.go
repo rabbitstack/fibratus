@@ -42,7 +42,7 @@ func TestKparams(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "\\Device\\HarddiskVolume2\\Windows\\system32\\kernel32.dll", filename)
 
-	filename, err = kpars.GetString(kparams.FileObject)
+	_, err = kpars.GetString(kparams.FileObject)
 	require.Error(t, err)
 
 	assert.Equal(t, 5, kpars.Len())

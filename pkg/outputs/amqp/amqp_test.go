@@ -147,24 +147,29 @@ func consumeKevents(t *testing.T, amqpURI string, done chan struct{}) error {
 		false,              // noWait
 		nil,                // arguments
 	)
+	require.NoError(t, err)
+
 	go func() {
 		for d := range deliveries {
 			body := d.Body
 			if len(body) == 0 {
 				done <- struct{}{}
-				t.Fatal("got empty AMQP message")
+				t.Error("got empty AMQP message")
 			}
 			var kevents []*kevent.Kevent
 			err := json.Unmarshal(body, &kevents)
 			if err != nil {
 				done <- struct{}{}
-				t.Fatal(err)
+				t.Error(err)
 			}
 			if len(kevents) != 3 {
 				done <- struct{}{}
-				t.Fatalf("expected 3 events in body but got %d", len(kevents))
+				t.Errorf("expected 3 events in body but got %d", len(kevents))
 			}
-			d.Ack(false)
+			err = d.Ack(false)
+			if err != nil {
+				t.Error(err)
+			}
 			done <- struct{}{}
 		}
 	}()

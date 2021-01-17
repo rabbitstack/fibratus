@@ -50,5 +50,5 @@ type DevInfo struct {
 }
 
 type ioStatusBlock struct {
-	status, information uintptr
+	Status, Information uintptr
 }

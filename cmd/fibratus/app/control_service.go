@@ -68,7 +68,9 @@ func startService(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("couldn't connect to Windows Service Manager: %v", err)
 	}
 	m := &mgr.Mgr{Handle: h}
-	defer m.Disconnect()
+	defer func() {
+		_ = m.Disconnect()
+	}()
 	s, err := windows.OpenService(
 		m.Handle,
 		windows.StringToUTF16Ptr(svcName),
@@ -78,7 +80,9 @@ func startService(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("could not open fibratus service: %v", err)
 	}
 	scm := &mgr.Service{Name: svcName, Handle: s}
-	defer scm.Close()
+	defer func() {
+		_ = scm.Close()
+	}()
 	err = scm.Start()
 	if err != nil {
 		return fmt.Errorf("could not start fibratus service: %v", err)
@@ -116,7 +120,9 @@ func stopSvc() error {
 		return fmt.Errorf("couldn't connect to Windows Service Manager: %v", err)
 	}
 	m := &mgr.Mgr{Handle: h}
-	defer m.Disconnect()
+	defer func() {
+		_ = m.Disconnect()
+	}()
 
 	s, err := windows.OpenService(
 		m.Handle,
@@ -127,7 +133,9 @@ func stopSvc() error {
 		return fmt.Errorf("could not open fibratus service: %v", err)
 	}
 	scm := &mgr.Service{Name: svcName, Handle: s}
-	defer scm.Close()
+	defer func() {
+		_ = scm.Close()
+	}()
 
 	status, err := scm.Control(svc.Stop)
 	if err != nil {
@@ -161,40 +169,38 @@ func (s *fsvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan<-
 	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
 
 	if err := s.run(); err != nil {
-		evtlog.Error(0xc000000B, err.Error())
+		_ = evtlog.Error(0xc000000B, err.Error())
 		changes <- svc.Status{State: svc.Stopped}
 		return false, 1
 	}
 
 loop:
 	for {
-		select {
-		case c := <-r:
-			switch c.Cmd {
-			case svc.Interrogate:
-				changes <- c.CurrentStatus
-				time.Sleep(100 * time.Millisecond)
-				changes <- c.CurrentStatus
-			case svc.Stop:
-				break loop
-			case svc.Shutdown:
-				break loop
-			}
+		c := <-r
+		switch c.Cmd {
+		case svc.Interrogate:
+			changes <- c.CurrentStatus
+			time.Sleep(100 * time.Millisecond)
+			changes <- c.CurrentStatus
+		case svc.Stop:
+			break loop
+		case svc.Shutdown:
+			break loop
 		}
 	}
 
 	changes <- svc.Status{State: svc.StopPending}
 	if sktracec != nil {
-		sktracec.CloseKtrace()
+		_ = sktracec.CloseKtrace()
 	}
 	if skstreamc != nil {
-		skstreamc.CloseKstream()
+		_ = skstreamc.CloseKstream()
 	}
 	if sagg != nil {
-		sagg.Stop()
+		_ = sagg.Stop()
 	}
-	handle.CloseTimeout()
-	api.CloseServer()
+	_ = handle.CloseTimeout()
+	_ = api.CloseServer()
 	changes <- svc.Status{State: svc.Stopped}
 
 	return true, 0
@@ -255,11 +261,13 @@ func RunService() {
 	if err != nil {
 		return
 	}
-	defer evtlog.Close()
+	defer func() {
+		_ = evtlog.Close()
+	}()
 
 	err = svc.Run(svcName, &fsvc{})
 	if err != nil {
-		evtlog.Error(0xc0000008, err.Error())
+		_ = evtlog.Error(0xc0000008, err.Error())
 		return
 	}
 }

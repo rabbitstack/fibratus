@@ -42,7 +42,6 @@ type handleInterceptor struct {
 	typeStore handle.ObjectTypeStore
 	devMapper fs.DevMapper
 	defers    map[uint64]*kevent.Kevent
-	enqueue   func(*kevent.Kevent)
 }
 
 func newHandleInterceptor(hsnap handle.Snapshotter, typeStore handle.ObjectTypeStore, devMapper fs.DevMapper) KstreamInterceptor {

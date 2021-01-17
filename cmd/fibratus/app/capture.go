@@ -33,6 +33,7 @@ import (
 	"github.com/spf13/cobra"
 	"os"
 	"os/signal"
+	"syscall"
 	"time"
 )
 
@@ -92,7 +93,9 @@ func capture(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	defer ktracec.CloseKtrace()
+	defer func() {
+		_ = ktracec.CloseKtrace()
+	}()
 
 	kstreamc := kstream.NewConsumer(ktracec, psnap, hsnap, captureConfig)
 	kfilter, err := filter.NewFromCLI(args, captureConfig)
@@ -106,7 +109,9 @@ func capture(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	defer kstreamc.CloseKstream()
+	defer func() {
+		_ = kstreamc.CloseKstream()
+	}()
 
 	// bootstrap kcap writer with inbound event channel
 	writer, err := kcap.NewWriter(captureConfig.KcapFile, psnap, hsnap)
@@ -128,7 +133,7 @@ func capture(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	signal.Notify(sig, os.Kill, os.Interrupt)
+	signal.Notify(sig, syscall.SIGTERM, os.Interrupt)
 	<-sig
 	spin.Stop()
 

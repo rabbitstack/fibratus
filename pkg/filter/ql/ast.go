@@ -238,24 +238,12 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			case neq:
 				return uint64(lhs) != rhs
 			case lt:
-				if lhs < 0 {
-					return true
-				}
 				return uint64(lhs) < rhs
 			case lte:
-				if lhs < 0 {
-					return true
-				}
 				return uint64(lhs) <= rhs
 			case gt:
-				if lhs < 0 {
-					return false
-				}
 				return uint64(lhs) > rhs
 			case gte:
-				if lhs < 0 {
-					return false
-				}
 				return uint64(lhs) >= rhs
 			}
 		}

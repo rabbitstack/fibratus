@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/api/handler"
 	"github.com/rabbitstack/fibratus/pkg/config"
+	log "github.com/sirupsen/logrus"
 	"net"
 	"net/http"
 	"net/http/pprof"
@@ -53,6 +54,9 @@ func StartServer(c *config.Config) error {
 		// Give generic read/write access to the specified user.
 		descriptor := "D:P(A;;GA;;;" + usr.Uid + ")"
 		listener, err = MakePipeListener(apiConfig.Transport, descriptor)
+		if err != nil {
+			return err
+		}
 	} else {
 		listener, err = makeTCPListener(apiConfig.Transport)
 	}
@@ -75,7 +79,11 @@ func StartServer(c *config.Config) error {
 		Handler: mux,
 	}
 
-	go srv.Serve(listener)
+	go func() {
+		if err := srv.Serve(listener); err != nil {
+			log.Errorf("unable to bind the API server: %v", err)
+		}
+	}()
 
 	return nil
 }

@@ -98,7 +98,7 @@ func InitFromConfig(c Config) error {
 	if err != nil {
 		loggerErrors.Add(err.Error(), 1)
 		// failed to initialize log rotate, so we fallback on simple log hook
-		var pathMap fs.PathMap = make(map[logrus.Level]string, 0)
+		var pathMap fs.PathMap = make(map[logrus.Level]string)
 		for _, lvl := range logrus.AllLevels {
 			pathMap[lvl] = file
 		}
