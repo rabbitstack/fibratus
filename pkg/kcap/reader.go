@@ -158,8 +158,8 @@ func (r *reader) Read(ctx context.Context) (chan *kevent.Kevent, chan error) {
 			if err := r.updateSnapshotters(kevt); err != nil {
 				log.Warn(err)
 			}
-			// push the event
-			r.pushKevent(kevt, keventsc)
+			// push the event to the chanel
+			r.read(kevt, keventsc)
 		}
 	}()
 
@@ -178,7 +178,7 @@ func (r *reader) Close() error {
 	return nil
 }
 
-func (r *reader) pushKevent(kevt *kevent.Kevent, keventsc chan *kevent.Kevent) {
+func (r *reader) read(kevt *kevent.Kevent, keventsc chan *kevent.Kevent) {
 	if kevt.Type.Dropped(false) {
 		return
 	}

@@ -21,6 +21,7 @@ package app
 import (
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/config"
+	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/util/rest"
 	"github.com/spf13/cobra"
 	"os"
@@ -50,7 +51,7 @@ func printConfig(cmd *cobra.Command, args []string) error {
 	}
 	body, err := rest.Get(rest.WithTransport(c.API.Transport), rest.WithURI("config"))
 	if err != nil {
-		return err
+		return kerrors.ErrHTTPServerUnavailable(c.API.Transport, err)
 	}
 	_, err = fmt.Fprintln(os.Stdout, string(body))
 	if err != nil {

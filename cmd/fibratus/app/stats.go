@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/rabbitstack/fibratus/pkg/config"
+	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/util/rest"
 	"github.com/spf13/cobra"
 	"os"
@@ -125,7 +126,7 @@ func stats(cmd *cobra.Command, args []string) error {
 	c := statsConfig.API
 	body, err := rest.Get(rest.WithTransport(c.Transport), rest.WithURI("debug/vars"))
 	if err != nil {
-		return err
+		return kerrors.ErrHTTPServerUnavailable(c.Transport, err)
 	}
 	var stats Stats
 	if err := json.Unmarshal(body, &stats); err != nil {

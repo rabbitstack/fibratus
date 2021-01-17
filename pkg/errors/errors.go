@@ -63,6 +63,11 @@ var (
 	ErrFeatureUnsupported = func(s string) error {
 		return fmt.Errorf("fibratus was compiled without %s support. Please compile with the '%s' build flag", s, s)
 	}
+
+	// ErrHTTPServerUnavailable signals that the HTTP server is not running on the specified transport
+	ErrHTTPServerUnavailable = func(transport string, err error) error {
+		return fmt.Errorf("fibratus API server up and running on %s? %v", transport, err)
+	}
 )
 
 // ErrKparamNotFound is the error is thrown when a parameter is not present in the list of parameters
