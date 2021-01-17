@@ -92,10 +92,10 @@ jobs:
            mingw-w64-x86_64-gcc
       - name: Make Python symlink
         shell: bash
-        run: ln -s C:/hostedtoolcache/windows/Python/3.7.9/x64 C:/Python37
-        env:
-          PKG_CONFIG_PATH: $(pwd)/pkg-config
-          PATH: /c/msys64/mingw64/bin:$PATH
+        run: |
+          ln -s C:/hostedtoolcache/windows/Python/3.7.9/x64 C:/Python37
+          echo "PATH=/c/msys64/mingw64/bin:$PATH" >> $GITHUB_ENV
+          echo "PKG_CONFIG_PATH=$(pwd)/pkg-config" >> $GITHUB_ENV
       - name: Lint
         uses: golangci/golangci-lint-action@v2
         with:
