@@ -1,4 +1,5 @@
 run:
+  deadline: 10m
   build-tags:
     - kcap
     - filament
