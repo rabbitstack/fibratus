@@ -215,10 +215,7 @@ func (f *fsInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 		kevt.Tid, err = kevt.Kparams.GetUint32(kparams.ThreadID)
 		if err != nil {
 			// tid is sometimes represented in hex format
-			kevt.Tid, err = kevt.Kparams.GetHexAsUint32(kparams.ThreadID)
-			if err != nil {
-				log.Warn(err)
-			}
+			kevt.Tid, _ = kevt.Kparams.GetHexAsUint32(kparams.ThreadID)
 		}
 
 		switch kevt.Type {

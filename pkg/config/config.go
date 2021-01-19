@@ -203,7 +203,7 @@ func (c Config) GetConfigFile() string {
 	return c.viper.GetString(configFile)
 }
 
-// MustViperize adds the flag set to the Cobra command and binds them within Viper flags.
+// MustViperize adds the flag set to the Cobra command and binds them within the Viper flags.
 func (c *Config) MustViperize(cmd *cobra.Command) {
 	cmd.PersistentFlags().AddFlagSet(c.flags)
 	if err := c.viper.BindPFlags(cmd.PersistentFlags()); err != nil {

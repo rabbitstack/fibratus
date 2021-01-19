@@ -80,7 +80,7 @@ func StartServer(c *config.Config) error {
 	}
 
 	go func() {
-		if err := srv.Serve(listener); err != nil {
+		if err := srv.Serve(listener); err != nil && err != http.ErrServerClosed {
 			log.Errorf("unable to bind the API server: %v", err)
 		}
 	}()
