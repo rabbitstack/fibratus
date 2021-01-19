@@ -27,7 +27,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/filament"
 	"github.com/rabbitstack/fibratus/pkg/filter"
 	"github.com/rabbitstack/fibratus/pkg/kcap"
-	"github.com/rabbitstack/fibratus/pkg/outputs"
 	"github.com/spf13/cobra"
 )
 
@@ -59,6 +58,7 @@ func replay(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+
 	// initialize kcap reader and try to recover the snapshotters
 	// from the captured state
 	reader, err := kcap.NewReader(replayConfig.KcapFile, replayConfig)
@@ -113,7 +113,7 @@ func replay(cmd *cobra.Command, args []string) error {
 			kevents,
 			errs,
 			replayConfig.Aggregator,
-			outputs.Config{Type: replayConfig.Output.Type, Output: replayConfig.Output.Output},
+			replayConfig.Output,
 			replayConfig.Transformers,
 			replayConfig.Alertsenders,
 		)

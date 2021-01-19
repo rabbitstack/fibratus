@@ -26,7 +26,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	"github.com/rabbitstack/fibratus/pkg/kstream"
-	"github.com/rabbitstack/fibratus/pkg/outputs"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/spf13/cobra"
 	"golang.org/x/sys/windows"
@@ -236,7 +235,7 @@ func (s *fsvc) run() error {
 		skstreamc.Events(),
 		skstreamc.Errors(),
 		svcConfig.Aggregator,
-		outputs.Config{Type: svcConfig.Output.Type, Output: svcConfig.Output.Output},
+		svcConfig.Output,
 		svcConfig.Transformers,
 		svcConfig.Alertsenders,
 	)

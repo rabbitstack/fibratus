@@ -28,7 +28,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/filter"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	"github.com/rabbitstack/fibratus/pkg/kstream"
-	"github.com/rabbitstack/fibratus/pkg/outputs"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -142,7 +141,7 @@ func run(cmd *cobra.Command, args []string) error {
 			kstreamc.Events(),
 			kstreamc.Errors(),
 			cfg.Aggregator,
-			outputs.Config{Type: cfg.Output.Type, Output: cfg.Output.Output},
+			cfg.Output,
 			cfg.Transformers,
 			cfg.Alertsenders,
 		)
