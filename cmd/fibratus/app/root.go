@@ -21,11 +21,8 @@ package app
 import (
 	"errors"
 	"github.com/spf13/cobra"
-	"os"
 	"runtime"
 )
-
-var sig = make(chan os.Signal, 2)
 
 // RootCmd is the entrance to Fibratus CLI
 var RootCmd = &cobra.Command{

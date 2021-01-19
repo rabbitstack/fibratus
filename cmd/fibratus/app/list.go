@@ -22,6 +22,7 @@ import (
 	"bufio"
 	"fmt"
 	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/rabbitstack/fibratus/cmd/fibratus/common"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
@@ -69,7 +70,7 @@ func init() {
 
 // listFilaments renders a table with all available filaments.
 func listFilaments(cmd *cobra.Command, args []string) error {
-	if err := listConfig.Init(); err != nil {
+	if err := common.Init(listConfig, false); err != nil {
 		return err
 	}
 

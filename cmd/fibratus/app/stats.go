@@ -21,6 +21,7 @@ package app
 import (
 	"encoding/json"
 	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/rabbitstack/fibratus/cmd/fibratus/common"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/util/rest"
@@ -113,13 +114,7 @@ type Stats struct {
 }
 
 func stats(cmd *cobra.Command, args []string) error {
-	if err := statsConfig.TryLoadFile(statsConfig.File()); err != nil {
-		return err
-	}
-	if err := statsConfig.Init(); err != nil {
-		return err
-	}
-	if err := statsConfig.Validate(); err != nil {
+	if err := common.Init(cfg, false); err != nil {
 		return err
 	}
 

@@ -19,6 +19,7 @@
 package app
 
 import (
+	"github.com/rabbitstack/fibratus/cmd/fibratus/common"
 	"github.com/rabbitstack/fibratus/pkg/aggregator"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	"github.com/rabbitstack/fibratus/pkg/api"
@@ -29,13 +30,9 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kstream"
 	"github.com/rabbitstack/fibratus/pkg/outputs"
 	"github.com/rabbitstack/fibratus/pkg/ps"
-	"github.com/rabbitstack/fibratus/pkg/syscall/security"
-	logger "github.com/rabbitstack/fibratus/pkg/util/log"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"os"
-	"os/signal"
-	"syscall"
 )
 
 var runCmd = &cobra.Command{
@@ -58,41 +55,34 @@ var runCmd = &cobra.Command{
 	`,
 }
 
-var cfg = config.NewWithOpts(config.WithRun())
+var (
+	// the run command config
+	cfg = config.NewWithOpts(config.WithRun())
+)
 
 func init() {
+
+	// initialize flags
 	cfg.MustViperize(runCmd)
+
 }
 
 func run(cmd *cobra.Command, args []string) error {
-	// even though it is possible to bootstrap with default config, we'll
-	// return an error if for some reason the config can't be loaded from the file
-	if err := cfg.TryLoadFile(cfg.File()); err != nil {
+	// initialize config and logger
+	if err := common.Init(cfg, true); err != nil {
 		return err
 	}
-	// initialize and validate the config
-	if err := cfg.Init(); err != nil {
-		return err
-	}
-	if err := cfg.Validate(); err != nil {
-		return err
-	}
-	// inject the debug privilege if enabled
-	if cfg.DebugPrivilege {
-		security.SetDebugPrivilege()
-	}
-	if err := logger.InitFromConfig(cfg.Log); err != nil {
-		return err
-	}
+
+	// set up the signals
+	stopCh := common.Signals()
+
 	// initialize kernel trace controller and try to start the trace
 	ktracec := kstream.NewKtraceController(cfg.Kstream)
 	err := ktracec.StartKtrace()
 	if err != nil {
 		return err
 	}
-	defer func() {
-		_ = ktracec.CloseKtrace()
-	}()
+
 	// bootstrap essential components, including handle, process snapshotters
 	// and the kernel stream consumer that will actually collect all the events
 	hsnap := handle.NewSnapshotter(cfg, nil)
@@ -109,6 +99,7 @@ func run(cmd *cobra.Command, args []string) error {
 		kstreamc.SetFilter(kfilter)
 	}
 	log.Infof("bootstrapping with pid %d", os.Getpid())
+
 	// user can either instruct to bootstrap a filament or start a regular run. We'll setup
 	// the corresponding components accordingly to what we got from the CLI options. If a filament
 	// was given, we'll assign it the previous filter if it wasn't provided in the filament init function.
@@ -129,9 +120,6 @@ func run(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		defer func() {
-			_ = kstreamc.CloseKstream()
-		}()
 		// load alert senders so emitting alerts is possible from filaments
 		err = alertsender.LoadAll(cfg.Alertsenders)
 		if err != nil {
@@ -141,7 +129,7 @@ func run(cmd *cobra.Command, args []string) error {
 			err = f.Run(kstreamc.Events(), kstreamc.Errors())
 			if err != nil {
 				log.Error(err)
-				sig <- os.Interrupt
+				stopCh <- struct{}{}
 			}
 		}()
 	} else {
@@ -149,9 +137,6 @@ func run(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		defer func() {
-			_ = kstreamc.CloseKstream()
-		}()
 		// setup the aggregator that forwards events to outputs
 		agg, err := aggregator.NewBuffered(
 			kstreamc.Events(),
@@ -174,10 +159,14 @@ func run(cmd *cobra.Command, args []string) error {
 	if err := api.StartServer(cfg); err != nil {
 		return err
 	}
-	// wait for signals
-	signal.Notify(sig, syscall.SIGTERM, os.Interrupt)
-	<-sig
-	log.Infof("shutting down...")
+
+	defer func() {
+		_ = ktracec.CloseKtrace()
+		_ = kstreamc.CloseKstream()
+	}()
+
+	<-stopCh
+
 	// shutdown everything gracefully
 	if f != nil {
 		if err := f.Close(); err != nil {
@@ -190,5 +179,6 @@ func run(cmd *cobra.Command, args []string) error {
 	if err := api.CloseServer(); err != nil {
 		return err
 	}
+
 	return nil
 }

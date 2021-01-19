@@ -19,6 +19,7 @@
 package app
 
 import (
+	"github.com/rabbitstack/fibratus/cmd/fibratus/common"
 	"github.com/rabbitstack/fibratus/pkg/api"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/filter"
@@ -26,14 +27,9 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kcap"
 	"github.com/rabbitstack/fibratus/pkg/kstream"
 	"github.com/rabbitstack/fibratus/pkg/ps"
-	"github.com/rabbitstack/fibratus/pkg/syscall/security"
-	logger "github.com/rabbitstack/fibratus/pkg/util/log"
 	"github.com/rabbitstack/fibratus/pkg/util/spinner"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 )
 
@@ -43,28 +39,23 @@ var captureCmd = &cobra.Command{
 	RunE:  capture,
 }
 
-var captureConfig = config.NewWithOpts(config.WithCapture())
+var (
+	// capture command config
+	captureConfig = config.NewWithOpts(config.WithCapture())
+)
 
 func init() {
 	captureConfig.MustViperize(captureCmd)
 }
 
 func capture(cmd *cobra.Command, args []string) error {
-	if err := captureConfig.TryLoadFile(captureConfig.File()); err != nil {
+	// initialize config and logger
+	if err := common.Init(captureConfig, true); err != nil {
 		return err
 	}
-	if err := captureConfig.Init(); err != nil {
-		return err
-	}
-	if err := captureConfig.Validate(); err != nil {
-		return err
-	}
-	if captureConfig.DebugPrivilege {
-		security.SetDebugPrivilege()
-	}
-	if err := logger.InitFromConfig(captureConfig.Log); err != nil {
-		return err
-	}
+
+	// set up the signals
+	stopCh := common.Signals()
 
 	spin := spinner.Show("Snapshotting processes and handles")
 	// make sure to not wait more than a minute if system handle enumeration
@@ -93,9 +84,6 @@ func capture(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	defer func() {
-		_ = ktracec.CloseKtrace()
-	}()
 
 	kstreamc := kstream.NewConsumer(ktracec, psnap, hsnap, captureConfig)
 	kfilter, err := filter.NewFromCLI(args, captureConfig)
@@ -110,6 +98,7 @@ func capture(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	defer func() {
+		_ = ktracec.CloseKtrace()
 		_ = kstreamc.CloseKstream()
 	}()
 
@@ -119,6 +108,7 @@ func capture(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	errsc := writer.Write(kstreamc.Events(), kstreamc.Errors())
+
 	go func() {
 		for err := range errsc {
 			log.Warnf("fail to write event to kcap: %v", err)
@@ -133,8 +123,7 @@ func capture(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	signal.Notify(sig, syscall.SIGTERM, os.Interrupt)
-	<-sig
+	<-stopCh
 	spin.Stop()
 
 	if err := writer.Close(); err != nil {

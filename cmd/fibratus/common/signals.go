@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 by Nedim Sabic Sabic
+ * Copyright 2020-2021 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -16,35 +16,27 @@
  * limitations under the License.
  */
 
-package app
+package common
 
 import (
-	"fmt"
-	"github.com/spf13/cobra"
+	log "github.com/sirupsen/logrus"
 	"os"
-	"runtime"
+	"os/signal"
+	"syscall"
 )
 
-var version string
-var commit string
-var built string
+// Signals set ups the signal handler.
+func Signals() chan struct{} {
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 
-var versionCmd = &cobra.Command{
-	Use:   "version",
-	Short: "Show version info",
-	Run:   versionFn,
-}
+	stopCh := make(chan struct{})
 
-func versionFn(cmd *cobra.Command, args []string) {
-	if version == "" {
-		version = "dev"
-	}
-	_, _ = fmt.Fprintln(
-		os.Stdout,
-		"\n",
-		"Version:", version, "\n",
-		"Commit:", commit, "\n",
-		"Go compiler:", runtime.Version(), "\n",
-		"Built:", built,
-	)
+	go func() {
+		sig := <-sigCh
+		log.Infof("got signal %q, shutting down...", sig)
+		stopCh <- struct{}{}
+	}()
+
+	return stopCh
 }

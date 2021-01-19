@@ -20,6 +20,7 @@ package app
 
 import (
 	"fmt"
+	"github.com/rabbitstack/fibratus/cmd/fibratus/common"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/util/rest"
@@ -33,20 +34,17 @@ var configCmd = &cobra.Command{
 	RunE:  printConfig,
 }
 
-var c = config.NewWithOpts(config.WithStats())
+var (
+	// config command options
+	c = config.NewWithOpts(config.WithStats())
+)
 
 func init() {
 	c.MustViperize(configCmd)
 }
 
 func printConfig(cmd *cobra.Command, args []string) error {
-	if err := c.TryLoadFile(c.File()); err != nil {
-		return err
-	}
-	if err := c.Init(); err != nil {
-		return err
-	}
-	if err := c.Validate(); err != nil {
+	if err := common.Init(c, false); err != nil {
 		return err
 	}
 	body, err := rest.Get(rest.WithTransport(c.API.Transport), rest.WithURI("config"))
