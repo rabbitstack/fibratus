@@ -117,6 +117,7 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 		err = kstreamc.OpenKstream()
 		if err != nil {
+			_ = ktracec.CloseKtrace()
 			return err
 		}
 		// load alert senders so emitting alerts is possible from filaments
@@ -134,6 +135,7 @@ func run(cmd *cobra.Command, args []string) error {
 	} else {
 		err = kstreamc.OpenKstream()
 		if err != nil {
+			_ = ktracec.CloseKtrace()
 			return err
 		}
 		// setup the aggregator that forwards events to outputs
@@ -154,15 +156,16 @@ func run(cmd *cobra.Command, args []string) error {
 			}
 		}()
 	}
-	// start the HTTP server
-	if err := api.StartServer(cfg); err != nil {
-		return err
-	}
 
 	defer func() {
 		_ = ktracec.CloseKtrace()
 		_ = kstreamc.CloseKstream()
 	}()
+
+	// start the HTTP server
+	if err := api.StartServer(cfg); err != nil {
+		return err
+	}
 
 	<-stopCh
 

@@ -93,8 +93,10 @@ func capture(cmd *cobra.Command, args []string) error {
 	if kfilter != nil {
 		kstreamc.SetFilter(kfilter)
 	}
+
 	err = kstreamc.OpenKstream()
 	if err != nil {
+		_ = ktracec.CloseKtrace()
 		return err
 	}
 	defer func() {
