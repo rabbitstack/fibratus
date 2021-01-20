@@ -15,7 +15,7 @@
   <br>
   <br>
   <strong>
-    <a href="https://www.fibratus.io">Docs</a>
+    <a href="https://www.fibratus.io/#/setup/installation">Docs</a>
     &nbsp;&nbsp;&bull;&nbsp;&nbsp;
     <a href="https://github.com/rabbitstack/fibratus/tree/master/filaments">Filaments</a>
     &nbsp;&nbsp;&bull;&nbsp;&nbsp;
