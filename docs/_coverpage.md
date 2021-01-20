@@ -12,9 +12,11 @@
 - <ion-icon class="extensible-icon" name="cube"></ion-icon> Extensible
 - <ion-icon class="comprehensive-icon" name="magnet"></ion-icon> Comprehensive
 
+
 <a href="https://github.com/rabbitstack/fibratus/" target="_blank" rel="noopener"><ion-icon name="logo-github"></ion-icon> GitHub</a>
 <a href="#/setup/installation"><ion-icon name="rocket"></ion-icon> Get Started</a>
 
 <div>
   <img src='images/fibratus-term.gif'></img>
 </div>
+

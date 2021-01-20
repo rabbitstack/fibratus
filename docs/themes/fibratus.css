@@ -344,6 +344,40 @@ main.hidden {
 	text-decoration: none;
 }
 
+.ml-auto {
+	margin-left: auto;
+}
+
+.mr-auto {
+	margin-right: auto;
+}
+
+.divider-custom {
+    margin: 1.25rem 0 1.5rem;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.divider-custom.divider-light .divider-custom-line {
+    background-color: #2c3e50;
+}
+
+.divider-custom .divider-custom-line {
+    width: 100%;
+    max-width: 7rem;
+    height: 0.25rem;
+    background-color: #2c3e50;
+    border-radius: 1rem;
+    border-color: #2c3e50 !important;
+}
+
+.divider-custom .divider-custom-icon {
+    color: #2c3e50 !important;
+    font-size: 2rem;
+}
+
 .sidebar {
 	border-right: 1px solid rgba(0, 0, 0, .07);
 	overflow-y: auto;
@@ -725,7 +759,7 @@ section.cover {
 	background-position: 50%;
 	background-repeat: no-repeat;
 	background-size: cover;
-	height: 185vh;
+	height: 205vh;
 	display: none;
 }
 
@@ -745,7 +779,7 @@ section.cover.has-mask .mask {
 
 section.cover .cover-main {
 	flex: 1;
-	margin: -20px 16px 0px;
+	margin: -20px 16px 0px; 
 	text-align: center;
 	position: relative;
 }
@@ -848,7 +882,7 @@ section.cover blockquote>p>a:hover {
 
 section.cover .cover-main div {
 	position: relative;
-}
+} 
 
 .sidebar,
 body {
