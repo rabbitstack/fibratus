@@ -124,7 +124,7 @@ func AddFlags(flags *pflag.FlagSet) {
 // ShouldSkipProcess determines whether the specified process name is rejected by the scanner.
 func (c Config) ShouldSkipProcess(ps string) bool {
 	for _, proc := range c.ExcludedProcesses {
-		if strings.ToLower(proc) == strings.ToLower(ps) {
+		if strings.EqualFold(proc, ps) {
 			return true
 		}
 	}
@@ -134,7 +134,7 @@ func (c Config) ShouldSkipProcess(ps string) bool {
 // ShouldSkipFile determines whether the specified file name is rejected by the scanner.
 func (c Config) ShouldSkipFile(file string) bool {
 	for _, f := range c.ExcludedFiles {
-		if strings.ToLower(f) == strings.ToLower(filepath.Base(file)) {
+		if strings.EqualFold(f, filepath.Base(file)) {
 			return true
 		}
 	}

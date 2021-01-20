@@ -21,7 +21,9 @@ package app
 import (
 	"encoding/json"
 	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/rabbitstack/fibratus/cmd/fibratus/common"
 	"github.com/rabbitstack/fibratus/pkg/config"
+	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/util/rest"
 	"github.com/spf13/cobra"
 	"os"
@@ -64,7 +66,6 @@ type Stats struct {
 	HandleTypeNameMisses                int            `json:"handle.type.name.misses"`
 	HandleWaitTimeouts                  int            `json:"handle.wait.timeouts"`
 	HostnameErrors                      map[string]int `json:"hostname.errors"`
-	KcapDroppedKevents                  int            `json:"kcap.dropped.kevents"`
 	KcapFlusherErrors                   map[string]int `json:"kcap.flusher.errors"`
 	KcapHandleWriteErrors               int            `json:"kcap.handle.write.errors"`
 	KcapKeventUnmarshalErrors           int            `json:"kcap.kevent.unmarshal.errors"`
@@ -113,20 +114,14 @@ type Stats struct {
 }
 
 func stats(cmd *cobra.Command, args []string) error {
-	if err := statsConfig.TryLoadFile(statsConfig.File()); err != nil {
-		return err
-	}
-	if err := statsConfig.Init(); err != nil {
-		return err
-	}
-	if err := statsConfig.Validate(); err != nil {
+	if err := common.Init(statsConfig, false); err != nil {
 		return err
 	}
 
 	c := statsConfig.API
 	body, err := rest.Get(rest.WithTransport(c.Transport), rest.WithURI("debug/vars"))
 	if err != nil {
-		return err
+		return kerrors.ErrHTTPServerUnavailable(c.Transport, err)
 	}
 	var stats Stats
 	if err := json.Unmarshal(body, &stats); err != nil {

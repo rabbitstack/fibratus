@@ -49,7 +49,6 @@ var (
 	errReadSection       = func(s section.Type, err error) error { return fmt.Errorf("couldn't read %s section: %v", s, err) }
 
 	kcapReadKevents           = expvar.NewInt("kcap.read.kevents")
-	kcapDroppedKevents        = expvar.NewInt("kcap.dropped.kevents")
 	kcapReadBytes             = expvar.NewInt("kcap.read.bytes")
 	kcapKeventUnmarshalErrors = expvar.NewInt("kcap.kevent.unmarshal.errors")
 	kcapHandleUnmarshalErrors = expvar.NewInt("kcap.reader.handle.unmarshal.errors")
@@ -119,7 +118,7 @@ func (r *reader) SetFilter(f filter.Filter) { r.filter = f }
 
 func (r *reader) Read(ctx context.Context) (chan *kevent.Kevent, chan error) {
 	errsc := make(chan error, 100)
-	keventsc := make(chan *kevent.Kevent, 55000)
+	keventsc := make(chan *kevent.Kevent, 2000)
 	go func() {
 		r.mu.Lock()
 		defer r.mu.Unlock()
@@ -159,8 +158,8 @@ func (r *reader) Read(ctx context.Context) (chan *kevent.Kevent, chan error) {
 			if err := r.updateSnapshotters(kevt); err != nil {
 				log.Warn(err)
 			}
-			// push the event
-			r.pushKevent(kevt, keventsc)
+			// push the event to the chanel
+			r.read(kevt, keventsc)
 		}
 	}()
 
@@ -179,7 +178,7 @@ func (r *reader) Close() error {
 	return nil
 }
 
-func (r *reader) pushKevent(kevt *kevent.Kevent, keventsc chan *kevent.Kevent) {
+func (r *reader) read(kevt *kevent.Kevent, keventsc chan *kevent.Kevent) {
 	if kevt.Type.Dropped(false) {
 		return
 	}
@@ -187,12 +186,8 @@ func (r *reader) pushKevent(kevt *kevent.Kevent, keventsc chan *kevent.Kevent) {
 		kcapDroppedByFilter.Add(1)
 		return
 	}
-	select {
-	case keventsc <- kevt:
-		kcapReadKevents.Add(1)
-	default:
-		kcapDroppedKevents.Add(1)
-	}
+	keventsc <- kevt
+	kcapReadKevents.Add(1)
 }
 
 func (r *reader) updateSnapshotters(kevt *kevent.Kevent) error {

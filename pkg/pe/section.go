@@ -93,10 +93,9 @@ func (r *reader) readSections(pefile *pe.File) []Sec {
 				sections = append(sections, sec)
 			}(&wg, cancel)
 
-			select {
-			case <-ctx.Done():
-				wg.Done()
-			}
+			<-ctx.Done()
+			wg.Done()
+
 		} else {
 			sections = append(sections, sec)
 		}

@@ -63,7 +63,7 @@ func AddFlags(flags *pflag.FlagSet) {
 // ShouldSkipProcess determines whether the specified filename name is ignored by PE reader.
 func (c Config) shouldSkipImage(filename string) bool {
 	for _, img := range c.ExcludedImages {
-		if strings.ToLower(img) == strings.ToLower(filepath.Base(filename)) {
+		if strings.EqualFold(img, filepath.Base(filename)) {
 			return true
 		}
 	}

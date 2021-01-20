@@ -75,13 +75,13 @@ type ProcessHandleTableEntryInfo struct {
 	GrantedAccess    uint32
 	ObjectTypeIndex  uint32
 	HandleAttributes uint32
-	reserved         uint32
+	Reserved         uint32
 }
 
 // ProcessHandleSnapshotInformation is the structure that holds the process handle table.
 type ProcessHandleSnapshotInformation struct {
 	NumberOfHandles uintptr
-	reserved        uintptr
+	Reserved        uintptr
 	Handles         [1]ProcessHandleTableEntryInfo
 }
 
@@ -94,12 +94,12 @@ type SystemHandleTableEntryInfoEx struct {
 	CreatorBackTraceIndex uint8
 	ObjectTypeIndex       uint8
 	HandleAttributes      uint32
-	reserved              uint32
+	Reserved              uint32
 }
 
 // SystemHandleInformationEx is the structures that holds the process handle table.
 type SystemHandleInformationEx struct {
 	NumberOfHandles uintptr
-	reserved        uintptr
+	Reserved        uintptr
 	Handles         [1]SystemHandleTableEntryInfoEx
 }

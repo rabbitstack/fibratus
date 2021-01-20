@@ -138,6 +138,9 @@ func (f *filter) Compile() error {
 			if lhs, ok := expr.LHS.(*ql.FieldLiteral); ok {
 				f.fields = append(f.fields, fields.Field(lhs.Value))
 			}
+			if rhs, ok := expr.RHS.(*ql.FieldLiteral); ok {
+				f.fields = append(f.fields, fields.Field(rhs.Value))
+			}
 		}
 	})
 	if len(f.fields) == 0 {

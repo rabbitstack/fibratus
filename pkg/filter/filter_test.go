@@ -58,14 +58,16 @@ func TestFilterRunProcessKevent(t *testing.T) {
 	kpars := kevent.Kparams{
 		kparams.Comm:            {Name: kparams.Comm, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost.exe -k RPCSS"},
 		kparams.ProcessName:     {Name: kparams.ProcessName, Type: kparams.AnsiString, Value: "svchost.exe"},
-		kparams.ProcessID:       {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(1234)},
-		kparams.ProcessParentID: {Name: kparams.ProcessParentID, Type: kparams.Uint32, Value: uint32(345)},
+		kparams.ProcessID:       {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1234)},
+		kparams.ProcessParentID: {Name: kparams.ProcessParentID, Type: kparams.PID, Value: uint32(345)},
 	}
 	kevt := &kevent.Kevent{
 		Type:    ktypes.CreateProcess,
 		Kparams: kpars,
 		Name:    "CreateProcess",
+		PID:     1023,
 		PS: &pstypes.PS{
+			Ppid: 345,
 			Envs: map[string]string{"ALLUSERSPROFILE": "C:\\ProgramData", "OS": "Windows_NT", "ProgramFiles(x86)": "C:\\Program Files (x86)"},
 			Modules: []pstypes.Module{
 				{Name: "C:\\Windows\\System32\\kernel32.dll", Size: 12354, Checksum: 23123343, BaseAddress: kparams.Hex("fff23fff"), DefaultBaseAddress: kparams.Hex("fff124fd")},
@@ -93,6 +95,7 @@ func TestFilterRunProcessKevent(t *testing.T) {
 		{`ps.modules[kernel32.dll].address.base = 'fff23fff'`, true},
 		{`ps.modules[kernel32.dll].location = 'C:\\Windows\\System32'`, true},
 		{`ps.modules[xul.dll].size = 12354`, false},
+		{`kevt.name = 'CreateProcess' and kevt.pid != ps.ppid`, true},
 	}
 
 	for i, tt := range tests {

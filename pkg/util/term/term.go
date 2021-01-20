@@ -47,6 +47,7 @@ type rect struct {
 	right, bottom int16
 }
 
+//nolint:unused
 func (r *rect) uintptr() uintptr { return uintptr(unsafe.Pointer(r)) }
 
 type charInfo struct {
@@ -55,11 +56,11 @@ type charInfo struct {
 }
 
 type consoleScreenBufferInfo struct {
-	size          point
-	cursorPos     point
-	attributes    uint16
-	window        rect
-	maxWindowSize point
+	size       point
+	_          point
+	attributes uint16
+	_          rect
+	_          point
 }
 
 type consoleCursorInfo struct {

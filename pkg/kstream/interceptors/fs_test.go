@@ -110,6 +110,7 @@ func TestCreateFile(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, fmt.Sprintf("%s\\system32\\kernel32.dll", sysRoot), filename)
 	mask, err := kevt1.Kparams.Get(kparams.FileShareMask)
+	require.NoError(t, err)
 	assert.Equal(t, "r-d", mask.(fs.FileShareMode).String())
 
 	require.Empty(t, pendingKevents)
@@ -190,6 +191,7 @@ func TestDeleteFile(t *testing.T) {
 
 	assert.Equal(t, fmt.Sprintf("%s\\system32\\user32.dll", sysRoot), filename)
 	typ, err := kevt.Kparams.GetString(kparams.FileType)
+	require.NoError(t, err)
 	assert.Equal(t, "file", typ)
 }
 

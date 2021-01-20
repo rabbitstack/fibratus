@@ -22,6 +22,7 @@ func bytesToString(b []byte) string {
 	return *(*string)(unsafe.Pointer(&b))
 }
 
+//nolint:govet
 func stringToBytes(s string) []byte {
 	sh := (*reflect.StringHeader)(unsafe.Pointer(&s))
 	bh := reflect.SliceHeader{

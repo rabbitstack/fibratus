@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 by Nedim Sabic Sabic
+ * Copyright 2020-2021 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -16,12 +16,27 @@
  * limitations under the License.
  */
 
-package typesize
+package common
 
-import "unsafe"
+import (
+	log "github.com/sirupsen/logrus"
+	"os"
+	"os/signal"
+	"syscall"
+)
 
-//nolint:unused
-var ptr uintptr
+// Signals set ups the signal handler.
+func Signals() chan struct{} {
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 
-// Pointer returns the pointer size on this machine.
-func Pointer() uintptr { return unsafe.Sizeof(ptr) }
+	stopCh := make(chan struct{})
+
+	go func() {
+		sig := <-sigCh
+		log.Infof("got signal %q, shutting down...", sig)
+		stopCh <- struct{}{}
+	}()
+
+	return stopCh
+}

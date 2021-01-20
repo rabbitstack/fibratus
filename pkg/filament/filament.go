@@ -417,6 +417,9 @@ func (f *filament) Close() error {
 	}
 	f.close <- struct{}{}
 	if f.tick != nil {
+		f.close <- struct{}{}
+	}
+	if f.tick != nil {
 		f.tick.Stop()
 	}
 	return nil
@@ -548,6 +551,7 @@ func (f *filament) onInterval(fn *cpython.PyObject) {
 				f.fnerrs <- err
 			}
 			f.gil.Unlock()
+		case <-f.close:
 		}
 	}
 }

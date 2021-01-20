@@ -27,7 +27,7 @@ import (
 
 type mutant struct {
 	count     int32
-	owned     bool
+	_         bool
 	abandoned bool
 }
 

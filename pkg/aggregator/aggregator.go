@@ -92,7 +92,7 @@ func NewBuffered(
 		errsc:   errs,
 		stop:    make(chan struct{}, 1),
 		flusher: time.NewTicker(flushInterval),
-		wq:      make(chan *kevent.Batch, 0),
+		wq:      make(chan *kevent.Batch),
 		c:       config,
 	}
 

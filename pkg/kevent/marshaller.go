@@ -763,17 +763,8 @@ func (js *jsonStream) writeByte(c byte) {
 	js.buf = append(js.buf, c)
 }
 
-func (js *jsonStream) writeNewline() {
-	js.buf = append(js.buf, '\n')
-}
-
 func (js *jsonStream) writeTwoBytes(c1, c2 byte) {
 	js.buf = append(js.buf, c1, c2)
-}
-
-func (js *jsonStream) writeBytes(b []byte) *jsonStream {
-	js.buf = append(js.buf, b...)
-	return js
 }
 
 func (js *jsonStream) writeString(s string) *jsonStream {

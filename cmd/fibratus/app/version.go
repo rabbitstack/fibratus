@@ -27,14 +27,24 @@ import (
 
 var version string
 var commit string
+var built string
 
 var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Show version info",
-	Run: func(cmd *cobra.Command, args []string) {
-		if version == "" {
-			version = "dev"
-		}
-		_, _ = fmt.Fprintln(os.Stdout, "Version:", version, "Commit:", commit, "Go compiler:", runtime.Version())
-	},
+	Run:   versionFn,
+}
+
+func versionFn(cmd *cobra.Command, args []string) {
+	if version == "" {
+		version = "dev"
+	}
+	_, _ = fmt.Fprintln(
+		os.Stdout,
+		"\n",
+		"Version:", version, "\n",
+		"Commit:", commit, "\n",
+		"Go compiler:", runtime.Version(), "\n",
+		"Built:", built,
+	)
 }

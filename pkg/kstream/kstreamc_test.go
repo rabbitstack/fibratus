@@ -161,86 +161,107 @@ func TestGetParam(t *testing.T) {
 	assert.Equal(t, "cmd\\fibratus\\fibratus.exe  ", kpar.Value)
 
 	kpar, err = getParam("exe", []byte{77, 105, 99, 114, 111, 115, 111, 102, 116, 46, 80, 104, 111, 116, 111, 115, 46, 101, 120, 101, 0}, 21, tdh.NonStructType{InType: tdh.IntypeAnsiString})
+	require.NoError(t, err)
 	assert.Equal(t, kparams.AnsiString, kpar.Type)
 	assert.Equal(t, "Microsoft.Photos.exe", kpar.Value)
 
 	kpar, err = getParam("flag", []byte{127}, 1, tdh.NonStructType{InType: tdh.IntypeInt8})
+	require.NoError(t, err)
 	assert.Equal(t, kparams.Int8, kpar.Type)
 	assert.Equal(t, int8(127), kpar.Value)
 
 	kpar, err = getParam("flag", []byte{255}, 1, tdh.NonStructType{InType: tdh.IntypeUint8})
+	require.NoError(t, err)
 	assert.Equal(t, kparams.Uint8, kpar.Type)
 	assert.Equal(t, uint8(255), kpar.Value)
 
 	kpar, err = getParam("flag", []byte{255}, 1, tdh.NonStructType{InType: tdh.IntypeUint8, OutType: tdh.OutypeHexInt8})
+	require.NoError(t, err)
 	assert.Equal(t, kparams.HexInt8, kpar.Type)
 	assert.Equal(t, kparams.Hex("ff"), kpar.Value)
 
 	kpar, err = getParam("enabled", []byte{1}, 1, tdh.NonStructType{InType: tdh.IntypeBoolean})
+	require.NoError(t, err)
 	assert.Equal(t, kparams.Bool, kpar.Type)
 	assert.Equal(t, true, kpar.Value)
 
 	kpar, err = getParam("enabled", []byte{0}, 1, tdh.NonStructType{InType: tdh.IntypeBoolean})
+	require.NoError(t, err)
 	assert.Equal(t, kparams.Bool, kpar.Type)
 	assert.Equal(t, false, kpar.Value)
 
 	kpar, err = getParam("addr", []byte{255, 169}, 2, tdh.NonStructType{InType: tdh.IntypeUint16, OutType: tdh.OutypeHexInt16})
+	require.NoError(t, err)
 	assert.Equal(t, kparams.HexInt16, kpar.Type)
 	assert.Equal(t, kparams.Hex("a9ff"), kpar.Value)
 
 	kpar, err = getParam("sport", []byte{255, 169}, 2, tdh.NonStructType{InType: tdh.IntypeUint16, OutType: tdh.OutypePort})
+	require.NoError(t, err)
 	assert.Equal(t, kparams.Port, kpar.Type)
 	assert.Equal(t, uint16(65449), kpar.Value)
 
 	kpar, err = getParam("pid", []byte{252, 26, 0, 0}, 4, tdh.NonStructType{InType: tdh.IntypeInt32})
+	require.NoError(t, err)
 	assert.Equal(t, kparams.Int32, kpar.Type)
 	assert.Equal(t, int32(6908), kpar.Value)
 
 	kpar, err = getParam("kproc", []byte{108, 3, 0, 0}, 4, tdh.NonStructType{InType: tdh.IntypeUint32})
+	require.NoError(t, err)
 	assert.Equal(t, kparams.Uint32, kpar.Type)
 	assert.Equal(t, uint32(876), kpar.Value)
 
 	kpar, err = getParam("kproc", []byte{108, 3, 0, 0}, 4, tdh.NonStructType{InType: tdh.IntypeUint32, OutType: tdh.OutypeHexInt32})
+	require.NoError(t, err)
 	assert.Equal(t, kparams.HexInt32, kpar.Type)
 	assert.Equal(t, kparams.Hex("36c"), kpar.Value)
 
 	kpar, err = getParam("dip", []byte{192, 168, 1, 210}, 4, tdh.NonStructType{InType: tdh.IntypeUint32, OutType: tdh.OutypeIPv4})
+	require.NoError(t, err)
 	assert.Equal(t, kparams.IPv4, kpar.Type)
 	assert.Equal(t, net.ParseIP("192.168.1.210"), kpar.Value)
 
 	kpar, err = getParam("syscall.addr", []byte{192, 168, 1, 210, 8, 1, 1, 1}, 8, tdh.NonStructType{InType: tdh.IntypeInt64})
+	require.NoError(t, err)
 	assert.Equal(t, kparams.Int64, kpar.Type)
 	assert.Equal(t, int64(72340206409328832), kpar.Value)
 
 	kpar, err = getParam("syscall.addr", []byte{192, 168, 1, 210, 199, 100, 100, 100}, 8, tdh.NonStructType{InType: tdh.IntypeUint64})
+	require.NoError(t, err)
 	assert.Equal(t, kparams.Uint64, kpar.Type)
 	assert.Equal(t, uint64(7234017710848452800), kpar.Value)
 
 	kpar, err = getParam("syscall.addr", []byte{192, 168, 1, 210, 199, 100, 100, 100}, 8, tdh.NonStructType{InType: tdh.IntypeUint64, OutType: tdh.OutypeHexInt64})
+	require.NoError(t, err)
 	assert.Equal(t, kparams.HexInt64, kpar.Type)
 	assert.Equal(t, kparams.Hex("646464c7d201a8c0"), kpar.Value)
 
 	kpar, err = getParam("currency", []byte{0, 0, 0, 1}, 4, tdh.NonStructType{InType: tdh.IntypeFloat})
+	require.NoError(t, err)
 	assert.Equal(t, kparams.Float, kpar.Type)
 	assert.Equal(t, float32(2.3509887e-38), kpar.Value)
 
 	kpar, err = getParam("currency", []byte{0, 0, 0, 0, 0, 0, 0, 1}, 8, tdh.NonStructType{InType: tdh.IntypeDouble})
+	require.NoError(t, err)
 	assert.Equal(t, kparams.Double, kpar.Type)
 	assert.Equal(t, float64(7.291122019556398e-304), kpar.Value)
 
 	kpar, err = getParam("kproc", []byte{108, 3, 0, 0}, 4, tdh.NonStructType{InType: tdh.IntypeHexInt32})
+	require.NoError(t, err)
 	assert.Equal(t, kparams.HexInt32, kpar.Type)
 	assert.Equal(t, kparams.Hex("36c"), kpar.Value)
 
 	kpar, err = getParam("syscall.addr", []byte{192, 168, 1, 210, 199, 100, 100, 100}, 8, tdh.NonStructType{InType: tdh.IntypeHexInt64})
+	require.NoError(t, err)
 	assert.Equal(t, kparams.HexInt64, kpar.Type)
 	assert.Equal(t, kparams.Hex("646464c7d201a8c0"), kpar.Value)
 
 	kpar, err = getParam("sid", []byte{96, 12, 161, 104, 133, 219, 255, 255, 0, 0, 0, 0, 3, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0}, 8, tdh.NonStructType{InType: tdh.IntypeWbemSID})
+	require.NoError(t, err)
 	assert.Equal(t, kparams.WbemSID, kpar.Type)
 	assert.Equal(t, "NT AUTHORITY\\SYSTEM", kpar.Value)
 
 	kpar, err = getParam("sip", []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1}, 16, tdh.NonStructType{InType: tdh.IntypeBinary, OutType: tdh.OutypeIPv6})
+	require.NoError(t, err)
 	assert.Equal(t, kparams.IPv6, kpar.Type)
 	assert.Equal(t, net.ParseIP("::1"), kpar.Value)
 }

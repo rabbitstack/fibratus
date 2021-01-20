@@ -485,34 +485,34 @@ func newPEAccessor() accessor {
 	return &peAccessor{}
 }
 
-func (p *peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
-	var pex *pe.PE
+func (*peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
+	var p *pe.PE
 	if kevt.PS != nil && kevt.PS.PE != nil {
-		pex = kevt.PS.PE
+		p = kevt.PS.PE
 	}
-	if pex == nil {
+	if p == nil {
 		return nil, nil
 	}
 
 	switch f {
 	case fields.PeEntrypoint:
-		return pex.EntryPoint, nil
+		return p.EntryPoint, nil
 	case fields.PeBaseAddress:
-		return pex.ImageBase, nil
+		return p.ImageBase, nil
 	case fields.PeNumSections:
-		return pex.NumberOfSections, nil
+		return p.NumberOfSections, nil
 	case fields.PeNumSymbols:
-		return pex.NumberOfSymbols, nil
+		return p.NumberOfSymbols, nil
 	case fields.PeSymbols:
-		return pex.Symbols, nil
+		return p.Symbols, nil
 	case fields.PeImports:
-		return pex.Imports, nil
+		return p.Imports, nil
 	default:
 		field := f.String()
 		if strings.HasPrefix(field, fields.PeSectionsSubfield) {
 			// get the section name
 			sname, subfield := captureInBrackets(field)
-			sec := pex.Section(sname)
+			sec := p.Section(sname)
 			if sec == nil {
 				return nil, nil
 			}
@@ -529,12 +529,12 @@ func (p *peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, er
 		if strings.HasPrefix(field, fields.PeResourcesSubfield) {
 			// consult the resource name
 			key, _ := captureInBrackets(field)
-			v, ok := pex.VersionResources[key]
+			v, ok := p.VersionResources[key]
 			if ok {
 				return v, nil
 			}
 			// match on prefix (e.g. pe.resources[Org] = Blackwater)
-			for k, v := range pex.VersionResources {
+			for k, v := range p.VersionResources {
 				if strings.HasPrefix(k, key) {
 					return v, nil
 				}

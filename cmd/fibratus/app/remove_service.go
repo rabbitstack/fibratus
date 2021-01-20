@@ -39,12 +39,16 @@ func removeService(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	defer m.Disconnect()
+	defer func() {
+		_ = m.Disconnect()
+	}()
 	s, err := m.OpenService(svcName)
 	if err != nil {
 		return errServiceNotInstalled
 	}
-	defer s.Close()
+	defer func() {
+		_ = s.Close()
+	}()
 	err = s.Delete()
 	if err != nil {
 		return err

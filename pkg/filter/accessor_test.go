@@ -76,9 +76,11 @@ func TestPEAccessor(t *testing.T) {
 	assert.Equal(t, 6.368381, entropy)
 
 	v, err := pea.get(fields.Field("pe.sections[.text].md6"), kevt)
+	require.NoError(t, err)
 	require.Nil(t, v)
 
 	md5, err := pea.get(fields.Field("pe.sections[.rdata].md5"), kevt)
+	require.NoError(t, err)
 	require.Nil(t, v)
 	assert.Equal(t, "ffa5c960b421ca9887e54966588e97e8", md5)
 

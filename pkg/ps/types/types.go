@@ -66,7 +66,7 @@ type PS struct {
 }
 
 // String returns a string representation of the process' state.
-func (ps PS) String() string {
+func (ps *PS) String() string {
 	return fmt.Sprintf(`
 		Pid:  %d
 		Ppid: %d

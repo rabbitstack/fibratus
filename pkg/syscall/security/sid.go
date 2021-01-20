@@ -126,6 +126,6 @@ func LookupAllSids() ([]string, error) {
 		sids = append(sids, s)
 		entry = uintptr(unsafe.Pointer(entry + unsafe.Sizeof(userInfo{})))
 	}
-	netBufferFree.Call(buf)
+	_, _, _ = netBufferFree.Call(buf)
 	return sids, nil
 }

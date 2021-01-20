@@ -151,8 +151,8 @@ func infoClassFromID(klass uint32) string {
 
 func newFsInterceptor(devMapper fs.DevMapper, hsnap handle.Snapshotter, config *config.Config, fn func() error) KstreamInterceptor {
 	interceptor := &fsInterceptor{
-		files:           make(map[uint64]*fileInfo, 0),
-		pendingKevents:  make(map[uint64]*kevent.Kevent, 0),
+		files:           make(map[uint64]*fileInfo),
+		pendingKevents:  make(map[uint64]*kevent.Kevent),
 		devMapper:       devMapper,
 		rundownDeadline: time.NewTimer(rundownDeadlinePeriod),
 		hsnap:           hsnap,
@@ -215,7 +215,7 @@ func (f *fsInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 		kevt.Tid, err = kevt.Kparams.GetUint32(kparams.ThreadID)
 		if err != nil {
 			// tid is sometimes represented in hex format
-			kevt.Tid, err = kevt.Kparams.GetHexAsUint32(kparams.ThreadID)
+			kevt.Tid, _ = kevt.Kparams.GetHexAsUint32(kparams.ThreadID)
 		}
 
 		switch kevt.Type {
@@ -424,7 +424,7 @@ func (f *fsInterceptor) findDirHandle(fobj uint64) fs.FileType {
 		return fs.Unknown
 	}
 	md, ok := fhandle.MD.(*htypes.FileInfo)
-	if md.IsDirectory {
+	if ok && md.IsDirectory {
 		return fs.Directory
 	}
 	return fs.Unknown

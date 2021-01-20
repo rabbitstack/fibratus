@@ -20,17 +20,14 @@ package app
 
 import (
 	"context"
+	"github.com/rabbitstack/fibratus/cmd/fibratus/common"
 	"github.com/rabbitstack/fibratus/pkg/aggregator"
 	"github.com/rabbitstack/fibratus/pkg/api"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/filament"
 	"github.com/rabbitstack/fibratus/pkg/filter"
 	"github.com/rabbitstack/fibratus/pkg/kcap"
-	"github.com/rabbitstack/fibratus/pkg/outputs"
-	logger "github.com/rabbitstack/fibratus/pkg/util/log"
 	"github.com/spf13/cobra"
-	"os"
-	"os/signal"
 )
 
 var replayCmd = &cobra.Command{
@@ -39,29 +36,29 @@ var replayCmd = &cobra.Command{
 	RunE:  replay,
 }
 
-var replayConfig = config.NewWithOpts(config.WithReplay())
+var (
+	// replay command config
+	replayConfig = config.NewWithOpts(config.WithReplay())
+)
 
 func init() {
 	replayConfig.MustViperize(replayCmd)
 }
 
 func replay(cmd *cobra.Command, args []string) error {
-	if err := replayConfig.TryLoadFile(replayConfig.File()); err != nil {
+	// initialize config and logger
+	if err := common.Init(replayConfig, false); err != nil {
 		return err
 	}
-	if err := replayConfig.Init(); err != nil {
-		return err
-	}
-	if err := replayConfig.Validate(); err != nil {
-		return err
-	}
-	if err := logger.InitFromConfig(replayConfig.Log); err != nil {
-		return err
-	}
+
+	// set up the signals
+	stopCh := common.Signals()
+
 	kfilter, err := filter.NewFromCLIWithAllAccessors(args)
 	if err != nil {
 		return err
 	}
+
 	// initialize kcap reader and try to recover the snapshotters
 	// from the captured state
 	reader, err := kcap.NewReader(replayConfig.KcapFile, replayConfig)
@@ -74,6 +71,8 @@ func replay(cmd *cobra.Command, args []string) error {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
+	// stop kcap reader consumers
+	defer cancel()
 
 	filamentName := replayConfig.Filament.Name
 	// we don't need the aggregator is user decided to replay the
@@ -98,7 +97,7 @@ func replay(cmd *cobra.Command, args []string) error {
 			defer f.Close()
 			err = f.Run(kevents, errs)
 			if err != nil {
-				sig <- os.Interrupt
+				stopCh <- struct{}{}
 			}
 		}()
 	} else {
@@ -114,7 +113,7 @@ func replay(cmd *cobra.Command, args []string) error {
 			kevents,
 			errs,
 			replayConfig.Aggregator,
-			outputs.Config{Type: replayConfig.Output.Type, Output: replayConfig.Output.Output},
+			replayConfig.Output,
 			replayConfig.Transformers,
 			replayConfig.Alertsenders,
 		)
@@ -126,10 +125,8 @@ func replay(cmd *cobra.Command, args []string) error {
 	if err := api.StartServer(replayConfig); err != nil {
 		return err
 	}
-	signal.Notify(sig, os.Kill, os.Interrupt)
-	<-sig
-	// stop reader consumer goroutines
-	cancel()
+
+	<-stopCh
 
 	if agg != nil {
 		if err := agg.Stop(); err != nil {

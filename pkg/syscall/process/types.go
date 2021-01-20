@@ -52,13 +52,13 @@ type String struct {
 // process environment block.
 type RTLUserProcessParameters struct {
 	Reserved1        [16]byte
-	consoleHandle    uintptr
-	consoleFlags     uint32
-	stdin            uintptr
-	stdout           uintptr
-	stderr           uintptr
+	ConsoleHandle    uintptr
+	ConsoleFlags     uint32
+	Stdin            uintptr
+	Stdout           uintptr
+	Stderr           uintptr
 	CurrentDirectory CurDir
-	dllPath          utf16.UnicodeString
+	DllPath          utf16.UnicodeString
 	ImagePathName    utf16.UnicodeString
 	CommandLine      utf16.UnicodeString
 	Environment      uintptr
