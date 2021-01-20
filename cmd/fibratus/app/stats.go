@@ -114,7 +114,7 @@ type Stats struct {
 }
 
 func stats(cmd *cobra.Command, args []string) error {
-	if err := common.Init(cfg, false); err != nil {
+	if err := common.Init(statsConfig, false); err != nil {
 		return err
 	}
 
