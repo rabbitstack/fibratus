@@ -101,6 +101,7 @@ jobs:
         run: |
           echo $PKG_CONFIG_PATH
           ls -l C:/Python37
+          cat $PKG_CONFIG_PATH/python-37.pc
       - name: Lint
         uses: golangci/golangci-lint-action@v2
         with:
