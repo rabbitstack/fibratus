@@ -445,24 +445,31 @@ func (k *kstreamConsumer) produceParams(ktype ktypes.Ktype, evt *etw.EventRecord
 		if _, ok := k.ignoredKparams[kparName]; ok {
 			continue
 		}
+		kparName = kparams.Canonicalize(kparName)
+		// discard unknown canonical names
+		if kparName == "" {
+			continue
+		}
 
 		descriptor := &tdh.PropertyDataDescriptor{
 			PropertyName: propp,
 			ArrayIndex:   0xFFFFFFFF,
 		}
-		size, err := getPropertySize(evt, descriptor)
-		if err != nil || size == 0 {
-			continue
+		// try to get the param size for static types
+		// and fallback to TdhGetPropertySize for the
+		// dynamic event parameters such as paths
+		// process names, registry keys and so on
+		size := kparams.SizeOf(kparName)
+		if size == 0 {
+			var err error
+			size, err = getPropertySize(evt, descriptor)
+			if err != nil || size == 0 {
+				continue
+			}
 		}
 
 		buffer := make([]byte, size)
 		if err := getProperty(evt, descriptor, size, buffer); err != nil {
-			continue
-		}
-
-		kparName = kparams.Canonicalize(kparName)
-		// discard unknown canonical names
-		if kparName == "" {
 			continue
 		}
 

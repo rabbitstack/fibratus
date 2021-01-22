@@ -117,7 +117,7 @@ func (c chain) Dispatch(kevt *kevent.Kevent) (*kevent.Kevent, error) {
 	}
 
 	if len(errs) > 0 {
-		return kevt, multierror.Wrap(errs)
+		return kevt, multierror.Wrap(errs...)
 	}
 
 	if cukerr != nil {
