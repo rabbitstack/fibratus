@@ -57,10 +57,20 @@ var restartSvcCmd = &cobra.Command{
 var (
 	// windows service command config
 	svcConfig = config.NewWithOpts(config.WithRun())
+
+	// windows event logger
+	evtlog debug.Log
+
+	ctrl     kstream.KtraceController
+	consumer kstream.Consumer
+	aggr     *aggregator.BufferedAggregator
 )
 
 func init() {
+
+	// initialize service config
 	svcConfig.MustViperize(startSvcCmd)
+
 }
 
 func startService(cmd *cobra.Command, args []string) error {
@@ -158,12 +168,6 @@ func stopSvc() error {
 
 type fsvc struct{}
 
-var evtlog debug.Log
-
-var sktracec kstream.KtraceController
-var skstreamc kstream.Consumer
-var sagg *aggregator.BufferedAggregator
-
 func (s *fsvc) Execute(args []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (bool, uint32) {
 	const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown
 	changes <- svc.Status{State: svc.StartPending}
@@ -192,14 +196,14 @@ loop:
 
 	changes <- svc.Status{State: svc.StopPending}
 
-	if sktracec != nil {
-		_ = sktracec.CloseKtrace()
+	if ctrl != nil {
+		_ = ctrl.CloseKtrace()
 	}
-	if skstreamc != nil {
-		_ = skstreamc.CloseKstream()
+	if consumer != nil {
+		_ = consumer.CloseKstream()
 	}
-	if sagg != nil {
-		_ = sagg.Stop()
+	if aggr != nil {
+		_ = aggr.Stop()
 	}
 	_ = handle.CloseTimeout()
 	_ = api.CloseServer()
@@ -215,8 +219,8 @@ func (s *fsvc) run() error {
 		return err
 	}
 
-	sktracec = kstream.NewKtraceController(svcConfig.Kstream)
-	err := sktracec.StartKtrace()
+	ctrl = kstream.NewKtraceController(svcConfig.Kstream)
+	err := ctrl.StartKtrace()
 	if err != nil {
 		return err
 	}
@@ -224,16 +228,16 @@ func (s *fsvc) run() error {
 	// initialize handle/process snapshotters and try to open the kernel event stream
 	hsnap := handle.NewSnapshotter(svcConfig, nil)
 	psnap := ps.NewSnapshotter(hsnap, svcConfig)
-	skstreamc = kstream.NewConsumer(sktracec, psnap, hsnap, svcConfig)
+	consumer = kstream.NewConsumer(ctrl, psnap, hsnap, svcConfig)
 	// open the kernel event stream, start processing events and forwarding to outputs
-	err = skstreamc.OpenKstream()
+	err = consumer.OpenKstream()
 	if err != nil {
 		return err
 	}
 
-	sagg, err = aggregator.NewBuffered(
-		skstreamc.Events(),
-		skstreamc.Errors(),
+	aggr, err = aggregator.NewBuffered(
+		consumer.Events(),
+		consumer.Errors(),
 		svcConfig.Aggregator,
 		svcConfig.Output,
 		svcConfig.Transformers,

@@ -24,7 +24,7 @@ import (
 // If the slice only contains a single element, that error is returned directly.
 // When more than one error is wrapped, the Error() string is a concatenation
 // of the Error() values of all underlying errors.
-func Wrap(errs []error) error {
+func Wrap(errs ...error) error {
 	return multiError(errs).flatten()
 }
 
@@ -47,9 +47,12 @@ func (errors multiError) flatten() error {
 // Error returns a string like "[e1, e2, ...]" where each eN is the Error() of
 // each error in the slice.
 func (errors multiError) Error() string {
-	parts := make([]string, len(errors))
-	for i, err := range errors {
-		parts[i] = err.Error()
+	parts := make([]string, 0)
+	for _, err := range errors {
+		if err == nil {
+			continue
+		}
+		parts = append(parts, err.Error())
 	}
 	return fmt.Sprintf("[%s]", strings.Join(parts, ", "))
 }

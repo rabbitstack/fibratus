@@ -336,7 +336,7 @@ func (r *reader) readVersionInfo(vsDir *rdir) (map[string]string, error) {
 	}
 
 	if len(vers) == 0 && len(errs) > 0 {
-		return nil, multierror.Wrap(errs)
+		return nil, multierror.Wrap(errs...)
 	}
 
 	return vers, nil

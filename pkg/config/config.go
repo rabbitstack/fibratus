@@ -280,12 +280,12 @@ func (c *Config) Validate() error {
 	// validate config file content
 	valid, errs := validate(out)
 	if !valid || len(errs) > 0 {
-		return fmt.Errorf("invalid config: %v", multierror.Wrap(errs))
+		return fmt.Errorf("invalid config: %v", multierror.Wrap(errs...))
 	}
 	// now validate the Viper config flags
 	valid, errs = validate(c.viper.AllSettings())
 	if !valid || len(errs) > 0 {
-		return fmt.Errorf("invalid config: %v", multierror.Wrap(errs))
+		return fmt.Errorf("invalid config: %v", multierror.Wrap(errs...))
 	}
 	return nil
 }

@@ -29,6 +29,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	"github.com/rabbitstack/fibratus/pkg/kstream"
 	"github.com/rabbitstack/fibratus/pkg/ps"
+	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"os"
@@ -117,8 +118,7 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 		err = kstreamc.OpenKstream()
 		if err != nil {
-			_ = ktracec.CloseKtrace()
-			return err
+			return multierror.Wrap(err, ktracec.CloseKtrace())
 		}
 		// load alert senders so emitting alerts is possible from filaments
 		err = alertsender.LoadAll(cfg.Alertsenders)
@@ -135,8 +135,7 @@ func run(cmd *cobra.Command, args []string) error {
 	} else {
 		err = kstreamc.OpenKstream()
 		if err != nil {
-			_ = ktracec.CloseKtrace()
-			return err
+			return multierror.Wrap(err, ktracec.CloseKtrace())
 		}
 		// setup the aggregator that forwards events to outputs
 		agg, err := aggregator.NewBuffered(
