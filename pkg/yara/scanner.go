@@ -264,7 +264,7 @@ func parseCompilerErrors(errors []yara.CompilerMessage) error {
 	for i, err := range errors {
 		errs[i] = fmt.Errorf("%s, filename: %s line: %d", err.Text, err.Filename, err.Line)
 	}
-	return multierror.Wrap(errs)
+	return multierror.Wrap(errs...)
 }
 
 func (s scanner) ScanProc(pid uint32) error {
