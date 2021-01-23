@@ -292,7 +292,7 @@ func New(
 				return nil, fmt.Errorf("filament init error: %v", err)
 			}
 			if len(f.initErrors) > 0 {
-				return nil, multierror.Wrap(f.initErrors)
+				return nil, multierror.Wrap(f.initErrors...)
 			}
 		}
 	}
