@@ -56,6 +56,7 @@ goto :EOF
 
 :test
 %GOTEST% -tags %TAGS% %PKGS%
+if errorlevel 1 goto fail
 goto :EOF
 
 :lint
@@ -114,3 +115,8 @@ goto :EOF
 :clean
 rm cmd\fibratus\fibratus.exe
 goto :EOF
+
+:fail
+echo Failed with error #%errorlevel%.
+exit /b %errorlevel%
+
