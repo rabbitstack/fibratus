@@ -22,7 +22,7 @@ jobs:
       - name: Adjust pkg-config prefix
         shell: bash
         run: |
-           sed -i 's/C:\/Python37/C:\/hostedtoolcache\/windows\/Python\/3.7.9\/x64/' python-37.pc
+           sed -i 's/C:\/Python37/C:\/hostedtoolcache\/windows\/Python\/3.7.9\/x64/' pkg-config/python-37.pc
       - name: Setup msys2
         uses: msys2/setup-msys2@v2
         with:
@@ -83,7 +83,7 @@ jobs:
       - name: Adjust pkg-config prefix
         shell: bash
         run: |
-           sed -i 's/C:\/Python37/C:\/hostedtoolcache\/windows\/Python\/3.7.9\/x64/' python-37.pc
+           sed -i 's/C:\/Python37/C:\/hostedtoolcache\/windows\/Python\/3.7.9\/x64/' pkg-config/python-37.pc
       - name: Install Go
         uses: actions/setup-go@v2
         with:
