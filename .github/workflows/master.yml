@@ -8,9 +8,6 @@ on:
       - "README.md"
       - "CONTRIBUTING.md"
       - "docs/**"
-
-env:
-  BUILD_TAGS: "kcap,filament,yara,yara_static"
            
 jobs:
   build:
@@ -22,6 +19,10 @@ jobs:
            go-version: 1.15.x
       - name: Checkout
         uses: actions/checkout@v2
+      - name: Adjust pkg-config prefix
+        shell: bash
+        run: |
+           sed -i 's/C:\/Python37/C:\/hostedtoolcache\/windows\/Python\/3.7.9\/x64/' python-37.pc
       - name: Setup msys2
         uses: msys2/setup-msys2@v2
         with:
@@ -63,10 +64,10 @@ jobs:
         run: |
           export PATH=/c/msys64/mingw64/bin:$PATH
           export PKG_CONFIG_PATH=$(pwd)/pkg-config
-          ln -s C:/hostedtoolcache/windows/Python/3.7.9/x64 C:/Python37
-          go build -ldflags "-s -w -X github.com/rabbitstack/fibratus/cmd/fibratus/app.commit=$GITHUB_SHA" \
-                   -tags $BUILD_TAGS \
-                   -o ./cmd/fibratus/fibratus.exe ./cmd/fibratus
+          export COMMIT=$(echo $GITHUB_SHA | cut -c1-8)
+          cmd.exe /C "make"
+        env:
+          TAGS: kcap,filament,yara,yara_static
       - uses: actions/upload-artifact@v2
         with:
           name: "fibratus-amd64.exe"
@@ -79,6 +80,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+      - name: Adjust pkg-config prefix
+        shell: bash
+        run: |
+           sed -i 's/C:\/Python37/C:\/hostedtoolcache\/windows\/Python\/3.7.9\/x64/' python-37.pc
       - name: Install Go
         uses: actions/setup-go@v2
         with:
@@ -90,23 +95,34 @@ jobs:
          install: >-
            base-devel
            mingw-w64-x86_64-gcc
-      - name: Make Python symlink
-        shell: bash
-        run: |
-          ln -s C:/hostedtoolcache/windows/Python/3.7.9/x64 C:/Python37
-          echo "PKG_CONFIG_PATH=$(pwd)/pkg-config" >> $GITHUB_ENV
-          echo "C:/msys64/mingw64/bin" >> $GITHUB_PATH
-      - name: Echo envs
-        shell: bash
-        run: |
-          echo $PATH
-          echo $GITHUB_PATH
-          ls -l C:/Python37
-          cat $PKG_CONFIG_PATH/python-37.pc
-      - name: Lint
-        uses: golangci/golangci-lint-action@v2
+      - name: Cache yara
+        uses: actions/cache@v2
+        id: cache
         with:
-          version: v1.29
+          path: |
+            **/yara
+          key: ${{ runner.os }}-yara-${{ hashFiles('**/pkg/yara') }}
+          restore-keys: |
+            ${{ runner.os }}-yara-${{ hashFiles('**/pkg/yara') }}
+      - name: Install yara
+        shell: msys2 {0}
+        run: |
+          cd yara
+          make install
+      - name: Install golangci-lint
+        shell: bash
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin $GOLANGCI_LINT_VER
+        env:
+          GOLANGCI_LINT_VER: v1.35.2 
+      - name: Lint
+        shell: bash
+        run: |
+           export PATH="/c/msys64/mingw64/bin:$PATH"
+           export PKG_CONFIG_PATH=$(pwd)/pkg-config
+           cmd.exe /C "make lint"
+      
         
+  
 
   
