@@ -19,7 +19,7 @@ set GOBIN=%USERPROFILE%\go\bin
 set GOTEST=go test -v -race -gcflags=all=-d=checkptr=0
 set GOVET=go vet
 set GOFMT=gofmt -e -s -l -w
-set GOLINT=%GOBIN%\golangci-lint run
+set GOLINT=%GOBIN%\golangci-lint
 
 FOR /F "tokens=* USEBACKQ" %%F IN (`powershell -Command get-date -format "{dd-MM-yyyyHH:mm:ss}"`) DO (
     SET BUILD_DATE=%%F
@@ -60,7 +60,7 @@ goto :EOF
 
 :lint
 %GOVET%
-%GOLINT%
+%GOLINT% run
 goto :EOF
 
 :fmt
