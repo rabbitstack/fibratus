@@ -52,6 +52,7 @@ if "%~1"=="rsrc" goto rsrc
 :build
 :: set PKG_CONFIG_PATH=pkg-config
 go build -ldflags %LDFLAGS% -tags %TAGS% -o .\cmd\fibratus\fibratus.exe .\cmd\fibratus
+if errorlevel 1 goto fail
 goto :EOF
 
 :test
@@ -62,6 +63,7 @@ goto :EOF
 :lint
 %GOVET%
 %GOLINT% run
+if errorlevel 1 goto fail
 goto :EOF
 
 :fmt
@@ -75,6 +77,7 @@ goto :EOF
 :rsrc
 set RC_VER=%VERSION:.=,%
 windres --define RC_VER=%RC_VER% --define VER=%VERSION% -i cmd\fibratus\fibratus.rc -O coff -o cmd\fibratus\fibratus.syso
+if errorlevel 1 goto fail
 goto :EOF
 
 :pkg
