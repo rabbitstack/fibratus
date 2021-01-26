@@ -16,7 +16,7 @@ set PYTHON_URL=https://www.python.org/ftp/python/%PYTHON_VER%/python-%PYTHON_VER
 
 set GOBIN=%USERPROFILE%\go\bin
 
-set GOTEST=go test -v -race -gcflags=all=-d=checkptr=0
+set GOTEST=go test -v -race -gcflags=all=-d=checkptr=0 -ldflags "-extldflags=-Wl,--allow-multiple-definition"
 set GOFMT=gofmt -e -s -l -w
 set GOLINT=%GOBIN%\golangci-lint
 
