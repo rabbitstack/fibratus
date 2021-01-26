@@ -17,7 +17,6 @@ set PYTHON_URL=https://www.python.org/ftp/python/%PYTHON_VER%/python-%PYTHON_VER
 set GOBIN=%USERPROFILE%\go\bin
 
 set GOTEST=go test -v -race -gcflags=all=-d=checkptr=0
-set GOVET=go vet
 set GOFMT=gofmt -e -s -l -w
 set GOLINT=%GOBIN%\golangci-lint
 
@@ -61,7 +60,6 @@ if errorlevel 1 goto fail
 goto :EOF
 
 :lint
-%GOVET%
 %GOLINT% run
 if errorlevel 1 goto fail
 goto :EOF
