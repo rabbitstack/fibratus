@@ -20,6 +20,8 @@
     <a href="https://github.com/rabbitstack/fibratus/tree/master/filaments">Filaments</a>
     &nbsp;&nbsp;&bull;&nbsp;&nbsp;
     <a href="https://github.com/rabbitstack/fibratus/releases">Download</a>
+    &nbsp;&nbsp;&bull;&nbsp;&nbsp;
+    <a href="https://github.com/rabbitstack/fibratus/discussions">Discussions</a>
   </strong>
 </p>
 
