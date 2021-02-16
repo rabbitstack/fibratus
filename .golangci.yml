@@ -2,7 +2,6 @@ run:
   build-tags:	 
     - kcap	
     - filament
-    - yara
   deadline: 10m
   skip-files:
     - pkg/pe/entropy.go
