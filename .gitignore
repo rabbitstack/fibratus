@@ -1,8 +1,11 @@
 cmd/fibratus/fibratus.exe
 cmd/fibratus/fibratus.syso
 
-build/package/release
-build/package/*.exe
+build/msi/fibratus-
+build/msi/components.wxs
+build/msi/*.wixobj
+build/msi/*.wixpdb
+build/msi/*.msi
 
 .idea
 filaments/__pycache__

@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<?define VERSION="!(bind.fileVersion.fibratus.exe)"?>
+
+<Wix
+  xmlns="http://schemas.microsoft.com/wix/2006/wi"
+  xmlns:util="http://schemas.microsoft.com/wix/UtilExtension"
+  >
+
+  <Product
+    Id="*"
+    UpgradeCode="E81B8794-3277-47F9-BE58-2EF2D20930EC"
+    Name="Fibratus"
+    Version="$(var.VERSION)"
+    Manufacturer="Nedim Sabic Sabic &lt;https://www.fibratus.io&gt;"
+    Language="1033"
+    >
+    <Package
+      Id="*"
+      Description="Fibratus Installer"
+      InstallerVersion="200"
+      Compressed="yes"
+      Languages="1033"
+      Platform="x64"
+      />
+    <UIRef
+      Id="WixUI_InstallDir"
+      />
+    <Property
+      Id="WIXUI_INSTALLDIR"
+      Value="INSTALLDIR"
+      />
+    <WixVariable
+      Id="WixUIDialogBmp"
+      Value="background.png"
+      />
+    <WixVariable
+      Id="WixUIBannerBmp"
+      Value="banner.png"
+      />
+    <WixVariable
+      Id="WixUILicenseRtf"
+      Value="LICENSE.txt"
+      />
+    <Media
+      Id="1"
+      Cabinet="fibratus.cab"
+      EmbedCab="yes"
+      />
+    <Directory
+      Id="TARGETDIR"
+      Name="SourceDir"
+      >
+      <Directory
+        Id="ProgramFiles64Folder"
+        >
+        <Directory
+          Id="INSTALLDIR"
+          Name="Fibratus"
+          >
+          <Component Win64='yes' Id="Version" Guid="*">
+              <File Id="fibratus.exe" Name="fibratus.exe" Source="$(var.FibratusDir)\Bin\fibratus.exe" />
+          </Component>
+          <Component Win64='yes' Id="Path" KeyPath="yes" Guid="E81B8794-3277-47F9-BE58-2EF2D20930EC">
+            <Environment Id="PATH" Name="PATH" Value="[INSTALLDIR]Bin" Permanent="no" Part="last" Action="set" System="yes" />
+          </Component>
+        </Directory>
+      </Directory>
+    </Directory>
+
+    <Feature
+      Id="Fibratus"
+      Description="The complete installation."
+      Level="1"
+      Display="expand"
+      ConfigurableDirectory="INSTALLDIR"
+      >
+      <ComponentRef
+        Id="Version" 
+      />
+       <ComponentRef
+        Id="Path" 
+      />
+    </Feature>
+  </Product>
+</Wix>

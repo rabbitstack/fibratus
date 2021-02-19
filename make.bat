@@ -69,7 +69,7 @@ goto :EOF
 goto :EOF
 
 :deps
-go get -v -u golang.org/x/lint/golint
+go get -v -u github.com/golangci/golangci-lint/cmd/golangci-lint@v1.34.1
 goto :EOF
 
 :rsrc
@@ -79,17 +79,20 @@ if errorlevel 1 goto fail
 goto :EOF
 
 :pkg
-set RELEASE_DIR=.\build\package\release
+set RELEASE_DIR=.\build\msi\fibratus-%VERSION%
 
+:: create the dir structure
 mkdir "%~dp0\%RELEASE_DIR%"
 mkdir "%~dp0\%RELEASE_DIR%\Bin"
 mkdir "%~dp0\%RELEASE_DIR%\Config"
 mkdir "%~dp0\%RELEASE_DIR%\Python"
 
+:: copy artifacts
 copy /y ".\cmd\fibratus\fibratus.exe" "%RELEASE_DIR%\bin"
 copy /y ".\configs\fibratus.yml" "%RELEASE_DIR%\config\fibratus.yml"
 xcopy /s /f /y ".\filaments" "%RELEASE_DIR%\Filaments\*"
 
+:: download the embedded Python distribution
 echo Downloading Python %PYTHON_VER%...
 powershell -Command "Invoke-WebRequest %PYTHON_URL% -OutFile %RELEASE_DIR%\python.zip"
 
@@ -103,14 +106,21 @@ echo Downloading get-pip.py...
 powershell -Command "Invoke-WebRequest https://bootstrap.pypa.io/get-pip.py -OutFile %RELEASE_DIR%\get-pip.py"
 %RELEASE_DIR%\python\python.exe %RELEASE_DIR%\get-pip.py
 
+rm %RELEASE_DIR%\get-pip.py
+
 :: Move Python DLLs and other dependencies to the same directory where the fibratus binary
 :: is located to advise Windows on the DLL search path strategy.
 move %RELEASE_DIR%\python\*.dll %RELEASE_DIR%\bin
 
-:: Download env var plugin: https://nsis.sourceforge.io/mediawiki/images/7/7f/EnVar_plugin.zip
-FOR /F "usebackq" %%A IN ('%RELEASE_DIR%\bin\fibratus.exe') DO set /a SIZE=%%~zA / 1024
+heat dir %RELEASE_DIR%\ -cg Fibratus -dr INSTALLDIR -gg -sfrag -srd -var var.FibratusDir -out build/msi/components.wxs || exit /b
+:: To target wind64 builds
+powershell -Command "(Get-Content -path build/msi/components.wxs) -replace 'Component ','Component Win64=\"yes\" ' | Set-Content -Path build/msi/components.wxs" || exit /b
+candle build/msi/components.wxs -dFibratusDir=%RELEASE_DIR% -out build/msi/components.wixobj || exit /b
+candle build/msi/fibratus.wxs -ext WiXUtilExtension -dFibratusDir=%RELEASE_DIR% -out build/msi/fibratus.wixobj || exit /b
+light build/msi/fibratus.wixobj build/msi/components.wixobj -out build/msi/fibratus-%VERSION%-amd64.msi -ext WixUIExtension -ext WiXUtilExtension
 
-makensis /DVERSION=1.0.0 /DINSTALLSIZE=%SIZE% build/package/fibratus.nsi
+if errorlevel 1 goto fail
+
 goto :EOF
 
 :clean
