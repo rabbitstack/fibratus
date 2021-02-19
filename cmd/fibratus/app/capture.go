@@ -27,6 +27,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kcap"
 	"github.com/rabbitstack/fibratus/pkg/kstream"
 	"github.com/rabbitstack/fibratus/pkg/ps"
+	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"github.com/rabbitstack/fibratus/pkg/util/spinner"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -96,8 +97,7 @@ func capture(cmd *cobra.Command, args []string) error {
 
 	err = kstreamc.OpenKstream()
 	if err != nil {
-		_ = ktracec.CloseKtrace()
-		return err
+		return multierror.Wrap(err, ktracec.CloseKtrace())
 	}
 	defer func() {
 		_ = ktracec.CloseKtrace()

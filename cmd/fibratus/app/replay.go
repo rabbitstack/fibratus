@@ -76,7 +76,7 @@ func replay(cmd *cobra.Command, args []string) error {
 
 	filamentName := replayConfig.Filament.Name
 	// we don't need the aggregator is user decided to replay the
-	// kcap on the filament. Otwherise, we setup the full-fledged
+	// kcap on the filament. Otherwise, we setup the full-fledged
 	// buffered aggregator
 	var agg *aggregator.BufferedAggregator
 
@@ -132,6 +132,9 @@ func replay(cmd *cobra.Command, args []string) error {
 		if err := agg.Stop(); err != nil {
 			return err
 		}
+	}
+	if err := api.CloseServer(); err != nil {
+		return err
 	}
 
 	return nil
