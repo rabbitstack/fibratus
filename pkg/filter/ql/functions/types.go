@@ -50,6 +50,7 @@ func (typ ArgType) String() string {
 // FunctionDesc contains the function signature that
 // particular filter function has to satisfy.
 type FunctionDesc struct {
+	Name    Fn
 	MinArgs uint8
 	Args    []FunctionArgDesc
 }

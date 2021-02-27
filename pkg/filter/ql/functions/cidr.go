@@ -67,6 +67,7 @@ func (f CIDRContains) Call(args []interface{}) (interface{}, bool) {
 
 func (f CIDRContains) Desc() FunctionDesc {
 	return FunctionDesc{
+		Name:    CIDRContainsFn,
 		MinArgs: 2,
 		Args: []FunctionArgDesc{
 			{Keyword: "ip", Types: []ArgType{IP, Field}},

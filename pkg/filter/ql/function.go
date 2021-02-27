@@ -40,8 +40,8 @@ var (
 		return fmt.Errorf("%s function is undefined. Did you mean one of %s%s", fn, strings.Join(functionNames(), "|"), "?")
 	}
 	// ErrMinArguments is thrown when the required arguments are not satisfied
-	ErrMinArguments = func(fn FunctionDef, givenArguments int) error {
-		return fmt.Errorf("%s function requires %d argument(s) but %d argument(s) given", fn.Name(), fn.Desc().MinArgs, givenArguments)
+	ErrMinArguments = func(desc functions.FunctionDesc, givenArguments int) error {
+		return fmt.Errorf("%s function requires %d argument(s) but %d argument(s) given", desc.Name, desc.MinArgs, givenArguments)
 	}
 )
 
@@ -78,25 +78,33 @@ func (FunctionValuer) Call(name string, args []interface{}) (interface{}, bool) 
 	return fn.Call(args)
 }
 
-func checkFunc(f *Function) error {
-	fn, ok := funcs[strings.ToUpper(f.Name)]
+func checkFunc(function *Function) error {
+	fn, ok := funcs[strings.ToUpper(function.Name)]
 	if !ok {
 		return ErrUndefinedFunction(fn.Name())
 	}
-	args := fn.Desc().Args
-	if uint8(len(f.Args)) < fn.Desc().MinArgs {
-		return ErrMinArguments(fn, len(f.Args))
+	if uint8(len(function.Args)) < fn.Desc().MinArgs {
+		return ErrMinArguments(fn.Desc(), len(function.Args))
 	}
-	for i, expr := range f.Args {
-		if i < len(args)-1 {
-			arg := args[i]
+
+	if err := checkArgs(function, fn.Desc()); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func checkArgs(function *Function, desc functions.FunctionDesc) error {
+	for i, expr := range function.Args {
+		if i < len(desc.Args)-1 {
+			arg := desc.Args[i]
 			if !arg.ContainsType(exprToArgumentType(expr)) {
-				return ErrArgumentTypeMismatch(i, arg.Keyword, fn.Name(), arg.Types)
+				return ErrArgumentTypeMismatch(i, arg.Keyword, desc.Name, arg.Types)
 			}
 		} else {
-			arg := args[len(args)-1]
+			arg := desc.Args[len(desc.Args)-1]
 			if !arg.ContainsType(exprToArgumentType(expr)) {
-				return ErrArgumentTypeMismatch(i, arg.Keyword, fn.Name(), arg.Types)
+				return ErrArgumentTypeMismatch(i, arg.Keyword, desc.Name, arg.Types)
 			}
 		}
 	}
@@ -121,6 +129,6 @@ func functionNames() []string {
 	for _, f := range funcs {
 		names = append(names, f.Name().String())
 	}
-	sort.Slice(funcs, func(i, j int) bool { return names[i] < names[j] })
+	sort.Slice(names, func(i, j int) bool { return names[i] < names[j] })
 	return names
 }
