@@ -41,6 +41,8 @@ const (
 	duration // 13h
 	ip       // 192.168.1.23
 	badip    // 192.156.300.12
+	truet    // true
+	falset   // false
 
 	opBeg
 	and        // and
@@ -74,6 +76,8 @@ func init() {
 	for _, tok := range []token{and, or, contains, icontains, in, not, startswith, endswith, matches, imatches} {
 		keywords[strings.ToLower(tokens[tok])] = tok
 	}
+	keywords["true"] = truet
+	keywords["false"] = falset
 }
 
 var tokens = [...]string{
@@ -91,6 +95,8 @@ var tokens = [...]string{
 	badesc:   "BADESCAPE",
 	ip:       "IPADDRESS",
 	badip:    "BADIPADDRESS",
+	truet:    "TRUE",
+	falset:   "FALSE",
 
 	and:        "AND",
 	or:         "OR",

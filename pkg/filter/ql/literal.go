@@ -20,8 +20,10 @@ package ql
 
 import (
 	"bytes"
+	"fmt"
 	"net"
 	"strconv"
+	"strings"
 )
 
 // StringLiteral represents a string literal.
@@ -47,6 +49,11 @@ type UnsignedLiteral struct {
 // DecimalLiteral represents an floating point number literal.
 type DecimalLiteral struct {
 	Value float64
+}
+
+// BoolLiteral represents the logical true/false literal.
+type BoolLiteral struct {
+	Value bool
 }
 
 // IPLiteral represents an IP literal.
@@ -78,6 +85,10 @@ func (d DecimalLiteral) String() string {
 	return strconv.FormatFloat(d.Value, 'e', -1, 64)
 }
 
+func (b BoolLiteral) String() string {
+	return strconv.FormatBool(b.Value)
+}
+
 // ListLiteral represents a list of tag key literals.
 type ListLiteral struct {
 	Values []string
@@ -95,4 +106,22 @@ func (s *ListLiteral) String() string {
 	}
 	_, _ = buf.WriteString(")")
 	return buf.String()
+}
+
+// Function represents a function call.
+type Function struct {
+	Name string
+	Args []Expr
+}
+
+// String returns a string representation of the call.
+func (f *Function) String() string {
+	// join arguments.
+	var str []string
+	for _, arg := range f.Args {
+		str = append(str, arg.String())
+	}
+
+	// Write function name and args.
+	return fmt.Sprintf("%s(%s)", f.Name, strings.Join(str, ", "))
 }

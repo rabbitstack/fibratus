@@ -48,6 +48,11 @@ type filter struct {
 	parser    *ql.Parser
 	accessors []accessor
 	fields    []fields.Field
+	// multivaluer determines whether we should
+	// rely on the multivaluer to supply args
+	// for function calls or just use a simple
+	// map valuer
+	multivaluer bool
 }
 
 // New creates a new filter with the specified filter expression. The consumers must ensure
@@ -125,6 +130,8 @@ func NewFromCLIWithAllAccessors(args []string) (Filter, error) {
 // where leaf nodes represent constants/variables while internal nodes are
 // operators. Operators can be binary (=) or unary (not). Fields in filter
 // expressions are replaced with respective event parameters via map valuer.
+// For functions call we grab all the arguments that are evaluated as field
+// literals.
 // Matching the filter involves descending the binary expression tree recursively
 // until all nodes are visited.
 func (f *filter) Compile() error {
@@ -140,6 +147,14 @@ func (f *filter) Compile() error {
 			}
 			if rhs, ok := expr.RHS.(*ql.FieldLiteral); ok {
 				f.fields = append(f.fields, fields.Field(rhs.Value))
+			}
+		}
+		if expr, ok := n.(*ql.Function); ok {
+			f.multivaluer = true
+			for _, arg := range expr.Args {
+				if fld, ok := arg.(*ql.FieldLiteral); ok {
+					f.fields = append(f.fields, fields.Field(fld.Value))
+				}
 			}
 		}
 	})
@@ -171,5 +186,5 @@ func (f *filter) Run(kevt *kevent.Kevent) bool {
 			valuer[field.String()] = v
 		}
 	}
-	return ql.Eval(f.expr, valuer)
+	return ql.Eval(f.expr, valuer, f.multivaluer)
 }

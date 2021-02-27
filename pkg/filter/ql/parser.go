@@ -55,8 +55,8 @@ func (p *Parser) ParseExpr() (Expr, error) {
 		op, pos, lit := p.scanIgnoreWhitespace()
 		if !op.isOperator() {
 			p.unscan()
-			if op != eof && op != rparen {
-				return nil, newParseError(tokstr(op, lit), []string{"operator", ")"}, pos, p.expr)
+			if op != eof && op != rparen && op != comma {
+				return nil, newParseError(tokstr(op, lit), []string{"operator", ")", ","}, pos, p.expr)
 			}
 			return root.RHS, nil
 		}
@@ -136,12 +136,21 @@ func (p *Parser) parseUnaryExpr() (Expr, error) {
 
 	tok, pos, lit := p.scanIgnoreWhitespace()
 	switch tok {
+	case ident:
+		if tok0, _, _ := p.scan(); tok0 == lparen {
+			return p.parseFunction(lit)
+		}
+		// unscan lparen and ident tokens
+		p.unscan()
+		p.unscan()
 	case ip:
 		return &IPLiteral{Value: net.ParseIP(lit)}, nil
 	case str:
 		return &StringLiteral{Value: lit}, nil
 	case field:
 		return &FieldLiteral{Value: lit}, nil
+	case truet, falset:
+		return &BoolLiteral{Value: tok == truet}, nil
 	case integer:
 		v, err := strconv.ParseInt(lit, 10, 64)
 		if err != nil {
@@ -161,7 +170,7 @@ func (p *Parser) parseUnaryExpr() (Expr, error) {
 		return &DecimalLiteral{Value: v}, nil
 	}
 
-	expectations := []string{"field", "string", "number", "bool", "ip"}
+	expectations := []string{"field", "string", "number", "bool", "ip", "function"}
 	if tok == badip {
 		expectations = []string{"a valid IP address"}
 	}
@@ -190,6 +199,54 @@ func (p *Parser) parseList() ([]string, error) {
 
 		idents = append(idents, lit)
 	}
+}
+
+// parseFunction parses a function call. This function assumes
+// the function name and LPAREN have been consumed.
+func (p *Parser) parseFunction(name string) (*Function, error) {
+	name = strings.ToLower(name)
+	args := make([]Expr, 0)
+
+	// If there's a right paren then just return immediately.
+	// This is the case for functions without arguments
+	if tok, _, _ := p.scan(); tok == rparen {
+		return &Function{Name: name}, nil
+	}
+	p.unscan()
+
+	arg, err := p.ParseExpr()
+	if err != nil {
+		return nil, err
+	}
+	args = append(args, arg)
+
+	// Parse additional function arguments if there is a comma.
+	for {
+		// If there's not a comma, stop parsing arguments.
+		if tok, _, _ := p.scanIgnoreWhitespace(); tok != comma {
+			p.unscan()
+			break
+		}
+
+		// Parse an expression argument.
+		arg, err := p.ParseExpr()
+		if err != nil {
+			return nil, err
+		}
+		args = append(args, arg)
+	}
+
+	// There should be a right parentheses at the end.
+	if tok, pos, lit := p.scan(); tok != rparen {
+		return nil, newParseError(tokstr(tok, lit), []string{")"}, pos, p.expr)
+	}
+
+	fn := &Function{Name: name, Args: args}
+	if err := checkFunc(fn); err != nil {
+		return nil, err
+	}
+
+	return fn, nil
 }
 
 // scan returns the next token from the underlying scanner.

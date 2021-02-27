@@ -281,6 +281,10 @@ func TestFilterRunNetKevent(t *testing.T) {
 		{`net.dip != 216.58.201.174`, false},
 		{`net.dip != 116.58.201.174`, true},
 		{`net.dip not in ('116.58.201.172', '16.58.201.176')`, true},
+		{`cidr_contains(net.dip, '216.58.201.1/24') = true`, true},
+		{`cidr_contains(net.dip, '226.58.201.1/24') = false`, true},
+		{`cidr_contains(net.dip, '216.58.201.1/24', '216.58.201.10/24') = true and kevt.pid = 859`, true},
+		{`kevt.name not in ('CreateProcess', 'Connect') and cidr_contains(net.dip, '216.58.201.1/24') = true`, true},
 	}
 
 	for i, tt := range tests {

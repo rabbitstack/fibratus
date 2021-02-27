@@ -38,6 +38,10 @@ func Walk(v Visitor, node Node) {
 		Walk(v, n.RHS)
 	case *NotExpr:
 		Walk(v, n.Expr)
+	case *Function:
+		for _, expr := range n.Args {
+			Walk(v, expr)
+		}
 	}
 }
 

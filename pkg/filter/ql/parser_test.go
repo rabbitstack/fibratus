@@ -59,6 +59,7 @@ func TestParser(t *testing.T) {
 
 		{expr: "ps.name = 'cmd.exe' AND ps.name IN ('exe') ps.name", err: errors.New("ps.name = 'cmd.exe' AND ps.name IN ('exe') ps.name" +
 			"	^ expected operator")},
+		{expr: "ip_cidr(net.dip) = '24'"},
 	}
 
 	for i, tt := range tests {

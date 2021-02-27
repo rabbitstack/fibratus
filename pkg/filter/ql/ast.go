@@ -26,9 +26,14 @@ import (
 	"strings"
 )
 
-// Eval evaluates expr against a map.
-func Eval(expr Expr, m map[string]interface{}) bool {
-	eval := ValuerEval{Valuer: MapValuer(m)}
+// Eval evaluates expr against a map that contains the field values.
+func Eval(expr Expr, m map[string]interface{}, multivaluer bool) bool {
+	var eval ValuerEval
+	if multivaluer {
+		eval = ValuerEval{Valuer: MultiValuer(MapValuer(m), FunctionValuer{m})}
+	} else {
+		eval = ValuerEval{Valuer: MapValuer(m)}
+	}
 	v, ok := eval.Eval(expr).(bool)
 	if !ok {
 		return false
@@ -49,6 +54,42 @@ func (m MapValuer) Value(key string) (interface{}, bool) {
 type Valuer interface {
 	// Value returns the value and existence flag for a given key.
 	Value(key string) (interface{}, bool)
+}
+
+// CallValuer implements the Call method for evaluating function calls.
+type CallValuer interface {
+	Valuer
+
+	// Call is invoked to evaluate a function call (if possible).
+	Call(name string, args []interface{}) (interface{}, bool)
+}
+
+// MultiValuer returns a Valuer that iterates over multiple Valuer instances
+// to find a match.
+func MultiValuer(valuers ...Valuer) Valuer {
+	return multiValuer(valuers)
+}
+
+type multiValuer []Valuer
+
+func (valuers multiValuer) Value(key string) (interface{}, bool) {
+	for _, valuer := range valuers {
+		if v, ok := valuer.Value(key); ok {
+			return v, true
+		}
+	}
+	return nil, false
+}
+
+func (valuers multiValuer) Call(name string, args []interface{}) (interface{}, bool) {
+	for _, valuer := range valuers {
+		if valuer, ok := valuer.(CallValuer); ok {
+			if v, ok := valuer.Call(name, args); ok {
+				return v, true
+			}
+		}
+	}
+	return nil, false
 }
 
 // ValuerEval will evaluate an expression using the Valuer.
@@ -95,6 +136,8 @@ func (v *ValuerEval) Eval(expr Expr) interface{} {
 		return expr.Value
 	case *ListLiteral:
 		return expr.Values
+	case *BoolLiteral:
+		return expr.Value
 	case *FieldLiteral:
 		val, ok := v.Valuer.Value(expr.Value)
 		if !ok {
@@ -103,6 +146,19 @@ func (v *ValuerEval) Eval(expr Expr) interface{} {
 		return val
 	case *IPLiteral:
 		return expr.Value
+	case *Function:
+		if valuer, ok := v.Valuer.(CallValuer); ok {
+			var args []interface{}
+			if len(expr.Args) > 0 {
+				args = make([]interface{}, len(expr.Args))
+				for i := range expr.Args {
+					args[i] = v.Eval(expr.Args[i])
+				}
+			}
+			val, _ := valuer.Call(expr.Name, args)
+			return val
+		}
+		return nil
 	default:
 		return nil
 	}
