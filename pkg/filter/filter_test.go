@@ -323,6 +323,7 @@ func TestFilterRunRegistryKevent(t *testing.T) {
 		{`registry.key.name icontains ('hkey_local_machine', 'HKEY_LOCAL')`, true},
 		{`registry.value = 10234`, true},
 		{`registry.value.type in ('DWORD', 'QWORD')`, true},
+		{`MD5(registry.key.name) = 'eab870b2a516206575d2ffa2b98d8af5'`, true},
 	}
 
 	for i, tt := range tests {
@@ -333,7 +334,7 @@ func TestFilterRunRegistryKevent(t *testing.T) {
 		}
 		matches := f.Run(kevt)
 		if matches != tt.matches {
-			t.Errorf("%d. %q net filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
+			t.Errorf("%d. %q registry filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
 	}
 }
@@ -381,7 +382,7 @@ func TestFilterRunPE(t *testing.T) {
 		}
 		matches := f.Run(kevt)
 		if matches != tt.matches {
-			t.Errorf("%d. %q ps filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
+			t.Errorf("%d. %q pe filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
 	}
 

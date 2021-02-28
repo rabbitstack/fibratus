@@ -242,7 +242,8 @@ func (p *Parser) parseFunction(name string) (*Function, error) {
 	}
 
 	fn := &Function{Name: name, Args: args}
-	if err := checkFunc(fn); err != nil {
+
+	if err := checkFuncCall(fn); err != nil {
 		return nil, err
 	}
 

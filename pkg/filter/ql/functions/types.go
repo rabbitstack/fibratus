@@ -18,23 +18,35 @@
 
 package functions
 
+const maxArgs = 1 << 5
+
 // Fn is the type alias for function definitions.
 type Fn uint16
 
 const (
 	// CIDRContains identifies the CIDR_CONTAINS function
 	CIDRContainsFn Fn = iota + 1
+	// MD5Fn represents the MD5 function
+	MD5Fn
 )
 
+// ArgType is the type alias for the argument value type.
 type ArgType uint8
 
 const (
+	// String represents the string argument type.
 	String ArgType = iota
+	// IP represents the IP argument type.
 	IP
+	// Field represents the argument type that is derived
+	// from the field literal. Field literal values can
+	// be simple primitive types.
 	Field
+	// Unknown is the unknown argument type.
 	Unknown
 )
 
+// String returns the argument type as a string value.
 func (typ ArgType) String() string {
 	switch typ {
 	case String:
@@ -50,15 +62,26 @@ func (typ ArgType) String() string {
 // FunctionDesc contains the function signature that
 // particular filter function has to satisfy.
 type FunctionDesc struct {
-	Name    Fn
-	MinArgs uint8
-	Args    []FunctionArgDesc
+	Name Fn
+	Args []FunctionArgDesc
+}
+
+// RequiredArgs returns the number of the required function args.
+func (f FunctionDesc) RequiredArgs() int {
+	var nargs int
+	for _, arg := range f.Args {
+		if arg.Required {
+			nargs++
+		}
+	}
+	return nargs
 }
 
 // FunctionArgDesc described each function argument.
 type FunctionArgDesc struct {
-	Keyword string
-	Types   []ArgType
+	Keyword  string
+	Required bool
+	Types    []ArgType
 }
 
 // ContainsType returns true if the argument satisfies the given argument type.
@@ -76,6 +99,8 @@ func (f Fn) String() string {
 	switch f {
 	case CIDRContainsFn:
 		return "CIDR_CONTAINS"
+	case MD5Fn:
+		return "MD5"
 	default:
 		return "UNDEFINED"
 	}

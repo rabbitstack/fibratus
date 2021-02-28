@@ -39,14 +39,15 @@ var (
 	ErrUndefinedFunction = func(fn functions.Fn) error {
 		return fmt.Errorf("%s function is undefined. Did you mean one of %s%s", fn, strings.Join(functionNames(), "|"), "?")
 	}
-	// ErrMinArguments is thrown when the required arguments are not satisfied
-	ErrMinArguments = func(desc functions.FunctionDesc, givenArguments int) error {
-		return fmt.Errorf("%s function requires %d argument(s) but %d argument(s) given", desc.Name, desc.MinArgs, givenArguments)
+	// ErrFunctionSignature is thrown when the function signature is not satisfied
+	ErrFunctionSignature = func(desc functions.FunctionDesc, givenArguments int) error {
+		return fmt.Errorf("%s function requires %d argument(s) but %d argument(s) given", desc.Name, desc.RequiredArgs(), givenArguments)
 	}
 )
 
 var funcs = map[string]FunctionDef{
 	functions.CIDRContainsFn.String(): &functions.CIDRContains{},
+	functions.MD5Fn.String():          &functions.MD5{},
 }
 
 // FunctionDef is the interface that all function definitions have to satisfy.
@@ -78,34 +79,26 @@ func (FunctionValuer) Call(name string, args []interface{}) (interface{}, bool) 
 	return fn.Call(args)
 }
 
-func checkFunc(function *Function) error {
+// checkFuncCall ensures that the function name obtained
+// from the parser exists within the internal functions
+// catalog. It also validates the function signature to
+// make sure required arguments are supplied. Finally, it
+// checks the type of each argument with the expected one.
+func checkFuncCall(function *Function) error {
 	fn, ok := funcs[strings.ToUpper(function.Name)]
 	if !ok {
 		return ErrUndefinedFunction(fn.Name())
 	}
-	if uint8(len(function.Args)) < fn.Desc().MinArgs {
-		return ErrMinArguments(fn.Desc(), len(function.Args))
+
+	if len(function.Args) < fn.Desc().RequiredArgs() ||
+		len(function.Args) > len(fn.Desc().Args) {
+		return ErrFunctionSignature(fn.Desc(), len(function.Args))
 	}
 
-	if err := checkArgs(function, fn.Desc()); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func checkArgs(function *Function, desc functions.FunctionDesc) error {
 	for i, expr := range function.Args {
-		if i < len(desc.Args)-1 {
-			arg := desc.Args[i]
-			if !arg.ContainsType(exprToArgumentType(expr)) {
-				return ErrArgumentTypeMismatch(i, arg.Keyword, desc.Name, arg.Types)
-			}
-		} else {
-			arg := desc.Args[len(desc.Args)-1]
-			if !arg.ContainsType(exprToArgumentType(expr)) {
-				return ErrArgumentTypeMismatch(i, arg.Keyword, desc.Name, arg.Types)
-			}
+		arg := fn.Desc().Args[i]
+		if !arg.ContainsType(exprToArgumentType(expr)) {
+			return ErrArgumentTypeMismatch(i, arg.Keyword, fn.Name(), arg.Types)
 		}
 	}
 	return nil

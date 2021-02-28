@@ -66,14 +66,19 @@ func (f CIDRContains) Call(args []interface{}) (interface{}, bool) {
 }
 
 func (f CIDRContains) Desc() FunctionDesc {
-	return FunctionDesc{
-		Name:    CIDRContainsFn,
-		MinArgs: 2,
+	desc := FunctionDesc{
+		Name: CIDRContainsFn,
 		Args: []FunctionArgDesc{
-			{Keyword: "ip", Types: []ArgType{IP, Field}},
-			{Keyword: "cidr", Types: []ArgType{String}},
+			{Keyword: "ip", Types: []ArgType{IP, Field}, Required: true},
+			{Keyword: "cidr", Types: []ArgType{String}, Required: true},
 		},
 	}
+	offset := len(desc.Args)
+	// add optional CIDR arguments
+	for i := offset; i < maxArgs; i++ {
+		desc.Args = append(desc.Args, FunctionArgDesc{Keyword: "cidr", Types: []ArgType{String}})
+	}
+	return desc
 }
 
 func (f CIDRContains) Name() Fn { return CIDRContainsFn }

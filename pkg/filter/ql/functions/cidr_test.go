@@ -19,6 +19,7 @@
 package functions
 
 import (
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"net"
 	"testing"
@@ -47,4 +48,13 @@ func TestCIDRContainsCall(t *testing.T) {
 
 	res, _ = call.Call([]interface{}{net.ParseIP("192.168.1.5")})
 	require.False(t, res.(bool))
+}
+
+func TestCIDRContainsDesc(t *testing.T) {
+	call := CIDRContains{}
+
+	desc := call.Desc()
+
+	assert.Equal(t, desc.RequiredArgs(), 2)
+	assert.Len(t, desc.Args, maxArgs)
 }
