@@ -124,13 +124,12 @@ func (h *handleInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool
 			return kevt, true, err
 		}
 
-		// at this point we hit CloseHandle kernel event and have waiting CreateHandle
+		// at this point we hit CloseHandle kernel event and have the awaiting CreateHandle
 		// event reference. So we set handle object name to the name of its CloseHandle counterpart
 		if hkevt, ok := h.defers[object]; ok {
 			if err := hkevt.Kparams.Set(kparams.HandleObjectName, name, kparams.AnsiString); err != nil {
 				return kevt, true, err
 			}
-			kevt = hkevt
 			delete(h.defers, object)
 			err := h.hsnap.Write(hkevt)
 			if err != nil {
