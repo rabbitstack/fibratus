@@ -180,12 +180,8 @@ func TestHandleCoalescingWaiting(t *testing.T) {
 
 	time.Sleep(time.Millisecond * 510)
 
-	ckevt, _, err := hi.Intercept(kevt1)
+	_, _, err = hi.Intercept(kevt1)
 	require.NoError(t, err)
-
-	keyName, err := ckevt.Kparams.GetString(kparams.HandleObjectName)
-	require.NoError(t, err)
-	assert.Empty(t, keyName)
 
 	assert.Len(t, hi.(*handleInterceptor).defers, 0)
 }

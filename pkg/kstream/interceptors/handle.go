@@ -140,14 +140,12 @@ func (h *handleInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool
 			}
 			return hkevt, false, h.hsnap.Remove(kevt)
 		}
-		// push pending CreateHandle kevents if they remained longer then expected. Possible
+		// drain pending CreateHandle kevents if they remained longer then expected. Possible
 		// cause could be that we lost the corresponding CloseHandle kernel event
-		for kobj, hkevt := range h.defers {
+		for kobj := range h.defers {
 			evict := kevt.Timestamp.Before(time.Now().Add(joinElapsingPeriod))
 			if evict {
 				handleDeferEvictions.Add(1)
-				_ = kevt.Kparams.Set(kparams.HandleObjectName, kparams.NA, kparams.AnsiString)
-				kevt = hkevt
 				delete(h.defers, kobj)
 			}
 		}
