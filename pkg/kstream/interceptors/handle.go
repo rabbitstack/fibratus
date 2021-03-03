@@ -89,6 +89,7 @@ func (h *handleInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool
 
 		kevt.Kparams.Append(kparams.HandleObjectTypeName, kparams.AnsiString, typeName)
 		kevt.Kparams.Remove(kparams.HandleObjectTypeID)
+
 		// get the best possible object name according to its type
 		name, err := kevt.Kparams.GetString(kparams.HandleObjectName)
 		if err != nil {
@@ -138,7 +139,8 @@ func (h *handleInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool
 					return hkevt, false, err
 				}
 			}
-			return hkevt, false, h.hsnap.Remove(kevt)
+			// return the CloseHandle event
+			return kevt, false, h.hsnap.Remove(kevt)
 		}
 		// drain pending CreateHandle kevents if they remained longer then expected. Possible
 		// cause could be that we lost the corresponding CloseHandle kernel event
@@ -156,3 +158,4 @@ func (h *handleInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool
 }
 
 func (handleInterceptor) Name() InterceptorType { return Handle }
+func (handleInterceptor) Close()                {}

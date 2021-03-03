@@ -22,95 +22,124 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-	"github.com/rabbitstack/fibratus/pkg/net"
+	"github.com/rabbitstack/fibratus/pkg/network"
 	"github.com/rabbitstack/fibratus/pkg/util/ports"
+	"net"
+	"time"
 )
 
-type netInterceptor struct{}
+var (
+	remappedKtypes = map[ktypes.Ktype]ktypes.Ktype{
+		ktypes.AcceptTCPv4:     ktypes.Accept,
+		ktypes.AcceptTCPv6:     ktypes.Accept,
+		ktypes.ConnectTCPv4:    ktypes.Connect,
+		ktypes.ConnectTCPv6:    ktypes.Connect,
+		ktypes.ReconnectTCPv4:  ktypes.Reconnect,
+		ktypes.ReconnectTCPv6:  ktypes.Reconnect,
+		ktypes.RetransmitTCPv4: ktypes.Retransmit,
+		ktypes.RetransmitTCPv6: ktypes.Retransmit,
+		ktypes.DisconnectTCPv4: ktypes.Disconnect,
+		ktypes.DisconnectTCPv6: ktypes.Disconnect,
+		ktypes.SendTCPv4:       ktypes.Send,
+		ktypes.SendTCPv6:       ktypes.Send,
+		ktypes.SendUDPv4:       ktypes.Send,
+		ktypes.SendUDPv6:       ktypes.Send,
+		ktypes.RecvTCPv4:       ktypes.Recv,
+		ktypes.RecvTCPv6:       ktypes.Recv,
+		ktypes.RecvUDPv4:       ktypes.Recv,
+		ktypes.RecvUDPv6:       ktypes.Recv,
+	}
+)
+
+type netInterceptor struct {
+	reverseDNS *network.ReverseDNS
+}
 
 // newNetInterceptor creates a new instance of the network kernel stream interceptor.
 func newNetInterceptor() KstreamInterceptor {
-	return &netInterceptor{}
+	return &netInterceptor{
+		reverseDNS: network.NewReverseDNS(2000, time.Minute*30, time.Minute*2),
+	}
 }
 
 func (netInterceptor) Name() InterceptorType {
 	return Net
 }
 
+func (n netInterceptor) Close() {
+	n.reverseDNS.Close()
+}
+
 // Intercpet overrides the kernel event type according to the transport layer
 // and/or IP protocol version. At this point we also append the port names for all
-// network kernel events.
+// network kernel events and perform reverse DNS lookups to obtain the domain names.
 func (n *netInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, error) {
-	switch kevt.Type {
-	case ktypes.AcceptTCPv4, ktypes.AcceptTCPv6:
-		appendPortKparam(kevt, true)
-		kevt.Type = ktypes.Accept
-		return kevt, false, nil
-
-	case ktypes.ConnectTCPv4, ktypes.ConnectTCPv6:
-		appendPortKparam(kevt, true)
-		kevt.Type = ktypes.Connect
-		return kevt, false, nil
-
-	case ktypes.ReconnectTCPv4, ktypes.ReconnectTCPv6:
-		appendPortKparam(kevt, true)
-		kevt.Type = ktypes.Reconnect
-		return kevt, false, nil
-
-	case ktypes.RetransmitTCPv4, ktypes.RetransmitTCPv6:
-		appendPortKparam(kevt, true)
-		kevt.Type = ktypes.Retransmit
-		return kevt, false, nil
-
-	case ktypes.DisconnectTCPv4, ktypes.DisconnectTCPv6:
-		appendPortKparam(kevt, true)
-		kevt.Type = ktypes.Disconnect
-		return kevt, false, nil
-
-	case ktypes.SendTCPv4, ktypes.SendTCPv6, ktypes.SendUDPv4, ktypes.SendUDPv6:
-		// append Layer 4 protocol name to Send events
-		if kevt.Type == ktypes.SendTCPv4 || kevt.Type == ktypes.SendTCPv6 {
-			kevt.Kparams.Append(kparams.NetL4Proto, kparams.Enum, net.TCP)
-		} else {
-			kevt.Kparams.Append(kparams.NetL4Proto, kparams.Enum, net.UDP)
+	if kevt.Category == ktypes.Net {
+		if kevt.IsNetworkTCP() {
+			kevt.Kparams.Append(kparams.NetL4Proto, kparams.Enum, network.TCP)
 		}
-		appendPortKparam(kevt, kevt.Type == ktypes.SendTCPv4 || kevt.Type == ktypes.SendTCPv6)
-		kevt.Type = ktypes.Send
-		return kevt, false, nil
-
-	case ktypes.RecvTCPv4, ktypes.RecvTCPv6, ktypes.RecvUDPv4, ktypes.RecvUDPv6:
-		// append Layer 4 protocol name to Recv events
-		if kevt.Type == ktypes.RecvTCPv4 || kevt.Type == ktypes.RecvTCPv6 {
-			kevt.Kparams.Append(kparams.NetL4Proto, kparams.Enum, net.TCP)
-		} else {
-			kevt.Kparams.Append(kparams.NetL4Proto, kparams.Enum, net.UDP)
+		if kevt.IsNetworkUDP() {
+			kevt.Kparams.Append(kparams.NetL4Proto, kparams.Enum, network.UDP)
 		}
-		appendPortKparam(kevt, kevt.Type == ktypes.RecvTCPv4 || kevt.Type == ktypes.RecvTCPv6)
-		kevt.Type = ktypes.Recv
-		return kevt, false, nil
+
+		n.resolvePortName(kevt)
+
+		names := n.resolveNamesForIP(unwrapIP(kevt.Kparams.GetIP(kparams.NetDIP)))
+		if len(names) > 0 {
+			kevt.Kparams.Append(kparams.NetDIPNames, kparams.Slice, names)
+		}
+
+		names = n.resolveNamesForIP(unwrapIP(kevt.Kparams.GetIP(kparams.NetSIP)))
+		if len(names) > 0 {
+			kevt.Kparams.Append(kparams.NetSIPNames, kparams.Slice, names)
+		}
+
+		return remapKtype(kevt), false, nil
 	}
-
 	return kevt, true, nil
 }
 
-// appendPortKparam resolves the IANA (https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.xhtml)
-// service name for the particular port and transport protocol.
-func appendPortKparam(kevt *kevent.Kevent, isTCP bool) {
-	dport, _ := kevt.Kparams.GetUint16(kparams.NetDport)
-	sport, _ := kevt.Kparams.GetUint16(kparams.NetSport)
-	if isTCP {
+func (n *netInterceptor) resolveNamesForIP(ip net.IP) []string {
+	names, err := n.reverseDNS.Add(network.AddressFromIP(ip))
+	if err != nil {
+		return nil
+	}
+	return names
+}
+
+// resolvePortName resolves the IANA service name for the particular port and transport protocol as
+// per https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.xhtml.
+func (n netInterceptor) resolvePortName(kevt *kevent.Kevent) *kevent.Kevent {
+	dport := unwrapPort(kevt.Kparams.GetUint16(kparams.NetDport))
+	sport := unwrapPort(kevt.Kparams.GetUint16(kparams.NetSport))
+
+	if kevt.IsNetworkTCP() {
 		if name, ok := ports.TCPPortNames[dport]; ok {
 			kevt.Kparams.Append(kparams.NetDportName, kparams.AnsiString, name)
 		}
 		if name, ok := ports.TCPPortNames[sport]; ok {
 			kevt.Kparams.Append(kparams.NetSportName, kparams.AnsiString, name)
 		}
-		return
+		return kevt
 	}
+
 	if name, ok := ports.UDPPortNames[dport]; ok {
 		kevt.Kparams.Append(kparams.NetDportName, kparams.AnsiString, name)
 	}
 	if name, ok := ports.UDPPortNames[sport]; ok {
 		kevt.Kparams.Append(kparams.NetSportName, kparams.AnsiString, name)
 	}
+	return kevt
+}
+
+func unwrapIP(ip net.IP, _ error) net.IP     { return ip }
+func unwrapPort(port uint16, _ error) uint16 { return port }
+
+func remapKtype(kevt *kevent.Kevent) *kevent.Kevent {
+	ktyp, ok := remappedKtypes[kevt.Type]
+	if !ok {
+		return kevt
+	}
+	kevt.Type = ktyp
+	return kevt
 }

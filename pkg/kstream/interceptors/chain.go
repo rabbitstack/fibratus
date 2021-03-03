@@ -41,6 +41,8 @@ type Chain interface {
 	// sure that any interceptor providing additional context to the next interceptor is defined first in the chain. If
 	// one interceptor fails, the next interceptor in chain is invoked.
 	Dispatch(kevt *kevent.Kevent) (*kevent.Kevent, error)
+	// Close closes the interceptor chain and frees all allocated resources.
+	Close() error
 }
 
 type chain struct {
@@ -125,4 +127,12 @@ func (c chain) Dispatch(kevt *kevent.Kevent) (*kevent.Kevent, error) {
 	}
 
 	return kevt, nil
+}
+
+// Close closes the interceptor chain and frees all allocated resources.
+func (c chain) Close() error {
+	for _, interceptor := range c.interceptors {
+		interceptor.Close()
+	}
+	return nil
 }

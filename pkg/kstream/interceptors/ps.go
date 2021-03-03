@@ -157,6 +157,12 @@ func (ps psInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 
 func (psInterceptor) Name() InterceptorType { return Ps }
 
+func (ps psInterceptor) Close() {
+	if ps.yara != nil {
+		ps.yara.Close()
+	}
+}
+
 func getStartTime(pid uint32) (time.Time, error) {
 	handle, err := process.Open(process.QueryLimitedInformation, false, pid)
 	if err != nil {

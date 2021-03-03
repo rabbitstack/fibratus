@@ -23,7 +23,7 @@ import (
 	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	knet "github.com/rabbitstack/fibratus/pkg/net"
+	"github.com/rabbitstack/fibratus/pkg/network"
 	"github.com/rabbitstack/fibratus/pkg/syscall/security"
 	"github.com/rabbitstack/fibratus/pkg/util/ip"
 	"net"
@@ -160,7 +160,7 @@ func (k Kparam) String() string {
 		switch typ := k.Value.(type) {
 		case fs.FileShareMode:
 			return typ.String()
-		case knet.L4Proto:
+		case network.L4Proto:
 			return typ.String()
 		case fs.FileDisposition:
 			return typ.String()

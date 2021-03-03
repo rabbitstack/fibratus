@@ -249,7 +249,7 @@ func (k *kstreamConsumer) CloseKstream() error {
 			return err
 		}
 	}
-	return nil
+	return k.interceptorChain.Close()
 }
 
 // Errors returns a channel where errors are pushed.

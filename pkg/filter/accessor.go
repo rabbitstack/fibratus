@@ -24,7 +24,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/net"
+	"github.com/rabbitstack/fibratus/pkg/network"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	"path/filepath"
 	"strings"
@@ -444,7 +444,7 @@ func (n *networkAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Valu
 		if err != nil {
 			return nil, err
 		}
-		l4proto, ok := v.(net.L4Proto)
+		l4proto, ok := v.(network.L4Proto)
 		if !ok {
 			return nil, errors.New("couldn't type assert to L4 proto enum")
 		}

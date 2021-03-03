@@ -153,6 +153,10 @@ const (
 	NetDportName = "dport_name"
 	// NetSportName is the field that denotes the source port name.
 	NetSportName = "sport_name"
+	// NetSIPNames is the field that denotes the source IP address names.
+	NetSIPNames = "sip_names"
+	// NetDIPNames is the field that denotes the destination IP address names.
+	NetDIPNames = "dip_names"
 
 	// HandleID identifies the parameter that specifies the handle identifier.
 	HandleID = "handle_id"

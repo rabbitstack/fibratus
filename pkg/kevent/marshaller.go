@@ -26,7 +26,7 @@ import (
 	kcapver "github.com/rabbitstack/fibratus/pkg/kcap/version"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-	knet "github.com/rabbitstack/fibratus/pkg/net"
+	"github.com/rabbitstack/fibratus/pkg/network"
 	ptypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/util/bytes"
 	"github.com/rabbitstack/fibratus/pkg/util/ip"
@@ -153,7 +153,7 @@ func (kevt *Kevent) MarshalRaw() []byte {
 				b = append(b, uint8(e))
 			case fs.FileShareMode:
 				b = append(b, uint8(e))
-			case knet.L4Proto:
+			case network.L4Proto:
 				b = append(b, uint8(e))
 			}
 		}
@@ -302,7 +302,7 @@ func (kevt *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 			case kparams.FileShareMask:
 				kval = fs.FileShareMode(uint8(b[50+offset+kparamNameLength+poffset : 50+offset+kparamNameLength+poffset+1][0]))
 			case kparams.NetL4Proto:
-				kval = knet.L4Proto(uint8(b[50+offset+kparamNameLength+poffset : 50+offset+kparamNameLength+poffset+1][0]))
+				kval = network.L4Proto(uint8(b[50+offset+kparamNameLength+poffset : 50+offset+kparamNameLength+poffset+1][0]))
 			default:
 				kval = uint8(b[50+offset+kparamNameLength+poffset : 50+offset+kparamNameLength+poffset+1][0])
 			}
@@ -465,7 +465,7 @@ func (kevt *Kevent) MarshalJSON() []byte {
 			case kparams.FileShareMask:
 				js.writeString(kpar.Value.(fs.FileShareMode).String())
 			case kparams.NetL4Proto:
-				js.writeString(kpar.Value.(knet.L4Proto).String())
+				js.writeString(kpar.Value.(network.L4Proto).String())
 			default:
 				val, ok := kpar.Value.(uint8)
 				if !ok {

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package net
+package network
 
 // L4Proto is the type alias for the Layer 4 protocol.
 type L4Proto uint8

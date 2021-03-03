@@ -81,3 +81,5 @@ func (i *imageInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool,
 
 	return kevt, true, nil
 }
+
+func (imageInterceptor) Close() {}

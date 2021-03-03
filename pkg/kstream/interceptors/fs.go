@@ -353,6 +353,10 @@ func removeKparams(kevt *kevent.Kevent) {
 }
 
 func (fsInterceptor) Name() InterceptorType { return Fs }
+func (f fsInterceptor) Close() {
+	f.rundownDeadline.Stop()
+}
+
 func (f *fsInterceptor) getFileInfo(name string, opts uint32) *fileInfo {
 	return &fileInfo{name: name, typ: fs.GetFileType(name, opts)}
 }

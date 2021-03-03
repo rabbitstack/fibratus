@@ -22,7 +22,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-	knet "github.com/rabbitstack/fibratus/pkg/net"
+	"github.com/rabbitstack/fibratus/pkg/network"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"net"
@@ -31,9 +31,10 @@ import (
 
 func TestNetInterceptorSend(t *testing.T) {
 	kevt := &kevent.Kevent{
-		Type: ktypes.SendTCPv4,
-		Tid:  2484,
-		PID:  859,
+		Type:     ktypes.SendTCPv4,
+		Tid:      2484,
+		PID:      859,
+		Category: ktypes.Net,
 		Kparams: kevent.Kparams{
 			kparams.NetDport: {Name: kparams.NetDport, Type: kparams.Uint16, Value: uint16(443)},
 			kparams.NetSport: {Name: kparams.NetSport, Type: kparams.Uint16, Value: uint16(43123)},
@@ -55,8 +56,8 @@ func TestNetInterceptorSend(t *testing.T) {
 
 	v, err := kevt.Kparams.Get(kparams.NetL4Proto)
 	require.NoError(t, err)
-	assert.IsType(t, knet.L4Proto(1), v)
-	assert.Equal(t, "tcp", v.(knet.L4Proto).String())
+	assert.IsType(t, network.L4Proto(1), v)
+	assert.Equal(t, "tcp", v.(network.L4Proto).String())
 
 	sip, err := kevt.Kparams.GetIPv4(kparams.NetSIP)
 	require.NoError(t, err)
@@ -65,4 +66,30 @@ func TestNetInterceptorSend(t *testing.T) {
 	dip, err := kevt.Kparams.GetIPv4(kparams.NetDIP)
 	require.NoError(t, err)
 	assert.Equal(t, "216.58.201.174", dip.String())
+}
+
+func TestNetInterceptorReverseDNS(t *testing.T) {
+	kevt := &kevent.Kevent{
+		Type:     ktypes.SendTCPv4,
+		Tid:      2484,
+		PID:      859,
+		Category: ktypes.Net,
+		Kparams: kevent.Kparams{
+			kparams.NetDport: {Name: kparams.NetDport, Type: kparams.Uint16, Value: uint16(53)},
+			kparams.NetSport: {Name: kparams.NetSport, Type: kparams.Uint16, Value: uint16(43123)},
+			kparams.NetSIP:   {Name: kparams.NetSIP, Type: kparams.IPv4, Value: net.ParseIP("127.0.0.1")},
+			kparams.NetDIP:   {Name: kparams.NetDIP, Type: kparams.IPv4, Value: net.ParseIP("8.8.8.8")},
+		},
+	}
+	ni := newNetInterceptor()
+
+	_, _, err := ni.Intercept(kevt)
+	require.NoError(t, err)
+
+	assert.Equal(t, ktypes.Send, kevt.Type)
+
+	assert.Contains(t, kevt.Kparams, kparams.NetDIPNames)
+	names, err := kevt.Kparams.GetStringSlice(kparams.NetDIPNames)
+	require.NoError(t, err)
+	assert.Contains(t, names, "dns.google.")
 }

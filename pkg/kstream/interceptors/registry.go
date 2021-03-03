@@ -200,6 +200,7 @@ func (r *registryInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bo
 }
 
 func (registryInterceptor) Name() InterceptorType { return Registry }
+func (registryInterceptor) Close()                {}
 
 func typToString(typ uint32) string {
 	switch typ {

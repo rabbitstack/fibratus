@@ -49,6 +49,9 @@ type KstreamInterceptor interface {
 
 	// Name returns a human-readable name of this interceptor.
 	Name() InterceptorType
+
+	// Close closes the interceptor and disposes allocated resources.
+	Close()
 }
 
 // String returns a human-friendly interceptor name.
