@@ -66,6 +66,7 @@ func TestMarshaller(t *testing.T) {
 			kparams.KstackLimit:   {Name: kparams.KstackLimit, Type: kparams.HexInt8, Value: kparams.Hex("ff")},
 			kparams.StartTime:     {Name: kparams.StartTime, Type: kparams.Time, Value: time.Now()},
 			kparams.ProcessID:     {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1204)},
+			kparams.NetDIPNames:   {Name: kparams.NetDIPNames, Type: kparams.Slice, Value: []string{"dns.google.", "github.com."}},
 		},
 		Metadata: map[string]string{"foo": "bar", "fooz": "barzz"},
 	}
@@ -87,7 +88,7 @@ func TestMarshaller(t *testing.T) {
 	assert.Equal(t, "archrabbit", clone.Host)
 	assert.Equal(t, now, clone.Timestamp)
 
-	assert.Len(t, clone.Kparams, 9)
+	assert.Len(t, clone.Kparams, 10)
 
 	filename, err := clone.Kparams.GetString(kparams.FileName)
 	require.NoError(t, err)
@@ -121,6 +122,7 @@ func TestKeventMarshalJSON(t *testing.T) {
 			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.AnsiString, Value: "open"},
 			kparams.BasePrio:      {Name: kparams.BasePrio, Type: kparams.Int8, Value: int8(2)},
 			kparams.PagePrio:      {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(2)},
+			kparams.NetDIPNames:   {Name: kparams.NetDIPNames, Type: kparams.Slice, Value: []string{"dns.google.", "github.com."}},
 		},
 		Metadata: map[string]string{"foo": "bar", "fooz": "baarz"},
 		PS: &pstypes.PS{

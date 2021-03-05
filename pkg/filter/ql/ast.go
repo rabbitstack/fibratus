@@ -792,6 +792,32 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 				}
 			}
 			return false
+		case matches:
+			rhs, ok := rhs.([]string)
+			if !ok {
+				return false
+			}
+			for _, pat := range rhs {
+				for _, val := range lhs {
+					if wildcard.Match(pat, val) {
+						return true
+					}
+				}
+			}
+			return false
+		case imatches:
+			rhs, ok := rhs.([]string)
+			if !ok {
+				return false
+			}
+			for _, pat := range rhs {
+				for _, val := range lhs {
+					if wildcard.Match(strings.ToLower(pat), strings.ToLower(val)) {
+						return true
+					}
+				}
+			}
+			return false
 		}
 	}
 

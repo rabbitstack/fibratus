@@ -156,6 +156,17 @@ func (kevt *Kevent) MarshalRaw() []byte {
 			case network.L4Proto:
 				b = append(b, uint8(e))
 			}
+		case kparams.Slice:
+			switch slice := kpar.Value.(type) {
+			case []string:
+				// append the type for slice elements
+				b = append(b, uint8('s'))
+				b = append(b, bytes.WriteUint16(uint16(len(slice)))...)
+				for _, s := range slice {
+					b = append(b, bytes.WriteUint16(uint16(len(s)))...)
+					b = append(b, s...)
+				}
+			}
 		}
 	}
 	// write metadata key/value pairs
@@ -236,6 +247,7 @@ func (kevt *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 
 	// read parameters
 	nbKparams := bytes.ReadUint16(b[44+offset:])
+	// accumulates the offset of all parameter name and value lengths
 	var poffset uint16
 
 	for i := 0; i < int(nbKparams); i++ {
@@ -346,6 +358,24 @@ func (kevt *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 				}
 			}
 			poffset += kparamNameLength + 6 + l
+		case kparams.Slice:
+			// read slice element type
+			typ := b[50+offset+kparamNameLength+poffset]
+			// read slice size
+			l := bytes.ReadUint16(b[51+offset+kparamNameLength+poffset:])
+			var off uint16
+			switch typ {
+			case 's':
+				s := make([]string, l)
+				for i := 0; i < int(l); i++ {
+					size := bytes.ReadUint16(b[53+offset+kparamNameLength+poffset+off:])
+					buf := b[55+offset+kparamNameLength+poffset+off:]
+					s[i] = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:size:size])
+					off += 2 + size
+				}
+				kval = s
+			}
+			poffset += kparamNameLength + 4 + 1 + 2 + off
 		}
 		if kval != nil {
 			kevt.Kparams.AppendFromKcap(kparamName, kparams.Type(typ), kval)
@@ -477,6 +507,19 @@ func (kevt *Kevent) MarshalJSON() []byte {
 			js.writeBool(kpar.Value.(bool))
 		case kparams.Time:
 			js.writeString(kpar.Value.(time.Time).String())
+		case kparams.Slice:
+			switch slice := kpar.Value.(type) {
+			case []string:
+				js.writeArrayStart()
+				for i, s := range slice {
+					writeMore := js.shouldWriteMore(i, len(slice))
+					js.writeEscapeString(s)
+					if writeMore {
+						js.writeMore()
+					}
+				}
+				js.writeArrayEnd()
+			}
 		}
 		if writeMore {
 			js.writeMore()

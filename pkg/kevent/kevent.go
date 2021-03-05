@@ -192,7 +192,7 @@ func (kevt *Kevent) Release() {
 
 // IsNetworkTCP determines whether the kevent pertains to network TCP events.
 func (kevt Kevent) IsNetworkTCP() bool {
-	return kevt.Type == ktypes.RecvTCPv4 || kevt.Type == ktypes.RecvTCPv6 || kevt.Type == ktypes.SendTCPv4 || kevt.Type == ktypes.SendTCPv6
+	return kevt.Type != ktypes.RecvUDPv4 && kevt.Type != ktypes.RecvUDPv6 && kevt.Type != ktypes.SendUDPv4 && kevt.Type != ktypes.SendUDPv6
 }
 
 // IsNetworkUDP determines whether the kevent pertains to network UDP events.

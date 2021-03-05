@@ -451,6 +451,10 @@ func (n *networkAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Valu
 		return l4proto.String(), nil
 	case fields.NetPacketSize:
 		return kevt.Kparams.GetUint32(kparams.NetSize)
+	case fields.NetSIPNames:
+		return kevt.Kparams.GetStringSlice(kparams.NetSIPNames)
+	case fields.NetDIPNames:
+		return kevt.Kparams.GetStringSlice(kparams.NetDIPNames)
 	}
 	return nil, nil
 }

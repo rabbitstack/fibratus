@@ -17,3 +17,19 @@
  */
 
 package kevent
+
+import (
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/stretchr/testify/assert"
+	"testing"
+)
+
+func TestKeventIsNetworkTCP(t *testing.T) {
+	assert.True(t, Kevent{Type: ktypes.AcceptTCPv4}.IsNetworkTCP())
+	assert.False(t, Kevent{Type: ktypes.SendUDPv6}.IsNetworkTCP())
+}
+
+func TestKeventIsNetworkUDP(t *testing.T) {
+	assert.True(t, Kevent{Type: ktypes.RecvUDPv4}.IsNetworkUDP())
+	assert.False(t, Kevent{Type: ktypes.SendTCPv6}.IsNetworkUDP())
+}

@@ -165,6 +165,10 @@ const (
 	NetL4Proto Field = "net.l4.proto"
 	// NetPacketSize represents the packet size
 	NetPacketSize Field = "net.size"
+	// NetSIPNames represents the source IP names
+	NetSIPNames Field = "net.sip.names"
+	// NetDIPNames represents the destination IP names
+	NetDIPNames Field = "net.dip.names"
 
 	// FileObject represents the address of the file object
 	FileObject Field = "file.object"
@@ -332,6 +336,8 @@ var fields = map[Field]FieldInfo{
 	NetSportName:  {NetSportName, "source port name", kparams.AnsiString, []string{"net.sport.name = 'http'"}},
 	NetL4Proto:    {NetL4Proto, "layer 4 protocol name", kparams.AnsiString, []string{"net.l4.proto = 'TCP"}},
 	NetPacketSize: {NetPacketSize, "packet size", kparams.Uint32, []string{"net.size > 512"}},
+	NetSIPNames:   {NetSIPNames, "source IP names", kparams.Slice, []string{"net.sip.names in ('github.com.')"}},
+	NetDIPNames:   {NetDIPNames, "destination IP names", kparams.Slice, []string{"net.dip.names in ('github.com.')"}},
 
 	HandleID:     {HandleID, "handle identifier", kparams.Uint16, []string{"handle.id = 24"}},
 	HandleObject: {HandleObject, "handle object address", kparams.HexInt64, []string{"handle.object = 'FFFFB905DBF61988'"}},

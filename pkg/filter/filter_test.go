@@ -265,10 +265,12 @@ func TestFilterRunNetKevent(t *testing.T) {
 		Tid:  2484,
 		PID:  859,
 		Kparams: kevent.Kparams{
-			kparams.NetDport: {Name: kparams.NetDport, Type: kparams.Uint16, Value: uint16(443)},
-			kparams.NetSport: {Name: kparams.NetSport, Type: kparams.Uint16, Value: uint16(43123)},
-			kparams.NetSIP:   {Name: kparams.NetSIP, Type: kparams.IPv4, Value: net.ParseIP("127.0.0.1")},
-			kparams.NetDIP:   {Name: kparams.NetDIP, Type: kparams.IPv4, Value: net.ParseIP("216.58.201.174")},
+			kparams.NetDport:    {Name: kparams.NetDport, Type: kparams.Uint16, Value: uint16(443)},
+			kparams.NetSport:    {Name: kparams.NetSport, Type: kparams.Uint16, Value: uint16(43123)},
+			kparams.NetSIP:      {Name: kparams.NetSIP, Type: kparams.IPv4, Value: net.ParseIP("127.0.0.1")},
+			kparams.NetDIP:      {Name: kparams.NetDIP, Type: kparams.IPv4, Value: net.ParseIP("216.58.201.174")},
+			kparams.NetDIPNames: {Name: kparams.NetDIPNames, Type: kparams.Slice, Value: []string{"dns.google.", "github.com."}},
+			kparams.NetSIPNames: {Name: kparams.NetSIPNames, Type: kparams.Slice, Value: []string{"local.domain."}},
 		},
 	}
 
@@ -279,6 +281,9 @@ func TestFilterRunNetKevent(t *testing.T) {
 
 		{`net.dip = 216.58.201.174`, true},
 		{`net.dip != 216.58.201.174`, false},
+		{`net.dip != 116.58.201.174`, true},
+		{`net.dip.names in ('dns.google.')`, true},
+		{`net.sip.names matches ('*.domain.')`, true},
 		{`net.dip != 116.58.201.174`, true},
 		{`net.dip not in ('116.58.201.172', '16.58.201.176')`, true},
 		{`cidr_contains(net.dip, '216.58.201.1/24') = true`, true},

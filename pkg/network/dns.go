@@ -30,11 +30,15 @@ import (
 var ErrMaxNamesReached = errors.New("dns reverse max names reached")
 
 var (
-	totalDNSLookups  = expvar.NewInt("dns.revers.total.lookups")
-	failedDNSLookups = expvar.NewMap("dns.reverse.failed.lookups")
-	expiredDNSNames  = expvar.NewInt("dns.reverse.expired.names")
-	totalDNSNames    = expvar.NewInt("dns.reverse.total.names")
+	totalDNSLookups     = expvar.NewInt("dns.reverse.total.lookups")
+	failedDNSLookups    = expvar.NewMap("dns.reverse.failed.lookups")
+	expiredDNSNames     = expvar.NewInt("dns.reverse.expired.names")
+	totalDNSNames       = expvar.NewInt("dns.reverse.total.names")
+	cacheFullDNSLookups = expvar.NewInt("dns.reverse.cache.full.lookups")
 )
+
+// maxDNSLookups designates the maximum number of lookups per IP
+const maxDNSLookups = 20
 
 // ReverseDNS performs reverse DNS resolutions and keeps the cache of
 // resolved IP to domain mappings.
@@ -42,11 +46,17 @@ type ReverseDNS struct {
 	mux sync.Mutex
 	// ttl specifies the time to live for each cache entry
 	ttl time.Duration
-	// max determines the maximum size of the domains map
-	max int
+	// size determines the maximum size of the domains cache
+	size int
 
 	domains map[Address]*dnsNames
-	close   chan struct{}
+
+	// blacklist contains the IP addresses that fail
+	// to resolve after a number of attempts. We want to defend
+	// ourselves from excessive reverse DNS lookup calls
+	blacklist map[Address]int
+	bmux      sync.Mutex
+	close     chan struct{}
 }
 
 type dnsNames struct {
@@ -57,10 +67,11 @@ type dnsNames struct {
 // NewReverseDNS creates a new DNS reverser with the specified size and TTL period.
 func NewReverseDNS(size int, ttl, exp time.Duration) *ReverseDNS {
 	reverseDNS := &ReverseDNS{
-		domains: make(map[Address]*dnsNames),
-		max:     size,
-		ttl:     ttl,
-		close:   make(chan struct{}, 1),
+		domains:   make(map[Address]*dnsNames),
+		blacklist: make(map[Address]int),
+		size:      size,
+		ttl:       ttl,
+		close:     make(chan struct{}, 1),
 	}
 
 	tick := time.NewTicker(exp)
@@ -82,39 +93,48 @@ func NewReverseDNS(size int, ttl, exp time.Duration) *ReverseDNS {
 // of names mapping to that address. It assigns a ttl to the names value
 // and puts it in the map. If the names map capacity is reached this method
 // returns an error and gives up on adding new entries.
-func (d *ReverseDNS) Add(addr Address) ([]string, error) {
-	d.mux.Lock()
-	defer d.mux.Unlock()
+func (r *ReverseDNS) Add(addr Address) ([]string, error) {
+	r.mux.Lock()
+	defer r.mux.Unlock()
 
-	if len(d.domains) > d.max {
+	if len(r.domains) > r.size {
+		cacheFullDNSLookups.Add(1)
 		return nil, ErrMaxNamesReached
 	}
 
-	if names, ok := d.domains[addr]; ok {
+	r.bmux.Lock()
+	defer r.bmux.Unlock()
+	if r.blacklist[addr] > maxDNSLookups {
+		return nil, nil
+	}
+
+	if names, ok := r.domains[addr]; ok {
 		return names.names, nil
 	}
 
 	now := time.Now()
-	exp := now.Add(d.ttl).UnixNano()
+	exp := now.Add(r.ttl).UnixNano()
 	names, err := net.LookupAddr(addr.ToIPString())
 	if err != nil {
+		r.blacklist[addr]++
 		failedDNSLookups.Add(addr.ToIPString(), 1)
 		return nil, err
 	}
 
 	totalDNSLookups.Add(1)
+	totalDNSNames.Add(1)
 
-	d.domains[addr] = &dnsNames{names: names, expiration: exp}
+	r.domains[addr] = &dnsNames{names: names, expiration: exp}
 
 	return names, nil
 }
 
 // Get returns all the name mappings for the specified address.
-func (d *ReverseDNS) Get(addr Address) []string {
-	d.mux.Lock()
-	defer d.mux.Unlock()
+func (r *ReverseDNS) Get(addr Address) []string {
+	r.mux.Lock()
+	defer r.mux.Unlock()
 
-	names, ok := d.domains[addr]
+	names, ok := r.domains[addr]
 	if !ok {
 		return nil
 	}
@@ -123,32 +143,35 @@ func (d *ReverseDNS) Get(addr Address) []string {
 }
 
 // Expire evicts name values that are eligible for expiration.
-func (d *ReverseDNS) Expire() {
+func (r *ReverseDNS) Expire() {
 	deadline := time.Now().UnixNano()
 	expired := int64(0)
-	d.mux.Lock()
+	r.mux.Lock()
+	r.bmux.Lock()
 
-	for addr, val := range d.domains {
+	for addr, val := range r.domains {
 		if val.expiration > deadline {
 			continue
 		}
 		expired++
-		delete(d.domains, addr)
+		delete(r.domains, addr)
+		delete(r.blacklist, addr)
 	}
-	d.mux.Unlock()
+	r.mux.Unlock()
+	r.bmux.Unlock()
 
 	expiredDNSNames.Add(expired)
 	totalDNSNames.Add(-expired)
 }
 
 // Len returns the size of the names map.
-func (d *ReverseDNS) Len() int {
-	d.mux.Lock()
-	defer d.mux.Unlock()
-	return len(d.domains)
+func (r *ReverseDNS) Len() int {
+	r.mux.Lock()
+	defer r.mux.Unlock()
+	return len(r.domains)
 }
 
 // Close closes the expiration ticker.
-func (d *ReverseDNS) Close() {
-	d.close <- struct{}{}
+func (r *ReverseDNS) Close() {
+	r.close <- struct{}{}
 }

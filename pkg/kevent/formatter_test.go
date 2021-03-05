@@ -134,5 +134,5 @@ func TestIsTemplateBalanced(t *testing.T) {
 
 	ok, pos = isTemplateBalanced("{{ .Seq }} {{.CPU}} -  ({{.Type}}) -- pid: {{]} {{ .Kparams.Pid }} ({{.Kparams}}) {{ .Meta }}")
 	require.False(t, ok)
-	assert.Equal(t, -1, pos)
+	assert.Equal(t, 4, pos)
 }

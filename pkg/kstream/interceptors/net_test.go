@@ -93,3 +93,47 @@ func TestNetInterceptorReverseDNS(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, names, "dns.google.")
 }
+
+func TestNetInterceptorL4LayerProtocol(t *testing.T) {
+	tests := []struct {
+		typ      ktypes.Ktype
+		protocol network.L4Proto
+	}{
+		{ktypes.ReconnectTCPv6, network.TCP},
+		{ktypes.ReconnectTCPv4, network.TCP},
+		{ktypes.AcceptTCPv6, network.TCP},
+		{ktypes.AcceptTCPv4, network.TCP},
+		{ktypes.RetransmitTCPv4, network.TCP},
+		{ktypes.RetransmitTCPv6, network.TCP},
+		{ktypes.DisconnectTCPv6, network.TCP},
+		{ktypes.DisconnectTCPv4, network.TCP},
+		{ktypes.SendTCPv4, network.TCP},
+		{ktypes.SendTCPv6, network.TCP},
+		{ktypes.RecvTCPv4, network.TCP},
+		{ktypes.RecvTCPv6, network.TCP},
+		{ktypes.RecvUDPv4, network.UDP},
+		{ktypes.RecvUDPv6, network.UDP},
+		{ktypes.SendUDPv4, network.UDP},
+		{ktypes.SendUDPv6, network.UDP},
+	}
+
+	ni := newNetInterceptor()
+
+	for i, tt := range tests {
+		kevt := &kevent.Kevent{
+			Type:     tt.typ,
+			Tid:      2484,
+			PID:      859,
+			Category: ktypes.Net,
+			Kparams: kevent.Kparams{
+				kparams.NetSIP: {Name: kparams.NetSIP, Type: kparams.IPv4, Value: net.ParseIP("127.0.0.1")},
+			},
+		}
+		kevt, _, err := ni.Intercept(kevt)
+		require.NoError(t, err)
+
+		v, err := kevt.Kparams.Get(kparams.NetL4Proto)
+		require.NoError(t, err)
+		assert.Equal(t, tt.protocol, v.(network.L4Proto), "#%d", i+1)
+	}
+}
