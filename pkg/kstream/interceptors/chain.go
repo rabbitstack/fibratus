@@ -50,7 +50,14 @@ type chain struct {
 }
 
 // NewChain constructs the interceptor chain. It arranges all the interceptors according to enabled kernel event categories.
-func NewChain(psnap ps.Snapshotter, hsnap handle.Snapshotter, rundownFn func() error, config *config.Config) Chain {
+func NewChain(
+	psnap ps.Snapshotter,
+	hsnap handle.Snapshotter,
+	rundownFn func() error,
+	config *config.Config,
+	deferredKevtsCh chan *kevent.Kevent,
+) Chain {
+
 	var (
 		chain     = &chain{interceptors: make([]KstreamInterceptor, 0)}
 		devMapper = fs.NewDevMapper()
@@ -80,7 +87,7 @@ func NewChain(psnap ps.Snapshotter, hsnap handle.Snapshotter, rundownFn func() e
 		chain.addInterceptor(newNetInterceptor())
 	}
 	if config.Kstream.EnableHandleKevents {
-		chain.addInterceptor(newHandleInterceptor(hsnap, handle.NewObjectTypeStore(), devMapper))
+		chain.addInterceptor(newHandleInterceptor(hsnap, handle.NewObjectTypeStore(), devMapper, deferredKevtsCh))
 	}
 
 	return chain

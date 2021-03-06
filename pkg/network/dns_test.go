@@ -32,41 +32,50 @@ func TestLookupAddr(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Contains(t, names, "dns.google.")
-	assert.Equal(t, int64(1), totalDNSLookups.Value())
+	assert.Equal(t, reverseDNS.Len(), 1)
 
 	names, err = reverseDNS.Add(AddressFromIP(net.ParseIP("8.8.8.8")))
 	require.NoError(t, err)
 	assert.Contains(t, names, "dns.google.")
-	assert.Equal(t, int64(1), totalDNSLookups.Value())
+}
+
+func TestLookupAddrBlacklisted(t *testing.T) {
+	reverseDNS := NewReverseDNS(100, time.Minute, time.Minute)
+	for i := 0; i < maxFailedDNSLookups+1; i++ {
+		_, err := reverseDNS.Add(AddressFromIP(net.ParseIP("1.2.3.1")))
+		require.Error(t, err)
+	}
+	_, err := reverseDNS.Add(AddressFromIP(net.ParseIP("1.2.3.1")))
+	require.NoError(t, err)
 }
 
 func TestLookupAddrExpiration(t *testing.T) {
 	reverseDNS := NewReverseDNS(100, time.Millisecond*5, time.Minute)
+
 	names, err := reverseDNS.Add(AddressFromIP(net.ParseIP("8.8.8.8")))
 
 	require.NoError(t, err)
 	assert.Contains(t, names, "dns.google.")
-	assert.Equal(t, int64(1), totalDNSLookups.Value())
+	assert.Equal(t, reverseDNS.Len(), 1)
 
 	time.Sleep(time.Millisecond * 10)
 	reverseDNS.Expire()
+	assert.Equal(t, reverseDNS.Len(), 0)
 
 	names, err = reverseDNS.Add(AddressFromIP(net.ParseIP("8.8.8.8")))
 	require.NoError(t, err)
 	assert.Contains(t, names, "dns.google.")
-	assert.Equal(t, int64(2), totalDNSLookups.Value())
 }
 
-func TestTickerExpiration(t *testing.T) {
-	reverseDNS := NewReverseDNS(100, time.Millisecond*50, time.Millisecond*100)
+func TestLookupAddrTickerExpiration(t *testing.T) {
+	reverseDNS := NewReverseDNS(100, time.Millisecond*50, time.Millisecond*80)
 
 	names, err := reverseDNS.Add(AddressFromIP(net.ParseIP("8.8.8.8")))
 	require.NoError(t, err)
 	assert.Contains(t, names, "dns.google.")
-	assert.Equal(t, int64(1), totalDNSLookups.Value())
 	assert.True(t, reverseDNS.Len() == 1)
 
-	time.Sleep(time.Millisecond * 105)
+	time.Sleep(time.Millisecond * 125)
 
 	assert.Empty(t, reverseDNS.Get(AddressFromIP(net.ParseIP("8.8.8.8"))))
 	assert.True(t, reverseDNS.Len() == 0)

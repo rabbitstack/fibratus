@@ -51,6 +51,7 @@ func TestCloseHandle(t *testing.T) {
 	objectTypeStore := new(objectTypeStoreMock)
 	hsnapMock := new(handle.SnapshotterMock)
 	devMapper := new(devMapperMock)
+	deferredKevts := make(chan *kevent.Kevent, 1)
 
 	kevt := &kevent.Kevent{
 		Type: ktypes.CloseHandle,
@@ -65,7 +66,7 @@ func TestCloseHandle(t *testing.T) {
 
 	hsnapMock.On("Remove", kevt).Return(nil)
 
-	hi := newHandleInterceptor(hsnapMock, objectTypeStore, devMapper)
+	hi := newHandleInterceptor(hsnapMock, objectTypeStore, devMapper, deferredKevts)
 
 	objectTypeStore.On("FindByID", uint8(23)).Return(handle.Key)
 
@@ -94,6 +95,7 @@ func TestHandleCoalescing(t *testing.T) {
 			kparams.HandleObjectName:   {Name: kparams.HandleObjectName, Type: kparams.UnicodeString, Value: ""},
 		},
 	}
+	deferredKevts := make(chan *kevent.Kevent, 1)
 	devMapper := new(devMapperMock)
 
 	hsnapMock := new(handle.SnapshotterMock)
@@ -102,7 +104,7 @@ func TestHandleCoalescing(t *testing.T) {
 	hsnapMock.On("Write", mock.Anything).Return(nil)
 	hsnapMock.On("Remove", mock.Anything).Return(nil)
 
-	hi := newHandleInterceptor(hsnapMock, objectTypeStore, devMapper)
+	hi := newHandleInterceptor(hsnapMock, objectTypeStore, devMapper, deferredKevts)
 
 	objectTypeStore.On("FindByID", uint8(23)).Return(handle.Key)
 
@@ -131,10 +133,20 @@ func TestHandleCoalescing(t *testing.T) {
 	assert.Equal(t, `HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\Tcpip\Parameters\Interfaces\{b677c565-6ca5-45d3-b618-736b4e09b036}`, keyName)
 
 	assert.Len(t, hi.(*handleInterceptor).defers, 0)
+
+	dkevt := <-deferredKevts
+	require.NotNil(t, dkevt)
+
+	assert.Equal(t, ktypes.CreateHandle, dkevt.Type)
+
+	keyName, err = dkevt.Kparams.GetString(kparams.HandleObjectName)
+	require.NoError(t, err)
+	assert.Equal(t, `HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\Tcpip\Parameters\Interfaces\{b677c565-6ca5-45d3-b618-736b4e09b036}`, keyName)
+
 }
 
 func init() {
-	joinElapsingPeriod = time.Millisecond * 500
+	waitPeriod = time.Millisecond * 500
 }
 
 func TestHandleCoalescingWaiting(t *testing.T) {
@@ -150,6 +162,8 @@ func TestHandleCoalescingWaiting(t *testing.T) {
 		},
 	}
 
+	deferredKevts := make(chan *kevent.Kevent, 1)
+
 	devMapper := new(devMapperMock)
 	objectTypeStore := new(objectTypeStoreMock)
 	hsnapMock := new(handle.SnapshotterMock)
@@ -157,7 +171,7 @@ func TestHandleCoalescingWaiting(t *testing.T) {
 	hsnapMock.On("Write", mock.Anything).Return(nil)
 	hsnapMock.On("Remove", mock.Anything).Return(nil)
 
-	hi := newHandleInterceptor(hsnapMock, objectTypeStore, devMapper)
+	hi := newHandleInterceptor(hsnapMock, objectTypeStore, devMapper, deferredKevts)
 
 	objectTypeStore.On("FindByID", uint8(23)).Return(handle.Key)
 

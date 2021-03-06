@@ -100,9 +100,16 @@ type blacklist map[ktypes.Ktype]string
 func (b blacklist) has(ktype ktypes.Ktype) bool { return b[ktype] != "" }
 
 type kstreamConsumer struct {
-	handle           etw.TraceHandle
-	errs             chan error
-	kevts            chan *kevent.Kevent
+	handle etw.TraceHandle
+
+	errs  chan error
+	kevts chan *kevent.Kevent
+	// deferredKevts accepts the events that are deferred
+	// by the interceptor chain.
+	deferredKevts chan *kevent.Kevent
+
+	stop chan struct{}
+
 	interceptorChain interceptors.Chain
 	ignoredKparams   map[string]bool
 	config           *config.Config
@@ -135,9 +142,13 @@ func NewConsumer(ktraceController KtraceController, psnap ps.Snapshotter, hsnap 
 		capture:                config.KcapFile != "",
 		sequencer:              kevent.NewSequencer(),
 		kevts:                  make(chan *kevent.Kevent),
+		deferredKevts:          make(chan *kevent.Kevent, 1000),
+		stop:                   make(chan struct{}, 1),
 	}
 
-	kconsumer.interceptorChain = interceptors.NewChain(psnap, hsnap, kconsumer.startRundown, config)
+	kconsumer.interceptorChain = interceptors.NewChain(psnap, hsnap, kconsumer.startRundown, config, kconsumer.deferredKevts)
+
+	go kconsumer.consumeDeferred()
 
 	return kconsumer
 }
@@ -163,6 +174,31 @@ func (k *kstreamConsumer) init() {
 
 	for i, name := range k.config.Kstream.BlacklistImages {
 		k.procsBlacklist[i] = strings.ToLower(name)
+	}
+}
+
+func (k *kstreamConsumer) consumeDeferred() {
+	for {
+		select {
+		case kevt := <-k.deferredKevts:
+			if kevt.PS == nil {
+				kevt.PS = k.psnapshotter.Find(kevt.PID)
+			}
+			if k.isDropped(kevt) {
+				kevt.Release()
+				continue
+			}
+
+			k.kevts <- kevt
+
+			keventsEnqueued.Add(1)
+
+			if !kevt.Type.Dropped(false) {
+				k.sequencer.Increment()
+			}
+		case <-k.stop:
+			return
+		}
 	}
 }
 
@@ -235,6 +271,8 @@ func (k *kstreamConsumer) openRundownConsumer() {
 // CloseKstream shutdowns the currently running kernel event stream consumer by closing the corresponding
 // session.
 func (k *kstreamConsumer) CloseKstream() error {
+	k.stop <- struct{}{}
+
 	if err := etw.CloseTrace(k.handle); err != nil {
 		return err
 	}

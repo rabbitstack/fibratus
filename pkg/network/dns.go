@@ -37,8 +37,9 @@ var (
 	cacheFullDNSLookups = expvar.NewInt("dns.reverse.cache.full.lookups")
 )
 
-// maxDNSLookups designates the maximum number of lookups per IP
-const maxDNSLookups = 20
+// maxFailedDNSLookups designates the maximum number of failed DNS lookups
+// after which the IP address is blacklisted
+const maxFailedDNSLookups = 10
 
 // ReverseDNS performs reverse DNS resolutions and keeps the cache of
 // resolved IP to domain mappings.
@@ -55,7 +56,6 @@ type ReverseDNS struct {
 	// to resolve after a number of attempts. We want to defend
 	// ourselves from excessive reverse DNS lookup calls
 	blacklist map[Address]int
-	bmux      sync.Mutex
 	close     chan struct{}
 }
 
@@ -102,9 +102,7 @@ func (r *ReverseDNS) Add(addr Address) ([]string, error) {
 		return nil, ErrMaxNamesReached
 	}
 
-	r.bmux.Lock()
-	defer r.bmux.Unlock()
-	if r.blacklist[addr] > maxDNSLookups {
+	if r.blacklist[addr] > maxFailedDNSLookups {
 		return nil, nil
 	}
 
@@ -147,7 +145,6 @@ func (r *ReverseDNS) Expire() {
 	deadline := time.Now().UnixNano()
 	expired := int64(0)
 	r.mux.Lock()
-	r.bmux.Lock()
 
 	for addr, val := range r.domains {
 		if val.expiration > deadline {
@@ -155,10 +152,8 @@ func (r *ReverseDNS) Expire() {
 		}
 		expired++
 		delete(r.domains, addr)
-		delete(r.blacklist, addr)
 	}
 	r.mux.Unlock()
-	r.bmux.Unlock()
 
 	expiredDNSNames.Add(expired)
 	totalDNSNames.Add(-expired)

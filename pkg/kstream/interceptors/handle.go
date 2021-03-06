@@ -35,21 +35,25 @@ var (
 	handleDeferEvictions = expvar.NewInt("handle.deferred.evictions")
 )
 
-var joinElapsingPeriod = time.Second * 2
+// waitPeriod specifies the interval for which the accumulated
+// CreateHandle events are drained from the map
+var waitPeriod = time.Second * 2
 
 type handleInterceptor struct {
-	hsnap     handle.Snapshotter
-	typeStore handle.ObjectTypeStore
-	devMapper fs.DevMapper
-	defers    map[uint64]*kevent.Kevent
+	hsnap         handle.Snapshotter
+	typeStore     handle.ObjectTypeStore
+	devMapper     fs.DevMapper
+	defers        map[uint64]*kevent.Kevent
+	deferredKevts chan *kevent.Kevent
 }
 
-func newHandleInterceptor(hsnap handle.Snapshotter, typeStore handle.ObjectTypeStore, devMapper fs.DevMapper) KstreamInterceptor {
+func newHandleInterceptor(hsnap handle.Snapshotter, typeStore handle.ObjectTypeStore, devMapper fs.DevMapper, defferedKevts chan *kevent.Kevent) KstreamInterceptor {
 	return &handleInterceptor{
-		hsnap:     hsnap,
-		typeStore: typeStore,
-		devMapper: devMapper,
-		defers:    make(map[uint64]*kevent.Kevent),
+		hsnap:         hsnap,
+		typeStore:     typeStore,
+		devMapper:     devMapper,
+		defers:        make(map[uint64]*kevent.Kevent),
+		deferredKevts: defferedKevts,
 	}
 }
 
@@ -132,6 +136,10 @@ func (h *handleInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool
 				return kevt, true, err
 			}
 			delete(h.defers, object)
+
+			// send the deferred event
+			h.deferredKevts <- hkevt
+
 			err := h.hsnap.Write(hkevt)
 			if err != nil {
 				err = h.hsnap.Remove(kevt)
@@ -139,13 +147,14 @@ func (h *handleInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool
 					return hkevt, false, err
 				}
 			}
+
 			// return the CloseHandle event
 			return kevt, false, h.hsnap.Remove(kevt)
 		}
 		// drain pending CreateHandle kevents if they remained longer then expected. Possible
 		// cause could be that we lost the corresponding CloseHandle kernel event
 		for kobj := range h.defers {
-			evict := kevt.Timestamp.Before(time.Now().Add(joinElapsingPeriod))
+			evict := kevt.Timestamp.Before(time.Now().Add(waitPeriod))
 			if evict {
 				handleDeferEvictions.Add(1)
 				delete(h.defers, kobj)

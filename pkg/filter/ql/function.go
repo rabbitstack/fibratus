@@ -36,8 +36,8 @@ var (
 		return fmt.Errorf("argument #%d (%s) in function %s should be one of %v", i+1, keyword, fn, strings.Join(argTypes, "|"))
 	}
 	// ErrUndefinedFunction is thrown when an unknown function is supplied
-	ErrUndefinedFunction = func(fn functions.Fn) error {
-		return fmt.Errorf("%s function is undefined. Did you mean one of %s%s", fn, strings.Join(functionNames(), "|"), "?")
+	ErrUndefinedFunction = func(name string) error {
+		return fmt.Errorf("%s function is undefined. Did you mean one of %s%s", name, strings.Join(functionNames(), "|"), "?")
 	}
 	// ErrFunctionSignature is thrown when the function signature is not satisfied
 	ErrFunctionSignature = func(desc functions.FunctionDesc, givenArguments int) error {
@@ -87,7 +87,7 @@ func (FunctionValuer) Call(name string, args []interface{}) (interface{}, bool) 
 func checkFuncCall(function *Function) error {
 	fn, ok := funcs[strings.ToUpper(function.Name)]
 	if !ok {
-		return ErrUndefinedFunction(fn.Name())
+		return ErrUndefinedFunction(function.Name)
 	}
 
 	if len(function.Args) < fn.Desc().RequiredArgs() ||
