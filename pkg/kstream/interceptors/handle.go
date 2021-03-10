@@ -33,11 +33,12 @@ import (
 
 var (
 	handleDeferEvictions = expvar.NewInt("handle.deferred.evictions")
+	handleDeferMatches   = expvar.NewInt("handle.deferred.matches")
 )
 
 // waitPeriod specifies the interval for which the accumulated
 // CreateHandle events are drained from the map
-var waitPeriod = time.Second * 2
+var waitPeriod = time.Second * 5
 
 type handleInterceptor struct {
 	hsnap         handle.Snapshotter
@@ -114,29 +115,34 @@ func (h *handleInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool
 			name = h.devMapper.Convert(name)
 		}
 
+		// assign the formatted handle name
+		if err := kevt.Kparams.Set(kparams.HandleObjectName, name, kparams.AnsiString); err != nil {
+			return kevt, true, err
+		}
+
 		if kevt.Type == ktypes.CreateHandle {
 			// for some handle objects, the CreateHandle usually lacks the handle name
 			// but its counterpart CloseHandle kevent ships with the handle name. We'll
 			// defer emitting the CreateHandle kevent until we receive a CloseHandle targeting
 			// the same object
-			if name == "" && (typeName == handle.Key || typeName == handle.File || typeName == handle.Desktop) {
+			if name == "" && (typeName == handle.Key || typeName == handle.File ||
+				typeName == handle.Desktop || typeName == handle.SymbolicLink) {
 				h.defers[object] = kevt
 				return kevt, false, kerrors.ErrCancelUpstreamKevent
 			}
 			return kevt, false, h.hsnap.Write(kevt)
 		}
-		if err := kevt.Kparams.Set(kparams.HandleObjectName, name, kparams.AnsiString); err != nil {
-			return kevt, true, err
-		}
 
 		// at this point we hit CloseHandle kernel event and have the awaiting CreateHandle
 		// event reference. So we set handle object name to the name of its CloseHandle counterpart
 		if hkevt, ok := h.defers[object]; ok {
+			delete(h.defers, object)
+
 			if err := hkevt.Kparams.Set(kparams.HandleObjectName, name, kparams.AnsiString); err != nil {
 				return kevt, true, err
 			}
-			delete(h.defers, object)
 
+			handleDeferMatches.Add(1)
 			// send the deferred event
 			h.deferredKevts <- hkevt
 
@@ -144,7 +150,7 @@ func (h *handleInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool
 			if err != nil {
 				err = h.hsnap.Remove(kevt)
 				if err != nil {
-					return hkevt, false, err
+					return kevt, false, err
 				}
 			}
 
@@ -153,8 +159,8 @@ func (h *handleInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool
 		}
 		// drain pending CreateHandle kevents if they remained longer then expected. Possible
 		// cause could be that we lost the corresponding CloseHandle kernel event
-		for kobj := range h.defers {
-			evict := kevt.Timestamp.Before(time.Now().Add(waitPeriod))
+		for kobj, kvt := range h.defers {
+			evict := kvt.Timestamp.Before(time.Now().Add(waitPeriod))
 			if evict {
 				handleDeferEvictions.Add(1)
 				delete(h.defers, kobj)

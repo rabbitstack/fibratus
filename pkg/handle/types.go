@@ -61,6 +61,8 @@ const (
 	UserApcReserve = "UserApcReserve"
 	// Process represents the process object
 	Process = "Process"
+	// SymbolicLink represents the symbolic link object
+	SymbolicLink = "SymbolicLink"
 	// Unknown is the unknown handle object
 	Unknown = "Unknown"
 )
