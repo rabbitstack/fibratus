@@ -775,7 +775,6 @@ func (kevt *Kevent) MarshalJSON() []byte {
 
 			// end PE
 			js.writeObjectEnd()
-
 		}
 
 		// end process state

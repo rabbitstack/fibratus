@@ -109,11 +109,11 @@ func request(method string, options ...Option) ([]byte, error) {
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, method, scheme+path.Join(addr, opts.uri), nil)
 	if err != nil {
 		return nil, err
 	}
-	defer cancel()
 	req.Header.Add("Content-Type", contentType)
 	resp, err := client.Do(req)
 	if err != nil {

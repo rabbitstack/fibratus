@@ -46,11 +46,11 @@ func NewHex(v Value) Hex {
 	case uint32:
 		return Hex(strconv.FormatUint(uint64(n), 16))
 	case uint64:
-		return Hex(strconv.FormatUint(uint64(n), 16))
+		return Hex(strconv.FormatUint(n, 16))
 	case int32:
 		return Hex(strconv.FormatInt(int64(n), 16))
 	case int64:
-		return Hex(strconv.FormatInt(int64(n), 16))
+		return Hex(strconv.FormatInt(n, 16))
 	default:
 		return ""
 	}

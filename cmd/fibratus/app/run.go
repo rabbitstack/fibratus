@@ -61,10 +61,8 @@ var (
 )
 
 func init() {
-
 	// initialize flags
 	cfg.MustViperize(runCmd)
-
 }
 
 func run(cmd *cobra.Command, args []string) error {

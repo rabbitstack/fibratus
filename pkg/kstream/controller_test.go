@@ -50,7 +50,6 @@ func TestStartKtraceSuccess(t *testing.T) {
 }
 
 func TestStartKtraceNoSysResources(t *testing.T) {
-
 	startTrace = func(name string, props *etw.EventTraceProperties) (etw.TraceHandle, error) {
 		return etw.TraceHandle(0), errors.ErrTraceNoSysResources
 	}

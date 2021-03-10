@@ -67,10 +67,8 @@ var (
 )
 
 func init() {
-
 	// initialize service config
 	svcConfig.MustViperize(startSvcCmd)
-
 }
 
 func startService(cmd *cobra.Command, args []string) error {

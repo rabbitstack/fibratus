@@ -35,6 +35,7 @@ type httpClient struct {
 }
 
 func (c *httpClient) Connect() error {
+	//nolint:noctx
 	res, err := http.Get(c.url + "/connect")
 	if err != nil {
 		return err
@@ -51,6 +52,7 @@ func (c *httpClient) Connect() error {
 func (c *httpClient) Close() error { return nil }
 
 func (c *httpClient) Publish(b *kevent.Batch) error {
+	//nolint:noctx
 	res, err := http.Post(c.url+"/publish", "application/json", nil)
 	if err != nil {
 		return err

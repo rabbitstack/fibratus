@@ -157,7 +157,7 @@ func SetDebugPrivilege() {
 	h, err := syscall.GetCurrentProcess()
 	if err == nil {
 		var token syscall.Token
-		_ = syscall.OpenProcessToken(syscall.Handle(h), syscall.TOKEN_ADJUST_PRIVILEGES|syscall.TOKEN_QUERY, &token)
+		_ = syscall.OpenProcessToken(h, syscall.TOKEN_ADJUST_PRIVILEGES|syscall.TOKEN_QUERY, &token)
 		_ = EnableTokenPrivileges(token, SeDebugPrivilege)
 	}
 }

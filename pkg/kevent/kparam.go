@@ -301,7 +301,6 @@ func (kpars Kparams) GetInt8(name string) (int8, error) {
 		return int8(0), fmt.Errorf("unable to type cast %q parameter to int8 value", name)
 	}
 	return v, nil
-
 }
 
 // GetUint16 returns the underlying int16 value from the parameter.
@@ -406,7 +405,6 @@ func (kpars Kparams) GetDouble(name string) (float64, error) {
 		return float64(0), fmt.Errorf("unable to type cast %q parameter to float64 value", name)
 	}
 	return v, nil
-
 }
 
 // GetHexAsUint32 returns the number hexadecimal representation as uint32 value.
