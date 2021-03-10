@@ -81,7 +81,7 @@ func (r *reader) readSections(pefile *pe.File) []Sec {
 
 		if r.config.ReadSections {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*250)
-			go func(wg *sync.WaitGroup, cancel context.CancelFunc) {
+			go func(cancel context.CancelFunc) {
 				defer cancel()
 				data, err := s.Data()
 				if err != nil {
@@ -91,15 +91,13 @@ func (r *reader) readSections(pefile *pe.File) []Sec {
 				sec.Md5 = hex.EncodeToString(sum[:])
 				//sec.Entropy = entropy(data)
 				sections = append(sections, sec)
-			}(&wg, cancel)
+			}(cancel)
 
 			<-ctx.Done()
 			wg.Done()
-
 		} else {
 			sections = append(sections, sec)
 		}
-
 	}
 
 	if r.config.ReadSections {

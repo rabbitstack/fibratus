@@ -81,7 +81,6 @@ func NewBuffered(
 	transformerConfigs []transformers.Config,
 	alertsenderConfigs []alertsender.Config,
 ) (*BufferedAggregator, error) {
-
 	flushInterval := config.FlushPeriod
 	if flushInterval < time.Millisecond*250 {
 		flushInterval = time.Millisecond * 250

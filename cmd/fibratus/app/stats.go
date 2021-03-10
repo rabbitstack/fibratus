@@ -90,9 +90,9 @@ type Stats struct {
 	KstreamKeventsMissingSchemaErrors   map[string]int `json:"kstream.kevents.missing.schema.errors"`
 	KstreamUpstreamCancellations        int            `json:"kstream.upstream.cancellations"`
 	LoggerErrors                        map[string]int `json:"logger.errors"`
-	OutputAmqpChannelFailures           int            `json:"output.amqp.channel.failures"`
-	OutputAmqpConnectionFailures        int            `json:"output.amqp.connection.failures"`
-	OutputAmqpPublishErrors             int            `json:"output.amqp.publish.errors"`
+	OutputAMQPChannelFailures           int            `json:"output.amqp.channel.failures"`
+	OutputAMQPConnectionFailures        int            `json:"output.amqp.connection.failures"`
+	OutputAMQPPublishErrors             int            `json:"output.amqp.publish.errors"`
 	OutputConsoleErrors                 int            `json:"output.console.errors"`
 	OutputNullBlackholeEvents           int            `json:"output.null.blackhole.events"`
 	PeFailedResourceEntryReads          int            `json:"pe.failed.resource.entry.reads"`

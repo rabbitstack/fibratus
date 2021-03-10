@@ -36,10 +36,10 @@ type rabbitmq struct {
 }
 
 func init() {
-	outputs.Register(outputs.AMQP, initAmqp)
+	outputs.Register(outputs.AMQP, initAMQP)
 }
 
-func initAmqp(config outputs.Config) (outputs.OutputGroup, error) {
+func initAMQP(config outputs.Config) (outputs.OutputGroup, error) {
 	cfg, ok := config.Output.(Config)
 	if !ok {
 		return outputs.Fail(outputs.ErrInvalidConfig(outputs.AMQP, config.Output))

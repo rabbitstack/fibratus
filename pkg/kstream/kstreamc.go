@@ -58,6 +58,8 @@ var (
 	failedKeventsByMissingSchema = expvar.NewMap("kstream.kevents.missing.schema.errors")
 	// keventsEnqueued counts the number of events that are pushed to the queue
 	keventsEnqueued = expvar.NewInt("kstream.kevents.enqueued")
+	// deferredEnqueued counts the number of deferred events
+	deferredEnqueued  = expvar.NewInt("kstream.deferred.kevents.enqueued")
 	// failedKparams counts the number of kernel event parameters that failed to process
 	failedKparams      = expvar.NewInt("kstream.kevent.param.failures")
 	blacklistedKevents = expvar.NewMap("kstream.blacklist.dropped.kevents")
@@ -177,6 +179,14 @@ func (k *kstreamConsumer) init() {
 	}
 }
 
+// consumeDeferred is responsible for receiving the events
+// that have been deferred by the interceptors. Events are
+// usually deferred when some of their parameters or global
+// state depend on the presence of other events. For example,
+// CreateHandle events sometimes lack the involved handle name,
+// but their counterpart, CloseHandle events contain that
+// information. So, we wait for the CloseHandle counterpart to
+// occur to augment the deferred event with the handle name param.
 func (k *kstreamConsumer) consumeDeferred() {
 	for {
 		select {
@@ -192,10 +202,9 @@ func (k *kstreamConsumer) consumeDeferred() {
 			k.kevts <- kevt
 
 			keventsEnqueued.Add(1)
+			deferredEnqueued.Add(1)
 
-			if !kevt.Type.Dropped(false) {
-				k.sequencer.Increment()
-			}
+			k.sequencer.Increment()
 		case <-k.stop:
 			return
 		}

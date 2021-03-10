@@ -844,11 +844,13 @@ func (js *jsonStream) writeEscapeString(s string) *jsonStream {
 	return js
 }
 
+//nolint:unparam
 func (js *jsonStream) writeObjectStart() *jsonStream {
 	js.writeByte('{')
 	return js
 }
 
+//nolint:unparam
 func (js *jsonStream) writeArrayStart() *jsonStream {
 	js.writeByte('[')
 	return js
@@ -879,6 +881,7 @@ func (js *jsonStream) writeObjectEnd() *jsonStream {
 	return js
 }
 
+//nolint:unparam
 func (js *jsonStream) writeMore() *jsonStream {
 	js.writeByte(',')
 	return js

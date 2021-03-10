@@ -30,10 +30,6 @@ import (
 	"os/user"
 	"runtime/debug"
 	"strings"
-	// register expvar stats
-	_ "expvar"
-	// register pprof handlers
-	_ "net/http/pprof"
 )
 
 var listener net.Listener

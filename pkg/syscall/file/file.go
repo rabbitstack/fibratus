@@ -94,7 +94,7 @@ func QueryVolumeInfo(fd uintptr) (*DevInfo, error) {
 		fd,
 		uintptr(unsafe.Pointer(&iosb)),
 		uintptr(unsafe.Pointer(&di)),
-		uintptr(unsafe.Sizeof(di)),
+		unsafe.Sizeof(di),
 		uintptr(fsDeviceInformation),
 	)
 	if err != nil && err != syscall.Errno(0) {

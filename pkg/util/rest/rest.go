@@ -19,6 +19,7 @@
 package rest
 
 import (
+	"context"
 	"errors"
 	"github.com/rabbitstack/fibratus/pkg/api"
 	"io/ioutil"
@@ -106,10 +107,13 @@ func request(method string, options ...Option) ([]byte, error) {
 	if strings.HasPrefix(addr, `npipe:///`) {
 		addr = strings.TrimPrefix(addr, `npipe:///`)
 	}
-	req, err := http.NewRequest(method, scheme+path.Join(addr, opts.uri), nil)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	req, err := http.NewRequestWithContext(ctx, method, scheme+path.Join(addr, opts.uri), nil)
 	if err != nil {
 		return nil, err
 	}
+	defer cancel()
 	req.Header.Add("Content-Type", contentType)
 	resp, err := client.Do(req)
 	if err != nil {

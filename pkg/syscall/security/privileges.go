@@ -136,7 +136,7 @@ func EnableTokenPrivileges(token syscall.Token, privileges ...string) error {
 		if err := binary.Write(&b, binary.LittleEndian, p); err != nil {
 			continue
 		}
-		if err := binary.Write(&b, binary.LittleEndian, uint32(PrivilegedEnabled)); err != nil {
+		if err := binary.Write(&b, binary.LittleEndian, PrivilegedEnabled); err != nil {
 			continue
 		}
 	}

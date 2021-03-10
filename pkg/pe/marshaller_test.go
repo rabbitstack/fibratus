@@ -20,14 +20,12 @@ package pe
 
 import (
 	"github.com/stretchr/testify/assert"
-
 	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
 )
 
 func TestMetadataMarshal(t *testing.T) {
-
 	now := time.Now()
 
 	pe := &PE{

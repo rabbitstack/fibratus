@@ -55,7 +55,7 @@ func NewFrameBuffer() (io.Writer, error) {
 	fb := &FrameBuffer{
 		handle: syscall.Handle(handle),
 	}
-	errno, _, err := setConsoleActiveScreenBuffer.Call(uintptr(handle))
+	errno, _, err := setConsoleActiveScreenBuffer.Call(handle)
 	if errno == 0 {
 		return nil, fmt.Errorf("couldn't activate console screen buffer: %v", err)
 	}

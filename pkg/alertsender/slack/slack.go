@@ -54,7 +54,6 @@ func makeSender(config alertsender.Config) (alertsender.Sender, error) {
 	c, ok := config.Sender.(Config)
 	if !ok {
 		return nil, alertsender.ErrInvalidConfig(alertsender.Slack)
-
 	}
 	client := &http.Client{
 		Transport: &http.Transport{
@@ -103,7 +102,7 @@ func (s slack) Send(alert alertsender.Alert) error {
 	if err != nil {
 		return nil
 	}
-
+	//nolint:noctx
 	resp, err := s.client.Post(s.config.URL, "application/json", &body)
 	if err != nil {
 		return err

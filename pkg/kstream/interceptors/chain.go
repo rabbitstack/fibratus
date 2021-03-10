@@ -57,7 +57,6 @@ func NewChain(
 	config *config.Config,
 	deferredKevtsCh chan *kevent.Kevent,
 ) Chain {
-
 	var (
 		chain     = &chain{interceptors: make([]KstreamInterceptor, 0)}
 		devMapper = fs.NewDevMapper()

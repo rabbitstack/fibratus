@@ -39,6 +39,9 @@ func (c *httpClient) Connect() error {
 	if err != nil {
 		return err
 	}
+	defer func() {
+		_ = res.Body.Close()
+	}()
 	if res.StatusCode != http.StatusOK {
 		return err
 	}
@@ -48,10 +51,13 @@ func (c *httpClient) Connect() error {
 func (c *httpClient) Close() error { return nil }
 
 func (c *httpClient) Publish(b *kevent.Batch) error {
-	_, err := http.Post(c.url+"/publish", "application/json", nil)
+	res, err := http.Post(c.url+"/publish", "application/json", nil)
 	if err != nil {
 		return err
 	}
+	defer func() {
+		_ = res.Body.Close()
+	}()
 	c.published++
 	if c.published == c.expectedPublished {
 		c.wait <- struct{}{}
