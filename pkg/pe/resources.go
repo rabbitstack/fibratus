@@ -102,7 +102,7 @@ func (r *reader) readResourcesDirectory(rva uint32, baseRVA uint32, level uint16
 	}
 	// try to read the resource directory structure that is basically
 	// a header of the table preceding the actual resource entries
-	if _, err := sr.Seek(int64(offset), seekStart); err != nil {
+	if _, err := sr.Seek(offset, seekStart); err != nil {
 		return nil, err
 	}
 	var dir resource.Directory
@@ -247,7 +247,7 @@ func (r *reader) readVersionInfo(vsDir *rdir) (map[string]string, error) {
 		// now the real work begins. To reach version keys/values, we first have to parse all
 		// of the StringFileInfo and VarFileInfo structures until we get to string table whose
 		// entries store the data we're after
-		stringFileinfoOffset := dwordAlign(int64(fixedFileinfoOffset+int64(fixedFileinfo.Size())), int64(offsetToData))
+		stringFileinfoOffset := dwordAlign(fixedFileinfoOffset+int64(fixedFileinfo.Size()), int64(offsetToData))
 		for {
 			// process StringFileInfo/VarFileInfo structures. The file info string determines whether we
 			// should process StringFileInfo or VarFileInfo items
@@ -271,7 +271,7 @@ func (r *reader) readVersionInfo(vsDir *rdir) (map[string]string, error) {
 				for {
 					stringTable, langID, err := r.parseStringTable(
 						sr,
-						int64(startOffset+stringTableOffset),
+						startOffset+stringTableOffset,
 						offsetToData+uint32(stringTableOffset),
 					)
 					if err != nil {
@@ -281,7 +281,7 @@ func (r *reader) readVersionInfo(vsDir *rdir) (map[string]string, error) {
 					// now we can process all the entries in the string table and populate the result map
 					entryOffset := dwordAlign(stringTableOffset+int64(stringTable.Size()+(2*len(langID)+1)), int64(offsetToData))
 					for entryOffset < stringTableOffset+int64(stringTable.Length) {
-						if _, err := sr.Seek(int64(startOffset+entryOffset), 0); err != nil {
+						if _, err := sr.Seek(startOffset+entryOffset, 0); err != nil {
 							break
 						}
 						var str resource.String
@@ -294,7 +294,7 @@ func (r *reader) readVersionInfo(vsDir *rdir) (map[string]string, error) {
 							break
 						}
 						valueOffset := dwordAlign(int64(2*(len(key)+1))+entryOffset+int64(str.Size()), int64(offsetToData))
-						value, err := r.readUTF16String(uint32(offsetToData + uint32(valueOffset)))
+						value, err := r.readUTF16String(offsetToData + uint32(valueOffset))
 						if err != nil {
 							// couldn't read the value but still index the key
 							vers[key] = ""

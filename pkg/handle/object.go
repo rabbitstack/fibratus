@@ -111,9 +111,9 @@ func (s *otstore) queryTypes() {
 	// heavily influenced by ProcessHacker pointer arithmetic hackery to
 	// dereference the first and all subsequent file object type instances
 	// starting from the address of the TypesInformation structure
-	objectTypeInfo := (*object.TypeInformation)(unsafe.Pointer(s.first(buf)))
+	objectTypeInfo := (*object.TypeInformation)(s.first(buf))
 	for i := 0; i < int(types.NumberOfTypes); i++ {
-		objectTypeInfo = (*object.TypeInformation)(unsafe.Pointer(s.next(objectTypeInfo)))
+		objectTypeInfo = (*object.TypeInformation)(s.next(objectTypeInfo))
 		s.types[objectTypeInfo.TypeIndex] = objectTypeInfo.TypeName.String()
 	}
 }

@@ -303,7 +303,6 @@ func (c *Config) addFlags() {
 	}
 	if c.opts.replay {
 		c.flags.StringP(kcapFile, "k", "", "The path of the input kcap file")
-
 	}
 	if c.opts.run || c.opts.replay || c.opts.list {
 		c.flags.String(filamentPath, filepath.Join(os.Getenv("PROGRAMFILES"), "fibratus", "filaments"), "Denotes the directory where filaments are located")

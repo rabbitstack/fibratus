@@ -90,7 +90,6 @@ func TestNewFromYamlFile(t *testing.T) {
 
 	assert.Equal(t, "C:\\yara-rules", c.Yara.Rule.Paths[0].Path)
 	assert.Equal(t, "default", c.Yara.Rule.Paths[0].Namespace)
-
 }
 
 func TestNewFromJsonFile(t *testing.T) {
@@ -109,5 +108,4 @@ func TestNewFromJsonFile(t *testing.T) {
 
 	assert.Equal(t, time.Millisecond*230, c.Aggregator.FlushPeriod)
 	assert.Equal(t, time.Second*8, c.Aggregator.FlushTimeout)
-
 }

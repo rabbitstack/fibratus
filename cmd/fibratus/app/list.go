@@ -116,7 +116,6 @@ func listFilaments(cmd *cobra.Command, args []string) error {
 			if ln == `"""` {
 				docStart = true
 			}
-
 		}
 		_ = py.Close()
 		t.AppendRow(table.Row{strings.TrimSuffix(f.Name(), ".py"), doc})

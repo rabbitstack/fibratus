@@ -237,7 +237,7 @@ func formatStatus(status uint32) string {
 	}
 	var flags uint32 = syscall.FORMAT_MESSAGE_FROM_SYSTEM
 	b := make([]uint16, 300)
-	n, err := windows.FormatMessage(flags, 0, uint32(sys.CodeFromNtStatus(status)), 0, b, nil)
+	n, err := windows.FormatMessage(flags, 0, sys.CodeFromNtStatus(status), 0, b, nil)
 	if err != nil {
 		return "unknown"
 	}

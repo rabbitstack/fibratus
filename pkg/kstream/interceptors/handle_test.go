@@ -81,7 +81,6 @@ func TestCloseHandle(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, handle.Key, typ)
 	assert.Equal(t, `HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\Tcpip\Parameters\Interfaces\{b677c565-6ca5-45d3-b618-736b4e09b036}`, keyName)
-
 }
 
 func TestHandleCoalescing(t *testing.T) {
@@ -142,7 +141,6 @@ func TestHandleCoalescing(t *testing.T) {
 	keyName, err = dkevt.Kparams.GetString(kparams.HandleObjectName)
 	require.NoError(t, err)
 	assert.Equal(t, `HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\Tcpip\Parameters\Interfaces\{b677c565-6ca5-45d3-b618-736b4e09b036}`, keyName)
-
 }
 
 func init() {

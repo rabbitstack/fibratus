@@ -52,5 +52,4 @@ func TestTransform(t *testing.T) {
 	assert.False(t, kevt.Kparams.Contains("dport"))
 	assert.True(t, kevt.Kparams.Contains("srcip"))
 	assert.False(t, kevt.Kparams.Contains("sip"))
-
 }

@@ -390,7 +390,6 @@ func TestFilterRunPE(t *testing.T) {
 			t.Errorf("%d. %q pe filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
 	}
-
 }
 
 func BenchmarkFilterRun(b *testing.B) {

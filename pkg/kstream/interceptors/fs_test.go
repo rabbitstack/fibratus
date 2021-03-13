@@ -114,7 +114,6 @@ func TestCreateFile(t *testing.T) {
 	assert.Equal(t, "r-d", mask.(fs.FileShareMode).String())
 
 	require.Empty(t, pendingKevents)
-
 }
 
 func TestRundownFile(t *testing.T) {

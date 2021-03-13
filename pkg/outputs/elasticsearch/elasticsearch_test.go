@@ -49,7 +49,7 @@ func TestElasticsearchConnect(t *testing.T) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 
-		_, err = w.Write([]byte(resp))
+		_, err = w.Write(resp)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -72,7 +72,7 @@ func TestElasticsearchConnectUnsupportedVersion(t *testing.T) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 
-		_, err = w.Write([]byte(resp))
+		_, err = w.Write(resp)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -109,7 +109,7 @@ func TestElasticsearchPublish(t *testing.T) {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
 
-			_, err = w.Write([]byte(resp))
+			_, err = w.Write(resp)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -123,7 +123,7 @@ func TestElasticsearchPublish(t *testing.T) {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
 
-			_, err = w.Write([]byte(resp))
+			_, err = w.Write(resp)
 			if err != nil {
 				t.Fatal(err)
 			}

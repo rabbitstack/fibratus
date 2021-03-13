@@ -63,5 +63,4 @@ func TestTransform(t *testing.T) {
 
 	assert.Equal(t, "\\HarddiskVolume2\\Windows\\system32\\user32.dll", filename)
 	assert.Equal(t, "overwrite", dispo)
-
 }

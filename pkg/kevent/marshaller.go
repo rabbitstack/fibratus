@@ -207,7 +207,7 @@ func (kevt *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 	var ktype ktypes.Ktype
 	copy(ktype[:], b[16:33])
 	kevt.Type = ktype
-	kevt.CPU = uint8(b[33:34][0])
+	kevt.CPU = b[33:34][0]
 
 	// read event name
 	l := bytes.ReadUint16(b[34:])
@@ -310,20 +310,20 @@ func (kevt *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 		case kparams.Uint8, kparams.Enum:
 			switch kparamName {
 			case kparams.FileOperation:
-				kval = fs.FileDisposition(uint8(b[50+offset+kparamNameLength+poffset : 50+offset+kparamNameLength+poffset+1][0]))
+				kval = fs.FileDisposition(b[50+offset+kparamNameLength+poffset : 50+offset+kparamNameLength+poffset+1][0])
 			case kparams.FileShareMask:
-				kval = fs.FileShareMode(uint8(b[50+offset+kparamNameLength+poffset : 50+offset+kparamNameLength+poffset+1][0]))
+				kval = fs.FileShareMode(b[50+offset+kparamNameLength+poffset : 50+offset+kparamNameLength+poffset+1][0])
 			case kparams.NetL4Proto:
-				kval = network.L4Proto(uint8(b[50+offset+kparamNameLength+poffset : 50+offset+kparamNameLength+poffset+1][0]))
+				kval = network.L4Proto(b[50+offset+kparamNameLength+poffset : 50+offset+kparamNameLength+poffset+1][0])
 			default:
-				kval = uint8(b[50+offset+kparamNameLength+poffset : 50+offset+kparamNameLength+poffset+1][0])
+				kval = b[50+offset+kparamNameLength+poffset : 50+offset+kparamNameLength+poffset+1][0]
 			}
 			poffset += kparamNameLength + 4 + 1
 		case kparams.Int8:
 			kval = int8(b[50+offset+kparamNameLength+poffset : 50+offset+kparamNameLength+poffset+1][0])
 			poffset += kparamNameLength + 4 + 1
 		case kparams.HexInt8:
-			v := uint8(b[50+offset+kparamNameLength+poffset : 50+offset+kparamNameLength+poffset+1][0])
+			v := b[50+offset+kparamNameLength+poffset : 50+offset+kparamNameLength+poffset+1][0]
 			kval = kparams.NewHex(v)
 			poffset += kparamNameLength + 4 + 1
 		case kparams.HexInt16:
@@ -339,7 +339,7 @@ func (kevt *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 			kval = kparams.NewHex(v)
 			poffset += kparamNameLength + 4 + 8
 		case kparams.Bool:
-			v := uint8(b[50+offset+kparamNameLength+poffset : 50+offset+kparamNameLength+poffset+1][0])
+			v := b[50+offset+kparamNameLength+poffset : 50+offset+kparamNameLength+poffset+1][0]
 			if v == 1 {
 				kval = true
 			} else {
@@ -660,7 +660,7 @@ func (kevt *Kevent) MarshalJSON() []byte {
 				js.writeObjectField("name").writeEscapeString(handle.Name).writeMore()
 				js.writeObjectField("type").writeString(handle.Type).writeMore()
 				js.writeObjectField("id").writeUint64(uint64(handle.Num)).writeMore()
-				js.writeObjectField("object").writeUint64(uint64(handle.Object))
+				js.writeObjectField("object").writeUint64(handle.Object)
 				js.writeObjectEnd()
 
 				if writeMore {
@@ -770,7 +770,6 @@ func (kevt *Kevent) MarshalJSON() []byte {
 					i++
 				}
 				js.writeObjectEnd()
-
 			}
 
 			// end PE
@@ -1244,6 +1243,6 @@ func (js *jsonStream) writeFloat64(val float64) *jsonStream {
 			format = 'e'
 		}
 	}
-	js.buf = strconv.AppendFloat(js.buf, float64(val), format, -1, 64)
+	js.buf = strconv.AppendFloat(js.buf, val, format, -1, 64)
 	return js
 }

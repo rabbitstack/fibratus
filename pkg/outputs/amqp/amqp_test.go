@@ -105,7 +105,6 @@ func TestHealthcheck(t *testing.T) {
 	require.NoError(t, q.client.declareExchange())
 	err = q.Publish(getBatch())
 	require.NoError(t, err)
-
 }
 
 func consumeKevents(t *testing.T, amqpURI string, done chan struct{}) error {
