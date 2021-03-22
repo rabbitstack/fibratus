@@ -659,8 +659,11 @@ func (kevt *Kevent) MarshalJSON() []byte {
 				js.writeObjectStart()
 				js.writeObjectField("name").writeEscapeString(handle.Name).writeMore()
 				js.writeObjectField("type").writeString(handle.Type).writeMore()
-				js.writeObjectField("id").writeUint64(uint64(handle.Num)).writeMore()
-				js.writeObjectField("object").writeUint64(handle.Object)
+				js.writeObjectField("id").writeInt64(int64(handle.Num)).writeMore()
+				// unsigned_long field type seems to only be
+				// available in ES via xpack, so we coerce
+				// the object address to hex string
+				js.writeObjectField("object").writeString(kparams.Hex(handle.Object).String())
 				js.writeObjectEnd()
 
 				if writeMore {

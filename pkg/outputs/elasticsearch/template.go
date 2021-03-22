@@ -64,7 +64,16 @@ const indexTemplate = `
 					"exe": { "type": "text" },
 					"cwd": { "type": "text" },
 					"sid": { "type": "keyword" },
-					"sessionid": { "type": "short" }
+					"sessionid": { "type": "short" },
+					"handles": {
+						"type": "nested",
+						"properties": {
+							"name": { "type": "text" },
+							"type": { "type": "text" },
+							"id": 	{ "type": "long" },
+							"object": { "type": "keyword" }
+						}
+					}
 				}
 			}
 			
