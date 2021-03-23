@@ -90,5 +90,4 @@ func (v Version) Render() {
 	t.AppendRow(table.Row{"Go compiler", runtime.Version()})
 
 	t.Render()
-
 }

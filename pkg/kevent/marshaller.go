@@ -660,7 +660,7 @@ func (kevt *Kevent) MarshalJSON() []byte {
 				js.writeObjectField("name").writeEscapeString(handle.Name).writeMore()
 				js.writeObjectField("type").writeString(handle.Type).writeMore()
 				js.writeObjectField("id").writeInt64(int64(handle.Num)).writeMore()
-				js.writeObjectField("object").writeEscapeString(kparams.Hex(handle.Object).String())
+				js.writeObjectField("object").writeEscapeString(string(kparams.NewHex(handle.Object)))
 				js.writeObjectEnd()
 
 				if writeMore {
