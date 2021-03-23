@@ -19,32 +19,18 @@
 package app
 
 import (
-	"fmt"
+	v "github.com/rabbitstack/fibratus/pkg/util/version"
 	"github.com/spf13/cobra"
-	"os"
-	"runtime"
 )
 
 var version string
 var commit string
-var built string
+var date string
 
 var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Show version info",
-	Run:   versionFn,
-}
-
-func versionFn(cmd *cobra.Command, args []string) {
-	if version == "" {
-		version = "dev"
-	}
-	_, _ = fmt.Fprintln(
-		os.Stdout,
-		"\n",
-		"Version:", version, "\n",
-		"Commit:", commit, "\n",
-		"Go compiler:", runtime.Version(), "\n",
-		"Built:", built,
-	)
+	Run: func(cmd *cobra.Command, args []string) {
+		v.New(version, commit, date).Render()
+	},
 }

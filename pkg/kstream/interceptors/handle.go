@@ -141,8 +141,8 @@ func (h *handleInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool
 			if err := hkevt.Kparams.Set(kparams.HandleObjectName, name, kparams.AnsiString); err != nil {
 				return kevt, true, err
 			}
-
 			handleDeferMatches.Add(1)
+
 			// send the deferred event
 			h.deferredKevts <- hkevt
 
@@ -158,7 +158,9 @@ func (h *handleInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool
 			return kevt, false, h.hsnap.Remove(kevt)
 		}
 		// drain pending CreateHandle kevents if they remained longer then expected. Possible
-		// cause could be that we lost the corresponding CloseHandle kernel event
+		// cause could be that we lost the corresponding CloseHandle kernel event or the
+		// CreateHandle event was produced but the corresponding CloseHandle event will happen
+		// during the longer time frame
 		for kobj, kvt := range h.defers {
 			evict := kvt.Timestamp.Before(time.Now().Add(waitPeriod))
 			if evict {

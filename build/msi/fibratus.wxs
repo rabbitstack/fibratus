@@ -23,6 +23,10 @@
       Languages="1033"
       Platform="x64"
       />
+    <MajorUpgrade
+        Schedule="afterInstallInitialize"
+        DowngradeErrorMessage="A later version of [ProductName] is already installed"
+        AllowSameVersionUpgrades="yes" />
     <UIRef
       Id="WixUI_InstallDir"
       />
@@ -40,7 +44,7 @@
       />
     <WixVariable
       Id="WixUILicenseRtf"
-      Value="LICENSE.txt"
+      Value="LICENSE.rtf"
       />
     <Media
       Id="1"

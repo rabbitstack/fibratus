@@ -1,7 +1,7 @@
 cmd/fibratus/fibratus.exe
 cmd/fibratus/fibratus.syso
 
-build/msi/fibratus-
+build/msi/fibratus-*
 build/msi/components.wxs
 build/msi/*.wixobj
 build/msi/*.wixpdb

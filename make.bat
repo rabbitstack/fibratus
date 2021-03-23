@@ -20,10 +20,10 @@ set GOTEST=go test -timeout=10m -v -gcflags=all=-d=checkptr=0
 set GOFMT=gofmt -e -s -l -w
 set GOLINT=%GOBIN%\golangci-lint
 
-FOR /F "tokens=* USEBACKQ" %%F IN (`powershell -Command get-date -format "{dd-MM-yyyyHH:mm:ss}"`) DO (
+FOR /F "tokens=* USEBACKQ" %%F IN (`powershell -Command get-date -format "{dd-MM-yyyy.HH:mm:ss}"`) DO (
     SET BUILD_DATE=%%F
 )
-set LDFLAGS="-s -w -X github.com/rabbitstack/fibratus/cmd/fibratus/app.version=%VERSION% -X github.com/rabbitstack/fibratus/cmd/fibratus/app.commit=%COMMIT% -X github.com/rabbitstack/fibratus/cmd/fibratus/app.built=%BUILD_DATE%"
+set LDFLAGS="-s -w -X github.com/rabbitstack/fibratus/cmd/fibratus/app.version=%VERSION% -X github.com/rabbitstack/fibratus/cmd/fibratus/app.commit=%COMMIT% -X github.com/rabbitstack/fibratus/cmd/fibratus/app.date=%BUILD_DATE%"
 
 :: In case you want to avoid CGO overhead or don't need a specific feature, try tweaking the following compilation tags:
 ::
@@ -45,6 +45,7 @@ if "%~1"=="lint" goto lint
 if "%~1"=="fmt" goto fmt
 if "%~1"=="clean" goto clean
 if "%~1"=="pkg" goto pkg
+if "%~1"=="pkg-slim" goto pkg-slim
 if "%~1"=="deps" goto deps
 if "%~1"=="rsrc" goto rsrc
 
@@ -86,11 +87,12 @@ mkdir "%~dp0\%RELEASE_DIR%"
 mkdir "%~dp0\%RELEASE_DIR%\Bin"
 mkdir "%~dp0\%RELEASE_DIR%\Config"
 mkdir "%~dp0\%RELEASE_DIR%\Python"
+mkdir "%~dp0\%RELEASE_DIR%\Filaments"
 
 :: copy artifacts
 copy /y ".\cmd\fibratus\fibratus.exe" "%RELEASE_DIR%\bin"
 copy /y ".\configs\fibratus.yml" "%RELEASE_DIR%\config\fibratus.yml"
-xcopy /s /f /y ".\filaments" "%RELEASE_DIR%\Filaments\*"
+robocopy ".\filaments" "%RELEASE_DIR%\Filaments" /E /S /XF *.md /XD __pycache__ .idea
 
 :: download the embedded Python distribution
 echo Downloading Python %PYTHON_VER%...
@@ -107,17 +109,41 @@ powershell -Command "Invoke-WebRequest https://bootstrap.pypa.io/get-pip.py -Out
 %RELEASE_DIR%\python\python.exe %RELEASE_DIR%\get-pip.py
 
 rm %RELEASE_DIR%\get-pip.py
+rm %RELEASE_DIR%\python.zip
 
 :: Move Python DLLs and other dependencies to the same directory where the fibratus binary
 :: is located to advise Windows on the DLL search path strategy.
 move %RELEASE_DIR%\python\*.dll %RELEASE_DIR%\bin
 
 heat dir %RELEASE_DIR%\ -cg Fibratus -dr INSTALLDIR -gg -sfrag -srd -var var.FibratusDir -out build/msi/components.wxs || exit /b
-:: To target wind64 builds
+:: To target win64 builds
 powershell -Command "(Get-Content -path build/msi/components.wxs) -replace 'Component ','Component Win64=\"yes\" ' | Set-Content -Path build/msi/components.wxs" || exit /b
 candle build/msi/components.wxs -dFibratusDir=%RELEASE_DIR% -out build/msi/components.wixobj || exit /b
 candle build/msi/fibratus.wxs -ext WiXUtilExtension -dFibratusDir=%RELEASE_DIR% -out build/msi/fibratus.wixobj || exit /b
 light build/msi/fibratus.wixobj build/msi/components.wixobj -out build/msi/fibratus-%VERSION%-amd64.msi -ext WixUIExtension -ext WiXUtilExtension
+
+if errorlevel 1 goto fail
+
+goto :EOF
+
+:pkg-slim
+set RELEASE_DIR=.\build\msi\fibratus-%VERSION%-slim
+
+:: create the dir structure
+mkdir "%~dp0\%RELEASE_DIR%"
+mkdir "%~dp0\%RELEASE_DIR%\Bin"
+mkdir "%~dp0\%RELEASE_DIR%\Config"
+
+:: copy artifacts
+copy /y ".\cmd\fibratus\fibratus.exe" "%RELEASE_DIR%\bin"
+copy /y ".\configs\fibratus.yml" "%RELEASE_DIR%\config\fibratus.yml"
+
+heat dir %RELEASE_DIR%\ -cg Fibratus -dr INSTALLDIR -gg -sfrag -srd -var var.FibratusDir -out build/msi/components.wxs || exit /b
+:: To target win64 builds
+powershell -Command "(Get-Content -path build/msi/components.wxs) -replace 'Component ','Component Win64=\"yes\" ' | Set-Content -Path build/msi/components.wxs" || exit /b
+candle build/msi/components.wxs -dFibratusDir=%RELEASE_DIR% -out build/msi/components.wixobj || exit /b
+candle build/msi/fibratus.wxs -ext WiXUtilExtension -dFibratusDir=%RELEASE_DIR% -out build/msi/fibratus.wixobj || exit /b
+light build/msi/fibratus.wixobj build/msi/components.wixobj -out build/msi/fibratus-%VERSION%-slim-amd64.msi -ext WixUIExtension -ext WiXUtilExtension
 
 if errorlevel 1 goto fail
 

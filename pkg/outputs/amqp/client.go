@@ -194,8 +194,7 @@ func (c *client) close() error {
 	if c.conn == nil {
 		return nil
 	}
-	c.quit <- struct{}{}
-	c.quit <- struct{}{}
+	close(c.quit)
 	c.connLock.Lock()
 	defer c.connLock.Unlock()
 	err := c.conn.Close()
