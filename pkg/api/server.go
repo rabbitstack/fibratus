@@ -77,6 +77,9 @@ func StartServer(c *config.Config) error {
 
 	go func() {
 		if err := srv.Serve(listener); err != nil && err != http.ErrServerClosed {
+			if strings.Contains(err.Error(), "use of closed network connection") {
+				return
+			}
 			log.Errorf("unable to bind the API server: %v", err)
 		}
 	}()
