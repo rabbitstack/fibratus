@@ -40,3 +40,16 @@ Reconnects to the socket.
 #### Retransmit
 
 Retransmits unacknowledged TCP segments. The kernel networking stack generates retransmissions when packets are dropped due to network congestion, packets arriving out of order and other reasons. 
+
+### DNS reverse lookups
+
+Fibratus can perform reverse DNS lookups on IP addresses and return a list of domain names that correspond to a particular IP address. Domain names are represented as slice event parameters:
+
+- `dip_names` contains the destination IP address domain names (e.g.`47.224.186.35.bc.googleusercontent.com.`)
+- `sip_names` contains the source IP address domain names (e.g. `a-0001.a-msedge.net.`)
+
+You can use domain names in [filters](filters/introduction) in conjunction with the `matches`, `contains` or `in` operators. For example, the following filter would match all events that have at least one domain ending with `.domain.`
+
+```
+net.sip.names matches ('*.domain.')
+```
