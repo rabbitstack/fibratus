@@ -23,9 +23,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var version string
-var commit string
-var date string
+var (
+	version string // version string
+	commit  string // commit hash
+	date    string // build date
+)
 
 var versionCmd = &cobra.Command{
 	Use:   "version",

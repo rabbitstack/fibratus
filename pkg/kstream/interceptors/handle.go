@@ -166,6 +166,8 @@ func (h *handleInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool
 			if evict {
 				handleDeferEvictions.Add(1)
 				delete(h.defers, kobj)
+				// push the CreateHandle event
+				h.deferredKevts <- kvt
 			}
 		}
 		return kevt, false, h.hsnap.Remove(kevt)
