@@ -854,7 +854,9 @@ section.cover .cover-main {
 }
 
 section.cover .cover-main>p:nth-last-child(2) a:last-child {
-	background-color: var(--theme-color, #42b983);
+	background: linear-gradient(340.87deg,#777ce0 -5.97%,#60cefd 100.83%);
+	box-shadow: 0px 20px 30px -3px rgba(112,153,234,.45);
+	transition: .3s all ease-in-out;
 	color: #fefefe
 }
 
