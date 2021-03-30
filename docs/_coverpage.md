@@ -13,7 +13,7 @@
 - <ion-icon class="comprehensive-icon" name="magnet"></ion-icon> Comprehensive
 
 
-<a href="https://github.com/rabbitstack/fibratus/" target="_blank" rel="noopener"><ion-icon name="logo-github"></ion-icon> GitHub</a>
+<a href="https://github.com/rabbitstack/fibratus/releases" target="_blank" rel="noopener"><ion-icon name="download"></ion-icon> Download</a>
 <a href="#/setup/installation"><ion-icon name="rocket"></ion-icon> Get Started</a>
 
 <div>
