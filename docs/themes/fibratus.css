@@ -835,17 +835,19 @@ section.cover ul {
 }
 
 section.cover .cover-main>p:nth-last-child(2) a {
+	background: linear-gradient(340.87deg,#777ce0 -5.97%,#60cefd 100.83%);
+	box-shadow: 0px 20px 30px -3px rgba(112,153,234,.45);
 	border-radius: 2rem;
 	border: 1px solid var(--theme-color, #42b983);
 	box-sizing: border-box;
-	color: var(--theme-color, #42b983);
+	color: #34495e;
 	display: inline-block;
 	font-size: 1.05rem;
 	letter-spacing: .1rem;
 	margin: .5rem 1rem;
 	padding: .75em 2rem;
 	text-decoration: none;
-	transition: all .15s ease
+	transition: .3s all ease-in-out;
 }
 
 section.cover .cover-main {
@@ -853,20 +855,9 @@ section.cover .cover-main {
 	top: 0px;
 }
 
-section.cover .cover-main>p:nth-last-child(2) a:last-child {
-	background: linear-gradient(340.87deg,#777ce0 -5.97%,#60cefd 100.83%);
-	box-shadow: 0px 20px 30px -3px rgba(112,153,234,.45);
-	transition: .3s all ease-in-out;
-	color: #fefefe
-}
-
-section.cover .cover-main>p:nth-last-child(2) a:last-child:hover {
-	color: inherit;
-	opacity: .8
-}
-
 section.cover .cover-main>p:nth-last-child(2) a:hover {
-	color: inherit
+	color: inherit;
+  opacity: .8;
 }
 
 section.cover .cover-main h1 {
