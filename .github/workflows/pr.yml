@@ -73,7 +73,6 @@ jobs:
     runs-on: windows-latest
     needs: 
       - build
-      - build-slim
     continue-on-error: true
     steps:
       - name: Checkout
