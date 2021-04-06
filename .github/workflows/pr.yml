@@ -1,0 +1,166 @@
+name: master
+
+on:
+  pull_request:
+    branches:
+      - master
+           
+jobs:
+  build:
+      runs-on: windows-latest
+      steps:
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+           go-version: 1.15.x
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Adjust pkg-config prefix
+        shell: bash
+        run: |
+           sed -i 's/C:\/Python37/C:\/hostedtoolcache\/windows\/Python\/3.7.9\/x64/' pkg-config/python-37.pc
+      - name: Setup msys2
+        uses: msys2/setup-msys2@v2
+        with:
+          release: false
+          install: >-
+            base-devel
+            mingw-w64-x86_64-gcc
+            git
+      - name: Cache yara
+        uses: actions/cache@v2
+        id: cache
+        with:
+          path: |
+            **/yara
+          key: ${{ runner.os }}-yara-${{ hashFiles('**/pkg/yara') }}
+          restore-keys: |
+            ${{ runner.os }}-yara-${{ hashFiles('**/pkg/yara') }}
+      - name: Clone yara
+        if: steps.cache.outputs.cache-hit != 'true'
+        shell: bash
+        env:
+          VERSION: "4.0.2"
+        run: |
+          git clone --depth 1 --branch v$VERSION https://github.com/VirusTotal/yara.git
+      - name: Configure yara
+        if: steps.cache.outputs.cache-hit != 'true'
+        shell: msys2 {0}
+        run: |
+          cd yara
+          autoreconf -fiv
+          ./configure --host=x86_64-w64-mingw32
+      - name: Install yara
+        shell: msys2 {0}
+        run: |
+          cd yara
+          make install
+      - name: Build
+        shell: bash
+        run: |
+          export PATH=/c/msys64/mingw64/bin:$PATH
+          export PKG_CONFIG_PATH=$(pwd)/pkg-config
+          export COMMIT=$(echo $GITHUB_SHA | cut -c1-8)
+          ./make.bat
+        env:
+          TAGS: kcap,filament,yara,yara_static
+      - uses: actions/upload-artifact@v2
+        with:
+          name: "fibratus-amd64.exe"
+          path: "./cmd/fibratus/fibratus.exe" 
+          
+  test:
+    runs-on: windows-latest
+    needs: 
+      - build
+      - build-slim
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Adjust pkg-config prefix
+        shell: bash
+        run: |
+           sed -i 's/C:\/Python37/C:\/hostedtoolcache\/windows\/Python\/3.7.9\/x64/' pkg-config/python-37.pc
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+           go-version: 1.15.x
+      - name: Setup msys2
+        uses: msys2/setup-msys2@v2
+        with:
+         release: false
+         install: >-
+           base-devel
+           mingw-w64-x86_64-gcc
+      - name: Cache yara
+        uses: actions/cache@v2
+        id: cache
+        with:
+          path: |
+            **/yara
+          key: ${{ runner.os }}-yara-${{ hashFiles('**/pkg/yara') }}
+          restore-keys: |
+            ${{ runner.os }}-yara-${{ hashFiles('**/pkg/yara') }}
+      - name: Install yara
+        shell: msys2 {0}
+        run: |
+          cd yara
+          make install
+      - name: Test
+        shell: bash
+        run: |
+           export PATH="/c/msys64/mingw64/bin:$PATH"
+           export PKG_CONFIG_PATH=$(pwd)/pkg-config
+           ./make.bat test
+        env:
+          TAGS: kcap,filament,yara,yara_static
+  
+  lint:
+    runs-on: windows-latest
+    needs: test
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Adjust pkg-config prefix
+        shell: bash
+        run: |
+           sed -i 's/C:\/Python37/C:\/hostedtoolcache\/windows\/Python\/3.7.9\/x64/' pkg-config/python-37.pc
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+           go-version: 1.15.x
+      - name: Setup msys2
+        uses: msys2/setup-msys2@v2
+        with:
+         release: false
+         install: >-
+           base-devel
+           mingw-w64-x86_64-gcc
+      - name: Cache yara
+        uses: actions/cache@v2
+        id: cache
+        with:
+          path: |
+            **/yara
+          key: ${{ runner.os }}-yara-${{ hashFiles('**/pkg/yara') }}
+          restore-keys: |
+            ${{ runner.os }}-yara-${{ hashFiles('**/pkg/yara') }}
+      - name: Install yara
+        shell: msys2 {0}
+        run: |
+          cd yara
+          make install
+      - name: Install golangci-lint
+        shell: bash
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin $GOLANGCI_LINT_VER
+        env:
+          GOLANGCI_LINT_VER: v1.35.2 
+      - name: Lint
+        shell: bash
+        run: |
+           export PATH="/c/msys64/mingw64/bin:$PATH"
+           export PKG_CONFIG_PATH=$(pwd)/pkg-config
+           ./make.bat lint
