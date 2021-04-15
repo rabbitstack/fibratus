@@ -65,13 +65,23 @@ jobs:
           export PATH=/c/msys64/mingw64/bin:$PATH
           export PKG_CONFIG_PATH=$(pwd)/pkg-config
           export COMMIT=$(echo $GITHUB_SHA | cut -c1-8)
+          export VERSION=0.0.0
+          ./make.bat rsrc
           ./make.bat
         env:
           TAGS: kcap,filament,yara,yara_static
       - uses: actions/upload-artifact@v2
         with:
           name: "fibratus-amd64.exe"
-          path: "./cmd/fibratus/fibratus.exe" 
+          path: "./cmd/fibratus/fibratus.exe"
+      - name: Package
+        shell: bash
+        run: |
+          ./make.bat pkg
+      - uses: actions/upload-artifact@v2
+        with:
+          name: "fibratus-amd64.msi"
+          path: "./build/msi/fibratus-0.0.0/fibratus-0.0.0-amd64.msi"
   
   build-slim:
       runs-on: windows-latest
