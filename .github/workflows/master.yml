@@ -88,6 +88,7 @@ jobs:
            export PATH="/c/wix:$PATH"
            export VERSION=0.0.0
            ./make.bat pkg
+           ls -l ./build/msi/fibratus-0.0.0
       - uses: actions/upload-artifact@v2
         with:
           name: "fibratus-amd64.msi"
