@@ -74,10 +74,20 @@ jobs:
         with:
           name: "fibratus-amd64.exe"
           path: "./cmd/fibratus/fibratus.exe"
+      - name: "Install Wix"
+        shell: bash
+        run: |
+          mkdir -p /c/wix
+          cd /c/wix
+          curl -sSfL https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip > wix-binaries.zip
+          unzip wix-binaries.zip
+          rm wix-binaries.zip
       - name: Package
         shell: bash
         run: |
-          ./make.bat pkg
+           export PATH="/c/wix:$PATH"
+           export VERSION=0.0.0
+           ./make.bat pkg
       - uses: actions/upload-artifact@v2
         with:
           name: "fibratus-amd64.msi"
