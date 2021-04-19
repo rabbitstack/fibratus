@@ -5,7 +5,7 @@
 - 64-bits Windows operating system starting from Windows 7
 - 40 MB of free disk space
 - 1 (V)CPU
-- 50 MB of RAM
+- 50 MB of available memory
 
 ### Deployment  {docsify-ignore}
 
@@ -13,13 +13,13 @@ The easiest way to get started with Fibratus is by downloading the Windows insta
 Windows installers are automatically built by the CI platform each time new Fibratus release is published.
 
 <p align="center">
-  <img src="setup/images/fibratus-installer-msi.png" />
+  <a href="https://github.com/rabbitstack/fibratus/releases"><img src="setup/images/fibratus-installer-msi.png"/></a>
 </p>
 
 There are two flavors of Windows MSI installers:
 
 - __full installers__ ship with all features ([captures](captures/introduction), [filaments](filaments/introduction), [yara](yara/introduction)) and bundle the embedded Python distribution
-- __slim installers__ support a minimum set of features but have lower disk space requirements
+- __slim installers__ support less features but have lower disk space requirements
 
 After the install completes, you can verify if Fibratus was correctly installed. Spin up a command line prompt. Alternatively, you can use [Windows Terminal](https://github.com/microsoft/terminal) or [Cmder](https://cmder.net/) consoles which is the recommended choice for better user experience. Run the following command:
 
@@ -51,7 +51,7 @@ If you're able to see the output like in the snippet above, congratulations! You
 
 ### Uninstall {docsify-ignore}
 
-To remove Fibratus from your system, either head to the Control Panel > Programs and Features. The uninstaller will make sure to get rid of all installation data.
+To remove Fibratus from your system, head to the Control Panel > Programs and Features and start the uninstall process. The uninstaller will make sure to get rid of all installation data.
 
 ## Building from source {docsify-ignore}
 

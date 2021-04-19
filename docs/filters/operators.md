@@ -13,13 +13,22 @@ The filtering query language supports the following  comparison binary operators
 - `>=` (greater or equal)
 - `<=` (less or equal)
 
-## Logical binary operators {docsify-ignore}
+## Logical operators {docsify-ignore}
 
  Logical operators are defined between two or more field evaluations.
 
- - `or` (union)
- - `and` (intersection)
- - `not` (negation)
+ - `or` (union) evalutes to true if either one of the LHS or RHS expressions return true. Example:
+    ```
+    ps.name = 'svchost.exe' or ps.name contains ('svc')
+    ````
+ - `and` (intersection) evalutes to true if both of the LHS and RHS expressions return true. Example:
+    ```
+    ps.name = 'System' and ps.pid = 4
+    ```
+ - `not` (negation) negates the result of the adjacent expression. Example:
+    ```
+    ps.name = 'svchost.exe' and ps.args not in ('/-C', '/cdir') 
+    ```
 
 ## Membership operators {docsify-ignore}
 
