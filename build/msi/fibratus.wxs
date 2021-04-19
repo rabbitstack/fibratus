@@ -62,11 +62,8 @@
           Id="INSTALLDIR"
           Name="Fibratus"
           >
-          <Component Win64='yes' Id="Version" Guid="*">
-              <File Id="fibratus.exe" Name="fibratus.exe" Source="$(var.FibratusDir)\Bin\fibratus.exe" />
-          </Component>
           <Component Win64='yes' Id="Path" KeyPath="yes" Guid="E81B8794-3277-47F9-BE58-2EF2D20930EC">
-            <Environment Id="PATH" Name="PATH" Value="[INSTALLDIR]Bin" Permanent="no" Part="last" Action="set" System="yes" />
+              <Environment Id="PATH" Name="PATH" Value="[INSTALLDIR]Bin" Permanent="no" Part="last" Action="set" System="yes" />
           </Component>
         </Directory>
       </Directory>
@@ -79,11 +76,11 @@
       Display="expand"
       ConfigurableDirectory="INSTALLDIR"
       >
-      <ComponentRef
-        Id="Version" 
+      <ComponentGroupRef
+              Id="Fibratus"
       />
-       <ComponentRef
-        Id="Path" 
+      <ComponentRef
+              Id="Path"
       />
     </Feature>
   </Product>

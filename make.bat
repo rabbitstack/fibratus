@@ -89,9 +89,10 @@ mkdir "%~dp0\%RELEASE_DIR%\Config"
 mkdir "%~dp0\%RELEASE_DIR%\Python"
 mkdir "%~dp0\%RELEASE_DIR%\Filaments"
 
+echo "Copying artifacts..."
 :: copy artifacts
-copy /y ".\cmd\fibratus\fibratus.exe" "%RELEASE_DIR%\bin"
-copy /y ".\configs\fibratus.yml" "%RELEASE_DIR%\config\fibratus.yml"
+copy /y ".\cmd\fibratus\fibratus.exe" "%RELEASE_DIR%\Bin"
+copy /y ".\configs\fibratus.yml" "%RELEASE_DIR%\Config\fibratus.yml"
 robocopy ".\filaments" "%RELEASE_DIR%\Filaments" /E /S /XF *.md /XD __pycache__ .idea
 
 :: download the embedded Python distribution
@@ -115,7 +116,8 @@ rm %RELEASE_DIR%\python.zip
 :: is located to advise Windows on the DLL search path strategy.
 move %RELEASE_DIR%\python\*.dll %RELEASE_DIR%\bin
 
-heat dir %RELEASE_DIR%\ -cg Fibratus -dr INSTALLDIR -gg -sfrag -srd -var var.FibratusDir -out build/msi/components.wxs || exit /b
+echo "Building MSI package..."
+heat dir %RELEASE_DIR%\ -cg Fibratus -dr INSTALLDIR -suid -gg -sfrag -srd -var var.FibratusDir -out build/msi/components.wxs || exit /b
 :: To target win64 builds
 powershell -Command "(Get-Content -path build/msi/components.wxs) -replace 'Component ','Component Win64=\"yes\" ' | Set-Content -Path build/msi/components.wxs" || exit /b
 candle build/msi/components.wxs -dFibratusDir=%RELEASE_DIR% -out build/msi/components.wixobj || exit /b
@@ -134,11 +136,13 @@ mkdir "%~dp0\%RELEASE_DIR%"
 mkdir "%~dp0\%RELEASE_DIR%\Bin"
 mkdir "%~dp0\%RELEASE_DIR%\Config"
 
+echo "Copying artifacts..."
 :: copy artifacts
-copy /y ".\cmd\fibratus\fibratus.exe" "%RELEASE_DIR%\bin"
-copy /y ".\configs\fibratus.yml" "%RELEASE_DIR%\config\fibratus.yml"
+copy /y ".\cmd\fibratus\fibratus.exe" "%RELEASE_DIR%\Bin"
+copy /y ".\configs\fibratus.yml" "%RELEASE_DIR%\Config\fibratus.yml"
 
-heat dir %RELEASE_DIR%\ -cg Fibratus -dr INSTALLDIR -gg -sfrag -srd -var var.FibratusDir -out build/msi/components.wxs || exit /b
+echo "Building MSI package..."
+heat dir %RELEASE_DIR%\ -cg Fibratus -dr INSTALLDIR -suid -gg -sfrag -srd -var var.FibratusDir -out build/msi/components.wxs || exit /b
 :: To target win64 builds
 powershell -Command "(Get-Content -path build/msi/components.wxs) -replace 'Component ','Component Win64=\"yes\" ' | Set-Content -Path build/msi/components.wxs" || exit /b
 candle build/msi/components.wxs -dFibratusDir=%RELEASE_DIR% -out build/msi/components.wixobj || exit /b
