@@ -19,7 +19,7 @@ Each kernel event contains a series of canonical fields that describe the nature
 - **Name** is the human-readable event name such as `CreateProcess` or `RegOpenKey`.
 - **Timestamp** denotes the timestamp expressed in nanosecond precision as the instant the event occurred.
 - **Category** designates the category to which the event pertains, e.g. `file` or `thread`. Each particular category is explained thoroughly in the next
- sections.
+ sections. Possible category types are: `registry`, `file`, `net`, `process`, `thread`, `image` and `handle`.
 - **Description** is a short explanation about the purpose of the event. For example, `CreateFile` kernel event creates or opens a file, directory, I/O device, pipe, console buffer or other block/pseudo device.
 - **Host** represents the host name where the event was produced.
 
