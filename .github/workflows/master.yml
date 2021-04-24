@@ -22,10 +22,7 @@ jobs:
       - name: Adjust pkg-config prefix
         shell: bash
         run: |
-           curl -sSfL https://www.python.org/ftp/python/3.7.9/python-3.7.9-embed-amd64.zip > python.zip
-           unzip python.zip
-           ls -lR python
-           mv python C:/Python37
+           sed -i 's/C:\/Python37/C:\/hostedtoolcache\/windows\/Python\/3.7.9\/x64/' pkg-config/python-37.pc
       - name: Setup msys2
         uses: msys2/setup-msys2@v2
         with:
