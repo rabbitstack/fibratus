@@ -24,6 +24,7 @@ jobs:
         run: |
            curl -sSfL https://www.python.org/ftp/python/3.7.9/python-3.7.9-embed-amd64.zip > python.zip
            unzip python.zip
+           ls -lR python.zip
            mv python C:/Python37
       - name: Setup msys2
         uses: msys2/setup-msys2@v2
