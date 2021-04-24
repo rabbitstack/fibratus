@@ -210,7 +210,11 @@ func (p *Parser) parseFunction(name string) (*Function, error) {
 	// If there's a right paren then just return immediately.
 	// This is the case for functions without arguments
 	if tok, _, _ := p.scan(); tok == rparen {
-		return &Function{Name: name}, nil
+		fn := &Function{Name: name}
+		if err := checkFuncCall(fn); err != nil {
+			return nil, err
+		}
+		return fn, nil
 	}
 	p.unscan()
 
