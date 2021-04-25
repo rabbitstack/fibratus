@@ -116,9 +116,9 @@ rm %RELEASE_DIR%\python.zip
 :: is located to advise Windows on the DLL search path strategy.
 move %RELEASE_DIR%\python\*.dll %RELEASE_DIR%\bin
 
-:: Rename libcrypto to placate Windows DLL search strategy. This is apparently needed
-:: when Fibratus is built in Github Actions against preinstalled Python distribution
-ren %RELEASE_DIR%\bin\libcrypto-1_1.dll %RELEASE_DIR%\bin\libcrypto-1_1-x64.dll
+:: Rename libcrypto to libcrypto-1_1-x64.dll. The latter is the DLL name that linker
+:: encounters when using the C compiler msys64.
+ren "%RELEASE_DIR%\bin\libcrypto-1_1.dll" "%RELEASE_DIR%\bin\libcrypto-1_1-x64.dll"
 
 echo "Building MSI package..."
 heat dir %RELEASE_DIR%\ -cg Fibratus -dr INSTALLDIR -suid -gg -sfrag -srd -var var.FibratusDir -out build/msi/components.wxs || exit /b
