@@ -118,7 +118,7 @@ move %RELEASE_DIR%\python\*.dll %RELEASE_DIR%\bin
 
 :: Rename libcrypto to placate Windows DLL search strategy. This is apparently needed
 :: when Fibratus is built in Github Actions against preinstalled Python distribution
-rename %RELEASE_DIR%\bin\libcrypto-1_1.dll %RELEASE_DIR%\bin\libcrypto-1_1-x64.dll
+ren %RELEASE_DIR%\bin\libcrypto-1_1.dll %RELEASE_DIR%\bin\libcrypto-1_1-x64.dll
 
 echo "Building MSI package..."
 heat dir %RELEASE_DIR%\ -cg Fibratus -dr INSTALLDIR -suid -gg -sfrag -srd -var var.FibratusDir -out build/msi/components.wxs || exit /b
