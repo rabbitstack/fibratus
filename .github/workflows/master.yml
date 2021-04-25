@@ -23,7 +23,6 @@ jobs:
         shell: bash
         run: |
            sed -i 's/C:\/Python37/C:\/hostedtoolcache\/windows\/Python\/3.7.9\/x64/' pkg-config/python-37.pc
-           ls -lR C:/hostedtoolcache/windows/Python/3.7.9/x64
       - name: Setup msys2
         uses: msys2/setup-msys2@v2
         with:
@@ -63,7 +62,7 @@ jobs:
       - name: Build
         shell: bash
         run: |
-          export PATH=/c/hostedtoolcache/windows/Python/3.7.9/x64/DLLs:/c/msys64/mingw64/bin:$PATH
+          export PATH=/c/msys64/mingw64/bin:$PATH
           export PKG_CONFIG_PATH=$(pwd)/pkg-config
           export COMMIT=$(echo $GITHUB_SHA | cut -c1-8)
           export VERSION=0.0.0
