@@ -19,7 +19,7 @@ Windows installers are automatically built by the CI platform each time new Fibr
 There are two flavors of Windows MSI installers:
 
 - __full installers__ ship with all features ([captures](captures/introduction), [filaments](filaments/introduction), [yara](yara/introduction)) and bundle the embedded Python distribution
-- __slim installers__ support less features but have lower disk space requirements
+- __slim installers__ support less features but are more portable and have lower disk space requirements
 
 After the install completes, you can verify if Fibratus was correctly installed. Spin up a command line prompt. Alternatively, you can use [Windows Terminal](https://github.com/microsoft/terminal) or [Cmder](https://cmder.net/) consoles which is the recommended choice for better user experience. Run the following command:
 
