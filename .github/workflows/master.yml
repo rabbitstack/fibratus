@@ -23,8 +23,6 @@ jobs:
         shell: bash
         run: |
            sed -i 's/C:\/Python37/C:\/hostedtoolcache\/windows\/Python\/3.7.9\/x64/' pkg-config/python-37.pc
-           mv /c/msys64/mingw64/bin/libcrypto-1_1-x64.dll /c/msys64/mingw64/bin/libcrypto-1_1.dll
-           ls -ltr /c/msys64/mingw64/bin
       - name: Setup msys2
         uses: msys2/setup-msys2@v2
         with:
