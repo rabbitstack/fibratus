@@ -88,7 +88,6 @@ jobs:
            export PATH="/c/wix:$PATH"
            export VERSION=0.0.0
            ./make.bat pkg
-           ls -lR ./build/msi
       - uses: actions/upload-artifact@v2
         with:
           name: "fibratus-amd64.msi"
@@ -115,7 +114,6 @@ jobs:
   
   test:
     runs-on: windows-latest
-    if: ${{ false }}
     needs: 
       - build
       - build-slim
