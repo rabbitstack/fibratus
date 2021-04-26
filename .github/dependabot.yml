@@ -1,0 +1,12 @@
+version: 2
+updates:
+  - package-ecosystem: "go:modules"
+    directory: "/"
+    schedule:
+      interval: "daily"
+      time: "13:00"
+    labels:
+      - deps"
+    commit-message:
+      prefix: "chore(deps)"
+ 
