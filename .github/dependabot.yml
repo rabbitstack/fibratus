@@ -6,7 +6,7 @@ updates:
       interval: "daily"
       time: "13:00"
     labels:
-      - deps"
+      - deps
     commit-message:
       prefix: "chore(deps)"
  
