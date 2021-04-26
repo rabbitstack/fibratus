@@ -1,0 +1,166 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v1*
+           
+jobs:
+  build:
+      runs-on: windows-latest
+      steps:
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+           go-version: 1.15.x
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Adjust pkg-config prefix
+        shell: bash
+        run: |
+           sed -i 's/C:\/Python37/C:\/hostedtoolcache\/windows\/Python\/3.7.9\/x64/' pkg-config/python-37.pc
+      - name: Setup msys2
+        uses: msys2/setup-msys2@v2
+        with:
+          release: false
+          install: >-
+            base-devel
+            mingw-w64-x86_64-gcc
+            git
+      - name: Cache yara
+        uses: actions/cache@v2
+        id: cache
+        with:
+          path: |
+            **/yara
+          key: ${{ runner.os }}-yara-${{ hashFiles('**/pkg/yara') }}
+          restore-keys: |
+            ${{ runner.os }}-yara-${{ hashFiles('**/pkg/yara') }}
+      - name: Clone yara
+        if: steps.cache.outputs.cache-hit != 'true'
+        shell: bash
+        env:
+          VERSION: "4.0.2"
+        run: |
+          git clone --depth 1 --branch v$VERSION https://github.com/VirusTotal/yara.git
+      - name: Configure yara
+        if: steps.cache.outputs.cache-hit != 'true'
+        shell: msys2 {0}
+        run: |
+          cd yara
+          autoreconf -fiv
+          ./configure --host=x86_64-w64-mingw32
+      - name: Install yara
+        shell: msys2 {0}
+        run: |
+          cd yara
+          make install
+      - name: Get version
+        id: get_version
+        shell: bash
+        run: | 
+          echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3 | cut -c2-)
+      - name: Build
+        shell: bash
+        run: |
+          export PATH=/c/msys64/mingw64/bin:$PATH
+          export PKG_CONFIG_PATH=$(pwd)/pkg-config
+          export COMMIT=$(echo $GITHUB_SHA | cut -c1-8)
+          export VERSION=${{ steps.get_version.outputs.VERSION }}
+          ./make.bat rsrc
+          ./make.bat
+        env:
+          TAGS: kcap,filament,yara,yara_static
+      - name: "Install Wix"
+        shell: bash
+        run: |
+          mkdir -p /c/wix
+          cd /c/wix
+          curl -sSfL https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip > wix-binaries.zip
+          unzip wix-binaries.zip
+          rm wix-binaries.zip
+      - name: Package
+        shell: bash
+        run: |
+           export PATH="/c/wix:$PATH"
+           export VERSION=${{ steps.get_version.outputs.VERSION }}
+           ./make.bat pkg
+      - uses: actions/upload-artifact@v2
+        with:
+          name: fibratus-${{ steps.get_version.outputs.VERSION }}-amd64.msi
+          path: "./build/msi/fibratus-${{ steps.get_version.outputs.VERSION }-amd64.msi"
+  
+  build-slim:
+      runs-on: windows-latest
+      steps:
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+           go-version: 1.15.x
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Get version
+        id: get_version
+        shell: bash
+        run: | 
+          echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3 | cut -c2-)
+      - name: Build
+        shell: bash
+        run: |
+          export PATH=/c/msys64/mingw64/bin:$PATH
+          export COMMIT=$(echo $GITHUB_SHA | cut -c1-8)
+          export VERSION=${{ steps.get_version.outputs.VERSION }}
+          ./make.bat rsrc
+          ./make.bat
+      - name: "Install Wix"
+        shell: bash
+        run: |
+          mkdir -p /c/wix
+          cd /c/wix
+          curl -sSfL https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip > wix-binaries.zip
+          unzip wix-binaries.zip
+          rm wix-binaries.zip
+      - name: Package
+        shell: bash
+        run: |
+           export PATH="/c/wix:$PATH"
+           export VERSION=${{ steps.get_version.outputs.VERSION }}
+           ./make.bat pkg-slim
+      - uses: actions/upload-artifact@v2
+        with:
+          name: fibratus-${{ steps.get_version.outputs.VERSION }}-slim-amd64.msi
+          path: "./build/msi/fibratus-${{ steps.get_version.outputs.VERSION }-slim-amd64.msi"
+          
+  release:
+      runs-on: windows-latest
+      needs: 
+        - build
+        - build-slim
+      steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Get version
+        id: get_version
+        shell: bash
+        run: | 
+          echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3 | cut -c2-)
+      - uses: actions/download-artifact@v2
+        with:
+          name: fibratus-${{ steps.get_version.outputs.VERSION }}-amd64.msi
+          path: build
+      - uses: actions/download-artifact@v2
+        with:
+          name: fibratus-${{ steps.get_version.outputs.VERSION }}-slim-amd64.msi
+          path: build
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          draft: true
+          prerelease: true
+          files: |
+             build/fibratus-${{ steps.get_version.outputs.VERSION }}-amd64.msi
+             build/fibratus-${{ steps.get_version.outputs.VERSION }}-slim-amd64.msi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
