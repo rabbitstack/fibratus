@@ -88,7 +88,7 @@ jobs:
       - uses: actions/upload-artifact@v2
         with:
           name: fibratus-${{ steps.get_version.outputs.VERSION }}-amd64.msi
-          path: "./build/msi/fibratus-${{ steps.get_version.outputs.VERSION }-amd64.msi"
+          path: "./build/msi/fibratus-${{ steps.get_version.outputs.VERSION }}-amd64.msi"
   
   build-slim:
       runs-on: windows-latest
@@ -129,7 +129,7 @@ jobs:
       - uses: actions/upload-artifact@v2
         with:
           name: fibratus-${{ steps.get_version.outputs.VERSION }}-slim-amd64.msi
-          path: "./build/msi/fibratus-${{ steps.get_version.outputs.VERSION }-slim-amd64.msi"
+          path: "./build/msi/fibratus-${{ steps.get_version.outputs.VERSION }}-slim-amd64.msi"
           
   release:
       runs-on: windows-latest
