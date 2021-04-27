@@ -87,10 +87,8 @@ The following tables summarize available field names that can be used in filter 
 | file.io.size    | I/O read/write size | `file.io.size > 512`   |
 | file.offset     | Read/write position in the file | `file.offset = 1024`   |
 | file.type       | File type. Possible values are `file`, `directory`, `pipe`, `console`, `mailslot`, `other`, `unknown` | `file.type = 'directory'`   |
-| file.extension  | File extension | `file.extension = '.dll'`   |
+| file.extension  | File extension represents the file extension (e.g. .exe or .dll) | `file.extension = '.dll'`   |
 
-
- represents the file extension (e.g. .exe or .dll)
 
 ### Registry
 | Field Name  | Description | Example     |
@@ -112,6 +110,8 @@ The following tables summarize available field names that can be used in filter 
 | net.sport.name   | Source port name as per [IANA](https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.txt) port to service assignation | `net.sport.name = 'http'`   |
 | net.l4.proto   | Layer 4 protocol name | `net.l4.proto = 'TCP'`   |
 | net.size   | Network packet size | `net.size > 512`   |
+| net.dip.names | List of destination IP address domain names | `net.dip.names in ('github.com.')` |
+| net.sip.names | List of source IP address domain names | `net.sip.names in ('github.com.')` |
 
 ### Handle
 | Field Name  | Description | Example     |

@@ -18,6 +18,7 @@
   * [Prefiltering](filters/prefiltering.md)
   * [Filtering](filters/filtering.md)
   * [Operators](filters/operators.md)
+  * [Functions](filters/functions.md)
   * [Fields](filters/fields.md)
 * <ion-icon name="server-outline"></ion-icon> Captures
   * [Immortalizing The Event Flux](captures/introduction.md)

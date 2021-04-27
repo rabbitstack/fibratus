@@ -17,7 +17,7 @@ The `CreateFile` event is triggered when the kernel serves create/open requests 
   - `overwrite` opens and overwrites the file if it already exists
   - `overwriteif` opens and overwrites the file if it already exists, otherwise creates a new file
 - `share_mask` specifies the sharing mode of the file or device, which can be read, write, both, delete, all of these, or none. This flag determines the permission granularity which enables a process to share a file or device while another process has the file or device open.
-- `type` defines the file type. Possible value are `file`, `directory`, `pipe`, `console`, `mailslot`, `other`, `unknown`.
+- `type` defines the file type. Possible values are `file`, `directory`, `pipe`, `console`, `mailslot`, `other`, `unknown`.
 
 #### WriteFile and ReadFile
 
@@ -28,7 +28,7 @@ These events occur when a process writes data to a file or reads data from the f
 - `irp` is the I/O request packet value that identifies the file system activity.
 - `io_size` specifies the number of bytes read or written.
 - `offset` determines the offset in the file where the data is read or written.
-- `type` defines the file type. Possible value are  `file`, `directory`, `pipe`, `console`, `mailslot`, `other`, `unknown`.
+- `type` defines the file type. Possible values are  `file`, `directory`, `pipe`, `console`, `mailslot`, `other`, `unknown`.
 
 
 #### DeleteFile
@@ -38,7 +38,7 @@ Removes the file from the file system. This event contains the following paramet
 - `file_object` is the file object pointer as seen from the kernel perspective. You can use this parameter to correlate file events.
 - `file_name` represents the file/directory that was removed
 - `irp` is the I/O request packet value that identifies the file system activity.
-- `type` defines the file type. Possible value are  `file`, `directory`, `pipe`, `mailslot`, `other`, `unknown`.
+- `type` defines the file type. Possible values are  `file`, `directory`, `pipe`, `mailslot`, `other`, `unknown`.
 
 #### RenameFile
 
@@ -47,7 +47,7 @@ Renames the file or directory in the file system.
 - `file_object` is the file object pointer as seen from the kernel perspective.
 - `file_name` represents the file/directory that was renamed.
 - `irp` is the I/O request packet value that identifies the file system activity.
-- `type` defines the file type. Possible value are  `file`, `directory`, `other`, `unknown`.
+- `type` defines the file type. Possible values are  `file`, `directory`, `other`, `unknown`.
 
 #### CloseFile
 
@@ -56,7 +56,7 @@ Closes the handle to opened file. This event is excluded by default.
 - `file_object` is the file object pointer as seen from the kernel perspective.
 - `file_name` represents the file/directory that was closed.
 - `irp` is the I/O request packet value that identifies the file system activity.
-- `type` defines the file type. Possible value are  `file`, `directory`, `pipe`, `console`, `mailslot`, `other`, `unknown`.
+- `type` defines the file type. Possible values are  `file`, `directory`, `pipe`, `console`, `mailslot`, `other`, `unknown`.
 
 
 #### SetFileInformation
@@ -67,7 +67,7 @@ Sets the file information for the file according to the file information class.
 - `file_object` is the file object pointer as seen from the kernel perspective.
 - `file_name` represents the file whose information class was set.
 - `irp` is the I/O request packet value that identifies the file system activity.
-- `type` defines the file type. Possible value are `file`, `pipe`, `mailslot`, `other`, `unknown`.
+- `type` defines the file type. Possible values are `file`, `pipe`, `mailslot`, `other`, `unknown`.
 
 
 #### EnumDirectory
