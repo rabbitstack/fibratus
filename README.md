@@ -74,6 +74,7 @@ You can use [filaments](https://www.fibratus.io/#/filaments/introduction) to ext
 * [**Prefiltering**](https://www.fibratus.io/#/filters/prefiltering)
 * [**Filtering**](https://www.fibratus.io/#/filters/filtering)
 * [**Operators**](https://www.fibratus.io/#/filters/operators)
+* [**Functions**](https://www.fibratus.io/#/filters/functions)
 * [**Fields**](https://www.fibratus.io/#/filters/fields)
 
 ### Captures
