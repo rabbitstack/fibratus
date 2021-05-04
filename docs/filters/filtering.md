@@ -1,5 +1,23 @@
 # Filtering
 
+### Anatomy of a filter {docsify-ignore}
+
+At its simplest form, a filter is composed of the LHS (Left Hand Side) and RHS (Right Hand Side) expressions connected with an [operator](/filters/operators) that can pertain to binary, logical, or string operators. The LHS expression is usually a [field](/filters/fields) name, even though the use of fields is possible in Right Hand Side expressions as well.
+
+```
+    LHS          operator         RHS
+kevt.category       =            'net'
+```
+
+The RHS expressions can be strings, numbers, IP addresses, boolean values, and fields. In the above snippet, the RHS is a simple string literal, but we could have written filters with the following RHS expressions:
+
+- IP addresses: `net.sip = 127.0.0.1`
+- Booleans: `kevt.nparams != false`
+- Numbers: `ps.pid = 4`
+- Fields: `kevt.pid != ps.pid`
+
+### Running filters {docsify-ignore}
+
 As previously mentioned, filters can be engaged in various stages of event collection and processing. The filter expression is given  to `run`, `capture`, and `replay` commands in form of the command line argument.
 
 The `run` command applies the filter expression to each inbound kernel event and prevents upstream propagation if the event doesn't match the filter. The above command filters events that occur on `Monday` and are produced by `cmd.exe` and `svchost.exe` processes.
