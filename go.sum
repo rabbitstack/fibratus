@@ -76,8 +76,8 @@ github.com/hashicorp/go-version v1.2.1 h1:zEfKbn2+PDgroKdiOzqiE8rsmLqU2uwi5PB5pB
 github.com/hashicorp/go-version v1.2.1/go.mod h1:fltr4n8CU8Ke44wwGCBoEymUuxUHl09ZGVZPK5anwXA=
 github.com/hashicorp/hcl v1.0.0 h1:0Anlzjpi4vEasTeNFn2mLJgTSwt0+6sfsiTG8qcWGx4=
 github.com/hashicorp/hcl v1.0.0/go.mod h1:E5yfLk+7swimpb2L/Alb/PJmXilQ/rhwaUYs4T20WEQ=
-github.com/hillu/go-yara/v4 v4.0.4 h1:DxKUyCwk6BG2SONtvkpeuYOdjmHMZ5ybqLdaH2POLRw=
-github.com/hillu/go-yara/v4 v4.0.4/go.mod h1:rkb/gSAoO8qcmj+pv6fDZN4tOa3N7R+qqGlEkzT4iys=
+github.com/hillu/go-yara/v4 v4.0.6 h1:2fHGPatCXQL1RgWWvPJDdaCkXAzvMx8SpVtKpqVMHDo=
+github.com/hillu/go-yara/v4 v4.0.6/go.mod h1:rkb/gSAoO8qcmj+pv6fDZN4tOa3N7R+qqGlEkzT4iys=
 github.com/inconshreveable/mousetrap v1.0.0 h1:Z8tu5sraLXCXIcARxBp/8cbvlwVa7Z1NHg9XEKhtSvM=
 github.com/inconshreveable/mousetrap v1.0.0/go.mod h1:PxqpIevigyE2G7u3NXJIT2ANytuPF1OarO4DADm73n8=
 github.com/jedib0t/go-pretty/v6 v6.0.1 h1:uUMwi75B5+yaLy6sldJusQYXXkTttIxnsDBzNYL+XdI=
