@@ -4,11 +4,10 @@ require (
 	github.com/Microsoft/go-winio v0.4.14
 	github.com/briandowns/spinner v1.12.0
 	github.com/dustin/go-humanize v1.0.0
-	github.com/go-openapi/strfmt v0.19.4 // indirect
 	github.com/hashicorp/go-version v1.2.1
 	github.com/hillu/go-yara/v4 v4.0.6
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
-	github.com/jedib0t/go-pretty/v6 v6.0.1
+	github.com/jedib0t/go-pretty/v6 v6.2.1
 	github.com/magiconair/properties v1.8.1
 	github.com/mitchellh/mapstructure v1.4.1
 	github.com/olivere/elastic/v7 v7.0.20
@@ -20,6 +19,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.6.2
 	github.com/streadway/amqp v1.0.0
+	github.com/stretchr/objx v0.2.0 // indirect
 	github.com/stretchr/testify v1.5.1
 	github.com/valyala/bytebufferpool v1.0.0
 	github.com/valyala/gozstd v1.6.4
