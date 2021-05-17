@@ -22,7 +22,7 @@ require (
 	github.com/stretchr/objx v0.2.0 // indirect
 	github.com/stretchr/testify v1.5.1
 	github.com/valyala/bytebufferpool v1.0.0
-	github.com/valyala/gozstd v1.6.4
+	github.com/valyala/gozstd v1.10.0
 	github.com/xeipuuv/gojsonschema v1.2.0
 	golang.org/x/sys v0.0.0-20190507160741-ecd444e8653b
 	golang.org/x/text v0.3.2
