@@ -282,6 +282,7 @@ func TestFilterRunNetKevent(t *testing.T) {
 		{`net.dip = 216.58.201.174`, true},
 		{`net.dip != 216.58.201.174`, false},
 		{`net.dip != 116.58.201.174`, true},
+		{`net.dport = 443`, true},
 		{`net.dip.names in ('dns.google.')`, true},
 		{`net.sip.names matches ('*.domain.')`, true},
 		{`net.dip != 116.58.201.174`, true},

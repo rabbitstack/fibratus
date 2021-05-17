@@ -1,0 +1,11 @@
+- group: network events
+  selector:
+    type: Recv
+  enabled: true
+  policy: include
+  relation: and
+  from_strings:
+    - name: match https connections
+      def: net.dport = 443
+    - name: accept events where source port = 43123
+      def: net.sport = 43123

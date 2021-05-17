@@ -32,7 +32,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/log"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	yara "github.com/rabbitstack/fibratus/pkg/yara/config"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"time"
 
@@ -94,6 +94,9 @@ type Config struct {
 	Transformers []transformers.Config
 	// Alertsenders stores alert sender configurations
 	Alertsenders []alertsender.Config
+
+	// Filters contains filter group definitions
+	Filters *Filters `json:"filters" yaml:"filters"`
 
 	flags *pflag.FlagSet
 	viper *viper.Viper
@@ -278,12 +281,12 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("couldn't read the config file: %v", err)
 	}
 	// validate config file content
-	valid, errs := validate(out)
+	valid, errs := validate(interpolateSchema(), out)
 	if !valid || len(errs) > 0 {
 		return fmt.Errorf("invalid config: %v", multierror.Wrap(errs...))
 	}
 	// now validate the Viper config flags
-	valid, errs = validate(c.viper.AllSettings())
+	valid, errs = validate(interpolateSchema(), c.viper.AllSettings())
 	if !valid || len(errs) > 0 {
 		return fmt.Errorf("invalid config: %v", multierror.Wrap(errs...))
 	}

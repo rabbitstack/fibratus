@@ -1,0 +1,9 @@
+- group: network events
+  selector:
+    type: Recv
+  enabled: true
+  policy: exclude
+  relation: or
+  from_strings:
+    - name: ignore http connections
+      def: net.dport = 80

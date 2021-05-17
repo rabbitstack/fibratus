@@ -93,6 +93,16 @@ filament:
   # Determines how often event batches are propagated to the filament callback function
   #flush-period: 200ms
 
+# =============================== Filters ===============================================
+
+# Contains the definition of filters. Filter expressions are contained in filter group files.
+# Filter group files can reside in the local file system or also can be exposed via HTTP url.
+filters:
+  from_paths:
+    - configs/filters/default.yml
+  from_urls:
+    - https://raw.githubusercontent.com/rabbitstack/fibratus/master/configs/filters/default/default.yml
+
 # =============================== Handle ===============================================
 
 # Indicates whether initial handle snapshot is built. The snapshot contains the state of system handles.

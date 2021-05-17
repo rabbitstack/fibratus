@@ -1,0 +1,19 @@
+- group: internal network traffic
+  selector:
+    type: Connect
+    category: net
+  enabled: true
+  policy: include
+  relation: or
+  tags:
+    - TE
+  from_strings:
+    - name: only network category
+      def: kevt.category = 'net'
+
+- group: rouge processes
+  enabled: true
+  policy: include
+  relation: and
+  from_files:
+    - C:\Fibratus\filters.yml

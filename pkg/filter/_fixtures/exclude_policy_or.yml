@@ -1,0 +1,18 @@
+- group: network events
+  selector:
+    type: Recv
+  enabled: true
+  policy: exclude
+  relation: or
+  from_strings:
+    - name: ignore https connections
+      def: net.dport = 443
+- group: network events
+  selector:
+    type: Recv
+  enabled: true
+  policy: include
+  relation: or
+  from_strings:
+    - name: match http connections
+      def: net.dport = '{{ .process.windows }}'

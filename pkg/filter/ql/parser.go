@@ -56,7 +56,7 @@ func (p *Parser) ParseExpr() (Expr, error) {
 		if !op.isOperator() {
 			p.unscan()
 			if op != eof && op != rparen && op != comma {
-				return nil, newParseError(tokstr(op, lit), []string{"operator", ")", ","}, pos, p.expr)
+				return nil, newParseError(tokstr(op, lit), []string{"operator", "')'", "','"}, pos, p.expr)
 			}
 			return root.RHS, nil
 		}

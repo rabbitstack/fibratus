@@ -1,0 +1,11 @@
+- group: network events
+  selector:
+    type: Recv
+  enabled: true
+  policy: include
+  relation: or
+  from_strings:
+    - name: match https connections
+      def: net.dport = 443
+      action: |
+       {{ emitAlert "a" "a" "normal" .Kevt.Name }}

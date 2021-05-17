@@ -126,7 +126,9 @@ type kstreamConsumer struct {
 	psnapshotter ps.Snapshotter
 	sequencer    *kevent.Sequencer
 
-	filter  filter.Filter
+	filter      filter.Filter
+	filterChain filter.Chain
+
 	capture bool
 }
 
@@ -146,6 +148,7 @@ func NewConsumer(ktraceController KtraceController, psnap ps.Snapshotter, hsnap 
 		kevts:                  make(chan *kevent.Kevent),
 		deferredKevts:          make(chan *kevent.Kevent, 1000),
 		stop:                   make(chan struct{}, 1),
+		filterChain:            filter.NewChain(config),
 	}
 
 	kconsumer.interceptorChain = interceptors.NewChain(psnap, hsnap, kconsumer.startRundown, config, kconsumer.deferredKevts)
@@ -163,7 +166,7 @@ func (k *kstreamConsumer) startRundown() error {
 	return nil
 }
 
-func (k *kstreamConsumer) init() {
+func (k *kstreamConsumer) init() error {
 	if k.ktraceController.IsKRundownStarted() {
 		go k.openRundownConsumer()
 	}
@@ -177,6 +180,8 @@ func (k *kstreamConsumer) init() {
 	for i, name := range k.config.Kstream.BlacklistImages {
 		k.procsBlacklist[i] = strings.ToLower(name)
 	}
+	// try to compile the filter chain
+	return k.filterChain.Compile()
 }
 
 // consumeDeferred is responsible for receiving the events
@@ -235,7 +240,10 @@ func (k *kstreamConsumer) OpenKstream() error {
 		return fmt.Errorf("unable to open kernel trace: %v", syscall.GetLastError())
 	}
 	k.handle = h
-	k.init()
+	if err := k.init(); err != nil {
+		_ = etw.CloseTrace(h)
+		return err
+	}
 	// since `ProcessTrace` blocks the current thread
 	// we invoke it in a separate goroutine but send
 	// any possible errors to the channel
@@ -627,7 +635,8 @@ func getParam(name string, buffer []byte, size uint32, nonStructType tdh.NonStru
 // the state
 // - process that produced the kernel event is fibratus itself
 // - kernel event is present in the blacklist, and thus it is always dropped
-// - finally, the event is dropped by the filter engine
+// - filters defined in filter group files are triggered
+// - finally, the event is evaluated by the CLI filter
 func (k *kstreamConsumer) isDropped(kevt *kevent.Kevent) bool {
 	if kevt.Type.Dropped(k.capture) {
 		return true
@@ -639,10 +648,13 @@ func (k *kstreamConsumer) isDropped(kevt *kevent.Kevent) bool {
 		blacklistedKevents.Add(kevt.Name, 1)
 		return true
 	}
-	if k.filter == nil {
+	if ok := k.filterChain.Run(kevt); !ok {
 		return false
 	}
-	return !k.filter.Run(kevt)
+	if k.filter != nil {
+		return !k.filter.Run(kevt)
+	}
+	return true
 }
 
 // dropBlacklistProc drops the events from the blacklist if it is linked to particular process name.
