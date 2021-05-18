@@ -74,6 +74,20 @@ func TestChainCompileMergeGroups(t *testing.T) {
 	assert.Len(t, chain.filterGroups, 2)
 	assert.Len(t, chain.filterGroups[ktypes.Recv.Hash()], 2)
 	assert.Len(t, chain.filterGroups[ktypes.Net.Hash()], 1)
+
+	groups := chain.findFilterGroups(&kevent.Kevent{Type: ktypes.Recv, Category: ktypes.Net})
+	assert.Len(t, groups, 3)
+}
+
+func TestChainCompileGroupsOnlyTypeSelector(t *testing.T) {
+	chain := NewChain(newConfig("_fixtures/groups_type_selector.yml"))
+	require.NoError(t, chain.Compile())
+
+	assert.Len(t, chain.filterGroups, 1)
+	assert.Len(t, chain.filterGroups[ktypes.Recv.Hash()], 3)
+
+	groups := chain.findFilterGroups(&kevent.Kevent{Type: ktypes.Recv})
+	assert.Len(t, groups, 3)
 }
 
 func TestChainRun(t *testing.T) {

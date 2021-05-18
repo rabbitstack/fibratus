@@ -15,4 +15,4 @@
   relation: or
   from-strings:
     - name: match http connections
-      def: net.dport = '{{ .process.windows }}'
+      def: net.dport = '{{ .Values.process.windows }}'

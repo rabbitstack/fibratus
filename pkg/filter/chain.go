@@ -130,17 +130,12 @@ func (c *Chain) Compile() error {
 }
 
 func (c *Chain) findFilterGroups(kevt *kevent.Kevent) filterGroups {
-	hash := kevt.Type.Hash()
-	groups, ok := c.filterGroups[hash]
-	if !ok {
-		// check if the category selector exists
-		hash = kevt.Category.Hash()
-		groups, ok = c.filterGroups[hash]
-		if !ok {
-			return nil
-		}
+	groups1 := c.filterGroups[kevt.Type.Hash()]
+	groups2 := c.filterGroups[kevt.Category.Hash()]
+	if groups1 == nil && groups2 == nil {
+		return nil
 	}
-	return groups
+	return append(groups1, groups2...)
 }
 
 func (c *Chain) Run(kevt *kevent.Kevent) bool {
@@ -154,8 +149,7 @@ func (c *Chain) Run(kevt *kevent.Kevent) bool {
 		return true
 	}
 	// get filter groups for particular
-	// kevent type or category if the
-	// the latter selector is active.
+	// kevent type or category.
 	// Events/categories without filter
 	// groups are dropped by default
 	groups := c.findFilterGroups(kevt)

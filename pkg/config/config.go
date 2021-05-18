@@ -172,7 +172,7 @@ func NewWithOpts(options ...Option) *Config {
 		PE:         pe.Config{},
 		Log:        log.Config{},
 		Aggregator: aggregator.Config{},
-		Filters: 	&Filters{},
+		Filters:    &Filters{},
 		viper:      v,
 		flags:      flagSet,
 		opts:       opts,

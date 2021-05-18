@@ -23,6 +23,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/filter/funcmap"
+	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"github.com/spf13/viper"
@@ -152,11 +153,12 @@ func (f FilterConfig) parseTmpl(resource string) error {
 	if err != nil {
 		return err
 	}
-	_, err = template.New(f.Name).Funcs(funcmap.New()).Parse(string(decoded))
+	tmpl, err := template.New(f.Name).Funcs(funcmap.New()).Parse(string(decoded))
 	if err != nil {
 		return cleanupParseError(resource, err)
 	}
-	return nil
+	var bb bytes.Buffer
+	return cleanupParseError(resource, tmpl.Execute(&bb, tmplData()))
 }
 
 // FilterGroup represents the container for filters.
@@ -173,7 +175,7 @@ type FilterGroup struct {
 func (g FilterGroup) validate(resource string) error {
 	for _, filter := range g.FromStrings {
 		if filter.Action != "" && g.Policy == ExcludePolicy {
-			return fmt.Errorf("%q filter found in %q group with exclude policy. " +
+			return fmt.Errorf("%q filter found in %q group with exclude policy. "+
 				"Only groups with include policies can have filter actions", filter.Name, g.Name)
 		}
 		if err := filter.parseTmpl(resource); err != nil {
@@ -214,12 +216,12 @@ func (f *Filters) initFromViper(v *viper.Viper) {
 func (f Filters) LoadGroups() ([]FilterGroup, error) {
 	allGroups := make([]FilterGroup, 0)
 	for _, path := range f.FromPaths {
-		f, err := os.Stat(path)
+		file, err := os.Stat(path)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("couldn't open filter file %s: %v", path, err)
 		}
-		if f.IsDir() {
-			return nil, fmt.Errorf("expected yml file but got directory %s", f)
+		if file.IsDir() {
+			return nil, fmt.Errorf("expected yml file but got directory %s", path)
 		}
 		// read the file group yaml file and produce
 		// the corresponding filter groups from it
@@ -241,12 +243,15 @@ func (f Filters) LoadGroups() ([]FilterGroup, error) {
 		if err != nil {
 			return nil, fmt.Errorf("cannot fetch filter file from %q: %v", url, err)
 		}
-		func() {
-			defer resp.Body.Close()
-		}()
+		if resp.StatusCode != http.StatusOK {
+			_ = resp.Body.Close()
+			return nil, fmt.Errorf("got non-ok status code for %q: %s", url,
+				http.StatusText(resp.StatusCode))
+		}
 
 		var rawConfig bytes.Buffer
 		_, err = io.Copy(&rawConfig, resp.Body)
+		_ = resp.Body.Close()
 		if err != nil {
 			return nil, fmt.Errorf("cannot copy filter file from %q: %v", url, err)
 		}
@@ -321,12 +326,12 @@ func renderTmpl(filename string, b []byte) ([]byte, error) {
 	rawValues := unmarshalValues(filename)
 	tmpl, err := template.New(filename).Funcs(funcmap.New()).Parse(string(b))
 	if err != nil {
-		return nil, err
+		return nil, cleanupParseError(filename, err)
 	}
 	var w bytes.Buffer
 	// force strict keys presence
 	tmpl.Option("missingkey=error")
-	err = tmpl.Execute(&w, rawValues)
+	err = tmpl.Execute(&w, map[string]interface{}{"Values": rawValues})
 	if err != nil {
 		return nil, cleanupParseError(filename, err)
 	}
@@ -373,6 +378,24 @@ func cleanupParseError(filename string, err error) error {
 	return fmt.Errorf("syntax error in (%s) at %s: %s", string(location), key, errMsg)
 }
 
+// TmplData is the template data object. Some
+// fields of this structure represent empty
+// values, since we have to satisfy the presence
+// of certain keys when executing the template.
+type TmplData struct {
+	Filter *FilterConfig
+	Group  *FilterGroup
+	Kevt   *kevent.Kevent
+}
+
+func tmplData() TmplData {
+	return TmplData{
+		Filter: &FilterConfig{},
+		Group:  &FilterGroup{},
+		Kevt:   kevent.Empty(),
+	}
+}
+
 // encodeFilterActions convert the filter action template
 // to base64 payload. Because we only want to execute
 // the action template when a filter matches in runtime,
@@ -389,7 +412,7 @@ func encodeFilterActions(buf []byte) ([]byte, error) {
 	for _, n := range yn.Content[0].Content {
 		// for each group node
 		for i, gn := range n.Content {
-			if gn.Value == "from_strings" {
+			if gn.Value == "from-strings" {
 				content := n.Content[i+1]
 				// for each node in from_strings
 				for _, s := range content.Content {

@@ -23,6 +23,7 @@ import (
 	"github.com/Masterminds/sprig/v3"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	log "github.com/sirupsen/logrus"
+	"strings"
 	"syscall"
 	"text/template"
 )
@@ -37,12 +38,23 @@ func New() template.FuncMap {
 	f := sprig.TxtFuncMap()
 
 	extra := template.FuncMap{
-		// This is a placeholder for the functions that are
+		// This is a placeholder for the functions that might be
 		// late-bound to a template. By declaring them here, we
 		// can still execute the template associated with the
 		// filter action to ensure template syntax is correct
-		"emit": func(title string, text string, args ...string) string {return ""},
-		"kill": func(pid int) string { return "" },
+		"emit": func(title string, text string, args ...string) string { return "" },
+		"kill": func(pid uint32) string { return "" },
+		"stringify": func(in []interface{}) string {
+			values := make([]string, 0)
+			for _, e := range in {
+				s, ok := e.(string)
+				if !ok {
+					continue
+				}
+				values = append(values, fmt.Sprintf("'%s'", s))
+			}
+			return fmt.Sprintf("(%s)", strings.Join(values, ", "))
+		},
 	}
 
 	for k, v := range extra {
@@ -89,12 +101,14 @@ func emit(title string, text string, args ...string) string {
 }
 
 // kill terminates a process with specified pid.
-func kill(pid int) string {
-	h, err := syscall.OpenProcess(syscall.PROCESS_TERMINATE, false, uint32(pid))
+func kill(pid uint32) string {
+	h, err := syscall.OpenProcess(syscall.PROCESS_TERMINATE, false, pid)
 	if err != nil {
 		return fmt.Sprintf("couldn't open pid %d for terminating: %v", pid, err)
 	}
-	defer syscall.CloseHandle(h)
+	defer func() {
+		_ = syscall.CloseHandle(h)
+	}()
 	err = syscall.TerminateProcess(h, uint32(1))
 	if err != nil {
 		return fmt.Sprintf("fail to kill pid %d: %v", pid, err)
