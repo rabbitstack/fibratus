@@ -6,7 +6,7 @@
   relation: and
   tags:
     - TE
-  from_strings:
+  from-strings:
     - name: only network category
       def: kevt.category = 'net'
 
@@ -14,6 +14,6 @@
   enabled: true
   selector:
     category: net
-  from_strings:
+  from-strings:
     - name: suspicious network {{ upper "activity" }}
       def: kevt.category = 'net' and ps.name in ('at.exe', 'java.exe')

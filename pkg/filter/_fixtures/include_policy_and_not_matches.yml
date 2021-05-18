@@ -4,7 +4,7 @@
   enabled: true
   policy: include
   relation: and
-  from_strings:
+  from-strings:
     - name: match https connections
       def: net.dport = 443
     - name: accept events where source port = 44123
@@ -17,6 +17,6 @@
   enabled: true
   policy: include
   relation: and
-  from_strings:
+  from-strings:
     - name: src ip address is
       def: net.sip = 172.0.0.1

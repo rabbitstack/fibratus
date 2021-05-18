@@ -98,9 +98,9 @@ filament:
 # Contains the definition of filters. Filter expressions are contained in filter group files.
 # Filter group files can reside in the local file system or also can be exposed via HTTP url.
 filters:
-  from_paths:
+  from-paths:
     - configs/filters/default.yml
-  from_urls:
+  from-urls:
     - https://raw.githubusercontent.com/rabbitstack/fibratus/master/configs/filters/default/default.yml
 
 # =============================== Handle ===============================================

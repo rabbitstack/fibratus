@@ -4,7 +4,7 @@
   enabled: true
   policy: exclude
   relation: and
-  from_strings:
+  from-strings:
     - name: ignore https connections
       def: net.dport = 80
     - name: ignore events where source port != 44123

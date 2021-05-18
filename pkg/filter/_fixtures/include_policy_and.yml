@@ -4,7 +4,7 @@
   enabled: true
   policy: include
   relation: and
-  from_strings:
+  from-strings:
     - name: match https connections
       def: net.dport = 443
     - name: accept events where source port = 43123

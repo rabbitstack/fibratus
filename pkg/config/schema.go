@@ -122,8 +122,8 @@ var schema = `
 		"filters": {
 			"type": "object",
 			"properties": {
-				"from_paths": 	{"type": "array", "items": [{"type": "string", "minLength": 5}]},
-				"from_urls":	{"type": "array", "items": [{"type": "string", "minLength": 5}]}
+				"from-paths": 	{"type": "array", "items": [{"type": "string", "minLength": 5}]},
+				"from-urls":	{"type": "array", "items": [{"type": "string", "minLength": 5}]}
 			},
 			"additionalProperties": false
 		},
@@ -454,7 +454,7 @@ var filterGroupSchema = `
 		"policy":   	{"type": "string", "enum": ["include", "exclude", "INCLUDE", "EXCLUDE"]},
 		"relation": 	{"type": "string", "enum": ["or", "and", "OR", "AND"]},
 		"tags":			{"type": "array", "items": [{"type": "string", "minLength": 1}]},
-		"from_strings": {
+		"from-strings": {
 			"type": "array",
 			"items": [
 				{
@@ -470,7 +470,7 @@ var filterGroupSchema = `
 			]
 		}
 	},
-	"required": ["group", "enabled", "selector", "from_strings"],
+	"required": ["group", "enabled", "selector", "from-strings"],
 	"additionalProperties": false
 }
 `

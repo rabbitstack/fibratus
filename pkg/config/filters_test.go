@@ -64,5 +64,5 @@ func TestLoadGroupsInvalidFilterAction(t *testing.T) {
 		},
 	}
 	_, err := filters.LoadGroups()
-	require.NoError(t, err)
+	require.EqualError(t, err, `invalid "suspicious network activity" filter action: syntax error in (suspicious network activity:1) at function "kil" not defined: function "kil" not defined`)
 }

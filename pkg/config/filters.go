@@ -25,6 +25,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/filter/funcmap"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
+	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 	"io"
 	"io/ioutil"
@@ -140,20 +141,20 @@ type FilterConfig struct {
 	Action string `json:"action" yaml:"action"`
 }
 
-// validate ensures the correctness of the filter
+// parseTmpl ensures the correctness of the filter
 // action template by trying to parse the template
 // string from the base64 payload.
-func (f FilterConfig) tryTmpl(filename string) error {
+func (f FilterConfig) parseTmpl(resource string) error {
 	if f.Action == "" {
 		return nil
 	}
-	tmpl, err := base64.StdEncoding.DecodeString(f.Action)
+	decoded, err := base64.StdEncoding.DecodeString(f.Action)
 	if err != nil {
 		return err
 	}
-	_, err = template.New(f.Name).Funcs(funcmap.New()).Parse(string(tmpl))
+	_, err = template.New(f.Name).Funcs(funcmap.New()).Parse(string(decoded))
 	if err != nil {
-		return cleanupParseError(filename, err)
+		return cleanupParseError(resource, err)
 	}
 	return nil
 }
@@ -165,8 +166,21 @@ type FilterGroup struct {
 	Selector    FilterGroupSelector `json:"selector" yaml:"selector"`
 	Policy      FilterGroupPolicy   `json:"policy" yaml:"policy"`
 	Relation    FilterGroupRelation `json:"relation" yaml:"relation"`
-	FromStrings []*FilterConfig     `json:"from_strings" yaml:"from_strings"`
+	FromStrings []*FilterConfig     `json:"from-strings" yaml:"from-strings"`
 	Tags        []string            `json:"tags" yaml:"tags"`
+}
+
+func (g FilterGroup) validate(resource string) error {
+	for _, filter := range g.FromStrings {
+		if filter.Action != "" && g.Policy == ExcludePolicy {
+			return fmt.Errorf("%q filter found in %q group with exclude policy. " +
+				"Only groups with include policies can have filter actions", filter.Name, g.Name)
+		}
+		if err := filter.parseTmpl(resource); err != nil {
+			return fmt.Errorf("invalid %q filter action: %v", filter.Name, err)
+		}
+	}
+	return nil
 }
 
 // FilterGroupSelector permits specifying the events
@@ -183,8 +197,16 @@ type FilterGroupSelector struct {
 // Filter expressions can reside in the filter group file or
 // live in a separate file.
 type Filters struct {
-	FromPaths []string `json:"from_paths" yaml:"from_paths"`
-	FromURLs  []string `json:"from_urls" yaml:"from_urls"`
+	FromPaths []string `json:"from-paths" yaml:"from-paths"`
+	FromURLs  []string `json:"from-urls" yaml:"from-urls"`
+}
+
+const filtersFromPaths = "filters.from-paths"
+const filtersFromURLs = "filters.from-urls"
+
+func (f *Filters) initFromViper(v *viper.Viper) {
+	f.FromPaths = v.GetStringSlice(filtersFromPaths)
+	f.FromURLs = v.GetStringSlice(filtersFromURLs)
 }
 
 // LoadGroups for each filter group file it decodes the
@@ -237,17 +259,17 @@ func (f Filters) LoadGroups() ([]FilterGroup, error) {
 	return allGroups, nil
 }
 
-func decodeFilterGroups(filename string, b []byte) ([]FilterGroup, error) {
+func decodeFilterGroups(resource string, b []byte) ([]FilterGroup, error) {
 	var out interface{}
 	err := yaml.Unmarshal(b, &out)
 	if err != nil {
-		return nil, fmt.Errorf("%q is invalid yaml file: %v", filename, err)
+		return nil, fmt.Errorf("%q is invalid yaml file: %v", resource, err)
 	}
 
 	rawGroups, ok := out.([]interface{})
 	if !ok {
 		return nil, fmt.Errorf("invalid filter group "+
-			"file %s: expected array(s) of groups", filename)
+			"file %s: expected array(s) of groups", resource)
 	}
 	// apply validation to each group
 	// declared in the yml config file
@@ -260,7 +282,7 @@ func decodeFilterGroups(filename string, b []byte) ([]FilterGroup, error) {
 				rawGroup = string(b)
 			}
 			return nil, fmt.Errorf("invalid filter group: \n\n"+
-				"%v in %s: %v", rawGroup, filename, multierror.Wrap(errs...))
+				"%v in %s: %v", rawGroup, resource, multierror.Wrap(errs...))
 		}
 	}
 	// convert filter action template to
@@ -272,7 +294,7 @@ func decodeFilterGroups(filename string, b []byte) ([]FilterGroup, error) {
 	if err != nil {
 		return nil, err
 	}
-	b, err = renderTmpl(filename, b)
+	b, err = renderTmpl(resource, b)
 	if err != nil {
 		return nil, err
 	}
@@ -284,18 +306,17 @@ func decodeFilterGroups(filename string, b []byte) ([]FilterGroup, error) {
 	}
 	// try to validate filter action template
 	for _, group := range groups {
-		for _, filter := range group.FromStrings {
-			if err := filter.tryTmpl(filename); err != nil {
-				return nil, fmt.Errorf("invalid %q filter action: %v", filter.Name, err)
-			}
+		err := group.validate(resource)
+		if err != nil {
+			return nil, err
 		}
 	}
-
 	return groups, nil
 }
 
 // renderTmpl executes templating directives in the
-// file group yaml file.
+// file group yaml file. It returns the byte slice
+// with yaml content after template expansion.
 func renderTmpl(filename string, b []byte) ([]byte, error) {
 	rawValues := unmarshalValues(filename)
 	tmpl, err := template.New(filename).Funcs(funcmap.New()).Parse(string(b))

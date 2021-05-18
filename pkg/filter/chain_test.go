@@ -23,6 +23,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"net"
 	"testing"
@@ -64,6 +65,15 @@ func newConfig(fromFiles ...string) *config.Config {
 		},
 	}
 	return c
+}
+
+func TestChainCompileMergeGroups(t *testing.T) {
+	chain := NewChain(newConfig("_fixtures/merged_groups.yml"))
+	require.NoError(t, chain.Compile())
+
+	assert.Len(t, chain.filterGroups, 2)
+	assert.Len(t, chain.filterGroups[ktypes.Recv.Hash()], 2)
+	assert.Len(t, chain.filterGroups[ktypes.Net.Hash()], 1)
 }
 
 func TestChainRun(t *testing.T) {

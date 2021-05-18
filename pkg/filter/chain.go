@@ -21,6 +21,7 @@ package filter
 import (
 	"bytes"
 	"encoding/base64"
+	"errors"
 	"expvar"
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/config"
@@ -67,7 +68,8 @@ type filterGroups []*filterGroup
 
 func (groups filterGroups) hasIncludePolicy(kevt *kevent.Kevent) bool {
 	for _, g := range groups {
-		if g.group.Selector.Type == kevt.Type || g.group.Selector.Category == kevt.Category {
+		if g.group.Selector.Type == kevt.Type ||
+			g.group.Selector.Category == kevt.Category {
 			if g.group.Policy == config.IncludePolicy {
 				return true
 			}
@@ -192,8 +194,11 @@ nextGroup:
 		// filters. Depending on the group policy
 		// and relation we act accordingly
 		for _, f := range g.filters {
+			// execute filter
 			ok := f.run(kevt)
-
+			// apply group policies and
+			// for each policy their two
+			// possible relation types
 			switch g.group.Policy {
 			case config.ExcludePolicy:
 				switch g.group.Relation {
@@ -229,9 +234,8 @@ nextGroup:
 					andMatched = true
 				}
 			}
-
 		}
-
+		// got a match on the and relation group
 		if andMatched {
 			switch g.group.Policy {
 			case config.ExcludePolicy:
@@ -272,9 +276,11 @@ func runFilterAction(kevt *kevent.Kevent, group config.FilterGroup, filter *conf
 	}
 	action, err := base64.StdEncoding.DecodeString(filter.Action)
 	if err != nil {
-		return err
+		return fmt.Errorf("corrupted filter action: %v", err)
 	}
+
 	fmap := funcmap.New()
+	funcmap.InitFuncs(fmap)
 	tmpl, err := template.New(filter.Name).Funcs(fmap).Parse(string(action))
 	if err != nil {
 		return err
@@ -285,5 +291,11 @@ func runFilterAction(kevt *kevent.Kevent, group config.FilterGroup, filter *conf
 		Group:  group,
 	}
 	var bb bytes.Buffer
-	return tmpl.Execute(&bb, ctx)
+	if err := tmpl.Execute(&bb, ctx); err != nil {
+		return err
+	}
+	if bb.Len() > 0 {
+		return errors.New(bb.String())
+	}
+	return nil
 }

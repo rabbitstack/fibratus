@@ -4,6 +4,6 @@
   enabled: true
   policy: exclude
   relation: or
-  from_strings:
+  from-strings:
     - name: ignore http connections
       def: net.dport = 80

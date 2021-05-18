@@ -29,15 +29,20 @@ import (
 
 // New returns the template func map
 // populated with some useful template functions
-// that can be used in filter actions.
+// that can be used in filter actions. Some functions
+// are late-bound, so we merely provide a declaration.
+// The real function is attached when the filter action
+// is triggered.
 func New() template.FuncMap {
 	f := sprig.TxtFuncMap()
 
 	extra := template.FuncMap{
-		// Here we declare extra functions to
-		// use them from the group file templates
-		"emitAlert": emitAlert,
-		"kill":      kill,
+		// This is a placeholder for the functions that are
+		// late-bound to a template. By declaring them here, we
+		// can still execute the template associated with the
+		// filter action to ensure template syntax is correct
+		"emit": func(title string, text string, args ...string) string {return ""},
+		"kill": func(pid int) string { return "" },
 	}
 
 	for k, v := range extra {
@@ -47,12 +52,17 @@ func New() template.FuncMap {
 	return f
 }
 
-// emitAlert sends an alert via all configured alert senders.
-func emitAlert(title string, text string, args ...string) string {
+// InitFuncs assigns late-bound functions to the func map.
+func InitFuncs(funcMap template.FuncMap) {
+	funcMap["emit"] = emit
+	funcMap["kill"] = kill
+}
+
+// emit sends an alert via all configured alert senders.
+func emit(title string, text string, args ...string) string {
 	senders := alertsender.FindAll()
 	if len(senders) == 0 {
-		log.Warn("no alertsenders registered. Alert won't be sent")
-		return ""
+		return "no alertsenders registered. Alert won't be sent"
 	}
 
 	severity := "normal"
