@@ -119,14 +119,14 @@ func (p *Parser) parseUnaryExpr() (Expr, error) {
 			}
 			// Expect an RPAREN at the end.
 			if tok, pos, lit := p.scanIgnoreWhitespace(); tok != rparen {
-				return nil, newParseError(tokstr(tok, lit), []string{")"}, pos, p.expr)
+				return nil, newParseError(tokstr(tok, lit), []string{"')'"}, pos, p.expr)
 			}
 			return &ParenExpr{Expr: expr}, nil
 		}
 
 		// Expect an RPAREN at the end of list
 		if tok, pos, lit := p.scanIgnoreWhitespace(); tok != rparen {
-			return nil, newParseError(tokstr(tok, lit), []string{")"}, pos, p.expr)
+			return nil, newParseError(tokstr(tok, lit), []string{"')'"}, pos, p.expr)
 		}
 
 		return &ListLiteral{Values: tagKeys}, nil
@@ -174,13 +174,16 @@ func (p *Parser) parseUnaryExpr() (Expr, error) {
 	if tok == badip {
 		expectations = []string{"a valid IP address"}
 	}
+	if tok == badesc || tok == badstr {
+		expectations = []string{"a valid string but bad string or escape found"}
+	}
 
 	return nil, newParseError(tokstr(tok, lit), expectations, pos, p.expr)
 }
 
 func (p *Parser) parseList() ([]string, error) {
 	tok, pos, lit := p.scanIgnoreWhitespace()
-	if tok != str {
+	if tok != str && tok != ip && tok != integer {
 		return []string{}, newParseError(tokstr(tok, lit), []string{"identifier"}, pos, p.expr)
 	}
 	idents := []string{lit}
@@ -193,7 +196,7 @@ func (p *Parser) parseList() ([]string, error) {
 		}
 
 		tok, pos, lit := p.scanIgnoreWhitespace()
-		if tok != str {
+		if tok != str && tok != ip && tok != integer {
 			return []string{}, newParseError(tokstr(tok, lit), []string{"identifier"}, pos, p.expr)
 		}
 

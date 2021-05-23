@@ -456,18 +456,19 @@ var filterGroupSchema = `
 		"tags":			{"type": "array", "items": [{"type": "string", "minLength": 1}]},
 		"from-strings": {
 			"type": "array",
-			"items": [
+			"items": 
 				{
 					"type": "object",
 					"properties": {
-						"name": 	{"type": "string", "minLength": 1},
-						"def": 		{"type": "string", "minLength": 5},
+						"name": 	{"type": "string", "minLength": 3},
+						"def": 		{"type": "string", "minLength": 3},
 						"action": 	{"type": "string"}
 					},
 					"required": ["name", "def"],
+					"minItems": 1,
 					"additionalProperties": false
 				}
-			]
+			
 		}
 	},
 	"required": ["group", "enabled", "selector", "from-strings"],

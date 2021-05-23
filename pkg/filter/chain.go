@@ -28,6 +28,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/filter/funcmap"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	log "github.com/sirupsen/logrus"
+	"strings"
 	"text/template"
 )
 
@@ -288,7 +289,7 @@ func runFilterAction(kevt *kevent.Kevent, group config.FilterGroup, filter *conf
 	if err := tmpl.Execute(&bb, ctx); err != nil {
 		return err
 	}
-	if bb.Len() > 0 {
+	if strings.TrimSpace(bb.String()) != "" {
 		return errors.New(bb.String())
 	}
 	return nil

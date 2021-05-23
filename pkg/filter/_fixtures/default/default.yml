@@ -96,7 +96,7 @@
     - name: Media Player
       def: ps.exe = 'C:\\Program Files\\Windows Media Player\\wmpnscfg.exe'
     - name: Google
-      def: ps.comm startswith
+      def: ps.comm in
           (
             '\"C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe\\\" --type='
           )

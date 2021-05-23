@@ -7,5 +7,3 @@
   from-strings:
     - name: match https connections
       def: net.dport = 443
-      action: |
-       {{ emit "a" "a" "normal" .Kevt.Name }}

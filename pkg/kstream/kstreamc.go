@@ -636,7 +636,7 @@ func getParam(name string, buffer []byte, size uint32, nonStructType tdh.NonStru
 // - process that produced the kernel event is fibratus itself
 // - kernel event is present in the blacklist, and thus it is always dropped
 // - filters defined in filter group files are triggered
-// - finally, the event is evaluated by the CLI filter
+// - finally, the event is checked by the CLI filter
 func (k *kstreamConsumer) isDropped(kevt *kevent.Kevent) bool {
 	if kevt.Type.Dropped(k.capture) {
 		return true
@@ -649,12 +649,12 @@ func (k *kstreamConsumer) isDropped(kevt *kevent.Kevent) bool {
 		return true
 	}
 	if ok := k.filterChain.Run(kevt); !ok {
-		return false
+		return true
 	}
 	if k.filter != nil {
 		return !k.filter.Run(kevt)
 	}
-	return true
+	return false
 }
 
 // dropBlacklistProc drops the events from the blacklist if it is linked to particular process name.

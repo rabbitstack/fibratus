@@ -323,7 +323,10 @@ func decodeFilterGroups(resource string, b []byte) ([]FilterGroup, error) {
 // file group yaml file. It returns the byte slice
 // with yaml content after template expansion.
 func renderTmpl(filename string, b []byte) ([]byte, error) {
-	rawValues := unmarshalValues(filename)
+	rawValues, err := unmarshalValues(filename)
+	if err != nil {
+		return nil, err
+	}
 	tmpl, err := template.New(filename).Funcs(funcmap.New()).Parse(string(b))
 	if err != nil {
 		return nil, cleanupParseError(filename, err)
@@ -341,21 +344,24 @@ func renderTmpl(filename string, b []byte) ([]byte, error) {
 // unmarshalValues reads the values defined in
 // the values.yml file is the file is present
 // in the same directory as the filter group yaml file.
-func unmarshalValues(filename string) interface{} {
+func unmarshalValues(filename string) (interface{}, error) {
 	path := filepath.Join(filepath.Dir(filename), "values.yml")
 	f, err := ioutil.ReadFile(path)
 	if err != nil {
-		return nil
+		return nil, nil
 	}
 	var rawValues interface{}
 	err = yaml.Unmarshal(f, &rawValues)
 	if err != nil {
-		return nil
+		return nil, fmt.Errorf("unable to unmarshal yaml: %v", err)
 	}
-	return rawValues
+	return rawValues, nil
 }
 
 func cleanupParseError(filename string, err error) error {
+	if err == nil {
+		return nil
+	}
 	tokens := strings.Split(err.Error(), ": ")
 	if len(tokens) < 2 {
 		// This might happen if a non-templating error occurs
