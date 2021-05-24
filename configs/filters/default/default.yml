@@ -1,5 +1,6 @@
-# ========================== Filter rules ================================
-# This filter group rules try to mimic the subset of the sysmon config template
+# ====================================================================================================
+#
+# This filter rules try to mimic the subset of the sysmon config template
 # created by SwiftOnSecurity (https://github.com/SwiftOnSecurity/sysmon-config).
 #
 # All credits for digging the rule definitions go to the above author/contributors.
@@ -9,7 +10,11 @@
 # some filter fields are still missing in Fibratus, so that sysmon rules were
 # omitted.
 #
-# ======================= Process creation ================================
+# To improve detection precision, the `matches` operator the case insensitive string
+# operators were used, instead of original operators.
+#
+#
+# ======================= Process creation ===========================================================
 #
 # All processes launched will be logged, except for what matches a rule below.
 # It's best to be as specific as possible, to avoid user-mode executables imitating
@@ -23,7 +28,7 @@
   relation: or
   from-strings:
     - name: Windows error reporting/telemetry, WMI provider host
-      def: ps.comm startswith
+      def: ps.comm istartswith
           (
             ' \"C:\\Windows\\system32\\wermgr.exe\\" \"-queuereporting_svc\" ',
             'C:\\Windows\\system32\\DllHost.exe /Processid',
@@ -69,19 +74,19 @@
     - name: svchost
       def: ps.comm in {{ .Values.processes.comm.svchost | stringify }}
     - name: Microsoft edge
-      def: ps.comm startswith '\"C:\\Program Files (x86)\\Microsoft\\Edge Dev\\Application\\msedge.exe\" --type='
+      def: ps.comm istartswith '\"C:\\Program Files (x86)\\Microsoft\\Edge Dev\\Application\\msedge.exe\" --type='
     - name: Microsoft dotNet
-      def: ps.comm startswith
+      def: ps.comm istartswith
           (
             'C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\ngen.exe',
             'C:\\WINDOWS\\Microsoft.NET\\Framework64\\v4.0.30319\\Ngen.exe'
           )
             or
-          ps.exe in
+          ps.exe matches
           (
-            'C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\mscorsvw.exe',
-            'C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\mscorsvw.exe',
-            'C:\\Windows\\Microsoft.Net\\Framework64\\v3.0\\WPF\\PresentationFontCache.exe'
+            'C:\\Windows\\Microsoft.NET\\Framework64\\*\\mscorsvw.exe',
+            'C:\\Windows\\Microsoft.NET\\Framework\\*\\mscorsvw.exe',
+            'C:\\Windows\\Microsoft.Net\\Framework64\\*\\WPF\\PresentationFontCache.exe'
           )
     - name: Microsoft Office
       def: ps.exe in
@@ -96,13 +101,64 @@
     - name: Media Player
       def: ps.exe = 'C:\\Program Files\\Windows Media Player\\wmpnscfg.exe'
     - name: Google
-      def: ps.comm startswith
+      def: ps.comm istartswith
           (
-            '\"C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe\\\" --type='
+            '\"C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe\\\" --type=',
+            '\"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\" --type='
           )
 
+# ======================= Process termination ========================================================
+#
+- group: Suspicious process terminations
+  selector:
+    type: TerminateProcess
+  enabled: true
+  policy: include
+  relation: or
+  from-strings:
+    - name: User binaries
+      def: ps.name startswith ('C:\\Users', '\\')
 
-# ======================= Network connection initiated ================================
+
+# ======================= Remote thread creation =====================================================
+#
+# Monitor for processes injecting code into other processes. Often used by malware to cloak their actions.
+# Also when Firefox loads Flash.
+#
+- group: Safe remote thread creation sources
+  selector:
+    type: CreateThread
+  enabled: false
+  policy: exclude
+  relation: or
+  from-strings:
+    - name: System processes and common binaries
+      def: kevt.pid != thread.pid
+             and
+           ps.exe iin
+           (
+              'C:\\Windows\\system32\\wbem\\WmiPrvSE.exe',
+              'C:\\Windows\\system32\\svchost.exe',
+              'C:\\Windows\\system32\\wininit.exe',
+              'C:\\Windows\\system32\\csrss.exe',
+              'C:\\Windows\\system32\\services.exe',
+              'C:\\Windows\\system32\\winlogon.exe',
+              'C:\\Windows\\system32\\audiodg.exe',
+              'C:\\Windows\\system32\\kernel32.dll',
+              'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe'
+           )
+
+- group: Suspicious remote thread creations
+  selector:
+    type: CreateThread
+  enabled: true
+  policy: include
+  relation: or
+  from-strings:
+    - name: Fishy remote threads
+      def: kevt.pid != thread.pid
+
+# ======================= Network connection initiated ===============================================
 #
 # By default this configuration takes a very conservative approach to network logging,
 # limited to only extremely high-signal events.
@@ -115,7 +171,7 @@
   relation: or
   from-strings:
     - name: Suspicious sources for network-connecting binaries
-      def: ps.exe startswith
+      def: ps.exe istartswith
           (
             'C:\\Users',
             'C:\\Recycle',
@@ -200,7 +256,7 @@
             9030
           )
 
-- group: Suspicious network-connecting binaries
+- group: Microsoft binaries and known addresses
   selector:
     type: Connect
   enabled: true

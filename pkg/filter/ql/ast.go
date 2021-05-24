@@ -708,6 +708,17 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 				}
 			}
 			return false
+		case iin:
+			rhs, ok := rhs.([]string)
+			if !ok {
+				return false
+			}
+			for _, i := range rhs {
+				if strings.ToLower(i) == strings.ToLower(lhs) {
+					return true
+				}
+			}
+			return false
 		case startswith:
 			switch rhs := rhs.(type) {
 			case string:
@@ -722,6 +733,20 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			default:
 				return false
 			}
+		case istartswith:
+			switch rhs := rhs.(type) {
+			case string:
+				return strings.HasPrefix(strings.ToLower(lhs), strings.ToLower(rhs))
+			case []string:
+				for _, s := range rhs {
+					if strings.HasPrefix(strings.ToLower(lhs), strings.ToLower(s)) {
+						return true
+					}
+				}
+				return false
+			default:
+				return false
+			}
 		case endswith:
 			switch rhs := rhs.(type) {
 			case string:
@@ -729,6 +754,20 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			case []string:
 				for _, s := range rhs {
 					if strings.HasSuffix(lhs, s) {
+						return true
+					}
+				}
+				return false
+			default:
+				return false
+			}
+		case iendswith:
+			switch rhs := rhs.(type) {
+			case string:
+				return strings.HasSuffix(strings.ToLower(lhs), strings.ToLower(rhs))
+			case []string:
+				for _, s := range rhs {
+					if strings.HasSuffix(strings.ToLower(lhs), strings.ToLower(s)) {
 						return true
 					}
 				}
