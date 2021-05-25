@@ -35,7 +35,7 @@ type Handle struct {
 	// Num represents the internal handle identifier.
 	Num handle.Handle `json:"id"`
 	// Object is the kernel address that this handle references.
-	Object uint64 `json:"object"`
+	Object uint64 `json:"-"`
 	// Pid represents the process's identifier that owns the handle.
 	Pid uint32 `json:"-"`
 	// Type is the type of this handle (e.g. File, Key, Mutant, Section)

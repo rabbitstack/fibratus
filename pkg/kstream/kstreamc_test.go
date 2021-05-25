@@ -133,7 +133,12 @@ func TestProcessKevent(t *testing.T) {
 
 		ts, err := time.Parse("2006-01-02 15:04:05.0000000 -0700 CEST", "2019-04-05 16:10:36.5225778 +0200 CEST")
 		require.NoError(t, err)
-		assert.Equal(t, ts, kevt.Timestamp)
+		assert.Equal(t, ts.Year(), kevt.Timestamp.Year())
+		assert.Equal(t, ts.Month(), kevt.Timestamp.Month())
+		assert.Equal(t, ts.Day(), kevt.Timestamp.Day())
+		assert.Equal(t, ts.Minute(), kevt.Timestamp.Minute())
+		assert.Equal(t, ts.Second(), kevt.Timestamp.Second())
+		assert.Equal(t, ts.Nanosecond(), kevt.Timestamp.Nanosecond())
 		assert.Len(t, kevt.Kparams, 9)
 
 		assert.True(t, kevt.Kparams.Contains(kparams.DTB))
