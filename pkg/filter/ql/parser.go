@@ -214,7 +214,7 @@ func (p *Parser) parseFunction(name string) (*Function, error) {
 	// This is the case for functions without arguments
 	if tok, _, _ := p.scan(); tok == rparen {
 		fn := &Function{Name: name}
-		if err := checkFuncCall(fn); err != nil {
+		if err := fn.validate(); err != nil {
 			return nil, err
 		}
 		return fn, nil
@@ -250,7 +250,7 @@ func (p *Parser) parseFunction(name string) (*Function, error) {
 
 	fn := &Function{Name: name, Args: args}
 
-	if err := checkFuncCall(fn); err != nil {
+	if err := fn.validate(); err != nil {
 		return nil, err
 	}
 

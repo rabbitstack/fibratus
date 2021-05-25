@@ -714,7 +714,7 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 				return false
 			}
 			for _, i := range rhs {
-				if strings.ToLower(i) == strings.ToLower(lhs) {
+				if strings.EqualFold(i, lhs) {
 					return true
 				}
 			}

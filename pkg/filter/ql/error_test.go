@@ -25,7 +25,7 @@ import (
 
 func TestParseError(t *testing.T) {
 	err := newParseError("[", []string{"("}, 10, "ps.name in ['svchost.exe', 'cmd.exe')")
-	expected := "ps.name in ['svchost.exe', 'cmd.exe')\n" +
+	expected := "\nps.name in ['svchost.exe', 'cmd.exe')\n" +
 		"           ^ expected ("
 	assert.Equal(t, expected, err.Error())
 }

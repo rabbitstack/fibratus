@@ -10,9 +10,6 @@
 # some filter fields are still missing in Fibratus, so that sysmon rules were
 # omitted.
 #
-# To improve detection precision, the `matches` operator the case insensitive string
-# operators were used, instead of original operators.
-#
 #
 # ======================= Process creation ===========================================================
 #
@@ -36,7 +33,7 @@
             'C:\\Windows\\system32\\wbem\\wmiprvse.exe -secured -Embedding'
           )
     - name: Windows error reporting/telemetry, Search Indexer, Session Manager, Auto check utility
-      def: ps.comm in
+      def: ps.comm iin
           (
             'C:\\Windows\\system32\\wermgr.exe -upload',
             'C:\\Windows\\system32\\SearchIndexer.exe /Embedding',
@@ -46,7 +43,7 @@
             'C:\\Windows\\System32\\RuntimeBroker.exe -Embedding'
           )
     - name: Various Windows processes
-      def: ps.exe in
+      def: ps.exe iin
           (
             'C:\\Program Files (x86)\\Common Files\\microsoft shared\\ink\\TabTip32.exe',
             'C:\\Windows\\System32\\TokenBrokerCookies.exe',
@@ -66,13 +63,13 @@
             'C:\\Windows\\system32\\wbem\\WmiApSrv.exe'
           )
             or
-          ps.comm in
+          ps.comm iin
           (
             'C:\\WINDOWS\\system32\\devicecensus.exe UserCxt',
             'C:\\Windows\\System32\\usocoreworker.exe -Embedding'
           )
     - name: svchost
-      def: ps.comm in {{ .Values.processes.comm.svchost | stringify }}
+      def: ps.comm iin {{ .Values.processes.comm.svchost | stringify }}
     - name: Microsoft edge
       def: ps.comm istartswith '\"C:\\Program Files (x86)\\Microsoft\\Edge Dev\\Application\\msedge.exe\" --type='
     - name: Microsoft dotNet
@@ -82,14 +79,14 @@
             'C:\\WINDOWS\\Microsoft.NET\\Framework64\\v4.0.30319\\Ngen.exe'
           )
             or
-          ps.exe matches
+          ps.exe imatches
           (
             'C:\\Windows\\Microsoft.NET\\Framework64\\*\\mscorsvw.exe',
             'C:\\Windows\\Microsoft.NET\\Framework\\*\\mscorsvw.exe',
             'C:\\Windows\\Microsoft.Net\\Framework64\\*\\WPF\\PresentationFontCache.exe'
           )
     - name: Microsoft Office
-      def: ps.exe in
+      def: ps.exe iin
           (
             'C:\\Program Files\\Microsoft Office\\Office16\\MSOSYNC.EXE',
             'C:\\Program Files (x86)\\Microsoft Office\\Office16\\MSOSYNC.EXE',
@@ -117,7 +114,7 @@
   relation: or
   from-strings:
     - name: User binaries
-      def: ps.name startswith ('C:\\Users', '\\')
+      def: ps.name istartswith ('C:\\Users', '\\')
 
 
 # ======================= Remote thread creation =====================================================
@@ -128,7 +125,7 @@
 - group: Safe remote thread creation sources
   selector:
     type: CreateThread
-  enabled: false
+  enabled: true
   policy: exclude
   relation: or
   from-strings:
@@ -157,6 +154,10 @@
   from-strings:
     - name: Fishy remote threads
       def: kevt.pid != thread.pid
+      action: |
+        {{ $title := cat "Identified remote thread creation in" .Kevt.Kparams.exe }}
+        {{ $text := cat "Injected by" .Kevt.PS.Exe }}
+        {{ emit $title $text }}
 
 # ======================= Network connection initiated ===============================================
 #
@@ -264,7 +265,7 @@
   relation: or
   from-strings:
     - name: Microsoft binaries
-      def: ps.exe startswith 'C:\\ProgramData\\Microsoft\\Windows Defender\\Platform\\'
+      def: ps.exe istartswith 'C:\\ProgramData\\Microsoft\\Windows Defender\\Platform\\'
               or
            ps.exe endswith 'AppData\\Local\\Microsoft\\Teams\\current\\Teams.exe'
               or
@@ -278,3 +279,43 @@
       def: net.dip in (23.4.43.27, 72.21.91.29)
     - name: Loopback addresses
       def: net.dip = 127.0.0.1 or net.dip startswith 'fe80:0:0:0'
+
+# ======================= File created ===============================================================
+#
+- group: Suspicious file creation operations
+  selector:
+    type: CreateFile
+  enabled: true
+  policy: include
+  relation: or
+  from-strings:
+    - name: Startup links and shortcut modifications
+      def: file.operation = 'create'
+              and
+           file.name icontains
+           (
+              '\\Start Menu',
+              '\\Startup\\'
+           )
+    - name: Microsoft Outlook attachments
+      def: file.operation = 'create' and file.name icontains '\\Content.Outlook\\'
+    - name: Downloaded files
+      def: file.operation = 'create' and file.name icontains '\\Downloads\\'
+    - name: Microsoft ClickOnce application
+      def: file.operation = 'create'
+              and
+           file.extension in
+           (
+              '.application',
+              '.appref-ms'
+           )
+    - name: Batch scripting
+      def: file.operation = 'create'
+              and
+           file.extension in
+           (
+              '.bat',
+              '.chm',
+              '.cmd',
+              '.cmdline'
+           )

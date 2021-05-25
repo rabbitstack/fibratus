@@ -132,6 +132,26 @@ func TestChainRun(t *testing.T) {
 	}
 }
 
+func TestIncludeExcludeRemoteThreads(t *testing.T) {
+	chain := NewChain(newConfig("_fixtures/include_exclude_remote_threads.yml"))
+	require.NoError(t, chain.Compile())
+
+	kevt := &kevent.Kevent{
+		Type: ktypes.CreateThread,
+		Name: "CreateThread",
+		Tid:  2484,
+		PID:  859,
+		PS: &types.PS{
+			Exe: "C:\\Windows\\system32\\svchost.exe",
+		},
+		Kparams: kevent.Kparams{
+			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
+		},
+	}
+
+	require.False(t, chain.Run(kevt))
+}
+
 func TestFilterActionEmitAlert(t *testing.T) {
 	require.NoError(t, alertsender.LoadAll([]alertsender.Config{{Type: alertsender.Noop}}))
 	chain := NewChain(newConfig("_fixtures/include_policy_emit_alert.yml"))

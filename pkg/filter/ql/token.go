@@ -110,8 +110,8 @@ var tokens = [...]string{
 	not:         "NOT",
 	startswith:  "STARTSWITH",
 	istartswith: "ISTARTSWITH",
-	iendswith:   "IENDSWITH",
 	endswith:    "ENDSWITH",
+	iendswith:   "IENDSWITH",
 	matches:     "MATCHES",
 	imatches:    "IMATCHES",
 

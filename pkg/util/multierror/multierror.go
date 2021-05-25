@@ -54,5 +54,5 @@ func (errors multiError) Error() string {
 		}
 		parts = append(parts, err.Error())
 	}
-	return fmt.Sprintf("[%s]", strings.Join(parts, ", "))
+	return fmt.Sprintf("%s", strings.Join(parts, ", "))
 }

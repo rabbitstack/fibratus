@@ -191,6 +191,7 @@ func TestFilterRunFileKevent(t *testing.T) {
 		{`file.name endswith ('.exe', 'kernel32.dll', 'user32.dll')`, true},
 		{`file.name iendswith ('.EXE', 'KERNEL32.dll', 'user32.dll')`, true},
 		{`file.name istartswith ('C:\\WINDOWS', 'KERNEL32.dll', 'user32.dll')`, true},
+		{`file.name iin ('C:\\WINDOWS\\system32\\user32.dll')`, true},
 	}
 
 	for i, tt := range tests {
