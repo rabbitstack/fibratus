@@ -3,7 +3,7 @@ package config
 import (
 	"io/ioutil"
 
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 // Config represents server changeable se
