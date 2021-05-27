@@ -32,7 +32,7 @@ var (
 		for i, typ := range types {
 			argTypes[i] = typ.String()
 		}
-		return fmt.Errorf("argument #%d (%s) in function %s should be one of %v", i+1, keyword, fn, strings.Join(argTypes, "|"))
+		return fmt.Errorf("argument #%d (%s) in function %s should be one of: %v", i+1, keyword, fn, strings.Join(argTypes, "|"))
 	}
 	// ErrUndefinedFunction is thrown when an unknown function is supplied
 	ErrUndefinedFunction = func(name string) error {

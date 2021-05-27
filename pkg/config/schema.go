@@ -122,8 +122,8 @@ var schema = `
 		"filters": {
 			"type": "object",
 			"properties": {
-				"from-paths": 	{"type": "array", "items": [{"type": "string", "minLength": 5}]},
-				"from-urls":	{"type": "array", "items": [{"type": "string", "minLength": 5}]}
+				"from-paths": 	{"type": ["array", "null"], "items": [{"type": "string", "minLength": 5}]},
+				"from-urls":	{"type": ["array", "null"], "items": [{"type": "string", "minLength": 5}]}
 			},
 			"additionalProperties": false
 		},
