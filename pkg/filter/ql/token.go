@@ -55,6 +55,10 @@ const (
 	endswith   // endswith
 	matches    // matches
 	imatches   // imatches
+	fuzzy      // fuzzy
+	ifuzzy     // ifuzzy
+	fuzzynorm  // fuzzynorm
+	ifuzzynorm // ifuzzynorm
 	eq         // =
 	neq        // !=
 	lt         // <
@@ -73,7 +77,7 @@ var keywords map[string]token
 
 func init() {
 	keywords = make(map[string]token)
-	for _, tok := range []token{and, or, contains, icontains, in, not, startswith, endswith, matches, imatches} {
+	for _, tok := range []token{and, or, contains, icontains, in, not, startswith, endswith, matches, imatches, fuzzy, ifuzzy, fuzzynorm, ifuzzynorm} {
 		keywords[strings.ToLower(tokens[tok])] = tok
 	}
 	keywords["true"] = truet
@@ -108,6 +112,10 @@ var tokens = [...]string{
 	endswith:   "ENDSWITH",
 	matches:    "MATCHES",
 	imatches:   "IMATCHES",
+	fuzzy:      "FUZZY",
+	ifuzzy:     "IFUZZY",
+	fuzzynorm:  "FUZZYNORM",
+	ifuzzynorm: "IFUZZYNORM",
 
 	eq:  "=",
 	neq: "!=",
@@ -144,7 +152,7 @@ func (tok token) precedence() int {
 		return 3
 	case eq, neq, lt, lte, gt, gte:
 		return 4
-	case in, contains, icontains, startswith, endswith, matches, imatches:
+	case in, contains, icontains, startswith, endswith, matches, imatches, fuzzy, ifuzzy, fuzzynorm, ifuzzynorm:
 		return 5
 	}
 	return 0

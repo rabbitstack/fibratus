@@ -189,6 +189,11 @@ func TestFilterRunFileKevent(t *testing.T) {
 		{`file.name contains ('C:\\Windows\\system32\\kernel32.dll', 'C:\\Windows\\system32\\user32.dll')`, true},
 		{`file.name not matches ('C:\\*.exe', 'C:\\Windows\\*.com')`, true},
 		{`file.name endswith ('.exe', 'kernel32.dll', 'user32.dll')`, true},
+		{`file.name fuzzy 'C:\\Windows\\system32\\ser3ll'`, true},
+		{`file.name ifuzzy 'C:\\WINDOWS\\sYS\\ser3ll'`, true},
+		{`file.name ifuzzy 'C:\\WINDOWS\\sYS\\32dll'`, true},
+		{`file.name fuzzy ('C:\\Windows\\system32\\kernel', 'C:\\Windows\\system32\\ser3ll')`, true},
+		{`file.name ifuzzynorm 'C:\\WINDOWS\\sÝS\\32dll'`, true},
 	}
 
 	for i, tt := range tests {
