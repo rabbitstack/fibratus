@@ -26,7 +26,10 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/network"
 	"github.com/rabbitstack/fibratus/pkg/pe"
+	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
+	"math"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -62,6 +65,13 @@ func newKevtAccessor() accessor {
 
 const timeFmt = "15:04:05"
 const dateFmt = "2006-01-02"
+
+func getParentPs(kevt *kevent.Kevent) *pstypes.PS {
+	if kevt.PS == nil {
+		return nil
+	}
+	return kevt.PS.Parent
+}
 
 func (k *kevtAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
 	switch f {
@@ -214,10 +224,16 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 			types[i] = handle.Type
 		}
 		return types, nil
+	case fields.PsParentName:
+		parent := getParentPs(kevt)
+		if parent == nil {
+			return nil, nil
+		}
+		return parent.Name, nil
 	default:
 		field := f.String()
 		switch {
-		case strings.HasPrefix(field, fields.PsEnvsSubfield):
+		case strings.HasPrefix(field, fields.PsEnvsPath):
 			// access the specific environment variable
 			env, _ := captureInBrackets(field)
 			ps := kevt.PS
@@ -235,7 +251,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 				}
 			}
 
-		case strings.HasPrefix(field, fields.PsModsSubfield):
+		case strings.HasPrefix(field, fields.PsModsPath):
 			name, subfield := captureInBrackets(field)
 			ps := kevt.PS
 			if ps == nil {
@@ -258,6 +274,29 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 			case fields.ModuleLocation:
 				return filepath.Dir(mod.Name), nil
 			}
+
+		case strings.HasPrefix(field, fields.PsParentPath):
+			// get the parent index or a wildcard
+			// to indicate we want to visit all of
+			// the parent processes
+			val, subfield := captureInBrackets(field)
+
+			depth, err := strconv.Atoi(val)
+			if err != nil {
+				// we got the * rune
+				depth = math.MaxUint32
+			}
+			currentDepth := 0
+			pstypes.Visit(func(ps *pstypes.PS) {
+				currentDepth++
+				if currentDepth >= depth {
+					return
+				}
+				switch subfield{
+
+				}
+
+			}, kevt.PS)
 		}
 
 		return nil, nil
@@ -513,7 +552,7 @@ func (*peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, erro
 		return p.Imports, nil
 	default:
 		field := f.String()
-		if strings.HasPrefix(field, fields.PeSectionsSubfield) {
+		if strings.HasPrefix(field, fields.PeSectionsPath) {
 			// get the section name
 			sname, subfield := captureInBrackets(field)
 			sec := p.Section(sname)
@@ -530,7 +569,7 @@ func (*peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, erro
 			}
 		}
 
-		if strings.HasPrefix(field, fields.PeResourcesSubfield) {
+		if strings.HasPrefix(field, fields.PeResourcesPath) {
 			// consult the resource name
 			key, _ := captureInBrackets(field)
 			v, ok := p.VersionResources[key]

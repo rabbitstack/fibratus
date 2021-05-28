@@ -98,7 +98,7 @@ func NewSnapshotter(handleSnap handle.Snapshotter, config *config.Config) Snapsh
 	s.handleSnap.RegisterCreateCallback(s.onHandleCreated)
 	s.handleSnap.RegisterDestroyCallback(s.onHandleDestroyed)
 
-	go s.reapDeadProcesses()
+	go s.gcDeadProcesses()
 
 	return s
 }
@@ -188,6 +188,7 @@ func (s *snapshotter) Write(kevt *kevent.Kevent) error {
 		if err != nil {
 			log.Warnf("couldn't enumerate handles for pid (%d): %v", pid, err)
 		}
+		ps.Parent = s.procs[ps.Ppid]
 		ps.Handles = handles
 
 		// inspect PE metadata and attach corresponding headers
@@ -241,6 +242,7 @@ func (s *snapshotter) Write(kevt *kevent.Kevent) error {
 		if err != nil {
 			log.Warnf("couldn't enumerate handles for pid (%d): %v", pid, err)
 		}
+		ps.Parent = s.procs[ps.Ppid]
 		ps.Handles = handles
 
 		s.procs[pid] = ps
@@ -265,10 +267,10 @@ func (s *snapshotter) Close() error {
 	return nil
 }
 
-// reapDeadProcesses periodically scans the map of the snapshot's processes and removes
+// gcDeadProcesses periodically scans the map of the snapshot's processes and removes
 // any terminated processes from it. This guarantees that any leftovers are cleaned-up
 // in case we miss process' terminate events.
-func (s *snapshotter) reapDeadProcesses() {
+func (s *snapshotter) gcDeadProcesses() {
 	tick := time.NewTicker(reapPeriod)
 	for {
 		select {
@@ -367,9 +369,7 @@ func (s *snapshotter) findProcess(pid uint32, thread pstypes.Thread) *pstypes.PS
 		}
 		return pstypes.NewPS(pid, pid, image, "", image, thread, nil)
 	}
-	ppid := process.GetParentPID(h)
-
-	return fromPEB(pid, ppid, peb, thread)
+	return fromPEB(pid, process.GetParentPID(h), peb, thread)
 }
 
 func (s *snapshotter) readPE(ps *pstypes.PS) {

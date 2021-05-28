@@ -24,7 +24,7 @@ import (
 	"sort"
 )
 
-var subfieldRegexp = regexp.MustCompile(`(pe.sections|pe.resources|ps.envs|ps.modules)\[.+\s*].?(.*)`)
+var pathRegexp = regexp.MustCompile(`(pe.sections|pe.resources|ps.envs|ps.modules|ps.parent)\[.+\s*].?(.*)`)
 
 // Field represents the type alias for the field
 type Field string
@@ -58,6 +58,19 @@ const (
 	PsDTB Field = "ps.dtb"
 	// PsModules represents the process modules
 	PsModules Field = "ps.modules"
+	// PsParentName represents the parent process name field
+	PsParentName        Field = "ps.parent.name"
+	PsParentComm        Field = "ps.parent.comm"
+	PsParentExe         Field = "ps.parent.exe"
+	PsParentArgs        Field = "ps.parent.args"
+	PsParentCwd         Field = "ps.parent.cwd"
+	PsParentSID         Field = "ps.parent.sid"
+	PsParentEnvs        Field = "ps.parent.envs"
+	PsParentHandles     Field = "ps.parent.handles"
+	PsParentHandleTypes Field = "ps.parent.handle.types"
+	PsParentDTB         Field = "ps.parent.dtb"
+	PsParentModules     Field = "ps.parent.modules"
+	PsParent            Field = "ps.parent"
 
 	// ThreadBasePrio is the base thread priority
 	ThreadBasePrio Field = "thread.prio"
@@ -242,14 +255,16 @@ const (
 )
 
 const (
-	// PsEnvsSubfield is the process environment variable property indexer
-	PsEnvsSubfield = "ps.envs["
-	// PsModsSubfield is the process module property indexer
-	PsModsSubfield = "ps.modules["
-	// PeSectionsSubfield is the PE section property indexer
-	PeSectionsSubfield = "pe.sections["
-	// PeResourcesSubfield is the PE resource property indexer
-	PeResourcesSubfield = "pe.resources["
+	// PsEnvsPath is the process environment variable path pattern
+	PsEnvsPath = "ps.envs["
+	// PsModsPath is the process module path pattern
+	PsModsPath = "ps.modules["
+	// PsParentPath
+	PsParentPath = "ps.parent["
+	// PeSectionsPath is the PE section path pattern
+	PeSectionsPath = "pe.sections["
+	// PeResourcesPath is the PE resource path pattern
+	PeResourcesPath = "pe.resources["
 )
 
 // FieldInfo is the field metadata descriptor.
@@ -297,6 +312,7 @@ var fields = map[Field]FieldInfo{
 	PsHandleTypes: {PsHandleTypes, "allocated process handle types", kparams.Slice, []string{"ps.handle.types in ('Key', 'Mutant', 'Section')"}},
 	PsDTB:         {PsDTB, "process directory table base address", kparams.HexInt64, []string{"ps.dtb = '7ffe0000'"}},
 	PsModules:     {PsModules, "modules loaded by the process", kparams.Slice, []string{"ps.modules in ('crypt32.dll', 'xul.dll')"}},
+	PsParentName:  {PsParentName, "parent process image name including the file extension", kparams.UnicodeString, []string{"ps.parent.name contains 'powershell'"}},
 
 	ThreadBasePrio:    {ThreadBasePrio, "scheduler priority of the thread", kparams.Int8, []string{"thread.prio = 5"}},
 	ThreadIOPrio:      {ThreadIOPrio, "I/O priority hint for scheduling I/O operations", kparams.Int8, []string{"thread.io.prio = 4"}},
@@ -371,7 +387,7 @@ func Lookup(name string) Field {
 	if _, ok := fields[Field(name)]; ok {
 		return Field(name)
 	}
-	groups := subfieldRegexp.FindStringSubmatch(name)
+	groups := pathRegexp.FindStringSubmatch(name)
 	if len(groups) != 3 {
 		return None
 	}
@@ -406,7 +422,8 @@ func Lookup(name string) Field {
 		case ModuleLocation:
 			return Field(ModuleLocation)
 		}
+	case PsParent:
+		return Field(name)
 	}
-
 	return None
 }
