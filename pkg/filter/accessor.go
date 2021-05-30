@@ -230,10 +230,79 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 			return nil, nil
 		}
 		return parent.Name, nil
+	case fields.PsParentComm:
+		parent := getParentPs(kevt)
+		if parent == nil {
+			return nil, nil
+		}
+		return parent.Comm, nil
+	case fields.PsParentExe:
+		parent := getParentPs(kevt)
+		if parent == nil {
+			return nil, nil
+		}
+		return parent.Exe, nil
+	case fields.PsParentArgs:
+		parent := getParentPs(kevt)
+		if parent == nil {
+			return nil, nil
+		}
+		return parent.Args, nil
+	case fields.PsParentCwd:
+		parent := getParentPs(kevt)
+		if parent == nil {
+			return nil, nil
+		}
+		return parent.Cwd, nil
+	case fields.PsParentSID:
+		parent := getParentPs(kevt)
+		if parent == nil {
+			return nil, nil
+		}
+		return parent.SID, nil
+	case fields.PsParentSessionID:
+		parent := getParentPs(kevt)
+		if parent == nil {
+			return nil, nil
+		}
+		return parent.SessionID, nil
+	case fields.PsParentEnvs:
+		ps := getParentPs(kevt)
+		if ps == nil {
+			return nil, nil
+		}
+		envs := make([]string, 0, len(ps.Envs))
+		for env := range ps.Envs {
+			envs = append(envs, env)
+		}
+		return envs, nil
+	case fields.PsParentHandles:
+		ps := getParentPs(kevt)
+		if ps == nil {
+			return nil, nil
+		}
+		handles := make([]string, len(ps.Handles))
+		for i, handle := range ps.Handles {
+			handles[i] = handle.Name
+		}
+		return handles, nil
+	case fields.PsParentHandleTypes:
+		ps := getParentPs(kevt)
+		if ps == nil {
+			return nil, nil
+		}
+		types := make([]string, len(ps.Handles))
+		for i, handle := range ps.Handles {
+			if types[i] == handle.Type {
+				continue
+			}
+			types[i] = handle.Type
+		}
+		return types, nil
 	default:
 		field := f.String()
 		switch {
-		case strings.HasPrefix(field, fields.PsEnvsPath):
+		case strings.HasPrefix(field, fields.PsEnvsSequence):
 			// access the specific environment variable
 			env, _ := captureInBrackets(field)
 			ps := kevt.PS
@@ -251,7 +320,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 				}
 			}
 
-		case strings.HasPrefix(field, fields.PsModsPath):
+		case strings.HasPrefix(field, fields.PsModsSequence):
 			name, segment := captureInBrackets(field)
 			ps := kevt.PS
 			if ps == nil {
@@ -275,7 +344,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 				return filepath.Dir(mod.Name), nil
 			}
 
-		case strings.HasPrefix(field, fields.PsParentPath):
+		case strings.HasPrefix(field, fields.PsParentSequence):
 			key, segment := captureInBrackets(field)
 			depth, err := strconv.Atoi(key)
 			if err != nil {
@@ -298,8 +367,8 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 				return nil, nil
 			}
 
-			switch segment{
-			case fields.Segment("name"):
+			switch segment {
+			case fields.ProcessName:
 				return ps.Name, nil
 			}
 		}
@@ -433,6 +502,8 @@ func (i *imageAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value,
 		return kevt.Kparams.GetUint32(kparams.ImageSize)
 	case fields.ImageChecksum:
 		return kevt.Kparams.GetUint32(kparams.ImageCheckSum)
+	case fields.ImagePID:
+		return kevt.Kparams.GetPid()
 	}
 	return nil, nil
 }
@@ -557,7 +628,7 @@ func (*peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, erro
 		return p.Imports, nil
 	default:
 		field := f.String()
-		if strings.HasPrefix(field, fields.PeSectionsPath) {
+		if strings.HasPrefix(field, fields.PeSectionsSequence) {
 			// get the section name
 			sname, segment := captureInBrackets(field)
 			sec := p.Section(sname)
@@ -574,7 +645,7 @@ func (*peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, erro
 			}
 		}
 
-		if strings.HasPrefix(field, fields.PeResourcesPath) {
+		if strings.HasPrefix(field, fields.PeResourcesSequence) {
 			// consult the resource name
 			key, _ := captureInBrackets(field)
 			v, ok := p.VersionResources[key]

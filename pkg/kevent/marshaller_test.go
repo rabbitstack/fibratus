@@ -126,8 +126,14 @@ func TestKeventMarshalJSON(t *testing.T) {
 		},
 		Metadata: map[string]string{"foo": "bar", "fooz": "baarz"},
 		PS: &pstypes.PS{
-			PID:       2436,
-			Ppid:      6304,
+			PID:  2436,
+			Ppid: 6304,
+			Parent: &pstypes.PS{
+				Name: "explorer.exe",
+				Exe:  `C:\Windows\System32\explorer.exe`,
+				Cwd:  `C:\Windows\System32`,
+				SID:  "admin\\SYSTEM",
+			},
 			Name:      "firefox.exe",
 			Exe:       `C:\Program Files\Mozilla Firefox\firefox.exe`,
 			Comm:      `C:\Program Files\Mozilla Firefox\firefox.exe -contentproc --channel="6304.3.1055809391\1014207667" -childID 1 -isForBrowser -prefsHandle 2584 -prefMapHandle 2580 -prefsLen 70 -prefMapSize 216993 -parentBuildID 20200107212822 -greomni "C:\Program Files\Mozilla Firefox\omni.ja" -appomni "C:\Program Files\Mozilla Firefox\browser\omni.ja" -appdir "C:\Program Files\Mozilla Firefox\browser" - 6304 "\\.\pipe\gecko-crash-server-pipe.6304" 2596 tab`,
@@ -198,6 +204,7 @@ func TestKeventMarshalJSON(t *testing.T) {
 	assert.Len(t, newKevt.PS.Handles, 3)
 
 	assert.NotNil(t, newKevt.PS.PE)
+	assert.Equal(t, "explorer.exe", newKevt.PS.Parent.Name)
 	assert.Equal(t, uint32(10), newKevt.PS.PE.NumberOfSymbols)
 	assert.Equal(t, uint16(2), newKevt.PS.PE.NumberOfSections)
 	assert.Len(t, newKevt.PS.PE.Sections, 2)

@@ -26,6 +26,7 @@ import (
 func TestLookup(t *testing.T) {
 	assert.Equal(t, PsPid, Lookup("ps.pid"))
 	assert.Equal(t, Field("ps.envs[ALLUSERSPROFILE]"), Lookup("ps.envs[ALLUSERSPROFILE]"))
+	assert.Empty(t, Lookup("ps.envs[ALLUSERSPROFILE].env"))
 	assert.Empty(t, Lookup("ps.envs[ALLUSERSPROFILE"))
 	assert.Empty(t, Lookup("ps.envs["))
 	assert.Empty(t, Lookup("ps.envs[]"))
@@ -36,6 +37,6 @@ func TestLookup(t *testing.T) {
 	assert.Empty(t, Lookup("ps.pe.sections[.debug$S]."))
 	assert.Empty(t, Lookup("ps.pe.sections[.debug$S].e"))
 	assert.Equal(t, Field("ps.parent[1].name"), Lookup("ps.parent[1].name"))
-	assert.Equal(t, Field("ps.parent[*].name"), Lookup("ps.parent[*].name"))
-	assert.Equal(t, Field("ps.parent[*]"), Lookup("ps.parent[*]"))
+	assert.Equal(t, Field("ps.parent[root].name"), Lookup("ps.parent[root].name"))
+	assert.Empty(t, Lookup("ps.parent[ro].name"))
 }

@@ -38,6 +38,8 @@ const (
 	ts            = ".Timestamp"
 	pid           = ".Pid"
 	ppid          = ".Ppid"
+	pexe          = ".Pexe"
+	pcomm         = ".Pcomm"
 	cwd           = ".Cwd"
 	exe           = ".Exe"
 	comm          = ".Comm"
@@ -213,6 +215,11 @@ func (f *Formatter) Format(kevt *Kevent) []byte {
 		values[exe] = ps.Exe
 		values[comm] = ps.Comm
 		values[sid] = ps.SID
+		parent := ps.Parent
+		if parent != nil {
+			values[pexe] = parent.Exe
+			values[pcomm] = parent.Comm
+		}
 		if ps.PE != nil {
 			values[pe] = ps.PE.String()
 		}

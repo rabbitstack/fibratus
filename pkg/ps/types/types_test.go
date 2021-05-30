@@ -28,33 +28,32 @@ func TestVisit(t *testing.T) {
 		Name: "cmd.exe",
 	}
 	ps2 := &PS{
-		Name: "powershell.exe",
+		Name:   "powershell.exe",
 		Parent: ps1,
 	}
 	ps3 := &PS{
-		Name: "winword.exe",
+		Name:   "winword.exe",
 		Parent: ps2,
 	}
 
 	expected := []string{"powershell.exe", "cmd.exe"}
 	parents := make([]string, 0)
 
-	Visit(func(ps *PS) { parents = append(parents, ps.Name)}, ps3)
+	Visit(func(ps *PS) { parents = append(parents, ps.Name) }, ps3)
 
 	assert.Equal(t, expected, parents)
 
-
 	ps4 := &PS{
-		Name: "iexplorer.exe",
+		Name:   "iexplorer.exe",
 		Parent: ps3,
 	}
-	ps5 := &PS {
-		Name: "dropper.exe",
+	ps5 := &PS{
+		Name:   "dropper.exe",
 		Parent: ps4,
 	}
 
 	expected = []string{"iexplorer.exe", "winword.exe", "powershell.exe", "cmd.exe"}
 	parents = make([]string, 0)
 
-	Visit(func(ps *PS) { parents = append(parents, ps.Name)}, ps5)
+	Visit(func(ps *PS) { parents = append(parents, ps.Name) }, ps5)
 }

@@ -574,6 +574,21 @@ func (kevt *Kevent) MarshalJSON() []byte {
 
 		js.writeObjectField("sessionid").writeUint8(ps.SessionID)
 
+		parent := ps.Parent
+		if parent != nil {
+			js.writeMore()
+			js.writeObjectField("parent")
+			js.writeObjectStart()
+
+			js.writeObjectField("name").writeString(parent.Name).writeMore()
+			js.writeObjectField("comm").writeEscapeString(parent.Comm).writeMore()
+			js.writeObjectField("exe").writeEscapeString(parent.Exe).writeMore()
+			js.writeObjectField("cwd").writeEscapeString(parent.Cwd).writeMore()
+			js.writeObjectField("sid").writeEscapeString(parent.SID)
+
+			js.writeObjectEnd()
+		}
+
 		if SerializeEnvs {
 			js.writeMore()
 			js.writeObjectField("envs")

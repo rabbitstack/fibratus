@@ -135,6 +135,7 @@ func (s *snapshotter) WriteFromKcap(kevt *kevent.Kevent) error {
 		if ps.PID == winerrno.InvalidPID {
 			return nil
 		}
+		ps.Parent = s.procs[ps.Ppid]
 		s.procs[ps.PID] = ps
 
 	case ktypes.CreateThread, ktypes.EnumThread:
@@ -146,6 +147,7 @@ func (s *snapshotter) WriteFromKcap(kevt *kevent.Kevent) error {
 		thread := pstypes.ThreadFromKevent(unwrapThreadParams(pid, kevt))
 		if ps, ok := s.procs[pid]; ok {
 			ps.AddThread(thread)
+			ps.Parent = s.procs[ps.Ppid]
 		}
 
 	case ktypes.LoadImage, ktypes.EnumImage:
