@@ -21,6 +21,7 @@
 package ql
 
 import (
+	fuzzysearch "github.com/lithammer/fuzzysearch/fuzzy"
 	"github.com/rabbitstack/fibratus/pkg/util/wildcard"
 	"net"
 	"strconv"
@@ -796,6 +797,62 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			case []string:
 				for _, pat := range rhs {
 					if wildcard.Match(strings.ToLower(pat), strings.ToLower(lhs)) {
+						return true
+					}
+				}
+				return false
+			default:
+				return false
+			}
+		case fuzzy:
+			switch rhs := rhs.(type) {
+			case string:
+				return fuzzysearch.Match(rhs, lhs)
+			case []string:
+				for _, s := range rhs {
+					if fuzzysearch.Match(s, lhs) {
+						return true
+					}
+				}
+				return false
+			default:
+				return false
+			}
+		case ifuzzy:
+			switch rhs := rhs.(type) {
+			case string:
+				return fuzzysearch.MatchFold(rhs, lhs)
+			case []string:
+				for _, s := range rhs {
+					if fuzzysearch.MatchFold(s, lhs) {
+						return true
+					}
+				}
+				return false
+			default:
+				return false
+			}
+		case fuzzynorm:
+			switch rhs := rhs.(type) {
+			case string:
+				return fuzzysearch.MatchNormalized(rhs, lhs)
+			case []string:
+				for _, s := range rhs {
+					if fuzzysearch.MatchNormalized(s, lhs) {
+						return true
+					}
+				}
+				return false
+			default:
+				return false
+			}
+		case ifuzzynorm:
+			switch rhs := rhs.(type) {
+			case string:
+				return fuzzysearch.MatchNormalizedFold(rhs, lhs)
+			case []string:
+				for _, s := range rhs {
+					if fuzzysearch.MatchNormalizedFold(s, lhs) {
 						return true
 					}
 				}
