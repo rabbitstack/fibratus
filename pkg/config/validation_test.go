@@ -19,7 +19,7 @@
 package config
 
 import (
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 	"testing"
 )
 
@@ -82,7 +82,7 @@ func TestValidate(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		valid, errs := validate(m)
+		valid, errs := validate(interpolateSchema(), m)
 		if valid != tt.valid {
 			t.Errorf("%d. valid mismatch: text=%q exp=%#v got=%#v errs=%#v", i, tt.text, tt.valid, valid, errs)
 		} else if len(errs) != tt.errs {

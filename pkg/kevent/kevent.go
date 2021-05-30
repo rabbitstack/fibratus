@@ -164,6 +164,15 @@ func New(seq uint64, pid, tid uint32, cpu uint8, ktype ktypes.Ktype, ts time.Tim
 	return kevt
 }
 
+// Empty return a pristine kernel event instance.
+func Empty() *Kevent {
+	return &Kevent{
+		Kparams:  map[string]*Kparam{},
+		Metadata: make(map[string]string),
+		PS:       &pstypes.PS{},
+	}
+}
+
 // NewFromKcap recovers the kernel event instance from the kcapture byte buffer.
 func NewFromKcap(buf []byte) (*Kevent, error) {
 	kevt := &Kevent{

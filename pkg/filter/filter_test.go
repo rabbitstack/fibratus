@@ -51,7 +51,7 @@ func TestFilterCompile(t *testing.T) {
 	f = New(`ps.name`, cfg)
 	require.EqualError(t, f.Compile(), "expected at least one field or operator but zero found")
 	f = New(`ps.name =`, cfg)
-	require.EqualError(t, f.Compile(), "ps.name =\n          ^ expected field, string, number, bool, ip, function")
+	require.EqualError(t, f.Compile(), "\nps.name =\n          ^ expected field, string, number, bool, ip, function")
 }
 
 func TestFilterRunProcessKevent(t *testing.T) {
@@ -189,6 +189,9 @@ func TestFilterRunFileKevent(t *testing.T) {
 		{`file.name contains ('C:\\Windows\\system32\\kernel32.dll', 'C:\\Windows\\system32\\user32.dll')`, true},
 		{`file.name not matches ('C:\\*.exe', 'C:\\Windows\\*.com')`, true},
 		{`file.name endswith ('.exe', 'kernel32.dll', 'user32.dll')`, true},
+		{`file.name iendswith ('.EXE', 'KERNEL32.dll', 'user32.dll')`, true},
+		{`file.name istartswith ('C:\\WINDOWS', 'KERNEL32.dll', 'user32.dll')`, true},
+		{`file.name iin ('C:\\WINDOWS\\system32\\user32.dll')`, true},
 		{`file.name fuzzy 'C:\\Windows\\system32\\ser3ll'`, true},
 		{`file.name ifuzzy 'C:\\WINDOWS\\sYS\\ser3ll'`, true},
 		{`file.name ifuzzy 'C:\\WINDOWS\\sYS\\32dll'`, true},
@@ -287,10 +290,15 @@ func TestFilterRunNetKevent(t *testing.T) {
 		{`net.dip = 216.58.201.174`, true},
 		{`net.dip != 216.58.201.174`, false},
 		{`net.dip != 116.58.201.174`, true},
+		{`net.dip startswith '216.58'`, true},
+		{`net.dip endswith '.174'`, true},
+		{`net.dport = 443`, true},
+		{`net.dport in (123, 443)`, true},
 		{`net.dip.names in ('dns.google.')`, true},
 		{`net.sip.names matches ('*.domain.')`, true},
 		{`net.dip != 116.58.201.174`, true},
 		{`net.dip not in ('116.58.201.172', '16.58.201.176')`, true},
+		{`net.dip not in (116.58.201.172, 16.58.201.176)`, true},
 		{`cidr_contains(net.dip, '216.58.201.1/24') = true`, true},
 		{`cidr_contains(net.dip, '226.58.201.1/24') = false`, true},
 		{`cidr_contains(net.dip, '216.58.201.1/24', '216.58.201.10/24') = true and kevt.pid = 859`, true},

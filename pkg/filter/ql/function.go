@@ -21,7 +21,6 @@ package ql
 import (
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/filter/ql/functions"
-	"reflect"
 	"sort"
 	"strings"
 )
@@ -33,7 +32,7 @@ var (
 		for i, typ := range types {
 			argTypes[i] = typ.String()
 		}
-		return fmt.Errorf("argument #%d (%s) in function %s should be one of %v", i+1, keyword, fn, strings.Join(argTypes, "|"))
+		return fmt.Errorf("argument #%d (%s) in function %s should be one of: %v", i+1, keyword, fn, strings.Join(argTypes, "|"))
 	}
 	// ErrUndefinedFunction is thrown when an unknown function is supplied
 	ErrUndefinedFunction = func(name string) error {
@@ -77,44 +76,6 @@ func (FunctionValuer) Call(name string, args []interface{}) (interface{}, bool) 
 		return nil, false
 	}
 	return fn.Call(args)
-}
-
-// checkFuncCall ensures that the function name obtained
-// from the parser exists within the internal functions
-// catalog. It also validates the function signature to
-// make sure required arguments are supplied. Finally, it
-// checks the type of each argument with the expected one.
-func checkFuncCall(function *Function) error {
-	fn, ok := funcs[strings.ToUpper(function.Name)]
-	if !ok {
-		return ErrUndefinedFunction(function.Name)
-	}
-
-	if len(function.Args) < fn.Desc().RequiredArgs() ||
-		len(function.Args) > len(fn.Desc().Args) {
-		return ErrFunctionSignature(fn.Desc(), len(function.Args))
-	}
-
-	for i, expr := range function.Args {
-		arg := fn.Desc().Args[i]
-		if !arg.ContainsType(exprToArgumentType(expr)) {
-			return ErrArgumentTypeMismatch(i, arg.Keyword, fn.Name(), arg.Types)
-		}
-	}
-	return nil
-}
-
-func exprToArgumentType(expr Expr) functions.ArgType {
-	switch reflect.TypeOf(expr) {
-	case reflect.TypeOf(&FieldLiteral{}):
-		return functions.Field
-	case reflect.TypeOf(&IPLiteral{}):
-		return functions.IP
-	case reflect.TypeOf(&StringLiteral{}):
-		return functions.String
-	default:
-		return functions.Unknown
-	}
 }
 
 func functionNames() []string {

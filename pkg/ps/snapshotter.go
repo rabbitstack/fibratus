@@ -229,6 +229,8 @@ func (s *snapshotter) Write(kevt *kevent.Kevent) error {
 		// as it already exists in the map
 		thread := pstypes.ThreadFromKevent(unwrapThreadParams(pid, kevt))
 		if ps, ok := s.procs[pid]; ok {
+			// append additional params
+			kevt.Kparams.Append(kparams.Exe, kparams.UnicodeString, ps.Exe)
 			ps.AddThread(thread)
 			return nil
 		}
@@ -378,17 +380,17 @@ func (s *snapshotter) readPE(ps *pstypes.PS) {
 	if pid == 0 || pid == 4 || pid == 72 || pid == 128 {
 		return
 	}
-	pex, err := s.peReader.Read(ps.Exe)
+	p, err := s.peReader.Read(ps.Exe)
 	if err != nil {
 		log.Warnf("fail to inspect PE metadata for process %s (%d): %v", ps.Name, ps.PID, err)
 		return
 	}
 
-	if pex == nil {
+	if p == nil {
 		return
 	}
 
-	ps.PE = pex
+	ps.PE = p
 	s.procs[pid] = ps
 }
 

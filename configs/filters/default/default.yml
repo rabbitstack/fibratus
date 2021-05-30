@@ -1,0 +1,402 @@
+# ====================================================================================================
+#
+# This filter rules try to mimic the subset of the sysmon config template
+# created by SwiftOnSecurity (https://github.com/SwiftOnSecurity/sysmon-config).
+#
+# All credits for digging the rule definitions go to the above author/contributors.
+#
+# Obviously, some events can't be directly translated to Fibratus equivalent
+# since Fibratus is not aware of them. In the same way,
+# some filter fields are still missing in Fibratus, so those sysmon rules were
+# omitted.
+#
+# ======================= Process creation ===========================================================
+#
+# All processes launched will be logged, except for what matches a rule below.
+# It's best to be as specific as possible, to avoid user-mode executables imitating
+# other process names to avoid logging, or if malware drops files in an existing directory.
+#
+- group: Windows userspace and common apps processes
+  selector:
+    type: CreateProcess
+  enabled: true
+  policy: exclude
+  relation: or
+  from-strings:
+    - name: Windows error reporting/telemetry, WMI provider host
+      def: ps.comm istartswith
+          (
+            ' \"C:\\Windows\\system32\\wermgr.exe\\" \"-queuereporting_svc\" ',
+            'C:\\Windows\\system32\\DllHost.exe /Processid',
+            'C:\\Windows\\system32\\wbem\\wmiprvse.exe -Embedding',
+            'C:\\Windows\\system32\\wbem\\wmiprvse.exe -secured -Embedding'
+          )
+    - name: Windows error reporting/telemetry, Search Indexer, Session Manager, Auto check utility
+      def: ps.comm iin
+          (
+            'C:\\Windows\\system32\\wermgr.exe -upload',
+            'C:\\Windows\\system32\\SearchIndexer.exe /Embedding',
+            'C:\\windows\\system32\\wermgr.exe -queuereporting',
+            '\\??\\C:\\Windows\\system32\\autochk.exe *',
+            '\\SystemRoot\\System32\\smss.exe',
+            'C:\\Windows\\System32\\RuntimeBroker.exe -Embedding'
+          )
+    - name: Various Windows processes
+      def: ps.exe iin
+          (
+            'C:\\Program Files (x86)\\Common Files\\microsoft shared\\ink\\TabTip32.exe',
+            'C:\\Windows\\System32\\TokenBrokerCookies.exe',
+            'C:\\Windows\\System32\\plasrv.exe',
+            'C:\\Windows\\System32\\wifitask.exe',
+            'C:\\Windows\\system32\\CompatTelRunner.exe',
+            'C:\\Windows\\system32\\PrintIsolationHost.exe',
+            'C:\\Windows\\system32\\SppExtComObj.Exe',
+            'C:\\Windows\\system32\\audiodg.exe',
+            'C:\\Windows\\system32\\conhost.exe',
+            'C:\\Windows\\system32\\mobsync.exe',
+            'C:\\Windows\\system32\\musNotification.exe',
+            'C:\\Windows\\system32\\musNotificationUx.exe',
+            'C:\\Windows\\system32\\powercfg.exe',
+            'C:\\Windows\\system32\\sndVol.exe',
+            'C:\\Windows\\system32\\sppsvc.exe',
+            'C:\\Windows\\system32\\wbem\\WmiApSrv.exe'
+          )
+            or
+          ps.comm iin
+          (
+            'C:\\WINDOWS\\system32\\devicecensus.exe UserCxt',
+            'C:\\Windows\\System32\\usocoreworker.exe -Embedding'
+          )
+    - name: svchost
+      def: ps.comm iin {{ .Values.processes.comm.svchost | stringify }}
+    - name: Microsoft edge
+      def: ps.comm istartswith '\"C:\\Program Files (x86)\\Microsoft\\Edge Dev\\Application\\msedge.exe\" --type='
+    - name: Microsoft dotNet
+      def: ps.comm istartswith
+          (
+            'C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\ngen.exe',
+            'C:\\WINDOWS\\Microsoft.NET\\Framework64\\v4.0.30319\\Ngen.exe'
+          )
+            or
+          ps.exe imatches
+          (
+            'C:\\Windows\\Microsoft.NET\\Framework64\\*\\mscorsvw.exe',
+            'C:\\Windows\\Microsoft.NET\\Framework\\*\\mscorsvw.exe',
+            'C:\\Windows\\Microsoft.Net\\Framework64\\*\\WPF\\PresentationFontCache.exe'
+          )
+    - name: Microsoft Office
+      def: ps.exe iin
+          (
+            'C:\\Program Files\\Microsoft Office\\Office16\\MSOSYNC.EXE',
+            'C:\\Program Files (x86)\\Microsoft Office\\Office16\\MSOSYNC.EXE',
+            'C:\\Program Files\\Common Files\\Microsoft Shared\\OfficeSoftwareProtectionPlatform\\OSPPSVC.EXE',
+            'C:\\Program Files\\Microsoft Office\\Office16\\msoia.exe',
+            'C:\\Program Files (x86)\\Microsoft Office\\root\\Office16\\officebackgroundtaskhandler.exe',
+            'C:\\Program Files\\Common Files\\Microsoft Shared\\ClickToRun\\OfficeC2RClient.exe'
+          )
+    - name: Media Player
+      def: ps.exe = 'C:\\Program Files\\Windows Media Player\\wmpnscfg.exe'
+    - name: Google
+      def: ps.comm istartswith
+          (
+            '\"C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe\\\" --type=',
+            '\"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\" --type='
+          )
+
+# ======================= Process termination ========================================================
+#
+- group: Suspicious process terminations
+  selector:
+    type: TerminateProcess
+  enabled: true
+  policy: include
+  relation: or
+  from-strings:
+    - name: User binaries
+      def: ps.name istartswith ('C:\\Users', '\\')
+
+
+# ======================= Remote thread creation =====================================================
+#
+# Monitor for processes injecting code into other processes. Often used by malware to cloak their actions.
+# Also when Firefox loads Flash.
+#
+- group: Safe remote thread creation sources
+  selector:
+    type: CreateThread
+  enabled: true
+  policy: exclude
+  relation: or
+  from-strings:
+    - name: System processes and common binaries
+      def: kevt.pid != thread.pid
+             and
+           ps.exe iin
+           (
+              'C:\\Windows\\system32\\wbem\\WmiPrvSE.exe',
+              'C:\\Windows\\system32\\svchost.exe',
+              'C:\\Windows\\system32\\wininit.exe',
+              'C:\\Windows\\system32\\csrss.exe',
+              'C:\\Windows\\system32\\services.exe',
+              'C:\\Windows\\system32\\winlogon.exe',
+              'C:\\Windows\\system32\\audiodg.exe',
+              'C:\\Windows\\system32\\kernel32.dll',
+              'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe'
+           )
+
+- group: Suspicious remote thread creations
+  selector:
+    type: CreateThread
+  enabled: true
+  policy: include
+  relation: or
+  from-strings:
+    - name: Fishy remote threads
+      def: kevt.pid != thread.pid
+      action: |
+        {{ $title := cat "Identified remote thread creation in"
+          .Kevt.Kparams.exe }}
+        {{  $text := cat "Injected by" .Kevt.PS.Exe }}
+        {{ emit $title $text }}
+
+# ======================= Network connection initiated ===============================================
+#
+# By default this configuration takes a very conservative approach to network logging,
+# limited to only extremely high-signal events.
+#
+- group: Suspicious network-connecting binaries
+  selector:
+    type: Connect
+  enabled: true
+  policy: include
+  relation: or
+  from-strings:
+    - name: Suspicious sources for network-connecting binaries
+      def: ps.exe istartswith
+          (
+            'C:\\Users',
+            'C:\\Recycle',
+            'C:\\ProgramData',
+            'C:\\Windows\\Temp',
+            '\\',
+            'C:\\perflogs',
+            'C:\\intel',
+            'C:\\Windows\\fonts',
+            'C:\\Windows\\system32\\config'
+          )
+    - name: Suspicious Windows tools network-connecting binaries
+      def: ps.name in
+          (
+            'at.exe',
+            'certutil.exe',
+            'cmd.exe',
+            'cmstp.exe',
+            'cscript.exe',
+            'driverquery.exe',
+            'dsquery.exe',
+            'hh.exe',
+            'infDefaultInstall.exe',
+            'java.exe',
+            'javaw.exe',
+            'javaws.exe',
+            'mmc.exe',
+            'msbuild.exe',
+            'mshta.exe',
+            'msiexec.exe',
+            'nbtstat.exe',
+            'net.exe',
+            'net1.exe',
+            'notepad.exe',
+            'nslookup.exe',
+            'powershell.exe',
+            'qprocess.exe',
+            'qwinsta.exe',
+            'reg.exe',
+            'regsvcs.exe',
+            'regsvr32.exe',
+            'rundll32.exe',
+            'rwinsta.exe',
+            'sc.exe',
+            'schtasks.exe',
+            'taskkill.exe',
+            'tasklist.exe',
+            'wmic.exe',
+            'wscript.exe'
+          )
+    - name: Relevant 3rd Party Tools
+      def: ps.name in
+          (
+            'nc.exe',
+            'ncat.exe',
+            'psexec.exe',
+            'psexesvc.exe',
+            'tor.exe',
+            'vnc.exe',
+            'vncservice.exe',
+            'vncviewer.exe',
+            'winexesvc.exe',
+            'nmap.exe',
+            'psinfo.exe'
+          )
+    - name: Suspicious ports
+      def: net.dport in
+          (
+            22,
+            23,
+            25,
+            143,
+            3389,
+            5800,
+            5900,
+            444,
+            1080,
+            3128,
+            8080,
+            1723,
+            9001,
+            9030
+          )
+
+- group: Microsoft binaries and known addresses
+  selector:
+    type: Connect
+  enabled: true
+  policy: exclude
+  relation: or
+  from-strings:
+    - name: Microsoft binaries
+      def: ps.exe istartswith 'C:\\ProgramData\\Microsoft\\Windows Defender\\Platform\\'
+              or
+           ps.exe endswith 'AppData\\Local\\Microsoft\\Teams\\current\\Teams.exe'
+              or
+           net.dip.names endswith
+           (
+              '.microsoft.com',
+              'microsoft.com.akadns.net',
+              'microsoft.com.nsatc.net'
+           )
+    - name: OCSP protocol known addresses
+      def: net.dip in (23.4.43.27, 72.21.91.29)
+    - name: Loopback addresses
+      def: net.dip = 127.0.0.1 or net.dip startswith 'fe80:0:0:0'
+
+# ======================= File created ===============================================================
+#
+- group: Suspicious file creation operations
+  selector:
+    type: CreateFile
+  enabled: true
+  policy: include
+  relation: or
+  from-strings:
+    - name: Startup links and shortcut modifications
+      def: file.operation = 'create'
+              and
+           file.name icontains
+           (
+              '\\Start Menu',
+              '\\Startup\\'
+           )
+    - name: Microsoft Outlook attachments
+      def: file.operation = 'create' and file.name icontains '\\Content.Outlook\\'
+    - name: Downloaded files
+      def: file.operation = 'create' and file.name icontains '\\Downloads\\'
+    - name: Microsoft ClickOnce application
+      def: file.operation = 'create'
+              and
+           file.extension in
+           (
+              '.application',
+              '.appref-ms'
+           )
+    - name: Batch scripting
+      def: file.operation = 'create'
+              and
+           file.extension in
+           (
+              '.bat',
+              '.chm',
+              '.cmd',
+              '.cmdline'
+           )
+    - name: Fishy extensions
+      def: file.operation = 'create'
+              and
+           file.extension in
+           (
+              '.dll',
+              '.exe',
+              '.exe.log',
+              '.jar',
+              '.jnlp',
+              '.jse',
+              '.hta',
+              '.job',
+              '.pptm',
+              '.ps1',
+              '.sys',
+              '.scr',
+              '.vbe',
+              '.vbs',
+              '.xlsm',
+              '.ocx',
+              '.sln',
+              '.xls'
+           )
+    - name: Powershell persistence
+      def: file.operation = 'create'
+              and
+           file.name imatches 'C:\\Windows\\*\\WindowsPowerShell'
+
+# ======================= Registry modification ======================================================
+#
+- group: Suspicious registry key modifications
+  selector:
+    category: registry
+  enabled: true
+  policy: include
+  relation: or
+  from-strings:
+    - name: Core Windows keys
+      def: kevt.name in ('RegCreateKey', 'RegDeleteKey', 'RegSetValue', 'RegDeleteValue')
+              and
+           registry.key.name icontains
+              (
+                'CurrentVersion\\Run',
+                'Policies\\Explorer\\Run',
+                'Group Policy\\Scripts',
+                'Windows\\System\\Scripts',
+                'CurrentVersion\\Windows\\Load',
+                'CurrentVersion\\Windows\\Run',
+                'CurrentVersion\\Winlogon\\Shell',
+                'CurrentVersion\\Winlogon\\System',
+                'UserInitMprLogonScript'
+              )
+              or
+           registry.key.name istartswith
+              (
+                'HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\\Notify',
+                'HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\\Shell',
+                'HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\\Userinit',
+                'HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Microsoft\\Windows NT\\CurrentVersion\\Drivers32',
+                'HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\BootExecute',
+                'HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows NT\\CurrentVersion\\AeDebug'
+              )
+              or
+           registry.key.name iendswith
+              (
+                'user shell folders\\startup'
+              )
+
+    - name: Services
+      def: kevt.name in ('RegCreateKey', 'RegDeleteKey', 'RegSetValue', 'RegDeleteValue')
+              and
+           registry.key.name iendswith
+           (
+              '\\ServiceDll',
+              '\\ServiceManifest',
+              '\\ImagePath',
+              '\\Start',
+              'CurrentVersion\\Run'
+           )
+

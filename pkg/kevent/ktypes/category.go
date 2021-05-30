@@ -18,6 +18,8 @@
 
 package ktypes
 
+import "hash/fnv"
+
 // Category is the type alias for kernel event categories
 type Category string
 
@@ -41,3 +43,13 @@ const (
 	// Unknown is the category for events that couldn't match any of the previous categories
 	Unknown Category = "unknown"
 )
+
+// Hash obtains the hash of the category string.
+func (c Category) Hash() uint32 {
+	h := fnv.New32()
+	_, err := h.Write([]byte(c))
+	if err != nil {
+		return 0
+	}
+	return h.Sum32()
+}

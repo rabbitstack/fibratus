@@ -75,6 +75,8 @@ const (
 	ThreadUstackLimit Field = "thread.ustack.limit"
 	// ThreadEntrypoint is the thread entrypoint address
 	ThreadEntrypoint Field = "thread.entrypoint"
+	// ThreadPID is the process identifier where the thread is created
+	ThreadPID Field = "thread.pid"
 
 	// PeNumSections represents the number of sections
 	PeNumSections Field = "pe.nsections"
@@ -306,6 +308,7 @@ var fields = map[Field]FieldInfo{
 	ThreadUstackBase:  {ThreadUstackBase, "base address of the thread's user space stack", kparams.HexInt64, []string{"thread.ustack.base = '7ffe0000'"}},
 	ThreadUstackLimit: {ThreadUstackLimit, "limit of the thread's user space stack", kparams.HexInt64, []string{"thread.ustack.limit = '8ffe0000'"}},
 	ThreadEntrypoint:  {ThreadEntrypoint, "starting address of the function to be executed by the thread", kparams.HexInt64, []string{"thread.entrypoint = '7efe0000'"}},
+	ThreadPID:         {ThreadPID, "the process identifier where the thread is created", kparams.Uint32, []string{"kevt.pid != thread.pid"}},
 
 	ImageName:           {ImageName, "full image name", kparams.UnicodeString, []string{"image.name contains 'advapi32.dll'"}},
 	ImageBase:           {ImageBase, "the base address of process in which the image is loaded", kparams.HexInt64, []string{"image.base.address = 'a65d800000'"}},

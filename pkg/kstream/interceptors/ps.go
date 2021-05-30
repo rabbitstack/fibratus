@@ -45,15 +45,20 @@ type psInterceptor struct {
 	yara yara.Scanner
 }
 
-var sysProcs = []string{
-	"dwm.exe",
-	"wininit.exe",
-	"winlogon.exe",
-	"fontdrvhost.exe",
-	"sihost.exe",
-	"taskhostw.exe",
-	"dashost.exe",
-	"ctfmon.exe",
+var sysProcs = map[string]bool{
+	"dwm.exe":         true,
+	"wininit.exe":     true,
+	"winlogon.exe":    true,
+	"fontdrvhost.exe": true,
+	"sihost.exe":      true,
+	"taskhostw.exe":   true,
+	"dashost.exe":     true,
+	"ctfmon.exe":      true,
+	"svchost.exe":     true,
+	"csrss.exe":       true,
+	"services.exe":    true,
+	"audiodg.exe":     true,
+	"kernel32.dll":    true,
 }
 
 // newPsInterceptor creates a new kstream interceptor for process events.
@@ -71,18 +76,17 @@ func (ps psInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 		}
 		// some system processes are reported without the path in command line
 		if !strings.Contains(comm, `\\:`) {
-			for _, proc := range sysProcs {
-				if proc == comm {
-					_ = kevt.Kparams.Set(kparams.Comm, filepath.Join(os.Getenv("SystemRoot"), comm), kparams.UnicodeString)
-				}
+			_, ok := sysProcs[comm]
+			if ok {
+				_ = kevt.Kparams.Set(kparams.Comm, filepath.Join(os.Getenv("SystemRoot"), comm), kparams.UnicodeString)
 			}
 		}
 		// to compose the full executable string we extract the path
 		// from the process's command line by expanding the `SystemRoot`
 		// env variable accordingly and also removing rubbish characters
-		i := strings.Index(comm, "exe")
+		i := strings.Index(comm, ".exe")
 		if i > 0 {
-			exe := strings.Replace(comm[0:i+3], "\"", "", -1)
+			exe := strings.Replace(comm[0:i+4], "\"", "", -1)
 			if strings.Contains(exe, "SystemRoot") {
 				exe = systemRootRegexp.ReplaceAllString(exe, os.Getenv("SystemRoot"))
 			}

@@ -309,6 +309,8 @@ func (t *threadAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value
 			return nil, err
 		}
 		return v.String(), nil
+	case fields.ThreadPID:
+		return kevt.Kparams.GetUint32(kparams.ProcessID)
 	}
 	return nil, nil
 }

@@ -45,26 +45,29 @@ const (
 	falset   // false
 
 	opBeg
-	and        // and
-	or         // or
-	in         // in
-	not        // not
-	contains   // contains
-	icontains  // icontains
-	startswith // startswith
-	endswith   // endswith
-	matches    // matches
-	imatches   // imatches
-	fuzzy      // fuzzy
-	ifuzzy     // ifuzzy
-	fuzzynorm  // fuzzynorm
-	ifuzzynorm // ifuzzynorm
-	eq         // =
-	neq        // !=
-	lt         // <
-	lte        // <=
-	gt         // >
-	gte        // >=
+	and         // and
+	or          // or
+	in          // in
+	iin         // iin
+	not         // not
+	contains    // contains
+	icontains   // icontains
+	istartswith // istartswith
+	startswith  // startswith
+	endswith    // endswith
+	iendswith   // iendswith
+	matches     // matches
+	imatches    // imatches
+	fuzzy       // fuzzy
+	ifuzzy      // ifuzzy
+	fuzzynorm   // fuzzynorm
+	ifuzzynorm  // ifuzzynorm
+	eq          // =
+	neq         // !=
+	lt          // <
+	lte         // <=
+	gt          // >
+	gte         // >=
 	opEnd
 
 	lparen // (
@@ -77,7 +80,9 @@ var keywords map[string]token
 
 func init() {
 	keywords = make(map[string]token)
-	for _, tok := range []token{and, or, contains, icontains, in, not, startswith, endswith, matches, imatches, fuzzy, ifuzzy, fuzzynorm, ifuzzynorm} {
+	for _, tok := range []token{and, or, contains, icontains, in,
+		iin, not, startswith, istartswith, endswith, iendswith,
+		matches, imatches, fuzzy, ifuzzy, fuzzynorm, ifuzzynorm} {
 		keywords[strings.ToLower(tokens[tok])] = tok
 	}
 	keywords["true"] = truet
@@ -102,20 +107,23 @@ var tokens = [...]string{
 	truet:    "TRUE",
 	falset:   "FALSE",
 
-	and:        "AND",
-	or:         "OR",
-	contains:   "CONTAINS",
-	icontains:  "ICONTAINS",
-	in:         "IN",
-	not:        "NOT",
-	startswith: "STARTSWITH",
-	endswith:   "ENDSWITH",
-	matches:    "MATCHES",
-	imatches:   "IMATCHES",
-	fuzzy:      "FUZZY",
-	ifuzzy:     "IFUZZY",
-	fuzzynorm:  "FUZZYNORM",
-	ifuzzynorm: "IFUZZYNORM",
+	and:         "AND",
+	or:          "OR",
+	contains:    "CONTAINS",
+	icontains:   "ICONTAINS",
+	in:          "IN",
+	iin:         "IIN",
+	not:         "NOT",
+	startswith:  "STARTSWITH",
+	istartswith: "ISTARTSWITH",
+	endswith:    "ENDSWITH",
+	iendswith:   "IENDSWITH",
+	matches:     "MATCHES",
+	imatches:    "IMATCHES",
+	fuzzy:       "FUZZY",
+	ifuzzy:      "IFUZZY",
+	fuzzynorm:   "FUZZYNORM",
+	ifuzzynorm:  "IFUZZYNORM",
 
 	eq:  "=",
 	neq: "!=",
@@ -152,7 +160,8 @@ func (tok token) precedence() int {
 		return 3
 	case eq, neq, lt, lte, gt, gte:
 		return 4
-	case in, contains, icontains, startswith, endswith, matches, imatches, fuzzy, ifuzzy, fuzzynorm, ifuzzynorm:
+	case in, iin, contains, icontains, startswith, istartswith, endswith, iendswith,
+		matches, imatches, fuzzy, ifuzzy, fuzzynorm, ifuzzynorm:
 		return 5
 	}
 	return 0
