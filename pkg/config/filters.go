@@ -239,6 +239,7 @@ func (f Filters) LoadGroups() ([]FilterGroup, error) {
 		if _, err := u.Parse(url); err != nil {
 			return nil, fmt.Errorf("%q is an invalid URL", url)
 		}
+		//nolint:noctx
 		resp, err := http.Get(url)
 		if err != nil {
 			return nil, fmt.Errorf("cannot fetch filter file from %q: %v", url, err)
@@ -381,7 +382,7 @@ func cleanupParseError(filename string, err error) error {
 	} else {
 		errMsg = tokens[len(tokens)-1]
 	}
-	return fmt.Errorf("syntax error in (%s) at %s: %s", string(location), key, errMsg)
+	return fmt.Errorf("syntax error in (%s) at %s: %s", location, key, errMsg)
 }
 
 // TmplData is the template data object. Some

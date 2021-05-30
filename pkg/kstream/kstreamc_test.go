@@ -42,7 +42,7 @@ func TestOpenKstream(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
 	hsnap := new(handle.SnapshotterMock)
 	ktraceController := NewKtraceController(config.KstreamConfig{})
-	kstreamc := NewConsumer(ktraceController, psnap, hsnap, &config.Config{})
+	kstreamc := NewConsumer(ktraceController, psnap, hsnap, &config.Config{Filters: &config.Filters{}})
 	openTrace = func(ktrace etw.EventTraceLogfile) etw.TraceHandle {
 		return etw.TraceHandle(2)
 	}
@@ -57,7 +57,7 @@ func TestOpenKstreamInvalidHandle(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
 	hsnap := new(handle.SnapshotterMock)
 	ktraceController := NewKtraceController(config.KstreamConfig{})
-	kstreamc := NewConsumer(ktraceController, psnap, hsnap, &config.Config{})
+	kstreamc := NewConsumer(ktraceController, psnap, hsnap, &config.Config{Filters: &config.Filters{}})
 	openTrace = func(ktrace etw.EventTraceLogfile) etw.TraceHandle {
 		return etw.TraceHandle(0xffffffffffffffff)
 	}
@@ -69,7 +69,7 @@ func TestOpenKstreamKsessionNotRunning(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
 	hsnap := new(handle.SnapshotterMock)
 	ktraceController := NewKtraceController(config.KstreamConfig{})
-	kstreamc := NewConsumer(ktraceController, psnap, hsnap, &config.Config{})
+	kstreamc := NewConsumer(ktraceController, psnap, hsnap, &config.Config{Filters: &config.Filters{}})
 	openTrace = func(ktrace etw.EventTraceLogfile) etw.TraceHandle {
 		return etw.TraceHandle(2)
 	}
@@ -86,7 +86,7 @@ func TestProcessKevent(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
 	hsnap := new(handle.SnapshotterMock)
 	ktraceController := NewKtraceController(config.KstreamConfig{})
-	kstreamc := NewConsumer(ktraceController, psnap, hsnap, &config.Config{})
+	kstreamc := NewConsumer(ktraceController, psnap, hsnap, &config.Config{Filters: &config.Filters{}})
 
 	psnap.On("Find", mock.Anything).Return(&types.PS{Name: "cmd.exe"})
 

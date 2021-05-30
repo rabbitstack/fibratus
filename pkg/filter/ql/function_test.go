@@ -40,7 +40,7 @@ func TestParseFunction(t *testing.T) {
 		_, err := p.ParseExpr()
 		if err == nil && tt.err != nil {
 			t.Errorf("%d. exp=%s expected error=%v", i, tt.expr, tt.err)
-		} else if err != nil  {
+		} else if err != nil {
 			assert.EqualError(t, err, tt.err.Error())
 		} else if err != nil && tt.err == nil {
 			t.Errorf("%d. exp=%s got error=%v", i, tt.expr, err)
