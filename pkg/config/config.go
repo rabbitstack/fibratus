@@ -32,7 +32,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/log"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	yara "github.com/rabbitstack/fibratus/pkg/yara/config"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"time"
 
@@ -94,6 +94,9 @@ type Config struct {
 	Transformers []transformers.Config
 	// Alertsenders stores alert sender configurations
 	Alertsenders []alertsender.Config
+
+	// Filters contains filter group definitions
+	Filters *Filters `json:"filters" yaml:"filters"`
 
 	flags *pflag.FlagSet
 	viper *viper.Viper
@@ -169,6 +172,7 @@ func NewWithOpts(options ...Option) *Config {
 		PE:         pe.Config{},
 		Log:        log.Config{},
 		Aggregator: aggregator.Config{},
+		Filters:    &Filters{},
 		viper:      v,
 		flags:      flagSet,
 		opts:       opts,
@@ -225,6 +229,7 @@ func (c *Config) Init() error {
 	c.Aggregator.InitFromViper(c.viper)
 	c.Log.InitFromViper(c.viper)
 	c.Yara.InitFromViper(c.viper)
+	c.Filters.initFromViper(c.viper)
 
 	c.InitHandleSnapshot = c.viper.GetBool(initHandleSnapshot)
 	c.DebugPrivilege = c.viper.GetBool(debugPrivilege)
@@ -278,12 +283,12 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("couldn't read the config file: %v", err)
 	}
 	// validate config file content
-	valid, errs := validate(out)
+	valid, errs := validate(interpolateSchema(), out)
 	if !valid || len(errs) > 0 {
 		return fmt.Errorf("invalid config: %v", multierror.Wrap(errs...))
 	}
 	// now validate the Viper config flags
-	valid, errs = validate(c.viper.AllSettings())
+	valid, errs = validate(interpolateSchema(), c.viper.AllSettings())
 	if !valid || len(errs) > 0 {
 		return fmt.Errorf("invalid config: %v", multierror.Wrap(errs...))
 	}
@@ -297,6 +302,8 @@ func (c *Config) addFlags() {
 	c.flags.String(configFile, filepath.Join(os.Getenv("PROGRAMFILES"), "fibratus", "config", "fibratus.yml"), "Indicates the location of the configuration file")
 	if c.opts.run || c.opts.replay {
 		c.flags.StringP(filamentName, "f", "", "Specifies the filament to execute")
+		c.flags.StringSlice(filtersFromPaths, []string{}, "Comma-separated list of filter group files")
+		c.flags.StringSlice(filtersFromURLs, []string{}, "Comma-separated list of filter group URL addresses")
 	}
 	if c.opts.capture {
 		c.flags.StringP(kcapFile, "o", "", "The path of the output kcap file")

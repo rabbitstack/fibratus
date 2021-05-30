@@ -15,7 +15,6 @@
 package multierror
 
 import (
-	"fmt"
 	"strings"
 )
 
@@ -54,5 +53,5 @@ func (errors multiError) Error() string {
 		}
 		parts = append(parts, err.Error())
 	}
-	return fmt.Sprintf("[%s]", strings.Join(parts, ", "))
+	return strings.Join(parts, ", ")
 }

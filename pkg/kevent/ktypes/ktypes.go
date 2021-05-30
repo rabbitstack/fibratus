@@ -238,6 +238,9 @@ func (k Ktype) String() string {
 
 // Hash calculates the hash number of the ktype.
 func (k Ktype) Hash() uint32 {
+	if k == UnknownKtype {
+		return 0
+	}
 	h := fnv.New32()
 	_, err := h.Write([]byte(k.String()))
 	if err != nil {
@@ -293,6 +296,17 @@ func (k Ktype) Dropped(capture bool) bool {
 	default:
 		return false
 	}
+}
+
+// UnmarshalYAML converts the ktype name to ktype array type.
+func (k *Ktype) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var ktyp string
+	err := unmarshal(&ktyp)
+	if err != nil {
+		return err
+	}
+	*k = KeventNameToKtype(ktyp)
+	return nil
 }
 
 // Pack transforms event provider GUID and the op code into `Ktype` type. The type provides a convenient way

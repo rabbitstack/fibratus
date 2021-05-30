@@ -1,0 +1,19 @@
+- group: internal network traffic
+  enabled: true
+  selector:
+    type: Connect
+  policy: exclude
+  relation: and
+  tags:
+    - TE
+  from-strings:
+    - name: only network category
+      def: kevt.category = 'net'
+
+- group: rouge processes
+  enabled: true
+  selector:
+    category: net
+  from-strings:
+    - name: suspicious network {{ upper "activity" }}
+      def: kevt.category = 'net' and ps.name in ('at.exe', 'java.exe')

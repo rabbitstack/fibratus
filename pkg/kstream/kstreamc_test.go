@@ -42,7 +42,7 @@ func TestOpenKstream(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
 	hsnap := new(handle.SnapshotterMock)
 	ktraceController := NewKtraceController(config.KstreamConfig{})
-	kstreamc := NewConsumer(ktraceController, psnap, hsnap, &config.Config{})
+	kstreamc := NewConsumer(ktraceController, psnap, hsnap, &config.Config{Filters: &config.Filters{}})
 	openTrace = func(ktrace etw.EventTraceLogfile) etw.TraceHandle {
 		return etw.TraceHandle(2)
 	}
@@ -57,7 +57,7 @@ func TestOpenKstreamInvalidHandle(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
 	hsnap := new(handle.SnapshotterMock)
 	ktraceController := NewKtraceController(config.KstreamConfig{})
-	kstreamc := NewConsumer(ktraceController, psnap, hsnap, &config.Config{})
+	kstreamc := NewConsumer(ktraceController, psnap, hsnap, &config.Config{Filters: &config.Filters{}})
 	openTrace = func(ktrace etw.EventTraceLogfile) etw.TraceHandle {
 		return etw.TraceHandle(0xffffffffffffffff)
 	}
@@ -69,7 +69,7 @@ func TestOpenKstreamKsessionNotRunning(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
 	hsnap := new(handle.SnapshotterMock)
 	ktraceController := NewKtraceController(config.KstreamConfig{})
-	kstreamc := NewConsumer(ktraceController, psnap, hsnap, &config.Config{})
+	kstreamc := NewConsumer(ktraceController, psnap, hsnap, &config.Config{Filters: &config.Filters{}})
 	openTrace = func(ktrace etw.EventTraceLogfile) etw.TraceHandle {
 		return etw.TraceHandle(2)
 	}
@@ -86,7 +86,7 @@ func TestProcessKevent(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
 	hsnap := new(handle.SnapshotterMock)
 	ktraceController := NewKtraceController(config.KstreamConfig{})
-	kstreamc := NewConsumer(ktraceController, psnap, hsnap, &config.Config{})
+	kstreamc := NewConsumer(ktraceController, psnap, hsnap, &config.Config{Filters: &config.Filters{}})
 
 	psnap.On("Find", mock.Anything).Return(&types.PS{Name: "cmd.exe"})
 
@@ -133,7 +133,12 @@ func TestProcessKevent(t *testing.T) {
 
 		ts, err := time.Parse("2006-01-02 15:04:05.0000000 -0700 CEST", "2019-04-05 16:10:36.5225778 +0200 CEST")
 		require.NoError(t, err)
-		assert.Equal(t, ts, kevt.Timestamp)
+		assert.Equal(t, ts.Year(), kevt.Timestamp.Year())
+		assert.Equal(t, ts.Month(), kevt.Timestamp.Month())
+		assert.Equal(t, ts.Day(), kevt.Timestamp.Day())
+		assert.Equal(t, ts.Minute(), kevt.Timestamp.Minute())
+		assert.Equal(t, ts.Second(), kevt.Timestamp.Second())
+		assert.Equal(t, ts.Nanosecond(), kevt.Timestamp.Nanosecond())
 		assert.Len(t, kevt.Kparams, 9)
 
 		assert.True(t, kevt.Kparams.Contains(kparams.DTB))

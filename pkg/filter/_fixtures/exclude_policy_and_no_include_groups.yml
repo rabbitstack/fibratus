@@ -1,0 +1,11 @@
+- group: network events
+  selector:
+    type: Recv
+  enabled: true
+  policy: exclude
+  relation: and
+  from-strings:
+    - name: ignore https connections
+      def: net.dport = 80
+    - name: ignore events where source port != 44123
+      def: net.sport != 44123

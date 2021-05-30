@@ -24,16 +24,16 @@ import (
 	"github.com/xeipuuv/gojsonschema"
 )
 
-func validate(m interface{}) (bool, []error) {
+func validate(s string, m interface{}) (bool, []error) {
 	converted, err := convertToStringKeysRecursive(m, "")
 	if err != nil {
 		return false, []error{fmt.Errorf("fail to convert keys to string: %v", err)}
 	}
 	loader := gojsonschema.NewGoLoader(converted)
-	sc := gojsonschema.NewStringLoader(interpolateSchema())
+	sc := gojsonschema.NewStringLoader(s)
 	r, err := gojsonschema.Validate(sc, loader)
 	if err != nil {
-		return false, []error{fmt.Errorf("fail to validate config file through schema: %v", err)}
+		return false, []error{fmt.Errorf("fail to validate file through schema: %v", err)}
 	}
 	errs := make([]error, len(r.Errors()))
 	for i, err := range r.Errors() {

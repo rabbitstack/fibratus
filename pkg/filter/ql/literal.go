@@ -21,7 +21,9 @@ package ql
 import (
 	"bytes"
 	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/filter/ql/functions"
 	"net"
+	"reflect"
 	"strconv"
 	"strings"
 )
@@ -124,4 +126,40 @@ func (f *Function) String() string {
 
 	// Write function name and args.
 	return fmt.Sprintf("%s(%s)", f.Name, strings.Join(str, ", "))
+}
+
+// validate ensures that the function name obtained
+// from the parser exists within the internal functions
+// catalog. It also validates the function signature to
+// make sure required arguments are supplied. Finally, it
+// checks the type of each argument with the expected one.
+func (f Function) validate() error {
+	fn, ok := funcs[strings.ToUpper(f.Name)]
+	if !ok {
+		return ErrUndefinedFunction(f.Name)
+	}
+
+	if len(f.Args) < fn.Desc().RequiredArgs() ||
+		len(f.Args) > len(fn.Desc().Args) {
+		return ErrFunctionSignature(fn.Desc(), len(f.Args))
+	}
+
+	for i, expr := range f.Args {
+		arg := fn.Desc().Args[i]
+		typ := functions.Unknown
+
+		switch reflect.TypeOf(expr) {
+		case reflect.TypeOf(&FieldLiteral{}):
+			typ = functions.Field
+		case reflect.TypeOf(&IPLiteral{}):
+			typ = functions.IP
+		case reflect.TypeOf(&StringLiteral{}):
+			typ = functions.String
+		}
+
+		if !arg.ContainsType(typ) {
+			return ErrArgumentTypeMismatch(i, arg.Keyword, fn.Name(), arg.Types)
+		}
+	}
+	return nil
 }

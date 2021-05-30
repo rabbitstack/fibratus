@@ -1,6 +1,7 @@
 module github.com/rabbitstack/fibratus
 
 require (
+	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/Microsoft/go-winio v0.4.14
 	github.com/briandowns/spinner v1.12.0
 	github.com/dustin/go-humanize v1.0.0
@@ -29,7 +30,7 @@ require (
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
-	gopkg.in/yaml.v2 v2.2.4
+	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 )
 
-go 1.15
+go 1.16

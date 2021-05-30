@@ -119,6 +119,14 @@ var schema = `
 			},
 			"additionalProperties": false
 		},
+		"filters": {
+			"type": "object",
+			"properties": {
+				"from-paths": 	{"type": ["array", "null"], "items": [{"type": "string", "minLength": 5}]},
+				"from-urls":	{"type": ["array", "null"], "items": [{"type": "string", "minLength": 5}]}
+			},
+			"additionalProperties": false
+		},
 		"kevent": {
 			"type": "object",
 			"properties": {
@@ -419,6 +427,51 @@ var schema = `
 			"additionalProperties": false
 		}
 	},
+	"additionalProperties": false
+}
+`
+
+var filterGroupSchema = `	
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+
+	"type": "object",
+	"properties": {
+		"group": {"type": "string", "minLength": 1},
+		"selector": {
+			"type": "object",
+			"properties": {
+				"type":		{"type": "string", "enum": ["CreateProcess", "CreateThread", "TerminateProcess", "TerminateThread", "LoadImage", "UnloadImage", "CreateFile", "CloseFile", "ReadFile", "WriteFile", "DeleteFile", "RenameFile", "SetFileInformation", "EnumDirectory", "RegCreateKey", "RegOpenKey", "RegSetValue", "RegQueryValue", "RegQueryKey", "RegDeleteKey", "RegDeleteValue", "Accept", "Send", "Recv", "Connect", "Disconnect", "Reconnect", "Retransmit", "CreateHandle", "CloseHandle"]},
+				"category": {"type": "string", "enum": ["registry", "file", "net", "process", "thread", "image", "handle"]}
+			},
+			"additionalProperties": false,
+			"oneOf": [
+				{"required": ["type"]},
+				{"required": ["category"]}
+			]
+		},
+		"enabled":  	{"type": "boolean"},
+		"policy":   	{"type": "string", "enum": ["include", "exclude", "INCLUDE", "EXCLUDE"]},
+		"relation": 	{"type": "string", "enum": ["or", "and", "OR", "AND"]},
+		"tags":			{"type": "array", "items": [{"type": "string", "minLength": 1}]},
+		"from-strings": {
+			"type": "array",
+			"items": 
+				{
+					"type": "object",
+					"properties": {
+						"name": 	{"type": "string", "minLength": 3},
+						"def": 		{"type": "string", "minLength": 3},
+						"action": 	{"type": "string"}
+					},
+					"required": ["name", "def"],
+					"minItems": 1,
+					"additionalProperties": false
+				}
+			
+		}
+	},
+	"required": ["group", "enabled", "selector", "from-strings"],
 	"additionalProperties": false
 }
 `

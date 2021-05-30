@@ -140,6 +140,7 @@ func (f *filter) Compile() error {
 	if err != nil {
 		return err
 	}
+
 	ql.WalkFunc(f.expr, func(n ql.Node) {
 		if expr, ok := n.(*ql.BinaryExpr); ok {
 			if lhs, ok := expr.LHS.(*ql.FieldLiteral); ok {
@@ -158,9 +159,11 @@ func (f *filter) Compile() error {
 			}
 		}
 	})
+
 	if len(f.fields) == 0 {
 		return errNoFields
 	}
+
 	return nil
 }
 

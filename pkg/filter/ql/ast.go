@@ -23,6 +23,7 @@ package ql
 import (
 	"github.com/rabbitstack/fibratus/pkg/util/wildcard"
 	"net"
+	"strconv"
 	"strings"
 )
 
@@ -252,6 +253,16 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 					return false
 				}
 				return uint64(lhs) >= rhs
+			}
+		case []uint16:
+			switch expr.Op {
+			case in:
+				for _, i := range rhs {
+					if int(i) == lhs {
+						return true
+					}
+				}
+				return false
 			}
 		}
 	case uint8:
@@ -629,6 +640,20 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			case gte:
 				return lhs >= rhs
 			}
+		case []string:
+			switch expr.Op {
+			case in:
+				for _, s := range rhs {
+					n, err := strconv.Atoi(s)
+					if err != nil {
+						continue
+					}
+					if uint16(n) == lhs {
+						return true
+					}
+				}
+				return false
+			}
 		}
 	case string:
 		switch expr.Op {
@@ -683,6 +708,17 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 				}
 			}
 			return false
+		case iin:
+			rhs, ok := rhs.([]string)
+			if !ok {
+				return false
+			}
+			for _, i := range rhs {
+				if strings.EqualFold(i, lhs) {
+					return true
+				}
+			}
+			return false
 		case startswith:
 			switch rhs := rhs.(type) {
 			case string:
@@ -697,6 +733,20 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			default:
 				return false
 			}
+		case istartswith:
+			switch rhs := rhs.(type) {
+			case string:
+				return strings.HasPrefix(strings.ToLower(lhs), strings.ToLower(rhs))
+			case []string:
+				for _, s := range rhs {
+					if strings.HasPrefix(strings.ToLower(lhs), strings.ToLower(s)) {
+						return true
+					}
+				}
+				return false
+			default:
+				return false
+			}
 		case endswith:
 			switch rhs := rhs.(type) {
 			case string:
@@ -704,6 +754,20 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			case []string:
 				for _, s := range rhs {
 					if strings.HasSuffix(lhs, s) {
+						return true
+					}
+				}
+				return false
+			default:
+				return false
+			}
+		case iendswith:
+			switch rhs := rhs.(type) {
+			case string:
+				return strings.HasSuffix(strings.ToLower(lhs), strings.ToLower(rhs))
+			case []string:
+				for _, s := range rhs {
+					if strings.HasSuffix(strings.ToLower(lhs), strings.ToLower(s)) {
 						return true
 					}
 				}
@@ -755,16 +819,38 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			}
 			return !lhs.Equal(rhs)
 		case in:
-			rhs, ok := rhs.([]string)
+			ips, ok := rhs.([]net.IP)
 			if !ok {
+				// keep backward compatibility with string lists
+				ips1, ok := rhs.([]string)
+				if !ok {
+					return false
+				}
+				for _, ip := range ips1 {
+					if net.ParseIP(ip).Equal(lhs) {
+						return true
+					}
+				}
 				return false
 			}
-			for _, s := range rhs {
-				if net.ParseIP(s).Equal(lhs) {
+			for _, ip := range ips {
+				if ip.Equal(lhs) {
 					return true
 				}
 			}
 			return false
+		case startswith:
+			rhs, ok := rhs.(string)
+			if !ok {
+				return false
+			}
+			return strings.HasPrefix(lhs.String(), rhs)
+		case endswith:
+			rhs, ok := rhs.(string)
+			if !ok {
+				return false
+			}
+			return strings.HasSuffix(lhs.String(), rhs)
 		}
 	case []string:
 		switch expr.Op {

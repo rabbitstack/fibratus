@@ -1,0 +1,32 @@
+- group: Safe remote thread creation sources
+  selector:
+    type: CreateThread
+  enabled: true
+  policy: exclude
+  relation: or
+  from-strings:
+    - name: System processes and common binaries
+      def: kevt.pid != thread.pid
+        and
+        ps.exe iin
+        (
+        'C:\\Windows\\system32\\wbem\\WmiPrvSE.exe',
+        'C:\\Windows\\system32\\svchost.exe',
+        'C:\\Windows\\system32\\wininit.exe',
+        'C:\\Windows\\system32\\csrss.exe',
+        'C:\\Windows\\system32\\services.exe',
+        'C:\\Windows\\system32\\winlogon.exe',
+        'C:\\Windows\\system32\\audiodg.exe',
+        'C:\\Windows\\system32\\kernel32.dll',
+        'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe'
+        )
+
+- group: Suspicious remote thread creations
+  selector:
+    type: CreateThread
+  enabled: true
+  policy: include
+  relation: or
+  from-strings:
+    - name: Fishy remote threads
+      def: kevt.pid != thread.pid

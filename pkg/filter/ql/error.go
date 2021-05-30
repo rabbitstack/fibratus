@@ -44,7 +44,8 @@ func (e *ParseError) Error() string {
 	}
 	l := e.Pos + 1
 	var sb strings.Builder
-	sb.WriteString(e.Expr)
+	sb.WriteRune('\n')
+	sb.WriteString(strings.TrimSpace(e.Expr))
 	sb.WriteRune('\n')
 	for l > 0 {
 		l--

@@ -25,7 +25,7 @@ import (
 // CIDRContains determines if the specified IP is contained within
 // the block referenced by the given CIDR mask. The first argument
 // in the slice represents the IP address and the rest of the args
-// represents IP addresses in CIDR notation.
+// represent IP addresses in CIDR notation.
 type CIDRContains struct{}
 
 func (f CIDRContains) Call(args []interface{}) (interface{}, bool) {
