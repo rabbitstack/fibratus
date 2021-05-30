@@ -252,7 +252,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 			}
 
 		case strings.HasPrefix(field, fields.PsModsPath):
-			name, subfield := captureInBrackets(field)
+			name, segment := captureInBrackets(field)
 			ps := kevt.PS
 			if ps == nil {
 				return nil, nil
@@ -262,7 +262,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 				return nil, nil
 			}
 
-			switch subfield {
+			switch segment {
 			case fields.ModuleSize:
 				return mod.Size, nil
 			case fields.ModuleChecksum:
@@ -276,27 +276,32 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 			}
 
 		case strings.HasPrefix(field, fields.PsParentPath):
-			// get the parent index or a wildcard
-			// to indicate we want to visit all of
-			// the parent processes
-			val, subfield := captureInBrackets(field)
-
-			depth, err := strconv.Atoi(val)
+			key, segment := captureInBrackets(field)
+			depth, err := strconv.Atoi(key)
 			if err != nil {
-				// we got the * rune
+				// we got the last key
 				depth = math.MaxUint32
 			}
-			currentDepth := 0
-			pstypes.Visit(func(ps *pstypes.PS) {
-				currentDepth++
-				if currentDepth >= depth {
-					return
-				}
-				switch subfield{
+			var (
+				dp int
+				ps *pstypes.PS
+			)
 
+			pstypes.Visit(func(proc *pstypes.PS) {
+				dp++
+				if dp == depth || depth == math.MaxUint32 {
+					ps = proc
 				}
-
 			}, kevt.PS)
+
+			if ps == nil {
+				return nil, nil
+			}
+
+			switch segment{
+			case fields.Segment("name"):
+				return ps.Name, nil
+			}
 		}
 
 		return nil, nil
@@ -554,12 +559,12 @@ func (*peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, erro
 		field := f.String()
 		if strings.HasPrefix(field, fields.PeSectionsPath) {
 			// get the section name
-			sname, subfield := captureInBrackets(field)
+			sname, segment := captureInBrackets(field)
 			sec := p.Section(sname)
 			if sec == nil {
 				return nil, nil
 			}
-			switch subfield {
+			switch segment {
 			case fields.SectionEntropy:
 				return sec.Entropy, nil
 			case fields.SectionMD5Hash:
@@ -588,7 +593,7 @@ func (*peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, erro
 	return nil, nil
 }
 
-func captureInBrackets(s string) (string, fields.Subfield) {
+func captureInBrackets(s string) (string, fields.Segment) {
 	lbracket := strings.Index(s, "[")
 	if lbracket == -1 {
 		return "", ""
@@ -601,7 +606,7 @@ func captureInBrackets(s string) (string, fields.Subfield) {
 		return "", ""
 	}
 	if rbracket+2 < len(s) {
-		return s[lbracket+1 : rbracket], fields.Subfield(s[rbracket+2:])
+		return s[lbracket+1 : rbracket], fields.Segment(s[rbracket+2:])
 	}
 	return s[lbracket+1 : rbracket], ""
 }

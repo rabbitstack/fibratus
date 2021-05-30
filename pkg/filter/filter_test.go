@@ -61,12 +61,22 @@ func TestFilterRunProcessKevent(t *testing.T) {
 		kparams.ProcessID:       {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1234)},
 		kparams.ProcessParentID: {Name: kparams.ProcessParentID, Type: kparams.PID, Value: uint32(345)},
 	}
+
+	ps1 := &pstypes.PS{
+		Name: "wininit.exe",
+		Parent: &pstypes.PS{
+			Name: "services.exe",
+		},
+	}
+
 	kevt := &kevent.Kevent{
 		Type:    ktypes.CreateProcess,
 		Kparams: kpars,
 		Name:    "CreateProcess",
 		PID:     1023,
 		PS: &pstypes.PS{
+			Name: "svchost.exe",
+			Parent: ps1,
 			Ppid: 345,
 			Envs: map[string]string{"ALLUSERSPROFILE": "C:\\ProgramData", "OS": "Windows_NT", "ProgramFiles(x86)": "C:\\Program Files (x86)"},
 			Modules: []pstypes.Module{
@@ -96,6 +106,7 @@ func TestFilterRunProcessKevent(t *testing.T) {
 		{`ps.modules[kernel32.dll].location = 'C:\\Windows\\System32'`, true},
 		{`ps.modules[xul.dll].size = 12354`, false},
 		{`kevt.name = 'CreateProcess' and kevt.pid != ps.ppid`, true},
+		{`ps.parent[1].name = 'wininit.exe'`, true},
 	}
 
 	for i, tt := range tests {

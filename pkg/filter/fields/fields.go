@@ -24,6 +24,8 @@ import (
 	"sort"
 )
 
+// pathRegexp splits the provided path into different components. The first capture
+// contains the indexed field name. Next is the indexed key and, finally the segment.
 var pathRegexp = regexp.MustCompile(`(pe.sections|pe.resources|ps.envs|ps.modules|ps.parent)\[.+\s*].?(.*)`)
 
 // Field represents the type alias for the field
@@ -231,27 +233,28 @@ const (
 // String casts the field type to string.
 func (f Field) String() string { return string(f) }
 
-// Subfield represents the type alias for the subfield.
-type Subfield string
+// Segment represents the type alias for the segment. Segment
+// denotes the location of the value within an indexed field.
+type Segment string
 
 const (
 	// SectionEntropy is the entropy value of the specific PE section
-	SectionEntropy Subfield = "entropy"
+	SectionEntropy Segment = "entropy"
 	// SectionMD5Hash refers to the section md5 sum
-	SectionMD5Hash Subfield = "md5"
+	SectionMD5Hash Segment = "md5"
 	// SectionSize is the section size
-	SectionSize Subfield = "size"
+	SectionSize Segment = "size"
 
 	// ModuleSize is the module size
-	ModuleSize Subfield = "size"
+	ModuleSize Segment = "size"
 	// ModuleChecksum is the module checksum
-	ModuleChecksum Subfield = "checksum"
+	ModuleChecksum Segment = "checksum"
 	// ModuleLocation is the module location
-	ModuleLocation Subfield = "location"
+	ModuleLocation Segment = "location"
 	// ModuleBaseAddress is the module base address
-	ModuleBaseAddress Subfield = "address.base"
+	ModuleBaseAddress Segment = "address.base"
 	// ModuleDefaultAddress is the module address
-	ModuleDefaultAddress Subfield = "address.default"
+	ModuleDefaultAddress Segment = "address.default"
 )
 
 const (
@@ -393,11 +396,11 @@ func Lookup(name string) Field {
 	}
 
 	field := groups[1]
-	subfield := groups[2]
+	segment := groups[2]
 
 	switch Field(field) {
 	case PeSections:
-		switch Subfield(subfield) {
+		switch Segment(segment) {
 		case SectionEntropy:
 			return Field(name)
 		case SectionMD5Hash:
@@ -410,7 +413,7 @@ func Lookup(name string) Field {
 	case PsEnvs:
 		return Field(name)
 	case PsModules:
-		switch Subfield(subfield) {
+		switch Segment(segment) {
 		case ModuleSize:
 			return Field(ModuleSize)
 		case ModuleChecksum:
@@ -423,6 +426,9 @@ func Lookup(name string) Field {
 			return Field(ModuleLocation)
 		}
 	case PsParent:
+		if segment == "" {
+			return None
+		}
 		return Field(name)
 	}
 	return None
