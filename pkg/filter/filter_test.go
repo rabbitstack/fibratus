@@ -66,6 +66,10 @@ func TestFilterRunProcessKevent(t *testing.T) {
 		Name: "wininit.exe",
 		Parent: &pstypes.PS{
 			Name: "services.exe",
+			SID:  "administrator/SYSTEM",
+			Parent: &pstypes.PS{
+				Name: "System",
+			},
 		},
 	}
 
@@ -106,8 +110,11 @@ func TestFilterRunProcessKevent(t *testing.T) {
 		{`ps.modules[kernel32.dll].location = 'C:\\Windows\\System32'`, true},
 		{`ps.modules[xul.dll].size = 12354`, false},
 		{`kevt.name = 'CreateProcess' and kevt.pid != ps.ppid`, true},
+		{`ps.parent.name = 'wininit.exe'`, true},
 		{`ps.parent[1].name = 'wininit.exe'`, true},
-		{`ps.parent[root].name = 'services.exe'`, true},
+		{`ps.parent[2].name = 'services.exe'`, true},
+		{`ps.parent[2].sid = 'administrator/SYSTEM'`, true},
+		{`ps.parent[root].name = 'System'`, true},
 	}
 
 	for i, tt := range tests {

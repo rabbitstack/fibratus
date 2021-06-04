@@ -267,8 +267,22 @@ const (
 	// ModuleDefaultAddress is the module address
 	ModuleDefaultAddress Segment = "address.default"
 
+	// ProcessID represents the process id
+	ProcessID Segment = "pid"
 	// ProcessName represents the process name
 	ProcessName Segment = "name"
+	// PsComm represents the process command line
+	ProcessComm Segment = "comm"
+	// ProcessExe represents the process image path
+	ProcessExe Segment = "exe"
+	// ProcessArgs represents the process command line arguments
+	ProcessArgs Segment = "args"
+	// ProcessCwd represents the process current working directory
+	ProcessCwd Segment = "cwd"
+	// ProcessSID represents the process security identifier
+	ProcessSID Segment = "sid"
+	// ProcessSessionID represents the session id bound to the process
+	ProcessSessionID Segment = "sessionid"
 )
 
 const (
@@ -469,8 +483,21 @@ func Lookup(name string) Field {
 		switch Segment(segment) {
 		case ProcessName:
 			return Field(name)
+		case ProcessID:
+			return Field(name)
+		case ProcessArgs:
+			return Field(name)
+		case ProcessComm:
+			return Field(name)
+		case ProcessCwd:
+			return Field(name)
+		case ProcessExe:
+			return Field(name)
+		case ProcessSID:
+			return Field(name)
+		case ProcessSessionID:
+			return Field(name)
 		}
-
 	case PeResources:
 		if segment == "" {
 			return Field(name)

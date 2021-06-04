@@ -27,7 +27,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/network"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
-	"math"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -346,19 +345,19 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 
 		case strings.HasPrefix(field, fields.PsParentSequence):
 			key, segment := captureInBrackets(field)
-			depth, err := strconv.Atoi(key)
+			depth, err := strconv.Atoi(strings.TrimSpace(key))
 			if err != nil {
-				// we got the last key
-				depth = math.MaxUint32
+				// we got the `root` key
+				depth = -1
 			}
+
 			var (
 				dp int
 				ps *pstypes.PS
 			)
-
 			pstypes.Visit(func(proc *pstypes.PS) {
 				dp++
-				if dp == depth || depth == math.MaxUint32 {
+				if dp == depth || depth == -1 {
 					ps = proc
 				}
 			}, kevt.PS)
@@ -370,6 +369,20 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 			switch segment {
 			case fields.ProcessName:
 				return ps.Name, nil
+			case fields.ProcessID:
+				return ps.PID, nil
+			case fields.ProcessSID:
+				return ps.SID, nil
+			case fields.ProcessSessionID:
+				return ps.SessionID, nil
+			case fields.ProcessCwd:
+				return ps.Cwd, nil
+			case fields.ProcessComm:
+				return ps.Comm, nil
+			case fields.ProcessArgs:
+				return ps.Args, nil
+			case fields.ProcessExe:
+				return ps.Exe, nil
 			}
 		}
 

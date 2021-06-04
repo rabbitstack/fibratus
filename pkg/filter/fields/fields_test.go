@@ -38,5 +38,6 @@ func TestLookup(t *testing.T) {
 	assert.Empty(t, Lookup("ps.pe.sections[.debug$S].e"))
 	assert.Equal(t, Field("ps.parent[1].name"), Lookup("ps.parent[1].name"))
 	assert.Equal(t, Field("ps.parent[root].name"), Lookup("ps.parent[root].name"))
+	assert.Equal(t, Field("ps.parent[2].sid"), Lookup("ps.parent[2].sid"))
 	assert.Empty(t, Lookup("ps.parent[ro].name"))
 }

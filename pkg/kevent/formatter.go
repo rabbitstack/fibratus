@@ -40,6 +40,7 @@ const (
 	ppid          = ".Ppid"
 	pexe          = ".Pexe"
 	pcomm         = ".Pcomm"
+	pproc         = ".Pname"
 	cwd           = ".Cwd"
 	exe           = ".Exe"
 	comm          = ".Comm"
@@ -72,6 +73,9 @@ var kfields = map[string]bool{
 	ts:          true,
 	pid:         true,
 	ppid:        true,
+	pexe:        true,
+	pcomm:       true,
+	pproc:       true,
 	cwd:         true,
 	exe:         true,
 	comm:        true,
@@ -217,6 +221,7 @@ func (f *Formatter) Format(kevt *Kevent) []byte {
 		values[sid] = ps.SID
 		parent := ps.Parent
 		if parent != nil {
+			values[pproc] = parent.Name
 			values[pexe] = parent.Exe
 			values[pcomm] = parent.Comm
 		}
