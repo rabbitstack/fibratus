@@ -24,7 +24,9 @@ import (
 	"sort"
 )
 
-var subfieldRegexp = regexp.MustCompile(`(pe.sections|pe.resources|ps.envs|ps.modules)\[.+\s*].?(.*)`)
+// pathRegexp splits the provided path into different components. The first capture
+// contains the indexed field name. Next is the indexed key and, finally the segment.
+var pathRegexp = regexp.MustCompile(`(pe.sections|pe.resources|ps.envs|ps.modules|ps.parent)\[(.+\s*)].?(.*)`)
 
 // Field represents the type alias for the field
 type Field string
@@ -58,6 +60,30 @@ const (
 	PsDTB Field = "ps.dtb"
 	// PsModules represents the process modules
 	PsModules Field = "ps.modules"
+	// PsParentName represents the parent process name field
+	PsParentName Field = "ps.parent.name"
+	// PsParentComm represents the parent process command line field
+	PsParentComm Field = "ps.parent.comm"
+	// PsParentExe represents the parent process image path field
+	PsParentExe Field = "ps.parent.exe"
+	// PsParentArgs represents the parent process command line arguments field
+	PsParentArgs Field = "ps.parent.args"
+	// PsParentCwd represents the parent process current working directory field
+	PsParentCwd Field = "ps.parent.cwd"
+	// PsParentSID represents the parent process security identifier field
+	PsParentSID Field = "ps.parent.sid"
+	// PsParentSessionID represents the session id field bound to the parent process
+	PsParentSessionID Field = "ps.parent.sessionid"
+	// PsParentEnvs represents the parent process environment variables field
+	PsParentEnvs Field = "ps.parent.envs"
+	// PsParentHandles represents the parent process handles field
+	PsParentHandles Field = "ps.parent.handles"
+	// PsParentHandleTypes represents the parent process handle types field
+	PsParentHandleTypes Field = "ps.parent.handle.types"
+	// PsParentDTB represents the parent process directory table base address field
+	PsParentDTB Field = "ps.parent.dtb"
+	// PsParent represents the parent process sequence field
+	PsParent Field = "ps.parent"
 
 	// ThreadBasePrio is the base thread priority
 	ThreadBasePrio Field = "thread.prio"
@@ -220,38 +246,58 @@ const (
 // String casts the field type to string.
 func (f Field) String() string { return string(f) }
 
-// Subfield represents the type alias for the subfield.
-type Subfield string
+// Segment represents the type alias for the segment. Segment
+// denotes the location of the value within an indexed field.
+type Segment string
 
 const (
 	// SectionEntropy is the entropy value of the specific PE section
-	SectionEntropy Subfield = "entropy"
+	SectionEntropy Segment = "entropy"
 	// SectionMD5Hash refers to the section md5 sum
-	SectionMD5Hash Subfield = "md5"
+	SectionMD5Hash Segment = "md5"
 	// SectionSize is the section size
-	SectionSize Subfield = "size"
+	SectionSize Segment = "size"
 
 	// ModuleSize is the module size
-	ModuleSize Subfield = "size"
+	ModuleSize Segment = "size"
 	// ModuleChecksum is the module checksum
-	ModuleChecksum Subfield = "checksum"
+	ModuleChecksum Segment = "checksum"
 	// ModuleLocation is the module location
-	ModuleLocation Subfield = "location"
+	ModuleLocation Segment = "location"
 	// ModuleBaseAddress is the module base address
-	ModuleBaseAddress Subfield = "address.base"
+	ModuleBaseAddress Segment = "address.base"
 	// ModuleDefaultAddress is the module address
-	ModuleDefaultAddress Subfield = "address.default"
+	ModuleDefaultAddress Segment = "address.default"
+
+	// ProcessID represents the process id
+	ProcessID Segment = "pid"
+	// ProcessName represents the process name
+	ProcessName Segment = "name"
+	// PsComm represents the process command line
+	ProcessComm Segment = "comm"
+	// ProcessExe represents the process image path
+	ProcessExe Segment = "exe"
+	// ProcessArgs represents the process command line arguments
+	ProcessArgs Segment = "args"
+	// ProcessCwd represents the process current working directory
+	ProcessCwd Segment = "cwd"
+	// ProcessSID represents the process security identifier
+	ProcessSID Segment = "sid"
+	// ProcessSessionID represents the session id bound to the process
+	ProcessSessionID Segment = "sessionid"
 )
 
 const (
-	// PsEnvsSubfield is the process environment variable property indexer
-	PsEnvsSubfield = "ps.envs["
-	// PsModsSubfield is the process module property indexer
-	PsModsSubfield = "ps.modules["
-	// PeSectionsSubfield is the PE section property indexer
-	PeSectionsSubfield = "pe.sections["
-	// PeResourcesSubfield is the PE resource property indexer
-	PeResourcesSubfield = "pe.resources["
+	// PsEnvsSequence denotes the beginning of the process environment variables sequence
+	PsEnvsSequence = "ps.envs["
+	// PsModsSequence denotes the beginning of  the process modules sequence
+	PsModsSequence = "ps.modules["
+	// PsParentSequence denotes the start of the parent processes sequence
+	PsParentSequence = "ps.parent["
+	// PeSectionsSequence denotes the start of the PE sections sequence
+	PeSectionsSequence = "pe.sections["
+	// PeResourcesSequence denotes the beginning opf the he PE resources sequence
+	PeResourcesSequence = "pe.resources["
 )
 
 // FieldInfo is the field metadata descriptor.
@@ -285,20 +331,31 @@ var fields = map[Field]FieldInfo{
 	KevtDateWeekday: {KevtDateWeekday, "week day on which the event occurred", kparams.AnsiString, []string{"kevt.date.weekday = 'Monday'"}},
 	KevtNparams:     {KevtNparams, "number of parameters", kparams.Int8, []string{"kevt.nparams > 2"}},
 
-	PsPid:         {PsPid, "process identifier", kparams.PID, []string{"ps.pid = 1024"}},
-	PsPpid:        {PsPpid, "parent process identifier", kparams.PID, []string{"ps.ppid = 45"}},
-	PsName:        {PsName, "process image name including the file extension", kparams.UnicodeString, []string{"ps.name contains 'firefox'"}},
-	PsComm:        {PsComm, "process command line", kparams.UnicodeString, []string{"ps.comm contains 'java'"}},
-	PsExe:         {PsExe, "full name of the process' executable", kparams.UnicodeString, []string{"ps.exe = 'C:\\Windows\\system32\\cmd.exe'"}},
-	PsArgs:        {PsArgs, "process command line arguments", kparams.Slice, []string{"ps.args in ('/cdir', '/-C')"}},
-	PsCwd:         {PsCwd, "process current working directory", kparams.UnicodeString, []string{"ps.cwd = 'C:\\Users\\Default'"}},
-	PsSID:         {PsSID, "security identifier under which this process is run", kparams.UnicodeString, []string{"ps.sid contains 'SYSTEM'"}},
-	PsSessionID:   {PsSessionID, "unique identifier for the current session", kparams.Int16, []string{"ps.sessionid = 1"}},
-	PsEnvs:        {PsEnvs, "process environment variables", kparams.Slice, []string{"ps.envs in ('MOZ_CRASHREPORTER_DATA_DIRECTORY')"}},
-	PsHandles:     {PsHandles, "allocated process handle names", kparams.Slice, []string{"ps.handles in ('\\BaseNamedObjects\\__ComCatalogCache__')"}},
-	PsHandleTypes: {PsHandleTypes, "allocated process handle types", kparams.Slice, []string{"ps.handle.types in ('Key', 'Mutant', 'Section')"}},
-	PsDTB:         {PsDTB, "process directory table base address", kparams.HexInt64, []string{"ps.dtb = '7ffe0000'"}},
-	PsModules:     {PsModules, "modules loaded by the process", kparams.Slice, []string{"ps.modules in ('crypt32.dll', 'xul.dll')"}},
+	PsPid:               {PsPid, "process identifier", kparams.PID, []string{"ps.pid = 1024"}},
+	PsPpid:              {PsPpid, "parent process identifier", kparams.PID, []string{"ps.ppid = 45"}},
+	PsName:              {PsName, "process image name including the file extension", kparams.UnicodeString, []string{"ps.name contains 'firefox'"}},
+	PsComm:              {PsComm, "process command line", kparams.UnicodeString, []string{"ps.comm contains 'java'"}},
+	PsExe:               {PsExe, "full name of the process' executable", kparams.UnicodeString, []string{"ps.exe = 'C:\\Windows\\system32\\cmd.exe'"}},
+	PsArgs:              {PsArgs, "process command line arguments", kparams.Slice, []string{"ps.args in ('/cdir', '/-C')"}},
+	PsCwd:               {PsCwd, "process current working directory", kparams.UnicodeString, []string{"ps.cwd = 'C:\\Users\\Default'"}},
+	PsSID:               {PsSID, "security identifier under which this process is run", kparams.UnicodeString, []string{"ps.sid contains 'SYSTEM'"}},
+	PsSessionID:         {PsSessionID, "unique identifier for the current session", kparams.Int16, []string{"ps.sessionid = 1"}},
+	PsEnvs:              {PsEnvs, "process environment variables", kparams.Slice, []string{"ps.envs in ('MOZ_CRASHREPORTER_DATA_DIRECTORY')"}},
+	PsHandles:           {PsHandles, "allocated process handle names", kparams.Slice, []string{"ps.handles in ('\\BaseNamedObjects\\__ComCatalogCache__')"}},
+	PsHandleTypes:       {PsHandleTypes, "allocated process handle types", kparams.Slice, []string{"ps.handle.types in ('Key', 'Mutant', 'Section')"}},
+	PsDTB:               {PsDTB, "process directory table base address", kparams.HexInt64, []string{"ps.dtb = '7ffe0000'"}},
+	PsModules:           {PsModules, "modules loaded by the process", kparams.Slice, []string{"ps.modules in ('crypt32.dll', 'xul.dll')"}},
+	PsParentName:        {PsParentName, "parent process image name including the file extension", kparams.UnicodeString, []string{"ps.parent.name contains 'cmd.exe'"}},
+	PsParentComm:        {PsParentComm, "parent process command line", kparams.UnicodeString, []string{"parent.ps.comm contains 'java'"}},
+	PsParentExe:         {PsParentExe, "full name of the parent process' executable", kparams.UnicodeString, []string{"ps.parent.exe = 'C:\\Windows\\system32\\explorer.exe'"}},
+	PsParentArgs:        {PsParentArgs, "parent process command line arguments", kparams.Slice, []string{"ps.parent.args in ('/cdir', '/-C')"}},
+	PsParentCwd:         {PsParentCwd, "parent process current working directory", kparams.UnicodeString, []string{"ps.parent.cwd = 'C:\\Temp'"}},
+	PsParentSID:         {PsParentSID, "security identifier under which the parent process is run", kparams.UnicodeString, []string{"ps.parent.sid contains 'SYSTEM'"}},
+	PsParentSessionID:   {PsParentSessionID, "unique identifier for the current session of parent process", kparams.Int16, []string{"ps.parent.sessionid = 1"}},
+	PsParentEnvs:        {PsParentEnvs, "parent process environment variables", kparams.Slice, []string{"ps.parent.envs in ('MOZ_CRASHREPORTER_DATA_DIRECTORY')"}},
+	PsParentHandles:     {PsParentHandles, "allocated parent process handle names", kparams.Slice, []string{"ps.parent.handles in ('\\BaseNamedObjects\\__ComCatalogCache__')"}},
+	PsParentHandleTypes: {PsParentHandleTypes, "allocated parent process handle types", kparams.Slice, []string{"ps.parent.handle.types in ('File', 'SymbolicLink')"}},
+	PsParentDTB:         {PsParentDTB, "parent process directory table base address", kparams.HexInt64, []string{"ps.parent.dtb = '7ffe0000'"}},
 
 	ThreadBasePrio:    {ThreadBasePrio, "scheduler priority of the thread", kparams.Int8, []string{"thread.prio = 5"}},
 	ThreadIOPrio:      {ThreadIOPrio, "I/O priority hint for scheduling I/O operations", kparams.Int8, []string{"thread.io.prio = 4"}},
@@ -315,6 +372,7 @@ var fields = map[Field]FieldInfo{
 	ImageChecksum:       {ImageChecksum, "image checksum", kparams.Uint32, []string{"image.checksum = 746424"}},
 	ImageSize:           {ImageSize, "image size", kparams.Uint32, []string{"image.size > 1024"}},
 	ImageDefaultAddress: {ImageDefaultAddress, "default image address", kparams.HexInt64, []string{"image.default.address = '7efe0000'"}},
+	ImagePID:            {ImagePID, "target process identifier", kparams.Uint32, []string{"image.pid = 80"}},
 
 	FileObject:    {FileObject, "file object address", kparams.Uint64, []string{"file.object = 18446738026482168384"}},
 	FileName:      {FileName, "full file name", kparams.UnicodeString, []string{"file.name contains 'mimikatz'"}},
@@ -368,23 +426,27 @@ func Get() []FieldInfo {
 }
 
 // Lookup finds the field literal in the map. For the nested fields, it checks the pattern matches
-// the expected one and compares the subfields. If all checks pass, the full nested field literal
+// the expected one and compares the paths. If all checks pass, the full segment field literal
 // is returned.
 func Lookup(name string) Field {
 	if _, ok := fields[Field(name)]; ok {
 		return Field(name)
 	}
-	groups := subfieldRegexp.FindStringSubmatch(name)
-	if len(groups) != 3 {
+	groups := pathRegexp.FindStringSubmatch(name)
+	if len(groups) != 4 {
 		return None
 	}
 
 	field := groups[1]
-	subfield := groups[2]
+	key := groups[2]
+	segment := groups[3]
 
 	switch Field(field) {
 	case PeSections:
-		switch Subfield(subfield) {
+		if segment == "" {
+			return None
+		}
+		switch Segment(segment) {
 		case SectionEntropy:
 			return Field(name)
 		case SectionMD5Hash:
@@ -392,24 +454,61 @@ func Lookup(name string) Field {
 		case SectionSize:
 			return Field(name)
 		}
-	case PeResources:
-		return Field(name)
-	case PsEnvs:
-		return Field(name)
 	case PsModules:
-		switch Subfield(subfield) {
+		if segment == "" {
+			return None
+		}
+		switch Segment(segment) {
 		case ModuleSize:
-			return Field(ModuleSize)
+			return Field(name)
 		case ModuleChecksum:
-			return Field(ModuleChecksum)
+			return Field(name)
 		case ModuleDefaultAddress:
-			return Field(ModuleDefaultAddress)
+			return Field(name)
 		case ModuleBaseAddress:
-			return Field(ModuleBaseAddress)
+			return Field(name)
 		case ModuleLocation:
-			return Field(ModuleLocation)
+			return Field(name)
+		}
+	case PsParent:
+		if segment == "" {
+			return None
+		}
+		// the key is either the number
+		// that represents the depth of
+		// the parent process node or the
+		// `root` keyword to designate the
+		// root process node
+		var keyRegexp = regexp.MustCompile(`[1-9]+|root`)
+		if !keyRegexp.MatchString(key) {
+			return None
+		}
+		switch Segment(segment) {
+		case ProcessName:
+			return Field(name)
+		case ProcessID:
+			return Field(name)
+		case ProcessArgs:
+			return Field(name)
+		case ProcessComm:
+			return Field(name)
+		case ProcessCwd:
+			return Field(name)
+		case ProcessExe:
+			return Field(name)
+		case ProcessSID:
+			return Field(name)
+		case ProcessSessionID:
+			return Field(name)
+		}
+	case PeResources:
+		if segment == "" {
+			return Field(name)
+		}
+	case PsEnvs:
+		if segment == "" {
+			return Field(name)
 		}
 	}
-
 	return None
 }

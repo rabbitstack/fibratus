@@ -63,6 +63,27 @@ type PS struct {
 	Handles htypes.Handles `json:"handles"`
 	// PE stores the PE (Portable Executable) metadata.
 	PE *pe.PE `json:"pe"`
+	// Parent represents the reference to the parent process.
+	Parent *PS `json:"parent"`
+}
+
+// Visitor is the type definition for the function that is
+// invoked on each parent visit walk.
+type Visitor func(*PS)
+
+// Visit recursively visits all parents of the given process
+// and invokes the visitor function on each parent process.
+func Visit(v Visitor, ps *PS) {
+	if ps == nil {
+		return
+	}
+	if ps.Parent == nil {
+		return
+	}
+	v(ps.Parent)
+	if ps.Parent != nil {
+		Visit(v, ps.Parent)
+	}
 }
 
 // String returns a string representation of the process' state.
