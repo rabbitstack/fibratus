@@ -89,3 +89,30 @@ func SetPath(path string) {
 	}
 	C.Py_SetPath((*C.wchar_t)(&w[0]))
 }
+
+// SetSysArgv sets sys.argv based on argc and argv. These parameters are similar to those passed to
+// the program’s main() function with the difference that the first entry should refer to the script
+// file to be executed rather than the executable hosting the Python interpreter. If there isn’t a
+// script that will be run, the first entry in argv can be an empty string. If this function fails
+// to initialize sys.argv, a fatal condition is signalled using Py_FatalError().
+func SetSysArgv(args []string) {
+	argc := C.int(len(args))
+	argv := make([]*C.wchar_t, argc, argc)
+	for i, arg := range args {
+		argv[i] = produceWarg(arg)
+	}
+	C.PySys_SetArgvEx(argc, (**C.wchar_t)(unsafe.Pointer(&argv[0])), 0)
+}
+
+func produceWarg(arg string) *C.wchar_t {
+	carg := C.CString(arg)
+	defer C.free(unsafe.Pointer(carg))
+
+	warg := C.Py_DecodeLocale(carg, nil)
+	if warg == nil {
+		return nil
+	}
+	// Py_DecodeLocale requires a call to PyMem_RawFree to free the memory
+	defer C.PyMem_RawFree(unsafe.Pointer(warg))
+	return warg
+}

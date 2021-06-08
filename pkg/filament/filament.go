@@ -85,6 +85,7 @@ var (
 	errNoOnNextKevent           = errors.New("required on_next_kevent function is not defined")
 	errOnNextKeventNotCallable  = errors.New("on_next_kevent is not callable")
 	errOnNextKeventMismatchArgs = func(c uint32) error { return fmt.Errorf("expected 1 argument for on_next_kevent but found %d args", c) }
+	errEmptyName = errors.New("filament name is empty")
 
 	tableOutput io.Writer
 )
@@ -150,10 +151,26 @@ func New(
 		cpython.SetPath(pylib)
 	}
 
+	if name == "" {
+		return nil, errEmptyName
+	}
+
+	// split filament args. The first argument
+	// is the filament name followed by comma
+	// separated list of arguments
+	args := strings.Split(name, ",")
+	if len(args) == 0 {
+		return nil, errEmptyName
+	}
+	filamentName := args[0]
+
 	// initialize the Python interpreter
 	if err := cpython.Initialize(); err != nil {
 		return nil, err
 	}
+	// set sys.argv
+	cpython.SetSysArgv(args)
+
 	// set the PYTHON_PATH to the filaments directory so the interpreter
 	// is aware of our filament module prior to its loading
 	path := config.Filament.Path
@@ -168,7 +185,7 @@ func New(
 	// check if the filament is present in the directory
 	var exists bool
 	for _, f := range filaments {
-		if strings.TrimSuffix(f.Name(), filepath.Ext(f.Name())) == name {
+		if strings.TrimSuffix(f.Name(), filepath.Ext(f.Name())) == filamentName {
 			exists = true
 		}
 	}
@@ -178,7 +195,7 @@ func New(
 	}
 
 	cpython.AddPythonPath(path)
-	mod, err := cpython.NewModule(name)
+	mod, err := cpython.NewModule(filamentName)
 	if err != nil {
 		if err = cpython.FetchErr(); err != nil {
 			return nil, err
