@@ -344,23 +344,56 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 			}
 
 		case strings.HasPrefix(field, fields.PsParentSequence):
-			key, segment := captureInBrackets(field)
-			depth, err := strconv.Atoi(strings.TrimSpace(key))
-			if err != nil {
-				// we got the `root` key
-				depth = -1
-			}
-
 			var (
-				dp int
 				ps *pstypes.PS
 			)
-			pstypes.Visit(func(proc *pstypes.PS) {
-				dp++
-				if dp == depth || depth == -1 {
-					ps = proc
+			key, segment := captureInBrackets(field)
+			switch key {
+			case "root":
+				pstypes.Visit(func(proc *pstypes.PS) { ps = proc }, kevt.PS)
+			case "any":
+				values := make([]string, 0)
+				ids := make([]uint32, 0)
+
+				pstypes.Visit(func(proc *pstypes.PS) {
+					if proc != nil {
+						switch segment {
+						case fields.ProcessName:
+							values = append(values, proc.Name)
+						case fields.ProcessID:
+							ids = append(ids, proc.PID)
+						case fields.ProcessSID:
+							values = append(values, proc.SID)
+						case fields.ProcessSessionID:
+							ids = append(ids, uint32(proc.SessionID))
+						case fields.ProcessCwd:
+							values = append(values, proc.Cwd)
+						case fields.ProcessComm:
+							values = append(values, proc.Comm)
+						case fields.ProcessArgs:
+							values = append(values, proc.Args...)
+						case fields.ProcessExe:
+							values = append(values, proc.Exe)
+						}
+					}
+				}, kevt.PS)
+				if len(values) > 0 {
+					return values, nil
 				}
-			}, kevt.PS)
+				return ids, nil
+			default:
+				depth, err := strconv.Atoi(key)
+				if err != nil {
+					return nil, err
+				}
+				var i int
+				pstypes.Visit(func(proc *pstypes.PS) {
+					i++
+					if i == depth {
+						ps = proc
+					}
+				}, kevt.PS)
+			}
 
 			if ps == nil {
 				return nil, nil

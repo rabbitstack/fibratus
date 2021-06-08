@@ -478,8 +478,11 @@ func Lookup(name string) Field {
 		// that represents the depth of
 		// the parent process node or the
 		// `root` keyword to designate the
-		// root process node
-		var keyRegexp = regexp.MustCompile(`[1-9]+|root`)
+		// root process node. Additionally,
+		// we can also get the `any` keyword
+		// that collects the fields of all
+		// ancestor processes
+		var keyRegexp = regexp.MustCompile(`[1-9]+|root|any`)
 		if !keyRegexp.MatchString(key) {
 			return None
 		}

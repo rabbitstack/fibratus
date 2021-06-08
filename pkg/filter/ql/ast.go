@@ -922,6 +922,19 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 				}
 			}
 			return false
+		case icontains:
+			rhs, ok := rhs.([]string)
+			if !ok {
+				return false
+			}
+			for _, i := range lhs {
+				for _, j := range rhs {
+					if strings.EqualFold(i, j) {
+						return true
+					}
+				}
+			}
+			return false
 		case in:
 			rhs, ok := rhs.([]string)
 			if !ok {
@@ -962,6 +975,27 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			}
 			return false
 		}
+	case []uint32:
+		switch expr.Op {
+		case in:
+			rhs, ok := rhs.([]string)
+			if !ok {
+				return false
+			}
+			for _, i := range lhs {
+				for _, j := range rhs {
+					n, err := strconv.Atoi(j)
+					if err != nil {
+						continue
+					}
+					if i == uint32(n) {
+						return true
+					}
+				}
+			}
+			return false
+		}
+
 	}
 
 	// the types were not comparable. If our operation was an equality operation,

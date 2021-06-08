@@ -67,6 +67,7 @@ func TestFilterRunProcessKevent(t *testing.T) {
 		Parent: &pstypes.PS{
 			Name: "services.exe",
 			SID:  "administrator/SYSTEM",
+			PID:  2034,
 			Parent: &pstypes.PS{
 				Name: "System",
 			},
@@ -115,6 +116,10 @@ func TestFilterRunProcessKevent(t *testing.T) {
 		{`ps.parent[2].name = 'services.exe'`, true},
 		{`ps.parent[2].sid = 'administrator/SYSTEM'`, true},
 		{`ps.parent[root].name = 'System'`, true},
+		{`ps.parent[any].name in ('services.exe', 'System')`, true},
+		{`ps.parent[any].name not in ('svchost.exe')`, true},
+		{`ps.parent[any].name icontains ('system')`, true},
+		{`ps.parent[any].pid in (2034, 343)`, true},
 	}
 
 	for i, tt := range tests {
