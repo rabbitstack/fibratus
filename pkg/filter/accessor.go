@@ -344,83 +344,93 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 			}
 
 		case strings.HasPrefix(field, fields.PsParentSequence):
-			var (
-				ps *pstypes.PS
-			)
-			key, segment := captureInBrackets(field)
-			switch key {
-			case "root":
-				pstypes.Visit(func(proc *pstypes.PS) { ps = proc }, kevt.PS)
-			case "any":
-				values := make([]string, 0)
-				ids := make([]uint32, 0)
-
-				pstypes.Visit(func(proc *pstypes.PS) {
-					if proc != nil {
-						switch segment {
-						case fields.ProcessName:
-							values = append(values, proc.Name)
-						case fields.ProcessID:
-							ids = append(ids, proc.PID)
-						case fields.ProcessSID:
-							values = append(values, proc.SID)
-						case fields.ProcessSessionID:
-							ids = append(ids, uint32(proc.SessionID))
-						case fields.ProcessCwd:
-							values = append(values, proc.Cwd)
-						case fields.ProcessComm:
-							values = append(values, proc.Comm)
-						case fields.ProcessArgs:
-							values = append(values, proc.Args...)
-						case fields.ProcessExe:
-							values = append(values, proc.Exe)
-						}
-					}
-				}, kevt.PS)
-				if len(values) > 0 {
-					return values, nil
-				}
-				return ids, nil
-			default:
-				depth, err := strconv.Atoi(key)
-				if err != nil {
-					return nil, err
-				}
-				var i int
-				pstypes.Visit(func(proc *pstypes.PS) {
-					i++
-					if i == depth {
-						ps = proc
-					}
-				}, kevt.PS)
-			}
-
-			if ps == nil {
-				return nil, nil
-			}
-
-			switch segment {
-			case fields.ProcessName:
-				return ps.Name, nil
-			case fields.ProcessID:
-				return ps.PID, nil
-			case fields.ProcessSID:
-				return ps.SID, nil
-			case fields.ProcessSessionID:
-				return ps.SessionID, nil
-			case fields.ProcessCwd:
-				return ps.Cwd, nil
-			case fields.ProcessComm:
-				return ps.Comm, nil
-			case fields.ProcessArgs:
-				return ps.Args, nil
-			case fields.ProcessExe:
-				return ps.Exe, nil
-			}
+			return parentFields(field, kevt)
 		}
 
 		return nil, nil
 	}
+}
+
+// parentFields recursively walks the process ancestors and extracts
+// the required field values. If we get the `root` key, the root ancestor
+// fields are inspected, while `any` accumulates values of all ancestors.
+// Alternatively, the key may represent the depth that only returns the
+// ancestor located at the given depth, starting with 1 which is the immediate
+// process parent.
+func parentFields(field string, kevt *kevent.Kevent) (kparams.Value, error) {
+	var ps *pstypes.PS
+	key, segment := captureInBrackets(field)
+
+	switch key {
+	case "root":
+		pstypes.Visit(func(proc *pstypes.PS) {
+			ps = proc
+		}, kevt.PS)
+	case "any":
+		values := make([]string, 0)
+		ids := make([]uint32, 0)
+		pstypes.Visit(func(ps *pstypes.PS) {
+			switch segment {
+			case fields.ProcessName:
+				values = append(values, ps.Name)
+			case fields.ProcessID:
+				ids = append(ids, ps.PID)
+			case fields.ProcessSID:
+				values = append(values, ps.SID)
+			case fields.ProcessSessionID:
+				ids = append(ids, uint32(ps.SessionID))
+			case fields.ProcessCwd:
+				values = append(values, ps.Cwd)
+			case fields.ProcessComm:
+				values = append(values, ps.Comm)
+			case fields.ProcessArgs:
+				values = append(values, ps.Args...)
+			case fields.ProcessExe:
+				values = append(values, ps.Exe)
+			}
+		}, kevt.PS)
+		if len(values) > 0 {
+			return values, nil
+		}
+		return ids, nil
+	default:
+		depth, err := strconv.Atoi(key)
+		if err != nil {
+			return nil, err
+		}
+		var i int
+		pstypes.Visit(func(proc *pstypes.PS) {
+			i++
+			if i == depth {
+				ps = proc
+			}
+		}, kevt.PS)
+	}
+
+	if ps == nil {
+		return nil, nil
+	}
+
+	switch segment {
+	case fields.ProcessName:
+		return ps.Name, nil
+	case fields.ProcessID:
+		return ps.PID, nil
+	case fields.ProcessSID:
+		return ps.SID, nil
+	case fields.ProcessSessionID:
+		return ps.SessionID, nil
+	case fields.ProcessCwd:
+		return ps.Cwd, nil
+	case fields.ProcessComm:
+		return ps.Comm, nil
+	case fields.ProcessArgs:
+		return ps.Args, nil
+	case fields.ProcessExe:
+		return ps.Exe, nil
+	}
+
+	return nil, nil
 }
 
 // threadAccessor fetches thread parameters from thread kernel events.

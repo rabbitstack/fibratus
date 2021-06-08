@@ -917,7 +917,7 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 				return false
 			}
 			for _, s := range lhs {
-				if s == rhs {
+				if strings.Contains(rhs, s) {
 					return true
 				}
 			}
@@ -929,7 +929,7 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			}
 			for _, i := range lhs {
 				for _, j := range rhs {
-					if strings.EqualFold(i, j) {
+					if strings.Contains(strings.ToLower(i), strings.ToLower(j)) {
 						return true
 					}
 				}
