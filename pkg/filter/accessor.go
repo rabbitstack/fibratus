@@ -358,27 +358,31 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 // ancestor located at the given depth, starting with 1 which is the immediate
 // process parent.
 func parentFields(field string, kevt *kevent.Kevent) (kparams.Value, error) {
-	var ps *pstypes.PS
 	key, segment := captureInBrackets(field)
+	if key == "" || segment == "" {
+		return nil, nil
+	}
+
+	var ps *pstypes.PS
 
 	switch key {
 	case "root":
-		pstypes.Visit(func(proc *pstypes.PS) {
+		pstypes.Walk(func(proc *pstypes.PS) {
 			ps = proc
 		}, kevt.PS)
+
 	case "any":
 		values := make([]string, 0)
-		ids := make([]uint32, 0)
-		pstypes.Visit(func(ps *pstypes.PS) {
+		pstypes.Walk(func(ps *pstypes.PS) {
 			switch segment {
 			case fields.ProcessName:
 				values = append(values, ps.Name)
 			case fields.ProcessID:
-				ids = append(ids, ps.PID)
+				values = append(values, strconv.Itoa(int(ps.PID)))
 			case fields.ProcessSID:
 				values = append(values, ps.SID)
 			case fields.ProcessSessionID:
-				ids = append(ids, uint32(ps.SessionID))
+				values = append(values, strconv.Itoa(int(ps.SessionID)))
 			case fields.ProcessCwd:
 				values = append(values, ps.Cwd)
 			case fields.ProcessComm:
@@ -389,17 +393,16 @@ func parentFields(field string, kevt *kevent.Kevent) (kparams.Value, error) {
 				values = append(values, ps.Exe)
 			}
 		}, kevt.PS)
-		if len(values) > 0 {
-			return values, nil
-		}
-		return ids, nil
+
+		return values, nil
+
 	default:
 		depth, err := strconv.Atoi(key)
 		if err != nil {
 			return nil, err
 		}
 		var i int
-		pstypes.Visit(func(proc *pstypes.PS) {
+		pstypes.Walk(func(proc *pstypes.PS) {
 			i++
 			if i == depth {
 				ps = proc
