@@ -85,7 +85,7 @@ var (
 	errNoOnNextKevent           = errors.New("required on_next_kevent function is not defined")
 	errOnNextKeventNotCallable  = errors.New("on_next_kevent is not callable")
 	errOnNextKeventMismatchArgs = func(c uint32) error { return fmt.Errorf("expected 1 argument for on_next_kevent but found %d args", c) }
-	errEmptyName = errors.New("filament name is empty")
+	errEmptyName                = errors.New("filament name is empty")
 
 	tableOutput io.Writer
 )
