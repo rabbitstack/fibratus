@@ -344,50 +344,96 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 			}
 
 		case strings.HasPrefix(field, fields.PsParentSequence):
-			key, segment := captureInBrackets(field)
-			depth, err := strconv.Atoi(strings.TrimSpace(key))
-			if err != nil {
-				// we got the `root` key
-				depth = -1
-			}
-
-			var (
-				dp int
-				ps *pstypes.PS
-			)
-			pstypes.Visit(func(proc *pstypes.PS) {
-				dp++
-				if dp == depth || depth == -1 {
-					ps = proc
-				}
-			}, kevt.PS)
-
-			if ps == nil {
-				return nil, nil
-			}
-
-			switch segment {
-			case fields.ProcessName:
-				return ps.Name, nil
-			case fields.ProcessID:
-				return ps.PID, nil
-			case fields.ProcessSID:
-				return ps.SID, nil
-			case fields.ProcessSessionID:
-				return ps.SessionID, nil
-			case fields.ProcessCwd:
-				return ps.Cwd, nil
-			case fields.ProcessComm:
-				return ps.Comm, nil
-			case fields.ProcessArgs:
-				return ps.Args, nil
-			case fields.ProcessExe:
-				return ps.Exe, nil
-			}
+			return parentFields(field, kevt)
 		}
 
 		return nil, nil
 	}
+}
+
+// parentFields recursively walks the process ancestors and extracts
+// the required field values. If we get the `root` key, the root ancestor
+// fields are inspected, while `any` accumulates values of all ancestors.
+// Alternatively, the key may represent the depth that only returns the
+// ancestor located at the given depth, starting with 1 which is the immediate
+// process parent.
+func parentFields(field string, kevt *kevent.Kevent) (kparams.Value, error) {
+	key, segment := captureInBrackets(field)
+	if key == "" || segment == "" {
+		return nil, nil
+	}
+
+	var ps *pstypes.PS
+
+	switch key {
+	case "root":
+		pstypes.Walk(func(proc *pstypes.PS) {
+			ps = proc
+		}, kevt.PS)
+
+	case "any":
+		values := make([]string, 0)
+		pstypes.Walk(func(ps *pstypes.PS) {
+			switch segment {
+			case fields.ProcessName:
+				values = append(values, ps.Name)
+			case fields.ProcessID:
+				values = append(values, strconv.Itoa(int(ps.PID)))
+			case fields.ProcessSID:
+				values = append(values, ps.SID)
+			case fields.ProcessSessionID:
+				values = append(values, strconv.Itoa(int(ps.SessionID)))
+			case fields.ProcessCwd:
+				values = append(values, ps.Cwd)
+			case fields.ProcessComm:
+				values = append(values, ps.Comm)
+			case fields.ProcessArgs:
+				values = append(values, ps.Args...)
+			case fields.ProcessExe:
+				values = append(values, ps.Exe)
+			}
+		}, kevt.PS)
+
+		return values, nil
+
+	default:
+		depth, err := strconv.Atoi(key)
+		if err != nil {
+			return nil, err
+		}
+		var i int
+		pstypes.Walk(func(proc *pstypes.PS) {
+			i++
+			if i == depth {
+				ps = proc
+			}
+		}, kevt.PS)
+	}
+
+	if ps == nil {
+		return nil, nil
+	}
+
+	switch segment {
+	case fields.ProcessName:
+		return ps.Name, nil
+	case fields.ProcessID:
+		return ps.PID, nil
+	case fields.ProcessSID:
+		return ps.SID, nil
+	case fields.ProcessSessionID:
+		return ps.SessionID, nil
+	case fields.ProcessCwd:
+		return ps.Cwd, nil
+	case fields.ProcessComm:
+		return ps.Comm, nil
+	case fields.ProcessArgs:
+		return ps.Args, nil
+	case fields.ProcessExe:
+		return ps.Exe, nil
+	}
+
+	return nil, nil
 }
 
 // threadAccessor fetches thread parameters from thread kernel events.

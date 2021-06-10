@@ -912,13 +912,37 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 	case []string:
 		switch expr.Op {
 		case contains:
-			rhs, ok := rhs.(string)
+			s, ok := rhs.(string)
+			if !ok {
+				rhs, ok := rhs.([]string)
+				if !ok {
+					return false
+				}
+				for _, s1 := range rhs {
+					for _, s2 := range lhs {
+						if strings.Contains(s2, s1) {
+							return true
+						}
+					}
+				}
+				return false
+			}
+			for _, val := range lhs {
+				if strings.Contains(val, s) {
+					return true
+				}
+			}
+			return false
+		case icontains:
+			rhs, ok := rhs.([]string)
 			if !ok {
 				return false
 			}
-			for _, s := range lhs {
-				if s == rhs {
-					return true
+			for _, s1 := range lhs {
+				for _, s2 := range rhs {
+					if strings.Contains(strings.ToLower(s1), strings.ToLower(s2)) {
+						return true
+					}
 				}
 			}
 			return false
@@ -930,6 +954,58 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			for _, i := range lhs {
 				for _, j := range rhs {
 					if i == j {
+						return true
+					}
+				}
+			}
+			return false
+		case startswith:
+			rhs, ok := rhs.([]string)
+			if !ok {
+				return false
+			}
+			for _, s1 := range rhs {
+				for _, s2 := range lhs {
+					if strings.HasPrefix(s2, s1) {
+						return true
+					}
+				}
+			}
+			return false
+		case istartswith:
+			rhs, ok := rhs.([]string)
+			if !ok {
+				return false
+			}
+			for _, s1 := range rhs {
+				for _, s2 := range lhs {
+					if strings.HasPrefix(strings.ToLower(s2), strings.ToLower(s1)) {
+						return true
+					}
+				}
+			}
+			return false
+		case endswith:
+			rhs, ok := rhs.([]string)
+			if !ok {
+				return false
+			}
+			for _, s1 := range rhs {
+				for _, s2 := range lhs {
+					if strings.HasSuffix(s2, s1) {
+						return true
+					}
+				}
+			}
+			return false
+		case iendswith:
+			rhs, ok := rhs.([]string)
+			if !ok {
+				return false
+			}
+			for _, s1 := range rhs {
+				for _, s2 := range lhs {
+					if strings.HasSuffix(strings.ToLower(s2), strings.ToLower(s1)) {
 						return true
 					}
 				}
