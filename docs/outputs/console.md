@@ -40,6 +40,9 @@ The following field modifiers are supported:
 - `.Timestamp`
 - `.Pid`
 - `.Ppid`
+- `.Pexe`
+- `.Pcomm`
+- `.Pname`
 - `.Cwd`
 - `.Exe`
 - `.Comm`
