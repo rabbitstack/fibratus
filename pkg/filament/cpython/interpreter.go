@@ -97,14 +97,14 @@ func SetPath(path string) {
 // to initialize sys.argv, a fatal condition is signalled using Py_FatalError().
 func SetSysArgv(args []string) {
 	argc := C.int(len(args))
-	argv := make([]*C.wchar_t, argc, argc)
+	argv := make([]*C.wchar_t, argc)
 	for i, arg := range args {
-		argv[i] = produceWarg(arg)
+		argv[i] = newWarg(arg)
 	}
 	C.PySys_SetArgvEx(argc, (**C.wchar_t)(unsafe.Pointer(&argv[0])), 0)
 }
 
-func produceWarg(arg string) *C.wchar_t {
+func newWarg(arg string) *C.wchar_t {
 	carg := C.CString(arg)
 	defer C.free(unsafe.Pointer(carg))
 
