@@ -6,9 +6,24 @@ Filaments are bootstrapped via the `fibratus run` command by specifying the fila
 $ fibratus run -f watch_files
 ```
 
-The filament will keep running until the keyboard interrupt signal is received. By default, filaments reside within the `%PROGRAMFILES%\Fibratus\Filaments` directory. It is possible to override this location by specifying an alternative directory via the `--filament.path` flag or by editing the config file.
+The filament will keep running until the keyboard interrupt signal is received. 
 
-To list available filaments, run the above command.
+### Passing arguments to filaments {docsify-ignore}
+
+Filaments may require additional arguments to execute some conditional logic or set up a filter. Arguments are passed to a filament by specifying a list of comma-separated values after filament name:
+
+```
+$ fibratus run -f "watch_files,powershell.exe"
+```
+
+This populates the [sys.argv](https://docs.python.org/3/library/sys.html#sys.argv) list with the provided arguments, where `sys.argv[0]` is the filament name.
+
+
+### Listing filaments {docsify-ignore}
+
+By default, filaments reside within the `%PROGRAMFILES%\Fibratus\Filaments` directory. It is possible to override this location by specifying an alternative directory via the `--filament.path` flag or by editing the config file.
+
+To list available filaments, run the below command.
 
 ```
 $ fibratus list filaments
