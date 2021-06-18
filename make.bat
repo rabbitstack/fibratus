@@ -86,6 +86,7 @@ set RELEASE_DIR=.\build\msi\fibratus-%VERSION%
 mkdir "%~dp0\%RELEASE_DIR%"
 mkdir "%~dp0\%RELEASE_DIR%\Bin"
 mkdir "%~dp0\%RELEASE_DIR%\Config"
+mkdir "%~dp0\%RELEASE_DIR%\Config\Filters"
 mkdir "%~dp0\%RELEASE_DIR%\Python"
 mkdir "%~dp0\%RELEASE_DIR%\Filaments"
 
@@ -94,6 +95,7 @@ echo "Copying artifacts..."
 copy /y ".\cmd\fibratus\fibratus.exe" "%RELEASE_DIR%\Bin"
 copy /y ".\configs\fibratus.yml" "%RELEASE_DIR%\Config\fibratus.yml"
 robocopy ".\filaments" "%RELEASE_DIR%\Filaments" /E /S /XF *.md /XD __pycache__ .idea
+robocopy ".\configs\filters" "%RELEASE_DIR%\Config\Filters" /E /S
 
 :: download the embedded Python distribution
 echo Downloading Python %PYTHON_VER%...
@@ -139,11 +141,13 @@ set RELEASE_DIR=.\build\msi\fibratus-%VERSION%-slim
 mkdir "%~dp0\%RELEASE_DIR%"
 mkdir "%~dp0\%RELEASE_DIR%\Bin"
 mkdir "%~dp0\%RELEASE_DIR%\Config"
+mkdir "%~dp0\%RELEASE_DIR%\Config\Filters"
 
 echo "Copying artifacts..."
 :: copy artifacts
 copy /y ".\cmd\fibratus\fibratus.exe" "%RELEASE_DIR%\Bin"
 copy /y ".\configs\fibratus.yml" "%RELEASE_DIR%\Config\fibratus.yml"
+robocopy ".\configs\filters" "%RELEASE_DIR%\Config\Filters" /E /S
 
 echo "Building MSI package..."
 heat dir %RELEASE_DIR%\ -cg Fibratus -dr INSTALLDIR -suid -gg -sfrag -srd -var var.FibratusDir -out build/msi/components.wxs || exit /b
