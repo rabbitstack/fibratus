@@ -73,7 +73,7 @@ footer {
 }
 
 .operator > p {
-	background-color: rgba(0,27,61,.075);
+	background-color: rgba(0, 27, 61, 0.03);
 	border-left: 4px solid #6da9e2 !important;
 	border-radius: 5px;
 	color: #001b3d;

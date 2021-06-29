@@ -64,10 +64,10 @@ Logical operators are applied on two or more binary expressions, except for `not
 String operators are applied to string field types or string literals.
 
 <div class="operator">
-<p>in</p>
+<p>in, iin</p>
 </div>
 
-`in` operator validates the presence of a value in the string sequence. It can be applied to string literal sequences or dynamic string slices given by filter fields.
+`in` operator validates the presence of a value in the string sequence. It can be applied to string literal sequences or dynamic string slices given by filter fields. `iin` is the case-insensitive variant of the `in` operator.
 
 - **Examples**
 
@@ -110,7 +110,7 @@ String operators are applied to string field types or string literals.
 `icontains` is the case-insensitive variant of the `contains` operator.
 
 <div class="operator">
-<p>startswith</p>
+<p>startswith, istartswith</p>
 </div>
 
 `startswith` checks whether a string field starts with a specified prefix. This operator works on both simple string values and lists of strings.
@@ -124,7 +124,7 @@ String operators are applied to string field types or string literals.
    ```
 
 <div class="operator">
-<p>endswith</p>
+<p>endswith, iendswith </p>
 </div>
 
 `endswith` checks whether a string field ends with a specified suffix. This operator works on both simple string values and lists of strings.
