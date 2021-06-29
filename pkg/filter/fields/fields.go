@@ -22,11 +22,12 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"regexp"
 	"sort"
+	"strings"
 )
 
 // pathRegexp splits the provided path into different components. The first capture
 // contains the indexed field name. Next is the indexed key and, finally the segment.
-var pathRegexp = regexp.MustCompile(`(pe.sections|pe.resources|ps.envs|ps.modules|ps.parent)\[(.+\s*)].?(.*)`)
+var pathRegexp = regexp.MustCompile(`(pe.sections|pe.resources|ps.envs|ps.modules|ps.ancestor)\[(.+\s*)].?(.*)`)
 
 // Field represents the type alias for the field
 type Field string
@@ -82,8 +83,8 @@ const (
 	PsParentHandleTypes Field = "ps.parent.handle.types"
 	// PsParentDTB represents the parent process directory table base address field
 	PsParentDTB Field = "ps.parent.dtb"
-	// PsParent represents the parent process sequence field
-	PsParent Field = "ps.parent"
+	// PsAncestor represents the process ancestor sequence field
+	PsAncestor Field = "ps.ancestor"
 
 	// ThreadBasePrio is the base thread priority
 	ThreadBasePrio Field = "thread.prio"
@@ -287,18 +288,11 @@ const (
 	ProcessSessionID Segment = "sessionid"
 )
 
-const (
-	// PsEnvsSequence denotes the beginning of the process environment variables sequence
-	PsEnvsSequence = "ps.envs["
-	// PsModsSequence denotes the beginning of  the process modules sequence
-	PsModsSequence = "ps.modules["
-	// PsParentSequence denotes the start of the parent processes sequence
-	PsParentSequence = "ps.parent["
-	// PeSectionsSequence denotes the start of the PE sections sequence
-	PeSectionsSequence = "pe.sections["
-	// PeResourcesSequence denotes the beginning opf the he PE resources sequence
-	PeResourcesSequence = "pe.resources["
-)
+func (f Field) IsEnvsSequence() bool        { return strings.HasPrefix(f.String(), "ps.envs[") }
+func (f Field) IsModsSequence() bool        { return strings.HasPrefix(f.String(), "ps.modules[") }
+func (f Field) IsAncestorSequence() bool    { return strings.HasPrefix(f.String(), "ps.ancestor[") }
+func (f Field) IsPeSectionsSequence() bool  { return strings.HasPrefix(f.String(), "pe.sections[") }
+func (f Field) IsPeResourcesSequence() bool { return strings.HasPrefix(f.String(), "pe.resources[") }
 
 // FieldInfo is the field metadata descriptor.
 type FieldInfo struct {
@@ -470,15 +464,15 @@ func Lookup(name string) Field {
 		case ModuleLocation:
 			return Field(name)
 		}
-	case PsParent:
+	case PsAncestor:
 		if segment == "" {
 			return None
 		}
 		// the key is either the number
 		// that represents the depth of
-		// the parent process node or the
+		// the ancestor process node or the
 		// `root` keyword to designate the
-		// root process node. Additionally,
+		// root ancestor process node. Additionally,
 		// we can also get the `any` keyword
 		// that collects the fields of all
 		// ancestor processes

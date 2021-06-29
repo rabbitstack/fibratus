@@ -299,11 +299,10 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 		}
 		return types, nil
 	default:
-		field := f.String()
 		switch {
-		case strings.HasPrefix(field, fields.PsEnvsSequence):
+		case f.IsEnvsSequence():
 			// access the specific environment variable
-			env, _ := captureInBrackets(field)
+			env, _ := captureInBrackets(f.String())
 			ps := kevt.PS
 			if ps == nil {
 				return nil, nil
@@ -318,9 +317,8 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 					return v, nil
 				}
 			}
-
-		case strings.HasPrefix(field, fields.PsModsSequence):
-			name, segment := captureInBrackets(field)
+		case f.IsModsSequence():
+			name, segment := captureInBrackets(f.String())
 			ps := kevt.PS
 			if ps == nil {
 				return nil, nil
@@ -342,9 +340,8 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 			case fields.ModuleLocation:
 				return filepath.Dir(mod.Name), nil
 			}
-
-		case strings.HasPrefix(field, fields.PsParentSequence):
-			return parentFields(field, kevt)
+		case f.IsAncestorSequence():
+			return parentFields(f.String(), kevt)
 		}
 
 		return nil, nil
@@ -688,10 +685,10 @@ func (*peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, erro
 	case fields.PeImports:
 		return p.Imports, nil
 	default:
-		field := f.String()
-		if strings.HasPrefix(field, fields.PeSectionsSequence) {
+		switch {
+		case f.IsPeSectionsSequence():
 			// get the section name
-			sname, segment := captureInBrackets(field)
+			sname, segment := captureInBrackets(f.String())
 			sec := p.Section(sname)
 			if sec == nil {
 				return nil, nil
@@ -704,11 +701,9 @@ func (*peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, erro
 			case fields.SectionSize:
 				return sec.Size, nil
 			}
-		}
-
-		if strings.HasPrefix(field, fields.PeResourcesSequence) {
+		case f.IsPeResourcesSequence():
 			// consult the resource name
-			key, _ := captureInBrackets(field)
+			key, _ := captureInBrackets(f.String())
 			v, ok := p.VersionResources[key]
 			if ok {
 				return v, nil

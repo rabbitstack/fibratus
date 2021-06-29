@@ -71,7 +71,7 @@ type PS struct {
 // invoked on each parent visit walk.
 type Visitor func(*PS)
 
-// Walk recursively visits all parents of the given process
+// Walk recursively visits all ancestors of the given process
 // and invokes the visitor function on each parent process.
 func Walk(v Visitor, ps *PS) {
 	if ps == nil {
