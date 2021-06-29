@@ -26,8 +26,8 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/ps"
 )
 
-// Writer is the minimal interface that all kcap writers need to satisfy. The kcap file format has the layout as
-// depicted in the following diagram:
+// Writer is the minimal interface that all kcap writers need to satisfy. The Windows kcap
+// file format has the layout as depicted in the following diagram:
 //
 //  +-+-+-+-+-+-+-+-++-+-+-+-+-+-+-+-++-+-+-+
 //  | Magic Number  | Major | Minor | Flags |

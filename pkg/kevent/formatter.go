@@ -23,7 +23,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/fasttemplate"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"unicode"
 )
@@ -189,54 +188,4 @@ func isTemplateBalanced(tmpl string) (bool, int) {
 		}
 	}
 	return true, -1
-}
-
-// Format applies the template on the provided kernel event.
-func (f *Formatter) Format(kevt *Kevent) []byte {
-	if kevt == nil {
-		return []byte{}
-	}
-	values := map[string]interface{}{
-		ts:          kevt.Timestamp.String(),
-		pid:         strconv.FormatUint(uint64(kevt.PID), 10),
-		tid:         strconv.FormatUint(uint64(kevt.Tid), 10),
-		seq:         strconv.FormatUint(kevt.Seq, 10),
-		cpu:         strconv.FormatUint(uint64(kevt.CPU), 10),
-		typ:         kevt.Name,
-		cat:         kevt.Category,
-		desc:        kevt.Description,
-		host:        kevt.Host,
-		meta:        kevt.Metadata.String(),
-		kparameters: kevt.Kparams.String(),
-	}
-
-	// add process' metadata
-	ps := kevt.PS
-	if ps != nil {
-		values[proc] = ps.Name
-		values[ppid] = strconv.FormatUint(uint64(ps.Ppid), 10)
-		values[cwd] = ps.Cwd
-		values[exe] = ps.Exe
-		values[comm] = ps.Comm
-		values[sid] = ps.SID
-		parent := ps.Parent
-		if parent != nil {
-			values[pproc] = parent.Name
-			values[pexe] = parent.Exe
-			values[pcomm] = parent.Comm
-		}
-		if ps.PE != nil {
-			values[pe] = ps.PE.String()
-		}
-	}
-
-	if f.expandKparamsDot {
-		// expand all parameters into the map so we can ask
-		// for specific parameter names in the template
-		for _, kpar := range kevt.Kparams {
-			values[".Kparams."+strings.Title(kpar.Name)] = kpar.String()
-		}
-	}
-
-	return f.t.ExecuteString(values)
 }

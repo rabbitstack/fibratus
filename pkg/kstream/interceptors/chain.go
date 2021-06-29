@@ -21,15 +21,9 @@ package interceptors
 import (
 	"expvar"
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/config"
 	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
-	"github.com/rabbitstack/fibratus/pkg/fs"
-	"github.com/rabbitstack/fibratus/pkg/handle"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
-	"github.com/rabbitstack/fibratus/pkg/yara"
-	log "github.com/sirupsen/logrus"
 )
 
 // interceptorFailures counts the number of failures caused by interceptors while processing kernel events
@@ -43,53 +37,6 @@ type Chain interface {
 	Dispatch(kevt *kevent.Kevent) (*kevent.Kevent, error)
 	// Close closes the interceptor chain and frees all allocated resources.
 	Close() error
-}
-
-type chain struct {
-	interceptors []KstreamInterceptor
-}
-
-// NewChain constructs the interceptor chain. It arranges all the interceptors according to enabled kernel event categories.
-func NewChain(
-	psnap ps.Snapshotter,
-	hsnap handle.Snapshotter,
-	rundownFn func() error,
-	config *config.Config,
-	deferredKevtsCh chan *kevent.Kevent,
-) Chain {
-	var (
-		chain     = &chain{interceptors: make([]KstreamInterceptor, 0)}
-		devMapper = fs.NewDevMapper()
-		scanner   yara.Scanner
-	)
-
-	if config.Yara.Enabled {
-		var err error
-		scanner, err = yara.NewScanner(psnap, config.Yara)
-		if err != nil {
-			log.Warnf("unable to start YARA scanner: %v", err)
-		}
-	}
-
-	chain.addInterceptor(newPsInterceptor(psnap, scanner))
-
-	if config.Kstream.EnableFileIOKevents {
-		chain.addInterceptor(newFsInterceptor(devMapper, hsnap, config, rundownFn))
-	}
-	if config.Kstream.EnableRegistryKevents {
-		chain.addInterceptor(newRegistryInterceptor(hsnap))
-	}
-	if config.Kstream.EnableImageKevents {
-		chain.addInterceptor(newImageInterceptor(psnap, devMapper, scanner))
-	}
-	if config.Kstream.EnableNetKevents {
-		chain.addInterceptor(newNetInterceptor())
-	}
-	if config.Kstream.EnableHandleKevents {
-		chain.addInterceptor(newHandleInterceptor(hsnap, handle.NewObjectTypeStore(), devMapper, deferredKevtsCh))
-	}
-
-	return chain
 }
 
 func (c *chain) addInterceptor(interceptor KstreamInterceptor) {

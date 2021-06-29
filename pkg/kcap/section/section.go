@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 by Nedim Sabic Sabic
+ * Copyright 2020-2021 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -32,37 +32,7 @@ func (s Section) String() string {
 	return fmt.Sprintf("type: %s, version: %d, len: %d, size: %d", s.Type(), s.Version(), s.Len(), s.Size())
 }
 
-// Type describes the type of a section
-type Type uint8
-
-const (
-	// Process is the process header type
-	Process Type = iota + 1
-	// Handle is the handle header type
-	Handle
-	// Kevt is the kernel event header type
-	Kevt
-	// PE is the Portable Executable header type
-	PE
-)
-
-// String returns the type name.
-func (s Type) String() string {
-	switch s {
-	case Process:
-		return "process"
-	case Handle:
-		return "handle"
-	case Kevt:
-		return "kevent"
-	case PE:
-		return "pe"
-	default:
-		return ""
-	}
-}
-
-// New buils a new section block with the specified type, version, optional length and size.
+// New builds a new section block with the specified type, version, optional length and size.
 func New(typ Type, ver kcapver.Version, l, size uint32) Section {
 	var s Section
 	s[0] = uint8(typ)
