@@ -341,20 +341,20 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 				return filepath.Dir(mod.Name), nil
 			}
 		case f.IsAncestorSequence():
-			return parentFields(f.String(), kevt)
+			return ancestorFields(f.String(), kevt)
 		}
 
 		return nil, nil
 	}
 }
 
-// parentFields recursively walks the process ancestors and extracts
+// ancestorFields recursively walks the process ancestors and extracts
 // the required field values. If we get the `root` key, the root ancestor
 // fields are inspected, while `any` accumulates values of all ancestors.
 // Alternatively, the key may represent the depth that only returns the
 // ancestor located at the given depth, starting with 1 which is the immediate
 // process parent.
-func parentFields(field string, kevt *kevent.Kevent) (kparams.Value, error) {
+func ancestorFields(field string, kevt *kevent.Kevent) (kparams.Value, error) {
 	key, segment := captureInBrackets(field)
 	if key == "" || segment == "" {
 		return nil, nil
