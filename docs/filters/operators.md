@@ -17,7 +17,9 @@ The filtering query language supports the following  comparison binary operators
 
 Logical operators are applied on two or more binary expressions, except for `not` that acts as a unary operator.
 
-#### or
+<div class="operator">
+<p>or</p>
+</div>
 
 `or` (union) evalutes to true if either one of the LHS (Left Hand Side) or RHS (Right Hand Side) expressions are true. 
 
@@ -29,7 +31,9 @@ Logical operators are applied on two or more binary expressions, except for `not
    fibratus run ps.name = 'svchost.exe' or ps.name contains ('svc')
    ```
 
-#### and
+<div class="operator">
+<p>and</p>
+</div>
 
 `and` (intersection) evalutes to true if both of the LHS (Left Hand Side) and RHS (Right Hand Side) expressions are true.
 
@@ -41,7 +45,9 @@ Logical operators are applied on two or more binary expressions, except for `not
    fibratus run ps.name = 'System' and ps.pid = 4
    ```
 
-#### not
+<div class="operator">
+<p>not</p>
+</div>
 
 `not` (negation) negates the result of the adjacent expression.
 
@@ -57,9 +63,11 @@ Logical operators are applied on two or more binary expressions, except for `not
 
 String operators are applied to string field types or string literals.
 
-#### in
+<div class="operator">
+<p>in</p>
+</div>
 
-`in` operator validates the presence of a value in the string sequence. It can be applied to string literal sequences or dynamic string slices given by filter fields. 
+`in` operator validates the presence of a value in the string sequence. It can be applied to string literal sequences or dynamic string slices given by filter fields.
 
 - **Examples**
 
@@ -75,7 +83,9 @@ String operators are applied to string field types or string literals.
    $ fibratus run ps.modules in ('kernel32.dll')
    ```
 
-#### contains
+<div class="operator">
+<p> contains </p>
+</div>
 
 `contains` operator checks whether a string field contains a sequence of characters. This operator works on both simple string values and lists of strings. 
 
@@ -93,11 +103,15 @@ String operators are applied to string field types or string literals.
    $ fibratus run ps.comm contains 'Windows Tasks'
    ```
 
-#### icontains
+<div class="operator">
+<p>icontains</p>
+</div>
 
 `icontains` is the case-insensitive variant of the `contains` operator.
 
-#### startswith
+<div class="operator">
+<p>startswith</p>
+</div>
 
 `startswith` checks whether a string field starts with a specified prefix. This operator works on both simple string values and lists of strings.
 
@@ -109,7 +123,9 @@ String operators are applied to string field types or string literals.
    fibratus run ps.name startswith 'svchost'
    ```
 
-#### endswith
+<div class="operator">
+<p>endswith</p>
+</div>
 
 `endswith` checks whether a string field ends with a specified suffix. This operator works on both simple string values and lists of strings.
 
@@ -120,7 +136,9 @@ String operators are applied to string field types or string literals.
    ```
    fibratus run ps.name endswith '.exe'
 
-#### matches
+<div class="operator">
+<p>matches</p>
+</div>
 
 `matches` is the swiss army knife string matching operator. It allows string matching by using the wildcard characters similar to [globbing](https://en.wikipedia.org/wiki/Glob_(programming)). The `*` wildcard matches a sequence of characters, while the `?` wildcard matches a single character. 
 
@@ -138,8 +156,28 @@ String operators are applied to string field types or string literals.
    fibratus run registry.key.name matches 'HKEY_USERS\\*\\Environment\\windir'
    ```
 
-#### imatches
+<div class="operator">
+<p>imatches</p>
+</div>
 
 `imatches` is the case-insensitive variant of the `matches` operator.
 
+<div class="operator">
+<p>fuzzy, ifuzzy, fuzzynorm, ifuzzynorm</p>
+</div>
 
+`fuzzy` operators allow for flexibly matching a string with partial input. `fuzzynorm` applies Unicode normalization before running the matching phase. `ifuzzy` and `ifuzzynorm` are the case-insensitive variants of the respective fuzzy operators.
+
+- **Examples**
+
+   To match events with file paths that contain `C:\\Windows\\System32\\user32.dll`, you could create an expression with the  partial path input
+
+   ```
+   fibratus run file.name fuzzy 'C:\\Windows\\Sys\\ser3ll'
+   ```
+
+   `fuzzynorm` operates on normalized Unicode codepoints
+
+   ```
+   fibratus run file.name fuzzynorm 'C:\\Windows\\Sys\\sér3ll'
+   ```

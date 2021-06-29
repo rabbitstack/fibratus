@@ -72,6 +72,17 @@ footer {
 	color: #738FD6;
 }
 
+.operator > p {
+	background-color: rgba(0,27,61,.075);
+	border-left: 4px solid #6da9e2 !important;
+	border-radius: 5px;
+	color: #001b3d;
+	font-weight: 600;
+	font-size: .95em;
+	padding: 0.7em 0.6em;
+}
+
+
 p.center {
 	text-align: center;
 	font-size: 30px;
