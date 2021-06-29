@@ -65,7 +65,7 @@ The following tables summarize available field names that can be used in filter 
 | ps.parent.envs    | Parent process environment variables   | `ps.parent.envs in ('PROCESSOR_LEVEL')'`   |
 | ps.parent.handles    | Allocated parent process handles  | `ps.parent.handles in ('\\...\\Cor_SxSPublic_IPCBlock')`   |
 | ps.parent.handle.types    | Allocated parent process handles types  | `ps.parent.handle.types in ('Key', 'Mutant', 'Section')`   |
-| ps.parent[]    | Process ancestry traversing  | `ps.parent[2].name in ('winword.exe', 'powershell.exe')`   |
+| ps.ancestor[]    | Process ancestry traversing  | `ps.ancestor[2].name in ('winword.exe', 'powershell.exe')`   |
 
 ### Thread
 | Field Name  | Description | Example     |

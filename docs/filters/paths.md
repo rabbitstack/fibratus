@@ -10,7 +10,7 @@ Walking the process tree is a useful feature when you want to capture events pro
 
 #### Depth indexing
 
-Fetches the ancestor that is located at a specified depth starting from the current process. Imagine the following process tree:
+Fetches the ancestor that is located at a specified depth starting from the current process. `ps.ancestor[1]` yields the immediate parent process and it is equivalent to using the `ps.parent` field. Imagine the following process tree:
 
 ```
 ├───wininit.exe
@@ -24,7 +24,7 @@ Fetches the ancestor that is located at a specified depth starting from the curr
 Assuming the `winword.exe` is the current process generating the event, we could write the following filter expression to check its ancestors:
 
 ```
-$ fibratus run ps.parent[1].name = 'dllhost.exe' or ps.parent[3].name = 'services.exe'
+$ fibratus run ps.ancestor[1].name = 'dllhost.exe' or ps.ancestor[3].name = 'services.exe'
 ```
 
 #### Root indexing
@@ -32,7 +32,7 @@ $ fibratus run ps.parent[1].name = 'dllhost.exe' or ps.parent[3].name = 'service
 To filter events where their ancestor process is the root of the process tree, you can employ the `root` key. Considering the same process tree as above, we can construct the following filter:
 
 ```
-$ fibratus run ps.parent[root].name = 'wininit.exe'
+$ fibratus run ps.ancestor[root].name = 'wininit.exe'
 ```
 
 #### Any indexing
@@ -40,7 +40,7 @@ $ fibratus run ps.parent[root].name = 'wininit.exe'
 If you want to match on multiple ancestors, use the `any` key. The following expression would filter all events where the process generating them has `svchost.exe` or `dllhost.exe` ancestors:
 
 ```
-$ fibratus run ps.parent[any].name in ('svchost.exe', 'dllhost.exe')
+$ fibratus run ps.ancestor[any].name in ('svchost.exe', 'dllhost.exe')
 ```
 
 Besides the process name, several other path segments are available for returning the ancestor data:
