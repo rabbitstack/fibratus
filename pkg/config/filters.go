@@ -218,7 +218,7 @@ func (f Filters) LoadGroups() ([]FilterGroup, error) {
 	for _, path := range f.FromPaths {
 		file, err := os.Stat(path)
 		if err != nil {
-			return nil, fmt.Errorf("couldn't open filter file %s: %v", path, err)
+			return nil, fmt.Errorf("couldn't open rule file %s: %v", path, err)
 		}
 		if file.IsDir() {
 			return nil, fmt.Errorf("expected yml file but got directory %s", path)
@@ -227,7 +227,7 @@ func (f Filters) LoadGroups() ([]FilterGroup, error) {
 		// the corresponding filter groups from it
 		rawConfig, err := ioutil.ReadFile(path)
 		if err != nil {
-			return nil, fmt.Errorf("couldn't load yml filter file: %v", err)
+			return nil, fmt.Errorf("couldn't load rule file: %v", err)
 		}
 		groups, err := decodeFilterGroups(path, rawConfig)
 		if err != nil {
@@ -242,7 +242,7 @@ func (f Filters) LoadGroups() ([]FilterGroup, error) {
 		//nolint:noctx
 		resp, err := http.Get(url)
 		if err != nil {
-			return nil, fmt.Errorf("cannot fetch filter file from %q: %v", url, err)
+			return nil, fmt.Errorf("cannot fetch rule file from %q: %v", url, err)
 		}
 		if resp.StatusCode != http.StatusOK {
 			_ = resp.Body.Close()
@@ -254,7 +254,7 @@ func (f Filters) LoadGroups() ([]FilterGroup, error) {
 		_, err = io.Copy(&rawConfig, resp.Body)
 		_ = resp.Body.Close()
 		if err != nil {
-			return nil, fmt.Errorf("cannot copy filter file from %q: %v", url, err)
+			return nil, fmt.Errorf("cannot copy rule file from %q: %v", url, err)
 		}
 		groups, err := decodeFilterGroups(url, rawConfig.Bytes())
 		if err != nil {
@@ -421,7 +421,7 @@ func encodeFilterActions(buf []byte) ([]byte, error) {
 		for i, gn := range n.Content {
 			if gn.Value == "from-strings" {
 				content := n.Content[i+1]
-				// for each node in from_strings
+				// for each node in from-strings
 				for _, s := range content.Content {
 					for j, e := range s.Content {
 						if e.Value == "action" && s.Content[j+1].Value != "" {

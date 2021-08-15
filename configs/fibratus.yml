@@ -99,9 +99,9 @@ filament:
 # Filter group files can reside in the local file system or also can be exposed via HTTP url.
 filters:
   from-paths:
-  # - C:\Program Files\Fibratus\Config\Filters\Default\default.yml
+  # - C:\Program Files\Fibratus\Config\Rules\Default\default.yml
   #from-urls:
-  #  - https://raw.githubusercontent.com/rabbitstack/fibratus/master/configs/filters/default/default.yml
+  #  - https://raw.githubusercontent.com/rabbitstack/fibratus/master/configs/rules/default/default.yml
 
 # =============================== Handle ===============================================
 

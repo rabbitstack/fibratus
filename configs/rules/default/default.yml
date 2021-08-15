@@ -1,6 +1,6 @@
 # ====================================================================================================
 #
-# This filter rules try to mimic the subset of the sysmon config template
+# These filter rules try to mimic the subset of the sysmon config template
 # created by SwiftOnSecurity (https://github.com/SwiftOnSecurity/sysmon-config).
 #
 # All credits for digging the rule definitions go to the above author/contributors.
