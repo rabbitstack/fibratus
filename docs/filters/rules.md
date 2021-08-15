@@ -11,7 +11,7 @@ CLI filters offer a decent amount of flexibility when digging into the event flu
 
 ### Loading rules {docsify-ignore}
 
-Rules reside inside `%PROGRAM FILES%\Fibratus\Config\Rules` directory.
+Rules reside inside `%PROGRAM FILES%\Fibratus\Config\Rules` directory. 
 
 ### Defining rules {docsify-ignore}
 
