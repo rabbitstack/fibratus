@@ -126,8 +126,8 @@ type kstreamConsumer struct {
 	psnapshotter ps.Snapshotter
 	sequencer    *kevent.Sequencer
 
-	filter      filter.Filter
-	filterChain filter.Chain
+	filter filter.Filter
+	rules  filter.Rules
 
 	capture bool
 }
@@ -148,7 +148,7 @@ func NewConsumer(ktraceController KtraceController, psnap ps.Snapshotter, hsnap 
 		kevts:                  make(chan *kevent.Kevent),
 		deferredKevts:          make(chan *kevent.Kevent, 1000),
 		stop:                   make(chan struct{}, 1),
-		filterChain:            filter.NewChain(config),
+		rules:                  filter.NewRules(config),
 	}
 
 	kconsumer.interceptorChain = interceptors.NewChain(psnap, hsnap, kconsumer.startRundown, config, kconsumer.deferredKevts)
@@ -180,8 +180,8 @@ func (k *kstreamConsumer) init() error {
 	for i, name := range k.config.Kstream.BlacklistImages {
 		k.procsBlacklist[i] = strings.ToLower(name)
 	}
-	// try to compile the filter chain
-	return k.filterChain.Compile()
+	// try to compile the rules
+	return k.rules.Compile()
 }
 
 // consumeDeferred is responsible for receiving the events
@@ -635,7 +635,7 @@ func getParam(name string, buffer []byte, size uint32, nonStructType tdh.NonStru
 // the state
 // - process that produced the kernel event is fibratus itself
 // - kernel event is present in the blacklist, and thus it is always dropped
-// - filters defined in filter group files are triggered
+// - rules defined in filter group files are triggered
 // - finally, the event is checked by the CLI filter
 func (k *kstreamConsumer) isDropped(kevt *kevent.Kevent) bool {
 	if kevt.Type.Dropped(k.capture) {
@@ -648,7 +648,7 @@ func (k *kstreamConsumer) isDropped(kevt *kevent.Kevent) bool {
 		blacklistedKevents.Add(kevt.Name, 1)
 		return true
 	}
-	if ok := k.filterChain.Run(kevt); !ok {
+	if ok := k.rules.Fire(kevt); !ok {
 		return true
 	}
 	if k.filter != nil {

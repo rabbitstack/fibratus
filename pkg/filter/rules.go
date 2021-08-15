@@ -41,12 +41,14 @@ var (
 	filtersCount            = expvar.NewInt("filter.chain.filters.count")
 )
 
-// Chain stores the compiled filter groups
+// Rules stores the compiled filter groups
 // and for each incoming event, it applies
 // the corresponding filtering policies to
 // the event, dropping the event or passing
-// it accordingly.
-type Chain struct {
+// it accordingly. If the filter rule has
+// an action, the former is executed when the
+// rule fires.
+type Rules struct {
 	filterGroups map[uint32]filterGroups
 	config       *config.Config
 }
@@ -54,6 +56,10 @@ type Chain struct {
 type filterGroup struct {
 	group   config.FilterGroup
 	filters []compiledFilter
+}
+
+func newFilterGroup(g config.FilterGroup, filters []compiledFilter) *filterGroup {
+	return &filterGroup{group: g, filters: filters}
 }
 
 type compiledFilter struct {
@@ -79,9 +85,9 @@ func (groups filterGroups) hasIncludePolicy(kevt *kevent.Kevent) bool {
 	return false
 }
 
-// NewChain produces a fresh filter chain.
-func NewChain(c *config.Config) Chain {
-	chain := Chain{
+// NewRules produces a fresh rules instance.
+func NewRules(c *config.Config) Rules {
+	chain := Rules{
 		filterGroups: make(map[uint32]filterGroups),
 		config:       c,
 	}
@@ -90,8 +96,8 @@ func NewChain(c *config.Config) Chain {
 
 // Compile loads the filter groups from all files
 // and creates the filters for each filter group.
-func (c *Chain) Compile() error {
-	groups, err := c.config.Filters.LoadGroups()
+func (r *Rules) Compile() error {
+	groups, err := r.config.Filters.LoadGroups()
 	if err != nil {
 		return err
 	}
@@ -103,57 +109,51 @@ func (c *Chain) Compile() error {
 		// compute the key hash depending
 		// on whether the type or category
 		// were supplied in the selector
-		sel := group.Selector
-		key := sel.Type.Hash()
+		selector := group.Selector
+		key := selector.Type.Hash()
 		if key == 0 {
-			key = sel.Category.Hash()
+			key = selector.Category.Hash()
 		}
-		// compile filters
+		// compile filters and convert into rules
 		filters := make([]compiledFilter, 0, len(group.FromStrings))
 		for _, filterConfig := range group.FromStrings {
-			f := New(filterConfig.Def, c.config)
+			f := New(filterConfig.Def, r.config)
 			if err := f.Compile(); err != nil {
 				return fmt.Errorf("invalid filter %q in %q group: %v",
 					filterConfig.Name, group.Name, err)
 			}
-			filters = append(
-				filters,
-				compiledFilter{config: filterConfig, filter: f},
-			)
+			filters = append(filters, compiledFilter{config: filterConfig, filter: f})
 			filtersCount.Add(1)
 		}
-		c.filterGroups[key] = append(
-			c.filterGroups[key],
-			&filterGroup{group: group, filters: filters},
-		)
+		r.filterGroups[key] = append(r.filterGroups[key], newFilterGroup(group, filters))
 	}
 	return nil
 }
 
-func (c *Chain) findFilterGroups(kevt *kevent.Kevent) filterGroups {
-	groups1 := c.filterGroups[kevt.Type.Hash()]
-	groups2 := c.filterGroups[kevt.Category.Hash()]
+func (r *Rules) findFilterGroups(kevt *kevent.Kevent) filterGroups {
+	groups1 := r.filterGroups[kevt.Type.Hash()]
+	groups2 := r.filterGroups[kevt.Category.Hash()]
 	if groups1 == nil && groups2 == nil {
 		return nil
 	}
 	return append(groups1, groups2...)
 }
 
-func (c *Chain) Run(kevt *kevent.Kevent) bool {
+func (r *Rules) Fire(kevt *kevent.Kevent) bool {
 	// if there are no filter groups
 	// we assume no group files were
 	// defined or specified in the config
 	// so, the default behaviour in such
 	// cases is to pass the event and
 	// hand over it to the CLI filter
-	if len(c.filterGroups) == 0 {
+	if len(r.filterGroups) == 0 {
 		return true
 	}
 	// get filter groups for particular
 	// kevent type or category.
 	// Events/categories without filter
 	// groups are dropped by default
-	groups := c.findFilterGroups(kevt)
+	groups := r.findFilterGroups(kevt)
 	if len(groups) == 0 {
 		return false
 	}
