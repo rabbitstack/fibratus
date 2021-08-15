@@ -87,11 +87,11 @@ func (groups filterGroups) hasIncludePolicy(kevt *kevent.Kevent) bool {
 
 // NewRules produces a fresh rules instance.
 func NewRules(c *config.Config) Rules {
-	chain := Rules{
+	rules := Rules{
 		filterGroups: make(map[uint32]filterGroups),
 		config:       c,
 	}
-	return chain
+	return rules
 }
 
 // Compile loads the filter groups from all files
@@ -264,7 +264,7 @@ type ActionContext struct {
 }
 
 // runFilterAction executes the template associated with the filter
-// that has producing a match in one of the include groups.
+// that has produced a match in one of the include groups.
 func runFilterAction(kevt *kevent.Kevent, group config.FilterGroup, filter *config.FilterConfig) error {
 	if filter.Action == "" {
 		return nil
