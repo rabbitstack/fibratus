@@ -302,8 +302,8 @@ func (c *Config) addFlags() {
 	c.flags.String(configFile, filepath.Join(os.Getenv("PROGRAMFILES"), "fibratus", "config", "fibratus.yml"), "Indicates the location of the configuration file")
 	if c.opts.run || c.opts.replay {
 		c.flags.StringP(filamentName, "f", "", "Specifies the filament to execute")
-		c.flags.StringSlice(filtersFromPaths, []string{}, "Comma-separated list of filter group files")
-		c.flags.StringSlice(filtersFromURLs, []string{}, "Comma-separated list of filter group URL addresses")
+		c.flags.StringSlice(rulesFromPaths, []string{}, "Comma-separated list of rules files")
+		c.flags.StringSlice(rulesFromURLs, []string{}, "Comma-separated list of rules URL resources")
 	}
 	if c.opts.capture {
 		c.flags.StringP(kcapFile, "o", "", "The path of the output kcap file")

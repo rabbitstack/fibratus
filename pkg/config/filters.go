@@ -199,23 +199,29 @@ type FilterGroupSelector struct {
 // Filter expressions can reside in the filter group file or
 // live in a separate file.
 type Filters struct {
+	Rules Rules `json:"rules" yaml:"rules"`
+}
+
+// Rules contains attributes that describe the location of
+// rule resources.
+type Rules struct {
 	FromPaths []string `json:"from-paths" yaml:"from-paths"`
 	FromURLs  []string `json:"from-urls" yaml:"from-urls"`
 }
 
-const filtersFromPaths = "filters.from-paths"
-const filtersFromURLs = "filters.from-urls"
+const rulesFromPaths = "filters.rules.from-paths"
+const rulesFromURLs = "filters.rules.from-urls"
 
 func (f *Filters) initFromViper(v *viper.Viper) {
-	f.FromPaths = v.GetStringSlice(filtersFromPaths)
-	f.FromURLs = v.GetStringSlice(filtersFromURLs)
+	f.Rules.FromPaths = v.GetStringSlice(rulesFromPaths)
+	f.Rules.FromURLs = v.GetStringSlice(rulesFromURLs)
 }
 
 // LoadGroups for each filter group file it decodes the
 // groups and ensures the correctness of the yaml file.
 func (f Filters) LoadGroups() ([]FilterGroup, error) {
 	allGroups := make([]FilterGroup, 0)
-	for _, path := range f.FromPaths {
+	for _, path := range f.Rules.FromPaths {
 		file, err := os.Stat(path)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't open rule file %s: %v", path, err)
@@ -235,7 +241,7 @@ func (f Filters) LoadGroups() ([]FilterGroup, error) {
 		}
 		allGroups = append(allGroups, groups...)
 	}
-	for _, url := range f.FromURLs {
+	for _, url := range f.Rules.FromURLs {
 		if _, err := u.Parse(url); err != nil {
 			return nil, fmt.Errorf("%q is an invalid URL", url)
 		}

@@ -80,7 +80,9 @@ func newConfig(fromFiles ...string) *config.Config {
 	c := &config.Config{
 		Kstream: kstreamConfig,
 		Filters: &config.Filters{
-			FromPaths: fromFiles,
+			Rules: config.Rules{
+				FromPaths: fromFiles,
+			},
 		},
 	}
 	return c
