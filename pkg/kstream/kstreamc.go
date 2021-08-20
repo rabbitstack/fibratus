@@ -638,19 +638,25 @@ func getParam(name string, buffer []byte, size uint32, nonStructType tdh.NonStru
 // - rules defined in filter group files are triggered
 // - finally, the event is checked by the CLI filter
 func (k *kstreamConsumer) isDropped(kevt *kevent.Kevent) bool {
+	// drops events of certain type. For example, EnumProces
+	// is solely used to create the snapshot of live processes
 	if kevt.Type.Dropped(k.capture) {
 		return true
 	}
+	// ignores anything produced by fibratus process
 	if kevt.PID == currentPid {
 		return true
 	}
+	// discard event types in blacklist
 	if k.keventsBlacklist.has(kevt.Type) {
 		blacklistedKevents.Add(kevt.Name, 1)
 		return true
 	}
+	// check if rules got matched
 	if ok := k.rules.Fire(kevt); !ok {
 		return true
 	}
+	// fallback to CLI filter
 	if k.filter != nil {
 		return !k.filter.Run(kevt)
 	}
