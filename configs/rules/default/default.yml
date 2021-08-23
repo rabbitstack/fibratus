@@ -144,9 +144,8 @@
               'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe'
            )
       action: |
-        {{ $title := cat "Identified remote thread creation in"
-          .Kevt.Kparams.exe }}
-        {{  $text := cat "Injected by" .Kevt.PS.Exe }}
+        {{ $title := cat "Identified remote thread creation in" .Kevt.Kparams.exe }}
+        {{ $text := cat "Injected by" .Kevt.PS.Exe }}
         {{ emit $title $text }}
 
 # ======================= Network connection initiated ===============================================
