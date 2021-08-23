@@ -217,7 +217,7 @@ nextGroup:
 						includeOrFilterMatches.Add(f.config.Name, 1)
 						err := runFilterAction(kevt, g.group, f.config)
 						if err != nil {
-							log.Warnf("unable to execute %q filter action: %v", f.config.Name, err)
+							log.Warnf("unable to execute %q rule action: %v", f.config.Name, err)
 						}
 						return true
 					}
