@@ -121,17 +121,17 @@
 # Monitor for processes injecting code into other processes. Often used by malware to cloak their actions.
 # Also when Firefox loads Flash.
 #
-- group: Safe remote thread creation sources
+- group: Suspicious remote thread creations
   selector:
     type: CreateThread
   enabled: true
-  policy: exclude
+  policy: include
   relation: or
   from-strings:
-    - name: System processes and common binaries
+    - name: Fishy remote threads
       def: kevt.pid != thread.pid
              and
-           ps.exe iin
+           ps.exe not iin
            (
               'C:\\Windows\\system32\\wbem\\WmiPrvSE.exe',
               'C:\\Windows\\system32\\svchost.exe',
@@ -143,16 +143,6 @@
               'C:\\Windows\\system32\\kernel32.dll',
               'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe'
            )
-
-- group: Suspicious remote thread creations
-  selector:
-    type: CreateThread
-  enabled: true
-  policy: include
-  relation: or
-  from-strings:
-    - name: Fishy remote threads
-      def: kevt.pid != thread.pid
       action: |
         {{ $title := cat "Identified remote thread creation in"
           .Kevt.Kparams.exe }}
