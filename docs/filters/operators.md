@@ -17,7 +17,7 @@ The filtering query language supports the following  comparison binary operators
 
 Logical operators are applied on two or more binary expressions, except for `not` that acts as a unary operator.
 
-#### or
+### or
 
 `or` (union) evalutes to true if either one of the LHS (Left Hand Side) or RHS (Right Hand Side) expressions are true. 
 
@@ -29,7 +29,7 @@ Logical operators are applied on two or more binary expressions, except for `not
    fibratus run ps.name = 'svchost.exe' or ps.name contains ('svc')
    ```
 
-#### and
+### and
 
 `and` (intersection) evalutes to true if both of the LHS (Left Hand Side) and RHS (Right Hand Side) expressions are true.
 
@@ -41,7 +41,7 @@ Logical operators are applied on two or more binary expressions, except for `not
    fibratus run ps.name = 'System' and ps.pid = 4
    ```
 
-#### not
+### not
 
 `not` (negation) negates the result of the adjacent expression.
 
@@ -57,9 +57,9 @@ Logical operators are applied on two or more binary expressions, except for `not
 
 String operators are applied to string field types or string literals.
 
-#### in
+### in, iin
 
-`in` operator validates the presence of a value in the string sequence. It can be applied to string literal sequences or dynamic string slices given by filter fields. 
+`in` operator validates the presence of a value in the string sequence. It can be applied to string literal sequences or dynamic string slices given by filter fields. `iin` is the case-insensitive variant of the `in` operator.
 
 - **Examples**
 
@@ -75,9 +75,9 @@ String operators are applied to string field types or string literals.
    $ fibratus run ps.modules in ('kernel32.dll')
    ```
 
-#### contains
+### contains, icontains
 
-`contains` operator checks whether a string field contains a sequence of characters. This operator works on both simple string values and lists of strings. 
+`contains` operator checks whether a string field contains a sequence of characters. This operator works on both simple string values and lists of strings. `icontains` is the case-insensitive variant of the `contains` operator.
 
 - **Examples**
 
@@ -93,13 +93,10 @@ String operators are applied to string field types or string literals.
    $ fibratus run ps.comm contains 'Windows Tasks'
    ```
 
-#### icontains
 
-`icontains` is the case-insensitive variant of the `contains` operator.
+### startswith, istartswith
 
-#### startswith
-
-`startswith` checks whether a string field starts with a specified prefix. This operator works on both simple string values and lists of strings.
+`startswith` checks whether a string field starts with a specified prefix. This operator works on both simple string values and lists of strings. `istartswith` is the case-insensitive variant of the `startswith` operator.
 
 - **Example**
 
@@ -109,9 +106,10 @@ String operators are applied to string field types or string literals.
    fibratus run ps.name startswith 'svchost'
    ```
 
-#### endswith
 
-`endswith` checks whether a string field ends with a specified suffix. This operator works on both simple string values and lists of strings.
+### endswith, iendswith
+
+`endswith` checks whether a string field ends with a specified suffix. This operator works on both simple string values and lists of strings. `iendswith` is the case-insensitive variant of the `endswith` operator.
 
 - **Example**
 
@@ -120,9 +118,9 @@ String operators are applied to string field types or string literals.
    ```
    fibratus run ps.name endswith '.exe'
 
-#### matches
+### matches, imatches
 
-`matches` is the swiss army knife string matching operator. It allows string matching by using the wildcard characters similar to [globbing](https://en.wikipedia.org/wiki/Glob_(programming)). The `*` wildcard matches a sequence of characters, while the `?` wildcard matches a single character. 
+`matches` is the swiss army knife string matching operator. It allows string matching by using the wildcard characters similar to [globbing](https://en.wikipedia.org/wiki/Glob_(programming)). The `*` wildcard matches a sequence of characters, while the `?` wildcard matches a single character. `imatches` is the case-insensitive variant of the `matches` operator.
 
 - **Examples**
 
@@ -138,8 +136,20 @@ String operators are applied to string field types or string literals.
    fibratus run registry.key.name matches 'HKEY_USERS\\*\\Environment\\windir'
    ```
 
-#### imatches
+### fuzzy, ifuzzy, fuzzynorm, ifuzzynorm
 
-`imatches` is the case-insensitive variant of the `matches` operator.
+`fuzzy` operators allow for flexibly matching a string with partial input based on [fuzzy matching](https://en.wikipedia.org/wiki/Fuzzy_matching_(computer-assisted_translation)) techniques. `fuzzynorm` applies Unicode normalization before running the matching phase. `ifuzzy` and `ifuzzynorm` are the case-insensitive variants of the respective fuzzy operators.
 
+- **Examples**
 
+   To match events with file paths that contain `C:\\Windows\\System32\\user32.dll`, you could create an expression with the  partial path input
+
+   ```
+   fibratus run file.name fuzzy 'C:\\Windows\\Sys\\ser3ll'
+   ```
+
+   `fuzzynorm` operates on normalized Unicode codepoints
+
+   ```
+   fibratus run file.name fuzzynorm 'C:\\Windows\\Sys\\sér3ll'
+   ```
