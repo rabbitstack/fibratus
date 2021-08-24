@@ -2,7 +2,7 @@
 
 ### Anatomy of a filter {docsify-ignore}
 
-At its simplest form, a filter is composed of the LHS (Left Hand Side) and RHS (Right Hand Side) expressions connected with an [operator](/filters/operators) that can pertain to binary, logical, or string operators. The LHS expression is usually a [field](/filters/fields) name, even though the use of fields is possible in Right Hand Side expressions as well.
+At its simplest form, a filter is composed of the LHS (Left Hand Side) and RHS (Right Hand Side) expressions connected with an [operator](/filters/operators) that can pertain to binary, logical, or string operators. The LHS expression is usually a [field](/filters/fields) [path](/filters/paths), even though the use of fields is possible in Right Hand Side expressions as well.
 
 ```
     LHS          operator         RHS
