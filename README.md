@@ -42,7 +42,7 @@ You can use [filaments](https://www.fibratus.io/#/filaments/introduction) to ext
 - :minidisc: capturing event flux to **kcap** files and replaying anywhere
 - :rocket: transporting events to Elasticsearch, RabbitMQ or console sinks
 - :scissors: transforming kernel events
-- :beetle: scanning malicious processes and files with Yara
+- :dart: scanning malicious processes and files with Yara
 - :file_folder: PE (Portable Executable) introspection
 
 ### [Documentation](https://www.fibratus.io)
@@ -75,7 +75,9 @@ You can use [filaments](https://www.fibratus.io/#/filaments/introduction) to ext
 * [**Filtering**](https://www.fibratus.io/#/filters/filtering)
 * [**Operators**](https://www.fibratus.io/#/filters/operators)
 * [**Functions**](https://www.fibratus.io/#/filters/functions)
+* [**Paths**](https://www.fibratus.io/#/filters/paths)
 * [**Fields**](https://www.fibratus.io/#/filters/fields)
+* [**Rules**](https://www.fibratus.io/#/filters/rules)
 
 ### Captures
 
