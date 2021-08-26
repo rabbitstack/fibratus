@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 by Nedim Sabic Sabic
+ * Copyright 2020-2021 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -20,46 +20,17 @@ package api
 
 import (
 	"expvar"
-	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/api/handler"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	log "github.com/sirupsen/logrus"
 	"net"
 	"net/http"
 	"net/http/pprof"
-	"os/user"
 	"runtime/debug"
 	"strings"
 )
 
-var listener net.Listener
-
-// StartServer starts the HTTP server with the specified configuration.
-func StartServer(c *config.Config) error {
-	var err error
-	apiConfig := c.API
-	if strings.HasPrefix(apiConfig.Transport, `npipe:///`) {
-		usr, err := user.Current()
-		if err != nil {
-			return fmt.Errorf("failed to retrieve the current user: %v", err)
-		}
-		// Named pipe security and access rights.
-		// We create the pipe and the specific users should only be able to write to it.
-		// See docs: https://docs.microsoft.com/en-us/windows/win32/ipc/named-pipe-security-and-access-rights
-		// String definition: https://docs.microsoft.com/en-us/windows/win32/secauthz/ace-strings
-		// Give generic read/write access to the specified user.
-		descriptor := "D:P(A;;GA;;;" + usr.Uid + ")"
-		listener, err = MakePipeListener(apiConfig.Transport, descriptor)
-		if err != nil {
-			return err
-		}
-	} else {
-		listener, err = makeTCPListener(apiConfig.Transport)
-	}
-	if err != nil {
-		return err
-	}
-
+func setupServer(lis net.Listener, c *config.Config) {
 	mux := http.NewServeMux()
 	mux.Handle("/config", handler.Config(c))
 	mux.Handle("/debug/vars", expvar.Handler())
@@ -71,26 +42,15 @@ func StartServer(c *config.Config) error {
 	})
 
 	srv := &http.Server{
-		//WriteTimeout: apiConfig.Timeout,
 		Handler: mux,
 	}
 
 	go func() {
-		if err := srv.Serve(listener); err != nil && err != http.ErrServerClosed {
+		if err := srv.Serve(lis); err != nil && err != http.ErrServerClosed {
 			if strings.Contains(err.Error(), "use of closed network connection") {
 				return
 			}
 			log.Errorf("unable to bind the API server: %v", err)
 		}
 	}()
-
-	return nil
-}
-
-// CloseServer shutdowns the server by stopping the listener.
-func CloseServer() error {
-	if listener != nil {
-		return listener.Close()
-	}
-	return nil
 }
