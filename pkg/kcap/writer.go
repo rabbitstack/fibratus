@@ -20,6 +20,13 @@
 
 package kcap
 
+import (
+	"expvar"
+	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/kcap/section"
+	"math"
+)
+
 var (
 	errWriteMagic   = func(err error) error { return fmt.Errorf("couldn't write magic number: %v", err) }
 	errWriteVersion = func(v string, err error) error { return fmt.Errorf("couldn't write %s kcap digit: %v", v, err) }

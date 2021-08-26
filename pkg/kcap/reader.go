@@ -20,6 +20,13 @@
 
 package kcap
 
+import (
+	"errors"
+	"expvar"
+	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/kcap/section"
+)
+
 var (
 	errKcapMagicMismatch = errors.New("invalid kcap file magic number")
 	errMajorVer          = errors.New("incompatible kcap version format. Please upgrade Fibratus to newer version")
