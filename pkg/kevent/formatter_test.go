@@ -58,7 +58,7 @@ func TestFormat(t *testing.T) {
 		kpars.ProcessID: {Name: kpars.ProcessID, Type: kpars.HexInt32, Value: kpars.Hex("0x36c")},
 	}
 	s := f.Format(&Kevent{CPU: uint8(4), Name: "CreateProcess", Seq: uint64(1999), Kparams: params, Metadata: map[string]string{"key1": "value1"}})
-	assert.Equal(t, "1999 4 -  (CreateProcess) -- pid: 0x36c (pid➜ 0x36c) key1:value1", string(s))
+	assert.Equal(t, "1999 4 -  (CreateProcess) -- pid: 0x36c (pid➜ 0x36c) key1: value1", string(s))
 }
 
 func TestFormatPS(t *testing.T) {

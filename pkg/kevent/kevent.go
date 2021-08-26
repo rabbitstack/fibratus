@@ -46,7 +46,7 @@ type Metadata map[string]string
 func (md Metadata) String() string {
 	var sb strings.Builder
 	for k, v := range md {
-		sb.WriteString(k + ":" + v + ", ")
+		sb.WriteString(k + ": " + v + ", ")
 	}
 	return strings.TrimSuffix(sb.String(), ", ")
 }

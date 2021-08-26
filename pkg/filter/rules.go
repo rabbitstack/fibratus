@@ -32,6 +32,14 @@ import (
 	"text/template"
 )
 
+
+const (
+	// ruleNameMeta identifies the rule that was triggered by the event
+	ruleNameMeta = "rule.name"
+	// ruleGroupMeta identifies the group to which the triggered rule pertains
+	ruleGroupMeta = "rule.group"
+)
+
 var (
 	excludeOrFilterMatches  = expvar.NewMap("filter.chain.exclude.or.matches")
 	excludeAndFilterMatches = expvar.NewMap("filter.chain.exclude.and.matches")
@@ -219,6 +227,9 @@ nextGroup:
 						if err != nil {
 							log.Warnf("unable to execute %q rule action: %v", f.config.Name, err)
 						}
+						// attach rule and group meta
+						kevt.AddMeta(ruleNameMeta, f.config.Name)
+						kevt.AddMeta(ruleGroupMeta, g.group.Name)
 						return true
 					}
 				case config.AndRelation:
@@ -242,7 +253,7 @@ nextGroup:
 					includeAndFilterMatches.Add(f.config.Name, 1)
 					err := runFilterAction(kevt, g.group, f.config)
 					if err != nil {
-						log.Warnf("unable to execute %q filter action: %v", f.config.Name, err)
+						log.Warnf("unable to execute %q rule action: %v", f.config.Name, err)
 					}
 				}
 			}
