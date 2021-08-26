@@ -199,26 +199,32 @@ type FilterGroupSelector struct {
 // Filter expressions can reside in the filter group file or
 // live in a separate file.
 type Filters struct {
+	Rules Rules `json:"rules" yaml:"rules"`
+}
+
+// Rules contains attributes that describe the location of
+// rule resources.
+type Rules struct {
 	FromPaths []string `json:"from-paths" yaml:"from-paths"`
 	FromURLs  []string `json:"from-urls" yaml:"from-urls"`
 }
 
-const filtersFromPaths = "filters.from-paths"
-const filtersFromURLs = "filters.from-urls"
+const rulesFromPaths = "filters.rules.from-paths"
+const rulesFromURLs = "filters.rules.from-urls"
 
 func (f *Filters) initFromViper(v *viper.Viper) {
-	f.FromPaths = v.GetStringSlice(filtersFromPaths)
-	f.FromURLs = v.GetStringSlice(filtersFromURLs)
+	f.Rules.FromPaths = v.GetStringSlice(rulesFromPaths)
+	f.Rules.FromURLs = v.GetStringSlice(rulesFromURLs)
 }
 
 // LoadGroups for each filter group file it decodes the
 // groups and ensures the correctness of the yaml file.
 func (f Filters) LoadGroups() ([]FilterGroup, error) {
 	allGroups := make([]FilterGroup, 0)
-	for _, path := range f.FromPaths {
+	for _, path := range f.Rules.FromPaths {
 		file, err := os.Stat(path)
 		if err != nil {
-			return nil, fmt.Errorf("couldn't open filter file %s: %v", path, err)
+			return nil, fmt.Errorf("couldn't open rule file %s: %v", path, err)
 		}
 		if file.IsDir() {
 			return nil, fmt.Errorf("expected yml file but got directory %s", path)
@@ -227,7 +233,7 @@ func (f Filters) LoadGroups() ([]FilterGroup, error) {
 		// the corresponding filter groups from it
 		rawConfig, err := ioutil.ReadFile(path)
 		if err != nil {
-			return nil, fmt.Errorf("couldn't load yml filter file: %v", err)
+			return nil, fmt.Errorf("couldn't load rule file: %v", err)
 		}
 		groups, err := decodeFilterGroups(path, rawConfig)
 		if err != nil {
@@ -235,14 +241,14 @@ func (f Filters) LoadGroups() ([]FilterGroup, error) {
 		}
 		allGroups = append(allGroups, groups...)
 	}
-	for _, url := range f.FromURLs {
+	for _, url := range f.Rules.FromURLs {
 		if _, err := u.Parse(url); err != nil {
 			return nil, fmt.Errorf("%q is an invalid URL", url)
 		}
 		//nolint:noctx
 		resp, err := http.Get(url)
 		if err != nil {
-			return nil, fmt.Errorf("cannot fetch filter file from %q: %v", url, err)
+			return nil, fmt.Errorf("cannot fetch rule file from %q: %v", url, err)
 		}
 		if resp.StatusCode != http.StatusOK {
 			_ = resp.Body.Close()
@@ -254,7 +260,7 @@ func (f Filters) LoadGroups() ([]FilterGroup, error) {
 		_, err = io.Copy(&rawConfig, resp.Body)
 		_ = resp.Body.Close()
 		if err != nil {
-			return nil, fmt.Errorf("cannot copy filter file from %q: %v", url, err)
+			return nil, fmt.Errorf("cannot copy rule file from %q: %v", url, err)
 		}
 		groups, err := decodeFilterGroups(url, rawConfig.Bytes())
 		if err != nil {
@@ -421,7 +427,7 @@ func encodeFilterActions(buf []byte) ([]byte, error) {
 		for i, gn := range n.Content {
 			if gn.Value == "from-strings" {
 				content := n.Content[i+1]
-				// for each node in from_strings
+				// for each node in from-strings
 				for _, s := range content.Content {
 					for j, e := range s.Content {
 						if e.Value == "action" && s.Content[j+1].Value != "" {

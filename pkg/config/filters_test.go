@@ -31,14 +31,18 @@ import (
 
 func newFilters(paths ...string) Filters {
 	return Filters{
-		FromPaths: paths,
+		Rules{
+			FromPaths: paths,
+		},
 	}
 }
 
 func TestLoadGroupsFromPaths(t *testing.T) {
 	filters := Filters{
-		FromPaths: []string{
-			"_fixtures/filters/default.yml",
+		Rules{
+			FromPaths: []string{
+				"_fixtures/filters/default.yml",
+			},
 		},
 	}
 	groups, err := filters.LoadGroups()
@@ -88,8 +92,10 @@ func TestLoadGroupsFromURLs(t *testing.T) {
 	defer srv.Close()
 
 	filters := Filters{
-		FromURLs: []string{
-			"http://localhost:3231/default.yml",
+		Rules{
+			FromURLs: []string{
+				"http://localhost:3231/default.yml",
+			},
 		},
 	}
 	groups, err := filters.LoadGroups()
@@ -121,8 +127,10 @@ func TestLoadGroupsInvalidTemplates(t *testing.T) {
 
 func TestLoadGroupsWithValues(t *testing.T) {
 	filters := Filters{
-		FromPaths: []string{
-			"_fixtures/filters/values/default.yml",
+		Rules{
+			FromPaths: []string{
+				"_fixtures/filters/values/default.yml",
+			},
 		},
 	}
 	groups, err := filters.LoadGroups()

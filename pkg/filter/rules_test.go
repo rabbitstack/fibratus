@@ -48,8 +48,8 @@ func init() {
 	alertsender.Register(alertsender.Noop, makeSender)
 }
 
-func runChain(t *testing.T, c *config.Config) bool {
-	chain := NewChain(c)
+func fireRules(t *testing.T, c *config.Config) bool {
+	rules := NewRules(c)
 
 	kevt := &kevent.Kevent{
 		Type: ktypes.Recv,
@@ -64,8 +64,8 @@ func runChain(t *testing.T, c *config.Config) bool {
 		},
 	}
 
-	require.NoError(t, chain.Compile())
-	return chain.Run(kevt)
+	require.NoError(t, rules.Compile())
+	return rules.Fire(kevt)
 }
 
 func newConfig(fromFiles ...string) *config.Config {
@@ -80,36 +80,38 @@ func newConfig(fromFiles ...string) *config.Config {
 	c := &config.Config{
 		Kstream: kstreamConfig,
 		Filters: &config.Filters{
-			FromPaths: fromFiles,
+			Rules: config.Rules{
+				FromPaths: fromFiles,
+			},
 		},
 	}
 	return c
 }
 
 func TestChainCompileMergeGroups(t *testing.T) {
-	chain := NewChain(newConfig("_fixtures/merged_groups.yml"))
-	require.NoError(t, chain.Compile())
+	rules := NewRules(newConfig("_fixtures/merged_groups.yml"))
+	require.NoError(t, rules.Compile())
 
-	assert.Len(t, chain.filterGroups, 2)
-	assert.Len(t, chain.filterGroups[ktypes.Recv.Hash()], 2)
-	assert.Len(t, chain.filterGroups[ktypes.Net.Hash()], 1)
+	assert.Len(t, rules.filterGroups, 2)
+	assert.Len(t, rules.filterGroups[ktypes.Recv.Hash()], 2)
+	assert.Len(t, rules.filterGroups[ktypes.Net.Hash()], 1)
 
-	groups := chain.findFilterGroups(&kevent.Kevent{Type: ktypes.Recv, Category: ktypes.Net})
+	groups := rules.findFilterGroups(&kevent.Kevent{Type: ktypes.Recv, Category: ktypes.Net})
 	assert.Len(t, groups, 3)
 }
 
 func TestChainCompileGroupsOnlyTypeSelector(t *testing.T) {
-	chain := NewChain(newConfig("_fixtures/groups_type_selector.yml"))
-	require.NoError(t, chain.Compile())
+	rules := NewRules(newConfig("_fixtures/groups_type_selector.yml"))
+	require.NoError(t, rules.Compile())
 
-	assert.Len(t, chain.filterGroups, 1)
-	assert.Len(t, chain.filterGroups[ktypes.Recv.Hash()], 3)
+	assert.Len(t, rules.filterGroups, 1)
+	assert.Len(t, rules.filterGroups[ktypes.Recv.Hash()], 3)
 
-	groups := chain.findFilterGroups(&kevent.Kevent{Type: ktypes.Recv})
+	groups := rules.findFilterGroups(&kevent.Kevent{Type: ktypes.Recv})
 	assert.Len(t, groups, 3)
 }
 
-func TestChainRun(t *testing.T) {
+func TestFireRules(t *testing.T) {
 	var tests = []struct {
 		config  *config.Config
 		matches bool
@@ -125,7 +127,7 @@ func TestChainRun(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		matches := runChain(t, tt.config)
+		matches := fireRules(t, tt.config)
 		if matches != tt.matches {
 			t.Errorf("%d. %v filter chain mismatch: exp=%t got=%t", i, tt.config.Filters, tt.matches, matches)
 		}
@@ -133,8 +135,8 @@ func TestChainRun(t *testing.T) {
 }
 
 func TestIncludeExcludeRemoteThreads(t *testing.T) {
-	chain := NewChain(newConfig("_fixtures/include_exclude_remote_threads.yml"))
-	require.NoError(t, chain.Compile())
+	rules := NewRules(newConfig("_fixtures/include_exclude_remote_threads.yml"))
+	require.NoError(t, rules.Compile())
 
 	kevt := &kevent.Kevent{
 		Type: ktypes.CreateThread,
@@ -149,13 +151,13 @@ func TestIncludeExcludeRemoteThreads(t *testing.T) {
 		},
 	}
 
-	require.False(t, chain.Run(kevt))
+	require.False(t, rules.Fire(kevt))
 }
 
 func TestFilterActionEmitAlert(t *testing.T) {
 	require.NoError(t, alertsender.LoadAll([]alertsender.Config{{Type: alertsender.Noop}}))
-	chain := NewChain(newConfig("_fixtures/include_policy_emit_alert.yml"))
-	require.NoError(t, chain.Compile())
+	rules := NewRules(newConfig("_fixtures/include_policy_emit_alert.yml"))
+	require.NoError(t, rules.Compile())
 
 	kevt := &kevent.Kevent{
 		Type: ktypes.Recv,
@@ -173,7 +175,7 @@ func TestFilterActionEmitAlert(t *testing.T) {
 		},
 	}
 
-	require.True(t, chain.Run(kevt))
+	require.True(t, rules.Fire(kevt))
 
 	require.NotNil(t, emitAlert)
 	assert.Equal(t, "Test alert", emitAlert.Title)
@@ -185,8 +187,8 @@ func TestFilterActionEmitAlert(t *testing.T) {
 func BenchmarkChainRun(b *testing.B) {
 	b.ReportAllocs()
 
-	chain := NewChain(newConfig("_fixtures/default/default.yml"))
-	require.NoError(b, chain.Compile())
+	rules := NewRules(newConfig("_fixtures/default/default.yml"))
+	require.NoError(b, rules.Compile())
 
 	kevts := []*kevent.Kevent{
 		{
@@ -225,7 +227,7 @@ func BenchmarkChainRun(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		for _, kevt := range kevts {
-			chain.Run(kevt)
+			rules.Fire(kevt)
 		}
 	}
 }

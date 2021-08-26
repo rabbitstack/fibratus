@@ -122,8 +122,14 @@ var schema = `
 		"filters": {
 			"type": "object",
 			"properties": {
-				"from-paths": 	{"type": ["array", "null"], "items": [{"type": "string", "minLength": 5}]},
-				"from-urls":	{"type": ["array", "null"], "items": [{"type": "string", "minLength": 5}]}
+				"rules": {
+					"type": "object",
+					"properties": {
+						"from-paths": 	{"type": ["array", "null"], "items": [{"type": "string", "minLength": 4}]},
+						"from-urls":	{"type": ["array", "null"], "items": [{"type": "string", "minLength": 8}]}
+					},
+					"additionalProperties": false
+				}
 			},
 			"additionalProperties": false
 		},

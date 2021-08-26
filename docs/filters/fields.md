@@ -55,6 +55,17 @@ The following tables summarize available field names that can be used in filter 
 | ps.handle.types | Allocated process handle types | `ps.handle.types in ('Key', 'Mutant', 'Section')`   |
 | ps.modules      | Modules loaded by the process | `ps.modules in ('crypt32.dll', 'xul.dll')`   |
 | ps.modules[]    | Accesses a specific process module. Prefix matches are supported  | `ps.modules['crypt'].size > 1024`   |
+| ps.parent.name    | Parent process name  | `ps.parent.name = 'powershell.exe'`   |
+| ps.parent.comm    | Parent process command line  | `ps.parent.comm contains 'attrib'`   |
+| ps.parent.exe    | Full name of the parent process executable  | `ps.parent.exe = 'C:\\Windows\\system32\\cmd.exe'`   |
+| ps.parent.cwd    | Parent process current working directory  | `ps.parent.cwd = 'C:\\Users\\Default'`   |
+| ps.parent.sid    | Security identifier under which the parent process is run  | `ps.parent.sid contains 'SYSTEM'`   |
+| ps.parent.sessionid    | Unique identifier for the current session of the parent process  | `ps.parent.session = 1`   |
+| ps.parent.dtb    | Parent process directory table base address  | `ps.parent.dtb = 'powershell.exe'`   |
+| ps.parent.envs    | Parent process environment variables   | `ps.parent.envs in ('PROCESSOR_LEVEL')'`   |
+| ps.parent.handles    | Allocated parent process handles  | `ps.parent.handles in ('\\...\\Cor_SxSPublic_IPCBlock')`   |
+| ps.parent.handle.types    | Allocated parent process handles types  | `ps.parent.handle.types in ('Key', 'Mutant', 'Section')`   |
+| ps.ancestor[]    | Process ancestry traversing  | `ps.ancestor[2].name in ('winword.exe', 'powershell.exe')`   |
 
 ### Thread
 | Field Name  | Description | Example     |

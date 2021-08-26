@@ -95,13 +95,14 @@ filament:
 
 # =============================== Filters ===============================================
 
-# Contains the definition of filters. Filter expressions are contained in filter group files.
-# Filter group files can reside in the local file system or also can be exposed via HTTP url.
+# Contains the definition of filter rules. Filter expressions are contained in filter group files.
+# Rule definitions can reside in the local file system or also can be served over HTTP/S.
 filters:
-  from-paths:
-  # - C:\Program Files\Fibratus\Config\Filters\Default\default.yml
-  #from-urls:
-  #  - https://raw.githubusercontent.com/rabbitstack/fibratus/master/configs/filters/default/default.yml
+  rules:
+    from-paths:
+    # - C:\Program Files\Fibratus\Config\Rules\Default\default.yml
+    #from-urls:
+    #  - https://raw.githubusercontent.com/rabbitstack/fibratus/master/configs/rules/default/default.yml
 
 # =============================== Handle ===============================================
 

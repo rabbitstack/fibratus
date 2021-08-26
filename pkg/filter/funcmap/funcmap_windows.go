@@ -94,7 +94,7 @@ func emit(title string, text string, args ...string) string {
 			alertsender.ParseSeverityFromString(severity),
 		)
 		if err := s.Send(alert); err != nil {
-			log.Warnf("unable to emit alert from filter: %v", err)
+			log.Warnf("unable to emit alert from rule: %v", err)
 		}
 	}
 	return ""
