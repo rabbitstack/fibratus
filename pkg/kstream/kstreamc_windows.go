@@ -53,8 +53,6 @@ const (
 )
 
 var (
-	// failedKevents counts the number of kevents that failed to process
-	failedKevents                = expvar.NewMap("kstream.kevents.failures")
 	failedKeventsByMissingSchema = expvar.NewMap("kstream.kevents.missing.schema.errors")
 	// keventsEnqueued counts the number of events that are pushed to the queue
 	keventsEnqueued = expvar.NewInt("kstream.kevents.enqueued")
@@ -78,28 +76,6 @@ var (
 
 	currentPid = uint32(os.Getpid())
 )
-
-// Consumer is the interface for the kernel event stream consumer.
-type Consumer interface {
-	// OpenKstream initializes the kernel event stream by setting the event record callback and instructing it
-	// to consume events from log buffers. This operation can fail if opening the kernel logger session results
-	// in an invalid trace handler. Errors returned by `ProcessTrace` are sent to the channel since this function
-	// blocks the current thread and we schedule its execution in a separate goroutine.
-	OpenKstream() error
-	// CloseKstream shutdowns the currently running kernel event stream consumer by closing the corresponding
-	// session.
-	CloseKstream() error
-	// Errors returns the channel where errors are pushed.
-	Errors() chan error
-	// Events returns the buffered channel for pulling collected kernel events.
-	Events() chan *kevent.Kevent
-	// SetFilter initializes the filter that's applied on the kernel events.
-	SetFilter(filter filter.Filter)
-}
-
-type blacklist map[ktypes.Ktype]string
-
-func (b blacklist) has(ktype ktypes.Ktype) bool { return b[ktype] != "" }
 
 type kstreamConsumer struct {
 	handle etw.TraceHandle

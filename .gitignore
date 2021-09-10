@@ -1,5 +1,7 @@
 cmd/fibratus/fibratus.exe
+cmd/fibratus/fibratus
 cmd/fibratus/fibratus.syso
+pkg/kstream/kprobe.o
 
 build/msi/fibratus-*
 build/msi/components.wxs

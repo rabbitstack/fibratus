@@ -26,12 +26,6 @@ import (
 	"unsafe"
 )
 
-// hostname is the current host name or FQDN
-var hostname string
-
-// hostnameErrors exposes host/fqdn resolution errors
-var hostnameErrors = expvar.NewMap("hostname.errors")
-
 const computerNamePhysicalDNSFullyQualified = 7
 
 var (

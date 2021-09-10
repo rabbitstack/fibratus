@@ -20,29 +20,24 @@ package common
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/config"
-	"github.com/rabbitstack/fibratus/pkg/syscall/security"
 	"github.com/rabbitstack/fibratus/pkg/util/log"
 )
 
-// Init initializes and validates the configuration
-// as given by the commands. This function will also set up
-// the logger and adjust the process token with the debug
-// privilege if required.
-func Init(c *config.Config, debugPrivilege bool) error {
-	if err := c.TryLoadFile(c.File()); err != nil {
+// SetupConfigAndLogger initializes and validates the configuration
+// along with the logger. The configuration setup process consists of
+// loading the config from the file, initializing internal state, and
+// finally validating the config options.
+func SetupConfigAndLogger(c *config.Config) error {
+	if err := c.TryLoadFile(c.GetConfigFile()); err != nil {
 		return err
 	}
 	// initialize and validate the config
 	if err := c.Init(); err != nil {
 		return err
 	}
-	if err := c.Validate(); err != nil {
-		return err
-	}
-	// inject the debug privilege if enabled
-	if c.DebugPrivilege && debugPrivilege {
-		security.SetDebugPrivilege()
-	}
+	// if err := c.Validate(); err != nil {
+	// 	return err
+	// }
 	if err := log.InitFromConfig(c.Log); err != nil {
 		return err
 	}

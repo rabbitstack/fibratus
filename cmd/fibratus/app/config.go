@@ -44,7 +44,7 @@ func init() {
 }
 
 func printConfig(cmd *cobra.Command, args []string) error {
-	if err := common.Init(c, false); err != nil {
+	if err := common.SetupConfigAndLogger(c); err != nil {
 		return err
 	}
 	body, err := rest.Get(rest.WithTransport(c.API.Transport), rest.WithURI("config"))

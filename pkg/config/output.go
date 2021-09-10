@@ -21,22 +21,23 @@ package config
 import (
 	"errors"
 	"fmt"
+	"reflect"
+	"strconv"
+
 	"github.com/rabbitstack/fibratus/pkg/outputs"
 	"github.com/rabbitstack/fibratus/pkg/outputs/amqp"
 	"github.com/rabbitstack/fibratus/pkg/outputs/console"
 	"github.com/rabbitstack/fibratus/pkg/outputs/elasticsearch"
 	"github.com/rabbitstack/fibratus/pkg/outputs/null"
+	"github.com/rabbitstack/fibratus/pkg/util/service"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/sys/windows/svc"
-	"reflect"
-	"strconv"
 )
 
 var errNoOutputSection = errors.New("no output section in config")
 
 var errOutputConfig = func(output string, err error) error { return fmt.Errorf("%s output invalid config: %v", output, err) }
 
-func (c *Config) tryLoadOutput() error {
+func (c *BaseConfig) tryLoadOutput() error {
 	output := c.viper.AllSettings()["output"]
 	if output == nil {
 		return errNoOutputSection
@@ -106,8 +107,7 @@ func (c *Config) tryLoadOutput() error {
 
 	// if it is not an interactive session but the console output is enabled
 	// we default to null output and warn about that
-	in, err := svc.IsAnInteractiveSession()
-	if err == nil && !in && c.Output.Output != nil {
+	if !service.IsInteractive() && c.Output.Output != nil {
 		if c.Output.Type == outputs.Console {
 			log.Warn("running in non-interactive session with console output. " +
 				"Please configure a different output type. Defaulting to null output")

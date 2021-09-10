@@ -27,6 +27,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	"github.com/rabbitstack/fibratus/pkg/kstream"
 	"github.com/rabbitstack/fibratus/pkg/ps"
+	"github.com/rabbitstack/fibratus/pkg/syscall/security"
 	"github.com/spf13/cobra"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
@@ -35,24 +36,6 @@ import (
 	"golang.org/x/sys/windows/svc/mgr"
 	"time"
 )
-
-var startSvcCmd = &cobra.Command{
-	Use:   "start-service",
-	RunE:  startService,
-	Short: "Start fibratus service",
-}
-
-var stopSvcCmd = &cobra.Command{
-	Use:   "stop-service",
-	RunE:  stopService,
-	Short: "Stop fibratus service",
-}
-
-var restartSvcCmd = &cobra.Command{
-	Use:   "restart-service",
-	RunE:  restartService,
-	Short: "Restart fibratus service",
-}
 
 var (
 	// windows service command config
@@ -213,8 +196,13 @@ loop:
 
 func (s *fsvc) run() error {
 	// initialize config and logger
-	if err := common.Init(svcConfig, true); err != nil {
+	if err := common.SetupConfigAndLogger(svcConfig); err != nil {
 		return err
+	}
+
+	// inject the debug privilege if enabled
+	if svcConfig.DebugPrivilege {
+		security.SetDebugPrivilege()
 	}
 
 	ctrl = kstream.NewKtraceController(svcConfig.Kstream)

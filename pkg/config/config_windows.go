@@ -21,41 +21,21 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/aggregator"
-	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers"
-	removet "github.com/rabbitstack/fibratus/pkg/aggregator/transformers/remove"
-	replacet "github.com/rabbitstack/fibratus/pkg/aggregator/transformers/replace"
-	tagst "github.com/rabbitstack/fibratus/pkg/aggregator/transformers/tags"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/outputs/amqp"
-	"github.com/rabbitstack/fibratus/pkg/outputs/elasticsearch"
-	"github.com/rabbitstack/fibratus/pkg/util/log"
-	"github.com/rabbitstack/fibratus/pkg/util/multierror"
-	yara "github.com/rabbitstack/fibratus/pkg/yara/config"
-	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"time"
 
-	renamet "github.com/rabbitstack/fibratus/pkg/aggregator/transformers/rename"
-	trimt "github.com/rabbitstack/fibratus/pkg/aggregator/transformers/trim"
-
-	"github.com/rabbitstack/fibratus/pkg/alertsender"
-	mailsender "github.com/rabbitstack/fibratus/pkg/alertsender/mail"
-	slacksender "github.com/rabbitstack/fibratus/pkg/alertsender/slack"
-	"github.com/rabbitstack/fibratus/pkg/outputs"
-	"github.com/rabbitstack/fibratus/pkg/outputs/console"
-	"github.com/rabbitstack/fibratus/pkg/pe"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
+	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/rabbitstack/fibratus/pkg/pe"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 )
 
 const (
-	kcapFile           = "kcap.file"
-	configFile         = "config-file"
 	debugPrivilege     = "debug-privilege"
 	initHandleSnapshot = "handle.init-snapshot"
 
@@ -63,177 +43,39 @@ const (
 	serializeImages  = "kevent.serialize-images"
 	serializeHandles = "kevent.serialize-handles"
 	serializePE      = "kevent.serialize-pe"
-	serializeEnvs    = "kevent.serialize-envs"
 )
 
 // Config stores configuration options for fine tuning the behaviour of Fibratus.
 type Config struct {
-	// Kstream stores different configuration options for fine tuning kstream consumer/controller settings.
-	Kstream KstreamConfig `json:"kstream" yaml:"kstream"`
-	// Filament contains filament settings
-	Filament FilamentConfig `json:"filament" yaml:"filament"`
+	BaseConfig
 	// PE contains the settings that influences the behaviour of the PE (Portable Executable) reader.
 	PE pe.Config `json:"pe" yaml:"pe"`
-	// Output stores the currently active output config
-	Output outputs.Config
 	// InitHandleSnapshot indicates whether initial handle snapshot is built
 	InitHandleSnapshot bool `json:"init-handle-snapshot" yaml:"init-handle-snapshot"`
-	DebugPrivilege     bool `json:"debug-privilege" yaml:"debug-privilege"`
-	KcapFile           string
-
-	// API stores global HTTP API preferences
-	API APIConfig `json:"api" yaml:"api"`
-	// Yara contains configuration that influences the behaviour of the Yara engine
-	Yara yara.Config `json:"yara" yaml:"yara"`
-	// Aggregator stores event aggregator configuration
-	Aggregator aggregator.Config `json:"aggregator" yaml:"aggregator"`
-	// Log contains log-specific configuration options
-	Log log.Config `json:"logging" yaml:"logging"`
-
-	// Transformers stores transformer configurations
-	Transformers []transformers.Config
-	// Alertsenders stores alert sender configurations
-	Alertsenders []alertsender.Config
-
-	// Filters contains filter group definitions
-	Filters *Filters `json:"filters" yaml:"filters"`
-
-	flags *pflag.FlagSet
-	viper *viper.Viper
-	opts  *Options
-}
-
-// Options determines which config flags are toggled depending on the command type.
-type Options struct {
-	capture bool
-	replay  bool
-	run     bool
-	list    bool
-	stats   bool
-}
-
-// Option is the type alias for the config option.
-type Option func(*Options)
-
-// WithCapture determines the capture command is executed.
-func WithCapture() Option {
-	return func(o *Options) {
-		o.capture = true
-	}
-}
-
-// WithReplay determines the replay command is executed.
-func WithReplay() Option {
-	return func(o *Options) {
-		o.replay = true
-	}
-}
-
-// WithRun determines the main command is executed.
-func WithRun() Option {
-	return func(o *Options) {
-		o.run = true
-	}
-}
-
-// WithList determines the list command is executed.
-func WithList() Option {
-	return func(o *Options) {
-		o.list = true
-	}
-}
-
-// WithStats determines the stats command is executed.
-func WithStats() Option {
-	return func(o *Options) {
-		o.stats = true
-	}
+	// DebugPrivilege determines whether fibratus process token acquires the debug privilege
+	DebugPrivilege bool `json:"debug-privilege" yaml:"debug-privilege"`
 }
 
 // NewWithOpts builds a new configuration store from a variety of sources such as configuration files,
 // environment variables or command line flags.
 func NewWithOpts(options ...Option) *Config {
-	opts := &Options{}
-
-	for _, opt := range options {
-		opt(opts)
-	}
-
-	v := viper.New()
-	v.AutomaticEnv()
-	v.SetEnvKeyReplacer(strings.NewReplacer("-", "_", ".", "_"))
-
-	flagSet := new(pflag.FlagSet)
-
-	c := &Config{
-		Kstream:    KstreamConfig{},
-		Filament:   FilamentConfig{},
-		API:        APIConfig{},
-		PE:         pe.Config{},
-		Log:        log.Config{},
-		Aggregator: aggregator.Config{},
-		Filters:    &Filters{},
-		viper:      v,
-		flags:      flagSet,
-		opts:       opts,
-	}
-
-	if opts.run || opts.replay {
-		aggregator.AddFlags(flagSet)
-		console.AddFlags(flagSet)
-		amqp.AddFlags(flagSet)
-		elasticsearch.AddFlags(flagSet)
-		removet.AddFlags(flagSet)
-		replacet.AddFlags(flagSet)
-		renamet.AddFlags(flagSet)
-		trimt.AddFlags(flagSet)
-		tagst.AddFlags(flagSet)
-		mailsender.AddFlags(flagSet)
-		slacksender.AddFlags(flagSet)
-		yara.AddFlags(flagSet)
-	}
+	config := newWithOpts(options...)
 
 	if opts.run || opts.capture {
 		pe.AddFlags(flagSet)
 	}
 
-	c.addFlags()
+	config.addFlags()
 
-	return c
-}
-
-// GetConfigFile gets the path of the configuration file from Viper value.
-func (c Config) GetConfigFile() string {
-	return c.viper.GetString(configFile)
-}
-
-// MustViperize adds the flag set to the Cobra command and binds them within the Viper flags.
-func (c *Config) MustViperize(cmd *cobra.Command) {
-	cmd.PersistentFlags().AddFlagSet(c.flags)
-	if err := c.viper.BindPFlags(cmd.PersistentFlags()); err != nil {
-		panic(err)
-	}
-	if c.opts.capture || c.opts.replay {
-		if err := cmd.MarkPersistentFlagRequired(kcapFile); err != nil {
-			panic(err)
-		}
-	}
+	return config
 }
 
 // Init setups the configuration state from Viper.
 func (c *Config) Init() error {
-	c.Kstream.initFromViper(c.viper)
-	c.Filament.initFromViper(c.viper)
-	c.API.initFromViper(c.viper)
 	c.PE.InitFromViper(c.viper)
-	c.Aggregator.InitFromViper(c.viper)
-	c.Log.InitFromViper(c.viper)
-	c.Yara.InitFromViper(c.viper)
-	c.Filters.initFromViper(c.viper)
 
 	c.InitHandleSnapshot = c.viper.GetBool(initHandleSnapshot)
 	c.DebugPrivilege = c.viper.GetBool(debugPrivilege)
-	c.KcapFile = c.viper.GetString(kcapFile)
 
 	kevent.SerializeThreads = c.viper.GetBool(serializeThreads)
 	kevent.SerializeImages = c.viper.GetBool(serializeImages)
@@ -241,62 +83,8 @@ func (c *Config) Init() error {
 	kevent.SerializePE = c.viper.GetBool(serializePE)
 	kevent.SerializeEnvs = c.viper.GetBool(serializeEnvs)
 
-	if c.opts.run || c.opts.replay {
-		if err := c.tryLoadOutput(); err != nil {
-			return err
-		}
-		if err := c.tryLoadTransformers(); err != nil {
-			return err
-		}
-		if err := c.tryLoadAlertSenders(); err != nil {
-			return err
-		}
-	}
-	return nil
+	return c.init()
 }
-
-// TryLoadFile attempts to load the configuration file from specified path on the file system.
-func (c *Config) TryLoadFile(file string) error {
-	c.viper.SetConfigFile(file)
-	return c.viper.ReadInConfig()
-}
-
-// Validate ensures that all configuration options provided by user have the expected values. It returns
-// a list of validation errors prefixed with the offending configuration property/flag.
-func (c *Config) Validate() error {
-	// we'll first validate the structure and values of the config file
-	file := c.viper.GetString(configFile)
-	var out interface{}
-	b, err := ioutil.ReadFile(file)
-	if err != nil {
-		return err
-	}
-	switch filepath.Ext(file) {
-	case ".yaml", ".yml":
-		err = yaml.Unmarshal(b, &out)
-	case ".json":
-		err = json.Unmarshal(b, &out)
-	default:
-		return fmt.Errorf("%s is not a supported config file extension", filepath.Ext(file))
-	}
-	if err != nil {
-		return fmt.Errorf("couldn't read the config file: %v", err)
-	}
-	// validate config file content
-	valid, errs := validate(interpolateSchema(), out)
-	if !valid || len(errs) > 0 {
-		return fmt.Errorf("invalid config: %v", multierror.Wrap(errs...))
-	}
-	// now validate the Viper config flags
-	valid, errs = validate(interpolateSchema(), c.viper.AllSettings())
-	if !valid || len(errs) > 0 {
-		return fmt.Errorf("invalid config: %v", multierror.Wrap(errs...))
-	}
-	return nil
-}
-
-// File returns the config file path.
-func (c *Config) File() string { return c.viper.GetString(configFile) }
 
 func (c *Config) addFlags() {
 	c.flags.String(configFile, filepath.Join(os.Getenv("PROGRAMFILES"), "fibratus", "config", "fibratus.yml"), "Indicates the location of the configuration file")

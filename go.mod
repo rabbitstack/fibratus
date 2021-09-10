@@ -4,6 +4,7 @@ require (
 	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/Microsoft/go-winio v0.4.14
 	github.com/briandowns/spinner v1.12.0
+	github.com/cilium/ebpf v0.6.2 // indirect
 	github.com/dustin/go-humanize v1.0.0
 	github.com/hashicorp/go-version v1.2.1
 	github.com/hillu/go-yara/v4 v4.0.6
@@ -26,7 +27,7 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0
 	github.com/valyala/gozstd v1.11.0
 	github.com/xeipuuv/gojsonschema v1.2.0
-	golang.org/x/sys v0.0.0-20190507160741-ecd444e8653b
+	golang.org/x/sys v0.0.0-20210124154548-22da62e12c0c
 	golang.org/x/text v0.3.5
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df

@@ -18,9 +18,6 @@
 
 package section
 
-// Type describes the type of a section
-type Type uint8
-
 const (
 	// Process is the process header type
 	Process Type = iota + 1

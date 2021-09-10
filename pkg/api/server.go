@@ -20,17 +20,18 @@ package api
 
 import (
 	"expvar"
-	"github.com/rabbitstack/fibratus/pkg/api/handler"
-	"github.com/rabbitstack/fibratus/pkg/config"
-	log "github.com/sirupsen/logrus"
 	"net"
 	"net/http"
 	"net/http/pprof"
 	"runtime/debug"
 	"strings"
+
+	"github.com/rabbitstack/fibratus/pkg/api/handler"
+	"github.com/rabbitstack/fibratus/pkg/config"
+	log "github.com/sirupsen/logrus"
 )
 
-func setupServer(lis net.Listener, c *config.Config) {
+func setupAndListen(lis net.Listener, c *config.Config) {
 	mux := http.NewServeMux()
 	mux.Handle("/config", handler.Config(c))
 	mux.Handle("/debug/vars", expvar.Handler())
@@ -53,4 +54,12 @@ func setupServer(lis net.Listener, c *config.Config) {
 			log.Errorf("unable to bind the API server: %v", err)
 		}
 	}()
+}
+
+// CloseServer shutdowns the server by stopping the listener.
+func CloseServer() error {
+	if listener != nil {
+		return listener.Close()
+	}
+	return nil
 }

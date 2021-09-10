@@ -30,12 +30,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var replayCmd = &cobra.Command{
-	Use:   "replay",
-	Short: "Replay kernel event flow from the kcap file",
-	RunE:  replay,
-}
-
 var (
 	// replay command config
 	replayConfig = config.NewWithOpts(config.WithReplay())
@@ -47,7 +41,7 @@ func init() {
 
 func replay(cmd *cobra.Command, args []string) error {
 	// initialize config and logger
-	if err := common.Init(replayConfig, false); err != nil {
+	if err := common.SetupConfigAndLogger(replayConfig); err != nil {
 		return err
 	}
 
@@ -133,9 +127,6 @@ func replay(cmd *cobra.Command, args []string) error {
 			return err
 		}
 	}
-	if err := api.CloseServer(); err != nil {
-		return err
-	}
 
-	return nil
+	return api.CloseServer()
 }

@@ -20,13 +20,13 @@ package kevent
 
 import (
 	"fmt"
-	kcapver "github.com/rabbitstack/fibratus/pkg/kcap/version"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
-	"github.com/rabbitstack/fibratus/pkg/util/hostname"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
+	"github.com/rabbitstack/fibratus/pkg/util/hostname"
 )
 
 // pool is used to alleviate the pressure on the heap allocator
@@ -97,7 +97,7 @@ func (kevt *Kevent) String() string {
 		Timestamp: %s,
 		Kparams: %s,
 		Metadata: %s,
-	    %s
+	    %#v
 	`,
 			kevt.Seq,
 			kevt.PID,
@@ -171,18 +171,6 @@ func Empty() *Kevent {
 		Metadata: make(map[string]string),
 		PS:       &pstypes.PS{},
 	}
-}
-
-// NewFromKcap recovers the kernel event instance from the kcapture byte buffer.
-func NewFromKcap(buf []byte) (*Kevent, error) {
-	kevt := &Kevent{
-		Kparams:  make(Kparams),
-		Metadata: make(map[string]string),
-	}
-	if err := kevt.UnmarshalRaw(buf, kcapver.KevtSecV1); err != nil {
-		return nil, err
-	}
-	return kevt, nil
 }
 
 // AddMeta appends a key/value pair to event's metadata.

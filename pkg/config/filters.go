@@ -22,12 +22,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/filter/funcmap"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-	"github.com/rabbitstack/fibratus/pkg/util/multierror"
-	"github.com/spf13/viper"
-	"gopkg.in/yaml.v3"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -36,6 +30,13 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+
+	"github.com/rabbitstack/fibratus/pkg/filter/funcmap"
+	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/util/multierror"
+	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 )
 
 // FilterGroupPolicy is the type alias for the filter group policy
@@ -446,3 +447,48 @@ func encodeFilterActions(buf []byte) ([]byte, error) {
 	}
 	return b, nil
 }
+
+var filterGroupSchema = `	
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+
+	"type": "object",
+	"properties": {
+		"group": {"type": "string", "minLength": 1},
+		"selector": {
+			"type": "object",
+			"properties": {
+				"type":		{"type": "string", "enum": ["CreateProcess", "CreateThread", "TerminateProcess", "TerminateThread", "LoadImage", "UnloadImage", "CreateFile", "CloseFile", "ReadFile", "WriteFile", "DeleteFile", "RenameFile", "SetFileInformation", "EnumDirectory", "RegCreateKey", "RegOpenKey", "RegSetValue", "RegQueryValue", "RegQueryKey", "RegDeleteKey", "RegDeleteValue", "Accept", "Send", "Recv", "Connect", "Disconnect", "Reconnect", "Retransmit", "CreateHandle", "CloseHandle"]},
+				"category": {"type": "string", "enum": ["registry", "file", "net", "process", "thread", "image", "handle"]}
+			},
+			"additionalProperties": false,
+			"oneOf": [
+				{"required": ["type"]},
+				{"required": ["category"]}
+			]
+		},
+		"enabled":  	{"type": "boolean"},
+		"policy":   	{"type": "string", "enum": ["include", "exclude", "INCLUDE", "EXCLUDE"]},
+		"relation": 	{"type": "string", "enum": ["or", "and", "OR", "AND"]},
+		"tags":			{"type": "array", "items": [{"type": "string", "minLength": 1}]},
+		"from-strings": {
+			"type": "array",
+			"items": 
+				{
+					"type": "object",
+					"properties": {
+						"name": 	{"type": "string", "minLength": 3},
+						"def": 		{"type": "string", "minLength": 3},
+						"action": 	{"type": "string"}
+					},
+					"required": ["name", "def"],
+					"minItems": 1,
+					"additionalProperties": false
+				}
+			
+		}
+	},
+	"required": ["group", "enabled", "selector", "from-strings"],
+	"additionalProperties": false
+}
+`

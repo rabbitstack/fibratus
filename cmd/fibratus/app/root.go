@@ -20,8 +20,9 @@ package app
 
 import (
 	"errors"
-	"github.com/spf13/cobra"
 	"runtime"
+
+	"github.com/spf13/cobra"
 )
 
 // RootCmd is the entrance to Fibratus CLI
@@ -29,19 +30,19 @@ var RootCmd = &cobra.Command{
 	Use:   "fibratus",
 	Short: "Modern tool for the kernel observability and exploration",
 	Long: `
-	Fibratus is a tool for exploration and tracing of the Windows kernel. 
+	Fibratus is a tool for exploration and tracing of the Windows and Linux kernels. 
 	It lets you trap system-wide events such as process life-cycle, file system I/O, 
-	registry modifications or network requests among many other observability signals. 
-	In a nutshell, Fibratus allows for gaining deep operational visibility into the Windows 
-	kernel but also processes running on top of it.
+	or network requests among many other observability signals. 
+	In a nutshell, Fibratus allows for gaining deep operational visibility into the kernel 
+	but also processes running on top of it.
 	`,
 	SilenceUsage: true,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		if runtime.GOOS != "windows" {
-			return errors.New("fibratus can only be run on Windows operating systems")
+		if runtime.GOOS != "windows" && runtime.GOOS != "linux" {
+			return errors.New("fibratus can only be run on Windows and Linux operating systems")
 		}
 		if runtime.GOARCH == "386" {
-			return errors.New("fibratus can't be run on 32-bits Windows operating systems")
+			return errors.New("fibratus can't be run on 32-bits operating systems")
 		}
 		return nil
 	},

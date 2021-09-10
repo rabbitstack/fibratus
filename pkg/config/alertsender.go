@@ -33,7 +33,7 @@ var errAlertsenderConfig = func(sender string, err error) error {
 	return fmt.Errorf("%s alert sender invalid config: %v", sender, err)
 }
 
-func (c *Config) tryLoadAlertSenders() error {
+func (c *BaseConfig) tryLoadAlertSenders() error {
 	configs := make([]alertsender.Config, 0)
 	alertsenders := c.viper.AllSettings()["alertsenders"]
 	if alertsenders == nil {

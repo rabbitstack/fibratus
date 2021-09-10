@@ -28,9 +28,6 @@ import (
 // contains the indexed field name. Next is the indexed key and, finally the segment.
 var pathRegexp = regexp.MustCompile(`(pe.sections|pe.resources|ps.envs|ps.modules|ps.ancestor)\[(.+\s*)].?(.*)`)
 
-// Field represents the type alias for the field
-type Field string
-
 const (
 	// PsPid represents the process id field
 	PsPid Field = "ps.pid"
@@ -123,51 +120,6 @@ const (
 	// PeResources represents PE resources
 	PeResources Field = "pe.resources"
 
-	// KevtSeq is the event sequence number
-	KevtSeq Field = "kevt.seq"
-	// KevtPID is the process identifier that generated the event
-	KevtPID Field = "kevt.pid"
-	// KevtTID is the thread identifier that generated the event
-	KevtTID Field = "kevt.tid"
-	// KevtCPU is the CPU core where the event was generated
-	KevtCPU Field = "kevt.cpu"
-	// KevtDesc represents the event description
-	KevtDesc Field = "kevt.desc"
-	// KevtHost represents the host where the event was produced
-	KevtHost Field = "kevt.host"
-	// KevtTime is the event time
-	KevtTime Field = "kevt.time"
-	// KevtTimeHour is the hour part of the event time
-	KevtTimeHour Field = "kevt.time.h"
-	// KevtTimeMin is the minute part of the event time
-	KevtTimeMin Field = "kevt.time.m"
-	// KevtTimeSec is the second part of the event time
-	KevtTimeSec Field = "kevt.time.s"
-	// KevtTimeNs is the nanosecond part of the event time
-	KevtTimeNs Field = "kevt.time.ns"
-	// KevtDate is the event date
-	KevtDate Field = "kevt.date"
-	// KevtDateDay is the day of event date
-	KevtDateDay Field = "kevt.date.d"
-	// KevtDateMonth is the month of event date
-	KevtDateMonth Field = "kevt.date.m"
-	// KevtDateYear is the year of event date
-	KevtDateYear Field = "kevt.date.y"
-	// KevtDateTz is the time zone of event timestamp
-	KevtDateTz Field = "kevt.date.tz"
-	// KevtDateWeek is the event week number
-	KevtDateWeek Field = "kevt.date.week"
-	// KevtDateWeekday is the event week day
-	KevtDateWeekday Field = "kevt.date.weekday"
-	// KevtName is the event name
-	KevtName Field = "kevt.name"
-	// KevtCategory is the event category
-	KevtCategory Field = "kevt.category"
-	// KevtMeta is the event metadata
-	KevtMeta Field = "kevt.meta"
-	// KevtNparams is the number of event parameters
-	KevtNparams Field = "kevt.nparams"
-
 	// HandleID represents the handle identifier within the process address space
 	HandleID Field = "handle.id"
 	// HandleObject represents the handle object address
@@ -242,9 +194,6 @@ const (
 	// None represents the unknown field
 	None Field = ""
 )
-
-// String casts the field type to string.
-func (f Field) String() string { return string(f) }
 
 // Segment represents the type alias for the segment. Segment
 // denotes the location of the value within an indexed field.

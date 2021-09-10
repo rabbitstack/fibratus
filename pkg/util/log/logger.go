@@ -22,12 +22,14 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/util/log/rotate"
-	fs "github.com/rifflock/lfshook"
-	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
+
+	"github.com/rabbitstack/fibratus/pkg/util/log/rotate"
+	fs "github.com/rifflock/lfshook"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -39,10 +41,14 @@ var (
 func InitFromConfig(c Config) error {
 	exe, err := os.Executable()
 	var path string
-	if err != nil {
-		path = filepath.Join(os.Getenv("PROGRAMFILES"), "fibratus", "logs")
+	if runtime.GOOS == "windows" {
+		if err != nil {
+			path = filepath.Join(os.Getenv("PROGRAMFILES"), "fibratus", "logs")
+		} else {
+			path = filepath.Join(filepath.Dir(exe), "..", "logs")
+		}
 	} else {
-		path = filepath.Join(filepath.Dir(exe), "..", "logs")
+		path = "/var/run/fibratus/logs"
 	}
 	if c.Path != "" {
 		path = c.Path
@@ -68,7 +74,7 @@ func InitFromConfig(c Config) error {
 	case "json":
 		formatter = &logrus.JSONFormatter{}
 	case "text":
-		formatter = &logrus.TextFormatter{}
+		formatter = &logrus.TextFormatter{FullTimestamp: true}
 	default:
 		formatter = &logrus.JSONFormatter{}
 	}

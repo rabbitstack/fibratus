@@ -22,14 +22,8 @@ const (
 	// NTStatus is the parameter that identifies the NTSTATUS value.
 	NTStatus = "status"
 
-	// ProcessID represents the process identifier.
-	ProcessID = "pid"
 	// ProcessObject field represents the address of the process object in the kernel.
 	ProcessObject = "kproc"
-	// ThreadID field represents the thread identifier.
-	ThreadID = "tid"
-	// ProcessParentID field represents the parent process identifier.
-	ProcessParentID = "ppid"
 	// SessionID fields represents the session identifier.
 	SessionID = "session_id"
 	// UserSID field is the security identifier associated to the process token under which it is run.

@@ -298,17 +298,6 @@ func (k Ktype) Dropped(capture bool) bool {
 	}
 }
 
-// UnmarshalYAML converts the ktype name to ktype array type.
-func (k *Ktype) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	var ktyp string
-	err := unmarshal(&ktyp)
-	if err != nil {
-		return err
-	}
-	*k = KeventNameToKtype(ktyp)
-	return nil
-}
-
 // Pack transforms event provider GUID and the op code into `Ktype` type. The type provides a convenient way
 // to compare different kernel event types.
 func Pack(g syscall.GUID, opcode uint8) Ktype {

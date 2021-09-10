@@ -29,6 +29,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	"github.com/rabbitstack/fibratus/pkg/kstream"
 	"github.com/rabbitstack/fibratus/pkg/ps"
+	"github.com/rabbitstack/fibratus/pkg/syscall/security"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -67,8 +68,13 @@ func init() {
 
 func run(cmd *cobra.Command, args []string) error {
 	// initialize config and logger
-	if err := common.Init(cfg, true); err != nil {
+	if err := common.SetupConfigAndLogger(cfg); err != nil {
 		return err
+	}
+
+	// inject the debug privilege if enabled
+	if cfg.DebugPrivilege {
+		security.SetDebugPrivilege()
 	}
 
 	// set up the signals
@@ -175,9 +181,6 @@ func run(cmd *cobra.Command, args []string) error {
 	if err := handle.CloseTimeout(); err != nil {
 		return err
 	}
-	if err := api.CloseServer(); err != nil {
-		return err
-	}
 
-	return nil
+	return api.CloseServer()
 }

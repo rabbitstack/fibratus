@@ -21,12 +21,9 @@ package api
 import (
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/config"
-	"net"
 	"os/user"
 	"strings"
 )
-
-var listener net.Listener
 
 // StartServer starts the HTTP server with the specified configuration.
 func StartServer(c *config.Config) error {
@@ -54,15 +51,7 @@ func StartServer(c *config.Config) error {
 		return err
 	}
 
-	setupServer(listener, c)
+	setupAndListen(listener, c)
 
-	return nil
-}
-
-// CloseServer shutdowns the server by stopping the listener.
-func CloseServer() error {
-	if listener != nil {
-		return listener.Close()
-	}
 	return nil
 }

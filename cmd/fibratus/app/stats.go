@@ -20,14 +20,15 @@ package app
 
 import (
 	"encoding/json"
+	"os"
+	"reflect"
+
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/rabbitstack/fibratus/cmd/fibratus/common"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/util/rest"
 	"github.com/spf13/cobra"
-	"os"
-	"reflect"
 )
 
 var statsCmd = &cobra.Command{
@@ -114,7 +115,7 @@ type Stats struct {
 }
 
 func stats(cmd *cobra.Command, args []string) error {
-	if err := common.Init(statsConfig, false); err != nil {
+	if err := common.SetupConfigAndLogger(statsConfig); err != nil {
 		return err
 	}
 

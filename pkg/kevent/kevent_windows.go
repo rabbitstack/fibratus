@@ -18,7 +18,22 @@
 
 package kevent
 
-import "github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+import (
+	kcapver "github.com/rabbitstack/fibratus/pkg/kcap/version"
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+)
+
+// NewFromKcap recovers the kernel event instance from the kcapture byte buffer.
+func NewFromKcap(buf []byte) (*Kevent, error) {
+	kevt := &Kevent{
+		Kparams:  make(Kparams),
+		Metadata: make(map[string]string),
+	}
+	if err := kevt.UnmarshalRaw(buf, kcapver.KevtSecV1); err != nil {
+		return nil, err
+	}
+	return kevt, nil
+}
 
 // IsNetworkTCP determines whether the kevent pertains to network TCP events.
 func (kevt Kevent) IsNetworkTCP() bool {

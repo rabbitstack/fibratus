@@ -20,9 +20,13 @@ package section
 
 import (
 	"fmt"
+
 	kcapver "github.com/rabbitstack/fibratus/pkg/kcap/version"
 	"github.com/rabbitstack/fibratus/pkg/util/bytes"
 )
+
+// Type describes the type of a section
+type Type uint8
 
 // Section represents the header describing the type, length and the version of each section.
 type Section [10]byte

@@ -27,6 +27,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kcap"
 	"github.com/rabbitstack/fibratus/pkg/kstream"
 	"github.com/rabbitstack/fibratus/pkg/ps"
+	"github.com/rabbitstack/fibratus/pkg/syscall/security"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"github.com/rabbitstack/fibratus/pkg/util/spinner"
 	log "github.com/sirupsen/logrus"
@@ -51,8 +52,13 @@ func init() {
 
 func capture(cmd *cobra.Command, args []string) error {
 	// initialize config and logger
-	if err := common.Init(captureConfig, true); err != nil {
+	if err := common.SetupConfigAndLogger(captureConfig); err != nil {
 		return err
+	}
+
+	// inject the debug privilege if enabled
+	if captureConfig.DebugPrivilege {
+		security.SetDebugPrivilege()
 	}
 
 	// set up the signals
@@ -131,9 +137,6 @@ func capture(cmd *cobra.Command, args []string) error {
 	if err := writer.Close(); err != nil {
 		return err
 	}
-	if err := api.CloseServer(); err != nil {
-		return err
-	}
 
-	return nil
+	return api.CloseServer()
 }

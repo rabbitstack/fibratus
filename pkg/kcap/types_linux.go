@@ -18,6 +18,13 @@
 
 package kcap
 
+import (
+	"context"
+
+	"github.com/rabbitstack/fibratus/pkg/filter"
+	"github.com/rabbitstack/fibratus/pkg/kevent"
+)
+
 type Writer interface {
 	// Write accepts two channels. The event channel receives events pushed by the kstream consumer. When the event
 	// is peeked from the channel, it is serialized and written to the underlying byte buffer.

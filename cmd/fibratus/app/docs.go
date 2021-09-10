@@ -19,14 +19,20 @@
 package app
 
 import (
-	"github.com/spf13/cobra"
 	"os/exec"
+	"runtime"
+
+	"github.com/spf13/cobra"
 )
 
 var docsCmd = &cobra.Command{
 	Use:   "docs",
 	Short: "Open Fibratus docs in the web browser",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return exec.Command("rundll32", "url.dll,FileProtocolHandler", "https://www.fibratus.io").Start()
+		if runtime.GOOS == "windows" {
+			return exec.Command("rundll32", "url.dll,FileProtocolHandler", "https://www.fibratus.io").Start()
+		} else {
+			return exec.Command("xdg-open", "https://www.fibratus.io").Start()
+		}
 	},
 }

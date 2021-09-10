@@ -18,8 +18,6 @@
 
 package ktypes
 
-import "sort"
-
 // KeventInfo describes the kernel event meta info such as human readable name, category
 // and event's description.
 type KeventInfo struct {
@@ -128,22 +126,4 @@ func KtypeToKeventInfo(ktype Ktype) KeventInfo {
 		return kinfo
 	}
 	return KeventInfo{Name: "N/A", Category: Unknown}
-}
-
-// KeventNameToKtype converts a human-readable kernel event name to its internal kernel type representation.
-func KeventNameToKtype(name string) Ktype {
-	if ktype, ok := ktypes[name]; ok {
-		return ktype
-	}
-	return UnknownKtype
-}
-
-// GetKtypesMeta returns kernel event types metadata.
-func GetKtypesMeta() []KeventInfo {
-	ktypes := make([]KeventInfo, 0, len(kevents))
-	for _, ktyp := range kevents {
-		ktypes = append(ktypes, ktyp)
-	}
-	sort.Slice(ktypes, func(i, j int) bool { return ktypes[i].Category < ktypes[j].Category })
-	return ktypes
 }

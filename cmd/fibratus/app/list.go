@@ -21,16 +21,17 @@ package app
 import (
 	"bufio"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/rabbitstack/fibratus/cmd/fibratus/common"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/spf13/cobra"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"strings"
 )
 
 var listCmd = &cobra.Command{
@@ -70,7 +71,7 @@ func init() {
 
 // listFilaments renders a table with all available filaments.
 func listFilaments(cmd *cobra.Command, args []string) error {
-	if err := common.Init(listConfig, false); err != nil {
+	if err := common.SetupConfigAndLogger(listConfig); err != nil {
 		return err
 	}
 

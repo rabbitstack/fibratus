@@ -20,85 +20,8 @@ package funcmap
 
 import (
 	"fmt"
-	"github.com/Masterminds/sprig/v3"
-	"github.com/rabbitstack/fibratus/pkg/alertsender"
-	log "github.com/sirupsen/logrus"
-	"strings"
 	"syscall"
-	"text/template"
 )
-
-// New returns the template func map
-// populated with some useful template functions
-// that can be used in filter actions. Some functions
-// are late-bound, so we merely provide a declaration.
-// The real function is attached when the filter action
-// is triggered.
-func New() template.FuncMap {
-	f := sprig.TxtFuncMap()
-
-	extra := template.FuncMap{
-		// This is a placeholder for the functions that might be
-		// late-bound to a template. By declaring them here, we
-		// can still execute the template associated with the
-		// filter action to ensure template syntax is correct
-		"emit": func(title string, text string, args ...string) string { return "" },
-		"kill": func(pid uint32) string { return "" },
-		"stringify": func(in []interface{}) string {
-			values := make([]string, 0)
-			for _, e := range in {
-				s, ok := e.(string)
-				if !ok {
-					continue
-				}
-				values = append(values, fmt.Sprintf("'%s'", s))
-			}
-			return fmt.Sprintf("(%s)", strings.Join(values, ", "))
-		},
-	}
-
-	for k, v := range extra {
-		f[k] = v
-	}
-
-	return f
-}
-
-// InitFuncs assigns late-bound functions to the func map.
-func InitFuncs(funcMap template.FuncMap) {
-	funcMap["emit"] = emit
-	funcMap["kill"] = kill
-}
-
-// emit sends an alert via all configured alert senders.
-func emit(title string, text string, args ...string) string {
-	senders := alertsender.FindAll()
-	if len(senders) == 0 {
-		return "no alertsenders registered. Alert won't be sent"
-	}
-
-	severity := "normal"
-	tags := make([]string, 0)
-	if len(args) > 0 {
-		severity = args[0]
-	}
-	if len(args) > 1 {
-		tags = args[1:]
-	}
-
-	for _, s := range senders {
-		alert := alertsender.NewAlert(
-			title,
-			text,
-			tags,
-			alertsender.ParseSeverityFromString(severity),
-		)
-		if err := s.Send(alert); err != nil {
-			log.Warnf("unable to emit alert from rule: %v", err)
-		}
-	}
-	return ""
-}
 
 // kill terminates a process with specified pid.
 func kill(pid uint32) string {

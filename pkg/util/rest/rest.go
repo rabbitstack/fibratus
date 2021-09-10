@@ -21,9 +21,7 @@ package rest
 import (
 	"context"
 	"errors"
-	"github.com/rabbitstack/fibratus/pkg/api"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"path"
 	"strings"
@@ -41,22 +39,6 @@ type opts struct {
 
 // Option represents the option for the HTTP client.
 type Option func(o *opts)
-
-// WithTransport sets the preferred transport for the HTTP client.
-func WithTransport(addr string) Option {
-	return func(o *opts) {
-		o.addr = addr
-		if strings.HasPrefix(addr, `npipe:///`) {
-			transport = &http.Transport{
-				DialContext: api.DialPipe(addr),
-			}
-		} else {
-			transport = &http.Transport{
-				DialContext: (&net.Dialer{}).DialContext,
-			}
-		}
-	}
-}
 
 // WithURI initializes the URI where the request is sent.
 func WithURI(uri string) Option {
