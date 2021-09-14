@@ -83,7 +83,20 @@ func (c *Config) Init() error {
 	kevent.SerializePE = c.viper.GetBool(serializePE)
 	kevent.SerializeEnvs = c.viper.GetBool(serializeEnvs)
 
-	return c.init()
+	if err := c.init(); err != nil {
+		return err
+	}
+
+	// if it is not an interactive session but the console output is enabled
+	// we default to null output and warn about that
+	if isWindowsService() && c.Output.Output != nil {
+		if c.Output.Type == outputs.Console {
+			log.Warn("running in non-interactive session with console output. " +
+				"Please configure a different output type. Defaulting to null output")
+			c.Output.Type, c.Output.Output = outputs.Null, &null.Config{}
+			return nil
+		}
+	}
 }
 
 func (c *Config) addFlags() {
@@ -129,4 +142,13 @@ func (c *Config) addFlags() {
 		c.flags.Bool(serializeEnvs, true, "Indicates if environment variables are serialized as part of the process state")
 	}
 	c.Log.AddFlags(c.flags)
+}
+
+// isWindowsService returns true if fibratus is running as Windows service.
+func isWindowsService() bool {
+	in, err := svc.IsAnInteractiveSession()
+	if err != nil {
+		return false
+	}
+	return !in
 }

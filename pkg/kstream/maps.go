@@ -43,6 +43,20 @@ const (
 var ebpfMaps = [...]string{
 	"perf",
 	"tracers",
+	"discarders",
+}
+
+type DiscarderKey struct {
+	Comm [16]byte
+}
+
+func (d *DiscarderKey) MarshalBinary() ([]byte, error) {
+	return d.Comm[:], nil
+}
+
+func (d *DiscarderKey) UnmarshalBinary(buf []byte) error {
+	copy(d.Comm[:], buf)
+	return nil
 }
 
 func (m MapType) String() string {
@@ -51,6 +65,8 @@ func (m MapType) String() string {
 		return "perf"
 	case Tracers:
 		return "tracers"
+	case Discarders:
+		return "discarders"
 	}
 	return ""
 }
@@ -72,4 +88,10 @@ func (maps Maps) GetMap(m MapType) *ebpf.Map {
 
 func (maps Maps) Put(m MapType, key, value interface{}) error {
 	return maps[m.String()].Put(key, value)
+}
+
+func NewDiscarderKey(proc string) *DiscarderKey {
+	var comm [16]byte
+	copy(comm[:], proc)
+	return &DiscarderKey{comm}
 }

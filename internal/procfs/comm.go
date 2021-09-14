@@ -16,6 +16,18 @@
  * limitations under the License.
  */
 
-package service
+package procfs
 
-func IsInteractive() bool { return true }
+import (
+	"io/ioutil"
+	"strings"
+)
+
+// SelfComm returns the process image name of the current process.
+func SelfComm() string {
+	comm, err := ioutil.ReadFile("/proc/self/comm")
+	if err != nil {
+		return "fibratus"
+	}
+	return strings.TrimSpace(string(comm))
+}

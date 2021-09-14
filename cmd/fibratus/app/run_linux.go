@@ -71,7 +71,7 @@ func run(cmd *cobra.Command, args []string) error {
 	// try to load the kprobe by reading the embedded
 	// bytecode and parsing all of the ELF objects that
 	// build up the kprobe program
-	kstreamc, err := kstream.NewConsumer()
+	kstreamc, err := kstream.NewConsumer(cfg)
 	if err != nil {
 		return err
 	}

@@ -16,31 +16,18 @@
  * limitations under the License.
  */
 
-package config
+package procfs
 
 import "os"
 
-type Config struct {
-	BaseConfig
-}
-
-func NewWithOpts(options ...Option) *Config {
-	config := newWithOpts(options...)
-
-	config.addCommonFlags()
-	config.addFlags()
-
-	return config
-}
-
-func (c *Config) Init() error {
-	return c.init()
-}
-
-func (c *Config) addFlags() {
-	c.flags.String(configFile, "/etc/fibratus/fibratus.yml", "Indicates the location of the configuration file")
-	if c.opts.run || c.opts.capture {
-		c.flags.Int(watermark, 128, "")
-		c.flags.Int(ringBufferSize, 8*os.Getpagesize(), "")
+// Path returns the path to the procfs. In container envs this path
+// is overridden and points to the bind-mount location as specified
+// when deploying the container. This function attempts to get the
+// procfs location from the `PROCFS` environment variable and fallbacks
+// to `/proc` if the env variable is not defined.
+func Path() string {
+	if path := os.Getenv("PROCFS"); path != "" {
+		return path
 	}
+	return "/proc"
 }

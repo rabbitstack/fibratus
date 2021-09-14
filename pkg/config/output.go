@@ -29,7 +29,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/outputs/console"
 	"github.com/rabbitstack/fibratus/pkg/outputs/elasticsearch"
 	"github.com/rabbitstack/fibratus/pkg/outputs/null"
-	"github.com/rabbitstack/fibratus/pkg/util/service"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -102,17 +101,6 @@ func (c *BaseConfig) tryLoadOutput() error {
 				continue
 			}
 			c.Output.Type, c.Output.Output = outputs.Elasticsearch, esConfig
-		}
-	}
-
-	// if it is not an interactive session but the console output is enabled
-	// we default to null output and warn about that
-	if !service.IsInteractive() && c.Output.Output != nil {
-		if c.Output.Type == outputs.Console {
-			log.Warn("running in non-interactive session with console output. " +
-				"Please configure a different output type. Defaulting to null output")
-			c.Output.Type, c.Output.Output = outputs.Null, &null.Config{}
-			return nil
 		}
 	}
 

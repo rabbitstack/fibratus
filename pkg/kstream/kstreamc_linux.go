@@ -24,7 +24,6 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -33,6 +32,7 @@ import (
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/perf"
 
+	"github.com/rabbitstack/fibratus/internal/procfs"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/filter"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
@@ -57,6 +57,8 @@ var (
 	errKprobeNotEmbedded = errors.New("kprobe object file was not embedded or couldn't be read")
 	// lostPerfEvents computes lost event samples per CPU
 	lostPerfEvents = expvar.NewMap("kevent.lost.perf.events")
+
+	discarderFailedInsertions = expvar.NewMap("kstream.discarders.failed.insertions")
 )
 
 type kstreamConsumer struct {
@@ -142,9 +144,16 @@ func NewConsumer(config *config.Config) (Consumer, error) {
 		}
 	}
 
-	// populate discarders map
-	for _, proc := range config.Kstream.BlacklistImages {
-		
+	// populate discarders map with process image names.
+	// Any event that is originated by the process image
+	// present in the discarders map is dropped in the raw
+	// syscall tracepoint hook
+	comms := append(config.Kstream.BlacklistImages, procfs.SelfComm())
+	for _, comm := range comms {
+		key := NewDiscarderKey(comm)
+		if err := maps.Put(Discarders, key, key); err != nil {
+			discarderFailedInsertions.Add(err.Error(), 1)
+		}
 	}
 
 	kconsumer := &kstreamConsumer{
@@ -163,12 +172,17 @@ func NewConsumer(config *config.Config) (Consumer, error) {
 // intercepting all syscall exit events and polls the perf ring buffer
 // for incoming events.
 func (k *kstreamConsumer) OpenKstream() error {
+	watermark := k.config.Kstream.Watermark
+	perCPUBuffer := k.config.Kstream.RingBufferSize
+	if watermark > perCPUBuffer {
+		watermark = perCPUBuffer / 2
+	}
 	var err error
 	readerOpts := perf.ReaderOptions{
-		Watermark: 128,
+		Watermark: watermark,
 	}
 	perfMap := k.maps.GetMap(Perf)
-	k.perfReader, err = perf.NewReaderWithOptions(perfMap, 8*os.Getpagesize(), readerOpts)
+	k.perfReader, err = perf.NewReaderWithOptions(perfMap, perCPUBuffer, readerOpts)
 	if err != nil {
 		return err
 	}

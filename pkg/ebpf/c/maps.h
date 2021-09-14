@@ -37,10 +37,10 @@ struct bpf_map_def SEC("maps/tracers") tracers = {
         .max_entries = sizeof(u16),
 };
 
-struct bpf_map_def SEC("maps/pid_discarders") pid_discarders = {
+struct bpf_map_def SEC("maps/discarders") discarders = {
         .type = BPF_MAP_TYPE_LRU_HASH,
-        .key_size = sizeof(u32),
-        .value_size = sizeof(u32),
+        .key_size = sizeof(struct discarder_key),
+        .value_size = sizeof(struct discarder_key),
         .max_entries = 32000,
 };
 

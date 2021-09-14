@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 by Nedim Sabic Sabic
+ * Copyright 2020-2021 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -16,14 +16,6 @@
  * limitations under the License.
  */
 
-package service
-
-import "golang.org/x/sys/windows/svc"
-
-func IsInteractive() bool {
-	in, err := svc.IsAnInteractiveSession()
-	if err != nil || !in {
-		return false
-	}
-	return in
-}
+ struct discarder_key {
+     char comm[TASK_COMM_LEN];
+ };

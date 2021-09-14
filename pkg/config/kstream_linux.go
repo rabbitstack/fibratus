@@ -20,11 +20,16 @@ package config
 
 import "github.com/spf13/viper"
 
+const (
+	watermark      = "kstream.watermark"
+	ringBufferSize = "kstream.ring-buffer-size"
+)
+
 type KstreamConfig struct {
-	RingBufferSize        int `json:"ring-buffer-size" yaml:"ring-buffer-size"`
-	Watermark             int `json:"watermark" yaml:"watermark"`
-	VerifierLogsize       int
-	EnableVerifierLogging bool
+	RingBufferSize        int  `json:"ring-buffer-size" yaml:"ring-buffer-size"`
+	Watermark             int  `json:"watermark" yaml:"watermark"`
+	VerifierLogsize       int  `json:"verifier-log-size" yaml:"verifier-log-size"`
+	EnableVerifierLogging bool `json:"enable-verifier-logging" yaml:"enable-verifier-logging"`
 	// BlacklistKevents are kernel event names that will be dropped from the kernel event stream.
 	BlacklistKevents []string `json:"blacklist.events" yaml:"blacklist.events"`
 	// BlacklistImages are process image names that will be rejected if they generate a kernel event.
@@ -32,5 +37,6 @@ type KstreamConfig struct {
 }
 
 func (k *KstreamConfig) initFromViper(v *viper.Viper) {
-
+	k.RingBufferSize = v.GetInt(ringBufferSize)
+	k.Watermark = v.GetInt(watermark)
 }

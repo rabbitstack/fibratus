@@ -46,6 +46,7 @@
 
 #include "bpf/api.h"
 #include "kevent.h"
+#include "types.h"
 #include "maps.h"
 #include "syscall.h"
 
@@ -59,8 +60,10 @@ void tail_call(struct sys_exit_args *ctx, long syscall_id) {
     bpf_tail_call(ctx, &tracers, syscall_id);
 }
 
-bool __attribute__((always_inline)) discard_pid(struct kevent_header *khdr) {
-    return bpf_map_lookup_elem(&pid_discarders, &khdr->pid) != NULL;
+bool __attribute__((always_inline)) discard_kevent() {
+    struct discarder_key key;
+    bpf_get_current_comm(&key.comm, sizeof(key.comm));
+    return bpf_map_lookup_elem(&discarders, &key) != NULL;
 }
 
 SEC("raw_tracepoint/sys_exit")
@@ -75,6 +78,10 @@ int sys_exit_tracepoint(struct sys_exit_args *ctx) {
 
 SEC("raw_tracepoint/sys_read")
 int sys_read(struct sys_exit_args *ctx) {
+    if (discard_kevent()) {
+        return 0;
+    }
+
     int offset = sizeof(struct kevent_header);
     u32 cpu = bpf_get_smp_processor_id();
 
@@ -95,10 +102,6 @@ int sys_read(struct sys_exit_args *ctx) {
     khdr->tid = pid_tgid & 0xffffffff;
     khdr->cpu = cpu;
     khdr->type = id;
-
-    if (discard_pid(khdr)) {
-        return 0;
-    }
 
     int res = bpf_perf_event_output(ctx,
                          &perf,
