@@ -19,9 +19,10 @@
 package fields
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"regexp"
 	"strings"
+
+	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 )
 
 // pathRegexp splits the provided path into different components. The first capture
@@ -122,6 +123,20 @@ const (
 	PeEntrypoint Field = "pe.address.entrypoint"
 	// PeResources represents PE resources
 	PeResources Field = "pe.resources"
+	// PeCompany represents the company name resource
+	PeCompany Field = "pe.company"
+	// PeDescription represents the internal description of the file
+	PeDescription Field = "pe.description"
+	// PeFileVersion represents the internal file version
+	PeFileVersion Field = "pe.file.version"
+	// PeFileName represents the original file name provided at compile-time.
+	PeFileName Field = "pe.file.name"
+	// PeCopyright represents the copyright notice emitted at compile-time
+	PeCopyright Field = "pe.copyright"
+	// PeProduct represents the product name provided at compile-time
+	PeProduct Field = "pe.product"
+	// PeProductVersion represents the internal product version provided at compile-time
+	PeProductVersion Field = "pe.product.version"
 
 	// KevtSeq is the event sequence number
 	KevtSeq Field = "kevt.seq"
@@ -390,14 +405,21 @@ var fields = map[Field]FieldInfo{
 	HandleName:   {HandleName, "handle name", kparams.UnicodeString, []string{"handle.name = '\\Device\\NamedPipe\\chrome.12644.28.105826381'"}},
 	HandleType:   {HandleType, "handle type", kparams.AnsiString, []string{"handle.type = 'Mutant'"}},
 
-	PeNumSections: {PeNumSections, "number of sections", kparams.Uint16, []string{"pe.nsections < 5"}},
-	PeNumSymbols:  {PeNumSymbols, "number of entries in the symbol table", kparams.Uint32, []string{"pe.nsymbols > 230"}},
-	PeBaseAddress: {PeBaseAddress, "image base address", kparams.HexInt64, []string{"pe.address.base = '140000000'"}},
-	PeEntrypoint:  {PeEntrypoint, "address of the entrypoint function", kparams.HexInt64, []string{"pe.address.entrypoint = '20110'"}},
-	PeSections:    {PeSections, "PE sections", kparams.Object, []string{"pe.sections[.text].entropy > 6.2"}},
-	PeSymbols:     {PeSymbols, "imported symbols", kparams.Slice, []string{"pe.symbols in ('GetTextFaceW', 'GetProcessHeap')"}},
-	PeImports:     {PeImports, "imported dynamic linked libraries", kparams.Slice, []string{"pe.imports in ('msvcrt.dll', 'GDI32.dll'"}},
-	PeResources:   {PeResources, "version and other resources", kparams.Map, []string{"pe.resources[FileDescription] = 'Notepad'"}},
+	PeNumSections:    {PeNumSections, "number of sections", kparams.Uint16, []string{"pe.nsections < 5"}},
+	PeNumSymbols:     {PeNumSymbols, "number of entries in the symbol table", kparams.Uint32, []string{"pe.nsymbols > 230"}},
+	PeBaseAddress:    {PeBaseAddress, "image base address", kparams.HexInt64, []string{"pe.address.base = '140000000'"}},
+	PeEntrypoint:     {PeEntrypoint, "address of the entrypoint function", kparams.HexInt64, []string{"pe.address.entrypoint = '20110'"}},
+	PeSections:       {PeSections, "PE sections", kparams.Object, []string{"pe.sections[.text].entropy > 6.2"}},
+	PeSymbols:        {PeSymbols, "imported symbols", kparams.Slice, []string{"pe.symbols in ('GetTextFaceW', 'GetProcessHeap')"}},
+	PeImports:        {PeImports, "imported dynamic linked libraries", kparams.Slice, []string{"pe.imports in ('msvcrt.dll', 'GDI32.dll'"}},
+	PeResources:      {PeResources, "version and other resources", kparams.Map, []string{"pe.resources[FileDescription] = 'Notepad'"}},
+	PeCompany:        {PeCompany, "internal company name of the file provided at compile-time", kparams.UnicodeString, []string{"pe.company = 'Microsoft Corporation'"}},
+	PeCopyright:      {PeCopyright, "copyright notice for the file emitted at compile-time", kparams.UnicodeString, []string{"pe.copyright = '© Microsoft Corporation'"}},
+	PeDescription:    {PeDescription, "internal description of the file provided compile-time", kparams.UnicodeString, []string{"pe.description = 'Notepad'"}},
+	PeFileName:       {PeFileName, "original file name supplied at compile-time", kparams.UnicodeString, []string{"pe.file.name = 'NOTEPAD.EXE'"}},
+	PeFileVersion:    {PeFileVersion, "file version supplied at compile-time", kparams.UnicodeString, []string{"pe.file.version = '10.0.18362.693 (WinBuild.160101.0800)'"}},
+	PeProduct:        {PeProduct, "internal product name of the file provided at compile-time", kparams.UnicodeString, []string{"pe.product = 'Microsoft® Windows® Operating System'"}},
+	PeProductVersion: {PeProductVersion, "internal product version of the file provided at compile-time", kparams.UnicodeString, []string{"pe.product.version = '10.0.18362.693'"}},
 }
 
 // Lookup finds the field literal in the map. For the nested fields, it checks the pattern matches

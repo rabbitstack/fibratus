@@ -17,3 +17,70 @@
  */
 
 package filter
+
+import (
+	"github.com/rabbitstack/fibratus/pkg/filter/fields"
+	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
+)
+
+// kevtAccessor extracts kernel event specific values.
+type kevtAccessor struct{}
+
+func newKevtAccessor() accessor {
+	return &kevtAccessor{}
+}
+
+const timeFmt = "15:04:05"
+const dateFmt = "2006-01-02"
+
+func (k *kevtAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
+	switch f {
+	case fields.KevtSeq:
+		return kevt.Seq, nil
+	case fields.KevtPID:
+		return kevt.PID, nil
+	case fields.KevtTID:
+		return kevt.Tid, nil
+	case fields.KevtCPU:
+		return kevt.CPU, nil
+	case fields.KevtName:
+		return kevt.Name, nil
+	case fields.KevtCategory:
+		return string(kevt.Category), nil
+	case fields.KevtDesc:
+		return kevt.Description, nil
+	case fields.KevtHost:
+		return kevt.Host, nil
+	case fields.KevtTime:
+		return kevt.Timestamp.Format(timeFmt), nil
+	case fields.KevtTimeHour:
+		return uint8(kevt.Timestamp.Hour()), nil
+	case fields.KevtTimeMin:
+		return uint8(kevt.Timestamp.Minute()), nil
+	case fields.KevtTimeSec:
+		return uint8(kevt.Timestamp.Second()), nil
+	case fields.KevtTimeNs:
+		return kevt.Timestamp.UnixNano(), nil
+	case fields.KevtDate:
+		return kevt.Timestamp.Format(dateFmt), nil
+	case fields.KevtDateDay:
+		return uint8(kevt.Timestamp.Day()), nil
+	case fields.KevtDateMonth:
+		return uint8(kevt.Timestamp.Month()), nil
+	case fields.KevtDateTz:
+		tz, _ := kevt.Timestamp.Zone()
+		return tz, nil
+	case fields.KevtDateYear:
+		return uint32(kevt.Timestamp.Year()), nil
+	case fields.KevtDateWeek:
+		_, week := kevt.Timestamp.ISOWeek()
+		return uint8(week), nil
+	case fields.KevtDateWeekday:
+		return kevt.Timestamp.Weekday().String(), nil
+	case fields.KevtNparams:
+		return uint64(kevt.Kparams.Len()), nil
+	default:
+		return nil, nil
+	}
+}

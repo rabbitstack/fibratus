@@ -46,5 +46,6 @@ func Init(c *config.Config, debugPrivilege bool) error {
 	if err := log.InitFromConfig(c.Log); err != nil {
 		return err
 	}
+
 	return nil
 }
