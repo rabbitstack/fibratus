@@ -5,7 +5,7 @@ We greatly appreciate you have considered contributing to Fibratus! Please, read
 ## Introduction
 
 1. **You're familiar with [Github](https://github.com) and the pull request workflow.**
-2. **Make sure you've read Fibratus' [docs](https://www.fibratus.io).**
+2. **Make sure you've read Fibratus [docs](https://www.fibratus.io).**
 3. If you got an idea about some feature that's not currently in the backlog, please create the [feature request](https://github.com/rabbitstack/fibratus/issues/new) first.
 
 ## Development
@@ -18,7 +18,7 @@ We greatly appreciate you have considered contributing to Fibratus! Please, read
 
 - [`/build/package`](/build/package) - [NSIS](https://nsis.sourceforge.io/Main_Page) script for producing the Windows installer.
 - [`/cmd/fibratus`](/cmd/fibratus) - Contains the entrypoint, CLI command implementations and the resource compiler manifest.
-- [`/config`](/config) - Configuration files in `yml` and `json` format, included in releases.
+- [`/config`](/config) - Configuration files in `yml` and `json` format, included in releases. [Rules](https://www.fibratus.io/#/filters/rules) files are included in the `rules` subdirectory.
 - [`/docs`](/docs) - Markdown files for generating the [documentation](https://www.fibratus.io/) site.
 - [`/filaments`](/filaments) - The collection of [filaments](https://www.fibratus.io/#/filaments/introduction) that are included in releases.
 - [`/pkg`](/pkg) - Fibratus main source.
@@ -27,7 +27,7 @@ We greatly appreciate you have considered contributing to Fibratus! Please, read
 #### Make
 
 Fibratus includes a [`make.bat`](/make.bat) in the root of the repo. The `bat` script mimics the [Makefile](https://www.gnu.org/software/make/manual/html_node/Introduction.html) execution workflow.
-Running `make` will produce the Fibratus binary with all build flags enabled. Refer to the `make.bat` file for a list of available tasks.
+Running `make` will produce the Fibratus binary and place it inside `cmd\fibratus` directory. Refer to the `make.bat` file for a list of available tasks.
 
 #### Code Style
 
