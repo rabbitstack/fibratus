@@ -74,7 +74,7 @@ func NewWithOpts(options ...Option) *Config {
 	return config
 }
 
-// Init setups the configuration state from Viper.
+// Init sets up the configuration state from Viper.
 func (c *Config) Init() error {
 	c.PE.InitFromViper(c.viper)
 
