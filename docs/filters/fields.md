@@ -144,4 +144,12 @@ The following tables summarize available field names that can be used in filter 
 | pe.sections[].md5   | MD5 hash of the specified section | `pe.sections[.text].md5 = '0464997eb36c70083164c666d53c6af3'`   |
 | pe.symbols   | Imported symbols | `pe.symbols in ('GetTextFaceW', 'GetProcessHeap')`   |
 | pe.imports   | Imported dynamic linked libraries | `pe.imports in ('msvcrt.dll', 'GDI32.dll')`   |
-| pe.resources   | Version and other PE resources | `pe.resources[FileDescription] = 'Notepad'`   |
+| pe.resources  | Version and other PE resources | `pe.resources[FileDescription] = 'Notepad'`   |
+| pe.company   | Internal company name of the file provided at compile-time | `pe.company = 'Microsoft Corporation'`  |
+| pe.copyright | Copyright notice for the file emitted at compile-time | `pe.company = '© Microsoft Corporation'`  |
+| pe.description   | Internal description of the file provided at compile-time | `pe.description = 'Notepad'`   |
+| pe.file.name   | Original file name supplied at compile-time | `pe.file.name = 'NOTEPAD.EXE'`   |
+| pe.file.version   | File version supplied at compile-time | `pe.file.version = '10.0.18362.693 (WinBuild.160101.0800)'`   |
+| pe.product   | Internal product name of the file provided at compile-time | `pe.product = 'Microsoft® Windows® Operating System'`   |
+| pe.product.name   | Internal product version of the file provided at compile-time | `pe.product.version = '10.0.18362.693'`   |
+

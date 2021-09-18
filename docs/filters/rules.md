@@ -146,3 +146,8 @@ Each time we detect a thread creation event happening in a remote process the `a
     - `.Group.Tags` fetches group tags
 
 We have used the `cat` function to concatenate string literals with fields. Finally, we call into the `emit` actuator passing the title and text arguments.
+
+#### Event rule metadata {docsify-ignore}
+
+For include groups matches, the rule and group name are pushed into the event metadata stitching the rule with the event that triggered it. `rule.name` and `rule.group` tags identify the rule and the group name respectively. For example, you can configure the console output [template](outputs/console?id=templates) to print the metadata of the event. Similarly, other outputs will produce the corresponding JSON dictionary with the rule tags.
+
