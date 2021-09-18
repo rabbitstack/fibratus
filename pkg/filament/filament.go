@@ -1,3 +1,4 @@
+//go:build filament && windows
 // +build filament,windows
 
 /*

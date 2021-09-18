@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 /*
@@ -24,14 +25,15 @@ import (
 	"bytes"
 	"debug/pe"
 	"expvar"
-	log "github.com/sirupsen/logrus"
-	"golang.org/x/text/encoding/unicode"
 	"io"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	log "github.com/sirupsen/logrus"
+	"golang.org/x/text/encoding/unicode"
 )
 
 var (
@@ -94,6 +96,7 @@ func (r *reader) Read(filename string) (*PE, error) {
 		Sections:         r.readSections(pefile),
 		Symbols:          make([]string, 0),
 		Imports:          make([]string, 0),
+		VersionResources: make(map[string]string),
 	}
 
 	var resDir pe.DataDirectory
