@@ -18,9 +18,6 @@
 
 package version
 
-// Version designates the type for specifying the current section version.
-type Version uint16
-
 const (
 	// KevtSecV1 is the v1 of the kernel event section
 	KevtSecV1 Version = iota + 1

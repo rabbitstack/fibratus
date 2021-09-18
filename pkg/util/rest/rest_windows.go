@@ -18,6 +18,14 @@
 
 package rest
 
+import (
+	"net"
+	"net/http"
+	"strings"
+
+	"github.com/rabbitstack/fibratus/pkg/api"
+)
+
 // WithTransport sets the preferred transport for the HTTP client.
 func WithTransport(addr string) Option {
 	return func(o *opts) {

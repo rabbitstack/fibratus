@@ -19,7 +19,6 @@
 package hostname
 
 import (
-	"expvar"
 	"net"
 	"os"
 	"syscall"

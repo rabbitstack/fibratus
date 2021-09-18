@@ -19,20 +19,18 @@
 package config
 
 import (
-	"encoding/json"
-	"fmt"
-	"io/ioutil"
 	"time"
 
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
-	"strings"
+
+	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/outputs"
+	"github.com/rabbitstack/fibratus/pkg/outputs/null"
+	log "github.com/sirupsen/logrus"
+	"golang.org/x/sys/windows/svc"
 
 	"github.com/rabbitstack/fibratus/pkg/pe"
-	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 )
 
 const (
@@ -61,8 +59,14 @@ type Config struct {
 func NewWithOpts(options ...Option) *Config {
 	config := newWithOpts(options...)
 
+	opts := &Options{}
+
+	for _, opt := range options {
+		opt(opts)
+	}
+
 	if opts.run || opts.capture {
-		pe.AddFlags(flagSet)
+		pe.AddFlags(config.flags)
 	}
 
 	config.addFlags()
@@ -97,6 +101,7 @@ func (c *Config) Init() error {
 			return nil
 		}
 	}
+	return nil
 }
 
 func (c *Config) addFlags() {

@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 /*
  * Copyright 2019-2020 by Nedim Sabic Sabic
  * https://www.fibratus.io

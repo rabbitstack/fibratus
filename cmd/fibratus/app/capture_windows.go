@@ -19,6 +19,8 @@
 package app
 
 import (
+	"time"
+
 	"github.com/rabbitstack/fibratus/cmd/fibratus/common"
 	"github.com/rabbitstack/fibratus/pkg/api"
 	"github.com/rabbitstack/fibratus/pkg/config"
@@ -32,14 +34,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/spinner"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"time"
 )
-
-var captureCmd = &cobra.Command{
-	Use:   "capture [filter]",
-	Short: "Capture kernel event stream to the kcap file",
-	RunE:  capture,
-}
 
 var (
 	// capture command config
