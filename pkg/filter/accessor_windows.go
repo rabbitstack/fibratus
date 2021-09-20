@@ -637,7 +637,7 @@ func (*peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, erro
 	case fields.PeProduct:
 		return p.VersionResources[pe.ProductName], nil
 	case fields.PeProductVersion:
-		return p.VersionResources[pe.ProductName], nil
+		return p.VersionResources[pe.ProductVersion], nil
 	default:
 		switch {
 		case f.IsPeSectionsSequence():
