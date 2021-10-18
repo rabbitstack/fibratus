@@ -76,8 +76,8 @@ func (fb FrameBuffer) Write(p []byte) (int, error) {
 		return 0, nil
 	}
 
-	rows := int(bufferInfo.size.y)
-	cols := int(bufferInfo.size.x)
+	rows := int(bufferInfo.rect.bottom)
+	cols := int(bufferInfo.rect.right)
 
 	chars := make([]charInfo, cols*rows)
 
@@ -132,6 +132,7 @@ func (fb FrameBuffer) Write(p []byte) (int, error) {
 
 	// clear the current frame buffer screen
 	fb.cls(bufferInfo)
+
 	// the following block of code does the heavy lifting of writing the
 	// character buffer to the screen frame buffer that we previously created
 	cord := point{}
@@ -145,7 +146,7 @@ func (fb FrameBuffer) Write(p []byte) (int, error) {
 		uintptr(unsafe.Pointer(&rect)),
 	)
 
-	return 0, nil
+	return len(p), nil
 }
 
 // Close closes this frame buffer.
