@@ -19,6 +19,9 @@
 package config
 
 import (
+	"testing"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers"
 	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers/rename"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
@@ -26,8 +29,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/alertsender/slack"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
-	"time"
 )
 
 func TestNewFromYamlFile(t *testing.T) {

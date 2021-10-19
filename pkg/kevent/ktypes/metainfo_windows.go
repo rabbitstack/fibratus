@@ -62,11 +62,14 @@ var kevents = map[Ktype]KeventInfo{
 	UnloadImage:        {"UnloadImage", Image, "Unloads the module from the address space of the calling process"},
 	CreateHandle:       {"CreateHandle", Handle, "Creates a new handle"},
 	CloseHandle:        {"CloseHandle", Handle, "Closes the handle"},
+	EnumProcess:        {"EnumProcess", Process, "Enumerates a running process"},
+	FileRundown:        {"FileRundown", File, "Enumerates open files"},
 }
 
 var ktypes = map[string]Ktype{
 	"CreateProcess":      CreateProcess,
 	"TerminateProcess":   TerminateProcess,
+	"EnumProcess":        EnumProcess,
 	"CreateThread":       CreateThread,
 	"TerminateThread":    TerminateThread,
 	"LoadImage":          LoadImage,
@@ -79,6 +82,7 @@ var ktypes = map[string]Ktype{
 	"DeleteFile":         DeleteFile,
 	"RenameFile":         RenameFile,
 	"EnumDirectory":      EnumDirectory,
+	"FileRundown":        FileRundown,
 	"RegCreateKey":       RegCreateKey,
 	"RegOpenKey":         RegOpenKey,
 	"RegSetValue":        RegSetValue,

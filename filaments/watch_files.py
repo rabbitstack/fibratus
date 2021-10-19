@@ -18,7 +18,7 @@
 Watches files and directories created in the file system
 """
 
-from utils.dotdict import dotdictify
+from filament.utils import dotdictify
 
 __files__ = []
 

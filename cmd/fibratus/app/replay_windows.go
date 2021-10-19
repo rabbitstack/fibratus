@@ -20,6 +20,7 @@ package app
 
 import (
 	"context"
+
 	"github.com/rabbitstack/fibratus/cmd/fibratus/common"
 	"github.com/rabbitstack/fibratus/pkg/aggregator"
 	"github.com/rabbitstack/fibratus/pkg/api"
@@ -61,7 +62,7 @@ func replay(cmd *cobra.Command, args []string) error {
 
 	// initialize kcap reader and try to recover the snapshotters
 	// from the captured state
-	reader, err := kcap.NewReader(replayConfig.KcapFile, replayConfig)
+	reader, err := kcap.NewReader(replayConfig.KcapFile, replayConfig.Filament.Name != "", replayConfig)
 	if err != nil {
 		return err
 	}
@@ -85,14 +86,16 @@ func replay(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
+		if f.IsHeadless() {
+			goto wait
+		}
 		if f.Filter() != nil {
 			kfilter = f.Filter()
 		}
 		reader.SetFilter(kfilter)
 
 		// returns the channel where events are read from the kcap
-		kevents, errs := reader.Read(ctx)
-
+		kevents, _, errs := reader.Read(ctx)
 		go func() {
 			defer f.Close()
 			err = f.Run(kevents, errs)
@@ -106,7 +109,7 @@ func replay(cmd *cobra.Command, args []string) error {
 		}
 
 		// use the channels where events are read from the kcap as aggregator source
-		kevents, errs := reader.Read(ctx)
+		kevents, _, errs := reader.Read(ctx)
 
 		var err error
 		agg, err = aggregator.NewBuffered(
@@ -125,7 +128,7 @@ func replay(cmd *cobra.Command, args []string) error {
 	if err := api.StartServer(replayConfig); err != nil {
 		return err
 	}
-
+wait:
 	<-stopCh
 
 	if agg != nil {

@@ -312,10 +312,10 @@ func (k *Ktype) UnmarshalYAML(unmarshal func(interface{}) error) error {
 // Pack transforms event provider GUID and the op code into `Ktype` type. The type provides a convenient way
 // to compare different kernel event types.
 func Pack(g syscall.GUID, opcode uint8) Ktype {
-	return Ktype([17]byte{
+	return [17]byte{
 		byte(g.Data1 >> 24), byte(g.Data1 >> 16), byte(g.Data1 >> 8), byte(g.Data1),
 		byte(g.Data2 >> 8), byte(g.Data2), byte(g.Data3 >> 8), byte(g.Data3),
 		g.Data4[0], g.Data4[1], g.Data4[2], g.Data4[3], g.Data4[4], g.Data4[5], g.Data4[6], g.Data4[7],
 		opcode,
-	})
+	}
 }

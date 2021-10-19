@@ -24,6 +24,11 @@ package kcap
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"sync"
+
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/filter"
 	"github.com/rabbitstack/fibratus/pkg/handle"
@@ -35,10 +40,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/bytes"
 	log "github.com/sirupsen/logrus"
 	zstd "github.com/valyala/gozstd"
-	"io"
-	"os"
-	"path/filepath"
-	"sync"
 )
 
 type reader struct {
@@ -49,10 +50,11 @@ type reader struct {
 	filter       filter.Filter
 	config       *config.Config
 	mu           sync.Mutex // guards the underlying zstd byte buffer
+	isFilament   bool
 }
 
 // NewReader builds a new instance of the kcap reader.
-func NewReader(filename string, config *config.Config) (Reader, error) {
+func NewReader(filename string, isFilament bool, config *config.Config) (Reader, error) {
 	if filepath.Ext(filename) == "" {
 		filename += ".kcap"
 	}
@@ -97,14 +99,15 @@ func NewReader(filename string, config *config.Config) (Reader, error) {
 		return nil, fmt.Errorf("fail to read kcap flags: %v", err)
 	}
 
-	return &reader{f: f, zr: zr, config: config}, nil
+	return &reader{f: f, zr: zr, isFilament: isFilament, config: config}, nil
 }
 
 func (r *reader) SetFilter(f filter.Filter) { r.filter = f }
 
-func (r *reader) Read(ctx context.Context) (chan *kevent.Kevent, chan error) {
+func (r *reader) Read(ctx context.Context) (chan *kevent.Kevent, chan EndOfKcap, chan error) {
 	errsc := make(chan error, 100)
 	keventsc := make(chan *kevent.Kevent, 2000)
+	eokc := make(chan EndOfKcap, 1)
 	go func() {
 		r.mu.Lock()
 		defer r.mu.Unlock()
@@ -121,6 +124,9 @@ func (r *reader) Read(ctx context.Context) (chan *kevent.Kevent, chan error) {
 					errsc <- err
 					continue
 				}
+				// signal end of file for the consumers
+				// to know when to give up and yield results
+				eokc <- EndOfKcap{KeventsRead: kcapReadKevents.Value()}
 				break
 			}
 
@@ -144,12 +150,12 @@ func (r *reader) Read(ctx context.Context) (chan *kevent.Kevent, chan error) {
 			if err := r.updateSnapshotters(kevt); err != nil {
 				log.Warn(err)
 			}
-			// push the event to the chanel
+			// push the event to the channel
 			r.read(kevt, keventsc)
 		}
 	}()
 
-	return keventsc, errsc
+	return keventsc, eokc, errsc
 }
 
 func (r *reader) Close() error {
@@ -165,7 +171,11 @@ func (r *reader) Close() error {
 }
 
 func (r *reader) read(kevt *kevent.Kevent, keventsc chan *kevent.Kevent) {
-	if kevt.Type.Dropped(false) {
+	// if the capture is replayed on filament we accept
+	// all events, including those that are used to
+	// build the state, like open files, processes,
+	// and registry keys
+	if kevt.Type.Dropped(false) && !r.isFilament {
 		return
 	}
 	if r.filter != nil && !r.filter.Run(kevt) {
@@ -213,6 +223,8 @@ func (r *reader) RecoverSnapshotters() (handle.Snapshotter, ps.Snapshotter, erro
 	r.psnapshotter = ps.NewSnapshotterFromKcap(hsnap, r.config)
 	return hsnap, r.psnapshotter, nil
 }
+
+func (r *reader) ForwardSnapshotters() (err error) { _, _, err = r.RecoverSnapshotters(); return }
 
 func (r *reader) recoverHandleSnapshotter() (handle.Snapshotter, error) {
 	var sec section.Section

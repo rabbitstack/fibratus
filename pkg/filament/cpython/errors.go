@@ -25,6 +25,7 @@ import "C"
 import (
 	"errors"
 	"sync"
+	"unsafe"
 )
 
 var once sync.Once
@@ -73,6 +74,13 @@ func FetchErr() error {
 		return errors.New(exc.String())
 	}
 	return nil
+}
+
+// SetRuntimeErr raises the Python Runtime Error.
+func SetRuntimeErr(message string) {
+	msg := C.CString(message)
+	defer C.free(unsafe.Pointer(msg))
+	C.PyErr_SetString(C.PyExc_RuntimeError, msg)
 }
 
 // ClearError clears the error indicator.

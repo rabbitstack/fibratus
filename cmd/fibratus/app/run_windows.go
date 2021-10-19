@@ -19,6 +19,8 @@
 package app
 
 import (
+	"os"
+
 	"github.com/rabbitstack/fibratus/cmd/fibratus/common"
 	"github.com/rabbitstack/fibratus/pkg/aggregator"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
@@ -32,7 +34,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"os"
 )
 
 var runCmd = &cobra.Command{
@@ -111,6 +112,12 @@ func run(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
+		// headless filaments are not fed with events, so we
+		// simply skip opening the kstream and executing the
+		// filament
+		if f.IsHeadless() {
+			goto wait
+		}
 		if f.Filter() != nil {
 			kstreamc.SetFilter(f.Filter())
 		}
@@ -163,7 +170,7 @@ func run(cmd *cobra.Command, args []string) error {
 	if err := api.StartServer(cfg); err != nil {
 		return err
 	}
-
+wait:
 	<-stopCh
 
 	// shutdown everything gracefully

@@ -11,7 +11,7 @@
 @echo off
 SetLocal EnableDelayedExpansion
 
-set PYTHON_VER=3.7.9
+set PYTHON_VER=3.10.0
 set PYTHON_URL=https://www.python.org/ftp/python/%PYTHON_VER%/python-%PYTHON_VER%-embed-amd64.zip
 
 set GOBIN=%USERPROFILE%\go\bin

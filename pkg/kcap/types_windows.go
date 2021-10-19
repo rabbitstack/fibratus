@@ -20,6 +20,7 @@ package kcap
 
 import (
 	"context"
+
 	"github.com/rabbitstack/fibratus/pkg/filter"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
@@ -49,15 +50,23 @@ type Writer interface {
 	Close() error
 }
 
+// EndOfKcap contains kcap stats at the end of kcap read.
+type EndOfKcap struct {
+	KeventsRead int64
+}
+
 // Reader offers the mechanism for recovering the state of the kcapture and replaying all captured events.
 type Reader interface {
 	// Read returns two channels. The event channel is poplated with event instances pulled from the kcap. If
-	// any error occurs during kcap processing, it is pushed to the error channel.
-	Read(ctx context.Context) (chan *kevent.Kevent, chan error)
+	// any error occurs during kcap processing, it is pushed to the error channel. The end of kcap channel
+	// receives the signal to inform consumers that the end of the kcap is reached.
+	Read(ctx context.Context) (chan *kevent.Kevent, chan EndOfKcap, chan error)
 	// Close shutdowns the reader gracefully.
 	Close() error
-	// RecoverSnapshotters recovers the statate of the snapshotters from the kcap.
+	// RecoverSnapshotters recovers the state of the snapshotters from the kcap.
 	RecoverSnapshotters() (handle.Snapshotter, ps.Snapshotter, error)
-	// SetFilter sets the filter that's is applied to each event coming out of the kcap.
+	// ForwardSnapshotters recovers snapshotters without returning them. It is the alias for RecoverSnapshotters.
+	ForwardSnapshotters() error
+	// SetFilter sets the filter that is applied to each event coming out of the kcap.
 	SetFilter(f filter.Filter)
 }

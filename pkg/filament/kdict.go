@@ -23,6 +23,7 @@ package filament
 
 import (
 	"errors"
+
 	"github.com/rabbitstack/fibratus/pkg/filament/cpython"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 )
@@ -56,24 +57,24 @@ func newKDict(kevt *kevent.Kevent) (*cpython.Dict, error) {
 	}
 
 	// insert canonical kevent fields
-	kdict.Insert(seq, cpython.NewPyObjectFromValue(kevt.Seq))
-	kdict.Insert(pid, cpython.NewPyObjectFromValue(kevt.PID))
-	kdict.Insert(tid, cpython.NewPyObjectFromValue(kevt.Tid))
-	kdict.Insert(cpu, cpython.NewPyObjectFromValue(kevt.CPU))
-	kdict.Insert(name, cpython.NewPyObjectFromValue(kevt.Name))
-	kdict.Insert(cat, cpython.NewPyObjectFromValue(string(kevt.Category)))
-	kdict.Insert(desc, cpython.NewPyObjectFromValue(kevt.Description))
-	kdict.Insert(host, cpython.NewPyObjectFromValue(kevt.Host))
-	kdict.Insert(ts, cpython.NewPyObjectFromValue(kevt.Timestamp))
+	kdict.InsertWithDecref(seq, cpython.NewPyObjectFromValue(kevt.Seq), false)
+	kdict.InsertWithDecref(pid, cpython.NewPyObjectFromValue(kevt.PID), false)
+	kdict.InsertWithDecref(tid, cpython.NewPyObjectFromValue(kevt.Tid), false)
+	kdict.InsertWithDecref(cpu, cpython.NewPyObjectFromValue(kevt.CPU), false)
+	kdict.InsertWithDecref(name, cpython.NewPyObjectFromValue(kevt.Name), false)
+	kdict.InsertWithDecref(cat, cpython.NewPyObjectFromValue(string(kevt.Category)), false)
+	kdict.InsertWithDecref(desc, cpython.NewPyObjectFromValue(kevt.Description), false)
+	kdict.InsertWithDecref(host, cpython.NewPyObjectFromValue(kevt.Host), false)
+	kdict.InsertWithDecref(ts, cpython.NewPyObjectFromValue(kevt.Timestamp), false)
 
 	// insert process state fields
 	ps := kevt.PS
 	if ps != nil {
-		kdict.Insert(ppid, cpython.NewPyObjectFromValue(ps.Ppid))
-		kdict.Insert(cwd, cpython.NewPyObjectFromValue(ps.Cwd))
-		kdict.Insert(exec, cpython.NewPyObjectFromValue(ps.Name))
-		kdict.Insert(comm, cpython.NewPyObjectFromValue(ps.Comm))
-		kdict.Insert(sid, cpython.NewPyObjectFromValue(ps.SID))
+		kdict.InsertWithDecref(ppid, cpython.NewPyObjectFromValue(ps.Ppid), false)
+		kdict.InsertWithDecref(cwd, cpython.NewPyObjectFromValue(ps.Cwd), false)
+		kdict.InsertWithDecref(exec, cpython.NewPyObjectFromValue(ps.Name), false)
+		kdict.InsertWithDecref(comm, cpython.NewPyObjectFromValue(ps.Comm), false)
+		kdict.InsertWithDecref(sid, cpython.NewPyObjectFromValue(ps.SID), false)
 	}
 
 	// insert kevent parameters
@@ -83,10 +84,10 @@ func newKDict(kevt *kevent.Kevent) (*cpython.Dict, error) {
 		if kparam.IsNull() {
 			continue
 		}
-		kpars.Insert(cpython.PyUnicodeFromString(kpar.Name), kparam)
+		kpars.InsertWithDecref(cpython.PyUnicodeFromString(kpar.Name), kparam, true)
 	}
 
-	kdict.Insert(kparamsk, kpars.Object())
+	kdict.InsertWithDecref(kparamsk, kpars.Object(), false)
 
 	return kdict, nil
 }

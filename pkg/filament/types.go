@@ -32,6 +32,10 @@ type Filament interface {
 	Close() error
 	// Filter returns the filter compiled from filament.
 	Filter() filter.Filter
+	// IsHeadless indicates whether the filament can be run in headless mode. When in headless mode, the
+	// events are not pushed to the filament. However, the filament can fetch events on demand by reading
+	// the kcap file via read_kcap function.
+	IsHeadless() bool
 }
 
 // Info stores metadata about the filament.

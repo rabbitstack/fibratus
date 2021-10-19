@@ -22,9 +22,21 @@
 package filament
 
 import (
+	"context"
 	"errors"
 	"expvar"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/rabbitstack/fibratus/pkg/kcap"
+
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/filament/cpython"
@@ -35,22 +47,17 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"github.com/rabbitstack/fibratus/pkg/util/term"
 	log "github.com/sirupsen/logrus"
-	"io"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"strings"
-	"time"
+
 	// initialize alert senders
 	_ "github.com/rabbitstack/fibratus/pkg/alertsender/mail"
 	_ "github.com/rabbitstack/fibratus/pkg/alertsender/slack"
 )
 
 // pyver designates the current Python version
-const pyver = "37"
+const pyver = "310"
 
 // useEmbeddedPython instructs the filament engine to use the embedded Python distribution.
-var useEmbeddedPython = true
+var useEmbeddedPython = false
 
 const (
 	intervalFn      = "interval"
@@ -67,11 +74,16 @@ const (
 	findProcessesFn = "find_processes"
 	emitAlertFn     = "emit_alert"
 
+	readKcapFn = "read_kcap"
+
 	onInitFn       = "on_init"
 	onStopFn       = "on_stop"
 	onNextKeventFn = "on_next_kevent"
 	onIntervalFn   = "on_interval"
-	doc            = "__doc__"
+
+	doc      = "__doc__"
+	headless = "__headless__"
+	kcapped  = "__kcapped__"
 )
 
 var (
@@ -122,6 +134,8 @@ type filament struct {
 	hsnap  handle.Snapshotter
 	filter filter.Filter
 
+	kcapFile string
+
 	initErrors []error
 
 	onNextKevent *cpython.PyObject
@@ -139,6 +153,8 @@ func New(
 	hsnap handle.Snapshotter,
 	config *config.Config,
 ) (Filament, error) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
 	if useEmbeddedPython {
 		exe, err := os.Executable()
 		if err != nil {
@@ -148,7 +164,7 @@ func New(
 		if _, err := os.Stat(pylib); err != nil {
 			return nil, fmt.Errorf("python lib not found: %v", err)
 		}
-		// set the default module search path so it points to our embedded Python distribution
+		// set the default module search path, so it points to our embedded Python distribution
 		cpython.SetPath(pylib)
 	}
 
@@ -184,10 +200,39 @@ func New(
 		return nil, err
 	}
 	// check if the filament is present in the directory
-	var exists bool
+	var (
+		exists bool
+		inDir  bool
+	)
 	for _, f := range filaments {
-		if strings.TrimSuffix(f.Name(), filepath.Ext(f.Name())) == filamentName {
-			exists = true
+		switch f.IsDir() {
+		case true:
+			inDir = true
+			// the filament is packed within directory
+			// where we expect to find the __init__.py file
+			if f.Name() == filamentName {
+				exists = true
+				_, err := os.Stat(filepath.Join(path, f.Name(), "__init__.py"))
+				if err != nil {
+					if os.IsNotExist(err) {
+						return nil, fmt.Errorf("__init__.py is missing in %s filament", filamentName)
+					}
+					return nil, err
+				}
+			}
+		case false:
+			ext := filepath.Ext(f.Name())
+			if ext != ".py" {
+				continue
+			}
+			if strings.TrimSuffix(f.Name(), ext) == filamentName {
+				exists = true
+				inDir = false
+			}
+		}
+		// filament was found
+		if exists {
+			break
 		}
 	}
 
@@ -196,14 +241,14 @@ func New(
 	}
 
 	cpython.AddPythonPath(path)
-	mod, err := cpython.NewModule(filamentName)
+
+	mod, err := cpython.NewModule(modName(filamentName, inDir))
 	if err != nil {
 		if err = cpython.FetchErr(); err != nil {
 			return nil, err
 		}
 		return nil, err
 	}
-
 	// ensure required attributes are present before proceeding with
 	// further initialization. For instance, if the documentation
 	// string is not provided, on_next_kevent function is missing
@@ -213,35 +258,40 @@ func New(
 		return nil, errNoDoc
 	}
 	defer doc.DecRef()
-	if !mod.HasAttr(onNextKeventFn) {
-		return nil, errNoOnNextKevent
-	}
-	onNextKevent, err := mod.GetAttrString(onNextKeventFn)
-	if err != nil || onNextKevent.IsNull() {
-		return nil, errNoOnNextKevent
-	}
-	if !onNextKevent.IsCallable() {
-		return nil, errOnNextKeventNotCallable
-	}
-	argCount := onNextKevent.CallableArgCount()
-	if argCount != 1 {
-		return nil, errOnNextKeventMismatchArgs(argCount)
-	}
 
 	f := &filament{
-		name:         name,
-		mod:          mod,
-		config:       config,
-		psnap:        psnap,
-		hsnap:        hsnap,
-		close:        make(chan struct{}, 1),
-		fnerrs:       make(chan error, 100),
-		gil:          cpython.NewGIL(),
-		columns:      make([]string, 0),
-		onNextKevent: onNextKevent,
-		interval:     time.Second,
-		initErrors:   make([]error, 0),
-		table:        newTable(),
+		name:       name,
+		mod:        mod,
+		config:     config,
+		psnap:      psnap,
+		hsnap:      hsnap,
+		close:      make(chan struct{}, 1),
+		fnerrs:     make(chan error, 100),
+		gil:        cpython.NewGIL(),
+		columns:    make([]string, 0),
+		interval:   time.Second,
+		initErrors: make([]error, 0),
+		table:      newTable(),
+	}
+
+	// check for the presence of mandatory on_next_kevent
+	// function if filament is not set up in headless mode
+	if !f.isHeadless() {
+		if !mod.HasAttr(onNextKeventFn) {
+			return nil, errNoOnNextKevent
+		}
+		onNextKevent, err := mod.GetAttrString(onNextKeventFn)
+		if err != nil || onNextKevent.IsNull() {
+			return nil, errNoOnNextKevent
+		}
+		if !onNextKevent.IsCallable() {
+			return nil, errOnNextKeventNotCallable
+		}
+		argCount := onNextKevent.CallableArgCount()
+		if argCount != 1 {
+			return nil, errOnNextKeventMismatchArgs(argCount)
+		}
+		f.onNextKevent = onNextKevent
 	}
 
 	if mod.HasAttr(onStopFn) {
@@ -299,6 +349,17 @@ func New(
 	}
 	err = f.mod.RegisterFn(findProcessesFn, f.findProcessesFn, cpython.DefaultMethFlags)
 	if err != nil {
+		return nil, err
+	}
+	err = f.mod.RegisterFn(readKcapFn, f.readKcapFn, cpython.DefaultMethFlags)
+	if err != nil {
+		return nil, err
+	}
+
+	// add an attribute to indicate if the filament was run from the capture
+	isKcap := cpython.NewPyObjectFromValue(config.KcapFile != "")
+	defer isKcap.DecRef()
+	if err := mod.SetAttrString(kcapped, isKcap.RawPyObject()); err != nil {
 		return nil, err
 	}
 	// invoke the on_init function if it has been declared in the filament
@@ -367,6 +428,35 @@ func New(
 	f.gil.SaveThread()
 
 	return f, nil
+}
+
+func modName(filamentName string, inDir bool) string {
+	if inDir {
+		return filamentName + "." + "__init__"
+	}
+	return filamentName
+}
+
+func (f *filament) IsHeadless() bool {
+	f.gil.Lock()
+	defer f.gil.Unlock()
+	return f.isHeadless()
+}
+
+// isHeadless consults the __headless__ attribute
+// of the filament module to figure out whether it
+// was set up in headless mode.
+func (f *filament) isHeadless() bool {
+	attr, err := f.mod.GetAttrString(headless)
+	if err != nil || attr.IsNull() {
+		return false
+	}
+	defer attr.DecRef()
+	isHeadless, err := strconv.ParseBool(strings.ToLower(attr.String()))
+	if err != nil {
+		return false
+	}
+	return isHeadless
 }
 
 func (f *filament) Run(kevents chan *kevent.Kevent, errs chan error) error {
@@ -554,6 +644,55 @@ func (f *filament) findHandlesFn(_, args cpython.PyArgs) cpython.PyRawObject {
 	f.gil.Lock()
 	defer f.gil.Unlock()
 	return cpython.NewPyNone()
+}
+
+func (f *filament) readKcapFn(_, args cpython.PyArgs) cpython.PyRawObject {
+	f.gil.Lock()
+	defer f.gil.Unlock()
+	kevents := cpython.NewList(0)
+
+	// set up filter and kcap reader
+	expr := args.GetString(1)
+	var ff filter.Filter
+	if expr != "" {
+		ff = filter.New(expr, f.config)
+		if err := ff.Compile(); err != nil {
+			cpython.SetRuntimeErr(fmt.Sprintf("bad filter in read_kcap: %v", err))
+			return cpython.NewPyNone()
+		}
+	}
+	r, err := kcap.NewReader(f.config.KcapFile, true, f.config)
+	if err != nil {
+		cpython.SetRuntimeErr(fmt.Sprintf("unable to set up kcap reader: %v", err))
+		return cpython.NewPyNone()
+	}
+	if err := r.ForwardSnapshotters(); err != nil {
+		cpython.SetRuntimeErr(fmt.Sprintf("fatal kcap forward: %v", err))
+		return cpython.NewPyNone()
+	}
+	r.SetFilter(ff)
+
+	// consume events from kcap and produce Python
+	// dictionary objects that are appended to the
+	// list which the kcap_read function returns
+	kevtsCh, eokc, errCh := r.Read(context.Background())
+	for {
+		select {
+		case kevt := <-kevtsCh:
+			kdict, err := newKDict(kevt)
+			kevt.Release()
+			if err != nil {
+				kdict.DecRef()
+				continue
+			}
+			kevents.Append(kdict.Object())
+			kdict.DecRef()
+		case err := <-errCh:
+			log.Warnf("kcap_read encountered an error: %v", err)
+		case <-eokc:
+			return kevents.RawPyObject()
+		}
+	}
 }
 
 func (f *filament) onInterval(fn *cpython.PyObject) {

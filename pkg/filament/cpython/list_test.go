@@ -1,8 +1,5 @@
-//go:build !kcap
-// +build !kcap
-
 /*
- * Copyright 2019-2020 by Nedim Sabic Sabic
+ * Copyright 2021-2022 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -19,14 +16,4 @@
  * limitations under the License.
  */
 
-package kcap
-
-import (
-	"github.com/rabbitstack/fibratus/pkg/config"
-	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
-)
-
-// NewReader returns unsupported reader.
-func NewReader(filename string, isFilament bool, config *config.Config) (Reader, error) {
-	return nil, kerrors.ErrFeatureUnsupported("kcap")
-}
+package cpython

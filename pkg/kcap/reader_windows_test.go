@@ -23,13 +23,14 @@ package kcap
 
 import (
 	"context"
+	"testing"
+
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestRead(t *testing.T) {
-	r, err := NewReader("_fixtures/cap1.kcap", &config.Config{})
+	r, err := NewReader("_fixtures/cap1.kcap", false, &config.Config{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +40,7 @@ func TestRead(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	kevtsc, errs := r.Read(ctx)
+	kevtsc, _, errs := r.Read(ctx)
 	i := 0
 	for {
 		select {

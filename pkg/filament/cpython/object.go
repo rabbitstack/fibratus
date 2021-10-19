@@ -25,11 +25,11 @@ import "C"
 import (
 	"errors"
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/fs"
 	"net"
-	"syscall"
 	"time"
 	"unsafe"
+
+	"github.com/rabbitstack/fibratus/pkg/fs"
 )
 
 var errTypeNotList = errors.New("couldn't parse the argument. It is probably not a list")
@@ -166,6 +166,13 @@ func NewPyObjectFromValue(value interface{}) *PyObject {
 		ob = C.PyChar_FromChar(C.i8(v))
 	case uint8:
 		ob = C.PyChar_FromUnsignedChar(C.u8(v))
+	case bool:
+		switch v {
+		case true:
+			ob = C.Py_True
+		case false:
+			ob = C.Py_False
+		}
 	case int16:
 		ob = C.PyShort_FromShort(C.i16(v))
 	case uint16:
@@ -190,15 +197,6 @@ func NewPyObjectFromValue(value interface{}) *PyObject {
 		} else {
 			ob = PyUnicodeFromString(v.String()).asRaw()
 		}
-	case func(arg1, arg2 PyArgs) PyRawObject:
-		n := C.CString("func")
-		defer C.free(unsafe.Pointer(n))
-		mdef := &C.PyMethodDef{
-			ml_name:  n,
-			ml_meth:  (C.PyCFunction)(unsafe.Pointer(syscall.NewCallback(v))),
-			ml_flags: C.int(DefaultMethFlags),
-		}
-		ob = C.PyCFunction_NewEx((*C.PyMethodDef)(unsafe.Pointer(mdef)), nil, C.PyUnicode_FromString(n))
 	}
 	return &PyObject{rawptr: ob}
 }
@@ -209,7 +207,7 @@ func fromRawOb(ob *C.PyObject) *PyObject { return &PyObject{rawptr: ob} }
 // DecRef decrements the reference count for object o. If the object is NULL, nothing happens. If the reference count
 // reaches zero, the object’s type’s deallocation function (which must not be NULL) is invoked.
 func (ob *PyObject) DecRef() {
-	if ob != nil || ob.rawptr == nil {
+	if ob != nil && ob.rawptr == nil {
 		return
 	}
 	C.Py_DecRef(ob.rawptr)
@@ -229,6 +227,11 @@ func (ob *PyObject) IsNull() bool {
 		return true
 	}
 	return ob.rawptr == nil
+}
+
+// RawPyObject returns the pointer to the raw python object. Is a public alias for the asRaw method.
+func (ob *PyObject) RawPyObject() PyRawObject {
+	return ob.asRaw()
 }
 
 func (ob *PyObject) asRaw() *C.PyObject {

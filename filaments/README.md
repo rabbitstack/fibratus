@@ -6,10 +6,4 @@ Visit the [documentation](https://www.fibratus.io/#/filaments/writing) for a wal
 
 ### Available filaments
 
-- `fishy_netio` alerts when atypical processes produce network requests
-- `registry_persistence` surfaces registry operations that would allow a process to execute on system startup
-- `top_in_packets` shows the top TCP / UDP inbound packets by IP/port tuple
-- `top_keys` shows the top registry keys by number of registry operations
-- `top_out_packets` shows the top TCP / UDP outbound packets by IP/port tuple
 - `watch_files` watches files and directories created in the file system
-- `teamviewer_remote_file_copy` identifies an executable or script file remotely downloaded via a TeamViewer transfer session

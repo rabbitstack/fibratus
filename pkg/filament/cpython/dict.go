@@ -43,6 +43,16 @@ func (d *Dict) Insert(k, v *PyObject) {
 	C.PyDict_SetItem(d.rawptr, k.rawptr, v.rawptr)
 }
 
+// InsertWithDecref inserts a value into dictionary indexed with a key and decrements the reference count
+// for the key and value objects.
+func (d *Dict) InsertWithDecref(k, v *PyObject, decrefKey bool) {
+	if decrefKey {
+		defer k.DecRef()
+	}
+	defer v.DecRef()
+	d.Insert(k, v)
+}
+
 // Get returns the object from dictionary with the provided key. Returns a null object if the key key is not present,
 // but without setting an exception.
 func (d *Dict) Get(k *PyObject) *PyObject {

@@ -19,24 +19,22 @@
 package cpython
 
 /*
-#cgo pkg-config: python-37
+#cgo pkg-config: python-310
 
 #include "api.h"
 
 */
 import "C"
 import (
-	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 	"syscall"
 	"unsafe"
+
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 )
 
 // ErrPyInit signals that an error ocurred while initializing the Python interpreter
 var ErrPyInit = errors.New("couldn't initialize the Python interpreter")
-
-// ErrGILInit indicates that the global interpreter lock failed to initialize
-var ErrGILInit = errors.New("unable to initialize the GIL")
 
 // Initialize initializes the Python interpreter and its global interpreter lock (GIL).
 func Initialize() error {
@@ -47,12 +45,7 @@ func Initialize() error {
 	if C.Py_IsInitialized() == 0 {
 		return ErrPyInit
 	}
-	if C.PyEval_ThreadsInitialized() == 0 {
-		C.PyEval_InitThreads()
-	}
-	if C.PyEval_ThreadsInitialized() == 0 {
-		return ErrGILInit
-	}
+
 	// this calls into PyDateTime_IMPORT macro to initialize the PyDateTimeAPI
 	C.Py_DateTimeImport()
 
