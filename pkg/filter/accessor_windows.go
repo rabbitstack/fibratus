@@ -70,6 +70,8 @@ func newPSAccessor() accessor { return &psAccessor{} }
 
 func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
 	switch f {
+	case fields.PsSnapshotID:
+		return kevt.Kparams.GetPid()
 	case fields.PsPid:
 		return kevt.PID, nil
 	case fields.PsPpid:

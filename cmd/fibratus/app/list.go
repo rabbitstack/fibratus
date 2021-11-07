@@ -21,16 +21,17 @@ package app
 import (
 	"bufio"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/rabbitstack/fibratus/cmd/fibratus/common"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/spf13/cobra"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"strings"
 )
 
 var listCmd = &cobra.Command{
@@ -93,15 +94,26 @@ func listFilaments(cmd *cobra.Command, args []string) error {
 	t.SetStyle(table.StyleLight)
 
 	for _, f := range filaments {
-		if f.IsDir() {
-			continue
-		}
 		py, err := os.Open(filepath.Join(dir, f.Name()))
 		if err != nil {
 			continue
 		}
-		if filepath.Ext(f.Name()) != ".py" {
-			continue
+
+		switch f.IsDir() {
+		case true:
+			// skip filament framework dir
+			if f.Name() == "filament" {
+				continue
+			}
+			// the directory should contain the __init__.py module
+			py, err = os.Open(filepath.Join(dir, f.Name(), "__init__.py"))
+			if err != nil {
+				continue
+			}
+		case false:
+			if filepath.Ext(f.Name()) != ".py" {
+				continue
+			}
 		}
 
 		sn := bufio.NewScanner(py)

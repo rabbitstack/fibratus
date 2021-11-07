@@ -83,7 +83,8 @@ const (
 
 	doc      = "__doc__"
 	headless = "__headless__"
-	kcapped  = "__kcapped__"
+	isKcap   = "__is_kcap__"
+	kcapFile = "__kcap_file__"
 )
 
 var (
@@ -254,7 +255,7 @@ func New(
 	// string is not provided, on_next_kevent function is missing
 	// or has a wrong signature we won't run the filament
 	doc, err := mod.GetAttrString(doc)
-	if err != nil || doc.IsNull() {
+	if err != nil || doc.IsNull() || doc.IsNone() {
 		return nil, errNoDoc
 	}
 	defer doc.DecRef()
@@ -356,12 +357,11 @@ func New(
 		return nil, err
 	}
 
-	// add an attribute to indicate if the filament was run from the capture
-	isKcap := cpython.NewPyObjectFromValue(config.KcapFile != "")
-	defer isKcap.DecRef()
-	if err := mod.SetAttrString(kcapped, isKcap.RawPyObject()); err != nil {
+	// add kcap attributes
+	if err := f.addKcapAttrs(); err != nil {
 		return nil, err
 	}
+
 	// invoke the on_init function if it has been declared in the filament
 	if mod.HasAttr(onInitFn) {
 		onInit, _ := mod.GetAttrString(onInitFn)
@@ -428,6 +428,23 @@ func New(
 	f.gil.SaveThread()
 
 	return f, nil
+}
+
+// addKcapAttrs declares attributes related to kcap information. For instance, the __is_kcap__ attribute indicates
+// if the filament is running from the capture. To get the capture file name you can consult the __kcap_file__
+// attribute.
+func (f *filament) addKcapAttrs() error {
+	kcapFileName := f.config.KcapFile
+	if err := f.mod.SetAttrString(isKcap, cpython.NewPyObjectFromValue(kcapFileName != "").RawPyObject()); err != nil {
+		return err
+	}
+	if kcapFileName == "" {
+		return nil
+	}
+	if err := f.mod.SetAttrString(kcapFile, cpython.NewPyObjectFromValue(kcapFileName).RawPyObject()); err != nil {
+		return err
+	}
+	return nil
 }
 
 func modName(filamentName string, inDir bool) string {
@@ -500,6 +517,9 @@ func (f *filament) pushKevents(b kbatch) error {
 	for _, kevt := range b {
 		kdict, err := newKDict(kevt)
 		kevt.Release()
+		if kdict == nil {
+			continue
+		}
 		if err != nil {
 			kdict.DecRef()
 			kdictErrors.Add(1)
@@ -661,21 +681,22 @@ func (f *filament) readKcapFn(_, args cpython.PyArgs) cpython.PyRawObject {
 			return cpython.NewPyNone()
 		}
 	}
-	r, err := kcap.NewReader(f.config.KcapFile, true, f.config)
+	reader, err := kcap.NewReader(f.config.KcapFile, true, f.config)
 	if err != nil {
 		cpython.SetRuntimeErr(fmt.Sprintf("unable to set up kcap reader: %v", err))
 		return cpython.NewPyNone()
 	}
-	if err := r.ForwardSnapshotters(); err != nil {
+	defer reader.Close()
+	if err := reader.ForwardSnapshotters(); err != nil {
 		cpython.SetRuntimeErr(fmt.Sprintf("fatal kcap forward: %v", err))
 		return cpython.NewPyNone()
 	}
-	r.SetFilter(ff)
+	reader.SetFilter(ff)
 
 	// consume events from kcap and produce Python
 	// dictionary objects that are appended to the
 	// list which the kcap_read function returns
-	kevtsCh, eokc, errCh := r.Read(context.Background())
+	kevtsCh, eokc, errCh := reader.Read(context.Background())
 	for {
 		select {
 		case kevt := <-kevtsCh:

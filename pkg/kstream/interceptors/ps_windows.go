@@ -20,6 +20,12 @@ package interceptors
 
 import (
 	"expvar"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
@@ -27,11 +33,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/syscall/process"
 	"github.com/rabbitstack/fibratus/pkg/yara"
 	log "github.com/sirupsen/logrus"
-	"os"
-	"path/filepath"
-	"regexp"
-	"strings"
-	"time"
 )
 
 // systemRootRegexp is the regular expression for detecting path with unexpanded SystemRoot environment variable
@@ -48,6 +49,7 @@ type psInterceptor struct {
 var sysProcs = map[string]bool{
 	"dwm.exe":         true,
 	"wininit.exe":     true,
+	"explorer.exe":    true,
 	"winlogon.exe":    true,
 	"fontdrvhost.exe": true,
 	"sihost.exe":      true,
@@ -75,7 +77,8 @@ func (ps psInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 			return kevt, true, err
 		}
 		// some system processes are reported without the path in command line
-		if !strings.Contains(comm, `\\:`) {
+		// or contain an empty command line arguments
+		if !strings.Contains(comm, `\\:`) || comm == "" {
 			_, ok := sysProcs[comm]
 			if ok {
 				_ = kevt.Kparams.Set(kparams.Comm, filepath.Join(os.Getenv("SystemRoot"), comm), kparams.UnicodeString)
@@ -87,7 +90,7 @@ func (ps psInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 		i := strings.Index(comm, ".exe")
 		if i > 0 {
 			exe := strings.Replace(comm[0:i+4], "\"", "", -1)
-			if strings.Contains(exe, "SystemRoot") {
+			if strings.Contains(exe, "SystemRoot") || strings.HasPrefix(strings.ToLower(exe), "%systemroot%") {
 				exe = systemRootRegexp.ReplaceAllString(exe, os.Getenv("SystemRoot"))
 			}
 			kevt.Kparams.Append(kparams.Exe, kparams.UnicodeString, exe)

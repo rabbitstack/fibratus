@@ -229,6 +229,14 @@ func (ob *PyObject) IsNull() bool {
 	return ob.rawptr == nil
 }
 
+// IsNone determines whether this object is PyNone.
+func (ob *PyObject) IsNone() bool {
+	if ob.IsNull() {
+		return false
+	}
+	return ob.rawptr == C.Py_None
+}
+
 // RawPyObject returns the pointer to the raw python object. Is a public alias for the asRaw method.
 func (ob *PyObject) RawPyObject() PyRawObject {
 	return ob.asRaw()

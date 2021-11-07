@@ -1,76 +1,32 @@
 <template>
   <el-container>
     <el-aside>
-  <el-menu class="navmenu" background-color="#192A4E" text-color="#fff" router="true" default-active="/">
-    <el-menu-item index="/processes">
-      <ion-icon name="terminal-outline"></ion-icon>
-      <span> Processes</span>
-    </el-menu-item>
-    <el-menu-item index="/about">
-      <ion-icon name="folder-outline"></ion-icon>
-      <span> Directories</span>
-    </el-menu-item>
-    <el-menu-item index="/profile">
-      <ion-icon name="cube-outline"></ion-icon>
-      <span> Registry</span>
-    </el-menu-item>
-    <el-menu-item index="/profile1">
-      <ion-icon name="file-tray-full-outline"></ion-icon>
-      <span> Files</span>
-    </el-menu-item>
-    <el-menu-item index="/connections">
-      <ion-icon name="wifi-outline"></ion-icon>
-      <span> Connections</span>
-    </el-menu-item>
-    <el-menu-item index="/threads">
-      <ion-icon name="flash-outline"></ion-icon>
-      <span> Threads</span>
-    </el-menu-item>
-    <el-menu-item index="/errors">
-      <ion-icon name="bug-outline"></ion-icon>
-      <span> Errors</span>
-    </el-menu-item>
-    <el-menu-item index="/handles">
-      <ion-icon name="bag-handle-outline"></ion-icon>
-      <span> Handles</span>
-    </el-menu-item>
-    <el-menu-item index="/dlls">
-      <ion-icon name="bag-handle-outline"></ion-icon>
-      <span> DLLs</span>
-    </el-menu-item>
-    <el-menu-item index="/ports">
-      <ion-icon name="bag-handle-outline"></ion-icon>
-      <span> Server Ports</span>
-    </el-menu-item>
-    <el-menu-item index="/slowio">
-      <ion-icon name="stats-chart-outline"></ion-icon>
-      <span> Slow File I/O</span>
-    </el-menu-item>
-    <el-menu-item index="/pe">
-      <ion-icon name="stats-chart-outline"></ion-icon>
-      <span> PE</span>
-    </el-menu-item>
-  </el-menu>
+      <navbar/>
     </el-aside>
 
+    <el-container>
+      <el-header>
+        <breadcrumb/>
+      </el-header>
 
-  <el-container>
-    <el-main>
-      <router-view/>
-    </el-main>
-  </el-container>
+      <el-main>
+        <router-view/>
+      </el-main>
+    </el-container>
 
   </el-container>
 </template>
+
 <style>
 
-@import url('https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,300;0,400;0,500;0,700;1,500&display=swap');
 
 html, body {
   margin: 0;
+  overflow: hidden;
   min-height: 100% !important;
   height: 100%;
-  font-family: Jost, Source Sans Pro, Helvetica Neue, Arial, sans-serif;
+  font-family: 'Jost', Jost, Source Sans Pro, Helvetica Neue, Arial, sans-serif;
 }
 
 main {
@@ -78,45 +34,41 @@ main {
 }
 
 aside {
-  max-width: 230px;
+  max-width: 60px;
   height: 100%;
+  overflow: hidden;
 }
 
-.navmenu {
-  max-width: 230px;
-  padding-top: 20px;
-  height: 100vh;
-  font-family: Jost, Source Sans Pro, Helvetica Neue, Arial, sans-serif;
+header {
+  height: 45px !important;
+  background: rgba(15,23,42, 0.9);
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.55);
+  border-bottom: 3px solid transparent;
+  border-image: repeating-linear-gradient(340.87deg, #777ce0 -5.97%, #60cefd 100.83%) 10;
 }
 
-ion-icon {
-  --ionicon-stroke-width: 40px;
-  font-size: 20px;
+.el-table__body-wrapper::-webkit-scrollbar {
+  width: 20px;
 }
 
-ul .el-menu-item {
-  height: 40px;
-  font-weight: 500;
-  line-height: 38px;
-  text-align: left;
+.el-table__body-wrapper::-webkit-scrollbar-track {
+  background-color: #F7F7F7;
+  border-radius: 100px;
 }
 
-ul .el-menu-item.is-active {
-  background-color: rgba(150, 167, 223, .45) !important;
-  color: #fff;
-  border-radius: 3px;
-  margin: 0 12px 0 12px;
+.el-table__body-wrapper::-webkit-scrollbar-thumb {
+  border-radius: 100px;
+  border: 5px solid transparent;
+  background-clip: content-box;
+  background-color: #60cefd;
 }
 
-#app {
-  font-family: Avenir, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-align: center;
-  color: #2c3e50;
-}
-
-#nav a.router-link-exact-active {
-  color: #42b983;
-}
 </style>
+<script>
+import Navbar from "@/components/core/Navbar";
+import Breadcrumb from "@/components/core/Breadcrumb";
+
+export default {
+  components: {Breadcrumb, Navbar}
+}
+</script>
