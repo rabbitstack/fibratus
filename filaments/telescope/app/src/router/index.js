@@ -14,6 +14,21 @@ const routes = [
     props: true,
     component: () => import('../components/ps/Process')
   },
+  {
+    path: '/files',
+    name: 'files',
+    meta: {text: "Files"},
+    props: true,
+    component: () => import('../components/file/Files')
+  },
+
+  {
+    path: '/ingress',
+    name: 'ingress',
+    meta: {text: "Ingress Packets"},
+    props: true,
+    component: () => import('../components/packet/Ingress')
+  },
 ]
 
 const router = createRouter({

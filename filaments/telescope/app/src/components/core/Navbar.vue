@@ -6,6 +6,7 @@
            collapse
            router>
     <div class="logo">
+      <a href="/" class="logo-text">F</a>
     </div>
     <el-menu-item v-for="item in items" v-bind:key="item.route" v-bind:route="item.route" v-bind:index="item.route">
         <ion-icon v-bind:name="item.icon"></ion-icon>
@@ -71,16 +72,19 @@ ul .el-menu-item.is-active {
 
 .logo {
   height: 42px;
-  background: linear-gradient(0deg, #0f172a 35%, #1b293d 75%);
+  background: #121F34;
   border-bottom: 3px solid transparent;
   border-image: repeating-linear-gradient(340.87deg, #777ce0 -5.97%, #60cefd 100.83%) 10;
 }
 
 .logo-text {
-  color: #ffba00;
-  font-size: 25px;
-  align-content: center;
-  top: 10px;
-  right: 10px;
+  border-color: #7193e8;
+  color: #7093e8;
+  font-size: 28px;
+  left: 22px;
+  top: 2px;
+  font-weight: bolder;
+  position: relative;
+  text-decoration: none;
 }
 </style>

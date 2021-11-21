@@ -20,7 +20,7 @@
           header-row-class-name="header-row"
           :data="search"
           style="width: 100%;"
-          height="78vh">
+          height="82vh">
 
           <el-table-column label="NAME" width="580">
             <template #default="scope">
@@ -76,7 +76,6 @@ export default {
     },
     // eslint-disable-next-line no-unused-vars
     tableRowClassName({row, rowIndex}) {
-
       if (row.ps && row.ps.name === 'svchost.exe') {
         return 'success-row'
       }

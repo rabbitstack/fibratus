@@ -17,9 +17,11 @@ from abc import ABC
 
 from filament.http import BaseHandler
 from filament.json import jsonify
-import collections
 from filament.utils import to_ddict
-from datetime import datetime
+from telescope.ps import ps_from_kevt, build_tree
+from filament import ktypes
+from collections import Counter
+from telescope.types import Packets
 
 
 class NavbarItem:
@@ -51,85 +53,58 @@ class NavbarHandler(BaseHandler, ABC):
         self.write(jsonify(items))
 
 
-class Node:
-    def __init__(self, pid, ps):
-        self.id = pid if not ps else ps.id
-        self.pid = pid
-        self.ps = ps
-        self.children = []
-
-
-class PS:
-    def __init__(self, pid, name, exe, sid, start_time):
-        self.pid = pid
-        self.name = name
-        self.exe = exe
-        self.sid = sid
-        self.start_time = start_time.isoformat() if isinstance(start_time, datetime) else ""
-
-        # Unique value used for table row keys
-        self.id = self.name + str(self.pid) + self.start_time
-
-    def __str__(self):
-        return f"pid: {self.pid}, name: {self.name}"
-
-
-def ps_from_kevt(kevt):
-    if kevt:
-        return PS(
-            kevt.kparams.pid,
-            kevt.kparams.name,
-            kevt.kparams.exe,
-            kevt.kparams.sid,
-            kevt.kparams.start_time
-        )
-
-
-def build_tree(ppid, tree, procs):
-    node = Node(ppid, ps_from_kevt(procs[ppid]) if ppid in procs else None)
-    if ppid not in tree:
-        return node
-    children = tree.pop(ppid, [])
-    for child in children:
-        node.children.append(build_tree(child, tree, procs))
-    return node
-
-
 class ProcessTreeHandler(BaseHandler, ABC):
+    _tree = None
+
     def get(self):
-        procs = dict()
-        tree = collections.defaultdict(list)
-        kevents = map(to_ddict, self.read_kcap("kevt.name in ('EnumProcess', 'CreateProcess')"))
-
-        for kevt in kevents:
-            pid = kevt.kparams.pid
-            if pid in procs:
-                continue
-            ppid = kevt.kparams.ppid
-            tree[ppid].append(pid)
-            procs[pid] = kevt
-
-        if 0 in tree and 0 in tree[0]:
-            del tree[0]
-
-        # Avoid endless recursion for PID 0 whose parent is 0
-        trees = []
-        # Build process trees
-        while len(tree) > 0:
-            trees.append(build_tree(min(tree), tree, procs))
+        if not ProcessTreeHandler._tree:
+            kevents = map(to_ddict, self.read_kcap("kevt.name in ('EnumProcess', 'CreateProcess')"))
+            ProcessTreeHandler._tree = build_tree(kevents)
 
         self.set_header("Content-Type", "application/json")
-        self.write(jsonify(trees))
+        self.write(jsonify(ProcessTreeHandler._tree))
 
 
 class ProcessHandler(BaseHandler, ABC):
     def get(self, pid):
-        events = list(map(to_ddict, self.read_kcap(f"ps.snapshot.id = {pid} or kevt.pid = {pid}")))
-        ps = None
-        for evt in events:
-            match evt.name:
-                case 'EnumProcess':
-                    ps = ps_from_kevt(evt)
+        # Get all events originated from the given pid
+        kevents = list(map(to_ddict, self.read_kcap(f"ps.pid = {pid} or kevt.pid = {pid}")))
+        kevt = next(iter([kevt for kevt in kevents if kevt.name in (ktypes.CREATE_PROCESS, ktypes.ENUM_PROCESS)]),
+                    None)
+        if not kevt:
+            self.write_error(500, message=f"process with pid #{pid} not found")
+
+        ps = ps_from_kevt(kevt)
+
+        for kevent in kevents:
+            match kevent.name:
+                case ktypes.LOAD_IMAGE | ktypes.ENUM_IMAGE:
+                    ps.add_module(kevent)
 
         self.set_header("Content-Type", "application/json")
         self.write(jsonify(ps))
+
+
+class IngressPacketsHandler(BaseHandler, ABC):
+    _packets = None
+
+    def get(self):
+        if not IngressPacketsHandler._packets:
+            kevents = list(map(to_ddict, self.read_kcap("kevt.name in ('Accept', 'Recv')")))
+
+            by_dport = Counter()
+            by_sport = Counter()
+
+            for kevent in kevents:
+                by_dport.update(
+                    ['%d (%s)' % (kevent.kparams.dport, kevent.kparams.dport_name)] if kevent.kparams.dport_name else [
+                        (kevent.kparams.dport,)])
+                by_sport.update((kevent.kparams.sport,))
+
+            IngressPacketsHandler._packets = Packets(
+                [{"port": c[0], "count": c[1]} for c in by_dport.most_common()],
+                by_sport.most_common()
+            )
+
+        self.set_header("Content-Type", "application/json")
+        self.write(jsonify(IngressPacketsHandler._packets))

@@ -26,7 +26,7 @@ html, body {
   overflow: hidden;
   min-height: 100% !important;
   height: 100%;
-  font-family: 'Jost', Jost, Source Sans Pro, Helvetica Neue, Arial, sans-serif;
+  font-family: Jost, Source Sans Pro, Helvetica Neue, Arial, sans-serif;
 }
 
 main {

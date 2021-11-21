@@ -2,7 +2,7 @@
   <el-breadcrumb separator-class="el-icon-arrow-right">
     <el-row>
       <el-col>
-        <el-breadcrumb-item><a href="/"><ion-icon name="telescope"></ion-icon> Overview</a></el-breadcrumb-item>
+        <el-breadcrumb-item><a href="/">Overview</a></el-breadcrumb-item>
         <el-breadcrumb-item v-for="(item, index) in crumbs" :key="index">{{ item.meta.text }}</el-breadcrumb-item>
       </el-col>
     </el-row>

@@ -2,24 +2,15 @@
   <el-card v-loading="loading" style="height: 89vh" class="box-card">
     <el-tabs v-model="active">
       <el-tab-pane label="General" name="general">
-        <el-form ref="form" :model="ps" label-width="120px" size="mini">
-          <el-form-item label="Name">
-            <el-input disabled v-model="ps.name">
-              <template #append>
-                <el-button icon="search"></el-button>
-              </template>
-            </el-input>
-          </el-form-item>
-          <el-form-item label="Path">
-            <el-input disabled v-model="ps.exe">
-              <template #append>
-                <el-button :icon="document-copy"></el-button>
-              </template>
-            </el-input>
-          </el-form-item>
-        </el-form>
+        <General v-bind:ps="ps"/>
       </el-tab-pane>
-      <el-tab-pane label="Modules" name="modules">Modules</el-tab-pane>
+
+      <el-tab-pane label="Modules" name="modules">
+        <Modules v-bind:modules="ps.modules"></Modules>
+      </el-tab-pane>
+
+      <el-tab-pane label="Events" name="events">
+      </el-tab-pane>
     </el-tabs>
   </el-card>
 </template>
@@ -27,8 +18,11 @@
 <script>
 import axios from "axios";
 import {ElMessage} from "element-plus";
+import General from "@/components/ps/tab/General";
+import Modules from "@/components/ps/tab/Modules";
 
 export default {
+  components: {Modules, General},
   props: ['pid'],
   data() {
     return {
@@ -48,10 +42,17 @@ export default {
           ElMessage.error({showClose: true, message: error, type: 'error'})
           this.loading = false
         })
-    },
+    }
   },
   created() {
     this.fetchProcess()
   }
 }
 </script>
+
+<style>
+.header-row {
+  font-weight: 500;
+  font-size: 13px;
+}
+</style>

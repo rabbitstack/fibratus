@@ -13,9 +13,9 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
-import json
 
+CREATE_PROCESS = 'CreateProcess'
+ENUM_PROCESS = 'EnumProcess'
 
-def jsonify(obj):
-    """Produces a JSON representation of the given object"""
-    return json.dumps(obj, default=vars)
+ENUM_IMAGE = 'EnumImage'
+LOAD_IMAGE = 'LoadImage'
