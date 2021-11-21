@@ -36,7 +36,7 @@ import (
 )
 
 // systemRootRegexp is the regular expression for detecting path with unexpanded SystemRoot environment variable
-var systemRootRegexp = regexp.MustCompile(`%SystemRoot%|\\SystemRoot`)
+var systemRootRegexp = regexp.MustCompile(`%SystemRoot%|\\SystemRoot|%systemroot%`)
 
 // procYaraScans stores the total count of yara process scans
 var procYaraScans = expvar.NewInt("yara.proc.scans")
@@ -79,7 +79,8 @@ func (ps psInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 		// some system processes are reported without the path in command line
 		// or contain an empty command line arguments
 		if !strings.Contains(comm, `\\:`) || comm == "" {
-			_, ok := sysProcs[comm]
+			proc, _ := kevt.Kparams.GetString(kparams.ProcessName)
+			_, ok := sysProcs[proc]
 			if ok {
 				_ = kevt.Kparams.Set(kparams.Comm, filepath.Join(os.Getenv("SystemRoot"), comm), kparams.UnicodeString)
 			}
@@ -90,7 +91,7 @@ func (ps psInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 		i := strings.Index(comm, ".exe")
 		if i > 0 {
 			exe := strings.Replace(comm[0:i+4], "\"", "", -1)
-			if strings.Contains(exe, "SystemRoot") || strings.HasPrefix(strings.ToLower(exe), "%systemroot%") {
+			if systemRootRegexp.MatchString(exe) {
 				exe = systemRootRegexp.ReplaceAllString(exe, os.Getenv("SystemRoot"))
 			}
 			kevt.Kparams.Append(kparams.Exe, kparams.UnicodeString, exe)
