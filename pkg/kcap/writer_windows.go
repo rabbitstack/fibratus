@@ -23,6 +23,12 @@ package kcap
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	"github.com/dustin/go-humanize"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/rabbitstack/fibratus/pkg/handle"
@@ -33,11 +39,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/bytes"
 	zstd "github.com/valyala/gozstd"
-	"os"
-	"path/filepath"
-	"sync"
-	"sync/atomic"
-	"time"
 )
 
 type stats struct {
@@ -47,8 +48,6 @@ type stats struct {
 	bytesWritten   uint64
 	handlesWritten uint64
 	procsWritten   uint64
-
-	pids map[uint32]bool
 }
 
 func (s *stats) incKevts(kevt *kevent.Kevent) {
@@ -62,15 +61,6 @@ func (s *stats) incKevts(kevt *kevent.Kevent) {
 func (s *stats) incBytes(bytes uint64) { atomic.AddUint64(&s.bytesWritten, bytes) }
 func (s *stats) incHandles()           { atomic.AddUint64(&s.handlesWritten, 1) }
 func (s *stats) incProcs(kevt *kevent.Kevent) {
-	// EnumProcess events can arrive twice for the same kernel session, so we
-	// ignore incrementing the number of processes if we've already seen the process
-	if kevt.Type == ktypes.EnumProcess {
-		pid, _ := kevt.Kparams.GetPid()
-		if _, ok := s.pids[pid]; ok {
-			return
-		}
-		s.pids[pid] = true
-	}
 	if kevt.Type == ktypes.CreateProcess || kevt.Type == ktypes.EnumProcess {
 		atomic.AddUint64(&s.procsWritten, 1)
 	}
@@ -112,6 +102,9 @@ type writer struct {
 	stats *stats
 	// mu protects the underlying zstd buffer
 	mu sync.Mutex
+	// hashes holds discriminant hashes of enumerate
+	// events that already appeared on the stream
+	hashes map[uint64]bool
 }
 
 // NewWriter constructs a new instance of the kcap writer.
@@ -154,8 +147,9 @@ func NewWriter(filename string, psnap ps.Snapshotter, hsnap handle.Snapshotter) 
 		flusher: time.NewTicker(time.Second),
 		psnap:   psnap,
 		hsnap:   hsnap,
-		stop:    make(chan struct{}, 1),
-		stats:   &stats{kcapFile: filename, pids: make(map[uint32]bool)},
+		stop:    make(chan struct{}),
+		stats:   &stats{kcapFile: filename},
+		hashes:  make(map[uint64]bool),
 	}
 
 	if err := w.writeSnapshots(); err != nil {
@@ -189,12 +183,26 @@ func (w *writer) Write(kevtsc chan *kevent.Kevent, errs chan error) chan error {
 	go func() {
 		for {
 			select {
+			case <-w.stop:
+				return
 			case kevt := <-kevtsc:
 				b := kevt.MarshalRaw()
 				l := len(b)
 				if l == 0 {
 					continue
 				}
+
+				// skip duplicate enumerate events
+				hash := kevt.Discriminant()
+				if hash != 0 {
+					if _, seen := w.hashes[hash]; !seen {
+						w.hashes[hash] = true
+					} else {
+						kevt.Release()
+						continue
+					}
+				}
+
 				// write event buffer
 				err := w.write(b)
 				if err != nil {
@@ -211,8 +219,6 @@ func (w *writer) Write(kevtsc chan *kevent.Kevent, errs chan error) chan error {
 			case err := <-errs:
 				errsc <- err
 				kstreamConsumerErrors.Add(1)
-			case <-w.stop:
-				return
 			}
 		}
 	}()
@@ -244,8 +250,9 @@ func (w *writer) Close() error {
 
 	w.stats.printStats()
 
-	w.flusher.Stop()
 	w.stop <- struct{}{}
+	w.flusher.Stop()
+
 	if w.zw != nil {
 		defer w.zw.Release()
 		if err := w.zw.Close(); err != nil {
