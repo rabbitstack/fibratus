@@ -70,16 +70,10 @@ func newPSAccessor() accessor { return &psAccessor{} }
 
 func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
 	switch f {
-	case fields.PsSnapshotID:
-		return kevt.Kparams.GetPid()
 	case fields.PsPid:
-		return kevt.PID, nil
+		return kevt.Kparams.GetPid()
 	case fields.PsPpid:
-		ps := kevt.PS
-		if ps == nil {
-			return kevt.Kparams.GetPpid()
-		}
-		return ps.Ppid, nil
+		return kevt.Kparams.GetPpid()
 	case fields.PsName:
 		ps := kevt.PS
 		if ps == nil || ps.Name == "" {

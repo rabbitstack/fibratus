@@ -33,8 +33,6 @@ var pathRegexp = regexp.MustCompile(`(pe.sections|pe.resources|ps.envs|ps.module
 type Field string
 
 const (
-	// PsSnapshotID specifies the pid field of the enumeration events
-	PsSnapshotID = "ps.snapshot.id"
 	// PsPid represents the process id field
 	PsPid Field = "ps.pid"
 	// PsPpid represents the parent process id field
@@ -333,7 +331,6 @@ var fields = map[Field]FieldInfo{
 	KevtDateWeekday: {KevtDateWeekday, "week day on which the event occurred", kparams.AnsiString, []string{"kevt.date.weekday = 'Monday'"}},
 	KevtNparams:     {KevtNparams, "number of parameters", kparams.Int8, []string{"kevt.nparams > 2"}},
 
-	PsSnapshotID:        {PsSnapshotID, "snapshot process identifier", kparams.PID, []string{"ps.snapshot.id = 1023"}},
 	PsPid:               {PsPid, "process identifier", kparams.PID, []string{"ps.pid = 1024"}},
 	PsPpid:              {PsPpid, "parent process identifier", kparams.PID, []string{"ps.ppid = 45"}},
 	PsName:              {PsName, "process image name including the file extension", kparams.UnicodeString, []string{"ps.name contains 'firefox'"}},
