@@ -18,7 +18,14 @@
 
 package kevent
 
-import "github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+import (
+	"encoding/binary"
+	"hash/fnv"
+
+	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
+
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+)
 
 // IsNetworkTCP determines whether the kevent pertains to network TCP events.
 func (kevt Kevent) IsNetworkTCP() bool {
@@ -28,4 +35,51 @@ func (kevt Kevent) IsNetworkTCP() bool {
 // IsNetworkUDP determines whether the kevent pertains to network UDP events.
 func (kevt Kevent) IsNetworkUDP() bool {
 	return kevt.Type == ktypes.RecvUDPv4 || kevt.Type == ktypes.RecvUDPv6 || kevt.Type == ktypes.SendUDPv4 || kevt.Type == ktypes.SendUDPv6
+}
+
+// Discriminant returns the hash value that uniquely identifies
+// a particular event instance. This is useful for discarding
+// instances of repetitive enumerate events like EnumProcess or
+// EnumImage that are produced when the trace session is restarted.
+func (kevt Kevent) Discriminant() uint64 {
+	switch kevt.Type {
+	case ktypes.EnumProcess:
+		h := fnv.New64()
+
+		pid, _ := kevt.Kparams.GetPid()
+		b := make([]byte, 4)
+		binary.LittleEndian.PutUint32(b, pid)
+		_, _ = h.Write(b)
+		return h.Sum64()
+
+	case ktypes.EnumImage:
+		h := fnv.New64()
+
+		pid, _ := kevt.Kparams.GetPid()
+		mod, _ := kevt.Kparams.GetString(kparams.ImageFilename)
+		b := make([]byte, 4+len(mod))
+
+		binary.LittleEndian.PutUint32(b, pid)
+		b = append(b, mod...)
+
+		_, _ = h.Write(b)
+		return h.Sum64()
+
+	case ktypes.EnumThread:
+		h := fnv.New64()
+
+		pid, _ := kevt.Kparams.GetPid()
+		tid, _ := kevt.Kparams.GetTid()
+
+		b := make([]byte, 8)
+
+		binary.LittleEndian.PutUint32(b, pid)
+		binary.LittleEndian.PutUint32(b[4:], tid)
+
+		_, _ = h.Write(b)
+		return h.Sum64()
+
+	default:
+		return 0
+	}
 }
