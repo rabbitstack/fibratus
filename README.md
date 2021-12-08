@@ -53,6 +53,18 @@ fibratus run kevt.name = 'CreateThread' and kevt.pid != thread.pid
 fibratus capture kevt.category = 'file' -o files.kcap
 ```
 
+- Replay events from the capture
+
+```
+fibratus replay file.extension in ('.exe', '.dll') -k files.kcap
+```
+
+- Run the filament for watching file system changes
+
+```
+fibratus run -f watch_files
+```
+
 ### Features
 
 - :zap: blazing fast
