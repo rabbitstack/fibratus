@@ -47,16 +47,16 @@ fibratus run file.operation = 'create' and file.name icontains '\\Content.Outloo
 fibratus run kevt.name = 'CreateThread' and kevt.pid != thread.pid
 ```
 
-- Record file system events to the capture file
+- Record network interactions to the capture file
 
 ```
-fibratus capture kevt.category = 'file' -o files.kcap
+fibratus capture kevt.category = 'net' -o conns.kcap
 ```
 
 - Replay events from the capture
 
 ```
-fibratus replay file.extension in ('.exe', '.dll') -k files.kcap
+fibratus replay net.dport in (443, 80) -k conns.kcap
 ```
 
 - Run the filament for watching file system changes
