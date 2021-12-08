@@ -31,7 +31,27 @@ Fibratus is a tool for exploration and tracing of the **Windows** kernel. It let
 
 Events can be shipped to a wide array of [output sinks](https://www.fibratus.io/#/outputs/introduction) or dumped to [capture](https://www.fibratus.io/#/captures/introduction) files for local inspection and forensics analysis. The powerful [filtering](https://www.fibratus.io/#/filters/introduction) engine permits drilling into the event flux entrails.
 
-You can use [filaments](https://www.fibratus.io/#/filaments/introduction) to extend Fibratus with your own arsenal of tools and so leverage the power of the Python ecosystem.
+You can use [filaments](https://www.fibratus.io/#/filaments/introduction) to extend Fibratus with your own arsenal of tools and so leverage the power of the Python ecosystem
+
+### Quick start
+
+- Observe Microsoft Outlook attachments creating on the file system
+
+```
+fibratus run file.operation = 'create' and file.name icontains '\\Content.Outlook\\'
+```
+
+- Hunt remote thread creations
+
+```
+fibratus run kevt.name = 'CreateThread' and kevt.pid != thread.pid
+```
+
+- Record file system events to the capture file
+
+```
+fibratus capture kevt.category = 'file' -o files.kcap
+```
 
 ### Features
 
