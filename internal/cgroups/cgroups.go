@@ -20,22 +20,27 @@ package cgroups
 
 import (
 	"io/ioutil"
+	"os"
 	"regexp"
 )
 
-// cgroupContainerRegexp represents the regular expression for matching the cgroup path pertaning
-// to one of the container engines or orchestration platforms.
+// cgroupContainerRegexp represents the regular expression for matching the process' cgroup
+// hierarchy pertaning to container engines and orchestration platforms.
 //
 // docker - regular Docker containers
 // lxc - Linux containers
-// kubepods - the cgroup path for Kubernetes-managed containers
-// ecs - the cgroup path for ECS (Elastic Container service) containers
+// kubepods - Kubernetes-managed containers
+// ecs - ECS (Elastic Container service) containers
 // libpod - podman containers
 // crio - crio runtime containers
+//
 var cgroupContainerRegexp = regexp.MustCompile("docker|lxc|kubepods|ecs|libpod|crio")
 
-// InContainer determines whether the current process is running in a container.
-var InContainer = matchesContainerCgroup()
+// IsContainerized determines whether the current process is running in a container.
+var IsContainerized = matchesContainerCgroup()
+
+// IsInKubernetes determines whether the current process is running in Kubernetes pod.
+var IsInKubernetes = IsContainerized && os.Getenv("KUBERNETES_PORT_443_TCP") != ""
 
 func matchesContainerCgroup() bool {
 	f, err := ioutil.ReadFile("/proc/self/cgroup")

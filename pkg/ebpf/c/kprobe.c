@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
- 
+
 #include <linux/types.h>
 
 /* In Linux 5.4 asm_inline was introduced, but it's not supported by clang.
@@ -70,7 +70,7 @@ SEC("raw_tracepoint/sys_exit")
 int sys_exit_tracepoint(struct sys_exit_args *ctx) {
     struct pt_regs *regs = (struct pt_regs *)ctx->regs;
 
-	long id = _READ(regs->orig_ax);
+	  long id = _READ(regs->orig_ax);
 
     tail_call(ctx, id);
     return 0;
@@ -89,7 +89,7 @@ int sys_read(struct sys_exit_args *ctx) {
 
     struct pt_regs *regs = (struct pt_regs *)ctx->regs;
 
-	long id = _READ(regs->orig_ax);
+	  long id = _READ(regs->orig_ax);
 
     char *buf = bpf_map_lookup_elem(&buffer_area, &cpu);
     if (buf == NULL) {

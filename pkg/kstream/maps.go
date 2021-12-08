@@ -22,11 +22,14 @@
 package kstream
 
 import (
+	"encoding/binary"
 	"fmt"
 
 	"github.com/cilium/ebpf"
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 )
 
+// MapType is the type alias for possible map types in the eBPF program
 type MapType uint16
 
 const (
@@ -36,18 +39,41 @@ const (
 	// contains the index of the CPU to look up, masked
 	// with BPF_F_INDEX_MASK.
 	Perf MapType = iota
+	// Tracers is the BPF_MAP_TYPE_PROG_ARRAY map type where the key is
+	// the event type identifier and the value represents the file
+	// descriptor of the eBPF program for the tail call
 	Tracers
+	// Discarders is the BPF_MAP_TYPE_LRU_HASH map type that stores
+	// discriminants used to drop the event in kernel space.
 	Discarders
+	KparSpecs
 )
+
+// maxKpars represents the maximum number of parameters in the kevent
+const maxKpars = 1 << 5
+
+// maxKparName is the max size of the parameter name
+const maxKparName = 32
 
 var ebpfMaps = [...]string{
 	"perf",
 	"tracers",
 	"discarders",
+	"kparspecs",
 }
 
 type DiscarderKey struct {
 	Comm [16]byte
+}
+
+type KparSpec struct {
+	Name [maxKparName]byte
+	Type uint16
+}
+
+type KparsValue struct {
+	Nparams uint32
+	Kpars   [maxKpars]KparSpec
 }
 
 func (d *DiscarderKey) MarshalBinary() ([]byte, error) {
@@ -59,6 +85,18 @@ func (d *DiscarderKey) UnmarshalBinary(buf []byte) error {
 	return nil
 }
 
+func (k KparsValue) MarshalBinary() ([]byte, error) {
+	b := make([]byte, 4+((2+maxKparName)*maxKpars))
+	binary.LittleEndian.PutUint32(b, k.Nparams)
+	offset := 0
+	for i := range k.Kpars {
+		copy(b[4+offset:], k.Kpars[i].Name[:])
+		binary.LittleEndian.PutUint16(b[4+maxKparName+offset:], k.Kpars[i].Type)
+		offset += 2
+	}
+	return b, nil
+}
+
 func (m MapType) String() string {
 	switch m {
 	case Perf:
@@ -67,19 +105,24 @@ func (m MapType) String() string {
 		return "tracers"
 	case Discarders:
 		return "discarders"
+	case KparSpecs:
+		return "kparspecs"
 	}
 	return ""
 }
 
+// Maps represents the type alias that stores well-known ebpf maps
 type Maps map[string]*ebpf.Map
 
-func (maps Maps) VerifyMaps() error {
+// ToMaps converts the raw to aliased map type and
+// checks the presence of the mandatory map definitions.
+func ToMaps(maps map[string]*ebpf.Map) (Maps, error) {
 	for _, mapName := range ebpfMaps {
 		if _, ok := maps[mapName]; !ok {
-			return fmt.Errorf("missing map %s", mapName)
+			return nil, fmt.Errorf("missing map %s", mapName)
 		}
 	}
-	return nil
+	return Maps(maps), nil
 }
 
 func (maps Maps) GetMap(m MapType) *ebpf.Map {
@@ -94,4 +137,16 @@ func NewDiscarderKey(proc string) *DiscarderKey {
 	var comm [16]byte
 	copy(comm[:], proc)
 	return &DiscarderKey{comm}
+}
+
+func NewKparsValue(kpars []ktypes.KparInfo) *KparsValue {
+	kparsValue := &KparsValue{
+		Nparams: uint32(len(kpars)),
+	}
+	for i, kpar := range kpars {
+		var kparName [maxKparName]byte
+		copy(kparName[:], kpar.Name)
+		kparsValue.Kpars[i] = KparSpec{Name: kparName, Type: uint16(kpar.Type)}
+	}
+	return kparsValue
 }

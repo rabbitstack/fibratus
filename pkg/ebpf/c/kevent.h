@@ -17,10 +17,10 @@
  */
 
 struct kevent_header {
-    u64 ts;         /* timestamp in nanoseconds from epoch */
-    u32 pid;        /* process identifier that produced the event */
-    u32 tid;        /* thread identifier that produced the event */
-    u32 cpu;        /* logical core on which the event was generated */
-    u32 nparams;    /* number of event parameters */
-    u16 type;       /* event type which corresponds to syscall id */
+    u64 ts;         /* Timestamp in nanoseconds from epoch */
+    u32 pid;        /* Process identifier that produced the event */
+    u32 tid;        /* Thread identifier that produced the event */
+    u32 cpu;        /* Logical core on which the event was generated */
+    u32 nparams;    /* Number of event parameters */
+    u16 type;       /* Event type which maps to syscall id */
 };

@@ -16,6 +16,19 @@
  * limitations under the License.
  */
 
- struct discarder_key {
-     char comm[TASK_COMM_LEN];
- };
+#define MAX_KPARS (1 << 5)      /* Max number of event parameters */
+#define MAX_KPAR_NAME 32        /* Max size of the parameter name */
+
+struct discarder_key {
+    char comm[TASK_COMM_LEN];
+};
+
+struct kpar_spec {
+    char name[MAX_KPAR_NAME];
+    u16 type;
+};
+
+struct kpars_value {
+    u32 nparams;
+    struct kpar_spec specs[MAX_KPARS];
+};

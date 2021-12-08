@@ -25,7 +25,6 @@ import (
 	"expvar"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/cilium/ebpf"
@@ -118,18 +117,22 @@ func NewConsumer(config *config.Config) (Consumer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to load kprobe: %w", err)
 	}
-	maps := Maps(objs.Maps)
-	if err := maps.VerifyMaps(); err != nil {
+	maps, err := ToMaps(objs.Maps)
+	if err != nil {
 		return nil, err
 	}
+
+	var (
+		keventsBlacklist = makeKeventBlacklist(config.Kstream.BlacklistKevents)
+		commsBlacklist   = makeImageBlacklist(config.Kstream.BlacklistImages)
+	)
 
 	// populate tracer programs. This step consists of
 	// traversing the collection of ebpf programs and
 	// indexing the ktype number to the corresponding
 	// program file descriptor.
-	keventsBlacklist := makeKeventBlacklist(config.Kstream.BlacklistKevents)
 	for _, progSpec := range spec.Programs {
-		ktype := ktypes.KeventNameToKtype(strings.TrimPrefix(progSpec.Name, "sys_"))
+		ktype := ktypes.FromProg(progSpec.Name)
 		if ktype == ktypes.UnknownKtype || keventsBlacklist.has(ktype) {
 			continue
 		}
@@ -148,21 +151,31 @@ func NewConsumer(config *config.Config) (Consumer, error) {
 	// Any event that is originated by the process image
 	// present in the discarders map is dropped in the raw
 	// syscall tracepoint hook
-	comms := append(config.Kstream.BlacklistImages, procfs.SelfComm())
-	for _, comm := range comms {
+	for _, comm := range commsBlacklist {
 		key := NewDiscarderKey(comm)
 		if err := maps.Put(Discarders, key, key); err != nil {
 			discarderFailedInsertions.Add(err.Error(), 1)
 		}
 	}
+	// populate kpar specs map
+	for _, kevtInfo := range ktypes.GetKtypesMeta() {
+		ktype := ktypes.KeventNameToKtype(kevtInfo.Name)
+		if ktype == ktypes.UnknownKtype {
+			continue
+		}
+		if err := maps.Put(KparSpecs, ktype.RawID(), NewKparsValue(kevtInfo.Kpars)); err != nil {
+			return nil, err
+		}
+	}
 
 	kconsumer := &kstreamConsumer{
-		objs:   objs,
-		spec:   spec,
-		maps:   maps,
-		config: config,
-		kevts:  make(chan *kevent.Kevent),
-		errs:   make(chan error, 1000),
+		objs:      objs,
+		spec:      spec,
+		maps:      maps,
+		config:    config,
+		kevts:     make(chan *kevent.Kevent),
+		errs:      make(chan error, 1000),
+		sequencer: kevent.NewSequencer(),
 	}
 
 	return kconsumer, nil
@@ -170,7 +183,7 @@ func NewConsumer(config *config.Config) (Consumer, error) {
 
 // OpenKstream attaches the eBPF program to the raw tracepoint for
 // intercepting all syscall exit events and polls the perf ring buffer
-// for incoming events.
+// for raw samples.
 func (k *kstreamConsumer) OpenKstream() error {
 	watermark := k.config.Kstream.Watermark
 	perCPUBuffer := k.config.Kstream.RingBufferSize
@@ -229,6 +242,7 @@ func (k kstreamConsumer) CloseKstream() error {
 	if err := k.tracepoint.Close(); err != nil {
 		return err
 	}
+	// release prog collection
 	k.objs.Close()
 	return k.perfReader.Close()
 }
@@ -251,7 +265,7 @@ func (k kstreamConsumer) processKevent(rawSample []byte) error {
 		return nil
 	}
 	kevt := kevent.New(
-		1,
+		k.sequencer.Get(),
 		header.Pid,
 		header.Tid,
 		uint8(header.CPU),
@@ -260,6 +274,8 @@ func (k kstreamConsumer) processKevent(rawSample []byte) error {
 		nil,
 	)
 	k.kevts <- kevt
+
+	k.sequencer.Increment()
 
 	return nil
 }
@@ -283,4 +299,8 @@ func makeKeventBlacklist(kevents []string) blacklist {
 		}
 	}
 	return keventsBlacklist
+}
+
+func makeImageBlacklist(images []string) []string {
+	return append(images, procfs.SelfComm())
 }

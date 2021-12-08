@@ -59,9 +59,7 @@ var (
 	// deferredEnqueued counts the number of deferred events
 	deferredEnqueued = expvar.NewInt("kstream.deferred.kevents.enqueued")
 	// failedKparams counts the number of kernel event parameters that failed to process
-	failedKparams      = expvar.NewInt("kstream.kevent.param.failures")
-	blacklistedKevents = expvar.NewMap("kstream.blacklist.dropped.kevents")
-	blacklistedProcs   = expvar.NewMap("kstream.blacklist.dropped.procs")
+	failedKparams = expvar.NewInt("kstream.kevent.param.failures")
 
 	upstreamCancellations = expvar.NewInt("kstream.upstream.cancellations")
 

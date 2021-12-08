@@ -18,7 +18,20 @@
 
 package kevent
 
+import "sync/atomic"
+
 type Sequencer struct {
+	seq uint64
 }
 
 func NewSequencer() *Sequencer { return &Sequencer{} }
+
+// Increment increments the sequence number atomically.
+func (s *Sequencer) Increment() {
+	atomic.AddUint64(&s.seq, 1)
+}
+
+// Get returns the current sequence number.
+func (s *Sequencer) Get() uint64 {
+	return atomic.LoadUint64(&s.seq)
+}

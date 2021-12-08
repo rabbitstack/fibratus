@@ -18,7 +18,10 @@
 
 package ktypes
 
-import "math"
+import (
+	"math"
+	"strings"
+)
 
 // Ktype represents the kernel event type which usually maps to syscall identifier
 type Ktype uint16
@@ -46,3 +49,8 @@ func (k Ktype) String() string {
 func (k Ktype) RawID() uint32 { return uint32(k) }
 
 func (k Ktype) Hash() uint32 { return 0 }
+
+// FromProg creates the ktype from eBPF program name.
+func FromProg(prog string) Ktype {
+	return KeventNameToKtype(strings.TrimPrefix(prog, "sys_"))
+}

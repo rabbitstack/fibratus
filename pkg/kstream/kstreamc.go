@@ -29,6 +29,9 @@ import (
 var (
 	// failedKevents counts the number of kevents that failed to process grouped by error
 	failedKevents = expvar.NewMap("kstream.kevents.failures")
+
+	blacklistedKevents = expvar.NewMap("kstream.blacklist.dropped.kevents")
+	blacklistedProcs   = expvar.NewMap("kstream.blacklist.dropped.procs")
 )
 
 // Consumer is the interface all kernel event stream consumers have to satisfy.

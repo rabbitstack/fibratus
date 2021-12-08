@@ -44,6 +44,13 @@ struct bpf_map_def SEC("maps/discarders") discarders = {
         .max_entries = 32000,
 };
 
+struct bpf_map_def SEC("maps/kparspecs") kparspecs = {
+        .type = BPF_MAP_TYPE_LRU_HASH,
+        .key_size = sizeof(u32),
+        .value_size = sizeof(struct kpars_value),
+        .max_entries = sizeof(u16),
+};
+
 struct bpf_map_def SEC("maps/buffer_area") buffer_area = {
         .type = BPF_MAP_TYPE_ARRAY,
         .key_size = sizeof(u32),
