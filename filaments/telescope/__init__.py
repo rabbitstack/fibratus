@@ -19,7 +19,7 @@ Inspects your
 """
 
 from filament.http import HttpServer
-from telescope.handlers import NavbarHandler, ProcessTreeHandler, ProcessHandler, IngressPacketsHandler
+from telescope.handlers import NavbarHandler, ProcessTreeHandler, ProcessHandler, PacketHandler
 import os
 import signal
 import sys
@@ -37,7 +37,7 @@ class Telescope:
                 (r'/navbar', NavbarHandler),
                 (r'/processes', ProcessTreeHandler),
                 (r'/processes/(\d+)', ProcessHandler),
-                (r'/ingress', IngressPacketsHandler)
+                (r'/packets', PacketHandler)
             ],
         )
 
@@ -54,10 +54,10 @@ def on_init():
     if not __is_kcap__:
         print(f"error: {sys.argv[0]} filament needs a capture file. To produce the capture file "
               f"run `fibratus capture -o {sys.argv[0]}`. Use the resulting capture to run the filament "
-              f"with `fibratus replay -f {sys.argv[0]} -k {sys.argv[0]}` command")
+              f"with the `fibratus replay -f {sys.argv[0]} -k {sys.argv[0]}` command")
         sys.exit(0)
     # Augment handler classes with the read_kcap method
-    for kclass in [ProcessTreeHandler, ProcessHandler, IngressPacketsHandler]:
+    for kclass in [ProcessTreeHandler, ProcessHandler, PacketHandler]:
         kclass.read_kcap = read_kcap
     telescope.run()
 

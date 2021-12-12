@@ -88,7 +88,7 @@ func (ps psInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 		// to compose the full executable string we extract the path
 		// from the process's command line by expanding the `SystemRoot`
 		// env variable accordingly and also removing rubbish characters
-		i := strings.Index(comm, ".exe")
+		i := strings.Index(strings.ToLower(comm), ".exe")
 		if i > 0 {
 			exe := strings.Replace(comm[0:i+4], "\"", "", -1)
 			if systemRootRegexp.MatchString(exe) {
@@ -115,12 +115,11 @@ func (ps psInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 		if typ != ktypes.TerminateProcess {
 			if pid != 0 {
 				// get the process's start time and append it to the parameters
-				started, err := getStartTime(pid)
+				started, err := getStartTime(pid, kevt.Timestamp)
 				if err != nil {
 					log.Warnf("couldn't get process (%d) start time: %v", pid, err)
-				} else {
-					_ = kevt.Kparams.Append(kparams.StartTime, kparams.Time, started)
 				}
+				_ = kevt.Kparams.Append(kparams.StartTime, kparams.Time, started)
 			}
 			if ps.yara != nil && typ == ktypes.CreateProcess {
 				// run yara scanner on the target process
@@ -171,15 +170,15 @@ func (ps psInterceptor) Close() {
 	}
 }
 
-func getStartTime(pid uint32) (time.Time, error) {
+func getStartTime(pid uint32, ts time.Time) (time.Time, error) {
 	handle, err := process.Open(process.QueryLimitedInformation, false, pid)
 	if err != nil {
-		return time.Now(), err
+		return ts, err
 	}
 	defer handle.Close()
 	started, err := process.GetStartTime(handle)
 	if err != nil {
-		return time.Now(), err
+		return ts, err
 	}
 	return started, nil
 }

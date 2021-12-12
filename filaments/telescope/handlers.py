@@ -85,11 +85,11 @@ class ProcessHandler(BaseHandler, ABC):
         self.write(jsonify(ps))
 
 
-class IngressPacketsHandler(BaseHandler, ABC):
+class PacketHandler(BaseHandler, ABC):
     _packets = None
 
     def get(self):
-        if not IngressPacketsHandler._packets:
+        if not PacketHandler._packets:
             kevents = list(map(to_ddict, self.read_kcap("kevt.name in ('Accept', 'Recv')")))
 
             by_dport = Counter()
@@ -101,10 +101,10 @@ class IngressPacketsHandler(BaseHandler, ABC):
                         (kevent.kparams.dport,)])
                 by_sport.update((kevent.kparams.sport,))
 
-            IngressPacketsHandler._packets = Packets(
-                [{"port": c[0], "count": c[1]} for c in by_dport.most_common()],
+            PacketHandler._packets = Packets(
+                [{"port": c[0], "count": c[1], "pct": (c[1] * 100) / len(kevents)} for c in by_dport.most_common()],
                 by_sport.most_common()
             )
 
         self.set_header("Content-Type", "application/json")
-        self.write(jsonify(IngressPacketsHandler._packets))
+        self.write(jsonify(PacketHandler._packets))

@@ -52,7 +52,7 @@ def build_tree(kevents):
         tree[ppid].append(pid)
         procs[pid] = kevt
 
-    # Avoid endless recursion for PID 0 whose parent is 0
+    # Avoid endless recursion for PID 0 whose parent is reported as 0
     if 0 in tree and 0 in tree[0]:
         del tree[0]
 
