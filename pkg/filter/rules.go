@@ -32,7 +32,6 @@ import (
 	"text/template"
 )
 
-
 const (
 	// ruleNameMeta identifies the rule that was triggered by the event
 	ruleNameMeta = "rule.name"

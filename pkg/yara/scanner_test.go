@@ -22,6 +22,16 @@
 package yara
 
 import (
+	"os"
+	"path/filepath"
+	"syscall"
+	"testing"
+	"time"
+
+	"github.com/hillu/go-yara/v4"
+	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
@@ -34,11 +44,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"os"
-	"path/filepath"
-	"syscall"
-	"testing"
-	"time"
 )
 
 var yaraAlert *alertsender.Alert
@@ -167,8 +172,19 @@ func TestScan(t *testing.T) {
 		time.Sleep(time.Millisecond * 100)
 	}
 
+	kevt := &kevent.Kevent{
+		Type: ktypes.CreateProcess,
+		Name: "CreateProcess",
+		Tid:  2484,
+		PID:  859,
+		Kparams: kevent.Kparams{
+			kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "svchost.exe"},
+		},
+		Metadata: make(map[string]string),
+	}
+
 	// test attaching on pid
-	require.NoError(t, s.ScanProc(pi.ProcessId))
+	require.NoError(t, s.ScanProc(pi.ProcessId, kevt))
 	require.NotNil(t, yaraAlert)
 
 	assert.Equal(t, "YARA alert on process notepad.exe", yaraAlert.Title)
@@ -177,10 +193,35 @@ func TestScan(t *testing.T) {
 
 	// test file scanning on DLL that merely contains
 	// the fmt.Println("Go Yara DLL Test") statement
-	require.NoError(t, s.ScanFile("_fixtures/yara-test.dll"))
+	require.NoError(t, s.ScanFile("_fixtures/yara-test.dll", kevt))
 	require.NotNil(t, yaraAlert)
 
 	assert.Equal(t, "YARA alert on file _fixtures/yara-test.dll", yaraAlert.Title)
 	assert.Contains(t, yaraAlert.Tags, "dll")
 
+}
+
+func TestMatchesMeta(t *testing.T) {
+	yaraMatches := []yara.MatchRule{
+		{Rule: "test", Namespace: "ns1"},
+		{Rule: "test2", Namespace: "ns2", Tags: []string{"dropper"}, Metas: []yara.Meta{{Identifier: "author", Value: "rabbit"}}},
+	}
+
+	kevt := &kevent.Kevent{
+		Type: ktypes.CreateProcess,
+		Name: "CreateProcess",
+		Tid:  2484,
+		PID:  859,
+		Kparams: kevent.Kparams{
+			kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "svchost.exe"},
+		},
+		Metadata: make(map[string]string),
+	}
+
+	assert.Empty(t, kevt.Metadata)
+
+	putMatchesMeta(yaraMatches, kevt)
+
+	assert.NotEmpty(t, kevt.Metadata)
+	assert.Contains(t, kevt.Metadata, matchesMeta)
 }

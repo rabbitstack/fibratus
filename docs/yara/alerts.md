@@ -104,3 +104,40 @@ Resources:
   ProductName: Microsoft® Windows® Operating System
   ProductVersion: 10.0.18362.693
 ```
+
+##  Event metadata {docsify-ignore}
+
+When the event triggers a specific YARA rule, its metadata is automatically decorated with the rule matches. 
+The`yara.matches` tag contains the JSON array payload where each object represents the YARA rule match. For example:
+
+```json
+[
+  {
+    "Rule": "AnglerEKredirector ",
+    "Namespace": "EK",
+    "Tags": null,
+    "Metas": [
+      {
+        "Identifier": "description",
+        "Value": "Angler Exploit Kit Redirector"
+      }
+    ],
+    "Strings": "..."
+  },
+  {
+    "Rule": "angler_flash_uncompressed ",
+    "Namespace": "EK",
+    "Tags": [
+      "exploitkit"
+    ],
+    "Metas": [
+      {
+        "Identifier": "description",
+        "Value": "Angler Exploit Kit Detection"
+      }
+    ],
+    "Strings": "..."
+  }
+]
+```
+

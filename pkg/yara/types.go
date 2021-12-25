@@ -18,14 +18,16 @@
 
 package yara
 
+import "github.com/rabbitstack/fibratus/pkg/kevent"
+
 // Scanner watches for certain kernel events such as process creation or image loading and
 // triggers the scanning either of the target process or image file. If matches occur, an
 // alert is emitted via specified alert sender.
 type Scanner interface {
 	// ScanProc scans process memory.
-	ScanProc(pid uint32) error
+	ScanProc(pid uint32, kevt *kevent.Kevent) error
 	// ScanFile scans the specified file in the file system.
-	ScanFile(filename string) error
+	ScanFile(filename string, kevt *kevent.Kevent) error
 	// Close disposes any resources allocated by scanner.
 	Close()
 }

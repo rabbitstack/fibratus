@@ -20,6 +20,12 @@ package interceptors
 
 import (
 	"expvar"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
@@ -27,11 +33,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/syscall/process"
 	"github.com/rabbitstack/fibratus/pkg/yara"
 	log "github.com/sirupsen/logrus"
-	"os"
-	"path/filepath"
-	"regexp"
-	"strings"
-	"time"
 )
 
 // systemRootRegexp is the regular expression for detecting path with unexpanded SystemRoot environment variable
@@ -122,7 +123,7 @@ func (ps psInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 				// run yara scanner on the target process
 				go func() {
 					procYaraScans.Add(1)
-					err := ps.yara.ScanProc(pid)
+					err := ps.yara.ScanProc(pid, kevt)
 					if err != nil {
 						log.Warnf("unable to run yara scanner on pid %d: %v", pid, err)
 					}
