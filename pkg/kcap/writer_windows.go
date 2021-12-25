@@ -23,6 +23,12 @@ package kcap
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	"github.com/dustin/go-humanize"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/rabbitstack/fibratus/pkg/handle"
@@ -33,11 +39,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/bytes"
 	zstd "github.com/valyala/gozstd"
-	"os"
-	"path/filepath"
-	"sync"
-	"sync/atomic"
-	"time"
 )
 
 type stats struct {
@@ -154,7 +155,7 @@ func NewWriter(filename string, psnap ps.Snapshotter, hsnap handle.Snapshotter) 
 		flusher: time.NewTicker(time.Second),
 		psnap:   psnap,
 		hsnap:   hsnap,
-		stop:    make(chan struct{}, 1),
+		stop:    make(chan struct{}),
 		stats:   &stats{kcapFile: filename, pids: make(map[uint32]bool)},
 	}
 
@@ -246,6 +247,7 @@ func (w *writer) Close() error {
 
 	w.flusher.Stop()
 	w.stop <- struct{}{}
+
 	if w.zw != nil {
 		defer w.zw.Release()
 		if err := w.zw.Close(); err != nil {
