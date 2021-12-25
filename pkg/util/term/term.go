@@ -62,7 +62,7 @@ type consoleScreenBufferInfo struct {
 	size       point
 	_          point
 	attributes uint16
-	_          rect
+	rect       rect
 	_          point
 }
 
@@ -87,7 +87,7 @@ func GetColumns() int {
 	if err != nil {
 		return 0
 	}
-	return int(bufferInfo.size.x)
+	return int(bufferInfo.rect.right)
 }
 
 // showCursor shows/hides the cursor.
