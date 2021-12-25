@@ -108,7 +108,7 @@ Resources:
 ##  Event metadata {docsify-ignore}
 
 When the event triggers a specific YARA rule, its metadata is automatically decorated with the rule matches. 
-The`yara.matches` tag contains the JSON array payload where each object represents the YARA rule match. For example:
+The `yara.matches` tag contains the JSON array payload where each object represents the YARA rule match. For example:
 
 ```json
 [
