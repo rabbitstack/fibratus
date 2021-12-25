@@ -20,6 +20,7 @@ package interceptors
 
 import (
 	"expvar"
+
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
@@ -67,7 +68,7 @@ func (i *imageInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool,
 			// scan the the target filename
 			go func() {
 				imageYaraScans.Add(1)
-				err := i.yara.ScanFile(filename)
+				err := i.yara.ScanFile(filename, kevt)
 				if err != nil {
 					log.Warnf("unable to run yara scanner on %s image: %v", filename, err)
 				}

@@ -23,22 +23,28 @@ package yara
 
 import (
 	"bytes"
+	"encoding/json"
 	"expvar"
 	"fmt"
+	"html/template"
+	"os"
+	"path/filepath"
+	"time"
+
 	"github.com/hillu/go-yara/v4"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
+	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"github.com/rabbitstack/fibratus/pkg/yara/config"
 	log "github.com/sirupsen/logrus"
-	"html/template"
-	"os"
-	"path/filepath"
-	"time"
 )
 
 const alertTitleTmpl = `{{if .PS }}YARA alert on process {{ .PS.Name }}{{ else }}YARA alert on file {{ .Filename }}{{ end }}`
+
+// matchesMeta is the tag name for the yara matches
+const matchesMeta = "yara.matches"
 
 var (
 	// ruleMatches computes all the rule matches
@@ -159,7 +165,7 @@ func parseCompilerErrors(errors []yara.CompilerMessage) error {
 	return multierror.Wrap(errs...)
 }
 
-func (s scanner) ScanProc(pid uint32) error {
+func (s scanner) ScanProc(pid uint32, kevt *kevent.Kevent) error {
 	proc := s.psnap.Find(pid)
 	if proc == nil {
 		return fmt.Errorf("cannot scan proc. pid %d does not exist in snapshotter", pid)
@@ -183,15 +189,20 @@ func (s scanner) ScanProc(pid uint32) error {
 	}
 	ruleMatches.Add(int64(len(matches)))
 
+	if err := putMatchesMeta(matches, kevt); err != nil {
+		return err
+	}
+
 	ctx := AlertContext{
 		PS:        proc,
 		Matches:   matches,
 		Timestamp: time.Now().Format(tsLayout),
 	}
+
 	return s.send(ctx)
 }
 
-func (s scanner) ScanFile(filename string) error {
+func (s scanner) ScanFile(filename string, kevt *kevent.Kevent) error {
 	if s.config.SkipFiles || s.config.ShouldSkipFile(filename) {
 		return nil
 	}
@@ -209,6 +220,10 @@ func (s scanner) ScanFile(filename string) error {
 		return nil
 	}
 	ruleMatches.Add(int64(len(matches)))
+
+	if err := putMatchesMeta(matches, kevt); err != nil {
+		return err
+	}
 
 	ctx := AlertContext{
 		Filename:  filename,
@@ -279,6 +294,16 @@ func tagsFromMatches(matches []yara.MatchRule) []string {
 		tags = append(tags, match.Tags...)
 	}
 	return tags
+}
+
+// putMatchesMeta injects rule matches into event metadata as a JSON payload.
+func putMatchesMeta(matches yara.MatchRules, kevt *kevent.Kevent) error {
+	b, err := json.Marshal(matches)
+	if err != nil {
+		return nil
+	}
+	kevt.AddMeta(matchesMeta, string(b))
+	return nil
 }
 
 func (s scanner) Close() {
