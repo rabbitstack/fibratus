@@ -300,7 +300,7 @@ func tagsFromMatches(matches []yara.MatchRule) []string {
 func putMatchesMeta(matches yara.MatchRules, kevt *kevent.Kevent) error {
 	b, err := json.Marshal(matches)
 	if err != nil {
-		return nil
+		return err
 	}
 	kevt.AddMeta(matchesMeta, string(b))
 	return nil
