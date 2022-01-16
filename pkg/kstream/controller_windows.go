@@ -20,14 +20,15 @@ package kstream
 
 import (
 	"fmt"
+	"runtime"
+	"time"
+	"unsafe"
+
 	"github.com/rabbitstack/fibratus/pkg/config"
 	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/syscall/etw"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows/registry"
-	"runtime"
-	"time"
-	"unsafe"
 )
 
 const (
@@ -187,6 +188,10 @@ func (k *ktraceController) StartKtrace() error {
 		k.handle = handleCopy
 		k.props = props
 
+		if err := enableTrace(etw.KernelAuditAPICallsGUID, handle, 0x10); err != nil {
+			return fmt.Errorf("couldn't activate kernel audit API calls logger: %v", err)
+		}
+
 		return nil
 	}
 
@@ -316,6 +321,29 @@ func (k *ktraceController) StartKtraceRundown() error {
 
 	return nil
 }
+
+//func startKtrace() error {
+//	props := &etw.EventTraceProperties{
+//		Wnode: etw.WnodeHeader{
+//			BufferSize: uint32(unsafe.Sizeof(etw.EventTraceProperties{})) + 2*maxStringLen,
+//			Flags:      etw.WnodeTraceFlagGUID,
+//		},
+//		LoggerNameOffset:  uint32(unsafe.Sizeof(etw.EventTraceProperties{})),
+//		LogFileNameOffset: 0,
+//		BufferSize:        maxBufferSize,
+//		LogFileMode:       etw.ProcessTraceModeRealtime,
+//	}
+//	handle, err := startTrace(
+//		ktraceSession,
+//		props,
+//	)
+//	if err := enableTrace(etw.KernelRundownGUID, handle, 0x10); err != nil {
+//		return fmt.Errorf("couldn't activate kernel rundown logger: %v", err)
+//	}
+//
+//
+//	return nil
+//}
 
 // IsKRundownStarted indicates if kernel logger rundown session is started.
 func (k *ktraceController) IsKRundownStarted() bool {

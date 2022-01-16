@@ -22,6 +22,11 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
+	"os"
+	"strings"
+	"syscall"
+	"unsafe"
+
 	"github.com/rabbitstack/fibratus/pkg/config"
 	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/filter"
@@ -39,10 +44,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/syscall/winerrno"
 	"github.com/rabbitstack/fibratus/pkg/util/filetime"
 	log "github.com/sirupsen/logrus"
-	"os"
-	"strings"
-	"syscall"
-	"unsafe"
 )
 
 const (
@@ -341,7 +342,7 @@ func (k *kstreamConsumer) processKevent(evt *etw.EventRecord) error {
 		pid = evt.Header.ProcessID
 		tid = evt.Header.ThreadID
 		// get the CPU core on which the event was generated
-		cpu   = *(*uint8)(unsafe.Pointer(&evt.BufferContext.ProcessorIndex[0]))
+		cpu   = *(&evt.BufferContext.ProcessorIndex[0])
 		ktype = ktypes.Pack(evt.Header.ProviderID, evt.Header.EventDescriptor.Opcode)
 	)
 
@@ -437,7 +438,9 @@ func (k *kstreamConsumer) processKevent(evt *etw.EventRecord) error {
 		ts,
 		kpars,
 	)
-
+	if evt.Header.ProviderID == etw.KernelAuditAPICallsGUID {
+		fmt.Println(kevt)
+	}
 	// dispatch each event to the interceptor chain that will further augment the kernel
 	// event with useful fields, route events to corresponding snapshotters or initialize
 	// open files/registry control blocks at the beginning of the kernel trace session
