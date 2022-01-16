@@ -19,6 +19,12 @@
 package ps
 
 import (
+	"os"
+	"path/filepath"
+	"syscall"
+	"testing"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
@@ -26,11 +32,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"os"
-	"path/filepath"
-	"syscall"
-	"testing"
-	"time"
 )
 
 func TestSnapshotterWrite(t *testing.T) {
@@ -86,6 +87,50 @@ func TestSnapshotterWrite(t *testing.T) {
 	require.NotNil(t, ps)
 	require.NotNil(t, ps.Parent)
 	assert.Equal(t, `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --parent`, ps.Parent.Exe)
+}
+
+func TestSnapshotterWriteKeventProcess(t *testing.T) {
+	hsnap := new(handle.SnapshotterMock)
+	psnap := NewSnapshotter(hsnap, &config.Config{})
+
+	kevt := &kevent.Kevent{
+		Type: ktypes.EnumProcess,
+		Kparams: kevent.Kparams{
+			kparams.ProcessID:       {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1200)},
+			kparams.ProcessParentID: {Name: kparams.ProcessParentID, Type: kparams.PID, Value: uint32(8390)},
+			kparams.ProcessName:     {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "spotify.exe"},
+			kparams.Comm:            {Name: kparams.Comm, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`},
+			kparams.Exe:             {Name: kparams.Exe, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --parent`},
+			kparams.UserSID:         {Name: kparams.UserSID, Type: kparams.UnicodeString, Value: `admin\SYSTEM`},
+		},
+	}
+
+	err := psnap.Write(kevt)
+	require.NoError(t, err)
+	require.NotNil(t, psnap.Find(1200))
+
+	assert.Equal(t, uint32(1200), kevt.PS.PID)
+
+	kevt = &kevent.Kevent{
+		Type: ktypes.CreateProcess,
+		PID:  1200,
+		Kparams: kevent.Kparams{
+			kparams.ProcessID:       {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1232)},
+			kparams.ProcessParentID: {Name: kparams.ProcessParentID, Type: kparams.PID, Value: 1200},
+			kparams.ProcessName:     {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "spotify-client.exe"},
+			kparams.Comm:            {Name: kparams.Comm, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`},
+			kparams.Exe:             {Name: kparams.Exe, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe`},
+			kparams.UserSID:         {Name: kparams.UserSID, Type: kparams.UnicodeString, Value: `admin\SYSTEM`},
+		},
+	}
+
+	err = psnap.Write(kevt)
+	require.NoError(t, err)
+
+	assert.Equal(t, uint32(1200), kevt.PS.PID)
+	assert.Equal(t, "spotify.exe", kevt.PS.Name)
+	require.NotNil(t, psnap.Find(1232))
+
 }
 
 func TestSnapshotterWriteNoPIDInParams(t *testing.T) {

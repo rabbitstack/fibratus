@@ -49,6 +49,10 @@ const (
 	PsCwd Field = "ps.cwd"
 	// PsSID represents the process security identifier
 	PsSID Field = "ps.sid"
+	// PsDomain represents the process domain field
+	PsDomain Field = "ps.domain"
+	// PsUsername represents the process username field
+	PsUsername Field = "ps.username"
 	// PsSessionID represents the session id bound to the process
 	PsSessionID Field = "ps.sessionid"
 	// PsEnvs represents the process environment variables
@@ -85,6 +89,23 @@ const (
 	PsParentDTB Field = "ps.parent.dtb"
 	// PsAncestor represents the process ancestor sequence field
 	PsAncestor Field = "ps.ancestor"
+
+	// PsSiblingPid represents the sibling process identifier field
+	PsSiblingPid Field = "ps.sibling.pid"
+	// PsSiblingName represents the sibling process name field
+	PsSiblingName Field = "ps.sibling.name"
+	// PsSiblingComm represents the sibling process command line field
+	PsSiblingComm Field = "ps.sibling.comm"
+	// PsSiblingExe represents the sibling process complete executable path field
+	PsSiblingExe Field = "ps.sibling.exe"
+	// PsSiblingSID represents the sibling processes security identifier field
+	PsSiblingSID Field = "ps.sibling.sid"
+	// PsSiblingSessionID represents the sibling process session id field
+	PsSiblingSessionID Field = "ps.sibling.sessionid"
+	// PsSiblingDomain represents the sibling process domain field
+	PsSiblingDomain Field = "ps.sibling.domain"
+	// PsSiblingUsername represents the sibling process username field
+	PsSiblingUsername Field = "ps.sibling.username"
 
 	// ThreadBasePrio is the base thread priority
 	ThreadBasePrio Field = "thread.prio"

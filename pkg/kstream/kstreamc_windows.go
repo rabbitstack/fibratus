@@ -22,6 +22,11 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
+	"os"
+	"strings"
+	"syscall"
+	"unsafe"
+
 	"github.com/rabbitstack/fibratus/pkg/config"
 	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/filter"
@@ -39,10 +44,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/syscall/winerrno"
 	"github.com/rabbitstack/fibratus/pkg/util/filetime"
 	log "github.com/sirupsen/logrus"
-	"os"
-	"strings"
-	"syscall"
-	"unsafe"
 )
 
 const (
@@ -156,64 +157,6 @@ func NewConsumer(ktraceController KtraceController, psnap ps.Snapshotter, hsnap 
 	go kconsumer.consumeDeferred()
 
 	return kconsumer
-}
-
-func (k *kstreamConsumer) startRundown() error {
-	if err := k.ktraceController.StartKtraceRundown(); err != nil {
-		return err
-	}
-	go k.openRundownConsumer()
-	return nil
-}
-
-func (k *kstreamConsumer) init() error {
-	if k.ktraceController.IsKRundownStarted() {
-		go k.openRundownConsumer()
-	}
-
-	for _, name := range k.config.Kstream.BlacklistKevents {
-		if ktype := ktypes.KeventNameToKtype(name); ktype != ktypes.UnknownKtype {
-			k.keventsBlacklist[ktype] = name
-		}
-	}
-
-	for i, name := range k.config.Kstream.BlacklistImages {
-		k.procsBlacklist[i] = strings.ToLower(name)
-	}
-	// try to compile the rules
-	return k.rules.Compile()
-}
-
-// consumeDeferred is responsible for receiving the events
-// that have been deferred by the interceptors. Events are
-// usually deferred when some of their parameters or global
-// state depend on the presence of other events. For example,
-// CreateHandle events sometimes lack the involved handle name,
-// but their counterpart, CloseHandle events contain that
-// information. So, we wait for the CloseHandle counterpart to
-// occur to augment the deferred event with the handle name param.
-func (k *kstreamConsumer) consumeDeferred() {
-	for {
-		select {
-		case kevt := <-k.deferredKevts:
-			if kevt.PS == nil {
-				kevt.PS = k.psnapshotter.Find(kevt.PID)
-			}
-			if k.isDropped(kevt) {
-				kevt.Release()
-				continue
-			}
-
-			k.kevts <- kevt
-
-			keventsEnqueued.Add(1)
-			deferredEnqueued.Add(1)
-
-			k.sequencer.Increment()
-		case <-k.stop:
-			return
-		}
-	}
 }
 
 // SetFilter initializes the filter that's applied on the kernel events.
@@ -413,8 +356,10 @@ func (k *kstreamConsumer) processKevent(evt *etw.EventRecord) error {
 	case ktypes.Process:
 		// process and thread start events may be logged in the context of the parent process or thread.
 		// As a result, the ProcessId and ThreadId members of EVENT_TRACE_HEADER may not correspond to the
-		// process and thread being created so we set the event pid to be the one of the parent process
-		pid, _ = kpars.GetHexAsUint32(kparams.ProcessParentID)
+		// process and thread being created, so we set the event pid to be the one of the parent process
+		if ktype == ktypes.CreateProcess {
+			pid, _ = kpars.GetHexAsUint32(kparams.ProcessParentID)
+		}
 
 	case ktypes.Net:
 		pid, _ = kpars.GetUint32(kparams.ProcessID)
@@ -679,4 +624,65 @@ func (k *kstreamConsumer) dropBlacklistProc(pid uint32) bool {
 		}
 	}
 	return false
+}
+
+func (k *kstreamConsumer) startRundown() error {
+	if err := k.ktraceController.StartKtraceRundown(); err != nil {
+		return err
+	}
+	go k.openRundownConsumer()
+	return nil
+}
+
+// init attempts to the start the file rundown kernel session, sets up the
+// kstream prefilters and compiles the rule set.
+func (k *kstreamConsumer) init() error {
+	if k.ktraceController.IsKRundownStarted() {
+		go k.openRundownConsumer()
+	}
+
+	for _, name := range k.config.Kstream.BlacklistKevents {
+		if ktype := ktypes.KeventNameToKtype(name); ktype != ktypes.UnknownKtype {
+			k.keventsBlacklist[ktype] = name
+		}
+	}
+
+	for i, name := range k.config.Kstream.BlacklistImages {
+		k.procsBlacklist[i] = strings.ToLower(name)
+	}
+
+	// try to compile the rules
+	return k.rules.Compile()
+}
+
+// consumeDeferred is responsible for receiving the events
+// that have been deferred by the interceptors. Events are
+// usually deferred when some of their parameters or global
+// state depend on the presence of other events. For example,
+// CreateHandle events sometimes lack the involved handle name,
+// but their counterpart, CloseHandle events contain that
+// information. So, we wait for the CloseHandle counterpart to
+// occur to augment the deferred event with the handle name param.
+func (k *kstreamConsumer) consumeDeferred() {
+	for {
+		select {
+		case kevt := <-k.deferredKevts:
+			if kevt.PS == nil {
+				kevt.PS = k.psnapshotter.Find(kevt.PID)
+			}
+			if k.isDropped(kevt) {
+				kevt.Release()
+				continue
+			}
+
+			k.kevts <- kevt
+
+			keventsEnqueued.Add(1)
+			deferredEnqueued.Add(1)
+
+			k.sequencer.Increment()
+		case <-k.stop:
+			return
+		}
+	}
 }

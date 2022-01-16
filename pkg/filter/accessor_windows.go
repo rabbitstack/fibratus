@@ -20,9 +20,12 @@ package filter
 
 import (
 	"errors"
+	"fmt"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/fs"
@@ -71,55 +74,117 @@ func newPSAccessor() accessor { return &psAccessor{} }
 func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
 	switch f {
 	case fields.PsPid:
+		// the process id that is generating the event
 		return kevt.PID, nil
+	case fields.PsSiblingPid:
+		if kevt.Category != ktypes.Process {
+			return nil, ErrNotProcessKevent
+		}
+		// the id of a freshly created process. `kevt.PID` references the parent process
+		return kevt.Kparams.GetPid()
 	case fields.PsPpid:
 		ps := kevt.PS
 		if ps == nil {
-			return kevt.Kparams.GetPpid()
+			return nil, ErrPsNil
 		}
 		return ps.Ppid, nil
 	case fields.PsName:
 		ps := kevt.PS
-		if ps == nil || ps.Name == "" {
-			return kevt.Kparams.GetString(kparams.ProcessName)
+		if ps == nil {
+			return nil, ErrPsNil
 		}
 		return ps.Name, nil
+	case fields.PsSiblingName:
+		if kevt.Category != ktypes.Process {
+			return nil, ErrNotProcessKevent
+		}
+		return kevt.Kparams.GetString(kparams.ProcessName)
 	case fields.PsComm:
 		ps := kevt.PS
 		if ps == nil {
-			return kevt.Kparams.GetString(kparams.Comm)
+			return nil, ErrPsNil
 		}
 		return ps.Comm, nil
+	case fields.PsSiblingComm:
+		if kevt.Category != ktypes.Process {
+			return nil, ErrNotProcessKevent
+		}
+		return kevt.Kparams.GetString(kparams.Comm)
 	case fields.PsExe:
 		ps := kevt.PS
 		if ps == nil {
-			return nil, nil
+			return nil, ErrPsNil
 		}
 		return ps.Exe, nil
+	case fields.PsSiblingExe:
+		if kevt.Category != ktypes.Process {
+			return nil, ErrNotProcessKevent
+		}
+		return kevt.Kparams.GetString(kparams.Exe)
 	case fields.PsArgs:
 		ps := kevt.PS
 		if ps == nil {
-			return nil, nil
+			return nil, ErrPsNil
 		}
 		return ps.Args, nil
 	case fields.PsCwd:
 		ps := kevt.PS
 		if ps == nil {
-			return nil, nil
+			return nil, ErrPsNil
 		}
 		return ps.Cwd, nil
 	case fields.PsSID:
 		ps := kevt.PS
 		if ps == nil {
-			return nil, nil
+			return nil, ErrPsNil
 		}
 		return ps.SID, nil
+	case fields.PsSiblingSID:
+		if kevt.Category != ktypes.Process {
+			return nil, ErrNotProcessKevent
+		}
+		return kevt.Kparams.GetString(kparams.UserSID)
+	case fields.PsSiblingDomain:
+		if kevt.Category != ktypes.Process {
+			return nil, ErrNotProcessKevent
+		}
+		sid, err := kevt.Kparams.GetString(kparams.UserSID)
+		if err != nil {
+			return nil, err
+		}
+		return domainFromSID(sid)
+	case fields.PsSiblingUsername:
+		if kevt.Category != ktypes.Process {
+			return nil, ErrNotProcessKevent
+		}
+		sid, err := kevt.Kparams.GetString(kparams.UserSID)
+		if err != nil {
+			return nil, err
+		}
+		return usernameFromSID(sid)
+	case fields.PsDomain:
+		ps := kevt.PS
+		if ps == nil {
+			return nil, ErrPsNil
+		}
+		return domainFromSID(ps.SID)
+	case fields.PsUsername:
+		ps := kevt.PS
+		if ps == nil {
+			return nil, ErrPsNil
+		}
+		return usernameFromSID(ps.SID)
 	case fields.PsSessionID:
 		ps := kevt.PS
 		if ps == nil {
 			return nil, nil
 		}
 		return ps.SessionID, nil
+	case fields.PsSiblingSessionID:
+		if kevt.Category != ktypes.Process {
+			return nil, ErrNotProcessKevent
+		}
+		return kevt.Kparams.GetUint32(kparams.SessionID)
 	case fields.PsEnvs:
 		ps := kevt.PS
 		if ps == nil {
@@ -286,6 +351,22 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 
 		return nil, nil
 	}
+}
+
+func domainFromSID(sid string) (string, error) {
+	s := strings.Split(sid, "\\")
+	if len(s) != 2 {
+		return "", fmt.Errorf("illegal split for the domain field. Expected 2 but got %d substrings", len(s))
+	}
+	return s[0], nil
+}
+
+func usernameFromSID(sid string) (string, error) {
+	s := strings.Split(sid, "\\")
+	if len(s) != 2 {
+		return "", fmt.Errorf("illegal split for the username field. Expected 2 but got %d substrings", len(s))
+	}
+	return s[1], nil
 }
 
 // ancestorFields recursively walks the process ancestors and extracts
