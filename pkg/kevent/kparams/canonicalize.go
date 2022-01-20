@@ -36,7 +36,12 @@ const (
 	issuingThreadID = "IssuingThreadId"
 	ttid            = "TTID"
 
-	pid = "PID"
+	targetThreatID = "TargetThreatId" // Threat? MS typo?
+
+	pid             = "PID"
+	targetProcessID = "TargetProcessId"
+
+	desiredAccess = "DesiredAccess"
 
 	basePriority   = "BasePriority"
 	ioPriority     = "IoPriority"
@@ -100,9 +105,9 @@ func Ignored() map[string]bool {
 // to canonical parameter name.
 func Canonicalize(name string) string {
 	switch name {
-	case tthreadID, issuingThreadID, ttid:
+	case tthreadID, issuingThreadID, ttid, targetThreatID:
 		return ThreadID
-	case processID, pid:
+	case processID, pid, targetProcessID:
 		return ProcessID
 	case uniqueProcessKey:
 		return ProcessObject
@@ -188,6 +193,8 @@ func Canonicalize(name string) string {
 		return HandleObjectTypeID
 	case registryStatus, ntStatus:
 		return NTStatus
+	case desiredAccess:
+		return DesiredAccess
 	default:
 		return ""
 	}

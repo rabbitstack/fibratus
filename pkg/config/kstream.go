@@ -22,9 +22,17 @@
 package config
 
 import (
-	"github.com/spf13/viper"
 	"runtime"
+	"strings"
 	"time"
+
+	"github.com/rabbitstack/fibratus/pkg/kevent"
+
+	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
+
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+
+	"github.com/spf13/viper"
 )
 
 const (
@@ -75,10 +83,13 @@ type KstreamConfig struct {
 	MaxBuffers uint32 `json:"max-buffers" yaml:"max-buffers"`
 	// FlushTimer specifies how often the trace buffers are forcibly flushed.
 	FlushTimer time.Duration `json:"flush-interval" yaml:"flush-interval"`
-	// BlacklistKevents are kernel event names that will be dropped from the kernel event stream.
-	BlacklistKevents []string `json:"blacklist.events" yaml:"blacklist.events"`
-	// BlacklistImages are process image names that will be rejected if they generate a kernel event.
-	BlacklistImages []string `json:"blacklist.images" yaml:"blacklist.images"`
+	// ExcludedKevents are kernel event names that will be dropped from the kernel event stream.
+	ExcludedKevents []string `json:"blacklist.events" yaml:"blacklist.events"`
+	// ExcludedImages are process image names that will be rejected if they generate a kernel event.
+	ExcludedImages []string `json:"blacklist.images" yaml:"blacklist.images"`
+
+	excludedKtypes map[ktypes.Ktype]bool
+	excludedImages map[string]bool
 }
 
 func (c *KstreamConfig) initFromViper(v *viper.Viper) {
@@ -92,6 +103,29 @@ func (c *KstreamConfig) initFromViper(v *viper.Viper) {
 	c.MinBuffers = uint32(v.GetInt(minBuffers))
 	c.MaxBuffers = uint32(v.GetInt(maxBuffers))
 	c.FlushTimer = v.GetDuration(flushInterval)
-	c.BlacklistKevents = v.GetStringSlice(blacklistEvents)
-	c.BlacklistImages = v.GetStringSlice(blacklistImages)
+	c.ExcludedKevents = v.GetStringSlice(blacklistEvents)
+	c.ExcludedImages = v.GetStringSlice(blacklistImages)
+
+	c.excludedKtypes = make(map[ktypes.Ktype]bool)
+	c.excludedImages = make(map[string]bool)
+
+	for _, name := range c.ExcludedKevents {
+		if ktype := ktypes.KeventNameToKtype(name); ktype != ktypes.UnknownKtype {
+			c.excludedKtypes[ktype] = true
+		}
+	}
+	for _, name := range c.ExcludedImages {
+		c.excludedImages[strings.ToLower(name)] = true
+	}
+}
+
+func (c *KstreamConfig) ExcludeKevent(kevt *kevent.Kevent) bool {
+	return c.excludedKtypes[kevt.Type]
+}
+
+func (c *KstreamConfig) ExcludeImage(ps *pstypes.PS) bool {
+	if ps == nil {
+		return false
+	}
+	return c.excludedImages[strings.ToLower(ps.Name)]
 }

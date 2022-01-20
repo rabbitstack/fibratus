@@ -34,6 +34,7 @@ type KeventInfo struct {
 var kevents = map[Ktype]KeventInfo{
 	CreateProcess:      {"CreateProcess", Process, "Creates a new process and its primary thread"},
 	TerminateProcess:   {"TerminateProcess", Process, "Terminates the process and all of its threads"},
+	OpenProcess:        {"OpenProcess", Process, "Opens the process handle"},
 	CreateThread:       {"CreateThread", Thread, "Creates a thread to execute within the virtual address space of the calling process"},
 	TerminateThread:    {"TerminateThread", Thread, "Terminates a thread within the process"},
 	ReadFile:           {"ReadFile", File, "Reads data from the file or I/O device"},
@@ -67,6 +68,7 @@ var kevents = map[Ktype]KeventInfo{
 var ktypes = map[string]Ktype{
 	"CreateProcess":      CreateProcess,
 	"TerminateProcess":   TerminateProcess,
+	"OpenProcess":        OpenProcess,
 	"CreateThread":       CreateThread,
 	"TerminateThread":    TerminateThread,
 	"LoadImage":          LoadImage,

@@ -20,14 +20,15 @@ package app
 
 import (
 	"encoding/json"
+	"os"
+	"reflect"
+
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/rabbitstack/fibratus/cmd/fibratus/common"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/util/rest"
 	"github.com/spf13/cobra"
-	"os"
-	"reflect"
 )
 
 var statsCmd = &cobra.Command{
@@ -80,8 +81,8 @@ type Stats struct {
 	KeventSeqInitErrors                 map[string]int `json:"kevent.seq.init.errors"`
 	KeventSeqStoreErrors                int            `json:"kevent.seq.store.errors"`
 	KeventTimestampUnmarshalErrors      int            `json:"kevent.timestamp.unmarshal.errors"`
-	KstreamBlacklistDroppedKevents      map[string]int `json:"kstream.blacklist.dropped.kevents"`
-	KstreamBlacklistDroppedProcs        map[string]int `json:"kstream.blacklist.dropped.procs"`
+	KstreamDroppedKevents               int            `json:"kstream.dropped.kevents"`
+	KstreamDroppedProcs                 int            `json:"kstream.dropped.procs"`
 	KstreamKbuffersRead                 int            `json:"kstream.kbuffers.read"`
 	KstreamKeventParamFailures          int            `json:"kstream.kevent.param.failures"`
 	KstreamKeventsEnqueued              int            `json:"kstream.kevents.enqueued"`

@@ -33,6 +33,8 @@ var (
 	TerminateProcess = Pack(syscall.GUID{Data1: 0x3d6fa8d0, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}, 2)
 	// EnumProcess represents the start data collection process event that enumerates processes that are currently running at the time the kernel session starts
 	EnumProcess = Pack(syscall.GUID{Data1: 0x3d6fa8d0, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}, 3)
+	// OpenProcess identifies the kernel events that are triggered when the process handle is acquired
+	OpenProcess = Pack(syscall.GUID{Data1: 0xe02a841c, Data2: 0x75a3, Data3: 0x4fa7, Data4: [8]byte{0xaf, 0xc8, 0xae, 0x09, 0xcf, 0x9b, 0x7f, 0x23}}, 5)
 
 	// CreateThread identifies thread creation kernel events
 	CreateThread = Pack(syscall.GUID{Data1: 0x3d6fa8d1, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}, 1)
@@ -167,6 +169,8 @@ func (k Ktype) String() string {
 		return "CreateProcess"
 	case TerminateProcess:
 		return "TerminateProcess"
+	case OpenProcess:
+		return "OpenProcess"
 	case CreateThread:
 		return "CreateThread"
 	case TerminateThread:

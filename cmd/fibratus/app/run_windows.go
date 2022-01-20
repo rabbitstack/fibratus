@@ -19,6 +19,8 @@
 package app
 
 import (
+	"os"
+
 	"github.com/rabbitstack/fibratus/cmd/fibratus/common"
 	"github.com/rabbitstack/fibratus/pkg/aggregator"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
@@ -32,7 +34,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"os"
 )
 
 var runCmd = &cobra.Command{
@@ -154,11 +155,6 @@ func run(cmd *cobra.Command, args []string) error {
 		}()
 	}
 
-	defer func() {
-		_ = ktracec.CloseKtrace()
-		_ = kstreamc.CloseKstream()
-	}()
-
 	// start the HTTP server
 	if err := api.StartServer(cfg); err != nil {
 		return err
@@ -167,6 +163,9 @@ func run(cmd *cobra.Command, args []string) error {
 	<-stopCh
 
 	// shutdown everything gracefully
+	_ = ktracec.CloseKtrace()
+	_ = kstreamc.CloseKstream()
+
 	if f != nil {
 		if err := f.Close(); err != nil {
 			return err

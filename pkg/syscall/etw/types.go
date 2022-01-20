@@ -48,6 +48,8 @@ const (
 	KernelLoggerSession = "NT Kernel Logger"
 	// KernelLoggerRundownSession is the session name for the kernel rundown logger
 	KernelLoggerRundownSession = "Kernel Rundown Logger"
+	// KernelAuditAPICallsSession represents the session name for the kernel audit API logger
+	KernelAuditAPICallsSession = "Kernel Audit API Calls Logger"
 	// WnodeTraceFlagGUID indicates that the structure contains event tracing information
 	WnodeTraceFlagGUID = 0x00020000
 	// ProcessTraceModeRealtime denotes that there will be a real-time consumers for events forwarded from the providers
