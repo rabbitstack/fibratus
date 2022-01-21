@@ -67,7 +67,9 @@ const (
 	keyName        = "KeyName"
 	keyHandle      = "KeyHandle"
 	registryStatus = "Status"
-	ntStatus       = "NtStatus"
+
+	ntStatus   = "NtStatus"
+	returnCode = "ReturnCode"
 
 	imageBase        = "ImageBase"
 	imageSize        = "ImageSize"
@@ -191,7 +193,7 @@ func Canonicalize(name string) string {
 		return HandleObjectName
 	case handleObjectType:
 		return HandleObjectTypeID
-	case registryStatus, ntStatus:
+	case registryStatus, ntStatus, returnCode:
 		return NTStatus
 	case desiredAccess:
 		return DesiredAccess

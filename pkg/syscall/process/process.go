@@ -23,13 +23,14 @@ package process
 
 import (
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/errors"
-	"github.com/rabbitstack/fibratus/pkg/syscall/handle"
-	"github.com/rabbitstack/fibratus/pkg/syscall/winerrno"
 	"os"
 	"syscall"
 	"time"
 	"unsafe"
+
+	"github.com/rabbitstack/fibratus/pkg/errors"
+	"github.com/rabbitstack/fibratus/pkg/syscall/handle"
+	"github.com/rabbitstack/fibratus/pkg/syscall/winerrno"
 )
 
 var (
@@ -45,20 +46,98 @@ var (
 	getExitCodeProcess        = kernel32.NewProc("GetExitCodeProcess")
 )
 
+const procStatusStillActive = 259
+
 // DesiredAccess defines the type alias for process's access modifiers
 type DesiredAccess uint32
 
 const (
-	procStatusStillActive = 259
-	// QueryInformation is required to retrieve certain information about a process, such as its token, exit code, and priority class
-	QueryInformation DesiredAccess = 0x0400
-	// QueryLimitedInformation is required to get certain information about process, such as process's image name
-	QueryLimitedInformation DesiredAccess = 0x1000
+	// Terminate is required to terminate a process
+	Terminate DesiredAccess = 0x0001
+	// CreateThread is required to create a thread in the process
+	CreateThread DesiredAccess = 0x0002
+	// VMOperation is required to perform an operation on the address space of a process
+	VMOperation DesiredAccess = 0x0008
 	// VMRead is required to read memory in a process
 	VMRead DesiredAccess = 0x0010
+	// VMWrite is required to write to memory in a process
+	VMWrite DesiredAccess = 0x0020
 	// DupHandle lets duplicate handles of the target process
 	DupHandle DesiredAccess = 0x0040
+	// CreateProcess is required to use this process as the parent process
+	CreateProcess DesiredAccess = 0x0080
+	// SetQuota is required to set memory limits
+	SetQuota DesiredAccess = 0x0100
+	// SetInformation is required to set certain information about a process
+	SetInformation DesiredAccess = 0x0200
+	// QueryInformation is required to retrieve certain information about a process, such as its token, exit code, and priority class
+	QueryInformation DesiredAccess = 0x0400
+	// SuspendResume is required to suspend or resume a process
+	SuspendResume DesiredAccess = 0x0800
+	// QueryLimitedInformation is required to get certain information about process, such as process's image name
+	QueryLimitedInformation DesiredAccess = 0x1000
+	// AllAccess represents all possible access rights
+	AllAccess DesiredAccess = 0x000F0000 | 0x00100000 | 0xFFFF
 )
+
+// String returns a human-readable process desired access.
+func (access DesiredAccess) String() string {
+	switch access {
+	case Terminate:
+		return "TERMINATE"
+	case CreateThread:
+		return "CREATE_THREAD"
+	case VMOperation:
+		return "VM_OPERATION"
+	case VMWrite:
+		return "VM_WRITE"
+	case VMRead:
+		return "VM_READ"
+	case DupHandle:
+		return "DUP_HANDLE"
+	case CreateProcess:
+		return "CREATE_PROCESS"
+	case SetQuota:
+		return "SET_QUOTA"
+	case QueryInformation:
+		return "QUERY_INFORMATION"
+	case QueryLimitedInformation:
+		return "QUERY_LIMITED_INFORMATION"
+	case SetInformation:
+		return "SET_INFORMATION"
+	case SuspendResume:
+		return "SUSPEND_RESUME"
+	case AllAccess:
+		return "ALL_ACCESS"
+	default:
+		return "UNKNOWN"
+	}
+}
+
+const maxFlags = 0x10660
+
+// ToFlags converts the desired access mask to the slice of string values.
+func (access DesiredAccess) ToFlags() []string {
+	flags := make([]string, 0)
+	if access == AllAccess {
+		return []string{AllAccess.String()}
+	}
+	if (access & Terminate) != 0 {
+		flags = append(flags, Terminate.String())
+	}
+	if (access & CreateThread) != 0 {
+		flags = append(flags, CreateThread.String())
+	}
+	if (access & VMOperation) != 0 {
+		flags = append(flags, VMOperation.String())
+	}
+	for mask := VMRead; mask <= maxFlags; mask *= 2 {
+		if access&mask != 0 {
+			flags = append(flags, mask.String())
+		}
+	}
+	return flags
+}
 
 // InfoClassFlags defines the type for process's info class
 type InfoClassFlags uint8
@@ -70,7 +149,7 @@ const (
 	HandleInformationClass InfoClassFlags = 51
 )
 
-// Open acquires an handle from the running process.
+// Open acquires a handle from the running process.
 func Open(access DesiredAccess, inheritHandle bool, processID uint32) (handle.Handle, error) {
 	var inherit uint8
 	if inheritHandle {

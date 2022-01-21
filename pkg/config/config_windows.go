@@ -21,6 +21,9 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/aggregator"
 	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers"
 	removet "github.com/rabbitstack/fibratus/pkg/aggregator/transformers/remove"
@@ -33,11 +36,13 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	yara "github.com/rabbitstack/fibratus/pkg/yara/config"
 	"gopkg.in/yaml.v3"
-	"io/ioutil"
-	"time"
 
 	renamet "github.com/rabbitstack/fibratus/pkg/aggregator/transformers/rename"
 	trimt "github.com/rabbitstack/fibratus/pkg/aggregator/transformers/trim"
+
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	mailsender "github.com/rabbitstack/fibratus/pkg/alertsender/mail"
@@ -48,9 +53,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"os"
-	"path/filepath"
-	"strings"
 )
 
 const (
@@ -331,8 +333,8 @@ func (c *Config) addFlags() {
 		c.flags.Int(minBuffers, int(defaultMinBuffers), "Determines the minimum number of buffers allocated for the event tracing session's buffer pool")
 		c.flags.Int(maxBuffers, int(defaultMaxBuffers), "Determines the maximum number of buffers allocated for the event tracing session's buffer pool")
 		c.flags.Duration(flushInterval, defaultFlushInterval, "Specifies how often the trace buffers are forcibly flushed")
-		c.flags.StringSlice(blacklistEvents, []string{}, "A list of symbolical kernel event names that will be dropped from the kernel event stream. By default all events are accepted")
-		c.flags.StringSlice(blacklistImages, []string{"System"}, "A list of image names that will be dropped from the kernel event stream. Image names are case insensitive")
+		c.flags.StringSlice(excludedEvents, []string{}, "A list of symbolical kernel event names that will be dropped from the kernel event stream. By default all events are accepted")
+		c.flags.StringSlice(excludedImages, []string{"System"}, "A list of image names that will be dropped from the kernel event stream. Image names are case insensitive")
 
 		c.flags.Bool(serializeThreads, false, "Indicates if threads are serialized as part of the process state")
 		c.flags.Bool(serializeImages, false, "Indicates if images are serialized as part of the process state")

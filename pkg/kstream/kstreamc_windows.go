@@ -102,25 +102,23 @@ type Consumer interface {
 }
 
 type kstreamConsumer struct {
-	// trace session handles
-	handles []etw.TraceHandle
+	handles []etw.TraceHandle // trace session handles
 
-	errs  chan error
-	kevts chan *kevent.Kevent
+	errs  chan error          // channel for event processing errors
+	kevts chan *kevent.Kevent // channel for fanning out generated events
 
 	interceptorChain interceptors.Chain
-	ignoredKparams   map[string]bool
-	config           *config.Config
+	ignoredKparams   map[string]bool // avoids parsing event parameters in this map
+	config           *config.Config  // main configuration
 
-	ktraceController KtraceController
-
-	psnapshotter ps.Snapshotter
-	sequencer    *kevent.Sequencer
+	ktraceController KtraceController  // trace session control plane
+	psnapshotter     ps.Snapshotter    // process state tracker
+	sequencer        *kevent.Sequencer // event sequence manager
 
 	filter filter.Filter
 	rules  filter.Rules
 
-	capture bool
+	capture bool // capture determines whether the event capture is triggered
 }
 
 // NewConsumer constructs a new kernel event stream consumer.
@@ -284,7 +282,7 @@ func (k *kstreamConsumer) processKevent(evt *etw.EventRecord) error {
 		ktype = ktypes.Pack(evt.Header.ProviderID, evt.Header.EventDescriptor.Opcode)
 	}
 
-	// drop unknown kernel event or excluded process as early as possible
+	// drop unknown kernel events or excluded processes as soon as possible
 	if !ktype.Exists() {
 		return nil
 	}
@@ -629,7 +627,7 @@ func (k *kstreamConsumer) isKeventDropped(kevt *kevent.Kevent) bool {
 		return true
 	}
 	// check if rules got matched
-	if ok := k.rules.Fire(kevt); !ok {
+	if rulesFired := k.rules.Fire(kevt); !rulesFired {
 		return true
 	}
 	// fallback to CLI filter

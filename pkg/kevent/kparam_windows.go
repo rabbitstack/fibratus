@@ -20,15 +20,17 @@ package kevent
 
 import (
 	"fmt"
+	"net"
+	"strconv"
+	"strings"
+	"syscall"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/network"
 	"github.com/rabbitstack/fibratus/pkg/syscall/security"
 	"github.com/rabbitstack/fibratus/pkg/util/ip"
-	"net"
-	"strconv"
-	"syscall"
-	"time"
 )
 
 // NewKparam creates a new event parameter. Since the parameter type is already categorized,
@@ -116,6 +118,13 @@ func (k Kparam) String() string {
 			return typ.String()
 		default:
 			return fmt.Sprintf("%v", k.Value)
+		}
+	case kparams.Slice:
+		switch slice := k.Value.(type) {
+		case []string:
+			return strings.Join(slice, ",")
+		default:
+			return fmt.Sprintf("%v", slice)
 		}
 	default:
 		return fmt.Sprintf("%v", k.Value)

@@ -47,8 +47,8 @@ const (
 	maxBuffers            = "kstream.max-buffers"
 	flushInterval         = "kstream.flush-interval"
 
-	blacklistEvents = "kstream.blacklist.events"
-	blacklistImages = "kstream.blacklist.images"
+	excludedEvents = "kstream.blacklist.events"
+	excludedImages = "kstream.blacklist.images"
 
 	maxBufferSize = uint32(1024)
 )
@@ -103,8 +103,8 @@ func (c *KstreamConfig) initFromViper(v *viper.Viper) {
 	c.MinBuffers = uint32(v.GetInt(minBuffers))
 	c.MaxBuffers = uint32(v.GetInt(maxBuffers))
 	c.FlushTimer = v.GetDuration(flushInterval)
-	c.ExcludedKevents = v.GetStringSlice(blacklistEvents)
-	c.ExcludedImages = v.GetStringSlice(blacklistImages)
+	c.ExcludedKevents = v.GetStringSlice(excludedEvents)
+	c.ExcludedImages = v.GetStringSlice(excludedImages)
 
 	c.excludedKtypes = make(map[ktypes.Ktype]bool)
 	c.excludedImages = make(map[string]bool)
@@ -119,10 +119,15 @@ func (c *KstreamConfig) initFromViper(v *viper.Viper) {
 	}
 }
 
+// ExcludeKevent determines whether the supplied event is present in the list of
+// excluded event types.
 func (c *KstreamConfig) ExcludeKevent(kevt *kevent.Kevent) bool {
 	return c.excludedKtypes[kevt.Type]
 }
 
+// ExcludeImage determines whether the process generating event is present in the
+// list of excluded images. If the hit occurs, the event associated with the process
+// is dropped.
 func (c *KstreamConfig) ExcludeImage(ps *pstypes.PS) bool {
 	if ps == nil {
 		return false

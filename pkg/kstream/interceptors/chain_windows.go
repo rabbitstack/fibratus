@@ -86,9 +86,8 @@ func NewChain(
 	}
 	if config.Kstream.EnableHandleKevents {
 		chain.addInterceptor(newHandleInterceptor(hsnap, handle.NewObjectTypeStore(), devMapper, chain.deferredKevts))
+		go chain.consumeDeferred()
 	}
-
-	go chain.consumeDeferred()
 
 	return chain
 }
