@@ -23,8 +23,11 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
+
+	"github.com/rabbitstack/fibratus/pkg/syscall/thread"
 
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
@@ -68,8 +71,7 @@ func newPsInterceptor(snap ps.Snapshotter, yara yara.Scanner) KstreamInterceptor
 }
 
 func (ps psInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, error) {
-	typ := kevt.Type
-	switch typ {
+	switch kevt.Type {
 	case ktypes.CreateProcess, ktypes.TerminateProcess, ktypes.EnumProcess:
 		comm, err := kevt.Kparams.GetString(kparams.Comm)
 		if err != nil {
@@ -109,7 +111,7 @@ func (ps psInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 			return kevt, true, err
 		}
 
-		if typ != ktypes.TerminateProcess {
+		if kevt.Type != ktypes.TerminateProcess {
 			if pid != 0 {
 				// get the process's start time and append it to the parameters
 				started, err := getStartTime(pid)
@@ -119,7 +121,7 @@ func (ps psInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 					_ = kevt.Kparams.Append(kparams.StartTime, kparams.Time, started)
 				}
 			}
-			if ps.yara != nil && typ == ktypes.CreateProcess {
+			if ps.yara != nil && kevt.Type == ktypes.CreateProcess {
 				// run yara scanner on the target process
 				go func() {
 					procYaraScans.Add(1)
@@ -150,11 +152,40 @@ func (ps psInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 			return kevt, true, err
 		}
 
-		if typ != ktypes.TerminateThread {
+		if kevt.Type != ktypes.TerminateThread {
 			return kevt, false, ps.snap.Write(kevt)
 		}
 
 		return kevt, false, ps.snap.Remove(kevt)
+
+	case ktypes.OpenProcess, ktypes.OpenThread:
+		pid, err := kevt.Kparams.GetUint32(kparams.ProcessID)
+		if err != nil {
+			return kevt, true, err
+		}
+		proc := ps.snap.Find(pid)
+		if proc != nil {
+			kevt.Kparams.Append(kparams.Exe, kparams.UnicodeString, proc.Exe)
+			kevt.Kparams.Append(kparams.ProcessName, kparams.UnicodeString, proc.Name)
+		}
+		_ = kevt.Kparams.Set(kparams.ProcessID, pid, kparams.PID)
+		// format the status code
+		status, err := kevt.Kparams.GetUint32(kparams.NTStatus)
+		if err == nil {
+			_ = kevt.Kparams.Set(kparams.NTStatus, formatStatus(status), kparams.UnicodeString)
+		}
+		// convert desired access mask to hex value and transform
+		// the access mask to a list of symbolical names
+		desiredAccess, err := kevt.Kparams.GetUint32(kparams.DesiredAccess)
+		if err == nil {
+			_ = kevt.Kparams.Set(kparams.DesiredAccess, toHex(desiredAccess), kparams.AnsiString)
+		}
+		if kevt.Type == ktypes.OpenProcess {
+			kevt.Kparams.Append(kparams.DesiredAccessNames, kparams.Slice, process.DesiredAccess(desiredAccess).Flags())
+		} else {
+			kevt.Kparams.Append(kparams.DesiredAccessNames, kparams.Slice, thread.DesiredAccess(desiredAccess).Flags())
+		}
+		return kevt, false, nil
 	}
 
 	return kevt, true, nil
@@ -180,3 +211,5 @@ func getStartTime(pid uint32) (time.Time, error) {
 	}
 	return started, nil
 }
+
+func toHex(desiredAccess uint32) string { return "0x" + strconv.FormatInt(int64(desiredAccess), 16) }

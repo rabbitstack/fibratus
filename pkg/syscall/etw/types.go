@@ -35,6 +35,9 @@ var KernelTraceControlGUID = syscall.GUID{Data1: 0x9e814aad, Data2: 0x3204, Data
 // KernelRundownGUID is the GUID for the kernel rundown logger
 var KernelRundownGUID = syscall.GUID{Data1: 0x3b9c9951, Data2: 0x3480, Data3: 0x4220, Data4: [8]byte{0x93, 0x77, 0x9c, 0x8e, 0x51, 0x84, 0xf5, 0xcd}}
 
+// KernelAuditAPICallsGUID represents the GUID for the kernel audit API provider
+var KernelAuditAPICallsGUID = syscall.GUID{Data1: 0xe02a841c, Data2: 0x75a3, Data3: 0x4fa7, Data4: [8]byte{0xaf, 0xc8, 0xae, 0x09, 0xcf, 0x9b, 0x7f, 0x23}}
+
 const (
 	// TraceSystemTraceEnableFlagsInfo controls system logger event flags
 	TraceSystemTraceEnableFlagsInfo = uint8(4)
@@ -45,6 +48,8 @@ const (
 	KernelLoggerSession = "NT Kernel Logger"
 	// KernelLoggerRundownSession is the session name for the kernel rundown logger
 	KernelLoggerRundownSession = "Kernel Rundown Logger"
+	// KernelAuditAPICallsSession represents the session name for the kernel audit API logger
+	KernelAuditAPICallsSession = "Kernel Audit API Calls Logger"
 	// WnodeTraceFlagGUID indicates that the structure contains event tracing information
 	WnodeTraceFlagGUID = 0x00020000
 	// ProcessTraceModeRealtime denotes that there will be a real-time consumers for events forwarded from the providers

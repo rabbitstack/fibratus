@@ -21,6 +21,7 @@ package interceptors
 import (
 	"expvar"
 	"fmt"
+
 	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
@@ -87,5 +88,6 @@ func (c chain) Close() error {
 	for _, interceptor := range c.interceptors {
 		interceptor.Close()
 	}
+	close(c.deferredKevts)
 	return nil
 }

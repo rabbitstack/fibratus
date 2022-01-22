@@ -20,6 +20,8 @@ package interceptors
 
 import (
 	"expvar"
+	"sync"
+
 	"github.com/rabbitstack/fibratus/pkg/config"
 	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/fs"
@@ -28,30 +30,25 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-	log "github.com/sirupsen/logrus"
-	"sync"
-	"time"
 )
 
 var (
 	// totalRundownFiles counts the number of opened files
 	totalRundownFiles = expvar.NewInt("fs.total.rundown.files")
 	// fileObjectMisses computes file object cache misses
-	fileObjectMisses      = expvar.NewInt("fs.file.objects.misses")
-	fileObjectHandleHits  = expvar.NewInt("fs.file.object.handle.hits")
-	fileReleaseCount      = expvar.NewInt("fs.file.releases")
-	rundownDeadlinePeriod = time.Minute
-	once                  sync.Once
+	fileObjectMisses     = expvar.NewInt("fs.file.objects.misses")
+	fileObjectHandleHits = expvar.NewInt("fs.file.object.handle.hits")
+	fileReleaseCount     = expvar.NewInt("fs.file.releases")
 )
 
 type fsInterceptor struct {
 	// files stores the file metadata indexed by file object
 	files map[uint64]*fileInfo
+	mux   sync.Mutex
 	// devMapper translates DOS device names to regular drive letters
-	devMapper       fs.DevMapper
-	rundownDeadline *time.Timer
-	hsnap           handle.Snapshotter
-	config          *config.Config
+	devMapper fs.DevMapper
+	hsnap     handle.Snapshotter
+	config    *config.Config
 
 	pendingKevents map[uint64]*kevent.Kevent
 }
@@ -149,27 +146,14 @@ func infoClassFromID(klass uint32) string {
 	return class
 }
 
-func newFsInterceptor(devMapper fs.DevMapper, hsnap handle.Snapshotter, config *config.Config, fn func() error) KstreamInterceptor {
+func newFsInterceptor(devMapper fs.DevMapper, hsnap handle.Snapshotter, config *config.Config) KstreamInterceptor {
 	interceptor := &fsInterceptor{
-		files:           make(map[uint64]*fileInfo),
-		pendingKevents:  make(map[uint64]*kevent.Kevent),
-		devMapper:       devMapper,
-		rundownDeadline: time.NewTimer(rundownDeadlinePeriod),
-		hsnap:           hsnap,
-		config:          config,
+		files:          make(map[uint64]*fileInfo),
+		pendingKevents: make(map[uint64]*kevent.Kevent),
+		devMapper:      devMapper,
+		hsnap:          hsnap,
+		config:         config,
 	}
-
-	// define a rundown deadline timer that will call into provided
-	// function if we didn't receive any rundown within the deadline
-	go func() {
-		<-interceptor.rundownDeadline.C
-		if fn != nil {
-			if err := fn(); err != nil {
-				log.Errorf("couldn't start kernel rundown session after deadline: %v", err)
-			}
-		}
-	}()
-
 	return interceptor
 }
 
@@ -195,18 +179,18 @@ func (f *fsInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 		// in the map in order to augment the rest of file events
 		// that lack the file name field
 		if kevt.Type == ktypes.FileRundown {
-			// cancel rundown deadline timer
-			once.Do(func() {
-				f.rundownDeadline.Stop()
-			})
 			filename, err := kevt.Kparams.GetString(kparams.FileName)
 			if err != nil {
 				return kevt, true, err
 			}
-			totalRundownFiles.Add(1)
-			filename = f.devMapper.Convert(filename)
 
-			f.files[fobj] = &fileInfo{name: filename, typ: fs.GetFileType(filename, 0)}
+			f.mux.Lock()
+			defer f.mux.Unlock()
+			if _, ok := f.files[fobj]; !ok {
+				filename = f.devMapper.Convert(filename)
+				totalRundownFiles.Add(1)
+				f.files[fobj] = &fileInfo{name: filename, typ: fs.GetFileType(filename, 0)}
+			}
 
 			return kevt, false, nil
 		}
@@ -257,6 +241,8 @@ func (f *fsInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 			fileReleaseCount.Add(1)
 			// delete both, the file object and the file key from files map
 			fileKey, err := kevt.Kparams.GetHexAsUint64(kparams.FileKey)
+			f.mux.Lock()
+			defer f.mux.Unlock()
 			if err == nil {
 				delete(f.files, fileKey)
 			}
@@ -274,6 +260,8 @@ func (f *fsInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 			// attempt to get the file by file key. If there is no such file referenced
 			// by the file key, then try to fetch it by file object. Even if file object
 			// references fails, we search in the file handles for such file
+			f.mux.Lock()
+			defer f.mux.Unlock()
 			fileinfo, ok := f.files[fileKey]
 			if !ok {
 				fileinfo, ok = f.files[fobj]
@@ -335,27 +323,8 @@ func (f *fsInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 	return kevt, true, nil
 }
 
-// removeKparams removes unwanted kparams, either because they are already present in kevent
-// canonical attributes or are not very useful.
-func removeKparams(kevt *kevent.Kevent) {
-	if kevt.Kparams.Contains(kparams.ProcessID) {
-		kevt.Kparams.Remove(kparams.ProcessID)
-	}
-	if kevt.Kparams.Contains(kparams.ThreadID) {
-		kevt.Kparams.Remove(kparams.ThreadID)
-	}
-	if kevt.Kparams.Contains(kparams.FileCreateOptions) {
-		kevt.Kparams.Remove(kparams.FileCreateOptions)
-	}
-	if kevt.Kparams.Contains(kparams.FileKey) {
-		kevt.Kparams.Remove(kparams.FileKey)
-	}
-}
-
-func (fsInterceptor) Name() InterceptorType { return Fs }
-func (f fsInterceptor) Close() {
-	f.rundownDeadline.Stop()
-}
+func (*fsInterceptor) Name() InterceptorType { return Fs }
+func (f *fsInterceptor) Close()              {}
 
 func (f *fsInterceptor) getFileInfo(name string, opts uint32) *fileInfo {
 	return &fileInfo{name: name, typ: fs.GetFileType(name, opts)}
@@ -397,6 +366,8 @@ func (f *fsInterceptor) processCreateFile(kevt *kevent.Kevent) error {
 	}
 	// try to get extended file info. If the file object is already
 	// present in the map, we'll reuse the existing file information
+	f.mux.Lock()
+	defer f.mux.Unlock()
 	fileinfo, ok := f.files[fobj]
 	if !ok {
 		opts, _ := kevt.Kparams.GetUint32(kparams.FileCreateOptions)
@@ -451,4 +422,21 @@ func (f *fsInterceptor) appendKparams(fileinfo *fileInfo, kevt *kevent.Kevent) e
 		kevt.Kparams.Append(kparams.FileName, kparams.UnicodeString, fileinfo.name)
 	}
 	return nil
+}
+
+// removeKparams removes unwanted kparams, either because they are already present in kevent
+// canonical attributes or are not very useful.
+func removeKparams(kevt *kevent.Kevent) {
+	if kevt.Kparams.Contains(kparams.ProcessID) {
+		kevt.Kparams.Remove(kparams.ProcessID)
+	}
+	if kevt.Kparams.Contains(kparams.ThreadID) {
+		kevt.Kparams.Remove(kparams.ThreadID)
+	}
+	if kevt.Kparams.Contains(kparams.FileCreateOptions) {
+		kevt.Kparams.Remove(kparams.FileCreateOptions)
+	}
+	if kevt.Kparams.Contains(kparams.FileKey) {
+		kevt.Kparams.Remove(kparams.FileKey)
+	}
 }

@@ -180,6 +180,21 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 			return nil, nil
 		}
 		return ps.SessionID, nil
+	case fields.PsAccessMask:
+		if kevt.Type != ktypes.OpenProcess {
+			return nil, nil
+		}
+		return kevt.Kparams.GetString(kparams.DesiredAccess)
+	case fields.PsAccessMaskNames:
+		if kevt.Type != ktypes.OpenProcess {
+			return nil, nil
+		}
+		return kevt.Kparams.GetSlice(kparams.DesiredAccessNames)
+	case fields.PsAccessStatus:
+		if kevt.Type != ktypes.OpenProcess {
+			return nil, nil
+		}
+		return kevt.Kparams.GetString(kparams.NTStatus)
 	case fields.PsSiblingSessionID:
 		if kevt.Category != ktypes.Process {
 			return nil, nil
@@ -519,6 +534,21 @@ func (t *threadAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value
 		return v.String(), nil
 	case fields.ThreadPID:
 		return kevt.Kparams.GetUint32(kparams.ProcessID)
+	case fields.ThreadAccessMask:
+		if kevt.Type != ktypes.OpenThread {
+			return nil, nil
+		}
+		return kevt.Kparams.GetString(kparams.DesiredAccess)
+	case fields.ThreadAccessMaskNames:
+		if kevt.Type != ktypes.OpenThread {
+			return nil, nil
+		}
+		return kevt.Kparams.GetSlice(kparams.DesiredAccessNames)
+	case fields.ThreadAccessStatus:
+		if kevt.Type != ktypes.OpenThread {
+			return nil, nil
+		}
+		return kevt.Kparams.GetString(kparams.NTStatus)
 	}
 	return nil, nil
 }

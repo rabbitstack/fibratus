@@ -20,6 +20,9 @@ package interceptors
 
 import (
 	"fmt"
+	"os"
+	"testing"
+
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/handle"
@@ -29,9 +32,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"os"
-	"testing"
-	"time"
 )
 
 type devMapperMock struct {
@@ -43,10 +43,6 @@ func (dm *devMapperMock) Convert(filename string) string {
 	return args.String(0)
 }
 
-func init() {
-	rundownDeadlinePeriod = time.Millisecond * 200
-}
-
 func TestCreateFile(t *testing.T) {
 	devMapper := new(devMapperMock)
 	hsnapMock := new(handle.SnapshotterMock)
@@ -54,7 +50,7 @@ func TestCreateFile(t *testing.T) {
 	sysRoot := os.Getenv("SystemRoot")
 	devMapper.On("Convert", "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll").Return(fmt.Sprintf("%s\\system32\\user32.dll", sysRoot))
 
-	fsi := newFsInterceptor(devMapper, hsnapMock, &config.Config{}, nil)
+	fsi := newFsInterceptor(devMapper, hsnapMock, &config.Config{})
 
 	_, _, err := fsi.Intercept(&kevent.Kevent{
 		Type: ktypes.FileRundown,
@@ -123,7 +119,7 @@ func TestRundownFile(t *testing.T) {
 	sysRoot := os.Getenv("SystemRoot")
 	devMapper.On("Convert", "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll").Return(fmt.Sprintf("%s\\system32\\user32.dll", sysRoot))
 
-	fsi := newFsInterceptor(devMapper, hsnapMock, &config.Config{}, nil)
+	fsi := newFsInterceptor(devMapper, hsnapMock, &config.Config{})
 
 	_, _, err := fsi.Intercept(&kevent.Kevent{
 		Type: ktypes.FileRundown,
@@ -153,7 +149,7 @@ func TestDeleteFile(t *testing.T) {
 	sysRoot := os.Getenv("SystemRoot")
 	devMapper.On("Convert", "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll").Return(fmt.Sprintf("%s\\system32\\user32.dll", sysRoot))
 
-	fsi := newFsInterceptor(devMapper, hsnapMock, &config.Config{}, nil)
+	fsi := newFsInterceptor(devMapper, hsnapMock, &config.Config{})
 
 	_, _, err := fsi.Intercept(&kevent.Kevent{
 		Type: ktypes.FileRundown,
@@ -192,22 +188,4 @@ func TestDeleteFile(t *testing.T) {
 	typ, err := kevt.Kparams.GetString(kparams.FileType)
 	require.NoError(t, err)
 	assert.Equal(t, "file", typ)
-}
-
-func TestRundownFileDeadline(t *testing.T) {
-	devMapper := new(devMapperMock)
-	hsnapMock := new(handle.SnapshotterMock)
-
-	sysRoot := os.Getenv("SystemRoot")
-	devMapper.On("Convert", "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll").Return(fmt.Sprintf("%s\\system32\\user32.dll", sysRoot))
-
-	ch := make(chan bool, 1)
-	fn := func() error {
-		ch <- true
-		return nil
-	}
-
-	newFsInterceptor(devMapper, hsnapMock, &config.Config{}, fn)
-
-	<-ch
 }

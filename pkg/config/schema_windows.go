@@ -27,7 +27,7 @@ var schema = `
 {
 	"$schema": "http://json-schema.org/draft-07/schema#",
 	"definitions": {"yara": {"$id": "#yara", "type": "object", "properties": {"enabled": {"type": "boolean"}}}},
-	
+
 	"type": "object",
 	"properties": {
 		"aggregator": {
@@ -160,7 +160,7 @@ var schema = `
 				"blacklist":		{
 					"type": "object",
 					"properties":	{
-						"events":	{"type": "array", "items": [{"type": "string", "enum": ["CreateProcess", "CreateThread", "TerminateProcess", "TerminateThread", "LoadImage", "UnloadImage", "CreateFile", "CloseFile", "ReadFile", "WriteFile", "DeleteFile", "RenameFile", "SetFileInformation", "EnumDirectory", "RegCreateKey", "RegOpenKey", "RegSetValue", "RegQueryValue", "RegQueryKey", "RegDeleteKey", "RegDeleteValue", "Accept", "Send", "Recv", "Connect", "Disconnect", "Reconnect", "Retransmit", "CreateHandle", "CloseHandle"]}]},
+						"events":	{"type": "array", "items": [{"type": "string", "enum": ["CreateProcess", "CreateThread", "TerminateProcess", "TerminateThread", "OpenProcess", "OpenThread", "LoadImage", "UnloadImage", "CreateFile", "CloseFile", "ReadFile", "WriteFile", "DeleteFile", "RenameFile", "SetFileInformation", "EnumDirectory", "RegCreateKey", "RegOpenKey", "RegSetValue", "RegQueryValue", "RegQueryKey", "RegDeleteKey", "RegDeleteValue", "Accept", "Send", "Recv", "Connect", "Disconnect", "Reconnect", "Retransmit", "CreateHandle", "CloseHandle"]}]},
 						"images":	{"type": "array", "items": [{"type": "string", "minLength": 1}]}
 					},
 					"additionalProperties": false
@@ -412,7 +412,7 @@ var schema = `
                 	                     },
 							"strings": 	{"type": "array"}
 						},
-						"additionalProperties": false 
+						"additionalProperties": false
 					}]
 				},
 				"alert-via":		{"type": "string", "enum": ["slack", "mail"]},
@@ -437,7 +437,7 @@ var schema = `
 }
 `
 
-var filterGroupSchema = `	
+var filterGroupSchema = `
 {
 	"$schema": "http://json-schema.org/draft-07/schema#",
 
@@ -462,7 +462,7 @@ var filterGroupSchema = `
 		"tags":			{"type": "array", "items": [{"type": "string", "minLength": 1}]},
 		"from-strings": {
 			"type": "array",
-			"items": 
+			"items":
 				{
 					"type": "object",
 					"properties": {
@@ -474,7 +474,7 @@ var filterGroupSchema = `
 					"minItems": 1,
 					"additionalProperties": false
 				}
-			
+
 		}
 	},
 	"required": ["group", "enabled", "selector", "from-strings"],

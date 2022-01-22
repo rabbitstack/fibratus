@@ -19,20 +19,24 @@
 package kstream
 
 import (
+	"expvar"
 	"fmt"
+	"runtime"
+	"syscall"
+	"time"
+	"unsafe"
+
 	"github.com/rabbitstack/fibratus/pkg/config"
 	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/syscall/etw"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows/registry"
-	"runtime"
-	"time"
-	"unsafe"
 )
 
 const (
-	ktraceSession   = etw.KernelLoggerSession
-	krundownSession = etw.KernelLoggerRundownSession
+	ktraceSession         = etw.KernelLoggerSession
+	krundownSession       = etw.KernelLoggerRundownSession
+	kauditAPICallsSession = etw.KernelAuditAPICallsSession
 	// maxBufferSize specifies the maximum buffer size for event tracing session buffer
 	maxBufferSize = 1024
 	// etwMaxLoggersPath is the registry subkey that contains ETW logger preferences
@@ -49,17 +53,15 @@ var (
 	enableTrace  = etw.EnableTrace
 )
 
+// etwProviderErrors accumulates ETW provider activation errors
+var etwProviderErrors = expvar.NewMap("ktrace.etw.provider.errors")
+
 // KtraceController is responsible for managing the life cycle of the kernel traces.
 type KtraceController interface {
 	// StartKtrace starts a new kernel tracing session.
 	StartKtrace() error
 	// CloseKtrace stops currently running kernel trace session.
 	CloseKtrace() error
-	// StartKtraceRundown initiates the kernel logger rundown session that will enumerate open file objects
-	// we can use to match file names in file system kernel events.
-	StartKtraceRundown() error
-	// IsKRundownStarted indicates if kernel logger rundown session is started.
-	IsKRundownStarted() bool
 	// GetTraceHandle returns the handle of the kernel trace session.
 	GetTraceHandle() etw.TraceHandle
 }
@@ -68,18 +70,27 @@ type KtraceController interface {
 type ktraceController struct {
 	// kstreamConfig stores kernel stream specific settings
 	kstreamConfig config.KstreamConfig
-	// handle is the pointer to kernel trace handle
-	handle        etw.TraceHandle
-	rundownHandle etw.TraceHandle
+	// handle is the pointer to NT Kernel Logger trace handle
+	handle etw.TraceHandle
 	// props is the pointer to event trace properties descriptor
-	props           *etw.EventTraceProperties
-	rundownProps    *etw.EventTraceProperties
-	krundownStarted bool
+	props *etw.EventTraceProperties
+	// ksessions contains non-NT Kernel Logger handles and trace properties
+	ksessions []TraceSession
+}
+
+// TraceSession stores the trace session handle along with the
+// name of the trace session.
+type TraceSession struct {
+	Handle etw.TraceHandle
+	Name   string
 }
 
 // NewKtraceController spins up a new instance of kernel trace controller.
 func NewKtraceController(kstreamConfig config.KstreamConfig) KtraceController {
-	return &ktraceController{kstreamConfig: kstreamConfig}
+	return &ktraceController{
+		kstreamConfig: kstreamConfig,
+		ksessions:     make([]TraceSession, 0),
+	}
 }
 
 // StartKtrace starts a new kernel tracing session. User has the ability to disable
@@ -144,7 +155,9 @@ func (k *ktraceController) StartKtrace() error {
 		MaximumBuffers:    maxBuffers,
 		FlushTimer:        uint32(flushTimer.Seconds()),
 	}
+
 	log.Debugf("starting kernel trace with %q event flags", flags)
+
 	handle, err := startTrace(
 		ktraceSession,
 		props,
@@ -168,10 +181,7 @@ func (k *ktraceController) StartKtrace() error {
 		// registry keys that are very valuable for us to construct the initial snapshot of
 		// these system resources and let us build the event's context
 		if err := etw.SetTraceInformation(handle, etw.TraceSystemTraceEnableFlagsInfo, sysTraceFlags); err != nil {
-			// enable rundown kernel logger to at least enumerate open file objects
-			if err := k.StartKtraceRundown(); err != nil {
-				log.Warn(err)
-			}
+			log.Warn(err)
 		}
 		sysTraceFlags[0] = flags
 		// enable object manager tracking
@@ -186,6 +196,12 @@ func (k *ktraceController) StartKtrace() error {
 
 		k.handle = handleCopy
 		k.props = props
+
+		// start the rest of the ETW providers that collect
+		// event sources we can't obtain with the main NT Kernel Logger provider
+		if err := k.startTraceSessions(); err != nil {
+			log.Warn(err)
+		}
 
 		return nil
 	}
@@ -229,9 +245,7 @@ func (k *ktraceController) StartKtrace() error {
 
 		sysTraceFlags := make([]etw.EventTraceFlags, 8)
 		if err := etw.SetTraceInformation(handle, etw.TraceSystemTraceEnableFlagsInfo, sysTraceFlags); err != nil {
-			if err := k.StartKtraceRundown(); err != nil {
-				log.Warn(err)
-			}
+			log.Warn(err)
 		}
 		sysTraceFlags[0] = flags
 		// enable object manager tracking
@@ -246,6 +260,13 @@ func (k *ktraceController) StartKtrace() error {
 
 		k.handle = handleCopy
 		k.props = props
+
+		// start the rest of the ETW providers that collect
+		// event sources we can obtain with the main NT Kernel Logger provider
+		if err := k.startTraceSessions(); err != nil {
+			log.Warn(err)
+		}
+
 		return nil
 
 	case kerrors.ErrTraceNoSysResources:
@@ -268,9 +289,56 @@ func (k *ktraceController) StartKtrace() error {
 	}
 }
 
-// StartKtraceRundown initiates the kernel logger rundown session that will enumerate open file objects
-// we can use to match file names in file system kernel events.
-func (k *ktraceController) StartKtraceRundown() error {
+//nolint:unparam
+// startTraceSessions enables ETW providers that emit a flux of events we can't
+// find in the main NT Kernel Logger provider. The following providers are
+// enabled:
+//
+// - Kernel Rundown Provider: provides a source of events for constructing the
+// state of opened file objects.
+// - Kernel Audit API Calls: supplies the `OpenProcess` and `OpenThread` events
+//
+func (k *ktraceController) startTraceSessions() error {
+	var ktraceDefs = []struct {
+		traceName    string       // trace name
+		providerGUID syscall.GUID // provider GUID to enable
+		keywords     uint32       // enabled keywords
+		enabled      bool         // whether the trace session should start
+	}{
+		{
+			krundownSession,
+			etw.KernelRundownGUID,
+			0x10, // file rundown events
+			true,
+		},
+		{
+			kauditAPICallsSession,
+			etw.KernelAuditAPICallsGUID,
+			0x0, // no keywords, so we accept all events
+			true,
+		},
+	}
+	for _, kdef := range ktraceDefs {
+		if !kdef.enabled {
+			continue
+		}
+		handle, err := k.startTrace(kdef.traceName, kdef.providerGUID, kdef.keywords)
+		if err != nil {
+			log.Warn(err)
+			etwProviderErrors.Add(err.Error(), 1)
+			continue
+		}
+		ksession := TraceSession{
+			Handle: handle,
+			Name:   kdef.traceName,
+		}
+		k.ksessions = append(k.ksessions, ksession)
+	}
+
+	return nil
+}
+
+func (k *ktraceController) startTrace(traceName string, guid syscall.GUID, keywords uint32) (etw.TraceHandle, error) {
 	props := &etw.EventTraceProperties{
 		Wnode: etw.WnodeHeader{
 			BufferSize: uint32(unsafe.Sizeof(etw.EventTraceProperties{})) + 2*maxStringLen,
@@ -281,14 +349,16 @@ func (k *ktraceController) StartKtraceRundown() error {
 		BufferSize:        maxBufferSize,
 		LogFileMode:       etw.ProcessTraceModeRealtime,
 	}
-	k.rundownProps = props
+
+	// attempt to start tracing session
 	handle, err := startTrace(
-		krundownSession,
+		traceName,
 		props,
 	)
+	// if it is already running, try to restart
 	if err == kerrors.ErrTraceAlreadyRunning {
-		if err := controlTrace(handle, krundownSession, props, etw.Stop); err != nil {
-			return kerrors.ErrStopTrace
+		if err := controlTrace(handle, traceName, props, etw.Stop); err != nil {
+			return 0, fmt.Errorf("couldn't stop %s trace: %v", traceName, err)
 		}
 		props := &etw.EventTraceProperties{
 			Wnode: etw.WnodeHeader{
@@ -301,29 +371,44 @@ func (k *ktraceController) StartKtraceRundown() error {
 			LogFileMode:       etw.ProcessTraceModeRealtime,
 		}
 		handle, err = startTrace(
-			krundownSession,
+			traceName,
 			props,
 		)
 		if err != nil {
-			return kerrors.ErrRestartTrace
+			return 0, fmt.Errorf("couldn't restart %s trace: %v", traceName, err)
 		}
 	}
-	if err := enableTrace(etw.KernelRundownGUID, handle, 0x10); err != nil {
-		return fmt.Errorf("couldn't activate kernel rundown logger: %v", err)
+
+	// enable the specified trace provider
+	if err := enableTrace(guid, handle, keywords); err != nil {
+		return 0, fmt.Errorf("couldn't activate %s logger: %v", traceName, err)
 	}
-	k.rundownHandle = handle
-	k.krundownStarted = true
 
-	return nil
-}
-
-// IsKRundownStarted indicates if kernel logger rundown session is started.
-func (k *ktraceController) IsKRundownStarted() bool {
-	return k.krundownStarted
+	return handle, nil
 }
 
 // CloseKtrace stops currently running kernel trace session.
 func (k *ktraceController) CloseKtrace() error {
+	// close non-NT Kernel Logger sessions
+	for _, ksession := range k.ksessions {
+		props := &etw.EventTraceProperties{
+			Wnode: etw.WnodeHeader{
+				BufferSize: uint32(unsafe.Sizeof(etw.EventTraceProperties{})) + 2*maxStringLen,
+				Flags:      etw.WnodeTraceFlagGUID,
+			},
+			LoggerNameOffset:  uint32(unsafe.Sizeof(etw.EventTraceProperties{})),
+			LogFileNameOffset: 0,
+			BufferSize:        maxBufferSize,
+			LogFileMode:       etw.ProcessTraceModeRealtime,
+		}
+		if err := controlTrace(ksession.Handle, ksession.Name, props, etw.Flush); err != nil {
+			log.Warnf("couldn't flush trace session for [%s]: %v", ksession.Name, err)
+		}
+		time.Sleep(time.Millisecond * 50)
+		if err := controlTrace(ksession.Handle, ksession.Name, props, etw.Stop); err != nil {
+			log.Warnf("couldn't stop trace session for [%s]: %v", ksession.Name, err)
+		}
+	}
 	// flush pending event buffers
 	if err := controlTrace(k.handle, ktraceSession, k.props, etw.Flush); err != nil {
 		log.Warnf("couldn't flush kernel trace session: %v", err)
@@ -332,12 +417,6 @@ func (k *ktraceController) CloseKtrace() error {
 	if err := controlTrace(k.handle, ktraceSession, k.props, etw.Stop); err != nil {
 		return fmt.Errorf("couldn't stop kernel trace session: %v", err)
 	}
-	if k.rundownHandle.IsValid() {
-		if err := controlTrace(k.rundownHandle, krundownSession, k.rundownProps, etw.Stop); err != nil {
-			log.Warn(err)
-		}
-	}
-	k.krundownStarted = false
 	return nil
 }
 

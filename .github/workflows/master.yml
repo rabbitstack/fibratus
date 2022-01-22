@@ -4,11 +4,11 @@ on:
   push:
     branches:
       - master
-    paths-ignore: 
+    paths-ignore:
       - "README.md"
       - "CONTRIBUTING.md"
       - "docs/**"
-           
+
 jobs:
   build:
       runs-on: windows-latest
@@ -31,6 +31,9 @@ jobs:
             base-devel
             mingw-w64-x86_64-gcc
             git
+            automake
+            libtool
+            autoconf
       - name: Cache yara
         uses: actions/cache@v2
         id: cache
@@ -92,7 +95,7 @@ jobs:
         with:
           name: "fibratus-amd64.msi"
           path: "./build/msi/fibratus-0.0.0-amd64.msi"
-  
+
   build-slim:
       runs-on: windows-latest
       steps:
@@ -110,11 +113,11 @@ jobs:
       - uses: actions/upload-artifact@v2
         with:
           name: "fibratus-amd64-slim.exe"
-          path: "./cmd/fibratus/fibratus.exe" 
-  
+          path: "./cmd/fibratus/fibratus.exe"
+
   test:
     runs-on: windows-latest
-    needs: 
+    needs:
       - build
       - build-slim
     continue-on-error: true
@@ -158,7 +161,7 @@ jobs:
            ./make.bat test
         env:
           TAGS: kcap,filament,yara,yara_static
-  
+
   lint:
     runs-on: windows-latest
     needs: test
@@ -200,7 +203,7 @@ jobs:
         run: |
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin $GOLANGCI_LINT_VER
         env:
-          GOLANGCI_LINT_VER: v1.35.2 
+          GOLANGCI_LINT_VER: v1.35.2
       - name: Lint
         shell: bash
         run: |

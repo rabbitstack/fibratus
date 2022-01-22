@@ -65,7 +65,7 @@ func (i *imageInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool,
 			return kevt, true, err
 		}
 		if i.yara != nil && kevt.Type == ktypes.LoadImage {
-			// scan the the target filename
+			// scan the target filename
 			go func() {
 				imageYaraScans.Add(1)
 				err := i.yara.ScanFile(filename, kevt)

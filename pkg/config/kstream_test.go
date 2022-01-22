@@ -22,9 +22,15 @@
 package config
 
 import (
+	"testing"
+
+	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
+
+	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestKstreamConfig(t *testing.T) {
@@ -36,6 +42,8 @@ func TestKstreamConfig(t *testing.T) {
 		"--kstream.enable-fileio=false",
 		"--kstream.enable-net=false",
 		"--kstream.enable-image=false",
+		"--kstream.blacklist.events=CloseFile,CloseHandle",
+		"--kstream.blacklist.images=System,svchost.exe",
 	})
 	require.NoError(t, err)
 	require.NoError(t, c.viper.BindPFlags(c.flags))
@@ -48,4 +56,10 @@ func TestKstreamConfig(t *testing.T) {
 	assert.False(t, c.Kstream.EnableRegistryKevents)
 	assert.False(t, c.Kstream.EnableImageKevents)
 	assert.False(t, c.Kstream.EnableFileIOKevents)
+
+	assert.True(t, c.Kstream.ExcludeKevent(&kevent.Kevent{Type: ktypes.CloseHandle}))
+	assert.False(t, c.Kstream.ExcludeKevent(&kevent.Kevent{Type: ktypes.CreateProcess}))
+
+	assert.True(t, c.Kstream.ExcludeImage(&pstypes.PS{Name: "SVCHOST.exe"}))
+	assert.False(t, c.Kstream.ExcludeImage(&pstypes.PS{Name: "explorer.exe"}))
 }
