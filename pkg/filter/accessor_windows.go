@@ -78,7 +78,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 		return kevt.PID, nil
 	case fields.PsSiblingPid:
 		if kevt.Category != ktypes.Process {
-			return nil, ErrNotProcessKevent
+			return nil, nil
 		}
 		// the id of a freshly created process. `kevt.PID` references the parent process
 		return kevt.Kparams.GetPid()
@@ -96,7 +96,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 		return ps.Name, nil
 	case fields.PsSiblingName:
 		if kevt.Category != ktypes.Process {
-			return nil, ErrNotProcessKevent
+			return nil, nil
 		}
 		return kevt.Kparams.GetString(kparams.ProcessName)
 	case fields.PsComm:
@@ -107,7 +107,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 		return ps.Comm, nil
 	case fields.PsSiblingComm:
 		if kevt.Category != ktypes.Process {
-			return nil, ErrNotProcessKevent
+			return nil, nil
 		}
 		return kevt.Kparams.GetString(kparams.Comm)
 	case fields.PsExe:
@@ -118,7 +118,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 		return ps.Exe, nil
 	case fields.PsSiblingExe:
 		if kevt.Category != ktypes.Process {
-			return nil, ErrNotProcessKevent
+			return nil, nil
 		}
 		return kevt.Kparams.GetString(kparams.Exe)
 	case fields.PsArgs:
@@ -141,12 +141,12 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 		return ps.SID, nil
 	case fields.PsSiblingSID:
 		if kevt.Category != ktypes.Process {
-			return nil, ErrNotProcessKevent
+			return nil, nil
 		}
 		return kevt.Kparams.GetString(kparams.UserSID)
 	case fields.PsSiblingDomain:
 		if kevt.Category != ktypes.Process {
-			return nil, ErrNotProcessKevent
+			return nil, nil
 		}
 		sid, err := kevt.Kparams.GetString(kparams.UserSID)
 		if err != nil {
@@ -155,7 +155,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 		return domainFromSID(sid)
 	case fields.PsSiblingUsername:
 		if kevt.Category != ktypes.Process {
-			return nil, ErrNotProcessKevent
+			return nil, nil
 		}
 		sid, err := kevt.Kparams.GetString(kparams.UserSID)
 		if err != nil {
@@ -182,13 +182,13 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 		return ps.SessionID, nil
 	case fields.PsSiblingSessionID:
 		if kevt.Category != ktypes.Process {
-			return nil, ErrNotProcessKevent
+			return nil, nil
 		}
 		return kevt.Kparams.GetUint32(kparams.SessionID)
 	case fields.PsEnvs:
 		ps := kevt.PS
 		if ps == nil {
-			return nil, nil
+			return nil, ErrPsNil
 		}
 		envs := make([]string, 0, len(ps.Envs))
 		for env := range ps.Envs {
@@ -198,7 +198,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 	case fields.PsModules:
 		ps := kevt.PS
 		if ps == nil {
-			return nil, nil
+			return nil, ErrPsNil
 		}
 		mods := make([]string, 0, len(ps.Modules))
 		for _, m := range ps.Modules {
@@ -208,7 +208,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 	case fields.PsHandles:
 		ps := kevt.PS
 		if ps == nil {
-			return nil, nil
+			return nil, ErrPsNil
 		}
 		handles := make([]string, len(ps.Handles))
 		for i, handle := range ps.Handles {
@@ -218,7 +218,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 	case fields.PsHandleTypes:
 		ps := kevt.PS
 		if ps == nil {
-			return nil, nil
+			return nil, ErrPsNil
 		}
 		types := make([]string, len(ps.Handles))
 		for i, handle := range ps.Handles {
@@ -228,52 +228,70 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 			types[i] = handle.Type
 		}
 		return types, nil
+	case fields.PsParentPid:
+		parent := getParentPs(kevt)
+		if parent == nil {
+			return nil, ErrPsNil
+		}
+		return parent.PID, nil
 	case fields.PsParentName:
 		parent := getParentPs(kevt)
 		if parent == nil {
-			return nil, nil
+			return nil, ErrPsNil
 		}
 		return parent.Name, nil
 	case fields.PsParentComm:
 		parent := getParentPs(kevt)
 		if parent == nil {
-			return nil, nil
+			return nil, ErrPsNil
 		}
 		return parent.Comm, nil
 	case fields.PsParentExe:
 		parent := getParentPs(kevt)
 		if parent == nil {
-			return nil, nil
+			return nil, ErrPsNil
 		}
 		return parent.Exe, nil
 	case fields.PsParentArgs:
 		parent := getParentPs(kevt)
 		if parent == nil {
-			return nil, nil
+			return nil, ErrPsNil
 		}
 		return parent.Args, nil
 	case fields.PsParentCwd:
 		parent := getParentPs(kevt)
 		if parent == nil {
-			return nil, nil
+			return nil, ErrPsNil
 		}
 		return parent.Cwd, nil
 	case fields.PsParentSID:
 		parent := getParentPs(kevt)
 		if parent == nil {
-			return nil, nil
+			return nil, ErrPsNil
 		}
 		return parent.SID, nil
+	case fields.PsParentDomain:
+		ps := getParentPs(kevt)
+		if ps == nil {
+			return nil, ErrPsNil
+		}
+		return domainFromSID(ps.SID)
+	case fields.PsParentUsername:
+		ps := getParentPs(kevt)
+		if ps == nil {
+			return nil, ErrPsNil
+		}
+		return usernameFromSID(ps.SID)
 	case fields.PsParentSessionID:
 		parent := getParentPs(kevt)
 		if parent == nil {
-			return nil, nil
+			return nil, ErrPsNil
 		}
 		return parent.SessionID, nil
 	case fields.PsParentEnvs:
 		ps := getParentPs(kevt)
 		if ps == nil {
-			return nil, nil
+			return nil, ErrPsNil
 		}
 		envs := make([]string, 0, len(ps.Envs))
 		for env := range ps.Envs {
@@ -283,7 +301,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 	case fields.PsParentHandles:
 		ps := getParentPs(kevt)
 		if ps == nil {
-			return nil, nil
+			return nil, ErrPsNil
 		}
 		handles := make([]string, len(ps.Handles))
 		for i, handle := range ps.Handles {
@@ -293,7 +311,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 	case fields.PsParentHandleTypes:
 		ps := getParentPs(kevt)
 		if ps == nil {
-			return nil, nil
+			return nil, ErrPsNil
 		}
 		types := make([]string, len(ps.Handles))
 		for i, handle := range ps.Handles {
@@ -310,7 +328,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 			env, _ := captureInBrackets(f.String())
 			ps := kevt.PS
 			if ps == nil {
-				return nil, nil
+				return nil, ErrPsNil
 			}
 			v, ok := ps.Envs[env]
 			if ok {
@@ -326,7 +344,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 			name, segment := captureInBrackets(f.String())
 			ps := kevt.PS
 			if ps == nil {
-				return nil, nil
+				return nil, ErrPsNil
 			}
 			mod := ps.FindModule(name)
 			if mod == nil {

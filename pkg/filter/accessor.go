@@ -29,9 +29,6 @@ import (
 var (
 	// ErrPsNil indicates the process state associated with the event is not initialized
 	ErrPsNil = errors.New("process state is nil")
-	// ErrNotProcessKevent indicates the error that raises when the process sibling
-	// fields are used on non-process kernel events
-	ErrNotProcessKevent = errors.New("expected create or terminate process event")
 )
 
 // kevtAccessor extracts kernel event specific values.
