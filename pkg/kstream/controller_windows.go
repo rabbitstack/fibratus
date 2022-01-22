@@ -198,7 +198,7 @@ func (k *ktraceController) StartKtrace() error {
 		k.props = props
 
 		// start the rest of the ETW providers that collect
-		// event sources we can obtain with the main NT Kernel Logger provider
+		// event sources we can't obtain with the main NT Kernel Logger provider
 		if err := k.startTraceSessions(); err != nil {
 			log.Warn(err)
 		}
