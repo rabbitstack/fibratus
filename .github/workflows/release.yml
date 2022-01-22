@@ -4,7 +4,7 @@ on:
   push:
     tags:
       - 'v1*'
-      
+
 jobs:
   build:
       runs-on: windows-latest
@@ -27,6 +27,9 @@ jobs:
             base-devel
             mingw-w64-x86_64-gcc
             git
+            automake
+            libtool
+            autoconf
       - name: Cache yara
         uses: actions/cache@v2
         id: cache
@@ -58,7 +61,7 @@ jobs:
       - name: Get version
         id: get_version
         shell: bash
-        run: | 
+        run: |
           echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3 | cut -c2-)
       - name: Build
         shell: bash
@@ -89,7 +92,7 @@ jobs:
         with:
           name: fibratus-${{ steps.get_version.outputs.VERSION }}-amd64.msi
           path: "./build/msi/fibratus-${{ steps.get_version.outputs.VERSION }}-amd64.msi"
-  
+
   build-slim:
       runs-on: windows-latest
       steps:
@@ -102,7 +105,7 @@ jobs:
       - name: Get version
         id: get_version
         shell: bash
-        run: | 
+        run: |
           echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3 | cut -c2-)
       - name: Build
         shell: bash
@@ -130,10 +133,10 @@ jobs:
         with:
           name: fibratus-${{ steps.get_version.outputs.VERSION }}-slim-amd64.msi
           path: "./build/msi/fibratus-${{ steps.get_version.outputs.VERSION }}-slim-amd64.msi"
-          
+
   release:
       runs-on: windows-latest
-      needs: 
+      needs:
         - build
         - build-slim
       steps:
@@ -142,7 +145,7 @@ jobs:
       - name: Get version
         id: get_version
         shell: bash
-        run: | 
+        run: |
           echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3 | cut -c2-)
       - uses: actions/download-artifact@v2
         with:
@@ -163,4 +166,4 @@ jobs:
              build/fibratus-${{ steps.get_version.outputs.VERSION }}-slim-amd64.msi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
+
