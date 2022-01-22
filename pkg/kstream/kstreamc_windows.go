@@ -268,7 +268,7 @@ func (k *kstreamConsumer) processKevent(evt *etw.EventRecord) error {
 		tid   = evt.Header.ThreadID
 		ktype ktypes.Ktype
 		// get the CPU core on which the event was generated
-		cpu = *(&evt.BufferContext.ProcessorIndex[0])
+		cpu = *(*uint8)(unsafe.Pointer(&evt.BufferContext.ProcessorIndex[0]))
 	)
 
 	// obtain the ktype from provider GUID + event type that varies

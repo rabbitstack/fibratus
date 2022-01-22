@@ -101,14 +101,11 @@ func NewChain(
 // information. So, we wait for the CloseHandle counterpart to
 // occur to augment the deferred event with the handle name param.
 func (c *chain) consumeDeferred() {
-	for {
-		select {
-		case kevt := <-c.deferredKevts:
-			if c.cb != nil {
-				err := c.cb(kevt)
-				if err == nil {
-					deferredEnqueued.Add(1)
-				}
+	for kevt := range c.deferredKevts {
+		if c.cb != nil {
+			err := c.cb(kevt)
+			if err == nil {
+				deferredEnqueued.Add(1)
 			}
 		}
 	}

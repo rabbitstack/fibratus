@@ -246,7 +246,6 @@ func (k *ktraceController) StartKtrace() error {
 		sysTraceFlags := make([]etw.EventTraceFlags, 8)
 		if err := etw.SetTraceInformation(handle, etw.TraceSystemTraceEnableFlagsInfo, sysTraceFlags); err != nil {
 			log.Warn(err)
-
 		}
 		sysTraceFlags[0] = flags
 		// enable object manager tracking
@@ -290,6 +289,7 @@ func (k *ktraceController) StartKtrace() error {
 	}
 }
 
+//nolint:unparam
 // startTraceSessions enables ETW providers that emit a flux of events we can't
 // find in the main NT Kernel Logger provider. The following providers are
 // enabled:
