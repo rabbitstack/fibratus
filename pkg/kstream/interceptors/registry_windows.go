@@ -20,20 +20,17 @@ package interceptors
 
 import (
 	"expvar"
+	"path/filepath"
+	"strings"
+	"sync/atomic"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/syscall/registry"
-	"github.com/rabbitstack/fibratus/pkg/syscall/sys"
-	"golang.org/x/sys/windows"
 	reg "golang.org/x/sys/windows/registry"
-	"path/filepath"
-	"strings"
-	"sync/atomic"
-	"syscall"
-	"time"
-	"unicode/utf16"
 )
 
 var (
@@ -219,36 +216,6 @@ func typToString(typ uint32) string {
 	default:
 		return "UNKNOWN"
 	}
-}
-
-var resolvedStatuses = map[uint32]string{}
-
-func formatStatus(status uint32) string {
-	if status == 0 {
-		return "success"
-	}
-	// this status code is return quite often so we can offload the FormatMessage call
-	if status == notFoundNTStatus {
-		return "key not found"
-	}
-	// pick resolved status
-	if s, ok := resolvedStatuses[status]; ok {
-		return s
-	}
-	var flags uint32 = syscall.FORMAT_MESSAGE_FROM_SYSTEM
-	b := make([]uint16, 300)
-	n, err := windows.FormatMessage(flags, 0, sys.CodeFromNtStatus(status), 0, b, nil)
-	if err != nil {
-		return "unknown"
-	}
-	// trim terminating \r and \n
-	for ; n > 0 && (b[n-1] == '\n' || b[n-1] == '\r'); n-- {
-	}
-
-	s := strings.ToLower(string(utf16.Decode(b[:n])))
-	resolvedStatuses[status] = s
-
-	return s
 }
 
 func (r *registryInterceptor) findMatchingKey(pid uint32, relativeKeyName string) string {

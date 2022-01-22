@@ -19,13 +19,14 @@
 package interceptors
 
 import (
+	"net"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/network"
 	"github.com/rabbitstack/fibratus/pkg/util/ports"
-	"net"
-	"time"
 )
 
 var (
@@ -70,7 +71,7 @@ func (n netInterceptor) Close() {
 	n.reverseDNS.Close()
 }
 
-// Intercpet overrides the kernel event type according to the transport layer
+// Intercept overrides the kernel event type according to the transport layer
 // and/or IP protocol version. At this point we also append the port names for all
 // network kernel events and perform reverse DNS lookups to obtain the domain names.
 func (n *netInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, error) {

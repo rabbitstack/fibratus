@@ -19,6 +19,10 @@
 package filter
 
 import (
+	"net"
+	"testing"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
@@ -26,9 +30,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/stretchr/testify/require"
-	"net"
-	"testing"
-	"time"
 )
 
 var cfg = &config.Config{
@@ -62,6 +63,10 @@ func TestFilterRunProcessKevent(t *testing.T) {
 		kparams.ProcessParentID: {Name: kparams.ProcessParentID, Type: kparams.PID, Value: uint32(345)},
 	}
 
+	kpars1 := kevent.Kparams{
+		kparams.DesiredAccessNames: {Name: kparams.DesiredAccessNames, Type: kparams.Slice, Value: []string{"QUERY_INFORMATION", "QUERY_LIMITED_INFORMATION"}},
+	}
+
 	ps1 := &pstypes.PS{
 		Name: "wininit.exe",
 		Parent: &pstypes.PS{
@@ -75,10 +80,11 @@ func TestFilterRunProcessKevent(t *testing.T) {
 	}
 
 	kevt := &kevent.Kevent{
-		Type:    ktypes.CreateProcess,
-		Kparams: kpars,
-		Name:    "CreateProcess",
-		PID:     1023,
+		Type:     ktypes.CreateProcess,
+		Category: ktypes.Process,
+		Kparams:  kpars,
+		Name:     "CreateProcess",
+		PID:      1023,
 		PS: &pstypes.PS{
 			Name:   "svchost.exe",
 			Parent: ps1,
@@ -91,6 +97,24 @@ func TestFilterRunProcessKevent(t *testing.T) {
 		},
 	}
 	kevt.Timestamp, _ = time.Parse(time.RFC3339, "2011-05-03T15:04:05.323Z")
+
+	kevt1 := &kevent.Kevent{
+		Type:     ktypes.OpenProcess,
+		Category: ktypes.Process,
+		Kparams:  kpars1,
+		Name:     "OpenProcess",
+		PID:      1023,
+		PS: &pstypes.PS{
+			Name:   "svchost.exe",
+			Parent: ps1,
+			Ppid:   345,
+			Envs:   map[string]string{"ALLUSERSPROFILE": "C:\\ProgramData", "OS": "Windows_NT", "ProgramFiles(x86)": "C:\\Program Files (x86)"},
+			Modules: []pstypes.Module{
+				{Name: "C:\\Windows\\System32\\kernel32.dll", Size: 12354, Checksum: 23123343, BaseAddress: kparams.Hex("fff23fff"), DefaultBaseAddress: kparams.Hex("fff124fd")},
+				{Name: "C:\\Windows\\System32\\user32.dll", Size: 212354, Checksum: 33123343, BaseAddress: kparams.Hex("fef23fff"), DefaultBaseAddress: kparams.Hex("fff124fd")},
+			},
+		},
+	}
 
 	var tests = []struct {
 		filter  string
@@ -134,6 +158,26 @@ func TestFilterRunProcessKevent(t *testing.T) {
 			t.Fatal(err)
 		}
 		matches := f.Run(kevt)
+		if matches != tt.matches {
+			t.Errorf("%d. %q ps filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
+		}
+	}
+
+	var tests1 = []struct {
+		filter  string
+		matches bool
+	}{
+
+		{`ps.access.mask.names in ('QUERY_INFORMATION')`, true},
+	}
+
+	for i, tt := range tests1 {
+		f := New(tt.filter, cfg)
+		err := f.Compile()
+		if err != nil {
+			t.Fatal(err)
+		}
+		matches := f.Run(kevt1)
 		if matches != tt.matches {
 			t.Errorf("%d. %q ps filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}

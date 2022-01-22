@@ -22,10 +22,11 @@
 package thread
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/syscall/handle"
 	"os"
 	"syscall"
 	"unsafe"
+
+	"github.com/rabbitstack/fibratus/pkg/syscall/handle"
 )
 
 var (
@@ -40,9 +41,98 @@ var (
 type DesiredAccess uint32
 
 const (
+	// TerminateThread is required to terminate a thread using `TerminateThread`
+	TerminateThread DesiredAccess = 0x0001
+	// SuspendResume is required to suspend or resume a thread
+	SuspendResume DesiredAccess = 0x0002
+	// GetContext is required to read the context of a thread using `GetThreadContext`
+	GetContext DesiredAccess = 0x0008
+	// SetContext is required to write the context of a thread
+	SetContext DesiredAccess = 0x0010
+	// SetInformation is required to set certain information in the thread object
+	SetInformation DesiredAccess = 0x0020
+	// QueryInformation is required to read certain information from the thread object
+	QueryInformation DesiredAccess = 0x0040
+	// SetThreadToken is required to set the impersonation token for a thread
+	SetThreadToken DesiredAccess = 0x0080
+	// Impersonate is required to use a thread's security information directly without calling it by using a communication mechanism that provides impersonation services
+	Impersonate DesiredAccess = 0x0100
+	// DirectImpersonation is required for a server thread that impersonates a client
+	DirectImpersonation DesiredAccess = 0x0200
+	// SetLimitedInformation is required to set certain information in the thread object
+	SetLimitedInformation DesiredAccess = 0x0400
 	// QueryLimitedInformation is required to get certain information from the thread objects (e.g. PID to which pertains some thread)
 	QueryLimitedInformation DesiredAccess = 0x0800
+
+	// AllAccess grants all possible access rights for a thread object
+	AllAccess DesiredAccess = 0x000F0000 | 0x00100000 | 0xFFFF
 )
+
+// String returns the human-readable representation of the thread access rights.
+func (access DesiredAccess) String() string {
+	switch access {
+	case TerminateThread:
+		return "TERMINATE"
+	case SuspendResume:
+		return "SUSPEND_RESUME"
+	case GetContext:
+		return "GET_CONTEXT"
+	case SetContext:
+		return "SET_CONTEXT"
+	case SetInformation:
+		return "SET_INFORMATION"
+	case QueryInformation:
+		return "QUERY_INFORMATION"
+	case SetThreadToken:
+		return "SET_THREAD_TOKEN"
+	case Impersonate:
+		return "IMPERSONATE"
+	case DirectImpersonation:
+		return "DIRECT_IMPERSONATION"
+	case SetLimitedInformation:
+		return "SET_LIMITED_INFORMATION"
+	case QueryLimitedInformation:
+		return "QUERY_LIMITED_INFORMATION"
+	case AllAccess:
+		return "ALL_ACCESS"
+	default:
+		return "UNKNOWN"
+	}
+}
+
+const maxFlags = 0x1800
+
+// Flags returns a list of thread access right flags.
+func (access DesiredAccess) Flags() []string {
+	flags := make([]string, 0)
+	if access == AllAccess {
+		return []string{AllAccess.String()}
+	}
+	if (access & TerminateThread) != 0 {
+		flags = append(flags, TerminateThread.String())
+	}
+	if (access & SuspendResume) != 0 {
+		flags = append(flags, SuspendResume.String())
+	}
+	if (access & GetContext) != 0 {
+		flags = append(flags, GetContext.String())
+	}
+	if (access & SetInformation) != 0 {
+		flags = append(flags, SetInformation.String())
+	}
+	if (access & QueryInformation) != 0 {
+		flags = append(flags, QueryInformation.String())
+	}
+	if (access & SetThreadToken) != 0 {
+		flags = append(flags, SetThreadToken.String())
+	}
+	for mask := Impersonate; mask <= maxFlags; mask *= 2 {
+		if (access & mask) != 0 {
+			flags = append(flags, mask.String())
+		}
+	}
+	return flags
+}
 
 // Open opens an existing thread object.
 func Open(access DesiredAccess, inheritHandle bool, threadID uint32) (handle.Handle, error) {

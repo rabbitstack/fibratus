@@ -47,6 +47,11 @@ const (
 	// StartTime field denotes the process start time.
 	StartTime = "start_time"
 
+	// DesiredAccess field denotes the access rights for different kernel objects such as processes or threads.
+	DesiredAccess = "desired_access"
+	// DesiredAccessNames field denotes the list of human-readable access rights.
+	DesiredAccessNames = "desired_access_names"
+
 	// BasePrio field is the thread base priority assigned by the scheduler.
 	BasePrio = "base_prio"
 	// IOPrio represents the filed that indicates the thread I/O priority.
