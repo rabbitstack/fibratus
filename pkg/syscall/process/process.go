@@ -114,10 +114,10 @@ func (access DesiredAccess) String() string {
 	}
 }
 
-const maxFlags = 0x10660
+const maxFlags = 0x2460
 
-// ToFlags converts the desired access mask to the slice of string values.
-func (access DesiredAccess) ToFlags() []string {
+// Flags converts the desired access mask to the slice of string values.
+func (access DesiredAccess) Flags() []string {
 	flags := make([]string, 0)
 	if access == AllAccess {
 		return []string{AllAccess.String()}
@@ -132,7 +132,7 @@ func (access DesiredAccess) ToFlags() []string {
 		flags = append(flags, VMOperation.String())
 	}
 	for mask := VMRead; mask <= maxFlags; mask *= 2 {
-		if access&mask != 0 {
+		if (access & mask) != 0 {
 			flags = append(flags, mask.String())
 		}
 	}

@@ -27,6 +27,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rabbitstack/fibratus/pkg/syscall/thread"
+
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
@@ -166,6 +168,7 @@ func (ps psInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 			kevt.Kparams.Append(kparams.Exe, kparams.UnicodeString, proc.Exe)
 			kevt.Kparams.Append(kparams.ProcessName, kparams.UnicodeString, proc.Name)
 		}
+		_ = kevt.Kparams.Set(kparams.ProcessID, pid, kparams.PID)
 		// format the status code
 		status, err := kevt.Kparams.GetUint32(kparams.NTStatus)
 		if err == nil {
@@ -175,10 +178,12 @@ func (ps psInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 		// the access mask to a list of symbolical names
 		desiredAccess, err := kevt.Kparams.GetUint32(kparams.DesiredAccess)
 		if err == nil {
-			_ = kevt.Kparams.Set(kparams.DesiredAccess, "0x"+strconv.FormatInt(int64(desiredAccess), 16), kparams.AnsiString)
+			_ = kevt.Kparams.Set(kparams.DesiredAccess, toHex(desiredAccess), kparams.AnsiString)
 		}
 		if kevt.Type == ktypes.OpenProcess {
-			kevt.Kparams.Append(kparams.DesiredAccessNames, kparams.Slice, process.DesiredAccess(desiredAccess).ToFlags())
+			kevt.Kparams.Append(kparams.DesiredAccessNames, kparams.Slice, process.DesiredAccess(desiredAccess).Flags())
+		} else {
+			kevt.Kparams.Append(kparams.DesiredAccessNames, kparams.Slice, thread.DesiredAccess(desiredAccess).Flags())
 		}
 		return kevt, false, nil
 	}
@@ -206,3 +211,5 @@ func getStartTime(pid uint32) (time.Time, error) {
 	}
 	return started, nil
 }
+
+func toHex(desiredAccess uint32) string { return "0x" + strconv.FormatInt(int64(desiredAccess), 16) }

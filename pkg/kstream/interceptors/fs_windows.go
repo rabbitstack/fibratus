@@ -39,7 +39,6 @@ var (
 	fileObjectMisses     = expvar.NewInt("fs.file.objects.misses")
 	fileObjectHandleHits = expvar.NewInt("fs.file.object.handle.hits")
 	fileReleaseCount     = expvar.NewInt("fs.file.releases")
-	once                 sync.Once
 )
 
 type fsInterceptor struct {
@@ -324,23 +323,6 @@ func (f *fsInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 	return kevt, true, nil
 }
 
-// removeKparams removes unwanted kparams, either because they are already present in kevent
-// canonical attributes or are not very useful.
-func removeKparams(kevt *kevent.Kevent) {
-	if kevt.Kparams.Contains(kparams.ProcessID) {
-		kevt.Kparams.Remove(kparams.ProcessID)
-	}
-	if kevt.Kparams.Contains(kparams.ThreadID) {
-		kevt.Kparams.Remove(kparams.ThreadID)
-	}
-	if kevt.Kparams.Contains(kparams.FileCreateOptions) {
-		kevt.Kparams.Remove(kparams.FileCreateOptions)
-	}
-	if kevt.Kparams.Contains(kparams.FileKey) {
-		kevt.Kparams.Remove(kparams.FileKey)
-	}
-}
-
 func (*fsInterceptor) Name() InterceptorType { return Fs }
 func (f *fsInterceptor) Close()              {}
 
@@ -440,4 +422,21 @@ func (f *fsInterceptor) appendKparams(fileinfo *fileInfo, kevt *kevent.Kevent) e
 		kevt.Kparams.Append(kparams.FileName, kparams.UnicodeString, fileinfo.name)
 	}
 	return nil
+}
+
+// removeKparams removes unwanted kparams, either because they are already present in kevent
+// canonical attributes or are not very useful.
+func removeKparams(kevt *kevent.Kevent) {
+	if kevt.Kparams.Contains(kparams.ProcessID) {
+		kevt.Kparams.Remove(kparams.ProcessID)
+	}
+	if kevt.Kparams.Contains(kparams.ThreadID) {
+		kevt.Kparams.Remove(kparams.ThreadID)
+	}
+	if kevt.Kparams.Contains(kparams.FileCreateOptions) {
+		kevt.Kparams.Remove(kparams.FileCreateOptions)
+	}
+	if kevt.Kparams.Contains(kparams.FileKey) {
+		kevt.Kparams.Remove(kparams.FileKey)
+	}
 }

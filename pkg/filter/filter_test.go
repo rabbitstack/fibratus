@@ -19,6 +19,10 @@
 package filter
 
 import (
+	"net"
+	"testing"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
@@ -26,9 +30,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/stretchr/testify/require"
-	"net"
-	"testing"
-	"time"
 )
 
 var cfg = &config.Config{
@@ -56,10 +57,11 @@ func TestFilterCompile(t *testing.T) {
 
 func TestFilterRunProcessKevent(t *testing.T) {
 	kpars := kevent.Kparams{
-		kparams.Comm:            {Name: kparams.Comm, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost.exe -k RPCSS"},
-		kparams.ProcessName:     {Name: kparams.ProcessName, Type: kparams.AnsiString, Value: "svchost.exe"},
-		kparams.ProcessID:       {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1234)},
-		kparams.ProcessParentID: {Name: kparams.ProcessParentID, Type: kparams.PID, Value: uint32(345)},
+		kparams.Comm:               {Name: kparams.Comm, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost.exe -k RPCSS"},
+		kparams.ProcessName:        {Name: kparams.ProcessName, Type: kparams.AnsiString, Value: "svchost.exe"},
+		kparams.ProcessID:          {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1234)},
+		kparams.ProcessParentID:    {Name: kparams.ProcessParentID, Type: kparams.PID, Value: uint32(345)},
+		kparams.DesiredAccessNames: {Name: kparams.DesiredAccessNames, Type: kparams.Slice, Value: []string{"QUERY_INFORMATION", "QUERY_LIMITED_INFORMATION"}},
 	}
 
 	ps1 := &pstypes.PS{
@@ -102,6 +104,7 @@ func TestFilterRunProcessKevent(t *testing.T) {
 		{`ps.name = 'mimikatz.exe' or ps.name contains 'svc'`, true},
 		{`ps.envs in ('ALLUSERSPROFILE')`, true},
 		{`kevt.name='CreateProcess' and ps.name contains 'svchost'`, true},
+		{`ps.access.mask.names in ('QUERY_INFORMATION')`, true},
 
 		{`ps.modules IN ('kernel32.dll')`, true},
 		{`ps.modules[kernel32.dll].size = 12354`, true},

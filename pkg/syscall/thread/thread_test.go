@@ -19,7 +19,7 @@
  * limitations under the License.
  */
 
-package process
+package thread
 
 import (
 	"testing"
@@ -27,8 +27,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestDesiredAccessToFlags(t *testing.T) {
-	assert.Contains(t, DesiredAccess(0x1400).Flags(), "QUERY_INFORMATION")
-	assert.Contains(t, DesiredAccess(0x1400).Flags(), "QUERY_LIMITED_INFORMATION")
-	assert.Contains(t, DesiredAccess(0x1fffff).Flags(), "ALL_ACCESS")
+func TestDesiredAccessFlags(t *testing.T) {
+	assert.Contains(t, DesiredAccess(0x1800).Flags(), "QUERY_LIMITED_INFORMATION")
 }
