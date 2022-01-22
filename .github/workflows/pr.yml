@@ -24,12 +24,13 @@ jobs:
       - name: Setup msys2
         uses: msys2/setup-msys2@v2
         with:
-          release: true
+          release: false
           install: >-
             base-devel
             mingw-w64-x86_64-gcc
             git
-            autoconf
+            automake
+            libtool
       - name: Cache yara
         uses: actions/cache@v2
         id: cache
