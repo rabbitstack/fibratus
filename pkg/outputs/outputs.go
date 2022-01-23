@@ -41,10 +41,12 @@ type Type uint8
 const (
 	// Console represents the default terminal output.
 	Console Type = iota
-	// AMQP denotest the AMQP output.
+	// AMQP denotes the AMQP output.
 	AMQP
 	// Elasticsearch denotes the Elasticsearch output.
 	Elasticsearch
+	// HTTP denotes the HTTP output.
+	HTTP
 	// Null is the null output.
 	Null
 )
@@ -58,6 +60,8 @@ func (t Type) String() string {
 		return "amqp"
 	case Elasticsearch:
 		return "elasticsearch"
+	case HTTP:
+		return "http"
 	case Null:
 		return "null"
 	default:

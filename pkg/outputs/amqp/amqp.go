@@ -20,6 +20,7 @@ package amqp
 
 import (
 	"expvar"
+
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/outputs"
 )
