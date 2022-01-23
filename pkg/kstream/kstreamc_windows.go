@@ -417,6 +417,7 @@ func (k *kstreamConsumer) processKevent(evt *etw.EventRecord) error {
 	return nil
 }
 
+// enqueueKevent is the callback method invoked on deferred event arrival.
 func (k *kstreamConsumer) enqueueKevent(kevt *kevent.Kevent) error {
 	if kevt.PS == nil {
 		kevt.PS = k.psnapshotter.Find(kevt.PID)
@@ -433,10 +434,7 @@ func (k *kstreamConsumer) enqueueKevent(kevt *kevent.Kevent) error {
 	k.kevts <- kevt
 
 	keventsEnqueued.Add(1)
-
-	if !kevt.Type.Dropped(false) {
-		k.sequencer.Increment()
-	}
+	k.sequencer.Increment()
 
 	return nil
 }

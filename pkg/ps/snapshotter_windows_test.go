@@ -130,7 +130,6 @@ func TestSnapshotterWriteKeventProcess(t *testing.T) {
 	assert.Equal(t, uint32(1200), kevt.PS.PID)
 	assert.Equal(t, "spotify.exe", kevt.PS.Name)
 	require.NotNil(t, psnap.Find(1232))
-
 }
 
 func TestSnapshotterWriteNoPIDInParams(t *testing.T) {
