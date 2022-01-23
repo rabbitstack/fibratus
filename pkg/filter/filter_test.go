@@ -211,6 +211,7 @@ func TestFilterRunThreadKevent(t *testing.T) {
 		Kparams: kpars,
 		Name:    "CreateThread",
 		PS: &pstypes.PS{
+			Name: "svchost.exe",
 			Envs: map[string]string{"ALLUSERSPROFILE": "C:\\ProgramData", "OS": "Windows_NT", "ProgramFiles(x86)": "C:\\Program Files (x86)"},
 		},
 	}
