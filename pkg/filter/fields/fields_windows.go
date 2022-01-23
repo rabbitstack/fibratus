@@ -49,6 +49,10 @@ const (
 	PsCwd Field = "ps.cwd"
 	// PsSID represents the process security identifier
 	PsSID Field = "ps.sid"
+	// PsDomain represents the process domain field
+	PsDomain Field = "ps.domain"
+	// PsUsername represents the process username field
+	PsUsername Field = "ps.username"
 	// PsSessionID represents the session id bound to the process
 	PsSessionID Field = "ps.sessionid"
 	// PsEnvs represents the process environment variables
@@ -61,6 +65,8 @@ const (
 	PsDTB Field = "ps.dtb"
 	// PsModules represents the process modules
 	PsModules Field = "ps.modules"
+	// PsParentPid represents the parent process identifier field
+	PsParentPid Field = "ps.parent.pid"
 	// PsParentName represents the parent process name field
 	PsParentName Field = "ps.parent.name"
 	// PsParentComm represents the parent process command line field
@@ -73,6 +79,10 @@ const (
 	PsParentCwd Field = "ps.parent.cwd"
 	// PsParentSID represents the parent process security identifier field
 	PsParentSID Field = "ps.parent.sid"
+	// PsParentUsername represents the parent process username field
+	PsParentUsername Field = "ps.parent.username"
+	// PsParentDomain represents the parent process domain field
+	PsParentDomain Field = "ps.parent.domain"
 	// PsParentSessionID represents the session id field bound to the parent process
 	PsParentSessionID Field = "ps.parent.sessionid"
 	// PsParentEnvs represents the parent process environment variables field
@@ -91,6 +101,23 @@ const (
 	PsAccessMaskNames Field = "ps.access.mask.names"
 	// PsAccessStatus represents the process access status field
 	PsAccessStatus Field = "ps.access.status"
+
+	// PsSiblingPid represents the sibling process identifier field
+	PsSiblingPid Field = "ps.sibling.pid"
+	// PsSiblingName represents the sibling process name field
+	PsSiblingName Field = "ps.sibling.name"
+	// PsSiblingComm represents the sibling process command line field
+	PsSiblingComm Field = "ps.sibling.comm"
+	// PsSiblingExe represents the sibling process complete executable path field
+	PsSiblingExe Field = "ps.sibling.exe"
+	// PsSiblingSID represents the sibling processes security identifier field
+	PsSiblingSID Field = "ps.sibling.sid"
+	// PsSiblingSessionID represents the sibling process session id field
+	PsSiblingSessionID Field = "ps.sibling.sessionid"
+	// PsSiblingDomain represents the sibling process domain field
+	PsSiblingDomain Field = "ps.sibling.domain"
+	// PsSiblingUsername represents the sibling process username field
+	PsSiblingUsername Field = "ps.sibling.username"
 
 	// ThreadBasePrio is the base thread priority
 	ThreadBasePrio Field = "thread.prio"
@@ -300,7 +327,7 @@ const (
 	ProcessID Segment = "pid"
 	// ProcessName represents the process name
 	ProcessName Segment = "name"
-	// PsComm represents the process command line
+	// ProcessComm represents the process command line
 	ProcessComm Segment = "comm"
 	// ProcessExe represents the process image path
 	ProcessExe Segment = "exe"
@@ -352,17 +379,22 @@ var fields = map[Field]FieldInfo{
 	PsCwd:               {PsCwd, "process current working directory", kparams.UnicodeString, []string{"ps.cwd = 'C:\\Users\\Default'"}},
 	PsSID:               {PsSID, "security identifier under which this process is run", kparams.UnicodeString, []string{"ps.sid contains 'SYSTEM'"}},
 	PsSessionID:         {PsSessionID, "unique identifier for the current session", kparams.Int16, []string{"ps.sessionid = 1"}},
+	PsDomain:            {PsDomain, "process domain", kparams.UnicodeString, []string{"ps.domain contains 'SERVICE'"}},
+	PsUsername:          {PsUsername, "process username", kparams.UnicodeString, []string{"ps.username contains 'system'"}},
 	PsEnvs:              {PsEnvs, "process environment variables", kparams.Slice, []string{"ps.envs in ('MOZ_CRASHREPORTER_DATA_DIRECTORY')"}},
 	PsHandles:           {PsHandles, "allocated process handle names", kparams.Slice, []string{"ps.handles in ('\\BaseNamedObjects\\__ComCatalogCache__')"}},
 	PsHandleTypes:       {PsHandleTypes, "allocated process handle types", kparams.Slice, []string{"ps.handle.types in ('Key', 'Mutant', 'Section')"}},
 	PsDTB:               {PsDTB, "process directory table base address", kparams.HexInt64, []string{"ps.dtb = '7ffe0000'"}},
 	PsModules:           {PsModules, "modules loaded by the process", kparams.Slice, []string{"ps.modules in ('crypt32.dll', 'xul.dll')"}},
 	PsParentName:        {PsParentName, "parent process image name including the file extension", kparams.UnicodeString, []string{"ps.parent.name contains 'cmd.exe'"}},
+	PsParentPid:         {PsParentPid, "parent process id", kparams.Uint32, []string{"ps.parent.pid = 4"}},
 	PsParentComm:        {PsParentComm, "parent process command line", kparams.UnicodeString, []string{"parent.ps.comm contains 'java'"}},
 	PsParentExe:         {PsParentExe, "full name of the parent process' executable", kparams.UnicodeString, []string{"ps.parent.exe = 'C:\\Windows\\system32\\explorer.exe'"}},
 	PsParentArgs:        {PsParentArgs, "parent process command line arguments", kparams.Slice, []string{"ps.parent.args in ('/cdir', '/-C')"}},
 	PsParentCwd:         {PsParentCwd, "parent process current working directory", kparams.UnicodeString, []string{"ps.parent.cwd = 'C:\\Temp'"}},
 	PsParentSID:         {PsParentSID, "security identifier under which the parent process is run", kparams.UnicodeString, []string{"ps.parent.sid contains 'SYSTEM'"}},
+	PsParentDomain:      {PsParentDomain, "parent process domain", kparams.UnicodeString, []string{"ps.parent.domain contains 'SERVICE'"}},
+	PsParentUsername:    {PsParentUsername, "parent process username", kparams.UnicodeString, []string{"ps.parent.username contains 'system'"}},
 	PsParentSessionID:   {PsParentSessionID, "unique identifier for the current session of parent process", kparams.Int16, []string{"ps.parent.sessionid = 1"}},
 	PsParentEnvs:        {PsParentEnvs, "parent process environment variables", kparams.Slice, []string{"ps.parent.envs in ('MOZ_CRASHREPORTER_DATA_DIRECTORY')"}},
 	PsParentHandles:     {PsParentHandles, "allocated parent process handle names", kparams.Slice, []string{"ps.parent.handles in ('\\BaseNamedObjects\\__ComCatalogCache__')"}},
@@ -371,6 +403,14 @@ var fields = map[Field]FieldInfo{
 	PsAccessMask:        {PsAccessMask, "process desired access rights", kparams.AnsiString, []string{"ps.access.mask = '0x1400'"}},
 	PsAccessMaskNames:   {PsAccessMaskNames, "process desired access rights as a string list", kparams.Slice, []string{"ps.access.mask.names in ('SUSPEND_RESUME')"}},
 	PsAccessStatus:      {PsAccessStatus, "process access status", kparams.UnicodeString, []string{"ps.access.status = 'access is denied.'"}},
+	PsSiblingPid:        {PsSiblingPid, "created, terminated, or opened process id", kparams.PID, []string{"ps.sibling.pid = 320"}},
+	PsSiblingName:       {PsSiblingName, "created, terminated, or opened process name", kparams.UnicodeString, []string{"ps.sibling.name = 'notepad.exe'"}},
+	PsSiblingComm:       {PsSiblingComm, "created or terminated process command line", kparams.UnicodeString, []string{"ps.sibling.comm contains '\\k \\v'"}},
+	PsSiblingExe:        {PsSiblingExe, "created, terminated, or opened process id", kparams.UnicodeString, []string{"ps.sibling.exe contains '\\Windows\\cmd.exe'"}},
+	PsSiblingSID:        {PsSiblingSID, "created or terminated process security identifier", kparams.UnicodeString, []string{"ps.sibling.sid contains 'SERVICE'"}},
+	PsSiblingSessionID:  {PsSiblingSessionID, "created or terminated process session identifier", kparams.Int16, []string{"ps.sibling.sessionid == 1"}},
+	PsSiblingDomain:     {PsSiblingDomain, "created or terminated process domain", kparams.UnicodeString, []string{"ps.sibling.domain contains 'SERVICE'"}},
+	PsSiblingUsername:   {PsSiblingUsername, "created or terminated process username", kparams.UnicodeString, []string{"ps.sibling.username contains 'system'"}},
 
 	ThreadBasePrio:        {ThreadBasePrio, "scheduler priority of the thread", kparams.Int8, []string{"thread.prio = 5"}},
 	ThreadIOPrio:          {ThreadIOPrio, "I/O priority hint for scheduling I/O operations", kparams.Int8, []string{"thread.io.prio = 4"}},

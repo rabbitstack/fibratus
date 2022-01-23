@@ -27,11 +27,8 @@ import (
 	"time"
 
 	"github.com/rabbitstack/fibratus/pkg/kevent"
-
-	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
-
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-
+	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/spf13/viper"
 )
 

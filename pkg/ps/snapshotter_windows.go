@@ -20,6 +20,12 @@ package ps
 
 import (
 	"expvar"
+	"os"
+	"path/filepath"
+	"strconv"
+	"sync"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
@@ -33,11 +39,6 @@ import (
 	t "github.com/rabbitstack/fibratus/pkg/syscall/thread"
 	"github.com/rabbitstack/fibratus/pkg/syscall/winerrno"
 	log "github.com/sirupsen/logrus"
-	"os"
-	"path/filepath"
-	"strconv"
-	"sync"
-	"time"
 )
 
 var (
@@ -148,39 +149,56 @@ func (s *snapshotter) WriteFromKcap(kevt *kevent.Kevent) error {
 func (s *snapshotter) Write(kevt *kevent.Kevent) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
 	switch kevt.Type {
 	case ktypes.CreateProcess, ktypes.EnumProcess:
 		pid, err := kevt.Kparams.GetPid()
 		if err != nil {
 			return err
 		}
-		// discard writing the snapshot state if the pid is already present
+		// discard writing the snapshot state if the pid is
+		// already present. This usually happens when we alter
+		// the ksession to induce the arrival of rundown events
+		// by calling into the `etw.SetTraceInformation` Windows API
+		// function twice in a row.
+		// For more pointers check `kstream/controller_windows.go`
+		// and the `etw.SetTraceInformation` API function
 		if _, ok := s.procs[pid]; ok {
 			return nil
 		}
 		processCount.Add(1)
-		if pid == winerrno.InvalidPID {
+
+		// ETW can sometimes report invalid process id, so we try
+		// to obtain the process id from its thread identifier
+		if kevt.Type == ktypes.CreateProcess && pid == winerrno.InvalidPID {
 			pid = pidFromThreadID(kevt.Tid)
 		}
 
 		ps := pstypes.FromKevent(unwrapParams(pid, kevt))
+
 		// enumerate process handles
-		handles, err := s.handleSnap.FindHandles(pid)
+		ps.Handles, err = s.handleSnap.FindHandles(pid)
 		if err != nil {
 			log.Warnf("couldn't enumerate handles for pid (%d): %v", pid, err)
 		}
 		ps.Parent = s.procs[ps.Ppid]
-		ps.Handles = handles
 
 		// inspect PE metadata and attach corresponding headers
 		s.readPE(ps)
 
+		// adjust the process that is producing the event. For
+		// `CreateProcess` events the process context is scoped
+		// to the parent/creator process. Otherwise, it is a regular
+		// enumeration event that doesn't require consulting the
+		// process in the snapshot state
+		if kevt.Type == ktypes.CreateProcess {
+			kevt.PS = s.procs[kevt.PID]
+		} else {
+			kevt.PS = ps
+		}
 		// try to enum process's env variables and the cwd
 		flags := process.QueryInformation | process.VMRead
 		h, err := process.Open(flags, false, pid)
 		if err != nil {
-			kevt.PS = ps
 			s.procs[pid] = ps
 			return nil
 		}
@@ -195,7 +213,11 @@ func (s *snapshotter) Write(kevt *kevent.Kevent) error {
 
 		ps.Envs = peb.GetEnvs()
 		ps.Cwd = peb.GetCurrentWorkingDirectory()
-		kevt.PS = ps
+
+		if kevt.Type != ktypes.CreateProcess {
+			kevt.PS = ps
+		}
+
 		s.procs[pid] = ps
 
 	case ktypes.CreateThread, ktypes.EnumThread:
@@ -222,12 +244,11 @@ func (s *snapshotter) Write(kevt *kevent.Kevent) error {
 		ps := s.findProcess(pid, thread)
 
 		// enumerate process handles
-		handles, err := s.handleSnap.FindHandles(pid)
+		ps.Handles, err = s.handleSnap.FindHandles(pid)
 		if err != nil {
 			log.Warnf("couldn't enumerate handles for pid (%d): %v", pid, err)
 		}
 		ps.Parent = s.procs[ps.Ppid]
-		ps.Handles = handles
 
 		s.procs[pid] = ps
 
@@ -407,13 +428,15 @@ func (s *snapshotter) Remove(kevt *kevent.Kevent) error {
 	if err != nil {
 		return err
 	}
-	if kevt.Type == ktypes.TerminateProcess {
+	switch kevt.Type {
+	case ktypes.TerminateProcess:
 		if _, ok := s.procs[pid]; ok {
 			delete(s.procs, pid)
 			processCount.Add(-1)
 			return nil
 		}
-	} else if kevt.Type == ktypes.TerminateThread {
+
+	case ktypes.TerminateThread:
 		if ps, ok := s.procs[pid]; ok {
 			tid, err := kevt.Kparams.GetTid()
 			if err != nil {
@@ -422,7 +445,8 @@ func (s *snapshotter) Remove(kevt *kevent.Kevent) error {
 			ps.RemoveThread(tid)
 			threadCount.Add(-1)
 		}
-	} else if kevt.Type == ktypes.UnloadImage {
+
+	case ktypes.UnloadImage:
 		pid, err := kevt.Kparams.GetPid()
 		if err != nil {
 			return err
@@ -433,6 +457,7 @@ func (s *snapshotter) Remove(kevt *kevent.Kevent) error {
 			moduleCount.Add(-1)
 		}
 	}
+
 	return nil
 }
 
@@ -447,6 +472,7 @@ func (s *snapshotter) Find(pid uint32) *pstypes.PS {
 		return nil
 	}
 	processLookupFailureCount.Add(strconv.Itoa(int(pid)), 1)
+
 	// allocate missing process's state and fill in metadata/handles
 	thread := pstypes.Thread{}
 	ps = s.findProcess(pid, thread)
@@ -454,12 +480,12 @@ func (s *snapshotter) Find(pid uint32) *pstypes.PS {
 	s.readPE(ps)
 
 	// enumerate process handles
-	handles, err := s.handleSnap.FindHandles(pid)
+	var err error
+	ps.Handles, err = s.handleSnap.FindHandles(pid)
 	if err != nil {
 		log.Warnf("couldn't enumerate handles for pid (%d): %v", pid, err)
 	}
 
-	ps.Handles = handles
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.procs[pid] = ps

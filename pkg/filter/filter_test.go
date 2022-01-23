@@ -57,10 +57,11 @@ func TestFilterCompile(t *testing.T) {
 
 func TestFilterRunProcessKevent(t *testing.T) {
 	kpars := kevent.Kparams{
-		kparams.Comm:            {Name: kparams.Comm, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost.exe -k RPCSS"},
-		kparams.ProcessName:     {Name: kparams.ProcessName, Type: kparams.AnsiString, Value: "svchost.exe"},
+		kparams.Comm:            {Name: kparams.Comm, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost-fake.exe -k RPCSS"},
+		kparams.ProcessName:     {Name: kparams.ProcessName, Type: kparams.AnsiString, Value: "svchost-fake.exe"},
 		kparams.ProcessID:       {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1234)},
 		kparams.ProcessParentID: {Name: kparams.ProcessParentID, Type: kparams.PID, Value: uint32(345)},
+		kparams.UserSID:         {Name: kparams.UserSID, Type: kparams.UnicodeString, Value: "TITAN\\loki"},
 	}
 
 	kpars1 := kevent.Kparams{
@@ -69,9 +70,11 @@ func TestFilterRunProcessKevent(t *testing.T) {
 
 	ps1 := &pstypes.PS{
 		Name: "wininit.exe",
+		SID:  "NT AUTHORITY\\SYSTEM",
+		PID:  5042,
 		Parent: &pstypes.PS{
 			Name: "services.exe",
-			SID:  "administrator/SYSTEM",
+			SID:  "NT AUTHORITY\\SYSTEM",
 			PID:  2034,
 			Parent: &pstypes.PS{
 				Name: "System",
@@ -89,6 +92,7 @@ func TestFilterRunProcessKevent(t *testing.T) {
 			Name:   "svchost.exe",
 			Parent: ps1,
 			Ppid:   345,
+			SID:    "LOCAL\\tor",
 			Envs:   map[string]string{"ALLUSERSPROFILE": "C:\\ProgramData", "OS": "Windows_NT", "ProgramFiles(x86)": "C:\\Program Files (x86)"},
 			Modules: []pstypes.Module{
 				{Name: "C:\\Windows\\System32\\kernel32.dll", Size: 12354, Checksum: 23123343, BaseAddress: kparams.Hex("fff23fff"), DefaultBaseAddress: kparams.Hex("fff124fd")},
@@ -124,6 +128,16 @@ func TestFilterRunProcessKevent(t *testing.T) {
 		{`ps.name = 'svchost.exe'`, true},
 		{`ps.name = 'svchot.exe'`, false},
 		{`ps.name = 'mimikatz.exe' or ps.name contains 'svc'`, true},
+		{`ps.username = 'tor'`, true},
+		{`ps.domain = 'LOCAL'`, true},
+		{`ps.pid = 1023`, true},
+		{`ps.sibling.pid = 1234`, true},
+		{`ps.parent.pid = 5042`, true},
+		{`ps.sibling.name = 'svchost-fake.exe'`, true},
+		{`ps.sibling.username = 'loki'`, true},
+		{`ps.sibling.domain = 'TITAN'`, true},
+		{`ps.parent.username = 'SYSTEM'`, true},
+		{`ps.parent.domain = 'NT AUTHORITY'`, true},
 		{`ps.envs in ('ALLUSERSPROFILE')`, true},
 		{`kevt.name='CreateProcess' and ps.name contains 'svchost'`, true},
 
@@ -138,7 +152,7 @@ func TestFilterRunProcessKevent(t *testing.T) {
 		{`ps.parent.name = 'wininit.exe'`, true},
 		{`ps.ancestor[1].name = 'wininit.exe'`, true},
 		{`ps.ancestor[2].name = 'services.exe'`, true},
-		{`ps.ancestor[2].sid = 'administrator/SYSTEM'`, true},
+		{`ps.ancestor[2].sid = 'NT AUTHORITY\\SYSTEM'`, true},
 		{`ps.ancestor[root].name = 'System'`, true},
 		{`ps.ancestor[any].name in ('services.exe', 'System')`, true},
 		{`ps.ancestor[any].name not in ('svchost.exe')`, true},
