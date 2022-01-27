@@ -20,9 +20,10 @@ package ql
 
 import (
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/filter/ql/functions"
 	"sort"
 	"strings"
+
+	"github.com/rabbitstack/fibratus/pkg/filter/ql/functions"
 )
 
 var (
@@ -47,6 +48,14 @@ var (
 var funcs = map[string]FunctionDef{
 	functions.CIDRContainsFn.String(): &functions.CIDRContains{},
 	functions.MD5Fn.String():          &functions.MD5{},
+	functions.ConcatFn.String():       &functions.Concat{},
+	functions.LtrimFn.String():        &functions.Ltrim{},
+	functions.RtrimFn.String():        &functions.Rtrim{},
+	functions.LowerFn.String():        &functions.Lower{},
+	functions.UpperFn.String():        &functions.Upper{},
+	functions.ReplaceFn.String():      &functions.Replace{},
+	functions.SplitFn.String():        &functions.Split{},
+	functions.LengthFn.String():       &functions.Length{},
 }
 
 // FunctionDef is the interface that all function definitions have to satisfy.

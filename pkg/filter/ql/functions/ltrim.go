@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 by Nedim Sabic Sabic
+ * Copyright 2021-2022 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -18,42 +18,35 @@
 
 package functions
 
-import (
-	"crypto/md5"
-	"encoding/hex"
-)
+import "strings"
 
-// MD5 computes the MD5 hash of the given value.
-type MD5 struct{}
+// Ltrim trims the specified prefix from a string.
+type Ltrim struct{}
 
-func (f MD5) Call(args []interface{}) (interface{}, bool) {
-	if len(args) != 1 {
+func (f Ltrim) Call(args []interface{}) (interface{}, bool) {
+	if len(args) < 2 {
 		return false, false
 	}
-
-	var data []byte
-	switch v := args[0].(type) {
-	case []byte:
-		data = v
-	case string:
-		data = []byte(v)
-	}
-
-	if data == nil {
+	s, ok := args[0].(string)
+	if !ok {
 		return false, false
 	}
-
-	hash := md5.Sum(data)
-	return hex.EncodeToString(hash[:]), true
+	prefix, ok := args[1].(string)
+	if !ok {
+		return false, false
+	}
+	return strings.TrimPrefix(s, prefix), true
 }
 
-func (f MD5) Desc() FunctionDesc {
-	return FunctionDesc{
-		Name: MD5Fn,
+func (f Ltrim) Desc() FunctionDesc {
+	desc := FunctionDesc{
+		Name: LtrimFn,
 		Args: []FunctionArgDesc{
-			{Keyword: "data", Types: []ArgType{Field, String, Func}, Required: true},
+			{Keyword: "string", Types: []ArgType{String, Field, Func}, Required: true},
+			{Keyword: "prefix", Types: []ArgType{String, Func}, Required: true},
 		},
 	}
+	return desc
 }
 
-func (f MD5) Name() Fn { return MD5Fn }
+func (f Ltrim) Name() Fn { return LtrimFn }

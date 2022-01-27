@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 by Nedim Sabic Sabic
+ * Copyright 2021-2022 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -19,41 +19,36 @@
 package functions
 
 import (
-	"crypto/md5"
-	"encoding/hex"
+	"strings"
 )
 
-// MD5 computes the MD5 hash of the given value.
-type MD5 struct{}
+// Split produces a slice of substrings separated by the given delimiter.
+type Split struct{}
 
-func (f MD5) Call(args []interface{}) (interface{}, bool) {
-	if len(args) != 1 {
+func (f Split) Call(args []interface{}) (interface{}, bool) {
+	if len(args) < 2 {
 		return false, false
 	}
-
-	var data []byte
-	switch v := args[0].(type) {
-	case []byte:
-		data = v
-	case string:
-		data = []byte(v)
-	}
-
-	if data == nil {
+	s, ok := args[0].(string)
+	if !ok {
 		return false, false
 	}
-
-	hash := md5.Sum(data)
-	return hex.EncodeToString(hash[:]), true
+	sep, ok := args[1].(string)
+	if !ok {
+		return false, false
+	}
+	return strings.Split(s, sep), true
 }
 
-func (f MD5) Desc() FunctionDesc {
-	return FunctionDesc{
-		Name: MD5Fn,
+func (f Split) Desc() FunctionDesc {
+	desc := FunctionDesc{
+		Name: SplitFn,
 		Args: []FunctionArgDesc{
-			{Keyword: "data", Types: []ArgType{Field, String, Func}, Required: true},
+			{Keyword: "string", Types: []ArgType{String, Field, Func}, Required: true},
+			{Keyword: "sep", Types: []ArgType{String}, Required: true},
 		},
 	}
+	return desc
 }
 
-func (f MD5) Name() Fn { return MD5Fn }
+func (f Split) Name() Fn { return SplitFn }

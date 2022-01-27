@@ -24,24 +24,48 @@ const maxArgs = 1 << 5
 type Fn uint16
 
 const (
-	// CIDRContains identifies the CIDR_CONTAINS function
+	// CIDRContainsFn identifies the CIDR_CONTAINS function
 	CIDRContainsFn Fn = iota + 1
 	// MD5Fn represents the MD5 function
 	MD5Fn
+	// ConcatFn represents the CONCAT function
+	ConcatFn
+	// LtrimFn represents the LTRIM function
+	LtrimFn
+	// RtrimFn represents the RTRIM function
+	RtrimFn
+	// LowerFn represents the LOWER function
+	LowerFn
+	// UpperFn represents the UPPER function
+	UpperFn
+	// ReplaceFn represents the REPLACE function
+	ReplaceFn
+	// SplitFn represents the SPLIT function
+	SplitFn
+	// LengthFn represents the LENGTH function
+	LengthFn
 )
 
 // ArgType is the type alias for the argument value type.
 type ArgType uint8
 
+// ArgsValidation is a function for the custom argument validation logic.
+type ArgsValidation func(args []string) error
+
 const (
 	// String represents the string argument type.
 	String ArgType = iota
+	// Number represents the scalar argument type.
+	Number
 	// IP represents the IP argument type.
 	IP
 	// Field represents the argument type that is derived
 	// from the field literal. Field literal values can
 	// be simple primitive types.
 	Field
+	// Func represents the argument type that is derived
+	// from the function return value.
+	Func
 	// Unknown is the unknown argument type.
 	Unknown
 )
@@ -51,10 +75,14 @@ func (typ ArgType) String() string {
 	switch typ {
 	case String:
 		return "string"
+	case Number:
+		return "number"
 	case IP:
 		return "ip"
 	case Field:
 		return "field"
+	case Func:
+		return "func"
 	}
 	return "unknown"
 }
@@ -62,8 +90,9 @@ func (typ ArgType) String() string {
 // FunctionDesc contains the function signature that
 // particular filter function has to satisfy.
 type FunctionDesc struct {
-	Name Fn
-	Args []FunctionArgDesc
+	Name               Fn
+	Args               []FunctionArgDesc
+	ArgsValidationFunc ArgsValidation
 }
 
 // RequiredArgs returns the number of the required function args.
@@ -101,6 +130,22 @@ func (f Fn) String() string {
 		return "CIDR_CONTAINS"
 	case MD5Fn:
 		return "MD5"
+	case ConcatFn:
+		return "CONCAT"
+	case LtrimFn:
+		return "LTRIM"
+	case RtrimFn:
+		return "RTRIM"
+	case LowerFn:
+		return "LOWER"
+	case UpperFn:
+		return "UPPER"
+	case ReplaceFn:
+		return "REPLACE"
+	case SplitFn:
+		return "SPLIT"
+	case LengthFn:
+		return "LENGTH"
 	default:
 		return "UNDEFINED"
 	}

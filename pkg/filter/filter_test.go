@@ -339,6 +339,15 @@ func TestFilterRunKevent(t *testing.T) {
 
 		{`kevt.date.d = 3 AND kevt.date.m = 5 AND kevt.time.s = 5 AND kevt.time.m = 4 and kevt.time.h = 15`, true},
 		{`kevt.time = '15:04:05'`, true},
+		{`concat(kevt.name, kevt.host, kevt.nparams) = 'CreateFilearchrabbit4'`, true},
+		{`ltrim(kevt.host, 'arch') = 'rabbit'`, true},
+		{`concat(ltrim(kevt.name, 'Create'), kevt.host) = 'Filearchrabbit'`, true},
+		{`lower(rtrim(kevt.name, 'File')) = 'create'`, true},
+		{`upper(rtrim(kevt.name, 'File')) = 'CREATE'`, true},
+		{`replace(kevt.host, 'rabbit', '_bunny') = 'arch_bunny'`, true},
+		{`replace(kevt.host, 'rabbit', '_bunny', '_bunny', 'bunny') = 'archbunny'`, true},
+		{`split(file.name, '\\') IN ('windows', 'system32')`, true},
+		{`length(file.name) = 51`, true},
 	}
 
 	for i, tt := range tests {
