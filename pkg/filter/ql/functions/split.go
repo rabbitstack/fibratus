@@ -29,14 +29,8 @@ func (f Split) Call(args []interface{}) (interface{}, bool) {
 	if len(args) < 2 {
 		return false, false
 	}
-	s, ok := args[0].(string)
-	if !ok {
-		return false, false
-	}
-	sep, ok := args[1].(string)
-	if !ok {
-		return false, false
-	}
+	s := parseString(0, args)
+	sep := parseString(1, args)
 	return strings.Split(s, sep), true
 }
 

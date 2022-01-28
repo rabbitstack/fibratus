@@ -31,20 +31,11 @@ func (f Replace) Call(args []interface{}) (interface{}, bool) {
 	if len(args) < 3 {
 		return false, false
 	}
-	s, ok := args[0].(string)
-	if !ok {
-		return false, false
-	}
+	s := parseString(0, args)
 	// happy path
 	if len(args) == 3 {
-		o, ok := args[1].(string)
-		if !ok {
-			return false, false
-		}
-		n, ok := args[2].(string)
-		if !ok {
-			return false, false
-		}
+		o := parseString(1, args)
+		n := parseString(2, args)
 		return strings.Replace(s, o, n, -1), true
 	}
 	// apply multiple replacements
@@ -75,7 +66,7 @@ func (f Replace) Desc() FunctionDesc {
 			if len(args) == 3 {
 				return nil
 			}
-			if (len(args)-3)%2 != 0 {
+			if (len(args)-1)%2 != 0 {
 				return errors.New("old/new replacements mismatch")
 			}
 			return nil

@@ -44,6 +44,12 @@ const (
 	SplitFn
 	// LengthFn represents the LENGTH function
 	LengthFn
+	// IndexOfFn represents the INDEXOF function
+	IndexOfFn
+	// SubstrFn represents the SUBSTR function
+	SubstrFn
+	// EntropyFn represents the ENTROPY function
+	EntropyFn
 )
 
 // ArgType is the type alias for the argument value type.
@@ -146,7 +152,25 @@ func (f Fn) String() string {
 		return "SPLIT"
 	case LengthFn:
 		return "LENGTH"
+	case IndexOfFn:
+		return "INDEXOF"
+	case SubstrFn:
+		return "SUBSTR"
+	case EntropyFn:
+		return "ENTROPY"
 	default:
 		return "UNDEFINED"
 	}
+}
+
+// parseString yields a string value from the specific position in the args slice.
+func parseString(index int, args []interface{}) string {
+	if index > len(args) {
+		return ""
+	}
+	s, ok := args[index].(string)
+	if !ok {
+		return ""
+	}
+	return s
 }

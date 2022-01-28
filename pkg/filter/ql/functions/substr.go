@@ -18,25 +18,38 @@
 
 package functions
 
-// Length returns the number of characters (runes) in the string.
-type Length struct{}
+// Substr creates a substring of a given string.
+type Substr struct{}
 
-func (f Length) Call(args []interface{}) (interface{}, bool) {
-	if len(args) < 1 {
+func (f Substr) Call(args []interface{}) (interface{}, bool) {
+	if len(args) < 3 {
 		return false, false
 	}
 	s := parseString(0, args)
-	return len([]rune(s)), true
+	start, ok := args[1].(int)
+	if !ok {
+		return false, false
+	}
+	end, ok := args[2].(int)
+	if !ok {
+		return false, false
+	}
+	if start >= 0 && (end >= start && end < len(s)) {
+		return s[start:end], true
+	}
+	return s, true
 }
 
-func (f Length) Desc() FunctionDesc {
+func (f Substr) Desc() FunctionDesc {
 	desc := FunctionDesc{
-		Name: LengthFn,
+		Name: SubstrFn,
 		Args: []FunctionArgDesc{
-			{Keyword: "string", Types: []ArgType{Field, Func}, Required: true},
+			{Keyword: "string", Types: []ArgType{Func, Field}, Required: true},
+			{Keyword: "start", Types: []ArgType{Func, Number}, Required: true},
+			{Keyword: "end", Types: []ArgType{Func, Number}, Required: true},
 		},
 	}
 	return desc
 }
 
-func (f Length) Name() Fn { return LengthFn }
+func (f Substr) Name() Fn { return SubstrFn }

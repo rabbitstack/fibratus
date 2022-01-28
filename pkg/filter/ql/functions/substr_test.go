@@ -18,25 +18,26 @@
 
 package functions
 
-// Length returns the number of characters (runes) in the string.
-type Length struct{}
+import (
+	"testing"
 
-func (f Length) Call(args []interface{}) (interface{}, bool) {
-	if len(args) < 1 {
-		return false, false
-	}
-	s := parseString(0, args)
-	return len([]rune(s)), true
+	"github.com/stretchr/testify/assert"
+)
+
+func TestSubstr(t *testing.T) {
+	call := Substr{}
+	res, _ := call.Call([]interface{}{"Hello", 0, 4})
+	assert.Equal(t, "Hell", res)
+
+	res1, _ := call.Call([]interface{}{"Hello World!", 0, 50})
+	assert.Equal(t, "Hello World!", res1)
+
+	res2, _ := call.Call([]interface{}{"Hello World!", 4, -1})
+	assert.Equal(t, "Hello World!", res2)
+
+	res3, _ := call.Call([]interface{}{"Hello World!", -1, 10})
+	assert.Equal(t, "Hello World!", res3)
+
+	res4, _ := call.Call([]interface{}{"Hello World!", 6, 7})
+	assert.Equal(t, "W", res4)
 }
-
-func (f Length) Desc() FunctionDesc {
-	desc := FunctionDesc{
-		Name: LengthFn,
-		Args: []FunctionArgDesc{
-			{Keyword: "string", Types: []ArgType{Field, Func}, Required: true},
-		},
-	}
-	return desc
-}
-
-func (f Length) Name() Fn { return LengthFn }

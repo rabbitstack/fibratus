@@ -348,6 +348,12 @@ func TestFilterRunKevent(t *testing.T) {
 		{`replace(kevt.host, 'rabbit', '_bunny', '_bunny', 'bunny') = 'archbunny'`, true},
 		{`split(file.name, '\\') IN ('windows', 'system32')`, true},
 		{`length(file.name) = 51`, true},
+		{`indexof(file.name, '\\') = 0`, true},
+		{`indexof(file.name, '\\', 'last') = 40`, true},
+		{`indexof(file.name, 'h2', 'any') = 22`, true},
+		{`substr(file.name, indexof(file.name, '\\'), indexof(file.name, '\\Hard')) = '\\Device'`, true},
+		{`substr(kevt.desc, indexof(kevt.desc, '\\'), indexof(kevt.desc, 'NOT')) = 'Creates or opens a new file, directory, I/O device, pipe, console'`, true},
+		{`entropy(file.name) > 120`, true},
 	}
 
 	for i, tt := range tests {

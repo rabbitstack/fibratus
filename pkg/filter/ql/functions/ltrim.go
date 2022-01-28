@@ -27,14 +27,8 @@ func (f Ltrim) Call(args []interface{}) (interface{}, bool) {
 	if len(args) < 2 {
 		return false, false
 	}
-	s, ok := args[0].(string)
-	if !ok {
-		return false, false
-	}
-	prefix, ok := args[1].(string)
-	if !ok {
-		return false, false
-	}
+	s := parseString(0, args)
+	prefix := parseString(1, args)
 	return strings.TrimPrefix(s, prefix), true
 }
 

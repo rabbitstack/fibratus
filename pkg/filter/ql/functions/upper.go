@@ -27,10 +27,7 @@ func (f Upper) Call(args []interface{}) (interface{}, bool) {
 	if len(args) < 1 {
 		return false, false
 	}
-	s, ok := args[0].(string)
-	if !ok {
-		return false, false
-	}
+	s := parseString(0, args)
 	return strings.ToUpper(s), true
 }
 

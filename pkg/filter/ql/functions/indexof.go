@@ -17,3 +17,80 @@
  */
 
 package functions
+
+import (
+	"fmt"
+	"strings"
+)
+
+// index is the type alias for the string position search order
+type index uint8
+
+const (
+	unknown index = iota
+	first         // Index
+	any           // IndexAny
+	last          // LastIndex
+	lastany       // LastIndexAny
+)
+
+var orderMappings = map[string]index{
+	"first":   first,
+	"any":     any,
+	"last":    last,
+	"lastany": lastany,
+}
+
+func indexFromString(s string) index { return orderMappings[s] }
+
+// IndexOf returns the index of the instance of substring in a given string
+// depending on the provided search order.
+type IndexOf struct{}
+
+func (f IndexOf) Call(args []interface{}) (interface{}, bool) {
+	if len(args) < 2 {
+		return false, false
+	}
+	str := parseString(0, args)
+	substr := parseString(1, args)
+	if len(args) == 2 {
+		return strings.Index(str, substr), true
+	}
+	// index search order
+	switch indexFromString(parseString(2, args)) {
+	case first:
+		return strings.Index(str, substr), true
+	case any:
+		return strings.IndexAny(str, substr), true
+	case last:
+		return strings.LastIndex(str, substr), true
+	case lastany:
+		return strings.LastIndexAny(str, substr), true
+	default:
+		return false, false
+	}
+}
+
+func (f IndexOf) Desc() FunctionDesc {
+	desc := FunctionDesc{
+		Name: IndexOfFn,
+		Args: []FunctionArgDesc{
+			{Keyword: "string", Types: []ArgType{Field, Func}, Required: true},
+			{Keyword: "substr", Types: []ArgType{String, Func}, Required: true},
+			{Keyword: "pos", Types: []ArgType{String}},
+		},
+		ArgsValidationFunc: func(args []string) error {
+			if len(args) == 2 {
+				return nil
+			}
+			if len(args) == 3 && indexFromString(args[2]) == unknown {
+				return fmt.Errorf("%s is not a valid position search order. "+
+					"Available options are: first,any,last,lastany", args[2])
+			}
+			return nil
+		},
+	}
+	return desc
+}
+
+func (f IndexOf) Name() Fn { return IndexOfFn }

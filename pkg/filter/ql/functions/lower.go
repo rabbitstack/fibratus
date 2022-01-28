@@ -27,10 +27,7 @@ func (f Lower) Call(args []interface{}) (interface{}, bool) {
 	if len(args) < 1 {
 		return false, false
 	}
-	s, ok := args[0].(string)
-	if !ok {
-		return false, false
-	}
+	s := parseString(0, args)
 	return strings.ToLower(s), true
 }
 

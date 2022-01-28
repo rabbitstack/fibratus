@@ -154,8 +154,9 @@ func (f Function) validate() error {
 		return ErrFunctionSignature(fn.Desc(), len(f.Args))
 	}
 
-	if fn.Desc().ArgsValidationFunc != nil {
-		if err := fn.Desc().ArgsValidationFunc(f.ArgsSlice()); err != nil {
+	validationFunc := fn.Desc().ArgsValidationFunc
+	if validationFunc != nil {
+		if err := validationFunc(f.ArgsSlice()); err != nil {
 			return err
 		}
 	}

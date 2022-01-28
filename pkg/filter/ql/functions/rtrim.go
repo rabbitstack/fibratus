@@ -27,14 +27,8 @@ func (f Rtrim) Call(args []interface{}) (interface{}, bool) {
 	if len(args) < 2 {
 		return false, false
 	}
-	s, ok := args[0].(string)
-	if !ok {
-		return false, false
-	}
-	suffix, ok := args[1].(string)
-	if !ok {
-		return false, false
-	}
+	s := parseString(0, args)
+	suffix := parseString(1, args)
 	return strings.TrimSuffix(s, suffix), true
 }
 
