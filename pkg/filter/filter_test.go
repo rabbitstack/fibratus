@@ -354,6 +354,7 @@ func TestFilterRunKevent(t *testing.T) {
 		{`substr(file.name, indexof(file.name, '\\'), indexof(file.name, '\\Hard')) = '\\Device'`, true},
 		{`substr(kevt.desc, indexof(kevt.desc, '\\'), indexof(kevt.desc, 'NOT')) = 'Creates or opens a new file, directory, I/O device, pipe, console'`, true},
 		{`entropy(file.name) > 120`, true},
+		{`regex(file.name, '\\\\Device\\\\HarddiskVolume[2-9]+\\\\.*')`, true},
 	}
 
 	for i, tt := range tests {

@@ -176,6 +176,8 @@ func (f Function) validate() error {
 			typ = functions.Number
 		case reflect.TypeOf(&Function{}):
 			typ = functions.Func
+		case reflect.TypeOf(&ListLiteral{}):
+			typ = functions.Slice
 		}
 
 		if !arg.ContainsType(typ) {

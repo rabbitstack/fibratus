@@ -50,6 +50,8 @@ const (
 	SubstrFn
 	// EntropyFn represents the ENTROPY function
 	EntropyFn
+	// RegexFn represents the REGEX function
+	RegexFn
 )
 
 // ArgType is the type alias for the argument value type.
@@ -72,6 +74,8 @@ const (
 	// Func represents the argument type that is derived
 	// from the function return value.
 	Func
+	// Slice represents the string slice argument type.
+	Slice
 	// Unknown is the unknown argument type.
 	Unknown
 )
@@ -89,6 +93,8 @@ func (typ ArgType) String() string {
 		return "field"
 	case Func:
 		return "func"
+	case Slice:
+		return "slice"
 	}
 	return "unknown"
 }
@@ -158,6 +164,8 @@ func (f Fn) String() string {
 		return "SUBSTR"
 	case EntropyFn:
 		return "ENTROPY"
+	case RegexFn:
+		return "REGEX"
 	default:
 		return "UNDEFINED"
 	}

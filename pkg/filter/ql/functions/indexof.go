@@ -34,14 +34,14 @@ const (
 	lastany       // LastIndexAny
 )
 
-var orderMappings = map[string]index{
+var indexMappings = map[string]index{
 	"first":   first,
 	"any":     any,
 	"last":    last,
 	"lastany": lastany,
 }
 
-func indexFromString(s string) index { return orderMappings[s] }
+func indexFromString(s string) index { return indexMappings[s] }
 
 // IndexOf returns the index of the instance of substring in a given string
 // depending on the provided search order.
@@ -77,15 +77,14 @@ func (f IndexOf) Desc() FunctionDesc {
 		Args: []FunctionArgDesc{
 			{Keyword: "string", Types: []ArgType{Field, Func}, Required: true},
 			{Keyword: "substr", Types: []ArgType{String, Func}, Required: true},
-			{Keyword: "pos", Types: []ArgType{String}},
+			{Keyword: "index", Types: []ArgType{String}},
 		},
 		ArgsValidationFunc: func(args []string) error {
 			if len(args) == 2 {
 				return nil
 			}
 			if len(args) == 3 && indexFromString(args[2]) == unknown {
-				return fmt.Errorf("%s is not a valid position search order. "+
-					"Available options are: first,any,last,lastany", args[2])
+				return fmt.Errorf("%s is not a index search order. Available options are: first,any,last,lastany", args[2])
 			}
 			return nil
 		},

@@ -18,31 +18,23 @@
 
 package functions
 
-// Length returns the number of characters (runes) for string arguments and
-// the size of the slice for slice arguments.
-type Length struct{}
+import (
+	"testing"
 
-func (f Length) Call(args []interface{}) (interface{}, bool) {
-	if len(args) < 1 {
-		return false, false
+	"github.com/stretchr/testify/assert"
+)
+
+func TestRegex(t *testing.T) {
+	call := NewRegex()
+
+	res, _ := call.Call([]interface{}{`powershell.exe`, `power.*(shell|hell).exe`})
+	assert.True(t, res.(bool))
+
+	res1, _ := call.Call([]interface{}{`powershell.exe`, `power.*(shell|hell).dll`, `.*hell.exe`})
+	assert.True(t, res1.(bool))
+
+	for i := 0; i < 10; i++ {
+		res, _ := call.Call([]interface{}{`powershell.exe`, `power.*(shell|hell).dll`, `.*hell.exe`})
+		assert.True(t, res.(bool))
 	}
-	switch arg := args[0].(type) {
-	case string:
-		return len([]rune(arg)), true
-	case []string:
-		return len(arg), true
-	}
-	return 0, false
 }
-
-func (f Length) Desc() FunctionDesc {
-	desc := FunctionDesc{
-		Name: LengthFn,
-		Args: []FunctionArgDesc{
-			{Keyword: "string/slice", Types: []ArgType{Field, Slice, Func}, Required: true},
-		},
-	}
-	return desc
-}
-
-func (f Length) Name() Fn { return LengthFn }

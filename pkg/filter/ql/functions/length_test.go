@@ -31,4 +31,7 @@ func TestLength(t *testing.T) {
 
 	res1, _ := call.Call([]interface{}{"こんにちは"})
 	assert.Equal(t, 5, res1)
+
+	res2, _ := call.Call([]interface{}{[]string{"hello", "world"}})
+	assert.Equal(t, 2, res2)
 }
