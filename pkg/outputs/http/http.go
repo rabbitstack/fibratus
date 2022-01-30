@@ -19,14 +19,21 @@
 package http
 
 import (
+	"bytes"
+	"context"
+	libhttp "net/http"
 	"net/url"
 
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/outputs"
 )
 
+const userAgentHeader = "fibratus"
+
 type http struct {
-	client *client
+	client *libhttp.Client
+	config Config
+	url    string
 }
 
 func init() {
@@ -45,8 +52,16 @@ func initHTTP(config outputs.Config) (outputs.OutputGroup, error) {
 		if err != nil {
 			return outputs.Fail(err)
 		}
+		client, err := newHTTPClient(cfg)
+		if err != nil {
+			return outputs.Fail(err)
+		}
 
-		http := &http{client: newHTTPClient(cfg)}
+		http := &http{
+			client: client,
+			config: cfg,
+			url:    endpoint,
+		}
 
 		clients[i] = http
 	}
@@ -63,5 +78,35 @@ func (h *http) Close() error {
 }
 
 func (h *http) Publish(batch *kevent.Batch) error {
+	body := batch.MarshalJSON()
+	defer batch.Release()
+
+	ctx, cancel := context.WithTimeout(context.Background(), h.config.Timeout)
+	defer cancel()
+	req, err := libhttp.NewRequestWithContext(ctx, h.config.Method, h.url, bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+
+	if h.config.Username != "" && h.config.Password != "" {
+		req.SetBasicAuth(h.config.Username, h.config.Password)
+	}
+
+	req.Header.Set("User-Agent", userAgentHeader)
+	//req.Header.Set("Content-Type", defaultContentType)
+	//if h.ContentEncoding == "gzip" {
+	//	req.Header.Set("Content-Encoding", "gzip")
+	//}
+	for k, v := range h.config.Headers {
+		req.Header.Set(k, v)
+	}
+
+	resp, err := h.client.Do(req)
+	if err != nil {
+		return err
+	}
+
+	defer resp.Body.Close()
+
 	return nil
 }

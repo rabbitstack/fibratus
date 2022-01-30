@@ -18,10 +18,37 @@
 
 package http
 
-type client struct {
-	config Config
-}
+import (
+	"fmt"
+	libhttp "net/http"
+	"net/url"
 
-func newHTTPClient(config Config) *client {
-	return &client{config: config}
+	"github.com/rabbitstack/fibratus/pkg/util/tls"
+)
+
+func newHTTPClient(config Config) (*libhttp.Client, error) {
+	tlsConfig, err := tls.MakeConfig(config.TLSCert, config.TLSKey, config.TLSCA, config.TLSInsecureSkipVerify)
+	if err != nil {
+		return nil, fmt.Errorf("invalid TLS config: %v", err)
+	}
+
+	proxy := libhttp.ProxyFromEnvironment
+	if config.ProxyURL != "" {
+		address, err := url.Parse(config.ProxyURL)
+		if err != nil {
+			return nil, fmt.Errorf("invalid HTTP proxy url %q: %w", config.ProxyURL, err)
+		}
+		proxy = libhttp.ProxyURL(address)
+	}
+
+	transport := &libhttp.Transport{
+		TLSClientConfig: tlsConfig,
+		Proxy:           proxy,
+	}
+	httpClient := &libhttp.Client{
+		Transport: transport,
+		Timeout:   config.Timeout,
+	}
+
+	return httpClient, nil
 }

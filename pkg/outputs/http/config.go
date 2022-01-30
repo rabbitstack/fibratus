@@ -29,9 +29,16 @@ type Config struct {
 	outputs.TLSConfig
 	// Enabled determines whether HTTP output is enabled.
 	Enabled bool `mapstructure:"enabled"`
-	// Endpoints contains a collection of URLs to which the events are sent. Internal
-	// load balancer spreads the requests across available endpoints.
+	// Endpoints contains a collection of URLs to which the events are sent.
 	Endpoints []string `mapstructure:"endpoints"`
 	// Timeout represents the timeout for HTTP requests
-	Timeout time.Duration
+	Timeout time.Duration `mapstructure:"timeout"`
+	// ProxyURL specifies the HTTP proxy URL.
+	ProxyURL string `mapstructure:"proxyurl"`
+	// Method determines the HTTP verb in the requests.
+	Method   string `mapstructure:"method"`
+	Username string
+	Password string
+	// Headers contains a list of additional headers in the HTTP request
+	Headers map[string]string `mapstructure:"headers"`
 }
