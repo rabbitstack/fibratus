@@ -26,13 +26,13 @@ func (f Length) Call(args []interface{}) (interface{}, bool) {
 	if len(args) < 1 {
 		return false, false
 	}
-	switch arg := args[0].(type) {
+	switch s := args[0].(type) {
 	case string:
-		return len([]rune(arg)), true
+		return len([]rune(s)), true
 	case []string:
-		return len(arg), true
+		return len(s), true
 	}
-	return 0, false
+	return -1, false
 }
 
 func (f Length) Desc() FunctionDesc {
