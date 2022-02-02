@@ -26,6 +26,8 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/tls"
 )
 
+// newHTTPClient builds a fresh stdlib HTTP client. The HTTP proxy and TLS config is set
+// accordingly if enabled in the HTTP output preferences.
 func newHTTPClient(config Config) (*libhttp.Client, error) {
 	tlsConfig, err := tls.MakeConfig(config.TLSCert, config.TLSKey, config.TLSCA, config.TLSInsecureSkipVerify)
 	if err != nil {
@@ -38,7 +40,15 @@ func newHTTPClient(config Config) (*libhttp.Client, error) {
 		if err != nil {
 			return nil, fmt.Errorf("invalid HTTP proxy url %q: %w", config.ProxyURL, err)
 		}
-		proxy = libhttp.ProxyURL(address)
+		if config.ProxyUsername != "" && config.ProxyPassword != "" {
+			proxy = libhttp.ProxyURL(&url.URL{
+				Scheme: address.Scheme,
+				User:   url.UserPassword(config.ProxyUsername, config.ProxyPassword),
+				Host:   config.ProxyURL,
+			})
+		} else {
+			proxy = libhttp.ProxyURL(address)
+		}
 	}
 
 	transport := &libhttp.Transport{

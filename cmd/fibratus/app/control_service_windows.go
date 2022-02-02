@@ -20,6 +20,8 @@ package app
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/rabbitstack/fibratus/cmd/fibratus/common"
 	"github.com/rabbitstack/fibratus/pkg/aggregator"
 	"github.com/rabbitstack/fibratus/pkg/api"
@@ -27,13 +29,13 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	"github.com/rabbitstack/fibratus/pkg/kstream"
 	"github.com/rabbitstack/fibratus/pkg/ps"
+	ver "github.com/rabbitstack/fibratus/pkg/util/version"
 	"github.com/spf13/cobra"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
 	"golang.org/x/sys/windows/svc/eventlog"
 	"golang.org/x/sys/windows/svc/mgr"
-	"time"
 )
 
 var startSvcCmd = &cobra.Command{
@@ -216,7 +218,7 @@ func (s *fsvc) run() error {
 	if err := common.Init(svcConfig, true); err != nil {
 		return err
 	}
-
+	ver.Set(version)
 	ctrl = kstream.NewKtraceController(svcConfig.Kstream)
 	err := ctrl.StartKtrace()
 	if err != nil {

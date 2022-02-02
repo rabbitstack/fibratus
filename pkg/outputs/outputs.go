@@ -49,6 +49,8 @@ const (
 	HTTP
 	// Null is the null output.
 	Null
+	// Unknown is an undefined output type.
+	Unknown
 )
 
 // String returns the string representation of the output type.
@@ -66,6 +68,24 @@ func (t Type) String() string {
 		return "null"
 	default:
 		return "unknown"
+	}
+}
+
+// TypeFromString parses output type from input string.
+func TypeFromString(s string) Type {
+	switch s {
+	case "console":
+		return Console
+	case "amqp":
+		return AMQP
+	case "elasticsearch":
+		return Elasticsearch
+	case "http":
+		return HTTP
+	case "null":
+		return Null
+	default:
+		return Unknown
 	}
 }
 

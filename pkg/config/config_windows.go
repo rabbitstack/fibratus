@@ -24,6 +24,8 @@ import (
 	"io/ioutil"
 	"time"
 
+	"github.com/rabbitstack/fibratus/pkg/outputs/http"
+
 	"github.com/rabbitstack/fibratus/pkg/aggregator"
 	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers"
 	removet "github.com/rabbitstack/fibratus/pkg/aggregator/transformers/remove"
@@ -185,6 +187,7 @@ func NewWithOpts(options ...Option) *Config {
 		console.AddFlags(flagSet)
 		amqp.AddFlags(flagSet)
 		elasticsearch.AddFlags(flagSet)
+		http.AddFlags(flagSet)
 		removet.AddFlags(flagSet)
 		replacet.AddFlags(flagSet)
 		renamet.AddFlags(flagSet)
