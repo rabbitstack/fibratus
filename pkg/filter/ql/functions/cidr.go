@@ -76,7 +76,7 @@ func (f CIDRContains) Desc() FunctionDesc {
 	offset := len(desc.Args)
 	// add optional CIDR arguments
 	for i := offset; i < maxArgs; i++ {
-		desc.Args = append(desc.Args, FunctionArgDesc{Keyword: "cidr", Types: []ArgType{String}})
+		desc.Args = append(desc.Args, FunctionArgDesc{Keyword: "cidr", Types: []ArgType{String, Func}})
 	}
 	return desc
 }

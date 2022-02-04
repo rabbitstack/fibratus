@@ -21,11 +21,12 @@ package ql
 import (
 	"bytes"
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/filter/ql/functions"
 	"net"
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/rabbitstack/fibratus/pkg/filter/ql/functions"
 )
 
 // StringLiteral represents a string literal.
@@ -116,6 +117,15 @@ type Function struct {
 	Args []Expr
 }
 
+// ArgsSlice returns arguments as a slice of strings.
+func (f *Function) ArgsSlice() []string {
+	args := make([]string, 0, len(f.Args))
+	for _, arg := range f.Args {
+		args = append(args, arg.String())
+	}
+	return args
+}
+
 // String returns a string representation of the call.
 func (f *Function) String() string {
 	// join arguments.
@@ -144,6 +154,13 @@ func (f Function) validate() error {
 		return ErrFunctionSignature(fn.Desc(), len(f.Args))
 	}
 
+	validationFunc := fn.Desc().ArgsValidationFunc
+	if validationFunc != nil {
+		if err := validationFunc(f.ArgsSlice()); err != nil {
+			return err
+		}
+	}
+
 	for i, expr := range f.Args {
 		arg := fn.Desc().Args[i]
 		typ := functions.Unknown
@@ -155,6 +172,12 @@ func (f Function) validate() error {
 			typ = functions.IP
 		case reflect.TypeOf(&StringLiteral{}):
 			typ = functions.String
+		case reflect.TypeOf(&IntegerLiteral{}):
+			typ = functions.Number
+		case reflect.TypeOf(&Function{}):
+			typ = functions.Func
+		case reflect.TypeOf(&ListLiteral{}):
+			typ = functions.Slice
 		}
 
 		if !arg.ContainsType(typ) {

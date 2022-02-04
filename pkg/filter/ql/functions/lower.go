@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 by Nedim Sabic Sabic
+ * Copyright 2021-2022 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -16,30 +16,29 @@
  * limitations under the License.
  */
 
-package cpython
+package functions
 
-import (
-	"testing"
+import "strings"
 
-	"github.com/stretchr/testify/require"
-)
+// Lower converts the string with all Unicode letters mapped to their lower case.
+type Lower struct{}
 
-func TestGILLock(t *testing.T) {
-	require.NoError(t, Initialize())
-	defer Finalize()
-	gil := NewGIL()
-	gil.Lock()
-	require.True(t, gil.Locked())
+func (f Lower) Call(args []interface{}) (interface{}, bool) {
+	if len(args) < 1 {
+		return false, false
+	}
+	s := parseString(0, args)
+	return strings.ToLower(s), true
 }
 
-func TestGILUnlock(t *testing.T) {
-	// failing non-deterministically in CI
-	t.SkipNow()
-	require.NoError(t, Initialize())
-	defer Finalize()
-	gil := NewGIL()
-	gil.Lock()
-	require.True(t, gil.Locked())
-	gil.Unlock()
-	require.False(t, gil.Locked())
+func (f Lower) Desc() FunctionDesc {
+	desc := FunctionDesc{
+		Name: LowerFn,
+		Args: []FunctionArgDesc{
+			{Keyword: "string", Types: []ArgType{String, Field, Func}, Required: true},
+		},
+	}
+	return desc
 }
+
+func (f Lower) Name() Fn { return LowerFn }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 by Nedim Sabic Sabic
+ * Copyright 2021-2022 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -18,42 +18,31 @@
 
 package functions
 
-import (
-	"crypto/md5"
-	"encoding/hex"
-)
+// Length returns the number of characters (runes) for string arguments and
+// the size of the slice for slice arguments.
+type Length struct{}
 
-// MD5 computes the MD5 hash of the given value.
-type MD5 struct{}
-
-func (f MD5) Call(args []interface{}) (interface{}, bool) {
-	if len(args) != 1 {
+func (f Length) Call(args []interface{}) (interface{}, bool) {
+	if len(args) < 1 {
 		return false, false
 	}
-
-	var data []byte
-	switch v := args[0].(type) {
-	case []byte:
-		data = v
+	switch s := args[0].(type) {
 	case string:
-		data = []byte(v)
+		return len([]rune(s)), true
+	case []string:
+		return len(s), true
 	}
-
-	if data == nil {
-		return false, false
-	}
-
-	hash := md5.Sum(data)
-	return hex.EncodeToString(hash[:]), true
+	return -1, false
 }
 
-func (f MD5) Desc() FunctionDesc {
-	return FunctionDesc{
-		Name: MD5Fn,
+func (f Length) Desc() FunctionDesc {
+	desc := FunctionDesc{
+		Name: LengthFn,
 		Args: []FunctionArgDesc{
-			{Keyword: "data", Types: []ArgType{Field, String, Func}, Required: true},
+			{Keyword: "string/slice", Types: []ArgType{Field, Slice, Func}, Required: true},
 		},
 	}
+	return desc
 }
 
-func (f MD5) Name() Fn { return MD5Fn }
+func (f Length) Name() Fn { return LengthFn }

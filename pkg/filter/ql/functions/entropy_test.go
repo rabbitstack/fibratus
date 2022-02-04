@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 by Nedim Sabic Sabic
+ * Copyright 2021-2022 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -16,30 +16,16 @@
  * limitations under the License.
  */
 
-package cpython
+package functions
 
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestGILLock(t *testing.T) {
-	require.NoError(t, Initialize())
-	defer Finalize()
-	gil := NewGIL()
-	gil.Lock()
-	require.True(t, gil.Locked())
-}
-
-func TestGILUnlock(t *testing.T) {
-	// failing non-deterministically in CI
-	t.SkipNow()
-	require.NoError(t, Initialize())
-	defer Finalize()
-	gil := NewGIL()
-	gil.Lock()
-	require.True(t, gil.Locked())
-	gil.Unlock()
-	require.False(t, gil.Locked())
+func TestEntropy(t *testing.T) {
+	call := Entropy{}
+	res, _ := call.Call([]interface{}{"\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"})
+	assert.Equal(t, 255, res)
 }

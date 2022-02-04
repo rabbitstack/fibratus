@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 by Nedim Sabic Sabic
+ * Copyright 2021-2022 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -16,30 +16,22 @@
  * limitations under the License.
  */
 
-package cpython
+package functions
 
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestGILLock(t *testing.T) {
-	require.NoError(t, Initialize())
-	defer Finalize()
-	gil := NewGIL()
-	gil.Lock()
-	require.True(t, gil.Locked())
-}
+func TestIndexOf(t *testing.T) {
+	call := IndexOf{}
+	res, _ := call.Call([]interface{}{"hello world", "world"})
+	assert.Equal(t, 6, res)
 
-func TestGILUnlock(t *testing.T) {
-	// failing non-deterministically in CI
-	t.SkipNow()
-	require.NoError(t, Initialize())
-	defer Finalize()
-	gil := NewGIL()
-	gil.Lock()
-	require.True(t, gil.Locked())
-	gil.Unlock()
-	require.False(t, gil.Locked())
+	res1, _ := call.Call([]interface{}{"hello world", "brave"})
+	assert.Equal(t, -1, res1)
+
+	res2, _ := call.Call([]interface{}{"hello world brave world", "world", "last"})
+	assert.Equal(t, 18, res2)
 }

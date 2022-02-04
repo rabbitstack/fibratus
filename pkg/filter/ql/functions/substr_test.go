@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 by Nedim Sabic Sabic
+ * Copyright 2021-2022 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -16,30 +16,28 @@
  * limitations under the License.
  */
 
-package cpython
+package functions
 
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestGILLock(t *testing.T) {
-	require.NoError(t, Initialize())
-	defer Finalize()
-	gil := NewGIL()
-	gil.Lock()
-	require.True(t, gil.Locked())
-}
+func TestSubstr(t *testing.T) {
+	call := Substr{}
+	res, _ := call.Call([]interface{}{"Hello", 0, 4})
+	assert.Equal(t, "Hell", res)
 
-func TestGILUnlock(t *testing.T) {
-	// failing non-deterministically in CI
-	t.SkipNow()
-	require.NoError(t, Initialize())
-	defer Finalize()
-	gil := NewGIL()
-	gil.Lock()
-	require.True(t, gil.Locked())
-	gil.Unlock()
-	require.False(t, gil.Locked())
+	res1, _ := call.Call([]interface{}{"Hello World!", 0, 50})
+	assert.Equal(t, "Hello World!", res1)
+
+	res2, _ := call.Call([]interface{}{"Hello World!", 4, -1})
+	assert.Equal(t, "Hello World!", res2)
+
+	res3, _ := call.Call([]interface{}{"Hello World!", -1, 10})
+	assert.Equal(t, "Hello World!", res3)
+
+	res4, _ := call.Call([]interface{}{"Hello World!", 6, 7})
+	assert.Equal(t, "W", res4)
 }

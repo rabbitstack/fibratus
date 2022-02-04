@@ -340,6 +340,22 @@ func TestFilterRunKevent(t *testing.T) {
 
 		{`kevt.date.d = 3 AND kevt.date.m = 5 AND kevt.time.s = 5 AND kevt.time.m = 4 and kevt.time.h = 15`, true},
 		{`kevt.time = '15:04:05'`, true},
+		{`concat(kevt.name, kevt.host, kevt.nparams) = 'CreateFilearchrabbit4'`, true},
+		{`ltrim(kevt.host, 'arch') = 'rabbit'`, true},
+		{`concat(ltrim(kevt.name, 'Create'), kevt.host) = 'Filearchrabbit'`, true},
+		{`lower(rtrim(kevt.name, 'File')) = 'create'`, true},
+		{`upper(rtrim(kevt.name, 'File')) = 'CREATE'`, true},
+		{`replace(kevt.host, 'rabbit', '_bunny') = 'arch_bunny'`, true},
+		{`replace(kevt.host, 'rabbit', '_bunny', '_bunny', 'bunny') = 'archbunny'`, true},
+		{`split(file.name, '\\') IN ('windows', 'system32')`, true},
+		{`length(file.name) = 51`, true},
+		{`indexof(file.name, '\\') = 0`, true},
+		{`indexof(file.name, '\\', 'last') = 40`, true},
+		{`indexof(file.name, 'h2', 'any') = 22`, true},
+		{`substr(file.name, indexof(file.name, '\\'), indexof(file.name, '\\Hard')) = '\\Device'`, true},
+		{`substr(kevt.desc, indexof(kevt.desc, '\\'), indexof(kevt.desc, 'NOT')) = 'Creates or opens a new file, directory, I/O device, pipe, console'`, true},
+		{`entropy(file.name) > 120`, true},
+		{`regex(file.name, '\\\\Device\\\\HarddiskVolume[2-9]+\\\\.*')`, true},
 	}
 
 	for i, tt := range tests {
