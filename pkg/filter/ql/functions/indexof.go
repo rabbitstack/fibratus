@@ -84,7 +84,7 @@ func (f IndexOf) Desc() FunctionDesc {
 				return nil
 			}
 			if len(args) == 3 && indexFromString(args[2]) == unknown {
-				return fmt.Errorf("%s is not a index search order. Available options are: first,any,last,lastany", args[2])
+				return fmt.Errorf("%s is not a valid index search order. Available options are: first,any,last,lastany", args[2])
 			}
 			return nil
 		},
