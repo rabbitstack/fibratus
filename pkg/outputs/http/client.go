@@ -20,7 +20,7 @@ package http
 
 import (
 	"fmt"
-	libhttp "net/http"
+	"net/http"
 	"net/url"
 
 	"github.com/rabbitstack/fibratus/pkg/util/tls"
@@ -28,34 +28,34 @@ import (
 
 // newHTTPClient builds a fresh stdlib HTTP client. The HTTP proxy and TLS config is set
 // accordingly if enabled in the HTTP output preferences.
-func newHTTPClient(config Config) (*libhttp.Client, error) {
+func newHTTPClient(config Config) (*http.Client, error) {
 	tlsConfig, err := tls.MakeConfig(config.TLSCert, config.TLSKey, config.TLSCA, config.TLSInsecureSkipVerify)
 	if err != nil {
 		return nil, fmt.Errorf("invalid TLS config: %v", err)
 	}
 
-	proxy := libhttp.ProxyFromEnvironment
+	proxy := http.ProxyFromEnvironment
 	if config.ProxyURL != "" {
 		address, err := url.Parse(config.ProxyURL)
 		if err != nil {
 			return nil, fmt.Errorf("invalid HTTP proxy url %q: %w", config.ProxyURL, err)
 		}
 		if config.ProxyUsername != "" && config.ProxyPassword != "" {
-			proxy = libhttp.ProxyURL(&url.URL{
+			proxy = http.ProxyURL(&url.URL{
 				Scheme: address.Scheme,
 				User:   url.UserPassword(config.ProxyUsername, config.ProxyPassword),
 				Host:   config.ProxyURL,
 			})
 		} else {
-			proxy = libhttp.ProxyURL(address)
+			proxy = http.ProxyURL(address)
 		}
 	}
 
-	transport := &libhttp.Transport{
+	transport := &http.Transport{
 		TLSClientConfig: tlsConfig,
 		Proxy:           proxy,
 	}
-	httpClient := &libhttp.Client{
+	httpClient := &http.Client{
 		Transport: transport,
 		Timeout:   config.Timeout,
 	}

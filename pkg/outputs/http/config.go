@@ -52,7 +52,7 @@ type Config struct {
 	ProxyURL string `mapstructure:"proxy-url"`
 	// ProxyUsername is the username for proxy authentication.
 	ProxyUsername string `mapstructure:"proxy-username"`
-	// ProxyPassword is the password for proxy authetnication.
+	// ProxyPassword is the password for proxy authentication.
 	ProxyPassword string `mapstructure:"proxy-password"`
 	// Method determines the HTTP verb in the requests.
 	Method string `mapstructure:"method"`
@@ -70,6 +70,13 @@ type Config struct {
 func AddFlags(flags *pflag.FlagSet) {
 	flags.Bool(httpEnabled, false, "Determines whether the HTTP output is enabled")
 	flags.Duration(httpTimeout, time.Second*5, "Represents the timeout for the HTTP requests")
-	flags.StringSlice(httpEndpoints, []string{}, "Endpoints to which the events are sent. Must contain the HTTP/S protocol schema")
+	flags.StringSlice(httpEndpoints, []string{}, "A comma-separated list of endpoints to which the events are sent. Must contain the HTTP/S protocol schema")
+	flags.String(httpProxyURL, "", "Specifies the HTTP proxy URL. It overrides the HTTP proxy URL as indicated by the environment variables")
+	flags.String(httpProxyUsername, "", "The username for HTTP proxy authentication")
+	flags.String(httpProxyPassword, "", "The password for HTTP proxy authentication")
+	flags.String(httpMethod, "POST", "Determines the HTTP verb to use in requests")
+	flags.String(httpUsername, "", "Username for the basic HTTP authentication")
+	flags.String(httpPassword, "", "Password for the basic HTTP authentication")
+	flags.Bool(httpEnableGzip, false, "Indicates whether the gzip compression is enabled")
 	outputs.AddTLSFlags(flags, outputs.HTTP)
 }

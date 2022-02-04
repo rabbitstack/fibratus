@@ -24,7 +24,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	libhttp "net/http"
+	"net/http"
 	"net/url"
 
 	"github.com/rabbitstack/fibratus/pkg/util/version"
@@ -36,11 +36,11 @@ import (
 // userAgentHeader represents the value of the User-Agent header
 var userAgentHeader = version.ProductToken()
 
-// defaultContentType represents the default content type
+// defaultContentType represents the default content type for HTTP requests
 const defaultContentType = "application/json"
 
-type http struct {
-	client *libhttp.Client
+type h2p struct {
+	client *http.Client
 	config Config
 	url    string
 }
@@ -66,31 +66,29 @@ func initHTTP(config outputs.Config) (outputs.OutputGroup, error) {
 			return outputs.Fail(err)
 		}
 
-		http := &http{
+		clients[i] = &h2p{
 			client: client,
 			config: cfg,
 			url:    endpoint,
 		}
-
-		clients[i] = http
 	}
 
 	return outputs.Success(clients...), nil
 }
 
-func (h *http) Connect() error { return nil }
-func (h *http) Close() error   { return nil }
+func (h *h2p) Connect() error { return nil }
+func (h *h2p) Close() error   { return nil }
 
-func (h *http) Publish(batch *kevent.Batch) error {
+func (h *h2p) Publish(batch *kevent.Batch) error {
 	defer batch.Release()
-	buf, err := h.prepareBody(batch.MarshalJSON())
+	buf, err := h.serializeBody(batch)
 	if err != nil {
 		return err
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), h.config.Timeout)
 	defer cancel()
-	req, err := libhttp.NewRequestWithContext(ctx, h.config.Method, h.url, bytes.NewBuffer(buf))
+	req, err := http.NewRequestWithContext(ctx, h.config.Method, h.url, bytes.NewBuffer(buf))
 	if err != nil {
 		return err
 	}
@@ -117,14 +115,14 @@ func (h *http) Publish(batch *kevent.Batch) error {
 
 // setBasicAuth sets the request's Authorization header to use HTTP
 // Basic Authentication with the provided username and password.
-func (h *http) setBasicAuth(req *libhttp.Request) {
+func (h *h2p) setBasicAuth(req *http.Request) {
 	if h.config.Username != "" && h.config.Password != "" {
 		req.SetBasicAuth(h.config.Username, h.config.Password)
 	}
 }
 
 // setHeaders populates required and optional request headers.
-func (h *http) setHeaders(req *libhttp.Request) {
+func (h *h2p) setHeaders(req *http.Request) {
 	req.Header.Set("User-Agent", userAgentHeader)
 	req.Header.Set("Content-Type", defaultContentType)
 	if h.config.EnableGzip {
@@ -135,10 +133,10 @@ func (h *http) setHeaders(req *libhttp.Request) {
 	}
 }
 
-// prepareBody returns the request body as produced by the serializer if
-// the gzip compression is disabled. Otherwise, the body is compressed by
-// gzip writer before transporting it to remote endpoints.
-func (h *http) prepareBody(body []byte) ([]byte, error) {
+// serializeBody serializes and optionally compresses the body
+// before transporting it to remote endpoints.
+func (h *h2p) serializeBody(batch *kevent.Batch) ([]byte, error) {
+	body := batch.MarshalJSON()
 	if !h.config.EnableGzip {
 		return body, nil
 	}

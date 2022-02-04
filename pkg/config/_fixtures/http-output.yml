@@ -1,0 +1,30 @@
+kstream:
+  max-buffers: 10
+  min-buffers: 8
+  flush-interval: 1s
+  blacklist:
+    events:
+      - CreateThread
+
+filament: top_hives_io
+
+output:
+  console:
+    enabled: false
+    format: pretty
+  elasticsearch:
+  http:
+    enabled: true
+    endpoints:
+      - http://localhost:8081
+      - http://localhost:8082
+    timeout: 2s
+    proxy-url: http://192.168.1.8:3123
+    proxy-username: bunny
+    proxy-password: bunny
+    username: basic
+    password: basic
+    enable-gzip: true
+    headers:
+      api-Key: kkvvkk
+      header2: value2

@@ -24,7 +24,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
-	libhttp "net/http"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -46,16 +46,16 @@ func TestHttpPublish(t *testing.T) {
 		log.Fatal(err)
 	}
 
-	mux := libhttp.NewServeMux()
-	mux.HandleFunc("/intake", func(w libhttp.ResponseWriter, r *libhttp.Request) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/intake", func(w http.ResponseWriter, r *http.Request) {
 		body, err := ioutil.ReadAll(r.Body)
 		if err != nil {
-			libhttp.Error(w, err.Error(), libhttp.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		var kevents []*kevent.Kevent
 		if err := json.Unmarshal(body, &kevents); err != nil {
-			libhttp.Error(w, err.Error(), libhttp.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		assert.Equal(t, 3, len(kevents))
@@ -63,7 +63,7 @@ func TestHttpPublish(t *testing.T) {
 		assert.Equal(t, "fibratus/", r.Header.Get("User-Agent"))
 		assert.Equal(t, "1.1", r.Header.Get("Version"))
 		assert.Equal(t, "Basic dXNlcjpwYXNz", r.Header.Get("Authorization"))
-		w.WriteHeader(libhttp.StatusOK)
+		w.WriteHeader(http.StatusOK)
 	})
 
 	srv := httptest.NewUnstartedServer(mux)
@@ -87,7 +87,7 @@ func TestHttpPublish(t *testing.T) {
 	httpClient, err := newHTTPClient(c)
 	require.NoError(t, err)
 
-	h := http{config: c, client: httpClient, url: "http://127.0.0.1:8081/intake"}
+	h := h2p{config: c, client: httpClient, url: "http://127.0.0.1:8081/intake"}
 
 	err = h.Publish(getBatch())
 	require.NoError(t, err)
@@ -99,26 +99,26 @@ func TestHttpGzipPublish(t *testing.T) {
 		log.Fatal(err)
 	}
 
-	mux := libhttp.NewServeMux()
-	mux.HandleFunc("/intake", func(w libhttp.ResponseWriter, r *libhttp.Request) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/intake", func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "gzip", r.Header.Get("Content-Encoding"))
 		gr, err := gzip.NewReader(r.Body)
 		if err != nil {
-			libhttp.Error(w, err.Error(), libhttp.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		body, err := ioutil.ReadAll(gr)
 		if err != nil {
-			libhttp.Error(w, err.Error(), libhttp.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		var kevents []*kevent.Kevent
 		if err := json.Unmarshal(body, &kevents); err != nil {
-			libhttp.Error(w, err.Error(), libhttp.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		assert.Equal(t, 3, len(kevents))
-		w.WriteHeader(libhttp.StatusOK)
+		w.WriteHeader(http.StatusOK)
 	})
 
 	srv := httptest.NewUnstartedServer(mux)
@@ -137,7 +137,7 @@ func TestHttpGzipPublish(t *testing.T) {
 	httpClient, err := newHTTPClient(c)
 	require.NoError(t, err)
 
-	h := http{config: c, client: httpClient, url: "http://127.0.0.1:8081/intake"}
+	h := h2p{config: c, client: httpClient, url: "http://127.0.0.1:8081/intake"}
 
 	err = h.Publish(getBatch())
 	require.NoError(t, err)

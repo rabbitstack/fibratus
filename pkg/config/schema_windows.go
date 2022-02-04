@@ -226,7 +226,7 @@ var schema = `
 							"properties": {
 								"enabled":					{"type": "boolean"},
 								"url": 						{"type": "string", "format": "uri", "minLength": 1, "maxLength": 255, "pattern": "^(amqps?|amqp?)://"},
-								"timeout": 					{"type": "string"},
+								"timeout": 					{"type": "string", "minLength": 2, "pattern": "[0-9]+s|m}"},
 								"exchange": 				{"type": "string", "minLength": 1},
 								"exchange-type": 			{"type": "string", "enum": ["direct", "topic", "fanout", "header", "x-consistent-hash"]},
 								"routing-key": 				{"type": "string", "minLength": 1},
@@ -234,6 +234,27 @@ var schema = `
 								"vhost": 					{"type": "string", "minLength": 1},
 								"passive": 					{"type": "boolean"},
 								"durable": 					{"type": "boolean"},
+								"username": 				{"type": "string"},
+								"password": 				{"type": "string"},
+								"tls-key": 					{"type": "string"},
+								"tls-cert": 				{"type": "string"},
+								"tls-ca": 					{"type": "string"},
+								"tls-insecure-skip-verify": {"type": "boolean"},
+								"headers":					{"type": "object", "additionalProperties": true}
+							},
+							"additionalProperties": false
+						},
+						"http": {
+							"type": "object",
+							"properties": {
+								"enabled":					{"type": "boolean"},
+								"endpoints": 				{"type": "array", "items": [{"type": "string", "minItems": 1, "format": "uri", "minLength": 1, "maxLength": 255, "pattern": "^(https?|http?)://"}]},
+								"timeout": 					{"type": "string", "minLength": 2, "pattern": "[0-9]+s|m}"},
+								"method": 					{"type": "string", "enum": ["POST", "PUT"]},
+								"enable-gzip": 				{"type": "boolean"},
+								"proxy-url": 				{"type": "string"},
+								"proxy-username": 			{"type": "string"},
+								"proxy-password": 			{"type": "string"},
 								"username": 				{"type": "string"},
 								"password": 				{"type": "string"},
 								"tls-key": 					{"type": "string"},

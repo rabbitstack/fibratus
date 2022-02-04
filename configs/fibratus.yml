@@ -359,6 +359,55 @@ output:
     # Indicates if the chain and host verification stage is skipped
     #tls-insecure-skip-verify: false
 
+  # HTTP output sends event batches to HTTP servers.
+  http:
+    # Indicates if the HTTP output is enabled
+    enabled: false
+
+    # List of endpoints to which the events are sent
+    #endpoints:
+    #  - http://localhost:8081
+
+    # Represents the timeout for the HTTP requests
+    #timeout: 5s
+
+    # Specifies the HTTP proxy URL. It overrides the HTTP proxy URL as indicated by the environment variables
+    #proxy-url: ""
+
+    # The username for HTTP proxy authentication
+    #proxy-username: ""
+
+    # The password for HTTP proxy authentication
+    #proxy-password: ""
+
+    # Determines the HTTP verb to use in requests
+    #method: POST
+
+    # Username for the basic HTTP authentication
+    #username: ""
+
+    # Password for the basic HTTP authentication
+    #password: ""
+
+    # If enabled, the HTTP body is compressed with gzip compression
+    #enable-gzip: false
+
+    # List of arbitrary headers to include in HTTP requests
+    #headers:
+    #  api-key: ""
+
+    # Path to the public/private key file
+    #tls-key:
+
+    # Path to certificate file
+    #tls-cert:
+
+    # Represents the path of the certificate file that is associated with the Certification Authority (CA)
+    #tls-ca:
+
+    # Indicates if the chain and host verification stage is skipped
+    #tls-insecure-skip-verify: false
+
 # =============================== Portable Executable (PE) =============================
 
 # Tweaks for controlling the fetching of the PE (Portable Executable) metadata from the process' binary image.
