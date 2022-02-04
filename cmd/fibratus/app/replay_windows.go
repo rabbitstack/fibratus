@@ -20,6 +20,7 @@ package app
 
 import (
 	"context"
+
 	"github.com/rabbitstack/fibratus/cmd/fibratus/common"
 	"github.com/rabbitstack/fibratus/pkg/aggregator"
 	"github.com/rabbitstack/fibratus/pkg/api"
@@ -27,6 +28,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/filament"
 	"github.com/rabbitstack/fibratus/pkg/filter"
 	"github.com/rabbitstack/fibratus/pkg/kcap"
+	ver "github.com/rabbitstack/fibratus/pkg/util/version"
 	"github.com/spf13/cobra"
 )
 
@@ -50,7 +52,7 @@ func replay(cmd *cobra.Command, args []string) error {
 	if err := common.Init(replayConfig, false); err != nil {
 		return err
 	}
-
+	ver.Set(version)
 	// set up the signals
 	stopCh := common.Signals()
 

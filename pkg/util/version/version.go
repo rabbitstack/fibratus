@@ -20,12 +20,13 @@ package version
 
 import (
 	"fmt"
-	"github.com/jedib0t/go-pretty/v6/table"
 	"os"
 	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
+
+	"github.com/jedib0t/go-pretty/v6/table"
 )
 
 // Version stores the SemVer release information along with the
@@ -39,6 +40,14 @@ type Version struct {
 }
 
 var versionRegexp = regexp.MustCompile(`(\d+\.\d+\.\d+)`)
+
+var version string
+
+// Set initializes the version string as global variable.
+func Set(v string) { version = v }
+
+// ProductToken returns a tag to be poked in User Agent headers.
+func ProductToken() string { return fmt.Sprintf("fibratus/%s", version) }
 
 // New parses the version string and return the version instance.
 func New(version, commit, date string) Version {

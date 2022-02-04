@@ -21,15 +21,17 @@ package config
 import (
 	"errors"
 	"fmt"
+	"reflect"
+	"strconv"
+
 	"github.com/rabbitstack/fibratus/pkg/outputs"
 	"github.com/rabbitstack/fibratus/pkg/outputs/amqp"
 	"github.com/rabbitstack/fibratus/pkg/outputs/console"
 	"github.com/rabbitstack/fibratus/pkg/outputs/elasticsearch"
+	"github.com/rabbitstack/fibratus/pkg/outputs/http"
 	"github.com/rabbitstack/fibratus/pkg/outputs/null"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows/svc"
-	"reflect"
-	"strconv"
 )
 
 var errNoOutputSection = errors.New("no output section in config")
@@ -71,8 +73,8 @@ func (c *Config) tryLoadOutput() error {
 	}
 
 	for typ, config := range mapping {
-		switch typ {
-		case "console":
+		switch outputs.TypeFromString(typ) {
+		case outputs.Console:
 			var consoleConfig console.Config
 			if err := decode(config, &consoleConfig); err != nil {
 				return errOutputConfig(typ, err)
@@ -82,7 +84,7 @@ func (c *Config) tryLoadOutput() error {
 			}
 			c.Output.Type, c.Output.Output = outputs.Console, consoleConfig
 
-		case "amqp":
+		case outputs.AMQP:
 			var amqpConfig amqp.Config
 			if err := decode(config, &amqpConfig); err != nil {
 				return errOutputConfig(typ, err)
@@ -92,7 +94,7 @@ func (c *Config) tryLoadOutput() error {
 			}
 			c.Output.Type, c.Output.Output = outputs.AMQP, amqpConfig
 
-		case "elasticsearch":
+		case outputs.Elasticsearch:
 			var esConfig elasticsearch.Config
 			if err := decode(config, &esConfig); err != nil {
 				return errOutputConfig(typ, err)
@@ -101,13 +103,22 @@ func (c *Config) tryLoadOutput() error {
 				continue
 			}
 			c.Output.Type, c.Output.Output = outputs.Elasticsearch, esConfig
+
+		case outputs.HTTP:
+			var httpConfig http.Config
+			if err := decode(config, &httpConfig); err != nil {
+				return errOutputConfig(typ, err)
+			}
+			if !httpConfig.Enabled {
+				continue
+			}
+			c.Output.Type, c.Output.Output = outputs.HTTP, httpConfig
 		}
 	}
 
 	// if it is not an interactive session but the console output is enabled
 	// we default to null output and warn about that
-	in, err := svc.IsAnInteractiveSession()
-	if err == nil && !in && c.Output.Output != nil {
+	if isWindowsService() && c.Output.Output != nil {
 		if c.Output.Type == outputs.Console {
 			log.Warn("running in non-interactive session with console output. " +
 				"Please configure a different output type. Defaulting to null output")
@@ -134,4 +145,13 @@ func findActiveOutputs(outputs map[string]interface{}) []string {
 		}
 	}
 	return outputTypes
+}
+
+// isWindowsService returns true if the process is running inside Windows Service.
+func isWindowsService() bool {
+	interactive, err := svc.IsAnInteractiveSession()
+	if err != nil {
+		return false
+	}
+	return !interactive
 }

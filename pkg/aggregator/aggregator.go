@@ -21,20 +21,25 @@ package aggregator
 import (
 	"errors"
 	"expvar"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/outputs"
 	log "github.com/sirupsen/logrus"
-	"time"
+
 	// initialize outputs
 	_ "github.com/rabbitstack/fibratus/pkg/outputs/amqp"
 	_ "github.com/rabbitstack/fibratus/pkg/outputs/console"
 	_ "github.com/rabbitstack/fibratus/pkg/outputs/elasticsearch"
+	_ "github.com/rabbitstack/fibratus/pkg/outputs/http"
 	_ "github.com/rabbitstack/fibratus/pkg/outputs/null"
+
 	// initialize alert senders
 	_ "github.com/rabbitstack/fibratus/pkg/alertsender/mail"
 	_ "github.com/rabbitstack/fibratus/pkg/alertsender/slack"
+
 	// initialize transformers
 	_ "github.com/rabbitstack/fibratus/pkg/aggregator/transformers/remove"
 	_ "github.com/rabbitstack/fibratus/pkg/aggregator/transformers/rename"

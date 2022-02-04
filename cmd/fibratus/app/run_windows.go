@@ -21,6 +21,8 @@ package app
 import (
 	"os"
 
+	ver "github.com/rabbitstack/fibratus/pkg/util/version"
+
 	"github.com/rabbitstack/fibratus/cmd/fibratus/common"
 	"github.com/rabbitstack/fibratus/pkg/aggregator"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
@@ -71,7 +73,7 @@ func run(cmd *cobra.Command, args []string) error {
 	if err := common.Init(cfg, true); err != nil {
 		return err
 	}
-
+	ver.Set(version)
 	// set up the signals
 	stopCh := common.Signals()
 
