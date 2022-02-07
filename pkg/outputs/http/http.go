@@ -80,10 +80,23 @@ func (h *h2p) Connect() error { return nil }
 func (h *h2p) Close() error   { return nil }
 
 func (h *h2p) Publish(batch *kevent.Batch) error {
+	var buf []byte
 	defer batch.Release()
-	buf, err := h.serializeBody(batch)
-	if err != nil {
-		return err
+	switch h.config.Serializer {
+	case outputs.JSON:
+		buf = batch.MarshalJSON()
+	}
+
+	if h.config.EnableGzip {
+		var bb bytes.Buffer
+		gz := gzip.NewWriter(&bb)
+		if _, err := gz.Write(buf); err != nil {
+			return err
+		}
+		if err := gz.Close(); err != nil {
+			return err
+		}
+		buf = bb.Bytes()
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), h.config.Timeout)
@@ -131,22 +144,4 @@ func (h *h2p) setHeaders(req *http.Request) {
 	for k, v := range h.config.Headers {
 		req.Header.Set(k, v)
 	}
-}
-
-// serializeBody serializes and optionally compresses the body
-// before transporting it to remote endpoints.
-func (h *h2p) serializeBody(batch *kevent.Batch) ([]byte, error) {
-	body := batch.MarshalJSON()
-	if !h.config.EnableGzip {
-		return body, nil
-	}
-	var buf bytes.Buffer
-	gz := gzip.NewWriter(&buf)
-	if _, err := gz.Write(body); err != nil {
-		return nil, err
-	}
-	if err := gz.Close(); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
 }

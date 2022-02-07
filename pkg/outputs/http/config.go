@@ -64,6 +64,8 @@ type Config struct {
 	Headers map[string]string `mapstructure:"headers"`
 	// EnableGzip specifies whether the gzip compression is enabled.
 	EnableGzip bool `mapstructure:"enable-gzip"`
+	// Serializer indicates the serializer for the HTTP request body.
+	Serializer outputs.Serializer `mapstructure:"serializer"`
 }
 
 // AddFlags registers persistent flags for the HTTP output.

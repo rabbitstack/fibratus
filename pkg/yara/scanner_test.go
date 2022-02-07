@@ -217,7 +217,6 @@ func TestMatchesMeta(t *testing.T) {
 		},
 		Metadata: make(map[string]string),
 	}
-
 	assert.Empty(t, kevt.Metadata)
 
 	putMatchesMeta(yaraMatches, kevt)

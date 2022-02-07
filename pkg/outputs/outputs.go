@@ -47,6 +47,8 @@ const (
 	Elasticsearch
 	// HTTP denotes the HTTP output.
 	HTTP
+	// Eventlog denotes the eventlog output.
+	Eventlog
 	// Null is the null output.
 	Null
 	// Unknown is an undefined output type.
@@ -64,6 +66,8 @@ func (t Type) String() string {
 		return "elasticsearch"
 	case HTTP:
 		return "http"
+	case Eventlog:
+		return "eventlog"
 	case Null:
 		return "null"
 	default:
@@ -82,10 +86,38 @@ func TypeFromString(s string) Type {
 		return Elasticsearch
 	case "http":
 		return HTTP
+	case "eventlog":
+		return Eventlog
 	case "null":
 		return Null
 	default:
 		return Unknown
+	}
+}
+
+// Serializer is the type definition for the output serializers.
+type Serializer uint8
+
+const (
+	// JSON represents the JSON serializer type.
+	JSON Serializer = iota
+	// XML represents the XML serializer type.
+	XML
+	// Text represents the textual form serializer type.
+	Text
+)
+
+// String returns the string representation of the serializer type.
+func (s Serializer) String() string {
+	switch s {
+	case JSON:
+		return "json"
+	case XML:
+		return "xml"
+	case Text:
+		return "text"
+	default:
+		panic(fmt.Sprintf("unrecognized serializer identifier: %d", s))
 	}
 }
 

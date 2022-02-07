@@ -20,6 +20,12 @@ package kevent
 
 import (
 	"encoding/json"
+	"encoding/xml"
+	"fmt"
+	"io/ioutil"
+	"testing"
+	"time"
+
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
@@ -28,9 +34,6 @@ import (
 	shandle "github.com/rabbitstack/fibratus/pkg/syscall/handle"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"io/ioutil"
-	"testing"
-	"time"
 )
 
 func init() {
@@ -359,6 +362,95 @@ func TestKeventMarshalJSONMultiple(t *testing.T) {
 		assert.Equal(t, seq, newKevt.Seq)
 		assert.Len(t, newKevt.PS.Handles, 3)
 	}
+}
+
+func TestMarshalXML(t *testing.T) {
+	kevt := &Kevent{
+		Type:        ktypes.CreateProcess,
+		Tid:         2484,
+		PID:         859,
+		CPU:         1,
+		Seq:         2,
+		Name:        "CreateProcess",
+		Timestamp:   time.Now(),
+		Category:    ktypes.File,
+		Host:        "archrabbit",
+		Description: "Creates a new process",
+		Kparams: Kparams{
+			kparams.FileObject:    {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(12456738026482168384)},
+			kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
+			kparams.FileType:      {Name: kparams.FileType, Type: kparams.AnsiString, Value: "file"},
+			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.AnsiString, Value: "open"},
+			kparams.BasePrio:      {Name: kparams.BasePrio, Type: kparams.Int8, Value: int8(2)},
+			kparams.PagePrio:      {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(2)},
+		},
+		Metadata: map[string]string{"foo": "bar", "fooz": "baarz", "yara.matches": `[{"rule":"AnglerEKredirector ","namespace":"EK","tags":null,"metas":[{"identifier":"description","value":"Angler Exploit Kit Redirector"}],"strings": []},{"rule":"angler_flash_uncompressed ","namespace":"EK","tags":["exploitkit"],"metas":[{"identifier":"description","value":"Angler Exploit Kit Detection"}],"strings":[]}]`},
+		PS: &pstypes.PS{
+			PID:       2436,
+			Ppid:      6304,
+			Name:      "firefox.exe",
+			Exe:       `C:\Program Files\Mozilla Firefox\firefox.exe`,
+			Comm:      `C:\Program Files\Mozilla Firefox\firefox.exe -contentproc --channel="6304.3.1055809391\1014207667" -childID 1 -isForBrowser -prefsHandle 2584 -prefMapHandle 2580 -prefsLen 70 -prefMapSize 216993 -parentBuildID 20200107212822 -greomni "C:\Program Files\Mozilla Firefox\omni.ja" -appomni "C:\Program Files\Mozilla Firefox\browser\omni.ja" -appdir "C:\Program Files\Mozilla Firefox\browser" - 6304 "\\.\pipe\gecko-crash-server-pipe.6304" 2596 tab`,
+			Cwd:       `C:\Program Files\Mozilla Firefox\`,
+			SID:       "archrabbit\\SYSTEM",
+			Args:      []string{"-contentproc", `--channel=6304.3.1055809391\1014207667`, "-childID", "1", "-isForBrowser", "-prefsHandle", "2584", "-prefMapHandle", "2580", "-prefsLen", "70", "-prefMapSize", "216993", "-parentBuildID"},
+			SessionID: 4,
+			Envs:      map[string]string{"ProgramData": "C:\\ProgramData", "COMPUTRENAME": "archrabbit"},
+			Threads: map[uint32]pstypes.Thread{
+				3453: {Tid: 3453, Entrypoint: kparams.Hex("0x7ffe2557ff80"), IOPrio: 2, PagePrio: 5, KstackBase: kparams.Hex("0xffffc307810d6000"), KstackLimit: kparams.Hex("0xffffc307810cf000"), UstackLimit: kparams.Hex("0x5260000"), UstackBase: kparams.Hex("0x525f000")},
+				3455: {Tid: 3455, Entrypoint: kparams.Hex("0x5efe2557ff80"), IOPrio: 3, PagePrio: 5, KstackBase: kparams.Hex("0xffffc307810d6000"), KstackLimit: kparams.Hex("0xffffc307810cf000"), UstackLimit: kparams.Hex("0x5260000"), UstackBase: kparams.Hex("0x525f000")},
+			},
+			Handles: []htypes.Handle{
+				{Num: shandle.Handle(0xffffd105e9baaf70),
+					Name:   `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\Tcpip\Parameters\Interfaces\{b677c565-6ca5-45d3-b618-736b4e09b036}`,
+					Type:   "Key",
+					Object: 777488883434455544,
+					Pid:    uint32(1023),
+				},
+				{
+					Num:  shandle.Handle(0xffffd105e9adaf70),
+					Name: `\RPC Control\OLEA61B27E13E028C4EA6C286932E80`,
+					Type: "ALPC Port",
+					Pid:  uint32(1023),
+					MD: &htypes.AlpcPortInfo{
+						Seqno:   1,
+						Context: 0x0,
+						Flags:   0x0,
+					},
+					Object: 457488883434455544,
+				},
+				{
+					Num:  shandle.Handle(0xeaffd105e9adaf30),
+					Name: `C:\Users\bunny`,
+					Type: "File",
+					Pid:  uint32(1023),
+					MD: &htypes.FileInfo{
+						IsDirectory: true,
+					},
+					Object: 357488883434455544,
+				},
+			},
+			PE: &pex.PE{
+				NumberOfSections: 7,
+				NumberOfSymbols:  10,
+				EntryPoint:       "0x20110",
+				ImageBase:        "0x140000000",
+				LinkTime:         time.Now(),
+				Sections: []pex.Sec{
+					{Name: ".text", Size: 132608, Entropy: 6.368381, Md5: "db23dce3911a42e987041d98abd4f7cd"},
+					{Name: ".rdata", Size: 35840, Entropy: 5.996976, Md5: "ffa5c960b421ca9887e54966588e97e8"},
+				},
+				Symbols:          []string{"SelectObject", "GetTextFaceW", "EnumFontsW", "TextOutW", "GetProcessHeap"},
+				Imports:          []string{"GDI32.dll", "USER32.dll", "msvcrt.dll", "api-ms-win-core-libraryloader-l1-2-0.dl"},
+				VersionResources: map[string]string{"CompanyName": "Microsoft Corporation", "FileDescription": "Notepad", "FileVersion": "10.0.18362.693"},
+			},
+		},
+	}
+
+	buf, err := xml.MarshalIndent(&kevt, "", " ")
+	require.NoError(t, err)
+
+	fmt.Println(string(buf))
 }
 
 func BenchmarkKeventMarshalJSON(b *testing.B) {

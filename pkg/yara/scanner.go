@@ -38,6 +38,7 @@ import (
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"github.com/rabbitstack/fibratus/pkg/yara/config"
+	ytypes "github.com/rabbitstack/fibratus/pkg/yara/types"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -298,7 +299,22 @@ func tagsFromMatches(matches []yara.MatchRule) []string {
 
 // putMatchesMeta injects rule matches into event metadata as a JSON payload.
 func putMatchesMeta(matches yara.MatchRules, kevt *kevent.Kevent) error {
-	b, err := json.Marshal(matches)
+	ruleMatches := make([]ytypes.MatchRule, 0)
+	for _, m := range matches {
+		match := ytypes.MatchRule{
+			Rule:      m.Rule,
+			Namespace: m.Namespace,
+			Tags:      m.Tags,
+		}
+		for _, meta := range m.Metas {
+
+		}
+		for _, s := range m.Strings {
+
+		}
+		ruleMatches = append(ruleMatches, match)
+	}
+	b, err := json.Marshal(ruleMatches)
 	if err != nil {
 		return err
 	}
