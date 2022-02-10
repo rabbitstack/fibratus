@@ -95,32 +95,6 @@ func TypeFromString(s string) Type {
 	}
 }
 
-// Serializer is the type definition for the output serializers.
-type Serializer uint8
-
-const (
-	// JSON represents the JSON serializer type.
-	JSON Serializer = iota
-	// XML represents the XML serializer type.
-	XML
-	// Text represents the textual form serializer type.
-	Text
-)
-
-// String returns the string representation of the serializer type.
-func (s Serializer) String() string {
-	switch s {
-	case JSON:
-		return "json"
-	case XML:
-		return "xml"
-	case Text:
-		return "text"
-	default:
-		panic(fmt.Sprintf("unrecognized serializer identifier: %d", s))
-	}
-}
-
 // OutputGroup is a collection of outputs that can be configured in a load-balanced fashion.
 type OutputGroup struct {
 	// Clients is the list of clients to which events are forwarded.

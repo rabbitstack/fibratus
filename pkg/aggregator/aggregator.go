@@ -33,6 +33,7 @@ import (
 	_ "github.com/rabbitstack/fibratus/pkg/outputs/amqp"
 	_ "github.com/rabbitstack/fibratus/pkg/outputs/console"
 	_ "github.com/rabbitstack/fibratus/pkg/outputs/elasticsearch"
+	_ "github.com/rabbitstack/fibratus/pkg/outputs/eventlog"
 	_ "github.com/rabbitstack/fibratus/pkg/outputs/http"
 	_ "github.com/rabbitstack/fibratus/pkg/outputs/null"
 

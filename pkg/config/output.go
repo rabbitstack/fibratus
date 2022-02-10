@@ -24,6 +24,8 @@ import (
 	"reflect"
 	"strconv"
 
+	"github.com/rabbitstack/fibratus/pkg/outputs/eventlog"
+
 	"github.com/rabbitstack/fibratus/pkg/outputs"
 	"github.com/rabbitstack/fibratus/pkg/outputs/amqp"
 	"github.com/rabbitstack/fibratus/pkg/outputs/console"
@@ -113,6 +115,16 @@ func (c *Config) tryLoadOutput() error {
 				continue
 			}
 			c.Output.Type, c.Output.Output = outputs.HTTP, httpConfig
+
+		case outputs.Eventlog:
+			var eventlogConfig eventlog.Config
+			if err := decode(config, &eventlogConfig); err != nil {
+				return errOutputConfig(typ, err)
+			}
+			if !eventlogConfig.Enabled {
+				continue
+			}
+			c.Output.Type, c.Output.Output = outputs.Eventlog, eventlogConfig
 		}
 	}
 

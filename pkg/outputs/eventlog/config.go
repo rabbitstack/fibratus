@@ -19,34 +19,22 @@
 package eventlog
 
 import (
+	"fmt"
+
 	"github.com/rabbitstack/fibratus/pkg/outputs"
-	"golang.org/x/sys/windows/svc/eventlog"
 )
 
 // Level is the type definition for the eventlog log level
-type Level int
+type Level uint16
 
 const (
 	// Info represents the info log level
-	Info Level = eventlog.Info
+	Info Level = 4
 	// Warn represents the warning info level
-	Warn Level = eventlog.Warning
+	Warn Level = 2
 	// Erro represents the error log level
-	Erro Level = eventlog.Error
-	// Unknown is the unknown log level
-	Unknown Level = -1
+	Erro Level = 1
 )
-
-// UnmarshalYAML converts the level yaml string to the corresponding enum type.
-func (l *Level) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	var level string
-	err := unmarshal(&level)
-	if err != nil {
-		return err
-	}
-	*l = levelFromString(level)
-	return nil
-}
 
 func levelFromString(s string) Level {
 	switch s {
@@ -57,12 +45,14 @@ func levelFromString(s string) Level {
 	case "erro", "error", "ERRO", "ERROR":
 		return Erro
 	default:
-		return Unknown
+		panic(fmt.Sprintf("unrecognized evtlog level: %s", s))
 	}
 }
 
 // Config contains configuration properties for fine-tuning the eventlog output.
 type Config struct {
-	Serializer outputs.Serializer
-	Level      Level
+	Enabled    bool               `mapstructure:"enabled"`
+	Serializer outputs.Serializer `mapstructure:"serializer"`
+	Level      string             `mapstructure:"level"`
+	RemoteHost string             `mapstructure:"remote-host"`
 }

@@ -47,7 +47,7 @@ var (
 )
 
 type evtlog struct {
-	l      *eventlog.Log // eventlog writer
+	evtlog *Eventlog // eventlog writer
 	config Config
 }
 
@@ -58,7 +58,7 @@ func init() {
 func initEventlog(config outputs.Config) (outputs.OutputGroup, error) {
 	cfg, ok := config.Output.(Config)
 	if !ok {
-		return outputs.Fail(outputs.ErrInvalidConfig(outputs.HTTP, config.Output))
+		return outputs.Fail(outputs.ErrInvalidConfig(outputs.Eventlog, config.Output))
 	}
 	err := eventlog.InstallAsEventCreate(source, levels)
 	if err != nil {
@@ -74,17 +74,25 @@ func initEventlog(config outputs.Config) (outputs.OutputGroup, error) {
 }
 
 func (e *evtlog) Connect() error {
-	l, err := eventlog.Open(source)
+	var (
+		l   *Eventlog
+		err error
+	)
+	if e.config.RemoteHost != "" {
+		l, err = OpenRemote(e.config.RemoteHost, source)
+	} else {
+		l, err = Open(source)
+	}
 	if err != nil {
 		return err
 	}
-	e.l = l
+	e.evtlog = l
 	return nil
 }
 
 func (e *evtlog) Close() error {
-	if e.l != nil {
-		return e.l.Close()
+	if e.evtlog != nil {
+		return e.evtlog.Close()
 	}
 	return nil
 }
@@ -93,40 +101,47 @@ func (e *evtlog) Publish(batch *kevent.Batch) error {
 	defer batch.Release()
 
 	for _, kevt := range batch.Events {
-		switch e.config.Serializer {
-		case outputs.XML:
-			buf, err := xml.MarshalIndent(kevt, "", " ")
-			if err != nil {
-				return err
-			}
-			err = e.writeEvtlog(ktypeToEventID(kevt), buf)
-			if err != nil {
-				return err
-			}
-
-		case outputs.Text:
-			buf, err := kevt.MarshalText()
-			if err != nil {
-				return err
-			}
-			err = e.writeEvtlog(ktypeToEventID(kevt), buf)
-			if err != nil {
-				return err
-			}
+		if err := e.publish(kevt); err != nil {
+			return err
 		}
 	}
 
 	return nil
 }
 
+func (e *evtlog) publish(kevt *kevent.Kevent) error {
+	switch e.config.Serializer {
+	case outputs.XML:
+		buf, err := xml.MarshalIndent(kevt, "", " ")
+		if err != nil {
+			return err
+		}
+		err = e.writeEvtlog(ktypeToEventID(kevt), buf)
+		if err != nil {
+			return err
+		}
+
+	case outputs.Text:
+		buf, err := kevt.MarshalText()
+		if err != nil {
+			return err
+		}
+		err = e.writeEvtlog(ktypeToEventID(kevt), buf)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (e *evtlog) writeEvtlog(eventID uint32, buf []byte) error {
-	switch e.config.Level {
+	switch levelFromString(e.config.Level) {
 	case Info:
-		return e.l.Info(eventID, string(buf))
+		return e.evtlog.Info(eventID, buf)
 	case Warn:
-		return e.l.Warning(eventID, string(buf))
+		return e.evtlog.Warning(eventID, buf)
 	case Erro:
-		return e.l.Error(eventID, string(buf))
+		return e.evtlog.Error(eventID, buf)
 	default:
 		return ErrUnknownLogLevel
 	}

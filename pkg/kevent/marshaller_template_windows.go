@@ -23,13 +23,13 @@ import "text/template"
 var textMarshallerTpl = template.Must(template.New("marshaller").Parse(TextMarshallerTemplate))
 
 // TextMarshallerTemplate is the Go template used for producing the text-form
-// payloads of the event instances.
+// payloads for event instances.
 var TextMarshallerTemplate = `
-Name:  {{ .Kevt.Name }}
-Sequence: {{ .Kevt.Seq }}
-Thread ID: {{ .Kevt.Tid }}
-Cpu: {{ .Kevt.CPU }}
-Category: {{ .Kevt.Category }}
+Name:  		{{ .Kevt.Name }}
+Sequence: 	{{ .Kevt.Seq }}
+Thread ID: 	{{ .Kevt.Tid }}
+Cpu: 		{{ .Kevt.CPU }}
+Category: 	{{ .Kevt.Category }}
 
 {{- if .Kevt.PS }}
 
@@ -40,73 +40,73 @@ Cmdline:	{{ .Kevt.PS.Comm }}
 Cwd:		{{ .Kevt.PS.Cwd }}
 SID:		{{ .Kevt.PS.SID }}
 Session ID: {{ .Kevt.PS.SessionID }}
-	{{ if .Kevt.PS.Envs }}
-	Env:
+{{ if .Kevt.PS.Envs }}
+Env:
 			{{- with .Kevt.PS.Envs }}
 			{{- range $k, $v := . }}
 			{{ $k }}: {{ $v }}
 			{{- end }}
 			{{- end }}
-	{{ end }}
-	Threads:
+{{ end }}
+Threads:
 			{{- with .Kevt.PS.Threads }}
 			{{- range . }}
 			{{ . }}
 			{{- end }}
 			{{- end }}
-	Modules:
+Modules:
 			{{- with .Kevt.PS.Modules }}
 			{{- range . }}
 			{{ . }}
 			{{- end }}
 			{{- end }}
-	{{ if .Kevt.PS.Handles }}
-	Handles:
+{{ if .Kevt.PS.Handles }}
+Handles:
 			{{- with .Kevt.PS.Handles }}
 			{{- range . }}
 			{{ . }}
 			{{- end }}
 			{{- end }}
-	{{ end }}
+{{ end }}
 
-	{{ if .Kevt.PS.PE }}
-	Entrypoint:  		{{ .Kevt.PS.PE.EntryPoint }}
-	Image base: 		{{ .Kevt.PS.PE.ImageBase }}
-	Build date:  		{{ .Kevt.PS.PE.LinkTime }}
+{{ if .Kevt.PS.PE }}
+Entrypoint:  		{{ .Kevt.PS.PE.EntryPoint }}
+Image base: 		{{ .Kevt.PS.PE.ImageBase }}
+Build date:  		{{ .Kevt.PS.PE.LinkTime }}
 
-	Number of symbols: 	{{ .Kevt.PS.PE.NumberOfSymbols }}
-	Number of sections: {{ .Kevt.PS.PE.NumberOfSections }}
+Number of symbols: 	{{ .Kevt.PS.PE.NumberOfSymbols }}
+Number of sections: {{ .Kevt.PS.PE.NumberOfSections }}
 
-	Sections:
+Sections:
 			{{- with .Kevt.PS.PE.Sections }}
 			{{- range . }}
 			{{ . }}
 			{{- end }}
 			{{- end }}
-	{{ if .Kevt.PS.PE.Symbols }}
-	Symbols:
+{{ if .Kevt.PS.PE.Symbols }}
+Symbols:
 			{{- with .Kevt.PS.PE.Symbols }}
 			{{- range . }}
 			{{ . }}
 			{{- end }}
 			{{- end }}
-	{{ end }}
-	{{ if .Kevt.PS.PE.Imports }}
-	Imports:
+{{ end }}
+{{ if .Kevt.PS.PE.Imports }}
+Imports:
 			{{- with .Kevt.PS.PE.Imports }}
 			{{- range . }}
 			{{ . }}
 			{{- end }}
 			{{- end }}
-	{{ end }}
-	{{ if .Kevt.PS.PE.VersionResources }}
-	Resources:
+{{ end }}
+{{ if .Kevt.PS.PE.VersionResources }}
+Resources:
 			{{- with .Kevt.PS.PE.VersionResources }}
 			{{- range $k, $v := . }}
 			{{ $k }}: {{ $v }}
 			{{- end }}
 			{{- end }}
-	{{ end }}
-	{{ end }}
-	{{- end }}
+			{{ end }}
+{{ end }}
+{{- end }}
 `

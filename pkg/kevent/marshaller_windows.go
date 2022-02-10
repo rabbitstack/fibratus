@@ -409,7 +409,7 @@ func (kevt *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 		// that corresponds to bytes storing the lengths of keys/values
 		moffset += klen + vlen + 4
 		if key != "" {
-			kevt.AddMeta(key, value)
+			kevt.AddMeta(MetadataKey(key), value)
 		}
 	}
 
@@ -545,7 +545,7 @@ func (kevt *Kevent) MarshalJSON() []byte {
 	var i int
 	for k, v := range kevt.Metadata {
 		writeMore := js.shouldWriteMore(i, len(kevt.Metadata))
-		js.writeObjectField(k).writeEscapeString(v)
+		js.writeObjectField(k.String()).writeEscapeString(v)
 		if writeMore {
 			js.writeMore()
 		}
@@ -850,8 +850,8 @@ func (kevt *Kevent) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
 		_ = e.EncodeToken(metadataNode)
 
 		for k, v := range kevt.Metadata {
-			key := stringcase.Camel(strings.TrimRight(k, "."))
-			if k == "yara.matches" {
+			key := stringcase.Camel(strings.TrimRight(k.String(), "."))
+			if k == YaraMatchesKey {
 				if err := marshalYARAMatches(e, v); err != nil {
 					log.Warnf("yara matches XML marshal: %v", err)
 				}
@@ -895,7 +895,7 @@ func (kevt *Kevent) MarshalText() ([]byte, error) {
 	}
 	err := textMarshallerTpl.Execute(&writer, data)
 	if err != nil {
-		return nil, fmt.Errorf("marshal text: %v", err)
+		return nil, fmt.Errorf("unable to execute text marshaller template: %v", err)
 	}
 	return writer.Bytes(), nil
 }

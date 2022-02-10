@@ -44,9 +44,6 @@ import (
 
 const alertTitleTmpl = `{{if .PS }}YARA alert on process {{ .PS.Name }}{{ else }}YARA alert on file {{ .Filename }}{{ end }}`
 
-// matchesMeta is the tag name for the yara matches
-const matchesMeta = "yara.matches"
-
 var (
 	// ruleMatches computes all the rule matches
 	ruleMatches = expvar.NewInt("yara.rule.matches")
@@ -318,7 +315,7 @@ func putMatchesMeta(matches yara.MatchRules, kevt *kevent.Kevent) error {
 	if err != nil {
 		return err
 	}
-	kevt.AddMeta(matchesMeta, string(b))
+	kevt.AddMeta(kevent.YaraMatchesKey, string(b))
 	return nil
 }
 
