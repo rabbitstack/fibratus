@@ -24,6 +24,7 @@ import (
 	"encoding/xml"
 	"expvar"
 	"fmt"
+	"html/template"
 	"math"
 	"net"
 	"sort"
@@ -852,7 +853,7 @@ func (kevt *Kevent) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
 		for k, v := range kevt.Metadata {
 			key := stringcase.Camel(strings.TrimRight(k.String(), "."))
 			if k == YaraMatchesKey {
-				if err := marshalYARAMatches(e, v); err != nil {
+				if err := marshalXMLYARAMatches(e, v); err != nil {
 					log.Warnf("yara matches XML marshal: %v", err)
 				}
 			} else {
@@ -879,6 +880,114 @@ func (kevt *Kevent) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
 	return nil
 }
 
+// marshalXMLYARAMatches converts yara rule matches from a valid JSON payload to XML.
+func marshalXMLYARAMatches(e *xml.Encoder, v string) error {
+	var matches []ytypes.MatchRule
+	err := json.Unmarshal([]byte(v), &matches)
+	if err != nil {
+		return err
+	}
+	yaraMatchesNode := xml.StartElement{Name: xml.Name{Local: "YaraMatches"}}
+	_ = e.EncodeToken(yaraMatchesNode)
+	for _, ruleMatch := range matches {
+		_ = e.EncodeElement(ruleMatch.Rule, xml.StartElement{Name: xml.Name{Local: "Rule"}})
+	}
+	_ = e.EncodeToken(xml.EndElement{Name: yaraMatchesNode.Name})
+	return nil
+}
+
+var textMarshallerTpl = template.Must(template.New("marshaller").Parse(TextMarshallerTemplate))
+
+// TextMarshallerTemplate is the Go template used for producing the text-form payloads for event instances.
+var TextMarshallerTemplate = `Name:  		{{ .Kevt.Name }}
+Sequence: 		{{ .Kevt.Seq }}
+Process ID:		{{ .Kevt.PID }}
+Thread ID: 		{{ .Kevt.Tid }}
+Cpu: 			{{ .Kevt.CPU }}
+Params:			{{ .Kevt.Kparams }}
+Category: 		{{ .Kevt.Category }}
+
+{{- if .Kevt.PS }}
+
+Process:		{{ .Kevt.PS.Name }}
+Exe:			{{ .Kevt.PS.Exe }}
+Pid:  			{{ .Kevt.PS.PID }}
+Ppid: 			{{ .Kevt.PS.Ppid }}
+Cmdline:		{{ .Kevt.PS.Comm }}
+Cwd:			{{ .Kevt.PS.Cwd }}
+SID:			{{ .Kevt.PS.SID }}
+Session ID:		{{ .Kevt.PS.SessionID }}
+{{ if .Kevt.PS.Envs }}
+Env:
+			{{- with .Kevt.PS.Envs }}
+			{{- range $k, $v := . }}
+			{{ $k }}: {{ $v }}
+			{{- end }}
+			{{- end }}
+{{ end }}
+Threads:
+			{{- with .Kevt.PS.Threads }}
+			{{- range . }}
+			{{ . }}
+			{{- end }}
+			{{- end }}
+Modules:
+			{{- with .Kevt.PS.Modules }}
+			{{- range . }}
+			{{ . }}
+			{{- end }}
+			{{- end }}
+{{ if .Kevt.PS.Handles }}
+Handles:
+			{{- with .Kevt.PS.Handles }}
+			{{- range . }}
+			{{ . }}
+			{{- end }}
+			{{- end }}
+{{ end }}
+
+{{ if .Kevt.PS.PE }}
+Entrypoint:  		{{ .Kevt.PS.PE.EntryPoint }}
+Image base: 		{{ .Kevt.PS.PE.ImageBase }}
+Build date:  		{{ .Kevt.PS.PE.LinkTime }}
+
+Number of symbols: 	{{ .Kevt.PS.PE.NumberOfSymbols }}
+Number of sections: {{ .Kevt.PS.PE.NumberOfSections }}
+
+Sections:
+			{{- with .Kevt.PS.PE.Sections }}
+			{{- range . }}
+			{{ . }}
+			{{- end }}
+			{{- end }}
+{{ if .Kevt.PS.PE.Symbols }}
+Symbols:
+			{{- with .Kevt.PS.PE.Symbols }}
+			{{- range . }}
+			{{ . }}
+			{{- end }}
+			{{- end }}
+{{ end }}
+{{ if .Kevt.PS.PE.Imports }}
+Imports:
+			{{- with .Kevt.PS.PE.Imports }}
+			{{- range . }}
+			{{ . }}
+			{{- end }}
+			{{- end }}
+{{ end }}
+{{ if .Kevt.PS.PE.VersionResources }}
+Resources:
+			{{- with .Kevt.PS.PE.VersionResources }}
+			{{- range $k, $v := . }}
+			{{ $k }}: {{ $v }}
+			{{- end }}
+			{{- end }}
+			{{ end }}
+{{ end }}
+{{- end }}
+`
+
 // MarshalText produces the textual form of the kernel event.
 func (kevt *Kevent) MarshalText() ([]byte, error) {
 	var writer stdbytes.Buffer
@@ -898,20 +1007,4 @@ func (kevt *Kevent) MarshalText() ([]byte, error) {
 		return nil, fmt.Errorf("unable to execute text marshaller template: %v", err)
 	}
 	return writer.Bytes(), nil
-}
-
-// marshalYARAMatches converts yara rule matches from a valid JSON payload to XML.
-func marshalYARAMatches(e *xml.Encoder, v string) error {
-	var matches []ytypes.MatchRule
-	err := json.Unmarshal([]byte(v), &matches)
-	if err != nil {
-		return err
-	}
-	yaraMatchesNode := xml.StartElement{Name: xml.Name{Local: "YaraMatches"}}
-	_ = e.EncodeToken(yaraMatchesNode)
-	for _, ruleMatch := range matches {
-		_ = e.EncodeElement(ruleMatch.Rule, xml.StartElement{Name: xml.Name{Local: "Rule"}})
-	}
-	_ = e.EncodeToken(xml.EndElement{Name: yaraMatchesNode.Name})
-	return nil
 }

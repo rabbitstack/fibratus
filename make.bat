@@ -48,6 +48,7 @@ if "%~1"=="pkg" goto pkg
 if "%~1"=="pkg-slim" goto pkg-slim
 if "%~1"=="deps" goto deps
 if "%~1"=="rsrc" goto rsrc
+if "%~1"=="mc" goto mc
 
 :build
 :: set PKG_CONFIG_PATH=pkg-config
@@ -76,6 +77,14 @@ goto :EOF
 :rsrc
 set RC_VER=%VERSION:.=,%
 windres --define RC_VER=%RC_VER% --define VER=%VERSION% -i cmd\fibratus\fibratus.rc -O coff -o cmd\fibratus\fibratus.syso
+if errorlevel 1 goto fail
+goto :EOF
+
+:mc
+windmc -r pkg/outputs/eventlog/mc pkg/outputs/eventlog/mc/fibratus.mc
+windres.exe -O coff -r -fo pkg/outputs/eventlog/mc/fibratus.res pkg/outputs/eventlog/mc/fibratus.rc
+:: link the resulting resource object
+gcc pkg/outputs/eventlog/mc/fibratus.res -o pkg/outputs/eventlog/mc/mf.dll -s -shared "-Wl,--subsystem,windows"
 if errorlevel 1 goto fail
 goto :EOF
 

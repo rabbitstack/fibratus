@@ -65,7 +65,7 @@ func (l *Eventlog) Close() error {
 	return windows.DeregisterEventSource(l.Handle)
 }
 
-func (l *Eventlog) report(etype uint16, eid uint32, msg []byte) error {
+func (l *Eventlog) report(etype uint16, eid uint32, category uint16, msg []byte) error {
 	lines := bytes.Split(msg, []byte("\n"))
 	ss := make([]*uint16, len(lines))
 	for i, line := range lines {
@@ -79,23 +79,20 @@ func (l *Eventlog) report(etype uint16, eid uint32, msg []byte) error {
 		}
 		ss[i] = s
 	}
-	return windows.ReportEvent(l.Handle, etype, 0, eid, 0, uint16(len(ss)), 0, &ss[0], nil)
+	return windows.ReportEvent(l.Handle, etype, category, eid, 0, uint16(len(ss)), 0, &ss[0], nil)
 }
 
-// Info writes an information event msg with event id eid to the end of event log l.
-// When EventCreate.exe is used, eid must be between 1 and 1000.
-func (l *Eventlog) Info(eid uint32, msg []byte) error {
-	return l.report(uint16(Info), eid, msg)
+// Info writes an information event msg with event id eid to the end of event log.
+func (l *Eventlog) Info(eid uint32, category uint16, msg []byte) error {
+	return l.report(uint16(Info), eid, category, msg)
 }
 
-// Warning writes an warning event msg with event id eid to the end of event log l.
-// When EventCreate.exe is used, eid must be between 1 and 1000.
-func (l *Eventlog) Warning(eid uint32, msg []byte) error {
-	return l.report(uint16(Warn), eid, msg)
+// Warning writes an warning event msg with event id eid to the end of event log.
+func (l *Eventlog) Warning(eid uint32, category uint16, msg []byte) error {
+	return l.report(uint16(Warn), eid, category, msg)
 }
 
-// Error writes an error event msg with event id eid to the end of event log l.
-// When EventCreate.exe is used, eid must be between 1 and 1000.
-func (l *Eventlog) Error(eid uint32, msg []byte) error {
-	return l.report(uint16(Erro), eid, msg)
+// Error writes an error event msg with event id eid to the end of event log.
+func (l *Eventlog) Error(eid uint32, category uint16, msg []byte) error {
+	return l.report(uint16(Erro), eid, category, msg)
 }

@@ -1,6 +1,11 @@
 cmd/fibratus/fibratus.exe
 cmd/fibratus/fibratus.syso
 
+pkg/outputs/eventlog/mc/*.bin
+pkg/outputs/eventlog/mc/fibratus.h
+pkg/outputs/eventlog/mc/fibratus.rc
+pkg/outputs/eventlog/mc/fibratus.res
+
 build/msi/fibratus-*
 build/msi/components.wxs
 build/msi/*.wixobj

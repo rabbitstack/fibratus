@@ -24,8 +24,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 
 	"github.com/rabbitstack/fibratus/pkg/kevent"
@@ -60,7 +58,7 @@ func initEventlog(config outputs.Config) (outputs.OutputGroup, error) {
 	if !ok {
 		return outputs.Fail(outputs.ErrInvalidConfig(outputs.Eventlog, config.Output))
 	}
-	err := eventlog.InstallAsEventCreate(source, levels)
+	err := eventlog.Install(source, `C:\Fibratus\fibratus\pkg\outputs\eventlog\mc\fibratus.mc.dll`, false, levels)
 	if err != nil {
 		// ignore error if the key already exists
 		if !strings.HasSuffix(err.Error(), keyAlreadyExistsErrorMessage) {
@@ -75,18 +73,18 @@ func initEventlog(config outputs.Config) (outputs.OutputGroup, error) {
 
 func (e *evtlog) Connect() error {
 	var (
-		l   *Eventlog
+		evl *Eventlog
 		err error
 	)
 	if e.config.RemoteHost != "" {
-		l, err = OpenRemote(e.config.RemoteHost, source)
+		evl, err = OpenRemote(e.config.RemoteHost, source)
 	} else {
-		l, err = Open(source)
+		evl, err = Open(source)
 	}
 	if err != nil {
 		return err
 	}
-	e.evtlog = l
+	e.evtlog = evl
 	return nil
 }
 
@@ -110,13 +108,17 @@ func (e *evtlog) Publish(batch *kevent.Batch) error {
 }
 
 func (e *evtlog) publish(kevt *kevent.Kevent) error {
+	var (
+		eventID    = ktypeToEventID(kevt)
+		categoryID = categoryToID(kevt)
+	)
 	switch e.config.Serializer {
 	case outputs.XML:
 		buf, err := xml.MarshalIndent(kevt, "", " ")
 		if err != nil {
 			return err
 		}
-		err = e.writeEvtlog(ktypeToEventID(kevt), buf)
+		err = e.writeEvtlog(eventID, categoryID, buf)
 		if err != nil {
 			return err
 		}
@@ -126,7 +128,7 @@ func (e *evtlog) publish(kevt *kevent.Kevent) error {
 		if err != nil {
 			return err
 		}
-		err = e.writeEvtlog(ktypeToEventID(kevt), buf)
+		err = e.writeEvtlog(eventID, categoryID, buf)
 		if err != nil {
 			return err
 		}
@@ -134,90 +136,98 @@ func (e *evtlog) publish(kevt *kevent.Kevent) error {
 	return nil
 }
 
-func (e *evtlog) writeEvtlog(eventID uint32, buf []byte) error {
+func (e *evtlog) writeEvtlog(eventID uint32, categoryID uint16, buf []byte) error {
 	switch levelFromString(e.config.Level) {
 	case Info:
-		return e.evtlog.Info(eventID, buf)
+		return e.evtlog.Info(eventID, categoryID, buf)
 	case Warn:
-		return e.evtlog.Warning(eventID, buf)
+		return e.evtlog.Warning(eventID, categoryID, buf)
 	case Erro:
-		return e.evtlog.Error(eventID, buf)
+		return e.evtlog.Error(eventID, categoryID, buf)
 	default:
 		return ErrUnknownLogLevel
 	}
 }
 
-// ktypeToEventID is the best effort to keep the event enumeration parity
-// with sysmon. For any event that can't directly be mapped to the corresponding
-// sysmon event, we establish our own event identifiers.
+// categoryToID maps category name to eventlog identifier.
+func categoryToID(kevt *kevent.Kevent) uint16 {
+	switch kevt.Category {
+	case ktypes.Registry:
+		return 1
+	case ktypes.File:
+		return 2
+	default:
+		return 8
+	}
+}
+
+// ktypeToEventID returns the event ID from the event type.
 func ktypeToEventID(kevt *kevent.Kevent) uint32 {
 	switch kevt.Type {
 	case ktypes.CreateProcess:
-		return 1
-	case ktypes.TerminateProcess:
-		return 2
-	case ktypes.OpenProcess:
 		return 10
-	case ktypes.LoadImage:
-		return 7
-	case ktypes.Connect:
-		return 3
-	case ktypes.CreateFile:
+	case ktypes.TerminateProcess:
 		return 11
-	case ktypes.RegDeleteKey, ktypes.RegDeleteValue, ktypes.RegCreateKey:
+	case ktypes.OpenProcess:
 		return 12
-	case ktypes.RegSetValue:
+	case ktypes.LoadImage:
 		return 13
+	case ktypes.Connect:
+		return 14
+	case ktypes.CreateFile:
+		return 15
+	case ktypes.RegDeleteKey:
+		return 16
+	case ktypes.RegDeleteValue:
+		return 17
+	case ktypes.RegCreateKey:
+		return 18
+	case ktypes.RegSetValue:
+		return 19
 	case ktypes.CreateHandle:
-		handleType, _ := kevt.Kparams.GetString(kparams.HandleObjectTypeName)
-		handleName, _ := kevt.Kparams.GetString(kparams.HandleObjectName)
-		if handleType == "File" && strings.HasPrefix(handleName, "\\Device\\NamedPipe\\") {
-			// sysmon pipe created event
-			return 17
-		}
-		return 119
+		return 20
 	case ktypes.DeleteFile:
-		return 26
-	case ktypes.CreateThread: // custom event identifiers
-		return 100
+		return 21
+	case ktypes.CreateThread:
+		return 22
 	case ktypes.TerminateThread:
-		return 101
+		return 23
 	case ktypes.OpenThread:
-		return 102
+		return 24
 	case ktypes.UnloadImage:
-		return 103
+		return 25
 	case ktypes.WriteFile:
-		return 104
+		return 26
 	case ktypes.ReadFile:
-		return 105
+		return 27
 	case ktypes.RenameFile:
-		return 106
+		return 28
 	case ktypes.CloseFile:
-		return 107
+		return 29
 	case ktypes.SetFileInformation:
-		return 108
+		return 31
 	case ktypes.EnumDirectory:
-		return 109
+		return 32
 	case ktypes.RegOpenKey:
-		return 110
+		return 33
 	case ktypes.RegQueryKey:
-		return 111
+		return 34
 	case ktypes.RegQueryValue:
-		return 112
+		return 35
 	case ktypes.Accept:
-		return 113
+		return 36
 	case ktypes.Send:
-		return 114
+		return 37
 	case ktypes.Recv:
-		return 115
+		return 38
 	case ktypes.Disconnect:
-		return 116
+		return 39
 	case ktypes.Reconnect:
-		return 117
+		return 40
 	case ktypes.Retransmit:
-		return 118
+		return 41
 	case ktypes.CloseHandle:
-		return 120
+		return 44
 	}
 	return 255
 }

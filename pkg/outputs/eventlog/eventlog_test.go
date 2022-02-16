@@ -38,7 +38,7 @@ import (
 
 func TestEvtlogPublish(t *testing.T) {
 	c := Config{
-		Level:      Info,
+		Level:      "INFO",
 		Serializer: outputs.Text,
 	}
 	el := &evtlog{
