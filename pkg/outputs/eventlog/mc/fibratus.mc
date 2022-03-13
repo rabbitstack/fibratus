@@ -1,4 +1,4 @@
-;//************** Define event categories ************
+;//************** Event categories ************
 MessageId=1
 SymbolicName=Registry
 Language=English
@@ -34,11 +34,16 @@ SymbolicName=Handle
 Language=English
 Handle
 .
+MessageId=8
+SymbolicName=Other
+Language=English
+Other
+.
 
-;//*********** Define event types **************
+;//*********** Event types **************
 MessageId=15
 SymbolicName=CreateFile
 Language=English
-CreateFile events open/create a file or I/O device.%n%n%9%n%10%n%13%n%14%n%15%n%16%n%3%n%4%n%6
+CreateFile events open/create a file or I/O device.
 .
 

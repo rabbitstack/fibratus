@@ -24,8 +24,4 @@ type Serializer string
 const (
 	// JSON represents the JSON serializer type.
 	JSON Serializer = "json"
-	// XML represents the XML serializer type.
-	XML Serializer = "xml"
-	// Text represents the textual form serializer type.
-	Text Serializer = "text"
 )

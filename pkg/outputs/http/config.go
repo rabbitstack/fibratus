@@ -37,6 +37,7 @@ const (
 	httpPassword      = "output.http.password"
 	httpEndpoints     = "output.http.endpoints"
 	httpEnableGzip    = "output.http.enable-gzip"
+	httpSerializer    = "output.http.serializer"
 )
 
 // Config contains the options for tweaking the HTTP output behaviour.
@@ -80,5 +81,6 @@ func AddFlags(flags *pflag.FlagSet) {
 	flags.String(httpUsername, "", "Username for the basic HTTP authentication")
 	flags.String(httpPassword, "", "Password for the basic HTTP authentication")
 	flags.Bool(httpEnableGzip, false, "Indicates whether the gzip compression is enabled")
+	flags.String(httpSerializer, string(outputs.JSON), "Indicates the event serializer type")
 	outputs.AddTLSFlags(flags, outputs.HTTP)
 }

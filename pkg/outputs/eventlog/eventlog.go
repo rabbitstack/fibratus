@@ -19,16 +19,13 @@
 package eventlog
 
 import (
-	"encoding/xml"
 	"errors"
-	"fmt"
-	"strings"
+	"text/template"
 
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/outputs"
-	"golang.org/x/sys/windows/svc/eventlog"
 )
 
 const (
@@ -36,17 +33,14 @@ const (
 	source = "Fibratus"
 	// levels designates the supported eventlog levels
 	levels = uint32(Info | Warn | Erro)
-)
-
-var (
-	// ErrUnknownLogLevel the error type that signify an unknown log level
-	ErrUnknownLogLevel           = errors.New("unknown log level")
-	keyAlreadyExistsErrorMessage = fmt.Sprintf("%s registry key already exists", source)
+	// msgFile specifies the location of the eventlog message DLL
+	msgFile = "%ProgramFiles%\\Fibratus\\fibratus.mc.dll"
 )
 
 type evtlog struct {
 	evtlog *Eventlog // eventlog writer
 	config Config
+	tmpl   *template.Template
 }
 
 func init() {
@@ -58,15 +52,19 @@ func initEventlog(config outputs.Config) (outputs.OutputGroup, error) {
 	if !ok {
 		return outputs.Fail(outputs.ErrInvalidConfig(outputs.Eventlog, config.Output))
 	}
-	err := eventlog.Install(source, `C:\Fibratus\fibratus\pkg\outputs\eventlog\mc\fibratus.mc.dll`, false, levels)
+	err := Install(source, msgFile, false, levels)
 	if err != nil {
 		// ignore error if the key already exists
-		if !strings.HasSuffix(err.Error(), keyAlreadyExistsErrorMessage) {
+		if !errors.Is(err, ErrKeyExists) {
 			return outputs.Fail(err)
 		}
 	}
 	evtlog := &evtlog{
 		config: cfg,
+	}
+	evtlog.tmpl, err = cfg.parseTemplate()
+	if err != nil {
+		return outputs.Fail(err)
 	}
 	return outputs.Success(evtlog), nil
 }
@@ -108,30 +106,13 @@ func (e *evtlog) Publish(batch *kevent.Batch) error {
 }
 
 func (e *evtlog) publish(kevt *kevent.Kevent) error {
-	var (
-		eventID    = ktypeToEventID(kevt)
-		categoryID = categoryToID(kevt)
-	)
-	switch e.config.Serializer {
-	case outputs.XML:
-		buf, err := xml.MarshalIndent(kevt, "", " ")
-		if err != nil {
-			return err
-		}
-		err = e.writeEvtlog(eventID, categoryID, buf)
-		if err != nil {
-			return err
-		}
-
-	case outputs.Text:
-		buf, err := kevt.MarshalText()
-		if err != nil {
-			return err
-		}
-		err = e.writeEvtlog(eventID, categoryID, buf)
-		if err != nil {
-			return err
-		}
+	buf, err := e.renderTemplate(kevt)
+	if err != nil {
+		return err
+	}
+	err = e.writeEvtlog(ktypeToEventID(kevt), categoryID(kevt), buf)
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -145,19 +126,31 @@ func (e *evtlog) writeEvtlog(eventID uint32, categoryID uint16, buf []byte) erro
 	case Erro:
 		return e.evtlog.Error(eventID, categoryID, buf)
 	default:
-		return ErrUnknownLogLevel
+		panic("unknown log level")
 	}
 }
 
-// categoryToID maps category name to eventlog identifier.
-func categoryToID(kevt *kevent.Kevent) uint16 {
+// kcatToCategoryID maps category name to eventlog identifier.
+func categoryID(kevt *kevent.Kevent) uint16 {
 	switch kevt.Category {
 	case ktypes.Registry:
 		return 1
 	case ktypes.File:
 		return 2
-	default:
+	case ktypes.Net:
+		return 3
+	case ktypes.Process:
+		return 4
+	case ktypes.Thread:
+		return 5
+	case ktypes.Image:
+		return 6
+	case ktypes.Handle:
+		return 7
+	case ktypes.Other:
 		return 8
+	default:
+		return 0
 	}
 }
 
@@ -165,69 +158,69 @@ func categoryToID(kevt *kevent.Kevent) uint16 {
 func ktypeToEventID(kevt *kevent.Kevent) uint32 {
 	switch kevt.Type {
 	case ktypes.CreateProcess:
-		return 10
-	case ktypes.TerminateProcess:
-		return 11
-	case ktypes.OpenProcess:
-		return 12
-	case ktypes.LoadImage:
-		return 13
-	case ktypes.Connect:
-		return 14
-	case ktypes.CreateFile:
 		return 15
-	case ktypes.RegDeleteKey:
+	case ktypes.TerminateProcess:
 		return 16
-	case ktypes.RegDeleteValue:
+	case ktypes.OpenProcess:
 		return 17
-	case ktypes.RegCreateKey:
+	case ktypes.LoadImage:
 		return 18
-	case ktypes.RegSetValue:
+	case ktypes.Connect:
 		return 19
-	case ktypes.CreateHandle:
+	case ktypes.CreateFile:
 		return 20
-	case ktypes.DeleteFile:
+	case ktypes.RegDeleteKey:
 		return 21
-	case ktypes.CreateThread:
+	case ktypes.RegDeleteValue:
 		return 22
-	case ktypes.TerminateThread:
+	case ktypes.RegCreateKey:
 		return 23
-	case ktypes.OpenThread:
+	case ktypes.RegSetValue:
 		return 24
-	case ktypes.UnloadImage:
+	case ktypes.CreateHandle:
 		return 25
-	case ktypes.WriteFile:
+	case ktypes.DeleteFile:
 		return 26
-	case ktypes.ReadFile:
+	case ktypes.CreateThread:
 		return 27
-	case ktypes.RenameFile:
+	case ktypes.TerminateThread:
 		return 28
-	case ktypes.CloseFile:
+	case ktypes.OpenThread:
 		return 29
-	case ktypes.SetFileInformation:
+	case ktypes.UnloadImage:
+		return 30
+	case ktypes.WriteFile:
 		return 31
-	case ktypes.EnumDirectory:
+	case ktypes.ReadFile:
 		return 32
-	case ktypes.RegOpenKey:
+	case ktypes.RenameFile:
 		return 33
-	case ktypes.RegQueryKey:
+	case ktypes.CloseFile:
 		return 34
-	case ktypes.RegQueryValue:
+	case ktypes.SetFileInformation:
 		return 35
-	case ktypes.Accept:
+	case ktypes.EnumDirectory:
 		return 36
-	case ktypes.Send:
+	case ktypes.RegOpenKey:
 		return 37
-	case ktypes.Recv:
+	case ktypes.RegQueryKey:
 		return 38
-	case ktypes.Disconnect:
+	case ktypes.RegQueryValue:
 		return 39
-	case ktypes.Reconnect:
+	case ktypes.Accept:
 		return 40
-	case ktypes.Retransmit:
+	case ktypes.Send:
 		return 41
-	case ktypes.CloseHandle:
+	case ktypes.Recv:
+		return 42
+	case ktypes.Disconnect:
+		return 43
+	case ktypes.Reconnect:
 		return 44
+	case ktypes.Retransmit:
+		return 45
+	case ktypes.CloseHandle:
+		return 46
 	}
 	return 255
 }

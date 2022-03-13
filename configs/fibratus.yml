@@ -383,6 +383,9 @@ output:
     # Determines the HTTP verb to use in requests
     #method: POST
 
+    # Specifies the event serializer type
+    #serializer: json
+
     # Username for the basic HTTP authentication
     #username: ""
 

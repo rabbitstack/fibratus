@@ -82,7 +82,7 @@ goto :EOF
 
 :mc
 windmc -r pkg/outputs/eventlog/mc pkg/outputs/eventlog/mc/fibratus.mc
-windres.exe -O coff -r -fo pkg/outputs/eventlog/mc/fibratus.res pkg/outputs/eventlog/mc/fibratus.rc
+windres -O coff -r -fo pkg/outputs/eventlog/mc/fibratus.res pkg/outputs/eventlog/mc/fibratus.rc
 :: link the resulting resource object
 gcc pkg/outputs/eventlog/mc/fibratus.res -o pkg/outputs/eventlog/mc/mf.dll -s -shared "-Wl,--subsystem,windows"
 if errorlevel 1 goto fail

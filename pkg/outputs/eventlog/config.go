@@ -20,8 +20,7 @@ package eventlog
 
 import (
 	"fmt"
-
-	"github.com/rabbitstack/fibratus/pkg/outputs"
+	"text/template"
 )
 
 // Level is the type definition for the eventlog log level
@@ -51,8 +50,20 @@ func levelFromString(s string) Level {
 
 // Config contains configuration properties for fine-tuning the eventlog output.
 type Config struct {
-	Enabled    bool               `mapstructure:"enabled"`
-	Serializer outputs.Serializer `mapstructure:"serializer"`
-	Level      string             `mapstructure:"level"`
-	RemoteHost string             `mapstructure:"remote-host"`
+	// Enabled determines whether the eventlog output is enabled.
+	Enabled bool `mapstructure:"enabled"`
+	// Level specifies the eventlog log level.
+	Level string `mapstructure:"level"`
+	// RemoteHost is the address of the remote eventlog intake.
+	RemoteHost string `mapstructure:"remote-host"`
+	// Template specifies the Go template for rendering the eventlog message.
+	Template string `mapstructure:"template"`
+}
+
+func (c Config) parseTemplate() (*template.Template, error) {
+	if c.Template == "" {
+		// use built-in template
+		return template.New("evtlog").Parse(Template)
+	}
+	return template.New("evtlog").Parse(c.Template)
 }

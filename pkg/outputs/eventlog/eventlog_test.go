@@ -29,7 +29,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-	"github.com/rabbitstack/fibratus/pkg/outputs"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	shandle "github.com/rabbitstack/fibratus/pkg/syscall/handle"
@@ -38,8 +37,7 @@ import (
 
 func TestEvtlogPublish(t *testing.T) {
 	c := Config{
-		Level:      "INFO",
-		Serializer: outputs.Text,
+		Level: "INFO",
 	}
 	el := &evtlog{
 		config: c,

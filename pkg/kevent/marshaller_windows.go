@@ -19,20 +19,13 @@
 package kevent
 
 import (
-	stdbytes "bytes"
-	"encoding/json"
-	"encoding/xml"
 	"expvar"
 	"fmt"
-	"html/template"
 	"math"
 	"net"
 	"sort"
-	"strings"
 	"time"
 	"unsafe"
-
-	"github.com/rabbitstack/fibratus/pkg/util/stringcase"
 
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/kcap/section"
@@ -41,11 +34,8 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/network"
 	ptypes "github.com/rabbitstack/fibratus/pkg/ps/types"
-	ytypes "github.com/rabbitstack/fibratus/pkg/yara/types"
-
 	"github.com/rabbitstack/fibratus/pkg/util/bytes"
 	"github.com/rabbitstack/fibratus/pkg/util/ip"
-	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -811,200 +801,4 @@ func (kevt *Kevent) MarshalJSON() []byte {
 	js.writeObjectEnd()
 
 	return js.flush()
-}
-
-// MarshalXML marshals the event to XML representation.
-func (kevt *Kevent) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
-	start.Name = xml.Name{Local: "Event"}
-	// start of <Event>
-	_ = e.EncodeToken(start)
-
-	// canonical fields
-	_ = e.EncodeElement(kevt.Seq, xml.StartElement{Name: xml.Name{Local: "Seq"}})
-	_ = e.EncodeElement(kevt.PID, xml.StartElement{Name: xml.Name{Local: "Pid"}})
-	_ = e.EncodeElement(kevt.Tid, xml.StartElement{Name: xml.Name{Local: "Tid"}})
-	_ = e.EncodeElement(kevt.CPU, xml.StartElement{Name: xml.Name{Local: "Cpu"}})
-	_ = e.EncodeElement(kevt.Name, xml.StartElement{Name: xml.Name{Local: "Name"}})
-	_ = e.EncodeElement(kevt.Category, xml.StartElement{Name: xml.Name{Local: "Category"}})
-	_ = e.EncodeElement(kevt.Description, xml.StartElement{Name: xml.Name{Local: "Description"}})
-	_ = e.EncodeElement(kevt.Host, xml.StartElement{Name: xml.Name{Local: "Host"}})
-	_ = e.EncodeElement(kevt.Timestamp, xml.StartElement{Name: xml.Name{Local: "Timestamp"}})
-
-	// start of <Params>
-	pars := make([]*Kparam, 0, len(kevt.Kparams))
-	for _, kpar := range kevt.Kparams {
-		pars = append(pars, kpar)
-	}
-	sort.Slice(pars, func(i, j int) bool { return pars[i].Name < pars[j].Name })
-
-	kparsNode := xml.StartElement{Name: xml.Name{Local: "Params"}}
-	_ = e.EncodeToken(kparsNode)
-	for _, kpar := range pars {
-		_ = e.EncodeElement(kpar.Value, xml.StartElement{Name: xml.Name{Local: stringcase.Camel(kpar.Name)}})
-	}
-	// end of <Params>
-	_ = e.EncodeToken(xml.EndElement{Name: kparsNode.Name})
-
-	if len(kevt.Metadata) > 0 {
-		// start of <Metadata>
-		metadataNode := xml.StartElement{Name: xml.Name{Local: "Metadata"}}
-		_ = e.EncodeToken(metadataNode)
-
-		for k, v := range kevt.Metadata {
-			key := stringcase.Camel(strings.TrimRight(k.String(), "."))
-			if k == YaraMatchesKey {
-				if err := marshalXMLYARAMatches(e, v); err != nil {
-					log.Warnf("yara matches XML marshal: %v", err)
-				}
-			} else {
-				_ = e.EncodeElement(v, xml.StartElement{Name: xml.Name{Local: key}})
-			}
-		}
-
-		// end of <Metadata>
-		_ = e.EncodeToken(xml.EndElement{Name: metadataNode.Name})
-	}
-
-	ps := kevt.PS
-	if ps != nil {
-		// start of <Process>
-		psNode := xml.StartElement{Name: xml.Name{Local: "Process"}}
-		_ = e.EncodeToken(psNode)
-		// end of <Process>
-		_ = e.EncodeToken(xml.EndElement{Name: psNode.Name})
-	}
-
-	// end of <Event>
-	_ = e.EncodeToken(xml.EndElement{Name: start.Name})
-
-	return nil
-}
-
-// marshalXMLYARAMatches converts yara rule matches from a valid JSON payload to XML.
-func marshalXMLYARAMatches(e *xml.Encoder, v string) error {
-	var matches []ytypes.MatchRule
-	err := json.Unmarshal([]byte(v), &matches)
-	if err != nil {
-		return err
-	}
-	yaraMatchesNode := xml.StartElement{Name: xml.Name{Local: "YaraMatches"}}
-	_ = e.EncodeToken(yaraMatchesNode)
-	for _, ruleMatch := range matches {
-		_ = e.EncodeElement(ruleMatch.Rule, xml.StartElement{Name: xml.Name{Local: "Rule"}})
-	}
-	_ = e.EncodeToken(xml.EndElement{Name: yaraMatchesNode.Name})
-	return nil
-}
-
-var textMarshallerTpl = template.Must(template.New("marshaller").Parse(TextMarshallerTemplate))
-
-// TextMarshallerTemplate is the Go template used for producing the text-form payloads for event instances.
-var TextMarshallerTemplate = `Name:  		{{ .Kevt.Name }}
-Sequence: 		{{ .Kevt.Seq }}
-Process ID:		{{ .Kevt.PID }}
-Thread ID: 		{{ .Kevt.Tid }}
-Cpu: 			{{ .Kevt.CPU }}
-Params:			{{ .Kevt.Kparams }}
-Category: 		{{ .Kevt.Category }}
-
-{{- if .Kevt.PS }}
-
-Process:		{{ .Kevt.PS.Name }}
-Exe:			{{ .Kevt.PS.Exe }}
-Pid:  			{{ .Kevt.PS.PID }}
-Ppid: 			{{ .Kevt.PS.Ppid }}
-Cmdline:		{{ .Kevt.PS.Comm }}
-Cwd:			{{ .Kevt.PS.Cwd }}
-SID:			{{ .Kevt.PS.SID }}
-Session ID:		{{ .Kevt.PS.SessionID }}
-{{ if .Kevt.PS.Envs }}
-Env:
-			{{- with .Kevt.PS.Envs }}
-			{{- range $k, $v := . }}
-			{{ $k }}: {{ $v }}
-			{{- end }}
-			{{- end }}
-{{ end }}
-Threads:
-			{{- with .Kevt.PS.Threads }}
-			{{- range . }}
-			{{ . }}
-			{{- end }}
-			{{- end }}
-Modules:
-			{{- with .Kevt.PS.Modules }}
-			{{- range . }}
-			{{ . }}
-			{{- end }}
-			{{- end }}
-{{ if .Kevt.PS.Handles }}
-Handles:
-			{{- with .Kevt.PS.Handles }}
-			{{- range . }}
-			{{ . }}
-			{{- end }}
-			{{- end }}
-{{ end }}
-
-{{ if .Kevt.PS.PE }}
-Entrypoint:  		{{ .Kevt.PS.PE.EntryPoint }}
-Image base: 		{{ .Kevt.PS.PE.ImageBase }}
-Build date:  		{{ .Kevt.PS.PE.LinkTime }}
-
-Number of symbols: 	{{ .Kevt.PS.PE.NumberOfSymbols }}
-Number of sections: {{ .Kevt.PS.PE.NumberOfSections }}
-
-Sections:
-			{{- with .Kevt.PS.PE.Sections }}
-			{{- range . }}
-			{{ . }}
-			{{- end }}
-			{{- end }}
-{{ if .Kevt.PS.PE.Symbols }}
-Symbols:
-			{{- with .Kevt.PS.PE.Symbols }}
-			{{- range . }}
-			{{ . }}
-			{{- end }}
-			{{- end }}
-{{ end }}
-{{ if .Kevt.PS.PE.Imports }}
-Imports:
-			{{- with .Kevt.PS.PE.Imports }}
-			{{- range . }}
-			{{ . }}
-			{{- end }}
-			{{- end }}
-{{ end }}
-{{ if .Kevt.PS.PE.VersionResources }}
-Resources:
-			{{- with .Kevt.PS.PE.VersionResources }}
-			{{- range $k, $v := . }}
-			{{ $k }}: {{ $v }}
-			{{- end }}
-			{{- end }}
-			{{ end }}
-{{ end }}
-{{- end }}
-`
-
-// MarshalText produces the textual form of the kernel event.
-func (kevt *Kevent) MarshalText() ([]byte, error) {
-	var writer stdbytes.Buffer
-	data := struct {
-		Kevt             *Kevent
-		SerializeHandles bool
-		SerializeThreads bool
-		SerializeImages  bool
-	}{
-		kevt,
-		SerializeHandles,
-		SerializeThreads,
-		SerializeImages,
-	}
-	err := textMarshallerTpl.Execute(&writer, data)
-	if err != nil {
-		return nil, fmt.Errorf("unable to execute text marshaller template: %v", err)
-	}
-	return writer.Bytes(), nil
 }
