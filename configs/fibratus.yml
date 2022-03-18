@@ -411,6 +411,20 @@ output:
     # Indicates if the chain and host verification stage is skipped
     #tls-insecure-skip-verify: false
 
+  # Eventlog output publishes events to Windows Event Log.
+  eventlog:
+    # Indicates if the Eventlog output is enabled
+    enabled: false
+
+    # Specifies the eventlog level
+    # level: info
+
+    # Address of the remote eventlog intake
+    # remote-host:
+
+    # Go template for rendering the eventlog message
+    # template:
+
 # =============================== Portable Executable (PE) =============================
 
 # Tweaks for controlling the fetching of the PE (Portable Executable) metadata from the process' binary image.

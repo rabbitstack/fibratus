@@ -21,6 +21,15 @@ package eventlog
 import (
 	"fmt"
 	"text/template"
+
+	"github.com/spf13/pflag"
+)
+
+const (
+	enabled    = "output.eventlog.enabled"
+	level      = "output.eventlog.level"
+	remoteHost = "output.eventlog.remote-host"
+	tmpl       = "output.eventlog.template"
 )
 
 // Level is the type definition for the eventlog log level
@@ -66,4 +75,12 @@ func (c Config) parseTemplate() (*template.Template, error) {
 		return template.New("evtlog").Parse(Template)
 	}
 	return template.New("evtlog").Parse(c.Template)
+}
+
+// AddFlags registers persistent flags.
+func AddFlags(flags *pflag.FlagSet) {
+	flags.String(tmpl, "", "Go template for rendering the eventlog message")
+	flags.String(level, "info", "Specifies the eventlog level")
+	flags.String(remoteHost, "", "Address of the remote eventlog intake")
+	flags.Bool(enabled, true, "Indicates if the eventlog output is enabled")
 }

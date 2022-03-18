@@ -22,8 +22,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rabbitstack/fibratus/pkg/outputs"
-
 	"github.com/rabbitstack/fibratus/pkg/outputs/eventlog"
 
 	"github.com/rabbitstack/fibratus/pkg/outputs/amqp"
@@ -97,5 +95,5 @@ func TestEventlogOutput(t *testing.T) {
 
 	eventlogConfig := c.Output.Output.(eventlog.Config)
 	assert.True(t, eventlogConfig.Enabled)
-	assert.Equal(t, outputs.Text, eventlogConfig.Serializer)
+	assert.Equal(t, "INFO", eventlogConfig.Level)
 }

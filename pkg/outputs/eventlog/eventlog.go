@@ -35,7 +35,13 @@ const (
 	levels = uint32(Info | Warn | Erro)
 	// msgFile specifies the location of the eventlog message DLL
 	msgFile = "%ProgramFiles%\\Fibratus\\fibratus.mc.dll"
+	// unknownEventID represents the unknown event identifier
+	unknownEventID = 0
 )
+
+// ErrUnknownEventID represents the error for signaling unknown event identifiers. This error
+// is raised when we can't get a valid mapping for the existing kernel event type.
+var ErrUnknownEventID = errors.New("unknown event id found")
 
 type evtlog struct {
 	evtlog *Eventlog // eventlog writer
@@ -110,14 +116,18 @@ func (e *evtlog) publish(kevt *kevent.Kevent) error {
 	if err != nil {
 		return err
 	}
-	err = e.writeEvtlog(ktypeToEventID(kevt), categoryID(kevt), buf)
+	eventID := ktypeToEventID(kevt)
+	if eventID == unknownEventID {
+		return ErrUnknownEventID
+	}
+	err = e.log(eventID, categoryID(kevt), buf)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (e *evtlog) writeEvtlog(eventID uint32, categoryID uint16, buf []byte) error {
+func (e *evtlog) log(eventID uint32, categoryID uint16, buf []byte) error {
 	switch levelFromString(e.config.Level) {
 	case Info:
 		return e.evtlog.Info(eventID, categoryID, buf)
@@ -126,7 +136,7 @@ func (e *evtlog) writeEvtlog(eventID uint32, categoryID uint16, buf []byte) erro
 	case Erro:
 		return e.evtlog.Error(eventID, categoryID, buf)
 	default:
-		panic("unknown log level")
+		panic("unknown eventlog level")
 	}
 }
 
@@ -222,5 +232,5 @@ func ktypeToEventID(kevt *kevent.Kevent) uint32 {
 	case ktypes.CloseHandle:
 		return 46
 	}
-	return 255
+	return unknownEventID
 }

@@ -266,6 +266,16 @@ var schema = `
 							},
 							"additionalProperties": false
 						}
+						"eventlog": {
+							"type": "object",
+							"properties": {
+								"enabled":					{"type": "boolean"},
+								"level": 					{"type": "string", "enum": ["INFO", "info", "warn", "warning", "WARN", "WARNING", "error", "erro", "ERROR", "ERRO"]},
+								"remote-host": 				{"type": "string"},
+								"template": 				{"type": "string"}
+							},
+							"additionalProperties": false
+						}
 					},
 					"additionalProperties": false
 				}

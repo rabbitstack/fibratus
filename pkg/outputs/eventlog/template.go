@@ -44,7 +44,7 @@ Cmdline:		{{ .Kevt.PS.Comm }}
 Cwd:			{{ .Kevt.PS.Cwd }}
 SID:			{{ .Kevt.PS.SID }}
 Session ID:		{{ .Kevt.PS.SessionID }}
-{{ if .Kevt.PS.Envs }}
+{{ if and (.SerializeEnvs .Kevt.PS.Envs) }}
 Env:
 			{{- with .Kevt.PS.Envs }}
 			{{- range $k, $v := . }}
@@ -52,19 +52,23 @@ Env:
 			{{- end }}
 			{{- end }}
 {{ end }}
+{{ if .SerializeThreads }}
 Threads:
 			{{- with .Kevt.PS.Threads }}
 			{{- range . }}
 			{{ . }}
 			{{- end }}
 			{{- end }}
+{{ end }}
+{{ if .SerializeImages }}
 Modules:
 			{{- with .Kevt.PS.Modules }}
 			{{- range . }}
 			{{ . }}
 			{{- end }}
 			{{- end }}
-{{ if .Kevt.PS.Handles }}
+{{ end }}
+{{ if and (.SerializeHandles .Kevt.PS.Handles) }}
 Handles:
 			{{- with .Kevt.PS.Handles }}
 			{{- range . }}
@@ -73,7 +77,7 @@ Handles:
 			{{- end }}
 {{ end }}
 
-{{ if .Kevt.PS.PE }}
+{{ if and (.SerializePE .Kevt.PS.PE) }}
 Entrypoint:  		{{ .Kevt.PS.PE.EntryPoint }}
 Image base: 		{{ .Kevt.PS.PE.ImageBase }}
 Build date:  		{{ .Kevt.PS.PE.LinkTime }}
@@ -122,11 +126,15 @@ func (e *evtlog) renderTemplate(kevt *kevent.Kevent) ([]byte, error) {
 		SerializeHandles bool
 		SerializeThreads bool
 		SerializeImages  bool
+		SerializeEnvs    bool
+		SerializePE      bool
 	}{
 		kevt,
 		kevent.SerializeHandles,
 		kevent.SerializeThreads,
 		kevent.SerializeImages,
+		kevent.SerializeEnvs,
+		kevent.SerializePE,
 	}
 	err := e.tmpl.Execute(&writer, data)
 	if err != nil {

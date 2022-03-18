@@ -26,12 +26,12 @@ import (
 
 // Regex applies single/multiple regular expressions on the provided string arguments.
 type Regex struct {
-	regexs map[string]*regexp.Regexp
+	rxs map[string]*regexp.Regexp
 }
 
 // NewRegex creates a new regex function.
 func NewRegex() *Regex {
-	return &Regex{regexs: make(map[string]*regexp.Regexp)}
+	return &Regex{rxs: make(map[string]*regexp.Regexp)}
 }
 
 func (f Regex) Call(args []interface{}) (interface{}, bool) {
@@ -39,30 +39,32 @@ func (f Regex) Call(args []interface{}) (interface{}, bool) {
 		return false, false
 	}
 	s := parseString(0, args)
+
 	for _, arg := range args[1:] {
 		expr, ok := arg.(string)
 		if !ok {
 			continue
 		}
-		regex, compiled := f.regexs[expr]
-		if compiled && regex == nil {
+		rx, compiled := f.rxs[expr]
+		if compiled && rx == nil {
 			continue
 		}
 		if !compiled {
 			var err error
-			regex, err = regexp.Compile(expr)
+			rx, err = regexp.Compile(expr)
 			if err != nil {
 				log.Warnf("invalid regular expression pattern: %v", err)
 				// to avoid compiling the regex ad infinitum
-				f.regexs[expr] = nil
+				f.rxs[expr] = nil
 				continue
 			}
-			f.regexs[expr] = regex
+			f.rxs[expr] = rx
 		}
-		if regex.MatchString(s) {
+		if rx.MatchString(s) {
 			return true, true
 		}
 	}
+
 	return false, false
 }
 

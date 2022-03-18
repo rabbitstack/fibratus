@@ -15,4 +15,4 @@ output:
   elasticsearch:
   eventlog:
     enabled: true
-    serializer: text
+    level: INFO

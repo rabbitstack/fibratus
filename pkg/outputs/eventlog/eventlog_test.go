@@ -19,7 +19,7 @@
 package eventlog
 
 import (
-	"strings"
+	"errors"
 	"testing"
 	"time"
 
@@ -43,7 +43,7 @@ func TestEvtlogPublish(t *testing.T) {
 		config: c,
 	}
 	err := eventlog.InstallAsEventCreate(source, levels)
-	if err != nil && !strings.HasSuffix(err.Error(), keyAlreadyExistsErrorMessage) {
+	if err != nil && !errors.Is(err, ErrKeyExists) {
 		require.NoError(t, err)
 	}
 	require.NoError(t, el.Connect())
