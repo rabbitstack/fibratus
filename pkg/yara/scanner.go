@@ -302,12 +302,14 @@ func putMatchesMeta(matches yara.MatchRules, kevt *kevent.Kevent) error {
 			Rule:      m.Rule,
 			Namespace: m.Namespace,
 			Tags:      m.Tags,
+			Metas:     make([]ytypes.Meta, 0),
+			Strings:   make([]ytypes.MatchString, 0),
 		}
 		for _, meta := range m.Metas {
-
+			match.Metas = append(match.Metas, ytypes.Meta{Value: meta.Value, Identifier: meta.Identifier})
 		}
 		for _, s := range m.Strings {
-
+			match.Strings = append(match.Strings, ytypes.MatchString{Name: s.Name, Base: s.Base, Data: s.Data, Offset: s.Offset})
 		}
 		ruleMatches = append(ruleMatches, match)
 	}

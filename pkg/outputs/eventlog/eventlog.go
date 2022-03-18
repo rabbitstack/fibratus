@@ -34,7 +34,7 @@ const (
 	// levels designates the supported eventlog levels
 	levels = uint32(Info | Warn | Erro)
 	// msgFile specifies the location of the eventlog message DLL
-	msgFile = "%ProgramFiles%\\Fibratus\\fibratus.mc.dll"
+	msgFile = "%ProgramFiles%\\Fibratus\\mf.dll"
 	// unknownEventID represents the unknown event identifier
 	unknownEventID = 0
 )
