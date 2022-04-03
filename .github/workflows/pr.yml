@@ -47,7 +47,7 @@ jobs:
         env:
           VERSION: "4.0.x"
         run: |
-          git clone --depth 1 --branch v$VERSION https://github.com/VirusTotal/yara.git
+          git clone --depth 1 --branch $VERSION https://github.com/VirusTotal/yara.git
       - name: Configure yara
         if: steps.cache.outputs.cache-hit != 'true'
         shell: msys2 {0}
