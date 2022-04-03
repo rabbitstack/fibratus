@@ -30,6 +30,7 @@ jobs:
           install: >-
             base-devel
             mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-openssl
             git
             automake
             libtool
@@ -47,9 +48,9 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
         shell: bash
         env:
-          VERSION: "4.0.2"
+          VERSION: "4.0.x"
         run: |
-          git clone --depth 1 --branch v$VERSION https://github.com/VirusTotal/yara.git
+          git clone --depth 1 --branch $VERSION https://github.com/VirusTotal/yara.git
       - name: Configure yara
         if: steps.cache.outputs.cache-hit != 'true'
         shell: msys2 {0}
