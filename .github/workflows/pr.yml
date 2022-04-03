@@ -45,7 +45,7 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
         shell: bash
         env:
-          VERSION: "4.0.2"
+          VERSION: "4.0.x"
         run: |
           git clone --depth 1 --branch v$VERSION https://github.com/VirusTotal/yara.git
       - name: Configure yara
