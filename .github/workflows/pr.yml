@@ -4,9 +4,9 @@ on:
   pull_request:
     branches:
       - master
-    paths-ignore: 
+    paths-ignore:
       - "docs/**"
-           
+
 jobs:
   build:
       runs-on: windows-latest
@@ -45,7 +45,7 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
         shell: bash
         env:
-          VERSION: "4.0.2"
+          VERSION: "4.0.x"
         run: |
           git clone --depth 1 --branch v$VERSION https://github.com/VirusTotal/yara.git
       - name: Configure yara
@@ -69,10 +69,10 @@ jobs:
           ./make.bat
         env:
           TAGS: kcap,filament,yara,yara_static
-          
+
   test:
     runs-on: windows-latest
-    needs: 
+    needs:
       - build
     continue-on-error: true
     steps:
@@ -115,7 +115,7 @@ jobs:
            ./make.bat test
         env:
           TAGS: kcap,filament,yara,yara_static
-  
+
   lint:
     runs-on: windows-latest
     needs: test
@@ -157,7 +157,7 @@ jobs:
         run: |
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin $GOLANGCI_LINT_VER
         env:
-          GOLANGCI_LINT_VER: v1.35.2 
+          GOLANGCI_LINT_VER: v1.35.2
       - name: Lint
         shell: bash
         run: |
