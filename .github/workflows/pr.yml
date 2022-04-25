@@ -29,6 +29,7 @@ jobs:
             base-devel
             mingw-w64-x86_64-gcc
             mingw-w64-x86_64-openssl
+            mingw-w64-x86_64-pkg-config
             git
             automake
             libtool
@@ -48,8 +49,6 @@ jobs:
         env:
           VERSION: "4.0.x"
         run: |
-          ls -l /c/msys64/mingw64/bin
-          ls -lR /c/msys64/mingw64
           git clone --depth 1 --branch $VERSION https://github.com/VirusTotal/yara.git
       - name: Configure yara
         if: steps.cache.outputs.cache-hit != 'true'
