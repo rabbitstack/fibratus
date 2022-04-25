@@ -84,7 +84,7 @@ func TestWrite(t *testing.T) {
 				kparams.FileType:      {Name: kparams.FileType, Type: kparams.AnsiString, Value: "file"},
 				kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.AnsiString, Value: "open"},
 			},
-			Metadata: map[string]string{"foo": "bar", "fooz": "barz"},
+			Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "barz"},
 			PS: &pstypes.PS{
 				PID:       2436,
 				Ppid:      6304,

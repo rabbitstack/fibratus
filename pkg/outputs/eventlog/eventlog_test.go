@@ -39,10 +39,13 @@ func TestEvtlogPublish(t *testing.T) {
 	c := Config{
 		Level: "INFO",
 	}
+	tmpl, err := c.parseTemplate()
+	require.NoError(t, err)
 	el := &evtlog{
 		config: c,
+		tmpl:   tmpl,
 	}
-	err := eventlog.InstallAsEventCreate(source, levels)
+	err = eventlog.InstallAsEventCreate(source, levels)
 	if err != nil && !errors.Is(err, ErrKeyExists) {
 		require.NoError(t, err)
 	}

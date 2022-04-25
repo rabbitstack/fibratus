@@ -254,7 +254,7 @@ func TestFilterRunFileKevent(t *testing.T) {
 			kparams.FileType:      {Name: kparams.FileType, Type: kparams.AnsiString, Value: "file"},
 			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.AnsiString, Value: "open"},
 		},
-		Metadata: map[string]string{"foo": "bar", "fooz": "barzz"},
+		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "barzz"},
 	}
 
 	var tests = []struct {
@@ -317,7 +317,7 @@ func TestFilterRunKevent(t *testing.T) {
 			kparams.FileType:      {Name: kparams.FileType, Type: kparams.AnsiString, Value: "file"},
 			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.AnsiString, Value: "open"},
 		},
-		Metadata: map[string]string{"foo": "bar", "fooz": "barz"},
+		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "barz"},
 	}
 
 	kevt.Timestamp, _ = time.Parse(time.RFC3339, "2011-05-03T15:04:05.323Z")
