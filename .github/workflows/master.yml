@@ -31,6 +31,7 @@ jobs:
             base-devel
             mingw-w64-x86_64-gcc
             mingw-w64-x86_64-openssl
+            mingw-w64-x86_64-pkg-config
             git
             automake
             libtool
@@ -140,6 +141,11 @@ jobs:
          install: >-
            base-devel
            mingw-w64-x86_64-gcc
+           mingw-w64-x86_64-pkg-config
+           mingw-w64-x86_64-openssl
+           automake
+           libtool
+           autoconf
       - name: Cache yara
         uses: actions/cache@v2
         id: cache
@@ -185,6 +191,11 @@ jobs:
          install: >-
            base-devel
            mingw-w64-x86_64-gcc
+           mingw-w64-x86_64-pkg-config
+           mingw-w64-x86_64-openssl
+           automake
+           libtool
+           autoconf
       - name: Cache yara
         uses: actions/cache@v2
         id: cache
