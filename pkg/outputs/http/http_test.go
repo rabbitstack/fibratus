@@ -21,6 +21,7 @@ package http
 import (
 	"compress/gzip"
 	"encoding/json"
+	"github.com/rabbitstack/fibratus/pkg/outputs"
 	"io/ioutil"
 	"log"
 	"net"
@@ -80,8 +81,9 @@ func TestHttpPublish(t *testing.T) {
 			"API-Key": "aaabbbaaa",
 			"Version": "1.1",
 		},
-		Username: "user",
-		Password: "pass",
+		Username:   "user",
+		Password:   "pass",
+		Serializer: outputs.JSON,
 	}
 
 	httpClient, err := newHTTPClient(c)
@@ -132,6 +134,7 @@ func TestHttpGzipPublish(t *testing.T) {
 	c := Config{
 		Timeout:    time.Second * 3,
 		EnableGzip: true,
+		Serializer: outputs.JSON,
 	}
 
 	httpClient, err := newHTTPClient(c)
