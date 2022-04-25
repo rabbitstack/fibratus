@@ -51,9 +51,8 @@ func TestTransform(t *testing.T) {
 	require.NoError(t, transf.Transform(kevt))
 
 	require.Len(t, kevt.Metadata, 3)
-	require.Contains(t, kevt.Metadata, "env")
 
+	assert.Equal(t, "staging", kevt.Metadata["env"])
 	assert.Equal(t, "dmz", kevt.Metadata["zone"])
-
 	assert.Equal(t, "archbunny", kevt.Metadata["node"])
 }

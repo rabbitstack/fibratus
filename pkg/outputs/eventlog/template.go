@@ -44,7 +44,7 @@ Cmdline:		{{ .Kevt.PS.Comm }}
 Cwd:			{{ .Kevt.PS.Cwd }}
 SID:			{{ .Kevt.PS.SID }}
 Session ID:		{{ .Kevt.PS.SessionID }}
-{{ if and (.SerializeEnvs .Kevt.PS.Envs) }}
+{{ if and (.SerializeEnvs) (.Kevt.PS.Envs) }}
 Env:
 			{{- with .Kevt.PS.Envs }}
 			{{- range $k, $v := . }}
@@ -68,7 +68,7 @@ Modules:
 			{{- end }}
 			{{- end }}
 {{ end }}
-{{ if and (.SerializeHandles .Kevt.PS.Handles) }}
+{{ if and (.SerializeHandles) (.Kevt.PS.Handles) }}
 Handles:
 			{{- with .Kevt.PS.Handles }}
 			{{- range . }}
@@ -77,7 +77,7 @@ Handles:
 			{{- end }}
 {{ end }}
 
-{{ if and (.SerializePE .Kevt.PS.PE) }}
+{{ if and (.SerializePE) (.Kevt.PS.PE) }}
 Entrypoint:  		{{ .Kevt.PS.PE.EntryPoint }}
 Image base: 		{{ .Kevt.PS.PE.ImageBase }}
 Build date:  		{{ .Kevt.PS.PE.LinkTime }}

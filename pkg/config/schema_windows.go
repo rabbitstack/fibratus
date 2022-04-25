@@ -265,7 +265,7 @@ var schema = `
 								"headers":					{"type": "object", "additionalProperties": true}
 							},
 							"additionalProperties": false
-						}
+						},
 						"eventlog": {
 							"type": "object",
 							"properties": {

@@ -82,5 +82,5 @@ func AddFlags(flags *pflag.FlagSet) {
 	flags.String(tmpl, "", "Go template for rendering the eventlog message")
 	flags.String(level, "info", "Specifies the eventlog level")
 	flags.String(remoteHost, "", "Address of the remote eventlog intake")
-	flags.Bool(enabled, true, "Indicates if the eventlog output is enabled")
+	flags.Bool(enabled, false, "Indicates if the eventlog output is enabled")
 }

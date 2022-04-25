@@ -37,7 +37,7 @@ const addKeyName = `SYSTEM\CurrentControlSet\Services\EventLog\Application`
 const categoryCount = 8
 
 // ErrKeyExists signals that the registry key already exists
-var ErrKeyExists = errors.New(fmt.Sprintf("%s\\%s already exists", addKeyName, source))
+var ErrKeyExists = fmt.Errorf("%s\\%s already exists", addKeyName, source)
 
 // Eventlog provides access to the system log.
 type Eventlog struct {

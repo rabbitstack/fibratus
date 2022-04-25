@@ -222,5 +222,5 @@ func TestMatchesMeta(t *testing.T) {
 	putMatchesMeta(yaraMatches, kevt)
 
 	assert.NotEmpty(t, kevt.Metadata)
-	assert.Contains(t, kevt.Metadata, matchesMeta)
+	assert.Contains(t, kevt.Metadata, kevent.YaraMatchesKey)
 }
