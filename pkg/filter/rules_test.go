@@ -63,7 +63,7 @@ func fireRules(t *testing.T, c *config.Config) bool {
 			kparams.NetSIP:   {Name: kparams.NetSIP, Type: kparams.IPv4, Value: net.ParseIP("127.0.0.1")},
 			kparams.NetDIP:   {Name: kparams.NetDIP, Type: kparams.IPv4, Value: net.ParseIP("216.58.201.174")},
 		},
-		Metadata: make(map[string]string),
+		Metadata: make(map[kevent.MetadataKey]string),
 	}
 
 	require.NoError(t, rules.Compile())
@@ -175,7 +175,7 @@ func TestFilterActionEmitAlert(t *testing.T) {
 			kparams.NetSIP:   {Name: kparams.NetSIP, Type: kparams.IPv4, Value: net.ParseIP("127.0.0.1")},
 			kparams.NetDIP:   {Name: kparams.NetDIP, Type: kparams.IPv4, Value: net.ParseIP("216.58.201.174")},
 		},
-		Metadata: make(map[string]string),
+		Metadata: make(map[kevent.MetadataKey]string),
 	}
 
 	require.True(t, rules.Fire(kevt))
@@ -208,7 +208,7 @@ func BenchmarkChainRun(b *testing.B) {
 				kparams.NetSIP:   {Name: kparams.NetSIP, Type: kparams.IPv4, Value: net.ParseIP("127.0.0.1")},
 				kparams.NetDIP:   {Name: kparams.NetDIP, Type: kparams.IPv4, Value: net.ParseIP("216.58.201.174")},
 			},
-			Metadata: make(map[string]string),
+			Metadata: make(map[kevent.MetadataKey]string),
 		},
 		{
 			Type: ktypes.CreateProcess,
@@ -226,7 +226,7 @@ func BenchmarkChainRun(b *testing.B) {
 				kparams.Exe:             {Name: kparams.Exe, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe`},
 				kparams.UserSID:         {Name: kparams.UserSID, Type: kparams.UnicodeString, Value: `admin\SYSTEM`},
 			},
-			Metadata: make(map[string]string),
+			Metadata: make(map[kevent.MetadataKey]string),
 		},
 	}
 

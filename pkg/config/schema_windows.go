@@ -251,6 +251,7 @@ var schema = `
 								"endpoints": 				{"type": "array", "items": [{"type": "string", "minItems": 1, "format": "uri", "minLength": 1, "maxLength": 255, "pattern": "^(https?|http?)://"}]},
 								"timeout": 					{"type": "string", "minLength": 2, "pattern": "[0-9]+s|m}"},
 								"method": 					{"type": "string", "enum": ["POST", "PUT"]},
+								"serializer": 				{"type": "string", "enum": ["json"]},
 								"enable-gzip": 				{"type": "boolean"},
 								"proxy-url": 				{"type": "string"},
 								"proxy-username": 			{"type": "string"},
@@ -262,6 +263,16 @@ var schema = `
 								"tls-ca": 					{"type": "string"},
 								"tls-insecure-skip-verify": {"type": "boolean"},
 								"headers":					{"type": "object", "additionalProperties": true}
+							},
+							"additionalProperties": false
+						},
+						"eventlog": {
+							"type": "object",
+							"properties": {
+								"enabled":					{"type": "boolean"},
+								"level": 					{"type": "string", "enum": ["INFO", "info", "warn", "warning", "WARN", "WARNING", "error", "erro", "ERROR", "ERRO"]},
+								"remote-host": 				{"type": "string"},
+								"template": 				{"type": "string"}
 							},
 							"additionalProperties": false
 						}

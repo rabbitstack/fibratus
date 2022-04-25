@@ -21,6 +21,13 @@ package elasticsearch
 import (
 	"bytes"
 	"encoding/json"
+	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/olivere/elastic/v7"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
@@ -30,12 +37,6 @@ import (
 	shandle "github.com/rabbitstack/fibratus/pkg/syscall/handle"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"io/ioutil"
-	"net/http"
-	"net/http/httptest"
-	"strings"
-	"testing"
-	"time"
 )
 
 func TestElasticsearchConnect(t *testing.T) {
@@ -178,7 +179,7 @@ func getBatch() *kevent.Batch {
 			kparams.BasePrio:      {Name: kparams.BasePrio, Type: kparams.Int8, Value: int8(2)},
 			kparams.PagePrio:      {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(2)},
 		},
-		Metadata: map[string]string{"foo": "bar", "fooz": "baarz"},
+		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "baarz"},
 		PS: &pstypes.PS{
 			PID:       2436,
 			Ppid:      6304,
@@ -246,7 +247,7 @@ func getBatch() *kevent.Batch {
 			kparams.BasePrio:      {Name: kparams.BasePrio, Type: kparams.Int8, Value: int8(2)},
 			kparams.PagePrio:      {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(2)},
 		},
-		Metadata: map[string]string{"foo": "bar", "fooz": "baarz"},
+		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "baarz"},
 		PS: &pstypes.PS{
 			PID:       2436,
 			Ppid:      6304,
@@ -314,7 +315,7 @@ func getBatch() *kevent.Batch {
 			kparams.BasePrio:      {Name: kparams.BasePrio, Type: kparams.Int8, Value: int8(2)},
 			kparams.PagePrio:      {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(2)},
 		},
-		Metadata: map[string]string{"foo": "bar", "fooz": "baarz"},
+		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "baarz"},
 		PS: &pstypes.PS{
 			PID:       829,
 			Ppid:      6304,

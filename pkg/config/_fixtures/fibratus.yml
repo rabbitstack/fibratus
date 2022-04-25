@@ -162,6 +162,7 @@ output:
     exchange-type: topic
     routing-key: fibratus
     vhost: /
+
   http:
     enabled: false
     endpoints:

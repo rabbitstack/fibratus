@@ -38,13 +38,11 @@ import (
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"github.com/rabbitstack/fibratus/pkg/yara/config"
+	ytypes "github.com/rabbitstack/fibratus/pkg/yara/types"
 	log "github.com/sirupsen/logrus"
 )
 
 const alertTitleTmpl = `{{if .PS }}YARA alert on process {{ .PS.Name }}{{ else }}YARA alert on file {{ .Filename }}{{ end }}`
-
-// matchesMeta is the tag name for the yara matches
-const matchesMeta = "yara.matches"
 
 var (
 	// ruleMatches computes all the rule matches
@@ -298,11 +296,28 @@ func tagsFromMatches(matches []yara.MatchRule) []string {
 
 // putMatchesMeta injects rule matches into event metadata as a JSON payload.
 func putMatchesMeta(matches yara.MatchRules, kevt *kevent.Kevent) error {
-	b, err := json.Marshal(matches)
+	ruleMatches := make([]ytypes.MatchRule, 0)
+	for _, m := range matches {
+		match := ytypes.MatchRule{
+			Rule:      m.Rule,
+			Namespace: m.Namespace,
+			Tags:      m.Tags,
+			Metas:     make([]ytypes.Meta, 0),
+			Strings:   make([]ytypes.MatchString, 0),
+		}
+		for _, meta := range m.Metas {
+			match.Metas = append(match.Metas, ytypes.Meta{Value: meta.Value, Identifier: meta.Identifier})
+		}
+		for _, s := range m.Strings {
+			match.Strings = append(match.Strings, ytypes.MatchString{Name: s.Name, Base: s.Base, Data: s.Data, Offset: s.Offset})
+		}
+		ruleMatches = append(ruleMatches, match)
+	}
+	b, err := json.Marshal(ruleMatches)
 	if err != nil {
 		return err
 	}
-	kevt.AddMeta(matchesMeta, string(b))
+	kevt.AddMeta(kevent.YaraMatchesKey, string(b))
 	return nil
 }
 

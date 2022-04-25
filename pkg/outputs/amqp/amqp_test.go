@@ -21,6 +21,9 @@ package amqp
 import (
 	"encoding/json"
 	"fmt"
+	"testing"
+	"time"
+
 	"github.com/phayes/freeport"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
@@ -32,8 +35,6 @@ import (
 	shandle "github.com/rabbitstack/fibratus/pkg/syscall/handle"
 	"github.com/streadway/amqp"
 	"github.com/stretchr/testify/require"
-	"testing"
-	"time"
 )
 
 func TestPublishAmqpOutput(t *testing.T) {
@@ -211,7 +212,7 @@ func getBatch() *kevent.Batch {
 			kparams.BasePrio:      {Name: kparams.BasePrio, Type: kparams.Int8, Value: int8(2)},
 			kparams.PagePrio:      {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(2)},
 		},
-		Metadata: map[string]string{"foo": "bar", "fooz": "baarz"},
+		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "baarz"},
 		PS: &pstypes.PS{
 			PID:       2436,
 			Ppid:      6304,
@@ -279,7 +280,7 @@ func getBatch() *kevent.Batch {
 			kparams.BasePrio:      {Name: kparams.BasePrio, Type: kparams.Int8, Value: int8(2)},
 			kparams.PagePrio:      {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(2)},
 		},
-		Metadata: map[string]string{"foo": "bar", "fooz": "baarz"},
+		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "baarz"},
 		PS: &pstypes.PS{
 			PID:       2436,
 			Ppid:      6304,
@@ -347,7 +348,7 @@ func getBatch() *kevent.Batch {
 			kparams.BasePrio:      {Name: kparams.BasePrio, Type: kparams.Int8, Value: int8(2)},
 			kparams.PagePrio:      {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(2)},
 		},
-		Metadata: map[string]string{"foo": "bar", "fooz": "baarz"},
+		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "baarz"},
 		PS: &pstypes.PS{
 			PID:       829,
 			Ppid:      6304,

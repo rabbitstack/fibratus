@@ -39,7 +39,7 @@ var userAgentHeader = version.ProductToken()
 // defaultContentType represents the default content type for HTTP requests
 const defaultContentType = "application/json"
 
-type h2p struct {
+type _http struct {
 	client *http.Client
 	config Config
 	url    string
@@ -66,7 +66,7 @@ func initHTTP(config outputs.Config) (outputs.OutputGroup, error) {
 			return outputs.Fail(err)
 		}
 
-		clients[i] = &h2p{
+		clients[i] = &_http{
 			client: client,
 			config: cfg,
 			url:    endpoint,
@@ -76,14 +76,27 @@ func initHTTP(config outputs.Config) (outputs.OutputGroup, error) {
 	return outputs.Success(clients...), nil
 }
 
-func (h *h2p) Connect() error { return nil }
-func (h *h2p) Close() error   { return nil }
+func (h *_http) Connect() error { return nil }
+func (h *_http) Close() error   { return nil }
 
-func (h *h2p) Publish(batch *kevent.Batch) error {
+func (h *_http) Publish(batch *kevent.Batch) error {
+	var buf []byte
 	defer batch.Release()
-	buf, err := h.serializeBody(batch)
-	if err != nil {
-		return err
+	switch h.config.Serializer {
+	case outputs.JSON:
+		buf = batch.MarshalJSON()
+	}
+
+	if h.config.EnableGzip {
+		var bb bytes.Buffer
+		gz := gzip.NewWriter(&bb)
+		if _, err := gz.Write(buf); err != nil {
+			return err
+		}
+		if err := gz.Close(); err != nil {
+			return err
+		}
+		buf = bb.Bytes()
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), h.config.Timeout)
@@ -115,14 +128,14 @@ func (h *h2p) Publish(batch *kevent.Batch) error {
 
 // setBasicAuth sets the request's Authorization header to use HTTP
 // Basic Authentication with the provided username and password.
-func (h *h2p) setBasicAuth(req *http.Request) {
+func (h *_http) setBasicAuth(req *http.Request) {
 	if h.config.Username != "" && h.config.Password != "" {
 		req.SetBasicAuth(h.config.Username, h.config.Password)
 	}
 }
 
 // setHeaders populates required and optional request headers.
-func (h *h2p) setHeaders(req *http.Request) {
+func (h *_http) setHeaders(req *http.Request) {
 	req.Header.Set("User-Agent", userAgentHeader)
 	req.Header.Set("Content-Type", defaultContentType)
 	if h.config.EnableGzip {
@@ -131,22 +144,4 @@ func (h *h2p) setHeaders(req *http.Request) {
 	for k, v := range h.config.Headers {
 		req.Header.Set(k, v)
 	}
-}
-
-// serializeBody serializes and optionally compresses the body
-// before transporting it to remote endpoints.
-func (h *h2p) serializeBody(batch *kevent.Batch) ([]byte, error) {
-	body := batch.MarshalJSON()
-	if !h.config.EnableGzip {
-		return body, nil
-	}
-	var buf bytes.Buffer
-	gz := gzip.NewWriter(&buf)
-	if _, err := gz.Write(body); err != nil {
-		return nil, err
-	}
-	if err := gz.Close(); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
 }

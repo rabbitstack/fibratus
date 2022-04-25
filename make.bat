@@ -48,6 +48,7 @@ if "%~1"=="pkg" goto pkg
 if "%~1"=="pkg-slim" goto pkg-slim
 if "%~1"=="deps" goto deps
 if "%~1"=="rsrc" goto rsrc
+if "%~1"=="mc" goto mc
 
 :build
 :: set PKG_CONFIG_PATH=pkg-config
@@ -57,7 +58,6 @@ goto :EOF
 
 :test
 %GOTEST% -tags %TAGS% %PKGS%
-if errorlevel 1 goto fail
 goto :EOF
 
 :lint
@@ -79,6 +79,14 @@ windres --define RC_VER=%RC_VER% --define VER=%VERSION% -i cmd\fibratus\fibratus
 if errorlevel 1 goto fail
 goto :EOF
 
+:mc
+windmc -r pkg/outputs/eventlog/mc pkg/outputs/eventlog/mc/fibratus.mc
+windres -O coff -r -fo pkg/outputs/eventlog/mc/fibratus.res pkg/outputs/eventlog/mc/fibratus.rc
+:: link the resulting resource object
+gcc pkg/outputs/eventlog/mc/fibratus.res -o pkg/outputs/eventlog/mc/fibratus.dll -s -shared "-Wl,--subsystem,windows"
+if errorlevel 1 goto fail
+goto :EOF
+
 :pkg
 set RELEASE_DIR=.\build\msi\fibratus-%VERSION%
 
@@ -94,6 +102,8 @@ echo "Copying artifacts..."
 :: copy artifacts
 copy /y ".\cmd\fibratus\fibratus.exe" "%RELEASE_DIR%\Bin"
 copy /y ".\configs\fibratus.yml" "%RELEASE_DIR%\Config\fibratus.yml"
+copy /y ".\pkg\outputs\eventlog\mc\fibratus.dll" "%RELEASE_DIR%\fibratus.dll"
+
 robocopy ".\filaments" "%RELEASE_DIR%\Filaments" /E /S /XF *.md /XD __pycache__ .idea
 robocopy ".\configs\rules" "%RELEASE_DIR%\Config\Rules" /E /S
 
@@ -147,6 +157,8 @@ echo "Copying artifacts..."
 :: copy artifacts
 copy /y ".\cmd\fibratus\fibratus.exe" "%RELEASE_DIR%\Bin"
 copy /y ".\configs\fibratus.yml" "%RELEASE_DIR%\Config\fibratus.yml"
+copy /y ".\pkg\outputs\eventlog\mc\fibratus.dll" "%RELEASE_DIR%\fibratus.dll"
+
 robocopy ".\configs\rules" "%RELEASE_DIR%\Config\Rules" /E /S
 
 echo "Building MSI package..."

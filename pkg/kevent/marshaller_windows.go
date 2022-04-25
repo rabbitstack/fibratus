@@ -21,6 +21,12 @@ package kevent
 import (
 	"expvar"
 	"fmt"
+	"math"
+	"net"
+	"sort"
+	"time"
+	"unsafe"
+
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/kcap/section"
 	kcapver "github.com/rabbitstack/fibratus/pkg/kcap/version"
@@ -30,10 +36,6 @@ import (
 	ptypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/util/bytes"
 	"github.com/rabbitstack/fibratus/pkg/util/ip"
-	"math"
-	"net"
-	"time"
-	"unsafe"
 )
 
 var (
@@ -398,7 +400,7 @@ func (kevt *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 		// that corresponds to bytes storing the lengths of keys/values
 		moffset += klen + vlen + 4
 		if key != "" {
-			kevt.AddMeta(key, value)
+			kevt.AddMeta(MetadataKey(key), value)
 		}
 	}
 
@@ -454,6 +456,8 @@ func (kevt *Kevent) MarshalJSON() []byte {
 	for _, kpar := range kevt.Kparams {
 		pars = append(pars, kpar)
 	}
+	sort.Slice(pars, func(i, j int) bool { return pars[i].Name < pars[j].Name })
+
 	for i, kpar := range pars {
 		writeMore := js.shouldWriteMore(i, len(pars))
 		js.writeObjectField(kpar.Name)
@@ -532,7 +536,7 @@ func (kevt *Kevent) MarshalJSON() []byte {
 	var i int
 	for k, v := range kevt.Metadata {
 		writeMore := js.shouldWriteMore(i, len(kevt.Metadata))
-		js.writeObjectField(k).writeEscapeString(v)
+		js.writeObjectField(k.String()).writeEscapeString(v)
 		if writeMore {
 			js.writeMore()
 		}

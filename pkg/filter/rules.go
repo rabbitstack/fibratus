@@ -24,19 +24,13 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
+	"strings"
+	"text/template"
+
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/filter/funcmap"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	log "github.com/sirupsen/logrus"
-	"strings"
-	"text/template"
-)
-
-const (
-	// ruleNameMeta identifies the rule that was triggered by the event
-	ruleNameMeta = "rule.name"
-	// ruleGroupMeta identifies the group to which the triggered rule pertains
-	ruleGroupMeta = "rule.group"
 )
 
 var (
@@ -227,8 +221,8 @@ nextGroup:
 							log.Warnf("unable to execute %q rule action: %v", f.config.Name, err)
 						}
 						// attach rule and group meta
-						kevt.AddMeta(ruleNameMeta, f.config.Name)
-						kevt.AddMeta(ruleGroupMeta, g.group.Name)
+						kevt.AddMeta(kevent.RuleNameKey, f.config.Name)
+						kevt.AddMeta(kevent.RuleGroupKey, g.group.Name)
 						return true
 					}
 				case config.AndRelation:

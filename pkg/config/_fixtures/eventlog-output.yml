@@ -1,0 +1,18 @@
+kstream:
+  max-buffers: 10
+  min-buffers: 8
+  flush-interval: 1s
+  blacklist:
+    events:
+      - CreateThread
+
+filament: top_hives_io
+
+output:
+  console:
+    enabled: false
+    format: pretty
+  elasticsearch:
+  eventlog:
+    enabled: true
+    level: INFO

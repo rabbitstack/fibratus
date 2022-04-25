@@ -51,7 +51,7 @@ func TestReader(t *testing.T) {
 
 	require.NotEmpty(t, pe.EntryPoint)
 	require.NotEmpty(t, pe.ImageBase)
-	assert.Contains(t, pe.Symbols, "free")
+	assert.Contains(t, pe.Symbols, "GetProcAddress")
 	assert.Contains(t, pe.Imports, "GDI32.dll")
 
 	assert.Contains(t, pe.VersionResources, "CompanyName")

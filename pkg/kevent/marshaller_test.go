@@ -20,6 +20,10 @@ package kevent
 
 import (
 	"encoding/json"
+	"io/ioutil"
+	"testing"
+	"time"
+
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
@@ -28,9 +32,6 @@ import (
 	shandle "github.com/rabbitstack/fibratus/pkg/syscall/handle"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"io/ioutil"
-	"testing"
-	"time"
 )
 
 func init() {
@@ -68,7 +69,7 @@ func TestMarshaller(t *testing.T) {
 			kparams.ProcessID:     {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1204)},
 			kparams.NetDIPNames:   {Name: kparams.NetDIPNames, Type: kparams.Slice, Value: []string{"dns.google.", "github.com."}},
 		},
-		Metadata: map[string]string{"foo": "bar", "fooz": "barzz"},
+		Metadata: map[MetadataKey]string{"foo": "bar", "fooz": "barzz"},
 	}
 
 	b := kevt.MarshalRaw()
@@ -124,7 +125,7 @@ func TestKeventMarshalJSON(t *testing.T) {
 			kparams.PagePrio:      {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(2)},
 			kparams.NetDIPNames:   {Name: kparams.NetDIPNames, Type: kparams.Slice, Value: []string{"dns.google.", "github.com."}},
 		},
-		Metadata: map[string]string{"foo": "bar", "fooz": "baarz"},
+		Metadata: map[MetadataKey]string{"foo": "bar", "fooz": "baarz"},
 		PS: &pstypes.PS{
 			PID:  2436,
 			Ppid: 6304,
@@ -239,7 +240,7 @@ func TestUnmarshalHugeHandles(t *testing.T) {
 			kparams.BasePrio:      {Name: kparams.BasePrio, Type: kparams.Int8, Value: int8(2)},
 			kparams.PagePrio:      {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(2)},
 		},
-		Metadata: map[string]string{"foo": "bar", "fooz": "baarz"},
+		Metadata: map[MetadataKey]string{"foo": "bar", "fooz": "baarz"},
 		PS: &pstypes.PS{
 			PID:       2436,
 			Ppid:      6304,
@@ -301,7 +302,7 @@ func TestKeventMarshalJSONMultiple(t *testing.T) {
 				kparams.BasePrio:      {Name: kparams.BasePrio, Type: kparams.Int8, Value: int8(2)},
 				kparams.PagePrio:      {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(2)},
 			},
-			Metadata: map[string]string{"foo": "bar", "fooz": "baarz"},
+			Metadata: map[MetadataKey]string{"foo": "bar", "fooz": "baarz"},
 			PS: &pstypes.PS{
 				PID:       2436,
 				Ppid:      6304,
@@ -381,7 +382,7 @@ func BenchmarkKeventMarshalJSON(b *testing.B) {
 			kparams.BasePrio:      {Name: kparams.BasePrio, Type: kparams.Int8, Value: int8(2)},
 			kparams.PagePrio:      {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(2)},
 		},
-		Metadata: map[string]string{"foo": "bar", "fooz": "baarz"},
+		Metadata: map[MetadataKey]string{"foo": "bar", "fooz": "baarz"},
 		PS: &pstypes.PS{
 			PID:       2436,
 			Ppid:      6304,
@@ -465,7 +466,7 @@ func BenchmarkKeventMarshalJSONStdlib(b *testing.B) {
 			kparams.BasePrio:      {Name: kparams.BasePrio, Type: kparams.Int8, Value: int8(2)},
 			kparams.PagePrio:      {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(2)},
 		},
-		Metadata: map[string]string{"foo": "bar", "fooz": "baarz"},
+		Metadata: map[MetadataKey]string{"foo": "bar", "fooz": "baarz"},
 		PS: &pstypes.PS{
 			PID:       2436,
 			Ppid:      6304,
@@ -549,7 +550,7 @@ func BenchmarkMarshal(b *testing.B) {
 			kparams.FileType:      {Name: kparams.FileType, Type: kparams.AnsiString, Value: "file"},
 			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.AnsiString, Value: "open"},
 		},
-		Metadata: map[string]string{"foo": "bar", "fooz": "barz"},
+		Metadata: map[MetadataKey]string{"foo": "bar", "fooz": "barz"},
 	}
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
@@ -577,7 +578,7 @@ func BenchmarkUnmarshal(b *testing.B) {
 			kparams.FileType:      {Name: kparams.FileType, Type: kparams.AnsiString, Value: "file"},
 			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.AnsiString, Value: "open"},
 		},
-		Metadata: map[string]string{"foo": "bar", "fooz": "barz"},
+		Metadata: map[MetadataKey]string{"foo": "bar", "fooz": "barz"},
 	}
 	buf := kevt.MarshalRaw()
 	b.ReportAllocs()

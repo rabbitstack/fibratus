@@ -21,6 +21,7 @@ package http
 import (
 	"compress/gzip"
 	"encoding/json"
+	"github.com/rabbitstack/fibratus/pkg/outputs"
 	"io/ioutil"
 	"log"
 	"net"
@@ -80,14 +81,15 @@ func TestHttpPublish(t *testing.T) {
 			"API-Key": "aaabbbaaa",
 			"Version": "1.1",
 		},
-		Username: "user",
-		Password: "pass",
+		Username:   "user",
+		Password:   "pass",
+		Serializer: outputs.JSON,
 	}
 
 	httpClient, err := newHTTPClient(c)
 	require.NoError(t, err)
 
-	h := h2p{config: c, client: httpClient, url: "http://127.0.0.1:8081/intake"}
+	h := _http{config: c, client: httpClient, url: "http://127.0.0.1:8081/intake"}
 
 	err = h.Publish(getBatch())
 	require.NoError(t, err)
@@ -132,12 +134,13 @@ func TestHttpGzipPublish(t *testing.T) {
 	c := Config{
 		Timeout:    time.Second * 3,
 		EnableGzip: true,
+		Serializer: outputs.JSON,
 	}
 
 	httpClient, err := newHTTPClient(c)
 	require.NoError(t, err)
 
-	h := h2p{config: c, client: httpClient, url: "http://127.0.0.1:8081/intake"}
+	h := _http{config: c, client: httpClient, url: "http://127.0.0.1:8081/intake"}
 
 	err = h.Publish(getBatch())
 	require.NoError(t, err)
@@ -163,7 +166,7 @@ func getBatch() *kevent.Batch {
 			kparams.BasePrio:      {Name: kparams.BasePrio, Type: kparams.Int8, Value: int8(2)},
 			kparams.PagePrio:      {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(2)},
 		},
-		Metadata: map[string]string{"foo": "bar", "fooz": "baarz"},
+		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "baarz"},
 		PS: &pstypes.PS{
 			PID:       2436,
 			Ppid:      6304,
@@ -231,7 +234,7 @@ func getBatch() *kevent.Batch {
 			kparams.BasePrio:      {Name: kparams.BasePrio, Type: kparams.Int8, Value: int8(2)},
 			kparams.PagePrio:      {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(2)},
 		},
-		Metadata: map[string]string{"foo": "bar", "fooz": "baarz"},
+		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "baarz"},
 		PS: &pstypes.PS{
 			PID:       2436,
 			Ppid:      6304,
@@ -299,7 +302,7 @@ func getBatch() *kevent.Batch {
 			kparams.BasePrio:      {Name: kparams.BasePrio, Type: kparams.Int8, Value: int8(2)},
 			kparams.PagePrio:      {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(2)},
 		},
-		Metadata: map[string]string{"foo": "bar", "fooz": "baarz"},
+		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "baarz"},
 		PS: &pstypes.PS{
 			PID:       829,
 			Ppid:      6304,

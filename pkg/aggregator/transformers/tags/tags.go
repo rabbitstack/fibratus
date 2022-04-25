@@ -19,10 +19,11 @@
 package tags
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"os"
 	"strings"
+
+	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers"
+	"github.com/rabbitstack/fibratus/pkg/kevent"
 )
 
 // tags transformer appends tags to the event's metadata. It is capable of adding literal values as well as
@@ -62,7 +63,7 @@ func initTagsTransformer(config transformers.Config) (transformers.Transformer, 
 
 func (t tags) Transform(kevt *kevent.Kevent) error {
 	for k, v := range t.tags {
-		kevt.AddMeta(k, v)
+		kevt.AddMeta(kevent.MetadataKey(k), v)
 	}
 	return nil
 }

@@ -20,13 +20,14 @@ package kevent
 
 import (
 	"fmt"
+	"strings"
+	"sync"
+	"time"
+
 	kcapver "github.com/rabbitstack/fibratus/pkg/kcap/version"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/util/hostname"
-	"strings"
-	"sync"
-	"time"
 )
 
 // pool is used to alleviate the pressure on the heap allocator
@@ -39,14 +40,28 @@ var pool = sync.Pool{
 // TimestampFormat is the Go valid format for the kernel event timestamp
 var TimestampFormat string
 
+// MetadataKey represents the type definition for the metadata keys
+type MetadataKey string
+
 // Metadata is a type alias for event metadata. Any tag, i.e. key/value pair could be attached to metadata.
-type Metadata map[string]string
+type Metadata map[MetadataKey]string
+
+const (
+	// YaraMatchesKey is the tag name for the yara matches JSON representation
+	YaraMatchesKey MetadataKey = "yara.matches"
+	// RuleNameKey identifies the rule that was triggered by the event
+	RuleNameKey MetadataKey = "rule.name"
+	// RuleGroupKey identifies the group to which the triggered rule pertains
+	RuleGroupKey MetadataKey = "rule.group"
+)
+
+func (key MetadataKey) String() string { return string(key) }
 
 // String turns kernel event's metadata into string.
 func (md Metadata) String() string {
 	var sb strings.Builder
 	for k, v := range md {
-		sb.WriteString(k + ": " + v + ", ")
+		sb.WriteString(k.String() + ": " + v + ", ")
 	}
 	return strings.TrimSuffix(sb.String(), ", ")
 }
@@ -158,7 +173,7 @@ func New(seq uint64, pid, tid uint32, cpu uint8, ktype ktypes.Ktype, ts time.Tim
 		Description: metainfo.Description,
 		Timestamp:   ts,
 		Kparams:     kpars,
-		Metadata:    make(map[string]string),
+		Metadata:    make(map[MetadataKey]string),
 		Host:        hostname.Get(),
 	}
 	return kevt
@@ -168,7 +183,7 @@ func New(seq uint64, pid, tid uint32, cpu uint8, ktype ktypes.Ktype, ts time.Tim
 func Empty() *Kevent {
 	return &Kevent{
 		Kparams:  map[string]*Kparam{},
-		Metadata: make(map[string]string),
+		Metadata: make(map[MetadataKey]string),
 		PS:       &pstypes.PS{},
 	}
 }
@@ -177,7 +192,7 @@ func Empty() *Kevent {
 func NewFromKcap(buf []byte) (*Kevent, error) {
 	kevt := &Kevent{
 		Kparams:  make(Kparams),
-		Metadata: make(map[string]string),
+		Metadata: make(map[MetadataKey]string),
 	}
 	if err := kevt.UnmarshalRaw(buf, kcapver.KevtSecV1); err != nil {
 		return nil, err
@@ -186,7 +201,7 @@ func NewFromKcap(buf []byte) (*Kevent, error) {
 }
 
 // AddMeta appends a key/value pair to event's metadata.
-func (kevt *Kevent) AddMeta(k, v string) {
+func (kevt *Kevent) AddMeta(k MetadataKey, v string) {
 	kevt.Metadata[k] = v
 }
 
