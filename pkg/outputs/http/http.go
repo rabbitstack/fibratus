@@ -39,7 +39,7 @@ var userAgentHeader = version.ProductToken()
 // defaultContentType represents the default content type for HTTP requests
 const defaultContentType = "application/json"
 
-type h2p struct {
+type _http struct {
 	client *http.Client
 	config Config
 	url    string
@@ -66,7 +66,7 @@ func initHTTP(config outputs.Config) (outputs.OutputGroup, error) {
 			return outputs.Fail(err)
 		}
 
-		clients[i] = &h2p{
+		clients[i] = &_http{
 			client: client,
 			config: cfg,
 			url:    endpoint,
@@ -76,10 +76,10 @@ func initHTTP(config outputs.Config) (outputs.OutputGroup, error) {
 	return outputs.Success(clients...), nil
 }
 
-func (h *h2p) Connect() error { return nil }
-func (h *h2p) Close() error   { return nil }
+func (h *_http) Connect() error { return nil }
+func (h *_http) Close() error   { return nil }
 
-func (h *h2p) Publish(batch *kevent.Batch) error {
+func (h *_http) Publish(batch *kevent.Batch) error {
 	var buf []byte
 	defer batch.Release()
 	switch h.config.Serializer {
@@ -128,14 +128,14 @@ func (h *h2p) Publish(batch *kevent.Batch) error {
 
 // setBasicAuth sets the request's Authorization header to use HTTP
 // Basic Authentication with the provided username and password.
-func (h *h2p) setBasicAuth(req *http.Request) {
+func (h *_http) setBasicAuth(req *http.Request) {
 	if h.config.Username != "" && h.config.Password != "" {
 		req.SetBasicAuth(h.config.Username, h.config.Password)
 	}
 }
 
 // setHeaders populates required and optional request headers.
-func (h *h2p) setHeaders(req *http.Request) {
+func (h *_http) setHeaders(req *http.Request) {
 	req.Header.Set("User-Agent", userAgentHeader)
 	req.Header.Set("Content-Type", defaultContentType)
 	if h.config.EnableGzip {

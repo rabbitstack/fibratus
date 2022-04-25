@@ -89,7 +89,7 @@ func TestHttpPublish(t *testing.T) {
 	httpClient, err := newHTTPClient(c)
 	require.NoError(t, err)
 
-	h := h2p{config: c, client: httpClient, url: "http://127.0.0.1:8081/intake"}
+	h := _http{config: c, client: httpClient, url: "http://127.0.0.1:8081/intake"}
 
 	err = h.Publish(getBatch())
 	require.NoError(t, err)
@@ -140,7 +140,7 @@ func TestHttpGzipPublish(t *testing.T) {
 	httpClient, err := newHTTPClient(c)
 	require.NoError(t, err)
 
-	h := h2p{config: c, client: httpClient, url: "http://127.0.0.1:8081/intake"}
+	h := _http{config: c, client: httpClient, url: "http://127.0.0.1:8081/intake"}
 
 	err = h.Publish(getBatch())
 	require.NoError(t, err)
