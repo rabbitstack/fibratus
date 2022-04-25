@@ -48,6 +48,8 @@ jobs:
         env:
           VERSION: "4.0.x"
         run: |
+          ls -l /c/msys64/mingw64/bin
+          ls -lR /c/msys64/mingw64
           git clone --depth 1 --branch $VERSION https://github.com/VirusTotal/yara.git
       - name: Configure yara
         if: steps.cache.outputs.cache-hit != 'true'
@@ -64,7 +66,7 @@ jobs:
       - name: Build
         shell: bash
         run: |
-          export PATH=/c/msys64/usr/bin:/c/msys64/mingw64/bin:$PATH
+          export PATH=/c/msys64/mingw64/bin:$PATH
           export PKG_CONFIG_PATH=$(pwd)/pkg-config
           export COMMIT=$(echo $GITHUB_SHA | cut -c1-8)
           ./make.bat
