@@ -67,7 +67,7 @@ func (f Entropy) Desc() FunctionDesc {
 	return desc
 }
 
-func (f Entropy) Name() Fn { return LengthFn }
+func (f Entropy) Name() Fn { return EntropyFn }
 
 // shannon measures the Shannon entropy of a string.
 func shannon(value string) int {
