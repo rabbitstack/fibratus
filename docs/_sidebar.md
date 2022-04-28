@@ -37,6 +37,8 @@
   * [Null](outputs/null.md)
   * [RabbitMQ](outputs/rabbitmq.md)
   * [Elasticsearch](outputs/elasticsearch.md)
+  * [HTTP](outputs/http.md)
+  * [Eventlog](outputs/eventlog.md)
 * <ion-icon name="color-wand-outline"></ion-icon> Transformers
   * [Parsing, Enriching, Transforming](transformers/introduction.md)
   * <ion-icon name="remove-circle-outline"></ion-icon> [Remove](transformers/remove.md)

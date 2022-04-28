@@ -113,30 +113,30 @@ The `yara.matches` tag contains the JSON array payload where each object represe
 ```json
 [
   {
-    "Rule": "AnglerEKredirector ",
-    "Namespace": "EK",
-    "Tags": null,
-    "Metas": [
+    "rule": "AnglerEKredirector ",
+    "namespace": "EK",
+    "tags": null,
+    "metas": [
       {
-        "Identifier": "description",
-        "Value": "Angler Exploit Kit Redirector"
+        "identifier": "description",
+        "value": "Angler Exploit Kit Redirector"
       }
     ],
-    "Strings": "..."
+    "strings": "..."
   },
   {
-    "Rule": "angler_flash_uncompressed ",
-    "Namespace": "EK",
-    "Tags": [
+    "rule": "angler_flash_uncompressed ",
+    "namespace": "EK",
+    "tags": [
       "exploitkit"
     ],
-    "Metas": [
+    "metas": [
       {
-        "Identifier": "description",
-        "Value": "Angler Exploit Kit Detection"
+        "identifier": "description",
+        "value": "Angler Exploit Kit Detection"
       }
     ],
-    "Strings": "..."
+    "strings": "..."
   }
 ]
 ```

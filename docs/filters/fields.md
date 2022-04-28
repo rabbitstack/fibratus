@@ -47,7 +47,12 @@ The following tables summarize available field names that can be used in filter 
 | ps.args         | Process command line arguments | `ps.args in ('/cdir', '/-C')`   |
 | ps.cwd          | Process current working directory | `ps.cwd = 'C:\\Users\\Default'`   |
 | ps.sid          | Security identifier under which this process is run | `ps.sid contains 'SYSTEM'`   |
+| ps.domain       | Process domain name  | `ps.domain = 'NT AUTHORITY'`   |
+| ps.username     | Process user name  | `ps.username = 'SYSTEM'`   |
 | ps.sessionid    | Unique identifier for the current session | `ps.sessionid = 1`   |
+| ps.access.mask  | Process access rights | `ps.access.mask = '0x1000'`   |
+| ps.access.mask.names  | Process access human-readable rights | `ps.access.mask.names in ('TERMINATE', 'QUERY_INFORMATION')`   |
+| ps.access.status  | Process access status | `ps.access.status = 'success'`   |
 | ps.envs         | Process environment variables | `ps.envs in ('MOZ_CRASHREPORTER_DATA_DIRECTORY')`  |
 | ps.envs[]       | Accesses a specific environment variable. Prefix matches are supported | `ps.envs['MOZ_CRASHREPORTER'] = 'C:\\Program Files\\Firefox'`  |
 | ps.dtb          | Process directory table base address | `ps.dtb = '7ffe0000'` |
@@ -56,16 +61,27 @@ The following tables summarize available field names that can be used in filter 
 | ps.modules      | Modules loaded by the process | `ps.modules in ('crypt32.dll', 'xul.dll')`   |
 | ps.modules[]    | Accesses a specific process module. Prefix matches are supported  | `ps.modules['crypt'].size > 1024`   |
 | ps.parent.name    | Parent process name  | `ps.parent.name = 'powershell.exe'`   |
+| ps.parent.pid    | Parent process identifier  | `ps.parent.pid = 2340`   |
 | ps.parent.comm    | Parent process command line  | `ps.parent.comm contains 'attrib'`   |
 | ps.parent.exe    | Full name of the parent process executable  | `ps.parent.exe = 'C:\\Windows\\system32\\cmd.exe'`   |
 | ps.parent.cwd    | Parent process current working directory  | `ps.parent.cwd = 'C:\\Users\\Default'`   |
 | ps.parent.sid    | Security identifier under which the parent process is run  | `ps.parent.sid contains 'SYSTEM'`   |
+| ps.parent.domain    | Parent process domain name  | `ps.parent.domain = 'NT AUTHORITY'`   |
+| ps.parent.username  | Parent process user name  | `ps.parent.username = 'SYSTEM'`   |
 | ps.parent.sessionid    | Unique identifier for the current session of the parent process  | `ps.parent.session = 1`   |
 | ps.parent.dtb    | Parent process directory table base address  | `ps.parent.dtb = 'powershell.exe'`   |
 | ps.parent.envs    | Parent process environment variables   | `ps.parent.envs in ('PROCESSOR_LEVEL')'`   |
 | ps.parent.handles    | Allocated parent process handles  | `ps.parent.handles in ('\\...\\Cor_SxSPublic_IPCBlock')`   |
 | ps.parent.handle.types    | Allocated parent process handles types  | `ps.parent.handle.types in ('Key', 'Mutant', 'Section')`   |
 | ps.ancestor[]    | Process ancestry traversing  | `ps.ancestor[2].name in ('winword.exe', 'powershell.exe')`   |
+| ps.sibling.name    | Sibling process name  | `ps.sibling.name = 'cmd.exe'`   |
+| ps.sibling.pid     | Sibling process identifier  | `ps.sibling.id = 6050`   |
+| ps.sibling.comm    | Sibling process command line  | `ps.sibling.name contains '/k /v'`   |
+| ps.sibling.exe     | Sibling process executable full path  | `ps.sibling.exe = 'C:\\Windows\\system32\\cmd.exe'`   |
+| ps.sibling.sid     | Sibling process security identifier  | `ps.sibling.sid contains 'SYSTEM'`   |
+| ps.sibling.sessionid   | Sibling process session identifier  | `ps.sibling.sessionid = 1`   |
+| ps.sibling.domain    | Sibling process domain name  | `ps.sibling.domain = 'NT AUTHORITY'`   |
+| ps.sibling.username  | Sibling process user name  | `ps.sibling.username = 'SYSTEM'`   |
 
 ### Thread
 | Field Name  | Description | Example     |
@@ -78,6 +94,10 @@ The following tables summarize available field names that can be used in filter 
 | thread.ustack.base | Base address of the thread's user space stack | `thread.ustack.base = '7ffe0000'`   |
 | thread.ustack.limit | Limit of the thread's user space stack | `thread.ustack.limit = '8ffe0000'`   |
 | thread.entrypoint | Starting address of the function to be executed by the thread | `thread.entrypoint = '7efe0000'`   |
+| thread.access.mask | Thread access rights | `thread.access.mask = '0x1800'`   |
+| thread.access.mask.names | Thread access human-readable rights | `thread.access.mask.names in ('QUERY_LIMITED_INFORMATION')`   |
+| thread.access.status | Thread access status | `thread.access.status = 'success'`   |
+
 
 ### Image
 | Field Name  | Description | Example     |

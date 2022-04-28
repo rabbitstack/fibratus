@@ -1,5 +1,7 @@
 # Thread events
 
+#### CreateThread and TerminateThread
+
 Thread events notify the creation (`CreateThread`) or termination (`TerminateThread`) of threads within the process' address space. In situations where a process spawns a remote thread that runs in other process' address space, the `CreateThread` event is also triggered.
 Thread events are comprised of the following parameters:
 
@@ -13,3 +15,16 @@ Thread events are comprised of the following parameters:
 - `kstack_base` is the base address of the thread's kernel space stack.
 - `kstack_limit` is the limit of the thread's kernel space stack.
 - `entrypoint` is the starting address of the function to be executed by the thread.
+
+#### OpenThread
+
+`OpenProcess` event is triggered when a process opens an existing local thread object. This event contains the following parameters:
+
+- `desired_access` is the hexadecimal value that represents the desired access to the thread object.
+- `desired_access_names` is the list of human-readable desired access strings (e.g. `QUERY_LIMITED_INFORMATION`). For a full list and detailed explanation of available access rights, head to the official [docs](https://docs.microsoft.com/en-us/windows/win32/procthread/thread-security-and-access-rights).
+- `name` is the name of the local process whose thread object was open.
+- `exe` is the full path of the local process image whose thread object was open.
+- `pid` is the identifier of the local process whose thread object was opened.
+- `tid` is the identifier of the local thread that was opened.
+- `status` contains the result of the thread object open operation. (e.g. `success`)
+
