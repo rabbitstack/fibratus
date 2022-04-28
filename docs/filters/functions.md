@@ -1,6 +1,6 @@
 # Functions
 
-Functions expand the scope of the filtering language by bringing a plethora of capabilities. The function can return a primitive value, including integers, strings, and booleans. Function calls can be nested where the result of one function is used as an input in other function. For example, `lower(ltrim(file.name, 'C:'))`, removes the `C` drive letter from the file path and converts it to a lower case string.
+Functions expand the scope of the filtering language by bringing a plethora of capabilities. The function can return a primitive value, including integers, strings, and booleans. Function calls can be nested where the result of one function is used as an input in another function. For example, `lower(ltrim(file.name, 'C:'))`, removes the `C` drive letter from the file path and converts it to a lower case string.
 
 Additionally, some functions may return a collection of values. Function names are case insensitive.
 
