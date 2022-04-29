@@ -1,5 +1,7 @@
 # Process events
 
+#### CreateProcess and TerminateProcess
+
 Process events are fired up as a stimulus to the process' life-cycle changes. When the kernel puts into motion a process or terminates it, the `CreateProcess` and `TerminateProcess` events are emitted respectively. The following list summarizes all the distinct event parameters that are associated with process events.
 
 - `pid` is the process' identifier. This value is valid from the time a process is created until it is terminated.
@@ -14,6 +16,17 @@ Process events are fired up as a stimulus to the process' life-cycle changes. Wh
 - `session_id` is the unique identifier for the current session under which process was started or terminated.
 - `status` is the exit status of the stopped process.
 - `start_time` designates the instant when the process was started.
+
+#### OpenProcess
+
+`OpenProcess` event is triggered when a process tries to acquire an existing local process object. This event contains the following parameters:
+
+- `desired_access` is the hexadecimal value that represents the desired access to the process object.
+- `desired_access_names` is the list of human-readable desired access strings (e.g. `TERMINATE,QUERY_INFORMATION`). For a full list and detailed explanation of available access rights, head to the official [docs](https://docs.microsoft.com/en-us/windows/win32/procthread/process-security-and-access-rights).
+- `name` is the name of the local process that was opened.
+- `exe` is the full path of the local process object that was open.
+- `pid` is the identifier of the local process that was opened.
+- `status` contains the result of the process object open operation. (e.g. `success`)
 
 ### Process state  {docsify-ignore}
 
