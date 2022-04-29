@@ -72,6 +72,7 @@ jobs:
           export COMMIT=$(echo $GITHUB_SHA | cut -c1-8)
           export VERSION=0.0.0
           ./make.bat rsrc
+          ./make.bat mc
           ./make.bat
         env:
           TAGS: kcap,filament,yara,yara_static

@@ -73,6 +73,7 @@ jobs:
           export COMMIT=$(echo $GITHUB_SHA | cut -c1-8)
           export VERSION=${{ steps.get_version.outputs.VERSION }}
           ./make.bat rsrc
+          ./make.bat mc
           ./make.bat
         env:
           TAGS: kcap,filament,yara,yara_static
@@ -116,6 +117,7 @@ jobs:
           export COMMIT=$(echo $GITHUB_SHA | cut -c1-8)
           export VERSION=${{ steps.get_version.outputs.VERSION }}
           ./make.bat rsrc
+          ./make.bat mc
           ./make.bat
       - name: "Install Wix"
         shell: bash
