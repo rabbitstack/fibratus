@@ -1,6 +1,6 @@
 # HTTP
 
-Sends events to local/remote endpoints via HTTP protocol. Requests are serialized to the data format specified by the `serializer` property, which by default encodes events as `JSON` payloads.
+Sends events to local/remote endpoints via HTTP protocol. Requests are serialized to the data format specified by the `serializer` property, which by default encodes events as `JSON` payloads. HTTP requests are randomly load-balanced across endpoints defined in the `endpoints` config property.
 
 ### Configuration {docsify-ignore}
 
