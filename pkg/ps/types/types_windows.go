@@ -20,13 +20,14 @@ package types
 
 import (
 	"fmt"
+	"path/filepath"
+	"strings"
+	"sync"
+
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	hndl "github.com/rabbitstack/fibratus/pkg/syscall/handle"
-	"path/filepath"
-	"strings"
-	"sync"
 )
 
 // PS encapsulates process' state such as allocated resources and other metadata.
@@ -271,6 +272,10 @@ func (ps *PS) RemoveHandle(num hndl.Handle) {
 
 // AddModule adds a new module to this process state.
 func (ps *PS) AddModule(mod Module) {
+	m := ps.FindModule(mod.Name)
+	if m != nil {
+		return
+	}
 	ps.Modules = append(ps.Modules, mod)
 }
 

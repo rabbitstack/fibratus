@@ -221,6 +221,8 @@ func (k Ktype) String() string {
 		return "RegQueryValue"
 	case RegCreateKCB:
 		return "RegCreateKCB"
+	case RegSetValue:
+		return "RegSetValue"
 	case LoadImage:
 		return "LoadImage"
 	case UnloadImage:
@@ -244,6 +246,33 @@ func (k Ktype) String() string {
 	}
 }
 
+// Category determines the category to which the ktype pertains.
+func (k Ktype) Category() Category {
+	switch k {
+	case CreateProcess, TerminateProcess, OpenProcess:
+		return Process
+	case CreateThread, TerminateThread, OpenThread:
+		return Thread
+	case LoadImage, UnloadImage:
+		return Image
+	case CreateFile, ReadFile, WriteFile, EnumDirectory, DeleteFile, RenameFile, CloseFile, SetFileInformation:
+		return File
+	case RegCreateKey, RegDeleteKey, RegOpenKey, RegQueryKey, RegQueryValue, RegSetValue, RegDeleteValue:
+		return Registry
+	case Connect, Accept, Send, Recv, Disconnect, Reconnect, Retransmit:
+		return Net
+	case CreateHandle, CloseHandle:
+		return Handle
+	default:
+		return Unknown
+	}
+}
+
+// Description returns a brief description of the event type.
+func (k Ktype) Description() string {
+	return ""
+}
+
 // Hash calculates the hash number of the ktype.
 func (k Ktype) Hash() uint32 {
 	if k == UnknownKtype {
@@ -260,7 +289,41 @@ func (k Ktype) Hash() uint32 {
 // Exists determines whether particular ktype exists.
 func (k Ktype) Exists() bool {
 	switch k {
-	case EnumProcess, EnumThread, FileRundown, FileOpEnd, ReleaseFile, EnumImage, RegCreateKCB, RegKCBRundown:
+	case EnumProcess,
+		EnumThread,
+		FileRundown,
+		FileOpEnd,
+		ReleaseFile,
+		EnumImage,
+		RegCreateKCB,
+		RegDeleteKCB,
+		RegKCBRundown,
+		CreateHandle,
+		CloseHandle,
+		CreateProcess,
+		TerminateProcess,
+		OpenProcess,
+		CreateThread,
+		TerminateThread,
+		OpenThread,
+		LoadImage,
+		UnloadImage,
+		CreateFile,
+		WriteFile,
+		ReadFile,
+		DeleteFile,
+		RenameFile,
+		CloseFile,
+		SetFileInformation,
+		EnumDirectory,
+		RegCreateKey,
+		RegDeleteKey,
+		RegOpenKey,
+		RegOpenKeyV1,
+		RegQueryKey,
+		RegQueryValue,
+		RegSetValue,
+		RegDeleteValue:
 		return true
 	default:
 		// for composite kernel events we match against a single global ktype. This way
@@ -287,8 +350,7 @@ func (k Ktype) Exists() bool {
 		if k == RecvTCPv4 || k == RecvTCPv6 || k == RecvUDPv4 || k == RecvUDPv6 {
 			return true
 		}
-		_, ok := kevents[k]
-		return ok
+		return false
 	}
 }
 
@@ -296,7 +358,8 @@ func (k Ktype) Exists() bool {
 // the output channel.
 func (k Ktype) Dropped(capture bool) bool {
 	switch k {
-	case EnumProcess, EnumThread, FileRundown, FileOpEnd, ReleaseFile, EnumImage, RegCreateKCB, RegKCBRundown:
+	case EnumProcess, EnumThread, FileRundown, FileOpEnd,
+		ReleaseFile, EnumImage, RegCreateKCB, RegKCBRundown:
 		if capture {
 			return false
 		}

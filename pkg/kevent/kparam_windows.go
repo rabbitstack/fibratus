@@ -66,10 +66,7 @@ func NewKparam(name string, typ kparams.Type, value kparams.Value) *Kparam {
 		v = value
 	}
 
-	kparam := kparamPool.Get().(*Kparam)
-	*kparam = Kparam{Name: name, Type: typ, Value: v}
-
-	return kparam
+	return &Kparam{Name: name, Type: typ, Value: v}
 }
 
 // String returns the string representation of the parameter value.

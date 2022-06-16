@@ -24,6 +24,12 @@ package handle
 import (
 	"expvar"
 	"fmt"
+	"os"
+	"strconv"
+	"sync"
+	"time"
+	"unsafe"
+
 	"github.com/rabbitstack/fibratus/pkg/config"
 	errs "github.com/rabbitstack/fibratus/pkg/errors"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
@@ -35,11 +41,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/syscall/process"
 	"github.com/rabbitstack/fibratus/pkg/syscall/sys"
 	log "github.com/sirupsen/logrus"
-	"os"
-	"strconv"
-	"sync"
-	"time"
-	"unsafe"
 )
 
 var (
@@ -385,7 +386,13 @@ func (s *snapshotter) Write(kevt *kevent.Kevent) error {
 		return fmt.Errorf("expected CreateHandle kernel event but got %s", kevt.Type)
 	}
 	h := unwrapHandle(kevt)
-	obj, err := kevt.Kparams.GetHexAsUint64(kparams.HandleObject)
+	var obj uint64
+	var err error
+	if s.config.Kstream.RawParamParsing {
+		obj, err = kevt.Kparams.GetUint64(kparams.HandleObject)
+	} else {
+		obj, err = kevt.Kparams.GetHexAsUint64(kparams.HandleObject)
+	}
 	if err != nil {
 		return err
 	}
@@ -399,7 +406,13 @@ func (s *snapshotter) Remove(kevt *kevent.Kevent) error {
 	if kevt.Type != ktypes.CloseHandle {
 		return fmt.Errorf("expected CloseHandle kernel event but got %s", kevt.Type)
 	}
-	obj, err := kevt.Kparams.GetHexAsUint64(kparams.HandleObject)
+	var obj uint64
+	var err error
+	if s.config.Kstream.RawParamParsing {
+		obj, err = kevt.Kparams.GetUint64(kparams.HandleObject)
+	} else {
+		obj, err = kevt.Kparams.GetHexAsUint64(kparams.HandleObject)
+	}
 	if err != nil {
 		return err
 	}

@@ -100,15 +100,15 @@ func (k *ktraceController) StartKtrace() error {
 	// at least process events have to be enabled
 	// for the purpose of building the state machine
 	flags := etw.Process
-	if k.kstreamConfig.EnableThreadKevents {
-		flags |= etw.Thread
-	}
-	if k.kstreamConfig.EnableImageKevents {
-		flags |= etw.ImageLoad
-	}
-	if k.kstreamConfig.EnableNetKevents {
-		flags |= etw.NetTCPIP
-	}
+	// if k.kstreamConfig.EnableThreadKevents {
+	// 	flags |= etw.Thread
+	// }
+	// if k.kstreamConfig.EnableImageKevents {
+	// 	flags |= etw.ImageLoad
+	// }
+	// if k.kstreamConfig.EnableNetKevents {
+	// 	flags |= etw.NetTCPIP
+	// }
 	if k.kstreamConfig.EnableRegistryKevents {
 		flags |= etw.Registry
 	}
@@ -309,13 +309,13 @@ func (k *ktraceController) startTraceSessions() error {
 			krundownSession,
 			etw.KernelRundownGUID,
 			0x10, // file rundown events
-			true,
+			false,
 		},
 		{
 			kauditAPICallsSession,
 			etw.KernelAuditAPICallsGUID,
 			0x0, // no keywords, so we accept all events
-			true,
+			false,
 		},
 	}
 	for _, kdef := range ktraceDefs {

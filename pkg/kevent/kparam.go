@@ -20,21 +20,15 @@ package kevent
 
 import (
 	"fmt"
-	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"net"
 	"reflect"
 	"sort"
 	"strings"
-	"sync"
 	"time"
-)
 
-var kparamPool = sync.Pool{
-	New: func() interface{} {
-		return &Kparam{}
-	},
-}
+	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
+	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
+)
 
 // ParamCaseStyle is the type definition for parameter name case style
 type ParamCaseStyle uint8
@@ -73,11 +67,6 @@ type Kparams map[string]*Kparam
 // NewKparamFromKcap builds a kparam instance from the restored state.
 func NewKparamFromKcap(name string, typ kparams.Type, value kparams.Value) *Kparam {
 	return &Kparam{Name: name, Type: typ, Value: value}
-}
-
-// Release returns the param to the pool.
-func (k *Kparam) Release() {
-	kparamPool.Put(k)
 }
 
 // Append adds a new parameter with specified name, type and value.

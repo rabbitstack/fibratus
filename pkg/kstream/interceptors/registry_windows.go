@@ -25,6 +25,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
@@ -50,11 +51,12 @@ const (
 
 type registryInterceptor struct {
 	// keys stores the mapping between the KCB (Key Control Block) and the key name.
-	keys  map[uint64]string
-	hsnap handle.Snapshotter
+	keys   map[uint64]string
+	hsnap  handle.Snapshotter
+	config *config.Config
 }
 
-func newRegistryInterceptor(hsnap handle.Snapshotter) KstreamInterceptor {
+func newRegistryInterceptor(hsnap handle.Snapshotter, config *config.Config) KstreamInterceptor {
 	// schedule a ticker that resets the throttle count every minute
 	tick := time.NewTicker(time.Minute)
 	go func() {
@@ -63,14 +65,24 @@ func newRegistryInterceptor(hsnap handle.Snapshotter) KstreamInterceptor {
 			atomic.StoreUint32(&handleThrottleCount, 0)
 		}
 	}()
-	return &registryInterceptor{keys: make(map[uint64]string), hsnap: hsnap}
+	return &registryInterceptor{
+		keys:   make(map[uint64]string),
+		hsnap:  hsnap,
+		config: config,
+	}
 }
 
 func (r *registryInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, error) {
 	typ := kevt.Type
 	switch typ {
 	case ktypes.RegKCBRundown, ktypes.RegCreateKCB:
-		khandle, err := kevt.Kparams.GetHexAsUint64(kparams.RegKeyHandle)
+		var khandle uint64
+		var err error
+		if r.config.Kstream.RawParamParsing {
+			khandle, err = kevt.Kparams.GetUint64(kparams.RegKeyHandle)
+		} else {
+			khandle, err = kevt.Kparams.GetHexAsUint64(kparams.RegKeyHandle)
+		}
 		if err != nil {
 			return kevt, true, err
 		}
@@ -79,16 +91,20 @@ func (r *registryInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bo
 		}
 		kcbCount.Add(1)
 		return kevt, false, nil
-
 	case ktypes.RegDeleteKCB:
-		khandle, err := kevt.Kparams.GetHexAsUint64(kparams.RegKeyHandle)
+		var khandle uint64
+		var err error
+		if r.config.Kstream.RawParamParsing {
+			khandle, err = kevt.Kparams.GetUint64(kparams.RegKeyHandle)
+		} else {
+			khandle, err = kevt.Kparams.GetHexAsUint64(kparams.RegKeyHandle)
+		}
 		if err != nil {
 			return kevt, true, err
 		}
 		delete(r.keys, khandle)
 		kcbCount.Add(-1)
 		return kevt, false, nil
-
 	case ktypes.RegCreateKey,
 		ktypes.RegDeleteKey,
 		ktypes.RegOpenKey, ktypes.RegOpenKeyV1,
@@ -96,7 +112,13 @@ func (r *registryInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bo
 		ktypes.RegQueryValue,
 		ktypes.RegSetValue,
 		ktypes.RegDeleteValue:
-		khandle, err := kevt.Kparams.GetHexAsUint64(kparams.RegKeyHandle)
+		var khandle uint64
+		var err error
+		if r.config.Kstream.RawParamParsing {
+			khandle, err = kevt.Kparams.GetUint64(kparams.RegKeyHandle)
+		} else {
+			khandle, err = kevt.Kparams.GetHexAsUint64(kparams.RegKeyHandle)
+		}
 		if err != nil {
 			return kevt, true, err
 		}

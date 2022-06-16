@@ -71,6 +71,11 @@ func WriteUint16(v uint16) (b []byte) {
 	return
 }
 
+// WriteUint16Buffer writes the provided uint16 value to the byte slice.
+func WriteUint16Buffer(v uint16, b []byte) {
+	NativeEndian.PutUint16(b, v)
+}
+
 // WriteUint32 writes the provided uint32 value to byte slice.
 func WriteUint32(v uint32) (b []byte) {
 	b = make([]byte, 4)

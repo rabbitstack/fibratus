@@ -99,6 +99,10 @@ type Consumer interface {
 	Events() chan *kevent.Kevent
 	// SetFilter initializes the filter that's applied on the kernel events.
 	SetFilter(filter filter.Filter)
+	// SetEventCallback registers a callback function that is invoked for
+	// each incoming event. If the callback function is set up, the events
+	// channel doesn't receive any inbound events.
+	SetEventCallback(func(*kevent.Kevent))
 }
 
 type kstreamConsumer struct {
@@ -119,6 +123,8 @@ type kstreamConsumer struct {
 	rules  filter.Rules
 
 	capture bool // capture determines whether the event capture is triggered
+
+	eventCallback func(*kevent.Kevent) // called on each incoming event
 }
 
 // NewConsumer constructs a new kernel event stream consumer.
@@ -131,7 +137,7 @@ func NewConsumer(ktraceController KtraceController, psnap ps.Snapshotter, hsnap 
 		ktraceController: ktraceController,
 		capture:          config.KcapFile != "",
 		sequencer:        kevent.NewSequencer(),
-		kevts:            make(chan *kevent.Kevent),
+		kevts:            make(chan *kevent.Kevent, 500),
 		rules:            filter.NewRules(config),
 	}
 
@@ -206,6 +212,8 @@ func (k *kstreamConsumer) openKstream(loggerName string) error {
 					k.errs <- err
 				}
 			}
+		case kerrors.ErrKsessionNotRunning:
+			log.Warn(err)
 		default:
 			k.errs <- err
 		}
@@ -243,6 +251,11 @@ func (k *kstreamConsumer) Events() chan *kevent.Kevent {
 	return k.kevts
 }
 
+// SetEventCallback sets the event callback to receive inbound events.
+func (k *kstreamConsumer) SetEventCallback(f func(*kevent.Kevent)) {
+	k.eventCallback = f
+}
+
 // bufferStatsCallback is periodically triggered by ETW subsystem for the purpose of reporting
 // buffer statistics, such as the number of buffers processed.
 func (k *kstreamConsumer) bufferStatsCallback(logfile *etw.EventTraceLogfile) uintptr {
@@ -260,8 +273,10 @@ func (k *kstreamConsumer) processKeventCallback(evt *etw.EventRecord) uintptr {
 	return callbackNext
 }
 
-// processKevent is the backbone of the kernel stream consumer. It does the heavy lifting of parsing inbound ETW events,
-// iterating through event properties and pushing kernel events to the channel.
+// processKevent is the backbone of the kernel stream consumer.
+// It does the heavy lifting of parsing inbound ETW events,
+// iterating through event properties or raw parsing them and
+// pushing kernel events to the channel.
 func (k *kstreamConsumer) processKevent(evt *etw.EventRecord) error {
 	var (
 		pid   = evt.Header.ProcessID
@@ -290,43 +305,30 @@ func (k *kstreamConsumer) processKevent(evt *etw.EventRecord) error {
 		excludedProcs.Add(1)
 		return nil
 	}
-	// it as required to initialize the size of the
-	// event trace buffer that we'll have to reallocate
-	// in case there's no enough room to store the whole trace
-	bufferSize := evtBufferSize
-	buffer := make([]byte, bufferSize)
 
-	err := tdh.GetEventInformation(evt, buffer, bufferSize)
-	if err == kerrors.ErrInsufficentBuffer {
-		// not enough space to store the event, so we retry with bigger buffer
-		buffer = make([]byte, bufferSize)
-		if err = tdh.GetEventInformation(evt, buffer, bufferSize); err != nil {
-			return fmt.Errorf("failed to get event metadata after reallocating buffer size to %d KB: %v", bufferSize, err)
+	// parse event parameters depending on the params reader strategy.
+	// Raw event parsing is preferred over TDH (Trace Data Helper) API
+	// as it leverages huge performance gains
+	var kpars kevent.Kparams
+	if k.config.Kstream.RawParamParsing {
+		kpars = kevent.Kparams(k.produceRawParams(ktype, evt))
+	} else {
+		trace, err := getTraceInfo(ktype, evt)
+		if err != nil {
+			return err
 		}
+		kpars = kevent.Kparams(k.produceParams(ktype, evt, trace))
 	}
 
-	if err != nil {
-		if err == kerrors.ErrEventSchemaNotFound {
-			// increment error count for events that lack the schema
-			failedKeventsByMissingSchema.Add(ktype.String(), 1)
-			return fmt.Errorf("schema not found for event %q", ktype)
-		}
-		return fmt.Errorf("unable to retrieve kernel event metadata for :%q: %v", ktype, err)
-	}
+	timestamp := filetime.ToEpoch(evt.Header.Timestamp)
 
-	trace := (*tdh.TraceEventInfo)(unsafe.Pointer(&buffer[0]))
-	kpars := kevent.Kparams(k.produceParams(ktype, evt, trace))
-	ts := filetime.ToEpoch(evt.Header.Timestamp)
-	category := ktypes.KtypeToKeventInfo(ktype).Category
-
-	switch category {
+	switch ktype.Category() {
 	case ktypes.Image:
 		// sometimes the pid present in event header is invalid
 		// but we can get the valid one from the event parameters
 		if pid == winerrno.InvalidPID {
 			pid, _ = kpars.GetUint32(kparams.ProcessID)
 		}
-
 	case ktypes.File:
 		// on some Windows versions the value of
 		// the PID attribute is invalid for the
@@ -350,7 +352,6 @@ func (k *kstreamConsumer) processKevent(evt *etw.EventRecord) error {
 		if pid != winerrno.InvalidPID {
 			kpars.Append(kparams.ProcessID, kparams.PID, pid)
 		}
-
 	case ktypes.Process:
 		// process and thread start events may be logged in the context of the parent process or thread.
 		// As a result, the ProcessId and ThreadId members of EVENT_TRACE_HEADER may not correspond to the
@@ -358,14 +359,14 @@ func (k *kstreamConsumer) processKevent(evt *etw.EventRecord) error {
 		if ktype == ktypes.CreateProcess {
 			pid, _ = kpars.GetHexAsUint32(kparams.ProcessParentID)
 		}
-
 	case ktypes.Net:
 		pid, _ = kpars.GetUint32(kparams.ProcessID)
 		kpars.Remove(kparams.ProcessID)
 	}
 
 	// try to drop excluded processes after pid readjustment
-	if k.config.Kstream.ExcludeImage(k.psnapshotter.Find(pid)) {
+	ps := k.psnapshotter.Find(pid)
+	if k.config.Kstream.ExcludeImage(ps) {
 		excludedProcs.Add(1)
 		return nil
 	}
@@ -378,14 +379,14 @@ func (k *kstreamConsumer) processKevent(evt *etw.EventRecord) error {
 		tid,
 		cpu,
 		ktype,
-		ts,
+		timestamp,
 		kpars,
 	)
 
 	// dispatch each event to the interceptor chain that will further augment the kernel
 	// event with useful fields, route events to corresponding snapshotters or initialize
 	// open files/registry control blocks at the beginning of the kernel trace session
-	kevt, err = k.interceptorChain.Dispatch(kevt)
+	kevt, err := k.interceptorChain.Dispatch(kevt)
 	if err != nil {
 		if kerrors.IsCancelUpstreamKevent(err) {
 			upstreamCancellations.Add(1)
@@ -400,18 +401,17 @@ func (k *kstreamConsumer) processKevent(evt *etw.EventRecord) error {
 	// have attached process state, so simply by replaying the flow of these events
 	// we are able to reconstruct system-wide process state.
 	if kevt.PS == nil {
-		kevt.PS = k.psnapshotter.Find(kevt.PID)
+		kevt.PS = ps
 	}
 	if k.isKeventDropped(kevt) {
 		kevt.Release()
 		return nil
 	}
 
-	k.kevts <- kevt
-
-	keventsEnqueued.Add(1)
-	if !kevt.Type.Dropped(false) {
-		k.sequencer.Increment()
+	if k.eventCallback != nil {
+		k.eventCallback(kevt)
+	} else {
+		k.kevts <- kevt
 	}
 
 	return nil
@@ -433,14 +433,38 @@ func (k *kstreamConsumer) enqueueKevent(kevt *kevent.Kevent) error {
 
 	k.kevts <- kevt
 
-	keventsEnqueued.Add(1)
-	k.sequencer.Increment()
-
 	return nil
 }
 
 var offsets = map[uint32]string{}
 var omux sync.RWMutex
+
+// getTraceInfo returns the trace info from the event record.
+func getTraceInfo(ktype ktypes.Ktype, evt *etw.EventRecord) (*tdh.TraceEventInfo, error) {
+	// it as required to initialize the size of the
+	// event trace buffer that we'll have to reallocate
+	// in case there's no enough room to store the whole trace
+	bufferSize := evtBufferSize
+	buffer := make([]byte, bufferSize)
+
+	err := tdh.GetEventInformation(evt, buffer, bufferSize)
+	if err == kerrors.ErrInsufficentBuffer {
+		// not enough space to store the event, so we retry with bigger buffer
+		buffer = make([]byte, bufferSize)
+		if err = tdh.GetEventInformation(evt, buffer, bufferSize); err != nil {
+			return nil, fmt.Errorf("failed to get event metadata after reallocating buffer size to %d KB: %v", bufferSize, err)
+		}
+	}
+	if err != nil {
+		if err == kerrors.ErrEventSchemaNotFound {
+			// increment error count for events that lack the schema
+			failedKeventsByMissingSchema.Add(ktype.String(), 1)
+			return nil, fmt.Errorf("schema not found for event %q", ktype)
+		}
+		return nil, fmt.Errorf("unable to retrieve kernel event metadata for :%q: %v", ktype, err)
+	}
+	return (*tdh.TraceEventInfo)(unsafe.Pointer(&buffer[0])), nil
+}
 
 // produceParams traverses ETW event's properties, gets the underlying property buffer and produces a kernel event
 // parameter for the particular event.
@@ -467,15 +491,14 @@ func (k *kstreamConsumer) produceParams(ktype ktypes.Ktype, evt *etw.EventRecord
 			offsets[hashKey] = kparName
 			omux.Unlock()
 		}
-
 		// skip ignored parameters
-		if _, ok := k.ignoredKparams[kparName]; ok {
-			continue
-		}
-		kparName = kparams.Canonicalize(kparName)
+		// if _, ok := k.ignoredKparams[kparName]; ok {
+		// 	continue
+		// }
+		//kparName = kparams.Canonicalize(kparName)
 		// discard unknown canonical names
 		if kparName == "" {
-			continue
+			//continue
 		}
 
 		descriptor := &tdh.PropertyDataDescriptor{
@@ -507,10 +530,165 @@ func (k *kstreamConsumer) produceParams(ktype ktypes.Ktype, evt *etw.EventRecord
 			failedKparams.Add(1)
 			continue
 		}
+		if ktype == ktypes.FileRundown {
+			fmt.Println(kparName, kpar.Type)
+		}
+
 		kpars[kparName] = kpar
 	}
 
 	return kpars
+}
+
+// produceRawParams parses the event binary layout to extract the parameters. Each event is annotated with the
+// schema version number which will help us determine when the event schema changes to be able to parse
+// new fields.
+func (k *kstreamConsumer) produceRawParams(ktype ktypes.Ktype, evt *etw.EventRecord) map[string]*kevent.Kparam {
+	buf := evt.Buffer
+	len := evt.BufferLen
+	switch ktype {
+	case ktypes.EnumProcess, ktypes.CreateProcess, ktypes.TerminateProcess:
+		kproc := kparams.ReadUint64(buf, 0)
+		pid := kparams.ReadUint32(buf, 8)
+		ppid := kparams.ReadUint32(buf, 12)
+		sessionID := kparams.ReadUint32(buf, 16)
+		// skip exit status (uint32)
+		dtb := kparams.ReadUint64(buf, 24)
+		// skip flags (uint32)
+		sid, soffset := kparams.ReadSID(buf, 36)
+		name, noffset := kparams.ReadUTF8String(buf, soffset, len)
+		cmdline, _ := kparams.ReadUTF16String(buf, soffset+noffset, len)
+		return kevent.Kparams{
+			kparams.ProcessObject:   kevent.NewKparam(kparams.ProcessObject, kparams.Uint64, kproc),
+			kparams.ProcessID:       kevent.NewKparam(kparams.ProcessID, kparams.HexInt32, pid),
+			kparams.ProcessParentID: kevent.NewKparam(kparams.ProcessParentID, kparams.HexInt32, ppid),
+			kparams.SessionID:       kevent.NewKparam(kparams.SessionID, kparams.Uint32, sessionID),
+			kparams.DTB:             kevent.NewKparam(kparams.DTB, kparams.Uint64, dtb),
+			kparams.UserSID:         kevent.NewKparam(kparams.UserSID, kparams.WbemSID, sid),
+			kparams.ProcessName:     kevent.NewKparam(kparams.ProcessName, kparams.AnsiString, name),
+			kparams.Comm:            kevent.NewKparam(kparams.Comm, kparams.UnicodeString, cmdline),
+		}
+	case ktypes.CreateHandle, ktypes.CloseHandle:
+		object := kparams.ReadUint64(buf, 0)
+		handleID := kparams.ReadUint32(buf, 8)
+		typeID := kparams.ReadUint16(buf, 12)
+		handleName := kparams.ConsumeString(buf, 14, len)
+		return kevent.Kparams{
+			kparams.HandleObject:       kevent.NewKparam(kparams.HandleObject, kparams.Uint64, object),
+			kparams.HandleID:           kevent.NewKparam(kparams.HandleID, kparams.Uint32, handleID),
+			kparams.HandleObjectTypeID: kevent.NewKparam(kparams.HandleObjectTypeID, kparams.Uint16, typeID),
+			kparams.HandleObjectName:   kevent.NewKparam(kparams.HandleObjectName, kparams.AnsiString, handleName),
+		}
+	case ktypes.RegOpenKey, ktypes.RegOpenKeyV1,
+		ktypes.RegCreateKCB, ktypes.RegDeleteKCB,
+		ktypes.RegKCBRundown, ktypes.RegCreateKey,
+		ktypes.RegDeleteKey, ktypes.RegDeleteValue,
+		ktypes.RegQueryKey, ktypes.RegQueryValue,
+		ktypes.RegSetValue:
+		// skip initial time (int64)
+		status := kparams.ReadUint32(buf, 8)
+		// skip index (uint32)
+		keyHandle := kparams.ReadUint64(buf, 16)
+		keyName := kparams.ConsumeString(buf, 24, len)
+		return kevent.Kparams{
+			kparams.RegKeyHandle: kevent.NewKparam(kparams.RegKeyHandle, kparams.Uint64, keyHandle),
+			kparams.RegKeyName:   kevent.NewKparam(kparams.RegKeyName, kparams.UnicodeString, keyName),
+			kparams.NTStatus:     kevent.NewKparam(kparams.NTStatus, kparams.Uint32, status),
+		}
+	case ktypes.CreateFile:
+		irp := kparams.ReadUint64(buf, 0)
+		fileObject := kparams.ReadUint64(buf, 8)
+		tid := kparams.ReadUint32(buf, 16)
+		createOptions := kparams.ReadUint32(buf, 20)
+		fileAttributes := kparams.ReadUint32(buf, 24)
+		shareAccess := kparams.ReadUint32(buf, 28)
+		filename := kparams.ConsumeString(buf, 32, len)
+		return kevent.Kparams{
+			kparams.FileIrpPtr:        kevent.NewKparam(kparams.FileIrpPtr, kparams.Uint64, irp),
+			kparams.FileObject:        kevent.NewKparam(kparams.FileObject, kparams.Uint64, fileObject),
+			kparams.ThreadID:          kevent.NewKparam(kparams.ThreadID, kparams.Uint32, tid),
+			kparams.FileCreateOptions: kevent.NewKparam(kparams.FileCreateOptions, kparams.Uint32, createOptions),
+			kparams.FileAttributes:    kevent.NewKparam(kparams.FileAttributes, kparams.Uint32, fileAttributes),
+			kparams.FileShareMask:     kevent.NewKparam(kparams.FileShareMask, kparams.Uint32, shareAccess),
+			kparams.FileName:          kevent.NewKparam(kparams.FileName, kparams.UnicodeString, filename),
+		}
+	case ktypes.FileOpEnd:
+		irp := kparams.ReadUint64(buf, 0)
+		extraInfo := kparams.ReadUint64(buf, 8)
+		status := kparams.ReadUint32(buf, 16)
+		return kevent.Kparams{
+			kparams.FileIrpPtr:    kevent.NewKparam(kparams.FileIrpPtr, kparams.Uint64, irp),
+			kparams.FileExtraInfo: kevent.NewKparam(kparams.FileExtraInfo, kparams.Uint64, extraInfo),
+			kparams.NTStatus:      kevent.NewKparam(kparams.NTStatus, kparams.Uint32, status),
+		}
+	case ktypes.FileRundown:
+		fileObject := kparams.ReadUint64(buf, 0)
+		filename := kparams.ConsumeString(buf, 8, len)
+		return kevent.Kparams{
+			kparams.FileObject: kevent.NewKparam(kparams.FileObject, kparams.Uint64, fileObject),
+			kparams.FileName:   kevent.NewKparam(kparams.FileName, kparams.UnicodeString, filename),
+		}
+	case ktypes.ReleaseFile, ktypes.CloseFile:
+		irp := kparams.ReadUint64(buf, 0)
+		fileObject := kparams.ReadUint64(buf, 8)
+		fileKey := kparams.ReadUint64(buf, 16)
+		tid := kparams.ReadUint32(buf, 24)
+		return kevent.Kparams{
+			kparams.FileIrpPtr: kevent.NewKparam(kparams.FileIrpPtr, kparams.Uint64, irp),
+			kparams.FileObject: kevent.NewKparam(kparams.FileObject, kparams.Uint64, fileObject),
+			kparams.FileKey:    kevent.NewKparam(kparams.FileKey, kparams.Uint64, fileKey),
+			kparams.ThreadID:   kevent.NewKparam(kparams.ThreadID, kparams.Uint32, tid),
+		}
+	case ktypes.DeleteFile, ktypes.RenameFile, ktypes.SetFileInformation:
+		irp := kparams.ReadUint64(buf, 0)
+		fileObject := kparams.ReadUint64(buf, 8)
+		fileKey := kparams.ReadUint64(buf, 16)
+		extraInfo := kparams.ReadUint64(buf, 24)
+		tid := kparams.ReadUint32(buf, 32)
+		infoClass := kparams.ReadUint32(buf, 36)
+		return kevent.Kparams{
+			kparams.FileIrpPtr:    kevent.NewKparam(kparams.FileIrpPtr, kparams.Uint64, irp),
+			kparams.FileObject:    kevent.NewKparam(kparams.FileObject, kparams.Uint64, fileObject),
+			kparams.FileKey:       kevent.NewKparam(kparams.FileKey, kparams.Uint64, fileKey),
+			kparams.ThreadID:      kevent.NewKparam(kparams.ThreadID, kparams.Uint32, tid),
+			kparams.FileExtraInfo: kevent.NewKparam(kparams.FileExtraInfo, kparams.Uint64, extraInfo),
+			kparams.FileInfoClass: kevent.NewKparam(kparams.FileInfoClass, kparams.Uint32, infoClass),
+		}
+	case ktypes.ReadFile, ktypes.WriteFile:
+		offset := kparams.ReadUint64(buf, 0)
+		irp := kparams.ReadUint64(buf, 8)
+		fileObject := kparams.ReadUint64(buf, 16)
+		fileKey := kparams.ReadUint64(buf, 24)
+		tid := kparams.ReadUint32(buf, 32)
+		size := kparams.ReadUint32(buf, 34)
+		return kevent.Kparams{
+			kparams.FileIrpPtr: kevent.NewKparam(kparams.FileIrpPtr, kparams.Uint64, irp),
+			kparams.FileObject: kevent.NewKparam(kparams.FileObject, kparams.Uint64, fileObject),
+			kparams.FileKey:    kevent.NewKparam(kparams.FileKey, kparams.Uint64, fileKey),
+			kparams.ThreadID:   kevent.NewKparam(kparams.ThreadID, kparams.Uint32, tid),
+			kparams.FileOffset: kevent.NewKparam(kparams.FileOffset, kparams.Uint64, offset),
+			kparams.FileIoSize: kevent.NewKparam(kparams.FileIoSize, kparams.Uint32, size),
+		}
+	case ktypes.EnumDirectory:
+		irp := kparams.ReadUint64(buf, 0)
+		fileObject := kparams.ReadUint64(buf, 8)
+		fileKey := kparams.ReadUint64(buf, 16)
+		tid := kparams.ReadUint32(buf, 24)
+		// skip Length (uint32)
+		infoClass := kparams.ReadUint32(buf, 32)
+		// skip FileIndex (uint32)
+		filename := kparams.ConsumeString(buf, 38, len)
+		return kevent.Kparams{
+			kparams.FileIrpPtr:    kevent.NewKparam(kparams.FileIrpPtr, kparams.Uint64, irp),
+			kparams.FileObject:    kevent.NewKparam(kparams.FileObject, kparams.Uint64, fileObject),
+			kparams.ThreadID:      kevent.NewKparam(kparams.ThreadID, kparams.Uint32, tid),
+			kparams.FileKey:       kevent.NewKparam(kparams.FileKey, kparams.Uint64, fileKey),
+			kparams.FileName:      kevent.NewKparam(kparams.FileName, kparams.UnicodeString, filename),
+			kparams.FileInfoClass: kevent.NewKparam(kparams.FileInfoClass, kparams.Uint32, infoClass),
+		}
+	default:
+		return kevent.Kparams{}
+	}
 }
 
 // getParam extracts parameter value from the property buffer and builds the kparam structure.
@@ -632,5 +810,7 @@ func (k *kstreamConsumer) isKeventDropped(kevt *kevent.Kevent) bool {
 	if k.filter != nil {
 		return !k.filter.Run(kevt)
 	}
+	keventsEnqueued.Add(1)
+	k.sequencer.Increment()
 	return false
 }

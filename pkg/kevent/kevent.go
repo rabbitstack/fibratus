@@ -161,16 +161,15 @@ func (kevt *Kevent) String() string {
 // New constructs a new kernel event instance.
 func New(seq uint64, pid, tid uint32, cpu uint8, ktype ktypes.Ktype, ts time.Time, kpars Kparams) *Kevent {
 	kevt := pool.Get().(*Kevent)
-	metainfo := ktypes.KtypeToKeventInfo(ktype)
 	*kevt = Kevent{
 		Seq:         seq,
 		PID:         pid,
 		Tid:         tid,
 		CPU:         cpu,
 		Type:        ktype,
-		Category:    metainfo.Category,
-		Name:        metainfo.Name,
-		Description: metainfo.Description,
+		Category:    ktype.Category(),
+		Name:        ktype.String(),
+		Description: ktype.Description(),
 		Timestamp:   ts,
 		Kparams:     kpars,
 		Metadata:    make(map[MetadataKey]string),
@@ -207,9 +206,6 @@ func (kevt *Kevent) AddMeta(k MetadataKey, v string) {
 
 // Release returns an event to the pool.
 func (kevt *Kevent) Release() {
-	for _, kpar := range kevt.Kparams {
-		kpar.Release()
-	}
 	*kevt = Kevent{} // clear kevent
 	pool.Put(kevt)
 }

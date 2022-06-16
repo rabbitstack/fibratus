@@ -20,6 +20,9 @@ package interceptors
 
 import (
 	"expvar"
+	"time"
+
+	"github.com/rabbitstack/fibratus/pkg/config"
 	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/handle"
@@ -28,7 +31,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	syshandle "github.com/rabbitstack/fibratus/pkg/syscall/handle"
 	"github.com/rabbitstack/fibratus/pkg/syscall/registry"
-	"time"
 )
 
 var (
@@ -46,29 +48,48 @@ type handleInterceptor struct {
 	devMapper     fs.DevMapper
 	defers        map[uint64]*kevent.Kevent
 	deferredKevts chan *kevent.Kevent
+	config        *config.Config
 }
 
-func newHandleInterceptor(hsnap handle.Snapshotter, typeStore handle.ObjectTypeStore, devMapper fs.DevMapper, defferedKevts chan *kevent.Kevent) KstreamInterceptor {
+func newHandleInterceptor(hsnap handle.Snapshotter, typeStore handle.ObjectTypeStore, devMapper fs.DevMapper, defferedKevts chan *kevent.Kevent, config *config.Config) KstreamInterceptor {
 	return &handleInterceptor{
 		hsnap:         hsnap,
 		typeStore:     typeStore,
 		devMapper:     devMapper,
 		defers:        make(map[uint64]*kevent.Kevent),
 		deferredKevts: defferedKevts,
+		config:        config,
 	}
 }
 
 func (h *handleInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, error) {
 	if kevt.Type == ktypes.CreateHandle || kevt.Type == ktypes.CloseHandle {
-		handleID, err := kevt.Kparams.GetHexAsUint32(kparams.HandleID)
-		if err == nil {
-			_ = kevt.Kparams.Set(kparams.HandleID, handleID, kparams.Uint32)
+		var (
+			handleID uint32
+			object   uint64
+		)
+		if h.config.Kstream.RawParamParsing {
+			var err error
+			handleID, err = kevt.Kparams.GetUint32(kparams.HandleID)
+			if err != nil {
+				return kevt, true, err
+			}
+			object, err = kevt.Kparams.GetUint64(kparams.HandleObject)
+			if err != nil {
+				return kevt, true, err
+			}
+		} else {
+			var err error
+			handleID, err = kevt.Kparams.GetHexAsUint32(kparams.HandleID)
+			if err == nil {
+				_ = kevt.Kparams.Set(kparams.HandleID, handleID, kparams.Uint32)
+			}
+			object, err = kevt.Kparams.GetHexAsUint64(kparams.HandleObject)
+			if err != nil {
+				return kevt, true, err
+			}
 		}
 		typeID, err := kevt.Kparams.GetUint16(kparams.HandleObjectTypeID)
-		if err != nil {
-			return kevt, true, err
-		}
-		object, err := kevt.Kparams.GetHexAsUint64(kparams.HandleObject)
 		if err != nil {
 			return kevt, true, err
 		}
@@ -76,11 +97,7 @@ func (h *handleInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool
 		// we didn't find in the object store
 		typeName := h.typeStore.FindByID(uint8(typeID))
 		if typeName == "" {
-			rawHandle, err := kevt.Kparams.GetHexAsUint32(kparams.HandleID)
-			if err != nil {
-				return kevt, true, err
-			}
-			dup, err := handle.Duplicate(syshandle.Handle(rawHandle), kevt.PID, syshandle.AllAccess)
+			dup, err := handle.Duplicate(syshandle.Handle(handleID), kevt.PID, syshandle.AllAccess)
 			if err != nil {
 				return kevt, true, err
 			}
@@ -114,7 +131,6 @@ func (h *handleInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool
 		case handle.File:
 			name = h.devMapper.Convert(name)
 		}
-
 		// assign the formatted handle name
 		if err := kevt.Kparams.Set(kparams.HandleObjectName, name, kparams.AnsiString); err != nil {
 			return kevt, true, err
@@ -144,7 +160,10 @@ func (h *handleInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool
 			handleDeferMatches.Add(1)
 
 			// send the deferred event
-			h.deferredKevts <- hkevt
+			select {
+			case h.deferredKevts <- hkevt:
+			default:
+			}
 
 			err := h.hsnap.Write(hkevt)
 			if err != nil {
@@ -167,7 +186,10 @@ func (h *handleInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool
 				handleDeferEvictions.Add(1)
 				delete(h.defers, kobj)
 				// push the CreateHandle event
-				h.deferredKevts <- kvt
+				select {
+				case h.deferredKevts <- kvt:
+				default:
+				}
 			}
 		}
 		return kevt, false, h.hsnap.Remove(kevt)

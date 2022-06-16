@@ -23,10 +23,11 @@ package security
 
 import (
 	"errors"
-	"github.com/rabbitstack/fibratus/pkg/syscall/winerrno"
 	"os"
 	"syscall"
 	"unsafe"
+
+	"github.com/rabbitstack/fibratus/pkg/syscall/winerrno"
 )
 
 var (
@@ -46,6 +47,9 @@ const (
 func LookupAccount(buffer []byte, wbemSID bool) (string, string) {
 	n := uint32(50)
 	dn := uint32(50)
+	if len(buffer) == 0 {
+		return "", ""
+	}
 	sid := uintptr(unsafe.Pointer(&buffer[0]))
 
 	if wbemSID {

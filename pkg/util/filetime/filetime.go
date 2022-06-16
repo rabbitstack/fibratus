@@ -22,12 +22,22 @@
 package filetime
 
 import (
-	"syscall"
 	"time"
 )
 
 // ToEpoch converts file timestamp to Unix time.
-func ToEpoch(ts uint64) time.Time {
-	ft := &syscall.Filetime{HighDateTime: uint32(ts >> 32), LowDateTime: uint32(ts)}
-	return time.Unix(0, ft.Nanoseconds())
+func ToEpoch(ts uint64) time.Time { return time.Unix(0, nanoseconds(ts)) }
+
+// nanoseconds returns Filetime ft in nanoseconds
+// since Epoch (00:00:00 UTC, January 1, 1970). This
+// function is copied from the stdlib to avoid allocating
+// the FileTime structure in the `ToEpoch` function.
+func nanoseconds(ts uint64) int64 {
+	// 100-nanosecond intervals since January 1, 1601
+	nsec := int64(uint32(ts>>32))<<32 + int64(uint32(ts))
+	// change starting time to the Epoch (00:00:00 UTC, January 1, 1970)
+	nsec -= 116444736000000000
+	// convert into nanoseconds
+	nsec *= 100
+	return nsec
 }
