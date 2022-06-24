@@ -268,6 +268,8 @@ const (
 	FileOffset Field = "file.offset"
 	// FileType represents the file type
 	FileType Field = "file.type"
+	// FileAttributes represents a slice of file attributes
+	FileAttributes Field = "file.attributes"
 
 	// RegistryKeyName represents the registry key name
 	RegistryKeyName Field = "registry.key.name"
@@ -432,14 +434,15 @@ var fields = map[Field]FieldInfo{
 	ImageDefaultAddress: {ImageDefaultAddress, "default image address", kparams.HexInt64, []string{"image.default.address = '7efe0000'"}},
 	ImagePID:            {ImagePID, "target process identifier", kparams.Uint32, []string{"image.pid = 80"}},
 
-	FileObject:    {FileObject, "file object address", kparams.Uint64, []string{"file.object = 18446738026482168384"}},
-	FileName:      {FileName, "full file name", kparams.UnicodeString, []string{"file.name contains 'mimikatz'"}},
-	FileOperation: {FileOperation, "file operation", kparams.AnsiString, []string{"file.operation = 'open'"}},
-	FileShareMask: {FileShareMask, "file share mask", kparams.AnsiString, []string{"file.share.mask = 'rw-'"}},
-	FileIOSize:    {FileIOSize, "file I/O size", kparams.Uint32, []string{"file.io.size > 512"}},
-	FileOffset:    {FileOffset, "file offset", kparams.Uint64, []string{"file.offset = 1024"}},
-	FileType:      {FileType, "file type", kparams.AnsiString, []string{"file.type = 'directory'"}},
-	FileExtension: {FileExtension, "file extension", kparams.AnsiString, []string{"file.extension = '.dll'"}},
+	FileObject:     {FileObject, "file object address", kparams.Uint64, []string{"file.object = 18446738026482168384"}},
+	FileName:       {FileName, "full file name", kparams.UnicodeString, []string{"file.name contains 'mimikatz'"}},
+	FileOperation:  {FileOperation, "file operation", kparams.AnsiString, []string{"file.operation = 'open'"}},
+	FileShareMask:  {FileShareMask, "file share mask", kparams.AnsiString, []string{"file.share.mask = 'rw-'"}},
+	FileIOSize:     {FileIOSize, "file I/O size", kparams.Uint32, []string{"file.io.size > 512"}},
+	FileOffset:     {FileOffset, "file offset", kparams.Uint64, []string{"file.offset = 1024"}},
+	FileType:       {FileType, "file type", kparams.AnsiString, []string{"file.type = 'directory'"}},
+	FileExtension:  {FileExtension, "file extension", kparams.AnsiString, []string{"file.extension = '.dll'"}},
+	FileAttributes: {FileAttributes, "file attributes", kparams.Slice, []string{"file.attributes in ('archive', 'hidden')"}},
 
 	RegistryKeyName:   {RegistryKeyName, "fully qualified key name", kparams.UnicodeString, []string{"registry.key.name contains 'HKEY_LOCAL_MACHINE'"}},
 	RegistryKeyHandle: {RegistryKeyHandle, "registry key object address", kparams.HexInt64, []string{"registry.key.handle = 'FFFFB905D60C2268'"}},

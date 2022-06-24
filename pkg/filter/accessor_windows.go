@@ -598,6 +598,21 @@ func (l *fileAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, 
 			return nil, err
 		}
 		return filepath.Ext(file), nil
+	case fields.FileAttributes:
+		val, err := kevt.Kparams.GetSlice(kparams.FileAttributes)
+		if err != nil {
+			return nil, err
+		}
+		slice, ok := val.([]fs.FileAttr)
+		if !ok {
+			return nil, nil
+		}
+		// convert from []fs.FileAttr to string slice
+		attrs := make([]string, 0, len(slice))
+		for _, attr := range slice {
+			attrs = append(attrs, attr.String())
+		}
+		return attrs, nil
 	}
 	return nil, nil
 }

@@ -345,6 +345,13 @@ func (f *fsInterceptor) processCreateFile(kevt *kevent.Kevent) error {
 	kevt.Kparams.Remove(kparams.FileExtraInfo)
 	// append human-readable file operation param
 	kevt.Kparams.Append(kparams.FileOperation, kparams.Enum, fs.FileDisposition(extraInfo))
+	// include file attributes as a slice parameter type
+	attrs, _ := kevt.Kparams.GetUint32(kparams.FileAttributes)
+	if attrs != 0 {
+		_ = kevt.Kparams.Set(kparams.FileAttributes, fs.FileAttributes(attrs), kparams.Slice)
+	} else {
+		kevt.Kparams.Remove(kparams.FileAttributes)
+	}
 
 	filename, err := kevt.Kparams.GetString(kparams.FileName)
 	if err != nil {

@@ -63,6 +63,7 @@ const (
 	fileKey           = "FileKey"
 	fileExtraInfo     = "ExtraInfo"
 	fileIrpPtr        = "IrpPtr"
+	fileAttributes    = "FileAttributes"
 
 	keyName        = "KeyName"
 	keyHandle      = "KeyHandle"
@@ -197,6 +198,8 @@ func Canonicalize(name string) string {
 		return NTStatus
 	case desiredAccess:
 		return DesiredAccess
+	case fileAttributes:
+		return FileAttributes
 	default:
 		return ""
 	}
