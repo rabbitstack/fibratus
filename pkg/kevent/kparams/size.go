@@ -33,7 +33,7 @@ func SizeOf(kpar string) uint32 {
 		return 8
 	case NTStatus, ProcessID, ThreadID, ProcessParentID,
 		SessionID, ExitStatus, FileCreateOptions, FileShareMask,
-		HandleID, FileIoSize, FileInfoClass:
+		HandleID, FileIoSize, FileInfoClass, FileAttributes:
 		return 4
 	case NetDport, NetSport, HandleObjectTypeID:
 		return 2

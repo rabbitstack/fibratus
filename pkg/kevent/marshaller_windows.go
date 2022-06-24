@@ -166,6 +166,13 @@ func (kevt *Kevent) MarshalRaw() []byte {
 					b = append(b, bytes.WriteUint16(uint16(len(s)))...)
 					b = append(b, s...)
 				}
+			case []fs.FileAttr:
+				b = append(b, uint8('s'))
+				b = append(b, bytes.WriteUint16(uint16(len(slice)))...)
+				for _, s := range slice {
+					b = append(b, bytes.WriteUint16(uint16(len(s.String())))...)
+					b = append(b, s.String()...)
+				}
 			}
 		}
 	}
