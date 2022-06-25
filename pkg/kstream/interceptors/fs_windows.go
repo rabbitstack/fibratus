@@ -229,6 +229,11 @@ func (f *fsInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 				return kevt, true, err
 			}
 			fkevt.Kparams.Append(kparams.FileExtraInfo, kparams.Uint8, extraInfo)
+			// resolve the status of the file operation
+			status, err := kevt.Kparams.GetUint32(kparams.NTStatus)
+			if err == nil {
+				_ = fkevt.Kparams.Append(kparams.NTStatus, kparams.UnicodeString, formatStatus(status, fkevt))
+			}
 
 			delete(f.pendingKevents, irp)
 

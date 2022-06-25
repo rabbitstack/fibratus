@@ -172,7 +172,7 @@ func (ps psInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 		// format the status code
 		status, err := kevt.Kparams.GetUint32(kparams.NTStatus)
 		if err == nil {
-			_ = kevt.Kparams.Set(kparams.NTStatus, formatStatus(status), kparams.UnicodeString)
+			_ = kevt.Kparams.Set(kparams.NTStatus, formatStatus(status, kevt), kparams.UnicodeString)
 		}
 		// convert desired access mask to hex value and transform
 		// the access mask to a list of symbolical names

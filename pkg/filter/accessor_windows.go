@@ -613,6 +613,8 @@ func (l *fileAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, 
 			attrs = append(attrs, attr.String())
 		}
 		return attrs, nil
+	case fields.FileStatus:
+		return kevt.Kparams.GetString(kparams.NTStatus)
 	}
 	return nil, nil
 }

@@ -44,7 +44,6 @@ var (
 )
 
 const (
-	notFoundNTStatus = 3221225524
 	maxHandleQueries = 200
 )
 
@@ -141,7 +140,7 @@ func (r *registryInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bo
 		// format registry operation status code
 		status, err := kevt.Kparams.GetUint32(kparams.NTStatus)
 		if err == nil {
-			_ = kevt.Kparams.Set(kparams.NTStatus, formatStatus(status), kparams.UnicodeString)
+			_ = kevt.Kparams.Set(kparams.NTStatus, formatStatus(status, kevt), kparams.UnicodeString)
 		}
 
 		// get the type/value of the registry key and append to parameters

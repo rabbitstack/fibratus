@@ -270,6 +270,8 @@ const (
 	FileType Field = "file.type"
 	// FileAttributes represents a slice of file attributes
 	FileAttributes Field = "file.attributes"
+	// FileStatus represents the status message of the file operation
+	FileStatus Field = "file.status"
 
 	// RegistryKeyName represents the registry key name
 	RegistryKeyName Field = "registry.key.name"
@@ -443,6 +445,7 @@ var fields = map[Field]FieldInfo{
 	FileType:       {FileType, "file type", kparams.AnsiString, []string{"file.type = 'directory'"}},
 	FileExtension:  {FileExtension, "file extension", kparams.AnsiString, []string{"file.extension = '.dll'"}},
 	FileAttributes: {FileAttributes, "file attributes", kparams.Slice, []string{"file.attributes in ('archive', 'hidden')"}},
+	FileStatus:     {FileStatus, "file operation status message", kparams.UnicodeString, []string{"file.status != 'success'"}},
 
 	RegistryKeyName:   {RegistryKeyName, "fully qualified key name", kparams.UnicodeString, []string{"registry.key.name contains 'HKEY_LOCAL_MACHINE'"}},
 	RegistryKeyHandle: {RegistryKeyHandle, "registry key object address", kparams.HexInt64, []string{"registry.key.handle = 'FFFFB905D60C2268'"}},
