@@ -479,7 +479,7 @@ var filterGroupSchema = `
 		"selector": {
 			"type": "object",
 			"properties": {
-				"type":		{"type": "string", "enum": ["CreateProcess", "CreateThread", "TerminateProcess", "TerminateThread", "LoadImage", "UnloadImage", "CreateFile", "CloseFile", "ReadFile", "WriteFile", "DeleteFile", "RenameFile", "SetFileInformation", "EnumDirectory", "RegCreateKey", "RegOpenKey", "RegSetValue", "RegQueryValue", "RegQueryKey", "RegDeleteKey", "RegDeleteValue", "Accept", "Send", "Recv", "Connect", "Disconnect", "Reconnect", "Retransmit", "CreateHandle", "CloseHandle"]},
+				"type":		{"type": "string", "enum": ["CreateProcess", "CreateThread", "TerminateProcess", "TerminateThread", "OpenProcess", "OpenThread", "LoadImage", "UnloadImage", "CreateFile", "CloseFile", "ReadFile", "WriteFile", "DeleteFile", "RenameFile", "SetFileInformation", "EnumDirectory", "RegCreateKey", "RegOpenKey", "RegSetValue", "RegQueryValue", "RegQueryKey", "RegDeleteKey", "RegDeleteValue", "Accept", "Send", "Recv", "Connect", "Disconnect", "Reconnect", "Retransmit", "CreateHandle", "CloseHandle"]},
 				"category": {"type": "string", "enum": ["registry", "file", "net", "process", "thread", "image", "handle"]}
 			},
 			"additionalProperties": false,
