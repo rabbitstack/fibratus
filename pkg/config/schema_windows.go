@@ -489,7 +489,7 @@ var filterGroupSchema = `
 			]
 		},
 		"enabled":  	{"type": "boolean"},
-		"policy":   	{"type": "string", "enum": ["include", "exclude", "INCLUDE", "EXCLUDE"]},
+		"policy":   	{"type": "string", "enum": ["include", "exclude", "sequence", "INCLUDE", "EXCLUDE", "SEQUENCE"]},
 		"relation": 	{"type": "string", "enum": ["or", "and", "OR", "AND"]},
 		"tags":			{"type": "array", "items": [{"type": "string", "minLength": 1}]},
 		"from-strings": {
@@ -498,18 +498,32 @@ var filterGroupSchema = `
 				{
 					"type": "object",
 					"properties": {
-						"name": 	{"type": "string", "minLength": 3},
-						"def": 		{"type": "string", "minLength": 3},
-						"action": 	{"type": "string"}
+						"name": 		{"type": "string", "minLength": 3},
+						"def": 			{"type": "string", "minLength": 3},
+						"condition": 	{"type": "string", "minLength": 3},
+						"action": 		{"type": "string"},
+						"max-span": 	{"type": "string"}
 					},
-					"required": ["name", "def"],
+					"oneOf": [
+						{"required": ["def"]},
+						{"required": ["condition"]}
+					],
+					"required": ["name"],
 					"minItems": 1,
 					"additionalProperties": false
 				}
 
 		}
 	},
-	"required": ["group", "enabled", "selector", "from-strings"],
+	"if": {
+		"properties": {"policy": {"const": "sequence" }}
+	},
+	"then": {
+		"required": ["group", "from-strings"]
+	},
+	"else": {
+		"required": ["group", "selector", "from-strings"]
+	},
 	"additionalProperties": false
 }
 `

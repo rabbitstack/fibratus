@@ -21,6 +21,7 @@ package filter
 import (
 	"net"
 	"testing"
+	"time"
 
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	"github.com/rabbitstack/fibratus/pkg/config"
@@ -154,6 +155,113 @@ func TestIncludeExcludeRemoteThreads(t *testing.T) {
 	}
 
 	require.False(t, rules.Fire(kevt))
+}
+
+func TestSimpleSequencePolicy(t *testing.T) {
+	rules := NewRules(newConfig("_fixtures/sequence_policy_simple.yml"))
+	require.NoError(t, rules.Compile())
+
+	kevt1 := &kevent.Kevent{
+		Type: ktypes.CreateProcess,
+		Name: "CreateProcess",
+		Tid:  2484,
+		PID:  859,
+		PS: &types.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\svchost.exe",
+		},
+		Kparams: kevent.Kparams{
+			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
+		},
+	}
+
+	kevt2 := &kevent.Kevent{
+		Type: ktypes.CreateFile,
+		Name: "CreateFile",
+		Tid:  2484,
+		PID:  859,
+		PS: &types.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\svchost.exe",
+		},
+		Kparams: kevent.Kparams{
+			kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper"},
+		},
+	}
+	require.False(t, rules.Fire(kevt1))
+	require.True(t, rules.Fire(kevt2))
+}
+
+func TestSimpleSequencePolicyWithMaxSpan(t *testing.T) {
+	rules := NewRules(newConfig("_fixtures/sequence_policy_simple_max_span.yml"))
+	require.NoError(t, rules.Compile())
+
+	kevt1 := &kevent.Kevent{
+		Type: ktypes.CreateProcess,
+		Name: "CreateProcess",
+		Tid:  2484,
+		PID:  859,
+		PS: &types.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\svchost.exe",
+		},
+		Kparams: kevent.Kparams{
+			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
+		},
+	}
+
+	kevt2 := &kevent.Kevent{
+		Type: ktypes.CreateFile,
+		Name: "CreateFile",
+		Tid:  2484,
+		PID:  859,
+		PS: &types.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\svchost.exe",
+		},
+		Kparams: kevent.Kparams{
+			kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper"},
+		},
+	}
+	require.False(t, rules.Fire(kevt1))
+	time.Sleep(time.Millisecond * 250)
+	require.False(t, rules.Fire(kevt2))
+}
+
+func TestSimpleSequencePolicyWithMaxSpanNotReached(t *testing.T) {
+	rules := NewRules(newConfig("_fixtures/sequence_policy_simple_max_span.yml"))
+	require.NoError(t, rules.Compile())
+
+	kevt1 := &kevent.Kevent{
+		Type: ktypes.CreateProcess,
+		Name: "CreateProcess",
+		Tid:  2484,
+		PID:  859,
+		PS: &types.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\svchost.exe",
+		},
+		Kparams: kevent.Kparams{
+			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
+		},
+	}
+
+	kevt2 := &kevent.Kevent{
+		Type: ktypes.CreateFile,
+		Name: "CreateFile",
+		Tid:  2484,
+		PID:  859,
+		PS: &types.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\svchost.exe",
+		},
+		Kparams: kevent.Kparams{
+			kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper"},
+		},
+	}
+	require.False(t, rules.Fire(kevt1))
+	time.Sleep(time.Millisecond * 110)
+	require.True(t, rules.Fire(kevt2))
 }
 
 func TestFilterActionEmitAlert(t *testing.T) {

@@ -28,6 +28,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
+	"hash/fnv"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -36,6 +37,7 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+	"time"
 )
 
 // FilterGroupPolicy is the type alias for the filter group policy
@@ -52,6 +54,9 @@ const (
 	// out the matching events, that is, discarding them from the event
 	// flow.
 	ExcludePolicy
+	// SequencePolicy determines the policy that allows matching a
+	// sequence of temporal events based on pattern binding restrictions
+	SequencePolicy
 	// UnknownPolicy determines the unknown group policy type.
 	UnknownPolicy
 )
@@ -74,6 +79,8 @@ func (p FilterGroupPolicy) String() string {
 		return "include"
 	case ExcludePolicy:
 		return "exclude"
+	case SequencePolicy:
+		return "sequence"
 	default:
 		return ""
 	}
@@ -119,6 +126,8 @@ func filterGroupPolicyFromString(s string) FilterGroupPolicy {
 		return IncludePolicy
 	case "exclude", "EXCLUDE":
 		return ExcludePolicy
+	case "sequence", "SEQUENCE":
+		return SequencePolicy
 	default:
 		return UnknownPolicy
 	}
@@ -137,9 +146,11 @@ func filterGroupRelationFromString(s string) FilterGroupRelation {
 
 // FilterConfig is the descriptor of a single filter.
 type FilterConfig struct {
-	Name   string `json:"name" yaml:"name"`
-	Def    string `json:"def" yaml:"def"`
-	Action string `json:"action" yaml:"action"`
+	Name      string        `json:"name" yaml:"name"`
+	Def       string        `json:"def" yaml:"def"` // deprecated in favor of `Condition`
+	Condition string        `json:"condition" yaml:"condition"`
+	Action    string        `json:"action" yaml:"action"`
+	MaxSpan   time.Duration `json:"max-span" yaml:"max-span"`
 }
 
 // parseTmpl ensures the correctness of the filter
@@ -185,6 +196,16 @@ func (g FilterGroup) validate(resource string) error {
 	return nil
 }
 
+// Hash calculates the filter group hash.
+func (g FilterGroup) Hash() uint32 {
+	h := fnv.New32()
+	_, err := h.Write([]byte(g.Policy.String() + g.Name))
+	if err != nil {
+		return 0
+	}
+	return h.Sum32()
+}
+
 // FilterGroupSelector permits specifying the events
 // that will be captured by particular filter group.
 // Only one of type or category selectors can be active
@@ -192,6 +213,15 @@ func (g FilterGroup) validate(resource string) error {
 type FilterGroupSelector struct {
 	Type     ktypes.Ktype    `json:"type" yaml:"type"`
 	Category ktypes.Category `json:"category" yaml:"category"`
+}
+
+// Hash computes the filter group selector hash.
+func (s FilterGroupSelector) Hash() uint32 {
+	hash := s.Type.Hash()
+	if hash != 0 {
+		return hash
+	}
+	return s.Category.Hash()
 }
 
 // Filters contains references to filter group definitions.
