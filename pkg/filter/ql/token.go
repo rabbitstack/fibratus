@@ -20,6 +20,7 @@ package ql
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
+	"regexp"
 	"strings"
 )
 
@@ -31,8 +32,9 @@ const (
 	ws
 	eof
 
-	field // ps.name
-	str   // 'cmd.exe'
+	field          // ps.name
+	str            // 'cmd.exe'
+	patternBinding // $1.ps.name
 	badstr
 	badesc
 	ident
@@ -94,18 +96,19 @@ var tokens = [...]string{
 	eof:     "EOF",
 	ws:      "WS",
 
-	ident:    "IDENT",
-	field:    "FIELD",
-	integer:  "INTEGER",
-	dec:      "DECIMAL",
-	duration: "DURATION",
-	str:      "STRING",
-	badstr:   "BADSTRING",
-	badesc:   "BADESCAPE",
-	ip:       "IPADDRESS",
-	badip:    "BADIPADDRESS",
-	truet:    "TRUE",
-	falset:   "FALSE",
+	ident:          "IDENT",
+	field:          "FIELD",
+	patternBinding: "PATTERNBINDING",
+	integer:        "INTEGER",
+	dec:            "DECIMAL",
+	duration:       "DURATION",
+	str:            "STRING",
+	badstr:         "BADSTRING",
+	badesc:         "BADESCAPE",
+	ip:             "IPADDRESS",
+	badip:          "BADIPADDRESS",
+	truet:          "TRUE",
+	falset:         "FALSE",
 
 	and:         "AND",
 	or:          "OR",
@@ -174,10 +177,18 @@ func tokstr(tok token, lit string) string {
 	return tok.String()
 }
 
+var patternBindingRegexp = regexp.MustCompile("\\$[1-9]\\.(.+)")
+
 // lookup returns the token associated with a given string.
 func lookup(id string) (token, string) {
 	if tok, ok := keywords[strings.ToLower(id)]; ok {
 		return tok, ""
+	}
+	matches := patternBindingRegexp.FindStringSubmatch(id)
+	if len(matches) > 0 {
+		if tok := fields.Lookup(matches[1]); tok != "" {
+			return patternBinding, id
+		}
 	}
 	if tok := fields.Lookup(id); tok != "" {
 		return field, id

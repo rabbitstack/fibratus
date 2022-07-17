@@ -62,6 +62,10 @@ func TestScanner(t *testing.T) {
 		{s: `ps.pe.sections[.debug$S].entropy`, tok: field, lit: "ps.pe.sections[.debug$S].entropy"},
 		{s: `ps.envs[CommonProgramFiles86]`, tok: field, lit: "ps.envs[CommonProgramFiles86]"},
 
+		// pattern bindings
+		{s: `$1.ps.name`, tok: patternBinding, lit: "$1.ps.name"},
+		{s: `$4.kevt.name`, tok: patternBinding, lit: "$4.kevt.name"},
+
 		// identifiers
 		{s: `foo`, tok: ident, lit: `foo`},
 		{s: `_foo`, tok: ident, lit: `_foo`},

@@ -65,6 +65,7 @@ const (
 
 	matchTransition    = "match"
 	deadlineTransition = "deadline"
+	resetTransition    = "reset"
 )
 
 // Rules stores the compiled filter groups
@@ -92,34 +93,45 @@ type compiledFilter struct {
 }
 
 // sequenceState represents the state of the
-// outstanding sequence. A deterministic finite
-// state machine tracks the matching status of
+// ordered sequence of multiple events that
+// may have time-frame constraints. A deterministic
+// finite state machine tracks the matching status of
 // each rule (state) in the machine.
 type sequenceState struct {
 	// keeps the state of matched events per rule index
 	matchedEvents map[uint16][]*kevent.Kevent
 	fsm           *stateless.StateMachine
 	idxs          map[string]uint16
+	maxSpans      map[string]time.Duration
 	spanDeadlines map[string]*time.Timer
+	initialState  string
 }
 
 func newSequenceState(initialState string) *sequenceState {
-	fsm := stateless.NewStateMachine(initialState)
-
 	ss := &sequenceState{
 		matchedEvents: make(map[uint16][]*kevent.Kevent),
 		idxs:          make(map[string]uint16),
-		fsm:           fsm,
+		maxSpans:      make(map[string]time.Duration),
 		spanDeadlines: make(map[string]*time.Timer),
+		initialState:  initialState,
 	}
 
-	fsm.OnTransitioned(func(ctx context.Context, transition stateless.Transition) {
-		if span, ok := ss.spanDeadlines[transition.Source.(string)]; ok {
-			span.Stop()
-		}
-	})
+	ss.initFSM()
 
 	return ss
+}
+
+func (s *sequenceState) initFSM() {
+	s.fsm = stateless.NewStateMachine(s.initialState)
+	s.fsm.OnTransitioned(func(ctx context.Context, transition stateless.Transition) {
+		if dur, ok := s.maxSpans[transition.Destination.(string)]; ok {
+			s.scheduleMaxSpanDeadline(transition.Destination.(string), dur)
+		}
+		if span, ok := s.spanDeadlines[transition.Source.(string)]; ok {
+			span.Stop()
+			delete(s.spanDeadlines, transition.Source.(string))
+		}
+	})
 }
 
 func (s *sequenceState) matchTransition(rule string, kevt *kevent.Kevent) error {
@@ -131,14 +143,21 @@ func (s *sequenceState) deadlineTransition(rule string) error {
 }
 
 func (s *sequenceState) isTerminalState() bool {
-	return s.fsm.MustState() == sequenceTerminalState
+	isFinal := s.fsm.MustState() == sequenceTerminalState
+	if isFinal {
+		err := s.fsm.Fire(resetTransition)
+		if err != nil {
+			log.Warnf("unable to transition to initial state: %v", err)
+		}
+	}
+	return isFinal
 }
 
 func (s *sequenceState) addMatched(rule string, kevt *kevent.Kevent) {
 	s.matchedEvents[s.idxs[rule]] = append(s.matchedEvents[s.idxs[rule]], kevt)
 }
 
-func (s *sequenceState) getMatched(rule string) []*kevent.Kevent {
+func (s *sequenceState) getMatched(rule string) map[uint16][]*kevent.Kevent {
 	i := s.idxs[rule]
 	// if this is the first rule in the sequence we don't
 	// feed back it with partial matches. Propagation is
@@ -146,13 +165,13 @@ func (s *sequenceState) getMatched(rule string) []*kevent.Kevent {
 	if i == 1 {
 		return nil
 	}
-	n := i
-	kevts := make([]*kevent.Kevent, 0)
+	n := i - 1
+	partials := make(map[uint16][]*kevent.Kevent)
 	for n > 0 {
+		partials[n] = s.matchedEvents[n]
 		n--
-		kevts = append(kevts, s.matchedEvents[n]...)
 	}
-	return kevts
+	return partials
 }
 
 func (s *sequenceState) clearMatched() {
@@ -172,6 +191,10 @@ func (s *sequenceState) scheduleMaxSpanDeadline(rule string, maxSpan time.Durati
 			if err != nil {
 				log.Warnf("deadline transition failed: %v", err)
 			}
+			err = s.fsm.Fire(resetTransition)
+			if err != nil {
+				log.Warnf("unable to transition to initial state: %v", err)
+			}
 		}
 	})
 	s.spanDeadlines[rule] = t
@@ -185,9 +208,9 @@ func newCompiledFilter(f Filter, filterConfig *config.FilterConfig) compiledFilt
 	return compiledFilter{config: filterConfig, filter: f}
 }
 
-func (f compiledFilter) run(kevt *kevent.Kevent, partials ...*kevent.Kevent) bool {
+func (f compiledFilter) run(kevt *kevent.Kevent, partials map[uint16][]*kevent.Kevent) bool {
 	if len(partials) > 0 {
-
+		return f.filter.RunPartials(kevt, partials)
 	}
 	return f.filter.Run(kevt)
 }
@@ -269,15 +292,15 @@ func (r *Rules) Compile() error {
 			if err := f.Compile(); err != nil {
 				return ErrInvalidFilter(rule, group.Name, err)
 			}
-			seqState.setRuleIndex(rule, i+1)
-			// schedule maximum span deadline
-			if filterConfig.MaxSpan != 0 {
-				seqState.scheduleMaxSpanDeadline(rule, filterConfig.MaxSpan)
-			}
 			// setup finite state machine states. The last rule
 			// in the sequence transitions to the terminal state
 			// if all rules match
 			if group.Policy == config.SequencePolicy {
+				seqState.setRuleIndex(rule, i+1)
+				// schedule maximum span deadline
+				if filterConfig.MaxSpan != 0 {
+					seqState.maxSpans[rule] = filterConfig.MaxSpan
+				}
 				if i >= len(group.FromStrings)-1 {
 					seqState.fsm.Configure(rule).
 						Permit(stateTrigger(matchTransition, rule), sequenceTerminalState).
@@ -293,9 +316,13 @@ func (r *Rules) Compile() error {
 		}
 		// initialize filter groups
 		fg := newFilterGroup(group, filters)
-		r.sequences[group.Name] = seqState
 		r.filterGroups[hash] = append(r.filterGroups[hash], fg)
 		if group.Policy == config.SequencePolicy {
+			// configure reset transitions that are triggered
+			// when the final state is reached of when a deadline happens
+			seqState.fsm.Configure(sequenceTerminalState).Permit(resetTransition, initialState)
+			seqState.fsm.Configure(deadlineTransition).Permit(resetTransition, initialState)
+			r.sequences[group.Name] = seqState
 			r.sequenceGroups = append(r.sequenceGroups, fg)
 		}
 	}
@@ -370,7 +397,7 @@ nextGroup:
 			}
 			for _, f := range g.filters {
 				rule := f.config.Name
-				ok := f.run(kevt, seqState.getMatched(rule)...)
+				ok := f.run(kevt, seqState.getMatched(rule))
 				if ok {
 					seqState.addMatched(rule, kevt)
 					err := seqState.matchTransition(rule, kevt)
@@ -391,7 +418,7 @@ nextGroup:
 		// group upon first match or either all rules in the group
 		// need to match
 		for _, f := range g.filters {
-			ok := f.run(kevt)
+			ok := f.run(kevt, nil)
 
 			switch g.group.Policy {
 			case config.ExcludePolicy:

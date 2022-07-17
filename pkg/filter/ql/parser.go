@@ -149,6 +149,8 @@ func (p *Parser) parseUnaryExpr() (Expr, error) {
 		return &StringLiteral{Value: lit}, nil
 	case field:
 		return &FieldLiteral{Value: lit}, nil
+	case patternBinding:
+		return &PatternBindingLiteral{Value: lit}, nil
 	case truet, falset:
 		return &BoolLiteral{Value: tok == truet}, nil
 	case integer:
@@ -170,7 +172,7 @@ func (p *Parser) parseUnaryExpr() (Expr, error) {
 		return &DecimalLiteral{Value: v}, nil
 	}
 
-	expectations := []string{"field", "string", "number", "bool", "ip", "function"}
+	expectations := []string{"field", "string", "number", "bool", "ip", "function", "pattern binding"}
 	if tok == badip {
 		expectations = []string{"a valid IP address"}
 	}

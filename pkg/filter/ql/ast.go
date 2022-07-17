@@ -29,12 +29,20 @@ import (
 )
 
 // Eval evaluates expr against a map that contains the field values.
-func Eval(expr Expr, m map[string]interface{}, multivaluer bool) bool {
+func Eval(expr Expr, m map[string]interface{}, b map[string]interface{}, funcValuer bool) bool {
 	var eval ValuerEval
-	if multivaluer {
-		eval = ValuerEval{Valuer: MultiValuer(MapValuer(m), FunctionValuer{m})}
+	if funcValuer {
+		if len(b) > 0 {
+			eval = ValuerEval{Valuer: MultiValuer(MapValuer(m), PatternBindingValuer(b), FunctionValuer{m})}
+		} else {
+			eval = ValuerEval{Valuer: MultiValuer(MapValuer(m), FunctionValuer{m})}
+		}
 	} else {
-		eval = ValuerEval{Valuer: MapValuer(m)}
+		if len(b) > 0 {
+			eval = ValuerEval{Valuer: MultiValuer(MapValuer(m), PatternBindingValuer(b))}
+		} else {
+			eval = ValuerEval{Valuer: MapValuer(m)}
+		}
 	}
 	v, ok := eval.Eval(expr).(bool)
 	if !ok {
@@ -64,6 +72,15 @@ type CallValuer interface {
 
 	// Call is invoked to evaluate a function call (if possible).
 	Call(name string, args []interface{}) (interface{}, bool)
+}
+
+// PatternBindingValuer fetches values from pattern bindings
+type PatternBindingValuer map[string]interface{}
+
+// Value returns the value for a key in the PatternBindingValuer.
+func (b PatternBindingValuer) Value(key string) (interface{}, bool) {
+	v, ok := b[key]
+	return v, ok
 }
 
 // MultiValuer returns a Valuer that iterates over multiple Valuer instances
@@ -141,6 +158,12 @@ func (v *ValuerEval) Eval(expr Expr) interface{} {
 	case *BoolLiteral:
 		return expr.Value
 	case *FieldLiteral:
+		val, ok := v.Valuer.Value(expr.Value)
+		if !ok {
+			return nil
+		}
+		return val
+	case *PatternBindingLiteral:
 		val, ok := v.Valuer.Value(expr.Value)
 		if !ok {
 			return nil

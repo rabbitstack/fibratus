@@ -19,6 +19,7 @@
 package filter
 
 import (
+	"github.com/rabbitstack/fibratus/pkg/fs"
 	"net"
 	"testing"
 	"time"
@@ -262,6 +263,123 @@ func TestSimpleSequencePolicyWithMaxSpanNotReached(t *testing.T) {
 	require.False(t, rules.Fire(kevt1))
 	time.Sleep(time.Millisecond * 110)
 	require.True(t, rules.Fire(kevt2))
+}
+
+func TestSimpleSequencePolicyPatternBindings(t *testing.T) {
+	rules := NewRules(newConfig("_fixtures/sequence_policy_simple_pattern_bindings.yml"))
+	require.NoError(t, rules.Compile())
+
+	kevt1 := &kevent.Kevent{
+		Type: ktypes.CreateProcess,
+		Name: "CreateProcess",
+		Tid:  2484,
+		PID:  859,
+		PS: &types.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\svchost.exe",
+		},
+		Kparams: kevent.Kparams{
+			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
+		},
+	}
+
+	kevt2 := &kevent.Kevent{
+		Type: ktypes.CreateFile,
+		Name: "CreateFile",
+		Tid:  2484,
+		PID:  859,
+		PS: &types.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\svchost.exe",
+		},
+		Kparams: kevent.Kparams{
+			kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper"},
+		},
+	}
+	require.False(t, rules.Fire(kevt1))
+	require.True(t, rules.Fire(kevt2))
+}
+
+func TestSequenceComplexPatternBindings(t *testing.T) {
+	rules := NewRules(newConfig("_fixtures/sequence_policy_complex_pattern_bindings.yml"))
+	require.NoError(t, rules.Compile())
+
+	kevt1 := &kevent.Kevent{
+		Type:     ktypes.CreateProcess,
+		Category: ktypes.Process,
+		Name:     "CreateProcess",
+		Tid:      2484,
+		PID:      859,
+		PS: &types.PS{
+			Name: "explorer.exe",
+			Exe:  "C:\\Windows\\system32\\explorer.exe",
+		},
+		Kparams: kevent.Kparams{
+			kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(2243)},
+			kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "firefox.exe"},
+		},
+	}
+
+	kevt2 := &kevent.Kevent{
+		Type: ktypes.CreateFile,
+		Name: "CreateFile",
+		Tid:  2484,
+		PID:  859,
+		PS: &types.PS{
+			Name: "firefox.exe",
+			Exe:  "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
+			Comm: "C:\\Program Files\\Mozilla Firefox\\firefox.exe\" -contentproc --channel=\"10464.7.539748228\\1366525930\" -childID 6 -isF",
+		},
+		Kparams: kevent.Kparams{
+			kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
+			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: fs.FileDisposition(2)},
+		},
+	}
+
+	kevt3 := &kevent.Kevent{
+		Type:     ktypes.CreateProcess,
+		Name:     "CreateProcess",
+		Category: ktypes.Process,
+		Tid:      244,
+		PID:      1234,
+		PS: &types.PS{
+			Name: "explorer.exe",
+			Exe:  "C:\\Windows\\system32\\explorer.exe",
+		},
+		Kparams: kevent.Kparams{
+			kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(4143)},
+			kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "dropper.exe"},
+			kparams.Exe:         {Name: kparams.Exe, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
+		},
+	}
+
+	kevt4 := &kevent.Kevent{
+		Type:     ktypes.Connect,
+		Category: ktypes.Net,
+		Name:     "Connect",
+		Tid:      244,
+		PID:      4143,
+		PS: &types.PS{
+			Name: "dropper.exe",
+			Exe:  "C:\\Temp\\dropper.exe",
+		},
+		Kparams: kevent.Kparams{},
+	}
+
+	require.False(t, rules.Fire(kevt1))
+	require.False(t, rules.Fire(kevt2))
+	time.Sleep(time.Millisecond * 30)
+	require.False(t, rules.Fire(kevt3))
+	time.Sleep(time.Millisecond * 22)
+
+	require.True(t, rules.Fire(kevt4))
+
+	// FSM should transition from terminal to inital state
+	require.False(t, rules.Fire(kevt1))
+	require.False(t, rules.Fire(kevt2))
+	time.Sleep(time.Millisecond * 15)
+	require.False(t, rules.Fire(kevt3))
+	require.True(t, rules.Fire(kevt4))
 }
 
 func TestFilterActionEmitAlert(t *testing.T) {
