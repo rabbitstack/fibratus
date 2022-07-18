@@ -49,10 +49,6 @@ var (
 	ErrInvalidFilter = func(rule, group string, err error) error {
 		return fmt.Errorf("invalid filter %q in %q group: %v", rule, group, err)
 	}
-
-	stateTrigger = func(transition fsm.Trigger, rule fsm.State) string {
-		return fmt.Sprintf("%s-%s", transition, rule)
-	}
 )
 
 var (
@@ -101,20 +97,31 @@ type compiledFilter struct {
 // each rule (state) in the machine.
 type sequenceState struct {
 	// keeps the state of matched events per rule index
-	matchedEvents   map[uint16][]*kevent.Kevent
-	fsm             *fsm.StateMachine
-	idxs            map[string]uint16
-	maxSpans        map[fsm.State]time.Duration
-	spanDeadlines   map[fsm.State]*time.Timer
-	inDeadlineState uint64
+	matchedEvents map[uint16][]*kevent.Kevent
+	// reducedMatches stores only the event that matched
+	// the upstream partials. These events will be propagated
+	// in the rule action context
+	reducedMatches map[uint16]*kevent.Kevent
+	fsm            *fsm.StateMachine
+	idxs           map[string]uint16
+	maxSpans       map[fsm.State]time.Duration
+	spanDeadlines  map[fsm.State]*time.Timer
+	inDeadline     uint64
+	initialState   fsm.State
+	// matchedRules keeps the mapping between rule indexes and
+	// their matches.
+	matchedRules   map[uint16]bool
 }
 
 func newSequenceState(initialState string) *sequenceState {
 	ss := &sequenceState{
-		matchedEvents: make(map[uint16][]*kevent.Kevent),
-		idxs:          make(map[string]uint16),
-		maxSpans:      make(map[fsm.State]time.Duration),
-		spanDeadlines: make(map[fsm.State]*time.Timer),
+		matchedEvents:  make(map[uint16][]*kevent.Kevent),
+		matchedRules:   make(map[uint16]bool),
+		reducedMatches: make(map[uint16]*kevent.Kevent),
+		idxs:           make(map[string]uint16),
+		maxSpans:       make(map[fsm.State]time.Duration),
+		spanDeadlines:  make(map[fsm.State]*time.Timer),
+		initialState:   fsm.State(initialState),
 	}
 
 	ss.initFSM(initialState)
@@ -132,15 +139,24 @@ func (s *sequenceState) initFSM(initialState string) {
 			span.Stop()
 			delete(s.spanDeadlines, transition.Source)
 		}
+		// the sequence is stuck in deadline until the reset transitions
+		// to initial state and initial state transitions to the next one
+		if transition.Trigger == resetTransition && transition.Destination == s.initialState {
+			atomic.StoreUint64(&s.inDeadline, 0)
+			s.clearMatched()
+		}
+		if transition.Trigger == matchTransition {
+			s.matchedRules[s.idxs[transition.Source.(string)]] = true
+		}
 	})
 }
 
-func (s *sequenceState) matchTransition(rule string, kevt *kevent.Kevent) error {
-	return s.fsm.Fire(stateTrigger(matchTransition, rule), kevt)
+func (s *sequenceState) matchTransition(kevt *kevent.Kevent) error {
+	return s.fsm.Fire(matchTransition, kevt)
 }
 
 func (s *sequenceState) deadlineTransition(rule fsm.State) error {
-	return s.fsm.Fire(stateTrigger(deadlineTransition, rule))
+	return s.fsm.Fire(deadlineTransition, rule)
 }
 
 func (s *sequenceState) isTerminalState() bool {
@@ -152,6 +168,10 @@ func (s *sequenceState) isTerminalState() bool {
 		}
 	}
 	return isFinal
+}
+
+func (s *sequenceState) isInitialState() bool {
+	return s.fsm.MustState() == s.initialState
 }
 
 func (s *sequenceState) addMatched(rule string, kevt *kevent.Kevent) {
@@ -177,6 +197,18 @@ func (s *sequenceState) getMatched(rule string) map[uint16][]*kevent.Kevent {
 
 func (s *sequenceState) clearMatched() {
 	s.matchedEvents = make(map[uint16][]*kevent.Kevent)
+	s.reducedMatches = make(map[uint16]*kevent.Kevent)
+	s.matchedRules = make(map[uint16]bool)
+}
+
+// shouldRun determines whether the next rule in the
+// sequence should be evaluated.
+func (s *sequenceState) shouldRun(i int) bool {
+	// always evaluate the first rule in the sequence
+	if i == 0 {
+		return true
+	}
+	return s.matchedRules[uint16(i)]
 }
 
 func (s *sequenceState) scheduleMaxSpanDeadline(rule fsm.State, maxSpan time.Duration) {
@@ -184,12 +216,14 @@ func (s *sequenceState) scheduleMaxSpanDeadline(rule fsm.State, maxSpan time.Dur
 		inState, _ := s.fsm.IsInState(rule)
 		if inState {
 			log.Infof("max span of %v exceded for rule %s", maxSpan, rule)
-			s.markDeadline(true)
+			atomic.StoreUint64(&s.inDeadline, 1)
+			// transitions to deadline state
 			err := s.deadlineTransition(rule)
 			if err != nil {
-				s.markDeadline(false)
+				atomic.StoreUint64(&s.inDeadline, 0)
 				log.Warnf("deadline transition failed: %v", err)
 			}
+			// transitions from deadline state to initial state
 			err = s.fsm.Fire(resetTransition)
 			if err != nil {
 				log.Warnf("unable to transition to initial state: %v", err)
@@ -199,17 +233,7 @@ func (s *sequenceState) scheduleMaxSpanDeadline(rule fsm.State, maxSpan time.Dur
 	s.spanDeadlines[rule] = t
 }
 
-func (s *sequenceState) deadlined() bool { return atomic.LoadUint64(&s.inDeadlineState) > 0 }
-func (s *sequenceState) markDeadline(deadline bool) {
-	atomic.StoreUint64(&s.inDeadlineState, btoi(deadline))
-}
-
-func btoi(v bool) uint64 {
-	if v {
-		return 1
-	}
-	return 0
-}
+func (s *sequenceState) deadlined() bool { return atomic.LoadUint64(&s.inDeadline) > 0 }
 
 func newFilterGroup(g config.FilterGroup, filters []compiledFilter) *filterGroup {
 	return &filterGroup{group: g, filters: filters}
@@ -219,11 +243,20 @@ func newCompiledFilter(f Filter, filterConfig *config.FilterConfig) compiledFilt
 	return compiledFilter{config: filterConfig, filter: f}
 }
 
-func (f compiledFilter) run(kevt *kevent.Kevent, partials map[uint16][]*kevent.Kevent) bool {
+// run execute the filter and returns the matching partial index along with
+// the partial event that produced a match.
+//
+// Example assumes the following partials:
+//
+// partials[1] = {e1, e2, e3, e4}
+//
+// If the second filter in the sequence matches on the event e3 in the partials
+// index 1, then this method would return the (true, 1, e3) tuple.
+func (f compiledFilter) run(kevt *kevent.Kevent, partials map[uint16][]*kevent.Kevent) (bool, uint16, *kevent.Kevent) {
 	if len(partials) > 0 {
 		return f.filter.RunPartials(kevt, partials)
 	}
-	return f.filter.Run(kevt)
+	return f.filter.Run(kevt), 0, kevt
 }
 
 type filterGroups []*filterGroup
@@ -314,12 +347,12 @@ func (r *Rules) Compile() error {
 				}
 				if i >= len(group.FromStrings)-1 {
 					seqState.fsm.Configure(rule).
-						Permit(stateTrigger(matchTransition, rule), sequenceTerminalState).
-						Permit(stateTrigger(deadlineTransition, rule), sequenceDeadlineState)
+						Permit(matchTransition, sequenceTerminalState).
+						Permit(deadlineTransition, sequenceDeadlineState)
 				} else {
 					seqState.fsm.Configure(rule).
-						Permit(stateTrigger(matchTransition, rule), group.FromStrings[i+1].Name).
-						Permit(stateTrigger(deadlineTransition, rule), sequenceDeadlineState)
+						Permit(matchTransition, group.FromStrings[i+1].Name).
+						Permit(deadlineTransition, sequenceDeadlineState)
 				}
 			}
 			filters = append(filters, newCompiledFilter(f, filterConfig))
@@ -332,7 +365,7 @@ func (r *Rules) Compile() error {
 			// configure reset transitions that are triggered
 			// when the final state is reached of when a deadline happens
 			seqState.fsm.Configure(sequenceTerminalState).Permit(resetTransition, initialState)
-			seqState.fsm.Configure(deadlineTransition).Permit(resetTransition, initialState)
+			seqState.fsm.Configure(sequenceDeadlineState).Permit(resetTransition, initialState)
 			r.sequences[group.Name] = seqState
 			r.sequenceGroups = append(r.sequenceGroups, fg)
 		}
@@ -407,21 +440,25 @@ nextGroup:
 				continue
 			}
 			// if the sequence transitioned through deadline state
-			// we can reject any further rule evaluation and clear
+			// we can reject any further rule evaluations and clear
 			// all matched event tuples
-			if seqState.deadlined() == true {
+			if seqState.deadlined() {
 				seqState.clearMatched()
-				seqState.markDeadline(false)
 				return false
 			}
-			for _, f := range g.filters {
+			for i, f := range g.filters {
+				// run the filter only if the previous rule matched
+				if !seqState.shouldRun(i) {
+					return false
+				}
 				rule := f.config.Name
-				ok := f.run(kevt, seqState.getMatched(rule))
+				ok, idx, e := f.run(kevt, seqState.getMatched(rule))
 				if ok {
 					seqState.addMatched(rule, kevt)
-					err := seqState.matchTransition(rule, kevt)
+					seqState.reducedMatches[idx] = e
+					err := seqState.matchTransition(kevt)
 					if err != nil {
-						log.Warnf("sequence transiton failure: %v", err)
+						log.Warnf("match transition: %v", err)
 					}
 				}
 			}
@@ -437,7 +474,7 @@ nextGroup:
 		// group upon first match or either all rules in the group
 		// need to match
 		for _, f := range g.filters {
-			ok := f.run(kevt, nil)
+			ok, _, _ := f.run(kevt, nil)
 
 			switch g.group.Policy {
 			case config.ExcludePolicy:

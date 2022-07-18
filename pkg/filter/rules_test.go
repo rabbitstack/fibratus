@@ -227,6 +227,13 @@ func TestSimpleSequencePolicyWithMaxSpanReached(t *testing.T) {
 	require.False(t, rules.Fire(kevt1))
 	time.Sleep(time.Millisecond * 250)
 	require.False(t, rules.Fire(kevt2))
+
+	// now the state machine has transitioned
+	// to the initial state, which means we should
+	// be able to match the sequence if we reinsert
+	// the events
+	require.False(t, rules.Fire(kevt1))
+	require.True(t, rules.Fire(kevt2))
 }
 
 func TestSimpleSequencePolicyWithMaxSpanNotReached(t *testing.T) {
@@ -324,7 +331,7 @@ func TestSequenceComplexPatternBindings(t *testing.T) {
 		Type: ktypes.CreateFile,
 		Name: "CreateFile",
 		Tid:  2484,
-		PID:  859,
+		PID:  2243,
 		PS: &types.PS{
 			Name: "firefox.exe",
 			Exe:  "C:\\Program Files\\Mozilla Firefox\\firefox.exe",

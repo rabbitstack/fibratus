@@ -41,7 +41,7 @@ type Filter interface {
 	Run(kevt *kevent.Kevent) bool
 	// RunPartials runs a filter with stateful event tracking. Partials store all
 	// intermediate events that are the result of previous filter matches.
-	RunPartials(kevt *kevent.Kevent, partials map[uint16][]*kevent.Kevent) bool
+	RunPartials(kevt *kevent.Kevent, partials map[uint16][]*kevent.Kevent) (bool, uint16, *kevent.Kevent)
 }
 
 type filter struct {
@@ -106,9 +106,9 @@ func (f *filter) Run(kevt *kevent.Kevent) bool {
 	return ql.Eval(f.expr, f.mapValuer(kevt), nil, f.useFuncValuer)
 }
 
-func (f *filter) RunPartials(kevt *kevent.Kevent, partials map[uint16][]*kevent.Kevent) bool {
+func (f *filter) RunPartials(kevt *kevent.Kevent, partials map[uint16][]*kevent.Kevent) (bool, uint16, *kevent.Kevent) {
 	if f.expr == nil {
-		return false
+		return false, 0, nil
 	}
 	mapValuer := f.mapValuer(kevt)
 	for i, kevts := range partials {
@@ -116,11 +116,11 @@ func (f *filter) RunPartials(kevt *kevent.Kevent, partials map[uint16][]*kevent.
 			valuer := f.bindingValuer(e, i)
 			ok := ql.Eval(f.expr, mapValuer, valuer, f.useFuncValuer)
 			if ok {
-				return true
+				return true, i, e
 			}
 		}
 	}
-	return false
+	return false, 0, nil
 }
 
 // mapValuer for each field present in the AST, we run the
