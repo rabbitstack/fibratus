@@ -193,7 +193,7 @@ func TestSimpleSequencePolicy(t *testing.T) {
 	require.True(t, rules.Fire(kevt2))
 }
 
-func TestSimpleSequencePolicyWithMaxSpan(t *testing.T) {
+func TestSimpleSequencePolicyWithMaxSpanReached(t *testing.T) {
 	rules := NewRules(newConfig("_fixtures/sequence_policy_simple_max_span.yml"))
 	require.NoError(t, rules.Compile())
 
@@ -374,7 +374,7 @@ func TestSequenceComplexPatternBindings(t *testing.T) {
 
 	require.True(t, rules.Fire(kevt4))
 
-	// FSM should transition from terminal to inital state
+	// FSM should transition from terminal to initial state
 	require.False(t, rules.Fire(kevt1))
 	require.False(t, rules.Fire(kevt2))
 	time.Sleep(time.Millisecond * 15)

@@ -49,7 +49,7 @@ type filter struct {
 	parser    *ql.Parser
 	accessors []accessor
 	fields    []fields.Field
-	bindings  []*ql.PatternBindingLiteral
+	bindings  map[uint16][]*ql.PatternBindingLiteral
 	// useFuncValuer determines whether we should supply the function valuer
 	useFuncValuer bool
 }
@@ -78,7 +78,7 @@ func (f *filter) Compile() error {
 				f.fields = append(f.fields, fields.Field(rhs.Value))
 			}
 			if rhs, ok := expr.RHS.(*ql.PatternBindingLiteral); ok {
-				f.bindings = append(f.bindings, rhs)
+				f.bindings[rhs.Index()] = append(f.bindings[rhs.Index()], rhs)
 			}
 		}
 		if expr, ok := n.(*ql.Function); ok {
@@ -110,10 +110,11 @@ func (f *filter) RunPartials(kevt *kevent.Kevent, partials map[uint16][]*kevent.
 	if f.expr == nil {
 		return false
 	}
+	mapValuer := f.mapValuer(kevt)
 	for i, kevts := range partials {
 		for _, e := range kevts {
 			valuer := f.bindingValuer(e, i)
-			ok := ql.Eval(f.expr, f.mapValuer(kevt), valuer, f.useFuncValuer)
+			ok := ql.Eval(f.expr, mapValuer, valuer, f.useFuncValuer)
 			if ok {
 				return true
 			}
@@ -145,13 +146,10 @@ func (f *filter) mapValuer(kevt *kevent.Kevent) map[string]interface{} {
 }
 
 // bindingValuer for each pattern binding node, resolves its value from
-// the event that pertains to the same binding index.
+// the event that pertains to the same pattern binding index.
 func (f *filter) bindingValuer(kevt *kevent.Kevent, idx uint16) map[string]interface{} {
 	valuer := make(map[string]interface{})
-	for _, binding := range f.bindings {
-		if binding.Index() != idx {
-			continue
-		}
+	for _, binding := range f.bindings[idx] {
 		for _, accessor := range f.accessors {
 			v, err := accessor.get(binding.Field(), kevt)
 			if err != nil && !kerrors.IsKparamNotFound(err) {

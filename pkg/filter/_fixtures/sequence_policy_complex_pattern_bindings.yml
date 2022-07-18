@@ -1,4 +1,4 @@
-- group: phising dropper outbound communication
+- group: phishing dropper outbound communication
   policy: sequence
   enabled: true
   from-strings:

@@ -29,20 +29,17 @@ import (
 )
 
 // Eval evaluates expr against a map that contains the field values.
-func Eval(expr Expr, m map[string]interface{}, b map[string]interface{}, funcValuer bool) bool {
+func Eval(expr Expr, m map[string]interface{}, b map[string]interface{}, useFuncValuer bool) bool {
 	var eval ValuerEval
-	if funcValuer {
-		if len(b) > 0 {
-			eval = ValuerEval{Valuer: MultiValuer(MapValuer(m), PatternBindingValuer(b), FunctionValuer{m})}
-		} else {
-			eval = ValuerEval{Valuer: MultiValuer(MapValuer(m), FunctionValuer{m})}
-		}
-	} else {
-		if len(b) > 0 {
-			eval = ValuerEval{Valuer: MultiValuer(MapValuer(m), PatternBindingValuer(b))}
-		} else {
-			eval = ValuerEval{Valuer: MapValuer(m)}
-		}
+	switch {
+	case useFuncValuer && len(b) > 0:
+		eval = ValuerEval{Valuer: MultiValuer(MapValuer(m), PatternBindingValuer(b), FunctionValuer{m})}
+	case useFuncValuer:
+		eval = ValuerEval{Valuer: MultiValuer(MapValuer(m), FunctionValuer{m})}
+	case len(b) > 0:
+		eval = ValuerEval{Valuer: MultiValuer(MapValuer(m), PatternBindingValuer(b))}
+	default:
+		eval = ValuerEval{Valuer: MapValuer(m)}
 	}
 	v, ok := eval.Eval(expr).(bool)
 	if !ok {

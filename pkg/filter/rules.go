@@ -25,8 +25,9 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
-	"github.com/qmuntal/stateless"
+	fsm "github.com/qmuntal/stateless"
 	"strings"
+	"sync/atomic"
 	"text/template"
 	"time"
 
@@ -49,23 +50,24 @@ var (
 		return fmt.Errorf("invalid filter %q in %q group: %v", rule, group, err)
 	}
 
-	stateTrigger = func(transition, rule string) string {
+	stateTrigger = func(transition fsm.Trigger, rule fsm.State) string {
 		return fmt.Sprintf("%s-%s", transition, rule)
 	}
 )
 
-const (
+var (
 	// sequenceTerminalState represents the final state in the FSM.
 	// This state is transitioned when the last rule in the group
 	// produces a match
-	sequenceTerminalState = "terminal"
+	sequenceTerminalState = fsm.State("terminal")
 	// sequenceDeadlineState represents the state to which other
 	// states transition if the rule's max span is reached
-	sequenceDeadlineState = "deadline"
+	sequenceDeadlineState = fsm.State("deadline")
 
-	matchTransition    = "match"
-	deadlineTransition = "deadline"
-	resetTransition    = "reset"
+	// transitions for match, deadline and reset triggers
+	matchTransition    = fsm.Trigger("match")
+	deadlineTransition = fsm.Trigger("deadline")
+	resetTransition    = fsm.Trigger("reset")
 )
 
 // Rules stores the compiled filter groups
@@ -99,37 +101,36 @@ type compiledFilter struct {
 // each rule (state) in the machine.
 type sequenceState struct {
 	// keeps the state of matched events per rule index
-	matchedEvents map[uint16][]*kevent.Kevent
-	fsm           *stateless.StateMachine
-	idxs          map[string]uint16
-	maxSpans      map[string]time.Duration
-	spanDeadlines map[string]*time.Timer
-	initialState  string
+	matchedEvents   map[uint16][]*kevent.Kevent
+	fsm             *fsm.StateMachine
+	idxs            map[string]uint16
+	maxSpans        map[fsm.State]time.Duration
+	spanDeadlines   map[fsm.State]*time.Timer
+	inDeadlineState uint64
 }
 
 func newSequenceState(initialState string) *sequenceState {
 	ss := &sequenceState{
 		matchedEvents: make(map[uint16][]*kevent.Kevent),
 		idxs:          make(map[string]uint16),
-		maxSpans:      make(map[string]time.Duration),
-		spanDeadlines: make(map[string]*time.Timer),
-		initialState:  initialState,
+		maxSpans:      make(map[fsm.State]time.Duration),
+		spanDeadlines: make(map[fsm.State]*time.Timer),
 	}
 
-	ss.initFSM()
+	ss.initFSM(initialState)
 
 	return ss
 }
 
-func (s *sequenceState) initFSM() {
-	s.fsm = stateless.NewStateMachine(s.initialState)
-	s.fsm.OnTransitioned(func(ctx context.Context, transition stateless.Transition) {
-		if dur, ok := s.maxSpans[transition.Destination.(string)]; ok {
-			s.scheduleMaxSpanDeadline(transition.Destination.(string), dur)
+func (s *sequenceState) initFSM(initialState string) {
+	s.fsm = fsm.NewStateMachine(initialState)
+	s.fsm.OnTransitioned(func(ctx context.Context, transition fsm.Transition) {
+		if dur, ok := s.maxSpans[transition.Destination]; ok {
+			s.scheduleMaxSpanDeadline(transition.Destination, dur)
 		}
-		if span, ok := s.spanDeadlines[transition.Source.(string)]; ok {
+		if span, ok := s.spanDeadlines[transition.Source]; ok {
 			span.Stop()
-			delete(s.spanDeadlines, transition.Source.(string))
+			delete(s.spanDeadlines, transition.Source)
 		}
 	})
 }
@@ -138,7 +139,7 @@ func (s *sequenceState) matchTransition(rule string, kevt *kevent.Kevent) error 
 	return s.fsm.Fire(stateTrigger(matchTransition, rule), kevt)
 }
 
-func (s *sequenceState) deadlineTransition(rule string) error {
+func (s *sequenceState) deadlineTransition(rule fsm.State) error {
 	return s.fsm.Fire(stateTrigger(deadlineTransition, rule))
 }
 
@@ -178,17 +179,15 @@ func (s *sequenceState) clearMatched() {
 	s.matchedEvents = make(map[uint16][]*kevent.Kevent)
 }
 
-func (s *sequenceState) setRuleIndex(rule string, i int) {
-	s.idxs[rule] = uint16(i)
-}
-
-func (s *sequenceState) scheduleMaxSpanDeadline(rule string, maxSpan time.Duration) {
+func (s *sequenceState) scheduleMaxSpanDeadline(rule fsm.State, maxSpan time.Duration) {
 	t := time.AfterFunc(maxSpan, func() {
 		inState, _ := s.fsm.IsInState(rule)
 		if inState {
 			log.Infof("max span of %v exceded for rule %s", maxSpan, rule)
+			s.markDeadline(true)
 			err := s.deadlineTransition(rule)
 			if err != nil {
+				s.markDeadline(false)
 				log.Warnf("deadline transition failed: %v", err)
 			}
 			err = s.fsm.Fire(resetTransition)
@@ -198,6 +197,18 @@ func (s *sequenceState) scheduleMaxSpanDeadline(rule string, maxSpan time.Durati
 		}
 	})
 	s.spanDeadlines[rule] = t
+}
+
+func (s *sequenceState) deadlined() bool { return atomic.LoadUint64(&s.inDeadlineState) > 0 }
+func (s *sequenceState) markDeadline(deadline bool) {
+	atomic.StoreUint64(&s.inDeadlineState, btoi(deadline))
+}
+
+func btoi(v bool) uint64 {
+	if v {
+		return 1
+	}
+	return 0
 }
 
 func newFilterGroup(g config.FilterGroup, filters []compiledFilter) *filterGroup {
@@ -296,7 +307,7 @@ func (r *Rules) Compile() error {
 			// in the sequence transitions to the terminal state
 			// if all rules match
 			if group.Policy == config.SequencePolicy {
-				seqState.setRuleIndex(rule, i+1)
+				seqState.idxs[rule] = uint16(i + 1)
 				// schedule maximum span deadline
 				if filterConfig.MaxSpan != 0 {
 					seqState.maxSpans[rule] = filterConfig.MaxSpan
@@ -394,6 +405,14 @@ nextGroup:
 			seqState := r.sequences[g.group.Name]
 			if seqState == nil {
 				continue
+			}
+			// if the sequence transitioned through deadline state
+			// we can reject any further rule evaluation and clear
+			// all matched event tuples
+			if seqState.deadlined() == true {
+				seqState.clearMatched()
+				seqState.markDeadline(false)
+				return false
 			}
 			for _, f := range g.filters {
 				rule := f.config.Name

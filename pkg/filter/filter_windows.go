@@ -64,7 +64,7 @@ func New(expr string, config *config.Config) Filter {
 		parser:    ql.NewParser(expr),
 		accessors: accessors,
 		fields:    make([]fields.Field, 0),
-		bindings:  make([]*ql.PatternBindingLiteral, 0),
+		bindings:  make(map[uint16][]*ql.PatternBindingLiteral, 0),
 	}
 }
 
@@ -91,7 +91,7 @@ func NewFromCLIWithAllAccessors(args []string) (Filter, error) {
 		parser:    ql.NewParser(expr),
 		accessors: getAccessors(),
 		fields:    make([]fields.Field, 0),
-		bindings:  make([]*ql.PatternBindingLiteral, 0),
+		bindings:  make(map[uint16][]*ql.PatternBindingLiteral, 0),
 	}
 	if err := filter.Compile(); err != nil {
 		return nil, fmt.Errorf("bad filter: \n  %v", err)
