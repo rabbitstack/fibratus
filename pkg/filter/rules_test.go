@@ -158,6 +158,73 @@ func TestIncludeExcludeRemoteThreads(t *testing.T) {
 	require.False(t, rules.Fire(kevt))
 }
 
+func TestSequenceState(t *testing.T) {
+	rules := NewRules(newConfig("_fixtures/sequence_policy_simple_max_span.yml"))
+	require.NoError(t, rules.Compile())
+
+	kevt1 := &kevent.Kevent{
+		Type: ktypes.CreateProcess,
+		Name: "CreateProcess",
+		Tid:  2484,
+		PID:  859,
+		PS: &types.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\svchost.exe",
+		},
+		Kparams: kevent.Kparams{
+			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
+		},
+	}
+
+	kevt2 := &kevent.Kevent{
+		Type: ktypes.CreateFile,
+		Name: "CreateFile",
+		Tid:  2484,
+		PID:  859,
+		PS: &types.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\svchost.exe",
+		},
+		Kparams: kevent.Kparams{
+			kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper"},
+		},
+	}
+
+	sequences := rules.sequences
+	assert.Len(t, sequences, 1)
+	ss := sequences["command shell execution and temp files"]
+
+	require.NotNil(t, ss)
+
+	assert.Equal(t, "spawn command shell", ss.currentState())
+	assert.True(t, ss.isInitialState())
+	assert.Equal(t, "spawn command shell", ss.initialState)
+
+	require.NoError(t, ss.matchTransition(kevt1))
+	assert.False(t, ss.isInitialState())
+	assert.Equal(t, "created temp file by command shell", ss.currentState())
+
+	require.NoError(t, ss.matchTransition(kevt2))
+	assert.Equal(t, sequenceTerminalState, ss.currentState())
+	assert.True(t, ss.isTerminalState())
+	// reset transition leads back to initial state
+	assert.Equal(t, "spawn command shell", ss.currentState())
+
+	// deadline exceeded
+	require.NoError(t, ss.matchTransition(kevt1))
+	assert.Equal(t, "created temp file by command shell", ss.currentState())
+	time.Sleep(time.Millisecond * 300)
+	assert.True(t, ss.isInitialState())
+
+	require.True(t, ss.deadlined())
+	if !ss.deadlined() {
+		require.NoError(t, ss.matchTransition(kevt2))
+	}
+	assert.True(t, ss.isInitialState())
+	require.NoError(t, ss.matchTransition(kevt1))
+	require.False(t, ss.deadlined())
+}
+
 func TestSimpleSequencePolicy(t *testing.T) {
 	rules := NewRules(newConfig("_fixtures/sequence_policy_simple.yml"))
 	require.NoError(t, rules.Compile())

@@ -21,10 +21,12 @@ package filter
 import (
 	"errors"
 	"expvar"
+	"fmt"
 	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/filter/ql"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"strings"
 )
 
 var (
@@ -42,6 +44,9 @@ type Filter interface {
 	// RunPartials runs a filter with stateful event tracking. Partials store all
 	// intermediate events that are the result of previous filter matches.
 	RunPartials(kevt *kevent.Kevent, partials map[uint16][]*kevent.Kevent) (bool, uint16, *kevent.Kevent)
+	// BindingIndex returns the binding index to which the filter is bound
+	// or a zero value if there are no pattern bindings defined.
+	BindingIndex() (uint16, bool)
 }
 
 type filter struct {
@@ -96,6 +101,16 @@ func (f *filter) Compile() error {
 		return errNoFields
 	}
 
+	if len(f.bindings) > 1 {
+		binds := make([]string, 0)
+		for _, b := range f.bindings {
+			for _, binding := range b {
+				binds = append(binds, binding.Value)
+			}
+		}
+		return fmt.Errorf("multiple pattern bindings found referencing "+
+			"distinct sequence events: %s", strings.Join(binds, ","))
+	}
 	return nil
 }
 
@@ -121,6 +136,16 @@ func (f *filter) RunPartials(kevt *kevent.Kevent, partials map[uint16][]*kevent.
 		}
 	}
 	return false, 0, nil
+}
+
+func (f *filter) BindingIndex() (uint16, bool) {
+	if len(f.bindings) == 0 {
+		return 0, false
+	}
+	for i := range f.bindings {
+		return i, true
+	}
+	return 0, false
 }
 
 // mapValuer for each field present in the AST, we run the
