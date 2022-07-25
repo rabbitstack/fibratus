@@ -319,7 +319,6 @@ func (k *kstreamConsumer) processKevent(evt *etw.EventRecord) error {
 		}
 		kpars = kevent.Kparams(k.produceParams(ktype, evt, trace))
 	}
-
 	timestamp := filetime.ToEpoch(evt.Header.Timestamp)
 
 	switch ktype.Category() {

@@ -72,21 +72,8 @@ func ReadUTF16String(buf uintptr, offset, length uint16) (string, uint16) {
 	if offset > length {
 		return "", 0
 	}
-	// scan the entire string
-	b := make([]uint16, length)
-	var i uint16
-	for i < length-offset {
-		c := *(*uint16)(unsafe.Pointer(buf + uintptr(offset) + uintptr(i)))
-		if c == 0 {
-			break // null terminator
-		}
-		b[i] = c
-		i++
-	}
-	if int(i) > len(b) {
-		return string(syscall.UTF16ToString(b[:len(b)-1])), uint16(len(b))
-	}
-	return syscall.UTF16ToString(b[:i]), i + 2
+	s := (*[1<<30 - 1]uint16)(unsafe.Pointer(buf + uintptr(offset)))[: length-offset-1 : length-offset-1]
+	return syscall.UTF16ToString(s), uint16(len(s) + 2)
 }
 
 // ConsumeString reads the byte slice with UTF16-encoded string

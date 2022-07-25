@@ -109,12 +109,12 @@ func (k *ktraceController) StartKtrace() error {
 	// if k.kstreamConfig.EnableNetKevents {
 	// 	flags |= etw.NetTCPIP
 	// }
-	if k.kstreamConfig.EnableRegistryKevents {
-		flags |= etw.Registry
-	}
-	if k.kstreamConfig.EnableFileIOKevents {
-		flags |= etw.DiskFileIO | etw.FileIO | etw.FileIOInit
-	}
+	// if k.kstreamConfig.EnableRegistryKevents {
+	// 	flags |= etw.Registry
+	// }
+	// if k.kstreamConfig.EnableFileIOKevents {
+	// 	flags |= etw.DiskFileIO | etw.FileIO | etw.FileIOInit
+	// }
 
 	bufferSize := k.kstreamConfig.BufferSize
 	if bufferSize > maxBufferSize {
