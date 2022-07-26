@@ -102,14 +102,14 @@ func (f *filter) Compile() error {
 	}
 
 	if len(f.bindings) > 1 {
-		binds := make([]string, 0)
+		bindings := make([]string, 0)
 		for _, b := range f.bindings {
 			for _, binding := range b {
-				binds = append(binds, binding.Value)
+				bindings = append(bindings, binding.Value)
 			}
 		}
 		return fmt.Errorf("multiple pattern bindings found referencing "+
-			"distinct sequence events: %s", strings.Join(binds, ","))
+			"distinct sequence events: %s", strings.Join(bindings, ","))
 	}
 	return nil
 }
@@ -126,13 +126,16 @@ func (f *filter) RunPartials(kevt *kevent.Kevent, partials map[uint16][]*kevent.
 		return false, 0, nil
 	}
 	mapValuer := f.mapValuer(kevt)
-	for i, kevts := range partials {
-		for _, e := range kevts {
-			valuer := f.bindingValuer(e, i)
-			ok := ql.Eval(f.expr, mapValuer, valuer, f.useFuncValuer)
-			if ok {
-				return true, i, e
-			}
+	i, ok := f.BindingIndex()
+	if !ok {
+		return false, 0, nil
+	}
+	kevts := partials[i]
+	for _, e := range kevts {
+		valuer := f.bindingValuer(e, i)
+		ok := ql.Eval(f.expr, mapValuer, valuer, f.useFuncValuer)
+		if ok {
+			return true, i, e
 		}
 	}
 	return false, 0, nil

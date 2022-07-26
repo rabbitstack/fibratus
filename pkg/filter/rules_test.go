@@ -159,7 +159,7 @@ func TestIncludeExcludeRemoteThreads(t *testing.T) {
 }
 
 func TestSequenceState(t *testing.T) {
-	rules := NewRules(newConfig("_fixtures/sequence_policy_simple_max_span.yml"))
+	rules := NewRules(newConfig("_fixtures/sequence_policy_simple_pattern_bindings.yml"))
 	require.NoError(t, rules.Compile())
 
 	kevt1 := &kevent.Kevent{
@@ -172,7 +172,8 @@ func TestSequenceState(t *testing.T) {
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
 		},
 		Kparams: kevent.Kparams{
-			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
+			kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(4143)},
+			kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.AnsiString, Value: "powershell.exe"},
 		},
 	}
 
@@ -200,11 +201,17 @@ func TestSequenceState(t *testing.T) {
 	assert.True(t, ss.isInitialState())
 	assert.Equal(t, "spawn command shell", ss.initialState)
 
+	ss.addPartial("spawn command shell", kevt1)
 	require.NoError(t, ss.matchTransition(kevt1))
 	assert.False(t, ss.isInitialState())
 	assert.Equal(t, "created temp file by command shell", ss.currentState())
 
+	ss.addPartial("created temp file by command shell", kevt2)
 	require.NoError(t, ss.matchTransition(kevt2))
+
+	assert.Len(t, ss.getPartials("spawn command shell"), 0)
+	assert.Len(t, ss.getPartials("created temp file by command shell"), 1)
+
 	assert.Equal(t, sequenceTerminalState, ss.currentState())
 	assert.True(t, ss.isTerminalState())
 	// reset transition leads back to initial state
@@ -213,16 +220,45 @@ func TestSequenceState(t *testing.T) {
 	// deadline exceeded
 	require.NoError(t, ss.matchTransition(kevt1))
 	assert.Equal(t, "created temp file by command shell", ss.currentState())
-	time.Sleep(time.Millisecond * 300)
+	time.Sleep(time.Millisecond * 120)
 	assert.True(t, ss.isInitialState())
 
 	require.True(t, ss.deadlined())
-	if !ss.deadlined() {
+	require.False(t, ss.next(1))
+	if ss.next(1) {
+		// this shouldn't happen
 		require.NoError(t, ss.matchTransition(kevt2))
 	}
+
+	ss.clear()
 	assert.True(t, ss.isInitialState())
 	require.NoError(t, ss.matchTransition(kevt1))
+	ss.addPartial("spawn command shell", kevt1)
 	require.False(t, ss.deadlined())
+
+	// test expiration
+	terminateProcess := &kevent.Kevent{
+		Type: ktypes.TerminateProcess,
+		Name: "TerminateProcess",
+		Tid:  2484,
+		PID:  859,
+		PS: &types.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\svchost.exe",
+		},
+		Kparams: kevent.Kparams{
+			kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(4143)},
+			kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.AnsiString, Value: "powershell.exe"},
+		},
+	}
+
+	require.True(t, ss.expire(terminateProcess))
+	require.True(t, ss.inExpired)
+
+	require.NoError(t, ss.matchTransition(kevt1))
+	require.False(t, ss.inExpired)
+
+	assert.Equal(t, "created temp file by command shell", ss.currentState())
 }
 
 func TestSimpleSequencePolicy(t *testing.T) {

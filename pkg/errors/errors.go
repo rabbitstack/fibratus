@@ -45,7 +45,7 @@ type ErrKparamNotFound struct {
 
 // Error returns the error message.
 func (e ErrKparamNotFound) Error() string {
-	return "couldn't find " + e.Name + " in event parameters"
+	return "couldn't find '" + e.Name + "' in event parameters"
 }
 
 // IsCancelUpstreamKevent determines if the error being passed if of `ErrCancelUpstreamKevent` type.

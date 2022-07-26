@@ -6,5 +6,9 @@
       condition: kevt.name = 'CreateProcess' and ps.name = 'cmd.exe'
     - name: created temp file by command shell
       condition: >
-        kevt.name = 'CreateFile' and ps.pid = $1.ps.pid and file.name icontains 'temp'
+        kevt.name = 'CreateFile'
+          and
+        ps.pid = $1.ps.pid
+          and
+        file.name icontains 'temp'
       max-span: 100ms
