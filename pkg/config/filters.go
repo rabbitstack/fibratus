@@ -181,6 +181,7 @@ type FilterGroup struct {
 	Relation    FilterGroupRelation `json:"relation" yaml:"relation"`
 	FromStrings []*FilterConfig     `json:"from-strings" yaml:"from-strings"`
 	Tags        []string            `json:"tags" yaml:"tags"`
+	Action      string              `json:"action" yaml:"action"` // only valid in sequence policies
 }
 
 func (g FilterGroup) validate(resource string) error {
@@ -439,6 +440,9 @@ func tmplData() TmplData {
 	}
 }
 
+const actionNode = "action"
+const fromStringsNode = "from-strings"
+
 // encodeFilterActions convert the filter action template
 // to base64 payload. Because we only want to execute
 // the action template when a filter matches in runtime,
@@ -455,12 +459,17 @@ func encodeFilterActions(buf []byte) ([]byte, error) {
 	for _, n := range yn.Content[0].Content {
 		// for each group node
 		for i, gn := range n.Content {
-			if gn.Value == "from-strings" {
+			// sequence groups action
+			if gn.Value == actionNode && n.Content[i+1].Value != "" {
+				n.Content[i+1].Value =
+					base64.StdEncoding.EncodeToString([]byte(n.Content[i+1].Value))
+			}
+			if gn.Value == fromStringsNode {
 				content := n.Content[i+1]
 				// for each node in from-strings
 				for _, s := range content.Content {
 					for j, e := range s.Content {
-						if e.Value == "action" && s.Content[j+1].Value != "" {
+						if e.Value == actionNode && s.Content[j+1].Value != "" {
 							s.Content[j+1].Value =
 								base64.StdEncoding.EncodeToString([]byte(s.Content[j+1].Value))
 						}

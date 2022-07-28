@@ -492,6 +492,7 @@ var filterGroupSchema = `
 		"policy":   	{"type": "string", "enum": ["include", "exclude", "sequence", "INCLUDE", "EXCLUDE", "SEQUENCE"]},
 		"relation": 	{"type": "string", "enum": ["or", "and", "OR", "AND"]},
 		"tags":			{"type": "array", "items": [{"type": "string", "minLength": 1}]},
+		"action":       {"type": "string"},
 		"from-strings": {
 			"type": "array",
 			"items":
@@ -502,7 +503,7 @@ var filterGroupSchema = `
 						"def": 			{"type": "string", "minLength": 3},
 						"condition": 	{"type": "string", "minLength": 3},
 						"action": 		{"type": "string"},
-						"max-span": 	{"type": "string"}
+						"max-span": 	{"type": "string", "minLength": 2, "pattern": "[0-9]+ms|s|m|h|d"}
 					},
 					"oneOf": [
 						{"required": ["def"]},

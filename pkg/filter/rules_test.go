@@ -223,7 +223,7 @@ func TestSequenceState(t *testing.T) {
 	time.Sleep(time.Millisecond * 120)
 	assert.True(t, ss.isInitialState())
 
-	require.True(t, ss.deadlined())
+	require.True(t, ss.inDeadline.Load())
 	require.False(t, ss.next(1))
 	if ss.next(1) {
 		// this shouldn't happen
@@ -234,7 +234,7 @@ func TestSequenceState(t *testing.T) {
 	assert.True(t, ss.isInitialState())
 	require.NoError(t, ss.matchTransition(kevt1))
 	ss.addPartial("spawn command shell", kevt1)
-	require.False(t, ss.deadlined())
+	require.False(t, ss.inDeadline.Load())
 
 	// test expiration
 	terminateProcess := &kevent.Kevent{
@@ -277,6 +277,7 @@ func TestSimpleSequencePolicy(t *testing.T) {
 		Kparams: kevent.Kparams{
 			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
 		},
+		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "barzz"},
 	}
 
 	kevt2 := &kevent.Kevent{
@@ -291,6 +292,7 @@ func TestSimpleSequencePolicy(t *testing.T) {
 		Kparams: kevent.Kparams{
 			kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper"},
 		},
+		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "barzz"},
 	}
 	require.False(t, rules.Fire(kevt1))
 	require.True(t, rules.Fire(kevt2))
@@ -326,6 +328,7 @@ func TestSimpleSequencePolicyWithMaxSpanReached(t *testing.T) {
 		Kparams: kevent.Kparams{
 			kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper"},
 		},
+		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "barzz"},
 	}
 	require.False(t, rules.Fire(kevt1))
 	time.Sleep(time.Millisecond * 250)
@@ -405,6 +408,7 @@ func TestSimpleSequencePolicyPatternBindings(t *testing.T) {
 		Kparams: kevent.Kparams{
 			kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper"},
 		},
+		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "barzz"},
 	}
 	require.False(t, rules.Fire(kevt1))
 	require.True(t, rules.Fire(kevt2))
@@ -415,6 +419,7 @@ func TestSequenceComplexPatternBindings(t *testing.T) {
 	require.NoError(t, rules.Compile())
 
 	kevt1 := &kevent.Kevent{
+		Seq:      1,
 		Type:     ktypes.CreateProcess,
 		Category: ktypes.Process,
 		Name:     "CreateProcess",
@@ -431,6 +436,7 @@ func TestSequenceComplexPatternBindings(t *testing.T) {
 	}
 
 	kevt2 := &kevent.Kevent{
+		Seq:  2,
 		Type: ktypes.CreateFile,
 		Name: "CreateFile",
 		Tid:  2484,
@@ -447,6 +453,7 @@ func TestSequenceComplexPatternBindings(t *testing.T) {
 	}
 
 	kevt3 := &kevent.Kevent{
+		Seq:      3,
 		Type:     ktypes.CreateProcess,
 		Name:     "CreateProcess",
 		Category: ktypes.Process,
@@ -464,6 +471,7 @@ func TestSequenceComplexPatternBindings(t *testing.T) {
 	}
 
 	kevt4 := &kevent.Kevent{
+		Seq:      4,
 		Type:     ktypes.Connect,
 		Category: ktypes.Net,
 		Name:     "Connect",
@@ -473,16 +481,41 @@ func TestSequenceComplexPatternBindings(t *testing.T) {
 			Name: "dropper.exe",
 			Exe:  "C:\\Temp\\dropper.exe",
 		},
-		Kparams: kevent.Kparams{},
+		Kparams: kevent.Kparams{
+			kparams.NetDIP: {Name: kparams.NetDIP, Type: kparams.IP, Value: net.ParseIP("10.0.2.3")},
+		},
+		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "barzz"},
 	}
 
 	require.False(t, rules.Fire(kevt1))
 	require.False(t, rules.Fire(kevt2))
 	time.Sleep(time.Millisecond * 30)
 	require.False(t, rules.Fire(kevt3))
+
+	// at this point we should have
+	// accumulated multiple matches
+	matches := rules.sequences["phishing dropper outbound communication"].matches
+
+	require.Len(t, matches, 3)
+	assert.Equal(t, uint64(1), matches[1].Seq)
+	assert.Equal(t, uint64(2), matches[2].Seq)
+	assert.Equal(t, uint64(3), matches[3].Seq)
+
 	time.Sleep(time.Millisecond * 22)
 
+	// register alert sender
+	require.NoError(t, alertsender.LoadAll([]alertsender.Config{{Type: alertsender.Noop}}))
+
 	require.True(t, rules.Fire(kevt4))
+
+	// check the format of the generated alert
+	require.NotNil(t, emitAlert)
+	assert.Equal(t, "Phishing dropper outbound communication", emitAlert.Title)
+	assert.Equal(t, "dropper.exe process initiated outbound communication to 10.0.2.3", emitAlert.Text)
+	emitAlert = nil
+
+	matches = rules.sequences["phishing dropper outbound communication"].matches
+	require.Len(t, matches, 0)
 
 	// FSM should transition from terminal to initial state
 	require.False(t, rules.Fire(kevt1))
@@ -521,6 +554,7 @@ func TestFilterActionEmitAlert(t *testing.T) {
 	assert.Equal(t, "cmd.exe process received data on port 443", emitAlert.Text)
 	assert.Equal(t, alertsender.Critical, emitAlert.Severity)
 	assert.Equal(t, []string{"tag1", "tag2"}, emitAlert.Tags)
+	emitAlert = nil
 }
 
 func BenchmarkChainRun(b *testing.B) {
