@@ -472,6 +472,26 @@ var schema = `
 var filterGroupSchema = `
 {
 	"$schema": "http://json-schema.org/draft-07/schema#",
+    "definitions": {"rules": {"$id": "#rules", "type": "object", "type": "array",
+			"items":
+				{
+					"type": "object",
+					"properties": {
+						"name": 		{"type": "string", "minLength": 3},
+						"def": 			{"type": "string", "minLength": 3},
+						"condition": 	{"type": "string", "minLength": 3},
+						"action": 		{"type": "string"},
+						"max-span": 	{"type": "string", "minLength": 2, "pattern": "[0-9]+ms|s|m|h|d"}
+					},
+					"oneOf": [
+						{"required": ["def"]},
+						{"required": ["condition"]}
+					],
+					"required": ["name"],
+					"minItems": 1,
+					"additionalProperties": false
+				}}},
+
 
 	"type": "object",
 	"properties": {
@@ -493,37 +513,25 @@ var filterGroupSchema = `
 		"relation": 	{"type": "string", "enum": ["or", "and", "OR", "AND"]},
 		"tags":			{"type": "array", "items": [{"type": "string", "minLength": 1}]},
 		"action":       {"type": "string"},
-		"from-strings": {
-			"type": "array",
-			"items":
-				{
-					"type": "object",
-					"properties": {
-						"name": 		{"type": "string", "minLength": 3},
-						"def": 			{"type": "string", "minLength": 3},
-						"condition": 	{"type": "string", "minLength": 3},
-						"action": 		{"type": "string"},
-						"max-span": 	{"type": "string", "minLength": 2, "pattern": "[0-9]+ms|s|m|h|d"}
-					},
-					"oneOf": [
-						{"required": ["def"]},
-						{"required": ["condition"]}
-					],
-					"required": ["name"],
-					"minItems": 1,
-					"additionalProperties": false
-				}
-
-		}
+		"from-strings": {"$ref": "#rules"},
+		"rules": 		{"$ref": "#rules"}
 	},
 	"if": {
 		"properties": {"policy": {"const": "sequence" }}
 	},
 	"then": {
-		"required": ["group", "from-strings"]
+		"required": ["group"],
+		"oneOf": [
+			{"required": ["from-strings"]},
+			{"required": ["rules"]}
+		]
 	},
 	"else": {
-		"required": ["group", "selector", "from-strings"]
+		"required": ["group", "selector"],
+		"oneOf": [
+			{"required": ["from-strings"]},
+			{"required": ["rules"]}
+		]
 	},
 	"additionalProperties": false
 }

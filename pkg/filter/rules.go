@@ -53,6 +53,8 @@ var (
 	filtersCount              = expvar.NewInt("filter.filters.count")
 
 	matchTransitionErrors = expvar.NewInt("sequence.match.transition.errors")
+	partialsPerSequence   = expvar.NewMap("sequence.partials.count")
+	partialExpirations    = expvar.NewMap("sequence.partial.expirations")
 
 	ErrInvalidFilter = func(rule, group string, err error) error {
 		return fmt.Errorf("invalid filter %q in %q group: %v", rule, group, err)
@@ -178,6 +180,7 @@ func (s *sequenceState) initFSM(initialState string) {
 			s.clear()
 		}
 		if transition.Trigger == matchTransition {
+			log.Debugf("state trigger from rule [%s]", transition.Source)
 			// a match occurred from current to next state.
 			// Stop deadline execution for the old current state
 			if span, ok := s.spanDeadlines[transition.Source]; ok {
@@ -191,8 +194,12 @@ func (s *sequenceState) initFSM(initialState string) {
 	})
 }
 
-func (s *sequenceState) matchTransition(kevt *kevent.Kevent) error {
-	return s.fsm.Fire(matchTransition, kevt)
+func (s *sequenceState) matchTransition(rule string, kevt *kevent.Kevent) error {
+	shouldFire := !s.matchedRules[s.idxs[rule]]
+	if shouldFire {
+		return s.fsm.Fire(matchTransition, kevt)
+	}
+	return nil
 }
 
 func (s *sequenceState) cancelTransition(rule fsm.State) error {
@@ -229,6 +236,8 @@ func (s *sequenceState) addPartial(rule string, kevt *kevent.Kevent) {
 		return
 	}
 	if len(s.bindingIndexes) > 0 {
+		log.Debugf("adding partial to slot [%d] for rule %q: %s", s.idxs[rule], rule, kevt)
+		partialsPerSequence.Add(s.name, 1)
 		s.partials[s.idxs[rule]] = append(s.partials[s.idxs[rule]], kevt)
 	}
 }
@@ -262,6 +271,7 @@ func (s *sequenceState) clear() {
 	s.matches = make(map[uint16]*kevent.Kevent)
 	s.matchedRules = make(map[uint16]bool)
 	s.spanDeadlines = make(map[fsm.State]*time.Timer)
+	partialsPerSequence.Delete(s.name)
 }
 
 // next determines whether the next rule in the
@@ -269,10 +279,6 @@ func (s *sequenceState) clear() {
 // if its upstream sequence rule produced a match and
 // the sequence is not stuck in deadline or expired state.
 func (s *sequenceState) next(i int) bool {
-	// if rule already matched, don't eval again
-	if s.matchedRules[uint16(i+1)] {
-		return false
-	}
 	// always evaluate the first rule in the sequence
 	if i == 0 {
 		return true
@@ -316,7 +322,7 @@ func (s *sequenceState) expire(e *kevent.Kevent) bool {
 	}
 	for _, idx := range s.idxs {
 		currentPartials := s.partials[idx]
-		for _, e1 := range currentPartials {
+		for i, e1 := range currentPartials {
 			if !canExpire(e1, e) {
 				continue
 			}
@@ -329,23 +335,31 @@ func (s *sequenceState) expire(e *kevent.Kevent) bool {
 			matched := s.matchedRules[idx+1]
 			bindingIndex := s.bindingIndexes[idx+1]
 			if !matched && bindingIndex == idx {
-				log.Infof("%q sequence expired. Process %s (%d) "+
-					"terminated which was previously referenced "+
-					"in upstream sequence(s)", s.name,
+				log.Infof("removing process %s (%d) "+
+					"from partials pertaining to sequence [%s]",
 					e.Kparams.MustGetString(kparams.ProcessName),
-					e.Kparams.MustGetPid())
-				s.inExpired = true
-				err := s.expireTransition()
-				if err != nil {
-					s.inExpired = false
-					log.Warnf("expire transition failed: %v", err)
+					e.Kparams.MustGetPid(),
+					s.name)
+				s.partials[idx] = append(
+					s.partials[idx][:i],
+					s.partials[idx][i+1:]...)
+
+				if len(s.partials[idx]) == 0 {
+					log.Infof("%q sequence expired. All partials terminated", s.name)
+					partialExpirations.Add(s.name, 1)
+					s.inExpired = true
+					err := s.expireTransition()
+					if err != nil {
+						s.inExpired = false
+						log.Warnf("expire transition failed: %v", err)
+					}
+					// transitions from expired state to initial state
+					err = s.fsm.Fire(resetTransition)
+					if err != nil {
+						log.Warnf("unable to transition to initial state: %v", err)
+					}
+					return true
 				}
-				// transitions from expired state to initial state
-				err = s.fsm.Fire(resetTransition)
-				if err != nil {
-					log.Warnf("unable to transition to initial state: %v", err)
-				}
-				return true
 			}
 		}
 	}
@@ -411,12 +425,18 @@ func (r *Rules) Compile() error {
 		return err
 	}
 	for _, group := range groups {
-		if !group.Enabled {
-			log.Warnf("group [%s] disabled", group.Name)
+		if group.IsDisabled() {
+			log.Warnf("rule group [%s] disabled", group.Name)
 			continue
 		}
+		log.Infof("loading rule group [%s]", group.Name)
+		rules := append(group.Rules, group.FromStrings...)
+		if group.Policy != config.SequencePolicy &&
+			group.Action != "" {
+			return fmt.Errorf("%s: only sequence policies can have top level actions", group.Name)
+		}
 		if group.Policy == config.SequencePolicy &&
-			len(group.FromStrings) <= 1 {
+			len(rules) <= 1 {
 			return fmt.Errorf("%s: policy requires at least two rules", group.Name)
 		}
 
@@ -426,10 +446,14 @@ func (r *Rules) Compile() error {
 		// compile filters and populate the groups. Additionally, for
 		// sequence policies we have to configure the FSM states and
 		// transitions.
-		initialState := group.FromStrings[0].Name
+		if len(rules) == 0 {
+			panic("got empty rules")
+		}
+		initialState := rules[0].Name
 		seqState := newSequenceState(group.Name, initialState)
-		filters := make([]compiledFilter, 0, len(group.FromStrings))
-		for i, filterConfig := range group.FromStrings {
+		filters := make([]compiledFilter, 0, len(rules))
+
+		for i, filterConfig := range rules {
 			rule := filterConfig.Name
 			f := New(expr(filterConfig), r.config)
 			if err := f.Compile(); err != nil {
@@ -451,14 +475,14 @@ func (r *Rules) Compile() error {
 				if filterConfig.MaxSpan != 0 {
 					seqState.maxSpans[rule] = filterConfig.MaxSpan
 				}
-				if i >= len(group.FromStrings)-1 {
+				if i >= len(rules)-1 {
 					seqState.fsm.Configure(rule).
 						Permit(matchTransition, sequenceTerminalState).
 						Permit(cancelTransition, sequenceDeadlineState).
 						Permit(expireTransition, sequenceExpiredState)
 				} else {
 					seqState.fsm.Configure(rule).
-						Permit(matchTransition, group.FromStrings[i+1].Name).
+						Permit(matchTransition, rules[i+1].Name).
 						Permit(cancelTransition, sequenceDeadlineState).
 						Permit(expireTransition, sequenceExpiredState)
 				}
@@ -572,7 +596,7 @@ nextGroup:
 				ok, idx, e := f.run(kevt, uint16(i+1), seqState.getPartials(rule))
 				if ok {
 					seqState.addPartial(rule, kevt)
-					err := seqState.matchTransition(kevt)
+					err := seqState.matchTransition(rule, kevt)
 					if err != nil {
 						matchTransitionErrors.Add(1)
 						log.Warnf("match transition: %v", err)
@@ -583,7 +607,7 @@ nextGroup:
 			}
 			done := seqState.isTerminalState()
 			if done {
-				log.Infof("sequence [%s] matched", g.group.Name)
+				log.Debugf("rule group [%s] matched", g.group.Name)
 				// this is the event that triggered the group match
 				kevt.AddMeta(kevent.RuleGroupKey, g.group.Name)
 				err := runFilterAction(nil, seqState.matches, g.group, nil)
@@ -622,7 +646,7 @@ nextGroup:
 				case config.OrRelation:
 					if ok {
 						includeOrFilterMatches.Add(f.config.Name, 1)
-						log.Infof("rule [%s] in group [%s] matched", f.config.Name, g.group.Name)
+						log.Debugf("rule [%s] in group [%s] matched", f.config.Name, g.group.Name)
 						err := runFilterAction(kevt, nil, g.group, f.config)
 						if err != nil {
 							log.Warnf("unable to execute %q rule action: %v", f.config.Name, err)
@@ -651,6 +675,7 @@ nextGroup:
 			case config.IncludePolicy:
 				for _, f := range g.filters {
 					includeAndFilterMatches.Add(f.config.Name, 1)
+					log.Debugf("rule [%s] in group [%s] matched", f.config.Name, g.group.Name)
 					err := runFilterAction(kevt, nil, g.group, f.config)
 					if err != nil {
 						log.Warnf("unable to execute %q rule action: %v", f.config.Name, err)

@@ -20,6 +20,7 @@ package filter
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/fs"
+	log "github.com/sirupsen/logrus"
 	"net"
 	"testing"
 	"time"
@@ -161,6 +162,7 @@ func TestIncludeExcludeRemoteThreads(t *testing.T) {
 func TestSequenceState(t *testing.T) {
 	rules := NewRules(newConfig("_fixtures/sequence_policy_simple_pattern_bindings.yml"))
 	require.NoError(t, rules.Compile())
+	log.SetLevel(log.DebugLevel)
 
 	kevt1 := &kevent.Kevent{
 		Type: ktypes.CreateProcess,
@@ -176,7 +178,6 @@ func TestSequenceState(t *testing.T) {
 			kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.AnsiString, Value: "powershell.exe"},
 		},
 	}
-
 	kevt2 := &kevent.Kevent{
 		Type: ktypes.CreateFile,
 		Name: "CreateFile",
@@ -202,23 +203,25 @@ func TestSequenceState(t *testing.T) {
 	assert.Equal(t, "spawn command shell", ss.initialState)
 
 	ss.addPartial("spawn command shell", kevt1)
-	require.NoError(t, ss.matchTransition(kevt1))
+	require.NoError(t, ss.matchTransition("spawn command shell", kevt1))
 	assert.False(t, ss.isInitialState())
 	assert.Equal(t, "created temp file by command shell", ss.currentState())
 
 	ss.addPartial("created temp file by command shell", kevt2)
-	require.NoError(t, ss.matchTransition(kevt2))
+	require.NoError(t, ss.matchTransition("created temp file by command shell", kevt2))
 
 	assert.Len(t, ss.getPartials("spawn command shell"), 0)
 	assert.Len(t, ss.getPartials("created temp file by command shell"), 1)
 
 	assert.Equal(t, sequenceTerminalState, ss.currentState())
 	assert.True(t, ss.isTerminalState())
+
+	ss.clear()
+
 	// reset transition leads back to initial state
 	assert.Equal(t, "spawn command shell", ss.currentState())
-
 	// deadline exceeded
-	require.NoError(t, ss.matchTransition(kevt1))
+	require.NoError(t, ss.matchTransition("spawn command shell", kevt1))
 	assert.Equal(t, "created temp file by command shell", ss.currentState())
 	time.Sleep(time.Millisecond * 120)
 	assert.True(t, ss.isInitialState())
@@ -227,12 +230,12 @@ func TestSequenceState(t *testing.T) {
 	require.False(t, ss.next(1))
 	if ss.next(1) {
 		// this shouldn't happen
-		require.NoError(t, ss.matchTransition(kevt2))
+		require.NoError(t, ss.matchTransition("created temp file by command shell", kevt2))
 	}
 
 	ss.clear()
 	assert.True(t, ss.isInitialState())
-	require.NoError(t, ss.matchTransition(kevt1))
+	require.NoError(t, ss.matchTransition("spawn command shell", kevt1))
 	ss.addPartial("spawn command shell", kevt1)
 	require.False(t, ss.inDeadline.Load())
 
@@ -255,7 +258,7 @@ func TestSequenceState(t *testing.T) {
 	require.True(t, ss.expire(terminateProcess))
 	require.True(t, ss.inExpired)
 
-	require.NoError(t, ss.matchTransition(kevt1))
+	require.NoError(t, ss.matchTransition("spawn command shell", kevt1))
 	require.False(t, ss.inExpired)
 
 	assert.Equal(t, "created temp file by command shell", ss.currentState())
@@ -358,6 +361,7 @@ func TestSimpleSequencePolicyWithMaxSpanNotReached(t *testing.T) {
 		Kparams: kevent.Kparams{
 			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
 		},
+		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "barzz"},
 	}
 
 	kevt2 := &kevent.Kevent{
@@ -372,6 +376,7 @@ func TestSimpleSequencePolicyWithMaxSpanNotReached(t *testing.T) {
 		Kparams: kevent.Kparams{
 			kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper"},
 		},
+		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "barzz"},
 	}
 	require.False(t, rules.Fire(kevt1))
 	time.Sleep(time.Millisecond * 110)

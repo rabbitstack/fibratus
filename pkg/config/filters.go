@@ -26,6 +26,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 	"hash/fnv"
@@ -175,23 +176,32 @@ func (f FilterConfig) parseTmpl(resource string) error {
 // FilterGroup represents the container for filters.
 type FilterGroup struct {
 	Name        string              `json:"group" yaml:"group"`
-	Enabled     bool                `json:"enabled" yaml:"enabled"`
+	Enabled     *bool               `json:"enabled" yaml:"enabled"`
 	Selector    FilterGroupSelector `json:"selector" yaml:"selector"`
 	Policy      FilterGroupPolicy   `json:"policy" yaml:"policy"`
 	Relation    FilterGroupRelation `json:"relation" yaml:"relation"`
-	FromStrings []*FilterConfig     `json:"from-strings" yaml:"from-strings"`
+	Rules       []*FilterConfig     `json:"rules" yaml:"rules"`
+	FromStrings []*FilterConfig     `json:"from-strings" yaml:"from-strings"` // deprecated in favor or `Rules`
 	Tags        []string            `json:"tags" yaml:"tags"`
 	Action      string              `json:"action" yaml:"action"` // only valid in sequence policies
 }
 
+// IsDisabled determines if this group is disabled.
+func (g FilterGroup) IsDisabled() bool { return g.Enabled != nil && !*g.Enabled }
+
 func (g FilterGroup) validate(resource string) error {
-	for _, filter := range g.FromStrings {
+	filters := append(g.FromStrings, g.Rules...)
+	for _, filter := range filters {
 		if filter.Action != "" && g.Policy == ExcludePolicy {
-			return fmt.Errorf("%q filter found in %q group with exclude policy. "+
-				"Only groups with include policies can have filter actions", filter.Name, g.Name)
+			return fmt.Errorf("%q rule found in %q group with exclude policy. "+
+				"Only groups with include policies can have rule actions", filter.Name, g.Name)
+		}
+		if filter.MaxSpan != 0 && g.Policy != SequencePolicy {
+			return fmt.Errorf("%q rule found has max span, but it is not in sequence policy " +
+				filter.Name)
 		}
 		if err := filter.parseTmpl(resource); err != nil {
-			return fmt.Errorf("invalid %q filter action: %v", filter.Name, err)
+			return fmt.Errorf("invalid %q rule action: %v", filter.Name, err)
 		}
 	}
 	return nil
@@ -253,6 +263,7 @@ func (f *Filters) initFromViper(v *viper.Viper) {
 func (f Filters) LoadGroups() ([]FilterGroup, error) {
 	allGroups := make([]FilterGroup, 0)
 	for _, path := range f.Rules.FromPaths {
+		log.Infof("loading rules from file %s", path)
 		file, err := os.Stat(path)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't open rule file %s: %v", path, err)
@@ -273,6 +284,7 @@ func (f Filters) LoadGroups() ([]FilterGroup, error) {
 		allGroups = append(allGroups, groups...)
 	}
 	for _, url := range f.Rules.FromURLs {
+		log.Infof("loading rules from URL %s", url)
 		if _, err := u.Parse(url); err != nil {
 			return nil, fmt.Errorf("%q is an invalid URL", url)
 		}
@@ -311,7 +323,7 @@ func decodeFilterGroups(resource string, b []byte) ([]FilterGroup, error) {
 
 	rawGroups, ok := out.([]interface{})
 	if !ok {
-		return nil, fmt.Errorf("invalid filter group "+
+		return nil, fmt.Errorf("invalid rule group "+
 			"file %s: expected array(s) of groups", resource)
 	}
 	// apply validation to each group
@@ -324,7 +336,7 @@ func decodeFilterGroups(resource string, b []byte) ([]FilterGroup, error) {
 			if err == nil {
 				rawGroup = string(b)
 			}
-			return nil, fmt.Errorf("invalid filter group: \n\n"+
+			return nil, fmt.Errorf("invalid rule group: \n\n"+
 				"%v in %s: %v", rawGroup, resource, multierror.Wrap(errs...))
 		}
 	}
@@ -440,8 +452,12 @@ func tmplData() TmplData {
 	}
 }
 
-const actionNode = "action"
-const fromStringsNode = "from-strings"
+const (
+	actionNode      = "action"
+	defNode         = "def"
+	fromStringsNode = "from-strings"
+	rulesNode       = "rules"
+)
 
 // encodeFilterActions convert the filter action template
 // to base64 payload. Because we only want to execute
@@ -465,10 +481,18 @@ func encodeFilterActions(buf []byte) ([]byte, error) {
 					base64.StdEncoding.EncodeToString([]byte(n.Content[i+1].Value))
 			}
 			if gn.Value == fromStringsNode {
+				log.Warnf("`from-strings` attribute is deprecated and will be " +
+					"removed in future versions. Please consider switching to `rules` attribute")
+			}
+			if gn.Value == fromStringsNode || gn.Value == rulesNode {
 				content := n.Content[i+1]
 				// for each node in from-strings
 				for _, s := range content.Content {
 					for j, e := range s.Content {
+						if e.Value == defNode {
+							log.Warnf("`def` attribute is deprecated and will be " +
+								"removed in future versions. Please consider switching to `condition` attribute")
+						}
 						if e.Value == actionNode && s.Content[j+1].Value != "" {
 							s.Content[j+1].Value =
 								base64.StdEncoding.EncodeToString([]byte(s.Content[j+1].Value))
