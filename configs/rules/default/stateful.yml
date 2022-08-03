@@ -1,0 +1,20 @@
+- group: remote connection and command shell spawning
+  policy: sequence
+  rules:
+    - name: establish remote connection
+      condition: >
+        kevt.name = 'Connect'
+          and
+        cidr_contains(net.dip,
+          '10.0.0.0/8',
+          '172.16.0.0/12',
+          '172.17.0.0/16',
+          '192.168.0.0/16') = false
+    - name: spawn command shell
+      max-span: 1m
+      condition: >
+        kevt.name = 'CreateProcess'
+          and
+        ps.pid = $1.ps.pid
+          and
+        ps.sibling.name in ('cmd.exe', 'powershell.exe')

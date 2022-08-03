@@ -3,7 +3,7 @@
 # These filter rules try to mimic the subset of the sysmon config template
 # created by SwiftOnSecurity (https://github.com/SwiftOnSecurity/sysmon-config).
 #
-# All credits for digging the rule conditioninitions go to the above author/contributors.
+# All credits for digging the rule definitions go to the above author/contributors.
 #
 # Obviously, some events can't be directly translated to Fibratus equivalent
 # since Fibratus is not aware of them. In the same way,
@@ -139,10 +139,11 @@
               'C:\\Windows\\system32\\kernel32.dll',
               'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe'
            )
-      action: |
-        {{ $title := cat "Identified remote thread creation in" .Kevt.Kparams.exe }}
-        {{ $text := cat "Injected by" .Kevt.PS.Exe }}
-        {{ emit $title $text }}
+      action: >
+        {{ emit
+            (printf "Detected remote thread creation in %s" .Kevt.Kparams.exe)
+            (printf "Possible code injection by %s" .Kevt.PS.Exe)
+        }}
 
 # ======================= Network connection initiated ===============================================
 #

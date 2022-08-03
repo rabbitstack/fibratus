@@ -313,12 +313,12 @@ func (s *sequenceState) expire(e *kevent.Kevent) bool {
 		return false
 	}
 	canExpire := func(lhs, rhs *kevent.Kevent) bool {
-		if lhs.Type != ktypes.CreateProcess {
-			return false
+		if lhs.Type == ktypes.CreateProcess {
+			p1, _ := lhs.Kparams.GetPid()
+			p2, _ := rhs.Kparams.GetPid()
+			return p1 == p2
 		}
-		p1, _ := lhs.Kparams.GetPid()
-		p2, _ := rhs.Kparams.GetPid()
-		return p1 == p2
+		return lhs.PID == rhs.PID
 	}
 	for _, idx := range s.idxs {
 		currentPartials := s.partials[idx]
@@ -335,7 +335,7 @@ func (s *sequenceState) expire(e *kevent.Kevent) bool {
 			matched := s.matchedRules[idx+1]
 			bindingIndex := s.bindingIndexes[idx+1]
 			if !matched && bindingIndex == idx {
-				log.Infof("removing process %s (%d) "+
+				log.Debugf("removing process %s (%d) "+
 					"from partials pertaining to sequence [%s]",
 					e.Kparams.MustGetString(kparams.ProcessName),
 					e.Kparams.MustGetPid(),
