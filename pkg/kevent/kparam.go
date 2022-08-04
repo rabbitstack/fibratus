@@ -139,9 +139,29 @@ func (kpars Kparams) GetString(name string) (string, error) {
 	return kpar.Value.(string), nil
 }
 
+// MustGetString returns the string parameter or panics
+// if an error occurs while trying to get the parameter.
+func (kpars Kparams) MustGetString(name string) string {
+	s, err := kpars.GetString(name)
+	if err != nil {
+		panic(err)
+	}
+	return s
+}
+
 // GetPid returns the pid from the parameter.
 func (kpars Kparams) GetPid() (uint32, error) {
 	return kpars.getPid(kparams.ProcessID)
+}
+
+// MustGetPid returns the pid parameter. It panics if
+// an error occurs while trying to get the pid parameter.
+func (kpars Kparams) MustGetPid() uint32 {
+	pid, err := kpars.GetPid()
+	if err != nil {
+		panic(err)
+	}
+	return pid
 }
 
 // GetPpid returns the parent pid from the parameter.

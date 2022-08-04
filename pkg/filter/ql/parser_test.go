@@ -60,6 +60,8 @@ func TestParser(t *testing.T) {
 		{expr: "ps.name = 'cmd.exe' AND ps.name IN ('exe') ps.name", err: errors.New("ps.name = 'cmd.exe' AND ps.name IN ('exe') ps.name" +
 			"	^ expected operator")},
 		{expr: "ip_cidr(net.dip) = '24'", err: errors.New("ip_cidr function is undefined. Did you mean one of CIDR_CONTAINS|MD5?")},
+
+		{expr: "ps.name = 'cmd.exe' and not cidr_contains(net.sip, '172.14.0.0')"},
 	}
 
 	for i, tt := range tests {

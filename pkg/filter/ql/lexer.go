@@ -52,14 +52,14 @@ func (s *scanner) scan() (tok token, pos int, lit string) {
 	// as an ident or reserved word.
 	if isWhitespace(ch0) {
 		return s.scanWhitespace()
-	} else if isLetter(ch0) || ch0 == '_' {
+	} else if isLetter(ch0) || ch0 == '_' || ch0 == '$' {
 		s.r.unread()
 		return s.scanIdent()
 	} else if isDigit(ch0) {
 		return s.scanNumber()
 	}
 
-	// Otherwise parse individual characters.
+	// Otherwise, parse individual characters.
 	switch ch0 {
 	case reof:
 		return eof, pos, ""
