@@ -75,10 +75,23 @@ func (p *Parser) ParseExpr() (Expr, error) {
 			}
 			rhs = &BinaryExpr{RHS: rhs1, Op: op1}
 		} else {
-			// otherwise parse the next expression
-			rhs, err = p.parseUnaryExpr()
-			if err != nil {
-				return nil, err
+			op1, _, _ := p.scanIgnoreWhitespace()
+			// if the negation appears after the operator
+			// try to parse an entire binary expr and wrap
+			// it inside the `not` expression
+			if op1 == not {
+				binaryExpr, err := p.ParseExpr()
+				if err != nil {
+					return nil, err
+				}
+				rhs = &NotExpr{binaryExpr}
+			} else {
+				p.unscan()
+				// otherwise, parse the next expression
+				rhs, err = p.parseUnaryExpr()
+				if err != nil {
+					return nil, err
+				}
 			}
 		}
 

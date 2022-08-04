@@ -343,6 +343,7 @@ func (s *sequenceState) expire(e *kevent.Kevent) bool {
 				s.partials[idx] = append(
 					s.partials[idx][:i],
 					s.partials[idx][i+1:]...)
+				partialsPerSequence.Add(s.name, -1)
 
 				if len(s.partials[idx]) == 0 {
 					log.Infof("%q sequence expired. All partials terminated", s.name)

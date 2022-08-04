@@ -65,6 +65,7 @@ func TestScanner(t *testing.T) {
 		// pattern bindings
 		{s: `$1.ps.name`, tok: patternBinding, lit: "$1.ps.name"},
 		{s: `$4.kevt.name`, tok: patternBinding, lit: "$4.kevt.name"},
+		{s: `$4.ps.ancestor[1].name`, tok: patternBinding, lit: "$4.ps.ancestor[1].name"},
 
 		// identifiers
 		{s: `foo`, tok: ident, lit: `foo`},

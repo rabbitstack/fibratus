@@ -177,16 +177,26 @@ func tokstr(tok token, lit string) string {
 	return tok.String()
 }
 
-var patternBindingRegexp = regexp.MustCompile("\\$[1-9]\\.(.+)")
+// parsePatternBinding parses the pattern binding token and
+// returns true if the provided id is a pattern binding. Returns
+// false otherwise.
+func parsePatternBinding(id string) (string, bool) {
+	//nolint:gosimple
+	matches := regexp.MustCompile("\\$[1-9]\\.([a-z0-9A-Z\\[\\].]+)").FindStringSubmatch(id)
+	if len(matches) > 0 {
+		return matches[1], true
+	}
+	return "", false
+}
 
 // lookup returns the token associated with a given string.
 func lookup(id string) (token, string) {
 	if tok, ok := keywords[strings.ToLower(id)]; ok {
 		return tok, ""
 	}
-	matches := patternBindingRegexp.FindStringSubmatch(id)
-	if len(matches) > 0 {
-		if tok := fields.Lookup(matches[1]); tok != "" {
+	pb, ok := parsePatternBinding(id)
+	if ok {
+		if tok := fields.Lookup(pb); tok != "" {
 			return patternBinding, id
 		}
 	}
