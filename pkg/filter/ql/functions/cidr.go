@@ -62,7 +62,7 @@ func (f CIDRContains) Call(args []interface{}) (interface{}, bool) {
 		}
 	}
 
-	return false, false
+	return false, true
 }
 
 func (f CIDRContains) Desc() FunctionDesc {

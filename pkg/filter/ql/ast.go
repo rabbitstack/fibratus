@@ -137,6 +137,31 @@ func (v *ValuerEval) Eval(expr Expr) interface{} {
 				return !val
 			}
 			return nil
+		case *Function:
+			if valuer, ok := v.Valuer.(CallValuer); ok {
+				var args []interface{}
+				if len(expr1.Args) > 0 {
+					args = make([]interface{}, len(expr1.Args))
+					for i := range expr1.Args {
+						args[i] = v.Eval(expr1.Args[i])
+					}
+				}
+				v, _ := valuer.Call(expr1.Name, args)
+				if val, ok := v.(bool); ok {
+					return !val
+				}
+				return nil
+			}
+			return nil
+		case *ParenExpr:
+			v := v.Eval(expr1.Expr)
+			if v == nil {
+				return nil
+			}
+			if val, ok := v.(bool); ok {
+				return !val
+			}
+			return nil
 		default:
 			return nil
 		}

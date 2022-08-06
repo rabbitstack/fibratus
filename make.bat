@@ -58,6 +58,7 @@ goto :EOF
 
 :test
 %GOTEST% -tags %TAGS% %PKGS%
+if errorlevel 1 goto fail
 goto :EOF
 
 :lint
