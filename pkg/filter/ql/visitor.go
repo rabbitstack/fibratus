@@ -42,6 +42,8 @@ func Walk(v Visitor, node Node) {
 		for _, expr := range n.Args {
 			Walk(v, expr)
 		}
+	case *ParenExpr:
+		Walk(v, n.Expr)
 	}
 }
 

@@ -407,7 +407,7 @@ func TestFilterRunNetKevent(t *testing.T) {
 		{`net.dip not in ('116.58.201.172', '16.58.201.176')`, true},
 		{`net.dip not in (116.58.201.172, 16.58.201.176)`, true},
 		{`ps.name = 'cmd.exe' and not cidr_contains(net.sip, '227.0.0.1/12', '8.2.3.0/4')`, true},
-		//{`ps.name = 'cmd.exe' and not ((net.sip not in (222.1.1.1)) or (net.sip not in (12.3.4.5)))`, true},
+		{`ps.name = 'cmd.exe' and not ((net.sip in (222.1.1.1)) or (net.sip in (12.3.4.5)))`, true},
 		{`cidr_contains(net.dip, '216.58.201.1/24') = true`, true},
 		{`cidr_contains(net.dip, '226.58.201.1/24') = false`, true},
 		{`cidr_contains(net.dip, '216.58.201.1/24', '216.58.201.10/24') = true and kevt.pid = 859`, true},
