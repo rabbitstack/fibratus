@@ -94,10 +94,10 @@ func TestParseError(t *testing.T) {
 	e = newParseError("[", []string{"operator"}, 20, expr)
 
 	expected1 := `ps.name = 'cmd.exe' aand ps.cmdline contains 'ss'
-                  ╭────────────────────^
-                  |
-                  |
-                  ╰─────────────────── expected operator`
+╭────────────────────^
+|
+|
+╰─────────────────── expected operator`
 
 	require.Equal(t, expected1, e.Error())
 
