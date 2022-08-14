@@ -37,22 +37,97 @@ func newParseError(found string, expected []string, pos int, expr string) *Parse
 	return &ParseError{Found: found, Expected: expected, Pos: pos, Expr: expr}
 }
 
+// findPosInLine returns the parser position and the line number
+// where the syntax error occurred when the expression is split
+// over multiple lines.
+func findPosInLine(expr string, pos int) (int, int) {
+	ln := 1
+	for i, c := range []rune(expr) {
+		if c == '\n' {
+			ln++
+		}
+		if i == pos {
+			switch {
+			case ln > 1:
+				// multiline expression. Calculate
+				// the position relative to the line
+				// number by looking back for the
+				// previous newline terminator
+				j := pos
+				for expr[j] != '\n' {
+					j--
+					// no newline found
+					if j == -1 {
+						break
+					}
+				}
+				return pos - j + 2, ln
+			default:
+				// single line expression
+				return pos + 1, 1
+			}
+		}
+	}
+	return pos + 1, 1
+}
+
+type renderer struct {
+	strings.Builder
+}
+
+func (r *renderer) renderTopGutter()                 { r.WriteString("\n╭") }
+func (r *renderer) renderCaret()                     { r.WriteString("^\n|") }
+func (r *renderer) renderLeftBorder()                { r.WriteString("|\n") }
+func (r *renderer) renderLineWithBorder(line string) { r.WriteString("|" + line) }
+func (r *renderer) renderLine(line string)           { r.WriteString(line) }
+func (r *renderer) renderNewLine()                   { r.WriteString("\n") }
+func (r *renderer) renderLabel(width int, msg string) {
+	r.WriteString("╰")
+	for i := 0; i <= width; i++ {
+		r.WriteString("─")
+	}
+	r.WriteString(" expected " + msg)
+
+}
+
+func (r *renderer) renderTopBorder(width int) {
+	for i := 0; i < width; i++ {
+		r.WriteString("─")
+	}
+}
+
+func render(e *ParseError) string {
+	pos, ln := findPosInLine(e.Expr, e.Pos)
+	r := renderer{}
+
+	lines := strings.Split(e.Expr, "\n")
+
+	for n, line := range lines {
+		if n >= ln {
+			r.renderLineWithBorder(line)
+		} else {
+			r.renderLine(line)
+		}
+		// insert a new line and start drawing
+		// the snippet lines, gutters and borders
+		if n == ln-1 {
+			r.renderTopGutter()
+			r.renderTopBorder(pos - 1)
+			r.renderCaret()
+		}
+		r.renderNewLine()
+	}
+
+	r.renderLeftBorder()
+	r.renderLabel(18, strings.Join(e.Expected, ", "))
+
+	return r.String()
+}
+
 // Error returns the string representation of the error.
 func (e *ParseError) Error() string {
 	if e.Message != "" {
 		return fmt.Sprintf("%s at line %d, char %d", e.Message, e.Pos+1, e.Pos+1)
 	}
-	l := e.Pos + 1
-	var sb strings.Builder
-	sb.WriteRune('\n')
-	sb.WriteString(strings.TrimSpace(e.Expr))
-	sb.WriteRune('\n')
-	for l > 0 {
-		l--
-		sb.WriteRune(' ')
-		if l == 0 {
-			sb.WriteString(fmt.Sprintf("^ expected %s", strings.Join(e.Expected, ", ")))
-		}
-	}
-	return sb.String()
+	return render(e)
 }

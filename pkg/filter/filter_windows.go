@@ -76,7 +76,7 @@ func NewFromCLI(args []string, config *config.Config) (Filter, error) {
 	}
 	filter := New(expr, config)
 	if err := filter.Compile(); err != nil {
-		return nil, fmt.Errorf("bad filter: \n  %v", err)
+		return nil, fmt.Errorf("bad filter:\n %v", err)
 	}
 	return filter, nil
 }
@@ -94,7 +94,7 @@ func NewFromCLIWithAllAccessors(args []string) (Filter, error) {
 		bindings:  make(map[uint16][]*ql.PatternBindingLiteral),
 	}
 	if err := filter.Compile(); err != nil {
-		return nil, fmt.Errorf("bad filter: \n  %v", err)
+		return nil, fmt.Errorf("bad filter:\n %v", err)
 	}
 	return filter, nil
 }

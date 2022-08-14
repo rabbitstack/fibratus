@@ -57,7 +57,7 @@ var (
 	partialExpirations    = expvar.NewMap("sequence.partial.expirations")
 
 	ErrInvalidFilter = func(rule, group string, err error) error {
-		return fmt.Errorf("invalid filter %q in %q group: %v", rule, group, err)
+		return fmt.Errorf("invalid filter %q in %q group: \n%v", rule, group, err)
 	}
 	ErrInvalidPatternBinding = func(rule string) error {
 		return fmt.Errorf("%q is the initial sequence rule and can't contain pattern bindings", rule)

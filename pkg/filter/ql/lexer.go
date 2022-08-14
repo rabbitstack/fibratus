@@ -418,7 +418,7 @@ type reader struct {
 	eof bool
 }
 
-// readRune reads the next rune from the reader.
+// ReadRune reads the next rune from the reader.
 // This is a wrapper function to implement the io.RuneReader interface.
 // Note that this function does not return size.
 func (r *reader) ReadRune() (ch rune, size int, err error) {
@@ -429,7 +429,7 @@ func (r *reader) ReadRune() (ch rune, size int, err error) {
 	return
 }
 
-// unreadRune pushes the previously read rune back onto the buffer.
+// UnreadRune pushes the previously read rune back onto the buffer.
 // This is a wrapper function to implement the io.RuneScanner interface.
 func (r *reader) UnreadRune() error {
 	r.unread()
