@@ -253,7 +253,7 @@ func (w *writer) Close() error {
 		}
 	}
 	if w.zw != nil {
-		w.zw.Release()
+		//w.zw.Release()
 	}
 	if w.f != nil {
 		return w.f.Close()
