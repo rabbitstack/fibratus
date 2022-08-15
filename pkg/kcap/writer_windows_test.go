@@ -207,6 +207,6 @@ func TestLiveKcap(t *testing.T) {
 	<-time.After(time.Minute)
 
 	writer.Close()
-	kstreamc.CloseKstream()
-	ktracec.CloseKtrace()
+	_ = kstreamc.CloseKstream()
+	_ = ktracec.CloseKtrace()
 }
