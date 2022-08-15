@@ -100,5 +100,4 @@ func TestParseError(t *testing.T) {
 ╰─────────────────── expected operator`
 
 	require.Equal(t, expected1, e.Error())
-
 }

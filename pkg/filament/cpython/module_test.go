@@ -24,6 +24,7 @@ import (
 )
 
 func TestNewModule(t *testing.T) {
+	t.SkipNow()
 	require.NoError(t, Initialize())
 	defer Finalize()
 	AddPythonPath("_fixtures/")
@@ -33,6 +34,7 @@ func TestNewModule(t *testing.T) {
 }
 
 func TestModuleRegisterFn(t *testing.T) {
+	t.SkipNow()
 	require.NoError(t, Initialize())
 	defer Finalize()
 	AddPythonPath("_fixtures/")

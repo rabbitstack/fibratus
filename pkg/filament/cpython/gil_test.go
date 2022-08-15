@@ -25,6 +25,7 @@ import (
 )
 
 func TestGILLock(t *testing.T) {
+	t.SkipNow()
 	require.NoError(t, Initialize())
 	defer Finalize()
 	gil := NewGIL()
