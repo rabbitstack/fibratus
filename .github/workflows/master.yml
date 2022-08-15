@@ -173,6 +173,10 @@ jobs:
         with:
           name: "test.kcap"
           path: "./test.kcap"
+      - name: List cwd
+        shell: bash
+        run: |
+           ls -ltr
 
   lint:
     runs-on: windows-latest

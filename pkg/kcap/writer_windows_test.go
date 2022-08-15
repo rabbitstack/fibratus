@@ -22,7 +22,7 @@
 package kcap
 
 import (
-	config2 "github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
@@ -165,28 +165,36 @@ func TestWrite(t *testing.T) {
 }
 
 func TestLiveKcap(t *testing.T) {
-	config := &config2.Config{
-		Kstream: config2.KstreamConfig{
+	cfg := &config.Config{
+		Kstream: config.KstreamConfig{
 			EnableFileIOKevents:   true,
 			EnableImageKevents:    true,
 			EnableRegistryKevents: true,
 			EnableNetKevents:      true,
 			EnableThreadKevents:   true,
+			EnableHandleKevents:   true,
 		},
-		KcapFile: "../../test.kcap",
-		Filters:  &config2.Filters{},
+		KcapFile:           "../../test.kcap",
+		Filters:            &config.Filters{},
+		InitHandleSnapshot: true,
 	}
-	hsnap := handle.NewSnapshotter(config, nil)
-	psnap := ps.NewSnapshotter(hsnap, config)
+	wait := make(chan struct{}, 1)
+	cb := func(total uint64, withName uint64) {
+		wait <- struct{}{}
+	}
+	hsnap := handle.NewSnapshotter(cfg, cb)
+	psnap := ps.NewSnapshotter(hsnap, cfg)
+
+	<-wait
 
 	// initiate the kernel trace and start consuming from the event stream
-	ktracec := kstream.NewKtraceController(config.Kstream)
+	ktracec := kstream.NewKtraceController(cfg.Kstream)
 	err := ktracec.StartKtrace()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	kstreamc := kstream.NewConsumer(ktracec, psnap, hsnap, config)
+	kstreamc := kstream.NewConsumer(ktracec, psnap, hsnap, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -197,7 +205,7 @@ func TestLiveKcap(t *testing.T) {
 	}
 
 	// bootstrap kcap writer with inbound event channel
-	writer, err := NewWriter(config.KcapFile, psnap, hsnap)
+	writer, err := NewWriter(cfg.KcapFile, psnap, hsnap)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,6 +215,7 @@ func TestLiveKcap(t *testing.T) {
 	<-time.After(time.Minute)
 
 	writer.Close()
+
 	_ = kstreamc.CloseKstream()
 	_ = ktracec.CloseKtrace()
 }
