@@ -43,9 +43,7 @@ func TestStartKtraceSuccess(t *testing.T) {
 	err := ktracec.StartKtrace()
 
 	require.NoError(t, err)
-	assert.Equal(t, etw.TraceHandle(1), ktracec.(*ktraceController).handle)
-	assert.Equal(t, etw.EventTraceFlags(0x10003), ktracec.(*ktraceController).props.EnableFlags)
-	assert.Equal(t, "TCPIP, Process, Thread", ktracec.(*ktraceController).props.EnableFlags.String())
+	assert.Equal(t, etw.TraceHandle(1), ktracec.(*ktraceController))
 }
 
 func TestStartKtraceNoSysResources(t *testing.T) {

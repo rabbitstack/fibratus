@@ -539,26 +539,29 @@ func (k *kstreamConsumer) produceRawParams(ktype ktypes.Ktype, evt *etw.EventRec
 	version := evt.Header.EventDescriptor.Version
 	switch ktype {
 	case ktypes.EnumProcess, ktypes.CreateProcess, ktypes.TerminateProcess:
-		kproc := kparams.VersionCheck(version >= 3, kparams.ReadUint64(buf, 0), 0).(uint64)
-		pid := kparams.VersionCheck(version >= 3, kparams.ReadUint32(buf, 8), kparams.ReadUint32(buf, 0)).(uint32)
-		ppid := kparams.VersionCheck(version >= 3, kparams.ReadUint32(buf, 12), kparams.ReadUint32(buf, 4)).(uint32)
-		sessionID := kparams.VersionCheck(version >= 3, kparams.ReadUint32(buf, 16), 0).(uint32)
-		// skip exit status (uint32)
+		kproc := kparams.VersionCheck(version >= 3, kparams.ReadUint64(buf, 0), 0)
+		pid := kparams.VersionCheck(version >= 3, kparams.ReadUint32(buf, 8), kparams.ReadUint32(buf, 0))
+		ppid := kparams.VersionCheck(version >= 3, kparams.ReadUint32(buf, 12), kparams.ReadUint32(buf, 4))
+		sessionID := kparams.VersionCheck(version >= 3, kparams.ReadUint32(buf, 16), 0)
+		exitStatus := kparams.VersionCheck(version >= 3, kparams.ReadUint32(buf, 20), 0)
 		dtb := kparams.ReadUint64(buf, 24)
 		// skip flags (uint32)
 		sid, soffset := kparams.ReadSID(buf, 36)
 		name, noffset := kparams.ReadUTF8String(buf, soffset, length)
 		cmdline, _ := kparams.ReadUTF16String(buf, soffset+noffset, length)
-		return kevent.Kparams{
-			kparams.ProcessObject:   kevent.NewKparam(kparams.ProcessObject, kparams.Uint64, kproc),
-			kparams.ProcessID:       kevent.NewKparam(kparams.ProcessID, kparams.HexInt32, pid),
-			kparams.ProcessParentID: kevent.NewKparam(kparams.ProcessParentID, kparams.HexInt32, ppid),
-			kparams.SessionID:       kevent.NewKparam(kparams.SessionID, kparams.Uint32, sessionID),
-			kparams.DTB:             kevent.NewKparam(kparams.DTB, kparams.Uint64, dtb),
-			kparams.UserSID:         kevent.NewKparam(kparams.UserSID, kparams.WbemSID, sid),
-			kparams.ProcessName:     kevent.NewKparam(kparams.ProcessName, kparams.AnsiString, name),
-			kparams.Comm:            kevent.NewKparam(kparams.Comm, kparams.UnicodeString, cmdline),
-		}
+		return kevent.NewKparams(
+			kevent.NewKparam(kparams.ProcessObject, kparams.HexInt64, kproc),
+			kevent.NewKparam(kparams.ProcessID, kparams.HexInt32, pid),
+			kevent.NewKparam(kparams.ProcessParentID, kparams.HexInt32, ppid),
+			kevent.NewKparam(kparams.SessionID, kparams.Uint32, sessionID),
+			kevent.NewKparam(kparams.ExitStatus, kparams.Uint32, exitStatus),
+			kevent.NewKparam(kparams.DTB, kparams.HexInt64, dtb),
+			kevent.NewKparam(kparams.UserSID, kparams.WbemSID, sid),
+			kevent.NewKparam(kparams.ProcessName, kparams.AnsiString, name),
+			kevent.NewKparam(kparams.Comm, kparams.UnicodeString, cmdline),
+		)
+	case ktypes.OpenProcess:
+		return kevent.NewKparams()
 	case ktypes.CreateHandle, ktypes.CloseHandle:
 		object := kparams.ReadUint64(buf, 0)
 		handleID := kparams.ReadUint32(buf, 8)

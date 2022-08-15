@@ -71,9 +71,9 @@ func (p TraceProvider) IsKernelLogger() bool {
 	return p.GUID == etw.KernelTraceControlGUID
 }
 
-// providers contains all supported providers
 var providers = []TraceProvider{
 	{
+		// core system events
 		etw.KernelLoggerSession,
 		etw.KernelTraceControlGUID,
 		0x0, // no keywords
@@ -128,21 +128,21 @@ func (k *ktraceController) StartKtrace() error {
 	// at least process events have to be enabled
 	// for the purpose of building the state machine
 	flags := etw.Process
-	if k.kstreamConfig.EnableThreadKevents {
-		flags |= etw.Thread
-	}
-	if k.kstreamConfig.EnableImageKevents {
-		flags |= etw.ImageLoad
-	}
-	if k.kstreamConfig.EnableNetKevents {
-		flags |= etw.NetTCPIP
-	}
-	if k.kstreamConfig.EnableRegistryKevents {
-		flags |= etw.Registry
-	}
-	if k.kstreamConfig.EnableFileIOKevents {
-		flags |= etw.DiskFileIO | etw.FileIO | etw.FileIOInit
-	}
+	//if k.kstreamConfig.EnableThreadKevents {
+	//	flags |= etw.Thread
+	//}
+	//if k.kstreamConfig.EnableImageKevents {
+	//	flags |= etw.ImageLoad
+	//}
+	//if k.kstreamConfig.EnableNetKevents {
+	//	flags |= etw.NetTCPIP
+	//}
+	//if k.kstreamConfig.EnableRegistryKevents {
+	//	flags |= etw.Registry
+	//}
+	//if k.kstreamConfig.EnableFileIOKevents {
+	//	flags |= etw.DiskFileIO | etw.FileIO | etw.FileIOInit
+	//}
 
 	bufferSize := k.kstreamConfig.BufferSize
 	if bufferSize > maxBufferSize {
@@ -170,7 +170,7 @@ func (k *ktraceController) StartKtrace() error {
 
 	for _, prov := range providers {
 		if !prov.Enabled {
-			log.Warnf("provider for trace %s is disabled", prov.TraceName)
+			log.Warnf("provider for trace [%s] is disabled", prov.TraceName)
 			continue
 		}
 		props := &etw.EventTraceProperties{

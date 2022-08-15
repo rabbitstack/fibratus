@@ -64,18 +64,27 @@ type Kparam struct {
 // Kparams is the type that represents the sequence of kernel event parameters
 type Kparams map[string]*Kparam
 
+// NewKparams creates the params map from the variadic param list.
+func NewKparams(pars ...*Kparam) Kparams {
+	kpars := make(Kparams, len(pars))
+	for _, kpar := range pars {
+		kpars[kpar.Name] = kpar
+	}
+	return kpars
+}
+
 // NewKparamFromKcap builds a kparam instance from the restored state.
 func NewKparamFromKcap(name string, typ kparams.Type, value kparams.Value) *Kparam {
 	return &Kparam{Name: name, Type: typ, Value: value}
 }
 
-// Append adds a new parameter with specified name, type and value.
+// Append adds a new parameter with the specified name, type and value.
 func (kpars Kparams) Append(name string, typ kparams.Type, value kparams.Value) Kparams {
 	kpars[name] = NewKparam(name, typ, value)
 	return kpars
 }
 
-// AppendFromKcap adds a new parameter with specified name, type and value from the kcap state.
+// AppendFromKcap adds a new parameter with the specified name, type and value from the kcap state.
 func (kpars Kparams) AppendFromKcap(name string, typ kparams.Type, value kparams.Value) Kparams {
 	kpars[name] = NewKparamFromKcap(name, typ, value)
 	return kpars
