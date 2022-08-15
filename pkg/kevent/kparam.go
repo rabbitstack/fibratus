@@ -308,6 +308,20 @@ func (kpars Kparams) GetHexAsUint32(name string) (uint32, error) {
 	return hex.Uint32(), nil
 }
 
+// TryGetHexAsUint32 attempts to get the uint8 value from its hexadecimal representation.
+// If the param is present, but doesn't have the hex type, then the param value is directly
+// coerced into uint32 scalar.
+func (kpars Kparams) TryGetHexAsUint32(name string) (uint32, error) {
+	hex, err := kpars.GetHex(name)
+	if kerrors.IsKparamNotFound(err) {
+		return uint32(0), err
+	}
+	if err != nil {
+		return kpars.GetUint32(name)
+	}
+	return hex.Uint32(), nil
+}
+
 // GetHexAsUint8 returns the number hexadecimal representation as uint8 value.
 func (kpars Kparams) GetHexAsUint8(name string) (uint8, error) {
 	hex, err := kpars.GetHex(name)
@@ -317,11 +331,39 @@ func (kpars Kparams) GetHexAsUint8(name string) (uint8, error) {
 	return hex.Uint8(), nil
 }
 
+// TryGetHexAsUint8 attempts to get the uint8 value from its hexadecimal representation.
+// If the param is present, but doesn't have the hex type, then the param value is directly
+// coerced into uint8 scalar.
+func (kpars Kparams) TryGetHexAsUint8(name string) (uint8, error) {
+	hex, err := kpars.GetHex(name)
+	if kerrors.IsKparamNotFound(err) {
+		return uint8(0), err
+	}
+	if err != nil {
+		return kpars.GetUint8(name)
+	}
+	return hex.Uint8(), nil
+}
+
 // GetHexAsUint64 returns the number hexadecimal representation as uint64 value.
 func (kpars Kparams) GetHexAsUint64(name string) (uint64, error) {
 	hex, err := kpars.GetHex(name)
 	if err != nil {
 		return uint64(0), err
+	}
+	return hex.Uint64(), nil
+}
+
+// TryGetHexAsUint64 attempts to get the uint64 value from its hexadecimal representation.
+// If the param is present, but doesn't have the hex type, then the param value is directly
+// coerced into uint64 scalar.
+func (kpars Kparams) TryGetHexAsUint64(name string) (uint64, error) {
+	hex, err := kpars.GetHex(name)
+	if kerrors.IsKparamNotFound(err) {
+		return uint64(0), err
+	}
+	if err != nil {
+		return kpars.GetUint64(name)
 	}
 	return hex.Uint64(), nil
 }

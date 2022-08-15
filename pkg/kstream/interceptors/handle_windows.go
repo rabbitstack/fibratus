@@ -22,7 +22,6 @@ import (
 	"expvar"
 	"time"
 
-	"github.com/rabbitstack/fibratus/pkg/config"
 	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/handle"
@@ -48,48 +47,30 @@ type handleInterceptor struct {
 	devMapper     fs.DevMapper
 	defers        map[uint64]*kevent.Kevent
 	deferredKevts chan *kevent.Kevent
-	config        *config.Config
 }
 
-func newHandleInterceptor(hsnap handle.Snapshotter, typeStore handle.ObjectTypeStore, devMapper fs.DevMapper, defferedKevts chan *kevent.Kevent, config *config.Config) KstreamInterceptor {
+func newHandleInterceptor(hsnap handle.Snapshotter, typeStore handle.ObjectTypeStore, devMapper fs.DevMapper, defferedKevts chan *kevent.Kevent) KstreamInterceptor {
 	return &handleInterceptor{
 		hsnap:         hsnap,
 		typeStore:     typeStore,
 		devMapper:     devMapper,
 		defers:        make(map[uint64]*kevent.Kevent),
 		deferredKevts: defferedKevts,
-		config:        config,
 	}
 }
 
 func (h *handleInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, error) {
 	if kevt.Type == ktypes.CreateHandle || kevt.Type == ktypes.CloseHandle {
-		var (
-			handleID uint32
-			object   uint64
-		)
-		if h.config.Kstream.RawParamParsing {
-			var err error
-			handleID, err = kevt.Kparams.GetUint32(kparams.HandleID)
-			if err != nil {
-				return kevt, true, err
-			}
-			object, err = kevt.Kparams.GetUint64(kparams.HandleObject)
-			if err != nil {
-				return kevt, true, err
-			}
-		} else {
-			var err error
-			handleID, err = kevt.Kparams.GetHexAsUint32(kparams.HandleID)
-			if err == nil {
-				_ = kevt.Kparams.Set(kparams.HandleID, handleID, kparams.Uint32)
-			}
-			object, err = kevt.Kparams.GetHexAsUint64(kparams.HandleObject)
-			if err != nil {
-				return kevt, true, err
-			}
+		handleID, err := kevt.Kparams.TryGetHexAsUint32(kparams.HandleID)
+		if err == nil {
+			// if the param was in hex representation, convert to uint32
+			_ = kevt.Kparams.Set(kparams.HandleID, handleID, kparams.Uint32)
 		}
 		typeID, err := kevt.Kparams.GetUint16(kparams.HandleObjectTypeID)
+		if err != nil {
+			return kevt, true, err
+		}
+		object, err := kevt.Kparams.TryGetHexAsUint64(kparams.HandleObject)
 		if err != nil {
 			return kevt, true, err
 		}
