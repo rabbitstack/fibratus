@@ -107,12 +107,3 @@ func ReadSID(buf uintptr, offset uint16) ([]byte, uint16) {
 	}
 	return b, end
 }
-
-// VersionCheck receives the event schema version check as a first parameter.
-// If it evaluates to true, p1 is returned. Otherwise, p2 is returned.
-func VersionCheck(version bool, p1, p2 interface{}) interface{} {
-	if version {
-		return p1
-	}
-	return p2
-}
