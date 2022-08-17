@@ -169,14 +169,6 @@ jobs:
            ./make.bat test
         env:
           TAGS: kcap,filament,yara,yara_static
-      - uses: actions/upload-artifact@v2
-        with:
-          name: "test.kcap"
-          path: "./test.kcap"
-      - name: List cwd
-        shell: bash
-        run: |
-           ls -ltr
 
   lint:
     runs-on: windows-latest

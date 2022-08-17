@@ -251,9 +251,7 @@ func (w *writer) Close() error {
 		if err := w.zw.Close(); err != nil {
 			return err
 		}
-	}
-	if w.zw != nil {
-		//w.zw.Release()
+		w.zw.Release()
 	}
 	if w.f != nil {
 		return w.f.Close()

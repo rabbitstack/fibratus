@@ -165,6 +165,7 @@ func TestWrite(t *testing.T) {
 }
 
 func TestLiveKcap(t *testing.T) {
+	t.SkipNow()
 	cfg := &config.Config{
 		Kstream: config.KstreamConfig{
 			EnableFileIOKevents:   true,
