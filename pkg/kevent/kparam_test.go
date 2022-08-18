@@ -59,4 +59,9 @@ func TestKparams(t *testing.T) {
 	mode := filemode.(fs.FileShareMode)
 
 	assert.Equal(t, "r-d", mode.String())
+
+	require.NoError(t, kpars.SetValue(kparams.FileName, "\\Device\\HarddiskVolume2\\Windows\\system32\\KERNEL32.dll"))
+	filename1, err := kpars.GetString(kparams.FileName)
+	require.NoError(t, err)
+	assert.Equal(t, "\\Device\\HarddiskVolume2\\Windows\\system32\\KERNEL32.dll", filename1)
 }
