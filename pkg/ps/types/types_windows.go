@@ -218,17 +218,7 @@ func NewFromKcap(buf []byte) (*PS, error) {
 	return &ps, nil
 }
 
-func splitArgs(comm string) []string {
-	ext := strings.Index(comm, ".exe")
-	if ext == -1 {
-		return []string{}
-	}
-	ext += 5
-	if ext > len(comm) {
-		return []string{}
-	}
-	return strings.Fields(comm[ext:])
-}
+func splitArgs(cmdline string) []string { return strings.Fields(cmdline) }
 
 // AddThread adds a thread to process's state descriptor.
 func (ps *PS) AddThread(thread Thread) {

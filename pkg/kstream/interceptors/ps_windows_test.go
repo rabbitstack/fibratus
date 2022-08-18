@@ -105,6 +105,7 @@ func TestPsInterceptorIntercept(t *testing.T) {
 	}
 
 	_, _, err = psi.Intercept(kevt3)
+	require.NoError(t, err)
 	cmdline1, _ := kevt3.Kparams.GetString(kparams.Comm)
 	require.Equal(t, "C:\\Windows\\System32\\csrss.exe", cmdline1)
 }
