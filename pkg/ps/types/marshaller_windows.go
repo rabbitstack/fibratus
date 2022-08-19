@@ -314,7 +314,7 @@ func (m *Module) Unmarshal(b []byte) (uint16, error) {
 	// read checksum
 	m.Checksum = bytes.ReadUint32(b[4:])
 
-	// read DLL full path
+	// read module full path
 	length := bytes.ReadUint16(b[8:])
 	buf := b[10:]
 	offset := length
