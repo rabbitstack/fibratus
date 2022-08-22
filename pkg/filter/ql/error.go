@@ -87,7 +87,6 @@ func (r *renderer) renderLabel(width int, msg string) {
 		r.WriteString("─")
 	}
 	r.WriteString(" expected " + msg)
-
 }
 
 func (r *renderer) renderTopBorder(width int) {
