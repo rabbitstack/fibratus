@@ -41,6 +41,7 @@ func init() {
 }
 
 func TestNewFilament(t *testing.T) {
+	t.SkipNow()
 	filament, err := New("top_hives_io", nil, nil, &config.Config{Filament: config.FilamentConfig{Path: "_fixtures"}})
 	require.NoError(t, err)
 	require.NotNil(t, filament)

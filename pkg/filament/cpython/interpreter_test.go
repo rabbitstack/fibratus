@@ -24,6 +24,7 @@ import (
 )
 
 func TestInitialize(t *testing.T) {
+	t.SkipNow()
 	require.NoError(t, Initialize())
 	Finalize()
 }

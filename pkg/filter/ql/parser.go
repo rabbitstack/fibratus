@@ -61,9 +61,21 @@ func (p *Parser) ParseExpr() (Expr, error) {
 			return root.RHS, nil
 		}
 
+		if op == in || op == iin {
+			// expect LPAREN after in
+			tok, pos, lit := p.scanIgnoreWhitespace()
+			p.unscan()
+			if tok != lparen {
+				return nil, newParseError(tokstr(op, lit), []string{"'('"}, pos, p.expr)
+			}
+		}
+
 		var rhs Expr
-		if op == not {
-			// parse the operator
+		switch op {
+		case not:
+			// the first variant of the negation operator.
+			// The operator that is negated appears immediately
+			// after the `not` operator, e.g. ps.name not in ('cmd.exe')
 			op1, pos, lit := p.scanIgnoreWhitespace()
 			if !op1.isOperator() {
 				return nil, newParseError(tokstr(op, lit), []string{"operator"}, pos, p.expr)
@@ -74,11 +86,13 @@ func (p *Parser) ParseExpr() (Expr, error) {
 				return nil, err
 			}
 			rhs = &BinaryExpr{RHS: rhs1, Op: op1}
-		} else {
+		default:
 			op1, _, _ := p.scanIgnoreWhitespace()
 			// if the negation appears after the operator
 			// try to parse an entire binary expr and wrap
-			// it inside the `not` expression
+			// it inside the `not` expression. This is the
+			// second variant of the negating expressions, e.g.
+			// ps.name = 'cmd.exe' and not (ps.name in ('powershell.exe'))
 			if op1 == not {
 				binaryExpr, err := p.ParseExpr()
 				if err != nil {
