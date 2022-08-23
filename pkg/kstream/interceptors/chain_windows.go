@@ -76,7 +76,7 @@ func NewChain(
 		chain.addInterceptor(newFsInterceptor(devMapper, hsnap))
 	}
 	if config.Kstream.EnableRegistryKevents {
-		chain.addInterceptor(newRegistryInterceptor(hsnap, config))
+		chain.addInterceptor(newRegistryInterceptor(hsnap))
 	}
 	if config.Kstream.EnableImageKevents {
 		chain.addInterceptor(newImageInterceptor(psnap, devMapper, scanner))

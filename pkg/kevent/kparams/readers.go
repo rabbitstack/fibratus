@@ -31,6 +31,11 @@ func ReadByte(buf uintptr, offset uint16) byte {
 	return *(*byte)(unsafe.Pointer(buf + uintptr(offset)))
 }
 
+// ReadBytes reads a contiguous block of bytes from the buffer.
+func ReadBytes(buf uintptr, offset uint16, nbytes uint16) []byte {
+	return (*[1<<30 - 1]byte)(unsafe.Pointer(buf + uintptr(offset) + uintptr(nbytes)))[:nbytes:nbytes]
+}
+
 // ReadUint16 reads the uint16 value from the buffer at the specified offset.
 func ReadUint16(buf uintptr, offset uint16) uint16 {
 	return *(*uint16)(unsafe.Pointer(buf + uintptr(offset)))
@@ -72,17 +77,17 @@ func ReadUTF16String(buf uintptr, offset, length uint16) (string, uint16) {
 	if offset > length {
 		return "", 0
 	}
-	s := (*[1<<30 - 1]uint16)(unsafe.Pointer(buf + uintptr(offset)))[: length-offset-1 : length-offset-1]
+	s := (*[1<<30 - 1]uint16)(unsafe.Pointer(buf + uintptr(offset)))[: length-offset : length-offset]
 	return syscall.UTF16ToString(s), uint16(len(s) + 2)
 }
 
 // ConsumeString reads the byte slice with UTF16-encoded string
-// when the length is known upfront.
+// when the UTF16 string is located at the end of the buffer.
 func ConsumeString(buf uintptr, offset, length uint16) string {
 	if offset > length {
 		return ""
 	}
-	s := (*[1<<30 - 1]uint16)(unsafe.Pointer(buf + uintptr(offset)))[: length-offset-1 : length-offset-1]
+	s := (*[1<<30 - 1]uint16)(unsafe.Pointer(buf + uintptr(offset)))[: length-offset : length-offset]
 	return syscall.UTF16ToString(s)
 }
 

@@ -43,7 +43,7 @@ const (
 	minBuffers            = "kstream.min-buffers"
 	maxBuffers            = "kstream.max-buffers"
 	flushInterval         = "kstream.flush-interval"
-	rawParamParsing       = "kstream.raw-param-parsing"
+	rawEventParsing       = "kstream.raw-event-parsing"
 
 	excludedEvents = "kstream.blacklist.events"
 	excludedImages = "kstream.blacklist.images"
@@ -86,8 +86,8 @@ type KstreamConfig struct {
 	// ExcludedImages are process image names that will be rejected if they generate a kernel event.
 	ExcludedImages []string `json:"blacklist.images" yaml:"blacklist.images"`
 
-	// RawParamParsing indicates if raw buffer parsing for parameter extraction is used
-	RawParamParsing bool `json:"raw-param-parsing" yaml:"raw-param-parsing"`
+	// RawEventParsing indicates if raw event buffer parsing is enabled
+	RawEventParsing bool `json:"raw-param-parsing" yaml:"raw-event-parsing"`
 
 	excludedKtypes map[ktypes.Ktype]bool
 	excludedImages map[string]bool
@@ -106,7 +106,7 @@ func (c *KstreamConfig) initFromViper(v *viper.Viper) {
 	c.FlushTimer = v.GetDuration(flushInterval)
 	c.ExcludedKevents = v.GetStringSlice(excludedEvents)
 	c.ExcludedImages = v.GetStringSlice(excludedImages)
-	c.RawParamParsing = v.GetBool(rawParamParsing)
+	c.RawEventParsing = v.GetBool(rawEventParsing)
 
 	c.excludedKtypes = make(map[ktypes.Ktype]bool)
 	c.excludedImages = make(map[string]bool)

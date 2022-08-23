@@ -153,7 +153,7 @@ var schema = `
 				"enable-fileio": 	{"type": "boolean"},
 				"enable-handle": 	{"type": "boolean"},
 				"enable-net": 		{"type": "boolean"},
-				"raw-param-parsing":{"type": "boolean"},
+				"raw-event-parsing":{"type": "boolean"},
 				"min-buffers": 		{"type": "integer", "minimum": 1, "maximum": {{ .MinBuffers }}},
 				"max-buffers": 		{"type": "integer", "minimum": 2, "maximum": {{ .MaxBuffers }}},
 				"buffer-size":		{"type": "integer", "maximum": {{ .MaxBufferSize }}},

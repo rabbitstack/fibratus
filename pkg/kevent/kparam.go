@@ -64,8 +64,8 @@ type Kparam struct {
 // Kparams is the type that represents the sequence of kernel event parameters
 type Kparams map[string]*Kparam
 
-// NewKparams creates the params map from the variadic param list.
-func NewKparams(pars ...*Kparam) Kparams {
+// KparamsFromSlice creates the params map from the variadic param list.
+func KparamsFromSlice(pars ...*Kparam) Kparams {
 	kpars := make(Kparams, len(pars))
 	for _, kpar := range pars {
 		kpars[kpar.Name] = kpar

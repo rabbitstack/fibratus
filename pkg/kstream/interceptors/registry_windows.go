@@ -56,7 +56,7 @@ type registryInterceptor struct {
 	config *config.Config
 }
 
-func newRegistryInterceptor(hsnap handle.Snapshotter, config *config.Config) KstreamInterceptor {
+func newRegistryInterceptor(hsnap handle.Snapshotter) KstreamInterceptor {
 	// schedule a ticker that resets the throttle count every minute
 	tick := time.NewTicker(time.Minute)
 	go func() {
@@ -66,9 +66,8 @@ func newRegistryInterceptor(hsnap handle.Snapshotter, config *config.Config) Kst
 		}
 	}()
 	return &registryInterceptor{
-		keys:   make(map[uint64]string),
-		hsnap:  hsnap,
-		config: config,
+		keys:  make(map[uint64]string),
+		hsnap: hsnap,
 	}
 }
 
@@ -76,13 +75,7 @@ func (r *registryInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bo
 	typ := kevt.Type
 	switch typ {
 	case ktypes.RegKCBRundown, ktypes.RegCreateKCB:
-		var khandle uint64
-		var err error
-		if r.config.Kstream.RawParamParsing {
-			khandle, err = kevt.Kparams.GetUint64(kparams.RegKeyHandle)
-		} else {
-			khandle, err = kevt.Kparams.GetHexAsUint64(kparams.RegKeyHandle)
-		}
+		khandle, err := kevt.Kparams.TryGetHexAsUint64(kparams.RegKeyHandle)
 		if err != nil {
 			return kevt, true, err
 		}
@@ -92,13 +85,7 @@ func (r *registryInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bo
 		kcbCount.Add(1)
 		return kevt, false, nil
 	case ktypes.RegDeleteKCB:
-		var khandle uint64
-		var err error
-		if r.config.Kstream.RawParamParsing {
-			khandle, err = kevt.Kparams.GetUint64(kparams.RegKeyHandle)
-		} else {
-			khandle, err = kevt.Kparams.GetHexAsUint64(kparams.RegKeyHandle)
-		}
+		khandle, err := kevt.Kparams.TryGetHexAsUint64(kparams.RegKeyHandle)
 		if err != nil {
 			return kevt, true, err
 		}
@@ -112,13 +99,7 @@ func (r *registryInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bo
 		ktypes.RegQueryValue,
 		ktypes.RegSetValue,
 		ktypes.RegDeleteValue:
-		var khandle uint64
-		var err error
-		if r.config.Kstream.RawParamParsing {
-			khandle, err = kevt.Kparams.GetUint64(kparams.RegKeyHandle)
-		} else {
-			khandle, err = kevt.Kparams.GetHexAsUint64(kparams.RegKeyHandle)
-		}
+		khandle, err := kevt.Kparams.TryGetHexAsUint64(kparams.RegKeyHandle)
 		if err != nil {
 			return kevt, true, err
 		}

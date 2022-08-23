@@ -47,20 +47,26 @@ type handleInterceptor struct {
 	devMapper     fs.DevMapper
 	defers        map[uint64]*kevent.Kevent
 	deferredKevts chan *kevent.Kevent
+	isClosed      bool
 }
 
-func newHandleInterceptor(hsnap handle.Snapshotter, typeStore handle.ObjectTypeStore, devMapper fs.DevMapper, defferedKevts chan *kevent.Kevent) KstreamInterceptor {
+func newHandleInterceptor(
+	hsnap handle.Snapshotter,
+	typeStore handle.ObjectTypeStore,
+	devMapper fs.DevMapper,
+	defferedKevts chan *kevent.Kevent,
+) KstreamInterceptor {
 	return &handleInterceptor{
 		hsnap:         hsnap,
 		typeStore:     typeStore,
 		devMapper:     devMapper,
-		defers:        make(map[uint64]*kevent.Kevent),
+		defers:        make(map[uint64]*kevent.Kevent, 1000),
 		deferredKevts: defferedKevts,
 	}
 }
 
 func (h *handleInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, error) {
-	if kevt.Type == ktypes.CreateHandle || kevt.Type == ktypes.CloseHandle {
+	if kevt.Category == ktypes.Handle {
 		handleID, err := kevt.Kparams.TryGetHexAsUint32(kparams.HandleID)
 		if err == nil {
 			// if the param was in hex representation, convert to uint32
@@ -122,8 +128,7 @@ func (h *handleInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool
 			// but its counterpart CloseHandle kevent ships with the handle name. We'll
 			// defer emitting the CreateHandle kevent until we receive a CloseHandle targeting
 			// the same object
-			if name == "" && (typeName == handle.Key || typeName == handle.File ||
-				typeName == handle.Desktop || typeName == handle.SymbolicLink) {
+			if name == "" {
 				h.defers[object] = kevt
 				return kevt, false, kerrors.ErrCancelUpstreamKevent
 			}
@@ -134,16 +139,17 @@ func (h *handleInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool
 		// event reference. So we set handle object name to the name of its CloseHandle counterpart
 		if hkevt, ok := h.defers[object]; ok {
 			delete(h.defers, object)
-
 			if err := hkevt.Kparams.Set(kparams.HandleObjectName, name, kparams.AnsiString); err != nil {
 				return kevt, true, err
 			}
 			handleDeferMatches.Add(1)
 
 			// send the deferred event
-			select {
-			case h.deferredKevts <- hkevt:
-			default:
+			if !h.isClosed {
+				select {
+				case h.deferredKevts <- hkevt:
+				default:
+				}
 			}
 
 			err := h.hsnap.Write(hkevt)
@@ -167,9 +173,11 @@ func (h *handleInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool
 				handleDeferEvictions.Add(1)
 				delete(h.defers, kobj)
 				// push the CreateHandle event
-				select {
-				case h.deferredKevts <- kvt:
-				default:
+				if !h.isClosed {
+					select {
+					case h.deferredKevts <- kvt:
+					default:
+					}
 				}
 			}
 		}
@@ -180,4 +188,4 @@ func (h *handleInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool
 }
 
 func (handleInterceptor) Name() InterceptorType { return Handle }
-func (handleInterceptor) Close()                {}
+func (h *handleInterceptor) Close()             { h.isClosed = true }

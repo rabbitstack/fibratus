@@ -386,13 +386,7 @@ func (s *snapshotter) Write(kevt *kevent.Kevent) error {
 		return fmt.Errorf("expected CreateHandle kernel event but got %s", kevt.Type)
 	}
 	h := unwrapHandle(kevt)
-	var obj uint64
-	var err error
-	if s.config.Kstream.RawParamParsing {
-		obj, err = kevt.Kparams.GetUint64(kparams.HandleObject)
-	} else {
-		obj, err = kevt.Kparams.GetHexAsUint64(kparams.HandleObject)
-	}
+	obj, err := kevt.Kparams.TryGetHexAsUint64(kparams.HandleObject)
 	if err != nil {
 		return err
 	}
@@ -406,13 +400,7 @@ func (s *snapshotter) Remove(kevt *kevent.Kevent) error {
 	if kevt.Type != ktypes.CloseHandle {
 		return fmt.Errorf("expected CloseHandle kernel event but got %s", kevt.Type)
 	}
-	var obj uint64
-	var err error
-	if s.config.Kstream.RawParamParsing {
-		obj, err = kevt.Kparams.GetUint64(kparams.HandleObject)
-	} else {
-		obj, err = kevt.Kparams.GetHexAsUint64(kparams.HandleObject)
-	}
+	obj, err := kevt.Kparams.TryGetHexAsUint64(kparams.HandleObject)
 	if err != nil {
 		return err
 	}

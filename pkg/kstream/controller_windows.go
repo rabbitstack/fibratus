@@ -128,21 +128,21 @@ func (k *ktraceController) StartKtrace() error {
 	// at least process events have to be enabled
 	// for the purpose of building the state machine
 	flags := etw.Process
-	//if k.kstreamConfig.EnableThreadKevents {
-	//	flags |= etw.Thread
-	//}
-	//if k.kstreamConfig.EnableImageKevents {
-	//	flags |= etw.ImageLoad
-	//}
-	//if k.kstreamConfig.EnableNetKevents {
-	//	flags |= etw.NetTCPIP
-	//}
-	//if k.kstreamConfig.EnableRegistryKevents {
-	//	flags |= etw.Registry
-	//}
-	//if k.kstreamConfig.EnableFileIOKevents {
-	//	flags |= etw.DiskFileIO | etw.FileIO | etw.FileIOInit
-	//}
+	if k.kstreamConfig.EnableThreadKevents {
+		flags |= etw.Thread
+	}
+	if k.kstreamConfig.EnableImageKevents {
+		flags |= etw.ImageLoad
+	}
+	if k.kstreamConfig.EnableNetKevents {
+		flags |= etw.NetTCPIP
+	}
+	if k.kstreamConfig.EnableRegistryKevents {
+		flags |= etw.Registry
+	}
+	if k.kstreamConfig.EnableFileIOKevents {
+		flags |= etw.DiskFileIO | etw.FileIO | etw.FileIOInit
+	}
 
 	bufferSize := k.kstreamConfig.BufferSize
 	if bufferSize > maxBufferSize {
