@@ -101,12 +101,14 @@ type KtraceController interface {
 	StartKtrace() error
 	// CloseKtrace stops currently running tracing sessions.
 	CloseKtrace() error
+	// Traces returns initiated tracing sessions.
+	Traces() map[string]TraceSession
 }
 
 type ktraceController struct {
 	// kstreamConfig stores kernel stream-specific settings
 	kstreamConfig config.KstreamConfig
-	// traces contain initiated tracing sessions
+	// traces contains initiated tracing sessions
 	traces map[string]TraceSession
 }
 
@@ -346,6 +348,8 @@ func (k *ktraceController) CloseKtrace() error {
 	}
 	return nil
 }
+
+func (k *ktraceController) Traces() map[string]TraceSession { return k.traces }
 
 func (k *ktraceController) insertTrace(name string, handle etw.TraceHandle, guid syscall.GUID) {
 	trace := TraceSession{

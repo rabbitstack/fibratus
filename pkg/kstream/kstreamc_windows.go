@@ -92,7 +92,7 @@ type Consumer interface {
 	// to consume events from log buffers. This operation can fail if opening the kernel logger session results
 	// in an invalid trace handler. Errors returned by `ProcessTrace` are sent to the channel since this function
 	// blocks the current thread and we schedule its execution in a separate goroutine.
-	OpenKstream() error
+	OpenKstream(traces map[string]TraceSession) error
 	// CloseKstream shutdowns the currently running kernel event stream consumer by closing the corresponding
 	// session.
 	CloseKstream() error
@@ -154,25 +154,16 @@ func (k *kstreamConsumer) SetFilter(filter filter.Filter) { k.filter = filter }
 // to consume events from log buffers. This operation can fail if opening the kernel logger session results
 // in an invalid trace handler. Errors returned by `ProcessTrace` are sent to the channel since this function
 // blocks the current thread, and we schedule its execution in a separate goroutine.
-func (k *kstreamConsumer) OpenKstream() error {
-	err := k.openKstream(etw.KernelLoggerSession)
+func (k *kstreamConsumer) OpenKstream(traces map[string]TraceSession) error {
+	err := k.rules.Compile()
 	if err != nil {
 		return err
 	}
-	// try to compile rules
-	if err := k.rules.Compile(); err != nil {
-		for _, h := range k.handles {
-			_ = etw.CloseTrace(h)
+	for loggerName := range traces {
+		err := k.openKstream(loggerName)
+		if err != nil {
+			return err
 		}
-		return err
-	}
-	err = k.openKstream(etw.KernelLoggerRundownSession)
-	if err != nil {
-		log.Warn(err)
-	}
-	err = k.openKstream(etw.KernelAuditAPICallsSession)
-	if err != nil {
-		log.Warn(err)
 	}
 	return nil
 }
@@ -221,8 +212,7 @@ func (k *kstreamConsumer) openKstream(loggerName string) error {
 	return nil
 }
 
-// CloseKstream shutdowns the currently running kernel event stream consumer by closing the corresponding
-// session.
+// CloseKstream shutdowns the event stream consumer by closing all running traces.
 func (k *kstreamConsumer) CloseKstream() error {
 	for _, h := range k.handles {
 		if err := etw.CloseTrace(h); err != nil {

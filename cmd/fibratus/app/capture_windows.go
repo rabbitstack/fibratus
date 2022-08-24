@@ -95,7 +95,7 @@ func capture(cmd *cobra.Command, args []string) error {
 		kstreamc.SetFilter(kfilter)
 	}
 
-	err = kstreamc.OpenKstream()
+	err = kstreamc.OpenKstream(ktracec.Traces())
 	if err != nil {
 		return multierror.Wrap(err, ktracec.CloseKtrace())
 	}

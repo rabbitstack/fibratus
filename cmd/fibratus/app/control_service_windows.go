@@ -230,7 +230,7 @@ func (s *fsvc) run() error {
 	psnap := ps.NewSnapshotter(hsnap, svcConfig)
 	consumer = kstream.NewConsumer(ctrl, psnap, hsnap, svcConfig)
 	// open the kernel event stream, start processing events and forwarding to outputs
-	err = consumer.OpenKstream()
+	err = consumer.OpenKstream(ctrl.Traces())
 	if err != nil {
 		return err
 	}

@@ -259,7 +259,7 @@ func (k Ktype) Category() Category {
 		return File
 	case RegCreateKey, RegDeleteKey, RegOpenKey, RegQueryKey, RegQueryValue, RegSetValue, RegDeleteValue:
 		return Registry
-	case Connect, Accept, Send, Recv, Disconnect, Reconnect, Retransmit, AcceptTCPv4, AcceptTCPv6,
+	case AcceptTCPv4, AcceptTCPv6,
 		ConnectTCPv4, ConnectTCPv6,
 		ReconnectTCPv4, ReconnectTCPv6,
 		RetransmitTCPv4, RetransmitTCPv6,
@@ -276,7 +276,74 @@ func (k Ktype) Category() Category {
 
 // Description returns a brief description of the event type.
 func (k Ktype) Description() string {
-	return ""
+	switch k {
+	case CreateProcess:
+		return "Creates a new process and its primary thread"
+	case TerminateProcess:
+		return "Terminates the process and all of its threads"
+	case OpenProcess:
+		return "Opens the process handle"
+	case CreateThread:
+		return "Creates a thread to execute within the virtual address space of the calling process"
+	case TerminateThread:
+		return "Terminates a thread within the process"
+	case OpenThread:
+		return "Opens the thread handle"
+	case ReadFile:
+		return "Reads data from the file or I/O device"
+	case WriteFile:
+		return "Writes data to the file or I/O device"
+	case CreateFile:
+		return "Creates or opens a file or I/O device"
+	case CloseFile:
+		return "Closes the file handle"
+	case DeleteFile:
+		return "Removes the file from the file system"
+	case RenameFile:
+		return "Changes the file name"
+	case SetFileInformation:
+		return "Sets the file meta information"
+	case EnumDirectory:
+		return "Enumerates a directory or dispatches a directory change notification to registered listeners"
+	case RegCreateKey:
+		return "Creates a registry key or opens it if the key already exists"
+	case RegOpenKey, RegOpenKeyV1:
+		return "Opens the registry key"
+	case RegSetValue:
+		return "Sets the data for the value of a registry key"
+	case RegQueryValue:
+		return "Reads the data for the value of a registry key"
+	case RegQueryKey:
+		return "Enumerates subkeys of the parent key"
+	case RegDeleteKey:
+		return "Removes the registry key"
+	case RegDeleteValue:
+		return "Removes the registry value"
+	case AcceptTCPv4, AcceptTCPv6:
+		return "Accepts the connection request from the socket queu"
+	case ConnectTCPv4, ConnectTCPv6:
+		return "Connects establishes a connection to the socket"
+	case DisconnectTCPv4, DisconnectTCPv6:
+		return "Terminates data reception on the socket"
+	case ReconnectTCPv4, ReconnectTCPv6:
+		return "Reconnects to the socket"
+	case RetransmitTCPv4, RetransmitTCPv6:
+		return "Retransmits unacknowledged TCP segments"
+	case SendTCPv4, SendUDPv4, SendTCPv6, SendUDPv6:
+		return "Sends data over the wire"
+	case RecvTCPv4, RecvUDPv4, RecvTCPv6, RecvUDPv6:
+		return "Receives data from the socket"
+	case LoadImage:
+		return "Loads the module into the address space of the calling process"
+	case UnloadImage:
+		return "Unloads the module from the address space of the calling process"
+	case CreateHandle:
+		return "Creates a new handle"
+	case CloseHandle:
+		return "Closes the handle"
+	default:
+		return ""
+	}
 }
 
 // Hash calculates the hash number of the ktype.
