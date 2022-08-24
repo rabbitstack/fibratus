@@ -473,6 +473,26 @@ var schema = `
 var filterGroupSchema = `
 {
 	"$schema": "http://json-schema.org/draft-07/schema#",
+    "definitions": {"rules": {"$id": "#rules", "type": "object", "type": "array",
+			"items":
+				{
+					"type": "object",
+					"properties": {
+						"name": 		{"type": "string", "minLength": 3},
+						"def": 			{"type": "string", "minLength": 3},
+						"condition": 	{"type": "string", "minLength": 3},
+						"action": 		{"type": "string"},
+						"max-span": 	{"type": "string", "minLength": 2, "pattern": "[0-9]+ms|s|m|h|d"}
+					},
+					"oneOf": [
+						{"required": ["def"]},
+						{"required": ["condition"]}
+					],
+					"required": ["name"],
+					"minItems": 1,
+					"additionalProperties": false
+				}}},
+
 
 	"type": "object",
 	"properties": {
@@ -480,7 +500,7 @@ var filterGroupSchema = `
 		"selector": {
 			"type": "object",
 			"properties": {
-				"type":		{"type": "string", "enum": ["CreateProcess", "CreateThread", "TerminateProcess", "TerminateThread", "LoadImage", "UnloadImage", "CreateFile", "CloseFile", "ReadFile", "WriteFile", "DeleteFile", "RenameFile", "SetFileInformation", "EnumDirectory", "RegCreateKey", "RegOpenKey", "RegSetValue", "RegQueryValue", "RegQueryKey", "RegDeleteKey", "RegDeleteValue", "Accept", "Send", "Recv", "Connect", "Disconnect", "Reconnect", "Retransmit", "CreateHandle", "CloseHandle"]},
+				"type":		{"type": "string", "enum": ["CreateProcess", "CreateThread", "TerminateProcess", "TerminateThread", "OpenProcess", "OpenThread", "LoadImage", "UnloadImage", "CreateFile", "CloseFile", "ReadFile", "WriteFile", "DeleteFile", "RenameFile", "SetFileInformation", "EnumDirectory", "RegCreateKey", "RegOpenKey", "RegSetValue", "RegQueryValue", "RegQueryKey", "RegDeleteKey", "RegDeleteValue", "Accept", "Send", "Recv", "Connect", "Disconnect", "Reconnect", "Retransmit", "CreateHandle", "CloseHandle"]},
 				"category": {"type": "string", "enum": ["registry", "file", "net", "process", "thread", "image", "handle"]}
 			},
 			"additionalProperties": false,
@@ -490,27 +510,30 @@ var filterGroupSchema = `
 			]
 		},
 		"enabled":  	{"type": "boolean"},
-		"policy":   	{"type": "string", "enum": ["include", "exclude", "INCLUDE", "EXCLUDE"]},
+		"policy":   	{"type": "string", "enum": ["include", "exclude", "sequence", "INCLUDE", "EXCLUDE", "SEQUENCE"]},
 		"relation": 	{"type": "string", "enum": ["or", "and", "OR", "AND"]},
 		"tags":			{"type": "array", "items": [{"type": "string", "minLength": 1}]},
-		"from-strings": {
-			"type": "array",
-			"items":
-				{
-					"type": "object",
-					"properties": {
-						"name": 	{"type": "string", "minLength": 3},
-						"def": 		{"type": "string", "minLength": 3},
-						"action": 	{"type": "string"}
-					},
-					"required": ["name", "def"],
-					"minItems": 1,
-					"additionalProperties": false
-				}
-
-		}
+		"action":       {"type": "string"},
+		"from-strings": {"$ref": "#rules"},
+		"rules": 		{"$ref": "#rules"}
 	},
-	"required": ["group", "enabled", "selector", "from-strings"],
+	"if": {
+		"properties": {"policy": {"const": "sequence" }}
+	},
+	"then": {
+		"required": ["group"],
+		"oneOf": [
+			{"required": ["from-strings"]},
+			{"required": ["rules"]}
+		]
+	},
+	"else": {
+		"required": ["group", "selector"],
+		"oneOf": [
+			{"required": ["from-strings"]},
+			{"required": ["rules"]}
+		]
+	},
 	"additionalProperties": false
 }
 `

@@ -114,6 +114,12 @@ func (k Kparam) String() string {
 		switch slice := k.Value.(type) {
 		case []string:
 			return strings.Join(slice, ",")
+		case []fs.FileAttr:
+			attrs := make([]string, 0, len(slice))
+			for _, s := range slice {
+				attrs = append(attrs, s.String())
+			}
+			return strings.Join(attrs, ",")
 		default:
 			return fmt.Sprintf("%v", slice)
 		}

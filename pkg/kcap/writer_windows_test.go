@@ -22,11 +22,13 @@
 package kcap
 
 import (
+	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/kstream"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	shandle "github.com/rabbitstack/fibratus/pkg/syscall/handle"
@@ -160,4 +162,61 @@ func TestWrite(t *testing.T) {
 	case <-quit:
 		return
 	}
+}
+
+func TestLiveKcap(t *testing.T) {
+	t.SkipNow()
+	cfg := &config.Config{
+		Kstream: config.KstreamConfig{
+			EnableFileIOKevents:   true,
+			EnableImageKevents:    true,
+			EnableRegistryKevents: true,
+			EnableNetKevents:      true,
+			EnableThreadKevents:   true,
+			EnableHandleKevents:   true,
+		},
+		KcapFile:           "../../test.kcap",
+		Filters:            &config.Filters{},
+		InitHandleSnapshot: true,
+	}
+	wait := make(chan struct{}, 1)
+	cb := func(total uint64, withName uint64) {
+		wait <- struct{}{}
+	}
+	hsnap := handle.NewSnapshotter(cfg, cb)
+	psnap := ps.NewSnapshotter(hsnap, cfg)
+
+	<-wait
+
+	// initiate the kernel trace and start consuming from the event stream
+	ktracec := kstream.NewKtraceController(cfg.Kstream)
+	err := ktracec.StartKtrace()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kstreamc := kstream.NewConsumer(ktracec, psnap, hsnap, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = kstreamc.OpenKstream()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// bootstrap kcap writer with inbound event channel
+	writer, err := NewWriter(cfg.KcapFile, psnap, hsnap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer.Write(kstreamc.Events(), kstreamc.Errors())
+
+	// capture for a minute
+	<-time.After(time.Minute)
+
+	writer.Close()
+
+	_ = kstreamc.CloseKstream()
+	_ = ktracec.CloseKtrace()
 }

@@ -72,6 +72,8 @@ func InitFuncs(funcMap template.FuncMap) {
 
 // emit sends an alert via all configured alert senders.
 func emit(title string, text string, args ...string) string {
+	log.Debugf("sending alert: %s. Text: %s", title, text)
+
 	senders := alertsender.FindAll()
 	if len(senders) == 0 {
 		return "no alertsenders registered. Alert won't be sent"

@@ -240,24 +240,22 @@ func (w *writer) write(b []byte) error {
 }
 
 func (w *writer) Close() error {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
 	w.stats.printStats()
 
 	w.flusher.Stop()
 	w.stop <- struct{}{}
+	w.mu.Lock()
+	defer w.mu.Unlock()
 
 	if w.zw != nil {
-		defer w.zw.Release()
 		if err := w.zw.Close(); err != nil {
 			return err
 		}
+		w.zw.Release()
 	}
 	if w.f != nil {
 		return w.f.Close()
 	}
-
 	return nil
 }
 

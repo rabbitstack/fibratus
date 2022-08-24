@@ -115,6 +115,17 @@ func (kpars Kparams) Set(name string, value kparams.Value, typ kparams.Type) err
 	return nil
 }
 
+// SetValue replaces the value for the given parameter name. It will return an error
+// if the supplied parameter is not present in the parameter map.
+func (kpars Kparams) SetValue(name string, value kparams.Value) error {
+	_, err := kpars.findParam(name)
+	if err != nil {
+		return fmt.Errorf("setting the value on a missing %q parameter is not allowed", name)
+	}
+	kpars[name].Value = value
+	return nil
+}
+
 // Get returns the raw value for given parameter name. It is the responsibility of the caller to probe type assertion
 // on the value before yielding its underlying type.
 func (kpars Kparams) Get(name string) (kparams.Value, error) {
@@ -137,9 +148,29 @@ func (kpars Kparams) GetString(name string) (string, error) {
 	return kpar.Value.(string), nil
 }
 
+// MustGetString returns the string parameter or panics
+// if an error occurs while trying to get the parameter.
+func (kpars Kparams) MustGetString(name string) string {
+	s, err := kpars.GetString(name)
+	if err != nil {
+		panic(err)
+	}
+	return s
+}
+
 // GetPid returns the pid from the parameter.
 func (kpars Kparams) GetPid() (uint32, error) {
 	return kpars.getPid(kparams.ProcessID)
+}
+
+// MustGetPid returns the pid parameter. It panics if
+// an error occurs while trying to get the pid parameter.
+func (kpars Kparams) MustGetPid() uint32 {
+	pid, err := kpars.GetPid()
+	if err != nil {
+		panic(err)
+	}
+	return pid
 }
 
 // GetPpid returns the parent pid from the parameter.
@@ -241,6 +272,16 @@ func (kpars Kparams) GetUint32(name string) (uint32, error) {
 		return uint32(0), fmt.Errorf("unable to type cast %q parameter to uint32 value", name)
 	}
 	return v, nil
+}
+
+// MustGetUint32 returns  the underlying uint32 value parameter. It panics if
+// an error occurs while trying to get the parameter.
+func (kpars Kparams) MustGetUint32(name string) uint32 {
+	v, err := kpars.GetUint32(name)
+	if err != nil {
+		panic(err)
+	}
+	return v
 }
 
 // GetInt32 returns the underlying int32 value from the parameter.

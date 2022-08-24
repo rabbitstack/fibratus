@@ -21,10 +21,12 @@ package filter
 import (
 	"errors"
 	"expvar"
+	"fmt"
 	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/filter/ql"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"strings"
 )
 
 var (
@@ -36,8 +38,15 @@ var (
 type Filter interface {
 	// Compile compiles the filter by parsing the filtering expression.
 	Compile() error
-	// Run runs a filter on the inbound kernel event and decides whether the event should be dropped or propagated to the downstream channel.
+	// Run runs a filter on the inbound kernel event and decides whether the event
+	// should be dropped or propagated to the downstream channel.
 	Run(kevt *kevent.Kevent) bool
+	// RunPartials runs a filter with stateful event tracking. Partials store all
+	// intermediate events that are the result of previous filter matches.
+	RunPartials(kevt *kevent.Kevent, partials map[uint16][]*kevent.Kevent) (bool, uint16, *kevent.Kevent)
+	// BindingIndex returns the binding index to which the filter is bound
+	// or a zero value if there are no pattern bindings defined.
+	BindingIndex() (uint16, bool)
 }
 
 type filter struct {
@@ -45,11 +54,9 @@ type filter struct {
 	parser    *ql.Parser
 	accessors []accessor
 	fields    []fields.Field
-	// multivaluer determines whether we should
-	// rely on the multivaluer to supply args
-	// for function calls or just use a simple
-	// map valuer
-	multivaluer bool
+	bindings  map[uint16][]*ql.PatternBindingLiteral
+	// useFuncValuer determines whether we should supply the function valuer
+	useFuncValuer bool
 }
 
 // Compile parsers the filter expression and builds a binary expression tree
@@ -67,7 +74,7 @@ func (f *filter) Compile() error {
 		return err
 	}
 
-	ql.WalkFunc(f.expr, func(n ql.Node) {
+	walk := func(n ql.Node) {
 		if expr, ok := n.(*ql.BinaryExpr); ok {
 			if lhs, ok := expr.LHS.(*ql.FieldLiteral); ok {
 				f.fields = append(f.fields, fields.Field(lhs.Value))
@@ -75,21 +82,35 @@ func (f *filter) Compile() error {
 			if rhs, ok := expr.RHS.(*ql.FieldLiteral); ok {
 				f.fields = append(f.fields, fields.Field(rhs.Value))
 			}
+			if rhs, ok := expr.RHS.(*ql.PatternBindingLiteral); ok {
+				f.bindings[rhs.Index()] = append(f.bindings[rhs.Index()], rhs)
+			}
 		}
 		if expr, ok := n.(*ql.Function); ok {
-			f.multivaluer = true
+			f.useFuncValuer = true
 			for _, arg := range expr.Args {
 				if fld, ok := arg.(*ql.FieldLiteral); ok {
 					f.fields = append(f.fields, fields.Field(fld.Value))
 				}
 			}
 		}
-	})
+	}
+	ql.WalkFunc(f.expr, walk)
 
 	if len(f.fields) == 0 {
 		return errNoFields
 	}
 
+	if len(f.bindings) > 1 {
+		bindings := make([]string, 0)
+		for _, b := range f.bindings {
+			for _, binding := range b {
+				bindings = append(bindings, binding.Value)
+			}
+		}
+		return fmt.Errorf("multiple pattern bindings found referencing "+
+			"distinct sequence events: %s", strings.Join(bindings, ","))
+	}
 	return nil
 }
 
@@ -97,11 +118,45 @@ func (f *filter) Run(kevt *kevent.Kevent) bool {
 	if f.expr == nil {
 		return false
 	}
+	return ql.Eval(f.expr, f.mapValuer(kevt), nil, f.useFuncValuer)
+}
+
+func (f *filter) RunPartials(kevt *kevent.Kevent, partials map[uint16][]*kevent.Kevent) (bool, uint16, *kevent.Kevent) {
+	if f.expr == nil {
+		return false, 0, nil
+	}
+	mapValuer := f.mapValuer(kevt)
+	i, ok := f.BindingIndex()
+	if !ok {
+		return false, 0, nil
+	}
+	kevts := partials[i]
+	for _, e := range kevts {
+		valuer := f.bindingValuer(e, i)
+		ok := ql.Eval(f.expr, mapValuer, valuer, f.useFuncValuer)
+		if ok {
+			return true, i, e
+		}
+	}
+	return false, 0, nil
+}
+
+func (f *filter) BindingIndex() (uint16, bool) {
+	if len(f.bindings) == 0 {
+		return 0, false
+	}
+	for i := range f.bindings {
+		return i, true
+	}
+	return 0, false
+}
+
+// mapValuer for each field present in the AST, we run the
+// accessors and extract the field vales that are
+// supplied to the valuer. The valuer feeds the
+// expression with correct values.
+func (f *filter) mapValuer(kevt *kevent.Kevent) map[string]interface{} {
 	valuer := make(map[string]interface{})
-	// for each field present in the AST, we run the
-	// accessors and extract the field vales that are
-	// supplied to the valuer. The valuer feeds the
-	// expression with correct values.
 	for _, field := range f.fields {
 		for _, accessor := range f.accessors {
 			v, err := accessor.get(field, kevt)
@@ -115,5 +170,25 @@ func (f *filter) Run(kevt *kevent.Kevent) bool {
 			valuer[field.String()] = v
 		}
 	}
-	return ql.Eval(f.expr, valuer, f.multivaluer)
+	return valuer
+}
+
+// bindingValuer for each pattern binding node, resolves its value from
+// the event that pertains to the same pattern binding index.
+func (f *filter) bindingValuer(kevt *kevent.Kevent, idx uint16) map[string]interface{} {
+	valuer := make(map[string]interface{})
+	for _, binding := range f.bindings[idx] {
+		for _, accessor := range f.accessors {
+			v, err := accessor.get(binding.Field(), kevt)
+			if err != nil && !kerrors.IsKparamNotFound(err) {
+				accessorErrors.Add(err.Error(), 1)
+				continue
+			}
+			if v == nil {
+				continue
+			}
+			valuer[binding.Value] = v
+		}
+	}
+	return valuer
 }

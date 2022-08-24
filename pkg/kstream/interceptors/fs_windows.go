@@ -226,6 +226,13 @@ func (f *fsInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 				return kevt, true, kerrors.ErrCancelUpstreamKevent
 			}
 			fkevt.Kparams.Append(kparams.FileExtraInfo, kparams.Uint8, extraInfo)
+
+			// resolve the status of the file operation
+			status, err := kevt.Kparams.GetUint32(kparams.NTStatus)
+			if err == nil {
+				_ = fkevt.Kparams.Append(kparams.NTStatus, kparams.UnicodeString, formatStatus(status, fkevt))
+			}
+
 			delete(f.pendingKevents, irp)
 			if err := f.processCreateFile(fkevt); err != nil {
 				return kevt, true, err
@@ -339,6 +346,13 @@ func (f *fsInterceptor) processCreateFile(kevt *kevent.Kevent) error {
 	kevt.Kparams.Remove(kparams.FileExtraInfo)
 	// append human-readable file operation param
 	kevt.Kparams.Append(kparams.FileOperation, kparams.Enum, fs.FileDisposition(extraInfo))
+	// include file attributes as a slice parameter type
+	attrs, _ := kevt.Kparams.GetUint32(kparams.FileAttributes)
+	if attrs != 0 {
+		_ = kevt.Kparams.Set(kparams.FileAttributes, fs.FileAttributes(attrs), kparams.Slice)
+	} else {
+		kevt.Kparams.Remove(kparams.FileAttributes)
+	}
 
 	filename, err := kevt.Kparams.GetString(kparams.FileName)
 	if err != nil {

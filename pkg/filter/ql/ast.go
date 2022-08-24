@@ -29,11 +29,16 @@ import (
 )
 
 // Eval evaluates expr against a map that contains the field values.
-func Eval(expr Expr, m map[string]interface{}, multivaluer bool) bool {
+func Eval(expr Expr, m map[string]interface{}, b map[string]interface{}, useFuncValuer bool) bool {
 	var eval ValuerEval
-	if multivaluer {
+	switch {
+	case useFuncValuer && len(b) > 0:
+		eval = ValuerEval{Valuer: MultiValuer(MapValuer(m), PatternBindingValuer(b), FunctionValuer{m})}
+	case useFuncValuer:
 		eval = ValuerEval{Valuer: MultiValuer(MapValuer(m), FunctionValuer{m})}
-	} else {
+	case len(b) > 0:
+		eval = ValuerEval{Valuer: MultiValuer(MapValuer(m), PatternBindingValuer(b))}
+	default:
 		eval = ValuerEval{Valuer: MapValuer(m)}
 	}
 	v, ok := eval.Eval(expr).(bool)
@@ -64,6 +69,15 @@ type CallValuer interface {
 
 	// Call is invoked to evaluate a function call (if possible).
 	Call(name string, args []interface{}) (interface{}, bool)
+}
+
+// PatternBindingValuer fetches values from pattern bindings
+type PatternBindingValuer map[string]interface{}
+
+// Value returns the value for a key in the PatternBindingValuer.
+func (b PatternBindingValuer) Value(key string) (interface{}, bool) {
+	v, ok := b[key]
+	return v, ok
 }
 
 // MultiValuer returns a Valuer that iterates over multiple Valuer instances
@@ -123,6 +137,31 @@ func (v *ValuerEval) Eval(expr Expr) interface{} {
 				return !val
 			}
 			return nil
+		case *Function:
+			if valuer, ok := v.Valuer.(CallValuer); ok {
+				var args []interface{}
+				if len(expr1.Args) > 0 {
+					args = make([]interface{}, len(expr1.Args))
+					for i := range expr1.Args {
+						args[i] = v.Eval(expr1.Args[i])
+					}
+				}
+				v, _ := valuer.Call(expr1.Name, args)
+				if val, ok := v.(bool); ok {
+					return !val
+				}
+				return nil
+			}
+			return nil
+		case *ParenExpr:
+			v := v.Eval(expr1.Expr)
+			if v == nil {
+				return nil
+			}
+			if val, ok := v.(bool); ok {
+				return !val
+			}
+			return nil
 		default:
 			return nil
 		}
@@ -141,6 +180,12 @@ func (v *ValuerEval) Eval(expr Expr) interface{} {
 	case *BoolLiteral:
 		return expr.Value
 	case *FieldLiteral:
+		val, ok := v.Valuer.Value(expr.Value)
+		if !ok {
+			return nil
+		}
+		return val
+	case *PatternBindingLiteral:
 		val, ok := v.Valuer.Value(expr.Value)
 		if !ok {
 			return nil

@@ -21,6 +21,7 @@ package ql
 import (
 	"bytes"
 	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"net"
 	"reflect"
 	"strconv"
@@ -64,6 +65,27 @@ type IPLiteral struct {
 	Value net.IP
 }
 
+// PatternBindingLiteral represents a pattern binding literal.
+type PatternBindingLiteral struct {
+	Value string
+}
+
+// Index returns the index pattern binding index number. E.g.
+// Say the pattern binding is $1.ps.name, this method returns
+// 1
+func (b PatternBindingLiteral) Index() uint16 {
+	i, err := strconv.Atoi(b.Value[1:2])
+	if err != nil {
+		return 0
+	}
+	return uint16(i)
+}
+
+// Field returns the string name from the pattern binding.
+func (b PatternBindingLiteral) Field() fields.Field {
+	return fields.Field(b.Value[3:])
+}
+
 func (i IPLiteral) String() string {
 	return i.Value.String()
 }
@@ -90,6 +112,10 @@ func (d DecimalLiteral) String() string {
 
 func (b BoolLiteral) String() string {
 	return strconv.FormatBool(b.Value)
+}
+
+func (b PatternBindingLiteral) String() string {
+	return b.Value
 }
 
 // ListLiteral represents a list of tag key literals.

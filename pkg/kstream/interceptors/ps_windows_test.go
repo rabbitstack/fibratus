@@ -75,8 +75,9 @@ func TestPsInterceptorIntercept(t *testing.T) {
 	assert.Equal(t, "C:\\Windows\\System32\\smss.exe", exe)
 
 	tpid := fmt.Sprintf("%x", os.Getpid())
+
 	kpars2 := kevent.Kparams{
-		kparams.Comm:            {Name: kparams.Comm, Type: kparams.UnicodeString, Value: "C:\\Windows\\System32\\smss.exe"},
+		kparams.Comm:            {Name: kparams.Comm, Type: kparams.UnicodeString, Value: "\"C:\\Windows\\System32\\smss.exe\""},
 		kparams.ProcessID:       {Name: kparams.ProcessID, Type: kparams.HexInt32, Value: kparams.Hex(tpid)},
 		kparams.ProcessParentID: {Name: kparams.ProcessParentID, Type: kparams.HexInt32, Value: kparams.Hex("26c")},
 	}
@@ -89,4 +90,22 @@ func TestPsInterceptorIntercept(t *testing.T) {
 	require.NoError(t, err)
 
 	require.True(t, kevt2.Kparams.Contains(kparams.StartTime))
+
+	cmdline, _ := kevt2.Kparams.GetString(kparams.Comm)
+	require.Equal(t, "C:\\Windows\\System32\\smss.exe", cmdline)
+
+	kpars3 := kevent.Kparams{
+		kparams.Comm:        {Name: kparams.Comm, Type: kparams.UnicodeString, Value: "csrss.exe"},
+		kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "csrss.exe"},
+	}
+
+	kevt3 := &kevent.Kevent{
+		Type:    ktypes.CreateProcess,
+		Kparams: kpars3,
+	}
+
+	_, _, err = psi.Intercept(kevt3)
+	require.NoError(t, err)
+	cmdline1, _ := kevt3.Kparams.GetString(kparams.Comm)
+	require.Equal(t, "C:\\Windows\\System32\\csrss.exe", cmdline1)
 }

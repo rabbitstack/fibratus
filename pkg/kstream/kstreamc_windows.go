@@ -397,12 +397,22 @@ func (k *kstreamConsumer) processKevent(evt *etw.EventRecord) error {
 		kevt.Release()
 		return nil
 	}
-
+	// run rules. In case of rule groups with sequence policy
+	// the last event matching the group is forwarded to the
+	// outputs
+	if rulesFired := k.rules.Fire(kevt); !rulesFired {
+		return nil
+	}
+	// increment sequence
+	if !kevt.Type.Dropped(false) {
+		k.sequencer.Increment()
+	}
 	if k.eventCallback != nil {
 		return k.eventCallback(kevt)
 	}
 
 	k.kevts <- kevt
+	keventsEnqueued.Add(1)
 
 	return nil
 }
@@ -1075,7 +1085,6 @@ func getParam(name string, buffer []byte, size uint32, nonStructType tdh.NonStru
 // the state
 // - process that produced the kernel event is fibratus itself
 // - kernel event is present in the exclude list, and thus it is always dropped
-// - rules defined in filter group files are triggered
 // - finally, the event is checked by the CLI filter
 func (k *kstreamConsumer) isKeventDropped(kevt *kevent.Kevent) bool {
 	// drops events of certain type. For example, EnumProcess
@@ -1092,15 +1101,9 @@ func (k *kstreamConsumer) isKeventDropped(kevt *kevent.Kevent) bool {
 		excludedKevents.Add(1)
 		return true
 	}
-	// check if rules got matched
-	if rulesFired := k.rules.Fire(kevt); !rulesFired {
-		return true
-	}
 	// fallback to CLI filter
 	if k.filter != nil {
 		return !k.filter.Run(kevt)
 	}
-	keventsEnqueued.Add(1)
-	k.sequencer.Increment()
 	return false
 }

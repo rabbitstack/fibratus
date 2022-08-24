@@ -19,6 +19,8 @@
 package interceptors
 
 import (
+	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"strings"
 	"sync"
 	"syscall"
@@ -28,28 +30,36 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// resolvedStatuses keeps the mappings of formatted NT status messages
-var resolvedStatuses = map[uint32]string{}
+// statusCache keeps the mappings of formatted NT status messages
+var statusCache = map[uint32]string{}
 var mux sync.Mutex
 
 const (
-	successStatusMessage     = "success"
-	keyNotFoundStatusMessage = "key not found"
-	unknownStatusMessage     = "unknown"
+	successStatusMessage      = "success"
+	keyNotFoundStatusMessage  = "key not found"
+	fileNotFoundStatusMessage = "file not found"
+	unknownStatusMessage      = "unknown"
+
+	notFoundNTStatus = 3221225524
 )
 
-func formatStatus(status uint32) string {
+func formatStatus(status uint32, kevt *kevent.Kevent) string {
 	if status == 0 {
 		return successStatusMessage
 	}
 	// this status code is return quite often, so we can offload the FormatMessage call
 	if status == notFoundNTStatus {
-		return keyNotFoundStatusMessage
+		switch kevt.Category {
+		case ktypes.Registry:
+			return keyNotFoundStatusMessage
+		case ktypes.File:
+			return fileNotFoundStatusMessage
+		}
 	}
 	// pick resolved status
 	mux.Lock()
 	defer mux.Unlock()
-	if s, ok := resolvedStatuses[status]; ok {
+	if s, ok := statusCache[status]; ok {
 		return s
 	}
 	var flags uint32 = syscall.FORMAT_MESSAGE_FROM_SYSTEM
@@ -63,7 +73,7 @@ func formatStatus(status uint32) string {
 	}
 
 	s := strings.ToLower(string(utf16.Decode(b[:n])))
-	resolvedStatuses[status] = s
+	statusCache[status] = s
 
 	return s
 }

@@ -52,14 +52,14 @@ func (s *scanner) scan() (tok token, pos int, lit string) {
 	// as an ident or reserved word.
 	if isWhitespace(ch0) {
 		return s.scanWhitespace()
-	} else if isLetter(ch0) || ch0 == '_' {
+	} else if isLetter(ch0) || ch0 == '_' || ch0 == '$' {
 		s.r.unread()
 		return s.scanIdent()
 	} else if isDigit(ch0) {
 		return s.scanNumber()
 	}
 
-	// Otherwise parse individual characters.
+	// Otherwise, parse individual characters.
 	switch ch0 {
 	case reof:
 		return eof, pos, ""
@@ -418,7 +418,7 @@ type reader struct {
 	eof bool
 }
 
-// readRune reads the next rune from the reader.
+// ReadRune reads the next rune from the reader.
 // This is a wrapper function to implement the io.RuneReader interface.
 // Note that this function does not return size.
 func (r *reader) ReadRune() (ch rune, size int, err error) {
@@ -429,7 +429,7 @@ func (r *reader) ReadRune() (ch rune, size int, err error) {
 	return
 }
 
-// unreadRune pushes the previously read rune back onto the buffer.
+// UnreadRune pushes the previously read rune back onto the buffer.
 // This is a wrapper function to implement the io.RuneScanner interface.
 func (r *reader) UnreadRune() error {
 	r.unread()

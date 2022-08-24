@@ -20,6 +20,7 @@ package types
 
 import (
 	"github.com/magiconair/properties/assert"
+	"github.com/stretchr/testify/require"
 	"testing"
 )
 
@@ -58,4 +59,16 @@ func TestVisit(t *testing.T) {
 	Walk(func(ps *PS) { parents1 = append(parents1, ps.Name) }, ps5)
 
 	assert.Equal(t, expected1, parents1)
+}
+
+func TestPSArgs(t *testing.T) {
+	ps := NewPS(
+		233,
+		4532,
+		"spotify.exe",
+		"",
+		"C:\\Users\\admin\\AppData\\Roaming\\Spotify\\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler \"--metrics-dir=C:\\Users\\admin\\AppData\\Local\\Spotify\\User Data\" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify",
+		Thread{}, nil)
+	require.Len(t, ps.Args, 12)
+	require.Equal(t, "/prefetch:7", ps.Args[2])
 }
