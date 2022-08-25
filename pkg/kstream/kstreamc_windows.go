@@ -430,8 +430,19 @@ func (k *kstreamConsumer) enqueueKevent(kevt *kevent.Kevent) error {
 		kevt.Release()
 		return nil
 	}
+	if rulesFired := k.rules.Fire(kevt); !rulesFired {
+		return nil
+	}
+	// increment sequence
+	if !kevt.Type.Dropped(false) {
+		k.sequencer.Increment()
+	}
+	if k.eventCallback != nil {
+		return k.eventCallback(kevt)
+	}
 
 	k.kevts <- kevt
+	keventsEnqueued.Add(1)
 
 	return nil
 }

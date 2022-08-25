@@ -116,7 +116,7 @@ type ktraceController struct {
 func NewKtraceController(kstreamConfig config.KstreamConfig) KtraceController {
 	controller := &ktraceController{
 		kstreamConfig: kstreamConfig,
-		traces:        make(map[string]TraceSession, 0),
+		traces:        make(map[string]TraceSession),
 	}
 	return controller
 }

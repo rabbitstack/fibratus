@@ -25,7 +25,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
@@ -50,9 +49,8 @@ const (
 
 type registryInterceptor struct {
 	// keys stores the mapping between the KCB (Key Control Block) and the key name.
-	keys   map[uint64]string
-	hsnap  handle.Snapshotter
-	config *config.Config
+	keys  map[uint64]string
+	hsnap handle.Snapshotter
 }
 
 func newRegistryInterceptor(hsnap handle.Snapshotter) KstreamInterceptor {

@@ -95,8 +95,10 @@ func TestPsInterceptorIntercept(t *testing.T) {
 	require.Equal(t, "C:\\Windows\\System32\\smss.exe", cmdline)
 
 	kpars3 := kevent.Kparams{
-		kparams.Comm:        {Name: kparams.Comm, Type: kparams.UnicodeString, Value: "csrss.exe"},
-		kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "csrss.exe"},
+		kparams.ProcessID:       {Name: kparams.ProcessID, Type: kparams.HexInt32, Value: kparams.Hex(tpid)},
+		kparams.ProcessParentID: {Name: kparams.ProcessParentID, Type: kparams.HexInt32, Value: kparams.Hex("26c")},
+		kparams.Comm:            {Name: kparams.Comm, Type: kparams.UnicodeString, Value: "csrss.exe"},
+		kparams.ProcessName:     {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "csrss.exe"},
 	}
 
 	kevt3 := &kevent.Kevent{

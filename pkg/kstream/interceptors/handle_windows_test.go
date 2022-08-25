@@ -54,10 +54,12 @@ func TestCloseHandle(t *testing.T) {
 	deferredKevts := make(chan *kevent.Kevent, 1)
 
 	kevt := &kevent.Kevent{
-		Type: ktypes.CloseHandle,
-		Tid:  2484,
-		PID:  859,
+		Type:     ktypes.CloseHandle,
+		Tid:      2484,
+		PID:      859,
+		Category: ktypes.Handle,
 		Kparams: kevent.Kparams{
+			kparams.HandleID:           {Name: kparams.HandleID, Type: kparams.Uint32, Value: uint32(21)},
 			kparams.HandleObjectTypeID: {Name: kparams.HandleObjectTypeID, Type: kparams.Uint16, Value: uint16(23)},
 			kparams.HandleObject:       {Name: kparams.HandleObject, Type: kparams.HexInt64, Value: kparams.Hex("ffffd105e9baaf70")},
 			kparams.HandleObjectName:   {Name: kparams.HandleObjectName, Type: kparams.UnicodeString, Value: `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\Tcpip\Parameters\Interfaces\{b677c565-6ca5-45d3-b618-736b4e09b036}`},
@@ -85,10 +87,12 @@ func TestCloseHandle(t *testing.T) {
 
 func TestHandleCoalescing(t *testing.T) {
 	kevt := &kevent.Kevent{
-		Type: ktypes.CreateHandle,
-		Tid:  2484,
-		PID:  859,
+		Type:     ktypes.CreateHandle,
+		Tid:      2484,
+		PID:      859,
+		Category: ktypes.Handle,
 		Kparams: kevent.Kparams{
+			kparams.HandleID:           {Name: kparams.HandleID, Type: kparams.Uint32, Value: uint32(21)},
 			kparams.HandleObjectTypeID: {Name: kparams.HandleObjectTypeID, Type: kparams.Uint16, Value: uint16(23)},
 			kparams.HandleObject:       {Name: kparams.HandleObject, Type: kparams.HexInt64, Value: kparams.Hex("ffffd105e9baaf70")},
 			kparams.HandleObjectName:   {Name: kparams.HandleObjectName, Type: kparams.UnicodeString, Value: ""},
@@ -114,10 +118,12 @@ func TestHandleCoalescing(t *testing.T) {
 	assert.Len(t, hi.(*handleInterceptor).defers, 1)
 
 	kevt1 := &kevent.Kevent{
-		Type: ktypes.CloseHandle,
-		Tid:  2484,
-		PID:  859,
+		Type:     ktypes.CloseHandle,
+		Tid:      2484,
+		PID:      859,
+		Category: ktypes.Handle,
 		Kparams: kevent.Kparams{
+			kparams.HandleID:           {Name: kparams.HandleID, Type: kparams.Uint32, Value: uint32(21)},
 			kparams.HandleObjectTypeID: {Name: kparams.HandleObjectTypeID, Type: kparams.Uint16, Value: uint16(23)},
 			kparams.HandleObject:       {Name: kparams.HandleObject, Type: kparams.HexInt64, Value: kparams.Hex("ffffd105e9baaf70")},
 			kparams.HandleObjectName:   {Name: kparams.HandleObjectName, Type: kparams.UnicodeString, Value: `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\Tcpip\Parameters\Interfaces\{b677c565-6ca5-45d3-b618-736b4e09b036}`},
@@ -153,6 +159,7 @@ func TestHandleCoalescingWaiting(t *testing.T) {
 		Tid:       2484,
 		PID:       859,
 		Timestamp: time.Now(),
+		Category:  ktypes.Handle,
 		Kparams: kevent.Kparams{
 			kparams.HandleObjectTypeID: {Name: kparams.HandleObjectTypeID, Type: kparams.Uint16, Value: uint16(23)},
 			kparams.HandleObject:       {Name: kparams.HandleObject, Type: kparams.HexInt64, Value: kparams.Hex("ffffd105e9baaf70")},
@@ -180,9 +187,10 @@ func TestHandleCoalescingWaiting(t *testing.T) {
 	assert.Len(t, hi.(*handleInterceptor).defers, 1)
 
 	kevt1 := &kevent.Kevent{
-		Type: ktypes.CloseHandle,
-		Tid:  2484,
-		PID:  859,
+		Type:     ktypes.CloseHandle,
+		Tid:      2484,
+		PID:      859,
+		Category: ktypes.Handle,
 		Kparams: kevent.Kparams{
 			kparams.HandleObjectTypeID: {Name: kparams.HandleObjectTypeID, Type: kparams.Uint16, Value: uint16(23)},
 			kparams.HandleObject:       {Name: kparams.HandleObject, Type: kparams.HexInt64, Value: kparams.Hex("affdd155e9baaf70")},

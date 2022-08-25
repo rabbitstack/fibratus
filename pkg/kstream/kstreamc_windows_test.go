@@ -234,7 +234,7 @@ func TestProcessKeventRaw(t *testing.T) {
 		assert.Equal(t, ktypes.CreateProcess, kevt.Type)
 		assert.Equal(t, "CreateProcess", kevt.Name)
 
-		assert.Len(t, kevt.Kparams, 10)
+		assert.Len(t, kevt.Kparams, 11)
 
 		assert.True(t, kevt.Kparams.Contains(kparams.DTB))
 		assert.True(t, kevt.Kparams.Contains(kparams.ProcessName))

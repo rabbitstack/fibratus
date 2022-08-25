@@ -68,9 +68,8 @@ func newHandleInterceptor(
 func (h *handleInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, error) {
 	if kevt.Category == ktypes.Handle {
 		handleID, err := kevt.Kparams.TryGetHexAsUint32(kparams.HandleID)
-		if err == nil {
-			// if the param was in hex representation, convert to uint32
-			_ = kevt.Kparams.Set(kparams.HandleID, handleID, kparams.Uint32)
+		if err != nil {
+			return kevt, true, err
 		}
 		typeID, err := kevt.Kparams.GetUint16(kparams.HandleObjectTypeID)
 		if err != nil {
