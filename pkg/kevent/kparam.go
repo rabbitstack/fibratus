@@ -362,14 +362,14 @@ func (kpars Kparams) GetHexAsUint32(name string) (uint32, error) {
 // If the param is present, but doesn't have the hex type, then the param value is directly
 // coerced into uint32 scalar.
 func (kpars Kparams) TryGetHexAsUint32(name string) (uint32, error) {
-	hex, err := kpars.GetHex(name)
-	if kerrors.IsKparamNotFound(err) {
-		return uint32(0), err
-	}
+	kpar, err := kpars.findParam(name)
 	if err != nil {
-		return kpars.GetUint32(name)
+		return 0, err
 	}
-	return hex.Uint32(), nil
+	if kpar.Type == kparams.HexInt32 {
+		return kpars.GetHexAsUint32(name)
+	}
+	return kpars.GetUint32(name)
 }
 
 // GetHexAsUint8 returns the number hexadecimal representation as uint8 value.
@@ -385,14 +385,14 @@ func (kpars Kparams) GetHexAsUint8(name string) (uint8, error) {
 // If the param is present, but doesn't have the hex type, then the param value is directly
 // coerced into uint8 scalar.
 func (kpars Kparams) TryGetHexAsUint8(name string) (uint8, error) {
-	hex, err := kpars.GetHex(name)
-	if kerrors.IsKparamNotFound(err) {
-		return uint8(0), err
-	}
+	kpar, err := kpars.findParam(name)
 	if err != nil {
-		return kpars.GetUint8(name)
+		return 0, err
 	}
-	return hex.Uint8(), nil
+	if kpar.Type == kparams.HexInt8 {
+		return kpars.GetHexAsUint8(name)
+	}
+	return kpars.GetUint8(name)
 }
 
 // GetHexAsUint64 returns the number hexadecimal representation as uint64 value.
@@ -408,14 +408,14 @@ func (kpars Kparams) GetHexAsUint64(name string) (uint64, error) {
 // If the param is present, but doesn't have the hex type, then the param value is directly
 // coerced into uint64 scalar.
 func (kpars Kparams) TryGetHexAsUint64(name string) (uint64, error) {
-	hex, err := kpars.GetHex(name)
-	if kerrors.IsKparamNotFound(err) {
-		return uint64(0), err
-	}
+	kpar, err := kpars.findParam(name)
 	if err != nil {
-		return kpars.GetUint64(name)
+		return 0, err
 	}
-	return hex.Uint64(), nil
+	if kpar.Type == kparams.HexInt64 {
+		return kpars.GetHexAsUint64(name)
+	}
+	return kpars.GetUint64(name)
 }
 
 // GetHex returns the generic hexadecimal type for the specified parameter name.
