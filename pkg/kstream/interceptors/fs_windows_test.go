@@ -23,7 +23,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
@@ -50,7 +49,7 @@ func TestCreateFile(t *testing.T) {
 	sysRoot := os.Getenv("SystemRoot")
 	devMapper.On("Convert", "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll").Return(fmt.Sprintf("%s\\system32\\user32.dll", sysRoot))
 
-	fsi := newFsInterceptor(devMapper, hsnapMock, &config.Config{})
+	fsi := newFsInterceptor(devMapper, hsnapMock)
 
 	_, _, err := fsi.Intercept(&kevent.Kevent{
 		Type: ktypes.FileRundown,
@@ -119,7 +118,7 @@ func TestRundownFile(t *testing.T) {
 	sysRoot := os.Getenv("SystemRoot")
 	devMapper.On("Convert", "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll").Return(fmt.Sprintf("%s\\system32\\user32.dll", sysRoot))
 
-	fsi := newFsInterceptor(devMapper, hsnapMock, &config.Config{})
+	fsi := newFsInterceptor(devMapper, hsnapMock)
 
 	_, _, err := fsi.Intercept(&kevent.Kevent{
 		Type: ktypes.FileRundown,
@@ -149,7 +148,7 @@ func TestDeleteFile(t *testing.T) {
 	sysRoot := os.Getenv("SystemRoot")
 	devMapper.On("Convert", "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll").Return(fmt.Sprintf("%s\\system32\\user32.dll", sysRoot))
 
-	fsi := newFsInterceptor(devMapper, hsnapMock, &config.Config{})
+	fsi := newFsInterceptor(devMapper, hsnapMock)
 
 	_, _, err := fsi.Intercept(&kevent.Kevent{
 		Type: ktypes.FileRundown,

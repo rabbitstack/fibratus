@@ -51,8 +51,8 @@ func ReadUint64(buf uintptr, offset uint16) uint64 {
 	return *(*uint64)(unsafe.Pointer(buf + uintptr(offset)))
 }
 
-// ReadUTF8String reads the UTF-8 string from the buffer at the specified offset and buffer length.
-func ReadUTF8String(buf uintptr, offset, length uint16) (string, uint16) {
+// ReadAnsiString reads the ANSI string from the buffer at the specified offset and buffer length.
+func ReadAnsiString(buf uintptr, offset, length uint16) (string, uint16) {
 	if offset > length {
 		return "", 0
 	}
@@ -81,9 +81,9 @@ func ReadUTF16String(buf uintptr, offset, length uint16) (string, uint16) {
 	return syscall.UTF16ToString(s), uint16(len(s) + 2)
 }
 
-// ConsumeString reads the byte slice with UTF16-encoded string
+// ConsumeUTF16String reads the byte slice with UTF16-encoded string
 // when the UTF16 string is located at the end of the buffer.
-func ConsumeString(buf uintptr, offset, length uint16) string {
+func ConsumeUTF16String(buf uintptr, offset, length uint16) string {
 	if offset > length {
 		return ""
 	}

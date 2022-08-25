@@ -80,7 +80,7 @@ func (ps psInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 			return kevt, true, err
 		}
 		// if leading/trailing quotes are found, get rid of them
-		if cmdline[0] == '"' && cmdline[len(cmdline)-1] == '"' {
+		if len(cmdline) > 0 && cmdline[0] == '"' && cmdline[len(cmdline)-1] == '"' {
 			cmdline = cmdline[1 : len(cmdline)-1]
 		}
 		// expand all variations of the SystemRoot env variable

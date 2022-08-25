@@ -168,7 +168,7 @@ jobs:
            export PKG_CONFIG_PATH=$(pwd)/pkg-config
            ./make.bat test
         env:
-          TAGS: kcap,filament,yara,yara_static
+          TAGS: kcap,yara,yara_static
 
   lint:
     runs-on: windows-latest

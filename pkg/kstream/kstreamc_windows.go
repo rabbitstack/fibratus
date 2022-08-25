@@ -549,7 +549,7 @@ func (k *kstreamConsumer) produceRawParams(ktype ktypes.Ktype, evt *etw.EventRec
 			offset = 24
 		}
 		sid, soffset = kparams.ReadSID(buf, offset)
-		name, noffset = kparams.ReadUTF8String(buf, soffset, length)
+		name, noffset = kparams.ReadAnsiString(buf, soffset, length)
 		cmdline, _ = kparams.ReadUTF16String(buf, soffset+noffset, length)
 		return kevent.KparamsFromSlice(
 			kevent.NewKparam(kparams.ProcessObject, kparams.HexInt64, kproc),
@@ -632,7 +632,7 @@ func (k *kstreamConsumer) produceRawParams(ktype ktypes.Ktype, evt *etw.EventRec
 		typeID := kparams.ReadUint16(buf, 12)
 		var handleName string
 		if length >= 16 {
-			handleName = kparams.ConsumeString(buf, 14, length)
+			handleName = kparams.ConsumeUTF16String(buf, 14, length)
 		}
 		return kevent.KparamsFromSlice(
 			kevent.NewKparam(kparams.HandleObject, kparams.Uint64, object),
@@ -700,9 +700,9 @@ func (k *kstreamConsumer) produceRawParams(ktype ktypes.Ktype, evt *etw.EventRec
 			keyHandle = kparams.ReadUint64(buf, 4)
 		}
 		if version >= 1 {
-			keyName = kparams.ConsumeString(buf, 24, length)
+			keyName = kparams.ConsumeUTF16String(buf, 24, length)
 		} else {
-			keyName = kparams.ConsumeString(buf, 20, length)
+			keyName = kparams.ConsumeUTF16String(buf, 20, length)
 		}
 		return kevent.KparamsFromSlice(
 			kevent.NewKparam(kparams.RegKeyHandle, kparams.Uint64, keyHandle),
@@ -726,10 +726,10 @@ func (k *kstreamConsumer) produceRawParams(ktype ktypes.Ktype, evt *etw.EventRec
 			createOptions = kparams.ReadUint32(buf, 20)
 			fileAttributes = kparams.ReadUint32(buf, 24)
 			shareAccess = kparams.ReadUint32(buf, 28)
-			filename = kparams.ConsumeString(buf, 32, length)
+			filename = kparams.ConsumeUTF16String(buf, 32, length)
 		} else {
 			fileObject = kparams.ReadUint64(buf, 0)
-			filename = kparams.ConsumeString(buf, 8, length)
+			filename = kparams.ConsumeUTF16String(buf, 8, length)
 		}
 		return kevent.KparamsFromSlice(
 			kevent.NewKparam(kparams.FileIrpPtr, kparams.Uint64, irp),
@@ -763,7 +763,7 @@ func (k *kstreamConsumer) produceRawParams(ktype ktypes.Ktype, evt *etw.EventRec
 		)
 		if version >= 2 {
 			fileObject = kparams.ReadUint64(buf, 0)
-			filename = kparams.ConsumeString(buf, 8, length)
+			filename = kparams.ConsumeUTF16String(buf, 8, length)
 		}
 		return kevent.KparamsFromSlice(
 			kevent.NewKparam(kparams.FileObject, kparams.Uint64, fileObject),
@@ -872,7 +872,7 @@ func (k *kstreamConsumer) produceRawParams(ktype ktypes.Ktype, evt *etw.EventRec
 			fileKey = kparams.ReadUint64(buf, 16)
 			tid = kparams.ReadUint32(buf, 24)
 			infoClass = kparams.ReadUint32(buf, 32)
-			filename = kparams.ConsumeString(buf, 38, length)
+			filename = kparams.ConsumeUTF16String(buf, 38, length)
 		} else {
 			tid = kparams.ReadUint32(buf, 8)
 			fileObject = kparams.ReadUint64(buf, 12)
