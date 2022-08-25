@@ -73,7 +73,7 @@ func NewChain(
 	chain.addInterceptor(newPsInterceptor(psnap, scanner))
 
 	if config.Kstream.EnableFileIOKevents {
-		chain.addInterceptor(newFsInterceptor(devMapper, hsnap, config))
+		chain.addInterceptor(newFsInterceptor(devMapper, hsnap))
 	}
 	if config.Kstream.EnableRegistryKevents {
 		chain.addInterceptor(newRegistryInterceptor(hsnap))

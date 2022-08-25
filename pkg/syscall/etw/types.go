@@ -482,13 +482,13 @@ type EventRecord struct {
 	BufferContext BufferContext
 	// ExtendedDataCount is the number of extended data structures in the `ExtendedData` field.
 	ExtendedDataCount uint16
-	// UserDataLength represents the size, in bytes, of the data in the `UserData` field.
-	UserDataLength uint16
+	// BufferLen represents the size, in bytes, of the event data buffer
+	BufferLen uint16
 	// ExtendedData designates extended data items that ETW collects. The extended data includes some items, such as the security
 	// identifier (SID) of the user that logged the event.
 	ExtendedData *EventHeaderExtendedDataItem
-	// UserData represents event specific data that's parsed via TDH API.
-	UserData uintptr
+	// Buffer represents raw event data that's parsed via TDH API.
+	Buffer uintptr
 	// UserContext is a pointer to custom user data passed in `EventTraceLogfile` structure.
 	UserContext uintptr
 }

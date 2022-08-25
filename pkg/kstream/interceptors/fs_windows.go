@@ -22,7 +22,6 @@ import (
 	"expvar"
 	"sync"
 
-	"github.com/rabbitstack/fibratus/pkg/config"
 	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/handle"
@@ -48,7 +47,6 @@ type fsInterceptor struct {
 	// devMapper translates DOS device names to regular drive letters
 	devMapper fs.DevMapper
 	hsnap     handle.Snapshotter
-	config    *config.Config
 
 	pendingKevents map[uint64]*kevent.Kevent
 }
@@ -146,13 +144,12 @@ func infoClassFromID(klass uint32) string {
 	return class
 }
 
-func newFsInterceptor(devMapper fs.DevMapper, hsnap handle.Snapshotter, config *config.Config) KstreamInterceptor {
+func newFsInterceptor(devMapper fs.DevMapper, hsnap handle.Snapshotter) KstreamInterceptor {
 	interceptor := &fsInterceptor{
 		files:          make(map[uint64]*fileInfo),
 		pendingKevents: make(map[uint64]*kevent.Kevent),
 		devMapper:      devMapper,
 		hsnap:          hsnap,
-		config:         config,
 	}
 	return interceptor
 }
@@ -171,7 +168,7 @@ func (f *fsInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 		ktypes.SetFileInformation,
 		ktypes.EnumDirectory:
 
-		fobj, err := kevt.Kparams.GetHexAsUint64(kparams.FileObject)
+		fobj, err := kevt.Kparams.TryGetHexAsUint64(kparams.FileObject)
 		if err != nil && kevt.Type != ktypes.FileOpEnd {
 			return kevt, true, err
 		}
@@ -207,7 +204,7 @@ func (f *fsInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 			// we defer the processing of the CreateFile event until we get
 			// the matching FileOpEnd event. This event contains the operation
 			// that was done on behalf of the file, e.g. create or open.
-			irp, err := kevt.Kparams.GetHexAsUint64(kparams.FileIrpPtr)
+			irp, err := kevt.Kparams.TryGetHexAsUint64(kparams.FileIrpPtr)
 			if err != nil {
 				return kevt, true, err
 			}
@@ -216,7 +213,11 @@ func (f *fsInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 
 		case ktypes.FileOpEnd:
 			// get the CreateFile pending event by IRP identifier
-			irp, err := kevt.Kparams.GetHexAsUint64(kparams.FileIrpPtr)
+			irp, err := kevt.Kparams.TryGetHexAsUint64(kparams.FileIrpPtr)
+			if err != nil {
+				return kevt, true, err
+			}
+			extraInfo, err := kevt.Kparams.TryGetHexAsUint8(kparams.FileExtraInfo)
 			if err != nil {
 				return kevt, true, err
 			}
@@ -224,11 +225,8 @@ func (f *fsInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 			if !ok {
 				return kevt, true, kerrors.ErrCancelUpstreamKevent
 			}
-			extraInfo, err := kevt.Kparams.GetHexAsUint8(kparams.FileExtraInfo)
-			if err != nil {
-				return kevt, true, err
-			}
 			fkevt.Kparams.Append(kparams.FileExtraInfo, kparams.Uint8, extraInfo)
+
 			// resolve the status of the file operation
 			status, err := kevt.Kparams.GetUint32(kparams.NTStatus)
 			if err == nil {
@@ -236,7 +234,6 @@ func (f *fsInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 			}
 
 			delete(f.pendingKevents, irp)
-
 			if err := f.processCreateFile(fkevt); err != nil {
 				return kevt, true, err
 			}
@@ -245,7 +242,7 @@ func (f *fsInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 		case ktypes.ReleaseFile:
 			fileReleaseCount.Add(1)
 			// delete both, the file object and the file key from files map
-			fileKey, err := kevt.Kparams.GetHexAsUint64(kparams.FileKey)
+			fileKey, err := kevt.Kparams.TryGetHexAsUint64(kparams.FileKey)
 			f.mux.Lock()
 			defer f.mux.Unlock()
 			if err == nil {
@@ -257,7 +254,7 @@ func (f *fsInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 			ktypes.CloseFile, ktypes.ReadFile,
 			ktypes.WriteFile, ktypes.SetFileInformation, ktypes.EnumDirectory:
 
-			fileKey, err := kevt.Kparams.GetHexAsUint64(kparams.FileKey)
+			fileKey, err := kevt.Kparams.TryGetHexAsUint64(kparams.FileKey)
 			if err != nil {
 				return kevt, true, err
 			}
@@ -302,7 +299,7 @@ func (f *fsInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 
 			if kevt.Type == ktypes.EnumDirectory {
 				// the file key kparam contains the reference to the directory name
-				fileKey, err := kevt.Kparams.GetHexAsUint64(kparams.FileKey)
+				fileKey, err := kevt.Kparams.TryGetHexAsUint64(kparams.FileKey)
 				if err != nil {
 					kevt.Kparams.Remove(kparams.FileKey)
 					removeKparams(kevt)
@@ -336,11 +333,10 @@ func (f *fsInterceptor) getFileInfo(name string, opts uint32) *fileInfo {
 }
 
 func (f *fsInterceptor) processCreateFile(kevt *kevent.Kevent) error {
-	fobj, err := kevt.Kparams.GetHexAsUint64(kparams.FileObject)
+	fobj, err := kevt.Kparams.TryGetHexAsUint64(kparams.FileObject)
 	if err != nil {
 		return err
 	}
-
 	extraInfo, err := kevt.Kparams.GetUint8(kparams.FileExtraInfo)
 	if err != nil {
 		return err

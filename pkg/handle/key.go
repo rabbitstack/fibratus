@@ -23,10 +23,11 @@ package handle
 
 import (
 	"expvar"
-	"github.com/rabbitstack/fibratus/pkg/syscall/registry"
-	"github.com/rabbitstack/fibratus/pkg/syscall/security"
 	"strings"
 	"sync"
+
+	"github.com/rabbitstack/fibratus/pkg/syscall/registry"
+	"github.com/rabbitstack/fibratus/pkg/syscall/security"
 )
 
 const (

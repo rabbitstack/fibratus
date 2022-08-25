@@ -24,6 +24,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/syscall/etw"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -31,6 +32,9 @@ import (
 func TestStartKtraceSuccess(t *testing.T) {
 	startTrace = func(name string, flags *etw.EventTraceProperties) (etw.TraceHandle, error) {
 		return etw.TraceHandle(1), nil
+	}
+	enableTrace = func(guid syscall.GUID, handle etw.TraceHandle, keyword uint32) error {
+		return nil
 	}
 
 	ktracec := NewKtraceController(config.KstreamConfig{
@@ -43,9 +47,7 @@ func TestStartKtraceSuccess(t *testing.T) {
 	err := ktracec.StartKtrace()
 
 	require.NoError(t, err)
-	assert.Equal(t, etw.TraceHandle(1), ktracec.(*ktraceController).handle)
-	assert.Equal(t, etw.EventTraceFlags(0x10003), ktracec.(*ktraceController).props.EnableFlags)
-	assert.Equal(t, "TCPIP, Process, Thread", ktracec.(*ktraceController).props.EnableFlags.String())
+	assert.Len(t, ktracec.(*ktraceController).traces, 3)
 }
 
 func TestStartKtraceNoSysResources(t *testing.T) {

@@ -157,7 +157,7 @@ func (s *snapshotter) Write(kevt *kevent.Kevent) error {
 		}
 		// discard writing the snapshot state if the pid is
 		// already present. This usually happens when we alter
-		// the ksession to induce the arrival of rundown events
+		// the tracing session to induce the arrival of rundown events
 		// by calling into the `etw.SetTraceInformation` Windows API
 		// function twice in a row.
 		// For more pointers check `kstream/controller_windows.go`
@@ -219,7 +219,6 @@ func (s *snapshotter) Write(kevt *kevent.Kevent) error {
 		}
 
 		s.procs[pid] = ps
-
 	case ktypes.CreateThread, ktypes.EnumThread:
 		pid, err := kevt.Kparams.GetPid()
 		if err != nil {
@@ -251,7 +250,6 @@ func (s *snapshotter) Write(kevt *kevent.Kevent) error {
 		ps.Parent = s.procs[ps.Ppid]
 
 		s.procs[pid] = ps
-
 	case ktypes.LoadImage, ktypes.EnumImage:
 		pid, err := kevt.Kparams.GetPid()
 		if err != nil {
@@ -435,7 +433,6 @@ func (s *snapshotter) Remove(kevt *kevent.Kevent) error {
 			processCount.Add(-1)
 			return nil
 		}
-
 	case ktypes.TerminateThread:
 		if ps, ok := s.procs[pid]; ok {
 			tid, err := kevt.Kparams.GetTid()
@@ -445,7 +442,6 @@ func (s *snapshotter) Remove(kevt *kevent.Kevent) error {
 			ps.RemoveThread(tid)
 			threadCount.Add(-1)
 		}
-
 	case ktypes.UnloadImage:
 		pid, err := kevt.Kparams.GetPid()
 		if err != nil {
@@ -457,7 +453,6 @@ func (s *snapshotter) Remove(kevt *kevent.Kevent) error {
 			moduleCount.Add(-1)
 		}
 	}
-
 	return nil
 }
 

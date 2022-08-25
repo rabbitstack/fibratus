@@ -221,26 +221,128 @@ func (k Ktype) String() string {
 		return "RegQueryValue"
 	case RegCreateKCB:
 		return "RegCreateKCB"
+	case RegSetValue:
+		return "RegSetValue"
 	case LoadImage:
 		return "LoadImage"
 	case UnloadImage:
 		return "UnloadImage"
-	case Accept:
+	case Accept, AcceptTCPv4, AcceptTCPv6:
 		return "Accept"
-	case Send:
+	case Send, SendTCPv4, SendTCPv6, SendUDPv4, SendUDPv6:
 		return "Send"
-	case Recv:
+	case Recv, RecvTCPv4, RecvTCPv6, RecvUDPv4, RecvUDPv6:
 		return "Recv"
-	case Connect:
+	case Connect, ConnectTCPv4, ConnectTCPv6:
 		return "Connect"
-	case Reconnect:
+	case Reconnect, ReconnectTCPv4, ReconnectTCPv6:
 		return "Reconnect"
-	case Disconnect:
+	case Disconnect, DisconnectTCPv4, DisconnectTCPv6:
 		return "Disconnect"
-	case Retransmit:
+	case Retransmit, RetransmitTCPv4, RetransmitTCPv6:
 		return "Retransmit"
 	default:
 		return string(k[:])
+	}
+}
+
+// Category determines the category to which the ktype pertains.
+func (k Ktype) Category() Category {
+	switch k {
+	case CreateProcess, TerminateProcess, OpenProcess:
+		return Process
+	case CreateThread, TerminateThread, OpenThread:
+		return Thread
+	case LoadImage, UnloadImage:
+		return Image
+	case CreateFile, ReadFile, WriteFile, EnumDirectory, DeleteFile, RenameFile, CloseFile, SetFileInformation:
+		return File
+	case RegCreateKey, RegDeleteKey, RegOpenKey, RegQueryKey, RegQueryValue, RegSetValue, RegDeleteValue:
+		return Registry
+	case AcceptTCPv4, AcceptTCPv6,
+		ConnectTCPv4, ConnectTCPv6,
+		ReconnectTCPv4, ReconnectTCPv6,
+		RetransmitTCPv4, RetransmitTCPv6,
+		DisconnectTCPv4, DisconnectTCPv6,
+		SendTCPv4, SendTCPv6, SendUDPv4, SendUDPv6,
+		RecvTCPv4, RecvTCPv6, RecvUDPv4, RecvUDPv6:
+		return Net
+	case CreateHandle, CloseHandle:
+		return Handle
+	default:
+		return Unknown
+	}
+}
+
+// Description returns a brief description of the event type.
+func (k Ktype) Description() string {
+	switch k {
+	case CreateProcess:
+		return "Creates a new process and its primary thread"
+	case TerminateProcess:
+		return "Terminates the process and all of its threads"
+	case OpenProcess:
+		return "Opens the process handle"
+	case CreateThread:
+		return "Creates a thread to execute within the virtual address space of the calling process"
+	case TerminateThread:
+		return "Terminates a thread within the process"
+	case OpenThread:
+		return "Opens the thread handle"
+	case ReadFile:
+		return "Reads data from the file or I/O device"
+	case WriteFile:
+		return "Writes data to the file or I/O device"
+	case CreateFile:
+		return "Creates or opens a file or I/O device"
+	case CloseFile:
+		return "Closes the file handle"
+	case DeleteFile:
+		return "Removes the file from the file system"
+	case RenameFile:
+		return "Changes the file name"
+	case SetFileInformation:
+		return "Sets the file meta information"
+	case EnumDirectory:
+		return "Enumerates a directory or dispatches a directory change notification to registered listeners"
+	case RegCreateKey:
+		return "Creates a registry key or opens it if the key already exists"
+	case RegOpenKey, RegOpenKeyV1:
+		return "Opens the registry key"
+	case RegSetValue:
+		return "Sets the data for the value of a registry key"
+	case RegQueryValue:
+		return "Reads the data for the value of a registry key"
+	case RegQueryKey:
+		return "Enumerates subkeys of the parent key"
+	case RegDeleteKey:
+		return "Removes the registry key"
+	case RegDeleteValue:
+		return "Removes the registry value"
+	case AcceptTCPv4, AcceptTCPv6:
+		return "Accepts the connection request from the socket queu"
+	case ConnectTCPv4, ConnectTCPv6:
+		return "Connects establishes a connection to the socket"
+	case DisconnectTCPv4, DisconnectTCPv6:
+		return "Terminates data reception on the socket"
+	case ReconnectTCPv4, ReconnectTCPv6:
+		return "Reconnects to the socket"
+	case RetransmitTCPv4, RetransmitTCPv6:
+		return "Retransmits unacknowledged TCP segments"
+	case SendTCPv4, SendUDPv4, SendTCPv6, SendUDPv6:
+		return "Sends data over the wire"
+	case RecvTCPv4, RecvUDPv4, RecvTCPv6, RecvUDPv6:
+		return "Receives data from the socket"
+	case LoadImage:
+		return "Loads the module into the address space of the calling process"
+	case UnloadImage:
+		return "Unloads the module from the address space of the calling process"
+	case CreateHandle:
+		return "Creates a new handle"
+	case CloseHandle:
+		return "Closes the handle"
+	default:
+		return ""
 	}
 }
 
@@ -260,35 +362,51 @@ func (k Ktype) Hash() uint32 {
 // Exists determines whether particular ktype exists.
 func (k Ktype) Exists() bool {
 	switch k {
-	case EnumProcess, EnumThread, FileRundown, FileOpEnd, ReleaseFile, EnumImage, RegCreateKCB, RegKCBRundown:
+	case EnumProcess,
+		EnumThread,
+		FileRundown,
+		FileOpEnd,
+		ReleaseFile,
+		EnumImage,
+		RegCreateKCB,
+		RegDeleteKCB,
+		RegKCBRundown,
+		CreateHandle,
+		CloseHandle,
+		CreateProcess,
+		TerminateProcess,
+		OpenProcess,
+		CreateThread,
+		TerminateThread,
+		OpenThread,
+		LoadImage,
+		UnloadImage,
+		CreateFile,
+		WriteFile,
+		ReadFile,
+		DeleteFile,
+		RenameFile,
+		CloseFile,
+		SetFileInformation,
+		EnumDirectory,
+		RegCreateKey,
+		RegDeleteKey,
+		RegOpenKey,
+		RegOpenKeyV1,
+		RegQueryKey,
+		RegQueryValue,
+		RegSetValue,
+		RegDeleteValue,
+		AcceptTCPv4, AcceptTCPv6,
+		ConnectTCPv4, ConnectTCPv6,
+		ReconnectTCPv4, ReconnectTCPv6,
+		RetransmitTCPv4, RetransmitTCPv6,
+		DisconnectTCPv4, DisconnectTCPv6,
+		SendTCPv4, SendTCPv6, SendUDPv4, SendUDPv6,
+		RecvTCPv4, RecvTCPv6, RecvUDPv4, RecvUDPv6:
 		return true
 	default:
-		// for composite kernel events we match against a single global ktype. This way
-		// we use a unique kernel type to group several kernel events. For example, `Send`
-		// designates all network Send regardless of transport protocol or IP version
-		if k == AcceptTCPv4 || k == AcceptTCPv6 {
-			return true
-		}
-		if k == ConnectTCPv4 || k == ConnectTCPv6 {
-			return true
-		}
-		if k == ReconnectTCPv4 || k == ReconnectTCPv6 {
-			return true
-		}
-		if k == RetransmitTCPv4 || k == RetransmitTCPv6 {
-			return true
-		}
-		if k == DisconnectTCPv4 || k == DisconnectTCPv6 {
-			return true
-		}
-		if k == SendTCPv4 || k == SendTCPv6 || k == SendUDPv4 || k == SendUDPv6 {
-			return true
-		}
-		if k == RecvTCPv4 || k == RecvTCPv6 || k == RecvUDPv4 || k == RecvUDPv6 {
-			return true
-		}
-		_, ok := kevents[k]
-		return ok
+		return false
 	}
 }
 
@@ -296,7 +414,14 @@ func (k Ktype) Exists() bool {
 // the output channel.
 func (k Ktype) Dropped(capture bool) bool {
 	switch k {
-	case EnumProcess, EnumThread, FileRundown, FileOpEnd, ReleaseFile, EnumImage, RegCreateKCB, RegKCBRundown:
+	case EnumProcess,
+		EnumThread,
+		FileRundown,
+		FileOpEnd,
+		ReleaseFile,
+		EnumImage,
+		RegCreateKCB,
+		RegKCBRundown:
 		if capture {
 			return false
 		}
@@ -320,10 +445,10 @@ func (k *Ktype) UnmarshalYAML(unmarshal func(interface{}) error) error {
 // Pack transforms event provider GUID and the op code into `Ktype` type. The type provides a convenient way
 // to compare different kernel event types.
 func Pack(g syscall.GUID, opcode uint8) Ktype {
-	return Ktype([17]byte{
+	return [17]byte{
 		byte(g.Data1 >> 24), byte(g.Data1 >> 16), byte(g.Data1 >> 8), byte(g.Data1),
 		byte(g.Data2 >> 8), byte(g.Data2), byte(g.Data3 >> 8), byte(g.Data3),
 		g.Data4[0], g.Data4[1], g.Data4[2], g.Data4[3], g.Data4[4], g.Data4[5], g.Data4[6], g.Data4[7],
 		opcode,
-	})
+	}
 }

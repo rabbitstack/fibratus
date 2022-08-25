@@ -40,36 +40,27 @@ func NewKparam(name string, typ kparams.Type, value kparams.Value) *Kparam {
 	switch typ {
 	case kparams.HexInt8, kparams.HexInt16, kparams.HexInt32, kparams.HexInt64:
 		v = kparams.NewHex(value)
-
 	case kparams.IPv4:
 		v = ip.ToIPv4(value.(uint32))
-
 	case kparams.IPv6:
 		v = ip.ToIPv6(value.([]byte))
-
 	case kparams.Port:
 		v = syscall.Ntohs(value.(uint16))
-
 	case kparams.SID:
 		account, domain := security.LookupAccount(value.([]byte), false)
 		if account != "" || domain != "" {
 			v = joinSID(account, domain)
 		}
-
 	case kparams.WbemSID:
 		account, domain := security.LookupAccount(value.([]byte), true)
 		if account != "" || domain != "" {
 			v = joinSID(account, domain)
 		}
-
 	default:
 		v = value
 	}
 
-	kparam := kparamPool.Get().(*Kparam)
-	*kparam = Kparam{Name: name, Type: typ, Value: v}
-
-	return kparam
+	return &Kparam{Name: name, Type: typ, Value: v}
 }
 
 // String returns the string representation of the parameter value.

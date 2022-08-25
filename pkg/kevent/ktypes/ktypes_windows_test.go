@@ -63,7 +63,6 @@ func TestPack(t *testing.T) {
 }
 
 func TestKtypeExists(t *testing.T) {
-	require.True(t, Accept.Exists())
 	require.True(t, AcceptTCPv4.Exists())
 	require.True(t, AcceptTCPv6.Exists())
 }

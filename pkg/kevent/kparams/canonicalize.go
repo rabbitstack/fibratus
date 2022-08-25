@@ -89,21 +89,6 @@ const (
 	handleObjectType = "ObjectType"
 )
 
-// Ignored returns the collection of parameters that are ignored by kernel stream consumer.
-func Ignored() map[string]bool {
-	return map[string]bool{
-		"Reserved0":       true,
-		"Reserved1":       true,
-		"Reserved2":       true,
-		"Reserved3":       true,
-		"Reserved4":       true,
-		"ThreadFlags":     true,
-		"ApplicationId":   true,
-		"PackageFullName": true,
-		"IoFlags":         true,
-	}
-}
-
 // Canonicalize takes an original kernel event property name and normalizes it
 // to canonical parameter name.
 func Canonicalize(name string) string {

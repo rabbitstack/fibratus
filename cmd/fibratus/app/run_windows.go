@@ -117,7 +117,7 @@ func run(cmd *cobra.Command, args []string) error {
 		if f.Filter() != nil {
 			kstreamc.SetFilter(f.Filter())
 		}
-		err = kstreamc.OpenKstream()
+		err = kstreamc.OpenKstream(ktracec.Traces())
 		if err != nil {
 			return multierror.Wrap(err, ktracec.CloseKtrace())
 		}
@@ -134,7 +134,7 @@ func run(cmd *cobra.Command, args []string) error {
 			}
 		}()
 	} else {
-		err = kstreamc.OpenKstream()
+		err = kstreamc.OpenKstream(ktracec.Traces())
 		if err != nil {
 			return multierror.Wrap(err, ktracec.CloseKtrace())
 		}

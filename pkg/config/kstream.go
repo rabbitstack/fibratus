@@ -43,6 +43,7 @@ const (
 	minBuffers            = "kstream.min-buffers"
 	maxBuffers            = "kstream.max-buffers"
 	flushInterval         = "kstream.flush-interval"
+	rawEventParsing       = "kstream.raw-event-parsing"
 
 	excludedEvents = "kstream.blacklist.events"
 	excludedImages = "kstream.blacklist.images"
@@ -85,6 +86,9 @@ type KstreamConfig struct {
 	// ExcludedImages are process image names that will be rejected if they generate a kernel event.
 	ExcludedImages []string `json:"blacklist.images" yaml:"blacklist.images"`
 
+	// RawEventParsing indicates if raw event buffer parsing is enabled
+	RawEventParsing bool `json:"raw-param-parsing" yaml:"raw-event-parsing"`
+
 	excludedKtypes map[ktypes.Ktype]bool
 	excludedImages map[string]bool
 }
@@ -102,6 +106,7 @@ func (c *KstreamConfig) initFromViper(v *viper.Viper) {
 	c.FlushTimer = v.GetDuration(flushInterval)
 	c.ExcludedKevents = v.GetStringSlice(excludedEvents)
 	c.ExcludedImages = v.GetStringSlice(excludedImages)
+	c.RawEventParsing = v.GetBool(rawEventParsing)
 
 	c.excludedKtypes = make(map[ktypes.Ktype]bool)
 	c.excludedImages = make(map[string]bool)
@@ -116,6 +121,21 @@ func (c *KstreamConfig) initFromViper(v *viper.Viper) {
 	}
 }
 
+// Init is an exported method to allow initializing exclusion maps from external modules.
+func (c *KstreamConfig) Init() {
+	c.excludedKtypes = make(map[ktypes.Ktype]bool)
+	c.excludedImages = make(map[string]bool)
+
+	for _, name := range c.ExcludedKevents {
+		if ktype := ktypes.KeventNameToKtype(name); ktype != ktypes.UnknownKtype {
+			c.excludedKtypes[ktype] = true
+		}
+	}
+	for _, name := range c.ExcludedImages {
+		c.excludedImages[name] = true
+	}
+}
+
 // ExcludeKevent determines whether the supplied event is present in the list of
 // excluded event types.
 func (c *KstreamConfig) ExcludeKevent(kevt *kevent.Kevent) bool {
@@ -126,8 +146,11 @@ func (c *KstreamConfig) ExcludeKevent(kevt *kevent.Kevent) bool {
 // list of excluded images. If the hit occurs, the event associated with the process
 // is dropped.
 func (c *KstreamConfig) ExcludeImage(ps *pstypes.PS) bool {
+	if len(c.excludedImages) == 0 {
+		return false
+	}
 	if ps == nil {
 		return false
 	}
-	return c.excludedImages[strings.ToLower(ps.Name)]
+	return c.excludedImages[ps.Name]
 }

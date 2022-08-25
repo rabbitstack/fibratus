@@ -20,21 +20,15 @@ package kevent
 
 import (
 	"fmt"
-	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"net"
 	"reflect"
 	"sort"
 	"strings"
-	"sync"
 	"time"
-)
 
-var kparamPool = sync.Pool{
-	New: func() interface{} {
-		return &Kparam{}
-	},
-}
+	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
+	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
+)
 
 // ParamCaseStyle is the type definition for parameter name case style
 type ParamCaseStyle uint8
@@ -70,23 +64,27 @@ type Kparam struct {
 // Kparams is the type that represents the sequence of kernel event parameters
 type Kparams map[string]*Kparam
 
+// KparamsFromSlice creates the params map from the variadic param list.
+func KparamsFromSlice(pars ...*Kparam) Kparams {
+	kpars := make(Kparams, len(pars))
+	for _, kpar := range pars {
+		kpars[kpar.Name] = kpar
+	}
+	return kpars
+}
+
 // NewKparamFromKcap builds a kparam instance from the restored state.
 func NewKparamFromKcap(name string, typ kparams.Type, value kparams.Value) *Kparam {
 	return &Kparam{Name: name, Type: typ, Value: value}
 }
 
-// Release returns the param to the pool.
-func (k *Kparam) Release() {
-	kparamPool.Put(k)
-}
-
-// Append adds a new parameter with specified name, type and value.
+// Append adds a new parameter with the specified name, type and value.
 func (kpars Kparams) Append(name string, typ kparams.Type, value kparams.Value) Kparams {
 	kpars[name] = NewKparam(name, typ, value)
 	return kpars
 }
 
-// AppendFromKcap adds a new parameter with specified name, type and value from the kcap state.
+// AppendFromKcap adds a new parameter with the specified name, type and value from the kcap state.
 func (kpars Kparams) AppendFromKcap(name string, typ kparams.Type, value kparams.Value) Kparams {
 	kpars[name] = NewKparamFromKcap(name, typ, value)
 	return kpars
@@ -360,6 +358,20 @@ func (kpars Kparams) GetHexAsUint32(name string) (uint32, error) {
 	return hex.Uint32(), nil
 }
 
+// TryGetHexAsUint32 attempts to get the uint8 value from its hexadecimal representation.
+// If the param is present, but doesn't have the hex type, then the param value is directly
+// coerced into uint32 scalar.
+func (kpars Kparams) TryGetHexAsUint32(name string) (uint32, error) {
+	kpar, err := kpars.findParam(name)
+	if err != nil {
+		return 0, err
+	}
+	if kpar.Type == kparams.HexInt32 {
+		return kpars.GetHexAsUint32(name)
+	}
+	return kpars.GetUint32(name)
+}
+
 // GetHexAsUint8 returns the number hexadecimal representation as uint8 value.
 func (kpars Kparams) GetHexAsUint8(name string) (uint8, error) {
 	hex, err := kpars.GetHex(name)
@@ -369,6 +381,20 @@ func (kpars Kparams) GetHexAsUint8(name string) (uint8, error) {
 	return hex.Uint8(), nil
 }
 
+// TryGetHexAsUint8 attempts to get the uint8 value from its hexadecimal representation.
+// If the param is present, but doesn't have the hex type, then the param value is directly
+// coerced into uint8 scalar.
+func (kpars Kparams) TryGetHexAsUint8(name string) (uint8, error) {
+	kpar, err := kpars.findParam(name)
+	if err != nil {
+		return 0, err
+	}
+	if kpar.Type == kparams.HexInt8 {
+		return kpars.GetHexAsUint8(name)
+	}
+	return kpars.GetUint8(name)
+}
+
 // GetHexAsUint64 returns the number hexadecimal representation as uint64 value.
 func (kpars Kparams) GetHexAsUint64(name string) (uint64, error) {
 	hex, err := kpars.GetHex(name)
@@ -376,6 +402,20 @@ func (kpars Kparams) GetHexAsUint64(name string) (uint64, error) {
 		return uint64(0), err
 	}
 	return hex.Uint64(), nil
+}
+
+// TryGetHexAsUint64 attempts to get the uint64 value from its hexadecimal representation.
+// If the param is present, but doesn't have the hex type, then the param value is directly
+// coerced into uint64 scalar.
+func (kpars Kparams) TryGetHexAsUint64(name string) (uint64, error) {
+	kpar, err := kpars.findParam(name)
+	if err != nil {
+		return 0, err
+	}
+	if kpar.Type == kparams.HexInt64 {
+		return kpars.GetHexAsUint64(name)
+	}
+	return kpars.GetUint64(name)
 }
 
 // GetHex returns the generic hexadecimal type for the specified parameter name.

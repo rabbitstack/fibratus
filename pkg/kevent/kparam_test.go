@@ -60,6 +60,18 @@ func TestKparams(t *testing.T) {
 
 	assert.Equal(t, "r-d", mode.String())
 
+	fileObject, err := kpars.TryGetHexAsUint64(kparams.FileObject)
+	require.NoError(t, err)
+	assert.Equal(t, uint64(18446738026482168384), fileObject)
+
+	kpars1 := Kparams{
+		kparams.FileObject: {Name: kparams.FileObject, Type: kparams.HexInt64, Value: kparams.Hex("FFFFFA800528F240")},
+	}
+
+	fileObjectFromHex, err := kpars1.TryGetHexAsUint64(kparams.FileObject)
+	require.NoError(t, err)
+	assert.Equal(t, uint64(18446738026482168384), fileObjectFromHex)
+
 	require.NoError(t, kpars.SetValue(kparams.FileName, "\\Device\\HarddiskVolume2\\Windows\\system32\\KERNEL32.dll"))
 	filename1, err := kpars.GetString(kparams.FileName)
 	require.NoError(t, err)

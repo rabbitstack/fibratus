@@ -341,6 +341,7 @@ func (c *Config) addFlags() {
 		c.flags.Duration(flushInterval, defaultFlushInterval, "Specifies how often the trace buffers are forcibly flushed")
 		c.flags.StringSlice(excludedEvents, []string{}, "A list of symbolical kernel event names that will be dropped from the kernel event stream. By default all events are accepted")
 		c.flags.StringSlice(excludedImages, []string{"System"}, "A list of image names that will be dropped from the kernel event stream. Image names are case insensitive")
+		c.flags.Bool(rawEventParsing, true, "Determines if raw event buffer parsing is used instead of TDH (Trace Data Helper) API")
 
 		c.flags.Bool(serializeThreads, false, "Indicates if threads are serialized as part of the process state")
 		c.flags.Bool(serializeImages, false, "Indicates if images are serialized as part of the process state")
