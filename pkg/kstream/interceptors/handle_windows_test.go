@@ -161,6 +161,7 @@ func TestHandleCoalescingWaiting(t *testing.T) {
 		Timestamp: time.Now(),
 		Category:  ktypes.Handle,
 		Kparams: kevent.Kparams{
+			kparams.HandleID:           {Name: kparams.HandleID, Type: kparams.Uint32, Value: uint32(21)},
 			kparams.HandleObjectTypeID: {Name: kparams.HandleObjectTypeID, Type: kparams.Uint16, Value: uint16(23)},
 			kparams.HandleObject:       {Name: kparams.HandleObject, Type: kparams.HexInt64, Value: kparams.Hex("ffffd105e9baaf70")},
 			kparams.HandleObjectName:   {Name: kparams.HandleObjectName, Type: kparams.UnicodeString, Value: ""},
@@ -192,6 +193,7 @@ func TestHandleCoalescingWaiting(t *testing.T) {
 		PID:      859,
 		Category: ktypes.Handle,
 		Kparams: kevent.Kparams{
+			kparams.HandleID:           {Name: kparams.HandleID, Type: kparams.Uint32, Value: uint32(21)},
 			kparams.HandleObjectTypeID: {Name: kparams.HandleObjectTypeID, Type: kparams.Uint16, Value: uint16(23)},
 			kparams.HandleObject:       {Name: kparams.HandleObject, Type: kparams.HexInt64, Value: kparams.Hex("affdd155e9baaf70")},
 			kparams.HandleObjectName:   {Name: kparams.HandleObjectName, Type: kparams.UnicodeString, Value: `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\Tcpip\Parameters\Interfaces\{b677c565-6ca5-45d3-b618-736b4e09b036}`},

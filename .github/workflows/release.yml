@@ -170,4 +170,3 @@ jobs:
              build/fibratus-${{ steps.get_version.outputs.VERSION }}-slim-amd64.msi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
