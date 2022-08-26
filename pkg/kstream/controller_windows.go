@@ -56,6 +56,11 @@ type TraceSession struct {
 	GUID   syscall.GUID
 }
 
+// IsKernelLogger determines if the session is tied to the NT Kernel Logger provider.
+func (s TraceSession) IsKernelLogger() bool {
+	return s.GUID == etw.KernelTraceControlGUID
+}
+
 // TraceProvider describes the ETW provider metainfo. The provider
 // acts as a source of events that are published to the tracing
 // session.

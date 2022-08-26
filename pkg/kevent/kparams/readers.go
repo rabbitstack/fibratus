@@ -23,6 +23,7 @@ package kparams
 
 import (
 	"syscall"
+	"unicode/utf16"
 	"unsafe"
 )
 
@@ -88,7 +89,7 @@ func ConsumeUTF16String(buf uintptr, offset, length uint16) string {
 		return ""
 	}
 	s := (*[1<<30 - 1]uint16)(unsafe.Pointer(buf + uintptr(offset)))[: length-offset : length-offset]
-	return syscall.UTF16ToString(s)
+	return string(utf16.Decode(s[:len(s)/2-1]))
 }
 
 // ReadSID reads the security identifier from the provided buffer.

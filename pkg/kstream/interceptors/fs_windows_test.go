@@ -56,9 +56,9 @@ func TestCreateFile(t *testing.T) {
 		Tid:  2484,
 		PID:  859,
 		Kparams: kevent.Kparams{
-			kparams.FileObject: {Name: kparams.FileObject, Type: kparams.Uint64, Value: kparams.Hex("12456738026482168384")},
+			kparams.FileObject: {Name: kparams.FileObject, Type: kparams.HexInt64, Value: kparams.Hex("12456738026482168384")},
 			kparams.FileName:   {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
-			kparams.FileIrpPtr: {Name: kparams.FileIrpPtr, Type: kparams.Uint64, Value: kparams.Hex("1234543123112321")},
+			kparams.FileIrpPtr: {Name: kparams.FileIrpPtr, Type: kparams.HexInt64, Value: kparams.Hex("1234543123112321")},
 		},
 	})
 	require.NoError(t, err)
@@ -68,12 +68,12 @@ func TestCreateFile(t *testing.T) {
 		Tid:  2484,
 		PID:  859,
 		Kparams: kevent.Kparams{
-			kparams.FileObject:        {Name: kparams.FileObject, Type: kparams.Uint64, Value: kparams.Hex("18446738026482168384")},
+			kparams.FileObject:        {Name: kparams.FileObject, Type: kparams.HexInt64, Value: kparams.Hex("18446738026482168384")},
 			kparams.ThreadID:          {Name: kparams.ThreadID, Type: kparams.Uint32, Value: uint32(1484)},
 			kparams.FileCreateOptions: {Name: kparams.FileCreateOptions, Type: kparams.Uint32, Value: uint32(1223456)},
 			kparams.FileName:          {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\kernel32.dll"},
 			kparams.FileShareMask:     {Name: kparams.FileShareMask, Type: kparams.Uint32, Value: uint32(5)},
-			kparams.FileIrpPtr:        {Name: kparams.FileIrpPtr, Type: kparams.Uint64, Value: kparams.Hex("1234543123112321")},
+			kparams.FileIrpPtr:        {Name: kparams.FileIrpPtr, Type: kparams.HexInt64, Value: kparams.Hex("1234543123112321")},
 		},
 	}
 	devMapper.On("Convert", "\\Device\\HarddiskVolume2\\Windows\\system32\\kernel32.dll").Return(fmt.Sprintf("%s\\system32\\kernel32.dll", sysRoot))
@@ -89,10 +89,10 @@ func TestCreateFile(t *testing.T) {
 		Tid:  2484,
 		PID:  859,
 		Kparams: kevent.Kparams{
-			kparams.FileObject:    {Name: kparams.FileObject, Type: kparams.Uint64, Value: kparams.Hex("18446738026482168384")},
+			kparams.FileObject:    {Name: kparams.FileObject, Type: kparams.HexInt64, Value: kparams.Hex("18446738026482168384")},
 			kparams.ThreadID:      {Name: kparams.ThreadID, Type: kparams.Uint32, Value: uint32(1484)},
-			kparams.FileIrpPtr:    {Name: kparams.FileIrpPtr, Type: kparams.Uint64, Value: kparams.Hex("1234543123112321")},
-			kparams.FileExtraInfo: {Name: kparams.FileExtraInfo, Type: kparams.Uint8, Value: kparams.Hex("2")},
+			kparams.FileIrpPtr:    {Name: kparams.FileIrpPtr, Type: kparams.HexInt64, Value: kparams.Hex("1234543123112321")},
+			kparams.FileExtraInfo: {Name: kparams.FileExtraInfo, Type: kparams.Uint64, Value: uint64(2)},
 		},
 	}
 	kevt1, _, err = fsi.Intercept(opEnd)
@@ -125,7 +125,7 @@ func TestRundownFile(t *testing.T) {
 		Tid:  2484,
 		PID:  859,
 		Kparams: kevent.Kparams{
-			kparams.FileObject: {Name: kparams.FileObject, Type: kparams.Uint64, Value: kparams.Hex("124567380264")},
+			kparams.FileObject: {Name: kparams.FileObject, Type: kparams.HexInt64, Value: kparams.Hex("124567380264")},
 			kparams.FileName:   {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
 		},
 	})
@@ -155,7 +155,7 @@ func TestDeleteFile(t *testing.T) {
 		Tid:  2484,
 		PID:  859,
 		Kparams: kevent.Kparams{
-			kparams.FileObject: {Name: kparams.FileObject, Type: kparams.Uint64, Value: kparams.Hex("12456738026482168384")},
+			kparams.FileObject: {Name: kparams.FileObject, Type: kparams.HexInt64, Value: kparams.Hex("12456738026482168384")},
 			kparams.FileName:   {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
 		},
 	})
@@ -166,8 +166,8 @@ func TestDeleteFile(t *testing.T) {
 		Tid:  2484,
 		PID:  859,
 		Kparams: kevent.Kparams{
-			kparams.FileObject: {Name: kparams.FileObject, Type: kparams.Uint64, Value: kparams.Hex("12456738026482168384")},
-			kparams.FileKey:    {Name: kparams.FileKey, Type: kparams.Uint64, Value: kparams.Hex("12456738026482168384")},
+			kparams.FileObject: {Name: kparams.FileObject, Type: kparams.HexInt64, Value: kparams.Hex("12456738026482168384")},
+			kparams.FileKey:    {Name: kparams.FileKey, Type: kparams.HexInt64, Value: kparams.Hex("12456738026482168384")},
 			kparams.ThreadID:   {Name: kparams.ThreadID, Type: kparams.Uint32, Value: uint32(1484)},
 		},
 	}

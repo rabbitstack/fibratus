@@ -109,7 +109,7 @@ type Consumer interface {
 }
 
 type kstreamConsumer struct {
-	handles []etw.TraceHandle // trace session handles
+	traceHandles []etw.TraceHandle // trace session handles
 
 	errs  chan error          // channel for event processing errors
 	kevts chan *kevent.Kevent // channel for fanning out generated events
@@ -127,6 +127,10 @@ type kstreamConsumer struct {
 	capture bool // capture determines whether the event capture is triggered
 
 	eventCallback EventCallbackFunc // called on each incoming event
+}
+
+func (k *kstreamConsumer) addTraceHandle(traceHandle etw.TraceHandle) {
+	k.traceHandles = append(k.traceHandles, traceHandle)
 }
 
 // NewConsumer constructs a new kernel event stream consumer.
@@ -159,10 +163,13 @@ func (k *kstreamConsumer) OpenKstream(traces map[string]TraceSession) error {
 	if err != nil {
 		return err
 	}
-	for loggerName := range traces {
-		err := k.openKstream(loggerName)
+	for _, trace := range traces {
+		err := k.openKstream(trace.Name)
 		if err != nil {
-			return err
+			if trace.IsKernelLogger() {
+				return err
+			}
+			log.Warnf("unable to open %s trace: %v", trace.Name, err)
 		}
 	}
 	return nil
@@ -184,9 +191,7 @@ func (k *kstreamConsumer) openKstream(loggerName string) error {
 	if uint64(traceHandle) == winerrno.InvalidProcessTraceHandle {
 		return fmt.Errorf("unable to open kernel trace: %v", syscall.GetLastError())
 	}
-
-	k.handles = append(k.handles, traceHandle)
-
+	k.addTraceHandle(traceHandle)
 	// since `ProcessTrace` blocks the current thread
 	// we invoke it in a separate goroutine but send
 	// any possible errors to the channel
@@ -214,7 +219,7 @@ func (k *kstreamConsumer) openKstream(loggerName string) error {
 
 // CloseKstream shutdowns the event stream consumer by closing all running traces.
 func (k *kstreamConsumer) CloseKstream() error {
-	for _, h := range k.handles {
+	for _, h := range k.traceHandles {
 		if err := etw.CloseTrace(h); err != nil {
 			log.Warn(err)
 		}
@@ -764,7 +769,7 @@ func (k *kstreamConsumer) produceRawParams(ktype ktypes.Ktype, evt *etw.EventRec
 		}
 		return kevent.KparamsFromSlice(
 			kevent.NewKparam(kparams.FileIrpPtr, kparams.Uint64, irp),
-			kevent.NewKparam(kparams.FileExtraInfo, kparams.Uint8, uint8(extraInfo)),
+			kevent.NewKparam(kparams.FileExtraInfo, kparams.Uint64, extraInfo),
 			kevent.NewKparam(kparams.NTStatus, kparams.Uint32, status),
 		)
 	case ktypes.FileRundown:

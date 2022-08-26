@@ -217,7 +217,7 @@ func (f *fsInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 			if err != nil {
 				return kevt, true, err
 			}
-			extraInfo, err := kevt.Kparams.TryGetHexAsUint8(kparams.FileExtraInfo)
+			extraInfo, err := kevt.Kparams.TryGetHexAsUint64(kparams.FileExtraInfo)
 			if err != nil {
 				return kevt, true, err
 			}
@@ -225,7 +225,7 @@ func (f *fsInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 			if !ok {
 				return kevt, true, kerrors.ErrCancelUpstreamKevent
 			}
-			fkevt.Kparams.Append(kparams.FileExtraInfo, kparams.Uint8, extraInfo)
+			fkevt.Kparams.Append(kparams.FileExtraInfo, kparams.Uint64, extraInfo)
 
 			// resolve the status of the file operation
 			status, err := kevt.Kparams.GetUint32(kparams.NTStatus)
@@ -337,7 +337,7 @@ func (f *fsInterceptor) processCreateFile(kevt *kevent.Kevent) error {
 	if err != nil {
 		return err
 	}
-	extraInfo, err := kevt.Kparams.GetUint8(kparams.FileExtraInfo)
+	extraInfo, err := kevt.Kparams.GetUint64(kparams.FileExtraInfo)
 	if err != nil {
 		return err
 	}
