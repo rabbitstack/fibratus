@@ -115,6 +115,7 @@ func (s *snapshotter) WriteFromKcap(kevt *kevent.Kevent) error {
 			return err
 		}
 		if kevt.Type == ktypes.EnumProcess {
+			// invalid process
 			if ps.PID == ps.Ppid {
 				return nil
 			}
