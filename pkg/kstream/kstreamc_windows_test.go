@@ -66,7 +66,7 @@ func TestOpenKstreamInvalidHandle(t *testing.T) {
 		return etw.TraceHandle(0xffffffffffffffff)
 	}
 	traces := map[string]TraceSession{
-		etw.KernelLoggerSession: {},
+		etw.KernelLoggerSession: {Name: etw.KernelLoggerSession, GUID: etw.KernelTraceControlGUID},
 	}
 	err := kstreamc.OpenKstream(traces)
 	require.Error(t, err)
