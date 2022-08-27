@@ -65,12 +65,8 @@ func TestWrite(t *testing.T) {
 	errs := make(chan error, 10)
 
 	for i := 0; i < 100; i++ {
-		typ := ktypes.CreateFile
-		if i%2 == 0 {
-			typ = ktypes.CreateProcess
-		}
 		kevt := &kevent.Kevent{
-			Type:        typ,
+			Type:        ktypes.CreateFile,
 			Tid:         2484,
 			PID:         859,
 			CPU:         uint8(i / 2),

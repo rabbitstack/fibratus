@@ -418,47 +418,47 @@ func ancestorFields(field string, kevt *kevent.Kevent) (kparams.Value, error) {
 
 	switch key {
 	case "root":
-		pstypes.Walk(func(proc *pstypes.PS) {
+		walk := func(proc *pstypes.PS) {
 			ps = proc
-		}, kevt.PS)
-
+		}
+		pstypes.Walk(walk, kevt.PS)
 	case "any":
 		values := make([]string, 0)
-		pstypes.Walk(func(ps *pstypes.PS) {
+		walk := func(proc *pstypes.PS) {
 			switch segment {
 			case fields.ProcessName:
-				values = append(values, ps.Name)
+				values = append(values, proc.Name)
 			case fields.ProcessID:
-				values = append(values, strconv.Itoa(int(ps.PID)))
+				values = append(values, strconv.Itoa(int(proc.PID)))
 			case fields.ProcessSID:
-				values = append(values, ps.SID)
+				values = append(values, proc.SID)
 			case fields.ProcessSessionID:
-				values = append(values, strconv.Itoa(int(ps.SessionID)))
+				values = append(values, strconv.Itoa(int(proc.SessionID)))
 			case fields.ProcessCwd:
-				values = append(values, ps.Cwd)
+				values = append(values, proc.Cwd)
 			case fields.ProcessComm:
-				values = append(values, ps.Comm)
+				values = append(values, proc.Comm)
 			case fields.ProcessArgs:
-				values = append(values, ps.Args...)
+				values = append(values, proc.Args...)
 			case fields.ProcessExe:
-				values = append(values, ps.Exe)
+				values = append(values, proc.Exe)
 			}
-		}, kevt.PS)
-
+		}
+		pstypes.Walk(walk, kevt.PS)
 		return values, nil
-
 	default:
 		depth, err := strconv.Atoi(key)
 		if err != nil {
 			return nil, err
 		}
 		var i int
-		pstypes.Walk(func(proc *pstypes.PS) {
+		walk := func(proc *pstypes.PS) {
 			i++
 			if i == depth {
 				ps = proc
 			}
-		}, kevt.PS)
+		}
+		pstypes.Walk(walk, kevt.PS)
 	}
 
 	if ps == nil {

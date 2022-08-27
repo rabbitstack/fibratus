@@ -95,9 +95,6 @@ func NewSnapshotterFromKcap(handleSnap handle.Snapshotter, config *config.Config
 		capture:    true,
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	s.handleSnap.RegisterCreateCallback(s.onHandleCreated)
 	s.handleSnap.RegisterDestroyCallback(s.onHandleDestroyed)
 
@@ -113,12 +110,24 @@ func (s *snapshotter) WriteFromKcap(kevt *kevent.Kevent) error {
 		if ps == nil {
 			return nil
 		}
-		if ps.PID == winerrno.InvalidPID {
-			return nil
+		pid, err := kevt.Kparams.GetPid()
+		if err != nil {
+			return err
 		}
-		ps.Parent = s.procs[ps.Ppid]
-		s.procs[ps.PID] = ps
-
+		if kevt.Type == ktypes.EnumProcess {
+			// invalid process
+			if ps.PID == ps.Ppid {
+				return nil
+			}
+			s.procs[pid] = ps
+		} else {
+			s.procs[pid] = pstypes.FromKevent(unwrapParams(pid, kevt))
+		}
+		ppid, err := kevt.Kparams.GetPpid()
+		if err != nil {
+			return err
+		}
+		ps.Parent = s.procs[ppid]
 	case ktypes.CreateThread, ktypes.EnumThread:
 		pid, err := kevt.Kparams.GetPid()
 		if err != nil {
@@ -130,7 +139,6 @@ func (s *snapshotter) WriteFromKcap(kevt *kevent.Kevent) error {
 			ps.AddThread(thread)
 			ps.Parent = s.procs[ps.Ppid]
 		}
-
 	case ktypes.LoadImage, ktypes.EnumImage:
 		pid, err := kevt.Kparams.GetPid()
 		if err != nil {
@@ -340,7 +348,7 @@ func (s *snapshotter) findProcess(pid uint32, thread pstypes.Thread) *pstypes.PS
 	case 0:
 		return pstypes.NewPS(pid, pid, "idle", "", "idle", thread, nil)
 	case 4:
-		return pstypes.NewPS(pid, pid, "System", "", ntoskrnl(), thread, nil)
+		return pstypes.NewPS(pid, 0, "System", "", ntoskrnl(), thread, nil)
 	}
 	flags := process.QueryInformation | process.VMRead
 	h, err := process.Open(flags, false, pid)

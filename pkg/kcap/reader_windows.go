@@ -178,7 +178,9 @@ func (r *reader) read(kevt *kevent.Kevent, keventsc chan *kevent.Kevent) {
 
 func (r *reader) updateSnapshotters(kevt *kevent.Kevent) error {
 	switch kevt.Type {
-	case ktypes.TerminateThread, ktypes.TerminateProcess, ktypes.UnloadImage:
+	case ktypes.TerminateThread,
+		ktypes.TerminateProcess,
+		ktypes.UnloadImage:
 		if err := r.psnapshotter.Remove(kevt); err != nil {
 			return err
 		}
@@ -186,7 +188,8 @@ func (r *reader) updateSnapshotters(kevt *kevent.Kevent) error {
 		ktypes.CreateThread,
 		ktypes.LoadImage,
 		ktypes.EnumImage,
-		ktypes.EnumProcess, ktypes.EnumThread:
+		ktypes.EnumProcess,
+		ktypes.EnumThread:
 		if err := r.psnapshotter.WriteFromKcap(kevt); err != nil {
 			return err
 		}
