@@ -6,7 +6,7 @@ CLI filters offer a decent amount of flexibility when digging into the event flu
 - **selector** indicates the event type or event category that a certain filter group can capture. For example,`CreateProcess` or `registry`. The selector is only relevant for `include` and `exclude` policies.
 - **enabled** specifies whether the group is active
 - **policy** determines the action that's taken on behalf of the incoming event. There are different types of policies: `include`,  `exclude`, and `sequence.`. Include policy filters the event if one of the filters in the group matches, even though this behavior can be tweaked by setting the `relation` attribute. On the other hand, the exclude policy drops the event when a match occurs in the group.
-Sequence policy deserves a [dedicated section](/filters/rules?id=stateful-event-tracking). In a nutshell, sequence policy permit stateful event tracking which is the foundation for detections that can assert an ordered sequence of events sharing certain properties.
+Sequence policy deserves a [dedicated section](/filters/rules?id=stateful-event-tracking). In a nutshell, sequence policy permit stateful event tracking which is the foundation of detections that can assert an ordered sequence of events sharing certain properties.
 - **relation** controls the group matching criteria. Possible values for the group relation are `and` and `or`. When the `and` relation type is specified, all filters in the group have to match for the event to get accepted. Conversely, the `or` relation type requires only one filter in the group to evaluate to true for accepting the event. Relation is only relevant for `include` and `exclude` policies.
 - **rules** contains an array of rule expressions. Each expression is composed of a descriptive rule name, condition, and an optional action that is executed when the rule is triggered.
 
@@ -156,7 +156,7 @@ For include groups matches, the rule and group name are pushed into the event me
 
 ### Stateful event tracking {docsify-ignore}
 
-Sequence policies piggyback on stateful event tracking. These policies are the most flexible and powerful ways of implementing runtime detections. Let's peer into the structure of the sequence group policy.
+Sequence policies piggyback on stateful event tracking. These policies are the most flexible and powerful for implementing runtime detections. Let's peer into the structure of the sequence group policy.
 
 ```yaml
 - group: remote connection and command shell execution
@@ -186,4 +186,7 @@ Sequence policies piggyback on stateful event tracking. These policies are the m
 ```
 
 1. As with regular group policies, the name is also mandatory in the sequence policies.
-2. 
+2. Since sequence groups track an ordered sequence of events of any type, the selector is not applicable to these groups.
+3. Every sequence group requires at least two rule definitions. The rules can refer to partial events matched by upstream rules. This is achieved with **pattern bindings**. The syntax for a pattern binding is expressed with the `$` symbol followed by the scalar number that refers to the position where the rule is declared in the `rules` array. The rest of the path is a well-known filter field identifier. For example, in the above rule group, we require that the process spawning the command shell is equal to the process that established a network connection.
+4. Sometimes we want to scope the occurrence of a specific event within a time frame. This is the purpose of the `max-span` attribute. Following the previous example, the group matches if the command shell execution happens within the one-minute time window. Otherwise, all partial matches are discarded and the evaluation phase starts over again.
+5. Unlike `include` group policies, `sequence` policy has group-level actions. The action is executed when all rules in the group match. The action context contains a list of events that triggered each individual rule in the group.

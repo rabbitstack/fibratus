@@ -19,4 +19,3 @@
 <div>
   <img src='images/fibratus-term.gif'></img>
 </div>
-
