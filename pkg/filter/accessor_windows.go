@@ -614,6 +614,9 @@ func (l *fileAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, 
 		}
 		return attrs, nil
 	case fields.FileStatus:
+		if kevt.Type != ktypes.CreateFile {
+			return nil, nil
+		}
 		return kevt.Kparams.GetString(kparams.NTStatus)
 	}
 	return nil, nil

@@ -41,6 +41,9 @@ import (
 // systemRootRegexp is the regular expression for detecting path with unexpanded SystemRoot environment variable
 var systemRootRegexp = regexp.MustCompile(`%SystemRoot%|^\\SystemRoot|%systemroot%`)
 
+// driveRegexp is used for determining if the command line start with a valid drive letter based path
+var driveRegexp = regexp.MustCompile(`^[a-zA-Z]:\\`)
+
 // procYaraScans stores the total count of yara process scans
 var procYaraScans = expvar.NewInt("yara.proc.scans")
 
@@ -87,8 +90,9 @@ func (ps psInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 		if systemRootRegexp.MatchString(cmdline) {
 			cmdline = systemRootRegexp.ReplaceAllString(cmdline, os.Getenv("SystemRoot"))
 		}
-		// some system processes are reported without the path in command line
-		if strings.Index(cmdline, `:\\`) != 1 {
+		// some system processes are reported without the path in the command line,
+		// but we can expand the path from the SystemRoot environment variable
+		if !driveRegexp.MatchString(cmdline) {
 			proc, _ := kevt.Kparams.GetString(kparams.ProcessName)
 			_, ok := sysProcs[proc]
 			if ok {
