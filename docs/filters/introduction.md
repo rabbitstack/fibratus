@@ -10,7 +10,7 @@ ps.name in ('cmd.exe', 'powershell.exe', 'winword.exe')
 
 It may look intimidating at first glance, but once you get familiar with the syntax and the field names you'll be able to write even the most intricate filters.
 
-Filters represent the foundation of the [rule engine](/filters/rules) that provides threat detection capabilities. For example, the following stanza detects the outbound communication followed by the execution of the command shell within one minute time window. The action invokes the [alert sender](/alerts/senders) to emit the security alert via email or Slack. 
+Filters represent the foundation of the [rule engine](/filters/rules) that provides threat detection capabilities. For example, the following stanza detects the outbound communication followed by the execution of the command shell within one-minute time window. The action invokes the [alert sender](/alerts/senders) to emit the security alert via email or Slack. 
 
 ```yaml
 - group: remote connection and command shell execution
