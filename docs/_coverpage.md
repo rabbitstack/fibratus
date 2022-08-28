@@ -4,7 +4,7 @@
   <img src='logo.png'></img>
 </div>
 
-# fibratus <small>1.5.0</small>
+# fibratus <small>1.6.0</small>
 
 > A modern tool for the Windows kernel exploration and observability
 
