@@ -27,9 +27,9 @@
 
 ### What is Fibratus?
 
-Fibratus is a tool for exploration and tracing of the **Windows** kernel. It lets you trap system-wide [events](https://www.fibratus.io/#/kevents/anatomy) such as process life-cycle, file system I/O, registry modifications or network requests among many other observability signals. In a nutshell, Fibratus allows for gaining deep operational visibility into the Windows kernel but also processes running on top of it.
+Fibratus is a tool for exploration and tracing of the **Windows** kernel. It lets you trap system-wide [events](https://www.fibratus.io/#/kevents/anatomy) such as process life-cycle, file system I/O, registry modifications or network requests among many other observability signals. In a nutshell, Fibratus allows for gaining deep operational visibility into the Windows kernel but also processes running on top of it. It requires no drivers nor third-party software.
 
-Events can be shipped to a wide array of [output sinks](https://www.fibratus.io/#/outputs/introduction) or dumped to [capture](https://www.fibratus.io/#/captures/introduction) files for local inspection and forensics analysis. The powerful [filtering](https://www.fibratus.io/#/filters/introduction) engine permits drilling into the event flux entrails.
+Events can be shipped to a wide array of [output sinks](https://www.fibratus.io/#/outputs/introduction) or dumped to [capture](https://www.fibratus.io/#/captures/introduction) files for local inspection and forensics analysis. The powerful [filtering](https://www.fibratus.io/#/filters/introduction) engine permits drilling into the event flux entrails and the [rules engine](https://www.fibratus.io/#/filters/rules) is capable of detecting stealthy adversary attacks and sophisticated threats.
 
 You can use [filaments](https://www.fibratus.io/#/filaments/introduction) to extend Fibratus with your own arsenal of tools and so leverage the power of the Python ecosystem
 
@@ -69,7 +69,7 @@ fibratus run -f watch_files
 
 - :zap: blazing fast
 - :satellite: collects a wide spectrum of kernel events - from process to network observability signals
-- :mag: super powerful filtering engine
+- :mag: super powerful filtering and rule engine
 - :snake: running Python scriptlets on top of kernel event flow
 - :minidisc: capturing event flux to **kcap** files and replaying anywhere
 - :rocket: transporting events to Elasticsearch, RabbitMQ or console sinks
@@ -100,7 +100,7 @@ fibratus run -f watch_files
 * [**Network**](https://www.fibratus.io/#/kevents/network)
 * [**Handle**](https://www.fibratus.io/#/kevents/handle)
 
-### Filters
+### Filters and Rules
 
 * [**Needle in the haystack**](https://www.fibratus.io/#/filters/introduction)
 * [**Prefiltering**](https://www.fibratus.io/#/filters/prefiltering)
@@ -131,6 +131,8 @@ fibratus run -f watch_files
 * [**Null**](https://www.fibratus.io/#/outputs/null)
 * [**RabbitMQ**](https://www.fibratus.io/#/outputs/rabbitmq)
 * [**Elasticsearch**](https://www.fibratus.io/#/outputs/elasticsearch)
+* [**Eventlog**](https://www.fibratus.io/#/outputs/eventlog)
+* [**HTTP**](https://www.fibratus.io/#/outputs/http)
 
 
 ### Transformers

@@ -59,6 +59,35 @@ Filter expressions can accept escape sequences, such as newline characters (`\n`
 If a syntax error is present in the filter, a hint is given indicating the erroneous position in the expression.  
 
 ```
-ps.name =          
-         ^ expected field, string, number, bool, ip
+kevt.name in ('RegCreateKey', 'RegDeleteKey', 'RegSetValue', 'RegDeleteValue')
+      and
+   registry.key.name icontains
+      (
+        'CurrentVersion\\Run',
+        'Windows\\System\\Scripts',
+        'CurrentVersion\\Windows\\Load',
+        'CurrentVersion\\Windows\\Run',
+        'CurrentVersion\\Winlogon\\Shell',
+        'CurrentVersion\\Winlogon\\System',
+        'UserInitMprLogonScript'
+      )
+      or
+   registry.key.name istartswith
+      (
+        'HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\\Notify',
+        'HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\\Shell',
+        'HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\\Userinit',
+        'HKEY_LOCAL_MACHINE\\Software\\WOW6432Node\\Microsoft\\Windows NT\\CurrentVersion\\Drivers32',
+        HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\BootExecute',
+╭──────────^
+|        'HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows NT\\CurrentVersion\\AeDebug'
+|      )
+|      or
+|   registry.key.name iendswith
+|      (
+|        'user shell folders\\startup'
+|      )
+|
+|
+╰─────────────────── expected field, string, number, bool, ip, function, pattern binding
 ```

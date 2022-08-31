@@ -185,7 +185,7 @@ kstream:
     events:
       - CloseFile
       - CloseHandle
-    # Contains a list of case-insensitive process image names including the extension.
+    # Contains a list of case-sensitive process image names including the extension.
     # Any event originated by the image specified in this list is dropped from the event stream
     images:
       - System

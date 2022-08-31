@@ -119,7 +119,8 @@ The following tables summarize available field names that can be used in filter 
 | file.offset     | Read/write position in the file | `file.offset = 1024`   |
 | file.type       | File type. Possible values are `file`, `directory`, `pipe`, `console`, `mailslot`, `other`, `unknown` | `file.type = 'directory'`   |
 | file.extension  | File extension represents the file extension (e.g. .exe or .dll) | `file.extension = '.dll'`   |
-
+| file.attributes | List of file attributes | `file.attributes in ('hidden', 'temporary')`   |
+| file.status | System status message of the `CreateFile` operation | `file.status = 'success'`   |
 
 ### Registry
 | Field Name  | Description | Example     |

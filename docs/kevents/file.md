@@ -18,6 +18,8 @@ The `CreateFile` event is triggered when the kernel serves create/open requests 
   - `overwriteif` opens and overwrites the file if it already exists, otherwise creates a new file
 - `share_mask` specifies the sharing mode of the file or device, which can be read, write, both, delete, all of these, or none. This flag determines the permission granularity which enables a process to share a file or device while another process has the file or device open.
 - `type` defines the file type. Possible values are `file`, `directory`, `pipe`, `console`, `mailslot`, `other`, `unknown`.
+- `attributes` denotes the file attributes. Possible values are `readonly`, `hidden`, `system`, `directory`, `compressed`, `encrypted`, `hidden`, `junction`, `sparse`,`temporary`, `device`, `normal`, `offline`, `unindexed`, `stream`, `virtual`, `noscrub`, `recallopen`, `recallaccess`, `pinned`, `unpinned`, `unknown`.
+- `status` represents the system status message (e.g. `success`)
 
 #### WriteFile and ReadFile
 
