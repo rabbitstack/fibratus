@@ -127,6 +127,15 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 			return nil, ErrPsNil
 		}
 		return ps.Args, nil
+	case fields.PsSiblingArgs:
+		if kevt.Category != ktypes.Process {
+			return nil, nil
+		}
+		cmdline, err := kevt.Kparams.GetString(kparams.Comm)
+		if err != nil {
+			return nil, err
+		}
+		return pstypes.SplitArgs(cmdline), nil
 	case fields.PsCwd:
 		ps := kevt.PS
 		if ps == nil {

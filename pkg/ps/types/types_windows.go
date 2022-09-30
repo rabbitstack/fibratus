@@ -21,7 +21,7 @@ package types
 import (
 	"fmt"
 	"path/filepath"
-	"strings"
+	"regexp"
 	"sync"
 
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
@@ -68,13 +68,31 @@ type PS struct {
 	Parent *PS `json:"parent"`
 }
 
+// PName returns the parent process name.
+func (ps *PS) PName() string {
+	if ps.Parent == nil {
+		return "n/a"
+	}
+	return ps.Parent.Name
+}
+
+// PCmdline returns the parent process command line.
+func (ps *PS) PCmdline() string {
+	if ps.Parent == nil {
+		return "n/a"
+	}
+	return ps.Parent.Comm
+}
+
 // String returns a string representation of the process' state.
 func (ps *PS) String() string {
 	return fmt.Sprintf(`
 		Pid:  %d
 		Ppid: %d
 		Name: %s
-		Comm: %s
+		Parent Name: %s
+		Cmdline: %s
+		Parent Cmdline: %s
 		Exe:  %s
 		Cwd:  %s
 		SID:  %s
@@ -85,7 +103,9 @@ func (ps *PS) String() string {
 		ps.PID,
 		ps.Ppid,
 		ps.Name,
+		ps.PName(),
 		ps.Comm,
+		ps.PCmdline(),
 		ps.Exe,
 		ps.Cwd,
 		ps.SID,
@@ -95,7 +115,7 @@ func (ps *PS) String() string {
 	)
 }
 
-// Thread stores several metadata about a thread that's executing in process's address space.
+// Thread stores metadata about a thread that's executing in process's address space.
 type Thread struct {
 	// Tid is the unique identifier of thread inside the process.
 	Tid uint32
@@ -151,7 +171,7 @@ func FromKevent(pid, ppid uint32, name, comm, exe, sid string, sessionID uint8) 
 		Name:      name,
 		Comm:      comm,
 		Exe:       exe,
-		Args:      splitArgs(comm),
+		Args:      SplitArgs(comm),
 		SID:       sid,
 		SessionID: sessionID,
 		Threads:   make(map[uint32]Thread),
@@ -196,7 +216,7 @@ func NewPS(pid, ppid uint32, exe, cwd, comm string, thread Thread, envs map[stri
 		Exe:     exe,
 		Comm:    comm,
 		Cwd:     cwd,
-		Args:    splitArgs(comm),
+		Args:    SplitArgs(comm),
 		Threads: map[uint32]Thread{thread.Tid: thread},
 		Modules: make([]Module, 0),
 		Handles: make([]htypes.Handle, 0),
@@ -219,7 +239,13 @@ func NewFromKcap(buf []byte) (*PS, error) {
 	return &ps, nil
 }
 
-func splitArgs(cmdline string) []string { return strings.Fields(cmdline) }
+var splitArgsRegexp = regexp.MustCompile(`("[^"]+?"\S*|\S+)`)
+
+// SplitArgs returns a slice of strings where each element is
+// a single argument in the process command line.
+func SplitArgs(cmdline string) []string {
+	return splitArgsRegexp.FindAllString(cmdline, -1)
+}
 
 // AddThread adds a thread to process's state descriptor.
 func (ps *PS) AddThread(thread Thread) {

@@ -95,14 +95,19 @@ filament:
 
 # =============================== Filters ===============================================
 
-# Contains the definition of filter rules. Filter expressions are contained in filter group files.
+# Contains the definition of detection rules. Rules are contained within rule group files.
 # Rule definitions can reside in the local file system or also can be served over HTTP/S.
+# For local file system rule paths, it is possible to use the glob expression to load the
+# rules from different directory locations.
 filters:
   rules:
     from-paths:
-    # - C:\Program Files\Fibratus\Config\Rules\Default\default.yml
+      - C:\Fibratus\fibratus\rules\*.yml
     #from-urls:
-    #  - https://raw.githubusercontent.com/rabbitstack/fibratus/master/configs/rules/default/default.yml
+    #  - https://raw.githubusercontent.com/rabbitstack/fibratus/master/rules/default.yml
+  macros:
+    from-paths:
+      - C:\Fibratus\fibratus\rules\macros\*.yml
 
 # =============================== Handle ===============================================
 

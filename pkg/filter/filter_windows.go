@@ -26,10 +26,24 @@ import (
 	"strings"
 )
 
+type opts struct {
+	MacroStore *ql.MacroStore
+}
+
+// Option is used to initialize filter dependencies or change internal behaviour
+type Option func(o *opts)
+
+// WithMacroStore creates a new option with the macro store instance.
+func WithMacroStore(store *ql.MacroStore) Option {
+	return func(o *opts) {
+		o.MacroStore = store
+	}
+}
+
 // New creates a new filter with the specified filter expression. The consumers must ensure
 // the expression is correctly parsed before executing the filter. This is achieved by calling the
 // Compile` method after constructing the filter.
-func New(expr string, config *config.Config) Filter {
+func New(expr string, config *config.Config, options ...Option) Filter {
 	accessors := []accessor{
 		// general event parameters
 		newKevtAccessor(),
@@ -37,6 +51,11 @@ func New(expr string, config *config.Config) Filter {
 		newPSAccessor(),
 	}
 	kconfig := config.Kstream
+
+	var opts opts
+	for _, opt := range options {
+		opt(&opts)
+	}
 
 	if kconfig.EnableThreadKevents {
 		accessors = append(accessors, newThreadAccessor())
@@ -60,8 +79,15 @@ func New(expr string, config *config.Config) Filter {
 		accessors = append(accessors, newPEAccessor())
 	}
 
+	var parser *ql.Parser
+	if opts.MacroStore != nil {
+		parser = ql.NewParserWithMacroStore(expr, opts.MacroStore)
+	} else {
+		parser = ql.NewParser(expr)
+	}
+
 	return &filter{
-		parser:    ql.NewParser(expr),
+		parser:    parser,
 		accessors: accessors,
 		fields:    make([]fields.Field, 0),
 		bindings:  make(map[uint16][]*ql.PatternBindingLiteral),

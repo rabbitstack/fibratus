@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"github.com/Masterminds/sprig/v3"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
+	"github.com/rabbitstack/fibratus/pkg/kevent"
 	log "github.com/sirupsen/logrus"
 	"strings"
 	"syscall"
@@ -55,6 +56,7 @@ func New() template.FuncMap {
 			}
 			return fmt.Sprintf("(%s)", strings.Join(values, ", "))
 		},
+		"printk": func(kevts ...*kevent.Kevent) string { return "" },
 	}
 
 	for k, v := range extra {
@@ -68,6 +70,7 @@ func New() template.FuncMap {
 func InitFuncs(funcMap template.FuncMap) {
 	funcMap["emit"] = emit
 	funcMap["kill"] = kill
+	funcMap["printk"] = printk
 }
 
 // emit sends an alert via all configured alert senders.
@@ -106,7 +109,7 @@ func emit(title string, text string, args ...string) string {
 func kill(pid uint32) string {
 	h, err := syscall.OpenProcess(syscall.PROCESS_TERMINATE, false, pid)
 	if err != nil {
-		return fmt.Sprintf("couldn't open pid %d for terminating: %v", pid, err)
+		return fmt.Sprintf("couldn't open pid %d for termination: %v", pid, err)
 	}
 	defer func() {
 		_ = syscall.CloseHandle(h)

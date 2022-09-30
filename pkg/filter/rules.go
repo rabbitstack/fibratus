@@ -26,6 +26,7 @@ import (
 	"expvar"
 	"fmt"
 	fsm "github.com/qmuntal/stateless"
+	"github.com/rabbitstack/fibratus/pkg/filter/ql"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/util/atomic"
@@ -57,7 +58,7 @@ var (
 	partialExpirations    = expvar.NewMap("sequence.partial.expirations")
 
 	ErrInvalidFilter = func(rule, group string, err error) error {
-		return fmt.Errorf("invalid filter %q in %q group: \n%v", rule, group, err)
+		return fmt.Errorf("syntax error in rule %q located in %q group: \n%v", rule, group, err)
 	}
 	ErrInvalidPatternBinding = func(rule string) error {
 		return fmt.Errorf("%q is the initial sequence rule and can't contain pattern bindings", rule)
@@ -230,15 +231,25 @@ func (s *sequenceState) currentState() fsm.State {
 }
 
 func (s *sequenceState) addPartial(rule string, kevt *kevent.Kevent) {
-	if len(s.partials[s.idxs[rule]]) > maxOutstandingPartials {
-		log.Warnf("max partials encountered in sequence %s index %d. "+
+	i := s.idxs[rule]
+	if len(s.partials[i]) > maxOutstandingPartials {
+		log.Warnf("max partials encountered in sequence %s slot [%d]. "+
 			"Dropping incoming partial", s.name, s.idxs[rule])
 		return
 	}
 	if len(s.bindingIndexes) > 0 {
-		log.Debugf("adding partial to slot [%d] for rule %q: %s", s.idxs[rule], rule, kevt)
+		key := kevt.PartialKey()
+		if key != 0 {
+			for _, p := range s.partials[i] {
+				if key == p.PartialKey() {
+					log.Debugf("%s event tuple already in sequence state", kevt.Name)
+					return
+				}
+			}
+		}
+		log.Debugf("adding partial to slot [%d] for rule %q: %s", i, rule, kevt)
 		partialsPerSequence.Add(s.name, 1)
-		s.partials[s.idxs[rule]] = append(s.partials[s.idxs[rule]], kevt)
+		s.partials[i] = append(s.partials[i], kevt)
 	}
 }
 
@@ -321,9 +332,8 @@ func (s *sequenceState) expire(e *kevent.Kevent) bool {
 		return lhs.PID == rhs.PID
 	}
 	for _, idx := range s.idxs {
-		currentPartials := s.partials[idx]
-		for i, e1 := range currentPartials {
-			if !canExpire(e1, e) {
+		for i := len(s.partials[idx]) - 1; i >= 0; i-- {
+			if len(s.partials[idx]) > 0 && !canExpire(s.partials[idx][i], e) {
 				continue
 			}
 			// if downstream rule didn't match, and it contains
@@ -335,18 +345,19 @@ func (s *sequenceState) expire(e *kevent.Kevent) bool {
 			matched := s.matchedRules[idx+1]
 			bindingIndex := s.bindingIndexes[idx+1]
 			if !matched && bindingIndex == idx {
-				log.Debugf("removing process %s (%d) "+
-					"from partials pertaining to sequence [%s]",
+				log.Debugf("removing event originated from %s (%d) "+
+					"in partials pertaining to sequence [%s]",
 					e.Kparams.MustGetString(kparams.ProcessName),
 					e.Kparams.MustGetPid(),
 					s.name)
+				// remove partial event from the corresponding slot
 				s.partials[idx] = append(
 					s.partials[idx][:i],
 					s.partials[idx][i+1:]...)
 				partialsPerSequence.Add(s.name, -1)
 
 				if len(s.partials[idx]) == 0 {
-					log.Infof("%q sequence expired. All partials terminated", s.name)
+					log.Infof("%q sequence expired. All partials retracted", s.name)
 					partialExpirations.Add(s.name, 1)
 					s.inExpired = true
 					err := s.expireTransition()
@@ -418,9 +429,15 @@ func expr(c *config.FilterConfig) string {
 	return c.Def
 }
 
-// Compile loads the filter groups from all files
-// and creates the filters for each filter group.
+// Compile loads the rule groups from all files
+// and creates the rules for each filter group.
+// It also sets up the state machine transitions
+// for sequence rule group policies.
 func (r *Rules) Compile() error {
+	store := ql.NewMacroStore(r.config)
+	if err := store.Load(); err != nil {
+		return err
+	}
 	groups, err := r.config.Filters.LoadGroups()
 	if err != nil {
 		return err
@@ -430,7 +447,7 @@ func (r *Rules) Compile() error {
 			log.Warnf("rule group [%s] disabled", group.Name)
 			continue
 		}
-		log.Infof("loading rule group [%s]", group.Name)
+		log.Infof("loading rule group [%s] with %q policy", group.Name, group.Policy)
 		rules := append(group.Rules, group.FromStrings...)
 		if group.Policy != config.SequencePolicy &&
 			group.Action != "" {
@@ -456,7 +473,11 @@ func (r *Rules) Compile() error {
 
 		for i, filterConfig := range rules {
 			rule := filterConfig.Name
-			f := New(expr(filterConfig), r.config)
+			f := New(
+				expr(filterConfig),
+				r.config,
+				WithMacroStore(store),
+			)
 			if err := f.Compile(); err != nil {
 				return ErrInvalidFilter(rule, group.Name, err)
 			}
@@ -564,6 +585,10 @@ func (r *Rules) Fire(kevt *kevent.Kevent) bool {
 	// the groups with exclude policies got matched
 	ok = r.runRules(groups, config.IncludePolicy, kevt)
 	if ok {
+		// transition state machine. In this case
+		// both include/sequence groups could produce
+		// a match
+		r.runRules(groups, config.SequencePolicy, kevt)
 		return true
 	}
 
@@ -611,6 +636,9 @@ nextGroup:
 				log.Debugf("rule group [%s] matched", g.group.Name)
 				// this is the event that triggered the group match
 				kevt.AddMeta(kevent.RuleGroupKey, g.group.Name)
+				for k, v := range g.group.Labels {
+					kevt.AddMeta(kevent.MetadataKey(k), v)
+				}
 				err := runFilterAction(nil, seqState.matches, g.group, nil)
 				if err != nil {
 					log.Warnf("unable to execute %q sequence action: %v", g.group.Name, err)
@@ -648,13 +676,16 @@ nextGroup:
 					if ok {
 						includeOrFilterMatches.Add(f.config.Name, 1)
 						log.Debugf("rule [%s] in group [%s] matched", f.config.Name, g.group.Name)
+						// attach rule and group meta
+						kevt.AddMeta(kevent.RuleNameKey, f.config.Name)
+						kevt.AddMeta(kevent.RuleGroupKey, g.group.Name)
+						for k, v := range g.group.Labels {
+							kevt.AddMeta(kevent.MetadataKey(k), v)
+						}
 						err := runFilterAction(kevt, nil, g.group, f.config)
 						if err != nil {
 							log.Warnf("unable to execute %q rule action: %v", f.config.Name, err)
 						}
-						// attach rule and group meta
-						kevt.AddMeta(kevent.RuleNameKey, f.config.Name)
-						kevt.AddMeta(kevent.RuleGroupKey, g.group.Name)
 						return true
 					}
 				case config.AndRelation:

@@ -1,0 +1,14 @@
+- macro: spawn_process
+  expr: kevt.name = 'CreateProcess'
+
+- macro: msoffice_binaries
+  list: [EXCEL.EXE, WINWORD.EXE, MSACCESS.EXE, POWERPNT.EXE, WORDPAD.EXE]
+
+- macro: write_file
+  expr: kevt.name = 'WriteFile'
+
+- macro: query_registry
+  expr: kevt.name in ('RegQueryKey', 'RegQueryValue')
+
+- macro: open_registry
+  expr: kevt.name = 'RegOpenKey'

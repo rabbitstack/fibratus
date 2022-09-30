@@ -159,19 +159,3 @@ func TestLoadGroupsInvalidTemplates(t *testing.T) {
 		}
 	}
 }
-
-func TestLoadGroupsWithValues(t *testing.T) {
-	filters := Filters{
-		Rules{
-			FromPaths: []string{
-				"_fixtures/filters/values/default.yml",
-			},
-		},
-	}
-	groups, err := filters.LoadGroups()
-	require.NoError(t, err)
-	require.Len(t, groups, 2)
-
-	g2 := groups[1]
-	assert.Equal(t, "kevt.category = 'net' and ps.name in ('at.exe', 'java.exe', 'nc.exe')", g2.FromStrings[0].Def)
-}

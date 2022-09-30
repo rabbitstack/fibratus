@@ -30,14 +30,15 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/syscall/security"
 )
 
+var (
+	hklmPrefixes = []string{"\\REGISTRY\\MACHINE", "\\Registry\\Machine", "\\Registry\\MACHINE"}
+	hkcrPrefixes = []string{"\\REGISTRY\\MACHINE\\SOFTWARE\\CLASSES", "\\Registry\\Machine\\Software\\Classes"}
+	hkuPrefixes  = []string{"\\REGISTRY\\USER", "\\Registry\\User"}
+)
+
 const (
-	hklmPrefixUppercase   = "\\REGISTRY\\MACHINE"
-	hklmPrefixCapitalized = "\\Registry\\Machine"
-	hkcrPrefixUppercase   = "\\REGISTRY\\MACHINE\\SOFTWARE\\CLASSES"
-	hkcrPrefixCapitalized = "\\Registry\\Machine\\Software\\Classes"
-	hkuPrefixUppercase    = "\\REGISTRY\\USER"
-	hkuPrefixCapitalized  = "\\Registry\\User"
-	// hive represents an application hive. Application hives are loaded by user-mode processes via RegLoadAppKey to store application-specific state data.
+	// hive represents an application hive. Application hives are loaded by user-mode processes
+	// via RegLoadAppKey to store application-specific state data.
 	hive = "\\REGISTRY\\A"
 )
 
@@ -52,12 +53,15 @@ var (
 
 // FormatKey produces a root,key tuple from registry native key name.
 func FormatKey(key string) (registry.Key, string) {
-	if strings.HasPrefix(key, hklmPrefixUppercase) || strings.HasPrefix(key, hklmPrefixCapitalized) {
-		return registry.LocalMachine, subkey(key, hklmPrefixUppercase)
+	for _, p := range hklmPrefixes {
+		if strings.HasPrefix(key, p) {
+			return registry.LocalMachine, subkey(key, p)
+		}
 	}
-
-	if strings.HasPrefix(key, hkcrPrefixUppercase) || strings.HasPrefix(key, hkcrPrefixCapitalized) {
-		return registry.ClassesRoot, subkey(key, hkcrPrefixUppercase)
+	for _, p := range hkcrPrefixes {
+		if strings.HasPrefix(key, p) {
+			return registry.ClassesRoot, subkey(key, p)
+		}
 	}
 
 	once.Do(func() { initKeys() })
@@ -65,9 +69,10 @@ func FormatKey(key string) (registry.Key, string) {
 	if root, k := findSIDKey(key); root != registry.InvalidKey {
 		return root, k
 	}
-
-	if strings.HasPrefix(key, hkuPrefixUppercase) || strings.HasPrefix(key, hkuPrefixCapitalized) {
-		return registry.Users, subkey(key, hkuPrefixUppercase)
+	for _, p := range hkuPrefixes {
+		if strings.HasPrefix(key, p) {
+			return registry.Users, subkey(key, p)
+		}
 	}
 
 	if strings.HasPrefix(key, hive) {
@@ -88,7 +93,7 @@ func initKeys() {
 	mux.Lock()
 	defer mux.Unlock()
 	for _, sid := range sids {
-		user := hkuPrefixUppercase + "\\" + sid
+		user := "\\REGISTRY\\USER\\" + sid
 		keys = append(keys, user, user+"\\_Classes")
 	}
 }

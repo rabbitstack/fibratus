@@ -21,6 +21,8 @@
 package ql
 
 import (
+	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"net"
 	"strconv"
 	"strings"
@@ -28,13 +30,19 @@ import (
 
 // Parser builds the binary expression tree from the filter string.
 type Parser struct {
-	s    *bufScanner
-	expr string
+	s          *bufScanner
+	expr       string
+	macroStore *MacroStore
 }
 
 // NewParser builds a new parser instance from the expression string.
 func NewParser(expr string) *Parser {
 	return &Parser{s: newBufScanner(strings.NewReader(expr)), expr: expr}
+}
+
+// NewParserWithMacroStore builds a new parser instance with a macro store.
+func NewParserWithMacroStore(expr string, store *MacroStore) *Parser {
+	return &Parser{s: newBufScanner(strings.NewReader(expr)), expr: expr, macroStore: store}
 }
 
 // ParseExpr parses an expression by building the binary expression tree.
@@ -65,7 +73,7 @@ func (p *Parser) ParseExpr() (Expr, error) {
 			// expect LPAREN after in
 			tok, pos, lit := p.scanIgnoreWhitespace()
 			p.unscan()
-			if tok != lparen {
+			if tok != lparen && !p.macroStore.IsMacroList(lit) {
 				return nil, newParseError(tokstr(op, lit), []string{"'('"}, pos, p.expr)
 			}
 		}
@@ -167,9 +175,26 @@ func (p *Parser) parseUnaryExpr() (Expr, error) {
 		if tok0, _, _ := p.scan(); tok0 == lparen {
 			return p.parseFunction(lit)
 		}
-		// unscan lparen and ident tokens
+		// unscan lparen token
 		p.unscan()
-		p.unscan()
+
+		// expand macros
+		macro := p.macroStore.FindMacro(lit)
+		if macro != nil {
+			if macro.Expr != "" {
+				p := NewParserWithMacroStore(macro.Expr, p.macroStore)
+				expr, err := p.ParseExpr()
+				if err != nil {
+					return nil, multierror.WrapWithSeparator("\n", fmt.Errorf("syntax error in %q macro", lit), err)
+				}
+				return expr, nil
+			} else {
+				return &ListLiteral{Values: macro.List}, nil
+			}
+		} else {
+			// unscan ident
+			p.unscan()
+		}
 	case ip:
 		return &IPLiteral{Value: net.ParseIP(lit)}, nil
 	case str:

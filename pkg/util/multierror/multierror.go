@@ -18,12 +18,21 @@ import (
 	"strings"
 )
 
+var sep = ", "
+
 // Wrap takes a slice of errors and returns a single error that encapsulates
 // those underlying errors. If the slice is nil or empty it returns nil.
 // If the slice only contains a single element, that error is returned directly.
 // When more than one error is wrapped, the Error() string is a concatenation
 // of the Error() values of all underlying errors.
 func Wrap(errs ...error) error {
+	return multiError(errs).flatten()
+}
+
+// WrapWithSeparator same as Wrap but uses a custom separator when joining
+// error messages.
+func WrapWithSeparator(s string, errs ...error) error {
+	sep = s
 	return multiError(errs).flatten()
 }
 
@@ -53,5 +62,5 @@ func (errors multiError) Error() string {
 		}
 		parts = append(parts, err.Error())
 	}
-	return strings.Join(parts, ", ")
+	return strings.Join(parts, sep)
 }

@@ -20,6 +20,7 @@ package ql
 
 import (
 	"errors"
+	"github.com/rabbitstack/fibratus/pkg/config"
 	"testing"
 )
 
@@ -71,6 +72,92 @@ func TestParser(t *testing.T) {
 			t.Errorf("%d. exp=%s expected error=%v", i, tt.expr, tt.err)
 		} else if err != nil && tt.err == nil {
 			t.Errorf("%d. exp=%s got error=%v", i, tt.expr, err)
+		}
+	}
+}
+
+func TestExpandMacros(t *testing.T) {
+	var tests = []struct {
+		ms           *MacroStore
+		expr         string
+		expectedExpr string
+		err          error
+	}{
+		{
+			NewMacroStoreFromStatic(map[string]*config.Macro{"spawn_process": {Expr: "kevt.name = 'CreateProcess'"}}),
+			"spawn_process and ps.name in ('cmd.exe', 'powershell.exe')",
+			"kevt.name = CreateProcess AND ps.name IN (cmd.exe, powershell.exe)",
+			nil,
+		},
+		{
+			NewMacroStoreFromStatic(map[string]*config.Macro{"span_process": {Expr: "kevt.name = 'CreateProcess'"}}),
+			"spawn_process and ps.name in ('cmd.exe', 'powershell.exe')",
+			"",
+			errors.New("expected field, string, number, bool, ip, function, pattern binding"),
+		},
+		{
+			NewMacroStoreFromStatic(map[string]*config.Macro{"spawn_process": {Expr: "kevt.name = 'CreateProcess'"}, "command_clients": {List: []string{"cmd.exe", "pwsh.exe"}}}),
+			"spawn_process and ps.name in command_clients",
+			"kevt.name = CreateProcess AND ps.name IN (cmd.exe, pwsh.exe)",
+			nil,
+		},
+		{
+			NewMacroStoreFromStatic(map[string]*config.Macro{"spawn_process": {Expr: "kevt.nnname = 'CreateProcess'"}, "command_clients": {List: []string{"cmd.exe", "pwsh.exe"}}}),
+			"spawn_process and ps.name in command_clients",
+			"",
+			errors.New("syntax error in \"spawn_process\" macro. expected field, string, number, bool, ip, function, pattern binding"),
+		},
+		{
+			NewMacroStoreFromStatic(map[string]*config.Macro{
+				"rename":    {Expr: "kevt.name = 'RenameFile'"},
+				"remove":    {Expr: "kevt.name = 'DeleteFile'"},
+				"modify":    {Expr: "rename or remove"},
+				"wcm_files": {List: []string{"?:\\Users\\*\\AppData\\*\\Microsoft\\Credentials\\*"}}}),
+			"(modify) and file.name imatches wcm_files",
+			"(kevt.name = RenameFile OR kevt.name = DeleteFile) AND file.name IMATCHES (?:\\Users\\*\\AppData\\*\\Microsoft\\Credentials\\*)",
+			nil,
+		},
+		{
+			NewMacroStoreFromStatic(map[string]*config.Macro{
+				"rename": {Expr: "kevt.name = 'RenameFile'"},
+				"remove": {Expr: "kevt.name = 'DeleteFile'"},
+				"modify": {Expr: "rename or remove"}}),
+			"entropy(file.name) > 0.22 and ren",
+			"",
+			errors.New("expected field, string, number, bool, ip, function, pattern binding"),
+		},
+		{
+			NewMacroStoreFromStatic(map[string]*config.Macro{
+				"rename": {Expr: "kevt.name = 'RenameFile'"},
+				"remove": {Expr: "kevt.name = 'DeleteFile'"},
+				"modify": {Expr: "rename or remove"}}),
+			"entropy(file.name) > 0.22 and rename",
+			"entropy(file.name) > 2.2e-01 AND kevt.name = RenameFile",
+			nil,
+		},
+		{
+			NewMacroStoreFromStatic(map[string]*config.Macro{
+				"rename":    {Expr: "kevt.name = 'RenameFile'"},
+				"remove":    {Expr: "kevt.name = 'DeleteFile'"},
+				"create":    {Expr: "kevt.name = 'CreateFile' and file.operation = 'create'"},
+				"modify":    {Expr: "rename or remove"},
+				"change_fs": {Expr: "modify or (create)"}}),
+			"change_fs",
+			"kevt.name = RenameFile OR kevt.name = DeleteFile OR (kevt.name = CreateFile AND file.operation = create)",
+			nil,
+		},
+	}
+
+	for i, tt := range tests {
+		p := NewParserWithMacroStore(tt.expr, tt.ms)
+		expr, err := p.ParseExpr()
+		if err == nil && tt.err != nil {
+			t.Errorf("%d. exp=%s expected error=\n%v", i, tt.expr, tt.err)
+		} else if err != nil && tt.err == nil {
+			t.Errorf("%d. exp=%s got error=\n%v", i, tt.expr, err)
+		}
+		if tt.expectedExpr != "" && expr.String() != tt.expectedExpr {
+			t.Errorf("%d. exp=%s expected expr=%v", i, expr.String(), tt.expectedExpr)
 		}
 	}
 }

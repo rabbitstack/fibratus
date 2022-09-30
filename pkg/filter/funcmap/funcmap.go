@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 by Nedim Sabic Sabic
+ * Copyright 2021-2022 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -16,20 +16,23 @@
  * limitations under the License.
  */
 
-package kevent
+package funcmap
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-	"github.com/stretchr/testify/assert"
-	"testing"
+	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"strings"
 )
 
-func TestKeventIsNetworkTCP(t *testing.T) {
-	assert.True(t, Kevent{Type: ktypes.AcceptTCPv4, Category: ktypes.Net}.IsNetworkTCP())
-	assert.False(t, Kevent{Type: ktypes.SendUDPv6, Category: ktypes.Net}.IsNetworkTCP())
-}
-
-func TestKeventIsNetworkUDP(t *testing.T) {
-	assert.True(t, Kevent{Type: ktypes.RecvUDPv4}.IsNetworkUDP())
-	assert.False(t, Kevent{Type: ktypes.SendTCPv6}.IsNetworkUDP())
+func printk(kevts ...*kevent.Kevent) string {
+	if len(kevts) == 1 {
+		return kevts[0].String()
+	}
+	var sb strings.Builder
+	for i, kevt := range kevts {
+		sb.WriteString(fmt.Sprintf("Event #%d\n\n", i))
+		sb.WriteString(kevt.String())
+		sb.WriteRune('\n')
+	}
+	return sb.String()
 }

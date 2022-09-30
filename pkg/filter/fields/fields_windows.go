@@ -110,6 +110,8 @@ const (
 	PsSiblingComm Field = "ps.sibling.comm"
 	// PsSiblingExe represents the sibling process complete executable path field
 	PsSiblingExe Field = "ps.sibling.exe"
+	// PsSiblingArgs represents the sibling process command line arguments path field
+	PsSiblingArgs Field = "ps.sibling.args"
 	// PsSiblingSID represents the sibling processes security identifier field
 	PsSiblingSID Field = "ps.sibling.sid"
 	// PsSiblingSessionID represents the sibling process session id field
@@ -410,6 +412,7 @@ var fields = map[Field]FieldInfo{
 	PsSiblingPid:        {PsSiblingPid, "created, terminated, or opened process id", kparams.PID, []string{"ps.sibling.pid = 320"}},
 	PsSiblingName:       {PsSiblingName, "created, terminated, or opened process name", kparams.UnicodeString, []string{"ps.sibling.name = 'notepad.exe'"}},
 	PsSiblingComm:       {PsSiblingComm, "created or terminated process command line", kparams.UnicodeString, []string{"ps.sibling.comm contains '\\k \\v'"}},
+	PsSiblingArgs:       {PsSiblingArgs, "created process command line arguments", kparams.Slice, []string{"ps.sibling.args in ('/cdir', '/-C')"}},
 	PsSiblingExe:        {PsSiblingExe, "created, terminated, or opened process id", kparams.UnicodeString, []string{"ps.sibling.exe contains '\\Windows\\cmd.exe'"}},
 	PsSiblingSID:        {PsSiblingSID, "created or terminated process security identifier", kparams.UnicodeString, []string{"ps.sibling.sid contains 'SERVICE'"}},
 	PsSiblingSessionID:  {PsSiblingSessionID, "created or terminated process session identifier", kparams.Int16, []string{"ps.sibling.sessionid == 1"}},

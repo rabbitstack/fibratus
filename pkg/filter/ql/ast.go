@@ -1004,6 +1004,19 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 				}
 			}
 			return false
+		case iin:
+			rhs, ok := rhs.([]string)
+			if !ok {
+				return false
+			}
+			for _, i := range lhs {
+				for _, j := range rhs {
+					if strings.EqualFold(i, j) {
+						return true
+					}
+				}
+			}
+			return false
 		case startswith:
 			rhs, ok := rhs.([]string)
 			if !ok {
