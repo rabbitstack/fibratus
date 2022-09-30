@@ -26,7 +26,6 @@ import (
 	"expvar"
 	"fmt"
 	fsm "github.com/qmuntal/stateless"
-	"github.com/rabbitstack/fibratus/pkg/filter/ql"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/util/atomic"
@@ -429,13 +428,12 @@ func expr(c *config.FilterConfig) string {
 	return c.Def
 }
 
-// Compile loads the rule groups from all files
-// and creates the rules for each filter group.
-// It also sets up the state machine transitions
-// for sequence rule group policies.
+// Compile loads macros and rule groups from all
+// indicated resources and creates the rules for
+// each filter group. It also sets up the state
+// machine transitions for sequence rule group policies.
 func (r *Rules) Compile() error {
-	store := ql.NewMacroStore(r.config)
-	if err := store.Load(); err != nil {
+	if err := r.config.Filters.LoadMacros(); err != nil {
 		return err
 	}
 	groups, err := r.config.Filters.LoadGroups()
@@ -473,11 +471,7 @@ func (r *Rules) Compile() error {
 
 		for i, filterConfig := range rules {
 			rule := filterConfig.Name
-			f := New(
-				expr(filterConfig),
-				r.config,
-				WithMacroStore(store),
-			)
+			f := New(expr(filterConfig), r.config)
 			if err := f.Compile(); err != nil {
 				return ErrInvalidFilter(rule, group.Name, err)
 			}

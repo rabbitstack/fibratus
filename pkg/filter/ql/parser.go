@@ -22,6 +22,7 @@ package ql
 
 import (
 	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"net"
 	"strconv"
@@ -30,9 +31,9 @@ import (
 
 // Parser builds the binary expression tree from the filter string.
 type Parser struct {
-	s          *bufScanner
-	expr       string
-	macroStore *MacroStore
+	s    *bufScanner
+	c    *config.Filters
+	expr string
 }
 
 // NewParser builds a new parser instance from the expression string.
@@ -40,16 +41,15 @@ func NewParser(expr string) *Parser {
 	return &Parser{s: newBufScanner(strings.NewReader(expr)), expr: expr}
 }
 
-// NewParserWithMacroStore builds a new parser instance with a macro store.
-func NewParserWithMacroStore(expr string, store *MacroStore) *Parser {
-	return &Parser{s: newBufScanner(strings.NewReader(expr)), expr: expr, macroStore: store}
+// NewParserWithConfig builds a new parser instance with filters config.
+func NewParserWithConfig(expr string, config *config.Filters) *Parser {
+	return &Parser{s: newBufScanner(strings.NewReader(expr)), expr: expr, c: config}
 }
 
 // ParseExpr parses an expression by building the binary expression tree.
 func (p *Parser) ParseExpr() (Expr, error) {
 	var err error
 	root := &BinaryExpr{}
-
 	// parse a non-binary expression type to start. This variable will always be
 	// the root of the expression tree.
 	root.RHS, err = p.parseUnaryExpr()
@@ -73,7 +73,7 @@ func (p *Parser) ParseExpr() (Expr, error) {
 			// expect LPAREN after in
 			tok, pos, lit := p.scanIgnoreWhitespace()
 			p.unscan()
-			if tok != lparen && !p.macroStore.IsMacroList(lit) {
+			if tok != lparen && !p.c.IsMacroList(lit) {
 				return nil, newParseError(tokstr(op, lit), []string{"'('"}, pos, p.expr)
 			}
 		}
@@ -179,10 +179,10 @@ func (p *Parser) parseUnaryExpr() (Expr, error) {
 		p.unscan()
 
 		// expand macros
-		macro := p.macroStore.FindMacro(lit)
+		macro := p.c.GetMacro(lit)
 		if macro != nil {
 			if macro.Expr != "" {
-				p := NewParserWithMacroStore(macro.Expr, p.macroStore)
+				p := NewParserWithConfig(macro.Expr, p.c)
 				expr, err := p.ParseExpr()
 				if err != nil {
 					return nil, multierror.WrapWithSeparator("\n", fmt.Errorf("syntax error in %q macro", lit), err)

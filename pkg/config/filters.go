@@ -244,6 +244,11 @@ func (s FilterGroupSelector) Hash() uint32 {
 type Filters struct {
 	Rules  Rules  `json:"rules" yaml:"rules"`
 	Macros Macros `json:"macros" yaml:"macros"`
+	macros map[string]*Macro
+}
+
+func FiltersWithMacros(macros map[string]*Macro) *Filters {
+	return &Filters{macros: macros}
 }
 
 // Rules contains attributes that describe the location of
@@ -280,17 +285,25 @@ func (f *Filters) initFromViper(v *viper.Viper) {
 	f.Macros.FromPaths = v.GetStringSlice(macrosFromPaths)
 }
 
-func (f Filters) HasMacros() bool { return len(f.Macros.FromPaths) > 0 }
+func (f Filters) HasMacros() bool           { return len(f.Macros.FromPaths) > 0 }
+func (f Filters) GetMacro(id string) *Macro { return f.macros[id] }
+func (f Filters) IsMacroList(id string) bool {
+	macro, ok := f.macros[id]
+	if !ok {
+		return false
+	}
+	return macro.List != nil
+}
 
 // LoadMacros from the macro library. The Go templates are applied
 // on each macro file before running the YAML decoder on them.
-func (f Filters) LoadMacros() (map[string]*Macro, error) {
-	allMacros := make(map[string]*Macro)
+func (f *Filters) LoadMacros() error {
+	f.macros = make(map[string]*Macro)
 	for _, p := range f.Macros.FromPaths {
 		// apply glob pattern
 		paths, err := filepath.Glob(p)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		for _, path := range paths {
 			if filepath.Ext(path) != ".yml" && filepath.Ext(path) != ".yaml" {
@@ -299,28 +312,28 @@ func (f Filters) LoadMacros() (map[string]*Macro, error) {
 			log.Infof("loading macros from file %s", path)
 			buf, err := ioutil.ReadFile(path)
 			if err != nil {
-				return nil, fmt.Errorf("couldn't load macros from file: %v", err)
+				return fmt.Errorf("couldn't load macros from file: %v", err)
 			}
 			buf, err = renderTmpl(path, buf)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			// unmarshal macros and transform to map
 			var macros []Macro
 			if err := yaml.Unmarshal(buf, &macros); err != nil {
-				return nil, err
+				return err
 			}
 			for _, m := range macros {
-				allMacros[m.ID] = &Macro{
-					ID:   m.ID,
-					Name: m.Name,
-					Expr: m.Expr,
-					List: m.List,
+				f.macros[m.ID] = &Macro{
+					ID:          m.ID,
+					Description: m.Description,
+					Expr:        m.Expr,
+					List:        m.List,
 				}
 			}
 		}
 	}
-	return allMacros, nil
+	return nil
 }
 
 // LoadGroups for each rule group file it decodes the

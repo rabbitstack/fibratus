@@ -78,37 +78,37 @@ func TestParser(t *testing.T) {
 
 func TestExpandMacros(t *testing.T) {
 	var tests = []struct {
-		ms           *MacroStore
+		c            *config.Filters
 		expr         string
 		expectedExpr string
 		err          error
 	}{
 		{
-			NewMacroStoreFromStatic(map[string]*config.Macro{"spawn_process": {Expr: "kevt.name = 'CreateProcess'"}}),
+			config.FiltersWithMacros(map[string]*config.Macro{"spawn_process": {Expr: "kevt.name = 'CreateProcess'"}}),
 			"spawn_process and ps.name in ('cmd.exe', 'powershell.exe')",
 			"kevt.name = CreateProcess AND ps.name IN (cmd.exe, powershell.exe)",
 			nil,
 		},
 		{
-			NewMacroStoreFromStatic(map[string]*config.Macro{"span_process": {Expr: "kevt.name = 'CreateProcess'"}}),
+			config.FiltersWithMacros(map[string]*config.Macro{"span_process": {Expr: "kevt.name = 'CreateProcess'"}}),
 			"spawn_process and ps.name in ('cmd.exe', 'powershell.exe')",
 			"",
 			errors.New("expected field, string, number, bool, ip, function, pattern binding"),
 		},
 		{
-			NewMacroStoreFromStatic(map[string]*config.Macro{"spawn_process": {Expr: "kevt.name = 'CreateProcess'"}, "command_clients": {List: []string{"cmd.exe", "pwsh.exe"}}}),
+			config.FiltersWithMacros(map[string]*config.Macro{"spawn_process": {Expr: "kevt.name = 'CreateProcess'"}, "command_clients": {List: []string{"cmd.exe", "pwsh.exe"}}}),
 			"spawn_process and ps.name in command_clients",
 			"kevt.name = CreateProcess AND ps.name IN (cmd.exe, pwsh.exe)",
 			nil,
 		},
 		{
-			NewMacroStoreFromStatic(map[string]*config.Macro{"spawn_process": {Expr: "kevt.nnname = 'CreateProcess'"}, "command_clients": {List: []string{"cmd.exe", "pwsh.exe"}}}),
+			config.FiltersWithMacros(map[string]*config.Macro{"spawn_process": {Expr: "kevt.nnname = 'CreateProcess'"}, "command_clients": {List: []string{"cmd.exe", "pwsh.exe"}}}),
 			"spawn_process and ps.name in command_clients",
 			"",
 			errors.New("syntax error in \"spawn_process\" macro. expected field, string, number, bool, ip, function, pattern binding"),
 		},
 		{
-			NewMacroStoreFromStatic(map[string]*config.Macro{
+			config.FiltersWithMacros(map[string]*config.Macro{
 				"rename":    {Expr: "kevt.name = 'RenameFile'"},
 				"remove":    {Expr: "kevt.name = 'DeleteFile'"},
 				"modify":    {Expr: "rename or remove"},
@@ -118,7 +118,7 @@ func TestExpandMacros(t *testing.T) {
 			nil,
 		},
 		{
-			NewMacroStoreFromStatic(map[string]*config.Macro{
+			config.FiltersWithMacros(map[string]*config.Macro{
 				"rename": {Expr: "kevt.name = 'RenameFile'"},
 				"remove": {Expr: "kevt.name = 'DeleteFile'"},
 				"modify": {Expr: "rename or remove"}}),
@@ -127,7 +127,7 @@ func TestExpandMacros(t *testing.T) {
 			errors.New("expected field, string, number, bool, ip, function, pattern binding"),
 		},
 		{
-			NewMacroStoreFromStatic(map[string]*config.Macro{
+			config.FiltersWithMacros(map[string]*config.Macro{
 				"rename": {Expr: "kevt.name = 'RenameFile'"},
 				"remove": {Expr: "kevt.name = 'DeleteFile'"},
 				"modify": {Expr: "rename or remove"}}),
@@ -136,7 +136,7 @@ func TestExpandMacros(t *testing.T) {
 			nil,
 		},
 		{
-			NewMacroStoreFromStatic(map[string]*config.Macro{
+			config.FiltersWithMacros(map[string]*config.Macro{
 				"rename":    {Expr: "kevt.name = 'RenameFile'"},
 				"remove":    {Expr: "kevt.name = 'DeleteFile'"},
 				"create":    {Expr: "kevt.name = 'CreateFile' and file.operation = 'create'"},
@@ -149,7 +149,7 @@ func TestExpandMacros(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		p := NewParserWithMacroStore(tt.expr, tt.ms)
+		p := NewParserWithConfig(tt.expr, tt.c)
 		expr, err := p.ParseExpr()
 		if err == nil && tt.err != nil {
 			t.Errorf("%d. exp=%s expected error=\n%v", i, tt.expr, tt.err)
