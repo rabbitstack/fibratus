@@ -9,7 +9,7 @@
 <h2 align="center">Fibratus</h2>
 
 <p align="center">
-  A modern tool for the Windows kernel exploration and observability
+  A modern tool for Windows kernel exploration and observability with a focus on security
   <br>
   <a href="https://www.fibratus.io/#/setup/installation"><strong>Get Started »</strong></a>
   <br>
