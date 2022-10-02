@@ -36,11 +36,11 @@ ReadFrame reads and parses raw data from conn reader and returns amqp frame
 All frames consist of a header (7 octets), a payload of arbitrary size, and a
 'frame-end' octet that detects malformed frames:
 
-  0      1         3             7                  size+7 size+8
-  +------+---------+-------------+  +------------+  +-----------+
-  | type | channel |     size    |  |  payload   |  | frame-end |
-  +------+---------+-------------+  +------------+  +-----------+
-   octet   short         long         size octets       octet
+	0      1         3             7                  size+7 size+8
+	+------+---------+-------------+  +------------+  +-----------+
+	| type | channel |     size    |  |  payload   |  | frame-end |
+	+------+---------+-------------+  +------------+  +-----------+
+	 octet   short         long         size octets       octet
 
 To read a frame, we:
  1. Read the header and check the frame type and channel.
@@ -807,11 +807,11 @@ follows it with a content header and zero or more content body frames.
 
 A content header frame has this format:
 
-    0          2        4           12               14
-    +----------+--------+-----------+----------------+------------- - -
-    | class-id | weight | body size | property flags | property list...
-    +----------+--------+-----------+----------------+------------- - -
-      short     short    long long       short        remainder...
+	0          2        4           12               14
+	+----------+--------+-----------+----------------+------------- - -
+	| class-id | weight | body size | property flags | property list...
+	+----------+--------+-----------+----------------+------------- - -
+	  short     short    long long       short        remainder...
 */
 func ReadContentHeader(r io.Reader, protoVersion string) (*ContentHeader, error) {
 	var err error

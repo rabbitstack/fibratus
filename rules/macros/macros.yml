@@ -1,8 +1,9 @@
 - macro: spawn_process
   expr: kevt.name = 'CreateProcess'
 
-- macro: msoffice_binaries
-  list: [EXCEL.EXE, WINWORD.EXE, MSACCESS.EXE, POWERPNT.EXE, WORDPAD.EXE]
+- macro: spawn_msoffice_process
+  expr: spawn_process and ps.sibling.exe iin msoffice_binaries
+  description: Identifies the execution of the MS Office process
 
 - macro: write_file
   expr: kevt.name = 'WriteFile'
@@ -12,3 +13,6 @@
 
 - macro: open_registry
   expr: kevt.name = 'RegOpenKey'
+
+- macro: msoffice_binaries
+  list: [EXCEL.EXE, WINWORD.EXE, MSACCESS.EXE, POWERPNT.EXE, WORDPAD.EXE]

@@ -43,8 +43,8 @@ func (kevt Kevent) PartialKey() uint64 {
 	switch kevt.Type {
 	case ktypes.WriteFile, ktypes.ReadFile, ktypes.CreateFile:
 		h := fnv.New64()
-
 		b := make([]byte, 12)
+
 		binary.LittleEndian.PutUint32(b, kevt.PID)
 		file, _ := kevt.Kparams.GetUint64(kparams.FileObject)
 		binary.LittleEndian.PutUint64(b, file)

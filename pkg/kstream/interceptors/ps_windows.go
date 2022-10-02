@@ -20,6 +20,7 @@ package interceptors
 
 import (
 	"expvar"
+	"github.com/rabbitstack/fibratus/pkg/util/commandline"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -33,7 +34,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/ps"
-	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/syscall/process"
 	"github.com/rabbitstack/fibratus/pkg/yara"
 	log "github.com/sirupsen/logrus"
@@ -74,14 +74,6 @@ func newPsInterceptor(snap ps.Snapshotter, yara yara.Scanner) KstreamInterceptor
 	return psInterceptor{snap: snap, yara: yara}
 }
 
-func cleanCmdlineExe(args []string) string {
-	exe := args[0]
-	if exe[0] == '"' && exe[len(exe)-1] == '"' {
-		return strings.Join(append([]string{exe[1 : len(exe)-1]}, args[1:]...), " ")
-	}
-	return strings.Join(args, " ")
-}
-
 func (ps psInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, error) {
 	switch kevt.Type {
 	case ktypes.CreateProcess,
@@ -92,9 +84,9 @@ func (ps psInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 			return kevt, true, err
 		}
 		// if leading/trailing quotes are found in the executable path, get rid of them
-		args := pstypes.SplitArgs(cmdline)
+		args := commandline.Split(cmdline)
 		if len(args) > 0 {
-			cmdline = cleanCmdlineExe(args)
+			cmdline = commandline.CleanExe(args)
 		}
 		// expand all variations of the SystemRoot env variable
 		if systemRootRegexp.MatchString(cmdline) {

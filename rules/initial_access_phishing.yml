@@ -16,7 +16,7 @@
     subtechnique.ref: https://attack.mitre.org/techniques/T1566/001/
   policy: sequence
   rules:
-    - name: File written by Microsoft Office processes
+    - name: File written by Microsoft Office process
       condition: >
         write_file
             and
@@ -28,9 +28,11 @@
             )
             and
         ps.name iin msoffice_binaries
-    - name: Binary executed by Microsoft Office processes
+    - name: Binary executed by Microsoft Office process
       condition: >
         spawn_process
+            and
+        ps.name iin msoffice_binaries
             and
         ps.sibling.exe = $1.file.name
   action: >

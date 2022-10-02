@@ -22,7 +22,6 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/config"
 	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/filter/ql"
@@ -58,7 +57,6 @@ type filter struct {
 	bindings  map[uint16][]*ql.PatternBindingLiteral
 	// useFuncValuer determines whether we should supply the function valuer
 	useFuncValuer bool
-	macros        map[string]config.Macro
 }
 
 // Compile parsers the filter expression and builds a binary expression tree

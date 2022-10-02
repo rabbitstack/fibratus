@@ -247,6 +247,8 @@ type Filters struct {
 	macros map[string]*Macro
 }
 
+// FiltersWithMacros builds the filter config with the map of
+// predefined macros. Only used for testing purposes.
 func FiltersWithMacros(macros map[string]*Macro) *Filters {
 	return &Filters{macros: macros}
 }
@@ -300,7 +302,6 @@ func (f Filters) IsMacroList(id string) bool {
 func (f *Filters) LoadMacros() error {
 	f.macros = make(map[string]*Macro)
 	for _, p := range f.Macros.FromPaths {
-		// apply glob pattern
 		paths, err := filepath.Glob(p)
 		if err != nil {
 			return err
@@ -341,7 +342,6 @@ func (f *Filters) LoadMacros() error {
 func (f Filters) LoadGroups() ([]FilterGroup, error) {
 	allGroups := make([]FilterGroup, 0)
 	for _, p := range f.Rules.FromPaths {
-		// apply glob pattern
 		paths, err := filepath.Glob(p)
 		if err != nil {
 			return nil, err

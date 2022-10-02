@@ -26,7 +26,7 @@ import (
 
 var removedCount = expvar.NewInt("transformers.removed.params")
 
-//remove transformer deletes kparams that are given in the list.
+// remove transformer deletes kparams that are given in the list.
 type remove struct {
 	c Config
 }
