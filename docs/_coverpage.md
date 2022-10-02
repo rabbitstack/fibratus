@@ -6,7 +6,7 @@
 
 # fibratus <small>1.6.0</small>
 
-> A modern tool for the Windows kernel exploration and observability
+> A modern tool for Windows kernel exploration and observability with a focus on security
 
 - <ion-icon class="fast-icon" name="flash"></ion-icon> Fast
 - <ion-icon class="extensible-icon" name="cube"></ion-icon> Extensible
