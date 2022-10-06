@@ -1,4 +1,4 @@
-- group: Spearphishing attachment execution
+- group: Spearphishing attachment execution of files written by Microsoft Office processes
   description: |
     Adversaries may send spearphishing emails with a malicious attachment in an
     attempt to gain access to victim systems. Spearphishing attachment is a specific
@@ -16,7 +16,7 @@
     subtechnique.ref: https://attack.mitre.org/techniques/T1566/001/
   policy: sequence
   rules:
-    - name: File written by Microsoft Office process
+    - name: Binary file written by Microsoft Office process
       condition: >
         write_file
             and
