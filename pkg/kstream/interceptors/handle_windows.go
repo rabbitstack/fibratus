@@ -20,6 +20,9 @@ package interceptors
 
 import (
 	"expvar"
+	"github.com/rabbitstack/fibratus/pkg/syscall/driver"
+	"path/filepath"
+	"strings"
 	"time"
 
 	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
@@ -45,7 +48,7 @@ type handleInterceptor struct {
 	hsnap         handle.Snapshotter
 	typeStore     handle.ObjectTypeStore
 	devMapper     fs.DevMapper
-	defers        map[uint64]*kevent.Kevent
+	objects       map[uint64]*kevent.Kevent
 	deferredKevts chan *kevent.Kevent
 	isClosed      bool
 }
@@ -60,7 +63,7 @@ func newHandleInterceptor(
 		hsnap:         hsnap,
 		typeStore:     typeStore,
 		devMapper:     devMapper,
-		defers:        make(map[uint64]*kevent.Kevent, 1000),
+		objects:       make(map[uint64]*kevent.Kevent, 1000),
 		deferredKevts: defferedKevts,
 	}
 }
@@ -116,6 +119,14 @@ func (h *handleInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool
 			}
 		case handle.File:
 			name = h.devMapper.Convert(name)
+		case handle.Driver:
+			driverName := strings.TrimPrefix(name, "\\Driver\\") + ".sys"
+			drivers := driver.EnumDevices()
+			for _, drv := range drivers {
+				if strings.EqualFold(filepath.Base(drv.Filename), driverName) {
+					kevt.Kparams.Append(kparams.ImageFilename, kparams.UnicodeString, drv.Filename)
+				}
+			}
 		}
 		// assign the formatted handle name
 		if err := kevt.Kparams.Set(kparams.HandleObjectName, name, kparams.AnsiString); err != nil {
@@ -128,7 +139,7 @@ func (h *handleInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool
 			// defer emitting the CreateHandle kevent until we receive a CloseHandle targeting
 			// the same object
 			if name == "" {
-				h.defers[object] = kevt
+				h.objects[object] = kevt
 				return kevt, false, kerrors.ErrCancelUpstreamKevent
 			}
 			return kevt, false, h.hsnap.Write(kevt)
@@ -136,12 +147,17 @@ func (h *handleInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool
 
 		// at this point we hit CloseHandle kernel event and have the awaiting CreateHandle
 		// event reference. So we set handle object name to the name of its CloseHandle counterpart
-		if hkevt, ok := h.defers[object]; ok {
-			delete(h.defers, object)
+		if hkevt, ok := h.objects[object]; ok {
+			delete(h.objects, object)
 			if err := hkevt.Kparams.Set(kparams.HandleObjectName, name, kparams.AnsiString); err != nil {
 				return kevt, true, err
 			}
 			handleDeferMatches.Add(1)
+
+			if typeName == handle.Driver {
+				driverFilename, _ := kevt.Kparams.GetString(kparams.ImageFilename)
+				hkevt.Kparams.Append(kparams.ImageFilename, kparams.UnicodeString, driverFilename)
+			}
 
 			// send the deferred event
 			if !h.isClosed {
@@ -166,11 +182,11 @@ func (h *handleInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool
 		// cause could be that we lost the corresponding CloseHandle kernel event or the
 		// CreateHandle event was produced but the corresponding CloseHandle event will happen
 		// during the longer time frame
-		for kobj, kvt := range h.defers {
+		for kobj, kvt := range h.objects {
 			evict := kvt.Timestamp.Before(time.Now().Add(waitPeriod))
 			if evict {
 				handleDeferEvictions.Add(1)
-				delete(h.defers, kobj)
+				delete(h.objects, kobj)
 				// push the CreateHandle event
 				if !h.isClosed {
 					select {

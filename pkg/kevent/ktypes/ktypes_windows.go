@@ -160,6 +160,9 @@ var (
 	// CloseHandle represents handle closure kernel event
 	CloseHandle = Pack(syscall.GUID{Data1: 0x89497f50, Data2: 0xeffe, Data3: 0x4440, Data4: [8]byte{0x8c, 0xf2, 0xce, 0x6b, 0x1c, 0xdc, 0xac, 0xa7}}, 33)
 
+	// LoadDriver represents kernel driver loading event.
+	LoadDriver = Pack(syscall.GUID{Data1: 0xa002690, Data2: 0x3839, Data3: 0x4e3a, Data4: [8]byte{0xb3, 0xb6, 0x96, 0xd8, 0xdf, 0x86, 0x8d, 0x99}}, 10)
+
 	// UnknownKtype designates unknown kernel event type
 	UnknownKtype = Pack(syscall.GUID{}, 0)
 )
@@ -241,6 +244,8 @@ func (k Ktype) String() string {
 		return "Disconnect"
 	case Retransmit, RetransmitTCPv4, RetransmitTCPv6:
 		return "Retransmit"
+	case LoadDriver:
+		return "LoadDriver"
 	default:
 		return string(k[:])
 	}
@@ -269,6 +274,8 @@ func (k Ktype) Category() Category {
 		return Net
 	case CreateHandle, CloseHandle:
 		return Handle
+	case LoadDriver:
+		return Driver
 	default:
 		return Unknown
 	}
@@ -341,6 +348,8 @@ func (k Ktype) Description() string {
 		return "Creates a new handle"
 	case CloseHandle:
 		return "Closes the handle"
+	case LoadDriver:
+		return "Loads the kernel driver"
 	default:
 		return ""
 	}
@@ -403,7 +412,8 @@ func (k Ktype) Exists() bool {
 		RetransmitTCPv4, RetransmitTCPv6,
 		DisconnectTCPv4, DisconnectTCPv6,
 		SendTCPv4, SendTCPv6, SendUDPv4, SendUDPv6,
-		RecvTCPv4, RecvTCPv6, RecvUDPv4, RecvUDPv6:
+		RecvTCPv4, RecvTCPv6, RecvUDPv4, RecvUDPv6,
+		LoadDriver:
 		return true
 	default:
 		return false

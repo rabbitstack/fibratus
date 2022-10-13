@@ -30,6 +30,8 @@ const (
 	dirTableBase     = "DirectoryTableBase"
 	userSID          = "UserSID"
 	imageFileName    = "ImageFileName"
+	imageName        = "ImageName"
+	imagePath        = "ImagePath"
 	commandLine      = "CommandLine"
 
 	tthreadID       = "TThreadId"
@@ -105,6 +107,8 @@ func Canonicalize(name string) string {
 		return SessionID
 	case imageFileName:
 		return ProcessName
+	case imageName, imagePath:
+		return ImageFilename
 	case commandLine:
 		return Comm
 	case userSID:

@@ -88,6 +88,9 @@ func NewChain(
 		chain.addInterceptor(newHandleInterceptor(hsnap, handle.NewObjectTypeStore(), devMapper, chain.deferredKevts))
 		go chain.consumeDeferred()
 	}
+	if config.Kstream.EnableAntimalwareEngineEvents {
+		chain.addInterceptor(newDriverInterceptor(devMapper))
+	}
 
 	return chain
 }
