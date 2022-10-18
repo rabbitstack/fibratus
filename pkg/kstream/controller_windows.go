@@ -76,30 +76,6 @@ func (p TraceProvider) IsKernelLogger() bool {
 	return p.GUID == etw.KernelTraceControlGUID
 }
 
-var providers = []TraceProvider{
-	{
-		// core system events
-		etw.KernelLoggerSession,
-		etw.KernelTraceControlGUID,
-		0x0, // no keywords
-		true,
-	},
-	{
-		// provides a source of events for constructing the state of opened file objects
-		etw.KernelLoggerRundownSession,
-		etw.KernelRundownGUID,
-		0x10, // file rundown events
-		true,
-	},
-	{
-		// supplies the `OpenProcess` and `OpenThread` events
-		etw.KernelAuditAPICallsSession,
-		etw.KernelAuditAPICallsGUID,
-		0x0, // no keywords, so we accept all events
-		true,
-	},
-}
-
 // KtraceController is responsible for managing the life cycle of the tracing sessions.
 type KtraceController interface {
 	// StartKtrace starts configured tracing sessions.
@@ -115,13 +91,45 @@ type ktraceController struct {
 	kstreamConfig config.KstreamConfig
 	// traces contains initiated tracing sessions
 	traces map[string]TraceSession
+	// providers contains a list of enabled ETW providers
+	providers []TraceProvider
 }
 
 // NewKtraceController spins up a new instance of kernel trace controller.
 func NewKtraceController(kstreamConfig config.KstreamConfig) KtraceController {
+	providers := []TraceProvider{
+		{
+			// core system events
+			etw.KernelLoggerSession,
+			etw.KernelTraceControlGUID,
+			0x0, // no keywords
+			true,
+		},
+		{
+			// provides a source of events for constructing the state of opened file objects
+			etw.KernelLoggerRundownSession,
+			etw.KernelRundownGUID,
+			0x10, // file rundown events
+			true,
+		},
+		{
+			// supplies the `OpenProcess` and `OpenThread` events
+			etw.KernelAuditAPICallsSession,
+			etw.KernelAuditAPICallsGUID,
+			0x0, // no keywords, so we accept all events
+			kstreamConfig.EnableAuditAPIEvents,
+		},
+		{
+			etw.AntimalwareEngineSession,
+			etw.AntimalwareEngineGUID,
+			0x0,
+			kstreamConfig.EnableAntimalwareEngineEvents,
+		},
+	}
 	controller := &ktraceController{
 		kstreamConfig: kstreamConfig,
 		traces:        make(map[string]TraceSession),
+		providers:     providers,
 	}
 	return controller
 }
@@ -175,7 +183,7 @@ func (k *ktraceController) StartKtrace() error {
 		flushTimer = time.Second
 	}
 
-	for _, prov := range providers {
+	for _, prov := range k.providers {
 		if !prov.Enabled {
 			log.Warnf("provider for trace [%s] is disabled", prov.TraceName)
 			continue

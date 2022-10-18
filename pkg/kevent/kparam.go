@@ -78,6 +78,17 @@ func NewKparamFromKcap(name string, typ kparams.Type, value kparams.Value) *Kpar
 	return &Kparam{Name: name, Type: typ, Value: value}
 }
 
+// NewKparamBuilder yields a new event parameter builder.
+func NewKparamBuilder(n int) Kparams {
+	kpars := make(Kparams, n)
+	return kpars
+}
+
+// Build returns all appended parameters.
+func (kpars Kparams) Build() Kparams {
+	return kpars
+}
+
 // Append adds a new parameter with the specified name, type and value.
 func (kpars Kparams) Append(name string, typ kparams.Type, value kparams.Value) Kparams {
 	kpars[name] = NewKparam(name, typ, value)

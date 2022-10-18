@@ -38,6 +38,8 @@ const (
 	Image Category = "image"
 	// Handle is the category for handle events
 	Handle Category = "handle"
+	// Driver is the category for driver events
+	Driver Category = "driver"
 	// Other is the category for uncategorized events
 	Other Category = "other"
 	// Unknown is the category for events that couldn't match any of the previous categories

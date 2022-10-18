@@ -66,6 +66,8 @@ const (
 	Process = "Process"
 	// SymbolicLink represents the symbolic link object
 	SymbolicLink = "SymbolicLink"
+	// Driver represents the device driver object
+	Driver = "Driver"
 	// Unknown is the unknown handle object
 	Unknown = "Unknown"
 )
