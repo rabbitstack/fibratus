@@ -14,5 +14,8 @@
 - macro: open_registry
   expr: kevt.name = 'RegOpenKey'
 
+- macro: load_module
+  expr: kevt.name = 'LoadImage'
+
 - macro: msoffice_binaries
   list: [EXCEL.EXE, WINWORD.EXE, MSACCESS.EXE, POWERPNT.EXE, WORDPAD.EXE]

@@ -112,7 +112,7 @@ func (e *evtlog) Publish(batch *kevent.Batch) error {
 }
 
 func (e *evtlog) publish(kevt *kevent.Kevent) error {
-	buf, err := e.renderTemplate(kevt)
+	buf, err := kevt.RenderCustomTemplate(e.tmpl)
 	if err != nil {
 		return err
 	}

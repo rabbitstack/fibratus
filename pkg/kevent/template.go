@@ -16,16 +16,15 @@
  * limitations under the License.
  */
 
-package eventlog
+package kevent
 
 import (
 	"bytes"
 	"fmt"
-
-	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"text/template"
 )
 
-// Template is the default Go template used for producing the eventlog messages.
+// Template is the default Go template used for formatting events.
 var Template = `Name:  		{{ .Kevt.Name }}
 Sequence: 		{{ .Kevt.Seq }}
 Process ID:		{{ .Kevt.PID }}
@@ -119,10 +118,26 @@ Resources:
 {{- end }}
 `
 
-func (e *evtlog) renderTemplate(kevt *kevent.Kevent) ([]byte, error) {
+// RenderDefaultTemplate returns the event string representation
+// after applying the default Go template.
+func (kevt *Kevent) RenderDefaultTemplate() ([]byte, error) {
+	tmpl, err := template.New("event").Parse(Template)
+	if err != nil {
+		return nil, err
+	}
+	return renderTemplate(kevt, tmpl)
+}
+
+// RenderCustomTemplate returns the event string representation
+// after applying the given Go template.
+func (kevt *Kevent) RenderCustomTemplate(tmpl *template.Template) ([]byte, error) {
+	return renderTemplate(kevt, tmpl)
+}
+
+func renderTemplate(kevt *Kevent, tmpl *template.Template) ([]byte, error) {
 	var writer bytes.Buffer
 	data := struct {
-		Kevt             *kevent.Kevent
+		Kevt             *Kevent
 		SerializeHandles bool
 		SerializeThreads bool
 		SerializeImages  bool
@@ -130,15 +145,15 @@ func (e *evtlog) renderTemplate(kevt *kevent.Kevent) ([]byte, error) {
 		SerializePE      bool
 	}{
 		kevt,
-		kevent.SerializeHandles,
-		kevent.SerializeThreads,
-		kevent.SerializeImages,
-		kevent.SerializeEnvs,
-		kevent.SerializePE,
+		SerializeHandles,
+		SerializeThreads,
+		SerializeImages,
+		SerializeEnvs,
+		SerializePE,
 	}
-	err := e.tmpl.Execute(&writer, data)
+	err := tmpl.Execute(&writer, data)
 	if err != nil {
-		return nil, fmt.Errorf("unable to render eventlog template: %v", err)
+		return nil, fmt.Errorf("unable to render event template: %v", err)
 	}
 	return writer.Bytes(), nil
 }

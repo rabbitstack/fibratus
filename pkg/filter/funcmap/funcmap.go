@@ -21,18 +21,34 @@ package funcmap
 import (
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
+	log "github.com/sirupsen/logrus"
+	"strconv"
 	"strings"
 )
 
 func printk(kevts ...*kevent.Kevent) string {
 	if len(kevts) == 1 {
-		return kevts[0].String()
+		b, err := kevts[0].RenderDefaultTemplate()
+		if err != nil {
+			log.Warnf("failed to render event template: %v", err)
+			return ""
+		}
+		return string(b)
 	}
 	var sb strings.Builder
 	for i, kevt := range kevts {
 		sb.WriteString(fmt.Sprintf("Event #%d\n\n", i))
-		sb.WriteString(kevt.String())
+		b, err := kevt.RenderDefaultTemplate()
+		if err != nil {
+			log.Warnf("failed to render event template: %v", err)
+			continue
+		}
+		sb.WriteString(string(b))
 		sb.WriteRune('\n')
 	}
 	return sb.String()
+}
+
+func at(kevts map[string]*kevent.Kevent, i int) *kevent.Kevent {
+	return kevts["k"+strconv.Itoa(i)]
 }
