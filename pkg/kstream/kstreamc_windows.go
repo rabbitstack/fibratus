@@ -402,15 +402,15 @@ func (k *kstreamConsumer) processKevent(evt *etw.EventRecord) error {
 		kevt.Release()
 		return nil
 	}
+	// increment sequence
+	if !kevt.Type.Dropped(false) {
+		k.sequencer.Increment()
+	}
 	// run rules. In case of rule groups with sequence policy
 	// the last event matching the group is forwarded to the
 	// outputs
 	if rulesFired := k.rules.Fire(kevt); !rulesFired {
 		return nil
-	}
-	// increment sequence
-	if !kevt.Type.Dropped(false) {
-		k.sequencer.Increment()
 	}
 	if k.eventCallback != nil {
 		return k.eventCallback(kevt)

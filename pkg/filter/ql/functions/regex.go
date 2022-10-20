@@ -19,14 +19,15 @@
 package functions
 
 import (
-	"regexp"
-
 	log "github.com/sirupsen/logrus"
+	"regexp"
+	"sync"
 )
 
 // Regex applies single/multiple regular expressions on the provided string arguments.
 type Regex struct {
-	rxs map[string]*regexp.Regexp
+	rxs  map[string]*regexp.Regexp
+	once sync.Once
 }
 
 // NewRegex creates a new regex function.
@@ -34,41 +35,47 @@ func NewRegex() *Regex {
 	return &Regex{rxs: make(map[string]*regexp.Regexp)}
 }
 
-func (f Regex) Call(args []interface{}) (interface{}, bool) {
+func (f *Regex) Call(args []interface{}) (interface{}, bool) {
 	if len(args) < 2 {
 		return false, false
 	}
 	s := parseString(0, args)
 
+	// compile regular expressions
+	f.once.Do(func() {
+		for _, arg := range args[1:] {
+			expr, ok := arg.(string)
+			if !ok {
+				continue
+			}
+			rx, err := regexp.Compile(expr)
+			if err != nil {
+				log.Warnf("invalid regular expression pattern: %v", err)
+				continue
+			}
+			f.rxs[expr] = rx
+		}
+	})
+
+	// match regular expressions
 	for _, arg := range args[1:] {
 		expr, ok := arg.(string)
 		if !ok {
 			continue
 		}
-		rx, compiled := f.rxs[expr]
-		if compiled && rx == nil {
+		rx, ok := f.rxs[expr]
+		if !ok {
 			continue
-		}
-		if !compiled {
-			var err error
-			rx, err = regexp.Compile(expr)
-			if err != nil {
-				log.Warnf("invalid regular expression pattern: %v", err)
-				// to avoid compiling the regex ad infinitum
-				f.rxs[expr] = nil
-				continue
-			}
-			f.rxs[expr] = rx
 		}
 		if rx.MatchString(s) {
 			return true, true
 		}
 	}
 
-	return false, false
+	return false, true
 }
 
-func (f Regex) Desc() FunctionDesc {
+func (f *Regex) Desc() FunctionDesc {
 	desc := FunctionDesc{
 		Name: RegexFn,
 		Args: []FunctionArgDesc{
@@ -84,4 +91,4 @@ func (f Regex) Desc() FunctionDesc {
 	return desc
 }
 
-func (f Regex) Name() Fn { return RegexFn }
+func (f *Regex) Name() Fn { return RegexFn }

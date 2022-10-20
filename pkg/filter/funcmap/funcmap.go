@@ -22,11 +22,12 @@ import (
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	log "github.com/sirupsen/logrus"
-	"strconv"
+	"sort"
+
 	"strings"
 )
 
-func printk(kevts ...*kevent.Kevent) string {
+func printEvt(kevts ...*kevent.Kevent) string {
 	if len(kevts) == 1 {
 		b, err := kevts[0].RenderDefaultTemplate()
 		if err != nil {
@@ -37,7 +38,7 @@ func printk(kevts ...*kevent.Kevent) string {
 	}
 	var sb strings.Builder
 	for i, kevt := range kevts {
-		sb.WriteString(fmt.Sprintf("Event #%d\n\n", i))
+		sb.WriteString(fmt.Sprintf("Event #%d\n\n", i+1))
 		b, err := kevt.RenderDefaultTemplate()
 		if err != nil {
 			log.Warnf("failed to render event template: %v", err)
@@ -49,6 +50,11 @@ func printk(kevts ...*kevent.Kevent) string {
 	return sb.String()
 }
 
-func at(kevts map[string]*kevent.Kevent, i int) *kevent.Kevent {
-	return kevts["k"+strconv.Itoa(i)]
+func printEvts(kevts map[string]*kevent.Kevent) string {
+	evts := make([]*kevent.Kevent, 0, len(kevts))
+	for _, kevt := range kevts {
+		evts = append(evts, kevt)
+	}
+	sort.Slice(evts, func(i, j int) bool { return evts[i].Timestamp.Unix() < evts[j].Timestamp.Unix() })
+	return printEvt(evts...)
 }

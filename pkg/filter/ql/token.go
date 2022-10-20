@@ -65,6 +65,7 @@ const (
 	fuzzynorm   // fuzzynorm
 	ifuzzynorm  // ifuzzynorm
 	eq          // =
+	ieq         // ~=
 	neq         // !=
 	lt          // <
 	lte         // <=
@@ -129,6 +130,7 @@ var tokens = [...]string{
 	ifuzzynorm:  "IFUZZYNORM",
 
 	eq:  "=",
+	ieq: "~=",
 	neq: "!=",
 	lt:  "<",
 	lte: "<=",
@@ -161,7 +163,7 @@ func (tok token) precedence() int {
 		return 2
 	case not:
 		return 3
-	case eq, neq, lt, lte, gt, gte:
+	case eq, ieq, neq, lt, lte, gt, gte:
 		return 4
 	case in, iin, contains, icontains, startswith, istartswith, endswith, iendswith,
 		matches, imatches, fuzzy, ifuzzy, fuzzynorm, ifuzzynorm:

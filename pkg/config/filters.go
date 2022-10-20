@@ -315,6 +315,21 @@ func (f *Filters) LoadMacros() error {
 			if err != nil {
 				return fmt.Errorf("couldn't load macros from file: %v", err)
 			}
+			// validate macro yaml structure
+			var out interface{}
+			err = yaml.Unmarshal(buf, &out)
+			if err != nil {
+				return fmt.Errorf("%q is invalid macro yaml file: %v", path, err)
+			}
+			valid, errs := validate(macrosSchema, out)
+			if !valid || len(errs) > 0 {
+				b, err := yaml.Marshal(&out)
+				if err == nil {
+					out = string(b)
+				}
+				return fmt.Errorf("invalid macro definition: \n\n"+
+					"%v in %s: %v", out, path, multierror.Wrap(errs...))
+			}
 			buf, err = renderTmpl(path, buf)
 			if err != nil {
 				return err
@@ -410,7 +425,7 @@ func decodeFilterGroups(resource string, b []byte) ([]FilterGroup, error) {
 	// apply validation to each group
 	// declared in the yml config file
 	for _, group := range rawGroups {
-		valid, errs := validate(filterGroupSchema, group)
+		valid, errs := validate(rulesSchema, group)
 		if !valid || len(errs) > 0 {
 			rawGroup := group
 			b, err := yaml.Marshal(&rawGroup)

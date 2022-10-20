@@ -619,7 +619,7 @@ nextGroup:
 					err := seqState.matchTransition(rule, kevt)
 					if err != nil {
 						matchTransitionErrors.Add(1)
-						log.Warnf("match transition: %v", err)
+						log.Warnf("match transition failure: %v", err)
 					}
 					seqState.addMatch(uint16(i+1), kevt)
 					seqState.addMatch(idx, e)
@@ -638,8 +638,8 @@ nextGroup:
 					log.Warnf("unable to execute %q sequence action: %v", g.group.Name, err)
 				}
 				seqState.clear()
+				return done
 			}
-			return done
 		}
 		var andMatched bool
 		// process include/exclude filter groups. Each of them

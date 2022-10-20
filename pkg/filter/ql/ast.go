@@ -709,6 +709,12 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 				return false
 			}
 			return lhs == rhs
+		case ieq:
+			rhs, ok := rhs.(string)
+			if !ok {
+				return false
+			}
+			return strings.EqualFold(lhs, rhs)
 		case neq:
 			rhs, ok := rhs.(string)
 			if !ok {

@@ -21,6 +21,7 @@ package filter
 import (
 	"errors"
 	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -131,11 +132,11 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 		if kevt.Category != ktypes.Process {
 			return nil, nil
 		}
-		cmdline, err := kevt.Kparams.GetString(kparams.Comm)
+		cmndline, err := kevt.Kparams.GetString(kparams.Comm)
 		if err != nil {
 			return nil, err
 		}
-		return pstypes.SplitArgs(cmdline), nil
+		return cmdline.Split(cmndline), nil
 	case fields.PsCwd:
 		ps := kevt.PS
 		if ps == nil {

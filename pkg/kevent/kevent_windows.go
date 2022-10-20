@@ -41,16 +41,36 @@ func (kevt Kevent) IsNetworkUDP() bool {
 // in the rule sequences.
 func (kevt Kevent) PartialKey() uint64 {
 	switch kevt.Type {
-	case ktypes.WriteFile, ktypes.ReadFile, ktypes.CreateFile:
-		h := fnv.New64()
+	case ktypes.WriteFile, ktypes.ReadFile:
 		b := make([]byte, 12)
+		object, _ := kevt.Kparams.GetUint64(kparams.FileObject)
 
 		binary.LittleEndian.PutUint32(b, kevt.PID)
-		file, _ := kevt.Kparams.GetUint64(kparams.FileObject)
-		binary.LittleEndian.PutUint64(b, file)
-		_, _ = h.Write(b)
+		binary.LittleEndian.PutUint64(b, object)
 
-		return h.Sum64()
+		return fnvHash(b)
+	case ktypes.CreateFile:
+		file, _ := kevt.Kparams.GetString(kparams.FileName)
+		b := make([]byte, 4+len(file))
+
+		binary.LittleEndian.PutUint32(b, kevt.PID)
+		b = append(b, []byte(file)...)
+
+		return fnvHash(b)
+	case ktypes.OpenProcess:
+		b := make([]byte, 4)
+		binary.LittleEndian.PutUint32(b, kevt.PID)
+		pid, _ := kevt.Kparams.GetUint32(kparams.ProcessID)
+
+		binary.LittleEndian.PutUint32(b, kevt.PID)
+		binary.LittleEndian.PutUint32(b, pid)
+		return fnvHash(b)
 	}
 	return 0
+}
+
+func fnvHash(b []byte) uint64 {
+	h := fnv.New64()
+	_, _ = h.Write(b)
+	return h.Sum64()
 }

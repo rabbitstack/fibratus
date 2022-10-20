@@ -25,16 +25,18 @@ import (
 )
 
 func TestRegex(t *testing.T) {
-	call := NewRegex()
+	call1 := NewRegex()
 
-	res, _ := call.Call([]interface{}{`powershell.exe`, `power.*(shell|hell).exe`})
+	res, _ := call1.Call([]interface{}{`powershell.exe`, `power.*(shell|hell).exe`})
 	assert.True(t, res.(bool))
 
-	res1, _ := call.Call([]interface{}{`powershell.exe`, `power.*(shell|hell).dll`, `.*hell.exe`})
+	call2 := NewRegex()
+	res1, _ := call2.Call([]interface{}{`powershell.exe`, `power.*(shell|hell).dll`, `.*hell.exe`})
 	assert.True(t, res1.(bool))
 
+	call3 := NewRegex()
 	for i := 0; i < 10; i++ {
-		res, _ := call.Call([]interface{}{`powershell.exe`, `power.*(shell|hell).dll`, `.*hell.exe`})
+		res, _ := call3.Call([]interface{}{`powershell.exe`, `power.*(shell|hell).dll`, `.*hell.exe`})
 		assert.True(t, res.(bool))
 	}
 }

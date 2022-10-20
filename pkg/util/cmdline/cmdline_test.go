@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package commandline
+package cmdline
 
 import (
 	"github.com/stretchr/testify/assert"

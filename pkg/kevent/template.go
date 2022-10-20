@@ -29,9 +29,7 @@ var Template = `Name:  		{{ .Kevt.Name }}
 Sequence: 		{{ .Kevt.Seq }}
 Process ID:		{{ .Kevt.PID }}
 Thread ID: 		{{ .Kevt.Tid }}
-Cpu: 			{{ .Kevt.CPU }}
 Params:			{{ .Kevt.Kparams }}
-Category: 		{{ .Kevt.Category }}
 
 {{- if .Kevt.PS }}
 

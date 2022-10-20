@@ -1,12 +1,22 @@
 - macro: spawn_process
   expr: kevt.name = 'CreateProcess'
 
+- macro: open_process
+  expr: kevt.name = 'OpenProcess' and ps.access.status = 'success'
+  description: Acquires the local process object
+
 - macro: spawn_msoffice_process
   expr: spawn_process and ps.sibling.exe iin msoffice_binaries
   description: Identifies the execution of the MS Office process
 
 - macro: write_file
   expr: kevt.name = 'WriteFile'
+
+- macro: open_file
+  expr: kevt.name = 'CreateFile' and file.operation = 'open'
+
+- macro: create_file
+  expr: kevt.name = 'CreateFile' and file.operation = 'create'
 
 - macro: query_registry
   expr: kevt.name in ('RegQueryKey', 'RegQueryValue')

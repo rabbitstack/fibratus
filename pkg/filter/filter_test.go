@@ -41,7 +41,8 @@ var cfg = &config.Config{
 		EnableImageKevents:    true,
 		EnableThreadKevents:   true,
 	},
-	PE: pe.Config{Enabled: true},
+	Filters: &config.Filters{},
+	PE:      pe.Config{Enabled: true},
 }
 
 func TestFilterCompile(t *testing.T) {
@@ -128,6 +129,7 @@ func TestFilterRunProcessKevent(t *testing.T) {
 		{`ps.name = 'svchost.exe'`, true},
 		{`ps.name = 'svchot.exe'`, false},
 		{`ps.name = 'mimikatz.exe' or ps.name contains 'svc'`, true},
+		{`ps.name ~= 'SVCHOST.exe'`, true},
 		{`ps.username = 'tor'`, true},
 		{`ps.domain = 'LOCAL'`, true},
 		{`ps.pid = 1023`, true},

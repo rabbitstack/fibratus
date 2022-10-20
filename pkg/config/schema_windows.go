@@ -25,533 +25,557 @@ import (
 
 var schema = `
 {
-	"$schema": "http://json-schema.org/draft-07/schema#",
-	"definitions": {"yara": {"$id": "#yara", "type": "object", "properties": {"enabled": {"type": "boolean"}}}},
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "definitions": {"yara": {"$id": "#yara", "type": "object", "properties": {"enabled": {"type": "boolean"}}}},
 
-	"type": "object",
-	"properties": {
-		"aggregator": {
-			"type": "object",
-			"properties": {
-				"flush-period":		{"type": "string", "minLength": 2, "pattern": "[0-9]+ms|s"},
-				"flush-timeout":	{"type": "string", "minLength": 2, "pattern": "[0-9]+s"}
-			},
-			"additionalProperties": false
-		},
-		"alertsenders": {
-			"type": "object",
-			"anyOf": [{
-					"properties": {
-						"mail": {
-							"type": "object",
-							"properties": {
-								"enabled": 		{"type": "boolean"},
-								"host": 		{"type": "string"},
-								"port": 		{"type": "number"},
-								"user": 		{"type": "string"},
-								"password": 	{"type": "string"},
-								"from": 		{"type": "string"},
-								"to": 			{"type": "array", "items": {"type": "string", "format": "email"}}
-							},
-							"if": {
-								"properties": {"enabled": { "const": true }}
-							},
-							"then": {
-								"properties": {
-									"from": {"type": "string", "format": "email"},
-									"to": 	{"type": "array", "minItems": 1, "items": {"type": "string", "format": "email"}}
-								}
-							},
-							"additionalProperties": false
-						},
-						"slack": {
-							"type": "object",
-							"properties": {
-								"enabled": 		{"type": "boolean"},
-								"url": 			{"type": "string"},
-								"workspace": 	{"type": "string"},
-								"channel": 		{"type": "string"},
-								"emoji": 		{"type": "string"}
-							},
-							"if": {
-								"properties": {"enabled": { "const": true }}
-							},
-							"then": {
-								"properties": {"url": {"type": "string", "format": "uri", "minLength": 1, "pattern": "^(https?|http?)://"}}
-							},
-							"additionalProperties": false
-						}
-					},
-					"additionalProperties": false
-				}
-			]
-		},
-		"api": {
-			"type": "object",
-			"properties": {
-				"transport": 		{"type": "string", "minLength": 3},
-				"timeout":			{"type": "string", "minLength": 2, "pattern": "[0-9]+s"}
-			},
-			"additionalProperties": false
-		},
-		"config-file": 		{"type": "string"},
-		"debug-privilege":  {"type": "boolean"},
-		"handle": {
-			"type": "object",
-			"properties": {
-				"init-snapshot": 		{"type": "boolean"}
-			},
-			"additionalProperties": false
-		},
-		"kcap": {
-			"type": "object",
-			"properties": {
-				"file":				{"type": "string"}
-			},
-			"additionalProperties": false
-		},
-		"filament": {
-			"type": "object",
-			"properties": {
-				"name":				{"type": "string"},
-				"path":				{"type": "string"},
-				"flush-period":		{"type": "string",  "minLength": 2, "pattern": "[0-9]+ms|s"}
-			},
-			"additionalProperties": false
-		},
-		"filters": {
-			"type": "object",
-			"properties": {
-				"rules": {
-					"type": "object",
-					"properties": {
-						"from-paths": 	{"type": ["array", "null"], "items": [{"type": "string", "minLength": 4}]},
-						"from-urls":	{"type": ["array", "null"], "items": [{"type": "string", "minLength": 8}]}
-					},
-					"additionalProperties": false
-				},
-				"macros": {
-					"type": "object",
-					"properties": {
-						"from-paths": 	{"type": ["array", "null"], "items": [{"type": "string", "minLength": 4}]}
-					},
-					"additionalProperties": false
-				}
-			},
-			"additionalProperties": false
-		},
-		"kevent": {
-			"type": "object",
-			"properties": {
-				"serialize-threads":	{"type": "boolean"},
-				"serialize-images":		{"type": "boolean"},
-				"serialize-handles":	{"type": "boolean"},
-				"serialize-pe":			{"type": "boolean"},
-				"serialize-envs":		{"type": "boolean"}
-			},
-			"additionalProperties": false
-		},
-		"kstream": {
-			"type": "object",
-			"properties": {
-				"enable-thread": 	{"type": "boolean"},
-				"enable-image": 	{"type": "boolean"},
-				"enable-registry": 	{"type": "boolean"},
-				"enable-fileio": 	{"type": "boolean"},
-				"enable-handle": 	{"type": "boolean"},
-				"enable-net": 		{"type": "boolean"},
-				"raw-event-parsing":{"type": "boolean"},
-				"min-buffers": 		{"type": "integer", "minimum": 1, "maximum": {{ .MinBuffers }}},
-				"max-buffers": 		{"type": "integer", "minimum": 2, "maximum": {{ .MaxBuffers }}},
-				"buffer-size":		{"type": "integer", "maximum": {{ .MaxBufferSize }}},
+    "type": "object",
+    "properties": {
+        "aggregator": {
+            "type": "object",
+            "properties": {
+                "flush-period":		{"type": "string", "minLength": 2, "pattern": "[0-9]+ms|s"},
+                "flush-timeout":	{"type": "string", "minLength": 2, "pattern": "[0-9]+s"}
+            },
+            "additionalProperties": false
+        },
+        "alertsenders": {
+            "type": "object",
+            "anyOf": [{
+                    "properties": {
+                        "mail": {
+                            "type": "object",
+                            "properties": {
+                                "enabled": 		{"type": "boolean"},
+                                "host": 		{"type": "string"},
+                                "port": 		{"type": "number"},
+                                "user": 		{"type": "string"},
+                                "password": 	{"type": "string"},
+                                "from": 		{"type": "string"},
+                                "to": 			{"type": "array", "items": {"type": "string", "format": "email"}}
+                            },
+                            "if": {
+                                "properties": {"enabled": { "const": true }}
+                            },
+                            "then": {
+                                "properties": {
+                                    "from": {"type": "string", "format": "email"},
+                                    "to": 	{"type": "array", "minItems": 1, "items": {"type": "string", "format": "email"}}
+                                }
+                            },
+                            "additionalProperties": false
+                        },
+                        "slack": {
+                            "type": "object",
+                            "properties": {
+                                "enabled": 		{"type": "boolean"},
+                                "url": 			{"type": "string"},
+                                "workspace": 	{"type": "string"},
+                                "channel": 		{"type": "string"},
+                                "emoji": 		{"type": "string"}
+                            },
+                            "if": {
+                                "properties": {"enabled": { "const": true }}
+                            },
+                            "then": {
+                                "properties": {"url": {"type": "string", "format": "uri", "minLength": 1, "pattern": "^(https?|http?)://"}}
+                            },
+                            "additionalProperties": false
+                        }
+                    },
+                    "additionalProperties": false
+                }
+            ]
+        },
+        "api": {
+            "type": "object",
+            "properties": {
+                "transport": 		{"type": "string", "minLength": 3},
+                "timeout":			{"type": "string", "minLength": 2, "pattern": "[0-9]+s"}
+            },
+            "additionalProperties": false
+        },
+        "config-file": 		{"type": "string"},
+        "debug-privilege":  {"type": "boolean"},
+        "handle": {
+            "type": "object",
+            "properties": {
+                "init-snapshot": 		{"type": "boolean"}
+            },
+            "additionalProperties": false
+        },
+        "kcap": {
+            "type": "object",
+            "properties": {
+                "file":				{"type": "string"}
+            },
+            "additionalProperties": false
+        },
+        "filament": {
+            "type": "object",
+            "properties": {
+                "name":				{"type": "string"},
+                "path":				{"type": "string"},
+                "flush-period":		{"type": "string",  "minLength": 2, "pattern": "[0-9]+ms|s"}
+            },
+            "additionalProperties": false
+        },
+        "filters": {
+            "type": "object",
+            "properties": {
+                "rules": {
+                    "type": "object",
+                    "properties": {
+                        "from-paths": 	{"type": ["array", "null"], "items": [{"type": "string", "minLength": 4}]},
+                        "from-urls":	{"type": ["array", "null"], "items": [{"type": "string", "minLength": 8}]}
+                    },
+                    "additionalProperties": false
+                },
+                "macros": {
+                    "type": "object",
+                    "properties": {
+                        "from-paths": 	{"type": ["array", "null"], "items": [{"type": "string", "minLength": 4}]}
+                    },
+                    "additionalProperties": false
+                }
+            },
+            "additionalProperties": false
+        },
+        "kevent": {
+            "type": "object",
+            "properties": {
+                "serialize-threads":	{"type": "boolean"},
+                "serialize-images":		{"type": "boolean"},
+                "serialize-handles":	{"type": "boolean"},
+                "serialize-pe":			{"type": "boolean"},
+                "serialize-envs":		{"type": "boolean"}
+            },
+            "additionalProperties": false
+        },
+        "kstream": {
+            "type": "object",
+            "properties": {
+                "enable-thread": 	{"type": "boolean"},
+                "enable-image": 	{"type": "boolean"},
+                "enable-registry": 	{"type": "boolean"},
+                "enable-fileio": 	{"type": "boolean"},
+                "enable-handle": 	{"type": "boolean"},
+                "enable-net": 		{"type": "boolean"},
+                "raw-event-parsing":{"type": "boolean"},
+                "min-buffers": 		{"type": "integer", "minimum": 1, "maximum": {{ .MinBuffers }}},
+                "max-buffers": 		{"type": "integer", "minimum": 2, "maximum": {{ .MaxBuffers }}},
+                "buffer-size":		{"type": "integer", "maximum": {{ .MaxBufferSize }}},
                 "flush-interval":	{"type": "string", "minLength": 2, "pattern": "[0-9]+s"},
-				"blacklist":		{
-					"type": "object",
-					"properties":	{
-						"events":	{"type": "array", "items": [{"type": "string", "enum": ["CreateProcess", "CreateThread", "TerminateProcess", "TerminateThread", "OpenProcess", "OpenThread", "LoadImage", "UnloadImage", "CreateFile", "CloseFile", "ReadFile", "WriteFile", "DeleteFile", "RenameFile", "SetFileInformation", "EnumDirectory", "RegCreateKey", "RegOpenKey", "RegSetValue", "RegQueryValue", "RegQueryKey", "RegDeleteKey", "RegDeleteValue", "Accept", "Send", "Recv", "Connect", "Disconnect", "Reconnect", "Retransmit", "CreateHandle", "CloseHandle"]}]},
-						"images":	{"type": "array", "items": [{"type": "string", "minLength": 1}]}
-					},
-					"additionalProperties": false
-				}
-			},
-			"additionalProperties": false
-		},
-		"logging": {
-			"type": "object",
-			"properties": {
-				"level": 			{"type": "string"},
-				"max-age":			{"type": "integer"},
-				"max-backups":		{"type": "integer", "minimum": 1},
-				"max-size":			{"type": "integer", "minimum": 1},
-				"formatter":		{"type": "string", "enum": ["json", "text"]},
-				"path":				{"type": "string"},
-				"log-stdout":		{"type": "boolean"}
-			},
-			"additionalProperties": false
-		},
-		"output": {
-			"type": "object",
-			"anyOf": [{
-					"properties": {
-						"console": {
-							"type": "object",
-							"properties": {
-								"enabled":		{"type": "boolean"},
-								"format": 		{"type": "string", "enum": ["json", "pretty"]},
-								"template": 	{"type": "string"},
-								"kv-delimiter": {"type": "string"}
-							},
-							"additionalProperties": false
-						},
-						"elasticsearch": {
-							"type": "object",
-							"properties": {
-								"enabled":					{"type": "boolean"},
-								"servers": 					{"type": "array", "items": [{"type": "string", "minItems": 1, "format": "uri", "minLength": 1, "maxLength": 255, "pattern": "^(https?|http?)://"}]},
-								"timeout": 					{"type": "string"},
-								"index-name":				{"type": "string", "minLength": 1},
-								"template-config":			{"type": "string"},
-								"template-name":			{"type": "string", "minLength": 1},
-								"healthcheck": 				{"type": "boolean"},
-								"bulk-workers":				{"type": "integer", "minimum": 1},
-								"sniff": 					{"type": "boolean"},
-								"trace-log": 				{"type": "boolean"},
-								"gzip-compression": 		{"type": "boolean"},
-								"healthcheck-interval":		{"type": "string", "minLength": 2, "pattern": "[0-9]+s|m}"},
-								"healthcheck-timeout":		{"type": "string", "minLength": 2, "pattern": "[0-9]+s|m}"},
-								"flush-period":				{"type": "string", "minLength": 2, "pattern": "[0-9]+s|m}"},
-								"username": 				{"type": "string"},
-								"password": 				{"type": "string"},
-								"tls-key": 					{"type": "string"},
-								"tls-cert": 				{"type": "string"},
-								"tls-ca": 					{"type": "string"},
-								"tls-insecure-skip-verify": {"type": "boolean"}
-							},
-							"additionalProperties": false
-						},
-						"amqp": {
-							"type": "object",
-							"properties": {
-								"enabled":					{"type": "boolean"},
-								"url": 						{"type": "string", "format": "uri", "minLength": 1, "maxLength": 255, "pattern": "^(amqps?|amqp?)://"},
-								"timeout": 					{"type": "string", "minLength": 2, "pattern": "[0-9]+s|m}"},
-								"exchange": 				{"type": "string", "minLength": 1},
-								"exchange-type": 			{"type": "string", "enum": ["direct", "topic", "fanout", "header", "x-consistent-hash"]},
-								"routing-key": 				{"type": "string", "minLength": 1},
-								"delivery-mode": 			{"type": "string", "enum": ["transient", "persistent"]},
-								"vhost": 					{"type": "string", "minLength": 1},
-								"passive": 					{"type": "boolean"},
-								"durable": 					{"type": "boolean"},
-								"username": 				{"type": "string"},
-								"password": 				{"type": "string"},
-								"tls-key": 					{"type": "string"},
-								"tls-cert": 				{"type": "string"},
-								"tls-ca": 					{"type": "string"},
-								"tls-insecure-skip-verify": {"type": "boolean"},
-								"headers":					{"type": "object", "additionalProperties": true}
-							},
-							"additionalProperties": false
-						},
-						"http": {
-							"type": "object",
-							"properties": {
-								"enabled":					{"type": "boolean"},
-								"endpoints": 				{"type": "array", "items": [{"type": "string", "minItems": 1, "format": "uri", "minLength": 1, "maxLength": 255, "pattern": "^(https?|http?)://"}]},
-								"timeout": 					{"type": "string", "minLength": 2, "pattern": "[0-9]+s|m}"},
-								"method": 					{"type": "string", "enum": ["POST", "PUT"]},
-								"serializer": 				{"type": "string", "enum": ["json"]},
-								"enable-gzip": 				{"type": "boolean"},
-								"proxy-url": 				{"type": "string"},
-								"proxy-username": 			{"type": "string"},
-								"proxy-password": 			{"type": "string"},
-								"username": 				{"type": "string"},
-								"password": 				{"type": "string"},
-								"tls-key": 					{"type": "string"},
-								"tls-cert": 				{"type": "string"},
-								"tls-ca": 					{"type": "string"},
-								"tls-insecure-skip-verify": {"type": "boolean"},
-								"headers":					{"type": "object", "additionalProperties": true}
-							},
-							"additionalProperties": false
-						},
-						"eventlog": {
-							"type": "object",
-							"properties": {
-								"enabled":					{"type": "boolean"},
-								"level": 					{"type": "string", "enum": ["INFO", "info", "warn", "warning", "WARN", "WARNING", "error", "erro", "ERROR", "ERRO"]},
-								"remote-host": 				{"type": "string"},
-								"template": 				{"type": "string"}
-							},
-							"additionalProperties": false
-						}
-					},
-					"additionalProperties": false
-				}
-			]
-		},
-		"pe": {
-			"type": "object",
-			"properties": {
-				"enabled":			{"type": "boolean"},
-				"read-resources":	{"type": "boolean"},
-				"read-symbols":		{"type": "boolean"},
-				"read-sections":	{"type": "boolean"},
-				"excluded-images":  {"type": "array", "items": [{"type": "string"}]}
-			},
-			"additionalProperties": false
-		},
-		"transformers": {
-			"type": "object",
-			"anyOf": [{
-					"properties": {
-						"remove": {
-							"type": "object",
-							"properties": {
-								"enabled":  {"type": "boolean"},
-								"kparams": 	{"type": "array", "items": [{"type": "string"}]}
-							},
-							"if": {
-								"properties": {"enabled": { "const": true }}
-							},
-							"then": {
-								"properties": {"kparams": 	{"type": "array", "minItems": 1, "items": [{"type": "string"}]}}
-							},
-							"additionalProperties": false
-						},
-						"rename": {
-							"type": "object",
-							"properties": {
-								"enabled":  {"type": "boolean"},
-								"kparams": 	{"type": "array", "items": [
-														{
-															"type": "object",
-															"properties": {
-																"old": {"type": "string", "minLength": 1},
-																"new": {"type": "string", "minLength": 1}
-															},
-															"additionalProperties": false
-														}
-								]}
-							},
-							"if": {
-								"properties": {"enabled": { "const": true }}
-							},
-							"then": {
-								"properties": {"kparams": {"minItems": 1}}
-							},
-							"additionalProperties": false
-						},
-						"replace": {
-							"type": "object",
-							"properties": {
-								"enabled":  		{"type": "boolean"},
-								"replacements": 	{"type": "array", "items": [
-														{
-															"type": "object",
-															"properties": {
-																"kparam": 	{"type": "string", "minLength": 1},
-																"old": 		{"type": "string", "minLength": 1},
-																"new": 		{"type": "string"}
-															},
-															"additionalProperties": false
-														}
-								]}
-							},
-							"if": {
-								"properties": {"enabled": { "const": true }}
-							},
-							"then": {
-								"properties": {"replacements": 	{"minItems": 1}}
-							},
-							"additionalProperties": false
-						},
-						"tags": {
-							"type": "object",
-							"properties": {
-								"enabled":  {"type": "boolean"},
-								"tags": 	{"type": "array", "items": [
-														{
-															"type": "object",
-															"properties": {
-																"key": 	 {"type": "string", "minLength": 1},
-																"value": {"type": "string", "minLength": 1}
-															},
-															"additionalProperties": false
-														}
-								]}
-							},
-							"if": {
-								"properties": {"enabled": { "const": true }}
-							},
-							"then": {
-								"properties": {"tags": 	{"minItems": 1}}
-							},
-							"additionalProperties": false
-						},
-						"trim": {
-							"type": "object",
-							"properties": {
-								"enabled":  		{"type": "boolean"},
-								"prefixes": 		{"type": "array", "items": [
-														{
-															"type": "object",
-															"properties": {
-																"kparam": 	{"type": "string", "minLength": 1},
-																"trim": 	{"type": "string", "minLength": 1}
-															},
-															"additionalProperties": false
-														}
-								]},
-								"suffixes": 		{"type": "array", "items": [
-														{
-															"type": "object",
-															"properties": {
-																"kparam": 	{"type": "string", "minLength": 1},
-																"trim": 	{"type": "string", "minLength": 1}
-															},
-															"additionalProperties": false
-														}
-								]}
-							},
-							"if": {
-								"properties": {"enabled": { "const": true }}
-							},
-							"then": {
-								"properties": {"suffixes": 	{"minItems": 1}, "prefixes": {"minItems": 1}}
-							},
-							"additionalProperties": false
-						}
-					},
-					"additionalProperties": false
-				}
-			]
-		},
-		"yara": {
-			"type": "object",
-			"properties": {
-				"enabled":			{"type": "boolean"},
-				"rule":				{
-					"type": "object",
-					"anyOf": [{
-						"properties": {
-							"paths":  {"type": "array", "items": [
-											{
-												"type": "object",
-												"properties": {
-													"path": 		{"type": "string"},
-													"namespace": 	{"type": "string"}
-												},
-												"if": {
-													"properties": {"enabled": {"$ref": "#yara", "const": true }}
-												},
-												"then": {
-													"properties": {"path": 	{"minLength": 0}}
-												},
-												"additionalProperties": false
-											}]
-                	                     },
-							"strings": 	{"type": "array"}
-						},
-						"additionalProperties": false
-					}]
-				},
-				"alert-via":		{"type": "string", "enum": ["slack", "mail"]},
-				"alert-template":   {
-						"type": 		"object",
-						"properties": {
-							"text":	 	{"type": "string"},
-							"title": 	{"type": "string"}
-						},
-						"additionalProperties": false
-				},
-				"fastscan":			{"type": "boolean"},
-				"skip-files":		{"type": "boolean"},
-				"scan-timeout":		{"type": "string", "minLength": 2, "pattern": "[0-9]+s"},
-				"excluded-files":	{"type": "array", "items": [{"type": "string", "minLength": 1}]},
-				"excluded-procs":	{"type": "array", "items": [{"type": "string", "minLength": 1}]}
-			},
-			"additionalProperties": false
-		}
-	},
-	"additionalProperties": false
+                "blacklist":		{
+                    "type": "object",
+                    "properties":	{
+                        "events":	{"type": "array", "items": [{"type": "string", "enum": ["CreateProcess", "CreateThread", "TerminateProcess", "TerminateThread", "OpenProcess", "OpenThread", "LoadImage", "UnloadImage", "CreateFile", "CloseFile", "ReadFile", "WriteFile", "DeleteFile", "RenameFile", "SetFileInformation", "EnumDirectory", "RegCreateKey", "RegOpenKey", "RegSetValue", "RegQueryValue", "RegQueryKey", "RegDeleteKey", "RegDeleteValue", "Accept", "Send", "Recv", "Connect", "Disconnect", "Reconnect", "Retransmit", "CreateHandle", "CloseHandle"]}]},
+                        "images":	{"type": "array", "items": [{"type": "string", "minLength": 1}]}
+                    },
+                    "additionalProperties": false
+                }
+            },
+            "additionalProperties": false
+        },
+        "logging": {
+            "type": "object",
+            "properties": {
+                "level": 			{"type": "string"},
+                "max-age":			{"type": "integer"},
+                "max-backups":		{"type": "integer", "minimum": 1},
+                "max-size":			{"type": "integer", "minimum": 1},
+                "formatter":		{"type": "string", "enum": ["json", "text"]},
+                "path":				{"type": "string"},
+                "log-stdout":		{"type": "boolean"}
+            },
+            "additionalProperties": false
+        },
+        "output": {
+            "type": "object",
+            "anyOf": [{
+                    "properties": {
+                        "console": {
+                            "type": "object",
+                            "properties": {
+                                "enabled":		{"type": "boolean"},
+                                "format": 		{"type": "string", "enum": ["json", "pretty"]},
+                                "template": 	{"type": "string"},
+                                "kv-delimiter": {"type": "string"}
+                            },
+                            "additionalProperties": false
+                        },
+                        "elasticsearch": {
+                            "type": "object",
+                            "properties": {
+                                "enabled":					{"type": "boolean"},
+                                "servers": 					{"type": "array", "items": [{"type": "string", "minItems": 1, "format": "uri", "minLength": 1, "maxLength": 255, "pattern": "^(https?|http?)://"}]},
+                                "timeout": 					{"type": "string"},
+                                "index-name":				{"type": "string", "minLength": 1},
+                                "template-config":			{"type": "string"},
+                                "template-name":			{"type": "string", "minLength": 1},
+                                "healthcheck": 				{"type": "boolean"},
+                                "bulk-workers":				{"type": "integer", "minimum": 1},
+                                "sniff": 					{"type": "boolean"},
+                                "trace-log": 				{"type": "boolean"},
+                                "gzip-compression": 		{"type": "boolean"},
+                                "healthcheck-interval":		{"type": "string", "minLength": 2, "pattern": "[0-9]+s|m}"},
+                                "healthcheck-timeout":		{"type": "string", "minLength": 2, "pattern": "[0-9]+s|m}"},
+                                "flush-period":				{"type": "string", "minLength": 2, "pattern": "[0-9]+s|m}"},
+                                "username": 				{"type": "string"},
+                                "password": 				{"type": "string"},
+                                "tls-key": 					{"type": "string"},
+                                "tls-cert": 				{"type": "string"},
+                                "tls-ca": 					{"type": "string"},
+                                "tls-insecure-skip-verify": {"type": "boolean"}
+                            },
+                            "additionalProperties": false
+                        },
+                        "amqp": {
+                            "type": "object",
+                            "properties": {
+                                "enabled":					{"type": "boolean"},
+                                "url": 						{"type": "string", "format": "uri", "minLength": 1, "maxLength": 255, "pattern": "^(amqps?|amqp?)://"},
+                                "timeout": 					{"type": "string", "minLength": 2, "pattern": "[0-9]+s|m}"},
+                                "exchange": 				{"type": "string", "minLength": 1},
+                                "exchange-type": 			{"type": "string", "enum": ["direct", "topic", "fanout", "header", "x-consistent-hash"]},
+                                "routing-key": 				{"type": "string", "minLength": 1},
+                                "delivery-mode": 			{"type": "string", "enum": ["transient", "persistent"]},
+                                "vhost": 					{"type": "string", "minLength": 1},
+                                "passive": 					{"type": "boolean"},
+                                "durable": 					{"type": "boolean"},
+                                "username": 				{"type": "string"},
+                                "password": 				{"type": "string"},
+                                "tls-key": 					{"type": "string"},
+                                "tls-cert": 				{"type": "string"},
+                                "tls-ca": 					{"type": "string"},
+                                "tls-insecure-skip-verify": {"type": "boolean"},
+                                "headers":					{"type": "object", "additionalProperties": true}
+                            },
+                            "additionalProperties": false
+                        },
+                        "http": {
+                            "type": "object",
+                            "properties": {
+                                "enabled":					{"type": "boolean"},
+                                "endpoints": 				{"type": "array", "items": [{"type": "string", "minItems": 1, "format": "uri", "minLength": 1, "maxLength": 255, "pattern": "^(https?|http?)://"}]},
+                                "timeout": 					{"type": "string", "minLength": 2, "pattern": "[0-9]+s|m}"},
+                                "method": 					{"type": "string", "enum": ["POST", "PUT"]},
+                                "serializer": 				{"type": "string", "enum": ["json"]},
+                                "enable-gzip": 				{"type": "boolean"},
+                                "proxy-url": 				{"type": "string"},
+                                "proxy-username": 			{"type": "string"},
+                                "proxy-password": 			{"type": "string"},
+                                "username": 				{"type": "string"},
+                                "password": 				{"type": "string"},
+                                "tls-key": 					{"type": "string"},
+                                "tls-cert": 				{"type": "string"},
+                                "tls-ca": 					{"type": "string"},
+                                "tls-insecure-skip-verify": {"type": "boolean"},
+                                "headers":					{"type": "object", "additionalProperties": true}
+                            },
+                            "additionalProperties": false
+                        },
+                        "eventlog": {
+                            "type": "object",
+                            "properties": {
+                                "enabled":					{"type": "boolean"},
+                                "level": 					{"type": "string", "enum": ["INFO", "info", "warn", "warning", "WARN", "WARNING", "error", "erro", "ERROR", "ERRO"]},
+                                "remote-host": 				{"type": "string"},
+                                "template": 				{"type": "string"}
+                            },
+                            "additionalProperties": false
+                        }
+                    },
+                    "additionalProperties": false
+                }
+            ]
+        },
+        "pe": {
+            "type": "object",
+            "properties": {
+                "enabled":			{"type": "boolean"},
+                "read-resources":	{"type": "boolean"},
+                "read-symbols":		{"type": "boolean"},
+                "read-sections":	{"type": "boolean"},
+                "excluded-images":  {"type": "array", "items": [{"type": "string"}]}
+            },
+            "additionalProperties": false
+        },
+        "transformers": {
+            "type": "object",
+            "anyOf": [{
+                    "properties": {
+                        "remove": {
+                            "type": "object",
+                            "properties": {
+                                "enabled":  {"type": "boolean"},
+                                "kparams": 	{"type": "array", "items": [{"type": "string"}]}
+                            },
+                            "if": {
+                                "properties": {"enabled": { "const": true }}
+                            },
+                            "then": {
+                                "properties": {"kparams": 	{"type": "array", "minItems": 1, "items": [{"type": "string"}]}}
+                            },
+                            "additionalProperties": false
+                        },
+                        "rename": {
+                            "type": "object",
+                            "properties": {
+                                "enabled":  {"type": "boolean"},
+                                "kparams": 	{"type": "array", "items": [
+                                                        {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "old": {"type": "string", "minLength": 1},
+                                                                "new": {"type": "string", "minLength": 1}
+                                                            },
+                                                            "additionalProperties": false
+                                                        }
+                                ]}
+                            },
+                            "if": {
+                                "properties": {"enabled": { "const": true }}
+                            },
+                            "then": {
+                                "properties": {"kparams": {"minItems": 1}}
+                            },
+                            "additionalProperties": false
+                        },
+                        "replace": {
+                            "type": "object",
+                            "properties": {
+                                "enabled":  		{"type": "boolean"},
+                                "replacements": 	{"type": "array", "items": [
+                                                        {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "kparam": 	{"type": "string", "minLength": 1},
+                                                                "old": 		{"type": "string", "minLength": 1},
+                                                                "new": 		{"type": "string"}
+                                                            },
+                                                            "additionalProperties": false
+                                                        }
+                                ]}
+                            },
+                            "if": {
+                                "properties": {"enabled": { "const": true }}
+                            },
+                            "then": {
+                                "properties": {"replacements": 	{"minItems": 1}}
+                            },
+                            "additionalProperties": false
+                        },
+                        "tags": {
+                            "type": "object",
+                            "properties": {
+                                "enabled":  {"type": "boolean"},
+                                "tags": 	{"type": "array", "items": [
+                                                        {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "key": 	 {"type": "string", "minLength": 1},
+                                                                "value": {"type": "string", "minLength": 1}
+                                                            },
+                                                            "additionalProperties": false
+                                                        }
+                                ]}
+                            },
+                            "if": {
+                                "properties": {"enabled": { "const": true }}
+                            },
+                            "then": {
+                                "properties": {"tags": 	{"minItems": 1}}
+                            },
+                            "additionalProperties": false
+                        },
+                        "trim": {
+                            "type": "object",
+                            "properties": {
+                                "enabled":  		{"type": "boolean"},
+                                "prefixes": 		{"type": "array", "items": [
+                                                        {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "kparam": 	{"type": "string", "minLength": 1},
+                                                                "trim": 	{"type": "string", "minLength": 1}
+                                                            },
+                                                            "additionalProperties": false
+                                                        }
+                                ]},
+                                "suffixes": 		{"type": "array", "items": [
+                                                        {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "kparam": 	{"type": "string", "minLength": 1},
+                                                                "trim": 	{"type": "string", "minLength": 1}
+                                                            },
+                                                            "additionalProperties": false
+                                                        }
+                                ]}
+                            },
+                            "if": {
+                                "properties": {"enabled": { "const": true }}
+                            },
+                            "then": {
+                                "properties": {"suffixes": 	{"minItems": 1}, "prefixes": {"minItems": 1}}
+                            },
+                            "additionalProperties": false
+                        }
+                    },
+                    "additionalProperties": false
+                }
+            ]
+        },
+        "yara": {
+            "type": "object",
+            "properties": {
+                "enabled":			{"type": "boolean"},
+                "rule":				{
+                    "type": "object",
+                    "anyOf": [{
+                        "properties": {
+                            "paths":  {"type": "array", "items": [
+                                            {
+                                                "type": "object",
+                                                "properties": {
+                                                    "path": 		{"type": "string"},
+                                                    "namespace": 	{"type": "string"}
+                                                },
+                                                "if": {
+                                                    "properties": {"enabled": {"$ref": "#yara", "const": true }}
+                                                },
+                                                "then": {
+                                                    "properties": {"path": 	{"minLength": 0}}
+                                                },
+                                                "additionalProperties": false
+                                            }]
+                                         },
+                            "strings": 	{"type": "array"}
+                        },
+                        "additionalProperties": false
+                    }]
+                },
+                "alert-via":		{"type": "string", "enum": ["slack", "mail"]},
+                "alert-template":   {
+                        "type": 		"object",
+                        "properties": {
+                            "text":	 	{"type": "string"},
+                            "title": 	{"type": "string"}
+                        },
+                        "additionalProperties": false
+                },
+                "fastscan":			{"type": "boolean"},
+                "skip-files":		{"type": "boolean"},
+                "scan-timeout":		{"type": "string", "minLength": 2, "pattern": "[0-9]+s"},
+                "excluded-files":	{"type": "array", "items": [{"type": "string", "minLength": 1}]},
+                "excluded-procs":	{"type": "array", "items": [{"type": "string", "minLength": 1}]}
+            },
+            "additionalProperties": false
+        }
+    },
+    "additionalProperties": false
 }
 `
 
-var filterGroupSchema = `
+var rulesSchema = `
 {
-	"$schema": "http://json-schema.org/draft-07/schema#",
-    "definitions": {"rules": {"$id": "#rules", "type": "object", "type": "array",
-			"items":
-				{
-					"type": "object",
-					"properties": {
-						"name": 		{"type": "string", "minLength": 3},
-						"labels":       {
-							"type": "object",
-							"additionalProperties": {"type": "string"}
-						},
-						"description": 	{"type": "string", "minLength": 8},
-						"def": 			{"type": "string", "minLength": 3},
-						"condition": 	{"type": "string", "minLength": 3},
-						"action": 		{"type": "string"},
-						"max-span": 	{"type": "string", "minLength": 2, "pattern": "[0-9]+ms|s|m|h|d"}
-					},
-					"oneOf": [
-						{"required": ["def"]},
-						{"required": ["condition"]}
-					],
-					"required": ["name"],
-					"minItems": 1,
-					"additionalProperties": false
-				}}},
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "definitions": {"rules": {"$id": "#rules", "type": "array",
+            "items":
+                {
+                    "type": "object",
+                    "properties": {
+                        "name": 		{"type": "string", "minLength": 3},
+                        "labels":       {
+                            "type": "object",
+                            "additionalProperties": {"type": "string"}
+                        },
+                        "description": 	{"type": "string", "minLength": 8},
+                        "def": 			{"type": "string", "minLength": 3},
+                        "condition": 	{"type": "string", "minLength": 3},
+                        "action": 		{"type": "string"},
+                        "max-span": 	{"type": "string", "minLength": 2, "pattern": "[0-9]+ms|s|m|h|d"}
+                    },
+                    "oneOf": [
+                        {"required": ["def"]},
+                        {"required": ["condition"]}
+                    ],
+                    "required": ["name"],
+                    "minItems": 1,
+                    "additionalProperties": false
+                }
+            }
+        },
+    "type": "object",
+    "properties": {
+        "group": {"type": "string", "minLength": 1},
+        "selector": {
+            "type": "object",
+            "properties": {
+                "type":		{"type": "string", "enum": ["CreateProcess", "CreateThread", "TerminateProcess", "TerminateThread", "OpenProcess", "OpenThread", "LoadImage", "UnloadImage", "CreateFile", "CloseFile", "ReadFile", "WriteFile", "DeleteFile", "RenameFile", "SetFileInformation", "EnumDirectory", "RegCreateKey", "RegOpenKey", "RegSetValue", "RegQueryValue", "RegQueryKey", "RegDeleteKey", "RegDeleteValue", "Accept", "Send", "Recv", "Connect", "Disconnect", "Reconnect", "Retransmit", "CreateHandle", "CloseHandle"]},
+                "category": {"type": "string", "enum": ["registry", "file", "net", "process", "thread", "image", "handle"]}
+            },
+            "additionalProperties": false,
+            "oneOf": [
+                {"required": ["type"]},
+                {"required": ["category"]}
+            ]
+        },
+        "description":  {"type": "string"},
+        "labels":       {
+            "type": "object",
+            "additionalProperties": {"type": "string"}
+        },
+        "enabled":  	{"type": "boolean"},
+        "policy":   	{"type": "string", "enum": ["include", "exclude", "sequence", "INCLUDE", "EXCLUDE", "SEQUENCE"]},
+        "relation": 	{"type": "string", "enum": ["or", "and", "OR", "AND"]},
+        "tags":			{"type": "array", "items": [{"type": "string", "minLength": 1}]},
+        "action":       {"type": "string"},
+        "from-strings": {"$ref": "#rules"},
+        "rules": 		{"$ref": "#rules"}
+    },
+    "if": {
+        "properties": {"policy": {"const": "sequence" }}
+    },
+    "then": {
+        "required": ["group"],
+        "oneOf": [
+            {"required": ["from-strings"]},
+            {"required": ["rules"]}
+        ]
+    },
+    "else": {
+        "required": ["group", "selector"],
+        "oneOf": [
+            {"required": ["from-strings"]},
+            {"required": ["rules"]}
+        ]
+    },
+    "additionalProperties": false
+}
+`
 
-
-	"type": "object",
-	"properties": {
-		"group": {"type": "string", "minLength": 1},
-		"selector": {
-			"type": "object",
-			"properties": {
-				"type":		{"type": "string", "enum": ["CreateProcess", "CreateThread", "TerminateProcess", "TerminateThread", "OpenProcess", "OpenThread", "LoadImage", "UnloadImage", "CreateFile", "CloseFile", "ReadFile", "WriteFile", "DeleteFile", "RenameFile", "SetFileInformation", "EnumDirectory", "RegCreateKey", "RegOpenKey", "RegSetValue", "RegQueryValue", "RegQueryKey", "RegDeleteKey", "RegDeleteValue", "Accept", "Send", "Recv", "Connect", "Disconnect", "Reconnect", "Retransmit", "CreateHandle", "CloseHandle"]},
-				"category": {"type": "string", "enum": ["registry", "file", "net", "process", "thread", "image", "handle"]}
-			},
-			"additionalProperties": false,
-			"oneOf": [
-				{"required": ["type"]},
-				{"required": ["category"]}
-			]
-		},
-		"description":  {"type": "string"},
-		"labels":       {
-			"type": "object",
-			"additionalProperties": {"type": "string"}
-		},
-		"enabled":  	{"type": "boolean"},
-		"policy":   	{"type": "string", "enum": ["include", "exclude", "sequence", "INCLUDE", "EXCLUDE", "SEQUENCE"]},
-		"relation": 	{"type": "string", "enum": ["or", "and", "OR", "AND"]},
-		"tags":			{"type": "array", "items": [{"type": "string", "minLength": 1}]},
-		"action":       {"type": "string"},
-		"from-strings": {"$ref": "#rules"},
-		"rules": 		{"$ref": "#rules"}
-	},
-	"if": {
-		"properties": {"policy": {"const": "sequence" }}
-	},
-	"then": {
-		"required": ["group"],
+var macrosSchema = `
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "array",
+    "items":
+    {
+        "type": "object",
+        "properties": {
+            "macro": 		{"type": "string", "minLength": 2, "pattern": "^[A-Za-z0-9_-]+$"},
+            "description":  {"type": "string"},
+            "expr":  		{"type": "string", "minLength": 5},
+            "list":			{"type": "array", "items": [{"type": "string", "minLength": 1}]}
+        },
+		"required":     ["macro"],
 		"oneOf": [
-			{"required": ["from-strings"]},
-			{"required": ["rules"]}
-		]
-	},
-	"else": {
-		"required": ["group", "selector"],
-		"oneOf": [
-			{"required": ["from-strings"]},
-			{"required": ["rules"]}
-		]
-	},
-	"additionalProperties": false
+            {"required": ["expr"]},
+            {"required": ["list"]}
+        ],
+        "additionalProperties": false
+    },
+    "additionalProperties": false
 }
 `
 

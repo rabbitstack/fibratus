@@ -20,7 +20,7 @@ package types
 
 import (
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/util/commandline"
+	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
 	"path/filepath"
 	"sync"
 
@@ -151,7 +151,7 @@ func FromKevent(pid, ppid uint32, name, comm, exe, sid string, sessionID uint8) 
 		Name:      name,
 		Comm:      comm,
 		Exe:       exe,
-		Args:      commandline.Split(comm),
+		Args:      cmdline.Split(comm),
 		SID:       sid,
 		SessionID: sessionID,
 		Threads:   make(map[uint32]Thread),
@@ -196,7 +196,7 @@ func NewPS(pid, ppid uint32, exe, cwd, comm string, thread Thread, envs map[stri
 		Exe:     exe,
 		Comm:    comm,
 		Cwd:     cwd,
-		Args:    commandline.Split(comm),
+		Args:    cmdline.Split(comm),
 		Threads: map[uint32]Thread{thread.Tid: thread},
 		Modules: make([]Module, 0),
 		Handles: make([]htypes.Handle, 0),

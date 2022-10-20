@@ -77,6 +77,11 @@ func (s *scanner) scan() (tok token, pos int, lit string) {
 		return dot, pos, ""
 	case '=':
 		return eq, pos, ""
+	case '~':
+		if ch1, _ := s.r.read(); ch1 == '=' {
+			return ieq, pos, ""
+		}
+		s.r.unread()
 	case '!':
 		if ch1, _ := s.r.read(); ch1 == '=' {
 			return neq, pos, ""

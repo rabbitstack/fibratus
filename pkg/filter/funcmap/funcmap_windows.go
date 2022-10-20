@@ -56,7 +56,8 @@ func New() template.FuncMap {
 			}
 			return fmt.Sprintf("(%s)", strings.Join(values, ", "))
 		},
-		"printk": func(kevts ...*kevent.Kevent) string { return "" },
+		"printevt":  func(kevts ...*kevent.Kevent) string { return "" },
+		"printevts": func(kevts map[string]*kevent.Kevent) string { return "" },
 	}
 
 	for k, v := range extra {
@@ -70,7 +71,8 @@ func New() template.FuncMap {
 func InitFuncs(funcMap template.FuncMap) {
 	funcMap["emit"] = emit
 	funcMap["kill"] = kill
-	funcMap["printk"] = printk
+	funcMap["printevt"] = printEvt
+	funcMap["printevts"] = printEvts
 }
 
 // emit sends an alert via all configured alert senders.

@@ -52,6 +52,8 @@ const (
 	EntropyFn
 	// RegexFn represents the REGEX function
 	RegexFn
+	// IsMinidumpFn represents the ISMINIDUMP function
+	IsMinidumpFn
 )
 
 // ArgType is the type alias for the argument value type.
@@ -166,6 +168,8 @@ func (f Fn) String() string {
 		return "ENTROPY"
 	case RegexFn:
 		return "REGEX"
+	case IsMinidumpFn:
+		return "IS_MINIDUMP"
 	default:
 		return "UNDEFINED"
 	}
