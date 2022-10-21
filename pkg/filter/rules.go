@@ -26,6 +26,8 @@ import (
 	"expvar"
 	"fmt"
 	fsm "github.com/qmuntal/stateless"
+	"github.com/rabbitstack/fibratus/pkg/filter/fields"
+
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/util/atomic"
@@ -103,8 +105,9 @@ type filterGroup struct {
 }
 
 type compiledFilter struct {
-	filter Filter
-	config *config.FilterConfig
+	filter  Filter
+	buckets map[ktypes.Ktype]bool
+	config  *config.FilterConfig
 }
 
 // sequenceState represents the state of the
@@ -381,8 +384,22 @@ func newFilterGroup(g config.FilterGroup, filters []compiledFilter) *filterGroup
 	return &filterGroup{group: g, filters: filters}
 }
 
-func newCompiledFilter(f Filter, filterConfig *config.FilterConfig) compiledFilter {
-	return compiledFilter{config: filterConfig, filter: f}
+func newCompiledFilter(f Filter, filterConfig *config.FilterConfig, groupConfig config.FilterGroup) compiledFilter {
+	buckets := make(map[ktypes.Ktype]bool)
+	for name, values := range f.GetStringFields() {
+		if name == fields.KevtName {
+			for _, v := range values {
+				buckets[ktypes.KeventNameToKtype(v)] = true
+			}
+		}
+	}
+	if len(buckets) == 0 && groupConfig.Policy == config.SequencePolicy {
+		log.Warnf("%q rule in %q group doesn't have event type condition! "+
+			"This could cause runtime performance degradation. Please consider "+
+			"narrowing the scope of this rule by including the `kevt.name` condition",
+			filterConfig.Name, groupConfig.Name)
+	}
+	return compiledFilter{config: filterConfig, filter: f, buckets: buckets}
 }
 
 // run execute the filter and returns the matching partial index along with
@@ -392,6 +409,16 @@ func (f compiledFilter) run(kevt *kevent.Kevent, i uint16, partials map[uint16][
 		return f.filter.RunPartials(kevt, partials)
 	}
 	return f.filter.Run(kevt), i, kevt
+}
+
+// isEligible determines if the filter should be evaluated by inspecting
+// the event type filter fields defined in the expression. We allow an event
+// being eligible for evaluation even when the filter doesn't contain the kevt.name
+// binary expression. However, this is considered a warning which could potentially
+// cause runtime performance degradation if the filter is evaluated against every
+// event.
+func (f compiledFilter) isEligible(ktype ktypes.Ktype) bool {
+	return len(f.buckets) == 0 || f.buckets[ktype]
 }
 
 type filterGroups []*filterGroup
@@ -503,7 +530,7 @@ func (r *Rules) Compile() error {
 						Permit(expireTransition, sequenceExpiredState)
 				}
 			}
-			filters = append(filters, newCompiledFilter(f, filterConfig))
+			filters = append(filters, newCompiledFilter(f, filterConfig, group))
 			filtersCount.Add(1)
 		}
 
@@ -609,6 +636,9 @@ nextGroup:
 				return false
 			}
 			for i, f := range g.filters {
+				if !f.isEligible(kevt.Type) {
+					continue
+				}
 				if !seqState.next(i) {
 					continue
 				}

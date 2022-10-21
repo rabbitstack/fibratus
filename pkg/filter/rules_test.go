@@ -562,6 +562,52 @@ func TestFilterActionEmitAlert(t *testing.T) {
 	emitAlert = nil
 }
 
+func TestIsKtypeEligible(t *testing.T) {
+	rules := NewRules(newConfig("_fixtures/sequence_policy_simple_pattern_bindings.yml"))
+	require.NoError(t, rules.Compile())
+	log.SetLevel(log.DebugLevel)
+
+	kevt1 := &kevent.Kevent{
+		Type: ktypes.CreateProcess,
+		Name: "CreateProcess",
+		Tid:  2484,
+		PID:  859,
+		PS: &types.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\svchost.exe",
+		},
+		Kparams: kevent.Kparams{
+			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
+		},
+		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "barzz"},
+	}
+
+	kevt2 := &kevent.Kevent{
+		Type: ktypes.CreateFile,
+		Name: "CreateFile",
+		Tid:  2484,
+		PID:  859,
+		PS: &types.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\svchost.exe",
+		},
+		Kparams: kevent.Kparams{
+			kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper"},
+		},
+		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "barzz"},
+	}
+
+	groups := rules.sequenceGroups
+	for _, g := range groups {
+		for _, f := range g.filters {
+			if f.config.Name == "spawn command shell" {
+				assert.False(t, f.isEligible(kevt2.Type))
+				assert.True(t, f.isEligible(kevt1.Type))
+			}
+		}
+	}
+}
+
 func BenchmarkChainRun(b *testing.B) {
 	b.ReportAllocs()
 

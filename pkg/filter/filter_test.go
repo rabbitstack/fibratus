@@ -19,6 +19,8 @@
 package filter
 
 import (
+	"github.com/rabbitstack/fibratus/pkg/filter/fields"
+	"github.com/stretchr/testify/assert"
 	"net"
 	"testing"
 	"time"
@@ -54,6 +56,14 @@ func TestFilterCompile(t *testing.T) {
 	require.EqualError(t, f.Compile(), "expected at least one field or operator but zero found")
 	f = New(`ps.name =`, cfg)
 	require.EqualError(t, f.Compile(), "ps.name =\n╭─────────^\n|\n|\n╰─────────────────── expected field, string, number, bool, ip, function, pattern binding")
+}
+
+func TestStringFields(t *testing.T) {
+	f := New(`ps.name = 'cmd.exe' and kevt.name = 'CreateProcess' or kevt.name in ('TerminateProcess', 'CreateFile')`, cfg)
+	require.NoError(t, f.Compile())
+	assert.Len(t, f.GetStringFields(), 2)
+	assert.Len(t, f.GetStringFields()[fields.KevtName], 3)
+	assert.Len(t, f.GetStringFields()[fields.PsName], 1)
 }
 
 func TestFilterRunProcessKevent(t *testing.T) {

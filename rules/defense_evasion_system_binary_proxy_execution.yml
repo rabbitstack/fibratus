@@ -39,3 +39,48 @@
     {{
         emit "System Binary Proxy Execution via Rundll32" (printevts .Kevts)
     }}
+
+- group: System Binary Proxy Execution via Regsvr32
+  description: |
+    Adversaries may abuse Regsvr32.exe to proxy execution of malicious code.
+    Regsvr32.exe is a command-line program used to register and unregister object
+    linking and embedding controls, including dynamic link libraries (DLLs), on Windows systems.
+  labels:
+    tactic.id: TA0005
+    tactic.name: Defense Evasion
+    tactic.ref: https://attack.mitre.org/tactics/TA0005/
+    technique.id: T1218
+    technique.name: System Binary Proxy Execution
+    technique.ref: https://attack.mitre.org/techniques/T1218/
+    subtechnique.id: T1218.010
+    subtechnique.name: Regsvr32
+    subtechnique.ref: https://attack.mitre.org/techniques/T1218/010/
+  selector:
+    type: CreateProcess
+  rules:
+    - name: Regsvr32 scriptlet execution
+      description: |
+        Identifies the exection of a scriptlet file by regsvr32.exe process. Regsvr32
+        is usually abused by adversaries to execute malicious payloads without triggering
+        AV product alerts.
+      condition: >
+        ps.sibling.name ~= 'regsvr32.exe'
+          and
+        (
+          ps.sibling.comm imatches
+          (
+            '*scrobj*'
+          )
+            and
+          ps.sibling.comm imatches
+          (
+            '*/i:*',
+            '*-i:*',
+            '*.sct*'
+          )
+        )
+      action: >
+       {{
+            emit "Regsvr32 scriptlet execution" (printevt .Kevt)
+       }}
+

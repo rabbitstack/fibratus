@@ -47,6 +47,8 @@ type Filter interface {
 	// BindingIndex returns the binding index to which the filter is bound
 	// or a zero value if there are no pattern bindings defined.
 	BindingIndex() (uint16, bool)
+	// GetStringFields returns field names mapped to their string values
+	GetStringFields() map[fields.Field][]string
 }
 
 type filter struct {
@@ -57,6 +59,8 @@ type filter struct {
 	bindings  map[uint16][]*ql.PatternBindingLiteral
 	// useFuncValuer determines whether we should supply the function valuer
 	useFuncValuer bool
+	// stringFields contains filter field names mapped to their string values
+	stringFields map[fields.Field][]string
 }
 
 // Compile parsers the filter expression and builds a binary expression tree
@@ -77,10 +81,24 @@ func (f *filter) Compile() error {
 	walk := func(n ql.Node) {
 		if expr, ok := n.(*ql.BinaryExpr); ok {
 			if lhs, ok := expr.LHS.(*ql.FieldLiteral); ok {
-				f.fields = append(f.fields, fields.Field(lhs.Value))
+				field := fields.Field(lhs.Value)
+				f.fields = append(f.fields, field)
+				switch v := expr.RHS.(type) {
+				case *ql.StringLiteral:
+					f.stringFields[field] = append(f.stringFields[field], v.Value)
+				case *ql.ListLiteral:
+					f.stringFields[field] = append(f.stringFields[field], v.Values...)
+				}
 			}
 			if rhs, ok := expr.RHS.(*ql.FieldLiteral); ok {
-				f.fields = append(f.fields, fields.Field(rhs.Value))
+				field := fields.Field(rhs.Value)
+				f.fields = append(f.fields, field)
+				switch v := expr.LHS.(type) {
+				case *ql.StringLiteral:
+					f.stringFields[field] = append(f.stringFields[field], v.Value)
+				case *ql.ListLiteral:
+					f.stringFields[field] = append(f.stringFields[field], v.Values...)
+				}
 			}
 			if rhs, ok := expr.RHS.(*ql.PatternBindingLiteral); ok {
 				f.bindings[rhs.Index()] = append(f.bindings[rhs.Index()], rhs)
@@ -150,6 +168,8 @@ func (f *filter) BindingIndex() (uint16, bool) {
 	}
 	return 0, false
 }
+
+func (f filter) GetStringFields() map[fields.Field][]string { return f.stringFields }
 
 // mapValuer for each field present in the AST, we run the
 // accessors and extract the field vales that are
