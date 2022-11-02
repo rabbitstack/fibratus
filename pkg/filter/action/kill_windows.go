@@ -16,28 +16,25 @@
  * limitations under the License.
  */
 
-package functions
+package action
 
 import (
-	"testing"
-
-	"github.com/stretchr/testify/assert"
+	"fmt"
+	"syscall"
 )
 
-func TestRegex(t *testing.T) {
-	call := NewRegex()
-
-	res, _ := call.Call([]interface{}{`powershell.exe`, `power.*(shell|hell).exe`})
-	assert.True(t, res.(bool))
-
-	res1, _ := call.Call([]interface{}{`powershell.exe`, `power.*(shell|hell).dll`, `.*hell.exe`})
-	assert.True(t, res1.(bool))
-
-	res3, _ := call.Call([]interface{}{`powershell.exe`, "[`"})
-	assert.False(t, res3.(bool))
-
-	for i := 0; i < 10; i++ {
-		res, _ := call.Call([]interface{}{`powershell.exe`, `power.*(shell|hell).dll`, `.*hell.exe`})
-		assert.True(t, res.(bool))
+// Kill terminates a process with specified pid.
+func Kill(pid uint32) error {
+	h, err := syscall.OpenProcess(syscall.PROCESS_TERMINATE, false, pid)
+	if err != nil {
+		return fmt.Errorf("couldn't open pid %d for termination: %v", pid, err)
 	}
+	defer func() {
+		_ = syscall.CloseHandle(h)
+	}()
+	err = syscall.TerminateProcess(h, uint32(1))
+	if err != nil {
+		return fmt.Errorf("fail to kill pid %d: %v", pid, err)
+	}
+	return nil
 }

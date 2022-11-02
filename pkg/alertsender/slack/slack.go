@@ -126,3 +126,5 @@ func (s slack) Send(alert alertsender.Alert) error {
 	}
 	return nil
 }
+
+func (s slack) Type() alertsender.Type { return alertsender.Slack }

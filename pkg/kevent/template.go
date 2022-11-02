@@ -24,9 +24,10 @@ import (
 	"text/template"
 )
 
-// Template is the default Go template used for formatting events.
+// Template is the default Go template used for formatting events in textual format.
 var Template = `Name:  		{{ .Kevt.Name }}
 Sequence: 		{{ .Kevt.Seq }}
+Description:    {{ .Kevt.Description }}
 Process ID:		{{ .Kevt.PID }}
 Thread ID: 		{{ .Kevt.Tid }}
 Params:			{{ .Kevt.Kparams }}

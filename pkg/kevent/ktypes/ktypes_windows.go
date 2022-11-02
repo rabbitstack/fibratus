@@ -242,7 +242,7 @@ func (k Ktype) String() string {
 	case Retransmit, RetransmitTCPv4, RetransmitTCPv6:
 		return "Retransmit"
 	default:
-		return string(k[:])
+		return ""
 	}
 }
 

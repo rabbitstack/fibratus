@@ -61,6 +61,8 @@ func (s Type) String() string {
 type Sender interface {
 	// Send emits an alert.
 	Send(Alert) error
+	// Type returns the type that identifies a particular sender.
+	Type() Type
 }
 
 // ToType converts the string representation of the alert sender to its corresponding type.

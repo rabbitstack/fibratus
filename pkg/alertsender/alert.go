@@ -36,7 +36,7 @@ const (
 func (s Severity) String() string {
 	switch s {
 	case Normal:
-		return "normal"
+		return "low"
 	case Medium:
 		return "medium"
 	case Critical:
@@ -49,11 +49,11 @@ func (s Severity) String() string {
 // ParseSeverityFromString parses the severity from the string representation.
 func ParseSeverityFromString(sever string) Severity {
 	switch sever {
-	case "normal", "Normal":
+	case "normal", "Normal", "NORMAL", "low", "LOW":
 		return Normal
-	case "medium", "Medium":
+	case "medium", "Medium", "MEDIUM":
 		return Medium
-	case "critical", "Critical":
+	case "critical", "Critical", "high", "High", "HIGH":
 		return Critical
 	default:
 		return Normal

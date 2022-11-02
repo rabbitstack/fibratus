@@ -213,6 +213,12 @@ func (v *ValuerEval) Eval(expr Expr) interface{} {
 
 func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 	lhs := v.Eval(expr.LHS)
+	// lazy evaluation for the AND operator
+	if lhs != nil && expr.Op == and {
+		if val, ok := lhs.(bool); ok && !val {
+			return false
+		}
+	}
 	rhs := v.Eval(expr.RHS)
 	if lhs == nil && rhs != nil {
 		// when the LHS is nil and the RHS is a boolean, implicitly cast the

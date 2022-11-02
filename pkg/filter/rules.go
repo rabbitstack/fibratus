@@ -27,6 +27,8 @@ import (
 	"fmt"
 	fsm "github.com/qmuntal/stateless"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
+	"github.com/rabbitstack/fibratus/pkg/filter/funcmap"
+	"sort"
 
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
@@ -37,7 +39,6 @@ import (
 	"time"
 
 	"github.com/rabbitstack/fibratus/pkg/config"
-	"github.com/rabbitstack/fibratus/pkg/filter/funcmap"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	log "github.com/sirupsen/logrus"
 )
@@ -129,7 +130,7 @@ type sequenceState struct {
 
 	fsm *fsm.StateMachine
 
-	// rule to rule index mapping
+	// rule to rule index mapping. Indices start at 1
 	idxs          map[fsm.State]uint16
 	maxSpans      map[fsm.State]time.Duration
 	spanDeadlines map[fsm.State]*time.Timer
@@ -261,8 +262,7 @@ func (s *sequenceState) addMatch(idx uint16, kevt *kevent.Kevent) {
 
 func (s *sequenceState) getPartials(rule string) map[uint16][]*kevent.Kevent {
 	i := s.idxs[rule] - 1
-	// is this is the first rule in the sequence
-	// return no partials
+	// no partials for the first rule in the sequence
 	if i == 0 {
 		return nil
 	}
@@ -298,6 +298,8 @@ func (s *sequenceState) next(i int) bool {
 	}
 	return s.matchedRules[uint16(i)] && !s.inDeadline.Load() && !s.inExpired
 }
+
+func (s *sequenceState) matched(i int) bool { return s.matchedRules[uint16(i+1)] }
 
 func (s *sequenceState) scheduleMaxSpanDeadline(rule fsm.State, maxSpan time.Duration) {
 	t := time.AfterFunc(maxSpan, func() {
@@ -633,13 +635,13 @@ nextGroup:
 			}
 			// if the sequence expired we'll not keep evaluating
 			if seqState.expire(kevt) {
-				return false
+				continue
 			}
 			for i, f := range g.filters {
 				if !f.isEligible(kevt.Type) {
 					continue
 				}
-				if !seqState.next(i) {
+				if !seqState.next(i) || seqState.matched(i) {
 					continue
 				}
 				rule := f.config.Name
@@ -745,17 +747,6 @@ nextGroup:
 	return false
 }
 
-// ActionContext is the convenient structure
-// for grouping the event that resulted in
-// matched filter along with filter group
-// information.
-type ActionContext struct {
-	Kevt   *kevent.Kevent
-	Kevts  map[string]*kevent.Kevent
-	Filter *config.FilterConfig
-	Group  config.FilterGroup
-}
-
 // runFilterAction executes the template associated with the filter
 // that has produced a match in one of the include groups.
 func runFilterAction(
@@ -767,35 +758,43 @@ func runFilterAction(
 	if (filter != nil && filter.Action == "") && group.Action == "" {
 		return nil
 	}
-	var action []byte
+	var actionBlock []byte
 	var err error
 	if group.Policy == config.SequencePolicy {
-		action, err = base64.StdEncoding.DecodeString(group.Action)
+		actionBlock, err = base64.StdEncoding.DecodeString(group.Action)
 	} else {
 		if filter == nil {
 			panic("filter shouldn't be nil")
 		}
-		action, err = base64.StdEncoding.DecodeString(filter.Action)
+		actionBlock, err = base64.StdEncoding.DecodeString(filter.Action)
 	}
 	if err != nil {
 		return fmt.Errorf("corrupted filter/group action: %v", err)
 	}
 
+	events := make([]*kevent.Kevent, 0)
+	matches := make(map[string]*kevent.Kevent, len(kevts))
+	if kevt != nil {
+		events = append(events, kevt)
+	} else {
+		for k, kevt := range kevts {
+			events = append(events, kevt)
+			matches["k"+strconv.Itoa(int(k))] = kevt
+		}
+		sort.Slice(events, func(i, j int) bool { return events[i].Timestamp.Before(events[j].Timestamp) })
+	}
+
 	fmap := funcmap.New()
 	funcmap.InitFuncs(fmap)
-	tmpl, err := template.New(group.Name).Funcs(fmap).Parse(string(action))
+	tmpl, err := template.New(group.Name).Funcs(fmap).Parse(string(actionBlock))
 	if err != nil {
 		return err
 	}
 
-	matches := make(map[string]*kevent.Kevent, len(kevts))
-	for k, v := range kevts {
-		matches["k"+strconv.Itoa(int(k))] = v
-	}
-
-	ctx := &ActionContext{
+	ctx := &config.ActionContext{
 		Kevt:   kevt,
 		Kevts:  matches,
+		Events: events,
 		Filter: filter,
 		Group:  group,
 	}

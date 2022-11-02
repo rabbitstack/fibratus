@@ -44,6 +44,10 @@ func (s *mockSender) Send(a alertsender.Alert) error {
 	return nil
 }
 
+func (s *mockSender) Type() alertsender.Type {
+	return alertsender.None
+}
+
 func makeSender(config alertsender.Config) (alertsender.Sender, error) {
 	return &mockSender{}, nil
 }

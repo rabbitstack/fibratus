@@ -95,6 +95,17 @@ func (ps *PS) String() string {
 	)
 }
 
+// Ancestors returns all ancestors of this process. The string slice contains
+// the process image name followed by the process id.
+func (ps *PS) Ancestors() []string {
+	ancestors := make([]string, 0)
+	walk := func(proc *PS) {
+		ancestors = append(ancestors, fmt.Sprintf("%s (%d)", proc.Name, proc.PID))
+	}
+	Walk(walk, ps)
+	return ancestors
+}
+
 // Thread stores metadata about a thread that's executing in process's address space.
 type Thread struct {
 	// Tid is the unique identifier of thread inside the process.

@@ -30,15 +30,15 @@
         ps.name iin msoffice_binaries
     - name: Binary executed by Microsoft Office process
       condition: >
+        ps.sibling.exe = $1.file.name
+            and
         spawn_process
             and
         ps.name iin msoffice_binaries
-            and
-        ps.sibling.exe = $1.file.name
       max-span: 1h
   action: >
     {{
-        emit "File execution via Microsoft Office process" ""
+        emit . "File execution via Microsoft Office process" ""
     }}
 
 - group: Spearphishing DLL attachment loaded by Microsoft Office processes
@@ -73,13 +73,13 @@
         ps.name iin msoffice_binaries
     - name: Module loaded by Microsoft Office process
       condition: >
+        image.name = $1.file.name
+            and
         load_module
             and
         ps.name iin msoffice_binaries
-            and
-        image.name = $1.file.name
       max-span: 1h
   action: >
     {{
-        emit "Potentially malicious module loaded by Microsoft Office process" (printsevts .Kevts)
+        emit . "Potentially malicious module loaded by Microsoft Office process" ""
     }}

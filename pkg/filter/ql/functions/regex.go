@@ -21,13 +21,11 @@ package functions
 import (
 	log "github.com/sirupsen/logrus"
 	"regexp"
-	"sync"
 )
 
 // Regex applies single/multiple regular expressions on the provided string arguments.
 type Regex struct {
-	rxs  map[string]*regexp.Regexp
-	once sync.Once
+	rxs map[string]*regexp.Regexp
 }
 
 // NewRegex creates a new regex function.
@@ -41,22 +39,6 @@ func (f *Regex) Call(args []interface{}) (interface{}, bool) {
 	}
 	s := parseString(0, args)
 
-	// compile regular expressions
-	f.once.Do(func() {
-		for _, arg := range args[1:] {
-			expr, ok := arg.(string)
-			if !ok {
-				continue
-			}
-			rx, err := regexp.Compile(expr)
-			if err != nil {
-				log.Warnf("invalid regular expression pattern: %v", err)
-				continue
-			}
-			f.rxs[expr] = rx
-		}
-	})
-
 	// match regular expressions
 	for _, arg := range args[1:] {
 		expr, ok := arg.(string)
@@ -65,6 +47,18 @@ func (f *Regex) Call(args []interface{}) (interface{}, bool) {
 		}
 		rx, ok := f.rxs[expr]
 		if !ok {
+			var err error
+			rx, err = regexp.Compile(expr)
+			if err != nil {
+				log.Warnf(
+					"invalid %q pattern in "+
+						"regex function: %v", expr, err)
+				f.rxs[expr] = nil
+			} else {
+				f.rxs[expr] = rx
+			}
+		}
+		if rx == nil {
 			continue
 		}
 		if rx.MatchString(s) {

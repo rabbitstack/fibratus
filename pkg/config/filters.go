@@ -22,7 +22,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/filter/funcmap"
+	"github.com/Masterminds/sprig/v3"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
@@ -155,7 +155,7 @@ type FilterConfig struct {
 	Labels      map[string]string `json:"labels" yaml:"labels"`
 }
 
-// parseTmpl ensures the correctness of the filter
+// parseTmpl ensures the correctness of the rule
 // action template by trying to parse the template
 // string from the base64 payload.
 func (f FilterConfig) parseTmpl(resource string) error {
@@ -166,7 +166,7 @@ func (f FilterConfig) parseTmpl(resource string) error {
 	if err != nil {
 		return err
 	}
-	tmpl, err := template.New(f.Name).Funcs(funcmap.New()).Parse(string(decoded))
+	tmpl, err := template.New(f.Name).Funcs(FilterFuncMap()).Parse(string(decoded))
 	if err != nil {
 		return cleanupParseError(resource, err)
 	}
@@ -469,7 +469,7 @@ func decodeFilterGroups(resource string, b []byte) ([]FilterGroup, error) {
 // file group yaml file. It returns the byte slice
 // with yaml content after template expansion.
 func renderTmpl(filename string, b []byte) ([]byte, error) {
-	tmpl, err := template.New(filename).Funcs(funcmap.New()).Parse(string(b))
+	tmpl, err := template.New(filename).Funcs(FilterFuncMap()).Parse(string(b))
 	if err != nil {
 		return nil, cleanupParseError(filename, err)
 	}
@@ -509,21 +509,64 @@ func cleanupParseError(filename string, err error) error {
 	return fmt.Errorf("syntax error in (%s) at %s: %s", location, key, errMsg)
 }
 
-// TmplData is the template data object. Some
-// fields of this structure represent empty
-// values, since we have to satisfy the presence
-// of certain keys when executing the template.
-type TmplData struct {
+// ActionContext is the convenient structure
+// for grouping the event that resulted in
+// matched filter along with filter group
+// information.
+type ActionContext struct {
+	Kevt *kevent.Kevent
+	// Kevts contains matched events for sequence group
+	// policies indexed by `k` + the slot number of the
+	// rule that produced a partial match
+	Kevts map[string]*kevent.Kevent
+	// Events contains a single element for non-sequence
+	// group policies or a list of ordered matched events
+	// for sequence group policies
+	Events []*kevent.Kevent
 	Filter *FilterConfig
-	Group  *FilterGroup
-	Kevt   *kevent.Kevent
+	Group  FilterGroup
 }
 
-func tmplData() TmplData {
-	return TmplData{
+// FilterFuncMap returns the template func map
+// populated with some useful template functions
+// that can be used in rule actions.
+func FilterFuncMap() template.FuncMap {
+	f := sprig.TxtFuncMap()
+
+	extra := template.FuncMap{
+		// This is a placeholder for the functions that might be
+		// late-bound to a template. By declaring them here, we
+		// can still execute the template associated with the
+		// filter action to ensure template syntax is correct
+		"emit": func(ctx *ActionContext, title string, text string, args ...string) string { return "" },
+		"kill": func(pid uint32) string { return "" },
+		"stringify": func(in []interface{}) string {
+			values := make([]string, 0)
+			for _, e := range in {
+				s, ok := e.(string)
+				if !ok {
+					continue
+				}
+				values = append(values, fmt.Sprintf("'%s'", s))
+			}
+			return fmt.Sprintf("(%s)", strings.Join(values, ", "))
+		},
+	}
+
+	for k, v := range extra {
+		f[k] = v
+	}
+
+	return f
+}
+
+func tmplData() *ActionContext {
+	return &ActionContext{
 		Filter: &FilterConfig{},
-		Group:  &FilterGroup{},
+		Group:  FilterGroup{},
 		Kevt:   kevent.Empty(),
+		Events: make([]*kevent.Kevent, 0),
+		Kevts:  make(map[string]*kevent.Kevent),
 	}
 }
 

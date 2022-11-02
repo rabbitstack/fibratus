@@ -31,13 +31,13 @@
             )
     - name: Rundll32 child process executed
       condition: >
-        spawn_process
-          and
         ps.pid = $1.ps.sibling.pid
+           and
+        spawn_process
       max-span: 45s
   action: >
     {{
-        emit "System Binary Proxy Execution via Rundll32" (printevts .Kevts)
+        emit . "System Binary Proxy Execution via Rundll32" ""
     }}
 
 - group: System Binary Proxy Execution via Regsvr32
@@ -81,6 +81,6 @@
         )
       action: >
        {{
-            emit "Regsvr32 scriptlet execution" (printevt .Kevt)
+            emit . "Regsvr32 scriptlet execution" ""
        }}
 

@@ -51,7 +51,8 @@ var schema = `
                                 "user": 		{"type": "string"},
                                 "password": 	{"type": "string"},
                                 "from": 		{"type": "string"},
-                                "to": 			{"type": "array", "items": {"type": "string", "format": "email"}}
+                                "to": 			{"type": "array", "items": {"type": "string", "format": "email"}},
+                                "content-type": {"type": "string"}
                             },
                             "if": {
                                 "properties": {"enabled": { "const": true }}

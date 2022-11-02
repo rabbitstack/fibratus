@@ -20,6 +20,7 @@ package kevent
 
 import (
 	"encoding/binary"
+	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"hash/fnv"
@@ -67,6 +68,28 @@ func (kevt Kevent) PartialKey() uint64 {
 		return fnvHash(b)
 	}
 	return 0
+}
+
+// Summary returns a brief summary of this event. Various important substrings
+// in the summary text are highlighted by surrounding them insde <code> HTML tags.
+func (kevt Kevent) Summary() string {
+	ps := kevt.PS
+	switch kevt.Type {
+	case ktypes.CreateProcess:
+		if ps != nil {
+			exe := kevt.Kparams.MustGetString(kparams.Exe)
+			sid := kevt.Kparams.MustGetString(kparams.UserSID)
+			return fmt.Sprintf("<code>%s</code> spawned the <code>%s</code> process with user <code>%s</code>", ps.Name, exe, sid)
+		}
+	case ktypes.CreateFile:
+		op := kevt.Kparams.MustGetFileOperation()
+		filename := kevt.Kparams.MustGetString(kparams.FileName)
+		if ps != nil {
+			return fmt.Sprintf("<code>%s</code> process %sed a file <code>%s</code>", ps.Name, op, filename)
+		}
+		return fmt.Sprintf("file %s %sed", filename, op)
+	}
+	return ""
 }
 
 func fnvHash(b []byte) uint64 {

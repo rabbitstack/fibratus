@@ -21,13 +21,14 @@ package mail
 import "github.com/spf13/pflag"
 
 const (
-	host    = "alertsenders.mail.host"
-	port    = "alertsenders.mail.port"
-	user    = "alertsenders.mail.user"
-	pass    = "alertsenders.mail.password"
-	from    = "alertsenders.mail.from"
-	to      = "alertsenders.mail.to"
-	enabled = "alertsenders.mail.enabled"
+	host        = "alertsenders.mail.host"
+	port        = "alertsenders.mail.port"
+	user        = "alertsenders.mail.user"
+	pass        = "alertsenders.mail.password"
+	from        = "alertsenders.mail.from"
+	to          = "alertsenders.mail.to"
+	enabled     = "alertsenders.mail.enabled"
+	contentType = "alertsenders.mail.content-type"
 )
 
 // Config contains the configuration for the mail alert sender.
@@ -44,8 +45,10 @@ type Config struct {
 	From string `mapstructure:"from"`
 	// To specifies recipients that receive the alert.
 	To []string `mapstructure:"to"`
-	// Enabled indicates whether mail alert sender is enabled
+	// Enabled indicates whether mail alert sender is enabled.
 	Enabled bool `mapstructure:"enabled"`
+	// ContentType represents the email body content type.
+	ContentType string `mapstructure:"content-type"`
 }
 
 // AddFlags registers persistent flags.
@@ -57,4 +60,5 @@ func AddFlags(flags *pflag.FlagSet) {
 	flags.String(from, "", "Specifies the sender's address")
 	flags.StringSlice(to, []string{}, "Specifies all the recipients that'll receive the alert")
 	flags.Bool(enabled, false, "Indicates whether mail alert sender is enabled")
+	flags.String(contentType, "text/html", "Represents the email body content type")
 }
