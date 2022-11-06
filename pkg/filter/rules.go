@@ -27,7 +27,6 @@ import (
 	"fmt"
 	fsm "github.com/qmuntal/stateless"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
-	"github.com/rabbitstack/fibratus/pkg/filter/funcmap"
 	"sort"
 
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
@@ -641,7 +640,7 @@ nextGroup:
 				if !f.isEligible(kevt.Type) {
 					continue
 				}
-				if !seqState.next(i) || seqState.matched(i) {
+				if !seqState.next(i) {
 					continue
 				}
 				rule := f.config.Name
@@ -784,8 +783,8 @@ func runFilterAction(
 		sort.Slice(events, func(i, j int) bool { return events[i].Timestamp.Before(events[j].Timestamp) })
 	}
 
-	fmap := funcmap.New()
-	funcmap.InitFuncs(fmap)
+	fmap := NewFuncMap()
+	InitFuncs(fmap)
 	tmpl, err := template.New(group.Name).Funcs(fmap).Parse(string(actionBlock))
 	if err != nil {
 		return err

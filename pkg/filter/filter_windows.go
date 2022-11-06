@@ -28,7 +28,7 @@ import (
 
 // New creates a new filter with the specified filter expression. The consumers must ensure
 // the expression is correctly parsed before executing the filter. This is achieved by calling the
-// Compile` method after constructing the filter.
+// `Compile` method after constructing the filter.
 func New(expr string, config *config.Config) Filter {
 	accessors := []accessor{
 		// general event parameters
@@ -107,4 +107,18 @@ func NewFromCLIWithAllAccessors(args []string) (Filter, error) {
 		return nil, fmt.Errorf("bad filter:\n %v", err)
 	}
 	return filter, nil
+}
+
+func allAccessors() []accessor {
+	return []accessor{
+		newKevtAccessor(),
+		newPSAccessor(),
+		newThreadAccessor(),
+		newImageAccessor(),
+		newFileAccessor(),
+		newRegistryAccessor(),
+		newNetworkAccessor(),
+		newHandleAccessor(),
+		newPEAccessor(),
+	}
 }

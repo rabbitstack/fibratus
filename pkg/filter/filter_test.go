@@ -526,6 +526,123 @@ func TestFilterRunPE(t *testing.T) {
 	}
 }
 
+func TestInterpolateFields(t *testing.T) {
+	var tests = []struct {
+		original     string
+		interpolated string
+		evts         []*kevent.Kevent
+	}{
+		{
+			original:     "Credential discovery via %ps.name and user %ps.sid",
+			interpolated: "Credential discovery via VaultCmd.exe and user LOCAL\\tor",
+			evts: []*kevent.Kevent{
+				{
+					Type:     ktypes.CreateProcess,
+					Category: ktypes.Process,
+					Name:     "CreateProcess",
+					PID:      1023,
+					PS: &pstypes.PS{
+						Name: "VaultCmd.exe",
+						Ppid: 345,
+						SID:  "LOCAL\\tor",
+					},
+				},
+			},
+		},
+		{
+			original:     "Credential discovery via %ps.name and pid %kevt.pid",
+			interpolated: "Credential discovery via N/A and pid 1023",
+			evts: []*kevent.Kevent{
+				{
+					Type:     ktypes.CreateProcess,
+					Category: ktypes.Process,
+					Name:     "CreateProcess",
+					PID:      1023,
+				},
+			},
+		},
+		{
+			original: `Detected an attempt by <code>%1.ps.name</code> process to access
+and read the memory of the <b>Local Security And Authority Subsystem Service</b>
+and subsequently write the <code>%2.file.name</code> dump file to the disk device`,
+			interpolated: `Detected an attempt by <code>taskmgr.exe</code> process to access
+and read the memory of the <b>Local Security And Authority Subsystem Service</b>
+and subsequently write the <code>C:\Users
+eo\Temp\lsass.dump</code> dump file to the disk device`,
+			evts: []*kevent.Kevent{
+				{
+					Type:     ktypes.OpenProcess,
+					Category: ktypes.Process,
+					Name:     "OpenProcess",
+					PID:      1023,
+					PS: &pstypes.PS{
+						Name: "taskmgr.exe",
+						Ppid: 345,
+						SID:  "LOCAL\\tor",
+					},
+				},
+				{
+					Type:     ktypes.WriteFile,
+					Category: ktypes.File,
+					Name:     "WriteFile",
+					PID:      1023,
+					Kparams: kevent.Kparams{
+						kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Users\neo\\Temp\\lsass.dump"},
+					},
+					PS: &pstypes.PS{
+						Name: "taskmgr.exe",
+						Ppid: 345,
+						SID:  "LOCAL\\tor",
+					},
+				},
+			},
+		},
+		{
+			original: `Detected an attempt by <code>%ps.name</code> process to access
+and read the memory of the <b>Local Security And Authority Subsystem Service</b>
+and subsequently write the <code>%2.file.name</code> dump file to the disk device`,
+			interpolated: `Detected an attempt by <code>taskmgr.exe</code> process to access
+and read the memory of the <b>Local Security And Authority Subsystem Service</b>
+and subsequently write the <code>C:\Users
+eo\Temp\lsass.dump</code> dump file to the disk device`,
+			evts: []*kevent.Kevent{
+				{
+					Type:     ktypes.OpenProcess,
+					Category: ktypes.Process,
+					Name:     "OpenProcess",
+					PID:      1023,
+					PS: &pstypes.PS{
+						Name: "taskmgr.exe",
+						Ppid: 345,
+						SID:  "LOCAL\\tor",
+					},
+				},
+				{
+					Type:     ktypes.WriteFile,
+					Category: ktypes.File,
+					Name:     "WriteFile",
+					PID:      1023,
+					Kparams: kevent.Kparams{
+						kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Users\neo\\Temp\\lsass.dump"},
+					},
+					PS: &pstypes.PS{
+						Name: "taskmgr.exe",
+						Ppid: 345,
+						SID:  "LOCAL\\tor",
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		s := InterpolateFields(tt.original, tt.evts)
+		if tt.interpolated != s {
+			t.Errorf("expected %s interpolated string but got %s", tt.interpolated, s)
+		}
+	}
+}
+
 func BenchmarkFilterRun(b *testing.B) {
 	b.ReportAllocs()
 	f := New(`ps.name = 'mimikatz.exe' or ps.name contains 'svc'`, cfg)

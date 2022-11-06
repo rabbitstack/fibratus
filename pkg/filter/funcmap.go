@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package funcmap
+package filter
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/config"
@@ -24,13 +24,10 @@ import (
 	"text/template"
 )
 
-// New returns the template func map
+// NewFuncMap returns the template func map
 // populated with some useful template functions
-// that can be used in rule actions. Some functions
-// are late-bound, so we merely provide a declaration.
-// The real function is attached when the filter action
-// is triggered.
-func New() template.FuncMap {
+// that can be used in rule actions.
+func NewFuncMap() template.FuncMap {
 	return config.FilterFuncMap()
 }
 
@@ -42,7 +39,7 @@ func InitFuncs(funcMap template.FuncMap) {
 
 // emit sends the rule alert via all configured alert senders.
 func emit(ctx *config.ActionContext, title string, text string, args ...string) string {
-	err := action.Emit(ctx, title, text, args...)
+	err := action.Emit(ctx, InterpolateFields(title, ctx.Events), InterpolateFields(text, ctx.Events), args...)
 	if err != nil {
 		return err.Error()
 	}

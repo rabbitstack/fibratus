@@ -21,11 +21,9 @@ package formatter
 import (
 	"bytes"
 	"github.com/Masterminds/sprig/v3"
-	"github.com/dustin/go-humanize"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/util/hostname"
-	"github.com/rabbitstack/fibratus/pkg/util/version"
 	"text/template"
 	"time"
 )
@@ -44,13 +42,11 @@ func (f HTML) FormatRuleAlert(ctx *config.ActionContext, alert alertsender.Alert
 		Alert       alertsender.Alert
 		TriggeredAt time.Time
 		Hostname    string
-		Version     string
 	}{
 		ctx,
 		alert,
 		time.Now(),
 		hostname.Get(),
-		version.Get(),
 	}
 
 	funcmap := sprig.TxtFuncMap()
@@ -62,8 +58,6 @@ func (f HTML) FormatRuleAlert(ctx *config.ActionContext, alert alertsender.Alert
 		}
 		return false
 	}
-	funcmap["humanizeBytes"] = func(bytes int) string { return humanize.Bytes(uint64(bytes)) }
-
 	tmpl, err := template.New("rule-alert").Funcs(funcmap).Parse(ruleAlertHTMLTemplate)
 	if err != nil {
 		return "", err

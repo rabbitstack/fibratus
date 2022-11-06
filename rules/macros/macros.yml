@@ -5,6 +5,10 @@
   expr: kevt.name = 'OpenProcess' and ps.access.status = 'success'
   description: Acquires the local process object
 
+- macro: open_process_all_access
+  expr: open_process and ps.access.mask.names in ('ALL_ACCESS')
+  description: Acquires the local process object with all possible rights for the process object
+
 - macro: spawn_msoffice_process
   expr: spawn_process and ps.sibling.exe iin msoffice_binaries
   description: Identifies the execution of the MS Office process

@@ -26,6 +26,8 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/filter/ql"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -176,7 +178,7 @@ func (f filter) GetStringFields() map[fields.Field][]string { return f.stringFie
 // supplied to the valuer. The valuer feeds the
 // expression with correct values.
 func (f *filter) mapValuer(kevt *kevent.Kevent) map[string]interface{} {
-	valuer := make(map[string]interface{})
+	valuer := make(map[string]interface{}, len(f.fields))
 	for _, field := range f.fields {
 		for _, accessor := range f.accessors {
 			v, err := accessor.get(field, kevt)
@@ -184,10 +186,10 @@ func (f *filter) mapValuer(kevt *kevent.Kevent) map[string]interface{} {
 				accessorErrors.Add(err.Error(), 1)
 				continue
 			}
-			if v == nil {
-				continue
+			if v != nil {
+				valuer[field.String()] = v
+				break
 			}
-			valuer[field.String()] = v
 		}
 	}
 	return valuer
@@ -204,11 +206,63 @@ func (f *filter) bindingValuer(kevt *kevent.Kevent, idx uint16) map[string]inter
 				accessorErrors.Add(err.Error(), 1)
 				continue
 			}
-			if v == nil {
-				continue
+			if v != nil {
+				valuer[binding.Value] = v
+				break
 			}
-			valuer[binding.Value] = v
 		}
 	}
 	return valuer
+}
+
+// InterpolateFields replaces all occurrences of field modifiers in the given string
+// with values extracted from the event. Field modifiers may contain a leading ordinal
+// which refers to the event in particular sequence stage. Otherwise, the modifier is
+// a well-known field name prepended with the `%` symbol.
+func InterpolateFields(s string, evts []*kevent.Kevent) string {
+	var fieldsReplRegexp = regexp.MustCompile(`%([1-9]?)\.?([a-z0-9A-Z\[\].]+)`)
+	matches := fieldsReplRegexp.FindAllStringSubmatch(s, -1)
+	r := s
+	if len(matches) == 0 {
+		return s
+	}
+	for _, m := range matches {
+		switch {
+		case len(m) == 3:
+			// parse index if the field modifier
+			// refers to the event in the sequence
+			i := 1
+			if m[1] != "" {
+				var err error
+				i, err = strconv.Atoi(m[1])
+				if err != nil {
+					continue
+				}
+			}
+			if i-1 > len(evts)-1 {
+				continue
+			}
+			kevt := evts[i-1]
+			// extract field value from the event and replace in string
+			var val any
+			for _, accessor := range allAccessors() {
+				var err error
+				val, err = accessor.get(fields.Field(m[2]), kevt)
+				if err != nil {
+					continue
+				}
+				if val != nil {
+					break
+				}
+			}
+			if val != nil {
+				r = strings.ReplaceAll(r, m[0], fmt.Sprintf("%v", val))
+			} else {
+				r = strings.ReplaceAll(r, m[0], "N/A")
+			}
+		default:
+			return r
+		}
+	}
+	return r
 }

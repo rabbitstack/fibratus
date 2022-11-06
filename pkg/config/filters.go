@@ -540,17 +540,6 @@ func FilterFuncMap() template.FuncMap {
 		// filter action to ensure template syntax is correct
 		"emit": func(ctx *ActionContext, title string, text string, args ...string) string { return "" },
 		"kill": func(pid uint32) string { return "" },
-		"stringify": func(in []interface{}) string {
-			values := make([]string, 0)
-			for _, e := range in {
-				s, ok := e.(string)
-				if !ok {
-					continue
-				}
-				values = append(values, fmt.Sprintf("'%s'", s))
-			}
-			return fmt.Sprintf("(%s)", strings.Join(values, ", "))
-		},
 	}
 
 	for k, v := range extra {
