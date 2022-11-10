@@ -24,6 +24,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/util/hostname"
+	"github.com/rabbitstack/fibratus/pkg/util/version"
 	"text/template"
 	"time"
 )
@@ -42,11 +43,13 @@ func (f HTML) FormatRuleAlert(ctx *config.ActionContext, alert alertsender.Alert
 		Alert       alertsender.Alert
 		TriggeredAt time.Time
 		Hostname    string
+		Version     string
 	}{
 		ctx,
 		alert,
 		time.Now(),
 		hostname.Get(),
+		version.Get(),
 	}
 
 	funcmap := sprig.TxtFuncMap()

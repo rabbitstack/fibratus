@@ -16,7 +16,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v2
         with:
-           go-version: 1.17.x
+           go-version: 1.19.x
       - name: Checkout
         uses: actions/checkout@v2
       - name: Adjust pkg-config prefix
@@ -105,7 +105,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v2
         with:
-           go-version: 1.17.x
+           go-version: 1.19.x
       - name: Checkout
         uses: actions/checkout@v2
       - name: Build
@@ -134,7 +134,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v2
         with:
-           go-version: 1.17.x
+           go-version: 1.19.x
       - name: Setup msys2
         uses: msys2/setup-msys2@v2
         with:
@@ -184,7 +184,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v2
         with:
-           go-version: 1.17.x
+           go-version: 1.19.x
       - name: Setup msys2
         uses: msys2/setup-msys2@v2
         with:

@@ -63,6 +63,9 @@ type filter struct {
 	useFuncValuer bool
 	// stringFields contains filter field names mapped to their string values
 	stringFields map[fields.Field][]string
+
+	hasPsFields   bool
+	hasKevtFields bool
 }
 
 // Compile parsers the filter expression and builds a binary expression tree
@@ -119,6 +122,15 @@ func (f *filter) Compile() error {
 
 	if len(f.fields) == 0 {
 		return errNoFields
+	}
+
+	for _, field := range f.fields {
+		switch {
+		case field.IsKevtField():
+			f.hasKevtFields = true
+		case field.IsPsField():
+			f.hasPsFields = true
+		}
 	}
 
 	if len(f.bindings) > 1 {
@@ -181,6 +193,9 @@ func (f *filter) mapValuer(kevt *kevent.Kevent) map[string]interface{} {
 	valuer := make(map[string]interface{}, len(f.fields))
 	for _, field := range f.fields {
 		for _, accessor := range f.accessors {
+			if !accessor.canAccess(kevt, f) {
+				continue
+			}
 			v, err := accessor.get(field, kevt)
 			if err != nil && !kerrors.IsKparamNotFound(err) {
 				accessorErrors.Add(err.Error(), 1)
@@ -201,6 +216,9 @@ func (f *filter) bindingValuer(kevt *kevent.Kevent, idx uint16) map[string]inter
 	valuer := make(map[string]interface{})
 	for _, binding := range f.bindings[idx] {
 		for _, accessor := range f.accessors {
+			if !accessor.canAccess(kevt, f) {
+				continue
+			}
 			v, err := accessor.get(binding.Field(), kevt)
 			if err != nil && !kerrors.IsKparamNotFound(err) {
 				accessorErrors.Add(err.Error(), 1)
@@ -245,7 +263,7 @@ func InterpolateFields(s string, evts []*kevent.Kevent) string {
 			kevt := evts[i-1]
 			// extract field value from the event and replace in string
 			var val any
-			for _, accessor := range allAccessors() {
+			for _, accessor := range getAccessors() {
 				var err error
 				val, err = accessor.get(fields.Field(m[2]), kevt)
 				if err != nil {

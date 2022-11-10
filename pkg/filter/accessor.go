@@ -20,7 +20,6 @@ package filter
 
 import (
 	"errors"
-
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
@@ -31,8 +30,10 @@ var (
 	ErrPsNil = errors.New("process state is nil")
 )
 
-// kevtAccessor extracts kernel event specific values.
+// kevtAccessor extracts generic event values.
 type kevtAccessor struct{}
+
+func (kevtAccessor) canAccess(kevt *kevent.Kevent, filter *filter) bool { return filter.hasKevtFields }
 
 func newKevtAccessor() accessor {
 	return &kevtAccessor{}

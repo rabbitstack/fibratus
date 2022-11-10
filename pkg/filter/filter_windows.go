@@ -108,17 +108,3 @@ func NewFromCLIWithAllAccessors(args []string) (Filter, error) {
 	}
 	return filter, nil
 }
-
-func allAccessors() []accessor {
-	return []accessor{
-		newKevtAccessor(),
-		newPSAccessor(),
-		newThreadAccessor(),
-		newImageAccessor(),
-		newFileAccessor(),
-		newRegistryAccessor(),
-		newNetworkAccessor(),
-		newHandleAccessor(),
-		newPEAccessor(),
-	}
-}

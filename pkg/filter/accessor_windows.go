@@ -43,6 +43,11 @@ import (
 type accessor interface {
 	// get fetches the parameter value for the specified filter field.
 	get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error)
+	// canAccess indicates if the particular accessor is able to extract
+	// fields from the given event. The filter context is also provided to
+	// this method to determine whether the accessor should be visited depending
+	// on some condition derived from the filter expression.
+	canAccess(kevt *kevent.Kevent, filter *filter) bool
 }
 
 // getAccessors initializes and returns all available accessors.
@@ -69,6 +74,8 @@ func getParentPs(kevt *kevent.Kevent) *pstypes.PS {
 
 // psAccessor extracts process's state or kevent specific values.
 type psAccessor struct{}
+
+func (psAccessor) canAccess(kevt *kevent.Kevent, filter *filter) bool { return filter.hasPsFields }
 
 func newPSAccessor() accessor { return &psAccessor{} }
 
@@ -500,6 +507,10 @@ func ancestorFields(field string, kevt *kevent.Kevent) (kparams.Value, error) {
 // threadAccessor fetches thread parameters from thread kernel events.
 type threadAccessor struct{}
 
+func (threadAccessor) canAccess(kevt *kevent.Kevent, filter *filter) bool {
+	return kevt.Category == ktypes.Thread
+}
+
 func newThreadAccessor() accessor {
 	return &threadAccessor{}
 }
@@ -565,6 +576,10 @@ func (t *threadAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value
 
 // fileAccessor extracts file specific values.
 type fileAccessor struct{}
+
+func (fileAccessor) canAccess(kevt *kevent.Kevent, filter *filter) bool {
+	return kevt.Category == ktypes.File
+}
 
 func newFileAccessor() accessor {
 	return &fileAccessor{}
@@ -632,8 +647,12 @@ func (l *fileAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, 
 	return nil, nil
 }
 
-// imageAccessor extracts image (DLL) kevent values.
+// imageAccessor extracts image (DLL) event values.
 type imageAccessor struct{}
+
+func (imageAccessor) canAccess(kevt *kevent.Kevent, filter *filter) bool {
+	return kevt.Category == ktypes.Image
+}
 
 func newImageAccessor() accessor {
 	return &imageAccessor{}
@@ -668,6 +687,10 @@ func (i *imageAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value,
 // registryAccessor extracts registry specific parameters.
 type registryAccessor struct{}
 
+func (registryAccessor) canAccess(kevt *kevent.Kevent, filter *filter) bool {
+	return kevt.Category == ktypes.Registry
+}
+
 func newRegistryAccessor() accessor {
 	return &registryAccessor{}
 }
@@ -694,6 +717,10 @@ func (r *registryAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Val
 
 // networkAccessor deals with extracting the network specific kernel event parameters.
 type networkAccessor struct{}
+
+func (networkAccessor) canAccess(kevt *kevent.Kevent, filter *filter) bool {
+	return kevt.Category == ktypes.Net
+}
 
 func newNetworkAccessor() accessor { return &networkAccessor{} }
 
@@ -734,6 +761,10 @@ func (n *networkAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Valu
 // handleAccessor extracts handle event values.
 type handleAccessor struct{}
 
+func (handleAccessor) canAccess(kevt *kevent.Kevent, filter *filter) bool {
+	return kevt.Category == ktypes.Handle
+}
+
 func newHandleAccessor() accessor { return &handleAccessor{} }
 
 func (h *handleAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
@@ -756,6 +787,8 @@ func (h *handleAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value
 
 // peAccessor extracts PE specific values.
 type peAccessor struct{}
+
+func (peAccessor) canAccess(kevt *kevent.Kevent, filter *filter) bool { return true }
 
 func newPEAccessor() accessor {
 	return &peAccessor{}
