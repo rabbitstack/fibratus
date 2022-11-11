@@ -61,11 +61,12 @@ type filter struct {
 	bindings  map[uint16][]*ql.PatternBindingLiteral
 	// useFuncValuer determines whether we should supply the function valuer
 	useFuncValuer bool
+	// useProcAccessor indicates if the process accessor is called by this filter
+	useProcAccessor bool
+	// useKevtAccessor indicates if the event accessor is called by this filter
+	useKevtAccessor bool
 	// stringFields contains filter field names mapped to their string values
 	stringFields map[fields.Field][]string
-
-	hasPsFields   bool
-	hasKevtFields bool
 }
 
 // Compile parsers the filter expression and builds a binary expression tree
@@ -127,9 +128,9 @@ func (f *filter) Compile() error {
 	for _, field := range f.fields {
 		switch {
 		case field.IsKevtField():
-			f.hasKevtFields = true
+			f.useKevtAccessor = true
 		case field.IsPsField():
-			f.hasPsFields = true
+			f.useProcAccessor = true
 		}
 	}
 
@@ -186,7 +187,7 @@ func (f *filter) BindingIndex() (uint16, bool) {
 func (f filter) GetStringFields() map[fields.Field][]string { return f.stringFields }
 
 // mapValuer for each field present in the AST, we run the
-// accessors and extract the field vales that are
+// accessors and extract the field values that are
 // supplied to the valuer. The valuer feeds the
 // expression with correct values.
 func (f *filter) mapValuer(kevt *kevent.Kevent) map[string]interface{} {

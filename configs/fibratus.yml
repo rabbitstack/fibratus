@@ -19,13 +19,13 @@ alertsenders:
   # Mail sender transports the alerts via SMTP protocol.
   mail:
     # Enables/disables mail alert sender
-    enabled: false
+    #enabled: true
 
     # Represents the host of the SMTP server
     #host:
 
     # Represents the port of the SMTP server
-    #port: 25
+    #port: 587
 
     # Specifies the user name when authenticating to the SMTP server
     #user:
@@ -38,7 +38,9 @@ alertsenders:
 
     # Specifies all the recipients that'll receive the alert
     #to:
-    #  - ""
+
+    # Specifies the email body content type
+    #content-type: text/html
 
   # Slack sender transports the alerts to the Slack workspace.
   slack:

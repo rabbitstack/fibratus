@@ -75,7 +75,7 @@ func getParentPs(kevt *kevent.Kevent) *pstypes.PS {
 // psAccessor extracts process's state or kevent specific values.
 type psAccessor struct{}
 
-func (psAccessor) canAccess(kevt *kevent.Kevent, filter *filter) bool { return filter.hasPsFields }
+func (psAccessor) canAccess(kevt *kevent.Kevent, filter *filter) bool { return filter.useProcAccessor }
 
 func newPSAccessor() accessor { return &psAccessor{} }
 

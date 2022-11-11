@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package formatter
+package renderer
 
 import (
 	"bytes"
@@ -29,15 +29,10 @@ import (
 	"time"
 )
 
-// HTML formatter produces HTML templates for various alert types. HTML formatter
-// produces inlined CSS to maximize the compatibility between email clients when
-// the alert is transported via email sender.
-type HTML struct{}
-
-// NewHTML builds a new HTML formatter.
-func NewHTML() HTML { return HTML{} }
-
-func (f HTML) FormatRuleAlert(ctx *config.ActionContext, alert alertsender.Alert) (string, error) {
+// RenderHTMLRuleAlert produces HTML template for rule alerts. This function generates
+// inlined CSS to maximize the compatibility between email clients when the alert is
+// transported via email sender or other senders that may render HTML content.
+func RenderHTMLRuleAlert(ctx *config.ActionContext, alert alertsender.Alert) (string, error) {
 	data := struct {
 		*config.ActionContext
 		Alert       alertsender.Alert
@@ -51,7 +46,7 @@ func (f HTML) FormatRuleAlert(ctx *config.ActionContext, alert alertsender.Alert
 		hostname.Get(),
 		version.Get(),
 	}
-
+	_ = data.Alert.MDToHTML()
 	funcmap := sprig.TxtFuncMap()
 
 	// redefine hasKey to work on string map values

@@ -18,7 +18,13 @@
 
 package alertsender
 
-import "fmt"
+import (
+	"bytes"
+	"fmt"
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/extension"
+	"github.com/yuin/goldmark/renderer/html"
+)
 
 // Severity is the type alias for alert's severity level.
 type Severity uint8
@@ -75,6 +81,21 @@ type Alert struct {
 // String returns the alert string representation.
 func (a Alert) String() string {
 	return fmt.Sprintf("Title: %s, Text: %s, Severity: %s, Tags: %v", a.Title, a.Text, a.Severity, a.Tags)
+}
+
+// MDToHTML converts alert's text Markdown elements to HTML blocks.
+func (a *Alert) MDToHTML() error {
+	md := goldmark.New(
+		goldmark.WithExtensions(extension.GFM),
+		goldmark.WithRendererOptions(html.WithUnsafe()),
+	)
+	var w bytes.Buffer
+	err := md.Convert([]byte(a.Text), &w)
+	if err != nil {
+		return err
+	}
+	a.Text = w.String()
+	return nil
 }
 
 // NewAlert builds a new alert.

@@ -21,7 +21,7 @@ package action
 import (
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
-	"github.com/rabbitstack/fibratus/pkg/alertsender/formatter"
+	"github.com/rabbitstack/fibratus/pkg/alertsender/renderer"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	log "github.com/sirupsen/logrus"
 )
@@ -51,18 +51,19 @@ func Emit(ctx *config.ActionContext, title string, text string, args ...string) 
 			tags,
 			alertsender.ParseSeverityFromString(severity),
 		)
-		// produce a HTML rule alert text for email sender
+		// produce HTML rule alert text for email sender
 		if s.Type() == alertsender.Mail {
 			var err error
-			f := formatter.NewHTML()
-			alert.Text, err = f.FormatRuleAlert(ctx, alert)
+			alert.Text, err = renderer.RenderHTMLRuleAlert(ctx, alert)
 			if err != nil {
 				log.Warn(err)
 			}
 		}
-		if err := s.Send(alert); err != nil {
-			log.Warnf("unable to emit alert from rule: %v", err)
-		}
+		go func(s alertsender.Sender) {
+			if err := s.Send(alert); err != nil {
+				log.Warnf("unable to emit alert from rule: %v", err)
+			}
+		}(s)
 	}
 	return nil
 }

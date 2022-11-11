@@ -33,7 +33,9 @@ var (
 // kevtAccessor extracts generic event values.
 type kevtAccessor struct{}
 
-func (kevtAccessor) canAccess(kevt *kevent.Kevent, filter *filter) bool { return filter.hasKevtFields }
+func (kevtAccessor) canAccess(kevt *kevent.Kevent, filter *filter) bool {
+	return filter.useKevtAccessor
+}
 
 func newKevtAccessor() accessor {
 	return &kevtAccessor{}

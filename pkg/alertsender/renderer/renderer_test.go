@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package formatter
+package renderer
 
 import (
 	"github.com/antchfx/htmlquery"
@@ -38,8 +38,7 @@ import (
 )
 
 func TestHTMLFormatterRuleAlert(t *testing.T) {
-	f := HTML{}
-	out, err := f.FormatRuleAlert(&config.ActionContext{
+	out, err := RenderHTMLRuleAlert(&config.ActionContext{
 		Group: config.FilterGroup{
 			Description: "Identifies attempts from adversaries to acquire credentials from Vault files.",
 			Labels: map[string]string{
@@ -245,7 +244,7 @@ func TestHTMLFormatterRuleAlert(t *testing.T) {
 	},
 		alertsender.Alert{
 			Title:    "Suspicious access to Windows Vault files",
-			Text:     "<code>cmd.exe</code> attempted to access Windows Vault files which was considered as a suspicious activity",
+			Text:     "`cmd.exe` attempted to access Windows Vault files which was considered as a suspicious activity",
 			Severity: alertsender.Critical})
 	require.NoError(t, err)
 	doc, err := htmlquery.Parse(strings.NewReader(out))
