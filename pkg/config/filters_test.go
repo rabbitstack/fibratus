@@ -22,10 +22,10 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 )
 
@@ -34,6 +34,8 @@ func newFilters(paths ...string) Filters {
 		Rules{
 			FromPaths: paths,
 		},
+		Macros{FromPaths: nil},
+		map[string]*Macro{},
 	}
 }
 
@@ -44,6 +46,8 @@ func TestLoadGroupsFromPaths(t *testing.T) {
 				"_fixtures/filters/default.yml",
 			},
 		},
+		Macros{FromPaths: nil},
+		map[string]*Macro{},
 	}
 	groups, err := filters.LoadGroups()
 	require.NoError(t, err)
@@ -78,6 +82,8 @@ func TestLoadGroupsFromPathsNewAttributes(t *testing.T) {
 				"_fixtures/filters/default-new-attributes.yml",
 			},
 		},
+		Macros{FromPaths: nil},
+		map[string]*Macro{},
 	}
 	groups, err := filters.LoadGroups()
 	require.NoError(t, err)
@@ -109,7 +115,7 @@ func TestLoadGroupsFromPathsNewAttributes(t *testing.T) {
 func TestLoadGroupsFromURLs(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/default.yml", func(w http.ResponseWriter, r *http.Request) {
-		b, err := ioutil.ReadFile("_fixtures/filters/default.yml")
+		b, err := os.ReadFile("_fixtures/filters/default.yml")
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
@@ -132,6 +138,8 @@ func TestLoadGroupsFromURLs(t *testing.T) {
 				"http://localhost:3231/default.yml",
 			},
 		},
+		Macros{FromPaths: nil},
+		map[string]*Macro{},
 	}
 	groups, err := filters.LoadGroups()
 	require.NoError(t, err)
@@ -158,20 +166,4 @@ func TestLoadGroupsInvalidTemplates(t *testing.T) {
 			t.Errorf("%d. filter group error mismatch: exp=%s got=%v", i, tt.errMsg, err)
 		}
 	}
-}
-
-func TestLoadGroupsWithValues(t *testing.T) {
-	filters := Filters{
-		Rules{
-			FromPaths: []string{
-				"_fixtures/filters/values/default.yml",
-			},
-		},
-	}
-	groups, err := filters.LoadGroups()
-	require.NoError(t, err)
-	require.Len(t, groups, 2)
-
-	g2 := groups[1]
-	assert.Equal(t, "kevt.category = 'net' and ps.name in ('at.exe', 'java.exe', 'nc.exe')", g2.FromStrings[0].Def)
 }

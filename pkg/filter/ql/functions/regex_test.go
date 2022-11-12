@@ -33,6 +33,9 @@ func TestRegex(t *testing.T) {
 	res1, _ := call.Call([]interface{}{`powershell.exe`, `power.*(shell|hell).dll`, `.*hell.exe`})
 	assert.True(t, res1.(bool))
 
+	res3, _ := call.Call([]interface{}{`powershell.exe`, "[`"})
+	assert.False(t, res3.(bool))
+
 	for i := 0; i < 10; i++ {
 		res, _ := call.Call([]interface{}{`powershell.exe`, `power.*(shell|hell).dll`, `.*hell.exe`})
 		assert.True(t, res.(bool))

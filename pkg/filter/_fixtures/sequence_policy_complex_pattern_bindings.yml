@@ -22,6 +22,6 @@
       condition: >
         kevt.name in ('Send', 'Connect') and ps.pid = $3.ps.sibling.pid
   action: >
-      {{ emit "Phishing dropper outbound communication"
+      {{ emit . "Phishing dropper outbound communication"
         (printf "%s process initiated outbound communication to %s" .Kevts.k3.Kparams.name .Kevts.k4.Kparams.dip)
       }}

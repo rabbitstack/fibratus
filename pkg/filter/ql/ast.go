@@ -213,6 +213,12 @@ func (v *ValuerEval) Eval(expr Expr) interface{} {
 
 func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 	lhs := v.Eval(expr.LHS)
+	// lazy evaluation for the AND operator
+	if lhs != nil && expr.Op == and {
+		if val, ok := lhs.(bool); ok && !val {
+			return false
+		}
+	}
 	rhs := v.Eval(expr.RHS)
 	if lhs == nil && rhs != nil {
 		// when the LHS is nil and the RHS is a boolean, implicitly cast the
@@ -709,6 +715,12 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 				return false
 			}
 			return lhs == rhs
+		case ieq:
+			rhs, ok := rhs.(string)
+			if !ok {
+				return false
+			}
+			return strings.EqualFold(lhs, rhs)
 		case neq:
 			rhs, ok := rhs.(string)
 			if !ok {
@@ -924,12 +936,12 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			ips, ok := rhs.([]net.IP)
 			if !ok {
 				// keep backward compatibility with string lists
-				ips1, ok := rhs.([]string)
+				addrs, ok := rhs.([]string)
 				if !ok {
 					return false
 				}
-				for _, ip := range ips1 {
-					if net.ParseIP(ip).Equal(lhs) {
+				for _, s := range addrs {
+					if net.ParseIP(s).Equal(lhs) {
 						return true
 					}
 				}
@@ -999,6 +1011,19 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			for _, i := range lhs {
 				for _, j := range rhs {
 					if i == j {
+						return true
+					}
+				}
+			}
+			return false
+		case iin:
+			rhs, ok := rhs.([]string)
+			if !ok {
+				return false
+			}
+			for _, i := range lhs {
+				for _, j := range rhs {
+					if strings.EqualFold(i, j) {
 						return true
 					}
 				}
@@ -1088,7 +1113,7 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 	// the types were not comparable. If our operation was an equality operation,
 	// return false instead of true.
 	switch expr.Op {
-	case eq, neq, lt, lte, gt, gte:
+	case eq, ieq, neq, lt, lte, gt, gte:
 		return false
 	}
 	return nil

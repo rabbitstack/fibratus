@@ -63,7 +63,7 @@ func TestSnapshotterWrite(t *testing.T) {
 	assert.Equal(t, `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`, ps.Comm)
 	assert.Equal(t, `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --parent`, ps.Exe)
 	assert.Equal(t, `admin\SYSTEM`, ps.SID)
-	assert.Len(t, ps.Args, 14)
+	assert.Len(t, ps.Args, 13)
 	assert.Equal(t, "--type=crashpad-handler", ps.Args[1])
 	assert.Equal(t, "ps", filepath.Base(ps.Cwd))
 	assert.True(t, len(ps.Envs) > 0)

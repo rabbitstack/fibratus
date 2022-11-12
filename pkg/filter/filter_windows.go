@@ -28,7 +28,7 @@ import (
 
 // New creates a new filter with the specified filter expression. The consumers must ensure
 // the expression is correctly parsed before executing the filter. This is achieved by calling the
-// Compile` method after constructing the filter.
+// `Compile` method after constructing the filter.
 func New(expr string, config *config.Config) Filter {
 	accessors := []accessor{
 		// general event parameters
@@ -37,6 +37,7 @@ func New(expr string, config *config.Config) Filter {
 		newPSAccessor(),
 	}
 	kconfig := config.Kstream
+	fconfig := config.Filters
 
 	if kconfig.EnableThreadKevents {
 		accessors = append(accessors, newThreadAccessor())
@@ -60,11 +61,19 @@ func New(expr string, config *config.Config) Filter {
 		accessors = append(accessors, newPEAccessor())
 	}
 
+	var parser *ql.Parser
+	if fconfig.HasMacros() {
+		parser = ql.NewParserWithConfig(expr, fconfig)
+	} else {
+		parser = ql.NewParser(expr)
+	}
+
 	return &filter{
-		parser:    ql.NewParser(expr),
-		accessors: accessors,
-		fields:    make([]fields.Field, 0),
-		bindings:  make(map[uint16][]*ql.PatternBindingLiteral),
+		parser:       parser,
+		accessors:    accessors,
+		fields:       make([]fields.Field, 0),
+		stringFields: make(map[fields.Field][]string),
+		bindings:     make(map[uint16][]*ql.PatternBindingLiteral),
 	}
 }
 
@@ -76,7 +85,7 @@ func NewFromCLI(args []string, config *config.Config) (Filter, error) {
 	}
 	filter := New(expr, config)
 	if err := filter.Compile(); err != nil {
-		return nil, fmt.Errorf("bad filter:\n %v", err)
+		return nil, fmt.Errorf("bad filter:\n%v", err)
 	}
 	return filter, nil
 }
@@ -88,10 +97,11 @@ func NewFromCLIWithAllAccessors(args []string) (Filter, error) {
 		return nil, nil
 	}
 	filter := &filter{
-		parser:    ql.NewParser(expr),
-		accessors: getAccessors(),
-		fields:    make([]fields.Field, 0),
-		bindings:  make(map[uint16][]*ql.PatternBindingLiteral),
+		parser:       ql.NewParser(expr),
+		accessors:    getAccessors(),
+		fields:       make([]fields.Field, 0),
+		stringFields: make(map[fields.Field][]string),
+		bindings:     make(map[uint16][]*ql.PatternBindingLiteral),
 	}
 	if err := filter.Compile(); err != nil {
 		return nil, fmt.Errorf("bad filter:\n %v", err)

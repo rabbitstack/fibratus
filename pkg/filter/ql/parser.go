@@ -21,6 +21,9 @@
 package ql
 
 import (
+	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"net"
 	"strconv"
 	"strings"
@@ -29,6 +32,7 @@ import (
 // Parser builds the binary expression tree from the filter string.
 type Parser struct {
 	s    *bufScanner
+	c    *config.Filters
 	expr string
 }
 
@@ -37,11 +41,15 @@ func NewParser(expr string) *Parser {
 	return &Parser{s: newBufScanner(strings.NewReader(expr)), expr: expr}
 }
 
+// NewParserWithConfig builds a new parser instance with filters config.
+func NewParserWithConfig(expr string, config *config.Filters) *Parser {
+	return &Parser{s: newBufScanner(strings.NewReader(expr)), expr: expr, c: config}
+}
+
 // ParseExpr parses an expression by building the binary expression tree.
 func (p *Parser) ParseExpr() (Expr, error) {
 	var err error
 	root := &BinaryExpr{}
-
 	// parse a non-binary expression type to start. This variable will always be
 	// the root of the expression tree.
 	root.RHS, err = p.parseUnaryExpr()
@@ -65,7 +73,7 @@ func (p *Parser) ParseExpr() (Expr, error) {
 			// expect LPAREN after in
 			tok, pos, lit := p.scanIgnoreWhitespace()
 			p.unscan()
-			if tok != lparen {
+			if tok != lparen && !p.c.IsMacroList(lit) {
 				return nil, newParseError(tokstr(op, lit), []string{"'('"}, pos, p.expr)
 			}
 		}
@@ -167,9 +175,26 @@ func (p *Parser) parseUnaryExpr() (Expr, error) {
 		if tok0, _, _ := p.scan(); tok0 == lparen {
 			return p.parseFunction(lit)
 		}
-		// unscan lparen and ident tokens
+		// unscan lparen token
 		p.unscan()
-		p.unscan()
+
+		// expand macros
+		if p.c != nil {
+			macro := p.c.GetMacro(lit)
+			if macro != nil {
+				if macro.Expr != "" {
+					p := NewParserWithConfig(macro.Expr, p.c)
+					expr, err := p.ParseExpr()
+					if err != nil {
+						return nil, multierror.WrapWithSeparator("\n", fmt.Errorf("syntax error in %q macro", lit), err)
+					}
+					return expr, nil
+				}
+				return &ListLiteral{Values: macro.List}, nil
+			}
+			// unscan ident
+			p.unscan()
+		}
 	case ip:
 		return &IPLiteral{Value: net.ParseIP(lit)}, nil
 	case str:

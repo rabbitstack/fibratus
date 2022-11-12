@@ -20,6 +20,7 @@ package interceptors
 
 import (
 	"expvar"
+	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -78,34 +79,35 @@ func (ps psInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 	case ktypes.CreateProcess,
 		ktypes.TerminateProcess,
 		ktypes.EnumProcess:
-		cmdline, err := kevt.Kparams.GetString(kparams.Comm)
+		cmndline, err := kevt.Kparams.GetString(kparams.Comm)
 		if err != nil {
 			return kevt, true, err
 		}
-		// if leading/trailing quotes are found, get rid of them
-		if len(cmdline) > 0 && cmdline[0] == '"' && cmdline[len(cmdline)-1] == '"' {
-			cmdline = cmdline[1 : len(cmdline)-1]
+		// if leading/trailing quotes are found in the executable path, get rid of them
+		args := cmdline.Split(cmndline)
+		if len(args) > 0 {
+			cmndline = cmdline.CleanExe(args)
 		}
 		// expand all variations of the SystemRoot env variable
-		if systemRootRegexp.MatchString(cmdline) {
-			cmdline = systemRootRegexp.ReplaceAllString(cmdline, os.Getenv("SystemRoot"))
+		if systemRootRegexp.MatchString(cmndline) {
+			cmndline = systemRootRegexp.ReplaceAllString(cmndline, os.Getenv("SystemRoot"))
 		}
 		// some system processes are reported without the path in the command line,
 		// but we can expand the path from the SystemRoot environment variable
-		if !driveRegexp.MatchString(cmdline) {
+		if !driveRegexp.MatchString(cmndline) {
 			proc, _ := kevt.Kparams.GetString(kparams.ProcessName)
 			_, ok := sysProcs[proc]
 			if ok {
-				cmdline = filepath.Join(os.Getenv("SystemRoot"), "System32", cmdline)
+				cmndline = filepath.Join(os.Getenv("SystemRoot"), "System32", cmndline)
 			}
 		}
 		// append executable path parameter
-		i := strings.Index(strings.ToLower(cmdline), ".exe")
+		i := strings.Index(strings.ToLower(cmndline), ".exe")
 		if i > 0 {
-			exe := cmdline[0 : i+4]
+			exe := cmndline[0 : i+4]
 			kevt.Kparams.Append(kparams.Exe, kparams.UnicodeString, exe)
 		}
-		_ = kevt.Kparams.SetValue(kparams.Comm, cmdline)
+		_ = kevt.Kparams.SetValue(kparams.Comm, cmndline)
 
 		// convert hexadecimal PID values to integers
 		pid, err := kevt.Kparams.GetHexAsUint32(kparams.ProcessID)

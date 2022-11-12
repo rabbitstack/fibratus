@@ -19,6 +19,8 @@
 package filter
 
 import (
+	"github.com/rabbitstack/fibratus/pkg/filter/fields"
+	"github.com/stretchr/testify/assert"
 	"net"
 	"testing"
 	"time"
@@ -41,7 +43,8 @@ var cfg = &config.Config{
 		EnableImageKevents:    true,
 		EnableThreadKevents:   true,
 	},
-	PE: pe.Config{Enabled: true},
+	Filters: &config.Filters{},
+	PE:      pe.Config{Enabled: true},
 }
 
 func TestFilterCompile(t *testing.T) {
@@ -53,6 +56,14 @@ func TestFilterCompile(t *testing.T) {
 	require.EqualError(t, f.Compile(), "expected at least one field or operator but zero found")
 	f = New(`ps.name =`, cfg)
 	require.EqualError(t, f.Compile(), "ps.name =\n╭─────────^\n|\n|\n╰─────────────────── expected field, string, number, bool, ip, function, pattern binding")
+}
+
+func TestStringFields(t *testing.T) {
+	f := New(`ps.name = 'cmd.exe' and kevt.name = 'CreateProcess' or kevt.name in ('TerminateProcess', 'CreateFile')`, cfg)
+	require.NoError(t, f.Compile())
+	assert.Len(t, f.GetStringFields(), 2)
+	assert.Len(t, f.GetStringFields()[fields.KevtName], 3)
+	assert.Len(t, f.GetStringFields()[fields.PsName], 1)
 }
 
 func TestFilterRunProcessKevent(t *testing.T) {
@@ -128,6 +139,7 @@ func TestFilterRunProcessKevent(t *testing.T) {
 		{`ps.name = 'svchost.exe'`, true},
 		{`ps.name = 'svchot.exe'`, false},
 		{`ps.name = 'mimikatz.exe' or ps.name contains 'svc'`, true},
+		{`ps.name ~= 'SVCHOST.exe'`, true},
 		{`ps.username = 'tor'`, true},
 		{`ps.domain = 'LOCAL'`, true},
 		{`ps.pid = 1023`, true},
@@ -207,9 +219,10 @@ func TestFilterRunThreadKevent(t *testing.T) {
 	}
 
 	kevt := &kevent.Kevent{
-		Type:    ktypes.CreateThread,
-		Kparams: kpars,
-		Name:    "CreateThread",
+		Type:     ktypes.CreateThread,
+		Kparams:  kpars,
+		Name:     "CreateThread",
+		Category: ktypes.Thread,
 		PS: &pstypes.PS{
 			Name: "svchost.exe",
 			Envs: map[string]string{"ALLUSERSPROFILE": "C:\\ProgramData", "OS": "Windows_NT", "ProgramFiles(x86)": "C:\\Program Files (x86)"},
@@ -379,6 +392,7 @@ func TestFilterRunNetKevent(t *testing.T) {
 		PS: &pstypes.PS{
 			Name: "cmd.exe",
 		},
+		Category: ktypes.Net,
 		Kparams: kevent.Kparams{
 			kparams.NetDport:    {Name: kparams.NetDport, Type: kparams.Uint16, Value: uint16(443)},
 			kparams.NetSport:    {Name: kparams.NetSport, Type: kparams.Uint16, Value: uint16(43123)},
@@ -429,9 +443,10 @@ func TestFilterRunNetKevent(t *testing.T) {
 
 func TestFilterRunRegistryKevent(t *testing.T) {
 	kevt := &kevent.Kevent{
-		Type: ktypes.RegSetValue,
-		Tid:  2484,
-		PID:  859,
+		Type:     ktypes.RegSetValue,
+		Tid:      2484,
+		PID:      859,
+		Category: ktypes.Registry,
 		Kparams: kevent.Kparams{
 			kparams.RegKeyName:   {Name: kparams.RegKeyName, Type: kparams.UnicodeString, Value: `HKEY_LOCAL_MACHINE\SYSTEM\Setup\Pid`},
 			kparams.RegValue:     {Name: kparams.RegValue, Type: kparams.Uint32, Value: 10234},
@@ -510,6 +525,123 @@ func TestFilterRunPE(t *testing.T) {
 		matches := f.Run(kevt)
 		if matches != tt.matches {
 			t.Errorf("%d. %q pe filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
+		}
+	}
+}
+
+func TestInterpolateFields(t *testing.T) {
+	var tests = []struct {
+		original     string
+		interpolated string
+		evts         []*kevent.Kevent
+	}{
+		{
+			original:     "Credential discovery via %ps.name and user %ps.sid",
+			interpolated: "Credential discovery via VaultCmd.exe and user LOCAL\\tor",
+			evts: []*kevent.Kevent{
+				{
+					Type:     ktypes.CreateProcess,
+					Category: ktypes.Process,
+					Name:     "CreateProcess",
+					PID:      1023,
+					PS: &pstypes.PS{
+						Name: "VaultCmd.exe",
+						Ppid: 345,
+						SID:  "LOCAL\\tor",
+					},
+				},
+			},
+		},
+		{
+			original:     "Credential discovery via %ps.name and pid %kevt.pid",
+			interpolated: "Credential discovery via N/A and pid 1023",
+			evts: []*kevent.Kevent{
+				{
+					Type:     ktypes.CreateProcess,
+					Category: ktypes.Process,
+					Name:     "CreateProcess",
+					PID:      1023,
+				},
+			},
+		},
+		{
+			original: `Detected an attempt by <code>%1.ps.name</code> process to access
+and read the memory of the <b>Local Security And Authority Subsystem Service</b>
+and subsequently write the <code>%2.file.name</code> dump file to the disk device`,
+			interpolated: `Detected an attempt by <code>taskmgr.exe</code> process to access
+and read the memory of the <b>Local Security And Authority Subsystem Service</b>
+and subsequently write the <code>C:\Users
+eo\Temp\lsass.dump</code> dump file to the disk device`,
+			evts: []*kevent.Kevent{
+				{
+					Type:     ktypes.OpenProcess,
+					Category: ktypes.Process,
+					Name:     "OpenProcess",
+					PID:      1023,
+					PS: &pstypes.PS{
+						Name: "taskmgr.exe",
+						Ppid: 345,
+						SID:  "LOCAL\\tor",
+					},
+				},
+				{
+					Type:     ktypes.WriteFile,
+					Category: ktypes.File,
+					Name:     "WriteFile",
+					PID:      1023,
+					Kparams: kevent.Kparams{
+						kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Users\neo\\Temp\\lsass.dump"},
+					},
+					PS: &pstypes.PS{
+						Name: "taskmgr.exe",
+						Ppid: 345,
+						SID:  "LOCAL\\tor",
+					},
+				},
+			},
+		},
+		{
+			original: `Detected an attempt by <code>%ps.name</code> process to access
+and read the memory of the <b>Local Security And Authority Subsystem Service</b>
+and subsequently write the <code>%2.file.name</code> dump file to the disk device`,
+			interpolated: `Detected an attempt by <code>taskmgr.exe</code> process to access
+and read the memory of the <b>Local Security And Authority Subsystem Service</b>
+and subsequently write the <code>C:\Users
+eo\Temp\lsass.dump</code> dump file to the disk device`,
+			evts: []*kevent.Kevent{
+				{
+					Type:     ktypes.OpenProcess,
+					Category: ktypes.Process,
+					Name:     "OpenProcess",
+					PID:      1023,
+					PS: &pstypes.PS{
+						Name: "taskmgr.exe",
+						Ppid: 345,
+						SID:  "LOCAL\\tor",
+					},
+				},
+				{
+					Type:     ktypes.WriteFile,
+					Category: ktypes.File,
+					Name:     "WriteFile",
+					PID:      1023,
+					Kparams: kevent.Kparams{
+						kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Users\neo\\Temp\\lsass.dump"},
+					},
+					PS: &pstypes.PS{
+						Name: "taskmgr.exe",
+						Ppid: 345,
+						SID:  "LOCAL\\tor",
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		s := InterpolateFields(tt.original, tt.evts)
+		if tt.interpolated != s {
+			t.Errorf("expected %s interpolated string but got %s", tt.interpolated, s)
 		}
 	}
 }

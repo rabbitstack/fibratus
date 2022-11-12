@@ -19,9 +19,8 @@
 package functions
 
 import (
-	"regexp"
-
 	log "github.com/sirupsen/logrus"
+	"regexp"
 )
 
 // Regex applies single/multiple regular expressions on the provided string arguments.
@@ -34,41 +33,43 @@ func NewRegex() *Regex {
 	return &Regex{rxs: make(map[string]*regexp.Regexp)}
 }
 
-func (f Regex) Call(args []interface{}) (interface{}, bool) {
+func (f *Regex) Call(args []interface{}) (interface{}, bool) {
 	if len(args) < 2 {
 		return false, false
 	}
 	s := parseString(0, args)
 
+	// match regular expressions
 	for _, arg := range args[1:] {
 		expr, ok := arg.(string)
 		if !ok {
 			continue
 		}
-		rx, compiled := f.rxs[expr]
-		if compiled && rx == nil {
-			continue
-		}
-		if !compiled {
+		rx, ok := f.rxs[expr]
+		if !ok {
 			var err error
 			rx, err = regexp.Compile(expr)
 			if err != nil {
-				log.Warnf("invalid regular expression pattern: %v", err)
-				// to avoid compiling the regex ad infinitum
+				log.Warnf(
+					"invalid %q pattern in "+
+						"regex function: %v", expr, err)
 				f.rxs[expr] = nil
-				continue
+			} else {
+				f.rxs[expr] = rx
 			}
-			f.rxs[expr] = rx
+		}
+		if rx == nil {
+			continue
 		}
 		if rx.MatchString(s) {
 			return true, true
 		}
 	}
 
-	return false, false
+	return false, true
 }
 
-func (f Regex) Desc() FunctionDesc {
+func (f *Regex) Desc() FunctionDesc {
 	desc := FunctionDesc{
 		Name: RegexFn,
 		Args: []FunctionArgDesc{
@@ -84,4 +85,4 @@ func (f Regex) Desc() FunctionDesc {
 	return desc
 }
 
-func (f Regex) Name() Fn { return RegexFn }
+func (f *Regex) Name() Fn { return RegexFn }

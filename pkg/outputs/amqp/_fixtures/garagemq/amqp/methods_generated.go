@@ -4458,12 +4458,11 @@ ReadMethod reads method from frame's payload
 Method frames carry the high-level protocol commands (which we call "methods").
 One method frame carries one command.  The method frame payload has this format:
 
-  0          2           4
-  +----------+-----------+-------------- - -
-  | class-id | method-id | arguments...
-  +----------+-----------+-------------- - -
-     short      short    ...
-
+	0          2           4
+	+----------+-----------+-------------- - -
+	| class-id | method-id | arguments...
+	+----------+-----------+-------------- - -
+	   short      short    ...
 */
 func ReadMethod(reader io.Reader, protoVersion string) (Method, error) {
 	classID, err := ReadShort(reader)

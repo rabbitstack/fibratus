@@ -247,7 +247,7 @@ func (k Ktype) String() string {
 	case LoadDriver:
 		return "LoadDriver"
 	default:
-		return string(k[:])
+		return ""
 	}
 }
 

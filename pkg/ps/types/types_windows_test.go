@@ -69,6 +69,6 @@ func TestPSArgs(t *testing.T) {
 		"",
 		"C:\\Users\\admin\\AppData\\Roaming\\Spotify\\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler \"--metrics-dir=C:\\Users\\admin\\AppData\\Local\\Spotify\\User Data\" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify",
 		Thread{}, nil)
-	require.Len(t, ps.Args, 12)
+	require.Len(t, ps.Args, 11)
 	require.Equal(t, "/prefetch:7", ps.Args[2])
 }

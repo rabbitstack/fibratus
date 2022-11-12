@@ -48,14 +48,16 @@ func (s mail) Send(alert alertsender.Alert) error {
 		return err
 	}
 	defer sender.Close()
-	return gomail.Send(sender, composeMessage(s.c.From, s.c.To, alert))
+	return gomail.Send(sender, s.composeMessage(s.c.From, s.c.To, alert))
 }
 
-func composeMessage(from string, to []string, alert alertsender.Alert) *gomail.Message {
+func (s mail) Type() alertsender.Type { return alertsender.Mail }
+
+func (s mail) composeMessage(from string, to []string, alert alertsender.Alert) *gomail.Message {
 	msg := gomail.NewMessage()
 	msg.SetHeader("From", from)
 	msg.SetHeader("To", to...)
 	msg.SetHeader("Subject", alert.Title)
-	msg.SetBody("text/plain", alert.Text)
+	msg.SetBody(s.c.ContentType, alert.Text)
 	return msg
 }

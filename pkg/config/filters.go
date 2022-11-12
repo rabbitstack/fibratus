@@ -22,7 +22,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/filter/funcmap"
+	"github.com/Masterminds/sprig/v3"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
@@ -31,7 +31,6 @@ import (
 	"gopkg.in/yaml.v3"
 	"hash/fnv"
 	"io"
-	"io/ioutil"
 	"net/http"
 	u "net/url"
 	"os"
@@ -73,7 +72,7 @@ const (
 	UnknownRelation
 )
 
-// String yields human readable group policy.
+// String yields a human-readable group policy.
 func (p FilterGroupPolicy) String() string {
 	switch p {
 	case IncludePolicy:
@@ -87,7 +86,7 @@ func (p FilterGroupPolicy) String() string {
 	}
 }
 
-// String yields human readable group relation.
+// String yields a human-readable group relation.
 func (r FilterGroupRelation) String() string {
 	switch r {
 	case OrRelation:
@@ -147,14 +146,16 @@ func filterGroupRelationFromString(s string) FilterGroupRelation {
 
 // FilterConfig is the descriptor of a single filter.
 type FilterConfig struct {
-	Name      string        `json:"name" yaml:"name"`
-	Def       string        `json:"def" yaml:"def"` // deprecated in favor of `Condition`
-	Condition string        `json:"condition" yaml:"condition"`
-	Action    string        `json:"action" yaml:"action"`
-	MaxSpan   time.Duration `json:"max-span" yaml:"max-span"`
+	Name        string            `json:"name" yaml:"name"`
+	Description string            `json:"description" yaml:"description"`
+	Def         string            `json:"def" yaml:"def"` // deprecated in favor of `Condition`
+	Condition   string            `json:"condition" yaml:"condition"`
+	Action      string            `json:"action" yaml:"action"`
+	MaxSpan     time.Duration     `json:"max-span" yaml:"max-span"`
+	Labels      map[string]string `json:"labels" yaml:"labels"`
 }
 
-// parseTmpl ensures the correctness of the filter
+// parseTmpl ensures the correctness of the rule
 // action template by trying to parse the template
 // string from the base64 payload.
 func (f FilterConfig) parseTmpl(resource string) error {
@@ -165,7 +166,7 @@ func (f FilterConfig) parseTmpl(resource string) error {
 	if err != nil {
 		return err
 	}
-	tmpl, err := template.New(f.Name).Funcs(funcmap.New()).Parse(string(decoded))
+	tmpl, err := template.New(f.Name).Funcs(FilterFuncMap()).Parse(string(decoded))
 	if err != nil {
 		return cleanupParseError(resource, err)
 	}
@@ -176,6 +177,7 @@ func (f FilterConfig) parseTmpl(resource string) error {
 // FilterGroup represents the container for filters.
 type FilterGroup struct {
 	Name        string              `json:"group" yaml:"group"`
+	Description string              `json:"description" yaml:"description"`
 	Enabled     *bool               `json:"enabled" yaml:"enabled"`
 	Selector    FilterGroupSelector `json:"selector" yaml:"selector"`
 	Policy      FilterGroupPolicy   `json:"policy" yaml:"policy"`
@@ -183,6 +185,7 @@ type FilterGroup struct {
 	Rules       []*FilterConfig     `json:"rules" yaml:"rules"`
 	FromStrings []*FilterConfig     `json:"from-strings" yaml:"from-strings"` // deprecated in favor or `Rules`
 	Tags        []string            `json:"tags" yaml:"tags"`
+	Labels      map[string]string   `json:"labels" yaml:"labels"`
 	Action      string              `json:"action" yaml:"action"` // only valid in sequence policies
 }
 
@@ -197,7 +200,7 @@ func (g FilterGroup) validate(resource string) error {
 				"Only groups with include policies can have rule actions", filter.Name, g.Name)
 		}
 		if filter.MaxSpan != 0 && g.Policy != SequencePolicy {
-			return fmt.Errorf("%q rule found has max span, but it is not in sequence policy " +
+			return fmt.Errorf("%q rule has max span, but it is not in sequence policy " +
 				filter.Name)
 		}
 		if err := filter.parseTmpl(resource); err != nil {
@@ -235,12 +238,19 @@ func (s FilterGroupSelector) Hash() uint32 {
 	return s.Category.Hash()
 }
 
-// Filters contains references to filter group definitions.
-// Each filter group can contain multiple filter expressions.
-// Filter expressions can reside in the filter group file or
-// live in a separate file.
+// Filters contains references to rule groups and macro definitions.
+// Each filter group can contain multiple filter expressions whcih
+// represent the rules.
 type Filters struct {
-	Rules Rules `json:"rules" yaml:"rules"`
+	Rules  Rules  `json:"rules" yaml:"rules"`
+	Macros Macros `json:"macros" yaml:"macros"`
+	macros map[string]*Macro
+}
+
+// FiltersWithMacros builds the filter config with the map of
+// predefined macros. Only used for testing purposes.
+func FiltersWithMacros(macros map[string]*Macro) *Filters {
+	return &Filters{macros: macros}
 }
 
 // Rules contains attributes that describe the location of
@@ -250,38 +260,124 @@ type Rules struct {
 	FromURLs  []string `json:"from-urls" yaml:"from-urls"`
 }
 
-const rulesFromPaths = "filters.rules.from-paths"
-const rulesFromURLs = "filters.rules.from-urls"
+// Macros contains attributes that describe the location of
+// macro resources.
+type Macros struct {
+	FromPaths []string `json:"from-paths" yaml:"from-paths"`
+}
+
+// Macro represents the state of the rule macro. Macros
+// either expand to expressions or lists.
+type Macro struct {
+	ID          string   `json:"macro" yaml:"macro"`
+	Description string   `json:"description" yaml:"description"`
+	Expr        string   `json:"expr" yaml:"expr"`
+	List        []string `json:"list" yaml:"list"`
+}
+
+const (
+	rulesFromPaths  = "filters.rules.from-paths"
+	rulesFromURLs   = "filters.rules.from-urls"
+	macrosFromPaths = "filters.macros.from-paths"
+)
 
 func (f *Filters) initFromViper(v *viper.Viper) {
 	f.Rules.FromPaths = v.GetStringSlice(rulesFromPaths)
 	f.Rules.FromURLs = v.GetStringSlice(rulesFromURLs)
+	f.Macros.FromPaths = v.GetStringSlice(macrosFromPaths)
 }
 
-// LoadGroups for each filter group file it decodes the
+func (f Filters) HasMacros() bool           { return len(f.macros) > 0 }
+func (f Filters) GetMacro(id string) *Macro { return f.macros[id] }
+func (f Filters) IsMacroList(id string) bool {
+	macro, ok := f.macros[id]
+	if !ok {
+		return false
+	}
+	return macro.List != nil
+}
+
+// LoadMacros from the macro library. The Go templates are applied
+// on each macro file before running the YAML decoder on them.
+func (f *Filters) LoadMacros() error {
+	f.macros = make(map[string]*Macro)
+	for _, p := range f.Macros.FromPaths {
+		paths, err := filepath.Glob(p)
+		if err != nil {
+			return err
+		}
+		for _, path := range paths {
+			if filepath.Ext(path) != ".yml" && filepath.Ext(path) != ".yaml" {
+				continue
+			}
+			log.Infof("loading macros from file %s", path)
+			buf, err := os.ReadFile(path)
+			if err != nil {
+				return fmt.Errorf("couldn't load macros from file: %v", err)
+			}
+			// validate macro yaml structure
+			var out interface{}
+			err = yaml.Unmarshal(buf, &out)
+			if err != nil {
+				return fmt.Errorf("%q is invalid macro yaml file: %v", path, err)
+			}
+			valid, errs := validate(macrosSchema, out)
+			if !valid || len(errs) > 0 {
+				b, err := yaml.Marshal(&out)
+				if err == nil {
+					out = string(b)
+				}
+				return fmt.Errorf("invalid macro definition: \n\n"+
+					"%v in %s: %v", out, path, multierror.Wrap(errs...))
+			}
+			buf, err = renderTmpl(path, buf)
+			if err != nil {
+				return err
+			}
+			// unmarshal macros and transform to map
+			var macros []Macro
+			if err := yaml.Unmarshal(buf, &macros); err != nil {
+				return err
+			}
+			for _, m := range macros {
+				f.macros[m.ID] = &Macro{
+					ID:          m.ID,
+					Description: m.Description,
+					Expr:        m.Expr,
+					List:        m.List,
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// LoadGroups for each rule group file it decodes the
 // groups and ensures the correctness of the yaml file.
 func (f Filters) LoadGroups() ([]FilterGroup, error) {
 	allGroups := make([]FilterGroup, 0)
-	for _, path := range f.Rules.FromPaths {
-		log.Infof("loading rules from file %s", path)
-		file, err := os.Stat(path)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't open rule file %s: %v", path, err)
-		}
-		if file.IsDir() {
-			return nil, fmt.Errorf("expected yml file but got directory %s", path)
-		}
-		// read the file group yaml file and produce
-		// the corresponding filter groups from it
-		rawConfig, err := ioutil.ReadFile(path)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't load rule file: %v", err)
-		}
-		groups, err := decodeFilterGroups(path, rawConfig)
+	for _, p := range f.Rules.FromPaths {
+		paths, err := filepath.Glob(p)
 		if err != nil {
 			return nil, err
 		}
-		allGroups = append(allGroups, groups...)
+		for _, path := range paths {
+			if filepath.Ext(path) != ".yml" && filepath.Ext(path) != ".yaml" {
+				continue
+			}
+			log.Infof("loading rules from file %s", path)
+			// read the file group yaml file and produce
+			// the corresponding filter groups from it
+			rawConfig, err := os.ReadFile(path)
+			if err != nil {
+				return nil, fmt.Errorf("couldn't load rule file: %v", err)
+			}
+			groups, err := decodeFilterGroups(path, rawConfig)
+			if err != nil {
+				return nil, err
+			}
+			allGroups = append(allGroups, groups...)
+		}
 	}
 	for _, url := range f.Rules.FromURLs {
 		log.Infof("loading rules from URL %s", url)
@@ -329,7 +425,7 @@ func decodeFilterGroups(resource string, b []byte) ([]FilterGroup, error) {
 	// apply validation to each group
 	// declared in the yml config file
 	for _, group := range rawGroups {
-		valid, errs := validate(filterGroupSchema, group)
+		valid, errs := validate(rulesSchema, group)
 		if !valid || len(errs) > 0 {
 			rawGroup := group
 			b, err := yaml.Marshal(&rawGroup)
@@ -373,39 +469,18 @@ func decodeFilterGroups(resource string, b []byte) ([]FilterGroup, error) {
 // file group yaml file. It returns the byte slice
 // with yaml content after template expansion.
 func renderTmpl(filename string, b []byte) ([]byte, error) {
-	rawValues, err := unmarshalValues(filename)
-	if err != nil {
-		return nil, err
-	}
-	tmpl, err := template.New(filename).Funcs(funcmap.New()).Parse(string(b))
+	tmpl, err := template.New(filename).Funcs(FilterFuncMap()).Parse(string(b))
 	if err != nil {
 		return nil, cleanupParseError(filename, err)
 	}
 	var w bytes.Buffer
 	// force strict keys presence
 	tmpl.Option("missingkey=error")
-	err = tmpl.Execute(&w, map[string]interface{}{"Values": rawValues})
+	err = tmpl.Execute(&w, nil)
 	if err != nil {
 		return nil, cleanupParseError(filename, err)
 	}
 	return w.Bytes(), nil
-}
-
-// unmarshalValues reads the values defined in
-// the values.yml file is the file is present
-// in the same directory as the filter group yaml file.
-func unmarshalValues(filename string) (interface{}, error) {
-	path := filepath.Join(filepath.Dir(filename), "values.yml")
-	f, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, nil
-	}
-	var rawValues interface{}
-	err = yaml.Unmarshal(f, &rawValues)
-	if err != nil {
-		return nil, fmt.Errorf("unable to unmarshal yaml: %v", err)
-	}
-	return rawValues, nil
 }
 
 func cleanupParseError(filename string, err error) error {
@@ -434,21 +509,53 @@ func cleanupParseError(filename string, err error) error {
 	return fmt.Errorf("syntax error in (%s) at %s: %s", location, key, errMsg)
 }
 
-// TmplData is the template data object. Some
-// fields of this structure represent empty
-// values, since we have to satisfy the presence
-// of certain keys when executing the template.
-type TmplData struct {
+// ActionContext is the convenient structure
+// for grouping the event that resulted in
+// matched filter along with filter group
+// information.
+type ActionContext struct {
+	Kevt *kevent.Kevent
+	// Kevts contains matched events for sequence group
+	// policies indexed by `k` + the slot number of the
+	// rule that produced a partial match
+	Kevts map[string]*kevent.Kevent
+	// Events contains a single element for non-sequence
+	// group policies or a list of ordered matched events
+	// for sequence group policies
+	Events []*kevent.Kevent
 	Filter *FilterConfig
-	Group  *FilterGroup
-	Kevt   *kevent.Kevent
+	Group  FilterGroup
 }
 
-func tmplData() TmplData {
-	return TmplData{
+// FilterFuncMap returns the template func map
+// populated with some useful template functions
+// that can be used in rule actions.
+func FilterFuncMap() template.FuncMap {
+	f := sprig.TxtFuncMap()
+
+	extra := template.FuncMap{
+		// This is a placeholder for the functions that might be
+		// late-bound to a template. By declaring them here, we
+		// can still execute the template associated with the
+		// filter action to ensure template syntax is correct
+		"emit": func(ctx *ActionContext, title string, text string, args ...string) string { return "" },
+		"kill": func(pid uint32) string { return "" },
+	}
+
+	for k, v := range extra {
+		f[k] = v
+	}
+
+	return f
+}
+
+func tmplData() *ActionContext {
+	return &ActionContext{
 		Filter: &FilterConfig{},
-		Group:  &FilterGroup{},
+		Group:  FilterGroup{},
 		Kevt:   kevent.Empty(),
+		Events: make([]*kevent.Kevent, 0),
+		Kevts:  make(map[string]*kevent.Kevent),
 	}
 }
 

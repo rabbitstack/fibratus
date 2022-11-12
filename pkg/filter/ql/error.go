@@ -61,10 +61,10 @@ func findPosInLine(expr string, pos int) (int, int) {
 						break
 					}
 				}
-				return pos - j + 2, ln
+				return pos - j - 1, ln
 			default:
 				// single line expression
-				return pos + 1, 1
+				return pos, 1
 			}
 		}
 	}
@@ -126,7 +126,7 @@ func render(e *ParseError) string {
 // Error returns the string representation of the error.
 func (e *ParseError) Error() string {
 	if e.Message != "" {
-		return fmt.Sprintf("%s at line %d, char %d", e.Message, e.Pos+1, e.Pos+1)
+		return fmt.Sprintf("%s at char %d", e.Message, e.Pos+1)
 	}
 	return render(e)
 }

@@ -20,8 +20,8 @@ package types
 
 import (
 	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
 	"path/filepath"
-	"strings"
 	"sync"
 
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
@@ -74,7 +74,7 @@ func (ps *PS) String() string {
 		Pid:  %d
 		Ppid: %d
 		Name: %s
-		Comm: %s
+		Cmdline: %s
 		Exe:  %s
 		Cwd:  %s
 		SID:  %s
@@ -95,7 +95,18 @@ func (ps *PS) String() string {
 	)
 }
 
-// Thread stores several metadata about a thread that's executing in process's address space.
+// Ancestors returns all ancestors of this process. The string slice contains
+// the process image name followed by the process id.
+func (ps *PS) Ancestors() []string {
+	ancestors := make([]string, 0)
+	walk := func(proc *PS) {
+		ancestors = append(ancestors, fmt.Sprintf("%s (%d)", proc.Name, proc.PID))
+	}
+	Walk(walk, ps)
+	return ancestors
+}
+
+// Thread stores metadata about a thread that's executing in process's address space.
 type Thread struct {
 	// Tid is the unique identifier of thread inside the process.
 	Tid uint32
@@ -151,7 +162,7 @@ func FromKevent(pid, ppid uint32, name, comm, exe, sid string, sessionID uint8) 
 		Name:      name,
 		Comm:      comm,
 		Exe:       exe,
-		Args:      splitArgs(comm),
+		Args:      cmdline.Split(comm),
 		SID:       sid,
 		SessionID: sessionID,
 		Threads:   make(map[uint32]Thread),
@@ -196,7 +207,7 @@ func NewPS(pid, ppid uint32, exe, cwd, comm string, thread Thread, envs map[stri
 		Exe:     exe,
 		Comm:    comm,
 		Cwd:     cwd,
-		Args:    splitArgs(comm),
+		Args:    cmdline.Split(comm),
 		Threads: map[uint32]Thread{thread.Tid: thread},
 		Modules: make([]Module, 0),
 		Handles: make([]htypes.Handle, 0),
@@ -218,8 +229,6 @@ func NewFromKcap(buf []byte) (*PS, error) {
 	}
 	return &ps, nil
 }
-
-func splitArgs(cmdline string) []string { return strings.Fields(cmdline) }
 
 // AddThread adds a thread to process's state descriptor.
 func (ps *PS) AddThread(thread Thread) {

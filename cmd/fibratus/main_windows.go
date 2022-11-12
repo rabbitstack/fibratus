@@ -26,13 +26,13 @@ import (
 )
 
 func main() {
-	// determine if we are running in an interactive session
-	in, err := svc.IsAnInteractiveSession()
+	// determine if we are running as a Windows Service
+	isWinService, err := svc.IsWindowsService()
 	if err != nil {
 		fmt.Printf("interactive session check failed: %v\n", err)
 		os.Exit(-1)
 	}
-	if !in {
+	if isWinService {
 		app.RunService()
 		return
 	}

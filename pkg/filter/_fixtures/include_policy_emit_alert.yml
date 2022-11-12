@@ -9,7 +9,7 @@
       def: net.dport = 443
       action: |
         {{ $text := cat .Kevt.PS.Name "process received data on port" .Kevt.Kparams.dport }}
-        {{ emit "Test alert" $text "critical" "tag1" "tag2" }}
+        {{ emit . "Test alert" $text "critical" "tag1" "tag2" }}
     - name: Windows error reporting/telemetry, WMI provider host
       def: ps.comm startswith
         (

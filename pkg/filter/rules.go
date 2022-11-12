@@ -26,6 +26,9 @@ import (
 	"expvar"
 	"fmt"
 	fsm "github.com/qmuntal/stateless"
+	"github.com/rabbitstack/fibratus/pkg/filter/fields"
+	"sort"
+
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/util/atomic"
@@ -35,7 +38,6 @@ import (
 	"time"
 
 	"github.com/rabbitstack/fibratus/pkg/config"
-	"github.com/rabbitstack/fibratus/pkg/filter/funcmap"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	log "github.com/sirupsen/logrus"
 )
@@ -57,7 +59,7 @@ var (
 	partialExpirations    = expvar.NewMap("sequence.partial.expirations")
 
 	ErrInvalidFilter = func(rule, group string, err error) error {
-		return fmt.Errorf("invalid filter %q in %q group: \n%v", rule, group, err)
+		return fmt.Errorf("syntax error in rule %q located in %q group: \n%v", rule, group, err)
 	}
 	ErrInvalidPatternBinding = func(rule string) error {
 		return fmt.Errorf("%q is the initial sequence rule and can't contain pattern bindings", rule)
@@ -103,8 +105,9 @@ type filterGroup struct {
 }
 
 type compiledFilter struct {
-	filter Filter
-	config *config.FilterConfig
+	filter  Filter
+	buckets map[ktypes.Ktype]bool
+	config  *config.FilterConfig
 }
 
 // sequenceState represents the state of the
@@ -126,7 +129,7 @@ type sequenceState struct {
 
 	fsm *fsm.StateMachine
 
-	// rule to rule index mapping
+	// rule to rule index mapping. Indices start at 1
 	idxs          map[fsm.State]uint16
 	maxSpans      map[fsm.State]time.Duration
 	spanDeadlines map[fsm.State]*time.Timer
@@ -230,15 +233,25 @@ func (s *sequenceState) currentState() fsm.State {
 }
 
 func (s *sequenceState) addPartial(rule string, kevt *kevent.Kevent) {
-	if len(s.partials[s.idxs[rule]]) > maxOutstandingPartials {
-		log.Warnf("max partials encountered in sequence %s index %d. "+
+	i := s.idxs[rule]
+	if len(s.partials[i]) > maxOutstandingPartials {
+		log.Warnf("max partials encountered in sequence %s slot [%d]. "+
 			"Dropping incoming partial", s.name, s.idxs[rule])
 		return
 	}
 	if len(s.bindingIndexes) > 0 {
-		log.Debugf("adding partial to slot [%d] for rule %q: %s", s.idxs[rule], rule, kevt)
+		key := kevt.PartialKey()
+		if key != 0 {
+			for _, p := range s.partials[i] {
+				if key == p.PartialKey() {
+					log.Debugf("%s event tuple already in sequence state", kevt.Name)
+					return
+				}
+			}
+		}
+		log.Debugf("adding partial to slot [%d] for rule %q: %s", i, rule, kevt)
 		partialsPerSequence.Add(s.name, 1)
-		s.partials[s.idxs[rule]] = append(s.partials[s.idxs[rule]], kevt)
+		s.partials[i] = append(s.partials[i], kevt)
 	}
 }
 
@@ -248,8 +261,7 @@ func (s *sequenceState) addMatch(idx uint16, kevt *kevent.Kevent) {
 
 func (s *sequenceState) getPartials(rule string) map[uint16][]*kevent.Kevent {
 	i := s.idxs[rule] - 1
-	// is this is the first rule in the sequence
-	// return no partials
+	// no partials for the first rule in the sequence
 	if i == 0 {
 		return nil
 	}
@@ -321,9 +333,8 @@ func (s *sequenceState) expire(e *kevent.Kevent) bool {
 		return lhs.PID == rhs.PID
 	}
 	for _, idx := range s.idxs {
-		currentPartials := s.partials[idx]
-		for i, e1 := range currentPartials {
-			if !canExpire(e1, e) {
+		for i := len(s.partials[idx]) - 1; i >= 0; i-- {
+			if len(s.partials[idx]) > 0 && !canExpire(s.partials[idx][i], e) {
 				continue
 			}
 			// if downstream rule didn't match, and it contains
@@ -335,18 +346,19 @@ func (s *sequenceState) expire(e *kevent.Kevent) bool {
 			matched := s.matchedRules[idx+1]
 			bindingIndex := s.bindingIndexes[idx+1]
 			if !matched && bindingIndex == idx {
-				log.Debugf("removing process %s (%d) "+
-					"from partials pertaining to sequence [%s]",
+				log.Debugf("removing event originated from %s (%d) "+
+					"in partials pertaining to sequence [%s]",
 					e.Kparams.MustGetString(kparams.ProcessName),
 					e.Kparams.MustGetPid(),
 					s.name)
+				// remove partial event from the corresponding slot
 				s.partials[idx] = append(
 					s.partials[idx][:i],
 					s.partials[idx][i+1:]...)
 				partialsPerSequence.Add(s.name, -1)
 
 				if len(s.partials[idx]) == 0 {
-					log.Infof("%q sequence expired. All partials terminated", s.name)
+					log.Infof("%q sequence expired. All partials retracted", s.name)
 					partialExpirations.Add(s.name, 1)
 					s.inExpired = true
 					err := s.expireTransition()
@@ -371,8 +383,22 @@ func newFilterGroup(g config.FilterGroup, filters []compiledFilter) *filterGroup
 	return &filterGroup{group: g, filters: filters}
 }
 
-func newCompiledFilter(f Filter, filterConfig *config.FilterConfig) compiledFilter {
-	return compiledFilter{config: filterConfig, filter: f}
+func newCompiledFilter(f Filter, filterConfig *config.FilterConfig, groupConfig config.FilterGroup) compiledFilter {
+	buckets := make(map[ktypes.Ktype]bool)
+	for name, values := range f.GetStringFields() {
+		if name == fields.KevtName {
+			for _, v := range values {
+				buckets[ktypes.KeventNameToKtype(v)] = true
+			}
+		}
+	}
+	if len(buckets) == 0 && groupConfig.Policy == config.SequencePolicy {
+		log.Warnf("%q rule in %q group doesn't have event type condition! "+
+			"This could cause runtime performance degradation. Please consider "+
+			"narrowing the scope of this rule by including the `kevt.name` condition",
+			filterConfig.Name, groupConfig.Name)
+	}
+	return compiledFilter{config: filterConfig, filter: f, buckets: buckets}
 }
 
 // run execute the filter and returns the matching partial index along with
@@ -382,6 +408,16 @@ func (f compiledFilter) run(kevt *kevent.Kevent, i uint16, partials map[uint16][
 		return f.filter.RunPartials(kevt, partials)
 	}
 	return f.filter.Run(kevt), i, kevt
+}
+
+// isEligible determines if the filter should be evaluated by inspecting
+// the event type filter fields defined in the expression. We allow an event
+// being eligible for evaluation even when the filter doesn't contain the kevt.name
+// binary expression. However, this is considered a warning which could potentially
+// cause runtime performance degradation if the filter is evaluated against every
+// event.
+func (f compiledFilter) isEligible(ktype ktypes.Ktype) bool {
+	return len(f.buckets) == 0 || f.buckets[ktype]
 }
 
 type filterGroups []*filterGroup
@@ -418,9 +454,14 @@ func expr(c *config.FilterConfig) string {
 	return c.Def
 }
 
-// Compile loads the filter groups from all files
-// and creates the filters for each filter group.
+// Compile loads macros and rule groups from all
+// indicated resources and creates the rules for
+// each filter group. It also sets up the state
+// machine transitions for sequence rule group policies.
 func (r *Rules) Compile() error {
+	if err := r.config.Filters.LoadMacros(); err != nil {
+		return err
+	}
 	groups, err := r.config.Filters.LoadGroups()
 	if err != nil {
 		return err
@@ -430,7 +471,7 @@ func (r *Rules) Compile() error {
 			log.Warnf("rule group [%s] disabled", group.Name)
 			continue
 		}
-		log.Infof("loading rule group [%s]", group.Name)
+		log.Infof("loading rule group [%s] with %q policy", group.Name, group.Policy)
 		rules := append(group.Rules, group.FromStrings...)
 		if group.Policy != config.SequencePolicy &&
 			group.Action != "" {
@@ -488,7 +529,7 @@ func (r *Rules) Compile() error {
 						Permit(expireTransition, sequenceExpiredState)
 				}
 			}
-			filters = append(filters, newCompiledFilter(f, filterConfig))
+			filters = append(filters, newCompiledFilter(f, filterConfig, group))
 			filtersCount.Add(1)
 		}
 
@@ -564,6 +605,10 @@ func (r *Rules) Fire(kevt *kevent.Kevent) bool {
 	// the groups with exclude policies got matched
 	ok = r.runRules(groups, config.IncludePolicy, kevt)
 	if ok {
+		// transition state machine. In this case
+		// both include/sequence groups could produce
+		// a match
+		r.runRules(groups, config.SequencePolicy, kevt)
 		return true
 	}
 
@@ -587,9 +632,12 @@ nextGroup:
 			}
 			// if the sequence expired we'll not keep evaluating
 			if seqState.expire(kevt) {
-				return false
+				continue
 			}
 			for i, f := range g.filters {
+				if !f.isEligible(kevt.Type) {
+					continue
+				}
 				if !seqState.next(i) {
 					continue
 				}
@@ -600,7 +648,7 @@ nextGroup:
 					err := seqState.matchTransition(rule, kevt)
 					if err != nil {
 						matchTransitionErrors.Add(1)
-						log.Warnf("match transition: %v", err)
+						log.Warnf("match transition failure: %v", err)
 					}
 					seqState.addMatch(uint16(i+1), kevt)
 					seqState.addMatch(idx, e)
@@ -611,13 +659,16 @@ nextGroup:
 				log.Debugf("rule group [%s] matched", g.group.Name)
 				// this is the event that triggered the group match
 				kevt.AddMeta(kevent.RuleGroupKey, g.group.Name)
+				for k, v := range g.group.Labels {
+					kevt.AddMeta(kevent.MetadataKey(k), v)
+				}
 				err := runFilterAction(nil, seqState.matches, g.group, nil)
 				if err != nil {
 					log.Warnf("unable to execute %q sequence action: %v", g.group.Name, err)
 				}
 				seqState.clear()
+				return done
 			}
-			return done
 		}
 		var andMatched bool
 		// process include/exclude filter groups. Each of them
@@ -648,13 +699,16 @@ nextGroup:
 					if ok {
 						includeOrFilterMatches.Add(f.config.Name, 1)
 						log.Debugf("rule [%s] in group [%s] matched", f.config.Name, g.group.Name)
+						// attach rule and group meta
+						kevt.AddMeta(kevent.RuleNameKey, f.config.Name)
+						kevt.AddMeta(kevent.RuleGroupKey, g.group.Name)
+						for k, v := range g.group.Labels {
+							kevt.AddMeta(kevent.MetadataKey(k), v)
+						}
 						err := runFilterAction(kevt, nil, g.group, f.config)
 						if err != nil {
 							log.Warnf("unable to execute %q rule action: %v", f.config.Name, err)
 						}
-						// attach rule and group meta
-						kevt.AddMeta(kevent.RuleNameKey, f.config.Name)
-						kevt.AddMeta(kevent.RuleGroupKey, g.group.Name)
 						return true
 					}
 				case config.AndRelation:
@@ -690,17 +744,6 @@ nextGroup:
 	return false
 }
 
-// ActionContext is the convenient structure
-// for grouping the event that resulted in
-// matched filter along with filter group
-// information.
-type ActionContext struct {
-	Kevt   *kevent.Kevent
-	Kevts  map[string]*kevent.Kevent
-	Filter *config.FilterConfig
-	Group  config.FilterGroup
-}
-
 // runFilterAction executes the template associated with the filter
 // that has produced a match in one of the include groups.
 func runFilterAction(
@@ -712,35 +755,43 @@ func runFilterAction(
 	if (filter != nil && filter.Action == "") && group.Action == "" {
 		return nil
 	}
-	var action []byte
+	var actionBlock []byte
 	var err error
 	if group.Policy == config.SequencePolicy {
-		action, err = base64.StdEncoding.DecodeString(group.Action)
+		actionBlock, err = base64.StdEncoding.DecodeString(group.Action)
 	} else {
 		if filter == nil {
 			panic("filter shouldn't be nil")
 		}
-		action, err = base64.StdEncoding.DecodeString(filter.Action)
+		actionBlock, err = base64.StdEncoding.DecodeString(filter.Action)
 	}
 	if err != nil {
 		return fmt.Errorf("corrupted filter/group action: %v", err)
 	}
 
-	fmap := funcmap.New()
-	funcmap.InitFuncs(fmap)
-	tmpl, err := template.New(group.Name).Funcs(fmap).Parse(string(action))
+	events := make([]*kevent.Kevent, 0)
+	matches := make(map[string]*kevent.Kevent, len(kevts))
+	if kevt != nil {
+		events = append(events, kevt)
+	} else {
+		for k, kevt := range kevts {
+			events = append(events, kevt)
+			matches["k"+strconv.Itoa(int(k))] = kevt
+		}
+		sort.Slice(events, func(i, j int) bool { return events[i].Timestamp.Before(events[j].Timestamp) })
+	}
+
+	fmap := NewFuncMap()
+	InitFuncs(fmap)
+	tmpl, err := template.New(group.Name).Funcs(fmap).Parse(string(actionBlock))
 	if err != nil {
 		return err
 	}
 
-	matches := make(map[string]*kevent.Kevent, len(kevts))
-	for k, v := range kevts {
-		matches["k"+strconv.Itoa(int(k))] = v
-	}
-
-	ctx := &ActionContext{
+	ctx := &config.ActionContext{
 		Kevt:   kevt,
 		Kevts:  matches,
+		Events: events,
 		Filter: filter,
 		Group:  group,
 	}

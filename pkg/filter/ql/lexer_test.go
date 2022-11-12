@@ -43,6 +43,7 @@ func TestScanner(t *testing.T) {
 		{s: `or`, tok: or},
 
 		{s: `=`, tok: eq},
+		{s: `~=`, tok: ieq},
 		{s: `<>`, tok: neq},
 		{s: `! `, tok: illegal, lit: "!"},
 		{s: `<`, tok: lt},

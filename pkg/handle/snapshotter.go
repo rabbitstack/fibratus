@@ -54,6 +54,13 @@ var (
 	currentPid = uint32(os.Getpid())
 )
 
+const (
+	// maxProcHandles determines the maximum number of handles the handle snapshotter can store
+	maxProcHandles = 70000
+	// maxHandlesPerProc determines the maximum number of handles a particular process state can store
+	maxHandlesPerProc = 800
+)
+
 // CreateCallback defines the function that is triggered when new handle is conceived
 type CreateCallback func(pid uint32, handle htypes.Handle)
 
@@ -195,6 +202,11 @@ func (s *snapshotter) FindHandles(pid uint32) ([]htypes.Handle, error) {
 	// the type and the name of each allocated handle
 	handles := make([]htypes.Handle, 0)
 	count := snapshot.NumberOfHandles
+	if count > maxHandlesPerProc {
+		log.Warnf("maximum handle table size reached for %d pid. "+
+			"Shrinking table size from %d to %d handles", pid, count, maxHandlesPerProc)
+		count = maxHandlesPerProc
+	}
 	sysHandles := (*[1 << 30]object.ProcessHandleTableEntryInfo)(unsafe.Pointer(&snapshot.Handles[0]))[:count:count]
 
 	for _, sh := range sysHandles {
@@ -224,6 +236,10 @@ func (s *snapshotter) initSnapshot() {
 		} else if err == nil {
 			sysHandleInfo := (*object.SystemHandleInformationEx)(unsafe.Pointer(&buf[0]))
 			count := int(sysHandleInfo.NumberOfHandles)
+			if count > maxProcHandles {
+				log.Warnf("handle snapshotter size exceeded. Shrinking from %d to %d handles", count, maxProcHandles)
+				count = maxProcHandles
+			}
 			sysHandles := (*[1 << 30]object.SystemHandleTableEntryInfoEx)(unsafe.Pointer(&sysHandleInfo.Handles[0]))[:count:count]
 
 			// iterate through available handles to get extended info
@@ -344,6 +360,10 @@ func (s *snapshotter) housekeeping() {
 			} else if err == nil {
 				sysHandleInfo := (*object.SystemHandleInformationEx)(unsafe.Pointer(&buf[0]))
 				count := int(sysHandleInfo.NumberOfHandles)
+				if count > maxProcHandles {
+					log.Warnf("handle snapshotter size exceeded. Shrinking from %d to %d handles", count, maxProcHandles)
+					count = maxProcHandles
+				}
 				sysHandles := (*[1 << 30]object.SystemHandleTableEntryInfoEx)(unsafe.Pointer(&sysHandleInfo.Handles[0]))[:count:count]
 
 				s.Lock()

@@ -18,7 +18,13 @@
 
 package alertsender
 
-import "fmt"
+import (
+	"bytes"
+	"fmt"
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/extension"
+	"github.com/yuin/goldmark/renderer/html"
+)
 
 // Severity is the type alias for alert's severity level.
 type Severity uint8
@@ -36,7 +42,7 @@ const (
 func (s Severity) String() string {
 	switch s {
 	case Normal:
-		return "normal"
+		return "low"
 	case Medium:
 		return "medium"
 	case Critical:
@@ -49,11 +55,11 @@ func (s Severity) String() string {
 // ParseSeverityFromString parses the severity from the string representation.
 func ParseSeverityFromString(sever string) Severity {
 	switch sever {
-	case "normal", "Normal":
+	case "normal", "Normal", "NORMAL", "low", "LOW":
 		return Normal
-	case "medium", "Medium":
+	case "medium", "Medium", "MEDIUM":
 		return Medium
-	case "critical", "Critical":
+	case "critical", "Critical", "high", "High", "HIGH":
 		return Critical
 	default:
 		return Normal
@@ -75,6 +81,21 @@ type Alert struct {
 // String returns the alert string representation.
 func (a Alert) String() string {
 	return fmt.Sprintf("Title: %s, Text: %s, Severity: %s, Tags: %v", a.Title, a.Text, a.Severity, a.Tags)
+}
+
+// MDToHTML converts alert's text Markdown elements to HTML blocks.
+func (a *Alert) MDToHTML() error {
+	md := goldmark.New(
+		goldmark.WithExtensions(extension.GFM),
+		goldmark.WithRendererOptions(html.WithUnsafe()),
+	)
+	var w bytes.Buffer
+	err := md.Convert([]byte(a.Text), &w)
+	if err != nil {
+		return err
+	}
+	a.Text = w.String()
+	return nil
 }
 
 // NewAlert builds a new alert.

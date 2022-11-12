@@ -25,7 +25,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/log/rotate"
 	fs "github.com/rifflock/lfshook"
 	"github.com/sirupsen/logrus"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 )
@@ -82,7 +82,7 @@ func InitFromConfig(c Config) error {
 
 	// disable writing to stdout
 	if !c.LogStdout {
-		logrus.SetOutput(ioutil.Discard)
+		logrus.SetOutput(io.Discard)
 	}
 
 	// initialize log rotate hook

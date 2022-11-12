@@ -128,4 +128,17 @@ func (k Kparam) String() string {
 	}
 }
 
+// MustGetFileOperation returns the file operation involved in the I/O request.
+func (kpars Kparams) MustGetFileOperation() string {
+	op, err := kpars.Get(kparams.FileOperation)
+	if err != nil {
+		panic(err)
+	}
+	disposition, ok := op.(fs.FileDisposition)
+	if !ok {
+		panic("couldn't type assert to file operation enum")
+	}
+	return disposition.String()
+}
+
 func joinSID(account, domain string) string { return fmt.Sprintf("%s\\%s", domain, account) }

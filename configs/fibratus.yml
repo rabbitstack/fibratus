@@ -25,7 +25,7 @@ alertsenders:
     #host:
 
     # Represents the port of the SMTP server
-    #port: 25
+    #port: 587
 
     # Specifies the user name when authenticating to the SMTP server
     #user:
@@ -38,7 +38,9 @@ alertsenders:
 
     # Specifies all the recipients that'll receive the alert
     #to:
-    #  - ""
+
+    # Specifies the email body content type
+    #content-type: text/html
 
   # Slack sender transports the alerts to the Slack workspace.
   slack:
@@ -95,14 +97,18 @@ filament:
 
 # =============================== Filters ===============================================
 
-# Contains the definition of filter rules. Filter expressions are contained in filter group files.
+# Contains the definition of detection rules. Rules are contained within rule group files.
 # Rule definitions can reside in the local file system or also can be served over HTTP/S.
+# For local file system rule paths, it is possible to use the glob expression to load the
+# rules from different directory locations.
 filters:
   rules:
     from-paths:
-    # - C:\Program Files\Fibratus\Config\Rules\Default\default.yml
+    # - C:\Program Files\Fibratus\Rules\*.yml
     #from-urls:
-    #  - https://raw.githubusercontent.com/rabbitstack/fibratus/master/configs/rules/default/default.yml
+  macros:
+    from-paths:
+      - C:\Program Files\Fibratus\Rules\Macros\*.yml
 
 # =============================== Handle ===============================================
 

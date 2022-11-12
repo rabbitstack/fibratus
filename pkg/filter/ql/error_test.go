@@ -20,6 +20,7 @@ package ql
 
 import (
 	"github.com/stretchr/testify/require"
+	"strings"
 	"testing"
 )
 
@@ -87,17 +88,17 @@ func TestParseError(t *testing.T) {
 |
 ╰─────────────────── expected field, string, number, bool, ip, function, pattern binding`
 
-	e := newParseError("[", []string{"field, string, number, bool, ip, function, pattern binding"}, 142, expr)
+	e := newParseError("[", []string{"field, string, number, bool, ip, function, pattern binding"}, 145, expr)
 	require.Equal(t, expected, e.Error())
 
 	expr = `ps.name = 'cmd.exe' aand ps.cmdline contains 'ss'`
 	e = newParseError("[", []string{"operator"}, 20, expr)
 
-	expected1 := `ps.name = 'cmd.exe' aand ps.cmdline contains 'ss'
-╭────────────────────^
+	expected1 := `
+ps.name = 'cmd.exe' aand ps.cmdline contains 'ss'
+╭───────────────────^
 |
 |
 ╰─────────────────── expected operator`
-
-	require.Equal(t, expected1, e.Error())
+	require.Equal(t, strings.TrimSpace(expected1), e.Error())
 }

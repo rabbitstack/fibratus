@@ -21,7 +21,6 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"time"
 
 	"github.com/rabbitstack/fibratus/pkg/outputs/eventlog"
@@ -275,11 +274,12 @@ func (c *Config) Validate() error {
 	// we'll first validate the structure and values of the config file
 	file := c.viper.GetString(configFile)
 	var out interface{}
-	b, err := ioutil.ReadFile(file)
+	b, err := os.ReadFile(file)
 	if err != nil {
 		return err
 	}
 	switch filepath.Ext(file) {
+	//nolint:goconst
 	case ".yaml", ".yml":
 		err = yaml.Unmarshal(b, &out)
 	case ".json":

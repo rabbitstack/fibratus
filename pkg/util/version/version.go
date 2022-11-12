@@ -46,6 +46,9 @@ var version string
 // Set initializes the version string as global variable.
 func Set(v string) { version = v }
 
+// Get returns the version string.
+func Get() string { return version }
+
 // ProductToken returns a tag to be poked in User Agent headers.
 func ProductToken() string { return fmt.Sprintf("fibratus/%s", version) }
 

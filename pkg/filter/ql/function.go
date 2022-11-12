@@ -60,6 +60,7 @@ var funcs = map[string]FunctionDef{
 	functions.SubstrFn.String():       &functions.Substr{},
 	functions.EntropyFn.String():      &functions.Entropy{},
 	functions.RegexFn.String():        functions.NewRegex(),
+	functions.IsMinidumpFn.String():   functions.IsMinidump{},
 }
 
 // FunctionDef is the interface that all function definitions have to satisfy.
