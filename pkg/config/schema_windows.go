@@ -130,7 +130,14 @@ var schema = `
 						"from-urls":	{"type": ["array", "null"], "items": [{"type": "string", "minLength": 8}]}
 					},
 					"additionalProperties": false
-				}
+				},
+				"macros": {
+					"type": "object",
+                    "properties": {
+                        "from-paths": 	{"type": ["array", "null"], "items": [{"type": "string", "minLength": 4}]}
+                    },
+                    "additionalProperties": false
+                }
 			},
 			"additionalProperties": false
 		},
@@ -473,7 +480,7 @@ var schema = `
 }
 `
 
-var filterGroupSchema = `
+var rulesSchema = `
 {
 	"$schema": "http://json-schema.org/draft-07/schema#",
     "definitions": {"rules": {"$id": "#rules", "type": "object", "type": "array",
@@ -538,6 +545,30 @@ var filterGroupSchema = `
 		]
 	},
 	"additionalProperties": false
+}
+`
+
+var macrosSchema = `
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "array",
+    "items":
+    {
+        "type": "object",
+        "properties": {
+            "macro": 		{"type": "string", "minLength": 2, "pattern": "^[A-Za-z0-9_-]+$"},
+            "description":  {"type": "string"},
+            "expr":  		{"type": "string", "minLength": 5},
+            "list":			{"type": "array", "items": [{"type": "string", "minLength": 1}]}
+        },
+		"required":     ["macro"],
+		"oneOf": [
+            {"required": ["expr"]},
+            {"required": ["list"]}
+        ],
+        "additionalProperties": false
+    },
+    "additionalProperties": false
 }
 `
 

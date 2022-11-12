@@ -7,7 +7,7 @@ require (
 	github.com/briandowns/spinner v1.12.0
 	github.com/dustin/go-humanize v1.0.0
 	github.com/hashicorp/go-version v1.2.1
-	github.com/hillu/go-yara/v4 v4.0.6
+	github.com/hillu/go-yara/v4 v4.2.4
 	github.com/jedib0t/go-pretty/v6 v6.2.1
 	github.com/lithammer/fuzzysearch v1.1.2
 	github.com/magiconair/properties v1.8.1
@@ -26,6 +26,7 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0
 	github.com/valyala/gozstd v1.11.0
 	github.com/xeipuuv/gojsonschema v1.2.0
+	github.com/yuin/goldmark v1.5.2
 	golang.org/x/sys v0.0.0-20210423082822-04245dca01da
 	golang.org/x/text v0.3.6
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
@@ -64,7 +65,6 @@ require (
 	github.com/subosito/gotenv v1.2.0 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
-	github.com/yuin/goldmark v1.5.2 // indirect
 	golang.org/x/crypto v0.0.0-20200414173820-0848c9571904 // indirect
 	golang.org/x/net v0.0.0-20210916014120-12bc252f5db8 // indirect
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
