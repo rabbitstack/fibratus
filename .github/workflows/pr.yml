@@ -44,10 +44,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yara-${{ hashFiles('**/pkg/yara') }}
       - name: Clone yara
-        if: steps.cache.outputs.cache-hit != 'true'
+        #if: steps.cache.outputs.cache-hit != 'true'
         shell: bash
         env:
-          VERSION: "4.0.x"
+          VERSION: "4.2.x"
         run: |
           git clone --depth 1 --branch $VERSION https://github.com/VirusTotal/yara.git
       - name: Configure yara

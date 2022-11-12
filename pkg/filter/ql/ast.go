@@ -936,12 +936,12 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			ips, ok := rhs.([]net.IP)
 			if !ok {
 				// keep backward compatibility with string lists
-				ips1, ok := rhs.([]string)
+				addrs, ok := rhs.([]string)
 				if !ok {
 					return false
 				}
-				for _, ip := range ips1 {
-					if net.ParseIP(ip).Equal(lhs) {
+				for _, s := range addrs {
+					if net.ParseIP(s).Equal(lhs) {
 						return true
 					}
 				}
@@ -1113,7 +1113,7 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 	// the types were not comparable. If our operation was an equality operation,
 	// return false instead of true.
 	switch expr.Op {
-	case eq, neq, lt, lte, gt, gte:
+	case eq, ieq, neq, lt, lte, gt, gte:
 		return false
 	}
 	return nil
