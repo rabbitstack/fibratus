@@ -103,13 +103,13 @@ filament:
 # rules from different directory locations.
 filters:
   rules:
-    from-paths:
-      - C:\Fibratus\fibratus\rules\*.yml
+    #from-paths:
+    #  - C:\Program Files\Fibratus\Rules\*.yml
     #from-urls:
     #  - https://raw.githubusercontent.com/rabbitstack/fibratus/master/rules/default.yml
   macros:
     from-paths:
-      - C:\Fibratus\fibratus\rules\macros\*.yml
+      - C:\Program Files\Fibratus\Rules\Macros\*.yml
 
 # =============================== Handle ===============================================
 

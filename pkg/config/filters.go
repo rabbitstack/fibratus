@@ -287,7 +287,7 @@ func (f *Filters) initFromViper(v *viper.Viper) {
 	f.Macros.FromPaths = v.GetStringSlice(macrosFromPaths)
 }
 
-func (f Filters) HasMacros() bool           { return len(f.Macros.FromPaths) > 0 }
+func (f Filters) HasMacros() bool           { return len(f.macros) > 0 }
 func (f Filters) GetMacro(id string) *Macro { return f.macros[id] }
 func (f Filters) IsMacroList(id string) bool {
 	macro, ok := f.macros[id]
