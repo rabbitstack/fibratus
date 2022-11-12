@@ -34,6 +34,8 @@ func newFilters(paths ...string) Filters {
 		Rules{
 			FromPaths: paths,
 		},
+		Macros{FromPaths: nil},
+		map[string]*Macro{},
 	}
 }
 
@@ -44,6 +46,8 @@ func TestLoadGroupsFromPaths(t *testing.T) {
 				"_fixtures/filters/default.yml",
 			},
 		},
+		Macros{FromPaths: nil},
+		map[string]*Macro{},
 	}
 	groups, err := filters.LoadGroups()
 	require.NoError(t, err)
@@ -78,6 +82,8 @@ func TestLoadGroupsFromPathsNewAttributes(t *testing.T) {
 				"_fixtures/filters/default-new-attributes.yml",
 			},
 		},
+		Macros{FromPaths: nil},
+		map[string]*Macro{},
 	}
 	groups, err := filters.LoadGroups()
 	require.NoError(t, err)
@@ -132,6 +138,8 @@ func TestLoadGroupsFromURLs(t *testing.T) {
 				"http://localhost:3231/default.yml",
 			},
 		},
+		Macros{FromPaths: nil},
+		map[string]*Macro{},
 	}
 	groups, err := filters.LoadGroups()
 	require.NoError(t, err)

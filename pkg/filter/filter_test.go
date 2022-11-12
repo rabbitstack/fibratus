@@ -219,9 +219,10 @@ func TestFilterRunThreadKevent(t *testing.T) {
 	}
 
 	kevt := &kevent.Kevent{
-		Type:    ktypes.CreateThread,
-		Kparams: kpars,
-		Name:    "CreateThread",
+		Type:     ktypes.CreateThread,
+		Kparams:  kpars,
+		Name:     "CreateThread",
+		Category: ktypes.Thread,
 		PS: &pstypes.PS{
 			Name: "svchost.exe",
 			Envs: map[string]string{"ALLUSERSPROFILE": "C:\\ProgramData", "OS": "Windows_NT", "ProgramFiles(x86)": "C:\\Program Files (x86)"},
@@ -391,6 +392,7 @@ func TestFilterRunNetKevent(t *testing.T) {
 		PS: &pstypes.PS{
 			Name: "cmd.exe",
 		},
+		Category: ktypes.Net,
 		Kparams: kevent.Kparams{
 			kparams.NetDport:    {Name: kparams.NetDport, Type: kparams.Uint16, Value: uint16(443)},
 			kparams.NetSport:    {Name: kparams.NetSport, Type: kparams.Uint16, Value: uint16(43123)},
@@ -441,9 +443,10 @@ func TestFilterRunNetKevent(t *testing.T) {
 
 func TestFilterRunRegistryKevent(t *testing.T) {
 	kevt := &kevent.Kevent{
-		Type: ktypes.RegSetValue,
-		Tid:  2484,
-		PID:  859,
+		Type:     ktypes.RegSetValue,
+		Tid:      2484,
+		PID:      859,
+		Category: ktypes.Registry,
 		Kparams: kevent.Kparams{
 			kparams.RegKeyName:   {Name: kparams.RegKeyName, Type: kparams.UnicodeString, Value: `HKEY_LOCAL_MACHINE\SYSTEM\Setup\Pid`},
 			kparams.RegValue:     {Name: kparams.RegValue, Type: kparams.Uint32, Value: 10234},

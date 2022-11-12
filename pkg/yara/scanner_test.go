@@ -28,7 +28,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hillu/go-yara/v4"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 
@@ -53,6 +52,10 @@ type mockSender struct{}
 func (s *mockSender) Send(a alertsender.Alert) error {
 	yaraAlert = &a
 	return nil
+}
+
+func (s *mockSender) Type(a alertsender.Alert) alertsender.Type {
+	return alertsender.Noop
 }
 
 func makeSender(config alertsender.Config) (alertsender.Sender, error) {

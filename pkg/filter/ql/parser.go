@@ -179,21 +179,23 @@ func (p *Parser) parseUnaryExpr() (Expr, error) {
 		p.unscan()
 
 		// expand macros
-		macro := p.c.GetMacro(lit)
-		if macro != nil {
-			if macro.Expr != "" {
-				p := NewParserWithConfig(macro.Expr, p.c)
-				expr, err := p.ParseExpr()
-				if err != nil {
-					return nil, multierror.WrapWithSeparator("\n", fmt.Errorf("syntax error in %q macro", lit), err)
+		if p.c != nil {
+			macro := p.c.GetMacro(lit)
+			if macro != nil {
+				if macro.Expr != "" {
+					p := NewParserWithConfig(macro.Expr, p.c)
+					expr, err := p.ParseExpr()
+					if err != nil {
+						return nil, multierror.WrapWithSeparator("\n", fmt.Errorf("syntax error in %q macro", lit), err)
+					}
+					return expr, nil
+				} else {
+					return &ListLiteral{Values: macro.List}, nil
 				}
-				return expr, nil
 			} else {
-				return &ListLiteral{Values: macro.List}, nil
+				// unscan ident
+				p.unscan()
 			}
-		} else {
-			// unscan ident
-			p.unscan()
 		}
 	case ip:
 		return &IPLiteral{Value: net.ParseIP(lit)}, nil

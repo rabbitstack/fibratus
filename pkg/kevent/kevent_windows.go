@@ -253,6 +253,9 @@ func (kevt *Kevent) Summary() string {
 		handleName, _ := kevt.Kparams.GetString(kparams.HandleObjectName)
 		return printSummary(kevt, fmt.Sprintf("closed <code>%s</code> handle of <code>%s</code> type",
 			handleName, handleType))
+	case ktypes.LoadDriver:
+		driver, _ := kevt.Kparams.GetString(kparams.ImageFilename)
+		return printSummary(kevt, fmt.Sprintf("loaded <code>%s</code> driver", driver))
 	}
 	return ""
 }

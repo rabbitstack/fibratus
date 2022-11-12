@@ -33,7 +33,8 @@
 
 - macro: write_minidump_file
   expr: >
-    write_file and
+    write_file
+      and
     (
       file.extension iin
       (

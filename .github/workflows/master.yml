@@ -49,7 +49,7 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
         shell: bash
         env:
-          VERSION: "4.0.x"
+          VERSION: "4.2.x"
         run: |
           git clone --depth 1 --branch $VERSION https://github.com/VirusTotal/yara.git
       - name: Configure yara
@@ -216,7 +216,7 @@ jobs:
         run: |
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin $GOLANGCI_LINT_VER
         env:
-          GOLANGCI_LINT_VER: v1.35.2
+          GOLANGCI_LINT_VER: v1.50.1
       - name: Lint
         shell: bash
         run: |

@@ -60,10 +60,11 @@ func fireRules(t *testing.T, c *config.Config) bool {
 	rules := NewRules(c)
 
 	kevt := &kevent.Kevent{
-		Type: ktypes.Recv,
-		Name: "Recv",
-		Tid:  2484,
-		PID:  859,
+		Type:     ktypes.Recv,
+		Name:     "Recv",
+		Tid:      2484,
+		PID:      859,
+		Category: ktypes.Net,
 		Kparams: kevent.Kparams{
 			kparams.NetDport: {Name: kparams.NetDport, Type: kparams.Uint16, Value: uint16(443)},
 			kparams.NetSport: {Name: kparams.NetSport, Type: kparams.Uint16, Value: uint16(43123)},
@@ -288,10 +289,11 @@ func TestSimpleSequencePolicy(t *testing.T) {
 	}
 
 	kevt2 := &kevent.Kevent{
-		Type: ktypes.CreateFile,
-		Name: "CreateFile",
-		Tid:  2484,
-		PID:  859,
+		Type:     ktypes.CreateFile,
+		Name:     "CreateFile",
+		Tid:      2484,
+		PID:      859,
+		Category: ktypes.File,
 		PS: &types.PS{
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
@@ -324,10 +326,11 @@ func TestSimpleSequencePolicyWithMaxSpanReached(t *testing.T) {
 	}
 
 	kevt2 := &kevent.Kevent{
-		Type: ktypes.CreateFile,
-		Name: "CreateFile",
-		Tid:  2484,
-		PID:  859,
+		Type:     ktypes.CreateFile,
+		Name:     "CreateFile",
+		Tid:      2484,
+		PID:      859,
+		Category: ktypes.File,
 		PS: &types.PS{
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
@@ -369,10 +372,11 @@ func TestSimpleSequencePolicyWithMaxSpanNotReached(t *testing.T) {
 	}
 
 	kevt2 := &kevent.Kevent{
-		Type: ktypes.CreateFile,
-		Name: "CreateFile",
-		Tid:  2484,
-		PID:  859,
+		Type:     ktypes.CreateFile,
+		Name:     "CreateFile",
+		Tid:      2484,
+		PID:      859,
+		Category: ktypes.File,
 		PS: &types.PS{
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
@@ -406,10 +410,11 @@ func TestSimpleSequencePolicyPatternBindings(t *testing.T) {
 	}
 
 	kevt2 := &kevent.Kevent{
-		Type: ktypes.CreateFile,
-		Name: "CreateFile",
-		Tid:  2484,
-		PID:  859,
+		Type:     ktypes.CreateFile,
+		Name:     "CreateFile",
+		Tid:      2484,
+		PID:      859,
+		Category: ktypes.File,
 		PS: &types.PS{
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
@@ -445,11 +450,12 @@ func TestSequenceComplexPatternBindings(t *testing.T) {
 	}
 
 	kevt2 := &kevent.Kevent{
-		Seq:  2,
-		Type: ktypes.CreateFile,
-		Name: "CreateFile",
-		Tid:  2484,
-		PID:  2243,
+		Seq:      2,
+		Type:     ktypes.CreateFile,
+		Name:     "CreateFile",
+		Tid:      2484,
+		PID:      2243,
+		Category: ktypes.File,
 		PS: &types.PS{
 			Name: "firefox.exe",
 			Exe:  "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
@@ -517,6 +523,8 @@ func TestSequenceComplexPatternBindings(t *testing.T) {
 
 	require.True(t, rules.Fire(kevt4))
 
+	time.Sleep(time.Millisecond * 25)
+
 	// check the format of the generated alert
 	require.NotNil(t, emitAlert)
 	assert.Equal(t, "Phishing dropper outbound communication", emitAlert.Title)
@@ -540,10 +548,11 @@ func TestFilterActionEmitAlert(t *testing.T) {
 	require.NoError(t, rules.Compile())
 
 	kevt := &kevent.Kevent{
-		Type: ktypes.Recv,
-		Name: "Recv",
-		Tid:  2484,
-		PID:  859,
+		Type:     ktypes.Recv,
+		Name:     "Recv",
+		Tid:      2484,
+		PID:      859,
+		Category: ktypes.Net,
 		PS: &types.PS{
 			Name: "cmd.exe",
 		},
@@ -557,7 +566,7 @@ func TestFilterActionEmitAlert(t *testing.T) {
 	}
 
 	require.True(t, rules.Fire(kevt))
-
+	time.Sleep(time.Millisecond * 25)
 	require.NotNil(t, emitAlert)
 	assert.Equal(t, "Test alert", emitAlert.Title)
 	assert.Equal(t, "cmd.exe process received data on port 443", emitAlert.Text)
@@ -620,10 +629,11 @@ func BenchmarkChainRun(b *testing.B) {
 
 	kevts := []*kevent.Kevent{
 		{
-			Type: ktypes.Connect,
-			Name: "Recv",
-			Tid:  2484,
-			PID:  859,
+			Type:     ktypes.Connect,
+			Name:     "Recv",
+			Tid:      2484,
+			PID:      859,
+			Category: ktypes.Net,
 			PS: &types.PS{
 				Name: "cmd.exe",
 			},

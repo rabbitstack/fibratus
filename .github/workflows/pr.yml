@@ -44,7 +44,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yara-${{ hashFiles('**/pkg/yara') }}
       - name: Clone yara
-        #if: steps.cache.outputs.cache-hit != 'true'
+        if: steps.cache.outputs.cache-hit != 'true'
         shell: bash
         env:
           VERSION: "4.2.x"
@@ -169,7 +169,7 @@ jobs:
         run: |
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin $GOLANGCI_LINT_VER
         env:
-          GOLANGCI_LINT_VER: v1.35.2
+          GOLANGCI_LINT_VER: v1.50.1
       - name: Lint
         shell: bash
         run: |
