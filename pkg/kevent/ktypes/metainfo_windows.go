@@ -64,6 +64,7 @@ var kevents = map[Ktype]KeventInfo{
 	UnloadImage:        {"UnloadImage", Image, "Unloads the module from the address space of the calling process"},
 	CreateHandle:       {"CreateHandle", Handle, "Creates a new handle"},
 	CloseHandle:        {"CloseHandle", Handle, "Closes the handle"},
+	LoadDriver:         {"LoadDriver", Driver, "Loads the kernel driver"},
 }
 
 var ktypes = map[string]Ktype{
@@ -99,6 +100,7 @@ var ktypes = map[string]Ktype{
 	"Retransmit":         Retransmit,
 	"CreateHandle":       CreateHandle,
 	"CloseHandle":        CloseHandle,
+	"LoadDriver":         LoadDriver,
 }
 
 // KtypeToKeventInfo maps the kernel event type to a structure that stores detailed information about the event.

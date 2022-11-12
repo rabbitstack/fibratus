@@ -19,7 +19,7 @@ alertsenders:
   # Mail sender transports the alerts via SMTP protocol.
   mail:
     # Enables/disables mail alert sender
-    #enabled: true
+    enabled: false
 
     # Represents the host of the SMTP server
     #host:
@@ -103,10 +103,9 @@ filament:
 # rules from different directory locations.
 filters:
   rules:
-    #from-paths:
-    #  - C:\Program Files\Fibratus\Rules\*.yml
+    from-paths:
+    # - C:\Program Files\Fibratus\Rules\*.yml
     #from-urls:
-    #  - https://raw.githubusercontent.com/rabbitstack/fibratus/master/rules/default.yml
   macros:
     from-paths:
       - C:\Program Files\Fibratus\Rules\Macros\*.yml
@@ -182,6 +181,13 @@ kstream:
   # collected by Kernel Logger provider
   #enable-handle: false
 
+  # Determines whether kernel Audit API calls events are collected
+  #enable-audit-api: true
+
+  # Determines whether the Microsoft Antimalware Engine events are collected. For the
+  # events to be collected it is necessary to enable Windows Defender realtime protection.
+  #enable-antimalware-engine: true
+
   # Determines if raw event buffer parsing is used instead of TDH (Trace Data Helper) API
   # raw-event-parsing: true
 
@@ -191,7 +197,6 @@ kstream:
     # Contains a list of kernel event names that are dropped from the event stream
     events:
       - CloseFile
-      - CloseHandle
     # Contains a list of case-sensitive process image names including the extension.
     # Any event originated by the image specified in this list is dropped from the event stream
     images:

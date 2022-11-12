@@ -192,14 +192,16 @@ func (k *kstreamConsumer) openKstream(loggerName string) error {
 		return fmt.Errorf("unable to open kernel trace: %v", syscall.GetLastError())
 	}
 	k.addTraceHandle(traceHandle)
+
 	// since `ProcessTrace` blocks the current thread
 	// we invoke it in a separate goroutine but send
 	// any possible errors to the channel
 	go func() {
+		log.Infof("starting trace processing for [%s]", loggerName)
 		err := processTrace(traceHandle)
-		log.Infof("stopping kernel trace processing for [%s]", loggerName)
+		log.Infof("stopping trace processing for [%s]", loggerName)
 		if err == nil {
-			log.Infof("kernel trace processing successfully stopped for [%s]", loggerName)
+			log.Infof("trace processing successfully stopped for [%s]", loggerName)
 			return
 		}
 		switch err {
@@ -279,13 +281,12 @@ func (k *kstreamConsumer) processKevent(evt *etw.EventRecord) error {
 		// get the CPU core on which the event was generated
 		cpu = *(*uint8)(unsafe.Pointer(&evt.BufferContext.ProcessorIndex[0]))
 	)
-
 	// obtain the ktype from provider GUID + event type that varies
 	// across different provider types. For the NT Kernel Logger provider
 	// this is the `Opcode` field, while other providers utilize the `ID`
 	// field to transport the event type value
 	switch evt.Header.ProviderID {
-	case etw.KernelAuditAPICallsGUID:
+	case etw.KernelAuditAPICallsGUID, etw.AntimalwareEngineGUID:
 		ktype = ktypes.Pack(evt.Header.ProviderID, uint8(evt.Header.EventDescriptor.ID))
 	default:
 		ktype = ktypes.Pack(evt.Header.ProviderID, evt.Header.EventDescriptor.Opcode)
@@ -480,6 +481,7 @@ func (k *kstreamConsumer) produceParams(ktype ktypes.Ktype, evt *etw.EventRecord
 			offsets[hashKey] = kparName
 			omux.Unlock()
 		}
+
 		kparName = kparams.Canonicalize(kparName)
 		// discard unknown canonical names
 		if kparName == "" {
@@ -567,26 +569,26 @@ func (k *kstreamConsumer) produceRawParams(ktype ktypes.Ktype, evt *etw.EventRec
 		sid, soffset = kparams.ReadSID(buf, offset)
 		name, noffset = kparams.ReadAnsiString(buf, soffset, length)
 		cmdline, _ = kparams.ReadUTF16String(buf, soffset+noffset, length)
-		return kevent.KparamsFromSlice(
-			kevent.NewKparam(kparams.ProcessObject, kparams.HexInt64, kproc),
-			kevent.NewKparam(kparams.ProcessID, kparams.HexInt32, pid),
-			kevent.NewKparam(kparams.ProcessParentID, kparams.HexInt32, ppid),
-			kevent.NewKparam(kparams.SessionID, kparams.Uint32, sessionID),
-			kevent.NewKparam(kparams.ExitStatus, kparams.Uint32, exitStatus),
-			kevent.NewKparam(kparams.DTB, kparams.HexInt64, dtb),
-			kevent.NewKparam(kparams.UserSID, kparams.WbemSID, sid),
-			kevent.NewKparam(kparams.ProcessName, kparams.AnsiString, name),
-			kevent.NewKparam(kparams.Comm, kparams.UnicodeString, cmdline),
-		)
+		return kevent.NewKparamBuilder(9).
+			Append(kparams.ProcessObject, kparams.HexInt64, kproc).
+			Append(kparams.ProcessID, kparams.HexInt32, pid).
+			Append(kparams.ProcessParentID, kparams.HexInt32, ppid).
+			Append(kparams.SessionID, kparams.Uint32, sessionID).
+			Append(kparams.ExitStatus, kparams.Uint32, exitStatus).
+			Append(kparams.DTB, kparams.HexInt64, dtb).
+			Append(kparams.UserSID, kparams.WbemSID, sid).
+			Append(kparams.ProcessName, kparams.AnsiString, name).
+			Append(kparams.Comm, kparams.UnicodeString, cmdline).
+			Build()
 	case ktypes.OpenProcess:
 		processID := kparams.ReadUint32(buf, 0)
 		desiredAccess := kparams.ReadUint32(buf, 4)
 		status := kparams.ReadUint32(buf, 8)
-		return kevent.KparamsFromSlice(
-			kevent.NewKparam(kparams.ProcessID, kparams.Uint32, processID),
-			kevent.NewKparam(kparams.DesiredAccess, kparams.Uint32, desiredAccess),
-			kevent.NewKparam(kparams.NTStatus, kparams.Uint32, status),
-		)
+		return kevent.NewKparamBuilder(3).
+			Append(kparams.ProcessID, kparams.Uint32, processID).
+			Append(kparams.DesiredAccess, kparams.Uint32, desiredAccess).
+			Append(kparams.NTStatus, kparams.Uint32, status).
+			Build()
 	case ktypes.CreateThread,
 		ktypes.TerminateThread,
 		ktypes.EnumThread:
@@ -619,29 +621,29 @@ func (k *kstreamConsumer) produceRawParams(ktype ktypes.Ktype, evt *etw.EventRec
 			pagePrio = kparams.ReadByte(buf, 70)
 			ioPrio = kparams.ReadByte(buf, 71)
 		}
-		return kevent.KparamsFromSlice(
-			kevent.NewKparam(kparams.ProcessID, kparams.HexInt32, pid),
-			kevent.NewKparam(kparams.ThreadID, kparams.HexInt32, tid),
-			kevent.NewKparam(kparams.KstackBase, kparams.HexInt64, kstack),
-			kevent.NewKparam(kparams.KstackLimit, kparams.HexInt64, klimit),
-			kevent.NewKparam(kparams.UstackBase, kparams.HexInt64, ustack),
-			kevent.NewKparam(kparams.UstackLimit, kparams.HexInt64, ulimit),
-			kevent.NewKparam(kparams.ThreadEntrypoint, kparams.HexInt64, startAddr),
-			kevent.NewKparam(kparams.BasePrio, kparams.Uint8, basePrio),
-			kevent.NewKparam(kparams.PagePrio, kparams.Uint8, pagePrio),
-			kevent.NewKparam(kparams.IOPrio, kparams.Uint8, ioPrio),
-		)
+		return kevent.NewKparamBuilder(10).
+			Append(kparams.ProcessID, kparams.HexInt32, pid).
+			Append(kparams.ThreadID, kparams.HexInt32, tid).
+			Append(kparams.KstackBase, kparams.HexInt64, kstack).
+			Append(kparams.KstackLimit, kparams.HexInt64, klimit).
+			Append(kparams.UstackBase, kparams.HexInt64, ustack).
+			Append(kparams.UstackLimit, kparams.HexInt64, ulimit).
+			Append(kparams.ThreadEntrypoint, kparams.HexInt64, startAddr).
+			Append(kparams.BasePrio, kparams.Uint8, basePrio).
+			Append(kparams.PagePrio, kparams.Uint8, pagePrio).
+			Append(kparams.IOPrio, kparams.Uint8, ioPrio).
+			Build()
 	case ktypes.OpenThread:
 		processID := kparams.ReadUint32(buf, 0)
 		threadID := kparams.ReadUint32(buf, 4)
 		desiredAccess := kparams.ReadUint32(buf, 8)
 		status := kparams.ReadUint32(buf, 12)
-		return kevent.KparamsFromSlice(
-			kevent.NewKparam(kparams.ProcessID, kparams.Uint32, processID),
-			kevent.NewKparam(kparams.ThreadID, kparams.Uint32, threadID),
-			kevent.NewKparam(kparams.DesiredAccess, kparams.Uint32, desiredAccess),
-			kevent.NewKparam(kparams.NTStatus, kparams.Uint32, status),
-		)
+		return kevent.NewKparamBuilder(4).
+			Append(kparams.ProcessID, kparams.Uint32, processID).
+			Append(kparams.ThreadID, kparams.Uint32, threadID).
+			Append(kparams.DesiredAccess, kparams.Uint32, desiredAccess).
+			Append(kparams.NTStatus, kparams.Uint32, status).
+			Build()
 	case ktypes.CreateHandle, ktypes.CloseHandle:
 		object := kparams.ReadUint64(buf, 0)
 		handleID := kparams.ReadUint32(buf, 8)
@@ -650,12 +652,12 @@ func (k *kstreamConsumer) produceRawParams(ktype ktypes.Ktype, evt *etw.EventRec
 		if length >= 16 {
 			handleName = kparams.ConsumeUTF16String(buf, 14, length)
 		}
-		return kevent.KparamsFromSlice(
-			kevent.NewKparam(kparams.HandleObject, kparams.Uint64, object),
-			kevent.NewKparam(kparams.HandleID, kparams.Uint32, handleID),
-			kevent.NewKparam(kparams.HandleObjectTypeID, kparams.Uint16, typeID),
-			kevent.NewKparam(kparams.HandleObjectName, kparams.UnicodeString, handleName),
-		)
+		return kevent.NewKparamBuilder(4).
+			Append(kparams.HandleObject, kparams.Uint64, object).
+			Append(kparams.HandleID, kparams.Uint32, handleID).
+			Append(kparams.HandleObjectTypeID, kparams.Uint16, typeID).
+			Append(kparams.HandleObjectName, kparams.UnicodeString, handleName).
+			Build()
 	case ktypes.LoadImage,
 		ktypes.UnloadImage,
 		ktypes.EnumImage:
@@ -689,14 +691,14 @@ func (k *kstreamConsumer) produceRawParams(ktype ktypes.Ktype, evt *etw.EventRec
 			offset = 16
 		}
 		filename, _ = kparams.ReadUTF16String(buf, offset, length)
-		return kevent.KparamsFromSlice(
-			kevent.NewKparam(kparams.ProcessID, kparams.Uint32, pid),
-			kevent.NewKparam(kparams.ImageCheckSum, kparams.Uint32, checksum),
-			kevent.NewKparam(kparams.ImageDefaultBase, kparams.HexInt64, defaultBase),
-			kevent.NewKparam(kparams.ImageBase, kparams.HexInt64, imageBase),
-			kevent.NewKparam(kparams.ImageSize, kparams.Uint32, uint32(imageSize)),
-			kevent.NewKparam(kparams.ImageFilename, kparams.UnicodeString, filename),
-		)
+		return kevent.NewKparamBuilder(6).
+			Append(kparams.ProcessID, kparams.Uint32, pid).
+			Append(kparams.ImageCheckSum, kparams.Uint32, checksum).
+			Append(kparams.ImageDefaultBase, kparams.HexInt64, defaultBase).
+			Append(kparams.ImageBase, kparams.HexInt64, imageBase).
+			Append(kparams.ImageSize, kparams.Uint32, uint32(imageSize)).
+			Append(kparams.ImageFilename, kparams.UnicodeString, filename).
+			Build()
 	case ktypes.RegOpenKey, ktypes.RegOpenKeyV1,
 		ktypes.RegCreateKCB, ktypes.RegDeleteKCB,
 		ktypes.RegKCBRundown, ktypes.RegCreateKey,
@@ -720,11 +722,11 @@ func (k *kstreamConsumer) produceRawParams(ktype ktypes.Ktype, evt *etw.EventRec
 		} else {
 			keyName = kparams.ConsumeUTF16String(buf, 20, length)
 		}
-		return kevent.KparamsFromSlice(
-			kevent.NewKparam(kparams.RegKeyHandle, kparams.Uint64, keyHandle),
-			kevent.NewKparam(kparams.RegKeyName, kparams.UnicodeString, keyName),
-			kevent.NewKparam(kparams.NTStatus, kparams.Uint32, status),
-		)
+		return kevent.NewKparamBuilder(3).
+			Append(kparams.RegKeyHandle, kparams.Uint64, keyHandle).
+			Append(kparams.RegKeyName, kparams.UnicodeString, keyName).
+			Append(kparams.NTStatus, kparams.Uint32, status).
+			Build()
 	case ktypes.CreateFile:
 		var (
 			irp            uint64
@@ -747,15 +749,15 @@ func (k *kstreamConsumer) produceRawParams(ktype ktypes.Ktype, evt *etw.EventRec
 			fileObject = kparams.ReadUint64(buf, 0)
 			filename = kparams.ConsumeUTF16String(buf, 8, length)
 		}
-		return kevent.KparamsFromSlice(
-			kevent.NewKparam(kparams.FileIrpPtr, kparams.Uint64, irp),
-			kevent.NewKparam(kparams.FileObject, kparams.Uint64, fileObject),
-			kevent.NewKparam(kparams.ThreadID, kparams.Uint32, tid),
-			kevent.NewKparam(kparams.FileCreateOptions, kparams.Uint32, createOptions),
-			kevent.NewKparam(kparams.FileAttributes, kparams.Uint32, fileAttributes),
-			kevent.NewKparam(kparams.FileShareMask, kparams.Uint32, shareAccess),
-			kevent.NewKparam(kparams.FileName, kparams.UnicodeString, filename),
-		)
+		return kevent.NewKparamBuilder(7).
+			Append(kparams.FileIrpPtr, kparams.Uint64, irp).
+			Append(kparams.FileObject, kparams.Uint64, fileObject).
+			Append(kparams.ThreadID, kparams.Uint32, tid).
+			Append(kparams.FileCreateOptions, kparams.Uint32, createOptions).
+			Append(kparams.FileAttributes, kparams.Uint32, fileAttributes).
+			Append(kparams.FileShareMask, kparams.Uint32, shareAccess).
+			Append(kparams.FileName, kparams.UnicodeString, filename).
+			Build()
 	case ktypes.FileOpEnd:
 		var (
 			irp       uint64
@@ -767,11 +769,11 @@ func (k *kstreamConsumer) produceRawParams(ktype ktypes.Ktype, evt *etw.EventRec
 			extraInfo = kparams.ReadUint64(buf, 8)
 			status = kparams.ReadUint32(buf, 16)
 		}
-		return kevent.KparamsFromSlice(
-			kevent.NewKparam(kparams.FileIrpPtr, kparams.Uint64, irp),
-			kevent.NewKparam(kparams.FileExtraInfo, kparams.Uint64, extraInfo),
-			kevent.NewKparam(kparams.NTStatus, kparams.Uint32, status),
-		)
+		return kevent.NewKparamBuilder(3).
+			Append(kparams.FileIrpPtr, kparams.Uint64, irp).
+			Append(kparams.FileExtraInfo, kparams.Uint64, extraInfo).
+			Append(kparams.NTStatus, kparams.Uint32, status).
+			Build()
 	case ktypes.FileRundown:
 		var (
 			fileObject uint64
@@ -781,10 +783,10 @@ func (k *kstreamConsumer) produceRawParams(ktype ktypes.Ktype, evt *etw.EventRec
 			fileObject = kparams.ReadUint64(buf, 0)
 			filename = kparams.ConsumeUTF16String(buf, 8, length)
 		}
-		return kevent.KparamsFromSlice(
-			kevent.NewKparam(kparams.FileObject, kparams.Uint64, fileObject),
-			kevent.NewKparam(kparams.FileName, kparams.UnicodeString, filename),
-		)
+		return kevent.NewKparamBuilder(2).
+			Append(kparams.FileObject, kparams.Uint64, fileObject).
+			Append(kparams.FileName, kparams.UnicodeString, filename).
+			Build()
 	case ktypes.ReleaseFile, ktypes.CloseFile:
 		var (
 			irp        uint64
@@ -800,12 +802,12 @@ func (k *kstreamConsumer) produceRawParams(ktype ktypes.Ktype, evt *etw.EventRec
 			fileKey = kparams.ReadUint64(buf, 16)
 			tid = kparams.ReadUint32(buf, 24)
 		}
-		return kevent.KparamsFromSlice(
-			kevent.NewKparam(kparams.FileIrpPtr, kparams.Uint64, irp),
-			kevent.NewKparam(kparams.FileObject, kparams.Uint64, fileObject),
-			kevent.NewKparam(kparams.FileKey, kparams.Uint64, fileKey),
-			kevent.NewKparam(kparams.ThreadID, kparams.Uint32, tid),
-		)
+		return kevent.NewKparamBuilder(4).
+			Append(kparams.FileIrpPtr, kparams.Uint64, irp).
+			Append(kparams.FileObject, kparams.Uint64, fileObject).
+			Append(kparams.FileKey, kparams.Uint64, fileKey).
+			Append(kparams.ThreadID, kparams.Uint32, tid).
+			Build()
 	case ktypes.DeleteFile,
 		ktypes.RenameFile,
 		ktypes.SetFileInformation:
@@ -832,14 +834,14 @@ func (k *kstreamConsumer) produceRawParams(ktype ktypes.Ktype, evt *etw.EventRec
 			fileKey = kparams.ReadUint64(buf, 18)
 			extraInfo = kparams.ReadUint64(buf, 28)
 		}
-		return kevent.KparamsFromSlice(
-			kevent.NewKparam(kparams.FileIrpPtr, kparams.Uint64, irp),
-			kevent.NewKparam(kparams.FileObject, kparams.Uint64, fileObject),
-			kevent.NewKparam(kparams.FileKey, kparams.Uint64, fileKey),
-			kevent.NewKparam(kparams.ThreadID, kparams.Uint32, tid),
-			kevent.NewKparam(kparams.FileExtraInfo, kparams.Uint64, extraInfo),
-			kevent.NewKparam(kparams.FileInfoClass, kparams.Uint32, infoClass),
-		)
+		return kevent.NewKparamBuilder(6).
+			Append(kparams.FileIrpPtr, kparams.Uint64, irp).
+			Append(kparams.FileObject, kparams.Uint64, fileObject).
+			Append(kparams.FileKey, kparams.Uint64, fileKey).
+			Append(kparams.ThreadID, kparams.Uint32, tid).
+			Append(kparams.FileExtraInfo, kparams.Uint64, extraInfo).
+			Append(kparams.FileInfoClass, kparams.Uint32, infoClass).
+			Build()
 	case ktypes.ReadFile, ktypes.WriteFile:
 		var (
 			irp        uint64
@@ -863,14 +865,14 @@ func (k *kstreamConsumer) produceRawParams(ktype ktypes.Ktype, evt *etw.EventRec
 			fileKey = kparams.ReadUint64(buf, 28)
 			tid = kparams.ReadUint32(buf, 16)
 		}
-		return kevent.KparamsFromSlice(
-			kevent.NewKparam(kparams.FileIrpPtr, kparams.Uint64, irp),
-			kevent.NewKparam(kparams.FileObject, kparams.Uint64, fileObject),
-			kevent.NewKparam(kparams.FileKey, kparams.Uint64, fileKey),
-			kevent.NewKparam(kparams.ThreadID, kparams.Uint32, tid),
-			kevent.NewKparam(kparams.FileOffset, kparams.Uint64, offset),
-			kevent.NewKparam(kparams.FileIoSize, kparams.Uint32, size),
-		)
+		return kevent.NewKparamBuilder(7).
+			Append(kparams.FileIrpPtr, kparams.Uint64, irp).
+			Append(kparams.FileObject, kparams.Uint64, fileObject).
+			Append(kparams.FileKey, kparams.Uint64, fileKey).
+			Append(kparams.ThreadID, kparams.Uint32, tid).
+			Append(kparams.FileOffset, kparams.Uint64, offset).
+			Append(kparams.FileIoSize, kparams.Uint32, size).
+			Build()
 	case ktypes.EnumDirectory:
 		var (
 			irp        uint64
@@ -894,14 +896,14 @@ func (k *kstreamConsumer) produceRawParams(ktype ktypes.Ktype, evt *etw.EventRec
 			fileObject = kparams.ReadUint64(buf, 12)
 			fileKey = kparams.ReadUint64(buf, 20)
 		}
-		return kevent.KparamsFromSlice(
-			kevent.NewKparam(kparams.FileIrpPtr, kparams.Uint64, irp),
-			kevent.NewKparam(kparams.FileObject, kparams.Uint64, fileObject),
-			kevent.NewKparam(kparams.ThreadID, kparams.Uint32, tid),
-			kevent.NewKparam(kparams.FileKey, kparams.Uint64, fileKey),
-			kevent.NewKparam(kparams.FileName, kparams.UnicodeString, filename),
-			kevent.NewKparam(kparams.FileInfoClass, kparams.Uint32, infoClass),
-		)
+		return kevent.NewKparamBuilder(7).
+			Append(kparams.FileIrpPtr, kparams.Uint64, irp).
+			Append(kparams.FileObject, kparams.Uint64, fileObject).
+			Append(kparams.ThreadID, kparams.Uint32, tid).
+			Append(kparams.FileKey, kparams.Uint64, fileKey).
+			Append(kparams.FileName, kparams.UnicodeString, filename).
+			Append(kparams.FileInfoClass, kparams.Uint32, infoClass).
+			Build()
 	case ktypes.SendTCPv4,
 		ktypes.SendUDPv4,
 		ktypes.RecvTCPv4,
@@ -934,14 +936,14 @@ func (k *kstreamConsumer) produceRawParams(ktype ktypes.Ktype, evt *etw.EventRec
 			size = kparams.ReadUint32(buf, 12)
 			pid = kparams.ReadUint32(buf, 16)
 		}
-		return kevent.KparamsFromSlice(
-			kevent.NewKparam(kparams.ProcessID, kparams.Uint32, pid),
-			kevent.NewKparam(kparams.NetSize, kparams.Uint32, size),
-			kevent.NewKparam(kparams.NetDIP, kparams.IPv4, dip),
-			kevent.NewKparam(kparams.NetSIP, kparams.IPv4, sip),
-			kevent.NewKparam(kparams.NetDport, kparams.Port, dport),
-			kevent.NewKparam(kparams.NetSport, kparams.Port, sport),
-		)
+		return kevent.NewKparamBuilder(7).
+			Append(kparams.ProcessID, kparams.Uint32, pid).
+			Append(kparams.NetSize, kparams.Uint32, size).
+			Append(kparams.NetDIP, kparams.IPv4, dip).
+			Append(kparams.NetSIP, kparams.IPv4, sip).
+			Append(kparams.NetDport, kparams.Port, dport).
+			Append(kparams.NetSport, kparams.Port, sport).
+			Build()
 	case ktypes.SendTCPv6,
 		ktypes.SendUDPv6,
 		ktypes.RecvTCPv6,
@@ -967,14 +969,19 @@ func (k *kstreamConsumer) produceRawParams(ktype ktypes.Ktype, evt *etw.EventRec
 			dport = kparams.ReadUint16(buf, 40)
 			sport = kparams.ReadUint16(buf, 42)
 		}
-		return kevent.KparamsFromSlice(
-			kevent.NewKparam(kparams.ProcessID, kparams.Uint32, pid),
-			kevent.NewKparam(kparams.NetSize, kparams.Uint32, size),
-			kevent.NewKparam(kparams.NetDIP, kparams.IPv6, dip),
-			kevent.NewKparam(kparams.NetSIP, kparams.IPv6, sip),
-			kevent.NewKparam(kparams.NetDport, kparams.Port, dport),
-			kevent.NewKparam(kparams.NetSport, kparams.Port, sport),
-		)
+		return kevent.NewKparamBuilder(7).
+			Append(kparams.ProcessID, kparams.Uint32, pid).
+			Append(kparams.NetSize, kparams.Uint32, size).
+			Append(kparams.NetDIP, kparams.IPv6, dip).
+			Append(kparams.NetSIP, kparams.IPv6, sip).
+			Append(kparams.NetDport, kparams.Port, dport).
+			Append(kparams.NetSport, kparams.Port, sport).
+			Build()
+	case ktypes.LoadDriver:
+		filename := kparams.ConsumeUTF16String(buf, 4, length)
+		return kevent.NewKparamBuilder(1).
+			Append(kparams.ImageFilename, kparams.UnicodeString, filename).
+			Build()
 	default:
 		return kevent.Kparams{}
 	}

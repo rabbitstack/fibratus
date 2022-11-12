@@ -38,6 +38,9 @@ var KernelRundownGUID = syscall.GUID{Data1: 0x3b9c9951, Data2: 0x3480, Data3: 0x
 // KernelAuditAPICallsGUID represents the GUID for the kernel audit API provider
 var KernelAuditAPICallsGUID = syscall.GUID{Data1: 0xe02a841c, Data2: 0x75a3, Data3: 0x4fa7, Data4: [8]byte{0xaf, 0xc8, 0xae, 0x09, 0xcf, 0x9b, 0x7f, 0x23}}
 
+// AntimalwareEngineGUID represents the GUID for the Microsoft Antimalware Engine provider
+var AntimalwareEngineGUID = syscall.GUID{Data1: 0x0a002690, Data2: 0x3839, Data3: 0x4e3a, Data4: [8]byte{0xb3, 0xb6, 0x96, 0xd8, 0xdf, 0x86, 0x8d, 0x99}}
+
 const (
 	// TraceSystemTraceEnableFlagsInfo controls system logger event flags
 	TraceSystemTraceEnableFlagsInfo = uint8(4)
@@ -50,6 +53,8 @@ const (
 	KernelLoggerRundownSession = "Kernel Rundown Logger"
 	// KernelAuditAPICallsSession represents the session name for the kernel audit API logger
 	KernelAuditAPICallsSession = "Kernel Audit API Calls Logger"
+	// AntimalwareEngineSession is the session name for the Antimalware Engine logger
+	AntimalwareEngineSession = "Antimalware Engine Logger"
 	// WnodeTraceFlagGUID indicates that the structure contains event tracing information
 	WnodeTraceFlagGUID = 0x00020000
 	// ProcessTraceModeRealtime denotes that there will be a real-time consumers for events forwarded from the providers

@@ -36,6 +36,8 @@ const (
 	Net
 	// Handle represents the handle interceptor.
 	Handle
+	// Driver represents the driver interceptor.
+	Driver
 )
 
 // KstreamInterceptor is the minimal interface that each kernel stream interceptor has to satisfy. Kernel stream interceptor
@@ -69,6 +71,8 @@ func (typ InterceptorType) String() string {
 		return "net"
 	case Handle:
 		return "handle"
+	case Driver:
+		return "driver"
 	default:
 		return "unknown"
 	}

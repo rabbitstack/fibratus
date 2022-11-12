@@ -29,7 +29,7 @@ import (
 	"time"
 )
 
-func TestStartKtraceSuccess(t *testing.T) {
+func TestStartKtrace(t *testing.T) {
 	startTrace = func(name string, flags *etw.EventTraceProperties) (etw.TraceHandle, error) {
 		return etw.TraceHandle(1), nil
 	}
@@ -38,16 +38,18 @@ func TestStartKtraceSuccess(t *testing.T) {
 	}
 
 	ktracec := NewKtraceController(config.KstreamConfig{
-		EnableThreadKevents: true,
-		EnableNetKevents:    true,
-		BufferSize:          1024,
-		FlushTimer:          time.Millisecond * 2300,
+		EnableThreadKevents:           true,
+		EnableNetKevents:              true,
+		BufferSize:                    1024,
+		FlushTimer:                    time.Millisecond * 2300,
+		EnableAntimalwareEngineEvents: true,
+		EnableAuditAPIEvents:          true,
 	})
 
 	err := ktracec.StartKtrace()
 
 	require.NoError(t, err)
-	assert.Len(t, ktracec.(*ktraceController).traces, 3)
+	assert.Len(t, ktracec.(*ktraceController).traces, 4)
 }
 
 func TestStartKtraceNoSysResources(t *testing.T) {

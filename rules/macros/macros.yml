@@ -31,5 +31,20 @@
 - macro: load_module
   expr: kevt.name = 'LoadImage'
 
+- macro: write_minidump_file
+  expr: >
+    write_file and
+    (
+      file.extension iin
+      (
+        '.dmp',
+        '.mdmp',
+        '.dump'
+      )
+        or
+      is_minidump(file.name)
+    )
+  description: Detects when a process writes a minidump file
+
 - macro: msoffice_binaries
   list: [EXCEL.EXE, WINWORD.EXE, MSACCESS.EXE, POWERPNT.EXE, WORDPAD.EXE]

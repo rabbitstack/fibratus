@@ -33,17 +33,19 @@ import (
 )
 
 const (
-	enableThreadKevents   = "kstream.enable-thread"
-	enableRegistryKevents = "kstream.enable-registry"
-	enableNetKevents      = "kstream.enable-net"
-	enableFileIOKevents   = "kstream.enable-fileio"
-	enableImageKevents    = "kstream.enable-image"
-	enableHandleKevents   = "kstream.enable-handle"
-	bufferSize            = "kstream.buffer-size"
-	minBuffers            = "kstream.min-buffers"
-	maxBuffers            = "kstream.max-buffers"
-	flushInterval         = "kstream.flush-interval"
-	rawEventParsing       = "kstream.raw-event-parsing"
+	enableThreadKevents           = "kstream.enable-thread"
+	enableRegistryKevents         = "kstream.enable-registry"
+	enableNetKevents              = "kstream.enable-net"
+	enableFileIOKevents           = "kstream.enable-fileio"
+	enableImageKevents            = "kstream.enable-image"
+	enableHandleKevents           = "kstream.enable-handle"
+	enableAuditAPIEvents          = "kstream.enable-audit-api"
+	enableAntimalwareEngineEvents = "kstream.enable-antimalware-engine"
+	bufferSize                    = "kstream.buffer-size"
+	minBuffers                    = "kstream.min-buffers"
+	maxBuffers                    = "kstream.max-buffers"
+	flushInterval                 = "kstream.flush-interval"
+	rawEventParsing               = "kstream.raw-event-parsing"
 
 	excludedEvents = "kstream.blacklist.events"
 	excludedImages = "kstream.blacklist.images"
@@ -71,6 +73,10 @@ type KstreamConfig struct {
 	EnableImageKevents bool `json:"enable-image" yaml:"enable-image"`
 	// EnableHandleKevents indicates whether handle creation/disposal events are enabled.
 	EnableHandleKevents bool `json:"enable-handle" yaml:"enable-handle"`
+	// EnableAuditAPIEvents indicates if kernel audit API calls events are enabled
+	EnableAuditAPIEvents bool `json:"enable-audit-api" yaml:"enable-audit-api"`
+	// EnableAntimalwareEngineEvents indicates if Antimalware Engine events are enabled
+	EnableAntimalwareEngineEvents bool `json:"enable-antimalware-engine" yaml:"enable-antimalware-engine"`
 	// BufferSize represents the amount of memory allocated for each event tracing session buffer, in kilobytes.
 	// The buffer size affects the rate at which buffers fill and must be flushed (small buffer size requires
 	// less memory but it increases the rate at which buffers must be flushed).
@@ -100,6 +106,8 @@ func (c *KstreamConfig) initFromViper(v *viper.Viper) {
 	c.EnableFileIOKevents = v.GetBool(enableFileIOKevents)
 	c.EnableImageKevents = v.GetBool(enableImageKevents)
 	c.EnableHandleKevents = v.GetBool(enableHandleKevents)
+	c.EnableAuditAPIEvents = v.GetBool(enableAuditAPIEvents)
+	c.EnableAntimalwareEngineEvents = v.GetBool(enableAntimalwareEngineEvents)
 	c.BufferSize = uint32(v.GetInt(bufferSize))
 	c.MinBuffers = uint32(v.GetInt(minBuffers))
 	c.MaxBuffers = uint32(v.GetInt(maxBuffers))

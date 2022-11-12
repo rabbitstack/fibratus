@@ -72,7 +72,7 @@ func TestCloseHandle(t *testing.T) {
 
 	objectTypeStore.On("FindByID", uint8(23)).Return(handle.Key)
 
-	assert.Len(t, hi.(*handleInterceptor).defers, 0)
+	assert.Len(t, hi.(*handleInterceptor).objects, 0)
 
 	_, _, err := hi.Intercept(kevt)
 	require.NoError(t, err)
@@ -115,7 +115,7 @@ func TestHandleCoalescing(t *testing.T) {
 	require.Error(t, err)
 	require.True(t, kerrors.IsCancelUpstreamKevent(err))
 
-	assert.Len(t, hi.(*handleInterceptor).defers, 1)
+	assert.Len(t, hi.(*handleInterceptor).objects, 1)
 
 	kevt1 := &kevent.Kevent{
 		Type:     ktypes.CloseHandle,
@@ -137,7 +137,7 @@ func TestHandleCoalescing(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, `HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\Tcpip\Parameters\Interfaces\{b677c565-6ca5-45d3-b618-736b4e09b036}`, keyName)
 
-	assert.Len(t, hi.(*handleInterceptor).defers, 0)
+	assert.Len(t, hi.(*handleInterceptor).objects, 0)
 
 	dkevt := <-deferredKevts
 	require.NotNil(t, dkevt)
@@ -185,7 +185,7 @@ func TestHandleCoalescingWaiting(t *testing.T) {
 	require.Error(t, err)
 	require.True(t, kerrors.IsCancelUpstreamKevent(err))
 
-	assert.Len(t, hi.(*handleInterceptor).defers, 1)
+	assert.Len(t, hi.(*handleInterceptor).objects, 1)
 
 	kevt1 := &kevent.Kevent{
 		Type:     ktypes.CloseHandle,
@@ -205,5 +205,5 @@ func TestHandleCoalescingWaiting(t *testing.T) {
 	_, _, err = hi.Intercept(kevt1)
 	require.NoError(t, err)
 
-	assert.Len(t, hi.(*handleInterceptor).defers, 0)
+	assert.Len(t, hi.(*handleInterceptor).objects, 0)
 }
