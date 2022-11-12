@@ -20,7 +20,6 @@ package kevent
 
 import (
 	"strconv"
-	"strings"
 )
 
 // Format applies the template on the provided kernel event.
@@ -66,7 +65,7 @@ func (f *Formatter) Format(kevt *Kevent) []byte {
 		// expand all parameters into the map so we can ask
 		// for specific parameter names in the template
 		for _, kpar := range kevt.Kparams {
-			values[".Kparams."+strings.Title(kpar.Name)] = kpar.String()
+			values[".Kparams."+caser.String(kpar.Name)] = kpar.String()
 		}
 	}
 

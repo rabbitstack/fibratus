@@ -31,9 +31,9 @@ import (
 	"gopkg.in/yaml.v3"
 	"hash/fnv"
 	"io"
-	"io/ioutil"
 	"net/http"
 	u "net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -311,7 +311,7 @@ func (f *Filters) LoadMacros() error {
 				continue
 			}
 			log.Infof("loading macros from file %s", path)
-			buf, err := ioutil.ReadFile(path)
+			buf, err := os.ReadFile(path)
 			if err != nil {
 				return fmt.Errorf("couldn't load macros from file: %v", err)
 			}
@@ -368,7 +368,7 @@ func (f Filters) LoadGroups() ([]FilterGroup, error) {
 			log.Infof("loading rules from file %s", path)
 			// read the file group yaml file and produce
 			// the corresponding filter groups from it
-			rawConfig, err := ioutil.ReadFile(path)
+			rawConfig, err := os.ReadFile(path)
 			if err != nil {
 				return nil, fmt.Errorf("couldn't load rule file: %v", err)
 			}

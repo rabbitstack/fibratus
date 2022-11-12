@@ -22,10 +22,10 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 )
 
@@ -115,7 +115,7 @@ func TestLoadGroupsFromPathsNewAttributes(t *testing.T) {
 func TestLoadGroupsFromURLs(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/default.yml", func(w http.ResponseWriter, r *http.Request) {
-		b, err := ioutil.ReadFile("_fixtures/filters/default.yml")
+		b, err := os.ReadFile("_fixtures/filters/default.yml")
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return

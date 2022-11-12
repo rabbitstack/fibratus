@@ -22,6 +22,7 @@
 package yara
 
 import (
+	"github.com/hillu/go-yara/v4"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -54,7 +55,7 @@ func (s *mockSender) Send(a alertsender.Alert) error {
 	return nil
 }
 
-func (s *mockSender) Type(a alertsender.Alert) alertsender.Type {
+func (s *mockSender) Type() alertsender.Type {
 	return alertsender.Noop
 }
 

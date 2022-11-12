@@ -27,7 +27,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/spf13/cobra"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -82,7 +81,7 @@ func listFilaments(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	filaments, err := ioutil.ReadDir(dir)
+	filaments, err := os.ReadDir(dir)
 	if err != nil {
 		return err
 	}

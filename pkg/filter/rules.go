@@ -298,8 +298,6 @@ func (s *sequenceState) next(i int) bool {
 	return s.matchedRules[uint16(i)] && !s.inDeadline.Load() && !s.inExpired
 }
 
-func (s *sequenceState) matched(i int) bool { return s.matchedRules[uint16(i+1)] }
-
 func (s *sequenceState) scheduleMaxSpanDeadline(rule fsm.State, maxSpan time.Duration) {
 	t := time.AfterFunc(maxSpan, func() {
 		inState, _ := s.fsm.IsInState(rule)

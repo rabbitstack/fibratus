@@ -20,7 +20,7 @@ package kevent
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"os"
 	"testing"
 	"time"
 
@@ -215,7 +215,7 @@ func TestKeventMarshalJSON(t *testing.T) {
 }
 
 func TestUnmarshalHugeHandles(t *testing.T) {
-	b, err := ioutil.ReadFile("_fixtures\\handles.json")
+	b, err := os.ReadFile("_fixtures\\handles.json")
 	require.NoError(t, err)
 	handles := make([]htypes.Handle, 0)
 	err = json.Unmarshal(b, &handles)

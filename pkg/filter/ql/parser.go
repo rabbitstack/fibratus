@@ -189,13 +189,11 @@ func (p *Parser) parseUnaryExpr() (Expr, error) {
 						return nil, multierror.WrapWithSeparator("\n", fmt.Errorf("syntax error in %q macro", lit), err)
 					}
 					return expr, nil
-				} else {
-					return &ListLiteral{Values: macro.List}, nil
 				}
-			} else {
-				// unscan ident
-				p.unscan()
+				return &ListLiteral{Values: macro.List}, nil
 			}
+			// unscan ident
+			p.unscan()
 		}
 	case ip:
 		return &IPLiteral{Value: net.ParseIP(lit)}, nil

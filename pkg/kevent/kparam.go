@@ -20,6 +20,8 @@ package kevent
 
 import (
 	"fmt"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"net"
 	"reflect"
 	"sort"
@@ -29,6 +31,8 @@ import (
 	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 )
+
+var caser = cases.Title(language.English)
 
 // ParamCaseStyle is the type definition for parameter name case style
 type ParamCaseStyle uint8
@@ -545,7 +549,7 @@ func (kpars Kparams) String() string {
 		case DotCase:
 			sb.WriteString(strings.Replace(kpar.Name, "_", ".", -1) + ParamKVDelimiter + kpar.String())
 		case PascalCase:
-			sb.WriteString(strings.Replace(strings.Title(strings.Replace(kpar.Name, "_", " ", -1)), " ", "", -1) + ParamKVDelimiter + kpar.String())
+			sb.WriteString(strings.Replace(caser.String(strings.Replace(kpar.Name, "_", " ", -1)), " ", "", -1) + ParamKVDelimiter + kpar.String())
 		case CamelCase:
 		}
 		if i != len(pars)-1 {

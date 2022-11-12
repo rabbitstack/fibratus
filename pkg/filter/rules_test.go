@@ -22,6 +22,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	log "github.com/sirupsen/logrus"
 	"net"
+	"sync"
 	"testing"
 	"time"
 
@@ -37,6 +38,7 @@ import (
 
 type mockSender struct{}
 
+var mu sync.Mutex
 var emitAlert *alertsender.Alert
 
 func (s *mockSender) Send(a alertsender.Alert) error {
@@ -521,6 +523,8 @@ func TestSequenceComplexPatternBindings(t *testing.T) {
 	// register alert sender
 	require.NoError(t, alertsender.LoadAll([]alertsender.Config{{Type: alertsender.Noop}}))
 
+	mu.Lock()
+	defer mu.Unlock()
 	require.True(t, rules.Fire(kevt4))
 
 	time.Sleep(time.Millisecond * 25)
@@ -564,7 +568,8 @@ func TestFilterActionEmitAlert(t *testing.T) {
 		},
 		Metadata: make(map[kevent.MetadataKey]string),
 	}
-
+	mu.Lock()
+	defer mu.Unlock()
 	require.True(t, rules.Fire(kevt))
 	time.Sleep(time.Millisecond * 25)
 	require.NotNil(t, emitAlert)

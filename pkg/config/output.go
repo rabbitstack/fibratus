@@ -161,9 +161,9 @@ func findActiveOutputs(outputs map[string]interface{}) []string {
 
 // isWindowsService returns true if the process is running inside Windows Service.
 func isWindowsService() bool {
-	interactive, err := svc.IsAnInteractiveSession()
+	isWinService, err := svc.IsWindowsService()
 	if err != nil {
 		return false
 	}
-	return !interactive
+	return isWinService
 }

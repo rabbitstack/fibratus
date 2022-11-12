@@ -22,7 +22,7 @@ import (
 	"context"
 	"errors"
 	"github.com/rabbitstack/fibratus/pkg/api"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"path"
@@ -103,10 +103,7 @@ func request(method string, options ...Option) ([]byte, error) {
 	}
 
 	scheme := "http://"
-	addr := opts.addr
-	if strings.HasPrefix(addr, `npipe:///`) {
-		addr = strings.TrimPrefix(addr, `npipe:///`)
-	}
+	addr := strings.TrimPrefix(opts.addr, `npipe:///`)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
@@ -121,7 +118,7 @@ func request(method string, options ...Option) ([]byte, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}

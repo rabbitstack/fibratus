@@ -214,9 +214,8 @@ func (kevt *Kevent) Summary() string {
 		val, err := kevt.Kparams.GetString(kparams.RegValue)
 		if err != nil {
 			return printSummary(kevt, fmt.Sprintf("set <code>%s</code> value", key))
-		} else {
-			return printSummary(kevt, fmt.Sprintf("set <code>%s</code> payload in <code>%s</code> value", val, key))
 		}
+		return printSummary(kevt, fmt.Sprintf("set <code>%s</code> payload in <code>%s</code> value", val, key))
 	case ktypes.RegDeleteValue:
 		key, _ := kevt.Kparams.GetString(kparams.RegKeyName)
 		return printSummary(kevt, fmt.Sprintf("deleted <code>%s</code> value", key))

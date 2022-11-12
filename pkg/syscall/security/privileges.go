@@ -73,7 +73,7 @@ func lookupPrivilegeValue(systemName string, name string, luid *int64) (err erro
 }
 
 func lookupPrivilegeValueW(systemName *uint16, name *uint16, luid *int64) (err error) {
-	r1, _, e1 := syscall.Syscall(procLookupPrivilegeValueW.Addr(), 3, uintptr(unsafe.Pointer(systemName)), uintptr(unsafe.Pointer(name)), uintptr(unsafe.Pointer(luid)))
+	r1, _, e1 := syscall.SyscallN(procLookupPrivilegeValueW.Addr(), uintptr(unsafe.Pointer(systemName)), uintptr(unsafe.Pointer(name)), uintptr(unsafe.Pointer(luid)))
 	if r1 == 0 {
 		if e1 != 0 {
 			err = error(e1)
@@ -91,7 +91,7 @@ func adjustTokenPrivileges(token syscall.Token, releaseAll bool, input *byte, ou
 	} else {
 		_p0 = 0
 	}
-	r0, _, e1 := syscall.Syscall6(procAdjustTokenPrivileges.Addr(), 6, uintptr(token), uintptr(_p0), uintptr(unsafe.Pointer(input)), uintptr(outputSize), uintptr(unsafe.Pointer(output)), uintptr(unsafe.Pointer(requiredSize)))
+	r0, _, e1 := syscall.SyscallN(procAdjustTokenPrivileges.Addr(), uintptr(token), uintptr(_p0), uintptr(unsafe.Pointer(input)), uintptr(outputSize), uintptr(unsafe.Pointer(output)), uintptr(unsafe.Pointer(requiredSize)))
 	success = r0 != 0
 	if true {
 		if e1 != 0 {

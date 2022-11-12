@@ -36,7 +36,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/term"
 	log "github.com/sirupsen/logrus"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -179,7 +178,7 @@ func New(
 	if err != nil || !fstat.IsDir() {
 		return nil, errFilamentsDir(path)
 	}
-	filaments, err := ioutil.ReadDir(path)
+	filaments, err := os.ReadDir(path)
 	if err != nil {
 		return nil, err
 	}

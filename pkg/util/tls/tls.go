@@ -22,7 +22,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io/ioutil"
+	"os"
 )
 
 // MakeConfig builds a TLS config from the certificate, private/public key and the CA cert files.
@@ -48,7 +48,7 @@ func MakeConfig(certFile, keyFile, caFile string, insecureSkipVerify bool) (*tls
 	// load certificate issuing authority
 	if caFile != "" {
 		cpool := x509.NewCertPool()
-		caCert, err := ioutil.ReadFile(caFile)
+		caCert, err := os.ReadFile(caFile)
 		if err != nil {
 			return nil, err
 		}
