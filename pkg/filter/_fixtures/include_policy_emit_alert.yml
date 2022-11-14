@@ -1,17 +1,15 @@
 - group: network events
-  selector:
-    type: Recv
   enabled: true
   policy: include
   relation: or
   from-strings:
     - name: match https connections
-      def: net.dport = 443
+      def:  kevt.name = 'Recv' and net.dport = 443
       action: |
         {{ $text := cat .Kevt.PS.Name "process received data on port" .Kevt.Kparams.dport }}
         {{ emit . "Test alert" $text "critical" "tag1" "tag2" }}
     - name: Windows error reporting/telemetry, WMI provider host
-      def: ps.comm startswith
+      def:  kevt.name = 'Recv' and ps.comm startswith
         (
           ' \"C:\\Windows\\system32\\wermgr.exe\\" \"-queuereporting_svc\" ',
           'C:\\Windows\\system32\\DllHost.exe /Processid'

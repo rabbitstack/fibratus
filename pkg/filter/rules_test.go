@@ -108,18 +108,7 @@ func TestChainCompileMergeGroups(t *testing.T) {
 	assert.Len(t, rules.filterGroups[ktypes.Recv.Hash()], 2)
 	assert.Len(t, rules.filterGroups[ktypes.Net.Hash()], 1)
 
-	groups := rules.findFilterGroups(&kevent.Kevent{Type: ktypes.Recv, Category: ktypes.Net})
-	assert.Len(t, groups, 3)
-}
-
-func TestChainCompileGroupsOnlyTypeSelector(t *testing.T) {
-	rules := NewRules(newConfig("_fixtures/groups_type_selector.yml"))
-	require.NoError(t, rules.Compile())
-
-	assert.Len(t, rules.filterGroups, 1)
-	assert.Len(t, rules.filterGroups[ktypes.Recv.Hash()], 3)
-
-	groups := rules.findFilterGroups(&kevent.Kevent{Type: ktypes.Recv})
+	groups := rules.findFilterGroups(&kevent.Kevent{Type: ktypes.RecvUDPv6, Category: ktypes.Net})
 	assert.Len(t, groups, 3)
 }
 
@@ -619,14 +608,14 @@ func TestIsKtypeEligible(t *testing.T) {
 	for _, g := range groups {
 		for _, f := range g.filters {
 			if f.config.Name == "spawn command shell" {
-				assert.False(t, f.isEligible(kevt2.Type))
-				assert.True(t, f.isEligible(kevt1.Type))
+				assert.False(t, f.isEligible(kevt2))
+				assert.True(t, f.isEligible(kevt1))
 			}
 		}
 	}
 }
 
-func BenchmarkChainRun(b *testing.B) {
+func BenchmarkRunRules(b *testing.B) {
 	b.ReportAllocs()
 
 	rules := NewRules(newConfig("_fixtures/default/default.yml"))

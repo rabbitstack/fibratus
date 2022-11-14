@@ -1,9 +1,7 @@
 - group: network events
-  selector:
-    type: Recv
   enabled: true
   policy: include
   relation: or
   from-strings:
     - name: match https connections
-      def: net.dport = 443
+      def:  kevt.name = 'Recv' and net.dport = 443

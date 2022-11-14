@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"github.com/Masterminds/sprig/v3"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -179,7 +178,6 @@ type FilterGroup struct {
 	Name        string              `json:"group" yaml:"group"`
 	Description string              `json:"description" yaml:"description"`
 	Enabled     *bool               `json:"enabled" yaml:"enabled"`
-	Selector    FilterGroupSelector `json:"selector" yaml:"selector"`
 	Policy      FilterGroupPolicy   `json:"policy" yaml:"policy"`
 	Relation    FilterGroupRelation `json:"relation" yaml:"relation"`
 	Rules       []*FilterConfig     `json:"rules" yaml:"rules"`
@@ -218,24 +216,6 @@ func (g FilterGroup) Hash() uint32 {
 		return 0
 	}
 	return h.Sum32()
-}
-
-// FilterGroupSelector permits specifying the events
-// that will be captured by particular filter group.
-// Only one of type or category selectors can be active
-// at the same time.
-type FilterGroupSelector struct {
-	Type     ktypes.Ktype    `json:"type" yaml:"type"`
-	Category ktypes.Category `json:"category" yaml:"category"`
-}
-
-// Hash computes the filter group selector hash.
-func (s FilterGroupSelector) Hash() uint32 {
-	hash := s.Type.Hash()
-	if hash != 0 {
-		return hash
-	}
-	return s.Category.Hash()
 }
 
 // Filters contains references to rule groups and macro definitions.

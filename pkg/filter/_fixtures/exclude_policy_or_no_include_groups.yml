@@ -1,9 +1,7 @@
 - group: network events
-  selector:
-    type: Recv
   enabled: true
   policy: exclude
   relation: or
   from-strings:
     - name: ignore http connections
-      def: net.dport = 80
+      def:  kevt.name = 'Recv' and net.dport = 80

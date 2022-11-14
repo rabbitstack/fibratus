@@ -27,6 +27,7 @@ import (
 	"fmt"
 	fsm "github.com/qmuntal/stateless"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
+	"github.com/rabbitstack/fibratus/pkg/util/hashers"
 	"sort"
 
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
@@ -106,7 +107,7 @@ type filterGroup struct {
 
 type compiledFilter struct {
 	filter  Filter
-	buckets map[ktypes.Ktype]bool
+	buckets map[uint32]bool
 	config  *config.FilterConfig
 }
 
@@ -384,21 +385,32 @@ func newFilterGroup(g config.FilterGroup, filters []compiledFilter) *filterGroup
 }
 
 func newCompiledFilter(f Filter, filterConfig *config.FilterConfig, groupConfig config.FilterGroup) compiledFilter {
-	buckets := make(map[ktypes.Ktype]bool)
+	buckets := make(map[uint32]bool)
 	for name, values := range f.GetStringFields() {
-		if name == fields.KevtName {
+		if name == fields.KevtName || name == fields.KevtCategory {
 			for _, v := range values {
-				buckets[ktypes.KeventNameToKtype(v)] = true
+				buckets[hashers.FnvUint32([]byte(v))] = true
 			}
 		}
 	}
 	if len(buckets) == 0 && groupConfig.Policy == config.SequencePolicy {
-		log.Warnf("%q rule in %q group doesn't have event type condition! "+
+		log.Warnf("%q rule in %q group doesn't have event type or event category condition! "+
 			"This could cause runtime performance degradation. Please consider "+
-			"narrowing the scope of this rule by including the `kevt.name` condition",
+			"narrowing the scope of this rule by including the kevt.name or kevt.category condition",
 			filterConfig.Name, groupConfig.Name)
 	}
 	return compiledFilter{config: filterConfig, filter: f, buckets: buckets}
+}
+
+// isScoped determines if this filter is scoped, i.e. it has the event name or category
+// conditions.
+func (f compiledFilter) isScoped() bool {
+	for name := range f.filter.GetStringFields() {
+		if name == fields.KevtName || name == fields.KevtCategory {
+			return true
+		}
+	}
+	return false
 }
 
 // run execute the filter and returns the matching partial index along with
@@ -416,17 +428,25 @@ func (f compiledFilter) run(kevt *kevent.Kevent, i uint16, partials map[uint16][
 // binary expression. However, this is considered a warning which could potentially
 // cause runtime performance degradation if the filter is evaluated against every
 // event.
-func (f compiledFilter) isEligible(ktype ktypes.Ktype) bool {
-	return len(f.buckets) == 0 || f.buckets[ktype]
+func (f compiledFilter) isEligible(kevt *kevent.Kevent) bool {
+	return len(f.buckets) == 0 || f.buckets[kevt.Type.Hash()] || f.buckets[kevt.Category.Hash()]
 }
 
 type filterGroups []*filterGroup
 
-func (groups filterGroups) hasIncludePolicy(kevt *kevent.Kevent) bool {
+func (groups filterGroups) hasIncludePolicy() bool {
 	for _, g := range groups {
-		if g.group.Selector.Type == kevt.Type ||
-			g.group.Selector.Category == kevt.Category {
-			if g.group.Policy == config.IncludePolicy {
+		if g.group.Policy == config.IncludePolicy {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *Rules) isGroupMapped(scopeHash, groupHash uint32) bool {
+	for h, groups := range r.filterGroups {
+		for _, g := range groups {
+			if h == scopeHash && g.group.Hash() == groupHash {
 				return true
 			}
 		}
@@ -538,13 +558,32 @@ func (r *Rules) Compile() error {
 
 		switch group.Policy {
 		case config.ExcludePolicy, config.IncludePolicy:
-			// compute the hash depending on whether the type or category
-			// is given in the group selector. For sequence group policies
-			// we don't really care about the selector because these groups
-			// must attract all event types. In this case the hash is the
-			// filter group hash.
-			hash := group.Selector.Hash()
-			r.filterGroups[hash] = append(r.filterGroups[hash], fg)
+			// traverse all filters in the groups and determine
+			// the event type from the filter field name expression.
+			// We end up with a map of rule groups indexed by event name
+			// or event category hash which is used to collect all groups
+			// for the inbound event
+			for _, f := range filters {
+				if !f.isScoped() {
+					log.Warnf("%q rule in %q group doesn't have event type or event category condition! "+
+						"This may lead to rule being discarded by the engine. Please consider "+
+						"narrowing the scope of this rule by including the `kevt.name` "+
+						"or `kevt.category` condition",
+						f.config.Name, fg.group.Name)
+					continue
+				}
+				for name, values := range f.filter.GetStringFields() {
+					for _, v := range values {
+						if name == fields.KevtName || name == fields.KevtCategory {
+							hash := hashers.FnvUint32([]byte(v))
+							if r.isGroupMapped(hash, fg.group.Hash()) {
+								continue
+							}
+							r.filterGroups[hash] = append(r.filterGroups[hash], fg)
+						}
+					}
+				}
+			}
 		case config.SequencePolicy:
 			// configure reset transitions that are triggered
 			// when the final state is reached of when a deadline
@@ -597,7 +636,7 @@ func (r *Rules) Fire(kevt *kevent.Kevent) bool {
 		return false
 	}
 
-	if !groups.hasIncludePolicy(kevt) && !r.hasSequencePolicy() {
+	if !groups.hasIncludePolicy() && !r.hasSequencePolicy() {
 		return true
 	}
 
@@ -635,7 +674,7 @@ nextGroup:
 				continue
 			}
 			for i, f := range g.filters {
-				if !f.isEligible(kevt.Type) {
+				if !f.isEligible(kevt) {
 					continue
 				}
 				if !seqState.next(i) {
@@ -676,8 +715,10 @@ nextGroup:
 		// group upon first match or either all rules in the group
 		// need to match
 		for i, f := range g.filters {
+			if !f.isEligible(kevt) {
+				continue
+			}
 			ok, _, _ := f.run(kevt, uint16(i+1), nil)
-
 			switch g.group.Policy {
 			case config.ExcludePolicy:
 				switch g.group.Relation {
