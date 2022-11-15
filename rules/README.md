@@ -35,7 +35,7 @@ Additionally, there should exist labels attached to every rule group describing 
 ### Rules should have narrowed event scope
 
 Rule groups may have multiple rules each targeting different event types. If the rule definition lacks the event type or category condition, the rule engine needs to devote extra resources to evaluate the incoming event against every single rule. To alleviate the pressure on the rule engine, all rules should
-have the event type condition. In fact, if a rule is declared without the scoped conditions, you'll get a warning message in `Fibratus` logs informing you about unwanted side effects. In the case of `include` or `exclude` rule policies, ::this may lead to the rule being utterly discarded by the engine!
+have the event type condition. In fact, if a rule is declared without the scoped conditions, you'll get a warning message in `Fibratus` logs informing you about unwanted side effects. In the case of `include` or `exclude` rule policies, **this may lead to the rule being utterly discarded by the engine!**
 
 ### Sequence policies with early binding index condition
 
