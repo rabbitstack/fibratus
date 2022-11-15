@@ -26,3 +26,10 @@ func FnvUint32(b []byte) uint32 {
 	_, _ = h.Write(b)
 	return h.Sum32()
 }
+
+// FnvUint64 computes the uint64 FNV hash for the given byte input.
+func FnvUint64(b []byte) uint64 {
+	h := fnv.New64()
+	_, _ = h.Write(b)
+	return h.Sum64()
+}

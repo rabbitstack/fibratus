@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-	"hash/fnv"
+	"github.com/rabbitstack/fibratus/pkg/util/hashers"
 	"strings"
 )
 
@@ -50,7 +50,7 @@ func (kevt Kevent) PartialKey() uint64 {
 		binary.LittleEndian.PutUint32(b, kevt.PID)
 		binary.LittleEndian.PutUint64(b, object)
 
-		return fnvHash(b)
+		return hashers.FnvUint64(b)
 	case ktypes.CreateFile:
 		file, _ := kevt.Kparams.GetString(kparams.FileName)
 		b := make([]byte, 4+len(file))
@@ -58,7 +58,7 @@ func (kevt Kevent) PartialKey() uint64 {
 		binary.LittleEndian.PutUint32(b, kevt.PID)
 		b = append(b, []byte(file)...)
 
-		return fnvHash(b)
+		return hashers.FnvUint64(b)
 	case ktypes.OpenProcess:
 		b := make([]byte, 8)
 		pid, _ := kevt.Kparams.GetUint32(kparams.ProcessID)
@@ -67,7 +67,7 @@ func (kevt Kevent) PartialKey() uint64 {
 		binary.LittleEndian.PutUint32(b, kevt.PID)
 		binary.LittleEndian.PutUint32(b, pid)
 		binary.LittleEndian.PutUint32(b, access)
-		return fnvHash(b)
+		return hashers.FnvUint64(b)
 	case ktypes.OpenThread:
 		b := make([]byte, 8)
 		tid, _ := kevt.Kparams.GetUint32(kparams.ThreadID)
@@ -76,7 +76,7 @@ func (kevt Kevent) PartialKey() uint64 {
 		binary.LittleEndian.PutUint32(b, kevt.PID)
 		binary.LittleEndian.PutUint32(b, tid)
 		binary.LittleEndian.PutUint32(b, access)
-		return fnvHash(b)
+		return hashers.FnvUint64(b)
 	case ktypes.AcceptTCPv4, ktypes.RecvTCPv4, ktypes.RecvUDPv4:
 		b := make([]byte, 10)
 
@@ -86,7 +86,7 @@ func (kevt Kevent) PartialKey() uint64 {
 		binary.LittleEndian.PutUint32(b, kevt.PID)
 		binary.LittleEndian.PutUint32(b, binary.BigEndian.Uint32(ip.To4()))
 		binary.LittleEndian.PutUint16(b, port)
-		return fnvHash(b)
+		return hashers.FnvUint64(b)
 	case ktypes.AcceptTCPv6, ktypes.RecvTCPv6, ktypes.RecvUDPv6:
 		b := make([]byte, 22)
 
@@ -97,7 +97,7 @@ func (kevt Kevent) PartialKey() uint64 {
 		binary.LittleEndian.PutUint64(b, binary.BigEndian.Uint64(ip.To16()[0:8]))
 		binary.LittleEndian.PutUint64(b, binary.BigEndian.Uint64(ip.To16()[8:16]))
 		binary.LittleEndian.PutUint16(b, port)
-		return fnvHash(b)
+		return hashers.FnvUint64(b)
 	case ktypes.ConnectTCPv4, ktypes.SendTCPv4, ktypes.SendUDPv4:
 		b := make([]byte, 10)
 
@@ -107,7 +107,7 @@ func (kevt Kevent) PartialKey() uint64 {
 		binary.LittleEndian.PutUint32(b, kevt.PID)
 		binary.LittleEndian.PutUint32(b, binary.BigEndian.Uint32(ip.To4()))
 		binary.LittleEndian.PutUint16(b, port)
-		return fnvHash(b)
+		return hashers.FnvUint64(b)
 	case ktypes.ConnectTCPv6, ktypes.SendTCPv6, ktypes.SendUDPv6:
 		b := make([]byte, 22)
 
@@ -118,7 +118,7 @@ func (kevt Kevent) PartialKey() uint64 {
 		binary.LittleEndian.PutUint64(b, binary.BigEndian.Uint64(ip.To16()[0:8]))
 		binary.LittleEndian.PutUint64(b, binary.BigEndian.Uint64(ip.To16()[8:16]))
 		binary.LittleEndian.PutUint16(b, port)
-		return fnvHash(b)
+		return hashers.FnvUint64(b)
 	case ktypes.RegOpenKey, ktypes.RegQueryKey, ktypes.RegQueryValue,
 		ktypes.RegDeleteKey, ktypes.RegDeleteValue, ktypes.RegSetValue:
 		key, _ := kevt.Kparams.GetString(kparams.RegKeyName)
@@ -126,7 +126,7 @@ func (kevt Kevent) PartialKey() uint64 {
 
 		binary.LittleEndian.PutUint32(b, kevt.PID)
 		b = append(b, key...)
-		return fnvHash(b)
+		return hashers.FnvUint64(b)
 	}
 	return 0
 }
@@ -265,10 +265,4 @@ func printSummary(kevt *Kevent, text string) string {
 		return fmt.Sprintf("<code>%s</code> %s", ps.Name, text)
 	}
 	return fmt.Sprintf("process with <code>%d</code> id %s", kevt.PID, text)
-}
-
-func fnvHash(b []byte) uint64 {
-	h := fnv.New64()
-	_, _ = h.Write(b)
-	return h.Sum64()
 }
