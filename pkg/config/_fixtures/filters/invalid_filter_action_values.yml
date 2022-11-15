@@ -1,7 +1,5 @@
 - group: rouge processes
   enabled: true
-  selector:
-    category: net
   from-strings:
     - name: suspicious network activity
       def: kevt.category = 'net' and ps.name in ('at.exe', 'java.exe')

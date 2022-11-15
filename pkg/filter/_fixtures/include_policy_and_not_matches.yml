@@ -9,7 +9,8 @@
       def: kevt.name = 'Recv' and net.sport = 44123
     - name: src ip address is not a loopback address
       def:  kevt.name = 'Recv' and net.sip != 127.0.0.1
-- group: network events
+
+- group: network events 2
   enabled: true
   policy: include
   relation: and

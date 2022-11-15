@@ -5,6 +5,7 @@
   from-strings:
     - name: ignore https connections
       def:  kevt.name = 'Recv' and net.dport = 443
+
 - group: network events
   enabled: true
   policy: include

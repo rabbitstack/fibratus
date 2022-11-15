@@ -1,7 +1,5 @@
 - group: rouge processes
   enabled: true
-  selector:
-    category: net
   policy: exclude
   from-strings:
     - name: suspicious network activity

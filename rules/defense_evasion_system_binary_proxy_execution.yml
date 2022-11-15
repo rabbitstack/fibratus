@@ -55,8 +55,6 @@
     subtechnique.id: T1218.010
     subtechnique.name: Regsvr32
     subtechnique.ref: https://attack.mitre.org/techniques/T1218/010/
-  selector:
-    type: CreateProcess
   rules:
     - name: Regsvr32 scriptlet execution
       description: |
@@ -64,8 +62,10 @@
         is usually abused by adversaries to execute malicious payloads without triggering
         AV product alerts.
       condition: >
+        spawn_process
+            and
         ps.sibling.name ~= 'regsvr32.exe'
-          and
+            and
         (
           ps.sibling.comm imatches
           (
@@ -83,4 +83,3 @@
        {{
             emit . "Regsvr32 scriptlet execution" ""
        }}
-

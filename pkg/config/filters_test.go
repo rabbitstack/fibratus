@@ -19,7 +19,6 @@
 package config
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"net"
@@ -56,7 +55,6 @@ func TestLoadGroupsFromPaths(t *testing.T) {
 	g1 := groups[0]
 	assert.Equal(t, "internal network traffic", g1.Name)
 	assert.True(t, *g1.Enabled)
-	assert.Equal(t, ktypes.Connect, g1.Selector.Type)
 	assert.Equal(t, ExcludePolicy, g1.Policy)
 	assert.Equal(t, AndRelation, g1.Relation)
 	assert.Contains(t, g1.Tags, "TE")
@@ -67,7 +65,6 @@ func TestLoadGroupsFromPaths(t *testing.T) {
 	g2 := groups[1]
 	assert.Equal(t, "rouge processes", g2.Name)
 	assert.True(t, *g2.Enabled)
-	assert.Equal(t, ktypes.Net, g2.Selector.Category)
 	assert.Equal(t, IncludePolicy, g2.Policy)
 	assert.Equal(t, OrRelation, g2.Relation)
 	assert.Len(t, g2.FromStrings, 1)
@@ -92,7 +89,6 @@ func TestLoadGroupsFromPathsNewAttributes(t *testing.T) {
 	g1 := groups[0]
 	assert.Equal(t, "internal network traffic", g1.Name)
 	assert.False(t, *g1.Enabled)
-	assert.Equal(t, ktypes.Connect, g1.Selector.Type)
 	assert.Equal(t, ExcludePolicy, g1.Policy)
 	assert.Equal(t, AndRelation, g1.Relation)
 	assert.Contains(t, g1.Tags, "TE")
@@ -104,7 +100,6 @@ func TestLoadGroupsFromPathsNewAttributes(t *testing.T) {
 	assert.Equal(t, "rouge processes", g2.Name)
 	assert.Nil(t, g2.Enabled)
 	assert.False(t, g2.IsDisabled())
-	assert.Equal(t, ktypes.Net, g2.Selector.Category)
 	assert.Equal(t, IncludePolicy, g2.Policy)
 	assert.Equal(t, OrRelation, g2.Relation)
 	assert.Len(t, g2.Rules, 1)
@@ -148,7 +143,6 @@ func TestLoadGroupsFromURLs(t *testing.T) {
 	g1 := groups[0]
 	assert.Equal(t, "internal network traffic", g1.Name)
 	assert.True(t, *g1.Enabled)
-	assert.Equal(t, ktypes.Connect, g1.Selector.Type)
 }
 
 func TestLoadGroupsInvalidTemplates(t *testing.T) {

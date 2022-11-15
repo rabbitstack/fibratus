@@ -19,9 +19,9 @@
   enabled: true
   policy: exclude
   relation: or
-  from-strings:
+  rules:
     - name: Windows error reporting/telemetry, WMI provider host
-      def:  kevt.name = 'CreateProcess' and ps.comm startswith
+      condition:  kevt.name = 'CreateProcess' and ps.comm startswith
           (
             ' \"C:\\Windows\\system32\\wermgr.exe\\" \"-queuereporting_svc\" ',
             'C:\\Windows\\system32\\DllHost.exe /Processid',
@@ -29,7 +29,7 @@
             'C:\\Windows\\system32\\wbem\\wmiprvse.exe -secured -Embedding'
           )
     - name: Windows error reporting/telemetry, Search Indexer, Session Manager, Auto check utility
-      def: kevt.name = 'CreateProcess' and ps.comm in
+      condition: kevt.name = 'CreateProcess' and ps.comm in
           (
             'C:\\Windows\\system32\\wermgr.exe -upload',
             'C:\\Windows\\system32\\SearchIndexer.exe /Embedding',
@@ -39,7 +39,7 @@
             'C:\\Windows\\System32\\RuntimeBroker.exe -Embedding'
           )
     - name: Various Windows processes
-      def: kevt.name = 'CreateProcess' and ps.exe in
+      condition: kevt.name = 'CreateProcess' and ps.exe in
           (
             'C:\\Program Files (x86)\\Common Files\\microsoft shared\\ink\\TabTip32.exe',
             'C:\\Windows\\System32\\TokenBrokerCookies.exe',
@@ -65,11 +65,11 @@
             'C:\\Windows\\System32\\usocoreworker.exe -Embedding'
           )
     - name: svchost
-      def: kevt.name = 'CreateProcess' and ps.comm in ('svchost.exe')
+      condition: kevt.name = 'CreateProcess' and ps.comm in ('svchost.exe')
     - name: Microsoft edge
-      def: kevt.name = 'CreateProcess' and ps.comm startswith '\"C:\\Program Files (x86)\\Microsoft\\Edge Dev\\Application\\msedge.exe\" --type='
+      condition: kevt.name = 'CreateProcess' and ps.comm startswith '\"C:\\Program Files (x86)\\Microsoft\\Edge Dev\\Application\\msedge.exe\" --type='
     - name: Microsoft dotNet
-      def: kevt.name = 'CreateProcess' and ps.comm startswith
+      condition: kevt.name = 'CreateProcess' and ps.comm startswith
           (
             'C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\ngen.exe',
             'C:\\WINDOWS\\Microsoft.NET\\Framework64\\v4.0.30319\\Ngen.exe'
@@ -82,7 +82,7 @@
             'C:\\Windows\\Microsoft.Net\\Framework64\\v3.0\\WPF\\PresentationFontCache.exe'
           )
     - name: Microsoft Office
-      def: kevt.name = 'CreateProcess' and ps.exe in
+      condition: kevt.name = 'CreateProcess' and ps.exe in
           (
             'C:\\Program Files\\Microsoft Office\\Office16\\MSOSYNC.EXE',
             'C:\\Program Files (x86)\\Microsoft Office\\Office16\\MSOSYNC.EXE',
@@ -92,12 +92,14 @@
             'C:\\Program Files\\Common Files\\Microsoft Shared\\ClickToRun\\OfficeC2RClient.exe'
           )
     - name: Media Player
-      def: kevt.name = 'CreateProcess' and ps.exe = 'C:\\Program Files\\Windows Media Player\\wmpnscfg.exe'
+      condition: kevt.name = 'CreateProcess' and ps.exe = 'C:\\Program Files\\Windows Media Player\\wmpnscfg.exe'
     - name: Google
-      def: kevt.name = 'CreateProcess' and ps.comm in
+      condition: kevt.name = 'CreateProcess' and ps.comm in
           (
             '\"C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe\\\" --type='
           )
+    - name: Loaded suspicious module
+      condition: kevt.name = 'LoadImage' and image.name = 'svchost.dll'
 
 
 # ======================= Network connection initiated ================================
@@ -109,9 +111,9 @@
   enabled: true
   policy: include
   relation: or
-  from-strings:
+  rules:
     - name: Suspicious sources for network-connecting binaries
-      def: kevt.name = 'Connect' and ps.exe startswith
+      condition: kevt.name = 'Connect' and ps.exe startswith
           (
             'C:\\Users',
             'C:\\Recycle',
@@ -124,7 +126,7 @@
             'C:\\Windows\\system32\\config'
           )
     - name: Suspicious Windows tools network-connecting binaries
-      def: kevt.name = 'Connect' and ps.name in
+      condition: kevt.name = 'Connect' and ps.name in
           (
             'at.exe',
             'certutil.exe',
@@ -163,7 +165,7 @@
             'wscript.exe'
           )
     - name: Relevant 3rd Party Tools
-      def: kevt.name = 'Connect' and ps.name in
+      condition: kevt.name = 'Connect' and ps.name in
           (
             'nc.exe',
             'ncat.exe',
@@ -178,7 +180,7 @@
             'psinfo.exe'
           )
     - name: Suspicious ports
-      def: kevt.name = 'Connect' and net.dport in
+      condition: kevt.name = 'Connect' and net.dport in
           (
             22,
             23,
@@ -200,9 +202,9 @@
   enabled: true
   policy: exclude
   relation: or
-  from-strings:
+  rules:
     - name: Microsoft binaries
-      def: kevt.name = 'Connect' and  ps.exe startswith 'C:\\ProgramData\\Microsoft\\Windows Defender\\Platform\\'
+      condition: kevt.name = 'Connect' and  ps.exe startswith 'C:\\ProgramData\\Microsoft\\Windows Defender\\Platform\\'
               or
            ps.exe endswith 'AppData\\Local\\Microsoft\\Teams\\current\\Teams.exe'
               or
@@ -213,6 +215,6 @@
               'microsoft.com.nsatc.net'
            )
     - name: OCSP protocol known addresses
-      def: kevt.name = 'Connect' and net.dip in (23.4.43.27, 72.21.91.29)
+      condition: kevt.name = 'Connect' and net.dip in (23.4.43.27, 72.21.91.29)
     - name: Loopback addresses
-      def: kevt.name = 'Connect' and net.dip = 127.0.0.1 or net.dip startswith 'fe80:0:0:0'
+      condition: kevt.name = 'Connect' and net.dip = 127.0.0.1 or net.dip startswith 'fe80:0:0:0'

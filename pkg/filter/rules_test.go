@@ -42,6 +42,8 @@ var mu sync.Mutex
 var emitAlert *alertsender.Alert
 
 func (s *mockSender) Send(a alertsender.Alert) error {
+	mu.Lock()
+	defer mu.Unlock()
 	emitAlert = &a
 	return nil
 }
@@ -100,7 +102,7 @@ func newConfig(fromFiles ...string) *config.Config {
 	return c
 }
 
-func TestChainCompileMergeGroups(t *testing.T) {
+func TestCompileMergeGroups(t *testing.T) {
 	rules := NewRules(newConfig("_fixtures/merged_groups.yml"))
 	require.NoError(t, rules.Compile())
 
@@ -512,8 +514,6 @@ func TestSequenceComplexPatternBindings(t *testing.T) {
 	// register alert sender
 	require.NoError(t, alertsender.LoadAll([]alertsender.Config{{Type: alertsender.Noop}}))
 
-	mu.Lock()
-	defer mu.Unlock()
 	require.True(t, rules.Fire(kevt4))
 
 	time.Sleep(time.Millisecond * 25)
@@ -557,8 +557,7 @@ func TestFilterActionEmitAlert(t *testing.T) {
 		},
 		Metadata: make(map[kevent.MetadataKey]string),
 	}
-	mu.Lock()
-	defer mu.Unlock()
+
 	require.True(t, rules.Fire(kevt))
 	time.Sleep(time.Millisecond * 25)
 	require.NotNil(t, emitAlert)
@@ -621,6 +620,7 @@ func BenchmarkRunRules(b *testing.B) {
 	rules := NewRules(newConfig("_fixtures/default/default.yml"))
 	require.NoError(b, rules.Compile())
 
+	b.ResetTimer()
 	kevts := []*kevent.Kevent{
 		{
 			Type:     ktypes.Connect,
@@ -640,10 +640,11 @@ func BenchmarkRunRules(b *testing.B) {
 			Metadata: make(map[kevent.MetadataKey]string),
 		},
 		{
-			Type: ktypes.CreateProcess,
-			Name: "CreateProcess",
-			Tid:  2484,
-			PID:  859,
+			Type:     ktypes.CreateProcess,
+			Name:     "CreateProcess",
+			Category: ktypes.Process,
+			Tid:      2484,
+			PID:      859,
 			PS: &types.PS{
 				Name: "powershell.exe",
 			},
@@ -654,6 +655,20 @@ func BenchmarkRunRules(b *testing.B) {
 				kparams.Comm:            {Name: kparams.Comm, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`},
 				kparams.Exe:             {Name: kparams.Exe, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe`},
 				kparams.UserSID:         {Name: kparams.UserSID, Type: kparams.UnicodeString, Value: `admin\SYSTEM`},
+			},
+			Metadata: make(map[kevent.MetadataKey]string),
+		},
+		{
+			Type:     ktypes.CreateHandle,
+			Name:     "CreateHandle",
+			Category: ktypes.Handle,
+			Tid:      2484,
+			PID:      859,
+			PS: &types.PS{
+				Name: "powershell.exe",
+			},
+			Kparams: kevent.Kparams{
+				kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.PID, Value: 2323},
 			},
 			Metadata: make(map[kevent.MetadataKey]string),
 		},

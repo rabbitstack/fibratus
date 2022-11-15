@@ -7,6 +7,7 @@
       def:  kevt.name = 'Recv' and net.dport = 443
     - name: ignore events port 44123
       def:  kevt.name = 'Recv' and net.sport = 44123
+
 - group: network events
   enabled: true
   policy: include

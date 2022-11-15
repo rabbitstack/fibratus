@@ -5,6 +5,8 @@
   from-strings:
     - name: match https connections
       def: kevt.name = 'Recv' and net.dport = 443
+    - name: match http connections
+      def: kevt.name = 'Recv' and net.dport = 80
 
 - group: network events 2
   enabled: true
