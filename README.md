@@ -2,7 +2,7 @@
 
 <p align="center" >
   <a href="https://www.fibratus.io" >
-    <img width="600px" height="800px" src="logo.png" alt="Fibratus">
+    <img src="logo.png" alt="Fibratus">
   </a>
 </p>
 
