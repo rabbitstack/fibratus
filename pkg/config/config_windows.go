@@ -279,7 +279,6 @@ func (c *Config) Validate() error {
 		return err
 	}
 	switch filepath.Ext(file) {
-	//nolint:goconst
 	case ".yaml", ".yml":
 		err = yaml.Unmarshal(b, &out)
 	case ".json":

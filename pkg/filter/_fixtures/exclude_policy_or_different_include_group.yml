@@ -2,14 +2,14 @@
   enabled: true
   policy: exclude
   relation: or
-  from-strings:
+  rules:
     - name: ignore non https connections
-      def:  kevt.name = 'Recv' and net.dport != 443
+      condition:  kevt.name = 'Recv' and net.dport != 443
 
 - group: network events
   enabled: true
   policy: include
   relation: or
-  from-strings:
+  rules:
     - name: match files in C:/Users
-      def:  kevt.name = 'CreateFile' and file.name matches 'C:/Users/*'
+      condition:  kevt.name = 'CreateFile' and file.name matches 'C:/Users/*'

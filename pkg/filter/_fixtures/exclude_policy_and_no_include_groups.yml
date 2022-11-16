@@ -2,8 +2,8 @@
   enabled: true
   policy: exclude
   relation: and
-  from-strings:
+  rules:
     - name: ignore https connections
-      def:  kevt.name = 'Recv' and net.dport = 80
+      condition:  kevt.name = 'Recv' and net.dport = 80
     - name: ignore events where source port != 44123
-      def:  kevt.name = 'Recv' and net.sport != 44123
+      condition:  kevt.name = 'Recv' and net.sport != 44123

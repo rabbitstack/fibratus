@@ -2,18 +2,18 @@
   enabled: true
   policy: include
   relation: and
-  from-strings:
+  rules:
     - name: match https connections
-      def: kevt.name = 'Recv' and net.dport = 443
+      condition: kevt.name = 'Recv' and net.dport = 443
     - name: accept events where source port = 44123
-      def: kevt.name = 'Recv' and net.sport = 44123
+      condition: kevt.name = 'Recv' and net.sport = 44123
     - name: src ip address is not a loopback address
-      def:  kevt.name = 'Recv' and net.sip != 127.0.0.1
+      condition:  kevt.name = 'Recv' and net.sip != 127.0.0.1
 
 - group: network events 2
   enabled: true
   policy: include
   relation: and
-  from-strings:
+  rules:
     - name: src ip address is
-      def: kevt.name = 'Recv' and net.sip = 172.0.0.1
+      condition: kevt.name = 'Recv' and net.sip = 172.0.0.1

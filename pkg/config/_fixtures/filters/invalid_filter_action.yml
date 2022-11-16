@@ -2,6 +2,6 @@
   enabled: true
   from-strings:
     - name: suspicious network activity
-      def: kevt.category = 'net' and ps.name in ('at.exe', 'java.exe')
+      condition: kevt.category = 'net' and ps.name in ('at.exe', 'java.exe')
       action: |
         {{ kil .Kevt.PID }}

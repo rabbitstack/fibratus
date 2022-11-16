@@ -22,7 +22,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	log "github.com/sirupsen/logrus"
 	"net"
-	"sync"
 	"testing"
 	"time"
 
@@ -36,28 +35,41 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type mockSender struct{}
+type mockNoopSender struct{}
+type mockNoneSender struct{}
 
-var mu sync.Mutex
 var emitAlert *alertsender.Alert
+var seqAlert *alertsender.Alert
 
-func (s *mockSender) Send(a alertsender.Alert) error {
-	mu.Lock()
-	defer mu.Unlock()
+func (s *mockNoopSender) Send(a alertsender.Alert) error {
 	emitAlert = &a
 	return nil
 }
 
-func (s *mockSender) Type() alertsender.Type {
+func (s *mockNoopSender) Type() alertsender.Type {
+	return alertsender.Noop
+}
+
+func makeNoopSender(config alertsender.Config) (alertsender.Sender, error) {
+	return &mockNoopSender{}, nil
+}
+
+func (s *mockNoneSender) Send(a alertsender.Alert) error {
+	seqAlert = &a
+	return nil
+}
+
+func (s *mockNoneSender) Type() alertsender.Type {
 	return alertsender.None
 }
 
-func makeSender(config alertsender.Config) (alertsender.Sender, error) {
-	return &mockSender{}, nil
+func makeNoneSender(config alertsender.Config) (alertsender.Sender, error) {
+	return &mockNoneSender{}, nil
 }
 
 func init() {
-	alertsender.Register(alertsender.Noop, makeSender)
+	alertsender.Register(alertsender.Noop, makeNoopSender)
+	alertsender.Register(alertsender.None, makeNoneSender)
 }
 
 func fireRules(t *testing.T, c *config.Config) bool {
@@ -512,17 +524,17 @@ func TestSequenceComplexPatternBindings(t *testing.T) {
 	time.Sleep(time.Millisecond * 22)
 
 	// register alert sender
-	require.NoError(t, alertsender.LoadAll([]alertsender.Config{{Type: alertsender.Noop}}))
+	require.NoError(t, alertsender.LoadAll([]alertsender.Config{{Type: alertsender.None}}))
 
 	require.True(t, rules.Fire(kevt4))
 
 	time.Sleep(time.Millisecond * 25)
 
 	// check the format of the generated alert
-	require.NotNil(t, emitAlert)
-	assert.Equal(t, "Phishing dropper outbound communication", emitAlert.Title)
-	assert.Equal(t, "dropper.exe process initiated outbound communication to 10.0.2.3", emitAlert.Text)
-	emitAlert = nil
+	require.NotNil(t, seqAlert)
+	assert.Equal(t, "Phishing dropper outbound communication", seqAlert.Title)
+	assert.Equal(t, "dropper.exe process initiated outbound communication to 10.0.2.3", seqAlert.Text)
+	seqAlert = nil
 
 	matches = rules.sequences["phishing dropper outbound communication"].matches
 	require.Len(t, matches, 0)

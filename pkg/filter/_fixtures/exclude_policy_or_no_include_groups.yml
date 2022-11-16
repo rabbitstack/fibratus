@@ -2,6 +2,6 @@
   enabled: true
   policy: exclude
   relation: or
-  from-strings:
+  rules:
     - name: ignore http connections
-      def:  kevt.name = 'Recv' and net.dport = 80
+      condition:  kevt.name = 'Recv' and net.dport = 80

@@ -1,7 +1,7 @@
 - group: command shell execution and temp files
   policy: sequence
   enabled: true
-  from-strings:
+  rules:
     - name: spawn command shell
       condition: kevt.name = 'CreateProcess' and ps.name = 'cmd.exe'
     - name: created temp file by command shell

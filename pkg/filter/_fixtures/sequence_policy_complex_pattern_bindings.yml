@@ -1,7 +1,7 @@
 - group: phishing dropper outbound communication
   policy: sequence
   enabled: true
-  from-strings:
+  rules:
     - name: spawn browser client
       condition: >
         kevt.name = 'CreateProcess' and ps.sibling.name

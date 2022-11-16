@@ -2,7 +2,7 @@
 
 <p align="center" >
   <a href="https://www.fibratus.io" >
-    <img width="600px" height="800px" src="rule-alert.png" alt="Email rule alert">
+    <img src="rule-alert.png" alt="Email rule alert">
   </a>
 </p>
 
@@ -39,12 +39,12 @@ have the event type condition. In fact, if a rule is declared without the scoped
 
 ### Sequence policies with early binding index condition
 
-When writing detections that employ various event types or event multiple data sources, relationships between events are connected via [binding patterns](https://www.fibratus.io/#/filters/rules?id=stateful-event-tracking). The rule engine can lazily evaluate binary expressions comprising a rule. If the binding patterns are the first condition in downstream sequence rule groups, the rule engine will not keep on evaluating every single binary expression in the rule and thus will benefit the overall runtime performance.
+When writing detections that employ various event types or even multiple data sources, relationships between events are connected via [binding patterns](https://www.fibratus.io/#/filters/rules?id=stateful-event-tracking). The rule engine can lazily evaluate binary expressions comprising a rule. If the binding patterns are the first condition in downstream sequence rules, the rule engine will not keep on evaluating subsequent binary expressions in the rule and thus will benefit the overall runtime performance.
 
 ### Prefer macros over raw conditions
 
-Fibratus comes with a macro library to promote the reusability and modularization of rule conditions and lists. Before trying to spell out a raw rule condition, explore the library to check if there's already a macro you can pull into the rule. For example, detecting file accesses could be accomplished by declaring the `kevt.name = 'CreateFile' and file.operation = 'open'`. However, the macro library comes with the `open_file` macro that you can directly call in any rule. If you can't encounter a particular macro in the library, please consider creating it. Future detection engineers and rule writers could profit from those macros.
+Fibratus comes with a macro library to promote the reusability and modularization of rule conditions and lists. Before trying to spell out a raw rule condition, explore the library to check if there's already a macro you can pull into the rule. For example, detecting file accesses could be accomplished by declaring the `kevt.name = 'CreateFile' and file.operation = 'open'` expression. However, the macro library comes with the `open_file` macro that you can directly call in any rule. If you can't encounter a particular macro in the library, please consider creating it. Future detection engineers and rule writers could profit from those macros.
 
 ### Formatting styles
 
-Pay attention to rule condition/action formatting style. If the rule consists of multiple conditions, it is desirable to split each spanning condition on a new line and properly indent the `and`, `or`, or `not` operators. By default, we use 4 space tabs for indenting operators and rule actions. This will greatly improve readability and preventing formatting inconsistencies.
+Pay attention to rule condition/action formatting style. If the rule consists of multiple conditions, it is desirable to split each spanning condition on a new line and properly indent the `and`, `or`, or `not` operators. By default, we use 4 space tabs for indenting operators and rule actions. This will greatly improve readability and prevent formatting inconsistencies.
