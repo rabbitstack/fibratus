@@ -19,7 +19,7 @@
 package ktypes
 
 import (
-	"hash/fnv"
+	"github.com/rabbitstack/fibratus/pkg/util/hashers"
 	"syscall"
 )
 
@@ -360,12 +360,7 @@ func (k Ktype) Hash() uint32 {
 	if k == UnknownKtype {
 		return 0
 	}
-	h := fnv.New32()
-	_, err := h.Write([]byte(k.String()))
-	if err != nil {
-		return 0
-	}
-	return h.Sum32()
+	return hashers.FnvUint32([]byte(k.String()))
 }
 
 // Exists determines whether particular ktype exists.

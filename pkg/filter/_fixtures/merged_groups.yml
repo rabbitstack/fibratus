@@ -1,29 +1,25 @@
 - group: network events 1
-  selector:
-    type: Recv
   enabled: true
   policy: include
   relation: or
-  from-strings:
+  rules:
     - name: match https connections
-      def: net.dport = 443
+      condition: kevt.name = 'Recv' and net.dport = 443
+    - name: match http connections
+      condition: kevt.name = 'Recv' and net.dport = 80
 
 - group: network events 2
-  selector:
-    category: net
   enabled: true
   policy: include
   relation: or
-  from-strings:
+  rules:
     - name: match http connections
-      def: net.dport = 80
+      condition: kevt.category = 'net' and net.dport = 80
 
 - group: network events 3
-  selector:
-    type: Recv
   enabled: true
   policy: include
   relation: or
-  from-strings:
+  rules:
     - name: match ssh connections
-      def: net.dport = 22
+      condition: kevt.name = 'Recv' and net.dport = 22

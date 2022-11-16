@@ -24,12 +24,11 @@ import (
 	"fmt"
 	"github.com/Masterminds/sprig/v3"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/util/hashers"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
-	"hash/fnv"
 	"io"
 	"net/http"
 	u "net/url"
@@ -179,7 +178,6 @@ type FilterGroup struct {
 	Name        string              `json:"group" yaml:"group"`
 	Description string              `json:"description" yaml:"description"`
 	Enabled     *bool               `json:"enabled" yaml:"enabled"`
-	Selector    FilterGroupSelector `json:"selector" yaml:"selector"`
 	Policy      FilterGroupPolicy   `json:"policy" yaml:"policy"`
 	Relation    FilterGroupRelation `json:"relation" yaml:"relation"`
 	Rules       []*FilterConfig     `json:"rules" yaml:"rules"`
@@ -212,34 +210,11 @@ func (g FilterGroup) validate(resource string) error {
 
 // Hash calculates the filter group hash.
 func (g FilterGroup) Hash() uint32 {
-	h := fnv.New32()
-	_, err := h.Write([]byte(g.Policy.String() + g.Name))
-	if err != nil {
-		return 0
-	}
-	return h.Sum32()
-}
-
-// FilterGroupSelector permits specifying the events
-// that will be captured by particular filter group.
-// Only one of type or category selectors can be active
-// at the same time.
-type FilterGroupSelector struct {
-	Type     ktypes.Ktype    `json:"type" yaml:"type"`
-	Category ktypes.Category `json:"category" yaml:"category"`
-}
-
-// Hash computes the filter group selector hash.
-func (s FilterGroupSelector) Hash() uint32 {
-	hash := s.Type.Hash()
-	if hash != 0 {
-		return hash
-	}
-	return s.Category.Hash()
+	return hashers.FnvUint32([]byte(g.Policy.String() + g.Name))
 }
 
 // Filters contains references to rule groups and macro definitions.
-// Each filter group can contain multiple filter expressions whcih
+// Each filter group can contain multiple filter expressions which
 // represent the rules.
 type Filters struct {
 	Rules  Rules  `json:"rules" yaml:"rules"`
@@ -307,7 +282,7 @@ func (f *Filters) LoadMacros() error {
 			return err
 		}
 		for _, path := range paths {
-			if filepath.Ext(path) != ".yml" && filepath.Ext(path) != ".yaml" {
+			if !isValidExt(path) {
 				continue
 			}
 			log.Infof("loading macros from file %s", path)
@@ -352,6 +327,10 @@ func (f *Filters) LoadMacros() error {
 	return nil
 }
 
+func isValidExt(path string) bool {
+	return filepath.Ext(path) == ".yml" || filepath.Ext(path) == ".yaml"
+}
+
 // LoadGroups for each rule group file it decodes the
 // groups and ensures the correctness of the yaml file.
 func (f Filters) LoadGroups() ([]FilterGroup, error) {
@@ -362,7 +341,7 @@ func (f Filters) LoadGroups() ([]FilterGroup, error) {
 			return nil, err
 		}
 		for _, path := range paths {
-			if filepath.Ext(path) != ".yml" && filepath.Ext(path) != ".yaml" {
+			if !isValidExt(path) {
 				continue
 			}
 			log.Infof("loading rules from file %s", path)
@@ -407,6 +386,17 @@ func (f Filters) LoadGroups() ([]FilterGroup, error) {
 		}
 		allGroups = append(allGroups, groups...)
 	}
+
+	groupNames := make(map[string]bool)
+	for _, group := range allGroups {
+		key := group.Policy.String() + group.Name
+		_, isDup := groupNames[key]
+		if isDup {
+			return nil, fmt.Errorf("group names must be unique. "+
+				"Found duplicate %q group with %q policy", group.Name, group.Policy)
+		}
+		groupNames[key] = true
+	}
 	return allGroups, nil
 }
 
@@ -416,7 +406,6 @@ func decodeFilterGroups(resource string, b []byte) ([]FilterGroup, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%q is invalid yaml file: %v", resource, err)
 	}
-
 	rawGroups, ok := out.([]interface{})
 	if !ok {
 		return nil, fmt.Errorf("invalid rule group "+

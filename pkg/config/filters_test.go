@@ -19,7 +19,6 @@
 package config
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"net"
@@ -56,23 +55,21 @@ func TestLoadGroupsFromPaths(t *testing.T) {
 	g1 := groups[0]
 	assert.Equal(t, "internal network traffic", g1.Name)
 	assert.True(t, *g1.Enabled)
-	assert.Equal(t, ktypes.Connect, g1.Selector.Type)
 	assert.Equal(t, ExcludePolicy, g1.Policy)
 	assert.Equal(t, AndRelation, g1.Relation)
 	assert.Contains(t, g1.Tags, "TE")
-	assert.Len(t, g1.FromStrings, 1)
-	assert.Equal(t, "only network category", g1.FromStrings[0].Name)
-	assert.Equal(t, "kevt.category = 'net'", g1.FromStrings[0].Def)
+	assert.Len(t, g1.Rules, 1)
+	assert.Equal(t, "only network category", g1.Rules[0].Name)
+	assert.Equal(t, "kevt.category = 'net'", g1.Rules[0].Condition)
 
 	g2 := groups[1]
 	assert.Equal(t, "rouge processes", g2.Name)
 	assert.True(t, *g2.Enabled)
-	assert.Equal(t, ktypes.Net, g2.Selector.Category)
 	assert.Equal(t, IncludePolicy, g2.Policy)
 	assert.Equal(t, OrRelation, g2.Relation)
-	assert.Len(t, g2.FromStrings, 1)
-	assert.Equal(t, "suspicious network ACTIVITY", g2.FromStrings[0].Name)
-	assert.Equal(t, "kevt.category = 'net' and ps.name in ('at.exe', 'java.exe')", g2.FromStrings[0].Def)
+	assert.Len(t, g2.Rules, 1)
+	assert.Equal(t, "suspicious network ACTIVITY", g2.Rules[0].Name)
+	assert.Equal(t, "kevt.category = 'net' and ps.name in ('at.exe', 'java.exe')", g2.Rules[0].Condition)
 }
 
 func TestLoadGroupsFromPathsNewAttributes(t *testing.T) {
@@ -92,19 +89,17 @@ func TestLoadGroupsFromPathsNewAttributes(t *testing.T) {
 	g1 := groups[0]
 	assert.Equal(t, "internal network traffic", g1.Name)
 	assert.False(t, *g1.Enabled)
-	assert.Equal(t, ktypes.Connect, g1.Selector.Type)
 	assert.Equal(t, ExcludePolicy, g1.Policy)
 	assert.Equal(t, AndRelation, g1.Relation)
 	assert.Contains(t, g1.Tags, "TE")
-	assert.Len(t, g1.FromStrings, 1)
-	assert.Equal(t, "only network category", g1.FromStrings[0].Name)
-	assert.Equal(t, "kevt.category = 'net'", g1.FromStrings[0].Def)
+	assert.Len(t, g1.Rules, 1)
+	assert.Equal(t, "only network category", g1.Rules[0].Name)
+	assert.Equal(t, "kevt.category = 'net'", g1.Rules[0].Def)
 
 	g2 := groups[1]
 	assert.Equal(t, "rouge processes", g2.Name)
 	assert.Nil(t, g2.Enabled)
 	assert.False(t, g2.IsDisabled())
-	assert.Equal(t, ktypes.Net, g2.Selector.Category)
 	assert.Equal(t, IncludePolicy, g2.Policy)
 	assert.Equal(t, OrRelation, g2.Relation)
 	assert.Len(t, g2.Rules, 1)
@@ -148,7 +143,6 @@ func TestLoadGroupsFromURLs(t *testing.T) {
 	g1 := groups[0]
 	assert.Equal(t, "internal network traffic", g1.Name)
 	assert.True(t, *g1.Enabled)
-	assert.Equal(t, ktypes.Connect, g1.Selector.Type)
 }
 
 func TestLoadGroupsInvalidTemplates(t *testing.T) {

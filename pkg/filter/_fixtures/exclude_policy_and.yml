@@ -1,20 +1,17 @@
 - group: network events
-  selector:
-    type: Recv
   enabled: true
   policy: exclude
   relation: and
-  from-strings:
+  rules:
     - name: ignore https connections
-      def: net.dport = 443
+      condition:  kevt.name = 'Recv' and net.dport = 443
     - name: ignore events port 44123
-      def: net.sport = 44123
+      condition:  kevt.name = 'Recv' and net.sport = 44123
+
 - group: network events
-  selector:
-    type: Recv
   enabled: true
   policy: include
   relation: or
-  from-strings:
+  rules:
     - name: match http connections
-      def: net.dport = 80
+      condition:  kevt.name = 'Recv' and net.dport = 80

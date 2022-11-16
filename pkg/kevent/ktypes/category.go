@@ -18,7 +18,9 @@
 
 package ktypes
 
-import "hash/fnv"
+import (
+	"github.com/rabbitstack/fibratus/pkg/util/hashers"
+)
 
 // Category is the type alias for kernel event categories
 type Category string
@@ -48,10 +50,5 @@ const (
 
 // Hash obtains the hash of the category string.
 func (c Category) Hash() uint32 {
-	h := fnv.New32()
-	_, err := h.Write([]byte(c))
-	if err != nil {
-		return 0
-	}
-	return h.Sum32()
+	return hashers.FnvUint32([]byte(c))
 }

@@ -278,6 +278,8 @@ func TestFilterRunFileKevent(t *testing.T) {
 		{`file.name = 'C:\\Windows\\system32\\user32.dll'`, true},
 		{`file.extension  = '.dll'`, true},
 		{`file.extension not contains '.exe'`, true},
+		{`file.extension contains '.exe' or (file.extension contains '.dll' and file.name endswith 'user32.dll')`, true},
+		{`file.extension = '.dll' or (file.extension contains '.exe' and file.name endswith 'kernel32.dll')`, true},
 		{`file.extension not contains '.exe' and file.extension contains '.dll'`, true},
 		{`file.extension not contains '.exe' and file.extension not contains '.com'`, true},
 		{`file.extension not contains '.exe' and file.extension not contains '.com' and file.extension not in ('.vba', '.exe')`, true},

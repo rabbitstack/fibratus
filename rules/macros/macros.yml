@@ -31,6 +31,22 @@
 - macro: load_module
   expr: kevt.name = 'LoadImage'
 
+- macro: load_driver
+  expr: >
+    kevt.name = 'LoadDriver'
+      or
+    (
+      kevt.name = 'CreateHandle'
+        and
+      handle.type = 'Driver'
+    )
+  description: |
+    Detects the loading of the kernel driver. Antimalware Engine ETW provider
+    publishes events related to driver loading, but only if Windows Defender
+    Antivirus realtime protection is enabled. On the contrary, we can also detect
+    loading of kernel driver by observing the object manager events and watching
+    for driver objects being created.
+
 - macro: write_minidump_file
   expr: >
     write_file

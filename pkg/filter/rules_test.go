@@ -22,7 +22,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	log "github.com/sirupsen/logrus"
 	"net"
-	"sync"
 	"testing"
 	"time"
 
@@ -36,26 +35,41 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type mockSender struct{}
+type mockNoopSender struct{}
+type mockNoneSender struct{}
 
-var mu sync.Mutex
 var emitAlert *alertsender.Alert
+var seqAlert *alertsender.Alert
 
-func (s *mockSender) Send(a alertsender.Alert) error {
+func (s *mockNoopSender) Send(a alertsender.Alert) error {
 	emitAlert = &a
 	return nil
 }
 
-func (s *mockSender) Type() alertsender.Type {
+func (s *mockNoopSender) Type() alertsender.Type {
+	return alertsender.Noop
+}
+
+func makeNoopSender(config alertsender.Config) (alertsender.Sender, error) {
+	return &mockNoopSender{}, nil
+}
+
+func (s *mockNoneSender) Send(a alertsender.Alert) error {
+	seqAlert = &a
+	return nil
+}
+
+func (s *mockNoneSender) Type() alertsender.Type {
 	return alertsender.None
 }
 
-func makeSender(config alertsender.Config) (alertsender.Sender, error) {
-	return &mockSender{}, nil
+func makeNoneSender(config alertsender.Config) (alertsender.Sender, error) {
+	return &mockNoneSender{}, nil
 }
 
 func init() {
-	alertsender.Register(alertsender.Noop, makeSender)
+	alertsender.Register(alertsender.Noop, makeNoopSender)
+	alertsender.Register(alertsender.None, makeNoneSender)
 }
 
 func fireRules(t *testing.T, c *config.Config) bool {
@@ -100,7 +114,7 @@ func newConfig(fromFiles ...string) *config.Config {
 	return c
 }
 
-func TestChainCompileMergeGroups(t *testing.T) {
+func TestCompileMergeGroups(t *testing.T) {
 	rules := NewRules(newConfig("_fixtures/merged_groups.yml"))
 	require.NoError(t, rules.Compile())
 
@@ -108,18 +122,7 @@ func TestChainCompileMergeGroups(t *testing.T) {
 	assert.Len(t, rules.filterGroups[ktypes.Recv.Hash()], 2)
 	assert.Len(t, rules.filterGroups[ktypes.Net.Hash()], 1)
 
-	groups := rules.findFilterGroups(&kevent.Kevent{Type: ktypes.Recv, Category: ktypes.Net})
-	assert.Len(t, groups, 3)
-}
-
-func TestChainCompileGroupsOnlyTypeSelector(t *testing.T) {
-	rules := NewRules(newConfig("_fixtures/groups_type_selector.yml"))
-	require.NoError(t, rules.Compile())
-
-	assert.Len(t, rules.filterGroups, 1)
-	assert.Len(t, rules.filterGroups[ktypes.Recv.Hash()], 3)
-
-	groups := rules.findFilterGroups(&kevent.Kevent{Type: ktypes.Recv})
+	groups := rules.findFilterGroups(&kevent.Kevent{Type: ktypes.RecvUDPv6, Category: ktypes.Net})
 	assert.Len(t, groups, 3)
 }
 
@@ -521,19 +524,17 @@ func TestSequenceComplexPatternBindings(t *testing.T) {
 	time.Sleep(time.Millisecond * 22)
 
 	// register alert sender
-	require.NoError(t, alertsender.LoadAll([]alertsender.Config{{Type: alertsender.Noop}}))
+	require.NoError(t, alertsender.LoadAll([]alertsender.Config{{Type: alertsender.None}}))
 
-	mu.Lock()
-	defer mu.Unlock()
 	require.True(t, rules.Fire(kevt4))
 
 	time.Sleep(time.Millisecond * 25)
 
 	// check the format of the generated alert
-	require.NotNil(t, emitAlert)
-	assert.Equal(t, "Phishing dropper outbound communication", emitAlert.Title)
-	assert.Equal(t, "dropper.exe process initiated outbound communication to 10.0.2.3", emitAlert.Text)
-	emitAlert = nil
+	require.NotNil(t, seqAlert)
+	assert.Equal(t, "Phishing dropper outbound communication", seqAlert.Title)
+	assert.Equal(t, "dropper.exe process initiated outbound communication to 10.0.2.3", seqAlert.Text)
+	seqAlert = nil
 
 	matches = rules.sequences["phishing dropper outbound communication"].matches
 	require.Len(t, matches, 0)
@@ -568,8 +569,7 @@ func TestFilterActionEmitAlert(t *testing.T) {
 		},
 		Metadata: make(map[kevent.MetadataKey]string),
 	}
-	mu.Lock()
-	defer mu.Unlock()
+
 	require.True(t, rules.Fire(kevt))
 	time.Sleep(time.Millisecond * 25)
 	require.NotNil(t, emitAlert)
@@ -619,19 +619,20 @@ func TestIsKtypeEligible(t *testing.T) {
 	for _, g := range groups {
 		for _, f := range g.filters {
 			if f.config.Name == "spawn command shell" {
-				assert.False(t, f.isEligible(kevt2.Type))
-				assert.True(t, f.isEligible(kevt1.Type))
+				assert.False(t, f.isEligible(kevt2))
+				assert.True(t, f.isEligible(kevt1))
 			}
 		}
 	}
 }
 
-func BenchmarkChainRun(b *testing.B) {
+func BenchmarkRunRules(b *testing.B) {
 	b.ReportAllocs()
 
 	rules := NewRules(newConfig("_fixtures/default/default.yml"))
 	require.NoError(b, rules.Compile())
 
+	b.ResetTimer()
 	kevts := []*kevent.Kevent{
 		{
 			Type:     ktypes.Connect,
@@ -651,10 +652,11 @@ func BenchmarkChainRun(b *testing.B) {
 			Metadata: make(map[kevent.MetadataKey]string),
 		},
 		{
-			Type: ktypes.CreateProcess,
-			Name: "CreateProcess",
-			Tid:  2484,
-			PID:  859,
+			Type:     ktypes.CreateProcess,
+			Name:     "CreateProcess",
+			Category: ktypes.Process,
+			Tid:      2484,
+			PID:      859,
 			PS: &types.PS{
 				Name: "powershell.exe",
 			},
@@ -665,6 +667,20 @@ func BenchmarkChainRun(b *testing.B) {
 				kparams.Comm:            {Name: kparams.Comm, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`},
 				kparams.Exe:             {Name: kparams.Exe, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe`},
 				kparams.UserSID:         {Name: kparams.UserSID, Type: kparams.UnicodeString, Value: `admin\SYSTEM`},
+			},
+			Metadata: make(map[kevent.MetadataKey]string),
+		},
+		{
+			Type:     ktypes.CreateHandle,
+			Name:     "CreateHandle",
+			Category: ktypes.Handle,
+			Tid:      2484,
+			PID:      859,
+			PS: &types.PS{
+				Name: "powershell.exe",
+			},
+			Kparams: kevent.Kparams{
+				kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.PID, Value: 2323},
 			},
 			Metadata: make(map[kevent.MetadataKey]string),
 		},

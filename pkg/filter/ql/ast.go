@@ -213,10 +213,15 @@ func (v *ValuerEval) Eval(expr Expr) interface{} {
 
 func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 	lhs := v.Eval(expr.LHS)
-	// lazy evaluation for the AND operator
+	// lazy evaluation for the AND/OR operators
 	if lhs != nil && expr.Op == and {
 		if val, ok := lhs.(bool); ok && !val {
 			return false
+		}
+	}
+	if lhs != nil && expr.Op == or {
+		if val, ok := lhs.(bool); ok && val {
+			return true
 		}
 	}
 	rhs := v.Eval(expr.RHS)
