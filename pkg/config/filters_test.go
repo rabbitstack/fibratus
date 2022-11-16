@@ -58,18 +58,18 @@ func TestLoadGroupsFromPaths(t *testing.T) {
 	assert.Equal(t, ExcludePolicy, g1.Policy)
 	assert.Equal(t, AndRelation, g1.Relation)
 	assert.Contains(t, g1.Tags, "TE")
-	assert.Len(t, g1.FromStrings, 1)
-	assert.Equal(t, "only network category", g1.FromStrings[0].Name)
-	assert.Equal(t, "kevt.category = 'net'", g1.FromStrings[0].Def)
+	assert.Len(t, g1.Rules, 1)
+	assert.Equal(t, "only network category", g1.Rules[0].Name)
+	assert.Equal(t, "kevt.category = 'net'", g1.Rules[0].Condition)
 
 	g2 := groups[1]
 	assert.Equal(t, "rouge processes", g2.Name)
 	assert.True(t, *g2.Enabled)
 	assert.Equal(t, IncludePolicy, g2.Policy)
 	assert.Equal(t, OrRelation, g2.Relation)
-	assert.Len(t, g2.FromStrings, 1)
-	assert.Equal(t, "suspicious network ACTIVITY", g2.FromStrings[0].Name)
-	assert.Equal(t, "kevt.category = 'net' and ps.name in ('at.exe', 'java.exe')", g2.FromStrings[0].Def)
+	assert.Len(t, g2.Rules, 1)
+	assert.Equal(t, "suspicious network ACTIVITY", g2.Rules[0].Name)
+	assert.Equal(t, "kevt.category = 'net' and ps.name in ('at.exe', 'java.exe')", g2.Rules[0].Condition)
 }
 
 func TestLoadGroupsFromPathsNewAttributes(t *testing.T) {
@@ -92,9 +92,9 @@ func TestLoadGroupsFromPathsNewAttributes(t *testing.T) {
 	assert.Equal(t, ExcludePolicy, g1.Policy)
 	assert.Equal(t, AndRelation, g1.Relation)
 	assert.Contains(t, g1.Tags, "TE")
-	assert.Len(t, g1.FromStrings, 1)
-	assert.Equal(t, "only network category", g1.FromStrings[0].Name)
-	assert.Equal(t, "kevt.category = 'net'", g1.FromStrings[0].Def)
+	assert.Len(t, g1.Rules, 1)
+	assert.Equal(t, "only network category", g1.Rules[0].Name)
+	assert.Equal(t, "kevt.category = 'net'", g1.Rules[0].Def)
 
 	g2 := groups[1]
 	assert.Equal(t, "rouge processes", g2.Name)

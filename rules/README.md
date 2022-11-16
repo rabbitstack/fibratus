@@ -30,7 +30,7 @@ attempt to gain access to victim systems. Spearphishing attachment is a specific
 variant of spearphishing. Spearphishing attachment is different from other forms
 of spearphishing in that it employs the use of malware attached to an email.
 
-Additionally, there should exist labels attached to every rule group describing the MITRE tactic, technique, and sub-technique. This information is used when rendering email rule alert templates.
+Additionally, there should exist labels attached to every rule group describing the MITRE tactic, technique, and sub-technique. This information is used when rendering email rule alert templates as depicted in the image above.
 
 ### Rules should have narrowed event scope
 
