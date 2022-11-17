@@ -78,7 +78,7 @@ func ReadUTF16String(buf uintptr, offset, length uint16) (string, uint16) {
 		return "", 0
 	}
 	s := (*[1<<30 - 1]uint16)(unsafe.Pointer(buf + uintptr(offset)))[: length-offset : length-offset]
-	return utf16.Decode(s[:len(s)/2-1]), uint16(len(s) + 2)
+	return utf16.Decode(s[:len(s)/2-1-2]), uint16(len(s) + 2)
 }
 
 // ConsumeUTF16String reads the byte slice with UTF16-encoded string
