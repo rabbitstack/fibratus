@@ -22,8 +22,7 @@
 package kparams
 
 import (
-	"syscall"
-	"unicode/utf16"
+	"github.com/rabbitstack/fibratus/pkg/syscall/utf16"
 	"unsafe"
 )
 
@@ -79,7 +78,7 @@ func ReadUTF16String(buf uintptr, offset, length uint16) (string, uint16) {
 		return "", 0
 	}
 	s := (*[1<<30 - 1]uint16)(unsafe.Pointer(buf + uintptr(offset)))[: length-offset : length-offset]
-	return syscall.UTF16ToString(s), uint16(len(s) + 2)
+	return utf16.Decode(s[:len(s)/2-1-2]), uint16(len(s) + 2)
 }
 
 // ConsumeUTF16String reads the byte slice with UTF16-encoded string
@@ -89,13 +88,13 @@ func ConsumeUTF16String(buf uintptr, offset, length uint16) string {
 		return ""
 	}
 	s := (*[1<<30 - 1]uint16)(unsafe.Pointer(buf + uintptr(offset)))[: length-offset : length-offset]
-	return string(utf16.Decode(s[:len(s)/2-1]))
+	return utf16.Decode(s[:len(s)/2-1])
 }
 
 // ReadSID reads the security identifier from the provided buffer.
 func ReadSID(buf uintptr, offset uint16) ([]byte, uint16) {
 	// this is a Security Token which can be null and takes 4 bytes.
-	// Otherwise it is an 8 byte structure (TOKEN_USER) followed by SID,
+	// Otherwise, it is an 8 byte structure (TOKEN_USER) followed by SID,
 	// which is variable size depending on the 2nd byte in the SID
 	sid := ReadUint32(buf, offset)
 	if sid == 0 {

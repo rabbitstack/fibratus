@@ -25,6 +25,7 @@ import (
 	"reflect"
 	"syscall"
 	"unicode/utf16"
+	"unicode/utf8"
 	"unsafe"
 )
 
@@ -73,4 +74,38 @@ func PtrToString(p unsafe.Pointer) string {
 	}
 	// Remove trailing NUL and decode into a Go string.
 	return string(utf16.Decode(s[:len(s)-1]))
+}
+
+const (
+	// 0xd800-0xdc00 encodes the high 10 bits of a pair.
+	surr1 = 0xd800
+	// 0xdc00-0xe000 encodes the low 10 bits of a pair.
+	surr2 = 0xdc00
+)
+
+func isHighSurrogate(r rune) bool { return r >= surr1 && r <= 0xdbff }
+func isLowSurrogate(r rune) bool  { return r >= surr2 && r <= 0xdfff }
+
+// Decode decodes the UTF16-encoded string to UTF-8 string. This function
+// exhibits much better performance than the standard library counterpart.
+// All credits go to: https://gist.github.com/skeeto/09f1410183d246f9b18cba95c4e602f0
+func Decode(p []uint16) string {
+	s := make([]byte, 0, 2*len(p))
+	for i := 0; i < len(p); i++ {
+		r := rune(0xfffd)
+		r1 := rune(p[i])
+		if isHighSurrogate(r1) {
+			if i+1 < len(p) {
+				r2 := rune(p[i+1])
+				if isLowSurrogate(r2) {
+					i++
+					r = 0x10000 + (r1-surr1)<<10 + (r2 - surr2)
+				}
+			}
+		} else if !isLowSurrogate(r) {
+			r = r1
+		}
+		s = utf8.AppendRune(s, r)
+	}
+	return string(s)
 }
