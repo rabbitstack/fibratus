@@ -72,17 +72,17 @@ func (r *registryInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bo
 	typ := kevt.Type
 	switch typ {
 	case ktypes.RegKCBRundown, ktypes.RegCreateKCB:
-		khandle, err := kevt.Kparams.TryGetHexAsUint64(kparams.RegKeyHandle)
+		khandle, err := kevt.Kparams.GetUint64(kparams.RegKeyHandle)
 		if err != nil {
 			return kevt, true, err
 		}
 		if _, ok := r.keys[khandle]; !ok {
-			r.keys[khandle], _ = kevt.Kparams.GetString(kparams.RegKeyName)
+			r.keys[khandle] = kevt.GetParamAsString(kparams.RegKeyName)
 		}
 		kcbCount.Add(1)
 		return kevt, false, nil
 	case ktypes.RegDeleteKCB:
-		khandle, err := kevt.Kparams.TryGetHexAsUint64(kparams.RegKeyHandle)
+		khandle, err := kevt.Kparams.GetUint64(kparams.RegKeyHandle)
 		if err != nil {
 			return kevt, true, err
 		}
@@ -91,12 +91,13 @@ func (r *registryInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bo
 		return kevt, false, nil
 	case ktypes.RegCreateKey,
 		ktypes.RegDeleteKey,
-		ktypes.RegOpenKey, ktypes.RegOpenKeyV1,
+		ktypes.RegOpenKey,
+		ktypes.RegCloseKey,
 		ktypes.RegQueryKey,
 		ktypes.RegQueryValue,
 		ktypes.RegSetValue,
 		ktypes.RegDeleteValue:
-		khandle, err := kevt.Kparams.TryGetHexAsUint64(kparams.RegKeyHandle)
+		khandle, err := kevt.Kparams.GetUint64(kparams.RegKeyHandle)
 		if err != nil {
 			return kevt, true, err
 		}
@@ -136,12 +137,6 @@ func (r *registryInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bo
 			if err := kevt.Kparams.Set(kparams.RegKeyName, k, kparams.UnicodeString); err != nil {
 				return kevt, true, err
 			}
-		}
-
-		// format registry operation status code
-		status, err := kevt.Kparams.GetUint32(kparams.NTStatus)
-		if err == nil {
-			_ = kevt.Kparams.Set(kparams.NTStatus, formatStatus(status, kevt), kparams.UnicodeString)
 		}
 
 		// get the type/value of the registry key and append to parameters

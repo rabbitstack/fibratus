@@ -57,25 +57,6 @@ func StringToUTF16Ptr(s string) *uint16 {
 	return p
 }
 
-// PtrToString is like UTF16ToString, but takes *uint16
-// as a parameter instead of []uint16.
-func PtrToString(p unsafe.Pointer) string {
-	if p == nil {
-		return ""
-	}
-	var s []uint16
-	hdr := (*reflect.SliceHeader)(unsafe.Pointer(&s))
-	hdr.Data = uintptr(p)
-	hdr.Cap = 1
-	hdr.Len = 1
-	for s[len(s)-1] != 0 {
-		hdr.Cap++
-		hdr.Len++
-	}
-	// Remove trailing NUL and decode into a Go string.
-	return string(utf16.Decode(s[:len(s)-1]))
-}
-
 const (
 	// 0xd800-0xdc00 encodes the high 10 bits of a pair.
 	surr1 = 0xd800

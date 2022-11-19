@@ -54,6 +54,32 @@ var ParamNameCaseStyle = SnakeCase
 // ParamKVDelimiter specifies the character that delimits parameter's key from its value
 var ParamKVDelimiter = "➜ "
 
+// ParamEnum defines the type for the event parameter enumeration values. Enums
+// are a direct mapping from the parameter integer value to some symbolical name
+type ParamEnum map[uint32]string
+
+type paramOpts struct {
+	flags ParamFlags
+	enum  ParamEnum
+}
+
+// ParamOption represents the option for the parameter literal constructor.
+type ParamOption func(o *paramOpts)
+
+// WithFlags appends the parameter with a list of bitmask flags.
+func WithFlags(flags ParamFlags) ParamOption {
+	return func(o *paramOpts) {
+		o.flags = flags
+	}
+}
+
+// WithEnum appends the parameter with the enum mapping.
+func WithEnum(enum ParamEnum) ParamOption {
+	return func(o *paramOpts) {
+		o.enum = enum
+	}
+}
+
 // Kparam defines the layout of the kernel event parameter.
 type Kparam struct {
 	// Type is the type of the parameter. For example, `sport` parameter has the `Port` type although its value
@@ -63,39 +89,23 @@ type Kparam struct {
 	Value kparams.Value `json:"value"`
 	// Name represents the name of the parameter (e.g. pid, sport).
 	Name string `json:"name"`
+	// Flags represents parameter flags
+	Flags ParamFlags `json:"flags"`
+	// Enum represents parameter enumeration
+	Enum ParamEnum `json:"enum"`
 }
 
 // Kparams is the type that represents the sequence of kernel event parameters
 type Kparams map[string]*Kparam
-
-// KparamsFromSlice creates the params map from the variadic param list.
-func KparamsFromSlice(pars ...*Kparam) Kparams {
-	kpars := make(Kparams, len(pars))
-	for _, kpar := range pars {
-		kpars[kpar.Name] = kpar
-	}
-	return kpars
-}
 
 // NewKparamFromKcap builds a kparam instance from the restored state.
 func NewKparamFromKcap(name string, typ kparams.Type, value kparams.Value) *Kparam {
 	return &Kparam{Name: name, Type: typ, Value: value}
 }
 
-// NewKparamBuilder yields a new event parameter builder.
-func NewKparamBuilder(n int) Kparams {
-	kpars := make(Kparams, n)
-	return kpars
-}
-
-// Build returns all appended parameters.
-func (kpars Kparams) Build() Kparams {
-	return kpars
-}
-
 // Append adds a new parameter with the specified name, type and value.
-func (kpars Kparams) Append(name string, typ kparams.Type, value kparams.Value) Kparams {
-	kpars[name] = NewKparam(name, typ, value)
+func (kpars Kparams) Append(name string, typ kparams.Type, value kparams.Value, opts ...ParamOption) Kparams {
+	kpars[name] = NewKparam(name, typ, value, opts...)
 	return kpars
 }
 
@@ -114,6 +124,11 @@ func (kpars Kparams) Contains(name string) bool {
 // Remove deletes the specified parameter from the map.
 func (kpars Kparams) Remove(name string) {
 	delete(kpars, name)
+}
+
+// Get returns the event parameter with specified name.
+func (kpars Kparams) Get(name string) (*Kparam, error) {
+	return kpars.findParam(name)
 }
 
 // Len returns the number of parameters.
@@ -141,9 +156,9 @@ func (kpars Kparams) SetValue(name string, value kparams.Value) error {
 	return nil
 }
 
-// Get returns the raw value for given parameter name. It is the responsibility of the caller to probe type assertion
+// GetRaw returns the raw value for given parameter name. It is the responsibility of the caller to probe type assertion
 // on the value before yielding its underlying type.
-func (kpars Kparams) Get(name string) (kparams.Value, error) {
+func (kpars Kparams) GetRaw(name string) (kparams.Value, error) {
 	kpar, err := kpars.findParam(name)
 	if err != nil {
 		return "", err
@@ -373,20 +388,6 @@ func (kpars Kparams) GetHexAsUint32(name string) (uint32, error) {
 	return hex.Uint32(), nil
 }
 
-// TryGetHexAsUint32 attempts to get the uint8 value from its hexadecimal representation.
-// If the param is present, but doesn't have the hex type, then the param value is directly
-// coerced into uint32 scalar.
-func (kpars Kparams) TryGetHexAsUint32(name string) (uint32, error) {
-	kpar, err := kpars.findParam(name)
-	if err != nil {
-		return 0, err
-	}
-	if kpar.Type == kparams.HexInt32 {
-		return kpars.GetHexAsUint32(name)
-	}
-	return kpars.GetUint32(name)
-}
-
 // GetHexAsUint8 returns the number hexadecimal representation as uint8 value.
 func (kpars Kparams) GetHexAsUint8(name string) (uint8, error) {
 	hex, err := kpars.GetHex(name)
@@ -396,20 +397,6 @@ func (kpars Kparams) GetHexAsUint8(name string) (uint8, error) {
 	return hex.Uint8(), nil
 }
 
-// TryGetHexAsUint8 attempts to get the uint8 value from its hexadecimal representation.
-// If the param is present, but doesn't have the hex type, then the param value is directly
-// coerced into uint8 scalar.
-func (kpars Kparams) TryGetHexAsUint8(name string) (uint8, error) {
-	kpar, err := kpars.findParam(name)
-	if err != nil {
-		return 0, err
-	}
-	if kpar.Type == kparams.HexInt8 {
-		return kpars.GetHexAsUint8(name)
-	}
-	return kpars.GetUint8(name)
-}
-
 // GetHexAsUint64 returns the number hexadecimal representation as uint64 value.
 func (kpars Kparams) GetHexAsUint64(name string) (uint64, error) {
 	hex, err := kpars.GetHex(name)
@@ -417,20 +404,6 @@ func (kpars Kparams) GetHexAsUint64(name string) (uint64, error) {
 		return uint64(0), err
 	}
 	return hex.Uint64(), nil
-}
-
-// TryGetHexAsUint64 attempts to get the uint64 value from its hexadecimal representation.
-// If the param is present, but doesn't have the hex type, then the param value is directly
-// coerced into uint64 scalar.
-func (kpars Kparams) TryGetHexAsUint64(name string) (uint64, error) {
-	kpar, err := kpars.findParam(name)
-	if err != nil {
-		return 0, err
-	}
-	if kpar.Type == kparams.HexInt64 {
-		return kpars.GetHexAsUint64(name)
-	}
-	return kpars.GetUint64(name)
 }
 
 // GetHex returns the generic hexadecimal type for the specified parameter name.
@@ -509,11 +482,11 @@ func (kpars Kparams) GetTime(name string) (time.Time, error) {
 
 // GetStringSlice returns the string slice from the event parameter.
 func (kpars Kparams) GetStringSlice(name string) ([]string, error) {
-	kpar, err := kpars.findParam(name)
+	kpar, err := kpars.GetSlice(name)
 	if err != nil {
 		return nil, err
 	}
-	v, ok := kpar.Value.([]string)
+	v, ok := kpar.([]string)
 	if !ok {
 		return nil, fmt.Errorf("unable to type cast %q parameter to string slice", name)
 	}

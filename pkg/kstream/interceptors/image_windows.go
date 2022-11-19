@@ -21,7 +21,6 @@ package interceptors
 import (
 	"expvar"
 
-	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
@@ -34,37 +33,20 @@ import (
 var imageYaraScans = expvar.NewInt("yara.image.scans")
 
 type imageInterceptor struct {
-	devMapper fs.DevMapper
-	snap      ps.Snapshotter
-	yara      yara.Scanner
+	snap ps.Snapshotter
+	yara yara.Scanner
 }
 
-func newImageInterceptor(snap ps.Snapshotter, devMapper fs.DevMapper, yara yara.Scanner) KstreamInterceptor {
-	return &imageInterceptor{snap: snap, devMapper: devMapper, yara: yara}
+func newImageInterceptor(snap ps.Snapshotter, yara yara.Scanner) KstreamInterceptor {
+	return &imageInterceptor{snap: snap, yara: yara}
 }
 
 func (imageInterceptor) Name() InterceptorType { return Image }
 
 func (i *imageInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, error) {
-	if kevt.Type == ktypes.LoadImage || kevt.Type == ktypes.UnloadImage || kevt.Type == ktypes.EnumImage {
-		// normalize image parameters to convert the size of hex to decimal representation
-		// and replace the DOS image path to regular drive-based file path
-		pid, err := kevt.Kparams.GetUint32(kparams.ProcessID)
-		if err != nil {
-			return kevt, true, err
-		}
-		if err := kevt.Kparams.Set(kparams.ProcessID, pid, kparams.PID); err != nil {
-			return kevt, true, err
-		}
-		size, _ := kevt.Kparams.GetHexAsUint32(kparams.ImageSize)
-		if err := kevt.Kparams.Set(kparams.ImageSize, size, kparams.Uint32); err != nil {
-			return kevt, true, err
-		}
-		filename, _ := kevt.Kparams.GetString(kparams.ImageFilename)
-		if err := kevt.Kparams.Set(kparams.ImageFilename, i.devMapper.Convert(filename), kparams.UnicodeString); err != nil {
-			return kevt, true, err
-		}
-		if i.yara != nil && kevt.Type == ktypes.LoadImage {
+	if i.yara != nil && kevt.Type == ktypes.LoadImage {
+		filename, err := kevt.GetParamAsString(kparams.ImageFilename)
+		if err == nil {
 			// scan the target filename
 			go func() {
 				imageYaraScans.Add(1)
@@ -74,13 +56,11 @@ func (i *imageInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool,
 				}
 			}()
 		}
-		if kevt.Type != ktypes.UnloadImage {
-			return kevt, false, i.snap.Write(kevt)
-		}
+	}
+	if kevt.Type == ktypes.UnloadImage {
 		return kevt, false, i.snap.Remove(kevt)
 	}
-
-	return kevt, true, nil
+	return kevt, false, i.snap.Write(kevt)
 }
 
 func (imageInterceptor) Close() {}

@@ -30,6 +30,8 @@ const (
 	ThreadID = "tid"
 	// ProcessParentID field represents the parent process identifier.
 	ProcessParentID = "ppid"
+	// ProcessRealParentID field presents the real parent process identifier.
+	ProcessRealParentID = "real_ppid"
 	// SessionID fields represents the session identifier.
 	SessionID = "session_id"
 	// UserSID field is the security identifier associated to the process token under which it is run.
@@ -38,8 +40,8 @@ const (
 	ProcessName = "name"
 	// Exe field denotes the full path of the executable.
 	Exe = "exe"
-	// Comm field represents the process command line.
-	Comm = "comm"
+	// Cmdline field represents the process command line.
+	Cmdline = "cmdline"
 	// DTB field denotes the address of the process directory table.
 	DTB = "directory_table_base"
 	// ExitStatus is the field that represents the process exit status.
@@ -66,8 +68,8 @@ const (
 	UstackBase = "ustack"
 	// UstackLimit field is the end address of the user space stack.
 	UstackLimit = "ustack_limit"
-	// ThreadEntrypoint field is the address of the thread main function.
-	ThreadEntrypoint = "entrypoint"
+	// StartAddr field is the address of the thread main function.
+	StartAddr = "entrypoint"
 
 	// FileObject determines the field name for the file object pointer.
 	FileObject = "file_object"

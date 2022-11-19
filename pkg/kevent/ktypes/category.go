@@ -22,7 +22,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/hashers"
 )
 
-// Category is the type alias for kernel event categories
+// Category is the type alias for event categories
 type Category string
 
 const (

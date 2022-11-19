@@ -31,8 +31,8 @@ var (
 	CreateProcess = Pack(syscall.GUID{Data1: 0x3d6fa8d0, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}, 1)
 	// TerminateProcess identifies process termination kernel events
 	TerminateProcess = Pack(syscall.GUID{Data1: 0x3d6fa8d0, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}, 2)
-	// EnumProcess represents the start data collection process event that enumerates processes that are currently running at the time the kernel session starts
-	EnumProcess = Pack(syscall.GUID{Data1: 0x3d6fa8d0, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}, 3)
+	// ProcessRundown represents the start data collection process event that enumerates processes that are currently running at the time the kernel session starts
+	ProcessRundown = Pack(syscall.GUID{Data1: 0x3d6fa8d0, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}, 3)
 	// OpenProcess identifies the kernel events that are triggered when the process handle is acquired
 	OpenProcess = Pack(syscall.GUID{Data1: 0xe02a841c, Data2: 0x75a3, Data3: 0x4fa7, Data4: [8]byte{0xaf, 0xc8, 0xae, 0x09, 0xcf, 0x9b, 0x7f, 0x23}}, 5)
 
@@ -40,8 +40,8 @@ var (
 	CreateThread = Pack(syscall.GUID{Data1: 0x3d6fa8d1, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}, 1)
 	// TerminateThread identifies thread termination kernel events
 	TerminateThread = Pack(syscall.GUID{Data1: 0x3d6fa8d1, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}, 2)
-	// EnumThread represents the start data collection thread event that enumerates threads that are currently running at the time the kernel session starts
-	EnumThread = Pack(syscall.GUID{Data1: 0x3d6fa8d1, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}, 3)
+	// ThreadRundown represents the start data collection thread event that enumerates threads that are currently running at the time the kernel session starts
+	ThreadRundown = Pack(syscall.GUID{Data1: 0x3d6fa8d1, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}, 3)
 	// OpenThread identifies the kernel events that are triggered when the process acquires a thread handle
 	OpenThread = Pack(syscall.GUID{Data1: 0xe02a841c, Data2: 0x75a3, Data3: 0x4fa7, Data4: [8]byte{0xaf, 0xc8, 0xae, 0x09, 0xcf, 0x9b, 0x7f, 0x23}}, 6)
 
@@ -72,6 +72,8 @@ var (
 	RegCreateKey = Pack(syscall.GUID{Data1: 0xae53722e, Data2: 0xc863, Data3: 0x11d2, Data4: [8]byte{0x86, 0x59, 0x0, 0xc0, 0x4f, 0xa3, 0x21, 0xa1}}, 10)
 	// RegOpenKey represents registry open key kernel events
 	RegOpenKey = Pack(syscall.GUID{Data1: 0xae53722e, Data2: 0xc863, Data3: 0x11d2, Data4: [8]byte{0x86, 0x59, 0x0, 0xc0, 0x4f, 0xa3, 0x21, 0xa1}}, 11)
+	// RegCloseKey represents registry close key kernel event.
+	RegCloseKey = Pack(syscall.GUID{Data1: 0xae53722e, Data2: 0xc863, Data3: 0x11d2, Data4: [8]byte{0x86, 0x59, 0x0, 0xc0, 0x4f, 0xa3, 0x21, 0xa1}}, 27)
 	// RegDeleteKey represents registry key deletion kernel events
 	RegDeleteKey = Pack(syscall.GUID{Data1: 0xae53722e, Data2: 0xc863, Data3: 0x11d2, Data4: [8]byte{0x86, 0x59, 0x0, 0xc0, 0x4f, 0xa3, 0x21, 0xa1}}, 12)
 	// RegQueryKey represents registry query key kernel events
@@ -88,13 +90,11 @@ var (
 	RegDeleteKCB = Pack(syscall.GUID{Data1: 0xae53722e, Data2: 0xc863, Data3: 0x11d2, Data4: [8]byte{0x86, 0x59, 0x0, 0xc0, 0x4f, 0xa3, 0x21, 0xa1}}, 23)
 	// RegKCBRundown enumerates the registry keys open at the start of the kernel session.
 	RegKCBRundown = Pack(syscall.GUID{Data1: 0xae53722e, Data2: 0xc863, Data3: 0x11d2, Data4: [8]byte{0x86, 0x59, 0x0, 0xc0, 0x4f, 0xa3, 0x21, 0xa1}}, 25)
-	// RegOpenKeyV1 represents registry open key kernel event. It looks like this event type defines identical kernel event type as RegOpenKey
-	RegOpenKeyV1 = Pack(syscall.GUID{Data1: 0xae53722e, Data2: 0xc863, Data3: 0x11d2, Data4: [8]byte{0x86, 0x59, 0x0, 0xc0, 0x4f, 0xa3, 0x21, 0xa1}}, 27)
 
 	// UnloadImage represents unload image kernel events
 	UnloadImage = Pack(syscall.GUID{Data1: 0x2cb15d1d, Data2: 0x5fc1, Data3: 0x11d2, Data4: [8]byte{0xab, 0xe1, 0x0, 0xa0, 0xc9, 0x11, 0xf5, 0x18}}, 2)
-	// EnumImage represents kernel events that is triggered to enumerate all loaded images
-	EnumImage = Pack(syscall.GUID{Data1: 0x2cb15d1d, Data2: 0x5fc1, Data3: 0x11d2, Data4: [8]byte{0xab, 0xe1, 0x0, 0xa0, 0xc9, 0x11, 0xf5, 0x18}}, 3)
+	// ImageRundown represents kernel events that is triggered to enumerate all loaded images
+	ImageRundown = Pack(syscall.GUID{Data1: 0x2cb15d1d, Data2: 0x5fc1, Data3: 0x11d2, Data4: [8]byte{0xab, 0xe1, 0x0, 0xa0, 0xc9, 0x11, 0xf5, 0x18}}, 3)
 	// LoadImage represents load image kernel events that are triggered when a DLL or executable file  is loaded
 	LoadImage = Pack(syscall.GUID{Data1: 0x2cb15d1d, Data2: 0x5fc1, Data3: 0x11d2, Data4: [8]byte{0xab, 0xe1, 0x0, 0xa0, 0xc9, 0x11, 0xf5, 0x18}}, 10)
 
@@ -129,8 +129,6 @@ var (
 	DisconnectTCPv4 = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 13)
 	// DisconnectTCPv6 is the TCP IPv6 network disconnect event.
 	DisconnectTCPv6 = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 29)
-	// Disconnect encompasses TCP IPv4/6 network disconnect events.
-	Disconnect = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 42)
 
 	// ReconnectTCPv4 is the TCP IPv4 network reconnect event.
 	ReconnectTCPv4 = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 16)
@@ -141,19 +139,6 @@ var (
 	RetransmitTCPv4 = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 14)
 	// RetransmitTCPv6 is the TCP IPv6 network retransmit event.
 	RetransmitTCPv6 = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 30)
-
-	// Accept represents the global kernel event type for both TCP v4/v6 connections. Note this is an artificial kernel event that is never published by the provider.
-	Accept = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 46)
-	// Send represents the global kernel event for all variants of sending data to sockets. Note this is an artificial kernel event that is never published by the provider.
-	Send = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xa9c9, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 72)
-	// Recv represents the global kernel event for all variants of receiving data from sockets. Note this is an artificial kernel event that is never published by the provider.
-	Recv = Pack(syscall.GUID{Data1: 0xbf3a50c5, Data2: 0xc8e0, Data3: 0x4988, Data4: [8]byte{0xa0, 0x05, 0x2d, 0xc0, 0xb7, 0xc8, 0x0f, 0x80}}, 75)
-	// Connect represents the global kernel event for all variants of connecting to sockets sockets. Note this is an artificial kernel event that is never published by the provider.
-	Connect = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 40)
-	// Reconnect represents the global kernel event for all variants of reconnecting to sockets sockets. Note this is an artificial kernel event that is never published by the provider.
-	Reconnect = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 47)
-	// Retransmit represents the global kernel event for all variants of retransmitting TCP segments. Note this is an artificial kernel event that is never published by the provider.
-	Retransmit = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 44)
 
 	// CreateHandle represents handle creation kernel event
 	CreateHandle = Pack(syscall.GUID{Data1: 0x89497f50, Data2: 0xeffe, Data3: 0x4440, Data4: [8]byte{0x8c, 0xf2, 0xce, 0x6b, 0x1c, 0xdc, 0xac, 0xa7}}, 32)
@@ -167,19 +152,24 @@ var (
 	UnknownKtype = Pack(syscall.GUID{}, 0)
 )
 
-// String returns the string representation of the kernel event type. If event is unknown a GUID representation that includes the GUID of the event's provider + the opcode type is presented.
+// String returns the string representation of the event type. Returns an empty string
+// if the event type is not recognized.
 func (k Ktype) String() string {
 	switch k {
 	case CreateProcess:
 		return "CreateProcess"
 	case TerminateProcess:
 		return "TerminateProcess"
+	case ProcessRundown:
+		return "ProcessRundown"
 	case OpenProcess:
 		return "OpenProcess"
 	case CreateThread:
 		return "CreateThread"
 	case TerminateThread:
 		return "TerminateThread"
+	case ThreadRundown:
+		return "ThreadRundown"
 	case OpenThread:
 		return "OpenThread"
 	case CreateFile:
@@ -210,8 +200,10 @@ func (k Ktype) String() string {
 		return "CloseHandle"
 	case RegKCBRundown:
 		return "RegKCBRundown"
-	case RegOpenKey, RegOpenKeyV1:
+	case RegOpenKey:
 		return "RegOpenKey"
+	case RegCloseKey:
+		return "RegCloseKey"
 	case RegCreateKey:
 		return "RegCreateKey"
 	case RegDeleteKey:
@@ -230,19 +222,21 @@ func (k Ktype) String() string {
 		return "LoadImage"
 	case UnloadImage:
 		return "UnloadImage"
-	case Accept, AcceptTCPv4, AcceptTCPv6:
+	case ImageRundown:
+		return "ImageRundown"
+	case AcceptTCPv4, AcceptTCPv6:
 		return "Accept"
-	case Send, SendTCPv4, SendTCPv6, SendUDPv4, SendUDPv6:
+	case SendTCPv4, SendTCPv6, SendUDPv4, SendUDPv6:
 		return "Send"
-	case Recv, RecvTCPv4, RecvTCPv6, RecvUDPv4, RecvUDPv6:
+	case RecvTCPv4, RecvTCPv6, RecvUDPv4, RecvUDPv6:
 		return "Recv"
-	case Connect, ConnectTCPv4, ConnectTCPv6:
+	case ConnectTCPv4, ConnectTCPv6:
 		return "Connect"
-	case Reconnect, ReconnectTCPv4, ReconnectTCPv6:
+	case ReconnectTCPv4, ReconnectTCPv6:
 		return "Reconnect"
-	case Disconnect, DisconnectTCPv4, DisconnectTCPv6:
+	case DisconnectTCPv4, DisconnectTCPv6:
 		return "Disconnect"
-	case Retransmit, RetransmitTCPv4, RetransmitTCPv6:
+	case RetransmitTCPv4, RetransmitTCPv6:
 		return "Retransmit"
 	case LoadDriver:
 		return "LoadDriver"
@@ -262,7 +256,7 @@ func (k Ktype) Category() Category {
 		return Image
 	case CreateFile, ReadFile, WriteFile, EnumDirectory, DeleteFile, RenameFile, CloseFile, SetFileInformation:
 		return File
-	case RegCreateKey, RegDeleteKey, RegOpenKey, RegQueryKey, RegQueryValue, RegSetValue, RegDeleteValue:
+	case RegCreateKey, RegDeleteKey, RegOpenKey, RegCloseKey, RegQueryKey, RegQueryValue, RegSetValue, RegDeleteValue:
 		return Registry
 	case AcceptTCPv4, AcceptTCPv6,
 		ConnectTCPv4, ConnectTCPv6,
@@ -314,8 +308,10 @@ func (k Ktype) Description() string {
 		return "Enumerates a directory or dispatches a directory change notification to registered listeners"
 	case RegCreateKey:
 		return "Creates a registry key or opens it if the key already exists"
-	case RegOpenKey, RegOpenKeyV1:
+	case RegOpenKey:
 		return "Opens the registry key"
+	case RegCloseKey:
+		return "Closes the registry key"
 	case RegSetValue:
 		return "Sets the data for the value of a registry key"
 	case RegQueryValue:
@@ -355,7 +351,7 @@ func (k Ktype) Description() string {
 	}
 }
 
-// Hash calculates the hash number of the ktype.
+// Hash calculates the hash number of the event type.
 func (k Ktype) Hash() uint32 {
 	if k == UnknownKtype {
 		return 0
@@ -363,73 +359,23 @@ func (k Ktype) Hash() uint32 {
 	return hashers.FnvUint32([]byte(k.String()))
 }
 
-// Exists determines whether particular ktype exists.
+// Exists determines whether particular event type exists.
 func (k Ktype) Exists() bool {
-	switch k {
-	case EnumProcess,
-		EnumThread,
-		FileRundown,
-		FileOpEnd,
-		ReleaseFile,
-		EnumImage,
-		RegCreateKCB,
-		RegDeleteKCB,
-		RegKCBRundown,
-		CreateHandle,
-		CloseHandle,
-		CreateProcess,
-		TerminateProcess,
-		OpenProcess,
-		CreateThread,
-		TerminateThread,
-		OpenThread,
-		LoadImage,
-		UnloadImage,
-		CreateFile,
-		WriteFile,
-		ReadFile,
-		DeleteFile,
-		RenameFile,
-		CloseFile,
-		SetFileInformation,
-		EnumDirectory,
-		RegCreateKey,
-		RegDeleteKey,
-		RegOpenKey,
-		RegOpenKeyV1,
-		RegQueryKey,
-		RegQueryValue,
-		RegSetValue,
-		RegDeleteValue,
-		AcceptTCPv4, AcceptTCPv6,
-		ConnectTCPv4, ConnectTCPv6,
-		ReconnectTCPv4, ReconnectTCPv6,
-		RetransmitTCPv4, RetransmitTCPv6,
-		DisconnectTCPv4, DisconnectTCPv6,
-		SendTCPv4, SendTCPv6, SendUDPv4, SendUDPv6,
-		RecvTCPv4, RecvTCPv6, RecvUDPv4, RecvUDPv6,
-		LoadDriver:
-		return true
-	default:
-		return false
-	}
+	return k.String() != ""
 }
 
-// Dropped determines whether certain events responsible for building the internal state are kept or dropped before hitting
-// the output channel.
-func (k Ktype) Dropped(capture bool) bool {
+// OnlyState determines whether the event type is solely used for state management.
+func (k Ktype) OnlyState() bool {
 	switch k {
-	case EnumProcess,
-		EnumThread,
+	case ProcessRundown,
+		ThreadRundown,
+		ImageRundown,
 		FileRundown,
+		RegKCBRundown,
 		FileOpEnd,
 		ReleaseFile,
-		EnumImage,
 		RegCreateKCB,
-		RegKCBRundown:
-		if capture {
-			return false
-		}
+		RegDeleteKCB:
 		return true
 	default:
 		return false
@@ -447,8 +393,8 @@ func (k *Ktype) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-// Pack transforms event provider GUID and the op code into `Ktype` type. The type provides a convenient way
-// to compare different kernel event types.
+// Pack merges event provider GUID and the op code into `Ktype` array. The type provides a convenient way
+// for comparing event types.
 func Pack(g syscall.GUID, opcode uint8) Ktype {
 	return [17]byte{
 		byte(g.Data1 >> 24), byte(g.Data1 >> 16), byte(g.Data1 >> 8), byte(g.Data1),

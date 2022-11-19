@@ -22,8 +22,10 @@
 package etw
 
 import (
+	"github.com/rabbitstack/fibratus/pkg/syscall/utf16"
 	"strings"
 	"syscall"
+	"unsafe"
 )
 
 // EventTraceFlags is the type alias for kernel trace events
@@ -496,4 +498,98 @@ type EventRecord struct {
 	Buffer uintptr
 	// UserContext is a pointer to custom user data passed in `EventTraceLogfile` structure.
 	UserContext uintptr
+}
+
+// Version returns the version of the event schema.
+func (e *EventRecord) Version() uint8 {
+	return e.Header.EventDescriptor.Version
+}
+
+// ReadByte reads the byte from the buffer at the specified offset.
+func (e *EventRecord) ReadByte(offset uint16) byte {
+	return *(*byte)(unsafe.Pointer(e.Buffer + uintptr(offset)))
+}
+
+// ReadBytes reads a contiguous block of bytes from the buffer.
+func (e *EventRecord) ReadBytes(offset uint16, count uint16) []byte {
+	return (*[1<<30 - 1]byte)(unsafe.Pointer(e.Buffer + uintptr(offset) + uintptr(count)))[:count:count]
+}
+
+// ReadUint16 reads the uint16 value from the buffer at the specified offset.
+func (e *EventRecord) ReadUint16(offset uint16) uint16 {
+	return *(*uint16)(unsafe.Pointer(e.Buffer + uintptr(offset)))
+}
+
+// ReadUint32 reads the uint32 value from the buffer at the specified offset.
+func (e *EventRecord) ReadUint32(offset uint16) uint32 {
+	return *(*uint32)(unsafe.Pointer(e.Buffer + uintptr(offset)))
+}
+
+// ReadUint64 reads the uint64 value from the buffer at the specified offset.
+func (e *EventRecord) ReadUint64(offset uint16) uint64 {
+	return *(*uint64)(unsafe.Pointer(e.Buffer + uintptr(offset)))
+}
+
+// ReadAnsiString reads the ANSI string from the buffer at the specified offset.
+// Returns the UTF-8 string and the number of bytes read from the string.
+func (e *EventRecord) ReadAnsiString(offset uint16) (string, uint16) {
+	if offset > e.BufferLen {
+		return "", 0
+	}
+	b := make([]byte, e.BufferLen)
+	var i uint16
+	for i < e.BufferLen {
+		c := *(*byte)(unsafe.Pointer(e.Buffer + uintptr(offset) + uintptr(i)))
+		if c == 0 {
+			break // null terminator
+		}
+		b[i] = c
+		i++
+	}
+	if int(i) > len(b) {
+		return string(b[:len(b)-1]), uint16(len(b))
+	}
+	return string(b[:i]), i + 1
+}
+
+// ReadUTF16String reads the UTF-16 string from the buffer at the specified offset.
+// Returns the UTF-8 string and the number of bytes read from the string.
+func (e *EventRecord) ReadUTF16String(offset uint16) (string, uint16) {
+	if offset > e.BufferLen {
+		return "", 0
+	}
+	s := (*[1<<30 - 1]uint16)(unsafe.Pointer(e.Buffer + uintptr(offset)))[: e.BufferLen-offset : e.BufferLen-offset]
+	return utf16.Decode(s[:len(s)/2-1-2]), uint16(len(s) + 2)
+}
+
+// ConsumeUTF16String reads the byte slice with UTF16-encoded string
+// when the UTF16 string is located at the end of the buffer.
+func (e *EventRecord) ConsumeUTF16String(offset uint16) string {
+	if offset > e.BufferLen {
+		return ""
+	}
+	s := (*[1<<30 - 1]uint16)(unsafe.Pointer(e.Buffer + uintptr(offset)))[: e.BufferLen-offset : e.BufferLen-offset]
+	return utf16.Decode(s[:len(s)/2-1])
+}
+
+// ReadSID reads the security identifier from the event buffer.
+func (e *EventRecord) ReadSID(offset uint16) ([]byte, uint16) {
+	// this is a Security Token which can be null and takes 4 bytes.
+	// Otherwise, it is an 8 byte structure (TOKEN_USER) followed by SID,
+	// which is variable size depending on the 2nd byte in the SID
+	sid := e.ReadUint32(offset)
+	if sid == 0 {
+		return nil, offset + 4
+	}
+	const tokenSize uint16 = 16
+
+	authorities := e.ReadByte(offset + (tokenSize + 1))
+	end := offset + tokenSize + 8 + 4*uint16(authorities)
+	b := make([]byte, end-offset)
+	i := offset
+	for i < end {
+		b[i-offset] = *(*byte)(unsafe.Pointer(e.Buffer + uintptr(i)))
+		i++
+	}
+	return b, end
 }

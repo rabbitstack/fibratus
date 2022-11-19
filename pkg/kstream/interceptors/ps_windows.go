@@ -24,11 +24,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
-
-	"github.com/rabbitstack/fibratus/pkg/syscall/thread"
 
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
@@ -78,92 +75,20 @@ func (ps psInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 	switch kevt.Type {
 	case ktypes.CreateProcess,
 		ktypes.TerminateProcess,
-		ktypes.EnumProcess:
-		cmndline, err := kevt.Kparams.GetString(kparams.Comm)
-		if err != nil {
-			return kevt, true, err
+		ktypes.ProcessRundown:
+		if err := ps.processEvent(kevt); err != nil {
+			return kevt, false, err
 		}
-		// if leading/trailing quotes are found in the executable path, get rid of them
-		args := cmdline.Split(cmndline)
-		if len(args) > 0 {
-			cmndline = cmdline.CleanExe(args)
+		if kevt.Type == ktypes.CreateProcess {
+			ps.scanProc(kevt)
 		}
-		// expand all variations of the SystemRoot env variable
-		if systemRootRegexp.MatchString(cmndline) {
-			cmndline = systemRootRegexp.ReplaceAllString(cmndline, os.Getenv("SystemRoot"))
+		if kevt.Type == ktypes.TerminateProcess {
+			return kevt, false, ps.snap.Remove(kevt)
 		}
-		// some system processes are reported without the path in the command line,
-		// but we can expand the path from the SystemRoot environment variable
-		if !driveRegexp.MatchString(cmndline) {
-			proc, _ := kevt.Kparams.GetString(kparams.ProcessName)
-			_, ok := sysProcs[proc]
-			if ok {
-				cmndline = filepath.Join(os.Getenv("SystemRoot"), "System32", cmndline)
-			}
-		}
-		// append executable path parameter
-		i := strings.Index(strings.ToLower(cmndline), ".exe")
-		if i > 0 {
-			exe := cmndline[0 : i+4]
-			kevt.Kparams.Append(kparams.Exe, kparams.UnicodeString, exe)
-		}
-		_ = kevt.Kparams.SetValue(kparams.Comm, cmndline)
-
-		// convert hexadecimal PID values to integers
-		pid, err := kevt.Kparams.GetHexAsUint32(kparams.ProcessID)
-		if err != nil {
-			return kevt, true, err
-		}
-		if err := kevt.Kparams.Set(kparams.ProcessID, pid, kparams.PID); err != nil {
-			return kevt, true, err
-		}
-		ppid, err := kevt.Kparams.GetHexAsUint32(kparams.ProcessParentID)
-		if err != nil {
-			return kevt, true, err
-		}
-		if err := kevt.Kparams.Set(kparams.ProcessParentID, ppid, kparams.PID); err != nil {
-			return kevt, true, err
-		}
-
-		if kevt.Type != ktypes.TerminateProcess {
-			if pid != 0 {
-				// get the process's start time and append it to the parameters
-				started, err := getStartTime(pid)
-				if err != nil {
-					started = kevt.Timestamp
-				}
-				_ = kevt.Kparams.Append(kparams.StartTime, kparams.Time, started)
-			}
-			if ps.yara != nil && kevt.Type == ktypes.CreateProcess {
-				// run yara scanner on the target process
-				go func() {
-					procYaraScans.Add(1)
-					err := ps.yara.ScanProc(pid, kevt)
-					if err != nil {
-						log.Warnf("unable to run yara scanner on pid %d: %v", pid, err)
-					}
-				}()
-			}
-			return kevt, false, ps.snap.Write(kevt)
-		}
-		return kevt, false, ps.snap.Remove(kevt)
+		return kevt, false, ps.snap.Write(kevt)
 	case ktypes.CreateThread,
 		ktypes.TerminateThread,
-		ktypes.EnumThread:
-		pid, err := kevt.Kparams.GetHexAsUint32(kparams.ProcessID)
-		if err != nil {
-			return kevt, true, err
-		}
-		if err := kevt.Kparams.Set(kparams.ProcessID, pid, kparams.PID); err != nil {
-			return kevt, true, err
-		}
-		tid, err := kevt.Kparams.GetHexAsUint32(kparams.ThreadID)
-		if err != nil {
-			return kevt, true, err
-		}
-		if err := kevt.Kparams.Set(kparams.ThreadID, tid, kparams.TID); err != nil {
-			return kevt, true, err
-		}
+		ktypes.ThreadRundown:
 		if kevt.Type != ktypes.TerminateThread {
 			return kevt, false, ps.snap.Write(kevt)
 		}
@@ -174,31 +99,75 @@ func (ps psInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 		if err != nil {
 			return kevt, true, err
 		}
-
 		proc := ps.snap.Find(pid)
 		if proc != nil {
-			kevt.Kparams.Append(kparams.Exe, kparams.UnicodeString, proc.Exe).
-				Append(kparams.ProcessName, kparams.UnicodeString, proc.Name)
-		}
-		_ = kevt.Kparams.Set(kparams.ProcessID, pid, kparams.PID)
-
-		// format the status code
-		status := kevt.Kparams.MustGetUint32(kparams.NTStatus)
-		_ = kevt.Kparams.Set(kparams.NTStatus, formatStatus(status, kevt), kparams.UnicodeString)
-
-		// convert desired access mask to hex value and transform
-		// the access mask to a list of symbolical names
-		access := kevt.Kparams.MustGetUint32(kparams.DesiredAccess)
-		_ = kevt.Kparams.Set(kparams.DesiredAccess, toHex(access), kparams.AnsiString)
-
-		if kevt.Type == ktypes.OpenProcess {
-			kevt.Kparams.Append(kparams.DesiredAccessNames, kparams.Slice, process.DesiredAccess(access).Flags())
-		} else {
-			kevt.Kparams.Append(kparams.DesiredAccessNames, kparams.Slice, thread.DesiredAccess(access).Flags())
+			kevt.AppendParam(kparams.Exe, kparams.UnicodeString, proc.Exe)
+			kevt.AppendParam(kparams.ProcessName, kparams.UnicodeString, proc.Name)
 		}
 		return kevt, false, nil
 	}
 	return kevt, true, nil
+}
+
+func (ps psInterceptor) processEvent(kevt *kevent.Kevent) error {
+	cmndline, err := kevt.Kparams.GetString(kparams.Cmdline)
+	if err != nil {
+		return err
+	}
+	// if leading/trailing quotes are found in the executable path, get rid of them
+	args := cmdline.Split(cmndline)
+	if len(args) > 0 {
+		cmndline = cmdline.CleanExe(args)
+	}
+	// expand all variations of the SystemRoot env variable
+	if systemRootRegexp.MatchString(cmndline) {
+		cmndline = systemRootRegexp.ReplaceAllString(cmndline, os.Getenv("SystemRoot"))
+	}
+	// some system processes are reported without the path in the command line,
+	// but we can expand the path from the SystemRoot environment variable
+	if !driveRegexp.MatchString(cmndline) {
+		proc, _ := kevt.Kparams.GetString(kparams.ProcessName)
+		_, ok := sysProcs[proc]
+		if ok {
+			cmndline = filepath.Join(os.Getenv("SystemRoot"), "System32", cmndline)
+		}
+	}
+
+	// append executable path parameter
+	i := strings.Index(strings.ToLower(cmndline), ".exe")
+	if i > 0 {
+		exe := cmndline[0 : i+4]
+		kevt.AppendParam(kparams.Exe, kparams.UnicodeString, exe)
+	}
+	_ = kevt.Kparams.SetValue(kparams.Cmdline, cmndline)
+
+	// query process start time
+	if kevt.Type != ktypes.TerminateProcess {
+		pid, err := kevt.Kparams.GetPid()
+		if err == nil {
+			started, err := getStartTime(pid)
+			if err != nil {
+				started = kevt.Timestamp
+			}
+			kevt.AppendParam(kparams.StartTime, kparams.Time, started)
+		}
+	}
+	return nil
+}
+
+func (ps psInterceptor) scanProc(kevt *kevent.Kevent) {
+	if ps.yara != nil {
+		pid, err := kevt.Kparams.GetPid()
+		if err == nil {
+			go func() {
+				procYaraScans.Add(1)
+				err := ps.yara.ScanProc(pid, kevt)
+				if err != nil {
+					log.Warnf("unable to run yara scanner on pid %d: %v", pid, err)
+				}
+			}()
+		}
+	}
 }
 
 func (psInterceptor) Name() InterceptorType { return Ps }
@@ -221,5 +190,3 @@ func getStartTime(pid uint32) (time.Time, error) {
 	}
 	return started, nil
 }
-
-func toHex(desiredAccess uint32) string { return "0x" + strconv.FormatInt(int64(desiredAccess), 16) }

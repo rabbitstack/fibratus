@@ -29,29 +29,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/ports"
 )
 
-var (
-	remappedKtypes = map[ktypes.Ktype]ktypes.Ktype{
-		ktypes.AcceptTCPv4:     ktypes.Accept,
-		ktypes.AcceptTCPv6:     ktypes.Accept,
-		ktypes.ConnectTCPv4:    ktypes.Connect,
-		ktypes.ConnectTCPv6:    ktypes.Connect,
-		ktypes.ReconnectTCPv4:  ktypes.Reconnect,
-		ktypes.ReconnectTCPv6:  ktypes.Reconnect,
-		ktypes.RetransmitTCPv4: ktypes.Retransmit,
-		ktypes.RetransmitTCPv6: ktypes.Retransmit,
-		ktypes.DisconnectTCPv4: ktypes.Disconnect,
-		ktypes.DisconnectTCPv6: ktypes.Disconnect,
-		ktypes.SendTCPv4:       ktypes.Send,
-		ktypes.SendTCPv6:       ktypes.Send,
-		ktypes.SendUDPv4:       ktypes.Send,
-		ktypes.SendUDPv6:       ktypes.Send,
-		ktypes.RecvTCPv4:       ktypes.Recv,
-		ktypes.RecvTCPv6:       ktypes.Recv,
-		ktypes.RecvUDPv4:       ktypes.Recv,
-		ktypes.RecvUDPv6:       ktypes.Recv,
-	}
-)
-
 type netInterceptor struct {
 	reverseDNS *network.ReverseDNS
 }
@@ -95,7 +72,7 @@ func (n *netInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, e
 			kevt.Kparams.Append(kparams.NetSIPNames, kparams.Slice, names)
 		}
 
-		return remapKtype(kevt), false, nil
+		return kevt, false, nil
 	}
 	return kevt, true, nil
 }
@@ -135,12 +112,3 @@ func (n netInterceptor) resolvePortName(kevt *kevent.Kevent) *kevent.Kevent {
 
 func unwrapIP(ip net.IP, _ error) net.IP     { return ip }
 func unwrapPort(port uint16, _ error) uint16 { return port }
-
-func remapKtype(kevt *kevent.Kevent) *kevent.Kevent {
-	ktyp, ok := remappedKtypes[kevt.Type]
-	if !ok {
-		return kevt
-	}
-	kevt.Type = ktyp
-	return kevt
-}

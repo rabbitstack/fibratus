@@ -23,6 +23,7 @@ package process
 
 import (
 	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/syscall/thread"
 	"os"
 	"syscall"
 	"time"
@@ -112,31 +113,6 @@ func (access DesiredAccess) String() string {
 	default:
 		return "UNKNOWN"
 	}
-}
-
-const maxFlags = 0x2460
-
-// Flags converts the desired access mask to the slice of string values.
-func (access DesiredAccess) Flags() []string {
-	flags := make([]string, 0)
-	if access == AllAccess {
-		return []string{AllAccess.String()}
-	}
-	if (access & Terminate) != 0 {
-		flags = append(flags, Terminate.String())
-	}
-	if (access & CreateThread) != 0 {
-		flags = append(flags, CreateThread.String())
-	}
-	if (access & VMOperation) != 0 {
-		flags = append(flags, VMOperation.String())
-	}
-	for mask := VMRead; mask <= maxFlags; mask *= 2 {
-		if (access & mask) != 0 {
-			flags = append(flags, mask.String())
-		}
-	}
-	return flags
 }
 
 // InfoClassFlags defines the type for process's info class
@@ -239,8 +215,13 @@ func GetStartTime(handle handle.Handle) (time.Time, error) {
 }
 
 // GetPIDFromThread returns the pid to which the specified thread belongs.
-func GetPIDFromThread(handle handle.Handle) (uint32, error) {
-	pid, _, err := getProcessIDOfThread.Call(uintptr(handle))
+func GetPIDFromThread(tid uint32) (uint32, error) {
+	threadHandle, err := thread.Open(thread.QueryLimitedInformation, false, tid)
+	if err != nil {
+		return uint32(0), os.NewSyscallError("GetProcessIdOfThread", err)
+	}
+	defer threadHandle.Close()
+	pid, _, err := getProcessIDOfThread.Call(uintptr(threadHandle))
 	if pid == 0 {
 		return uint32(0), os.NewSyscallError("GetProcessIdOfThread", err)
 	}

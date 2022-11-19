@@ -117,7 +117,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 		if kevt.Category != ktypes.Process {
 			return nil, nil
 		}
-		return kevt.Kparams.GetString(kparams.Comm)
+		return kevt.Kparams.GetString(kparams.Cmdline)
 	case fields.PsExe:
 		ps := kevt.PS
 		if ps == nil {
@@ -139,7 +139,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 		if kevt.Category != ktypes.Process {
 			return nil, nil
 		}
-		cmndline, err := kevt.Kparams.GetString(kparams.Comm)
+		cmndline, err := kevt.Kparams.GetString(kparams.Cmdline)
 		if err != nil {
 			return nil, err
 		}
@@ -548,7 +548,7 @@ func (t *threadAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value
 		}
 		return v.String(), nil
 	case fields.ThreadEntrypoint:
-		v, err := kevt.Kparams.GetHex(kparams.ThreadEntrypoint)
+		v, err := kevt.Kparams.GetHex(kparams.StartAddr)
 		if err != nil {
 			return nil, err
 		}
@@ -594,7 +594,7 @@ func (l *fileAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, 
 	case fields.FileIOSize:
 		return kevt.Kparams.GetUint32(kparams.FileIoSize)
 	case fields.FileShareMask:
-		m, err := kevt.Kparams.Get(kparams.FileShareMask)
+		m, err := kevt.Kparams.GetRaw(kparams.FileShareMask)
 		if err != nil {
 			return nil, err
 		}
@@ -604,7 +604,7 @@ func (l *fileAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, 
 		}
 		return mode.String(), nil
 	case fields.FileOperation:
-		op, err := kevt.Kparams.Get(kparams.FileOperation)
+		op, err := kevt.Kparams.GetRaw(kparams.FileOperation)
 		if err != nil {
 			return nil, err
 		}
@@ -739,7 +739,7 @@ func (n *networkAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Valu
 	case fields.NetSportName:
 		return kevt.Kparams.GetString(kparams.NetSportName)
 	case fields.NetL4Proto:
-		v, err := kevt.Kparams.Get(kparams.NetL4Proto)
+		v, err := kevt.Kparams.GetRaw(kparams.NetL4Proto)
 		if err != nil {
 			return nil, err
 		}

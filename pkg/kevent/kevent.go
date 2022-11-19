@@ -20,14 +20,13 @@ package kevent
 
 import (
 	"fmt"
+	kcapver "github.com/rabbitstack/fibratus/pkg/kcap/version"
+	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"strings"
 	"sync"
 	"time"
-
-	kcapver "github.com/rabbitstack/fibratus/pkg/kcap/version"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
-	"github.com/rabbitstack/fibratus/pkg/util/hostname"
 )
 
 // pool is used to alleviate the pressure on the heap allocator
@@ -158,27 +157,7 @@ func (kevt *Kevent) String() string {
 	)
 }
 
-// New constructs a new kernel event instance.
-func New(seq uint64, pid, tid uint32, cpu uint8, ktype ktypes.Ktype, ts time.Time, kpars Kparams) *Kevent {
-	kevt := pool.Get().(*Kevent)
-	*kevt = Kevent{
-		Seq:         seq,
-		PID:         pid,
-		Tid:         tid,
-		CPU:         cpu,
-		Type:        ktype,
-		Category:    ktype.Category(),
-		Name:        ktype.String(),
-		Description: ktype.Description(),
-		Timestamp:   ts,
-		Kparams:     kpars,
-		Metadata:    make(map[MetadataKey]string),
-		Host:        hostname.Get(),
-	}
-	return kevt
-}
-
-// Empty return a pristine kernel event instance.
+// Empty return a pristine event instance.
 func Empty() *Kevent {
 	return &Kevent{
 		Kparams:  map[string]*Kparam{},
@@ -202,6 +181,22 @@ func NewFromKcap(buf []byte) (*Kevent, error) {
 // AddMeta appends a key/value pair to event's metadata.
 func (kevt *Kevent) AddMeta(k MetadataKey, v string) {
 	kevt.Metadata[k] = v
+}
+
+// AppendParam adds a new parameter to this event.
+func (kevt *Kevent) AppendParam(name string, typ kparams.Type, value kparams.Value, opts ...ParamOption) {
+	kevt.Kparams.Append(name, typ, value, opts...)
+}
+
+// GetParamAsString returns the specified parameter value as string.
+// Returns an empty string if the given parameter name is not found
+// in event paramters.
+func (kevt *Kevent) GetParamAsString(name string) string {
+	par, err := kevt.Kparams.Get(name)
+	if err != nil {
+		return ""
+	}
+	return par.String()
 }
 
 // Release returns an event to the pool.

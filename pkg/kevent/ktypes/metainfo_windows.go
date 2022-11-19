@@ -20,14 +20,14 @@ package ktypes
 
 import "sort"
 
-// KeventInfo describes the kernel event meta info such as human readable name, category
+// KeventInfo describes the kernel event meta info such as human-readable name, category
 // and event's description.
 type KeventInfo struct {
-	// Name is the human-readable representation of the kernel event (e.g. CreateProcess, DeleteFile).
+	// Name is the human-readable representation of the event (e.g. CreateProcess, DeleteFile).
 	Name string
-	// Category designates the category to which kernel event pertains. (e.g. process, net)
+	// Category designates the category to which event pertains. (e.g. process, net)
 	Category Category
-	// Description is the short explanation that describes the purpose of the kernel event.
+	// Description is the short explanation that describes the purpose of the event.
 	Description string
 }
 
@@ -48,18 +48,30 @@ var kevents = map[Ktype]KeventInfo{
 	EnumDirectory:      {"EnumDirectory", File, "Enumerates a directory or dispatches a directory change notification to registered listeners"},
 	RegCreateKey:       {"RegCreateKey", Registry, "Creates a registry key or opens it if the key already exists"},
 	RegOpenKey:         {"RegOpenKey", Registry, "Opens the registry key"},
+	RegCloseKey:        {"RegCloseKey", Registry, "Closes the registry key"},
 	RegSetValue:        {"RegSetValue", Registry, "Sets the data for the value of a registry key"},
 	RegQueryValue:      {"RegQueryValue", Registry, "Reads the data for the value of a registry key"},
 	RegQueryKey:        {"RegQueryKey", Registry, "Enumerates subkeys of the parent key"},
 	RegDeleteKey:       {"RegDeleteKey", Registry, "Removes the registry key"},
 	RegDeleteValue:     {"RegDeleteValue", Registry, "Removes the registry value"},
-	Accept:             {"Accept", Net, "Accepts the connection request from the socket queue"},
-	Send:               {"Send", Net, "Sends data over the wire"},
-	Recv:               {"Recv", Net, "Receives data from the socket"},
-	Connect:            {"Connect", Net, "Connects establishes a connection to the socket"},
-	Disconnect:         {"Disconnect", Net, "Terminates data reception on the socket"},
-	Reconnect:          {"Reconnect", Net, "Reconnects to the socket"},
-	Retransmit:         {"Retransmit", Net, "Retransmits unacknowledged TCP segments"},
+	AcceptTCPv4:        {"Accept", Net, "Accepts the connection request from the socket queue"},
+	AcceptTCPv6:        {"Accept", Net, "Accepts the connection request from the socket queue"},
+	SendTCPv4:          {"Send", Net, "Sends data over the wire"},
+	SendTCPv6:          {"Send", Net, "Sends data over the wire"},
+	SendUDPv4:          {"Send", Net, "Sends data over the wire"},
+	SendUDPv6:          {"Send", Net, "Sends data over the wire"},
+	RecvTCPv4:          {"Recv", Net, "Receives data from the socket"},
+	RecvTCPv6:          {"Recv", Net, "Receives data from the socket"},
+	RecvUDPv4:          {"Recv", Net, "Receives data from the socket"},
+	RecvUDPv6:          {"Recv", Net, "Receives data from the socket"},
+	ConnectTCPv4:       {"Connect", Net, "Connects establishes a connection to the socket"},
+	ConnectTCPv6:       {"Connect", Net, "Connects establishes a connection to the socket"},
+	DisconnectTCPv4:    {"Disconnect", Net, "Terminates data reception on the socket"},
+	DisconnectTCPv6:    {"Disconnect", Net, "Terminates data reception on the socket"},
+	ReconnectTCPv4:     {"Reconnect", Net, "Reconnects to the socket"},
+	ReconnectTCPv6:     {"Reconnect", Net, "Reconnects to the socket"},
+	RetransmitTCPv4:    {"Retransmit", Net, "Retransmits unacknowledged TCP segments"},
+	RetransmitTCPv6:    {"Retransmit", Net, "Retransmits unacknowledged TCP segments"},
 	LoadImage:          {"LoadImage", Image, "Loads the module into the address space of the calling process"},
 	UnloadImage:        {"UnloadImage", Image, "Unloads the module from the address space of the calling process"},
 	CreateHandle:       {"CreateHandle", Handle, "Creates a new handle"},
@@ -91,52 +103,27 @@ var ktypes = map[string]Ktype{
 	"RegQueryKey":        RegQueryKey,
 	"RegDeleteKey":       RegDeleteKey,
 	"RegDeleteValue":     RegDeleteValue,
-	"Accept":             Accept,
-	"Send":               Send,
-	"Recv":               Recv,
-	"Connect":            Connect,
-	"Reconnect":          Reconnect,
-	"Disconnect":         Disconnect,
-	"Retransmit":         Retransmit,
-	"CreateHandle":       CreateHandle,
-	"CloseHandle":        CloseHandle,
-	"LoadDriver":         LoadDriver,
+	//"Accept":             Accept,
+	//"Send":               Send,
+	//"Recv":               Recv,
+	//"Connect":            Connect,
+	//"Reconnect":          Reconnect,
+	//"Disconnect":         Disconnect,
+	//"Retransmit":         Retransmit,
+	"CreateHandle": CreateHandle,
+	"CloseHandle":  CloseHandle,
+	"LoadDriver":   LoadDriver,
 }
 
-// KtypeToKeventInfo maps the kernel event type to a structure that stores detailed information about the event.
+// KtypeToKeventInfo maps the event type to the structure storing detailed information about the event.
 func KtypeToKeventInfo(ktype Ktype) KeventInfo {
-	if ktype == RegOpenKeyV1 {
-		return kevents[RegOpenKey]
-	}
-	if ktype == AcceptTCPv4 || ktype == AcceptTCPv6 {
-		return kevents[Accept]
-	}
-	if ktype == ConnectTCPv4 || ktype == ConnectTCPv6 {
-		return kevents[Connect]
-	}
-	if ktype == ReconnectTCPv4 || ktype == ReconnectTCPv6 {
-		return kevents[Reconnect]
-	}
-	if ktype == RetransmitTCPv4 || ktype == RetransmitTCPv6 {
-		return kevents[Retransmit]
-	}
-	if ktype == DisconnectTCPv4 || ktype == DisconnectTCPv6 {
-		return kevents[Disconnect]
-	}
-	if ktype == SendTCPv4 || ktype == SendTCPv6 || ktype == SendUDPv4 || ktype == SendUDPv6 {
-		return kevents[Send]
-	}
-	if ktype == RecvTCPv4 || ktype == RecvTCPv6 || ktype == RecvUDPv4 || ktype == RecvUDPv6 {
-		return kevents[Recv]
-	}
-
 	if kinfo, ok := kevents[ktype]; ok {
 		return kinfo
 	}
 	return KeventInfo{Name: "N/A", Category: Unknown}
 }
 
-// KeventNameToKtype converts a human-readable kernel event name to its internal kernel type representation.
+// KeventNameToKtype converts a human-readable event name to its internal type representation.
 func KeventNameToKtype(name string) Ktype {
 	if ktype, ok := ktypes[name]; ok {
 		return ktype
@@ -144,10 +131,15 @@ func KeventNameToKtype(name string) Ktype {
 	return UnknownKtype
 }
 
-// GetKtypesMeta returns kernel event types metadata.
+// GetKtypesMeta returns event types metadata.
 func GetKtypesMeta() []KeventInfo {
 	ktypes := make([]KeventInfo, 0, len(kevents))
 	for _, ktyp := range kevents {
+		for _, typ := range ktypes {
+			if typ.Name == ktyp.Name {
+				continue
+			}
+		}
 		ktypes = append(ktypes, ktyp)
 	}
 	sort.Slice(ktypes, func(i, j int) bool { return ktypes[i].Category < ktypes[j].Category })

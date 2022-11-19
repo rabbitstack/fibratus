@@ -59,6 +59,16 @@ func (fd FileDisposition) String() string {
 	}
 }
 
+// FileCreateDispositions is the mapping between the file create disposition and its symbolical name.
+var FileCreateDispositions = map[uint32]string{
+	uint32(Supersede):   "SUPERSEDE",
+	uint32(Open):        "OPEN",
+	uint32(Create):      "CREATE",
+	uint32(OpenIf):      "OPEN_IF",
+	uint32(Overwrite):   "OVERWRITE",
+	uint32(OverwriteIf): "OVERWRITE_IF",
+}
+
 // FileType is the the type alias for the file type
 type FileType uint8
 

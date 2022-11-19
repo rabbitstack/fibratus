@@ -25,7 +25,7 @@ package fs
 type FileAttr uint32
 
 const (
-	// FileReadOnly reprsents file that is read-only. Processes can read the file, but cannot write to it or delete it.
+	// FileReadOnly represents file that is read-only. Processes can read the file, but cannot write to it or delete it.
 	// This attribute is not honored on directories.
 	FileReadOnly FileAttr = 0x00000001
 	// FileHidden designates a file or directory that is hidden, i.e. it is not included in an ordinary directory listing.
@@ -129,77 +129,4 @@ func (fa FileAttr) String() string {
 	default:
 		return "unknown"
 	}
-}
-
-// FileAttributes returns all the attributes present in the bitmask.
-func FileAttributes(b uint32) []FileAttr {
-	fa := make([]FileAttr, 0)
-	a := FileAttr(b)
-	if a&FileReadOnly != 0 {
-		fa = append(fa, FileReadOnly)
-	}
-	if a&FileHidden != 0 {
-		fa = append(fa, FileHidden)
-	}
-	if a&FileSystem != 0 {
-		fa = append(fa, FileSystem)
-	}
-	if a&FileOldDosVolID != 0 {
-		fa = append(fa, FileOldDosVolID)
-	}
-	if a&FileDirectory != 0 {
-		fa = append(fa, FileDirectory)
-	}
-	if a&FileArchive != 0 {
-		fa = append(fa, FileArchive)
-	}
-	if a&FileCompressed != 0 {
-		fa = append(fa, FileCompressed)
-	}
-	if a&FileEncrypted != 0 {
-		fa = append(fa, FileEncrypted)
-	}
-	if a&FileReparsePoint != 0 {
-		fa = append(fa, FileReparsePoint)
-	}
-	if a&FileSparse != 0 {
-		fa = append(fa, FileSparse)
-	}
-	if a&FileTemporary != 0 {
-		fa = append(fa, FileTemporary)
-	}
-	if a&FileDevice != 0 {
-		fa = append(fa, FileDevice)
-	}
-	if a&FileNormal != 0 {
-		fa = append(fa, FileNormal)
-	}
-	if a&FileOffline != 0 {
-		fa = append(fa, FileOffline)
-	}
-	if a&FileNotContentIndexed != 0 {
-		fa = append(fa, FileNotContentIndexed)
-	}
-	if a&FileIntegrityStream != 0 {
-		fa = append(fa, FileIntegrityStream)
-	}
-	if a&FileVirtual != 0 {
-		fa = append(fa, FileVirtual)
-	}
-	if a&FileNoScrubData != 0 {
-		fa = append(fa, FileNoScrubData)
-	}
-	if a&FileRecallOpen != 0 {
-		fa = append(fa, FileRecallOpen)
-	}
-	if a&FileRecallAccess != 0 {
-		fa = append(fa, FileRecallAccess)
-	}
-	if a&FilePinned != 0 {
-		fa = append(fa, FilePinned)
-	}
-	if a&FileUnpinned != 0 {
-		fa = append(fa, FileUnpinned)
-	}
-	return fa
 }

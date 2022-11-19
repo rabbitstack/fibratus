@@ -100,40 +100,6 @@ func (access DesiredAccess) String() string {
 	}
 }
 
-const maxFlags = 0x1800
-
-// Flags returns a list of thread access right flags.
-func (access DesiredAccess) Flags() []string {
-	flags := make([]string, 0)
-	if access == AllAccess {
-		return []string{AllAccess.String()}
-	}
-	if (access & TerminateThread) != 0 {
-		flags = append(flags, TerminateThread.String())
-	}
-	if (access & SuspendResume) != 0 {
-		flags = append(flags, SuspendResume.String())
-	}
-	if (access & GetContext) != 0 {
-		flags = append(flags, GetContext.String())
-	}
-	if (access & SetInformation) != 0 {
-		flags = append(flags, SetInformation.String())
-	}
-	if (access & QueryInformation) != 0 {
-		flags = append(flags, QueryInformation.String())
-	}
-	if (access & SetThreadToken) != 0 {
-		flags = append(flags, SetThreadToken.String())
-	}
-	for mask := Impersonate; mask <= maxFlags; mask *= 2 {
-		if (access & mask) != 0 {
-			flags = append(flags, mask.String())
-		}
-	}
-	return flags
-}
-
 // Open opens an existing thread object.
 func Open(access DesiredAccess, inheritHandle bool, threadID uint32) (handle.Handle, error) {
 	var inherit uint8

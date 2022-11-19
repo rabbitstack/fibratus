@@ -1,8 +1,5 @@
-//go:build windows
-// +build windows
-
 /*
- * Copyright 2020-2021 by Nedim Sabic Sabic
+ * Copyright 2021-2022 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -19,15 +16,25 @@
  * limitations under the License.
  */
 
-package kparams
+package kevent
 
-import (
-	"github.com/stretchr/testify/require"
-	"testing"
-)
+import "testing"
 
-func TestSizeOf(t *testing.T) {
-	require.Equal(t, uint32(4), SizeOf(ProcessID))
-	require.Equal(t, uint32(8), SizeOf(RegKeyHandle))
-	require.Equal(t, uint32(0), SizeOf(ProcessName))
+func TestParamFlags(t *testing.T) {
+	var tests = []struct {
+		flag     uint32
+		flags    ParamFlags
+		expected string
+	}{
+		{0x1fffff, PsAccessRightFlags, "ALL_ACCESS"},
+		{0x1400, PsAccessRightFlags, "QUERY_INFORMATION|QUERY_LIMITED_INFORMATION"},
+		{0x1800, ThreadAccessRightFlags, "QUERY_LIMITED_INFORMATION"},
+	}
+
+	for i, tt := range tests {
+		s := tt.flags.String(tt.flag)
+		if s != tt.expected {
+			t.Errorf("%d. %q flag mismatch: exp=%s got=%s", i, tt.expected, tt.expected, s)
+		}
+	}
 }

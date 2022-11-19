@@ -23,16 +23,48 @@ import (
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/syscall/etw"
+	"github.com/rabbitstack/fibratus/pkg/util/filetime"
 	"github.com/rabbitstack/fibratus/pkg/util/hashers"
+	"github.com/rabbitstack/fibratus/pkg/util/hostname"
 	"strings"
+	"unsafe"
 )
 
-// IsNetworkTCP determines whether the kevent pertains to network TCP events.
-func (kevt Kevent) IsNetworkTCP() bool {
-	return kevt.Category == ktypes.Net && kevt.Type != ktypes.RecvUDPv4 && kevt.Type != ktypes.RecvUDPv6 && kevt.Type != ktypes.SendUDPv4 && kevt.Type != ktypes.SendUDPv6
+// New constructs a fresh event instance with basic fields and parameters.
+func New(seq uint64, ktype ktypes.Ktype, evt *etw.EventRecord) *Kevent {
+	var (
+		pid = evt.Header.ProcessID
+		tid = evt.Header.ThreadID
+		cpu = *(*uint8)(unsafe.Pointer(&evt.BufferContext.ProcessorIndex[0]))
+		ts  = filetime.ToEpoch(evt.Header.Timestamp)
+	)
+	kevt := pool.Get().(*Kevent)
+	*kevt = Kevent{
+		Seq:         seq,
+		PID:         pid,
+		Tid:         tid,
+		CPU:         cpu,
+		Type:        ktype,
+		Category:    ktype.Category(),
+		Name:        ktype.String(),
+		Kparams:     make(map[string]*Kparam),
+		Description: ktype.Description(),
+		Timestamp:   ts,
+		Metadata:    make(map[MetadataKey]string),
+		Host:        hostname.Get(),
+	}
+	kevt.produceParams(evt)
+	return kevt
 }
 
-// IsNetworkUDP determines whether the kevent pertains to network UDP events.
+// IsNetworkTCP determines whether the event pertains to network TCP events.
+func (kevt Kevent) IsNetworkTCP() bool {
+	return kevt.Category == ktypes.Net && kevt.Type != ktypes.RecvUDPv4 && kevt.Type != ktypes.RecvUDPv6 &&
+		kevt.Type != ktypes.SendUDPv4 && kevt.Type != ktypes.SendUDPv6
+}
+
+// IsNetworkUDP determines whether the event pertains to network UDP events.
 func (kevt Kevent) IsNetworkUDP() bool {
 	return kevt.Type == ktypes.RecvUDPv4 || kevt.Type == ktypes.RecvUDPv6 || kevt.Type == ktypes.SendUDPv4 || kevt.Type == ktypes.SendUDPv6
 }
@@ -150,12 +182,12 @@ func (kevt *Kevent) Summary() string {
 			exe, strings.Join(access, "|")))
 	case ktypes.CreateThread:
 		tid, _ := kevt.Kparams.GetTid()
-		addr, _ := kevt.Kparams.GetHex(kparams.ThreadEntrypoint)
+		addr, _ := kevt.Kparams.GetHex(kparams.StartAddr)
 		return printSummary(kevt, fmt.Sprintf("spawned a new thread with <code>%d</code> id at <code>%s</code> address",
 			tid, addr))
 	case ktypes.TerminateThread:
 		tid, _ := kevt.Kparams.GetTid()
-		addr, _ := kevt.Kparams.GetHex(kparams.ThreadEntrypoint)
+		addr, _ := kevt.Kparams.GetHex(kparams.StartAddr)
 		return printSummary(kevt, fmt.Sprintf("terminated a thread with <code>%d</code> id at <code>%s</code> address",
 			tid, addr))
 	case ktypes.OpenThread:

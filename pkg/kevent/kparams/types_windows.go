@@ -151,6 +151,18 @@ const (
 	Map
 	// Object is the generic object
 	Object
+	// FileDosPath represents the file system path in DOS device notation
+	FileDosPath
+	// FilePath represents the file system path with normalized drive letter notation
+	FilePath
+	// FileClass represents the file information class
+	FileClass
+	// Status represents the system error code message
+	Status
+	// Key represents the registry key
+	Key
+	Flags
+	Address
 	// Unknown represent an unknown parameter type
 	Unknown
 )

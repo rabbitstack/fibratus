@@ -186,7 +186,7 @@ func (kevt *Kevent) MarshalRaw() []byte {
 	}
 
 	// write process state
-	if kevt.PS != nil && (kevt.Type == ktypes.CreateProcess || kevt.Type == ktypes.EnumProcess) {
+	if kevt.PS != nil && (kevt.Type == ktypes.CreateProcess || kevt.Type == ktypes.ProcessRundown) {
 		buf := kevt.PS.Marshal()
 		sec := section.New(section.Process, kcapver.ProcessSecV1, 0, uint32(len(buf)))
 		b = append(b, sec[:]...)
