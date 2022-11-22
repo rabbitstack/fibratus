@@ -19,10 +19,11 @@
  * limitations under the License.
  */
 
-package handle
+package key
 
 import (
 	"expvar"
+	reg "golang.org/x/sys/windows/registry"
 	"strings"
 	"sync"
 
@@ -42,6 +43,16 @@ const (
 	hive = "\\REGISTRY\\A"
 )
 
+// RegistryValueTypes enumerate all possible registry value types.
+var RegistryValueTypes = map[uint32]string{
+	reg.DWORD:     "REG_DWORD",
+	reg.QWORD:     "REG_QWORD",
+	reg.SZ:        "REG_SZ",
+	reg.EXPAND_SZ: "REG_EXPAND_SZ",
+	reg.MULTI_SZ:  "REG_MULTI_SZ",
+	reg.BINARY:    "REG_BINARY",
+}
+
 var (
 	keys = make([]string, 0)
 	mux  sync.Mutex
@@ -51,8 +62,8 @@ var (
 	lookupSids = security.LookupAllSids
 )
 
-// FormatKey produces a root,key tuple from registry native key name.
-func FormatKey(key string) (registry.Key, string) {
+// Format produces a root,key tuple from registry native key name.
+func Format(key string) (registry.Key, string) {
 	for _, p := range hklmPrefixes {
 		if strings.HasPrefix(key, p) {
 			return registry.LocalMachine, subkey(key, p)

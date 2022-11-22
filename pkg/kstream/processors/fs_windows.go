@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package interceptors
+package processors
 
 import (
 	"expvar"
@@ -40,7 +40,7 @@ var (
 	fileReleaseCount     = expvar.NewInt("fs.file.releases")
 )
 
-type fsInterceptor struct {
+type fsProcessor struct {
 	// files stores the file metadata indexed by file object
 	files map[uint64]*fileInfo
 	mux   sync.Mutex
@@ -54,8 +54,8 @@ type fileInfo struct {
 	typ  fs.FileType
 }
 
-func newFsInterceptor(hsnap handle.Snapshotter) KstreamInterceptor {
-	interceptor := &fsInterceptor{
+func newFsProcessor(hsnap handle.Snapshotter) Processor {
+	interceptor := &fsProcessor{
 		files:          make(map[uint64]*fileInfo),
 		pendingKevents: make(map[uint64]*kevent.Kevent),
 		hsnap:          hsnap,
@@ -63,26 +63,26 @@ func newFsInterceptor(hsnap handle.Snapshotter) KstreamInterceptor {
 	return interceptor
 }
 
-func (f *fsInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, error) {
+func (f *fsProcessor) ProcessEvent(kevt *kevent.Kevent) (*kevent.Kevent, bool, error) {
 	if kevt.Category == ktypes.File {
 		return kevt, false, f.processEvent(kevt)
 	}
 	return kevt, true, nil
 }
 
-func (*fsInterceptor) Name() InterceptorType { return Fs }
-func (f *fsInterceptor) Close()              {}
+func (*fsProcessor) Name() ProcessorType { return Fs }
+func (f *fsProcessor) Close()            {}
 
-func (f *fsInterceptor) getFileInfo(name string, opts uint32) *fileInfo {
+func (f *fsProcessor) getFileInfo(name string, opts uint32) *fileInfo {
 	return &fileInfo{name: name, typ: fs.GetFileType(name, opts)}
 }
 
-func (f *fsInterceptor) processEvent(kevt *kevent.Kevent) error {
+func (f *fsProcessor) processEvent(kevt *kevent.Kevent) error {
 	fobj, err := kevt.Kparams.GetUint64(kparams.FileObject)
 	if err != nil && kevt.Type != ktypes.FileOpEnd {
 		return err
 	}
-	// we'll update event's thread identifier with the one
+	// update event's thread identifier with the one
 	// that's involved in the file system operation
 	kevt.Tid, _ = kevt.Kparams.GetTid()
 
@@ -123,11 +123,11 @@ func (f *fsInterceptor) processEvent(kevt *kevent.Kevent) error {
 		if !ok {
 			return kerrors.ErrCancelUpstreamKevent
 		}
-		// resolve the status of the file operation
 		status, err := kevt.Kparams.GetUint32(kparams.NTStatus)
 		if err == nil {
 			fkevt.AppendParam(kparams.NTStatus, kparams.Status, status)
 		}
+		kevt = fkevt
 		delete(f.pendingKevents, irp)
 
 		// append file create disposition
@@ -226,7 +226,7 @@ func (f *fsInterceptor) processEvent(kevt *kevent.Kevent) error {
 	return nil
 }
 
-func (f *fsInterceptor) findDirHandle(fobj uint64) fs.FileType {
+func (f *fsProcessor) findDirHandle(fobj uint64) fs.FileType {
 	fhandle, ok := f.hsnap.FindByObject(fobj)
 	if !ok || fhandle.Type != handle.File {
 		return fs.Unknown

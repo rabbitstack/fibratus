@@ -33,6 +33,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/syscall/object"
 	"github.com/rabbitstack/fibratus/pkg/syscall/process"
 	"github.com/rabbitstack/fibratus/pkg/syscall/registry"
+	"github.com/rabbitstack/fibratus/pkg/util/key"
 	"github.com/rabbitstack/fibratus/pkg/util/typesize"
 	"os"
 	"sort"
@@ -216,15 +217,14 @@ func QueryName(handle handle.Handle, typ string, withTimeout bool) (string, htyp
 		}
 		switch typ {
 		case Key:
-			key, subkey := FormatKey(name)
-			rootKey := key.String()
-			if key == registry.InvalidKey {
+			rootKey, subkey := key.Format(name)
+			if rootKey == registry.InvalidKey {
 				return name, nil, nil
 			}
 			if subkey != "" {
-				return rootKey + "\\" + subkey, nil, nil
+				return rootKey.String() + "\\" + subkey, nil, nil
 			}
-			return key.String(), nil, nil
+			return rootKey.String(), nil, nil
 		default:
 			return name, nil, nil
 		}

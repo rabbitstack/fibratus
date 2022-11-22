@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package interceptors
+package processors
 
 import (
 	"net"
@@ -29,29 +29,24 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/ports"
 )
 
-type netInterceptor struct {
+type netProcessor struct {
 	reverseDNS *network.ReverseDNS
 }
 
-// newNetInterceptor creates a new instance of the network kernel stream interceptor.
-func newNetInterceptor() KstreamInterceptor {
-	return &netInterceptor{
+// newNetProcessor creates a new instance of the network event interceptor.
+func newNetProcessor() Processor {
+	return &netProcessor{
 		reverseDNS: network.NewReverseDNS(2000, time.Minute*30, time.Minute*2),
 	}
 }
 
-func (netInterceptor) Name() InterceptorType {
-	return Net
-}
+func (netProcessor) Name() ProcessorType { return Net }
 
-func (n netInterceptor) Close() {
+func (n netProcessor) Close() {
 	n.reverseDNS.Close()
 }
 
-// Intercept overrides the kernel event type according to the transport layer
-// and/or IP protocol version. At this point we also append the port names for all
-// network kernel events and perform reverse DNS lookups to obtain the domain names.
-func (n *netInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, error) {
+func (n *netProcessor) ProcessEvent(kevt *kevent.Kevent) (*kevent.Kevent, bool, error) {
 	if kevt.Category == ktypes.Net {
 		if kevt.IsNetworkTCP() {
 			kevt.Kparams.Append(kparams.NetL4Proto, kparams.Enum, network.TCP)
@@ -77,7 +72,7 @@ func (n *netInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, e
 	return kevt, true, nil
 }
 
-func (n *netInterceptor) resolveNamesForIP(ip net.IP) []string {
+func (n *netProcessor) resolveNamesForIP(ip net.IP) []string {
 	names, err := n.reverseDNS.Add(network.AddressFromIP(ip))
 	if err != nil {
 		return nil
@@ -87,7 +82,7 @@ func (n *netInterceptor) resolveNamesForIP(ip net.IP) []string {
 
 // resolvePortName resolves the IANA service name for the particular port and transport protocol as
 // per https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.xhtml.
-func (n netInterceptor) resolvePortName(kevt *kevent.Kevent) *kevent.Kevent {
+func (n netProcessor) resolvePortName(kevt *kevent.Kevent) *kevent.Kevent {
 	dport := unwrapPort(kevt.Kparams.GetUint16(kparams.NetDport))
 	sport := unwrapPort(kevt.Kparams.GetUint16(kparams.NetSport))
 

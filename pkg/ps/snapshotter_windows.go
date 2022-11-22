@@ -36,7 +36,6 @@ import (
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	hndl "github.com/rabbitstack/fibratus/pkg/syscall/handle"
 	"github.com/rabbitstack/fibratus/pkg/syscall/process"
-	t "github.com/rabbitstack/fibratus/pkg/syscall/thread"
 	"github.com/rabbitstack/fibratus/pkg/syscall/winerrno"
 	log "github.com/sirupsen/logrus"
 )
@@ -105,7 +104,7 @@ func (s *snapshotter) WriteFromKcap(kevt *kevent.Kevent) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	switch kevt.Type {
-	case ktypes.CreateProcess, ktypes.EnumProcess:
+	case ktypes.CreateProcess, ktypes.ProcessRundown:
 		ps := kevt.PS
 		if ps == nil {
 			return nil
@@ -114,7 +113,7 @@ func (s *snapshotter) WriteFromKcap(kevt *kevent.Kevent) error {
 		if err != nil {
 			return err
 		}
-		if kevt.Type == ktypes.EnumProcess {
+		if kevt.Type == ktypes.ProcessRundown {
 			// invalid process
 			if ps.PID == ps.Ppid {
 				return nil
@@ -128,7 +127,7 @@ func (s *snapshotter) WriteFromKcap(kevt *kevent.Kevent) error {
 			return err
 		}
 		ps.Parent = s.procs[ppid]
-	case ktypes.CreateThread, ktypes.EnumThread:
+	case ktypes.CreateThread, ktypes.ThreadRundown:
 		pid, err := kevt.Kparams.GetPid()
 		if err != nil {
 			return err
@@ -139,7 +138,7 @@ func (s *snapshotter) WriteFromKcap(kevt *kevent.Kevent) error {
 			ps.AddThread(thread)
 			ps.Parent = s.procs[ps.Ppid]
 		}
-	case ktypes.LoadImage, ktypes.EnumImage:
+	case ktypes.LoadImage, ktypes.ImageRundown:
 		pid, err := kevt.Kparams.GetPid()
 		if err != nil {
 			return err
@@ -158,7 +157,7 @@ func (s *snapshotter) Write(kevt *kevent.Kevent) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	switch kevt.Type {
-	case ktypes.CreateProcess, ktypes.EnumProcess:
+	case ktypes.CreateProcess, ktypes.ProcessRundown:
 		pid, err := kevt.Kparams.GetPid()
 		if err != nil {
 			return err
@@ -227,7 +226,7 @@ func (s *snapshotter) Write(kevt *kevent.Kevent) error {
 		}
 
 		s.procs[pid] = ps
-	case ktypes.CreateThread, ktypes.EnumThread:
+	case ktypes.CreateThread, ktypes.ThreadRundown:
 		pid, err := kevt.Kparams.GetPid()
 		if err != nil {
 			return err
@@ -258,7 +257,7 @@ func (s *snapshotter) Write(kevt *kevent.Kevent) error {
 		ps.Parent = s.procs[ps.Ppid]
 
 		s.procs[pid] = ps
-	case ktypes.LoadImage, ktypes.EnumImage:
+	case ktypes.LoadImage, ktypes.ImageRundown:
 		pid, err := kevt.Kparams.GetPid()
 		if err != nil {
 			return err
@@ -314,12 +313,7 @@ func (s *snapshotter) gcDeadProcesses() {
 }
 
 func pidFromThreadID(tid uint32) uint32 {
-	h, err := t.Open(t.QueryLimitedInformation, false, tid)
-	if err != nil {
-		return winerrno.InvalidPID
-	}
-	defer h.Close()
-	pid, err := process.GetPIDFromThread(h)
+	pid, err := process.GetPIDFromThread(tid)
 	if err != nil {
 		return winerrno.InvalidPID
 	}
@@ -505,7 +499,7 @@ func (s *snapshotter) Size() uint32 {
 func unwrapParams(pid uint32, kevt *kevent.Kevent) (uint32, uint32, string, string, string, string, uint8) {
 	ppid, _ := kevt.Kparams.GetPpid()
 	name, _ := kevt.Kparams.GetString(kparams.ProcessName)
-	comm, _ := kevt.Kparams.GetString(kparams.Comm)
+	comm, _ := kevt.Kparams.GetString(kparams.Cmdline)
 	exe, _ := kevt.Kparams.GetString(kparams.Exe)
 	sid, _ := kevt.Kparams.GetString(kparams.UserSID)
 	sessionID, _ := kevt.Kparams.GetUint32(kparams.SessionID)
@@ -522,7 +516,7 @@ func unwrapThreadParams(pid uint32, kevt *kevent.Kevent) (uint32, uint32, kparam
 	ioPrio, _ := kevt.Kparams.GetUint8(kparams.IOPrio)
 	basePrio, _ := kevt.Kparams.GetUint8(kparams.BasePrio)
 	pagePrio, _ := kevt.Kparams.GetUint8(kparams.PagePrio)
-	entrypoint, _ := kevt.Kparams.GetHex(kparams.ThreadEntrypoint)
+	entrypoint, _ := kevt.Kparams.GetHex(kparams.StartAddr)
 
 	return pid, tid, ustackBase, ustackLimit, kstackBase, kstackLimit, ioPrio, basePrio, pagePrio, entrypoint
 }

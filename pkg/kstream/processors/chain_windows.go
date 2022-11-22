@@ -16,11 +16,9 @@
  * limitations under the License.
  */
 
-package interceptors
+package processors
 
 import (
-	"expvar"
-
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/handle"
@@ -30,32 +28,23 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// EnqueueKeventCallback is the type definition for the event enqueue callback function
-type EnqueueKeventCallback func(kevent *kevent.Kevent) error
-
-// deferredEnqueued counts the number of deferred events
-var deferredEnqueued = expvar.NewInt("kstream.deferred.kevents.enqueued")
-
 type chain struct {
-	interceptors  []KstreamInterceptor
+	processors    []Processor
 	deferredKevts chan *kevent.Kevent
 	psnapshotter  ps.Snapshotter
-	cb            EnqueueKeventCallback
 }
 
-// NewChain constructs the interceptor chain. It arranges all the interceptors
+// NewChain constructs the processor chain. It arranges all the processors
 // according to enabled kernel event categories.
 func NewChain(
 	psnap ps.Snapshotter,
 	hsnap handle.Snapshotter,
 	config *config.Config,
-	cb EnqueueKeventCallback,
 ) Chain {
 	var (
 		chain = &chain{
 			psnapshotter:  psnap,
-			cb:            cb,
-			interceptors:  make([]KstreamInterceptor, 0),
+			processors:    make([]Processor, 0),
 			deferredKevts: make(chan *kevent.Kevent, 1000),
 		}
 		devMapper = fs.NewDevMapper()
@@ -70,46 +59,22 @@ func NewChain(
 		}
 	}
 
-	chain.addInterceptor(newPsInterceptor(psnap, scanner))
+	chain.addProcessor(newPsProcessor(psnap, scanner))
 
 	if config.Kstream.EnableFileIOKevents {
-		chain.addInterceptor(newFsInterceptor(devMapper, hsnap))
+		chain.addProcessor(newFsProcessor(hsnap))
 	}
 	if config.Kstream.EnableRegistryKevents {
-		chain.addInterceptor(newRegistryInterceptor(hsnap))
+		chain.addProcessor(newRegistryProcessor(hsnap))
 	}
 	if config.Kstream.EnableImageKevents {
-		chain.addInterceptor(newImageInterceptor(psnap, devMapper, scanner))
+		chain.addProcessor(newImageProcessor(psnap, scanner))
 	}
 	if config.Kstream.EnableNetKevents {
-		chain.addInterceptor(newNetInterceptor())
+		chain.addProcessor(newNetProcessor())
 	}
 	if config.Kstream.EnableHandleKevents {
-		chain.addInterceptor(newHandleInterceptor(hsnap, handle.NewObjectTypeStore(), devMapper, chain.deferredKevts))
-		go chain.consumeDeferred()
+		chain.addProcessor(newHandleProcessor(hsnap, handle.NewObjectTypeStore(), devMapper, chain.deferredKevts))
 	}
-	if config.Kstream.EnableAntimalwareEngineEvents {
-		chain.addInterceptor(newDriverInterceptor(devMapper))
-	}
-
 	return chain
-}
-
-// consumeDeferred is responsible for receiving the events
-// that have been deferred by the interceptors. Events are
-// usually deferred when some of their parameters or global
-// state depend on the presence of other events. For example,
-// CreateHandle events sometimes lack the involved handle name,
-// but their counterpart, CloseHandle events contain that
-// information. So, we wait for the CloseHandle counterpart to
-// occur to augment the deferred event with the handle name param.
-func (c *chain) consumeDeferred() {
-	for kevt := range c.deferredKevts {
-		if c.cb != nil {
-			err := c.cb(kevt)
-			if err == nil {
-				deferredEnqueued.Add(1)
-			}
-		}
-	}
 }

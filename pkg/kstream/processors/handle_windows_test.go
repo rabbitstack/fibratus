@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package interceptors
+package processors
 
 import (
 	kerrors "github.com/rabbitstack/fibratus/pkg/errors"

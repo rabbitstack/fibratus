@@ -197,7 +197,17 @@ Language=English
 Retransmit retransmits unacknowledged TCP
 .
 MessageId=46
-SymbolicName=Retransmit
+SymbolicName=CloseHandle
 Language=English
 CloseHandle closes the handle object.
+.
+MessageId=47
+SymbolicName=CloseKey
+Language=English
+CloseKey closes the registry key.
+.
+MessageId=48
+SymbolicName=LoadDriver
+Language=English
+LoadDriver loads the kernel driver.
 .

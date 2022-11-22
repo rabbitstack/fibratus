@@ -140,7 +140,7 @@ func (e *evtlog) log(eventID uint32, categoryID uint16, buf []byte) error {
 	}
 }
 
-// kcatToCategoryID maps category name to eventlog identifier.
+// categoryID maps category name to eventlog identifier.
 func categoryID(kevt *kevent.Kevent) uint16 {
 	switch kevt.Category {
 	case ktypes.Registry:
@@ -175,7 +175,7 @@ func ktypeToEventID(kevt *kevent.Kevent) uint32 {
 		return 17
 	case ktypes.LoadImage:
 		return 18
-	case ktypes.Connect:
+	case ktypes.ConnectTCPv4, ktypes.ConnectTCPv6:
 		return 19
 	case ktypes.CreateFile:
 		return 20
@@ -217,20 +217,24 @@ func ktypeToEventID(kevt *kevent.Kevent) uint32 {
 		return 38
 	case ktypes.RegQueryValue:
 		return 39
-	case ktypes.Accept:
+	case ktypes.AcceptTCPv4, ktypes.AcceptTCPv6:
 		return 40
-	case ktypes.Send:
+	case ktypes.SendTCPv4, ktypes.SendTCPv6, ktypes.SendUDPv4, ktypes.SendUDPv6:
 		return 41
-	case ktypes.Recv:
+	case ktypes.RecvTCPv4, ktypes.RecvTCPv6, ktypes.RecvUDPv4, ktypes.RecvUDPv6:
 		return 42
-	case ktypes.Disconnect:
+	case ktypes.DisconnectTCPv4, ktypes.DisconnectTCPv6:
 		return 43
-	case ktypes.Reconnect:
+	case ktypes.ReconnectTCPv4, ktypes.ReconnectTCPv6:
 		return 44
-	case ktypes.Retransmit:
+	case ktypes.RetransmitTCPv4, ktypes.RetransmitTCPv6:
 		return 45
 	case ktypes.CloseHandle:
 		return 46
+	case ktypes.RegCloseKey:
+		return 47
+	case ktypes.LoadDriver:
+		return 48
 	}
 	return unknownEventID
 }

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package interceptors
+package processors
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/kevent"

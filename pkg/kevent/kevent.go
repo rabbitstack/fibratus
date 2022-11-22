@@ -36,7 +36,7 @@ var pool = sync.Pool{
 	},
 }
 
-// TimestampFormat is the Go valid format for the kernel event timestamp
+// TimestampFormat is the Go valid format for the event timestamp
 var TimestampFormat string
 
 // MetadataKey represents the type definition for the metadata keys
@@ -65,7 +65,9 @@ func (md Metadata) String() string {
 	return strings.TrimSuffix(sb.String(), ", ")
 }
 
-// Kevent encapsulates kernel event's payload.
+// Kevent encapsulates event's state and provides a set of methods for
+// accessing and manipulating event parameters, process state, and other
+// metadata.
 type Kevent struct {
 	// Seq is monotonically incremented kernel event sequence.
 	Seq uint64 `json:"seq"`
@@ -166,7 +168,7 @@ func Empty() *Kevent {
 	}
 }
 
-// NewFromKcap recovers the kernel event instance from the kcapture byte buffer.
+// NewFromKcap recovers the event instance from the kcapture byte buffer.
 func NewFromKcap(buf []byte) (*Kevent, error) {
 	kevt := &Kevent{
 		Kparams:  make(Kparams),
@@ -189,8 +191,11 @@ func (kevt *Kevent) AppendParam(name string, typ kparams.Type, value kparams.Val
 }
 
 // GetParamAsString returns the specified parameter value as string.
+// Parameter values are resolved according to their types. For instance,
+// if the parameter type is `Status`, the system error code is converted
+// to the error message.
 // Returns an empty string if the given parameter name is not found
-// in event paramters.
+// in event parameters.
 func (kevt *Kevent) GetParamAsString(name string) string {
 	par, err := kevt.Kparams.Get(name)
 	if err != nil {

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package interceptors
+package processors
 
 import (
 	"expvar"
@@ -45,7 +45,7 @@ var driveRegexp = regexp.MustCompile(`^[a-zA-Z]:\\`)
 // procYaraScans stores the total count of yara process scans
 var procYaraScans = expvar.NewInt("yara.proc.scans")
 
-type psInterceptor struct {
+type psProcessor struct {
 	snap ps.Snapshotter
 	yara yara.Scanner
 }
@@ -66,42 +66,34 @@ var sysProcs = map[string]bool{
 	"kernel32.dll":    true,
 }
 
-// newPsInterceptor creates a new kstream interceptor for process events.
-func newPsInterceptor(snap ps.Snapshotter, yara yara.Scanner) KstreamInterceptor {
-	return psInterceptor{snap: snap, yara: yara}
+// newPsProcessor creates a new event processor for process events.
+func newPsProcessor(snap ps.Snapshotter, yara yara.Scanner) Processor {
+	return psProcessor{snap: snap, yara: yara}
 }
 
-func (ps psInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, error) {
+func (ps psProcessor) ProcessEvent(kevt *kevent.Kevent) (*kevent.Kevent, bool, error) {
 	switch kevt.Type {
-	case ktypes.CreateProcess,
-		ktypes.TerminateProcess,
-		ktypes.ProcessRundown:
+	case ktypes.CreateProcess, ktypes.TerminateProcess, ktypes.ProcessRundown:
 		if err := ps.processEvent(kevt); err != nil {
 			return kevt, false, err
-		}
-		if kevt.Type == ktypes.CreateProcess {
-			ps.scanProc(kevt)
 		}
 		if kevt.Type == ktypes.TerminateProcess {
 			return kevt, false, ps.snap.Remove(kevt)
 		}
 		return kevt, false, ps.snap.Write(kevt)
-	case ktypes.CreateThread,
-		ktypes.TerminateThread,
-		ktypes.ThreadRundown:
+	case ktypes.CreateThread, ktypes.TerminateThread, ktypes.ThreadRundown:
 		if kevt.Type != ktypes.TerminateThread {
 			return kevt, false, ps.snap.Write(kevt)
 		}
 		return kevt, false, ps.snap.Remove(kevt)
-	case ktypes.OpenProcess,
-		ktypes.OpenThread:
-		pid, err := kevt.Kparams.GetUint32(kparams.ProcessID)
+	case ktypes.OpenProcess, ktypes.OpenThread:
+		pid, err := kevt.Kparams.GetPid()
 		if err != nil {
 			return kevt, true, err
 		}
 		proc := ps.snap.Find(pid)
 		if proc != nil {
-			kevt.AppendParam(kparams.Exe, kparams.UnicodeString, proc.Exe)
+			kevt.AppendParam(kparams.Exe, kparams.FilePath, proc.Exe)
 			kevt.AppendParam(kparams.ProcessName, kparams.UnicodeString, proc.Name)
 		}
 		return kevt, false, nil
@@ -109,7 +101,7 @@ func (ps psInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, er
 	return kevt, true, nil
 }
 
-func (ps psInterceptor) processEvent(kevt *kevent.Kevent) error {
+func (ps psProcessor) processEvent(kevt *kevent.Kevent) error {
 	cmndline, err := kevt.Kparams.GetString(kparams.Cmdline)
 	if err != nil {
 		return err
@@ -137,7 +129,7 @@ func (ps psInterceptor) processEvent(kevt *kevent.Kevent) error {
 	i := strings.Index(strings.ToLower(cmndline), ".exe")
 	if i > 0 {
 		exe := cmndline[0 : i+4]
-		kevt.AppendParam(kparams.Exe, kparams.UnicodeString, exe)
+		kevt.AppendParam(kparams.Exe, kparams.FilePath, exe)
 	}
 	_ = kevt.Kparams.SetValue(kparams.Cmdline, cmndline)
 
@@ -155,7 +147,7 @@ func (ps psInterceptor) processEvent(kevt *kevent.Kevent) error {
 	return nil
 }
 
-func (ps psInterceptor) scanProc(kevt *kevent.Kevent) {
+func (ps psProcessor) scanProc(kevt *kevent.Kevent) {
 	if ps.yara != nil {
 		pid, err := kevt.Kparams.GetPid()
 		if err == nil {
@@ -170,9 +162,9 @@ func (ps psInterceptor) scanProc(kevt *kevent.Kevent) {
 	}
 }
 
-func (psInterceptor) Name() InterceptorType { return Ps }
+func (psProcessor) Name() ProcessorType { return Ps }
 
-func (ps psInterceptor) Close() {
+func (ps psProcessor) Close() {
 	if ps.yara != nil {
 		ps.yara.Close()
 	}

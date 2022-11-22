@@ -20,8 +20,7 @@ package kevent
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/fs"
-	"github.com/rabbitstack/fibratus/pkg/syscall/process"
-	"github.com/rabbitstack/fibratus/pkg/syscall/thread"
+	"golang.org/x/sys/windows"
 	"strings"
 )
 
@@ -55,35 +54,35 @@ func (flags ParamFlags) String(f uint32) string {
 
 // PsAccessRightFlags describes flags for the process access rights.
 var PsAccessRightFlags = []ParamFlag{
-	{"ALL_ACCESS", uint32(process.AllAccess)},
-	{"TERMINATE", uint32(process.Terminate)},
-	{"CREATE_THREAD", uint32(process.CreateThread)},
-	{"VM_OPERATION", uint32(process.VMOperation)},
-	{"VM_READ", uint32(process.VMRead)},
-	{"VM_WRITE", uint32(process.VMRead)},
-	{"DUP_HANDLE", uint32(process.DupHandle)},
-	{"CREATE_PROCESS", uint32(process.CreateProcess)},
-	{"SET_QUOTA", uint32(process.SetQuota)},
-	{"SET_INFORMATION", uint32(process.SetInformation)},
-	{"QUERY_INFORMATION", uint32(process.QueryInformation)},
-	{"SUSPEND_RESUME", uint32(process.SuspendResume)},
-	{"QUERY_LIMITED_INFORMATION", uint32(process.QueryLimitedInformation)},
+	{"ALL_ACCESS", uint32(windows.STANDARD_RIGHTS_REQUIRED | windows.SYNCHRONIZE | 0xFFFF)},
+	{"TERMINATE", uint32(windows.PROCESS_TERMINATE)},
+	{"CREATE_THREAD", uint32(windows.PROCESS_CREATE_THREAD)},
+	{"VM_OPERATION", uint32(windows.PROCESS_VM_OPERATION)},
+	{"VM_READ", uint32(windows.PROCESS_VM_READ)},
+	{"VM_WRITE", uint32(windows.PROCESS_VM_WRITE)},
+	{"DUP_HANDLE", uint32(windows.PROCESS_DUP_HANDLE)},
+	{"CREATE_PROCESS", uint32(windows.PROCESS_CREATE_PROCESS)},
+	{"SET_QUOTA", uint32(windows.PROCESS_SET_QUOTA)},
+	{"SET_INFORMATION", uint32(windows.PROCESS_SET_INFORMATION)},
+	{"QUERY_INFORMATION", uint32(windows.PROCESS_QUERY_INFORMATION)},
+	{"SUSPEND_RESUME", uint32(windows.PROCESS_SUSPEND_RESUME)},
+	{"QUERY_LIMITED_INFORMATION", uint32(windows.PROCESS_QUERY_LIMITED_INFORMATION)},
 }
 
 // ThreadAccessRightFlags describes flags for the thread access rights.
 var ThreadAccessRightFlags = []ParamFlag{
-	{"ALL_ACCESS", uint32(thread.AllAccess)},
-	{"TERMINATE", uint32(thread.TerminateThread)},
-	{"SUSPEND_THREAD", uint32(thread.SuspendResume)},
-	{"GET_CONTEXT", uint32(thread.GetContext)},
-	{"SET_CONTEXT", uint32(thread.SetContext)},
-	{"SET_INFORMATION", uint32(thread.SetInformation)},
-	{"QUERY_INFORMATION", uint32(thread.QueryInformation)},
-	{"SET_THREAD_TOKEN", uint32(thread.SetThreadToken)},
-	{"IMPERSONATE", uint32(thread.Impersonate)},
-	{"DIRECT_IMPERSONATION", uint32(thread.DirectImpersonation)},
-	{"SET_LIMITED_INFORMATION", uint32(thread.SetLimitedInformation)},
-	{"QUERY_LIMITED_INFORMATION", uint32(thread.QueryLimitedInformation)},
+	{"ALL_ACCESS", uint32(windows.STANDARD_RIGHTS_REQUIRED | windows.SYNCHRONIZE | 0xFFFF)},
+	{"TERMINATE", uint32(windows.THREAD_TERMINATE)},
+	{"SUSPEND_THREAD", uint32(windows.THREAD_SUSPEND_RESUME)},
+	{"GET_CONTEXT", uint32(windows.THREAD_GET_CONTEXT)},
+	{"SET_CONTEXT", uint32(windows.THREAD_SET_CONTEXT)},
+	{"SET_INFORMATION", uint32(windows.THREAD_SET_INFORMATION)},
+	{"QUERY_INFORMATION", uint32(windows.THREAD_QUERY_INFORMATION)},
+	{"SET_THREAD_TOKEN", uint32(windows.THREAD_SET_THREAD_TOKEN)},
+	{"IMPERSONATE", uint32(windows.THREAD_IMPERSONATE)},
+	{"DIRECT_IMPERSONATION", uint32(windows.THREAD_DIRECT_IMPERSONATION)},
+	{"SET_LIMITED_INFORMATION", uint32(windows.THREAD_SET_LIMITED_INFORMATION)},
+	{"QUERY_LIMITED_INFORMATION", uint32(windows.THREAD_QUERY_LIMITED_INFORMATION)},
 }
 
 // FileAttributeFlags describes file attribute flags.

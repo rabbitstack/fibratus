@@ -19,7 +19,7 @@
  * limitations under the License.
  */
 
-package handle
+package key
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/syscall/registry"
@@ -34,27 +34,27 @@ func init() {
 }
 
 func TestFormatKey(t *testing.T) {
-	root, key := FormatKey(`\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\Windows Workflow Foundation 4.0.0.0\Linkage`)
+	root, key := Format(`\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\Windows Workflow Foundation 4.0.0.0\Linkage`)
 	assert.Equal(t, registry.LocalMachine, root)
 	assert.Equal(t, `SYSTEM\ControlSet001\Services\Windows Workflow Foundation 4.0.0.0\Linkage`, key)
 
-	root, key = FormatKey(`\Registry\Machine\SYSTEM\ControlSet001\Services\Windows Workflow Foundation 4.0.0.0\Linkage`)
+	root, key = Format(`\Registry\Machine\SYSTEM\ControlSet001\Services\Windows Workflow Foundation 4.0.0.0\Linkage`)
 	assert.Equal(t, registry.LocalMachine, root)
 	assert.Equal(t, `SYSTEM\ControlSet001\Services\Windows Workflow Foundation 4.0.0.0\Linkage`, key)
 
-	root, key = FormatKey(`\REGISTRY\MACHINE`)
+	root, key = Format(`\REGISTRY\MACHINE`)
 	assert.Equal(t, registry.LocalMachine, root)
 	assert.Empty(t, key)
 
-	root, key = FormatKey(`\REGISTRY\USER\S-1-5-21-2271034452-2606270099-984871569-500\Console`)
+	root, key = Format(`\REGISTRY\USER\S-1-5-21-2271034452-2606270099-984871569-500\Console`)
 	assert.Equal(t, registry.CurrentUser, root)
 	assert.Equal(t, `Console`, key)
 
-	root, key = FormatKey(`\REGISTRY\USER\S-1-5-21-2271034452-2606270099-984871569-500\_Classes`)
+	root, key = Format(`\REGISTRY\USER\S-1-5-21-2271034452-2606270099-984871569-500\_Classes`)
 	assert.Equal(t, registry.CurrentUser, root)
 	assert.Equal(t, `Software\Classes`, key)
 
-	root, key = FormatKey(`\REGISTRY\USER\S-1-5-21-2271034452-2606270099-984871569-500\_Classes\.all`)
+	root, key = Format(`\REGISTRY\USER\S-1-5-21-2271034452-2606270099-984871569-500\_Classes\.all`)
 	assert.Equal(t, registry.CurrentUser, root)
 	assert.Equal(t, `Software\Classes\.all`, key)
 }

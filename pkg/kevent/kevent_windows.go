@@ -69,6 +69,9 @@ func (kevt Kevent) IsNetworkUDP() bool {
 	return kevt.Type == ktypes.RecvUDPv4 || kevt.Type == ktypes.RecvUDPv6 || kevt.Type == ktypes.SendUDPv4 || kevt.Type == ktypes.SendUDPv6
 }
 
+// IsState indicates if this event is only used for state management.
+func (kevt Kevent) IsState() bool { return kevt.Type.OnlyState() }
+
 // PartialKey computes the unique hash of the event
 // that can be employed to determine if the event
 // from the given process and source has been processed
@@ -202,9 +205,9 @@ func (kevt *Kevent) Summary() string {
 		filename, _ := kevt.Kparams.GetString(kparams.FileName)
 		return printSummary(kevt, fmt.Sprintf("unloaded </code>%s</code> module", filename))
 	case ktypes.CreateFile:
-		op := kevt.Kparams.MustGetFileOperation()
+		op := kevt.GetParamAsString(kparams.FileOperation)
 		filename := kevt.Kparams.MustGetString(kparams.FileName)
-		return printSummary(kevt, fmt.Sprintf("%sed a file <code>%s</code>", op, filename))
+		return printSummary(kevt, fmt.Sprintf("%sed a file <code>%s</code>", strings.ToLower(op), filename))
 	case ktypes.ReadFile:
 		filename, _ := kevt.Kparams.GetString(kparams.FileName)
 		size, _ := kevt.Kparams.GetUint32(kparams.FileIoSize)

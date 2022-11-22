@@ -22,26 +22,23 @@
 package etw
 
 import (
+	"golang.org/x/sys/windows"
 	"os"
 	"syscall"
 	"unsafe"
 
 	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
-	"github.com/rabbitstack/fibratus/pkg/syscall/utf16"
-	"github.com/rabbitstack/fibratus/pkg/syscall/winerrno"
 )
 
-var (
-	advapi32 = syscall.NewLazyDLL("advapi32.dll")
+//go:generate go run golang.org/x/sys/windows/mkwinsyscall -output zsyscall_windows.go etw.go
 
-	startTrace          = advapi32.NewProc("StartTraceW")
-	controlTrace        = advapi32.NewProc("ControlTraceW")
-	closeTrace          = advapi32.NewProc("CloseTrace")
-	openTrace           = advapi32.NewProc("OpenTraceW")
-	processTrace        = advapi32.NewProc("ProcessTrace")
-	traceSetInformation = advapi32.NewProc("TraceSetInformation")
-	enableTrace         = advapi32.NewProc("EnableTraceEx")
-)
+//sys startTrace(handle *TraceHandle, name string, props *EventTraceProperties) (errno windows.Errno, err error) = advapi32.StartTraceW
+//sys controlTrace(handle TraceHandle, name string, props *EventTraceProperties, operation TraceOperation) (errno windows.Errno, err error) = advapi32.ControlTraceW
+//sys closeTrace(handle TraceHandle) (errno windows.Errno, err error) = advapi32.CloseTrace
+//sys openTrace(logfile *EventTraceLogfile) (handle TraceHandle) = advapi32.OpenTraceW
+//sys processTrace(handle *TraceHandle, count uint32, start *windows.Filetime, end *windows.Filetime) (errno windows.Errno, err error) = advapi32.ProcessTrace
+//sys traceSetInformation(handle TraceHandle, infoClass uint8, info uintptr, length uintptr) (err error) = advapi32.TraceSetInformation
+//sys enableTraceEx(providerID *syscall.GUID, sourceID *syscall.GUID, handle TraceHandle, isEnabled uint32, level uint8, matchAnyKeyword uint64, matchAllKeyword uint64, enableProperty uint32, enableFilterDesc uintptr) (err error) = advapi32.EnableTraceEx
 
 // TraceOperation is the type alias for the trace operation.
 type TraceOperation uint32
@@ -63,30 +60,26 @@ type TraceHandle uintptr
 // IsValid determines if the session handle is valid
 func (handle TraceHandle) IsValid() bool { return handle != 0 }
 
-// StartTrace registers and starts an event tracing session for the specified provider. The trace assumes there will be a real-time
-// event consumer responsible for collecting and processing events. If the function succeeds, it returns the handle to the tracing
-// session.
+// StartTrace registers and starts an event tracing session for the specified provider. The trace assumes there will
+// be a real-time event consumer responsible for collecting and processing events. If the function succeeds, it returns
+// the handle to the tracing session.
 func StartTrace(name string, props *EventTraceProperties) (TraceHandle, error) {
 	var handle TraceHandle
-	errno, _, err := startTrace.Call(
-		uintptr(unsafe.Pointer(&handle)),
-		uintptr(unsafe.Pointer(utf16.StringToUTF16Ptr(name))),
-		uintptr(unsafe.Pointer(props)),
-	)
-	switch winerrno.Errno(errno) {
-	case winerrno.Success:
+	errno, err := startTrace(&handle, name, props)
+	switch errno {
+	case windows.ERROR_SUCCESS:
 		return handle, nil
-	case winerrno.AccessDenied:
+	case windows.ERROR_ACCESS_DENIED:
 		return TraceHandle(0), kerrors.ErrTraceAccessDenied
-	case winerrno.DiskFull:
+	case windows.ERROR_DISK_FULL:
 		return TraceHandle(0), kerrors.ErrTraceDiskFull
-	case winerrno.AlreadyExists:
+	case windows.ERROR_ALREADY_EXISTS:
 		return TraceHandle(0), kerrors.ErrTraceAlreadyRunning
-	case winerrno.InvalidParameter:
+	case windows.ERROR_INVALID_PARAMETER:
 		return TraceHandle(0), kerrors.ErrTraceInvalidParameter
-	case winerrno.BadLength:
+	case windows.ERROR_BAD_LENGTH:
 		return TraceHandle(0), kerrors.ErrTraceBadLength
-	case winerrno.NoSysResources:
+	case windows.ERROR_NO_SYSTEM_RESOURCES:
 		return TraceHandle(0), kerrors.ErrTraceNoSysResources
 	default:
 		return TraceHandle(0), os.NewSyscallError("StartTrace", err)
@@ -96,16 +89,11 @@ func StartTrace(name string, props *EventTraceProperties) (TraceHandle, error) {
 // ControlTrace performs various operation on the specified event tracing session, such as updating, flushing or stopping
 // the session.
 func ControlTrace(handle TraceHandle, name string, props *EventTraceProperties, operation TraceOperation) error {
-	errno, _, err := controlTrace.Call(
-		uintptr(handle),
-		uintptr(unsafe.Pointer(utf16.StringToUTF16Ptr(name))),
-		uintptr(unsafe.Pointer(props)),
-		uintptr(operation),
-	)
-	switch winerrno.Errno(errno) {
-	case winerrno.Success:
+	errno, err := controlTrace(handle, name, props, operation)
+	switch errno {
+	case windows.ERROR_SUCCESS:
 		return nil
-	case winerrno.WMIInstanceNotFound:
+	case windows.ERROR_WMI_INSTANCE_NOT_FOUND:
 		return kerrors.ErrKsessionNotRunning
 	default:
 		return os.NewSyscallError("ControlTrace", err)
@@ -116,52 +104,51 @@ func ControlTrace(handle TraceHandle, name string, props *EventTraceProperties, 
 // returns ErrorCtxClosePending. The ErrorCtxClosePending code indicates that the CloseTrace function call
 // was successful; the ProcessTrace function will stop processing events after it processes all events in its buffers.
 func CloseTrace(handle TraceHandle) error {
-	errno, _, err := closeTrace.Call(uintptr(handle))
-	if winerrno.Errno(errno) != winerrno.Success && winerrno.Errno(errno) != winerrno.CtxClosePending {
+	errno, err := closeTrace(handle)
+	if errno != windows.ERROR_SUCCESS && errno != windows.ERROR_CTX_CLOSE_PENDING {
 		return os.NewSyscallError("CloseTrace", err)
 	}
 	return nil
 }
 
 // OpenTrace opens a real-time trace session or log file for consuming.
-func OpenTrace(ktrace EventTraceLogfile) TraceHandle {
-	handle, _, _ := openTrace.Call(uintptr(unsafe.Pointer(&ktrace)))
-	return TraceHandle(handle)
+func OpenTrace(logfile EventTraceLogfile) TraceHandle {
+	return openTrace(&logfile)
 }
 
 // ProcessTrace function delivers events from one or more event tracing sessions to the consumer. Function sorts the events
 // chronologically and delivers all events generated between StartTime and EndTime. The ProcessTrace function blocks the
 // thread until it delivers all events, the BufferCallback function returns false, or you call CloseTrace.
 func ProcessTrace(handle TraceHandle) error {
-	errno, _, err := processTrace.Call(uintptr(unsafe.Pointer(&handle)), 1, 0, 0)
-	switch winerrno.Errno(errno) {
-	case winerrno.Success:
+	errno, err := processTrace(&handle, 1, nil, nil)
+	switch errno {
+	case windows.ERROR_SUCCESS:
 		return nil
-	case winerrno.WMIInstanceNotFound:
+	case windows.ERROR_WMI_INSTANCE_NOT_FOUND:
 		return kerrors.ErrKsessionNotRunning
-	case winerrno.NoAccess:
+	case windows.ERROR_NOACCESS:
 		return kerrors.ErrEventCallbackException
-	case winerrno.Cancelled:
+	case windows.ERROR_CANCELLED:
 		return kerrors.ErrTraceCancelled
 	default:
 		return os.NewSyscallError("ProcessTrace", err)
 	}
 }
 
-// SetTraceInformation enables or disables event tracing session settings for the specified information class.
-func SetTraceInformation(handle TraceHandle, infoClass uint8, traceFlags []EventTraceFlags) error {
-	errno, _, err := traceSetInformation.Call(uintptr(handle), uintptr(infoClass), uintptr(unsafe.Pointer(&traceFlags[0])), unsafe.Sizeof(traceFlags))
-	if winerrno.Errno(errno) == winerrno.Success {
-		return nil
+// SetTraceSystemFlags enables or disables event tracing session system flags.
+func SetTraceSystemFlags(handle TraceHandle, traceFlags []EventTraceFlags) error {
+	err := traceSetInformation(handle, TraceSystemTraceEnableFlagsInfo, uintptr(unsafe.Pointer(&traceFlags[0])), unsafe.Sizeof(traceFlags))
+	if err != nil {
+		return os.NewSyscallError("TraceSetInformation", err)
 	}
-	return os.NewSyscallError("TraceSetInformation", err)
+	return nil
 }
 
 // EnableTrace influences the behaviour of the specified event trace provider.
-func EnableTrace(guid syscall.GUID, handle TraceHandle, keyword uint32) error {
-	errno, _, err := enableTrace.Call(uintptr(unsafe.Pointer(&guid)), 0, uintptr(handle), 1, 0, uintptr(keyword), 0, 0, 0)
-	if winerrno.Errno(errno) == winerrno.Success {
-		return nil
+func EnableTrace(guid syscall.GUID, handle TraceHandle, keyword uint64) error {
+	err := enableTraceEx(&guid, nil, handle, 1, 0, keyword, 0, 0, 0)
+	if err != nil {
+		return os.NewSyscallError("EnableTraceEx", err)
 	}
-	return os.NewSyscallError("EnableTraceEx", err)
+	return nil
 }

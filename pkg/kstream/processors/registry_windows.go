@@ -16,10 +16,12 @@
  * limitations under the License.
  */
 
-package interceptors
+package processors
 
 import (
 	"expvar"
+	"github.com/rabbitstack/fibratus/pkg/syscall/registry"
+	"github.com/rabbitstack/fibratus/pkg/util/key"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -29,16 +31,14 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-	"github.com/rabbitstack/fibratus/pkg/syscall/registry"
 	reg "golang.org/x/sys/windows/registry"
 )
 
 var (
 	// kcbCount counts the total KCBs found during the duration of the kernel session
-	kcbCount         = expvar.NewInt("registry.kcb.count")
-	kcbMissCount     = expvar.NewInt("registry.kcb.misses")
-	unknownKeysCount = expvar.NewInt("registry.unknown.keys.count")
-	keyHandleHits    = expvar.NewInt("registry.key.handle.hits")
+	kcbCount      = expvar.NewInt("registry.kcb.count")
+	kcbMissCount  = expvar.NewInt("registry.kcb.misses")
+	keyHandleHits = expvar.NewInt("registry.key.handle.hits")
 
 	handleThrottleCount uint32
 )
@@ -47,13 +47,13 @@ const (
 	maxHandleQueries = 200
 )
 
-type registryInterceptor struct {
+type registryProcessor struct {
 	// keys stores the mapping between the KCB (Key Control Block) and the key name.
 	keys  map[uint64]string
 	hsnap handle.Snapshotter
 }
 
-func newRegistryInterceptor(hsnap handle.Snapshotter) KstreamInterceptor {
+func newRegistryProcessor(hsnap handle.Snapshotter) Processor {
 	// schedule a ticker that resets the throttle count every minute
 	tick := time.NewTicker(time.Minute)
 	go func() {
@@ -62,13 +62,13 @@ func newRegistryInterceptor(hsnap handle.Snapshotter) KstreamInterceptor {
 			atomic.StoreUint32(&handleThrottleCount, 0)
 		}
 	}()
-	return &registryInterceptor{
+	return &registryProcessor{
 		keys:  make(map[uint64]string),
 		hsnap: hsnap,
 	}
 }
 
-func (r *registryInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, error) {
+func (r *registryProcessor) ProcessEvent(kevt *kevent.Kevent) (*kevent.Kevent, bool, error) {
 	typ := kevt.Type
 	switch typ {
 	case ktypes.RegKCBRundown, ktypes.RegCreateKCB:
@@ -77,7 +77,7 @@ func (r *registryInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bo
 			return kevt, true, err
 		}
 		if _, ok := r.keys[khandle]; !ok {
-			r.keys[khandle] = kevt.GetParamAsString(kparams.RegKeyName)
+			r.keys[khandle], _ = kevt.Kparams.GetString(kparams.RegKeyName)
 		}
 		kcbCount.Add(1)
 		return kevt, false, nil
@@ -110,11 +110,7 @@ func (r *registryInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bo
 		// last resort is to scan process' handles and check if any of the
 		// key handles contain the partial key name. In this case we assume
 		// the correct key is encountered.
-		var rootKey registry.Key
-		keyName, err := kevt.Kparams.GetString(kparams.RegKeyName)
-		if err != nil {
-			return kevt, true, err
-		}
+		keyName, _ := kevt.Kparams.GetString(kparams.RegKeyName)
 		if khandle != 0 {
 			if baseKey, ok := r.keys[khandle]; ok {
 				keyName = baseKey + "\\" + keyName
@@ -122,62 +118,52 @@ func (r *registryInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bo
 				kcbMissCount.Add(1)
 				keyName = r.findMatchingKey(kevt.PID, keyName)
 			}
-		}
-
-		if keyName != "" {
-			rootKey, keyName = handle.FormatKey(keyName)
-			k := rootKey.String()
-			if keyName != "" && rootKey != registry.InvalidKey {
-				k += "\\" + keyName
-			}
-			if rootKey == registry.InvalidKey {
-				unknownKeysCount.Add(1)
-				k = keyName
-			}
-			if err := kevt.Kparams.Set(kparams.RegKeyName, k, kparams.UnicodeString); err != nil {
+			if err := kevt.Kparams.SetValue(kparams.RegKeyName, keyName); err != nil {
 				return kevt, true, err
 			}
 		}
 
 		// get the type/value of the registry key and append to parameters
 		if typ == ktypes.RegSetValue {
+			rootKey, keyName := key.Format(keyName)
 			if rootKey != registry.InvalidKey {
 				subkey, value := filepath.Split(keyName)
-				key, err := reg.OpenKey(reg.Key(rootKey), subkey, reg.QUERY_VALUE)
+
+				regKey, err := reg.OpenKey(reg.Key(rootKey), subkey, reg.QUERY_VALUE)
 				if err != nil {
 					return kevt, true, nil
 				}
-				defer key.Close()
+				defer regKey.Close()
 				b := make([]byte, 0)
-				_, typ, err := key.GetValue(value, b)
+				_, typ, err := regKey.GetValue(value, b)
 				if err != nil {
 					return kevt, true, nil
 				}
-				kevt.Kparams.Append(kparams.RegValueType, kparams.AnsiString, typToString(typ))
+				kevt.AppendParam(kparams.RegValueType, kparams.Enum, typ, kevent.WithEnum(key.RegistryValueTypes))
 				switch typ {
 				case reg.SZ, reg.EXPAND_SZ:
-					v, _, err := key.GetStringValue(value)
+					v, _, err := regKey.GetStringValue(value)
 					if err != nil {
 						return kevt, true, nil
 					}
 					kevt.Kparams.Append(kparams.RegValue, kparams.UnicodeString, v)
 
 				case reg.DWORD, reg.QWORD:
-					v, _, err := key.GetIntegerValue(value)
+					v, _, err := regKey.GetIntegerValue(value)
 					if err != nil {
 						return kevt, true, nil
 					}
 					kevt.Kparams.Append(kparams.RegValue, kparams.Uint64, v)
 
 				case reg.MULTI_SZ:
-					v, _, err := key.GetStringsValue(value)
+					v, _, err := regKey.GetStringsValue(value)
 					if err != nil {
 						return kevt, true, nil
 					}
 					kevt.Kparams.Append(kparams.RegValue, kparams.UnicodeString, strings.Join(v, "\n\r"))
 
 				case reg.BINARY:
-					v, _, err := key.GetBinaryValue(value)
+					v, _, err := regKey.GetBinaryValue(value)
 					if err != nil {
 						return kevt, true, nil
 					}
@@ -191,29 +177,10 @@ func (r *registryInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bo
 	return kevt, true, nil
 }
 
-func (registryInterceptor) Name() InterceptorType { return Registry }
-func (registryInterceptor) Close()                {}
+func (registryProcessor) Name() ProcessorType { return Registry }
+func (registryProcessor) Close()              {}
 
-func typToString(typ uint32) string {
-	switch typ {
-	case reg.DWORD:
-		return "REG_DWORD"
-	case reg.QWORD:
-		return "REG_QWORD"
-	case reg.SZ:
-		return "REG_SZ"
-	case reg.EXPAND_SZ:
-		return "REG_EXPAND_SZ"
-	case reg.MULTI_SZ:
-		return "REG_MULTI_SZ"
-	case reg.BINARY:
-		return "REG_BINARY"
-	default:
-		return "UNKNOWN"
-	}
-}
-
-func (r *registryInterceptor) findMatchingKey(pid uint32, relativeKeyName string) string {
+func (r *registryProcessor) findMatchingKey(pid uint32, relativeKeyName string) string {
 	// we want to prevent too frequent queries on the process' handles
 	// since that can cause significant performance overhead. When throttle
 	// count is greater than the max permitted value we'll just return the partial key

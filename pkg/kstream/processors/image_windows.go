@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package interceptors
+package processors
 
 import (
 	"expvar"
@@ -32,30 +32,28 @@ import (
 // imageYaraScans stores the total count of yara image scans
 var imageYaraScans = expvar.NewInt("yara.image.scans")
 
-type imageInterceptor struct {
+type imageProcessor struct {
 	snap ps.Snapshotter
 	yara yara.Scanner
 }
 
-func newImageInterceptor(snap ps.Snapshotter, yara yara.Scanner) KstreamInterceptor {
-	return &imageInterceptor{snap: snap, yara: yara}
+func newImageProcessor(snap ps.Snapshotter, yara yara.Scanner) Processor {
+	return &imageProcessor{snap: snap, yara: yara}
 }
 
-func (imageInterceptor) Name() InterceptorType { return Image }
+func (imageProcessor) Name() ProcessorType { return Image }
 
-func (i *imageInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool, error) {
+func (i *imageProcessor) ProcessEvent(kevt *kevent.Kevent) (*kevent.Kevent, bool, error) {
 	if i.yara != nil && kevt.Type == ktypes.LoadImage {
-		filename, err := kevt.GetParamAsString(kparams.ImageFilename)
-		if err == nil {
-			// scan the target filename
-			go func() {
-				imageYaraScans.Add(1)
-				err := i.yara.ScanFile(filename, kevt)
-				if err != nil {
-					log.Warnf("unable to run yara scanner on %s image: %v", filename, err)
-				}
-			}()
-		}
+		filename := kevt.GetParamAsString(kparams.ImageFilename)
+		// scan the target filename
+		go func() {
+			imageYaraScans.Add(1)
+			err := i.yara.ScanFile(filename, kevt)
+			if err != nil {
+				log.Warnf("unable to run yara scanner on %s image: %v", filename, err)
+			}
+		}()
 	}
 	if kevt.Type == ktypes.UnloadImage {
 		return kevt, false, i.snap.Remove(kevt)
@@ -63,4 +61,4 @@ func (i *imageInterceptor) Intercept(kevt *kevent.Kevent) (*kevent.Kevent, bool,
 	return kevt, false, i.snap.Write(kevt)
 }
 
-func (imageInterceptor) Close() {}
+func (imageProcessor) Close() {}

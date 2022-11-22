@@ -19,20 +19,25 @@
 package kevent
 
 import (
+	"expvar"
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-	"github.com/rabbitstack/fibratus/pkg/network"
 	"github.com/rabbitstack/fibratus/pkg/syscall/etw"
+	"github.com/rabbitstack/fibratus/pkg/syscall/registry"
 	"github.com/rabbitstack/fibratus/pkg/syscall/security"
 	"github.com/rabbitstack/fibratus/pkg/util/ip"
+	"github.com/rabbitstack/fibratus/pkg/util/key"
+	"github.com/rabbitstack/fibratus/pkg/util/status"
+	"golang.org/x/sys/windows"
 	"net"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 )
+
+var unknownKeysCount = expvar.NewInt("registry.unknown.keys.count")
 
 // NewKparam creates a new event parameter. Since the parameter type is already categorized,
 // we can coerce the value to the appropriate representation (e.g. hex, IP address)
@@ -50,17 +55,7 @@ func NewKparam(name string, typ kparams.Type, value kparams.Value, options ...Pa
 	case kparams.IPv6:
 		v = ip.ToIPv6(value.([]byte))
 	case kparams.Port:
-		v = syscall.Ntohs(value.(uint16))
-	case kparams.SID:
-		account, domain := security.LookupAccount(value.([]byte), false)
-		if account != "" || domain != "" {
-			v = joinSID(account, domain)
-		}
-	case kparams.WbemSID:
-		account, domain := security.LookupAccount(value.([]byte), true)
-		if account != "" || domain != "" {
-			v = joinSID(account, domain)
-		}
+		v = windows.Ntohs(value.(uint16))
 	default:
 		v = value
 	}
@@ -68,18 +63,7 @@ func NewKparam(name string, typ kparams.Type, value kparams.Value, options ...Pa
 	return &Kparam{Name: name, Type: typ, Value: v, Flags: opts.flags, Enum: opts.enum}
 }
 
-// MustGetFileOperation returns the file operation involved in the I/O request.
-func (kpars Kparams) MustGetFileOperation() string {
-	op, err := kpars.GetRaw(kparams.FileOperation)
-	if err != nil {
-		panic(err)
-	}
-	disposition, ok := op.(fs.FileDisposition)
-	if !ok {
-		panic("couldn't type assert to file operation enum")
-	}
-	return disposition.String()
-}
+var devMapper = fs.NewDevMapper()
 
 // String returns the string representation of the parameter value.
 func (k Kparam) String() string {
@@ -87,8 +71,37 @@ func (k Kparam) String() string {
 		return ""
 	}
 	switch k.Type {
-	case kparams.UnicodeString, kparams.AnsiString, kparams.SID, kparams.WbemSID:
+	case kparams.UnicodeString, kparams.AnsiString, kparams.FilePath:
 		return k.Value.(string)
+	case kparams.SID:
+		account, domain := security.LookupAccount(k.Value.([]byte), false)
+		if account != "" || domain != "" {
+			return joinSID(account, domain)
+		}
+		return ""
+	case kparams.WbemSID:
+		account, domain := security.LookupAccount(k.Value.([]byte), true)
+		if account != "" || domain != "" {
+			return joinSID(account, domain)
+		}
+		return ""
+	case kparams.FileDosPath:
+		return devMapper.Convert(k.Value.(string))
+	case kparams.Key:
+		rootKey, keyName := key.Format(k.Value.(string))
+		if keyName != "" && rootKey != registry.InvalidKey {
+			return rootKey.String() + "\\" + keyName
+		}
+		if rootKey == registry.InvalidKey {
+			unknownKeysCount.Add(1)
+			return keyName
+		}
+	case kparams.Status:
+		v, ok := k.Value.(uint32)
+		if !ok {
+			return ""
+		}
+		return status.FormatMessage(v)
 	case kparams.HexInt32, kparams.HexInt64, kparams.HexInt16, kparams.HexInt8:
 		return string(k.Value.(kparams.Hex))
 	case kparams.Int8:
@@ -118,37 +131,32 @@ func (k Kparam) String() string {
 	case kparams.Time:
 		return k.Value.(time.Time).String()
 	case kparams.Enum:
-		switch typ := k.Value.(type) {
-		case fs.FileShareMode:
-			return typ.String()
-		case network.L4Proto:
-			return typ.String()
-		case fs.FileDisposition:
-			return typ.String()
-		default:
-			return fmt.Sprintf("%v", k.Value)
+		if k.Enum == nil {
+			return ""
 		}
+		v, ok := k.Value.(uint32)
+		if !ok {
+			return ""
+		}
+		return k.Enum[v]
+	case kparams.Flags:
+		v, ok := k.Value.(uint32)
+		if !ok {
+			return ""
+		}
+		if k.Flags != nil {
+			return k.Flags.String(v)
+		}
+		return ""
 	case kparams.Slice:
 		switch slice := k.Value.(type) {
 		case []string:
 			return strings.Join(slice, ",")
-		case []fs.FileAttr:
-			attrs := make([]string, 0, len(slice))
-			for _, s := range slice {
-				attrs = append(attrs, s.String())
-			}
-			return strings.Join(attrs, ",")
 		default:
 			return fmt.Sprintf("%v", slice)
 		}
-	case kparams.Flags:
-		if k.Flags != nil {
-			return k.Flags.String(k.Value.(uint32))
-		}
-		return ""
-	default:
-		return fmt.Sprintf("%v", k.Value)
 	}
+	return fmt.Sprintf("%v", k.Value)
 }
 
 // produceParams parses the event binary layout to extract the parameters. Each event is annotated with the
@@ -443,7 +451,7 @@ func (kevt *Kevent) produceParams(e *etw.EventRecord) {
 		kevt.AppendParam(kparams.FileKey, kparams.Uint64, fileKey)
 		kevt.AppendParam(kparams.ThreadID, kparams.TID, tid)
 		kevt.AppendParam(kparams.FileExtraInfo, kparams.Uint64, extraInfo)
-		kevt.AppendParam(kparams.FileInfoClass, kparams.FileClass, infoClass, WithEnum(fs.FileInfoClasses))
+		kevt.AppendParam(kparams.FileInfoClass, kparams.Enum, infoClass, WithEnum(fs.FileInfoClasses))
 	case ktypes.ReadFile, ktypes.WriteFile:
 		var (
 			irp        uint64
@@ -501,7 +509,7 @@ func (kevt *Kevent) produceParams(e *etw.EventRecord) {
 		kevt.AppendParam(kparams.ThreadID, kparams.TID, tid)
 		kevt.AppendParam(kparams.FileKey, kparams.Uint64, fileKey)
 		kevt.AppendParam(kparams.FileName, kparams.UnicodeString, filename)
-		kevt.AppendParam(kparams.FileInfoClass, kparams.FileClass, infoClass, WithEnum(fs.FileInfoClasses))
+		kevt.AppendParam(kparams.FileInfoClass, kparams.Enum, infoClass, WithEnum(fs.FileInfoClasses))
 	case ktypes.SendTCPv4,
 		ktypes.SendUDPv4,
 		ktypes.RecvTCPv4,

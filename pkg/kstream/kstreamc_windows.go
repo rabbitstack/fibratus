@@ -31,7 +31,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-	"github.com/rabbitstack/fibratus/pkg/kstream/interceptors"
+	"github.com/rabbitstack/fibratus/pkg/kstream/processors"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/syscall/etw"
 	"github.com/rabbitstack/fibratus/pkg/syscall/process"
@@ -98,8 +98,8 @@ type kstreamConsumer struct {
 	errs  chan error          // channel for event processing errors
 	kevts chan *kevent.Kevent // channel for fanning out generated events
 
-	interceptorChain interceptors.Chain
-	config           *config.Config // main configuration
+	processors processors.Chain
+	config     *config.Config // main configuration
 
 	ktraceController KtraceController  // trace session control plane
 	psnapshotter     ps.Snapshotter    // process state tracker
@@ -135,7 +135,7 @@ func NewConsumer(
 		rules:            filter.NewRules(config),
 	}
 
-	kconsumer.interceptorChain = interceptors.NewChain(psnap, hsnap, config, kconsumer.enqueueKevent)
+	kconsumer.processors = processors.NewChain(psnap, hsnap, config)
 
 	return kconsumer
 }
@@ -223,7 +223,7 @@ func (k *kstreamConsumer) CloseKstream() error {
 		log.Warn(err)
 	}
 
-	return k.interceptorChain.Close()
+	return k.processors.Close()
 }
 
 // Errors returns a channel where errors are pushed.
@@ -258,7 +258,7 @@ func (k *kstreamConsumer) processKeventCallback(evt *etw.EventRecord) uintptr {
 	return callbackNext
 }
 
-// processKevent is the backbone of the kernel stream consumer.
+// processKevent is the backbone of the event stream consumer.
 // It does the heavy lifting of parsing inbound ETW events,
 // building the state machine, and pushing events to the channel.
 func (k *kstreamConsumer) processKevent(evt *etw.EventRecord) error {
@@ -286,7 +286,7 @@ func (k *kstreamConsumer) processKevent(evt *etw.EventRecord) error {
 		// sometimes the pid present in event header is invalid
 		// but, we can get the valid one from the event parameters
 		if kevt.PID == winerrno.InvalidPID {
-			kevt.PID, _ = kevt.Kparams.GetPpid()
+			kevt.PID, _ = kevt.Kparams.GetPid()
 		}
 	case ktypes.File:
 		// on some Windows versions the value of
@@ -314,25 +314,37 @@ func (k *kstreamConsumer) processKevent(evt *etw.EventRecord) error {
 		kevt.PID, _ = kevt.Kparams.GetPid()
 	}
 
+	// dispatch each event to the processor chain that will further augment the event
+	// with useful fields, route events to the corresponding snapshotters or initialize
+	// open files and registry control blocks at the beginning of the kernel trace session
+	output, err := k.processors.ProcessEvent(kevt)
+	if err != nil {
+		if kerrors.IsCancelUpstreamKevent(err) {
+			upstreamCancellations.Add(1)
+			return nil
+		}
+		log.Errorf("processor chain error(s) occurred: %v", err)
+	}
+	switch ktype {
+	case ktypes.CloseHandle:
+		if output != nil {
+			err = k.publishKevent(output)
+			if err != nil {
+				return err
+			}
+		}
+		return k.publishKevent(kevt)
+	}
+	return k.publishKevent(output)
+}
+
+func (k *kstreamConsumer) publishKevent(kevt *kevent.Kevent) error {
 	// try to drop excluded processes
 	proc := k.psnapshotter.Find(kevt.PID)
 	if k.config.Kstream.ExcludeImage(proc) {
 		excludedProcs.Add(1)
 		return nil
 	}
-
-	// dispatch each event to the interceptor chain that will further augment the kernel
-	// event with useful fields, route events to corresponding snapshotters or initialize
-	// open files/registry control blocks at the beginning of the kernel trace session
-	kevt, err := k.interceptorChain.Dispatch(kevt)
-	if err != nil {
-		if kerrors.IsCancelUpstreamKevent(err) {
-			upstreamCancellations.Add(1)
-			return nil
-		}
-		log.Errorf("interceptor chain error(s) occurred: %v", err)
-	}
-
 	// associate process' state with the kernel event. We only override the process'
 	// state if it hasn't been set previously like in the situation where captures
 	// are being taken. The kernel events that construct the process' snapshot also
@@ -346,7 +358,7 @@ func (k *kstreamConsumer) processKevent(evt *etw.EventRecord) error {
 		return nil
 	}
 	// increment sequence
-	if !kevt.Type.OnlyState() {
+	if !kevt.IsState() {
 		k.sequencer.Increment()
 	}
 	// run rules. In case of rule groups with sequence policy
@@ -361,37 +373,6 @@ func (k *kstreamConsumer) processKevent(evt *etw.EventRecord) error {
 
 	k.kevts <- kevt
 	keventsEnqueued.Add(1)
-
-	return nil
-}
-
-// enqueueKevent is the callback method invoked on deferred event arrival.
-func (k *kstreamConsumer) enqueueKevent(kevt *kevent.Kevent) error {
-	if kevt.PS == nil {
-		kevt.PS = k.psnapshotter.Find(kevt.PID)
-	}
-	if k.config.Kstream.ExcludeImage(kevt.PS) {
-		excludedProcs.Add(1)
-		return nil
-	}
-	if k.isKeventDropped(kevt) {
-		kevt.Release()
-		return nil
-	}
-	if rulesFired := k.rules.Fire(kevt); !rulesFired {
-		return nil
-	}
-	// increment sequence
-	if !kevt.Type.OnlyState() {
-		k.sequencer.Increment()
-	}
-	if k.eventCallback != nil {
-		return k.eventCallback(kevt)
-	}
-
-	k.kevts <- kevt
-	keventsEnqueued.Add(1)
-
 	return nil
 }
 
@@ -407,7 +388,7 @@ func (k *kstreamConsumer) enqueueKevent(kevt *kevent.Kevent) error {
 // - finally, the event is checked by the CLI filter
 func (k *kstreamConsumer) isKeventDropped(kevt *kevent.Kevent) bool {
 	// drop events used for state management unless we're writing the capture
-	if kevt.Type.OnlyState() && !k.capture {
+	if kevt.IsState() && !k.capture {
 		return true
 	}
 	// ignores anything produced by the fibratus process

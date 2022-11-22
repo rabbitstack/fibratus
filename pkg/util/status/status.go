@@ -16,47 +16,32 @@
  * limitations under the License.
  */
 
-package interceptors
+package status
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-	"strings"
+	"github.com/rabbitstack/fibratus/pkg/syscall/sys"
+	"golang.org/x/sys/windows"
 	"sync"
 	"syscall"
 	"unicode/utf16"
-
-	"github.com/rabbitstack/fibratus/pkg/syscall/sys"
-	"golang.org/x/sys/windows"
 )
 
-// statusCache keeps the mappings of formatted NT status messages
 var statusCache = map[uint32]string{}
 var mux sync.Mutex
 
-const (
-	successStatusMessage      = "success"
-	keyNotFoundStatusMessage  = "key not found"
-	fileNotFoundStatusMessage = "file not found"
-	unknownStatusMessage      = "unknown"
+// isSuccess determines if the status code is in success or information value ranges.
+// https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/using-ntstatus-values
+func isSuccess(status uint32) bool {
+	return status <= 0x3FFFFFFF && (status >= 0x40000000 && status <= 0x7FFFFFFF)
+}
 
-	notFoundNTStatus = 3221225524
-)
-
-func formatStatus(status uint32, kevt *kevent.Kevent) string {
-	if status == 0 {
-		return successStatusMessage
+// FormatMessage resolved the NT status code to an error message. The cache of resolved
+// messages is kept to speed up status code translation and alleviate the pressure on
+// API call invocations.
+func FormatMessage(status uint32) string {
+	if isSuccess(status) {
+		return "Success"
 	}
-	// this status code is return quite often, so we can offload the FormatMessage call
-	if status == notFoundNTStatus {
-		switch kevt.Category {
-		case ktypes.Registry:
-			return keyNotFoundStatusMessage
-		case ktypes.File:
-			return fileNotFoundStatusMessage
-		}
-	}
-	// pick resolved status
 	mux.Lock()
 	defer mux.Unlock()
 	if s, ok := statusCache[status]; ok {
@@ -66,14 +51,11 @@ func formatStatus(status uint32, kevt *kevent.Kevent) string {
 	b := make([]uint16, 300)
 	n, err := windows.FormatMessage(flags, 0, sys.CodeFromNtStatus(status), 0, b, nil)
 	if err != nil {
-		return unknownStatusMessage
+		return "Unknown"
 	}
 	// trim terminating \r and \n
 	for ; n > 0 && (b[n-1] == '\n' || b[n-1] == '\r'); n-- {
 	}
-
-	s := strings.ToLower(string(utf16.Decode(b[:n])))
-	statusCache[status] = s
-
-	return s
+	statusCache[status] = string(utf16.Decode(b[:n-1]))
+	return statusCache[status]
 }

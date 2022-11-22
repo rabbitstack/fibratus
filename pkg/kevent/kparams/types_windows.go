@@ -155,16 +155,14 @@ const (
 	FileDosPath
 	// FilePath represents the file system path with normalized drive letter notation
 	FilePath
-	// FileClass represents the file information class
-	FileClass
 	// Status represents the system error code message
 	Status
 	// Key represents the registry key
 	Key
+	// Flags represents a bitmask of flags
 	Flags
+	// Address is the memory address reference
 	Address
-	// Unknown represent an unknown parameter type
-	Unknown
 )
 
 // String return the type string representation.
