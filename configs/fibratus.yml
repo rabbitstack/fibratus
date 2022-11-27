@@ -182,11 +182,11 @@ kstream:
   #enable-handle: false
 
   # Determines whether kernel Audit API calls events are collected
-  #enable-audit-api: true
+  enable-audit-api: false
 
   # Determines whether the Microsoft Antimalware Engine events are collected. For the
   # events to be collected it is necessary to enable Windows Defender realtime protection.
-  #enable-antimalware-engine: true
+  enable-antimalware-engine: false
 
   # Determines if raw event buffer parsing is used instead of TDH (Trace Data Helper) API
   # raw-event-parsing: true
