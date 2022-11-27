@@ -70,28 +70,6 @@ var (
 // EventCallbackFunc is the type alias for the event callback function
 type EventCallbackFunc func(*kevent.Kevent) error
 
-// Consumer is the interface for the kernel event stream consumer.
-type Consumer interface {
-	// OpenKstream initializes the kernel event stream by setting the event record callback and instructing it
-	// to consume events from log buffers. This operation can fail if opening the kernel logger session results
-	// in an invalid trace handler. Errors returned by `ProcessTrace` are sent to the channel since this function
-	// blocks the current thread and we schedule its execution in a separate goroutine.
-	OpenKstream(traces map[string]TraceSession) error
-	// CloseKstream shutdowns the currently running kernel event stream consumer by closing the corresponding
-	// session.
-	CloseKstream() error
-	// Errors returns the channel where errors are pushed.
-	Errors() chan error
-	// Events returns the buffered channel for pulling collected kernel events.
-	Events() chan *kevent.Kevent
-	// SetFilter initializes the filter that's applied on the kernel events.
-	SetFilter(filter.Filter)
-	// SetEventCallback registers a callback function that is invoked for
-	// each incoming event. If the callback function is set up, the events
-	// channel doesn't receive any inbound events.
-	SetEventCallback(EventCallbackFunc)
-}
-
 type kstreamConsumer struct {
 	traceHandles []etw.TraceHandle // trace session handles
 
@@ -108,7 +86,7 @@ type kstreamConsumer struct {
 	filter filter.Filter
 	rules  filter.Rules
 
-	capture bool // capture determines whether the event capture is triggered
+	capture bool // capture determines if events are dumped to capture files
 
 	eventCallback EventCallbackFunc // called on each incoming event
 }
@@ -272,10 +250,12 @@ func (k *kstreamConsumer) processKevent(evt *etw.EventRecord) error {
 	default:
 		ktype = ktypes.Pack(providerID, evt.Header.EventDescriptor.Opcode)
 	}
-
 	if !ktype.Exists() {
 		return nil
 	}
+	// build a new event with all required fields
+	// and parameters. Kevent is the fundamental data
+	// structure for representing the event state
 	kevt := kevent.New(
 		k.sequencer.Get(),
 		ktype,
@@ -285,14 +265,13 @@ func (k *kstreamConsumer) processKevent(evt *etw.EventRecord) error {
 	case ktypes.Image:
 		// sometimes the pid present in event header is invalid
 		// but, we can get the valid one from the event parameters
-		if kevt.PID == winerrno.InvalidPID {
+		if kevt.InvalidPid() {
 			kevt.PID, _ = kevt.Kparams.GetPid()
 		}
 	case ktypes.File:
 		// on some Windows versions the value of
-		// the PID attribute is invalid for the
-		// file system kernel events
-		if kevt.PID == winerrno.InvalidPID {
+		// the PID is invalid in the event header
+		if kevt.InvalidPid() {
 			// try to resolve a valid pid from thread ID
 			threadID, err := kevt.Kparams.GetTid()
 			if err != nil {
@@ -325,12 +304,11 @@ func (k *kstreamConsumer) processKevent(evt *etw.EventRecord) error {
 		}
 		log.Errorf("processor chain error(s) occurred: %v", err)
 	}
-	switch ktype {
-	case ktypes.CloseHandle:
+	if ktype == ktypes.CloseHandle {
 		if output != nil {
 			err = k.publishKevent(output)
 			if err != nil {
-				return err
+				return k.publishKevent(kevt)
 			}
 		}
 		return k.publishKevent(kevt)
@@ -339,10 +317,11 @@ func (k *kstreamConsumer) processKevent(evt *etw.EventRecord) error {
 }
 
 func (k *kstreamConsumer) publishKevent(kevt *kevent.Kevent) error {
-	// try to drop excluded processes
+	// try to drop events from excluded processes
 	proc := k.psnapshotter.Find(kevt.PID)
 	if k.config.Kstream.ExcludeImage(proc) {
 		excludedProcs.Add(1)
+		kevt.Release()
 		return nil
 	}
 	// associate process' state with the kernel event. We only override the process'

@@ -588,7 +588,7 @@ func newFileAccessor() accessor {
 func (l *fileAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
 	switch f {
 	case fields.FileName:
-		return kevt.Kparams.GetString(kparams.FileName)
+		return kevt.GetParamAsString(kparams.FileName), nil
 	case fields.FileOffset:
 		return kevt.Kparams.GetUint64(kparams.FileOffset)
 	case fields.FileIOSize:
@@ -604,25 +604,14 @@ func (l *fileAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, 
 		}
 		return mode.String(), nil
 	case fields.FileOperation:
-		op, err := kevt.Kparams.GetRaw(kparams.FileOperation)
-		if err != nil {
-			return nil, err
-		}
-		fop, ok := op.(fs.FileDisposition)
-		if !ok {
-			return nil, errors.New("couldn't type assert to file operation enum")
-		}
-		return fop.String(), nil
+		return kevt.GetParamAsString(kparams.FileOperation), nil
 	case fields.FileObject:
 		return kevt.Kparams.GetUint64(kparams.FileObject)
 	case fields.FileType:
 		return kevt.Kparams.GetString(kparams.FileType)
 	case fields.FileExtension:
-		file, err := kevt.Kparams.GetString(kparams.FileName)
-		if err != nil {
-			return nil, err
-		}
-		return filepath.Ext(file), nil
+		filename := kevt.GetParamAsString(kparams.FileName)
+		return filepath.Ext(filename), nil
 	case fields.FileAttributes:
 		val, err := kevt.Kparams.GetSlice(kparams.FileAttributes)
 		if err != nil {

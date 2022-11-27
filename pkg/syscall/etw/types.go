@@ -34,9 +34,6 @@ type EventTraceFlags uint32
 // KernelTraceControlGUID is the GUID for the kernel system logger
 var KernelTraceControlGUID = syscall.GUID{Data1: 0x9e814aad, Data2: 0x3204, Data3: 0x11d2, Data4: [8]byte{0x9a, 0x82, 0x00, 0x60, 0x08, 0xa8, 0x69, 0x39}}
 
-// KernelRundownGUID is the GUID for the kernel rundown logger
-var KernelRundownGUID = syscall.GUID{Data1: 0x3b9c9951, Data2: 0x3480, Data3: 0x4220, Data4: [8]byte{0x93, 0x77, 0x9c, 0x8e, 0x51, 0x84, 0xf5, 0xcd}}
-
 // KernelAuditAPICallsGUID represents the GUID for the kernel audit API provider
 var KernelAuditAPICallsGUID = syscall.GUID{Data1: 0xe02a841c, Data2: 0x75a3, Data3: 0x4fa7, Data4: [8]byte{0xaf, 0xc8, 0xae, 0x09, 0xcf, 0x9b, 0x7f, 0x23}}
 
@@ -51,8 +48,6 @@ const (
 const (
 	// KernelLoggerSession represents the default session name for NT kernel logger
 	KernelLoggerSession = "NT Kernel Logger"
-	// KernelLoggerRundownSession is the session name for the kernel rundown logger
-	KernelLoggerRundownSession = "Kernel Rundown Logger"
 	// KernelAuditAPICallsSession represents the session name for the kernel audit API logger
 	KernelAuditAPICallsSession = "Kernel Audit API Calls Logger"
 	// AntimalwareEngineSession is the session name for the Antimalware Engine logger

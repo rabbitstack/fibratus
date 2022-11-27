@@ -340,6 +340,16 @@ func (kpars Kparams) GetUint64(name string) (uint64, error) {
 	return v, nil
 }
 
+// MustGetUint64 returns  the underlying uint64 value parameter. It panics if
+// an error occurs while trying to get the parameter.
+func (kpars Kparams) MustGetUint64(name string) uint64 {
+	v, err := kpars.GetUint64(name)
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
+
 // GetInt64 returns the underlying int64 value from the parameter.
 func (kpars Kparams) GetInt64(name string) (int64, error) {
 	kpar, err := kpars.findParam(name)

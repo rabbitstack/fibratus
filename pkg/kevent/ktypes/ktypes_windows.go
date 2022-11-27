@@ -248,15 +248,17 @@ func (k Ktype) String() string {
 // Category determines the category to which the ktype pertains.
 func (k Ktype) Category() Category {
 	switch k {
-	case CreateProcess, TerminateProcess, OpenProcess:
+	case CreateProcess, TerminateProcess, OpenProcess, ProcessRundown:
 		return Process
-	case CreateThread, TerminateThread, OpenThread:
+	case CreateThread, TerminateThread, OpenThread, ThreadRundown:
 		return Thread
-	case LoadImage, UnloadImage:
+	case LoadImage, UnloadImage, ImageRundown:
 		return Image
-	case CreateFile, ReadFile, WriteFile, EnumDirectory, DeleteFile, RenameFile, CloseFile, SetFileInformation:
+	case CreateFile, ReadFile, WriteFile, EnumDirectory, DeleteFile, RenameFile, CloseFile, SetFileInformation,
+		FileRundown, FileOpEnd, ReleaseFile:
 		return File
-	case RegCreateKey, RegDeleteKey, RegOpenKey, RegCloseKey, RegQueryKey, RegQueryValue, RegSetValue, RegDeleteValue:
+	case RegCreateKey, RegDeleteKey, RegOpenKey, RegCloseKey, RegQueryKey, RegQueryValue, RegSetValue, RegDeleteValue,
+		RegKCBRundown, RegDeleteKCB, RegCreateKCB:
 		return Registry
 	case AcceptTCPv4, AcceptTCPv6,
 		ConnectTCPv4, ConnectTCPv6,

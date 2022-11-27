@@ -55,7 +55,7 @@ func (i *imageProcessor) ProcessEvent(kevt *kevent.Kevent) (*kevent.Kevent, bool
 			}
 		}()
 	}
-	if kevt.Type == ktypes.UnloadImage {
+	if kevt.IsUnloadImage() {
 		return kevt, false, i.snap.Remove(kevt)
 	}
 	return kevt, false, i.snap.Write(kevt)

@@ -74,7 +74,7 @@ func (r *registryProcessor) ProcessEvent(kevt *kevent.Kevent) (*kevent.Kevent, b
 	case ktypes.RegKCBRundown, ktypes.RegCreateKCB:
 		khandle, err := kevt.Kparams.GetUint64(kparams.RegKeyHandle)
 		if err != nil {
-			return kevt, true, err
+			return kevt, false, err
 		}
 		if _, ok := r.keys[khandle]; !ok {
 			r.keys[khandle], _ = kevt.Kparams.GetString(kparams.RegKeyName)
@@ -84,7 +84,7 @@ func (r *registryProcessor) ProcessEvent(kevt *kevent.Kevent) (*kevent.Kevent, b
 	case ktypes.RegDeleteKCB:
 		khandle, err := kevt.Kparams.GetUint64(kparams.RegKeyHandle)
 		if err != nil {
-			return kevt, true, err
+			return kevt, false, err
 		}
 		delete(r.keys, khandle)
 		kcbCount.Add(-1)
@@ -99,7 +99,7 @@ func (r *registryProcessor) ProcessEvent(kevt *kevent.Kevent) (*kevent.Kevent, b
 		ktypes.RegDeleteValue:
 		khandle, err := kevt.Kparams.GetUint64(kparams.RegKeyHandle)
 		if err != nil {
-			return kevt, true, err
+			return kevt, false, err
 		}
 		// we have to obey a straightforward algorithm to connect relative
 		// key names to their root keys. If key handle is equal to zero we
@@ -119,7 +119,7 @@ func (r *registryProcessor) ProcessEvent(kevt *kevent.Kevent) (*kevent.Kevent, b
 				keyName = r.findMatchingKey(kevt.PID, keyName)
 			}
 			if err := kevt.Kparams.SetValue(kparams.RegKeyName, keyName); err != nil {
-				return kevt, true, err
+				return kevt, false, err
 			}
 		}
 
@@ -131,41 +131,41 @@ func (r *registryProcessor) ProcessEvent(kevt *kevent.Kevent) (*kevent.Kevent, b
 
 				regKey, err := reg.OpenKey(reg.Key(rootKey), subkey, reg.QUERY_VALUE)
 				if err != nil {
-					return kevt, true, nil
+					return kevt, false, nil
 				}
 				defer regKey.Close()
 				b := make([]byte, 0)
 				_, typ, err := regKey.GetValue(value, b)
 				if err != nil {
-					return kevt, true, nil
+					return kevt, false, nil
 				}
 				kevt.AppendParam(kparams.RegValueType, kparams.Enum, typ, kevent.WithEnum(key.RegistryValueTypes))
 				switch typ {
 				case reg.SZ, reg.EXPAND_SZ:
 					v, _, err := regKey.GetStringValue(value)
 					if err != nil {
-						return kevt, true, nil
+						return kevt, false, nil
 					}
 					kevt.Kparams.Append(kparams.RegValue, kparams.UnicodeString, v)
 
 				case reg.DWORD, reg.QWORD:
 					v, _, err := regKey.GetIntegerValue(value)
 					if err != nil {
-						return kevt, true, nil
+						return kevt, false, nil
 					}
 					kevt.Kparams.Append(kparams.RegValue, kparams.Uint64, v)
 
 				case reg.MULTI_SZ:
 					v, _, err := regKey.GetStringsValue(value)
 					if err != nil {
-						return kevt, true, nil
+						return kevt, false, nil
 					}
 					kevt.Kparams.Append(kparams.RegValue, kparams.UnicodeString, strings.Join(v, "\n\r"))
 
 				case reg.BINARY:
 					v, _, err := regKey.GetBinaryValue(value)
 					if err != nil {
-						return kevt, true, nil
+						return kevt, false, nil
 					}
 					kevt.Kparams.Append(kparams.RegValue, kparams.UnicodeString, string(v))
 				}

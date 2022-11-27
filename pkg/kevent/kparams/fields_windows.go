@@ -76,7 +76,7 @@ const (
 	// FileName represents the field that designates the absolute path of the file.
 	FileName = "file_name"
 	// FileCreateOptions is the field that represents the values passed in the CreateDispositions parameter to the NtCreateFile function.
-	FileCreateOptions = "options"
+	FileCreateOptions = "create_options"
 	// FileOperation is the field that represents the values passed in the CreateOptions parameter to the NtCreateFile function.
 	FileOperation = "operation"
 	// FileCreated represents the name for the file creation field.

@@ -109,6 +109,16 @@ func (typ FileType) String() string {
 	}
 }
 
+// FileTypes represents the mapping of file type identifiers to their string values.
+var FileTypes = map[uint32]string{
+	uint32(Regular):   "File",
+	uint32(Directory): "Directory",
+	uint32(Pipe):      "Pipe",
+	uint32(Console):   "Console",
+	uint32(Mailslot):  "Mailslot",
+	uint32(Other):     "Other",
+}
+
 // FileShareMode designates a type alias for file share mode values
 type FileShareMode uint8
 

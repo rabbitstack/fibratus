@@ -48,7 +48,7 @@ type Processor interface {
 	// ProcessEvent receives an existing event possibly mutating its state. The event is filtered out if
 	// this method returns an error. If it returns true, the next processor in the chain is evaluated.
 	// Processor may return a different event instance, if it piggybacks on the state of the outstanding event.
-	ProcessEvent(kevt *kevent.Kevent) (*kevent.Kevent, bool, error)
+	ProcessEvent(*kevent.Kevent) (*kevent.Kevent, bool, error)
 
 	// Name returns a human-readable name of this processor.
 	Name() ProcessorType

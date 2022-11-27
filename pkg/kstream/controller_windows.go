@@ -20,6 +20,8 @@ package kstream
 
 import (
 	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/util/multierror"
+	"golang.org/x/sys/windows"
 	"runtime"
 	"syscall"
 	"time"
@@ -39,7 +41,6 @@ const (
 	etwMaxLoggersPath = `SYSTEM\CurrentControlSet\Control\WMI`
 	// etwMaxLoggersValue is the registry value that dictates the maximum number of loggers. Default value is 64 on most systems
 	etwMaxLoggersValue = "EtwMaxLoggers"
-	maxStringLen       = 1024
 )
 
 // TraceSession stores metadata of the initiated tracing session.
@@ -84,11 +85,12 @@ type ktraceController struct {
 	kstreamConfig config.KstreamConfig
 	// traces contains initiated tracing sessions
 	traces map[string]TraceSession
-	// providers contains a list of enabled ETW providers
+	// providers contains a list of enabled ETW providers from
+	// which the telemetry is collected
 	providers []TraceProvider
 }
 
-// NewKtraceController spins up a new instance of kernel trace controller.
+// NewKtraceController spins up a new instance of the trace controller.
 func NewKtraceController(kstreamConfig config.KstreamConfig) KtraceController {
 	providers := []TraceProvider{
 		{
@@ -96,13 +98,6 @@ func NewKtraceController(kstreamConfig config.KstreamConfig) KtraceController {
 			etw.KernelLoggerSession,
 			etw.KernelTraceControlGUID,
 			0x0, // no keywords
-			true,
-		},
-		{
-			// provides a source of events for constructing the state of opened file objects
-			etw.KernelLoggerRundownSession,
-			etw.KernelRundownGUID,
-			0x10, // file rundown events
 			true,
 		},
 		{
@@ -168,7 +163,7 @@ func (k *ktraceController) StartKtrace() error {
 		maxBuffers = maxBuffersAllowed
 	}
 	if minBuffers > maxBuffers {
-		minBuffers = maxBuffers
+		minBuffers = maxBuffers - 20
 	}
 
 	flushTimer := k.kstreamConfig.FlushTimer
@@ -181,9 +176,10 @@ func (k *ktraceController) StartKtrace() error {
 			log.Warnf("provider for trace [%s] is disabled", prov.TraceName)
 			continue
 		}
-		props := &etw.EventTraceProperties{
+		traceName := prov.TraceName
+		props := etw.EventTraceProperties{
 			Wnode: etw.WnodeHeader{
-				BufferSize: uint32(unsafe.Sizeof(etw.EventTraceProperties{})) + 2*maxStringLen,
+				BufferSize: uint32(unsafe.Sizeof(etw.EventTraceProperties{})) + 2*windows.MAX_PATH,
 				Flags:      etw.WnodeTraceFlagGUID,
 			},
 			LoggerNameOffset:  uint32(unsafe.Sizeof(etw.EventTraceProperties{})),
@@ -199,7 +195,6 @@ func (k *ktraceController) StartKtrace() error {
 			props.Wnode.GUID = prov.GUID
 			log.Debugf("starting kernel trace with %q event flags", flags)
 		}
-		traceName := prov.TraceName
 
 		handle, err := etw.StartTrace(
 			traceName,
@@ -216,16 +211,17 @@ func (k *ktraceController) StartKtrace() error {
 				// poorly documented ETW feature that allows for enabling an extended set of
 				// kernel event tracing flags. According to the MSDN documentation, aside from
 				// invoking `EventTraceProperties` function to enable object manager tracking
-				// the `EventTraceProperties` structure's `EnableFlags` member needs to be set to PERF_OB_HANDLE (0x80000040).
-				// This actually results in an erroneous trace start. The documentation neither specifies how the function
-				// should be called (group mask array with its 4th element set to 0x80000040).
+				// the `EventTraceProperties` structure's `EnableFlags` member needs to be set
+				// to PERF_OB_HANDLE (0x80000040). This actually results in an erroneous trace start.
+				// The documentation neither specifies how the function should be called, group mask
+				// array with its 4th element set to 0x80000040.
 				sysTraceFlags := make([]etw.EventTraceFlags, 8)
 				// when we call the`TraceSetInformation` with event empty group mask reserved for the
 				// flags that are bitvectored into `EventTraceProperties` structure's `EnableFlags` field,
 				// it will trigger the arrival of rundown events including open file objects and
 				// registry keys that are very valuable for us to construct the initial snapshot of
 				// these system resources and let us build the event's context
-				if err := etw.SetTraceSystemFlags(handle, sysTraceFlags); err != nil {
+				if err := etw.SetTraceSystemFlags(handleCopy, sysTraceFlags); err != nil {
 					log.Warn(err)
 				}
 				sysTraceFlags[0] = flags
@@ -235,10 +231,10 @@ func (k *ktraceController) StartKtrace() error {
 				}
 				// call again to enable all kernel events. Just to recap. The first call to `TraceSetInformation` with empty
 				// group masks activates rundown events, while this second call enables the rest of the kernel events specified in flags.
-				if err := etw.SetTraceSystemFlags(handle, sysTraceFlags); err != nil {
+				if err := etw.SetTraceSystemFlags(handleCopy, sysTraceFlags); err != nil {
 					log.Warnf("unable to set trace information: %v", err)
 				}
-				k.insertTrace(traceName, handleCopy, prov.GUID)
+				k.insertTrace(traceName, handle, prov.GUID)
 			} else {
 				// enable the specified trace provider
 				if err := etw.EnableTrace(prov.GUID, handle, prov.Keywords); err != nil {
@@ -247,20 +243,16 @@ func (k *ktraceController) StartKtrace() error {
 				k.insertTrace(traceName, handle, prov.GUID)
 			}
 		}
-
 		switch err {
 		case kerrors.ErrTraceAlreadyRunning:
-			if err := etw.ControlTrace(etw.TraceHandle(0), traceName, props, etw.Query); err == kerrors.ErrKsessionNotRunning {
-				return kerrors.ErrCannotUpdateTrace
+			log.Debugf("%s trace is already running. Trying to restart...", traceName)
+			if err := etw.StopTrace(traceName, prov.GUID); err != nil {
+				return multierror.Wrap(kerrors.ErrStopTrace, err)
 			}
-			if err := etw.ControlTrace(etw.TraceHandle(0), traceName, props, etw.Stop); err != nil {
-				return kerrors.ErrStopTrace
-			}
-
 			time.Sleep(time.Millisecond * 100)
-			props := &etw.EventTraceProperties{
+			props := etw.EventTraceProperties{
 				Wnode: etw.WnodeHeader{
-					BufferSize: uint32(unsafe.Sizeof(etw.EventTraceProperties{})) + 2*maxStringLen,
+					BufferSize: uint32(unsafe.Sizeof(etw.EventTraceProperties{})) + 2*windows.MAX_PATH,
 					Flags:      etw.WnodeTraceFlagGUID,
 				},
 				LoggerNameOffset:  uint32(unsafe.Sizeof(etw.EventTraceProperties{})),
@@ -275,21 +267,21 @@ func (k *ktraceController) StartKtrace() error {
 				props.EnableFlags = flags
 				props.Wnode.GUID = prov.GUID
 			}
+			log.Debugf("restarting trace [%s]", traceName)
 			handle, err := etw.StartTrace(
 				traceName,
 				props,
 			)
 			if err != nil {
-				return kerrors.ErrRestartTrace
+				return multierror.Wrap(kerrors.ErrRestartTrace, err)
 			}
 			if !handle.IsValid() {
 				return kerrors.ErrInvalidTrace
 			}
 			if prov.IsKernelLogger() {
 				handleCopy := handle
-
 				sysTraceFlags := make([]etw.EventTraceFlags, 8)
-				if err := etw.SetTraceSystemFlags(handle, sysTraceFlags); err != nil {
+				if err := etw.SetTraceSystemFlags(handleCopy, sysTraceFlags); err != nil {
 					log.Warn(err)
 				}
 				sysTraceFlags[0] = flags
@@ -299,10 +291,10 @@ func (k *ktraceController) StartKtrace() error {
 				}
 				// call again to enable all kernel events. Just to recap. The first call to `TraceSetInformation` with empty
 				// group masks activates rundown events, while this second call enables the rest of the kernel events specified in flags.
-				if err := etw.SetTraceSystemFlags(handle, sysTraceFlags); err != nil {
+				if err := etw.SetTraceSystemFlags(handleCopy, sysTraceFlags); err != nil {
 					log.Warnf("unable to set trace information: %v", err)
 				}
-				k.insertTrace(traceName, handleCopy, prov.GUID)
+				k.insertTrace(traceName, handle, prov.GUID)
 			} else {
 				if err := etw.EnableTrace(prov.GUID, handle, prov.Keywords); err != nil {
 					return fmt.Errorf("unable to activate %s provider: %v", traceName, err)
@@ -336,26 +328,24 @@ func (k *ktraceController) StartKtrace() error {
 // CloseKtrace stops currently running trace sessions.
 func (k *ktraceController) CloseKtrace() error {
 	for _, trace := range k.traces {
-		props := &etw.EventTraceProperties{
-			Wnode: etw.WnodeHeader{
-				BufferSize: uint32(unsafe.Sizeof(etw.EventTraceProperties{})) + 2*maxStringLen,
-				GUID:       trace.GUID,
-			},
-			LoggerNameOffset:  uint32(unsafe.Sizeof(etw.EventTraceProperties{})),
-			LogFileNameOffset: 0,
+		if !trace.Handle.IsValid() {
+			continue
 		}
-		if err := etw.ControlTrace(etw.TraceHandle(0), trace.Name, props, etw.Flush); err != nil {
-			log.Warnf("couldn't flush trace session for [%s]: %v", trace.Name, err)
+		traceName := trace.Name
+		if err := etw.FlushTrace(traceName, trace.GUID); err != nil {
+			log.Warnf("couldn't flush trace session for [%s]: %v", traceName, err)
 		}
-		time.Sleep(time.Millisecond * 50)
-		if err := etw.ControlTrace(etw.TraceHandle(0), trace.Name, props, etw.Stop); err != nil {
-			log.Warnf("couldn't stop trace session for [%s]: %v", trace.Name, err)
+		time.Sleep(time.Millisecond * 150)
+		if err := etw.StopTrace(traceName, trace.GUID); err != nil {
+			log.Warnf("couldn't stop trace session for [%s]: %v", traceName, err)
 		}
 	}
 	return nil
 }
 
-func (k *ktraceController) Traces() map[string]TraceSession { return k.traces }
+func (k *ktraceController) Traces() map[string]TraceSession {
+	return k.traces
+}
 
 func (k *ktraceController) insertTrace(name string, handle etw.TraceHandle, guid syscall.GUID) {
 	trace := TraceSession{

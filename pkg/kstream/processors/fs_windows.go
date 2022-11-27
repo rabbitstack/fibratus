@@ -20,8 +20,6 @@ package processors
 
 import (
 	"expvar"
-	"sync"
-
 	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/handle"
@@ -43,10 +41,9 @@ var (
 type fsProcessor struct {
 	// files stores the file metadata indexed by file object
 	files map[uint64]*fileInfo
-	mux   sync.Mutex
 	hsnap handle.Snapshotter
-
-	pendingKevents map[uint64]*kevent.Kevent
+	// irps contains a mapping between the IRP and the CreateFile events
+	irps map[uint64]*kevent.Kevent
 }
 
 type fileInfo struct {
@@ -56,16 +53,18 @@ type fileInfo struct {
 
 func newFsProcessor(hsnap handle.Snapshotter) Processor {
 	interceptor := &fsProcessor{
-		files:          make(map[uint64]*fileInfo),
-		pendingKevents: make(map[uint64]*kevent.Kevent),
-		hsnap:          hsnap,
+		files: make(map[uint64]*fileInfo),
+		irps:  make(map[uint64]*kevent.Kevent),
+		hsnap: hsnap,
 	}
 	return interceptor
 }
 
 func (f *fsProcessor) ProcessEvent(kevt *kevent.Kevent) (*kevent.Kevent, bool, error) {
 	if kevt.Category == ktypes.File {
-		return kevt, false, f.processEvent(kevt)
+		err := f.processEvent(kevt)
+		kevt.Tid, _ = kevt.Kparams.GetTid()
+		return kevt, false, err
 	}
 	return kevt, true, nil
 }
@@ -78,22 +77,13 @@ func (f *fsProcessor) getFileInfo(name string, opts uint32) *fileInfo {
 }
 
 func (f *fsProcessor) processEvent(kevt *kevent.Kevent) error {
-	fobj, err := kevt.Kparams.GetUint64(kparams.FileObject)
-	if err != nil && kevt.Type != ktypes.FileOpEnd {
-		return err
-	}
-	// update event's thread identifier with the one
-	// that's involved in the file system operation
-	kevt.Tid, _ = kevt.Kparams.GetTid()
-
 	switch kevt.Type {
 	case ktypes.FileRundown:
 		// when the file rundown event comes in we store the file info
 		// in internal state in order to augment the rest of file events
 		// that lack the file name field
 		filename := kevt.GetParamAsString(kparams.FileName)
-		f.mux.Lock()
-		defer f.mux.Unlock()
+		fobj := kevt.Kparams.MustGetUint64(kparams.FileObject)
 		if _, ok := f.files[fobj]; !ok {
 			totalRundownFiles.Add(1)
 			f.files[fobj] = &fileInfo{name: filename, typ: fs.GetFileType(filename, 0)}
@@ -102,44 +92,29 @@ func (f *fsProcessor) processEvent(kevt *kevent.Kevent) error {
 		// we defer the processing of the CreateFile event until we get
 		// the matching FileOpEnd event. This event contains the operation
 		// that was done on behalf of the file, e.g. create or open.
-		irp, err := kevt.Kparams.GetUint64(kparams.FileIrpPtr)
-		if err != nil {
-			return err
-		}
-		f.pendingKevents[irp] = kevt
+		irp := kevt.Kparams.MustGetUint64(kparams.FileIrpPtr)
+		f.irps[irp] = kevt
 		return kerrors.ErrCancelUpstreamKevent
 	case ktypes.FileOpEnd:
 		// get the CreateFile pending event by IRP identifier
 		// and fetch the file create disposition value
-		irp, err := kevt.Kparams.GetUint64(kparams.FileIrpPtr)
-		if err != nil {
-			return err
+		var (
+			irp    = kevt.Kparams.MustGetUint64(kparams.FileIrpPtr)
+			dispo  = kevt.Kparams.MustGetUint64(kparams.FileExtraInfo)
+			status = kevt.Kparams.MustGetUint32(kparams.NTStatus)
+		)
+		fevt, ok := f.irps[irp]
+		if !ok || !fevt.IsCreateFile() {
+			return nil
 		}
-		extraInfo, err := kevt.Kparams.GetUint64(kparams.FileExtraInfo)
-		if err != nil {
-			return err
-		}
-		fkevt, ok := f.pendingKevents[irp]
-		if !ok {
-			return kerrors.ErrCancelUpstreamKevent
-		}
-		status, err := kevt.Kparams.GetUint32(kparams.NTStatus)
-		if err == nil {
-			fkevt.AppendParam(kparams.NTStatus, kparams.Status, status)
-		}
-		kevt = fkevt
-		delete(f.pendingKevents, irp)
-
-		// append file create disposition
-		kevt.AppendParam(kparams.FileOperation, kparams.Enum, uint32(extraInfo), kevent.WithEnum(fs.FileCreateDispositions))
-
+		kevt = fevt
+		delete(f.irps, irp)
+		fobj := kevt.Kparams.MustGetUint64(kparams.FileObject)
 		// try to get extended file info. If the file object is already
 		// present in the map, we'll reuse the existing file information
-		f.mux.Lock()
-		defer f.mux.Unlock()
 		fileinfo, ok := f.files[fobj]
 		if !ok {
-			opts, _ := kevt.Kparams.GetUint32(kparams.FileCreateOptions)
+			opts := kevt.Kparams.MustGetUint32(kparams.FileCreateOptions)
 			opts &= 0xFFFFFF
 
 			filename := kevt.GetParamAsString(kparams.FileName)
@@ -150,34 +125,27 @@ func (f *fsProcessor) processEvent(kevt *kevent.Kevent) error {
 			if fileinfo.typ == fs.Unknown {
 				fileinfo.typ = f.findDirHandle(fobj)
 			}
-			kevt.AppendParam(kparams.FileType, kparams.AnsiString, fileinfo.typ.String())
 			f.files[fobj] = fileinfo
 		}
-		// delete raw event parameters
-		kevt.Kparams.Remove(kparams.FileExtraInfo)
-		kevt.Kparams.Remove(kparams.FileCreateOptions)
+		kevt.AppendParam(kparams.NTStatus, kparams.Status, status)
+		kevt.AppendParam(kparams.FileType, kparams.Enum, fileinfo.typ, kevent.WithEnum(fs.FileTypes))
+		kevt.AppendParam(kparams.FileOperation, kparams.Enum, uint32(dispo), kevent.WithEnum(fs.FileCreateDispositions))
 	case ktypes.ReleaseFile:
 		fileReleaseCount.Add(1)
 		// delete both, the file object and the file key from files map
-		fileKey, err := kevt.Kparams.GetUint64(kparams.FileKey)
-		f.mux.Lock()
-		defer f.mux.Unlock()
-		if err == nil {
-			delete(f.files, fileKey)
-		}
+		fileKey := kevt.Kparams.MustGetUint64(kparams.FileKey)
+		fobj := kevt.Kparams.MustGetUint64(kparams.FileObject)
+		delete(f.files, fileKey)
 		delete(f.files, fobj)
 	case ktypes.DeleteFile, ktypes.RenameFile,
 		ktypes.CloseFile, ktypes.ReadFile,
 		ktypes.WriteFile, ktypes.SetFileInformation, ktypes.EnumDirectory:
-		fileKey, err := kevt.Kparams.GetUint64(kparams.FileKey)
-		if err != nil {
-			return err
-		}
+
+		fobj := kevt.Kparams.MustGetUint64(kparams.FileObject)
+		fileKey := kevt.Kparams.MustGetUint64(kparams.FileKey)
 		// attempt to get the file by file key. If there is no such file referenced
 		// by the file key, then try to fetch it by file object. Even if file object
 		// references fails, we search in the file handles for such file
-		f.mux.Lock()
-		defer f.mux.Unlock()
 		fileinfo, ok := f.files[fileKey]
 		if !ok {
 			fileinfo, ok = f.files[fobj]
@@ -205,20 +173,17 @@ func (f *fsProcessor) processEvent(kevt *kevent.Kevent) error {
 			// the file key parameter contains the reference to the directory name
 			fileKey, err := kevt.Kparams.GetUint64(kparams.FileKey)
 			if err != nil {
-				kevt.Kparams.Remove(kparams.FileKey)
 				return err
 			}
-			kevt.Kparams.Remove(kparams.FileKey)
 			fileinfo, ok := f.files[fileKey]
 			if ok && fileinfo != nil {
 				kevt.AppendParam(kparams.FileDirectory, kparams.FilePath, fileinfo.name)
 			}
 			break
 		}
-
 		if fileinfo != nil {
 			if fileinfo.typ != fs.Unknown {
-				kevt.AppendParam(kparams.FileType, kparams.AnsiString, fileinfo.typ.String())
+				kevt.AppendParam(kparams.FileType, kparams.Enum, fileinfo.typ, kevent.WithEnum(fs.FileTypes))
 			}
 			kevt.AppendParam(kparams.FileName, kparams.FilePath, fileinfo.name)
 		}
@@ -227,14 +192,14 @@ func (f *fsProcessor) processEvent(kevt *kevent.Kevent) error {
 }
 
 func (f *fsProcessor) findDirHandle(fobj uint64) fs.FileType {
-	fhandle, ok := f.hsnap.FindByObject(fobj)
-	if !ok || fhandle.Type != handle.File {
+	h, ok := f.hsnap.FindByObject(fobj)
+	if !ok || h.Type != handle.File {
 		return fs.Unknown
 	}
-	if fhandle.MD == nil {
+	if h.MD == nil {
 		return fs.Unknown
 	}
-	md, ok := fhandle.MD.(*htypes.FileInfo)
+	md, ok := h.MD.(*htypes.FileInfo)
 	if ok && md.IsDirectory {
 		return fs.Directory
 	}

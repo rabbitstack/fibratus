@@ -21,7 +21,6 @@ package processors
 import (
 	"expvar"
 	"fmt"
-
 	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
@@ -73,8 +72,8 @@ func (c chain) ProcessEvent(kevt *kevent.Kevent) (*kevent.Kevent, error) {
 	if len(errs) > 0 {
 		return output, multierror.Wrap(errs...)
 	}
-
 	if cukerr != nil {
+		cukerr = nil
 		return output, cukerr
 	}
 
@@ -86,6 +85,5 @@ func (c chain) Close() error {
 	for _, processor := range c.processors {
 		processor.Close()
 	}
-	close(c.deferredKevts)
 	return nil
 }

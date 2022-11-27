@@ -32,7 +32,7 @@ var mux sync.Mutex
 // isSuccess determines if the status code is in success or information value ranges.
 // https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/using-ntstatus-values
 func isSuccess(status uint32) bool {
-	return status <= 0x3FFFFFFF && (status >= 0x40000000 && status <= 0x7FFFFFFF)
+	return status <= 0x3FFFFFFF || (status >= 0x40000000 && status <= 0x7FFFFFFF)
 }
 
 // FormatMessage resolved the NT status code to an error message. The cache of resolved

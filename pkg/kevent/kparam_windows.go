@@ -92,10 +92,11 @@ func (k Kparam) String() string {
 		if keyName != "" && rootKey != registry.InvalidKey {
 			return rootKey.String() + "\\" + keyName
 		}
-		if rootKey == registry.InvalidKey {
-			unknownKeysCount.Add(1)
-			return keyName
+		if rootKey != registry.InvalidKey {
+			return rootKey.String()
 		}
+		unknownKeysCount.Add(1)
+		return keyName
 	case kparams.Status:
 		v, ok := k.Value.(uint32)
 		if !ok {
@@ -215,10 +216,10 @@ func (kevt *Kevent) produceParams(e *etw.EventRecord) {
 	case ktypes.OpenProcess:
 		processID := e.ReadUint32(0)
 		desiredAccess := e.ReadUint32(4)
-		status := e.ReadUint32(8)
+		statusCode := e.ReadUint32(8)
 		kevt.AppendParam(kparams.ProcessID, kparams.PID, processID)
 		kevt.AppendParam(kparams.DesiredAccess, kparams.Flags, desiredAccess, WithFlags(PsAccessRightFlags))
-		kevt.AppendParam(kparams.NTStatus, kparams.Status, status)
+		kevt.AppendParam(kparams.NTStatus, kparams.Status, statusCode)
 	case ktypes.CreateThread,
 		ktypes.TerminateThread,
 		ktypes.ThreadRundown:
@@ -265,11 +266,11 @@ func (kevt *Kevent) produceParams(e *etw.EventRecord) {
 		processID := e.ReadUint32(0)
 		threadID := e.ReadUint32(4)
 		desiredAccess := e.ReadUint32(8)
-		status := e.ReadUint32(12)
+		statusCode := e.ReadUint32(12)
 		kevt.AppendParam(kparams.ProcessID, kparams.PID, processID)
 		kevt.AppendParam(kparams.ThreadID, kparams.TID, threadID)
 		kevt.AppendParam(kparams.DesiredAccess, kparams.Flags, desiredAccess, WithFlags(ThreadAccessRightFlags))
-		kevt.AppendParam(kparams.NTStatus, kparams.Status, status)
+		kevt.AppendParam(kparams.NTStatus, kparams.Status, statusCode)
 	case ktypes.CreateHandle, ktypes.CloseHandle:
 		object := e.ReadUint64(0)
 		handleID := e.ReadUint32(8)
@@ -315,7 +316,7 @@ func (kevt *Kevent) produceParams(e *etw.EventRecord) {
 			offset = 16
 		}
 		filename, _ = e.ReadUTF16String(offset)
-		kevt.AppendParam(kparams.ProcessID, kparams.Uint32, pid)
+		kevt.AppendParam(kparams.ProcessID, kparams.PID, pid)
 		kevt.AppendParam(kparams.ImageCheckSum, kparams.Uint32, checksum)
 		kevt.AppendParam(kparams.ImageDefaultBase, kparams.Address, defaultBase)
 		kevt.AppendParam(kparams.ImageBase, kparams.Address, imageBase)
@@ -328,15 +329,15 @@ func (kevt *Kevent) produceParams(e *etw.EventRecord) {
 		ktypes.RegQueryKey, ktypes.RegQueryValue,
 		ktypes.RegSetValue:
 		var (
-			status    uint32
-			keyHandle uint64
-			keyName   string
+			statusCode uint32
+			keyHandle  uint64
+			keyName    string
 		)
 		if e.Version() >= 2 {
-			status = e.ReadUint32(8)
+			statusCode = e.ReadUint32(8)
 			keyHandle = e.ReadUint64(16)
 		} else {
-			status = e.ReadUint32(0)
+			statusCode = e.ReadUint32(0)
 			keyHandle = e.ReadUint64(4)
 		}
 		if e.Version() >= 1 {
@@ -346,7 +347,7 @@ func (kevt *Kevent) produceParams(e *etw.EventRecord) {
 		}
 		kevt.AppendParam(kparams.RegKeyHandle, kparams.Uint64, keyHandle)
 		kevt.AppendParam(kparams.RegKeyName, kparams.Key, keyName)
-		kevt.AppendParam(kparams.NTStatus, kparams.Status, status)
+		kevt.AppendParam(kparams.NTStatus, kparams.Status, statusCode)
 	case ktypes.CreateFile:
 		var (
 			irp            uint64
@@ -378,18 +379,18 @@ func (kevt *Kevent) produceParams(e *etw.EventRecord) {
 		kevt.AppendParam(kparams.FileName, kparams.FileDosPath, filename)
 	case ktypes.FileOpEnd:
 		var (
-			irp       uint64
-			extraInfo uint64
-			status    uint32
+			irp        uint64
+			extraInfo  uint64
+			statusCode uint32
 		)
 		if e.Version() >= 2 {
 			irp = e.ReadUint64(0)
 			extraInfo = e.ReadUint64(8)
-			status = e.ReadUint32(16)
+			statusCode = e.ReadUint32(16)
 		}
 		kevt.AppendParam(kparams.FileIrpPtr, kparams.Uint64, irp)
 		kevt.AppendParam(kparams.FileExtraInfo, kparams.Uint64, extraInfo)
-		kevt.AppendParam(kparams.NTStatus, kparams.Status, status)
+		kevt.AppendParam(kparams.NTStatus, kparams.Status, statusCode)
 	case ktypes.FileRundown:
 		var (
 			fileObject uint64

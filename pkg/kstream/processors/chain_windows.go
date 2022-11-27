@@ -22,16 +22,14 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/handle"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/yara"
 	log "github.com/sirupsen/logrus"
 )
 
 type chain struct {
-	processors    []Processor
-	deferredKevts chan *kevent.Kevent
-	psnapshotter  ps.Snapshotter
+	processors   []Processor
+	psnapshotter ps.Snapshotter
 }
 
 // NewChain constructs the processor chain. It arranges all the processors
@@ -43,9 +41,8 @@ func NewChain(
 ) Chain {
 	var (
 		chain = &chain{
-			psnapshotter:  psnap,
-			processors:    make([]Processor, 0),
-			deferredKevts: make(chan *kevent.Kevent, 1000),
+			psnapshotter: psnap,
+			processors:   make([]Processor, 0),
 		}
 		devMapper = fs.NewDevMapper()
 		scanner   yara.Scanner
@@ -74,7 +71,7 @@ func NewChain(
 		chain.addProcessor(newNetProcessor())
 	}
 	if config.Kstream.EnableHandleKevents {
-		chain.addProcessor(newHandleProcessor(hsnap, handle.NewObjectTypeStore(), devMapper, chain.deferredKevts))
+		chain.addProcessor(newHandleProcessor(hsnap, handle.NewObjectTypeStore(), devMapper))
 	}
 	return chain
 }

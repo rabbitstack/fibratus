@@ -37,8 +37,7 @@ import (
 )
 
 var (
-	handleDeferEvictions = expvar.NewInt("handle.deferred.evictions")
-	handleDeferMatches   = expvar.NewInt("handle.deferred.matches")
+	handleDeferMatches = expvar.NewInt("handle.deferred.matches")
 )
 
 // waitPeriod specifies the interval for which the accumulated
@@ -46,26 +45,22 @@ var (
 var waitPeriod = time.Second * 5
 
 type handleProcessor struct {
-	hsnap         handle.Snapshotter
-	typeStore     handle.ObjectTypeStore
-	devMapper     fs.DevMapper
-	objects       map[uint64]*kevent.Kevent
-	deferredKevts chan *kevent.Kevent
-	isClosed      bool
+	hsnap     handle.Snapshotter
+	typeStore handle.ObjectTypeStore
+	devMapper fs.DevMapper
+	objects   map[uint64]*kevent.Kevent
 }
 
 func newHandleProcessor(
 	hsnap handle.Snapshotter,
 	typeStore handle.ObjectTypeStore,
 	devMapper fs.DevMapper,
-	defferedKevts chan *kevent.Kevent,
 ) Processor {
 	return &handleProcessor{
-		hsnap:         hsnap,
-		typeStore:     typeStore,
-		devMapper:     devMapper,
-		objects:       make(map[uint64]*kevent.Kevent, 1000),
-		deferredKevts: defferedKevts,
+		hsnap:     hsnap,
+		typeStore: typeStore,
+		devMapper: devMapper,
+		objects:   make(map[uint64]*kevent.Kevent, 1000),
 	}
 }
 
@@ -182,4 +177,4 @@ func (h *handleProcessor) processEvent(kevt *kevent.Kevent) (*kevent.Kevent, err
 }
 
 func (handleProcessor) Name() ProcessorType { return Handle }
-func (h *handleProcessor) Close()           { h.isClosed = true }
+func (h *handleProcessor) Close()           {}

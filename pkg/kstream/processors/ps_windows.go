@@ -19,12 +19,7 @@
 package processors
 
 import (
-	"expvar"
 	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
-	"os"
-	"path/filepath"
-	"regexp"
-	"strings"
 	"time"
 
 	"github.com/rabbitstack/fibratus/pkg/kevent"
@@ -33,37 +28,11 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/syscall/process"
 	"github.com/rabbitstack/fibratus/pkg/yara"
-	log "github.com/sirupsen/logrus"
 )
-
-// systemRootRegexp is the regular expression for detecting path with unexpanded SystemRoot environment variable
-var systemRootRegexp = regexp.MustCompile(`%SystemRoot%|^\\SystemRoot|%systemroot%`)
-
-// driveRegexp is used for determining if the command line start with a valid drive letter based path
-var driveRegexp = regexp.MustCompile(`^[a-zA-Z]:\\`)
-
-// procYaraScans stores the total count of yara process scans
-var procYaraScans = expvar.NewInt("yara.proc.scans")
 
 type psProcessor struct {
 	snap ps.Snapshotter
 	yara yara.Scanner
-}
-
-var sysProcs = map[string]bool{
-	"dwm.exe":         true,
-	"wininit.exe":     true,
-	"winlogon.exe":    true,
-	"fontdrvhost.exe": true,
-	"sihost.exe":      true,
-	"taskhostw.exe":   true,
-	"dashost.exe":     true,
-	"ctfmon.exe":      true,
-	"svchost.exe":     true,
-	"csrss.exe":       true,
-	"services.exe":    true,
-	"audiodg.exe":     true,
-	"kernel32.dll":    true,
 }
 
 // newPsProcessor creates a new event processor for process events.
@@ -71,104 +40,69 @@ func newPsProcessor(snap ps.Snapshotter, yara yara.Scanner) Processor {
 	return psProcessor{snap: snap, yara: yara}
 }
 
-func (ps psProcessor) ProcessEvent(kevt *kevent.Kevent) (*kevent.Kevent, bool, error) {
+func (p psProcessor) ProcessEvent(kevt *kevent.Kevent) (*kevent.Kevent, bool, error) {
 	switch kevt.Type {
 	case ktypes.CreateProcess, ktypes.TerminateProcess, ktypes.ProcessRundown:
-		if err := ps.processEvent(kevt); err != nil {
+		if err := p.processEvent(kevt); err != nil {
 			return kevt, false, err
 		}
-		if kevt.Type == ktypes.TerminateProcess {
-			return kevt, false, ps.snap.Remove(kevt)
+		if kevt.IsTerminateProcess() {
+			return kevt, false, p.snap.Remove(kevt)
 		}
-		return kevt, false, ps.snap.Write(kevt)
+		return kevt, false, p.snap.Write(kevt)
 	case ktypes.CreateThread, ktypes.TerminateThread, ktypes.ThreadRundown:
-		if kevt.Type != ktypes.TerminateThread {
-			return kevt, false, ps.snap.Write(kevt)
+		if !kevt.IsTerminateThread() {
+			return kevt, false, p.snap.Write(kevt)
 		}
-		return kevt, false, ps.snap.Remove(kevt)
+		return kevt, false, p.snap.Remove(kevt)
 	case ktypes.OpenProcess, ktypes.OpenThread:
 		pid, err := kevt.Kparams.GetPid()
 		if err != nil {
-			return kevt, true, err
+			return kevt, false, err
 		}
-		proc := ps.snap.Find(pid)
+		proc := p.snap.Find(pid)
 		if proc != nil {
 			kevt.AppendParam(kparams.Exe, kparams.FilePath, proc.Exe)
-			kevt.AppendParam(kparams.ProcessName, kparams.UnicodeString, proc.Name)
+			kevt.AppendParam(kparams.ProcessName, kparams.AnsiString, proc.Name)
 		}
 		return kevt, false, nil
 	}
 	return kevt, true, nil
 }
 
-func (ps psProcessor) processEvent(kevt *kevent.Kevent) error {
-	cmndline, err := kevt.Kparams.GetString(kparams.Cmdline)
-	if err != nil {
-		return err
-	}
-	// if leading/trailing quotes are found in the executable path, get rid of them
-	args := cmdline.Split(cmndline)
-	if len(args) > 0 {
-		cmndline = cmdline.CleanExe(args)
-	}
-	// expand all variations of the SystemRoot env variable
-	if systemRootRegexp.MatchString(cmndline) {
-		cmndline = systemRootRegexp.ReplaceAllString(cmndline, os.Getenv("SystemRoot"))
-	}
-	// some system processes are reported without the path in the command line,
-	// but we can expand the path from the SystemRoot environment variable
-	if !driveRegexp.MatchString(cmndline) {
-		proc, _ := kevt.Kparams.GetString(kparams.ProcessName)
-		_, ok := sysProcs[proc]
-		if ok {
-			cmndline = filepath.Join(os.Getenv("SystemRoot"), "System32", cmndline)
-		}
-	}
+func (p psProcessor) processEvent(kevt *kevent.Kevent) error {
+	cmndline := cmdline.New(kevt.GetParamAsString(kparams.Cmdline)).
+		// get rid of leading/trailing quotes in the executable path
+		CleanExe().
+		// expand all variations of the SystemRoot environment variable
+		ExpandSystemRoot().
+		// some system processes are reported without the path in the command line,
+		// but we can expand the path from the SystemRoot environment variable
+		CompleteSysProc(kevt.GetParamAsString(kparams.ProcessName))
 
 	// append executable path parameter
-	i := strings.Index(strings.ToLower(cmndline), ".exe")
-	if i > 0 {
-		exe := cmndline[0 : i+4]
-		kevt.AppendParam(kparams.Exe, kparams.FilePath, exe)
+	kevt.AppendParam(kparams.Exe, kparams.FilePath, cmndline.Exeline())
+
+	// set normalized command line
+	_ = kevt.Kparams.SetValue(kparams.Cmdline, cmndline.String())
+
+	if kevt.IsTerminateProcess() {
+		return nil
 	}
-	_ = kevt.Kparams.SetValue(kparams.Cmdline, cmndline)
 
 	// query process start time
-	if kevt.Type != ktypes.TerminateProcess {
-		pid, err := kevt.Kparams.GetPid()
-		if err == nil {
-			started, err := getStartTime(pid)
-			if err != nil {
-				started = kevt.Timestamp
-			}
-			kevt.AppendParam(kparams.StartTime, kparams.Time, started)
-		}
+	pid := kevt.Kparams.MustGetPid()
+	started, err := getStartTime(pid)
+	if err != nil {
+		started = kevt.Timestamp
 	}
+	kevt.AppendParam(kparams.StartTime, kparams.Time, started)
+
 	return nil
 }
 
-func (ps psProcessor) scanProc(kevt *kevent.Kevent) {
-	if ps.yara != nil {
-		pid, err := kevt.Kparams.GetPid()
-		if err == nil {
-			go func() {
-				procYaraScans.Add(1)
-				err := ps.yara.ScanProc(pid, kevt)
-				if err != nil {
-					log.Warnf("unable to run yara scanner on pid %d: %v", pid, err)
-				}
-			}()
-		}
-	}
-}
-
 func (psProcessor) Name() ProcessorType { return Ps }
-
-func (ps psProcessor) Close() {
-	if ps.yara != nil {
-		ps.yara.Close()
-	}
-}
+func (p psProcessor) Close()            {}
 
 func getStartTime(pid uint32) (time.Time, error) {
 	handle, err := process.Open(process.QueryLimitedInformation, false, pid)

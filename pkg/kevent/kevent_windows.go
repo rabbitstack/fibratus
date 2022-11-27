@@ -69,6 +69,19 @@ func (kevt Kevent) IsNetworkUDP() bool {
 	return kevt.Type == ktypes.RecvUDPv4 || kevt.Type == ktypes.RecvUDPv6 || kevt.Type == ktypes.SendUDPv4 || kevt.Type == ktypes.SendUDPv6
 }
 
+// IsCreateFile indicates if this event is creating/opening a file.
+func (kevt Kevent) IsCreateFile() bool { return kevt.Type == ktypes.CreateFile }
+
+func (kevt Kevent) IsTerminateProcess() bool { return kevt.Type == ktypes.TerminateProcess }
+
+func (kevt Kevent) IsTerminateThread() bool { return kevt.Type == ktypes.TerminateThread }
+
+func (kevt Kevent) IsUnloadImage() bool { return kevt.Type == ktypes.UnloadImage }
+
+func (kevt Kevent) IsFileOpEnd() bool { return kevt.Type == ktypes.FileOpEnd }
+
+func (kevt Kevent) InvalidPid() bool { return kevt.PID == 0xffffffff }
+
 // IsState indicates if this event is only used for state management.
 func (kevt Kevent) IsState() bool { return kevt.Type.OnlyState() }
 
