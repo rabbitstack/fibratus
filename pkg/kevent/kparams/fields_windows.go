@@ -148,8 +148,12 @@ const (
 	NetRcvWinScale = "recv_winscale"
 	// NetSendWinScale is the parameter name that represents the TCP send window scaling factor.
 	NetSendWinScale = "send_winscale"
-	// NetSeqNum is the parameter name that represents that represents the TCP sequence number.
+	// NetSeqNum is the parameter name that represents the TCP sequence number.
 	NetSeqNum = "seqnum"
+	// NetStartTime is the parameter name that represents the TCP start time.
+	NetStartTime = "starttime"
+	// NetEndTime is the parameter name that represents the TCP end time.
+	NetEndTime = "endtime"
 	// NetConnID is the parameter name that represents a unique connection identifier.
 	NetConnID = "connid"
 	// NetL4Proto is the parameter name that identifies the Layer 4 protocol name.
