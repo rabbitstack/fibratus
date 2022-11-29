@@ -1,12 +1,12 @@
 # Rules
 
-Rules bring a set of capabilities for detecting and disrupting the adversary kill chain exploiting stealthy attacks and advanced threat models. Fibratus comes equipped with a decent catalog of [detection rules](https://github.com/rabbitstack/fibratus/tree/master/rules) built on top of the [MITRE ATT&CK](https://attack.mitre.org/) framework with each rule mapped to the most relevant tactics, techniques and sub-techniques.
+Rules bring a set of capabilities for detecting and disrupting the adversary kill chain exploiting stealthy attacks and advanced threat models. Fibratus comes equipped with a decent catalog of [detection rules](https://github.com/rabbitstack/fibratus/tree/master/rules) built on top of the [MITRE ATT&CK](https://attack.mitre.org/) framework with each rule mapped to the most relevant tactics, techniques, and sub-techniques.
 In a nutshell, rules are a collection of grouped filters defined in `yaml` files. Specifically, the following attributes describe a rule group:
 
 - **name** associates a meaningful name to the group such as `Suspicious network-connecting binaries`
 - **description** represents a detailed explanation of the rule group. 
 - **labels** are arbitrary key/value pairs. As per [best practices](https://github.com/rabbitstack/fibratus/tree/master/rules#guidelines) rule design guidelines, it is highly recommended to include labels for the MITRE tactic, technique/sub-technique. Of course, you are free to populate the labels attribute with any other useful data.
-- **tags** unlike labels, tags represent a sequence of meaningful keywords that you may find useful for categorization purposes.
+- **tags**, unlike labels, tags represent a sequence of meaningful keywords that you may find useful for categorization purposes.
 - **enabled** specifies whether the group is active
 - **policy** determines the action that's taken on behalf of the incoming event. There are different types of policies: `include`,  `exclude`, and `sequence.`. Include policy filters the event if one of the filters in the group matches, even though this behavior can be tweaked by setting the `relation` attribute. On the other hand, the exclude policy drops the event when a match occurs in the group.
 Sequence policy deserves a [dedicated section](/filters/rules?id=stateful-behaviour). In a nutshell, sequence policy permit stateful event tracking which is the foundation of detections that can assert an ordered sequence of events sharing certain properties.
@@ -116,7 +116,7 @@ As mentioned previously, rules are bound to groups. Let's have a glimpse at an e
 
 #### Macros
 
-Macros foment rule patterns reusability and a human-friendly domain specific language (DSL). A vast majority of detection rules may require conditions to express process execution or file writes. Traditionally, one could spell out a raw filter expression such as `kevt.name = 'CreateProcess'`. This may lead to a bloated and boiler-plate rules. From the maintenance standpoint, introducing a small change in the rule condition would force us to update all the rules, while macros are a much more convenient mechanism for declaring reusable rule patterns. Fibratus ships with a [macros library](https://github.com/rabbitstack/fibratus/blob/master/rules/macros/macros.yml) containing a dozen of different macros ready to use. Macros library is loaded from the file system, and can be split across multiple `yaml` files. The default location is designated by the `%PROGRAM FILES%\Fibratus\Rules\Macros` directory.
+Macros foment rule patterns reusability and a human-friendly domain-specific language (DSL). A vast majority of detection rules may require conditions to express process execution or file writes. Traditionally, one could spell out a raw filter expression such as `kevt.name = 'CreateProcess'`. This may lead to bloated and boilerplate rules. From the maintenance standpoint, introducing a small change in the rule condition would force us to update all the rules, while macros are a much more convenient mechanism for declaring reusable rule patterns. Fibratus ships with a [macros library](https://github.com/rabbitstack/fibratus/blob/master/rules/macros/macros.yml) containing a dozen of different macros ready to use. Macros library is loaded from the file system and can be split across multiple `yaml` files. The default location is designated by the `%PROGRAM FILES%\Fibratus\Rules\Macros` directory.
 
 ```yaml
 filters:
@@ -127,7 +127,7 @@ filters:
 
 Macros come in two flavors:
 
-- **expression** macros encapsulate filter expressions. A macro declaration requires an unique macro name, the filter expression, and an optional description.
+- **expression** macros encapsulate filter expressions. A macro declaration requires a unique macro name, the filter expression, and an optional description.
 
 ```yaml
 - macro: spawn_process
@@ -143,7 +143,7 @@ Where macro expressions really shine is when combined with other macros to forge
   description: Identifies the execution of the MS Office process
 ```
 
-- **list** macros declare a sequence of items such as file system paths, process names or registry keys. List macros keep the rules succinct and clean. An example of a macro list containing Microsoft Office process image names. Various operators, such as `in`, `matches`, or `startswith` can accept list macros as RHS (Right Hand Side) expressions.
+- **list** macros declare a sequence of items such as file system paths, process names, or registry keys. List macros help to make the rules succinct and clean. An example of a macro list containing Microsoft Office process image names. Various operators, such as `in`, `matches`, or `startswith` can accept list macros as RHS (Right Hand Side) expressions.
 
 ```yaml
 - macro: msoffice_binaries
@@ -152,7 +152,7 @@ Where macro expressions really shine is when combined with other macros to forge
 
 #### Templates {docsify-ignore}
 
-Both, rule and macro `yaml` files can include Go [template](https://pkg.go.dev/text/template) directives. This encompass loops, conditional directives, pipelines, or functions. Fibratus ships with a collection of [predefined](http://masterminds.github.io/sprig/) functions for string and filepath manipulation, math, date, and cryptographic functions to name a few. 
+Both, rule and macro `yaml` files can include Go [template](https://pkg.go.dev/text/template) directives. This encompasses loops, conditional directives, pipelines, or functions. Fibratus ships with a collection of [predefined](http://masterminds.github.io/sprig/) functions for string and filepath manipulation, math, date, and cryptographic functions to name a few. 
 
 To illustrate the use of templates, let's assume the rules we deploy should only be enabled under the presence of a certain environment variable in the host. By combining different Go template directives, we can conditionally render a fragment of the `yaml` file if the `env` function which receives the `AZ` environment variable name returns the `za` value.
 
@@ -234,7 +234,7 @@ action: >
         "critical"
     }}
 ```
-The above action sends the alert with the given title, description, and `critical` severity. If omitted, the `medium` severity level is set instead. As you may notice, the `printf` function from the standard Go template library is used to concatenate the full executable path of the process spawning a command shell. Instead of accessing raw event fields, we can resort to **fields interpolation**. In the following snippet, we use the `%ps.exe` format modifier to render the process' executable path. Formats modifiers are a well-known filter fields prefixed with the `%` symbol. 
+The above action sends the alert with the given title, description, and `critical` severity. If omitted, the `medium` severity level is set instead. As you may notice, the `printf` function from the standard Go template library is used to concatenate the full executable path of the process spawning a command shell. Instead of accessing raw event fields, we can resort to **field interpolation**. In the following snippet, we use the `%ps.exe` format modifier to render the process' executable path. Formats modifiers are well-known filter fields prefixed with the `%` symbol. 
 
 ```yaml
 action: >
@@ -261,26 +261,26 @@ action: >
     }}
 ```
 
-For [email](alerts/senders/mail.md) alert senders, a beautiful responsive HTML emails are rendered as depicted in the image below. Email rule alerts deliver high-fidelity incident centric notifications that aim to prevent alert fatigue by summarizing key investigation insights.
+[email](alerts/senders/mail.md) alert senders render beautiful responsive HTML emails as depicted in the image below. Email rule alerts deliver high-fidelity and incident-centric notifications that aim to prevent alert fatigue by summarizing key investigation insights.
 
 <p align="center">
   <img src="filters/images/rule-alert.png"/>
 </p>
 
-The email alerts has the following sections:
+The email alerts have the following sections:
 
-- Date, time and the host name where the alert was triggered
+- Date, time, and the hostname where the alert was triggered
 - Alert severity given in the `emit` action
 - Alert title as specified in the `emit` action
 - Alert description as specified in the `emit` action
-- Links with MITRE tactic, technique and sub-technique
+- Links with MITRE tactic, technique, and sub-technique
 - Description of the rule group
-- The list of security events involved in the incident. For each event, the name, timestamp and the excerpt is shown. Next, all event attributes and process state information is represented.
+- The list of security events involved in the incident. For each event, the name, timestamp, and excerpt are shown. Next, all event attributes and process state information is represented.
 
 
 #### Killing processes
 
-- `kill` action terminates a process with the specified pid. Fibratus needs to acquire the process handle with the `PROCESS_TERMINATE` access rights in order to successfully kill the process.
+- `kill` action terminates a process with the specified pid. Fibratus needs to acquire the process handle with the `PROCESS_TERMINATE` access rights to successfully kill the process.
 
 ```yaml
 action: >
@@ -291,7 +291,7 @@ action: >
 
 ### Stateful rules
 
-Adversary often employ advanced techniques which may be daunting to detect without combining events from different data sources. For example, detecting a remote connection attempt followed by the execution of a command shell by the same process that initiated the connection can't be expressed with regular `include` policies. Enter `sequence` policies. Sequence policies piggyback on stateful event tracking. These policies are able to express complex runtime threat detection scenarios. Let's peer into the structure of the sequence group policy.
+Adversaries often employ advanced techniques which may be daunting to detect without combining events from different data sources. For example, detecting a remote connection attempt followed by the execution of a command shell by the same process that initiated the connection can't be expressed with regular `include` policies. Enter `sequence` policies. Sequence policies piggyback on stateful event tracking. These policies can express complex runtime threat detection scenarios. Let's peer into the structure of the sequence group policy.
 
 ```yaml
 - group: LSASS memory dumping via legitimate or offensive tools

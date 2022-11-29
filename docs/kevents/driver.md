@@ -13,4 +13,4 @@ kevt.name = 'CreateHandle'
 handle.type = 'Driver'
 ```
 
-Rule writers are encouraged to use the `load_driver` macro from the [macro library](https://github.com/rabbitstack/fibratus/blob/master/rules/macros/macros.yml). This macro seamlessly handles the detection of driver loading depending on whether direct events are available or either handle manager tracking is required.
+Rule writers are encouraged to use the `load_driver` macro from the [macro library](https://github.com/rabbitstack/fibratus/blob/master/rules/macros/macros.yml). This macro seamlessly handles the detection of driver loading depending on whether direct events are available or handle manager tracking is required.

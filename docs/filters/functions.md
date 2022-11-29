@@ -299,7 +299,7 @@ Additionally, some functions may return a collection of values. Function names a
     ```
     is_mindump(path: <string>) :: <bool>
     ```
-    - `string`: File path for which the minidump signature is checked
+    - `string`: The file path for which the minidump signature is checked
     - `return` `true` if the file contains the `minidump` signature or `false` otherwise
 
 - **Examples**

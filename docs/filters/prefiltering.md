@@ -11,11 +11,11 @@ The above is the summary of configuration options that influence the collection 
 - `enable-image` enables/disables the collection of image loading/unloading events
 - `enable-handle` enables/disables the collection of handle events
 - `enable-audit-api` enables/disables kernel audit API calls events
-- `enable-antimalware-engine` enables/disables Antimalware Engine events, which primarily provide a source of [driver loading](kevents/driver.md) events
+- `enable-antimalware-engine` enables/disables Antimalware Engine events, which primarily provide a source of [driver-loading](kevents/driver.md) events
 
 ### Blacklisting {docsify-ignore}
 
-If you want to permanently exclude specific kernel events or processes that produce them from the event flow, you can achieve this by defining the blacklist in the `kstream.blacklist` configuration section:
+If you want to permanently exclude specific events or processes that produce them from the event flow, you can achieve this by defining the blacklist in the `kstream.blacklist` configuration section:
 
-- `events` contains a list of kernel event names that are dropped from the event stream.
+- `events` contains a list of event names that are dropped from the event stream.
 - `images` contains a list of case-sensitive process image names including the extension. Any event originated by the image specified in this list is dropped from the event stream.
