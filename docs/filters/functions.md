@@ -288,3 +288,24 @@ Additionally, some functions may return a collection of values. Function names a
     ```
     fibratus run regex(ps.name, 'power.*(shell|hell).dll', '.*hell.exe')
     ```
+
+### Miscellaneous functions
+
+#### is_minidump
+
+`is_minidump` checks the signature of the provided file and returns `true` if the signature matches the `minidump` file.
+
+- **Specification**
+    ```
+    is_mindump(path: <string>) :: <bool>
+    ```
+    - `string`: File path for which the minidump signature is checked
+    - `return` `true` if the file contains the `minidump` signature or `false` otherwise
+
+- **Examples**
+
+    Assuming the `file.name` field contains `C:\\Temp\\lsass.dmp` which is a valid `minidump` file. The function call would return a `true` value.
+
+    ```
+    fibratus run is_minidump(file.name)
+    ```

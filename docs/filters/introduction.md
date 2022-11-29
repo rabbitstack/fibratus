@@ -13,10 +13,10 @@ It may look intimidating at first glance, but once you get familiar with the syn
 Filters represent the foundation of the [rule engine](/filters/rules) that provides threat detection capabilities. For example, the following stanza detects the outbound communication followed by the execution of the command shell within one-minute time window. The action invokes the [alert sender](/alerts/senders) to emit the security alert via email or Slack. 
 
 ```yaml
-- group: remote connection and command shell execution
+- group: Remote connection followed by the command shell execution
   policy: sequence
   rules:
-    - name: establish remote connection
+    - name: Establish remote connection
       condition: >
         kevt.name = 'Connect'
           and
@@ -25,7 +25,7 @@ Filters represent the foundation of the [rule engine](/filters/rules) that provi
           net.dip,
           '10.0.0.0/8',
           '172.16.0.0/12')
-    - name: spawn command shell
+    - name: Spawn command shell
       max-span: 1m
       condition: >
         kevt.name = 'CreateProcess'
@@ -34,7 +34,10 @@ Filters represent the foundation of the [rule engine](/filters/rules) that provi
           and
         ps.sibling.name in ('cmd.exe', 'powershell.exe')
   action: >
-    {{ emit "Command shell spawned after remote connection"
-      (printf "%s process spawned a command shell after connecting to %s" .Kevts.k2.PS.Exe .Kevts.k1.Kparams.dip)
+    {{ 
+        emit
+          .
+        "Command shell spawned after remote connection"
+        "%2.ps.exe process spawned a command shell after connecting to %1.net.dip"
     }}
 ```

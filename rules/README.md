@@ -16,6 +16,10 @@ Next, we declare the `Credentials access from Windows Credential Manager` group 
 
 ## Guidelines
 
+### Read the docs
+
+This should be your starting point. Before trying to write new rules, explore the [docs](https://www.fibratus.io/#/filters/introduction) to learn about [filter expressions](https://www.fibratus.io/#/filters/filtering) fundamentals, [operators](https://www.fibratus.io/#/filters/operators), [functions](https://www.fibratus.io/#/filters/functions), [filter fields](https://www.fibratus.io/#/filters/fields) reference, and [rule engine](https://www.fibratus.io/#/filters/rules) specifics. 
+
 ### Stick to naming nomenclature
 
 It is highly recommended to name the rule files after the pattern explained in the above section. This facilitates the organization and searching through the detection rules catalog and fosters standardization.
@@ -43,8 +47,8 @@ When writing detections that employ various event types or even multiple data so
 
 ### Prefer macros over raw conditions
 
-Fibratus comes with a macro library to promote the reusability and modularization of rule conditions and lists. Before trying to spell out a raw rule condition, explore the library to check if there's already a macro you can pull into the rule. For example, detecting file accesses could be accomplished by declaring the `kevt.name = 'CreateFile' and file.operation = 'open'` expression. However, the macro library comes with the `open_file` macro that you can directly call in any rule. If you can't encounter a particular macro in the library, please consider creating it. Future detection engineers and rule writers could profit from those macros.
+Fibratus comes with a [macros](https://www.fibratus.io/#/filters/rules?id=macros) library to promote the reusability and modularization of rule conditions and lists. Before trying to spell out a raw rule condition, explore the library to check if there's already a macro you can pull into the rule. For example, detecting file accesses could be accomplished by declaring the `kevt.name = 'CreateFile' and file.operation = 'open'` expression. However, the macro library comes with the `open_file` macro that you can directly call in any rule. If you can't encounter a particular macro in the library, please consider creating it. Future detection engineers and rule writers could profit from those macros.
 
 ### Formatting styles
 
-Pay attention to rule condition/action formatting style. If the rule consists of multiple conditions, it is desirable to split each spanning condition on a new line and properly indent the `and`, `or`, or `not` operators. By default, we use 4 space tabs for indenting operators and rule actions. This will greatly improve readability and prevent formatting inconsistencies.
+Pay attention to rule condition/action formatting style. If the rule consists of multiple or large expressions, it is desirable to split each spanning expression on a new line and properly indent the `and`, `or`, or `not` operators. By default, we use 4 space tabs for indenting operators and rule actions. This notably improves readability and prevents formatting inconsistencies.

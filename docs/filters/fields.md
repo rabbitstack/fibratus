@@ -78,6 +78,7 @@ The following tables summarize available field names that can be used in filter 
 | ps.sibling.pid     | Sibling process identifier  | `ps.sibling.id = 6050`   |
 | ps.sibling.comm    | Sibling process command line  | `ps.sibling.name contains '/k /v'`   |
 | ps.sibling.exe     | Sibling process executable full path  | `ps.sibling.exe = 'C:\\Windows\\system32\\cmd.exe'`   |
+| ps.sibling.args    | Sibling process command line arguments  | `ps.sibling.args in ('C:\\Windows\\system32\\cmd.exe')`   |
 | ps.sibling.sid     | Sibling process security identifier  | `ps.sibling.sid contains 'SYSTEM'`   |
 | ps.sibling.sessionid   | Sibling process session identifier  | `ps.sibling.sessionid = 1`   |
 | ps.sibling.domain    | Sibling process domain name  | `ps.sibling.domain = 'NT AUTHORITY'`   |
