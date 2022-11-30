@@ -4,7 +4,7 @@ The filter engine supports logical, arithmetic, and string operators. Operator n
 
 ## Binary operators
 
-The filtering query language supports the following  comparison binary operators:
+The filtering query language supports the following comparison binary operators:
 
 - `=` (equal)
 - `!=` (not equal)
@@ -12,6 +12,7 @@ The filtering query language supports the following  comparison binary operators
 - `>` (greater than)
 - `>=` (greater or equal)
 - `<=` (less or equal)
+- `~=` (case-insensitive string comparison)
 
 ## Logical operators
 

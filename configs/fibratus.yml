@@ -301,7 +301,7 @@ output:
     #template-name: fibratus
 
     # Represents the target index for kernel events. It allows time specifiers to create indices per time frame.
-    # For example, fibratus-%Y-%m generates the index name with current year and and month time specifiers
+    # For example, fibratus-%Y-%m generates the index name with current year and month time specifiers
     #index-name: fibratus
 
     # Contains the full JSON body of the index template. For more information refer to
