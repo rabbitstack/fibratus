@@ -16,9 +16,27 @@
  * limitations under the License.
  */
 
-package reactors
+package matchers
 
-import "expvar"
+import (
+	"expvar"
+	"github.com/rabbitstack/fibratus/pkg/kevent"
+)
 
 // procYaraScans stores the total count of yara process scans
 var procYaraScans = expvar.NewInt("yara.proc.scans")
+
+type yaraRulesMatcher struct {
+}
+
+func newYaraRules() Matcher {
+	return &yaraRulesMatcher{}
+}
+
+func (r *yaraRulesMatcher) Compile() error {
+	return nil
+}
+
+func (r *yaraRulesMatcher) Match(kevt *kevent.Kevent) (bool, error) {
+	return false, nil
+}

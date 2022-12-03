@@ -21,7 +21,6 @@ package kstream
 import (
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
-	"golang.org/x/sys/windows"
 	"runtime"
 	"syscall"
 	"time"
@@ -41,6 +40,10 @@ const (
 	etwMaxLoggersPath = `SYSTEM\CurrentControlSet\Control\WMI`
 	// etwMaxLoggersValue is the registry value that dictates the maximum number of loggers. Default value is 64 on most systems
 	etwMaxLoggersValue = "EtwMaxLoggers"
+	maxLoggerNameSize  = 128
+	maxLogfileNameSize = 1024
+	// maxTracePropsSize must make room for logger name and log file name
+	maxTracePropsSize = 2 * (maxLoggerNameSize + maxLogfileNameSize)
 )
 
 // TraceSession stores metadata of the initiated tracing session.
@@ -71,16 +74,7 @@ func (p TraceProvider) IsKernelLogger() bool {
 }
 
 // KtraceController is responsible for managing the life cycle of the tracing sessions.
-type KtraceController interface {
-	// StartKtrace starts configured tracing sessions.
-	StartKtrace() error
-	// CloseKtrace stops currently running tracing sessions.
-	CloseKtrace() error
-	// Traces returns initiated tracing sessions.
-	Traces() map[string]TraceSession
-}
-
-type ktraceController struct {
+type KtraceController struct {
 	// kstreamConfig stores kernel stream-specific settings
 	kstreamConfig config.KstreamConfig
 	// traces contains initiated tracing sessions
@@ -91,7 +85,7 @@ type ktraceController struct {
 }
 
 // NewKtraceController spins up a new instance of the trace controller.
-func NewKtraceController(kstreamConfig config.KstreamConfig) KtraceController {
+func NewKtraceController(kstreamConfig config.KstreamConfig) *KtraceController {
 	providers := []TraceProvider{
 		{
 			// core system events
@@ -114,7 +108,7 @@ func NewKtraceController(kstreamConfig config.KstreamConfig) KtraceController {
 			kstreamConfig.EnableAntimalwareEngineEvents,
 		},
 	}
-	controller := &ktraceController{
+	controller := &KtraceController{
 		kstreamConfig: kstreamConfig,
 		traces:        make(map[string]TraceSession),
 		providers:     providers,
@@ -127,7 +121,7 @@ func NewKtraceController(kstreamConfig config.KstreamConfig) KtraceController {
 // are forwarded from the provider. Flags are only valid in context of the NT Kernel
 // Logger sessions. On the contrary, keywords can only be used on the non-NT Kernel
 // Logger tracing sessions.
-func (k *ktraceController) StartKtrace() error {
+func (k *KtraceController) StartKtrace() error {
 	// at least process events have to be enabled
 	// for the purpose of building the state machine
 	flags := etw.Process
@@ -177,18 +171,21 @@ func (k *ktraceController) StartKtrace() error {
 			continue
 		}
 		traceName := prov.TraceName
+		if len(traceName) > maxLoggerNameSize {
+			log.Warnf("trace name [%s] is too long", prov.TraceName)
+			continue
+		}
 		props := etw.EventTraceProperties{
 			Wnode: etw.WnodeHeader{
-				BufferSize: uint32(unsafe.Sizeof(etw.EventTraceProperties{})) + 2*windows.MAX_PATH,
-				Flags:      etw.WnodeTraceFlagGUID,
+				BufferSize:    uint32(unsafe.Sizeof(etw.EventTraceProperties{})) + maxTracePropsSize,
+				Flags:         etw.WnodeTraceFlagGUID,
+				ClientContext: 1, // QPC clock resolution
 			},
-			LoggerNameOffset:  uint32(unsafe.Sizeof(etw.EventTraceProperties{})),
-			LogFileNameOffset: 0,
-			BufferSize:        bufferSize,
-			LogFileMode:       etw.ProcessTraceModeRealtime,
-			MinimumBuffers:    minBuffers,
-			MaximumBuffers:    maxBuffers,
-			FlushTimer:        uint32(flushTimer.Seconds()),
+			BufferSize:     bufferSize,
+			LogFileMode:    etw.ProcessTraceModeRealtime,
+			MinimumBuffers: minBuffers,
+			MaximumBuffers: maxBuffers,
+			FlushTimer:     uint32(flushTimer.Seconds()),
 		}
 		if prov.IsKernelLogger() {
 			props.EnableFlags = flags
@@ -229,8 +226,9 @@ func (k *ktraceController) StartKtrace() error {
 				if k.kstreamConfig.EnableHandleKevents {
 					sysTraceFlags[4] = etw.Handle
 				}
-				// call again to enable all kernel events. Just to recap. The first call to `TraceSetInformation` with empty
-				// group masks activates rundown events, while this second call enables the rest of the kernel events specified in flags.
+				// call again to enable all kernel events. Just to recap. The first call to
+				// `TraceSetInformation` with empty group masks activates rundown events,
+				// while this second call enables the rest of the kernel events specified in flags.
 				if err := etw.SetTraceSystemFlags(handleCopy, sysTraceFlags); err != nil {
 					log.Warnf("unable to set trace information: %v", err)
 				}
@@ -252,16 +250,14 @@ func (k *ktraceController) StartKtrace() error {
 			time.Sleep(time.Millisecond * 100)
 			props := etw.EventTraceProperties{
 				Wnode: etw.WnodeHeader{
-					BufferSize: uint32(unsafe.Sizeof(etw.EventTraceProperties{})) + 2*windows.MAX_PATH,
+					BufferSize: uint32(unsafe.Sizeof(etw.EventTraceProperties{})) + maxTracePropsSize,
 					Flags:      etw.WnodeTraceFlagGUID,
 				},
-				LoggerNameOffset:  uint32(unsafe.Sizeof(etw.EventTraceProperties{})),
-				LogFileNameOffset: 0,
-				BufferSize:        bufferSize,
-				LogFileMode:       etw.ProcessTraceModeRealtime,
-				MinimumBuffers:    minBuffers,
-				MaximumBuffers:    maxBuffers,
-				FlushTimer:        uint32(flushTimer.Seconds()),
+				BufferSize:     bufferSize,
+				LogFileMode:    etw.ProcessTraceModeRealtime,
+				MinimumBuffers: minBuffers,
+				MaximumBuffers: maxBuffers,
+				FlushTimer:     uint32(flushTimer.Seconds()),
 			}
 			if prov.IsKernelLogger() {
 				props.EnableFlags = flags
@@ -326,7 +322,7 @@ func (k *ktraceController) StartKtrace() error {
 }
 
 // CloseKtrace stops currently running trace sessions.
-func (k *ktraceController) CloseKtrace() error {
+func (k *KtraceController) CloseKtrace() error {
 	for _, trace := range k.traces {
 		if !trace.Handle.IsValid() {
 			continue
@@ -343,11 +339,11 @@ func (k *ktraceController) CloseKtrace() error {
 	return nil
 }
 
-func (k *ktraceController) Traces() map[string]TraceSession {
+func (k *KtraceController) Traces() map[string]TraceSession {
 	return k.traces
 }
 
-func (k *ktraceController) insertTrace(name string, handle etw.TraceHandle, guid syscall.GUID) {
+func (k *KtraceController) insertTrace(name string, handle etw.TraceHandle, guid syscall.GUID) {
 	trace := TraceSession{
 		Handle: handle,
 		Name:   name,

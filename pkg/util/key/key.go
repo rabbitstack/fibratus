@@ -23,11 +23,10 @@ package key
 
 import (
 	"expvar"
-	reg "golang.org/x/sys/windows/registry"
+	"golang.org/x/sys/windows/registry"
 	"strings"
 	"sync"
 
-	"github.com/rabbitstack/fibratus/pkg/syscall/registry"
 	"github.com/rabbitstack/fibratus/pkg/syscall/security"
 )
 
@@ -37,20 +36,14 @@ var (
 	hkuPrefixes  = []string{"\\REGISTRY\\USER", "\\Registry\\User"}
 )
 
-const (
-	// hive represents an application hive. Application hives are loaded by user-mode processes
-	// via RegLoadAppKey to store application-specific state data.
-	hive = "\\REGISTRY\\A"
-)
-
 // RegistryValueTypes enumerate all possible registry value types.
 var RegistryValueTypes = map[uint32]string{
-	reg.DWORD:     "REG_DWORD",
-	reg.QWORD:     "REG_QWORD",
-	reg.SZ:        "REG_SZ",
-	reg.EXPAND_SZ: "REG_EXPAND_SZ",
-	reg.MULTI_SZ:  "REG_MULTI_SZ",
-	reg.BINARY:    "REG_BINARY",
+	registry.DWORD:     "REG_DWORD",
+	registry.QWORD:     "REG_QWORD",
+	registry.SZ:        "REG_SZ",
+	registry.EXPAND_SZ: "REG_EXPAND_SZ",
+	registry.MULTI_SZ:  "REG_MULTI_SZ",
+	registry.BINARY:    "REG_BINARY",
 }
 
 var (
@@ -60,37 +53,51 @@ var (
 	// sidsCount reflects the total count of the resolved SIDs
 	sidsCount  = expvar.NewInt("sids.count")
 	lookupSids = security.LookupAllSids
+
+	// Invalid represents an invalid registry key
+	Invalid = registry.Key(0)
 )
+
+// String converts registry root key identifier to string.
+func String(key registry.Key) string {
+	switch key {
+	case registry.USERS:
+		return "HKEY_USERS"
+	case registry.CLASSES_ROOT:
+		return "HKEY_CLASSES_ROOT"
+	case registry.LOCAL_MACHINE:
+		return "HKEY_LOCAL_MACHINE"
+	case registry.CURRENT_USER:
+		return "HKEY_CURRENT_USER"
+	default:
+		return "Unknown"
+	}
+}
 
 // Format produces a root,key tuple from registry native key name.
 func Format(key string) (registry.Key, string) {
 	for _, p := range hklmPrefixes {
 		if strings.HasPrefix(key, p) {
-			return registry.LocalMachine, subkey(key, p)
+			return registry.LOCAL_MACHINE, subkey(key, p)
 		}
 	}
 	for _, p := range hkcrPrefixes {
 		if strings.HasPrefix(key, p) {
-			return registry.ClassesRoot, subkey(key, p)
+			return registry.CLASSES_ROOT, subkey(key, p)
 		}
 	}
 
 	once.Do(func() { initKeys() })
 
-	if root, k := findSIDKey(key); root != registry.InvalidKey {
+	if root, k := findSIDKey(key); root != Invalid {
 		return root, k
 	}
 	for _, p := range hkuPrefixes {
 		if strings.HasPrefix(key, p) {
-			return registry.Users, subkey(key, p)
+			return registry.USERS, subkey(key, p)
 		}
 	}
-
-	if strings.HasPrefix(key, hive) {
-		return registry.Hive, key
-	}
-
-	return registry.InvalidKey, key
+	return Invalid, key
 }
 
 // initKeys retrieves all security identifiers on the local machine and builds a slice of
@@ -115,12 +122,12 @@ func findSIDKey(key string) (registry.Key, string) {
 	for _, k := range keys {
 		if strings.HasPrefix(key, k) {
 			if strings.Contains(key, "_Classes") {
-				return registry.CurrentUser, strings.Replace(subkey(key, k), "_Classes", "Software\\Classes", -1)
+				return registry.CURRENT_USER, strings.Replace(subkey(key, k), "_Classes", "Software\\Classes", -1)
 			}
-			return registry.CurrentUser, subkey(key, k)
+			return registry.CURRENT_USER, subkey(key, k)
 		}
 	}
-	return registry.InvalidKey, key
+	return Invalid, key
 }
 
 func subkey(key string, prefix string) string {

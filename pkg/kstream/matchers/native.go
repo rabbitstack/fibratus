@@ -16,4 +16,26 @@
  * limitations under the License.
  */
 
-package reactors
+package matchers
+
+import (
+	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/filter"
+	"github.com/rabbitstack/fibratus/pkg/kevent"
+)
+
+type nativeRulesMatcher struct {
+	rules filter.Rules
+}
+
+func newNativeRules(config *config.Config) Matcher {
+	return &nativeRulesMatcher{rules: filter.NewRules(config)}
+}
+
+func (r *nativeRulesMatcher) Compile() error {
+	return r.rules.Compile()
+}
+
+func (r *nativeRulesMatcher) Match(kevt *kevent.Kevent) (bool, error) {
+	return r.rules.Fire(kevt), nil
+}

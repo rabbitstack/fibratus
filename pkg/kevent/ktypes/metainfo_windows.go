@@ -103,16 +103,27 @@ var ktypes = map[string]Ktype{
 	"RegQueryKey":        RegQueryKey,
 	"RegDeleteKey":       RegDeleteKey,
 	"RegDeleteValue":     RegDeleteValue,
-	//"Accept":             Accept,
-	//"Send":               Send,
-	//"Recv":               Recv,
-	//"Connect":            Connect,
-	//"Reconnect":          Reconnect,
-	//"Disconnect":         Disconnect,
-	//"Retransmit":         Retransmit,
-	"CreateHandle": CreateHandle,
-	"CloseHandle":  CloseHandle,
-	"LoadDriver":   LoadDriver,
+	"AcceptTCP4":         AcceptTCPv4,
+	"AcceptTCP6":         AcceptTCPv6,
+	"SendTCP4":           SendTCPv4,
+	"SendTCP6":           SendTCPv6,
+	"SendUDP4":           SendUDPv4,
+	"SendUDP6":           SendUDPv6,
+	"RecvTCP4":           RecvTCPv4,
+	"RecvTCP6":           RecvTCPv6,
+	"RecvUDP4":           RecvUDPv4,
+	"RecvUDP6":           RecvUDPv6,
+	"ConnectTCP4":        ConnectTCPv4,
+	"ConnectTCP6":        ConnectTCPv6,
+	"ReconnectTCP4":      ReconnectTCPv4,
+	"ReconnectTCP6":      ReconnectTCPv6,
+	"DisconnectTCP4":     DisconnectTCPv4,
+	"DisconnectTCP6":     DisconnectTCPv6,
+	"RetransmitTCP4":     RetransmitTCPv4,
+	"RetransmitTCP6":     RetransmitTCPv6,
+	"CreateHandle":       CreateHandle,
+	"CloseHandle":        CloseHandle,
+	"LoadDriver":         LoadDriver,
 }
 
 // KtypeToKeventInfo maps the event type to the structure storing detailed information about the event.
@@ -133,11 +144,12 @@ func KeventNameToKtype(name string) Ktype {
 
 // GetKtypesMeta returns event types metadata.
 func GetKtypesMeta() []KeventInfo {
-	ktypes := make([]KeventInfo, 0, len(kevents))
+	ktypes := make([]KeventInfo, 0)
+outer:
 	for _, ktyp := range kevents {
 		for _, typ := range ktypes {
 			if typ.Name == ktyp.Name {
-				continue
+				continue outer
 			}
 		}
 		ktypes = append(ktypes, ktyp)

@@ -78,7 +78,7 @@ const (
 	// FileCreateOptions is the field that represents the values passed in the CreateDispositions parameter to the NtCreateFile function.
 	FileCreateOptions = "create_options"
 	// FileOperation is the field that represents the values passed in the CreateOptions parameter to the NtCreateFile function.
-	FileOperation = "operation"
+	FileOperation = "create_disposition"
 	// FileCreated represents the name for the file creation field.
 	FileCreated = "created"
 	// FileAccessed represents the name for the file access field.
@@ -99,8 +99,8 @@ const (
 	FileInfoClass = "class"
 	// FileKey represents the directory key identifier in EnumDirectory events.
 	FileKey = "file_key"
-	// FileDirectory represents the filed for the directory name in EnumDirectory events.
-	FileDirectory = "dir"
+	// FileDirectory represents the field for the directory name in EnumDirectory events.
+	FileDirectory = "directory"
 	// FileIrpPtr represents the I/O request packet id.
 	FileIrpPtr = "irp"
 	// FileExtraInfo is the parameter that represents extra information returned by the file system for the operation. For example for a read request, the actual number of bytes that were read.

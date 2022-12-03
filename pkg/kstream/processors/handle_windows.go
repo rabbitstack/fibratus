@@ -33,7 +33,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	syshandle "github.com/rabbitstack/fibratus/pkg/syscall/handle"
-	"github.com/rabbitstack/fibratus/pkg/syscall/registry"
 )
 
 var (
@@ -113,10 +112,10 @@ func (h *handleProcessor) processEvent(kevt *kevent.Kevent) (*kevent.Kevent, err
 	switch typeName {
 	case handle.Key:
 		rootKey, keyName := key.Format(name)
-		if rootKey == registry.InvalidKey {
+		if rootKey == key.Invalid {
 			break
 		}
-		name = rootKey.String()
+		name = key.String(rootKey)
 		if keyName != "" {
 			name += "\\" + keyName
 		}

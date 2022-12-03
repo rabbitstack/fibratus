@@ -326,7 +326,7 @@ func (c *Config) addFlags() {
 		c.flags.Duration(timeout, time.Second*15, "Determines the timeout for the API server responses")
 	}
 	if c.opts.run || c.opts.capture {
-		c.flags.Bool(initHandleSnapshot, true, "Indicates whether initial handle snapshot is built. This implies scanning the system handles table and producing an entry for each handle object")
+		c.flags.Bool(initHandleSnapshot, false, "Indicates whether initial handle snapshot is built. This implies scanning the system handles table and producing an entry for each handle object")
 
 		c.flags.Bool(enableThreadKevents, true, "Determines whether thread kernel events are collected by Kernel Logger provider")
 		c.flags.Bool(enableRegistryKevents, true, "Determines whether registry kernel events are collected by Kernel Logger provider")

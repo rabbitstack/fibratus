@@ -63,7 +63,7 @@ var (
 	// windows event logger
 	evtlog debug.Log
 
-	ctrl     kstream.KtraceController
+	ctrl     *kstream.KtraceController
 	consumer kstream.Consumer
 	aggr     *aggregator.BufferedAggregator
 )

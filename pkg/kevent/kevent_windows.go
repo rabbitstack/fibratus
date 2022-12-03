@@ -31,6 +31,8 @@ import (
 	"unsafe"
 )
 
+var rundowns = map[uint64]bool{}
+
 // New constructs a fresh event instance with basic fields and parameters.
 func New(seq uint64, ktype ktypes.Ktype, evt *etw.EventRecord) *Kevent {
 	var (
@@ -69,8 +71,29 @@ func (kevt Kevent) IsNetworkUDP() bool {
 	return kevt.Type == ktypes.RecvUDPv4 || kevt.Type == ktypes.RecvUDPv6 || kevt.Type == ktypes.SendUDPv4 || kevt.Type == ktypes.SendUDPv6
 }
 
+// IsRundown determines if this is a rundown events.
+func (kevt Kevent) IsRundown() bool {
+	return kevt.Type == ktypes.ProcessRundown || kevt.Type == ktypes.ThreadRundown || kevt.Type == ktypes.ImageRundown ||
+		kevt.Type == ktypes.FileRundown || kevt.Type == ktypes.RegKCBRundown
+}
+
+func (kevt Kevent) IsRundownProcessed() bool {
+	key := kevt.RundownKey()
+	if kevt.IsRundown() && !rundowns[key] {
+		rundowns[key] = true
+		return false
+	}
+	return kevt.IsRundown() && rundowns[key]
+}
+
 // IsCreateFile indicates if this event is creating/opening a file.
 func (kevt Kevent) IsCreateFile() bool { return kevt.Type == ktypes.CreateFile }
+
+func (kevt Kevent) IsCloseFile() bool { return kevt.Type == ktypes.CloseFile }
+
+func (kevt Kevent) IsDeleteFile() bool { return kevt.Type == ktypes.DeleteFile }
+
+func (kevt Kevent) IsEnumDirectory() bool { return kevt.Type == ktypes.EnumDirectory }
 
 func (kevt Kevent) IsTerminateProcess() bool { return kevt.Type == ktypes.TerminateProcess }
 
@@ -80,10 +103,16 @@ func (kevt Kevent) IsUnloadImage() bool { return kevt.Type == ktypes.UnloadImage
 
 func (kevt Kevent) IsFileOpEnd() bool { return kevt.Type == ktypes.FileOpEnd }
 
+func (kevt Kevent) IsRegSetValue() bool { return kevt.Type == ktypes.RegSetValue }
+
 func (kevt Kevent) InvalidPid() bool { return kevt.PID == 0xffffffff }
 
 // IsState indicates if this event is only used for state management.
 func (kevt Kevent) IsState() bool { return kevt.Type.OnlyState() }
+
+func (kevt Kevent) RundownKey() uint64 {
+	return 0
+}
 
 // PartialKey computes the unique hash of the event
 // that can be employed to determine if the event

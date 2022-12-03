@@ -56,8 +56,8 @@ const (
 // TraceHandle is an alias for trace handle type
 type TraceHandle uintptr
 
-// IsValid determines if the session handle is valid
-func (handle TraceHandle) IsValid() bool { return handle != 0 }
+// IsValid determines if the trace handle is valid
+func (handle TraceHandle) IsValid() bool { return handle != 0 && handle != 0xffffffffffffffff }
 
 // StartTrace registers and starts an event tracing session for the specified provider. The trace assumes there will
 // be a real-time event consumer responsible for collecting and processing events. If the function succeeds, it returns
@@ -94,8 +94,6 @@ func ControlTrace(handle TraceHandle, name string, guid syscall.GUID, operation 
 			BufferSize: uint32(unsafe.Sizeof(EventTraceProperties{})) + uint32(2*len(name)),
 			GUID:       guid,
 		},
-		LoggerNameOffset:  uint32(unsafe.Sizeof(EventTraceProperties{})),
-		LogFileNameOffset: 0,
 	}
 	err := controlTrace(handle, name, props, operation)
 	if err != nil && err != windows.ERROR_MORE_DATA {
@@ -104,10 +102,12 @@ func ControlTrace(handle TraceHandle, name string, guid syscall.GUID, operation 
 	return nil
 }
 
+// StopTrace stops the provided trace.
 func StopTrace(name string, guid syscall.GUID) error {
 	return ControlTrace(TraceHandle(0), name, guid, Stop)
 }
 
+// FlushTrace flushes the buffers of the provided trace.
 func FlushTrace(name string, guid syscall.GUID) error {
 	return ControlTrace(TraceHandle(0), name, guid, Flush)
 }

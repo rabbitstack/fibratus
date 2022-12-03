@@ -114,7 +114,7 @@ filters:
 
 # Indicates whether initial handle snapshot is built. The snapshot contains the state of system handles.
 handle:
-  init-snapshot: true
+  init-snapshot: false
 
 # =============================== Kevent ===============================================
 
@@ -182,11 +182,11 @@ kstream:
   #enable-handle: false
 
   # Determines whether kernel Audit API calls events are collected
-  enable-audit-api: false
+  #enable-audit-api: true
 
   # Determines whether the Microsoft Antimalware Engine events are collected. For the
   # events to be collected it is necessary to enable Windows Defender realtime protection.
-  enable-antimalware-engine: false
+  #enable-antimalware-engine: true
 
   # Determines if raw event buffer parsing is used instead of TDH (Trace Data Helper) API
   # raw-event-parsing: true

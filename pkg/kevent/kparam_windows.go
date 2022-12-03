@@ -25,7 +25,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/syscall/etw"
-	"github.com/rabbitstack/fibratus/pkg/syscall/registry"
 	"github.com/rabbitstack/fibratus/pkg/syscall/security"
 	"github.com/rabbitstack/fibratus/pkg/util/ip"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
@@ -89,11 +88,11 @@ func (k Kparam) String() string {
 		return devMapper.Convert(k.Value.(string))
 	case kparams.Key:
 		rootKey, keyName := key.Format(k.Value.(string))
-		if keyName != "" && rootKey != registry.InvalidKey {
-			return rootKey.String() + "\\" + keyName
+		if keyName != "" && rootKey != key.Invalid {
+			return key.String(rootKey) + "\\" + keyName
 		}
-		if rootKey != registry.InvalidKey {
-			return rootKey.String()
+		if rootKey != key.Invalid {
+			return key.String(rootKey)
 		}
 		unknownKeysCount.Add(1)
 		return keyName
@@ -135,7 +134,14 @@ func (k Kparam) String() string {
 		if k.Enum == nil {
 			return ""
 		}
-		v, ok := k.Value.(uint32)
+		e := k.Value
+		switch e.(type) {
+		case uint8:
+			e = uint32(e.(uint8))
+		case uint16:
+			e = uint32(e.(uint16))
+		}
+		v, ok := e.(uint32)
 		if !ok {
 			return ""
 		}

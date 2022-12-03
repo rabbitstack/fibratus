@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 by Nedim Sabic Sabic
+ * Copyright 2021-2022 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -16,32 +16,11 @@
  * limitations under the License.
  */
 
-package network
+package matchers
 
-// L4Proto is the type alias for the Layer 4 protocol.
-type L4Proto uint8
+import "github.com/rabbitstack/fibratus/pkg/kevent"
 
-const (
-	// TCP identifies TCP Layer 4 protocol.
-	TCP L4Proto = iota + 1
-	// UDP identifies UDP Layer 4 protocol.
-	UDP
-)
-
-// ProtoNames maps protocol identifiers to protocol names
-var ProtoNames = map[uint32]string{
-	uint32(TCP): "TCP",
-	uint32(UDP): "UDP",
-}
-
-// String returns the string representation of the Layer 4 protocol.
-func (proto L4Proto) String() string {
-	switch proto {
-	case TCP:
-		return "tcp"
-	case UDP:
-		return "udp"
-	default:
-		return "unknown"
-	}
+type Matcher interface {
+	Compile() error
+	Match(*kevent.Kevent) (bool, error)
 }

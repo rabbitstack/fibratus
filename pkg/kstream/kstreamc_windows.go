@@ -21,6 +21,7 @@ package kstream
 import (
 	"expvar"
 	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/kstream/matchers"
 	"os"
 	"syscall"
 	"unsafe"
@@ -77,14 +78,15 @@ type kstreamConsumer struct {
 	kevts chan *kevent.Kevent // channel for fanning out generated events
 
 	processors processors.Chain
-	config     *config.Config // main configuration
+	matchers   matchers.Chain
 
-	ktraceController KtraceController  // trace session control plane
+	config *config.Config // main configuration
+
+	ktraceController *KtraceController // trace session control plane
 	psnapshotter     ps.Snapshotter    // process state tracker
 	sequencer        *kevent.Sequencer // event sequence manager
 
 	filter filter.Filter
-	rules  filter.Rules
 
 	capture bool // capture determines if events are dumped to capture files
 
@@ -97,22 +99,22 @@ func (k *kstreamConsumer) addTraceHandle(traceHandle etw.TraceHandle) {
 
 // NewConsumer constructs a new event stream consumer.
 func NewConsumer(
-	ktraceController KtraceController,
+	ktraceController *KtraceController,
 	psnap ps.Snapshotter,
 	hsnap handle.Snapshotter,
 	config *config.Config,
 ) Consumer {
 	kconsumer := &kstreamConsumer{
 		errs:             make(chan error, 1000),
+		kevts:            make(chan *kevent.Kevent, 500),
 		config:           config,
 		psnapshotter:     psnap,
 		ktraceController: ktraceController,
 		capture:          config.KcapFile != "",
 		sequencer:        kevent.NewSequencer(),
-		kevts:            make(chan *kevent.Kevent, 500),
-		rules:            filter.NewRules(config),
 	}
 
+	kconsumer.matchers = matchers.NewChain(config)
 	kconsumer.processors = processors.NewChain(psnap, hsnap, config)
 
 	return kconsumer
@@ -126,10 +128,6 @@ func (k *kstreamConsumer) SetFilter(filter filter.Filter) { k.filter = filter }
 // in an invalid trace handler. Errors returned by `ProcessTrace` are sent to the channel since this function
 // blocks the current thread, and we schedule its execution in a separate goroutine.
 func (k *kstreamConsumer) OpenKstream(traces map[string]TraceSession) error {
-	err := k.rules.Compile()
-	if err != nil {
-		return err
-	}
 	for _, trace := range traces {
 		err := k.openKstream(trace.Name)
 		if err != nil {
@@ -155,7 +153,7 @@ func (k *kstreamConsumer) openKstream(loggerName string) error {
 	*(*uintptr)(unsafe.Pointer(&ktrace.EventCallback[4])) = cb
 
 	traceHandle := etw.OpenTrace(ktrace)
-	if uint64(traceHandle) == winerrno.InvalidProcessTraceHandle {
+	if !traceHandle.IsValid() {
 		return fmt.Errorf("unable to open kernel trace: %v", syscall.GetLastError())
 	}
 	k.addTraceHandle(traceHandle)
@@ -340,16 +338,13 @@ func (k *kstreamConsumer) publishKevent(kevt *kevent.Kevent) error {
 	if !kevt.IsState() {
 		k.sequencer.Increment()
 	}
-	// run rules. In case of rule groups with sequence policy
-	// the last event matching the group is forwarded to the
-	// outputs
-	if rulesFired := k.rules.Fire(kevt); !rulesFired {
-		return nil
+	// execute rule matchers
+	if matches, err := k.matchers.Match(kevt); !matches {
+		return err
 	}
 	if k.eventCallback != nil {
 		return k.eventCallback(kevt)
 	}
-
 	k.kevts <- kevt
 	keventsEnqueued.Add(1)
 	return nil

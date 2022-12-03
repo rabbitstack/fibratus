@@ -608,10 +608,9 @@ func (l *fileAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, 
 	case fields.FileObject:
 		return kevt.Kparams.GetUint64(kparams.FileObject)
 	case fields.FileType:
-		return kevt.Kparams.GetString(kparams.FileType)
+		return kevt.GetParamAsString(kparams.FileType), nil
 	case fields.FileExtension:
-		filename := kevt.GetParamAsString(kparams.FileName)
-		return filepath.Ext(filename), nil
+		return filepath.Ext(kevt.GetParamAsString(kparams.FileName)), nil
 	case fields.FileAttributes:
 		val, err := kevt.Kparams.GetSlice(kparams.FileAttributes)
 		if err != nil {

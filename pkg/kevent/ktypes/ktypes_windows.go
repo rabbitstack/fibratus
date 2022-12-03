@@ -23,7 +23,7 @@ import (
 	"syscall"
 )
 
-// Ktype identifies a kernel event type. It comprises the kernel event GUID + one extra opcode byte to uniquely identify a kernel event
+// Ktype identifies an event type. It comprises the event GUID + opcode to uniquely identify an event
 type Ktype [17]byte
 
 var (
@@ -110,7 +110,6 @@ var (
 	SendUDPv4 = Pack(syscall.GUID{Data1: 0xbf3a50c5, Data2: 0xa9c9, Data3: 0x4988, Data4: [8]byte{0xa0, 0x05, 0x2d, 0xf0, 0xb7, 0xc8, 0x0f, 0x80}}, 10)
 	// SendUDPv6 represents the UDPv6 kernel events for sending datagrams to connectionless sockets.
 	SendUDPv6 = Pack(syscall.GUID{Data1: 0xbf3a50c5, Data2: 0xa9c9, Data3: 0x4988, Data4: [8]byte{0xa0, 0x05, 0x2d, 0xf0, 0xb7, 0xc8, 0x0f, 0x80}}, 26)
-
 	// RecvTCPv4 represents the TCP IPv4 network receive event.
 	RecvTCPv4 = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 11)
 	// RecvTCPv6 represents the TCP IPv6 network receive event.
@@ -119,22 +118,18 @@ var (
 	RecvUDPv4 = Pack(syscall.GUID{Data1: 0xbf3a50c5, Data2: 0xa9c9, Data3: 0x4988, Data4: [8]byte{0xa0, 0x05, 0x2d, 0xf0, 0xb7, 0xc8, 0x0f, 0x80}}, 11)
 	// RecvUDPv6 represents the UDP IPv6 network receive event.
 	RecvUDPv6 = Pack(syscall.GUID{Data1: 0xbf3a50c5, Data2: 0xa9c9, Data3: 0x4988, Data4: [8]byte{0xa0, 0x05, 0x2d, 0xf0, 0xb7, 0xc8, 0x0f, 0x80}}, 27)
-
 	// ConnectTCPv4 represents the TCP IPv4 network connect event.
 	ConnectTCPv4 = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 12)
 	// ConnectTCPv6 represents the TCP IPv6 network connect event.
 	ConnectTCPv6 = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 28)
-
 	// DisconnectTCPv4 is the TCP IPv4 network disconnect event.
 	DisconnectTCPv4 = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 13)
 	// DisconnectTCPv6 is the TCP IPv6 network disconnect event.
 	DisconnectTCPv6 = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 29)
-
 	// ReconnectTCPv4 is the TCP IPv4 network reconnect event.
 	ReconnectTCPv4 = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 16)
 	// ReconnectTCPv6 is the TCP IPv6 network reconnect event.
 	ReconnectTCPv6 = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 32)
-
 	// RetransmitTCPv4 is the TCP IPv4 network retransmit event.
 	RetransmitTCPv4 = Pack(syscall.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 14)
 	// RetransmitTCPv6 is the TCP IPv6 network retransmit event.

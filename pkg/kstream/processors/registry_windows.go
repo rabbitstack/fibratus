@@ -20,7 +20,6 @@ package processors
 
 import (
 	"expvar"
-	"github.com/rabbitstack/fibratus/pkg/syscall/registry"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
 	"path/filepath"
 	"strings"
@@ -69,38 +68,30 @@ func newRegistryProcessor(hsnap handle.Snapshotter) Processor {
 }
 
 func (r *registryProcessor) ProcessEvent(kevt *kevent.Kevent) (*kevent.Kevent, bool, error) {
-	typ := kevt.Type
-	switch typ {
+	if kevt.Category == ktypes.Registry {
+		err := r.processEvent(kevt)
+		return kevt, false, err
+	}
+	return kevt, true, nil
+}
+
+func (registryProcessor) Name() ProcessorType { return Registry }
+func (registryProcessor) Close()              {}
+
+func (r *registryProcessor) processEvent(kevt *kevent.Kevent) error {
+	switch kevt.Type {
 	case ktypes.RegKCBRundown, ktypes.RegCreateKCB:
-		khandle, err := kevt.Kparams.GetUint64(kparams.RegKeyHandle)
-		if err != nil {
-			return kevt, false, err
-		}
+		khandle := kevt.Kparams.MustGetUint64(kparams.RegKeyHandle)
 		if _, ok := r.keys[khandle]; !ok {
 			r.keys[khandle], _ = kevt.Kparams.GetString(kparams.RegKeyName)
 		}
 		kcbCount.Add(1)
-		return kevt, false, nil
 	case ktypes.RegDeleteKCB:
-		khandle, err := kevt.Kparams.GetUint64(kparams.RegKeyHandle)
-		if err != nil {
-			return kevt, false, err
-		}
+		khandle := kevt.Kparams.MustGetUint64(kparams.RegKeyHandle)
 		delete(r.keys, khandle)
 		kcbCount.Add(-1)
-		return kevt, false, nil
-	case ktypes.RegCreateKey,
-		ktypes.RegDeleteKey,
-		ktypes.RegOpenKey,
-		ktypes.RegCloseKey,
-		ktypes.RegQueryKey,
-		ktypes.RegQueryValue,
-		ktypes.RegSetValue,
-		ktypes.RegDeleteValue:
-		khandle, err := kevt.Kparams.GetUint64(kparams.RegKeyHandle)
-		if err != nil {
-			return kevt, false, err
-		}
+	default:
+		khandle := kevt.Kparams.MustGetUint64(kparams.RegKeyHandle)
 		// we have to obey a straightforward algorithm to connect relative
 		// key names to their root keys. If key handle is equal to zero we
 		// have a full key name and don't have to go further resolving the
@@ -119,66 +110,58 @@ func (r *registryProcessor) ProcessEvent(kevt *kevent.Kevent) (*kevent.Kevent, b
 				keyName = r.findMatchingKey(kevt.PID, keyName)
 			}
 			if err := kevt.Kparams.SetValue(kparams.RegKeyName, keyName); err != nil {
-				return kevt, false, err
+				return err
 			}
 		}
 
 		// get the type/value of the registry key and append to parameters
-		if typ == ktypes.RegSetValue {
+		if kevt.IsRegSetValue() {
 			rootKey, keyName := key.Format(keyName)
-			if rootKey != registry.InvalidKey {
+			if rootKey != key.Invalid {
 				subkey, value := filepath.Split(keyName)
-
-				regKey, err := reg.OpenKey(reg.Key(rootKey), subkey, reg.QUERY_VALUE)
+				regKey, err := reg.OpenKey(rootKey, subkey, reg.QUERY_VALUE)
 				if err != nil {
-					return kevt, false, nil
+					return err
 				}
 				defer regKey.Close()
 				b := make([]byte, 0)
 				_, typ, err := regKey.GetValue(value, b)
 				if err != nil {
-					return kevt, false, nil
+					return err
 				}
+				// append value type parameter
 				kevt.AppendParam(kparams.RegValueType, kparams.Enum, typ, kevent.WithEnum(key.RegistryValueTypes))
 				switch typ {
 				case reg.SZ, reg.EXPAND_SZ:
 					v, _, err := regKey.GetStringValue(value)
 					if err != nil {
-						return kevt, false, nil
+						return err
 					}
 					kevt.Kparams.Append(kparams.RegValue, kparams.UnicodeString, v)
-
 				case reg.DWORD, reg.QWORD:
 					v, _, err := regKey.GetIntegerValue(value)
 					if err != nil {
-						return kevt, false, nil
+						return err
 					}
 					kevt.Kparams.Append(kparams.RegValue, kparams.Uint64, v)
-
 				case reg.MULTI_SZ:
 					v, _, err := regKey.GetStringsValue(value)
 					if err != nil {
-						return kevt, false, nil
+						return err
 					}
 					kevt.Kparams.Append(kparams.RegValue, kparams.UnicodeString, strings.Join(v, "\n\r"))
-
 				case reg.BINARY:
 					v, _, err := regKey.GetBinaryValue(value)
 					if err != nil {
-						return kevt, false, nil
+						return err
 					}
 					kevt.Kparams.Append(kparams.RegValue, kparams.UnicodeString, string(v))
 				}
-				return kevt, false, nil
 			}
 		}
 	}
-
-	return kevt, true, nil
+	return nil
 }
-
-func (registryProcessor) Name() ProcessorType { return Registry }
-func (registryProcessor) Close()              {}
 
 func (r *registryProcessor) findMatchingKey(pid uint32, relativeKeyName string) string {
 	// we want to prevent too frequent queries on the process' handles

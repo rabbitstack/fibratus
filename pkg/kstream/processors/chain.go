@@ -48,9 +48,8 @@ func (c *chain) addProcessor(processor Processor) {
 
 func (c chain) ProcessEvent(kevt *kevent.Kevent) (*kevent.Kevent, error) {
 	var errs = make([]error, 0)
-	var cukerr error
-
 	var output *kevent.Kevent
+
 	for _, processor := range c.processors {
 		var err error
 		var next bool
@@ -61,7 +60,7 @@ func (c chain) ProcessEvent(kevt *kevent.Kevent) (*kevent.Kevent, error) {
 				errs = append(errs, fmt.Errorf("%q processor failed with error: %v", processor.Name(), err))
 				continue
 			} else {
-				cukerr = err
+				return output, err
 			}
 		}
 		if !next {
@@ -71,10 +70,6 @@ func (c chain) ProcessEvent(kevt *kevent.Kevent) (*kevent.Kevent, error) {
 
 	if len(errs) > 0 {
 		return output, multierror.Wrap(errs...)
-	}
-	if cukerr != nil {
-		cukerr = nil
-		return output, cukerr
 	}
 
 	return output, nil
