@@ -20,7 +20,6 @@ package ql
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
-	"regexp"
 	"strings"
 )
 
@@ -72,12 +71,11 @@ const (
 	Gte         // >=
 	opEnd
 
-	Lparen   // (
-	Rparen   // )
-	Comma    // ,
-	Dot      // .
-	Lbracket // [
-	Rbracket // ]
+	Lparen // (
+	Rparen // )
+	Comma  // ,
+	Dot    // .
+	Pipe   // |
 
 	Seq     // SEQUENCE
 	MaxSpan // MAXSPAN
@@ -142,12 +140,11 @@ var tokens = [...]string{
 	Gt:  ">",
 	Gte: ">=",
 
-	Lparen:   "(",
-	Rparen:   ")",
-	Comma:    ",",
-	Dot:      ".",
-	Lbracket: "[",
-	Rbracket: "]",
+	Lparen: "(",
+	Rparen: ")",
+	Comma:  ",",
+	Dot:    ".",
+	Pipe:   "|",
 
 	Seq:     "SEQUENCE",
 	MaxSpan: "MAXSPAN",
@@ -188,18 +185,6 @@ func tokstr(tok token, lit string) string {
 		return lit
 	}
 	return tok.String()
-}
-
-// parsePatternBinding parses the pattern binding token and
-// returns true if the provided id is a pattern binding. Returns
-// false otherwise.
-func parsePatternBinding(id string) (string, bool) {
-	//nolint:gosimple
-	matches := regexp.MustCompile("\\$[1-9]\\.([a-z0-9A-Z\\[\\].]+)").FindStringSubmatch(id)
-	if len(matches) > 0 {
-		return matches[1], true
-	}
-	return "", false
 }
 
 // lookup returns the token associated with a given string.

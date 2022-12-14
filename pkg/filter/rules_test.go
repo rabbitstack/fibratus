@@ -328,10 +328,10 @@ func TestSimpleSequenceRuleMultiplePartials(t *testing.T) {
 	require.NoError(t, rules.Compile())
 
 	// create random matches which don't satisfy the BY statement
-	for _, pid := range []uint32{2343, 1024, 11122, 3450, 12319} {
+	for i, pid := range []uint32{2343, 1024, 11122, 3450, 12319} {
 		e := &kevent.Kevent{
 			Type:      ktypes.CreateProcess,
-			Timestamp: time.Now(),
+			Timestamp: time.Now().Add(time.Duration(i) * time.Millisecond),
 			Name:      "CreateProcess",
 			Tid:       2484,
 			PID:       pid,
@@ -346,7 +346,7 @@ func TestSimpleSequenceRuleMultiplePartials(t *testing.T) {
 		}
 		e1 := &kevent.Kevent{
 			Type:      ktypes.CreateFile,
-			Timestamp: time.Now(),
+			Timestamp: time.Now().Add(time.Duration(i) * time.Millisecond * 2),
 			Name:      "CreateFile",
 			Tid:       2484,
 			PID:       pid * 2,
@@ -370,7 +370,7 @@ func TestSimpleSequenceRuleMultiplePartials(t *testing.T) {
 
 	kevt1 := &kevent.Kevent{
 		Type:      ktypes.CreateProcess,
-		Timestamp: time.Now(),
+		Timestamp: time.Now().Add(time.Second),
 		Name:      "CreateProcess",
 		Tid:       2484,
 		PID:       859,
@@ -385,7 +385,7 @@ func TestSimpleSequenceRuleMultiplePartials(t *testing.T) {
 	}
 	kevt2 := &kevent.Kevent{
 		Type:      ktypes.CreateFile,
-		Timestamp: time.Now(),
+		Timestamp: time.Now().Add(time.Second * time.Duration(2)),
 		Name:      "CreateFile",
 		Tid:       2484,
 		PID:       859,

@@ -7,7 +7,7 @@
 
 - macro: open_process_all_access
   expr: open_process and ps.access.mask.names in ('ALL_ACCESS')
-  description: Acquires the local process object with all possible rights for the process object
+  description: Acquires the local process object with all possible access rights
 
 - macro: spawn_msoffice_process
   expr: spawn_process and ps.sibling.exe iin msoffice_binaries
@@ -65,3 +65,9 @@
 
 - macro: msoffice_binaries
   list: [EXCEL.EXE, WINWORD.EXE, MSACCESS.EXE, POWERPNT.EXE, WORDPAD.EXE]
+
+- macro: executable_extensions
+  list: [.exe, .com, .scr]
+
+- macro: module_extensions
+  list: [.dll, .ocx, .cpl]

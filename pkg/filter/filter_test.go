@@ -55,13 +55,13 @@ func TestFilterCompile(t *testing.T) {
 	f = New(`ps.name`, cfg)
 	require.EqualError(t, f.Compile(), "expected at least one field or operator but zero found")
 	f = New(`ps.name =`, cfg)
-	require.EqualError(t, f.Compile(), "ps.name =\n╭─────────^\n|\n|\n╰─────────────────── expected field, string, number, bool, ip, function, pattern binding")
+	require.EqualError(t, f.Compile(), "ps.name =\n╭─────────^\n|\n|\n╰─────────────────── expected field, string, number, bool, ip, function")
 }
 
 func TestSeqFilterCompile(t *testing.T) {
 	f := New(`sequence
-[kevt.name = 'CreateProcess'] by ps.exe
-[kevt.name = 'CreateFile' and file.operation = 'create'] by file.name
+|kevt.name = 'CreateProcess'| by ps.exe
+|kevt.name = 'CreateFile' and file.operation = 'create'| by file.name
 `, cfg)
 	require.NoError(t, f.Compile())
 	require.NotNil(t, f.GetSequence())

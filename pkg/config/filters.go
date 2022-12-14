@@ -36,7 +36,6 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
-	"time"
 )
 
 // FilterGroupPolicy is the type alias for the filter group policy
@@ -53,7 +52,6 @@ const (
 	// out the matching events, that is, discarding them from the event
 	// flow.
 	ExcludePolicy
-
 	// UnknownPolicy determines the unknown group policy type.
 	UnknownPolicy
 )
@@ -144,7 +142,6 @@ type FilterConfig struct {
 	Def         string            `json:"def" yaml:"def"` // deprecated in favor of `Condition`
 	Condition   string            `json:"condition" yaml:"condition"`
 	Action      string            `json:"action" yaml:"action"`
-	MaxSpan     time.Duration     `json:"max-span" yaml:"max-span"`
 	Labels      map[string]string `json:"labels" yaml:"labels"`
 }
 

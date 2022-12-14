@@ -5,9 +5,9 @@
       condition: >
         sequence
         maxspan 100ms
-        [kevt.name = 'CreateProcess' and ps.name = 'cmd.exe'] by ps.exe
-        [kevt.name = 'CreateFile'
+        |kevt.name = 'CreateProcess' and ps.name = 'cmd.exe'| by ps.exe
+        |kevt.name = 'CreateFile'
             and
          file.name icontains 'temp'
-        ] by file.name
+        | by file.name
 

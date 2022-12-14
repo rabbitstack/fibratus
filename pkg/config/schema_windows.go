@@ -492,7 +492,7 @@ var rulesSchema = `
                         "description":  {"type": "string"},
 						"def": 			{"type": "string", "minLength": 3},
 						"condition": 	{"type": "string", "minLength": 3},
-						"action": 		{"type": "string"},
+						"action": 		{"type": "string"}
 					},
 					"oneOf": [
 						{"required": ["def"]},

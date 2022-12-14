@@ -5,8 +5,9 @@
       condition: >
         sequence
         maxspan 200ms
-        [kevt.name = 'CreateProcess' and ps.name = 'cmd.exe'] by ps.pid
-        [kevt.name = 'CreateFile'
+        by ps.pid
+        |kevt.name = 'CreateProcess' and ps.name = 'cmd.exe'|
+        |kevt.name = 'CreateFile'
             and
          file.name icontains 'temp'
-        ] by ps.pid
+        |

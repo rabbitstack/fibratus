@@ -256,10 +256,10 @@ func (s *sequenceState) addPartial(rule string, kevt *kevent.Kevent) {
 
 func (s *sequenceState) isAfter(rule string, kevt *kevent.Kevent) bool {
 	i := s.idxs[rule]
-	if len(s.partials[i+1]) == 0 {
+	if len(s.partials[i]) == 0 {
 		return true
 	}
-	return kevt.Timestamp.After(s.partials[i+1][len(s.partials[i+1])-1].Timestamp)
+	return kevt.Timestamp.After(s.partials[i][len(s.partials[i])-1].Timestamp)
 }
 
 func (s *sequenceState) clear() {
@@ -302,8 +302,38 @@ func compareSeqJoin(s1, s2 any) bool {
 			return false
 		}
 		return strings.EqualFold(v, s)
+	case uint8:
+		n, ok := s2.(uint8)
+		if !ok {
+			return false
+		}
+		return v == n
+	case uint16:
+		n, ok := s2.(uint16)
+		if !ok {
+			return false
+		}
+		return v == n
 	case uint32:
 		n, ok := s2.(uint32)
+		if !ok {
+			return false
+		}
+		return v == n
+	case uint64:
+		n, ok := s2.(uint64)
+		if !ok {
+			return false
+		}
+		return v == n
+	case int:
+		n, ok := s2.(int)
+		if !ok {
+			return false
+		}
+		return v == n
+	case uint:
+		n, ok := s2.(uint)
 		if !ok {
 			return false
 		}
@@ -513,33 +543,30 @@ func (r *Rules) Compile() error {
 			r.hasExcludePolicies = true
 		}
 		log.Infof("loading rule group [%s] with %q policy", group.Name, group.Policy)
-		rules := append(group.Rules, group.FromStrings...)
-
 		filterGroupsCount.Add(1)
 		filterGroupsCountByPolicy.Add(group.Policy.String(), 1)
-
 		// compile filters and populate the groups. Additionally, for
-		// sequence policies we have to configure the FSM states and
-		// transitions.
-		if len(rules) == 0 {
-			panic("got empty rules")
-		}
-		filters := make([]*compiledFilter, 0, len(rules))
-
+		// sequence rules we have to configure the FSM states and
+		// transitions
+		var (
+			rules   = append(group.Rules, group.FromStrings...)
+			filters = make([]*compiledFilter, 0, len(rules))
+		)
 		for _, filterConfig := range rules {
 			rule := filterConfig.Name
 			f := New(expr(filterConfig), r.config)
 			if err := f.Compile(); err != nil {
 				return ErrInvalidFilter(rule, group.Name, err)
 			}
-			// initialize sequence state
 			var seqState *sequenceState
 			if f.IsSequence() {
 				seq := f.GetSequence()
 				expressions := seq.Expressions
 				initialState := expressions[0].Expr.String()
 				seqState = newSequenceState(group.Name, initialState, seq.MaxSpan)
-				// configure state machine transitions
+				// setup finite state machine states. The last rule
+				// in the sequence transitions to the terminal state
+				// if all rules match
 				for i, expr := range expressions {
 					n := expr.Expr.String()
 					seqState.idxs[n] = uint16(i + 1)
@@ -555,6 +582,9 @@ func (r *Rules) Compile() error {
 							Permit(expireTransition, sequenceExpiredState)
 					}
 				}
+				// configure reset transitions that are triggered
+				// when the final state is reached of when a deadline
+				// or sequence expiration happens
 				seqState.fsm.Configure(sequenceTerminalState).Permit(resetTransition, initialState)
 				seqState.fsm.Configure(sequenceDeadlineState).Permit(resetTransition, initialState)
 				seqState.fsm.Configure(sequenceExpiredState).Permit(resetTransition, initialState)
@@ -606,7 +636,7 @@ func (r *Rules) findFilterGroups(kevt *kevent.Kevent) filterGroups {
 }
 
 func (r *Rules) Fire(kevt *kevent.Kevent) bool {
-	// if there are no filter groups we assume
+	// if there are no rule groups we assume
 	// no group files were defined or specified
 	// in the config, so, the default behaviour
 	// in such cases is to pass the event and
@@ -693,22 +723,20 @@ nextGroup:
 					// in a simple rule could trigger multiple
 					// matches in sequence rules
 					for _, f := range g.filters {
-						if !f.filter.IsSequence() {
+						if !f.filter.IsSequence() && f.ss == nil {
 							continue
 						}
-						if f.ss != nil {
-							if f.ss.expire(kevt) {
-								continue
+						if f.ss.expire(kevt) {
+							continue
+						}
+						if r.runSequence(kevt, f) {
+							kevt.AddMeta(kevent.RuleNameKey, f.config.Name)
+							log.Debugf("rule [%s] in group [%s] matched", f.config.Name, g.group.Name)
+							err := runFilterAction(nil, f.ss.matches, g.group, f.config)
+							if err != nil {
+								log.Warnf("unable to execute %q rule action: %v", f.config.Name, err)
 							}
-							if r.runSequence(kevt, f) {
-								kevt.AddMeta(kevent.RuleNameKey, f.config.Name)
-								log.Debugf("rule [%s] in group [%s] matched", f.config.Name, g.group.Name)
-								err := runFilterAction(nil, f.ss.matches, g.group, f.config)
-								if err != nil {
-									log.Warnf("unable to execute %q rule action: %v", f.config.Name, err)
-								}
-								f.ss.clear()
-							}
+							f.ss.clear()
 						}
 					}
 				}

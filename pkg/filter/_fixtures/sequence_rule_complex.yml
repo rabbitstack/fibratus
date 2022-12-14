@@ -5,17 +5,19 @@
       condition: >
         sequence
         maxspan 1h
-        [kevt.name = 'CreateProcess' and ps.sibling.name
+        |kevt.name = 'CreateProcess' and ps.sibling.name
             in
         ('firefox.exe', 'chrome.exe', 'edge.exe')
-        ] by ps.sibling.pid
-        [kevt.name = 'CreateFile' and file.operation = 'create'
+        | by ps.sibling.pid
+
+        |kevt.name = 'CreateFile' and file.operation = 'create'
             and
         file.extension = '.exe'
-        ] by ps.pid
-        [
+        | by ps.pid
+
+        |
           kevt.name in ('Send', 'Connect')
-        ] by ps.pid
+        | by ps.pid
       action: >
         {{
             emit

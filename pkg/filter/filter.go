@@ -38,18 +38,24 @@ var (
 	accessorErrors = expvar.NewMap("filter.accessor.errors")
 )
 
-// Filter is the main interface for the filter engine implementors.
+// Filter is the main interface for the filter engine implementors. Filter can either
+// be a single expression combined by various subexpressions connected by operators, or
+// it can be a sequence of expressions.
 type Filter interface {
 	// Compile compiles the filter by parsing the filtering expression.
 	Compile() error
-	// Run runs a filter on the inbound kernel event and decides whether the event
-	// should be dropped or propagated to the downstream channel.
+	// Run runs a filter with a single expression. The return value decides
+	// if the incoming event has successfully matched the filter expression.
 	Run(kevt *kevent.Kevent) bool
-	// RunSequence runs a filter with stateful event tracking.
+	// RunSequence runs a filter with sequence expressions. Sequence rules depend
+	// on the state machine transitions and partial matches to decide whether the
+	// rule is fired.
 	RunSequence(kevt *kevent.Kevent, seqID uint16) bool
-	// GetStringFields returns field names mapped to their string values
+	// GetStringFields returns field names mapped to their string values.
 	GetStringFields() map[fields.Field][]string
+	// GetSequence returns the sequence descriptor or nil if this filter is not a sequence.
 	GetSequence() *ql.Sequence
+	// IsSequence determines if this filter is a sequence.
 	IsSequence() bool
 }
 
@@ -88,6 +94,7 @@ func (f *filter) Compile() error {
 		return err
 	}
 
+	// traverse the expression tree
 	walk := func(n ql.Node) {
 		if expr, ok := n.(*ql.BinaryExpr); ok {
 			if lhs, ok := expr.LHS.(*ql.FieldLiteral); ok {
@@ -123,9 +130,14 @@ func (f *filter) Compile() error {
 	if f.expr != nil {
 		ql.WalkFunc(f.expr, walk)
 	} else {
+		if !f.seq.By.IsEmpty() {
+			f.fields = append(f.fields, f.seq.By)
+		}
 		for _, expr := range f.seq.Expressions {
 			ql.WalkFunc(expr.Expr, walk)
-			f.fields = append(f.fields, expr.By)
+			if !expr.By.IsEmpty() {
+				f.fields = append(f.fields, expr.By)
+			}
 		}
 	}
 

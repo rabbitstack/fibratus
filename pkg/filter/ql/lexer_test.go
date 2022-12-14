@@ -57,6 +57,7 @@ func TestScanner(t *testing.T) {
 		{s: `(`, tok: Lparen},
 		{s: `)`, tok: Rparen},
 		{s: `,`, tok: Comma},
+		{s: `|`, tok: Pipe},
 
 		// fields
 		{s: `ps.name`, tok: Field, lit: "ps.name"},

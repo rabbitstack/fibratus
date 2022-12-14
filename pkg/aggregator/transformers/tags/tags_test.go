@@ -42,7 +42,7 @@ func TestTransform(t *testing.T) {
 			kparams.NetSIP:   {Name: kparams.NetSIP, Type: kparams.IPv4, Value: net.ParseIP("127.0.0.1")},
 			kparams.NetDIP:   {Name: kparams.NetDIP, Type: kparams.IPv4, Value: net.ParseIP("216.58.201.174")},
 		},
-		Metadata: make(map[kevent.MetadataKey]string),
+		Metadata: make(map[kevent.MetadataKey]any),
 	}
 	require.NoError(t, os.Setenv("NODENAME", "archbunny"))
 	transf, err := transformers.Load(transformers.Config{Type: transformers.Tags, Transformer: Config{Tags: []Tag{{Key: "env", Value: "staging"}, {Key: "zone", Value: "dmz"}, {Key: "node", Value: "%NODENAME%"}}}})

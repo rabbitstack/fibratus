@@ -15,30 +15,28 @@
     subtechnique.id: T1218.011
     subtechnique.name: Rundll32
     subtechnique.ref: https://attack.mitre.org/techniques/T1218/011/
-  policy: sequence
   rules:
-    - name: Rundll32 process executed with suspicious command line
+    - name: System Binary Proxy Execution via Rundll32
       condition: >
-        spawn_process
-            and
-        ps.sibling.name ~= 'rundll32.exe'
-            and
-        ps.sibling.comm imatches
-            (
-              '*javascript:*',
-              '*shell32.dll*ShellExec_RunDLL*',
-              '*-sta*'
-            )
-    - name: Rundll32 child process executed
-      condition: >
-        ps.pid = $1.ps.sibling.pid
-           and
-        spawn_process
-      max-span: 45s
-  action: >
-    {{
-        emit . "System Binary Proxy Execution via Rundll32" ""
-    }}
+        sequence
+        maxspan 1m
+        |
+          spawn_process
+              and
+          ps.sibling.name ~= 'rundll32.exe'
+              and
+          ps.sibling.comm imatches
+              (
+                '*javascript:*',
+                '*shell32.dll*ShellExec_RunDLL*',
+                '*-sta*'
+              )
+        | by ps.sibling.pid
+        |spawn_process| by ps.pid
+      action: >
+        {{
+            emit . "System Binary Proxy Execution via Rundll32" ""
+        }}
 
 - group: System Binary Proxy Execution via Regsvr32
   description: |

@@ -50,7 +50,8 @@ func NewParserWithConfig(expr string, config *config.Filters) *Parser {
 }
 
 // ParseSequence parses the collection of binary expressions with possible join
-// statements and time frame constraints.
+// statements and time frame constraints. This method assumes the SEQUENCE token
+// has already been consumed.
 func (p *Parser) ParseSequence() (*Sequence, error) {
 	seq := &Sequence{}
 	var exprs []SequenceExpr
@@ -87,7 +88,7 @@ func (p *Parser) ParseSequence() (*Sequence, error) {
 			}
 			seq.Expressions = exprs
 			if seq.impairBy() {
-				return nil, fmt.Errorf("%s: all expressions need the 'by' statement", p.expr)
+				return nil, fmt.Errorf("%s: all expressions require the 'by' statement", p.expr)
 			}
 			return seq, nil
 		} else {
@@ -95,16 +96,16 @@ func (p *Parser) ParseSequence() (*Sequence, error) {
 		}
 
 		tok, pos, lit := p.scanIgnoreWhitespace()
-		if tok != Lbracket {
-			return nil, newParseError(tokstr(tok, lit), []string{"["}, pos, p.expr)
+		if tok != Pipe {
+			return nil, newParseError(tokstr(tok, lit), []string{"|"}, pos, p.expr)
 		}
 		expr, err := p.ParseExpr()
 		if err != nil {
 			return nil, err
 		}
 		tok, pos, lit = p.scanIgnoreWhitespace()
-		if tok != Rbracket {
-			return nil, newParseError(tokstr(tok, lit), []string{"]"}, pos, p.expr)
+		if tok != Pipe {
+			return nil, newParseError(tokstr(tok, lit), []string{"|"}, pos, p.expr)
 		}
 
 		tok, pos, lit = p.scanIgnoreWhitespace()
@@ -115,12 +116,13 @@ func (p *Parser) ParseSequence() (*Sequence, error) {
 			}
 			exprs = append(exprs, SequenceExpr{Expr: expr, By: fields.Field(lit)})
 		} else {
-			p.unscan()
 			exprs = append(exprs, SequenceExpr{Expr: expr})
+			p.unscan()
 		}
 	}
 }
 
+// IsSequence checks whether the expression given to the parser is a sequence.
 func (p *Parser) IsSequence() bool {
 	tok, _, _ := p.scanIgnoreWhitespace()
 	if tok == Seq {
@@ -147,8 +149,8 @@ func (p *Parser) ParseExpr() (Expr, error) {
 		op, pos, lit := p.scanIgnoreWhitespace()
 		if !op.isOperator() {
 			p.unscan()
-			if op != EOF && op != Rparen && op != Comma && op != Rbracket {
-				return nil, newParseError(tokstr(op, lit), []string{"operator", "')'", "','", "']'"}, pos, p.expr)
+			if op != EOF && op != Rparen && op != Comma && op != Pipe {
+				return nil, newParseError(tokstr(op, lit), []string{"operator", "')'", "','", "'|'"}, pos, p.expr)
 			}
 			return root.RHS, nil
 		}
@@ -306,7 +308,7 @@ func (p *Parser) parseUnaryExpr() (Expr, error) {
 		return &DecimalLiteral{Value: v}, nil
 	}
 
-	expectations := []string{"field", "string", "number", "bool", "ip", "function", "pattern binding"}
+	expectations := []string{"field", "string", "number", "bool", "ip", "function"}
 	if tok == BadIP {
 		expectations = []string{"a valid IP address"}
 	}

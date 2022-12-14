@@ -8,16 +8,16 @@
       condition: >
         sequence
         maxspan 100ms
-        [kevt.name = 'CreateProcess' and ps.name = 'powershell.exe'] by ps.pid
-        [kevt.name = 'CreateFile'
+        |kevt.name = 'CreateProcess' and ps.name = 'powershell.exe'| by ps.pid
+        |kevt.name = 'CreateFile'
             and
          file.name icontains 'temp'
-        ] by ps.pid
+        | by ps.pid
     - name: Spawn Chrome browser
       condition: >
         kevt.name = 'CreateProcess' and ps.sibling.name = 'chrome.exe'
     - name: Command shell spawned Chrome browser
       condition: >
         sequence maxspan 1s
-        [kevt.name = 'CreateProcess' and ps.name = 'powershell.exe'] by ps.pid
-        [kevt.name = 'CreateProcess' and ps.sibling.name = 'chrome.exe'] by ps.pid
+        |kevt.name = 'CreateProcess' and ps.name = 'powershell.exe'| by ps.pid
+        |kevt.name = 'CreateProcess' and ps.sibling.name = 'chrome.exe'| by ps.pid

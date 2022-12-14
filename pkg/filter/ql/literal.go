@@ -206,12 +206,12 @@ func (s Sequence) IsConstrained() bool {
 }
 
 func (s Sequence) impairBy() bool {
-	if !s.By.IsEmpty() {
-		return false
-	}
 	b := make(map[bool]int, len(s.Expressions))
 	for _, expr := range s.Expressions {
 		b[!expr.By.IsEmpty()]++
 	}
-	return b[true] != len(s.Expressions)
+	if !s.By.IsEmpty() && (b[true] == len(s.Expressions) || b[false] == len(s.Expressions)) {
+		return false
+	}
+	return b[true] > 0 && b[false] > 0
 }
