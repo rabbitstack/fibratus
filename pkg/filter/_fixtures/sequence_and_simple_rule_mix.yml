@@ -1,0 +1,23 @@
+- group: command shell execution and temp files
+  enabled: true
+  rules:
+    - name: Process spawned by powershell
+      condition: >
+        kevt.name = 'CreateProcess' and ps.name = 'powershell.exe'
+    - name: Powershell created a temp file
+      condition: >
+        sequence
+        maxspan 100ms
+        [kevt.name = 'CreateProcess' and ps.name = 'powershell.exe'] by ps.pid
+        [kevt.name = 'CreateFile'
+            and
+         file.name icontains 'temp'
+        ] by ps.pid
+    - name: Spawn Chrome browser
+      condition: >
+        kevt.name = 'CreateProcess' and ps.sibling.name = 'chrome.exe'
+    - name: Command shell spawned Chrome browser
+      condition: >
+        sequence maxspan 1s
+        [kevt.name = 'CreateProcess' and ps.name = 'powershell.exe'] by ps.pid
+        [kevt.name = 'CreateProcess' and ps.sibling.name = 'chrome.exe'] by ps.pid

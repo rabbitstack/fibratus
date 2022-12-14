@@ -44,7 +44,7 @@ var TimestampFormat string
 type MetadataKey string
 
 // Metadata is a type alias for event metadata. Any tag, i.e. key/value pair could be attached to metadata.
-type Metadata map[MetadataKey]string
+type Metadata map[MetadataKey]any
 
 const (
 	// YaraMatchesKey is the tag name for the yara matches JSON representation
@@ -52,7 +52,8 @@ const (
 	// RuleNameKey identifies the rule that was triggered by the event
 	RuleNameKey MetadataKey = "rule.name"
 	// RuleGroupKey identifies the group to which the triggered rule pertains
-	RuleGroupKey MetadataKey = "rule.group"
+	RuleGroupKey      MetadataKey = "rule.group"
+	RuleSequenceByKey MetadataKey = "rule.seq.by"
 )
 
 func (key MetadataKey) String() string { return string(key) }
@@ -61,7 +62,7 @@ func (key MetadataKey) String() string { return string(key) }
 func (md Metadata) String() string {
 	var sb strings.Builder
 	for k, v := range md {
-		sb.WriteString(k.String() + ": " + v + ", ")
+		sb.WriteString(k.String() + ": " + fmt.Sprintf("%s", v) + ", ")
 	}
 	return strings.TrimSuffix(sb.String(), ", ")
 }
@@ -172,7 +173,7 @@ func New(seq uint64, pid, tid uint32, cpu uint8, ktype ktypes.Ktype, ts time.Tim
 		Description: ktype.Description(),
 		Timestamp:   ts,
 		Kparams:     kpars,
-		Metadata:    make(map[MetadataKey]string),
+		Metadata:    make(map[MetadataKey]any),
 		Host:        hostname.Get(),
 	}
 	return kevt
@@ -182,7 +183,7 @@ func New(seq uint64, pid, tid uint32, cpu uint8, ktype ktypes.Ktype, ts time.Tim
 func Empty() *Kevent {
 	return &Kevent{
 		Kparams:  map[string]*Kparam{},
-		Metadata: make(map[MetadataKey]string),
+		Metadata: make(map[MetadataKey]any),
 		PS:       &pstypes.PS{},
 	}
 }
@@ -191,7 +192,7 @@ func Empty() *Kevent {
 func NewFromKcap(buf []byte) (*Kevent, error) {
 	kevt := &Kevent{
 		Kparams:  make(Kparams),
-		Metadata: make(map[MetadataKey]string),
+		Metadata: make(map[MetadataKey]any),
 	}
 	if err := kevt.UnmarshalRaw(buf, kcapver.KevtSecV1); err != nil {
 		return nil, err
@@ -200,7 +201,7 @@ func NewFromKcap(buf []byte) (*Kevent, error) {
 }
 
 // AddMeta appends a key/value pair to event's metadata.
-func (kevt *Kevent) AddMeta(k MetadataKey, v string) {
+func (kevt *Kevent) AddMeta(k MetadataKey, v any) {
 	kevt.Metadata[k] = v
 }
 
@@ -209,3 +210,6 @@ func (kevt *Kevent) Release() {
 	*kevt = Kevent{} // clear kevent
 	pool.Put(kevt)
 }
+
+// SequenceBy returns the BY statement join field from event metadata.
+func (kevt *Kevent) SequenceBy() any { return kevt.Metadata[RuleSequenceByKey] }

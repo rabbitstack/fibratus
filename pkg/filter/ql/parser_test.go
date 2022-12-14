@@ -20,6 +20,7 @@ package ql
 
 import (
 	"errors"
+	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"testing"
 )
@@ -160,4 +161,13 @@ func TestExpandMacros(t *testing.T) {
 			t.Errorf("%d. exp=%s expected expr=%v", i, expr.String(), tt.expectedExpr)
 		}
 	}
+}
+
+func TestParseSequence(t *testing.T) {
+	p := NewParser(`
+		[kevt.name = 'CreateProcess'] by ps.exe
+		[kevt.name = 'CreateFile'] by file.name
+	`)
+	_, err := p.ParseSequence()
+	fmt.Println(err)
 }

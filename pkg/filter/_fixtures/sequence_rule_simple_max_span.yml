@@ -1,0 +1,12 @@
+- group: command shell execution and temp files
+  enabled: true
+  rules:
+    - name: Command shell created a temp file
+      condition: >
+        sequence
+        maxspan 200ms
+        [kevt.name = 'CreateProcess' and ps.name = 'cmd.exe'] by ps.pid
+        [kevt.name = 'CreateFile'
+            and
+         file.name icontains 'temp'
+        ] by ps.pid

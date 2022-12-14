@@ -73,7 +73,6 @@ func New(expr string, config *config.Config) Filter {
 		accessors:    accessors,
 		fields:       make([]fields.Field, 0),
 		stringFields: make(map[fields.Field][]string),
-		bindings:     make(map[uint16][]*ql.PatternBindingLiteral),
 	}
 }
 
@@ -101,7 +100,6 @@ func NewFromCLIWithAllAccessors(args []string) (Filter, error) {
 		accessors:    getAccessors(),
 		fields:       make([]fields.Field, 0),
 		stringFields: make(map[fields.Field][]string),
-		bindings:     make(map[uint16][]*ql.PatternBindingLiteral),
 	}
 	if err := filter.Compile(); err != nil {
 		return nil, fmt.Errorf("bad filter:\n %v", err)

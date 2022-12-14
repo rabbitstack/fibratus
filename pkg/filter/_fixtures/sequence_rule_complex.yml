@@ -1,0 +1,25 @@
+- group: Phishing dropper outbound communication
+  enabled: true
+  rules:
+    - name: Phishing dropper outbound communication
+      condition: >
+        sequence
+        maxspan 1h
+        [kevt.name = 'CreateProcess' and ps.sibling.name
+            in
+        ('firefox.exe', 'chrome.exe', 'edge.exe')
+        ] by ps.sibling.pid
+        [kevt.name = 'CreateFile' and file.operation = 'create'
+            and
+        file.extension = '.exe'
+        ] by ps.pid
+        [
+          kevt.name in ('Send', 'Connect')
+        ] by ps.pid
+      action: >
+        {{
+            emit
+              .
+            "Phishing dropper outbound communication"
+            (printf "%s process initiated outbound communication to %s" .Kevts.k2.PS.Name .Kevts.k3.Kparams.dip)
+        }}
