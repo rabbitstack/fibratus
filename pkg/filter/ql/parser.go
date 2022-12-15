@@ -91,24 +91,23 @@ func (p *Parser) ParseSequence() (*Sequence, error) {
 				return nil, fmt.Errorf("%s: all expressions require the 'by' statement", p.expr)
 			}
 			return seq, nil
-		} else {
-			p.unscan()
 		}
+		p.unscan()
 
-		tok, pos, lit := p.scanIgnoreWhitespace()
+		tok, posStart, lit := p.scanIgnoreWhitespace()
 		if tok != Pipe {
-			return nil, newParseError(tokstr(tok, lit), []string{"|"}, pos, p.expr)
+			return nil, newParseError(tokstr(tok, lit), []string{"|"}, posStart, p.expr)
 		}
 		expr, err := p.ParseExpr()
 		if err != nil {
 			return nil, err
 		}
-		tok, pos, lit = p.scanIgnoreWhitespace()
+		tok, posEnd, lit := p.scanIgnoreWhitespace()
 		if tok != Pipe {
-			return nil, newParseError(tokstr(tok, lit), []string{"|"}, pos, p.expr)
+			return nil, newParseError(tokstr(tok, lit), []string{"|"}, posEnd, p.expr)
 		}
 
-		tok, pos, lit = p.scanIgnoreWhitespace()
+		tok, pos, lit := p.scanIgnoreWhitespace()
 		if tok == By {
 			tok, pos, lit = p.scanIgnoreWhitespace()
 			if tok != Field {

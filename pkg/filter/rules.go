@@ -91,12 +91,10 @@ var (
 // an action, the former is executed when the
 // rule fires.
 type Rules struct {
-	filterGroups       map[uint32]filterGroups
-	hasExcludePolicies bool
-	config             *config.Config
+	filterGroups    map[uint32]filterGroups
+	excludePolicies bool
+	config          *config.Config
 }
-
-func (r *Rules) zeroGroups() bool { return len(r.filterGroups) == 0 }
 
 type filterGroup struct {
 	group   config.FilterGroup
@@ -506,6 +504,8 @@ func (r *Rules) isGroupMapped(scopeHash, groupHash uint32) bool {
 	return false
 }
 
+func (r *Rules) zeroGroups() bool { return len(r.filterGroups) == 0 }
+
 // NewRules produces a fresh rules instance.
 func NewRules(c *config.Config) Rules {
 	rules := Rules{
@@ -540,7 +540,7 @@ func (r *Rules) Compile() error {
 			continue
 		}
 		if group.Policy == config.ExcludePolicy {
-			r.hasExcludePolicies = true
+			r.excludePolicies = true
 		}
 		log.Infof("loading rule group [%s] with %q policy", group.Name, group.Policy)
 		filterGroupsCount.Add(1)
@@ -626,7 +626,7 @@ func (r *Rules) Compile() error {
 	return nil
 }
 
-func (r *Rules) findFilterGroups(kevt *kevent.Kevent) filterGroups {
+func (r *Rules) findGroups(kevt *kevent.Kevent) filterGroups {
 	groups1 := r.filterGroups[kevt.Type.Hash()]
 	groups2 := r.filterGroups[kevt.Category.Hash()]
 	if groups1 == nil && groups2 == nil {
@@ -647,7 +647,7 @@ func (r *Rules) Fire(kevt *kevent.Kevent) bool {
 	// find rule groups for a particular
 	// event type or category. Events are
 	// dropped if no groups are found
-	groups := r.findFilterGroups(kevt)
+	groups := r.findGroups(kevt)
 	if len(groups) == 0 {
 		return false
 	}
@@ -656,7 +656,7 @@ func (r *Rules) Fire(kevt *kevent.Kevent) bool {
 	// evaluate those. If no filter matches occur,
 	// we let pass the event but only if there are
 	// no groups with include/sequence policies
-	if r.hasExcludePolicies {
+	if r.excludePolicies {
 		if r.runRules(groups, config.ExcludePolicy, kevt) {
 			return false
 		}
@@ -723,7 +723,7 @@ nextGroup:
 					// in a simple rule could trigger multiple
 					// matches in sequence rules
 					for _, f := range g.filters {
-						if !f.filter.IsSequence() && f.ss == nil {
+						if !f.filter.IsSequence() || f.ss == nil {
 							continue
 						}
 						if f.ss.expire(kevt) {

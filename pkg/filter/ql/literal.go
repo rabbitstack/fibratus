@@ -193,7 +193,7 @@ type SequenceExpr struct {
 	By   fields.Field
 }
 
-// Sequence is a collection of two or various sequence expressions.
+// Sequence is a collection of two or more sequence expressions.
 type Sequence struct {
 	MaxSpan     time.Duration
 	By          fields.Field

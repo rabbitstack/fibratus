@@ -122,7 +122,7 @@ func TestCompileMergeGroups(t *testing.T) {
 	assert.Len(t, rules.filterGroups[ktypes.Recv.Hash()], 2)
 	assert.Len(t, rules.filterGroups[ktypes.Net.Hash()], 1)
 
-	groups := rules.findFilterGroups(&kevent.Kevent{Type: ktypes.RecvUDPv6, Category: ktypes.Net})
+	groups := rules.findGroups(&kevent.Kevent{Type: ktypes.RecvUDPv6, Category: ktypes.Net})
 	assert.Len(t, groups, 3)
 }
 

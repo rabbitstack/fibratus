@@ -19,18 +19,16 @@
       condition: >
         sequence
         maxspan 1h
-        |
-          write_file
+          |write_file
               and
-          file.extension iin executable_extensions
+           file.extension iin executable_extensions
               and
-          ps.name iin msoffice_binaries
-        | by file.name
-        |
-          spawn_process
+           ps.name iin msoffice_binaries
+          | by file.name
+          |spawn_process
               and
-          ps.name iin msoffice_binaries
-        | by ps.sibling.exe
+           ps.name iin msoffice_binaries
+          | by ps.sibling.exe
       action: >
         {{
             emit . "File execution via Microsoft Office process" ""
@@ -39,18 +37,16 @@
       condition: >
         sequence
         maxspan 1h
-        |
-          write_file
+          |write_file
               and
-          file.extension iin module_extensions
+           file.extension iin module_extensions
               and
-          ps.name iin msoffice_binaries
-        | by file.name
-        |
-          load_module
+           ps.name iin msoffice_binaries
+          | by file.name
+          |load_module
               and
-          ps.name iin msoffice_binaries
-        | by image.name
+           ps.name iin msoffice_binaries
+          | by image.name
       action: >
         {{
             emit . "Potentially malicious module loaded by Microsoft Office process" ""

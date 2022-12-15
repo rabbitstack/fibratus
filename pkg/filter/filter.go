@@ -34,7 +34,7 @@ import (
 var (
 	// ErrNoFields signals an error that happens when the filter is declared without any fields
 	ErrNoFields = errors.New("expected at least one field or operator but zero found")
-
+	// accessorErrors counts the errors produced by the field accessors
 	accessorErrors = expvar.NewMap("filter.accessor.errors")
 )
 
@@ -42,7 +42,7 @@ var (
 // be a single expression combined by various subexpressions connected by operators, or
 // it can be a sequence of expressions.
 type Filter interface {
-	// Compile compiles the filter by parsing the filtering expression.
+	// Compile compiles the filter by parsing the sequence/expression.
 	Compile() error
 	// Run runs a filter with a single expression. The return value decides
 	// if the incoming event has successfully matched the filter expression.
@@ -99,7 +99,7 @@ func (f *filter) Compile() error {
 		if expr, ok := n.(*ql.BinaryExpr); ok {
 			if lhs, ok := expr.LHS.(*ql.FieldLiteral); ok {
 				field := fields.Field(lhs.Value)
-				f.fields = append(f.fields, field)
+				f.addField(field)
 				switch v := expr.RHS.(type) {
 				case *ql.StringLiteral:
 					f.stringFields[field] = append(f.stringFields[field], v.Value)
@@ -109,7 +109,7 @@ func (f *filter) Compile() error {
 			}
 			if rhs, ok := expr.RHS.(*ql.FieldLiteral); ok {
 				field := fields.Field(rhs.Value)
-				f.fields = append(f.fields, field)
+				f.addField(field)
 				switch v := expr.LHS.(type) {
 				case *ql.StringLiteral:
 					f.stringFields[field] = append(f.stringFields[field], v.Value)
@@ -122,7 +122,7 @@ func (f *filter) Compile() error {
 			f.useFuncValuer = true
 			for _, arg := range expr.Args {
 				if fld, ok := arg.(*ql.FieldLiteral); ok {
-					f.fields = append(f.fields, fields.Field(fld.Value))
+					f.addField(fields.Field(fld.Value))
 				}
 			}
 		}
@@ -131,12 +131,12 @@ func (f *filter) Compile() error {
 		ql.WalkFunc(f.expr, walk)
 	} else {
 		if !f.seq.By.IsEmpty() {
-			f.fields = append(f.fields, f.seq.By)
+			f.addField(f.seq.By)
 		}
 		for _, expr := range f.seq.Expressions {
 			ql.WalkFunc(expr.Expr, walk)
 			if !expr.By.IsEmpty() {
-				f.fields = append(f.fields, expr.By)
+				f.addField(expr.By)
 			}
 		}
 	}
@@ -144,7 +144,6 @@ func (f *filter) Compile() error {
 	if len(f.fields) == 0 && !f.useFuncValuer {
 		return ErrNoFields
 	}
-
 	for _, field := range f.fields {
 		switch {
 		case field.IsKevtField():
@@ -153,7 +152,6 @@ func (f *filter) Compile() error {
 			f.useProcAccessor = true
 		}
 	}
-
 	return nil
 }
 
@@ -168,12 +166,14 @@ func (f *filter) RunSequence(kevt *kevent.Kevent, seqID uint16) bool {
 	if f.seq == nil || seqID > uint16(len(f.seq.Expressions))-1 {
 		return false
 	}
+
 	valuer := f.mapValuer(kevt)
 	expr := f.seq.Expressions[seqID]
 	ok := ql.Eval(expr.Expr, valuer, f.useFuncValuer)
 	if !ok {
 		return false
 	}
+
 	by := f.seq.By
 	if by.IsEmpty() {
 		by = expr.By
@@ -265,4 +265,14 @@ func (f *filter) mapValuer(kevt *kevent.Kevent) map[string]interface{} {
 		}
 	}
 	return valuer
+}
+
+// addField appends a new field to the filter fields list.
+func (f *filter) addField(field fields.Field) {
+	for _, f := range f.fields {
+		if f.String() == field.String() {
+			return
+		}
+	}
+	f.fields = append(f.fields, field)
 }

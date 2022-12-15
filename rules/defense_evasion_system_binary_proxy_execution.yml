@@ -20,19 +20,18 @@
       condition: >
         sequence
         maxspan 1m
-        |
-          spawn_process
+          |spawn_process
               and
-          ps.sibling.name ~= 'rundll32.exe'
+           ps.sibling.name ~= 'rundll32.exe'
               and
-          ps.sibling.comm imatches
+           ps.sibling.comm imatches
               (
                 '*javascript:*',
                 '*shell32.dll*ShellExec_RunDLL*',
                 '*-sta*'
               )
-        | by ps.sibling.pid
-        |spawn_process| by ps.pid
+          | by ps.sibling.pid
+          |spawn_process| by ps.pid
       action: >
         {{
             emit . "System Binary Proxy Execution via Rundll32" ""
