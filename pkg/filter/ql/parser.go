@@ -107,9 +107,9 @@ func (p *Parser) ParseSequence() (*Sequence, error) {
 			return nil, newParseError(tokstr(tok, lit), []string{"|"}, posEnd, p.expr)
 		}
 
-		tok, pos, lit := p.scanIgnoreWhitespace()
+		tok, _, _ = p.scanIgnoreWhitespace()
 		if tok == By {
-			tok, pos, lit = p.scanIgnoreWhitespace()
+			tok, pos, lit := p.scanIgnoreWhitespace()
 			if tok != Field {
 				return nil, newParseError(tokstr(tok, lit), []string{"field"}, pos, p.expr)
 			}
