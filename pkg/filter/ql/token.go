@@ -20,7 +20,6 @@ package ql
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
-	"regexp"
 	"strings"
 )
 
@@ -28,119 +27,128 @@ import (
 type token int
 
 const (
-	illegal token = iota
-	ws
-	eof
+	Illegal token = iota
+	WS
+	EOF
 
-	field          // ps.name
-	str            // 'cmd.exe'
-	patternBinding // $1.ps.name
-	badstr
-	badesc
-	ident
-	dec      // 123.3
-	integer  // 123
-	duration // 13h
-	ip       // 192.168.1.23
-	badip    // 192.156.300.12
-	truet    // true
-	falset   // false
+	Field // ps.name
+	Str   // 'cmd.exe'
+	Badstr
+	Badesc
+	Ident
+	Decimal  // 123.3
+	Integer  // 123
+	Duration // 13h
+	IP       // 192.168.1.23
+	BadIP    // 192.156.300.12
+	True     // true
+	False    // false
 
 	opBeg
-	and         // and
-	or          // or
-	in          // in
-	iin         // iin
-	not         // not
-	contains    // contains
-	icontains   // icontains
-	istartswith // istartswith
-	startswith  // startswith
-	endswith    // endswith
-	iendswith   // iendswith
-	matches     // matches
-	imatches    // imatches
-	fuzzy       // fuzzy
-	ifuzzy      // ifuzzy
-	fuzzynorm   // fuzzynorm
-	ifuzzynorm  // ifuzzynorm
-	eq          // =
-	ieq         // ~=
-	neq         // !=
-	lt          // <
-	lte         // <=
-	gt          // >
-	gte         // >=
+	And         // and
+	Or          // or
+	In          // in
+	IIn         // iin
+	Not         // not
+	Contains    // contains
+	IContains   // icontains
+	IStartswith // istartswith
+	Startswith  // startswith
+	Endswith    // endswith
+	IEndswith   // iendswith
+	Matches     // matches
+	IMatches    // imatches
+	Fuzzy       // fuzzy
+	IFuzzy      // ifuzzy
+	Fuzzynorm   // fuzzynorm
+	IFuzzynorm  // ifuzzynorm
+	Eq          // =
+	IEq         // ~=
+	Neq         // !=
+	Lt          // <
+	Lte         // <=
+	Gt          // >
+	Gte         // >=
 	opEnd
 
-	lparen // (
-	rparen // )
-	comma  // ,
-	dot    // .
+	Lparen // (
+	Rparen // )
+	Comma  // ,
+	Dot    // .
+	Pipe   // |
+
+	Seq     // SEQUENCE
+	MaxSpan // MAXSPAN
+	By      // BY
 )
 
 var keywords map[string]token
 
 func init() {
 	keywords = make(map[string]token)
-	for _, tok := range []token{and, or, contains, icontains, in,
-		iin, not, startswith, istartswith, endswith, iendswith,
-		matches, imatches, fuzzy, ifuzzy, fuzzynorm, ifuzzynorm} {
+	for _, tok := range []token{And, Or, Contains, IContains, In,
+		IIn, Not, Startswith, IStartswith, Endswith, IEndswith,
+		Matches, IMatches, Fuzzy, IFuzzy, Fuzzynorm, IFuzzynorm,
+		Seq, MaxSpan, By} {
 		keywords[strings.ToLower(tokens[tok])] = tok
 	}
-	keywords["true"] = truet
-	keywords["false"] = falset
+	keywords["true"] = True
+	keywords["false"] = False
 }
 
 var tokens = [...]string{
-	illegal: "ILLEGAL",
-	eof:     "EOF",
-	ws:      "WS",
+	Illegal: "ILLEGAL",
+	EOF:     "EOF",
+	WS:      "WS",
 
-	ident:          "IDENT",
-	field:          "FIELD",
-	patternBinding: "PATTERNBINDING",
-	integer:        "INTEGER",
-	dec:            "DECIMAL",
-	duration:       "DURATION",
-	str:            "STRING",
-	badstr:         "BADSTRING",
-	badesc:         "BADESCAPE",
-	ip:             "IPADDRESS",
-	badip:          "BADIPADDRESS",
-	truet:          "TRUE",
-	falset:         "FALSE",
+	Ident:    "IDENT",
+	Field:    "FIELD",
+	Integer:  "INTEGER",
+	Decimal:  "DECIMAL",
+	Duration: "DURATION",
+	Str:      "STRING",
+	Badstr:   "BADSTRING",
+	Badesc:   "BADESCAPE",
+	IP:       "IPADDRESS",
+	BadIP:    "BADIPADDRESS",
+	True:     "TRUE",
+	False:    "FALSE",
 
-	and:         "AND",
-	or:          "OR",
-	contains:    "CONTAINS",
-	icontains:   "ICONTAINS",
-	in:          "IN",
-	iin:         "IIN",
-	not:         "NOT",
-	startswith:  "STARTSWITH",
-	istartswith: "ISTARTSWITH",
-	endswith:    "ENDSWITH",
-	iendswith:   "IENDSWITH",
-	matches:     "MATCHES",
-	imatches:    "IMATCHES",
-	fuzzy:       "FUZZY",
-	ifuzzy:      "IFUZZY",
-	fuzzynorm:   "FUZZYNORM",
-	ifuzzynorm:  "IFUZZYNORM",
+	And:         "AND",
+	Or:          "OR",
+	Contains:    "CONTAINS",
+	IContains:   "ICONTAINS",
+	In:          "IN",
+	IIn:         "IIN",
+	Not:         "NOT",
+	Startswith:  "STARTSWITH",
+	IStartswith: "ISTARTSWITH",
+	Endswith:    "ENDSWITH",
+	IEndswith:   "IENDSWITH",
+	Matches:     "MATCHES",
+	IMatches:    "IMATCHES",
+	Fuzzy:       "FUZZY",
+	IFuzzy:      "IFUZZY",
+	Fuzzynorm:   "FUZZYNORM",
+	IFuzzynorm:  "IFUZZYNORM",
 
-	eq:  "=",
-	ieq: "~=",
-	neq: "!=",
-	lt:  "<",
-	lte: "<=",
-	gt:  ">",
-	gte: ">=",
+	Eq:  "=",
+	IEq: "~=",
+	Neq: "!=",
+	Lt:  "<",
+	Lte: "<=",
+	Gt:  ">",
+	Gte: ">=",
 
-	lparen: "(",
-	rparen: ")",
-	comma:  ",",
-	dot:    ".",
+	Lparen: "(",
+	Rparen: ")",
+	Comma:  ",",
+	Dot:    ".",
+	Pipe:   "|",
+
+	Seq:     "SEQUENCE",
+	MaxSpan: "MAXSPAN",
+	By:      "BY",
 }
 
 // isOperator determines whether the current token is an operator.
@@ -157,16 +165,16 @@ func (tok token) String() string {
 // precedence returns the operator precedence of the binary operator token.
 func (tok token) precedence() int {
 	switch tok {
-	case or:
+	case Or:
 		return 1
-	case and:
+	case And:
 		return 2
-	case not:
+	case Not:
 		return 3
-	case eq, ieq, neq, lt, lte, gt, gte:
+	case Eq, IEq, Neq, Lt, Lte, Gt, Gte:
 		return 4
-	case in, iin, contains, icontains, startswith, istartswith, endswith, iendswith,
-		matches, imatches, fuzzy, ifuzzy, fuzzynorm, ifuzzynorm:
+	case In, IIn, Contains, IContains, Startswith, IStartswith, Endswith, IEndswith,
+		Matches, IMatches, Fuzzy, IFuzzy, Fuzzynorm, IFuzzynorm:
 		return 5
 	}
 	return 0
@@ -179,31 +187,13 @@ func tokstr(tok token, lit string) string {
 	return tok.String()
 }
 
-// parsePatternBinding parses the pattern binding token and
-// returns true if the provided id is a pattern binding. Returns
-// false otherwise.
-func parsePatternBinding(id string) (string, bool) {
-	//nolint:gosimple
-	matches := regexp.MustCompile("\\$[1-9]\\.([a-z0-9A-Z\\[\\].]+)").FindStringSubmatch(id)
-	if len(matches) > 0 {
-		return matches[1], true
-	}
-	return "", false
-}
-
 // lookup returns the token associated with a given string.
 func lookup(id string) (token, string) {
 	if tok, ok := keywords[strings.ToLower(id)]; ok {
 		return tok, ""
 	}
-	pb, ok := parsePatternBinding(id)
-	if ok {
-		if tok := fields.Lookup(pb); tok != "" {
-			return patternBinding, id
-		}
-	}
 	if tok := fields.Lookup(id); tok != "" {
-		return field, id
+		return Field, id
 	}
-	return ident, id
+	return Ident, id
 }

@@ -36,7 +36,6 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
-	"time"
 )
 
 // FilterGroupPolicy is the type alias for the filter group policy
@@ -53,9 +52,6 @@ const (
 	// out the matching events, that is, discarding them from the event
 	// flow.
 	ExcludePolicy
-	// SequencePolicy determines the policy that allows matching a
-	// sequence of temporal events based on pattern binding restrictions
-	SequencePolicy
 	// UnknownPolicy determines the unknown group policy type.
 	UnknownPolicy
 )
@@ -78,8 +74,6 @@ func (p FilterGroupPolicy) String() string {
 		return "include"
 	case ExcludePolicy:
 		return "exclude"
-	case SequencePolicy:
-		return "sequence"
 	default:
 		return ""
 	}
@@ -125,8 +119,6 @@ func filterGroupPolicyFromString(s string) FilterGroupPolicy {
 		return IncludePolicy
 	case "exclude", "EXCLUDE":
 		return ExcludePolicy
-	case "sequence", "SEQUENCE":
-		return SequencePolicy
 	default:
 		return UnknownPolicy
 	}
@@ -150,7 +142,6 @@ type FilterConfig struct {
 	Def         string            `json:"def" yaml:"def"` // deprecated in favor of `Condition`
 	Condition   string            `json:"condition" yaml:"condition"`
 	Action      string            `json:"action" yaml:"action"`
-	MaxSpan     time.Duration     `json:"max-span" yaml:"max-span"`
 	Labels      map[string]string `json:"labels" yaml:"labels"`
 }
 
@@ -184,7 +175,6 @@ type FilterGroup struct {
 	FromStrings []*FilterConfig     `json:"from-strings" yaml:"from-strings"` // deprecated in favor or `Rules`
 	Tags        []string            `json:"tags" yaml:"tags"`
 	Labels      map[string]string   `json:"labels" yaml:"labels"`
-	Action      string              `json:"action" yaml:"action"` // only valid in sequence policies
 }
 
 // IsDisabled determines if this group is disabled.
@@ -196,10 +186,6 @@ func (g FilterGroup) validate(resource string) error {
 		if filter.Action != "" && g.Policy == ExcludePolicy {
 			return fmt.Errorf("%q rule found in %q group with exclude policy. "+
 				"Only groups with include policies can have rule actions", filter.Name, g.Name)
-		}
-		if filter.MaxSpan != 0 && g.Policy != SequencePolicy {
-			return fmt.Errorf("%q rule has max span, but it is not in sequence policy " +
-				filter.Name)
 		}
 		if err := filter.parseTmpl(resource); err != nil {
 			return fmt.Errorf("invalid %q rule action: %v", filter.Name, err)

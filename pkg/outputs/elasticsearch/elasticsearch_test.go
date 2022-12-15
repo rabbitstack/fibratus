@@ -179,7 +179,7 @@ func getBatch() *kevent.Batch {
 			kparams.BasePrio:      {Name: kparams.BasePrio, Type: kparams.Int8, Value: int8(2)},
 			kparams.PagePrio:      {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(2)},
 		},
-		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "baarz"},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "baarz"},
 		PS: &pstypes.PS{
 			PID:       2436,
 			Ppid:      6304,
@@ -247,7 +247,7 @@ func getBatch() *kevent.Batch {
 			kparams.BasePrio:      {Name: kparams.BasePrio, Type: kparams.Int8, Value: int8(2)},
 			kparams.PagePrio:      {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(2)},
 		},
-		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "baarz"},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "baarz"},
 		PS: &pstypes.PS{
 			PID:       2436,
 			Ppid:      6304,
@@ -315,7 +315,7 @@ func getBatch() *kevent.Batch {
 			kparams.BasePrio:      {Name: kparams.BasePrio, Type: kparams.Int8, Value: int8(2)},
 			kparams.PagePrio:      {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(2)},
 		},
-		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "baarz"},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "baarz"},
 		PS: &pstypes.PS{
 			PID:       829,
 			Ppid:      6304,

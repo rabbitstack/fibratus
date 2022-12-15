@@ -68,7 +68,7 @@ func TestHTMLFormatterRuleAlert(t *testing.T) {
 					kparams.FileType:      {Name: kparams.FileType, Type: kparams.AnsiString, Value: "file"},
 					kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: fs.FileDisposition(1)},
 				},
-				Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "barzz"},
+				Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 				PS: &pstypes.PS{
 					PID:  2436,
 					Ppid: 6304,
@@ -162,7 +162,7 @@ func TestHTMLFormatterRuleAlert(t *testing.T) {
 					kparams.Exe:     {Name: kparams.Exe, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost.exe"},
 					kparams.UserSID: {Name: kparams.UserSID, Type: kparams.UnicodeString, Value: "admin\\SYSTEM"},
 				},
-				Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "barzz"},
+				Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 				PS: &pstypes.PS{
 					PID:  2436,
 					Ppid: 6304,

@@ -26,6 +26,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/rabbitstack/fibratus/pkg/filter/ql/functions"
 )
@@ -65,27 +66,6 @@ type IPLiteral struct {
 	Value net.IP
 }
 
-// PatternBindingLiteral represents a pattern binding literal.
-type PatternBindingLiteral struct {
-	Value string
-}
-
-// Index returns the index pattern binding index number. E.g.
-// Say the pattern binding is $1.ps.name, this method returns
-// 1
-func (b PatternBindingLiteral) Index() uint16 {
-	i, err := strconv.Atoi(b.Value[1:2])
-	if err != nil {
-		return 0
-	}
-	return uint16(i)
-}
-
-// Field returns the string name from the pattern binding.
-func (b PatternBindingLiteral) Field() fields.Field {
-	return fields.Field(b.Value[3:])
-}
-
 func (i IPLiteral) String() string {
 	return i.Value.String()
 }
@@ -112,10 +92,6 @@ func (d DecimalLiteral) String() string {
 
 func (b BoolLiteral) String() string {
 	return strconv.FormatBool(b.Value)
-}
-
-func (b PatternBindingLiteral) String() string {
-	return b.Value
 }
 
 // ListLiteral represents a list of tag key literals.
@@ -190,7 +166,6 @@ func (f Function) validate() error {
 	for i, expr := range f.Args {
 		arg := fn.Desc().Args[i]
 		typ := functions.Unknown
-
 		switch reflect.TypeOf(expr) {
 		case reflect.TypeOf(&FieldLiteral{}):
 			typ = functions.Field
@@ -205,10 +180,38 @@ func (f Function) validate() error {
 		case reflect.TypeOf(&ListLiteral{}):
 			typ = functions.Slice
 		}
-
 		if !arg.ContainsType(typ) {
 			return ErrArgumentTypeMismatch(i, arg.Keyword, fn.Name(), arg.Types)
 		}
 	}
 	return nil
+}
+
+// SequenceExpr represents a single binary expression within the sequence.
+type SequenceExpr struct {
+	Expr Expr
+	By   fields.Field
+}
+
+// Sequence is a collection of two or more sequence expressions.
+type Sequence struct {
+	MaxSpan     time.Duration
+	By          fields.Field
+	Expressions []SequenceExpr
+}
+
+// IsConstrained determines if the sequence has the global or per-expression `BY` statement.
+func (s Sequence) IsConstrained() bool {
+	return !s.By.IsEmpty() || !s.Expressions[0].By.IsEmpty()
+}
+
+func (s Sequence) impairBy() bool {
+	b := make(map[bool]int, len(s.Expressions))
+	for _, expr := range s.Expressions {
+		b[!expr.By.IsEmpty()]++
+	}
+	if !s.By.IsEmpty() && (b[true] == len(s.Expressions) || b[false] == len(s.Expressions)) {
+		return false
+	}
+	return b[true] > 0 && b[false] > 0
 }
