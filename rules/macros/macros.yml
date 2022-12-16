@@ -7,7 +7,7 @@
 
 - macro: open_process_all_access
   expr: open_process and ps.access.mask.names in ('ALL_ACCESS')
-  description: Acquires the local process object with all possible rights for the process object
+  description: Acquires the local process object with all possible access rights
 
 - macro: spawn_msoffice_process
   expr: spawn_process and ps.sibling.exe iin msoffice_binaries
@@ -81,4 +81,25 @@
   list: [EXCEL.EXE, WINWORD.EXE, MSACCESS.EXE, POWERPNT.EXE, WORDPAD.EXE]
 
 - macro: web_browser_binaries
-  list: [chrome.exe, firefox.exe, msedge.exe, iexplore.exe, opera.exe, brave.exe, microsoftedge.exe, chromium.exe, safari.exe]
+  list: [
+    chrome.exe, firefox.exe, msedge.exe, iexplore.exe, opera.exe,
+    brave.exe, microsoftedge.exe, chromium.exe, safari.exe
+    ]
+
+- macro: web_browser_cred_stores
+  list: [
+    "?:\\Users\\*\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Network\\Cookies",
+    "?:\\Users\\*\\AppData\\Local\\Chrome\\User Data\\Default\\Login Data",
+    "?:\\Users\\*\\AppData\\Local\\Google\\Chrome\\User Data\\Local State",
+    "?:\\Users\\*\\Appdata\\Local\\Microsoft\\Windows\\WebCache\\WebCacheV0?.dat",
+    "?:\\Users\\*\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\*\\cookies.sqlite",
+    "?:\\Users\\*\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\*\\sigons.sqlite",
+    "?:\\Users\\*\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\*\\logins.json",
+    "?:\\Users\\*\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\*\\key?.db",
+    ]
+
+- macro: executable_extensions
+  list: [.exe, .com, .scr]
+
+- macro: module_extensions
+  list: [.dll, .ocx, .cpl]

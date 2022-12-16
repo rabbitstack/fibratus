@@ -37,6 +37,8 @@ func (kevt Kevent) IsNetworkUDP() bool {
 	return kevt.Type == ktypes.RecvUDPv4 || kevt.Type == ktypes.RecvUDPv6 || kevt.Type == ktypes.SendUDPv4 || kevt.Type == ktypes.SendUDPv6
 }
 
+func (kevt Kevent) IsTerminateProcess() bool { return kevt.Type == ktypes.TerminateProcess }
+
 // PartialKey computes the unique hash of the event
 // that can be employed to determine if the event
 // from the given process and source has been processed

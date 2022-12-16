@@ -184,7 +184,7 @@ func TestScan(t *testing.T) {
 		Kparams: kevent.Kparams{
 			kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "svchost.exe"},
 		},
-		Metadata: make(map[kevent.MetadataKey]string),
+		Metadata: make(map[kevent.MetadataKey]any),
 	}
 
 	// test attaching on pid
@@ -219,7 +219,7 @@ func TestMatchesMeta(t *testing.T) {
 		Kparams: kevent.Kparams{
 			kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "svchost.exe"},
 		},
-		Metadata: make(map[kevent.MetadataKey]string),
+		Metadata: make(map[kevent.MetadataKey]any),
 	}
 	assert.Empty(t, kevt.Metadata)
 

@@ -55,7 +55,19 @@ func TestFilterCompile(t *testing.T) {
 	f = New(`ps.name`, cfg)
 	require.EqualError(t, f.Compile(), "expected at least one field or operator but zero found")
 	f = New(`ps.name =`, cfg)
-	require.EqualError(t, f.Compile(), "ps.name =\n╭─────────^\n|\n|\n╰─────────────────── expected field, string, number, bool, ip, function, pattern binding")
+	require.EqualError(t, f.Compile(), "ps.name =\n╭─────────^\n|\n|\n╰─────────────────── expected field, string, number, bool, ip, function")
+}
+
+func TestSeqFilterCompile(t *testing.T) {
+	f := New(`sequence
+|kevt.name = 'CreateProcess'| by ps.exe
+|kevt.name = 'CreateFile' and file.operation = 'create'| by file.name
+`, cfg)
+	require.NoError(t, f.Compile())
+	require.NotNil(t, f.GetSequence())
+	assert.Len(t, f.GetSequence().Expressions, 2)
+	assert.NotNil(t, f.GetSequence().Expressions[0].By)
+	assert.True(t, len(f.GetStringFields()) > 0)
 }
 
 func TestStringFields(t *testing.T) {
@@ -267,7 +279,7 @@ func TestFilterRunFileKevent(t *testing.T) {
 			kparams.FileType:      {Name: kparams.FileType, Type: kparams.AnsiString, Value: "file"},
 			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.AnsiString, Value: "open"},
 		},
-		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "barzz"},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
 	var tests = []struct {
@@ -332,7 +344,7 @@ func TestFilterRunKevent(t *testing.T) {
 			kparams.FileType:      {Name: kparams.FileType, Type: kparams.AnsiString, Value: "file"},
 			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.AnsiString, Value: "open"},
 		},
-		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "barz"},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barz"},
 	}
 
 	kevt.Timestamp, _ = time.Parse(time.RFC3339, "2011-05-03T15:04:05.323Z")

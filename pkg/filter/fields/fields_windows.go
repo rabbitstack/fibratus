@@ -32,6 +32,9 @@ var pathRegexp = regexp.MustCompile(`(pe.sections|pe.resources|ps.envs|ps.module
 // Field represents the type alias for the field
 type Field string
 
+// IsEmpty determines if this field is empty.
+func (f Field) IsEmpty() bool { return f == "" }
+
 const (
 	// PsPid represents the process id field
 	PsPid Field = "ps.pid"

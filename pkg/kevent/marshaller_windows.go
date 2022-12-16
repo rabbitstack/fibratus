@@ -181,8 +181,9 @@ func (kevt *Kevent) MarshalRaw() []byte {
 	for key, value := range kevt.Metadata {
 		b = append(b, bytes.WriteUint16(uint16(len(key)))...)
 		b = append(b, key...)
-		b = append(b, bytes.WriteUint16(uint16(len(value)))...)
-		b = append(b, value...)
+		v := fmt.Sprintf("%s", value)
+		b = append(b, bytes.WriteUint16(uint16(len(v)))...)
+		b = append(b, v...)
 	}
 
 	// write process state
@@ -543,7 +544,7 @@ func (kevt *Kevent) MarshalJSON() []byte {
 	var i int
 	for k, v := range kevt.Metadata {
 		writeMore := js.shouldWriteMore(i, len(kevt.Metadata))
-		js.writeObjectField(k.String()).writeEscapeString(v)
+		js.writeObjectField(k.String()).writeEscapeString(fmt.Sprintf("%s", v))
 		if writeMore {
 			js.writeMore()
 		}
