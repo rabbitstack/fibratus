@@ -71,11 +71,11 @@
       is_minidump(file.name)
     )
   description: |
-    Detects a process writing a minidump file. Mindump files are used for crash
+    Detects a process writing the minidump file. Minidump files are used for crash
     reporting as they contain a snapshot of the process' memory such as local variables
     or heap objects. Processes can create minidump files by calling into the MiniDumpWriteDump()
     function. This macro checks the well-known extensions of the minidump files as well as
-    the mindump signature.
+    the minidump signature.
 
 - macro: msoffice_binaries
   list: [EXCEL.EXE, WINWORD.EXE, MSACCESS.EXE, POWERPNT.EXE, WORDPAD.EXE]
@@ -103,3 +103,6 @@
 
 - macro: module_extensions
   list: [.dll, .ocx, .cpl]
+
+- macro: vault_extensions
+  list: [.vcrd, .vpol]
