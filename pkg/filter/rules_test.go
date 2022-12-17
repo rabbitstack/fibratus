@@ -646,6 +646,86 @@ func TestSequenceAndSimpleRuleMix(t *testing.T) {
 	require.True(t, rules.Fire(kevt3))
 }
 
+func TestSequenceRuleBoundsFields(t *testing.T) {
+	rules := NewRules(newConfig("_fixtures/sequence_rule_bound_fields.yml"))
+	require.NoError(t, rules.Compile())
+
+	kevt := &kevent.Kevent{
+		Type:      ktypes.CreateProcess,
+		Timestamp: time.Now(),
+		Name:      "CreateProcess",
+		Tid:       2484,
+		PID:       859,
+		PS: &types.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\svchost-temp.exe",
+			SID:  "zinet",
+		},
+		Kparams: kevent.Kparams{
+			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
+		},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+	}
+
+	kevt1 := &kevent.Kevent{
+		Type:      ktypes.CreateProcess,
+		Timestamp: time.Now().Add(time.Millisecond * 20),
+		Name:      "CreateProcess",
+		Tid:       2484,
+		PID:       859,
+		PS: &types.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\svchost-temp.exe",
+			SID:  "nusret",
+		},
+		Kparams: kevent.Kparams{
+			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
+		},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+	}
+
+	kevt2 := &kevent.Kevent{
+		Type:      ktypes.CreateFile,
+		Timestamp: time.Now().Add(time.Second),
+		Name:      "CreateFile",
+		Tid:       2484,
+		PID:       859,
+		Category:  ktypes.File,
+		PS: &types.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\svchost.exe",
+			SID:  "nusret",
+		},
+		Kparams: kevent.Kparams{
+			kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost-temp.exe"},
+		},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+	}
+
+	kevt3 := &kevent.Kevent{
+		Type:      ktypes.Connect,
+		Timestamp: time.Now().Add(time.Second * 3),
+		Name:      "Connect",
+		Tid:       2484,
+		PID:       859,
+		Category:  ktypes.File,
+		PS: &types.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\svchost.exe",
+			SID:  "zinet",
+		},
+		Kparams: kevent.Kparams{
+			kparams.NetDport: {Name: kparams.NetDport, Type: kparams.Uint16, Value: uint16(80)},
+		},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+	}
+	require.False(t, rules.Fire(kevt))
+	require.False(t, rules.Fire(kevt1))
+	return
+	require.False(t, rules.Fire(kevt2))
+	require.True(t, rules.Fire(kevt3))
+}
+
 func TestFilterActionEmitAlert(t *testing.T) {
 	require.NoError(t, alertsender.LoadAll([]alertsender.Config{{Type: alertsender.Noop}}))
 	rules := NewRules(newConfig("_fixtures/include_policy_emit_alert.yml"))

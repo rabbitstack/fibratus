@@ -31,8 +31,9 @@ const (
 	WS
 	EOF
 
-	Field // ps.name
-	Str   // 'cmd.exe'
+	Field      // ps.name
+	BoundField // $evt1.file.name
+	Str        // 'cmd.exe'
 	Badstr
 	Badesc
 	Ident
@@ -80,6 +81,7 @@ const (
 	Seq     // SEQUENCE
 	MaxSpan // MAXSPAN
 	By      // BY
+	As      // AS
 )
 
 var keywords map[string]token
@@ -89,7 +91,7 @@ func init() {
 	for _, tok := range []token{And, Or, Contains, IContains, In,
 		IIn, Not, Startswith, IStartswith, Endswith, IEndswith,
 		Matches, IMatches, Fuzzy, IFuzzy, Fuzzynorm, IFuzzynorm,
-		Seq, MaxSpan, By} {
+		Seq, MaxSpan, By, As} {
 		keywords[strings.ToLower(tokens[tok])] = tok
 	}
 	keywords["true"] = True
@@ -101,18 +103,19 @@ var tokens = [...]string{
 	EOF:     "EOF",
 	WS:      "WS",
 
-	Ident:    "IDENT",
-	Field:    "FIELD",
-	Integer:  "INTEGER",
-	Decimal:  "DECIMAL",
-	Duration: "DURATION",
-	Str:      "STRING",
-	Badstr:   "BADSTRING",
-	Badesc:   "BADESCAPE",
-	IP:       "IPADDRESS",
-	BadIP:    "BADIPADDRESS",
-	True:     "TRUE",
-	False:    "FALSE",
+	Ident:      "IDENT",
+	Field:      "FIELD",
+	BoundField: "BOUNDFIELD",
+	Integer:    "INTEGER",
+	Decimal:    "DECIMAL",
+	Duration:   "DURATION",
+	Str:        "STRING",
+	Badstr:     "BADSTRING",
+	Badesc:     "BADESCAPE",
+	IP:         "IPADDRESS",
+	BadIP:      "BADIPADDRESS",
+	True:       "TRUE",
+	False:      "FALSE",
 
 	And:         "AND",
 	Or:          "OR",
@@ -149,6 +152,7 @@ var tokens = [...]string{
 	Seq:     "SEQUENCE",
 	MaxSpan: "MAXSPAN",
 	By:      "BY",
+	As:      "AS",
 }
 
 // isOperator determines whether the current token is an operator.

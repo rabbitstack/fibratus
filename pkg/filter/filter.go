@@ -50,7 +50,7 @@ type Filter interface {
 	// RunSequence runs a filter with sequence expressions. Sequence rules depend
 	// on the state machine transitions and partial matches to decide whether the
 	// rule is fired.
-	RunSequence(kevt *kevent.Kevent, seqID uint16) bool
+	RunSequence(kevt *kevent.Kevent, seqID uint16, partials map[uint16][]*kevent.Kevent) bool
 	// GetStringFields returns field names mapped to their string values.
 	GetStringFields() map[fields.Field][]string
 	// GetSequence returns the sequence descriptor or nil if this filter is not a sequence.
@@ -162,25 +162,73 @@ func (f *filter) Run(kevt *kevent.Kevent) bool {
 	return ql.Eval(f.expr, f.mapValuer(kevt), f.useFuncValuer)
 }
 
-func (f *filter) RunSequence(kevt *kevent.Kevent, seqID uint16) bool {
-	if f.seq == nil || seqID > uint16(len(f.seq.Expressions))-1 {
+func (f *filter) RunSequence(kevt *kevent.Kevent, seqID uint16, partials map[uint16][]*kevent.Kevent) bool {
+	nseqs := uint16(len(f.seq.Expressions))
+	if f.seq == nil || seqID > nseqs-1 {
 		return false
 	}
-
 	valuer := f.mapValuer(kevt)
 	expr := f.seq.Expressions[seqID]
-	ok := ql.Eval(expr.Expr, valuer, f.useFuncValuer)
-	if !ok {
+
+	var match bool
+	if seqID >= 1 && expr.HasBoundFields() {
+		// if a sequence expression contains references to
+		// bound fields we map all partials to its sequence
+		// alias
+		pm := make(map[string][]*kevent.Kevent)
+		for i := uint16(0); i < seqID; i++ {
+			alias := f.seq.Expressions[i].Alias
+			if alias == "" {
+				continue
+			}
+			pm[alias] = partials[i+1]
+		}
+		// process until partials from all slots are consumed
+		n := 0
+		nslots := len(pm)
+		for nslots > 0 {
+			for _, field := range expr.BoundFields {
+				for _, accessor := range f.accessors {
+					evts := pm[field.Alias()]
+					if n > len(evts)-1 {
+						nslots--
+						continue
+					}
+					evt := evts[n]
+					if !accessor.canAccess(evt, f) {
+						continue
+					}
+					v, err := accessor.get(field.Field(), evt)
+					if err != nil && !kerrors.IsKparamNotFound(err) {
+						accessorErrors.Add(err.Error(), 1)
+						continue
+					}
+					if v != nil {
+						valuer[field.String()] = v
+						break
+					}
+				}
+			}
+			n++
+			match = ql.Eval(expr.Expr, valuer, f.useFuncValuer)
+			if match {
+				break
+			}
+		}
+	} else {
+		match = ql.Eval(expr.Expr, valuer, f.useFuncValuer)
+	}
+	if !match {
 		return false
 	}
-
 	by := f.seq.By
 	if by.IsEmpty() {
 		by = expr.By
 	}
-	v := valuer[by.String()]
-	if v != nil {
-		kevt.AddMeta(kevent.RuleSequenceByKey, v)
+	if !by.IsEmpty() {
+		if v := valuer[by.String()]; v != nil {
+			kevt.AddMeta(kevent.RuleSequenceByKey, v)
+		}
 	}
 	return true
 }

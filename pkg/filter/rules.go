@@ -466,7 +466,7 @@ func (f compiledFilter) isScoped() bool {
 // run execute the filter with either simple or sequence expressions.
 func (f compiledFilter) run(kevt *kevent.Kevent, i uint16) bool {
 	if f.ss != nil {
-		return f.filter.RunSequence(kevt, i)
+		return f.filter.RunSequence(kevt, i, f.ss.partials)
 	}
 	return f.filter.Run(kevt)
 }
@@ -542,9 +542,10 @@ func (r *Rules) Compile() error {
 		if group.Policy == config.ExcludePolicy {
 			r.excludePolicies = true
 		}
-		log.Infof("loading rule group [%s] with %q policy", group.Name, group.Policy)
 		filterGroupsCount.Add(1)
 		filterGroupsCountByPolicy.Add(group.Policy.String(), 1)
+		log.Infof("loading rule group [%s] with %q policy", group.Name, group.Policy)
+
 		// compile filters and populate the groups. Additionally, for
 		// sequence rules we have to configure the FSM states and
 		// transitions
@@ -676,8 +677,12 @@ func (r *Rules) runSequence(kevt *kevent.Kevent, f *compiledFilter) bool {
 		if !f.ss.next(i) {
 			continue
 		}
+		if !expr.IsEligible(kevt) {
+			continue
+		}
 		rule := expr.Expr.String()
 		matches := f.run(kevt, uint16(i))
+
 		if matches && f.ss.isAfter(rule, kevt) {
 			f.ss.addPartial(rule, kevt)
 			err := f.ss.matchTransition(rule, kevt)
@@ -708,9 +713,6 @@ nextGroup:
 		// need to match
 		for i, f := range g.filters {
 			var ok bool
-			if !f.isEligible(kevt) {
-				continue
-			}
 			if f.ss != nil {
 				if f.ss.expire(kevt) {
 					continue

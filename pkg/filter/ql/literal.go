@@ -22,6 +22,8 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
+	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/util/hashers"
 	"net"
 	"reflect"
 	"strconv"
@@ -66,6 +68,10 @@ type IPLiteral struct {
 	Value net.IP
 }
 
+type BoundFieldLiteral struct {
+	Value string
+}
+
 func (i IPLiteral) String() string {
 	return i.Value.String()
 }
@@ -92,6 +98,26 @@ func (d DecimalLiteral) String() string {
 
 func (b BoolLiteral) String() string {
 	return strconv.FormatBool(b.Value)
+}
+
+func (b BoundFieldLiteral) String() string {
+	return b.Value
+}
+
+func (b BoundFieldLiteral) Field() fields.Field {
+	n := strings.Index(b.Value, ".")
+	if n > 0 {
+		return fields.Field(b.Value[n+1:])
+	}
+	return fields.Field(b.Value)
+}
+
+func (b BoundFieldLiteral) Alias() string {
+	n := strings.Index(b.Value, ".")
+	if n > 0 {
+		return b.Value[1:n]
+	}
+	return b.Value
 }
 
 // ListLiteral represents a list of tag key literals.
@@ -189,8 +215,71 @@ func (f Function) validate() error {
 
 // SequenceExpr represents a single binary expression within the sequence.
 type SequenceExpr struct {
-	Expr Expr
-	By   fields.Field
+	Expr        Expr
+	By          fields.Field
+	BoundFields []*BoundFieldLiteral
+	Alias       string
+
+	stringFields map[fields.Field][]string
+	buckets      map[uint32]bool
+}
+
+func (e *SequenceExpr) walk() {
+	if e.BoundFields == nil {
+		e.BoundFields = make([]*BoundFieldLiteral, 0)
+	}
+	if e.stringFields == nil {
+		e.stringFields = make(map[fields.Field][]string)
+	}
+	if e.buckets == nil {
+		e.buckets = make(map[uint32]bool)
+	}
+	walk := func(n Node) {
+		if expr, ok := n.(*BinaryExpr); ok {
+			if lhs, ok := expr.LHS.(*BoundFieldLiteral); ok {
+				e.BoundFields = append(e.BoundFields, lhs)
+			}
+			if rhs, ok := expr.RHS.(*BoundFieldLiteral); ok {
+				e.BoundFields = append(e.BoundFields, rhs)
+			}
+			if lhs, ok := expr.LHS.(*FieldLiteral); ok {
+				field := fields.Field(lhs.Value)
+				switch v := expr.RHS.(type) {
+				case *StringLiteral:
+					e.stringFields[field] = append(e.stringFields[field], v.Value)
+				case *ListLiteral:
+					e.stringFields[field] = append(e.stringFields[field], v.Values...)
+				}
+			}
+			if rhs, ok := expr.RHS.(*FieldLiteral); ok {
+				field := fields.Field(rhs.Value)
+				switch v := expr.LHS.(type) {
+				case *StringLiteral:
+					e.stringFields[field] = append(e.stringFields[field], v.Value)
+				case *ListLiteral:
+					e.stringFields[field] = append(e.stringFields[field], v.Values...)
+				}
+			}
+		}
+	}
+	WalkFunc(e.Expr, walk)
+
+	for name, values := range e.stringFields {
+		if name == fields.KevtName || name == fields.KevtCategory {
+			for _, v := range values {
+				e.buckets[hashers.FnvUint32([]byte(v))] = true
+			}
+		}
+	}
+}
+
+func (e *SequenceExpr) IsEligible(kevt *kevent.Kevent) bool {
+	return e.buckets[kevt.Type.Hash()] || e.buckets[kevt.Category.Hash()]
+}
+
+// HasBoundFields determines if this sequence expression has bound fields.
+func (e *SequenceExpr) HasBoundFields() bool {
+	return len(e.BoundFields) > 0
 }
 
 // Sequence is a collection of two or more sequence expressions.
