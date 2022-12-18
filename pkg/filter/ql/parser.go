@@ -130,6 +130,7 @@ func (p *Parser) ParseSequence() (*Sequence, error) {
 			seqexpr = SequenceExpr{Expr: expr}
 			p.unscan()
 		}
+		seqexpr.init()
 		seqexpr.walk()
 		exprs = append(exprs, seqexpr)
 	}

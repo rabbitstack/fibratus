@@ -96,35 +96,25 @@ func (f *filter) Compile() error {
 
 	// traverse the expression tree
 	walk := func(n ql.Node) {
-		if expr, ok := n.(*ql.BinaryExpr); ok {
+		switch expr := n.(type) {
+		case *ql.BinaryExpr:
 			if lhs, ok := expr.LHS.(*ql.FieldLiteral); ok {
 				field := fields.Field(lhs.Value)
 				f.addField(field)
-				switch v := expr.RHS.(type) {
-				case *ql.StringLiteral:
-					f.stringFields[field] = append(f.stringFields[field], v.Value)
-				case *ql.ListLiteral:
-					f.stringFields[field] = append(f.stringFields[field], v.Values...)
-				}
+				f.addStringFields(field, expr.RHS)
 			}
 			if rhs, ok := expr.RHS.(*ql.FieldLiteral); ok {
 				field := fields.Field(rhs.Value)
 				f.addField(field)
-				switch v := expr.LHS.(type) {
-				case *ql.StringLiteral:
-					f.stringFields[field] = append(f.stringFields[field], v.Value)
-				case *ql.ListLiteral:
-					f.stringFields[field] = append(f.stringFields[field], v.Values...)
-				}
+				f.addStringFields(field, expr.LHS)
 			}
-		}
-		if expr, ok := n.(*ql.Function); ok {
-			f.useFuncValuer = true
+		case *ql.Function:
 			for _, arg := range expr.Args {
-				if fld, ok := arg.(*ql.FieldLiteral); ok {
-					f.addField(fields.Field(fld.Value))
+				if field, ok := arg.(*ql.FieldLiteral); ok {
+					f.addField(fields.Field(field.Value))
 				}
 			}
+			f.useFuncValuer = true
 		}
 	}
 	if f.expr != nil {
@@ -140,7 +130,6 @@ func (f *filter) Compile() error {
 			}
 		}
 	}
-
 	if len(f.fields) == 0 && !f.useFuncValuer {
 		return ErrNoFields
 	}
@@ -173,23 +162,23 @@ func (f *filter) RunSequence(kevt *kevent.Kevent, seqID uint16, partials map[uin
 	var match bool
 	if seqID >= 1 && expr.HasBoundFields() {
 		// if a sequence expression contains references to
-		// bound fields we map all partials to its sequence
-		// alias
-		pm := make(map[string][]*kevent.Kevent)
+		// bound fields we map all partials to their sequence
+		// aliases
+		pls := make(map[string][]*kevent.Kevent)
 		for i := uint16(0); i < seqID; i++ {
 			alias := f.seq.Expressions[i].Alias
 			if alias == "" {
 				continue
 			}
-			pm[alias] = partials[i+1]
+			pls[alias] = partials[i+1]
 		}
 		// process until partials from all slots are consumed
 		n := 0
-		nslots := len(pm)
+		nslots := len(pls)
 		for nslots > 0 {
 			for _, field := range expr.BoundFields {
 				for _, accessor := range f.accessors {
-					evts := pm[field.Alias()]
+					evts := pls[field.Alias()]
 					if n > len(evts)-1 {
 						nslots--
 						continue
@@ -216,18 +205,40 @@ func (f *filter) RunSequence(kevt *kevent.Kevent, seqID uint16, partials map[uin
 			}
 		}
 	} else {
-		match = ql.Eval(expr.Expr, valuer, f.useFuncValuer)
+		by := f.seq.By
+		if by.IsEmpty() {
+			by = expr.By
+		}
+		if seqID >= 1 && !by.IsEmpty() {
+			// traverse upstream partials for join equality
+			joins := make([]bool, seqID)
+			joinID := valuer[by.String()]
+		outer:
+			for i := uint16(0); i < seqID; i++ {
+				for _, p := range partials[i+1] {
+					if compareSeqJoin(joinID, p.SequenceBy()) {
+						joins[i] = true
+						continue outer
+					}
+				}
+			}
+			match = joinsEqual(joins) && ql.Eval(expr.Expr, valuer, f.useFuncValuer)
+		} else {
+			match = ql.Eval(expr.Expr, valuer, f.useFuncValuer)
+		}
+		if match && !by.IsEmpty() {
+			if v := valuer[by.String()]; v != nil {
+				kevt.AddMeta(kevent.RuleSequenceByKey, v)
+			}
+		}
 	}
-	if !match {
-		return false
-	}
-	by := f.seq.By
-	if by.IsEmpty() {
-		by = expr.By
-	}
-	if !by.IsEmpty() {
-		if v := valuer[by.String()]; v != nil {
-			kevt.AddMeta(kevent.RuleSequenceByKey, v)
+	return match
+}
+
+func joinsEqual(joins []bool) bool {
+	for _, j := range joins {
+		if !j {
+			return false
 		}
 	}
 	return true
@@ -323,4 +334,14 @@ func (f *filter) addField(field fields.Field) {
 		}
 	}
 	f.fields = append(f.fields, field)
+}
+
+// addStringFields appends values for all string field expressions.
+func (f *filter) addStringFields(field fields.Field, expr ql.Expr) {
+	switch v := expr.(type) {
+	case *ql.StringLiteral:
+		f.stringFields[field] = append(f.stringFields[field], v.Value)
+	case *ql.ListLiteral:
+		f.stringFields[field] = append(f.stringFields[field], v.Values...)
+	}
 }

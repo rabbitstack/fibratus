@@ -366,9 +366,10 @@ func TestSimpleSequenceRuleMultiplePartials(t *testing.T) {
 
 	ss := rules.filterGroups[ktypes.CreateProcess.Hash()][0].filters[0].ss
 	assert.Len(t, ss.partials[1], 5)
-	assert.Len(t, ss.partials[2], 5)
+	assert.Len(t, ss.partials[2], 0)
 
 	kevt1 := &kevent.Kevent{
+		Seq:       20,
 		Type:      ktypes.CreateProcess,
 		Timestamp: time.Now().Add(time.Second),
 		Name:      "CreateProcess",
@@ -385,6 +386,7 @@ func TestSimpleSequenceRuleMultiplePartials(t *testing.T) {
 	}
 	kevt2 := &kevent.Kevent{
 		Type:      ktypes.CreateFile,
+		Seq:       22,
 		Timestamp: time.Now().Add(time.Second * time.Duration(2)),
 		Name:      "CreateFile",
 		Tid:       2484,
@@ -400,6 +402,8 @@ func TestSimpleSequenceRuleMultiplePartials(t *testing.T) {
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 	require.False(t, rules.Fire(kevt1))
+	assert.Len(t, ss.partials[1], 6)
+	assert.Len(t, ss.partials[2], 0)
 	require.True(t, rules.Fire(kevt2))
 }
 
@@ -560,6 +564,11 @@ func TestComplexSequenceRule(t *testing.T) {
 
 	require.False(t, rules.Fire(kevt1))
 	require.False(t, rules.Fire(kevt2))
+
+	ss := rules.filterGroups[ktypes.CreateProcess.Hash()][0].filters[0].ss
+	assert.Len(t, ss.partials[1], 1)
+	assert.Len(t, ss.partials[2], 1)
+
 	time.Sleep(time.Millisecond * 30)
 	require.True(t, rules.Fire(kevt3))
 
@@ -721,7 +730,6 @@ func TestSequenceRuleBoundsFields(t *testing.T) {
 	}
 	require.False(t, rules.Fire(kevt))
 	require.False(t, rules.Fire(kevt1))
-	return
 	require.False(t, rules.Fire(kevt2))
 	require.True(t, rules.Fire(kevt3))
 }
@@ -759,7 +767,7 @@ func TestFilterActionEmitAlert(t *testing.T) {
 	emitAlert = nil
 }
 
-func TestIsKtypeEligible(t *testing.T) {
+func TestIsExpressionEvaluable(t *testing.T) {
 	rules := NewRules(newConfig("_fixtures/sequence_rule_simple.yml"))
 	require.NoError(t, rules.Compile())
 	log.SetLevel(log.DebugLevel)
@@ -797,8 +805,9 @@ func TestIsKtypeEligible(t *testing.T) {
 	for _, groups := range rules.filterGroups {
 		for _, g := range groups {
 			for _, f := range g.filters {
-				assert.False(t, f.isEligible(kevt2))
-				assert.True(t, f.isEligible(kevt1))
+				e := f.filter.GetSequence().Expressions[0]
+				assert.False(t, e.IsEvaluable(kevt2))
+				assert.True(t, e.IsEvaluable(kevt1))
 			}
 		}
 	}

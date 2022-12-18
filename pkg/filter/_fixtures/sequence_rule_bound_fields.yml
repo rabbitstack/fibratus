@@ -12,4 +12,4 @@
             and
          $e1.ps.sid = ps.sid
         | as e2
-        |kevt.name = 'Connect' and ps.sid != $e2.ps.sid and ps.sid = $e1.ps.sid |
+        |kevt.name = 'Connect' and ps.sid != $e2.ps.sid and ps.sid = $e1.ps.sid|

@@ -171,7 +171,7 @@ func (f *Function) String() string {
 // catalog. It also validates the function signature to
 // make sure required arguments are supplied. Finally, it
 // checks the type of each argument with the expected one.
-func (f Function) validate() error {
+func (f *Function) validate() error {
 	fn, ok := funcs[strings.ToUpper(f.Name)]
 	if !ok {
 		return ErrUndefinedFunction(f.Name)
@@ -193,7 +193,7 @@ func (f Function) validate() error {
 		arg := fn.Desc().Args[i]
 		typ := functions.Unknown
 		switch reflect.TypeOf(expr) {
-		case reflect.TypeOf(&FieldLiteral{}):
+		case reflect.TypeOf(&FieldLiteral{}), reflect.TypeOf(&BoundFieldLiteral{}):
 			typ = functions.Field
 		case reflect.TypeOf(&IPLiteral{}):
 			typ = functions.IP
@@ -220,51 +220,48 @@ type SequenceExpr struct {
 	BoundFields []*BoundFieldLiteral
 	Alias       string
 
-	stringFields map[fields.Field][]string
-	buckets      map[uint32]bool
+	buckets map[uint32]bool
+}
+
+func (e *SequenceExpr) init() {
+	e.buckets = make(map[uint32]bool)
+	e.BoundFields = make([]*BoundFieldLiteral, 0)
 }
 
 func (e *SequenceExpr) walk() {
-	if e.BoundFields == nil {
-		e.BoundFields = make([]*BoundFieldLiteral, 0)
-	}
-	if e.stringFields == nil {
-		e.stringFields = make(map[fields.Field][]string)
-	}
-	if e.buckets == nil {
-		e.buckets = make(map[uint32]bool)
-	}
+	stringFields := make(map[fields.Field][]string)
 	walk := func(n Node) {
 		if expr, ok := n.(*BinaryExpr); ok {
-			if lhs, ok := expr.LHS.(*BoundFieldLiteral); ok {
+			switch lhs := expr.LHS.(type) {
+			case *BoundFieldLiteral:
 				e.BoundFields = append(e.BoundFields, lhs)
-			}
-			if rhs, ok := expr.RHS.(*BoundFieldLiteral); ok {
-				e.BoundFields = append(e.BoundFields, rhs)
-			}
-			if lhs, ok := expr.LHS.(*FieldLiteral); ok {
+			case *FieldLiteral:
 				field := fields.Field(lhs.Value)
 				switch v := expr.RHS.(type) {
 				case *StringLiteral:
-					e.stringFields[field] = append(e.stringFields[field], v.Value)
+					stringFields[field] = append(stringFields[field], v.Value)
 				case *ListLiteral:
-					e.stringFields[field] = append(e.stringFields[field], v.Values...)
+					stringFields[field] = append(stringFields[field], v.Values...)
 				}
 			}
-			if rhs, ok := expr.RHS.(*FieldLiteral); ok {
+			switch rhs := expr.RHS.(type) {
+			case *BoundFieldLiteral:
+				e.BoundFields = append(e.BoundFields, rhs)
+			case *FieldLiteral:
 				field := fields.Field(rhs.Value)
 				switch v := expr.LHS.(type) {
 				case *StringLiteral:
-					e.stringFields[field] = append(e.stringFields[field], v.Value)
+					stringFields[field] = append(stringFields[field], v.Value)
 				case *ListLiteral:
-					e.stringFields[field] = append(e.stringFields[field], v.Values...)
+					stringFields[field] = append(stringFields[field], v.Values...)
 				}
 			}
 		}
 	}
 	WalkFunc(e.Expr, walk)
 
-	for name, values := range e.stringFields {
+	// initialize event type/category buckets for every such field
+	for name, values := range stringFields {
 		if name == fields.KevtName || name == fields.KevtCategory {
 			for _, v := range values {
 				e.buckets[hashers.FnvUint32([]byte(v))] = true
@@ -273,7 +270,11 @@ func (e *SequenceExpr) walk() {
 	}
 }
 
-func (e *SequenceExpr) IsEligible(kevt *kevent.Kevent) bool {
+// IsEvaluable determines if the expression should be evaluated by inspecting
+// the event type filter fields defined in the expression. We permit the expression
+// to be evaluated when the incoming event type or category pertains to the one
+// defined in the field literal.
+func (e *SequenceExpr) IsEvaluable(kevt *kevent.Kevent) bool {
 	return e.buckets[kevt.Type.Hash()] || e.buckets[kevt.Category.Hash()]
 }
 

@@ -86,9 +86,9 @@ func TestParseError(t *testing.T) {
 |	          'user shell folders\\startup'
 |	        )
 |
-╰─────────────────── expected field, string, number, bool, ip, function, pattern binding`
+╰─────────────────── expected field, bound field, string, number, bool, ip, function`
 
-	e := newParseError("[", []string{"field, string, number, bool, ip, function, pattern binding"}, 145, expr)
+	e := newParseError("[", []string{"field, bound field, string, number, bool, ip, function"}, 145, expr)
 	require.Equal(t, expected, e.Error())
 
 	expr = `ps.name = 'cmd.exe' aand ps.cmdline contains 'ss'`
