@@ -158,7 +158,7 @@ func (p *Parser) ParseExpr() (Expr, error) {
 			// expect LPAREN after in
 			tok, pos, lit := p.scanIgnoreWhitespace()
 			p.unscan()
-			if tok != Lparen && !p.c.IsMacroList(lit) {
+			if tok != Lparen && (p.c != nil && !p.c.IsMacroList(lit)) {
 				return nil, newParseError(tokstr(op, lit), []string{"'('"}, pos, p.expr)
 			}
 		}

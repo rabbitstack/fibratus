@@ -42,6 +42,7 @@ func TestParseFunction(t *testing.T) {
 		{expr: "replace('hello world', 'hello', 'hell', 'world', 'war', 'hello')", err: errors.New("old/new replacements mismatch")},
 		{expr: "replace('hello world', 'hello', 'hell', 'world', 'war', 'hello', 'warld', 'old', 'new', 'one')", err: errors.New("old/new replacements mismatch")},
 		{expr: "indexof('hello', 'h', 'frst')", err: errors.New("frst is not a valid index search order")},
+		{expr: "base('C:\\\\Windows\\\\cmd.exe', false)"},
 	}
 
 	for i, tt := range tests {
@@ -49,7 +50,7 @@ func TestParseFunction(t *testing.T) {
 		_, err := p.ParseExpr()
 		if err == nil && tt.err != nil {
 			t.Errorf("%d. exp=%s expected error=%v", i, tt.expr, tt.err)
-		} else if err != nil {
+		} else if err != nil && tt.err != nil {
 			assert.True(t, strings.Contains(err.Error(), tt.err.Error()))
 		} else if err != nil && tt.err == nil {
 			t.Errorf("%d. exp=%s got error=%v", i, tt.expr, err)

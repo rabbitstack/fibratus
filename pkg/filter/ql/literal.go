@@ -179,6 +179,8 @@ func (f Function) validate() error {
 			typ = functions.Func
 		case reflect.TypeOf(&ListLiteral{}):
 			typ = functions.Slice
+		case reflect.TypeOf(&BoolLiteral{}):
+			typ = functions.Bool
 		}
 		if !arg.ContainsType(typ) {
 			return ErrArgumentTypeMismatch(i, arg.Keyword, fn.Name(), arg.Types)
