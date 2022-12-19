@@ -313,6 +313,7 @@ func TestFilterRunFileKevent(t *testing.T) {
 		{`file.name fuzzy ('C:\\Windows\\system32\\kernel', 'C:\\Windows\\system32\\ser3ll')`, true},
 		{`file.name ifuzzynorm 'C:\\WINDOWS\\sÝS\\32dll'`, true},
 		{`base(file.name) = 'user32.dll'`, true},
+		{`ext(base(file.name)) = '.dll'`, true},
 		{`base(file.name, false) = 'user32'`, true},
 		{`dir(file.name) = 'C:\\Windows\\system32'`, true},
 		{`ext(file.name) = '.dll'`, true},

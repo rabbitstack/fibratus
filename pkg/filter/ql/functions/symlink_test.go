@@ -31,6 +31,9 @@ func TestSymlink(t *testing.T) {
 	require.NoError(t, err)
 	call := Symlink{}
 	res, _ := call.Call([]interface{}{ln})
+	defer func() {
+		_ = os.RemoveAll(filepath.Join(os.TempDir(), "test"))
+	}()
 	assert.Equal(t, filepath.Join(os.TempDir(), "test", "target.txt"), res)
 }
 
