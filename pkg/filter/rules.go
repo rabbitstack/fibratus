@@ -28,6 +28,7 @@ import (
 	fsm "github.com/qmuntal/stateless"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/util/hashers"
+	"net"
 	"sort"
 
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
@@ -314,6 +315,12 @@ func compareSeqJoin(s1, s2 any) bool {
 			return false
 		}
 		return v == n
+	case net.IP:
+		ip, ok := s2.(net.IP)
+		if !ok {
+			return false
+		}
+		return v.Equal(ip)
 	}
 	return false
 }
@@ -500,20 +507,23 @@ func (r *Rules) Compile() error {
 		// compile filters and populate the groups. Additionally, for
 		// sequence rules we have to configure the FSM states and
 		// transitions
-		var (
-			rules   = append(group.Rules, group.FromStrings...)
-			filters = make([]*compiledFilter, 0, len(rules))
-		)
+		rules := append(group.Rules, group.FromStrings...)
+		filters := make([]*compiledFilter, 0, len(rules))
+
 		for _, filterConfig := range rules {
 			rule := filterConfig.Name
 			f := New(expr(filterConfig), r.config)
-			if err := f.Compile(); err != nil {
+			err := f.Compile()
+			if err != nil {
 				return ErrInvalidFilter(rule, group.Name, err)
 			}
 			var seqState *sequenceState
 			if f.IsSequence() {
 				seq := f.GetSequence()
 				expressions := seq.Expressions
+				if len(expressions) == 0 {
+					panic("expressions cannot be empty")
+				}
 				initialState := expressions[0].Expr.String()
 				seqState = newSequenceState(group.Name, initialState, seq.MaxSpan)
 				// setup finite state machine states. The last rule
@@ -541,12 +551,11 @@ func (r *Rules) Compile() error {
 				seqState.fsm.Configure(sequenceDeadlineState).Permit(resetTransition, initialState)
 				seqState.fsm.Configure(sequenceExpiredState).Permit(resetTransition, initialState)
 			}
-			filters = append(filters, newCompiledFilter(f, filterConfig, seqState))
 			filtersCount.Add(1)
+			filters = append(filters, newCompiledFilter(f, filterConfig, seqState))
 		}
 
-		// initialize filter groups
-		fg := newFilterGroup(group, filters)
+		g := newFilterGroup(group, filters)
 
 		// traverse all filters in the groups and determine
 		// the event type from the filter field name expression.
@@ -559,17 +568,17 @@ func (r *Rules) Compile() error {
 					"This may lead to rule being discarded by the engine. Please consider "+
 					"narrowing the scope of this rule by including the `kevt.name` "+
 					"or `kevt.category` condition",
-					f.config.Name, fg.group.Name)
+					f.config.Name, g.group.Name)
 				continue
 			}
 			for name, values := range f.filter.GetStringFields() {
 				for _, v := range values {
 					if name == fields.KevtName || name == fields.KevtCategory {
 						hash := hashers.FnvUint32([]byte(v))
-						if r.isGroupMapped(hash, fg.group.Hash()) {
+						if r.isGroupMapped(hash, g.group.Hash()) {
 							continue
 						}
-						r.filterGroups[hash] = append(r.filterGroups[hash], fg)
+						r.filterGroups[hash] = append(r.filterGroups[hash], g)
 					}
 				}
 			}
