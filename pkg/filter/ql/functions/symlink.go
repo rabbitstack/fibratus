@@ -27,10 +27,7 @@ func (f Symlink) Call(args []interface{}) (interface{}, bool) {
 	if len(args) < 1 {
 		return false, false
 	}
-	path, ok := args[0].(string)
-	if !ok {
-		return false, false
-	}
+	path := parseString(0, args)
 	newpath, err := filepath.EvalSymlinks(path)
 	if err != nil {
 		return path, true

@@ -19,14 +19,29 @@
 package functions
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestExt(t *testing.T) {
-	call := Ext{}
-	res, _ := call.Call([]interface{}{"C:\\Windows\\cmd.exe"})
-	assert.Equal(t, ".exe", res)
-	res1, _ := call.Call([]interface{}{"C:\\Windows\\cmd.exe", false})
-	assert.Equal(t, "exe", res1)
+	var tests = []struct {
+		args     []interface{}
+		expected interface{}
+	}{
+		{
+			[]interface{}{"C:\\Windows\\cmd.exe"},
+			".exe",
+		},
+		{
+			[]interface{}{"C:\\Windows\\cmd.exe", false},
+			"exe",
+		},
+	}
+
+	for i, tt := range tests {
+		f := Ext{}
+		res, _ := f.Call(tt.args)
+		assert.Equal(t, tt.expected, res, fmt.Sprintf("%d. result mismatch: exp=%v got=%v", i, tt.expected, res))
+	}
 }

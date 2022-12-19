@@ -30,31 +30,24 @@ func (f Base) Call(args []interface{}) (interface{}, bool) {
 	if len(args) < 1 {
 		return false, false
 	}
-	path, ok := args[0].(string)
-	if !ok {
-		return false, false
-	}
-	base := filepath.Base(path)
-	if len(args) > 1 {
-		ext, ok := args[1].(bool)
-		if !ok {
-			return base, true
+	switch s := args[0].(type) {
+	case string:
+		return f.trimExt(filepath.Base(s), args), true
+	case []string:
+		paths := make([]string, len(s))
+		for i, path := range s {
+			paths[i] = f.trimExt(filepath.Base(path), args)
 		}
-		if !ext {
-			n := strings.LastIndex(base, ".")
-			if n > 0 {
-				return base[:n], true
-			}
-		}
+		return paths, true
 	}
-	return base, true
+	return nil, true
 }
 
 func (f Base) Desc() FunctionDesc {
 	desc := FunctionDesc{
 		Name: BaseFn,
 		Args: []FunctionArgDesc{
-			{Keyword: "path", Types: []ArgType{Field, Func, String}, Required: true},
+			{Keyword: "path", Types: []ArgType{Field, Func, String, Slice}, Required: true},
 			{Keyword: "ext", Types: []ArgType{Bool}, Required: false},
 		},
 	}
@@ -62,3 +55,19 @@ func (f Base) Desc() FunctionDesc {
 }
 
 func (f Base) Name() Fn { return BaseFn }
+
+func (f Base) trimExt(base string, args []interface{}) string {
+	if len(args) > 1 {
+		ext, ok := args[1].(bool)
+		if !ok {
+			return base
+		}
+		if !ext {
+			n := strings.LastIndex(base, ".")
+			if n > 0 {
+				return base[:n]
+			}
+		}
+	}
+	return base
+}

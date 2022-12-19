@@ -27,10 +27,7 @@ func (f Ext) Call(args []interface{}) (interface{}, bool) {
 	if len(args) < 1 {
 		return false, false
 	}
-	path, ok := args[0].(string)
-	if !ok {
-		return false, false
-	}
+	path := parseString(0, args)
 	ext := filepath.Ext(path)
 	if len(args) > 1 {
 		dot, ok := args[1].(bool)

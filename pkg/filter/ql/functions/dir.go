@@ -27,18 +27,24 @@ func (f Dir) Call(args []interface{}) (interface{}, bool) {
 	if len(args) < 1 {
 		return false, false
 	}
-	path, ok := args[0].(string)
-	if !ok {
-		return false, false
+	switch s := args[0].(type) {
+	case string:
+		return filepath.Dir(s), true
+	case []string:
+		dirs := make([]string, len(s))
+		for i, path := range s {
+			dirs[i] = filepath.Dir(path)
+		}
+		return dirs, true
 	}
-	return filepath.Dir(path), true
+	return nil, true
 }
 
 func (f Dir) Desc() FunctionDesc {
 	desc := FunctionDesc{
 		Name: DirFn,
 		Args: []FunctionArgDesc{
-			{Keyword: "path", Types: []ArgType{Field, Func, String}, Required: true},
+			{Keyword: "path", Types: []ArgType{Field, Func, String, Slice}, Required: true},
 		},
 	}
 	return desc

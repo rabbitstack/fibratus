@@ -19,14 +19,37 @@
 package functions
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestBase(t *testing.T) {
-	call := Base{}
-	res, _ := call.Call([]interface{}{"C:\\Windows\\cmd.exe"})
-	assert.Equal(t, "cmd.exe", res)
-	res1, _ := call.Call([]interface{}{"C:\\Windows\\cmd.exe", false})
-	assert.Equal(t, "cmd", res1)
+	var tests = []struct {
+		args     []interface{}
+		expected interface{}
+	}{
+		{
+			[]interface{}{"C:\\Windows\\cmd.exe"},
+			"cmd.exe",
+		},
+		{
+			[]interface{}{"C:\\Windows\\cmd.exe", false},
+			"cmd",
+		},
+		{
+			[]interface{}{[]string{"C:\\Windows\\cmd.exe", "C:\\Windows\\notepad.exe"}},
+			[]string{"cmd.exe", "notepad.exe"},
+		},
+		{
+			[]interface{}{[]string{"C:\\Windows\\cmd.exe", "C:\\Windows\\notepad.exe"}, false},
+			[]string{"cmd", "notepad"},
+		},
+	}
+
+	for i, tt := range tests {
+		f := Base{}
+		res, _ := f.Call(tt.args)
+		assert.Equal(t, tt.expected, res, fmt.Sprintf("%d. result mismatch: exp=%v got=%v", i, tt.expected, res))
+	}
 }
