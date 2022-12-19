@@ -35,7 +35,7 @@ func (f GetRegValue) Call(args []interface{}) (interface{}, bool) {
 	n := strings.Index(path, "\\")
 	if n > 0 {
 		rootKey := path[:n]
-		subkey, value := filepath.Split(path[:n])
+		subkey, value := filepath.Split(path[n+1:])
 		key, err := registry.OpenKey(keyFromString(rootKey), subkey, registry.QUERY_VALUE)
 		if err != nil {
 			return nil, true
@@ -52,7 +52,12 @@ func (f GetRegValue) Call(args []interface{}) (interface{}, bool) {
 			val, _, err = key.GetStringValue(value)
 		case registry.MULTI_SZ:
 			val, _, err = key.GetStringsValue(value)
-		case registry.DWORD, registry.QWORD:
+		case registry.DWORD:
+			val, _, err = key.GetIntegerValue(value)
+			if err == nil {
+				val = uint32(val.(uint64))
+			}
+		case registry.QWORD:
 			val, _, err = key.GetIntegerValue(value)
 		case registry.BINARY:
 			val, _, err = key.GetBinaryValue(value)
@@ -91,6 +96,7 @@ func keyFromString(k string) registry.Key {
 		return registry.CURRENT_CONFIG
 	case "HKEY_PERFORMANCE_DATA", "HKPD":
 		return registry.PERFORMANCE_DATA
+	default:
+		return registry.Key(0)
 	}
-	return registry.Key(-1)
 }
