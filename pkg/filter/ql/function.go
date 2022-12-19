@@ -61,6 +61,7 @@ var funcs = map[string]FunctionDef{
 	functions.EntropyFn.String():      &functions.Entropy{},
 	functions.RegexFn.String():        functions.NewRegex(),
 	functions.IsMinidumpFn.String():   functions.IsMinidump{},
+	functions.GetRegValueFn.String():  functions.GetRegValue{},
 }
 
 // FunctionDef is the interface that all function definitions have to satisfy.

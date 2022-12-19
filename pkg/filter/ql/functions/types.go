@@ -54,6 +54,8 @@ const (
 	RegexFn
 	// IsMinidumpFn represents the ISMINIDUMP function
 	IsMinidumpFn
+	// GetRegValueFn represents the GET_REG_VALUE function
+	GetRegValueFn
 )
 
 // ArgType is the type alias for the argument value type.
@@ -170,6 +172,8 @@ func (f Fn) String() string {
 		return "REGEX"
 	case IsMinidumpFn:
 		return "IS_MINIDUMP"
+	case GetRegValueFn:
+		return "GET_REG_VALUE"
 	default:
 		return "UNDEFINED"
 	}
