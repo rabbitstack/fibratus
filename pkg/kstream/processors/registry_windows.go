@@ -21,7 +21,7 @@ package processors
 import (
 	"expvar"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
-	"path/filepath"
+	"golang.org/x/sys/windows/registry"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -30,7 +30,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-	reg "golang.org/x/sys/windows/registry"
 )
 
 var (
@@ -67,95 +66,64 @@ func newRegistryProcessor(hsnap handle.Snapshotter) Processor {
 	}
 }
 
-func (r *registryProcessor) ProcessEvent(kevt *kevent.Kevent) (*kevent.Kevent, bool, error) {
-	if kevt.Category == ktypes.Registry {
-		err := r.processEvent(kevt)
-		return kevt, false, err
+func (r *registryProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error) {
+	if e.Category == ktypes.Registry {
+		err := r.processEvent(e)
+		return e, false, err
 	}
-	return kevt, true, nil
+	return e, true, nil
 }
 
 func (registryProcessor) Name() ProcessorType { return Registry }
 func (registryProcessor) Close()              {}
 
-func (r *registryProcessor) processEvent(kevt *kevent.Kevent) error {
-	switch kevt.Type {
+func (r *registryProcessor) processEvent(e *kevent.Kevent) error {
+	switch e.Type {
 	case ktypes.RegKCBRundown, ktypes.RegCreateKCB:
-		khandle := kevt.Kparams.MustGetUint64(kparams.RegKeyHandle)
+		khandle := e.Kparams.MustGetUint64(kparams.RegKeyHandle)
 		if _, ok := r.keys[khandle]; !ok {
-			r.keys[khandle], _ = kevt.Kparams.GetString(kparams.RegKeyName)
+			r.keys[khandle], _ = e.Kparams.GetString(kparams.RegKeyName)
 		}
 		kcbCount.Add(1)
 	case ktypes.RegDeleteKCB:
-		khandle := kevt.Kparams.MustGetUint64(kparams.RegKeyHandle)
+		khandle := e.Kparams.MustGetUint64(kparams.RegKeyHandle)
 		delete(r.keys, khandle)
 		kcbCount.Add(-1)
 	default:
-		khandle := kevt.Kparams.MustGetUint64(kparams.RegKeyHandle)
+		khandle := e.Kparams.MustGetUint64(kparams.RegKeyHandle)
 		// we have to obey a straightforward algorithm to connect relative
 		// key names to their root keys. If key handle is equal to zero we
 		// have a full key name and don't have to go further resolving the
 		// missing part. Otherwise, we have to lookup existing KCBs to try
-		// find the matching base key name and concatenate to its relative
+		// finding the matching base key name and concatenate to its relative
 		// path. If none of the aforementioned checks are successful, our
 		// last resort is to scan process' handles and check if any of the
 		// key handles contain the partial key name. In this case we assume
 		// the correct key is encountered.
-		keyName, _ := kevt.Kparams.GetString(kparams.RegKeyName)
+		keyName, _ := e.Kparams.GetString(kparams.RegKeyName)
 		if khandle != 0 {
 			if baseKey, ok := r.keys[khandle]; ok {
 				keyName = baseKey + "\\" + keyName
 			} else {
 				kcbMissCount.Add(1)
-				keyName = r.findMatchingKey(kevt.PID, keyName)
+				keyName = r.findMatchingKey(e.PID, keyName)
 			}
-			if err := kevt.Kparams.SetValue(kparams.RegKeyName, keyName); err != nil {
+			if err := e.Kparams.SetValue(kparams.RegKeyName, keyName); err != nil {
 				return err
 			}
 		}
 
 		// get the type/value of the registry key and append to parameters
-		if kevt.IsRegSetValue() {
+		if e.IsRegSetValue() {
 			rootKey, keyName := key.Format(keyName)
 			if rootKey != key.Invalid {
-				subkey, value := filepath.Split(keyName)
-				regKey, err := reg.OpenKey(rootKey, subkey, reg.QUERY_VALUE)
+				typ, _, err := rootKey.ReadValue(keyName)
 				if err != nil {
 					return err
 				}
-				defer regKey.Close()
-				b := make([]byte, 0)
-				_, typ, err := regKey.GetValue(value, b)
-				if err != nil {
-					return err
-				}
-				// append value type parameter
-				kevt.AppendParam(kparams.RegValueType, kparams.Enum, typ, kevent.WithEnum(key.RegistryValueTypes))
+				e.AppendParam(kparams.RegValueType, kparams.Enum, typ, kevent.WithEnum(key.RegistryValueTypes))
 				switch typ {
-				case reg.SZ, reg.EXPAND_SZ:
-					v, _, err := regKey.GetStringValue(value)
-					if err != nil {
-						return err
-					}
-					kevt.Kparams.Append(kparams.RegValue, kparams.UnicodeString, v)
-				case reg.DWORD, reg.QWORD:
-					v, _, err := regKey.GetIntegerValue(value)
-					if err != nil {
-						return err
-					}
-					kevt.Kparams.Append(kparams.RegValue, kparams.Uint64, v)
-				case reg.MULTI_SZ:
-					v, _, err := regKey.GetStringsValue(value)
-					if err != nil {
-						return err
-					}
-					kevt.Kparams.Append(kparams.RegValue, kparams.UnicodeString, strings.Join(v, "\n\r"))
-				case reg.BINARY:
-					v, _, err := regKey.GetBinaryValue(value)
-					if err != nil {
-						return err
-					}
-					kevt.Kparams.Append(kparams.RegValue, kparams.UnicodeString, string(v))
+				case registry.SZ:
 				}
 			}
 		}

@@ -162,16 +162,6 @@ func (s *snapshotter) Write(kevt *kevent.Kevent) error {
 		if err != nil {
 			return err
 		}
-		// discard writing the snapshot state if the pid is
-		// already present. This usually happens when we alter
-		// the tracing session to induce the arrival of rundown events
-		// by calling into the `etw.SetTraceInformation` Windows API
-		// function twice in a row.
-		// For more pointers check `kstream/controller_windows.go`
-		// and the `etw.SetTraceInformation` API function
-		if _, ok := s.procs[pid]; ok {
-			return nil
-		}
 		processCount.Add(1)
 
 		// ETW can sometimes report invalid process id, so we try

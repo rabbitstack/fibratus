@@ -28,8 +28,8 @@ type Consumer interface {
 	// OpenKstream initializes the kernel event stream by setting the event record callback and instructing it
 	// to consume events from log buffers. This operation can fail if opening the kernel logger session results
 	// in an invalid trace handler. Errors returned by `ProcessTrace` are sent to the channel since this function
-	// blocks the current thread and we schedule its execution in a separate goroutine.
-	OpenKstream(traces map[string]TraceSession) error
+	// blocks the current thread, so we schedule its execution in a separate goroutine.
+	OpenKstream(map[string]TraceSession) error
 	// CloseKstream shutdowns the currently running kernel event stream consumer by closing the corresponding
 	// session.
 	CloseKstream() error

@@ -40,63 +40,63 @@ func newPsProcessor(snap ps.Snapshotter, yara yara.Scanner) Processor {
 	return psProcessor{snap: snap, yara: yara}
 }
 
-func (p psProcessor) ProcessEvent(kevt *kevent.Kevent) (*kevent.Kevent, bool, error) {
-	switch kevt.Type {
+func (p psProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error) {
+	switch e.Type {
 	case ktypes.CreateProcess, ktypes.TerminateProcess, ktypes.ProcessRundown:
-		if err := p.processEvent(kevt); err != nil {
-			return kevt, false, err
+		if err := p.processEvent(e); err != nil {
+			return e, false, err
 		}
-		if kevt.IsTerminateProcess() {
-			return kevt, false, p.snap.Remove(kevt)
+		if e.IsTerminateProcess() {
+			return e, false, p.snap.Remove(e)
 		}
-		return kevt, false, p.snap.Write(kevt)
+		return e, false, p.snap.Write(e)
 	case ktypes.CreateThread, ktypes.TerminateThread, ktypes.ThreadRundown:
-		if !kevt.IsTerminateThread() {
-			return kevt, false, p.snap.Write(kevt)
+		if !e.IsTerminateThread() {
+			return e, false, p.snap.Write(e)
 		}
-		return kevt, false, p.snap.Remove(kevt)
+		return e, false, p.snap.Remove(e)
 	case ktypes.OpenProcess, ktypes.OpenThread:
-		pid, err := kevt.Kparams.GetPid()
+		pid, err := e.Kparams.GetPid()
 		if err != nil {
-			return kevt, false, err
+			return e, false, err
 		}
 		proc := p.snap.Find(pid)
 		if proc != nil {
-			kevt.AppendParam(kparams.Exe, kparams.FilePath, proc.Exe)
-			kevt.AppendParam(kparams.ProcessName, kparams.AnsiString, proc.Name)
+			e.AppendParam(kparams.Exe, kparams.FilePath, proc.Exe)
+			e.AppendParam(kparams.ProcessName, kparams.AnsiString, proc.Name)
 		}
-		return kevt, false, nil
+		return e, false, nil
 	}
-	return kevt, true, nil
+	return e, true, nil
 }
 
-func (p psProcessor) processEvent(kevt *kevent.Kevent) error {
-	cmndline := cmdline.New(kevt.GetParamAsString(kparams.Cmdline)).
+func (p psProcessor) processEvent(e *kevent.Kevent) error {
+	cmndline := cmdline.New(e.GetParamAsString(kparams.Cmdline)).
 		// get rid of leading/trailing quotes in the executable path
 		CleanExe().
 		// expand all variations of the SystemRoot environment variable
 		ExpandSystemRoot().
 		// some system processes are reported without the path in the command line,
 		// but we can expand the path from the SystemRoot environment variable
-		CompleteSysProc(kevt.GetParamAsString(kparams.ProcessName))
+		CompleteSysProc(e.GetParamAsString(kparams.ProcessName))
 
 	// append executable path parameter
-	kevt.AppendParam(kparams.Exe, kparams.FilePath, cmndline.Exeline())
+	e.AppendParam(kparams.Exe, kparams.FilePath, cmndline.Exeline())
 
 	// set normalized command line
-	_ = kevt.Kparams.SetValue(kparams.Cmdline, cmndline.String())
+	_ = e.Kparams.SetValue(kparams.Cmdline, cmndline.String())
 
-	if kevt.IsTerminateProcess() {
+	if e.IsTerminateProcess() {
 		return nil
 	}
 
 	// query process start time
-	pid := kevt.Kparams.MustGetPid()
+	pid := e.Kparams.MustGetPid()
 	started, err := getStartTime(pid)
 	if err != nil {
-		started = kevt.Timestamp
+		started = e.Timestamp
 	}
-	kevt.AppendParam(kparams.StartTime, kparams.Time, started)
+	e.AppendParam(kparams.StartTime, kparams.Time, started)
 
 	return nil
 }

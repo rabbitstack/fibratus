@@ -98,8 +98,8 @@ type Kevent struct {
 }
 
 // String returns event's string representation.
-func (kevt *Kevent) String() string {
-	if kevt.PS != nil {
+func (e *Kevent) String() string {
+	if e.PS != nil {
 		return fmt.Sprintf(`
 		Seq: %d
 		Pid: %d
@@ -115,19 +115,19 @@ func (kevt *Kevent) String() string {
 		Metadata: %s,
 	    %s
 	`,
-			kevt.Seq,
-			kevt.PID,
-			kevt.Tid,
-			kevt.Type,
-			kevt.CPU,
-			kevt.Name,
-			kevt.Category,
-			kevt.Description,
-			kevt.Host,
-			kevt.Timestamp,
-			kevt.Kparams,
-			kevt.Metadata,
-			kevt.PS,
+			e.Seq,
+			e.PID,
+			e.Tid,
+			e.Type,
+			e.CPU,
+			e.Name,
+			e.Category,
+			e.Description,
+			e.Host,
+			e.Timestamp,
+			e.Kparams,
+			e.Metadata,
+			e.PS,
 		)
 	}
 	return fmt.Sprintf(`
@@ -144,18 +144,18 @@ func (kevt *Kevent) String() string {
 		Kparams: %s,
 		Metadata: %s
 	`,
-		kevt.Seq,
-		kevt.PID,
-		kevt.Tid,
-		kevt.Type,
-		kevt.CPU,
-		kevt.Name,
-		kevt.Category,
-		kevt.Description,
-		kevt.Host,
-		kevt.Timestamp,
-		kevt.Kparams,
-		kevt.Metadata,
+		e.Seq,
+		e.PID,
+		e.Tid,
+		e.Type,
+		e.CPU,
+		e.Name,
+		e.Category,
+		e.Description,
+		e.Host,
+		e.Timestamp,
+		e.Kparams,
+		e.Metadata,
 	)
 }
 
@@ -170,24 +170,24 @@ func Empty() *Kevent {
 
 // NewFromKcap recovers the event instance from the kcapture byte buffer.
 func NewFromKcap(buf []byte) (*Kevent, error) {
-	kevt := &Kevent{
+	e := &Kevent{
 		Kparams:  make(Kparams),
 		Metadata: make(map[MetadataKey]string),
 	}
-	if err := kevt.UnmarshalRaw(buf, kcapver.KevtSecV1); err != nil {
+	if err := e.UnmarshalRaw(buf, kcapver.KevtSecV1); err != nil {
 		return nil, err
 	}
-	return kevt, nil
+	return e, nil
 }
 
 // AddMeta appends a key/value pair to event's metadata.
-func (kevt *Kevent) AddMeta(k MetadataKey, v string) {
-	kevt.Metadata[k] = v
+func (e *Kevent) AddMeta(k MetadataKey, v string) {
+	e.Metadata[k] = v
 }
 
 // AppendParam adds a new parameter to this event.
-func (kevt *Kevent) AppendParam(name string, typ kparams.Type, value kparams.Value, opts ...ParamOption) {
-	kevt.Kparams.Append(name, typ, value, opts...)
+func (e *Kevent) AppendParam(name string, typ kparams.Type, value kparams.Value, opts ...ParamOption) {
+	e.Kparams.Append(name, typ, value, opts...)
 }
 
 // GetParamAsString returns the specified parameter value as string.
@@ -196,8 +196,8 @@ func (kevt *Kevent) AppendParam(name string, typ kparams.Type, value kparams.Val
 // to the error message.
 // Returns an empty string if the given parameter name is not found
 // in event parameters.
-func (kevt *Kevent) GetParamAsString(name string) string {
-	par, err := kevt.Kparams.Get(name)
+func (e *Kevent) GetParamAsString(name string) string {
+	par, err := e.Kparams.Get(name)
 	if err != nil {
 		return ""
 	}
@@ -205,7 +205,7 @@ func (kevt *Kevent) GetParamAsString(name string) string {
 }
 
 // Release returns an event to the pool.
-func (kevt *Kevent) Release() {
-	*kevt = Kevent{} // clear kevent
-	pool.Put(kevt)
+func (e *Kevent) Release() {
+	*e = Kevent{} // clear kevent
+	pool.Put(e)
 }

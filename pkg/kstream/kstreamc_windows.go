@@ -123,7 +123,7 @@ func NewConsumer(
 // SetFilter initializes the filter that's applied on the kernel events.
 func (k *kstreamConsumer) SetFilter(filter filter.Filter) { k.filter = filter }
 
-// OpenKstream initializes the kernel event stream by setting the event record callback and instructing it
+// OpenKstream initializes the event stream by setting the event record callback and instructing it
 // to consume events from log buffers. This operation can fail if opening the kernel logger session results
 // in an invalid trace handler. Errors returned by `ProcessTrace` are sent to the channel since this function
 // blocks the current thread, and we schedule its execution in a separate goroutine.
@@ -137,11 +137,11 @@ func (k *kstreamConsumer) OpenKstream(traces map[string]TraceSession) error {
 			log.Warnf("unable to open %s trace: %v", trace.Name, err)
 		}
 	}
-	return nil
+	return k.matchers.Compile()
 }
 
 func (k *kstreamConsumer) openKstream(loggerName string) error {
-	ktrace := etw.EventTraceLogfile{
+	trace := etw.EventTraceLogfile{
 		LoggerName:     utf16.StringToUTF16Ptr(loggerName),
 		BufferCallback: syscall.NewCallback(k.bufferStatsCallback),
 	}
@@ -149,10 +149,10 @@ func (k *kstreamConsumer) openKstream(loggerName string) error {
 	modes := uint32(etw.ProcessTraceModeRealtime | etw.ProcessTraceModeEventRecord)
 	// initialize real time trace mode and event callback functions
 	// via these nasty pointer accesses to unions inside the structure
-	*(*uint32)(unsafe.Pointer(&ktrace.LogFileMode[0])) = modes
-	*(*uintptr)(unsafe.Pointer(&ktrace.EventCallback[4])) = cb
+	*(*uint32)(unsafe.Pointer(&trace.LogFileMode[0])) = modes
+	*(*uintptr)(unsafe.Pointer(&trace.EventCallback[4])) = cb
 
-	traceHandle := etw.OpenTrace(ktrace)
+	traceHandle := etw.OpenTrace(trace)
 	if !traceHandle.IsValid() {
 		return fmt.Errorf("unable to open kernel trace: %v", syscall.GetLastError())
 	}
@@ -180,7 +180,6 @@ func (k *kstreamConsumer) openKstream(loggerName string) error {
 			k.errs <- err
 		}
 	}()
-
 	return nil
 }
 
@@ -254,30 +253,30 @@ func (k *kstreamConsumer) processKevent(evt *etw.EventRecord) error {
 	// build a new event with all required fields
 	// and parameters. Kevent is the fundamental data
 	// structure for representing the event state
-	kevt := kevent.New(
+	e := kevent.New(
 		k.sequencer.Get(),
 		ktype,
 		evt,
 	)
-	switch kevt.Category {
+	switch e.Category {
 	case ktypes.Image:
 		// sometimes the pid present in event header is invalid
 		// but, we can get the valid one from the event parameters
-		if kevt.InvalidPid() {
-			kevt.PID, _ = kevt.Kparams.GetPid()
+		if e.InvalidPid() {
+			e.PID, _ = e.Kparams.GetPid()
 		}
 	case ktypes.File:
 		// on some Windows versions the value of
 		// the PID is invalid in the event header
-		if kevt.InvalidPid() {
+		if e.InvalidPid() {
 			// try to resolve a valid pid from thread ID
-			threadID, err := kevt.Kparams.GetTid()
+			threadID, err := e.Kparams.GetTid()
 			if err != nil {
 				break
 			}
 			pid, err := process.GetPIDFromThread(threadID)
 			if err == nil {
-				kevt.PID = pid
+				e.PID = pid
 			}
 		}
 	case ktypes.Process:
@@ -285,16 +284,15 @@ func (k *kstreamConsumer) processKevent(evt *etw.EventRecord) error {
 		// As a result, the ProcessId member of EVENT_TRACE_HEADER may not correspond to the
 		// process being created, so we set the event pid to be the one of the parent process
 		if ktype == ktypes.CreateProcess {
-			kevt.PID, _ = kevt.Kparams.GetPpid()
+			e.PID, _ = e.Kparams.GetPpid()
 		}
 	case ktypes.Net:
-		kevt.PID, _ = kevt.Kparams.GetPid()
+		e.PID, _ = e.Kparams.GetPid()
 	}
-
 	// dispatch each event to the processor chain that will further augment the event
 	// with useful fields, route events to the corresponding snapshotters or initialize
 	// open files and registry control blocks at the beginning of the kernel trace session
-	output, err := k.processors.ProcessEvent(kevt)
+	output, err := k.processors.ProcessEvent(e)
 	if err != nil {
 		if kerrors.IsCancelUpstreamKevent(err) {
 			upstreamCancellations.Add(1)
@@ -306,20 +304,20 @@ func (k *kstreamConsumer) processKevent(evt *etw.EventRecord) error {
 		if output != nil {
 			err = k.publishKevent(output)
 			if err != nil {
-				return k.publishKevent(kevt)
+				return k.publishKevent(e)
 			}
 		}
-		return k.publishKevent(kevt)
+		return k.publishKevent(e)
 	}
 	return k.publishKevent(output)
 }
 
-func (k *kstreamConsumer) publishKevent(kevt *kevent.Kevent) error {
+func (k *kstreamConsumer) publishKevent(e *kevent.Kevent) error {
 	// try to drop events from excluded processes
-	proc := k.psnapshotter.Find(kevt.PID)
+	proc := k.psnapshotter.Find(e.PID)
 	if k.config.Kstream.ExcludeImage(proc) {
+		e.Release()
 		excludedProcs.Add(1)
-		kevt.Release()
 		return nil
 	}
 	// associate process' state with the kernel event. We only override the process'
@@ -327,25 +325,25 @@ func (k *kstreamConsumer) publishKevent(kevt *kevent.Kevent) error {
 	// are being taken. The kernel events that construct the process' snapshot also
 	// have attached process state, so simply by replaying the flow of these events
 	// we are able to reconstruct system-wide process state.
-	if kevt.PS == nil {
-		kevt.PS = proc
+	if e.PS == nil {
+		e.PS = proc
 	}
-	if k.isKeventDropped(kevt) {
-		kevt.Release()
+	if k.isKeventDropped(e) {
+		e.Release()
 		return nil
 	}
 	// increment sequence
-	if !kevt.IsState() {
+	if !e.IsState() {
 		k.sequencer.Increment()
 	}
 	// execute rule matchers
-	if matches, err := k.matchers.Match(kevt); !matches {
+	if matches, err := k.matchers.Match(e); !matches {
 		return err
 	}
 	if k.eventCallback != nil {
-		return k.eventCallback(kevt)
+		return k.eventCallback(e)
 	}
-	k.kevts <- kevt
+	k.kevts <- e
 	keventsEnqueued.Add(1)
 	return nil
 }
@@ -360,23 +358,27 @@ func (k *kstreamConsumer) publishKevent(kevt *kevent.Kevent) error {
 // - process that produced the kernel event is fibratus itself
 // - kernel event is present in the exclude list, and thus it is always dropped
 // - finally, the event is checked by the CLI filter
-func (k *kstreamConsumer) isKeventDropped(kevt *kevent.Kevent) bool {
-	// drop events used for state management unless we're writing the capture
-	if kevt.IsState() && !k.capture {
+func (k *kstreamConsumer) isKeventDropped(e *kevent.Kevent) bool {
+	// drop events used for state management unless we're
+	// writing to capture. Also, drop duplicate rundown events
+	if e.IsState() && !k.capture {
+		return true
+	}
+	if e.IsRundown() && e.IsRundownProcessed() {
 		return true
 	}
 	// ignores anything produced by the fibratus process
-	if kevt.PID == currentPid {
+	if e.PID == currentPid {
 		return true
 	}
 	// discard excluded event types
-	if k.config.Kstream.ExcludeKevent(kevt) {
+	if k.config.Kstream.ExcludeKevent(e) {
 		excludedKevents.Add(1)
 		return true
 	}
 	// fallback to CLI filter
 	if k.filter != nil {
-		return !k.filter.Run(kevt)
+		return !k.filter.Run(e)
 	}
 	return false
 }

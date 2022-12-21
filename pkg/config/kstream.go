@@ -128,19 +128,11 @@ func (c *KstreamConfig) initFromViper(v *viper.Viper) {
 func (c *KstreamConfig) Init() {
 	c.excludedKtypes = make(map[ktypes.Ktype]bool)
 	c.excludedImages = make(map[string]bool)
-
 	for _, name := range c.ExcludedKevents {
-		switch name {
-		case "Accept":
-			c.excludedKtypes[ktypes.AcceptTCPv4] = true
-			c.excludedKtypes[ktypes.AcceptTCPv6] = true
-		case "Send":
-
-		case "Recv":
-
-		}
-		if ktype := ktypes.KeventNameToKtype(name); ktype != ktypes.UnknownKtype {
-			c.excludedKtypes[ktype] = true
+		for _, ktype := range ktypes.KeventNameToKtypes(name) {
+			if ktype != ktypes.UnknownKtype {
+				c.excludedKtypes[ktype] = true
+			}
 		}
 	}
 	for _, name := range c.ExcludedImages {

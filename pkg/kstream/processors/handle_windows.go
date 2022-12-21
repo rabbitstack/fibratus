@@ -63,50 +63,50 @@ func newHandleProcessor(
 	}
 }
 
-func (h *handleProcessor) ProcessEvent(kevt *kevent.Kevent) (*kevent.Kevent, bool, error) {
-	if kevt.Category == ktypes.Handle {
-		output, err := h.processEvent(kevt)
+func (h *handleProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error) {
+	if e.Category == ktypes.Handle {
+		output, err := h.processEvent(e)
 		return output, false, err
 	}
-	return kevt, true, nil
+	return e, true, nil
 }
 
-func (h *handleProcessor) processEvent(kevt *kevent.Kevent) (*kevent.Kevent, error) {
-	handleID, err := kevt.Kparams.GetUint32(kparams.HandleID)
+func (h *handleProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
+	handleID, err := e.Kparams.GetUint32(kparams.HandleID)
 	if err != nil {
-		return kevt, err
+		return e, err
 	}
-	typeID, err := kevt.Kparams.GetUint16(kparams.HandleObjectTypeID)
+	typeID, err := e.Kparams.GetUint16(kparams.HandleObjectTypeID)
 	if err != nil {
-		return kevt, err
+		return e, err
 	}
-	object, err := kevt.Kparams.GetUint64(kparams.HandleObject)
+	object, err := e.Kparams.GetUint64(kparams.HandleObject)
 	if err != nil {
-		return kevt, err
+		return e, err
 	}
 	// map object type identifier to its name. Query for object type if
 	// we didn't find in the object store
 	typeName := h.typeStore.FindByID(uint8(typeID))
 	if typeName == "" {
-		dup, err := handle.Duplicate(syshandle.Handle(handleID), kevt.PID, syshandle.AllAccess)
+		dup, err := handle.Duplicate(syshandle.Handle(handleID), e.PID, syshandle.AllAccess)
 		if err != nil {
-			return kevt, err
+			return e, err
 		}
 		defer dup.Close()
 		typeName, err = handle.QueryType(dup)
 		if err != nil {
-			return kevt, err
+			return e, err
 		}
 		h.typeStore.RegisterType(uint8(typeID), typeName)
 	}
 
-	kevt.Kparams.Append(kparams.HandleObjectTypeName, kparams.AnsiString, typeName)
-	kevt.Kparams.Remove(kparams.HandleObjectTypeID)
+	e.Kparams.Append(kparams.HandleObjectTypeName, kparams.AnsiString, typeName)
+	e.Kparams.Remove(kparams.HandleObjectTypeID)
 
 	// get the best possible object name according to its type
-	name, err := kevt.Kparams.GetString(kparams.HandleObjectName)
+	name, err := e.Kparams.GetString(kparams.HandleObjectName)
 	if err != nil {
-		return kevt, err
+		return e, err
 	}
 
 	switch typeName {
@@ -115,7 +115,7 @@ func (h *handleProcessor) processEvent(kevt *kevent.Kevent) (*kevent.Kevent, err
 		if rootKey == key.Invalid {
 			break
 		}
-		name = key.String(rootKey)
+		name = rootKey.String()
 		if keyName != "" {
 			name += "\\" + keyName
 		}
@@ -126,53 +126,53 @@ func (h *handleProcessor) processEvent(kevt *kevent.Kevent) (*kevent.Kevent, err
 		drivers := driver.EnumDevices()
 		for _, drv := range drivers {
 			if strings.EqualFold(filepath.Base(drv.Filename), driverName) {
-				kevt.Kparams.Append(kparams.ImageFilename, kparams.FilePath, drv.Filename)
+				e.Kparams.Append(kparams.ImageFilename, kparams.FilePath, drv.Filename)
 			}
 		}
 	}
 	// assign the formatted handle name
-	if err := kevt.Kparams.SetValue(kparams.HandleObjectName, name); err != nil {
-		return kevt, err
+	if err := e.Kparams.SetValue(kparams.HandleObjectName, name); err != nil {
+		return e, err
 	}
 
-	if kevt.Type == ktypes.CreateHandle {
+	if e.Type == ktypes.CreateHandle {
 		// for some handle objects, the CreateHandle usually lacks the handle name
 		// but its counterpart CloseHandle kevent ships with the handle name. We'll
 		// defer emitting the CreateHandle kevent until we receive a CloseHandle targeting
 		// the same object
 		if name == "" {
-			h.objects[object] = kevt
-			return kevt, kerrors.ErrCancelUpstreamKevent
+			h.objects[object] = e
+			return e, kerrors.ErrCancelUpstreamKevent
 		}
-		return kevt, h.hsnap.Write(kevt)
+		return e, h.hsnap.Write(e)
 	}
 
 	// at this point we hit CloseHandle kernel event and have the awaiting CreateHandle
 	// event reference. So we set handle object name to the name of its CloseHandle counterpart
-	if hkevt, ok := h.objects[object]; ok {
+	if evt, ok := h.objects[object]; ok {
 		delete(h.objects, object)
-		if err := hkevt.Kparams.SetValue(kparams.HandleObjectName, name); err != nil {
-			return kevt, err
+		if err := evt.Kparams.SetValue(kparams.HandleObjectName, name); err != nil {
+			return e, err
 		}
 		handleDeferMatches.Add(1)
 
 		if typeName == handle.Driver {
-			driverFilename := kevt.GetParamAsString(kparams.ImageFilename)
-			hkevt.Kparams.Append(kparams.ImageFilename, kparams.FilePath, driverFilename)
+			driverFilename := e.GetParamAsString(kparams.ImageFilename)
+			evt.Kparams.Append(kparams.ImageFilename, kparams.FilePath, driverFilename)
 		}
 
-		err := h.hsnap.Write(hkevt)
+		err := h.hsnap.Write(evt)
 		if err != nil {
-			err = h.hsnap.Remove(kevt)
+			err = h.hsnap.Remove(e)
 			if err != nil {
-				return kevt, err
+				return e, err
 			}
 		}
 
 		// return the CreateHandle event
-		return hkevt, h.hsnap.Remove(kevt)
+		return evt, h.hsnap.Remove(e)
 	}
-	return kevt, h.hsnap.Remove(kevt)
+	return e, h.hsnap.Remove(e)
 }
 
 func (handleProcessor) Name() ProcessorType { return Handle }

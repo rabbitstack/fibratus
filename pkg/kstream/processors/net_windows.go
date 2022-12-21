@@ -46,26 +46,26 @@ func (n netProcessor) Close() {
 	n.reverseDNS.Close()
 }
 
-func (n *netProcessor) ProcessEvent(kevt *kevent.Kevent) (*kevent.Kevent, bool, error) {
-	if kevt.Category == ktypes.Net {
-		if kevt.IsNetworkTCP() {
-			kevt.Kparams.Append(kparams.NetL4Proto, kparams.Enum, uint32(network.TCP), kevent.WithEnum(network.ProtoNames))
+func (n *netProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error) {
+	if e.Category == ktypes.Net {
+		if e.IsNetworkTCP() {
+			e.Kparams.Append(kparams.NetL4Proto, kparams.Enum, uint32(network.TCP), kevent.WithEnum(network.ProtoNames))
 		}
-		if kevt.IsNetworkUDP() {
-			kevt.Kparams.Append(kparams.NetL4Proto, kparams.Enum, uint32(network.UDP), kevent.WithEnum(network.ProtoNames))
+		if e.IsNetworkUDP() {
+			e.Kparams.Append(kparams.NetL4Proto, kparams.Enum, uint32(network.UDP), kevent.WithEnum(network.ProtoNames))
 		}
-		n.resolvePortName(kevt)
-		names := n.resolveNamesForIP(unwrapIP(kevt.Kparams.GetIP(kparams.NetDIP)))
+		n.resolvePortName(e)
+		names := n.resolveNamesForIP(unwrapIP(e.Kparams.GetIP(kparams.NetDIP)))
 		if len(names) > 0 {
-			kevt.AppendParam(kparams.NetDIPNames, kparams.Slice, names)
+			e.AppendParam(kparams.NetDIPNames, kparams.Slice, names)
 		}
-		names = n.resolveNamesForIP(unwrapIP(kevt.Kparams.GetIP(kparams.NetSIP)))
+		names = n.resolveNamesForIP(unwrapIP(e.Kparams.GetIP(kparams.NetSIP)))
 		if len(names) > 0 {
-			kevt.AppendParam(kparams.NetSIPNames, kparams.Slice, names)
+			e.AppendParam(kparams.NetSIPNames, kparams.Slice, names)
 		}
-		return kevt, false, nil
+		return e, false, nil
 	}
-	return kevt, true, nil
+	return e, true, nil
 }
 
 func (n *netProcessor) resolveNamesForIP(ip net.IP) []string {
@@ -78,27 +78,27 @@ func (n *netProcessor) resolveNamesForIP(ip net.IP) []string {
 
 // resolvePortName resolves the IANA service name for the particular port and transport protocol as
 // per https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.xhtml.
-func (n netProcessor) resolvePortName(kevt *kevent.Kevent) *kevent.Kevent {
-	dport := unwrapPort(kevt.Kparams.GetUint16(kparams.NetDport))
-	sport := unwrapPort(kevt.Kparams.GetUint16(kparams.NetSport))
+func (n netProcessor) resolvePortName(e *kevent.Kevent) *kevent.Kevent {
+	dport := unwrapPort(e.Kparams.GetUint16(kparams.NetDport))
+	sport := unwrapPort(e.Kparams.GetUint16(kparams.NetSport))
 
-	if kevt.IsNetworkTCP() {
+	if e.IsNetworkTCP() {
 		if name, ok := ports.TCPPortNames[dport]; ok {
-			kevt.Kparams.Append(kparams.NetDportName, kparams.AnsiString, name)
+			e.Kparams.Append(kparams.NetDportName, kparams.AnsiString, name)
 		}
 		if name, ok := ports.TCPPortNames[sport]; ok {
-			kevt.Kparams.Append(kparams.NetSportName, kparams.AnsiString, name)
+			e.Kparams.Append(kparams.NetSportName, kparams.AnsiString, name)
 		}
-		return kevt
+		return e
 	}
 
 	if name, ok := ports.UDPPortNames[dport]; ok {
-		kevt.Kparams.Append(kparams.NetDportName, kparams.AnsiString, name)
+		e.Kparams.Append(kparams.NetDportName, kparams.AnsiString, name)
 	}
 	if name, ok := ports.UDPPortNames[sport]; ok {
-		kevt.Kparams.Append(kparams.NetSportName, kparams.AnsiString, name)
+		e.Kparams.Append(kparams.NetSportName, kparams.AnsiString, name)
 	}
-	return kevt
+	return e
 }
 
 func unwrapIP(ip net.IP, _ error) net.IP     { return ip }

@@ -31,6 +31,7 @@ import (
 	"unsafe"
 )
 
+// rundowns stores the hashes of processed rundown events
 var rundowns = map[uint64]bool{}
 
 // New constructs a fresh event instance with basic fields and parameters.
@@ -41,8 +42,8 @@ func New(seq uint64, ktype ktypes.Ktype, evt *etw.EventRecord) *Kevent {
 		cpu = *(*uint8)(unsafe.Pointer(&evt.BufferContext.ProcessorIndex[0]))
 		ts  = filetime.ToEpoch(evt.Header.Timestamp)
 	)
-	kevt := pool.Get().(*Kevent)
-	*kevt = Kevent{
+	e := pool.Get().(*Kevent)
+	*e = Kevent{
 		Seq:         seq,
 		PID:         pid,
 		Tid:         tid,
@@ -56,61 +57,60 @@ func New(seq uint64, ktype ktypes.Ktype, evt *etw.EventRecord) *Kevent {
 		Metadata:    make(map[MetadataKey]string),
 		Host:        hostname.Get(),
 	}
-	kevt.produceParams(evt)
-	return kevt
+	e.produceParams(evt)
+	return e
 }
 
 // IsNetworkTCP determines whether the event pertains to network TCP events.
-func (kevt Kevent) IsNetworkTCP() bool {
-	return kevt.Category == ktypes.Net && kevt.Type != ktypes.RecvUDPv4 && kevt.Type != ktypes.RecvUDPv6 &&
-		kevt.Type != ktypes.SendUDPv4 && kevt.Type != ktypes.SendUDPv6
+func (e Kevent) IsNetworkTCP() bool {
+	return e.Category == ktypes.Net && e.Type != ktypes.RecvUDPv4 && e.Type != ktypes.RecvUDPv6 &&
+		e.Type != ktypes.SendUDPv4 && e.Type != ktypes.SendUDPv6
 }
 
 // IsNetworkUDP determines whether the event pertains to network UDP events.
-func (kevt Kevent) IsNetworkUDP() bool {
-	return kevt.Type == ktypes.RecvUDPv4 || kevt.Type == ktypes.RecvUDPv6 || kevt.Type == ktypes.SendUDPv4 || kevt.Type == ktypes.SendUDPv6
+func (e Kevent) IsNetworkUDP() bool {
+	return e.Type == ktypes.RecvUDPv4 || e.Type == ktypes.RecvUDPv6 || e.Type == ktypes.SendUDPv4 || e.Type == ktypes.SendUDPv6
 }
 
 // IsRundown determines if this is a rundown events.
-func (kevt Kevent) IsRundown() bool {
-	return kevt.Type == ktypes.ProcessRundown || kevt.Type == ktypes.ThreadRundown || kevt.Type == ktypes.ImageRundown ||
-		kevt.Type == ktypes.FileRundown || kevt.Type == ktypes.RegKCBRundown
+func (e Kevent) IsRundown() bool {
+	return e.Type == ktypes.ProcessRundown || e.Type == ktypes.ThreadRundown || e.Type == ktypes.ImageRundown ||
+		e.Type == ktypes.FileRundown || e.Type == ktypes.RegKCBRundown
 }
 
-func (kevt Kevent) IsRundownProcessed() bool {
-	key := kevt.RundownKey()
-	if kevt.IsRundown() && !rundowns[key] {
+// IsRundownProcessed checks if the rundown events was processed
+// to discard writing the snapshot state if the process/module is
+// already present. This usually happens when we purposely alter
+// the tracing session to induce the arrival of rundown events
+// by calling into the `etw.SetTraceInformation` Windows API
+// function which causes duplicate rundown events.
+// For more pointers check `kstream/controller_windows.go`
+// and the `etw.SetTraceInformation` API function
+func (e Kevent) IsRundownProcessed() bool {
+	key := e.RundownKey()
+	if _, ok := rundowns[key]; !ok {
 		rundowns[key] = true
 		return false
 	}
-	return kevt.IsRundown() && rundowns[key]
+	return true
 }
 
-// IsCreateFile indicates if this event is creating/opening a file.
-func (kevt Kevent) IsCreateFile() bool { return kevt.Type == ktypes.CreateFile }
+func (e Kevent) IsCreateFile() bool       { return e.Type == ktypes.CreateFile }
+func (e Kevent) IsCloseFile() bool        { return e.Type == ktypes.CloseFile }
+func (e Kevent) IsDeleteFile() bool       { return e.Type == ktypes.DeleteFile }
+func (e Kevent) IsEnumDirectory() bool    { return e.Type == ktypes.EnumDirectory }
+func (e Kevent) IsTerminateProcess() bool { return e.Type == ktypes.TerminateProcess }
+func (e Kevent) IsTerminateThread() bool  { return e.Type == ktypes.TerminateThread }
+func (e Kevent) IsUnloadImage() bool      { return e.Type == ktypes.UnloadImage }
+func (e Kevent) IsFileOpEnd() bool        { return e.Type == ktypes.FileOpEnd }
+func (e Kevent) IsRegSetValue() bool      { return e.Type == ktypes.RegSetValue }
 
-func (kevt Kevent) IsCloseFile() bool { return kevt.Type == ktypes.CloseFile }
-
-func (kevt Kevent) IsDeleteFile() bool { return kevt.Type == ktypes.DeleteFile }
-
-func (kevt Kevent) IsEnumDirectory() bool { return kevt.Type == ktypes.EnumDirectory }
-
-func (kevt Kevent) IsTerminateProcess() bool { return kevt.Type == ktypes.TerminateProcess }
-
-func (kevt Kevent) IsTerminateThread() bool { return kevt.Type == ktypes.TerminateThread }
-
-func (kevt Kevent) IsUnloadImage() bool { return kevt.Type == ktypes.UnloadImage }
-
-func (kevt Kevent) IsFileOpEnd() bool { return kevt.Type == ktypes.FileOpEnd }
-
-func (kevt Kevent) IsRegSetValue() bool { return kevt.Type == ktypes.RegSetValue }
-
-func (kevt Kevent) InvalidPid() bool { return kevt.PID == 0xffffffff }
+func (e Kevent) InvalidPid() bool { return e.PID == 0xffffffff }
 
 // IsState indicates if this event is only used for state management.
-func (kevt Kevent) IsState() bool { return kevt.Type.OnlyState() }
+func (e Kevent) IsState() bool { return e.Type.OnlyState() }
 
-func (kevt Kevent) RundownKey() uint64 {
+func (e Kevent) RundownKey() uint64 {
 	return 0
 }
 
@@ -118,59 +118,59 @@ func (kevt Kevent) RundownKey() uint64 {
 // that can be employed to determine if the event
 // from the given process and source has been processed
 // in the rule sequences.
-func (kevt Kevent) PartialKey() uint64 {
-	switch kevt.Type {
+func (e Kevent) PartialKey() uint64 {
+	switch e.Type {
 	case ktypes.WriteFile, ktypes.ReadFile:
 		b := make([]byte, 12)
-		object, _ := kevt.Kparams.GetUint64(kparams.FileObject)
+		object, _ := e.Kparams.GetUint64(kparams.FileObject)
 
-		binary.LittleEndian.PutUint32(b, kevt.PID)
+		binary.LittleEndian.PutUint32(b, e.PID)
 		binary.LittleEndian.PutUint64(b, object)
 
 		return hashers.FnvUint64(b)
 	case ktypes.CreateFile:
-		file, _ := kevt.Kparams.GetString(kparams.FileName)
+		file, _ := e.Kparams.GetString(kparams.FileName)
 		b := make([]byte, 4+len(file))
 
-		binary.LittleEndian.PutUint32(b, kevt.PID)
+		binary.LittleEndian.PutUint32(b, e.PID)
 		b = append(b, []byte(file)...)
 
 		return hashers.FnvUint64(b)
 	case ktypes.OpenProcess:
 		b := make([]byte, 8)
-		pid, _ := kevt.Kparams.GetUint32(kparams.ProcessID)
-		access, _ := kevt.Kparams.GetUint32(kparams.DesiredAccess)
+		pid, _ := e.Kparams.GetUint32(kparams.ProcessID)
+		access, _ := e.Kparams.GetUint32(kparams.DesiredAccess)
 
-		binary.LittleEndian.PutUint32(b, kevt.PID)
+		binary.LittleEndian.PutUint32(b, e.PID)
 		binary.LittleEndian.PutUint32(b, pid)
 		binary.LittleEndian.PutUint32(b, access)
 		return hashers.FnvUint64(b)
 	case ktypes.OpenThread:
 		b := make([]byte, 8)
-		tid, _ := kevt.Kparams.GetUint32(kparams.ThreadID)
-		access, _ := kevt.Kparams.GetUint32(kparams.DesiredAccess)
+		tid, _ := e.Kparams.GetUint32(kparams.ThreadID)
+		access, _ := e.Kparams.GetUint32(kparams.DesiredAccess)
 
-		binary.LittleEndian.PutUint32(b, kevt.PID)
+		binary.LittleEndian.PutUint32(b, e.PID)
 		binary.LittleEndian.PutUint32(b, tid)
 		binary.LittleEndian.PutUint32(b, access)
 		return hashers.FnvUint64(b)
 	case ktypes.AcceptTCPv4, ktypes.RecvTCPv4, ktypes.RecvUDPv4:
 		b := make([]byte, 10)
 
-		ip, _ := kevt.Kparams.GetIP(kparams.NetSIP)
-		port, _ := kevt.Kparams.GetUint16(kparams.NetSport)
+		ip, _ := e.Kparams.GetIP(kparams.NetSIP)
+		port, _ := e.Kparams.GetUint16(kparams.NetSport)
 
-		binary.LittleEndian.PutUint32(b, kevt.PID)
+		binary.LittleEndian.PutUint32(b, e.PID)
 		binary.LittleEndian.PutUint32(b, binary.BigEndian.Uint32(ip.To4()))
 		binary.LittleEndian.PutUint16(b, port)
 		return hashers.FnvUint64(b)
 	case ktypes.AcceptTCPv6, ktypes.RecvTCPv6, ktypes.RecvUDPv6:
 		b := make([]byte, 22)
 
-		ip, _ := kevt.Kparams.GetIP(kparams.NetSIP)
-		port, _ := kevt.Kparams.GetUint16(kparams.NetSport)
+		ip, _ := e.Kparams.GetIP(kparams.NetSIP)
+		port, _ := e.Kparams.GetUint16(kparams.NetSport)
 
-		binary.LittleEndian.PutUint32(b, kevt.PID)
+		binary.LittleEndian.PutUint32(b, e.PID)
 		binary.LittleEndian.PutUint64(b, binary.BigEndian.Uint64(ip.To16()[0:8]))
 		binary.LittleEndian.PutUint64(b, binary.BigEndian.Uint64(ip.To16()[8:16]))
 		binary.LittleEndian.PutUint16(b, port)
@@ -178,30 +178,30 @@ func (kevt Kevent) PartialKey() uint64 {
 	case ktypes.ConnectTCPv4, ktypes.SendTCPv4, ktypes.SendUDPv4:
 		b := make([]byte, 10)
 
-		ip, _ := kevt.Kparams.GetIP(kparams.NetDIP)
-		port, _ := kevt.Kparams.GetUint16(kparams.NetDport)
+		ip, _ := e.Kparams.GetIP(kparams.NetDIP)
+		port, _ := e.Kparams.GetUint16(kparams.NetDport)
 
-		binary.LittleEndian.PutUint32(b, kevt.PID)
+		binary.LittleEndian.PutUint32(b, e.PID)
 		binary.LittleEndian.PutUint32(b, binary.BigEndian.Uint32(ip.To4()))
 		binary.LittleEndian.PutUint16(b, port)
 		return hashers.FnvUint64(b)
 	case ktypes.ConnectTCPv6, ktypes.SendTCPv6, ktypes.SendUDPv6:
 		b := make([]byte, 22)
 
-		ip, _ := kevt.Kparams.GetIP(kparams.NetDIP)
-		port, _ := kevt.Kparams.GetUint16(kparams.NetDport)
+		ip, _ := e.Kparams.GetIP(kparams.NetDIP)
+		port, _ := e.Kparams.GetUint16(kparams.NetDport)
 
-		binary.LittleEndian.PutUint32(b, kevt.PID)
+		binary.LittleEndian.PutUint32(b, e.PID)
 		binary.LittleEndian.PutUint64(b, binary.BigEndian.Uint64(ip.To16()[0:8]))
 		binary.LittleEndian.PutUint64(b, binary.BigEndian.Uint64(ip.To16()[8:16]))
 		binary.LittleEndian.PutUint16(b, port)
 		return hashers.FnvUint64(b)
 	case ktypes.RegOpenKey, ktypes.RegQueryKey, ktypes.RegQueryValue,
 		ktypes.RegDeleteKey, ktypes.RegDeleteValue, ktypes.RegSetValue:
-		key, _ := kevt.Kparams.GetString(kparams.RegKeyName)
+		key, _ := e.Kparams.GetString(kparams.RegKeyName)
 		b := make([]byte, 4+len(key))
 
-		binary.LittleEndian.PutUint32(b, kevt.PID)
+		binary.LittleEndian.PutUint32(b, e.PID)
 		b = append(b, key...)
 		return hashers.FnvUint64(b)
 	}
@@ -210,136 +210,136 @@ func (kevt Kevent) PartialKey() uint64 {
 
 // Summary returns a brief summary of this event. Various important substrings
 // in the summary text are highlighted by surrounding them inside <code> HTML tags.
-func (kevt *Kevent) Summary() string {
-	switch kevt.Type {
+func (e *Kevent) Summary() string {
+	switch e.Type {
 	case ktypes.CreateProcess:
-		exe := kevt.Kparams.MustGetString(kparams.Exe)
-		sid := kevt.Kparams.MustGetString(kparams.UserSID)
-		return printSummary(kevt, fmt.Sprintf("spawned <code>%s</code> process as <code>%s</code> user", exe, sid))
+		exe := e.Kparams.MustGetString(kparams.Exe)
+		sid := e.Kparams.MustGetString(kparams.UserSID)
+		return printSummary(e, fmt.Sprintf("spawned <code>%s</code> process as <code>%s</code> user", exe, sid))
 	case ktypes.TerminateProcess:
-		exe := kevt.Kparams.MustGetString(kparams.Exe)
-		sid := kevt.Kparams.MustGetString(kparams.UserSID)
-		return printSummary(kevt, fmt.Sprintf("terminated <code>%s</code> process as <code>%s</code> user", exe, sid))
+		exe := e.Kparams.MustGetString(kparams.Exe)
+		sid := e.Kparams.MustGetString(kparams.UserSID)
+		return printSummary(e, fmt.Sprintf("terminated <code>%s</code> process as <code>%s</code> user", exe, sid))
 	case ktypes.OpenProcess:
-		access, _ := kevt.Kparams.GetStringSlice(kparams.DesiredAccessNames)
-		exe, _ := kevt.Kparams.GetString(kparams.Exe)
-		return printSummary(kevt, fmt.Sprintf("opened <code>%s</code> process object with <code>%s</code> access right(s)",
+		access, _ := e.Kparams.GetStringSlice(kparams.DesiredAccessNames)
+		exe, _ := e.Kparams.GetString(kparams.Exe)
+		return printSummary(e, fmt.Sprintf("opened <code>%s</code> process object with <code>%s</code> access right(s)",
 			exe, strings.Join(access, "|")))
 	case ktypes.CreateThread:
-		tid, _ := kevt.Kparams.GetTid()
-		addr, _ := kevt.Kparams.GetHex(kparams.StartAddr)
-		return printSummary(kevt, fmt.Sprintf("spawned a new thread with <code>%d</code> id at <code>%s</code> address",
+		tid, _ := e.Kparams.GetTid()
+		addr, _ := e.Kparams.GetHex(kparams.StartAddr)
+		return printSummary(e, fmt.Sprintf("spawned a new thread with <code>%d</code> id at <code>%s</code> address",
 			tid, addr))
 	case ktypes.TerminateThread:
-		tid, _ := kevt.Kparams.GetTid()
-		addr, _ := kevt.Kparams.GetHex(kparams.StartAddr)
-		return printSummary(kevt, fmt.Sprintf("terminated a thread with <code>%d</code> id at <code>%s</code> address",
+		tid, _ := e.Kparams.GetTid()
+		addr, _ := e.Kparams.GetHex(kparams.StartAddr)
+		return printSummary(e, fmt.Sprintf("terminated a thread with <code>%d</code> id at <code>%s</code> address",
 			tid, addr))
 	case ktypes.OpenThread:
-		access, _ := kevt.Kparams.GetStringSlice(kparams.DesiredAccessNames)
-		exe, _ := kevt.Kparams.GetString(kparams.Exe)
-		return printSummary(kevt, fmt.Sprintf("opened <code>%s</code> process' thread object with <code>%s</code> access right(s)",
+		access, _ := e.Kparams.GetStringSlice(kparams.DesiredAccessNames)
+		exe, _ := e.Kparams.GetString(kparams.Exe)
+		return printSummary(e, fmt.Sprintf("opened <code>%s</code> process' thread object with <code>%s</code> access right(s)",
 			exe, strings.Join(access, "|")))
 	case ktypes.LoadImage:
-		filename, _ := kevt.Kparams.GetString(kparams.FileName)
-		return printSummary(kevt, fmt.Sprintf("loaded </code>%s</code> module", filename))
+		filename, _ := e.Kparams.GetString(kparams.FileName)
+		return printSummary(e, fmt.Sprintf("loaded </code>%s</code> module", filename))
 	case ktypes.UnloadImage:
-		filename, _ := kevt.Kparams.GetString(kparams.FileName)
-		return printSummary(kevt, fmt.Sprintf("unloaded </code>%s</code> module", filename))
+		filename, _ := e.Kparams.GetString(kparams.FileName)
+		return printSummary(e, fmt.Sprintf("unloaded </code>%s</code> module", filename))
 	case ktypes.CreateFile:
-		op := kevt.GetParamAsString(kparams.FileOperation)
-		filename := kevt.Kparams.MustGetString(kparams.FileName)
-		return printSummary(kevt, fmt.Sprintf("%sed a file <code>%s</code>", strings.ToLower(op), filename))
+		op := e.GetParamAsString(kparams.FileOperation)
+		filename := e.Kparams.MustGetString(kparams.FileName)
+		return printSummary(e, fmt.Sprintf("%sed a file <code>%s</code>", strings.ToLower(op), filename))
 	case ktypes.ReadFile:
-		filename, _ := kevt.Kparams.GetString(kparams.FileName)
-		size, _ := kevt.Kparams.GetUint32(kparams.FileIoSize)
-		return printSummary(kevt, fmt.Sprintf("read <code>%d</code> bytes from <code>%s</code> file", size, filename))
+		filename, _ := e.Kparams.GetString(kparams.FileName)
+		size, _ := e.Kparams.GetUint32(kparams.FileIoSize)
+		return printSummary(e, fmt.Sprintf("read <code>%d</code> bytes from <code>%s</code> file", size, filename))
 	case ktypes.WriteFile:
-		filename, _ := kevt.Kparams.GetString(kparams.FileName)
-		size, _ := kevt.Kparams.GetUint32(kparams.FileIoSize)
-		return printSummary(kevt, fmt.Sprintf("wrote <code>%d</code> bytes to <code>%s</code> file", size, filename))
+		filename, _ := e.Kparams.GetString(kparams.FileName)
+		size, _ := e.Kparams.GetUint32(kparams.FileIoSize)
+		return printSummary(e, fmt.Sprintf("wrote <code>%d</code> bytes to <code>%s</code> file", size, filename))
 	case ktypes.SetFileInformation:
-		filename, _ := kevt.Kparams.GetString(kparams.FileName)
-		class, _ := kevt.Kparams.GetString(kparams.FileInfoClass)
-		return printSummary(kevt, fmt.Sprintf("set <code>%s</code> information class on <code>%s</code> file", class, filename))
+		filename, _ := e.Kparams.GetString(kparams.FileName)
+		class, _ := e.Kparams.GetString(kparams.FileInfoClass)
+		return printSummary(e, fmt.Sprintf("set <code>%s</code> information class on <code>%s</code> file", class, filename))
 	case ktypes.DeleteFile:
-		filename, _ := kevt.Kparams.GetString(kparams.FileName)
-		return printSummary(kevt, fmt.Sprintf("deleted <code>%s</code> file", filename))
+		filename, _ := e.Kparams.GetString(kparams.FileName)
+		return printSummary(e, fmt.Sprintf("deleted <code>%s</code> file", filename))
 	case ktypes.RenameFile:
-		filename, _ := kevt.Kparams.GetString(kparams.FileName)
-		return printSummary(kevt, fmt.Sprintf("renamed <code>%s</code> file", filename))
+		filename, _ := e.Kparams.GetString(kparams.FileName)
+		return printSummary(e, fmt.Sprintf("renamed <code>%s</code> file", filename))
 	case ktypes.CloseFile:
-		filename, _ := kevt.Kparams.GetString(kparams.FileName)
-		return printSummary(kevt, fmt.Sprintf("closed <code>%s</code> file", filename))
+		filename, _ := e.Kparams.GetString(kparams.FileName)
+		return printSummary(e, fmt.Sprintf("closed <code>%s</code> file", filename))
 	case ktypes.EnumDirectory:
-		filename, _ := kevt.Kparams.GetString(kparams.FileName)
-		return printSummary(kevt, fmt.Sprintf("enumerated <code>%s</code> directory", filename))
+		filename, _ := e.Kparams.GetString(kparams.FileName)
+		return printSummary(e, fmt.Sprintf("enumerated <code>%s</code> directory", filename))
 	case ktypes.RegCreateKey:
-		key, _ := kevt.Kparams.GetString(kparams.RegKeyName)
-		return printSummary(kevt, fmt.Sprintf("created <code>%s</code> key", key))
+		key, _ := e.Kparams.GetString(kparams.RegKeyName)
+		return printSummary(e, fmt.Sprintf("created <code>%s</code> key", key))
 	case ktypes.RegOpenKey:
-		key, _ := kevt.Kparams.GetString(kparams.RegKeyName)
-		return printSummary(kevt, fmt.Sprintf("opened <code>%s</code> key", key))
+		key, _ := e.Kparams.GetString(kparams.RegKeyName)
+		return printSummary(e, fmt.Sprintf("opened <code>%s</code> key", key))
 	case ktypes.RegDeleteKey:
-		key, _ := kevt.Kparams.GetString(kparams.RegKeyName)
-		return printSummary(kevt, fmt.Sprintf("deleted <code>%s</code> key", key))
+		key, _ := e.Kparams.GetString(kparams.RegKeyName)
+		return printSummary(e, fmt.Sprintf("deleted <code>%s</code> key", key))
 	case ktypes.RegQueryKey:
-		key, _ := kevt.Kparams.GetString(kparams.RegKeyName)
-		return printSummary(kevt, fmt.Sprintf("queried <code>%s</code> key", key))
+		key, _ := e.Kparams.GetString(kparams.RegKeyName)
+		return printSummary(e, fmt.Sprintf("queried <code>%s</code> key", key))
 	case ktypes.RegSetValue:
-		key, _ := kevt.Kparams.GetString(kparams.RegKeyName)
-		val, err := kevt.Kparams.GetString(kparams.RegValue)
+		key, _ := e.Kparams.GetString(kparams.RegKeyName)
+		val, err := e.Kparams.GetString(kparams.RegValue)
 		if err != nil {
-			return printSummary(kevt, fmt.Sprintf("set <code>%s</code> value", key))
+			return printSummary(e, fmt.Sprintf("set <code>%s</code> value", key))
 		}
-		return printSummary(kevt, fmt.Sprintf("set <code>%s</code> payload in <code>%s</code> value", val, key))
+		return printSummary(e, fmt.Sprintf("set <code>%s</code> payload in <code>%s</code> value", val, key))
 	case ktypes.RegDeleteValue:
-		key, _ := kevt.Kparams.GetString(kparams.RegKeyName)
-		return printSummary(kevt, fmt.Sprintf("deleted <code>%s</code> value", key))
+		key, _ := e.Kparams.GetString(kparams.RegKeyName)
+		return printSummary(e, fmt.Sprintf("deleted <code>%s</code> value", key))
 	case ktypes.RegQueryValue:
-		key, _ := kevt.Kparams.GetString(kparams.RegKeyName)
-		return printSummary(kevt, fmt.Sprintf("queried <code>%s</code> value", key))
+		key, _ := e.Kparams.GetString(kparams.RegKeyName)
+		return printSummary(e, fmt.Sprintf("queried <code>%s</code> value", key))
 	case ktypes.AcceptTCPv4, ktypes.AcceptTCPv6:
-		ip, _ := kevt.Kparams.GetIP(kparams.NetSIP)
-		port, _ := kevt.Kparams.GetUint16(kparams.NetSport)
-		return printSummary(kevt, fmt.Sprintf("accepted connection from <code>%v</code> and <code>%d</code> port", ip, port))
+		ip, _ := e.Kparams.GetIP(kparams.NetSIP)
+		port, _ := e.Kparams.GetUint16(kparams.NetSport)
+		return printSummary(e, fmt.Sprintf("accepted connection from <code>%v</code> and <code>%d</code> port", ip, port))
 	case ktypes.ConnectTCPv4, ktypes.ConnectTCPv6:
-		ip, _ := kevt.Kparams.GetIP(kparams.NetDIP)
-		port, _ := kevt.Kparams.GetUint16(kparams.NetDport)
-		return printSummary(kevt, fmt.Sprintf("connected to <code>%v</code> and <code>%d</code> port", ip, port))
+		ip, _ := e.Kparams.GetIP(kparams.NetDIP)
+		port, _ := e.Kparams.GetUint16(kparams.NetDport)
+		return printSummary(e, fmt.Sprintf("connected to <code>%v</code> and <code>%d</code> port", ip, port))
 	case ktypes.SendTCPv4, ktypes.SendTCPv6, ktypes.SendUDPv4, ktypes.SendUDPv6:
-		ip, _ := kevt.Kparams.GetIP(kparams.NetDIP)
-		port, _ := kevt.Kparams.GetUint16(kparams.NetDport)
-		size, _ := kevt.Kparams.GetUint32(kparams.NetSize)
-		return printSummary(kevt, fmt.Sprintf("sent <code>%d</code> bytes to <code>%v</code> and <code>%d</code> port",
+		ip, _ := e.Kparams.GetIP(kparams.NetDIP)
+		port, _ := e.Kparams.GetUint16(kparams.NetDport)
+		size, _ := e.Kparams.GetUint32(kparams.NetSize)
+		return printSummary(e, fmt.Sprintf("sent <code>%d</code> bytes to <code>%v</code> and <code>%d</code> port",
 			size, ip, port))
 	case ktypes.RecvTCPv4, ktypes.RecvTCPv6, ktypes.RecvUDPv4, ktypes.RecvUDPv6:
-		ip, _ := kevt.Kparams.GetIP(kparams.NetSIP)
-		port, _ := kevt.Kparams.GetUint16(kparams.NetSport)
-		size, _ := kevt.Kparams.GetUint32(kparams.NetSize)
-		return printSummary(kevt, fmt.Sprintf("received <code>%d</code> bytes from <code>%v</code> and <code>%d</code> port",
+		ip, _ := e.Kparams.GetIP(kparams.NetSIP)
+		port, _ := e.Kparams.GetUint16(kparams.NetSport)
+		size, _ := e.Kparams.GetUint32(kparams.NetSize)
+		return printSummary(e, fmt.Sprintf("received <code>%d</code> bytes from <code>%v</code> and <code>%d</code> port",
 			size, ip, port))
 	case ktypes.CreateHandle:
-		handleType, _ := kevt.Kparams.GetString(kparams.HandleObjectTypeName)
-		handleName, _ := kevt.Kparams.GetString(kparams.HandleObjectName)
-		return printSummary(kevt, fmt.Sprintf("created <code>%s</code> handle of <code>%s</code> type",
+		handleType, _ := e.Kparams.GetString(kparams.HandleObjectTypeName)
+		handleName, _ := e.Kparams.GetString(kparams.HandleObjectName)
+		return printSummary(e, fmt.Sprintf("created <code>%s</code> handle of <code>%s</code> type",
 			handleName, handleType))
 	case ktypes.CloseHandle:
-		handleType, _ := kevt.Kparams.GetString(kparams.HandleObjectTypeName)
-		handleName, _ := kevt.Kparams.GetString(kparams.HandleObjectName)
-		return printSummary(kevt, fmt.Sprintf("closed <code>%s</code> handle of <code>%s</code> type",
+		handleType, _ := e.Kparams.GetString(kparams.HandleObjectTypeName)
+		handleName, _ := e.Kparams.GetString(kparams.HandleObjectName)
+		return printSummary(e, fmt.Sprintf("closed <code>%s</code> handle of <code>%s</code> type",
 			handleName, handleType))
 	case ktypes.LoadDriver:
-		driver, _ := kevt.Kparams.GetString(kparams.ImageFilename)
-		return printSummary(kevt, fmt.Sprintf("loaded <code>%s</code> driver", driver))
+		driver, _ := e.Kparams.GetString(kparams.ImageFilename)
+		return printSummary(e, fmt.Sprintf("loaded <code>%s</code> driver", driver))
 	}
 	return ""
 }
 
-func printSummary(kevt *Kevent, text string) string {
-	ps := kevt.PS
+func printSummary(e *Kevent, text string) string {
+	ps := e.PS
 	if ps != nil {
 		return fmt.Sprintf("<code>%s</code> %s", ps.Name, text)
 	}
-	return fmt.Sprintf("process with <code>%d</code> id %s", kevt.PID, text)
+	return fmt.Sprintf("process with <code>%d</code> id %s", e.PID, text)
 }

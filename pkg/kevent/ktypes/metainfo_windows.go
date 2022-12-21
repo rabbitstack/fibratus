@@ -18,7 +18,9 @@
 
 package ktypes
 
-import "sort"
+import (
+	"sort"
+)
 
 // KeventInfo describes the kernel event meta info such as human-readable name, category
 // and event's description.
@@ -140,6 +142,30 @@ func KeventNameToKtype(name string) Ktype {
 		return ktype
 	}
 	return UnknownKtype
+}
+
+// KeventNameToKtypes maps the event name to internal type representations, specifically, network
+// events that have multiple internal types for a single event name. For example, Accept event name
+// have AcceptTCP4 and AcceptTCP6 types.
+func KeventNameToKtypes(name string) []Ktype {
+	switch name {
+	case "Accept":
+		return []Ktype{AcceptTCPv4, AcceptTCPv6}
+	case "Send":
+		return []Ktype{SendTCPv4, SendTCPv6, SendUDPv4, SendUDPv6}
+	case "Recv":
+		return []Ktype{RecvTCPv4, RecvTCPv6, RecvUDPv4, RecvUDPv6}
+	case "Connect":
+		return []Ktype{ConnectTCPv4, ConnectTCPv6}
+	case "Reconnect":
+		return []Ktype{ReconnectTCPv4, ReconnectTCPv6}
+	case "Disconnect":
+		return []Ktype{DisconnectTCPv4, DisconnectTCPv6}
+	case "Retransmit":
+		return []Ktype{RetransmitTCPv4, RetransmitTCPv6}
+	default:
+		return []Ktype{KeventNameToKtype(name)}
+	}
 }
 
 // GetKtypesMeta returns event types metadata.

@@ -25,6 +25,7 @@ import (
 
 type Chain interface {
 	Match(*kevent.Kevent) (bool, error)
+	Compile() error
 }
 
 type chain struct {
@@ -43,21 +44,29 @@ func NewChain(config *config.Config) Chain {
 	return chain
 }
 
+func (c *chain) Compile() error {
+	for _, matcher := range c.matchers {
+		err := matcher.Compile()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (c *chain) addMatcher(m Matcher) {
 	c.matchers = append(c.matchers, m)
 }
 
 func (c *chain) Match(kevt *kevent.Kevent) (bool, error) {
-	var matches bool
 	for _, m := range c.matchers {
 		match, err := m.Match(kevt)
 		if err != nil {
 			return match, err
 		}
-		matches = match
-	}
-	if matches {
-		return true, nil
+		if !match {
+			return false, nil
+		}
 	}
 	return false, nil
 }

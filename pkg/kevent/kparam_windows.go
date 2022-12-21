@@ -89,10 +89,10 @@ func (k Kparam) String() string {
 	case kparams.Key:
 		rootKey, keyName := key.Format(k.Value.(string))
 		if keyName != "" && rootKey != key.Invalid {
-			return key.String(rootKey) + "\\" + keyName
+			return rootKey.String() + "\\" + keyName
 		}
 		if rootKey != key.Invalid {
-			return key.String(rootKey)
+			return rootKey.String()
 		}
 		unknownKeysCount.Add(1)
 		return keyName
