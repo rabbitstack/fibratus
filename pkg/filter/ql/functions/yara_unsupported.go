@@ -1,3 +1,6 @@
+//go:build !yara
+// +build !yara
+
 /*
  * Copyright 2021-2022 by Nedim Sabic Sabic
  * https://www.fibratus.io
@@ -18,31 +21,28 @@
 
 package functions
 
-// Length returns the number of characters (runes) for string arguments and
-// the size of the slice for slice arguments.
-type Length struct{}
+import (
+	"fmt"
+	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
+)
 
-func (f Length) Call(args []interface{}) (interface{}, bool) {
-	if len(args) < 1 {
-		return false, false
-	}
-	switch s := args[0].(type) {
-	case string:
-		return len([]rune(s)), true
-	case []string:
-		return len(s), true
-	}
-	return -1, false
-}
+type Yara struct{}
 
-func (f Length) Desc() FunctionDesc {
+func (f Yara) Call(args []interface{}) (interface{}, bool) { return false, false }
+
+func (f Yara) Desc() FunctionDesc {
 	desc := FunctionDesc{
-		Name: LengthFn,
+		Name: YaraFn,
 		Args: []FunctionArgDesc{
-			{Keyword: "string|slice", Types: []ArgType{Field, Slice, Func}, Required: true},
+			{Keyword: "pid|file|bytes", Types: []ArgType{Field, Func, String, Number}, Required: true},
+			{Keyword: "rules", Types: []ArgType{Field, Func, String}, Required: true},
+			{Keyword: "vars", Types: []ArgType{Field, Func, String}},
+		},
+		ArgsValidationFunc: func(args []string) error {
+			return fmt.Errorf("yara function is not supported. %w", kerrors.ErrFeatureUnsupported("yara"))
 		},
 	}
 	return desc
 }
 
-func (f Length) Name() Fn { return LengthFn }
+func (f Yara) Name() Fn { return YaraFn }

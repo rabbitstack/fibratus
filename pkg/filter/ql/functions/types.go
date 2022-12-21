@@ -54,6 +54,8 @@ const (
 	RegexFn
 	// IsMinidumpFn represents the ISMINIDUMP function
 	IsMinidumpFn
+	// YaraFn represents the YARA function
+	YaraFn
 )
 
 // ArgType is the type alias for the argument value type.
@@ -170,6 +172,8 @@ func (f Fn) String() string {
 		return "REGEX"
 	case IsMinidumpFn:
 		return "IS_MINIDUMP"
+	case YaraFn:
+		return "YARA"
 	default:
 		return "UNDEFINED"
 	}
