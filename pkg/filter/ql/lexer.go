@@ -52,7 +52,7 @@ func (s *scanner) scan() (tok token, pos int, lit string) {
 	// as an ident or reserved word.
 	if isWhitespace(ch0) {
 		return s.scanWhitespace()
-	} else if isLetter(ch0) || ch0 == '_' || ch0 == '$' {
+	} else if isLetter(ch0) || ch0 == '_' {
 		s.r.unread()
 		return s.scanIdent()
 	} else if isDigit(ch0) {
@@ -61,7 +61,7 @@ func (s *scanner) scan() (tok token, pos int, lit string) {
 
 	// Otherwise, parse individual characters.
 	switch ch0 {
-	case reof:
+	case eof:
 		return EOF, pos, ""
 	case '"':
 		s.r.unread()
@@ -109,6 +109,12 @@ func (s *scanner) scan() (tok token, pos int, lit string) {
 		return Pipe, pos, ""
 	case ',':
 		return Comma, pos, ""
+	case '$':
+		tok, _, lit = s.scanIdent()
+		if tok != Ident {
+			return tok, pos, "$" + lit
+		}
+		return BoundField, pos, "$" + lit
 	}
 	return Illegal, pos, string(ch0)
 }
@@ -124,7 +130,7 @@ func (s *scanner) scanWhitespace() (tok token, pos int, lit string) {
 	// Non-whitespace characters and EOF will cause the loop to exit.
 	for {
 		ch, _ = s.r.read()
-		if ch == reof {
+		if ch == eof {
 			break
 		} else if !isWhitespace(ch) {
 			s.r.unread()
@@ -144,7 +150,7 @@ func (s *scanner) scanIdent() (tok token, pos int, lit string) {
 
 	var buf bytes.Buffer
 	for {
-		if ch, _ := s.r.read(); ch == reof {
+		if ch, _ := s.r.read(); ch == eof {
 			break
 		} else if ch == '"' {
 			tok0, pos0, lit0 := s.scanString()
@@ -430,7 +436,7 @@ type reader struct {
 // Note that this function does not return size.
 func (r *reader) ReadRune() (ch rune, size int, err error) {
 	ch, _ = r.read()
-	if ch == reof {
+	if ch == eof {
 		err = io.EOF
 	}
 	return
@@ -443,7 +449,7 @@ func (r *reader) UnreadRune() error {
 	return nil
 }
 
-var reof = rune(0)
+var eof = rune(0)
 
 // read reads the next rune from the reader.
 func (r *reader) read() (ch rune, pos int) {
@@ -457,7 +463,7 @@ func (r *reader) read() (ch rune, pos int) {
 	// Any error (including io.EOF) should return as EOF.
 	ch, _, err := r.r.ReadRune()
 	if err != nil {
-		ch = reof
+		ch = eof
 	} else if ch == '\r' {
 		if ch, _, err := r.r.ReadRune(); err != nil {
 			// nop
@@ -479,7 +485,7 @@ func (r *reader) read() (ch rune, pos int) {
 
 	// Mark the reader as EOF.
 	// This is used to avoid doubling the count of EOF characters.
-	if ch == reof {
+	if ch == eof {
 		r.eof = true
 	}
 

@@ -55,7 +55,7 @@ func TestFilterCompile(t *testing.T) {
 	f = New(`ps.name`, cfg)
 	require.EqualError(t, f.Compile(), "expected at least one field or operator but zero found")
 	f = New(`ps.name =`, cfg)
-	require.EqualError(t, f.Compile(), "ps.name =\n╭─────────^\n|\n|\n╰─────────────────── expected field, string, number, bool, ip, function")
+	require.EqualError(t, f.Compile(), "ps.name =\n╭─────────^\n|\n|\n╰─────────────────── expected field, bound field, string, number, bool, ip, function")
 }
 
 func TestSeqFilterCompile(t *testing.T) {
