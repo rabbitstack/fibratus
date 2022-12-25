@@ -26,26 +26,27 @@ import (
 	"testing"
 )
 
+var testDir = filepath.Join(os.TempDir(), "test")
+
 func TestSymlink(t *testing.T) {
 	ln, err := createSymlink()
 	require.NoError(t, err)
 	call := Symlink{}
 	res, _ := call.Call([]interface{}{ln})
 	defer func() {
-		_ = os.RemoveAll(filepath.Join(os.TempDir(), "test"))
+		_ = os.RemoveAll(testDir)
 	}()
-	assert.Equal(t, filepath.Join(os.TempDir(), "test", "target.txt"), res)
+	assert.Equal(t, filepath.Join(testDir, "target.txt"), res)
 }
 
 func createSymlink() (string, error) {
-	path := filepath.Join(os.TempDir(), "test")
 	target := "target.txt"
-	if err := os.MkdirAll(path, 0755); err != nil {
+	if err := os.MkdirAll(testDir, 0755); err != nil {
 		return "", err
 	}
-	if err := os.WriteFile(filepath.Join(path, "target.txt"), []byte("Test\n"), os.ModePerm); err != nil {
+	if err := os.WriteFile(filepath.Join(testDir, "target.txt"), []byte("Test\n"), os.ModePerm); err != nil {
 		return "", err
 	}
-	symlink := filepath.Join(path, "symlink.txt")
+	symlink := filepath.Join(testDir, "symlink.txt")
 	return symlink, os.Symlink(target, symlink)
 }
