@@ -20,3 +20,28 @@
  */
 
 package functions
+
+import (
+	"fmt"
+	"github.com/stretchr/testify/assert"
+	"os"
+	"testing"
+)
+
+func TestYara(t *testing.T) {
+	var tests = []struct {
+		args     []interface{}
+		expected bool
+	}{
+		{
+			[]interface{}{uint32(os.Getpid())},
+			true,
+		},
+	}
+
+	for i, tt := range tests {
+		f := Yara{}
+		res, _ := f.Call(tt.args)
+		assert.Equal(t, tt.expected, res, fmt.Sprintf("%d. result mismatch: exp=%v got=%v", i, tt.expected, res))
+	}
+}

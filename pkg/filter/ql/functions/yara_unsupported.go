@@ -26,6 +26,7 @@ import (
 	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
 )
 
+// Yara unsupported function
 type Yara struct{}
 
 func (f Yara) Call(args []interface{}) (interface{}, bool) { return false, false }

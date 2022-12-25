@@ -26,6 +26,7 @@ import (
 	"github.com/hillu/go-yara/v4"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	log "github.com/sirupsen/logrus"
+	"strings"
 	"time"
 )
 
@@ -45,7 +46,13 @@ func (f Yara) Call(args []interface{}) (interface{}, bool) {
 	if len(args) < 2 {
 		return false, false
 	}
-	rules := parseString(1, args)
+	var rules string
+	switch r := args[1].(type) {
+	case string:
+		rules = r
+	case []string:
+		rules = strings.Join(r, " ")
+	}
 	scanner, err := f.newScanner(rules)
 	if err != nil {
 		log.Warnf("erroneous scanner for Yara rule(s): %v: %s", err, rules)
