@@ -58,11 +58,11 @@ func TestGetRegValue(t *testing.T) {
 	defer key.Close()
 
 	defer func() {
-		key.DeleteValue("FibratusTestDword")
-		key.DeleteValue("FibratusTestQword")
-		key.DeleteValue("FibratusTestSz")
-		key.DeleteValue("FibratusTestMultiSz")
-		key.DeleteValue("FibratusTestExpandSz")
+		_ = key.DeleteValue("FibratusTestDword")
+		_ = key.DeleteValue("FibratusTestQword")
+		_ = key.DeleteValue("FibratusTestSz")
+		_ = key.DeleteValue("FibratusTestMultiSz")
+		_ = key.DeleteValue("FibratusTestExpandSz")
 	}()
 
 	require.NoError(t, key.SetDWordValue("FibratusTestDword", 1))
