@@ -68,6 +68,7 @@ var funcs = map[string]FunctionDef{
 	functions.GlobFn.String():         &functions.Glob{},
 	functions.IsAbsFn.String():        &functions.IsAbs{},
 	functions.VolumeFn.String():       &functions.Volume{},
+	functions.GetRegValueFn.String():  &functions.GetRegValue{},
 }
 
 // FunctionDef is the interface that all function definitions have to satisfy.

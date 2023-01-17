@@ -68,6 +68,8 @@ const (
 	IsAbsFn
 	// VolumeFn represents the VOLUME function
 	VolumeFn
+	// GetRegValueFn represents the GET_REG_VALUE function
+	GetRegValueFn
 )
 
 // ArgType is the type alias for the argument value type.
@@ -200,6 +202,8 @@ func (f Fn) String() string {
 		return "IS_ABS"
 	case VolumeFn:
 		return "VOLUME"
+	case GetRegValueFn:
+		return "GET_REG_VALUE"
 	default:
 		return "UNDEFINED"
 	}
