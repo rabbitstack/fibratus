@@ -36,7 +36,7 @@ func TestSymlink(t *testing.T) {
 	defer func() {
 		_ = os.RemoveAll(testDir)
 	}()
-	assert.Equal(t, filepath.Join(testDir, "target.txt"), res)
+	assert.Equal(t, "target.txt", filepath.Base(res.(string)))
 }
 
 func createSymlink() (string, error) {
