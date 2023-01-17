@@ -152,8 +152,11 @@ func (f *filter) Run(kevt *kevent.Kevent) bool {
 }
 
 func (f *filter) RunSequence(kevt *kevent.Kevent, seqID uint16, partials map[uint16][]*kevent.Kevent) bool {
+	if f.seq == nil {
+		return false
+	}
 	nseqs := uint16(len(f.seq.Expressions))
-	if f.seq == nil || seqID > nseqs-1 {
+	if seqID > nseqs-1 {
 		return false
 	}
 	valuer := f.mapValuer(kevt)
