@@ -19,33 +19,42 @@
 package functions
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestReplace(t *testing.T) {
-	call := Replace{}
-	_, ok := call.Call([]interface{}{"hello world", "hello "})
-	assert.False(t, ok)
+	var tests = []struct {
+		args     []interface{}
+		expected interface{}
+	}{
+		{
+			[]interface{}{"hello world", "hello", "hell"},
+			"hell world",
+		},
+		{
+			[]interface{}{"hello world", "hello", "hell", "NO", "REPL"},
+			"hell world",
+		},
+		{
+			[]interface{}{"hello world", "hello", "hell", "hell", "heaven", "world", "brave"},
+			"heaven brave",
+		},
+		{
+			[]interface{}{"HKEY_LOCAL_MACHINE\\SAM", "HKEY_LOCAL_MACHINE", "HKLM", "HKEY_CURRENT_USER\\Console", "HKCU"},
+			"HKLM\\SAM",
+		},
+		{
+			[]interface{}{"HKEY_CURRENT_USER\\Console", "HKEY_LOCAL_MACHINE", "HKLM", "HKEY_CURRENT_USER", "HKCU"},
+			"HKCU\\Console",
+		},
+	}
 
-	res, ok := call.Call([]interface{}{"hello world", "hello", "hell"})
-	assert.Equal(t, "hell world", res)
-	assert.True(t, ok)
-
-	res1, ok := call.Call([]interface{}{"hello world", "hello", "hell", "NO", "REPL"})
-	assert.Equal(t, "hell world", res1)
-	assert.True(t, ok)
-
-	res2, ok := call.Call([]interface{}{"hello world", "hello", "hell", "hell", "heaven", "world", "brave"})
-	assert.Equal(t, "heaven brave", res2)
-	assert.True(t, ok)
-
-	key, ok := call.Call([]interface{}{"HKEY_LOCAL_MACHINE\\SAM", "HKEY_LOCAL_MACHINE", "HKLM", "HKEY_CURRENT_USER\\Console", "HKCU"})
-	assert.Equal(t, "HKLM\\SAM", key)
-	assert.True(t, ok)
-
-	key1, ok := call.Call([]interface{}{"HKEY_CURRENT_USER\\Console", "HKEY_LOCAL_MACHINE", "HKLM", "HKEY_CURRENT_USER", "HKCU"})
-	assert.Equal(t, "HKCU\\Console", key1)
-	assert.True(t, ok)
+	for i, tt := range tests {
+		f := Replace{}
+		res, _ := f.Call(tt.args)
+		assert.Equal(t, tt.expected, res, fmt.Sprintf("%d. result mismatch: exp=%v got=%v", i, tt.expected, res))
+	}
 }

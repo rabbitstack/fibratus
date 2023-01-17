@@ -54,6 +54,20 @@ const (
 	RegexFn
 	// IsMinidumpFn represents the ISMINIDUMP function
 	IsMinidumpFn
+	// BaseFn represents the BASE function
+	BaseFn
+	// DirFn represents the DIR function
+	DirFn
+	// SymlinkFn represents the SYMLINK function
+	SymlinkFn
+	// ExtFn represents the EXT function
+	ExtFn
+	// GlobFn represents the GLOB function
+	GlobFn
+	// IsAbsFn represents the IS_ABS function
+	IsAbsFn
+	// VolumeFn represents the VOLUME function
+	VolumeFn
 )
 
 // ArgType is the type alias for the argument value type.
@@ -78,6 +92,8 @@ const (
 	Func
 	// Slice represents the string slice argument type.
 	Slice
+	// Bool represents the boolean argument type.
+	Bool
 	// Unknown is the unknown argument type.
 	Unknown
 )
@@ -97,6 +113,8 @@ func (typ ArgType) String() string {
 		return "func"
 	case Slice:
 		return "slice"
+	case Bool:
+		return "bool"
 	}
 	return "unknown"
 }
@@ -170,6 +188,18 @@ func (f Fn) String() string {
 		return "REGEX"
 	case IsMinidumpFn:
 		return "IS_MINIDUMP"
+	case BaseFn:
+		return "BASE"
+	case DirFn:
+		return "DIR"
+	case ExtFn:
+		return "EXT"
+	case GlobFn:
+		return "GLOB"
+	case IsAbsFn:
+		return "IS_ABS"
+	case VolumeFn:
+		return "VOLUME"
 	default:
 		return "UNDEFINED"
 	}
