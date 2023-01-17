@@ -25,17 +25,65 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"os"
+	"syscall"
 	"testing"
 )
+
+var pi syscall.ProcessInformation
 
 func TestYara(t *testing.T) {
 	var tests = []struct {
 		args     []interface{}
 		expected bool
+		rules    string
 	}{
 		{
-			[]interface{}{uint32(os.Getpid())},
+			[]interface{}{uint32(runNotepad())},
 			true,
+			`
+rule Notepad : notepad
+{
+	meta:
+		severity = "Normal"
+		date = "2016-07"
+	strings:
+		$c0 = "Notepad" fullword ascii
+	condition:
+		$c0
+}
+			`,
+		},
+		{
+			[]interface{}{"_fixtures/yara-test.dll"},
+			true,
+			`
+rule DLL : dll
+{
+	meta:
+		severity = "Critical"
+		date = "2020-07"
+	strings:
+		$c0 = "Go" fullword ascii
+	condition:
+		$c0
+}
+			`,
+		},
+		{
+			[]interface{}{readNotepadBytes()},
+			true,
+			`
+rule Notepad : notepad
+{
+	meta:
+		severity = "Normal"
+		date = "2016-07"
+	strings:
+		$c0 = "Notepad" fullword ascii
+	condition:
+		$c0
+}
+			`,
 		},
 	}
 
@@ -44,4 +92,35 @@ func TestYara(t *testing.T) {
 		res, _ := f.Call(tt.args)
 		assert.Equal(t, tt.expected, res, fmt.Sprintf("%d. result mismatch: exp=%v got=%v", i, tt.expected, res))
 	}
+	defer syscall.TerminateProcess(pi.Process, uint32(257))
+}
+
+func runNotepad() uint32 {
+	var si syscall.StartupInfo
+	argv := syscall.StringToUTF16Ptr(filepath.Join(os.Getenv("windir"), "notepad.exe"))
+	err := syscall.CreateProcess(
+		nil,
+		argv,
+		nil,
+		nil,
+		true,
+		0,
+		nil,
+		nil,
+		&si,
+		&pi)
+
+	if err != nil {
+		return 0
+	}
+	return pi.ProcessId
+}
+
+func readNotepadBytes() []byte {
+	p := filepath.Join(os.Getenv("windir"), "notepad.exe")
+	b, err := os.ReadFile(p)
+	if err != nil {
+		return nil
+	}
+	return b
 }
