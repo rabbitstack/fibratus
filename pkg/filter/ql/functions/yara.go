@@ -47,13 +47,17 @@ func (f Yara) Call(args []interface{}) (interface{}, bool) {
 		return false, false
 	}
 	var rules string
+	var vars map[string]interface{}
 	switch r := args[1].(type) {
 	case string:
 		rules = r
 	case []string:
 		rules = strings.Join(r, " ")
 	}
-	scanner, err := f.newScanner(rules)
+	if len(args) > 3 {
+		vars, _ = args[2].(map[string]interface{})
+	}
+	scanner, err := f.newScanner(rules, vars)
 	if err != nil {
 		log.Warnf("erroneous scanner for Yara rule(s): %v: %s", err, rules)
 		return false, true
@@ -91,7 +95,7 @@ func (f Yara) Desc() FunctionDesc {
 
 func (f Yara) Name() Fn { return YaraFn }
 
-func (f Yara) newScanner(rules string) (*yara.Scanner, error) {
+func (f Yara) newScanner(rules string, vars map[string]interface{}) (*yara.Scanner, error) {
 	c, err := yara.NewCompiler()
 	if err != nil {
 		return nil, err
@@ -99,6 +103,11 @@ func (f Yara) newScanner(rules string) (*yara.Scanner, error) {
 	defer c.Destroy()
 	if err := c.AddString(rules, ""); err != nil {
 		return nil, err
+	}
+	for k, v := range vars {
+		if err := c.DefineVariable(k, v); err != nil {
+			return nil, err
+		}
 	}
 	if len(c.Errors) > 0 {
 		return nil, parseCompilerErrors(c.Errors)
