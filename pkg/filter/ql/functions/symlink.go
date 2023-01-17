@@ -18,35 +18,31 @@
 
 package functions
 
-import (
-	"fmt"
-	"testing"
+import "path/filepath"
 
-	"github.com/stretchr/testify/assert"
-)
+// Symlink returns the path name after the evaluation of any symbolic links.
+type Symlink struct{}
 
-func TestLength(t *testing.T) {
-	var tests = []struct {
-		args     []interface{}
-		expected interface{}
-	}{
-		{
-			[]interface{}{"hello"},
-			5,
-		},
-		{
-			[]interface{}{"こんにちは"},
-			5,
-		},
-		{
-			[]interface{}{[]string{"hello", "world"}},
-			2,
-		},
+func (f Symlink) Call(args []interface{}) (interface{}, bool) {
+	if len(args) < 1 {
+		return false, false
 	}
-
-	for i, tt := range tests {
-		f := Length{}
-		res, _ := f.Call(tt.args)
-		assert.Equal(t, tt.expected, res, fmt.Sprintf("%d. result mismatch: exp=%v got=%v", i, tt.expected, res))
+	path := parseString(0, args)
+	newpath, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return path, true
 	}
+	return newpath, true
 }
+
+func (f Symlink) Desc() FunctionDesc {
+	desc := FunctionDesc{
+		Name: SymlinkFn,
+		Args: []FunctionArgDesc{
+			{Keyword: "path", Types: []ArgType{Field, Func, String}, Required: true},
+		},
+	}
+	return desc
+}
+
+func (f Symlink) Name() Fn { return SymlinkFn }

@@ -19,34 +19,35 @@
 package functions
 
 import (
-	"fmt"
-	"testing"
-
-	"github.com/stretchr/testify/assert"
+	"path/filepath"
 )
 
-func TestLength(t *testing.T) {
-	var tests = []struct {
-		args     []interface{}
-		expected interface{}
-	}{
-		{
-			[]interface{}{"hello"},
-			5,
-		},
-		{
-			[]interface{}{"こんにちは"},
-			5,
-		},
-		{
-			[]interface{}{[]string{"hello", "world"}},
-			2,
-		},
-	}
+// Glob returns the names of all files matching the pattern or an empty list if there is no matching file.
+type Glob struct{}
 
-	for i, tt := range tests {
-		f := Length{}
-		res, _ := f.Call(tt.args)
-		assert.Equal(t, tt.expected, res, fmt.Sprintf("%d. result mismatch: exp=%v got=%v", i, tt.expected, res))
+func (f Glob) Call(args []interface{}) (interface{}, bool) {
+	if len(args) < 1 {
+		return false, false
 	}
+	pattern, ok := args[0].(string)
+	if !ok {
+		return false, false
+	}
+	matches, err := filepath.Glob(pattern)
+	if err != nil {
+		return nil, true
+	}
+	return matches, true
 }
+
+func (f Glob) Desc() FunctionDesc {
+	desc := FunctionDesc{
+		Name: GlobFn,
+		Args: []FunctionArgDesc{
+			{Keyword: "pattern", Types: []ArgType{Field, Func, String}, Required: true},
+		},
+	}
+	return desc
+}
+
+func (f Glob) Name() Fn { return GlobFn }

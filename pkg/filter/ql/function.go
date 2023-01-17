@@ -61,6 +61,13 @@ var funcs = map[string]FunctionDef{
 	functions.EntropyFn.String():      &functions.Entropy{},
 	functions.RegexFn.String():        functions.NewRegex(),
 	functions.IsMinidumpFn.String():   &functions.IsMinidump{},
+	functions.BaseFn.String():         &functions.Base{},
+	functions.DirFn.String():          &functions.Dir{},
+	functions.SymlinkFn.String():      &functions.Symlink{},
+	functions.ExtFn.String():          &functions.Ext{},
+	functions.GlobFn.String():         &functions.Glob{},
+	functions.IsAbsFn.String():        &functions.IsAbs{},
+	functions.VolumeFn.String():       &functions.Volume{},
 	functions.GetRegValueFn.String():  &functions.GetRegValue{},
 }
 

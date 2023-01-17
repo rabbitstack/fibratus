@@ -6,7 +6,7 @@
 #
 # Obviously, some events can't be directly translated from the corresponding
 # sysmon expressions, since Fibratus doesn't support them yet. In the same way,
-# some filter fields are still missing in Fibratus, so that sysmon rules were
+# some filter fields are still missing in Fibratus, so those sysmon rules were
 # omitted.
 #
 # ======================= Process creation ================================

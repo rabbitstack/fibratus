@@ -34,6 +34,7 @@ func TestParseFunction(t *testing.T) {
 		{expr: "cidr_contains(net.dip)", err: errors.New("CIDR_CONTAINS function requires 2 argument(s) but 1 argument(s) given")},
 		{expr: "cidr_contains(net.dip, 12)", err: errors.New("argument #2 (cidr) in function CIDR_CONTAINS should be one of: string")},
 		{expr: "cidr_contains(net.dip, '172.17.12.4/24')"},
+		{expr: "cidr_contains($e1.net.dip, '172.17.12.4/24')"},
 		{expr: "md('172.17.12.4')", err: errors.New("md function is undefined")},
 		{expr: "concat('hello ', 'world')"},
 		{expr: "concat('hello')", err: errors.New("CONCAT function requires 2 argument(s) but 1 argument(s) given")},
@@ -42,6 +43,7 @@ func TestParseFunction(t *testing.T) {
 		{expr: "replace('hello world', 'hello', 'hell', 'world', 'war', 'hello')", err: errors.New("old/new replacements mismatch")},
 		{expr: "replace('hello world', 'hello', 'hell', 'world', 'war', 'hello', 'warld', 'old', 'new', 'one')", err: errors.New("old/new replacements mismatch")},
 		{expr: "indexof('hello', 'h', 'frst')", err: errors.New("frst is not a valid index search order")},
+		{expr: "base('C:\\\\Windows\\\\cmd.exe', false)"},
 	}
 
 	for i, tt := range tests {
@@ -49,7 +51,7 @@ func TestParseFunction(t *testing.T) {
 		_, err := p.ParseExpr()
 		if err == nil && tt.err != nil {
 			t.Errorf("%d. exp=%s expected error=%v", i, tt.expr, tt.err)
-		} else if err != nil {
+		} else if err != nil && tt.err != nil {
 			assert.True(t, strings.Contains(err.Error(), tt.err.Error()))
 		} else if err != nil && tt.err == nil {
 			t.Errorf("%d. exp=%s got error=%v", i, tt.expr, err)

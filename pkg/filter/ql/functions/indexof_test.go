@@ -19,19 +19,34 @@
 package functions
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestIndexOf(t *testing.T) {
-	call := IndexOf{}
-	res, _ := call.Call([]interface{}{"hello world", "world"})
-	assert.Equal(t, 6, res)
+	var tests = []struct {
+		args     []interface{}
+		expected interface{}
+	}{
+		{
+			[]interface{}{"hello world", "world"},
+			6,
+		},
+		{
+			[]interface{}{"hello world", "brave"},
+			-1,
+		},
+		{
+			[]interface{}{"hello world brave world", "world", "last"},
+			18,
+		},
+	}
 
-	res1, _ := call.Call([]interface{}{"hello world", "brave"})
-	assert.Equal(t, -1, res1)
-
-	res2, _ := call.Call([]interface{}{"hello world brave world", "world", "last"})
-	assert.Equal(t, 18, res2)
+	for i, tt := range tests {
+		f := IndexOf{}
+		res, _ := f.Call(tt.args)
+		assert.Equal(t, tt.expected, res, fmt.Sprintf("%d. result mismatch: exp=%v got=%v", i, tt.expected, res))
+	}
 }

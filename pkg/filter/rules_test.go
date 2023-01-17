@@ -366,9 +366,10 @@ func TestSimpleSequenceRuleMultiplePartials(t *testing.T) {
 
 	ss := rules.filterGroups[ktypes.CreateProcess.Hash()][0].filters[0].ss
 	assert.Len(t, ss.partials[1], 5)
-	assert.Len(t, ss.partials[2], 5)
+	assert.Len(t, ss.partials[2], 0)
 
 	kevt1 := &kevent.Kevent{
+		Seq:       20,
 		Type:      ktypes.CreateProcess,
 		Timestamp: time.Now().Add(time.Second),
 		Name:      "CreateProcess",
@@ -385,6 +386,7 @@ func TestSimpleSequenceRuleMultiplePartials(t *testing.T) {
 	}
 	kevt2 := &kevent.Kevent{
 		Type:      ktypes.CreateFile,
+		Seq:       22,
 		Timestamp: time.Now().Add(time.Second * time.Duration(2)),
 		Name:      "CreateFile",
 		Tid:       2484,
@@ -400,6 +402,8 @@ func TestSimpleSequenceRuleMultiplePartials(t *testing.T) {
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 	require.False(t, rules.Fire(kevt1))
+	assert.Len(t, ss.partials[1], 6)
+	assert.Len(t, ss.partials[2], 0)
 	require.True(t, rules.Fire(kevt2))
 }
 
@@ -560,6 +564,11 @@ func TestComplexSequenceRule(t *testing.T) {
 
 	require.False(t, rules.Fire(kevt1))
 	require.False(t, rules.Fire(kevt2))
+
+	ss := rules.filterGroups[ktypes.CreateProcess.Hash()][0].filters[0].ss
+	assert.Len(t, ss.partials[1], 1)
+	assert.Len(t, ss.partials[2], 1)
+
 	time.Sleep(time.Millisecond * 30)
 	require.True(t, rules.Fire(kevt3))
 
@@ -646,6 +655,85 @@ func TestSequenceAndSimpleRuleMix(t *testing.T) {
 	require.True(t, rules.Fire(kevt3))
 }
 
+func TestSequenceRuleBoundsFields(t *testing.T) {
+	rules := NewRules(newConfig("_fixtures/sequence_rule_bound_fields.yml"))
+	require.NoError(t, rules.Compile())
+
+	kevt := &kevent.Kevent{
+		Type:      ktypes.CreateProcess,
+		Timestamp: time.Now(),
+		Name:      "CreateProcess",
+		Tid:       2484,
+		PID:       859,
+		PS: &types.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\svchost-temp.exe",
+			SID:  "zinet",
+		},
+		Kparams: kevent.Kparams{
+			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
+		},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+	}
+
+	kevt1 := &kevent.Kevent{
+		Type:      ktypes.CreateProcess,
+		Timestamp: time.Now().Add(time.Millisecond * 20),
+		Name:      "CreateProcess",
+		Tid:       2484,
+		PID:       859,
+		PS: &types.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\svchost-temp.exe",
+			SID:  "nusret",
+		},
+		Kparams: kevent.Kparams{
+			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
+		},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+	}
+
+	kevt2 := &kevent.Kevent{
+		Type:      ktypes.CreateFile,
+		Timestamp: time.Now().Add(time.Second),
+		Name:      "CreateFile",
+		Tid:       2484,
+		PID:       859,
+		Category:  ktypes.File,
+		PS: &types.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\svchost.exe",
+			SID:  "nusret",
+		},
+		Kparams: kevent.Kparams{
+			kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost-temp.exe"},
+		},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+	}
+
+	kevt3 := &kevent.Kevent{
+		Type:      ktypes.Connect,
+		Timestamp: time.Now().Add(time.Second * 3),
+		Name:      "Connect",
+		Tid:       2484,
+		PID:       859,
+		Category:  ktypes.File,
+		PS: &types.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\svchost.exe",
+			SID:  "zinet",
+		},
+		Kparams: kevent.Kparams{
+			kparams.NetDport: {Name: kparams.NetDport, Type: kparams.Uint16, Value: uint16(80)},
+		},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+	}
+	require.False(t, rules.Fire(kevt))
+	require.False(t, rules.Fire(kevt1))
+	require.False(t, rules.Fire(kevt2))
+	require.True(t, rules.Fire(kevt3))
+}
+
 func TestFilterActionEmitAlert(t *testing.T) {
 	require.NoError(t, alertsender.LoadAll([]alertsender.Config{{Type: alertsender.Noop}}))
 	rules := NewRules(newConfig("_fixtures/include_policy_emit_alert.yml"))
@@ -679,7 +767,7 @@ func TestFilterActionEmitAlert(t *testing.T) {
 	emitAlert = nil
 }
 
-func TestIsKtypeEligible(t *testing.T) {
+func TestIsExpressionEvaluable(t *testing.T) {
 	rules := NewRules(newConfig("_fixtures/sequence_rule_simple.yml"))
 	require.NoError(t, rules.Compile())
 	log.SetLevel(log.DebugLevel)
@@ -717,8 +805,9 @@ func TestIsKtypeEligible(t *testing.T) {
 	for _, groups := range rules.filterGroups {
 		for _, g := range groups {
 			for _, f := range g.filters {
-				assert.False(t, f.isEligible(kevt2))
-				assert.True(t, f.isEligible(kevt1))
+				e := f.filter.GetSequence().Expressions[0]
+				assert.False(t, e.IsEvaluable(kevt2))
+				assert.True(t, e.IsEvaluable(kevt1))
 			}
 		}
 	}

@@ -1,4 +1,4 @@
-- group: command shell execution and temp files
+- group: Command shell execution and temp files
   enabled: true
   rules:
     - name: Process spawned by powershell
