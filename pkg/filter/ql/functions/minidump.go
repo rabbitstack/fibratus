@@ -34,7 +34,7 @@ func (f IsMinidump) Call(args []interface{}) (interface{}, bool) {
 	if len(args) < 1 {
 		return false, false
 	}
-	path := args[0].(string)
+	path := parseString(0, args)
 
 	file, err := os.Open(path)
 	if err != nil {

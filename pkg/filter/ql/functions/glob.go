@@ -29,10 +29,7 @@ func (f Glob) Call(args []interface{}) (interface{}, bool) {
 	if len(args) < 1 {
 		return false, false
 	}
-	pattern, ok := args[0].(string)
-	if !ok {
-		return false, false
-	}
+	pattern := parseString(0, args)
 	matches, err := filepath.Glob(pattern)
 	if err != nil {
 		return nil, true

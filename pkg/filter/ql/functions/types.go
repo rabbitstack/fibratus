@@ -215,7 +215,7 @@ func (f Fn) String() string {
 
 // parseString yields a string value from the specific position in the args slice.
 func parseString(index int, args []interface{}) string {
-	if index > len(args) {
+	if index > len(args)-1 {
 		return ""
 	}
 	s, ok := args[index].(string)
