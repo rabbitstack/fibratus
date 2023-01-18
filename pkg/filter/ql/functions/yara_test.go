@@ -36,12 +36,9 @@ func TestYara(t *testing.T) {
 	var tests = []struct {
 		args     []interface{}
 		expected bool
-		rules    string
 	}{
 		{
-			[]interface{}{uint32(runNotepad())},
-			true,
-			`
+			[]interface{}{uint32(runNotepad()), `
 rule Notepad : notepad
 {
 	meta:
@@ -52,12 +49,11 @@ rule Notepad : notepad
 	condition:
 		$c0
 }
-			`,
+			`},
+			true,
 		},
 		{
-			[]interface{}{"_fixtures/yara-test.dll"},
-			true,
-			`
+			[]interface{}{"_fixtures/yara-test.dll", `
 rule DLL : dll
 {
 	meta:
@@ -68,12 +64,11 @@ rule DLL : dll
 	condition:
 		$c0
 }
-			`,
+			`},
+			true,
 		},
 		{
-			[]interface{}{readNotepadBytes()},
-			true,
-			`
+			[]interface{}{readNotepadBytes(), `
 rule Notepad : notepad
 {
 	meta:
@@ -84,16 +79,17 @@ rule Notepad : notepad
 	condition:
 		$c0
 }
-			`,
+			`},
+			true,
 		},
 	}
+	defer syscall.TerminateProcess(pi.Process, uint32(257))
 
 	for i, tt := range tests {
 		f := Yara{}
 		res, _ := f.Call(tt.args)
 		assert.Equal(t, tt.expected, res, fmt.Sprintf("%d. result mismatch: exp=%v got=%v", i, tt.expected, res))
 	}
-	defer syscall.TerminateProcess(pi.Process, uint32(257))
 }
 
 func runNotepad() uint32 {
