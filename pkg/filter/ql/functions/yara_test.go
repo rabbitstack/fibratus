@@ -121,7 +121,6 @@ func runNotepad() uint32 {
 		nil,
 		&si,
 		&pi)
-
 	if err != nil {
 		return 0
 	}

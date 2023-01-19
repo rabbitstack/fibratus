@@ -76,6 +76,7 @@ func (f Yara) Call(args []interface{}) (interface{}, bool) {
 		return false, false
 	}
 	if err != nil {
+		log.Warnf("YARA function scan failed: %v", err)
 		return false, true
 	}
 	if len(cb) > 0 {
