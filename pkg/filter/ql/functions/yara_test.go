@@ -82,6 +82,21 @@ rule Notepad : notepad
 			`},
 			true,
 		},
+		{
+			[]interface{}{uint32(runNotepad()), `
+rule Notepad : notepad
+{
+	meta:
+		severity = "Normal"
+		date = "2016-07"
+	strings:
+		$c0 = "Notfound" fullword ascii
+	condition:
+		$c0
+}
+			`},
+			false,
+		},
 	}
 	defer syscall.TerminateProcess(pi.Process, uint32(257))
 

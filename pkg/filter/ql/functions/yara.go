@@ -59,7 +59,7 @@ func (f Yara) Call(args []interface{}) (interface{}, bool) {
 	}
 	scanner, err := f.newScanner(rules, vars)
 	if err != nil {
-		log.Warnf("erroneous scanner for Yara rule(s): %v: %s", err, rules)
+		log.Warnf("erroneous scanner in YARA function: %v: %s", err, rules)
 		return false, true
 	}
 	defer scanner.Destroy()
@@ -76,10 +76,14 @@ func (f Yara) Call(args []interface{}) (interface{}, bool) {
 		return false, false
 	}
 	if err != nil {
-		log.Warnf("fail to run YARA scan: %v", err)
 		return false, true
 	}
-	log.Infof("number of YARA rule matches: %d", len(cb))
+	if len(cb) > 0 {
+		log.Debugf("YARA function produced %d match(es)", len(cb))
+		for _, match := range cb {
+			log.Debugf("Matched YARA rule: %s", match.Rule)
+		}
+	}
 	return len(cb) > 0, true
 }
 
