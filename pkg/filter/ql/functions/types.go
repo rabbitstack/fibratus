@@ -70,6 +70,8 @@ const (
 	VolumeFn
 	// GetRegValueFn represents the GET_REG_VALUE function
 	GetRegValueFn
+	// YaraFn represents the YARA function
+	YaraFn
 )
 
 // ArgType is the type alias for the argument value type.
@@ -204,6 +206,8 @@ func (f Fn) String() string {
 		return "VOLUME"
 	case GetRegValueFn:
 		return "GET_REG_VALUE"
+	case YaraFn:
+		return "YARA"
 	default:
 		return "UNDEFINED"
 	}
@@ -211,7 +215,7 @@ func (f Fn) String() string {
 
 // parseString yields a string value from the specific position in the args slice.
 func parseString(index int, args []interface{}) string {
-	if index > len(args) {
+	if index > len(args)-1 {
 		return ""
 	}
 	s, ok := args[index].(string)

@@ -1,3 +1,6 @@
+//go:build !yara
+// +build !yara
+
 /*
  * Copyright 2021-2022 by Nedim Sabic Sabic
  * https://www.fibratus.io
@@ -19,32 +22,28 @@
 package functions
 
 import (
-	"path/filepath"
+	"fmt"
+	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
 )
 
-// Glob returns the names of all files matching the pattern or an empty list if there is no matching file.
-type Glob struct{}
+// Yara unsupported function
+type Yara struct{}
 
-func (f Glob) Call(args []interface{}) (interface{}, bool) {
-	if len(args) < 1 {
-		return false, false
-	}
-	pattern := parseString(0, args)
-	matches, err := filepath.Glob(pattern)
-	if err != nil {
-		return nil, true
-	}
-	return matches, true
-}
+func (f Yara) Call(args []interface{}) (interface{}, bool) { return false, false }
 
-func (f Glob) Desc() FunctionDesc {
+func (f Yara) Desc() FunctionDesc {
 	desc := FunctionDesc{
-		Name: GlobFn,
+		Name: YaraFn,
 		Args: []FunctionArgDesc{
-			{Keyword: "pattern", Types: []ArgType{Field, Func, String}, Required: true},
+			{Keyword: "pid|file|bytes", Types: []ArgType{Field, Func, String, Number}, Required: true},
+			{Keyword: "rules", Types: []ArgType{Field, Func, String}, Required: true},
+			{Keyword: "vars", Types: []ArgType{Field, Func, String}},
+		},
+		ArgsValidationFunc: func(args []string) error {
+			return fmt.Errorf("yara function is not supported. %w", kerrors.ErrFeatureUnsupported("yara"))
 		},
 	}
 	return desc
 }
 
-func (f Glob) Name() Fn { return GlobFn }
+func (f Yara) Name() Fn { return YaraFn }
