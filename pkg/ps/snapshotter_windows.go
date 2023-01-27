@@ -99,46 +99,63 @@ func NewSnapshotterFromKcap(hsnap handle.Snapshotter, config *config.Config) Sna
 	return s
 }
 
-func (s *snapshotter) WriteFromKcap(kevt *kevent.Kevent) error {
+func (s *snapshotter) WriteFromKcap(e *kevent.Kevent) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	switch kevt.Type {
+	switch e.Type {
 	case ktypes.CreateProcess, ktypes.ProcessRundown:
-		ps := kevt.PS
-		if ps == nil {
+		proc := e.PS
+		if proc == nil {
 			return nil
 		}
-		pid, err := kevt.Kparams.GetPid()
+		pid, err := e.Kparams.GetPid()
 		if err != nil {
 			return err
 		}
-		if kevt.Type == ktypes.ProcessRundown {
+		ppid, err := e.Kparams.GetPpid()
+		if err != nil {
+			return err
+		}
+		if e.Type == ktypes.ProcessRundown {
 			// invalid process
-			if ps.PID == ps.Ppid {
+			if proc.PID == proc.Ppid {
 				return nil
 			}
-			s.procs[pid] = ps
+			s.procs[pid] = proc
 		} else {
-			//s.procs[pid] = pstypes.FromKevent(unwrapParams(pid, kevt))
+			ps := pstypes.NewProc(
+				pid,
+				ppid,
+				e.GetParamAsString(kparams.ProcessName),
+				e.GetParamAsString(kparams.Cmdline),
+				e.GetParamAsString(kparams.Exe),
+				e.GetParamAsString(kparams.UserSID),
+				uint8(e.Kparams.MustGetUint32(kparams.SessionID)),
+			)
+			s.procs[pid] = ps
 		}
-		ppid, err := kevt.Kparams.GetPpid()
-		if err != nil {
-			return err
-		}
-		ps.Parent = s.procs[ppid]
+		proc.Parent = s.procs[ppid]
 	case ktypes.CreateThread, ktypes.ThreadRundown:
-		pid, err := kevt.Kparams.GetPid()
+		pid, err := e.Kparams.GetPid()
 		if err != nil {
 			return err
 		}
 		threadCount.Add(1)
-		thread := pstypes.ThreadFromKevent(unwrapThreadParams(pid, kevt))
 		if ps, ok := s.procs[pid]; ok {
+			thread := pstypes.Thread{}
+			thread.Tid, _ = e.Kparams.GetTid()
+			thread.UstackBase, _ = e.Kparams.GetHex(kparams.UstackBase)
+			thread.UstackLimit, _ = e.Kparams.GetHex(kparams.UstackLimit)
+			thread.KstackBase, _ = e.Kparams.GetHex(kparams.KstackBase)
+			thread.KstackLimit, _ = e.Kparams.GetHex(kparams.KstackLimit)
+			thread.IOPrio, _ = e.Kparams.GetUint8(kparams.IOPrio)
+			thread.BasePrio, _ = e.Kparams.GetUint8(kparams.BasePrio)
+			thread.PagePrio, _ = e.Kparams.GetUint8(kparams.PagePrio)
+			thread.Entrypoint, _ = e.Kparams.GetHex(kparams.StartAddr)
 			ps.AddThread(thread)
-			ps.Parent = s.procs[ps.Ppid]
 		}
 	case ktypes.LoadImage, ktypes.ImageRundown:
-		pid, err := kevt.Kparams.GetPid()
+		pid, err := e.Kparams.GetPid()
 		if err != nil {
 			return err
 		}
@@ -147,7 +164,13 @@ func (s *snapshotter) WriteFromKcap(kevt *kevent.Kevent) error {
 		if !ok {
 			return nil
 		}
-		ps.AddModule(pstypes.ImageFromKevent(unwrapImageParams(kevt)))
+		module := pstypes.Module{}
+		module.Size, _ = e.Kparams.GetUint32(kparams.ImageSize)
+		module.Checksum, _ = e.Kparams.GetUint32(kparams.ImageCheckSum)
+		module.Name, _ = e.Kparams.GetString(kparams.ImageFilename)
+		module.BaseAddress, _ = e.Kparams.GetHex(kparams.ImageBase)
+		module.DefaultBaseAddress, _ = e.Kparams.GetHex(kparams.ImageDefaultBase)
+		ps.AddModule(module)
 	}
 	return nil
 }
@@ -231,8 +254,29 @@ func (s *snapshotter) AddModule(e *kevent.Kevent) error {
 	return nil
 }
 
-func (s *snapshotter) RemoveThread(tid uint32) error { return nil }
-func (s *snapshotter) RemoveModule(mod string) error { return nil }
+func (s *snapshotter) RemoveThread(pid uint32, tid uint32) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	proc, ok := s.procs[pid]
+	if !ok {
+		return nil
+	}
+	proc.RemoveThread(tid)
+	threadCount.Add(-1)
+	return nil
+}
+
+func (s *snapshotter) RemoveModule(pid uint32, module string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	proc, ok := s.procs[pid]
+	if !ok {
+		return nil
+	}
+	proc.RemoveModule(module)
+	moduleCount.Add(-1)
+	return nil
+}
 
 func (s *snapshotter) Close() error {
 	s.quit <- struct{}{}
@@ -301,7 +345,7 @@ func (s *snapshotter) gcDeadProcesses() {
 				if !syscall.IsProcessRunning(proc) {
 					delete(s.procs, pid)
 				}
-				windows.CloseHandle(proc)
+				_ = windows.CloseHandle(proc)
 			}
 
 			if ss > len(s.procs) {
@@ -340,38 +384,19 @@ func (s *snapshotter) onHandleDestroyed(pid uint32, num hndl.Handle) {
 	}
 }
 
-func (s *snapshotter) Remove(kevt *kevent.Kevent) error {
+func (s *snapshotter) Remove(e *kevent.Kevent) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	pid, err := kevt.Kparams.GetPid()
+	pid, err := e.Kparams.GetPid()
 	if err != nil {
 		return err
 	}
-	switch kevt.Type {
-	case ktypes.TerminateProcess:
-		if _, ok := s.procs[pid]; ok {
-			delete(s.procs, pid)
-			processCount.Add(-1)
-			return nil
-		}
-	case ktypes.TerminateThread:
-		if ps, ok := s.procs[pid]; ok {
-			tid, err := kevt.Kparams.GetTid()
-			if err != nil {
-				return err
-			}
-			ps.RemoveThread(tid)
-			threadCount.Add(-1)
-		}
-	case ktypes.UnloadImage:
-		pid, err := kevt.Kparams.GetPid()
-		if err != nil {
-			return err
-		}
-		if ps, ok := s.procs[pid]; ok {
-			name, _ := kevt.Kparams.GetString(kparams.ImageFilename)
-			ps.RemoveModule(name)
-			moduleCount.Add(-1)
+	delete(s.procs, pid)
+	processCount.Add(-1)
+	// reset parent if it died after spawning a process
+	for procID, proc := range s.procs {
+		if proc.Ppid == pid {
+			s.procs[procID].Parent = nil
 		}
 	}
 	return nil
@@ -406,9 +431,9 @@ func (s *snapshotter) Find(pid uint32) *pstypes.PS {
 		if err != nil {
 			return proc
 		}
-		exe := windows.UTF16ToString(n)
-		proc.Exe = exe
-		proc.Name = filepath.Base(exe)
+		image := windows.UTF16ToString(n)
+		proc.Exe = image
+		proc.Name = filepath.Base(image)
 	}
 	defer windows.CloseHandle(process)
 
@@ -451,39 +476,4 @@ func (s *snapshotter) Size() uint32 {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return uint32(len(s.procs))
-}
-
-func unwrapParams(pid uint32, kevt *kevent.Kevent) (uint32, uint32, string, string, string, string, uint8) {
-	ppid, _ := kevt.Kparams.GetPpid()
-	name, _ := kevt.Kparams.GetString(kparams.ProcessName)
-	comm, _ := kevt.Kparams.GetString(kparams.Cmdline)
-	exe, _ := kevt.Kparams.GetString(kparams.Exe)
-	sid, _ := kevt.Kparams.GetString(kparams.UserSID)
-	sessionID, _ := kevt.Kparams.GetUint32(kparams.SessionID)
-
-	return pid, ppid, name, comm, exe, sid, uint8(sessionID)
-}
-
-func unwrapThreadParams(pid uint32, kevt *kevent.Kevent) (uint32, uint32, kparams.Hex, kparams.Hex, kparams.Hex, kparams.Hex, uint8, uint8, uint8, kparams.Hex) {
-	tid, _ := kevt.Kparams.GetTid()
-	ustackBase, _ := kevt.Kparams.GetHex(kparams.UstackBase)
-	ustackLimit, _ := kevt.Kparams.GetHex(kparams.UstackLimit)
-	kstackBase, _ := kevt.Kparams.GetHex(kparams.KstackBase)
-	kstackLimit, _ := kevt.Kparams.GetHex(kparams.KstackLimit)
-	ioPrio, _ := kevt.Kparams.GetUint8(kparams.IOPrio)
-	basePrio, _ := kevt.Kparams.GetUint8(kparams.BasePrio)
-	pagePrio, _ := kevt.Kparams.GetUint8(kparams.PagePrio)
-	entrypoint, _ := kevt.Kparams.GetHex(kparams.StartAddr)
-
-	return pid, tid, ustackBase, ustackLimit, kstackBase, kstackLimit, ioPrio, basePrio, pagePrio, entrypoint
-}
-
-func unwrapImageParams(kevt *kevent.Kevent) (uint32, uint32, string, kparams.Hex, kparams.Hex) {
-	size, _ := kevt.Kparams.GetUint32(kparams.ImageSize)
-	checksum, _ := kevt.Kparams.GetUint32(kparams.ImageCheckSum)
-	name, _ := kevt.Kparams.GetString(kparams.ImageFilename)
-	baseAddress, _ := kevt.Kparams.GetHex(kparams.ImageBase)
-	defaultBaseAddress, _ := kevt.Kparams.GetHex(kparams.ImageDefaultBase)
-
-	return size, checksum, name, baseAddress, defaultBaseAddress
 }

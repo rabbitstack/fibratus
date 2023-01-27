@@ -33,8 +33,8 @@ type Snapshotter interface {
 	Write(*kevent.Kevent) error
 	AddThread(*kevent.Kevent) error
 	AddModule(*kevent.Kevent) error
-	RemoveThread(uint32) error
-	RemoveModule(string) error
+	RemoveThread(uint32, uint32) error
+	RemoveModule(uint32, string) error
 	// WriteFromKcap appends a new process state to the snapshotter from the captured kernel event.
 	WriteFromKcap(kevt *kevent.Kevent) error
 	// Remove deletes process's state from the snapshotter.
