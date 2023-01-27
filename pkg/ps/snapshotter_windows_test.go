@@ -45,7 +45,7 @@ func TestSnapshotterWrite(t *testing.T) {
 			kparams.ProcessID:       {Name: kparams.ProcessID, Type: kparams.PID, Value: pid},
 			kparams.ProcessParentID: {Name: kparams.ProcessParentID, Type: kparams.PID, Value: uint32(8390)},
 			kparams.ProcessName:     {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "spotify.exe"},
-			kparams.Comm:            {Name: kparams.Comm, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`},
+			kparams.Cmdline:         {Name: kparams.Cmdline, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`},
 			kparams.Exe:             {Name: kparams.Exe, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --parent`},
 			kparams.UserSID:         {Name: kparams.UserSID, Type: kparams.UnicodeString, Value: `admin\SYSTEM`},
 		},
@@ -60,7 +60,7 @@ func TestSnapshotterWrite(t *testing.T) {
 	assert.Equal(t, pid, ps.PID)
 	assert.Equal(t, uint32(8390), ps.Ppid)
 	assert.Equal(t, "spotify.exe", ps.Name)
-	assert.Equal(t, `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`, ps.Comm)
+	assert.Equal(t, `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`, ps.Cmdline)
 	assert.Equal(t, `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --parent`, ps.Exe)
 	assert.Equal(t, `admin\SYSTEM`, ps.SID)
 	assert.Len(t, ps.Args, 13)
@@ -74,7 +74,7 @@ func TestSnapshotterWrite(t *testing.T) {
 			kparams.ProcessID:       {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1232)},
 			kparams.ProcessParentID: {Name: kparams.ProcessParentID, Type: kparams.PID, Value: pid},
 			kparams.ProcessName:     {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "spotify.exe"},
-			kparams.Comm:            {Name: kparams.Comm, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`},
+			kparams.Cmdline:         {Name: kparams.Cmdline, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`},
 			kparams.Exe:             {Name: kparams.Exe, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe`},
 			kparams.UserSID:         {Name: kparams.UserSID, Type: kparams.UnicodeString, Value: `admin\SYSTEM`},
 		},
@@ -94,12 +94,12 @@ func TestSnapshotterWriteKeventProcess(t *testing.T) {
 	psnap := NewSnapshotter(hsnap, &config.Config{})
 
 	kevt := &kevent.Kevent{
-		Type: ktypes.EnumProcess,
+		Type: ktypes.ProcessRundown,
 		Kparams: kevent.Kparams{
 			kparams.ProcessID:       {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1200)},
 			kparams.ProcessParentID: {Name: kparams.ProcessParentID, Type: kparams.PID, Value: uint32(8390)},
 			kparams.ProcessName:     {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "spotify.exe"},
-			kparams.Comm:            {Name: kparams.Comm, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`},
+			kparams.Cmdline:         {Name: kparams.Cmdline, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`},
 			kparams.Exe:             {Name: kparams.Exe, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --parent`},
 			kparams.UserSID:         {Name: kparams.UserSID, Type: kparams.UnicodeString, Value: `admin\SYSTEM`},
 		},
@@ -118,7 +118,7 @@ func TestSnapshotterWriteKeventProcess(t *testing.T) {
 			kparams.ProcessID:       {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1232)},
 			kparams.ProcessParentID: {Name: kparams.ProcessParentID, Type: kparams.PID, Value: 1200},
 			kparams.ProcessName:     {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "spotify-client.exe"},
-			kparams.Comm:            {Name: kparams.Comm, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`},
+			kparams.Cmdline:         {Name: kparams.Cmdline, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`},
 			kparams.Exe:             {Name: kparams.Exe, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe`},
 			kparams.UserSID:         {Name: kparams.UserSID, Type: kparams.UnicodeString, Value: `admin\SYSTEM`},
 		},
@@ -141,7 +141,7 @@ func TestSnapshotterWriteNoPIDInParams(t *testing.T) {
 		Kparams: kevent.Kparams{
 			kparams.ProcessParentID: {Name: kparams.ProcessParentID, Type: kparams.PID, Value: uint32(8390)},
 			kparams.ProcessName:     {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "spotify.exe"},
-			kparams.Comm:            {Name: kparams.Comm, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`},
+			kparams.Cmdline:         {Name: kparams.Cmdline, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`},
 			kparams.Exe:             {Name: kparams.Exe, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe`},
 			kparams.UserSID:         {Name: kparams.UserSID, Type: kparams.UnicodeString, Value: `admin\SYSTEM`},
 		},
@@ -160,7 +160,7 @@ func TestSnapshotterWriteThread(t *testing.T) {
 			kparams.ProcessID:       {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(6599)},
 			kparams.ProcessParentID: {Name: kparams.ProcessParentID, Type: kparams.PID, Value: uint32(8390)},
 			kparams.ProcessName:     {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "spotify.exe"},
-			kparams.Comm:            {Name: kparams.Comm, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`},
+			kparams.Cmdline:         {Name: kparams.Cmdline, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`},
 			kparams.Exe:             {Name: kparams.Exe, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe`},
 			kparams.UserSID:         {Name: kparams.UserSID, Type: kparams.UnicodeString, Value: `admin\SYSTEM`},
 		},
@@ -170,16 +170,16 @@ func TestSnapshotterWriteThread(t *testing.T) {
 	kevt1 := &kevent.Kevent{
 		Type: ktypes.CreateThread,
 		Kparams: kevent.Kparams{
-			kparams.ProcessID:        {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(6599)},
-			kparams.ThreadID:         {Name: kparams.ThreadID, Type: kparams.TID, Value: uint32(3453)},
-			kparams.BasePrio:         {Name: kparams.BasePrio, Type: kparams.Uint8, Value: uint8(13)},
-			kparams.ThreadEntrypoint: {Name: kparams.ThreadEntrypoint, Type: kparams.HexInt64, Value: kparams.Hex("0x7ffe2557ff80")},
-			kparams.IOPrio:           {Name: kparams.IOPrio, Type: kparams.Uint8, Value: uint8(2)},
-			kparams.KstackBase:       {Name: kparams.KstackBase, Type: kparams.HexInt64, Value: kparams.Hex("0xffffc307810d6000")},
-			kparams.KstackLimit:      {Name: kparams.KstackLimit, Type: kparams.HexInt64, Value: kparams.Hex("0xffffc307810cf000")},
-			kparams.PagePrio:         {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(5)},
-			kparams.UstackBase:       {Name: kparams.UstackBase, Type: kparams.HexInt64, Value: kparams.Hex("0x5260000")},
-			kparams.UstackLimit:      {Name: kparams.UstackLimit, Type: kparams.HexInt64, Value: kparams.Hex("0x525f000")},
+			kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(6599)},
+			kparams.ThreadID:    {Name: kparams.ThreadID, Type: kparams.TID, Value: uint32(3453)},
+			kparams.BasePrio:    {Name: kparams.BasePrio, Type: kparams.Uint8, Value: uint8(13)},
+			kparams.StartAddr:   {Name: kparams.StartAddr, Type: kparams.HexInt64, Value: kparams.Hex("0x7ffe2557ff80")},
+			kparams.IOPrio:      {Name: kparams.IOPrio, Type: kparams.Uint8, Value: uint8(2)},
+			kparams.KstackBase:  {Name: kparams.KstackBase, Type: kparams.HexInt64, Value: kparams.Hex("0xffffc307810d6000")},
+			kparams.KstackLimit: {Name: kparams.KstackLimit, Type: kparams.HexInt64, Value: kparams.Hex("0xffffc307810cf000")},
+			kparams.PagePrio:    {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(5)},
+			kparams.UstackBase:  {Name: kparams.UstackBase, Type: kparams.HexInt64, Value: kparams.Hex("0x5260000")},
+			kparams.UstackLimit: {Name: kparams.UstackLimit, Type: kparams.HexInt64, Value: kparams.Hex("0x525f000")},
 		},
 	}
 
@@ -300,7 +300,7 @@ func TestReapDeadProcesses(t *testing.T) {
 			kparams.ProcessID:       {Name: kparams.ProcessID, Type: kparams.PID, Value: pi.ProcessId},
 			kparams.ProcessParentID: {Name: kparams.ProcessParentID, Type: kparams.PID, Value: uint32(8390)},
 			kparams.ProcessName:     {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "calc.exe"},
-			kparams.Comm:            {Name: kparams.Comm, Type: kparams.UnicodeString, Value: `c:\\windows\\system32\\calc.exe`},
+			kparams.Cmdline:         {Name: kparams.Cmdline, Type: kparams.UnicodeString, Value: `c:\\windows\\system32\\calc.exe`},
 			kparams.Exe:             {Name: kparams.Exe, Type: kparams.UnicodeString, Value: `c:\\windows\\system32\\calc.exe`},
 			kparams.UserSID:         {Name: kparams.UserSID, Type: kparams.UnicodeString, Value: `admin\SYSTEM`},
 		},
@@ -314,7 +314,7 @@ func TestReapDeadProcesses(t *testing.T) {
 			kparams.ProcessID:       {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(os.Getpid())},
 			kparams.ProcessParentID: {Name: kparams.ProcessParentID, Type: kparams.PID, Value: uint32(8390)},
 			kparams.ProcessName:     {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "spotify.exe"},
-			kparams.Comm:            {Name: kparams.Comm, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`},
+			kparams.Cmdline:         {Name: kparams.Cmdline, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`},
 			kparams.Exe:             {Name: kparams.Exe, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe`},
 			kparams.UserSID:         {Name: kparams.UserSID, Type: kparams.UnicodeString, Value: `admin\SYSTEM`},
 		},
@@ -339,7 +339,7 @@ func TestRemove(t *testing.T) {
 			kparams.ProcessID:       {Name: kparams.ProcessID, Type: kparams.PID, Value: pid},
 			kparams.ProcessParentID: {Name: kparams.ProcessParentID, Type: kparams.PID, Value: uint32(8390)},
 			kparams.ProcessName:     {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "spotify.exe"},
-			kparams.Comm:            {Name: kparams.Comm, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`},
+			kparams.Cmdline:         {Name: kparams.Cmdline, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`},
 			kparams.Exe:             {Name: kparams.Exe, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe`},
 			kparams.UserSID:         {Name: kparams.UserSID, Type: kparams.UnicodeString, Value: `admin\SYSTEM`},
 		},
@@ -369,7 +369,7 @@ func TestRemoveNoPidInParams(t *testing.T) {
 		Kparams: kevent.Kparams{
 			kparams.ProcessParentID: {Name: kparams.ProcessParentID, Type: kparams.PID, Value: uint32(8390)},
 			kparams.ProcessName:     {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "spotify.exe"},
-			kparams.Comm:            {Name: kparams.Comm, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`},
+			kparams.Cmdline:         {Name: kparams.Cmdline, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`},
 			kparams.Exe:             {Name: kparams.Exe, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe`},
 			kparams.UserSID:         {Name: kparams.UserSID, Type: kparams.UnicodeString, Value: `admin\SYSTEM`},
 		},
@@ -390,7 +390,7 @@ func TestRemoveThread(t *testing.T) {
 			kparams.ProcessID:       {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(6599)},
 			kparams.ProcessParentID: {Name: kparams.ProcessParentID, Type: kparams.PID, Value: uint32(8390)},
 			kparams.ProcessName:     {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "spotify.exe"},
-			kparams.Comm:            {Name: kparams.Comm, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`},
+			kparams.Cmdline:         {Name: kparams.Cmdline, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`},
 			kparams.Exe:             {Name: kparams.Exe, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe`},
 			kparams.UserSID:         {Name: kparams.UserSID, Type: kparams.UnicodeString, Value: `admin\SYSTEM`},
 		},
@@ -400,16 +400,16 @@ func TestRemoveThread(t *testing.T) {
 	kevt1 := &kevent.Kevent{
 		Type: ktypes.CreateThread,
 		Kparams: kevent.Kparams{
-			kparams.ProcessID:        {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(6599)},
-			kparams.ThreadID:         {Name: kparams.ThreadID, Type: kparams.TID, Value: uint32(3453)},
-			kparams.BasePrio:         {Name: kparams.BasePrio, Type: kparams.Uint8, Value: uint8(13)},
-			kparams.ThreadEntrypoint: {Name: kparams.ThreadEntrypoint, Type: kparams.HexInt64, Value: kparams.Hex("0x7ffe2557ff80")},
-			kparams.IOPrio:           {Name: kparams.IOPrio, Type: kparams.Uint8, Value: uint8(2)},
-			kparams.KstackBase:       {Name: kparams.KstackBase, Type: kparams.HexInt64, Value: kparams.Hex("0xffffc307810d6000")},
-			kparams.KstackLimit:      {Name: kparams.KstackLimit, Type: kparams.HexInt64, Value: kparams.Hex("0xffffc307810cf000")},
-			kparams.PagePrio:         {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(5)},
-			kparams.UstackBase:       {Name: kparams.UstackBase, Type: kparams.HexInt64, Value: kparams.Hex("0x5260000")},
-			kparams.UstackLimit:      {Name: kparams.UstackLimit, Type: kparams.HexInt64, Value: kparams.Hex("0x525f000")},
+			kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(6599)},
+			kparams.ThreadID:    {Name: kparams.ThreadID, Type: kparams.TID, Value: uint32(3453)},
+			kparams.BasePrio:    {Name: kparams.BasePrio, Type: kparams.Uint8, Value: uint8(13)},
+			kparams.StartAddr:   {Name: kparams.StartAddr, Type: kparams.HexInt64, Value: kparams.Hex("0x7ffe2557ff80")},
+			kparams.IOPrio:      {Name: kparams.IOPrio, Type: kparams.Uint8, Value: uint8(2)},
+			kparams.KstackBase:  {Name: kparams.KstackBase, Type: kparams.HexInt64, Value: kparams.Hex("0xffffc307810d6000")},
+			kparams.KstackLimit: {Name: kparams.KstackLimit, Type: kparams.HexInt64, Value: kparams.Hex("0xffffc307810cf000")},
+			kparams.PagePrio:    {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(5)},
+			kparams.UstackBase:  {Name: kparams.UstackBase, Type: kparams.HexInt64, Value: kparams.Hex("0x5260000")},
+			kparams.UstackLimit: {Name: kparams.UstackLimit, Type: kparams.HexInt64, Value: kparams.Hex("0x525f000")},
 		},
 	}
 

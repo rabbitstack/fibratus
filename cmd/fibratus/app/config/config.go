@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package app
+package config
 
 import (
 	"fmt"
@@ -28,7 +28,7 @@ import (
 	"os"
 )
 
-var configCmd = &cobra.Command{
+var Cmd = &cobra.Command{
 	Use:   "config",
 	Short: "Show runtime config",
 	RunE:  printConfig,
@@ -36,20 +36,20 @@ var configCmd = &cobra.Command{
 
 var (
 	// config command options
-	c = config.NewWithOpts(config.WithStats())
+	cfg = config.NewWithOpts(config.WithStats())
 )
 
 func init() {
-	c.MustViperize(configCmd)
+	cfg.MustViperize(Cmd)
 }
 
 func printConfig(cmd *cobra.Command, args []string) error {
-	if err := common.Init(c, false); err != nil {
+	if err := common.Init(cfg, false); err != nil {
 		return err
 	}
-	body, err := rest.Get(rest.WithTransport(c.API.Transport), rest.WithURI("config"))
+	body, err := rest.Get(rest.WithTransport(cfg.API.Transport), rest.WithURI("config"))
 	if err != nil {
-		return kerrors.ErrHTTPServerUnavailable(c.API.Transport, err)
+		return kerrors.ErrHTTPServerUnavailable(cfg.API.Transport, err)
 	}
 	_, err = fmt.Fprintln(os.Stdout, string(body))
 	if err != nil {

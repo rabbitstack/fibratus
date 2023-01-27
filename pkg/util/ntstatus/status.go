@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package status
+package ntstatus
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/syscall/sys"

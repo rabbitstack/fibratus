@@ -27,10 +27,14 @@ import (
 // of all running processes in the system including its threads, dynamically referenced libraries, handles/file descriptors and other
 // metadata.
 type Snapshotter interface {
-	// Write appends a new process state to the snapshotter. It takes as an input the inbound kernel event to fetch
+	// Write appends a new process state to the snapshotter. It takes as an input the inbound event to fetch
 	// the basic data, but also enriches the process' state with extra metadata such as process' env variables, PE
 	// metadata for Windows binaries and so on.
-	Write(kevt *kevent.Kevent) error
+	Write(*kevent.Kevent) error
+	AddThread(*kevent.Kevent) error
+	AddModule(*kevent.Kevent) error
+	RemoveThread(uint32) error
+	RemoveModule(string) error
 	// WriteFromKcap appends a new process state to the snapshotter from the captured kernel event.
 	WriteFromKcap(kevt *kevent.Kevent) error
 	// Remove deletes process's state from the snapshotter.

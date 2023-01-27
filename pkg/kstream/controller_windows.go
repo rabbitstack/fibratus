@@ -122,9 +122,7 @@ func NewKtraceController(kstreamConfig config.KstreamConfig) *KtraceController {
 // Logger sessions. On the contrary, keywords can only be used on the non-NT Kernel
 // Logger tracing sessions.
 func (k *KtraceController) StartKtrace() error {
-	// at least process events have to be enabled
-	// for the purpose of building the state machine
-	flags := etw.Process
+	flags := etw.Process // process events are required
 	if k.kstreamConfig.EnableThreadKevents {
 		flags |= etw.Thread
 	}

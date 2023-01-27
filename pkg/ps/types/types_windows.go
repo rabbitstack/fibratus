@@ -42,8 +42,8 @@ type PS struct {
 	Ppid uint32 `json:"ppid"`
 	// Name is the process' image name including file extension (e.g. cmd.exe)
 	Name string `json:"name"`
-	// Comm is the full process' command line (e.g. C:\Windows\system32\cmd.exe /cdir /-C /W)
-	Comm string `json:"comm"`
+	// Cmdline is the full process' command line (e.g. C:\Windows\system32\cmd.exe /cdir /-C /W)
+	Cmdline string `json:"comm"`
 	// Exe is the full name of the process' executable (e.g. C:\Windows\system32\cmd.exe)
 	Exe string `json:"exe"`
 	// Cwd designates the current working directory of the process.
@@ -85,7 +85,7 @@ func (ps *PS) String() string {
 		ps.PID,
 		ps.Ppid,
 		ps.Name,
-		ps.Comm,
+		ps.Cmdline,
 		ps.Exe,
 		ps.Cwd,
 		ps.SID,
@@ -154,15 +154,15 @@ func (m Module) String() string {
 	return fmt.Sprintf("Name: %s, Size: %d, Checksum: %d, Base address: %s, Default base address: %s", m.Name, m.Size, m.Checksum, m.BaseAddress, m.DefaultBaseAddress)
 }
 
-// FromKevent produces a new process state from kernel event.
-func FromKevent(pid, ppid uint32, name, comm, exe, sid string, sessionID uint8) *PS {
+// NewProc produces a new process state.
+func NewProc(pid, ppid uint32, name, cmndline, exe, sid string, sessionID uint8) *PS {
 	return &PS{
 		PID:       pid,
 		Ppid:      ppid,
 		Name:      name,
-		Comm:      comm,
+		Cmdline:   cmndline,
 		Exe:       exe,
-		Args:      cmdline.Split(comm),
+		Args:      cmdline.Split(cmndline),
 		SID:       sid,
 		SessionID: sessionID,
 		Threads:   make(map[uint32]Thread),
@@ -195,23 +195,6 @@ func ImageFromKevent(size, checksum uint32, name string, baseAddress, defaultBas
 		Name:               name,
 		BaseAddress:        baseAddress,
 		DefaultBaseAddress: defaultBaseAddress,
-	}
-}
-
-// NewPS produces a new process state from passed arguments.
-func NewPS(pid, ppid uint32, exe, cwd, comm string, thread Thread, envs map[string]string) *PS {
-	return &PS{
-		PID:     pid,
-		Ppid:    ppid,
-		Name:    filepath.Base(exe),
-		Exe:     exe,
-		Comm:    comm,
-		Cwd:     cwd,
-		Args:    cmdline.Split(comm),
-		Threads: map[uint32]Thread{thread.Tid: thread},
-		Modules: make([]Module, 0),
-		Handles: make([]htypes.Handle, 0),
-		Envs:    envs,
 	}
 }
 

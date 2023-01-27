@@ -20,7 +20,8 @@ package ps
 
 import (
 	"expvar"
-	"os"
+	"github.com/rabbitstack/fibratus/pkg/syscall"
+	"golang.org/x/sys/windows"
 	"path/filepath"
 	"strconv"
 	"sync"
@@ -35,13 +36,11 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	hndl "github.com/rabbitstack/fibratus/pkg/syscall/handle"
-	"github.com/rabbitstack/fibratus/pkg/syscall/process"
-	"github.com/rabbitstack/fibratus/pkg/syscall/winerrno"
 	log "github.com/sirupsen/logrus"
 )
 
 var (
-	// reapPeriod specifies the interval for triggering the house keeping of dead processes
+	// reapPeriod specifies the interval for triggering the housekeeping of dead processes
 	reapPeriod = time.Minute * 2
 
 	processLookupFailureCount = expvar.NewMap("process.lookup.failure.count")
@@ -53,30 +52,30 @@ var (
 )
 
 type snapshotter struct {
-	mu         sync.RWMutex
-	procs      map[uint32]*pstypes.PS
-	quit       chan struct{}
-	config     *config.Config
-	handleSnap handle.Snapshotter
-	peReader   pe.Reader
-	capture    bool
+	mu      sync.RWMutex
+	procs   map[uint32]*pstypes.PS
+	quit    chan struct{}
+	config  *config.Config
+	hsnap   handle.Snapshotter
+	pe      pe.Reader
+	capture bool
 }
 
 // NewSnapshotter returns a new instance of the process snapshotter.
-func NewSnapshotter(handleSnap handle.Snapshotter, config *config.Config) Snapshotter {
+func NewSnapshotter(hsnap handle.Snapshotter, config *config.Config) Snapshotter {
 	s := &snapshotter{
-		procs:      make(map[uint32]*pstypes.PS),
-		quit:       make(chan struct{}),
-		config:     config,
-		handleSnap: handleSnap,
-		peReader:   pe.NewReader(config.PE),
+		procs:  make(map[uint32]*pstypes.PS),
+		quit:   make(chan struct{}),
+		config: config,
+		hsnap:  hsnap,
+		pe:     pe.NewReader(config.PE),
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.handleSnap.RegisterCreateCallback(s.onHandleCreated)
-	s.handleSnap.RegisterDestroyCallback(s.onHandleDestroyed)
+	s.hsnap.RegisterCreateCallback(s.onHandleCreated)
+	s.hsnap.RegisterDestroyCallback(s.onHandleDestroyed)
 
 	go s.gcDeadProcesses()
 
@@ -84,18 +83,18 @@ func NewSnapshotter(handleSnap handle.Snapshotter, config *config.Config) Snapsh
 }
 
 // NewSnapshotterFromKcap restores the snapshotter state from the kcap file.
-func NewSnapshotterFromKcap(handleSnap handle.Snapshotter, config *config.Config) Snapshotter {
+func NewSnapshotterFromKcap(hsnap handle.Snapshotter, config *config.Config) Snapshotter {
 	s := &snapshotter{
-		procs:      make(map[uint32]*pstypes.PS),
-		quit:       make(chan struct{}),
-		config:     config,
-		handleSnap: handleSnap,
-		peReader:   pe.NewReader(config.PE),
-		capture:    true,
+		procs:   make(map[uint32]*pstypes.PS),
+		quit:    make(chan struct{}),
+		config:  config,
+		hsnap:   hsnap,
+		pe:      pe.NewReader(config.PE),
+		capture: true,
 	}
 
-	s.handleSnap.RegisterCreateCallback(s.onHandleCreated)
-	s.handleSnap.RegisterDestroyCallback(s.onHandleDestroyed)
+	s.hsnap.RegisterCreateCallback(s.onHandleCreated)
+	s.hsnap.RegisterDestroyCallback(s.onHandleDestroyed)
 
 	return s
 }
@@ -120,7 +119,7 @@ func (s *snapshotter) WriteFromKcap(kevt *kevent.Kevent) error {
 			}
 			s.procs[pid] = ps
 		} else {
-			s.procs[pid] = pstypes.FromKevent(unwrapParams(pid, kevt))
+			//s.procs[pid] = pstypes.FromKevent(unwrapParams(pid, kevt))
 		}
 		ppid, err := kevt.Kparams.GetPpid()
 		if err != nil {
@@ -153,118 +152,133 @@ func (s *snapshotter) WriteFromKcap(kevt *kevent.Kevent) error {
 	return nil
 }
 
-func (s *snapshotter) Write(kevt *kevent.Kevent) error {
+func (s *snapshotter) Write(e *kevent.Kevent) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	switch kevt.Type {
-	case ktypes.CreateProcess, ktypes.ProcessRundown:
-		pid, err := kevt.Kparams.GetPid()
-		if err != nil {
-			return err
-		}
-		processCount.Add(1)
-
-		// ETW can sometimes report invalid process id, so we try
-		// to obtain the process id from its thread identifier
-		if kevt.Type == ktypes.CreateProcess && pid == winerrno.InvalidPID {
-			pid = pidFromThreadID(kevt.Tid)
-		}
-
-		ps := pstypes.FromKevent(unwrapParams(pid, kevt))
-
-		// enumerate process handles
-		ps.Handles, err = s.handleSnap.FindHandles(pid)
-		if err != nil {
-			log.Warnf("couldn't enumerate handles for pid (%d): %v", pid, err)
-		}
-		ps.Parent = s.procs[ps.Ppid]
-
-		// inspect PE metadata and attach corresponding headers
-		s.readPE(ps)
-
-		// adjust the process that is producing the event. For
-		// `CreateProcess` events the process context is scoped
-		// to the parent/creator process. Otherwise, it is a regular
-		// enumeration event that doesn't require consulting the
-		// process in the snapshot state
-		if kevt.Type == ktypes.CreateProcess {
-			kevt.PS = s.procs[kevt.PID]
-		} else {
-			kevt.PS = ps
-		}
-		// try to enum process's env variables and the cwd
-		flags := process.QueryInformation | process.VMRead
-		h, err := process.Open(flags, false, pid)
-		if err != nil {
-			s.procs[pid] = ps
-			return nil
-		}
-		defer h.Close()
-
-		peb, err := ReadPEB(h)
-		if err != nil {
-			pebReadErrors.Add(1)
-			s.procs[pid] = ps
-			return nil
-		}
-
-		ps.Envs = peb.GetEnvs()
-		ps.Cwd = peb.GetCurrentWorkingDirectory()
-
-		if kevt.Type != ktypes.CreateProcess {
-			kevt.PS = ps
-		}
-
-		s.procs[pid] = ps
-	case ktypes.CreateThread, ktypes.ThreadRundown:
-		pid, err := kevt.Kparams.GetPid()
-		if err != nil {
-			return err
-		}
-		threadCount.Add(1)
-		if pid == winerrno.InvalidPID {
-			threadID, _ := kevt.Kparams.GetTid()
-			pid = pidFromThreadID(threadID)
-		}
-		// thread can be associated with the process
-		// as it already exists in the map
-		thread := pstypes.ThreadFromKevent(unwrapThreadParams(pid, kevt))
-		if ps, ok := s.procs[pid]; ok {
-			// append additional params
-			kevt.Kparams.Append(kparams.Exe, kparams.UnicodeString, ps.Exe)
-			ps.AddThread(thread)
-			return nil
-		}
-
-		// search for missing process and attempt to get its info
-		ps := s.findProcess(pid, thread)
-
-		// enumerate process handles
-		ps.Handles, err = s.handleSnap.FindHandles(pid)
-		if err != nil {
-			log.Warnf("couldn't enumerate handles for pid (%d): %v", pid, err)
-		}
-		ps.Parent = s.procs[ps.Ppid]
-
-		s.procs[pid] = ps
-	case ktypes.LoadImage, ktypes.ImageRundown:
-		pid, err := kevt.Kparams.GetPid()
-		if err != nil {
-			return err
-		}
-		moduleCount.Add(1)
-		ps, ok := s.procs[pid]
-		if !ok {
-			return nil
-		}
-		ps.AddModule(pstypes.ImageFromKevent(unwrapImageParams(kevt)))
+	processCount.Add(1)
+	pid, err := e.Kparams.GetPid()
+	if err != nil {
+		return err
+	}
+	ppid, err := e.Kparams.GetPpid()
+	if err != nil {
+		return err
+	}
+	proc, err := s.newProc(pid, ppid, e)
+	s.procs[pid] = proc
+	proc.Parent = s.procs[ppid]
+	// adjust the process which is generating the event. For
+	// `CreateProcess` events the process context is scoped
+	// to the parent/creator process. Otherwise, it is a regular
+	// rundown event that doesn't require consulting the
+	// process in the snapshot state
+	if e.IsCreateProcess() {
+		e.PS = s.procs[e.PID]
+	} else {
+		e.PS = proc
+	}
+	if err != nil {
+		return err
 	}
 	return nil
 }
 
+func (s *snapshotter) AddThread(e *kevent.Kevent) error {
+	pid, err := e.Kparams.GetPid()
+	if err != nil {
+		return err
+	}
+	threadCount.Add(1)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	proc, ok := s.procs[pid]
+	if !ok {
+		return nil
+	}
+	thread := pstypes.Thread{}
+	thread.Tid, _ = e.Kparams.GetTid()
+	thread.UstackBase, _ = e.Kparams.GetHex(kparams.UstackBase)
+	thread.UstackLimit, _ = e.Kparams.GetHex(kparams.UstackLimit)
+	thread.KstackBase, _ = e.Kparams.GetHex(kparams.KstackBase)
+	thread.KstackLimit, _ = e.Kparams.GetHex(kparams.KstackLimit)
+	thread.IOPrio, _ = e.Kparams.GetUint8(kparams.IOPrio)
+	thread.BasePrio, _ = e.Kparams.GetUint8(kparams.BasePrio)
+	thread.PagePrio, _ = e.Kparams.GetUint8(kparams.PagePrio)
+	thread.Entrypoint, _ = e.Kparams.GetHex(kparams.StartAddr)
+	proc.AddThread(thread)
+	return nil
+}
+
+func (s *snapshotter) AddModule(e *kevent.Kevent) error {
+	pid, err := e.Kparams.GetPid()
+	if err != nil {
+		return err
+	}
+	moduleCount.Add(1)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	proc, ok := s.procs[pid]
+	if !ok {
+		return nil
+	}
+	module := pstypes.Module{}
+	module.Size, _ = e.Kparams.GetUint32(kparams.ImageSize)
+	module.Checksum, _ = e.Kparams.GetUint32(kparams.ImageCheckSum)
+	module.Name, _ = e.Kparams.GetString(kparams.ImageFilename)
+	module.BaseAddress, _ = e.Kparams.GetHex(kparams.ImageBase)
+	module.DefaultBaseAddress, _ = e.Kparams.GetHex(kparams.ImageDefaultBase)
+	proc.AddModule(module)
+	return nil
+}
+
+func (s *snapshotter) RemoveThread(tid uint32) error { return nil }
+func (s *snapshotter) RemoveModule(mod string) error { return nil }
+
 func (s *snapshotter) Close() error {
 	s.quit <- struct{}{}
 	return nil
+}
+
+func (s *snapshotter) newProc(pid, ppid uint32, e *kevent.Kevent) (*pstypes.PS, error) {
+	proc := pstypes.NewProc(
+		pid,
+		ppid,
+		e.GetParamAsString(kparams.ProcessName),
+		e.GetParamAsString(kparams.Cmdline),
+		e.GetParamAsString(kparams.Exe),
+		e.GetParamAsString(kparams.UserSID),
+		uint8(e.Kparams.MustGetUint32(kparams.SessionID)),
+	)
+	// retrieve Portable Executable data
+	var err error
+	proc.PE, err = s.pe.Read(proc.Exe)
+	if err != nil {
+		return proc, err
+	}
+
+	// retrieve process handles
+	proc.Handles, err = s.hsnap.FindHandles(pid)
+	if err != nil {
+		return proc, err
+	}
+
+	// try to read the PEB (Process Environment Block)
+	// to access environment variables and the process
+	// current working directory
+	access := uint32(windows.PROCESS_QUERY_INFORMATION | windows.PROCESS_VM_READ)
+	process, err := windows.OpenProcess(access, false, pid)
+	if err != nil {
+		return proc, nil
+	}
+	defer windows.CloseHandle(process)
+	peb, err := ReadPEB(process)
+	if err != nil {
+		pebReadErrors.Add(1)
+		return proc, err
+	}
+	proc.Envs = peb.GetEnvs()
+	proc.Cwd = peb.GetCurrentWorkingDirectory()
+	return proc, nil
 }
 
 // gcDeadProcesses periodically scans the map of the snapshot's processes and removes
@@ -280,14 +294,14 @@ func (s *snapshotter) gcDeadProcesses() {
 			log.Debugf("scanning for dead processes on the snapshot of %d items", ss)
 
 			for pid := range s.procs {
-				h, err := process.Open(process.QueryLimitedInformation, false, pid)
+				proc, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
 				if err != nil {
 					continue
 				}
-				if !process.IsAlive(h) {
+				if !syscall.IsProcessRunning(proc) {
 					delete(s.procs, pid)
 				}
-				h.Close()
+				windows.CloseHandle(proc)
 			}
 
 			if ss > len(s.procs) {
@@ -300,91 +314,6 @@ func (s *snapshotter) gcDeadProcesses() {
 			tick.Stop()
 		}
 	}
-}
-
-func pidFromThreadID(tid uint32) uint32 {
-	pid, err := process.GetPIDFromThread(tid)
-	if err != nil {
-		return winerrno.InvalidPID
-	}
-	return pid
-}
-
-func ntoskrnl() string { return filepath.Join(os.Getenv("SystemRoot"), "ntoskrnl.exe") }
-
-func fromPEB(pid, ppid uint32, peb *PEB, thread pstypes.Thread) *pstypes.PS {
-	return pstypes.NewPS(
-		pid,
-		ppid,
-		peb.GetImage(),
-		peb.GetCurrentWorkingDirectory(),
-		peb.GetCommandLine(),
-		thread,
-		peb.GetEnvs(),
-	)
-}
-
-func (s *snapshotter) findProcess(pid uint32, thread pstypes.Thread) *pstypes.PS {
-	// several system protected processes don't allow for getting their handles
-	// even if SeDebugPrivilege is present in the process' token, so we'll handle
-	// them manually
-	switch pid {
-	case 0:
-		return pstypes.NewPS(pid, pid, "idle", "", "idle", thread, nil)
-	case 4:
-		return pstypes.NewPS(pid, 0, "System", "", ntoskrnl(), thread, nil)
-	}
-	flags := process.QueryInformation | process.VMRead
-	h, err := process.Open(flags, false, pid)
-	if err != nil {
-		// the access to protected / system process can't be achieved through
-		// `VMRead` or `QueryInformation` flags.
-		// Try to acquire the process handle again but with restricted access rights,
-		// so we can get the process image file name
-		h, err = process.Open(
-			process.QueryLimitedInformation,
-			false,
-			pid,
-		)
-		if err != nil {
-			return pstypes.NewPS(pid, pid, "", "", "", thread, nil)
-		}
-	}
-	defer h.Close()
-
-	// read process's metadata from the PEB
-	peb, err := ReadPEB(h)
-	if err != nil {
-		pebReadErrors.Add(1)
-		// couldn't query process basic info or read the PEB,
-		// so at least try to obtain the full process's image name
-		image, err := process.QueryFullImageName(h)
-		if err != nil {
-			return pstypes.NewPS(pid, pid, "", "", "", thread, nil)
-		}
-		return pstypes.NewPS(pid, pid, image, "", image, thread, nil)
-	}
-	return fromPEB(pid, process.GetParentPID(h), peb, thread)
-}
-
-func (s *snapshotter) readPE(ps *pstypes.PS) {
-	// skip imageless processes such as Idle, System or Registry
-	pid := ps.PID
-	if pid == 0 || pid == 4 || pid == 72 || pid == 128 {
-		return
-	}
-	p, err := s.peReader.Read(ps.Exe)
-	if err != nil {
-		log.Warnf("fail to inspect PE metadata for process %s (%d): %v", ps.Name, ps.PID, err)
-		return
-	}
-
-	if p == nil {
-		return
-	}
-
-	ps.PE = p
-	s.procs[pid] = ps
 }
 
 func (s *snapshotter) onHandleCreated(pid uint32, handle htypes.Handle) {
@@ -459,25 +388,63 @@ func (s *snapshotter) Find(pid uint32) *pstypes.PS {
 		return nil
 	}
 	processLookupFailureCount.Add(strconv.Itoa(int(pid)), 1)
-
-	// allocate missing process's state and fill in metadata/handles
-	thread := pstypes.Thread{}
-	ps = s.findProcess(pid, thread)
-
-	s.readPE(ps)
-
-	// enumerate process handles
-	var err error
-	ps.Handles, err = s.handleSnap.FindHandles(pid)
+	proc := &pstypes.PS{PID: pid, Ppid: syscall.InvalidProcessPid}
+	access := uint32(windows.PROCESS_QUERY_INFORMATION | windows.PROCESS_VM_READ)
+	process, err := windows.OpenProcess(access, false, pid)
 	if err != nil {
-		log.Warnf("couldn't enumerate handles for pid (%d): %v", pid, err)
+		// the access to protected / system process can't be achieved
+		// through `PROCESS_VM_READ` or `PROCESS_QUERY_INFORMATION` flags.
+		// Try to acquire the process handle again but with restricted access
+		// rights to obtain the full process's image name
+		process, err = windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
+		if err != nil {
+			return proc
+		}
+		var size uint32 = windows.MAX_PATH
+		n := make([]uint16, size)
+		err := windows.QueryFullProcessImageName(process, 0, &n[0], &size)
+		if err != nil {
+			return proc
+		}
+		exe := windows.UTF16ToString(n)
+		proc.Exe = exe
+		proc.Name = filepath.Base(exe)
 	}
+	defer windows.CloseHandle(process)
+
+	// retrieve Portable Executable data
+	proc.PE, err = s.pe.Read(proc.Exe)
+	if err != nil {
+		return proc
+	}
+
+	// consult process parent id
+	pbi, err := syscall.QueryInformationProcess[windows.PROCESS_BASIC_INFORMATION](process, syscall.ProcessBasicInformationClass)
+	if err != nil {
+		return proc
+	}
+	proc.Ppid = uint32(pbi.InheritedFromUniqueProcessId)
+
+	// retrieve process handles
+	proc.Handles, err = s.hsnap.FindHandles(pid)
+	if err != nil {
+		return proc
+	}
+
+	// read PEB
+	peb, err := ReadPEB(process)
+	if err != nil {
+		pebReadErrors.Add(1)
+		return proc
+	}
+	proc.Envs = peb.GetEnvs()
+	proc.Cmdline = peb.GetCommandLine()
+	proc.Cwd = peb.GetCurrentWorkingDirectory()
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.procs[pid] = ps
-
-	return ps
+	s.procs[pid] = proc
+	return proc
 }
 
 func (s *snapshotter) Size() uint32 {

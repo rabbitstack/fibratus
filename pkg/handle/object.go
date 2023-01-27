@@ -34,7 +34,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/syscall/process"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
 	"github.com/rabbitstack/fibratus/pkg/util/typesize"
-	"os"
 	"sort"
 	"unsafe"
 )
@@ -133,24 +132,25 @@ func (s *otstore) next(typ *object.TypeInformation) unsafe.Pointer {
 
 // Duplicate duplicates the handle in the caller process's address space.
 func Duplicate(h handle.Handle, pid uint32, access handle.DuplicateAccess) (handle.Handle, error) {
-	targetPs, err := process.Open(process.DupHandle, false, pid)
-	if err != nil {
-		return ^handle.Handle(0), err
-	}
-	defer targetPs.Close()
-	currentPs, err := process.Open(process.DupHandle, false, uint32(os.Getpid()))
-	if err != nil {
-		return ^handle.Handle(0), err
-	}
-	defer currentPs.Close()
-	// duplicate the remote handle in the current process's address space.
-	// Note that for certain handle types this operation might fail
-	// as they don't permit duplicate operations
-	dup, err := h.Duplicate(targetPs, currentPs, access)
-	if err != nil {
-		return ^handle.Handle(0), fmt.Errorf("couldn't duplicate handle: %v", err)
-	}
-	return dup, nil
+	//targetPs, err := process.Open(process.DupHandle, false, pid)
+	//if err != nil {
+	//	return ^handle.Handle(0), err
+	//}
+	//defer targetPs.Close()
+	//currentPs, err := process.Open(process.DupHandle, false, uint32(os.Getpid()))
+	//if err != nil {
+	//	return ^handle.Handle(0), err
+	//}
+	//defer currentPs.Close()
+	//// duplicate the remote handle in the current process's address space.
+	//// Note that for certain handle types this operation might fail
+	//// as they don't permit duplicate operations
+	//dup, err := h.Duplicate(targetPs, currentPs, access)
+	//if err != nil {
+	//	return ^handle.Handle(0), fmt.Errorf("couldn't duplicate handle: %v", err)
+	//}
+	//return dup, nil
+	return 0, nil
 }
 
 // QueryType returns the type of the specified handle.
@@ -221,9 +221,9 @@ func QueryName(handle handle.Handle, typ string, withTimeout bool) (string, htyp
 				return name, nil, nil
 			}
 			if subkey != "" {
-				return key.String(rootKey) + "\\" + subkey, nil, nil
+				return rootKey.String() + "\\" + subkey, nil, nil
 			}
-			return key.String(rootKey), nil, nil
+			return rootKey.String(), nil, nil
 		default:
 			return name, nil, nil
 		}

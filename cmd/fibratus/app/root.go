@@ -20,6 +20,8 @@ package app
 
 import (
 	"errors"
+	"github.com/rabbitstack/fibratus/cmd/fibratus/app/capture"
+	"github.com/rabbitstack/fibratus/cmd/fibratus/app/config"
 	"github.com/spf13/cobra"
 	"runtime"
 )
@@ -29,10 +31,10 @@ var RootCmd = &cobra.Command{
 	Use:   "fibratus",
 	Short: "Modern tool for the kernel observability and exploration",
 	Long: `
-	Fibratus is a tool for exploration and tracing of the Windows kernel. 
-	It lets you trap system-wide events such as process life-cycle, file system I/O, 
-	registry modifications or network requests among many other observability signals. 
-	In a nutshell, Fibratus allows for gaining deep operational visibility into the Windows 
+	Fibratus is a tool for exploration and tracing of the Windows kernel.
+	It lets you trap system-wide events such as process life-cycle, file system I/O,
+	registry modifications or network requests among many other observability signals.
+	In a nutshell, Fibratus allows for gaining deep operational visibility into the Windows
 	kernel but also processes running on top of it.
 	`,
 	SilenceUsage: true,
@@ -49,7 +51,7 @@ var RootCmd = &cobra.Command{
 
 func init() {
 	RootCmd.AddCommand(runCmd)
-	RootCmd.AddCommand(captureCmd)
+	RootCmd.AddCommand(capture.Cmd)
 	RootCmd.AddCommand(replayCmd)
 	RootCmd.AddCommand(installSvcCmd)
 	RootCmd.AddCommand(removeSvcCmd)
@@ -57,7 +59,7 @@ func init() {
 	RootCmd.AddCommand(stopSvcCmd)
 	RootCmd.AddCommand(restartSvcCmd)
 	RootCmd.AddCommand(statsCmd)
-	RootCmd.AddCommand(configCmd)
+	RootCmd.AddCommand(config.Cmd)
 	RootCmd.AddCommand(docsCmd)
 	RootCmd.AddCommand(versionCmd)
 }

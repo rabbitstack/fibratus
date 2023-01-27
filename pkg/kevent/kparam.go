@@ -208,6 +208,16 @@ func (kpars Kparams) GetPpid() (uint32, error) {
 	return kpars.getPid(kparams.ProcessParentID)
 }
 
+// MustGetPpid returns the parent pid parameter. It panics if
+// an error occurs while trying to get the pid parameter.
+func (kpars Kparams) MustGetPpid() uint32 {
+	ppid, err := kpars.GetPpid()
+	if err != nil {
+		panic(err)
+	}
+	return ppid
+}
+
 func (kpars Kparams) getPid(name string) (uint32, error) {
 	kpar, err := kpars.findParam(name)
 	if err != nil {
@@ -276,6 +286,16 @@ func (kpars Kparams) GetUint16(name string) (uint16, error) {
 		return uint16(0), fmt.Errorf("unable to type cast %q parameter to uint16 value", name)
 	}
 	return v, nil
+}
+
+// MustGetUint16 returns  the underlying uint16 value parameter. It panics if
+// an error occurs while trying to get the parameter.
+func (kpars Kparams) MustGetUint16(name string) uint16 {
+	v, err := kpars.GetUint16(name)
+	if err != nil {
+		panic(err)
+	}
+	return v
 }
 
 // GetInt16 returns the underlying int16 value from the parameter.

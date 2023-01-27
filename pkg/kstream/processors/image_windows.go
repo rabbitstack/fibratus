@@ -19,46 +19,28 @@
 package processors
 
 import (
-	"expvar"
-
 	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/ps"
-	"github.com/rabbitstack/fibratus/pkg/yara"
-	log "github.com/sirupsen/logrus"
 )
-
-// imageYaraScans stores the total count of yara image scans
-var imageYaraScans = expvar.NewInt("yara.image.scans")
 
 type imageProcessor struct {
 	snap ps.Snapshotter
-	yara yara.Scanner
 }
 
-func newImageProcessor(snap ps.Snapshotter, yara yara.Scanner) Processor {
-	return &imageProcessor{snap: snap, yara: yara}
+func newImageProcessor(snap ps.Snapshotter) Processor {
+	return &imageProcessor{snap: snap}
 }
 
 func (imageProcessor) Name() ProcessorType { return Image }
 
-func (i *imageProcessor) ProcessEvent(kevt *kevent.Kevent) (*kevent.Kevent, bool, error) {
-	if i.yara != nil && kevt.Type == ktypes.LoadImage {
-		filename := kevt.GetParamAsString(kparams.ImageFilename)
-		// scan the target filename
-		go func() {
-			imageYaraScans.Add(1)
-			err := i.yara.ScanFile(filename, kevt)
-			if err != nil {
-				log.Warnf("unable to run yara scanner on %s image: %v", filename, err)
-			}
-		}()
+func (i *imageProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Batch, bool, error) {
+	if e.IsUnloadImage() {
+		return kevent.NewBatch(e), false, i.snap.Remove(e)
 	}
-	if kevt.IsUnloadImage() {
-		return kevt, false, i.snap.Remove(kevt)
+	if e.IsLoadImage() {
+		return kevent.NewBatch(e), false, i.snap.Write(e)
 	}
-	return kevt, false, i.snap.Write(kevt)
+	return nil, true, nil
 }
 
 func (imageProcessor) Close() {}

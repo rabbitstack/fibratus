@@ -20,6 +20,8 @@ package app
 
 import (
 	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/filter"
+	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"time"
 
 	"github.com/rabbitstack/fibratus/cmd/fibratus/common"
@@ -219,8 +221,16 @@ func (s *fsvc) run() error {
 		return err
 	}
 	ver.Set(version)
+
+	// initialize rules engine
+	rules := filter.NewRules(cfg)
+	err := rules.Compile()
+	if err != nil {
+		return err
+	}
+
 	ctrl = kstream.NewKtraceController(svcConfig.Kstream)
-	err := ctrl.StartKtrace()
+	err = ctrl.StartKtrace()
 	if err != nil {
 		return err
 	}
@@ -228,7 +238,7 @@ func (s *fsvc) run() error {
 	// initialize handle/process snapshotters and try to open the kernel event stream
 	hsnap := handle.NewSnapshotter(svcConfig, nil)
 	psnap := ps.NewSnapshotter(hsnap, svcConfig)
-	consumer = kstream.NewConsumer(ctrl, psnap, hsnap, svcConfig)
+	consumer = kstream.NewConsumer(psnap, hsnap, svcConfig)
 	// open the kernel event stream, start processing events and forwarding to outputs
 	err = consumer.OpenKstream(ctrl.Traces())
 	if err != nil {
@@ -242,6 +252,9 @@ func (s *fsvc) run() error {
 		svcConfig.Output,
 		svcConfig.Transformers,
 		svcConfig.Alertsenders,
+		func(kevt *kevent.Kevent) bool {
+			return rules.Fire(kevt)
+		},
 	)
 	if err != nil {
 		return err

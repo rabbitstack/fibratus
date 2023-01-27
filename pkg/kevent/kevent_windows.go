@@ -24,24 +24,43 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/syscall/etw"
+	"github.com/rabbitstack/fibratus/pkg/syscall/process"
 	"github.com/rabbitstack/fibratus/pkg/util/filetime"
 	"github.com/rabbitstack/fibratus/pkg/util/hashers"
 	"github.com/rabbitstack/fibratus/pkg/util/hostname"
+	"os"
 	"strings"
 	"unsafe"
 )
 
-// rundowns stores the hashes of processed rundown events
-var rundowns = map[uint64]bool{}
+var (
+	// rundowns stores the hashes of processed rundown events
+	rundowns   = map[uint64]bool{}
+	currentPid = uint32(os.Getpid())
+)
 
-// New constructs a fresh event instance with basic fields and parameters.
-func New(seq uint64, ktype ktypes.Ktype, evt *etw.EventRecord) *Kevent {
+// New constructs a fresh event instance with basic fields and parameters. If the published
+// ETW event is not recognized as a valid event in our internal types, then we return a nil
+// event.
+func New(seq uint64, evt *etw.EventRecord) *Kevent {
 	var (
-		pid = evt.Header.ProcessID
-		tid = evt.Header.ThreadID
-		cpu = *(*uint8)(unsafe.Pointer(&evt.BufferContext.ProcessorIndex[0]))
-		ts  = filetime.ToEpoch(evt.Header.Timestamp)
+		pid        = evt.Header.ProcessID
+		tid        = evt.Header.ThreadID
+		providerID = evt.Header.ProviderID
+		cpu        = *(*uint8)(unsafe.Pointer(&evt.BufferContext.ProcessorIndex[0]))
+		ts         = filetime.ToEpoch(evt.Header.Timestamp)
 	)
+	// build event type from the provider GUID and opcode
+	var ktype ktypes.Ktype
+	switch providerID {
+	case etw.KernelAuditAPICallsGUID, etw.AntimalwareEngineGUID:
+		ktype = ktypes.Pack(providerID, uint8(evt.Header.EventDescriptor.ID))
+	default:
+		ktype = ktypes.Pack(providerID, evt.Header.EventDescriptor.Opcode)
+	}
+	if !ktype.Exists() {
+		return nil
+	}
 	e := pool.Get().(*Kevent)
 	*e = Kevent{
 		Seq:         seq,
@@ -58,7 +77,42 @@ func New(seq uint64, ktype ktypes.Ktype, evt *etw.EventRecord) *Kevent {
 		Host:        hostname.Get(),
 	}
 	e.produceParams(evt)
+	e.normalize()
 	return e
+}
+
+func (e *Kevent) normalize() {
+	switch e.Category {
+	case ktypes.Image:
+		// sometimes the pid present in event header is invalid
+		// but, we can get the valid one from the event parameters
+		if e.InvalidPid() {
+			e.PID, _ = e.Kparams.GetPid()
+		}
+	case ktypes.File:
+		// on some Windows versions the value of
+		// the PID is invalid in the event header
+		if e.InvalidPid() {
+			// try to resolve a valid pid from thread ID
+			threadID, err := e.Kparams.GetTid()
+			if err != nil {
+				break
+			}
+			pid, err := process.GetPIDFromThread(threadID)
+			if err == nil {
+				e.PID = pid
+			}
+		}
+	case ktypes.Process:
+		// process start events may be logged in the context of the parent or child process.
+		// As a result, the ProcessId member of EVENT_TRACE_HEADER may not correspond to the
+		// process being created, so we set the event pid to be the one of the parent process
+		if e.IsCreateProcess() {
+			e.PID, _ = e.Kparams.GetPpid()
+		}
+	case ktypes.Net:
+		e.PID, _ = e.Kparams.GetPid()
+	}
 }
 
 // IsNetworkTCP determines whether the event pertains to network TCP events.
@@ -96,16 +150,20 @@ func (e Kevent) IsRundownProcessed() bool {
 }
 
 func (e Kevent) IsCreateFile() bool       { return e.Type == ktypes.CreateFile }
+func (e Kevent) IsCreateProcess() bool    { return e.Type == ktypes.CreateProcess }
 func (e Kevent) IsCloseFile() bool        { return e.Type == ktypes.CloseFile }
+func (e Kevent) IsCloseHandle() bool      { return e.Type == ktypes.CloseHandle }
 func (e Kevent) IsDeleteFile() bool       { return e.Type == ktypes.DeleteFile }
 func (e Kevent) IsEnumDirectory() bool    { return e.Type == ktypes.EnumDirectory }
 func (e Kevent) IsTerminateProcess() bool { return e.Type == ktypes.TerminateProcess }
 func (e Kevent) IsTerminateThread() bool  { return e.Type == ktypes.TerminateThread }
 func (e Kevent) IsUnloadImage() bool      { return e.Type == ktypes.UnloadImage }
+func (e Kevent) IsLoadImage() bool        { return e.Type == ktypes.LoadImage }
 func (e Kevent) IsFileOpEnd() bool        { return e.Type == ktypes.FileOpEnd }
 func (e Kevent) IsRegSetValue() bool      { return e.Type == ktypes.RegSetValue }
 
 func (e Kevent) InvalidPid() bool { return e.PID == 0xffffffff }
+func (e Kevent) CurrentPid() bool { return e.PID == currentPid }
 
 // IsState indicates if this event is only used for state management.
 func (e Kevent) IsState() bool { return e.Type.OnlyState() }

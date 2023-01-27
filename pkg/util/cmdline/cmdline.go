@@ -53,6 +53,7 @@ var sysProcs = map[string]bool{
 	"kernel32.dll":    true,
 }
 
+// Cmdline offers a convenient interface for the process command line manipulation/normalization.
 type Cmdline struct {
 	cmdline string
 }

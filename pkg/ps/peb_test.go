@@ -22,24 +22,32 @@
 package ps
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/syscall/process"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sys/windows"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
-func TestPEBGetCurrentWorkingDirectory(t *testing.T) {
-	flags := process.QueryInformation | process.VMRead
-	handle, err := process.Open(flags, false, uint32(os.Getpid()))
+func TestReadPEB(t *testing.T) {
+	desiredAccess := uint32(windows.PROCESS_QUERY_INFORMATION | windows.PROCESS_VM_READ)
+	proc, err := windows.OpenProcess(desiredAccess, false, uint32(os.Getpid()))
 	if err != nil {
 		t.Fatal(err)
 	}
-	peb, err := ReadPEB(handle)
+	defer windows.CloseHandle(proc)
+
+	peb, err := ReadPEB(proc)
 	require.NoError(t, err)
 
-	cwd := peb.GetCurrentWorkingDirectory()
-	require.NotEmpty(t, cwd)
-	assert.Equal(t, "ps", filepath.Base(cwd))
+	assert.Equal(t, "ps.test.exe", filepath.Base(peb.GetImage()))
+	assert.Equal(t, "ps", filepath.Base(peb.GetCurrentWorkingDirectory()))
+
+	args := strings.Fields(peb.GetCommandLine())
+	assert.True(t, len(args) > 1)
+	assert.Contains(t, args, "-test.timeout=10m0s")
+
+	assert.Contains(t, peb.GetEnvs(), "COMPUTERNAME")
 }

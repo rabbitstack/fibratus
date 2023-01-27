@@ -196,7 +196,7 @@ func (e *Kevent) AppendParam(name string, typ kparams.Type, value kparams.Value,
 // to the error message.
 // Returns an empty string if the given parameter name is not found
 // in event parameters.
-func (e *Kevent) GetParamAsString(name string) string {
+func (e Kevent) GetParamAsString(name string) string {
 	par, err := e.Kparams.Get(name)
 	if err != nil {
 		return ""

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package app
+package capture
 
 import (
 	"github.com/rabbitstack/fibratus/cmd/fibratus/common"
@@ -34,7 +34,7 @@ import (
 	"time"
 )
 
-var captureCmd = &cobra.Command{
+var Cmd = &cobra.Command{
 	Use:   "capture [filter]",
 	Short: "Capture kernel event stream to the kcap file",
 	RunE:  capture,
@@ -42,16 +42,16 @@ var captureCmd = &cobra.Command{
 
 var (
 	// capture command config
-	captureConfig = config.NewWithOpts(config.WithCapture())
+	cfg = config.NewWithOpts(config.WithCapture())
 )
 
 func init() {
-	captureConfig.MustViperize(captureCmd)
+	cfg.MustViperize(Cmd)
 }
 
 func capture(cmd *cobra.Command, args []string) error {
 	// initialize config and logger
-	if err := common.Init(captureConfig, true); err != nil {
+	if err := common.Init(cfg, true); err != nil {
 		return err
 	}
 
@@ -73,21 +73,21 @@ func capture(cmd *cobra.Command, args []string) error {
 
 	// the capture will start after all system handles have been enumerated. This gives us a
 	// chance to build the handle state before writing the event flow
-	hsnap := handle.NewSnapshotter(captureConfig, cb)
-	psnap := ps.NewSnapshotter(hsnap, captureConfig)
+	hsnap := handle.NewSnapshotter(cfg, cb)
+	psnap := ps.NewSnapshotter(hsnap, cfg)
 
 	// we'll start writing to the kcap file once we receive on the wait channel
 	<-wait
 
 	// initiate the kernel trace and start consuming from the event stream
-	ktracec := kstream.NewKtraceController(captureConfig.Kstream)
+	ktracec := kstream.NewKtraceController(cfg.Kstream)
 	err := ktracec.StartKtrace()
 	if err != nil {
 		return err
 	}
 
-	kstreamc := kstream.NewConsumer(ktracec, psnap, hsnap, captureConfig)
-	kfilter, err := filter.NewFromCLI(args, captureConfig)
+	kstreamc := kstream.NewConsumer(psnap, hsnap, cfg)
+	kfilter, err := filter.NewFromCLI(args, cfg)
 	if err != nil {
 		return err
 	}
@@ -105,7 +105,7 @@ func capture(cmd *cobra.Command, args []string) error {
 	}()
 
 	// bootstrap kcap writer with inbound event channel
-	writer, err := kcap.NewWriter(captureConfig.KcapFile, psnap, hsnap)
+	writer, err := kcap.NewWriter(cfg.KcapFile, psnap, hsnap)
 	if err != nil {
 		return err
 	}
@@ -121,7 +121,7 @@ func capture(cmd *cobra.Command, args []string) error {
 	spin = spinner.Show("Capturing")
 
 	// start the HTTP server
-	if err := api.StartServer(captureConfig); err != nil {
+	if err := api.StartServer(cfg); err != nil {
 		return err
 	}
 

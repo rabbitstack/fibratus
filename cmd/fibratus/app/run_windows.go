@@ -19,6 +19,7 @@
 package app
 
 import (
+	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"os"
 
 	ver "github.com/rabbitstack/fibratus/pkg/util/version"
@@ -77,9 +78,16 @@ func run(cmd *cobra.Command, args []string) error {
 	// set up the signals
 	stopCh := common.Signals()
 
+	// initialize rules engine
+	rules := filter.NewRules(cfg)
+	err := rules.Compile()
+	if err != nil {
+		return err
+	}
+
 	// initialize kernel trace controller and try to start the trace
 	ktracec := kstream.NewKtraceController(cfg.Kstream)
-	err := ktracec.StartKtrace()
+	err = ktracec.StartKtrace()
 	if err != nil {
 		return err
 	}
@@ -88,9 +96,9 @@ func run(cmd *cobra.Command, args []string) error {
 	// and the kernel stream consumer that will actually collect all the events
 	hsnap := handle.NewSnapshotter(cfg, nil)
 	psnap := ps.NewSnapshotter(hsnap, cfg)
-	kstreamc := kstream.NewConsumer(ktracec, psnap, hsnap, cfg)
+	kstreamc := kstream.NewConsumer(psnap, hsnap, cfg)
 	// build the filter from the CLI argument. If we got a valid expression the filter
-	// is linked to the kernel stream consumer so it can drop any events that don't match
+	// is linked to the kernel stream consumer, so it can drop any events that don't match
 	// the filter criteria
 	kfilter, err := filter.NewFromCLI(args, cfg)
 	if err != nil {
@@ -138,7 +146,7 @@ func run(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return multierror.Wrap(err, ktracec.CloseKtrace())
 		}
-		// setup the aggregator that forwards events to outputs
+		// set up the aggregator that forwards events to outputs
 		agg, err := aggregator.NewBuffered(
 			kstreamc.Events(),
 			kstreamc.Errors(),
@@ -146,6 +154,9 @@ func run(cmd *cobra.Command, args []string) error {
 			cfg.Output,
 			cfg.Transformers,
 			cfg.Alertsenders,
+			func(kevt *kevent.Kevent) bool {
+				return rules.Fire(kevt)
+			},
 		)
 		if err != nil {
 			return err

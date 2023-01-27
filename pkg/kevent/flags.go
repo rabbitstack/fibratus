@@ -58,6 +58,13 @@ func (flags ParamFlags) String(f uint32) string {
 // PsAccessRightFlags describes flags for the process access rights.
 var PsAccessRightFlags = []ParamFlag{
 	{"ALL_ACCESS", windows.STANDARD_RIGHTS_REQUIRED | windows.SYNCHRONIZE | 0xFFFF},
+	{"DELETE", windows.DELETE},
+	{"READ_CONTROL", windows.READ_CONTROL},
+	{"SYNCHRONIZE", windows.SYNCHRONIZE},
+	{"WRITE_DAC", windows.WRITE_DAC},
+	{"WRITE_OWNER", windows.WRITE_OWNER},
+	{"GENERIC_READ", windows.GENERIC_READ},
+	{"ACCESS_SYSTEM_SECURITY", windows.ACCESS_SYSTEM_SECURITY},
 	{"TERMINATE", windows.PROCESS_TERMINATE},
 	{"CREATE_THREAD", windows.PROCESS_CREATE_THREAD},
 	{"VM_OPERATION", windows.PROCESS_VM_OPERATION},
@@ -75,6 +82,11 @@ var PsAccessRightFlags = []ParamFlag{
 // ThreadAccessRightFlags describes flags for the thread access rights.
 var ThreadAccessRightFlags = []ParamFlag{
 	{"ALL_ACCESS", windows.STANDARD_RIGHTS_REQUIRED | windows.SYNCHRONIZE | 0xFFFF},
+	{"DELETE", windows.DELETE},
+	{"READ_CONTROL", windows.READ_CONTROL},
+	{"SYNCHRONIZE", windows.SYNCHRONIZE},
+	{"WRITE_DAC", windows.WRITE_DAC},
+	{"WRITE_OWNER", windows.WRITE_OWNER},
 	{"TERMINATE", windows.THREAD_TERMINATE},
 	{"SUSPEND_THREAD", windows.THREAD_SUSPEND_RESUME},
 	{"GET_CONTEXT", windows.THREAD_GET_CONTEXT},

@@ -38,7 +38,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/syscall/handle"
 	"github.com/rabbitstack/fibratus/pkg/syscall/object"
-	"github.com/rabbitstack/fibratus/pkg/syscall/process"
 	"github.com/rabbitstack/fibratus/pkg/syscall/sys"
 	log "github.com/sirupsen/logrus"
 )
@@ -170,31 +169,31 @@ func (s *snapshotter) FindHandles(pid uint32) ([]htypes.Handle, error) {
 		}
 		return handles, nil
 	}
-	ps, err := process.Open(process.QueryInformation, false, pid)
-	if err != nil {
-		// trying to obtain the handle with `QueryInformation` access on a protected
-		// process will always fail, so our best effort is to collect handles for those
-		// processes in the snapshot's state
-		handles := make([]htypes.Handle, 0)
-		s.Lock()
-		defer s.Unlock()
-		for _, h := range s.handlesByObject {
-			if h.Pid == pid && h.Type != "" {
-				handles = append(handles, h)
-			}
-		}
-		return handles, nil
-	}
-	defer ps.Close()
+	//ps, err := process.Open(process.QueryInformation, false, pid)
+	//if err != nil {
+	//	// trying to obtain the handle with `QueryInformation` access on a protected
+	//	// process will always fail, so our best effort is to collect handles for those
+	//	// processes in the snapshot's state
+	//	handles := make([]htypes.Handle, 0)
+	//	s.Lock()
+	//	defer s.Unlock()
+	//	for _, h := range s.handlesByObject {
+	//		if h.Pid == pid && h.Type != "" {
+	//			handles = append(handles, h)
+	//		}
+	//	}
+	//	return handles, nil
+	//}
+	//defer ps.Close()
 	buf := make([]byte, bufferSize)
-	n, err := process.QueryInfo(ps, process.HandleInformationClass, buf)
-	if err == errs.ErrNeedsReallocateBuffer {
-		buf = make([]byte, n)
-		_, err = process.QueryInfo(ps, process.HandleInformationClass, buf)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("unable to query handles for process id %d: %v", pid, err)
-	}
+	//n, err := process.QueryInfo(ps, process.HandleInformationClass, buf)
+	//if err == errs.ErrNeedsReallocateBuffer {
+	//	buf = make([]byte, n)
+	//	_, err = process.QueryInfo(ps, process.HandleInformationClass, buf)
+	//}
+	//if err != nil {
+	//	return nil, fmt.Errorf("unable to query handles for process id %d: %v", pid, err)
+	//}
 
 	snapshot := (*object.ProcessHandleSnapshotInformation)(unsafe.Pointer(&buf[0]))
 

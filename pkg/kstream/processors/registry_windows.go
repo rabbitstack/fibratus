@@ -66,12 +66,12 @@ func newRegistryProcessor(hsnap handle.Snapshotter) Processor {
 	}
 }
 
-func (r *registryProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error) {
+func (r *registryProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Batch, bool, error) {
 	if e.Category == ktypes.Registry {
 		err := r.processEvent(e)
-		return e, false, err
+		return kevent.NewBatch(e), false, err
 	}
-	return e, true, nil
+	return nil, true, nil
 }
 
 func (registryProcessor) Name() ProcessorType { return Registry }
@@ -114,17 +114,23 @@ func (r *registryProcessor) processEvent(e *kevent.Kevent) error {
 		}
 
 		// get the type/value of the registry key and append to parameters
-		if e.IsRegSetValue() {
-			rootKey, keyName := key.Format(keyName)
-			if rootKey != key.Invalid {
-				typ, _, err := rootKey.ReadValue(keyName)
-				if err != nil {
-					return err
-				}
-				e.AppendParam(kparams.RegValueType, kparams.Enum, typ, kevent.WithEnum(key.RegistryValueTypes))
-				switch typ {
-				case registry.SZ:
-				}
+		if !e.IsRegSetValue() {
+			return nil
+		}
+		rootKey, keyName := key.Format(keyName)
+		if rootKey != key.Invalid {
+			typ, val, err := rootKey.ReadValue(keyName)
+			if err != nil {
+				return err
+			}
+			e.AppendParam(kparams.RegValueType, kparams.Enum, typ, kevent.WithEnum(key.RegistryValueTypes))
+			switch typ {
+			case registry.SZ, registry.EXPAND_SZ, registry.MULTI_SZ, registry.BINARY:
+				e.AppendParam(kparams.RegValue, kparams.UnicodeString, val)
+			case registry.QWORD:
+				e.AppendParam(kparams.RegValue, kparams.Uint64, val)
+			case registry.DWORD:
+				e.AppendParam(kparams.RegValue, kparams.Uint32, uint32(val.(uint64)))
 			}
 		}
 	}

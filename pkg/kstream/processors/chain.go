@@ -34,7 +34,7 @@ type Chain interface {
 	// ProcessEvent pushes the event into processor chain. Processors are applied sequentially, so we have to make
 	// sure that any processor providing additional context to the next processor is defined first in the chain. If
 	// one processor fails, the next processor in chain is invoked.
-	ProcessEvent(kevt *kevent.Kevent) (*kevent.Kevent, error)
+	ProcessEvent(kevt *kevent.Kevent) (*kevent.Batch, error)
 	// Close closes the processor chain and frees all allocated resources.
 	Close() error
 }
@@ -46,33 +46,34 @@ func (c *chain) addProcessor(processor Processor) {
 	c.processors = append(c.processors, processor)
 }
 
-func (c chain) ProcessEvent(kevt *kevent.Kevent) (*kevent.Kevent, error) {
+func (c chain) ProcessEvent(kevt *kevent.Kevent) (*kevent.Batch, error) {
 	var errs = make([]error, 0)
-	var output *kevent.Kevent
+	var evts *kevent.Batch
 
 	for _, processor := range c.processors {
-		var err error
 		var next bool
-		output, next, err = processor.ProcessEvent(kevt)
+		var err error
+		evts, next, err = processor.ProcessEvent(kevt)
 		if err != nil {
 			if !kerrors.IsCancelUpstreamKevent(err) {
 				processorFailures.Add(1)
 				errs = append(errs, fmt.Errorf("%q processor failed with error: %v", processor.Name(), err))
 				continue
 			} else {
-				return output, err
+				return evts, err
 			}
 		}
 		if !next {
 			break
 		}
 	}
-
-	if len(errs) > 0 {
-		return output, multierror.Wrap(errs...)
+	if evts == nil {
+		evts = kevent.NewBatch(kevt)
 	}
-
-	return output, nil
+	if len(errs) > 0 {
+		return evts, multierror.Wrap(errs...)
+	}
+	return evts, nil
 }
 
 // Close closes the processor chain and frees all allocated resources.

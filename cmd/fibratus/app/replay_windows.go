@@ -20,6 +20,7 @@ package app
 
 import (
 	"context"
+	"github.com/rabbitstack/fibratus/pkg/kevent"
 
 	"github.com/rabbitstack/fibratus/cmd/fibratus/common"
 	"github.com/rabbitstack/fibratus/pkg/aggregator"
@@ -118,6 +119,7 @@ func replay(cmd *cobra.Command, args []string) error {
 			replayConfig.Output,
 			replayConfig.Transformers,
 			replayConfig.Alertsenders,
+			func(kevt *kevent.Kevent) bool { return true },
 		)
 		if err != nil {
 			return err

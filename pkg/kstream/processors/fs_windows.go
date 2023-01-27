@@ -60,13 +60,13 @@ func newFsProcessor(hsnap handle.Snapshotter) Processor {
 	return interceptor
 }
 
-func (f *fsProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error) {
+func (f *fsProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Batch, bool, error) {
 	if e.Category == ktypes.File {
-		e, err := f.processEvent(e)
 		e.Tid, _ = e.Kparams.GetTid()
-		return e, false, err
+		evts, err := f.processEvent(e)
+		return evts, false, err
 	}
-	return e, true, nil
+	return nil, true, nil
 }
 
 func (*fsProcessor) Name() ProcessorType { return Fs }
@@ -76,7 +76,7 @@ func (f *fsProcessor) getFileInfo(name string, opts uint32) *fileInfo {
 	return &fileInfo{name: name, typ: fs.GetFileType(name, opts)}
 }
 
-func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
+func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Batch, error) {
 	switch e.Type {
 	case ktypes.FileRundown:
 		// when the file rundown event comes in we store the file info
@@ -94,7 +94,7 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 		// that was done on behalf of the file, e.g. create or open.
 		irp := e.Kparams.MustGetUint64(kparams.FileIrpPtr)
 		f.irps[irp] = e
-		return e, kerrors.ErrCancelUpstreamKevent
+		return kevent.NewBatch(e), kerrors.ErrCancelUpstreamKevent
 	case ktypes.FileOpEnd:
 		// get the CreateFile pending event by IRP identifier
 		// and fetch the file create disposition value
@@ -105,7 +105,7 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 		)
 		fevt, ok := f.irps[irp]
 		if !ok {
-			return e, nil
+			return kevent.NewBatch(e), nil
 		}
 		e = fevt
 		delete(f.irps, irp)
@@ -130,7 +130,7 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 		e.AppendParam(kparams.NTStatus, kparams.Status, status)
 		e.AppendParam(kparams.FileType, kparams.Enum, uint32(fileinfo.typ), kevent.WithEnum(fs.FileTypes))
 		e.AppendParam(kparams.FileOperation, kparams.Enum, uint32(dispo), kevent.WithEnum(fs.FileCreateDispositions))
-		return e, nil
+		return kevent.NewBatch(e), nil
 	case ktypes.ReleaseFile:
 		fileReleaseCount.Add(1)
 		// delete both, the file object and the file key from files map
@@ -156,7 +156,7 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 			// the file key parameter contains the reference to the directory name
 			fileKey, err := e.Kparams.GetUint64(kparams.FileKey)
 			if err != nil {
-				return e, err
+				return kevent.NewBatch(e), err
 			}
 			fileinfo, ok := f.files[fileKey]
 			if ok && fileinfo != nil {
@@ -171,7 +171,7 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 			e.AppendParam(kparams.FileName, kparams.FilePath, fileinfo.name)
 		}
 	}
-	return e, nil
+	return kevent.NewBatch(e), nil
 }
 
 func (f *fsProcessor) findFile(fileKey, fileObject uint64) *fileInfo {

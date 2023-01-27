@@ -62,6 +62,11 @@ var (
 	keventErrors = expvar.NewInt("aggregator.kevent.errors")
 )
 
+// OnPreAggregate represents the callback function which is called before
+// the event is stored in the aggregation batch. The event is not stored
+// in the bach if this function returns false.
+type OnPreAggregate func(*kevent.Kevent) bool
+
 // BufferedAggregator collects events from the inbound channel and produces batches on regular intervals. The batches
 // are pushed to the work queue from which load-balanced configured workers consume the batches and publish to the outputs.
 type BufferedAggregator struct {
@@ -72,33 +77,36 @@ type BufferedAggregator struct {
 	// queue of inbound kernel events
 	kevts []*kevent.Kevent
 	// work queue that forwarder passes to outputs
-	wq         queue
-	submitter  *submitter
-	transforms []transformers.Transformer
-	c          Config
+	wq             queue
+	submitter      *submitter
+	transforms     []transformers.Transformer
+	c              Config
+	onPreAggregate OnPreAggregate
 }
 
 // NewBuffered creates a new instance of the event aggregator.
 func NewBuffered(
 	kevents chan *kevent.Kevent,
 	errs chan error,
-	config Config,
+	aggConfig Config,
 	outputConfig outputs.Config,
 	transformerConfigs []transformers.Config,
 	alertsenderConfigs []alertsender.Config,
+	onPreAggregate OnPreAggregate,
 ) (*BufferedAggregator, error) {
-	flushInterval := config.FlushPeriod
+	flushInterval := aggConfig.FlushPeriod
 	if flushInterval < time.Millisecond*250 {
 		flushInterval = time.Millisecond * 250
 	}
 	agg := &BufferedAggregator{
-		kevtsc:  kevents,
-		kevts:   make([]*kevent.Kevent, 0),
-		errsc:   errs,
-		stop:    make(chan struct{}, 1),
-		flusher: time.NewTicker(flushInterval),
-		wq:      make(chan *kevent.Batch),
-		c:       config,
+		kevtsc:         kevents,
+		kevts:          make([]*kevent.Kevent, 0),
+		errsc:          errs,
+		stop:           make(chan struct{}, 1),
+		flusher:        time.NewTicker(flushInterval),
+		wq:             make(chan *kevent.Batch),
+		c:              aggConfig,
+		onPreAggregate: onPreAggregate,
 	}
 
 	var err error
@@ -153,7 +161,7 @@ func (agg *BufferedAggregator) Stop() error {
 	return nil
 }
 
-// run starts the aggregator loop. The aggregator receives kernel event stream from the upstream channel, buffers
+// run starts the aggregator loop. The aggregator receives event stream from the upstream channel, buffers
 // them to intermediate queue and dispatches batches to downstream worker queue.
 func (agg *BufferedAggregator) run() {
 	for {
@@ -186,9 +194,11 @@ func (agg *BufferedAggregator) run() {
 					transformerErrors.Add(err.Error(), 1)
 				}
 			}
-			// push the event to the queue
-			agg.kevts = append(agg.kevts, kevt)
-			keventsDequeued.Add(1)
+			if agg.onPreAggregate(kevt) {
+				// push the event to the queue
+				agg.kevts = append(agg.kevts, kevt)
+				keventsDequeued.Add(1)
+			}
 		case err := <-agg.errsc:
 			keventErrors.Add(1)
 			log.Errorf("aggregator dispatch failure: %v", err)

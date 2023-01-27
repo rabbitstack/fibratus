@@ -41,8 +41,8 @@ func (ps *PS) Marshal() []byte {
 	b = append(b, bytes.WriteUint16(uint16(len(ps.Name)))...)
 	b = append(b, ps.Name...)
 	// write process command line
-	b = append(b, bytes.WriteUint16(uint16(len(ps.Comm)))...)
-	b = append(b, ps.Comm...)
+	b = append(b, bytes.WriteUint16(uint16(len(ps.Cmdline)))...)
+	b = append(b, ps.Cmdline...)
 	// write full executable path
 	b = append(b, bytes.WriteUint16(uint16(len(ps.Exe)))...)
 	b = append(b, ps.Exe...)
@@ -116,7 +116,7 @@ func (ps *PS) Unmarshal(b []byte) error {
 	l = bytes.ReadUint16(b[10+offset:])
 	buf = b[12+offset:]
 	offset += uint32(l)
-	ps.Comm = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
+	ps.Cmdline = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
 
 	// read full image path
 	l = bytes.ReadUint16(b[12+offset:])

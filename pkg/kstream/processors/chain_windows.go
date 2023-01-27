@@ -23,8 +23,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	"github.com/rabbitstack/fibratus/pkg/ps"
-	"github.com/rabbitstack/fibratus/pkg/yara"
-	log "github.com/sirupsen/logrus"
 )
 
 type chain struct {
@@ -45,18 +43,9 @@ func NewChain(
 			processors:   make([]Processor, 0),
 		}
 		devMapper = fs.NewDevMapper()
-		scanner   yara.Scanner
 	)
 
-	if config.Yara.Enabled {
-		var err error
-		scanner, err = yara.NewScanner(psnap, config.Yara)
-		if err != nil {
-			log.Warnf("unable to start YARA scanner: %v", err)
-		}
-	}
-
-	chain.addProcessor(newPsProcessor(psnap, scanner))
+	chain.addProcessor(newPsProcessor(psnap))
 
 	if config.Kstream.EnableFileIOKevents {
 		chain.addProcessor(newFsProcessor(hsnap))
@@ -65,7 +54,7 @@ func NewChain(
 		chain.addProcessor(newRegistryProcessor(hsnap))
 	}
 	if config.Kstream.EnableImageKevents {
-		chain.addProcessor(newImageProcessor(psnap, scanner))
+		chain.addProcessor(newImageProcessor(psnap))
 	}
 	if config.Kstream.EnableNetKevents {
 		chain.addProcessor(newNetProcessor())
@@ -73,5 +62,6 @@ func NewChain(
 	if config.Kstream.EnableHandleKevents {
 		chain.addProcessor(newHandleProcessor(hsnap, handle.NewObjectTypeStore(), devMapper))
 	}
+
 	return chain
 }
