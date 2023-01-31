@@ -20,7 +20,7 @@ package types
 
 import (
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
-	"github.com/rabbitstack/fibratus/pkg/syscall/handle"
+	"github.com/rabbitstack/fibratus/pkg/zsyscall/handle"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"testing"

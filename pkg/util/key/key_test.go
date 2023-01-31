@@ -22,7 +22,7 @@
 package key
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/syscall/registry"
+	"github.com/rabbitstack/fibratus/pkg/zsyscall/registry"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )

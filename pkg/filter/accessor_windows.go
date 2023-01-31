@@ -112,7 +112,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 		if ps == nil {
 			return nil, ErrPsNil
 		}
-		return ps.Comm, nil
+		return ps.Cmdline, nil
 	case fields.PsSiblingComm:
 		if kevt.Category != ktypes.Process {
 			return nil, nil
@@ -277,7 +277,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 		if parent == nil {
 			return nil, ErrPsNil
 		}
-		return parent.Comm, nil
+		return parent.Cmdline, nil
 	case fields.PsParentExe:
 		parent := getParentPs(kevt)
 		if parent == nil {
@@ -454,7 +454,7 @@ func ancestorFields(field string, kevt *kevent.Kevent) (kparams.Value, error) {
 			case fields.ProcessCwd:
 				values = append(values, proc.Cwd)
 			case fields.ProcessComm:
-				values = append(values, proc.Comm)
+				values = append(values, proc.Cmdline)
 			case fields.ProcessArgs:
 				values = append(values, proc.Args...)
 			case fields.ProcessExe:
@@ -494,7 +494,7 @@ func ancestorFields(field string, kevt *kevent.Kevent) (kparams.Value, error) {
 	case fields.ProcessCwd:
 		return ps.Cwd, nil
 	case fields.ProcessComm:
-		return ps.Comm, nil
+		return ps.Cmdline, nil
 	case fields.ProcessArgs:
 		return ps.Args, nil
 	case fields.ProcessExe:

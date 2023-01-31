@@ -29,12 +29,13 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"github.com/rabbitstack/fibratus/pkg/util/spinner"
+	"github.com/rabbitstack/fibratus/pkg/zsyscall/security"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"time"
 )
 
-var Cmd = &cobra.Command{
+var Command = &cobra.Command{
 	Use:   "capture [filter]",
 	Short: "Capture kernel event stream to the kcap file",
 	RunE:  capture,
@@ -46,13 +47,16 @@ var (
 )
 
 func init() {
-	cfg.MustViperize(Cmd)
+	cfg.MustViperize(Command)
 }
 
 func capture(cmd *cobra.Command, args []string) error {
-	// initialize config and logger
-	if err := common.Init(cfg, true); err != nil {
+	if err := common.InitConfigAndLogger(cfg); err != nil {
 		return err
+	}
+	// inject SeDebugPrivilege in access token
+	if cfg.DebugPrivilege {
+		security.SetDebugPrivilege()
 	}
 
 	// set up the signals

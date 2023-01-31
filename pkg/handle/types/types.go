@@ -23,7 +23,7 @@ package types
 
 import (
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/syscall/handle"
+	"golang.org/x/sys/windows"
 	"strings"
 )
 
@@ -36,7 +36,7 @@ type Handles []Handle
 // Handle stores various metadata specific to the handle allocated by a process.
 type Handle struct {
 	// Num represents the internal handle identifier.
-	Num handle.Handle `json:"id"`
+	Num windows.Handle `json:"id"`
 	// Object is the kernel address that this handle references.
 	Object uint64 `json:"-"`
 	// Pid represents the process's identifier that owns the handle.
@@ -90,6 +90,7 @@ type AlpcPortInfo struct {
 // MutantInfo stores metadata about particular mutant object.
 type MutantInfo struct {
 	Count       int32
+	_           bool //unused
 	IsAbandoned bool
 }
 

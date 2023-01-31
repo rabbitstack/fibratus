@@ -20,6 +20,7 @@ package processors
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 )
 
@@ -35,10 +36,10 @@ func (imageProcessor) Name() ProcessorType { return Image }
 
 func (i *imageProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Batch, bool, error) {
 	if e.IsUnloadImage() {
-		return kevent.NewBatch(e), false, i.snap.Remove(e)
+		return kevent.NewBatch(e), false, i.snap.RemoveModule(e.Kparams.MustGetPid(), e.GetParamAsString(kparams.ImageFilename))
 	}
 	if e.IsLoadImage() {
-		return kevent.NewBatch(e), false, i.snap.Write(e)
+		return kevent.NewBatch(e), false, i.snap.AddModule(e)
 	}
 	return nil, true, nil
 }

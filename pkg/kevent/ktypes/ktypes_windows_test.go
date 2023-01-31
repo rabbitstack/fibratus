@@ -21,7 +21,7 @@ package ktypes
 import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"syscall"
+	"golang.org/x/sys/windows"
 	"testing"
 )
 
@@ -48,10 +48,10 @@ func TestPack(t *testing.T) {
 
 	assert.Equal(t, byte(0x1), CreateProcess[16])
 
-	kt := Pack(syscall.GUID{Data1: 0x3d6fa8d0, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}, 1)
+	kt := Pack(windows.GUID{Data1: 0x3d6fa8d0, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}, 1)
 	assert.Equal(t, CreateProcess, kt)
 
-	kt = Pack(syscall.GUID{Data1: 0x3d6fa8d0, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}, 2)
+	kt = Pack(windows.GUID{Data1: 0x3d6fa8d0, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}, 2)
 	assert.NotEqual(t, CreateProcess, kt)
 	assert.Equal(t, TerminateProcess, kt)
 

@@ -23,11 +23,12 @@ import (
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-	"github.com/rabbitstack/fibratus/pkg/syscall/etw"
-	"github.com/rabbitstack/fibratus/pkg/syscall/process"
 	"github.com/rabbitstack/fibratus/pkg/util/filetime"
 	"github.com/rabbitstack/fibratus/pkg/util/hashers"
 	"github.com/rabbitstack/fibratus/pkg/util/hostname"
+	"github.com/rabbitstack/fibratus/pkg/zsyscall"
+	"github.com/rabbitstack/fibratus/pkg/zsyscall/etw"
+	"golang.org/x/sys/windows"
 	"os"
 	"strings"
 	"unsafe"
@@ -98,10 +99,12 @@ func (e *Kevent) normalize() {
 			if err != nil {
 				break
 			}
-			pid, err := process.GetPIDFromThread(threadID)
-			if err == nil {
-				e.PID = pid
+			thread, err := windows.OpenThread(windows.THREAD_QUERY_LIMITED_INFORMATION, false, threadID)
+			if err != nil {
+				return
 			}
+			defer windows.CloseHandle(thread)
+			e.PID = zsyscall.GetProcessIdOfThread(thread)
 		}
 	case ktypes.Process:
 		// process start events may be logged in the context of the parent or child process.
@@ -142,16 +145,18 @@ func (e Kevent) IsRundown() bool {
 // and the `etw.SetTraceInformation` API function
 func (e Kevent) IsRundownProcessed() bool {
 	key := e.RundownKey()
-	if _, ok := rundowns[key]; !ok {
-		rundowns[key] = true
-		return false
+	_, isProcessed := rundowns[key]
+	if isProcessed {
+		return true
 	}
-	return true
+	rundowns[key] = true
+	return false
 }
 
 func (e Kevent) IsCreateFile() bool       { return e.Type == ktypes.CreateFile }
 func (e Kevent) IsCreateProcess() bool    { return e.Type == ktypes.CreateProcess }
 func (e Kevent) IsCloseFile() bool        { return e.Type == ktypes.CloseFile }
+func (e Kevent) IsCreateHandle() bool     { return e.Type == ktypes.CreateHandle }
 func (e Kevent) IsCloseHandle() bool      { return e.Type == ktypes.CloseHandle }
 func (e Kevent) IsDeleteFile() bool       { return e.Type == ktypes.DeleteFile }
 func (e Kevent) IsEnumDirectory() bool    { return e.Type == ktypes.EnumDirectory }
@@ -162,13 +167,53 @@ func (e Kevent) IsLoadImage() bool        { return e.Type == ktypes.LoadImage }
 func (e Kevent) IsFileOpEnd() bool        { return e.Type == ktypes.FileOpEnd }
 func (e Kevent) IsRegSetValue() bool      { return e.Type == ktypes.RegSetValue }
 
-func (e Kevent) InvalidPid() bool { return e.PID == 0xffffffff }
+func (e Kevent) InvalidPid() bool { return e.PID == zsyscall.InvalidProcessPid }
 func (e Kevent) CurrentPid() bool { return e.PID == currentPid }
 
 // IsState indicates if this event is only used for state management.
 func (e Kevent) IsState() bool { return e.Type.OnlyState() }
 
 func (e Kevent) RundownKey() uint64 {
+	switch e.Type {
+	case ktypes.ProcessRundown:
+		b := make([]byte, 4)
+		pid, _ := e.Kparams.GetPid()
+
+		binary.LittleEndian.PutUint32(b, pid)
+
+		return hashers.FnvUint64(b)
+	case ktypes.ThreadRundown:
+		b := make([]byte, 8)
+		pid, _ := e.Kparams.GetPid()
+		tid, _ := e.Kparams.GetTid()
+
+		binary.LittleEndian.PutUint32(b, pid)
+		binary.LittleEndian.PutUint32(b, tid)
+
+		return hashers.FnvUint64(b)
+	case ktypes.ImageRundown:
+		pid, _ := e.Kparams.GetPid()
+		mod, _ := e.Kparams.GetString(kparams.ImageFilename)
+		b := make([]byte, 4+len(mod))
+
+		binary.LittleEndian.PutUint32(b, pid)
+		b = append(b, mod...)
+
+		return hashers.FnvUint64(b)
+	case ktypes.FileRundown:
+		b := make([]byte, 8)
+		fileObject, _ := e.Kparams.GetUint64(kparams.FileObject)
+		binary.LittleEndian.PutUint64(b, fileObject)
+
+		return hashers.FnvUint64(b)
+	case ktypes.RegKCBRundown:
+		key, _ := e.Kparams.GetString(kparams.RegKeyName)
+		b := make([]byte, 4+len(key))
+
+		binary.LittleEndian.PutUint32(b, e.PID)
+		b = append(b, key...)
+		return hashers.FnvUint64(b)
+	}
 	return 0
 }
 

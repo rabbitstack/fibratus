@@ -20,6 +20,7 @@ package app
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/zsyscall/security"
 	"os"
 
 	ver "github.com/rabbitstack/fibratus/pkg/util/version"
@@ -70,9 +71,12 @@ func init() {
 }
 
 func run(cmd *cobra.Command, args []string) error {
-	// initialize config and logger
-	if err := common.Init(cfg, true); err != nil {
+	if err := common.InitConfigAndLogger(cfg); err != nil {
 		return err
+	}
+	// inject SeDebugPrivilege in access token
+	if cfg.DebugPrivilege {
+		security.SetDebugPrivilege()
 	}
 	ver.Set(version)
 	// set up the signals

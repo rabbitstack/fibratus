@@ -20,7 +20,7 @@ package ps
 
 import (
 	"expvar"
-	"github.com/rabbitstack/fibratus/pkg/syscall"
+	"github.com/rabbitstack/fibratus/pkg/zsyscall"
 	"golang.org/x/sys/windows"
 	"path/filepath"
 	"strconv"
@@ -35,7 +35,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
-	hndl "github.com/rabbitstack/fibratus/pkg/syscall/handle"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -187,7 +186,7 @@ func (s *snapshotter) Write(e *kevent.Kevent) error {
 	if err != nil {
 		return err
 	}
-	proc, err := s.newProc(pid, ppid, e)
+	proc, err := s.initProc(pid, ppid, e)
 	s.procs[pid] = proc
 	proc.Parent = s.procs[ppid]
 	// adjust the process which is generating the event. For
@@ -283,7 +282,7 @@ func (s *snapshotter) Close() error {
 	return nil
 }
 
-func (s *snapshotter) newProc(pid, ppid uint32, e *kevent.Kevent) (*pstypes.PS, error) {
+func (s *snapshotter) initProc(pid, ppid uint32, e *kevent.Kevent) (*pstypes.PS, error) {
 	proc := pstypes.NewProc(
 		pid,
 		ppid,
@@ -342,7 +341,7 @@ func (s *snapshotter) gcDeadProcesses() {
 				if err != nil {
 					continue
 				}
-				if !syscall.IsProcessRunning(proc) {
+				if !zsyscall.IsProcessRunning(proc) {
 					delete(s.procs, pid)
 				}
 				_ = windows.CloseHandle(proc)
@@ -372,14 +371,14 @@ func (s *snapshotter) onHandleCreated(pid uint32, handle htypes.Handle) {
 	}
 }
 
-func (s *snapshotter) onHandleDestroyed(pid uint32, num hndl.Handle) {
+func (s *snapshotter) onHandleDestroyed(pid uint32, rawHandle windows.Handle) {
 	s.mu.RLock()
 	ps, ok := s.procs[pid]
 	s.mu.RUnlock()
 	if ok {
 		s.mu.Lock()
 		defer s.mu.Unlock()
-		ps.RemoveHandle(num)
+		ps.RemoveHandle(rawHandle)
 		s.procs[pid] = ps
 	}
 }
@@ -413,7 +412,8 @@ func (s *snapshotter) Find(pid uint32) *pstypes.PS {
 		return nil
 	}
 	processLookupFailureCount.Add(strconv.Itoa(int(pid)), 1)
-	proc := &pstypes.PS{PID: pid, Ppid: syscall.InvalidProcessPid}
+
+	proc := &pstypes.PS{PID: pid, Ppid: zsyscall.InvalidProcessPid}
 	access := uint32(windows.PROCESS_QUERY_INFORMATION | windows.PROCESS_VM_READ)
 	process, err := windows.OpenProcess(access, false, pid)
 	if err != nil {
@@ -444,11 +444,11 @@ func (s *snapshotter) Find(pid uint32) *pstypes.PS {
 	}
 
 	// consult process parent id
-	pbi, err := syscall.QueryInformationProcess[windows.PROCESS_BASIC_INFORMATION](process, syscall.ProcessBasicInformationClass)
+	info, err := zsyscall.QueryInformationProcess[windows.PROCESS_BASIC_INFORMATION](process, windows.ProcessBasicInformation)
 	if err != nil {
 		return proc
 	}
-	proc.Ppid = uint32(pbi.InheritedFromUniqueProcessId)
+	proc.Ppid = uint32(info.InheritedFromUniqueProcessId)
 
 	// retrieve process handles
 	proc.Handles, err = s.hsnap.FindHandles(pid)

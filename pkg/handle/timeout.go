@@ -25,26 +25,24 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/syscall/handle"
-	"github.com/rabbitstack/fibratus/pkg/syscall/object"
-	"github.com/rabbitstack/fibratus/pkg/syscall/thread"
+	"github.com/rabbitstack/fibratus/pkg/zsyscall"
+	"golang.org/x/sys/windows"
 	"sync/atomic"
-	"syscall"
 )
 
 var (
-	threadHandle handle.Handle
-	rawHandle    atomic.Value
-	ini          object.Event
-	done         object.Event
-	name         string
+	thread               windows.Handle
+	rawHandle            atomic.Value
+	ini                  windows.Handle
+	done                 windows.Handle
+	objectNameInCallback string
 
 	waitTimeoutCounts = expvar.NewInt("handle.wait.timeouts")
 )
 
 func init() {
-	ini, _ = object.NewEvent(false, false)
-	done, _ = object.NewEvent(false, false)
+	ini, _ = windows.CreateEvent(nil, 0, 0, nil)
+	done, _ = windows.CreateEvent(nil, 0, 0, nil)
 }
 
 // GetHandleWithTimeout is in charge of resolving handle names on handle instances that are under the risk
@@ -54,70 +52,68 @@ func init() {
 // thread after completion of the `NtQueryObject` call. If the query thread doesn't notify the main thread after a prudent
 // timeout, then the query thread is killed. Subsequent calls for handle name resolution will recreate the thread in case
 // of it not being alive.
-func GetHandleWithTimeout(handle handle.Handle, timeout uint32) (string, error) {
-	if threadHandle == 0 {
-		if err := ini.Reset(); err != nil {
+func GetHandleWithTimeout(handle windows.Handle, timeout uint32) (string, error) {
+	if thread == 0 {
+		if err := windows.ResetEvent(ini); err != nil {
 			return "", fmt.Errorf("couldn't reset init event: %v", err)
 		}
-		if err := done.Reset(); err != nil {
+		if err := windows.ResetEvent(done); err != nil {
 			return "", fmt.Errorf("couldn't reset done event: %v", err)
 		}
-		h, _, err := thread.Create(nil, syscall.NewCallback(cb))
-		if err != nil {
-			return "", fmt.Errorf("cannot create handle query thread: %v", err)
+		thread = zsyscall.CreateThread(nil, 0, windows.NewCallback(getObjectNameCallback), 0, 0, nil)
+		if thread == 0 {
+			return "", fmt.Errorf("cannot create handle query thread: %v", windows.GetLastError())
 		}
-		threadHandle = h
 	}
-
 	rawHandle.Store(handle)
-
-	if err := ini.Set(); err != nil {
+	if err := windows.SetEvent(ini); err != nil {
 		return "", err
 	}
-
-	switch s, _ := syscall.WaitForSingleObject(syscall.Handle(done), timeout); s {
-	case syscall.WAIT_OBJECT_0:
-		return name, nil
-	case syscall.WAIT_TIMEOUT:
+	s, err := windows.WaitForSingleObject(done, timeout)
+	if s == windows.WAIT_OBJECT_0 {
+		return objectNameInCallback, nil
+	}
+	if err == windows.WAIT_TIMEOUT {
 		waitTimeoutCounts.Add(1)
 		// kill the thread and wait for its termination to orderly cleanup resources
-		if err := thread.Terminate(threadHandle, 0); err != nil {
+		if err := zsyscall.TerminateThread(thread, 0); err != nil {
 			return "", fmt.Errorf("unable to terminate timeout thread: %v", err)
 		}
-		if _, err := syscall.WaitForSingleObject(syscall.Handle(threadHandle), timeout); err != nil {
+		if _, err := windows.WaitForSingleObject(thread, timeout); err != nil {
 			return "", fmt.Errorf("failed awaiting timeout thread termination: %v", err)
 		}
-		threadHandle = 0
-		threadHandle.Close()
-
+		windows.CloseHandle(thread)
+		thread = 0
 		return "", errors.New("couldn't resolve handle name due to timeout")
 	}
 	return "", nil
 }
 
-// CloseTimeout releases handle timeut resources.
+// CloseTimeout releases event and thread handles.
 func CloseTimeout() error {
-	if err := ini.Close(); err != nil {
-		return done.Close()
+	if err := windows.CloseHandle(ini); err != nil {
+		return windows.CloseHandle(done)
 	}
-	threadHandle.Close()
-	return done.Close()
+	if err := windows.CloseHandle(done); err != nil {
+		return windows.CloseHandle(thread)
+	}
+	return windows.CloseHandle(thread)
 }
 
-func cb(ctx uintptr) uintptr {
+func getObjectNameCallback(ctx uintptr) uintptr {
 	for {
-		s, err := syscall.WaitForSingleObject(syscall.Handle(ini), syscall.INFINITE)
-		if err != nil || s != syscall.WAIT_OBJECT_0 {
+		s, err := windows.WaitForSingleObject(ini, windows.INFINITE)
+		if err != nil || s != windows.WAIT_OBJECT_0 {
 			break
 		}
-		name, err = queryObjectName(rawHandle.Load().(handle.Handle))
+		objectNameInCallback, err = QueryObjectName(rawHandle.Load().(windows.Handle))
 		if err != nil {
-			if err := done.Set(); err != nil {
+			if err := windows.SetEvent(done); err != nil {
 				break
 			}
 			continue
 		}
-		if err := done.Set(); err != nil {
+		if err := windows.SetEvent(done); err != nil {
 			break
 		}
 	}

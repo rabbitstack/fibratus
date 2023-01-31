@@ -28,7 +28,7 @@ import (
 	"os"
 )
 
-var Cmd = &cobra.Command{
+var Command = &cobra.Command{
 	Use:   "config",
 	Short: "Show runtime config",
 	RunE:  printConfig,
@@ -40,11 +40,11 @@ var (
 )
 
 func init() {
-	cfg.MustViperize(Cmd)
+	cfg.MustViperize(Command)
 }
 
 func printConfig(cmd *cobra.Command, args []string) error {
-	if err := common.Init(cfg, false); err != nil {
+	if err := common.InitConfigAndLogger(cfg); err != nil {
 		return err
 	}
 	body, err := rest.Get(rest.WithTransport(cfg.API.Transport), rest.WithURI("config"))

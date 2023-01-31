@@ -27,14 +27,14 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-	"github.com/rabbitstack/fibratus/pkg/syscall/driver"
-	syshandle "github.com/rabbitstack/fibratus/pkg/syscall/handle"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
+	"github.com/rabbitstack/fibratus/pkg/zsyscall/driver"
+	"golang.org/x/sys/windows"
 	"path/filepath"
 	"strings"
 )
 
-// maxLRUCacheSize specified the maximum number of objects waiting for the CreateHandle event
+// maxLRUCacheSize specifies the maximum number of objects waiting for their corresponding CreateHandle event
 const maxLRUCacheSize = 1000
 
 var (
@@ -77,12 +77,12 @@ func (h *handleProcessor) processEvent(e *kevent.Kevent) (*kevent.Batch, error) 
 	// it wasn't find in the object store and register the missing type
 	typeName := h.typeStore.FindByID(uint8(typeID))
 	if typeName == "" {
-		dup, err := handle.Duplicate(syshandle.Handle(handleID), e.PID, syshandle.AllAccess)
+		dup, err := handle.Duplicate(windows.Handle(handleID), e.PID, windows.GENERIC_ALL)
 		if err != nil {
 			return kevent.NewBatch(e), err
 		}
-		defer dup.Close()
-		typeName, err = handle.QueryType(dup)
+		defer windows.CloseHandle(dup)
+		typeName, err = handle.QueryObjectType(dup)
 		if err != nil {
 			return kevent.NewBatch(e), err
 		}
@@ -128,7 +128,7 @@ func (h *handleProcessor) processEvent(e *kevent.Kevent) (*kevent.Batch, error) 
 		// CreateHandle event until we receive a CloseHandle
 		// targeting the same object. If the cache capacity is
 		// over the specified threshold, remove the oldest entry
-		if h.objects.Len() > maxLRUCacheSize {
+		if h.objects.Len() >= maxLRUCacheSize {
 			h.objects.RemoveOldest()
 		}
 		h.objects.Add(object, e)

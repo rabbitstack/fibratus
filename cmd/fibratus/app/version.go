@@ -19,6 +19,8 @@
 package app
 
 import (
+	"github.com/rabbitstack/fibratus/cmd/fibratus/app/replay"
+	"github.com/rabbitstack/fibratus/cmd/fibratus/app/service"
 	v "github.com/rabbitstack/fibratus/pkg/util/version"
 	"github.com/spf13/cobra"
 )
@@ -28,6 +30,11 @@ var (
 	commit  string // commit hash
 	date    string // build date
 )
+
+func init() {
+	service.Version = version
+	replay.Version = version
+}
 
 var versionCmd = &cobra.Command{
 	Use:   "version",

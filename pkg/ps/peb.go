@@ -22,7 +22,7 @@
 package ps
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/syscall"
+	"github.com/rabbitstack/fibratus/pkg/zsyscall"
 	"golang.org/x/sys/windows"
 	"strings"
 	"unicode/utf16"
@@ -42,23 +42,23 @@ type PEB struct {
 
 // ReadPEB queries the process's basic information class structures and copies the PEB into
 // the current process's address space. Creates references to PEB and RTL_USER_PROCESS_PARAMETERS
-// structures of the process given by the handle.
+// structures of the process given its handle.
 func ReadPEB(proc windows.Handle) (*PEB, error) {
 	peb := &PEB{proc: proc}
-	pbi, err := syscall.QueryInformationProcess[windows.PROCESS_BASIC_INFORMATION](proc, syscall.ProcessBasicInformationClass)
+	pbi, err := zsyscall.QueryInformationProcess[windows.PROCESS_BASIC_INFORMATION](proc, windows.ProcessBasicInformation)
 	if err != nil {
 		return nil, err
 	}
 	// read the PEB to get the process parameters. Because the PEB structure resides
 	// in the address space of another process we must read the memory block in order
 	// to access the structure's fields.
-	peb.peb, err = syscall.ReadProcessMemory[windows.PEB](proc, uintptr(unsafe.Pointer(pbi.PebBaseAddress)))
+	peb.peb, err = zsyscall.ReadProcessMemory[windows.PEB](proc, uintptr(unsafe.Pointer(pbi.PebBaseAddress)))
 	if err != nil {
 		return nil, err
 	}
 	// read the `RTL_USER_PROCESS_PARAMETERS` struct which contains the command line
 	// and the image name of the process among many other attributes.
-	peb.procParams, err = syscall.ReadProcessMemory[windows.RTL_USER_PROCESS_PARAMETERS](proc, uintptr(unsafe.Pointer(peb.peb.ProcessParameters)))
+	peb.procParams, err = zsyscall.ReadProcessMemory[windows.RTL_USER_PROCESS_PARAMETERS](proc, uintptr(unsafe.Pointer(peb.peb.ProcessParameters)))
 	if err != nil {
 		return nil, err
 	}

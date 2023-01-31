@@ -22,6 +22,7 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
+	"golang.org/x/sys/windows"
 	"syscall"
 	"unsafe"
 
@@ -32,8 +33,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kstream/processors"
 	"github.com/rabbitstack/fibratus/pkg/ps"
-	"github.com/rabbitstack/fibratus/pkg/syscall/etw"
-	"github.com/rabbitstack/fibratus/pkg/syscall/utf16"
+	"github.com/rabbitstack/fibratus/pkg/zsyscall/etw"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -128,7 +128,7 @@ func (k *kstreamConsumer) OpenKstream(traces map[string]TraceSession) error {
 
 func (k *kstreamConsumer) openKstream(loggerName string) error {
 	trace := etw.EventTraceLogfile{
-		LoggerName:     utf16.StringToUTF16Ptr(loggerName),
+		LoggerName:     windows.StringToUTF16Ptr(loggerName),
 		BufferCallback: syscall.NewCallback(k.bufferStatsCallback),
 	}
 

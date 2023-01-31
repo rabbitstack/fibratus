@@ -63,7 +63,7 @@ func (p psProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Batch, bool, error)
 		if err != nil {
 			return kevent.NewBatch(e), false, err
 		}
-		return kevent.NewBatch(e), false, p.snap.RemoveThread(tid)
+		return kevent.NewBatch(e), false, p.snap.RemoveThread(pid, tid)
 	case ktypes.OpenProcess, ktypes.OpenThread:
 		pid, err := e.Kparams.GetPid()
 		if err != nil {

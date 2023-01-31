@@ -23,7 +23,7 @@ package fs
 
 import (
 	"expvar"
-	"github.com/rabbitstack/fibratus/pkg/syscall/file"
+	"github.com/rabbitstack/fibratus/pkg/zsyscall/file"
 	"os"
 	"path/filepath"
 	"strings"

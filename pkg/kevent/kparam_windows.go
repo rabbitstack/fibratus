@@ -24,11 +24,11 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-	"github.com/rabbitstack/fibratus/pkg/syscall/etw"
-	"github.com/rabbitstack/fibratus/pkg/syscall/security"
 	"github.com/rabbitstack/fibratus/pkg/util/ip"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
 	"github.com/rabbitstack/fibratus/pkg/util/ntstatus"
+	"github.com/rabbitstack/fibratus/pkg/zsyscall"
+	"github.com/rabbitstack/fibratus/pkg/zsyscall/etw"
 	"golang.org/x/sys/windows"
 	"net"
 	"strconv"
@@ -58,7 +58,6 @@ func NewKparam(name string, typ kparams.Type, value kparams.Value, options ...Pa
 	default:
 		v = value
 	}
-
 	return &Kparam{Name: name, Type: typ, Value: v, Flags: opts.flags, Enum: opts.enum}
 }
 
@@ -73,13 +72,13 @@ func (k Kparam) String() string {
 	case kparams.UnicodeString, kparams.AnsiString, kparams.FilePath:
 		return k.Value.(string)
 	case kparams.SID:
-		account, domain := security.LookupAccount(k.Value.([]byte), false)
+		account, domain := zsyscall.LookupAccount(k.Value.([]byte), false)
 		if account != "" || domain != "" {
 			return joinSID(account, domain)
 		}
 		return ""
 	case kparams.WbemSID:
-		account, domain := security.LookupAccount(k.Value.([]byte), true)
+		account, domain := zsyscall.LookupAccount(k.Value.([]byte), true)
 		if account != "" || domain != "" {
 			return joinSID(account, domain)
 		}

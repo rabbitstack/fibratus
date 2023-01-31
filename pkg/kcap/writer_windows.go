@@ -42,14 +42,11 @@ import (
 )
 
 type stats struct {
-	kcapFile string
-
+	kcapFile       string
 	kevtsWritten   uint64
 	bytesWritten   uint64
 	handlesWritten uint64
 	procsWritten   uint64
-
-	pids map[uint32]bool
 }
 
 func (s *stats) incKevts(kevt *kevent.Kevent) {
@@ -63,15 +60,6 @@ func (s *stats) incKevts(kevt *kevent.Kevent) {
 func (s *stats) incBytes(bytes uint64) { atomic.AddUint64(&s.bytesWritten, bytes) }
 func (s *stats) incHandles()           { atomic.AddUint64(&s.handlesWritten, 1) }
 func (s *stats) incProcs(kevt *kevent.Kevent) {
-	// EnumProcess events can arrive twice for the same kernel session, so we
-	// ignore incrementing the number of processes if we've already seen the process
-	if kevt.Type == ktypes.EnumProcess {
-		pid, _ := kevt.Kparams.GetPid()
-		if _, ok := s.pids[pid]; ok {
-			return
-		}
-		s.pids[pid] = true
-	}
 	if kevt.Type == ktypes.CreateProcess || kevt.Type == ktypes.EnumProcess {
 		atomic.AddUint64(&s.procsWritten, 1)
 	}
@@ -156,7 +144,7 @@ func NewWriter(filename string, psnap ps.Snapshotter, hsnap handle.Snapshotter) 
 		psnap:   psnap,
 		hsnap:   hsnap,
 		stop:    make(chan struct{}),
-		stats:   &stats{kcapFile: filename, pids: make(map[uint32]bool)},
+		stats:   &stats{kcapFile: filename},
 	}
 
 	if err := w.writeSnapshots(); err != nil {

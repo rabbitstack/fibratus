@@ -29,7 +29,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	pex "github.com/rabbitstack/fibratus/pkg/pe"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
-	shandle "github.com/rabbitstack/fibratus/pkg/syscall/handle"
+	shandle "github.com/rabbitstack/fibratus/pkg/zsyscall/handle"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

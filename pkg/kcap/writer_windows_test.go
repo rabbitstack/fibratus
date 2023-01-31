@@ -31,7 +31,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kstream"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
-	shandle "github.com/rabbitstack/fibratus/pkg/syscall/handle"
+	shandle "github.com/rabbitstack/fibratus/pkg/zsyscall/handle"
 	"github.com/stretchr/testify/require"
 	"testing"
 	"time"

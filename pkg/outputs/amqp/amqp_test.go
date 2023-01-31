@@ -32,7 +32,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/outputs/amqp/_fixtures/garagemq/config"
 	broker "github.com/rabbitstack/fibratus/pkg/outputs/amqp/_fixtures/garagemq/server"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
-	shandle "github.com/rabbitstack/fibratus/pkg/syscall/handle"
+	shandle "github.com/rabbitstack/fibratus/pkg/zsyscall/handle"
 	"github.com/streadway/amqp"
 	"github.com/stretchr/testify/require"
 )

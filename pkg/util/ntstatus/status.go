@@ -19,10 +19,9 @@
 package ntstatus
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/syscall/sys"
+	"github.com/rabbitstack/fibratus/pkg/zsyscall"
 	"golang.org/x/sys/windows"
 	"sync"
-	"syscall"
 	"unicode/utf16"
 )
 
@@ -47,9 +46,10 @@ func FormatMessage(status uint32) string {
 	if s, ok := statusCache[status]; ok {
 		return s
 	}
-	var flags uint32 = syscall.FORMAT_MESSAGE_FROM_SYSTEM
+	var flags uint32 = windows.FORMAT_MESSAGE_FROM_SYSTEM
 	b := make([]uint16, 300)
-	n, err := windows.FormatMessage(flags, 0, sys.CodeFromNtStatus(status), 0, b, nil)
+	msgID := zsyscall.RtlNtStatusToDosError(status)
+	n, err := windows.FormatMessage(flags, 0, msgID, 0, b, nil)
 	if err != nil {
 		return "Unknown"
 	}

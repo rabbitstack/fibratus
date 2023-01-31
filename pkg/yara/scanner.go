@@ -166,7 +166,7 @@ func parseCompilerErrors(errors []yara.CompilerMessage) error {
 func (s scanner) ScanProc(pid uint32, kevt *kevent.Kevent) error {
 	proc := s.psnap.Find(pid)
 	if proc == nil {
-		return fmt.Errorf("cannot scan proc. pid %d does not exist in snapshotter", pid)
+		return fmt.Errorf("cannot scan proc. pid %d does not exist in snapshotter state", pid)
 	}
 
 	if s.config.ShouldSkipProcess(proc.Name) {

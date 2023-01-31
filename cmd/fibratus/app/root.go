@@ -22,6 +22,10 @@ import (
 	"errors"
 	"github.com/rabbitstack/fibratus/cmd/fibratus/app/capture"
 	"github.com/rabbitstack/fibratus/cmd/fibratus/app/config"
+	"github.com/rabbitstack/fibratus/cmd/fibratus/app/list"
+	"github.com/rabbitstack/fibratus/cmd/fibratus/app/replay"
+	"github.com/rabbitstack/fibratus/cmd/fibratus/app/service"
+	"github.com/rabbitstack/fibratus/cmd/fibratus/app/stats"
 	"github.com/spf13/cobra"
 	"runtime"
 )
@@ -50,16 +54,17 @@ var RootCmd = &cobra.Command{
 }
 
 func init() {
+	RootCmd.AddCommand(capture.Command)
+	RootCmd.AddCommand(replay.Command)
+	RootCmd.AddCommand(service.InstallCommand)
+	RootCmd.AddCommand(service.RemoveCommand)
+	RootCmd.AddCommand(service.StartCommand)
+	RootCmd.AddCommand(service.StopCommand)
+	RootCmd.AddCommand(service.RestartCommand)
+	RootCmd.AddCommand(stats.Command)
+	RootCmd.AddCommand(config.Command)
+	RootCmd.AddCommand(list.Command)
 	RootCmd.AddCommand(runCmd)
-	RootCmd.AddCommand(capture.Cmd)
-	RootCmd.AddCommand(replayCmd)
-	RootCmd.AddCommand(installSvcCmd)
-	RootCmd.AddCommand(removeSvcCmd)
-	RootCmd.AddCommand(startSvcCmd)
-	RootCmd.AddCommand(stopSvcCmd)
-	RootCmd.AddCommand(restartSvcCmd)
-	RootCmd.AddCommand(statsCmd)
-	RootCmd.AddCommand(config.Cmd)
 	RootCmd.AddCommand(docsCmd)
 	RootCmd.AddCommand(versionCmd)
 }

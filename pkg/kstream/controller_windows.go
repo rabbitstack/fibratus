@@ -21,14 +21,14 @@ package kstream
 import (
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
+	"golang.org/x/sys/windows"
 	"runtime"
-	"syscall"
 	"time"
 	"unsafe"
 
 	"github.com/rabbitstack/fibratus/pkg/config"
 	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
-	"github.com/rabbitstack/fibratus/pkg/syscall/etw"
+	"github.com/rabbitstack/fibratus/pkg/zsyscall/etw"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows/registry"
 )
@@ -50,7 +50,7 @@ const (
 type TraceSession struct {
 	Handle etw.TraceHandle
 	Name   string
-	GUID   syscall.GUID
+	GUID   windows.GUID
 }
 
 // IsKernelLogger determines if the session is tied to the NT Kernel Logger provider.
@@ -63,7 +63,7 @@ func (s TraceSession) IsKernelLogger() bool {
 // session.
 type TraceProvider struct {
 	TraceName string       // trace name
-	GUID      syscall.GUID // provider GUID
+	GUID      windows.GUID // provider GUID
 	Keywords  uint64       // enabled keywords
 	Enabled   bool         // whether the provider is enabled
 }
@@ -341,7 +341,7 @@ func (k *KtraceController) Traces() map[string]TraceSession {
 	return k.traces
 }
 
-func (k *KtraceController) insertTrace(name string, handle etw.TraceHandle, guid syscall.GUID) {
+func (k *KtraceController) insertTrace(name string, handle etw.TraceHandle, guid windows.GUID) {
 	trace := TraceSession{
 		Handle: handle,
 		Name:   name,

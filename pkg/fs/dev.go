@@ -22,7 +22,7 @@
 package fs
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/syscall/file"
+	"github.com/rabbitstack/fibratus/pkg/zsyscall"
 	"strings"
 )
 
@@ -44,8 +44,8 @@ func NewDevMapper() DevMapper {
 		cache: make(map[string]string),
 	}
 	// loop through logical drives and query the DOS device name
-	for _, drive := range file.GetLogicalDrives() {
-		device, err := file.QueryDosDevice(drive)
+	for _, drive := range zsyscall.GetLogicalDrives() {
+		device, err := zsyscall.QueryDosDevice(drive)
 		if err != nil {
 			continue
 		}

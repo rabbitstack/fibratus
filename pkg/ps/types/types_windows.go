@@ -21,13 +21,13 @@ package types
 import (
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
+	"golang.org/x/sys/windows"
 	"path/filepath"
 	"sync"
 
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/pe"
-	hndl "github.com/rabbitstack/fibratus/pkg/syscall/handle"
 )
 
 // PS encapsulates process' state such as allocated resources and other metadata.
@@ -243,9 +243,9 @@ func (ps *PS) AddHandle(handle htypes.Handle) {
 }
 
 // RemoveHandle removes a handle with specified identifier from the list of allocated handles.
-func (ps *PS) RemoveHandle(num hndl.Handle) {
+func (ps *PS) RemoveHandle(raw windows.Handle) {
 	for i, h := range ps.Handles {
-		if h.Num == num {
+		if h.Num == raw {
 			ps.Handles = append(ps.Handles[:i], ps.Handles[i+1:]...)
 			break
 		}
