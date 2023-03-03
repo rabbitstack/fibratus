@@ -23,25 +23,25 @@ import (
 	"strings"
 )
 
-// index is the type alias for the string position search order
-type index uint8
+// IndexPosition is the type alias for the string position search order
+type IndexPosition uint8
 
 const (
-	unknown index = iota
-	first         // Index
-	any           // IndexAny
-	last          // LastIndex
-	lastany       // LastIndexAny
+	UnknownIndex IndexPosition = iota
+	FirstIndex                 // Index
+	AnyIndex                   // IndexAny
+	LastIndex                  // LastIndex
+	LastAnyIndex               // LastIndexAny
 )
 
-var indexMappings = map[string]index{
-	"first":   first,
-	"any":     any,
-	"last":    last,
-	"lastany": lastany,
+var indexMappings = map[string]IndexPosition{
+	"first":   FirstIndex,
+	"any":     AnyIndex,
+	"last":    LastIndex,
+	"lastany": LastAnyIndex,
 }
 
-func indexFromString(s string) index { return indexMappings[s] }
+func indexFromString(s string) IndexPosition { return indexMappings[s] }
 
 // IndexOf returns the index of the instance of substring in a given string
 // depending on the provided search order.
@@ -58,13 +58,13 @@ func (f IndexOf) Call(args []interface{}) (interface{}, bool) {
 	}
 	// index search order
 	switch indexFromString(parseString(2, args)) {
-	case first:
+	case FirstIndex:
 		return strings.Index(str, substr), true
-	case any:
+	case AnyIndex:
 		return strings.IndexAny(str, substr), true
-	case last:
+	case LastIndex:
 		return strings.LastIndex(str, substr), true
-	case lastany:
+	case LastAnyIndex:
 		return strings.LastIndexAny(str, substr), true
 	default:
 		return false, false
@@ -83,7 +83,7 @@ func (f IndexOf) Desc() FunctionDesc {
 			if len(args) == 2 {
 				return nil
 			}
-			if len(args) == 3 && indexFromString(args[2]) == unknown {
+			if len(args) == 3 && indexFromString(args[2]) == UnknownIndex {
 				return fmt.Errorf("%s is not a valid index search order. Available options are: first,any,last,lastany", args[2])
 			}
 			return nil

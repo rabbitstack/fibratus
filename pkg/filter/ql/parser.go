@@ -86,6 +86,10 @@ func (p *Parser) ParseSequence() (*Sequence, error) {
 			if len(exprs) < 1 {
 				return nil, fmt.Errorf("%s: sequences require at least two expressions", p.expr)
 			}
+			const maxExpressions = 5
+			if len(exprs) > maxExpressions {
+				return nil, fmt.Errorf("%s: maximum number of expressions reached", p.expr)
+			}
 			seq.Expressions = exprs
 			if seq.impairBy() {
 				return nil, fmt.Errorf("%s: all expressions require the 'by' statement", p.expr)
@@ -107,17 +111,28 @@ func (p *Parser) ParseSequence() (*Sequence, error) {
 			return nil, newParseError(tokstr(tok, lit), []string{"|"}, posEnd, p.expr)
 		}
 
+		var seqexpr SequenceExpr
 		tok, _, _ = p.scanIgnoreWhitespace()
-		if tok == By {
+		switch tok {
+		case By:
 			tok, pos, lit := p.scanIgnoreWhitespace()
 			if tok != Field {
 				return nil, newParseError(tokstr(tok, lit), []string{"field"}, pos, p.expr)
 			}
-			exprs = append(exprs, SequenceExpr{Expr: expr, By: fields.Field(lit)})
-		} else {
-			exprs = append(exprs, SequenceExpr{Expr: expr})
+			seqexpr = SequenceExpr{Expr: expr, By: fields.Field(lit)}
+		case As:
+			tok, pos, lit := p.scanIgnoreWhitespace()
+			if tok != Ident {
+				return nil, newParseError(tokstr(tok, lit), []string{"identifier"}, pos, p.expr)
+			}
+			seqexpr = SequenceExpr{Expr: expr, Alias: lit}
+		default:
+			seqexpr = SequenceExpr{Expr: expr}
 			p.unscan()
 		}
+		seqexpr.init()
+		seqexpr.walk()
+		exprs = append(exprs, seqexpr)
 	}
 }
 
@@ -158,7 +173,7 @@ func (p *Parser) ParseExpr() (Expr, error) {
 			// expect LPAREN after in
 			tok, pos, lit := p.scanIgnoreWhitespace()
 			p.unscan()
-			if tok != Lparen && !p.c.IsMacroList(lit) {
+			if tok != Lparen && (p.c != nil && !p.c.IsMacroList(lit)) {
 				return nil, newParseError(tokstr(op, lit), []string{"'('"}, pos, p.expr)
 			}
 		}
@@ -286,6 +301,12 @@ func (p *Parser) parseUnaryExpr() (Expr, error) {
 		return &StringLiteral{Value: lit}, nil
 	case Field:
 		return &FieldLiteral{Value: lit}, nil
+	case BoundField:
+		n := strings.Index(lit, ".")
+		if n > 0 && fields.Lookup(lit[n+1:]) == "" {
+			return nil, newParseError(tokstr(tok, lit), []string{"field after bound ref"}, pos+n, p.expr)
+		}
+		return &BoundFieldLiteral{Value: lit}, nil
 	case True, False:
 		return &BoolLiteral{Value: tok == True}, nil
 	case Integer:
@@ -307,7 +328,7 @@ func (p *Parser) parseUnaryExpr() (Expr, error) {
 		return &DecimalLiteral{Value: v}, nil
 	}
 
-	expectations := []string{"field", "string", "number", "bool", "ip", "function"}
+	expectations := []string{"field", "bound field", "string", "number", "bool", "ip", "function"}
 	if tok == BadIP {
 		expectations = []string{"a valid IP address"}
 	}

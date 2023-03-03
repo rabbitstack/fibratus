@@ -260,6 +260,26 @@ func TestParseSequence(t *testing.T) {
 			time.Second * 30,
 			false,
 		},
+		{
+
+			`maxspan 30s
+			 |kevt.name = 'CreateProcess'| as e1
+			 |kevt.name = 'CreateFile' and $e1.ps.name = file.name |
+			`,
+			nil,
+			time.Second * 30,
+			false,
+		},
+		{
+
+			`maxspan 30s
+			 |kevt.name = 'CreateProcess'| as e1
+			 |kevt.name = 'CreateFile' and $e1.ps.ame = file.name |
+			`,
+			errors.New("expected field after bound ref"),
+			time.Second * 30,
+			false,
+		},
 	}
 
 	for i, tt := range tests {

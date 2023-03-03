@@ -18,47 +18,27 @@
 
 package functions
 
-import (
-	"encoding/binary"
-	"io"
-	"os"
-)
+import "path/filepath"
 
-// The 4-byte magic number at the start of a minidump file
-const minidumpSignature = 1347241037
+// IsAbs reports whether the path is absolute.
+type IsAbs struct{}
 
-// IsMinidump determines if the specified file contains the minidump signature.
-type IsMinidump struct{}
-
-func (f IsMinidump) Call(args []interface{}) (interface{}, bool) {
+func (f IsAbs) Call(args []interface{}) (interface{}, bool) {
 	if len(args) < 1 {
 		return false, false
 	}
 	path := parseString(0, args)
-
-	file, err := os.Open(path)
-	if err != nil {
-		return false, true
-	}
-	defer file.Close()
-
-	var header [4]byte
-	_, err = io.ReadFull(file, header[:])
-	if err != nil {
-		return false, true
-	}
-	isMinidumpSignature := binary.LittleEndian.Uint32(header[:]) == minidumpSignature
-	return isMinidumpSignature, true
+	return filepath.IsAbs(path), true
 }
 
-func (f IsMinidump) Desc() FunctionDesc {
+func (f IsAbs) Desc() FunctionDesc {
 	desc := FunctionDesc{
-		Name: IsMinidumpFn,
+		Name: IsAbsFn,
 		Args: []FunctionArgDesc{
-			{Keyword: "path", Types: []ArgType{String, Field, Func}, Required: true},
+			{Keyword: "path", Types: []ArgType{Field, Func, String}, Required: true},
 		},
 	}
 	return desc
 }
 
-func (f IsMinidump) Name() Fn { return IsMinidumpFn }
+func (f IsAbs) Name() Fn { return IsAbsFn }

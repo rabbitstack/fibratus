@@ -171,6 +171,12 @@ func (v *ValuerEval) Eval(expr Expr) interface{} {
 			return nil
 		}
 		return val
+	case *BoundFieldLiteral:
+		val, ok := v.Valuer.Value(expr.Value)
+		if !ok {
+			return nil
+		}
+		return val
 	case *IPLiteral:
 		return expr.Value
 	case *Function:

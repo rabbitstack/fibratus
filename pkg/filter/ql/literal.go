@@ -22,6 +22,8 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
+	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/util/hashers"
 	"net"
 	"reflect"
 	"strconv"
@@ -66,6 +68,10 @@ type IPLiteral struct {
 	Value net.IP
 }
 
+type BoundFieldLiteral struct {
+	Value string
+}
+
 func (i IPLiteral) String() string {
 	return i.Value.String()
 }
@@ -92,6 +98,26 @@ func (d DecimalLiteral) String() string {
 
 func (b BoolLiteral) String() string {
 	return strconv.FormatBool(b.Value)
+}
+
+func (b BoundFieldLiteral) String() string {
+	return b.Value
+}
+
+func (b BoundFieldLiteral) Field() fields.Field {
+	n := strings.Index(b.Value, ".")
+	if n > 0 {
+		return fields.Field(b.Value[n+1:])
+	}
+	return fields.Field(b.Value)
+}
+
+func (b BoundFieldLiteral) Alias() string {
+	n := strings.Index(b.Value, ".")
+	if n > 0 {
+		return b.Value[1:n]
+	}
+	return b.Value
 }
 
 // ListLiteral represents a list of tag key literals.
@@ -145,7 +171,7 @@ func (f *Function) String() string {
 // catalog. It also validates the function signature to
 // make sure required arguments are supplied. Finally, it
 // checks the type of each argument with the expected one.
-func (f Function) validate() error {
+func (f *Function) validate() error {
 	fn, ok := funcs[strings.ToUpper(f.Name)]
 	if !ok {
 		return ErrUndefinedFunction(f.Name)
@@ -167,7 +193,7 @@ func (f Function) validate() error {
 		arg := fn.Desc().Args[i]
 		typ := functions.Unknown
 		switch reflect.TypeOf(expr) {
-		case reflect.TypeOf(&FieldLiteral{}):
+		case reflect.TypeOf(&FieldLiteral{}), reflect.TypeOf(&BoundFieldLiteral{}):
 			typ = functions.Field
 		case reflect.TypeOf(&IPLiteral{}):
 			typ = functions.IP
@@ -179,6 +205,8 @@ func (f Function) validate() error {
 			typ = functions.Func
 		case reflect.TypeOf(&ListLiteral{}):
 			typ = functions.Slice
+		case reflect.TypeOf(&BoolLiteral{}):
+			typ = functions.Bool
 		}
 		if !arg.ContainsType(typ) {
 			return ErrArgumentTypeMismatch(i, arg.Keyword, fn.Name(), arg.Types)
@@ -189,8 +217,72 @@ func (f Function) validate() error {
 
 // SequenceExpr represents a single binary expression within the sequence.
 type SequenceExpr struct {
-	Expr Expr
-	By   fields.Field
+	Expr        Expr
+	By          fields.Field
+	BoundFields []*BoundFieldLiteral
+	Alias       string
+
+	buckets map[uint32]bool
+}
+
+func (e *SequenceExpr) init() {
+	e.buckets = make(map[uint32]bool)
+	e.BoundFields = make([]*BoundFieldLiteral, 0)
+}
+
+func (e *SequenceExpr) walk() {
+	stringFields := make(map[fields.Field][]string)
+	walk := func(n Node) {
+		if expr, ok := n.(*BinaryExpr); ok {
+			switch lhs := expr.LHS.(type) {
+			case *BoundFieldLiteral:
+				e.BoundFields = append(e.BoundFields, lhs)
+			case *FieldLiteral:
+				field := fields.Field(lhs.Value)
+				switch v := expr.RHS.(type) {
+				case *StringLiteral:
+					stringFields[field] = append(stringFields[field], v.Value)
+				case *ListLiteral:
+					stringFields[field] = append(stringFields[field], v.Values...)
+				}
+			}
+			switch rhs := expr.RHS.(type) {
+			case *BoundFieldLiteral:
+				e.BoundFields = append(e.BoundFields, rhs)
+			case *FieldLiteral:
+				field := fields.Field(rhs.Value)
+				switch v := expr.LHS.(type) {
+				case *StringLiteral:
+					stringFields[field] = append(stringFields[field], v.Value)
+				case *ListLiteral:
+					stringFields[field] = append(stringFields[field], v.Values...)
+				}
+			}
+		}
+	}
+	WalkFunc(e.Expr, walk)
+
+	// initialize event type/category buckets for every such field
+	for name, values := range stringFields {
+		if name == fields.KevtName || name == fields.KevtCategory {
+			for _, v := range values {
+				e.buckets[hashers.FnvUint32([]byte(v))] = true
+			}
+		}
+	}
+}
+
+// IsEvaluable determines if the expression should be evaluated by inspecting
+// the event type filter fields defined in the expression. We permit the expression
+// to be evaluated when the incoming event type or category pertains to the one
+// defined in the field literal.
+func (e *SequenceExpr) IsEvaluable(kevt *kevent.Kevent) bool {
+	return e.buckets[kevt.Type.Hash()] || e.buckets[kevt.Category.Hash()]
+}
+
+// HasBoundFields determines if this sequence expression has bound fields.
+func (e *SequenceExpr) HasBoundFields() bool {
+	return len(e.BoundFields) > 0
 }
 
 // Sequence is a collection of two or more sequence expressions.

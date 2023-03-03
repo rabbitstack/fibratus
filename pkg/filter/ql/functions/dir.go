@@ -18,31 +18,36 @@
 
 package functions
 
-// Length returns the number of characters (runes) for string arguments and
-// the size of the slice for slice arguments.
-type Length struct{}
+import "path/filepath"
 
-func (f Length) Call(args []interface{}) (interface{}, bool) {
+// Dir returns all but the last element of the path, typically the path's directory.
+type Dir struct{}
+
+func (f Dir) Call(args []interface{}) (interface{}, bool) {
 	if len(args) < 1 {
 		return false, false
 	}
 	switch s := args[0].(type) {
 	case string:
-		return len([]rune(s)), true
+		return filepath.Dir(s), true
 	case []string:
-		return len(s), true
+		dirs := make([]string, len(s))
+		for i, path := range s {
+			dirs[i] = filepath.Dir(path)
+		}
+		return dirs, true
 	}
-	return -1, false
+	return nil, true
 }
 
-func (f Length) Desc() FunctionDesc {
+func (f Dir) Desc() FunctionDesc {
 	desc := FunctionDesc{
-		Name: LengthFn,
+		Name: DirFn,
 		Args: []FunctionArgDesc{
-			{Keyword: "string|slice", Types: []ArgType{Field, Slice, Func}, Required: true},
+			{Keyword: "path", Types: []ArgType{Field, Func, String, Slice}, Required: true},
 		},
 	}
 	return desc
 }
 
-func (f Length) Name() Fn { return LengthFn }
+func (f Dir) Name() Fn { return DirFn }

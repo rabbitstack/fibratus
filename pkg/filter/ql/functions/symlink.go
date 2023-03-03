@@ -18,47 +18,31 @@
 
 package functions
 
-import (
-	"encoding/binary"
-	"io"
-	"os"
-)
+import "path/filepath"
 
-// The 4-byte magic number at the start of a minidump file
-const minidumpSignature = 1347241037
+// Symlink returns the path name after the evaluation of any symbolic links.
+type Symlink struct{}
 
-// IsMinidump determines if the specified file contains the minidump signature.
-type IsMinidump struct{}
-
-func (f IsMinidump) Call(args []interface{}) (interface{}, bool) {
+func (f Symlink) Call(args []interface{}) (interface{}, bool) {
 	if len(args) < 1 {
 		return false, false
 	}
 	path := parseString(0, args)
-
-	file, err := os.Open(path)
+	newpath, err := filepath.EvalSymlinks(path)
 	if err != nil {
-		return false, true
+		return path, true
 	}
-	defer file.Close()
-
-	var header [4]byte
-	_, err = io.ReadFull(file, header[:])
-	if err != nil {
-		return false, true
-	}
-	isMinidumpSignature := binary.LittleEndian.Uint32(header[:]) == minidumpSignature
-	return isMinidumpSignature, true
+	return newpath, true
 }
 
-func (f IsMinidump) Desc() FunctionDesc {
+func (f Symlink) Desc() FunctionDesc {
 	desc := FunctionDesc{
-		Name: IsMinidumpFn,
+		Name: SymlinkFn,
 		Args: []FunctionArgDesc{
-			{Keyword: "path", Types: []ArgType{String, Field, Func}, Required: true},
+			{Keyword: "path", Types: []ArgType{Field, Func, String}, Required: true},
 		},
 	}
 	return desc
 }
 
-func (f IsMinidump) Name() Fn { return IsMinidumpFn }
+func (f Symlink) Name() Fn { return SymlinkFn }

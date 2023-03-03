@@ -18,47 +18,38 @@
 
 package functions
 
-import (
-	"encoding/binary"
-	"io"
-	"os"
-)
+import "path/filepath"
 
-// The 4-byte magic number at the start of a minidump file
-const minidumpSignature = 1347241037
+// Ext returns the file name extension used by the path.
+type Ext struct{}
 
-// IsMinidump determines if the specified file contains the minidump signature.
-type IsMinidump struct{}
-
-func (f IsMinidump) Call(args []interface{}) (interface{}, bool) {
+func (f Ext) Call(args []interface{}) (interface{}, bool) {
 	if len(args) < 1 {
 		return false, false
 	}
 	path := parseString(0, args)
-
-	file, err := os.Open(path)
-	if err != nil {
-		return false, true
+	ext := filepath.Ext(path)
+	if len(args) > 1 {
+		dot, ok := args[1].(bool)
+		if !ok {
+			return ext, true
+		}
+		if !dot {
+			return ext[1:], true
+		}
 	}
-	defer file.Close()
-
-	var header [4]byte
-	_, err = io.ReadFull(file, header[:])
-	if err != nil {
-		return false, true
-	}
-	isMinidumpSignature := binary.LittleEndian.Uint32(header[:]) == minidumpSignature
-	return isMinidumpSignature, true
+	return ext, true
 }
 
-func (f IsMinidump) Desc() FunctionDesc {
+func (f Ext) Desc() FunctionDesc {
 	desc := FunctionDesc{
-		Name: IsMinidumpFn,
+		Name: ExtFn,
 		Args: []FunctionArgDesc{
-			{Keyword: "path", Types: []ArgType{String, Field, Func}, Required: true},
+			{Keyword: "path", Types: []ArgType{Field, Func, String}, Required: true},
+			{Keyword: "dot", Types: []ArgType{Bool}, Required: false},
 		},
 	}
 	return desc
 }
 
-func (f IsMinidump) Name() Fn { return IsMinidumpFn }
+func (f Ext) Name() Fn { return ExtFn }

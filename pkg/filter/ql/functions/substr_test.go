@@ -19,25 +19,42 @@
 package functions
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestSubstr(t *testing.T) {
-	call := Substr{}
-	res, _ := call.Call([]interface{}{"Hello", 0, 4})
-	assert.Equal(t, "Hell", res)
+	var tests = []struct {
+		args     []interface{}
+		expected interface{}
+	}{
+		{
+			[]interface{}{"Hello", 0, 4},
+			"Hell",
+		},
+		{
+			[]interface{}{"Hello World!", 0, 50},
+			"Hello World!",
+		},
+		{
+			[]interface{}{"Hello World!", 4, -1},
+			"Hello World!",
+		},
+		{
+			[]interface{}{"Hello World!", -1, 10},
+			"Hello World!",
+		},
+		{
+			[]interface{}{"Hello World!", 6, 7},
+			"W",
+		},
+	}
 
-	res1, _ := call.Call([]interface{}{"Hello World!", 0, 50})
-	assert.Equal(t, "Hello World!", res1)
-
-	res2, _ := call.Call([]interface{}{"Hello World!", 4, -1})
-	assert.Equal(t, "Hello World!", res2)
-
-	res3, _ := call.Call([]interface{}{"Hello World!", -1, 10})
-	assert.Equal(t, "Hello World!", res3)
-
-	res4, _ := call.Call([]interface{}{"Hello World!", 6, 7})
-	assert.Equal(t, "W", res4)
+	for i, tt := range tests {
+		f := Substr{}
+		res, _ := f.Call(tt.args)
+		assert.Equal(t, tt.expected, res, fmt.Sprintf("%d. result mismatch: exp=%v got=%v", i, tt.expected, res))
+	}
 }

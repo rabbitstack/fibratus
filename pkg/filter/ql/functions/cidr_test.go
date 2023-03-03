@@ -19,35 +19,52 @@
 package functions
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"net"
 	"testing"
 )
 
 func TestCIDRContainsCall(t *testing.T) {
-	call := CIDRContains{}
+	var tests = []struct {
+		args     []interface{}
+		expected interface{}
+	}{
+		{
+			[]interface{}{net.ParseIP("192.168.1.5"), "192.168.1.0/24"},
+			true,
+		},
+		{
+			[]interface{}{net.ParseIP("216.58.201.174"), "216.58.201.1/24"},
+			true,
+		},
+		{
+			[]interface{}{"192.168.1.5", "192.168.1.0/24"},
+			true,
+		},
+		{
+			[]interface{}{net.ParseIP("192.168.1.5"), "172.168.1.0/24"},
+			false,
+		},
+		{
+			[]interface{}{net.ParseIP("192.168.1.5"), "172.168.1.0/24", "192.168.1.0/24"},
+			true,
+		},
+		{
+			[]interface{}{net.ParseIP("192.168.1.5"), "192.168.1.0"},
+			false,
+		},
+		{
+			[]interface{}{net.ParseIP("192.168.1.5")},
+			false,
+		},
+	}
 
-	res, _ := call.Call([]interface{}{net.ParseIP("192.168.1.5"), "192.168.1.0/24"})
-	require.True(t, res.(bool))
-
-	res, _ = call.Call([]interface{}{net.ParseIP("216.58.201.174"), "216.58.201.1/24"})
-	require.True(t, res.(bool))
-
-	res, _ = call.Call([]interface{}{"192.168.1.5", "192.168.1.0/24"})
-	require.True(t, res.(bool))
-
-	res, _ = call.Call([]interface{}{net.ParseIP("192.168.1.5"), "172.168.1.0/24"})
-	require.False(t, res.(bool))
-
-	res, _ = call.Call([]interface{}{net.ParseIP("192.168.1.5"), "172.168.1.0/24", "192.168.1.0/24"})
-	require.True(t, res.(bool))
-
-	res, _ = call.Call([]interface{}{net.ParseIP("192.168.1.5"), "192.168.1.0"})
-	require.False(t, res.(bool))
-
-	res, _ = call.Call([]interface{}{net.ParseIP("192.168.1.5")})
-	require.False(t, res.(bool))
+	for i, tt := range tests {
+		f := CIDRContains{}
+		res, _ := f.Call(tt.args)
+		assert.Equal(t, tt.expected, res, fmt.Sprintf("%d. result mismatch: exp=%v got=%v", i, tt.expected, res))
+	}
 }
 
 func TestCIDRContainsDesc(t *testing.T) {
