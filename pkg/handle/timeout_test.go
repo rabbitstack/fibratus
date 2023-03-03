@@ -23,11 +23,14 @@ package handle
 
 import (
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sys/windows"
 	"testing"
 )
 
 func TestTimeout(t *testing.T) {
-	deadlockTimeout, err := GetHandleWithTimeout(1, 500)
+	pipe, err := createPipe(`\\.\pipe\fibratus-timeout`, true)
 	require.NoError(t, err)
-	require.NotNil(t, deadlockTimeout)
+	objectName, err := GetHandleWithTimeout(windows.Handle(pipe), 150)
+	require.NoError(t, err)
+	require.Equal(t, "\\Device\\NamedPipe\\fibratus-timeout", objectName)
 }

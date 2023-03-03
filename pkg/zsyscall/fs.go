@@ -51,6 +51,17 @@ var drives = []string{
 	"Y",
 	"Z"}
 
+const FileFsDeviceInformationClass = 4
+
+// FileFsDeviceInformation provides file system device information about
+// the type of device object associated with a file object.
+type FileFsDeviceInformation struct {
+	// Type designates the type of underlying device.
+	Type uint32
+	// Characteristics represents device characteristics.
+	Characteristics uint32
+}
+
 // GetLogicalDrives returns available device drive letters in the system.
 func GetLogicalDrives() []string {
 	bitmask, err := windows.GetLogicalDrives()

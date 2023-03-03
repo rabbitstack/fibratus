@@ -457,8 +457,8 @@ func (r *Rules) isGroupMapped(scopeHash, groupHash uint32) bool {
 func (r *Rules) hasSequencePolicy() bool { return len(r.sequenceGroups) > 0 }
 
 // NewRules produces a fresh rules instance.
-func NewRules(c *config.Config) Rules {
-	rules := Rules{
+func NewRules(c *config.Config) *Rules {
+	rules := &Rules{
 		filterGroups:   make(map[uint32]filterGroups),
 		sequences:      make(map[string]*sequenceState),
 		sequenceGroups: make([]*filterGroup, 0),

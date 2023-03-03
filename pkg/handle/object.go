@@ -31,6 +31,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/typesize"
 	"github.com/rabbitstack/fibratus/pkg/zsyscall"
 	"golang.org/x/sys/windows"
+	"os"
 	"sort"
 	"unsafe"
 )
@@ -121,7 +122,7 @@ func Duplicate(handle windows.Handle, pid uint32, access uint32) (windows.Handle
 	}
 	defer windows.CloseHandle(source)
 	// this process receives the duplicated handle
-	target, err := windows.OpenProcess(windows.PROCESS_DUP_HANDLE, false, pid)
+	target, err := windows.OpenProcess(windows.PROCESS_DUP_HANDLE, false, uint32(os.Getpid()))
 	if err != nil {
 		return windows.InvalidHandle, err
 	}

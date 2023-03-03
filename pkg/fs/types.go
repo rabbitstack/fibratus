@@ -69,7 +69,7 @@ var FileCreateDispositions = map[uint32]string{
 	uint32(OverwriteIf): "OVERWRITE_IF",
 }
 
-// FileType is the the type alias for the file type
+// FileType is the type alias for the file type
 type FileType uint8
 
 const (
@@ -132,20 +132,20 @@ const (
 )
 
 // String returns user-friendly representation of the file share mask.
-func (shareMode FileShareMode) String() string {
-	if shareMode == FileShareRead {
+func (m FileShareMode) String() string {
+	if m == FileShareRead {
 		return "r--"
-	} else if shareMode == FileShareWrite {
+	} else if m == FileShareWrite {
 		return "-w-"
-	} else if shareMode == FileShareDelete {
+	} else if m == FileShareDelete {
 		return "--d"
-	} else if shareMode&FileShareRead == FileShareRead && shareMode&FileShareWrite == FileShareWrite {
+	} else if m&FileShareRead == FileShareRead && m&FileShareWrite == FileShareWrite {
 		return "rw-"
-	} else if shareMode&FileShareRead == FileShareRead && shareMode&FileShareDelete == FileShareDelete {
+	} else if m&FileShareRead == FileShareRead && m&FileShareDelete == FileShareDelete {
 		return "r-d"
-	} else if shareMode&FileShareWrite == FileShareWrite && shareMode&FileShareDelete == FileShareDelete {
+	} else if m&FileShareWrite == FileShareWrite && m&FileShareDelete == FileShareDelete {
 		return "-wd"
-	} else if shareMode&FileShareRead == FileShareRead && shareMode&FileShareWrite == FileShareWrite && shareMode&FileShareDelete == FileShareDelete {
+	} else if m&FileShareRead == FileShareRead && m&FileShareWrite == FileShareWrite && m&FileShareDelete == FileShareDelete {
 		return "rwd"
 	}
 	return "---"

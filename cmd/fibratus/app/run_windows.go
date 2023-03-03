@@ -19,7 +19,6 @@
 package app
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/zsyscall/security"
 	"os"
 
@@ -158,9 +157,7 @@ func run(cmd *cobra.Command, args []string) error {
 			cfg.Output,
 			cfg.Transformers,
 			cfg.Alertsenders,
-			func(kevt *kevent.Kevent) bool {
-				return rules.Fire(kevt)
-			},
+			common.PreAggregateFunc(rules),
 		)
 		if err != nil {
 			return err

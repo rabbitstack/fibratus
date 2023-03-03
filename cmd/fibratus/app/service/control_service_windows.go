@@ -21,7 +21,6 @@ package service
 import (
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/filter"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/zsyscall/security"
 	"time"
 
@@ -245,7 +244,8 @@ func (s *fsvc) run() error {
 	hsnap := handle.NewSnapshotter(cfg, nil)
 	psnap := ps.NewSnapshotter(hsnap, cfg)
 	kstreamc = kstream.NewConsumer(psnap, hsnap, cfg)
-	// open the kernel event stream, start processing events and forwarding to outputs
+
+	// open the event stream, start processing events and forwarding to outputs
 	err = kstreamc.OpenKstream(ktracec.Traces())
 	if err != nil {
 		return err
@@ -258,9 +258,7 @@ func (s *fsvc) run() error {
 		cfg.Output,
 		cfg.Transformers,
 		cfg.Alertsenders,
-		func(kevt *kevent.Kevent) bool {
-			return rules.Fire(kevt)
-		},
+		common.PreAggregateFunc(rules),
 	)
 	if err != nil {
 		return err

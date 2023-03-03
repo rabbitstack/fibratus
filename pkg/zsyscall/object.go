@@ -92,7 +92,7 @@ func QueryObject[C any](obj windows.Handle, class int32) (*C, error) {
 	n := make([]byte, unsafe.Sizeof(c))
 	err := NtQueryObject(obj, class, unsafe.Pointer(&n[0]), uint32(len(n)), &s)
 	if err != nil {
-		if err == windows.STATUS_INFO_LENGTH_MISMATCH || err == windows.STATUS_BUFFER_TOO_SMALL {
+		if err == windows.STATUS_INFO_LENGTH_MISMATCH || err == windows.STATUS_BUFFER_TOO_SMALL || err == windows.STATUS_BUFFER_OVERFLOW {
 			n = make([]byte, s)
 			err := NtQueryObject(obj, class, unsafe.Pointer(&n[0]), uint32(len(n)), &s)
 			if err != nil {

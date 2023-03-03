@@ -216,7 +216,7 @@ func (s *snapshotter) initSnapshot() {
 	buf := make([]byte, size)
 	for {
 		err := windows.NtQuerySystemInformation(windows.SystemExtendedHandleInformation, unsafe.Pointer(&buf[0]), size, nil)
-		if err == windows.STATUS_INFO_LENGTH_MISMATCH || err == windows.STATUS_BUFFER_TOO_SMALL {
+		if err == windows.STATUS_INFO_LENGTH_MISMATCH || err == windows.STATUS_BUFFER_TOO_SMALL || err == windows.STATUS_BUFFER_OVERFLOW {
 			size *= 2
 			buf = make([]byte, size)
 		} else if err == nil {
@@ -339,7 +339,7 @@ func (s *snapshotter) housekeeping() {
 	loop:
 		for {
 			err := windows.NtQuerySystemInformation(windows.SystemExtendedHandleInformation, unsafe.Pointer(&buf[0]), size, nil)
-			if err == windows.STATUS_INFO_LENGTH_MISMATCH || err == windows.STATUS_BUFFER_TOO_SMALL {
+			if err == windows.STATUS_INFO_LENGTH_MISMATCH || err == windows.STATUS_BUFFER_TOO_SMALL || err == windows.STATUS_BUFFER_OVERFLOW {
 				size *= 2
 				buf = make([]byte, size)
 			} else if err == nil {

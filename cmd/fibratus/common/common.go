@@ -20,6 +20,8 @@ package common
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/filter"
+	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/util/log"
 )
 
@@ -38,4 +40,10 @@ func InitConfigAndLogger(cfg *config.Config) error {
 		return err
 	}
 	return nil
+}
+
+func PreAggregateFunc(rules *filter.Rules) func(kevt *kevent.Kevent) bool {
+	return func(kevt *kevent.Kevent) bool {
+		return rules.Fire(kevt)
+	}
 }
