@@ -40,6 +40,9 @@
 - macro: modify_registry
   expr: (set_value or create_key)
 
+- macro: send_socket
+  expr: kevt.name = 'Send'
+
 - macro: load_driver
   expr: >
     kevt.name = 'LoadDriver'

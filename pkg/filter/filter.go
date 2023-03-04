@@ -167,26 +167,33 @@ func (f *filter) RunSequence(kevt *kevent.Kevent, seqID uint16, partials map[uin
 		// if a sequence expression contains references to
 		// bound fields we map all partials to their sequence
 		// aliases
-		pls := make(map[string][]*kevent.Kevent)
+		p := make(map[string][]*kevent.Kevent)
+		nslots := len(partials[seqID])
 		for i := uint16(0); i < seqID; i++ {
 			alias := f.seq.Expressions[i].Alias
 			if alias == "" {
 				continue
 			}
-			pls[alias] = partials[i+1]
+			p[alias] = partials[i+1]
+			if len(p[alias]) > nslots {
+				nslots = len(p[alias])
+			}
 		}
 		// process until partials from all slots are consumed
 		n := 0
-		nslots := len(pls)
 		for nslots > 0 {
+			nslots--
 			for _, field := range expr.BoundFields {
+				evts := p[field.Alias()]
+				var evt *kevent.Kevent
+				if n > len(evts)-1 {
+					// pick the latest event if all
+					// events for this slot are consumed
+					evt = evts[len(evts)-1]
+				} else {
+					evt = evts[n]
+				}
 				for _, accessor := range f.accessors {
-					evts := pls[field.Alias()]
-					if n > len(evts)-1 {
-						nslots--
-						continue
-					}
-					evt := evts[n]
 					if !accessor.canAccess(evt, f) {
 						continue
 					}
