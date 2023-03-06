@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 
@@ -73,9 +74,21 @@ func getParentPs(kevt *kevent.Kevent) *pstypes.PS {
 }
 
 // psAccessor extracts process's state or kevent specific values.
-type psAccessor struct{}
+type psAccessor struct {
+	isAccesible bool
+	once        sync.Once
+}
 
-func (psAccessor) canAccess(kevt *kevent.Kevent, filter *filter) bool { return filter.useProcAccessor }
+func (ps *psAccessor) canAccess(kevt *kevent.Kevent, filter *filter) bool {
+	ps.once.Do(func() {
+		for _, field := range filter.fields {
+			if field.IsPsField() {
+				ps.isAccesible = true
+			}
+		}
+	})
+	return ps.isAccesible
+}
 
 func newPSAccessor() accessor { return &psAccessor{} }
 
