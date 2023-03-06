@@ -67,10 +67,6 @@ type filter struct {
 	fields    []fields.Field
 	// useFuncValuer determines whether we should supply the function valuer
 	useFuncValuer bool
-	// useProcAccessor indicates if the process accessor is called by this filter
-	useProcAccessor bool
-	// useKevtAccessor indicates if the event accessor is called by this filter
-	useKevtAccessor bool
 	// stringFields contains filter field names mapped to their string values
 	stringFields map[fields.Field][]string
 }
@@ -109,12 +105,12 @@ func (f *filter) Compile() error {
 				f.addStringFields(field, expr.LHS)
 			}
 		case *ql.Function:
+			f.useFuncValuer = true
 			for _, arg := range expr.Args {
 				if field, ok := arg.(*ql.FieldLiteral); ok {
 					f.addField(fields.Field(field.Value))
 				}
 			}
-			f.useFuncValuer = true
 		}
 	}
 	if f.expr != nil {
@@ -133,14 +129,8 @@ func (f *filter) Compile() error {
 	if len(f.fields) == 0 && !f.useFuncValuer {
 		return ErrNoFields
 	}
-	for _, field := range f.fields {
-		switch {
-		case field.IsKevtField():
-			f.useKevtAccessor = true
-		case field.IsPsField():
-			f.useProcAccessor = true
-		}
-	}
+	// only retain accessors for declared filter fields
+	f.narrowAccessors()
 	return nil
 }
 
@@ -187,9 +177,6 @@ func (f *filter) RunSequence(kevt *kevent.Kevent, seqID uint16, partials map[uin
 						continue
 					}
 					evt := evts[n]
-					if !accessor.canAccess(evt, f) {
-						continue
-					}
 					v, err := accessor.get(field.Field(), evt)
 					if err != nil && !kerrors.IsKparamNotFound(err) {
 						accessorErrors.Add(err.Error(), 1)
@@ -312,9 +299,6 @@ func (f *filter) mapValuer(kevt *kevent.Kevent) map[string]interface{} {
 	valuer := make(map[string]interface{}, len(f.fields))
 	for _, field := range f.fields {
 		for _, accessor := range f.accessors {
-			if !accessor.canAccess(kevt, f) {
-				continue
-			}
 			v, err := accessor.get(field, kevt)
 			if err != nil && !kerrors.IsKparamNotFound(err) {
 				accessorErrors.Add(err.Error(), 1)
