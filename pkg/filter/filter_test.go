@@ -70,6 +70,19 @@ func TestSeqFilterCompile(t *testing.T) {
 	assert.True(t, len(f.GetStringFields()) > 0)
 }
 
+func TestSeqFilterInvalidBoundRefs(t *testing.T) {
+	f := New(`sequence
+|kevt.name = 'CreateProcess'| as e1
+|kevt.name = 'CreateFile' and file.name = $e.ps.exe |
+`, cfg)
+	require.Error(t, f.Compile())
+	f1 := New(`sequence
+|kevt.name = 'CreateProcess'| as e1
+|kevt.name = 'CreateFile' and file.name = $e1.ps.exe |
+`, cfg)
+	require.NoError(t, f1.Compile())
+}
+
 func TestStringFields(t *testing.T) {
 	f := New(`ps.name = 'cmd.exe' and kevt.name = 'CreateProcess' or kevt.name in ('TerminateProcess', 'CreateFile')`, cfg)
 	require.NoError(t, f.Compile())

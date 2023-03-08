@@ -60,17 +60,14 @@ type Filter interface {
 }
 
 type filter struct {
-	expr      ql.Expr
-	seq       *ql.Sequence
-	parser    *ql.Parser
-	accessors []accessor
-	fields    []fields.Field
+	expr        ql.Expr
+	seq         *ql.Sequence
+	parser      *ql.Parser
+	accessors   []accessor
+	fields      []fields.Field
+	boundFields []*ql.BoundFieldLiteral
 	// useFuncValuer determines whether we should supply the function valuer
 	useFuncValuer bool
-	// useProcAccessor indicates if the process accessor is called by this filter
-	useProcAccessor bool
-	// useKevtAccessor indicates if the event accessor is called by this filter
-	useKevtAccessor bool
 	// stringFields contains filter field names mapped to their string values
 	stringFields map[fields.Field][]string
 }
@@ -108,10 +105,19 @@ func (f *filter) Compile() error {
 				f.addField(field)
 				f.addStringFields(field, expr.LHS)
 			}
+			if lhs, ok := expr.LHS.(*ql.BoundFieldLiteral); ok {
+				f.addBoundField(lhs)
+			}
+			if rhs, ok := expr.RHS.(*ql.BoundFieldLiteral); ok {
+				f.addBoundField(rhs)
+			}
 		case *ql.Function:
 			for _, arg := range expr.Args {
 				if field, ok := arg.(*ql.FieldLiteral); ok {
 					f.addField(fields.Field(field.Value))
+				}
+				if field, ok := arg.(*ql.BoundFieldLiteral); ok {
+					f.addBoundField(field)
 				}
 			}
 			f.useFuncValuer = true
@@ -133,15 +139,7 @@ func (f *filter) Compile() error {
 	if len(f.fields) == 0 && !f.useFuncValuer {
 		return ErrNoFields
 	}
-	for _, field := range f.fields {
-		switch {
-		case field.IsKevtField():
-			f.useKevtAccessor = true
-		case field.IsPsField():
-			f.useProcAccessor = true
-		}
-	}
-	return nil
+	return f.checkBoundRefs()
 }
 
 func (f *filter) Run(kevt *kevent.Kevent) bool {
@@ -347,4 +345,33 @@ func (f *filter) addStringFields(field fields.Field, expr ql.Expr) {
 	case *ql.ListLiteral:
 		f.stringFields[field] = append(f.stringFields[field], v.Values...)
 	}
+}
+
+// addBoundField appends a new bound field
+func (f *filter) addBoundField(field *ql.BoundFieldLiteral) {
+	f.boundFields = append(f.boundFields, field)
+}
+
+// checkBoundRefs checks if the bound field is referencing a valid alias.
+// If no valid alias is reference, this method returns an error specifying
+// an incorrect alias reference.
+func (f *filter) checkBoundRefs() error {
+	if f.seq == nil {
+		return nil
+	}
+	aliases := make(map[string]bool)
+	for _, expr := range f.seq.Expressions {
+		if expr.Alias == "" {
+			continue
+		}
+		aliases[expr.Alias] = true
+	}
+	for _, field := range f.boundFields {
+		if _, ok := aliases[field.Alias()]; !ok {
+			return fmt.Errorf("%s bound field references "+
+				"an invalid '$%s' event alias",
+				field.String(), field.Alias())
+		}
+	}
+	return nil
 }
