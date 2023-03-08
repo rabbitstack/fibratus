@@ -92,6 +92,10 @@ func (k *kevtAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, 
 	}
 }
 
+// narrowAccessors dynamically disables filter accessors by walking
+// the fields declared in the expression. The field can be expressed
+// as a regular LHS/RHS component, used as a function parameter or
+// referenced in the bound field.
 func (f *filter) narrowAccessors() {
 	var (
 		removeKevtAccessor     = true
@@ -104,7 +108,14 @@ func (f *filter) narrowAccessors() {
 		removeHandleAccessor   = true
 		removePEAccessor       = true
 	)
+	allFields := make([]fields.Field, 0)
 	for _, field := range f.fields {
+		allFields = append(allFields, field)
+	}
+	for _, field := range f.boundFields {
+		allFields = append(allFields, field.Field())
+	}
+	for _, field := range allFields {
 		switch {
 		case field.IsKevtField():
 			removeKevtAccessor = false

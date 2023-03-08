@@ -21,12 +21,11 @@ package filter
 import (
 	"errors"
 	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
 	"path/filepath"
 	"strconv"
 	"strings"
-
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/fs"
@@ -67,7 +66,7 @@ func getParentPs(kevt *kevent.Kevent) *pstypes.PS {
 	return kevt.PS.Parent
 }
 
-// psAccessor extracts process's state or kevent specific values.
+// psAccessor extracts process's state or event specific values.
 type psAccessor struct{}
 
 func newPSAccessor() accessor { return &psAccessor{} }

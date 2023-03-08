@@ -87,6 +87,14 @@ func TestNarrowAccessors(t *testing.T) {
 			New(`handle.type = 'Section' and pe.sections > 1 and kevt.name = 'CreateHandle'`, cfg),
 			3,
 		},
+		{
+			New(`sequence |kevt.name = 'CreateProcess'| as e1 |kevt.name = 'CreateFile' and file.name = $e1.ps.exe |`, cfg),
+			3,
+		},
+		{
+			New(`base(file.name) = 'kernel32.dll'`, cfg),
+			1,
+		},
 	}
 
 	for i, tt := range tests {
@@ -96,6 +104,19 @@ func TestNarrowAccessors(t *testing.T) {
 			t.Errorf("%d. accessors mismatch: exp=%d got=%d", i, tt.expectedAccesors, naccessors)
 		}
 	}
+}
+
+func TestSeqFilterInvalidBoundRefs(t *testing.T) {
+	f := New(`sequence
+|kevt.name = 'CreateProcess'| as e1
+|kevt.name = 'CreateFile' and file.name = $e.ps.exe |
+`, cfg)
+	require.Error(t, f.Compile())
+	f1 := New(`sequence
+|kevt.name = 'CreateProcess'| as e1
+|kevt.name = 'CreateFile' and file.name = $e1.ps.exe |
+`, cfg)
+	require.NoError(t, f1.Compile())
 }
 
 func TestStringFields(t *testing.T) {
