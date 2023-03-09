@@ -250,6 +250,12 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 			mods = append(mods, filepath.Base(m.Name))
 		}
 		return mods, nil
+	case fields.PsUUID:
+		ps := kevt.PS
+		if ps == nil {
+			return nil, ErrPsNil
+		}
+		return ps.UUID(), nil
 	case fields.PsHandles:
 		ps := kevt.PS
 		if ps == nil {

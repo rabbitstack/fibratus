@@ -189,11 +189,11 @@ func (kevt *Kevent) MarshalRaw() []byte {
 	// write process state
 	if kevt.PS != nil && (kevt.Type == ktypes.CreateProcess || kevt.Type == ktypes.EnumProcess) {
 		buf := kevt.PS.Marshal()
-		sec := section.New(section.Process, kcapver.ProcessSecV1, 0, uint32(len(buf)))
+		sec := section.New(section.Process, kcapver.ProcessSecV2, 0, uint32(len(buf)))
 		b = append(b, sec[:]...)
 		b = append(b, buf...)
 	} else {
-		sec := section.New(section.Process, kcapver.ProcessSecV1, 0, 0)
+		sec := section.New(section.Process, kcapver.ProcessSecV2, 0, 0)
 		b = append(b, sec[:]...)
 	}
 
@@ -417,7 +417,7 @@ func (kevt *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 	// read process state
 	sec := section.Read(b[48+offset:])
 	if sec.Size() != 0 {
-		ps, err := ptypes.NewFromKcap(b[58+offset:])
+		ps, err := ptypes.NewFromKcap(b[58+offset:], sec)
 		if err != nil {
 			return err
 		}

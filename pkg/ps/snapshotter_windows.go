@@ -189,6 +189,7 @@ func (s *snapshotter) Write(kevt *kevent.Kevent) error {
 			log.Warnf("couldn't enumerate handles for pid (%d): %v", pid, err)
 		}
 		ps.Parent = s.procs[ps.Ppid]
+		ps.StartTime = kevt.Kparams.MustGetTime(kparams.StartTime)
 
 		// inspect PE metadata and attach corresponding headers
 		s.readPE(ps)
@@ -488,6 +489,7 @@ func (s *snapshotter) Find(pid uint32) *pstypes.PS {
 	if err != nil {
 		log.Warnf("couldn't enumerate handles for pid (%d): %v", pid, err)
 	}
+	ps.StartTime = time.Now()
 
 	s.mu.Lock()
 	defer s.mu.Unlock()

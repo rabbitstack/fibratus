@@ -92,11 +92,14 @@ func (ps *PS) Marshal() []byte {
 		b = append(b, sec[:]...)
 	}
 
+	// write UUID (introduced in ProcessSecV2)
+	b = append(b, bytes.WriteUint64(ps.uuid)...)
+
 	return b
 }
 
 // Unmarshal recovers the process' state from the capture file.
-func (ps *PS) Unmarshal(b []byte) error {
+func (ps *PS) Unmarshal(b []byte, psec section.Section) error {
 	if len(b) < 8 {
 		return fmt.Errorf("expected at least 8 bytes but got %d bytes", len(b))
 	}
@@ -179,9 +182,7 @@ func (ps *PS) Unmarshal(b []byte) error {
 	for i := 0; i < int(sec.Len()); i++ {
 		// read handle length
 		l := uint32(bytes.ReadUint16(b[23+offset+hoffset:]))
-
 		off := 25 + hoffset + offset
-
 		handle, err := htypes.NewFromKcap(b[off : off+l])
 		if err != nil {
 			return err
@@ -195,12 +196,22 @@ readpe:
 	// read PE metadata
 	sec = section.Read(b[23+offset:])
 	if sec.Size() == 0 {
+		// read UUID
+		if psec.Version() == kcapver.ProcessSecV2 {
+			ps.uuid = bytes.ReadUint64(b[33+offset:])
+		}
 		return nil
 	}
 	var err error
 	ps.PE, err = pe.NewFromKcap(b[33+offset:])
 	if err != nil {
 		return err
+	}
+
+	// read UUID
+	offset += sec.Size()
+	if psec.Version() == kcapver.ProcessSecV2 {
+		ps.uuid = bytes.ReadUint64(b[33+offset:])
 	}
 
 	return nil

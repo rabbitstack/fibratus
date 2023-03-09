@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 by Nedim Sabic Sabic
+ * Copyright 2021-2022 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -16,29 +16,13 @@
  * limitations under the License.
  */
 
-package version
+package bootid
 
-// Version designates the type for specifying the current section version.
-type Version uint16
-
-const (
-	// KevtSecV1 is the v1 of the kernel event section
-	KevtSecV1 Version = iota + 1
+import (
+	"github.com/stretchr/testify/require"
+	"testing"
 )
 
-const (
-	// ProcessSecV1 is the v1 of the process section
-	ProcessSecV1 Version = iota + 1
-	// ProcessSecV2 is the v2 of the process section
-	ProcessSecV2
-)
-
-const (
-	// HandleSecV1 is the v1 of the handle section
-	HandleSecV1 Version = iota + 1
-)
-
-const (
-	// PESecV1 is the v1 of the PE section
-	PESecV1 Version = iota + 1
-)
+func TestReadBootId(t *testing.T) {
+	require.True(t, Read() > 0)
+}

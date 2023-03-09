@@ -20,6 +20,8 @@ package types
 
 import (
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
+	"github.com/rabbitstack/fibratus/pkg/kcap/section"
+	kcapver "github.com/rabbitstack/fibratus/pkg/kcap/version"
 	"github.com/rabbitstack/fibratus/pkg/syscall/handle"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -71,7 +73,8 @@ func TestPSMarshaler(t *testing.T) {
 	}
 
 	b := ps.Marshal()
-	clone, err := NewFromKcap(b)
+	sec := section.New(section.Process, kcapver.ProcessSecV1, 0, 0)
+	clone, err := NewFromKcap(b, sec)
 	require.NoError(t, err)
 
 	assert.Equal(t, uint32(2436), clone.PID)

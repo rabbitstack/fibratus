@@ -147,6 +147,8 @@ const (
 	BasicInformationClass InfoClassFlags = 0
 	// HandleInformationClass returns allocated process handles
 	HandleInformationClass InfoClassFlags = 51
+	// SequenceNumberInformationClass returns the process sequence number
+	SequenceNumberInformationClass InfoClassFlags = 92
 )
 
 // Open acquires a handle from the running process.
