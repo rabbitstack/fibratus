@@ -53,6 +53,8 @@ type Filter interface {
 	RunSequence(kevt *kevent.Kevent, seqID uint16, partials map[uint16][]*kevent.Kevent) bool
 	// GetStringFields returns field names mapped to their string values.
 	GetStringFields() map[fields.Field][]string
+	// GetFields returns all field used in the filter expression.
+	GetFields() []fields.Field
 	// GetSequence returns the sequence descriptor or nil if this filter is not a sequence.
 	GetSequence() *ql.Sequence
 	// IsSequence determines if this filter is a sequence.
@@ -246,6 +248,7 @@ func joinsEqual(joins []bool) bool {
 }
 
 func (f *filter) GetStringFields() map[fields.Field][]string { return f.stringFields }
+func (f *filter) GetFields() []fields.Field                  { return f.fields }
 
 func (f *filter) IsSequence() bool          { return f.seq != nil }
 func (f *filter) GetSequence() *ql.Sequence { return f.seq }

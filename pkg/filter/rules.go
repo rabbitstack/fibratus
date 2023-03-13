@@ -517,6 +517,16 @@ func (r *Rules) Compile() error {
 			if err != nil {
 				return ErrInvalidFilter(rule, group.Name, err)
 			}
+			for _, field := range f.GetFields() {
+				deprecated, d := fields.IsDeprecated(field)
+				if deprecated {
+					log.Warnf("%s rule uses the [%s] field which "+
+						"was deprecated starting from version %s. "+
+						"Please consider migrating to [%s] field "+
+						"because [%s] will be removed in future versions.",
+						rule, field, d.Since, d.Field, field)
+				}
+			}
 			var seqState *sequenceState
 			if f.IsSequence() {
 				seq := f.GetSequence()

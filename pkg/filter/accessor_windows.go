@@ -97,7 +97,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 	case fields.PsPid:
 		// the process id that is generating the event
 		return kevt.PID, nil
-	case fields.PsSiblingPid:
+	case fields.PsSiblingPid, fields.PsChildPid:
 		if kevt.Category != ktypes.Process {
 			return nil, nil
 		}
@@ -115,18 +115,18 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 			return nil, ErrPsNil
 		}
 		return ps.Name, nil
-	case fields.PsSiblingName:
+	case fields.PsSiblingName, fields.PsChildName:
 		if kevt.Category != ktypes.Process {
 			return nil, nil
 		}
 		return kevt.Kparams.GetString(kparams.ProcessName)
-	case fields.PsComm:
+	case fields.PsComm, fields.PsCmdline:
 		ps := kevt.PS
 		if ps == nil {
 			return nil, ErrPsNil
 		}
 		return ps.Comm, nil
-	case fields.PsSiblingComm:
+	case fields.PsSiblingComm, fields.PsChildCmdline:
 		if kevt.Category != ktypes.Process {
 			return nil, nil
 		}
@@ -137,7 +137,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 			return nil, ErrPsNil
 		}
 		return ps.Exe, nil
-	case fields.PsSiblingExe:
+	case fields.PsSiblingExe, fields.PsChildExe:
 		if kevt.Category != ktypes.Process {
 			return nil, nil
 		}
@@ -148,7 +148,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 			return nil, ErrPsNil
 		}
 		return ps.Args, nil
-	case fields.PsSiblingArgs:
+	case fields.PsSiblingArgs, fields.PsChildArgs:
 		if kevt.Category != ktypes.Process {
 			return nil, nil
 		}
@@ -169,12 +169,12 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 			return nil, ErrPsNil
 		}
 		return ps.SID, nil
-	case fields.PsSiblingSID:
+	case fields.PsSiblingSID, fields.PsChildSID:
 		if kevt.Category != ktypes.Process {
 			return nil, nil
 		}
 		return kevt.Kparams.GetString(kparams.UserSID)
-	case fields.PsSiblingDomain:
+	case fields.PsSiblingDomain, fields.PsChildDomain:
 		if kevt.Category != ktypes.Process {
 			return nil, nil
 		}
@@ -183,7 +183,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 			return nil, err
 		}
 		return domainFromSID(sid)
-	case fields.PsSiblingUsername:
+	case fields.PsSiblingUsername, fields.PsChildUsername:
 		if kevt.Category != ktypes.Process {
 			return nil, nil
 		}
@@ -225,7 +225,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 			return nil, nil
 		}
 		return kevt.Kparams.GetString(kparams.NTStatus)
-	case fields.PsSiblingSessionID:
+	case fields.PsSiblingSessionID, fields.PsChildSessionID:
 		if kevt.Category != ktypes.Process {
 			return nil, nil
 		}
@@ -285,7 +285,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 			return nil, ErrPsNil
 		}
 		return parent.Name, nil
-	case fields.PsParentComm:
+	case fields.PsParentComm, fields.PsParentCmdline:
 		parent := getParentPs(kevt)
 		if parent == nil {
 			return nil, ErrPsNil
@@ -466,7 +466,7 @@ func ancestorFields(field string, kevt *kevent.Kevent) (kparams.Value, error) {
 				values = append(values, strconv.Itoa(int(proc.SessionID)))
 			case fields.ProcessCwd:
 				values = append(values, proc.Cwd)
-			case fields.ProcessComm:
+			case fields.ProcessCmdline:
 				values = append(values, proc.Comm)
 			case fields.ProcessArgs:
 				values = append(values, proc.Args...)
@@ -506,7 +506,7 @@ func ancestorFields(field string, kevt *kevent.Kevent) (kparams.Value, error) {
 		return ps.SessionID, nil
 	case fields.ProcessCwd:
 		return ps.Cwd, nil
-	case fields.ProcessComm:
+	case fields.ProcessCmdline:
 		return ps.Comm, nil
 	case fields.ProcessArgs:
 		return ps.Args, nil

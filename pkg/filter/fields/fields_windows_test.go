@@ -42,3 +42,9 @@ func TestLookup(t *testing.T) {
 	assert.Equal(t, Field("ps.ancestor[2].sid"), Lookup("ps.ancestor[2].sid"))
 	assert.Empty(t, Lookup("ps.ancestor[ro].name"))
 }
+
+func TestIsDeprecated(t *testing.T) {
+	deprecated, d := IsDeprecated(PsSiblingPid)
+	assert.True(t, deprecated)
+	assert.NotNil(t, d)
+}
