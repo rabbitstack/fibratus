@@ -26,6 +26,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	"github.com/rabbitstack/fibratus/pkg/util/bytes"
+	"time"
 	"unsafe"
 )
 
@@ -92,7 +93,13 @@ func (ps *PS) Marshal() []byte {
 		b = append(b, sec[:]...)
 	}
 
-	// write UUID (introduced in ProcessSecV2)
+	// write start time
+	timestamp := make([]byte, 0)
+	timestamp = ps.StartTime.AppendFormat(timestamp, time.RFC3339Nano)
+	b = append(b, bytes.WriteUint16(uint16(len(timestamp)))...)
+	b = append(b, timestamp...)
+
+	// write UUID
 	b = append(b, bytes.WriteUint64(ps.uuid)...)
 
 	return b
@@ -196,9 +203,21 @@ readpe:
 	// read PE metadata
 	sec = section.Read(b[23+offset:])
 	if sec.Size() == 0 {
-		// read UUID
 		if psec.Version() == kcapver.ProcessSecV2 {
-			ps.uuid = bytes.ReadUint64(b[33+offset:])
+			// read start time
+			l := uint32(bytes.ReadUint16(b[33+offset:]))
+			buf := b[35+offset:]
+			offset += l
+			if len(buf) > 0 {
+				var err error
+				t := string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
+				ps.StartTime, err = time.Parse(time.RFC3339Nano, t)
+				if err != nil {
+					return err
+				}
+			}
+			// read UUID
+			ps.uuid = bytes.ReadUint64(b[35+offset:])
 		}
 		return nil
 	}
@@ -208,10 +227,17 @@ readpe:
 		return err
 	}
 
-	// read UUID
 	offset += sec.Size()
 	if psec.Version() == kcapver.ProcessSecV2 {
-		ps.uuid = bytes.ReadUint64(b[33+offset:])
+		// read start time
+		l := uint32(bytes.ReadUint16(b[33+offset:]))
+		buf := b[35+offset:]
+		offset += l
+		if len(buf) > 0 {
+			ps.StartTime, _ = time.Parse(time.RFC3339Nano, string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l]))
+		}
+		// read UUID
+		ps.uuid = bytes.ReadUint64(b[35+offset:])
 	}
 
 	return nil

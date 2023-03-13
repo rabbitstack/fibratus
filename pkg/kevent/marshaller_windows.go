@@ -254,11 +254,11 @@ func (kevt *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 	}
 
 	// read parameters
-	nbKparams := bytes.ReadUint16(b[44+offset:])
+	nparams := bytes.ReadUint16(b[44+offset:])
 	// accumulates the offset of all parameter name and value lengths
 	var poffset uint16
 
-	for i := 0; i < int(nbKparams); i++ {
+	for i := 0; i < int(nparams); i++ {
 		// read kparam type
 		typ := bytes.ReadUint16(b[46+offset+poffset:])
 		// read kparam name

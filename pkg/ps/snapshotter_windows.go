@@ -376,12 +376,18 @@ func (s *snapshotter) findProcess(pid uint32, thread pstypes.Thread) *pstypes.PS
 		// couldn't query process basic info or read the PEB,
 		// so at least try to obtain the full process's image name
 		image, err := process.QueryFullImageName(h)
+		var proc *pstypes.PS
 		if err != nil {
-			return pstypes.NewPS(pid, pid, "", "", "", thread, nil)
+			proc = pstypes.NewPS(pid, pid, "", "", "", thread, nil)
+		} else {
+			proc = pstypes.NewPS(pid, pid, image, "", image, thread, nil)
 		}
-		return pstypes.NewPS(pid, pid, image, "", image, thread, nil)
+		proc.StartTime, _ = process.GetStartTime(h)
+		return proc
 	}
-	return fromPEB(pid, process.GetParentPID(h), peb, thread)
+	proc := fromPEB(pid, process.GetParentPID(h), peb, thread)
+	proc.StartTime, _ = process.GetStartTime(h)
+	return proc
 }
 
 func (s *snapshotter) readPE(ps *pstypes.PS) {
@@ -489,7 +495,6 @@ func (s *snapshotter) Find(pid uint32) *pstypes.PS {
 	if err != nil {
 		log.Warnf("couldn't enumerate handles for pid (%d): %v", pid, err)
 	}
-	ps.StartTime = time.Now()
 
 	s.mu.Lock()
 	defer s.mu.Unlock()

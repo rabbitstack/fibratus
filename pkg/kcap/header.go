@@ -37,7 +37,7 @@ const magic = 0x6669627261747573
 const major = uint8(1)
 
 // minor represents the minor digit of the kcap file format
-const minor = uint8(0)
+const minor = uint8(1)
 
 // flags denotes extra flags for the purpose of the header description
 const flags = uint64(0)
