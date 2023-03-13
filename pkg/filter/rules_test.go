@@ -22,6 +22,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	log "github.com/sirupsen/logrus"
 	"net"
+	"os"
 	"testing"
 	"time"
 
@@ -585,6 +586,56 @@ func TestComplexSequenceRule(t *testing.T) {
 	require.False(t, rules.Fire(kevt2))
 	time.Sleep(time.Millisecond * 15)
 	require.True(t, rules.Fire(kevt3))
+}
+
+func TestSequencePsUUID(t *testing.T) {
+	rules := NewRules(newConfig("_fixtures/sequence_rule_ps_uuid.yml"))
+	require.NoError(t, rules.Compile())
+	log.SetLevel(log.DebugLevel)
+
+	kevt1 := &kevent.Kevent{
+		Seq:       1,
+		Type:      ktypes.CreateProcess,
+		Timestamp: time.Now(),
+		Category:  ktypes.Process,
+		Name:      "CreateProcess",
+		Tid:       2484,
+		PID:       uint32(os.Getpid()),
+		PS: &types.PS{
+			PID:  uint32(os.Getpid()),
+			Name: "explorer.exe",
+			Exe:  "C:\\Windows\\system32\\explorer.exe",
+		},
+		Kparams: kevent.Kparams{
+			kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(2243)},
+			kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "firefox.exe"},
+		},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+	}
+
+	kevt2 := &kevent.Kevent{
+		Seq:       2,
+		Type:      ktypes.CreateFile,
+		Timestamp: time.Now(),
+		Name:      "CreateFile",
+		Tid:       2484,
+		PID:       uint32(os.Getpid()),
+		Category:  ktypes.File,
+		PS: &types.PS{
+			PID:  uint32(os.Getpid()),
+			Name: "firefox.exe",
+			Exe:  "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
+			Comm: "C:\\Program Files\\Mozilla Firefox\\firefox.exe\" -contentproc --channel=\"10464.7.539748228\\1366525930\" -childID 6 -isF",
+		},
+		Kparams: kevent.Kparams{
+			kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
+			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: fs.FileDisposition(2)},
+		},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+	}
+
+	require.False(t, rules.Fire(kevt1))
+	require.True(t, rules.Fire(kevt2))
 }
 
 func TestSequenceAndSimpleRuleMix(t *testing.T) {

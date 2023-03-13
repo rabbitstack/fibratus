@@ -256,6 +256,12 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 			return nil, ErrPsNil
 		}
 		return ps.UUID(), nil
+	case fields.PsParentUUID:
+		ps := getParentPs(kevt)
+		if ps == nil {
+			return nil, ErrPsNil
+		}
+		return ps.UUID(), nil
 	case fields.PsHandles:
 		ps := kevt.PS
 		if ps == nil {
