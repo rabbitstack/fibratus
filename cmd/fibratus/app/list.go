@@ -142,7 +142,7 @@ func listKevents(cmd *cobra.Command, args []string) {
 func listFields(cmd *cobra.Command, args []string) {
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
-	t.AppendHeader(table.Row{"Name", "Description", "Example", "Deprecated"})
+	t.AppendHeader(table.Row{"Name", "Description", "Example", "Deprecation"})
 	t.SetStyle(table.StyleLight)
 
 	for _, field := range fields.Get() {
