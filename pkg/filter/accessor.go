@@ -23,7 +23,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"sync"
 )
 
 var (
@@ -32,20 +31,10 @@ var (
 )
 
 // kevtAccessor extracts generic event values.
-type kevtAccessor struct {
-	isAccesible bool
-	once        sync.Once
-}
+type kevtAccessor struct{}
 
 func (k *kevtAccessor) canAccess(kevt *kevent.Kevent, filter *filter) bool {
-	k.once.Do(func() {
-		for _, field := range filter.fields {
-			if field.IsPsField() {
-				k.isAccesible = true
-			}
-		}
-	})
-	return k.isAccesible
+	return true
 }
 
 func newKevtAccessor() accessor {
@@ -102,6 +91,10 @@ func (k *kevtAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, 
 	case fields.KevtNparams:
 		return uint64(kevt.Kparams.Len()), nil
 	default:
+		if f.IsKevtArgMap() {
+			name, _ := captureInBrackets(f.String())
+			return kevt.Kparams.Get(name)
+		}
 		return nil, nil
 	}
 }

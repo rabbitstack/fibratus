@@ -41,4 +41,6 @@ func TestLookup(t *testing.T) {
 	assert.Equal(t, Field("ps.ancestor[any].pid"), Lookup("ps.ancestor[any].pid"))
 	assert.Equal(t, Field("ps.ancestor[2].sid"), Lookup("ps.ancestor[2].sid"))
 	assert.Empty(t, Lookup("ps.ancestor[ro].name"))
+	assert.Equal(t, Field("kevt.arg[exe]"), Lookup("kevt.arg[exe]"))
+	assert.Empty(t, Lookup("kevt.arg"))
 }

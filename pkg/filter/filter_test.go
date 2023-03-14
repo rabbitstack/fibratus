@@ -362,6 +362,7 @@ func TestFilterRunKevent(t *testing.T) {
 		Host:        "archrabbit",
 		Description: "Creates or opens a new file, directory, I/O device, pipe, console",
 		Kparams: kevent.Kparams{
+			kparams.ProcessID:     {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(3434)},
 			kparams.FileObject:    {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(12456738026482168384)},
 			kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
 			kparams.FileType:      {Name: kparams.FileType, Type: kparams.AnsiString, Value: "file"},
@@ -384,13 +385,16 @@ func TestFilterRunKevent(t *testing.T) {
 		{`kevt.name = 'CreateFile'`, true},
 		{`kevt.category = 'file'`, true},
 		{`kevt.host = 'archrabbit'`, true},
-		{`kevt.nparams = 4`, true},
+		{`kevt.nparams = 5`, true},
+		{`kevt.arg[file_name] = '\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll'`, true},
+		{`kevt.arg[type] = 'file'`, true},
+		{`kevt.arg[pid] = 3434`, true},
 
 		{`kevt.desc contains 'Creates or opens a new file'`, true},
 
 		{`kevt.date.d = 3 AND kevt.date.m = 5 AND kevt.time.s = 5 AND kevt.time.m = 4 and kevt.time.h = 15`, true},
 		{`kevt.time = '15:04:05'`, true},
-		{`concat(kevt.name, kevt.host, kevt.nparams) = 'CreateFilearchrabbit4'`, true},
+		{`concat(kevt.name, kevt.host, kevt.nparams) = 'CreateFilearchrabbit5'`, true},
 		{`ltrim(kevt.host, 'arch') = 'rabbit'`, true},
 		{`concat(ltrim(kevt.name, 'Create'), kevt.host) = 'Filearchrabbit'`, true},
 		{`lower(rtrim(kevt.name, 'File')) = 'create'`, true},

@@ -27,7 +27,7 @@ import (
 
 // pathRegexp splits the provided path into different components. The first capture
 // contains the indexed field name. Next is the indexed key and, finally the segment.
-var pathRegexp = regexp.MustCompile(`(pe.sections|pe.resources|ps.envs|ps.modules|ps.ancestor)\[(.+\s*)].?(.*)`)
+var pathRegexp = regexp.MustCompile(`(pe.sections|pe.resources|ps.envs|ps.modules|ps.ancestor|kevt.arg)\[(.+\s*)].?(.*)`)
 
 // Field represents the type alias for the field
 type Field string
@@ -226,6 +226,8 @@ const (
 	KevtMeta Field = "kevt.meta"
 	// KevtNparams is the number of event parameters
 	KevtNparams Field = "kevt.nparams"
+	// KevtArg represents the field sequence for generic argument access
+	KevtArg Field = "kevt.arg"
 
 	// HandleID represents the handle identifier within the process address space
 	HandleID Field = "handle.id"
@@ -353,11 +355,12 @@ const (
 	ProcessSessionID Segment = "sessionid"
 )
 
-func (f Field) IsEnvsSequence() bool        { return strings.HasPrefix(f.String(), "ps.envs[") }
-func (f Field) IsModsSequence() bool        { return strings.HasPrefix(f.String(), "ps.modules[") }
-func (f Field) IsAncestorSequence() bool    { return strings.HasPrefix(f.String(), "ps.ancestor[") }
-func (f Field) IsPeSectionsSequence() bool  { return strings.HasPrefix(f.String(), "pe.sections[") }
-func (f Field) IsPeResourcesSequence() bool { return strings.HasPrefix(f.String(), "pe.resources[") }
+func (f Field) IsEnvsMap() bool        { return strings.HasPrefix(f.String(), "ps.envs[") }
+func (f Field) IsModsMap() bool        { return strings.HasPrefix(f.String(), "ps.modules[") }
+func (f Field) IsAncestorMap() bool    { return strings.HasPrefix(f.String(), "ps.ancestor[") }
+func (f Field) IsPeSectionsMap() bool  { return strings.HasPrefix(f.String(), "pe.sections[") }
+func (f Field) IsPeResourcesMap() bool { return strings.HasPrefix(f.String(), "pe.resources[") }
+func (f Field) IsKevtArgMap() bool     { return strings.HasPrefix(f.String(), "kevt.arg[") }
 
 var fields = map[Field]FieldInfo{
 	KevtSeq:         {KevtSeq, "event sequence number", kparams.Uint64, []string{"kevt.seq > 666"}},
@@ -580,6 +583,10 @@ func Lookup(name string) Field {
 		}
 	case PsEnvs:
 		if segment == "" {
+			return Field(name)
+		}
+	case KevtArg:
+		if key != "" {
 			return Field(name)
 		}
 	}

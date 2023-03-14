@@ -21,13 +21,11 @@ package filter
 import (
 	"errors"
 	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
-
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/fs"
@@ -74,20 +72,10 @@ func getParentPs(kevt *kevent.Kevent) *pstypes.PS {
 }
 
 // psAccessor extracts process's state or kevent specific values.
-type psAccessor struct {
-	isAccesible bool
-	once        sync.Once
-}
+type psAccessor struct{}
 
 func (ps *psAccessor) canAccess(kevt *kevent.Kevent, filter *filter) bool {
-	ps.once.Do(func() {
-		for _, field := range filter.fields {
-			if field.IsPsField() {
-				ps.isAccesible = true
-			}
-		}
-	})
-	return ps.isAccesible
+	return true
 }
 
 func newPSAccessor() accessor { return &psAccessor{} }
@@ -368,7 +356,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 		return types, nil
 	default:
 		switch {
-		case f.IsEnvsSequence():
+		case f.IsEnvsMap():
 			// access the specific environment variable
 			env, _ := captureInBrackets(f.String())
 			ps := kevt.PS
@@ -385,7 +373,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 					return v, nil
 				}
 			}
-		case f.IsModsSequence():
+		case f.IsModsMap():
 			name, segment := captureInBrackets(f.String())
 			ps := kevt.PS
 			if ps == nil {
@@ -408,7 +396,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 			case fields.ModuleLocation:
 				return filepath.Dir(mod.Name), nil
 			}
-		case f.IsAncestorSequence():
+		case f.IsAncestorMap():
 			return ancestorFields(f.String(), kevt)
 		}
 
@@ -845,7 +833,7 @@ func (*peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, erro
 		return p.VersionResources[pe.ProductVersion], nil
 	default:
 		switch {
-		case f.IsPeSectionsSequence():
+		case f.IsPeSectionsMap():
 			// get the section name
 			sname, segment := captureInBrackets(f.String())
 			sec := p.Section(sname)
@@ -860,7 +848,7 @@ func (*peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, erro
 			case fields.SectionSize:
 				return sec.Size, nil
 			}
-		case f.IsPeResourcesSequence():
+		case f.IsPeResourcesMap():
 			// consult the resource name
 			key, _ := captureInBrackets(f.String())
 			v, ok := p.VersionResources[key]
