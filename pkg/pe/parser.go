@@ -1,0 +1,242 @@
+/*
+ * Copyright 2021-2022 by Nedim Sabic Sabic
+ * https://www.fibratus.io
+ * All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package pe
+
+import (
+	"bytes"
+	"crypto/md5"
+	"encoding/hex"
+	"expvar"
+	"github.com/rabbitstack/fibratus/pkg/util/format"
+	peparser "github.com/saferwall/pe"
+	"golang.org/x/text/encoding/unicode"
+	"path/filepath"
+	"strings"
+	"time"
+)
+
+var peSkippedImages = expvar.NewInt("pe.skipped.images")
+
+type opts struct {
+	parseSymbols   bool
+	parseSections  bool
+	parseResources bool
+	sectionEntropy bool
+	sectionMD5     bool
+	excludedImages []string
+}
+
+func (o opts) isImageExcluded(path string) bool {
+	for _, img := range o.excludedImages {
+		if strings.EqualFold(img, filepath.Base(path)) {
+			peSkippedImages.Add(1)
+			return true
+		}
+	}
+	return false
+}
+
+// Option represents the option type for the PE parser.
+type Option func(o *opts)
+
+func WithExcludedImages(images []string) Option {
+	return func(o *opts) {
+		o.excludedImages = images
+	}
+}
+
+func WithSymbols() Option {
+	return func(o *opts) {
+		o.parseSymbols = true
+	}
+}
+
+func WithSections() Option {
+	return func(o *opts) {
+		o.parseSections = true
+	}
+}
+
+func WithSectionEntropy() Option {
+	return func(o *opts) {
+		o.sectionEntropy = true
+	}
+}
+
+func WithSectionMD5() Option {
+	return func(o *opts) {
+		o.sectionMD5 = true
+	}
+}
+
+func WithVersionResources() Option {
+	return func(o *opts) {
+		o.parseResources = true
+	}
+}
+
+func ParseFile(path string, opts ...Option) (*PE, error) {
+	return parse(path, nil, opts...)
+}
+
+func ParseFileWithConfig(path string, config Config) (*PE, error) {
+	if !config.Enabled {
+		return nil, nil
+	}
+	if config.shouldSkipImage(path) {
+		return nil, nil
+	}
+	var opts []Option
+	if config.ReadSections {
+		opts = append(opts, WithSections())
+	}
+	if config.ReadSymbols {
+		opts = append(opts, WithSymbols())
+	}
+	if config.ReadResources {
+		opts = append(opts, WithVersionResources())
+	}
+	return ParseFile(path, opts...)
+}
+
+func ParseBytes(data []byte, opts ...Option) (*PE, error) {
+	return parse("", data, opts...)
+}
+
+func newParserOpts(opts opts) *peparser.Options {
+	return &peparser.Options{
+		DisableCertValidation: true,
+		SectionEntropy:        opts.sectionEntropy,
+	}
+}
+
+func parse(path string, data []byte, options ...Option) (*PE, error) {
+	var opts opts
+	for _, opt := range options {
+		opt(&opts)
+	}
+	if opts.isImageExcluded(path) {
+		return nil, nil
+	}
+	var pe *peparser.File
+	var err error
+	if data == nil {
+		pe, err = peparser.New(path, newParserOpts(opts))
+	} else {
+		pe, err = peparser.NewBytes(data, newParserOpts(opts))
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer pe.Close()
+
+	// parse the DOS header
+	err = pe.ParseDOSHeader()
+	if err != nil {
+		return nil, err
+	}
+	// parse the NT header
+	err = pe.ParseNTHeader()
+	if err != nil {
+		return nil, err
+	}
+
+	timestamp := pe.NtHeader.FileHeader.TimeDateStamp
+	linkTime := time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC).Add(time.Second * time.Duration(timestamp))
+	p := &PE{
+		NumberOfSections: pe.NtHeader.FileHeader.NumberOfSections,
+		LinkTime:         linkTime,
+		Symbols:          make([]string, 0),
+		Imports:          make([]string, 0),
+		Sections:         make([]Sec, 0),
+		VersionResources: make(map[string]string),
+	}
+	switch pe.Is64 {
+	case true:
+		oh64 := pe.NtHeader.OptionalHeader.(peparser.ImageOptionalHeader64)
+		p.ImageBase = format.UintToHex(oh64.ImageBase)
+		p.EntryPoint = format.UintToHex(uint64(oh64.AddressOfEntryPoint))
+	case false:
+		oh32 := pe.NtHeader.OptionalHeader.(peparser.ImageOptionalHeader32)
+		p.ImageBase = format.UintToHex(uint64(oh32.ImageBase))
+		p.EntryPoint = format.UintToHex(uint64(oh32.AddressOfEntryPoint))
+	}
+
+	// parse section header
+	if opts.parseSections {
+		err = pe.ParseSectionHeader()
+		if err != nil {
+			return nil, err
+		}
+	}
+	for _, section := range pe.Sections {
+		sec := Sec{
+			Name: section.String(),
+			Size: section.Header.VirtualSize,
+		}
+		if opts.sectionEntropy && section.Entropy != nil {
+			sec.Entropy = *section.Entropy
+		}
+		if opts.sectionMD5 {
+			sum := md5.Sum(section.Data(0, 0, pe))
+			sec.Md5 = hex.EncodeToString(sum[:])
+		}
+		p.Sections = append(p.Sections, sec)
+	}
+
+	// parse data directories
+	if opts.parseSymbols || opts.parseResources {
+		_ = pe.ParseDataDirectories()
+	}
+
+	// add imported symbols
+	for _, imp := range pe.Imports {
+		p.addImport(imp.Name)
+		for _, fun := range imp.Functions {
+			p.addSymbol(fun.Name)
+		}
+	}
+	p.NumberOfSymbols = uint32(len(p.Symbols))
+
+	if opts.parseResources {
+		// parse version resources
+		p.VersionResources, err = ParseVersionResources(pe)
+	}
+
+	return p, nil
+}
+
+// DecodeUTF16String decodes the UTF16 string from the byte slice.
+func DecodeUTF16String(b []byte) (string, error) {
+	n := bytes.Index(b, []byte{0, 0})
+	if n == 0 {
+		return "", nil
+	}
+	decoder := unicode.UTF16(unicode.LittleEndian, unicode.UseBOM).NewDecoder()
+	s, err := decoder.Bytes(b[0 : n+1])
+	if err != nil {
+		return "", err
+	}
+	return string(s), nil
+}
+
+// AlignDword aligns the offset on a 32-bit boundary.
+func AlignDword(offset, base uint32) uint32 {
+	return ((offset + base + 3) & 0xfffffffc) - (base & 0xfffffffc)
+}

@@ -97,7 +97,6 @@ type Stats struct {
 	OutputConsoleErrors                 int            `json:"output.console.errors"`
 	OutputNullBlackholeEvents           int            `json:"output.null.blackhole.events"`
 	PeFailedResourceEntryReads          int            `json:"pe.failed.resource.entry.reads"`
-	PeMaxResourceEntriesExceeded        int            `json:"pe.max.resource.entries.exceeded"`
 	ProcessCount                        int            `json:"process.count"`
 	ProcessModuleCount                  int            `json:"process.module.count"`
 	ProcessLookupFailureCount           map[int]int    `json:"process.lookup.failure.count"`

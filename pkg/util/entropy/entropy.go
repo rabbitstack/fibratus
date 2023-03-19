@@ -1,8 +1,5 @@
-//go:build windows
-// +build windows
-
 /*
- * Copyright 2019-2020 by Nedim Sabic Sabic
+ * Copyright 2021-2022 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -19,26 +16,25 @@
  * limitations under the License.
  */
 
-package pe
+package entropy
 
 import "math"
 
-// entropy calculates the entropy of the PE section's data. This function relies
-// on Shannon Entropy formula to calculate the entropy. High entropy scores mean
-// that there is a high variety of frequency over data located in sections.
-func entropy(data []byte) float64 {
-	entropy := 0.0
-	frq := make(map[byte]int, len(data))
+// Shannon measures the Shannon entropy of a string.
+func Shannon(value string) int {
+	frq := make(map[rune]float64)
 
-	// get the frequency of each rune
-	for _, i := range data {
+	//get frequency of characters
+	for _, i := range value {
 		frq[i]++
 	}
 
-	for _, value := range frq {
-		k := float64(value) / float64(len(data))
-		entropy -= k * math.Log2(k)
+	var sum float64
+
+	for _, v := range frq {
+		f := v / float64(len(value))
+		sum += f * math.Log2(f)
 	}
 
-	return entropy
+	return int(math.Ceil(sum*-1)) * len(value)
 }

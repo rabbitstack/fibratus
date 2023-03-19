@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 by Nedim Sabic Sabic
+ * Copyright 2021-2022 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -16,6 +16,9 @@
  * limitations under the License.
  */
 
-// Package pe contains different facilities for dealing with Portable Executable specifics and digging out valuable insights
-// from PE.
-package pe
+package format
+
+import "strconv"
+
+// UintToHex converts an unsigned wide integer to hex string.
+func UintToHex(v uint64) string { return strconv.FormatUint(v, 16) }

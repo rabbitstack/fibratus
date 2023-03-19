@@ -59,7 +59,6 @@ type snapshotter struct {
 	quit       chan struct{}
 	config     *config.Config
 	handleSnap handle.Snapshotter
-	peReader   pe.Reader
 	capture    bool
 }
 
@@ -70,7 +69,6 @@ func NewSnapshotter(handleSnap handle.Snapshotter, config *config.Config) Snapsh
 		quit:       make(chan struct{}),
 		config:     config,
 		handleSnap: handleSnap,
-		peReader:   pe.NewReader(config.PE),
 	}
 
 	s.mu.Lock()
@@ -91,7 +89,6 @@ func NewSnapshotterFromKcap(handleSnap handle.Snapshotter, config *config.Config
 		quit:       make(chan struct{}),
 		config:     config,
 		handleSnap: handleSnap,
-		peReader:   pe.NewReader(config.PE),
 		capture:    true,
 	}
 
@@ -389,7 +386,7 @@ func (s *snapshotter) readPE(ps *pstypes.PS) {
 	if pid == 0 || pid == 4 || pid == 72 || pid == 128 {
 		return
 	}
-	p, err := s.peReader.Read(ps.Exe)
+	p, err := pe.ParseFileWithConfig(ps.Exe, s.config.PE)
 	if err != nil {
 		log.Warnf("fail to inspect PE metadata for process %s (%d): %v", ps.Name, ps.PID, err)
 		return
