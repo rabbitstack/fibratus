@@ -99,10 +99,10 @@ func ParseFileWithConfig(path string, config Config) (*PE, error) {
 	if !config.Enabled {
 		return nil, nil
 	}
-	if config.shouldSkipImage(path) {
-		return nil, nil
-	}
 	var opts []Option
+	if len(config.ExcludedImages) > 0 {
+		opts = append(opts, WithExcludedImages(config.ExcludedImages))
+	}
 	if config.ReadSections {
 		opts = append(opts, WithSections())
 	}
@@ -190,7 +190,7 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 			Name: section.String(),
 			Size: section.Header.VirtualSize,
 		}
-		if opts.sectionEntropy && section.Entropy != nil {
+		if section.Entropy != nil {
 			sec.Entropy = *section.Entropy
 		}
 		if opts.sectionMD5 {

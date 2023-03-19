@@ -32,9 +32,6 @@ const (
 	// VsVersionInfoString is the UTF16-encoded string that identifies the VS_VERSION_INFO block
 	VsVersionInfoString = "VS_VERSION_INFO"
 
-	// VsVersionInfoStringOffset specifies the offset of the version Unicode string
-	VsVersionInfoStringOffset uint32 = 6
-
 	// VsFileInfoSignature is the file info signature
 	VsFileInfoSignature uint32 = 0xFEEF04BD
 
@@ -42,10 +39,13 @@ const (
 	StringFileInfoString = "StringFileInfo"
 	VarFileInfoString    = "VarFileInfo"
 
-	// StringFileInfoOffset specifies the offset of the file info Unicode string
-	StringFileInfoOffset uint32 = 6
-	StringTableOffset    uint32 = 6
-	StringOffset         uint32 = 6
+	// VsVersionInfoStringLength specifies the length of the VS_VERSION_INFO structure
+	VsVersionInfoStringLength uint32 = 6
+	// StringFileInfoLength specifies the offset of the file info Unicode string
+	StringFileInfoLength uint32 = 6
+	StringTableLength    uint32 = 6
+	StringLength         uint32 = 6
+	LangIDLength         uint32 = 8*2 + 1
 )
 
 // VsVersionInfo represents the organization of data in
@@ -77,7 +77,7 @@ func (v *VsVersionInfo) Parse(e peparser.ResourceDirectoryEntry, pe *peparser.Fi
 	if err := binary.Read(bytes.NewBuffer(b), binary.LittleEndian, v); err != nil {
 		return err
 	}
-	b, err = pe.ReadBytesAtOffset(offset+VsVersionInfoStringOffset, uint32(v.ValueLength))
+	b, err = pe.ReadBytesAtOffset(offset+VsVersionInfoStringLength, uint32(v.ValueLength))
 	if err != nil {
 		return err
 	}
@@ -116,11 +116,11 @@ type VsFixedFileInfo struct {
 func (f *VsFixedFileInfo) Size() uint32 { return uint32(binary.Size(f)) }
 
 func (f *VsFixedFileInfo) GetStringFileInfoOffset(e peparser.ResourceDirectoryEntry) uint32 {
-	return AlignDword(VsVersionInfoStringOffset+uint32(2*len(VsVersionInfoString)+1)+f.Size(), e.Data.Struct.OffsetToData)
+	return AlignDword(VsVersionInfoStringLength+uint32(2*len(VsVersionInfoString)+1)+f.Size(), e.Data.Struct.OffsetToData)
 }
 
 func (f *VsFixedFileInfo) GetOffset(e peparser.ResourceDirectoryEntry, pe *peparser.File) uint32 {
-	offset := pe.GetOffsetFromRva(e.Data.Struct.OffsetToData) + VsVersionInfoStringOffset
+	offset := pe.GetOffsetFromRva(e.Data.Struct.OffsetToData) + VsVersionInfoStringLength
 	offset += uint32(2*len(VsVersionInfoString)) + 1
 	return AlignDword(offset, e.Data.Struct.OffsetToData)
 }
@@ -155,7 +155,7 @@ func (s *StringFileInfo) ContainsData() bool {
 }
 
 func (s *StringFileInfo) GetStringTableOffset(offset uint32) uint32 {
-	return offset + StringFileInfoOffset + uint32(2*len(StringFileInfoString)) + 1
+	return offset + StringFileInfoLength + uint32(2*len(StringFileInfoString)) + 1
 }
 
 func (s *StringFileInfo) GetOffset(rva uint32, e peparser.ResourceDirectoryEntry, pe *peparser.File) uint32 {
@@ -165,14 +165,14 @@ func (s *StringFileInfo) GetOffset(rva uint32, e peparser.ResourceDirectoryEntry
 
 func (s *StringFileInfo) Parse(rva uint32, e peparser.ResourceDirectoryEntry, pe *peparser.File) (string, error) {
 	offset := s.GetOffset(rva, e, pe)
-	b, err := pe.ReadBytesAtOffset(offset, StringFileInfoOffset)
+	b, err := pe.ReadBytesAtOffset(offset, StringFileInfoLength)
 	if err != nil {
 		return "", err
 	}
 	if err := binary.Read(bytes.NewBuffer(b), binary.LittleEndian, s); err != nil {
 		return "", err
 	}
-	b, err = pe.ReadBytesAtOffset(offset+StringFileInfoOffset, uint32(len(StringFileInfoString)*2)+1)
+	b, err = pe.ReadBytesAtOffset(offset+StringFileInfoLength, uint32(len(StringFileInfoString)*2)+1)
 	if err != nil {
 		return "", err
 	}
@@ -188,8 +188,8 @@ type StringTable struct {
 	Type        uint16
 }
 
-func (s *StringTable) GetStringOffset(offset uint32, langID string, e peparser.ResourceDirectoryEntry) uint32 {
-	return AlignDword(offset+StringTableOffset+uint32(2*len(langID)+1), e.Data.Struct.OffsetToData)
+func (s *StringTable) GetStringOffset(offset uint32, e peparser.ResourceDirectoryEntry) uint32 {
+	return AlignDword(offset+StringTableLength+LangIDLength, e.Data.Struct.OffsetToData)
 }
 
 func (s *StringTable) GetOffset(rva uint32, e peparser.ResourceDirectoryEntry, pe *peparser.File) uint32 {
@@ -197,24 +197,33 @@ func (s *StringTable) GetOffset(rva uint32, e peparser.ResourceDirectoryEntry, p
 	return AlignDword(offset, e.Data.Struct.OffsetToData)
 }
 
-func (s *StringTable) Parse(rva uint32, e peparser.ResourceDirectoryEntry, pe *peparser.File) (string, error) {
+func (s *StringTable) Parse(rva uint32, e peparser.ResourceDirectoryEntry, pe *peparser.File) error {
 	offset := s.GetOffset(rva, e, pe)
-	b, err := pe.ReadBytesAtOffset(offset, StringTableOffset)
+	b, err := pe.ReadBytesAtOffset(offset, StringTableLength)
 	if err != nil {
-		return "", err
+		return err
 	}
 	if err := binary.Read(bytes.NewBuffer(b), binary.LittleEndian, s); err != nil {
-		return "", err
+		return err
 	}
 	// Read the 8-digit hexadecimal number stored as a Unicode string.
 	// The four most significant digits represent the language identifier.
 	// The four least significant digits represent the code page for which
 	// the data is formatted.
-	b, err = pe.ReadBytesAtOffset(offset+StringTableOffset, (8*2)+1)
+	b, err = pe.ReadBytesAtOffset(offset+StringTableLength, (8*2)+1)
 	if err != nil {
-		return "", err
+		return err
 	}
-	return DecodeUTF16String(b)
+	langID, err := DecodeUTF16String(b)
+	if err != nil {
+		return err
+	}
+	if len(langID) != int(LangIDLength/2) {
+		return fmt.Errorf("invalid language identifier length. Expected: %d, Got: %d",
+			LangIDLength/2,
+			len(langID))
+	}
+	return nil
 }
 
 // String Represents the organization of data in a
@@ -234,7 +243,7 @@ func (s *String) GetOffset(rva uint32, e peparser.ResourceDirectoryEntry, pe *pe
 
 func (s *String) Parse(rva uint32, e peparser.ResourceDirectoryEntry, pe *peparser.File) (string, string, error) {
 	offset := s.GetOffset(rva, e, pe)
-	b, err := pe.ReadBytesAtOffset(offset, StringOffset)
+	b, err := pe.ReadBytesAtOffset(offset, StringLength)
 	if err != nil {
 		return "", "", err
 	}
@@ -242,7 +251,7 @@ func (s *String) Parse(rva uint32, e peparser.ResourceDirectoryEntry, pe *pepars
 		return "", "", err
 	}
 	const maxKeySize = 100
-	b, err = pe.ReadBytesAtOffset(offset+StringOffset, maxKeySize)
+	b, err = pe.ReadBytesAtOffset(offset+StringLength, maxKeySize)
 	if err != nil {
 		return "", "", err
 	}
@@ -250,7 +259,7 @@ func (s *String) Parse(rva uint32, e peparser.ResourceDirectoryEntry, pe *pepars
 	if err != nil {
 		return "", "", err
 	}
-	valueOffset := AlignDword(uint32(2*(len(key)+1))+offset+StringOffset, e.Data.Struct.OffsetToData)
+	valueOffset := AlignDword(uint32(2*(len(key)+1))+offset+StringLength, e.Data.Struct.OffsetToData)
 	b, err = pe.ReadBytesAtOffset(valueOffset, uint32(s.Length))
 	if err != nil {
 		return "", "", err
@@ -285,24 +294,21 @@ func ParseVersionResources(pe *peparser.File) (map[string]string, error) {
 			}
 			offset := ff.GetStringFileInfoOffset(e)
 			for {
-				file := StringFileInfo{}
-				n, err := file.Parse(offset, e, pe)
-				if err != nil || file.Length == 0 {
+				f := StringFileInfo{}
+				n, err := f.Parse(offset, e, pe)
+				if err != nil || f.Length == 0 {
 					break
 				}
 				switch n {
 				case StringFileInfoString:
-					if !file.ContainsData() {
-						continue
-					}
-					tableOffset := file.GetStringTableOffset(offset)
+					tableOffset := f.GetStringTableOffset(offset)
 					for {
 						table := StringTable{}
-						langID, err := table.Parse(tableOffset, e, pe)
+						err := table.Parse(tableOffset, e, pe)
 						if err != nil {
 							break
 						}
-						stringOffset := table.GetStringOffset(tableOffset, langID, e)
+						stringOffset := table.GetStringOffset(tableOffset, e)
 						for stringOffset < tableOffset+uint32(table.Length) {
 							s := String{}
 							k, v, err := s.Parse(stringOffset, e, pe)
@@ -320,7 +326,7 @@ func ParseVersionResources(pe *peparser.File) (map[string]string, error) {
 						if uint32(table.Length)+tableOffset > tableOffset {
 							break
 						}
-						if tableOffset > uint32(file.Length) {
+						if tableOffset > uint32(f.Length) {
 							break
 						}
 					}
@@ -329,7 +335,7 @@ func ParseVersionResources(pe *peparser.File) (map[string]string, error) {
 				default:
 					break
 				}
-				offset += uint32(file.Length)
+				offset += uint32(f.Length)
 				// StringFileInfo/VarFileinfo structs consumed?
 				if offset >= uint32(ver.Length) {
 					break

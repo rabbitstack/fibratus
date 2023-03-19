@@ -19,7 +19,7 @@
 package pe
 
 import (
-	"fmt"
+	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
 	"testing"
@@ -27,27 +27,48 @@ import (
 
 func TestParseFile(t *testing.T) {
 	var tests = []struct {
-		file        string
-		hasSymbols  bool
-		hasSections bool
-		hasImports  bool
+		file             string
+		hasSymbols       bool
+		hasSections      bool
+		hasImports       bool
+		versionResources map[string]string
 	}{
-		{filepath.Join(os.Getenv("windir"), "notepad.exe"), true, true, true},
-		{filepath.Join(os.Getenv("windir"), "regedit.exe"), true, true, true},
-		{filepath.Join(os.Getenv("windir"), "system32", "svchost.exe"), true, true, true},
-		{filepath.Join(os.Getenv("windir"), "system32", "kernel32.dll"), true, true, true},
+		{filepath.Join(os.Getenv("windir"), "notepad.exe"), true, true, true, map[string]string{"OriginalFilename": "NOTEPAD.EXE"}},
+		{filepath.Join(os.Getenv("windir"), "regedit.exe"), true, true, true, nil},
+		{filepath.Join(os.Getenv("windir"), "system32", "svchost.exe"), true, true, true, nil},
+		{filepath.Join(os.Getenv("windir"), "system32", "kernel32.dll"), true, true, true, nil},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.file, func(t *testing.T) {
-			pe, err := ParseFile(tt.file, WithSections(), WithSymbols(), WithVersionResources())
+			pe, err := ParseFile(tt.file, WithSections(), WithSymbols(), WithVersionResources(), WithSectionEntropy())
 			if err != nil {
 				t.Errorf("%s: %v", tt.file, err)
 			}
 			if pe == nil {
 				t.Errorf("%s: PE metadata is nil", tt.file)
 			}
-			fmt.Println(pe.String())
+			if len(pe.Symbols) > 0 != tt.hasSymbols {
+				t.Errorf("%s: expected to have symbols", tt.file)
+			}
+			if len(pe.Sections) > 0 != tt.hasSections {
+				t.Errorf("%s: expected to have sections", tt.file)
+			}
+			if len(pe.Imports) > 0 != tt.hasImports {
+				t.Errorf("%s: expected to have imports", tt.file)
+			}
+			if tt.versionResources != nil {
+				require.True(t, len(pe.VersionResources) > 0)
+				for k, v := range tt.versionResources {
+					val, ok := pe.VersionResources[k]
+					if !ok {
+						t.Errorf("%s: should have %s version resource", tt.file, k)
+					}
+					if val != v {
+						t.Errorf("%s: expected: %s version resource got: %s", tt.file, v, val)
+					}
+				}
+			}
 		})
 	}
 }
