@@ -19,7 +19,6 @@
 package pe
 
 import (
-	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
 	"testing"
@@ -33,15 +32,21 @@ func TestParseFile(t *testing.T) {
 		hasImports       bool
 		versionResources map[string]string
 	}{
-		{filepath.Join(os.Getenv("windir"), "notepad.exe"), true, true, true, map[string]string{"OriginalFilename": "NOTEPAD.EXE"}},
+		{filepath.Join(os.Getenv("windir"), "notepad.exe"), true, true, true, map[string]string{"OriginalFilename": "NOTEPAD.EXE", "CompanyName": "Microsoft Corporation"}},
 		{filepath.Join(os.Getenv("windir"), "regedit.exe"), true, true, true, nil},
-		{filepath.Join(os.Getenv("windir"), "system32", "svchost.exe"), true, true, true, nil},
-		{filepath.Join(os.Getenv("windir"), "system32", "kernel32.dll"), true, true, true, nil},
+		{filepath.Join(os.Getenv("windir"), "system32", "svchost.exe"), true, true, true, map[string]string{"OriginalFilename": "svchost.exe"}},
+		{filepath.Join(os.Getenv("windir"), "system32", "kernel32.dll"), true, true, true, map[string]string{"InternalName": "kernel32"}},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.file, func(t *testing.T) {
-			pe, err := ParseFile(tt.file, WithSections(), WithSymbols(), WithVersionResources(), WithSectionEntropy())
+			pe, err := ParseFile(tt.file,
+				WithSections(),
+				WithSymbols(),
+				WithVersionResources(),
+				WithSectionEntropy(),
+				WithSectionMD5(),
+			)
 			if err != nil {
 				t.Errorf("%s: %v", tt.file, err)
 			}
@@ -57,8 +62,14 @@ func TestParseFile(t *testing.T) {
 			if len(pe.Imports) > 0 != tt.hasImports {
 				t.Errorf("%s: expected to have imports", tt.file)
 			}
+			sec := pe.Sections[0]
+			if sec.Md5 == "" {
+				t.Errorf("%s: section should have the MD5 hash", tt.file)
+			}
+			if sec.Entropy == 0.0 {
+				t.Errorf("%s: section should the entropy value", tt.file)
+			}
 			if tt.versionResources != nil {
-				require.True(t, len(pe.VersionResources) > 0)
 				for k, v := range tt.versionResources {
 					val, ok := pe.VersionResources[k]
 					if !ok {

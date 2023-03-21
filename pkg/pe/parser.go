@@ -22,16 +22,29 @@ import (
 	"bytes"
 	"crypto/md5"
 	"encoding/hex"
+	"errors"
 	"expvar"
 	"github.com/rabbitstack/fibratus/pkg/util/format"
+	"github.com/rabbitstack/fibratus/pkg/util/va"
 	peparser "github.com/saferwall/pe"
+	"golang.org/x/sys/windows"
 	"golang.org/x/text/encoding/unicode"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
 )
 
-var peSkippedImages = expvar.NewInt("pe.skipped.images")
+var (
+	// MaxHeaderSize specifies the maximum size of the PE header
+	MaxHeaderSize = uint(os.Getpagesize())
+	// MinHeaderSize denotes the minimal valid PE header size
+	MinHeaderSize = uint(0x100)
+	ErrEmptyVArea = errors.New("va memory area is empty")
+
+	// peSkippedImages counts the number of images skipped by the parser
+	peSkippedImages = expvar.NewInt("pe.skipped.images")
+)
 
 type opts struct {
 	parseSymbols   bool
@@ -117,6 +130,25 @@ func ParseFileWithConfig(path string, config Config) (*PE, error) {
 
 func ParseBytes(data []byte, opts ...Option) (*PE, error) {
 	return parse("", data, opts...)
+}
+
+// ParseMem parses the in-memory representation of the PE header for the
+// specified process and base address.
+func ParseMem(pid uint32, base uintptr, changeProtection bool, opts ...Option) (*PE, error) {
+	access := windows.PROCESS_VM_READ | windows.PROCESS_QUERY_INFORMATION
+	if changeProtection {
+		access |= windows.PROCESS_VM_OPERATION
+	}
+	process, err := windows.OpenProcess(uint32(access), false, pid)
+	if err != nil {
+		return nil, err
+	}
+	defer windows.Close(process)
+	buf := va.Read(process, base, MaxHeaderSize, MinHeaderSize, changeProtection)
+	if len(buf) == 0 {
+		return nil, ErrEmptyVArea
+	}
+	return ParseBytes(buf, opts...)
 }
 
 func newParserOpts(opts opts) *peparser.Options {

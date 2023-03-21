@@ -149,11 +149,6 @@ type StringFileInfo struct {
 	Type        uint16
 }
 
-// ContainsData determines if the resource contains text or binary data.
-func (s *StringFileInfo) ContainsData() bool {
-	return s.Length > 0 && (s.Type == 0 || s.Type == 1)
-}
-
 func (s *StringFileInfo) GetStringTableOffset(offset uint32) uint32 {
 	return offset + StringFileInfoLength + uint32(2*len(StringFileInfoString)) + 1
 }
@@ -315,12 +310,12 @@ func ParseVersionResources(pe *peparser.File) (map[string]string, error) {
 							if err != nil {
 								break
 							}
+							vers[k] = v
 							if s.Length == 0 {
 								stringOffset = tableOffset + uint32(table.Length)
 							} else {
 								stringOffset = stringOffset + uint32(s.Length)
 							}
-							vers[k] = v
 						}
 						// handle potential infinite loops
 						if uint32(table.Length)+tableOffset > tableOffset {

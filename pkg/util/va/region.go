@@ -1,0 +1,232 @@
+/*
+ * Copyright 2021-2022 by Nedim Sabic Sabic
+ * https://www.fibratus.io
+ * All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package va
+
+import (
+	"golang.org/x/sys/windows"
+	"unsafe"
+)
+
+// Region describes the state of a range of pages in the
+// process virtual address space and offers convenient
+// methods for reading and accessing region memory.
+// This code is inspired by libpeconv library:
+// https://github.com/hasherezade/libpeconv
+type Region struct {
+	base    uintptr // base address of the region of pages
+	size    uintptr // size of the region in bytes beginning at the base address
+	typ     uint32  // type of pages in the region
+	state   uint32  // state of the pages in the region
+	protect uint32  // access protection of the pages in the region
+
+	process windows.Handle
+}
+
+// Read reads a full memory area within a given process, starting at the base
+// address and until the buffer size is exceeded.
+// The memory area can consist of multiple regions with various access rights.
+// In case if the region is inaccessible, if forcing access is enabled,
+// it tries to change the region protection by temporarily adjusting the
+// permissions.
+// On read failure the region is skipped, and the read is moving to the
+// next one leaving in the output buffer an empty space of the region size.
+func Read(process windows.Handle, base uintptr, bufSize, minSize uint, forceAccess bool) []byte {
+	if bufSize == 0 || base == 0 {
+		return nil
+	}
+	i := uint(0)
+	buf := make([]byte, 0)
+	for i < bufSize {
+		chunk := base + uintptr(i)
+		region, err := NewRegion(process, chunk)
+		if err != nil {
+			break
+		}
+		if region.Size(chunk) == 0 {
+			break
+		}
+		n, b := region.Read(chunk, bufSize-i, minSize, forceAccess)
+		if n == 0 {
+			// skip the region that could not be read
+			// and fill it with zeros of region size
+			i += region.Size(chunk)
+			zeros := make([]byte, region.Size(chunk))
+			buf = append(buf, zeros...)
+			continue
+		}
+		i += n
+		buf = append(buf, b...)
+	}
+	return buf
+}
+
+// NewRegion creates a new region for the specified process and base address.
+func NewRegion(process windows.Handle, base uintptr) (*Region, error) {
+	var m windows.MemoryBasicInformation
+	err := windows.VirtualQueryEx(process, base, &m, unsafe.Sizeof(m))
+	if err != nil {
+		return nil, err
+	}
+	r := &Region{
+		process: process,
+		typ:     m.Type,
+		state:   m.State,
+		protect: m.Protect,
+		size:    m.RegionSize,
+		base:    m.BaseAddress,
+	}
+	return r, nil
+}
+
+// Size returns the size of the region starting from the base address.
+func (r Region) Size(base uintptr) uint {
+	if r.typ == 0 { // ignore invalid type
+		return 0
+	}
+	if r.size > base {
+		return 0
+	}
+	offset := base - r.base
+	return uint(r.size - offset)
+}
+
+// Read reads a single memory region within a given process
+// starting at supplied base address. In case region is inaccessible
+// and the force access flag is enabled, it tries to force the access
+// by temporarily changing the permissions of the memory region.
+func (r Region) Read(addr uintptr, bufSize, minSize uint, forceAccess bool) (uint, []byte) {
+	if bufSize == 0 {
+		return 0, nil
+	}
+	if (r.state & windows.MEM_COMMIT) == 0 {
+		// no committed pages in the region
+		return 0, nil
+	}
+	if r.Size(addr) == 0 {
+		return 0, nil
+	}
+	// size to read
+	size := r.Size(addr)
+	if size > bufSize {
+		size = bufSize
+	}
+	var prevProtection uint32
+	isAccessChanged := false
+	isAccessible := r.protect&windows.PAGE_NOACCESS == 0
+	if forceAccess && !isAccessible {
+		// change page access right
+		err := windows.VirtualProtectEx(r.process, addr, uintptr(r.Size(addr)), windows.PAGE_READONLY, &prevProtection)
+		if err == nil {
+			isAccessChanged = true
+		}
+		defer func() {
+			// restore page access right
+			if isAccessChanged {
+				_ = windows.VirtualProtectEx(r.process, addr, uintptr(r.Size(addr)), prevProtection, &prevProtection)
+			}
+		}()
+	}
+	if isAccessible || isAccessChanged {
+		n, b, err := r.read(addr, size, minSize)
+		if n == 0 && (r.protect&windows.PAGE_GUARD) != 0 {
+			// guarded page. Try to read again
+			n, b, err = r.read(addr, size, minSize)
+		}
+		if n == 0 || err != nil {
+			return 0, nil
+		}
+		return n, b
+	}
+	return 0, nil
+}
+
+// read allocates a buffer with maximum buffer size and attempts to
+// read the memory chunk from the specified base address.
+// If reading of the full buffer size was not possible, it will keep
+// trying to read a smaller chunk, decreasing requested size on each
+// attempt, until the minimal size is reached. This is a workaround for
+// errors such as FAULTY_HARDWARE_CORRUPTED_PAGE. It returns how many
+// bytes were successfully read, the memory buffer and an error in case
+// of unrecoverable errors have occurred.
+func (r Region) read(addr uintptr, bufSize, minSize uint) (uint, []byte, error) {
+	size := uintptr(0)
+	b := make([]byte, bufSize)
+	for bufSize > 0 {
+		err := windows.ReadProcessMemory(r.process, addr, &b[0], uintptr(bufSize), &size)
+		if err == nil {
+			// the entire memory chunk was read
+			return uint(size), b, nil
+		}
+		if size == 0 && err != windows.ERROR_PARTIAL_COPY {
+			// no data was read
+			return 0, nil, err
+		}
+		if err == windows.ERROR_PARTIAL_COPY {
+			// data partially read. Get readable size
+			n := r.seek(addr, b, bufSize, minSize)
+			size = uintptr(n)
+		}
+		break
+	}
+	if size > 0 {
+		b = make([]byte, size)
+		err := windows.ReadProcessMemory(r.process, addr, &b[0], size, &size)
+		if err != nil {
+			return 0, nil, err
+		}
+		return uint(size), b, nil
+	}
+	return 0, nil, nil
+}
+
+// seek performs a binary search via ReadProcessMemory, trying to find
+// the biggest size of memory chunk within the buffer size that can be
+// read. The search stops when the minimal size is reached. The given
+// minimal size must be non-zero, and smaller than the buffer size.
+func (r Region) seek(addr uintptr, buf []byte, bufSize, minSize uint) uint {
+	if buf == nil || bufSize == 0 {
+		return 0
+	}
+	if bufSize < minSize || minSize == 0 {
+		return 0
+	}
+	size := uintptr(0)
+	err := windows.ReadProcessMemory(r.process, addr, &buf[0], uintptr(minSize), &size)
+	if err != nil {
+		return uint(size)
+	}
+	n := bufSize / 2
+	successSize := minSize
+	failedSize := bufSize
+	for n > minSize && n < bufSize {
+		size = 0
+		err := windows.ReadProcessMemory(r.process, addr, &buf[0], uintptr(n), &size)
+		if err != nil {
+			failedSize = n
+		} else {
+			successSize = n
+		}
+		delta := (failedSize - successSize) / 2
+		if delta == 0 {
+			break
+		}
+		n = delta + successSize
+	}
+	return successSize
+}
