@@ -23,7 +23,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"sync"
+	"reflect"
 )
 
 var (
@@ -32,21 +32,7 @@ var (
 )
 
 // kevtAccessor extracts generic event values.
-type kevtAccessor struct {
-	isAccesible bool
-	once        sync.Once
-}
-
-func (k *kevtAccessor) canAccess(kevt *kevent.Kevent, filter *filter) bool {
-	k.once.Do(func() {
-		for _, field := range filter.fields {
-			if field.IsPsField() {
-				k.isAccesible = true
-			}
-		}
-	})
-	return k.isAccesible
-}
+type kevtAccessor struct{}
 
 func newKevtAccessor() accessor {
 	return &kevtAccessor{}
@@ -103,5 +89,85 @@ func (k *kevtAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, 
 		return uint64(kevt.Kparams.Len()), nil
 	default:
 		return nil, nil
+	}
+}
+
+// narrowAccessors dynamically disables filter accessors by walking
+// the fields declared in the expression. The field can be expressed
+// as a regular LHS/RHS component, used as a function parameter or
+// referenced in the bound field.
+func (f *filter) narrowAccessors() {
+	var (
+		removeKevtAccessor     = true
+		removePsAccessor       = true
+		removeThreadAccessor   = true
+		removeImageAccessor    = true
+		removeFileAccessor     = true
+		removeRegistryAccessor = true
+		removeNetworkAccessor  = true
+		removeHandleAccessor   = true
+		removePEAccessor       = true
+	)
+	allFields := make([]fields.Field, 0)
+	allFields = append(allFields, f.fields...)
+	for _, field := range f.boundFields {
+		allFields = append(allFields, field.Field())
+	}
+	for _, field := range allFields {
+		switch {
+		case field.IsKevtField():
+			removeKevtAccessor = false
+		case field.IsPsField():
+			removePsAccessor = false
+		case field.IsThreadField():
+			removeThreadAccessor = false
+		case field.IsImageField():
+			removeImageAccessor = false
+		case field.IsFileField():
+			removeFileAccessor = false
+		case field.IsRegistryField():
+			removeRegistryAccessor = false
+		case field.IsNetworkField():
+			removeNetworkAccessor = false
+		case field.IsHandleField():
+			removeHandleAccessor = false
+		case field.IsPeField():
+			removePEAccessor = false
+		}
+	}
+	if removeKevtAccessor {
+		f.removeAccessor(&kevtAccessor{})
+	}
+	if removePsAccessor {
+		f.removeAccessor(&psAccessor{})
+	}
+	if removeThreadAccessor {
+		f.removeAccessor(&threadAccessor{})
+	}
+	if removeImageAccessor {
+		f.removeAccessor(&imageAccessor{})
+	}
+	if removeFileAccessor {
+		f.removeAccessor(&fileAccessor{})
+	}
+	if removeRegistryAccessor {
+		f.removeAccessor(&registryAccessor{})
+	}
+	if removeNetworkAccessor {
+		f.removeAccessor(&networkAccessor{})
+	}
+	if removeHandleAccessor {
+		f.removeAccessor(&handleAccessor{})
+	}
+	if removePEAccessor {
+		f.removeAccessor(&peAccessor{})
+	}
+}
+
+func (f *filter) removeAccessor(removed accessor) {
+	for i, accessor := range f.accessors {
+		if reflect.TypeOf(accessor) == reflect.TypeOf(removed) {
+			f.accessors = append(f.accessors[:i], f.accessors[i+1:]...)
+		}
 	}
 }
