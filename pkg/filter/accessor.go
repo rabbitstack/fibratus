@@ -109,9 +109,7 @@ func (f *filter) narrowAccessors() {
 		removePEAccessor       = true
 	)
 	allFields := make([]fields.Field, 0)
-	for _, field := range f.fields {
-		allFields = append(allFields, field)
-	}
+	allFields = append(allFields, f.fields...)
 	for _, field := range f.boundFields {
 		allFields = append(allFields, field.Field())
 	}
