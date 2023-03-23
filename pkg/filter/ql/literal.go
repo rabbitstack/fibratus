@@ -259,6 +259,17 @@ func (e *SequenceExpr) walk() {
 				}
 			}
 		}
+		if expr, ok := n.(*Function); ok {
+			for _, arg := range expr.Args {
+				switch v := arg.(type) {
+				case *FieldLiteral:
+					field := fields.Field(v.Value)
+					stringFields[field] = append(stringFields[field], v.Value)
+				case *BoundFieldLiteral:
+					e.BoundFields = append(e.BoundFields, v)
+				}
+			}
+		}
 	}
 	WalkFunc(e.Expr, walk)
 
@@ -280,7 +291,7 @@ func (e *SequenceExpr) IsEvaluable(kevt *kevent.Kevent) bool {
 	return e.buckets[kevt.Type.Hash()] || e.buckets[kevt.Category.Hash()]
 }
 
-// HasBoundFields determines if this sequence expression has bound fields.
+// HasBoundFields determines if this sequence expression references any bound field.
 func (e *SequenceExpr) HasBoundFields() bool {
 	return len(e.BoundFields) > 0
 }
