@@ -19,26 +19,27 @@
 package va
 
 import (
+	"errors"
 	"golang.org/x/sys/windows"
 	"unsafe"
 )
 
-func getModuleBaseAddress(pid uint32) uintptr {
+func getModuleBaseAddress(pid uint32) (uintptr, error) {
 	var moduleHandles [1024]windows.Handle
 	var cbNeeded uint32
-	proc, err := windows.OpenProcess(windows.PROCESS_VM_READ|windows.PROCESS_QUERY_INFORMATION, false, pid)
+	proc, err := windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION|windows.PROCESS_VM_READ, false, pid)
 	if err != nil {
-		return 0
+		return 0, err
 	}
-	if err := windows.EnumProcessModules(proc, &moduleHandles[0], uint32(len(moduleHandles)), &cbNeeded); err != nil {
-		return 0
+	if err := windows.EnumProcessModules(proc, &moduleHandles[0], 1024, &cbNeeded); err != nil {
+		return 0, err
 	}
 	for _, moduleHandle := range moduleHandles[:uintptr(cbNeeded)/unsafe.Sizeof(moduleHandles[0])] {
 		var moduleInfo windows.ModuleInfo
 		if err := windows.GetModuleInformation(proc, moduleHandle, &moduleInfo, uint32(unsafe.Sizeof(moduleInfo))); err != nil {
-			continue
+			return 0, err
 		}
-		return moduleInfo.BaseOfDll
+		return moduleInfo.BaseOfDll, nil
 	}
-	return 0
+	return 0, errors.New("no modules found")
 }

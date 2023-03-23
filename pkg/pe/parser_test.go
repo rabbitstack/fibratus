@@ -19,9 +19,14 @@
 package pe
 
 import (
+	"errors"
+	"github.com/stretchr/testify/require"
+	"golang.org/x/sys/windows"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
+	"unsafe"
 )
 
 func TestParseFile(t *testing.T) {
@@ -48,10 +53,10 @@ func TestParseFile(t *testing.T) {
 				WithSectionMD5(),
 			)
 			if err != nil {
-				t.Errorf("%s: %v", tt.file, err)
+				t.Fatalf("%s: %v", tt.file, err)
 			}
 			if pe == nil {
-				t.Errorf("%s: PE metadata is nil", tt.file)
+				t.Fatalf("%s: PE metadata is nil", tt.file)
 			}
 			if len(pe.Symbols) > 0 != tt.hasSymbols {
 				t.Errorf("%s: expected to have symbols", tt.file)
@@ -64,10 +69,10 @@ func TestParseFile(t *testing.T) {
 			}
 			sec := pe.Sections[0]
 			if sec.Md5 == "" {
-				t.Errorf("%s: section should have the MD5 hash", tt.file)
+				t.Errorf("%s: section should have MD5 hash", tt.file)
 			}
 			if sec.Entropy == 0.0 {
-				t.Errorf("%s: section should the entropy value", tt.file)
+				t.Errorf("%s: section should have entropy value", tt.file)
 			}
 			if tt.versionResources != nil {
 				for k, v := range tt.versionResources {
@@ -82,4 +87,70 @@ func TestParseFile(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestParseMem(t *testing.T) {
+	var tests = []struct {
+		executable       string
+		expectedSections int
+	}{
+		{filepath.Join(os.Getenv("windir"), "notepad.exe"), 7},
+	}
+
+	for _, tt := range tests {
+		var si windows.StartupInfo
+		var pi windows.ProcessInformation
+		argv := windows.StringToUTF16Ptr(tt.executable)
+		err := windows.CreateProcess(
+			nil,
+			argv,
+			nil,
+			nil,
+			true,
+			0,
+			nil,
+			nil,
+			&si,
+			&pi)
+		require.NoError(t, err)
+		time.Sleep(time.Millisecond * 300)
+		defer func() {
+			_ = windows.TerminateProcess(pi.Process, 0)
+		}()
+		addr, err := getModuleBaseAddress(pi.ProcessId)
+		if err != nil {
+			t.Fatalf("%s: unable to get the base address: %v", tt.executable, err)
+		}
+
+		pe, err := ParseMem(pi.ProcessId, addr, false, WithSections())
+		if err != nil {
+			t.Fatalf("%s: %v", tt.executable, err)
+		}
+		if pe == nil {
+			t.Fatalf("%s: PE metadata is nil", tt.executable)
+		}
+		if len(pe.Sections) != tt.expectedSections {
+			t.Errorf("%s: expected: %d, got %d sections", tt.executable, tt.expectedSections, len(pe.Sections))
+		}
+	}
+}
+
+func getModuleBaseAddress(pid uint32) (uintptr, error) {
+	var moduleHandles [1024]windows.Handle
+	var cbNeeded uint32
+	proc, err := windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION|windows.PROCESS_VM_READ, false, pid)
+	if err != nil {
+		return 0, err
+	}
+	if err := windows.EnumProcessModules(proc, &moduleHandles[0], 1024, &cbNeeded); err != nil {
+		return 0, err
+	}
+	for _, moduleHandle := range moduleHandles[:uintptr(cbNeeded)/unsafe.Sizeof(moduleHandles[0])] {
+		var moduleInfo windows.ModuleInfo
+		if err := windows.GetModuleInformation(proc, moduleHandle, &moduleInfo, uint32(unsafe.Sizeof(moduleInfo))); err != nil {
+			return 0, err
+		}
+		return moduleInfo.BaseOfDll, nil
+	}
+	return 0, errors.New("no modules found")
 }

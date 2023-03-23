@@ -21,6 +21,7 @@ package functions
 import (
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/util/entropy"
+	"strings"
 )
 
 const (
@@ -62,7 +63,8 @@ func (f Entropy) Desc() FunctionDesc {
 				return nil
 			}
 			if len(args) > 1 && args[1] != Shannon {
-				return fmt.Errorf("unsupported entropy algorithm: %s. Availiable algorithms: shannon", args[1])
+				return fmt.Errorf("unsupported entropy algorithm: %s. Availiable algorithms: %s", args[1],
+					strings.Join([]string{Shannon}, "|"))
 			}
 			return nil
 		},

@@ -38,15 +38,16 @@ type Region struct {
 	process windows.Handle
 }
 
-// Read reads a full memory area within a given process, starting at the base
-// address and until the buffer size is exceeded.
+// ReadArea reads a full memory area within a given process, starting at the base
+// address and reading up to the buffer size.
 // The memory area can consist of multiple regions with various access rights.
-// In case if the region is inaccessible, if forcing access is enabled,
-// it tries to change the region protection by temporarily adjusting the
-// permissions.
+// If the region is inaccessible and protection changing flag is enabled,
+// this function tries to change the region protection to read-only access.
+// If the request to change region protection is granted, upon completion,
+// the original access permissions are restored.
 // On read failure the region is skipped, and the read is moving to the
 // next one leaving in the output buffer an empty space of the region size.
-func Read(process windows.Handle, base uintptr, bufSize, minSize uint, forceAccess bool) []byte {
+func ReadArea(process windows.Handle, base uintptr, bufSize, minSize uint, forceAccess bool) []byte {
 	if bufSize == 0 || base == 0 {
 		return nil
 	}
@@ -114,7 +115,7 @@ func (r Region) Read(addr uintptr, bufSize, minSize uint, forceAccess bool) (uin
 	if bufSize == 0 {
 		return 0, nil
 	}
-	if (r.state & windows.MEM_COMMIT) == 0 {
+	if r.state&windows.MEM_COMMIT == 0 {
 		// no committed pages in the region
 		return 0, nil
 	}
@@ -179,12 +180,12 @@ func (r Region) read(addr uintptr, bufSize, minSize uint) (uint, []byte, error) 
 		}
 		if err == windows.ERROR_PARTIAL_COPY {
 			// data partially read. Get readable size
-			n := r.seek(addr, b, bufSize, minSize)
-			size = uintptr(n)
+			size = uintptr(r.seek(addr, b, bufSize, minSize))
 		}
 		break
 	}
 	if size > 0 {
+		// have minimal readable size
 		b = make([]byte, size)
 		err := windows.ReadProcessMemory(r.process, addr, &b[0], size, &size)
 		if err != nil {

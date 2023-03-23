@@ -144,11 +144,11 @@ func ParseMem(pid uint32, base uintptr, changeProtection bool, opts ...Option) (
 		return nil, err
 	}
 	defer windows.Close(process)
-	buf := va.Read(process, base, MaxHeaderSize, MinHeaderSize, changeProtection)
-	if len(buf) == 0 {
+	area := va.ReadArea(process, base, MaxHeaderSize, MinHeaderSize, changeProtection)
+	if len(area) == 0 {
 		return nil, ErrEmptyVArea
 	}
-	return ParseBytes(buf, opts...)
+	return ParseBytes(area, opts...)
 }
 
 func newParserOpts(opts opts) *peparser.Options {
