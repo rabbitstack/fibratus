@@ -155,8 +155,8 @@ github.com/qmuntal/stateless v1.6.0/go.mod h1:cWTwXu9ey+FxI0fHvDi1nGCtpYa8N1X2aO
 github.com/rifflock/lfshook v0.0.0-20180920164130-b9218ef580f5 h1:mZHayPoR0lNmnHyvtYjDeq0zlVHn9K/ZXoy17ylucdo=
 github.com/rifflock/lfshook v0.0.0-20180920164130-b9218ef580f5/go.mod h1:GEXHk5HgEKCvEIIrSpFI3ozzG5xOKA2DVlEX/gGnewM=
 github.com/rogpeppe/fastuuid v0.0.0-20150106093220-6724a57986af/go.mod h1:XWv6SoW27p1b0cqNHllgS5HIMJraePCO15w5zCzIWYg=
-github.com/saferwall/pe v1.3.9 h1:MaTf23tQE+bAcy6lX61EnDEkMo4r2L37jzrIexEJh2w=
-github.com/saferwall/pe v1.3.9/go.mod h1:Fh6INnfm6vUTCW1w/pZ59aWQhlOwqBVxVACtadb3UbA=
+github.com/saferwall/pe v1.4.0 h1:5aZVTAEqYYwbC078GDPtml6pVcY6iLbTgO86leqp6K8=
+github.com/saferwall/pe v1.4.0/go.mod h1:Fh6INnfm6vUTCW1w/pZ59aWQhlOwqBVxVACtadb3UbA=
 github.com/shopspring/decimal v1.2.0 h1:abSATXmQEYyShuxI4/vyW3tV1MrKAJzCZ/0zLUXYbsQ=
 github.com/shopspring/decimal v1.2.0/go.mod h1:DKyhrW/HYNuLGql+MJL6WCR6knT2jwCFRcu2hWCYk4o=
 github.com/sirupsen/logrus v1.2.0/go.mod h1:LxeOpSwHxABJmUn/MG1IvRgCAasNZTLOkJPxbbu5VWo=

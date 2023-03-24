@@ -20,9 +20,68 @@ package va
 
 import (
 	"errors"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
+	"os"
+	"testing"
 	"unsafe"
 )
+
+func TestReadRegion(t *testing.T) {
+	addr, err := getModuleBaseAddress(uint32(os.Getpid()))
+	require.NoError(t, err)
+	rgn, err := NewRegion(windows.CurrentProcess(), addr)
+	require.NoError(t, err)
+	require.True(t, rgn.Size(addr) > 0)
+
+	size, b := rgn.Read(addr, uint(os.Getpagesize()), 0x100, false)
+	require.True(t, size > 0)
+	require.Len(t, b, os.Getpagesize())
+	// verify it is the DOS header
+	require.Equal(t, 'M', rune(b[0]))
+	require.Equal(t, 'Z', rune(b[1]))
+
+	var oldProtect uint32
+	windows.VirtualProtectEx(windows.CurrentProcess(), addr, uintptr(rgn.Size(addr)), windows.PAGE_NOACCESS, &oldProtect)
+
+	size, b = rgn.Read(addr, uint(os.Getpagesize()), 0x100, false)
+	// shouldn't be able to read the region
+	require.True(t, size == 0)
+	require.Len(t, b, 0)
+	windows.VirtualProtectEx(windows.CurrentProcess(), addr, uintptr(rgn.Size(addr)), oldProtect, &oldProtect)
+
+	windows.VirtualProtectEx(windows.CurrentProcess(), addr, 4096, windows.PAGE_NOACCESS, &oldProtect)
+	defer windows.VirtualProtectEx(windows.CurrentProcess(), addr, 4096, oldProtect, &oldProtect)
+
+	noAccessRgn, err := NewRegion(windows.CurrentProcess(), addr)
+	require.NoError(t, err)
+
+	size, b = noAccessRgn.Read(addr, uint(os.Getpagesize()), 0x100, true)
+	// force protection changing, so should be able to read the region
+	require.True(t, size > 0)
+	require.Len(t, b, os.Getpagesize())
+}
+
+func TestReadArea(t *testing.T) {
+	addr, err := getModuleBaseAddress(uint32(os.Getpid()))
+	require.NoError(t, err)
+
+	area := ReadArea(windows.CurrentProcess(), addr, uint(os.Getpagesize()), 0x100, false)
+	require.Len(t, area, os.Getpagesize())
+	require.False(t, Zeroed(area))
+
+	// allocate region with no access protection
+	base, err := windows.VirtualAlloc(0, 1024, windows.MEM_COMMIT|windows.MEM_RESERVE, windows.PAGE_NOACCESS)
+	require.NoError(t, err)
+	defer windows.VirtualFree(base, 1024, windows.MEM_RELEASE)
+	var oldProtect uint32
+	windows.VirtualProtectEx(windows.CurrentProcess(), base, 16, windows.PAGE_NOACCESS, &oldProtect)
+
+	// it should read all bytes set to zero
+	zeroArea := ReadArea(windows.CurrentProcess(), base, 4096, 0x100, false)
+	require.Len(t, zeroArea, 4096)
+	require.True(t, Zeroed(zeroArea))
+}
 
 func getModuleBaseAddress(pid uint32) (uintptr, error) {
 	var moduleHandles [1024]windows.Handle

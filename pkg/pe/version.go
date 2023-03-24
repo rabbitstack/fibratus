@@ -37,15 +37,20 @@ const (
 
 	// StringFileInfoString is the UTF16-encoded string that identifies the StringFileInfo block
 	StringFileInfoString = "StringFileInfo"
-	VarFileInfoString    = "VarFileInfo"
+	// VarFileInfoString is the UTF16-encoded string that identifies the VarFileInfoString block
+	VarFileInfoString = "VarFileInfo"
 
 	// VsVersionInfoStringLength specifies the length of the VS_VERSION_INFO structure
 	VsVersionInfoStringLength uint32 = 6
-	// StringFileInfoLength specifies the offset of the file info Unicode string
+	// StringFileInfoLength specifies length of the StringFileInfo structure
 	StringFileInfoLength uint32 = 6
-	StringTableLength    uint32 = 6
-	StringLength         uint32 = 6
-	LangIDLength         uint32 = 8*2 + 1
+	// StringTableLength specifies the length of the StringTable structure
+	StringTableLength uint32 = 6
+	// StringLength specifies the length of the String structure
+	StringLength uint32 = 6
+	// LangIDLength specifies the length of the language identifier string.
+	// It is represented as 8-digit hexadecimal number stored as a Unicode string.
+	LangIDLength uint32 = 8*2 + 1
 )
 
 // VsVersionInfo represents the organization of data in

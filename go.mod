@@ -17,6 +17,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/qmuntal/stateless v1.6.0
 	github.com/rifflock/lfshook v0.0.0-20180920164130-b9218ef580f5
+	github.com/saferwall/pe v1.4.0
 	github.com/sirupsen/logrus v1.4.1
 	github.com/spf13/cobra v0.0.3
 	github.com/spf13/pflag v1.0.5
@@ -58,7 +59,6 @@ require (
 	github.com/mitchellh/reflectwalk v1.0.0 // indirect
 	github.com/pelletier/go-toml v1.2.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/saferwall/pe v1.3.9 // indirect
 	github.com/shopspring/decimal v1.2.0 // indirect
 	github.com/spf13/afero v1.1.2 // indirect
 	github.com/spf13/cast v1.3.1 // indirect

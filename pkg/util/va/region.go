@@ -77,6 +77,16 @@ func ReadArea(process windows.Handle, base uintptr, bufSize, minSize uint, force
 	return buf
 }
 
+// Zeroed determines if all bytes in the area are zeroed.
+func Zeroed(area []byte) bool {
+	for _, b := range area {
+		if b != 0 {
+			return false
+		}
+	}
+	return true
+}
+
 // NewRegion creates a new region for the specified process and base address.
 func NewRegion(process windows.Handle, base uintptr) (*Region, error) {
 	var m windows.MemoryBasicInformation

@@ -40,6 +40,7 @@ var (
 	MaxHeaderSize = uint(os.Getpagesize())
 	// MinHeaderSize denotes the minimal valid PE header size
 	MinHeaderSize = uint(0x100)
+	// ErrEmptyVArea represents the error which is returned if the VA area couldn't be read
 	ErrEmptyVArea = errors.New("va memory area is empty")
 
 	// peSkippedImages counts the number of images skipped by the parser
@@ -145,7 +146,7 @@ func ParseMem(pid uint32, base uintptr, changeProtection bool, opts ...Option) (
 	}
 	defer windows.Close(process)
 	area := va.ReadArea(process, base, MaxHeaderSize, MinHeaderSize, changeProtection)
-	if len(area) == 0 {
+	if len(area) == 0 || va.Zeroed(area) {
 		return nil, ErrEmptyVArea
 	}
 	return ParseBytes(area, opts...)
@@ -153,8 +154,23 @@ func ParseMem(pid uint32, base uintptr, changeProtection bool, opts ...Option) (
 
 func newParserOpts(opts opts) *peparser.Options {
 	return &peparser.Options{
-		DisableCertValidation: true,
-		SectionEntropy:        opts.sectionEntropy,
+		DisableCertValidation:     true,
+		OmitIATDirectory:          true,
+		OmitSecurityDirectory:     true,
+		OmitExceptionDirectory:    true,
+		OmitTLSDirectory:          true,
+		OmitCLRHeaderDirectory:    true,
+		OmitDelayImportDirectory:  true,
+		OmitBoundImportDirectory:  true,
+		OmitArchitectureDirectory: true,
+		OmitDebugDirectory:        true,
+		OmitRelocDirectory:        true,
+		OmitResourceDirectory:     !opts.parseResources,
+		OmitImportDirectory:       !opts.parseSymbols,
+		OmitExportDirectory:       true,
+		OmitLoadConfigDirectory:   true,
+		OmitGlobalPtrDirectory:    true,
+		SectionEntropy:            opts.sectionEntropy,
 	}
 }
 
