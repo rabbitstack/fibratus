@@ -70,6 +70,42 @@ func TestSeqFilterCompile(t *testing.T) {
 	assert.True(t, len(f.GetStringFields()) > 0)
 }
 
+func TestNarrowAccessors(t *testing.T) {
+	var tests = []struct {
+		f                Filter
+		expectedAccesors int
+	}{
+		{
+			New(`ps.name = 'cmd.exe' and kevt.name = 'CreateProcess' or kevt.name in ('TerminateProcess', 'CreateFile')`, cfg),
+			2,
+		},
+		{
+			New(`ps.modules[kernel32.dll].location = 'C:\\Windows\\System32'`, cfg),
+			1,
+		},
+		{
+			New(`handle.type = 'Section' and pe.sections > 1 and kevt.name = 'CreateHandle'`, cfg),
+			3,
+		},
+		{
+			New(`sequence |kevt.name = 'CreateProcess'| as e1 |kevt.name = 'CreateFile' and file.name = $e1.ps.exe |`, cfg),
+			3,
+		},
+		{
+			New(`base(file.name) = 'kernel32.dll'`, cfg),
+			1,
+		},
+	}
+
+	for i, tt := range tests {
+		require.NoError(t, tt.f.Compile())
+		naccessors := len(tt.f.(*filter).accessors)
+		if tt.expectedAccesors != naccessors {
+			t.Errorf("%d. accessors mismatch: exp=%d got=%d", i, tt.expectedAccesors, naccessors)
+		}
+	}
+}
+
 func TestSeqFilterInvalidBoundRefs(t *testing.T) {
 	f := New(`sequence
 |kevt.name = 'CreateProcess'| as e1

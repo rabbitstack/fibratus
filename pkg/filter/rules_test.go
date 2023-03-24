@@ -21,6 +21,7 @@ package filter
 import (
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sys/windows/registry"
 	"net"
 	"os"
 	"testing"
@@ -862,6 +863,57 @@ func TestIsExpressionEvaluable(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestBoundFieldsWithFunctions(t *testing.T) {
+	log.SetLevel(log.DebugLevel)
+	rules := NewRules(newConfig("_fixtures/sequence_rule_bound_fields_with_functions.yml"))
+	require.NoError(t, rules.Compile())
+
+	kevt1 := &kevent.Kevent{
+		Type:     ktypes.CreateFile,
+		Name:     "CreateFile",
+		Category: ktypes.File,
+		Tid:      2484,
+		PID:      859,
+		PS: &types.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\cmd.exe",
+		},
+		Kparams: kevent.Kparams{
+			kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\System32\\passwdflt.dll"},
+		},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+	}
+
+	kevt2 := &kevent.Kevent{
+		Type:     ktypes.RegSetValue,
+		Name:     "RegSetValue",
+		Category: ktypes.Registry,
+		Tid:      2484,
+		PID:      859,
+		PS: &types.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\cmd.exe",
+		},
+		Kparams: kevent.Kparams{
+			kparams.RegKeyName: {Name: kparams.RegKeyName, Type: kparams.UnicodeString, Value: "HKEY_CURRENT_USER\\Volatile Environment\\Notification Packages"},
+		},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+	}
+
+	key, err := registry.OpenKey(registry.CURRENT_USER, "Volatile Environment", registry.SET_VALUE)
+	require.NoError(t, err)
+	defer key.Close()
+
+	defer func() {
+		_ = key.DeleteValue("Notification Packages")
+	}()
+
+	require.NoError(t, key.SetStringsValue("Notification Packages", []string{"secli", "passwdflt"}))
+
+	require.False(t, rules.Fire(kevt1))
+	require.True(t, rules.Fire(kevt2))
 }
 
 func BenchmarkRunRules(b *testing.B) {
