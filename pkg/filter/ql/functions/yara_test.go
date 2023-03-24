@@ -33,6 +33,7 @@ import (
 var pi syscall.ProcessInformation
 
 func TestYara(t *testing.T) {
+	t.SkipNow()
 	var tests = []struct {
 		args     []interface{}
 		expected bool

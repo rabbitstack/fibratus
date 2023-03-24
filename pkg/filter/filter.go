@@ -53,6 +53,8 @@ type Filter interface {
 	RunSequence(kevt *kevent.Kevent, seqID uint16, partials map[uint16][]*kevent.Kevent) bool
 	// GetStringFields returns field names mapped to their string values.
 	GetStringFields() map[fields.Field][]string
+	// GetFields returns all field used in the filter expression.
+	GetFields() []fields.Field
 	// GetSequence returns the sequence descriptor or nil if this filter is not a sequence.
 	GetSequence() *ql.Sequence
 	// IsSequence determines if this filter is a sequence.
@@ -112,6 +114,7 @@ func (f *filter) Compile() error {
 				f.addBoundField(rhs)
 			}
 		case *ql.Function:
+			f.useFuncValuer = true
 			for _, arg := range expr.Args {
 				if field, ok := arg.(*ql.FieldLiteral); ok {
 					f.addField(fields.Field(field.Value))
@@ -120,7 +123,6 @@ func (f *filter) Compile() error {
 					f.addBoundField(field)
 				}
 			}
-			f.useFuncValuer = true
 		}
 	}
 	if f.expr != nil {
@@ -139,6 +141,8 @@ func (f *filter) Compile() error {
 	if len(f.fields) == 0 && !f.useFuncValuer {
 		return ErrNoFields
 	}
+	// only retain accessors for declared filter fields
+	f.narrowAccessors()
 	return f.checkBoundRefs()
 }
 
@@ -165,29 +169,33 @@ func (f *filter) RunSequence(kevt *kevent.Kevent, seqID uint16, partials map[uin
 		// if a sequence expression contains references to
 		// bound fields we map all partials to their sequence
 		// aliases
-		pls := make(map[string][]*kevent.Kevent)
+		p := make(map[string][]*kevent.Kevent)
+		nslots := len(partials[seqID])
 		for i := uint16(0); i < seqID; i++ {
 			alias := f.seq.Expressions[i].Alias
 			if alias == "" {
 				continue
 			}
-			pls[alias] = partials[i+1]
+			p[alias] = partials[i+1]
+			if len(p[alias]) > nslots {
+				nslots = len(p[alias])
+			}
 		}
 		// process until partials from all slots are consumed
 		n := 0
-		nslots := len(pls)
 		for nslots > 0 {
+			nslots--
 			for _, field := range expr.BoundFields {
+				evts := p[field.Alias()]
+				var evt *kevent.Kevent
+				if n > len(evts)-1 {
+					// pick the latest event if all
+					// events for this slot are consumed
+					evt = evts[len(evts)-1]
+				} else {
+					evt = evts[n]
+				}
 				for _, accessor := range f.accessors {
-					evts := pls[field.Alias()]
-					if n > len(evts)-1 {
-						nslots--
-						continue
-					}
-					evt := evts[n]
-					if !accessor.canAccess(evt, f) {
-						continue
-					}
 					v, err := accessor.get(field.Field(), evt)
 					if err != nil && !kerrors.IsKparamNotFound(err) {
 						accessorErrors.Add(err.Error(), 1)
@@ -246,6 +254,7 @@ func joinsEqual(joins []bool) bool {
 }
 
 func (f *filter) GetStringFields() map[fields.Field][]string { return f.stringFields }
+func (f *filter) GetFields() []fields.Field                  { return f.fields }
 
 func (f *filter) IsSequence() bool          { return f.seq != nil }
 func (f *filter) GetSequence() *ql.Sequence { return f.seq }
@@ -310,9 +319,6 @@ func (f *filter) mapValuer(kevt *kevent.Kevent) map[string]interface{} {
 	valuer := make(map[string]interface{}, len(f.fields))
 	for _, field := range f.fields {
 		for _, accessor := range f.accessors {
-			if !accessor.canAccess(kevt, f) {
-				continue
-			}
 			v, err := accessor.get(field, kevt)
 			if err != nil && !kerrors.IsKparamNotFound(err) {
 				accessorErrors.Add(err.Error(), 1)

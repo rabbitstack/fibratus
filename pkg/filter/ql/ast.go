@@ -995,28 +995,44 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			}
 			return false
 		case In:
-			rhs, ok := rhs.([]string)
+			s, ok := rhs.(string)
 			if !ok {
-				return false
-			}
-			for _, i := range lhs {
-				for _, j := range rhs {
-					if i == j {
-						return true
+				rhs, ok := rhs.([]string)
+				if !ok {
+					return false
+				}
+				for _, i := range lhs {
+					for _, j := range rhs {
+						if i == j {
+							return true
+						}
 					}
+				}
+			}
+			for _, val := range lhs {
+				if val == s {
+					return true
 				}
 			}
 			return false
 		case IIn:
-			rhs, ok := rhs.([]string)
+			s, ok := rhs.(string)
 			if !ok {
-				return false
-			}
-			for _, i := range lhs {
-				for _, j := range rhs {
-					if strings.EqualFold(i, j) {
-						return true
+				rhs, ok := rhs.([]string)
+				if !ok {
+					return false
+				}
+				for _, i := range lhs {
+					for _, j := range rhs {
+						if strings.EqualFold(i, j) {
+							return true
+						}
 					}
+				}
+			}
+			for _, val := range lhs {
+				if strings.EqualFold(val, s) {
+					return true
 				}
 			}
 			return false

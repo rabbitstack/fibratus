@@ -44,3 +44,9 @@ func TestLookup(t *testing.T) {
 	assert.Equal(t, Field("kevt.arg[exe]"), Lookup("kevt.arg[exe]"))
 	assert.Empty(t, Lookup("kevt.arg"))
 }
+
+func TestIsDeprecated(t *testing.T) {
+	deprecated, d := IsDeprecated(PsSiblingPid)
+	assert.True(t, deprecated)
+	assert.NotNil(t, d)
+}

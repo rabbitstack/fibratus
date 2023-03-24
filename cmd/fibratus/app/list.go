@@ -142,12 +142,16 @@ func listKevents(cmd *cobra.Command, args []string) {
 func listFields(cmd *cobra.Command, args []string) {
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
-	t.AppendHeader(table.Row{"Name", "Description", "Example"})
+	t.AppendHeader(table.Row{"Name", "Description", "Example", "Deprecation"})
 	t.SetStyle(table.StyleLight)
 
 	for _, field := range fields.Get() {
-		t.AppendRow(table.Row{field.Field, field.Desc, strings.Join(field.Examples, ",")})
+		if field.IsDeprecated() {
+			deprecated := fmt.Sprintf("since %s", field.Deprecation.Since)
+			t.AppendRow(table.Row{field.Field, field.Desc, strings.Join(field.Examples, ","), deprecated})
+		} else {
+			t.AppendRow(table.Row{field.Field, field.Desc, strings.Join(field.Examples, ","), ""})
+		}
 	}
-
 	t.Render()
 }

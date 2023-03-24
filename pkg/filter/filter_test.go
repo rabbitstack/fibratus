@@ -70,6 +70,42 @@ func TestSeqFilterCompile(t *testing.T) {
 	assert.True(t, len(f.GetStringFields()) > 0)
 }
 
+func TestNarrowAccessors(t *testing.T) {
+	var tests = []struct {
+		f                Filter
+		expectedAccesors int
+	}{
+		{
+			New(`ps.name = 'cmd.exe' and kevt.name = 'CreateProcess' or kevt.name in ('TerminateProcess', 'CreateFile')`, cfg),
+			2,
+		},
+		{
+			New(`ps.modules[kernel32.dll].location = 'C:\\Windows\\System32'`, cfg),
+			1,
+		},
+		{
+			New(`handle.type = 'Section' and pe.sections > 1 and kevt.name = 'CreateHandle'`, cfg),
+			3,
+		},
+		{
+			New(`sequence |kevt.name = 'CreateProcess'| as e1 |kevt.name = 'CreateFile' and file.name = $e1.ps.exe |`, cfg),
+			3,
+		},
+		{
+			New(`base(file.name) = 'kernel32.dll'`, cfg),
+			1,
+		},
+	}
+
+	for i, tt := range tests {
+		require.NoError(t, tt.f.Compile())
+		naccessors := len(tt.f.(*filter).accessors)
+		if tt.expectedAccesors != naccessors {
+			t.Errorf("%d. accessors mismatch: exp=%d got=%d", i, tt.expectedAccesors, naccessors)
+		}
+	}
+}
+
 func TestSeqFilterInvalidBoundRefs(t *testing.T) {
 	f := New(`sequence
 |kevt.name = 'CreateProcess'| as e1
@@ -126,6 +162,7 @@ func TestFilterRunProcessKevent(t *testing.T) {
 		PID:      1023,
 		PS: &pstypes.PS{
 			Name:   "svchost.exe",
+			Comm:   "C:\\Windows\\System32\\svchost.exe",
 			Parent: ps1,
 			Ppid:   345,
 			SID:    "LOCAL\\tor",
@@ -165,14 +202,20 @@ func TestFilterRunProcessKevent(t *testing.T) {
 		{`ps.name = 'svchot.exe'`, false},
 		{`ps.name = 'mimikatz.exe' or ps.name contains 'svc'`, true},
 		{`ps.name ~= 'SVCHOST.exe'`, true},
+		{`ps.cmdline = 'C:\\Windows\\System32\\svchost.exe'`, true},
+		{`ps.child.cmdline = 'C:\\Windows\\system32\\svchost-fake.exe -k RPCSS'`, true},
 		{`ps.username = 'tor'`, true},
 		{`ps.domain = 'LOCAL'`, true},
 		{`ps.pid = 1023`, true},
 		{`ps.sibling.pid = 1234`, true},
+		{`ps.child.pid = 1234`, true},
 		{`ps.parent.pid = 5042`, true},
 		{`ps.sibling.name = 'svchost-fake.exe'`, true},
+		{`ps.child.name = 'svchost-fake.exe'`, true},
 		{`ps.sibling.username = 'loki'`, true},
+		{`ps.child.username = 'loki'`, true},
 		{`ps.sibling.domain = 'TITAN'`, true},
+		{`ps.child.domain = 'TITAN'`, true},
 		{`ps.parent.username = 'SYSTEM'`, true},
 		{`ps.parent.domain = 'NT AUTHORITY'`, true},
 		{`ps.envs in ('ALLUSERSPROFILE')`, true},

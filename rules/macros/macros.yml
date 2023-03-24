@@ -31,6 +31,18 @@
 - macro: load_module
   expr: kevt.name = 'LoadImage'
 
+- macro: set_value
+  expr: kevt.name = 'RegSetValue'
+
+- macro: create_key
+  expr: kevt.name = 'RegCreateKey'
+
+- macro: modify_registry
+  expr: (set_value or create_key)
+
+- macro: send_socket
+  expr: kevt.name = 'Send'
+
 - macro: load_driver
   expr: >
     kevt.name = 'LoadDriver'
@@ -61,13 +73,39 @@
         or
       is_minidump(file.name)
     )
-  description: Detects when a process writes a minidump file
+  description: |
+    Detects a process writing the minidump file. Minidump files are used for crash
+    reporting as they contain a snapshot of the process' memory such as local variables
+    or heap objects. Processes can create minidump files by calling into the MiniDumpWriteDump()
+    function. This macro checks the well-known extensions of the minidump files as well as
+    the minidump signature.
 
 - macro: msoffice_binaries
   list: [EXCEL.EXE, WINWORD.EXE, MSACCESS.EXE, POWERPNT.EXE, WORDPAD.EXE]
+
+- macro: web_browser_binaries
+  list: [
+    chrome.exe, firefox.exe, msedge.exe, iexplore.exe, opera.exe,
+    brave.exe, microsoftedge.exe, chromium.exe, safari.exe
+    ]
+
+- macro: web_browser_cred_stores
+  list: [
+    "?:\\Users\\*\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Network\\Cookies",
+    "?:\\Users\\*\\AppData\\Local\\Chrome\\User Data\\Default\\Login Data",
+    "?:\\Users\\*\\AppData\\Local\\Google\\Chrome\\User Data\\Local State",
+    "?:\\Users\\*\\Appdata\\Local\\Microsoft\\Windows\\WebCache\\WebCacheV0?.dat",
+    "?:\\Users\\*\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\*\\cookies.sqlite",
+    "?:\\Users\\*\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\*\\sigons.sqlite",
+    "?:\\Users\\*\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\*\\logins.json",
+    "?:\\Users\\*\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\*\\key?.db",
+    ]
 
 - macro: executable_extensions
   list: [.exe, .com, .scr]
 
 - macro: module_extensions
   list: [.dll, .ocx, .cpl]
+
+- macro: vault_extensions
+  list: [.vcrd, .vpol]
