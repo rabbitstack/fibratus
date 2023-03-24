@@ -566,6 +566,7 @@ func (r *Rules) Compile() error {
 		}
 
 		g := newFilterGroup(group, filters)
+		log.Infof("compiled rule group [%s] with %d rule(s)", group.Name, len(filters))
 
 		// traverse all filters in the groups and determine
 		// the event type from the filter field name expression.
@@ -653,6 +654,7 @@ func (r *Rules) runSequence(kevt *kevent.Kevent, f *compiledFilter) bool {
 		}
 		rule := expr.Expr.String()
 		matches := f.run(kevt, uint16(i))
+		log.Debugf("[%s] = %t", rule, matches)
 		// append the partial and transition state machine
 		if matches && f.ss.isAfter(rule, kevt) {
 			f.ss.addPartial(rule, kevt)

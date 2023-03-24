@@ -332,8 +332,15 @@ const (
 // String casts the field type to string.
 func (f Field) String() string { return string(f) }
 
-func (f Field) IsPsField() bool   { return strings.HasPrefix(string(f), "ps.") }
-func (f Field) IsKevtField() bool { return strings.HasPrefix(string(f), "kevt.") }
+func (f Field) IsPsField() bool       { return strings.HasPrefix(string(f), "ps.") }
+func (f Field) IsKevtField() bool     { return strings.HasPrefix(string(f), "kevt.") }
+func (f Field) IsThreadField() bool   { return strings.HasPrefix(string(f), "thread.") }
+func (f Field) IsImageField() bool    { return strings.HasPrefix(string(f), "image.") }
+func (f Field) IsFileField() bool     { return strings.HasPrefix(string(f), "file.") }
+func (f Field) IsRegistryField() bool { return strings.HasPrefix(string(f), "registry.") }
+func (f Field) IsNetworkField() bool  { return strings.HasPrefix(string(f), "net.") }
+func (f Field) IsHandleField() bool   { return strings.HasPrefix(string(f), "handle.") }
+func (f Field) IsPeField() bool       { return strings.HasPrefix(string(f), "pe.") }
 
 // Segment represents the type alias for the segment. Segment
 // denotes the location of the value within an indexed field.
