@@ -88,6 +88,10 @@ func (k *kevtAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, 
 	case fields.KevtNparams:
 		return uint64(kevt.Kparams.Len()), nil
 	default:
+		if f.IsKevtArgMap() {
+			name, _ := captureInBrackets(f.String())
+			return kevt.Kparams.Get(name)
+		}
 		return nil, nil
 	}
 }
