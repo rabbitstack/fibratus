@@ -20,6 +20,7 @@ package filter
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
+	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/stretchr/testify/assert"
 	"net"
 	"testing"
@@ -162,6 +163,7 @@ func TestFilterRunProcessKevent(t *testing.T) {
 		PID:      1023,
 		PS: &pstypes.PS{
 			Name:   "svchost.exe",
+			Comm:   "C:\\Windows\\System32\\svchost.exe",
 			Parent: ps1,
 			Ppid:   345,
 			SID:    "LOCAL\\tor",
@@ -201,14 +203,21 @@ func TestFilterRunProcessKevent(t *testing.T) {
 		{`ps.name = 'svchot.exe'`, false},
 		{`ps.name = 'mimikatz.exe' or ps.name contains 'svc'`, true},
 		{`ps.name ~= 'SVCHOST.exe'`, true},
+		{`ps.cmdline = 'C:\\Windows\\System32\\svchost.exe'`, true},
+		{`ps.child.cmdline = 'C:\\Windows\\system32\\svchost-fake.exe -k RPCSS'`, true},
 		{`ps.username = 'tor'`, true},
 		{`ps.domain = 'LOCAL'`, true},
 		{`ps.pid = 1023`, true},
 		{`ps.sibling.pid = 1234`, true},
+		{`ps.child.pid = 1234`, true},
+		{`ps.child.uuid > 0`, true},
 		{`ps.parent.pid = 5042`, true},
 		{`ps.sibling.name = 'svchost-fake.exe'`, true},
+		{`ps.child.name = 'svchost-fake.exe'`, true},
 		{`ps.sibling.username = 'loki'`, true},
+		{`ps.child.username = 'loki'`, true},
 		{`ps.sibling.domain = 'TITAN'`, true},
+		{`ps.child.domain = 'TITAN'`, true},
 		{`ps.parent.username = 'SYSTEM'`, true},
 		{`ps.parent.domain = 'NT AUTHORITY'`, true},
 		{`ps.envs in ('ALLUSERSPROFILE')`, true},
@@ -238,8 +247,11 @@ func TestFilterRunProcessKevent(t *testing.T) {
 		{`ps.ancestor[any].pid in (2034, 343)`, true},
 	}
 
+	psnap := new(ps.SnapshotterMock)
+	psnap.On("Find", uint32(1234)).Return(ps1)
+
 	for i, tt := range tests {
-		f := New(tt.filter, cfg)
+		f := New(tt.filter, cfg, WithPSnapshotter(psnap))
 		err := f.Compile()
 		if err != nil {
 			t.Fatal(err)
@@ -398,6 +410,7 @@ func TestFilterRunKevent(t *testing.T) {
 		Host:        "archrabbit",
 		Description: "Creates or opens a new file, directory, I/O device, pipe, console",
 		Kparams: kevent.Kparams{
+			kparams.ProcessID:     {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(3434)},
 			kparams.FileObject:    {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(12456738026482168384)},
 			kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
 			kparams.FileType:      {Name: kparams.FileType, Type: kparams.AnsiString, Value: "file"},
@@ -420,13 +433,16 @@ func TestFilterRunKevent(t *testing.T) {
 		{`kevt.name = 'CreateFile'`, true},
 		{`kevt.category = 'file'`, true},
 		{`kevt.host = 'archrabbit'`, true},
-		{`kevt.nparams = 4`, true},
+		{`kevt.nparams = 5`, true},
+		{`kevt.arg[file_name] = '\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll'`, true},
+		{`kevt.arg[type] = 'file'`, true},
+		{`kevt.arg[pid] = 3434`, true},
 
 		{`kevt.desc contains 'Creates or opens a new file'`, true},
 
 		{`kevt.date.d = 3 AND kevt.date.m = 5 AND kevt.time.s = 5 AND kevt.time.m = 4 and kevt.time.h = 15`, true},
 		{`kevt.time = '15:04:05'`, true},
-		{`concat(kevt.name, kevt.host, kevt.nparams) = 'CreateFilearchrabbit4'`, true},
+		{`concat(kevt.name, kevt.host, kevt.nparams) = 'CreateFilearchrabbit5'`, true},
 		{`ltrim(kevt.host, 'arch') = 'rabbit'`, true},
 		{`concat(ltrim(kevt.name, 'Create'), kevt.host) = 'Filearchrabbit'`, true},
 		{`lower(rtrim(kevt.name, 'File')) = 'create'`, true},
