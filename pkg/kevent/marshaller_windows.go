@@ -189,11 +189,11 @@ func (kevt *Kevent) MarshalRaw() []byte {
 	// write process state
 	if kevt.PS != nil && (kevt.Type == ktypes.CreateProcess || kevt.Type == ktypes.EnumProcess) {
 		buf := kevt.PS.Marshal()
-		sec := section.New(section.Process, kcapver.ProcessSecV1, 0, uint32(len(buf)))
+		sec := section.New(section.Process, kcapver.ProcessSecV2, 0, uint32(len(buf)))
 		b = append(b, sec[:]...)
 		b = append(b, buf...)
 	} else {
-		sec := section.New(section.Process, kcapver.ProcessSecV1, 0, 0)
+		sec := section.New(section.Process, kcapver.ProcessSecV2, 0, 0)
 		b = append(b, sec[:]...)
 	}
 
@@ -254,11 +254,11 @@ func (kevt *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 	}
 
 	// read parameters
-	nbKparams := bytes.ReadUint16(b[44+offset:])
+	nparams := bytes.ReadUint16(b[44+offset:])
 	// accumulates the offset of all parameter name and value lengths
 	var poffset uint16
 
-	for i := 0; i < int(nbKparams); i++ {
+	for i := 0; i < int(nparams); i++ {
 		// read kparam type
 		typ := bytes.ReadUint16(b[46+offset+poffset:])
 		// read kparam name
@@ -417,7 +417,7 @@ func (kevt *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 	// read process state
 	sec := section.Read(b[48+offset:])
 	if sec.Size() != 0 {
-		ps, err := ptypes.NewFromKcap(b[58+offset:])
+		ps, err := ptypes.NewFromKcap(b[58+offset:], sec)
 		if err != nil {
 			return err
 		}

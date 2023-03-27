@@ -27,6 +27,7 @@ import (
 	"fmt"
 	fsm "github.com/qmuntal/stateless"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
+	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/hashers"
 	"net"
 	"sort"
@@ -95,6 +96,7 @@ type Rules struct {
 	filterGroups    map[uint32]filterGroups
 	excludePolicies bool
 	config          *config.Config
+	psnap           ps.Snapshotter
 }
 
 type filterGroup struct {
@@ -465,9 +467,10 @@ func (r *Rules) isGroupMapped(scopeHash, groupHash uint32) bool {
 }
 
 // NewRules produces a fresh rules instance.
-func NewRules(c *config.Config) Rules {
+func NewRules(psnap ps.Snapshotter, c *config.Config) Rules {
 	rules := Rules{
 		filterGroups: make(map[uint32]filterGroups),
+		psnap:        psnap,
 		config:       c,
 	}
 	return rules
@@ -512,7 +515,7 @@ func (r *Rules) Compile() error {
 
 		for _, filterConfig := range rules {
 			rule := filterConfig.Name
-			f := New(expr(filterConfig), r.config)
+			f := New(expr(filterConfig), r.config, WithPSnapshotter(r.psnap))
 			err := f.Compile()
 			if err != nil {
 				return ErrInvalidFilter(rule, group.Name, err)

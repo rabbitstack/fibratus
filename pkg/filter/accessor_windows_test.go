@@ -22,6 +22,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/pe"
+	psnapshotter "github.com/rabbitstack/fibratus/pkg/ps"
 	ptypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,7 +31,8 @@ import (
 )
 
 func TestPSAccessor(t *testing.T) {
-	ps := newPSAccessor()
+	psnap := new(psnapshotter.SnapshotterMock)
+	ps := newPSAccessor(psnap)
 	kevt := &kevent.Kevent{
 		PS: &ptypes.PS{
 			Envs: map[string]string{"ALLUSERSPROFILE": "C:\\ProgramData", "OS": "Windows_NT", "ProgramFiles(x86)": "C:\\Program Files (x86)"},

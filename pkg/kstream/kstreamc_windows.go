@@ -143,7 +143,7 @@ func NewConsumer(ktraceController KtraceController, psnap ps.Snapshotter, hsnap 
 		capture:          config.KcapFile != "",
 		sequencer:        kevent.NewSequencer(),
 		kevts:            make(chan *kevent.Kevent, 500),
-		rules:            filter.NewRules(config),
+		rules:            filter.NewRules(psnap, config),
 	}
 
 	kconsumer.interceptorChain = interceptors.NewChain(psnap, hsnap, config, kconsumer.enqueueKevent)

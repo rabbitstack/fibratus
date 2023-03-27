@@ -19,15 +19,20 @@
 package types
 
 import (
+	"encoding/binary"
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
-	"path/filepath"
-	"sync"
-
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
+	"github.com/rabbitstack/fibratus/pkg/kcap/section"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	hndl "github.com/rabbitstack/fibratus/pkg/syscall/handle"
+	"github.com/rabbitstack/fibratus/pkg/syscall/process"
+	"github.com/rabbitstack/fibratus/pkg/util/bootid"
+	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
+	"golang.org/x/sys/windows"
+	"path/filepath"
+	"sync"
+	"time"
 )
 
 // PS encapsulates process' state such as allocated resources and other metadata.
@@ -66,6 +71,49 @@ type PS struct {
 	PE *pe.PE `json:"pe"`
 	// Parent represents the reference to the parent process.
 	Parent *PS `json:"parent"`
+	// StartTime represents the process start time.
+	StartTime time.Time `json:"started"`
+	// uuid is a unique process identifier derived from boot ID and process sequence number
+	uuid uint64
+}
+
+// UUID is meant to offer a more robust version of process ID that
+// is resistant to being repeated. Process start key was introduced
+// in Windows 10 1507 and is derived from _KUSER_SHARED_DATA.BootId and
+// EPROCESS.SequenceNumber both of which increment and are unlikely to
+// overflow. This method uses a combination of process start key and boot id
+// to fabric a unique process identifier. If this is not possible, the uuid
+// is computed by using the process start time.
+func (ps *PS) UUID() uint64 {
+	if ps.uuid != 0 {
+		return ps.uuid
+	}
+	// assume the uuid is derived from boot ID and process start time
+	ps.uuid = (bootid.Read() << 30) + uint64(ps.PID) | uint64(ps.StartTime.UnixNano())
+	maj, _, patch := windows.RtlGetNtVersionNumbers()
+	if maj >= 10 && patch >= 1507 {
+		seqNum := querySequenceNumber(ps.PID)
+		// prefer the most robust variant of the uuid which uses the
+		// process sequence number obtained from the process object
+		if seqNum != 0 {
+			ps.uuid = (bootid.Read() << 30) | seqNum
+		}
+	}
+	return ps.uuid
+}
+
+func querySequenceNumber(pid uint32) uint64 {
+	proc, err := process.Open(process.QueryInformation, false, pid)
+	if err != nil {
+		return 0
+	}
+	defer proc.Close()
+	buf := make([]byte, 8)
+	_, err = process.QueryInfo(proc, process.SequenceNumberInformationClass, buf)
+	if err != nil {
+		return 0
+	}
+	return binary.BigEndian.Uint64(buf)
 }
 
 // String returns a string representation of the process' state.
@@ -216,7 +264,7 @@ func NewPS(pid, ppid uint32, exe, cwd, comm string, thread Thread, envs map[stri
 }
 
 // NewFromKcap reconstructs the state of the process from kcap file.
-func NewFromKcap(buf []byte) (*PS, error) {
+func NewFromKcap(buf []byte, sec section.Section) (*PS, error) {
 	ps := PS{
 		Args:    make([]string, 0),
 		Envs:    make(map[string]string),
@@ -224,7 +272,7 @@ func NewFromKcap(buf []byte) (*PS, error) {
 		Modules: make([]Module, 0),
 		Threads: make(map[uint32]Thread),
 	}
-	if err := ps.Unmarshal(buf); err != nil {
+	if err := ps.Unmarshal(buf, sec); err != nil {
 		return nil, err
 	}
 	return &ps, nil

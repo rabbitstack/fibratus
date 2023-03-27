@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	psnap "github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
 	"path/filepath"
 	"strconv"
@@ -47,7 +48,7 @@ type accessor interface {
 // getAccessors initializes and returns all available accessors.
 func getAccessors() []accessor {
 	return []accessor{
-		newPSAccessor(),
+		newPSAccessor(nil),
 		newPEAccessor(),
 		newFileAccessor(),
 		newKevtAccessor(),
@@ -67,9 +68,11 @@ func getParentPs(kevt *kevent.Kevent) *pstypes.PS {
 }
 
 // psAccessor extracts process's state or event specific values.
-type psAccessor struct{}
+type psAccessor struct {
+	psnap psnap.Snapshotter
+}
 
-func newPSAccessor() accessor { return &psAccessor{} }
+func newPSAccessor(psnap psnap.Snapshotter) accessor { return &psAccessor{psnap: psnap} }
 
 func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
 	switch f {
@@ -229,6 +232,35 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 			mods = append(mods, filepath.Base(m.Name))
 		}
 		return mods, nil
+	case fields.PsUUID:
+		ps := kevt.PS
+		if ps == nil {
+			return nil, ErrPsNil
+		}
+		return ps.UUID(), nil
+	case fields.PsParentUUID:
+		ps := getParentPs(kevt)
+		if ps == nil {
+			return nil, ErrPsNil
+		}
+		return ps.UUID(), nil
+	case fields.PsChildUUID:
+		if kevt.Category != ktypes.Process {
+			return nil, nil
+		}
+		// find child process in snapshotter
+		pid, err := kevt.Kparams.GetPid()
+		if err != nil {
+			return nil, err
+		}
+		if ps.psnap == nil {
+			return nil, nil
+		}
+		proc := ps.psnap.Find(pid)
+		if proc == nil {
+			return nil, ErrPsNil
+		}
+		return proc.UUID(), nil
 	case fields.PsHandles:
 		ps := kevt.PS
 		if ps == nil {

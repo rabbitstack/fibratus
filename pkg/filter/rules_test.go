@@ -20,9 +20,11 @@ package filter
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/fs"
+	"github.com/rabbitstack/fibratus/pkg/ps"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows/registry"
 	"net"
+	"os"
 	"testing"
 	"time"
 
@@ -74,7 +76,8 @@ func init() {
 }
 
 func fireRules(t *testing.T, c *config.Config) bool {
-	rules := NewRules(c)
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, c)
 
 	kevt := &kevent.Kevent{
 		Type:     ktypes.Recv,
@@ -116,7 +119,8 @@ func newConfig(fromFiles ...string) *config.Config {
 }
 
 func TestCompileMergeGroups(t *testing.T) {
-	rules := NewRules(newConfig("_fixtures/merged_groups.yml"))
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, newConfig("_fixtures/merged_groups.yml"))
 	require.NoError(t, rules.Compile())
 
 	assert.Len(t, rules.filterGroups, 2)
@@ -151,7 +155,8 @@ func TestFireRules(t *testing.T) {
 }
 
 func TestIncludeExcludeRemoteThreads(t *testing.T) {
-	rules := NewRules(newConfig("_fixtures/include_exclude_remote_threads.yml"))
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, newConfig("_fixtures/include_exclude_remote_threads.yml"))
 	require.NoError(t, rules.Compile())
 
 	kevt := &kevent.Kevent{
@@ -171,7 +176,8 @@ func TestIncludeExcludeRemoteThreads(t *testing.T) {
 }
 
 func TestSequenceState(t *testing.T) {
-	rules := NewRules(newConfig("_fixtures/sequence_rule_simple.yml"))
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_simple.yml"))
 	require.NoError(t, rules.Compile())
 	log.SetLevel(log.DebugLevel)
 
@@ -279,7 +285,8 @@ func TestSequenceState(t *testing.T) {
 }
 
 func TestSimpleSequenceRule(t *testing.T) {
-	rules := NewRules(newConfig("_fixtures/sequence_rule_simple.yml"))
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_simple.yml"))
 	require.NoError(t, rules.Compile())
 
 	kevt1 := &kevent.Kevent{
@@ -325,7 +332,8 @@ func TestSimpleSequenceRule(t *testing.T) {
 }
 
 func TestSimpleSequenceRuleMultiplePartials(t *testing.T) {
-	rules := NewRules(newConfig("_fixtures/sequence_rule_simple_max_span.yml"))
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_simple_max_span.yml"))
 	require.NoError(t, rules.Compile())
 
 	// create random matches which don't satisfy the BY statement
@@ -409,7 +417,8 @@ func TestSimpleSequenceRuleMultiplePartials(t *testing.T) {
 }
 
 func TestSimpleSequenceRuleWithMaxSpanReached(t *testing.T) {
-	rules := NewRules(newConfig("_fixtures/sequence_rule_simple_max_span.yml"))
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_simple_max_span.yml"))
 	require.NoError(t, rules.Compile())
 
 	kevt1 := &kevent.Kevent{
@@ -457,7 +466,8 @@ func TestSimpleSequenceRuleWithMaxSpanReached(t *testing.T) {
 }
 
 func TestSimpleSequencePolicyWithMaxSpanNotReached(t *testing.T) {
-	rules := NewRules(newConfig("_fixtures/sequence_rule_simple_max_span.yml"))
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_simple_max_span.yml"))
 	require.NoError(t, rules.Compile())
 
 	kevt1 := &kevent.Kevent{
@@ -498,7 +508,8 @@ func TestSimpleSequencePolicyWithMaxSpanNotReached(t *testing.T) {
 }
 
 func TestComplexSequenceRule(t *testing.T) {
-	rules := NewRules(newConfig("_fixtures/sequence_rule_complex.yml"))
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_complex.yml"))
 	require.NoError(t, rules.Compile())
 	log.SetLevel(log.DebugLevel)
 
@@ -588,8 +599,60 @@ func TestComplexSequenceRule(t *testing.T) {
 	require.True(t, rules.Fire(kevt3))
 }
 
+func TestSequencePsUUID(t *testing.T) {
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_ps_uuid.yml"))
+	require.NoError(t, rules.Compile())
+	log.SetLevel(log.DebugLevel)
+
+	kevt1 := &kevent.Kevent{
+		Seq:       1,
+		Type:      ktypes.CreateProcess,
+		Timestamp: time.Now(),
+		Category:  ktypes.Process,
+		Name:      "CreateProcess",
+		Tid:       2484,
+		PID:       uint32(os.Getpid()),
+		PS: &types.PS{
+			PID:  uint32(os.Getpid()),
+			Name: "explorer.exe",
+			Exe:  "C:\\Windows\\system32\\explorer.exe",
+		},
+		Kparams: kevent.Kparams{
+			kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(2243)},
+			kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "firefox.exe"},
+		},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+	}
+
+	kevt2 := &kevent.Kevent{
+		Seq:       2,
+		Type:      ktypes.CreateFile,
+		Timestamp: time.Now(),
+		Name:      "CreateFile",
+		Tid:       2484,
+		PID:       uint32(os.Getpid()),
+		Category:  ktypes.File,
+		PS: &types.PS{
+			PID:  uint32(os.Getpid()),
+			Name: "firefox.exe",
+			Exe:  "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
+			Comm: "C:\\Program Files\\Mozilla Firefox\\firefox.exe\" -contentproc --channel=\"10464.7.539748228\\1366525930\" -childID 6 -isF",
+		},
+		Kparams: kevent.Kparams{
+			kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
+			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: fs.FileDisposition(2)},
+		},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+	}
+
+	require.False(t, rules.Fire(kevt1))
+	require.True(t, rules.Fire(kevt2))
+}
+
 func TestSequenceAndSimpleRuleMix(t *testing.T) {
-	rules := NewRules(newConfig("_fixtures/sequence_and_simple_rule_mix.yml"))
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, newConfig("_fixtures/sequence_and_simple_rule_mix.yml"))
 	require.NoError(t, rules.Compile())
 	log.SetLevel(log.DebugLevel)
 
@@ -657,7 +720,8 @@ func TestSequenceAndSimpleRuleMix(t *testing.T) {
 }
 
 func TestSequenceRuleBoundsFields(t *testing.T) {
-	rules := NewRules(newConfig("_fixtures/sequence_rule_bound_fields.yml"))
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_bound_fields.yml"))
 	require.NoError(t, rules.Compile())
 
 	kevt := &kevent.Kevent{
@@ -736,8 +800,9 @@ func TestSequenceRuleBoundsFields(t *testing.T) {
 }
 
 func TestFilterActionEmitAlert(t *testing.T) {
+	psnap := new(ps.SnapshotterMock)
 	require.NoError(t, alertsender.LoadAll([]alertsender.Config{{Type: alertsender.Noop}}))
-	rules := NewRules(newConfig("_fixtures/include_policy_emit_alert.yml"))
+	rules := NewRules(psnap, newConfig("_fixtures/include_policy_emit_alert.yml"))
 	require.NoError(t, rules.Compile())
 
 	kevt := &kevent.Kevent{
@@ -769,7 +834,8 @@ func TestFilterActionEmitAlert(t *testing.T) {
 }
 
 func TestIsExpressionEvaluable(t *testing.T) {
-	rules := NewRules(newConfig("_fixtures/sequence_rule_simple.yml"))
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_simple.yml"))
 	require.NoError(t, rules.Compile())
 	log.SetLevel(log.DebugLevel)
 
@@ -816,7 +882,8 @@ func TestIsExpressionEvaluable(t *testing.T) {
 
 func TestBoundFieldsWithFunctions(t *testing.T) {
 	log.SetLevel(log.DebugLevel)
-	rules := NewRules(newConfig("_fixtures/sequence_rule_bound_fields_with_functions.yml"))
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_bound_fields_with_functions.yml"))
 	require.NoError(t, rules.Compile())
 
 	kevt1 := &kevent.Kevent{
@@ -867,8 +934,8 @@ func TestBoundFieldsWithFunctions(t *testing.T) {
 
 func BenchmarkRunRules(b *testing.B) {
 	b.ReportAllocs()
-
-	rules := NewRules(newConfig("_fixtures/default/default.yml"))
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, newConfig("_fixtures/default/default.yml"))
 	require.NoError(b, rules.Compile())
 
 	b.ResetTimer()

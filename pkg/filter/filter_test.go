@@ -20,6 +20,7 @@ package filter
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
+	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/stretchr/testify/assert"
 	"net"
 	"testing"
@@ -209,6 +210,7 @@ func TestFilterRunProcessKevent(t *testing.T) {
 		{`ps.pid = 1023`, true},
 		{`ps.sibling.pid = 1234`, true},
 		{`ps.child.pid = 1234`, true},
+		{`ps.child.uuid > 0`, true},
 		{`ps.parent.pid = 5042`, true},
 		{`ps.sibling.name = 'svchost-fake.exe'`, true},
 		{`ps.child.name = 'svchost-fake.exe'`, true},
@@ -245,8 +247,11 @@ func TestFilterRunProcessKevent(t *testing.T) {
 		{`ps.ancestor[any].pid in (2034, 343)`, true},
 	}
 
+	psnap := new(ps.SnapshotterMock)
+	psnap.On("Find", uint32(1234)).Return(ps1)
+
 	for i, tt := range tests {
-		f := New(tt.filter, cfg)
+		f := New(tt.filter, cfg, WithPSnapshotter(psnap))
 		err := f.Compile()
 		if err != nil {
 			t.Fatal(err)

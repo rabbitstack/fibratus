@@ -127,6 +127,12 @@ const (
 	PsSiblingDomain Field = "ps.sibling.domain"
 	// PsSiblingUsername represents the sibling process username field. Deprecated
 	PsSiblingUsername Field = "ps.sibling.username"
+	// PsUUID represents the unique process identifier
+	PsUUID Field = "ps.uuid"
+	// PsParentUUID represents the unique parent process identifier
+	PsParentUUID Field = "ps.parent.uuid"
+	// PsChildUUID represents the unique child process identifier
+	PsChildUUID Field = "ps.child.uuid"
 
 	// PsChildPid represents the child process identifier field
 	PsChildPid Field = "ps.child.pid"
@@ -468,6 +474,9 @@ var fields = map[Field]FieldInfo{
 	PsChildDomain:       {PsChildDomain, "created or terminated process domain", kparams.UnicodeString, []string{"ps.child.domain contains 'SERVICE'"}, nil},
 	PsSiblingUsername:   {PsSiblingUsername, "created or terminated process username", kparams.UnicodeString, []string{"ps.sibling.username contains 'system'"}, &Deprecation{Since: "1.10.0", Field: PsChildUsername}},
 	PsChildUsername:     {PsChildUsername, "created or terminated process username", kparams.UnicodeString, []string{"ps.child.username contains 'system'"}, nil},
+	PsUUID:              {PsUUID, "unique process identifier", kparams.Uint64, []string{"ps.uuid > 6000054355"}, nil},
+	PsParentUUID:        {PsParentUUID, "unique parent process identifier", kparams.Uint64, []string{"ps.parent.uuid > 6000054355"}, nil},
+	PsChildUUID:         {PsChildUUID, "unique child process identifier", kparams.Uint64, []string{"ps.child.uuid > 6000054355"}, nil},
 
 	ThreadBasePrio:        {ThreadBasePrio, "scheduler priority of the thread", kparams.Int8, []string{"thread.prio = 5"}, nil},
 	ThreadIOPrio:          {ThreadIOPrio, "I/O priority hint for scheduling I/O operations", kparams.Int8, []string{"thread.io.prio = 4"}, nil},
@@ -551,9 +560,9 @@ func Lookup(name string) Field {
 		return None
 	}
 
-	field := groups[1]
-	key := groups[2]
-	segment := groups[3]
+	field := groups[1]   // `ps.envs` is a field in ps.envs[PATH]
+	key := groups[2]     // `PATH` is a key in ps.envs[PATH]
+	segment := groups[3] // `entropy` is a segment in pe.sections[.text].entropy
 
 	switch Field(field) {
 	case PeSections:
@@ -618,16 +627,8 @@ func Lookup(name string) Field {
 		case ProcessSessionID:
 			return Field(name)
 		}
-	case PeResources:
-		if segment == "" {
-			return Field(name)
-		}
-	case PsEnvs:
-		if segment == "" {
-			return Field(name)
-		}
-	case KevtArg:
-		if key != "" {
+	case PeResources, PsEnvs, KevtArg:
+		if key != "" && segment == "" {
 			return Field(name)
 		}
 	}
