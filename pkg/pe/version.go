@@ -99,22 +99,43 @@ func (v *VsVersionInfo) Parse(e peparser.ResourceDirectoryEntry, pe *peparser.Fi
 // VsFixedFileInfo contains version information for a file.
 // This information is language and code page independent.
 type VsFixedFileInfo struct {
-	// Signature Contains the value 0xFEEF04BD. This is used
+	// Signature contains the value 0xFEEF04BD. This is used
 	// with the `key` member of the VS_VERSIONINFO structure
 	// when searching a file for the VS_FIXEDFILEINFO structure.
-	Signature        uint32
-	StructVer        uint32
-	FileVersionMS    uint32
-	FileVersionLS    uint32
+	Signature uint32
+	// StructVer is the binary version number of this structure.
+	// The high-order word of this member contains the major version
+	// number, and the low-order word contains the minor version number.
+	StructVer uint32
+	// FileVersionMS denotes the most significant 32 bits of the file's
+	// binary version number.
+	FileVersionMS uint32
+	// FileVersionLS denotes the least significant 32 bits of the file's
+	// binary version number.
+	FileVersionLS uint32
+	// ProductVersionMS represents the most significant 32 bits of the
+	// binary version number of the product with which this file was distributed.
 	ProductVersionMS uint32
+	// ProductVersionLS represents the most significant 32 bits of the
+	// binary version number of the product with which this file was distributed.
 	ProductVersionLS uint32
-	FileFlagMask     uint32
-	FileFlags        uint32
-	FileOS           uint32
-	FileType         uint32
-	FileSubtype      uint32
-	FileDateMS       uint32
-	FileDateLS       uint32
+	// FileFlagMask contains a bitmask that specifies the valid bits in FileFlags.
+	// A bit is valid only if it was defined when the file was created.
+	FileFlagMask uint32
+	// FileFlags contains a bitmask that specifies the Boolean attributes of the file.
+	// For example, the file contains debugging information or is compiled with debugging
+	// features enabled if FileFlags is equal to 0x00000001L (VS_FF_DEBUG).
+	FileFlags uint32
+	// FileOS represents the operating system for which this file was designed.
+	FileOS uint32
+	// FileType describes the general type of file.
+	FileType uint32
+	// FileSubtype specifies the function of the file. The possible values depend on the value of FileType.
+	FileSubtype uint32
+	// FileDateMS are the most significant 32 bits of the file's 64-bit binary creation date and time stamp.
+	FileDateMS uint32
+	// FileDateLS are the least significant 32 bits of the file's 64-bit binary creation date and time stamp.
+	FileDateLS uint32
 }
 
 // Size returns the size of this structure in bytes.
@@ -271,8 +292,11 @@ func (s *String) Parse(rva uint32, e peparser.ResourceDirectoryEntry, pe *pepars
 	return key, value, nil
 }
 
-// ParseVersionResources parser file version strings from the version resource
-// directory.
+// ParseVersionResources parses file version strings from the version resource
+// directory. This directory contains several structures starting with VS_VERSION_INFO
+// with references to children StringFileInfo structures. In addition, StringFileInfo
+// contains the StringTable structure with String entries describing the name and value
+// of each file version strings.
 func ParseVersionResources(pe *peparser.File) (map[string]string, error) {
 	vers := make(map[string]string)
 	for _, e := range pe.Resources.Entries {

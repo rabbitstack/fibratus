@@ -29,13 +29,12 @@ import (
 // This code is inspired by libpeconv library:
 // https://github.com/hasherezade/libpeconv
 type Region struct {
-	base    uintptr // base address of the region of pages
-	size    uintptr // size of the region in bytes beginning at the base address
-	typ     uint32  // type of pages in the region
-	state   uint32  // state of the pages in the region
-	protect uint32  // access protection of the pages in the region
-
-	process windows.Handle
+	base    uintptr        // base address of the region of pages
+	size    uintptr        // size of the region in bytes beginning at the base address
+	typ     uint32         // type of pages in the region
+	state   uint32         // state of the pages in the region
+	protect uint32         // access protection of the pages in the region
+	process windows.Handle // process handle for which the region is read
 }
 
 // ReadArea reads a full memory area within a given process, starting at the base

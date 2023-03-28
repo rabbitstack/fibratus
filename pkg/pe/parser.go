@@ -43,8 +43,9 @@ var (
 	// ErrEmptyVArea represents the error which is returned if the VA area couldn't be read
 	ErrEmptyVArea = errors.New("va memory area is empty")
 
-	// peSkippedImages counts the number of images skipped by the parser
-	peSkippedImages = expvar.NewInt("pe.skipped.images")
+	skippedImages               = expvar.NewInt("pe.skipped.images")
+	directoryParseErrors        = expvar.NewInt("pe.directory.parse.errors")
+	versionResourcesParseErrors = expvar.NewInt("pe.version.resources.parse.errors")
 )
 
 type opts struct {
@@ -59,7 +60,7 @@ type opts struct {
 func (o opts) isImageExcluded(path string) bool {
 	for _, img := range o.excludedImages {
 		if strings.EqualFold(img, filepath.Base(path)) {
-			peSkippedImages.Add(1)
+			skippedImages.Add(1)
 			return true
 		}
 	}
@@ -69,46 +70,57 @@ func (o opts) isImageExcluded(path string) bool {
 // Option represents the option type for the PE parser.
 type Option func(o *opts)
 
+// WithExcludedImages provides a list of image paths for
+// which the parsing is skipped.
 func WithExcludedImages(images []string) Option {
 	return func(o *opts) {
 		o.excludedImages = images
 	}
 }
 
+// WithSymbols indicates import directory is parsed for imported symbols.
 func WithSymbols() Option {
 	return func(o *opts) {
 		o.parseSymbols = true
 	}
 }
 
+// WithSections indicates section header is parsed.
 func WithSections() Option {
 	return func(o *opts) {
 		o.parseSections = true
 	}
 }
 
+// WithSectionEntropy indicates if entropy is calculated for available sections.
 func WithSectionEntropy() Option {
 	return func(o *opts) {
 		o.sectionEntropy = true
 	}
 }
 
+// WithSectionMD5 indicates if MD5 hash is calculated for available sections.
 func WithSectionMD5() Option {
 	return func(o *opts) {
 		o.sectionMD5 = true
 	}
 }
 
+// WithVersionResources indicates if version resources are parsed from the resource directory.
 func WithVersionResources() Option {
 	return func(o *opts) {
 		o.parseResources = true
 	}
 }
 
+// ParseFile parses the PE given the file system path and parser options.
 func ParseFile(path string, opts ...Option) (*PE, error) {
 	return parse(path, nil, opts...)
 }
 
+// ParseFileWithConfig parses the PE given the file system path and the config
+// which is usually read from the YAML file. Config flags are converted to parser
+// options.
 func ParseFileWithConfig(path string, config Config) (*PE, error) {
 	if !config.Enabled {
 		return nil, nil
@@ -129,12 +141,15 @@ func ParseFileWithConfig(path string, config Config) (*PE, error) {
 	return ParseFile(path, opts...)
 }
 
+// ParseBytes tries to parse the PE from the given byte slice and parser options.
 func ParseBytes(data []byte, opts ...Option) (*PE, error) {
 	return parse("", data, opts...)
 }
 
-// ParseMem parses the in-memory representation of the PE header for the
-// specified process and base address.
+// ParseMem parses the in-memory layout of the PE header for the
+// specified process and base address. If change protection parameter
+// is set to true, this method will attempt to change region protection
+// if the region is marked as inaccessible.
 func ParseMem(pid uint32, base uintptr, changeProtection bool, opts ...Option) (*PE, error) {
 	access := windows.PROCESS_VM_READ | windows.PROCESS_QUERY_INFORMATION
 	if changeProtection {
@@ -249,8 +264,9 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 	}
 
 	// parse data directories
-	if opts.parseSymbols || opts.parseResources {
-		_ = pe.ParseDataDirectories()
+	err = pe.ParseDataDirectories()
+	if err != nil {
+		directoryParseErrors.Add(1)
 	}
 
 	// add imported symbols
@@ -265,6 +281,9 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 	if opts.parseResources {
 		// parse version resources
 		p.VersionResources, err = ParseVersionResources(pe)
+		if err != nil {
+			versionResourcesParseErrors.Add(1)
+		}
 	}
 
 	return p, nil
