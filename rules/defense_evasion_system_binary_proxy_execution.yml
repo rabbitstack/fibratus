@@ -17,20 +17,26 @@
     subtechnique.ref: https://attack.mitre.org/techniques/T1218/011/
   rules:
     - name: System Binary Proxy Execution via Rundll32
+      description: |
+        Detects the execution of rundll32.exe process with suspicious command line
+        followed by the creation of a child process which would probably unleash
+        nefarious actions in the system.
       condition: >
         sequence
         maxspan 1m
           |spawn_process
               and
-           ps.sibling.name ~= 'rundll32.exe'
+           ps.child.name ~= 'rundll32.exe'
               and
-           ps.sibling.comm imatches
+           ps.child.cmdline imatches
               (
                 '*javascript:*',
+                '*vbscript:*',
                 '*shell32.dll*ShellExec_RunDLL*',
-                '*-sta*'
+                '*-sta*',
+                '*RunHTMLApplication*',
               )
-          | by ps.sibling.pid
+          | by ps.child.pid
           |spawn_process| by ps.pid
       action: >
         {{
@@ -55,21 +61,21 @@
   rules:
     - name: Regsvr32 scriptlet execution
       description: |
-        Identifies the exection of a scriptlet file by regsvr32.exe process. Regsvr32
+        Identifies the execution of a scriptlet file by regsvr32.exe process. Regsvr32
         is usually abused by adversaries to execute malicious payloads without triggering
         AV product alerts.
       condition: >
         spawn_process
             and
-        ps.sibling.name ~= 'regsvr32.exe'
+        ps.child.name ~= 'regsvr32.exe'
             and
         (
-          ps.sibling.comm imatches
+          ps.child.cmdline imatches
           (
             '*scrobj*'
           )
             and
-          ps.sibling.comm imatches
+          ps.child.cmdline imatches
           (
             '*/i:*',
             '*-i:*',

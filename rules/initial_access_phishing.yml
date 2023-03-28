@@ -28,7 +28,7 @@
           |spawn_process
               and
            ps.name iin msoffice_binaries
-          | by ps.sibling.exe
+          | by ps.child.exe
       action: >
         {{
             emit . "File execution via Microsoft Office process" ""
