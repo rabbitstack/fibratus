@@ -19,7 +19,6 @@
 package va
 
 import (
-	"errors"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
 	"os"
@@ -42,16 +41,18 @@ func TestReadRegion(t *testing.T) {
 	require.Equal(t, 'Z', rune(b[1]))
 
 	var oldProtect uint32
-	windows.VirtualProtectEx(windows.CurrentProcess(), addr, uintptr(rgn.Size(addr)), windows.PAGE_NOACCESS, &oldProtect)
+	_ = windows.VirtualProtectEx(windows.CurrentProcess(), addr, uintptr(rgn.Size(addr)), windows.PAGE_NOACCESS, &oldProtect)
 
 	size, b = rgn.Read(addr, uint(os.Getpagesize()), 0x100, false)
 	// shouldn't be able to read the region
 	require.True(t, size == 0)
 	require.Len(t, b, 0)
-	windows.VirtualProtectEx(windows.CurrentProcess(), addr, uintptr(rgn.Size(addr)), oldProtect, &oldProtect)
+	_ = windows.VirtualProtectEx(windows.CurrentProcess(), addr, uintptr(rgn.Size(addr)), oldProtect, &oldProtect)
 
-	windows.VirtualProtectEx(windows.CurrentProcess(), addr, 4096, windows.PAGE_NOACCESS, &oldProtect)
-	defer windows.VirtualProtectEx(windows.CurrentProcess(), addr, 4096, oldProtect, &oldProtect)
+	_ = windows.VirtualProtectEx(windows.CurrentProcess(), addr, 4096, windows.PAGE_NOACCESS, &oldProtect)
+	defer func() {
+		_ = windows.VirtualProtectEx(windows.CurrentProcess(), addr, 4096, oldProtect, &oldProtect)
+	}()
 
 	noAccessRgn, err := NewRegion(windows.CurrentProcess(), addr)
 	require.NoError(t, err)
@@ -73,9 +74,11 @@ func TestReadArea(t *testing.T) {
 	// allocate region with no access protection
 	base, err := windows.VirtualAlloc(0, 1024, windows.MEM_COMMIT|windows.MEM_RESERVE, windows.PAGE_NOACCESS)
 	require.NoError(t, err)
-	defer windows.VirtualFree(base, 1024, windows.MEM_RELEASE)
+	defer func() {
+		_ = windows.VirtualFree(base, 1024, windows.MEM_RELEASE)
+	}()
 	var oldProtect uint32
-	windows.VirtualProtectEx(windows.CurrentProcess(), base, 16, windows.PAGE_NOACCESS, &oldProtect)
+	_ = windows.VirtualProtectEx(windows.CurrentProcess(), base, 16, windows.PAGE_NOACCESS, &oldProtect)
 
 	// it should read all bytes set to zero
 	zeroArea := ReadArea(windows.CurrentProcess(), base, 4096, 0x100, false)
@@ -93,12 +96,10 @@ func getModuleBaseAddress(pid uint32) (uintptr, error) {
 	if err := windows.EnumProcessModules(proc, &moduleHandles[0], 1024, &cbNeeded); err != nil {
 		return 0, err
 	}
-	for _, moduleHandle := range moduleHandles[:uintptr(cbNeeded)/unsafe.Sizeof(moduleHandles[0])] {
-		var moduleInfo windows.ModuleInfo
-		if err := windows.GetModuleInformation(proc, moduleHandle, &moduleInfo, uint32(unsafe.Sizeof(moduleInfo))); err != nil {
-			return 0, err
-		}
-		return moduleInfo.BaseOfDll, nil
+	moduleHandle := moduleHandles[0]
+	var moduleInfo windows.ModuleInfo
+	if err := windows.GetModuleInformation(proc, moduleHandle, &moduleInfo, uint32(unsafe.Sizeof(moduleInfo))); err != nil {
+		return 0, err
 	}
-	return 0, errors.New("no modules found")
+	return moduleInfo.BaseOfDll, nil
 }

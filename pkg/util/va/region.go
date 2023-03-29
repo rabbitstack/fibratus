@@ -177,21 +177,18 @@ func (r Region) Read(addr uintptr, bufSize, minSize uint, forceAccess bool) (uin
 func (r Region) read(addr uintptr, bufSize, minSize uint) (uint, []byte, error) {
 	size := uintptr(0)
 	b := make([]byte, bufSize)
-	for bufSize > 0 {
-		err := windows.ReadProcessMemory(r.process, addr, &b[0], uintptr(bufSize), &size)
-		if err == nil {
-			// the entire memory chunk was read
-			return uint(size), b, nil
-		}
-		if size == 0 && err != windows.ERROR_PARTIAL_COPY {
-			// no data was read
-			return 0, nil, err
-		}
-		if err == windows.ERROR_PARTIAL_COPY {
-			// data partially read. Get readable size
-			size = uintptr(r.seek(addr, b, bufSize, minSize))
-		}
-		break
+	err := windows.ReadProcessMemory(r.process, addr, &b[0], uintptr(bufSize), &size)
+	if err == nil {
+		// the entire memory chunk was read
+		return uint(size), b, nil
+	}
+	if size == 0 && err != windows.ERROR_PARTIAL_COPY {
+		// no data was read
+		return 0, nil, err
+	}
+	if err == windows.ERROR_PARTIAL_COPY {
+		// data partially read. Get readable size
+		size = uintptr(r.seek(addr, b, bufSize, minSize))
 	}
 	if size > 0 {
 		// have minimal readable size

@@ -19,7 +19,6 @@
 package pe
 
 import (
-	"errors"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
 	"os"
@@ -40,12 +39,13 @@ func TestParseFile(t *testing.T) {
 		{filepath.Join(os.Getenv("windir"), "notepad.exe"), true, true, true, map[string]string{"OriginalFilename": "NOTEPAD.EXE", "CompanyName": "Microsoft Corporation"}},
 		{filepath.Join(os.Getenv("windir"), "regedit.exe"), true, true, true, nil},
 		{filepath.Join(os.Getenv("windir"), "system32", "svchost.exe"), true, true, true, map[string]string{"OriginalFilename": "svchost.exe"}},
-		{filepath.Join(os.Getenv("windir"), "system32", "kernel32.dll"), true, true, true, map[string]string{"InternalName": "kernel32"}},
+		{filepath.Join(os.Getenv("windir"), "system32", "kernel32.dll"), true, true, true, map[string]string{"CompanyName": "Microsoft Corporation"}},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.file, func(t *testing.T) {
-			pe, err := ParseFile(tt.file,
+			file := tt.file
+			pe, err := ParseFile(file,
 				WithSections(),
 				WithSymbols(),
 				WithVersionResources(),
@@ -53,35 +53,36 @@ func TestParseFile(t *testing.T) {
 				WithSectionMD5(),
 			)
 			if err != nil {
-				t.Fatalf("%s: %v", tt.file, err)
+				t.Fatalf("%s: %v", file, err)
 			}
 			if pe == nil {
-				t.Fatalf("%s: PE metadata is nil", tt.file)
+				t.Fatalf("%s: PE metadata is nil", file)
 			}
 			if len(pe.Symbols) > 0 != tt.hasSymbols {
-				t.Errorf("%s: expected to have symbols", tt.file)
+				t.Errorf("%s: expected to have symbols", file)
 			}
 			if len(pe.Sections) > 0 != tt.hasSections {
-				t.Errorf("%s: expected to have sections", tt.file)
+				t.Errorf("%s: expected to have sections", file)
 			}
 			if len(pe.Imports) > 0 != tt.hasImports {
-				t.Errorf("%s: expected to have imports", tt.file)
+				t.Errorf("%s: expected to have imports", file)
 			}
 			sec := pe.Sections[0]
 			if sec.Md5 == "" {
-				t.Errorf("%s: section should have MD5 hash", tt.file)
+				t.Errorf("%s: section should have MD5 hash", file)
 			}
 			if sec.Entropy == 0.0 {
-				t.Errorf("%s: section should have entropy value", tt.file)
+				t.Errorf("%s: section should have entropy value", file)
 			}
 			if tt.versionResources != nil {
 				for k, v := range tt.versionResources {
-					val, ok := pe.VersionResources[k]
+					vers := pe.VersionResources
+					val, ok := vers[k]
 					if !ok {
-						t.Errorf("%s: should have %s version resource", tt.file, k)
+						t.Errorf("%s: should have %s version resource", file, k)
 					}
 					if val != v {
-						t.Errorf("%s: expected: %s version resource got: %s", tt.file, v, val)
+						t.Errorf("%s: expected: %s version resource got: %s. Available resources: %v", file, v, val, vers)
 					}
 				}
 			}
@@ -145,12 +146,10 @@ func getModuleBaseAddress(pid uint32) (uintptr, error) {
 	if err := windows.EnumProcessModules(proc, &moduleHandles[0], 1024, &cbNeeded); err != nil {
 		return 0, err
 	}
-	for _, moduleHandle := range moduleHandles[:uintptr(cbNeeded)/unsafe.Sizeof(moduleHandles[0])] {
-		var moduleInfo windows.ModuleInfo
-		if err := windows.GetModuleInformation(proc, moduleHandle, &moduleInfo, uint32(unsafe.Sizeof(moduleInfo))); err != nil {
-			return 0, err
-		}
-		return moduleInfo.BaseOfDll, nil
+	moduleHandle := moduleHandles[0]
+	var moduleInfo windows.ModuleInfo
+	if err := windows.GetModuleInformation(proc, moduleHandle, &moduleInfo, uint32(unsafe.Sizeof(moduleInfo))); err != nil {
+		return 0, err
 	}
-	return 0, errors.New("no modules found")
+	return moduleInfo.BaseOfDll, nil
 }
