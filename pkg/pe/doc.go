@@ -17,5 +17,5 @@
  */
 
 // Package pe contains different facilities for dealing with Portable Executable specifics and digging out valuable insights
-// from it.
+// from PE.
 package pe

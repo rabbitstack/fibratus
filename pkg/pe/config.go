@@ -24,8 +24,6 @@ package pe
 import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"path/filepath"
-	"strings"
 )
 
 const (
@@ -61,14 +59,4 @@ func AddFlags(flags *pflag.FlagSet) {
 	flags.Bool(readSymbols, false, "Indicates if symbols are read from the PE")
 	flags.Bool(readSections, false, "Indicates if full section inspection is allowed")
 	flags.StringSlice(excludedImages, []string{}, "Contains a list of comma-separated images names that are excluded from PE parsing")
-}
-
-// ShouldSkipProcess determines whether the specified filename name is ignored by PE reader.
-func (c Config) shouldSkipImage(filename string) bool {
-	for _, img := range c.ExcludedImages {
-		if strings.EqualFold(img, filepath.Base(filename)) {
-			return true
-		}
-	}
-	return false
 }
