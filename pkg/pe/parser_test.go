@@ -42,10 +42,10 @@ func TestParseFile(t *testing.T) {
 		{filepath.Join(os.Getenv("windir"), "system32", "kernel32.dll"), true, true, true, map[string]string{"CompanyName": "Microsoft Corporation"}},
 	}
 
-	for _, tt := range tests {
+	for _, n := range tests {
+		tt := n
 		t.Run(tt.file, func(t *testing.T) {
-			file := tt.file
-			pe, err := ParseFile(file,
+			pe, err := ParseFile(tt.file,
 				WithSections(),
 				WithSymbols(),
 				WithVersionResources(),
@@ -53,36 +53,36 @@ func TestParseFile(t *testing.T) {
 				WithSectionMD5(),
 			)
 			if err != nil {
-				t.Fatalf("%s: %v", file, err)
+				t.Fatalf("%s: %v", tt.file, err)
 			}
 			if pe == nil {
-				t.Fatalf("%s: PE metadata is nil", file)
+				t.Fatalf("%s: PE metadata is nil", tt.file)
 			}
 			if len(pe.Symbols) > 0 != tt.hasSymbols {
-				t.Errorf("%s: expected to have symbols", file)
+				t.Errorf("%s: expected to have symbols", tt.file)
 			}
 			if len(pe.Sections) > 0 != tt.hasSections {
-				t.Errorf("%s: expected to have sections", file)
+				t.Errorf("%s: expected to have sections", tt.file)
 			}
 			if len(pe.Imports) > 0 != tt.hasImports {
-				t.Errorf("%s: expected to have imports", file)
+				t.Errorf("%s: expected to have imports", tt.file)
 			}
 			sec := pe.Sections[0]
 			if sec.Md5 == "" {
-				t.Errorf("%s: section should have MD5 hash", file)
+				t.Errorf("%s: section should have MD5 hash", tt.file)
 			}
 			if sec.Entropy == 0.0 {
-				t.Errorf("%s: section should have entropy value", file)
+				t.Errorf("%s: section should have entropy value", tt.file)
 			}
 			if tt.versionResources != nil {
 				for k, v := range tt.versionResources {
 					vers := pe.VersionResources
 					val, ok := vers[k]
 					if !ok {
-						t.Errorf("%s: should have %s version resource", file, k)
+						t.Errorf("%s: should have %s version resource", tt.file, k)
 					}
 					if val != v {
-						t.Errorf("%s: expected: %s version resource got: %s. Available resources: %v", file, v, val, vers)
+						t.Errorf("%s: expected: %s version resource got: %s. Available resources: %v", tt.file, v, val, vers)
 					}
 				}
 			}
