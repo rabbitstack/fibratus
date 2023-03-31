@@ -201,7 +201,7 @@ To illustrate the use of templates, let's assume the rules we deploy should only
 Actions are responses executed as a consequence of rule matches. Actions provide alerting and prevention capabilities aim at stopping the adversary at the initial stages of the attack. The action must be a valid Go template block. Unlike templates, which are evaluated at rule load time, action blocks are evaluated when the rule fires. All action blocks have access to the root context consisting of the following fields:
 
 - `.Kevt` accesses the underlying event that triggered the rule. Refer to this [link](https://github.com/rabbitstack/fibratus/blob/83cd37820b208846809f82b19e857bff6f4eb415/pkg/kevent/kevent.go#L55) to inspect all possible subfields. 
-For sequences, which are explained in the [Advanced patterns](filters/rules?id=advanced-patterns) section, a list of all matched events is given instead. Thus, accessing a matching event for the specific group is accomplished with the `.Kevts.k{sequence-slot}` expression. For example, to access the process name of the event in that matched the expression in the first sequence slot, you would use `.Kevts.k1.PS.Name`. However, fields interpolation, which is explained next, allows accessing event attributes more succinctly.
+For sequences, which are explained in the [Advanced patterns](filters/rules?id=advanced-patterns) section, a list of all matched events is given instead. Thus, accessing a matching event for the specific group is accomplished with the `.Kevts.k{sequence-slot}` expression. For example, to access the process name of the event that matched the expression in the first sequence slot, you would use `.Kevts.k1.PS.Name`. Fields interpolation, which is explained in the next section, allows a more convenient and succinct way to access event fields.
 - `.Filter` provides access to filter attributes. The following subfields are available:
     - `.Filter.Name` gets the filter/rule name
     - `.Filter.Condition` gets the filter expression
@@ -289,7 +289,7 @@ Adversaries often employ sophisticated techniques which may be daunting to detec
 
 #### Sequences
 
-In a nutshell, sequences permit state tracking of an ordered series of events over a short period of time. Let's peer into the structure of sequence-powered rules. Sequence rules start with the `sequence` keyword as you can observe in the `LSASS memory dumping via legitimate or offensive tools` rule's condition. Sequence consists of two or more expressions enclosed within the vertical bars or pipes. For the sequence to match, all expressions need to match successively in time.
+In a nutshell, sequences permit state tracking of an ordered series of events over a short period of time. Let's peer into the structure of sequence-powered rules. Sequence rules start with the `sequence` keyword as you can observe in the `LSASS memory dumping via legitimate or offensive tools` rule's condition. Sequence consists of two or more expressions surrounded by vertical bars or pipes. For the sequence to match, all expressions need to match successively in time.
 
 ```yaml
 - group: LSASS memory
@@ -350,8 +350,8 @@ maxspan 1h
   | by ps.child.exe
 ```
 
-As we can observe, the `by` statement is anchored to each expression but using a different joining field. This rule would only match if the file being written is equal to the spawned process executable image.
-Of course, it is possible to omit both `maxspan` and `by` statements. However, such rules are rarely useful to express behaviors that require relationships between events and not a mere temporally connection.
+As we can observe, the `by` statement is anchored to each expression but using a different join field. This rule would only match if the file being written is equal to the spawned process executable image.
+Of course, it is possible to omit both `maxspan` and `by` statements. However, such rules are rarely used to express behaviors that require relationships between events, instead, a mere temporally connection.
 
 #### Aliases
 
@@ -372,4 +372,4 @@ maxspan 5m
   |
 ```
 
-The first expression in the sequence detects the creation of a DLL file in the system directory. Once this expression evaluates to true, the event that triggered it is accessible via the `e1` alias. The second expression will detect registry modifications on the specified value, and if eligible, it will use the `get_reg_value` function to query the value, which, in this case contains the `MULTI_SZ` content. The retrieved list of strings is compared against the filename from the event matching the first expression. The `$e1.file.name` bound field is responsible for consulting the filename field value from the referenced expression's matching event.
+The first expression in the sequence detects the creation of a DLL file in the system directory. Once this expression evaluates to true, the event that triggered it is accessible via the `e1` alias. The second expression will detect registry modifications on the specified value, and if eligible, it will use the `get_reg_value` function to query the value, which, in this case,contains the `MULTI_SZ` content. The retrieved list of strings is compared against the filename from the event matching the first expression. The `$e1.file.name` bound field is responsible for consulting the filename field value from the referenced expression's matching event.

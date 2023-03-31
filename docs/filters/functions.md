@@ -285,10 +285,10 @@ Additionally, some functions may return a collection of values. Function names a
     Assuming `ps.name` contains `powershell.exe`.
 
     ```
-    regex(ps.name, 'power.*(shell|hell).dll', '.*hell.exe')
+    regex(ps.name, 'power.*(shell|hell).dll', '.*hell.exe') = true
     ```
 
-### Path functions
+### File functions
 
 #### base
 
@@ -450,17 +450,17 @@ Additionally, some functions may return a collection of values. Function names a
 
 - **Specification**
     ```
-    get_reg_value(path: <string>) :: string
+    get_reg_value(key: <string>) :: <string|[]string|int>
     ```
-    - `path`: The string representing file system path
-    - `return` leading volume name
+    - `key`: Is the fully-qualified registry key path including the value name. The root key can be expressed in abbreviated notation, e.g. instead of `HKEY_LOCAL_MACHINE` you can write `HKLM`.
+    - `return` depending on the registry value type, it can return a string, array of strings or an integer value.
 
 - **Examples**
 
-    Assuming `file.name` contains the `C:\\Windows\\symlink.txt` path.
+    Assuming the `HKEY_CURRENT_USER\Volatile Environment\Envs` registry value contains a multi-size string with `dev\0staging` values.
 
     ```
-    get_reg_value(file.name) = 'C:'
+    get_reg_value('HKCU\Volatile Environment\Envs') in ('dev', 'staging')
     ```
 
 
@@ -474,15 +474,20 @@ or binary patterns. Depending on the parameter type supplied to this function, t
     ```
     yara(target: <int|string|[]byte>, rules: <string>) :: bool
     ```
-    - `target`: The string representing file system path
-    - `rules`:
-    - `return` leading volume name
+    - `target`: If this parameter is an integer value, it's assumed to be a pid for which the memory area is scanned. If it is a string, the scan is performed on the process image executable or arbitrary file system file. Otherwise, it is a stream of bytes that represents a memory block to be scanned.
+    - `rules`: a string containing YARA rules
+    - `return` if any rule defined in the `rules` parameter matches, the function returns `true`. Otherwise, it returns `false`.
 
 - **Examples**
 
-    Assuming `file.name` contains the `C:\\Windows\\symlink.txt` path.
+    Assuming `file.name` contains `C:\\Windows\\notepad.exe`. 
 
     ```
-    get_reg_value(file.name) = 'C:'
+    yara(file.name, 'rule Notepad : notepad
+{
+	strings:
+		$c0 = "Notepad" fullword ascii
+	condition:
+		$c0
+}') = true
     ```
-

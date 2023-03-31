@@ -85,9 +85,9 @@ The following tables summarize available field names that can be used in filter 
 | ps.child.sessionid   | Child process session identifier  | `ps.child.sessionid = 1`   |
 | ps.child.domain    | Child process domain name  | `ps.child.domain = 'NT AUTHORITY'`   |
 | ps.child.username  | Child process user name  | `ps.child.username = 'SYSTEM'`   |
-| ps.uuid  | Child process user name  | `ps.child.username = 'SYSTEM'`   |
-| ps.parent.uuid  | Child process user name  | `ps.child.username = 'SYSTEM'`   |
-| ps.child.uuid  | Child process user name  | `ps.child.username = 'SYSTEM'`   |
+| ps.uuid  | Unique process identifier resistant to repetition | `ps.uuid > 10000400`   |
+| ps.parent.uuid  | Unique parent process identifier resistant to repetition  | `ps.parent.uuid = 1843450000440`   |
+| ps.child.uuid  | Unique child process identifier resistant to repetition  | `ps.child.uuid > 20030000000`   |
 
 
 ### Thread
