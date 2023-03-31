@@ -20,11 +20,15 @@ package functions
 
 import (
 	"fmt"
-	"math"
+	"github.com/rabbitstack/fibratus/pkg/util/entropy"
+	"strings"
 )
 
 const (
-	shannonAlgo = "shannon"
+	// Shannon computes the string entropy by employing
+	// the Shannon algorithm.
+	// https://en.wikipedia.org/wiki/Entropy_(information_theory)
+	Shannon = "shannon"
 )
 
 // Entropy measures the string entropy
@@ -36,12 +40,12 @@ func (f Entropy) Call(args []interface{}) (interface{}, bool) {
 	}
 	s := parseString(0, args)
 	if len(args) == 1 {
-		return shannon(s), true
+		return entropy.Shannon(s), true
 	}
 	algo := parseString(1, args)
 	switch algo {
-	case shannonAlgo:
-		return shannon(s), true
+	case Shannon:
+		return entropy.Shannon(s), true
 	default:
 		return false, false
 	}
@@ -58,8 +62,9 @@ func (f Entropy) Desc() FunctionDesc {
 			if len(args) == 1 {
 				return nil
 			}
-			if len(args) > 1 && args[1] != shannonAlgo {
-				return fmt.Errorf("unsupported entropy algorithm: %s. Availiable algorithms: shannon", args[1])
+			if len(args) > 1 && args[1] != Shannon {
+				return fmt.Errorf("unsupported entropy algorithm: %s. Availiable algorithms: %s", args[1],
+					strings.Join([]string{Shannon}, "|"))
 			}
 			return nil
 		},
@@ -68,22 +73,3 @@ func (f Entropy) Desc() FunctionDesc {
 }
 
 func (f Entropy) Name() Fn { return EntropyFn }
-
-// shannon measures the Shannon entropy of a string.
-func shannon(value string) int {
-	frq := make(map[rune]float64)
-
-	//get frequency of characters
-	for _, i := range value {
-		frq[i]++
-	}
-
-	var sum float64
-
-	for _, v := range frq {
-		f := v / float64(len(value))
-		sum += f * math.Log2(f)
-	}
-
-	return int(math.Ceil(sum*-1)) * len(value)
-}

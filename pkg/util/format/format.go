@@ -1,8 +1,5 @@
-//go:build windows
-// +build windows
-
 /*
- * Copyright 2019-2020 by Nedim Sabic Sabic
+ * Copyright 2021-2022 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -19,4 +16,9 @@
  * limitations under the License.
  */
 
-package pe
+package format
+
+import "strconv"
+
+// UintToHex converts an unsigned wide integer to hex string.
+func UintToHex(v uint64) string { return strconv.FormatUint(v, 16) }

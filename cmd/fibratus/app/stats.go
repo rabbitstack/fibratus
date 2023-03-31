@@ -96,8 +96,9 @@ type Stats struct {
 	OutputAMQPPublishErrors             int            `json:"output.amqp.publish.errors"`
 	OutputConsoleErrors                 int            `json:"output.console.errors"`
 	OutputNullBlackholeEvents           int            `json:"output.null.blackhole.events"`
-	PeFailedResourceEntryReads          int            `json:"pe.failed.resource.entry.reads"`
-	PeMaxResourceEntriesExceeded        int            `json:"pe.max.resource.entries.exceeded"`
+	PeSkippedImages                     int            `json:"pe.skipped.images"`
+	PeDirectoryParseErrors              int            `json:"pe.directory.parse.errors"`
+	PeVersionResourcesParseErrors       int            `json:"pe.version.resources.parse.errors"`
 	ProcessCount                        int            `json:"process.count"`
 	ProcessModuleCount                  int            `json:"process.module.count"`
 	ProcessLookupFailureCount           map[int]int    `json:"process.lookup.failure.count"`
