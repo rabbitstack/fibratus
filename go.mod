@@ -18,12 +18,12 @@ require (
 	github.com/qmuntal/stateless v1.6.0
 	github.com/rifflock/lfshook v0.0.0-20180920164130-b9218ef580f5
 	github.com/saferwall/pe v1.4.0
-	github.com/sirupsen/logrus v1.4.1
+	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cobra v0.0.3
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.6.2
 	github.com/streadway/amqp v1.0.0
-	github.com/stretchr/testify v1.6.1
+	github.com/stretchr/testify v1.7.0
 	github.com/valyala/bytebufferpool v1.0.0
 	github.com/valyala/gozstd v1.11.0
 	github.com/xeipuuv/gojsonschema v1.2.0
@@ -50,7 +50,6 @@ require (
 	github.com/imdario/mergo v0.3.11 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
-	github.com/konsorten/go-windows-terminal-sequences v1.0.1 // indirect
 	github.com/mailru/easyjson v0.7.6 // indirect
 	github.com/mattn/go-colorable v0.1.2 // indirect
 	github.com/mattn/go-isatty v0.0.8 // indirect
