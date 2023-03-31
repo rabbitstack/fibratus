@@ -13,31 +13,30 @@ It may look intimidating at first glance, but once you get familiar with the syn
 Filters represent the foundation of the [rule engine](/filters/rules) that provides threat detection capabilities. For example, the following stanza detects the outbound communication followed by the execution of the command shell within one-minute time window. The action invokes the [alert sender](/alerts/senders) to emit the security alert via email or Slack. 
 
 ```yaml
-- group: Remote connection followed by the command shell execution
-  policy: sequence
+- group: C&C communication channels
   rules:
-    - name: Establish remote connection
+    - name: Remote connection followed by the command shell execution
       condition: >
-        kevt.name = 'Connect'
-          and
-          not
-        cidr_contains(
-          net.dip,
-          '10.0.0.0/8',
-          '172.16.0.0/12')
-    - name: Spawn command shell
-      max-span: 1m
-      condition: >
-        kevt.name = 'CreateProcess'
-          and
-        ps.pid = $1.ps.pid
-          and
-        ps.sibling.name in ('cmd.exe', 'powershell.exe')
-  action: >
-    {{ 
-        emit
-          .
-        "Command shell spawned after remote connection"
-        "%2.ps.exe process spawned a command shell after connecting to %1.net.dip"
-    }}
+        sequence
+        maxspan 1m
+        by ps.uuid
+          |kevt.name = 'Connect'
+              and
+              not
+           cidr_contains(
+              net.dip,
+            '10.0.0.0/8',
+            '172.16.0.0/12')
+          |
+          |kevt.name = 'CreateProcess'
+              and
+           ps.child.name in ('cmd.exe', 'powershell.exe') 
+          |
+      action: >
+        {{ 
+            emit
+              .
+            "Command shell spawned after remote connection"
+            "%2.ps.exe process spawned a command shell after connecting to %1.net.dip"
+        }}
 ```

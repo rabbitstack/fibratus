@@ -36,14 +36,14 @@ of spearphishing in that it employs the use of malware attached to an email.
 
 Additionally, there should exist labels attached to every rule group describing the MITRE tactic, technique, and sub-technique. This information is used when rendering email rule alert templates as depicted in the image above.
 
-### Rules should have narrowed event scope
+### Rules should have a narrowed event scope
 
 Rule groups may have multiple rules each targeting different event types. If the rule definition lacks the event type or category condition, the rule engine needs to devote extra resources to evaluate the incoming event against every single rule. To alleviate the pressure on the rule engine, all rules should
-have the event type condition. In fact, if a rule is declared without the scoped conditions, you'll get a warning message in `Fibratus` logs informing you about unwanted side effects. In the case of `include` or `exclude` rule policies, **this may lead to the rule being utterly discarded by the engine!**
+have the event type condition. In fact, if a rule is declared without the scoped event conditions, you'll get a warning message in `Fibratus` logs informing you about unwanted side effects. In some circumstances, **this may lead to the rule being utterly discarded by the engine!**
 
-### Sequence policies with early binding index condition
+### Pay attention to the condition arrangement
 
-When writing detections that employ various event types or even multiple data sources, relationships between events are connected via [binding patterns](https://www.fibratus.io/#/filters/rules?id=stateful-event-tracking). The rule engine can lazily evaluate binary expressions comprising a rule. If the binding patterns are the first condition in downstream sequence rules, the rule engine will not keep on evaluating subsequent binary expressions in the rule and thus will benefit the overall runtime performance.
+As highlighted in the previous paragraph, all rules should have the event type condition. Additionally, condition arrangement may have important runtime performance impact because the rule engine can lazily evaluate binary expressions that comprise a rule. In general, costly evaluations or functions such as `get_reg_value` should go last to make sure they are evaluated after all other expressions have been visited.
 
 ### Prefer macros over raw conditions
 

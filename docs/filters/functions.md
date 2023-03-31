@@ -20,11 +20,10 @@ Additionally, some functions may return a collection of values. Function names a
 
 - **Examples**
 
-    Assuming the `net.sip` field contains the `192.168.1.20` IP address, the following filter
-    would match on this event.
+    Assuming `net.sip` contains the `192.168.1.20` IP address
 
     ```
-    fibratus run kevt.category = 'net' and cidr_contains(net.sip, '192.168.1.1/24', '172.17.1.1/8')
+    cidr_contains(net.sip, '192.168.1.1/24', '172.17.1.1/8') = true
     ```
 
 ### Hash functions
@@ -42,10 +41,10 @@ Additionally, some functions may return a collection of values. Function names a
 
 - **Examples**
 
-    Assuming the `registry.key.name` field contains `HKEY_LOCAL_MACHINE\SYSTEM\Setup\Pid`, the following would filter events for the matching md5 hash.
+    Assuming `registry.key.name` contains the `HKEY_LOCAL_MACHINE\SYSTEM\Setup\Pid` key.
 
     ```
-    fibratus run kevt.category = 'net' and md5(registry.key.name) = 'eab870b2a516206575d2ffa2b98d8af5'
+    md5(registry.key.name) = 'eab870b2a516206575d2ffa2b98d8af5'
     ```
 
 ### String functions
@@ -63,10 +62,10 @@ Additionally, some functions may return a collection of values. Function names a
 
 - **Examples**
 
-    Assuming the `ps.domain` field contains `NT_AUTHORITY` and `ps.username` field contains `admin`, the following would filter events for the matching concatenated string.
+    Assuming `ps.domain` field contains `NT_AUTHORITY` and `ps.username` field contains `admin`.
 
     ```
-    fibratus run concat(ps.domain, '-', ps.username) = 'NT_AUTHORITY-admin'
+    concat(ps.domain, '-', ps.username) = 'NT_AUTHORITY-admin'
     ```
 
 #### ltrim
@@ -83,10 +82,10 @@ Additionally, some functions may return a collection of values. Function names a
 
 - **Examples**
 
-    Assuming the `registry.key.name` field contains `HKEY_LOCAL_MACHINE\SYSTEM\Setup\Pid`, the following filter expression would match on all events where the resulting string is equal to `SYSTEM\Setup\Pid`
+    Assuming `registry.key.name` contains the `HKEY_LOCAL_MACHINE\SYSTEM\Setup\Pid` key.
 
     ```
-    fibratus run ltrim(registry.key.name, 'HKEY_LOCAL_MACHINE\\') = 'SYSTEM\\Setup\\Pid'
+    ltrim(registry.key.name, 'HKEY_LOCAL_MACHINE\\') = 'SYSTEM\\Setup\\Pid'
     ```
 
 #### rtrim
@@ -103,10 +102,10 @@ Additionally, some functions may return a collection of values. Function names a
 
 - **Examples**
 
-    Assuming the `registry.key.name` field contains `HKEY_LOCAL_MACHINE\SYSTEM\Setup\Pid`, the following filter expression would match on all events where the resulting string is equal to `HKEY_LOCAL_MACHINE\SYSTEM\Setup`
+    Assuming `registry.key.name` contains the `HKEY_LOCAL_MACHINE\SYSTEM\Setup\Pid` key.
 
     ```
-    fibratus run rtrim(registry.key.name, '\\Pid') = 'HKEY_LOCAL_MACHINE\\SYSTEM\\Setup'
+    rtrim(registry.key.name, '\\Pid') = 'HKEY_LOCAL_MACHINE\\SYSTEM\\Setup'
     ```
 
 #### lower
@@ -122,10 +121,10 @@ Additionally, some functions may return a collection of values. Function names a
 
 - **Examples**
 
-    Assuming the `registry.key.name` field contains `HKEY_LOCAL_MACHINE\SYSTEM\Setup`, the following filter expression would match on all events where the resulting string is equal to `hkey_local_machine\system\setup`
+    Assuming `registry.key.name` contains the `HKEY_LOCAL_MACHINE\SYSTEM\Setup\Pid` key.
 
     ```
-    fibratus run lower(registry.key.name) = 'hkey_local_machine\\system\\setup'
+    lower(registry.key.name) = 'hkey_local_machine\\system\\setup'
     ```
 
 #### upper
@@ -141,10 +140,10 @@ Additionally, some functions may return a collection of values. Function names a
 
 - **Examples**
 
-    Assuming the `registry.key.name` field contains `HKEY_LOCAL_MACHINE\SYSTEM\Setup`, the following filter expression would match on all events where the resulting string is equal to `HKEY_LOCAL_MACHINE\SYSTEM\SETUP`
+    Assuming `registry.key.name` contains the `HKEY_LOCAL_MACHINE\SYSTEM\Setup` key. 
 
     ```
-    fibratus run upper(registry.key.name) = 'HKEY_LOCAL_MACHINE\\SYSTEM\\SETUP'
+    upper(registry.key.name) = 'HKEY_LOCAL_MACHINE\\SYSTEM\\SETUP'
     ```
 
 #### replace
@@ -162,10 +161,10 @@ Additionally, some functions may return a collection of values. Function names a
 
 - **Examples**
 
-    Assuming the `registry.key.name` field contains `HKEY_LOCAL_MACHINE\SYSTEM\Setup`, the following filter expression would match on all events where the resulting string is equal to `HKLM\SYS\Setup`
+    Assuming `registry.key.name` contains the `HKEY_LOCAL_MACHINE\SYSTEM\Setup` key.
 
     ```
-    fibratus run replace(registry.key.name, 'HKEY_LOCAL_MACHINE', 'HKLM', 'SYSTEM', 'SYS') = 'HKLM\\SYS\\Setup'
+    replace(registry.key.name, 'HKEY_LOCAL_MACHINE', 'HKLM', 'SYSTEM', 'SYS') = 'HKLM\\SYS\\Setup'
     ```
 
 #### split
@@ -182,10 +181,10 @@ Additionally, some functions may return a collection of values. Function names a
 
 - **Examples**
 
-    Assuming the `file.name` field contains `C:\Windows\System32\kernel32.dll`, the following filter expression would match on all events where the `kernel32.dll` or `System32` strings are present in the resulting slice.
+    Assuming `file.name` contains the `C:\Windows\System32\kernel32.dll` path.
 
     ```
-    fibratus run split(file.name, '\\') in ('kernel32.dll', 'System32')
+    split(file.name, '\\') in ('kernel32.dll', 'System32', 'Windows')
     ```
 
 #### length
@@ -201,10 +200,10 @@ Additionally, some functions may return a collection of values. Function names a
 
 - **Examples**
 
-    Assuming the `ps.domain` field contains `"こんにちは"`, the following would filter events with 5 symbols in the process domain.
+    Assuming `ps.domain` field contains `"こんにちは"`.
 
     ```
-    fibratus run length(ps.domain) = 5
+    length(ps.domain) = 5
     ```
 
 #### indexof
@@ -222,10 +221,10 @@ Additionally, some functions may return a collection of values. Function names a
 
 - **Examples**
 
-    Assuming the `ps.domain` field contains `NT_AUTHORITY`, the following would filter events for the matching substring index.
+    Assuming `ps.domain` contains `NT_AUTHORITY`.
 
     ```
-    fibratus run indexof(ps.domain, 'NT') = 0
+    indexof(ps.domain, 'NT') = 0
     ```
 
 #### substr
@@ -243,10 +242,10 @@ Additionally, some functions may return a collection of values. Function names a
 
 - **Examples**
 
-    Assuming the `file.name` field contains `\Device\HarddiskVolume2\Windows\system32\user32.dll`, the following filter expression would match on all events where the substring is equal to `\Device`
+    Assuming `file.name` contains the `\Device\HarddiskVolume2\Windows\system32\user32.dll` path.
 
     ```
-    fibratus run substr(file.name, indexof(file.name, '\\'), indexof(file.name, '\\Hard')) = '\\Device'
+    substr(file.name, indexof(file.name, '\\'), indexof(file.name, '\\Hard')) = '\\Device'
     ```
 
 #### entropy
@@ -263,10 +262,10 @@ Additionally, some functions may return a collection of values. Function names a
 
 - **Examples**
 
-    Assuming the `file.name` field contains `\Device\HarddiskVolume2\Windows\system32\user32.dll`, the following filter expression would match on all events where file name entropy is greater than 255.
+    Assuming `file.name` contains the `\Device\HarddiskVolume2\Windows\system32\user32.dll` path.
 
     ```
-    fibratus run entropy(file.name) > 255
+    entropy(file.name) > 255
     ```
 
 #### regex
@@ -283,13 +282,148 @@ Additionally, some functions may return a collection of values. Function names a
 
 - **Examples**
 
-    Assuming the `ps.name` field contains `powershell.exe`, the following would filter events matching the regular expressions.
+    Assuming `ps.name` contains `powershell.exe`.
 
     ```
-    fibratus run regex(ps.name, 'power.*(shell|hell).dll', '.*hell.exe')
+    regex(ps.name, 'power.*(shell|hell).dll', '.*hell.exe') = true
     ```
 
-### Miscellaneous functions
+### File functions
+
+#### base
+
+`base` returns the last element of the path.
+
+- **Specification**
+    ```
+    base(path: <string|[]string>, ext: bool) :: <string|[]string>
+    ```
+    - `path`: The string or an array of strings representing file system path(s)
+    - `ext`: Determines whether the extension is retained in the file path. This parameter is optional and `true` by default
+    - `return` a string or a slice of strings with file names
+
+- **Examples**
+
+    Assuming `file.name` contains the `C:\\Windows\\cmd.exe` path.
+
+    ```
+    base(file.name) = 'cmd.exe'
+    base(file.name, false) = 'cmd'
+    ```
+
+#### dir
+
+`dir` returns all but the last element of the path, typically the path's directory.
+
+- **Specification**
+    ```
+    dir(path: <string|[]string>) :: <string|[]string>
+    ```
+    - `path`: The string or an array of strings representing file system path(s)
+    - `return` a string or a slice of strings with directory names
+
+- **Examples**
+
+    Assuming `file.name` contains the `C:\\Windows\\cmd.exe` path.
+
+    ```
+    dir(file.name) = 'C:\\Windows'
+    ```
+
+#### ext
+
+`ext` returns the file name extension used by the path.
+
+- **Specification**
+    ```
+    ext(path: <string>, dot: bool) :: <string>
+    ```
+    - `path`: The string representing file system path
+    - `dot`: Indicates if the dot symbol is retained as part of extension. This parameter is optional and `true` by default
+    - `return` file name extension used by the path
+
+- **Examples**
+
+    Assuming `file.name` contains the `C:\\Windows\\cmd.exe` path.
+
+    ```
+    ext(file.name) = '.exe'
+    ext(file.name, false) = 'exe'
+    ```
+
+#### glob
+
+`glob` returns the names of all files matching the pattern.
+
+- **Specification**
+    ```
+    glob(pattern: <string>) :: <[]string>
+    ```
+    - `pattern`: Shell file name pattern as described [here](https://pkg.go.dev/path/filepath#Match)
+    - `return` returns the names of all files matching the pattern or an empty list if there is no matching file
+
+- **Examples**
+
+    ```
+    glob('C:\\Windows\\*.exe') in ('C:\\Windows\\notepad.exe')
+    ```
+
+#### is_abs
+
+`is_abs` reports whether the path is absolute.
+
+- **Specification**
+    ```
+    is_abs(path: <string>) :: bool
+    ```
+    - `path`: The string representing file system path
+    - `return` `true` if `path` references an absolute path or `false` otherwise
+
+- **Examples**
+
+    Assuming `file.name` contains the `Windows\\cmd.exe` path.
+
+    ```
+    is_abs(file.name) = false
+    ```
+
+#### symlink
+
+`symlink` returns the path name after the evaluation of any symbolic links.
+
+- **Specification**
+    ```
+    symlink(path: <string>) :: string
+    ```
+    - `path`: The string representing file system path
+    - `return` the path name after the evaluation of any symbolic links, or the original path if any errors occur
+
+- **Examples**
+
+    Assuming `file.name` contains the `C:\\Windows\\symlink.txt` path which is a symlink to `C:\Windows\target.txt`.
+
+    ```
+    symlink('C:\\Windows\\symlink.txt') = 'C:\\Windows\\target.txt'
+    ```
+
+#### volume
+
+`volume` returns leading volume name.
+
+- **Specification**
+    ```
+    volume(path: <string>) :: string
+    ```
+    - `path`: The string representing file system path
+    - `return` leading volume name
+
+- **Examples**
+
+    Assuming `file.name` contains the `C:\\Windows\\symlink.txt` path.
+
+    ```
+    volume(file.name) = 'C:'
+    ```
 
 #### is_minidump
 
@@ -304,8 +438,56 @@ Additionally, some functions may return a collection of values. Function names a
 
 - **Examples**
 
-    Assuming the `file.name` field contains `C:\\Temp\\lsass.dmp` which is a valid `minidump` file. The function call would return a `true` value.
+    Assuming `file.name` contains the `C:\\Temp\\lsass.dmp` path with a valid `minidump` file. 
 
     ```
-    fibratus run is_minidump(file.name)
+    is_minidump(file.name) = true
+    ```
+
+### Registry functions
+
+`get_reg_value` retrieves the content of the registry value.
+
+- **Specification**
+    ```
+    get_reg_value(key: <string>) :: <string|[]string|int>
+    ```
+    - `key`: Is the fully-qualified registry key path including the value name. The root key can be expressed in abbreviated notation, e.g. instead of `HKEY_LOCAL_MACHINE` you can write `HKLM`.
+    - `return` depending on the registry value type, it can return a string, array of strings or an integer value.
+
+- **Examples**
+
+    Assuming the `HKEY_CURRENT_USER\Volatile Environment\Envs` registry value contains a multi-size string with `dev\0staging` values.
+
+    ```
+    get_reg_value('HKCU\Volatile Environment\Envs') in ('dev', 'staging')
+    ```
+
+
+### YARA functions
+
+`yara` provides signature-based detection in filters and rules. YARA is a tool aimed at (but not limited to) helping malware
+researchers to identify and classify malware samples. With YARA you can create descriptions of malware families based on textual
+or binary patterns. Depending on the parameter type supplied to this function, the scan can be performed on the process, filename or a memory block.
+
+- **Specification**
+    ```
+    yara(target: <int|string|[]byte>, rules: <string>) :: bool
+    ```
+    - `target`: If this parameter is an integer value, it's assumed to be a pid for which the memory area is scanned. If it is a string, the scan is performed on the process image executable or arbitrary file system file. Otherwise, it is a stream of bytes that represents a memory block to be scanned.
+    - `rules`: a string containing YARA rules
+    - `return` if any rule defined in the `rules` parameter matches, the function returns `true`. Otherwise, it returns `false`.
+
+- **Examples**
+
+    Assuming `file.name` contains `C:\\Windows\\notepad.exe`. 
+
+    ```
+    yara(file.name, 'rule Notepad : notepad
+{
+	strings:
+		$c0 = "Notepad" fullword ascii
+	condition:
+		$c0
+}') = true
     ```
