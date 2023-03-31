@@ -36,8 +36,8 @@
                 '*-sta*',
                 '*RunHTMLApplication*',
               )
-          | by ps.child.pid
-          |spawn_process| by ps.pid
+          | by ps.child.uuid
+          |spawn_process| by ps.uuid
       action: >
         {{
             emit . "System Binary Proxy Execution via Rundll32" ""
