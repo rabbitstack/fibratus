@@ -34,7 +34,7 @@
                 '*vbscript:*',
                 '*shell32.dll*ShellExec_RunDLL*',
                 '*-sta*',
-                '*RunHTMLApplication*',
+                '*RunHTMLApplication*'
               )
           | by ps.child.uuid
           |spawn_process| by ps.uuid
