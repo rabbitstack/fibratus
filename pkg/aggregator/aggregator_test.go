@@ -41,12 +41,11 @@ func TestNewBufferedAggregator(t *testing.T) {
 		outputs.Config{Type: outputs.Console, Output: console.Config{Format: "pretty"}},
 		nil,
 		nil,
-		func(k *kevent.Kevent) bool {
-			return true
-		},
 	)
 	require.NoError(t, err)
 	require.NotNil(t, agg)
+
+	agg.Run()
 
 	for i := 0; i < 4; i++ {
 		kevt := &kevent.Kevent{

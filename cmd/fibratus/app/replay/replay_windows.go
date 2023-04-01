@@ -20,8 +20,6 @@ package replay
 
 import (
 	"context"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-
 	"github.com/rabbitstack/fibratus/cmd/fibratus/common"
 	"github.com/rabbitstack/fibratus/pkg/aggregator"
 	"github.com/rabbitstack/fibratus/pkg/api"
@@ -121,11 +119,11 @@ func replay(cmd *cobra.Command, args []string) error {
 			cfg.Output,
 			cfg.Transformers,
 			cfg.Alertsenders,
-			func(kevt *kevent.Kevent) bool { return true },
 		)
 		if err != nil {
 			return err
 		}
+		agg.Run()
 	}
 	// start the HTTP server
 	if err := api.StartServer(cfg); err != nil {

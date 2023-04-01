@@ -99,10 +99,10 @@ func NewSnapshotterFromKcap(hsnap handle.Snapshotter, config *config.Config) Sna
 }
 
 func (s *snapshotter) WriteFromKcap(e *kevent.Kevent) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	switch e.Type {
 	case ktypes.CreateProcess, ktypes.ProcessRundown:
+		s.mu.Lock()
+		defer s.mu.Unlock()
 		proc := e.PS
 		if proc == nil {
 			return nil
@@ -122,7 +122,7 @@ func (s *snapshotter) WriteFromKcap(e *kevent.Kevent) error {
 			}
 			s.procs[pid] = proc
 		} else {
-			ps := pstypes.NewProc(
+			ps := pstypes.New(
 				pid,
 				ppid,
 				e.GetParamAsString(kparams.ProcessName),
@@ -135,41 +135,9 @@ func (s *snapshotter) WriteFromKcap(e *kevent.Kevent) error {
 		}
 		proc.Parent = s.procs[ppid]
 	case ktypes.CreateThread, ktypes.ThreadRundown:
-		pid, err := e.Kparams.GetPid()
-		if err != nil {
-			return err
-		}
-		threadCount.Add(1)
-		if ps, ok := s.procs[pid]; ok {
-			thread := pstypes.Thread{}
-			thread.Tid, _ = e.Kparams.GetTid()
-			thread.UstackBase, _ = e.Kparams.GetHex(kparams.UstackBase)
-			thread.UstackLimit, _ = e.Kparams.GetHex(kparams.UstackLimit)
-			thread.KstackBase, _ = e.Kparams.GetHex(kparams.KstackBase)
-			thread.KstackLimit, _ = e.Kparams.GetHex(kparams.KstackLimit)
-			thread.IOPrio, _ = e.Kparams.GetUint8(kparams.IOPrio)
-			thread.BasePrio, _ = e.Kparams.GetUint8(kparams.BasePrio)
-			thread.PagePrio, _ = e.Kparams.GetUint8(kparams.PagePrio)
-			thread.Entrypoint, _ = e.Kparams.GetHex(kparams.StartAddr)
-			ps.AddThread(thread)
-		}
+		return s.AddThread(e)
 	case ktypes.LoadImage, ktypes.ImageRundown:
-		pid, err := e.Kparams.GetPid()
-		if err != nil {
-			return err
-		}
-		moduleCount.Add(1)
-		ps, ok := s.procs[pid]
-		if !ok {
-			return nil
-		}
-		module := pstypes.Module{}
-		module.Size, _ = e.Kparams.GetUint32(kparams.ImageSize)
-		module.Checksum, _ = e.Kparams.GetUint32(kparams.ImageCheckSum)
-		module.Name, _ = e.Kparams.GetString(kparams.ImageFilename)
-		module.BaseAddress, _ = e.Kparams.GetHex(kparams.ImageBase)
-		module.DefaultBaseAddress, _ = e.Kparams.GetHex(kparams.ImageDefaultBase)
-		ps.AddModule(module)
+		return s.AddModule(e)
 	}
 	return nil
 }
@@ -186,18 +154,19 @@ func (s *snapshotter) Write(e *kevent.Kevent) error {
 	if err != nil {
 		return err
 	}
-	proc, err := s.initProc(pid, ppid, e)
+	proc, err := s.newProcState(pid, ppid, e)
 	s.procs[pid] = proc
-	proc.Parent = s.procs[ppid]
-	// adjust the process which is generating the event. For
-	// `CreateProcess` events the process context is scoped
-	// to the parent/creator process. Otherwise, it is a regular
-	// rundown event that doesn't require consulting the
-	// process in the snapshot state
-	if e.IsCreateProcess() {
-		e.PS = s.procs[e.PID]
-	} else {
+	// adjust the process which is generating
+	// the event. For `CreateProcess` events
+	// the process context is scoped to the
+	// parent/creator process. Otherwise, it
+	// is a regular rundown event that doesn't
+	// require consulting the process in the
+	// snapshot state
+	if e.IsProcessRundown() {
 		e.PS = proc
+	} else {
+		e.PS = s.procs[e.PID]
 	}
 	if err != nil {
 		return err
@@ -282,8 +251,8 @@ func (s *snapshotter) Close() error {
 	return nil
 }
 
-func (s *snapshotter) initProc(pid, ppid uint32, e *kevent.Kevent) (*pstypes.PS, error) {
-	proc := pstypes.NewProc(
+func (s *snapshotter) newProcState(pid, ppid uint32, e *kevent.Kevent) (*pstypes.PS, error) {
+	proc := pstypes.New(
 		pid,
 		ppid,
 		e.GetParamAsString(kparams.ProcessName),
@@ -292,6 +261,7 @@ func (s *snapshotter) initProc(pid, ppid uint32, e *kevent.Kevent) (*pstypes.PS,
 		e.GetParamAsString(kparams.UserSID),
 		uint8(e.Kparams.MustGetUint32(kparams.SessionID)),
 	)
+	proc.Parent = s.procs[ppid]
 	// retrieve Portable Executable data
 	var err error
 	proc.PE, err = s.pe.Read(proc.Exe)
@@ -322,65 +292,6 @@ func (s *snapshotter) initProc(pid, ppid uint32, e *kevent.Kevent) (*pstypes.PS,
 	proc.Envs = peb.GetEnvs()
 	proc.Cwd = peb.GetCurrentWorkingDirectory()
 	return proc, nil
-}
-
-// gcDeadProcesses periodically scans the map of the snapshot's processes and removes
-// any terminated processes from it. This guarantees that any leftovers are cleaned-up
-// in case we miss process' terminate events.
-func (s *snapshotter) gcDeadProcesses() {
-	tick := time.NewTicker(reapPeriod)
-	for {
-		select {
-		case <-tick.C:
-			s.mu.Lock()
-			ss := len(s.procs)
-			log.Debugf("scanning for dead processes on the snapshot of %d items", ss)
-
-			for pid := range s.procs {
-				proc, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
-				if err != nil {
-					continue
-				}
-				if !zsyscall.IsProcessRunning(proc) {
-					delete(s.procs, pid)
-				}
-				_ = windows.CloseHandle(proc)
-			}
-
-			if ss > len(s.procs) {
-				reaped := ss - len(s.procs)
-				reapedProcesses.Add(int64(reaped))
-				log.Debugf("%d dead process(es) reaped", reaped)
-			}
-			s.mu.Unlock()
-		case <-s.quit:
-			tick.Stop()
-		}
-	}
-}
-
-func (s *snapshotter) onHandleCreated(pid uint32, handle htypes.Handle) {
-	s.mu.RLock()
-	ps, ok := s.procs[pid]
-	s.mu.RUnlock()
-	if ok {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		ps.AddHandle(handle)
-		s.procs[pid] = ps
-	}
-}
-
-func (s *snapshotter) onHandleDestroyed(pid uint32, rawHandle windows.Handle) {
-	s.mu.RLock()
-	ps, ok := s.procs[pid]
-	s.mu.RUnlock()
-	if ok {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		ps.RemoveHandle(rawHandle)
-		s.procs[pid] = ps
-	}
 }
 
 func (s *snapshotter) Remove(e *kevent.Kevent) error {
@@ -476,4 +387,63 @@ func (s *snapshotter) Size() uint32 {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return uint32(len(s.procs))
+}
+
+// gcDeadProcesses periodically scans the map of the snapshot's processes and removes
+// any terminated processes from it. This guarantees that any leftovers are cleaned-up
+// in case we miss process' terminate events.
+func (s *snapshotter) gcDeadProcesses() {
+	tick := time.NewTicker(reapPeriod)
+	for {
+		select {
+		case <-tick.C:
+			s.mu.Lock()
+			ss := len(s.procs)
+			log.Debugf("scanning for dead processes on the snapshot of %d items", ss)
+
+			for pid := range s.procs {
+				proc, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
+				if err != nil {
+					continue
+				}
+				if !zsyscall.IsProcessRunning(proc) {
+					delete(s.procs, pid)
+				}
+				_ = windows.CloseHandle(proc)
+			}
+
+			if ss > len(s.procs) {
+				reaped := ss - len(s.procs)
+				reapedProcesses.Add(int64(reaped))
+				log.Debugf("%d dead process(es) reaped", reaped)
+			}
+			s.mu.Unlock()
+		case <-s.quit:
+			tick.Stop()
+		}
+	}
+}
+
+func (s *snapshotter) onHandleCreated(pid uint32, handle htypes.Handle) {
+	s.mu.RLock()
+	ps, ok := s.procs[pid]
+	s.mu.RUnlock()
+	if ok {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		ps.AddHandle(handle)
+		s.procs[pid] = ps
+	}
+}
+
+func (s *snapshotter) onHandleDestroyed(pid uint32, rawHandle windows.Handle) {
+	s.mu.RLock()
+	ps, ok := s.procs[pid]
+	s.mu.RUnlock()
+	if ok {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		ps.RemoveHandle(rawHandle)
+		s.procs[pid] = ps
+	}
 }

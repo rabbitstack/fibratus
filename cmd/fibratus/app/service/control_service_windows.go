@@ -258,11 +258,13 @@ func (s *fsvc) run() error {
 		cfg.Output,
 		cfg.Transformers,
 		cfg.Alertsenders,
-		common.PreAggregateFunc(rules),
 	)
 	if err != nil {
 		return err
 	}
+	agg.AddListener(rules)
+	agg.Run()
+
 	if err := api.StartServer(cfg); err != nil {
 		return err
 	}

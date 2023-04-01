@@ -166,6 +166,7 @@ func (e Kevent) IsUnloadImage() bool      { return e.Type == ktypes.UnloadImage 
 func (e Kevent) IsLoadImage() bool        { return e.Type == ktypes.LoadImage }
 func (e Kevent) IsFileOpEnd() bool        { return e.Type == ktypes.FileOpEnd }
 func (e Kevent) IsRegSetValue() bool      { return e.Type == ktypes.RegSetValue }
+func (e Kevent) IsProcessRundown() bool   { return e.Type == ktypes.ProcessRundown }
 
 func (e Kevent) InvalidPid() bool { return e.PID == zsyscall.InvalidProcessPid }
 func (e Kevent) CurrentPid() bool { return e.PID == currentPid }

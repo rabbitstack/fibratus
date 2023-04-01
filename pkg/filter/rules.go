@@ -611,7 +611,7 @@ func (r *Rules) findFilterGroups(kevt *kevent.Kevent) filterGroups {
 	return append(groups1, groups2...)
 }
 
-func (r *Rules) Fire(kevt *kevent.Kevent) bool {
+func (r *Rules) ProcessEvent(kevt *kevent.Kevent) bool {
 	// if there are no filter groups we assume no group files were
 	// defined or specified in the config, so, the default behaviour
 	// in such cases is to pass the event and hand over it to the CLI

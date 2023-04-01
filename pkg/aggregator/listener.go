@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 by Nedim Sabic Sabic
+ * Copyright 2021-2022 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -16,26 +16,14 @@
  * limitations under the License.
  */
 
-package common
+package aggregator
 
-import (
-	"github.com/rabbitstack/fibratus/pkg/config"
-	"github.com/rabbitstack/fibratus/pkg/util/log"
-)
+import "github.com/rabbitstack/fibratus/pkg/kevent"
 
-// InitConfigAndLogger initializes the configuration and sets up the logger.
-func InitConfigAndLogger(cfg *config.Config) error {
-	if err := cfg.TryLoadFile(cfg.File()); err != nil {
-		return err
-	}
-	if err := cfg.Init(); err != nil {
-		return err
-	}
-	if err := cfg.Validate(); err != nil {
-		return err
-	}
-	if err := log.InitFromConfig(cfg.Log); err != nil {
-		return err
-	}
-	return nil
+// Listener is the minimal interface that all aggregator listeners need to implement.
+type Listener interface {
+	// ProcessEvent receives the event and returns a boolean value
+	// indicating if the event should be routed to the aggregator
+	// output queue.
+	ProcessEvent(*kevent.Kevent) bool
 }

@@ -76,7 +76,7 @@ func fireRules(t *testing.T, c *config.Config) bool {
 	rules := NewRules(c)
 
 	kevt := &kevent.Kevent{
-		Type:     ktypes.Recv,
+		Type:     ktypes.RecvTCPv4,
 		Name:     "Recv",
 		Tid:      2484,
 		PID:      859,
@@ -91,7 +91,7 @@ func fireRules(t *testing.T, c *config.Config) bool {
 	}
 
 	require.NoError(t, rules.Compile())
-	return rules.Fire(kevt)
+	return rules.ProcessEvent(kevt)
 }
 
 func newConfig(fromFiles ...string) *config.Config {
@@ -119,7 +119,7 @@ func TestCompileMergeGroups(t *testing.T) {
 	require.NoError(t, rules.Compile())
 
 	assert.Len(t, rules.filterGroups, 2)
-	assert.Len(t, rules.filterGroups[ktypes.Recv.Hash()], 2)
+	assert.Len(t, rules.filterGroups[ktypes.RecvTCPv4.Hash()], 2)
 	assert.Len(t, rules.filterGroups[ktypes.Net.Hash()], 1)
 
 	groups := rules.findFilterGroups(&kevent.Kevent{Type: ktypes.RecvUDPv6, Category: ktypes.Net})
@@ -166,7 +166,7 @@ func TestIncludeExcludeRemoteThreads(t *testing.T) {
 		},
 	}
 
-	require.False(t, rules.Fire(kevt))
+	require.False(t, rules.ProcessEvent(kevt))
 }
 
 func TestSequenceState(t *testing.T) {
@@ -308,8 +308,8 @@ func TestSimpleSequencePolicy(t *testing.T) {
 		},
 		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "barzz"},
 	}
-	require.False(t, rules.Fire(kevt1))
-	require.True(t, rules.Fire(kevt2))
+	require.False(t, rules.ProcessEvent(kevt1))
+	require.True(t, rules.ProcessEvent(kevt2))
 }
 
 func TestSimpleSequencePolicyWithMaxSpanReached(t *testing.T) {
@@ -345,16 +345,16 @@ func TestSimpleSequencePolicyWithMaxSpanReached(t *testing.T) {
 		},
 		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "barzz"},
 	}
-	require.False(t, rules.Fire(kevt1))
+	require.False(t, rules.ProcessEvent(kevt1))
 	time.Sleep(time.Millisecond * 250)
-	require.False(t, rules.Fire(kevt2))
+	require.False(t, rules.ProcessEvent(kevt2))
 
 	// now the state machine has transitioned
 	// to the initial state, which means we should
 	// be able to match the sequence if we reinsert
 	// the events
-	require.False(t, rules.Fire(kevt1))
-	require.True(t, rules.Fire(kevt2))
+	require.False(t, rules.ProcessEvent(kevt1))
+	require.True(t, rules.ProcessEvent(kevt2))
 }
 
 func TestSimpleSequencePolicyWithMaxSpanNotReached(t *testing.T) {
@@ -391,9 +391,9 @@ func TestSimpleSequencePolicyWithMaxSpanNotReached(t *testing.T) {
 		},
 		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "barzz"},
 	}
-	require.False(t, rules.Fire(kevt1))
+	require.False(t, rules.ProcessEvent(kevt1))
 	time.Sleep(time.Millisecond * 110)
-	require.True(t, rules.Fire(kevt2))
+	require.True(t, rules.ProcessEvent(kevt2))
 }
 
 func TestSimpleSequencePolicyPatternBindings(t *testing.T) {
@@ -429,8 +429,8 @@ func TestSimpleSequencePolicyPatternBindings(t *testing.T) {
 		},
 		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "barzz"},
 	}
-	require.False(t, rules.Fire(kevt1))
-	require.True(t, rules.Fire(kevt2))
+	require.False(t, rules.ProcessEvent(kevt1))
+	require.True(t, rules.ProcessEvent(kevt2))
 }
 
 func TestSequenceComplexPatternBindings(t *testing.T) {
@@ -462,9 +462,9 @@ func TestSequenceComplexPatternBindings(t *testing.T) {
 		PID:      2243,
 		Category: ktypes.File,
 		PS: &types.PS{
-			Name: "firefox.exe",
-			Exe:  "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
-			Comm: "C:\\Program Files\\Mozilla Firefox\\firefox.exe\" -contentproc --channel=\"10464.7.539748228\\1366525930\" -childID 6 -isF",
+			Name:    "firefox.exe",
+			Exe:     "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
+			Cmdline: "C:\\Program Files\\Mozilla Firefox\\firefox.exe\" -contentproc --channel=\"10464.7.539748228\\1366525930\" -childID 6 -isF",
 		},
 		Kparams: kevent.Kparams{
 			kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
@@ -492,7 +492,7 @@ func TestSequenceComplexPatternBindings(t *testing.T) {
 
 	kevt4 := &kevent.Kevent{
 		Seq:      4,
-		Type:     ktypes.Connect,
+		Type:     ktypes.ConnectTCPv4,
 		Category: ktypes.Net,
 		Name:     "Connect",
 		Tid:      244,
@@ -507,10 +507,10 @@ func TestSequenceComplexPatternBindings(t *testing.T) {
 		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "barzz"},
 	}
 
-	require.False(t, rules.Fire(kevt1))
-	require.False(t, rules.Fire(kevt2))
+	require.False(t, rules.ProcessEvent(kevt1))
+	require.False(t, rules.ProcessEvent(kevt2))
 	time.Sleep(time.Millisecond * 30)
-	require.False(t, rules.Fire(kevt3))
+	require.False(t, rules.ProcessEvent(kevt3))
 
 	// at this point we should have
 	// accumulated multiple matches
@@ -526,7 +526,7 @@ func TestSequenceComplexPatternBindings(t *testing.T) {
 	// register alert sender
 	require.NoError(t, alertsender.LoadAll([]alertsender.Config{{Type: alertsender.None}}))
 
-	require.True(t, rules.Fire(kevt4))
+	require.True(t, rules.ProcessEvent(kevt4))
 
 	time.Sleep(time.Millisecond * 25)
 
@@ -540,11 +540,11 @@ func TestSequenceComplexPatternBindings(t *testing.T) {
 	require.Len(t, matches, 0)
 
 	// FSM should transition from terminal to initial state
-	require.False(t, rules.Fire(kevt1))
-	require.False(t, rules.Fire(kevt2))
+	require.False(t, rules.ProcessEvent(kevt1))
+	require.False(t, rules.ProcessEvent(kevt2))
 	time.Sleep(time.Millisecond * 15)
-	require.False(t, rules.Fire(kevt3))
-	require.True(t, rules.Fire(kevt4))
+	require.False(t, rules.ProcessEvent(kevt3))
+	require.True(t, rules.ProcessEvent(kevt4))
 }
 
 func TestFilterActionEmitAlert(t *testing.T) {
@@ -553,7 +553,7 @@ func TestFilterActionEmitAlert(t *testing.T) {
 	require.NoError(t, rules.Compile())
 
 	kevt := &kevent.Kevent{
-		Type:     ktypes.Recv,
+		Type:     ktypes.RecvTCPv4,
 		Name:     "Recv",
 		Tid:      2484,
 		PID:      859,
@@ -570,7 +570,7 @@ func TestFilterActionEmitAlert(t *testing.T) {
 		Metadata: make(map[kevent.MetadataKey]string),
 	}
 
-	require.True(t, rules.Fire(kevt))
+	require.True(t, rules.ProcessEvent(kevt))
 	time.Sleep(time.Millisecond * 25)
 	require.NotNil(t, emitAlert)
 	assert.Equal(t, "Test alert", emitAlert.Title)
@@ -635,7 +635,7 @@ func BenchmarkRunRules(b *testing.B) {
 	b.ResetTimer()
 	kevts := []*kevent.Kevent{
 		{
-			Type:     ktypes.Connect,
+			Type:     ktypes.ConnectTCPv4,
 			Name:     "Recv",
 			Tid:      2484,
 			PID:      859,
@@ -664,7 +664,7 @@ func BenchmarkRunRules(b *testing.B) {
 				kparams.ProcessID:       {Name: kparams.ProcessID, Type: kparams.PID, Value: 2323},
 				kparams.ProcessParentID: {Name: kparams.ProcessParentID, Type: kparams.PID, Value: uint32(8390)},
 				kparams.ProcessName:     {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "spotify.exe"},
-				kparams.Comm:            {Name: kparams.Comm, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`},
+				kparams.Cmdline:         {Name: kparams.Cmdline, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`},
 				kparams.Exe:             {Name: kparams.Exe, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe`},
 				kparams.UserSID:         {Name: kparams.UserSID, Type: kparams.UnicodeString, Value: `admin\SYSTEM`},
 			},
@@ -688,7 +688,7 @@ func BenchmarkRunRules(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		for _, kevt := range kevts {
-			rules.Fire(kevt)
+			rules.ProcessEvent(kevt)
 		}
 	}
 }

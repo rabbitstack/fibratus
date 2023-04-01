@@ -98,7 +98,7 @@ func (c *Cmdline) CompleteSysProc(name string) *Cmdline {
 	return c
 }
 
-func (c Cmdline) Exeline() string {
+func (c *Cmdline) Exeline() string {
 	i := strings.Index(strings.ToLower(c.cmdline), ".exe")
 	if i > 0 {
 		return c.cmdline[0 : i+4] // dot + exe
@@ -106,4 +106,4 @@ func (c Cmdline) Exeline() string {
 	return c.cmdline
 }
 
-func (c Cmdline) String() string { return c.cmdline }
+func (c *Cmdline) String() string { return c.cmdline }

@@ -31,10 +31,14 @@ type Snapshotter interface {
 	// the basic data, but also enriches the process' state with extra metadata such as process' env variables, PE
 	// metadata for Windows binaries and so on.
 	Write(*kevent.Kevent) error
+	// AddThread builds thread state from the event representation.
 	AddThread(*kevent.Kevent) error
+	// AddModule builds module state from the event representation.
 	AddModule(*kevent.Kevent) error
-	RemoveThread(uint32, uint32) error
-	RemoveModule(uint32, string) error
+	// RemoveThread removes the thread from the given process.
+	RemoveThread(pid uint32, tid uint32) error
+	// RemoveModule removes the module the given process.
+	RemoveModule(pid uint32, mod string) error
 	// WriteFromKcap appends a new process state to the snapshotter from the captured kernel event.
 	WriteFromKcap(kevt *kevent.Kevent) error
 	// Remove deletes process's state from the snapshotter.

@@ -157,11 +157,14 @@ func run(cmd *cobra.Command, args []string) error {
 			cfg.Output,
 			cfg.Transformers,
 			cfg.Alertsenders,
-			common.PreAggregateFunc(rules),
 		)
 		if err != nil {
 			return err
 		}
+
+		agg.AddListener(rules)
+		agg.Run()
+
 		defer func() {
 			if err := agg.Stop(); err != nil {
 				log.Error(err)

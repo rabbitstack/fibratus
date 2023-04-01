@@ -154,8 +154,8 @@ func (m Module) String() string {
 	return fmt.Sprintf("Name: %s, Size: %d, Checksum: %d, Base address: %s, Default base address: %s", m.Name, m.Size, m.Checksum, m.BaseAddress, m.DefaultBaseAddress)
 }
 
-// NewProc produces a new process state.
-func NewProc(pid, ppid uint32, name, cmndline, exe, sid string, sessionID uint8) *PS {
+// New produces a new process state.
+func New(pid, ppid uint32, name, cmndline, exe, sid string, sessionID uint8) *PS {
 	return &PS{
 		PID:       pid,
 		Ppid:      ppid,
@@ -168,33 +168,6 @@ func NewProc(pid, ppid uint32, name, cmndline, exe, sid string, sessionID uint8)
 		Threads:   make(map[uint32]Thread),
 		Modules:   make([]Module, 0),
 		Handles:   make([]htypes.Handle, 0),
-	}
-}
-
-// ThreadFromKevent builds a thread info from kernel event.
-func ThreadFromKevent(pid, tid uint32, ustackBase, ustackLimit, kstackBase, kstackLimit kparams.Hex, ioPrio, basePrio, pagePrio uint8, entrypoint kparams.Hex) Thread {
-	return Thread{
-		Pid:         pid,
-		Tid:         tid,
-		UstackBase:  ustackBase,
-		UstackLimit: ustackLimit,
-		KstackBase:  kstackBase,
-		KstackLimit: kstackLimit,
-		IOPrio:      ioPrio,
-		BasePrio:    basePrio,
-		PagePrio:    pagePrio,
-		Entrypoint:  entrypoint,
-	}
-}
-
-// ImageFromKevent constructs a module info from the corresponding kernel event.
-func ImageFromKevent(size, checksum uint32, name string, baseAddress, defaultBaseAddress kparams.Hex) Module {
-	return Module{
-		Size:               size,
-		Checksum:           checksum,
-		Name:               name,
-		BaseAddress:        baseAddress,
-		DefaultBaseAddress: defaultBaseAddress,
 	}
 }
 

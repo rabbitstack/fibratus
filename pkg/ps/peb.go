@@ -41,8 +41,7 @@ type PEB struct {
 }
 
 // ReadPEB queries the process's basic information class structures and copies the PEB into
-// the current process's address space. Creates references to PEB and RTL_USER_PROCESS_PARAMETERS
-// structures of the process given its handle.
+// the current process's address space.
 func ReadPEB(proc windows.Handle) (*PEB, error) {
 	peb := &PEB{proc: proc}
 	pbi, err := zsyscall.QueryInformationProcess[windows.PROCESS_BASIC_INFORMATION](proc, windows.ProcessBasicInformation)
@@ -70,7 +69,7 @@ func (p PEB) GetImage() string {
 	if p.procParams == nil {
 		return ""
 	}
-	image := readUTF16(p.proc, uintptr(unsafe.Pointer(p.procParams.ImagePathName.Buffer)), uint32(p.procParams.ImagePathName.Length))
+	image := readUTF16(p.proc, uniptr(p.procParams.ImagePathName.Buffer), uint32(p.procParams.ImagePathName.Length))
 	return windows.UTF16ToString(image)
 }
 
@@ -79,7 +78,7 @@ func (p PEB) GetCommandLine() string {
 	if p.procParams == nil {
 		return ""
 	}
-	cmdline := readUTF16(p.proc, uintptr(unsafe.Pointer(p.procParams.CommandLine.Buffer)), uint32(p.procParams.CommandLine.Length))
+	cmdline := readUTF16(p.proc, uniptr(p.procParams.CommandLine.Buffer), uint32(p.procParams.CommandLine.Length))
 	return windows.UTF16ToString(cmdline)
 }
 
@@ -88,7 +87,7 @@ func (p PEB) GetCurrentWorkingDirectory() string {
 	if p.procParams == nil {
 		return ""
 	}
-	cwd := readUTF16(p.proc, uintptr(unsafe.Pointer(p.procParams.CurrentDirectory.DosPath.Buffer)), uint32(p.procParams.CurrentDirectory.DosPath.Length))
+	cwd := readUTF16(p.proc, uniptr(p.procParams.CurrentDirectory.DosPath.Buffer), uint32(p.procParams.CurrentDirectory.DosPath.Length))
 	return windows.UTF16ToString(cwd)
 }
 
@@ -97,9 +96,6 @@ func (p PEB) GetEnvs() map[string]string {
 	if p.procParams == nil {
 		return nil
 	}
-	// we can read the whole memory region starting from the env address
-	// and speculate the size of the env block, but we just use a fixed
-	// buffer size
 	start, end := 0, 0
 	envs := make(map[string]string)
 	s := readUTF16(p.proc, uintptr(p.procParams.Environment), uint32(p.procParams.EnvironmentSize))
@@ -134,3 +130,5 @@ func readUTF16(proc windows.Handle, addr uintptr, size uint32) []uint16 {
 	s := unsafe.Slice((*uint16)(unsafe.Pointer(&b[0])), l)
 	return s
 }
+
+func uniptr(b *uint16) uintptr { return uintptr(unsafe.Pointer(b)) }
