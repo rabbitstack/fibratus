@@ -36,7 +36,6 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
-	"time"
 )
 
 // FilterGroupPolicy is the type alias for the filter group policy
@@ -53,9 +52,6 @@ const (
 	// out the matching events, that is, discarding them from the event
 	// flow.
 	ExcludePolicy
-	// SequencePolicy determines the policy that allows matching a
-	// sequence of temporal events based on pattern binding restrictions
-	SequencePolicy
 	// UnknownPolicy determines the unknown group policy type.
 	UnknownPolicy
 )
@@ -78,8 +74,6 @@ func (p FilterGroupPolicy) String() string {
 		return "include"
 	case ExcludePolicy:
 		return "exclude"
-	case SequencePolicy:
-		return "sequence"
 	default:
 		return ""
 	}
@@ -125,8 +119,6 @@ func filterGroupPolicyFromString(s string) FilterGroupPolicy {
 		return IncludePolicy
 	case "exclude", "EXCLUDE":
 		return ExcludePolicy
-	case "sequence", "SEQUENCE":
-		return SequencePolicy
 	default:
 		return UnknownPolicy
 	}
@@ -147,10 +139,8 @@ func filterGroupRelationFromString(s string) FilterGroupRelation {
 type FilterConfig struct {
 	Name        string            `json:"name" yaml:"name"`
 	Description string            `json:"description" yaml:"description"`
-	Def         string            `json:"def" yaml:"def"` // deprecated in favor of `Condition`
 	Condition   string            `json:"condition" yaml:"condition"`
 	Action      string            `json:"action" yaml:"action"`
-	MaxSpan     time.Duration     `json:"max-span" yaml:"max-span"`
 	Labels      map[string]string `json:"labels" yaml:"labels"`
 }
 
@@ -181,25 +171,18 @@ type FilterGroup struct {
 	Policy      FilterGroupPolicy   `json:"policy" yaml:"policy"`
 	Relation    FilterGroupRelation `json:"relation" yaml:"relation"`
 	Rules       []*FilterConfig     `json:"rules" yaml:"rules"`
-	FromStrings []*FilterConfig     `json:"from-strings" yaml:"from-strings"` // deprecated in favor or `Rules`
 	Tags        []string            `json:"tags" yaml:"tags"`
 	Labels      map[string]string   `json:"labels" yaml:"labels"`
-	Action      string              `json:"action" yaml:"action"` // only valid in sequence policies
 }
 
 // IsDisabled determines if this group is disabled.
 func (g FilterGroup) IsDisabled() bool { return g.Enabled != nil && !*g.Enabled }
 
 func (g FilterGroup) validate(resource string) error {
-	filters := append(g.FromStrings, g.Rules...)
-	for _, filter := range filters {
+	for _, filter := range g.Rules {
 		if filter.Action != "" && g.Policy == ExcludePolicy {
 			return fmt.Errorf("%q rule found in %q group with exclude policy. "+
 				"Only groups with include policies can have rule actions", filter.Name, g.Name)
-		}
-		if filter.MaxSpan != 0 && g.Policy != SequencePolicy {
-			return fmt.Errorf("%q rule has max span, but it is not in sequence policy " +
-				filter.Name)
 		}
 		if err := filter.parseTmpl(resource); err != nil {
 			return fmt.Errorf("invalid %q rule action: %v", filter.Name, err)
@@ -220,12 +203,13 @@ type Filters struct {
 	Rules  Rules  `json:"rules" yaml:"rules"`
 	Macros Macros `json:"macros" yaml:"macros"`
 	macros map[string]*Macro
+	groups []FilterGroup
 }
 
 // FiltersWithMacros builds the filter config with the map of
 // predefined macros. Only used for testing purposes.
 func FiltersWithMacros(macros map[string]*Macro) *Filters {
-	return &Filters{macros: macros}
+	return &Filters{macros: macros, groups: make([]FilterGroup, 0)}
 }
 
 // Rules contains attributes that describe the location of
@@ -333,12 +317,12 @@ func isValidExt(path string) bool {
 
 // LoadGroups for each rule group file it decodes the
 // groups and ensures the correctness of the yaml file.
-func (f Filters) LoadGroups() ([]FilterGroup, error) {
-	allGroups := make([]FilterGroup, 0)
+func (f *Filters) LoadGroups() error {
+	f.groups = make([]FilterGroup, 0)
 	for _, p := range f.Rules.FromPaths {
 		paths, err := filepath.Glob(p)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		for _, path := range paths {
 			if !isValidExt(path) {
@@ -349,28 +333,28 @@ func (f Filters) LoadGroups() ([]FilterGroup, error) {
 			// the corresponding filter groups from it
 			rawConfig, err := os.ReadFile(path)
 			if err != nil {
-				return nil, fmt.Errorf("couldn't load rule file: %v", err)
+				return fmt.Errorf("couldn't load rule file: %v", err)
 			}
 			groups, err := decodeFilterGroups(path, rawConfig)
 			if err != nil {
-				return nil, err
+				return err
 			}
-			allGroups = append(allGroups, groups...)
+			f.groups = append(f.groups, groups...)
 		}
 	}
 	for _, url := range f.Rules.FromURLs {
 		log.Infof("loading rules from URL %s", url)
 		if _, err := u.Parse(url); err != nil {
-			return nil, fmt.Errorf("%q is an invalid URL", url)
+			return fmt.Errorf("%q is an invalid URL", url)
 		}
 		//nolint:noctx
 		resp, err := http.Get(url)
 		if err != nil {
-			return nil, fmt.Errorf("cannot fetch rule file from %q: %v", url, err)
+			return fmt.Errorf("cannot fetch rule file from %q: %v", url, err)
 		}
 		if resp.StatusCode != http.StatusOK {
 			_ = resp.Body.Close()
-			return nil, fmt.Errorf("got non-ok status code for %q: %s", url,
+			return fmt.Errorf("got non-ok status code for %q: %s", url,
 				http.StatusText(resp.StatusCode))
 		}
 
@@ -378,26 +362,27 @@ func (f Filters) LoadGroups() ([]FilterGroup, error) {
 		_, err = io.Copy(&rawConfig, resp.Body)
 		_ = resp.Body.Close()
 		if err != nil {
-			return nil, fmt.Errorf("cannot copy rule file from %q: %v", url, err)
+			return fmt.Errorf("cannot copy rule file from %q: %v", url, err)
 		}
 		groups, err := decodeFilterGroups(url, rawConfig.Bytes())
 		if err != nil {
-			return nil, err
+			return err
 		}
-		allGroups = append(allGroups, groups...)
+		f.groups = append(f.groups, groups...)
 	}
 
+	// check for duplicate rule groups
 	groupNames := make(map[string]bool)
-	for _, group := range allGroups {
+	for _, group := range f.groups {
 		key := group.Policy.String() + group.Name
 		_, isDup := groupNames[key]
 		if isDup {
-			return nil, fmt.Errorf("group names must be unique. "+
+			return fmt.Errorf("group names must be unique. "+
 				"Found duplicate %q group with %q policy", group.Name, group.Policy)
 		}
 		groupNames[key] = true
 	}
-	return allGroups, nil
+	return nil
 }
 
 func decodeFilterGroups(resource string, b []byte) ([]FilterGroup, error) {

@@ -21,7 +21,7 @@ package service
 import (
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/filter"
-	"github.com/rabbitstack/fibratus/pkg/zsyscall/security"
+	"github.com/rabbitstack/fibratus/pkg/sys/security"
 	"time"
 
 	"github.com/rabbitstack/fibratus/cmd/fibratus/common"
@@ -227,15 +227,8 @@ func (s *fsvc) run() error {
 	}
 	ver.Set(Version)
 
-	// initialize rules engine
-	rules := filter.NewRules(cfg)
-	err := rules.Compile()
-	if err != nil {
-		return err
-	}
-
 	ktracec = kstream.NewKtraceController(cfg.Kstream)
-	err = ktracec.StartKtrace()
+	err := ktracec.StartKtrace()
 	if err != nil {
 		return err
 	}
@@ -244,6 +237,13 @@ func (s *fsvc) run() error {
 	hsnap := handle.NewSnapshotter(cfg, nil)
 	psnap := ps.NewSnapshotter(hsnap, cfg)
 	kstreamc = kstream.NewConsumer(psnap, hsnap, cfg)
+
+	// initialize rules engine
+	rules := filter.NewRules(psnap, cfg)
+	err = rules.Compile()
+	if err != nil {
+		return err
+	}
 
 	// open the event stream, start processing events and forwarding to outputs
 	err = kstreamc.OpenKstream(ktracec.Traces())

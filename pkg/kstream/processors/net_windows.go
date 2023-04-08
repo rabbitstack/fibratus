@@ -46,13 +46,13 @@ func (n netProcessor) Close() {
 	n.reverseDNS.Close()
 }
 
-func (n *netProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Batch, bool, error) {
+func (n *netProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error) {
 	if e.Category == ktypes.Net {
 		if e.IsNetworkTCP() {
-			e.Kparams.Append(kparams.NetL4Proto, kparams.Enum, uint32(network.TCP), kevent.WithEnum(network.ProtoNames))
+			e.AppendEnum(kparams.NetL4Proto, uint32(network.TCP), kevent.WithEnum(network.ProtoNames))
 		}
 		if e.IsNetworkUDP() {
-			e.Kparams.Append(kparams.NetL4Proto, kparams.Enum, uint32(network.UDP), kevent.WithEnum(network.ProtoNames))
+			e.AppendEnum(kparams.NetL4Proto, uint32(network.UDP), kevent.WithEnum(network.ProtoNames))
 		}
 		n.resolvePortName(e)
 		names := n.resolveNamesForIP(unwrapIP(e.Kparams.GetIP(kparams.NetDIP)))
@@ -63,9 +63,9 @@ func (n *netProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Batch, bool, erro
 		if len(names) > 0 {
 			e.AppendParam(kparams.NetSIPNames, kparams.Slice, names)
 		}
-		return kevent.NewBatch(e), false, nil
+		return e, false, nil
 	}
-	return nil, true, nil
+	return e, true, nil
 }
 
 func (n *netProcessor) resolveNamesForIP(ip net.IP) []string {

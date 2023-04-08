@@ -45,10 +45,9 @@ const (
 // from the flow of events going through it. The processor can also decide to drop the inbound event by
 // returning an error via its `ProcessEvent` method.
 type Processor interface {
-	// ProcessEvent receives an existing event possibly mutating its state. The event is filtered out if
-	// this method returns an error. If it returns true, the next processor in the chain is evaluated.
-	// Processor may return a single instance of the mutated event or a batch of multiple events
-	ProcessEvent(*kevent.Kevent) (*kevent.Batch, bool, error)
+	// ProcessEvent receives an existing event possibly mutating its state or marking the event as dropped.
+	// If it returns true, the next processor in the chain is evaluated.
+	ProcessEvent(*kevent.Kevent) (*kevent.Kevent, bool, error)
 
 	// Name returns a human-readable name of this processor.
 	Name() ProcessorType

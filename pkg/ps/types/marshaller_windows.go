@@ -26,6 +26,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	"github.com/rabbitstack/fibratus/pkg/util/bytes"
+	"time"
 	"unsafe"
 )
 
@@ -61,7 +62,7 @@ func (ps *PS) Marshal() []byte {
 	}
 
 	// write session ID
-	b = append(b, ps.SessionID)
+	b = append(b, bytes.WriteUint32(ps.SessionID)...)
 
 	// write env vars block
 	b = append(b, bytes.WriteUint16(uint16(len(ps.Envs)))...)
@@ -92,11 +93,28 @@ func (ps *PS) Marshal() []byte {
 		b = append(b, sec[:]...)
 	}
 
+	// write start time
+	timestamp := make([]byte, 0)
+	timestamp = ps.StartTime.AppendFormat(timestamp, time.RFC3339Nano)
+	b = append(b, bytes.WriteUint16(uint16(len(timestamp)))...)
+	b = append(b, timestamp...)
+
+	// write UUID
+	b = append(b, bytes.WriteUint64(ps.uuid)...)
+
+	// write username
+	b = append(b, bytes.WriteUint16(uint16(len(ps.Username)))...)
+	b = append(b, ps.Username...)
+
+	// write domain
+	b = append(b, bytes.WriteUint16(uint16(len(ps.Domain)))...)
+	b = append(b, ps.Domain...)
+
 	return b
 }
 
 // Unmarshal recovers the process' state from the capture file.
-func (ps *PS) Unmarshal(b []byte) error {
+func (ps *PS) Unmarshal(b []byte, psec section.Section) error {
 	if len(b) < 8 {
 		return fmt.Errorf("expected at least 8 bytes but got %d bytes", len(b))
 	}
@@ -149,18 +167,27 @@ func (ps *PS) Unmarshal(b []byte) error {
 	}
 
 	offset += uint32(aoffset)
+	idx := uint32(20)
 	// read session ID
-	ps.SessionID = b[20+offset]
+	if psec.Version() >= kcapver.ProcessSecV3 {
+		// session identifier was changed from uint8 to uint32
+		ps.SessionID = bytes.ReadUint32(b[idx+offset:])
+		idx += 4
+	} else {
+		ps.SessionID = uint32(b[idx+offset])
+		idx += 1
+	}
 
 	// read env vars
-	nvars := bytes.ReadUint16(b[21+offset:])
+	nvars := bytes.ReadUint16(b[idx+offset:])
+	idx += 2
 	var eoffset uint16
 	for i := 0; i < int(nvars); i++ {
-		klen := bytes.ReadUint16(b[23+offset+uint32(eoffset):])
-		buf = b[25+offset+uint32(eoffset):]
+		klen := bytes.ReadUint16(b[idx+offset+uint32(eoffset):])
+		buf = b[idx+2+offset+uint32(eoffset):]
 		key := string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:klen:klen])
-		vlen := bytes.ReadUint16(b[25+offset+uint32(eoffset)+uint32(klen):])
-		buf = b[27+offset+uint32(eoffset)+uint32(klen):]
+		vlen := bytes.ReadUint16(b[idx+2+offset+uint32(eoffset)+uint32(klen):])
+		buf = b[idx+4+offset+uint32(eoffset)+uint32(klen):]
 		value := string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:vlen:vlen])
 		ps.Envs[key] = value
 		eoffset += klen + vlen + 2 + 2
@@ -169,7 +196,7 @@ func (ps *PS) Unmarshal(b []byte) error {
 	offset += uint32(eoffset)
 
 	// read handles
-	sec := section.Read(b[23+offset:])
+	sec := section.Read(b[idx+offset:])
 	offset += 10 // 10 is for the section size in bytes
 	var hoffset uint32
 	if sec.Len() == 0 {
@@ -178,10 +205,8 @@ func (ps *PS) Unmarshal(b []byte) error {
 
 	for i := 0; i < int(sec.Len()); i++ {
 		// read handle length
-		l := uint32(bytes.ReadUint16(b[23+offset+hoffset:]))
-
-		off := 25 + hoffset + offset
-
+		l := uint32(bytes.ReadUint16(b[idx+offset+hoffset:]))
+		off := idx + 2 + hoffset + offset
 		handle, err := htypes.NewFromKcap(b[off : off+l])
 		if err != nil {
 			return err
@@ -193,14 +218,79 @@ func (ps *PS) Unmarshal(b []byte) error {
 readpe:
 	offset += hoffset
 	// read PE metadata
-	sec = section.Read(b[23+offset:])
+	sec = section.Read(b[idx+offset:])
+	idx += 10
 	if sec.Size() == 0 {
+		if psec.Version() >= kcapver.ProcessSecV2 {
+			// read start time
+			l := uint32(bytes.ReadUint16(b[idx+offset:]))
+			idx += 2
+			buf := b[idx+offset:]
+			offset += l
+			if len(buf) > 0 {
+				var err error
+				t := string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
+				ps.StartTime, err = time.Parse(time.RFC3339Nano, t)
+				if err != nil {
+					return err
+				}
+			}
+			// read UUID
+			ps.uuid = bytes.ReadUint64(b[idx+offset:])
+		}
+		if psec.Version() >= kcapver.ProcessSecV3 {
+			idx += 8
+			// read username
+			l := bytes.ReadUint16(b[idx+offset:])
+			idx += 2
+			buf := b[:]
+			offset += uint32(l)
+			ps.Username = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
+
+			// read domain
+			l = bytes.ReadUint16(b[idx+offset:])
+			idx += 2
+			buf = b[:]
+			offset += uint32(l)
+			ps.Domain = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
+		}
 		return nil
 	}
+
 	var err error
-	ps.PE, err = pe.NewFromKcap(b[33+offset:])
+	ps.PE, err = pe.NewFromKcap(b[idx+offset:])
 	if err != nil {
 		return err
+	}
+
+	offset += sec.Size()
+	if psec.Version() >= kcapver.ProcessSecV2 {
+		// read start time
+		l := uint32(bytes.ReadUint16(b[idx+offset:]))
+		idx += 2
+		buf := b[idx+offset:]
+		offset += l
+		if len(buf) > 0 {
+			ps.StartTime, _ = time.Parse(time.RFC3339Nano, string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l]))
+		}
+		// read UUID
+		ps.uuid = bytes.ReadUint64(b[idx+offset:])
+	}
+	if psec.Version() >= kcapver.ProcessSecV3 {
+		idx += 8
+		// read username
+		l := bytes.ReadUint16(b[idx+offset:])
+		idx += 2
+		buf := b[:]
+		offset += uint32(l)
+		ps.Username = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
+
+		// read domain
+		l = bytes.ReadUint16(b[idx+offset:])
+		idx += 2
+		buf = b[:]
+		offset += uint32(l)
+		ps.Domain = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
 	}
 
 	return nil

@@ -22,6 +22,7 @@ import (
 	"errors"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"testing"
+	"time"
 )
 
 func TestParser(t *testing.T) {
@@ -158,6 +159,144 @@ func TestExpandMacros(t *testing.T) {
 		}
 		if tt.expectedExpr != "" && expr.String() != tt.expectedExpr {
 			t.Errorf("%d. exp=%s expected expr=%v", i, expr.String(), tt.expectedExpr)
+		}
+	}
+}
+
+func TestParseSequence(t *testing.T) {
+	var tests = []struct {
+		expr          string
+		err           error
+		maxSpan       time.Duration
+		isConstrained bool
+	}{
+		{
+			`kevt.name = 'CreateProcess'|
+			 |kevt.name = 'CreateFile'|
+			`,
+			errors.New("expected |"),
+			time.Duration(0),
+			false,
+		},
+		{
+			`|kevt.name = 'CreateProcess'
+			 kevt.name = 'CreateFile'|
+			`,
+			errors.New("expected operator, ')', ',', '|'"),
+			time.Duration(0),
+			false,
+		},
+		{
+			`|kevt.name = 'CreateProcess'|
+			 |kevt.name = 'CreateFile'
+			`,
+			errors.New("expected |"),
+			time.Duration(0),
+			false,
+		},
+		{
+			`|kevt.name = 'CreateProcess'|
+			 |kevt.name = 'CreateFile'|
+			`,
+			nil,
+			time.Duration(0),
+			false,
+		},
+		{
+			`|kevt.name = 'CreateProcess'| by ps.exe
+			 |kevt.name = 'CreateFile'| by file.name
+			`,
+			nil,
+			time.Duration(0),
+			true,
+		},
+		{
+
+			`by ps.pid
+			 |kevt.name = 'CreateProcess'|
+			 |kevt.name = 'CreateFile'|
+			`,
+			nil,
+			time.Duration(0),
+			true,
+		},
+		{
+
+			`by ps.pid
+			 |kevt.name = 'CreateProcess'| by ps.pid
+			 |kevt.name = 'CreateFile'|
+			`,
+			errors.New("all expressions require the 'by' statement"),
+			time.Duration(0),
+			false,
+		},
+		{
+
+			`|kevt.name = 'CreateProcess'| by ps.pid
+			 |kevt.name = 'CreateFile'|
+			`,
+			errors.New("all expressions require the 'by' statement"),
+			time.Duration(0),
+			true,
+		},
+		{
+
+			`maxspan 20s
+             by ps.pid
+			 |kevt.name = 'CreateProcess'| by ps.pid
+			 |kevt.name = 'CreateFile'| by ps.pid
+			`,
+			nil,
+			time.Second * 20,
+			true,
+		},
+		{
+
+			`maxspan 30s
+			 |kevt.name = 'CreateProcess'|
+			 |kevt.name = 'CreateFile'|
+			`,
+			nil,
+			time.Second * 30,
+			false,
+		},
+		{
+
+			`maxspan 30s
+			 |kevt.name = 'CreateProcess'| as e1
+			 |kevt.name = 'CreateFile' and $e1.ps.name = file.name |
+			`,
+			nil,
+			time.Second * 30,
+			false,
+		},
+		{
+
+			`maxspan 30s
+			 |kevt.name = 'CreateProcess'| as e1
+			 |kevt.name = 'CreateFile' and $e1.ps.ame = file.name |
+			`,
+			errors.New("expected field after bound ref"),
+			time.Second * 30,
+			false,
+		},
+	}
+
+	for i, tt := range tests {
+		p := NewParser(tt.expr)
+		seq, err := p.ParseSequence()
+		if err == nil && tt.err != nil {
+			t.Errorf("%d. exp=%s expected error=\n%v", i, tt.expr, tt.err)
+		} else if err != nil && tt.err == nil {
+			t.Errorf("%d. exp=%s got error=\n%v", i, tt.expr, err)
+		}
+		if seq != nil {
+			if seq.MaxSpan != tt.maxSpan {
+				t.Errorf("%d. exp=%s maxspan=%s got maxspan=%v", i, tt.expr, tt.maxSpan, seq.MaxSpan)
+			}
+			if seq.IsConstrained() != tt.isConstrained {
+				t.Errorf("%d. exp=%s isConstrained=%t got isConstrained=%t", i, tt.expr, tt.isConstrained, seq.IsConstrained())
+			}
 		}
 	}
 }

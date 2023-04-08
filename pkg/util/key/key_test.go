@@ -22,8 +22,8 @@
 package key
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/zsyscall/registry"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/sys/windows"
 	"testing"
 )
 
@@ -35,26 +35,26 @@ func init() {
 
 func TestFormatKey(t *testing.T) {
 	root, key := Format(`\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\Windows Workflow Foundation 4.0.0.0\Linkage`)
-	assert.Equal(t, registry.LocalMachine, root)
+	assert.Equal(t, windows.HKEY_LOCAL_MACHINE, root)
 	assert.Equal(t, `SYSTEM\ControlSet001\Services\Windows Workflow Foundation 4.0.0.0\Linkage`, key)
 
 	root, key = Format(`\Registry\Machine\SYSTEM\ControlSet001\Services\Windows Workflow Foundation 4.0.0.0\Linkage`)
-	assert.Equal(t, registry.LocalMachine, root)
+	assert.Equal(t, windows.HKEY_LOCAL_MACHINE, root)
 	assert.Equal(t, `SYSTEM\ControlSet001\Services\Windows Workflow Foundation 4.0.0.0\Linkage`, key)
 
 	root, key = Format(`\REGISTRY\MACHINE`)
-	assert.Equal(t, registry.LocalMachine, root)
+	assert.Equal(t, windows.HKEY_LOCAL_MACHINE, root)
 	assert.Empty(t, key)
 
 	root, key = Format(`\REGISTRY\USER\S-1-5-21-2271034452-2606270099-984871569-500\Console`)
-	assert.Equal(t, registry.CurrentUser, root)
+	assert.Equal(t, windows.HKEY_CURRENT_USER, root)
 	assert.Equal(t, `Console`, key)
 
 	root, key = Format(`\REGISTRY\USER\S-1-5-21-2271034452-2606270099-984871569-500\_Classes`)
-	assert.Equal(t, registry.CurrentUser, root)
+	assert.Equal(t, windows.HKEY_CURRENT_USER, root)
 	assert.Equal(t, `Software\Classes`, key)
 
 	root, key = Format(`\REGISTRY\USER\S-1-5-21-2271034452-2606270099-984871569-500\_Classes\.all`)
-	assert.Equal(t, registry.CurrentUser, root)
+	assert.Equal(t, windows.HKEY_CURRENT_USER, root)
 	assert.Equal(t, `Software\Classes\.all`, key)
 }

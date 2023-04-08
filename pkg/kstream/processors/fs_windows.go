@@ -20,7 +20,6 @@ package processors
 
 import (
 	"expvar"
-	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
@@ -40,43 +39,42 @@ var (
 
 type fsProcessor struct {
 	// files stores the file metadata indexed by file object
-	files map[uint64]*fileInfo
+	files map[uint64]*FileInfo
 	hsnap handle.Snapshotter
 	// irps contains a mapping between the IRP and the CreateFile events
 	irps map[uint64]*kevent.Kevent
 }
 
-type fileInfo struct {
-	name string
-	typ  fs.FileType
+// FileInfo stores file information obtained from event state.
+type FileInfo struct {
+	Name string
+	Type fs.FileType
 }
 
 func newFsProcessor(hsnap handle.Snapshotter) Processor {
-	interceptor := &fsProcessor{
-		files: make(map[uint64]*fileInfo),
+	return &fsProcessor{
+		files: make(map[uint64]*FileInfo),
 		irps:  make(map[uint64]*kevent.Kevent),
 		hsnap: hsnap,
 	}
-	return interceptor
 }
 
-func (f *fsProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Batch, bool, error) {
+func (f *fsProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error) {
 	if e.Category == ktypes.File {
-		e.Tid, _ = e.Kparams.GetTid()
-		evts, err := f.processEvent(e)
-		return evts, false, err
+		evt, err := f.processEvent(e)
+		return evt, false, err
 	}
-	return nil, true, nil
+	return e, true, nil
 }
 
 func (*fsProcessor) Name() ProcessorType { return Fs }
 func (f *fsProcessor) Close()            {}
 
-func (f *fsProcessor) getFileInfo(name string, opts uint32) *fileInfo {
-	return &fileInfo{name: name, typ: fs.GetFileType(name, opts)}
+func (f *fsProcessor) getFileInfo(name string, opts uint32) *FileInfo {
+	return &FileInfo{Name: name, Type: fs.GetFileType(name, opts)}
 }
 
-func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Batch, error) {
+func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 	switch e.Type {
 	case ktypes.FileRundown:
 		// when the file rundown event comes in we store the file info
@@ -86,15 +84,15 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Batch, error) {
 		fileObject := e.Kparams.MustGetUint64(kparams.FileObject)
 		if _, ok := f.files[fileObject]; !ok {
 			totalRundownFiles.Add(1)
-			f.files[fileObject] = &fileInfo{name: filename, typ: fs.GetFileType(filename, 0)}
+			f.files[fileObject] = &FileInfo{Name: filename, Type: fs.GetFileType(filename, 0)}
 		}
 	case ktypes.CreateFile:
 		// we defer the processing of the CreateFile event until we get
 		// the matching FileOpEnd event. This event contains the operation
 		// that was done on behalf of the file, e.g. create or open.
 		irp := e.Kparams.MustGetUint64(kparams.FileIrpPtr)
+		e.WaitEnqueue = true
 		f.irps[irp] = e
-		return kevent.NewBatch(e), kerrors.ErrCancelUpstreamKevent
 	case ktypes.FileOpEnd:
 		// get the CreateFile pending event by IRP identifier
 		// and fetch the file create disposition value
@@ -103,34 +101,31 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Batch, error) {
 			dispo  = e.Kparams.MustGetUint64(kparams.FileExtraInfo)
 			status = e.Kparams.MustGetUint32(kparams.NTStatus)
 		)
-		fevt, ok := f.irps[irp]
+		ev, ok := f.irps[irp]
 		if !ok {
-			return kevent.NewBatch(e), nil
+			return e, nil
 		}
-		e = fevt
 		delete(f.irps, irp)
-		fileObject := e.Kparams.MustGetUint64(kparams.FileObject)
+		// reset the wait status to allow passage of this event to
+		// the aggregator queue. Additionally, append params to it
+		ev.WaitEnqueue = false
+		fileObject := ev.Kparams.MustGetUint64(kparams.FileObject)
 		// try to get extended file info. If the file object is already
 		// present in the map, we'll reuse the existing file information
 		fileinfo, ok := f.files[fileObject]
 		if !ok {
-			opts := e.Kparams.MustGetUint32(kparams.FileCreateOptions)
+			opts := ev.Kparams.MustGetUint32(kparams.FileCreateOptions)
 			opts &= 0xFFFFFF
-
 			filename := e.GetParamAsString(kparams.FileName)
 			fileinfo = f.getFileInfo(filename, opts)
-			// file type couldn't be resolved, so we perform the lookup
-			// in system handles to determine whether file object is
-			// a directory
-			if fileinfo.typ == fs.Unknown {
-				fileinfo.typ = f.findDirHandle(fileObject)
-			}
 			f.files[fileObject] = fileinfo
 		}
-		e.AppendParam(kparams.NTStatus, kparams.Status, status)
-		e.AppendParam(kparams.FileType, kparams.Enum, uint32(fileinfo.typ), kevent.WithEnum(fs.FileTypes))
-		e.AppendParam(kparams.FileOperation, kparams.Enum, uint32(dispo), kevent.WithEnum(fs.FileCreateDispositions))
-		return kevent.NewBatch(e), nil
+		ev.AppendParam(kparams.NTStatus, kparams.Status, status)
+		if fileinfo.Type != fs.Unknown {
+			ev.AppendEnum(kparams.FileType, uint32(fileinfo.Type), kevent.WithEnum(fs.FileTypes))
+		}
+		ev.AppendEnum(kparams.FileOperation, uint32(dispo), kevent.WithEnum(fs.FileCreateDispositions))
+		return ev, nil
 	case ktypes.ReleaseFile:
 		fileReleaseCount.Add(1)
 		// delete both, the file object and the file key from files map
@@ -156,25 +151,25 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Batch, error) {
 			// the file key parameter contains the reference to the directory name
 			fileKey, err := e.Kparams.GetUint64(kparams.FileKey)
 			if err != nil {
-				return kevent.NewBatch(e), err
+				return e, err
 			}
 			fileinfo, ok := f.files[fileKey]
 			if ok && fileinfo != nil {
-				e.AppendParam(kparams.FileDirectory, kparams.FilePath, fileinfo.name)
+				e.AppendParam(kparams.FileDirectory, kparams.FilePath, fileinfo.Name)
 			}
 			break
 		}
 		if fileinfo != nil {
-			if fileinfo.typ != fs.Unknown {
-				e.AppendParam(kparams.FileType, kparams.Enum, uint32(fileinfo.typ), kevent.WithEnum(fs.FileTypes))
+			if fileinfo.Type != fs.Unknown {
+				e.AppendEnum(kparams.FileType, uint32(fileinfo.Type), kevent.WithEnum(fs.FileTypes))
 			}
-			e.AppendParam(kparams.FileName, kparams.FilePath, fileinfo.name)
+			e.AppendParam(kparams.FileName, kparams.FilePath, fileinfo.Name)
 		}
 	}
-	return kevent.NewBatch(e), nil
+	return e, nil
 }
 
-func (f *fsProcessor) findFile(fileKey, fileObject uint64) *fileInfo {
+func (f *fsProcessor) findFile(fileKey, fileObject uint64) *FileInfo {
 	fileinfo, ok := f.files[fileKey]
 	if ok {
 		return fileinfo
@@ -184,26 +179,11 @@ func (f *fsProcessor) findFile(fileKey, fileObject uint64) *fileInfo {
 		return fileinfo
 	}
 	// look in the system handles for file objects
-	var h htypes.Handle
-	h, ok = f.hsnap.FindByObject(fileObject)
-	if ok && h.Type == handle.File {
+	var file htypes.Handle
+	file, ok = f.hsnap.FindByObject(fileObject)
+	if ok && file.Type == handle.File {
 		fileObjectHandleHits.Add(1)
-		return &fileInfo{name: h.Name, typ: fs.GetFileType(h.Name, 0)}
+		return &FileInfo{Name: file.Name, Type: fs.GetFileType(file.Name, 0)}
 	}
 	return nil
-}
-
-func (f *fsProcessor) findDirHandle(fileObject uint64) fs.FileType {
-	h, ok := f.hsnap.FindByObject(fileObject)
-	if !ok || h.Type != handle.File {
-		return fs.Unknown
-	}
-	if h.MD == nil {
-		return fs.Unknown
-	}
-	md, ok := h.MD.(*htypes.FileInfo)
-	if ok && md.IsDirectory {
-		return fs.Directory
-	}
-	return fs.Unknown
 }

@@ -33,7 +33,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kstream/processors"
 	"github.com/rabbitstack/fibratus/pkg/ps"
-	"github.com/rabbitstack/fibratus/pkg/zsyscall/etw"
+	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -47,21 +47,17 @@ var (
 	failedKevents = expvar.NewMap("kstream.kevents.failures")
 	// keventsEnqueued counts the number of events that are pushed to the queue
 	keventsEnqueued = expvar.NewInt("kstream.kevents.enqueued")
+	// keventsDropped counts the number of overall dropped events
+	keventsDropped = expvar.NewInt("kstream.kevents.dropped")
 
 	// excludedKevents counts the number of excluded events
 	excludedKevents = expvar.NewInt("kstream.excluded.kevents")
 	// excludedProcs counts the number of excluded events by image name
 	excludedProcs = expvar.NewInt("kstream.excluded.procs")
 
-	// upstreamCancellations counts the event cancellations in interceptors
-	upstreamCancellations = expvar.NewInt("kstream.upstream.cancellations")
-
 	// buffersRead amount of buffers fetched from the ETW session
 	buffersRead = expvar.NewInt("kstream.kbuffers.read")
 )
-
-// EventCallbackFunc is the type alias for the event callback function
-type EventCallbackFunc func(*kevent.Kevent) error
 
 type kstreamConsumer struct {
 	traceHandles []etw.TraceHandle // trace session handles
@@ -73,13 +69,12 @@ type kstreamConsumer struct {
 
 	config *config.Config // main configuration
 
-	psnapshotter ps.Snapshotter    // process state tracker
-	sequencer    *kevent.Sequencer // event sequence manager
+	psnap     ps.Snapshotter    // process state tracker
+	sequencer *kevent.Sequencer // event sequence manager
 
 	filter filter.Filter
 
-	capture bool // capture determines if events are dumped to capture files
-
+	capture       bool              // capture determines if events are dumped to capture files
 	eventCallback EventCallbackFunc // called on each incoming event
 }
 
@@ -94,19 +89,19 @@ func NewConsumer(
 	config *config.Config,
 ) Consumer {
 	kconsumer := &kstreamConsumer{
-		errs:         make(chan error, 1000),
-		kevts:        make(chan *kevent.Kevent, 500),
-		config:       config,
-		psnapshotter: psnap,
-		capture:      config.KcapFile != "",
-		sequencer:    kevent.NewSequencer(),
-		processors:   processors.NewChain(psnap, hsnap, config),
+		errs:       make(chan error, 1000),
+		kevts:      make(chan *kevent.Kevent, 500),
+		config:     config,
+		psnap:      psnap,
+		capture:    config.KcapFile != "",
+		sequencer:  kevent.NewSequencer(),
+		processors: processors.NewChain(psnap, hsnap, config),
 	}
 
 	return kconsumer
 }
 
-// SetFilter initializes the filter that's applied on the kernel events.
+// SetFilter initializes the filter that's applied on events.
 func (k *kstreamConsumer) SetFilter(filter filter.Filter) { k.filter = filter }
 
 // OpenKstream initializes the event stream by setting the event record callback and instructing it
@@ -131,14 +126,12 @@ func (k *kstreamConsumer) openKstream(loggerName string) error {
 		LoggerName:     windows.StringToUTF16Ptr(loggerName),
 		BufferCallback: syscall.NewCallback(k.bufferStatsCallback),
 	}
-
-	cb := syscall.NewCallback(k.processEventCallback)
-
+	fn := syscall.NewCallback(k.processEventCallback)
 	modes := uint32(etw.ProcessTraceModeRealtime | etw.ProcessTraceModeEventRecord)
 	// initialize real time trace mode and event callback functions
 	// via these nasty pointer accesses to unions inside the structure
 	*(*uint32)(unsafe.Pointer(&trace.LogFileMode[0])) = modes
-	*(*uintptr)(unsafe.Pointer(&trace.EventCallback[4])) = cb
+	*(*uintptr)(unsafe.Pointer(&trace.EventCallback[4])) = fn
 
 	traceHandle := etw.OpenTrace(trace)
 	if !traceHandle.IsValid() {
@@ -213,98 +206,80 @@ func (k *kstreamConsumer) bufferStatsCallback(logfile *etw.EventTraceLogfile) ui
 // processEventCallback is the event callback function signature that is called each time
 // a new event is available on the session buffer. It does the heavy lifting of parsing inbound
 // ETW events from raw data buffers, building the state machine, and pushing events to the channel.
-func (k *kstreamConsumer) processEventCallback(evt *etw.EventRecord) uintptr {
-	if err := k.processEvent(evt); err != nil {
+func (k *kstreamConsumer) processEventCallback(ev *etw.EventRecord) uintptr {
+	if err := k.processEvent(ev); err != nil {
 		k.errs <- err
 		failedKevents.Add(err.Error(), 1)
 	}
 	return callbackNext
 }
 
-func (k *kstreamConsumer) processEvent(evt *etw.EventRecord) error {
-	e := kevent.New(k.sequencer.Get(), evt)
-	if e == nil {
-		return nil
-	}
-	// dispatch each event to the processor chain that will
-	// further augment the event with useful fields, route events
-	// to the corresponding snapshotters or initialize open files
-	// and registry control blocks at the beginning of the kernel
-	// trace session
-	evts, err := k.processors.ProcessEvent(e)
-	if err != nil {
-		if kerrors.IsCancelUpstreamKevent(err) {
-			upstreamCancellations.Add(1)
-			return nil
-		}
-		return err
-	}
-	return evts.Publish(k.publishEvent)
-}
-
-func (k *kstreamConsumer) publishEvent(e *kevent.Kevent) error {
-	// try to drop events from excluded processes
-	proc := k.psnapshotter.Find(e.PID)
-	if k.config.Kstream.ExcludeImage(proc) {
-		e.Release()
-		excludedProcs.Add(1)
-		return nil
-	}
-	// associate process' state with the kernel event. We only override the process'
-	// state if it hasn't been set previously like in the situation where captures
-	// are being taken. The kernel events that construct the process' snapshot also
-	// have attached process state, so simply by replaying the flow of these events
-	// we are able to reconstruct system-wide process state.
-	if e.PS == nil {
-		e.PS = proc
-	}
-	if k.isEventDropped(e) {
-		e.Release()
-		return nil
-	}
-	// increment sequence
-	if !e.IsState() {
-		k.sequencer.Increment()
-	}
-	if k.eventCallback != nil {
-		return k.eventCallback(e)
-	}
-	k.kevts <- e
-	keventsEnqueued.Add(1)
-	return nil
-}
-
-// isEventDropped discards the event before it hits the output channel.
-// Dropping an event occurs if any of the following conditions
-// are met:
-//
-// - event is solely used for building internal state of either
-// needs to be stored in the capture file for the purpose of restoring
-// the state
-// - process that produced the event is fibratus itself
-// - event is present in the exclude list, and thus it is always dropped
-// - finally, the event is handled by the CLI filter
-func (k *kstreamConsumer) isEventDropped(e *kevent.Kevent) bool {
-	// drop events used for state management unless we're
-	// writing to capture. Also, drop duplicate rundown events
-	if e.IsState() && !k.capture {
+func (k *kstreamConsumer) isEventDropped(evt *kevent.Kevent) bool {
+	if evt.IsDropped(k.capture) {
 		return true
 	}
-	if e.IsRundown() && e.IsRundownProcessed() {
-		return true
-	}
-	// ignores anything produced by fibratus process
-	if e.CurrentPid() {
-		return true
-	}
-	// discard excluded event types
-	if k.config.Kstream.ExcludeKevent(e) {
+	if k.config.Kstream.ExcludeKevent(evt) {
 		excludedKevents.Add(1)
 		return true
 	}
-	// fallback to CLI filter
+	if k.config.Kstream.ExcludeImage(evt.PS) {
+		excludedProcs.Add(1)
+		return true
+	}
 	if k.filter != nil {
-		return !k.filter.Run(e)
+		return !k.filter.Run(evt)
 	}
 	return false
+}
+
+func (k *kstreamConsumer) processEvent(ev *etw.EventRecord) error {
+	evt := kevent.New(k.sequencer.Get(), ev)
+	if evt == nil {
+		return nil
+	}
+	// Dispatch each event to the processor chain.
+	// Processors may further augment the event with
+	// useful fields or play the role of state managers.
+	// Scanning open files and registry control blocks
+	// at the beginning of the kernel trace session is an
+	// example of state management
+	var err error
+	evt, err = k.processors.ProcessEvent(evt)
+	if err != nil {
+		return err
+	}
+	if evt.WaitEnqueue {
+		return nil
+	}
+	if k.isEventDropped(evt) {
+		evt.Release()
+		keventsDropped.Add(1)
+		return nil
+	}
+	ok, proc := k.psnap.Find(evt.PID)
+	if !ok {
+		k.psnap.Put(proc)
+	}
+	// Associate process' state with the event.
+	// We only override the process' state if it hasn't
+	// been set previously such as in the situation where
+	// captures are being taken. Events that construct
+	// the process' snapshot also have attached process
+	// state, so simply by replaying the flow of these
+	// events we are able to reconstruct system-wide
+	// process state.
+	if evt.PS == nil {
+		evt.PS = proc
+	}
+	// Increment sequence
+	if !evt.IsState() {
+		k.sequencer.Increment()
+	}
+	// Invoke callback function
+	if k.eventCallback != nil {
+		return k.eventCallback(evt)
+	}
+	k.kevts <- evt
+	keventsEnqueued.Add(1)
+	return nil
 }

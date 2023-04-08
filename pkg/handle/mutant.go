@@ -23,7 +23,7 @@ package handle
 
 import (
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
-	"github.com/rabbitstack/fibratus/pkg/zsyscall"
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	"golang.org/x/sys/windows"
 	"unsafe"
 )
@@ -31,7 +31,7 @@ import (
 // GetMutant gets the information about specified mutant handle.
 func GetMutant(handle windows.Handle) (*htypes.MutantInfo, error) {
 	b := make([]byte, 8)
-	err := zsyscall.NtQueryMutant(handle, zsyscall.MutantBasicInformationClass, unsafe.Pointer(&b[0]), uint32(len(b)), nil)
+	err := sys.NtQueryMutant(handle, sys.MutantBasicInformationClass, unsafe.Pointer(&b[0]), uint32(len(b)), nil)
 	if err != nil {
 		return nil, err
 	}

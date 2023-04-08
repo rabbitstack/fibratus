@@ -44,7 +44,12 @@ type Snapshotter interface {
 	// Remove deletes process's state from the snapshotter.
 	Remove(kevt *kevent.Kevent) error
 	// Find attempts to retrieve process' state for the specified process identifier.
-	Find(pid uint32) *pstypes.PS
+	Find(pid uint32) (bool, *pstypes.PS)
+	// FindAndPut attempts to retrieve process' state for the specified process identifier.
+	// If the process is found, the snapshotter state is updated with the new process.
+	FindAndPut(pid uint32) *pstypes.PS
+	// Put inserts the process state into snapshotter.
+	Put(*pstypes.PS)
 	// Size returns the total number of process state items.
 	Size() uint32
 	// Close closes process snapshotter and disposes all allocated resources.

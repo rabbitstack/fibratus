@@ -21,7 +21,7 @@ package kstream
 import (
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/errors"
-	"github.com/rabbitstack/fibratus/pkg/zsyscall/etw"
+	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"syscall"

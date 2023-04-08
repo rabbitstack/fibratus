@@ -21,7 +21,6 @@ package processors
 import (
 	"expvar"
 	"fmt"
-	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 )
@@ -34,7 +33,7 @@ type Chain interface {
 	// ProcessEvent pushes the event into processor chain. Processors are applied sequentially, so we have to make
 	// sure that any processor providing additional context to the next processor is defined first in the chain. If
 	// one processor fails, the next processor in chain is invoked.
-	ProcessEvent(kevt *kevent.Kevent) (*kevent.Batch, error)
+	ProcessEvent(kevt *kevent.Kevent) (*kevent.Kevent, error)
 	// Close closes the processor chain and frees all allocated resources.
 	Close() error
 }
@@ -46,34 +45,28 @@ func (c *chain) addProcessor(processor Processor) {
 	c.processors = append(c.processors, processor)
 }
 
-func (c chain) ProcessEvent(kevt *kevent.Kevent) (*kevent.Batch, error) {
+func (c chain) ProcessEvent(kevt *kevent.Kevent) (*kevent.Kevent, error) {
 	var errs = make([]error, 0)
-	var evts *kevent.Batch
+	var evt *kevent.Kevent
 
 	for _, processor := range c.processors {
-		var next bool
 		var err error
-		evts, next, err = processor.ProcessEvent(kevt)
+		var next bool
+		evt, next, err = processor.ProcessEvent(kevt)
 		if err != nil {
-			if !kerrors.IsCancelUpstreamKevent(err) {
-				processorFailures.Add(1)
-				errs = append(errs, fmt.Errorf("%q processor failed with error: %v", processor.Name(), err))
-				continue
-			} else {
-				return evts, err
-			}
+			processorFailures.Add(1)
+			errs = append(errs, fmt.Errorf("%q processor failed with error: %v", processor.Name(), err))
+			continue
 		}
 		if !next {
 			break
 		}
 	}
-	if evts == nil {
-		evts = kevent.NewBatch(kevt)
-	}
 	if len(errs) > 0 {
-		return evts, multierror.Wrap(errs...)
+		return evt, multierror.Wrap(errs...)
 	}
-	return evts, nil
+
+	return evt, nil
 }
 
 // Close closes the processor chain and frees all allocated resources.

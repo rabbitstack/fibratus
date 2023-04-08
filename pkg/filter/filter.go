@@ -32,39 +32,44 @@ import (
 )
 
 var (
+	// ErrNoFields signals an error that happens when the filter is declared without any fields
+	ErrNoFields = errors.New("expected at least one field or operator but zero found")
+	// accessorErrors counts the errors produced by the field accessors
 	accessorErrors = expvar.NewMap("filter.accessor.errors")
-	errNoFields    = errors.New("expected at least one field or operator but zero found")
 )
 
-// Filter is the main interface for the filter engine implementors.
+// Filter is the main interface for the filter engine implementors. Filter can either
+// be a single expression combined by various subexpressions connected by operators, or
+// it can be a sequence of expressions.
 type Filter interface {
-	// Compile compiles the filter by parsing the filtering expression.
+	// Compile compiles the filter by parsing the sequence/expression.
 	Compile() error
-	// Run runs a filter on the inbound kernel event and decides whether the event
-	// should be dropped or propagated to the downstream channel.
+	// Run runs a filter with a single expression. The return value decides
+	// if the incoming event has successfully matched the filter expression.
 	Run(kevt *kevent.Kevent) bool
-	// RunPartials runs a filter with stateful event tracking. Partials store all
-	// intermediate events that are the result of previous filter matches.
-	RunPartials(kevt *kevent.Kevent, partials map[uint16][]*kevent.Kevent) (bool, uint16, *kevent.Kevent)
-	// BindingIndex returns the binding index to which the filter is bound
-	// or a zero value if there are no pattern bindings defined.
-	BindingIndex() (uint16, bool)
-	// GetStringFields returns field names mapped to their string values
+	// RunSequence runs a filter with sequence expressions. Sequence rules depend
+	// on the state machine transitions and partial matches to decide whether the
+	// rule is fired.
+	RunSequence(kevt *kevent.Kevent, seqID uint16, partials map[uint16][]*kevent.Kevent) bool
+	// GetStringFields returns field names mapped to their string values.
 	GetStringFields() map[fields.Field][]string
+	// GetFields returns all field used in the filter expression.
+	GetFields() []fields.Field
+	// GetSequence returns the sequence descriptor or nil if this filter is not a sequence.
+	GetSequence() *ql.Sequence
+	// IsSequence determines if this filter is a sequence.
+	IsSequence() bool
 }
 
 type filter struct {
-	expr      ql.Expr
-	parser    *ql.Parser
-	accessors []accessor
-	fields    []fields.Field
-	bindings  map[uint16][]*ql.PatternBindingLiteral
+	expr        ql.Expr
+	seq         *ql.Sequence
+	parser      *ql.Parser
+	accessors   []accessor
+	fields      []fields.Field
+	boundFields []*ql.BoundFieldLiteral
 	// useFuncValuer determines whether we should supply the function valuer
 	useFuncValuer bool
-	// useProcAccessor indicates if the process accessor is called by this filter
-	useProcAccessor bool
-	// useKevtAccessor indicates if the event accessor is called by this filter
-	useKevtAccessor bool
 	// stringFields contains filter field names mapped to their string values
 	stringFields map[fields.Field][]string
 }
@@ -79,160 +84,180 @@ type filter struct {
 // until all nodes are visited.
 func (f *filter) Compile() error {
 	var err error
-	f.expr, err = f.parser.ParseExpr()
+	if f.parser.IsSequence() {
+		f.seq, err = f.parser.ParseSequence()
+	} else {
+		f.expr, err = f.parser.ParseExpr()
+	}
 	if err != nil {
 		return err
 	}
 
+	// traverse the expression tree
 	walk := func(n ql.Node) {
-		if expr, ok := n.(*ql.BinaryExpr); ok {
+		switch expr := n.(type) {
+		case *ql.BinaryExpr:
 			if lhs, ok := expr.LHS.(*ql.FieldLiteral); ok {
 				field := fields.Field(lhs.Value)
-				f.fields = append(f.fields, field)
-				switch v := expr.RHS.(type) {
-				case *ql.StringLiteral:
-					f.stringFields[field] = append(f.stringFields[field], v.Value)
-				case *ql.ListLiteral:
-					f.stringFields[field] = append(f.stringFields[field], v.Values...)
-				}
+				f.addField(field)
+				f.addStringFields(field, expr.RHS)
 			}
 			if rhs, ok := expr.RHS.(*ql.FieldLiteral); ok {
 				field := fields.Field(rhs.Value)
-				f.fields = append(f.fields, field)
-				switch v := expr.LHS.(type) {
-				case *ql.StringLiteral:
-					f.stringFields[field] = append(f.stringFields[field], v.Value)
-				case *ql.ListLiteral:
-					f.stringFields[field] = append(f.stringFields[field], v.Values...)
-				}
+				f.addField(field)
+				f.addStringFields(field, expr.LHS)
 			}
-			if rhs, ok := expr.RHS.(*ql.PatternBindingLiteral); ok {
-				f.bindings[rhs.Index()] = append(f.bindings[rhs.Index()], rhs)
+			if lhs, ok := expr.LHS.(*ql.BoundFieldLiteral); ok {
+				f.addBoundField(lhs)
 			}
-		}
-		if expr, ok := n.(*ql.Function); ok {
+			if rhs, ok := expr.RHS.(*ql.BoundFieldLiteral); ok {
+				f.addBoundField(rhs)
+			}
+		case *ql.Function:
 			f.useFuncValuer = true
 			for _, arg := range expr.Args {
-				if fld, ok := arg.(*ql.FieldLiteral); ok {
-					f.fields = append(f.fields, fields.Field(fld.Value))
+				if field, ok := arg.(*ql.FieldLiteral); ok {
+					f.addField(fields.Field(field.Value))
+				}
+				if field, ok := arg.(*ql.BoundFieldLiteral); ok {
+					f.addBoundField(field)
 				}
 			}
 		}
 	}
-	ql.WalkFunc(f.expr, walk)
-
-	if len(f.fields) == 0 {
-		return errNoFields
-	}
-
-	for _, field := range f.fields {
-		switch {
-		case field.IsKevtField():
-			f.useKevtAccessor = true
-		case field.IsPsField():
-			f.useProcAccessor = true
+	if f.expr != nil {
+		ql.WalkFunc(f.expr, walk)
+	} else {
+		if !f.seq.By.IsEmpty() {
+			f.addField(f.seq.By)
 		}
-	}
-
-	if len(f.bindings) > 1 {
-		bindings := make([]string, 0)
-		for _, b := range f.bindings {
-			for _, binding := range b {
-				bindings = append(bindings, binding.Value)
+		for _, expr := range f.seq.Expressions {
+			ql.WalkFunc(expr.Expr, walk)
+			if !expr.By.IsEmpty() {
+				f.addField(expr.By)
 			}
 		}
-		return fmt.Errorf("multiple pattern bindings found referencing "+
-			"distinct sequence events: %s", strings.Join(bindings, ","))
 	}
-	return nil
+	if len(f.fields) == 0 && !f.useFuncValuer {
+		return ErrNoFields
+	}
+	// only retain accessors for declared filter fields
+	f.narrowAccessors()
+	return f.checkBoundRefs()
 }
 
 func (f *filter) Run(kevt *kevent.Kevent) bool {
 	if f.expr == nil {
 		return false
 	}
-	return ql.Eval(f.expr, f.mapValuer(kevt), nil, f.useFuncValuer)
+	return ql.Eval(f.expr, f.mapValuer(kevt), f.useFuncValuer)
 }
 
-func (f *filter) RunPartials(kevt *kevent.Kevent, partials map[uint16][]*kevent.Kevent) (bool, uint16, *kevent.Kevent) {
-	if f.expr == nil {
-		return false, 0, nil
+func (f *filter) RunSequence(kevt *kevent.Kevent, seqID uint16, partials map[uint16][]*kevent.Kevent) bool {
+	if f.seq == nil {
+		return false
 	}
-	mapValuer := f.mapValuer(kevt)
-	i, ok := f.BindingIndex()
-	if !ok {
-		return false, 0, nil
+	nseqs := uint16(len(f.seq.Expressions))
+	if seqID > nseqs-1 {
+		return false
 	}
-	kevts := partials[i]
-	for _, e := range kevts {
-		valuer := f.bindingValuer(e, i)
-		ok := ql.Eval(f.expr, mapValuer, valuer, f.useFuncValuer)
-		if ok {
-			return true, i, e
+	valuer := f.mapValuer(kevt)
+	expr := f.seq.Expressions[seqID]
+
+	var match bool
+	if seqID >= 1 && expr.HasBoundFields() {
+		// if a sequence expression contains references to
+		// bound fields we map all partials to their sequence
+		// aliases
+		p := make(map[string][]*kevent.Kevent)
+		nslots := len(partials[seqID])
+		for i := uint16(0); i < seqID; i++ {
+			alias := f.seq.Expressions[i].Alias
+			if alias == "" {
+				continue
+			}
+			p[alias] = partials[i+1]
+			if len(p[alias]) > nslots {
+				nslots = len(p[alias])
+			}
 		}
-	}
-	return false, 0, nil
-}
-
-func (f *filter) BindingIndex() (uint16, bool) {
-	if len(f.bindings) == 0 {
-		return 0, false
-	}
-	for i := range f.bindings {
-		return i, true
-	}
-	return 0, false
-}
-
-func (f filter) GetStringFields() map[fields.Field][]string { return f.stringFields }
-
-// mapValuer for each field present in the AST, we run the
-// accessors and extract the field values that are
-// supplied to the valuer. The valuer feeds the
-// expression with correct values.
-func (f *filter) mapValuer(kevt *kevent.Kevent) map[string]interface{} {
-	valuer := make(map[string]interface{}, len(f.fields))
-	for _, field := range f.fields {
-		for _, accessor := range f.accessors {
-			if !accessor.canAccess(kevt, f) {
-				continue
+		// process until partials from all slots are consumed
+		n := 0
+		for nslots > 0 {
+			nslots--
+			for _, field := range expr.BoundFields {
+				evts := p[field.Alias()]
+				var evt *kevent.Kevent
+				if n > len(evts)-1 {
+					// pick the latest event if all
+					// events for this slot are consumed
+					evt = evts[len(evts)-1]
+				} else {
+					evt = evts[n]
+				}
+				for _, accessor := range f.accessors {
+					v, err := accessor.get(field.Field(), evt)
+					if err != nil && !kerrors.IsKparamNotFound(err) {
+						accessorErrors.Add(err.Error(), 1)
+						continue
+					}
+					if v != nil {
+						valuer[field.String()] = v
+						break
+					}
+				}
 			}
-			v, err := accessor.get(field, kevt)
-			if err != nil && !kerrors.IsKparamNotFound(err) {
-				accessorErrors.Add(err.Error(), 1)
-				continue
-			}
-			if v != nil {
-				valuer[field.String()] = v
+			n++
+			match = ql.Eval(expr.Expr, valuer, f.useFuncValuer)
+			if match {
 				break
 			}
 		}
-	}
-	return valuer
-}
-
-// bindingValuer for each pattern binding node, resolves its value from
-// the event that pertains to the same pattern binding index.
-func (f *filter) bindingValuer(kevt *kevent.Kevent, idx uint16) map[string]interface{} {
-	valuer := make(map[string]interface{})
-	for _, binding := range f.bindings[idx] {
-		for _, accessor := range f.accessors {
-			if !accessor.canAccess(kevt, f) {
-				continue
+	} else {
+		by := f.seq.By
+		if by.IsEmpty() {
+			by = expr.By
+		}
+		if seqID >= 1 && !by.IsEmpty() {
+			// traverse upstream partials for join equality
+			joins := make([]bool, seqID)
+			joinID := valuer[by.String()]
+		outer:
+			for i := uint16(0); i < seqID; i++ {
+				for _, p := range partials[i+1] {
+					if compareSeqJoin(joinID, p.SequenceBy()) {
+						joins[i] = true
+						continue outer
+					}
+				}
 			}
-			v, err := accessor.get(binding.Field(), kevt)
-			if err != nil && !kerrors.IsKparamNotFound(err) {
-				accessorErrors.Add(err.Error(), 1)
-				continue
-			}
-			if v != nil {
-				valuer[binding.Value] = v
-				break
+			match = joinsEqual(joins) && ql.Eval(expr.Expr, valuer, f.useFuncValuer)
+		} else {
+			match = ql.Eval(expr.Expr, valuer, f.useFuncValuer)
+		}
+		if match && !by.IsEmpty() {
+			if v := valuer[by.String()]; v != nil {
+				kevt.AddMeta(kevent.RuleSequenceByKey, v)
 			}
 		}
 	}
-	return valuer
+	return match
 }
+
+func joinsEqual(joins []bool) bool {
+	for _, j := range joins {
+		if !j {
+			return false
+		}
+	}
+	return true
+}
+
+func (f *filter) GetStringFields() map[fields.Field][]string { return f.stringFields }
+func (f *filter) GetFields() []fields.Field                  { return f.fields }
+
+func (f *filter) IsSequence() bool          { return f.seq != nil }
+func (f *filter) GetSequence() *ql.Sequence { return f.seq }
 
 // InterpolateFields replaces all occurrences of field modifiers in the given string
 // with values extracted from the event. Field modifiers may contain a leading ordinal
@@ -284,4 +309,75 @@ func InterpolateFields(s string, evts []*kevent.Kevent) string {
 		}
 	}
 	return r
+}
+
+// mapValuer for each field present in the AST, we run the
+// accessors and extract the field values that are
+// supplied to the valuer. The valuer feeds the
+// expression with correct values.
+func (f *filter) mapValuer(kevt *kevent.Kevent) map[string]interface{} {
+	valuer := make(map[string]interface{}, len(f.fields))
+	for _, field := range f.fields {
+		for _, accessor := range f.accessors {
+			v, err := accessor.get(field, kevt)
+			if err != nil && !kerrors.IsKparamNotFound(err) {
+				accessorErrors.Add(err.Error(), 1)
+				continue
+			}
+			if v != nil {
+				valuer[field.String()] = v
+				break
+			}
+		}
+	}
+	return valuer
+}
+
+// addField appends a new field to the filter fields list.
+func (f *filter) addField(field fields.Field) {
+	for _, f := range f.fields {
+		if f.String() == field.String() {
+			return
+		}
+	}
+	f.fields = append(f.fields, field)
+}
+
+// addStringFields appends values for all string field expressions.
+func (f *filter) addStringFields(field fields.Field, expr ql.Expr) {
+	switch v := expr.(type) {
+	case *ql.StringLiteral:
+		f.stringFields[field] = append(f.stringFields[field], v.Value)
+	case *ql.ListLiteral:
+		f.stringFields[field] = append(f.stringFields[field], v.Values...)
+	}
+}
+
+// addBoundField appends a new bound field
+func (f *filter) addBoundField(field *ql.BoundFieldLiteral) {
+	f.boundFields = append(f.boundFields, field)
+}
+
+// checkBoundRefs checks if the bound field is referencing a valid alias.
+// If no valid alias is reference, this method returns an error specifying
+// an incorrect alias reference.
+func (f *filter) checkBoundRefs() error {
+	if f.seq == nil {
+		return nil
+	}
+	aliases := make(map[string]bool)
+	for _, expr := range f.seq.Expressions {
+		if expr.Alias == "" {
+			continue
+		}
+		aliases[expr.Alias] = true
+	}
+	for _, field := range f.boundFields {
+		if _, ok := aliases[field.Alias()]; !ok {
+			return fmt.Errorf("%s bound field references "+
+				"an invalid '$%s' event alias",
+				field.String(), field.Alias())
+		}
+	}
+	return nil
 }

@@ -163,6 +163,8 @@ const (
 	Flags
 	// Address is the memory address reference
 	Address
+	// HandleType represents the handle type such as Mutex or File
+	HandleType
 )
 
 // String return the type string representation.

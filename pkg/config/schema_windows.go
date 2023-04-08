@@ -489,16 +489,10 @@ var rulesSchema = `
 					"properties": {
 						"name": 		{"type": "string", "minLength": 3},
                         "description":  {"type": "string"},
-						"def": 			{"type": "string", "minLength": 3},
 						"condition": 	{"type": "string", "minLength": 3},
-						"action": 		{"type": "string"},
-						"max-span": 	{"type": "string", "minLength": 2, "pattern": "[0-9]+ms|s|m|h|d"}
+						"action": 		{"type": "string"}
 					},
-					"oneOf": [
-						{"required": ["def"]},
-						{"required": ["condition"]}
-					],
-					"required": ["name"],
+					"required": ["name", "condition"],
 					"minItems": 1,
 					"additionalProperties": false
 				}}},
@@ -509,34 +503,20 @@ var rulesSchema = `
 		"group": {"type": "string", "minLength": 1},
         "description":  {"type": "string"},
 		"enabled":  	{"type": "boolean"},
-		"policy":   	{"type": "string", "enum": ["include", "exclude", "sequence", "INCLUDE", "EXCLUDE", "SEQUENCE"]},
+		"policy":   	{"type": "string", "enum": ["include", "exclude", "INCLUDE", "EXCLUDE"]},
 		"relation": 	{"type": "string", "enum": ["or", "and", "OR", "AND"]},
 		"tags":			{"type": "array", "items": [{"type": "string", "minLength": 1}]},
-		"action":       {"type": "string"},
-		"from-strings": {"$ref": "#rules"},
 		"rules": 		{"$ref": "#rules"},
         "labels": {
   			"type": "object",
   			"additionalProperties": { "type": "string" }
 		}
 	},
-	"if": {
-		"properties": {"policy": {"const": "sequence" }}
-	},
-	"then": {
-		"required": ["group"],
-		"oneOf": [
-			{"required": ["from-strings"]},
-			{"required": ["rules"]}
-		]
-	},
-	"else": {
-		"required": ["group"],
-		"oneOf": [
-			{"required": ["from-strings"]},
-			{"required": ["rules"]}
-		]
-	},
+	"required": ["group"],
+	"oneOf": [
+		{"required": ["from-strings"]},
+		{"required": ["rules"]}
+	],
 	"additionalProperties": false
 }
 `

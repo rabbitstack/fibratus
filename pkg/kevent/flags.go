@@ -124,3 +124,9 @@ var FileAttributeFlags = []ParamFlag{
 	{"PINNED", 0x80000},
 	{"UNPINNED", 0x100000},
 }
+
+// FileCreateOptionsFlags describes file create options flags
+var FileCreateOptionsFlags = []ParamFlag{
+	{"OPEN_FOR_FREE_SPACE_QUERY", windows.FILE_OPEN_FOR_FREE_SPACE_QUERY},
+	{"OPEN_NO_RECALL", windows.FILE_OPEN_NO_RECALL},
+}

@@ -214,6 +214,14 @@ func (c Config) GetConfigFile() string {
 	return c.viper.GetString(configFile)
 }
 
+// GetRuleGroups returns all rule groups loaded into the engine.
+func (c Config) GetRuleGroups() []FilterGroup {
+	if c.Filters == nil {
+		return nil
+	}
+	return c.Filters.groups
+}
+
 // MustViperize adds the flag set to the Cobra command and binds them within the Viper flags.
 func (c *Config) MustViperize(cmd *cobra.Command) {
 	cmd.PersistentFlags().AddFlagSet(c.flags)

@@ -510,6 +510,20 @@ func (kpars Kparams) GetTime(name string) (time.Time, error) {
 	return v, nil
 }
 
+// MustGetTime returns the underlying time structure from the parameter or panics
+// if any errors occur.
+func (kpars Kparams) MustGetTime(name string) time.Time {
+	kpar, err := kpars.findParam(name)
+	if err != nil {
+		panic(err)
+	}
+	v, ok := kpar.Value.(time.Time)
+	if !ok {
+		panic(fmt.Errorf("unable to type cast %q parameter to Time value", name))
+	}
+	return v
+}
+
 // GetStringSlice returns the string slice from the event parameter.
 func (kpars Kparams) GetStringSlice(name string) ([]string, error) {
 	kpar, err := kpars.GetSlice(name)

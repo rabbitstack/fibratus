@@ -26,6 +26,7 @@ import (
 	"encoding/json"
 	"expvar"
 	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"html/template"
 	"os"
 	"path/filepath"
@@ -144,7 +145,7 @@ func (s scanner) newInternalScanner() (*yara.Scanner, error) {
 	if err != nil {
 		return nil, fmt.Errorf("fail to create yara scanner: %v", err)
 	}
-
+	defer sn.Destroy()
 	// set scan flags
 	var flags yara.ScanFlags
 	if s.config.FastScanMode {
@@ -163,70 +164,55 @@ func parseCompilerErrors(errors []yara.CompilerMessage) error {
 	return multierror.Wrap(errs...)
 }
 
-func (s scanner) ScanProc(pid uint32, kevt *kevent.Kevent) error {
-	proc := s.psnap.Find(pid)
-	if proc == nil {
-		return fmt.Errorf("cannot scan proc. pid %d does not exist in snapshotter state", pid)
-	}
-
-	if s.config.ShouldSkipProcess(proc.Name) {
-		return nil
-	}
-	var matches yara.MatchRules
-	sn, err := s.newInternalScanner()
+func (s scanner) ProcessEvent(evt *kevent.Kevent) bool {
+	err := s.scan(evt)
 	if err != nil {
-		return err
+		log.Error(err)
 	}
-	err = sn.SetCallback(&matches).ScanProc(int(pid))
-	if err != nil {
-		return fmt.Errorf("yara scan failed on proc %s (%d): %v", proc.Name, pid, err)
-	}
-	totalScans.Add(1)
-	if len(matches) == 0 {
-		return nil
-	}
-	ruleMatches.Add(int64(len(matches)))
-
-	if err := putMatchesMeta(matches, kevt); err != nil {
-		return err
-	}
-
-	ctx := AlertContext{
-		PS:        proc,
-		Matches:   matches,
-		Timestamp: time.Now().Format(tsLayout),
-	}
-
-	return s.send(ctx)
+	return true
 }
 
-func (s scanner) ScanFile(filename string, kevt *kevent.Kevent) error {
-	if s.config.SkipFiles || s.config.ShouldSkipFile(filename) {
+func (s scanner) scan(evt *kevent.Kevent) error {
+	if !evt.IsCreateProcess() && !evt.IsLoadImage() {
 		return nil
 	}
+	var matches yara.MatchRules
 	sn, err := s.newInternalScanner()
 	if err != nil {
 		return err
 	}
-	var matches yara.MatchRules
-	err = sn.SetCallback(&matches).ScanFile(filename)
+	alert := AlertContext{
+		Timestamp: time.Now().Format(tsLayout),
+	}
+	switch {
+	case evt.IsCreateProcess():
+		proc := s.psnap.Find(pid)
+		if proc == nil {
+			return fmt.Errorf("% process not found in snapshotter", pid)
+		}
+		if s.config.ShouldSkipProcess(proc.Name) {
+			return nil
+		}
+		alert.PS = proc
+		err = sn.SetCallback(&matches).ScanProc(int(pid))
+
+	case evt.IsLoadImage():
+		filename = evt.GetParamAsString(kparams.ImageFilename)
+		alert.Filename = filename
+		err = sn.SetCallback(&matches).ScanFile(filename)
+	}
 	if err != nil {
-		return fmt.Errorf("yara scan failed on %s file: %v", filename, err)
+
 	}
 	totalScans.Add(1)
 	if len(matches) == 0 {
 		return nil
 	}
+	alert.Matches = matches
 	ruleMatches.Add(int64(len(matches)))
 
 	if err := putMatchesMeta(matches, kevt); err != nil {
 		return err
-	}
-
-	ctx := AlertContext{
-		Filename:  filename,
-		Matches:   matches,
-		Timestamp: time.Now().Format(tsLayout),
 	}
 
 	return s.send(ctx)

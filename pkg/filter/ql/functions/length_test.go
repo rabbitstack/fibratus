@@ -19,19 +19,34 @@
 package functions
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestLength(t *testing.T) {
-	call := Length{}
-	res, _ := call.Call([]interface{}{"hello"})
-	assert.Equal(t, 5, res)
+	var tests = []struct {
+		args     []interface{}
+		expected interface{}
+	}{
+		{
+			[]interface{}{"hello"},
+			5,
+		},
+		{
+			[]interface{}{"こんにちは"},
+			5,
+		},
+		{
+			[]interface{}{[]string{"hello", "world"}},
+			2,
+		},
+	}
 
-	res1, _ := call.Call([]interface{}{"こんにちは"})
-	assert.Equal(t, 5, res1)
-
-	res2, _ := call.Call([]interface{}{[]string{"hello", "world"}})
-	assert.Equal(t, 2, res2)
+	for i, tt := range tests {
+		f := Length{}
+		res, _ := f.Call(tt.args)
+		assert.Equal(t, tt.expected, res, fmt.Sprintf("%d. result mismatch: exp=%v got=%v", i, tt.expected, res))
+	}
 }

@@ -43,7 +43,7 @@ var TimestampFormat string
 type MetadataKey string
 
 // Metadata is a type alias for event metadata. Any tag, i.e. key/value pair could be attached to metadata.
-type Metadata map[MetadataKey]string
+type Metadata map[MetadataKey]any
 
 const (
 	// YaraMatchesKey is the tag name for the yara matches JSON representation
@@ -52,6 +52,10 @@ const (
 	RuleNameKey MetadataKey = "rule.name"
 	// RuleGroupKey identifies the group to which the triggered rule pertains
 	RuleGroupKey MetadataKey = "rule.group"
+	// RuleSequenceByKey represents the join field value in sequence rules
+	RuleSequenceByKey MetadataKey = "rule.seq.by"
+	// DelayComparatorKey represents the value used for backlog lookups
+	DelayComparatorKey MetadataKey = "delay.comparator"
 )
 
 func (key MetadataKey) String() string { return string(key) }
@@ -60,7 +64,7 @@ func (key MetadataKey) String() string { return string(key) }
 func (md Metadata) String() string {
 	var sb strings.Builder
 	for k, v := range md {
-		sb.WriteString(k.String() + ": " + v + ", ")
+		sb.WriteString(k.String() + ": " + fmt.Sprintf("%s", v) + ", ")
 	}
 	return strings.TrimSuffix(sb.String(), ", ")
 }
@@ -95,6 +99,15 @@ type Kevent struct {
 	Metadata Metadata `json:"metadata"`
 	// PS represents process' metadata and its allocated resources such as handles, DLLs, etc.
 	PS *pstypes.PS `json:"ps,omitempty"`
+	// WaitEnqueue indicates if this event should temporarily defer pushing to
+	// the consumer output queue. This is usually required in event processors
+	// to propagate certain events when the related event arrives, and it is replaced
+	// by the event that was temporarily stored in processor's state.
+	WaitEnqueue bool `json:"waitenqueue"`
+	// Delayed indicates if this event should be enqueued in aggregator backlog.
+	// Backlog stores events that await for the acknowledgement from subsequent
+	// events.
+	Delayed bool `json:"delayed"`
 }
 
 // String returns event's string representation.
@@ -163,16 +176,16 @@ func (e *Kevent) String() string {
 func Empty() *Kevent {
 	return &Kevent{
 		Kparams:  map[string]*Kparam{},
-		Metadata: make(map[MetadataKey]string),
+		Metadata: make(map[MetadataKey]any),
 		PS:       &pstypes.PS{},
 	}
 }
 
-// NewFromKcap recovers the event instance from the kcapture byte buffer.
+// NewFromKcap recovers the event instance from the capture byte buffer.
 func NewFromKcap(buf []byte) (*Kevent, error) {
 	e := &Kevent{
 		Kparams:  make(Kparams),
-		Metadata: make(map[MetadataKey]string),
+		Metadata: make(map[MetadataKey]any),
 	}
 	if err := e.UnmarshalRaw(buf, kcapver.KevtSecV1); err != nil {
 		return nil, err
@@ -181,13 +194,18 @@ func NewFromKcap(buf []byte) (*Kevent, error) {
 }
 
 // AddMeta appends a key/value pair to event's metadata.
-func (e *Kevent) AddMeta(k MetadataKey, v string) {
+func (e *Kevent) AddMeta(k MetadataKey, v any) {
 	e.Metadata[k] = v
 }
 
 // AppendParam adds a new parameter to this event.
 func (e *Kevent) AppendParam(name string, typ kparams.Type, value kparams.Value, opts ...ParamOption) {
 	e.Kparams.Append(name, typ, value, opts...)
+}
+
+// AppendEnum adds the enum parameter to this event.
+func (e *Kevent) AppendEnum(name string, value uint32, opts ...ParamOption) {
+	e.AppendParam(name, kparams.Enum, value, opts...)
 }
 
 // GetParamAsString returns the specified parameter value as string.
@@ -204,8 +222,19 @@ func (e Kevent) GetParamAsString(name string) string {
 	return par.String()
 }
 
+// GetFlagsAsSlice returns parameter flags as a slice of bitmask string values.
+func (e Kevent) GetFlagsAsSlice(name string) []string {
+	return strings.Split(e.GetParamAsString(name), "|")
+}
+
 // Release returns an event to the pool.
 func (e *Kevent) Release() {
-	*e = Kevent{} // clear kevent
+	*e = Kevent{} // clear event
 	pool.Put(e)
 }
+
+// SequenceBy returns the BY statement join field from event metadata.
+func (e *Kevent) SequenceBy() any { return e.Metadata[RuleSequenceByKey] }
+
+// DelayComparator returns the delay comparator value.
+func (e *Kevent) DelayComparator() any { return e.Metadata[DelayComparatorKey] }

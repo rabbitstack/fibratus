@@ -22,18 +22,20 @@ import (
 	"expvar"
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/fs"
+	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/sys"
+	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/rabbitstack/fibratus/pkg/util/ip"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
 	"github.com/rabbitstack/fibratus/pkg/util/ntstatus"
-	"github.com/rabbitstack/fibratus/pkg/zsyscall"
-	"github.com/rabbitstack/fibratus/pkg/zsyscall/etw"
 	"golang.org/x/sys/windows"
 	"net"
 	"strconv"
 	"strings"
 	"time"
+	"unsafe"
 )
 
 var unknownKeysCount = expvar.NewInt("registry.unknown.keys.count")
@@ -72,17 +74,17 @@ func (k Kparam) String() string {
 	case kparams.UnicodeString, kparams.AnsiString, kparams.FilePath:
 		return k.Value.(string)
 	case kparams.SID:
-		account, domain := zsyscall.LookupAccount(k.Value.([]byte), false)
-		if account != "" || domain != "" {
-			return joinSID(account, domain)
+		account, domain, err := sys.LookupAccount(k.Value.([]byte), false)
+		if err != nil {
+			return ""
 		}
-		return ""
+		return joinSID(account, domain)
 	case kparams.WbemSID:
-		account, domain := zsyscall.LookupAccount(k.Value.([]byte), true)
-		if account != "" || domain != "" {
-			return joinSID(account, domain)
+		account, domain, err := sys.LookupAccount(k.Value.([]byte), true)
+		if err != nil {
+			return ""
 		}
-		return ""
+		return joinSID(account, domain)
 	case kparams.FileDosPath:
 		return devMapper.Convert(k.Value.(string))
 	case kparams.Key:
@@ -95,12 +97,20 @@ func (k Kparam) String() string {
 		}
 		unknownKeysCount.Add(1)
 		return keyName
+	case kparams.HandleType:
+		return htypes.ConvertTypeIDToName(k.Value.(uint16))
 	case kparams.Status:
 		v, ok := k.Value.(uint32)
 		if !ok {
 			return ""
 		}
 		return ntstatus.FormatMessage(v)
+	case kparams.Address:
+		v, ok := k.Value.(uint64)
+		if !ok {
+			return ""
+		}
+		return kparams.NewHex(v).String()
 	case kparams.HexInt32, kparams.HexInt64, kparams.HexInt16, kparams.HexInt8:
 		return string(k.Value.(kparams.Hex))
 	case kparams.Int8:
@@ -155,8 +165,41 @@ func (k Kparam) String() string {
 		default:
 			return fmt.Sprintf("%v", slice)
 		}
+	case kparams.Binary:
+		return string(k.Value.([]byte))
 	}
 	return fmt.Sprintf("%v", k.Value)
+}
+
+// GetSID returns the raw SID (Security Identifier) parameter as
+// typed representation on which various operations can be performed,
+// such as converting the SID to string or resolving username/domain.
+func (kpars Kparams) GetSID() (*windows.SID, error) {
+	kpar, err := kpars.findParam(kparams.UserSID)
+	if err != nil {
+		return nil, err
+	}
+	sid, ok := kpar.Value.([]byte)
+	if !ok {
+		return nil, fmt.Errorf("unable to type cast %q parameter to []byte value", kparams.UserSID)
+	}
+	b := uintptr(unsafe.Pointer(&sid[0]))
+	if kpar.Type == kparams.WbemSID {
+		// a WBEM SID is actually a TOKEN_USER structure followed
+		// by the SID, so we have to double the pointer size
+		b += uintptr(8 * 2)
+	}
+	return (*windows.SID)(unsafe.Pointer(b)), nil
+}
+
+// MustGetSID returns the SID (Security Identifier) event parameter
+// or panics if an error occurs.
+func (kpars Kparams) MustGetSID() *windows.SID {
+	sid, err := kpars.GetSID()
+	if err != nil {
+		panic(err)
+	}
+	return sid
 }
 
 // produceParams parses the event binary layout to extract the parameters. Each event is annotated with the
@@ -280,7 +323,7 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 		}
 		e.AppendParam(kparams.HandleObject, kparams.Uint64, object)
 		e.AppendParam(kparams.HandleID, kparams.Uint32, handleID)
-		e.AppendParam(kparams.HandleObjectTypeID, kparams.Uint16, typeID)
+		e.AppendParam(kparams.HandleObjectTypeID, kparams.HandleType, typeID)
 		e.AppendParam(kparams.HandleObjectName, kparams.UnicodeString, handleName)
 	case ktypes.LoadImage,
 		ktypes.UnloadImage,

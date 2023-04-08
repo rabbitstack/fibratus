@@ -129,9 +129,8 @@ rm %RELEASE_DIR%\python.zip
 :: is located to advise Windows on the DLL search path strategy.
 move %RELEASE_DIR%\python\*.dll %RELEASE_DIR%\bin
 
-:: Rename libcrypto-1_1.dll to libcrypto-1_1-x64.dll. Strangely, the latter
-:: is the DLL name required by linker.
-ren "%RELEASE_DIR%\bin\libcrypto-1_1.dll" "libcrypto-1_1-x64.dll"
+:: Rename libcrypto-1_1.dll to libcrypto-3-x64.dll
+ren "%RELEASE_DIR%\bin\libcrypto-1_1.dll" "libcrypto-3-x64.dll"
 
 echo "Building MSI package..."
 heat dir %RELEASE_DIR%\ -cg Fibratus -dr INSTALLDIR -suid -gg -sfrag -srd -var var.FibratusDir -out build/msi/components.wxs || exit /b

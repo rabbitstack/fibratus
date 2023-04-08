@@ -33,14 +33,12 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
-	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
+	htypes "github.com/rabbitstack/fibratus/pkg/windows/types"
 	"github.com/rabbitstack/fibratus/pkg/yara/config"
-	"github.com/rabbitstack/fibratus/pkg/zsyscall/handle"
-	"github.com/rabbitstack/fibratus/pkg/zsyscall/process"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -123,14 +121,14 @@ func TestScan(t *testing.T) {
 			{Name: "user32.dll", Size: 212354, Checksum: 33123343, BaseAddress: kparams.Hex("fef23fff"), DefaultBaseAddress: kparams.Hex("fff124fd")},
 		},
 		Handles: []htypes.Handle{
-			{Num: handle.Handle(0xffffd105e9baaf70),
+			{Num: windows.Handle(0xffffd105e9baaf70),
 				Name:   `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\Tcpip\Parameters\Interfaces\{b677c565-6ca5-45d3-b618-736b4e09b036}`,
 				Type:   "Key",
 				Object: 777488883434455544,
 				Pid:    uint32(1023),
 			},
 			{
-				Num:  handle.Handle(0xffffd105e9adaf70),
+				Num:  windows.Handle(0xffffd105e9adaf70),
 				Name: `\RPC Control\OLEA61B27E13E028C4EA6C286932E80`,
 				Type: "ALPC Port",
 				Pid:  uint32(1023),
@@ -142,7 +140,7 @@ func TestScan(t *testing.T) {
 				Object: 457488883434455544,
 			},
 			{
-				Num:  handle.Handle(0xeaffd105e9adaf30),
+				Num:  windows.Handle(0xeaffd105e9adaf30),
 				Name: `C:\Users\bunny`,
 				Type: "File",
 				Pid:  uint32(1023),
@@ -170,7 +168,7 @@ func TestScan(t *testing.T) {
 	psnap.On("Find", mock.Anything).Return(proc)
 
 	for {
-		if process.IsAlive(handle.Handle(pi.Process)) {
+		if !zsyscall.IsProcessRunning(pi.Process) {
 			break
 		}
 		time.Sleep(time.Millisecond * 100)
@@ -184,7 +182,7 @@ func TestScan(t *testing.T) {
 		Kparams: kevent.Kparams{
 			kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "svchost.exe"},
 		},
-		Metadata: make(map[kevent.MetadataKey]string),
+		Metadata: make(map[kevent.MetadataKey]any),
 	}
 
 	// test attaching on pid
@@ -219,7 +217,7 @@ func TestMatchesMeta(t *testing.T) {
 		Kparams: kevent.Kparams{
 			kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "svchost.exe"},
 		},
-		Metadata: make(map[kevent.MetadataKey]string),
+		Metadata: make(map[kevent.MetadataKey]any),
 	}
 	assert.Empty(t, kevt.Metadata)
 

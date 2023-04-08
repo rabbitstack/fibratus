@@ -23,6 +23,9 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 )
 
+// EventCallbackFunc is the type alias for the event callback function
+type EventCallbackFunc func(*kevent.Kevent) error
+
 // Consumer is the interface for the kernel event stream consumer.
 type Consumer interface {
 	// OpenKstream initializes the kernel event stream by setting the event record callback and instructing it
@@ -39,8 +42,8 @@ type Consumer interface {
 	Events() chan *kevent.Kevent
 	// SetFilter initializes the filter that's applied on the kernel events.
 	SetFilter(filter.Filter)
-	// SetEventCallback registers a callback function that is invoked for
+	// SetEventCallback registers a callback function that is invoked on
 	// each incoming event. If the callback function is set up, the events
-	// channel doesn't receive any inbound events.
+	// are not pushed to the consumer output channel.
 	SetEventCallback(EventCallbackFunc)
 }

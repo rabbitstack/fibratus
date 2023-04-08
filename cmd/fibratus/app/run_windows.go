@@ -19,7 +19,7 @@
 package app
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/zsyscall/security"
+	"github.com/rabbitstack/fibratus/pkg/sys/security"
 	"os"
 
 	ver "github.com/rabbitstack/fibratus/pkg/util/version"
@@ -81,16 +81,9 @@ func run(cmd *cobra.Command, args []string) error {
 	// set up the signals
 	stopCh := common.Signals()
 
-	// initialize rules engine
-	rules := filter.NewRules(cfg)
-	err := rules.Compile()
-	if err != nil {
-		return err
-	}
-
 	// initialize kernel trace controller and try to start the trace
 	ktracec := kstream.NewKtraceController(cfg.Kstream)
-	err = ktracec.StartKtrace()
+	err := ktracec.StartKtrace()
 	if err != nil {
 		return err
 	}
@@ -100,6 +93,14 @@ func run(cmd *cobra.Command, args []string) error {
 	hsnap := handle.NewSnapshotter(cfg, nil)
 	psnap := ps.NewSnapshotter(hsnap, cfg)
 	kstreamc := kstream.NewConsumer(psnap, hsnap, cfg)
+
+	// initialize rules engine
+	rules := filter.NewRules(psnap, cfg)
+	err = rules.Compile()
+	if err != nil {
+		return err
+	}
+
 	// build the filter from the CLI argument. If we got a valid expression the filter
 	// is linked to the kernel stream consumer, so it can drop any events that don't match
 	// the filter criteria

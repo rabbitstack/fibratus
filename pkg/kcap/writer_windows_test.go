@@ -31,7 +31,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kstream"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
-	shandle "github.com/rabbitstack/fibratus/pkg/zsyscall/handle"
 	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
@@ -82,7 +81,7 @@ func TestWrite(t *testing.T) {
 				kparams.FileType:      {Name: kparams.FileType, Type: kparams.AnsiString, Value: "file"},
 				kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.AnsiString, Value: "open"},
 			},
-			Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "barz"},
+			Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barz"},
 			PS: &pstypes.PS{
 				PID:       2436,
 				Ppid:      6304,
@@ -96,14 +95,14 @@ func TestWrite(t *testing.T) {
 				Envs:      map[string]string{"ProgramData": "C:\\ProgramData", "COMPUTRENAME": "archrabbit"},
 				Handles: []htypes.Handle{
 					{
-						Num:    shandle.Handle(0xffffd105e9baaf70),
+						Num:    windows.Handle(0xffffd105e9baaf70),
 						Name:   `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\Tcpip\Parameters\Interfaces\{b677c565-6ca5-45d3-b618-736b4e09b036}`,
 						Type:   "Key",
 						Object: 777488883434455544,
 						Pid:    uint32(1023),
 					},
 					{
-						Num:    shandle.Handle(0xe1ffd105e9baaf70),
+						Num:    windows.Handle(0xe1ffd105e9baaf70),
 						Type:   "Event",
 						Object: 777488883434455544,
 						Pid:    uint32(1023),
@@ -112,12 +111,12 @@ func TestWrite(t *testing.T) {
 						Type: "Event",
 					},
 					{
-						Num:  shandle.Handle(0xe1ecd105e9baaf70),
+						Num:  windows.Handle(0xe1ecd105e9baaf70),
 						Type: "Event",
 						Pid:  uint32(1023),
 					},
 					{
-						Num:  shandle.Handle(0xffffd105e9adaf70),
+						Num:  windows.Handle(0xffffd105e9adaf70),
 						Name: `\RPC Control\OLEA61B27E13E028C4EA6C286932E80`,
 						Type: "ALPC Port",
 						Pid:  uint32(1023),
@@ -129,7 +128,7 @@ func TestWrite(t *testing.T) {
 						Object: 457488883434455544,
 					},
 					{
-						Num:  shandle.Handle(0xeaffd105e9adaf30),
+						Num:  windows.Handle(0xeaffd105e9adaf30),
 						Name: `C:\Users\bunny`,
 						Type: "File",
 						Pid:  uint32(1023),

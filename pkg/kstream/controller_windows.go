@@ -28,7 +28,7 @@ import (
 
 	"github.com/rabbitstack/fibratus/pkg/config"
 	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
-	"github.com/rabbitstack/fibratus/pkg/zsyscall/etw"
+	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows/registry"
 )
@@ -79,8 +79,7 @@ type KtraceController struct {
 	kstreamConfig config.KstreamConfig
 	// traces contains initiated tracing sessions
 	traces map[string]TraceSession
-	// providers contains a list of enabled ETW providers from
-	// which the telemetry is collected
+	// providers contains a list of enabled ETW providers
 	providers []TraceProvider
 }
 

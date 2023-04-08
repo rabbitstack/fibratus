@@ -66,18 +66,15 @@ func newRegistryProcessor(hsnap handle.Snapshotter) Processor {
 	}
 }
 
-func (r *registryProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Batch, bool, error) {
+func (r *registryProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error) {
 	if e.Category == ktypes.Registry {
-		err := r.processEvent(e)
-		return kevent.NewBatch(e), false, err
+		evt, err := r.processEvent(e)
+		return evt, false, err
 	}
-	return nil, true, nil
+	return e, true, nil
 }
 
-func (registryProcessor) Name() ProcessorType { return Registry }
-func (registryProcessor) Close()              {}
-
-func (r *registryProcessor) processEvent(e *kevent.Kevent) error {
+func (r *registryProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 	switch e.Type {
 	case ktypes.RegKCBRundown, ktypes.RegCreateKCB:
 		khandle := e.Kparams.MustGetUint64(kparams.RegKeyHandle)
@@ -109,24 +106,29 @@ func (r *registryProcessor) processEvent(e *kevent.Kevent) error {
 				keyName = r.findMatchingKey(e.PID, keyName)
 			}
 			if err := e.Kparams.SetValue(kparams.RegKeyName, keyName); err != nil {
-				return err
+				return e, err
 			}
 		}
 
 		// get the type/value of the registry key and append to parameters
 		if !e.IsRegSetValue() {
-			return nil
+			return e, nil
 		}
+
 		rootKey, keyName := key.Format(keyName)
 		if rootKey != key.Invalid {
 			typ, val, err := rootKey.ReadValue(keyName)
 			if err != nil {
-				return err
+				return e, err
 			}
-			e.AppendParam(kparams.RegValueType, kparams.Enum, typ, kevent.WithEnum(key.RegistryValueTypes))
+			e.AppendEnum(kparams.RegValueType, typ, kevent.WithEnum(key.RegistryValueTypes))
 			switch typ {
-			case registry.SZ, registry.EXPAND_SZ, registry.MULTI_SZ, registry.BINARY:
+			case registry.SZ, registry.EXPAND_SZ:
 				e.AppendParam(kparams.RegValue, kparams.UnicodeString, val)
+			case registry.MULTI_SZ:
+				e.AppendParam(kparams.RegValue, kparams.Slice, val)
+			case registry.BINARY:
+				e.AppendParam(kparams.RegValue, kparams.Binary, val)
 			case registry.QWORD:
 				e.AppendParam(kparams.RegValue, kparams.Uint64, val)
 			case registry.DWORD:
@@ -134,8 +136,11 @@ func (r *registryProcessor) processEvent(e *kevent.Kevent) error {
 			}
 		}
 	}
-	return nil
+	return e, nil
 }
+
+func (registryProcessor) Name() ProcessorType { return Registry }
+func (registryProcessor) Close()              {}
 
 func (r *registryProcessor) findMatchingKey(pid uint32, relativeKeyName string) string {
 	// we want to prevent too frequent queries on the process' handles

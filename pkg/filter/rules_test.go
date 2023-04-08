@@ -20,8 +20,11 @@ package filter
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/fs"
+	"github.com/rabbitstack/fibratus/pkg/ps"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sys/windows/registry"
 	"net"
+	"os"
 	"testing"
 	"time"
 
@@ -73,7 +76,8 @@ func init() {
 }
 
 func fireRules(t *testing.T, c *config.Config) bool {
-	rules := NewRules(c)
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, c)
 
 	kevt := &kevent.Kevent{
 		Type:     ktypes.RecvTCPv4,
@@ -87,7 +91,7 @@ func fireRules(t *testing.T, c *config.Config) bool {
 			kparams.NetSIP:   {Name: kparams.NetSIP, Type: kparams.IPv4, Value: net.ParseIP("127.0.0.1")},
 			kparams.NetDIP:   {Name: kparams.NetDIP, Type: kparams.IPv4, Value: net.ParseIP("216.58.201.174")},
 		},
-		Metadata: make(map[kevent.MetadataKey]string),
+		Metadata: make(map[kevent.MetadataKey]any),
 	}
 
 	require.NoError(t, rules.Compile())
@@ -115,14 +119,15 @@ func newConfig(fromFiles ...string) *config.Config {
 }
 
 func TestCompileMergeGroups(t *testing.T) {
-	rules := NewRules(newConfig("_fixtures/merged_groups.yml"))
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, newConfig("_fixtures/merged_groups.yml"))
 	require.NoError(t, rules.Compile())
 
-	assert.Len(t, rules.filterGroups, 2)
-	assert.Len(t, rules.filterGroups[ktypes.RecvTCPv4.Hash()], 2)
-	assert.Len(t, rules.filterGroups[ktypes.Net.Hash()], 1)
+	assert.Len(t, rules.groups, 2)
+	assert.Len(t, rules.groups[ktypes.RecvTCPv4.Hash()], 2)
+	assert.Len(t, rules.groups[ktypes.Net.Hash()], 1)
 
-	groups := rules.findFilterGroups(&kevent.Kevent{Type: ktypes.RecvUDPv6, Category: ktypes.Net})
+	groups := rules.findGroups(&kevent.Kevent{Type: ktypes.RecvUDPv6, Category: ktypes.Net})
 	assert.Len(t, groups, 3)
 }
 
@@ -150,7 +155,8 @@ func TestFireRules(t *testing.T) {
 }
 
 func TestIncludeExcludeRemoteThreads(t *testing.T) {
-	rules := NewRules(newConfig("_fixtures/include_exclude_remote_threads.yml"))
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, newConfig("_fixtures/include_exclude_remote_threads.yml"))
 	require.NoError(t, rules.Compile())
 
 	kevt := &kevent.Kevent{
@@ -170,7 +176,8 @@ func TestIncludeExcludeRemoteThreads(t *testing.T) {
 }
 
 func TestSequenceState(t *testing.T) {
-	rules := NewRules(newConfig("_fixtures/sequence_policy_simple_pattern_bindings.yml"))
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_simple.yml"))
 	require.NoError(t, rules.Compile())
 	log.SetLevel(log.DebugLevel)
 
@@ -202,26 +209,29 @@ func TestSequenceState(t *testing.T) {
 		},
 	}
 
-	sequences := rules.sequences
-	assert.Len(t, sequences, 1)
-	ss := sequences["command shell execution and temp files"]
+	assert.Len(t, rules.groups, 2)
 
+	ss := rules.groups[ktypes.CreateProcess.Hash()][0].filters[0].ss
+	ss1 := rules.groups[ktypes.CreateFile.Hash()][0].filters[0].ss
+
+	// should reference the same sequence state
+	assert.Equal(t, ss, ss1)
 	require.NotNil(t, ss)
 
-	assert.Equal(t, "spawn command shell", ss.currentState())
+	assert.Equal(t, "kevt.name = CreateProcess AND ps.name = cmd.exe", ss.currentState())
 	assert.True(t, ss.isInitialState())
-	assert.Equal(t, "spawn command shell", ss.initialState)
+	assert.Equal(t, "kevt.name = CreateProcess AND ps.name = cmd.exe", ss.initialState)
 
-	ss.addPartial("spawn command shell", kevt1)
-	require.NoError(t, ss.matchTransition("spawn command shell", kevt1))
+	ss.addPartial("kevt.name = CreateProcess AND ps.name = cmd.exe", kevt1)
+	require.NoError(t, ss.matchTransition("kevt.name = CreateProcess AND ps.name = cmd.exe", kevt1))
 	assert.False(t, ss.isInitialState())
-	assert.Equal(t, "created temp file by command shell", ss.currentState())
+	assert.Equal(t, "kevt.name = CreateFile AND file.name ICONTAINS temp", ss.currentState())
 
-	ss.addPartial("created temp file by command shell", kevt2)
-	require.NoError(t, ss.matchTransition("created temp file by command shell", kevt2))
+	ss.addPartial("kevt.name = CreateFile AND file.name ICONTAINS temp", kevt2)
+	require.NoError(t, ss.matchTransition("kevt.name = CreateFile AND file.name ICONTAINS temp", kevt2))
 
-	assert.Len(t, ss.getPartials("spawn command shell"), 0)
-	assert.Len(t, ss.getPartials("created temp file by command shell"), 1)
+	assert.Len(t, ss.partials[1], 1)
+	assert.Len(t, ss.partials[2], 1)
 
 	assert.Equal(t, sequenceTerminalState, ss.currentState())
 	assert.True(t, ss.isTerminalState())
@@ -229,10 +239,10 @@ func TestSequenceState(t *testing.T) {
 	ss.clear()
 
 	// reset transition leads back to initial state
-	assert.Equal(t, "spawn command shell", ss.currentState())
+	assert.Equal(t, "kevt.name = CreateProcess AND ps.name = cmd.exe", ss.currentState())
 	// deadline exceeded
-	require.NoError(t, ss.matchTransition("spawn command shell", kevt1))
-	assert.Equal(t, "created temp file by command shell", ss.currentState())
+	require.NoError(t, ss.matchTransition("kevt.name = CreateProcess AND ps.name = cmd.exe", kevt1))
+	assert.Equal(t, "kevt.name = CreateFile AND file.name ICONTAINS temp", ss.currentState())
 	time.Sleep(time.Millisecond * 120)
 	assert.True(t, ss.isInitialState())
 
@@ -240,13 +250,13 @@ func TestSequenceState(t *testing.T) {
 	require.False(t, ss.next(1))
 	if ss.next(1) {
 		// this shouldn't happen
-		require.NoError(t, ss.matchTransition("created temp file by command shell", kevt2))
+		require.NoError(t, ss.matchTransition("kevt.name = CreateFile AND file.name ICONTAINS temp", kevt2))
 	}
 
 	ss.clear()
 	assert.True(t, ss.isInitialState())
-	require.NoError(t, ss.matchTransition("spawn command shell", kevt1))
-	ss.addPartial("spawn command shell", kevt1)
+	require.NoError(t, ss.matchTransition("kevt.name = CreateProcess AND ps.name = cmd.exe", kevt1))
+	ss.addPartial("kevt.name = CreateProcess AND ps.name = cmd.exe", kevt1)
 	require.False(t, ss.inDeadline.Load())
 
 	// test expiration
@@ -268,59 +278,155 @@ func TestSequenceState(t *testing.T) {
 	require.True(t, ss.expire(terminateProcess))
 	require.True(t, ss.inExpired)
 
-	require.NoError(t, ss.matchTransition("spawn command shell", kevt1))
+	require.NoError(t, ss.matchTransition("kevt.name = CreateProcess AND ps.name = cmd.exe", kevt1))
 	require.False(t, ss.inExpired)
 
-	assert.Equal(t, "created temp file by command shell", ss.currentState())
+	assert.Equal(t, "kevt.name = CreateFile AND file.name ICONTAINS temp", ss.currentState())
 }
 
-func TestSimpleSequencePolicy(t *testing.T) {
-	rules := NewRules(newConfig("_fixtures/sequence_policy_simple.yml"))
+func TestSimpleSequenceRule(t *testing.T) {
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_simple.yml"))
 	require.NoError(t, rules.Compile())
 
 	kevt1 := &kevent.Kevent{
-		Type: ktypes.CreateProcess,
-		Name: "CreateProcess",
-		Tid:  2484,
-		PID:  859,
+		Type:      ktypes.CreateProcess,
+		Timestamp: time.Now(),
+		Name:      "CreateProcess",
+		Tid:       2484,
+		PID:       859,
 		PS: &types.PS{
 			Name: "cmd.exe",
-			Exe:  "C:\\Windows\\system32\\svchost.exe",
+			Exe:  "C:\\Windows\\system32\\svchost-temp.exe",
 		},
 		Kparams: kevent.Kparams{
 			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
 		},
-		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "barzz"},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
 	kevt2 := &kevent.Kevent{
-		Type:     ktypes.CreateFile,
-		Name:     "CreateFile",
-		Tid:      2484,
-		PID:      859,
-		Category: ktypes.File,
+		Type:      ktypes.CreateFile,
+		Timestamp: time.Now(),
+		Name:      "CreateFile",
+		Tid:       2484,
+		PID:       859,
+		Category:  ktypes.File,
 		PS: &types.PS{
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
 		},
 		Kparams: kevent.Kparams{
-			kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper"},
+			kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost-temp.exe"},
 		},
-		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "barzz"},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 	require.False(t, rules.ProcessEvent(kevt1))
 	require.True(t, rules.ProcessEvent(kevt2))
+
+	// if we alter the process executable in the first event, it shouldn't match
+	kevt1.PS.Exe = "C:\\System32\\cmd.exe"
+
+	require.False(t, rules.ProcessEvent(kevt1))
+	require.False(t, rules.ProcessEvent(kevt2))
 }
 
-func TestSimpleSequencePolicyWithMaxSpanReached(t *testing.T) {
-	rules := NewRules(newConfig("_fixtures/sequence_policy_simple_max_span.yml"))
+func TestSimpleSequenceRuleMultiplePartials(t *testing.T) {
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_simple_max_span.yml"))
+	require.NoError(t, rules.Compile())
+
+	// create random matches which don't satisfy the BY statement
+	for i, pid := range []uint32{2343, 1024, 11122, 3450, 12319} {
+		e := &kevent.Kevent{
+			Type:      ktypes.CreateProcess,
+			Timestamp: time.Now().Add(time.Duration(i) * time.Millisecond),
+			Name:      "CreateProcess",
+			Tid:       2484,
+			PID:       pid,
+			PS: &types.PS{
+				Name: "cmd.exe",
+				Exe:  "C:\\Windows\\system32\\cmd.exe",
+			},
+			Kparams: kevent.Kparams{
+				kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: pid % 2},
+			},
+			Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+		}
+		e1 := &kevent.Kevent{
+			Type:      ktypes.CreateFile,
+			Timestamp: time.Now().Add(time.Duration(i) * time.Millisecond * 2),
+			Name:      "CreateFile",
+			Tid:       2484,
+			PID:       pid * 2,
+			Category:  ktypes.File,
+			PS: &types.PS{
+				Name: "cmd.exe",
+				Exe:  "C:\\Windows\\system32\\cmd.exe",
+			},
+			Kparams: kevent.Kparams{
+				kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost-temp.exe"},
+			},
+			Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+		}
+		require.False(t, rules.ProcessEvent(e))
+		require.False(t, rules.ProcessEvent(e1))
+	}
+
+	ss := rules.groups[ktypes.CreateProcess.Hash()][0].filters[0].ss
+	assert.Len(t, ss.partials[1], 5)
+	assert.Len(t, ss.partials[2], 0)
+
+	kevt1 := &kevent.Kevent{
+		Seq:       20,
+		Type:      ktypes.CreateProcess,
+		Timestamp: time.Now().Add(time.Second),
+		Name:      "CreateProcess",
+		Tid:       2484,
+		PID:       859,
+		PS: &types.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\svchost-temp.exe",
+		},
+		Kparams: kevent.Kparams{
+			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
+		},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+	}
+	kevt2 := &kevent.Kevent{
+		Type:      ktypes.CreateFile,
+		Seq:       22,
+		Timestamp: time.Now().Add(time.Second * time.Duration(2)),
+		Name:      "CreateFile",
+		Tid:       2484,
+		PID:       859,
+		Category:  ktypes.File,
+		PS: &types.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\svchost.exe",
+		},
+		Kparams: kevent.Kparams{
+			kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost-temp.exe"},
+		},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+	}
+	require.False(t, rules.ProcessEvent(kevt1))
+	assert.Len(t, ss.partials[1], 6)
+	assert.Len(t, ss.partials[2], 0)
+	require.True(t, rules.ProcessEvent(kevt2))
+}
+
+func TestSimpleSequenceRuleWithMaxSpanReached(t *testing.T) {
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_simple_max_span.yml"))
 	require.NoError(t, rules.Compile())
 
 	kevt1 := &kevent.Kevent{
-		Type: ktypes.CreateProcess,
-		Name: "CreateProcess",
-		Tid:  2484,
-		PID:  859,
+		Type:      ktypes.CreateProcess,
+		Timestamp: time.Now(),
+		Name:      "CreateProcess",
+		Tid:       2484,
+		PID:       859,
 		PS: &types.PS{
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
@@ -328,14 +434,16 @@ func TestSimpleSequencePolicyWithMaxSpanReached(t *testing.T) {
 		Kparams: kevent.Kparams{
 			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
 		},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
 	kevt2 := &kevent.Kevent{
-		Type:     ktypes.CreateFile,
-		Name:     "CreateFile",
-		Tid:      2484,
-		PID:      859,
-		Category: ktypes.File,
+		Type:      ktypes.CreateFile,
+		Timestamp: time.Now(),
+		Name:      "CreateFile",
+		Tid:       2484,
+		PID:       859,
+		Category:  ktypes.File,
 		PS: &types.PS{
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
@@ -343,11 +451,11 @@ func TestSimpleSequencePolicyWithMaxSpanReached(t *testing.T) {
 		Kparams: kevent.Kparams{
 			kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper"},
 		},
-		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "barzz"},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 	require.False(t, rules.ProcessEvent(kevt1))
-	time.Sleep(time.Millisecond * 250)
-	require.False(t, rules.ProcessEvent(kevt2))
+	time.Sleep(time.Millisecond * 110)
+	require.True(t, rules.ProcessEvent(kevt2))
 
 	// now the state machine has transitioned
 	// to the initial state, which means we should
@@ -358,14 +466,16 @@ func TestSimpleSequencePolicyWithMaxSpanReached(t *testing.T) {
 }
 
 func TestSimpleSequencePolicyWithMaxSpanNotReached(t *testing.T) {
-	rules := NewRules(newConfig("_fixtures/sequence_policy_simple_max_span.yml"))
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_simple_max_span.yml"))
 	require.NoError(t, rules.Compile())
 
 	kevt1 := &kevent.Kevent{
-		Type: ktypes.CreateProcess,
-		Name: "CreateProcess",
-		Tid:  2484,
-		PID:  859,
+		Type:      ktypes.CreateProcess,
+		Timestamp: time.Now(),
+		Name:      "CreateProcess",
+		Tid:       2484,
+		PID:       859,
 		PS: &types.PS{
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
@@ -373,15 +483,16 @@ func TestSimpleSequencePolicyWithMaxSpanNotReached(t *testing.T) {
 		Kparams: kevent.Kparams{
 			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
 		},
-		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "barzz"},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
 	kevt2 := &kevent.Kevent{
-		Type:     ktypes.CreateFile,
-		Name:     "CreateFile",
-		Tid:      2484,
-		PID:      859,
-		Category: ktypes.File,
+		Type:      ktypes.CreateFile,
+		Timestamp: time.Now(),
+		Name:      "CreateFile",
+		Tid:       2484,
+		PID:       859,
+		Category:  ktypes.File,
 		PS: &types.PS{
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
@@ -389,61 +500,27 @@ func TestSimpleSequencePolicyWithMaxSpanNotReached(t *testing.T) {
 		Kparams: kevent.Kparams{
 			kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper"},
 		},
-		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "barzz"},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 	require.False(t, rules.ProcessEvent(kevt1))
 	time.Sleep(time.Millisecond * 110)
 	require.True(t, rules.ProcessEvent(kevt2))
 }
 
-func TestSimpleSequencePolicyPatternBindings(t *testing.T) {
-	rules := NewRules(newConfig("_fixtures/sequence_policy_simple_pattern_bindings.yml"))
+func TestComplexSequenceRule(t *testing.T) {
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_complex.yml"))
 	require.NoError(t, rules.Compile())
+	log.SetLevel(log.DebugLevel)
 
 	kevt1 := &kevent.Kevent{
-		Type: ktypes.CreateProcess,
-		Name: "CreateProcess",
-		Tid:  2484,
-		PID:  859,
-		PS: &types.PS{
-			Name: "cmd.exe",
-			Exe:  "C:\\Windows\\system32\\svchost.exe",
-		},
-		Kparams: kevent.Kparams{
-			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
-		},
-	}
-
-	kevt2 := &kevent.Kevent{
-		Type:     ktypes.CreateFile,
-		Name:     "CreateFile",
-		Tid:      2484,
-		PID:      859,
-		Category: ktypes.File,
-		PS: &types.PS{
-			Name: "cmd.exe",
-			Exe:  "C:\\Windows\\system32\\svchost.exe",
-		},
-		Kparams: kevent.Kparams{
-			kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper"},
-		},
-		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "barzz"},
-	}
-	require.False(t, rules.ProcessEvent(kevt1))
-	require.True(t, rules.ProcessEvent(kevt2))
-}
-
-func TestSequenceComplexPatternBindings(t *testing.T) {
-	rules := NewRules(newConfig("_fixtures/sequence_policy_complex_pattern_bindings.yml"))
-	require.NoError(t, rules.Compile())
-
-	kevt1 := &kevent.Kevent{
-		Seq:      1,
-		Type:     ktypes.CreateProcess,
-		Category: ktypes.Process,
-		Name:     "CreateProcess",
-		Tid:      2484,
-		PID:      859,
+		Seq:       1,
+		Type:      ktypes.CreateProcess,
+		Timestamp: time.Now(),
+		Category:  ktypes.Process,
+		Name:      "CreateProcess",
+		Tid:       2484,
+		PID:       859,
 		PS: &types.PS{
 			Name: "explorer.exe",
 			Exe:  "C:\\Windows\\system32\\explorer.exe",
@@ -452,15 +529,17 @@ func TestSequenceComplexPatternBindings(t *testing.T) {
 			kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(2243)},
 			kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "firefox.exe"},
 		},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
 	kevt2 := &kevent.Kevent{
-		Seq:      2,
-		Type:     ktypes.CreateFile,
-		Name:     "CreateFile",
-		Tid:      2484,
-		PID:      2243,
-		Category: ktypes.File,
+		Seq:       2,
+		Type:      ktypes.CreateFile,
+		Timestamp: time.Now(),
+		Name:      "CreateFile",
+		Tid:       2484,
+		PID:       2243,
+		Category:  ktypes.File,
 		PS: &types.PS{
 			Name:    "firefox.exe",
 			Exe:     "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
@@ -470,86 +549,260 @@ func TestSequenceComplexPatternBindings(t *testing.T) {
 			kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
 			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: fs.FileDisposition(2)},
 		},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
 	kevt3 := &kevent.Kevent{
-		Seq:      3,
-		Type:     ktypes.CreateProcess,
-		Name:     "CreateProcess",
-		Category: ktypes.Process,
-		Tid:      244,
-		PID:      1234,
+		Seq:       4,
+		Type:      ktypes.ConnectTCPv4,
+		Timestamp: time.Now(),
+		Category:  ktypes.Net,
+		Name:      "Connect",
+		Tid:       244,
+		PID:       2243,
 		PS: &types.PS{
-			Name: "explorer.exe",
-			Exe:  "C:\\Windows\\system32\\explorer.exe",
-		},
-		Kparams: kevent.Kparams{
-			kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(4143)},
-			kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "dropper.exe"},
-			kparams.Exe:         {Name: kparams.Exe, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
-		},
-	}
-
-	kevt4 := &kevent.Kevent{
-		Seq:      4,
-		Type:     ktypes.ConnectTCPv4,
-		Category: ktypes.Net,
-		Name:     "Connect",
-		Tid:      244,
-		PID:      4143,
-		PS: &types.PS{
-			Name: "dropper.exe",
-			Exe:  "C:\\Temp\\dropper.exe",
+			Name:    "firefox.exe",
+			Exe:     "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
+			Cmdline: "C:\\Program Files\\Mozilla Firefox\\firefox.exe\" -contentproc --channel=\"10464.7.539748228\\1366525930\" -childID 6 -isF",
 		},
 		Kparams: kevent.Kparams{
 			kparams.NetDIP: {Name: kparams.NetDIP, Type: kparams.IP, Value: net.ParseIP("10.0.2.3")},
 		},
-		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "barzz"},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
-
-	require.False(t, rules.ProcessEvent(kevt1))
-	require.False(t, rules.ProcessEvent(kevt2))
-	time.Sleep(time.Millisecond * 30)
-	require.False(t, rules.ProcessEvent(kevt3))
-
-	// at this point we should have
-	// accumulated multiple matches
-	matches := rules.sequences["phishing dropper outbound communication"].matches
-
-	require.Len(t, matches, 3)
-	assert.Equal(t, uint64(1), matches[1].Seq)
-	assert.Equal(t, uint64(2), matches[2].Seq)
-	assert.Equal(t, uint64(3), matches[3].Seq)
-
-	time.Sleep(time.Millisecond * 22)
 
 	// register alert sender
 	require.NoError(t, alertsender.LoadAll([]alertsender.Config{{Type: alertsender.None}}))
 
-	require.True(t, rules.ProcessEvent(kevt4))
+	require.False(t, rules.ProcessEvent(kevt1))
+	require.False(t, rules.ProcessEvent(kevt2))
 
-	time.Sleep(time.Millisecond * 25)
+	ss := rules.groups[ktypes.CreateProcess.Hash()][0].filters[0].ss
+	assert.Len(t, ss.partials[1], 1)
+	assert.Len(t, ss.partials[2], 1)
+
+	time.Sleep(time.Millisecond * 30)
+	require.True(t, rules.ProcessEvent(kevt3))
+
+	time.Sleep(time.Millisecond * 50)
 
 	// check the format of the generated alert
 	require.NotNil(t, seqAlert)
 	assert.Equal(t, "Phishing dropper outbound communication", seqAlert.Title)
-	assert.Equal(t, "dropper.exe process initiated outbound communication to 10.0.2.3", seqAlert.Text)
+	assert.Equal(t, "firefox.exe process initiated outbound communication to 10.0.2.3", seqAlert.Text)
 	seqAlert = nil
-
-	matches = rules.sequences["phishing dropper outbound communication"].matches
-	require.Len(t, matches, 0)
 
 	// FSM should transition from terminal to initial state
 	require.False(t, rules.ProcessEvent(kevt1))
 	require.False(t, rules.ProcessEvent(kevt2))
 	time.Sleep(time.Millisecond * 15)
-	require.False(t, rules.ProcessEvent(kevt3))
-	require.True(t, rules.ProcessEvent(kevt4))
+	require.True(t, rules.ProcessEvent(kevt3))
+}
+
+func TestSequencePsUUID(t *testing.T) {
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_ps_uuid.yml"))
+	require.NoError(t, rules.Compile())
+	log.SetLevel(log.DebugLevel)
+
+	kevt1 := &kevent.Kevent{
+		Seq:       1,
+		Type:      ktypes.CreateProcess,
+		Timestamp: time.Now(),
+		Category:  ktypes.Process,
+		Name:      "CreateProcess",
+		Tid:       2484,
+		PID:       uint32(os.Getpid()),
+		PS: &types.PS{
+			PID:  uint32(os.Getpid()),
+			Name: "explorer.exe",
+			Exe:  "C:\\Windows\\system32\\explorer.exe",
+		},
+		Kparams: kevent.Kparams{
+			kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(2243)},
+			kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "firefox.exe"},
+		},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+	}
+
+	kevt2 := &kevent.Kevent{
+		Seq:       2,
+		Type:      ktypes.CreateFile,
+		Timestamp: time.Now(),
+		Name:      "CreateFile",
+		Tid:       2484,
+		PID:       uint32(os.Getpid()),
+		Category:  ktypes.File,
+		PS: &types.PS{
+			PID:     uint32(os.Getpid()),
+			Name:    "firefox.exe",
+			Exe:     "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
+			Cmdline: "C:\\Program Files\\Mozilla Firefox\\firefox.exe\" -contentproc --channel=\"10464.7.539748228\\1366525930\" -childID 6 -isF",
+		},
+		Kparams: kevent.Kparams{
+			kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
+			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: fs.FileDisposition(2)},
+		},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+	}
+
+	require.False(t, rules.ProcessEvent(kevt1))
+	require.True(t, rules.ProcessEvent(kevt2))
+}
+
+func TestSequenceAndSimpleRuleMix(t *testing.T) {
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, newConfig("_fixtures/sequence_and_simple_rule_mix.yml"))
+	require.NoError(t, rules.Compile())
+	log.SetLevel(log.DebugLevel)
+
+	kevt1 := &kevent.Kevent{
+		Seq:       1,
+		Type:      ktypes.CreateProcess,
+		Timestamp: time.Now(),
+		Category:  ktypes.Process,
+		Name:      "CreateProcess",
+		Tid:       2484,
+		PID:       2243,
+		PS: &types.PS{
+			Name: "powershell.exe",
+			Exe:  "C:\\Windows\\system32\\powershell.exe",
+		},
+		Kparams: kevent.Kparams{
+			kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(2243)},
+			kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "firefox.exe"},
+		},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+	}
+
+	kevt2 := &kevent.Kevent{
+		Seq:       2,
+		Type:      ktypes.CreateFile,
+		Timestamp: time.Now(),
+		Name:      "CreateFile",
+		Tid:       2484,
+		PID:       2243,
+		Category:  ktypes.File,
+		PS: &types.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\cmd.exe",
+		},
+		Kparams: kevent.Kparams{
+			kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
+			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: fs.FileDisposition(2)},
+		},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+	}
+
+	require.True(t, rules.ProcessEvent(kevt1))
+	require.True(t, rules.ProcessEvent(kevt2))
+
+	kevt3 := &kevent.Kevent{
+		Seq:       10,
+		Type:      ktypes.CreateProcess,
+		Timestamp: time.Now(),
+		Category:  ktypes.Process,
+		Name:      "CreateProcess",
+		Tid:       2484,
+		PID:       2243,
+		PS: &types.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\cmd.exe",
+		},
+		Kparams: kevent.Kparams{
+			kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(2243)},
+			kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "chrome.exe"},
+		},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+	}
+
+	require.True(t, rules.ProcessEvent(kevt3))
+}
+
+func TestSequenceRuleBoundsFields(t *testing.T) {
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_bound_fields.yml"))
+	require.NoError(t, rules.Compile())
+
+	kevt := &kevent.Kevent{
+		Type:      ktypes.CreateProcess,
+		Timestamp: time.Now(),
+		Name:      "CreateProcess",
+		Tid:       2484,
+		PID:       859,
+		PS: &types.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\svchost-temp.exe",
+			SID:  "zinet",
+		},
+		Kparams: kevent.Kparams{
+			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
+		},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+	}
+
+	kevt1 := &kevent.Kevent{
+		Type:      ktypes.CreateProcess,
+		Timestamp: time.Now().Add(time.Millisecond * 20),
+		Name:      "CreateProcess",
+		Tid:       2484,
+		PID:       859,
+		PS: &types.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\svchost-temp.exe",
+			SID:  "nusret",
+		},
+		Kparams: kevent.Kparams{
+			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
+		},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+	}
+
+	kevt2 := &kevent.Kevent{
+		Type:      ktypes.CreateFile,
+		Timestamp: time.Now().Add(time.Second),
+		Name:      "CreateFile",
+		Tid:       2484,
+		PID:       859,
+		Category:  ktypes.File,
+		PS: &types.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\svchost.exe",
+			SID:  "nusret",
+		},
+		Kparams: kevent.Kparams{
+			kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost-temp.exe"},
+		},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+	}
+
+	kevt3 := &kevent.Kevent{
+		Type:      ktypes.ConnectTCPv4,
+		Timestamp: time.Now().Add(time.Second * 3),
+		Name:      "Connect",
+		Tid:       2484,
+		PID:       859,
+		Category:  ktypes.File,
+		PS: &types.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\svchost.exe",
+			SID:  "zinet",
+		},
+		Kparams: kevent.Kparams{
+			kparams.NetDport: {Name: kparams.NetDport, Type: kparams.Uint16, Value: uint16(80)},
+		},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+	}
+	require.False(t, rules.ProcessEvent(kevt))
+	require.False(t, rules.ProcessEvent(kevt1))
+	require.False(t, rules.ProcessEvent(kevt2))
+	require.True(t, rules.ProcessEvent(kevt3))
 }
 
 func TestFilterActionEmitAlert(t *testing.T) {
+	psnap := new(ps.SnapshotterMock)
 	require.NoError(t, alertsender.LoadAll([]alertsender.Config{{Type: alertsender.Noop}}))
-	rules := NewRules(newConfig("_fixtures/include_policy_emit_alert.yml"))
+	rules := NewRules(psnap, newConfig("_fixtures/include_policy_emit_alert.yml"))
 	require.NoError(t, rules.Compile())
 
 	kevt := &kevent.Kevent{
@@ -567,7 +820,7 @@ func TestFilterActionEmitAlert(t *testing.T) {
 			kparams.NetSIP:   {Name: kparams.NetSIP, Type: kparams.IPv4, Value: net.ParseIP("127.0.0.1")},
 			kparams.NetDIP:   {Name: kparams.NetDIP, Type: kparams.IPv4, Value: net.ParseIP("216.58.201.174")},
 		},
-		Metadata: make(map[kevent.MetadataKey]string),
+		Metadata: make(map[kevent.MetadataKey]any),
 	}
 
 	require.True(t, rules.ProcessEvent(kevt))
@@ -580,8 +833,9 @@ func TestFilterActionEmitAlert(t *testing.T) {
 	emitAlert = nil
 }
 
-func TestIsKtypeEligible(t *testing.T) {
-	rules := NewRules(newConfig("_fixtures/sequence_policy_simple_pattern_bindings.yml"))
+func TestIsExpressionEvaluable(t *testing.T) {
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_simple.yml"))
 	require.NoError(t, rules.Compile())
 	log.SetLevel(log.DebugLevel)
 
@@ -597,12 +851,12 @@ func TestIsKtypeEligible(t *testing.T) {
 		Kparams: kevent.Kparams{
 			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
 		},
-		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "barzz"},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
 	kevt2 := &kevent.Kevent{
-		Type: ktypes.CreateFile,
-		Name: "CreateFile",
+		Type: ktypes.RenameFile,
+		Name: "RenameFile",
 		Tid:  2484,
 		PID:  859,
 		PS: &types.PS{
@@ -612,24 +866,76 @@ func TestIsKtypeEligible(t *testing.T) {
 		Kparams: kevent.Kparams{
 			kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper"},
 		},
-		Metadata: map[kevent.MetadataKey]string{"foo": "bar", "fooz": "barzz"},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
-	groups := rules.sequenceGroups
-	for _, g := range groups {
-		for _, f := range g.filters {
-			if f.config.Name == "spawn command shell" {
-				assert.False(t, f.isEligible(kevt2))
-				assert.True(t, f.isEligible(kevt1))
+	for _, groups := range rules.groups {
+		for _, g := range groups {
+			for _, f := range g.filters {
+				e := f.filter.GetSequence().Expressions[0]
+				assert.False(t, e.IsEvaluable(kevt2))
+				assert.True(t, e.IsEvaluable(kevt1))
 			}
 		}
 	}
 }
 
+func TestBoundFieldsWithFunctions(t *testing.T) {
+	log.SetLevel(log.DebugLevel)
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_bound_fields_with_functions.yml"))
+	require.NoError(t, rules.Compile())
+
+	kevt1 := &kevent.Kevent{
+		Type:     ktypes.CreateFile,
+		Name:     "CreateFile",
+		Category: ktypes.File,
+		Tid:      2484,
+		PID:      859,
+		PS: &types.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\cmd.exe",
+		},
+		Kparams: kevent.Kparams{
+			kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\System32\\passwdflt.dll"},
+		},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+	}
+
+	kevt2 := &kevent.Kevent{
+		Type:     ktypes.RegSetValue,
+		Name:     "RegSetValue",
+		Category: ktypes.Registry,
+		Tid:      2484,
+		PID:      859,
+		PS: &types.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\cmd.exe",
+		},
+		Kparams: kevent.Kparams{
+			kparams.RegKeyName: {Name: kparams.RegKeyName, Type: kparams.UnicodeString, Value: "HKEY_CURRENT_USER\\Volatile Environment\\Notification Packages"},
+		},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+	}
+
+	key, err := registry.OpenKey(registry.CURRENT_USER, "Volatile Environment", registry.SET_VALUE)
+	require.NoError(t, err)
+	defer key.Close()
+
+	defer func() {
+		_ = key.DeleteValue("Notification Packages")
+	}()
+
+	require.NoError(t, key.SetStringsValue("Notification Packages", []string{"secli", "passwdflt"}))
+
+	require.False(t, rules.ProcessEvent(kevt1))
+	require.True(t, rules.ProcessEvent(kevt2))
+}
+
 func BenchmarkRunRules(b *testing.B) {
 	b.ReportAllocs()
-
-	rules := NewRules(newConfig("_fixtures/default/default.yml"))
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, newConfig("_fixtures/default/default.yml"))
 	require.NoError(b, rules.Compile())
 
 	b.ResetTimer()
@@ -649,7 +955,7 @@ func BenchmarkRunRules(b *testing.B) {
 				kparams.NetSIP:   {Name: kparams.NetSIP, Type: kparams.IPv4, Value: net.ParseIP("127.0.0.1")},
 				kparams.NetDIP:   {Name: kparams.NetDIP, Type: kparams.IPv4, Value: net.ParseIP("216.58.201.174")},
 			},
-			Metadata: make(map[kevent.MetadataKey]string),
+			Metadata: make(map[kevent.MetadataKey]any),
 		},
 		{
 			Type:     ktypes.CreateProcess,
@@ -668,7 +974,7 @@ func BenchmarkRunRules(b *testing.B) {
 				kparams.Exe:             {Name: kparams.Exe, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe`},
 				kparams.UserSID:         {Name: kparams.UserSID, Type: kparams.UnicodeString, Value: `admin\SYSTEM`},
 			},
-			Metadata: make(map[kevent.MetadataKey]string),
+			Metadata: make(map[kevent.MetadataKey]any),
 		},
 		{
 			Type:     ktypes.CreateHandle,
@@ -682,7 +988,7 @@ func BenchmarkRunRules(b *testing.B) {
 			Kparams: kevent.Kparams{
 				kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.PID, Value: 2323},
 			},
-			Metadata: make(map[kevent.MetadataKey]string),
+			Metadata: make(map[kevent.MetadataKey]any),
 		},
 	}
 

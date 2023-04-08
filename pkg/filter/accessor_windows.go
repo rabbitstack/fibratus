@@ -21,12 +21,12 @@ package filter
 import (
 	"errors"
 	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	psnap "github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
 	"path/filepath"
 	"strconv"
 	"strings"
-
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/fs"
@@ -43,17 +43,12 @@ import (
 type accessor interface {
 	// get fetches the parameter value for the specified filter field.
 	get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error)
-	// canAccess indicates if the particular accessor is able to extract
-	// fields from the given event. The filter context is also provided to
-	// this method to determine whether the accessor should be visited depending
-	// on some condition derived from the filter expression.
-	canAccess(kevt *kevent.Kevent, filter *filter) bool
 }
 
 // getAccessors initializes and returns all available accessors.
 func getAccessors() []accessor {
 	return []accessor{
-		newPSAccessor(),
+		newPSAccessor(nil),
 		newPEAccessor(),
 		newFileAccessor(),
 		newKevtAccessor(),
@@ -72,19 +67,19 @@ func getParentPs(kevt *kevent.Kevent) *pstypes.PS {
 	return kevt.PS.Parent
 }
 
-// psAccessor extracts process's state or kevent specific values.
-type psAccessor struct{}
+// psAccessor extracts process's state or event specific values.
+type psAccessor struct {
+	psnap psnap.Snapshotter
+}
 
-func (psAccessor) canAccess(kevt *kevent.Kevent, filter *filter) bool { return filter.useProcAccessor }
-
-func newPSAccessor() accessor { return &psAccessor{} }
+func newPSAccessor(psnap psnap.Snapshotter) accessor { return &psAccessor{psnap: psnap} }
 
 func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
 	switch f {
 	case fields.PsPid:
 		// the process id that is generating the event
 		return kevt.PID, nil
-	case fields.PsSiblingPid:
+	case fields.PsSiblingPid, fields.PsChildPid:
 		if kevt.Category != ktypes.Process {
 			return nil, nil
 		}
@@ -102,18 +97,18 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 			return nil, ErrPsNil
 		}
 		return ps.Name, nil
-	case fields.PsSiblingName:
+	case fields.PsSiblingName, fields.PsChildName:
 		if kevt.Category != ktypes.Process {
 			return nil, nil
 		}
 		return kevt.Kparams.GetString(kparams.ProcessName)
-	case fields.PsComm:
+	case fields.PsComm, fields.PsCmdline:
 		ps := kevt.PS
 		if ps == nil {
 			return nil, ErrPsNil
 		}
 		return ps.Cmdline, nil
-	case fields.PsSiblingComm:
+	case fields.PsSiblingComm, fields.PsChildCmdline:
 		if kevt.Category != ktypes.Process {
 			return nil, nil
 		}
@@ -124,7 +119,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 			return nil, ErrPsNil
 		}
 		return ps.Exe, nil
-	case fields.PsSiblingExe:
+	case fields.PsSiblingExe, fields.PsChildExe:
 		if kevt.Category != ktypes.Process {
 			return nil, nil
 		}
@@ -135,7 +130,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 			return nil, ErrPsNil
 		}
 		return ps.Args, nil
-	case fields.PsSiblingArgs:
+	case fields.PsSiblingArgs, fields.PsChildArgs:
 		if kevt.Category != ktypes.Process {
 			return nil, nil
 		}
@@ -156,12 +151,12 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 			return nil, ErrPsNil
 		}
 		return ps.SID, nil
-	case fields.PsSiblingSID:
+	case fields.PsSiblingSID, fields.PsChildSID:
 		if kevt.Category != ktypes.Process {
 			return nil, nil
 		}
 		return kevt.Kparams.GetString(kparams.UserSID)
-	case fields.PsSiblingDomain:
+	case fields.PsSiblingDomain, fields.PsChildDomain:
 		if kevt.Category != ktypes.Process {
 			return nil, nil
 		}
@@ -170,7 +165,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 			return nil, err
 		}
 		return domainFromSID(sid)
-	case fields.PsSiblingUsername:
+	case fields.PsSiblingUsername, fields.PsChildUsername:
 		if kevt.Category != ktypes.Process {
 			return nil, nil
 		}
@@ -206,13 +201,13 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 		if kevt.Type != ktypes.OpenProcess {
 			return nil, nil
 		}
-		return kevt.Kparams.GetSlice(kparams.DesiredAccessNames)
+		return kevt.GetFlagsAsSlice(kparams.DesiredAccess), nil
 	case fields.PsAccessStatus:
 		if kevt.Type != ktypes.OpenProcess {
 			return nil, nil
 		}
-		return kevt.Kparams.GetString(kparams.NTStatus)
-	case fields.PsSiblingSessionID:
+		return kevt.GetParamAsString(kparams.NTStatus), nil
+	case fields.PsSiblingSessionID, fields.PsChildSessionID:
 		if kevt.Category != ktypes.Process {
 			return nil, nil
 		}
@@ -237,6 +232,35 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 			mods = append(mods, filepath.Base(m.Name))
 		}
 		return mods, nil
+	case fields.PsUUID:
+		ps := kevt.PS
+		if ps == nil {
+			return nil, ErrPsNil
+		}
+		return ps.UUID(), nil
+	case fields.PsParentUUID:
+		ps := getParentPs(kevt)
+		if ps == nil {
+			return nil, ErrPsNil
+		}
+		return ps.UUID(), nil
+	case fields.PsChildUUID:
+		if kevt.Category != ktypes.Process {
+			return nil, nil
+		}
+		// find child process in snapshotter
+		pid, err := kevt.Kparams.GetPid()
+		if err != nil {
+			return nil, err
+		}
+		if ps.psnap == nil {
+			return nil, nil
+		}
+		proc := ps.psnap.FindAndPut(pid)
+		if proc == nil {
+			return nil, ErrPsNil
+		}
+		return proc.UUID(), nil
 	case fields.PsHandles:
 		ps := kevt.PS
 		if ps == nil {
@@ -272,7 +296,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 			return nil, ErrPsNil
 		}
 		return parent.Name, nil
-	case fields.PsParentComm:
+	case fields.PsParentComm, fields.PsParentCmdline:
 		parent := getParentPs(kevt)
 		if parent == nil {
 			return nil, ErrPsNil
@@ -355,7 +379,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 		return types, nil
 	default:
 		switch {
-		case f.IsEnvsSequence():
+		case f.IsEnvsMap():
 			// access the specific environment variable
 			env, _ := captureInBrackets(f.String())
 			ps := kevt.PS
@@ -372,7 +396,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 					return v, nil
 				}
 			}
-		case f.IsModsSequence():
+		case f.IsModsMap():
 			name, segment := captureInBrackets(f.String())
 			ps := kevt.PS
 			if ps == nil {
@@ -395,7 +419,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 			case fields.ModuleLocation:
 				return filepath.Dir(mod.Name), nil
 			}
-		case f.IsAncestorSequence():
+		case f.IsAncestorMap():
 			return ancestorFields(f.String(), kevt)
 		}
 
@@ -453,7 +477,7 @@ func ancestorFields(field string, kevt *kevent.Kevent) (kparams.Value, error) {
 				values = append(values, strconv.Itoa(int(proc.SessionID)))
 			case fields.ProcessCwd:
 				values = append(values, proc.Cwd)
-			case fields.ProcessComm:
+			case fields.ProcessCmdline:
 				values = append(values, proc.Cmdline)
 			case fields.ProcessArgs:
 				values = append(values, proc.Args...)
@@ -493,7 +517,7 @@ func ancestorFields(field string, kevt *kevent.Kevent) (kparams.Value, error) {
 		return ps.SessionID, nil
 	case fields.ProcessCwd:
 		return ps.Cwd, nil
-	case fields.ProcessComm:
+	case fields.ProcessCmdline:
 		return ps.Cmdline, nil
 	case fields.ProcessArgs:
 		return ps.Args, nil
@@ -506,10 +530,6 @@ func ancestorFields(field string, kevt *kevent.Kevent) (kparams.Value, error) {
 
 // threadAccessor fetches thread parameters from thread kernel events.
 type threadAccessor struct{}
-
-func (threadAccessor) canAccess(kevt *kevent.Kevent, filter *filter) bool {
-	return kevt.Category == ktypes.Thread
-}
 
 func newThreadAccessor() accessor {
 	return &threadAccessor{}
@@ -577,10 +597,6 @@ func (t *threadAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value
 // fileAccessor extracts file specific values.
 type fileAccessor struct{}
 
-func (fileAccessor) canAccess(kevt *kevent.Kevent, filter *filter) bool {
-	return kevt.Category == ktypes.File
-}
-
 func newFileAccessor() accessor {
 	return &fileAccessor{}
 }
@@ -612,35 +628,18 @@ func (l *fileAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, 
 	case fields.FileExtension:
 		return filepath.Ext(kevt.GetParamAsString(kparams.FileName)), nil
 	case fields.FileAttributes:
-		val, err := kevt.Kparams.GetSlice(kparams.FileAttributes)
-		if err != nil {
-			return nil, err
-		}
-		slice, ok := val.([]fs.FileAttr)
-		if !ok {
-			return nil, nil
-		}
-		// convert from []fs.FileAttr to string slice
-		attrs := make([]string, 0, len(slice))
-		for _, attr := range slice {
-			attrs = append(attrs, attr.String())
-		}
-		return attrs, nil
+		return kevt.GetFlagsAsSlice(kparams.FileAttributes), nil
 	case fields.FileStatus:
 		if kevt.Type != ktypes.CreateFile {
 			return nil, nil
 		}
-		return kevt.Kparams.GetString(kparams.NTStatus)
+		return kevt.GetParamAsString(kparams.NTStatus), nil
 	}
 	return nil, nil
 }
 
 // imageAccessor extracts image (DLL) event values.
 type imageAccessor struct{}
-
-func (imageAccessor) canAccess(kevt *kevent.Kevent, filter *filter) bool {
-	return kevt.Category == ktypes.Image
-}
 
 func newImageAccessor() accessor {
 	return &imageAccessor{}
@@ -675,10 +674,6 @@ func (i *imageAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value,
 // registryAccessor extracts registry specific parameters.
 type registryAccessor struct{}
 
-func (registryAccessor) canAccess(kevt *kevent.Kevent, filter *filter) bool {
-	return kevt.Category == ktypes.Registry
-}
-
 func newRegistryAccessor() accessor {
 	return &registryAccessor{}
 }
@@ -705,10 +700,6 @@ func (r *registryAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Val
 
 // networkAccessor deals with extracting the network specific kernel event parameters.
 type networkAccessor struct{}
-
-func (networkAccessor) canAccess(kevt *kevent.Kevent, filter *filter) bool {
-	return kevt.Category == ktypes.Net
-}
 
 func newNetworkAccessor() accessor { return &networkAccessor{} }
 
@@ -749,10 +740,6 @@ func (n *networkAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Valu
 // handleAccessor extracts handle event values.
 type handleAccessor struct{}
 
-func (handleAccessor) canAccess(kevt *kevent.Kevent, filter *filter) bool {
-	return kevt.Category == ktypes.Handle
-}
-
 func newHandleAccessor() accessor { return &handleAccessor{} }
 
 func (h *handleAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
@@ -775,8 +762,6 @@ func (h *handleAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value
 
 // peAccessor extracts PE specific values.
 type peAccessor struct{}
-
-func (peAccessor) canAccess(kevt *kevent.Kevent, filter *filter) bool { return true }
 
 func newPEAccessor() accessor {
 	return &peAccessor{}
@@ -820,7 +805,7 @@ func (*peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, erro
 		return p.VersionResources[pe.ProductVersion], nil
 	default:
 		switch {
-		case f.IsPeSectionsSequence():
+		case f.IsPeSectionsMap():
 			// get the section name
 			sname, segment := captureInBrackets(f.String())
 			sec := p.Section(sname)
@@ -835,7 +820,7 @@ func (*peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, erro
 			case fields.SectionSize:
 				return sec.Size, nil
 			}
-		case f.IsPeResourcesSequence():
+		case f.IsPeResourcesMap():
 			// consult the resource name
 			key, _ := captureInBrackets(f.String())
 			v, ok := p.VersionResources[key]

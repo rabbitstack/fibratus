@@ -25,7 +25,7 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/zsyscall"
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	"golang.org/x/sys/windows"
 	"unsafe"
 )
@@ -60,7 +60,7 @@ func GetHandleWithTimeout(handle windows.Handle, timeout uint32) (string, error)
 	if err := windows.SetEvent(ini); err != nil {
 		return "", err
 	}
-	thread := zsyscall.CreateThread(
+	thread := sys.CreateThread(
 		nil,
 		0,
 		windows.NewCallback(getObjectNameCallback),
@@ -70,7 +70,7 @@ func GetHandleWithTimeout(handle windows.Handle, timeout uint32) (string, error)
 	if thread == 0 {
 		return "", fmt.Errorf("cannot create handle query thread: %v", windows.GetLastError())
 	}
-	defer zsyscall.TerminateThread(thread, 0)
+	defer sys.TerminateThread(thread, 0)
 
 	s, err := windows.WaitForSingleObject(done, timeout)
 	if s == windows.WAIT_OBJECT_0 {
@@ -79,7 +79,7 @@ func GetHandleWithTimeout(handle windows.Handle, timeout uint32) (string, error)
 	if err == windows.WAIT_TIMEOUT {
 		waitTimeoutCounts.Add(1)
 		// kill the thread and wait for its termination to orderly cleanup resources
-		if err := zsyscall.TerminateThread(thread, 0); err != nil {
+		if err := sys.TerminateThread(thread, 0); err != nil {
 			return "", fmt.Errorf("unable to terminate timeout thread: %v", err)
 		}
 		if _, err := windows.WaitForSingleObject(thread, timeout); err != nil {

@@ -36,10 +36,19 @@ func (s *SnapshotterMock) Write(kevt *kevent.Kevent) error { return nil }
 func (s *SnapshotterMock) Remove(kevt *kevent.Kevent) error { return nil }
 
 // Find method
-func (s *SnapshotterMock) Find(pid uint32) *pstypes.PS {
+func (s *SnapshotterMock) Find(pid uint32) (bool, *pstypes.PS) {
+	args := s.Called(pid)
+	return args.Bool(0), args.Get(1).(*pstypes.PS)
+}
+
+// FindAndPut method
+func (s *SnapshotterMock) FindAndPut(pid uint32) *pstypes.PS {
 	args := s.Called(pid)
 	return args.Get(0).(*pstypes.PS)
 }
+
+// Put method
+func (s *SnapshotterMock) Put(ps *pstypes.PS) {}
 
 // Size method
 func (s *SnapshotterMock) Size() uint32 { args := s.Called(); return uint32(args.Int(0)) }
@@ -52,6 +61,18 @@ func (s *SnapshotterMock) GetSnapshot() []*pstypes.PS {
 	args := s.Called()
 	return args.Get(0).([]*pstypes.PS)
 }
+
+// AddThread method
+func (s *SnapshotterMock) AddThread(*kevent.Kevent) error { return nil }
+
+// AddModule method
+func (s *SnapshotterMock) AddModule(*kevent.Kevent) error { return nil }
+
+// RemoveThread method
+func (s *SnapshotterMock) RemoveThread(pid uint32, tid uint32) error { return nil }
+
+// RemoveModule method
+func (s *SnapshotterMock) RemoveModule(pid uint32, mod string) error { return nil }
 
 // WriteFromKcap method
 func (s *SnapshotterMock) WriteFromKcap(kevt *kevent.Kevent) error { return nil }

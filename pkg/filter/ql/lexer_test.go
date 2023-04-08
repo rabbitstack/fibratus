@@ -31,62 +31,58 @@ func TestScanner(t *testing.T) {
 		pos int
 	}{
 		// special tokens
-		{s: ``, tok: eof},
-		{s: `#`, tok: illegal, lit: `#`},
-		{s: ` `, tok: ws, lit: " "},
-		{s: "\t", tok: ws, lit: "\t"},
+		{s: ``, tok: EOF},
+		{s: `#`, tok: Illegal, lit: `#`},
+		{s: ` `, tok: WS, lit: " "},
+		{s: "\t", tok: WS, lit: "\t"},
 
 		// logical operators
-		{s: `AND`, tok: and},
-		{s: `and`, tok: and},
-		{s: `OR`, tok: or},
-		{s: `or`, tok: or},
+		{s: `AND`, tok: And},
+		{s: `and`, tok: And},
+		{s: `OR`, tok: Or},
+		{s: `or`, tok: Or},
 
-		{s: `=`, tok: eq},
-		{s: `~=`, tok: ieq},
-		{s: `<>`, tok: neq},
-		{s: `! `, tok: illegal, lit: "!"},
-		{s: `<`, tok: lt},
-		{s: `<=`, tok: lte},
-		{s: `>`, tok: gt},
-		{s: `>=`, tok: gte},
-		{s: `IN`, tok: in},
-		{s: `in`, tok: in},
+		{s: `=`, tok: Eq},
+		{s: `~=`, tok: IEq},
+		{s: `<>`, tok: Neq},
+		{s: `! `, tok: Illegal, lit: "!"},
+		{s: `<`, tok: Lt},
+		{s: `<=`, tok: Lte},
+		{s: `>`, tok: Gt},
+		{s: `>=`, tok: Gte},
+		{s: `IN`, tok: In},
+		{s: `in`, tok: In},
 
 		// misc tokens
-		{s: `(`, tok: lparen},
-		{s: `)`, tok: rparen},
-		{s: `,`, tok: comma},
+		{s: `(`, tok: Lparen},
+		{s: `)`, tok: Rparen},
+		{s: `,`, tok: Comma},
+		{s: `|`, tok: Pipe},
 
 		// fields
-		{s: `ps.name`, tok: field, lit: "ps.name"},
-		{s: `ps.pe.sections[.debug$S].entropy`, tok: field, lit: "ps.pe.sections[.debug$S].entropy"},
-		{s: `ps.envs[CommonProgramFiles86]`, tok: field, lit: "ps.envs[CommonProgramFiles86]"},
-
-		// pattern bindings
-		{s: `$1.ps.name`, tok: patternBinding, lit: "$1.ps.name"},
-		{s: `$4.kevt.name`, tok: patternBinding, lit: "$4.kevt.name"},
-		{s: `$4.ps.ancestor[1].name`, tok: patternBinding, lit: "$4.ps.ancestor[1].name"},
+		{s: `ps.name`, tok: Field, lit: "ps.name"},
+		{s: `ps.pe.sections[.debug$S].entropy`, tok: Field, lit: "ps.pe.sections[.debug$S].entropy"},
+		{s: `ps.envs[CommonProgramFiles86]`, tok: Field, lit: "ps.envs[CommonProgramFiles86]"},
 
 		// identifiers
-		{s: `foo`, tok: ident, lit: `foo`},
-		{s: `_foo`, tok: ident, lit: `_foo`},
-		{s: `Zx12_3U_-`, tok: ident, lit: `Zx12_3U_`},
-		{s: `"foo\"bar\""`, tok: ident, lit: `foo"bar"`},
+		{s: `foo`, tok: Ident, lit: `foo`},
+		{s: `_foo`, tok: Ident, lit: `_foo`},
+		{s: `Zx12_3U_-`, tok: Ident, lit: `Zx12_3U_`},
+		{s: `"foo\"bar\""`, tok: Ident, lit: `foo"bar"`},
 
 		// IP address
-		{s: "172.17.0.1", tok: ip, lit: "172.17.0.1"},
-		{s: "172.17.1", tok: badip, lit: "172.17.1"},
-		{s: "172.317.1.2", tok: badip, lit: "172.317.1.2"},
-		{s: "172.2.266.2", tok: badip, lit: "172.2.266.2"},
+		{s: "172.17.0.1", tok: IP, lit: "172.17.0.1"},
+		{s: "172.17.1", tok: BadIP, lit: "172.17.1"},
+		{s: "172.317.1.2", tok: BadIP, lit: "172.317.1.2"},
+		{s: "172.2.266.2", tok: BadIP, lit: "172.2.266.2"},
 
 		// strings
-		{s: `'testing 123!'`, tok: str, lit: `testing 123!`},
-		{s: `'foo\nbar'`, tok: str, lit: "foo\nbar"},
-		{s: `'foo\\bar'`, tok: str, lit: "foo\\bar"},
+		{s: `'testing 123!'`, tok: Str, lit: `testing 123!`},
+		{s: `'foo\nbar'`, tok: Str, lit: "foo\nbar"},
+		{s: `'foo\\bar'`, tok: Str, lit: "foo\\bar"},
 
 		// numbers
-		{s: "6.2323", tok: dec, lit: "6.2323"},
+		{s: "6.2323", tok: Decimal, lit: "6.2323"},
 	}
 
 	for i, tt := range tests {

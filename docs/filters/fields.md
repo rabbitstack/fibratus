@@ -18,7 +18,7 @@ The following tables summarize available field names that can be used in filter 
 | kevt.pid      | Process identifier generating the kernel event       | `kevt.pid = 6`   |
 | kevt.tid      | Thread identifier generating the kernel event       | `kevt.tid = 1024`   |
 | kevt.cpu      | Logical processor core where the event was generated       | `kevt.cpu = 2`   |
-| kevt.name      | Symbolical kernel event name       | `kevt.name = 'CreateThread'`   |
+| kevt.name      | Symbolical event name       | `kevt.name = 'CreateThread'`   |
 | kevt.category      | Category to which the event pertains      | `kevt.category = 'registry'`   |
 | kevt.desc      | Cursory event description      | `kevt.desc contains 'Creates'`   |
 | kevt.host      | Hostname on which the event was produced     | `kevt.host contains 'dev'`   |
@@ -35,6 +35,8 @@ The following tables summarize available field names that can be used in filter 
 | kevt.date.tz    | Time zone associated with the event timestamp     | `kevt.date.tz = 'UTC'`   |
 | kevt.date.week    | Week number within the year on which the event occurred     | `kevt.date.week = 2`   |
 | kevt.date.weekday    | Week day on which the event occurred     | `kevt.date.weekday = 'Monday'`   |
+| kevt.arg[]    | Accesses a specific event parameter via internal name | `kevt.arg[exe] = 'C:\\Windows\\cmd.exe'`   |
+
 
 ### Process
 | Field Name  | Description | Example     |
@@ -42,7 +44,7 @@ The following tables summarize available field names that can be used in filter 
 | ps.pid         | Process identifier generating the kernel event. Alias for `kevt.pid` | `ps.pid = 1024`   |
 | ps.ppid         | Parent process identifier of the process generating the kernel event | `ps.ppid = 25`   |
 | ps.name         | Process (image) path name that generates an event | `ps.name = 'cmd.exe'`   |
-| ps.comm         | Process command line | `ps.comm contains '/E c:\\ads\\file.txt:regfile.reg'`   |
+| ps.cmdline      | Process command line | `ps.cmdline contains '/E c:\\ads\\file.txt:regfile.reg'`   |
 | ps.exe          | Full name of the process' executable | `ps.exe = 'C:\\Windows\\system32\\cmd.exe'`   |
 | ps.args         | Process command line arguments | `ps.args in ('/cdir', '/-C')`   |
 | ps.cwd          | Process current working directory | `ps.cwd = 'C:\\Users\\Default'`   |
@@ -62,7 +64,7 @@ The following tables summarize available field names that can be used in filter 
 | ps.modules[]    | Accesses a specific process module. Prefix matches are supported  | `ps.modules['crypt'].size > 1024`   |
 | ps.parent.name    | Parent process name  | `ps.parent.name = 'powershell.exe'`   |
 | ps.parent.pid    | Parent process identifier  | `ps.parent.pid = 2340`   |
-| ps.parent.comm    | Parent process command line  | `ps.parent.comm contains 'attrib'`   |
+| ps.parent.cmdline| Parent process command line  | `ps.parent.cmdline contains 'attrib'`   |
 | ps.parent.exe    | Full name of the parent process executable  | `ps.parent.exe = 'C:\\Windows\\system32\\cmd.exe'`   |
 | ps.parent.cwd    | Parent process current working directory  | `ps.parent.cwd = 'C:\\Users\\Default'`   |
 | ps.parent.sid    | Security identifier under which the parent process is run  | `ps.parent.sid contains 'SYSTEM'`   |
@@ -74,14 +76,19 @@ The following tables summarize available field names that can be used in filter 
 | ps.parent.handles    | Allocated parent process handles  | `ps.parent.handles in ('\\...\\Cor_SxSPublic_IPCBlock')`   |
 | ps.parent.handle.types    | Allocated parent process handles types  | `ps.parent.handle.types in ('Key', 'Mutant', 'Section')`   |
 | ps.ancestor[]    | Process ancestry traversing  | `ps.ancestor[2].name in ('winword.exe', 'powershell.exe')`   |
-| ps.sibling.name    | Sibling process name  | `ps.sibling.name = 'cmd.exe'`   |
-| ps.sibling.pid     | Sibling process identifier  | `ps.sibling.id = 6050`   |
-| ps.sibling.comm    | Sibling process command line  | `ps.sibling.name contains '/k /v'`   |
-| ps.sibling.exe     | Sibling process executable full path  | `ps.sibling.exe = 'C:\\Windows\\system32\\cmd.exe'`   |
-| ps.sibling.sid     | Sibling process security identifier  | `ps.sibling.sid contains 'SYSTEM'`   |
-| ps.sibling.sessionid   | Sibling process session identifier  | `ps.sibling.sessionid = 1`   |
-| ps.sibling.domain    | Sibling process domain name  | `ps.sibling.domain = 'NT AUTHORITY'`   |
-| ps.sibling.username  | Sibling process user name  | `ps.sibling.username = 'SYSTEM'`   |
+| ps.child.name    | Child process name  | `ps.child.name = 'cmd.exe'`   |
+| ps.child.pid     | Child process identifier  | `ps.child.id = 6050`   |
+| ps.child.cmdline    | Child process command line  | `ps.child.cmdline contains '/k /v'`   |
+| ps.child.exe     | Child process executable full path  | `ps.child.exe = 'C:\\Windows\\system32\\cmd.exe'`   |
+| ps.child.args    | Child process command line arguments  | `ps.child.args in ('C:\\Windows\\system32\\cmd.exe')`   |
+| ps.child.sid     | Child process security identifier  | `ps.child.sid contains 'SYSTEM'`   |
+| ps.child.sessionid   | Child process session identifier  | `ps.child.sessionid = 1`   |
+| ps.child.domain    | Child process domain name  | `ps.child.domain = 'NT AUTHORITY'`   |
+| ps.child.username  | Child process user name  | `ps.child.username = 'SYSTEM'`   |
+| ps.uuid  | Unique process identifier resistant to repetition | `ps.uuid > 10000400`   |
+| ps.parent.uuid  | Unique parent process identifier resistant to repetition  | `ps.parent.uuid = 1843450000440`   |
+| ps.child.uuid  | Unique child process identifier resistant to repetition  | `ps.child.uuid > 20030000000`   |
+
 
 ### Thread
 | Field Name  | Description | Example     |

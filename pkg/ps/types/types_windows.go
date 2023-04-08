@@ -19,20 +19,26 @@
 package types
 
 import (
+	"encoding/binary"
 	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
 	"golang.org/x/sys/windows"
 	"path/filepath"
 	"sync"
 
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
+	"github.com/rabbitstack/fibratus/pkg/kcap/section"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/pe"
+
+	"github.com/rabbitstack/fibratus/pkg/util/bootid"
+	"time"
 )
 
 // PS encapsulates process' state such as allocated resources and other metadata.
 type PS struct {
-	mu sync.RWMutex
+	sync.RWMutex
 	// PID is the identifier of this process. This value is valid from the time a process is created until it is terminated.
 	PID uint32 `json:"pid"`
 	// Ppipd represents the parent of this process. Process identifier numbers are reused, so they only identify a process
@@ -48,12 +54,12 @@ type PS struct {
 	Exe string `json:"exe"`
 	// Cwd designates the current working directory of the process.
 	Cwd string `json:"cwd"`
-	// SID is the security identifier under which this process is run.
+	// SID is the security identifier under which this process is run. (e.g. S-1-5-32-544)
 	SID string `json:"sid"`
 	// Args contains process' command line arguments (e.g. /cdir, /-C, /W)
 	Args []string `json:"args"`
 	// SessionID is the unique identifier for the current session.
-	SessionID uint8 `json:"session"`
+	SessionID uint32 `json:"session"`
 	// Envs contains process' environment variables indexed by env variable name.
 	Envs map[string]string `json:"envs"`
 	// Threads contains all the threads running in the address space of this process.
@@ -66,6 +72,57 @@ type PS struct {
 	PE *pe.PE `json:"pe"`
 	// Parent represents the reference to the parent process.
 	Parent *PS `json:"parent"`
+	// StartTime represents the process start time.
+	StartTime time.Time `json:"started"`
+	// uuid is a unique process identifier derived from boot ID and process sequence number
+	uuid uint64
+	// Username represents the username under which the process is run.
+	Username string `json:"username"`
+	// Domain represents the domain under which the process is run. (e.g. NT AUTHORITY)
+	Domain string `json:"domain"`
+}
+
+// UUID is meant to offer a more robust version of process ID that
+// is resistant to being repeated. Process start key was introduced
+// in Windows 10 1507 and is derived from _KUSER_SHARED_DATA.BootId and
+// EPROCESS.SequenceNumber both of which increment and are unlikely to
+// overflow. This method uses a combination of process start key and boot id
+// to fabric a unique process identifier. If this is not possible, the uuid
+// is computed by using the process start time.
+func (ps *PS) UUID() uint64 {
+	if ps.uuid != 0 {
+		return ps.uuid
+	}
+	// assume the uuid is derived from boot ID and process start time
+	ps.uuid = (bootid.Read() << 30) + uint64(ps.PID) | uint64(ps.StartTime.UnixNano())
+	maj, _, patch := windows.RtlGetNtVersionNumbers()
+	if maj >= 10 && patch >= 1507 {
+		seqNum := querySequenceNumber(ps.PID)
+		// prefer the most robust variant of the uuid which uses the
+		// process sequence number obtained from the process object
+		if seqNum != 0 {
+			ps.uuid = (bootid.Read() << 30) | seqNum
+		}
+	}
+	return ps.uuid
+}
+
+// ProcessSequenceNumber contains the unique process sequence number.
+type ProcessSequenceNumber struct {
+	Seq [8]byte
+}
+
+func querySequenceNumber(pid uint32) uint64 {
+	proc, err := windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION, false, pid)
+	if err != nil {
+		return 0
+	}
+	defer windows.Close(proc)
+	seq, err := sys.QueryInformationProcess[ProcessSequenceNumber](proc, windows.ProcessSequenceNumber)
+	if err != nil {
+		return 0
+	}
+	return binary.BigEndian.Uint64(seq.Seq[:])
 }
 
 // String returns a string representation of the process' state.
@@ -78,6 +135,8 @@ func (ps *PS) String() string {
 		Exe:  %s
 		Cwd:  %s
 		SID:  %s
+		Username: %s
+		Domain: %s
 		Args: %s
 		Session ID: %d
 		Envs: %s
@@ -89,6 +148,8 @@ func (ps *PS) String() string {
 		ps.Exe,
 		ps.Cwd,
 		ps.SID,
+		ps.Username,
+		ps.Domain,
 		ps.Args,
 		ps.SessionID,
 		ps.Envs,
@@ -155,24 +216,26 @@ func (m Module) String() string {
 }
 
 // New produces a new process state.
-func New(pid, ppid uint32, name, cmndline, exe, sid string, sessionID uint8) *PS {
-	return &PS{
+func New(pid, ppid uint32, name, cmndline, exe string, sid *windows.SID, sessionID uint32) *PS {
+	ps := &PS{
 		PID:       pid,
 		Ppid:      ppid,
 		Name:      name,
 		Cmdline:   cmndline,
 		Exe:       exe,
 		Args:      cmdline.Split(cmndline),
-		SID:       sid,
+		SID:       sid.String(),
 		SessionID: sessionID,
 		Threads:   make(map[uint32]Thread),
 		Modules:   make([]Module, 0),
 		Handles:   make([]htypes.Handle, 0),
 	}
+	ps.Username, ps.Domain, _, _ = sid.LookupAccount("")
+	return ps
 }
 
-// NewFromKcap reconstructs the state of the process from kcap file.
-func NewFromKcap(buf []byte) (*PS, error) {
+// NewFromKcap reconstructs the state of the process from capture file.
+func NewFromKcap(buf []byte, sec section.Section) (*PS, error) {
 	ps := PS{
 		Args:    make([]string, 0),
 		Envs:    make(map[string]string),
@@ -180,7 +243,7 @@ func NewFromKcap(buf []byte) (*PS, error) {
 		Modules: make([]Module, 0),
 		Threads: make(map[uint32]Thread),
 	}
-	if err := ps.Unmarshal(buf); err != nil {
+	if err := ps.Unmarshal(buf, sec); err != nil {
 		return nil, err
 	}
 	return &ps, nil
@@ -188,26 +251,26 @@ func NewFromKcap(buf []byte) (*PS, error) {
 
 // AddThread adds a thread to process's state descriptor.
 func (ps *PS) AddThread(thread Thread) {
-	ps.mu.Lock()
-	defer ps.mu.Unlock()
+	ps.Lock()
+	defer ps.Unlock()
 	ps.Threads[thread.Tid] = thread
 }
 
 // RemoveThread eliminates a thread from the process's state.
 func (ps *PS) RemoveThread(tid uint32) {
-	ps.mu.Lock()
-	defer ps.mu.Unlock()
+	ps.Lock()
+	defer ps.Unlock()
 	delete(ps.Threads, tid)
 }
 
 // RLock acquires a read mutex on the process state.
 func (ps *PS) RLock() {
-	ps.mu.RLock()
+	ps.RLock()
 }
 
 // RUnlock releases a read mutex on the process sate.
 func (ps *PS) RUnlock() {
-	ps.mu.RUnlock()
+	ps.RUnlock()
 }
 
 // AddHandle adds a new handle to this process state.
@@ -216,9 +279,9 @@ func (ps *PS) AddHandle(handle htypes.Handle) {
 }
 
 // RemoveHandle removes a handle with specified identifier from the list of allocated handles.
-func (ps *PS) RemoveHandle(raw windows.Handle) {
+func (ps *PS) RemoveHandle(handle windows.Handle) {
 	for i, h := range ps.Handles {
-		if h.Num == raw {
+		if h.Num == handle {
 			ps.Handles = append(ps.Handles[:i], ps.Handles[i+1:]...)
 			break
 		}

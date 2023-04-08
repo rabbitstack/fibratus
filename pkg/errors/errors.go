@@ -19,14 +19,10 @@
 package errors
 
 import (
-	"errors"
 	"fmt"
 )
 
 var (
-	// ErrCancelUpstreamKevent represents the error that is returned to denote that event is not going to be passed to upstream components such as aggregator or outputs
-	ErrCancelUpstreamKevent = errors.New("cancel bubbling up the kernel event to upstream components")
-
 	// ErrFeatureUnsupported is thrown when a certain feature was not triggered via the build flag
 	ErrFeatureUnsupported = func(s string) error {
 		return fmt.Errorf("fibratus was compiled without %s support. Please compile with the '%s' build flag", s, s)
@@ -47,9 +43,6 @@ type ErrKparamNotFound struct {
 func (e ErrKparamNotFound) Error() string {
 	return "couldn't find '" + e.Name + "' in event parameters"
 }
-
-// IsCancelUpstreamKevent determines if the error being passed if of `ErrCancelUpstreamKevent` type.
-func IsCancelUpstreamKevent(err error) bool { return err == ErrCancelUpstreamKevent }
 
 // IsKparamNotFound returns true if the error is KparamNotFound.
 func IsKparamNotFound(err error) bool {

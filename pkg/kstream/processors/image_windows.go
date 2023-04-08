@@ -25,23 +25,23 @@ import (
 )
 
 type imageProcessor struct {
-	snap ps.Snapshotter
+	psnap ps.Snapshotter
 }
 
-func newImageProcessor(snap ps.Snapshotter) Processor {
-	return &imageProcessor{snap: snap}
+func newImageProcessor(psnap ps.Snapshotter) Processor {
+	return &imageProcessor{psnap: psnap}
 }
 
 func (imageProcessor) Name() ProcessorType { return Image }
 
-func (i *imageProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Batch, bool, error) {
+func (i *imageProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error) {
 	if e.IsUnloadImage() {
-		return kevent.NewBatch(e), false, i.snap.RemoveModule(e.Kparams.MustGetPid(), e.GetParamAsString(kparams.ImageFilename))
+		return e, false, i.psnap.RemoveModule(e.Kparams.MustGetPid(), e.GetParamAsString(kparams.ImageFilename))
 	}
 	if e.IsLoadImage() {
-		return kevent.NewBatch(e), false, i.snap.AddModule(e)
+		return e, false, i.psnap.AddModule(e)
 	}
-	return nil, true, nil
+	return e, true, nil
 }
 
 func (imageProcessor) Close() {}

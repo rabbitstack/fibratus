@@ -25,10 +25,22 @@ import (
 
 // FieldInfo is the field metadata descriptor.
 type FieldInfo struct {
-	Field    Field
-	Desc     string
-	Type     kparams.Type
-	Examples []string
+	Field       Field
+	Desc        string
+	Type        kparams.Type
+	Examples    []string
+	Deprecation *Deprecation
+}
+
+// IsDeprecated determines if the field is deprecated.
+func (f FieldInfo) IsDeprecated() bool { return f.Deprecation != nil }
+
+// Deprecation specifies field deprecation info.
+type Deprecation struct {
+	// Since denotes from which version the field is flagged as deprecated
+	Since string
+	// Field represents the field by which the deprecated field is superseded
+	Field Field
 }
 
 // Get returns a slice of field information.
@@ -39,4 +51,14 @@ func Get() []FieldInfo {
 	}
 	sort.Slice(fi, func(i, j int) bool { return fi[i].Field < fi[j].Field })
 	return fi
+}
+
+// IsDeprecated determines if the given field is deprecated.
+func IsDeprecated(f Field) (bool, *Deprecation) {
+	for _, field := range fields {
+		if field.Field == f && field.IsDeprecated() {
+			return true, field.Deprecation
+		}
+	}
+	return false, nil
 }

@@ -23,7 +23,7 @@ package fs
 
 import (
 	"expvar"
-	"github.com/rabbitstack/fibratus/pkg/zsyscall"
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	"golang.org/x/sys/windows"
 	"os"
 	"path/filepath"
@@ -61,7 +61,7 @@ func GetFileType(filename string, opts uint32) FileType {
 	// with the FILE_DIRECTORY_FILE flag, it is likely that the target file object
 	// is a directory. We ensure that by calling the API function for checking whether
 	// the path name is truly a directory
-	if (opts&directoryFile) != 0 && zsyscall.PathIsDirectory(filename) {
+	if (opts&directoryFile) != 0 && sys.PathIsDirectory(filename) {
 		return Directory
 	}
 	// FILE_DIRECTORY_FILE flag only gives us a hint on the CreateFile op outcome. If this flag is
@@ -97,14 +97,14 @@ func getFileTypeFromVolumeInfo(filename string) FileType {
 
 	var (
 		iosb windows.IO_STATUS_BLOCK
-		dev  zsyscall.FileFsDeviceInformation
+		dev  sys.FileFsDeviceInformation
 	)
-	err = zsyscall.NtQueryVolumeInformationFile(
+	err = sys.NtQueryVolumeInformationFile(
 		windows.Handle(f.Fd()),
 		&iosb,
 		uintptr(unsafe.Pointer(&dev)),
 		uint32(unsafe.Sizeof(dev)),
-		zsyscall.FileFsDeviceInformationClass,
+		sys.FileFsDeviceInformationClass,
 	)
 	if err != nil {
 		return Other
@@ -112,7 +112,7 @@ func getFileTypeFromVolumeInfo(filename string) FileType {
 	switch dev.Type {
 	case deviceCDROM, deviceCDROMFs, deviceController,
 		deviceDatalink, deviceDFS, deviceDisk, deviceDiskFs:
-		if zsyscall.PathIsDirectory(filename) {
+		if sys.PathIsDirectory(filename) {
 			return Directory
 		}
 		return Regular

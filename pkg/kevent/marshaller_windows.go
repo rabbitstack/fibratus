@@ -89,7 +89,7 @@ func (e *Kevent) MarshalRaw() []byte {
 	b = append(b, bytes.WriteUint16(uint16(len(timestamp)))...)
 	b = append(b, timestamp...)
 
-	// write the number of kernel parameters followed by each parameter
+	// write the number of event parameters followed by each parameter
 	b = append(b, bytes.WriteUint16(uint16(len(e.Kparams)))...)
 	for _, kpar := range e.Kparams {
 		// append the type, parameter size and name
@@ -97,9 +97,13 @@ func (e *Kevent) MarshalRaw() []byte {
 		b = append(b, bytes.WriteUint16(uint16(len(kpar.Name)))...)
 		b = append(b, kpar.Name...)
 		switch kpar.Type {
-		case kparams.AnsiString, kparams.UnicodeString, kparams.SID, kparams.WbemSID:
+		case kparams.AnsiString, kparams.UnicodeString:
 			b = append(b, bytes.WriteUint16(uint16(len(kpar.Value.(string))))...)
 			b = append(b, kpar.Value.(string)...)
+		case kparams.SID, kparams.WbemSID, kparams.Key, kparams.FilePath, kparams.FileDosPath:
+			v := e.GetParamAsString(kpar.Name)
+			b = append(b, bytes.WriteUint16(uint16(len(v)))...)
+			b = append(b, v...)
 		case kparams.Uint8:
 			b = append(b, kpar.Value.(uint8))
 		case kparams.Int8:
@@ -116,7 +120,7 @@ func (e *Kevent) MarshalRaw() []byte {
 			b = append(b, bytes.WriteUint16(kpar.Value.(uint16))...)
 		case kparams.Int16:
 			b = append(b, bytes.WriteUint16(uint16(kpar.Value.(int16)))...)
-		case kparams.Uint32:
+		case kparams.Uint32, kparams.Status, kparams.Enum, kparams.Flags:
 			b = append(b, bytes.WriteUint32(kpar.Value.(uint32))...)
 		case kparams.Int32:
 			b = append(b, bytes.WriteUint32(uint32(kpar.Value.(int32)))...)
@@ -147,15 +151,6 @@ func (e *Kevent) MarshalRaw() []byte {
 			ts = v.AppendFormat(ts, time.RFC3339Nano)
 			b = append(b, bytes.WriteUint16(uint16(len(ts)))...)
 			b = append(b, ts...)
-		case kparams.Enum:
-			switch e := kpar.Value.(type) {
-			case fs.FileDisposition:
-				b = append(b, uint8(e))
-			case fs.FileShareMode:
-				b = append(b, uint8(e))
-			case network.L4Proto:
-				b = append(b, uint8(e))
-			}
 		case kparams.Slice:
 			switch slice := kpar.Value.(type) {
 			case []string:
@@ -166,14 +161,9 @@ func (e *Kevent) MarshalRaw() []byte {
 					b = append(b, bytes.WriteUint16(uint16(len(s)))...)
 					b = append(b, s...)
 				}
-			case []fs.FileAttr:
-				b = append(b, uint8('s'))
-				b = append(b, bytes.WriteUint16(uint16(len(slice)))...)
-				for _, s := range slice {
-					b = append(b, bytes.WriteUint16(uint16(len(s.String())))...)
-					b = append(b, s.String()...)
-				}
 			}
+		case kparams.Binary:
+			b = append(b, kpar.Value.([]byte)...)
 		}
 	}
 	// write metadata key/value pairs
@@ -181,18 +171,19 @@ func (e *Kevent) MarshalRaw() []byte {
 	for key, value := range e.Metadata {
 		b = append(b, bytes.WriteUint16(uint16(len(key)))...)
 		b = append(b, key...)
-		b = append(b, bytes.WriteUint16(uint16(len(value)))...)
-		b = append(b, value...)
+		v := fmt.Sprintf("%s", value)
+		b = append(b, bytes.WriteUint16(uint16(len(v)))...)
+		b = append(b, v...)
 	}
 
 	// write process state
-	if e.PS != nil && (e.Type == ktypes.CreateProcess || e.Type == ktypes.ProcessRundown) {
+	if e.PS != nil && (e.IsCreateProcess() || e.IsProcessRundown()) {
 		buf := e.PS.Marshal()
-		sec := section.New(section.Process, kcapver.ProcessSecV1, 0, uint32(len(buf)))
+		sec := section.New(section.Process, kcapver.ProcessSecV3, 0, uint32(len(buf)))
 		b = append(b, sec[:]...)
 		b = append(b, buf...)
 	} else {
-		sec := section.New(section.Process, kcapver.ProcessSecV1, 0, 0)
+		sec := section.New(section.Process, kcapver.ProcessSecV3, 0, 0)
 		b = append(b, sec[:]...)
 	}
 
@@ -253,11 +244,11 @@ func (e *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 	}
 
 	// read parameters
-	nbKparams := bytes.ReadUint16(b[44+offset:])
+	nparams := bytes.ReadUint16(b[44+offset:])
 	// accumulates the offset of all parameter name and value lengths
 	var poffset uint16
 
-	for i := 0; i < int(nbKparams); i++ {
+	for i := 0; i < int(nparams); i++ {
 		// read kparam type
 		typ := bytes.ReadUint16(b[46+offset+poffset:])
 		// read kparam name
@@ -383,7 +374,10 @@ func (e *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 				kval = s
 			}
 			poffset += kparamNameLength + 4 + 1 + 2 + off
+		case kparams.Binary:
+
 		}
+
 		if kval != nil {
 			e.Kparams.AppendFromKcap(kparamName, kparams.Type(typ), kval)
 		}
@@ -392,9 +386,9 @@ func (e *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 	offset += poffset
 
 	// read metadata tags
-	nbTags := bytes.ReadUint16(b[46+offset:])
+	ntags := bytes.ReadUint16(b[46+offset:])
 	var moffset uint16
-	for i := 0; i < int(nbTags); i++ {
+	for i := 0; i < int(ntags); i++ {
 		// read key
 		klen := bytes.ReadUint16(b[48+offset+moffset:])
 		buf = b[50+offset+moffset:]
@@ -416,7 +410,7 @@ func (e *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 	// read process state
 	sec := section.Read(b[48+offset:])
 	if sec.Size() != 0 {
-		ps, err := ptypes.NewFromKcap(b[58+offset:])
+		ps, err := ptypes.NewFromKcap(b[58+offset:], sec)
 		if err != nil {
 			return err
 		}
@@ -543,7 +537,7 @@ func (e *Kevent) MarshalJSON() []byte {
 	var i int
 	for k, v := range e.Metadata {
 		writeMore := js.shouldWriteMore(i, len(e.Metadata))
-		js.writeObjectField(k.String()).writeEscapeString(v)
+		js.writeObjectField(k.String()).writeEscapeString(fmt.Sprintf("%s", v))
 		if writeMore {
 			js.writeMore()
 		}
@@ -581,7 +575,7 @@ func (e *Kevent) MarshalJSON() []byte {
 		}
 		js.writeArrayEnd().writeMore()
 
-		js.writeObjectField("sessionid").writeUint8(ps.SessionID)
+		js.writeObjectField("sessionid").writeUint32(ps.SessionID)
 
 		parent := ps.Parent
 		if parent != nil {

@@ -19,81 +19,46 @@
 package processors
 
 import (
-	"expvar"
-	"github.com/golang/groupcache/lru"
-	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/sys/driver"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
-	"github.com/rabbitstack/fibratus/pkg/zsyscall/driver"
-	"golang.org/x/sys/windows"
 	"path/filepath"
 	"strings"
 )
 
-// maxLRUCacheSize specifies the maximum number of objects waiting for their corresponding CreateHandle event
-const maxLRUCacheSize = 1000
-
-var (
-	handleDeferMatches = expvar.NewInt("handle.deferred.matches")
-)
-
 type handleProcessor struct {
 	hsnap     handle.Snapshotter
-	typeStore handle.ObjectTypeStore
 	devMapper fs.DevMapper
-	objects   *lru.Cache
 }
 
 func newHandleProcessor(
 	hsnap handle.Snapshotter,
-	typeStore handle.ObjectTypeStore,
 	devMapper fs.DevMapper,
 ) Processor {
 	return &handleProcessor{
 		hsnap:     hsnap,
-		typeStore: typeStore,
 		devMapper: devMapper,
-		objects:   lru.New(maxLRUCacheSize),
 	}
 }
 
-func (h *handleProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Batch, bool, error) {
+func (h *handleProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error) {
 	if e.Category == ktypes.Handle {
-		evts, err := h.processEvent(e)
-		return evts, false, err
+		evt, err := h.processEvent(e)
+		return evt, false, err
 	}
-	return nil, true, nil
+	return e, true, nil
 }
 
-func (h *handleProcessor) processEvent(e *kevent.Kevent) (*kevent.Batch, error) {
-	handleID := e.Kparams.MustGetUint32(kparams.HandleID)
-	typeID := e.Kparams.MustGetUint16(kparams.HandleObjectTypeID)
-	object := e.Kparams.MustGetUint64(kparams.HandleObject)
-	// map object type identifier to its name. Query the object type if
-	// it wasn't find in the object store and register the missing type
-	typeName := h.typeStore.FindByID(uint8(typeID))
-	if typeName == "" {
-		dup, err := handle.Duplicate(windows.Handle(handleID), e.PID, windows.GENERIC_ALL)
-		if err != nil {
-			return kevent.NewBatch(e), err
-		}
-		defer windows.CloseHandle(dup)
-		typeName, err = handle.QueryObjectType(dup)
-		if err != nil {
-			return kevent.NewBatch(e), err
-		}
-		h.typeStore.RegisterType(uint8(typeID), typeName)
-	}
-	e.Kparams.Append(kparams.HandleObjectTypeName, kparams.AnsiString, typeName)
-
-	// get the best possible object name according to its type
+func (h *handleProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 	name := e.GetParamAsString(kparams.HandleObjectName)
+	typ := e.GetParamAsString(kparams.HandleObjectTypeName)
+
 	if name != "" {
-		switch typeName {
+		switch typ {
 		case handle.Key:
 			rootKey, keyName := key.Format(name)
 			if rootKey == key.Invalid {
@@ -118,48 +83,18 @@ func (h *handleProcessor) processEvent(e *kevent.Kevent) (*kevent.Batch, error) 
 
 	// assign the formatted handle name
 	if err := e.Kparams.SetValue(kparams.HandleObjectName, name); err != nil {
-		return kevent.NewBatch(e), err
+		return e, err
 	}
+
+	object := e.Kparams.MustGetUint64(kparams.HandleObject)
+	e.AddMeta(kevent.DelayComparatorKey, object)
 
 	if e.Type == ktypes.CreateHandle {
-		// CreateHandle events lack the handle name
-		// but its counterpart CloseHandle event has
-		// the handle name. We'll defer emitting the
-		// CreateHandle event until we receive a CloseHandle
-		// targeting the same object. If the cache capacity is
-		// over the specified threshold, remove the oldest entry
-		if h.objects.Len() >= maxLRUCacheSize {
-			h.objects.RemoveOldest()
-		}
-		h.objects.Add(object, e)
-		return nil, kerrors.ErrCancelUpstreamKevent
+		e.Delayed = true
+		return e, h.hsnap.Write(e)
 	}
 
-	// at this point we hit CloseHandle kernel event and have the awaiting CreateHandle
-	// event reference. So we set handle object name to the name of its CloseHandle counterpart
-	if o, ok := h.objects.Get(object); ok {
-		evt := o.(*kevent.Kevent)
-		h.objects.Remove(object)
-		if err := evt.Kparams.SetValue(kparams.HandleObjectName, name); err != nil {
-			return kevent.NewBatch(e), err
-		}
-		handleDeferMatches.Add(1)
-
-		if typeName == handle.Driver {
-			driverFilename := e.GetParamAsString(kparams.ImageFilename)
-			evt.Kparams.Append(kparams.ImageFilename, kparams.FilePath, driverFilename)
-		}
-		err := h.hsnap.Write(evt)
-		if err != nil {
-			err = h.hsnap.Remove(e)
-			if err != nil {
-				return kevent.NewBatch(e), err
-			}
-		}
-		// return the CreateHandle+CloseHandle batch
-		return kevent.NewBatch(evt, e), h.hsnap.Remove(e)
-	}
-	return kevent.NewBatch(e), h.hsnap.Remove(e)
+	return e, h.hsnap.Remove(e)
 }
 
 func (handleProcessor) Name() ProcessorType { return Handle }

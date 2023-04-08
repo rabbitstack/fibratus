@@ -24,62 +24,61 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
+	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"golang.org/x/sys/windows"
 	"time"
 )
 
 type psProcessor struct {
-	snap ps.Snapshotter
+	psnap ps.Snapshotter
 }
 
 // newPsProcessor creates a new event processor for process events.
-func newPsProcessor(snap ps.Snapshotter) Processor {
-	return psProcessor{snap: snap}
+func newPsProcessor(psnap ps.Snapshotter) Processor {
+	return psProcessor{psnap: psnap}
 }
 
-func (p psProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Batch, bool, error) {
+func (p psProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error) {
 	switch e.Type {
 	case ktypes.CreateProcess, ktypes.TerminateProcess, ktypes.ProcessRundown:
-		if err := p.processEvent(e); err != nil {
-			return kevent.NewBatch(e), false, err
+		evt, err := p.processEvent(e)
+		if evt.IsTerminateProcess() {
+			return evt, false, p.psnap.Remove(evt)
 		}
-		if e.IsTerminateProcess() {
-			return kevent.NewBatch(e), false, p.snap.Remove(e)
-		}
-		return kevent.NewBatch(e), false, p.snap.Write(e)
+		return evt, false, multierror.Wrap(err, p.psnap.Write(evt))
 	case ktypes.CreateThread, ktypes.TerminateThread, ktypes.ThreadRundown:
 		pid, err := e.Kparams.GetPid()
 		if err != nil {
-			return kevent.NewBatch(e), false, err
+			return e, false, err
 		}
-		proc := p.snap.Find(pid)
+		proc := p.psnap.FindAndPut(pid)
 		if proc != nil {
 			e.Kparams.Append(kparams.Exe, kparams.UnicodeString, proc.Exe)
 		}
 		if !e.IsTerminateThread() {
-			return kevent.NewBatch(e), false, p.snap.AddThread(e)
+			return e, false, p.psnap.AddThread(e)
 		}
 		tid, err := e.Kparams.GetTid()
 		if err != nil {
-			return kevent.NewBatch(e), false, err
+			return e, false, err
 		}
-		return kevent.NewBatch(e), false, p.snap.RemoveThread(pid, tid)
+		return e, false, p.psnap.RemoveThread(pid, tid)
 	case ktypes.OpenProcess, ktypes.OpenThread:
 		pid, err := e.Kparams.GetPid()
 		if err != nil {
-			return kevent.NewBatch(e), false, err
+			return e, false, err
 		}
-		proc := p.snap.Find(pid)
+		proc := p.psnap.FindAndPut(pid)
 		if proc != nil {
 			e.AppendParam(kparams.Exe, kparams.FilePath, proc.Exe)
 			e.AppendParam(kparams.ProcessName, kparams.AnsiString, proc.Name)
 		}
-		return kevent.NewBatch(e), false, nil
+		return e, false, nil
 	}
-	return nil, true, nil
+	return e, true, nil
 }
 
-func (p psProcessor) processEvent(e *kevent.Kevent) error {
+func (p psProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 	cmndline := cmdline.New(e.GetParamAsString(kparams.Cmdline)).
 		// get rid of leading/trailing quotes in the executable path
 		CleanExe().
@@ -96,7 +95,7 @@ func (p psProcessor) processEvent(e *kevent.Kevent) error {
 	_ = e.Kparams.SetValue(kparams.Cmdline, cmndline.String())
 
 	if e.IsTerminateProcess() {
-		return nil
+		return e, nil
 	}
 
 	// query process start time
@@ -107,7 +106,7 @@ func (p psProcessor) processEvent(e *kevent.Kevent) error {
 	}
 	e.AppendParam(kparams.StartTime, kparams.Time, started)
 
-	return nil
+	return e, nil
 }
 
 func (psProcessor) Name() ProcessorType { return Ps }

@@ -52,7 +52,7 @@ func (s *scanner) scan() (tok token, pos int, lit string) {
 	// as an ident or reserved word.
 	if isWhitespace(ch0) {
 		return s.scanWhitespace()
-	} else if isLetter(ch0) || ch0 == '_' || ch0 == '$' {
+	} else if isLetter(ch0) || ch0 == '_' {
 		s.r.unread()
 		return s.scanIdent()
 	} else if isDigit(ch0) {
@@ -61,8 +61,8 @@ func (s *scanner) scan() (tok token, pos int, lit string) {
 
 	// Otherwise, parse individual characters.
 	switch ch0 {
-	case reof:
-		return eof, pos, ""
+	case eof:
+		return EOF, pos, ""
 	case '"':
 		s.r.unread()
 		return s.scanIdent()
@@ -74,41 +74,49 @@ func (s *scanner) scan() (tok token, pos int, lit string) {
 		if isDigit(ch1) {
 			return s.scanNumber()
 		}
-		return dot, pos, ""
+		return Dot, pos, ""
 	case '=':
-		return eq, pos, ""
+		return Eq, pos, ""
 	case '~':
 		if ch1, _ := s.r.read(); ch1 == '=' {
-			return ieq, pos, ""
+			return IEq, pos, ""
 		}
 		s.r.unread()
 	case '!':
 		if ch1, _ := s.r.read(); ch1 == '=' {
-			return neq, pos, ""
+			return Neq, pos, ""
 		}
 		s.r.unread()
 	case '>':
 		if ch1, _ := s.r.read(); ch1 == '=' {
-			return gte, pos, ""
+			return Gte, pos, ""
 		}
 		s.r.unread()
-		return gt, pos, ""
+		return Gt, pos, ""
 	case '<':
 		if ch1, _ := s.r.read(); ch1 == '=' {
-			return lte, pos, ""
+			return Lte, pos, ""
 		} else if ch1 == '>' {
-			return neq, pos, ""
+			return Neq, pos, ""
 		}
 		s.r.unread()
-		return lt, pos, ""
+		return Lt, pos, ""
 	case '(':
-		return lparen, pos, ""
+		return Lparen, pos, ""
 	case ')':
-		return rparen, pos, ""
+		return Rparen, pos, ""
+	case '|':
+		return Pipe, pos, ""
 	case ',':
-		return comma, pos, ""
+		return Comma, pos, ""
+	case '$':
+		tok, _, lit = s.scanIdent()
+		if tok != Ident {
+			return tok, pos, "$" + lit
+		}
+		return BoundField, pos, "$" + lit
 	}
-	return illegal, pos, string(ch0)
+	return Illegal, pos, string(ch0)
 }
 
 // scanWhitespace consumes the current rune and all contiguous whitespace.
@@ -122,7 +130,7 @@ func (s *scanner) scanWhitespace() (tok token, pos int, lit string) {
 	// Non-whitespace characters and EOF will cause the loop to exit.
 	for {
 		ch, _ = s.r.read()
-		if ch == reof {
+		if ch == eof {
 			break
 		} else if !isWhitespace(ch) {
 			s.r.unread()
@@ -132,7 +140,7 @@ func (s *scanner) scanWhitespace() (tok token, pos int, lit string) {
 		}
 	}
 
-	return ws, pos, buf.String()
+	return WS, pos, buf.String()
 }
 
 func (s *scanner) scanIdent() (tok token, pos int, lit string) {
@@ -142,14 +150,14 @@ func (s *scanner) scanIdent() (tok token, pos int, lit string) {
 
 	var buf bytes.Buffer
 	for {
-		if ch, _ := s.r.read(); ch == reof {
+		if ch, _ := s.r.read(); ch == eof {
 			break
 		} else if ch == '"' {
 			tok0, pos0, lit0 := s.scanString()
-			if tok0 == badstr || tok0 == badesc {
+			if tok0 == Badstr || tok0 == Badesc {
 				return tok0, pos0, lit0
 			}
-			return ident, pos, lit0
+			return Ident, pos, lit0
 		} else if isIdentChar(ch) {
 			s.r.unread()
 			buf.WriteString(scanBareIdent(s.r))
@@ -160,11 +168,11 @@ func (s *scanner) scanIdent() (tok token, pos int, lit string) {
 	}
 	lit = buf.String()
 
-	if tok, lit = lookup(lit); tok != ident {
+	if tok, lit = lookup(lit); tok != Ident {
 		return tok, pos, lit
 	}
 
-	return ident, pos, lit
+	return Ident, pos, lit
 }
 
 // scanNumber consumes anything that looks like the start of a number.
@@ -178,7 +186,7 @@ func (s *scanner) scanNumber() (tok token, pos int, lit string) {
 		ch1, _ := s.r.read()
 		s.r.unread()
 		if !isDigit(ch1) {
-			return illegal, pos, "."
+			return Illegal, pos, "."
 		}
 		// Unread the full stop so we can read it later.
 		s.r.unread()
@@ -222,23 +230,23 @@ func (s *scanner) scanNumber() (tok token, pos int, lit string) {
 		}
 		if nbDots != 3 {
 			s.r.unread()
-			return badip, pos, buf.String()
+			return BadIP, pos, buf.String()
 		}
 		octets := strings.Split(buf.String(), ".")
 		if len(octets) != 4 {
-			return badip, pos, buf.String()
+			return BadIP, pos, buf.String()
 		}
 		// check the range of each octet
 		for _, oct := range octets {
 			n, err := strconv.Atoi(oct)
 			if err != nil {
-				return badip, pos, buf.String()
+				return BadIP, pos, buf.String()
 			}
 			if n < 0 || n > 255 {
-				return badip, pos, buf.String()
+				return BadIP, pos, buf.String()
 			}
 		}
-		return ip, pos, buf.String()
+		return IP, pos, buf.String()
 	}
 	// unread the previously read char
 	s.r.unread()
@@ -266,13 +274,13 @@ func (s *scanner) scanNumber() (tok token, pos int, lit string) {
 					break
 				}
 			}
-			return duration, pos, buf.String()
+			return Duration, pos, buf.String()
 		}
 		s.r.unread()
-		return integer, pos, buf.String()
+		return Integer, pos, buf.String()
 	}
 
-	return dec, pos, buf.String()
+	return Decimal, pos, buf.String()
 }
 
 // scanDigits consumes a contiguous series of digits.
@@ -317,12 +325,12 @@ func (s *scanner) scanString() (tok token, pos int, lit string) {
 	var err error
 	lit, err = ScanString(s.r)
 	if err == errBadString {
-		return badstr, pos, lit
+		return Badstr, pos, lit
 	} else if err == errBadEscape {
 		_, pos = s.r.curr()
-		return badstr, pos, lit
+		return Badstr, pos, lit
 	}
-	return str, pos, lit
+	return Str, pos, lit
 }
 
 var errBadString = errors.New("bad string")
@@ -428,7 +436,7 @@ type reader struct {
 // Note that this function does not return size.
 func (r *reader) ReadRune() (ch rune, size int, err error) {
 	ch, _ = r.read()
-	if ch == reof {
+	if ch == eof {
 		err = io.EOF
 	}
 	return
@@ -441,7 +449,7 @@ func (r *reader) UnreadRune() error {
 	return nil
 }
 
-var reof = rune(0)
+var eof = rune(0)
 
 // read reads the next rune from the reader.
 func (r *reader) read() (ch rune, pos int) {
@@ -455,7 +463,7 @@ func (r *reader) read() (ch rune, pos int) {
 	// Any error (including io.EOF) should return as EOF.
 	ch, _, err := r.r.ReadRune()
 	if err != nil {
-		ch = reof
+		ch = eof
 	} else if ch == '\r' {
 		if ch, _, err := r.r.ReadRune(); err != nil {
 			// nop
@@ -476,8 +484,8 @@ func (r *reader) read() (ch rune, pos int) {
 	}
 
 	// Mark the reader as EOF.
-	// This is used so we don't double count EOF characters.
-	if ch == reof {
+	// This is used to avoid doubling the count of EOF characters.
+	if ch == eof {
 		r.eof = true
 	}
 

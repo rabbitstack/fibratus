@@ -1,0 +1,15 @@
+- group: Command shell execution and temp files with network outbound
+  enabled: true
+  rules:
+    - name: Command shell created a temp file with network outbound
+      condition: >
+        sequence
+        maxspan 200ms
+        |kevt.name = 'CreateProcess' and ps.name = 'cmd.exe'| as e1
+        |kevt.name = 'CreateFile'
+            and
+         file.name icontains 'temp'
+            and
+         $e1.ps.sid = ps.sid
+        | as e2
+        |kevt.name = 'Connect' and ps.sid != $e2.ps.sid and ps.sid = $e1.ps.sid|

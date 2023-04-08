@@ -43,6 +43,19 @@ const (
 	ProductVersion = "ProductVersion"
 )
 
+// Sec contains the section attributes.
+type Sec struct {
+	Name    string
+	Size    uint32
+	Entropy float64
+	Md5     string
+}
+
+// String returns the stirng representation of the section.
+func (s Sec) String() string {
+	return fmt.Sprintf("Name: %s, Size: %d, Entropy: %f, Md5: %s", s.Name, s.Size, s.Entropy, s.Md5)
+}
+
 // PE contains various headers that identifies the format and characteristics of the executable files.
 type PE struct {
 	// NumberOfSections designates the total number of sections found withing the binary.
@@ -101,11 +114,6 @@ func (pe *PE) Section(s string) *Sec {
 }
 
 func (pe *PE) addImport(i string) {
-	for _, imp := range pe.Imports {
-		if imp == i {
-			return
-		}
-	}
 	pe.Imports = append(pe.Imports, i)
 }
 

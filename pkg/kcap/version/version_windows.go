@@ -29,6 +29,10 @@ const (
 const (
 	// ProcessSecV1 is the v1 of the process section
 	ProcessSecV1 Version = iota + 1
+	// ProcessSecV2 is the v2 of the process section
+	ProcessSecV2
+	// ProcessSecV3 is the v3 of the process section
+	ProcessSecV3
 )
 
 const (

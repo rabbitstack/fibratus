@@ -68,12 +68,6 @@ func createPipe(address string, first bool) (syscall.Handle, error) {
 		512, 512, 0, nil)
 }
 
-func TestQueryAllObjectTypes(t *testing.T) {
-	otstore := NewObjectTypeStore()
-	require.Contains(t, otstore.TypeNames(), "Directory")
-	require.Contains(t, otstore.TypeNames(), "Key")
-}
-
 func TestQueryType(t *testing.T) {
 	h, err := windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION, false, uint32(os.Getpid()))
 	require.NoError(t, err)

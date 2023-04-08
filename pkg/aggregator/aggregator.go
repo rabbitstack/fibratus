@@ -56,16 +56,14 @@ var (
 	flushesCount = expvar.NewInt("aggregator.flushes.count")
 	// batchEvents represents the overall number of processed batches
 	batchEvents = expvar.NewInt("aggregator.batch.events")
-	// transformerErrors is the count of transformers errors occurred during event processing
+	// transformerErrors is the count of errors occurred when applying transformers
 	transformerErrors = expvar.NewMap("aggregator.transformer.errors")
-	/// keventErrors is the number of kernel event errors
+	// keventErrors is the number of event errors
 	keventErrors = expvar.NewInt("aggregator.kevent.errors")
 )
 
-// OnPreAggregate represents the callback function which is called before
-// the event is stored in the aggregation batch. The event is not stored
-// in the bach if this function returns false.
-type OnPreAggregate func(*kevent.Kevent) bool
+// BacklogQueueSize the max size of the backlog queue
+const BacklogQueueSize = 800
 
 // BufferedAggregator collects events from the inbound channel and produces batches on regular intervals. The batches
 // are pushed to the work queue from which load-balanced configured workers consume the batches and publish to the outputs.
@@ -82,6 +80,9 @@ type BufferedAggregator struct {
 	transforms []transformers.Transformer
 	c          Config
 	listeners  []Listener
+
+	// stores delayed events
+	backlog *backlog
 }
 
 // NewBuffered creates a new instance of the event aggregator.
@@ -106,6 +107,7 @@ func NewBuffered(
 		wq:        make(chan *kevent.Batch),
 		c:         aggConfig,
 		listeners: make([]Listener, 0),
+		backlog:   newBacklog(BacklogQueueSize),
 	}
 
 	var err error
@@ -173,7 +175,6 @@ func (agg *BufferedAggregator) AddListener(lis Listener) {
 // run starts the aggregator loop. The aggregator receives event stream from the upstream channel, buffers
 // them to intermediate queue and dispatches batches to downstream worker queue.
 func (agg *BufferedAggregator) run() {
-loop:
 	for {
 		select {
 		case <-agg.stop:
@@ -193,28 +194,46 @@ loop:
 			flushesCount.Add(1)
 			// clear the queue
 			agg.kevts = nil
-		case kevt := <-agg.kevtsc:
-			for _, lis := range agg.listeners {
-				if !lis.ProcessEvent(kevt) {
-					continue loop
+		case evt := <-agg.kevtsc:
+			// put delayed event in backlog
+			if evt.Delayed {
+				agg.backlog.put(evt)
+				continue
+			}
+			// lookup backlog for delayed event
+			ev := agg.backlog.pop(evt)
+			if ev != nil {
+				ev.CopyFields(evt)
+				if !agg.push(ev) {
+					goto push
 				}
 			}
-			for _, trans := range agg.transforms {
-				if trans == nil {
-					continue
-				}
-				err := trans.Transform(kevt)
-				if err != nil {
-					log.Warnf("transformer error occurred: %v", err)
-					transformerErrors.Add(err.Error(), 1)
-				}
+		push:
+			if !agg.push(evt) {
+				continue
 			}
-			// push the event to the queue
-			agg.kevts = append(agg.kevts, kevt)
-			keventsDequeued.Add(1)
 		case err := <-agg.errsc:
 			keventErrors.Add(1)
-			log.Errorf("aggregator dispatch failure: %v", err)
+			log.Errorf("event processing failure: %v", err)
 		}
 	}
+}
+
+func (agg *BufferedAggregator) push(evt *kevent.Kevent) bool {
+	for _, lis := range agg.listeners {
+		if !lis.ProcessEvent(evt) {
+			evt.Release()
+			return false
+		}
+	}
+	for _, tra := range agg.transforms {
+		err := tra.Transform(evt)
+		if err != nil {
+			transformerErrors.Add(err.Error(), 1)
+		}
+	}
+	// push the event to the queue
+	agg.kevts = append(agg.kevts, evt)
+	keventsDequeued.Add(1)
+	return true
 }

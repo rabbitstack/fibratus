@@ -23,18 +23,37 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/filter/ql"
+	"github.com/rabbitstack/fibratus/pkg/ps"
 	"strings"
 )
+
+type opts struct {
+	psnap ps.Snapshotter
+}
+
+// Option defines the option supplied to the filter
+type Option func(o *opts)
+
+// WithPSnapshotter passes a process snapshotter reference to the filter.
+func WithPSnapshotter(psnap ps.Snapshotter) Option {
+	return func(o *opts) {
+		o.psnap = psnap
+	}
+}
 
 // New creates a new filter with the specified filter expression. The consumers must ensure
 // the expression is correctly parsed before executing the filter. This is achieved by calling the
 // `Compile` method after constructing the filter.
-func New(expr string, config *config.Config) Filter {
+func New(expr string, config *config.Config, options ...Option) Filter {
+	var opts opts
+	for _, opt := range options {
+		opt(&opts)
+	}
 	accessors := []accessor{
 		// general event parameters
 		newKevtAccessor(),
 		// process state and parameters
-		newPSAccessor(),
+		newPSAccessor(opts.psnap),
 	}
 	kconfig := config.Kstream
 	fconfig := config.Filters
@@ -73,7 +92,7 @@ func New(expr string, config *config.Config) Filter {
 		accessors:    accessors,
 		fields:       make([]fields.Field, 0),
 		stringFields: make(map[fields.Field][]string),
-		bindings:     make(map[uint16][]*ql.PatternBindingLiteral),
+		boundFields:  make([]*ql.BoundFieldLiteral, 0),
 	}
 }
 
@@ -101,7 +120,7 @@ func NewFromCLIWithAllAccessors(args []string) (Filter, error) {
 		accessors:    getAccessors(),
 		fields:       make([]fields.Field, 0),
 		stringFields: make(map[fields.Field][]string),
-		bindings:     make(map[uint16][]*ql.PatternBindingLiteral),
+		boundFields:  make([]*ql.BoundFieldLiteral, 0),
 	}
 	if err := filter.Compile(); err != nil {
 		return nil, fmt.Errorf("bad filter:\n %v", err)

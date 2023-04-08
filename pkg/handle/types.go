@@ -91,6 +91,8 @@ func GetShortName(typ string) string {
 		return "sec"
 	case Semaphore:
 		return "sem"
+	case Driver:
+		return "drv"
 	default:
 		return Unknown
 	}

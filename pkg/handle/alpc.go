@@ -23,7 +23,7 @@ package handle
 
 import (
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
-	"github.com/rabbitstack/fibratus/pkg/zsyscall"
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	"golang.org/x/sys/windows"
 	"unsafe"
 )
@@ -31,7 +31,7 @@ import (
 // GetAlpcPort get ALPC port information for the specified ALPC port handle.
 func GetAlpcPort(handle windows.Handle) (*htypes.AlpcPortInfo, error) {
 	b := make([]byte, 16)
-	err := zsyscall.NtAlpcQueryInformation(handle, zsyscall.AlpcBasicPortInformationClass, unsafe.Pointer(&b[0]), uint32(len(b)), nil)
+	err := sys.NtAlpcQueryInformation(handle, sys.AlpcBasicPortInformationClass, unsafe.Pointer(&b[0]), uint32(len(b)), nil)
 	if err != nil {
 		return nil, err
 	}

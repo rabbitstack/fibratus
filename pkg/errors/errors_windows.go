@@ -47,6 +47,4 @@ var (
 	ErrKsessionNotRunning = errors.New("session from which you are trying to consume events in real time is not running")
 	// ErrTraceCancelled is thrown when in-progress kernel event trace is cancelled
 	ErrTraceCancelled = errors.New("event trace has been cancelled")
-	// ErrNeedsReallocateBuffer is signaled when an API function requires bigger buffer size
-	ErrNeedsReallocateBuffer = errors.New("buffer size is too small")
 )

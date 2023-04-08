@@ -24,7 +24,7 @@ package handle
 import (
 	"expvar"
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/zsyscall"
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	"golang.org/x/sys/windows"
 	"os"
 	"strconv"
@@ -94,7 +94,6 @@ type snapshotter struct {
 	snapshotBuildCompleted SnapshotBuildCompleted
 	createCallback         CreateCallback
 	destroyCallback        DestroyCallback
-	store                  ObjectTypeStore
 	housekeepTick          *time.Ticker
 	initSnap               bool
 	capture                bool
@@ -109,7 +108,6 @@ func NewSnapshotter(config *config.Config, fn SnapshotBuildCompleted) Snapshotte
 		handlesByObject:        make(map[uint64]htypes.Handle),
 		snapshotBuildCompleted: fn,
 		config:                 config,
-		store:                  NewObjectTypeStore(),
 		housekeepTick:          time.NewTicker(time.Minute),
 		initSnap:               config.InitHandleSnapshot,
 	}
@@ -180,7 +178,7 @@ func (s *snapshotter) FindHandles(pid uint32) ([]htypes.Handle, error) {
 	}
 	defer windows.CloseHandle(process)
 
-	snapshot, err := zsyscall.QueryInformationProcess[zsyscall.ProcessHandleSnapshotInformation](process, windows.ProcessHandleInformation)
+	snapshot, err := sys.QueryInformationProcess[sys.ProcessHandleSnapshotInformation](process, windows.ProcessHandleInformation)
 	if err != nil {
 		return nil, fmt.Errorf("unable to query handles for process id %d: %v", pid, err)
 	}
@@ -194,10 +192,10 @@ func (s *snapshotter) FindHandles(pid uint32) ([]htypes.Handle, error) {
 			"Shrinking table size from %d to %d handles", pid, count, maxHandlesPerProc)
 		count = maxHandlesPerProc
 	}
-	sysHandles := (*[1 << 30]zsyscall.ProcessHandleTableEntryInfo)(unsafe.Pointer(&snapshot.Handles[0]))[:count:count]
+	sysHandles := (*[1 << 30]sys.ProcessHandleTableEntryInfo)(unsafe.Pointer(&snapshot.Handles[0]))[:count:count]
 
 	for _, sysHandle := range sysHandles {
-		h, err := s.getHandle(sysHandle.Handle, 0, uint8(sysHandle.ObjectTypeIndex), pid, false)
+		h, err := s.getHandle(sysHandle.Handle, 0, uint16(sysHandle.ObjectTypeIndex), pid, false)
 		if err != nil {
 			continue
 		}
@@ -220,13 +218,13 @@ func (s *snapshotter) initSnapshot() {
 			size *= 2
 			buf = make([]byte, size)
 		} else if err == nil {
-			sysHandleInfo := (*zsyscall.SystemHandleInformationEx)(unsafe.Pointer(&buf[0]))
+			sysHandleInfo := (*sys.SystemHandleInformationEx)(unsafe.Pointer(&buf[0]))
 			count := int(sysHandleInfo.NumberOfHandles)
 			if count > maxProcHandles {
 				log.Warnf("handle snapshotter size exceeded. Shrinking from %d to %d handles", count, maxProcHandles)
 				count = maxProcHandles
 			}
-			sysHandles := (*[1 << 30]zsyscall.SystemHandleTableEntryInfoEx)(unsafe.Pointer(&sysHandleInfo.Handles[0]))[:count:count]
+			sysHandles := (*[1 << 30]sys.SystemHandleTableEntryInfoEx)(unsafe.Pointer(&sysHandleInfo.Handles[0]))[:count:count]
 
 			// iterate through available handles to get extended info
 			// and send handle structure instances to the channel
@@ -235,7 +233,7 @@ func (s *snapshotter) initSnapshot() {
 				if pid == uintptr(os.Getpid()) {
 					continue
 				}
-				handle, err := s.getHandle(sysHandle.Handle, sysHandle.Object, sysHandle.ObjectTypeIndex, uint32(pid), true)
+				handle, err := s.getHandle(sysHandle.Handle, sysHandle.Object, uint16(sysHandle.ObjectTypeIndex), uint32(pid), true)
 				if err != nil || handle.Type == "" {
 					continue
 				}
@@ -250,8 +248,8 @@ func (s *snapshotter) initSnapshot() {
 	}
 }
 
-func (s *snapshotter) getHandle(rawHandle windows.Handle, obj uint64, typeIndex uint8, pid uint32, withTimeout bool) (htypes.Handle, error) {
-	typ := s.store.FindByID(typeIndex)
+func (s *snapshotter) getHandle(rawHandle windows.Handle, obj uint64, typeIndex uint16, pid uint32, withTimeout bool) (htypes.Handle, error) {
+	typ := htypes.ConvertTypeIDToName(typeIndex)
 	if typ == "" {
 		dup, err := Duplicate(rawHandle, pid, windows.GENERIC_ALL)
 		if err != nil {
@@ -343,13 +341,13 @@ func (s *snapshotter) housekeeping() {
 				size *= 2
 				buf = make([]byte, size)
 			} else if err == nil {
-				sysHandleInfo := (*zsyscall.SystemHandleInformationEx)(unsafe.Pointer(&buf[0]))
+				sysHandleInfo := (*sys.SystemHandleInformationEx)(unsafe.Pointer(&buf[0]))
 				count := int(sysHandleInfo.NumberOfHandles)
 				if count > maxProcHandles {
 					log.Warnf("handle snapshotter size exceeded. Shrinking from %d to %d handles", count, maxProcHandles)
 					count = maxProcHandles
 				}
-				sysHandles := (*[1 << 30]zsyscall.SystemHandleTableEntryInfoEx)(unsafe.Pointer(&sysHandleInfo.Handles[0]))[:count:count]
+				sysHandles := (*[1 << 30]sys.SystemHandleTableEntryInfoEx)(unsafe.Pointer(&sysHandleInfo.Handles[0]))[:count:count]
 
 				s.Lock()
 				for _, sysHandle := range sysHandles {

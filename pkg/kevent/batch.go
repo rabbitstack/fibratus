@@ -38,16 +38,6 @@ func (b *Batch) Release() {
 	}
 }
 
-// Publish executes the publish function for each event in the batch.
-func (b *Batch) Publish(pub func(*Kevent) error) error {
-	for _, e := range b.Events {
-		if err := pub(e); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // MarshalJSON serializes the batch of events to JSON format.
 func (b *Batch) MarshalJSON() []byte {
 	buf := make([]byte, 0)

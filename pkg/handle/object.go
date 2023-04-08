@@ -23,95 +23,16 @@ package handle
 
 import (
 	"errors"
-	"expvar"
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
-	"github.com/rabbitstack/fibratus/pkg/util/typesize"
-	"github.com/rabbitstack/fibratus/pkg/zsyscall"
 	"golang.org/x/sys/windows"
 	"os"
-	"sort"
-	"unsafe"
-)
-
-var (
-	// typesCount counts the number of resolved object type names
-	typesCount = expvar.NewInt("handle.types.count")
-	typeMisses = expvar.NewInt("handle.types.name.misses")
 )
 
 var devMapper = fs.NewDevMapper()
-
-// ObjectTypeStore holds all object type names as exposed by the Object Manager. The store represents an efficient
-// way of resolving object type indices to human-friendly names.
-type ObjectTypeStore interface {
-	FindByID(id uint8) string
-	RegisterType(id uint8, typ string)
-	TypeNames() []string
-}
-
-type otstore struct {
-	types map[uint8]string
-}
-
-// NewObjectTypeStore creates a new object store instance.
-func NewObjectTypeStore() ObjectTypeStore {
-	s := &otstore{
-		types: make(map[uint8]string),
-	}
-	s.queryTypes()
-	return s
-}
-
-func (s *otstore) FindByID(id uint8) string {
-	if typ, ok := s.types[id]; ok {
-		return typ
-	}
-	typeMisses.Add(1)
-	return ""
-}
-
-func (s *otstore) RegisterType(id uint8, typ string) {
-	s.types[id] = typ
-}
-
-func (s *otstore) TypeNames() []string {
-	types := make([]string, 0, len(s.types))
-	for _, v := range s.types {
-		types = append(types, v)
-	}
-	sort.Slice(types, func(i, j int) bool { return types[i] < types[j] })
-	return types
-}
-
-func (s *otstore) queryTypes() {
-	objectTypes, err := zsyscall.QueryObject[zsyscall.ObjectTypesInformation](0, zsyscall.ObjectTypesInformationClass)
-	if err != nil {
-		return
-	}
-	typesCount.Add(int64(objectTypes.NumberOfTypes))
-
-	// heavily influenced by ProcessHacker pointer arithmetic hackery to
-	// dereference the first and all subsequent file object type instances
-	// starting from the address of the TypesInformation structure
-	objectTypeInfo := (*zsyscall.ObjectTypeInformation)(s.first(objectTypes))
-	for i := 0; i < int(objectTypes.NumberOfTypes); i++ {
-		objectTypeInfo = (*zsyscall.ObjectTypeInformation)(s.next(objectTypeInfo))
-		s.types[objectTypeInfo.TypeIndex] = objectTypeInfo.TypeName.String()
-	}
-}
-
-func (s *otstore) first(types *zsyscall.ObjectTypesInformation) unsafe.Pointer {
-	return unsafe.Pointer(uintptr(unsafe.Pointer(types)) + (unsafe.Sizeof(zsyscall.ObjectTypesInformation{})+typesize.Pointer()-1)&^(typesize.Pointer()-1))
-}
-
-func (s *otstore) next(typ *zsyscall.ObjectTypeInformation) unsafe.Pointer {
-	align := (uintptr(typ.TypeName.MaximumLength) + typesize.Pointer() - 1) &^ (typesize.Pointer() - 1)
-	offset := uintptr(unsafe.Pointer(typ)) + unsafe.Sizeof(zsyscall.ObjectTypeInformation{})
-	return unsafe.Pointer(offset + align)
-}
 
 // Duplicate duplicates the handle in the caller process's address space.
 func Duplicate(handle windows.Handle, pid uint32, access uint32) (windows.Handle, error) {
@@ -140,7 +61,7 @@ func Duplicate(handle windows.Handle, pid uint32, access uint32) (windows.Handle
 
 // QueryObjectType returns the type of the specified object.
 func QueryObjectType(obj windows.Handle) (string, error) {
-	typeInfo, err := zsyscall.QueryObject[zsyscall.ObjectTypeInformation](obj, zsyscall.ObjectTypeInformationClass)
+	typeInfo, err := sys.QueryObject[sys.ObjectTypeInformation](obj, sys.ObjectTypeInformationClass)
 	if err != nil {
 		return "", fmt.Errorf("unable to query handle type: %v", err)
 	}
@@ -153,7 +74,7 @@ func QueryObjectType(obj windows.Handle) (string, error) {
 
 // QueryObjectName returns the object name of the specified object.
 func QueryObjectName(obj windows.Handle) (string, error) {
-	nameInfo, err := zsyscall.QueryObject[zsyscall.ObjectNameInformation](obj, zsyscall.ObjectNameInformationClass)
+	nameInfo, err := sys.QueryObject[sys.ObjectNameInformation](obj, sys.ObjectNameInformationClass)
 	if err != nil {
 		return "", fmt.Errorf("unable to query object name: %v", err)
 	}
@@ -177,7 +98,7 @@ func QueryName(handle windows.Handle, typ string, withTimeout bool) (string, hty
 			return "", nil, err
 		}
 		name = devMapper.Convert(name)
-		fileInfo := &htypes.FileInfo{IsDirectory: zsyscall.PathIsDirectory(name)}
+		fileInfo := &htypes.FileInfo{IsDirectory: sys.PathIsDirectory(name)}
 		return name, fileInfo, nil
 	case ALPCPort:
 		port, err := GetAlpcPort(handle)

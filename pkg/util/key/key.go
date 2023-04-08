@@ -28,7 +28,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/rabbitstack/fibratus/pkg/zsyscall/security"
+	"github.com/rabbitstack/fibratus/pkg/sys/security"
 )
 
 var (
