@@ -35,6 +35,8 @@ You can use [filaments](https://www.fibratus.io/#/filaments/introduction) to ext
 
 ### Quick start
 
+Check the [walkthrough](https://www.fibratus.io/#/filters/rules?id=loading-rules) how to load and create detection rules.
+
 - Observe Microsoft Outlook attachments creating on the file system
 
 ```
