@@ -93,17 +93,21 @@ func (e *Kevent) MarshalRaw() []byte {
 	b = append(b, bytes.WriteUint16(uint16(len(e.Kparams)))...)
 	for _, kpar := range e.Kparams {
 		// append the type, parameter size and name
-		b = append(b, bytes.WriteUint16(uint16(kpar.Type))...)
+		b = append(b, bytes.WriteUint16(uint16(kpar.KcapType()))...)
 		b = append(b, bytes.WriteUint16(uint16(len(kpar.Name)))...)
 		b = append(b, kpar.Name...)
 		switch kpar.Type {
 		case kparams.AnsiString, kparams.UnicodeString:
 			b = append(b, bytes.WriteUint16(uint16(len(kpar.Value.(string))))...)
 			b = append(b, kpar.Value.(string)...)
-		case kparams.SID, kparams.WbemSID, kparams.Key, kparams.FilePath, kparams.FileDosPath:
+		case kparams.Key, kparams.FilePath, kparams.FileDosPath, kparams.HandleType:
 			v := e.GetParamAsString(kpar.Name)
 			b = append(b, bytes.WriteUint16(uint16(len(v)))...)
 			b = append(b, v...)
+		case kparams.SID, kparams.WbemSID:
+			sid := e.Kparams.MustGetSID().String()
+			b = append(b, bytes.WriteUint16(uint16(len(sid)))...)
+			b = append(b, sid...)
 		case kparams.Uint8:
 			b = append(b, kpar.Value.(uint8))
 		case kparams.Int8:
@@ -163,6 +167,7 @@ func (e *Kevent) MarshalRaw() []byte {
 				}
 			}
 		case kparams.Binary:
+			b = append(b, bytes.WriteUint16(uint16(len(kpar.Value.([]byte))))...)
 			b = append(b, kpar.Value.([]byte)...)
 		}
 	}
@@ -310,7 +315,6 @@ func (e *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 			case kparams.FileOperation:
 				kval = fs.FileDisposition(b[50+offset+kparamNameLength+poffset : 50+offset+kparamNameLength+poffset+1][0])
 			case kparams.FileShareMask:
-				kval = fs.FileShareMode(b[50+offset+kparamNameLength+poffset : 50+offset+kparamNameLength+poffset+1][0])
 			case kparams.NetL4Proto:
 				kval = network.L4Proto(b[50+offset+kparamNameLength+poffset : 50+offset+kparamNameLength+poffset+1][0])
 			default:
@@ -496,7 +500,6 @@ func (e *Kevent) MarshalJSON() []byte {
 			case kparams.FileOperation:
 				js.writeString(kpar.Value.(fs.FileDisposition).String())
 			case kparams.FileShareMask:
-				js.writeString(kpar.Value.(fs.FileShareMode).String())
 			case kparams.NetL4Proto:
 				js.writeString(kpar.Value.(network.L4Proto).String())
 			default:
@@ -653,7 +656,7 @@ func (e *Kevent) MarshalJSON() []byte {
 				writeMore := js.shouldWriteMore(i, len(ps.Modules))
 				js.writeObjectStart()
 				js.writeObjectField("name").writeEscapeString(m.Name).writeMore()
-				js.writeObjectField("size").writeUint32(m.Size)
+				js.writeObjectField("size").writeUint64(m.Size)
 				js.writeObjectEnd()
 				if writeMore {
 					js.writeMore()

@@ -22,13 +22,9 @@
 package key
 
 import (
-	"expvar"
 	"golang.org/x/sys/windows/registry"
 	"path/filepath"
 	"strings"
-	"sync"
-
-	"github.com/rabbitstack/fibratus/pkg/sys/security"
 )
 
 var (
@@ -58,15 +54,6 @@ var RegistryValueTypes = map[uint32]string{
 	registry.MULTI_SZ:  "REG_MULTI_SZ",
 	registry.BINARY:    "REG_BINARY",
 }
-
-var (
-	keys = make([]string, 0)
-	mux  sync.Mutex
-	once sync.Once
-	// sidsCount reflects the total count of the resolved SIDs
-	sidsCount  = expvar.NewInt("sids.count")
-	lookupSids = security.LookupAllSids
-)
 
 // String converts registry root key identifier to string.
 func (key Key) String() string {
@@ -136,45 +123,26 @@ func Format(key string) (Key, string) {
 			return ClassesRoot, subkey(key, p)
 		}
 	}
-
-	once.Do(func() { initKeys() })
-
-	if root, k := findSIDKey(key); root != Invalid {
-		return root, k
-	}
 	for _, p := range hkuPrefixes {
 		if strings.HasPrefix(key, p) {
-			return Users, subkey(key, p)
-		}
-	}
-	return Invalid, key
-}
-
-// initKeys retrieves all security identifiers on the local machine and builds a slice of
-// prefixes targeting \\Registry\\User\\<sid> and \\Registry\\User\\<sid>\\_Classes keys.
-func initKeys() {
-	sids, err := lookupSids()
-	if err != nil {
-		return
-	}
-	sidsCount.Add(int64(len(sids)))
-	mux.Lock()
-	defer mux.Unlock()
-	for _, sid := range sids {
-		user := "\\REGISTRY\\USER\\" + sid
-		keys = append(keys, user, user+"\\_Classes")
-	}
-}
-
-func findSIDKey(key string) (Key, string) {
-	mux.Lock()
-	defer mux.Unlock()
-	for _, k := range keys {
-		if strings.HasPrefix(key, k) {
-			if strings.Contains(key, "_Classes") {
-				return CurrentUser, strings.Replace(subkey(key, k), "_Classes", "Software\\Classes", -1)
+			path := subkey(key, p)
+			n := strings.Index(path, "\\")
+			var secID string
+			if n > 0 {
+				secID = path[:n]
+			} else {
+				secID = path
 			}
-			return CurrentUser, subkey(key, k)
+			// https://gist.github.com/Coderx7/ed6cee4e4f2bf6edbd72a1db677e5b24
+			// https://stackoverflow.com/questions/57669937/get-current-logged-in-user-name-from-within-a-c-windows-service
+			switch {
+			case strings.Contains(key, "_Classes"):
+				return CurrentUser, strings.Replace(path, "_Classes", "Software\\Classes", -1)
+			case secID != "":
+				return CurrentUser, path
+			default:
+				return Users, path
+			}
 		}
 	}
 	return Invalid, key

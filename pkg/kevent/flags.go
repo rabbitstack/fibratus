@@ -130,3 +130,10 @@ var FileCreateOptionsFlags = []ParamFlag{
 	{"OPEN_FOR_FREE_SPACE_QUERY", windows.FILE_OPEN_FOR_FREE_SPACE_QUERY},
 	{"OPEN_NO_RECALL", windows.FILE_OPEN_NO_RECALL},
 }
+
+// FileShareModeFlags describes file share mask flags
+var FileShareModeFlags = []ParamFlag{
+	{"READ", windows.FILE_SHARE_READ},
+	{"WRITE", windows.FILE_SHARE_WRITE},
+	{"DELETE", windows.FILE_SHARE_DELETE},
+}

@@ -43,7 +43,7 @@ func (p psProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error
 	case ktypes.CreateProcess, ktypes.TerminateProcess, ktypes.ProcessRundown:
 		evt, err := p.processEvent(e)
 		if evt.IsTerminateProcess() {
-			return evt, false, p.psnap.Remove(evt)
+			return evt, false, multierror.Wrap(err, p.psnap.Remove(evt))
 		}
 		return evt, false, multierror.Wrap(err, p.psnap.Write(evt))
 	case ktypes.CreateThread, ktypes.TerminateThread, ktypes.ThreadRundown:
@@ -53,7 +53,7 @@ func (p psProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error
 		}
 		proc := p.psnap.FindAndPut(pid)
 		if proc != nil {
-			e.Kparams.Append(kparams.Exe, kparams.UnicodeString, proc.Exe)
+			e.AppendParam(kparams.Exe, kparams.UnicodeString, proc.Exe)
 		}
 		if !e.IsTerminateThread() {
 			return e, false, p.psnap.AddThread(e)

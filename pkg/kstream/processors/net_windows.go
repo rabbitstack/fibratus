@@ -49,10 +49,10 @@ func (n netProcessor) Close() {
 func (n *netProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error) {
 	if e.Category == ktypes.Net {
 		if e.IsNetworkTCP() {
-			e.AppendEnum(kparams.NetL4Proto, uint32(network.TCP), kevent.WithEnum(network.ProtoNames))
+			e.AppendEnum(kparams.NetL4Proto, uint32(network.TCP), network.ProtoNames)
 		}
 		if e.IsNetworkUDP() {
-			e.AppendEnum(kparams.NetL4Proto, uint32(network.UDP), kevent.WithEnum(network.ProtoNames))
+			e.AppendEnum(kparams.NetL4Proto, uint32(network.UDP), network.ProtoNames)
 		}
 		n.resolvePortName(e)
 		names := n.resolveNamesForIP(unwrapIP(e.Kparams.GetIP(kparams.NetDIP)))

@@ -167,7 +167,8 @@ func (agg *BufferedAggregator) Run() {
 
 // AddListener registers a new aggregator listener. The listener is
 // called for each event coming out of the event queue, before the
-// batch is created.
+// batch is created. If any of the listeners returns a false value,
+// the event is rejected.
 func (agg *BufferedAggregator) AddListener(lis Listener) {
 	agg.listeners = append(agg.listeners, lis)
 }

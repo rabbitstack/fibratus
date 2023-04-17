@@ -25,7 +25,8 @@ package fs
 type FileDisposition uint8
 
 const (
-	// Supersede dictates that if the file already exists, it is replaced with the given file. Otherwise the file with given name is created.
+	// Supersede dictates that if the file already exists, it is replaced with the given file.
+	// Otherwise, the file with given name is created.
 	Supersede FileDisposition = iota
 	// Open opens the file if it already exists instead of creating a new file.
 	Open
@@ -33,9 +34,9 @@ const (
 	Create
 	// OpenIf opens the file if it already exists or creates a new file otherwise.
 	OpenIf
-	// Overwrite opens and overwrites the file if it already exists. Otherwise it fails.
+	// Overwrite opens and overwrites the file if it already exists. Otherwise, it fails.
 	Overwrite
-	// OverwriteIf opens and overwrites the file is it already exists. Otherwise it creates a new file.
+	// OverwriteIf opens and overwrites the file is it already exists. Otherwise, it creates a new file.
 	OverwriteIf
 )
 
@@ -117,36 +118,4 @@ var FileTypes = map[uint32]string{
 	uint32(Console):   "Console",
 	uint32(Mailslot):  "Mailslot",
 	uint32(Other):     "Other",
-}
-
-// FileShareMode designates a type alias for file share mode values
-type FileShareMode uint8
-
-const (
-	// FileShareRead allows threads to gain read access to the file
-	FileShareRead FileShareMode = 1
-	// FileShareWrite allows threads to gain write access to the file
-	FileShareWrite FileShareMode = 1 << 1
-	// FileShareDelete grants threads the possibility to delete files
-	FileShareDelete FileShareMode = 1 << 2
-)
-
-// String returns user-friendly representation of the file share mask.
-func (m FileShareMode) String() string {
-	if m == FileShareRead {
-		return "r--"
-	} else if m == FileShareWrite {
-		return "-w-"
-	} else if m == FileShareDelete {
-		return "--d"
-	} else if m&FileShareRead == FileShareRead && m&FileShareWrite == FileShareWrite {
-		return "rw-"
-	} else if m&FileShareRead == FileShareRead && m&FileShareDelete == FileShareDelete {
-		return "r-d"
-	} else if m&FileShareWrite == FileShareWrite && m&FileShareDelete == FileShareDelete {
-		return "-wd"
-	} else if m&FileShareRead == FileShareRead && m&FileShareWrite == FileShareWrite && m&FileShareDelete == FileShareDelete {
-		return "rwd"
-	}
-	return "---"
 }

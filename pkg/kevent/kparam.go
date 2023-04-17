@@ -95,6 +95,21 @@ type Kparam struct {
 	Enum ParamEnum `json:"enum"`
 }
 
+// KcapType returns the event type saved inside the capture file.
+// Captures usually override the type of the parameter to provide
+// consistent replay experience. For example, the file path param
+// type is converted to string param type, as drive mapping is performed
+// on the target where the capture is being taken.
+func (kpar Kparam) KcapType() kparams.Type {
+	switch kpar.Type {
+	case kparams.SID, kparams.WbemSID, kparams.HandleType,
+		kparams.FilePath, kparams.FileDosPath, kparams.Key:
+		return kparams.UnicodeString
+	default:
+		return kpar.Type
+	}
+}
+
 // Kparams is the type that represents the sequence of kernel event parameters
 type Kparams map[string]*Kparam
 
@@ -247,6 +262,22 @@ func (kpars Kparams) GetTid() (uint32, error) {
 		return uint32(0), fmt.Errorf("unable to type cast %q parameter to uint32 value from tid", kparams.ThreadID)
 	}
 	return v, nil
+}
+
+// MustGetTid returns the thread id from the parameter or panics if an error occurs.
+func (kpars Kparams) MustGetTid() uint32 {
+	kpar, err := kpars.findParam(kparams.ThreadID)
+	if err != nil {
+		panic(err)
+	}
+	if kpar.Type != kparams.TID {
+		panic(fmt.Errorf("%q parameter is not a TID", kparams.ThreadID))
+	}
+	v, ok := kpar.Value.(uint32)
+	if !ok {
+		panic(fmt.Errorf("unable to type cast %q parameter to uint32 value from tid", kparams.ThreadID))
+	}
+	return v
 }
 
 // GetUint8 returns the underlying uint8 value from the parameter.

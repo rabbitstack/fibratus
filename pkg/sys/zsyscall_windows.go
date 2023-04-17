@@ -40,6 +40,7 @@ func errnoErr(e syscall.Errno) error {
 var (
 	modkernel32 = windows.NewLazySystemDLL("kernel32.dll")
 	modntdll    = windows.NewLazySystemDLL("ntdll.dll")
+	modpsapi    = windows.NewLazySystemDLL("psapi.dll")
 	modshlwapi  = windows.NewLazySystemDLL("shlwapi.dll")
 
 	procCreateThread                 = modkernel32.NewProc("CreateThread")
@@ -50,6 +51,8 @@ var (
 	procNtQueryObject                = modntdll.NewProc("NtQueryObject")
 	procNtQueryVolumeInformationFile = modntdll.NewProc("NtQueryVolumeInformationFile")
 	procRtlNtStatusToDosError        = modntdll.NewProc("RtlNtStatusToDosError")
+	procEnumDeviceDrivers            = modpsapi.NewProc("EnumDeviceDrivers")
+	procGetDeviceDriverFileNameW     = modpsapi.NewProc("GetDeviceDriverFileNameW")
 	procPathIsDirectoryW             = modshlwapi.NewProc("PathIsDirectoryW")
 )
 
@@ -108,6 +111,20 @@ func NtQueryVolumeInformationFile(handle windows.Handle, ioStatusBlock *windows.
 func RtlNtStatusToDosError(status uint32) (code uint32) {
 	r0, _, _ := syscall.Syscall(procRtlNtStatusToDosError.Addr(), 1, uintptr(status), 0, 0)
 	code = uint32(r0)
+	return
+}
+
+func EnumDeviceDrivers(imageBase uintptr, size uint32, needed *uint32) (err error) {
+	r1, _, e1 := syscall.Syscall(procEnumDeviceDrivers.Addr(), 3, uintptr(imageBase), uintptr(size), uintptr(unsafe.Pointer(needed)))
+	if r1 == 0 {
+		err = errnoErr(e1)
+	}
+	return
+}
+
+func GetDeviceDriverFileName(imageBase uintptr, filename *uint16, size uint32) (n uint32) {
+	r0, _, _ := syscall.Syscall(procGetDeviceDriverFileNameW.Addr(), 3, uintptr(imageBase), uintptr(unsafe.Pointer(filename)), uintptr(size))
+	n = uint32(r0)
 	return
 }
 

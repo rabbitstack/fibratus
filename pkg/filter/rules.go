@@ -497,16 +497,16 @@ func (r *Rules) Compile() error {
 		filterGroupsCountByPolicy.Add(group.Policy.String(), 1)
 
 		filters := make([]*compiledFilter, 0, len(group.Rules))
+
 		// compile filters and populate the groups. Additionally, for
 		// sequence rules we have to configure the FSM states and
 		// transitions
 		for _, rule := range group.Rules {
-			name := rule.Name
 			opts := []Option{WithPSnapshotter(r.psnap)}
 			f := New(rule.Condition, r.config, opts...)
 			err := f.Compile()
 			if err != nil {
-				return ErrInvalidFilter(name, group.Name, err)
+				return ErrInvalidFilter(rule.Name, group.Name, err)
 			}
 			for _, field := range f.GetFields() {
 				deprecated, d := fields.IsDeprecated(field)

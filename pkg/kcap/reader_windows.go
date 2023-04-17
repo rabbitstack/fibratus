@@ -30,6 +30,7 @@ import (
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/kcap/section"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/bytes"
@@ -165,7 +166,7 @@ func (r *reader) Close() error {
 }
 
 func (r *reader) read(kevt *kevent.Kevent, keventsc chan *kevent.Kevent) {
-	if kevt.Type.Dropped(false) {
+	if kevt.Type.OnlyState() {
 		return
 	}
 	if r.filter != nil && !r.filter.Run(kevt) {
@@ -178,18 +179,28 @@ func (r *reader) read(kevt *kevent.Kevent, keventsc chan *kevent.Kevent) {
 
 func (r *reader) updateSnapshotters(kevt *kevent.Kevent) error {
 	switch kevt.Type {
-	case ktypes.TerminateThread,
-		ktypes.TerminateProcess,
-		ktypes.UnloadImage:
+	case ktypes.TerminateProcess:
 		if err := r.psnapshotter.Remove(kevt); err != nil {
 			return err
 		}
+	case ktypes.TerminateThread:
+		pid := kevt.Kparams.MustGetPid()
+		tid := kevt.Kparams.MustGetTid()
+		if err := r.psnapshotter.RemoveThread(pid, tid); err != nil {
+			return err
+		}
+	case ktypes.UnloadImage:
+		pid := kevt.Kparams.MustGetPid()
+		mod := kevt.GetParamAsString(kparams.ImageFilename)
+		if err := r.psnapshotter.RemoveModule(pid, mod); err != nil {
+			return err
+		}
 	case ktypes.CreateProcess,
-		ktypes.CreateThread,
+		ktypes.ProcessRundown,
 		ktypes.LoadImage,
-		ktypes.EnumImage,
-		ktypes.EnumProcess,
-		ktypes.EnumThread:
+		ktypes.ProcessRundown,
+		ktypes.ThreadRundown,
+		ktypes.ImageRundown:
 		if err := r.psnapshotter.WriteFromKcap(kevt); err != nil {
 			return err
 		}
@@ -203,7 +214,7 @@ func (r *reader) updateSnapshotters(kevt *kevent.Kevent) error {
 		}
 	}
 	if kevt.PS == nil {
-		kevt.PS = r.psnapshotter.Find(kevt.PID)
+		_, kevt.PS = r.psnapshotter.Find(kevt.PID)
 	}
 	return nil
 }

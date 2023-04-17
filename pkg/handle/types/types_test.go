@@ -16,26 +16,22 @@
  * limitations under the License.
  */
 
-package driver
+package types
 
 import (
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"path/filepath"
-	"strings"
 	"testing"
 )
 
-func TestEnumDevices(t *testing.T) {
-	drivers := EnumDevices()
-	require.True(t, len(drivers) > 0)
-
-	ntoskrnlFound := false
-	for _, drv := range drivers {
-		if strings.EqualFold(filepath.Base(drv.Filename), "ntoskrnl.exe") {
-			ntoskrnlFound = true
-			break
+func TestHandleTypes(t *testing.T) {
+	names := make([]string, 0)
+	dirIdx := uint16(0)
+	for i, n := range typeNames {
+		names = append(names, n)
+		if n == "Directory" {
+			dirIdx = i
 		}
 	}
-	assert.True(t, ntoskrnlFound)
+	require.Contains(t, names, "Directory", "File", "Driver")
+	require.Equal(t, "Directory", ConvertTypeIDToName(dirIdx))
 }

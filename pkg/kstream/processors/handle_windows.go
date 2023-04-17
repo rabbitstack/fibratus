@@ -24,7 +24,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-	"github.com/rabbitstack/fibratus/pkg/sys/driver"
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
 	"path/filepath"
 	"strings"
@@ -72,7 +72,7 @@ func (h *handleProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error)
 			name = h.devMapper.Convert(name)
 		case handle.Driver:
 			driverName := strings.TrimPrefix(name, "\\Driver\\") + ".sys"
-			drivers := driver.EnumDevices()
+			drivers := sys.EnumDevices()
 			for _, drv := range drivers {
 				if strings.EqualFold(filepath.Base(drv.Filename), driverName) {
 					e.Kparams.Append(kparams.ImageFilename, kparams.FilePath, drv.Filename)

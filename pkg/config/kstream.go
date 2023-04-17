@@ -78,7 +78,7 @@ type KstreamConfig struct {
 	EnableAntimalwareEngineEvents bool `json:"enable-antimalware-engine" yaml:"enable-antimalware-engine"`
 	// BufferSize represents the amount of memory allocated for each event tracing session buffer, in kilobytes.
 	// The buffer size affects the rate at which buffers fill and must be flushed (small buffer size requires
-	// less memory but it increases the rate at which buffers must be flushed).
+	// less memory, but it increases the rate at which buffers must be flushed).
 	BufferSize uint32 `json:"buffer-size" yaml:"buffer-size"`
 	// MinBuffers determines the minimum number of buffers allocated for the event tracing session's buffer pool.
 	MinBuffers uint32 `json:"min-buffers" yaml:"min-buffers"`

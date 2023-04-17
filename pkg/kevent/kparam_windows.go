@@ -357,12 +357,12 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 		default:
 			offset = 16
 		}
-		filename, _ = evt.ReadUTF16String(offset)
+		filename = evt.ConsumeUTF16String(offset)
 		e.AppendParam(kparams.ProcessID, kparams.PID, pid)
 		e.AppendParam(kparams.ImageCheckSum, kparams.Uint32, checksum)
 		e.AppendParam(kparams.ImageDefaultBase, kparams.Address, defaultBase)
 		e.AppendParam(kparams.ImageBase, kparams.Address, imageBase)
-		e.AppendParam(kparams.ImageSize, kparams.Uint32, uint32(imageSize))
+		e.AppendParam(kparams.ImageSize, kparams.Uint64, imageSize)
 		e.AppendParam(kparams.ImageFilename, kparams.FileDosPath, filename)
 	case ktypes.RegOpenKey, ktypes.RegCloseKey,
 		ktypes.RegCreateKCB, ktypes.RegDeleteKCB,
@@ -415,9 +415,9 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 		e.AppendParam(kparams.FileIrpPtr, kparams.Uint64, irp)
 		e.AppendParam(kparams.FileObject, kparams.Uint64, fileObject)
 		e.AppendParam(kparams.ThreadID, kparams.TID, tid)
-		e.AppendParam(kparams.FileCreateOptions, kparams.Flags, createOptions)
+		e.AppendParam(kparams.FileShareMask, kparams.Flags, shareAccess, WithFlags(FileShareModeFlags))
 		e.AppendParam(kparams.FileAttributes, kparams.Flags, fileAttributes, WithFlags(FileAttributeFlags))
-		e.AppendParam(kparams.FileShareMask, kparams.Flags, shareAccess)
+		e.AppendParam(kparams.FileCreateOptions, kparams.Flags, createOptions, WithFlags(FileCreateOptionsFlags))
 		e.AppendParam(kparams.FileName, kparams.FileDosPath, filename)
 	case ktypes.FileOpEnd:
 		var (

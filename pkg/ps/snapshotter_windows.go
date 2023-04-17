@@ -20,6 +20,7 @@ package ps
 
 import (
 	"expvar"
+	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"golang.org/x/sys/windows"
 	"path/filepath"
@@ -152,13 +153,13 @@ func (s *snapshotter) Write(e *kevent.Kevent) error {
 	} else {
 		e.PS = s.procs[e.PID]
 	}
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func (s *snapshotter) AddThread(e *kevent.Kevent) error {
+	if !e.IsCreateThread() {
+		return fmt.Errorf("expected CreateThread but got %s event", e.Name)
+	}
 	pid, err := e.Kparams.GetPid()
 	if err != nil {
 		return err
@@ -185,6 +186,9 @@ func (s *snapshotter) AddThread(e *kevent.Kevent) error {
 }
 
 func (s *snapshotter) AddModule(e *kevent.Kevent) error {
+	if !e.IsLoadImage() {
+		return fmt.Errorf("expected LoadImage but got %s event", e.Name)
+	}
 	pid, err := e.Kparams.GetPid()
 	if err != nil {
 		return err
@@ -197,9 +201,9 @@ func (s *snapshotter) AddModule(e *kevent.Kevent) error {
 		return nil
 	}
 	module := pstypes.Module{}
-	module.Size, _ = e.Kparams.GetUint32(kparams.ImageSize)
+	module.Size, _ = e.Kparams.GetUint64(kparams.ImageSize)
 	module.Checksum, _ = e.Kparams.GetUint32(kparams.ImageCheckSum)
-	module.Name, _ = e.Kparams.GetString(kparams.ImageFilename)
+	module.Name = e.GetParamAsString(kparams.ImageFilename)
 	module.BaseAddress, _ = e.Kparams.GetHex(kparams.ImageBase)
 	module.DefaultBaseAddress, _ = e.Kparams.GetHex(kparams.ImageDefaultBase)
 	proc.AddModule(module)
@@ -246,6 +250,7 @@ func (s *snapshotter) newProcState(pid, ppid uint32, e *kevent.Kevent) (*pstypes
 		e.Kparams.MustGetUint32(kparams.SessionID),
 	)
 	proc.Parent = s.procs[ppid]
+	proc.StartTime, _ = e.Kparams.GetTime(kparams.StartTime)
 
 	// retrieve Portable Executable data
 	var err error

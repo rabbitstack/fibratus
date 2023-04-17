@@ -45,10 +45,13 @@ func (errors multiError) flatten() error {
 	switch len(errors) {
 	case 0:
 		return nil
-	case 1:
-		return errors[0]
 	default:
-		return errors
+		for _, err := range errors {
+			if err != nil {
+				return errors
+			}
+		}
+		return nil
 	}
 }
 

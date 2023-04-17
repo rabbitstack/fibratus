@@ -24,8 +24,8 @@ import (
 )
 
 // Snapshotter is the interface that exposes a set of methods all process snapshotters have to satisfy. It stores the state
-// of all running processes in the system including its threads, dynamically referenced libraries, handles/file descriptors and other
-// metadata.
+// of all running processes in the system including its threads, dynamically loaded libraries, handles/file descriptors
+// and other metadata.
 type Snapshotter interface {
 	// Write appends a new process state to the snapshotter. It takes as an input the inbound event to fetch
 	// the basic data, but also enriches the process' state with extra metadata such as process' env variables, PE

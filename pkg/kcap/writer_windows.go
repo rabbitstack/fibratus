@@ -50,17 +50,14 @@ type stats struct {
 }
 
 func (s *stats) incKevts(kevt *kevent.Kevent) {
-	switch kevt.Type {
-	case ktypes.FileRundown, ktypes.RegCreateKCB, ktypes.FileOpEnd,
-		ktypes.EnumProcess, ktypes.EnumThread, ktypes.EnumImage, ktypes.RegKCBRundown:
-	default:
+	if !kevt.Type.OnlyState() {
 		atomic.AddUint64(&s.kevtsWritten, 1)
 	}
 }
 func (s *stats) incBytes(bytes uint64) { atomic.AddUint64(&s.bytesWritten, bytes) }
 func (s *stats) incHandles()           { atomic.AddUint64(&s.handlesWritten, 1) }
 func (s *stats) incProcs(kevt *kevent.Kevent) {
-	if kevt.Type == ktypes.CreateProcess || kevt.Type == ktypes.EnumProcess {
+	if kevt.Type == ktypes.CreateProcess || kevt.Type == ktypes.ProcessRundown {
 		atomic.AddUint64(&s.procsWritten, 1)
 	}
 }

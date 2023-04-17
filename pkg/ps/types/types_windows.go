@@ -199,7 +199,7 @@ func (t Thread) String() string {
 // Module represents the data for all dynamic libraries/executables that reside in the process' address space.
 type Module struct {
 	// Size designates the size in bytes of the image file.
-	Size uint32
+	Size uint64
 	// Checksum is the checksum of the image file.
 	Checksum uint32
 	// Name represents the full path of this image.
@@ -234,7 +234,7 @@ func New(pid, ppid uint32, name, cmndline, exe string, sid *windows.SID, session
 	return ps
 }
 
-// NewFromKcap reconstructs the state of the process from capture file.
+// NewFromKcap reconstructs the state of the process from the capture file.
 func NewFromKcap(buf []byte, sec section.Section) (*PS, error) {
 	ps := PS{
 		Args:    make([]string, 0),
@@ -290,7 +290,7 @@ func (ps *PS) RemoveHandle(handle windows.Handle) {
 
 // AddModule adds a new module to this process state.
 func (ps *PS) AddModule(mod Module) {
-	m := ps.FindModule(mod.Name)
+	m := ps.FindModule(filepath.Base(mod.Name))
 	if m != nil {
 		return
 	}

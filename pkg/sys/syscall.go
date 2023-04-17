@@ -29,3 +29,5 @@ package sys
 //sys RtlNtStatusToDosError(status uint32) (code uint32) = ntdll.RtlNtStatusToDosError
 //sys CreateThread(attributes *windows.SecurityAttributes, stackSize uint, startAddress uintptr, param uintptr, creationFlags uint32, threadID *uint32) (handle windows.Handle) = kernel32.CreateThread
 //sys TerminateThread(handle windows.Handle, exitCode uint32) (err error) = kernel32.TerminateThread
+//sys EnumDeviceDrivers(imageBase uintptr, size uint32, needed *uint32) (err error) = psapi.EnumDeviceDrivers
+//sys GetDeviceDriverFileName(imageBase uintptr, filename *uint16, size uint32) (n uint32) = psapi.GetDeviceDriverFileNameW

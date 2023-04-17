@@ -121,16 +121,16 @@ func (r *registryProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, erro
 			if err != nil {
 				return e, err
 			}
-			e.AppendEnum(kparams.RegValueType, typ, kevent.WithEnum(key.RegistryValueTypes))
+			e.AppendEnum(kparams.RegValueType, typ, key.RegistryValueTypes)
 			switch typ {
 			case registry.SZ, registry.EXPAND_SZ:
-				e.AppendParam(kparams.RegValue, kparams.UnicodeString, val)
+				e.AppendParam(kparams.RegValue, kparams.UnicodeString, val.(string))
 			case registry.MULTI_SZ:
-				e.AppendParam(kparams.RegValue, kparams.Slice, val)
+				e.AppendParam(kparams.RegValue, kparams.Slice, val.([]string))
 			case registry.BINARY:
-				e.AppendParam(kparams.RegValue, kparams.Binary, val)
+				e.AppendParam(kparams.RegValue, kparams.Binary, val.([]byte))
 			case registry.QWORD:
-				e.AppendParam(kparams.RegValue, kparams.Uint64, val)
+				e.AppendParam(kparams.RegValue, kparams.Uint64, val.(uint64))
 			case registry.DWORD:
 				e.AppendParam(kparams.RegValue, kparams.Uint32, uint32(val.(uint64)))
 			}

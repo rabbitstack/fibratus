@@ -181,7 +181,7 @@ func (s scanner) scan(evt *kevent.Kevent) error {
 	if err != nil {
 		return err
 	}
-	alert := AlertContext{
+	alertCtx := AlertContext{
 		Timestamp: time.Now().Format(tsLayout),
 	}
 	switch {
@@ -193,29 +193,26 @@ func (s scanner) scan(evt *kevent.Kevent) error {
 		if s.config.ShouldSkipProcess(proc.Name) {
 			return nil
 		}
-		alert.PS = proc
+		alertCtx.PS = proc
 		err = sn.SetCallback(&matches).ScanProc(int(pid))
-
 	case evt.IsLoadImage():
 		filename = evt.GetParamAsString(kparams.ImageFilename)
-		alert.Filename = filename
+		alertCtx.Filename = filename
 		err = sn.SetCallback(&matches).ScanFile(filename)
 	}
 	if err != nil {
-
+		return err
 	}
 	totalScans.Add(1)
 	if len(matches) == 0 {
 		return nil
 	}
-	alert.Matches = matches
+	alertCtx.Matches = matches
 	ruleMatches.Add(int64(len(matches)))
-
 	if err := putMatchesMeta(matches, kevt); err != nil {
 		return err
 	}
-
-	return s.send(ctx)
+	return s.send(alertCtx)
 }
 
 func (s scanner) send(ctx AlertContext) error {

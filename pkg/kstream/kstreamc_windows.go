@@ -22,19 +22,17 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
-	"golang.org/x/sys/windows"
-	"syscall"
-	"unsafe"
-
 	"github.com/rabbitstack/fibratus/pkg/config"
 	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/filter"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/kstream/processors"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sys/windows"
 )
 
 const (
@@ -49,6 +47,8 @@ var (
 	keventsEnqueued = expvar.NewInt("kstream.kevents.enqueued")
 	// keventsDropped counts the number of overall dropped events
 	keventsDropped = expvar.NewInt("kstream.kevents.dropped")
+	// keventsUnknown counts the number of published events which types are not present in the internal catalog
+	keventsUnknown = expvar.NewInt("kstream.kevents.unknown")
 
 	// excludedKevents counts the number of excluded events
 	excludedKevents = expvar.NewInt("kstream.excluded.kevents")
@@ -60,7 +60,7 @@ var (
 )
 
 type kstreamConsumer struct {
-	traceHandles []etw.TraceHandle // trace session handles
+	traces []etw.TraceHandle // trace session handles
 
 	errs  chan error          // channel for event processing errors
 	kevts chan *kevent.Kevent // channel for fanning out generated events
@@ -78,8 +78,8 @@ type kstreamConsumer struct {
 	eventCallback EventCallbackFunc // called on each incoming event
 }
 
-func (k *kstreamConsumer) addTraceHandle(traceHandle etw.TraceHandle) {
-	k.traceHandles = append(k.traceHandles, traceHandle)
+func (k *kstreamConsumer) addTrace(trace etw.TraceHandle) {
+	k.traces = append(k.traces, trace)
 }
 
 // NewConsumer constructs a new event stream consumer.
@@ -122,42 +122,38 @@ func (k *kstreamConsumer) OpenKstream(traces map[string]TraceSession) error {
 }
 
 func (k *kstreamConsumer) openKstream(loggerName string) error {
-	trace := etw.EventTraceLogfile{
+	logfile := etw.EventTraceLogfile{
 		LoggerName:     windows.StringToUTF16Ptr(loggerName),
-		BufferCallback: syscall.NewCallback(k.bufferStatsCallback),
+		BufferCallback: windows.NewCallback(k.bufferStatsCallback),
 	}
-	fn := syscall.NewCallback(k.processEventCallback)
-	modes := uint32(etw.ProcessTraceModeRealtime | etw.ProcessTraceModeEventRecord)
-	// initialize real time trace mode and event callback functions
-	// via these nasty pointer accesses to unions inside the structure
-	*(*uint32)(unsafe.Pointer(&trace.LogFileMode[0])) = modes
-	*(*uintptr)(unsafe.Pointer(&trace.EventCallback[4])) = fn
+	logfile.SetEventCallback(windows.NewCallback(k.processEventCallback))
+	logfile.SetModes(uint32(etw.ProcessTraceModeRealtime | etw.ProcessTraceModeEventRecord))
 
-	traceHandle := etw.OpenTrace(trace)
-	if !traceHandle.IsValid() {
-		return fmt.Errorf("unable to open kernel trace: %v", syscall.GetLastError())
+	trace := etw.OpenTrace(logfile)
+	if !trace.IsValid() {
+		return fmt.Errorf("unable to open trace: %v", windows.GetLastError())
 	}
-	k.addTraceHandle(traceHandle)
+	k.addTrace(trace)
 
 	// since `ProcessTrace` blocks the current thread
 	// we invoke it in a separate goroutine but send
 	// any possible errors to the errors channel
 	go func() {
 		log.Infof("starting trace processing for [%s]", loggerName)
-		err := etw.ProcessTrace(traceHandle)
+		err := etw.ProcessTrace(trace)
 		log.Infof("stopping trace processing for [%s]", loggerName)
 		if err == nil {
-			log.Infof("trace processing successfully stopped for [%s]", loggerName)
+			log.Infof("trace processing stopped for [%s]", loggerName)
 			return
 		}
-		if errors.Is(err, kerrors.ErrTraceCancelled) {
-			if traceHandle.IsValid() {
-				if err := etw.CloseTrace(traceHandle); err != nil {
+		if !errors.Is(err, kerrors.ErrTraceCancelled) {
+			k.errs <- err
+		} else {
+			if trace.IsValid() {
+				if err := etw.CloseTrace(trace); err != nil {
 					k.errs <- err
 				}
 			}
-		} else {
-			k.errs <- err
 		}
 	}()
 	return nil
@@ -165,19 +161,17 @@ func (k *kstreamConsumer) openKstream(loggerName string) error {
 
 // CloseKstream shutdowns the event stream consumer by closing all running traces.
 func (k *kstreamConsumer) CloseKstream() error {
-	for _, h := range k.traceHandles {
-		if err := etw.CloseTrace(h); err != nil {
+	for _, trace := range k.traces {
+		if err := etw.CloseTrace(trace); err != nil {
 			log.Warn(err)
 		}
 	}
-
 	if err := k.sequencer.Store(); err != nil {
 		log.Warn(err)
 	}
 	if err := k.sequencer.Close(); err != nil {
 		log.Warn(err)
 	}
-
 	return k.processors.Close()
 }
 
@@ -233,10 +227,12 @@ func (k *kstreamConsumer) isEventDropped(evt *kevent.Kevent) bool {
 }
 
 func (k *kstreamConsumer) processEvent(ev *etw.EventRecord) error {
-	evt := kevent.New(k.sequencer.Get(), ev)
-	if evt == nil {
+	typ := ktypes.NewFromEventRecord(ev)
+	if !typ.Exists() {
+		keventsUnknown.Add(1)
 		return nil
 	}
+	evt := kevent.New(k.sequencer.Get(), typ, ev)
 	// Dispatch each event to the processor chain.
 	// Processors may further augment the event with
 	// useful fields or play the role of state managers.
@@ -275,7 +271,7 @@ func (k *kstreamConsumer) processEvent(ev *etw.EventRecord) error {
 	if !evt.IsState() {
 		k.sequencer.Increment()
 	}
-	// Invoke callback function
+	// Invoke event callback
 	if k.eventCallback != nil {
 		return k.eventCallback(evt)
 	}

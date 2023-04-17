@@ -400,6 +400,16 @@ type EventTraceLogfile struct {
 	Context uintptr
 }
 
+// SetModes sets the event processing modes.
+func (e *EventTraceLogfile) SetModes(modes uint32) {
+	*(*uint32)(unsafe.Pointer(&e.LogFileMode[0])) = modes
+}
+
+// SetEventCallback sets the event processing callback.
+func (e *EventTraceLogfile) SetEventCallback(fn uintptr) {
+	*(*uintptr)(unsafe.Pointer(&e.EventCallback[4])) = fn
+}
+
 // EventDescriptor contains metadata that defines the event.
 type EventDescriptor struct {
 	// ID represents event identifier.
@@ -502,26 +512,41 @@ func (e *EventRecord) Version() uint8 {
 
 // ReadByte reads the byte from the buffer at the specified offset.
 func (e *EventRecord) ReadByte(offset uint16) byte {
+	if offset > e.BufferLen {
+		return 0
+	}
 	return *(*byte)(unsafe.Pointer(e.Buffer + uintptr(offset)))
 }
 
 // ReadBytes reads a contiguous block of bytes from the buffer.
 func (e *EventRecord) ReadBytes(offset uint16, count uint16) []byte {
+	if offset > e.BufferLen {
+		return nil
+	}
 	return (*[1<<30 - 1]byte)(unsafe.Pointer(e.Buffer + uintptr(offset) + uintptr(count)))[:count:count]
 }
 
 // ReadUint16 reads the uint16 value from the buffer at the specified offset.
 func (e *EventRecord) ReadUint16(offset uint16) uint16 {
+	if offset > e.BufferLen {
+		return 0
+	}
 	return *(*uint16)(unsafe.Pointer(e.Buffer + uintptr(offset)))
 }
 
 // ReadUint32 reads the uint32 value from the buffer at the specified offset.
 func (e *EventRecord) ReadUint32(offset uint16) uint32 {
+	if offset > e.BufferLen {
+		return 0
+	}
 	return *(*uint32)(unsafe.Pointer(e.Buffer + uintptr(offset)))
 }
 
 // ReadUint64 reads the uint64 value from the buffer at the specified offset.
 func (e *EventRecord) ReadUint64(offset uint16) uint64 {
+	if offset > e.BufferLen {
+		return 0
+	}
 	return *(*uint64)(unsafe.Pointer(e.Buffer + uintptr(offset)))
 }
 
@@ -554,7 +579,7 @@ func (e *EventRecord) ReadUTF16String(offset uint16) (string, uint16) {
 		return "", 0
 	}
 	s := (*[1<<30 - 1]uint16)(unsafe.Pointer(e.Buffer + uintptr(offset)))[: e.BufferLen-offset : e.BufferLen-offset]
-	return utf16.Decode(s[:len(s)/2-1-2]), uint16(len(s) + 2)
+	return utf16.Decode(s[:len(s)/2-1]), uint16(len(s) + 2)
 }
 
 // ConsumeUTF16String reads the byte slice with UTF16-encoded string

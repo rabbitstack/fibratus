@@ -27,12 +27,6 @@ import (
 	"testing"
 )
 
-func init() {
-	lookupSids = func() ([]string, error) {
-		return []string{"S-1-5-21-2271034452-2606270099-984871569-500", "S-1-5-21-2271034452-2606270099-984871569-501"}, nil
-	}
-}
-
 func TestFormatKey(t *testing.T) {
 	root, key := Format(`\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\Windows Workflow Foundation 4.0.0.0\Linkage`)
 	assert.Equal(t, windows.HKEY_LOCAL_MACHINE, root)

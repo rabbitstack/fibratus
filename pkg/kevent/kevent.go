@@ -204,8 +204,8 @@ func (e *Kevent) AppendParam(name string, typ kparams.Type, value kparams.Value,
 }
 
 // AppendEnum adds the enum parameter to this event.
-func (e *Kevent) AppendEnum(name string, value uint32, opts ...ParamOption) {
-	e.AppendParam(name, kparams.Enum, value, opts...)
+func (e *Kevent) AppendEnum(name string, value uint32, enum ParamEnum) {
+	e.AppendParam(name, kparams.Enum, value, WithEnum(enum))
 }
 
 // GetParamAsString returns the specified parameter value as string.

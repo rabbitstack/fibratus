@@ -27,7 +27,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kcap"
 	"github.com/rabbitstack/fibratus/pkg/kstream"
 	"github.com/rabbitstack/fibratus/pkg/ps"
-	"github.com/rabbitstack/fibratus/pkg/sys/security"
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"github.com/rabbitstack/fibratus/pkg/util/spinner"
 	log "github.com/sirupsen/logrus"
@@ -56,7 +56,7 @@ func capture(cmd *cobra.Command, args []string) error {
 	}
 	// inject SeDebugPrivilege in access token
 	if cfg.DebugPrivilege {
-		security.SetDebugPrivilege()
+		sys.SetDebugPrivilege()
 	}
 
 	// set up the signals

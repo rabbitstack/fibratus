@@ -21,7 +21,8 @@ package service
 import (
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/filter"
-	"github.com/rabbitstack/fibratus/pkg/sys/security"
+	"github.com/rabbitstack/fibratus/pkg/sys"
+	"github.com/rabbitstack/fibratus/pkg/yara"
 	"time"
 
 	"github.com/rabbitstack/fibratus/cmd/fibratus/common"
@@ -223,7 +224,7 @@ func (s *fsvc) run() error {
 	}
 	// inject SeDebugPrivilege in access token
 	if cfg.DebugPrivilege {
-		security.SetDebugPrivilege()
+		sys.SetDebugPrivilege()
 	}
 	ver.Set(Version)
 
@@ -263,6 +264,13 @@ func (s *fsvc) run() error {
 		return err
 	}
 	agg.AddListener(rules)
+	if cfg.Yara.Enabled {
+		scanner, err := yara.NewScanner(psnap, cfg.Yara)
+		if err != nil {
+			return err
+		}
+		agg.AddListener(scanner)
+	}
 	agg.Run()
 
 	if err := api.StartServer(cfg); err != nil {

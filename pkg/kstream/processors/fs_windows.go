@@ -122,9 +122,9 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 		}
 		ev.AppendParam(kparams.NTStatus, kparams.Status, status)
 		if fileinfo.Type != fs.Unknown {
-			ev.AppendEnum(kparams.FileType, uint32(fileinfo.Type), kevent.WithEnum(fs.FileTypes))
+			ev.AppendEnum(kparams.FileType, uint32(fileinfo.Type), fs.FileTypes)
 		}
-		ev.AppendEnum(kparams.FileOperation, uint32(dispo), kevent.WithEnum(fs.FileCreateDispositions))
+		ev.AppendEnum(kparams.FileOperation, uint32(dispo), fs.FileCreateDispositions)
 		return ev, nil
 	case ktypes.ReleaseFile:
 		fileReleaseCount.Add(1)
@@ -161,7 +161,7 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 		}
 		if fileinfo != nil {
 			if fileinfo.Type != fs.Unknown {
-				e.AppendEnum(kparams.FileType, uint32(fileinfo.Type), kevent.WithEnum(fs.FileTypes))
+				e.AppendEnum(kparams.FileType, uint32(fileinfo.Type), fs.FileTypes)
 			}
 			e.AppendParam(kparams.FileName, kparams.FilePath, fileinfo.Name)
 		}
