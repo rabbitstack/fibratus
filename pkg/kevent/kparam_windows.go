@@ -73,14 +73,9 @@ func (k Kparam) String() string {
 	switch k.Type {
 	case kparams.UnicodeString, kparams.AnsiString, kparams.FilePath:
 		return k.Value.(string)
-	case kparams.SID:
-		account, domain, err := sys.LookupAccount(k.Value.([]byte), false)
-		if err != nil {
-			return ""
-		}
-		return joinSID(account, domain)
-	case kparams.WbemSID:
-		account, domain, err := sys.LookupAccount(k.Value.([]byte), true)
+	case kparams.SID, kparams.WbemSID:
+		isWbem := k.Type == kparams.WbemSID
+		account, domain, err := sys.LookupAccount(k.Value.([]byte), isWbem)
 		if err != nil {
 			return ""
 		}

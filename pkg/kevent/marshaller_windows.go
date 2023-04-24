@@ -27,12 +27,10 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/kcap/section"
 	kcapver "github.com/rabbitstack/fibratus/pkg/kcap/version"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-	"github.com/rabbitstack/fibratus/pkg/network"
 	ptypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/util/bytes"
 	"github.com/rabbitstack/fibratus/pkg/util/ip"
@@ -263,7 +261,7 @@ func (e *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 
 		var kval kparams.Value
 		switch kparams.Type(typ) {
-		case kparams.AnsiString, kparams.UnicodeString, kparams.SID, kparams.WbemSID:
+		case kparams.AnsiString, kparams.UnicodeString:
 			// read string parameter
 			l := bytes.ReadUint16(b[50+offset+kparamNameLength+poffset:])
 			buf = b[52+offset+kparamNameLength+poffset:]
@@ -301,7 +299,7 @@ func (e *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 		case kparams.Int32:
 			kval = int32(bytes.ReadUint32(b[50+offset+kparamNameLength+poffset:]))
 			poffset += kparamNameLength + 4 + 4
-		case kparams.Uint32:
+		case kparams.Uint32, kparams.Enum, kparams.Status:
 			kval = bytes.ReadUint32(b[50+offset+kparamNameLength+poffset:])
 			poffset += kparamNameLength + 4 + 4
 		case kparams.Uint16, kparams.Port:
@@ -310,16 +308,8 @@ func (e *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 		case kparams.Int16:
 			kval = int16(bytes.ReadUint16(b[50+offset+kparamNameLength+poffset:]))
 			poffset += kparamNameLength + 4 + 2
-		case kparams.Uint8, kparams.Enum:
-			switch kparamName {
-			case kparams.FileOperation:
-				kval = fs.FileDisposition(b[50+offset+kparamNameLength+poffset : 50+offset+kparamNameLength+poffset+1][0])
-			case kparams.FileShareMask:
-			case kparams.NetL4Proto:
-				kval = network.L4Proto(b[50+offset+kparamNameLength+poffset : 50+offset+kparamNameLength+poffset+1][0])
-			default:
-				kval = b[50+offset+kparamNameLength+poffset : 50+offset+kparamNameLength+poffset+1][0]
-			}
+		case kparams.Uint8:
+			kval = b[50+offset+kparamNameLength+poffset : 50+offset+kparamNameLength+poffset+1][0]
 			poffset += kparamNameLength + 4 + 1
 		case kparams.Int8:
 			kval = int8(b[50+offset+kparamNameLength+poffset : 50+offset+kparamNameLength+poffset+1][0])
@@ -467,8 +457,6 @@ func (e *Kevent) MarshalJSON() []byte {
 		writeMore := js.shouldWriteMore(i, len(pars))
 		js.writeObjectField(kpar.Name)
 		switch kpar.Type {
-		case kparams.AnsiString, kparams.UnicodeString, kparams.SID, kparams.WbemSID:
-			js.writeEscapeString(kpar.Value.(string))
 		case kparams.Int64:
 			js.writeInt64(kpar.Value.(int64))
 		case kparams.Uint64:
@@ -495,20 +483,6 @@ func (e *Kevent) MarshalJSON() []byte {
 			js.writeString(kpar.Value.(net.IP).String())
 		case kparams.HexInt8, kparams.HexInt16, kparams.HexInt32, kparams.HexInt64:
 			js.writeString(kpar.Value.(kparams.Hex).String())
-		case kparams.Enum:
-			switch kpar.Name {
-			case kparams.FileOperation:
-				js.writeString(kpar.Value.(fs.FileDisposition).String())
-			case kparams.FileShareMask:
-			case kparams.NetL4Proto:
-				js.writeString(kpar.Value.(network.L4Proto).String())
-			default:
-				val, ok := kpar.Value.(uint8)
-				if !ok {
-					continue
-				}
-				js.writeUint8(val)
-			}
 		case kparams.Bool:
 			js.writeBool(kpar.Value.(bool))
 		case kparams.Time:
@@ -526,6 +500,8 @@ func (e *Kevent) MarshalJSON() []byte {
 				}
 				js.writeArrayEnd()
 			}
+		default:
+			js.writeEscapeString(kpar.String())
 		}
 		if writeMore {
 			js.writeMore()

@@ -25,11 +25,13 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -475,10 +477,49 @@ func TestReapDeadProcesses(t *testing.T) {
 	}
 
 	require.True(t, psnap.Size() > 1)
-	require.NoError(t, windows.TerminateProcess(notepadHandle, uint32(257)))
+	require.NoError(t, windows.TerminateProcess(notepadHandle, 257))
 	time.Sleep(time.Millisecond * 100)
 
 	require.True(t, psnap.Size() == 1)
+}
+
+func TestFindQueryOS(t *testing.T) {
+	hsnap := new(handle.SnapshotterMock)
+	psnap := NewSnapshotter(hsnap, &config.Config{})
+	defer psnap.Close()
+
+	notepadHandle, notepadPID := spawnNotepad()
+	if notepadHandle == 0 {
+		t.Fatal("unable to spawn notepad process")
+	}
+	defer windows.TerminateProcess(notepadHandle, 257)
+
+	ok, proc := psnap.Find(notepadPID)
+	require.False(t, ok)
+	require.NotNil(t, proc)
+
+	assert.Equal(t, notepadPID, proc.PID)
+	assert.Equal(t, "notepad.exe", proc.Name)
+	assert.Equal(t, uint32(os.Getpid()), proc.Ppid)
+	assert.Equal(t, strings.ToLower(filepath.Join(os.Getenv("windir"), "notepad.exe")), strings.ToLower(proc.Exe))
+	assert.Equal(t, filepath.Join(os.Getenv("windir"), "notepad.exe"), proc.Cmdline)
+	assert.True(t, len(proc.Envs) > 0)
+	assert.Contains(t, proc.Cwd, "fibratus\\pkg\\ps")
+	assert.Equal(t, uint32(1), proc.SessionID)
+
+	loggedSID, err := sys.GetLoggedSID()
+	require.NoError(t, err)
+	assert.Equal(t, loggedSID.String(), proc.SID)
+	username, domain, _, err := loggedSID.LookupAccount("")
+	require.NoError(t, err)
+	assert.Equal(t, username, proc.Username)
+	assert.Equal(t, domain, proc.Domain)
+
+	// now the proc should exist in snapshotter state
+	psnap.Put(proc)
+	found, ps := psnap.Find(notepadPID)
+	require.True(t, found)
+	require.NotNil(t, ps)
 }
 
 func spawnNotepad() (windows.Handle, uint32) {

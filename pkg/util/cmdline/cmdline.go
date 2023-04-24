@@ -66,14 +66,20 @@ func New(cmdline string) *Cmdline {
 // a single argument in the process command line.
 func Split(cmdline string) []string { return splitRegexp.FindAllString(cmdline, -1) }
 
-// CleanExe removes the quotes from the executable path and rejoins
+// CleanExe cleans the executable path and rejoins
 // the rest of the command line arguments.
 func (c *Cmdline) CleanExe() *Cmdline {
 	args := Split(c.cmdline)
 	if len(args) > 0 {
 		exe := args[0]
+		// removes quotes from cmdline
 		if exe[0] == '"' && exe[len(exe)-1] == '"' {
 			c.cmdline = strings.Join(append([]string{exe[1 : len(exe)-1]}, args[1:]...), " ")
+			return c
+		}
+		// removes \??\ prefix from cmdline
+		if len(exe) > 4 && exe[1] == '?' && exe[2] == '?' {
+			c.cmdline = strings.Join(append([]string{exe[4:]}, args[1:]...), " ")
 			return c
 		}
 	}

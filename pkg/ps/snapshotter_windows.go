@@ -342,33 +342,66 @@ func (s *snapshotter) Find(pid uint32) (bool, *pstypes.PS) {
 		Handles: make([]htypes.Handle, 0),
 	}
 
+	getProcExecutable := func(process windows.Handle) (string, string) {
+		var size uint32 = windows.MAX_PATH
+		n := make([]uint16, size)
+		err := windows.QueryFullProcessImageName(process, 0, &n[0], &size)
+		if err != nil {
+			return "", ""
+		}
+		return windows.UTF16ToString(n), filepath.Base(windows.UTF16ToString(n))
+	}
+
 	access := uint32(windows.PROCESS_QUERY_INFORMATION | windows.PROCESS_VM_READ)
 	process, err := windows.OpenProcess(access, false, pid)
 	if err != nil {
 		// the access to protected / system process can't be achieved
 		// through `PROCESS_VM_READ` or `PROCESS_QUERY_INFORMATION` flags.
 		// Try to acquire the process handle again but with restricted access
-		// rights to obtain the full process's image name
+		// rights to be able to obtain other attributes such as the full process's
+		// image executable path or process times
 		process, err = windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
 		if err != nil {
 			return false, proc
 		}
-		var size uint32 = windows.MAX_PATH
-		n := make([]uint16, size)
-		err := windows.QueryFullProcessImageName(process, 0, &n[0], &size)
-		if err != nil {
-			return false, proc
-		}
-		proc.Exe = windows.UTF16ToString(n)
-		proc.Name = filepath.Base(proc.Exe)
 	}
 	defer windows.CloseHandle(process)
+
+	// get process executable full path and name
+	proc.Exe, proc.Name = getProcExecutable(process)
 
 	// retrieve Portable Executable data
 	proc.PE, err = pe.ParseFileWithConfig(proc.Exe, s.config.PE)
 	if err != nil {
 		return false, proc
 	}
+
+	// get process times
+	var (
+		ct windows.Filetime
+		xt windows.Filetime
+		kt windows.Filetime
+		ut windows.Filetime
+	)
+	err = windows.GetProcessTimes(process, &ct, &xt, &kt, &ut)
+	if err != nil {
+		return false, proc
+	}
+	proc.StartTime = time.Unix(0, ct.Nanoseconds())
+
+	// get process token attributes
+	var token windows.Token
+	err = windows.OpenProcessToken(process, windows.TOKEN_QUERY, &token)
+	if err != nil {
+		return false, proc
+	}
+	defer token.Close()
+	usr, err := token.GetTokenUser()
+	if err != nil {
+		return false, proc
+	}
+	proc.SID = usr.User.Sid.String()
+	proc.Username, proc.Domain, _, _ = usr.User.Sid.LookupAccount("")
 
 	// consult process parent id
 	info, err := sys.QueryInformationProcess[windows.PROCESS_BASIC_INFORMATION](process, windows.ProcessBasicInformation)
@@ -391,6 +424,7 @@ func (s *snapshotter) Find(pid uint32) (bool, *pstypes.PS) {
 	}
 	proc.Envs = peb.GetEnvs()
 	proc.Cmdline = peb.GetCommandLine()
+	proc.SessionID = peb.GetSessionID()
 	proc.Cwd = peb.GetCurrentWorkingDirectory()
 
 	return false, proc

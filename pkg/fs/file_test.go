@@ -27,12 +27,33 @@ import (
 )
 
 func TestGetFileType(t *testing.T) {
-	typ := GetFileType(`_fixtures`, 16777249)
-	assert.Equal(t, Directory, typ)
+	var tests = []struct {
+		filename string
+		opts     uint32
+		wants    FileType
+	}{
+		{
+			`_fixtures`,
+			16777249,
+			Directory,
+		},
+		{
+			`_fixtures`,
+			25165857,
+			Directory,
+		},
+		{
+			`C:\Users\bunny\AppData\Local\Mozilla\Firefox\Profiles\profile1.tmp`,
+			18874368,
+			Regular,
+		},
+	}
 
-	typ = GetFileType(`_fixtures`, 25165857)
-	assert.Equal(t, Directory, typ)
-
-	typ = GetFileType(`C:\Users\bunny\AppData\Local\Mozilla\Firefox\Profiles\profile1.tmp`, 18874368)
-	assert.Equal(t, Regular, typ)
+	for _, tt := range tests {
+		t.Run(tt.filename, func(t *testing.T) {
+			filename, opts := tt.filename, tt.opts
+			wants := tt.wants
+			assert.Equal(t, wants, GetFileType(filename, opts))
+		})
+	}
 }

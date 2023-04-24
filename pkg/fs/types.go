@@ -21,53 +21,16 @@
 
 package fs
 
-// FileDisposition is the alias for the file disposition modes
-type FileDisposition uint8
-
-const (
-	// Supersede dictates that if the file already exists, it is replaced with the given file.
-	// Otherwise, the file with given name is created.
-	Supersede FileDisposition = iota
-	// Open opens the file if it already exists instead of creating a new file.
-	Open
-	// Create fails if the file already exists.
-	Create
-	// OpenIf opens the file if it already exists or creates a new file otherwise.
-	OpenIf
-	// Overwrite opens and overwrites the file if it already exists. Otherwise, it fails.
-	Overwrite
-	// OverwriteIf opens and overwrites the file is it already exists. Otherwise, it creates a new file.
-	OverwriteIf
-)
-
-// String returns the textual representation of the file disposition.
-func (fd FileDisposition) String() string {
-	switch fd {
-	case Supersede:
-		return "supersede"
-	case Open:
-		return "open"
-	case Create:
-		return "create"
-	case OpenIf:
-		return "openif"
-	case Overwrite:
-		return "overwrite"
-	case OverwriteIf:
-		return "overwriteif"
-	default:
-		return "<na>"
-	}
-}
+import "golang.org/x/sys/windows"
 
 // FileCreateDispositions is the mapping between the file create disposition and its symbolical name.
 var FileCreateDispositions = map[uint32]string{
-	uint32(Supersede):   "SUPERSEDE",
-	uint32(Open):        "OPEN",
-	uint32(Create):      "CREATE",
-	uint32(OpenIf):      "OPEN_IF",
-	uint32(Overwrite):   "OVERWRITE",
-	uint32(OverwriteIf): "OVERWRITE_IF",
+	uint32(windows.FILE_SUPERSEDE):    "SUPERSEDE",
+	uint32(windows.FILE_OPEN):         "OPEN",
+	uint32(windows.FILE_CREATE):       "CREATE",
+	uint32(windows.FILE_OPEN_IF):      "OPEN_IF",
+	uint32(windows.FILE_OVERWRITE):    "OVERWRITE",
+	uint32(windows.FILE_OVERWRITE_IF): "OVERWRITE_IF",
 }
 
 // FileType is the type alias for the file type

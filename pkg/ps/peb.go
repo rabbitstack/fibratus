@@ -91,6 +91,14 @@ func (p PEB) GetCurrentWorkingDirectory() string {
 	return windows.UTF16ToString(cwd)
 }
 
+// GetSessionID returns the process session identifier.
+func (p PEB) GetSessionID() uint32 {
+	if p.peb == nil {
+		return 0
+	}
+	return p.peb.SessionId
+}
+
 // GetEnvs returns the map of environment variables that were mapped into the process PEB.
 func (p PEB) GetEnvs() map[string]string {
 	if p.procParams == nil {

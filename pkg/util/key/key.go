@@ -22,6 +22,7 @@
 package key
 
 import (
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	"golang.org/x/sys/windows/registry"
 	"path/filepath"
 	"strings"
@@ -32,6 +33,16 @@ var (
 	hkcrPrefixes = []string{"\\REGISTRY\\MACHINE\\SOFTWARE\\CLASSES", "\\Registry\\Machine\\Software\\Classes"}
 	hkuPrefixes  = []string{"\\REGISTRY\\USER", "\\Registry\\User"}
 )
+
+var loggedSID = getLoggedSID()
+
+func getLoggedSID() string {
+	sid, err := sys.GetLoggedSID()
+	if err != nil {
+		return ""
+	}
+	return sid.String()
+}
 
 // Key is the type alias for the registry key
 type Key registry.Key
@@ -127,19 +138,23 @@ func Format(key string) (Key, string) {
 		if strings.HasPrefix(key, p) {
 			path := subkey(key, p)
 			n := strings.Index(path, "\\")
-			var secID string
-			if n > 0 {
-				secID = path[:n]
-			} else {
-				secID = path
+			var sid string
+			if n > 0 && path[0] == 'S' {
+				sid = path[:n]
+			} else if len(path) > 0 && path[0] == 'S' {
+				sid = path
 			}
-			// https://gist.github.com/Coderx7/ed6cee4e4f2bf6edbd72a1db677e5b24
-			// https://stackoverflow.com/questions/57669937/get-current-logged-in-user-name-from-within-a-c-windows-service
+			// if the HKEY_USERS hive sid is equal to
+			// the sid of the currently logged user, we
+			// remap the root key to HKEY_CURRENT_USER
 			switch {
-			case strings.Contains(key, "_Classes"):
-				return CurrentUser, strings.Replace(path, "_Classes", "Software\\Classes", -1)
-			case secID != "":
-				return CurrentUser, path
+			case sid == loggedSID && strings.Contains(key, "_Classes"):
+				return CurrentUser, strings.Replace(path[n+1:], "_Classes", "Software\\Classes", -1)
+			case sid == loggedSID:
+				if len(path) == len(loggedSID) {
+					return CurrentUser, ""
+				}
+				return CurrentUser, path[n+1:]
 			default:
 				return Users, path
 			}

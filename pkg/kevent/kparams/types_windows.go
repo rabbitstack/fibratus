@@ -149,7 +149,7 @@ const (
 	Enum
 	// Map represents a map
 	Map
-	// Object is the generic object
+	// Object is the generic object type
 	Object
 	// FileDosPath represents the file system path in DOS device notation
 	FileDosPath

@@ -20,14 +20,24 @@ package sys
 
 //go:generate go run golang.org/x/sys/windows/mkwinsyscall -output zsyscall_windows.go syscall.go
 
+// Native API Functions
 //sys NtQueryObject(handle windows.Handle, objectInfoClass int32, objInfo unsafe.Pointer, objInfoLen uint32, retLen *uint32) (ntstatus error) = ntdll.NtQueryObject
 //sys NtQueryMutant(handle windows.Handle, mutantInfoClass int32, mutantInfo unsafe.Pointer, mutantInfoLen uint32, retLen *uint32) (ntstatus error) = ntdll.NtQueryMutant
 //sys NtAlpcQueryInformation(handle windows.Handle, alpcInfoClass int32, alpcInfo unsafe.Pointer, alpcInfoLen uint32, retLen *uint32) (ntstatus error) = ntdll.NtAlpcQueryInformation
 //sys NtQueryVolumeInformationFile(handle windows.Handle, ioStatusBlock *windows.IO_STATUS_BLOCK, fsInfo uintptr, retLen uint32, fsInfoClass int32) (ntstatus error) = ntdll.NtQueryVolumeInformationFile
-//sys GetProcessIdOfThread(handle windows.Handle) (pid uint32) = kernel32.GetProcessIdOfThread
-//sys pathIsDirectory(path *uint16) (isDirectory bool) = shlwapi.PathIsDirectoryW
 //sys RtlNtStatusToDosError(status uint32) (code uint32) = ntdll.RtlNtStatusToDosError
+
+// Thread Functions
+//sys GetProcessIdOfThread(handle windows.Handle) (pid uint32) = kernel32.GetProcessIdOfThread
 //sys CreateThread(attributes *windows.SecurityAttributes, stackSize uint, startAddress uintptr, param uintptr, creationFlags uint32, threadID *uint32) (handle windows.Handle) = kernel32.CreateThread
 //sys TerminateThread(handle windows.Handle, exitCode uint32) (err error) = kernel32.TerminateThread
+
+// File Functions
+//sys pathIsDirectory(path *uint16) (isDirectory bool) = shlwapi.PathIsDirectoryW
+
+// Device Functions
 //sys EnumDeviceDrivers(imageBase uintptr, size uint32, needed *uint32) (err error) = psapi.EnumDeviceDrivers
 //sys GetDeviceDriverFileName(imageBase uintptr, filename *uint16, size uint32) (n uint32) = psapi.GetDeviceDriverFileNameW
+
+// Windows Terminal Server Functions
+//sys WTSQuerySessionInformationA(handle windows.Handle, sessionID uint32, klass uint8, buf **uint16, size *uint32) (err error) = wtsapi32.WTSQuerySessionInformationW

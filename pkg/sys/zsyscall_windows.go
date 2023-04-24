@@ -42,6 +42,7 @@ var (
 	modntdll    = windows.NewLazySystemDLL("ntdll.dll")
 	modpsapi    = windows.NewLazySystemDLL("psapi.dll")
 	modshlwapi  = windows.NewLazySystemDLL("shlwapi.dll")
+	modwtsapi32 = windows.NewLazySystemDLL("wtsapi32.dll")
 
 	procCreateThread                 = modkernel32.NewProc("CreateThread")
 	procGetProcessIdOfThread         = modkernel32.NewProc("GetProcessIdOfThread")
@@ -54,6 +55,7 @@ var (
 	procEnumDeviceDrivers            = modpsapi.NewProc("EnumDeviceDrivers")
 	procGetDeviceDriverFileNameW     = modpsapi.NewProc("GetDeviceDriverFileNameW")
 	procPathIsDirectoryW             = modshlwapi.NewProc("PathIsDirectoryW")
+	procWTSQuerySessionInformationW  = modwtsapi32.NewProc("WTSQuerySessionInformationW")
 )
 
 func CreateThread(attributes *windows.SecurityAttributes, stackSize uint, startAddress uintptr, param uintptr, creationFlags uint32, threadID *uint32) (handle windows.Handle) {
@@ -131,5 +133,13 @@ func GetDeviceDriverFileName(imageBase uintptr, filename *uint16, size uint32) (
 func pathIsDirectory(path *uint16) (isDirectory bool) {
 	r0, _, _ := syscall.Syscall(procPathIsDirectoryW.Addr(), 1, uintptr(unsafe.Pointer(path)), 0, 0)
 	isDirectory = r0 != 0
+	return
+}
+
+func WTSQuerySessionInformationA(handle windows.Handle, sessionID uint32, klass uint8, buf **uint16, size *uint32) (err error) {
+	r1, _, e1 := syscall.Syscall6(procWTSQuerySessionInformationW.Addr(), 5, uintptr(handle), uintptr(sessionID), uintptr(klass), uintptr(unsafe.Pointer(buf)), uintptr(unsafe.Pointer(size)), 0)
+	if r1 == 0 {
+		err = errnoErr(e1)
+	}
 	return
 }

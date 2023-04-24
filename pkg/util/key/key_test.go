@@ -23,32 +23,136 @@ package key
 
 import (
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/registry"
 	"testing"
 )
 
+func init() {
+	loggedSID = "S-1-5-21-2271034452-2606270099-984871569-500"
+}
+
 func TestFormatKey(t *testing.T) {
-	root, key := Format(`\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\Windows Workflow Foundation 4.0.0.0\Linkage`)
-	assert.Equal(t, windows.HKEY_LOCAL_MACHINE, root)
-	assert.Equal(t, `SYSTEM\ControlSet001\Services\Windows Workflow Foundation 4.0.0.0\Linkage`, key)
+	var tests = []struct {
+		nativeKey   string
+		wantsKey    Key
+		wantsSubkey string
+	}{
+		{
+			`\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\Windows Workflow Foundation 4.0.0.0\Linkage`,
+			windows.HKEY_LOCAL_MACHINE,
+			`SYSTEM\ControlSet001\Services\Windows Workflow Foundation 4.0.0.0\Linkage`,
+		},
+		{
+			`\Registry\Machine\SYSTEM\ControlSet001\Services\Windows Workflow Foundation 4.0.0.0\Linkage`,
+			windows.HKEY_LOCAL_MACHINE,
+			`SYSTEM\ControlSet001\Services\Windows Workflow Foundation 4.0.0.0\Linkage`,
+		},
+		{
+			`\REGISTRY\MACHINE`,
+			windows.HKEY_LOCAL_MACHINE,
+			``,
+		},
+		{
+			`\REGISTRY\USER\S-1-5-21-2271034452-2606270099-984871569-500\Console`,
+			windows.HKEY_CURRENT_USER,
+			`Console`,
+		},
+		{
+			`\REGISTRY\USER\S-1-5-21-2271034452-2606270099-984871569-500\_Classes`,
+			windows.HKEY_CURRENT_USER,
+			`Software\Classes`,
+		},
+		{
+			`\REGISTRY\USER\S-1-5-21-2271034452-2606270099-984871569-500\_Classes\.all`,
+			windows.HKEY_CURRENT_USER,
+			`Software\Classes\.all`,
+		},
+		{
+			`\REGISTRY\USER\S-1-5-21-2271034452-2606270099-984871569-500`,
+			windows.HKEY_CURRENT_USER,
+			``,
+		},
+		{
+			`\REGISTRY\USER\S-1-5-9\Network`,
+			windows.HKEY_USERS,
+			`S-1-5-9\Network`,
+		},
+		{
+			`\REGISTRY\USER`,
+			windows.HKEY_USERS,
+			``,
+		},
+	}
 
-	root, key = Format(`\Registry\Machine\SYSTEM\ControlSet001\Services\Windows Workflow Foundation 4.0.0.0\Linkage`)
-	assert.Equal(t, windows.HKEY_LOCAL_MACHINE, root)
-	assert.Equal(t, `SYSTEM\ControlSet001\Services\Windows Workflow Foundation 4.0.0.0\Linkage`, key)
+	for _, tt := range tests {
+		t.Run(tt.nativeKey, func(t *testing.T) {
+			nativeKey := tt.nativeKey
+			k, s := tt.wantsKey, tt.wantsSubkey
+			key, subkey := Format(nativeKey)
+			assert.Equal(t, k, key)
+			assert.Equal(t, s, subkey)
+		})
+	}
+}
 
-	root, key = Format(`\REGISTRY\MACHINE`)
-	assert.Equal(t, windows.HKEY_LOCAL_MACHINE, root)
-	assert.Empty(t, key)
+func TestReadValue(t *testing.T) {
+	var tests = []struct {
+		key      Key
+		subkey   string
+		expected interface{}
+	}{
+		{
+			CurrentUser,
+			"Volatile Environment\\FibratusTestDword",
+			uint64(1),
+		},
+		{
+			CurrentUser,
+			"Volatile Environment\\FibratusTestQword",
+			uint64(1000),
+		},
+		{
+			CurrentUser,
+			"Volatile Environment\\FibratusTestSz",
+			"fibratus",
+		},
+		{
+			CurrentUser,
+			"Volatile Environment\\FibratusTestMultiSz",
+			[]string{"fibratus", "edr"},
+		},
+		{
+			CurrentUser,
+			"Volatile Environment\\FibratusTestExpandSz",
+			"%SYSTEMROOT%\\fibratus",
+		},
+	}
 
-	root, key = Format(`\REGISTRY\USER\S-1-5-21-2271034452-2606270099-984871569-500\Console`)
-	assert.Equal(t, windows.HKEY_CURRENT_USER, root)
-	assert.Equal(t, `Console`, key)
+	key, err := registry.OpenKey(registry.CURRENT_USER, "Volatile Environment", registry.SET_VALUE)
+	require.NoError(t, err)
+	defer key.Close()
 
-	root, key = Format(`\REGISTRY\USER\S-1-5-21-2271034452-2606270099-984871569-500\_Classes`)
-	assert.Equal(t, windows.HKEY_CURRENT_USER, root)
-	assert.Equal(t, `Software\Classes`, key)
+	defer func() {
+		_ = key.DeleteValue("FibratusTestDword")
+		_ = key.DeleteValue("FibratusTestQword")
+		_ = key.DeleteValue("FibratusTestSz")
+		_ = key.DeleteValue("FibratusTestMultiSz")
+		_ = key.DeleteValue("FibratusTestExpandSz")
+	}()
 
-	root, key = Format(`\REGISTRY\USER\S-1-5-21-2271034452-2606270099-984871569-500\_Classes\.all`)
-	assert.Equal(t, windows.HKEY_CURRENT_USER, root)
-	assert.Equal(t, `Software\Classes\.all`, key)
+	require.NoError(t, key.SetDWordValue("FibratusTestDword", 1))
+	require.NoError(t, key.SetQWordValue("FibratusTestQword", 1000))
+	require.NoError(t, key.SetStringValue("FibratusTestSz", "fibratus"))
+	require.NoError(t, key.SetStringsValue("FibratusTestMultiSz", []string{"fibratus", "edr"}))
+	require.NoError(t, key.SetExpandStringValue("FibratusTestExpandSz", "%SYSTEMROOT%\\fibratus"))
+
+	for _, tt := range tests {
+		t.Run(tt.subkey, func(t *testing.T) {
+			_, val, err := tt.key.ReadValue(tt.subkey)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, val)
+		})
+	}
 }
