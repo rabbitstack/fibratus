@@ -85,7 +85,8 @@ func (key Key) String() string {
 // ReadValue reads the registry value from the specified key path.
 func (key Key) ReadValue(k string) (uint32, any, error) {
 	// sometimes the value can contain slashes, in which
-	// case we use it as a separator between subkey
+	// case we use it as a separator between subkey. For
+	// example, \Device\HarddiskVolume4\Windows\regedit.exe
 	n := strings.Index(k, "\\\\")
 	var subkey string
 	var value string

@@ -19,172 +19,229 @@
 package processors
 
 import (
-	"fmt"
-	"os"
-	"testing"
-
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/handle"
+	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"reflect"
+	"testing"
 )
 
-type devMapperMock struct {
-	mock.Mock
-}
-
-func (dm *devMapperMock) Convert(filename string) string {
-	args := dm.Called(filename)
-	return args.String(0)
-}
-
-func TestCreateFile(t *testing.T) {
-	devMapper := new(devMapperMock)
-	hsnapMock := new(handle.SnapshotterMock)
-
-	sysRoot := os.Getenv("SystemRoot")
-	devMapper.On("Convert", "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll").Return(fmt.Sprintf("%s\\system32\\user32.dll", sysRoot))
-
-	fsi := newFsInterceptor(devMapper, hsnapMock)
-
-	_, _, err := fsi.Intercept(&kevent.Kevent{
-		Type: ktypes.FileRundown,
-		Tid:  2484,
-		PID:  859,
-		Kparams: kevent.Kparams{
-			kparams.FileObject: {Name: kparams.FileObject, Type: kparams.HexInt64, Value: kparams.Hex("12456738026482168384")},
-			kparams.FileName:   {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
-			kparams.FileIrpPtr: {Name: kparams.FileIrpPtr, Type: kparams.HexInt64, Value: kparams.Hex("1234543123112321")},
+func TestFsProcessor(t *testing.T) {
+	var tests = []struct {
+		name           string
+		e              *kevent.Kevent
+		setupProcessor func(Processor)
+		hsnap          func() *handle.SnapshotterMock
+		assertions     func(*kevent.Kevent, *testing.T, *handle.SnapshotterMock, Processor)
+	}{
+		{
+			"process file rundown",
+			&kevent.Kevent{
+				Type:     ktypes.FileRundown,
+				Category: ktypes.File,
+				Kparams: kevent.Kparams{
+					kparams.FileObject: {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(124567380264)},
+					kparams.FileName:   {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
+				},
+			},
+			nil,
+			func() *handle.SnapshotterMock {
+				hsnap := new(handle.SnapshotterMock)
+				return hsnap
+			},
+			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
+				fsProcessor := p.(*fsProcessor)
+				assert.Contains(t, fsProcessor.files, uint64(124567380264))
+				file := fsProcessor.files[124567380264]
+				assert.Equal(t, "C:\\Windows\\system32\\user32.dll", file.Name)
+				assert.Equal(t, fs.Regular, file.Type)
+			},
 		},
-	})
-	require.NoError(t, err)
-
-	kevt1 := &kevent.Kevent{
-		Type: ktypes.CreateFile,
-		Tid:  2484,
-		PID:  859,
-		Kparams: kevent.Kparams{
-			kparams.FileObject:        {Name: kparams.FileObject, Type: kparams.HexInt64, Value: kparams.Hex("18446738026482168384")},
-			kparams.ThreadID:          {Name: kparams.ThreadID, Type: kparams.Uint32, Value: uint32(1484)},
-			kparams.FileCreateOptions: {Name: kparams.FileCreateOptions, Type: kparams.Uint32, Value: uint32(1223456)},
-			kparams.FileName:          {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\kernel32.dll"},
-			kparams.FileShareMask:     {Name: kparams.FileShareMask, Type: kparams.Uint32, Value: uint32(5)},
-			kparams.FileIrpPtr:        {Name: kparams.FileIrpPtr, Type: kparams.HexInt64, Value: kparams.Hex("1234543123112321")},
+		{
+			"wait enqueue for create file events",
+			&kevent.Kevent{
+				Type:     ktypes.CreateFile,
+				Category: ktypes.File,
+				Kparams: kevent.Kparams{
+					kparams.FileObject:        {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(18446738026482168384)},
+					kparams.ThreadID:          {Name: kparams.ThreadID, Type: kparams.Uint32, Value: uint32(1484)},
+					kparams.FileCreateOptions: {Name: kparams.FileCreateOptions, Type: kparams.Uint32, Value: uint32(1223456)},
+					kparams.FileName:          {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\kernel32.dll"},
+					kparams.FileShareMask:     {Name: kparams.FileShareMask, Type: kparams.Uint32, Value: uint32(5)},
+					kparams.FileIrpPtr:        {Name: kparams.FileIrpPtr, Type: kparams.Uint64, Value: uint64(1234543123112321)},
+				},
+			},
+			nil,
+			func() *handle.SnapshotterMock {
+				hsnap := new(handle.SnapshotterMock)
+				return hsnap
+			},
+			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
+				fsProcessor := p.(*fsProcessor)
+				assert.True(t, e.WaitEnqueue)
+				assert.Contains(t, fsProcessor.irps, uint64(1234543123112321))
+				assert.True(t, reflect.DeepEqual(e, fsProcessor.irps[1234543123112321]))
+			},
+		},
+		{
+			"get IRP completion for create file event",
+			&kevent.Kevent{
+				Type:     ktypes.FileOpEnd,
+				Category: ktypes.File,
+				Kparams: kevent.Kparams{
+					kparams.FileObject:    {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(18446738026482168384)},
+					kparams.FileExtraInfo: {Name: kparams.FileExtraInfo, Type: kparams.Uint64, Value: uint64(2)},
+					kparams.FileIrpPtr:    {Name: kparams.FileIrpPtr, Type: kparams.Uint64, Value: uint64(1334543123112321)},
+					kparams.NTStatus:      {Name: kparams.NTStatus, Type: kparams.Status, Value: uint32(0)},
+				},
+			},
+			func(p Processor) {
+				fsProcessor := p.(*fsProcessor)
+				fsProcessor.irps[1334543123112321] = &kevent.Kevent{
+					Type:     ktypes.CreateFile,
+					Category: ktypes.File,
+					Kparams: kevent.Kparams{
+						kparams.FileObject:        {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(12446738026482168384)},
+						kparams.FileCreateOptions: {Name: kparams.FileCreateOptions, Type: kparams.Uint32, Value: uint32(18874368)},
+						kparams.FileName:          {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\temp\\idxx.exe"},
+						kparams.FileShareMask:     {Name: kparams.FileShareMask, Type: kparams.Uint32, Value: uint32(5)},
+						kparams.FileIrpPtr:        {Name: kparams.FileIrpPtr, Type: kparams.Uint64, Value: uint64(1334543123112321)},
+					},
+				}
+			},
+			func() *handle.SnapshotterMock {
+				hsnap := new(handle.SnapshotterMock)
+				return hsnap
+			},
+			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
+				fsProcessor := p.(*fsProcessor)
+				assert.Equal(t, ktypes.CreateFile, e.Type)
+				assert.NotContains(t, fsProcessor.irps, uint64(1334543123112321))
+				assert.False(t, e.WaitEnqueue)
+				assert.Contains(t, fsProcessor.files, uint64(12446738026482168384))
+				assert.Equal(t, "C:\\Windows\\temp\\idxx.exe", fsProcessor.files[12446738026482168384].Name)
+				assert.Equal(t, "Success", e.GetParamAsString(kparams.NTStatus))
+				assert.Equal(t, "File", e.GetParamAsString(kparams.FileType))
+				assert.Equal(t, "CREATE", e.GetParamAsString(kparams.FileOperation))
+			},
+		},
+		{
+			"release file and remove file info",
+			&kevent.Kevent{
+				Type:     ktypes.ReleaseFile,
+				Category: ktypes.File,
+				Kparams: kevent.Kparams{
+					kparams.FileObject: {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(18446738026482168384)},
+					kparams.FileKey:    {Name: kparams.FileKey, Type: kparams.Uint64, Value: uint64(14446538026482168384)},
+				},
+			},
+			func(p Processor) {
+				fsProcessor := p.(*fsProcessor)
+				fsProcessor.files[18446738026482168384] = &FileInfo{Name: "C:\\Windows\\temp\\idxx.exe", Type: fs.Regular}
+			},
+			func() *handle.SnapshotterMock {
+				hsnap := new(handle.SnapshotterMock)
+				return hsnap
+			},
+			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
+				fsProcessor := p.(*fsProcessor)
+				assert.Empty(t, fsProcessor.files)
+			},
+		},
+		{
+			"process write file",
+			&kevent.Kevent{
+				Type:     ktypes.WriteFile,
+				Category: ktypes.File,
+				Kparams: kevent.Kparams{
+					kparams.FileObject: {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(18446738026482168384)},
+					kparams.FileKey:    {Name: kparams.FileKey, Type: kparams.Uint64, Value: uint64(14446538026482168384)},
+					kparams.FileIoSize: {Name: kparams.FileIoSize, Type: kparams.Uint32, Value: uint32(1024)},
+				},
+			},
+			func(p Processor) {
+				fsProcessor := p.(*fsProcessor)
+				fsProcessor.files[18446738026482168384] = &FileInfo{Name: "C:\\Windows\\temp\\idxx.exe", Type: fs.Regular}
+			},
+			func() *handle.SnapshotterMock {
+				hsnap := new(handle.SnapshotterMock)
+				return hsnap
+			},
+			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
+				assert.Equal(t, ktypes.WriteFile, e.Type)
+				assert.Contains(t, e.Kparams, kparams.FileName, kparams.FileType)
+				assert.Equal(t, "C:\\Windows\\temp\\idxx.exe", e.GetParamAsString(kparams.FileName))
+				assert.Equal(t, "File", e.GetParamAsString(kparams.FileType))
+			},
+		},
+		{
+			"process write file consult handle snapshotter",
+			&kevent.Kevent{
+				Type:     ktypes.WriteFile,
+				Category: ktypes.File,
+				Kparams: kevent.Kparams{
+					kparams.FileObject: {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(18446738026482168384)},
+					kparams.FileKey:    {Name: kparams.FileKey, Type: kparams.Uint64, Value: uint64(14446538026482168384)},
+					kparams.FileIoSize: {Name: kparams.FileIoSize, Type: kparams.Uint32, Value: uint32(1024)},
+				},
+			},
+			nil,
+			func() *handle.SnapshotterMock {
+				hsnap := new(handle.SnapshotterMock)
+				hsnap.On("FindByObject", uint64(18446738026482168384)).Return(htypes.Handle{Type: handle.File, Name: "C:\\Windows\\temp\\doc.docx"}, true)
+				return hsnap
+			},
+			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
+				assert.Equal(t, ktypes.WriteFile, e.Type)
+				hsnap.AssertNumberOfCalls(t, "FindByObject", 1)
+				assert.Contains(t, e.Kparams, kparams.FileName, kparams.FileType)
+				assert.Equal(t, "C:\\Windows\\temp\\doc.docx", e.GetParamAsString(kparams.FileName))
+				assert.Equal(t, "File", e.GetParamAsString(kparams.FileType))
+			},
+		},
+		{
+			"process enum directory",
+			&kevent.Kevent{
+				Type:     ktypes.EnumDirectory,
+				Category: ktypes.File,
+				Kparams: kevent.Kparams{
+					kparams.FileObject: {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(18446738026482168384)},
+					kparams.FileKey:    {Name: kparams.FileKey, Type: kparams.Uint64, Value: uint64(14446538026482168384)},
+					kparams.FileName:   {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "*"},
+				},
+			},
+			func(p Processor) {
+				fsProcessor := p.(*fsProcessor)
+				fsProcessor.files[14446538026482168384] = &FileInfo{Name: "C:\\Windows\\temp", Type: fs.Regular}
+			},
+			func() *handle.SnapshotterMock {
+				hsnap := new(handle.SnapshotterMock)
+				return hsnap
+			},
+			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
+				assert.Equal(t, ktypes.EnumDirectory, e.Type)
+				assert.Contains(t, e.Kparams, kparams.FileName, kparams.FileDirectory)
+				assert.Equal(t, "C:\\Windows\\temp", e.GetParamAsString(kparams.FileDirectory))
+			},
 		},
 	}
-	devMapper.On("Convert", "\\Device\\HarddiskVolume2\\Windows\\system32\\kernel32.dll").Return(fmt.Sprintf("%s\\system32\\kernel32.dll", sysRoot))
 
-	_, _, err = fsi.Intercept(kevt1)
-	require.EqualErrorf(t, err, "cancel bubbling up the kernel event to upstream components", "")
-
-	pendingKevents := fsi.(*fsInterceptor).pendingKevents
-	require.Len(t, pendingKevents, 1)
-
-	opEnd := &kevent.Kevent{
-		Type: ktypes.FileOpEnd,
-		Tid:  2484,
-		PID:  859,
-		Kparams: kevent.Kparams{
-			kparams.FileObject:    {Name: kparams.FileObject, Type: kparams.HexInt64, Value: kparams.Hex("18446738026482168384")},
-			kparams.ThreadID:      {Name: kparams.ThreadID, Type: kparams.Uint32, Value: uint32(1484)},
-			kparams.FileIrpPtr:    {Name: kparams.FileIrpPtr, Type: kparams.HexInt64, Value: kparams.Hex("1234543123112321")},
-			kparams.FileExtraInfo: {Name: kparams.FileExtraInfo, Type: kparams.Uint64, Value: uint64(2)},
-		},
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			hsnap := tt.hsnap()
+			p := newFsProcessor(hsnap)
+			if tt.setupProcessor != nil {
+				tt.setupProcessor(p)
+			}
+			var err error
+			tt.e, _, err = p.ProcessEvent(tt.e)
+			require.NoError(t, err)
+			tt.assertions(tt.e, t, hsnap, p)
+		})
 	}
-	kevt1, _, err = fsi.Intercept(opEnd)
-	require.NoError(t, err)
-
-	dispo, err := kevt1.Kparams.Get(kparams.FileOperation)
-	require.NoError(t, err)
-	assert.Equal(t, fs.Create, dispo.(fs.FileDisposition))
-	filename, err := kevt1.Kparams.GetString(kparams.FileName)
-	require.NoError(t, err)
-	assert.Equal(t, fmt.Sprintf("%s\\system32\\kernel32.dll", sysRoot), filename)
-	mask, err := kevt1.Kparams.Get(kparams.FileShareMask)
-	require.NoError(t, err)
-	assert.Equal(t, "r-d", mask.(fs.FileShareMode).String())
-
-	require.Empty(t, pendingKevents)
-}
-
-func TestRundownFile(t *testing.T) {
-	devMapper := new(devMapperMock)
-	hsnapMock := new(handle.SnapshotterMock)
-
-	sysRoot := os.Getenv("SystemRoot")
-	devMapper.On("Convert", "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll").Return(fmt.Sprintf("%s\\system32\\user32.dll", sysRoot))
-
-	fsi := newFsInterceptor(devMapper, hsnapMock)
-
-	_, _, err := fsi.Intercept(&kevent.Kevent{
-		Type: ktypes.FileRundown,
-		Tid:  2484,
-		PID:  859,
-		Kparams: kevent.Kparams{
-			kparams.FileObject: {Name: kparams.FileObject, Type: kparams.HexInt64, Value: kparams.Hex("124567380264")},
-			kparams.FileName:   {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
-		},
-	})
-	require.NoError(t, err)
-
-	files := fsi.(*fsInterceptor).files
-	require.Len(t, files, 1)
-
-	fileinfo := files[20089293767268]
-	require.NotNil(t, fileinfo)
-
-	assert.Equal(t, fmt.Sprintf("%s\\system32\\user32.dll", sysRoot), fileinfo.name)
-	assert.Equal(t, fs.Regular, fileinfo.typ)
-}
-
-func TestDeleteFile(t *testing.T) {
-	devMapper := new(devMapperMock)
-	hsnapMock := new(handle.SnapshotterMock)
-
-	sysRoot := os.Getenv("SystemRoot")
-	devMapper.On("Convert", "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll").Return(fmt.Sprintf("%s\\system32\\user32.dll", sysRoot))
-
-	fsi := newFsInterceptor(devMapper, hsnapMock)
-
-	_, _, err := fsi.Intercept(&kevent.Kevent{
-		Type: ktypes.FileRundown,
-		Tid:  2484,
-		PID:  859,
-		Kparams: kevent.Kparams{
-			kparams.FileObject: {Name: kparams.FileObject, Type: kparams.HexInt64, Value: kparams.Hex("12456738026482168384")},
-			kparams.FileName:   {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
-		},
-	})
-	require.NoError(t, err)
-
-	kevt := &kevent.Kevent{
-		Type: ktypes.DeleteFile,
-		Tid:  2484,
-		PID:  859,
-		Kparams: kevent.Kparams{
-			kparams.FileObject: {Name: kparams.FileObject, Type: kparams.HexInt64, Value: kparams.Hex("12456738026482168384")},
-			kparams.FileKey:    {Name: kparams.FileKey, Type: kparams.HexInt64, Value: kparams.Hex("12456738026482168384")},
-			kparams.ThreadID:   {Name: kparams.ThreadID, Type: kparams.Uint32, Value: uint32(1484)},
-		},
-	}
-
-	files := fsi.(*fsInterceptor).files
-	require.Len(t, files, 1)
-
-	_, _, err = fsi.Intercept(kevt)
-	require.NoError(t, err)
-
-	require.Empty(t, files)
-
-	filename, err := kevt.Kparams.GetString(kparams.FileName)
-	require.NoError(t, err)
-
-	assert.Equal(t, fmt.Sprintf("%s\\system32\\user32.dll", sysRoot), filename)
-	typ, err := kevt.Kparams.GetString(kparams.FileType)
-	require.NoError(t, err)
-	assert.Equal(t, "file", typ)
 }

@@ -56,10 +56,11 @@ var sysProcs = map[string]bool{
 // Cmdline offers a convenient interface for the process command line manipulation/normalization.
 type Cmdline struct {
 	cmdline string
+	orig    string // original command line
 }
 
 func New(cmdline string) *Cmdline {
-	return &Cmdline{cmdline: cmdline}
+	return &Cmdline{cmdline: cmdline, orig: cmdline}
 }
 
 // Split returns a slice of strings where each element is
@@ -72,12 +73,12 @@ func (c *Cmdline) CleanExe() *Cmdline {
 	args := Split(c.cmdline)
 	if len(args) > 0 {
 		exe := args[0]
-		// removes quotes from cmdline
+		// remove quotes from executable path
 		if exe[0] == '"' && exe[len(exe)-1] == '"' {
 			c.cmdline = strings.Join(append([]string{exe[1 : len(exe)-1]}, args[1:]...), " ")
 			return c
 		}
-		// removes \??\ prefix from cmdline
+		// remove \??\ prefix from executable path
 		if len(exe) > 4 && exe[1] == '?' && exe[2] == '?' {
 			c.cmdline = strings.Join(append([]string{exe[4:]}, args[1:]...), " ")
 			return c
@@ -94,6 +95,7 @@ func (c *Cmdline) ExpandSystemRoot() *Cmdline {
 	return c
 }
 
+// CompleteSysProc completes the executable path of the missing system process.
 func (c *Cmdline) CompleteSysProc(name string) *Cmdline {
 	if !driveRegexp.MatchString(c.cmdline) {
 		_, ok := sysProcs[name]
@@ -104,6 +106,7 @@ func (c *Cmdline) CompleteSysProc(name string) *Cmdline {
 	return c
 }
 
+// Exeline returns the normalized executable path from cmdline.
 func (c *Cmdline) Exeline() string {
 	i := strings.Index(strings.ToLower(c.cmdline), ".exe")
 	if i > 0 {
@@ -112,4 +115,5 @@ func (c *Cmdline) Exeline() string {
 	return c.cmdline
 }
 
-func (c *Cmdline) String() string { return c.cmdline }
+// String returns the original command line string.
+func (c *Cmdline) String() string { return c.orig }

@@ -63,32 +63,32 @@ func TestCmdline(t *testing.T) {
 		{
 			`\SystemRoot\System32\smss.exe`,
 			`C:\Windows\System32\smss.exe`,
-			`C:\Windows\System32\smss.exe`,
+			`\SystemRoot\System32\smss.exe`,
 		},
 		{
 			`%SystemRoot%\system32\csrss.exe ObjectDirectory=\Windows SharedSection=1024,20480,768 Windows=On SubSystemType=Windows ServerDll=basesrv,1 ServerDll=winsrv:UserServerDllInitialization,3 ServerDll=sxssrv,4 ProfileControl=Off MaxRequestThreads=16`,
 			`C:\Windows\system32\csrss.exe`,
-			`C:\Windows\system32\csrss.exe ObjectDirectory=\Windows SharedSection=1024,20480,768 Windows=On SubSystemType=Windows ServerDll=basesrv,1 ServerDll=winsrv:UserServerDllInitialization,3 ServerDll=sxssrv,4 ProfileControl=Off MaxRequestThreads=16`,
+			`%SystemRoot%\system32\csrss.exe ObjectDirectory=\Windows SharedSection=1024,20480,768 Windows=On SubSystemType=Windows ServerDll=basesrv,1 ServerDll=winsrv:UserServerDllInitialization,3 ServerDll=sxssrv,4 ProfileControl=Off MaxRequestThreads=16`,
 		},
 		{
 			`winlogon.exe`,
 			`C:\Windows\System32\winlogon.exe`,
-			`C:\Windows\System32\winlogon.exe`,
+			`winlogon.exe`,
 		},
 		{
 			`\??\C:\WINDOWS\system32\lsaiso.exe`,
 			`C:\WINDOWS\system32\lsaiso.exe`,
-			`C:\WINDOWS\system32\lsaiso.exe`,
+			`\??\C:\WINDOWS\system32\lsaiso.exe`,
 		},
 		{
 			`"fontdrvhost.exe"`,
 			`C:\Windows\System32\fontdrvhost.exe`,
-			`C:\Windows\System32\fontdrvhost.exe`,
+			`"fontdrvhost.exe"`,
 		},
 		{
 			`"C:\Program Files\WindowsApps\Microsoft.WindowsTerminal_1.16.10261.0_x64__8wekyb3d8bbwe\WindowsTerminal.exe" Microsoft.WindowsTerminal_1.16.10261.0_x64__8wekyb3d8bbweApp`,
 			`C:\Program Files\WindowsApps\Microsoft.WindowsTerminal_1.16.10261.0_x64__8wekyb3d8bbwe\WindowsTerminal.exe`,
-			`C:\Program Files\WindowsApps\Microsoft.WindowsTerminal_1.16.10261.0_x64__8wekyb3d8bbwe\WindowsTerminal.exe Microsoft.WindowsTerminal_1.16.10261.0_x64__8wekyb3d8bbweApp`,
+			`"C:\Program Files\WindowsApps\Microsoft.WindowsTerminal_1.16.10261.0_x64__8wekyb3d8bbwe\WindowsTerminal.exe" Microsoft.WindowsTerminal_1.16.10261.0_x64__8wekyb3d8bbweApp`,
 		},
 		{
 			`C:\WINDOWS\system32\svchost.exe -k RPCSS -p`,
@@ -98,7 +98,7 @@ func TestCmdline(t *testing.T) {
 		{
 			`"C:\Program Files\Conexant\SAII\CxUtilSvc.exe"`,
 			`C:\Program Files\Conexant\SAII\CxUtilSvc.exe`,
-			`C:\Program Files\Conexant\SAII\CxUtilSvc.exe`,
+			`"C:\Program Files\Conexant\SAII\CxUtilSvc.exe"`,
 		},
 	}
 

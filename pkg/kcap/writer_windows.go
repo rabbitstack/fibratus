@@ -110,7 +110,7 @@ func NewWriter(filename string, psnap ps.Snapshotter, hsnap handle.Snapshotter) 
 		return nil, err
 	}
 	zw := zstd.NewWriter(f)
-	// start by writing the kcap header that is comprised
+	// start by writing the kcap header that is composed
 	// of magic number, major/minor digits and the optional
 	// flags bit vector. The flags bit vector is reserved
 	// for the future uses.
@@ -160,8 +160,20 @@ func (w *writer) writeSnapshots() error {
 	if err != nil {
 		return err
 	}
+
+	writeHandle := func(buf []byte) error {
+		l := bytes.WriteUint16(uint16(len(buf)))
+		if _, err := w.zw.Write(l); err != nil {
+			return err
+		}
+		if _, err := w.zw.Write(buf); err != nil {
+			return err
+		}
+		return nil
+	}
+
 	for _, khandle := range handles {
-		if err := w.writeHandle(khandle.Marshal()); err != nil {
+		if err := writeHandle(khandle.Marshal()); err != nil {
 			handleWriteErrors.Add(1)
 			continue
 		}
@@ -254,15 +266,4 @@ func (w *writer) flush() {
 			flusherErrors.Add(err.Error(), 1)
 		}
 	}
-}
-
-func (w *writer) writeHandle(buf []byte) error {
-	l := bytes.WriteUint16(uint16(len(buf)))
-	if _, err := w.zw.Write(l); err != nil {
-		return err
-	}
-	if _, err := w.zw.Write(buf); err != nil {
-		return err
-	}
-	return nil
 }

@@ -17,3 +17,71 @@
  */
 
 package processors
+
+import (
+	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/ps"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"testing"
+)
+
+func TestImageProcessor(t *testing.T) {
+	var tests = []struct {
+		name       string
+		e          *kevent.Kevent
+		psnap      func() *ps.SnapshotterMock
+		assertions func(*kevent.Kevent, *testing.T, *ps.SnapshotterMock)
+	}{
+		{
+			"load new image",
+			&kevent.Kevent{
+				Type: ktypes.LoadImage,
+				Kparams: kevent.Kparams{
+					kparams.ImageFilename: {Name: kparams.ImageFilename, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\kernel32.dll"},
+					kparams.ProcessID:     {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1023)},
+				},
+			},
+			func() *ps.SnapshotterMock {
+				psnap := new(ps.SnapshotterMock)
+				psnap.On("AddModule", mock.Anything).Return(nil)
+				return psnap
+			},
+			func(e *kevent.Kevent, t *testing.T, psnap *ps.SnapshotterMock) {
+				psnap.AssertNumberOfCalls(t, "AddModule", 1)
+			},
+		},
+		{
+			"unload image",
+			&kevent.Kevent{
+				Type: ktypes.UnloadImage,
+				Kparams: kevent.Kparams{
+					kparams.ImageFilename: {Name: kparams.ImageFilename, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\kernel32.dll"},
+					kparams.ProcessName:   {Name: kparams.ProcessName, Type: kparams.AnsiString, Value: "csrss.exe"},
+					kparams.ProcessID:     {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(676)},
+				},
+			},
+			func() *ps.SnapshotterMock {
+				psnap := new(ps.SnapshotterMock)
+				psnap.On("RemoveModule", uint32(676), "C:\\Windows\\system32\\kernel32.dll").Return(nil)
+				return psnap
+			},
+			func(e *kevent.Kevent, t *testing.T, psnap *ps.SnapshotterMock) {
+				psnap.AssertNumberOfCalls(t, "RemoveModule", 1)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			psnap := tt.psnap()
+			p := newImageProcessor(psnap)
+			var err error
+			tt.e, _, err = p.ProcessEvent(tt.e)
+			require.NoError(t, err)
+			tt.assertions(tt.e, t, psnap)
+		})
+	}
+}

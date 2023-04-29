@@ -23,19 +23,22 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/ps"
+	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
+	"time"
 )
 
 func TestPsProcessor(t *testing.T) {
-	psnap := new(ps.SnapshotterMock)
 	require.NoError(t, os.Setenv("SystemRoot", "C:\\Windows"))
 
 	var tests = []struct {
 		name       string
 		e          *kevent.Kevent
-		assertions func(e *kevent.Kevent, t *testing.T)
+		psnap      func() *ps.SnapshotterMock
+		assertions func(*kevent.Kevent, *testing.T, *ps.SnapshotterMock)
 	}{
 		{
 			"create exe parameter from cmdline",
@@ -46,9 +49,15 @@ func TestPsProcessor(t *testing.T) {
 					kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1023)},
 				},
 			},
-			func(e *kevent.Kevent, t *testing.T) {
+			func() *ps.SnapshotterMock {
+				psnap := new(ps.SnapshotterMock)
+				psnap.On("Write", mock.Anything).Return(nil)
+				return psnap
+			},
+			func(e *kevent.Kevent, t *testing.T, psnap *ps.SnapshotterMock) {
 				require.True(t, e.Kparams.Contains(kparams.Exe))
 				require.Equal(t, "C:\\Windows\\system32\\svchost.exe", e.GetParamAsString(kparams.Exe))
+				psnap.AssertNumberOfCalls(t, "Write", 1)
 			},
 		},
 		{
@@ -61,14 +70,20 @@ func TestPsProcessor(t *testing.T) {
 					kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(676)},
 				},
 			},
-			func(e *kevent.Kevent, t *testing.T) {
+			func() *ps.SnapshotterMock {
+				psnap := new(ps.SnapshotterMock)
+				psnap.On("Write", mock.Anything).Return(nil)
+				return psnap
+			},
+			func(e *kevent.Kevent, t *testing.T, psnap *ps.SnapshotterMock) {
 				require.True(t, e.Kparams.Contains(kparams.Exe))
-				require.Equal(t, "C:\\Windows\\System32\\csrss.exe", e.GetParamAsString(kparams.Cmdline))
+				require.Equal(t, "csrss.exe", e.GetParamAsString(kparams.Cmdline))
 				require.Equal(t, "C:\\Windows\\System32\\csrss.exe", e.GetParamAsString(kparams.Exe))
+				psnap.AssertNumberOfCalls(t, "Write", 1)
 			},
 		},
 		{
-			"clean quoted cmdline",
+			"clean quoted executable path",
 			&kevent.Kevent{
 				Type: ktypes.CreateProcess,
 				Kparams: kevent.Kparams{
@@ -76,78 +91,154 @@ func TestPsProcessor(t *testing.T) {
 					kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(760)},
 				},
 			},
-			func(e *kevent.Kevent, t *testing.T) {
+			func() *ps.SnapshotterMock {
+				psnap := new(ps.SnapshotterMock)
+				psnap.On("Write", mock.Anything).Return(nil)
+				return psnap
+			},
+			func(e *kevent.Kevent, t *testing.T, psnap *ps.SnapshotterMock) {
 				require.True(t, e.Kparams.Contains(kparams.Exe))
-				require.Equal(t, "C:\\Windows\\System32\\smss.exe", e.GetParamAsString(kparams.Cmdline))
+				require.Equal(t, "\"C:\\Windows\\System32\\smss.exe\"", e.GetParamAsString(kparams.Cmdline))
 				require.Equal(t, "C:\\Windows\\System32\\smss.exe", e.GetParamAsString(kparams.Exe))
+				psnap.AssertNumberOfCalls(t, "Write", 1)
+			},
+		},
+		{
+			"expand SystemRoot in executable path",
+			&kevent.Kevent{
+				Type: ktypes.CreateProcess,
+				Kparams: kevent.Kparams{
+					kparams.Cmdline:   {Name: kparams.Cmdline, Type: kparams.UnicodeString, Value: `\SystemRoot\System32\smss.exe`},
+					kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(760)},
+				},
+			},
+			func() *ps.SnapshotterMock {
+				psnap := new(ps.SnapshotterMock)
+				psnap.On("Write", mock.Anything).Return(nil)
+				return psnap
+			},
+			func(e *kevent.Kevent, t *testing.T, psnap *ps.SnapshotterMock) {
+				require.True(t, e.Kparams.Contains(kparams.Exe))
+				require.Equal(t, `\SystemRoot\System32\smss.exe`, e.GetParamAsString(kparams.Cmdline))
+				require.Equal(t, "C:\\Windows\\System32\\smss.exe", e.GetParamAsString(kparams.Exe))
+				psnap.AssertNumberOfCalls(t, "Write", 1)
+			},
+		},
+		{
+			"add process start time parameter",
+			&kevent.Kevent{
+				Type:      ktypes.CreateProcess,
+				Timestamp: time.Now(),
+				Kparams: kevent.Kparams{
+					kparams.Cmdline:   {Name: kparams.Cmdline, Type: kparams.UnicodeString, Value: `C:\Program Files\Fibratus\fibratus.exe`},
+					kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(os.Getpid())},
+				},
+			},
+			func() *ps.SnapshotterMock {
+				psnap := new(ps.SnapshotterMock)
+				psnap.On("Write", mock.Anything).Return(nil)
+				return psnap
+			},
+			func(e *kevent.Kevent, t *testing.T, psnap *ps.SnapshotterMock) {
+				require.True(t, e.Kparams.Contains(kparams.StartTime))
+				require.NotEqual(t, e.Timestamp, e.Kparams.MustGetTime(kparams.StartTime))
+			},
+		},
+		{
+			"terminate process",
+			&kevent.Kevent{
+				Type: ktypes.TerminateProcess,
+				Kparams: kevent.Kparams{
+					kparams.Cmdline:   {Name: kparams.Cmdline, Type: kparams.UnicodeString, Value: `\SystemRoot\System32\smss.exe`},
+					kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(760)},
+				},
+			},
+			func() *ps.SnapshotterMock {
+				psnap := new(ps.SnapshotterMock)
+				psnap.On("Remove", mock.Anything).Return(nil)
+				return psnap
+			},
+			func(e *kevent.Kevent, t *testing.T, psnap *ps.SnapshotterMock) {
+				require.True(t, e.Kparams.Contains(kparams.Exe))
+				require.Equal(t, `\SystemRoot\System32\smss.exe`, e.GetParamAsString(kparams.Cmdline))
+				require.Equal(t, "C:\\Windows\\System32\\smss.exe", e.GetParamAsString(kparams.Exe))
+				psnap.AssertNumberOfCalls(t, "Remove", 1)
+				psnap.AssertNotCalled(t, "Write")
+			},
+		},
+		{
+			"create thread",
+			&kevent.Kevent{
+				Type: ktypes.CreateThread,
+				Kparams: kevent.Kparams{
+					kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(760)},
+					kparams.ThreadID:  {Name: kparams.ThreadID, Type: kparams.TID, Value: uint32(10234)},
+				},
+			},
+			func() *ps.SnapshotterMock {
+				psnap := new(ps.SnapshotterMock)
+				psnap.On("FindAndPut", uint32(760)).Return(&pstypes.PS{Exe: "C:\\Windows\\System32\\smss.exe"})
+				psnap.On("AddThread", mock.Anything).Return(nil)
+				return psnap
+			},
+			func(e *kevent.Kevent, t *testing.T, psnap *ps.SnapshotterMock) {
+				require.True(t, e.Kparams.Contains(kparams.Exe))
+				require.Equal(t, "C:\\Windows\\System32\\smss.exe", e.GetParamAsString(kparams.Exe))
+				psnap.AssertNumberOfCalls(t, "AddThread", 1)
+			},
+		},
+		{
+			"terminate thread",
+			&kevent.Kevent{
+				Type: ktypes.TerminateThread,
+				Kparams: kevent.Kparams{
+					kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(760)},
+					kparams.ThreadID:  {Name: kparams.ThreadID, Type: kparams.TID, Value: uint32(10234)},
+				},
+			},
+			func() *ps.SnapshotterMock {
+				psnap := new(ps.SnapshotterMock)
+				psnap.On("FindAndPut", uint32(760)).Return(&pstypes.PS{Exe: "C:\\Windows\\System32\\smss.exe"})
+				psnap.On("RemoveThread", uint32(760), uint32(10234)).Return(nil)
+				return psnap
+			},
+			func(e *kevent.Kevent, t *testing.T, psnap *ps.SnapshotterMock) {
+				require.True(t, e.Kparams.Contains(kparams.Exe))
+				require.Equal(t, "C:\\Windows\\System32\\smss.exe", e.GetParamAsString(kparams.Exe))
+				psnap.AssertNumberOfCalls(t, "RemoveThread", 1)
+				psnap.AssertNotCalled(t, "AddThread")
+			},
+		},
+		{
+			"open process",
+			&kevent.Kevent{
+				Type: ktypes.OpenProcess,
+				Kparams: kevent.Kparams{
+					kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(760)},
+				},
+			},
+			func() *ps.SnapshotterMock {
+				psnap := new(ps.SnapshotterMock)
+				psnap.On("FindAndPut", uint32(760)).Return(&pstypes.PS{Name: "smss.exe", Exe: "C:\\Windows\\System32\\smss.exe"})
+				return psnap
+			},
+			func(e *kevent.Kevent, t *testing.T, psnap *ps.SnapshotterMock) {
+				require.True(t, e.Kparams.Contains(kparams.Exe))
+				require.True(t, e.Kparams.Contains(kparams.ProcessName))
+				require.Equal(t, "C:\\Windows\\System32\\smss.exe", e.GetParamAsString(kparams.Exe))
+				require.Equal(t, "smss.exe", e.GetParamAsString(kparams.ProcessName))
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			psnap := tt.psnap()
 			p := newPsProcessor(psnap)
 			var err error
 			tt.e, _, err = p.ProcessEvent(tt.e)
 			require.NoError(t, err)
-			tt.assertions(tt.e, t)
+			tt.assertions(tt.e, t, psnap)
 		})
 	}
-
-	//
-	//kpars1 := kevent.Kparams{
-	//	kparams.Comm:            {Name: kparams.Comm, Type: kparams.UnicodeString, Value: "C:\\Windows\\System32\\smss.exe"},
-	//	kparams.ProcessID:       {Name: kparams.ProcessID, Type: kparams.HexInt32, Value: kparams.Hex("36c")},
-	//	kparams.ProcessParentID: {Name: kparams.ProcessParentID, Type: kparams.HexInt32, Value: kparams.Hex("26c")},
-	//}
-	//
-	//kevt1 := &kevent.Kevent{
-	//	Type:    ktypes.EnumProcess,
-	//	Kparams: kpars1,
-	//}
-	//err = os.Setenv("SystemRoot", "C:\\Windows")
-	//if err != nil {
-	//	t.Fatal(err)
-	//}
-	//_, _, err = psi.Intercept(kevt1)
-	//require.NoError(t, err)
-	//exe, _ = kpars1.GetString(kparams.Exe)
-	//assert.Equal(t, "C:\\Windows\\System32\\smss.exe", exe)
-	//
-	//tpid := fmt.Sprintf("%x", os.Getpid())
-	//
-	//kpars2 := kevent.Kparams{
-	//	kparams.Comm:            {Name: kparams.Comm, Type: kparams.UnicodeString, Value: "\"C:\\Windows\\System32\\smss.exe\""},
-	//	kparams.ProcessID:       {Name: kparams.ProcessID, Type: kparams.HexInt32, Value: kparams.Hex(tpid)},
-	//	kparams.ProcessParentID: {Name: kparams.ProcessParentID, Type: kparams.HexInt32, Value: kparams.Hex("26c")},
-	//}
-	//
-	//kevt2 := &kevent.Kevent{
-	//	Type:    ktypes.CreateProcess,
-	//	Kparams: kpars2,
-	//}
-	//_, _, err = psi.Intercept(kevt2)
-	//require.NoError(t, err)
-	//
-	//require.True(t, kevt2.Kparams.Contains(kparams.StartTime))
-	//
-	//cmdline, _ := kevt2.Kparams.GetString(kparams.Comm)
-	//require.Equal(t, "C:\\Windows\\System32\\smss.exe", cmdline)
-	//
-	//kpars3 := kevent.Kparams{
-	//	kparams.ProcessID:       {Name: kparams.ProcessID, Type: kparams.HexInt32, Value: kparams.Hex(tpid)},
-	//	kparams.ProcessParentID: {Name: kparams.ProcessParentID, Type: kparams.HexInt32, Value: kparams.Hex("26c")},
-	//	kparams.Comm:            {Name: kparams.Comm, Type: kparams.UnicodeString, Value: "csrss.exe"},
-	//	kparams.ProcessName:     {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "csrss.exe"},
-	//}
-	//
-	//kevt3 := &kevent.Kevent{
-	//	Type:    ktypes.CreateProcess,
-	//	Kparams: kpars3,
-	//}
-	//
-	//_, _, err = psi.Intercept(kevt3)
-	//require.NoError(t, err)
-	//cmdline1, _ := kevt3.Kparams.GetString(kparams.Comm)
-	//require.Equal(t, "C:\\Windows\\System32\\csrss.exe", cmdline1)
 }

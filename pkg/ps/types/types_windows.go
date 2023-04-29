@@ -263,16 +263,6 @@ func (ps *PS) RemoveThread(tid uint32) {
 	delete(ps.Threads, tid)
 }
 
-// RLock acquires a read mutex on the process state.
-func (ps *PS) RLock() {
-	ps.RLock()
-}
-
-// RUnlock releases a read mutex on the process sate.
-func (ps *PS) RUnlock() {
-	ps.RUnlock()
-}
-
 // AddHandle adds a new handle to this process state.
 func (ps *PS) AddHandle(handle htypes.Handle) {
 	ps.Handles = append(ps.Handles, handle)

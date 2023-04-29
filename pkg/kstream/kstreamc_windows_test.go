@@ -21,6 +21,7 @@ import (
 	"context"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/handle"
+	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
@@ -136,10 +137,19 @@ func TestConsumerEvents(t *testing.T) {
 	}
 
 	psnap := new(ps.SnapshotterMock)
+	psnap.On("Write", mock.Anything).Return(nil)
+	psnap.On("AddThread", mock.Anything).Return(nil)
+	psnap.On("AddModule", mock.Anything).Return(nil)
+	psnap.On("RemoveThread", mock.Anything, mock.Anything).Return(nil)
+	psnap.On("RemoveModule", mock.Anything, mock.Anything).Return(nil)
 	psnap.On("FindAndPut", mock.Anything).Return(&pstypes.PS{})
 	psnap.On("Find", mock.Anything).Return(true, &pstypes.PS{})
+	psnap.On("Remove", mock.Anything).Return(nil)
 
 	hsnap := new(handle.SnapshotterMock)
+	hsnap.On("FindByObject", mock.Anything).Return(htypes.Handle{}, false)
+	hsnap.On("FindHandles", mock.Anything).Return([]htypes.Handle{}, nil)
+
 	kstreamConfig := config.KstreamConfig{
 		EnableThreadKevents:   true,
 		EnableImageKevents:    true,
@@ -150,8 +160,10 @@ func TestConsumerEvents(t *testing.T) {
 
 	kctrl := NewKtraceController(kstreamConfig)
 	require.NoError(t, kctrl.StartKtrace())
+	defer kctrl.CloseKtrace()
 	kstreamc := NewConsumer(psnap, hsnap, &config.Config{Kstream: kstreamConfig, Filters: &config.Filters{}})
 	require.NoError(t, kstreamc.OpenKstream(kctrl.Traces()))
+	defer kstreamc.CloseKstream()
 
 	time.Sleep(time.Second * 2)
 

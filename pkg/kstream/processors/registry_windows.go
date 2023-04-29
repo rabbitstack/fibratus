@@ -97,7 +97,7 @@ func (r *registryProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, erro
 		// last resort is to scan process' handles and check if any of the
 		// key handles contain the partial key name. In this case we assume
 		// the correct key is encountered.
-		keyName, _ := e.Kparams.GetString(kparams.RegKeyName)
+		keyName := e.Kparams.MustGetString(kparams.RegKeyName)
 		if khandle != 0 {
 			if baseKey, ok := r.keys[khandle]; ok {
 				keyName = baseKey + "\\" + keyName
@@ -124,13 +124,13 @@ func (r *registryProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, erro
 			e.AppendEnum(kparams.RegValueType, typ, key.RegistryValueTypes)
 			switch typ {
 			case registry.SZ, registry.EXPAND_SZ:
-				e.AppendParam(kparams.RegValue, kparams.UnicodeString, val.(string))
+				e.AppendParam(kparams.RegValue, kparams.UnicodeString, val)
 			case registry.MULTI_SZ:
-				e.AppendParam(kparams.RegValue, kparams.Slice, val.([]string))
+				e.AppendParam(kparams.RegValue, kparams.Slice, val)
 			case registry.BINARY:
-				e.AppendParam(kparams.RegValue, kparams.Binary, val.([]byte))
+				e.AppendParam(kparams.RegValue, kparams.Binary, val)
 			case registry.QWORD:
-				e.AppendParam(kparams.RegValue, kparams.Uint64, val.(uint64))
+				e.AppendParam(kparams.RegValue, kparams.Uint64, val)
 			case registry.DWORD:
 				e.AppendParam(kparams.RegValue, kparams.Uint32, uint32(val.(uint64)))
 			}
@@ -145,10 +145,10 @@ func (registryProcessor) Close()              {}
 func (r *registryProcessor) findMatchingKey(pid uint32, relativeKeyName string) string {
 	// we want to prevent too frequent queries on the process' handles
 	// since that can cause significant performance overhead. When throttle
-	// count is greater than the max permitted value we'll just return the partial key
-	// and hold on querying the handles of target process
+	// count is greater than the max permitted value we'll just return the
+	// partial key and hold on querying the handles of target process
 	atomic.AddUint32(&handleThrottleCount, 1)
-	if handleThrottleCount > maxHandleQueries {
+	if atomic.LoadUint32(&handleThrottleCount) > maxHandleQueries {
 		return relativeKeyName
 	}
 	handles, err := r.hsnap.FindHandles(pid)

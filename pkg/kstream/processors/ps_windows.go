@@ -33,9 +33,9 @@ type psProcessor struct {
 	psnap ps.Snapshotter
 }
 
-// newPsProcessor creates a new event processor for process events.
+// newPsProcessor creates a new event processor for process/thread events.
 func newPsProcessor(psnap ps.Snapshotter) Processor {
-	return psProcessor{psnap: psnap}
+	return &psProcessor{psnap: psnap}
 }
 
 func (p psProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error) {
@@ -90,9 +90,6 @@ func (p psProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 
 	// append executable path parameter
 	e.AppendParam(kparams.Exe, kparams.FilePath, cmndline.Exeline())
-
-	// set normalized command line
-	_ = e.Kparams.SetValue(kparams.Cmdline, cmndline.String())
 
 	if e.IsTerminateProcess() {
 		return e, nil

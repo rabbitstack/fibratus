@@ -41,7 +41,7 @@ type fsProcessor struct {
 	// files stores the file metadata indexed by file object
 	files map[uint64]*FileInfo
 	hsnap handle.Snapshotter
-	// irps contains a mapping between the IRP and the CreateFile events
+	// irps contains a mapping between the IRP (I/O request packet) and CreateFile events
 	irps map[uint64]*kevent.Kevent
 }
 
@@ -116,7 +116,7 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 		if !ok {
 			opts := ev.Kparams.MustGetUint32(kparams.FileCreateOptions)
 			opts &= 0xFFFFFF
-			filename := e.GetParamAsString(kparams.FileName)
+			filename := ev.GetParamAsString(kparams.FileName)
 			fileinfo = f.getFileInfo(filename, opts)
 			f.files[fileObject] = fileinfo
 		}
@@ -148,13 +148,7 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 			delete(f.files, fileObject)
 		}
 		if e.IsEnumDirectory() {
-			// the file key parameter contains the reference to the directory name
-			fileKey, err := e.Kparams.GetUint64(kparams.FileKey)
-			if err != nil {
-				return e, err
-			}
-			fileinfo, ok := f.files[fileKey]
-			if ok && fileinfo != nil {
+			if fileinfo != nil {
 				e.AppendParam(kparams.FileDirectory, kparams.FilePath, fileinfo.Name)
 			}
 			break
@@ -181,7 +175,10 @@ func (f *fsProcessor) findFile(fileKey, fileObject uint64) *FileInfo {
 	// look in the system handles for file objects
 	var file htypes.Handle
 	file, ok = f.hsnap.FindByObject(fileObject)
-	if ok && file.Type == handle.File {
+	if !ok {
+		return nil
+	}
+	if file.Type == handle.File {
 		fileObjectHandleHits.Add(1)
 		return &FileInfo{Name: file.Name, Type: fs.GetFileType(file.Name, 0)}
 	}

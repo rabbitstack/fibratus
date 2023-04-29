@@ -120,6 +120,11 @@ func TestReadValue(t *testing.T) {
 		},
 		{
 			CurrentUser,
+			"Volatile Environment\\\\FibratusTestSzSlash",
+			"slash",
+		},
+		{
+			CurrentUser,
 			"Volatile Environment\\FibratusTestMultiSz",
 			[]string{"fibratus", "edr"},
 		},
@@ -138,6 +143,7 @@ func TestReadValue(t *testing.T) {
 		_ = key.DeleteValue("FibratusTestDword")
 		_ = key.DeleteValue("FibratusTestQword")
 		_ = key.DeleteValue("FibratusTestSz")
+		_ = key.DeleteValue("FibratusTestSzSlash")
 		_ = key.DeleteValue("FibratusTestMultiSz")
 		_ = key.DeleteValue("FibratusTestExpandSz")
 	}()
@@ -145,6 +151,7 @@ func TestReadValue(t *testing.T) {
 	require.NoError(t, key.SetDWordValue("FibratusTestDword", 1))
 	require.NoError(t, key.SetQWordValue("FibratusTestQword", 1000))
 	require.NoError(t, key.SetStringValue("FibratusTestSz", "fibratus"))
+	require.NoError(t, key.SetStringValue("\\FibratusTestSzSlash", "slash"))
 	require.NoError(t, key.SetStringsValue("FibratusTestMultiSz", []string{"fibratus", "edr"}))
 	require.NoError(t, key.SetExpandStringValue("FibratusTestExpandSz", "%SYSTEMROOT%\\fibratus"))
 

@@ -39,11 +39,15 @@ func (s *SnapshotterMock) Write(kevt *kevent.Kevent) error { return nil }
 func (s *SnapshotterMock) Remove(kevt *kevent.Kevent) error { return nil }
 
 // FindHandles method
-func (s *SnapshotterMock) FindHandles(pid uint32) ([]htypes.Handle, error) { return nil, nil }
+func (s *SnapshotterMock) FindHandles(pid uint32) ([]htypes.Handle, error) {
+	args := s.Called(pid)
+	return args.Get(0).([]htypes.Handle), args.Error(1)
+}
 
 // FindByObject method
 func (s *SnapshotterMock) FindByObject(object uint64) (htypes.Handle, bool) {
-	return htypes.Handle{}, false
+	args := s.Called(object)
+	return args.Get(0).(htypes.Handle), args.Bool(1)
 }
 
 // RegisterCreateCallback method
