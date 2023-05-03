@@ -65,6 +65,11 @@ func TestFormatKey(t *testing.T) {
 			`Software\Classes`,
 		},
 		{
+			`\REGISTRY\USER\S-1-5-21-2271034452-2606270099-984871569-500_Classes\Local Settings\Software\Microsoft\Windows\Shell\MuiCache`,
+			windows.HKEY_CURRENT_USER,
+			`Software\Classes\Local Settings\Software\Microsoft\Windows\Shell\MuiCache`,
+		},
+		{
 			`\REGISTRY\USER\S-1-5-21-2271034452-2606270099-984871569-500\_Classes\.all`,
 			windows.HKEY_CURRENT_USER,
 			`Software\Classes\.all`,
@@ -133,6 +138,16 @@ func TestReadValue(t *testing.T) {
 			"Volatile Environment\\FibratusTestExpandSz",
 			"%SYSTEMROOT%\\fibratus",
 		},
+		{
+			CurrentUser,
+			"Volatile Environment\\UDP Query User{108C2D9B-A047-4E78-B337-BAFC7D9273AB}C:\\users\\admin\\appdata\\local\\temp\\go-build49437379\\b001\\kstream.test.exe",
+			`path`,
+		},
+		{
+			CurrentUser,
+			"Volatile Environment\\C:\\Program Files\\Java\\jre1.8.0_311\\bin\\javaws.exe.FriendlyAppName",
+			"javaws.exe",
+		},
 	}
 
 	key, err := registry.OpenKey(registry.CURRENT_USER, "Volatile Environment", registry.SET_VALUE)
@@ -143,9 +158,11 @@ func TestReadValue(t *testing.T) {
 		_ = key.DeleteValue("FibratusTestDword")
 		_ = key.DeleteValue("FibratusTestQword")
 		_ = key.DeleteValue("FibratusTestSz")
-		_ = key.DeleteValue("FibratusTestSzSlash")
+		_ = key.DeleteValue("\\FibratusTestSzSlash")
 		_ = key.DeleteValue("FibratusTestMultiSz")
 		_ = key.DeleteValue("FibratusTestExpandSz")
+		_ = key.DeleteValue("UDP Query User{108C2D9B-A047-4E78-B337-BAFC7D9273AB}C:\\users\\admin\\appdata\\local\\temp\\go-build49437379\\b001\\kstream.test.exe")
+		_ = key.DeleteValue("C:\\Program Files\\Java\\jre1.8.0_311\\bin\\javaws.exe.FriendlyAppName")
 	}()
 
 	require.NoError(t, key.SetDWordValue("FibratusTestDword", 1))
@@ -154,6 +171,8 @@ func TestReadValue(t *testing.T) {
 	require.NoError(t, key.SetStringValue("\\FibratusTestSzSlash", "slash"))
 	require.NoError(t, key.SetStringsValue("FibratusTestMultiSz", []string{"fibratus", "edr"}))
 	require.NoError(t, key.SetExpandStringValue("FibratusTestExpandSz", "%SYSTEMROOT%\\fibratus"))
+	require.NoError(t, key.SetStringValue("UDP Query User{108C2D9B-A047-4E78-B337-BAFC7D9273AB}C:\\users\\admin\\appdata\\local\\temp\\go-build49437379\\b001\\kstream.test.exe", "path"))
+	require.NoError(t, key.SetStringValue("C:\\Program Files\\Java\\jre1.8.0_311\\bin\\javaws.exe.FriendlyAppName", "javaws.exe"))
 
 	for _, tt := range tests {
 		t.Run(tt.subkey, func(t *testing.T) {

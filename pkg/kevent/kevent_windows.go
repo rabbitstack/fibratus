@@ -28,6 +28,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/filetime"
 	"github.com/rabbitstack/fibratus/pkg/util/hashers"
 	"github.com/rabbitstack/fibratus/pkg/util/hostname"
+	"github.com/rabbitstack/fibratus/pkg/util/ntstatus"
 	"golang.org/x/sys/windows"
 	"os"
 	"strings"
@@ -137,6 +138,16 @@ func (e Kevent) IsNetworkUDP() bool {
 func (e Kevent) IsRundown() bool {
 	return e.Type == ktypes.ProcessRundown || e.Type == ktypes.ThreadRundown || e.Type == ktypes.ImageRundown ||
 		e.Type == ktypes.FileRundown || e.Type == ktypes.RegKCBRundown
+}
+
+// IsSuccess checks if the event contains the status parameter
+// and in such case, returns true if the operation completed
+// successfully, i.e. the system code is equal to ERROR_SUCCESS.
+func (e Kevent) IsSuccess() bool {
+	if !e.Kparams.Contains(kparams.NTStatus) {
+		return true
+	}
+	return e.GetParamAsString(kparams.NTStatus) == ntstatus.Success
 }
 
 // IsRundownProcessed checks if the rundown events was processed

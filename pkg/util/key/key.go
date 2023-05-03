@@ -25,6 +25,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"golang.org/x/sys/windows/registry"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -33,6 +34,9 @@ var (
 	hkcrPrefixes = []string{"\\REGISTRY\\MACHINE\\SOFTWARE\\CLASSES", "\\Registry\\Machine\\Software\\Classes"}
 	hkuPrefixes  = []string{"\\REGISTRY\\USER", "\\Registry\\User"}
 )
+
+// rx detects a file path starting with a drive letter
+var rx = regexp.MustCompile(`[A-Za-z]:\\`)
 
 var loggedSID = getLoggedSID()
 
@@ -82,6 +86,29 @@ func (key Key) String() string {
 	}
 }
 
+func shiftPath(k, s, v string) (string, string) {
+	r := rx.FindString(s)
+	if r == "" {
+		return s, v
+	}
+	n := strings.LastIndex(s, r)
+	for n > 0 {
+		n--
+		// find first slash backwards
+		if s[n] == '\\' {
+			return k[:n], k[n+1:]
+		}
+	}
+	return s, v
+}
+
+// cleanSID returns the SID without trailing identifiers.
+// In some circumstances, the SID can contain the `_Classes`
+// suffix.
+func cleanSID(sid string) string {
+	return strings.TrimSuffix(sid, "_Classes")
+}
+
 // ReadValue reads the registry value from the specified key path.
 func (key Key) ReadValue(k string) (uint32, any, error) {
 	// sometimes the value can contain slashes, in which
@@ -94,6 +121,10 @@ func (key Key) ReadValue(k string) (uint32, any, error) {
 		subkey, value = k[0:n], k[n+1:]
 	} else {
 		subkey, value = filepath.Split(k)
+		// here we handle another corner case
+		// when the value can contain a file
+		// path starting with a drive letter
+		subkey, value = shiftPath(k, subkey, value)
 	}
 	regKey, err := registry.OpenKey(registry.Key(key), subkey, registry.QUERY_VALUE)
 	if err != nil {
@@ -149,8 +180,12 @@ func Format(key string) (Key, string) {
 			// the sid of the currently logged user, we
 			// remap the root key to HKEY_CURRENT_USER
 			switch {
-			case sid == loggedSID && strings.Contains(key, "_Classes"):
-				return CurrentUser, strings.Replace(path[n+1:], "_Classes", "Software\\Classes", -1)
+			case cleanSID(sid) == loggedSID && strings.Contains(path, "_Classes"):
+				if strings.HasSuffix(sid, "_Classes") {
+					return CurrentUser, "Software\\Classes\\" + path[n+1:]
+				} else {
+					return CurrentUser, strings.Replace(path[n+1:], "_Classes", "Software\\Classes", -1)
+				}
 			case sid == loggedSID:
 				if len(path) == len(loggedSID) {
 					return CurrentUser, ""

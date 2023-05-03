@@ -20,8 +20,12 @@ package processors
 
 import (
 	"expvar"
+	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
+	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -33,6 +37,11 @@ import (
 )
 
 var (
+	// ErrReadValue describes an error occurred while reading the registry value
+	ErrReadValue = func(key, subkey string, err error) error {
+		return fmt.Errorf("unable to read value %s : %v", filepath.Join(key, subkey), err)
+	}
+
 	// kcbCount counts the total KCBs found during the duration of the kernel session
 	kcbCount      = expvar.NewInt("registry.kcb.count")
 	kcbMissCount  = expvar.NewInt("registry.kcb.misses")
@@ -111,7 +120,7 @@ func (r *registryProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, erro
 		}
 
 		// get the type/value of the registry key and append to parameters
-		if !e.IsRegSetValue() {
+		if !e.IsRegSetValue() || !e.IsSuccess() {
 			return e, nil
 		}
 
@@ -119,7 +128,11 @@ func (r *registryProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, erro
 		if rootKey != key.Invalid {
 			typ, val, err := rootKey.ReadValue(keyName)
 			if err != nil {
-				return e, err
+				errno, ok := err.(windows.Errno)
+				if ok && errno.Is(os.ErrNotExist) {
+					return e, nil
+				}
+				return e, ErrReadValue(rootKey.String(), keyName, err)
 			}
 			e.AppendEnum(kparams.RegValueType, typ, key.RegistryValueTypes)
 			switch typ {

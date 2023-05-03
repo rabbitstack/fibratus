@@ -90,7 +90,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	// bootstrap essential components, including handle, process snapshotters
-	// and the kernel stream consumer that will actually collect all the events
+	// and the event stream consumer that will actually collect all the events
 	hsnap := handle.NewSnapshotter(cfg, nil)
 	psnap := ps.NewSnapshotter(hsnap, cfg)
 	kstreamc := kstream.NewConsumer(psnap, hsnap, cfg)

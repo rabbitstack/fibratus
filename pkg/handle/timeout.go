@@ -27,20 +27,25 @@ import (
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"golang.org/x/sys/windows"
-	"unsafe"
 )
 
-var (
-	ini                  windows.Handle
-	done                 windows.Handle
-	objectNameInCallback string
+type timeout struct {
+	ini    windows.Handle
+	done   windows.Handle
+	thread windows.Handle
+	in     chan windows.Handle
+	out    chan string
+}
 
+var tmt timeout
+
+var (
 	waitTimeoutCounts = expvar.NewInt("handle.wait.timeouts")
 )
 
 func init() {
-	ini, _ = windows.CreateEvent(nil, 0, 0, nil)
-	done, _ = windows.CreateEvent(nil, 0, 0, nil)
+	tmt.ini, _ = windows.CreateEvent(nil, 0, 0, nil)
+	tmt.done, _ = windows.CreateEvent(nil, 0, 0, nil)
 }
 
 // GetHandleWithTimeout is in charge of resolving handle names on handle instances that are under the risk
@@ -51,41 +56,46 @@ func init() {
 // If the query thread doesn't notify the main thread after a prudent timeout, then the query thread is killed.
 // Subsequent calls for handle name resolution will recreate the thread in case of it not being alive.
 func GetHandleWithTimeout(handle windows.Handle, timeout uint32) (string, error) {
-	if err := windows.ResetEvent(ini); err != nil {
-		return "", fmt.Errorf("couldn't reset init event: %v", err)
+	if tmt.thread == 0 {
+		tmt.in = make(chan windows.Handle, 1)
+		tmt.out = make(chan string, 1)
+		if err := windows.ResetEvent(tmt.ini); err != nil {
+			return "", fmt.Errorf("couldn't reset init event: %v", err)
+		}
+		if err := windows.ResetEvent(tmt.done); err != nil {
+			return "", fmt.Errorf("couldn't reset done event: %v", err)
+		}
+		tmt.thread = sys.CreateThread(
+			nil,
+			0,
+			windows.NewCallback(timeoutFn),
+			0,
+			0,
+			nil)
+		if tmt.thread == 0 {
+			return "", fmt.Errorf("cannot create handle query thread: %v", windows.GetLastError())
+		}
 	}
-	if err := windows.ResetEvent(done); err != nil {
-		return "", fmt.Errorf("couldn't reset done event: %v", err)
-	}
-	if err := windows.SetEvent(ini); err != nil {
+
+	tmt.in <- handle
+	if err := windows.SetEvent(tmt.ini); err != nil {
 		return "", err
 	}
-	thread := sys.CreateThread(
-		nil,
-		0,
-		windows.NewCallback(getObjectNameCallback),
-		uintptr(unsafe.Pointer(&handle)),
-		0,
-		nil)
-	if thread == 0 {
-		return "", fmt.Errorf("cannot create handle query thread: %v", windows.GetLastError())
-	}
-	defer sys.TerminateThread(thread, 0)
 
-	s, err := windows.WaitForSingleObject(done, timeout)
-	if s == windows.WAIT_OBJECT_0 {
-		return objectNameInCallback, nil
+	evt, err := windows.WaitForSingleObject(tmt.done, timeout)
+	if evt == windows.WAIT_OBJECT_0 {
+		return <-tmt.out, nil
 	}
 	if err == windows.WAIT_TIMEOUT {
 		waitTimeoutCounts.Add(1)
 		// kill the thread and wait for its termination to orderly cleanup resources
-		if err := sys.TerminateThread(thread, 0); err != nil {
-			return "", fmt.Errorf("unable to terminate timeout thread: %v", err)
+		if err := sys.TerminateThread(tmt.thread, 0); err != nil {
+			return "", fmt.Errorf("unable tmt terminate timeout thread: %v", err)
 		}
-		if _, err := windows.WaitForSingleObject(thread, timeout); err != nil {
+		if _, err := windows.WaitForSingleObject(tmt.thread, timeout); err != nil {
 			return "", fmt.Errorf("failed awaiting timeout thread termination: %v", err)
 		}
-		_ = windows.CloseHandle(thread)
+		_ = windows.CloseHandle(tmt.thread)
 		return "", errors.New("couldn't resolve handle name due to timeout")
 	}
 	return "", nil
@@ -93,26 +103,32 @@ func GetHandleWithTimeout(handle windows.Handle, timeout uint32) (string, error)
 
 // CloseTimeout releases event and thread handles.
 func CloseTimeout() error {
-	_ = windows.CloseHandle(ini)
-	_ = windows.CloseHandle(done)
+	_ = windows.CloseHandle(tmt.ini)
+	_ = windows.CloseHandle(tmt.done)
 	return nil
 }
 
-func getObjectNameCallback(ctx uintptr) uintptr {
+// timeoutFn waits for the initial event signalization and then
+// pulls the handle identifier from the input channel. With handle
+// identifier inside the callback function, the object is queried.
+// If the query is successful, the result is pushed to the output
+// channel, and the done event is signaled to indicate the object
+// name can be retrieved.
+func timeoutFn(ctx uintptr) uintptr {
 	for {
-		s, err := windows.WaitForSingleObject(ini, windows.INFINITE)
+		s, err := windows.WaitForSingleObject(tmt.ini, windows.INFINITE)
 		if err != nil || s != windows.WAIT_OBJECT_0 {
 			break
 		}
-		handle := *(*windows.Handle)(unsafe.Pointer(ctx))
-		objectNameInCallback, err = QueryObjectName(handle)
+		obj, err := QueryObjectName(<-tmt.in)
+		tmt.out <- obj
 		if err != nil {
-			if err := windows.SetEvent(done); err != nil {
+			if err := windows.SetEvent(tmt.done); err != nil {
 				break
 			}
 			continue
 		}
-		if err := windows.SetEvent(done); err != nil {
+		if err := windows.SetEvent(tmt.done); err != nil {
 			break
 		}
 	}

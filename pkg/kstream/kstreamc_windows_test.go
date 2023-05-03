@@ -1,20 +1,20 @@
-// /*
-// * Copyright 2019-2020 by Nedim Sabic Sabic
-// * https://www.fibratus.io
-// * All Rights Reserved.
-// *
-// * Licensed under the Apache License, Version 2.0 (the "License");
-// * you may not use this file except in compliance with the License.
-// * You may obtain a copy of the License at
-// *
-// *  http://www.apache.org/licenses/LICENSE-2.0
-// *
-// * Unless required by applicable law or agreed to in writing, software
-// * distributed under the License is distributed on an "AS IS" BASIS,
-// * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// * See the License for the specific language governing permissions and
-// * limitations under the License.
-// */
+/*
+* Copyright 2019-2020 by Nedim Sabic Sabic
+* https://www.fibratus.io
+* All Rights Reserved.
+*
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+*
+*  http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+ */
 package kstream
 
 import (
@@ -37,6 +37,76 @@ import (
 	"testing"
 	"time"
 )
+
+func TestRundownEvents(t *testing.T) {
+	psnap := new(ps.SnapshotterMock)
+	psnap.On("Write", mock.Anything).Return(nil)
+	psnap.On("AddThread", mock.Anything).Return(nil)
+	psnap.On("AddModule", mock.Anything).Return(nil)
+	psnap.On("RemoveThread", mock.Anything, mock.Anything).Return(nil)
+	psnap.On("RemoveModule", mock.Anything, mock.Anything).Return(nil)
+	psnap.On("FindAndPut", mock.Anything).Return(&pstypes.PS{})
+	psnap.On("Find", mock.Anything).Return(true, &pstypes.PS{})
+	psnap.On("Remove", mock.Anything).Return(nil)
+
+	hsnap := new(handle.SnapshotterMock)
+	hsnap.On("FindByObject", mock.Anything).Return(htypes.Handle{}, false)
+	hsnap.On("FindHandles", mock.Anything).Return([]htypes.Handle{}, nil)
+
+	kstreamConfig := config.KstreamConfig{
+		EnableThreadKevents:   true,
+		EnableImageKevents:    true,
+		EnableFileIOKevents:   true,
+		EnableNetKevents:      true,
+		EnableRegistryKevents: true,
+	}
+
+	kctrl := NewKtraceController(kstreamConfig)
+	require.NoError(t, kctrl.StartKtrace())
+	defer kctrl.CloseKtrace()
+	kstreamc := NewConsumer(psnap, hsnap, &config.Config{
+		Kstream:  kstreamConfig,
+		KcapFile: "fake.kcap", // simulate capture to receive state/rundown events
+		Filters:  &config.Filters{},
+	})
+	require.NoError(t, kstreamc.OpenKstream(kctrl.Traces()))
+	defer kstreamc.CloseKstream()
+
+	rundownsByType := map[ktypes.Ktype]bool{
+		ktypes.ProcessRundown: false,
+		ktypes.ThreadRundown:  false,
+		ktypes.ImageRundown:   false,
+		ktypes.FileRundown:    false,
+		ktypes.RegKCBRundown:  false,
+	}
+	rundownsByHash := make(map[uint64]uint8)
+	timeout := time.After(time.Second * 10)
+
+	for {
+		select {
+		case e := <-kstreamc.Events():
+			if !e.IsRundown() {
+				continue
+			}
+			rundownsByType[e.Type] = true
+			rundownsByHash[e.RundownKey()]++
+		case _ = <-kstreamc.Errors():
+		case <-timeout:
+			t.Logf("got %d rundown events", len(rundownsByHash))
+			for key, count := range rundownsByHash {
+				if count > 1 {
+					t.Fatalf("got more than 1 rundown event for key %d", key)
+				}
+			}
+			for typ, got := range rundownsByType {
+				if !got {
+					t.Fatalf("no rundown events for %s", typ.String())
+				}
+			}
+			return
+		}
+	}
+}
 
 func TestConsumerEvents(t *testing.T) {
 	kevent.DropCurrentProc = false
@@ -117,12 +187,12 @@ func TestConsumerEvents(t *testing.T) {
 			func() error {
 				go func() {
 					srv := http.Server{
-						Addr: ":8090",
+						Addr: ":18090",
 					}
 					mux := http.NewServeMux()
 					mux.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {})
 					time.AfterFunc(time.Second*2, func() {
-						_, _ = http.Get("http://localhost:8090")
+						_, _ = http.Get("http://localhost:18090")
 						_ = srv.Shutdown(context.TODO())
 					})
 					_ = srv.ListenAndServe()
@@ -175,6 +245,8 @@ func TestConsumerEvents(t *testing.T) {
 	}
 
 	ntests := len(tests)
+	timeout := time.After(time.Duration(ntests) * time.Minute)
+
 	for {
 		select {
 		case e := <-kstreamc.Events():
@@ -194,7 +266,7 @@ func TestConsumerEvents(t *testing.T) {
 			}
 		case err := <-kstreamc.Errors():
 			t.Fatalf("FAIL: %v", err)
-		case <-time.After(time.Duration(ntests) * time.Minute):
+		case <-timeout:
 			for _, tt := range tests {
 				if !tt.completed {
 					t.Logf("FAIL: %s", tt.name)
@@ -204,148 +276,3 @@ func TestConsumerEvents(t *testing.T) {
 		}
 	}
 }
-
-//
-//import (
-//	"encoding/gob"
-//	"github.com/rabbitstack/fibratus/pkg/config"
-//	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
-//	"github.com/rabbitstack/fibratus/pkg/handle"
-//	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-//	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-//	"github.com/rabbitstack/fibratus/pkg/ps"
-//	"github.com/rabbitstack/fibratus/pkg/ps/types"
-//	"github.com/rabbitstack/fibratus/pkg/syscall/etw"
-//	"github.com/rabbitstack/fibratus/pkg/syscall/tdh"
-//	"github.com/stretchr/testify/assert"
-//	"github.com/stretchr/testify/mock"
-//	"github.com/stretchr/testify/require"
-//	"net"
-//	"os"
-//	"testing"
-//	"time"
-//	"unsafe"
-//)
-//
-//func TestOpenKstream(t *testing.T) {
-//	psnap := new(ps.SnapshotterMock)
-//	hsnap := new(handle.SnapshotterMock)
-//	ktraceController := NewKtraceController(config.KstreamConfig{})
-//	kstreamc := NewConsumer(ktraceController, psnap, hsnap, &config.Config{Filters: &config.Filters{}})
-//	openTrace = func(ktrace etw.EventTraceLogfile) etw.TraceHandle {
-//		return etw.TraceHandle(2)
-//	}
-//	processTrace = func(handle etw.TraceHandle) error {
-//		return nil
-//	}
-//	traces := map[string]TraceSession{
-//		etw.KernelLoggerSession: {},
-//	}
-//	err := kstreamc.OpenKstream(traces)
-//	require.NoError(t, err)
-//}
-//
-//func TestOpenKstreamInvalidHandle(t *testing.T) {
-//	psnap := new(ps.SnapshotterMock)
-//	hsnap := new(handle.SnapshotterMock)
-//	ktraceController := NewKtraceController(config.KstreamConfig{})
-//	kstreamc := NewConsumer(ktraceController, psnap, hsnap, &config.Config{Filters: &config.Filters{}})
-//	openTrace = func(ktrace etw.EventTraceLogfile) etw.TraceHandle {
-//		return etw.TraceHandle(0xffffffffffffffff)
-//	}
-//	traces := map[string]TraceSession{
-//		etw.KernelLoggerSession: {Name: etw.KernelLoggerSession, GUID: etw.KernelTraceControlGUID},
-//	}
-//	err := kstreamc.OpenKstream(traces)
-//	require.Error(t, err)
-//}
-//
-//func TestOpenKstreamKsessionNotRunning(t *testing.T) {
-//	psnap := new(ps.SnapshotterMock)
-//	hsnap := new(handle.SnapshotterMock)
-//	ktraceController := NewKtraceController(config.KstreamConfig{})
-//	kstreamc := NewConsumer(ktraceController, psnap, hsnap, &config.Config{Filters: &config.Filters{}})
-//	openTrace = func(ktrace etw.EventTraceLogfile) etw.TraceHandle {
-//		return etw.TraceHandle(2)
-//	}
-//	processTrace = func(handle etw.TraceHandle) error {
-//		return kerrors.ErrKsessionNotRunning
-//	}
-//	traces := map[string]TraceSession{
-//		etw.KernelLoggerSession: {},
-//	}
-//	err := kstreamc.OpenKstream(traces)
-//	require.NoError(t, err)
-//	err = <-kstreamc.Errors()
-//	assert.EqualError(t, err, "kernel session from which you are trying to consume events in real time is not running")
-//}
-//
-//func TestProcessKevent(t *testing.T) {
-//	psnap := new(ps.SnapshotterMock)
-//	hsnap := new(handle.SnapshotterMock)
-//	ktraceController := NewKtraceController(config.KstreamConfig{})
-//	kstreamc := NewConsumer(ktraceController, psnap, hsnap, &config.Config{Filters: &config.Filters{}})
-//
-//	psnap.On("Find", mock.Anything).Return(&types.PS{Name: "cmd.exe"})
-//
-//	openTrace = func(ktrace etw.EventTraceLogfile) etw.TraceHandle {
-//		return etw.TraceHandle(2)
-//	}
-//	processTrace = func(handle etw.TraceHandle) error {
-//		return nil
-//	}
-//	getPropertySize = func(evt *etw.EventRecord, descriptor *tdh.PropertyDataDescriptor) (uint32, error) {
-//		return uint32(10), nil
-//	}
-//	getProperty = func(evt *etw.EventRecord, descriptor *tdh.PropertyDataDescriptor, size uint32, buffer []byte) error {
-//		return nil
-//	}
-//
-//	psnap.On("Write", mock.Anything).Return(nil)
-//
-//	f, err := os.Open("./_fixtures/snapshots/create-process.gob")
-//	if err != nil {
-//		t.Fatal(err)
-//	}
-//
-//	dec := gob.NewDecoder(f)
-//	var evt etw.EventRecord
-//	err = dec.Decode(&evt)
-//	if err != nil {
-//		t.Fatal(err)
-//	}
-//	done := make(chan struct{}, 1)
-//
-//	go func() {
-//		defer func() {
-//			done <- struct{}{}
-//		}()
-//		kevt := <-kstreamc.Events()
-//
-//		assert.Equal(t, ktypes.Process, kevt.Category)
-//		assert.Equal(t, uint32(9828), kevt.Tid)
-//		assert.Equal(t, uint8(5), kevt.CPU)
-//		assert.Equal(t, ktypes.CreateProcess, kevt.Type)
-//		assert.Equal(t, "CreateProcess", kevt.Name)
-//		assert.Equal(t, "Creates a new process and its primary thread", kevt.Description)
-//
-//		ts, err := time.Parse("2006-01-02 15:04:05.0000000 -0700 CEST", "2019-04-05 16:10:36.5225778 +0200 CEST")
-//		require.NoError(t, err)
-//		assert.Equal(t, ts.Year(), kevt.Timestamp.Year())
-//		assert.Equal(t, ts.Month(), kevt.Timestamp.Month())
-//		assert.Equal(t, ts.Day(), kevt.Timestamp.Day())
-//		assert.Equal(t, ts.Minute(), kevt.Timestamp.Minute())
-//		assert.Equal(t, ts.Second(), kevt.Timestamp.Second())
-//		assert.Equal(t, ts.Nanosecond(), kevt.Timestamp.Nanosecond())
-//		assert.Len(t, kevt.Kparams, 9)
-//
-//		assert.True(t, kevt.Kparams.Contains(kparams.DTB))
-//		assert.True(t, kevt.Kparams.Contains(kparams.ProcessName))
-//	}()
-//
-//	err = kstreamc.(*kstreamConsumer).processKevent(&evt)
-//	require.NoError(t, err)
-//
-//	<-done
-//}
-//

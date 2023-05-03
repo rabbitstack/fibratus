@@ -36,8 +36,6 @@ const (
 	Net
 	// Handle represents the handle processor.
 	Handle
-	// Driver represents the driver processor.
-	Driver
 )
 
 // Processor is the minimal interface that each event stream processor has to satisfy. Kernel stream processor
@@ -71,8 +69,6 @@ func (typ ProcessorType) String() string {
 		return "net"
 	case Handle:
 		return "handle"
-	case Driver:
-		return "driver"
 	default:
 		return "unknown"
 	}

@@ -25,6 +25,9 @@ import (
 	"unicode/utf16"
 )
 
+// Success determines the success system message
+const Success = "Success"
+
 var statusCache = map[uint32]string{}
 var mux sync.Mutex
 
@@ -39,7 +42,7 @@ func isSuccess(status uint32) bool {
 // API call invocations.
 func FormatMessage(status uint32) string {
 	if isSuccess(status) {
-		return "Success"
+		return Success
 	}
 	mux.Lock()
 	defer mux.Unlock()

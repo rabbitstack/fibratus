@@ -86,10 +86,18 @@ func (h *handleProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error)
 		return e, err
 	}
 
+	// anchor object address to event metadata. This is used
+	// as a comparator key for stitching the events together
+	// and augmenting the CreateHandle events with the handle name
 	object := e.Kparams.MustGetUint64(kparams.HandleObject)
 	e.AddMeta(kevent.DelayComparatorKey, object)
 
 	if e.Type == ktypes.CreateHandle {
+		// mark CreateHandle events as delayed. Delayed events
+		// are stored in the aggregator backlog. As soon as the
+		// corresponding CloseHandle event arrives, the event
+		// is removed from the backlog and forwarded to the output
+		// sink
 		e.Delayed = true
 		return e, h.hsnap.Write(e)
 	}

@@ -138,7 +138,7 @@ func (k *kstreamConsumer) openKstream(loggerName string) error {
 	// since `ProcessTrace` blocks the current thread
 	// we invoke it in a separate goroutine but send
 	// any possible errors to the errors channel
-	go func() {
+	go func(trace etw.TraceHandle) {
 		log.Infof("starting trace processing for [%s]", loggerName)
 		err := etw.ProcessTrace(trace)
 		log.Infof("stopping trace processing for [%s]", loggerName)
@@ -148,20 +148,23 @@ func (k *kstreamConsumer) openKstream(loggerName string) error {
 		}
 		if !errors.Is(err, kerrors.ErrTraceCancelled) {
 			k.errs <- err
-		} else {
-			if trace.IsValid() {
-				if err := etw.CloseTrace(trace); err != nil {
-					k.errs <- err
-				}
+		}
+		if trace.IsValid() {
+			if err := etw.CloseTrace(trace); err != nil {
+				k.errs <- err
 			}
 		}
-	}()
+	}(trace)
+
 	return nil
 }
 
 // CloseKstream shutdowns the event stream consumer by closing all running traces.
 func (k *kstreamConsumer) CloseKstream() error {
 	for _, trace := range k.traces {
+		if !trace.IsValid() {
+			continue
+		}
 		if err := etw.CloseTrace(trace); err != nil {
 			log.Warn(err)
 		}
