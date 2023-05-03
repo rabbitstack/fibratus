@@ -157,7 +157,7 @@ func (e Kevent) IsSuccess() bool {
 // by calling into the `etw.SetTraceInformation` Windows API
 // function which causes duplicate rundown events.
 // For more pointers check `kstream/controller_windows.go`
-// and the `etw.SetTraceInformation` API function
+// and the `etw.SetTraceInformation` API function.
 func (e Kevent) IsRundownProcessed() bool {
 	key := e.RundownKey()
 	_, isProcessed := rundowns[key]
@@ -193,6 +193,8 @@ func (e Kevent) CurrentPid() bool { return e.PID == currentPid }
 // IsState indicates if this event is only used for state management.
 func (e Kevent) IsState() bool { return e.Type.OnlyState() }
 
+// RundownKey calculates the rundown event hash. The hash is
+// used to determine if the rundown event was already processed.
 func (e Kevent) RundownKey() uint64 {
 	switch e.Type {
 	case ktypes.ProcessRundown:

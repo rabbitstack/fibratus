@@ -46,6 +46,8 @@ var (
 func init() {
 	tmt.ini, _ = windows.CreateEvent(nil, 0, 0, nil)
 	tmt.done, _ = windows.CreateEvent(nil, 0, 0, nil)
+	tmt.in = make(chan windows.Handle, 1)
+	tmt.out = make(chan string, 1)
 }
 
 // GetHandleWithTimeout is in charge of resolving handle names on handle instances that are under the risk
@@ -57,14 +59,14 @@ func init() {
 // Subsequent calls for handle name resolution will recreate the thread in case of it not being alive.
 func GetHandleWithTimeout(handle windows.Handle, timeout uint32) (string, error) {
 	if tmt.thread == 0 {
-		tmt.in = make(chan windows.Handle, 1)
-		tmt.out = make(chan string, 1)
 		if err := windows.ResetEvent(tmt.ini); err != nil {
 			return "", fmt.Errorf("couldn't reset init event: %v", err)
 		}
 		if err := windows.ResetEvent(tmt.done); err != nil {
 			return "", fmt.Errorf("couldn't reset done event: %v", err)
 		}
+		tmt.in = make(chan windows.Handle, 1)
+		tmt.out = make(chan string, 1)
 		tmt.thread = sys.CreateThread(
 			nil,
 			0,
@@ -83,19 +85,26 @@ func GetHandleWithTimeout(handle windows.Handle, timeout uint32) (string, error)
 	}
 
 	evt, err := windows.WaitForSingleObject(tmt.done, timeout)
+	if err != nil || evt == windows.WAIT_FAILED {
+		// consume pushed handle
+		<-tmt.in
+		return "", nil
+	}
 	if evt == windows.WAIT_OBJECT_0 {
 		return <-tmt.out, nil
 	}
-	if err == windows.WAIT_TIMEOUT {
+	if windows.Errno(evt) == windows.WAIT_TIMEOUT {
 		waitTimeoutCounts.Add(1)
 		// kill the thread and wait for its termination to orderly cleanup resources
 		if err := sys.TerminateThread(tmt.thread, 0); err != nil {
 			return "", fmt.Errorf("unable tmt terminate timeout thread: %v", err)
 		}
 		if _, err := windows.WaitForSingleObject(tmt.thread, timeout); err != nil {
+			tmt.thread = 0
 			return "", fmt.Errorf("failed awaiting timeout thread termination: %v", err)
 		}
 		_ = windows.CloseHandle(tmt.thread)
+		tmt.thread = 0
 		return "", errors.New("couldn't resolve handle name due to timeout")
 	}
 	return "", nil

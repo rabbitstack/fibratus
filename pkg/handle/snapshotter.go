@@ -199,7 +199,8 @@ func (s *snapshotter) FindHandles(pid uint32) ([]htypes.Handle, error) {
 		if err != nil {
 			continue
 		}
-		// ignore file handles since we can't get the file name...
+		// ignore file handles since we can't get the
+		// file name. Also, only collect named handles
 		if h.Type == File && h.Name == "" {
 			continue
 		}
@@ -233,7 +234,7 @@ func (s *snapshotter) initSnapshot() {
 				if pid == uintptr(os.Getpid()) {
 					continue
 				}
-				handle, err := s.getHandle(sysHandle.Handle, sysHandle.Object, uint16(sysHandle.ObjectTypeIndex), uint32(pid), true)
+				handle, err := s.getHandle(sysHandle.Handle, sysHandle.Object, sysHandle.ObjectTypeIndex, uint32(pid), true)
 				if err != nil || handle.Type == "" {
 					continue
 				}
@@ -266,6 +267,10 @@ func (s *snapshotter) getHandle(rawHandle windows.Handle, obj uint64, typeIndex 
 		Type:   typ,
 		Pid:    pid,
 	}
+	// IoCompletion handles shouldn't be duplicated
+	if handle.Type == IoCompletion {
+		return handle, nil
+	}
 	// use the required duplicate access to query handle name
 	var dupAccess uint32
 	switch typ {
@@ -275,8 +280,6 @@ func (s *snapshotter) getHandle(rawHandle windows.Handle, obj uint64, typeIndex 
 		dupAccess = windows.PROCESS_QUERY_INFORMATION
 	case Mutant:
 		dupAccess = windows.SEMAPHORE_ALL_ACCESS
-	default:
-		dupAccess = windows.GENERIC_ALL
 	}
 	dup, err := Duplicate(rawHandle, pid, dupAccess)
 	if err != nil {
@@ -416,7 +419,7 @@ func (s *snapshotter) Remove(e *kevent.Kevent) error {
 func unwrapHandle(e *kevent.Kevent) htypes.Handle {
 	h := htypes.Handle{}
 	h.Type, _ = e.Kparams.GetString(kparams.HandleObjectTypeName)
-	h.Object, _ = e.Kparams.GetHexAsUint64(kparams.HandleObject)
+	h.Object, _ = e.Kparams.GetUint64(kparams.HandleObject)
 	h.Name, _ = e.Kparams.GetString(kparams.HandleObjectName)
 	return h
 }

@@ -35,7 +35,7 @@ var (
 	hkuPrefixes  = []string{"\\REGISTRY\\USER", "\\Registry\\User"}
 )
 
-// rx detects a file path starting with a drive letter
+// rx detects a file path starting with a drive letter, e.g. C:\
 var rx = regexp.MustCompile(`[A-Za-z]:\\`)
 
 var loggedSID = getLoggedSID()
@@ -94,7 +94,7 @@ func shiftPath(k, s, v string) (string, string) {
 	n := strings.LastIndex(s, r)
 	for n > 0 {
 		n--
-		// find first slash backwards
+		// find first slash occurrence backwards
 		if s[n] == '\\' {
 			return k[:n], k[n+1:]
 		}

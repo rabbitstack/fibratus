@@ -44,8 +44,8 @@ type SystemHandleTableEntryInfoEx struct {
 	ProcessID             uintptr
 	Handle                windows.Handle
 	GrantedAccess         uint32
-	CreatorBackTraceIndex uint8
-	ObjectTypeIndex       uint8
+	CreatorBackTraceIndex uint16
+	ObjectTypeIndex       uint16
 	HandleAttributes      uint32
 	Reserved              uint32
 }
