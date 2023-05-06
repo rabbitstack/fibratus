@@ -52,7 +52,7 @@ var (
 
 	// excludedKevents counts the number of excluded events
 	excludedKevents = expvar.NewInt("kstream.excluded.kevents")
-	// excludedProcs counts the number of excluded events by image name
+	// excludedProcs counts the number of excluded events by process executable image name
 	excludedProcs = expvar.NewInt("kstream.excluded.procs")
 
 	// buffersRead amount of buffers fetched from the ETW session
@@ -104,11 +104,11 @@ func NewConsumer(
 // SetFilter initializes the filter that's applied on events.
 func (k *kstreamConsumer) SetFilter(filter filter.Filter) { k.filter = filter }
 
-// OpenKstream initializes the event stream by setting the event record callback and instructing it
+// Open initializes the event stream by setting the event record callback and instructing it
 // to consume events from log buffers. This operation can fail if opening the kernel logger session results
 // in an invalid trace handler. Errors returned by `ProcessTrace` are sent to the channel since this function
 // blocks the current thread, and we schedule its execution in a separate goroutine.
-func (k *kstreamConsumer) OpenKstream(traces map[string]TraceSession) error {
+func (k *kstreamConsumer) Open(traces map[string]TraceSession) error {
 	for _, trace := range traces {
 		err := k.openKstream(trace.Name)
 		if err != nil {
@@ -159,8 +159,8 @@ func (k *kstreamConsumer) openKstream(loggerName string) error {
 	return nil
 }
 
-// CloseKstream shutdowns the event stream consumer by closing all running traces.
-func (k *kstreamConsumer) CloseKstream() error {
+// Close shutdowns the event stream consumer by closing all running traces.
+func (k *kstreamConsumer) Close() error {
 	for _, trace := range k.traces {
 		if !trace.IsValid() {
 			continue
@@ -189,8 +189,8 @@ func (k *kstreamConsumer) Events() chan *kevent.Kevent {
 }
 
 // SetEventCallback sets the event callback to receive inbound events.
-func (k *kstreamConsumer) SetEventCallback(f EventCallbackFunc) {
-	k.eventCallback = f
+func (k *kstreamConsumer) SetEventCallback(fn EventCallbackFunc) {
+	k.eventCallback = fn
 }
 
 // bufferStatsCallback is periodically triggered by ETW subsystem for the purpose of reporting

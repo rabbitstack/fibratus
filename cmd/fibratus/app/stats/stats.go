@@ -20,11 +20,11 @@ package stats
 
 import (
 	"encoding/json"
+	"github.com/rabbitstack/fibratus/internal/bootstrap"
 	"os"
 	"reflect"
 
 	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/rabbitstack/fibratus/cmd/fibratus/common"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/util/rest"
@@ -77,19 +77,18 @@ type Stats struct {
 	KcapReadKevents                     int            `json:"kcap.read.kevents"`
 	KcapReaderDroppedByFilter           int            `json:"kcap.reader.dropped.by.filter"`
 	KcapReaderHandleUnmarshalErrors     int            `json:"kcap.reader.handle.unmarshal.errors"`
-	KeventInterceptorFailures           int            `json:"kevent.interceptor.failures"`
+	KeventPrcoessorFailures             int            `json:"kevent.processor.failures"`
 	KeventSeqInitErrors                 map[string]int `json:"kevent.seq.init.errors"`
 	KeventSeqStoreErrors                int            `json:"kevent.seq.store.errors"`
 	KeventTimestampUnmarshalErrors      int            `json:"kevent.timestamp.unmarshal.errors"`
 	KstreamDroppedKevents               int            `json:"kstream.dropped.kevents"`
-	KstreamDroppedProcs                 int            `json:"kstream.dropped.procs"`
 	KstreamKbuffersRead                 int            `json:"kstream.kbuffers.read"`
-	KstreamKeventParamFailures          int            `json:"kstream.kevent.param.failures"`
 	KstreamKeventsEnqueued              int            `json:"kstream.kevents.enqueued"`
 	KstreamKeventsDequeued              int            `json:"kstream.kevents.dequeued"`
+	KstreamUnknownKevents               int            `json:"kstream.kevents.unknown"`
+	KstreamExcludedKevents              int            `json:"kstream.excluded.kevents"`
+	KstreamExcludedProcs                int            `json:"kstream.excluded.procs"`
 	KstreamKeventsFailures              map[string]int `json:"kstream.kevents.failures"`
-	KstreamKeventsMissingSchemaErrors   map[string]int `json:"kstream.kevents.missing.schema.errors"`
-	KstreamUpstreamCancellations        int            `json:"kstream.upstream.cancellations"`
 	LoggerErrors                        map[string]int `json:"logger.errors"`
 	OutputAMQPChannelFailures           int            `json:"output.amqp.channel.failures"`
 	OutputAMQPConnectionFailures        int            `json:"output.amqp.connection.failures"`
@@ -109,17 +108,15 @@ type Stats struct {
 	RegistryKcbMisses                   int            `json:"registry.kcb.misses"`
 	RegistryKeyHandleHits               int            `json:"registry.key.handle.hits"`
 	RegistryUnknownKeysCount            int            `json:"registry.unknown.keys.count"`
-	SidsCount                           int            `json:"sids.count"`
 	YaraImageScans                      int            `json:"yara.image.scans"`
 	YaraProcScans                       int            `json:"yara.proc.scans"`
 	YaraRuleMatches                     int            `json:"yara.rule.matches"`
 }
 
 func stats(cmd *cobra.Command, args []string) error {
-	if err := common.InitConfigAndLogger(cfg); err != nil {
+	if err := bootstrap.InitConfigAndLogger(cfg); err != nil {
 		return err
 	}
-
 	c := cfg.API
 	body, err := rest.Get(rest.WithTransport(c.Transport), rest.WithURI("debug/vars"))
 	if err != nil {
@@ -145,11 +142,9 @@ func stats(cmd *cobra.Command, args []string) error {
 		if tag == "" {
 			continue
 		}
-
 		if !val.Field(i).CanInterface() {
 			continue
 		}
-
 		t.AppendRow(table.Row{tag, val.Field(i).Interface()})
 	}
 

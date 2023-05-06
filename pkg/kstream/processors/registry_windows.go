@@ -124,15 +124,15 @@ func (r *registryProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, erro
 			return e, nil
 		}
 
-		rootKey, keyName := key.Format(keyName)
-		if rootKey != key.Invalid {
-			typ, val, err := rootKey.ReadValue(keyName)
+		rootkey, subkey := key.Format(keyName)
+		if rootkey != key.Invalid {
+			typ, val, err := rootkey.ReadValue(subkey)
 			if err != nil {
 				errno, ok := err.(windows.Errno)
 				if ok && errno.Is(os.ErrNotExist) {
 					return e, nil
 				}
-				return e, ErrReadValue(rootKey.String(), keyName, err)
+				return e, ErrReadValue(rootkey.String(), keyName, err)
 			}
 			e.AppendEnum(kparams.RegValueType, typ, key.RegistryValueTypes)
 			switch typ {

@@ -22,7 +22,7 @@ import (
 	"bufio"
 	"fmt"
 	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/rabbitstack/fibratus/cmd/fibratus/common"
+	"github.com/rabbitstack/fibratus/internal/bootstrap"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
@@ -49,10 +49,11 @@ var listFieldsCmd = &cobra.Command{
 	Run:   listFields,
 }
 
-var listKeventsCmd = &cobra.Command{
-	Use:   "kevents",
-	Short: "List supported kernel event types",
-	Run:   listKevents,
+var listEventsCmd = &cobra.Command{
+	Use:     "kevents",
+	Aliases: []string{"events"},
+	Short:   "List supported kernel event types",
+	Run:     listEvents,
 }
 
 var cfg = config.NewWithOpts(config.WithList())
@@ -62,12 +63,12 @@ func init() {
 
 	Command.AddCommand(listFilamentsCmd)
 	Command.AddCommand(listFieldsCmd)
-	Command.AddCommand(listKeventsCmd)
+	Command.AddCommand(listEventsCmd)
 }
 
 // listFilaments renders a table with all available filaments.
 func listFilaments(cmd *cobra.Command, args []string) error {
-	if err := common.InitConfigAndLogger(cfg); err != nil {
+	if err := bootstrap.InitConfigAndLogger(cfg); err != nil {
 		return err
 	}
 
@@ -122,8 +123,9 @@ func listFilaments(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// listKevents renders a table with supported kernel event types showing the category to which their pertain and a short description.
-func listKevents(cmd *cobra.Command, args []string) {
+// listEvents renders a table with supported event types showing the category
+// to which their pertain and a short description of the event.
+func listEvents(cmd *cobra.Command, args []string) {
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 	t.AppendHeader(table.Row{"Name", "Category", "Description"})
@@ -136,7 +138,8 @@ func listKevents(cmd *cobra.Command, args []string) {
 	t.Render()
 }
 
-// listFields renders a table with available filtering fields containing the name, description and the example filtering expression.
+// listFields renders a table with available filtering fields containing the name,
+// description, filter example, and a column indicating if the field is deprecated.
 func listFields(cmd *cobra.Command, args []string) {
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)

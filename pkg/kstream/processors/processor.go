@@ -20,30 +20,29 @@ package processors
 
 import "github.com/rabbitstack/fibratus/pkg/kevent"
 
-// ProcessorType is an alias for the processor type
+// ProcessorType is an alias for the event processor type
 type ProcessorType uint8
 
 const (
-	// Ps represents the process processor.
+	// Ps represents the process event processor.
 	Ps ProcessorType = iota
-	// Fs represents the file system processor.
+	// Fs represents the file system event processor.
 	Fs
-	// Registry represents the registry processor.
+	// Registry represents the registry event processor.
 	Registry
-	// Image represents the image processor.
+	// Image represents the image event processor.
 	Image
-	// Net represents the network processor.
+	// Net represents the network event processor.
 	Net
-	// Handle represents the handle processor.
+	// Handle represents the handle event processor.
 	Handle
 )
 
-// Processor is the minimal interface that each event stream processor has to satisfy. Kernel stream processor
-// has the ability to augment kernel event with additional parameters. It is also capable of building a state machine
-// from the flow of events going through it. The processor can also decide to drop the inbound event by
-// returning an error via its `ProcessEvent` method.
+// Processor is the minimal interface that each event stream processor has to satisfy. The event processor
+// has the ability to augment events with additional parameters. It is also capable of building a state machine
+// from the flow of events going through it.
 type Processor interface {
-	// ProcessEvent receives an existing event possibly mutating its state or marking the event as dropped.
+	// ProcessEvent receives an existing event possibly mutating its state.
 	// If it returns true, the next processor in the chain is evaluated.
 	ProcessEvent(*kevent.Kevent) (*kevent.Kevent, bool, error)
 

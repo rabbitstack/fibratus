@@ -152,7 +152,11 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 		if kevt.Category != ktypes.Process {
 			return nil, nil
 		}
-		return kevt.Kparams.GetSID()
+		sid, err := kevt.Kparams.GetSID()
+		if err != nil {
+			return nil, err
+		}
+		return sid.String(), nil
 	case fields.PsSiblingDomain, fields.PsChildDomain:
 		if kevt.Category != ktypes.Process {
 			return nil, nil
@@ -723,7 +727,7 @@ func (h *handleAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value
 	case fields.HandleID:
 		return kevt.Kparams.GetHexAsUint32(kparams.HandleID)
 	case fields.HandleType:
-		return kevt.GetParamAsString(kparams.HandleObjectTypeName), nil
+		return kevt.GetParamAsString(kparams.HandleObjectTypeID), nil
 	case fields.HandleName:
 		return kevt.Kparams.GetString(kparams.HandleObjectName)
 	case fields.HandleObject:

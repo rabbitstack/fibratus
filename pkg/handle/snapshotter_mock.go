@@ -33,10 +33,16 @@ type SnapshotterMock struct {
 }
 
 // Write method
-func (s *SnapshotterMock) Write(kevt *kevent.Kevent) error { return nil }
+func (s *SnapshotterMock) Write(kevt *kevent.Kevent) error {
+	args := s.Called(kevt)
+	return args.Error(0)
+}
 
 // Remove method
-func (s *SnapshotterMock) Remove(kevt *kevent.Kevent) error { return nil }
+func (s *SnapshotterMock) Remove(kevt *kevent.Kevent) error {
+	args := s.Called(kevt)
+	return args.Error(0)
+}
 
 // FindHandles method
 func (s *SnapshotterMock) FindHandles(pid uint32) ([]htypes.Handle, error) {
@@ -61,3 +67,6 @@ func (s *SnapshotterMock) GetSnapshot() []htypes.Handle {
 	handles := s.Called()
 	return handles.Get(0).([]htypes.Handle)
 }
+
+// Close method
+func (s *SnapshotterMock) Close() error { return nil }

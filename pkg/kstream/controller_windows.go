@@ -73,9 +73,9 @@ func (p TraceProvider) IsKernelLogger() bool {
 	return p.GUID == etw.KernelTraceControlGUID
 }
 
-// KtraceController is responsible for managing the life cycle of the tracing sessions.
-type KtraceController struct {
-	// kstreamConfig stores kernel stream-specific settings
+// Controller is responsible for managing the life cycle of the tracing sessions.
+type Controller struct {
+	// kstreamConfig stores event stream specific settings
 	kstreamConfig config.KstreamConfig
 	// traces contains initiated tracing sessions
 	traces map[string]TraceSession
@@ -83,8 +83,8 @@ type KtraceController struct {
 	providers []TraceProvider
 }
 
-// NewKtraceController spins up a new instance of the trace controller.
-func NewKtraceController(kstreamConfig config.KstreamConfig) *KtraceController {
+// NewController spins up a new instance of the trace controller.
+func NewController(cfg config.KstreamConfig) *Controller {
 	providers := []TraceProvider{
 		{
 			// core system events
@@ -98,57 +98,57 @@ func NewKtraceController(kstreamConfig config.KstreamConfig) *KtraceController {
 			etw.KernelAuditAPICallsSession,
 			etw.KernelAuditAPICallsGUID,
 			0x0, // no keywords, so we accept all events
-			kstreamConfig.EnableAuditAPIEvents,
+			cfg.EnableAuditAPIEvents,
 		},
 		{
 			etw.AntimalwareEngineSession,
 			etw.AntimalwareEngineGUID,
 			0x0,
-			kstreamConfig.EnableAntimalwareEngineEvents,
+			cfg.EnableAntimalwareEngineEvents,
 		},
 	}
-	controller := &KtraceController{
-		kstreamConfig: kstreamConfig,
+	controller := &Controller{
+		kstreamConfig: cfg,
 		traces:        make(map[string]TraceSession),
 		providers:     providers,
 	}
 	return controller
 }
 
-// StartKtrace starts configured tracing sessions. User has the ability to disable
+// Start starts configured tracing sessions. User has the ability to disable
 // a specific subset of collected kernel events, even though by default most events
 // are forwarded from the provider. Flags are only valid in context of the NT Kernel
 // Logger sessions. On the contrary, keywords can only be used on the non-NT Kernel
 // Logger tracing sessions.
-func (k *KtraceController) StartKtrace() error {
+func (c *Controller) Start() error {
 	flags := etw.Process // process events are required
-	if k.kstreamConfig.EnableThreadKevents {
+	if c.kstreamConfig.EnableThreadKevents {
 		flags |= etw.Thread
 	}
-	if k.kstreamConfig.EnableImageKevents {
+	if c.kstreamConfig.EnableImageKevents {
 		flags |= etw.ImageLoad
 	}
-	if k.kstreamConfig.EnableNetKevents {
+	if c.kstreamConfig.EnableNetKevents {
 		flags |= etw.NetTCPIP
 	}
-	if k.kstreamConfig.EnableRegistryKevents {
+	if c.kstreamConfig.EnableRegistryKevents {
 		flags |= etw.Registry
 	}
-	if k.kstreamConfig.EnableFileIOKevents {
+	if c.kstreamConfig.EnableFileIOKevents {
 		flags |= etw.DiskFileIO | etw.FileIO | etw.FileIOInit
 	}
 
-	bufferSize := k.kstreamConfig.BufferSize
+	bufferSize := c.kstreamConfig.BufferSize
 	if bufferSize > maxBufferSize {
 		bufferSize = maxBufferSize
 	}
 	// validate min/max buffers. The minimal
 	// number of buffers is 2 per CPU logical core
-	minBuffers := k.kstreamConfig.MinBuffers
+	minBuffers := c.kstreamConfig.MinBuffers
 	if minBuffers < uint32(runtime.NumCPU()*2) {
 		minBuffers = uint32(runtime.NumCPU() * 2)
 	}
-	maxBuffers := k.kstreamConfig.MaxBuffers
+	maxBuffers := c.kstreamConfig.MaxBuffers
 	maxBuffersAllowed := minBuffers + 20
 	if maxBuffers > maxBuffersAllowed {
 		maxBuffers = maxBuffersAllowed
@@ -157,12 +157,12 @@ func (k *KtraceController) StartKtrace() error {
 		minBuffers = maxBuffers - 20
 	}
 
-	flushTimer := k.kstreamConfig.FlushTimer
+	flushTimer := c.kstreamConfig.FlushTimer
 	if flushTimer < time.Second {
 		flushTimer = time.Second
 	}
 
-	for _, prov := range k.providers {
+	for _, prov := range c.providers {
 		if !prov.Enabled {
 			log.Warnf("provider for trace [%s] is disabled", prov.TraceName)
 			continue
@@ -220,7 +220,7 @@ func (k *KtraceController) StartKtrace() error {
 				}
 				sysTraceFlags[0] = flags
 				// enable object manager tracking
-				if k.kstreamConfig.EnableHandleKevents {
+				if c.kstreamConfig.EnableHandleKevents {
 					sysTraceFlags[4] = etw.Handle
 				}
 				// call again to enable all kernel events. Just to recap. The first call to
@@ -229,13 +229,13 @@ func (k *KtraceController) StartKtrace() error {
 				if err := etw.SetTraceSystemFlags(handleCopy, sysTraceFlags); err != nil {
 					log.Warnf("unable to set trace information: %v", err)
 				}
-				k.insertTrace(traceName, handle, prov.GUID)
+				c.insertTrace(traceName, handle, prov.GUID)
 			} else {
 				// enable the specified trace provider
 				if err := etw.EnableTrace(prov.GUID, handle, prov.Keywords); err != nil {
 					return fmt.Errorf("unable to activate %s provider: %v", traceName, err)
 				}
-				k.insertTrace(traceName, handle, prov.GUID)
+				c.insertTrace(traceName, handle, prov.GUID)
 			}
 		}
 		switch err {
@@ -279,7 +279,7 @@ func (k *KtraceController) StartKtrace() error {
 				}
 				sysTraceFlags[0] = flags
 				// enable object manager tracking
-				if k.kstreamConfig.EnableHandleKevents {
+				if c.kstreamConfig.EnableHandleKevents {
 					sysTraceFlags[4] = etw.Handle
 				}
 				// call again to enable all kernel events. Just to recap. The first call to `TraceSetInformation` with empty
@@ -287,12 +287,12 @@ func (k *KtraceController) StartKtrace() error {
 				if err := etw.SetTraceSystemFlags(handleCopy, sysTraceFlags); err != nil {
 					log.Warnf("unable to set trace information: %v", err)
 				}
-				k.insertTrace(traceName, handle, prov.GUID)
+				c.insertTrace(traceName, handle, prov.GUID)
 			} else {
 				if err := etw.EnableTrace(prov.GUID, handle, prov.Keywords); err != nil {
 					return fmt.Errorf("unable to activate %s provider: %v", traceName, err)
 				}
-				k.insertTrace(traceName, handle, prov.GUID)
+				c.insertTrace(traceName, handle, prov.GUID)
 			}
 		case kerrors.ErrTraceNoSysResources:
 			// get the number of maximum allowed loggers from registry
@@ -318,9 +318,9 @@ func (k *KtraceController) StartKtrace() error {
 	return nil
 }
 
-// CloseKtrace stops currently running trace sessions.
-func (k *KtraceController) CloseKtrace() error {
-	for _, trace := range k.traces {
+// Close stops currently running trace sessions.
+func (c *Controller) Close() error {
+	for _, trace := range c.traces {
 		if !trace.Handle.IsValid() {
 			continue
 		}
@@ -336,15 +336,15 @@ func (k *KtraceController) CloseKtrace() error {
 	return nil
 }
 
-func (k *KtraceController) Traces() map[string]TraceSession {
-	return k.traces
+func (c *Controller) Traces() map[string]TraceSession {
+	return c.traces
 }
 
-func (k *KtraceController) insertTrace(name string, handle etw.TraceHandle, guid windows.GUID) {
+func (c *Controller) insertTrace(name string, handle etw.TraceHandle, guid windows.GUID) {
 	trace := TraceSession{
 		Handle: handle,
 		Name:   name,
 		GUID:   guid,
 	}
-	k.traces[name] = trace
+	c.traces[name] = trace
 }

@@ -19,6 +19,7 @@
 package sys
 
 import (
+	"github.com/rabbitstack/fibratus/pkg/util/typesize"
 	"golang.org/x/sys/windows"
 	"unsafe"
 )
@@ -79,6 +80,19 @@ type ObjectTypeInformation struct {
 // ObjectTypesInformation stores the number of resolved object type names.
 type ObjectTypesInformation struct {
 	NumberOfTypes uint32
+}
+
+// First returns the first object type structure.
+func (o *ObjectTypesInformation) First() *ObjectTypeInformation {
+	p := unsafe.Pointer(uintptr(unsafe.Pointer(o)) + (unsafe.Sizeof(ObjectTypesInformation{})+typesize.Pointer()-1)&^(typesize.Pointer()-1))
+	return (*ObjectTypeInformation)(p)
+}
+
+// Next returns the next object type structure given the previous structure pointer.
+func (*ObjectTypesInformation) Next(typ *ObjectTypeInformation) *ObjectTypeInformation {
+	align := (uintptr(typ.TypeName.MaximumLength) + typesize.Pointer() - 1) &^ (typesize.Pointer() - 1)
+	offset := uintptr(unsafe.Pointer(typ)) + unsafe.Sizeof(ObjectTypeInformation{})
+	return (*ObjectTypeInformation)(unsafe.Pointer(offset + align))
 }
 
 // ObjectNameInformation stores object name information.

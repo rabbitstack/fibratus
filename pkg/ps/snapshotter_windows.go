@@ -20,7 +20,6 @@ package ps
 
 import (
 	"expvar"
-	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"golang.org/x/sys/windows"
 	"path/filepath"
@@ -157,9 +156,6 @@ func (s *snapshotter) Write(e *kevent.Kevent) error {
 }
 
 func (s *snapshotter) AddThread(e *kevent.Kevent) error {
-	if !e.IsCreateThread() {
-		return fmt.Errorf("expected CreateThread but got %s event", e.Name)
-	}
 	pid, err := e.Kparams.GetPid()
 	if err != nil {
 		return err
@@ -186,9 +182,6 @@ func (s *snapshotter) AddThread(e *kevent.Kevent) error {
 }
 
 func (s *snapshotter) AddModule(e *kevent.Kevent) error {
-	if !e.IsLoadImage() {
-		return fmt.Errorf("expected LoadImage but got %s event", e.Name)
-	}
 	pid, err := e.Kparams.GetPid()
 	if err != nil {
 		return err

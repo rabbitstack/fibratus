@@ -55,8 +55,7 @@ func (h *handleProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, 
 
 func (h *handleProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 	name := e.GetParamAsString(kparams.HandleObjectName)
-	typ := e.GetParamAsString(kparams.HandleObjectTypeName)
-
+	typ := e.GetParamAsString(kparams.HandleObjectTypeID)
 	if name != "" {
 		switch typ {
 		case handle.Key:
@@ -79,11 +78,10 @@ func (h *handleProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error)
 				}
 			}
 		}
-	}
-
-	// assign the formatted handle name
-	if err := e.Kparams.SetValue(kparams.HandleObjectName, name); err != nil {
-		return e, err
+		// assign the formatted handle name
+		if err := e.Kparams.SetValue(kparams.HandleObjectName, name); err != nil {
+			return e, err
+		}
 	}
 
 	// anchor object address to event metadata. This is used

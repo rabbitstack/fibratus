@@ -173,6 +173,4 @@ const (
 	HandleObjectName = "handle_name"
 	// HandleObjectTypeID identifies the parameter that represents the kernel object type identifier.
 	HandleObjectTypeID = "type_id"
-	// HandleObjectTypeName identifies the parameter that represents the kernel object type name.
-	HandleObjectTypeName = "handle_type"
 )

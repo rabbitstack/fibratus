@@ -341,7 +341,7 @@ func (e *Kevent) CopyFields(evt *Kevent) {
 			imageFilename, _ := evt.Kparams.GetString(kparams.ImageFilename)
 			e.Kparams.Append(kparams.ImageFilename, kparams.UnicodeString, imageFilename)
 		}
-		_ = e.Kparams.SetValue(kparams.HandleObjectName, evt.GetParamAsString(kparams.HandleObjectTypeName))
+		_ = e.Kparams.SetValue(kparams.HandleObjectName, evt.GetParamAsString(kparams.HandleObjectName))
 	}
 }
 
@@ -457,17 +457,17 @@ func (e *Kevent) Summary() string {
 		return printSummary(e, fmt.Sprintf("received <code>%d</code> bytes from <code>%v</code> and <code>%d</code> port",
 			size, ip, port))
 	case ktypes.CreateHandle:
-		handleType, _ := e.Kparams.GetString(kparams.HandleObjectTypeName)
-		handleName, _ := e.Kparams.GetString(kparams.HandleObjectName)
+		handleType := e.GetParamAsString(kparams.HandleObjectTypeID)
+		handleName := e.GetParamAsString(kparams.HandleObjectName)
 		return printSummary(e, fmt.Sprintf("created <code>%s</code> handle of <code>%s</code> type",
 			handleName, handleType))
 	case ktypes.CloseHandle:
-		handleType, _ := e.Kparams.GetString(kparams.HandleObjectTypeName)
-		handleName, _ := e.Kparams.GetString(kparams.HandleObjectName)
+		handleType := e.GetParamAsString(kparams.HandleObjectTypeID)
+		handleName := e.GetParamAsString(kparams.HandleObjectName)
 		return printSummary(e, fmt.Sprintf("closed <code>%s</code> handle of <code>%s</code> type",
 			handleName, handleType))
 	case ktypes.LoadDriver:
-		driver, _ := e.Kparams.GetString(kparams.ImageFilename)
+		driver := e.GetParamAsString(kparams.ImageFilename)
 		return printSummary(e, fmt.Sprintf("loaded <code>%s</code> driver", driver))
 	}
 	return ""

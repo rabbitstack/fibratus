@@ -248,7 +248,7 @@ func TestFilterRunProcessKevent(t *testing.T) {
 	}
 
 	psnap := new(ps.SnapshotterMock)
-	psnap.On("Find", uint32(1234)).Return(ps1)
+	psnap.On("FindAndPut", uint32(1234)).Return(ps1)
 
 	for i, tt := range tests {
 		f := New(tt.filter, cfg, WithPSnapshotter(psnap))

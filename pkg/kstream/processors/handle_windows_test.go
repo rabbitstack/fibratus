@@ -19,166 +19,86 @@
 package processors
 
 import (
+	"github.com/rabbitstack/fibratus/pkg/fs"
+	"github.com/rabbitstack/fibratus/pkg/handle"
+	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"testing"
 )
 
-func TestCloseHandle(t *testing.T) {
-	//	objectTypeStore := new(objectTypeStoreMock)
-	//	hsnapMock := new(handle.SnapshotterMock)
-	//	devMapper := new(devMapperMock)
-	//	deferredKevts := make(chan *kevent.Kevent, 1)
-	//
-	//	kevt := &kevent.Kevent{
-	//		Type:     ktypes.CloseHandle,
-	//		Tid:      2484,
-	//		PID:      859,
-	//		Category: ktypes.Handle,
-	//		Kparams: kevent.Kparams{
-	//			kparams.HandleID:           {Name: kparams.HandleID, Type: kparams.Uint32, Value: uint32(21)},
-	//			kparams.HandleObjectTypeID: {Name: kparams.HandleObjectTypeID, Type: kparams.Uint16, Value: uint16(23)},
-	//			kparams.HandleObject:       {Name: kparams.HandleObject, Type: kparams.HexInt64, Value: kparams.Hex("ffffd105e9baaf70")},
-	//			kparams.HandleObjectName:   {Name: kparams.HandleObjectName, Type: kparams.UnicodeString, Value: `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\Tcpip\Parameters\Interfaces\{b677c565-6ca5-45d3-b618-736b4e09b036}`},
-	//		},
-	//	}
-	//
-	//	hsnapMock.On("Remove", kevt).Return(nil)
-	//
-	//	hi := newHandleInterceptor(hsnapMock, objectTypeStore, devMapper, deferredKevts)
-	//
-	//	objectTypeStore.On("FindByID", uint8(23)).Return(handle.Key)
-	//
-	//	assert.Len(t, hi.(*handleInterceptor).objects, 0)
-	//
-	//	_, _, err := hi.Intercept(kevt)
-	//	require.NoError(t, err)
-	//
-	//	keyName, err := kevt.Kparams.GetString(kparams.HandleObjectName)
-	//	require.NoError(t, err)
-	//	typ, err := kevt.Kparams.GetString(kparams.HandleObjectTypeName)
-	//	require.NoError(t, err)
-	//	assert.Equal(t, handle.Key, typ)
-	//	assert.Equal(t, `HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\Tcpip\Parameters\Interfaces\{b677c565-6ca5-45d3-b618-736b4e09b036}`, keyName)
-	//}
-	//
-	//func TestHandleCoalescing(t *testing.T) {
-	//	kevt := &kevent.Kevent{
-	//		Type:     ktypes.CreateHandle,
-	//		Tid:      2484,
-	//		PID:      859,
-	//		Category: ktypes.Handle,
-	//		Kparams: kevent.Kparams{
-	//			kparams.HandleID:           {Name: kparams.HandleID, Type: kparams.Uint32, Value: uint32(21)},
-	//			kparams.HandleObjectTypeID: {Name: kparams.HandleObjectTypeID, Type: kparams.Uint16, Value: uint16(23)},
-	//			kparams.HandleObject:       {Name: kparams.HandleObject, Type: kparams.HexInt64, Value: kparams.Hex("ffffd105e9baaf70")},
-	//			kparams.HandleObjectName:   {Name: kparams.HandleObjectName, Type: kparams.UnicodeString, Value: ""},
-	//		},
-	//	}
-	//	deferredKevts := make(chan *kevent.Kevent, 1)
-	//	devMapper := new(devMapperMock)
-	//
-	//	hsnapMock := new(handle.SnapshotterMock)
-	//	objectTypeStore := new(objectTypeStoreMock)
-	//
-	//	hsnapMock.On("Write", mock.Anything).Return(nil)
-	//	hsnapMock.On("Remove", mock.Anything).Return(nil)
-	//
-	//	hi := newHandleInterceptor(hsnapMock, objectTypeStore, devMapper, deferredKevts)
-	//
-	//	objectTypeStore.On("FindByID", uint8(23)).Return(handle.Key)
-	//
-	//	_, _, err := hi.Intercept(kevt)
-	//	require.Error(t, err)
-	//	require.True(t, kerrors.IsCancelUpstreamKevent(err))
-	//
-	//	assert.Len(t, hi.(*handleInterceptor).objects, 1)
-	//
-	//	kevt1 := &kevent.Kevent{
-	//		Type:     ktypes.CloseHandle,
-	//		Tid:      2484,
-	//		PID:      859,
-	//		Category: ktypes.Handle,
-	//		Kparams: kevent.Kparams{
-	//			kparams.HandleID:           {Name: kparams.HandleID, Type: kparams.Uint32, Value: uint32(21)},
-	//			kparams.HandleObjectTypeID: {Name: kparams.HandleObjectTypeID, Type: kparams.Uint16, Value: uint16(23)},
-	//			kparams.HandleObject:       {Name: kparams.HandleObject, Type: kparams.HexInt64, Value: kparams.Hex("ffffd105e9baaf70")},
-	//			kparams.HandleObjectName:   {Name: kparams.HandleObjectName, Type: kparams.UnicodeString, Value: `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\Tcpip\Parameters\Interfaces\{b677c565-6ca5-45d3-b618-736b4e09b036}`},
-	//		},
-	//	}
-	//
-	//	ckevt, _, err := hi.Intercept(kevt1)
-	//	require.NoError(t, err)
-	//
-	//	keyName, err := ckevt.Kparams.GetString(kparams.HandleObjectName)
-	//	require.NoError(t, err)
-	//	assert.Equal(t, `HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\Tcpip\Parameters\Interfaces\{b677c565-6ca5-45d3-b618-736b4e09b036}`, keyName)
-	//
-	//	assert.Len(t, hi.(*handleInterceptor).objects, 0)
-	//
-	//	dkevt := <-deferredKevts
-	//	require.NotNil(t, dkevt)
-	//
-	//	assert.Equal(t, ktypes.CreateHandle, dkevt.Type)
-	//
-	//	keyName, err = dkevt.Kparams.GetString(kparams.HandleObjectName)
-	//	require.NoError(t, err)
-	//	assert.Equal(t, `HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\Tcpip\Parameters\Interfaces\{b677c565-6ca5-45d3-b618-736b4e09b036}`, keyName)
-	//}
-	//
-	//func init() {
-	//	waitPeriod = time.Millisecond * 500
-	//}
-	//
-	//func TestHandleCoalescingWaiting(t *testing.T) {
-	//	kevt := &kevent.Kevent{
-	//		Type:      ktypes.CreateHandle,
-	//		Tid:       2484,
-	//		PID:       859,
-	//		Timestamp: time.Now(),
-	//		Category:  ktypes.Handle,
-	//		Kparams: kevent.Kparams{
-	//			kparams.HandleID:           {Name: kparams.HandleID, Type: kparams.Uint32, Value: uint32(21)},
-	//			kparams.HandleObjectTypeID: {Name: kparams.HandleObjectTypeID, Type: kparams.Uint16, Value: uint16(23)},
-	//			kparams.HandleObject:       {Name: kparams.HandleObject, Type: kparams.HexInt64, Value: kparams.Hex("ffffd105e9baaf70")},
-	//			kparams.HandleObjectName:   {Name: kparams.HandleObjectName, Type: kparams.UnicodeString, Value: ""},
-	//		},
-	//	}
-	//
-	//	deferredKevts := make(chan *kevent.Kevent, 1)
-	//
-	//	devMapper := new(devMapperMock)
-	//	objectTypeStore := new(objectTypeStoreMock)
-	//	hsnapMock := new(handle.SnapshotterMock)
-	//
-	//	hsnapMock.On("Write", mock.Anything).Return(nil)
-	//	hsnapMock.On("Remove", mock.Anything).Return(nil)
-	//
-	//	hi := newHandleInterceptor(hsnapMock, objectTypeStore, devMapper, deferredKevts)
-	//
-	//	objectTypeStore.On("FindByID", uint8(23)).Return(handle.Key)
-	//
-	//	_, _, err := hi.Intercept(kevt)
-	//	require.Error(t, err)
-	//	require.True(t, kerrors.IsCancelUpstreamKevent(err))
-	//
-	//	assert.Len(t, hi.(*handleInterceptor).objects, 1)
-	//
-	//	kevt1 := &kevent.Kevent{
-	//		Type:     ktypes.CloseHandle,
-	//		Tid:      2484,
-	//		PID:      859,
-	//		Category: ktypes.Handle,
-	//		Kparams: kevent.Kparams{
-	//			kparams.HandleID:           {Name: kparams.HandleID, Type: kparams.Uint32, Value: uint32(21)},
-	//			kparams.HandleObjectTypeID: {Name: kparams.HandleObjectTypeID, Type: kparams.Uint16, Value: uint16(23)},
-	//			kparams.HandleObject:       {Name: kparams.HandleObject, Type: kparams.HexInt64, Value: kparams.Hex("affdd155e9baaf70")},
-	//			kparams.HandleObjectName:   {Name: kparams.HandleObjectName, Type: kparams.UnicodeString, Value: `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\Tcpip\Parameters\Interfaces\{b677c565-6ca5-45d3-b618-736b4e09b036}`},
-	//		},
-	//	}
-	//
-	//	time.Sleep(time.Millisecond * 510)
-	//
-	//	_, _, err = hi.Intercept(kevt1)
-	//	require.NoError(t, err)
-	//
-	//	assert.Len(t, hi.(*handleInterceptor).objects, 0)
+func TestHandleProcessor(t *testing.T) {
+	var tests = []struct {
+		name       string
+		e          *kevent.Kevent
+		hsnap      func() *handle.SnapshotterMock
+		assertions func(*kevent.Kevent, *testing.T, *handle.SnapshotterMock)
+	}{
+		{
+			"process create handle",
+			&kevent.Kevent{
+				Type:     ktypes.CreateHandle,
+				Tid:      2484,
+				PID:      859,
+				Category: ktypes.Handle,
+				Kparams: kevent.Kparams{
+					kparams.HandleID:           {Name: kparams.HandleID, Type: kparams.Uint32, Value: uint32(21)},
+					kparams.HandleObjectTypeID: {Name: kparams.HandleObjectTypeID, Type: kparams.AnsiString, Value: "Key"},
+					kparams.HandleObject:       {Name: kparams.HandleObject, Type: kparams.Uint64, Value: uint64(18446692422059208560)},
+					kparams.HandleObjectName:   {Name: kparams.HandleObjectName, Type: kparams.UnicodeString, Value: ""},
+				},
+				Metadata: make(kevent.Metadata),
+			},
+			func() *handle.SnapshotterMock {
+				hsnap := new(handle.SnapshotterMock)
+				hsnap.On("Write", mock.Anything).Return(nil)
+				return hsnap
+			},
+			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock) {
+				assert.True(t, e.Delayed)
+				assert.Equal(t, uint64(18446692422059208560), e.Metadata[kevent.DelayComparatorKey])
+				hsnap.AssertNumberOfCalls(t, "Write", 1)
+			},
+		},
+		{
+			"process close handle",
+			&kevent.Kevent{
+				Type:     ktypes.CloseHandle,
+				Tid:      2484,
+				PID:      859,
+				Category: ktypes.Handle,
+				Kparams: kevent.Kparams{
+					kparams.HandleID:           {Name: kparams.HandleID, Type: kparams.Uint32, Value: uint32(21)},
+					kparams.HandleObjectTypeID: {Name: kparams.HandleObjectTypeID, Type: kparams.AnsiString, Value: "Key"},
+					kparams.HandleObject:       {Name: kparams.HandleObject, Type: kparams.Uint64, Value: uint64(18446692422059208560)},
+					kparams.HandleObjectName:   {Name: kparams.HandleObjectName, Type: kparams.UnicodeString, Value: `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\Tcpip\Parameters\Interfaces\{b677c565-6ca5-45d3-b618-736b4e09b036}`},
+				},
+				Metadata: make(kevent.Metadata),
+			},
+			func() *handle.SnapshotterMock {
+				hsnap := new(handle.SnapshotterMock)
+				hsnap.On("Remove", mock.Anything).Return(nil)
+				return hsnap
+			},
+			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock) {
+				assert.Equal(t, `HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\Tcpip\Parameters\Interfaces\{b677c565-6ca5-45d3-b618-736b4e09b036}`, e.GetParamAsString(kparams.HandleObjectName))
+				assert.Equal(t, uint64(18446692422059208560), e.Metadata[kevent.DelayComparatorKey])
+				hsnap.AssertNumberOfCalls(t, "Remove", 1)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			hsnap := tt.hsnap()
+			p := newHandleProcessor(hsnap, fs.NewDevMapper())
+			var err error
+			tt.e, _, err = p.ProcessEvent(tt.e)
+			require.NoError(t, err)
+			tt.assertions(tt.e, t, hsnap)
+		})
+	}
 }

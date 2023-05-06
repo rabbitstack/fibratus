@@ -61,7 +61,7 @@ type CreateCallback func(pid uint32, handle htypes.Handle)
 type DestroyCallback func(pid uint32, rawHandle windows.Handle)
 
 // SnapshotBuildCompleted is the function type for snapshot completed signal
-type SnapshotBuildCompleted func(total uint64, withName uint64)
+type SnapshotBuildCompleted func(total uint64, named uint64)
 
 // Snapshotter keeps the system-wide snapshot of allocated handles always when handle kernel events are enabled or
 // supported on the target system. It also provides facilities for obtaining a list of handles pertaining to the specific
@@ -83,10 +83,12 @@ type Snapshotter interface {
 	RegisterDestroyCallback(fn DestroyCallback)
 	// GetSnapshot returns all the handles present in the snapshotter state.
 	GetSnapshot() []htypes.Handle
+	// Close closes snapshotter and disposes all allocated resources.
+	Close() error
 }
 
 type snapshotter struct {
-	sync.Mutex
+	mu                     sync.Mutex
 	handlesByObject        map[uint64]htypes.Handle
 	hc                     chan htypes.Handle
 	hdone                  chan struct{}
@@ -138,8 +140,8 @@ func NewFromKcap(handles []htypes.Handle) Snapshotter {
 }
 
 func (s *snapshotter) FindByObject(object uint64) (htypes.Handle, bool) {
-	s.Lock()
-	defer s.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if h, ok := s.handlesByObject[object]; ok {
 		return h, ok
 	}
@@ -152,8 +154,8 @@ func (s *snapshotter) FindHandles(pid uint32) ([]htypes.Handle, error) {
 	}
 	if s.capture {
 		handles := make([]htypes.Handle, 0)
-		s.Lock()
-		defer s.Unlock()
+		s.mu.Lock()
+		defer s.mu.Unlock()
 		for _, h := range s.handlesByObject {
 			if h.Pid == pid {
 				handles = append(handles, h)
@@ -167,8 +169,8 @@ func (s *snapshotter) FindHandles(pid uint32) ([]htypes.Handle, error) {
 		// process will always fail, so our best effort is to collect handles for those
 		// processes in the snapshot's state
 		handles := make([]htypes.Handle, 0)
-		s.Lock()
-		defer s.Unlock()
+		s.mu.Lock()
+		defer s.mu.Unlock()
 		for _, h := range s.handlesByObject {
 			if h.Pid == pid && h.Type != "" {
 				handles = append(handles, h)
@@ -300,18 +302,18 @@ func (s *snapshotter) consumeHandles() {
 	for {
 		select {
 		case h := <-s.hc:
-			s.Lock()
+			s.mu.Lock()
 			handleSnapshotCount.Add(1)
 			handleSnapshotBytes.Add(int64(h.Len()))
 			s.handlesByObject[h.Object] = h
-			s.Unlock()
+			s.mu.Unlock()
 		case <-s.hdone:
 			log.Debug("initial handle enumeration has finalized")
-			s.Lock()
-			var withName uint64
+			s.mu.Lock()
+			var named uint64
 			for _, h := range s.handlesByObject {
 				if h.Name != "" {
-					withName++
+					named++
 				}
 				if s.createCallback != nil && h.Type == File {
 					// for safety reasons related to deadlocks we are skipping file handles
@@ -322,9 +324,9 @@ func (s *snapshotter) consumeHandles() {
 					}
 				}
 			}
-			s.Unlock()
+			s.mu.Unlock()
 			if s.snapshotBuildCompleted != nil {
-				s.snapshotBuildCompleted(uint64(len(s.handlesByObject)), withName)
+				s.snapshotBuildCompleted(uint64(len(s.handlesByObject)), named)
 			}
 			return
 		}
@@ -352,7 +354,7 @@ func (s *snapshotter) housekeeping() {
 				}
 				sysHandles := (*[1 << 30]sys.SystemHandleTableEntryInfoEx)(unsafe.Pointer(&sysHandleInfo.Handles[0]))[:count:count]
 
-				s.Lock()
+				s.mu.Lock()
 				for _, sysHandle := range sysHandles {
 					if handle, ok := s.handlesByObject[sysHandle.Object]; !ok {
 						handleSnapshotCount.Add(-1)
@@ -360,7 +362,7 @@ func (s *snapshotter) housekeeping() {
 						delete(s.handlesByObject, sysHandle.Object)
 					}
 				}
-				s.Unlock()
+				s.mu.Unlock()
 
 				break loop
 			} else {
@@ -396,9 +398,9 @@ func (s *snapshotter) Write(e *kevent.Kevent) error {
 	if err != nil {
 		return err
 	}
-	s.Lock()
+	s.mu.Lock()
 	s.handlesByObject[obj] = h
-	s.Unlock()
+	s.mu.Unlock()
 	return nil
 }
 
@@ -410,15 +412,20 @@ func (s *snapshotter) Remove(e *kevent.Kevent) error {
 	if err != nil {
 		return err
 	}
-	s.Lock()
+	s.mu.Lock()
 	delete(s.handlesByObject, obj)
-	s.Unlock()
+	s.mu.Unlock()
+	return nil
+}
+
+func (s *snapshotter) Close() error {
+	s.housekeepTick.Stop()
 	return nil
 }
 
 func unwrapHandle(e *kevent.Kevent) htypes.Handle {
 	h := htypes.Handle{}
-	h.Type, _ = e.Kparams.GetString(kparams.HandleObjectTypeName)
+	h.Type = e.GetParamAsString(kparams.HandleObjectTypeID)
 	h.Object, _ = e.Kparams.GetUint64(kparams.HandleObject)
 	h.Name, _ = e.Kparams.GetString(kparams.HandleObjectName)
 	return h

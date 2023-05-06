@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 by Nedim Sabic Sabic
+ * Copyright 2021-2022 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -16,27 +16,26 @@
  * limitations under the License.
  */
 
-package common
+package bootstrap
 
 import (
-	log "github.com/sirupsen/logrus"
-	"os"
-	"os/signal"
-	"syscall"
+	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/util/log"
 )
 
-// Signals set ups the signal handler.
-func Signals() chan struct{} {
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
-
-	stopCh := make(chan struct{})
-
-	go func() {
-		sig := <-sigCh
-		log.Infof("got signal %q, shutting down...", sig)
-		stopCh <- struct{}{}
-	}()
-
-	return stopCh
+// InitConfigAndLogger initializes the configuration and sets up the logger.
+func InitConfigAndLogger(cfg *config.Config) error {
+	if err := cfg.TryLoadFile(cfg.File()); err != nil {
+		return err
+	}
+	if err := cfg.Init(); err != nil {
+		return err
+	}
+	if err := cfg.Validate(); err != nil {
+		return err
+	}
+	if err := log.InitFromConfig(cfg.Log); err != nil {
+		return err
+	}
+	return nil
 }

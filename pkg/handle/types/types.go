@@ -25,10 +25,9 @@ import (
 	"expvar"
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/sys"
-	"github.com/rabbitstack/fibratus/pkg/util/typesize"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
 	"strings"
-	"unsafe"
 )
 
 // Meta represents the type alias for handle meta information
@@ -137,31 +136,15 @@ func ConvertTypeIDToName(id uint16) string {
 }
 
 func queryObjectTypes() {
-	objectTypes, err := sys.QueryObject[sys.ObjectTypesInformation](
-		0,
-		sys.ObjectTypesInformationClass)
+	objectTypes, err := sys.QueryObject[sys.ObjectTypesInformation](0, sys.ObjectTypesInformationClass)
 	if err != nil {
+		log.Warnf("unable to query object types: %v", err)
 		return
 	}
 	typesCount.Add(int64(objectTypes.NumberOfTypes))
-	// heavily influenced by ProcessHacker pointer arithmetic hackery to
-	// dereference the first and all subsequent file object type instances
-	// starting from the address of the TypesInformation structure
-	objectTypeInfo := (*sys.ObjectTypeInformation)(first(objectTypes))
+	objectTypeInfo := objectTypes.First()
 	for i := 0; i < int(objectTypes.NumberOfTypes); i++ {
-		objectTypeInfo = (*sys.ObjectTypeInformation)(next(objectTypeInfo))
+		objectTypeInfo = objectTypes.Next(objectTypeInfo)
 		typeNames[uint16(objectTypeInfo.TypeIndex)] = objectTypeInfo.TypeName.String()
 	}
-}
-
-func first(types *sys.ObjectTypesInformation) unsafe.Pointer {
-	return unsafe.Pointer(uintptr(unsafe.Pointer(types)) +
-		(unsafe.Sizeof(sys.ObjectTypesInformation{})+typesize.Pointer()-1)&^
-			(typesize.Pointer()-1))
-}
-
-func next(typ *sys.ObjectTypeInformation) unsafe.Pointer {
-	align := (uintptr(typ.TypeName.MaximumLength) + typesize.Pointer() - 1) &^ (typesize.Pointer() - 1)
-	offset := uintptr(unsafe.Pointer(typ)) + unsafe.Sizeof(sys.ObjectTypeInformation{})
-	return unsafe.Pointer(offset + align)
 }

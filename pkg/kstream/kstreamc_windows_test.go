@@ -61,16 +61,16 @@ func TestRundownEvents(t *testing.T) {
 		EnableRegistryKevents: true,
 	}
 
-	kctrl := NewKtraceController(kstreamConfig)
-	require.NoError(t, kctrl.StartKtrace())
-	defer kctrl.CloseKtrace()
+	kctrl := NewController(kstreamConfig)
+	require.NoError(t, kctrl.Start())
+	defer kctrl.Close()
 	kstreamc := NewConsumer(psnap, hsnap, &config.Config{
 		Kstream:  kstreamConfig,
 		KcapFile: "fake.kcap", // simulate capture to receive state/rundown events
 		Filters:  &config.Filters{},
 	})
-	require.NoError(t, kstreamc.OpenKstream(kctrl.Traces()))
-	defer kstreamc.CloseKstream()
+	require.NoError(t, kstreamc.Open(kctrl.Traces()))
+	defer kstreamc.Close()
 
 	rundownsByType := map[ktypes.Ktype]bool{
 		ktypes.ProcessRundown: false,
@@ -228,12 +228,12 @@ func TestConsumerEvents(t *testing.T) {
 		EnableRegistryKevents: true,
 	}
 
-	kctrl := NewKtraceController(kstreamConfig)
-	require.NoError(t, kctrl.StartKtrace())
-	defer kctrl.CloseKtrace()
+	kctrl := NewController(kstreamConfig)
+	require.NoError(t, kctrl.Start())
+	defer kctrl.Close()
 	kstreamc := NewConsumer(psnap, hsnap, &config.Config{Kstream: kstreamConfig, Filters: &config.Filters{}})
-	require.NoError(t, kstreamc.OpenKstream(kctrl.Traces()))
-	defer kstreamc.CloseKstream()
+	require.NoError(t, kstreamc.Open(kctrl.Traces()))
+	defer kstreamc.Close()
 
 	time.Sleep(time.Second * 2)
 

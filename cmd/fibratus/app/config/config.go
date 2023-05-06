@@ -20,7 +20,7 @@ package config
 
 import (
 	"fmt"
-	"github.com/rabbitstack/fibratus/cmd/fibratus/common"
+	"github.com/rabbitstack/fibratus/internal/bootstrap"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/util/rest"
@@ -44,7 +44,7 @@ func init() {
 }
 
 func printConfig(cmd *cobra.Command, args []string) error {
-	if err := common.InitConfigAndLogger(cfg); err != nil {
+	if err := bootstrap.InitConfigAndLogger(cfg); err != nil {
 		return err
 	}
 	body, err := rest.Get(rest.WithTransport(cfg.API.Transport), rest.WithURI("config"))

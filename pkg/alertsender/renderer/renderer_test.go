@@ -22,7 +22,6 @@ import (
 	"github.com/antchfx/htmlquery"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	"github.com/rabbitstack/fibratus/pkg/config"
-	"github.com/rabbitstack/fibratus/pkg/fs"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
@@ -66,7 +65,7 @@ func TestHTMLFormatterRuleAlert(t *testing.T) {
 					kparams.FileObject:    {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(12456738026482168384)},
 					kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
 					kparams.FileType:      {Name: kparams.FileType, Type: kparams.AnsiString, Value: "file"},
-					kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: fs.FileDisposition(1)},
+					kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: uint32(1)},
 				},
 				Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 				PS: &pstypes.PS{

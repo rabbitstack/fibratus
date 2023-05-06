@@ -20,19 +20,10 @@ package service
 
 import (
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/filter"
-	"github.com/rabbitstack/fibratus/pkg/sys"
-	"github.com/rabbitstack/fibratus/pkg/yara"
+	"github.com/rabbitstack/fibratus/internal/bootstrap"
 	"time"
 
-	"github.com/rabbitstack/fibratus/cmd/fibratus/common"
-	"github.com/rabbitstack/fibratus/pkg/aggregator"
-	"github.com/rabbitstack/fibratus/pkg/api"
 	"github.com/rabbitstack/fibratus/pkg/config"
-	"github.com/rabbitstack/fibratus/pkg/handle"
-	"github.com/rabbitstack/fibratus/pkg/kstream"
-	"github.com/rabbitstack/fibratus/pkg/ps"
-	ver "github.com/rabbitstack/fibratus/pkg/util/version"
 	"github.com/spf13/cobra"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
@@ -40,8 +31,6 @@ import (
 	"golang.org/x/sys/windows/svc/eventlog"
 	"golang.org/x/sys/windows/svc/mgr"
 )
-
-var Version string
 
 var StartCommand = &cobra.Command{
 	Use:   "start-service",
@@ -68,9 +57,8 @@ var (
 	// windows event logger
 	evtlog debug.Log
 
-	ktracec  *kstream.KtraceController
-	kstreamc kstream.Consumer
-	agg      *aggregator.BufferedAggregator
+	// entrypoint application
+	app *bootstrap.App
 )
 
 func init() {
@@ -200,84 +188,21 @@ loop:
 	}
 
 	changes <- svc.Status{State: svc.StopPending}
-
-	if ktracec != nil {
-		_ = ktracec.CloseKtrace()
+	if app != nil {
+		_ = app.Shutdown()
 	}
-	if kstreamc != nil {
-		_ = kstreamc.CloseKstream()
-	}
-	if agg != nil {
-		_ = agg.Stop()
-	}
-	_ = handle.CloseTimeout()
-	_ = api.CloseServer()
-
 	changes <- svc.Status{State: svc.Stopped}
 
 	return true, 0
 }
 
 func (s *fsvc) run() error {
-	if err := common.InitConfigAndLogger(cfg); err != nil {
-		return err
-	}
-	// inject SeDebugPrivilege in access token
-	if cfg.DebugPrivilege {
-		sys.SetDebugPrivilege()
-	}
-	ver.Set(Version)
-
-	ktracec = kstream.NewKtraceController(cfg.Kstream)
-	err := ktracec.StartKtrace()
+	var err error
+	app, err = bootstrap.NewApp(cfg, bootstrap.WithDebugPrivilege())
 	if err != nil {
 		return err
 	}
-
-	// initialize handle/process snapshotters and try to open the kernel event stream
-	hsnap := handle.NewSnapshotter(cfg, nil)
-	psnap := ps.NewSnapshotter(hsnap, cfg)
-	kstreamc = kstream.NewConsumer(psnap, hsnap, cfg)
-
-	// initialize rules engine
-	rules := filter.NewRules(psnap, cfg)
-	err = rules.Compile()
-	if err != nil {
-		return err
-	}
-
-	// open the event stream, start processing events and forwarding to outputs
-	err = kstreamc.OpenKstream(ktracec.Traces())
-	if err != nil {
-		return err
-	}
-
-	agg, err = aggregator.NewBuffered(
-		kstreamc.Events(),
-		kstreamc.Errors(),
-		cfg.Aggregator,
-		cfg.Output,
-		cfg.Transformers,
-		cfg.Alertsenders,
-	)
-	if err != nil {
-		return err
-	}
-	agg.AddListener(rules)
-	if cfg.Yara.Enabled {
-		scanner, err := yara.NewScanner(psnap, cfg.Yara)
-		if err != nil {
-			return err
-		}
-		agg.AddListener(scanner)
-	}
-	agg.Run()
-
-	if err := api.StartServer(cfg); err != nil {
-		return err
-	}
-
-	return nil
+	return app.Run(nil)
 }
 
 // Run runs the service handler.

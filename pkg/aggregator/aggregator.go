@@ -87,7 +87,7 @@ type BufferedAggregator struct {
 
 // NewBuffered creates a new instance of the event aggregator.
 func NewBuffered(
-	kevents chan *kevent.Kevent,
+	evts chan *kevent.Kevent,
 	errs chan error,
 	aggConfig Config,
 	outputConfig outputs.Config,
@@ -99,7 +99,7 @@ func NewBuffered(
 		flushInterval = time.Millisecond * 250
 	}
 	agg := &BufferedAggregator{
-		kevtsc:    kevents,
+		kevtsc:    evts,
 		kevts:     make([]*kevent.Kevent, 0),
 		errsc:     errs,
 		stop:      make(chan struct{}, 1),

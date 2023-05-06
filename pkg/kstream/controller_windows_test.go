@@ -18,37 +18,54 @@
 
 package kstream
 
-//func TestStartKtrace(t *testing.T) {
-//	startTrace = func(name string, flags *etw.EventTraceProperties) (etw.TraceHandle, error) {
-//		return etw.TraceHandle(1), nil
-//	}
-//	enableTrace = func(guid syscall.GUID, handle etw.TraceHandle, keyword uint32) error {
-//		return nil
-//	}
-//
-//	ktracec := NewKtraceController(config.KstreamConfig{
-//		EnableThreadKevents:           true,
-//		EnableNetKevents:              true,
-//		BufferSize:                    1024,
-//		FlushTimer:                    time.Millisecond * 2300,
-//		EnableAntimalwareEngineEvents: true,
-//		EnableAuditAPIEvents:          true,
-//	})
-//
-//	err := ktracec.StartKtrace()
-//
-//	require.NoError(t, err)
-//	assert.Len(t, ktracec.(*ktraceController).traces, 4)
-//}
-//
-//func TestStartKtraceNoSysResources(t *testing.T) {
-//	startTrace = func(name string, props *etw.EventTraceProperties) (etw.TraceHandle, error) {
-//		return etw.TraceHandle(0), errors.ErrTraceNoSysResources
-//	}
-//
-//	ktracec := NewKtraceController(config.KstreamConfig{EnableThreadKevents: true, BufferSize: 1024})
-//
-//	err := ktracec.StartKtrace()
-//
-//	require.Error(t, err)
-//}
+import (
+	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/sys/etw"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"testing"
+	"time"
+)
+
+func TestStartTraces(t *testing.T) {
+	var tests = []struct {
+		name         string
+		cfg          config.KstreamConfig
+		wantSessions int
+	}{
+		{"start kernel logger session",
+			config.KstreamConfig{
+				EnableThreadKevents: true,
+				EnableNetKevents:    true,
+				EnableFileIOKevents: true,
+				BufferSize:          1024,
+				FlushTimer:          time.Millisecond * 2300,
+			},
+			1,
+		},
+		{"start kernel logger and audit api sessions",
+			config.KstreamConfig{
+				EnableThreadKevents:  true,
+				EnableNetKevents:     true,
+				EnableFileIOKevents:  true,
+				BufferSize:           1024,
+				FlushTimer:           time.Millisecond * 2300,
+				EnableAuditAPIEvents: true,
+			},
+			2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := NewController(tt.cfg)
+			require.NoError(t, ctrl.Start())
+			defer ctrl.Close()
+			assert.Equal(t, tt.wantSessions, len(ctrl.traces))
+			for _, trace := range ctrl.traces {
+				require.True(t, trace.Handle.IsValid())
+				require.NoError(t, etw.ControlTrace(trace.Handle, trace.Name, trace.GUID, etw.Query))
+			}
+		})
+	}
+}

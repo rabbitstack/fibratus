@@ -114,6 +114,9 @@ func GetHandleWithTimeout(handle windows.Handle, timeout uint32) (string, error)
 func CloseTimeout() error {
 	_ = windows.CloseHandle(tmt.ini)
 	_ = windows.CloseHandle(tmt.done)
+	if tmt.thread != 0 {
+		return sys.TerminateThread(tmt.thread, 0)
+	}
 	return nil
 }
 

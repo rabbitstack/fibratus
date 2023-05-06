@@ -33,13 +33,18 @@ import (
 // RootCmd is the entrance to Fibratus CLI
 var RootCmd = &cobra.Command{
 	Use:   "fibratus",
-	Short: "Modern tool for the kernel observability and exploration",
+	Short: "Modern tool for the kernel observability and exploration with a focus on security",
 	Long: `
-	Fibratus is a tool for exploration and tracing of the Windows kernel.
+	Fibratus is a tool for exploration and tracing of the Windows kernel with a focus on security.
 	It lets you trap system-wide events such as process life-cycle, file system I/O,
 	registry modifications or network requests among many other observability signals.
-	In a nutshell, Fibratus allows for gaining deep operational visibility into the Windows
-	kernel but also processes running on top of it.
+	Events can be shipped to a wide array of output sinks or dumped to capture files
+    for local inspection and forensics analysis. The powerful filtering engine permits
+    drilling into the event flux entrails and the rules engine is capable of detecting
+    stealthy adversary attacks and sophisticated threats.
+
+	You can use filaments to extend Fibratus with your own arsenal of tools and so leverage
+    the power of the Python ecosystem
 	`,
 	SilenceUsage: true,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {

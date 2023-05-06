@@ -19,7 +19,6 @@
 package filter
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows/registry"
@@ -547,7 +546,7 @@ func TestComplexSequenceRule(t *testing.T) {
 		},
 		Kparams: kevent.Kparams{
 			kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
-			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: fs.FileDisposition(2)},
+			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: uint32(2)},
 		},
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
@@ -641,7 +640,7 @@ func TestSequencePsUUID(t *testing.T) {
 		},
 		Kparams: kevent.Kparams{
 			kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
-			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: fs.FileDisposition(2)},
+			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: uint32(2)},
 		},
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
@@ -689,7 +688,7 @@ func TestSequenceAndSimpleRuleMix(t *testing.T) {
 		},
 		Kparams: kevent.Kparams{
 			kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
-			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: fs.FileDisposition(2)},
+			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: uint32(2)},
 		},
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
