@@ -69,5 +69,6 @@ func capture(cmd *cobra.Command, args []string) error {
 	}
 	spin = spinner.Show("Capturing")
 	app.Wait()
+	spin.Stop()
 	return app.Shutdown()
 }

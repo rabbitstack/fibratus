@@ -113,7 +113,7 @@ const (
 	// RegValue identifies the parameter name that contains the value
 	RegValue = "value"
 	// RegValueType identifies the parameter that represents registry value type e.g (DWORD, BINARY)
-	RegValueType = "type"
+	RegValueType = "value_type"
 
 	// ImageBase identifies the parameter name for the base address of the process in which the image is loaded.
 	ImageBase = "base_address"

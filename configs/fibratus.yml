@@ -192,7 +192,7 @@ kstream:
   # Determines which events are dropped either by the event name or the process' image
   # name that triggered the event.
   blacklist:
-    # Contains a list of kernel event names that are dropped from the event stream
+    # Contains a list of event names that are dropped from the event stream
     events:
       - CloseFile
     # Contains a list of case-sensitive process image names including the extension.

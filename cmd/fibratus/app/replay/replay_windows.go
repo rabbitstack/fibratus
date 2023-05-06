@@ -19,6 +19,7 @@
 package replay
 
 import (
+	"context"
 	"github.com/rabbitstack/fibratus/internal/bootstrap"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/spf13/cobra"
@@ -26,7 +27,7 @@ import (
 
 var Command = &cobra.Command{
 	Use:   "replay",
-	Short: "Replay kernel event flow from the kcap file",
+	Short: "Replay event stream from the kcap (capture) file",
 	RunE:  replay,
 }
 
@@ -40,11 +41,13 @@ func init() {
 }
 
 func replay(cmd *cobra.Command, args []string) error {
-	app, err := bootstrap.NewApp(cfg, bootstrap.WithSignals())
+	app, err := bootstrap.NewApp(cfg, bootstrap.WithSignals(), bootstrap.WithCaptureReplay())
 	if err != nil {
 		return err
 	}
-	if err := app.ReadCapture(args); err != nil {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if err := app.ReadCapture(ctx, args); err != nil {
 		return err
 	}
 	app.Wait()

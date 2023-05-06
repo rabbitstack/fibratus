@@ -72,9 +72,9 @@ func NewReader(filename string, config *config.Config) (Reader, error) {
 	}
 	bytes.InitNativeEndian(mag)
 	// from now on all byte reads will use the endianness of the magic number.
-	// This guarantees we'll be able to replay kcaptures that were taken
+	// This guarantees we'll be able to replay captures that were taken
 	// on a machine with a different endianness from the machine where
-	// actual kcapture is being read.
+	// actual capture is being read.
 	if bytes.ReadUint64(mag) != magic {
 		return nil, errKcapMagicMismatch
 	}

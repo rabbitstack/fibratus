@@ -63,7 +63,7 @@ type snapshotter struct {
 func NewSnapshotter(hsnap handle.Snapshotter, config *config.Config) Snapshotter {
 	s := &snapshotter{
 		procs:  make(map[uint32]*pstypes.PS),
-		quit:   make(chan struct{}),
+		quit:   make(chan struct{}, 1),
 		config: config,
 		hsnap:  hsnap,
 	}
@@ -83,7 +83,7 @@ func NewSnapshotter(hsnap handle.Snapshotter, config *config.Config) Snapshotter
 func NewSnapshotterFromKcap(hsnap handle.Snapshotter, config *config.Config) Snapshotter {
 	s := &snapshotter{
 		procs:   make(map[uint32]*pstypes.PS),
-		quit:    make(chan struct{}),
+		quit:    make(chan struct{}, 1),
 		config:  config,
 		hsnap:   hsnap,
 		capture: true,

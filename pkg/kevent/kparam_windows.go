@@ -25,7 +25,6 @@ import (
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/rabbitstack/fibratus/pkg/util/ip"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
@@ -38,6 +37,7 @@ import (
 	"unsafe"
 )
 
+// unknownKeysCount counts the number of times the registry key failed to convert from native format
 var unknownKeysCount = expvar.NewInt("registry.unknown.keys.count")
 
 // NewKparam creates a new event parameter. Since the parameter type is already categorized,
@@ -74,12 +74,11 @@ func (k Kparam) String() string {
 	case kparams.UnicodeString, kparams.AnsiString, kparams.FilePath:
 		return k.Value.(string)
 	case kparams.SID, kparams.WbemSID:
-		isWbem := k.Type == kparams.WbemSID
-		account, domain, err := sys.LookupAccount(k.Value.([]byte), isWbem)
+		sid, err := getSID(&k)
 		if err != nil {
 			return ""
 		}
-		return joinSID(account, domain)
+		return sid.String()
 	case kparams.FileDosPath:
 		return devMapper.Convert(k.Value.(string))
 	case kparams.Key:
@@ -145,14 +144,15 @@ func (k Kparam) String() string {
 		}
 		return k.Enum[v]
 	case kparams.Flags:
-		v, ok := k.Value.(uint32)
+		if k.Flags == nil {
+			return ""
+		}
+		f := k.Value
+		v, ok := f.(uint32)
 		if !ok {
 			return ""
 		}
-		if k.Flags != nil {
-			return k.Flags.String(v)
-		}
-		return ""
+		return k.Flags.String(v)
 	case kparams.Slice:
 		switch slice := k.Value.(type) {
 		case []string:
@@ -174,6 +174,10 @@ func (kpars Kparams) GetSID() (*windows.SID, error) {
 	if err != nil {
 		return nil, err
 	}
+	return getSID(kpar)
+}
+
+func getSID(kpar *Kparam) (*windows.SID, error) {
 	sid, ok := kpar.Value.([]byte)
 	if !ok {
 		return nil, fmt.Errorf("unable to type cast %q parameter to []byte value", kparams.UserSID)
@@ -240,13 +244,13 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 		sid, soffset = evt.ReadSID(offset)
 		name, noffset = evt.ReadAnsiString(soffset)
 		cmdline, _ = evt.ReadUTF16String(soffset + noffset)
-		e.AppendParam(kparams.ProcessObject, kparams.HexInt64, kproc)
+		e.AppendParam(kparams.ProcessObject, kparams.Address, kproc)
 		e.AppendParam(kparams.ProcessID, kparams.PID, pid)
 		e.AppendParam(kparams.ProcessParentID, kparams.PID, ppid)
 		e.AppendParam(kparams.ProcessRealParentID, kparams.PID, evt.Header.ProcessID)
 		e.AppendParam(kparams.SessionID, kparams.Uint32, sessionID)
 		e.AppendParam(kparams.ExitStatus, kparams.Status, exitStatus)
-		e.AppendParam(kparams.DTB, kparams.HexInt64, dtb)
+		e.AppendParam(kparams.DTB, kparams.Address, dtb)
 		e.AppendParam(kparams.UserSID, kparams.WbemSID, sid)
 		e.AppendParam(kparams.ProcessName, kparams.AnsiString, name)
 		e.AppendParam(kparams.Cmdline, kparams.UnicodeString, cmdline)
@@ -316,7 +320,7 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 		if evt.BufferLen >= 16 {
 			handleName = evt.ConsumeUTF16String(14)
 		}
-		e.AppendParam(kparams.HandleObject, kparams.Uint64, object)
+		e.AppendParam(kparams.HandleObject, kparams.Address, object)
 		e.AppendParam(kparams.HandleID, kparams.Uint32, handleID)
 		e.AppendParam(kparams.HandleObjectTypeID, kparams.HandleType, typeID)
 		e.AppendParam(kparams.HandleObjectName, kparams.UnicodeString, handleName)
@@ -382,7 +386,7 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 		} else {
 			keyName = evt.ConsumeUTF16String(20)
 		}
-		e.AppendParam(kparams.RegKeyHandle, kparams.Uint64, keyHandle)
+		e.AppendParam(kparams.RegKeyHandle, kparams.Address, keyHandle)
 		e.AppendParam(kparams.RegKeyName, kparams.Key, keyName)
 		e.AppendParam(kparams.NTStatus, kparams.Status, status)
 	case ktypes.CreateFile:
@@ -407,8 +411,8 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 			fileObject = evt.ReadUint64(0)
 			filename = evt.ConsumeUTF16String(8)
 		}
-		e.AppendParam(kparams.FileIrpPtr, kparams.Uint64, irp)
-		e.AppendParam(kparams.FileObject, kparams.Uint64, fileObject)
+		e.AppendParam(kparams.FileIrpPtr, kparams.Address, irp)
+		e.AppendParam(kparams.FileObject, kparams.Address, fileObject)
 		e.AppendParam(kparams.ThreadID, kparams.TID, tid)
 		e.AppendParam(kparams.FileShareMask, kparams.Flags, shareAccess, WithFlags(FileShareModeFlags))
 		e.AppendParam(kparams.FileAttributes, kparams.Flags, fileAttributes, WithFlags(FileAttributeFlags))
@@ -425,8 +429,8 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 			extraInfo = evt.ReadUint64(8)
 			status = evt.ReadUint32(16)
 		}
-		e.AppendParam(kparams.FileIrpPtr, kparams.Uint64, irp)
-		e.AppendParam(kparams.FileExtraInfo, kparams.Uint64, extraInfo)
+		e.AppendParam(kparams.FileIrpPtr, kparams.Address, irp)
+		e.AppendParam(kparams.FileExtraInfo, kparams.Address, extraInfo)
 		e.AppendParam(kparams.NTStatus, kparams.Status, status)
 	case ktypes.FileRundown:
 		var (
@@ -437,7 +441,7 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 			fileObject = evt.ReadUint64(0)
 			filename = evt.ConsumeUTF16String(8)
 		}
-		e.AppendParam(kparams.FileObject, kparams.Uint64, fileObject)
+		e.AppendParam(kparams.FileObject, kparams.Address, fileObject)
 		e.AppendParam(kparams.FileName, kparams.FileDosPath, filename)
 	case ktypes.ReleaseFile, ktypes.CloseFile:
 		var (
@@ -454,9 +458,9 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 			fileKey = evt.ReadUint64(16)
 			tid = evt.ReadUint32(24)
 		}
-		e.AppendParam(kparams.FileIrpPtr, kparams.Uint64, irp)
-		e.AppendParam(kparams.FileObject, kparams.Uint64, fileObject)
-		e.AppendParam(kparams.FileKey, kparams.Uint64, fileKey)
+		e.AppendParam(kparams.FileIrpPtr, kparams.Address, irp)
+		e.AppendParam(kparams.FileObject, kparams.Address, fileObject)
+		e.AppendParam(kparams.FileKey, kparams.Address, fileKey)
 		e.AppendParam(kparams.ThreadID, kparams.TID, tid)
 	case ktypes.DeleteFile,
 		ktypes.RenameFile,
@@ -484,9 +488,9 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 			fileKey = evt.ReadUint64(18)
 			extraInfo = evt.ReadUint64(28)
 		}
-		e.AppendParam(kparams.FileIrpPtr, kparams.Uint64, irp)
-		e.AppendParam(kparams.FileObject, kparams.Uint64, fileObject)
-		e.AppendParam(kparams.FileKey, kparams.Uint64, fileKey)
+		e.AppendParam(kparams.FileIrpPtr, kparams.Address, irp)
+		e.AppendParam(kparams.FileObject, kparams.Address, fileObject)
+		e.AppendParam(kparams.FileKey, kparams.Address, fileKey)
 		e.AppendParam(kparams.ThreadID, kparams.TID, tid)
 		e.AppendParam(kparams.FileExtraInfo, kparams.Uint64, extraInfo)
 		e.AppendParam(kparams.FileInfoClass, kparams.Enum, infoClass, WithEnum(fs.FileInfoClasses))
@@ -513,9 +517,9 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 			fileKey = evt.ReadUint64(28)
 			tid = evt.ReadUint32(16)
 		}
-		e.AppendParam(kparams.FileIrpPtr, kparams.Uint64, irp)
-		e.AppendParam(kparams.FileObject, kparams.Uint64, fileObject)
-		e.AppendParam(kparams.FileKey, kparams.Uint64, fileKey)
+		e.AppendParam(kparams.FileIrpPtr, kparams.Address, irp)
+		e.AppendParam(kparams.FileObject, kparams.Address, fileObject)
+		e.AppendParam(kparams.FileKey, kparams.Address, fileKey)
 		e.AppendParam(kparams.ThreadID, kparams.TID, tid)
 		e.AppendParam(kparams.FileOffset, kparams.Uint64, offset)
 		e.AppendParam(kparams.FileIoSize, kparams.Uint32, size)
@@ -542,10 +546,10 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 			fileObject = evt.ReadUint64(12)
 			fileKey = evt.ReadUint64(20)
 		}
-		e.AppendParam(kparams.FileIrpPtr, kparams.Uint64, irp)
-		e.AppendParam(kparams.FileObject, kparams.Uint64, fileObject)
+		e.AppendParam(kparams.FileIrpPtr, kparams.Address, irp)
+		e.AppendParam(kparams.FileObject, kparams.Address, fileObject)
 		e.AppendParam(kparams.ThreadID, kparams.TID, tid)
-		e.AppendParam(kparams.FileKey, kparams.Uint64, fileKey)
+		e.AppendParam(kparams.FileKey, kparams.Address, fileKey)
 		e.AppendParam(kparams.FileName, kparams.UnicodeString, filename)
 		e.AppendParam(kparams.FileInfoClass, kparams.Enum, infoClass, WithEnum(fs.FileInfoClasses))
 	case ktypes.SendTCPv4,
@@ -623,5 +627,3 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 		e.AppendParam(kparams.ImageFilename, kparams.FileDosPath, filename)
 	}
 }
-
-func joinSID(account, domain string) string { return fmt.Sprintf("%s\\%s", domain, account) }

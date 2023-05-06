@@ -20,6 +20,10 @@ package kevent
 
 import (
 	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/fs"
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/network"
+	"github.com/rabbitstack/fibratus/pkg/util/key"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 	"net"
@@ -102,8 +106,7 @@ type Kparam struct {
 // on the target where the capture is being taken.
 func (kpar Kparam) KcapType() kparams.Type {
 	switch kpar.Type {
-	case kparams.SID, kparams.WbemSID, kparams.HandleType,
-		kparams.FilePath, kparams.FileDosPath, kparams.Key:
+	case kparams.SID, kparams.WbemSID, kparams.HandleType, kparams.FileDosPath, kparams.Key:
 		return kparams.UnicodeString
 	default:
 		return kpar.Type
@@ -114,8 +117,34 @@ func (kpar Kparam) KcapType() kparams.Type {
 type Kparams map[string]*Kparam
 
 // NewKparamFromKcap builds a kparam instance from the restored state.
-func NewKparamFromKcap(name string, typ kparams.Type, value kparams.Value) *Kparam {
-	return &Kparam{Name: name, Type: typ, Value: value}
+func NewKparamFromKcap(name string, typ kparams.Type, value kparams.Value, ktype ktypes.Ktype) *Kparam {
+	var enum ParamEnum
+	var flags ParamFlags
+	switch name {
+	case kparams.FileOperation:
+		enum = fs.FileCreateDispositions
+	case kparams.FileCreateOptions:
+		flags = FileCreateOptionsFlags
+	case kparams.FileAttributes:
+		flags = FileAttributeFlags
+	case kparams.FileShareMask:
+		flags = FileShareModeFlags
+	case kparams.FileInfoClass:
+		enum = fs.FileInfoClasses
+	case kparams.FileType:
+		enum = fs.FileTypes
+	case kparams.NetL4Proto:
+		enum = network.ProtoNames
+	case kparams.RegValueType:
+		enum = key.RegistryValueTypes
+	case kparams.DesiredAccess, kparams.DesiredAccessNames:
+		if ktype == ktypes.OpenProcess {
+			flags = PsAccessRightFlags
+		} else {
+			flags = ThreadAccessRightFlags
+		}
+	}
+	return &Kparam{Name: name, Type: typ, Value: value, Enum: enum, Flags: flags}
 }
 
 // Append adds a new parameter with the specified name, type and value.
@@ -125,8 +154,8 @@ func (kpars Kparams) Append(name string, typ kparams.Type, value kparams.Value, 
 }
 
 // AppendFromKcap adds a new parameter with the specified name, type and value from the kcap state.
-func (kpars Kparams) AppendFromKcap(name string, typ kparams.Type, value kparams.Value) Kparams {
-	kpars[name] = NewKparamFromKcap(name, typ, value)
+func (kpars Kparams) AppendFromKcap(name string, typ kparams.Type, value kparams.Value, ktype ktypes.Ktype) Kparams {
+	kpars[name] = NewKparamFromKcap(name, typ, value, ktype)
 	return kpars
 }
 

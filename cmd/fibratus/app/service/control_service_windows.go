@@ -57,7 +57,7 @@ var (
 	// windows event logger
 	evtlog debug.Log
 
-	// entrypoint application
+	// bootstrap application
 	app *bootstrap.App
 )
 

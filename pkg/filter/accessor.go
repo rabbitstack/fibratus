@@ -90,7 +90,24 @@ func (k *kevtAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, 
 	default:
 		if f.IsKevtArgMap() {
 			name, _ := captureInBrackets(f.String())
-			return kevt.GetParamAsString(name), nil
+			kpar, err := kevt.Kparams.Get(name)
+			if err != nil {
+				return nil, err
+			}
+			switch kpar.Type {
+			case kparams.Uint8:
+				return kevt.Kparams.GetUint8(name)
+			case kparams.Uint16, kparams.Port:
+				return kevt.Kparams.GetUint16(name)
+			case kparams.Uint32, kparams.PID, kparams.TID:
+				return kevt.Kparams.GetUint32(name)
+			case kparams.Uint64:
+				return kevt.Kparams.GetUint64(name)
+			case kparams.Time:
+				return kevt.Kparams.GetTime(name)
+			default:
+				return kevt.GetParamAsString(name), nil
+			}
 		}
 		return nil, nil
 	}

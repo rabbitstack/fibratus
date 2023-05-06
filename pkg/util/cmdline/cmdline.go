@@ -72,7 +72,11 @@ func Split(cmdline string) []string { return splitRegexp.FindAllString(cmdline, 
 func (c *Cmdline) CleanExe() *Cmdline {
 	args := Split(c.cmdline)
 	if len(args) > 0 {
-		exe := args[0]
+		// clean null-terminated executable paths
+		exe := strings.Trim(args[0], "\x00")
+		if exe == "" {
+			return c
+		}
 		// remove quotes from executable path
 		if exe[0] == '"' && exe[len(exe)-1] == '"' {
 			c.cmdline = strings.Join(append([]string{exe[1 : len(exe)-1]}, args[1:]...), " ")

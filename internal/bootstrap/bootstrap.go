@@ -29,7 +29,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	"github.com/rabbitstack/fibratus/pkg/kcap"
 	"github.com/rabbitstack/fibratus/pkg/kstream"
-	psnap "github.com/rabbitstack/fibratus/pkg/ps"
+	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"github.com/rabbitstack/fibratus/pkg/yara"
@@ -39,15 +39,16 @@ import (
 	"os/signal"
 )
 
-// App represents the central piece for all components
-// responsible for event acquisition, captures handling,
-// filament execution and event routing to outputs.
+// App centralizes the core building blocks
+// responsible for event acquisition, captures
+// handling, filament execution and event routing
+// to the output sinks.
 type App struct {
-	controller *kstream.Controller
 	config     *config.Config
-	consumer   kstream.Consumer
-	psnap      psnap.Snapshotter
+	controller *kstream.Controller
 	hsnap      handle.Snapshotter
+	psnap      ps.Snapshotter
+	consumer   kstream.Consumer
 	filament   filament.Filament
 	agg        *aggregator.BufferedAggregator
 	writer     kcap.Writer
@@ -117,13 +118,13 @@ func NewApp(config *config.Config, options ...Option) (*App, error) {
 	}
 
 	hsnap := handle.NewSnapshotter(config, opts.handleSnapshotFn)
-	psnap := psnap.NewSnapshotter(hsnap, config)
+	psnap := ps.NewSnapshotter(hsnap, config)
 
 	app := &App{
+		config:     config,
 		controller: kstream.NewController(config.Kstream),
 		hsnap:      hsnap,
 		psnap:      psnap,
-		config:     config,
 		consumer:   kstream.NewConsumer(psnap, hsnap, config),
 		signals:    sigs,
 	}
@@ -264,7 +265,7 @@ func (f *App) WriteCapture(args []string) error {
 	return api.StartServer(f.config)
 }
 
-func (f *App) ReadCapture(args []string) error {
+func (f *App) ReadCapture(ctx context.Context, args []string) error {
 	if f.reader == nil {
 		panic("reader is nil")
 	}
@@ -276,9 +277,6 @@ func (f *App) ReadCapture(args []string) error {
 	if err != nil {
 		return err
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	filamentName := f.config.Filament.Name
 	if filamentName != "" {
 		f.filament, err = filament.New(filamentName, f.psnap, f.hsnap, f.config)

@@ -59,7 +59,7 @@ var (
 	buffersRead = expvar.NewInt("kstream.kbuffers.read")
 )
 
-type kstreamConsumer struct {
+type consumer struct {
 	traces []etw.TraceHandle // trace session handles
 
 	errs  chan error          // channel for event processing errors
@@ -78,7 +78,7 @@ type kstreamConsumer struct {
 	eventCallback EventCallbackFunc // called on each incoming event
 }
 
-func (k *kstreamConsumer) addTrace(trace etw.TraceHandle) {
+func (k *consumer) addTrace(trace etw.TraceHandle) {
 	k.traces = append(k.traces, trace)
 }
 
@@ -88,7 +88,7 @@ func NewConsumer(
 	hsnap handle.Snapshotter,
 	config *config.Config,
 ) Consumer {
-	kconsumer := &kstreamConsumer{
+	kconsumer := &consumer{
 		errs:       make(chan error, 1000),
 		kevts:      make(chan *kevent.Kevent, 500),
 		config:     config,
@@ -102,13 +102,13 @@ func NewConsumer(
 }
 
 // SetFilter initializes the filter that's applied on events.
-func (k *kstreamConsumer) SetFilter(filter filter.Filter) { k.filter = filter }
+func (k *consumer) SetFilter(filter filter.Filter) { k.filter = filter }
 
 // Open initializes the event stream by setting the event record callback and instructing it
 // to consume events from log buffers. This operation can fail if opening the kernel logger session results
 // in an invalid trace handler. Errors returned by `ProcessTrace` are sent to the channel since this function
 // blocks the current thread, and we schedule its execution in a separate goroutine.
-func (k *kstreamConsumer) Open(traces map[string]TraceSession) error {
+func (k *consumer) Open(traces map[string]TraceSession) error {
 	for _, trace := range traces {
 		err := k.openKstream(trace.Name)
 		if err != nil {
@@ -121,7 +121,7 @@ func (k *kstreamConsumer) Open(traces map[string]TraceSession) error {
 	return nil
 }
 
-func (k *kstreamConsumer) openKstream(loggerName string) error {
+func (k *consumer) openKstream(loggerName string) error {
 	logfile := etw.EventTraceLogfile{
 		LoggerName:     windows.StringToUTF16Ptr(loggerName),
 		BufferCallback: windows.NewCallback(k.bufferStatsCallback),
@@ -160,7 +160,7 @@ func (k *kstreamConsumer) openKstream(loggerName string) error {
 }
 
 // Close shutdowns the event stream consumer by closing all running traces.
-func (k *kstreamConsumer) Close() error {
+func (k *consumer) Close() error {
 	for _, trace := range k.traces {
 		if !trace.IsValid() {
 			continue
@@ -179,23 +179,23 @@ func (k *kstreamConsumer) Close() error {
 }
 
 // Errors returns a channel where errors are pushed.
-func (k *kstreamConsumer) Errors() chan error {
+func (k *consumer) Errors() chan error {
 	return k.errs
 }
 
 // Events returns the buffered channel for pulling collected kernel events.
-func (k *kstreamConsumer) Events() chan *kevent.Kevent {
+func (k *consumer) Events() chan *kevent.Kevent {
 	return k.kevts
 }
 
 // SetEventCallback sets the event callback to receive inbound events.
-func (k *kstreamConsumer) SetEventCallback(fn EventCallbackFunc) {
+func (k *consumer) SetEventCallback(fn EventCallbackFunc) {
 	k.eventCallback = fn
 }
 
 // bufferStatsCallback is periodically triggered by ETW subsystem for the purpose of reporting
 // buffer statistics, such as the number of buffers processed.
-func (k *kstreamConsumer) bufferStatsCallback(logfile *etw.EventTraceLogfile) uintptr {
+func (k *consumer) bufferStatsCallback(logfile *etw.EventTraceLogfile) uintptr {
 	buffersRead.Add(int64(logfile.BuffersRead))
 	return callbackNext
 }
@@ -203,7 +203,7 @@ func (k *kstreamConsumer) bufferStatsCallback(logfile *etw.EventTraceLogfile) ui
 // processEventCallback is the event callback function signature that is called each time
 // a new event is available on the session buffer. It does the heavy lifting of parsing inbound
 // ETW events from raw data buffers, building the state machine, and pushing events to the channel.
-func (k *kstreamConsumer) processEventCallback(ev *etw.EventRecord) uintptr {
+func (k *consumer) processEventCallback(ev *etw.EventRecord) uintptr {
 	if err := k.processEvent(ev); err != nil {
 		k.errs <- err
 		failedKevents.Add(err.Error(), 1)
@@ -211,7 +211,7 @@ func (k *kstreamConsumer) processEventCallback(ev *etw.EventRecord) uintptr {
 	return callbackNext
 }
 
-func (k *kstreamConsumer) isEventDropped(evt *kevent.Kevent) bool {
+func (k *consumer) isEventDropped(evt *kevent.Kevent) bool {
 	if evt.IsDropped(k.capture) {
 		return true
 	}
@@ -229,7 +229,7 @@ func (k *kstreamConsumer) isEventDropped(evt *kevent.Kevent) bool {
 	return false
 }
 
-func (k *kstreamConsumer) processEvent(ev *etw.EventRecord) error {
+func (k *consumer) processEvent(ev *etw.EventRecord) error {
 	typ := ktypes.NewFromEventRecord(ev)
 	if !typ.Exists() {
 		keventsUnknown.Add(1)
@@ -250,11 +250,6 @@ func (k *kstreamConsumer) processEvent(ev *etw.EventRecord) error {
 	if evt.WaitEnqueue {
 		return nil
 	}
-	if k.isEventDropped(evt) {
-		evt.Release()
-		keventsDropped.Add(1)
-		return nil
-	}
 	ok, proc := k.psnap.Find(evt.PID)
 	if !ok {
 		k.psnap.Put(proc)
@@ -269,6 +264,11 @@ func (k *kstreamConsumer) processEvent(ev *etw.EventRecord) error {
 	// process state.
 	if evt.PS == nil {
 		evt.PS = proc
+	}
+	if k.isEventDropped(evt) {
+		evt.Release()
+		keventsDropped.Add(1)
+		return nil
 	}
 	// Increment sequence
 	if !evt.IsState() {

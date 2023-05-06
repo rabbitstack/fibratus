@@ -419,7 +419,9 @@ func (s *snapshotter) Remove(e *kevent.Kevent) error {
 }
 
 func (s *snapshotter) Close() error {
-	s.housekeepTick.Stop()
+	if s.housekeepTick != nil {
+		s.housekeepTick.Stop()
+	}
 	return nil
 }
 

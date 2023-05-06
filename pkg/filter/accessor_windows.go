@@ -19,7 +19,6 @@
 package filter
 
 import (
-	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	psnap "github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
@@ -161,12 +160,28 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 		if kevt.Category != ktypes.Process {
 			return nil, nil
 		}
-		return domainFromSID(kevt.GetParamAsString(kparams.UserSID))
+		sid, err := kevt.Kparams.GetSID()
+		if err != nil {
+			return nil, err
+		}
+		_, domain, _, err := sid.LookupAccount("")
+		if err != nil {
+			return nil, err
+		}
+		return domain, nil
 	case fields.PsSiblingUsername, fields.PsChildUsername:
 		if kevt.Category != ktypes.Process {
 			return nil, nil
 		}
-		return usernameFromSID(kevt.GetParamAsString(kparams.UserSID))
+		sid, err := kevt.Kparams.GetSID()
+		if err != nil {
+			return nil, err
+		}
+		username, _, _, err := sid.LookupAccount("")
+		if err != nil {
+			return nil, err
+		}
+		return username, nil
 	case fields.PsDomain:
 		ps := kevt.PS
 		if ps == nil {
@@ -418,22 +433,6 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 
 		return nil, nil
 	}
-}
-
-func domainFromSID(sid string) (string, error) {
-	s := strings.Split(sid, "\\")
-	if len(s) != 2 {
-		return "", fmt.Errorf("illegal split for the domain field. Expected 2 but got %d substrings", len(s))
-	}
-	return s[0], nil
-}
-
-func usernameFromSID(sid string) (string, error) {
-	s := strings.Split(sid, "\\")
-	if len(s) != 2 {
-		return "", fmt.Errorf("illegal split for the username field. Expected 2 but got %d substrings", len(s))
-	}
-	return s[1], nil
 }
 
 // ancestorFields recursively walks the process ancestors and extracts

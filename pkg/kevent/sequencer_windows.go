@@ -38,8 +38,6 @@ var seqStoreErrors = expvar.NewInt("kevent.seq.store.errors")
 var seqInitErrors = expvar.NewMap("kevent.seq.init.errors")
 var errInvalidVolatileKey = errors.New("couldn't open HKCU/Volatile Environment key")
 
-const flags = uint32(registry.QUERY_VALUE | registry.SET_VALUE)
-
 // Sequencer is responsible for incrementing, getting and persisting the kevent sequence number in the Windows registry.
 type Sequencer struct {
 	key  registry.Key
@@ -51,7 +49,8 @@ type Sequencer struct {
 // sequence number is initialized to the last stored sequence. The sequencer schedules a ticker that periodically dumps
 // the current sequence number into the registry value.
 func NewSequencer() *Sequencer {
-	key, err := registry.OpenKey(registry.CURRENT_USER, "Volatile Environment", flags)
+	access := uint32(registry.QUERY_VALUE | registry.SET_VALUE)
+	key, err := registry.OpenKey(registry.CURRENT_USER, "Volatile Environment", access)
 	if err != nil {
 		seqInitErrors.Add(err.Error(), 1)
 		return &Sequencer{key: invalidKey, quit: make(chan struct{}, 1)}
@@ -73,7 +72,8 @@ func (s *Sequencer) Store() error {
 	if s.key == invalidKey {
 		// try to open the key again
 		var err error
-		s.key, err = registry.OpenKey(registry.CURRENT_USER, "Volatile Environment", flags)
+		access := uint32(registry.QUERY_VALUE | registry.SET_VALUE)
+		s.key, err = registry.OpenKey(registry.CURRENT_USER, "Volatile Environment", access)
 		if err != nil {
 			return errInvalidVolatileKey
 		}

@@ -126,7 +126,7 @@ func (e *Kevent) MarshalRaw() []byte {
 			b = append(b, bytes.WriteUint32(kpar.Value.(uint32))...)
 		case kparams.Int32:
 			b = append(b, bytes.WriteUint32(uint32(kpar.Value.(int32)))...)
-		case kparams.Uint64:
+		case kparams.Uint64, kparams.Address:
 			b = append(b, bytes.WriteUint64(kpar.Value.(uint64))...)
 		case kparams.Int64:
 			b = append(b, bytes.WriteUint64(uint64(kpar.Value.(int64)))...)
@@ -261,7 +261,7 @@ func (e *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 
 		var kval kparams.Value
 		switch kparams.Type(typ) {
-		case kparams.AnsiString, kparams.UnicodeString:
+		case kparams.AnsiString, kparams.UnicodeString, kparams.FilePath:
 			// read string parameter
 			l := bytes.ReadUint16(b[50+offset+kparamNameLength+poffset:])
 			buf = b[52+offset+kparamNameLength+poffset:]
@@ -271,7 +271,7 @@ func (e *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 			// increment parameter offset by string by type length + name length bytes + length of
 			// the string parameter + string parameter size
 			poffset += kparamNameLength + 6 + l
-		case kparams.Uint64:
+		case kparams.Uint64, kparams.Address:
 			kval = bytes.ReadUint64(b[50+offset+kparamNameLength+poffset:])
 			// increment parameter offset by type length + name length sizes + size of uint64
 			poffset += kparamNameLength + 4 + 8
@@ -299,7 +299,7 @@ func (e *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 		case kparams.Int32:
 			kval = int32(bytes.ReadUint32(b[50+offset+kparamNameLength+poffset:]))
 			poffset += kparamNameLength + 4 + 4
-		case kparams.Uint32, kparams.Enum, kparams.Status:
+		case kparams.Uint32, kparams.Enum, kparams.Flags, kparams.Status:
 			kval = bytes.ReadUint32(b[50+offset+kparamNameLength+poffset:])
 			poffset += kparamNameLength + 4 + 4
 		case kparams.Uint16, kparams.Port:
@@ -369,11 +369,16 @@ func (e *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 			}
 			poffset += kparamNameLength + 4 + 1 + 2 + off
 		case kparams.Binary:
-
+			l := bytes.ReadUint16(b[50+offset+kparamNameLength+poffset:])
+			buf = b[52+offset+kparamNameLength+poffset:]
+			if len(buf) > 0 {
+				kval = buf[:l]
+			}
+			poffset += kparamNameLength + 6 + l
 		}
 
 		if kval != nil {
-			e.Kparams.AppendFromKcap(kparamName, kparams.Type(typ), kval)
+			e.Kparams.AppendFromKcap(kparamName, kparams.Type(typ), kval, e.Type)
 		}
 	}
 
