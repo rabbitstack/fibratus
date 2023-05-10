@@ -40,13 +40,14 @@ func errnoErr(e syscall.Errno) error {
 var (
 	modadvapi32 = windows.NewLazySystemDLL("advapi32.dll")
 
-	procCloseTrace          = modadvapi32.NewProc("CloseTrace")
-	procControlTraceW       = modadvapi32.NewProc("ControlTraceW")
-	procEnableTraceEx       = modadvapi32.NewProc("EnableTraceEx")
-	procOpenTraceW          = modadvapi32.NewProc("OpenTraceW")
-	procProcessTrace        = modadvapi32.NewProc("ProcessTrace")
-	procStartTraceW         = modadvapi32.NewProc("StartTraceW")
-	procTraceSetInformation = modadvapi32.NewProc("TraceSetInformation")
+	procCloseTrace            = modadvapi32.NewProc("CloseTrace")
+	procControlTraceW         = modadvapi32.NewProc("ControlTraceW")
+	procEnableTraceEx         = modadvapi32.NewProc("EnableTraceEx")
+	procOpenTraceW            = modadvapi32.NewProc("OpenTraceW")
+	procProcessTrace          = modadvapi32.NewProc("ProcessTrace")
+	procStartTraceW           = modadvapi32.NewProc("StartTraceW")
+	procTraceQueryInformation = modadvapi32.NewProc("TraceQueryInformation")
+	procTraceSetInformation   = modadvapi32.NewProc("TraceSetInformation")
 )
 
 func closeTrace(handle TraceHandle) (err error) {
@@ -107,6 +108,14 @@ func startTrace(handle *TraceHandle, name string, props *EventTraceProperties) (
 
 func _startTrace(handle *TraceHandle, name *uint16, props *EventTraceProperties) (err error) {
 	r1, _, e1 := syscall.Syscall(procStartTraceW.Addr(), 3, uintptr(unsafe.Pointer(handle)), uintptr(unsafe.Pointer(name)), uintptr(unsafe.Pointer(props)))
+	if r1 != 0 {
+		err = errnoErr(e1)
+	}
+	return
+}
+
+func traceQueryInformation(handle TraceHandle, infoClass uint8, info uintptr, length uint32, size *uint32) (err error) {
+	r1, _, e1 := syscall.Syscall6(procTraceQueryInformation.Addr(), 5, uintptr(handle), uintptr(infoClass), uintptr(info), uintptr(length), uintptr(unsafe.Pointer(size)), 0)
 	if r1 != 0 {
 		err = errnoErr(e1)
 	}

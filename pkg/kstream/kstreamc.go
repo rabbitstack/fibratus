@@ -29,10 +29,11 @@ type EventCallbackFunc func(*kevent.Kevent) error
 // Consumer is the interface for the kernel event stream consumer.
 type Consumer interface {
 	// Open initializes the event stream by setting the event record callback and instructing it
-	// to consume events from log buffers. This operation can fail if opening the kernel logger session results
-	// in an invalid trace handler. Errors returned by `ProcessTrace` are sent to the channel since this function
-	// blocks the current thread, so we schedule its execution in a separate goroutine.
-	Open(map[string]TraceSession) error
+	// to consume events from log buffers. This operation can fail if opening the kernel logger
+	// session results in an invalid trace handler. Errors returned by `ProcessTrace` are sent
+	// to the channel since this function blocks the current thread, so we schedule its execution
+	// in a separate goroutine.
+	Open([]TraceSession) error
 	// Close shutdowns the currently running event stream consumer by closing the corresponding session.
 	Close() error
 	// Errors returns the channel where errors are pushed.

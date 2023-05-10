@@ -78,7 +78,7 @@ type Controller struct {
 	// kstreamConfig stores event stream specific settings
 	kstreamConfig config.KstreamConfig
 	// traces contains initiated tracing sessions
-	traces map[string]TraceSession
+	traces []TraceSession
 	// providers contains a list of enabled ETW providers
 	providers []TraceProvider
 }
@@ -109,7 +109,7 @@ func NewController(cfg config.KstreamConfig) *Controller {
 	}
 	controller := &Controller{
 		kstreamConfig: cfg,
-		traces:        make(map[string]TraceSession),
+		traces:        make([]TraceSession, 0),
 		providers:     providers,
 	}
 	return controller
@@ -216,7 +216,7 @@ func (c *Controller) Start() error {
 				// registry keys that are very valuable for us to construct the initial snapshot of
 				// these system resources and let us build the event's context
 				if err := etw.SetTraceSystemFlags(handleCopy, sysTraceFlags); err != nil {
-					log.Warn(err)
+					log.Warnf("unable to set empty system flags: %v", err)
 				}
 				sysTraceFlags[0] = flags
 				// enable object manager tracking
@@ -275,7 +275,7 @@ func (c *Controller) Start() error {
 				handleCopy := handle
 				sysTraceFlags := make([]etw.EventTraceFlags, 8)
 				if err := etw.SetTraceSystemFlags(handleCopy, sysTraceFlags); err != nil {
-					log.Warn(err)
+					log.Warnf("unable to set empty system flags: %v", err)
 				}
 				sysTraceFlags[0] = flags
 				// enable object manager tracking
@@ -285,7 +285,7 @@ func (c *Controller) Start() error {
 				// call again to enable all kernel events. Just to recap. The first call to `TraceSetInformation` with empty
 				// group masks activates rundown events, while this second call enables the rest of the kernel events specified in flags.
 				if err := etw.SetTraceSystemFlags(handleCopy, sysTraceFlags); err != nil {
-					log.Warnf("unable to set trace information: %v", err)
+					log.Warnf("unable to set system flags: %v", err)
 				}
 				c.insertTrace(traceName, handle, prov.GUID)
 			} else {
@@ -336,15 +336,21 @@ func (c *Controller) Close() error {
 	return nil
 }
 
-func (c *Controller) Traces() map[string]TraceSession {
+func (c *Controller) Traces() []TraceSession {
 	return c.traces
 }
 
 func (c *Controller) insertTrace(name string, handle etw.TraceHandle, guid windows.GUID) {
+	for i, trace := range c.traces {
+		if trace.Name == name {
+			// if trace already present, remove it first
+			c.traces = append(c.traces[:i], c.traces[i+1:]...)
+		}
+	}
 	trace := TraceSession{
 		Handle: handle,
 		Name:   name,
 		GUID:   guid,
 	}
-	c.traces[name] = trace
+	c.traces = append(c.traces, trace)
 }

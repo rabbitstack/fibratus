@@ -32,17 +32,15 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
+	"github.com/rabbitstack/fibratus/pkg/util/signals"
 	"github.com/rabbitstack/fibratus/pkg/yara"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/sys/windows"
 	"os"
-	"os/signal"
 )
 
-// App centralizes the core building blocks
-// responsible for event acquisition, captures
-// handling, filament execution and event routing
-// to the output sinks.
+// App centralizes the core building blocks responsible
+// for event acquisition, captures handling, filament
+// execution and event routing to the output sinks.
 type App struct {
 	config     *config.Config
 	controller *kstream.Controller
@@ -56,6 +54,7 @@ type App struct {
 	signals    chan struct{}
 }
 
+// Option enables changing the behaviour of the bootstrap application.
 type Option func(*opts)
 
 type opts struct {
@@ -65,30 +64,37 @@ type opts struct {
 	handleSnapshotFn  handle.SnapshotBuildCompleted
 }
 
+// WithSignals installs signal handlers.
 func WithSignals() Option {
 	return func(o *opts) {
 		o.installSignals = true
 	}
 }
 
+// WithDebugPrivilege injects the SeDebugPrivilege in the process access token.
 func WithDebugPrivilege() Option {
 	return func(o *opts) {
 		o.setDebugPrivilege = true
 	}
 }
 
+// WithCaptureReplay denotes the capture file is being replayed.
 func WithCaptureReplay() Option {
 	return func(o *opts) {
 		o.isCaptureReplay = true
 	}
 }
 
+// WithHandleSnapshotFn sets the handle snapshotter completion function.
 func WithHandleSnapshotFn(fn handle.SnapshotBuildCompleted) Option {
 	return func(o *opts) {
 		o.handleSnapshotFn = fn
 	}
 }
 
+// NewApp constructs a new bootstrap application with the specified configuration
+// and a list of options. The configuration is passed from individual command work
+// functions.
 func NewApp(config *config.Config, options ...Option) (*App, error) {
 	if err := InitConfigAndLogger(config); err != nil {
 		return nil, err
@@ -102,7 +108,7 @@ func NewApp(config *config.Config, options ...Option) (*App, error) {
 		sys.SetDebugPrivilege()
 	}
 	if opts.installSignals {
-		sigs = signals()
+		sigs = signals.Install()
 	}
 	if opts.isCaptureReplay {
 		reader, err := kcap.NewReader(config.KcapFile, config)
@@ -131,6 +137,11 @@ func NewApp(config *config.Config, options ...Option) (*App, error) {
 	return app, nil
 }
 
+// Run starts configured tracing sessions and opens the event
+// stream to start consuming events. Depending on whether the
+// filament is provided, this method will either spin up a filament
+// or set up the aggregator to start forwarding events to the rule
+// engine and output sinks.
 func (f *App) Run(args []string) error {
 	if f.controller == nil {
 		panic("controller is nil")
@@ -230,6 +241,7 @@ func (f *App) Run(args []string) error {
 	return api.StartServer(cfg)
 }
 
+// WriteCapture writes the event stream to the capture file.
 func (f *App) WriteCapture(args []string) error {
 	if f.controller == nil {
 		panic("controller is nil")
@@ -265,6 +277,7 @@ func (f *App) WriteCapture(args []string) error {
 	return api.StartServer(f.config)
 }
 
+// ReadCapture reconstructs the event stream from the capture file.
 func (f *App) ReadCapture(ctx context.Context, args []string) error {
 	if f.reader == nil {
 		panic("reader is nil")
@@ -322,6 +335,7 @@ func (f *App) ReadCapture(ctx context.Context, args []string) error {
 	return api.StartServer(f.config)
 }
 
+// Wait waits for the app to receive the termination signal.
 func (f *App) Wait() {
 	if f.signals != nil {
 		<-f.signals
@@ -384,20 +398,4 @@ func (f *App) stop() {
 	if f.signals != nil {
 		f.signals <- struct{}{}
 	}
-}
-
-// signals set ups the signal handler.
-func signals() chan struct{} {
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, os.Interrupt, windows.SIGTERM)
-
-	stopCh := make(chan struct{})
-
-	go func() {
-		sig := <-sigCh
-		log.Infof("got signal %q, shutting down...", sig)
-		stopCh <- struct{}{}
-	}()
-
-	return stopCh
 }

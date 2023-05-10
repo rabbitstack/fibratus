@@ -19,7 +19,6 @@
 package kevent
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -52,7 +51,7 @@ func TestKparams(t *testing.T) {
 	assert.False(t, kpars.Contains(kparams.ThreadID))
 	assert.Equal(t, 4, kpars.Len())
 
-	require.NoError(t, kpars.Set(kparams.FileShareMask, fs.FileShareMode(5), kparams.Enum))
+	require.NoError(t, kpars.Set(kparams.FileShareMask, uint32(5), kparams.Enum))
 
 	require.NoError(t, kpars.SetValue(kparams.FileName, "\\Device\\HarddiskVolume2\\Windows\\system32\\KERNEL32.dll"))
 	filename1, err := kpars.GetString(kparams.FileName)

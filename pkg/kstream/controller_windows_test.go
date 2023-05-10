@@ -32,6 +32,7 @@ func TestStartTraces(t *testing.T) {
 		name         string
 		cfg          config.KstreamConfig
 		wantSessions int
+		wantFlags    []etw.EventTraceFlags
 	}{
 		{"start kernel logger session",
 			config.KstreamConfig{
@@ -42,17 +43,21 @@ func TestStartTraces(t *testing.T) {
 				FlushTimer:          time.Millisecond * 2300,
 			},
 			1,
+			[]etw.EventTraceFlags{0x6010203, 0},
 		},
 		{"start kernel logger and audit api sessions",
 			config.KstreamConfig{
-				EnableThreadKevents:  true,
-				EnableNetKevents:     true,
-				EnableFileIOKevents:  true,
-				BufferSize:           1024,
-				FlushTimer:           time.Millisecond * 2300,
-				EnableAuditAPIEvents: true,
+				EnableThreadKevents:   true,
+				EnableNetKevents:      true,
+				EnableFileIOKevents:   true,
+				EnableHandleKevents:   true,
+				EnableRegistryKevents: true,
+				BufferSize:            1024,
+				FlushTimer:            time.Millisecond * 2300,
+				EnableAuditAPIEvents:  true,
 			},
 			2,
+			[]etw.EventTraceFlags{0x6030203, 0x80000040},
 		},
 	}
 
@@ -64,8 +69,30 @@ func TestStartTraces(t *testing.T) {
 			assert.Equal(t, tt.wantSessions, len(ctrl.traces))
 			for _, trace := range ctrl.traces {
 				require.True(t, trace.Handle.IsValid())
-				require.NoError(t, etw.ControlTrace(trace.Handle, trace.Name, trace.GUID, etw.Query))
+				require.NoError(t, etw.ControlTrace(0, trace.Name, trace.GUID, etw.Query))
+				if tt.wantFlags != nil && trace.IsKernelLogger() {
+					flags, err := etw.GetTraceSystemFlags(trace.Handle)
+					require.NoError(t, err)
+					// check enabled system event flags
+					require.Equal(t, tt.wantFlags[0], flags[0])
+					require.Equal(t, tt.wantFlags[1], flags[4])
+				}
 			}
 		})
 	}
+}
+
+func TestRestartTrace(t *testing.T) {
+	cfg := config.KstreamConfig{
+		EnableThreadKevents: true,
+		EnableNetKevents:    true,
+		EnableFileIOKevents: true,
+		BufferSize:          1024,
+		FlushTimer:          time.Millisecond * 2300,
+	}
+	ctrl := NewController(cfg)
+	require.NoError(t, ctrl.Start())
+	require.NoError(t, ctrl.Start())
+	require.NoError(t, etw.ControlTrace(0, ctrl.traces[0].Name, ctrl.traces[0].GUID, etw.Query))
+	require.NoError(t, ctrl.Close())
 }

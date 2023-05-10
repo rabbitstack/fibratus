@@ -400,14 +400,26 @@ type EventTraceLogfile struct {
 	Context uintptr
 }
 
+// NewEventTraceLogfile creates a new event trace logfile structure.
+func NewEventTraceLogfile(loggerName string) EventTraceLogfile {
+	return EventTraceLogfile{
+		LoggerName: windows.StringToUTF16Ptr(loggerName),
+	}
+}
+
 // SetModes sets the event processing modes.
-func (e *EventTraceLogfile) SetModes(modes uint32) {
-	*(*uint32)(unsafe.Pointer(&e.LogFileMode[0])) = modes
+func (e *EventTraceLogfile) SetModes(modes int) {
+	*(*uint32)(unsafe.Pointer(&e.LogFileMode[0])) = uint32(modes)
 }
 
 // SetEventCallback sets the event processing callback.
 func (e *EventTraceLogfile) SetEventCallback(fn uintptr) {
 	*(*uintptr)(unsafe.Pointer(&e.EventCallback[4])) = fn
+}
+
+// SetBufferCallback sets the session buffer reporting callback.
+func (e *EventTraceLogfile) SetBufferCallback(fn uintptr) {
+	e.BufferCallback = fn
 }
 
 // EventDescriptor contains metadata that defines the event.

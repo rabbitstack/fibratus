@@ -36,6 +36,10 @@ const (
 	SessionID = "session_id"
 	// UserSID field is the security identifier associated to the process token under which it is run.
 	UserSID = "sid"
+	// Username field represents the username under which the event was generated.
+	Username = "username"
+	// Domain field represents the domain under which the event was generated.
+	Domain = "domain"
 	// ProcessName field denotes the process image name.
 	ProcessName = "name"
 	// Exe field denotes the full path of the executable.

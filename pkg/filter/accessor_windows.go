@@ -160,28 +160,12 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 		if kevt.Category != ktypes.Process {
 			return nil, nil
 		}
-		sid, err := kevt.Kparams.GetSID()
-		if err != nil {
-			return nil, err
-		}
-		_, domain, _, err := sid.LookupAccount("")
-		if err != nil {
-			return nil, err
-		}
-		return domain, nil
+		return kevt.Kparams.GetString(kparams.Username)
 	case fields.PsSiblingUsername, fields.PsChildUsername:
 		if kevt.Category != ktypes.Process {
 			return nil, nil
 		}
-		sid, err := kevt.Kparams.GetSID()
-		if err != nil {
-			return nil, err
-		}
-		username, _, _, err := sid.LookupAccount("")
-		if err != nil {
-			return nil, err
-		}
-		return username, nil
+		return kevt.Kparams.GetString(kparams.Domain)
 	case fields.PsDomain:
 		ps := kevt.PS
 		if ps == nil {
@@ -435,6 +419,11 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 	}
 }
 
+const (
+	rootAncestor = "root" // represents the root ancestor
+	anyAncestor  = "any"  // represents any ancestor in the hierarchy
+)
+
 // ancestorFields recursively walks the process ancestors and extracts
 // the required field values. If we get the `root` key, the root ancestor
 // fields are inspected, while `any` accumulates values of all ancestors.
@@ -450,12 +439,12 @@ func ancestorFields(field string, kevt *kevent.Kevent) (kparams.Value, error) {
 	var ps *pstypes.PS
 
 	switch key {
-	case "root":
+	case rootAncestor:
 		walk := func(proc *pstypes.PS) {
 			ps = proc
 		}
 		pstypes.Walk(walk, kevt.PS)
-	case "any":
+	case anyAncestor:
 		values := make([]string, 0)
 		walk := func(proc *pstypes.PS) {
 			switch segment {

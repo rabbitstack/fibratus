@@ -74,8 +74,9 @@ type consumer struct {
 
 	filter filter.Filter
 
-	capture       bool              // capture determines if events are dumped to capture files
-	eventCallback EventCallbackFunc // called on each incoming event
+	capture        bool              // capture determines if events are dumped to capture files
+	eventCallback  EventCallbackFunc // called on each incoming event
+	eventAssembler *EventAssembler   // event assembler
 }
 
 func (k *consumer) addTrace(trace etw.TraceHandle) {
@@ -97,7 +98,7 @@ func NewConsumer(
 		sequencer:  kevent.NewSequencer(),
 		processors: processors.NewChain(psnap, hsnap, config),
 	}
-
+	kconsumer.eventAssembler = NewEventAssembler(kconsumer.kevts)
 	return kconsumer
 }
 
@@ -108,55 +109,48 @@ func (k *consumer) SetFilter(filter filter.Filter) { k.filter = filter }
 // to consume events from log buffers. This operation can fail if opening the kernel logger session results
 // in an invalid trace handler. Errors returned by `ProcessTrace` are sent to the channel since this function
 // blocks the current thread, and we schedule its execution in a separate goroutine.
-func (k *consumer) Open(traces map[string]TraceSession) error {
-	for _, trace := range traces {
-		err := k.openKstream(trace.Name)
+func (k *consumer) Open(sessions []TraceSession) error {
+	for _, ses := range sessions {
+		trace, err := k.openTrace(ses.Name)
 		if err != nil {
-			if trace.IsKernelLogger() {
+			if ses.IsKernelLogger() {
 				return err
 			}
-			log.Warnf("unable to open %s trace: %v", trace.Name, err)
+			log.Warnf("unable to open %s trace: %v", ses.Name, err)
+		}
+		if err == nil {
+			k.addTrace(trace)
+			k.processTrace(ses.Name, trace)
 		}
 	}
 	return nil
 }
 
-func (k *consumer) openKstream(loggerName string) error {
-	logfile := etw.EventTraceLogfile{
-		LoggerName:     windows.StringToUTF16Ptr(loggerName),
-		BufferCallback: windows.NewCallback(k.bufferStatsCallback),
-	}
+func (k *consumer) openTrace(name string) (etw.TraceHandle, error) {
+	logfile := etw.NewEventTraceLogfile(name)
+	logfile.SetBufferCallback(windows.NewCallback(k.bufferStatsCallback))
 	logfile.SetEventCallback(windows.NewCallback(k.processEventCallback))
-	logfile.SetModes(uint32(etw.ProcessTraceModeRealtime | etw.ProcessTraceModeEventRecord))
-
+	logfile.SetModes(etw.ProcessTraceModeRealtime | etw.ProcessTraceModeEventRecord)
 	trace := etw.OpenTrace(logfile)
 	if !trace.IsValid() {
-		return fmt.Errorf("unable to open trace: %v", windows.GetLastError())
+		return 0, fmt.Errorf("unable to open %s trace: %v", name, windows.GetLastError())
 	}
-	k.addTrace(trace)
+	return trace, nil
+}
 
-	// since `ProcessTrace` blocks the current thread
-	// we invoke it in a separate goroutine but send
-	// any possible errors to the errors channel
+func (k *consumer) processTrace(name string, trace etw.TraceHandle) {
 	go func(trace etw.TraceHandle) {
-		log.Infof("starting trace processing for [%s]", loggerName)
+		log.Infof("starting [%s] trace processing", name)
 		err := etw.ProcessTrace(trace)
-		log.Infof("stopping trace processing for [%s]", loggerName)
+		log.Infof("stopping [%s] trace processing", name)
 		if err == nil {
-			log.Infof("trace processing stopped for [%s]", loggerName)
+			log.Infof("[%s] trace processing stopped", name)
 			return
 		}
 		if !errors.Is(err, kerrors.ErrTraceCancelled) {
 			k.errs <- err
 		}
-		if trace.IsValid() {
-			if err := etw.CloseTrace(trace); err != nil {
-				k.errs <- err
-			}
-		}
 	}(trace)
-
-	return nil
 }
 
 // Close shutdowns the event stream consumer by closing all running traces.
@@ -277,6 +271,10 @@ func (k *consumer) processEvent(ev *etw.EventRecord) error {
 	// Invoke event callback
 	if k.eventCallback != nil {
 		return k.eventCallback(evt)
+	}
+	// Run event assembler
+	if !k.eventAssembler.Assemble(evt) {
+		return nil
 	}
 	k.kevts <- evt
 	keventsEnqueued.Add(1)

@@ -33,11 +33,11 @@ import (
 const magic = 0x6669627261747573
 
 // major represents the major digit of the kcap file format. Incrementing the major digit makes older kcap readers not
-// capable to replay the capture file.
-const major = uint8(1)
+// capable to replay the capture file
+const major = uint8(2)
 
 // minor represents the minor digit of the kcap file format
-const minor = uint8(2)
+const minor = uint8(0)
 
 // flags denotes extra flags for the purpose of the header description
 const flags = uint64(0)
@@ -46,7 +46,7 @@ const flags = uint64(0)
 func (w *writer) ws(typ section.Type, ver kcapver.Version, l, size uint32) error {
 	sec := section.New(typ, ver, l, size)
 	if _, err := w.zw.Write(sec[:]); err != nil {
-		return errWriteSection(typ, err)
+		return ErrWriteSection(typ, err)
 	}
 	return nil
 }

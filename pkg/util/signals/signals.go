@@ -16,14 +16,29 @@
  * limitations under the License.
  */
 
-package aggregator
+package signals
 
-import "github.com/rabbitstack/fibratus/pkg/kevent"
+import (
+	log "github.com/sirupsen/logrus"
+	"golang.org/x/sys/windows"
+	"os"
+	"os/signal"
+)
 
-// Listener is the minimal interface that all aggregator listeners need to implement.
-type Listener interface {
-	// ProcessEvent receives the event and returns a boolean value
-	// indicating if the event should be routed to the aggregator
-	// output queue.
-	ProcessEvent(*kevent.Kevent) bool
+// Install setups the signal handler. Returns a blocking
+// channel which receives an input after Interrupt or Term
+// signals are triggered.
+func Install() chan struct{} {
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, windows.SIGTERM)
+
+	stopCh := make(chan struct{})
+
+	go func() {
+		sig := <-sigCh
+		log.Infof("got signal %q, shutting down...", sig)
+		stopCh <- struct{}{}
+	}()
+
+	return stopCh
 }

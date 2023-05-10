@@ -102,10 +102,6 @@ func (e *Kevent) MarshalRaw() []byte {
 			v := e.GetParamAsString(kpar.Name)
 			b = append(b, bytes.WriteUint16(uint16(len(v)))...)
 			b = append(b, v...)
-		case kparams.SID, kparams.WbemSID:
-			sid := e.Kparams.MustGetSID().String()
-			b = append(b, bytes.WriteUint16(uint16(len(sid)))...)
-			b = append(b, sid...)
 		case kparams.Uint8:
 			b = append(b, kpar.Value.(uint8))
 		case kparams.Int8:
@@ -164,11 +160,12 @@ func (e *Kevent) MarshalRaw() []byte {
 					b = append(b, s...)
 				}
 			}
-		case kparams.Binary:
-			b = append(b, bytes.WriteUint16(uint16(len(kpar.Value.([]byte))))...)
+		case kparams.Binary, kparams.SID, kparams.WbemSID:
+			b = append(b, bytes.WriteUint32(uint32(len(kpar.Value.([]byte))))...)
 			b = append(b, kpar.Value.([]byte)...)
 		}
 	}
+
 	// write metadata key/value pairs
 	b = append(b, bytes.WriteUint16(uint16(len(e.Metadata)))...)
 	for key, value := range e.Metadata {
@@ -210,34 +207,35 @@ func (e *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 	e.Type = ktype
 	e.CPU = b[33:34][0]
 
+	var offset uint32
 	// read event name
 	l := bytes.ReadUint16(b[34:])
 	buf := b[36:]
-	offset := l
+	offset = uint32(l)
 	e.Name = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
 
 	// read category
 	l = bytes.ReadUint16(b[36+offset:])
 	buf = b[38+offset:]
-	offset += l
+	offset += uint32(l)
 	e.Category = ktypes.Category(string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l]))
 
 	// read description
 	l = bytes.ReadUint16(b[38+offset:])
 	buf = b[40+offset:]
-	offset += l
+	offset += uint32(l)
 	e.Description = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
 
 	// read host name
 	l = bytes.ReadUint16(b[40+offset:])
 	buf = b[42+offset:]
-	offset += l
+	offset += uint32(l)
 	e.Host = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
 
 	// read timestamp
 	l = bytes.ReadUint16(b[42+offset:])
 	buf = b[44+offset:]
-	offset += l
+	offset += uint32(l)
 	if len(buf) > 0 {
 		var err error
 		e.Timestamp, err = time.Parse(time.RFC3339Nano, string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l]))
@@ -249,13 +247,13 @@ func (e *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 	// read parameters
 	nparams := bytes.ReadUint16(b[44+offset:])
 	// accumulates the offset of all parameter name and value lengths
-	var poffset uint16
+	var poffset uint32
 
 	for i := 0; i < int(nparams); i++ {
 		// read kparam type
 		typ := bytes.ReadUint16(b[46+offset+poffset:])
 		// read kparam name
-		kparamNameLength := bytes.ReadUint16(b[48+offset+poffset:])
+		kparamNameLength := uint32(bytes.ReadUint16(b[48+offset+poffset:]))
 		buf = b[50+offset+poffset:]
 		kparamName := string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:kparamNameLength:kparamNameLength])
 
@@ -270,7 +268,7 @@ func (e *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 			}
 			// increment parameter offset by string by type length + name length bytes + length of
 			// the string parameter + string parameter size
-			poffset += kparamNameLength + 6 + l
+			poffset += kparamNameLength + 6 + uint32(l)
 		case kparams.Uint64, kparams.Address:
 			kval = bytes.ReadUint64(b[50+offset+kparamNameLength+poffset:])
 			// increment parameter offset by type length + name length sizes + size of uint64
@@ -349,13 +347,13 @@ func (e *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 					unmarshalTimestampErrors.Add(1)
 				}
 			}
-			poffset += kparamNameLength + 6 + l
+			poffset += kparamNameLength + 6 + uint32(l)
 		case kparams.Slice:
 			// read slice element type
 			typ := b[50+offset+kparamNameLength+poffset]
 			// read slice size
 			l := bytes.ReadUint16(b[51+offset+kparamNameLength+poffset:])
-			var off uint16
+			var off uint32
 			switch typ {
 			case 's':
 				s := make([]string, l)
@@ -363,18 +361,18 @@ func (e *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 					size := bytes.ReadUint16(b[53+offset+kparamNameLength+poffset+off:])
 					buf := b[55+offset+kparamNameLength+poffset+off:]
 					s[i] = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:size:size])
-					off += 2 + size
+					off += 2 + uint32(size)
 				}
 				kval = s
 			}
 			poffset += kparamNameLength + 4 + 1 + 2 + off
-		case kparams.Binary:
-			l := bytes.ReadUint16(b[50+offset+kparamNameLength+poffset:])
-			buf = b[52+offset+kparamNameLength+poffset:]
+		case kparams.Binary, kparams.SID, kparams.WbemSID:
+			l := bytes.ReadUint32(b[50+offset+kparamNameLength+poffset:])
+			buf = b[54+offset+kparamNameLength+poffset:]
 			if len(buf) > 0 {
 				kval = buf[:l]
 			}
-			poffset += kparamNameLength + 6 + l
+			poffset += kparamNameLength + 8 + l
 		}
 
 		if kval != nil {
@@ -386,14 +384,14 @@ func (e *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 
 	// read metadata tags
 	ntags := bytes.ReadUint16(b[46+offset:])
-	var moffset uint16
+	var moffset uint32
 	for i := 0; i < int(ntags); i++ {
 		// read key
-		klen := bytes.ReadUint16(b[48+offset+moffset:])
+		klen := uint32(bytes.ReadUint16(b[48+offset+moffset:]))
 		buf = b[50+offset+moffset:]
 		key := string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:klen:klen])
 		// read value
-		vlen := bytes.ReadUint16(b[50+offset+klen+moffset:])
+		vlen := uint32(bytes.ReadUint16(b[50+offset+klen+moffset:]))
 		buf = b[52+offset+klen+moffset:]
 		value := string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:vlen:vlen])
 		// increment the offset by the length of the key + length value + size of uint16 * 2
@@ -506,7 +504,7 @@ func (e *Kevent) MarshalJSON() []byte {
 				js.writeArrayEnd()
 			}
 		default:
-			js.writeEscapeString(kpar.String())
+			js.writeEscapeString(e.GetParamAsString(kpar.Name))
 		}
 		if writeMore {
 			js.writeMore()

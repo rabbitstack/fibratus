@@ -47,7 +47,7 @@ var (
 )
 
 func init() {
-	queryObjectTypes()
+	findObjectTypes()
 }
 
 // Handle stores various metadata specific to the handle allocated by a process.
@@ -135,7 +135,7 @@ func ConvertTypeIDToName(id uint16) string {
 	return ""
 }
 
-func queryObjectTypes() {
+func findObjectTypes() {
 	objectTypes, err := sys.QueryObject[sys.ObjectTypesInformation](0, sys.ObjectTypesInformationClass)
 	if err != nil {
 		log.Warnf("unable to query object types: %v", err)

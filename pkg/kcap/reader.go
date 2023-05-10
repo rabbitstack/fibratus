@@ -29,10 +29,16 @@ import (
 )
 
 var (
-	errKcapMagicMismatch = errors.New("invalid kcap file magic number")
-	errMajorVer          = errors.New("incompatible kcap version format. Please upgrade Fibratus to newer version")
-	errReadVersion       = func(s string, err error) error { return fmt.Errorf("couldn't read %s version digit: %v", s, err) }
-	errReadSection       = func(s section.Type, err error) error { return fmt.Errorf("couldn't read %s section: %v", s, err) }
+	// ErrKcapMagicMismatch signals invalid kcap binary format
+	ErrKcapMagicMismatch = errors.New("invalid kcap file magic number")
+	// ErrMajorVer signals incompatible kcap version
+	ErrMajorVer = func(maj, min byte) error {
+		return fmt.Errorf("incompatible kcap version format. Required version %d.%d but %d.%d found", major, minor, maj, min)
+	}
+	// ErrReadVersion is thrown when version digit errors occur
+	ErrReadVersion = func(s string, err error) error { return fmt.Errorf("couldn't read %s version digit: %v", s, err) }
+	// ErrReadSection is thrown when section read errors occur
+	ErrReadSection = func(s section.Type, err error) error { return fmt.Errorf("couldn't read %s section: %v", s, err) }
 
 	kcapReadKevents           = expvar.NewInt("kcap.read.kevents")
 	kcapReadBytes             = expvar.NewInt("kcap.read.bytes")

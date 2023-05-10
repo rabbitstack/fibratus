@@ -149,7 +149,7 @@ func (s *snapshotter) FindByObject(object uint64) (htypes.Handle, bool) {
 }
 
 func (s *snapshotter) FindHandles(pid uint32) ([]htypes.Handle, error) {
-	if pid == uint32(os.Getpid()) || pid == 0 { // ignore current and idle processes
+	if pid == uint32(os.Getpid()) || pid == 0 { // ignore current, idle processes
 		return []htypes.Handle{}, nil
 	}
 	if s.capture {
@@ -182,6 +182,9 @@ func (s *snapshotter) FindHandles(pid uint32) ([]htypes.Handle, error) {
 
 	snapshot, err := sys.QueryInformationProcess[sys.ProcessHandleSnapshotInformation](process, windows.ProcessHandleInformation)
 	if err != nil {
+		if err.Error() == "An attempt was made to access an exiting process." {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("unable to query handles for process id %d: %v", pid, err)
 	}
 
@@ -390,8 +393,8 @@ func (s *snapshotter) GetSnapshot() []htypes.Handle {
 }
 
 func (s *snapshotter) Write(e *kevent.Kevent) error {
-	if !e.IsCloseHandle() {
-		return fmt.Errorf("expected CreateHandle kernel event but got %s", e.Type)
+	if !e.IsCreateHandle() {
+		return fmt.Errorf("expected CreateHandle event but got %s", e.Type)
 	}
 	h := unwrapHandle(e)
 	obj, err := e.Kparams.GetUint64(kparams.HandleObject)
@@ -406,7 +409,7 @@ func (s *snapshotter) Write(e *kevent.Kevent) error {
 
 func (s *snapshotter) Remove(e *kevent.Kevent) error {
 	if !e.IsCloseHandle() {
-		return fmt.Errorf("expected CloseHandle kernel event but got %s", e.Type)
+		return fmt.Errorf("expected CloseHandle event but got %s", e.Type)
 	}
 	obj, err := e.Kparams.GetUint64(kparams.HandleObject)
 	if err != nil {

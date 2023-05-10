@@ -30,6 +30,8 @@ const (
 	ProcessStatusStillActive uint32 = 259
 )
 
+// QueryInformationProcess consults the specified process information class and returns
+// a pointer to the structure containing process information.
 func QueryInformationProcess[C any](proc windows.Handle, class int32) (*C, error) {
 	var c C
 	var s uint32
@@ -49,6 +51,7 @@ func QueryInformationProcess[C any](proc windows.Handle, class int32) (*C, error
 	return (*C)(unsafe.Pointer(&n[0])), nil
 }
 
+// ReadProcessMemory reads from the process virtual address space starting at specified address.
 func ReadProcessMemory[S any](proc windows.Handle, addr uintptr) (*S, error) {
 	var s S
 	b := make([]byte, unsafe.Sizeof(s))
@@ -59,6 +62,7 @@ func ReadProcessMemory[S any](proc windows.Handle, addr uintptr) (*S, error) {
 	return (*S)(unsafe.Pointer(&b[0])), nil
 }
 
+// IsProcessRunning determines whether the process is in a running state.
 func IsProcessRunning(proc windows.Handle) bool {
 	var exitcode uint32
 	err := windows.GetExitCodeProcess(proc, &exitcode)

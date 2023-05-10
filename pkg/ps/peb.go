@@ -53,6 +53,10 @@ func ReadPEB(proc windows.Handle) (*PEB, error) {
 	// to access the structure's fields.
 	peb.peb, err = sys.ReadProcessMemory[windows.PEB](proc, uintptr(unsafe.Pointer(pbi.PebBaseAddress)))
 	if err != nil {
+		errno, ok := err.(windows.Errno)
+		if ok && (errno == windows.ERROR_ACCESS_DENIED || errno == windows.ERROR_NOACCESS) {
+			return peb, nil
+		}
 		return nil, err
 	}
 	// read the `RTL_USER_PROCESS_PARAMETERS` struct which contains the command line

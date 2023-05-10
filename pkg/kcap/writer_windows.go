@@ -122,13 +122,13 @@ func NewWriter(filename string, psnap ps.Snapshotter, hsnap handle.Snapshotter) 
 	// in the snapshot. This information is used by the reader to
 	// restore the state of the snapshotters.
 	if _, err := zw.Write(bytes.WriteUint64(magic)); err != nil {
-		return nil, errWriteMagic(err)
+		return nil, ErrWriteMagic(err)
 	}
 	if _, err := zw.Write([]byte{major}); err != nil {
-		return nil, errWriteVersion("major", err)
+		return nil, ErrWriteVersion("major", err)
 	}
 	if _, err := zw.Write([]byte{minor}); err != nil {
-		return nil, errWriteVersion("minor", err)
+		return nil, ErrWriteVersion("minor", err)
 	}
 	if _, err := zw.Write(bytes.WriteUint64(flags)); err != nil {
 		return nil, err

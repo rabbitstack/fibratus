@@ -116,8 +116,16 @@ func (s *snapshotter) WriteFromKcap(e *kevent.Kevent) error {
 			(e.IsProcessRundown() && pid == sys.InvalidProcessID) {
 			return nil
 		}
-		proc.Parent = s.procs[ppid]
-		s.procs[pid] = proc
+		if e.IsProcessRundown() {
+			proc.Parent = s.procs[ppid]
+			s.procs[pid] = proc
+		} else {
+			proc, err := s.newProcState(pid, ppid, e)
+			if err != nil {
+				return err
+			}
+			s.procs[pid] = proc
+		}
 	case ktypes.CreateThread, ktypes.ThreadRundown:
 		return s.AddThread(e)
 	case ktypes.LoadImage, ktypes.ImageRundown:
@@ -245,15 +253,27 @@ func (s *snapshotter) newProcState(pid, ppid uint32, e *kevent.Kevent) (*pstypes
 	proc.Parent = s.procs[ppid]
 	proc.StartTime, _ = e.Kparams.GetTime(kparams.StartTime)
 
-	// retrieve Portable Executable data
+	if proc.Username != "" {
+		e.AppendParam(kparams.Username, kparams.UnicodeString, proc.Username)
+	}
+	if proc.Domain != "" {
+		e.AppendParam(kparams.Domain, kparams.UnicodeString, proc.Domain)
+	}
+
+	// retrieve process handles
 	var err error
-	proc.PE, err = pe.ParseFileWithConfig(proc.Exe, s.config.PE)
+	proc.Handles, err = s.hsnap.FindHandles(pid)
 	if err != nil {
 		return proc, err
 	}
 
-	// retrieve process handles
-	proc.Handles, err = s.hsnap.FindHandles(pid)
+	// return early if we're reading from the capture file
+	if s.capture {
+		return proc, nil
+	}
+
+	// retrieve Portable Executable data
+	proc.PE, err = pe.ParseFileWithConfig(proc.Exe, s.config.PE)
 	if err != nil {
 		return proc, err
 	}

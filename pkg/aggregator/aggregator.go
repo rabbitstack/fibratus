@@ -21,6 +21,7 @@ package aggregator
 import (
 	"errors"
 	"expvar"
+	"github.com/rabbitstack/fibratus/pkg/util/eventlistener"
 	"time"
 
 	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers"
@@ -62,9 +63,6 @@ var (
 	keventErrors = expvar.NewInt("aggregator.kevent.errors")
 )
 
-// BacklogQueueSize the max size of the backlog queue
-const BacklogQueueSize = 800
-
 // BufferedAggregator collects events from the inbound channel and produces batches on regular intervals. The batches
 // are pushed to the work queue from which load-balanced configured workers consume the batches and publish to the outputs.
 type BufferedAggregator struct {
@@ -79,10 +77,7 @@ type BufferedAggregator struct {
 	submitter  *submitter
 	transforms []transformers.Transformer
 	c          Config
-	listeners  []Listener
-
-	// stores delayed events
-	backlog *backlog
+	listeners  []eventlistener.Listener
 }
 
 // NewBuffered creates a new instance of the event aggregator.
@@ -106,8 +101,7 @@ func NewBuffered(
 		flusher:   time.NewTicker(flushInterval),
 		wq:        make(chan *kevent.Batch),
 		c:         aggConfig,
-		listeners: make([]Listener, 0),
-		backlog:   newBacklog(BacklogQueueSize),
+		listeners: make([]eventlistener.Listener, 0),
 	}
 
 	var err error
@@ -169,7 +163,7 @@ func (agg *BufferedAggregator) Run() {
 // called for each event coming out of the event queue, before the
 // batch is created. If any of the listeners returns a false value,
 // the event is rejected.
-func (agg *BufferedAggregator) AddListener(lis Listener) {
+func (agg *BufferedAggregator) AddListener(lis eventlistener.Listener) {
 	agg.listeners = append(agg.listeners, lis)
 }
 
@@ -196,23 +190,7 @@ func (agg *BufferedAggregator) run() {
 			// clear the queue
 			agg.kevts = nil
 		case evt := <-agg.kevtsc:
-			// put delayed event in backlog
-			if evt.Delayed {
-				agg.backlog.put(evt)
-				continue
-			}
-			// lookup backlog for delayed event
-			ev := agg.backlog.pop(evt)
-			if ev != nil {
-				ev.CopyFields(evt)
-				if !agg.push(ev) {
-					goto push
-				}
-			}
-		push:
-			if !agg.push(evt) {
-				continue
-			}
+			agg.enqueue(evt)
 		case err := <-agg.errsc:
 			keventErrors.Add(1)
 			log.Errorf("event processing failure: %v", err)
@@ -220,15 +198,16 @@ func (agg *BufferedAggregator) run() {
 	}
 }
 
-func (agg *BufferedAggregator) push(evt *kevent.Kevent) bool {
-	for _, lis := range agg.listeners {
-		if !lis.ProcessEvent(evt) {
+func (agg *BufferedAggregator) enqueue(evt *kevent.Kevent) {
+	for _, listener := range agg.listeners {
+		enq := listener.ProcessEvent(evt)
+		if !enq {
 			evt.Release()
-			return false
+			return
 		}
 	}
-	for _, tra := range agg.transforms {
-		err := tra.Transform(evt)
+	for _, transform := range agg.transforms {
+		err := transform.Transform(evt)
 		if err != nil {
 			transformerErrors.Add(err.Error(), 1)
 		}
@@ -236,5 +215,4 @@ func (agg *BufferedAggregator) push(evt *kevent.Kevent) bool {
 	// push the event to the queue
 	agg.kevts = append(agg.kevts, evt)
 	keventsDequeued.Add(1)
-	return true
 }

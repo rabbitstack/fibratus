@@ -100,6 +100,8 @@ type ObjectNameInformation struct {
 	ObjectName windows.NTUnicodeString
 }
 
+// QueryObject consults the specified object information class and returns
+// a pointer to the structure containing object information.
 func QueryObject[C any](obj windows.Handle, class int32) (*C, error) {
 	var c C
 	var s uint32

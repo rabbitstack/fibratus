@@ -23,7 +23,6 @@ package config
 
 import (
 	"runtime"
-	"strings"
 	"time"
 
 	"github.com/rabbitstack/fibratus/pkg/kevent"
@@ -120,7 +119,7 @@ func (c *KstreamConfig) initFromViper(v *viper.Viper) {
 		}
 	}
 	for _, name := range c.ExcludedImages {
-		c.excludedImages[strings.ToLower(name)] = true
+		c.excludedImages[name] = true
 	}
 }
 

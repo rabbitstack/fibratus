@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 by Nedim Sabic Sabic
+ * Copyright 2021-2022 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -16,6 +16,13 @@
  * limitations under the License.
  */
 
-// Package kstream contains facilities for controlling ETW sessions and opening event stream
-// for the purpose of collecting and processing events.
-package kstream
+package eventlistener
+
+import "github.com/rabbitstack/fibratus/pkg/kevent"
+
+// Listener is the minimal interface that all event listeners need to implement.
+type Listener interface {
+	// ProcessEvent receives the event and returns a boolean value
+	// indicating if the event should continue the processing journey.
+	ProcessEvent(*kevent.Kevent) bool
+}

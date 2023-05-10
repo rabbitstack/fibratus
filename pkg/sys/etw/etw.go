@@ -36,6 +36,7 @@ import (
 //sys openTrace(logfile *EventTraceLogfile) (handle TraceHandle) = advapi32.OpenTraceW
 //sys processTrace(handle *TraceHandle, count uint32, start *windows.Filetime, end *windows.Filetime) (err error) [failretval!=0] = advapi32.ProcessTrace
 //sys traceSetInformation(handle TraceHandle, infoClass uint8, info uintptr, length uint32) (err error) [failretval!=0] = advapi32.TraceSetInformation
+//sys traceQueryInformation(handle TraceHandle, infoClass uint8, info uintptr, length uint32, size *uint32) (err error) [failretval!=0] = advapi32.TraceQueryInformation
 //sys enableTraceEx(providerID *windows.GUID, sourceID *windows.GUID, handle TraceHandle, isEnabled uint32, level uint8, matchAnyKeyword uint64, matchAllKeyword uint64, enableProperty uint32, enableFilterDesc uintptr) (err error) [failretval!=0] = advapi32.EnableTraceEx
 
 // TraceOperation is the type alias for the trace operation.
@@ -152,12 +153,22 @@ func ProcessTrace(handle TraceHandle) error {
 }
 
 // SetTraceSystemFlags enables or disables event tracing session system flags.
-func SetTraceSystemFlags(handle TraceHandle, traceFlags []EventTraceFlags) error {
-	err := traceSetInformation(handle, TraceSystemTraceEnableFlagsInfo, uintptr(unsafe.Pointer(&traceFlags[0])), uint32(4*len(traceFlags)))
+func SetTraceSystemFlags(handle TraceHandle, flags []EventTraceFlags) error {
+	err := traceSetInformation(handle, TraceSystemTraceEnableFlagsInfo, uintptr(unsafe.Pointer(&flags[0])), uint32(4*len(flags)))
 	if err != nil {
 		return os.NewSyscallError("TraceSetInformation", err)
 	}
 	return nil
+}
+
+// GetTraceSystemFlags returns enabled event tracing session system flags.
+func GetTraceSystemFlags(handle TraceHandle) ([]EventTraceFlags, error) {
+	flags := make([]EventTraceFlags, 8)
+	err := traceQueryInformation(handle, TraceSystemTraceEnableFlagsInfo, uintptr(unsafe.Pointer(&flags[0])), uint32(4*len(flags)), nil)
+	if err != nil {
+		return nil, os.NewSyscallError("TraceQueryInformation", err)
+	}
+	return flags, nil
 }
 
 // EnableTrace influences the behaviour of the specified event trace provider.

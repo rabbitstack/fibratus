@@ -16,38 +16,4 @@
  * limitations under the License.
  */
 
-package aggregator
-
-import (
-	"github.com/golang/groupcache/lru"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-)
-
-// backlog acts as LRU store for delayed events.
-type backlog struct {
-	q *lru.Cache
-}
-
-func newBacklog(size int) *backlog {
-	return &backlog{q: lru.New(size)}
-}
-
-func (b *backlog) put(evt *kevent.Kevent) {
-	if b.q.Len() > BacklogQueueSize {
-		b.q.RemoveOldest()
-	}
-	b.q.Add(evt.DelayComparator(), evt)
-}
-
-func (b *backlog) pop(evt *kevent.Kevent) *kevent.Kevent {
-	key := evt.DelayComparator()
-	if key == nil {
-		return nil
-	}
-	ev, ok := b.q.Get(key)
-	if !ok {
-		return nil
-	}
-	b.q.Remove(key)
-	return ev.(*kevent.Kevent)
-}
+package kstream
