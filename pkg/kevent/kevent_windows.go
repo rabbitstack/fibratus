@@ -351,17 +351,17 @@ func (e *Kevent) Summary() string {
 	switch e.Type {
 	case ktypes.CreateProcess:
 		exe := e.Kparams.MustGetString(kparams.Exe)
-		sid := e.Kparams.MustGetString(kparams.UserSID)
+		sid := e.GetParamAsString(kparams.UserSID)
 		return printSummary(e, fmt.Sprintf("spawned <code>%s</code> process as <code>%s</code> user", exe, sid))
 	case ktypes.TerminateProcess:
 		exe := e.Kparams.MustGetString(kparams.Exe)
-		sid := e.Kparams.MustGetString(kparams.UserSID)
+		sid := e.GetParamAsString(kparams.UserSID)
 		return printSummary(e, fmt.Sprintf("terminated <code>%s</code> process as <code>%s</code> user", exe, sid))
 	case ktypes.OpenProcess:
-		access, _ := e.Kparams.GetStringSlice(kparams.DesiredAccessNames)
+		access := e.GetParamAsString(kparams.DesiredAccess)
 		exe, _ := e.Kparams.GetString(kparams.Exe)
 		return printSummary(e, fmt.Sprintf("opened <code>%s</code> process object with <code>%s</code> access right(s)",
-			exe, strings.Join(access, "|")))
+			exe, access))
 	case ktypes.CreateThread:
 		tid, _ := e.Kparams.GetTid()
 		addr, _ := e.Kparams.GetHex(kparams.StartAddr)
@@ -373,68 +373,68 @@ func (e *Kevent) Summary() string {
 		return printSummary(e, fmt.Sprintf("terminated a thread with <code>%d</code> id at <code>%s</code> address",
 			tid, addr))
 	case ktypes.OpenThread:
-		access, _ := e.Kparams.GetStringSlice(kparams.DesiredAccessNames)
+		access := e.GetParamAsString(kparams.DesiredAccess)
 		exe, _ := e.Kparams.GetString(kparams.Exe)
 		return printSummary(e, fmt.Sprintf("opened <code>%s</code> process' thread object with <code>%s</code> access right(s)",
-			exe, strings.Join(access, "|")))
+			exe, access))
 	case ktypes.LoadImage:
-		filename, _ := e.Kparams.GetString(kparams.FileName)
+		filename := e.GetParamAsString(kparams.FileName)
 		return printSummary(e, fmt.Sprintf("loaded </code>%s</code> module", filename))
 	case ktypes.UnloadImage:
-		filename, _ := e.Kparams.GetString(kparams.FileName)
+		filename := e.GetParamAsString(kparams.FileName)
 		return printSummary(e, fmt.Sprintf("unloaded </code>%s</code> module", filename))
 	case ktypes.CreateFile:
 		op := e.GetParamAsString(kparams.FileOperation)
-		filename := e.Kparams.MustGetString(kparams.FileName)
+		filename := e.GetParamAsString(kparams.FileName)
 		return printSummary(e, fmt.Sprintf("%sed a file <code>%s</code>", strings.ToLower(op), filename))
 	case ktypes.ReadFile:
-		filename, _ := e.Kparams.GetString(kparams.FileName)
+		filename := e.GetParamAsString(kparams.FileName)
 		size, _ := e.Kparams.GetUint32(kparams.FileIoSize)
 		return printSummary(e, fmt.Sprintf("read <code>%d</code> bytes from <code>%s</code> file", size, filename))
 	case ktypes.WriteFile:
-		filename, _ := e.Kparams.GetString(kparams.FileName)
+		filename := e.GetParamAsString(kparams.FileName)
 		size, _ := e.Kparams.GetUint32(kparams.FileIoSize)
 		return printSummary(e, fmt.Sprintf("wrote <code>%d</code> bytes to <code>%s</code> file", size, filename))
 	case ktypes.SetFileInformation:
-		filename, _ := e.Kparams.GetString(kparams.FileName)
-		class, _ := e.Kparams.GetString(kparams.FileInfoClass)
+		filename := e.GetParamAsString(kparams.FileName)
+		class := e.GetParamAsString(kparams.FileInfoClass)
 		return printSummary(e, fmt.Sprintf("set <code>%s</code> information class on <code>%s</code> file", class, filename))
 	case ktypes.DeleteFile:
-		filename, _ := e.Kparams.GetString(kparams.FileName)
+		filename := e.GetParamAsString(kparams.FileName)
 		return printSummary(e, fmt.Sprintf("deleted <code>%s</code> file", filename))
 	case ktypes.RenameFile:
-		filename, _ := e.Kparams.GetString(kparams.FileName)
+		filename := e.GetParamAsString(kparams.FileName)
 		return printSummary(e, fmt.Sprintf("renamed <code>%s</code> file", filename))
 	case ktypes.CloseFile:
-		filename, _ := e.Kparams.GetString(kparams.FileName)
+		filename := e.GetParamAsString(kparams.FileName)
 		return printSummary(e, fmt.Sprintf("closed <code>%s</code> file", filename))
 	case ktypes.EnumDirectory:
-		filename, _ := e.Kparams.GetString(kparams.FileName)
+		filename := e.GetParamAsString(kparams.FileName)
 		return printSummary(e, fmt.Sprintf("enumerated <code>%s</code> directory", filename))
 	case ktypes.RegCreateKey:
-		key, _ := e.Kparams.GetString(kparams.RegKeyName)
+		key := e.GetParamAsString(kparams.RegKeyName)
 		return printSummary(e, fmt.Sprintf("created <code>%s</code> key", key))
 	case ktypes.RegOpenKey:
-		key, _ := e.Kparams.GetString(kparams.RegKeyName)
+		key := e.GetParamAsString(kparams.RegKeyName)
 		return printSummary(e, fmt.Sprintf("opened <code>%s</code> key", key))
 	case ktypes.RegDeleteKey:
-		key, _ := e.Kparams.GetString(kparams.RegKeyName)
+		key := e.GetParamAsString(kparams.RegKeyName)
 		return printSummary(e, fmt.Sprintf("deleted <code>%s</code> key", key))
 	case ktypes.RegQueryKey:
-		key, _ := e.Kparams.GetString(kparams.RegKeyName)
+		key := e.GetParamAsString(kparams.RegKeyName)
 		return printSummary(e, fmt.Sprintf("queried <code>%s</code> key", key))
 	case ktypes.RegSetValue:
-		key, _ := e.Kparams.GetString(kparams.RegKeyName)
+		key := e.GetParamAsString(kparams.RegKeyName)
 		val, err := e.Kparams.GetString(kparams.RegValue)
 		if err != nil {
 			return printSummary(e, fmt.Sprintf("set <code>%s</code> value", key))
 		}
 		return printSummary(e, fmt.Sprintf("set <code>%s</code> payload in <code>%s</code> value", val, key))
 	case ktypes.RegDeleteValue:
-		key, _ := e.Kparams.GetString(kparams.RegKeyName)
+		key := e.GetParamAsString(kparams.RegKeyName)
 		return printSummary(e, fmt.Sprintf("deleted <code>%s</code> value", key))
 	case ktypes.RegQueryValue:
-		key, _ := e.Kparams.GetString(kparams.RegKeyName)
+		key := e.GetParamAsString(kparams.RegKeyName)
 		return printSummary(e, fmt.Sprintf("queried <code>%s</code> value", key))
 	case ktypes.AcceptTCPv4, ktypes.AcceptTCPv6:
 		ip, _ := e.Kparams.GetIP(kparams.NetSIP)

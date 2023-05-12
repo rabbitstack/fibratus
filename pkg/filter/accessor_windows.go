@@ -160,12 +160,12 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 		if kevt.Category != ktypes.Process {
 			return nil, nil
 		}
-		return kevt.Kparams.GetString(kparams.Username)
+		return kevt.Kparams.GetString(kparams.Domain)
 	case fields.PsSiblingUsername, fields.PsChildUsername:
 		if kevt.Category != ktypes.Process {
 			return nil, nil
 		}
-		return kevt.Kparams.GetString(kparams.Domain)
+		return kevt.Kparams.GetString(kparams.Username)
 	case fields.PsDomain:
 		ps := kevt.PS
 		if ps == nil {
@@ -565,7 +565,7 @@ func (t *threadAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value
 		if kevt.Type != ktypes.OpenThread {
 			return nil, nil
 		}
-		return kevt.GetFlagsAsSlice(kparams.DesiredAccessNames), nil
+		return kevt.GetFlagsAsSlice(kparams.DesiredAccess), nil
 	case fields.ThreadAccessStatus:
 		if kevt.Type != ktypes.OpenThread {
 			return nil, nil
@@ -662,7 +662,7 @@ func (r *registryAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Val
 		}
 		return keyHandle.String(), nil
 	case fields.RegistryValue:
-		return kevt.Kparams.Get(kparams.RegValue)
+		return kevt.Kparams.GetRaw(kparams.RegValue)
 	case fields.RegistryValueType:
 		return kevt.Kparams.GetString(kparams.RegValueType)
 	case fields.RegistryStatus:

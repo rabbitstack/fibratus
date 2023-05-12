@@ -98,6 +98,7 @@ type Rules struct {
 	config     *config.Config
 	psnap      ps.Snapshotter
 	hasExclude bool // if any loaded groups have exclude policy
+	once       sync.Once
 }
 
 type filterGroup struct {
@@ -619,10 +620,8 @@ func (r *Rules) findGroups(kevt *kevent.Kevent) filterGroups {
 	return append(groups1, groups2...)
 }
 
-var once sync.Once
-
 func (r *Rules) hasExcludeGroups() bool {
-	once.Do(func() {
+	r.once.Do(func() {
 		for _, g := range r.groups {
 			if g.hasPolicy(config.ExcludePolicy) {
 				r.hasExclude = true

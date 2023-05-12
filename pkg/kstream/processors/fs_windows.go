@@ -62,7 +62,8 @@ func newFsProcessor(hsnap handle.Snapshotter) Processor {
 func (f *fsProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error) {
 	if e.Category == ktypes.File {
 		evt, err := f.processEvent(e)
-		return evt, false, err
+		// allow other processors to access fs events
+		return evt, true, err
 	}
 	return e, true, nil
 }

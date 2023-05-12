@@ -19,6 +19,7 @@
 package filter
 
 import (
+	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows/registry"
@@ -130,7 +131,7 @@ func TestCompileMergeGroups(t *testing.T) {
 	assert.Len(t, groups, 3)
 }
 
-func TestFireRules(t *testing.T) {
+func TestProcessRules(t *testing.T) {
 	var tests = []struct {
 		config  *config.Config
 		matches bool
@@ -148,7 +149,7 @@ func TestFireRules(t *testing.T) {
 	for i, tt := range tests {
 		matches := fireRules(t, tt.config)
 		if matches != tt.matches {
-			t.Errorf("%d. %v filter chain mismatch: exp=%t got=%t", i, tt.config.Filters, tt.matches, matches)
+			t.Errorf("%d. %v process rules mismatch: exp=%t got=%t", i, tt.config.Filters, tt.matches, matches)
 		}
 	}
 }
@@ -169,6 +170,7 @@ func TestIncludeExcludeRemoteThreads(t *testing.T) {
 		Kparams: kevent.Kparams{
 			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
 		},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
 	require.False(t, rules.ProcessEvent(kevt))
@@ -546,7 +548,7 @@ func TestComplexSequenceRule(t *testing.T) {
 		},
 		Kparams: kevent.Kparams{
 			kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
-			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: uint32(2)},
+			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: uint32(2), Enum: fs.FileCreateDispositions},
 		},
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
@@ -565,7 +567,7 @@ func TestComplexSequenceRule(t *testing.T) {
 			Cmdline: "C:\\Program Files\\Mozilla Firefox\\firefox.exe\" -contentproc --channel=\"10464.7.539748228\\1366525930\" -childID 6 -isF",
 		},
 		Kparams: kevent.Kparams{
-			kparams.NetDIP: {Name: kparams.NetDIP, Type: kparams.IP, Value: net.ParseIP("10.0.2.3")},
+			kparams.NetDIP: {Name: kparams.NetDIP, Type: kparams.IPv4, Value: net.ParseIP("10.0.2.3")},
 		},
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
@@ -640,7 +642,7 @@ func TestSequencePsUUID(t *testing.T) {
 		},
 		Kparams: kevent.Kparams{
 			kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
-			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: uint32(2)},
+			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: uint32(2), Enum: fs.FileCreateDispositions},
 		},
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
@@ -789,6 +791,7 @@ func TestSequenceRuleBoundsFields(t *testing.T) {
 		},
 		Kparams: kevent.Kparams{
 			kparams.NetDport: {Name: kparams.NetDport, Type: kparams.Uint16, Value: uint16(80)},
+			kparams.NetDIP:   {Name: kparams.NetDIP, Type: kparams.IPv4, Value: net.ParseIP("172.1.2.3")},
 		},
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}

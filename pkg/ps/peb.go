@@ -53,8 +53,8 @@ func ReadPEB(proc windows.Handle) (*PEB, error) {
 	// to access the structure's fields.
 	peb.peb, err = sys.ReadProcessMemory[windows.PEB](proc, uintptr(unsafe.Pointer(pbi.PebBaseAddress)))
 	if err != nil {
-		errno, ok := err.(windows.Errno)
-		if ok && (errno == windows.ERROR_ACCESS_DENIED || errno == windows.ERROR_NOACCESS) {
+		if err == windows.ERROR_ACCESS_DENIED || err == windows.ERROR_NOACCESS ||
+			err == windows.ERROR_PARTIAL_COPY {
 			return peb, nil
 		}
 		return nil, err

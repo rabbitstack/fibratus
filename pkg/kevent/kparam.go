@@ -137,7 +137,7 @@ func NewKparamFromKcap(name string, typ kparams.Type, value kparams.Value, ktype
 		enum = network.ProtoNames
 	case kparams.RegValueType:
 		enum = key.RegistryValueTypes
-	case kparams.DesiredAccess, kparams.DesiredAccessNames:
+	case kparams.DesiredAccess:
 		if ktype == ktypes.OpenProcess {
 			flags = PsAccessRightFlags
 		} else {

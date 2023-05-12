@@ -120,7 +120,7 @@ func (k *consumer) Open(sessions []TraceSession) error {
 		}
 		if err == nil {
 			k.addTrace(trace)
-			k.processTrace(ses.Name, trace)
+			go k.processTrace(ses.Name, trace)
 		}
 	}
 	return nil
@@ -139,18 +139,12 @@ func (k *consumer) openTrace(name string) (etw.TraceHandle, error) {
 }
 
 func (k *consumer) processTrace(name string, trace etw.TraceHandle) {
-	go func(trace etw.TraceHandle) {
-		log.Infof("starting [%s] trace processing", name)
-		err := etw.ProcessTrace(trace)
-		log.Infof("stopping [%s] trace processing", name)
-		if err == nil {
-			log.Infof("[%s] trace processing stopped", name)
-			return
-		}
-		if !errors.Is(err, kerrors.ErrTraceCancelled) {
-			k.errs <- err
-		}
-	}(trace)
+	log.Infof("starting [%s] trace processing", name)
+	err := etw.ProcessTrace(trace)
+	log.Infof("stopping [%s] trace processing", name)
+	if err != nil && !errors.Is(err, kerrors.ErrTraceCancelled) {
+		k.errs <- err
+	}
 }
 
 // Close shutdowns the event stream consumer by closing all running traces.

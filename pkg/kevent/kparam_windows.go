@@ -615,7 +615,6 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 			dport = evt.ReadUint16(40)
 			sport = evt.ReadUint16(42)
 		}
-
 		e.AppendParam(kparams.ProcessID, kparams.PID, pid)
 		e.AppendParam(kparams.NetSize, kparams.Uint32, size)
 		e.AppendParam(kparams.NetDIP, kparams.IPv6, dip)

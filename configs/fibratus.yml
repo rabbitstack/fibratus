@@ -194,7 +194,7 @@ kstream:
     # Contains a list of event names that are dropped from the event stream
     events:
       - CloseFile
-      - CloseKey
+      - RegCloseKey
     # Contains a list of case-sensitive process image names including the extension.
     # Any event originated by the image specified in this list is dropped from the event stream
     # images:

@@ -118,14 +118,13 @@ func (s *snapshotter) WriteFromKcap(e *kevent.Kevent) error {
 		}
 		if e.IsProcessRundown() {
 			proc.Parent = s.procs[ppid]
-			s.procs[pid] = proc
 		} else {
-			proc, err := s.newProcState(pid, ppid, e)
+			proc, err = s.newProcState(pid, ppid, e)
 			if err != nil {
 				return err
 			}
-			s.procs[pid] = proc
 		}
+		s.procs[pid] = proc
 	case ktypes.CreateThread, ktypes.ThreadRundown:
 		return s.AddThread(e)
 	case ktypes.LoadImage, ktypes.ImageRundown:

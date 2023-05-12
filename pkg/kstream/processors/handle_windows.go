@@ -24,15 +24,14 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
-	"path/filepath"
 	"strings"
 )
 
 type handleProcessor struct {
-	hsnap     handle.Snapshotter
-	devMapper fs.DevMapper
+	hsnap           handle.Snapshotter
+	devMapper       fs.DevMapper
+	devPathResolver fs.DevPathResolver
 }
 
 func newHandleProcessor(
@@ -40,12 +39,16 @@ func newHandleProcessor(
 	devMapper fs.DevMapper,
 ) Processor {
 	return &handleProcessor{
-		hsnap:     hsnap,
-		devMapper: devMapper,
+		hsnap:           hsnap,
+		devMapper:       devMapper,
+		devPathResolver: fs.NewDevPathResolver(),
 	}
 }
 
 func (h *handleProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error) {
+	if e.Type == ktypes.CreateFile {
+		h.devPathResolver.AddPath(e.GetParamAsString(kparams.FileName))
+	}
 	if e.Category == ktypes.Handle {
 		evt, err := h.processEvent(e)
 		return evt, false, err
@@ -71,12 +74,12 @@ func (h *handleProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error)
 			name = h.devMapper.Convert(name)
 		case handle.Driver:
 			driverName := strings.TrimPrefix(name, "\\Driver\\") + ".sys"
-			drivers := sys.EnumDevices()
-			for _, drv := range drivers {
-				if strings.EqualFold(filepath.Base(drv.Filename), driverName) {
-					e.Kparams.Append(kparams.ImageFilename, kparams.FilePath, drv.Filename)
-				}
+			driverPath := h.devPathResolver.GetPath(driverName)
+			if driverPath == "" {
+				driverPath = driverName
 			}
+			h.devPathResolver.RemovePath(driverName)
+			e.Kparams.Append(kparams.ImageFilename, kparams.FilePath, driverPath)
 		}
 		// assign the formatted handle name
 		if err := e.Kparams.SetValue(kparams.HandleObjectName, name); err != nil {

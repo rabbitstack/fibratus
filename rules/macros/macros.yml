@@ -10,7 +10,7 @@
   description: Acquires the local process object with all possible access rights
 
 - macro: spawn_msoffice_process
-  expr: spawn_process and ps.sibling.exe iin msoffice_binaries
+  expr: spawn_process and ps.child.name iin msoffice_binaries
   description: Identifies the execution of the MS Office process
 
 - macro: write_file
@@ -20,7 +20,7 @@
   expr: kevt.name = 'CreateFile' and file.operation = 'OPEN'
 
 - macro: create_file
-  expr: kevt.name = 'CreateFile' and file.operation = 'CREATE'
+  expr: kevt.name = 'CreateFile' and file.operation != 'OPEN'
 
 - macro: query_registry
   expr: kevt.name in ('RegQueryKey', 'RegQueryValue')

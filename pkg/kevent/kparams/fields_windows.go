@@ -55,8 +55,6 @@ const (
 
 	// DesiredAccess field denotes the access rights for different kernel objects such as processes or threads.
 	DesiredAccess = "desired_access"
-	// DesiredAccessNames field denotes the list of human-readable access rights.
-	DesiredAccessNames = "desired_access_names"
 
 	// BasePrio field is the thread base priority assigned by the scheduler.
 	BasePrio = "base_prio"
