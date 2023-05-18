@@ -252,11 +252,13 @@ func (s *snapshotter) newProcState(pid, ppid uint32, e *kevent.Kevent) (*pstypes
 	proc.Parent = s.procs[ppid]
 	proc.StartTime, _ = e.Kparams.GetTime(kparams.StartTime)
 
-	if proc.Username != "" {
-		e.AppendParam(kparams.Username, kparams.UnicodeString, proc.Username)
-	}
-	if proc.Domain != "" {
-		e.AppendParam(kparams.Domain, kparams.UnicodeString, proc.Domain)
+	if !s.capture {
+		if proc.Username != "" {
+			e.AppendParam(kparams.Username, kparams.UnicodeString, proc.Username)
+		}
+		if proc.Domain != "" {
+			e.AppendParam(kparams.Domain, kparams.UnicodeString, proc.Domain)
+		}
 	}
 
 	// retrieve process handles
