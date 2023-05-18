@@ -27,6 +27,7 @@ import (
 	"expvar"
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"html/template"
 	"os"
 	"path/filepath"
@@ -164,55 +165,54 @@ func parseCompilerErrors(errors []yara.CompilerMessage) error {
 	return multierror.Wrap(errs...)
 }
 
-func (s scanner) ProcessEvent(evt *kevent.Kevent) bool {
-	err := s.scan(evt)
-	if err != nil {
-		log.Error(err)
-	}
-	return true
+func (s scanner) ProcessEvent(evt *kevent.Kevent) (bool, error) {
+	return s.Scan(evt)
 }
 
-func (s scanner) scan(evt *kevent.Kevent) error {
+func (s scanner) Scan(evt *kevent.Kevent) (bool, error) {
 	if !evt.IsCreateProcess() && !evt.IsLoadImage() {
-		return nil
+		return false, nil
 	}
 	var matches yara.MatchRules
 	sn, err := s.newInternalScanner()
 	if err != nil {
-		return err
+		return false, err
 	}
 	alertCtx := AlertContext{
 		Timestamp: time.Now().Format(tsLayout),
 	}
-	switch {
-	case evt.IsCreateProcess():
+
+	switch evt.Type {
+	case ktypes.CreateProcess:
+		pid := evt.Kparams.MustGetPid()
 		proc := s.psnap.Find(pid)
 		if proc == nil {
-			return fmt.Errorf("% process not found in snapshotter", pid)
+			return false, fmt.Errorf("% process not found in snapshotter", pid)
 		}
 		if s.config.ShouldSkipProcess(proc.Name) {
-			return nil
+			return false, nil
 		}
 		alertCtx.PS = proc
 		err = sn.SetCallback(&matches).ScanProc(int(pid))
-	case evt.IsLoadImage():
+	case ktypes.LoadImage:
 		filename = evt.GetParamAsString(kparams.ImageFilename)
 		alertCtx.Filename = filename
 		err = sn.SetCallback(&matches).ScanFile(filename)
 	}
+
 	if err != nil {
-		return err
+		return false, err
 	}
 	totalScans.Add(1)
 	if len(matches) == 0 {
-		return nil
+		return false, nil
 	}
 	alertCtx.Matches = matches
 	ruleMatches.Add(int64(len(matches)))
 	if err := putMatchesMeta(matches, kevt); err != nil {
-		return err
+		return true, err
 	}
-	return s.send(alertCtx)
+	return true, s.send(alertCtx)
 }
 
 func (s scanner) send(ctx AlertContext) error {

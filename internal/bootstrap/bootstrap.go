@@ -210,6 +210,15 @@ func (f *App) Run(args []string) error {
 			}
 		}()
 	} else {
+		// register event listeners
+		f.consumer.RegisterEventListener(rules)
+		if cfg.Yara.Enabled {
+			scanner, err := yara.NewScanner(f.psnap, cfg.Yara)
+			if err != nil {
+				return err
+			}
+			f.consumer.RegisterEventListener(scanner)
+		}
 		err = f.consumer.Open(f.controller.Traces())
 		if err != nil {
 			return multierror.Wrap(err, f.controller.Close())
@@ -227,15 +236,6 @@ func (f *App) Run(args []string) error {
 		if err != nil {
 			return err
 		}
-		f.agg.AddListener(rules)
-		if cfg.Yara.Enabled {
-			scanner, err := yara.NewScanner(f.psnap, cfg.Yara)
-			if err != nil {
-				return err
-			}
-			f.agg.AddListener(scanner)
-		}
-		f.agg.Run()
 	}
 	// start the HTTP server
 	return api.StartServer(cfg)
@@ -330,7 +330,6 @@ func (f *App) ReadCapture(ctx context.Context, args []string) error {
 		if err != nil {
 			return err
 		}
-		f.agg.Run()
 	}
 	return api.StartServer(f.config)
 }

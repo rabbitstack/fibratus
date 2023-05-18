@@ -268,6 +268,9 @@ func (s *snapshotter) newProcState(pid, ppid uint32, e *kevent.Kevent) (*pstypes
 
 	// return early if we're reading from the capture file
 	if s.capture {
+		// reset username/domain from captured event parameters
+		proc.Domain = e.GetParamAsString(kparams.Domain)
+		proc.Username = e.GetParamAsString(kparams.Username)
 		return proc, nil
 	}
 

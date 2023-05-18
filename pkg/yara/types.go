@@ -24,8 +24,9 @@ import "github.com/rabbitstack/fibratus/pkg/kevent"
 // triggers the scanning either on the process memory or image file. If matches occur,
 // an alert is emitted via specified alert sender.
 type Scanner interface {
-	// ProcessEvent initiates the scanning process on behalf of the input event.
-	ProcessEvent(*kevent.Kevent) bool
+	kevent.Listener
+	// Scan runs a scan on a loaded executable disk image or in-memory process.
+	Scan(*kevent.Kevent) (bool, error)
 	// Close disposes any resources allocated by the scanner.
 	Close()
 }

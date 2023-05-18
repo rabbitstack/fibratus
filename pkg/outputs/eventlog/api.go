@@ -153,7 +153,7 @@ func (l *Eventlog) Info(eid uint32, category uint16, msg []byte) error {
 	return l.report(uint16(Info), eid, category, msg)
 }
 
-// Warning writes an warning event msg with event id eid to the end of event log.
+// Warning writes a warning event msg with event id eid to the end of event log.
 func (l *Eventlog) Warning(eid uint32, category uint16, msg []byte) error {
 	return l.report(uint16(Warn), eid, category, msg)
 }

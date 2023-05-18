@@ -43,6 +43,8 @@ type fsProcessor struct {
 	hsnap handle.Snapshotter
 	// irps contains a mapping between the IRP (I/O request packet) and CreateFile events
 	irps map[uint64]*kevent.Kevent
+
+	devPathResolver fs.DevPathResolver
 }
 
 // FileInfo stores file information obtained from event state.
@@ -51,19 +53,19 @@ type FileInfo struct {
 	Type fs.FileType
 }
 
-func newFsProcessor(hsnap handle.Snapshotter) Processor {
+func newFsProcessor(hsnap handle.Snapshotter, devPathResolver fs.DevPathResolver) Processor {
 	return &fsProcessor{
-		files: make(map[uint64]*FileInfo),
-		irps:  make(map[uint64]*kevent.Kevent),
-		hsnap: hsnap,
+		files:           make(map[uint64]*FileInfo),
+		irps:            make(map[uint64]*kevent.Kevent),
+		hsnap:           hsnap,
+		devPathResolver: devPathResolver,
 	}
 }
 
 func (f *fsProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error) {
 	if e.Category == ktypes.File {
 		evt, err := f.processEvent(e)
-		// allow other processors to access fs events
-		return evt, true, err
+		return evt, false, err
 	}
 	return e, true, nil
 }
@@ -118,6 +120,7 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 			opts := ev.Kparams.MustGetUint32(kparams.FileCreateOptions)
 			opts &= 0xFFFFFF
 			filename := ev.GetParamAsString(kparams.FileName)
+			f.devPathResolver.AddPath(filename)
 			fileinfo = f.getFileInfo(filename, opts)
 			f.files[fileObject] = fileinfo
 		}

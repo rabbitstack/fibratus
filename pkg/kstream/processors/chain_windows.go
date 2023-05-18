@@ -42,13 +42,14 @@ func NewChain(
 			psnapshotter: psnap,
 			processors:   make([]Processor, 0),
 		}
-		devMapper = fs.NewDevMapper()
+		devMapper       = fs.NewDevMapper()
+		devPathResolver = fs.NewDevPathResolver()
 	)
 
 	chain.addProcessor(newPsProcessor(psnap))
 
 	if config.Kstream.EnableFileIOKevents {
-		chain.addProcessor(newFsProcessor(hsnap))
+		chain.addProcessor(newFsProcessor(hsnap, devPathResolver))
 	}
 	if config.Kstream.EnableRegistryKevents {
 		chain.addProcessor(newRegistryProcessor(hsnap))
@@ -60,7 +61,7 @@ func NewChain(
 		chain.addProcessor(newNetProcessor())
 	}
 	if config.Kstream.EnableHandleKevents {
-		chain.addProcessor(newHandleProcessor(hsnap, devMapper))
+		chain.addProcessor(newHandleProcessor(hsnap, devMapper, devPathResolver))
 	}
 
 	return chain

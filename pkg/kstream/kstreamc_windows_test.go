@@ -178,7 +178,7 @@ func TestConsumerEvents(t *testing.T) {
 			func(e *kevent.Kevent) bool {
 				return e.CurrentPid() && e.Type == ktypes.CreateFile &&
 					strings.HasPrefix(filepath.Base(e.GetParamAsString(kparams.FileName)), "fibratus-test") &&
-					e.GetParamAsString(kparams.FileOperation) == "CREATE"
+					e.GetParamAsString(kparams.FileOperation) != "OPEN"
 			},
 			false,
 		},

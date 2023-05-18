@@ -37,18 +37,16 @@ type handleProcessor struct {
 func newHandleProcessor(
 	hsnap handle.Snapshotter,
 	devMapper fs.DevMapper,
+	devPathResolver fs.DevPathResolver,
 ) Processor {
 	return &handleProcessor{
 		hsnap:           hsnap,
 		devMapper:       devMapper,
-		devPathResolver: fs.NewDevPathResolver(),
+		devPathResolver: devPathResolver,
 	}
 }
 
 func (h *handleProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error) {
-	if e.Type == ktypes.CreateFile {
-		h.devPathResolver.AddPath(e.GetParamAsString(kparams.FileName))
-	}
 	if e.Category == ktypes.Handle {
 		evt, err := h.processEvent(e)
 		return evt, false, err
@@ -87,18 +85,12 @@ func (h *handleProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error)
 		}
 	}
 
-	// anchor object address to event metadata. This is used
-	// as a comparator key for stitching the events together
-	// and augmenting the CreateHandle events with the handle name
-	object := e.Kparams.MustGetUint64(kparams.HandleObject)
-	e.AddMeta(kevent.DelayComparatorKey, object)
-
 	if e.Type == ktypes.CreateHandle {
 		// mark CreateHandle events as delayed. Delayed events
-		// are stored in the aggregator backlog. As soon as the
-		// corresponding CloseHandle event arrives, the event
-		// is removed from the backlog and forwarded to the output
-		// sink
+		// are stored in the assembler backlog queue. As soon as
+		// the corresponding CloseHandle event arrives, the event
+		// is removed from the backlog and pushed to the output
+		// channel
 		e.Delayed = true
 		return e, h.hsnap.Write(e)
 	}
@@ -106,5 +98,5 @@ func (h *handleProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error)
 	return e, h.hsnap.Remove(e)
 }
 
-func (handleProcessor) Name() ProcessorType { return Handle }
-func (h *handleProcessor) Close()           {}
+func (*handleProcessor) Name() ProcessorType { return Handle }
+func (h *handleProcessor) Close()            {}

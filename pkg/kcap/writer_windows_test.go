@@ -32,6 +32,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sys/windows"
 	"testing"
 	"time"
 )
@@ -41,8 +42,8 @@ func TestWrite(t *testing.T) {
 	hsnap := new(handle.SnapshotterMock)
 
 	procs := []*pstypes.PS{
-		{PID: 8390, Ppid: 1096, Name: "spotify.exe", Exe: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe`, Comm: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`, Cwd: `C:\Users\admin\AppData\Roaming\Spotify`, SID: "admin\\SYSTEM"},
-		{PID: 2436, Ppid: 6304, Name: "firefox.exe", Exe: `C:\Program Files\Mozilla Firefox\firefox.exe`, Comm: `C:\Program Files\Mozilla Firefox\firefox.exe" -contentproc --channel="6304.3.1055809391\1014207667" -childID 1 -isForBrowser -prefsHandle 2584 -prefMapHandle 2580 -prefsLen 70 -prefMapSize 216993 -parentBuildID 20200107212822 -greomni "C:\Program Files\Mozilla Firefox\omni.ja" -appomni "C:\Program Files\Mozilla Firefox\browser\omni.ja" -appdir "C:\Program Files\Mozilla Firefox\browser" - 6304 "\\.\pipe\gecko-crash-server-pipe.6304" 2596 tab`, Cwd: `C:\Program Files\Mozilla Firefox\`, SID: "archrabbit\\SYSTEM"},
+		{PID: 8390, Ppid: 1096, Name: "spotify.exe", Exe: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe`, Cmdline: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`, Cwd: `C:\Users\admin\AppData\Roaming\Spotify`, SID: "admin\\SYSTEM"},
+		{PID: 2436, Ppid: 6304, Name: "firefox.exe", Exe: `C:\Program Files\Mozilla Firefox\firefox.exe`, Cmdline: `C:\Program Files\Mozilla Firefox\firefox.exe" -contentproc --channel="6304.3.1055809391\1014207667" -childID 1 -isForBrowser -prefsHandle 2584 -prefMapHandle 2580 -prefsLen 70 -prefMapSize 216993 -parentBuildID 20200107212822 -greomni "C:\Program Files\Mozilla Firefox\omni.ja" -appomni "C:\Program Files\Mozilla Firefox\browser\omni.ja" -appdir "C:\Program Files\Mozilla Firefox\browser" - 6304 "\\.\pipe\gecko-crash-server-pipe.6304" 2596 tab`, Cwd: `C:\Program Files\Mozilla Firefox\`, SID: "archrabbit\\SYSTEM"},
 	}
 
 	handles := []htypes.Handle{
@@ -87,9 +88,9 @@ func TestWrite(t *testing.T) {
 				Ppid:      6304,
 				Name:      "firefox.exe",
 				Exe:       `C:\Program Files\Mozilla Firefox\firefox.exe`,
-				Comm:      `C:\Program Files\Mozilla Firefox\firefox.exe -contentproc --channel="6304.3.1055809391\1014207667" -childID 1 -isForBrowser -prefsHandle 2584 -prefMapHandle 2580 -prefsLen 70 -prefMapSize 216993 -parentBuildID 20200107212822 -greomni "C:\Program Files\Mozilla Firefox\omni.ja" -appomni "C:\Program Files\Mozilla Firefox\browser\omni.ja" -appdir "C:\Program Files\Mozilla Firefox\browser" - 6304 "\\.\pipe\gecko-crash-server-pipe.6304" 2596 tab`,
+				Cmdline:   `C:\Program Files\Mozilla Firefox\firefox.exe -contentproc --channel="6304.3.1055809391\1014207667" -childID 1 -isForBrowser -prefsHandle 2584 -prefMapHandle 2580 -prefsLen 70 -prefMapSize 216993 -parentBuildID 20200107212822 -greomni "C:\Program Files\Mozilla Firefox\omni.ja" -appomni "C:\Program Files\Mozilla Firefox\browser\omni.ja" -appdir "C:\Program Files\Mozilla Firefox\browser" - 6304 "\\.\pipe\gecko-crash-server-pipe.6304" 2596 tab`,
 				Cwd:       `C:\Program Files\Mozilla Firefox\`,
-				SID:       "archrabbit\\SYSTEM",
+				SID:       "S-1-15-2",
 				Args:      []string{"-contentproc", `--channel="6304.3.1055809391\1014207667`, "-childID", "1", "-isForBrowser", "-prefsHandle", "2584", "-prefMapHandle", "2580", "-prefsLen", "70", "-prefMapSize", "216993", "-parentBuildID"},
 				SessionID: 4,
 				Envs:      map[string]string{"ProgramData": "C:\\ProgramData", "COMPUTRENAME": "archrabbit"},
@@ -184,18 +185,18 @@ func TestLiveKcap(t *testing.T) {
 	<-wait
 
 	// initiate the kernel trace and start consuming from the event stream
-	ktracec := kstream.NewKtraceController(cfg.Kstream)
-	err := ktracec.StartKtrace()
+	ktracec := kstream.NewController(cfg.Kstream)
+	err := ktracec.Start()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	kstreamc := kstream.NewConsumer(ktracec, psnap, hsnap, cfg)
+	kstreamc := kstream.NewConsumer(psnap, hsnap, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = kstreamc.OpenKstream(ktracec.Traces())
+	err = kstreamc.Open(ktracec.Traces())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -212,6 +213,6 @@ func TestLiveKcap(t *testing.T) {
 
 	writer.Close()
 
-	_ = kstreamc.CloseKstream()
-	_ = ktracec.CloseKtrace()
+	_ = kstreamc.Close()
+	_ = ktracec.Close()
 }

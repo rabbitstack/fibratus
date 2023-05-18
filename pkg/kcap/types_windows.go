@@ -44,7 +44,7 @@ type Writer interface {
 	// Write accepts two channels. The event channel receives events pushed by the event consumer.
 	// When the event is peeked from the channel, it is serialized and written to the underlying
 	// byte buffer.
-	Write(chan *kevent.Kevent, chan error) chan error
+	Write(<-chan *kevent.Kevent, <-chan error) chan error
 	// Close disposes all resources allocated by the writer.
 	Close() error
 }

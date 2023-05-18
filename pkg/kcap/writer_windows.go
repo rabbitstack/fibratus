@@ -35,7 +35,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kcap/section"
 	kcapver "github.com/rabbitstack/fibratus/pkg/kcap/version"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/bytes"
 	zstd "github.com/valyala/gozstd"
@@ -57,7 +56,7 @@ func (s *stats) incKevts(kevt *kevent.Kevent) {
 func (s *stats) incBytes(bytes uint64) { atomic.AddUint64(&s.bytesWritten, bytes) }
 func (s *stats) incHandles()           { atomic.AddUint64(&s.handlesWritten, 1) }
 func (s *stats) incProcs(kevt *kevent.Kevent) {
-	if kevt.Type == ktypes.CreateProcess || kevt.Type == ktypes.ProcessRundown {
+	if kevt.IsCreateProcess() || kevt.IsProcessRundown() {
 		atomic.AddUint64(&s.procsWritten, 1)
 	}
 }
@@ -182,7 +181,7 @@ func (w *writer) writeSnapshots() error {
 	return w.zw.Flush()
 }
 
-func (w *writer) Write(kevtsc chan *kevent.Kevent, errs chan error) chan error {
+func (w *writer) Write(kevtsc <-chan *kevent.Kevent, errs <-chan error) chan error {
 	errsc := make(chan error, 100)
 	go func() {
 		for {

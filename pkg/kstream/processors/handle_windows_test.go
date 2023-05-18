@@ -59,7 +59,6 @@ func TestHandleProcessor(t *testing.T) {
 			},
 			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock) {
 				assert.True(t, e.Delayed)
-				assert.Equal(t, uint64(18446692422059208560), e.Metadata[kevent.DelayComparatorKey])
 				hsnap.AssertNumberOfCalls(t, "Write", 1)
 			},
 		},
@@ -85,7 +84,6 @@ func TestHandleProcessor(t *testing.T) {
 			},
 			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock) {
 				assert.Equal(t, `HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\Tcpip\Parameters\Interfaces\{b677c565-6ca5-45d3-b618-736b4e09b036}`, e.GetParamAsString(kparams.HandleObjectName))
-				assert.Equal(t, uint64(18446692422059208560), e.Metadata[kevent.DelayComparatorKey])
 				hsnap.AssertNumberOfCalls(t, "Remove", 1)
 			},
 		},
@@ -94,7 +92,7 @@ func TestHandleProcessor(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			hsnap := tt.hsnap()
-			p := newHandleProcessor(hsnap, fs.NewDevMapper())
+			p := newHandleProcessor(hsnap, fs.NewDevMapper(), fs.NewDevPathResolver())
 			var err error
 			tt.e, _, err = p.ProcessEvent(tt.e)
 			require.NoError(t, err)

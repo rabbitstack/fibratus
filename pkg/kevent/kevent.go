@@ -54,8 +54,6 @@ const (
 	RuleGroupKey MetadataKey = "rule.group"
 	// RuleSequenceByKey represents the join field value in sequence rules
 	RuleSequenceByKey MetadataKey = "rule.seq.by"
-	// DelayComparatorKey represents the value used for backlog lookups
-	DelayComparatorKey MetadataKey = "delay.comparator"
 )
 
 func (key MetadataKey) String() string { return string(key) }
@@ -108,6 +106,18 @@ type Kevent struct {
 	// Backlog stores events that await for the acknowledgement from subsequent
 	// events.
 	Delayed bool `json:"delayed"`
+}
+
+// SequenceID returns the value that is used to
+// store and reference delayed events in the event
+// assembler state. The delayed event is indexed by
+// the sequence identifier.
+func (e *Kevent) SequenceID() uint64 {
+	switch e.Type {
+	case ktypes.CreateHandle, ktypes.CloseHandle:
+		return e.Kparams.MustGetUint64(kparams.HandleObject)
+	}
+	return 0
 }
 
 // String returns event's string representation.
@@ -235,6 +245,3 @@ func (e *Kevent) Release() {
 
 // SequenceBy returns the BY statement join field from event metadata.
 func (e *Kevent) SequenceBy() any { return e.Metadata[RuleSequenceByKey] }
-
-// DelayComparator returns the delay comparator value.
-func (e *Kevent) DelayComparator() any { return e.Metadata[DelayComparatorKey] }

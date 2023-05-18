@@ -23,10 +23,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 )
 
-// EventCallbackFunc is the type alias for the event callback function
-type EventCallbackFunc func(*kevent.Kevent) error
-
-// Consumer is the interface for the kernel event stream consumer.
+// Consumer is the interface for the event stream consumer.
 type Consumer interface {
 	// Open initializes the event stream by setting the event record callback and instructing it
 	// to consume events from log buffers. This operation can fail if opening the kernel logger
@@ -37,13 +34,12 @@ type Consumer interface {
 	// Close shutdowns the currently running event stream consumer by closing the corresponding session.
 	Close() error
 	// Errors returns the channel where errors are pushed.
-	Errors() chan error
-	// Events returns the buffered channel for pulling collected kernel events.
-	Events() chan *kevent.Kevent
-	// SetFilter initializes the filter that's applied on the kernel events.
+	Errors() <-chan error
+	// Events returns the buffered channel where collected events are pushed.
+	Events() <-chan *kevent.Kevent
+	// SetFilter initializes the filter that's run on every event.
 	SetFilter(filter.Filter)
-	// SetEventCallback registers a callback function that is invoked on
-	// each incoming event. If the callback function is set up, the events
-	// are not pushed to the consumer output channel.
-	SetEventCallback(EventCallbackFunc)
+	// RegisterEventListener registers a new event listener that is before the event
+	// is being pushed to the output queue.
+	RegisterEventListener(kevent.Listener)
 }

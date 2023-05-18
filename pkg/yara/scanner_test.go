@@ -107,8 +107,8 @@ func TestScan(t *testing.T) {
 		PID:       pi.ProcessId,
 		Ppid:      2434,
 		Exe:       `C:\Windows\notepad.exe`,
-		Comm:      `C:\Windows\notepad.exe`,
-		SID:       "archrabbit\\SYSTEM",
+		Cmdline:   `C:\Windows\notepad.exe`,
+		SID:       "S-1-1-18",
 		Cwd:       `C:\Windows\`,
 		SessionID: 1,
 		Threads: map[uint32]pstypes.Thread{
@@ -168,7 +168,7 @@ func TestScan(t *testing.T) {
 	psnap.On("Find", mock.Anything).Return(proc)
 
 	for {
-		if !zsyscall.IsProcessRunning(pi.Process) {
+		if !sys.IsProcessRunning(pi.Process) {
 			break
 		}
 		time.Sleep(time.Millisecond * 100)
@@ -181,12 +181,15 @@ func TestScan(t *testing.T) {
 		PID:  859,
 		Kparams: kevent.Kparams{
 			kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "svchost.exe"},
+			kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: pi.ProcessId},
 		},
 		Metadata: make(map[kevent.MetadataKey]any),
 	}
 
 	// test attaching on pid
-	require.NoError(t, s.ScanProc(pi.ProcessId, kevt))
+	match, err := s.Scan(kevt)
+	require.NoError(t, err)
+	require.True(t, match)
 	require.NotNil(t, yaraAlert)
 
 	assert.Equal(t, "YARA alert on process notepad.exe", yaraAlert.Title)
@@ -195,12 +198,13 @@ func TestScan(t *testing.T) {
 
 	// test file scanning on DLL that merely contains
 	// the fmt.Println("Go Yara DLL Test") statement
-	require.NoError(t, s.ScanFile("_fixtures/yara-test.dll", kevt))
+	match, err = s.Scan(kevt)
+	require.NoError(t, err)
+	require.True(t, match)
 	require.NotNil(t, yaraAlert)
 
 	assert.Equal(t, "YARA alert on file _fixtures/yara-test.dll", yaraAlert.Title)
 	assert.Contains(t, yaraAlert.Tags, "dll")
-
 }
 
 func TestMatchesMeta(t *testing.T) {

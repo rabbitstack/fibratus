@@ -631,18 +631,18 @@ func (r *Rules) hasExcludeGroups() bool {
 	return r.hasExclude
 }
 
-func (r *Rules) ProcessEvent(evt *kevent.Kevent) bool {
+func (r *Rules) ProcessEvent(evt *kevent.Kevent) (bool, error) {
 	// if no rules were loaded into the engine
 	// the event is forwarded to the aggregator
 	if len(r.groups) == 0 {
-		return true
+		return true, nil
 	}
 	// find rule groups for a particular event type
 	// or category. If no rule groups are found the
 	// event is rejected from the aggregator batch
 	groups := r.findGroups(evt)
 	if len(groups) == 0 {
-		return false
+		return false, nil
 	}
 	// exclude policies take precedence over groups
 	// with include policies, and so we first must
@@ -651,15 +651,15 @@ func (r *Rules) ProcessEvent(evt *kevent.Kevent) bool {
 	// with include exist
 	if r.hasExcludeGroups() {
 		if r.runRules(groups, config.ExcludePolicy, evt) {
-			return false
+			return false, nil
 		}
 		if !groups.hasPolicy(config.IncludePolicy) {
-			return true
+			return true, nil
 		}
 	}
 	// run include policy rules. At this point none of
 	// the groups with exclude policies got matched
-	return r.runRules(groups, config.IncludePolicy, evt)
+	return r.runRules(groups, config.IncludePolicy, evt), nil
 }
 
 func (r *Rules) runSequence(kevt *kevent.Kevent, f *compiledFilter) bool {

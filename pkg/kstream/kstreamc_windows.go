@@ -31,6 +31,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kstream/processors"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
+	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
 )
@@ -43,8 +44,6 @@ const (
 var (
 	// failedKevents counts the number of kevents that failed to process
 	failedKevents = expvar.NewMap("kstream.kevents.failures")
-	// keventsEnqueued counts the number of events that are pushed to the queue
-	keventsEnqueued = expvar.NewInt("kstream.kevents.enqueued")
 	// keventsDropped counts the number of overall dropped events
 	keventsDropped = expvar.NewInt("kstream.kevents.dropped")
 	// keventsUnknown counts the number of published events which types are not present in the internal catalog
@@ -62,21 +61,20 @@ var (
 type consumer struct {
 	traces []etw.TraceHandle // trace session handles
 
-	errs  chan error          // channel for event processing errors
-	kevts chan *kevent.Kevent // channel for fanning out generated events
+	errs      chan error        // channel for event processing errors
+	q         *kevent.Queue     // queue for output events
+	sequencer *kevent.Sequencer // event sequence manager
+	backlog   *kevent.Backlog
 
 	processors processors.Chain
 
 	config *config.Config // main configuration
 
-	psnap     ps.Snapshotter    // process state tracker
-	sequencer *kevent.Sequencer // event sequence manager
+	psnap ps.Snapshotter // process state tracker
 
 	filter filter.Filter
-
-	capture        bool              // capture determines if events are dumped to capture files
-	eventCallback  EventCallbackFunc // called on each incoming event
-	eventAssembler *EventAssembler   // event assembler
+	// capture indicates if events are dumped to capture files
+	capture bool
 }
 
 func (k *consumer) addTrace(trace etw.TraceHandle) {
@@ -91,14 +89,14 @@ func NewConsumer(
 ) Consumer {
 	kconsumer := &consumer{
 		errs:       make(chan error, 1000),
-		kevts:      make(chan *kevent.Kevent, 500),
+		q:          kevent.NewQueue(500),
+		backlog:    kevent.NewBacklog(),
 		config:     config,
 		psnap:      psnap,
 		capture:    config.KcapFile != "",
 		sequencer:  kevent.NewSequencer(),
 		processors: processors.NewChain(psnap, hsnap, config),
 	}
-	kconsumer.eventAssembler = NewEventAssembler(kconsumer.kevts)
 	return kconsumer
 }
 
@@ -166,19 +164,20 @@ func (k *consumer) Close() error {
 	return k.processors.Close()
 }
 
+// RegisterEventListener registers a new event listener that is before the event
+// is being pushed to the output queue.
+func (k *consumer) RegisterEventListener(listener kevent.Listener) {
+	k.q.RegisterListener(listener)
+}
+
 // Errors returns a channel where errors are pushed.
-func (k *consumer) Errors() chan error {
+func (k *consumer) Errors() <-chan error {
 	return k.errs
 }
 
-// Events returns the buffered channel for pulling collected kernel events.
-func (k *consumer) Events() chan *kevent.Kevent {
-	return k.kevts
-}
-
-// SetEventCallback sets the event callback to receive inbound events.
-func (k *consumer) SetEventCallback(fn EventCallbackFunc) {
-	k.eventCallback = fn
+// Events returns the buffered channel where collected events are pushed
+func (k *consumer) Events() <-chan *kevent.Kevent {
+	return k.q.Events()
 }
 
 // bufferStatsCallback is periodically triggered by ETW subsystem for the purpose of reporting
@@ -262,15 +261,16 @@ func (k *consumer) processEvent(ev *etw.EventRecord) error {
 	if !evt.IsState() {
 		k.sequencer.Increment()
 	}
-	// Invoke event callback
-	if k.eventCallback != nil {
-		return k.eventCallback(evt)
-	}
-	// Run event assembler
-	if !k.eventAssembler.Assemble(evt) {
+	if evt.Delayed {
+		k.backlog.Put(evt)
 		return nil
 	}
-	k.kevts <- evt
-	keventsEnqueued.Add(1)
-	return nil
+	// Process backlog events
+	e := k.backlog.Pop(evt)
+	if e == nil {
+		// Forward current event to the output queue
+		return k.q.Push(evt)
+	}
+	// Forward delayed and current events
+	return multierror.Wrap(k.q.Push(e), k.q.Push(evt))
 }
