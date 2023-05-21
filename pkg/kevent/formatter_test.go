@@ -31,7 +31,7 @@ import (
 func TestTemplateUnknownField(t *testing.T) {
 	template := "{{ .Seq }} {{NUllField1}} {{.Type}}"
 	_, err := NewFormatter(template)
-	require.Error(t, err, "NUllField1 is not a known field name. Maybe you meant one of the following fields: .CPU .Category .Comm .Cwd .Description .Exe .Handles .Host .Kparams .Meta .Pid .Ppid .Process .Seq .Sid .Tid .Timestamp .Type")
+	require.Error(t, err, "NUllField1 is not a known field name. Maybe you meant one of the following fields: .CPU .Category .Cmd .Cwd .Description .Exe .Handles .Host .Kparams .Meta .Pid .Ppid .Process .Seq .Sid .Tid .Timestamp .Type")
 }
 
 func TestTemplateEmptyField(t *testing.T) {

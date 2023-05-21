@@ -38,11 +38,11 @@ const (
 	pid           = ".Pid"
 	ppid          = ".Ppid"
 	pexe          = ".Pexe"
-	pcomm         = ".Pcomm"
+	pcmd          = ".Pcmd"
 	pproc         = ".Pname"
 	cwd           = ".Cwd"
 	exe           = ".Exe"
-	comm          = ".Comm"
+	cmd           = ".Cmd"
 	tid           = ".Tid"
 	sid           = ".Sid"
 	proc          = ".Process"
@@ -73,11 +73,11 @@ var kfields = map[string]bool{
 	pid:         true,
 	ppid:        true,
 	pexe:        true,
-	pcomm:       true,
+	pcmd:        true,
 	pproc:       true,
 	cwd:         true,
 	exe:         true,
-	comm:        true,
+	cmd:         true,
 	tid:         true,
 	sid:         true,
 	proc:        true,

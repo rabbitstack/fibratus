@@ -129,7 +129,7 @@ func (r *registryProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, erro
 			typ, val, err := rootkey.ReadValue(subkey)
 			if err != nil {
 				errno, ok := err.(windows.Errno)
-				if ok && errno.Is(os.ErrNotExist) {
+				if ok && (errno.Is(os.ErrNotExist) || err == windows.ERROR_ACCESS_DENIED) {
 					return e, nil
 				}
 				return e, ErrReadValue(rootkey.String(), keyName, err)
