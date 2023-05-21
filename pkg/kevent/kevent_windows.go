@@ -333,8 +333,8 @@ func (e Kevent) PartialKey() uint64 {
 	return 0
 }
 
-// CopyFields appends parameters or other fields from the given event.
-func (e *Kevent) CopyFields(evt *Kevent) {
+// CopyParams appends parameters or other fields from the given event.
+func (e *Kevent) CopyParams(evt *Kevent) {
 	switch evt.Type {
 	case ktypes.CloseHandle:
 		if evt.Kparams.Contains(kparams.ImageFilename) {

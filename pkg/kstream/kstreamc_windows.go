@@ -44,6 +44,8 @@ const (
 var (
 	// failedKevents counts the number of kevents that failed to process
 	failedKevents = expvar.NewMap("kstream.kevents.failures")
+	// keventsProcessed counts the number of total processed events
+	keventsProcessed = expvar.NewInt("kstream.kevents.processed")
 	// keventsDropped counts the number of overall dropped events
 	keventsDropped = expvar.NewInt("kstream.kevents.dropped")
 	// keventsUnknown counts the number of published events which types are not present in the internal catalog
@@ -59,20 +61,21 @@ var (
 )
 
 type consumer struct {
-	traces []etw.TraceHandle // trace session handles
+	traces []etw.TraceHandle
 
-	errs      chan error        // channel for event processing errors
-	q         *kevent.Queue     // queue for output events
-	sequencer *kevent.Sequencer // event sequence manager
+	errs      chan error
+	q         *kevent.Queue
+	sequencer *kevent.Sequencer
 	backlog   *kevent.Backlog
 
 	processors processors.Chain
 
-	config *config.Config // main configuration
+	config *config.Config
 
-	psnap ps.Snapshotter // process state tracker
+	psnap ps.Snapshotter
 
 	filter filter.Filter
+
 	// capture indicates if events are dumped to capture files
 	capture bool
 }
@@ -108,17 +111,17 @@ func (k *consumer) SetFilter(filter filter.Filter) { k.filter = filter }
 // in an invalid trace handler. Errors returned by `ProcessTrace` are sent to the channel since this function
 // blocks the current thread, and we schedule its execution in a separate goroutine.
 func (k *consumer) Open(sessions []TraceSession) error {
-	for _, ses := range sessions {
-		trace, err := k.openTrace(ses.Name)
+	for _, session := range sessions {
+		trace, err := k.openTrace(session.Name)
 		if err != nil {
-			if ses.IsKernelLogger() {
+			if session.IsKernelLogger() {
 				return err
 			}
-			log.Warnf("unable to open %s trace: %v", ses.Name, err)
+			log.Warnf("unable to open %s trace: %v", session.Name, err)
 		}
 		if err == nil {
 			k.addTrace(trace)
-			go k.processTrace(ses.Name, trace)
+			go k.processTrace(session.Name, trace)
 		}
 	}
 	return nil
@@ -222,6 +225,7 @@ func (k *consumer) processEvent(ev *etw.EventRecord) error {
 		keventsUnknown.Add(1)
 		return nil
 	}
+	keventsProcessed.Add(1)
 	evt := kevent.New(k.sequencer.Get(), typ, ev)
 	// Dispatch each event to the processor chain.
 	// Processors may further augment the event with

@@ -27,8 +27,7 @@ import (
 )
 
 func TestBacklog(t *testing.T) {
-	q := NewQueue(10)
-	b := NewBacklog(q)
+	b := NewBacklog()
 
 	e := &Kevent{
 		Type:     ktypes.CreateHandle,
@@ -45,7 +44,7 @@ func TestBacklog(t *testing.T) {
 		Metadata: make(Metadata),
 	}
 
-	require.NoError(t, b.Process(e))
+	b.Put(e)
 	require.Equal(t, 1, b.Size())
 
 	e1 := &Kevent{
@@ -62,9 +61,8 @@ func TestBacklog(t *testing.T) {
 		Metadata: make(Metadata),
 	}
 
-	require.NoError(t, b.Process(e1))
+	ev := b.Pop(e1)
 	require.Equal(t, 0, b.Size())
-	ev := <-q.Events()
 	require.NotNil(t, ev)
 	assert.False(t, ev.Delayed)
 	assert.Equal(t, `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\Tcpip\Parameters\Interfaces\{b677c565-6ca5-45d3-b618-736b4e09b036}`, ev.GetParamAsString(kparams.HandleObjectName))

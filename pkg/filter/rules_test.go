@@ -75,6 +75,14 @@ func init() {
 	alertsender.Register(alertsender.None, makeNoneSender)
 }
 
+func wrapProcessEvent(e *kevent.Kevent, fn func(*kevent.Kevent) (bool, error)) bool {
+	match, err := fn(e)
+	if err != nil {
+		panic(err)
+	}
+	return match
+}
+
 func fireRules(t *testing.T, c *config.Config) bool {
 	psnap := new(ps.SnapshotterMock)
 	rules := NewRules(psnap, c)
@@ -95,7 +103,7 @@ func fireRules(t *testing.T, c *config.Config) bool {
 	}
 
 	require.NoError(t, rules.Compile())
-	return rules.ProcessEvent(kevt)
+	return wrapProcessEvent(kevt, rules.ProcessEvent)
 }
 
 func newConfig(fromFiles ...string) *config.Config {
@@ -154,7 +162,7 @@ func TestProcessRules(t *testing.T) {
 	}
 }
 
-func TestIncludeExcludeRemoteThreads(t *testing.T) {
+func TestIncludeExclude(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
 	rules := NewRules(psnap, newConfig("_fixtures/include_exclude_remote_threads.yml"))
 	require.NoError(t, rules.Compile())
@@ -172,8 +180,7 @@ func TestIncludeExcludeRemoteThreads(t *testing.T) {
 		},
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
-
-	require.False(t, rules.ProcessEvent(kevt))
+	require.False(t, wrapProcessEvent(kevt, rules.ProcessEvent))
 }
 
 func TestSequenceState(t *testing.T) {
@@ -322,14 +329,14 @@ func TestSimpleSequenceRule(t *testing.T) {
 		},
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
-	require.False(t, rules.ProcessEvent(kevt1))
-	require.True(t, rules.ProcessEvent(kevt2))
+	require.False(t, wrapProcessEvent(kevt1, rules.ProcessEvent))
+	require.True(t, wrapProcessEvent(kevt2, rules.ProcessEvent))
 
 	// if we alter the process executable in the first event, it shouldn't match
 	kevt1.PS.Exe = "C:\\System32\\cmd.exe"
 
-	require.False(t, rules.ProcessEvent(kevt1))
-	require.False(t, rules.ProcessEvent(kevt2))
+	require.False(t, wrapProcessEvent(kevt1, rules.ProcessEvent))
+	require.False(t, wrapProcessEvent(kevt2, rules.ProcessEvent))
 }
 
 func TestSimpleSequenceRuleMultiplePartials(t *testing.T) {
@@ -370,8 +377,8 @@ func TestSimpleSequenceRuleMultiplePartials(t *testing.T) {
 			},
 			Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 		}
-		require.False(t, rules.ProcessEvent(e))
-		require.False(t, rules.ProcessEvent(e1))
+		require.False(t, wrapProcessEvent(e, rules.ProcessEvent))
+		require.False(t, wrapProcessEvent(e1, rules.ProcessEvent))
 	}
 
 	ss := rules.groups[ktypes.CreateProcess.Hash()][0].filters[0].ss
@@ -411,10 +418,10 @@ func TestSimpleSequenceRuleMultiplePartials(t *testing.T) {
 		},
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
-	require.False(t, rules.ProcessEvent(kevt1))
+	require.False(t, wrapProcessEvent(kevt1, rules.ProcessEvent))
 	assert.Len(t, ss.partials[1], 6)
 	assert.Len(t, ss.partials[2], 0)
-	require.True(t, rules.ProcessEvent(kevt2))
+	require.True(t, wrapProcessEvent(kevt2, rules.ProcessEvent))
 }
 
 func TestSimpleSequenceRuleWithMaxSpanReached(t *testing.T) {
@@ -454,16 +461,16 @@ func TestSimpleSequenceRuleWithMaxSpanReached(t *testing.T) {
 		},
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
-	require.False(t, rules.ProcessEvent(kevt1))
+	require.False(t, wrapProcessEvent(kevt1, rules.ProcessEvent))
 	time.Sleep(time.Millisecond * 110)
-	require.True(t, rules.ProcessEvent(kevt2))
+	require.True(t, wrapProcessEvent(kevt2, rules.ProcessEvent))
 
 	// now the state machine has transitioned
 	// to the initial state, which means we should
 	// be able to match the sequence if we reinsert
 	// the events
-	require.False(t, rules.ProcessEvent(kevt1))
-	require.True(t, rules.ProcessEvent(kevt2))
+	require.False(t, wrapProcessEvent(kevt1, rules.ProcessEvent))
+	require.True(t, wrapProcessEvent(kevt2, rules.ProcessEvent))
 }
 
 func TestSimpleSequencePolicyWithMaxSpanNotReached(t *testing.T) {
@@ -503,9 +510,9 @@ func TestSimpleSequencePolicyWithMaxSpanNotReached(t *testing.T) {
 		},
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
-	require.False(t, rules.ProcessEvent(kevt1))
+	require.False(t, wrapProcessEvent(kevt1, rules.ProcessEvent))
 	time.Sleep(time.Millisecond * 110)
-	require.True(t, rules.ProcessEvent(kevt2))
+	require.True(t, wrapProcessEvent(kevt2, rules.ProcessEvent))
 }
 
 func TestComplexSequenceRule(t *testing.T) {
@@ -575,15 +582,15 @@ func TestComplexSequenceRule(t *testing.T) {
 	// register alert sender
 	require.NoError(t, alertsender.LoadAll([]alertsender.Config{{Type: alertsender.None}}))
 
-	require.False(t, rules.ProcessEvent(kevt1))
-	require.False(t, rules.ProcessEvent(kevt2))
+	require.False(t, wrapProcessEvent(kevt1, rules.ProcessEvent))
+	require.False(t, wrapProcessEvent(kevt2, rules.ProcessEvent))
 
 	ss := rules.groups[ktypes.CreateProcess.Hash()][0].filters[0].ss
 	assert.Len(t, ss.partials[1], 1)
 	assert.Len(t, ss.partials[2], 1)
 
 	time.Sleep(time.Millisecond * 30)
-	require.True(t, rules.ProcessEvent(kevt3))
+	require.True(t, wrapProcessEvent(kevt3, rules.ProcessEvent))
 
 	time.Sleep(time.Millisecond * 50)
 
@@ -594,10 +601,10 @@ func TestComplexSequenceRule(t *testing.T) {
 	seqAlert = nil
 
 	// FSM should transition from terminal to initial state
-	require.False(t, rules.ProcessEvent(kevt1))
-	require.False(t, rules.ProcessEvent(kevt2))
+	require.False(t, wrapProcessEvent(kevt1, rules.ProcessEvent))
+	require.False(t, wrapProcessEvent(kevt2, rules.ProcessEvent))
 	time.Sleep(time.Millisecond * 15)
-	require.True(t, rules.ProcessEvent(kevt3))
+	require.True(t, wrapProcessEvent(kevt3, rules.ProcessEvent))
 }
 
 func TestSequencePsUUID(t *testing.T) {
@@ -647,8 +654,8 @@ func TestSequencePsUUID(t *testing.T) {
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
-	require.False(t, rules.ProcessEvent(kevt1))
-	require.True(t, rules.ProcessEvent(kevt2))
+	require.False(t, wrapProcessEvent(kevt1, rules.ProcessEvent))
+	require.True(t, wrapProcessEvent(kevt2, rules.ProcessEvent))
 }
 
 func TestSequenceAndSimpleRuleMix(t *testing.T) {
@@ -695,8 +702,8 @@ func TestSequenceAndSimpleRuleMix(t *testing.T) {
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
-	require.True(t, rules.ProcessEvent(kevt1))
-	require.True(t, rules.ProcessEvent(kevt2))
+	require.True(t, wrapProcessEvent(kevt1, rules.ProcessEvent))
+	require.True(t, wrapProcessEvent(kevt2, rules.ProcessEvent))
 
 	kevt3 := &kevent.Kevent{
 		Seq:       10,
@@ -717,7 +724,7 @@ func TestSequenceAndSimpleRuleMix(t *testing.T) {
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
-	require.True(t, rules.ProcessEvent(kevt3))
+	require.True(t, wrapProcessEvent(kevt3, rules.ProcessEvent))
 }
 
 func TestSequenceRuleBoundsFields(t *testing.T) {
@@ -795,10 +802,10 @@ func TestSequenceRuleBoundsFields(t *testing.T) {
 		},
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
-	require.False(t, rules.ProcessEvent(kevt))
-	require.False(t, rules.ProcessEvent(kevt1))
-	require.False(t, rules.ProcessEvent(kevt2))
-	require.True(t, rules.ProcessEvent(kevt3))
+	require.False(t, wrapProcessEvent(kevt, rules.ProcessEvent))
+	require.False(t, wrapProcessEvent(kevt1, rules.ProcessEvent))
+	require.False(t, wrapProcessEvent(kevt2, rules.ProcessEvent))
+	require.True(t, wrapProcessEvent(kevt3, rules.ProcessEvent))
 }
 
 func TestFilterActionEmitAlert(t *testing.T) {
@@ -825,7 +832,7 @@ func TestFilterActionEmitAlert(t *testing.T) {
 		Metadata: make(map[kevent.MetadataKey]any),
 	}
 
-	require.True(t, rules.ProcessEvent(kevt))
+	require.True(t, wrapProcessEvent(kevt, rules.ProcessEvent))
 	time.Sleep(time.Millisecond * 25)
 	require.NotNil(t, emitAlert)
 	assert.Equal(t, "Test alert", emitAlert.Title)
@@ -930,8 +937,8 @@ func TestBoundFieldsWithFunctions(t *testing.T) {
 
 	require.NoError(t, key.SetStringsValue("Notification Packages", []string{"secli", "passwdflt"}))
 
-	require.False(t, rules.ProcessEvent(kevt1))
-	require.True(t, rules.ProcessEvent(kevt2))
+	require.False(t, wrapProcessEvent(kevt1, rules.ProcessEvent))
+	require.True(t, wrapProcessEvent(kevt2, rules.ProcessEvent))
 }
 
 func BenchmarkRunRules(b *testing.B) {
@@ -996,7 +1003,7 @@ func BenchmarkRunRules(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		for _, kevt := range kevts {
-			rules.ProcessEvent(kevt)
+			_, _ = rules.ProcessEvent(kevt)
 		}
 	}
 }

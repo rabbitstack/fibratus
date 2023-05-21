@@ -39,32 +39,37 @@ func NewBacklog() *Backlog {
 	return &Backlog{cache: lru.New(BacklogCacheSize)}
 }
 
+// Put appends a new event to the backlog cache.
 func (b *Backlog) Put(evt *Kevent) {
 	if b.cache.Len() > BacklogCacheSize {
 		b.cache.RemoveOldest()
 	}
-	seqID := evt.SequenceID()
-	if seqID != 0 {
-		b.cache.Add(seqID, evt)
+	key := evt.DelayKey()
+	if key != 0 {
+		b.cache.Add(key, evt)
 	}
 }
 
+// Pop retrieves the event from the backlog cache and
+// invokes `CopyParams` to copy specified params from
+// the current to destination event.
 func (b *Backlog) Pop(evt *Kevent) *Kevent {
-	seqID := evt.SequenceID()
-	if seqID == 0 {
+	key := evt.DelayKey()
+	if key == 0 {
 		return nil
 	}
-	ev, ok := b.cache.Get(seqID)
+	ev, ok := b.cache.Get(key)
 	if !ok {
 		return nil
 	}
-	b.cache.Remove(seqID)
+	b.cache.Remove(key)
 	e := ev.(*Kevent)
 	e.Delayed = false
-	e.CopyFields(evt)
+	e.CopyParams(evt)
 	return e
 }
 
+// Size returns the size of the backlog cache
 func (b *Backlog) Size() int {
 	return b.cache.Len()
 }

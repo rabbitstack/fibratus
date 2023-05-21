@@ -86,6 +86,7 @@ type Stats struct {
 	KstreamKeventsEnqueued              int            `json:"kstream.kevents.enqueued"`
 	KstreamKeventsDequeued              int            `json:"kstream.kevents.dequeued"`
 	KstreamUnknownKevents               int            `json:"kstream.kevents.unknown"`
+	KstreamKeventsProcessed             int            `json:"kstream.kevents.processed"`
 	KstreamExcludedKevents              int            `json:"kstream.excluded.kevents"`
 	KstreamExcludedProcs                int            `json:"kstream.excluded.procs"`
 	KstreamKeventsFailures              map[string]int `json:"kstream.kevents.failures"`

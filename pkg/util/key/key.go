@@ -41,7 +41,11 @@ var rx = regexp.MustCompile(`[A-Za-z]:\\`)
 var loggedSID = getLoggedSID()
 
 func getLoggedSID() string {
-	sid, err := sys.GetLoggedSID()
+	wts, err := sys.LookupActiveWTS()
+	if err != nil {
+		return ""
+	}
+	sid, err := wts.SID()
 	if err != nil {
 		return ""
 	}

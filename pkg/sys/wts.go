@@ -19,36 +19,47 @@
 package sys
 
 import (
+	"errors"
 	"golang.org/x/sys/windows"
 	"unsafe"
 )
 
+// ErrNoSession signals that the active Windows Terminal Session is not available
+var ErrNoSession = errors.New("no active Windows Terminal Session")
+
 // WTSUserName is the WTS class that returns a null-terminated string
-// that contains the name of the user associated with the session
+// containing the name of the user associated with the active session.
 const WTSUserName = 5
 
-// GetLoggedSID returns the SID for the currently logged-in user.
-func GetLoggedSID() (*windows.SID, error) {
-	user, err := GetLoggedUser()
-	if err != nil {
-		return nil, err
-	}
-	sid, _, _, err := windows.LookupSID("", user)
-	if err != nil {
-		return nil, err
-	}
-	return sid, nil
+// WTS contains information about the current Windows Terminal Session.
+type WTS struct {
+	sessionID uint32
 }
 
-// GetLoggedUser obtains the currently logged-in username.
-func GetLoggedUser() (string, error) {
-	sessionID, err := getActiveSessionID()
+// LookupActiveWTS finds the active Windows Terminal Session.
+func LookupActiveWTS() (*WTS, error) {
+	var sess *windows.WTS_SESSION_INFO
+	var count uint32
+	err := windows.WTSEnumerateSessions(0, 0, 1, &sess, &count)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
+	sessions := unsafe.Slice(sess, count)
+	defer windows.WTSFreeMemory(uintptr(unsafe.Pointer(sess)))
+	for _, ses := range sessions {
+		if ses.State == windows.WTSActive || ses.State == windows.WTSConnected {
+			wts := &WTS{sessionID: ses.SessionID}
+			return wts, nil
+		}
+	}
+	return nil, ErrNoSession
+}
+
+// Username returns the name of the currently logged-on user.
+func (w *WTS) Username() (string, error) {
 	var size uint32
 	var user *uint16
-	err = WTSQuerySessionInformationA(0, sessionID, WTSUserName, &user, &size)
+	err := WTSQuerySessionInformationA(0, w.sessionID, WTSUserName, &user, &size)
 	if err != nil {
 		return "", err
 	}
@@ -56,21 +67,15 @@ func GetLoggedUser() (string, error) {
 	return windows.UTF16PtrToString(user), nil
 }
 
-func getActiveSessionID() (uint32, error) {
-	var sess *windows.WTS_SESSION_INFO
-	var count uint32
-	var sessionID uint32
-	err := windows.WTSEnumerateSessions(0, 0, 1, &sess, &count)
+// SID returns the SID (Security Identifier) of the currently logged-on user.
+func (w *WTS) SID() (*windows.SID, error) {
+	username, err := w.Username()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	sessions := unsafe.Slice(sess, count)
-	defer windows.WTSFreeMemory(uintptr(unsafe.Pointer(sess)))
-	for _, ses := range sessions {
-		if ses.State == windows.WTSActive || ses.State == windows.WTSConnected {
-			sessionID = ses.SessionID
-			break
-		}
+	sid, _, _, err := windows.LookupSID("", username)
+	if err != nil {
+		return nil, err
 	}
-	return sessionID, nil
+	return sid, nil
 }

@@ -45,8 +45,6 @@ func TestNewBufferedAggregator(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, agg)
 
-	agg.Run()
-
 	for i := 0; i < 4; i++ {
 		kevt := &kevent.Kevent{
 			Type: ktypes.SendTCPv4,

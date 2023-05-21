@@ -259,13 +259,12 @@ func (s *snapshotter) newProcState(pid, ppid uint32, e *kevent.Kevent) (*pstypes
 		if proc.Domain != "" {
 			e.AppendParam(kparams.Domain, kparams.UnicodeString, proc.Domain)
 		}
-	}
-
-	// retrieve process handles
-	var err error
-	proc.Handles, err = s.hsnap.FindHandles(pid)
-	if err != nil {
-		return proc, err
+		// retrieve process handles
+		var err error
+		proc.Handles, err = s.hsnap.FindHandles(pid)
+		if err != nil {
+			return proc, err
+		}
 	}
 
 	// return early if we're reading from the capture file
@@ -277,6 +276,7 @@ func (s *snapshotter) newProcState(pid, ppid uint32, e *kevent.Kevent) (*pstypes
 	}
 
 	// retrieve Portable Executable data
+	var err error
 	proc.PE, err = pe.ParseFileWithConfig(proc.Exe, s.config.PE)
 	if err != nil {
 		return proc, err

@@ -108,11 +108,11 @@ type Kevent struct {
 	Delayed bool `json:"delayed"`
 }
 
-// SequenceID returns the value that is used to
+// DelayKey returns the value that is used to
 // store and reference delayed events in the event
-// assembler state. The delayed event is indexed by
+// backlog state. The delayed event is indexed by
 // the sequence identifier.
-func (e *Kevent) SequenceID() uint64 {
+func (e *Kevent) DelayKey() uint64 {
 	switch e.Type {
 	case ktypes.CreateHandle, ktypes.CloseHandle:
 		return e.Kparams.MustGetUint64(kparams.HandleObject)
