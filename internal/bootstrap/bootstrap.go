@@ -193,7 +193,7 @@ func (f *App) Run(args []string) error {
 		if f.filament.Filter() != nil {
 			f.consumer.SetFilter(f.filament.Filter())
 		}
-		err = f.consumer.Open(f.controller.Traces())
+		err = f.consumer.Open()
 		if err != nil {
 			return multierror.Wrap(err, f.controller.Close())
 		}
@@ -219,7 +219,7 @@ func (f *App) Run(args []string) error {
 			}
 			f.consumer.RegisterEventListener(scanner)
 		}
-		err = f.consumer.Open(f.controller.Traces())
+		err = f.consumer.Open()
 		if err != nil {
 			return multierror.Wrap(err, f.controller.Close())
 		}
@@ -260,7 +260,7 @@ func (f *App) WriteCapture(args []string) error {
 	if kfilter != nil {
 		f.consumer.SetFilter(kfilter)
 	}
-	err = f.consumer.Open(f.controller.Traces())
+	err = f.consumer.Open()
 	if err != nil {
 		return err
 	}

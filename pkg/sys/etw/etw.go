@@ -22,7 +22,9 @@
 package etw
 
 import (
+	"errors"
 	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
 	"os"
 	"unsafe"
@@ -57,7 +59,23 @@ const (
 type TraceHandle uintptr
 
 // IsValid determines if the trace handle is valid
-func (handle TraceHandle) IsValid() bool { return handle != 0 && handle != 0xffffffffffffffff }
+func (trace TraceHandle) IsValid() bool { return trace != 0 && trace != 0xffffffffffffffff }
+
+// Process instructs the trace to start collecting events from the buffers.
+// This operation is blocking and should be run in a separate goroutine.
+func (trace TraceHandle) Process(name string) {
+	log.Infof("starting [%s] trace processing", name)
+	err := ProcessTrace(trace)
+	log.Infof("stopping [%s] trace processing", name)
+	if err != nil && !errors.Is(err, kerrors.ErrTraceCancelled) {
+		log.Errorf("process trace failed: %v", err)
+	}
+}
+
+// Close stops event processing on the trace session.
+func (trace TraceHandle) Close() error {
+	return CloseTrace(trace)
+}
 
 // StartTrace registers and starts an event tracing session for the specified provider. The trace assumes there will
 // be a real-time event consumer responsible for collecting and processing events. If the function succeeds, it returns

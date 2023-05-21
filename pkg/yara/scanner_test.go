@@ -33,11 +33,11 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
+	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
-	htypes "github.com/rabbitstack/fibratus/pkg/windows/types"
 	"github.com/rabbitstack/fibratus/pkg/yara/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"

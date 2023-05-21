@@ -27,6 +27,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
@@ -37,6 +38,16 @@ import (
 	"testing"
 	"time"
 )
+
+// MockListener receives the event and does nothing but indicating the event was processed.
+type MockListener struct {
+	gotEvent bool
+}
+
+func (l *MockListener) ProcessEvent(e *kevent.Kevent) (bool, error) {
+	l.gotEvent = true
+	return true, nil
+}
 
 func TestRundownEvents(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
@@ -69,7 +80,9 @@ func TestRundownEvents(t *testing.T) {
 		KcapFile: "fake.kcap", // simulate capture to receive state/rundown events
 		Filters:  &config.Filters{},
 	})
-	require.NoError(t, kstreamc.Open(kctrl.Traces()))
+	l := &MockListener{}
+	kstreamc.RegisterEventListener(l)
+	require.NoError(t, kstreamc.Open())
 	defer kstreamc.Close()
 
 	rundownsByType := map[ktypes.Ktype]bool{
@@ -232,7 +245,9 @@ func TestConsumerEvents(t *testing.T) {
 	require.NoError(t, kctrl.Start())
 	defer kctrl.Close()
 	kstreamc := NewConsumer(psnap, hsnap, &config.Config{Kstream: kstreamConfig, Filters: &config.Filters{}})
-	require.NoError(t, kstreamc.Open(kctrl.Traces()))
+	l := &MockListener{}
+	kstreamc.RegisterEventListener(l)
+	require.NoError(t, kstreamc.Open())
 	defer kstreamc.Close()
 
 	time.Sleep(time.Second * 2)
@@ -261,6 +276,7 @@ func TestConsumerEvents(t *testing.T) {
 					ntests--
 				}
 				if ntests == 0 {
+					assert.True(t, l.gotEvent)
 					return
 				}
 			}
