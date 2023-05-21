@@ -101,7 +101,7 @@ func newKDict(kevt *kevent.Kevent) (*cpython.Dict, error) {
 		if err != nil {
 			continue
 		}
-		kparam := cpython.NewPyObjectFromValue(v)
+		kparam := cpython.NewPyObjectFromValue(val)
 		if kparam.IsNull() {
 			continue
 		}
