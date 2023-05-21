@@ -195,7 +195,7 @@ func (w *writer) Write(kevtsc <-chan *kevent.Kevent, errs <-chan error) chan err
 				// write event buffer
 				err := w.write(b)
 				if err != nil {
-					errs <- err
+					errsc <- err
 					kevt.Release()
 					continue
 				}
@@ -222,7 +222,7 @@ func (w *writer) write(b []byte) error {
 	l := len(b)
 	if l > maxKevtSize {
 		overflowKevents.Add(1)
-		return fmt.Errorf("kevent size overflow by %d bytes", l-maxKevtSize)
+		return fmt.Errorf("event size overflow by %d bytes", l-maxKevtSize)
 	}
 	if err := w.ws(section.Kevt, kcapver.KevtSecV1, 0, uint32(l)); err != nil {
 		kevtWriteErrors.Add(1)

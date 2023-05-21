@@ -43,7 +43,9 @@ type Snapshotter interface {
 	WriteFromKcap(kevt *kevent.Kevent) error
 	// Remove deletes process's state from the snapshotter.
 	Remove(kevt *kevent.Kevent) error
-	// Find attempts to retrieve process' state for the specified process identifier.
+	// Find attempts to retrieve process' state for the specified process identifier. Returns true
+	// if the process was find in the state. Otherwise, returns false and constructs a fresh process
+	// state by querying the OS via API functions.
 	Find(pid uint32) (bool, *pstypes.PS)
 	// FindAndPut attempts to retrieve process' state for the specified process identifier.
 	// If the process is found, the snapshotter state is updated with the new process.

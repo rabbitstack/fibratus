@@ -25,6 +25,7 @@ import (
 	"errors"
 	"github.com/rabbitstack/fibratus/pkg/filament/cpython"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 )
 
 var (
@@ -72,14 +73,35 @@ func newKDict(kevt *kevent.Kevent) (*cpython.Dict, error) {
 		kdict.Insert(ppid, cpython.NewPyObjectFromValue(ps.Ppid))
 		kdict.Insert(cwd, cpython.NewPyObjectFromValue(ps.Cwd))
 		kdict.Insert(exec, cpython.NewPyObjectFromValue(ps.Name))
-		kdict.Insert(comm, cpython.NewPyObjectFromValue(ps.Comm))
+		kdict.Insert(comm, cpython.NewPyObjectFromValue(ps.Cmdline))
 		kdict.Insert(sid, cpython.NewPyObjectFromValue(ps.SID))
 	}
 
 	// insert kevent parameters
 	kpars := cpython.NewDict()
 	for _, kpar := range kevt.Kparams {
-		kparam := cpython.NewPyObjectFromValue(kpar.Value)
+		var val interface{}
+		var err error
+		switch kpar.Type {
+		case kparams.Uint8:
+			val, err = kevt.Kparams.GetUint8(kpar.Name)
+		case kparams.Uint16, kparams.Port:
+			val, err = kevt.Kparams.GetUint16(kpar.Name)
+		case kparams.Uint32, kparams.PID, kparams.TID:
+			val, err = kevt.Kparams.GetUint32(kpar.Name)
+		case kparams.Uint64:
+			val, err = kevt.Kparams.GetUint64(kpar.Name)
+		case kparams.Time:
+			val, err = kevt.Kparams.GetTime(kpar.Name)
+		case kparams.IP:
+			val, err = kevt.Kparams.GetIP(kpar.Name)
+		default:
+			val = kevt.GetParamAsString(kpar.Name)
+		}
+		if err != nil {
+			continue
+		}
+		kparam := cpython.NewPyObjectFromValue(v)
 		if kparam.IsNull() {
 			continue
 		}

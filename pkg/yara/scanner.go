@@ -185,7 +185,7 @@ func (s scanner) Scan(evt *kevent.Kevent) (bool, error) {
 	switch evt.Type {
 	case ktypes.CreateProcess:
 		pid := evt.Kparams.MustGetPid()
-		proc := s.psnap.Find(pid)
+		_, proc := s.psnap.Find(pid)
 		if proc == nil {
 			return false, fmt.Errorf("% process not found in snapshotter", pid)
 		}
@@ -195,7 +195,7 @@ func (s scanner) Scan(evt *kevent.Kevent) (bool, error) {
 		alertCtx.PS = proc
 		err = sn.SetCallback(&matches).ScanProc(int(pid))
 	case ktypes.LoadImage:
-		filename = evt.GetParamAsString(kparams.ImageFilename)
+		filename := evt.GetParamAsString(kparams.ImageFilename)
 		alertCtx.Filename = filename
 		err = sn.SetCallback(&matches).ScanFile(filename)
 	}
@@ -209,7 +209,7 @@ func (s scanner) Scan(evt *kevent.Kevent) (bool, error) {
 	}
 	alertCtx.Matches = matches
 	ruleMatches.Add(int64(len(matches)))
-	if err := putMatchesMeta(matches, kevt); err != nil {
+	if err := putMatchesMeta(matches, evt); err != nil {
 		return true, err
 	}
 	return true, s.send(alertCtx)
