@@ -1,6 +1,6 @@
 - group: rouge processes
   enabled: true
-  from-strings:
+  rules:
     - name: suspicious network activity
       condition: kevt.category = 'net' and ps.name in ('at.exe', 'java.exe')
       action: |

@@ -19,9 +19,11 @@
 package kstream
 
 import (
+	"errors"
 	"expvar"
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/config"
+	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/filter"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
@@ -78,10 +80,6 @@ type consumer struct {
 	capture bool
 }
 
-func (k *consumer) addTrace(trace etw.TraceHandle) {
-	k.traces = append(k.traces, trace)
-}
-
 // NewConsumer constructs a new event stream consumer.
 func NewConsumer(
 	psnap ps.Snapshotter,
@@ -89,6 +87,7 @@ func NewConsumer(
 	config *config.Config,
 ) Consumer {
 	kconsumer := &consumer{
+		traces:     make([]etw.TraceHandle, 0),
 		errs:       make(chan error, 1000),
 		q:          kevent.NewQueue(500),
 		backlog:    kevent.NewBacklog(),
@@ -105,17 +104,11 @@ func NewConsumer(
 func (k *consumer) SetFilter(filter filter.Filter) { k.filter = filter }
 
 // Open initializes the event stream by setting the event record callback and instructing it
-// to consume events from log buffers. This operation can fail if opening the kernel logger
-// session results in an invalid trace handler.
+// to consume events from log buffers. This operation can fail if opening any tracing session
+// results in an error.
 func (k *consumer) Open() error {
-	trace, err := k.openTrace(etw.KernelLoggerSession)
-	if err != nil {
-		return err
-	}
-	k.addTrace(trace)
-	go trace.Process(etw.KernelLoggerSession)
-
 	traces := make([]string, 0)
+	traces = append(traces, etw.KernelLoggerSession)
 	if k.config.Kstream.EnableAuditAPIEvents {
 		traces = append(traces, etw.KernelAuditAPICallsSession)
 	}
@@ -123,15 +116,14 @@ func (k *consumer) Open() error {
 		traces = append(traces, etw.AntimalwareEngineSession)
 	}
 
-	for _, n := range traces {
-		trace, err := k.openTrace(n)
+	for _, name := range traces {
+		trace, err := k.openTrace(name)
 		if err != nil {
-			log.Warnf("unable to open %s trace: %v", n, err)
-			continue
+			return fmt.Errorf("unable to open %s trace: %v", name, err)
 		}
-		k.addTrace(trace)
-		go trace.Process(n)
+		go k.processTrace(name, trace)
 	}
+
 	return nil
 }
 
@@ -145,6 +137,20 @@ func (k *consumer) openTrace(name string) (etw.TraceHandle, error) {
 		return 0, fmt.Errorf("unable to open %s trace: %v", name, windows.GetLastError())
 	}
 	return trace, nil
+}
+
+func (k *consumer) processTrace(name string, trace etw.TraceHandle) {
+	k.traces = append(k.traces, trace)
+	log.Infof("starting [%s] trace processing", name)
+	err := trace.Process()
+	log.Infof("stopping [%s] trace processing", name)
+	if err != nil && !errors.Is(err, kerrors.ErrTraceCancelled) {
+		select {
+		case k.errs <- err:
+		default:
+			log.Warn("errors channel is full")
+		}
+	}
 }
 
 // Close shutdowns the event stream consumer by closing all running traces.

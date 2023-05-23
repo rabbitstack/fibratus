@@ -38,10 +38,13 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/yara/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"golang.org/x/sys/windows"
 )
 
 var yaraAlert *alertsender.Alert

@@ -78,6 +78,7 @@ func (p psProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error
 	return e, true, nil
 }
 
+//nolint:unparam
 func (p psProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 	cmndline := cmdline.New(e.GetParamAsString(kparams.Cmdline)).
 		// get rid of leading/trailing quotes in the executable path
@@ -114,6 +115,7 @@ func getStartTime(pid uint32) (time.Time, error) {
 	if err != nil {
 		return time.Now(), err
 	}
+	//nolint:errcheck
 	defer windows.CloseHandle(proc)
 	var (
 		ct windows.Filetime

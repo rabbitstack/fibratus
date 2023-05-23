@@ -35,6 +35,7 @@ func newFilters(paths ...string) Filters {
 		},
 		Macros{FromPaths: nil},
 		map[string]*Macro{},
+		[]FilterGroup{},
 	}
 }
 
@@ -47,12 +48,13 @@ func TestLoadGroupsFromPaths(t *testing.T) {
 		},
 		Macros{FromPaths: nil},
 		map[string]*Macro{},
+		[]FilterGroup{},
 	}
-	groups, err := filters.LoadGroups()
+	err := filters.LoadGroups()
 	require.NoError(t, err)
-	require.Len(t, groups, 2)
+	require.Len(t, filters.groups, 2)
 
-	g1 := groups[0]
+	g1 := filters.groups[0]
 	assert.Equal(t, "internal network traffic", g1.Name)
 	assert.True(t, *g1.Enabled)
 	assert.Equal(t, ExcludePolicy, g1.Policy)
@@ -62,7 +64,7 @@ func TestLoadGroupsFromPaths(t *testing.T) {
 	assert.Equal(t, "only network category", g1.Rules[0].Name)
 	assert.Equal(t, "kevt.category = 'net'", g1.Rules[0].Condition)
 
-	g2 := groups[1]
+	g2 := filters.groups[1]
 	assert.Equal(t, "rouge processes", g2.Name)
 	assert.True(t, *g2.Enabled)
 	assert.Equal(t, IncludePolicy, g2.Policy)
@@ -81,12 +83,13 @@ func TestLoadGroupsFromPathsNewAttributes(t *testing.T) {
 		},
 		Macros{FromPaths: nil},
 		map[string]*Macro{},
+		[]FilterGroup{},
 	}
-	groups, err := filters.LoadGroups()
+	err := filters.LoadGroups()
 	require.NoError(t, err)
-	require.Len(t, groups, 2)
+	require.Len(t, filters.groups, 2)
 
-	g1 := groups[0]
+	g1 := filters.groups[0]
 	assert.Equal(t, "internal network traffic", g1.Name)
 	assert.False(t, *g1.Enabled)
 	assert.Equal(t, ExcludePolicy, g1.Policy)
@@ -94,9 +97,8 @@ func TestLoadGroupsFromPathsNewAttributes(t *testing.T) {
 	assert.Contains(t, g1.Tags, "TE")
 	assert.Len(t, g1.Rules, 1)
 	assert.Equal(t, "only network category", g1.Rules[0].Name)
-	assert.Equal(t, "kevt.category = 'net'", g1.Rules[0].Def)
 
-	g2 := groups[1]
+	g2 := filters.groups[1]
 	assert.Equal(t, "rouge processes", g2.Name)
 	assert.Nil(t, g2.Enabled)
 	assert.False(t, g2.IsDisabled())
@@ -135,12 +137,13 @@ func TestLoadGroupsFromURLs(t *testing.T) {
 		},
 		Macros{FromPaths: nil},
 		map[string]*Macro{},
+		[]FilterGroup{},
 	}
-	groups, err := filters.LoadGroups()
+	err = filters.LoadGroups()
 	require.NoError(t, err)
-	require.Len(t, groups, 2)
+	require.Len(t, filters.groups, 2)
 
-	g1 := groups[0]
+	g1 := filters.groups[0]
 	assert.Equal(t, "internal network traffic", g1.Name)
 	assert.True(t, *g1.Enabled)
 }
@@ -155,7 +158,7 @@ func TestLoadGroupsInvalidTemplates(t *testing.T) {
 		{newFilters("_fixtures/filters/filter_action_in_exclude_group.yml"), `"suspicious network activity" rule found in "rouge processes" group with exclude policy. Only groups with include policies can have rule actions`},
 	}
 	for i, tt := range tests {
-		_, err := tt.filters.LoadGroups()
+		err := tt.filters.LoadGroups()
 		if err.Error() != tt.errMsg {
 			t.Errorf("%d. filter group error mismatch: exp=%s got=%v", i, tt.errMsg, err)
 		}

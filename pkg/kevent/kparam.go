@@ -104,12 +104,12 @@ type Kparam struct {
 // consistent replay experience. For example, the file path param
 // type is converted to string param type, as drive mapping is performed
 // on the target where the capture is being taken.
-func (kpar Kparam) KcapType() kparams.Type {
-	switch kpar.Type {
+func (k Kparam) KcapType() kparams.Type {
+	switch k.Type {
 	case kparams.HandleType, kparams.FileDosPath, kparams.Key:
 		return kparams.UnicodeString
 	default:
-		return kpar.Type
+		return k.Type
 	}
 }
 

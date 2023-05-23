@@ -71,7 +71,7 @@ goto :EOF
 goto :EOF
 
 :deps
-go get -v -u github.com/golangci/golangci-lint/cmd/golangci-lint@v1.34.1
+go get -v -u github.com/golangci/golangci-lint/cmd/golangci-lint@v1.52.2
 goto :EOF
 
 :rsrc

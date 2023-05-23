@@ -19,6 +19,7 @@
 package kevent
 
 import (
+	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
@@ -54,7 +55,7 @@ func TestKeventSummary(t *testing.T) {
 			kparams.FileObject:    {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(12456738026482168384)},
 			kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
 			kparams.FileType:      {Name: kparams.FileType, Type: kparams.AnsiString, Value: "file"},
-			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: uint32(1)},
+			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: uint32(1), Enum: fs.FileCreateDispositions},
 		},
 		PS: &pstypes.PS{
 			PID:  2436,

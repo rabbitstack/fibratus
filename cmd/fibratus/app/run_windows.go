@@ -21,6 +21,7 @@ package app
 import (
 	"github.com/rabbitstack/fibratus/internal/bootstrap"
 	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	ver "github.com/rabbitstack/fibratus/pkg/util/version"
 	"github.com/spf13/cobra"
 )
@@ -59,10 +60,10 @@ func run(cmd *cobra.Command, args []string) error {
 	ver.Set(version)
 	app, err := bootstrap.NewApp(cfg, bootstrap.WithSignals(), bootstrap.WithDebugPrivilege())
 	if err != nil {
-		return err
+		return multierror.Wrap(err, app.Shutdown())
 	}
 	if err := app.Run(args); err != nil {
-		return err
+		return multierror.Wrap(err, app.Shutdown())
 	}
 	app.Wait()
 	return app.Shutdown()

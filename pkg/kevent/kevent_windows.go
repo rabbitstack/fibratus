@@ -92,7 +92,9 @@ func (e *Kevent) adjustPID() {
 			if err != nil {
 				return
 			}
-			defer windows.CloseHandle(thread)
+			defer func() {
+				_ = windows.CloseHandle(thread)
+			}()
 			e.PID = sys.GetProcessIdOfThread(thread)
 		}
 	case ktypes.Process:
@@ -322,7 +324,8 @@ func (e Kevent) PartialKey() uint64 {
 		binary.LittleEndian.PutUint16(b, port)
 		return hashers.FnvUint64(b)
 	case ktypes.RegOpenKey, ktypes.RegQueryKey, ktypes.RegQueryValue,
-		ktypes.RegDeleteKey, ktypes.RegDeleteValue, ktypes.RegSetValue:
+		ktypes.RegDeleteKey, ktypes.RegDeleteValue, ktypes.RegSetValue,
+		ktypes.RegCloseKey:
 		key, _ := e.Kparams.GetString(kparams.RegKeyName)
 		b := make([]byte, 4+len(key))
 
@@ -351,11 +354,11 @@ func (e *Kevent) Summary() string {
 	switch e.Type {
 	case ktypes.CreateProcess:
 		exe := e.Kparams.MustGetString(kparams.Exe)
-		sid := e.GetParamAsString(kparams.UserSID)
+		sid := e.GetParamAsString(kparams.Username)
 		return printSummary(e, fmt.Sprintf("spawned <code>%s</code> process as <code>%s</code> user", exe, sid))
 	case ktypes.TerminateProcess:
 		exe := e.Kparams.MustGetString(kparams.Exe)
-		sid := e.GetParamAsString(kparams.UserSID)
+		sid := e.GetParamAsString(kparams.Username)
 		return printSummary(e, fmt.Sprintf("terminated <code>%s</code> process as <code>%s</code> user", exe, sid))
 	case ktypes.OpenProcess:
 		access := e.GetParamAsString(kparams.DesiredAccess)

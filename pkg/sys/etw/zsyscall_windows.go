@@ -52,7 +52,7 @@ var (
 
 func closeTrace(handle TraceHandle) (err error) {
 	r1, _, e1 := syscall.Syscall(procCloseTrace.Addr(), 1, uintptr(handle), 0, 0)
-	if r1 != 0 {
+	if r1 == 0 {
 		err = errnoErr(e1)
 	}
 	return

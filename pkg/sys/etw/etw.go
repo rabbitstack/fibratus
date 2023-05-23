@@ -22,9 +22,7 @@
 package etw
 
 import (
-	"errors"
 	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
-	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
 	"os"
 	"unsafe"
@@ -34,7 +32,7 @@ import (
 
 //sys startTrace(handle *TraceHandle, name string, props *EventTraceProperties) (err error) [failretval!=0] = advapi32.StartTraceW
 //sys controlTrace(handle TraceHandle, name string, props *EventTraceProperties, operation TraceOperation) (err error) [failretval!=0] = advapi32.ControlTraceW
-//sys closeTrace(handle TraceHandle) (err error) [failretval!=0] = advapi32.CloseTrace
+//sys closeTrace(handle TraceHandle) (err error) = advapi32.CloseTrace
 //sys openTrace(logfile *EventTraceLogfile) (handle TraceHandle) = advapi32.OpenTraceW
 //sys processTrace(handle *TraceHandle, count uint32, start *windows.Filetime, end *windows.Filetime) (err error) [failretval!=0] = advapi32.ProcessTrace
 //sys traceSetInformation(handle TraceHandle, infoClass uint8, info uintptr, length uint32) (err error) [failretval!=0] = advapi32.TraceSetInformation
@@ -61,15 +59,9 @@ type TraceHandle uintptr
 // IsValid determines if the trace handle is valid
 func (trace TraceHandle) IsValid() bool { return trace != 0 && trace != 0xffffffffffffffff }
 
-// Process instructs the trace to start collecting events from the buffers.
-// This operation is blocking and should be run in a separate goroutine.
-func (trace TraceHandle) Process(name string) {
-	log.Infof("starting [%s] trace processing", name)
-	err := ProcessTrace(trace)
-	log.Infof("stopping [%s] trace processing", name)
-	if err != nil && !errors.Is(err, kerrors.ErrTraceCancelled) {
-		log.Errorf("process trace failed: %v", err)
-	}
+// Process starts trace processing. This operation blocks the main thread.
+func (trace TraceHandle) Process() error {
+	return ProcessTrace(trace)
 }
 
 // Close stops event processing on the trace session.

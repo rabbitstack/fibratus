@@ -20,7 +20,6 @@ package sys
 
 import (
 	"golang.org/x/sys/windows"
-	"syscall"
 )
 
 var drives = []string{
@@ -80,7 +79,7 @@ func GetLogicalDrives() []string {
 
 // QueryDosDevice translates the DOS device name to hard disk drive letter.
 func QueryDosDevice(drive string) (string, error) {
-	dev := make([]uint16, syscall.MAX_PATH)
+	dev := make([]uint16, windows.MAX_PATH)
 	_, err := windows.QueryDosDevice(windows.StringToUTF16Ptr(drive), &dev[0], windows.MAX_PATH)
 	if err != nil {
 		return "", err
@@ -88,6 +87,7 @@ func QueryDosDevice(drive string) (string, error) {
 	return windows.UTF16ToString(dev), nil
 }
 
+// PathIsDirectory determines if the provided path is a directory.
 func PathIsDirectory(path string) bool {
 	return pathIsDirectory(windows.StringToUTF16Ptr(path))
 }

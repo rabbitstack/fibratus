@@ -84,7 +84,10 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 		// in internal state in order to augment the rest of file events
 		// that lack the file name field
 		filename := e.GetParamAsString(kparams.FileName)
-		fileObject := e.Kparams.MustGetUint64(kparams.FileObject)
+		fileObject, err := e.Kparams.GetUint64(kparams.FileObject)
+		if err != nil {
+			return nil, err
+		}
 		if _, ok := f.files[fileObject]; !ok {
 			totalRundownFiles.Add(1)
 			f.files[fileObject] = &FileInfo{Name: filename, Type: fs.GetFileType(filename, 0)}

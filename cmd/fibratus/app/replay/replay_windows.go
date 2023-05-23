@@ -22,6 +22,7 @@ import (
 	"context"
 	"github.com/rabbitstack/fibratus/internal/bootstrap"
 	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"github.com/spf13/cobra"
 )
 
@@ -43,12 +44,12 @@ func init() {
 func replay(cmd *cobra.Command, args []string) error {
 	app, err := bootstrap.NewApp(cfg, bootstrap.WithSignals(), bootstrap.WithCaptureReplay())
 	if err != nil {
-		return err
+		return multierror.Wrap(err, app.Shutdown())
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	if err := app.ReadCapture(ctx, args); err != nil {
-		return err
+		return multierror.Wrap(err, app.Shutdown())
 	}
 	app.Wait()
 	return app.Shutdown()

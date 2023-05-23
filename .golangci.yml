@@ -1,11 +1,11 @@
 run:
-  build-tags:	 
-    - kcap	
+  build-tags:
+    - kcap
     - filament
   deadline: 10m
   skip-files:
     - pkg/pe/entropy.go
-    
+
 linters:
   disable-all: true
   enable:
@@ -33,4 +33,3 @@ linters:
     - unused
     - varcheck
     - whitespace
-

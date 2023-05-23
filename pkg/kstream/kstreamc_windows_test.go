@@ -103,7 +103,8 @@ func TestRundownEvents(t *testing.T) {
 			}
 			rundownsByType[e.Type] = true
 			rundownsByHash[e.RundownKey()]++
-		case _ = <-kstreamc.Errors():
+		case err := <-kstreamc.Errors():
+			t.Fatalf("FAIL: %v", err)
 		case <-timeout:
 			t.Logf("got %d rundown events", len(rundownsByHash))
 			for key, count := range rundownsByHash {
@@ -152,6 +153,7 @@ func TestConsumerEvents(t *testing.T) {
 				if err != nil {
 					return err
 				}
+				//nolint:errcheck
 				defer windows.TerminateProcess(pi.Process, 0)
 				return nil
 			},
@@ -185,6 +187,7 @@ func TestConsumerEvents(t *testing.T) {
 				if err != nil {
 					return err
 				}
+				//nolint:errcheck
 				defer f.Close()
 				return nil
 			},
@@ -205,7 +208,12 @@ func TestConsumerEvents(t *testing.T) {
 					mux := http.NewServeMux()
 					mux.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {})
 					time.AfterFunc(time.Second*2, func() {
-						_, _ = http.Get("http://localhost:18090")
+						resp, _ := http.Get("http://localhost:18090")
+						if resp != nil {
+							defer func() {
+								_ = resp.Body.Close()
+							}()
+						}
 						_ = srv.Shutdown(context.TODO())
 					})
 					_ = srv.ListenAndServe()

@@ -41,12 +41,14 @@ func Duplicate(handle windows.Handle, pid uint32, access uint32) (windows.Handle
 	if err != nil {
 		return windows.InvalidHandle, err
 	}
+	//nolint:errcheck
 	defer windows.CloseHandle(source)
 	// this process receives the duplicated handle
 	target, err := windows.OpenProcess(windows.PROCESS_DUP_HANDLE, false, uint32(os.Getpid()))
 	if err != nil {
 		return windows.InvalidHandle, err
 	}
+	//nolint:errcheck
 	defer windows.CloseHandle(target)
 	// duplicate the remote handle in the current process's address space.
 	// Note that for certain handle types this operation might fail

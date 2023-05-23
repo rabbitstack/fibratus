@@ -46,6 +46,7 @@ func TestSplit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.cmdline, func(t *testing.T) {
+			//nolint:scopelint
 			args := Split(tt.cmdline)
 			require.Len(t, args, tt.wantLen)
 			require.Equal(t, tt.wantExe, args[0])

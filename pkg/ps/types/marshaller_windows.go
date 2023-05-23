@@ -174,7 +174,7 @@ func (ps *PS) Unmarshal(b []byte, psec section.Section) error {
 		idx += 4
 	} else {
 		ps.SessionID = uint32(b[idx+offset])
-		idx += 1
+		idx++
 	}
 
 	// read env vars
@@ -248,9 +248,7 @@ readpe:
 
 			// read domain
 			l = bytes.ReadUint16(b[idx+offset:])
-			idx += 2
 			buf = b[:]
-			offset += uint32(l)
 			ps.Domain = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
 		}
 		return nil
@@ -286,9 +284,7 @@ readpe:
 
 		// read domain
 		l = bytes.ReadUint16(b[idx+offset:])
-		idx += 2
 		buf = b[:]
-		offset += uint32(l)
 		ps.Domain = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
 	}
 

@@ -21,6 +21,7 @@ package capture
 import (
 	"github.com/rabbitstack/fibratus/internal/bootstrap"
 	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"github.com/rabbitstack/fibratus/pkg/util/spinner"
 	"github.com/spf13/cobra"
 	"time"
@@ -61,11 +62,11 @@ func capture(cmd *cobra.Command, args []string) error {
 	app, err := bootstrap.NewApp(cfg, bootstrap.WithSignals(), bootstrap.WithDebugPrivilege(),
 		bootstrap.WithHandleSnapshotFn(fn))
 	if err != nil {
-		return err
+		return multierror.Wrap(err, app.Shutdown())
 	}
 	<-wait
 	if err := app.WriteCapture(args); err != nil {
-		return err
+		return multierror.Wrap(err, app.Shutdown())
 	}
 	spin = spinner.Show("Capturing")
 	app.Wait()

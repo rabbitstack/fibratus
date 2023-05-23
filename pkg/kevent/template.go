@@ -38,9 +38,11 @@ Process:		{{ .Kevt.PS.Name }}
 Exe:			{{ .Kevt.PS.Exe }}
 Pid:  			{{ .Kevt.PS.PID }}
 Ppid: 			{{ .Kevt.PS.Ppid }}
-Cmdline:		{{ .Kevt.PS.Comm }}
+Cmdline:		{{ .Kevt.PS.Cmdline }}
 Cwd:			{{ .Kevt.PS.Cwd }}
 SID:			{{ .Kevt.PS.SID }}
+User:           {{ .Kevt.PS.Username }}
+Domain:         {{ .Kevt.PS.Domain }}
 Session ID:		{{ .Kevt.PS.SessionID }}
 {{ if and (.SerializeEnvs) (.Kevt.PS.Envs) }}
 Env:

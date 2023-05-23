@@ -680,7 +680,7 @@ func (r *Rules) runSequence(kevt *kevent.Kevent, f *compiledFilter) bool {
 		}
 		rule := expr.Expr.String()
 		matches := f.run(kevt, uint16(i))
-		log.Debugf("[%s] = %t", rule, matches)
+		log.Debugf("sequence expression [%s] = %t", rule, matches)
 		// append the partial and transition state machine
 		if matches && f.ss.isAfter(rule, kevt) {
 			f.ss.addPartial(rule, kevt)

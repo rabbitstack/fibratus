@@ -178,6 +178,7 @@ func (s *snapshotter) FindHandles(pid uint32) ([]htypes.Handle, error) {
 		}
 		return handles, nil
 	}
+	//nolint:errcheck
 	defer windows.CloseHandle(process)
 
 	snapshot, err := sys.QueryInformationProcess[sys.ProcessHandleSnapshotInformation](process, windows.ProcessHandleInformation)
@@ -290,6 +291,7 @@ func (s *snapshotter) getHandle(rawHandle windows.Handle, obj uint64, typeIndex 
 	if err != nil {
 		return handle, err
 	}
+	//nolint:errcheck
 	defer windows.CloseHandle(dup)
 	handle.Name, handle.MD, err = QueryName(dup, typ, withTimeout)
 	if err != nil {

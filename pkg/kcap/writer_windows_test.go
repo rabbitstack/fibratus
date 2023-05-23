@@ -196,7 +196,7 @@ func TestLiveKcap(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = kstreamc.Open(ktracec.Traces())
+	err = kstreamc.Open()
 	if err != nil {
 		t.Fatal(err)
 	}

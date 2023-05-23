@@ -21,12 +21,14 @@ package ps
 import (
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/handle"
+	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
 	"os"
@@ -38,7 +40,10 @@ import (
 
 func TestWrite(t *testing.T) {
 	hsnap := new(handle.SnapshotterMock)
+	hsnap.On("FindHandles", mock.Anything).Return([]htypes.Handle{}, nil)
 	psnap := NewSnapshotter(hsnap, &config.Config{})
+	//nolint:errcheck
+	defer psnap.Close()
 
 	var tests = []struct {
 		name string
@@ -172,6 +177,8 @@ func TestWrite(t *testing.T) {
 func TestRemove(t *testing.T) {
 	hsnap := new(handle.SnapshotterMock)
 	psnap := NewSnapshotter(hsnap, &config.Config{})
+	//nolint:errcheck
+	defer psnap.Close()
 
 	var tests = []struct {
 		name string
@@ -213,6 +220,8 @@ func TestRemove(t *testing.T) {
 func TestAddThread(t *testing.T) {
 	hsnap := new(handle.SnapshotterMock)
 	psnap := NewSnapshotter(hsnap, &config.Config{})
+	//nolint:errcheck
+	defer psnap.Close()
 
 	evt := &kevent.Kevent{
 		Type: ktypes.CreateProcess,
@@ -290,6 +299,8 @@ func TestAddThread(t *testing.T) {
 func TestRemoveThread(t *testing.T) {
 	hsnap := new(handle.SnapshotterMock)
 	psnap := NewSnapshotter(hsnap, &config.Config{})
+	//nolint:errcheck
+	defer psnap.Close()
 
 	pevt := &kevent.Kevent{
 		Type: ktypes.CreateProcess,
@@ -335,6 +346,8 @@ func TestRemoveThread(t *testing.T) {
 func TestAddModule(t *testing.T) {
 	hsnap := new(handle.SnapshotterMock)
 	psnap := NewSnapshotter(hsnap, &config.Config{})
+	//nolint:errcheck
+	defer psnap.Close()
 
 	evt := &kevent.Kevent{
 		Type: ktypes.CreateProcess,
@@ -396,6 +409,8 @@ func TestAddModule(t *testing.T) {
 func TestRemoveModule(t *testing.T) {
 	hsnap := new(handle.SnapshotterMock)
 	psnap := NewSnapshotter(hsnap, &config.Config{})
+	//nolint:errcheck
+	defer psnap.Close()
 
 	pevt := &kevent.Kevent{
 		Type: ktypes.CreateProcess,
@@ -437,6 +452,7 @@ func init() {
 func TestReapDeadProcesses(t *testing.T) {
 	hsnap := new(handle.SnapshotterMock)
 	psnap := NewSnapshotter(hsnap, &config.Config{})
+	//nolint:errcheck
 	defer psnap.Close()
 
 	notepadHandle, notepadPID := spawnNotepad()
@@ -485,13 +501,16 @@ func TestReapDeadProcesses(t *testing.T) {
 
 func TestFindQueryOS(t *testing.T) {
 	hsnap := new(handle.SnapshotterMock)
+	hsnap.On("FindHandles", mock.Anything).Return([]htypes.Handle{}, nil)
 	psnap := NewSnapshotter(hsnap, &config.Config{})
+	//nolint:errcheck
 	defer psnap.Close()
 
 	notepadHandle, notepadPID := spawnNotepad()
 	if notepadHandle == 0 {
 		t.Fatal("unable to spawn notepad process")
 	}
+	//nolint:errcheck
 	defer windows.TerminateProcess(notepadHandle, 257)
 
 	ok, proc := psnap.Find(notepadPID)
@@ -507,7 +526,9 @@ func TestFindQueryOS(t *testing.T) {
 	assert.Contains(t, proc.Cwd, "fibratus\\pkg\\ps")
 	assert.Equal(t, uint32(1), proc.SessionID)
 
-	loggedSID, err := sys.GetLoggedSID()
+	wts, err := sys.LookupActiveWTS()
+	require.NoError(t, err)
+	loggedSID, err := wts.SID()
 	require.NoError(t, err)
 	assert.Equal(t, loggedSID.String(), proc.SID)
 	username, domain, _, err := loggedSID.LookupAccount("")
