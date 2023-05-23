@@ -3,8 +3,6 @@ run:
     - kcap
     - filament
   deadline: 10m
-  skip-files:
-    - pkg/pe/entropy.go
 
 linters:
   disable-all: true
@@ -33,3 +31,17 @@ linters:
     - unused
     - varcheck
     - whitespace
+
+issues:
+  # List of regexps of issue texts to exclude.
+  #
+  # But independently of this option we use default exclude patterns,
+  # it can be disabled by `exclude-use-default: false`.
+  # To list all excluded by default patterns execute `golangci-lint run --help`
+  #
+  exclude-rules:
+    # Exclude some linters from running on tests files.
+    - path: _test\.go
+      linters:
+        - errcheck
+        - scopelint

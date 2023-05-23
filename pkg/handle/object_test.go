@@ -71,7 +71,6 @@ func createPipe(address string, first bool) (syscall.Handle, error) {
 func TestQueryType(t *testing.T) {
 	h, err := windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION, false, uint32(os.Getpid()))
 	require.NoError(t, err)
-	//nolint:errcheck
 	defer windows.CloseHandle(h)
 	typeName, err := QueryObjectType(h)
 	require.NoError(t, err)
@@ -81,7 +80,6 @@ func TestQueryType(t *testing.T) {
 func TestQueryNameFileHandle(t *testing.T) {
 	f, err := windows.Open("_fixtures/.fibratus", windows.O_RDONLY, windows.S_ISUID)
 	require.NoError(t, err)
-	//nolint:errcheck
 	defer windows.Close(f)
 	handleName, _, err := QueryName(f, File, true)
 	require.NoError(t, err)
@@ -91,7 +89,6 @@ func TestQueryNameFileHandle(t *testing.T) {
 func TestQueryNamedPipe(t *testing.T) {
 	h, err := createPipe(`\\.\pipe\fibratus`, true)
 	require.NoError(t, err)
-	//nolint:errcheck
 	defer syscall.Close(h)
 	handleName, _, err := QueryName(windows.Handle(h), File, true)
 	require.NoError(t, err)

@@ -153,7 +153,6 @@ func TestConsumerEvents(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				//nolint:errcheck
 				defer windows.TerminateProcess(pi.Process, 0)
 				return nil
 			},
@@ -187,7 +186,6 @@ func TestConsumerEvents(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				//nolint:errcheck
 				defer f.Close()
 				return nil
 			},
@@ -208,6 +206,7 @@ func TestConsumerEvents(t *testing.T) {
 					mux := http.NewServeMux()
 					mux.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {})
 					time.AfterFunc(time.Second*2, func() {
+						//nolint:noctx
 						resp, _ := http.Get("http://localhost:18090")
 						if resp != nil {
 							defer func() {

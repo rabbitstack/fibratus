@@ -25,7 +25,6 @@ import (
 	"github.com/hillu/go-yara/v4"
 	"os"
 	"path/filepath"
-	"syscall"
 	"testing"
 	"time"
 
@@ -86,12 +85,12 @@ func TestScan(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	var si syscall.StartupInfo
-	var pi syscall.ProcessInformation
+	var si windows.StartupInfo
+	var pi windows.ProcessInformation
 
-	argv := syscall.StringToUTF16Ptr(filepath.Join(os.Getenv("windir"), "notepad.exe"))
+	argv := windows.StringToUTF16Ptr(filepath.Join(os.Getenv("windir"), "notepad.exe"))
 
-	err = syscall.CreateProcess(
+	err = windows.CreateProcess(
 		nil,
 		argv,
 		nil,
@@ -103,7 +102,8 @@ func TestScan(t *testing.T) {
 		&si,
 		&pi)
 	require.NoError(t, err)
-	defer syscall.TerminateProcess(pi.Process, uint32(257))
+	//nolint:errcheck
+	defer windows.TerminateProcess(pi.Process, uint32(257))
 
 	proc := &pstypes.PS{
 		Name:      "notepad.exe",

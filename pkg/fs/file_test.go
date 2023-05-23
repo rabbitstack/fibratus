@@ -51,10 +51,7 @@ func TestGetFileType(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.filename, func(t *testing.T) {
-			//nolint:scopelint
-			filename, opts := tt.filename, tt.opts
-			wants := tt.wants
-			assert.Equal(t, wants, GetFileType(filename, opts))
+			assert.Equal(t, tt.wants, GetFileType(tt.filename, tt.opts))
 		})
 	}
 }

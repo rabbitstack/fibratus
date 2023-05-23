@@ -37,7 +37,6 @@ func TestReadPEB(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	//nolint:errcheck
 	defer windows.CloseHandle(proc)
 
 	peb, err := ReadPEB(proc)

@@ -159,7 +159,6 @@ func ParseMem(pid uint32, base uintptr, changeProtection bool, opts ...Option) (
 	if err != nil {
 		return nil, err
 	}
-	//nolint:errcheck
 	defer windows.Close(process)
 	area := va.ReadArea(process, base, MaxHeaderSize, MinHeaderSize, changeProtection)
 	if len(area) == 0 || va.Zeroed(area) {

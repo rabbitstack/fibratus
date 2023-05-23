@@ -42,7 +42,6 @@ func TestWrite(t *testing.T) {
 	hsnap := new(handle.SnapshotterMock)
 	hsnap.On("FindHandles", mock.Anything).Return([]htypes.Handle{}, nil)
 	psnap := NewSnapshotter(hsnap, &config.Config{})
-	//nolint:errcheck
 	defer psnap.Close()
 
 	var tests = []struct {
@@ -70,7 +69,7 @@ func TestWrite(t *testing.T) {
 				Name:      "spotify.exe",
 				Cmdline:   `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`,
 				Exe:       `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --parent`,
-				Cwd:       "C:\\fibratus\\pkg\\ps",
+				Cwd:       "C:\\fibratus\\pkg\\ps\\fibratus",
 				SessionID: 1,
 				SID:       "S-1-5-18",
 				Username:  "SYSTEM",
@@ -98,7 +97,7 @@ func TestWrite(t *testing.T) {
 				Name:    "spotify.exe",
 				Cmdline: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`,
 				Exe:     `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --parent`,
-				Cwd:     "C:\\fibratus\\pkg\\ps",
+				Cwd:     "C:\\fibratus\\pkg\\ps\\fibratus",
 				Parent: &pstypes.PS{
 					PID: uint32(os.Getpid()),
 				},
@@ -128,7 +127,7 @@ func TestWrite(t *testing.T) {
 				Name:      "spotify.exe",
 				Cmdline:   `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`,
 				Exe:       `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --parent`,
-				Cwd:       "C:\\fibratus\\pkg\\ps",
+				Cwd:       "C:\\fibratus\\pkg\\ps\\fibratus",
 				SessionID: 1,
 				SID:       "S-1-5-18",
 				Username:  "SYSTEM",
@@ -176,8 +175,8 @@ func TestWrite(t *testing.T) {
 
 func TestRemove(t *testing.T) {
 	hsnap := new(handle.SnapshotterMock)
+	hsnap.On("FindHandles", mock.Anything).Return([]htypes.Handle{}, nil)
 	psnap := NewSnapshotter(hsnap, &config.Config{})
-	//nolint:errcheck
 	defer psnap.Close()
 
 	var tests = []struct {
@@ -220,7 +219,6 @@ func TestRemove(t *testing.T) {
 func TestAddThread(t *testing.T) {
 	hsnap := new(handle.SnapshotterMock)
 	psnap := NewSnapshotter(hsnap, &config.Config{})
-	//nolint:errcheck
 	defer psnap.Close()
 
 	evt := &kevent.Kevent{
@@ -299,7 +297,6 @@ func TestAddThread(t *testing.T) {
 func TestRemoveThread(t *testing.T) {
 	hsnap := new(handle.SnapshotterMock)
 	psnap := NewSnapshotter(hsnap, &config.Config{})
-	//nolint:errcheck
 	defer psnap.Close()
 
 	pevt := &kevent.Kevent{
@@ -346,7 +343,6 @@ func TestRemoveThread(t *testing.T) {
 func TestAddModule(t *testing.T) {
 	hsnap := new(handle.SnapshotterMock)
 	psnap := NewSnapshotter(hsnap, &config.Config{})
-	//nolint:errcheck
 	defer psnap.Close()
 
 	evt := &kevent.Kevent{
@@ -409,7 +405,6 @@ func TestAddModule(t *testing.T) {
 func TestRemoveModule(t *testing.T) {
 	hsnap := new(handle.SnapshotterMock)
 	psnap := NewSnapshotter(hsnap, &config.Config{})
-	//nolint:errcheck
 	defer psnap.Close()
 
 	pevt := &kevent.Kevent{
@@ -452,7 +447,6 @@ func init() {
 func TestReapDeadProcesses(t *testing.T) {
 	hsnap := new(handle.SnapshotterMock)
 	psnap := NewSnapshotter(hsnap, &config.Config{})
-	//nolint:errcheck
 	defer psnap.Close()
 
 	notepadHandle, notepadPID := spawnNotepad()
@@ -503,14 +497,12 @@ func TestFindQueryOS(t *testing.T) {
 	hsnap := new(handle.SnapshotterMock)
 	hsnap.On("FindHandles", mock.Anything).Return([]htypes.Handle{}, nil)
 	psnap := NewSnapshotter(hsnap, &config.Config{})
-	//nolint:errcheck
 	defer psnap.Close()
 
 	notepadHandle, notepadPID := spawnNotepad()
 	if notepadHandle == 0 {
 		t.Fatal("unable to spawn notepad process")
 	}
-	//nolint:errcheck
 	defer windows.TerminateProcess(notepadHandle, 257)
 
 	ok, proc := psnap.Find(notepadPID)

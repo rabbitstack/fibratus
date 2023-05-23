@@ -117,7 +117,6 @@ func querySequenceNumber(pid uint32) uint64 {
 	if err != nil {
 		return 0
 	}
-	//nolint:errcheck
 	defer windows.Close(proc)
 	seq, err := sys.QueryInformationProcess[ProcessSequenceNumber](proc, windows.ProcessSequenceNumber)
 	if err != nil {
