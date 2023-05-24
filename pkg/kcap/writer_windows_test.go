@@ -61,7 +61,6 @@ func TestWrite(t *testing.T) {
 	w, err := NewWriter("_fixtures/cap.kcap", psnap, hsnap)
 	require.NoError(t, err)
 	require.NotNil(t, w)
-	defer w.Close()
 
 	kevtsc := make(chan *kevent.Kevent, 100)
 	errs := make(chan error, 10)
@@ -158,6 +157,8 @@ func TestWrite(t *testing.T) {
 	case err := <-werrs:
 		t.Fatal(err)
 	case <-quit:
+		w.Close()
+		require.True(t, w.(*writer).stats.kevtsWritten > 0)
 		return
 	}
 }

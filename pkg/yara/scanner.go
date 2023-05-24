@@ -146,7 +146,6 @@ func (s scanner) newInternalScanner() (*yara.Scanner, error) {
 	if err != nil {
 		return nil, fmt.Errorf("fail to create yara scanner: %v", err)
 	}
-	defer sn.Destroy()
 	// set scan flags
 	var flags yara.ScanFlags
 	if s.config.FastScanMode {
@@ -178,6 +177,7 @@ func (s scanner) Scan(evt *kevent.Kevent) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	defer sn.Destroy()
 	alertCtx := AlertContext{
 		Timestamp: time.Now().Format(tsLayout),
 	}

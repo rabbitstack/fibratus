@@ -97,6 +97,8 @@ type writer struct {
 	stats *stats
 	// mu protects the underlying zstd buffer
 	mu sync.Mutex
+	// released indicates if the zstd buffer is disposed
+	released atomic.Bool
 }
 
 // NewWriter constructs a new instance of the kcap writer.
@@ -238,8 +240,9 @@ func (w *writer) write(b []byte) error {
 func (w *writer) Close() error {
 	w.stats.printStats()
 
-	w.flusher.Stop()
 	close(w.stop)
+
+	w.flusher.Stop()
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -248,6 +251,7 @@ func (w *writer) Close() error {
 			return err
 		}
 		w.zw.Release()
+		w.released.Store(true)
 	}
 	if w.f != nil {
 		return w.f.Close()
@@ -259,6 +263,9 @@ func (w *writer) flush() {
 	for {
 		select {
 		case <-w.flusher.C:
+			if w.released.Load() {
+				return
+			}
 			w.mu.Lock()
 			err := w.zw.Flush()
 			w.mu.Unlock()

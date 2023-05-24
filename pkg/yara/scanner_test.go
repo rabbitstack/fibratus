@@ -73,8 +73,9 @@ func TestScan(t *testing.T) {
 	require.NoError(t, alertsender.LoadAll([]alertsender.Config{{Type: alertsender.Noop}}))
 
 	s, err := NewScanner(psnap, config.Config{
-		Enabled:  true,
-		AlertVia: "noop",
+		Enabled:     true,
+		ScanTimeout: time.Minute,
+		AlertVia:    "noop",
 		Rule: config.Rule{
 			Paths: []config.RulePath{
 				{
