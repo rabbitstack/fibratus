@@ -31,6 +31,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kstream"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
 	"testing"
@@ -40,6 +41,7 @@ import (
 func TestWrite(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
 	hsnap := new(handle.SnapshotterMock)
+	log.SetLevel(log.DebugLevel)
 
 	procs := []*pstypes.PS{
 		{PID: 8390, Ppid: 1096, Name: "spotify.exe", Exe: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe`, Cmdline: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`, Cwd: `C:\Users\admin\AppData\Roaming\Spotify`, SID: "admin\\SYSTEM"},

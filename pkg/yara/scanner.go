@@ -187,7 +187,7 @@ func (s scanner) Scan(evt *kevent.Kevent) (bool, error) {
 		pid := evt.Kparams.MustGetPid()
 		_, proc := s.psnap.Find(pid)
 		if proc == nil {
-			return false, fmt.Errorf("% process not found in snapshotter", pid)
+			return false, fmt.Errorf("%d process not found in snapshotter", pid)
 		}
 		if s.config.ShouldSkipProcess(proc.Name) {
 			return false, nil

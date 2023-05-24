@@ -96,8 +96,7 @@ type writer struct {
 	// stats contains the capture statistics
 	stats *stats
 	// mu protects the underlying zstd buffer
-	mu     sync.Mutex
-	closed atomic.Bool
+	mu sync.Mutex
 }
 
 // NewWriter constructs a new instance of the kcap writer.
@@ -240,7 +239,7 @@ func (w *writer) Close() error {
 	w.stats.printStats()
 
 	w.flusher.Stop()
-	w.stop <- struct{}{}
+	close(w.stop)
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -249,7 +248,6 @@ func (w *writer) Close() error {
 			return err
 		}
 		w.zw.Release()
-		w.closed.Store(true)
 	}
 	if w.f != nil {
 		return w.f.Close()
@@ -259,15 +257,16 @@ func (w *writer) Close() error {
 
 func (w *writer) flush() {
 	for {
-		<-w.flusher.C
-		if w.closed.Load() {
+		select {
+		case <-w.flusher.C:
+			w.mu.Lock()
+			err := w.zw.Flush()
+			w.mu.Unlock()
+			if err != nil {
+				flusherErrors.Add(err.Error(), 1)
+			}
+		case <-w.stop:
 			return
-		}
-		w.mu.Lock()
-		err := w.zw.Flush()
-		w.mu.Unlock()
-		if err != nil {
-			flusherErrors.Add(err.Error(), 1)
 		}
 	}
 }

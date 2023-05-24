@@ -107,7 +107,7 @@ func TestCmdline(t *testing.T) {
 			cmdline := New(tt.cmdline).
 				CleanExe().
 				ExpandSystemRoot().
-				CompleteSysProc(strings.Trim(tt.cmdline, `""`))
+				CompleteSysProc(strings.Trim(tt.cmdline, `"`))
 			assert.Equal(t, tt.wantCmdline, cmdline.String())
 			assert.Equal(t, tt.wantExeline, cmdline.Exeline())
 		})
