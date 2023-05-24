@@ -25,99 +25,122 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/syscall/handle"
-	"github.com/rabbitstack/fibratus/pkg/syscall/object"
-	"github.com/rabbitstack/fibratus/pkg/syscall/thread"
-	"sync/atomic"
-	"syscall"
+	"github.com/rabbitstack/fibratus/pkg/sys"
+	"golang.org/x/sys/windows"
 )
 
-var (
-	threadHandle handle.Handle
-	rawHandle    atomic.Value
-	ini          object.Event
-	done         object.Event
-	name         string
+type timeout struct {
+	ini    windows.Handle
+	done   windows.Handle
+	thread windows.Handle
+	in     chan windows.Handle
+	out    chan string
+}
 
+var tmt timeout
+
+var (
 	waitTimeoutCounts = expvar.NewInt("handle.wait.timeouts")
 )
 
 func init() {
-	ini, _ = object.NewEvent(false, false)
-	done, _ = object.NewEvent(false, false)
+	tmt.ini, _ = windows.CreateEvent(nil, 0, 0, nil)
+	tmt.done, _ = windows.CreateEvent(nil, 0, 0, nil)
+	tmt.in = make(chan windows.Handle, 1)
+	tmt.out = make(chan string, 1)
 }
 
 // GetHandleWithTimeout is in charge of resolving handle names on handle instances that are under the risk
 // of producing a deadlock, and thus hanging the caller thread. To prevent this kind of unwanted scenarios,
-// deadlock aware timeout calls into `NtQueryObject` in a separate native thread. The thread is reused across
-// invocations as it is blocked waiting to be signaled by an event, but the query thread also signals back the main
-// thread after completion of the `NtQueryObject` call. If the query thread doesn't notify the main thread after a prudent
-// timeout, then the query thread is killed. Subsequent calls for handle name resolution will recreate the thread in case
-// of it not being alive.
-func GetHandleWithTimeout(handle handle.Handle, timeout uint32) (string, error) {
-	if threadHandle == 0 {
-		if err := ini.Reset(); err != nil {
+// deadlock aware timeout calls into `NtQueryObject` in a separate native thread. The thread is blocked waiting
+// to be signaled by an event, but the query thread also signals back the main thread after completion of the
+// `NtQueryObject` call.
+// If the query thread doesn't notify the main thread after a prudent timeout, then the query thread is killed.
+// Subsequent calls for handle name resolution will recreate the thread in case of it not being alive.
+func GetHandleWithTimeout(handle windows.Handle, timeout uint32) (string, error) {
+	if tmt.thread == 0 {
+		if err := windows.ResetEvent(tmt.ini); err != nil {
 			return "", fmt.Errorf("couldn't reset init event: %v", err)
 		}
-		if err := done.Reset(); err != nil {
+		if err := windows.ResetEvent(tmt.done); err != nil {
 			return "", fmt.Errorf("couldn't reset done event: %v", err)
 		}
-		h, _, err := thread.Create(nil, syscall.NewCallback(cb))
-		if err != nil {
-			return "", fmt.Errorf("cannot create handle query thread: %v", err)
+		tmt.in = make(chan windows.Handle, 1)
+		tmt.out = make(chan string, 1)
+		tmt.thread = sys.CreateThread(
+			nil,
+			0,
+			windows.NewCallback(timeoutFn),
+			0,
+			0,
+			nil)
+		if tmt.thread == 0 {
+			return "", fmt.Errorf("cannot create handle query thread: %v", windows.GetLastError())
 		}
-		threadHandle = h
 	}
 
-	rawHandle.Store(handle)
-
-	if err := ini.Set(); err != nil {
+	tmt.in <- handle
+	if err := windows.SetEvent(tmt.ini); err != nil {
 		return "", err
 	}
 
-	switch s, _ := syscall.WaitForSingleObject(syscall.Handle(done), timeout); s {
-	case syscall.WAIT_OBJECT_0:
-		return name, nil
-	case syscall.WAIT_TIMEOUT:
+	evt, err := windows.WaitForSingleObject(tmt.done, timeout)
+	if err != nil || evt == windows.WAIT_FAILED {
+		// consume pushed handle
+		<-tmt.in
+		return "", nil
+	}
+	if evt == windows.WAIT_OBJECT_0 {
+		return <-tmt.out, nil
+	}
+	if windows.Errno(evt) == windows.WAIT_TIMEOUT {
 		waitTimeoutCounts.Add(1)
 		// kill the thread and wait for its termination to orderly cleanup resources
-		if err := thread.Terminate(threadHandle, 0); err != nil {
-			return "", fmt.Errorf("unable to terminate timeout thread: %v", err)
+		if err := sys.TerminateThread(tmt.thread, 0); err != nil {
+			return "", fmt.Errorf("unable tmt terminate timeout thread: %v", err)
 		}
-		if _, err := syscall.WaitForSingleObject(syscall.Handle(threadHandle), timeout); err != nil {
+		if _, err := windows.WaitForSingleObject(tmt.thread, timeout); err != nil {
+			tmt.thread = 0
 			return "", fmt.Errorf("failed awaiting timeout thread termination: %v", err)
 		}
-		threadHandle = 0
-		threadHandle.Close()
-
+		_ = windows.CloseHandle(tmt.thread)
+		tmt.thread = 0
 		return "", errors.New("couldn't resolve handle name due to timeout")
 	}
 	return "", nil
 }
 
-// CloseTimeout releases handle timeut resources.
+// CloseTimeout releases event and thread handles.
 func CloseTimeout() error {
-	if err := ini.Close(); err != nil {
-		return done.Close()
+	_ = windows.CloseHandle(tmt.ini)
+	_ = windows.CloseHandle(tmt.done)
+	if tmt.thread != 0 {
+		return sys.TerminateThread(tmt.thread, 0)
 	}
-	threadHandle.Close()
-	return done.Close()
+	return nil
 }
 
-func cb(ctx uintptr) uintptr {
+// timeoutFn waits for the initial event signalization and then
+// pulls the handle identifier from the input channel. With handle
+// identifier inside the callback function, the object is queried.
+// If the query is successful, the result is pushed to the output
+// channel, and the done event is signaled to indicate the object
+// name can be retrieved.
+func timeoutFn(ctx uintptr) uintptr {
 	for {
-		s, err := syscall.WaitForSingleObject(syscall.Handle(ini), syscall.INFINITE)
-		if err != nil || s != syscall.WAIT_OBJECT_0 {
+		s, err := windows.WaitForSingleObject(tmt.ini, windows.INFINITE)
+		if err != nil || s != windows.WAIT_OBJECT_0 {
 			break
 		}
-		name, err = queryObjectName(rawHandle.Load().(handle.Handle))
+		obj, err := QueryObjectName(<-tmt.in)
+		tmt.out <- obj
 		if err != nil {
-			if err := done.Set(); err != nil {
+			if err := windows.SetEvent(tmt.done); err != nil {
 				break
 			}
 			continue
 		}
-		if err := done.Set(); err != nil {
+		if err := windows.SetEvent(tmt.done); err != nil {
 			break
 		}
 	}

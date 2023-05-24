@@ -23,23 +23,17 @@ package handle
 
 import (
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
-	"github.com/rabbitstack/fibratus/pkg/syscall/handle"
-	"github.com/rabbitstack/fibratus/pkg/syscall/object"
+	"github.com/rabbitstack/fibratus/pkg/sys"
+	"golang.org/x/sys/windows"
 	"unsafe"
 )
 
-type mutant struct {
-	count     int32
-	_         bool
-	abandoned bool
-}
-
 // GetMutant gets the information about specified mutant handle.
-func GetMutant(h handle.Handle) (*htypes.MutantInfo, error) {
-	buf := make([]byte, 8)
-	if err := object.QueryMutant(h, object.MutantBasicInfo, buf); err != nil {
+func GetMutant(handle windows.Handle) (*htypes.MutantInfo, error) {
+	b := make([]byte, 8)
+	err := sys.NtQueryMutant(handle, sys.MutantBasicInformationClass, unsafe.Pointer(&b[0]), uint32(len(b)), nil)
+	if err != nil {
 		return nil, err
 	}
-	basicInfo := (*mutant)(unsafe.Pointer(&buf[0]))
-	return &htypes.MutantInfo{Count: basicInfo.count, IsAbandoned: basicInfo.abandoned}, nil
+	return (*htypes.MutantInfo)(unsafe.Pointer(&b[0])), nil
 }

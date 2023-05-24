@@ -16,6 +16,6 @@
  * limitations under the License.
  */
 
-// Package kstream contains facilities for controlling the kernel logger session and opening kernel event stream
-// for the purpose of collecting and processing kernel events.
+// Package kstream contains facilities for controlling ETW sessions and opening event stream
+// for the purpose of collecting and processing events.
 package kstream

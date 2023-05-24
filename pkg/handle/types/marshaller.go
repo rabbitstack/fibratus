@@ -23,8 +23,8 @@ package types
 
 import (
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/syscall/handle"
 	"github.com/rabbitstack/fibratus/pkg/util/bytes"
+	"golang.org/x/sys/windows"
 	"unsafe"
 )
 
@@ -111,7 +111,7 @@ func (h *Handle) Unmarshal(b []byte) error {
 	}
 
 	// read handle identifier
-	h.Num = handle.Handle(bytes.ReadUint64(b[0:]))
+	h.Num = windows.Handle(bytes.ReadUint64(b[0:]))
 	// read object address
 	h.Object = bytes.ReadUint64(b[8:])
 	// read pid

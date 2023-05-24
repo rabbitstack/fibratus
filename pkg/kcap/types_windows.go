@@ -29,22 +29,22 @@ import (
 // Writer is the minimal interface that all kcap writers need to satisfy. The Windows kcap
 // file format has the layout as depicted in the following diagram:
 //
-//  +-+-+-+-+-+-+-+-++-+-+-+-+-+-+-+-++-+-+-+
-//  | Magic Number  | Major | Minor | Flags |
-//	|----------------------------------------
-//  | Handle Section |       Handles        |
-//  -----------------------------------------
-//  | Kevt Section | Kevt ..................|
-// 	| ......................................|
-//	| ......................................|
-//	| ......................................|
-//  | ........ Kevt Section n  Kevt n  EOF  |
-//  +-+-+-+-+-+-+-+-++-+-+-+-+-+-+-+-++-+-+-+
-//
+//	 +-+-+-+-+-+-+-+-++-+-+-+-+-+-+-+-++-+-+-+
+//	 | Magic Number  | Major | Minor | Flags |
+//		|----------------------------------------
+//	 | Handle Section |       Handles        |
+//	 -----------------------------------------
+//	 | Kevt Section | Kevt ..................|
+//		| ......................................|
+//		| ......................................|
+//		| ......................................|
+//	 | ........ Kevt Section n  Kevt n  EOF  |
+//	 +-+-+-+-+-+-+-+-++-+-+-+-+-+-+-+-++-+-+-+
 type Writer interface {
-	// Write accepts two channels. The event channel receives events pushed by the kstream consumer. When the event
-	// is peeked from the channel, it is serialized and written to the underlying byte buffer.
-	Write(chan *kevent.Kevent, chan error) chan error
+	// Write accepts two channels. The event channel receives events pushed by the event consumer.
+	// When the event is peeked from the channel, it is serialized and written to the underlying
+	// byte buffer.
+	Write(<-chan *kevent.Kevent, <-chan error) chan error
 	// Close disposes all resources allocated by the writer.
 	Close() error
 }
@@ -58,6 +58,6 @@ type Reader interface {
 	Close() error
 	// RecoverSnapshotters recovers the statate of the snapshotters from the kcap.
 	RecoverSnapshotters() (handle.Snapshotter, ps.Snapshotter, error)
-	// SetFilter sets the filter that's is applied to each event coming out of the kcap.
+	// SetFilter sets the filter applied to each event coming out of the kcap.
 	SetFilter(f filter.Filter)
 }

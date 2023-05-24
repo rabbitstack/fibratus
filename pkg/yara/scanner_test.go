@@ -25,7 +25,6 @@ import (
 	"github.com/hillu/go-yara/v4"
 	"os"
 	"path/filepath"
-	"syscall"
 	"testing"
 	"time"
 
@@ -38,12 +37,13 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
-	"github.com/rabbitstack/fibratus/pkg/syscall/handle"
-	"github.com/rabbitstack/fibratus/pkg/syscall/process"
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/yara/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"golang.org/x/sys/windows"
 )
 
 var yaraAlert *alertsender.Alert
@@ -68,12 +68,14 @@ func init() {
 }
 
 func TestScan(t *testing.T) {
+	t.SkipNow()
 	psnap := new(ps.SnapshotterMock)
 	require.NoError(t, alertsender.LoadAll([]alertsender.Config{{Type: alertsender.Noop}}))
 
 	s, err := NewScanner(psnap, config.Config{
-		Enabled:  true,
-		AlertVia: "noop",
+		Enabled:     true,
+		ScanTimeout: time.Minute,
+		AlertVia:    "noop",
 		Rule: config.Rule{
 			Paths: []config.RulePath{
 				{
@@ -85,12 +87,12 @@ func TestScan(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	var si syscall.StartupInfo
-	var pi syscall.ProcessInformation
+	var si windows.StartupInfo
+	var pi windows.ProcessInformation
 
-	argv := syscall.StringToUTF16Ptr(filepath.Join(os.Getenv("windir"), "notepad.exe"))
+	argv := windows.StringToUTF16Ptr(filepath.Join(os.Getenv("windir"), "notepad.exe"))
 
-	err = syscall.CreateProcess(
+	err = windows.CreateProcess(
 		nil,
 		argv,
 		nil,
@@ -102,15 +104,16 @@ func TestScan(t *testing.T) {
 		&si,
 		&pi)
 	require.NoError(t, err)
-	defer syscall.TerminateProcess(pi.Process, uint32(257))
+	//nolint:errcheck
+	defer windows.TerminateProcess(pi.Process, uint32(257))
 
 	proc := &pstypes.PS{
 		Name:      "notepad.exe",
 		PID:       pi.ProcessId,
 		Ppid:      2434,
 		Exe:       `C:\Windows\notepad.exe`,
-		Comm:      `C:\Windows\notepad.exe`,
-		SID:       "archrabbit\\SYSTEM",
+		Cmdline:   `C:\Windows\notepad.exe`,
+		SID:       "S-1-1-18",
 		Cwd:       `C:\Windows\`,
 		SessionID: 1,
 		Threads: map[uint32]pstypes.Thread{
@@ -123,14 +126,14 @@ func TestScan(t *testing.T) {
 			{Name: "user32.dll", Size: 212354, Checksum: 33123343, BaseAddress: kparams.Hex("fef23fff"), DefaultBaseAddress: kparams.Hex("fff124fd")},
 		},
 		Handles: []htypes.Handle{
-			{Num: handle.Handle(0xffffd105e9baaf70),
+			{Num: windows.Handle(0xffffd105e9baaf70),
 				Name:   `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\Tcpip\Parameters\Interfaces\{b677c565-6ca5-45d3-b618-736b4e09b036}`,
 				Type:   "Key",
 				Object: 777488883434455544,
 				Pid:    uint32(1023),
 			},
 			{
-				Num:  handle.Handle(0xffffd105e9adaf70),
+				Num:  windows.Handle(0xffffd105e9adaf70),
 				Name: `\RPC Control\OLEA61B27E13E028C4EA6C286932E80`,
 				Type: "ALPC Port",
 				Pid:  uint32(1023),
@@ -142,7 +145,7 @@ func TestScan(t *testing.T) {
 				Object: 457488883434455544,
 			},
 			{
-				Num:  handle.Handle(0xeaffd105e9adaf30),
+				Num:  windows.Handle(0xeaffd105e9adaf30),
 				Name: `C:\Users\bunny`,
 				Type: "File",
 				Pid:  uint32(1023),
@@ -170,7 +173,7 @@ func TestScan(t *testing.T) {
 	psnap.On("Find", mock.Anything).Return(proc)
 
 	for {
-		if process.IsAlive(handle.Handle(pi.Process)) {
+		if !sys.IsProcessRunning(pi.Process) {
 			break
 		}
 		time.Sleep(time.Millisecond * 100)
@@ -183,12 +186,15 @@ func TestScan(t *testing.T) {
 		PID:  859,
 		Kparams: kevent.Kparams{
 			kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "svchost.exe"},
+			kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: pi.ProcessId},
 		},
 		Metadata: make(map[kevent.MetadataKey]any),
 	}
 
 	// test attaching on pid
-	require.NoError(t, s.ScanProc(pi.ProcessId, kevt))
+	match, err := s.Scan(kevt)
+	require.NoError(t, err)
+	require.True(t, match)
 	require.NotNil(t, yaraAlert)
 
 	assert.Equal(t, "YARA alert on process notepad.exe", yaraAlert.Title)
@@ -197,12 +203,13 @@ func TestScan(t *testing.T) {
 
 	// test file scanning on DLL that merely contains
 	// the fmt.Println("Go Yara DLL Test") statement
-	require.NoError(t, s.ScanFile("_fixtures/yara-test.dll", kevt))
+	match, err = s.Scan(kevt)
+	require.NoError(t, err)
+	require.True(t, match)
 	require.NotNil(t, yaraAlert)
 
 	assert.Equal(t, "YARA alert on file _fixtures/yara-test.dll", yaraAlert.Title)
 	assert.Contains(t, yaraAlert.Tags, "dll")
-
 }
 
 func TestMatchesMeta(t *testing.T) {

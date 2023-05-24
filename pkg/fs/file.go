@@ -23,10 +23,12 @@ package fs
 
 import (
 	"expvar"
-	"github.com/rabbitstack/fibratus/pkg/syscall/file"
+	"github.com/rabbitstack/fibratus/pkg/sys"
+	"golang.org/x/sys/windows"
 	"os"
 	"path/filepath"
 	"strings"
+	"unsafe"
 )
 
 const (
@@ -59,12 +61,12 @@ func GetFileType(filename string, opts uint32) FileType {
 	// with the FILE_DIRECTORY_FILE flag, it is likely that the target file object
 	// is a directory. We ensure that by calling the API function for checking whether
 	// the path name is truly a directory
-	if (opts&directoryFile) != 0 && file.IsPathDirectory(filename) {
+	if (opts&directoryFile) != 0 && sys.PathIsDirectory(filename) {
 		return Directory
 	}
 	// FILE_DIRECTORY_FILE flag only gives us a hint on the CreateFile op outcome. If this flag is
 	// not present in the argument but the file is a directory, we can apply some simple heuristics
-	// like checking the extension/suffix, even though they are not bullet proof
+	// like checking the extension/suffix, even though they are not bullet-proof
 	if filename[:len(filename)-1] == "\\" || filepath.Ext(filename) == "" {
 		return Directory
 	}
@@ -93,14 +95,24 @@ func getFileTypeFromVolumeInfo(filename string) FileType {
 
 	queryVolumeCalls.Add(1)
 
-	dev, err := file.QueryVolumeInfo(f.Fd())
+	var (
+		iosb windows.IO_STATUS_BLOCK
+		dev  sys.FileFsDeviceInformation
+	)
+	err = sys.NtQueryVolumeInformationFile(
+		windows.Handle(f.Fd()),
+		&iosb,
+		uintptr(unsafe.Pointer(&dev)),
+		uint32(unsafe.Sizeof(dev)),
+		sys.FileFsDeviceInformationClass,
+	)
 	if err != nil {
 		return Other
 	}
 	switch dev.Type {
 	case deviceCDROM, deviceCDROMFs, deviceController,
 		deviceDatalink, deviceDFS, deviceDisk, deviceDiskFs:
-		if file.IsPathDirectory(filename) {
+		if sys.PathIsDirectory(filename) {
 			return Directory
 		}
 		return Regular

@@ -163,7 +163,6 @@ var schema = `
 				"enable-net": 		{"type": "boolean"},
 				"enable-audit-api": {"type": "boolean"},
 				"enable-antimalware-engine": {"type": "boolean"},
-				"raw-event-parsing":{"type": "boolean"},
 				"min-buffers": 		{"type": "integer", "minimum": 1, "maximum": {{ .MinBuffers }}},
 				"max-buffers": 		{"type": "integer", "minimum": 2, "maximum": {{ .MaxBuffers }}},
 				"buffer-size":		{"type": "integer", "maximum": {{ .MaxBufferSize }}},
@@ -490,15 +489,10 @@ var rulesSchema = `
 					"properties": {
 						"name": 		{"type": "string", "minLength": 3},
                         "description":  {"type": "string"},
-						"def": 			{"type": "string", "minLength": 3},
 						"condition": 	{"type": "string", "minLength": 3},
 						"action": 		{"type": "string"}
 					},
-					"oneOf": [
-						{"required": ["def"]},
-						{"required": ["condition"]}
-					],
-					"required": ["name"],
+					"required": ["name", "condition"],
 					"minItems": 1,
 					"additionalProperties": false
 				}}},
@@ -512,7 +506,6 @@ var rulesSchema = `
 		"policy":   	{"type": "string", "enum": ["include", "exclude", "INCLUDE", "EXCLUDE"]},
 		"relation": 	{"type": "string", "enum": ["or", "and", "OR", "AND"]},
 		"tags":			{"type": "array", "items": [{"type": "string", "minLength": 1}]},
-		"from-strings": {"$ref": "#rules"},
 		"rules": 		{"$ref": "#rules"},
         "labels": {
   			"type": "object",

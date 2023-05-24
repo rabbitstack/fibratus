@@ -205,7 +205,7 @@ var ruleAlertHTMLTemplate = `
                                         <p style="margin-top: 0px; font-size: 13px; color: #626567; line-height: 1.1em;">Cmdline</p>
                                       </td>
                                       <td style="padding: 5px 5px;">
-                                        <p style="margin-top: 0px; font-size: 13px; color: #74787E; line-height: 1.3em; font-weight: bold; display: inline-block; padding: 3px 5px; white-space: pre-wrap;">{{ .PS.Comm }}</p>
+                                        <p style="margin-top: 0px; font-size: 13px; color: #74787E; line-height: 1.3em; font-weight: bold; display: inline-block; padding: 3px 5px; white-space: pre-wrap;">{{ .PS.Cmdline }}</p>
                                       </td>
                                     </tr>
                                     <tr>

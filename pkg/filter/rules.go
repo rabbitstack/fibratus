@@ -31,6 +31,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/hashers"
 	"net"
 	"sort"
+	"sync"
 
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
@@ -93,10 +94,11 @@ var (
 // an action, the former is executed when the
 // rule fires.
 type Rules struct {
-	filterGroups    map[uint32]filterGroups
-	excludePolicies bool
-	config          *config.Config
-	psnap           ps.Snapshotter
+	groups     map[uint32]filterGroups
+	config     *config.Config
+	psnap      ps.Snapshotter
+	hasExclude bool // if any loaded groups have exclude policy
+	once       sync.Once
 }
 
 type filterGroup struct {
@@ -446,9 +448,9 @@ func (f compiledFilter) run(kevt *kevent.Kevent, i uint16) bool {
 
 type filterGroups []*filterGroup
 
-func (groups filterGroups) hasIncludePolicy() bool {
+func (groups filterGroups) hasPolicy(policy config.FilterGroupPolicy) bool {
 	for _, g := range groups {
-		if g.group.Policy == config.IncludePolicy {
+		if g.group.Policy == policy {
 			return true
 		}
 	}
@@ -456,7 +458,7 @@ func (groups filterGroups) hasIncludePolicy() bool {
 }
 
 func (r *Rules) isGroupMapped(scopeHash, groupHash uint32) bool {
-	for h, groups := range r.filterGroups {
+	for h, groups := range r.groups {
 		for _, g := range groups {
 			if h == scopeHash && g.group.Hash() == groupHash {
 				return true
@@ -466,59 +468,46 @@ func (r *Rules) isGroupMapped(scopeHash, groupHash uint32) bool {
 	return false
 }
 
-// NewRules produces a fresh rules instance.
-func NewRules(psnap ps.Snapshotter, c *config.Config) Rules {
-	rules := Rules{
-		filterGroups: make(map[uint32]filterGroups),
-		psnap:        psnap,
-		config:       c,
+// NewRules produces a fresh rules engine instance.
+func NewRules(psnap ps.Snapshotter, config *config.Config) *Rules {
+	rules := &Rules{
+		groups: make(map[uint32]filterGroups),
+		psnap:  psnap,
+		config: config,
 	}
 	return rules
-}
-
-func expr(c *config.FilterConfig) string {
-	if c.Condition != "" {
-		return c.Condition
-	}
-	return c.Def
 }
 
 // Compile loads macros and rule groups from all
 // indicated resources and creates the rules for
 // each filter group. It also sets up the state
-// machine transitions for sequence rule group policies.
+// machine transitions for sequence rules.
 func (r *Rules) Compile() error {
 	if err := r.config.Filters.LoadMacros(); err != nil {
 		return err
 	}
-	groups, err := r.config.Filters.LoadGroups()
-	if err != nil {
+	if err := r.config.Filters.LoadGroups(); err != nil {
 		return err
 	}
-	for _, group := range groups {
+	for _, group := range r.config.GetRuleGroups() {
 		if group.IsDisabled() {
 			log.Warnf("rule group [%s] disabled", group.Name)
 			continue
 		}
-		if group.Policy == config.ExcludePolicy {
-			r.excludePolicies = true
-		}
 		filterGroupsCount.Add(1)
 		filterGroupsCountByPolicy.Add(group.Policy.String(), 1)
-		log.Infof("loading rule group [%s] with %q policy", group.Name, group.Policy)
+
+		filters := make([]*compiledFilter, 0, len(group.Rules))
 
 		// compile filters and populate the groups. Additionally, for
 		// sequence rules we have to configure the FSM states and
 		// transitions
-		rules := append(group.Rules, group.FromStrings...)
-		filters := make([]*compiledFilter, 0, len(rules))
-
-		for _, filterConfig := range rules {
-			rule := filterConfig.Name
-			f := New(expr(filterConfig), r.config, WithPSnapshotter(r.psnap))
+		for _, rule := range group.Rules {
+			opts := []Option{WithPSnapshotter(r.psnap)}
+			f := New(rule.Condition, r.config, opts...)
 			err := f.Compile()
 			if err != nil {
-				return ErrInvalidFilter(rule, group.Name, err)
+				return ErrInvalidFilter(rule.Name, group.Name, err)
 			}
 			for _, field := range f.GetFields() {
 				deprecated, d := fields.IsDeprecated(field)
@@ -530,46 +519,19 @@ func (r *Rules) Compile() error {
 						rule, field, d.Since, d.Field, field)
 				}
 			}
-			var seqState *sequenceState
-			if f.IsSequence() {
-				seq := f.GetSequence()
-				expressions := seq.Expressions
-				if len(expressions) == 0 {
-					panic("expressions cannot be empty")
-				}
-				initialState := expressions[0].Expr.String()
-				seqState = newSequenceState(group.Name, initialState, seq.MaxSpan)
-				// setup finite state machine states. The last rule
-				// in the sequence transitions to the terminal state
-				// if all rules match
-				for i, expr := range expressions {
-					n := expr.Expr.String()
-					seqState.idxs[n] = uint16(i + 1)
-					if i >= len(expressions)-1 {
-						seqState.fsm.Configure(n).
-							Permit(matchTransition, sequenceTerminalState).
-							Permit(cancelTransition, sequenceDeadlineState).
-							Permit(expireTransition, sequenceExpiredState)
-					} else {
-						seqState.fsm.Configure(n).
-							Permit(matchTransition, expressions[i+1].Expr.String()).
-							Permit(cancelTransition, sequenceDeadlineState).
-							Permit(expireTransition, sequenceExpiredState)
-					}
-				}
-				// configure reset transitions that are triggered
-				// when the final state is reached of when a deadline
-				// or sequence expiration happens
-				seqState.fsm.Configure(sequenceTerminalState).Permit(resetTransition, initialState)
-				seqState.fsm.Configure(sequenceDeadlineState).Permit(resetTransition, initialState)
-				seqState.fsm.Configure(sequenceExpiredState).Permit(resetTransition, initialState)
-			}
 			filtersCount.Add(1)
-			filters = append(filters, newCompiledFilter(f, filterConfig, seqState))
+			filters = append(
+				filters,
+				newCompiledFilter(f, rule, configureFSM(group, f)),
+			)
 		}
 
 		g := newFilterGroup(group, filters)
-		log.Infof("compiled rule group [%s] with %d rule(s)", group.Name, len(filters))
+		log.Infof("loaded rule group [%s] with %q policy type. "+
+			"Number of rules: %d",
+			group.Name,
+			group.Policy,
+			len(filters))
 
 		// traverse all filters in the groups and determine
 		// the event type from the filter field name expression.
@@ -578,9 +540,11 @@ func (r *Rules) Compile() error {
 		// for the inbound event
 		for _, f := range filters {
 			if !f.isScoped() {
-				log.Warnf("%q rule in %q group doesn't have event type or event category condition! "+
-					"This may lead to rule being discarded by the engine. Please consider "+
-					"narrowing the scope of this rule by including the `kevt.name` "+
+				log.Warnf("%q rule in %q group doesn't have "+
+					"event type or event category condition! "+
+					"This may lead to rule being discarded by "+
+					"the engine. Please consider narrowing the "+
+					"scope of this rule by including the `kevt.name` "+
 					"or `kevt.category` condition",
 					f.config.Name, g.group.Name)
 				continue
@@ -592,7 +556,7 @@ func (r *Rules) Compile() error {
 						if r.isGroupMapped(hash, g.group.Hash()) {
 							continue
 						}
-						r.filterGroups[hash] = append(r.filterGroups[hash], g)
+						r.groups[hash] = append(r.groups[hash], g)
 					}
 				}
 			}
@@ -601,49 +565,108 @@ func (r *Rules) Compile() error {
 	return nil
 }
 
+func configureFSM(group config.FilterGroup, f Filter) *sequenceState {
+	if !f.IsSequence() {
+		return nil
+	}
+	seq := f.GetSequence()
+	expressions := seq.Expressions
+	if len(expressions) == 0 {
+		return nil
+	}
+	initialState := expressions[0].Expr.String()
+	seqState := newSequenceState(group.Name, initialState, seq.MaxSpan)
+	// setup finite state machine states. The last rule
+	// in the sequence transitions to the terminal state
+	// if all rules match
+	for i, expr := range expressions {
+		n := expr.Expr.String()
+		seqState.idxs[n] = uint16(i + 1)
+		if i >= len(expressions)-1 {
+			seqState.fsm.
+				Configure(n).
+				Permit(matchTransition, sequenceTerminalState).
+				Permit(cancelTransition, sequenceDeadlineState).
+				Permit(expireTransition, sequenceExpiredState)
+		} else {
+			seqState.fsm.
+				Configure(n).
+				Permit(matchTransition, expressions[i+1].Expr.String()).
+				Permit(cancelTransition, sequenceDeadlineState).
+				Permit(expireTransition, sequenceExpiredState)
+		}
+	}
+	// configure reset transitions that are triggered
+	// when the final state is reached of when a deadline
+	// or sequence expiration happens
+	seqState.fsm.
+		Configure(sequenceTerminalState).
+		Permit(resetTransition, initialState)
+	seqState.fsm.
+		Configure(sequenceDeadlineState).
+		Permit(resetTransition, initialState)
+	seqState.fsm.
+		Configure(sequenceExpiredState).
+		Permit(resetTransition, initialState)
+	return seqState
+}
+
 func (r *Rules) findGroups(kevt *kevent.Kevent) filterGroups {
-	groups1 := r.filterGroups[kevt.Type.Hash()]
-	groups2 := r.filterGroups[kevt.Category.Hash()]
+	groups1 := r.groups[kevt.Type.Hash()]
+	groups2 := r.groups[kevt.Category.Hash()]
 	if groups1 == nil && groups2 == nil {
 		return nil
 	}
 	return append(groups1, groups2...)
 }
 
-func (r *Rules) Fire(kevt *kevent.Kevent) bool {
-	// no rules were loaded into the engine in
-	// which the event is forwarded to the aggregator
-	// unless the CLI filter decides otherwise
-	if len(r.filterGroups) == 0 {
-		return true
+func (r *Rules) hasExcludeGroups() bool {
+	r.once.Do(func() {
+		for _, g := range r.groups {
+			if g.hasPolicy(config.ExcludePolicy) {
+				r.hasExclude = true
+			}
+		}
+	})
+	return r.hasExclude
+}
+
+func (r *Rules) ProcessEvent(evt *kevent.Kevent) (bool, error) {
+	// if no rules were loaded into the engine
+	// the event is forwarded to the aggregator
+	if len(r.groups) == 0 {
+		return true, nil
 	}
 	// find rule groups for a particular event type
-	// or category. If no rule groups are found we
-	// drop the event
-	groups := r.findGroups(kevt)
+	// or category. If no rule groups are found the
+	// event is rejected from the aggregator batch
+	groups := r.findGroups(evt)
 	if len(groups) == 0 {
-		return false
+		return false, nil
 	}
-	// exclude policies take precedence over
-	// groups with include policies, so we first
-	// evaluate those. If no filter matches occur,
-	// we let pass the event but only if there are
-	// no groups with include policy
-	if r.excludePolicies {
-		if r.runRules(groups, config.ExcludePolicy, kevt) {
-			return false
+	// exclude policies take precedence over groups
+	// with include policies, and so we first must
+	// evaluate exclude groups. If no rule matches
+	// happen, the event is dropped unless groups
+	// with include exist
+	if r.hasExcludeGroups() {
+		if r.runRules(groups, config.ExcludePolicy, evt) {
+			return false, nil
 		}
-		if !groups.hasIncludePolicy() {
-			return true
+		if !groups.hasPolicy(config.IncludePolicy) {
+			return true, nil
 		}
 	}
 	// run include policy rules. At this point none of
 	// the groups with exclude policies got matched
-	return r.runRules(groups, config.IncludePolicy, kevt)
+	return r.runRules(groups, config.IncludePolicy, evt), nil
 }
 
 func (r *Rules) runSequence(kevt *kevent.Kevent, f *compiledFilter) bool {
 	seq := f.filter.GetSequence()
+	if seq == nil {
+		return false
+	}
 	for i, expr := range seq.Expressions {
 		// only try to evaluate the expression
 		// if upstream expressions have matched
@@ -657,7 +680,7 @@ func (r *Rules) runSequence(kevt *kevent.Kevent, f *compiledFilter) bool {
 		}
 		rule := expr.Expr.String()
 		matches := f.run(kevt, uint16(i))
-		log.Debugf("[%s] = %t", rule, matches)
+		log.Debugf("sequence expression [%s] = %t", rule, matches)
 		// append the partial and transition state machine
 		if matches && f.ss.isAfter(rule, kevt) {
 			f.ss.addPartial(rule, kevt)

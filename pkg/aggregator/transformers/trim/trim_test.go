@@ -54,7 +54,7 @@ func TestTransform(t *testing.T) {
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barz"},
 	}
 
-	transf, err := transformers.Load(transformers.Config{Type: transformers.Trim, Transformer: Config{Prefixes: []Trim{{Name: "file_name", Trim: "\\Device"}}, Suffixes: []Trim{{Name: "operation", Trim: "if"}}}})
+	transf, err := transformers.Load(transformers.Config{Type: transformers.Trim, Transformer: Config{Prefixes: []Trim{{Name: "file_name", Trim: "\\Device"}}, Suffixes: []Trim{{Name: "create_disposition", Trim: "if"}}}})
 	require.NoError(t, err)
 
 	require.NoError(t, transf.Transform(kevt))

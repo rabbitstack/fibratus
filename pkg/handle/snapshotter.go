@@ -24,6 +24,8 @@ package handle
 import (
 	"expvar"
 	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/sys"
+	"golang.org/x/sys/windows"
 	"os"
 	"strconv"
 	"sync"
@@ -31,27 +33,18 @@ import (
 	"unsafe"
 
 	"github.com/rabbitstack/fibratus/pkg/config"
-	errs "github.com/rabbitstack/fibratus/pkg/errors"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-	"github.com/rabbitstack/fibratus/pkg/syscall/handle"
-	"github.com/rabbitstack/fibratus/pkg/syscall/object"
-	"github.com/rabbitstack/fibratus/pkg/syscall/process"
-	"github.com/rabbitstack/fibratus/pkg/syscall/sys"
 	log "github.com/sirupsen/logrus"
 )
 
 var (
-	globalBufferSize = 4096
-	bufferSize       = 1024
+	globalBufferSize uint32 = 4096
 
 	handleNameQueryFailures = expvar.NewMap("handle.name.query.failures")
 	handleSnapshotCount     = expvar.NewInt("handle.snapshot.count")
 	handleSnapshotBytes     = expvar.NewInt("handle.snapshot.bytes")
-
-	currentPid = uint32(os.Getpid())
 )
 
 const (
@@ -65,10 +58,10 @@ const (
 type CreateCallback func(pid uint32, handle htypes.Handle)
 
 // DestroyCallback defines the function signature that is fired upon handle's destruction
-type DestroyCallback func(pid uint32, num handle.Handle)
+type DestroyCallback func(pid uint32, rawHandle windows.Handle)
 
 // SnapshotBuildCompleted is the function type for snapshot completed signal
-type SnapshotBuildCompleted func(total uint64, withName uint64)
+type SnapshotBuildCompleted func(total uint64, named uint64)
 
 // Snapshotter keeps the system-wide snapshot of allocated handles always when handle kernel events are enabled or
 // supported on the target system. It also provides facilities for obtaining a list of handles pertaining to the specific
@@ -90,10 +83,12 @@ type Snapshotter interface {
 	RegisterDestroyCallback(fn DestroyCallback)
 	// GetSnapshot returns all the handles present in the snapshotter state.
 	GetSnapshot() []htypes.Handle
+	// Close closes snapshotter and disposes all allocated resources.
+	Close() error
 }
 
 type snapshotter struct {
-	sync.Mutex
+	mu                     sync.Mutex
 	handlesByObject        map[uint64]htypes.Handle
 	hc                     chan htypes.Handle
 	hdone                  chan struct{}
@@ -101,7 +96,6 @@ type snapshotter struct {
 	snapshotBuildCompleted SnapshotBuildCompleted
 	createCallback         CreateCallback
 	destroyCallback        DestroyCallback
-	store                  ObjectTypeStore
 	housekeepTick          *time.Ticker
 	initSnap               bool
 	capture                bool
@@ -116,7 +110,6 @@ func NewSnapshotter(config *config.Config, fn SnapshotBuildCompleted) Snapshotte
 		handlesByObject:        make(map[uint64]htypes.Handle),
 		snapshotBuildCompleted: fn,
 		config:                 config,
-		store:                  NewObjectTypeStore(),
 		housekeepTick:          time.NewTicker(time.Minute),
 		initSnap:               config.InitHandleSnapshot,
 	}
@@ -136,19 +129,19 @@ func NewSnapshotter(config *config.Config, fn SnapshotBuildCompleted) Snapshotte
 
 // NewFromKcap builds the handle snapshotter from kcap state.
 func NewFromKcap(handles []htypes.Handle) Snapshotter {
-	handlesByObject := make(map[uint64]htypes.Handle)
-	for _, h := range handles {
-		handlesByObject[h.Object] = h
-	}
-	return &snapshotter{
-		handlesByObject: handlesByObject,
+	s := &snapshotter{
+		handlesByObject: make(map[uint64]htypes.Handle),
 		capture:         true,
 	}
+	for _, handle := range handles {
+		s.handlesByObject[handle.Object] = handle
+	}
+	return s
 }
 
 func (s *snapshotter) FindByObject(object uint64) (htypes.Handle, bool) {
-	s.Lock()
-	defer s.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if h, ok := s.handlesByObject[object]; ok {
 		return h, ok
 	}
@@ -156,13 +149,13 @@ func (s *snapshotter) FindByObject(object uint64) (htypes.Handle, bool) {
 }
 
 func (s *snapshotter) FindHandles(pid uint32) ([]htypes.Handle, error) {
-	if pid == currentPid || pid == 0 { // ignore current and idle processes
+	if pid == uint32(os.Getpid()) || pid == 0 { // ignore current, idle processes
 		return []htypes.Handle{}, nil
 	}
 	if s.capture {
 		handles := make([]htypes.Handle, 0)
-		s.Lock()
-		defer s.Unlock()
+		s.mu.Lock()
+		defer s.mu.Unlock()
 		for _, h := range s.handlesByObject {
 			if h.Pid == pid {
 				handles = append(handles, h)
@@ -170,14 +163,14 @@ func (s *snapshotter) FindHandles(pid uint32) ([]htypes.Handle, error) {
 		}
 		return handles, nil
 	}
-	ps, err := process.Open(process.QueryInformation, false, pid)
+	process, err := windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION, false, pid)
 	if err != nil {
-		// trying to obtain the handle with `QueryInformation` access on a protected
+		// trying to obtain the handle with `PROCESS_QUERY_INFORMATION` access on a protected
 		// process will always fail, so our best effort is to collect handles for those
 		// processes in the snapshot's state
 		handles := make([]htypes.Handle, 0)
-		s.Lock()
-		defer s.Unlock()
+		s.mu.Lock()
+		defer s.mu.Unlock()
 		for _, h := range s.handlesByObject {
 			if h.Pid == pid && h.Type != "" {
 				handles = append(handles, h)
@@ -185,18 +178,16 @@ func (s *snapshotter) FindHandles(pid uint32) ([]htypes.Handle, error) {
 		}
 		return handles, nil
 	}
-	defer ps.Close()
-	buf := make([]byte, bufferSize)
-	n, err := process.QueryInfo(ps, process.HandleInformationClass, buf)
-	if err == errs.ErrNeedsReallocateBuffer {
-		buf = make([]byte, n)
-		_, err = process.QueryInfo(ps, process.HandleInformationClass, buf)
-	}
+	//nolint:errcheck
+	defer windows.CloseHandle(process)
+
+	snapshot, err := sys.QueryInformationProcess[sys.ProcessHandleSnapshotInformation](process, windows.ProcessHandleInformation)
 	if err != nil {
+		if err.Error() == "An attempt was made to access an exiting process." {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("unable to query handles for process id %d: %v", pid, err)
 	}
-
-	snapshot := (*object.ProcessHandleSnapshotInformation)(unsafe.Pointer(&buf[0]))
 
 	// enumerate process's handles and try to resolve
 	// the type and the name of each allocated handle
@@ -207,20 +198,20 @@ func (s *snapshotter) FindHandles(pid uint32) ([]htypes.Handle, error) {
 			"Shrinking table size from %d to %d handles", pid, count, maxHandlesPerProc)
 		count = maxHandlesPerProc
 	}
-	sysHandles := (*[1 << 30]object.ProcessHandleTableEntryInfo)(unsafe.Pointer(&snapshot.Handles[0]))[:count:count]
+	sysHandles := (*[1 << 30]sys.ProcessHandleTableEntryInfo)(unsafe.Pointer(&snapshot.Handles[0]))[:count:count]
 
-	for _, sh := range sysHandles {
-		h, err := s.getHandle(sh.Handle, 0, uint8(sh.ObjectTypeIndex), pid, false)
+	for _, sysHandle := range sysHandles {
+		h, err := s.getHandle(sysHandle.Handle, 0, uint16(sysHandle.ObjectTypeIndex), pid, false)
 		if err != nil {
 			continue
 		}
-		// ignore file handles since we can't get the file name...
+		// ignore file handles since we can't get the
+		// file name. Also, only collect named handles
 		if h.Type == File && h.Name == "" {
 			continue
 		}
 		handles = append(handles, h)
 	}
-
 	return handles, nil
 }
 
@@ -229,31 +220,31 @@ func (s *snapshotter) initSnapshot() {
 	size := globalBufferSize
 	buf := make([]byte, size)
 	for {
-		_, err := sys.QuerySystemInformation(object.SystemExtendedHandleInformation, buf)
-		if err == errs.ErrNeedsReallocateBuffer {
+		err := windows.NtQuerySystemInformation(windows.SystemExtendedHandleInformation, unsafe.Pointer(&buf[0]), size, nil)
+		if err == windows.STATUS_INFO_LENGTH_MISMATCH || err == windows.STATUS_BUFFER_TOO_SMALL || err == windows.STATUS_BUFFER_OVERFLOW {
 			size *= 2
 			buf = make([]byte, size)
 		} else if err == nil {
-			sysHandleInfo := (*object.SystemHandleInformationEx)(unsafe.Pointer(&buf[0]))
+			sysHandleInfo := (*sys.SystemHandleInformationEx)(unsafe.Pointer(&buf[0]))
 			count := int(sysHandleInfo.NumberOfHandles)
 			if count > maxProcHandles {
 				log.Warnf("handle snapshotter size exceeded. Shrinking from %d to %d handles", count, maxProcHandles)
 				count = maxProcHandles
 			}
-			sysHandles := (*[1 << 30]object.SystemHandleTableEntryInfoEx)(unsafe.Pointer(&sysHandleInfo.Handles[0]))[:count:count]
+			sysHandles := (*[1 << 30]sys.SystemHandleTableEntryInfoEx)(unsafe.Pointer(&sysHandleInfo.Handles[0]))[:count:count]
 
 			// iterate through available handles to get extended info
 			// and send handle structure instances to the channel
 			for _, sysHandle := range sysHandles {
 				pid := sysHandle.ProcessID
-				if pid == uintptr(currentPid) {
+				if pid == uintptr(os.Getpid()) {
 					continue
 				}
-				h, err := s.getHandle(sysHandle.Handle, sysHandle.Object, sysHandle.ObjectTypeIndex, uint32(pid), true)
-				if err != nil || h.Type == "" {
+				handle, err := s.getHandle(sysHandle.Handle, sysHandle.Object, sysHandle.ObjectTypeIndex, uint32(pid), true)
+				if err != nil || handle.Type == "" {
 					continue
 				}
-				s.hc <- h
+				s.hc <- handle
 			}
 			s.hdone <- struct{}{}
 			break
@@ -264,81 +255,83 @@ func (s *snapshotter) initSnapshot() {
 	}
 }
 
-func (s *snapshotter) getHandle(rawHandle handle.Handle, obj uint64, typeIndex uint8, pid uint32, withTimeout bool) (htypes.Handle, error) {
-	typ := s.store.FindByID(typeIndex)
+func (s *snapshotter) getHandle(rawHandle windows.Handle, obj uint64, typeIndex uint16, pid uint32, withTimeout bool) (htypes.Handle, error) {
+	typ := htypes.ConvertTypeIDToName(typeIndex)
 	if typ == "" {
-		dup, err := Duplicate(rawHandle, pid, handle.AllAccess)
+		dup, err := Duplicate(rawHandle, pid, windows.GENERIC_ALL)
 		if err != nil {
 			return htypes.Handle{Num: rawHandle, Object: obj}, nil
 		}
-		defer dup.Close()
-		typ, err = QueryType(dup)
+		typ, err = QueryObjectType(dup)
 		if err != nil {
 			return htypes.Handle{Num: rawHandle, Object: obj}, nil
 		}
 	}
-	h := htypes.Handle{
+	handle := htypes.Handle{
 		Num:    rawHandle,
 		Object: obj,
 		Type:   typ,
 		Pid:    pid,
 	}
+	// IoCompletion handles shouldn't be duplicated
+	if handle.Type == IoCompletion {
+		return handle, nil
+	}
 	// use the required duplicate access to query handle name
-	var dupAccess handle.DuplicateAccess
+	var dupAccess uint32
 	switch typ {
 	case ALPCPort:
-		dupAccess = handle.ReadControlAccess
+		dupAccess = windows.READ_CONTROL
 	case Process:
-		dupAccess = handle.ProcessQueryAccess
+		dupAccess = windows.PROCESS_QUERY_INFORMATION
 	case Mutant:
-		dupAccess = handle.SemaQueryAccess
-	default:
-		dupAccess = handle.AllAccess
+		dupAccess = windows.SEMAPHORE_ALL_ACCESS
 	}
 	dup, err := Duplicate(rawHandle, pid, dupAccess)
 	if err != nil {
-		return h, err
+		return handle, err
 	}
-	defer dup.Close()
-	h.Name, h.MD, err = QueryName(dup, typ, withTimeout)
+	//nolint:errcheck
+	defer windows.CloseHandle(dup)
+	handle.Name, handle.MD, err = QueryName(dup, typ, withTimeout)
 	if err != nil {
 		// even though we weren't able to query handle name we still
 		// return handle info with handle type and other metadata
 		handleNameQueryFailures.Add(strconv.Itoa(int(pid)), 1)
-		return h, nil
+		return handle, nil
 	}
-	return h, nil
+	return handle, nil
 }
 
 func (s *snapshotter) consumeHandles() {
 	for {
 		select {
 		case h := <-s.hc:
-			s.Lock()
+			s.mu.Lock()
 			handleSnapshotCount.Add(1)
 			handleSnapshotBytes.Add(int64(h.Len()))
 			s.handlesByObject[h.Object] = h
-			s.Unlock()
+			s.mu.Unlock()
 		case <-s.hdone:
 			log.Debug("initial handle enumeration has finalized")
-			s.Lock()
-			var withName uint64
+			s.mu.Lock()
+			var named uint64
 			for _, h := range s.handlesByObject {
 				if h.Name != "" {
-					withName++
+					named++
 				}
 				if s.createCallback != nil && h.Type == File {
 					// for safety reasons related to deadlocks we are skipping file handles
-					// for Enum/Create process events, we'll send these handles after initial
+					// for Rundown/Create process events, we'll send these handles after initial
 					// system-wide scan has completed
 					if h.Name != "" {
 						s.createCallback(h.Pid, h)
 					}
 				}
 			}
-			s.Unlock()
+			s.mu.Unlock()
 			if s.snapshotBuildCompleted != nil {
-				s.snapshotBuildCompleted(uint64(len(s.handlesByObject)), withName)
+				s.snapshotBuildCompleted(uint64(len(s.handlesByObject)), named)
 			}
 			return
 		}
@@ -353,28 +346,28 @@ func (s *snapshotter) housekeeping() {
 		buf := make([]byte, size)
 	loop:
 		for {
-			_, err := sys.QuerySystemInformation(object.SystemExtendedHandleInformation, buf)
-			if err == errs.ErrNeedsReallocateBuffer {
+			err := windows.NtQuerySystemInformation(windows.SystemExtendedHandleInformation, unsafe.Pointer(&buf[0]), size, nil)
+			if err == windows.STATUS_INFO_LENGTH_MISMATCH || err == windows.STATUS_BUFFER_TOO_SMALL || err == windows.STATUS_BUFFER_OVERFLOW {
 				size *= 2
 				buf = make([]byte, size)
 			} else if err == nil {
-				sysHandleInfo := (*object.SystemHandleInformationEx)(unsafe.Pointer(&buf[0]))
+				sysHandleInfo := (*sys.SystemHandleInformationEx)(unsafe.Pointer(&buf[0]))
 				count := int(sysHandleInfo.NumberOfHandles)
 				if count > maxProcHandles {
 					log.Warnf("handle snapshotter size exceeded. Shrinking from %d to %d handles", count, maxProcHandles)
 					count = maxProcHandles
 				}
-				sysHandles := (*[1 << 30]object.SystemHandleTableEntryInfoEx)(unsafe.Pointer(&sysHandleInfo.Handles[0]))[:count:count]
+				sysHandles := (*[1 << 30]sys.SystemHandleTableEntryInfoEx)(unsafe.Pointer(&sysHandleInfo.Handles[0]))[:count:count]
 
-				s.Lock()
+				s.mu.Lock()
 				for _, sysHandle := range sysHandles {
-					if h, ok := s.handlesByObject[sysHandle.Object]; !ok {
+					if handle, ok := s.handlesByObject[sysHandle.Object]; !ok {
 						handleSnapshotCount.Add(-1)
-						handleSnapshotBytes.Add(-int64(h.Len()))
+						handleSnapshotBytes.Add(-int64(handle.Len()))
 						delete(s.handlesByObject, sysHandle.Object)
 					}
 				}
-				s.Unlock()
+				s.mu.Unlock()
 
 				break loop
 			} else {
@@ -401,39 +394,46 @@ func (s *snapshotter) GetSnapshot() []htypes.Handle {
 	return handles
 }
 
-func (s *snapshotter) Write(kevt *kevent.Kevent) error {
-	if kevt.Type != ktypes.CreateHandle {
-		return fmt.Errorf("expected CreateHandle kernel event but got %s", kevt.Type)
+func (s *snapshotter) Write(e *kevent.Kevent) error {
+	if !e.IsCreateHandle() {
+		return fmt.Errorf("expected CreateHandle event but got %s", e.Type)
 	}
-	h := unwrapHandle(kevt)
-	obj, err := kevt.Kparams.TryGetHexAsUint64(kparams.HandleObject)
+	h := unwrapHandle(e)
+	obj, err := e.Kparams.GetUint64(kparams.HandleObject)
 	if err != nil {
 		return err
 	}
-	s.Lock()
+	s.mu.Lock()
 	s.handlesByObject[obj] = h
-	s.Unlock()
+	s.mu.Unlock()
 	return nil
 }
 
-func (s *snapshotter) Remove(kevt *kevent.Kevent) error {
-	if kevt.Type != ktypes.CloseHandle {
-		return fmt.Errorf("expected CloseHandle kernel event but got %s", kevt.Type)
+func (s *snapshotter) Remove(e *kevent.Kevent) error {
+	if !e.IsCloseHandle() {
+		return fmt.Errorf("expected CloseHandle event but got %s", e.Type)
 	}
-	obj, err := kevt.Kparams.TryGetHexAsUint64(kparams.HandleObject)
+	obj, err := e.Kparams.GetUint64(kparams.HandleObject)
 	if err != nil {
 		return err
 	}
-	s.Lock()
+	s.mu.Lock()
 	delete(s.handlesByObject, obj)
-	s.Unlock()
+	s.mu.Unlock()
 	return nil
 }
 
-func unwrapHandle(kevt *kevent.Kevent) htypes.Handle {
+func (s *snapshotter) Close() error {
+	if s.housekeepTick != nil {
+		s.housekeepTick.Stop()
+	}
+	return nil
+}
+
+func unwrapHandle(e *kevent.Kevent) htypes.Handle {
 	h := htypes.Handle{}
-	h.Type, _ = kevt.Kparams.GetString(kparams.HandleObjectTypeName)
-	h.Object, _ = kevt.Kparams.GetHexAsUint64(kparams.HandleObject)
-	h.Name, _ = kevt.Kparams.GetString(kparams.HandleObjectName)
+	h.Type = e.GetParamAsString(kparams.HandleObjectTypeID)
+	h.Object, _ = e.Kparams.GetUint64(kparams.HandleObject)
+	h.Name, _ = e.Kparams.GetString(kparams.HandleObjectName)
 	return h
 }

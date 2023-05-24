@@ -20,10 +20,12 @@ package types
 
 import (
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
+	"golang.org/x/sys/windows"
+
 	"github.com/rabbitstack/fibratus/pkg/kcap/section"
 	kcapver "github.com/rabbitstack/fibratus/pkg/kcap/version"
 	"github.com/rabbitstack/fibratus/pkg/pe"
-	"github.com/rabbitstack/fibratus/pkg/syscall/handle"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"testing"
@@ -37,7 +39,7 @@ func TestPSMarshaler(t *testing.T) {
 		Ppid:      6304,
 		Name:      "firefox.exe",
 		Exe:       `C:\Program Files\Mozilla Firefox\firefox.exe`,
-		Comm:      `C:\Program Files\Mozilla Firefox\firefox.exe -contentproc --channel="6304.3.1055809391\1014207667" -childID 1 -isForBrowser -prefsHandle 2584 -prefMapHandle 2580 -prefsLen 70 -prefMapSize 216993 -parentBuildID 20200107212822 -greomni "C:\Program Files\Mozilla Firefox\omni.ja" -appomni "C:\Program Files\Mozilla Firefox\browser\omni.ja" -appdir "C:\Program Files\Mozilla Firefox\browser" - 6304 "\\.\pipe\gecko-crash-server-pipe.6304" 2596 tab`,
+		Cmdline:   `C:\Program Files\Mozilla Firefox\firefox.exe -contentproc --channel="6304.3.1055809391\1014207667" -childID 1 -isForBrowser -prefsHandle 2584 -prefMapHandle 2580 -prefsLen 70 -prefMapSize 216993 -parentBuildID 20200107212822 -greomni "C:\Program Files\Mozilla Firefox\omni.ja" -appomni "C:\Program Files\Mozilla Firefox\browser\omni.ja" -appdir "C:\Program Files\Mozilla Firefox\browser" - 6304 "\\.\pipe\gecko-crash-server-pipe.6304" 2596 tab`,
 		Cwd:       `C:\Program Files\Mozilla Firefox\`,
 		SID:       "archrabbit\\SYSTEM",
 		Args:      []string{"-contentproc", `--channel="6304.3.1055809391\1014207667`, "-childID", "1", "-isForBrowser", "-prefsHandle", "2584", "-prefMapHandle", "2580", "-prefsLen", "70", "-prefMapSize", "216993", "-parentBuildID"},
@@ -46,14 +48,14 @@ func TestPSMarshaler(t *testing.T) {
 		uuid:      123456789,
 		StartTime: n,
 		Handles: []htypes.Handle{
-			{Num: handle.Handle(0xffffd105e9baaf70),
+			{Num: windows.Handle(0xffffd105e9baaf70),
 				Name:   `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\Tcpip\Parameters\Interfaces\{b677c565-6ca5-45d3-b618-736b4e09b036}`,
 				Type:   "Key",
 				Object: 777488883434455544,
 				Pid:    uint32(1023),
 			},
 			{
-				Num:  handle.Handle(0xffffd105e9adaf70),
+				Num:  windows.Handle(0xffffd105e9adaf70),
 				Name: `\RPC Control\OLEA61B27E13E028C4EA6C286932E80`,
 				Type: "ALPC Port",
 				Pid:  uint32(1023),
@@ -65,7 +67,7 @@ func TestPSMarshaler(t *testing.T) {
 				Object: 457488883434455544,
 			},
 			{
-				Num:  handle.Handle(0xeaffd105e9adaf30),
+				Num:  windows.Handle(0xeaffd105e9adaf30),
 				Name: `C:\Users\bunny`,
 				Type: "File",
 				Pid:  uint32(1023),
@@ -78,7 +80,7 @@ func TestPSMarshaler(t *testing.T) {
 	}
 
 	b := ps.Marshal()
-	sec := section.New(section.Process, kcapver.ProcessSecV2, 0, 0)
+	sec := section.New(section.Process, kcapver.ProcessSecV3, 0, 0)
 	clone, err := NewFromKcap(b, sec)
 	require.NoError(t, err)
 
@@ -88,11 +90,11 @@ func TestPSMarshaler(t *testing.T) {
 	assert.Equal(t, uint64(123456789), clone.uuid)
 	assert.True(t, n.Equal(clone.StartTime))
 	assert.Equal(t, `C:\Program Files\Mozilla Firefox\firefox.exe`, clone.Exe)
-	assert.Equal(t, `C:\Program Files\Mozilla Firefox\firefox.exe -contentproc --channel="6304.3.1055809391\1014207667" -childID 1 -isForBrowser -prefsHandle 2584 -prefMapHandle 2580 -prefsLen 70 -prefMapSize 216993 -parentBuildID 20200107212822 -greomni "C:\Program Files\Mozilla Firefox\omni.ja" -appomni "C:\Program Files\Mozilla Firefox\browser\omni.ja" -appdir "C:\Program Files\Mozilla Firefox\browser" - 6304 "\\.\pipe\gecko-crash-server-pipe.6304" 2596 tab`, clone.Comm)
+	assert.Equal(t, `C:\Program Files\Mozilla Firefox\firefox.exe -contentproc --channel="6304.3.1055809391\1014207667" -childID 1 -isForBrowser -prefsHandle 2584 -prefMapHandle 2580 -prefsLen 70 -prefMapSize 216993 -parentBuildID 20200107212822 -greomni "C:\Program Files\Mozilla Firefox\omni.ja" -appomni "C:\Program Files\Mozilla Firefox\browser\omni.ja" -appdir "C:\Program Files\Mozilla Firefox\browser" - 6304 "\\.\pipe\gecko-crash-server-pipe.6304" 2596 tab`, clone.Cmdline)
 	assert.Equal(t, `C:\Program Files\Mozilla Firefox\`, clone.Cwd)
 	assert.Equal(t, "archrabbit\\SYSTEM", clone.SID)
 	assert.Equal(t, []string{"-contentproc", `--channel="6304.3.1055809391\1014207667`, "-childID", "1", "-isForBrowser", "-prefsHandle", "2584", "-prefMapHandle", "2580", "-prefsLen", "70", "-prefMapSize", "216993", "-parentBuildID"}, clone.Args)
-	assert.Equal(t, uint8(4), clone.SessionID)
+	assert.Equal(t, uint32(4), clone.SessionID)
 	assert.Equal(t, map[string]string{"ProgramData": "C:\\ProgramData", "COMPUTRENAME": "archrabbit"}, clone.Envs)
 
 	require.Len(t, clone.Handles, 3)
@@ -127,7 +129,7 @@ func TestPSMarshalerWithPE(t *testing.T) {
 		Ppid:      6304,
 		Name:      "firefox.exe",
 		Exe:       `C:\Program Files\Mozilla Firefox\firefox.exe`,
-		Comm:      `C:\Program Files\Mozilla Firefox\firefox.exe -contentproc --channel="6304.3.1055809391\1014207667" -childID 1 -isForBrowser -prefsHandle 2584 -prefMapHandle 2580 -prefsLen 70 -prefMapSize 216993 -parentBuildID 20200107212822 -greomni "C:\Program Files\Mozilla Firefox\omni.ja" -appomni "C:\Program Files\Mozilla Firefox\browser\omni.ja" -appdir "C:\Program Files\Mozilla Firefox\browser" - 6304 "\\.\pipe\gecko-crash-server-pipe.6304" 2596 tab`,
+		Cmdline:   `C:\Program Files\Mozilla Firefox\firefox.exe -contentproc --channel="6304.3.1055809391\1014207667" -childID 1 -isForBrowser -prefsHandle 2584 -prefMapHandle 2580 -prefsLen 70 -prefMapSize 216993 -parentBuildID 20200107212822 -greomni "C:\Program Files\Mozilla Firefox\omni.ja" -appomni "C:\Program Files\Mozilla Firefox\browser\omni.ja" -appdir "C:\Program Files\Mozilla Firefox\browser" - 6304 "\\.\pipe\gecko-crash-server-pipe.6304" 2596 tab`,
 		Cwd:       `C:\Program Files\Mozilla Firefox\`,
 		SID:       "archrabbit\\SYSTEM",
 		Args:      []string{"-contentproc", `--channel="6304.3.1055809391\1014207667`, "-childID", "1", "-isForBrowser", "-prefsHandle", "2584", "-prefMapHandle", "2580", "-prefsLen", "70", "-prefMapSize", "216993", "-parentBuildID"},
@@ -137,14 +139,14 @@ func TestPSMarshalerWithPE(t *testing.T) {
 		StartTime: n,
 		PE:        p,
 		Handles: []htypes.Handle{
-			{Num: handle.Handle(0xffffd105e9baaf70),
+			{Num: windows.Handle(0xffffd105e9baaf70),
 				Name:   `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\Tcpip\Parameters\Interfaces\{b677c565-6ca5-45d3-b618-736b4e09b036}`,
 				Type:   "Key",
 				Object: 777488883434455544,
 				Pid:    uint32(1023),
 			},
 			{
-				Num:  handle.Handle(0xffffd105e9adaf70),
+				Num:  windows.Handle(0xffffd105e9adaf70),
 				Name: `\RPC Control\OLEA61B27E13E028C4EA6C286932E80`,
 				Type: "ALPC Port",
 				Pid:  uint32(1023),
@@ -156,7 +158,7 @@ func TestPSMarshalerWithPE(t *testing.T) {
 				Object: 457488883434455544,
 			},
 			{
-				Num:  handle.Handle(0xeaffd105e9adaf30),
+				Num:  windows.Handle(0xeaffd105e9adaf30),
 				Name: `C:\Users\bunny`,
 				Type: "File",
 				Pid:  uint32(1023),
@@ -169,7 +171,7 @@ func TestPSMarshalerWithPE(t *testing.T) {
 	}
 
 	b := ps.Marshal()
-	sec := section.New(section.Process, kcapver.ProcessSecV2, 0, 0)
+	sec := section.New(section.Process, kcapver.ProcessSecV3, 0, 0)
 	clone, err := NewFromKcap(b, sec)
 	require.NoError(t, err)
 
@@ -179,11 +181,11 @@ func TestPSMarshalerWithPE(t *testing.T) {
 	assert.Equal(t, uint64(123456789), clone.uuid)
 	assert.True(t, n.Equal(clone.StartTime))
 	assert.Equal(t, `C:\Program Files\Mozilla Firefox\firefox.exe`, clone.Exe)
-	assert.Equal(t, `C:\Program Files\Mozilla Firefox\firefox.exe -contentproc --channel="6304.3.1055809391\1014207667" -childID 1 -isForBrowser -prefsHandle 2584 -prefMapHandle 2580 -prefsLen 70 -prefMapSize 216993 -parentBuildID 20200107212822 -greomni "C:\Program Files\Mozilla Firefox\omni.ja" -appomni "C:\Program Files\Mozilla Firefox\browser\omni.ja" -appdir "C:\Program Files\Mozilla Firefox\browser" - 6304 "\\.\pipe\gecko-crash-server-pipe.6304" 2596 tab`, clone.Comm)
+	assert.Equal(t, `C:\Program Files\Mozilla Firefox\firefox.exe -contentproc --channel="6304.3.1055809391\1014207667" -childID 1 -isForBrowser -prefsHandle 2584 -prefMapHandle 2580 -prefsLen 70 -prefMapSize 216993 -parentBuildID 20200107212822 -greomni "C:\Program Files\Mozilla Firefox\omni.ja" -appomni "C:\Program Files\Mozilla Firefox\browser\omni.ja" -appdir "C:\Program Files\Mozilla Firefox\browser" - 6304 "\\.\pipe\gecko-crash-server-pipe.6304" 2596 tab`, clone.Cmdline)
 	assert.Equal(t, `C:\Program Files\Mozilla Firefox\`, clone.Cwd)
 	assert.Equal(t, "archrabbit\\SYSTEM", clone.SID)
 	assert.Equal(t, []string{"-contentproc", `--channel="6304.3.1055809391\1014207667`, "-childID", "1", "-isForBrowser", "-prefsHandle", "2584", "-prefMapHandle", "2580", "-prefsLen", "70", "-prefMapSize", "216993", "-parentBuildID"}, clone.Args)
-	assert.Equal(t, uint8(4), clone.SessionID)
+	assert.Equal(t, uint32(4), clone.SessionID)
 	assert.Equal(t, map[string]string{"ProgramData": "C:\\ProgramData", "COMPUTRENAME": "archrabbit"}, clone.Envs)
 
 	require.Len(t, clone.Handles, 3)

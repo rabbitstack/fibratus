@@ -24,7 +24,7 @@ __files__ = []
 
 
 def on_init():
-    kfilter("kevt.name = 'CreateFile' and file.operation = 'create'")
+    kfilter("kevt.name = 'CreateFile' and file.operation != 'OPEN'")
     columns(["Process", "File"])
 
 

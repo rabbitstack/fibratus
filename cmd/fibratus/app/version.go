@@ -29,6 +29,10 @@ var (
 	date    string // build date
 )
 
+func init() {
+	v.Set(version)
+}
+
 var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Show version info",

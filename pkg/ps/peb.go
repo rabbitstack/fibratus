@@ -22,17 +22,11 @@
 package ps
 
 import (
-	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/syscall/handle"
-	"github.com/rabbitstack/fibratus/pkg/syscall/process"
+	"github.com/rabbitstack/fibratus/pkg/sys"
+	"golang.org/x/sys/windows"
 	"strings"
-	"syscall"
 	"unicode/utf16"
 	"unsafe"
-)
-
-const (
-	maxEnvSize = 4096
 )
 
 // PEB contains various process's metadata from the Process Environment Block (PEB). PEB is an opaque data structure
@@ -41,84 +35,82 @@ const (
 // for process-wide data structures. Although it is not encouraged to access this structure due to its unstable nature, some
 // process's information like command line or environments strings are only available through Process Environment Block fields.
 type PEB struct {
-	peb        *process.PEB
-	handle     handle.Handle
-	procParams *process.RTLUserProcessParameters
+	peb        *windows.PEB
+	procParams *windows.RTL_USER_PROCESS_PARAMETERS
+	proc       windows.Handle
 }
 
 // ReadPEB queries the process's basic information class structures and copies the PEB into
-// the current process's address space. Returns the reference to the PEB of the process that is being queried.
-func ReadPEB(handle handle.Handle) (*PEB, error) {
-	buf := make([]byte, unsafe.Sizeof(process.BasicInformation{}))
-	_, err := process.QueryInfo(handle, process.BasicInformationClass, buf)
+// the current process's address space.
+func ReadPEB(proc windows.Handle) (*PEB, error) {
+	peb := &PEB{proc: proc}
+	pbi, err := sys.QueryInformationProcess[windows.PROCESS_BASIC_INFORMATION](proc, windows.ProcessBasicInformation)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't query process information: %v", err)
+		return nil, err
 	}
-	info := (*process.BasicInformation)(unsafe.Pointer(&buf[0]))
 	// read the PEB to get the process parameters. Because the PEB structure resides
 	// in the address space of another process we must read the memory block in order
 	// to access the structure's fields.
-	peb, err := process.ReadMemory(handle, unsafe.Pointer(info.PEB), unsafe.Sizeof(process.PEB{}))
+	peb.peb, err = sys.ReadProcessMemory[windows.PEB](proc, uintptr(unsafe.Pointer(pbi.PebBaseAddress)))
 	if err != nil {
-		return nil, fmt.Errorf("coulnd't read PEB: %v", err)
+		if err == windows.ERROR_ACCESS_DENIED || err == windows.ERROR_NOACCESS ||
+			err == windows.ERROR_PARTIAL_COPY {
+			return peb, nil
+		}
+		return nil, err
 	}
-	return &PEB{peb: (*process.PEB)(unsafe.Pointer(&peb[0])), handle: handle}, nil
+	// read the `RTL_USER_PROCESS_PARAMETERS` struct which contains the command line
+	// and the image name of the process among many other attributes.
+	peb.procParams, err = sys.ReadProcessMemory[windows.RTL_USER_PROCESS_PARAMETERS](proc, uintptr(unsafe.Pointer(peb.peb.ProcessParameters)))
+	if err != nil {
+		return nil, err
+	}
+	return peb, nil
 }
 
 // GetImage inspects the process image name by reading the memory buffer in the PEB.
 func (p PEB) GetImage() string {
-	params, err := p.readProcessParams()
-	if err != nil {
+	if p.procParams == nil {
 		return ""
 	}
-	image, err := process.ReadMemoryUnicode(p.handle, unsafe.Pointer(params.ImagePathName.Buffer), uintptr(params.ImagePathName.Length))
-	if err != nil {
-		return ""
-	}
-	return syscall.UTF16ToString(image)
+	image := readUTF16(p.proc, uniptr(p.procParams.ImagePathName.Buffer), uint32(p.procParams.ImagePathName.Length))
+	return windows.UTF16ToString(image)
 }
 
 // GetCommandLine inspects the process command line arguments by reading the memory buffer in the PEB.
 func (p PEB) GetCommandLine() string {
-	params, err := p.readProcessParams()
-	if err != nil {
+	if p.procParams == nil {
 		return ""
 	}
-	comm, err := process.ReadMemoryUnicode(p.handle, unsafe.Pointer(params.CommandLine.Buffer), uintptr(params.CommandLine.Length))
-	if err != nil {
-		return ""
-	}
-	return syscall.UTF16ToString(comm)
+	cmdline := readUTF16(p.proc, uniptr(p.procParams.CommandLine.Buffer), uint32(p.procParams.CommandLine.Length))
+	return windows.UTF16ToString(cmdline)
 }
 
 // GetCurrentWorkingDirectory reads the current working directory from the PEB.
 func (p PEB) GetCurrentWorkingDirectory() string {
-	params, err := p.readProcessParams()
-	if err != nil {
+	if p.procParams == nil {
 		return ""
 	}
-	cwd, err := process.ReadMemoryUnicode(p.handle, unsafe.Pointer(params.CurrentDirectory.DosPath.Buffer), uintptr(params.CurrentDirectory.DosPath.Length))
-	if err != nil {
-		return ""
+	cwd := readUTF16(p.proc, uniptr(p.procParams.CurrentDirectory.DosPath.Buffer), uint32(p.procParams.CurrentDirectory.DosPath.Length))
+	return windows.UTF16ToString(cwd)
+}
+
+// GetSessionID returns the process session identifier.
+func (p PEB) GetSessionID() uint32 {
+	if p.peb == nil {
+		return 0
 	}
-	return syscall.UTF16ToString(cwd)
+	return p.peb.SessionId
 }
 
 // GetEnvs returns the map of environment variables that were mapped into the process PEB.
 func (p PEB) GetEnvs() map[string]string {
-	params, err := p.readProcessParams()
-	if err != nil {
+	if p.procParams == nil {
 		return nil
 	}
-	// we can read the whole memory region starting from the env address
-	// and speculate the size of the env block, but we just use a fixed
-	// buffer size
-	s, err := process.ReadMemoryUnicode(p.handle, unsafe.Pointer(params.Environment), uintptr(maxEnvSize))
-	if err != nil {
-		return nil
-	}
-	envs := make(map[string]string)
 	start, end := 0, 0
+	envs := make(map[string]string)
+	s := readUTF16(p.proc, uintptr(p.procParams.Environment), uint32(p.procParams.EnvironmentSize))
 	for i, r := range s {
 		// each env variable key/value pair terminates with the NUL character
 		if r == 0 {
@@ -140,16 +132,15 @@ func (p PEB) GetEnvs() map[string]string {
 	return envs
 }
 
-// readProcessParams reads the `RtlUserProcessParameters` struct
-// which contains the command line and the image name of the process
-func (p *PEB) readProcessParams() (*process.RTLUserProcessParameters, error) {
-	if p.procParams != nil {
-		return p.procParams, nil
-	}
-	b, err := process.ReadMemory(p.handle, unsafe.Pointer(p.peb.ProcessParameters), unsafe.Sizeof(process.RTLUserProcessParameters{}))
+func readUTF16(proc windows.Handle, addr uintptr, size uint32) []uint16 {
+	b := make([]byte, size*2)
+	err := windows.ReadProcessMemory(proc, addr, &b[0], uintptr(size), nil)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't read process's parameters from PEB: %v", err)
+		return nil
 	}
-	p.procParams = (*process.RTLUserProcessParameters)(unsafe.Pointer(&b[0]))
-	return p.procParams, nil
+	l := uintptr(len(b)) * unsafe.Sizeof(b[0]) / unsafe.Sizeof(uint16(0))
+	s := unsafe.Slice((*uint16)(unsafe.Pointer(&b[0])), l)
+	return s
 }
+
+func uniptr(b *uint16) uintptr { return uintptr(unsafe.Pointer(b)) }

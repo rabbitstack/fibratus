@@ -21,7 +21,6 @@ package trim
 import (
 	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"strings"
 )
 
@@ -44,30 +43,27 @@ func initTrimTransformer(config transformers.Config) (transformers.Transformer, 
 
 func (r trim) Transform(kevt *kevent.Kevent) error {
 	for _, kpar := range kevt.Kparams {
-		if kpar.Type != kparams.AnsiString && kpar.Type != kparams.UnicodeString {
-			continue
-		}
 		// trim prefixes
 		for _, par := range r.c.Prefixes {
 			if kpar.Name != par.Name {
 				continue
 			}
-			s, ok := kpar.Value.(string)
+			_, ok := kpar.Value.(string)
 			if !ok {
 				continue
 			}
-			kpar.Value = strings.TrimPrefix(s, par.Trim)
+			kpar.Value = strings.TrimPrefix(kevt.GetParamAsString(kpar.Name), par.Trim)
 		}
 		// trim suffixes
 		for _, par := range r.c.Suffixes {
 			if kpar.Name != par.Name {
 				continue
 			}
-			s, ok := kpar.Value.(string)
+			_, ok := kpar.Value.(string)
 			if !ok {
 				continue
 			}
-			kpar.Value = strings.TrimSuffix(s, par.Trim)
+			kpar.Value = strings.TrimSuffix(kevt.GetParamAsString(kpar.Name), par.Trim)
 		}
 	}
 	return nil

@@ -149,10 +149,22 @@ const (
 	Enum
 	// Map represents a map
 	Map
-	// Object is the generic object
+	// Object is the generic object type
 	Object
-	// Unknown represent an unknown parameter type
-	Unknown
+	// FileDosPath represents the file system path in DOS device notation
+	FileDosPath
+	// FilePath represents the file system path with normalized drive letter notation
+	FilePath
+	// Status represents the system error code message
+	Status
+	// Key represents the registry key
+	Key
+	// Flags represents a bitmask of flags
+	Flags
+	// Address is the memory address reference
+	Address
+	// HandleType represents the handle type such as Mutex or File
+	HandleType
 )
 
 // String return the type string representation.

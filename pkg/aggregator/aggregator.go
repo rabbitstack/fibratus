@@ -56,17 +56,17 @@ var (
 	flushesCount = expvar.NewInt("aggregator.flushes.count")
 	// batchEvents represents the overall number of processed batches
 	batchEvents = expvar.NewInt("aggregator.batch.events")
-	// transformerErrors is the count of transformers errors occurred during event processing
+	// transformerErrors is the count of errors occurred when applying transformers
 	transformerErrors = expvar.NewMap("aggregator.transformer.errors")
-	/// keventErrors is the number of kernel event errors
+	// keventErrors is the number of event errors
 	keventErrors = expvar.NewInt("aggregator.kevent.errors")
 )
 
 // BufferedAggregator collects events from the inbound channel and produces batches on regular intervals. The batches
 // are pushed to the work queue from which load-balanced configured workers consume the batches and publish to the outputs.
 type BufferedAggregator struct {
-	kevtsc  chan *kevent.Kevent
-	errsc   chan error
+	kevtsc  <-chan *kevent.Kevent
+	errsc   <-chan error
 	stop    chan struct{}
 	flusher *time.Ticker
 	// queue of inbound kernel events
@@ -80,25 +80,25 @@ type BufferedAggregator struct {
 
 // NewBuffered creates a new instance of the event aggregator.
 func NewBuffered(
-	kevents chan *kevent.Kevent,
-	errs chan error,
-	config Config,
+	evts <-chan *kevent.Kevent,
+	errs <-chan error,
+	aggConfig Config,
 	outputConfig outputs.Config,
 	transformerConfigs []transformers.Config,
 	alertsenderConfigs []alertsender.Config,
 ) (*BufferedAggregator, error) {
-	flushInterval := config.FlushPeriod
+	flushInterval := aggConfig.FlushPeriod
 	if flushInterval < time.Millisecond*250 {
 		flushInterval = time.Millisecond * 250
 	}
 	agg := &BufferedAggregator{
-		kevtsc:  kevents,
+		kevtsc:  evts,
 		kevts:   make([]*kevent.Kevent, 0),
 		errsc:   errs,
 		stop:    make(chan struct{}, 1),
 		flusher: time.NewTicker(flushInterval),
 		wq:      make(chan *kevent.Batch),
-		c:       config,
+		c:       aggConfig,
 	}
 
 	var err error
@@ -153,7 +153,7 @@ func (agg *BufferedAggregator) Stop() error {
 	return nil
 }
 
-// run starts the aggregator loop. The aggregator receives kernel event stream from the upstream channel, buffers
+// run starts the aggregator loop. The aggregator receives event stream from the upstream channel, buffers
 // them to intermediate queue and dispatches batches to downstream worker queue.
 func (agg *BufferedAggregator) run() {
 	for {
@@ -175,23 +175,19 @@ func (agg *BufferedAggregator) run() {
 			flushesCount.Add(1)
 			// clear the queue
 			agg.kevts = nil
-		case kevt := <-agg.kevtsc:
-			for _, transformer := range agg.transforms {
-				if transformer == nil {
-					continue
-				}
-				err := transformer.Transform(kevt)
+		case evt := <-agg.kevtsc:
+			for _, transform := range agg.transforms {
+				err := transform.Transform(evt)
 				if err != nil {
-					log.Warnf("transformer error occurred: %v", err)
 					transformerErrors.Add(err.Error(), 1)
 				}
 			}
 			// push the event to the queue
-			agg.kevts = append(agg.kevts, kevt)
+			agg.kevts = append(agg.kevts, evt)
 			keventsDequeued.Add(1)
 		case err := <-agg.errsc:
 			keventErrors.Add(1)
-			log.Errorf("aggregator dispatch failure: %v", err)
+			log.Errorf("event processing failure: %v", err)
 		}
 	}
 }

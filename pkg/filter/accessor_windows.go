@@ -19,8 +19,6 @@
 package filter
 
 import (
-	"errors"
-	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	psnap "github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
@@ -29,10 +27,8 @@ import (
 	"strings"
 
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
-	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/network"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 )
@@ -107,12 +103,12 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 		if ps == nil {
 			return nil, ErrPsNil
 		}
-		return ps.Comm, nil
+		return ps.Cmdline, nil
 	case fields.PsSiblingComm, fields.PsChildCmdline:
 		if kevt.Category != ktypes.Process {
 			return nil, nil
 		}
-		return kevt.Kparams.GetString(kparams.Comm)
+		return kevt.Kparams.GetString(kparams.Cmdline)
 	case fields.PsExe:
 		ps := kevt.PS
 		if ps == nil {
@@ -134,7 +130,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 		if kevt.Category != ktypes.Process {
 			return nil, nil
 		}
-		cmndline, err := kevt.Kparams.GetString(kparams.Comm)
+		cmndline, err := kevt.Kparams.GetString(kparams.Cmdline)
 		if err != nil {
 			return nil, err
 		}
@@ -155,37 +151,33 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 		if kevt.Category != ktypes.Process {
 			return nil, nil
 		}
-		return kevt.Kparams.GetString(kparams.UserSID)
+		sid, err := kevt.Kparams.GetSID()
+		if err != nil {
+			return nil, err
+		}
+		return sid.String(), nil
 	case fields.PsSiblingDomain, fields.PsChildDomain:
 		if kevt.Category != ktypes.Process {
 			return nil, nil
 		}
-		sid, err := kevt.Kparams.GetString(kparams.UserSID)
-		if err != nil {
-			return nil, err
-		}
-		return domainFromSID(sid)
+		return kevt.Kparams.GetString(kparams.Domain)
 	case fields.PsSiblingUsername, fields.PsChildUsername:
 		if kevt.Category != ktypes.Process {
 			return nil, nil
 		}
-		sid, err := kevt.Kparams.GetString(kparams.UserSID)
-		if err != nil {
-			return nil, err
-		}
-		return usernameFromSID(sid)
+		return kevt.Kparams.GetString(kparams.Username)
 	case fields.PsDomain:
 		ps := kevt.PS
 		if ps == nil {
 			return nil, ErrPsNil
 		}
-		return domainFromSID(ps.SID)
+		return ps.Domain, nil
 	case fields.PsUsername:
 		ps := kevt.PS
 		if ps == nil {
 			return nil, ErrPsNil
 		}
-		return usernameFromSID(ps.SID)
+		return ps.Username, nil
 	case fields.PsSessionID:
 		ps := kevt.PS
 		if ps == nil {
@@ -201,12 +193,12 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 		if kevt.Type != ktypes.OpenProcess {
 			return nil, nil
 		}
-		return kevt.Kparams.GetSlice(kparams.DesiredAccessNames)
+		return kevt.GetFlagsAsSlice(kparams.DesiredAccess), nil
 	case fields.PsAccessStatus:
 		if kevt.Type != ktypes.OpenProcess {
 			return nil, nil
 		}
-		return kevt.Kparams.GetString(kparams.NTStatus)
+		return kevt.GetParamAsString(kparams.NTStatus), nil
 	case fields.PsSiblingSessionID, fields.PsChildSessionID:
 		if kevt.Category != ktypes.Process {
 			return nil, nil
@@ -256,7 +248,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 		if ps.psnap == nil {
 			return nil, nil
 		}
-		proc := ps.psnap.Find(pid)
+		proc := ps.psnap.FindAndPut(pid)
 		if proc == nil {
 			return nil, ErrPsNil
 		}
@@ -301,7 +293,7 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 		if parent == nil {
 			return nil, ErrPsNil
 		}
-		return parent.Comm, nil
+		return parent.Cmdline, nil
 	case fields.PsParentExe:
 		parent := getParentPs(kevt)
 		if parent == nil {
@@ -331,19 +323,19 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 		if ps == nil {
 			return nil, ErrPsNil
 		}
-		return domainFromSID(ps.SID)
+		return ps.Domain, nil
 	case fields.PsParentUsername:
 		ps := getParentPs(kevt)
 		if ps == nil {
 			return nil, ErrPsNil
 		}
-		return usernameFromSID(ps.SID)
+		return ps.Username, nil
 	case fields.PsParentSessionID:
-		parent := getParentPs(kevt)
-		if parent == nil {
+		ps := getParentPs(kevt)
+		if ps == nil {
 			return nil, ErrPsNil
 		}
-		return parent.SessionID, nil
+		return ps.SessionID, nil
 	case fields.PsParentEnvs:
 		ps := getParentPs(kevt)
 		if ps == nil {
@@ -427,21 +419,10 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 	}
 }
 
-func domainFromSID(sid string) (string, error) {
-	s := strings.Split(sid, "\\")
-	if len(s) != 2 {
-		return "", fmt.Errorf("illegal split for the domain field. Expected 2 but got %d substrings", len(s))
-	}
-	return s[0], nil
-}
-
-func usernameFromSID(sid string) (string, error) {
-	s := strings.Split(sid, "\\")
-	if len(s) != 2 {
-		return "", fmt.Errorf("illegal split for the username field. Expected 2 but got %d substrings", len(s))
-	}
-	return s[1], nil
-}
+const (
+	rootAncestor = "root" // represents the root ancestor
+	anyAncestor  = "any"  // represents any ancestor in the hierarchy
+)
 
 // ancestorFields recursively walks the process ancestors and extracts
 // the required field values. If we get the `root` key, the root ancestor
@@ -458,12 +439,12 @@ func ancestorFields(field string, kevt *kevent.Kevent) (kparams.Value, error) {
 	var ps *pstypes.PS
 
 	switch key {
-	case "root":
+	case rootAncestor:
 		walk := func(proc *pstypes.PS) {
 			ps = proc
 		}
 		pstypes.Walk(walk, kevt.PS)
-	case "any":
+	case anyAncestor:
 		values := make([]string, 0)
 		walk := func(proc *pstypes.PS) {
 			switch segment {
@@ -478,7 +459,7 @@ func ancestorFields(field string, kevt *kevent.Kevent) (kparams.Value, error) {
 			case fields.ProcessCwd:
 				values = append(values, proc.Cwd)
 			case fields.ProcessCmdline:
-				values = append(values, proc.Comm)
+				values = append(values, proc.Cmdline)
 			case fields.ProcessArgs:
 				values = append(values, proc.Args...)
 			case fields.ProcessExe:
@@ -518,7 +499,7 @@ func ancestorFields(field string, kevt *kevent.Kevent) (kparams.Value, error) {
 	case fields.ProcessCwd:
 		return ps.Cwd, nil
 	case fields.ProcessCmdline:
-		return ps.Comm, nil
+		return ps.Cmdline, nil
 	case fields.ProcessArgs:
 		return ps.Args, nil
 	case fields.ProcessExe:
@@ -568,7 +549,7 @@ func (t *threadAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value
 		}
 		return v.String(), nil
 	case fields.ThreadEntrypoint:
-		v, err := kevt.Kparams.GetHex(kparams.ThreadEntrypoint)
+		v, err := kevt.Kparams.GetHex(kparams.StartAddr)
 		if err != nil {
 			return nil, err
 		}
@@ -584,12 +565,12 @@ func (t *threadAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value
 		if kevt.Type != ktypes.OpenThread {
 			return nil, nil
 		}
-		return kevt.Kparams.GetSlice(kparams.DesiredAccessNames)
+		return kevt.GetFlagsAsSlice(kparams.DesiredAccess), nil
 	case fields.ThreadAccessStatus:
 		if kevt.Type != ktypes.OpenThread {
 			return nil, nil
 		}
-		return kevt.Kparams.GetString(kparams.NTStatus)
+		return kevt.GetParamAsString(kparams.NTStatus), nil
 	}
 	return nil, nil
 }
@@ -604,61 +585,28 @@ func newFileAccessor() accessor {
 func (l *fileAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
 	switch f {
 	case fields.FileName:
-		return kevt.Kparams.GetString(kparams.FileName)
+		return kevt.GetParamAsString(kparams.FileName), nil
 	case fields.FileOffset:
 		return kevt.Kparams.GetUint64(kparams.FileOffset)
 	case fields.FileIOSize:
 		return kevt.Kparams.GetUint32(kparams.FileIoSize)
 	case fields.FileShareMask:
-		m, err := kevt.Kparams.Get(kparams.FileShareMask)
-		if err != nil {
-			return nil, err
-		}
-		mode, ok := m.(fs.FileShareMode)
-		if !ok {
-			return nil, errors.New("couldn't type assert to file share mode enum")
-		}
-		return mode.String(), nil
+		return kevt.GetParamAsString(kparams.FileShareMask), nil
 	case fields.FileOperation:
-		op, err := kevt.Kparams.Get(kparams.FileOperation)
-		if err != nil {
-			return nil, err
-		}
-		fop, ok := op.(fs.FileDisposition)
-		if !ok {
-			return nil, errors.New("couldn't type assert to file operation enum")
-		}
-		return fop.String(), nil
+		return kevt.GetParamAsString(kparams.FileOperation), nil
 	case fields.FileObject:
 		return kevt.Kparams.GetUint64(kparams.FileObject)
 	case fields.FileType:
-		return kevt.Kparams.GetString(kparams.FileType)
+		return kevt.GetParamAsString(kparams.FileType), nil
 	case fields.FileExtension:
-		file, err := kevt.Kparams.GetString(kparams.FileName)
-		if err != nil {
-			return nil, err
-		}
-		return filepath.Ext(file), nil
+		return filepath.Ext(kevt.GetParamAsString(kparams.FileName)), nil
 	case fields.FileAttributes:
-		val, err := kevt.Kparams.GetSlice(kparams.FileAttributes)
-		if err != nil {
-			return nil, err
-		}
-		slice, ok := val.([]fs.FileAttr)
-		if !ok {
-			return nil, nil
-		}
-		// convert from []fs.FileAttr to string slice
-		attrs := make([]string, 0, len(slice))
-		for _, attr := range slice {
-			attrs = append(attrs, attr.String())
-		}
-		return attrs, nil
+		return kevt.GetFlagsAsSlice(kparams.FileAttributes), nil
 	case fields.FileStatus:
 		if kevt.Type != ktypes.CreateFile {
 			return nil, nil
 		}
-		return kevt.Kparams.GetString(kparams.NTStatus)
+		return kevt.GetParamAsString(kparams.NTStatus), nil
 	}
 	return nil, nil
 }
@@ -673,7 +621,7 @@ func newImageAccessor() accessor {
 func (i *imageAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
 	switch f {
 	case fields.ImageName:
-		return kevt.Kparams.GetString(kparams.ImageFilename)
+		return kevt.GetParamAsString(kparams.ImageFilename), nil
 	case fields.ImageDefaultAddress:
 		address, err := kevt.Kparams.GetHex(kparams.ImageDefaultBase)
 		if err != nil {
@@ -687,7 +635,7 @@ func (i *imageAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value,
 		}
 		return address.String(), nil
 	case fields.ImageSize:
-		return kevt.Kparams.GetUint32(kparams.ImageSize)
+		return kevt.Kparams.GetUint64(kparams.ImageSize)
 	case fields.ImageChecksum:
 		return kevt.Kparams.GetUint32(kparams.ImageCheckSum)
 	case fields.ImagePID:
@@ -706,7 +654,7 @@ func newRegistryAccessor() accessor {
 func (r *registryAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
 	switch f {
 	case fields.RegistryKeyName:
-		return kevt.Kparams.GetString(kparams.RegKeyName)
+		return kevt.GetParamAsString(kparams.RegKeyName), nil
 	case fields.RegistryKeyHandle:
 		keyHandle, err := kevt.Kparams.GetHex(kparams.RegKeyHandle)
 		if err != nil {
@@ -714,11 +662,14 @@ func (r *registryAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Val
 		}
 		return keyHandle.String(), nil
 	case fields.RegistryValue:
-		return kevt.Kparams.Get(kparams.RegValue)
+		return kevt.Kparams.GetRaw(kparams.RegValue)
 	case fields.RegistryValueType:
 		return kevt.Kparams.GetString(kparams.RegValueType)
 	case fields.RegistryStatus:
-		return kevt.Kparams.GetString(kparams.NTStatus)
+		if kevt.Category != ktypes.Registry {
+			return nil, nil
+		}
+		return kevt.GetParamAsString(kparams.NTStatus), nil
 	}
 	return nil, nil
 }
@@ -743,15 +694,7 @@ func (n *networkAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Valu
 	case fields.NetSportName:
 		return kevt.Kparams.GetString(kparams.NetSportName)
 	case fields.NetL4Proto:
-		v, err := kevt.Kparams.Get(kparams.NetL4Proto)
-		if err != nil {
-			return nil, err
-		}
-		l4proto, ok := v.(network.L4Proto)
-		if !ok {
-			return nil, errors.New("couldn't type assert to L4 proto enum")
-		}
-		return l4proto.String(), nil
+		return kevt.GetParamAsString(kparams.NetL4Proto), nil
 	case fields.NetPacketSize:
 		return kevt.Kparams.GetUint32(kparams.NetSize)
 	case fields.NetSIPNames:
@@ -772,15 +715,11 @@ func (h *handleAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value
 	case fields.HandleID:
 		return kevt.Kparams.GetHexAsUint32(kparams.HandleID)
 	case fields.HandleType:
-		return kevt.Kparams.GetString(kparams.HandleObjectTypeName)
+		return kevt.GetParamAsString(kparams.HandleObjectTypeID), nil
 	case fields.HandleName:
 		return kevt.Kparams.GetString(kparams.HandleObjectName)
 	case fields.HandleObject:
-		handleObject, err := kevt.Kparams.GetHex(kparams.HandleObject)
-		if err != nil {
-			return nil, err
-		}
-		return handleObject.String(), nil
+		return kevt.Kparams.GetUint64(kparams.HandleObject)
 	}
 	return nil, nil
 }

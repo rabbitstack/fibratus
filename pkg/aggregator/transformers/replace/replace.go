@@ -22,7 +22,6 @@ import (
 	"expvar"
 	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"strings"
 )
 
@@ -48,20 +47,14 @@ func initReplaceTransformer(config transformers.Config) (transformers.Transforme
 func (r replace) Transform(kevt *kevent.Kevent) error {
 	for _, repl := range r.c.Replacements {
 		kpar := kevt.Kparams.Find(repl.Kpar)
-
 		if kpar == nil {
 			continue
 		}
-		if kpar.Type != kparams.AnsiString && kpar.Type != kparams.UnicodeString {
-			continue
-		}
-
-		val, ok := kpar.Value.(string)
+		_, ok := kpar.Value.(string)
 		if !ok {
 			continue
 		}
-		kpar.Value = strings.ReplaceAll(val, repl.Old, repl.New)
-
+		kpar.Value = strings.ReplaceAll(kevt.GetParamAsString(kpar.Name), repl.Old, repl.New)
 		replaceCount.Add(1)
 	}
 	return nil

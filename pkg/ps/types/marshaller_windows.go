@@ -23,7 +23,6 @@ import (
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/kcap/section"
 	kcapver "github.com/rabbitstack/fibratus/pkg/kcap/version"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	"github.com/rabbitstack/fibratus/pkg/util/bytes"
 	"time"
@@ -42,8 +41,8 @@ func (ps *PS) Marshal() []byte {
 	b = append(b, bytes.WriteUint16(uint16(len(ps.Name)))...)
 	b = append(b, ps.Name...)
 	// write process command line
-	b = append(b, bytes.WriteUint16(uint16(len(ps.Comm)))...)
-	b = append(b, ps.Comm...)
+	b = append(b, bytes.WriteUint16(uint16(len(ps.Cmdline)))...)
+	b = append(b, ps.Cmdline...)
 	// write full executable path
 	b = append(b, bytes.WriteUint16(uint16(len(ps.Exe)))...)
 	b = append(b, ps.Exe...)
@@ -62,7 +61,7 @@ func (ps *PS) Marshal() []byte {
 	}
 
 	// write session ID
-	b = append(b, ps.SessionID)
+	b = append(b, bytes.WriteUint32(ps.SessionID)...)
 
 	// write env vars block
 	b = append(b, bytes.WriteUint16(uint16(len(ps.Envs)))...)
@@ -102,6 +101,14 @@ func (ps *PS) Marshal() []byte {
 	// write UUID
 	b = append(b, bytes.WriteUint64(ps.uuid)...)
 
+	// write username
+	b = append(b, bytes.WriteUint16(uint16(len(ps.Username)))...)
+	b = append(b, ps.Username...)
+
+	// write domain
+	b = append(b, bytes.WriteUint16(uint16(len(ps.Domain)))...)
+	b = append(b, ps.Domain...)
+
 	return b
 }
 
@@ -126,7 +133,7 @@ func (ps *PS) Unmarshal(b []byte, psec section.Section) error {
 	l = bytes.ReadUint16(b[10+offset:])
 	buf = b[12+offset:]
 	offset += uint32(l)
-	ps.Comm = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
+	ps.Cmdline = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
 
 	// read full image path
 	l = bytes.ReadUint16(b[12+offset:])
@@ -159,18 +166,27 @@ func (ps *PS) Unmarshal(b []byte, psec section.Section) error {
 	}
 
 	offset += uint32(aoffset)
+	idx := uint32(20)
 	// read session ID
-	ps.SessionID = b[20+offset]
+	if psec.Version() >= kcapver.ProcessSecV3 {
+		// session identifier was changed from uint8 to uint32
+		ps.SessionID = bytes.ReadUint32(b[idx+offset:])
+		idx += 4
+	} else {
+		ps.SessionID = uint32(b[idx+offset])
+		idx++
+	}
 
 	// read env vars
-	nvars := bytes.ReadUint16(b[21+offset:])
+	nvars := bytes.ReadUint16(b[idx+offset:])
+	idx += 2
 	var eoffset uint16
 	for i := 0; i < int(nvars); i++ {
-		klen := bytes.ReadUint16(b[23+offset+uint32(eoffset):])
-		buf = b[25+offset+uint32(eoffset):]
+		klen := bytes.ReadUint16(b[idx+offset+uint32(eoffset):])
+		buf = b[idx+2+offset+uint32(eoffset):]
 		key := string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:klen:klen])
-		vlen := bytes.ReadUint16(b[25+offset+uint32(eoffset)+uint32(klen):])
-		buf = b[27+offset+uint32(eoffset)+uint32(klen):]
+		vlen := bytes.ReadUint16(b[idx+2+offset+uint32(eoffset)+uint32(klen):])
+		buf = b[idx+4+offset+uint32(eoffset)+uint32(klen):]
 		value := string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:vlen:vlen])
 		ps.Envs[key] = value
 		eoffset += klen + vlen + 2 + 2
@@ -179,7 +195,7 @@ func (ps *PS) Unmarshal(b []byte, psec section.Section) error {
 	offset += uint32(eoffset)
 
 	// read handles
-	sec := section.Read(b[23+offset:])
+	sec := section.Read(b[idx+offset:])
 	offset += 10 // 10 is for the section size in bytes
 	var hoffset uint32
 	if sec.Len() == 0 {
@@ -188,8 +204,8 @@ func (ps *PS) Unmarshal(b []byte, psec section.Section) error {
 
 	for i := 0; i < int(sec.Len()); i++ {
 		// read handle length
-		l := uint32(bytes.ReadUint16(b[23+offset+hoffset:]))
-		off := 25 + hoffset + offset
+		l := uint32(bytes.ReadUint16(b[idx+offset+hoffset:]))
+		off := idx + 2 + hoffset + offset
 		handle, err := htypes.NewFromKcap(b[off : off+l])
 		if err != nil {
 			return err
@@ -201,12 +217,14 @@ func (ps *PS) Unmarshal(b []byte, psec section.Section) error {
 readpe:
 	offset += hoffset
 	// read PE metadata
-	sec = section.Read(b[23+offset:])
+	sec = section.Read(b[idx+offset:])
+	idx += 10
 	if sec.Size() == 0 {
-		if psec.Version() == kcapver.ProcessSecV2 {
+		if psec.Version() >= kcapver.ProcessSecV2 {
 			// read start time
-			l := uint32(bytes.ReadUint16(b[33+offset:]))
-			buf := b[35+offset:]
+			l := uint32(bytes.ReadUint16(b[idx+offset:]))
+			idx += 2
+			buf := b[idx+offset:]
 			offset += l
 			if len(buf) > 0 {
 				var err error
@@ -217,156 +235,58 @@ readpe:
 				}
 			}
 			// read UUID
-			ps.uuid = bytes.ReadUint64(b[35+offset:])
+			ps.uuid = bytes.ReadUint64(b[idx+offset:])
+		}
+		if psec.Version() >= kcapver.ProcessSecV3 {
+			idx += 8
+			// read username
+			l := bytes.ReadUint16(b[idx+offset:])
+			idx += 2
+			buf := b[:]
+			offset += uint32(l)
+			ps.Username = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
+
+			// read domain
+			l = bytes.ReadUint16(b[idx+offset:])
+			buf = b[:]
+			ps.Domain = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
 		}
 		return nil
 	}
+
 	var err error
-	ps.PE, err = pe.NewFromKcap(b[33+offset:])
+	ps.PE, err = pe.NewFromKcap(b[idx+offset:])
 	if err != nil {
 		return err
 	}
 
 	offset += sec.Size()
-	if psec.Version() == kcapver.ProcessSecV2 {
+	if psec.Version() >= kcapver.ProcessSecV2 {
 		// read start time
-		l := uint32(bytes.ReadUint16(b[33+offset:]))
-		buf := b[35+offset:]
+		l := uint32(bytes.ReadUint16(b[idx+offset:]))
+		idx += 2
+		buf := b[idx+offset:]
 		offset += l
 		if len(buf) > 0 {
 			ps.StartTime, _ = time.Parse(time.RFC3339Nano, string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l]))
 		}
 		// read UUID
-		ps.uuid = bytes.ReadUint64(b[35+offset:])
+		ps.uuid = bytes.ReadUint64(b[idx+offset:])
+	}
+	if psec.Version() >= kcapver.ProcessSecV3 {
+		idx += 8
+		// read username
+		l := bytes.ReadUint16(b[idx+offset:])
+		idx += 2
+		buf := b[:]
+		offset += uint32(l)
+		ps.Username = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
+
+		// read domain
+		l = bytes.ReadUint16(b[idx+offset:])
+		buf = b[:]
+		ps.Domain = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
 	}
 
 	return nil
-}
-
-// Marshal transforms the thread state to byte stream for persisting to capture files.
-func (t *Thread) Marshal() []byte {
-	b := make([]byte, 0)
-
-	// write thread/process ID
-	b = append(b, bytes.WriteUint32(t.Tid)...)
-	b = append(b, bytes.WriteUint32(t.Pid)...)
-
-	// write priority fields
-	b = append(b, t.IOPrio)
-	b = append(b, t.BasePrio)
-	b = append(b, t.PagePrio)
-
-	// write stack/kernel/entrypoint addresses
-	b = append(b, bytes.WriteUint16(uint16(len(t.UstackBase)))...)
-	b = append(b, t.UstackBase...)
-	b = append(b, bytes.WriteUint16(uint16(len(t.UstackLimit)))...)
-	b = append(b, t.UstackLimit...)
-	b = append(b, bytes.WriteUint16(uint16(len(t.KstackBase)))...)
-	b = append(b, t.KstackBase...)
-	b = append(b, bytes.WriteUint16(uint16(len(t.KstackLimit)))...)
-	b = append(b, t.KstackLimit...)
-	b = append(b, bytes.WriteUint16(uint16(len(t.Entrypoint)))...)
-	b = append(b, t.Entrypoint...)
-
-	return b
-}
-
-// Marshal produces a module byte stream state suitable for writing to capture files.
-func (m *Module) Marshal() []byte {
-	b := make([]byte, 0)
-
-	// write size and checksum
-	b = append(b, bytes.WriteUint32(m.Size)...)
-	b = append(b, bytes.WriteUint32(m.Checksum)...)
-
-	// write image name
-	b = append(b, bytes.WriteUint16(uint16(len(m.Name)))...)
-	b = append(b, m.Name...)
-
-	// write addresses
-	b = append(b, bytes.WriteUint16(uint16(len(m.BaseAddress)))...)
-	b = append(b, m.BaseAddress...)
-	b = append(b, bytes.WriteUint16(uint16(len(m.DefaultBaseAddress)))...)
-	b = append(b, m.DefaultBaseAddress...)
-
-	return b
-}
-
-// Unmarshal restores thead state from the byte slice.
-func (t *Thread) Unmarshal(b []byte) (uint16, error) {
-	if len(b) < 11 {
-		return 0, fmt.Errorf("expected at least 11 bytes but got %d", len(b))
-	}
-
-	// read tid and pid
-	t.Tid = bytes.ReadUint32(b[0:])
-	t.Pid = bytes.ReadUint32(b[4:])
-
-	// read priorities
-	t.IOPrio = b[8]
-	t.BasePrio = b[9]
-	t.PagePrio = b[10]
-
-	// read user space stack base address
-	l := bytes.ReadUint16(b[11:])
-	buf := b[13:]
-	offset := l
-	t.UstackBase = kparams.Hex(string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l]))
-
-	// read user space stack limit
-	l = bytes.ReadUint16(b[13+offset:])
-	buf = b[15+offset:]
-	offset += l
-	t.UstackLimit = kparams.Hex(string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l]))
-
-	// read kernel space stack base address
-	l = bytes.ReadUint16(b[15+offset:])
-	buf = b[17+offset:]
-	offset += l
-	t.KstackBase = kparams.Hex(string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l]))
-
-	// read kernel space stack limit
-	l = bytes.ReadUint16(b[17+offset:])
-	buf = b[19+offset:]
-	offset += l
-	t.KstackLimit = kparams.Hex(string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l]))
-
-	// read entry point address
-	l = bytes.ReadUint16(b[19+offset:])
-	buf = b[21+offset:]
-	offset += l
-	t.Entrypoint = kparams.Hex(string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l]))
-
-	return offset + 21, nil
-}
-
-// Unmarshal  reconstructs module state from the byte stream.
-func (m *Module) Unmarshal(b []byte) (uint16, error) {
-	if len(b) < 11 {
-		return 0, fmt.Errorf("expected at least 11 bytes but got %d", len(b))
-	}
-
-	// read size
-	m.Size = bytes.ReadUint32(b[0:])
-	// read checksum
-	m.Checksum = bytes.ReadUint32(b[4:])
-
-	// read module full path
-	length := bytes.ReadUint16(b[8:])
-	buf := b[10:]
-	offset := length
-	m.Name = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:length:length])
-
-	// read addresses
-	length = bytes.ReadUint16(b[10+offset:])
-	buf = b[12+offset:]
-	offset += length
-	m.BaseAddress = kparams.Hex(string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:length:length]))
-
-	length = bytes.ReadUint16(b[12+offset:])
-	buf = b[14+offset:]
-	offset += length
-	m.DefaultBaseAddress = kparams.Hex(string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:length:length]))
-
-	return offset + 14, nil
 }

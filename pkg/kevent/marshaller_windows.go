@@ -27,12 +27,10 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/kcap/section"
 	kcapver "github.com/rabbitstack/fibratus/pkg/kcap/version"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-	"github.com/rabbitstack/fibratus/pkg/network"
 	ptypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/util/bytes"
 	"github.com/rabbitstack/fibratus/pkg/util/ip"
@@ -55,51 +53,55 @@ var (
 var unmarshalTimestampErrors = expvar.NewInt("kevent.timestamp.unmarshal.errors")
 
 // MarshalRaw produces a byte stream of the kernel event suitable for writing to disk.
-func (kevt *Kevent) MarshalRaw() []byte {
+func (e *Kevent) MarshalRaw() []byte {
 	b := make([]byte, 0)
 
 	// write seq, pid, tid fields
-	b = append(b, bytes.WriteUint64(kevt.Seq)...)
-	b = append(b, bytes.WriteUint32(kevt.PID)...)
-	b = append(b, bytes.WriteUint32(kevt.Tid)...)
+	b = append(b, bytes.WriteUint64(e.Seq)...)
+	b = append(b, bytes.WriteUint32(e.PID)...)
+	b = append(b, bytes.WriteUint32(e.Tid)...)
 
 	// write ktype and CPU
-	b = append(b, kevt.Type[:]...)
-	b = append(b, kevt.CPU)
+	b = append(b, e.Type[:]...)
+	b = append(b, e.CPU)
 
 	// for the string fields we have to write the length prior to
-	// the string buffer itself so we can decode the string correctly
+	// the string buffer itself, so we can decode the string correctly
 	//
 	// write event name
-	b = append(b, bytes.WriteUint16(uint16(len(kevt.Name)))...)
-	b = append(b, kevt.Name...)
+	b = append(b, bytes.WriteUint16(uint16(len(e.Name)))...)
+	b = append(b, e.Name...)
 	// write category
-	b = append(b, bytes.WriteUint16(uint16(len(kevt.Category)))...)
-	b = append(b, kevt.Category...)
+	b = append(b, bytes.WriteUint16(uint16(len(e.Category)))...)
+	b = append(b, e.Category...)
 	// write description
-	b = append(b, bytes.WriteUint16(uint16(len(kevt.Description)))...)
-	b = append(b, kevt.Description...)
+	b = append(b, bytes.WriteUint16(uint16(len(e.Description)))...)
+	b = append(b, e.Description...)
 	// write host name
-	b = append(b, bytes.WriteUint16(uint16(len(kevt.Host)))...)
-	b = append(b, kevt.Host...)
+	b = append(b, bytes.WriteUint16(uint16(len(e.Host)))...)
+	b = append(b, e.Host...)
 
 	// write event's timestamp
 	timestamp := make([]byte, 0)
-	timestamp = kevt.Timestamp.AppendFormat(timestamp, time.RFC3339Nano)
+	timestamp = e.Timestamp.AppendFormat(timestamp, time.RFC3339Nano)
 	b = append(b, bytes.WriteUint16(uint16(len(timestamp)))...)
 	b = append(b, timestamp...)
 
-	// write the number of kernel parameters followed by each parameter
-	b = append(b, bytes.WriteUint16(uint16(len(kevt.Kparams)))...)
-	for _, kpar := range kevt.Kparams {
+	// write the number of event parameters followed by each parameter
+	b = append(b, bytes.WriteUint16(uint16(len(e.Kparams)))...)
+	for _, kpar := range e.Kparams {
 		// append the type, parameter size and name
-		b = append(b, bytes.WriteUint16(uint16(kpar.Type))...)
+		b = append(b, bytes.WriteUint16(uint16(kpar.KcapType()))...)
 		b = append(b, bytes.WriteUint16(uint16(len(kpar.Name)))...)
 		b = append(b, kpar.Name...)
 		switch kpar.Type {
-		case kparams.AnsiString, kparams.UnicodeString, kparams.SID, kparams.WbemSID:
+		case kparams.AnsiString, kparams.UnicodeString:
 			b = append(b, bytes.WriteUint16(uint16(len(kpar.Value.(string))))...)
 			b = append(b, kpar.Value.(string)...)
+		case kparams.Key, kparams.FilePath, kparams.FileDosPath, kparams.HandleType:
+			v := e.GetParamAsString(kpar.Name)
+			b = append(b, bytes.WriteUint16(uint16(len(v)))...)
+			b = append(b, v...)
 		case kparams.Uint8:
 			b = append(b, kpar.Value.(uint8))
 		case kparams.Int8:
@@ -116,11 +118,11 @@ func (kevt *Kevent) MarshalRaw() []byte {
 			b = append(b, bytes.WriteUint16(kpar.Value.(uint16))...)
 		case kparams.Int16:
 			b = append(b, bytes.WriteUint16(uint16(kpar.Value.(int16)))...)
-		case kparams.Uint32:
+		case kparams.Uint32, kparams.Status, kparams.Enum, kparams.Flags:
 			b = append(b, bytes.WriteUint32(kpar.Value.(uint32))...)
 		case kparams.Int32:
 			b = append(b, bytes.WriteUint32(uint32(kpar.Value.(int32)))...)
-		case kparams.Uint64:
+		case kparams.Uint64, kparams.Address:
 			b = append(b, bytes.WriteUint64(kpar.Value.(uint64))...)
 		case kparams.Int64:
 			b = append(b, bytes.WriteUint64(uint64(kpar.Value.(int64)))...)
@@ -147,15 +149,6 @@ func (kevt *Kevent) MarshalRaw() []byte {
 			ts = v.AppendFormat(ts, time.RFC3339Nano)
 			b = append(b, bytes.WriteUint16(uint16(len(ts)))...)
 			b = append(b, ts...)
-		case kparams.Enum:
-			switch e := kpar.Value.(type) {
-			case fs.FileDisposition:
-				b = append(b, uint8(e))
-			case fs.FileShareMode:
-				b = append(b, uint8(e))
-			case network.L4Proto:
-				b = append(b, uint8(e))
-			}
 		case kparams.Slice:
 			switch slice := kpar.Value.(type) {
 			case []string:
@@ -166,19 +159,16 @@ func (kevt *Kevent) MarshalRaw() []byte {
 					b = append(b, bytes.WriteUint16(uint16(len(s)))...)
 					b = append(b, s...)
 				}
-			case []fs.FileAttr:
-				b = append(b, uint8('s'))
-				b = append(b, bytes.WriteUint16(uint16(len(slice)))...)
-				for _, s := range slice {
-					b = append(b, bytes.WriteUint16(uint16(len(s.String())))...)
-					b = append(b, s.String()...)
-				}
 			}
+		case kparams.Binary, kparams.SID, kparams.WbemSID:
+			b = append(b, bytes.WriteUint32(uint32(len(kpar.Value.([]byte))))...)
+			b = append(b, kpar.Value.([]byte)...)
 		}
 	}
+
 	// write metadata key/value pairs
-	b = append(b, bytes.WriteUint16(uint16(len(kevt.Metadata)))...)
-	for key, value := range kevt.Metadata {
+	b = append(b, bytes.WriteUint16(uint16(len(e.Metadata)))...)
+	for key, value := range e.Metadata {
 		b = append(b, bytes.WriteUint16(uint16(len(key)))...)
 		b = append(b, key...)
 		v := fmt.Sprintf("%s", value)
@@ -187,13 +177,13 @@ func (kevt *Kevent) MarshalRaw() []byte {
 	}
 
 	// write process state
-	if kevt.PS != nil && (kevt.Type == ktypes.CreateProcess || kevt.Type == ktypes.EnumProcess) {
-		buf := kevt.PS.Marshal()
-		sec := section.New(section.Process, kcapver.ProcessSecV2, 0, uint32(len(buf)))
+	if e.PS != nil && (e.IsCreateProcess() || e.IsProcessRundown()) {
+		buf := e.PS.Marshal()
+		sec := section.New(section.Process, kcapver.ProcessSecV3, 0, uint32(len(buf)))
 		b = append(b, sec[:]...)
 		b = append(b, buf...)
 	} else {
-		sec := section.New(section.Process, kcapver.ProcessSecV2, 0, 0)
+		sec := section.New(section.Process, kcapver.ProcessSecV3, 0, 0)
 		b = append(b, sec[:]...)
 	}
 
@@ -201,53 +191,54 @@ func (kevt *Kevent) MarshalRaw() []byte {
 }
 
 // UnmarshalRaw recovers the state of the kernel event from the byte stream.
-func (kevt *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
+func (e *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 	if len(b) < 34 {
 		return fmt.Errorf("expected at least 34 bytes but got %d bytes", len(b))
 	}
 
 	// read seq, pid, tid
-	kevt.Seq = bytes.ReadUint64(b[0:])
-	kevt.PID = bytes.ReadUint32(b[8:])
-	kevt.Tid = bytes.ReadUint32(b[12:])
+	e.Seq = bytes.ReadUint64(b[0:])
+	e.PID = bytes.ReadUint32(b[8:])
+	e.Tid = bytes.ReadUint32(b[12:])
 
 	// read ktype and CPU
 	var ktype ktypes.Ktype
 	copy(ktype[:], b[16:33])
-	kevt.Type = ktype
-	kevt.CPU = b[33:34][0]
+	e.Type = ktype
+	e.CPU = b[33:34][0]
 
+	var offset uint32
 	// read event name
 	l := bytes.ReadUint16(b[34:])
 	buf := b[36:]
-	offset := l
-	kevt.Name = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
+	offset = uint32(l)
+	e.Name = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
 
 	// read category
 	l = bytes.ReadUint16(b[36+offset:])
 	buf = b[38+offset:]
-	offset += l
-	kevt.Category = ktypes.Category(string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l]))
+	offset += uint32(l)
+	e.Category = ktypes.Category(string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l]))
 
 	// read description
 	l = bytes.ReadUint16(b[38+offset:])
 	buf = b[40+offset:]
-	offset += l
-	kevt.Description = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
+	offset += uint32(l)
+	e.Description = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
 
 	// read host name
 	l = bytes.ReadUint16(b[40+offset:])
 	buf = b[42+offset:]
-	offset += l
-	kevt.Host = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
+	offset += uint32(l)
+	e.Host = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
 
 	// read timestamp
 	l = bytes.ReadUint16(b[42+offset:])
 	buf = b[44+offset:]
-	offset += l
+	offset += uint32(l)
 	if len(buf) > 0 {
 		var err error
-		kevt.Timestamp, err = time.Parse(time.RFC3339Nano, string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l]))
+		e.Timestamp, err = time.Parse(time.RFC3339Nano, string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l]))
 		if err != nil {
 			unmarshalTimestampErrors.Add(1)
 		}
@@ -256,19 +247,19 @@ func (kevt *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 	// read parameters
 	nparams := bytes.ReadUint16(b[44+offset:])
 	// accumulates the offset of all parameter name and value lengths
-	var poffset uint16
+	var poffset uint32
 
 	for i := 0; i < int(nparams); i++ {
 		// read kparam type
 		typ := bytes.ReadUint16(b[46+offset+poffset:])
 		// read kparam name
-		kparamNameLength := bytes.ReadUint16(b[48+offset+poffset:])
+		kparamNameLength := uint32(bytes.ReadUint16(b[48+offset+poffset:]))
 		buf = b[50+offset+poffset:]
 		kparamName := string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:kparamNameLength:kparamNameLength])
 
 		var kval kparams.Value
 		switch kparams.Type(typ) {
-		case kparams.AnsiString, kparams.UnicodeString, kparams.SID, kparams.WbemSID:
+		case kparams.AnsiString, kparams.UnicodeString, kparams.FilePath:
 			// read string parameter
 			l := bytes.ReadUint16(b[50+offset+kparamNameLength+poffset:])
 			buf = b[52+offset+kparamNameLength+poffset:]
@@ -277,8 +268,8 @@ func (kevt *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 			}
 			// increment parameter offset by string by type length + name length bytes + length of
 			// the string parameter + string parameter size
-			poffset += kparamNameLength + 6 + l
-		case kparams.Uint64:
+			poffset += kparamNameLength + 6 + uint32(l)
+		case kparams.Uint64, kparams.Address:
 			kval = bytes.ReadUint64(b[50+offset+kparamNameLength+poffset:])
 			// increment parameter offset by type length + name length sizes + size of uint64
 			poffset += kparamNameLength + 4 + 8
@@ -306,7 +297,7 @@ func (kevt *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 		case kparams.Int32:
 			kval = int32(bytes.ReadUint32(b[50+offset+kparamNameLength+poffset:]))
 			poffset += kparamNameLength + 4 + 4
-		case kparams.Uint32:
+		case kparams.Uint32, kparams.Enum, kparams.Flags, kparams.Status:
 			kval = bytes.ReadUint32(b[50+offset+kparamNameLength+poffset:])
 			poffset += kparamNameLength + 4 + 4
 		case kparams.Uint16, kparams.Port:
@@ -315,17 +306,8 @@ func (kevt *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 		case kparams.Int16:
 			kval = int16(bytes.ReadUint16(b[50+offset+kparamNameLength+poffset:]))
 			poffset += kparamNameLength + 4 + 2
-		case kparams.Uint8, kparams.Enum:
-			switch kparamName {
-			case kparams.FileOperation:
-				kval = fs.FileDisposition(b[50+offset+kparamNameLength+poffset : 50+offset+kparamNameLength+poffset+1][0])
-			case kparams.FileShareMask:
-				kval = fs.FileShareMode(b[50+offset+kparamNameLength+poffset : 50+offset+kparamNameLength+poffset+1][0])
-			case kparams.NetL4Proto:
-				kval = network.L4Proto(b[50+offset+kparamNameLength+poffset : 50+offset+kparamNameLength+poffset+1][0])
-			default:
-				kval = b[50+offset+kparamNameLength+poffset : 50+offset+kparamNameLength+poffset+1][0]
-			}
+		case kparams.Uint8:
+			kval = b[50+offset+kparamNameLength+poffset : 50+offset+kparamNameLength+poffset+1][0]
 			poffset += kparamNameLength + 4 + 1
 		case kparams.Int8:
 			kval = int8(b[50+offset+kparamNameLength+poffset : 50+offset+kparamNameLength+poffset+1][0])
@@ -365,13 +347,13 @@ func (kevt *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 					unmarshalTimestampErrors.Add(1)
 				}
 			}
-			poffset += kparamNameLength + 6 + l
+			poffset += kparamNameLength + 6 + uint32(l)
 		case kparams.Slice:
 			// read slice element type
 			typ := b[50+offset+kparamNameLength+poffset]
 			// read slice size
 			l := bytes.ReadUint16(b[51+offset+kparamNameLength+poffset:])
-			var off uint16
+			var off uint32
 			switch typ {
 			case 's':
 				s := make([]string, l)
@@ -379,36 +361,44 @@ func (kevt *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 					size := bytes.ReadUint16(b[53+offset+kparamNameLength+poffset+off:])
 					buf := b[55+offset+kparamNameLength+poffset+off:]
 					s[i] = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:size:size])
-					off += 2 + size
+					off += 2 + uint32(size)
 				}
 				kval = s
 			}
 			poffset += kparamNameLength + 4 + 1 + 2 + off
+		case kparams.Binary, kparams.SID, kparams.WbemSID:
+			l := bytes.ReadUint32(b[50+offset+kparamNameLength+poffset:])
+			buf = b[54+offset+kparamNameLength+poffset:]
+			if len(buf) > 0 {
+				kval = buf[:l]
+			}
+			poffset += kparamNameLength + 8 + l
 		}
+
 		if kval != nil {
-			kevt.Kparams.AppendFromKcap(kparamName, kparams.Type(typ), kval)
+			e.Kparams.AppendFromKcap(kparamName, kparams.Type(typ), kval, e.Type)
 		}
 	}
 
 	offset += poffset
 
 	// read metadata tags
-	nbTags := bytes.ReadUint16(b[46+offset:])
-	var moffset uint16
-	for i := 0; i < int(nbTags); i++ {
+	ntags := bytes.ReadUint16(b[46+offset:])
+	var moffset uint32
+	for i := 0; i < int(ntags); i++ {
 		// read key
-		klen := bytes.ReadUint16(b[48+offset+moffset:])
+		klen := uint32(bytes.ReadUint16(b[48+offset+moffset:]))
 		buf = b[50+offset+moffset:]
 		key := string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:klen:klen])
 		// read value
-		vlen := bytes.ReadUint16(b[50+offset+klen+moffset:])
+		vlen := uint32(bytes.ReadUint16(b[50+offset+klen+moffset:]))
 		buf = b[52+offset+klen+moffset:]
 		value := string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:vlen:vlen])
 		// increment the offset by the length of the key + length value + size of uint16 * 2
 		// that corresponds to bytes storing the lengths of keys/values
 		moffset += klen + vlen + 4
 		if key != "" {
-			kevt.AddMeta(MetadataKey(key), value)
+			e.AddMeta(MetadataKey(key), value)
 		}
 	}
 
@@ -421,7 +411,7 @@ func (kevt *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 		if err != nil {
 			return err
 		}
-		kevt.PS = ps
+		e.PS = ps
 	}
 
 	return nil
@@ -434,34 +424,34 @@ func writePsResources() bool {
 }
 
 // MarshalJSON produces a JSON payload for this kevent.
-func (kevt *Kevent) MarshalJSON() []byte {
-	if kevt == nil {
+func (e *Kevent) MarshalJSON() []byte {
+	if e == nil {
 		return []byte{}
 	}
 
 	// start of JSON
 	js.writeObjectStart()
 
-	js.writeObjectField("seq").writeUint64(kevt.Seq).writeMore()
-	js.writeObjectField("pid").writeUint32(kevt.PID).writeMore()
-	js.writeObjectField("tid").writeUint32(kevt.Tid).writeMore()
-	js.writeObjectField("cpu").writeUint8(kevt.CPU).writeMore()
+	js.writeObjectField("seq").writeUint64(e.Seq).writeMore()
+	js.writeObjectField("pid").writeUint32(e.PID).writeMore()
+	js.writeObjectField("tid").writeUint32(e.Tid).writeMore()
+	js.writeObjectField("cpu").writeUint8(e.CPU).writeMore()
 
-	js.writeObjectField("name").writeString(kevt.Name).writeMore()
-	js.writeObjectField("category").writeString(string(kevt.Category)).writeMore()
-	js.writeObjectField("description").writeString(kevt.Description).writeMore()
-	js.writeObjectField("host").writeString(kevt.Host).writeMore()
+	js.writeObjectField("name").writeString(e.Name).writeMore()
+	js.writeObjectField("category").writeString(string(e.Category)).writeMore()
+	js.writeObjectField("description").writeString(e.Description).writeMore()
+	js.writeObjectField("host").writeString(e.Host).writeMore()
 
 	timestamp := make([]byte, 0)
-	timestamp = kevt.Timestamp.AppendFormat(timestamp, time.RFC3339Nano)
+	timestamp = e.Timestamp.AppendFormat(timestamp, time.RFC3339Nano)
 	js.writeObjectField("timestamp").writeString(string(timestamp)).writeMore()
 
 	// start kparams
 	js.writeObjectField("kparams")
 	js.writeObjectStart()
 
-	pars := make([]*Kparam, 0, len(kevt.Kparams))
-	for _, kpar := range kevt.Kparams {
+	pars := make([]*Kparam, 0, len(e.Kparams))
+	for _, kpar := range e.Kparams {
 		pars = append(pars, kpar)
 	}
 	sort.Slice(pars, func(i, j int) bool { return pars[i].Name < pars[j].Name })
@@ -470,8 +460,6 @@ func (kevt *Kevent) MarshalJSON() []byte {
 		writeMore := js.shouldWriteMore(i, len(pars))
 		js.writeObjectField(kpar.Name)
 		switch kpar.Type {
-		case kparams.AnsiString, kparams.UnicodeString, kparams.SID, kparams.WbemSID:
-			js.writeEscapeString(kpar.Value.(string))
 		case kparams.Int64:
 			js.writeInt64(kpar.Value.(int64))
 		case kparams.Uint64:
@@ -498,21 +486,6 @@ func (kevt *Kevent) MarshalJSON() []byte {
 			js.writeString(kpar.Value.(net.IP).String())
 		case kparams.HexInt8, kparams.HexInt16, kparams.HexInt32, kparams.HexInt64:
 			js.writeString(kpar.Value.(kparams.Hex).String())
-		case kparams.Enum:
-			switch kpar.Name {
-			case kparams.FileOperation:
-				js.writeString(kpar.Value.(fs.FileDisposition).String())
-			case kparams.FileShareMask:
-				js.writeString(kpar.Value.(fs.FileShareMode).String())
-			case kparams.NetL4Proto:
-				js.writeString(kpar.Value.(network.L4Proto).String())
-			default:
-				val, ok := kpar.Value.(uint8)
-				if !ok {
-					continue
-				}
-				js.writeUint8(val)
-			}
 		case kparams.Bool:
 			js.writeBool(kpar.Value.(bool))
 		case kparams.Time:
@@ -530,6 +503,8 @@ func (kevt *Kevent) MarshalJSON() []byte {
 				}
 				js.writeArrayEnd()
 			}
+		default:
+			js.writeEscapeString(e.GetParamAsString(kpar.Name))
 		}
 		if writeMore {
 			js.writeMore()
@@ -542,8 +517,8 @@ func (kevt *Kevent) MarshalJSON() []byte {
 	js.writeObjectField("meta")
 	js.writeObjectStart()
 	var i int
-	for k, v := range kevt.Metadata {
-		writeMore := js.shouldWriteMore(i, len(kevt.Metadata))
+	for k, v := range e.Metadata {
+		writeMore := js.shouldWriteMore(i, len(e.Metadata))
 		js.writeObjectField(k.String()).writeEscapeString(fmt.Sprintf("%s", v))
 		if writeMore {
 			js.writeMore()
@@ -553,7 +528,7 @@ func (kevt *Kevent) MarshalJSON() []byte {
 
 	// end metadata
 	js.writeObjectEnd()
-	ps := kevt.PS
+	ps := e.PS
 	if ps != nil {
 		js.writeMore()
 	}
@@ -566,7 +541,7 @@ func (kevt *Kevent) MarshalJSON() []byte {
 		js.writeObjectField("pid").writeUint32(ps.PID).writeMore()
 		js.writeObjectField("ppid").writeUint32(ps.Ppid).writeMore()
 		js.writeObjectField("name").writeString(ps.Name).writeMore()
-		js.writeObjectField("comm").writeEscapeString(ps.Comm).writeMore()
+		js.writeObjectField("cmdline").writeEscapeString(ps.Cmdline).writeMore()
 		js.writeObjectField("exe").writeEscapeString(ps.Exe).writeMore()
 		js.writeObjectField("cwd").writeEscapeString(ps.Cwd).writeMore()
 		js.writeObjectField("sid").writeEscapeString(ps.SID).writeMore()
@@ -582,7 +557,7 @@ func (kevt *Kevent) MarshalJSON() []byte {
 		}
 		js.writeArrayEnd().writeMore()
 
-		js.writeObjectField("sessionid").writeUint8(ps.SessionID)
+		js.writeObjectField("sessionid").writeUint32(ps.SessionID)
 
 		parent := ps.Parent
 		if parent != nil {
@@ -591,7 +566,7 @@ func (kevt *Kevent) MarshalJSON() []byte {
 			js.writeObjectStart()
 
 			js.writeObjectField("name").writeString(parent.Name).writeMore()
-			js.writeObjectField("comm").writeEscapeString(parent.Comm).writeMore()
+			js.writeObjectField("cmdline").writeEscapeString(parent.Cmdline).writeMore()
 			js.writeObjectField("exe").writeEscapeString(parent.Exe).writeMore()
 			js.writeObjectField("cwd").writeEscapeString(parent.Cwd).writeMore()
 			js.writeObjectField("sid").writeEscapeString(parent.SID)
@@ -660,7 +635,7 @@ func (kevt *Kevent) MarshalJSON() []byte {
 				writeMore := js.shouldWriteMore(i, len(ps.Modules))
 				js.writeObjectStart()
 				js.writeObjectField("name").writeEscapeString(m.Name).writeMore()
-				js.writeObjectField("size").writeUint32(m.Size)
+				js.writeObjectField("size").writeUint64(m.Size)
 				js.writeObjectEnd()
 				if writeMore {
 					js.writeMore()
@@ -711,7 +686,7 @@ func (kevt *Kevent) MarshalJSON() []byte {
 			js.writeObjectField("entrypoint").writeString(pe.EntryPoint).writeMore()
 
 			timestamp := make([]byte, 0)
-			timestamp = kevt.Timestamp.AppendFormat(timestamp, time.RFC3339Nano)
+			timestamp = e.Timestamp.AppendFormat(timestamp, time.RFC3339Nano)
 			js.writeObjectField("link_time").writeString(string(timestamp)).writeMore()
 
 			// sections

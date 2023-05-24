@@ -48,13 +48,13 @@ func (f *Formatter) Format(kevt *Kevent) []byte {
 		values[ppid] = strconv.FormatUint(uint64(ps.Ppid), 10)
 		values[cwd] = ps.Cwd
 		values[exe] = ps.Exe
-		values[comm] = ps.Comm
+		values[cmd] = ps.Cmdline
 		values[sid] = ps.SID
 		parent := ps.Parent
 		if parent != nil {
 			values[pproc] = parent.Name
 			values[pexe] = parent.Exe
-			values[pcomm] = parent.Comm
+			values[pcmd] = parent.Cmdline
 		}
 		if ps.PE != nil {
 			values[pe] = ps.PE.String()

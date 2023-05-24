@@ -33,17 +33,27 @@ type SnapshotterMock struct {
 }
 
 // Write method
-func (s *SnapshotterMock) Write(kevt *kevent.Kevent) error { return nil }
+func (s *SnapshotterMock) Write(kevt *kevent.Kevent) error {
+	args := s.Called(kevt)
+	return args.Error(0)
+}
 
 // Remove method
-func (s *SnapshotterMock) Remove(kevt *kevent.Kevent) error { return nil }
+func (s *SnapshotterMock) Remove(kevt *kevent.Kevent) error {
+	args := s.Called(kevt)
+	return args.Error(0)
+}
 
 // FindHandles method
-func (s *SnapshotterMock) FindHandles(pid uint32) ([]htypes.Handle, error) { return nil, nil }
+func (s *SnapshotterMock) FindHandles(pid uint32) ([]htypes.Handle, error) {
+	args := s.Called(pid)
+	return args.Get(0).([]htypes.Handle), args.Error(1)
+}
 
 // FindByObject method
 func (s *SnapshotterMock) FindByObject(object uint64) (htypes.Handle, bool) {
-	return htypes.Handle{}, false
+	args := s.Called(object)
+	return args.Get(0).(htypes.Handle), args.Bool(1)
 }
 
 // RegisterCreateCallback method
@@ -57,3 +67,6 @@ func (s *SnapshotterMock) GetSnapshot() []htypes.Handle {
 	handles := s.Called()
 	return handles.Get(0).([]htypes.Handle)
 }
+
+// Close method
+func (s *SnapshotterMock) Close() error { return nil }

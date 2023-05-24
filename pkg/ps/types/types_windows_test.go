@@ -22,56 +22,56 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/bootid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sys/windows"
 	"os"
 	"testing"
 	"time"
 )
 
 func TestVisit(t *testing.T) {
-	ps1 := &PS{
-		Name: "cmd.exe",
+	p1 := &PS{
+		Name: "powershell.exe",
+		Parent: &PS{
+			Name: "cmd.exe",
+		},
 	}
-	ps2 := &PS{
-		Name:   "powershell.exe",
-		Parent: ps1,
-	}
-	ps3 := &PS{
-		Name:   "winword.exe",
-		Parent: ps2,
-	}
-
-	expected := []string{"powershell.exe", "cmd.exe"}
-	parents := make([]string, 0)
-
-	Walk(func(ps *PS) { parents = append(parents, ps.Name) }, ps3)
-
-	assert.Equal(t, expected, parents)
-
-	ps4 := &PS{
-		Name:   "iexplorer.exe",
-		Parent: ps3,
-	}
-	ps5 := &PS{
-		Name:   "dropper.exe",
-		Parent: ps4,
+	p2 := &PS{
+		Name: "iexplorer.exe",
+		Parent: &PS{
+			Name: "winword.exe",
+			Parent: &PS{
+				Name: "powershell.exe",
+				Parent: &PS{
+					Name: "cmd.exe",
+				},
+			},
+		},
 	}
 
-	expected1 := []string{"iexplorer.exe", "winword.exe", "powershell.exe", "cmd.exe"}
-	parents1 := make([]string, 0)
+	var tests = []struct {
+		proc *PS
+		want []string
+	}{
+		{&PS{Name: "winword.exe", Parent: p1}, []string{"powershell.exe", "cmd.exe"}},
+		{&PS{Name: "dropper.exe", Parent: p2}, []string{"iexplorer.exe", "winword.exe", "powershell.exe", "cmd.exe"}},
+	}
 
-	Walk(func(ps *PS) { parents1 = append(parents1, ps.Name) }, ps5)
-
-	assert.Equal(t, expected1, parents1)
+	for _, tt := range tests {
+		ancestors := make([]string, 0)
+		Walk(func(ps *PS) { ancestors = append(ancestors, ps.Name) }, tt.proc)
+		assert.Equal(t, ancestors, tt.want)
+	}
 }
 
 func TestPSArgs(t *testing.T) {
-	ps := NewPS(
+	ps := New(
 		233,
 		4532,
 		"spotify.exe",
-		"",
 		"C:\\Users\\admin\\AppData\\Roaming\\Spotify\\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler \"--metrics-dir=C:\\Users\\admin\\AppData\\Local\\Spotify\\User Data\" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify",
-		Thread{}, nil)
+		"C:\\Users\\admin\\AppData\\Roaming\\Spotify\\Spotify.exe",
+		&windows.SID{},
+		1)
 	require.Len(t, ps.Args, 11)
 	require.Equal(t, "/prefetch:7", ps.Args[2])
 }

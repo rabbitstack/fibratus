@@ -22,8 +22,11 @@
 package types
 
 import (
+	"expvar"
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/syscall/handle"
+	"github.com/rabbitstack/fibratus/pkg/sys"
+	log "github.com/sirupsen/logrus"
+	"golang.org/x/sys/windows"
 	"strings"
 )
 
@@ -33,10 +36,24 @@ type Meta interface{}
 // Handles represents a collection of handles.
 type Handles []Handle
 
+// typeNames maps the object type id to its name
+var typeNames = map[uint16]string{}
+
+var (
+	// typesCount counts the number of resolved object type names
+	typesCount = expvar.NewInt("handle.types.count")
+	// typeMisses counts the number of times type name resolution failed
+	typeMisses = expvar.NewInt("handle.types.name.misses")
+)
+
+func init() {
+	findObjectTypes()
+}
+
 // Handle stores various metadata specific to the handle allocated by a process.
 type Handle struct {
 	// Num represents the internal handle identifier.
-	Num handle.Handle `json:"id"`
+	Num windows.Handle `json:"id"`
 	// Object is the kernel address that this handle references.
 	Object uint64 `json:"-"`
 	// Pid represents the process's identifier that owns the handle.
@@ -90,6 +107,7 @@ type AlpcPortInfo struct {
 // MutantInfo stores metadata about particular mutant object.
 type MutantInfo struct {
 	Count       int32
+	_           bool //unused
 	IsAbandoned bool
 }
 
@@ -105,4 +123,28 @@ func (handles Handles) String() string {
 		sb.WriteString(h.String() + " | ")
 	}
 	return strings.TrimSuffix(sb.String(), " | ")
+}
+
+// ConvertTypeIDToName converts the object type identifier to its symbolical name.
+func ConvertTypeIDToName(id uint16) string {
+	typ, ok := typeNames[id]
+	if ok {
+		return typ
+	}
+	typeMisses.Add(1)
+	return ""
+}
+
+func findObjectTypes() {
+	objectTypes, err := sys.QueryObject[sys.ObjectTypesInformation](0, sys.ObjectTypesInformationClass)
+	if err != nil {
+		log.Warnf("unable to query object types: %v", err)
+		return
+	}
+	typesCount.Add(int64(objectTypes.NumberOfTypes))
+	objectTypeInfo := objectTypes.First()
+	for i := 0; i < int(objectTypes.NumberOfTypes); i++ {
+		objectTypeInfo = objectTypes.Next(objectTypeInfo)
+		typeNames[uint16(objectTypeInfo.TypeIndex)] = objectTypeInfo.TypeName.String()
+	}
 }

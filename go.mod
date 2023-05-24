@@ -6,6 +6,7 @@ require (
 	github.com/antchfx/htmlquery v1.2.5
 	github.com/briandowns/spinner v1.12.0
 	github.com/dustin/go-humanize v1.0.0
+	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e
 	github.com/hashicorp/go-version v1.2.1
 	github.com/hillu/go-yara/v4 v4.2.4
 	github.com/jedib0t/go-pretty/v6 v6.2.1
@@ -43,7 +44,6 @@ require (
 	github.com/edsrzf/mmap-go v1.1.0 // indirect
 	github.com/fatih/color v1.7.0 // indirect
 	github.com/fsnotify/fsnotify v1.4.7 // indirect
-	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/google/uuid v1.1.1 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/huandu/xstrings v1.3.1 // indirect

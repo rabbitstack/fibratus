@@ -38,9 +38,11 @@ Process:		{{ .Kevt.PS.Name }}
 Exe:			{{ .Kevt.PS.Exe }}
 Pid:  			{{ .Kevt.PS.PID }}
 Ppid: 			{{ .Kevt.PS.Ppid }}
-Cmdline:		{{ .Kevt.PS.Comm }}
+Cmdline:		{{ .Kevt.PS.Cmdline }}
 Cwd:			{{ .Kevt.PS.Cwd }}
 SID:			{{ .Kevt.PS.SID }}
+User:           {{ .Kevt.PS.Username }}
+Domain:         {{ .Kevt.PS.Domain }}
 Session ID:		{{ .Kevt.PS.SessionID }}
 {{ if and (.SerializeEnvs) (.Kevt.PS.Envs) }}
 Env:
@@ -119,18 +121,18 @@ Resources:
 
 // RenderDefaultTemplate returns the event string representation
 // after applying the default Go template.
-func (kevt *Kevent) RenderDefaultTemplate() ([]byte, error) {
+func (e *Kevent) RenderDefaultTemplate() ([]byte, error) {
 	tmpl, err := template.New("event").Parse(Template)
 	if err != nil {
 		return nil, err
 	}
-	return renderTemplate(kevt, tmpl)
+	return renderTemplate(e, tmpl)
 }
 
 // RenderCustomTemplate returns the event string representation
 // after applying the given Go template.
-func (kevt *Kevent) RenderCustomTemplate(tmpl *template.Template) ([]byte, error) {
-	return renderTemplate(kevt, tmpl)
+func (e *Kevent) RenderCustomTemplate(tmpl *template.Template) ([]byte, error) {
+	return renderTemplate(e, tmpl)
 }
 
 func renderTemplate(kevt *Kevent, tmpl *template.Template) ([]byte, error) {

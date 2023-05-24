@@ -39,15 +39,15 @@ func TestPSAccessor(t *testing.T) {
 		},
 	}
 
-	env, err := ps.get(fields.Field("ps.envs[ALLUSERSPROFILE]"), kevt)
+	env, err := ps.get("ps.envs[ALLUSERSPROFILE]", kevt)
 	require.NoError(t, err)
 	assert.Equal(t, "C:\\ProgramData", env)
 
-	env, err = ps.get(fields.Field("ps.envs[ALLUSER]"), kevt)
+	env, err = ps.get("ps.envs[ALLUSER]", kevt)
 	require.NoError(t, err)
 	assert.Equal(t, "C:\\ProgramData", env)
 
-	env, err = ps.get(fields.Field("ps.envs[ProgramFiles]"), kevt)
+	env, err = ps.get("ps.envs[ProgramFiles]", kevt)
 	require.NoError(t, err)
 	assert.Equal(t, "C:\\Program Files (x86)", env)
 }
@@ -73,20 +73,20 @@ func TestPEAccessor(t *testing.T) {
 		},
 	}
 
-	entropy, err := pea.get(fields.Field("pe.sections[.text].entropy"), kevt)
+	entropy, err := pea.get("pe.sections[.text].entropy", kevt)
 	require.NoError(t, err)
 	assert.Equal(t, 6.368381, entropy)
 
-	v, err := pea.get(fields.Field("pe.sections[.text].md6"), kevt)
+	v, err := pea.get("pe.sections[.text].md6", kevt)
 	require.NoError(t, err)
 	require.Nil(t, v)
 
-	md5, err := pea.get(fields.Field("pe.sections[.rdata].md5"), kevt)
+	md5, err := pea.get("pe.sections[.rdata].md5", kevt)
 	require.NoError(t, err)
 	require.Nil(t, v)
 	assert.Equal(t, "ffa5c960b421ca9887e54966588e97e8", md5)
 
-	company, err := pea.get(fields.Field("pe.resources[CompanyName]"), kevt)
+	company, err := pea.get("pe.resources[CompanyName]", kevt)
 	require.NoError(t, err)
 	assert.Equal(t, "Microsoft Corporation", company)
 }

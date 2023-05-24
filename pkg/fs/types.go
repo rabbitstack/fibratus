@@ -21,45 +21,19 @@
 
 package fs
 
-// FileDisposition is the alias for the file disposition modes
-type FileDisposition uint8
+import "golang.org/x/sys/windows"
 
-const (
-	// Supersede dictates that if the file already exists, it is replaced with the given file. Otherwise the file with given name is created.
-	Supersede FileDisposition = iota
-	// Open opens the file if it already exists instead of creating a new file.
-	Open
-	// Create fails if the file already exists.
-	Create
-	// OpenIf opens the file if it already exists or creates a new file otherwise.
-	OpenIf
-	// Overwrite opens and overwrites the file if it already exists. Otherwise it fails.
-	Overwrite
-	// OverwriteIf opens and overwrites the file is it already exists. Otherwise it creates a new file.
-	OverwriteIf
-)
-
-// String returns the textual representation of the file disposition.
-func (fd FileDisposition) String() string {
-	switch fd {
-	case Supersede:
-		return "supersede"
-	case Open:
-		return "open"
-	case Create:
-		return "create"
-	case OpenIf:
-		return "openif"
-	case Overwrite:
-		return "overwrite"
-	case OverwriteIf:
-		return "overwriteif"
-	default:
-		return "<na>"
-	}
+// FileCreateDispositions is the mapping between the file create disposition and its symbolical name.
+var FileCreateDispositions = map[uint32]string{
+	uint32(windows.FILE_SUPERSEDE):    "SUPERSEDE",
+	uint32(windows.FILE_OPEN):         "OPEN",
+	uint32(windows.FILE_CREATE):       "CREATE",
+	uint32(windows.FILE_OPEN_IF):      "OPEN_IF",
+	uint32(windows.FILE_OVERWRITE):    "OVERWRITE",
+	uint32(windows.FILE_OVERWRITE_IF): "OVERWRITE_IF",
 }
 
-// FileType is the the type alias for the file type
+// FileType is the type alias for the file type
 type FileType uint8
 
 const (
@@ -99,34 +73,12 @@ func (typ FileType) String() string {
 	}
 }
 
-// FileShareMode designates a type alias for file share mode values
-type FileShareMode uint8
-
-const (
-	// FileShareRead allows threads to gain read access to the file
-	FileShareRead FileShareMode = 1
-	// FileShareWrite allows threads to gain write access to the file
-	FileShareWrite FileShareMode = 1 << 1
-	// FileShareDelete grants threads the possibility to delete files
-	FileShareDelete FileShareMode = 1 << 2
-)
-
-// String returns user-friendly representation of the file share mask.
-func (shareMode FileShareMode) String() string {
-	if shareMode == FileShareRead {
-		return "r--"
-	} else if shareMode == FileShareWrite {
-		return "-w-"
-	} else if shareMode == FileShareDelete {
-		return "--d"
-	} else if shareMode&FileShareRead == FileShareRead && shareMode&FileShareWrite == FileShareWrite {
-		return "rw-"
-	} else if shareMode&FileShareRead == FileShareRead && shareMode&FileShareDelete == FileShareDelete {
-		return "r-d"
-	} else if shareMode&FileShareWrite == FileShareWrite && shareMode&FileShareDelete == FileShareDelete {
-		return "-wd"
-	} else if shareMode&FileShareRead == FileShareRead && shareMode&FileShareWrite == FileShareWrite && shareMode&FileShareDelete == FileShareDelete {
-		return "rwd"
-	}
-	return "---"
+// FileTypes represents the mapping of file type identifiers to their string values.
+var FileTypes = map[uint32]string{
+	uint32(Regular):   "File",
+	uint32(Directory): "Directory",
+	uint32(Pipe):      "Pipe",
+	uint32(Console):   "Console",
+	uint32(Mailslot):  "Mailslot",
+	uint32(Other):     "Other",
 }

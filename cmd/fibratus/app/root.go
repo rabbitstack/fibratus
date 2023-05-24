@@ -20,6 +20,12 @@ package app
 
 import (
 	"errors"
+	"github.com/rabbitstack/fibratus/cmd/fibratus/app/capture"
+	"github.com/rabbitstack/fibratus/cmd/fibratus/app/config"
+	"github.com/rabbitstack/fibratus/cmd/fibratus/app/list"
+	"github.com/rabbitstack/fibratus/cmd/fibratus/app/replay"
+	"github.com/rabbitstack/fibratus/cmd/fibratus/app/service"
+	"github.com/rabbitstack/fibratus/cmd/fibratus/app/stats"
 	"github.com/spf13/cobra"
 	"runtime"
 )
@@ -27,13 +33,18 @@ import (
 // RootCmd is the entrance to Fibratus CLI
 var RootCmd = &cobra.Command{
 	Use:   "fibratus",
-	Short: "Modern tool for the kernel observability and exploration",
+	Short: "Modern tool for the kernel observability and exploration with a focus on security",
 	Long: `
-	Fibratus is a tool for exploration and tracing of the Windows kernel. 
-	It lets you trap system-wide events such as process life-cycle, file system I/O, 
-	registry modifications or network requests among many other observability signals. 
-	In a nutshell, Fibratus allows for gaining deep operational visibility into the Windows 
-	kernel but also processes running on top of it.
+	Fibratus is a tool for exploration and tracing of the Windows kernel with a focus on security.
+	It lets you trap system-wide events such as process life-cycle, file system I/O,
+	registry modifications or network requests among many other observability signals.
+	Events can be shipped to a wide array of output sinks or dumped to capture files
+    for local inspection and forensics analysis. The powerful filtering engine permits
+    drilling into the event flux entrails and the rules engine is capable of detecting
+    stealthy adversary attacks and sophisticated threats.
+
+	You can use filaments to extend Fibratus with your own arsenal of tools and so leverage
+    the power of the Python ecosystem
 	`,
 	SilenceUsage: true,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -48,16 +59,17 @@ var RootCmd = &cobra.Command{
 }
 
 func init() {
+	RootCmd.AddCommand(capture.Command)
+	RootCmd.AddCommand(replay.Command)
+	RootCmd.AddCommand(service.InstallCommand)
+	RootCmd.AddCommand(service.RemoveCommand)
+	RootCmd.AddCommand(service.StartCommand)
+	RootCmd.AddCommand(service.StopCommand)
+	RootCmd.AddCommand(service.RestartCommand)
+	RootCmd.AddCommand(stats.Command)
+	RootCmd.AddCommand(config.Command)
+	RootCmd.AddCommand(list.Command)
 	RootCmd.AddCommand(runCmd)
-	RootCmd.AddCommand(captureCmd)
-	RootCmd.AddCommand(replayCmd)
-	RootCmd.AddCommand(installSvcCmd)
-	RootCmd.AddCommand(removeSvcCmd)
-	RootCmd.AddCommand(startSvcCmd)
-	RootCmd.AddCommand(stopSvcCmd)
-	RootCmd.AddCommand(restartSvcCmd)
-	RootCmd.AddCommand(statsCmd)
-	RootCmd.AddCommand(configCmd)
 	RootCmd.AddCommand(docsCmd)
 	RootCmd.AddCommand(versionCmd)
 }

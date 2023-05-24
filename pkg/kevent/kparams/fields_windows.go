@@ -30,16 +30,22 @@ const (
 	ThreadID = "tid"
 	// ProcessParentID field represents the parent process identifier.
 	ProcessParentID = "ppid"
+	// ProcessRealParentID field presents the real parent process identifier.
+	ProcessRealParentID = "real_ppid"
 	// SessionID fields represents the session identifier.
 	SessionID = "session_id"
 	// UserSID field is the security identifier associated to the process token under which it is run.
 	UserSID = "sid"
+	// Username field represents the username under which the event was generated.
+	Username = "username"
+	// Domain field represents the domain under which the event was generated.
+	Domain = "domain"
 	// ProcessName field denotes the process image name.
 	ProcessName = "name"
 	// Exe field denotes the full path of the executable.
 	Exe = "exe"
-	// Comm field represents the process command line.
-	Comm = "comm"
+	// Cmdline field represents the process command line.
+	Cmdline = "cmdline"
 	// DTB field denotes the address of the process directory table.
 	DTB = "directory_table_base"
 	// ExitStatus is the field that represents the process exit status.
@@ -49,8 +55,6 @@ const (
 
 	// DesiredAccess field denotes the access rights for different kernel objects such as processes or threads.
 	DesiredAccess = "desired_access"
-	// DesiredAccessNames field denotes the list of human-readable access rights.
-	DesiredAccessNames = "desired_access_names"
 
 	// BasePrio field is the thread base priority assigned by the scheduler.
 	BasePrio = "base_prio"
@@ -66,17 +70,17 @@ const (
 	UstackBase = "ustack"
 	// UstackLimit field is the end address of the user space stack.
 	UstackLimit = "ustack_limit"
-	// ThreadEntrypoint field is the address of the thread main function.
-	ThreadEntrypoint = "entrypoint"
+	// StartAddr field is the address of the thread main function.
+	StartAddr = "entrypoint"
 
 	// FileObject determines the field name for the file object pointer.
 	FileObject = "file_object"
 	// FileName represents the field that designates the absolute path of the file.
 	FileName = "file_name"
 	// FileCreateOptions is the field that represents the values passed in the CreateDispositions parameter to the NtCreateFile function.
-	FileCreateOptions = "options"
+	FileCreateOptions = "create_options"
 	// FileOperation is the field that represents the values passed in the CreateOptions parameter to the NtCreateFile function.
-	FileOperation = "operation"
+	FileOperation = "create_disposition"
 	// FileCreated represents the name for the file creation field.
 	FileCreated = "created"
 	// FileAccessed represents the name for the file access field.
@@ -97,8 +101,8 @@ const (
 	FileInfoClass = "class"
 	// FileKey represents the directory key identifier in EnumDirectory events.
 	FileKey = "file_key"
-	// FileDirectory represents the filed for the directory name in EnumDirectory events.
-	FileDirectory = "dir"
+	// FileDirectory represents the field for the directory name in EnumDirectory events.
+	FileDirectory = "directory"
 	// FileIrpPtr represents the I/O request packet id.
 	FileIrpPtr = "irp"
 	// FileExtraInfo is the parameter that represents extra information returned by the file system for the operation. For example for a read request, the actual number of bytes that were read.
@@ -111,7 +115,7 @@ const (
 	// RegValue identifies the parameter name that contains the value
 	RegValue = "value"
 	// RegValueType identifies the parameter that represents registry value type e.g (DWORD, BINARY)
-	RegValueType = "type"
+	RegValueType = "value_type"
 
 	// ImageBase identifies the parameter name for the base address of the process in which the image is loaded.
 	ImageBase = "base_address"
@@ -171,6 +175,4 @@ const (
 	HandleObjectName = "handle_name"
 	// HandleObjectTypeID identifies the parameter that represents the kernel object type identifier.
 	HandleObjectTypeID = "type_id"
-	// HandleObjectTypeName identifies the parameter that represents the kernel object type name.
-	HandleObjectTypeName = "handle_type"
 )

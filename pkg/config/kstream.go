@@ -23,7 +23,6 @@ package config
 
 import (
 	"runtime"
-	"strings"
 	"time"
 
 	"github.com/rabbitstack/fibratus/pkg/kevent"
@@ -45,7 +44,6 @@ const (
 	minBuffers                    = "kstream.min-buffers"
 	maxBuffers                    = "kstream.max-buffers"
 	flushInterval                 = "kstream.flush-interval"
-	rawEventParsing               = "kstream.raw-event-parsing"
 
 	excludedEvents = "kstream.blacklist.events"
 	excludedImages = "kstream.blacklist.images"
@@ -59,7 +57,7 @@ var (
 	defaultFlushInterval = time.Second
 )
 
-// KstreamConfig stores different configuration options for fine tuning kstream consumer/controller settings.
+// KstreamConfig stores different configuration options for fine-tuning kstream consumer/controller settings.
 type KstreamConfig struct {
 	// EnableThreadKevents indicates if thread kernel events are collected by the ETW provider.
 	EnableThreadKevents bool `json:"enable-thread" yaml:"enable-thread"`
@@ -79,7 +77,7 @@ type KstreamConfig struct {
 	EnableAntimalwareEngineEvents bool `json:"enable-antimalware-engine" yaml:"enable-antimalware-engine"`
 	// BufferSize represents the amount of memory allocated for each event tracing session buffer, in kilobytes.
 	// The buffer size affects the rate at which buffers fill and must be flushed (small buffer size requires
-	// less memory but it increases the rate at which buffers must be flushed).
+	// less memory, but it increases the rate at which buffers must be flushed).
 	BufferSize uint32 `json:"buffer-size" yaml:"buffer-size"`
 	// MinBuffers determines the minimum number of buffers allocated for the event tracing session's buffer pool.
 	MinBuffers uint32 `json:"min-buffers" yaml:"min-buffers"`
@@ -91,9 +89,6 @@ type KstreamConfig struct {
 	ExcludedKevents []string `json:"blacklist.events" yaml:"blacklist.events"`
 	// ExcludedImages are process image names that will be rejected if they generate a kernel event.
 	ExcludedImages []string `json:"blacklist.images" yaml:"blacklist.images"`
-
-	// RawEventParsing indicates if raw event buffer parsing is enabled
-	RawEventParsing bool `json:"raw-param-parsing" yaml:"raw-event-parsing"`
 
 	excludedKtypes map[ktypes.Ktype]bool
 	excludedImages map[string]bool
@@ -114,7 +109,6 @@ func (c *KstreamConfig) initFromViper(v *viper.Viper) {
 	c.FlushTimer = v.GetDuration(flushInterval)
 	c.ExcludedKevents = v.GetStringSlice(excludedEvents)
 	c.ExcludedImages = v.GetStringSlice(excludedImages)
-	c.RawEventParsing = v.GetBool(rawEventParsing)
 
 	c.excludedKtypes = make(map[ktypes.Ktype]bool)
 	c.excludedImages = make(map[string]bool)
@@ -125,7 +119,7 @@ func (c *KstreamConfig) initFromViper(v *viper.Viper) {
 		}
 	}
 	for _, name := range c.ExcludedImages {
-		c.excludedImages[strings.ToLower(name)] = true
+		c.excludedImages[name] = true
 	}
 }
 
@@ -133,10 +127,11 @@ func (c *KstreamConfig) initFromViper(v *viper.Viper) {
 func (c *KstreamConfig) Init() {
 	c.excludedKtypes = make(map[ktypes.Ktype]bool)
 	c.excludedImages = make(map[string]bool)
-
 	for _, name := range c.ExcludedKevents {
-		if ktype := ktypes.KeventNameToKtype(name); ktype != ktypes.UnknownKtype {
-			c.excludedKtypes[ktype] = true
+		for _, ktype := range ktypes.KeventNameToKtypes(name) {
+			if ktype != ktypes.UnknownKtype {
+				c.excludedKtypes[ktype] = true
+			}
 		}
 	}
 	for _, name := range c.ExcludedImages {

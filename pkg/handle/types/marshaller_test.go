@@ -22,15 +22,15 @@
 package types
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/syscall/handle"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sys/windows"
 	"testing"
 )
 
 func TestMarshaller(t *testing.T) {
 	h := Handle{
-		Num:    handle.Handle(0xffffd105e9baaf70),
+		Num:    windows.Handle(0xffffd105e9baaf70),
 		Name:   `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\Tcpip\Parameters\Interfaces\{b677c565-6ca5-45d3-b618-736b4e09b036}`,
 		Type:   "Key",
 		Object: 777488883434455544,
@@ -42,14 +42,14 @@ func TestMarshaller(t *testing.T) {
 	err := clone.Unmarshal(buf)
 	require.NoError(t, err)
 
-	assert.Equal(t, handle.Handle(18446692422059208560), clone.Num)
+	assert.Equal(t, windows.Handle(18446692422059208560), clone.Num)
 	assert.Equal(t, "Key", clone.Type)
 	assert.Equal(t, `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\Tcpip\Parameters\Interfaces\{b677c565-6ca5-45d3-b618-736b4e09b036}`, clone.Name)
 	assert.Equal(t, uint32(1023), clone.Pid)
 	assert.Equal(t, uint64(777488883434455544), clone.Object)
 
 	h = Handle{
-		Num:  handle.Handle(0xefffd105e9adaf70),
+		Num:  windows.Handle(0xefffd105e9adaf70),
 		Name: `\RPC Control\OLEA61B27E13E028C4EA6C286932E80`,
 		Type: "ALPC Port",
 		Pid:  uint32(1023),
@@ -64,7 +64,7 @@ func TestMarshaller(t *testing.T) {
 	err = clone.Unmarshal(buf)
 	require.NoError(t, err)
 
-	assert.Equal(t, handle.Handle(0xefffd105e9adaf70), clone.Num)
+	assert.Equal(t, windows.Handle(0xefffd105e9adaf70), clone.Num)
 	assert.Equal(t, "ALPC Port", clone.Type)
 	assert.Equal(t, `\RPC Control\OLEA61B27E13E028C4EA6C286932E80`, clone.Name)
 	assert.Equal(t, uint32(1023), clone.Pid)

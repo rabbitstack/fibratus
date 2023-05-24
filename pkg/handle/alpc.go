@@ -23,16 +23,17 @@ package handle
 
 import (
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
-	"github.com/rabbitstack/fibratus/pkg/syscall/handle"
-	"github.com/rabbitstack/fibratus/pkg/syscall/object"
+	"github.com/rabbitstack/fibratus/pkg/sys"
+	"golang.org/x/sys/windows"
 	"unsafe"
 )
 
-// GetAlpcPort get ALPC port information for the specified ALPC handle and process id.
-func GetAlpcPort(h handle.Handle) (*htypes.AlpcPortInfo, error) {
-	buf := make([]byte, 16)
-	if err := object.GetAlpcInformation(h, object.AlpcBasicPortInfo, buf); err != nil {
+// GetAlpcPort get ALPC port information for the specified ALPC port handle.
+func GetAlpcPort(handle windows.Handle) (*htypes.AlpcPortInfo, error) {
+	b := make([]byte, 16)
+	err := sys.NtAlpcQueryInformation(handle, sys.AlpcBasicPortInformationClass, unsafe.Pointer(&b[0]), uint32(len(b)), nil)
+	if err != nil {
 		return nil, err
 	}
-	return (*htypes.AlpcPortInfo)(unsafe.Pointer(&buf[0])), nil
+	return (*htypes.AlpcPortInfo)(unsafe.Pointer(&b[0])), nil
 }

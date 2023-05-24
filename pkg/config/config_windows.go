@@ -214,6 +214,14 @@ func (c Config) GetConfigFile() string {
 	return c.viper.GetString(configFile)
 }
 
+// GetRuleGroups returns all rule groups loaded into the engine.
+func (c Config) GetRuleGroups() []FilterGroup {
+	if c.Filters == nil {
+		return nil
+	}
+	return c.Filters.groups
+}
+
 // MustViperize adds the flag set to the Cobra command and binds them within the Viper flags.
 func (c *Config) MustViperize(cmd *cobra.Command) {
 	cmd.PersistentFlags().AddFlagSet(c.flags)
@@ -326,7 +334,7 @@ func (c *Config) addFlags() {
 		c.flags.Duration(timeout, time.Second*15, "Determines the timeout for the API server responses")
 	}
 	if c.opts.run || c.opts.capture {
-		c.flags.Bool(initHandleSnapshot, true, "Indicates whether initial handle snapshot is built. This implies scanning the system handles table and producing an entry for each handle object")
+		c.flags.Bool(initHandleSnapshot, false, "Indicates whether initial handle snapshot is built. This implies scanning the system handles table and producing an entry for each handle object")
 
 		c.flags.Bool(enableThreadKevents, true, "Determines whether thread kernel events are collected by Kernel Logger provider")
 		c.flags.Bool(enableRegistryKevents, true, "Determines whether registry kernel events are collected by Kernel Logger provider")
@@ -340,9 +348,8 @@ func (c *Config) addFlags() {
 		c.flags.Int(minBuffers, int(defaultMinBuffers), "Determines the minimum number of buffers allocated for the event tracing session's buffer pool")
 		c.flags.Int(maxBuffers, int(defaultMaxBuffers), "Determines the maximum number of buffers allocated for the event tracing session's buffer pool")
 		c.flags.Duration(flushInterval, defaultFlushInterval, "Specifies how often the trace buffers are forcibly flushed")
-		c.flags.StringSlice(excludedEvents, []string{}, "A list of symbolical kernel event names that will be dropped from the kernel event stream. By default all events are accepted")
-		c.flags.StringSlice(excludedImages, []string{"System"}, "A list of image names that will be dropped from the kernel event stream. Image names are case insensitive")
-		c.flags.Bool(rawEventParsing, true, "Determines if raw event buffer parsing is used instead of TDH (Trace Data Helper) API")
+		c.flags.StringSlice(excludedEvents, []string{}, "A list of symbolical kernel event names that will be dropped from the event stream. By default all events are accepted")
+		c.flags.StringSlice(excludedImages, []string{}, "A list of image names that will be dropped from the event stream. Image names are case sensitive")
 
 		c.flags.Bool(serializeThreads, false, "Indicates if threads are serialized as part of the process state")
 		c.flags.Bool(serializeImages, false, "Indicates if images are serialized as part of the process state")

@@ -133,7 +133,7 @@ func (c *client) msg(body []byte) amqp.Publishing {
 
 // healthcheck monitors the state of the AMQP connection and its corresponding channel. Since AMQP channel is
 // shutdown if an error occurs on it, we'll have to handle this situation properly and try to reopen the channel.
-// Similarly if the connection is lost, the reconnect loop kicks in and tries to reconcile the connection state.
+// Similarly, if the connection is lost, the reconnect loop kicks in and tries to reconcile the connection state.
 func (c *client) doHealthcheck() {
 	notify := c.conn.NotifyClose(make(chan *amqp.Error))
 	cnotify := c.channel.NotifyClose(make(chan *amqp.Error))

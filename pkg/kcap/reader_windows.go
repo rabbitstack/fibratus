@@ -30,6 +30,7 @@ import (
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/kcap/section"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/bytes"
@@ -67,28 +68,28 @@ func NewReader(filename string, config *config.Config) (Reader, error) {
 
 	mag := make([]byte, 8)
 	if n, err := zr.Read(mag); err != nil || n != 8 {
-		return nil, errKcapMagicMismatch
+		return nil, ErrKcapMagicMismatch
 	}
 	bytes.InitNativeEndian(mag)
 	// from now on all byte reads will use the endianness of the magic number.
-	// This guarantees we'll be able to replay kcaptures that were taken
+	// This guarantees we'll be able to replay captures that were taken
 	// on a machine with a different endianness from the machine where
-	// actual kcapture is being read.
+	// actual capture is being read.
 	if bytes.ReadUint64(mag) != magic {
-		return nil, errKcapMagicMismatch
+		return nil, ErrKcapMagicMismatch
 	}
 
 	maj := make([]byte, 1)
 	min := make([]byte, 1)
 
 	if n, err := zr.Read(maj); err != nil || n != 1 {
-		return nil, errReadVersion("major", err)
+		return nil, ErrReadVersion("major", err)
 	}
 	if n, err := zr.Read(min); err != nil || n != 1 {
-		return nil, errReadVersion("minor", err)
+		return nil, ErrReadVersion("minor", err)
 	}
 	if maj[0] < major {
-		return nil, errMajorVer
+		return nil, ErrMajorVer(maj[0], min[0])
 	}
 
 	// read the flags bit vector but do nothing with it at the moment
@@ -165,7 +166,7 @@ func (r *reader) Close() error {
 }
 
 func (r *reader) read(kevt *kevent.Kevent, keventsc chan *kevent.Kevent) {
-	if kevt.Type.Dropped(false) {
+	if kevt.Type.OnlyState() {
 		return
 	}
 	if r.filter != nil && !r.filter.Run(kevt) {
@@ -178,18 +179,28 @@ func (r *reader) read(kevt *kevent.Kevent, keventsc chan *kevent.Kevent) {
 
 func (r *reader) updateSnapshotters(kevt *kevent.Kevent) error {
 	switch kevt.Type {
-	case ktypes.TerminateThread,
-		ktypes.TerminateProcess,
-		ktypes.UnloadImage:
+	case ktypes.TerminateProcess:
 		if err := r.psnapshotter.Remove(kevt); err != nil {
 			return err
 		}
+	case ktypes.TerminateThread:
+		pid := kevt.Kparams.MustGetPid()
+		tid := kevt.Kparams.MustGetTid()
+		if err := r.psnapshotter.RemoveThread(pid, tid); err != nil {
+			return err
+		}
+	case ktypes.UnloadImage:
+		pid := kevt.Kparams.MustGetPid()
+		mod := kevt.GetParamAsString(kparams.ImageFilename)
+		if err := r.psnapshotter.RemoveModule(pid, mod); err != nil {
+			return err
+		}
 	case ktypes.CreateProcess,
-		ktypes.CreateThread,
+		ktypes.ProcessRundown,
 		ktypes.LoadImage,
-		ktypes.EnumImage,
-		ktypes.EnumProcess,
-		ktypes.EnumThread:
+		ktypes.ImageRundown,
+		ktypes.CreateThread,
+		ktypes.ThreadRundown:
 		if err := r.psnapshotter.WriteFromKcap(kevt); err != nil {
 			return err
 		}
@@ -203,7 +214,7 @@ func (r *reader) updateSnapshotters(kevt *kevent.Kevent) error {
 		}
 	}
 	if kevt.PS == nil {
-		kevt.PS = r.psnapshotter.Find(kevt.PID)
+		_, kevt.PS = r.psnapshotter.Find(kevt.PID)
 	}
 	return nil
 }
@@ -220,11 +231,11 @@ func (r *reader) RecoverSnapshotters() (handle.Snapshotter, ps.Snapshotter, erro
 func (r *reader) recoverHandleSnapshotter() (handle.Snapshotter, error) {
 	var sec section.Section
 	if _, err := io.ReadFull(r.zr, sec[:]); err != nil {
-		return nil, errReadSection(section.Handle, err)
+		return nil, ErrReadSection(section.Handle, err)
 	}
-	nbHandles := sec.Len()
-	handles := make([]htypes.Handle, nbHandles)
-	for i := 0; i < int(nbHandles); i++ {
+	nhandles := sec.Len()
+	handles := make([]htypes.Handle, nhandles)
+	for i := 0; i < int(nhandles); i++ {
 		b := make([]byte, 2)
 		if _, err := io.ReadFull(r.zr, b); err != nil {
 			continue

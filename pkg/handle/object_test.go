@@ -22,10 +22,9 @@
 package handle
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/syscall/handle"
-	"github.com/rabbitstack/fibratus/pkg/syscall/process"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sys/windows"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -34,7 +33,7 @@ import (
 )
 
 var (
-	modkernel32 = syscall.NewLazyDLL("kernel32.dll")
+	modkernel32 = windows.NewLazyDLL("kernel32.dll")
 
 	procCreateNamedPipeW = modkernel32.NewProc("CreateNamedPipeW")
 )
@@ -69,35 +68,20 @@ func createPipe(address string, first bool) (syscall.Handle, error) {
 		512, 512, 0, nil)
 }
 
-func TestQueryAllObjectTypes(t *testing.T) {
-	otstore := NewObjectTypeStore()
-	require.Contains(t, otstore.TypeNames(), "Directory")
-	require.Contains(t, otstore.TypeNames(), "Key")
-}
-
 func TestQueryType(t *testing.T) {
-	h, err := process.Open(process.QueryInformation, false, uint32(os.Getpid()))
+	h, err := windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION, false, uint32(os.Getpid()))
 	require.NoError(t, err)
-	defer h.Close()
-	typeName, err := QueryType(h)
-	require.NoError(t, err)
-	assert.Equal(t, Process, typeName)
-}
-
-func TestQueryTypeSmallBuffer(t *testing.T) {
-	typeBufSize = 25
-	h, err := process.Open(process.QueryInformation, false, uint32(os.Getpid()))
-	require.NoError(t, err)
-	typeName, err := QueryType(h)
+	defer windows.CloseHandle(h)
+	typeName, err := QueryObjectType(h)
 	require.NoError(t, err)
 	assert.Equal(t, Process, typeName)
 }
 
 func TestQueryNameFileHandle(t *testing.T) {
-	f, err := syscall.Open("_fixtures/.fibratus", syscall.O_RDONLY, syscall.S_ISUID)
+	f, err := windows.Open("_fixtures/.fibratus", windows.O_RDONLY, windows.S_ISUID)
 	require.NoError(t, err)
-	defer syscall.Close(f)
-	handleName, _, err := QueryName(handle.Handle(f), File, true)
+	defer windows.Close(f)
+	handleName, _, err := QueryName(f, File, true)
 	require.NoError(t, err)
 	assert.Equal(t, ".fibratus", filepath.Base(handleName))
 }
@@ -106,7 +90,7 @@ func TestQueryNamedPipe(t *testing.T) {
 	h, err := createPipe(`\\.\pipe\fibratus`, true)
 	require.NoError(t, err)
 	defer syscall.Close(h)
-	handleName, _, err := QueryName(handle.Handle(h), File, true)
+	handleName, _, err := QueryName(windows.Handle(h), File, true)
 	require.NoError(t, err)
 	assert.Equal(t, `\Device\NamedPipe\fibratus`, handleName)
 }

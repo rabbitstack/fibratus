@@ -368,7 +368,7 @@ func New(
 	return f, nil
 }
 
-func (f *filament) Run(kevents chan *kevent.Kevent, errs chan error) error {
+func (f *filament) Run(kevents <-chan *kevent.Kevent, errs <-chan error) error {
 	var batch kbatch
 	var flusher = time.NewTicker(time.Second)
 	for {

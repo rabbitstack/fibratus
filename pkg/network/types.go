@@ -28,6 +28,12 @@ const (
 	UDP
 )
 
+// ProtoNames maps protocol identifiers to protocol names
+var ProtoNames = map[uint32]string{
+	uint32(TCP): "TCP",
+	uint32(UDP): "UDP",
+}
+
 // String returns the string representation of the Layer 4 protocol.
 func (proto L4Proto) String() string {
 	switch proto {

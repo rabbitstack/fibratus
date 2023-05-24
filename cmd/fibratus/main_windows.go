@@ -21,6 +21,7 @@ package main
 import (
 	"fmt"
 	"github.com/rabbitstack/fibratus/cmd/fibratus/app"
+	"github.com/rabbitstack/fibratus/cmd/fibratus/app/service"
 	"golang.org/x/sys/windows/svc"
 	"os"
 )
@@ -33,7 +34,7 @@ func main() {
 		os.Exit(-1)
 	}
 	if isWinService {
-		app.RunService()
+		service.Run()
 		return
 	}
 	if err := app.RootCmd.Execute(); err != nil {

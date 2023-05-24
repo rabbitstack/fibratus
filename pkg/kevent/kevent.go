@@ -20,14 +20,13 @@ package kevent
 
 import (
 	"fmt"
+	kcapver "github.com/rabbitstack/fibratus/pkg/kcap/version"
+	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"strings"
 	"sync"
 	"time"
-
-	kcapver "github.com/rabbitstack/fibratus/pkg/kcap/version"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
-	"github.com/rabbitstack/fibratus/pkg/util/hostname"
 )
 
 // pool is used to alleviate the pressure on the heap allocator
@@ -37,7 +36,7 @@ var pool = sync.Pool{
 	},
 }
 
-// TimestampFormat is the Go valid format for the kernel event timestamp
+// TimestampFormat is the Go valid format for the event timestamp
 var TimestampFormat string
 
 // MetadataKey represents the type definition for the metadata keys
@@ -52,7 +51,8 @@ const (
 	// RuleNameKey identifies the rule that was triggered by the event
 	RuleNameKey MetadataKey = "rule.name"
 	// RuleGroupKey identifies the group to which the triggered rule pertains
-	RuleGroupKey      MetadataKey = "rule.group"
+	RuleGroupKey MetadataKey = "rule.group"
+	// RuleSequenceByKey represents the join field value in sequence rules
 	RuleSequenceByKey MetadataKey = "rule.seq.by"
 )
 
@@ -67,7 +67,9 @@ func (md Metadata) String() string {
 	return strings.TrimSuffix(sb.String(), ", ")
 }
 
-// Kevent encapsulates kernel event's payload.
+// Kevent encapsulates event's state and provides a set of methods for
+// accessing and manipulating event parameters, process state, and other
+// metadata.
 type Kevent struct {
 	// Seq is monotonically incremented kernel event sequence.
 	Seq uint64 `json:"seq"`
@@ -95,11 +97,32 @@ type Kevent struct {
 	Metadata Metadata `json:"metadata"`
 	// PS represents process' metadata and its allocated resources such as handles, DLLs, etc.
 	PS *pstypes.PS `json:"ps,omitempty"`
+	// WaitEnqueue indicates if this event should temporarily defer pushing to
+	// the consumer output queue. This is usually required in event processors
+	// to propagate certain events when the related event arrives, and it is replaced
+	// by the event that was temporarily stored in processor's state.
+	WaitEnqueue bool `json:"waitenqueue"`
+	// Delayed indicates if this event should be enqueued in aggregator backlog.
+	// Backlog stores events that await for the acknowledgement from subsequent
+	// events.
+	Delayed bool `json:"delayed"`
+}
+
+// DelayKey returns the value that is used to
+// store and reference delayed events in the event
+// backlog state. The delayed event is indexed by
+// the sequence identifier.
+func (e *Kevent) DelayKey() uint64 {
+	switch e.Type {
+	case ktypes.CreateHandle, ktypes.CloseHandle:
+		return e.Kparams.MustGetUint64(kparams.HandleObject)
+	}
+	return 0
 }
 
 // String returns event's string representation.
-func (kevt *Kevent) String() string {
-	if kevt.PS != nil {
+func (e *Kevent) String() string {
+	if e.PS != nil {
 		return fmt.Sprintf(`
 		Seq: %d
 		Pid: %d
@@ -115,19 +138,19 @@ func (kevt *Kevent) String() string {
 		Metadata: %s,
 	    %s
 	`,
-			kevt.Seq,
-			kevt.PID,
-			kevt.Tid,
-			kevt.Type,
-			kevt.CPU,
-			kevt.Name,
-			kevt.Category,
-			kevt.Description,
-			kevt.Host,
-			kevt.Timestamp,
-			kevt.Kparams,
-			kevt.Metadata,
-			kevt.PS,
+			e.Seq,
+			e.PID,
+			e.Tid,
+			e.Type,
+			e.CPU,
+			e.Name,
+			e.Category,
+			e.Description,
+			e.Host,
+			e.Timestamp,
+			e.Kparams,
+			e.Metadata,
+			e.PS,
 		)
 	}
 	return fmt.Sprintf(`
@@ -144,42 +167,22 @@ func (kevt *Kevent) String() string {
 		Kparams: %s,
 		Metadata: %s
 	`,
-		kevt.Seq,
-		kevt.PID,
-		kevt.Tid,
-		kevt.Type,
-		kevt.CPU,
-		kevt.Name,
-		kevt.Category,
-		kevt.Description,
-		kevt.Host,
-		kevt.Timestamp,
-		kevt.Kparams,
-		kevt.Metadata,
+		e.Seq,
+		e.PID,
+		e.Tid,
+		e.Type,
+		e.CPU,
+		e.Name,
+		e.Category,
+		e.Description,
+		e.Host,
+		e.Timestamp,
+		e.Kparams,
+		e.Metadata,
 	)
 }
 
-// New constructs a new kernel event instance.
-func New(seq uint64, pid, tid uint32, cpu uint8, ktype ktypes.Ktype, ts time.Time, kpars Kparams) *Kevent {
-	kevt := pool.Get().(*Kevent)
-	*kevt = Kevent{
-		Seq:         seq,
-		PID:         pid,
-		Tid:         tid,
-		CPU:         cpu,
-		Type:        ktype,
-		Category:    ktype.Category(),
-		Name:        ktype.String(),
-		Description: ktype.Description(),
-		Timestamp:   ts,
-		Kparams:     kpars,
-		Metadata:    make(map[MetadataKey]any),
-		Host:        hostname.Get(),
-	}
-	return kevt
-}
-
-// Empty return a pristine kernel event instance.
+// Empty return a pristine event instance.
 func Empty() *Kevent {
 	return &Kevent{
 		Kparams:  map[string]*Kparam{},
@@ -188,28 +191,57 @@ func Empty() *Kevent {
 	}
 }
 
-// NewFromKcap recovers the kernel event instance from the kcapture byte buffer.
+// NewFromKcap recovers the event instance from the capture byte buffer.
 func NewFromKcap(buf []byte) (*Kevent, error) {
-	kevt := &Kevent{
+	e := &Kevent{
 		Kparams:  make(Kparams),
 		Metadata: make(map[MetadataKey]any),
 	}
-	if err := kevt.UnmarshalRaw(buf, kcapver.KevtSecV1); err != nil {
+	if err := e.UnmarshalRaw(buf, kcapver.KevtSecV1); err != nil {
 		return nil, err
 	}
-	return kevt, nil
+	return e, nil
 }
 
 // AddMeta appends a key/value pair to event's metadata.
-func (kevt *Kevent) AddMeta(k MetadataKey, v any) {
-	kevt.Metadata[k] = v
+func (e *Kevent) AddMeta(k MetadataKey, v any) {
+	e.Metadata[k] = v
+}
+
+// AppendParam adds a new parameter to this event.
+func (e *Kevent) AppendParam(name string, typ kparams.Type, value kparams.Value, opts ...ParamOption) {
+	e.Kparams.Append(name, typ, value, opts...)
+}
+
+// AppendEnum adds the enum parameter to this event.
+func (e *Kevent) AppendEnum(name string, value uint32, enum ParamEnum) {
+	e.AppendParam(name, kparams.Enum, value, WithEnum(enum))
+}
+
+// GetParamAsString returns the specified parameter value as string.
+// Parameter values are resolved according to their types. For instance,
+// if the parameter type is `Status`, the system error code is converted
+// to the error message.
+// Returns an empty string if the given parameter name is not found
+// in event parameters.
+func (e Kevent) GetParamAsString(name string) string {
+	par, err := e.Kparams.Get(name)
+	if err != nil {
+		return ""
+	}
+	return par.String()
+}
+
+// GetFlagsAsSlice returns parameter flags as a slice of bitmask string values.
+func (e Kevent) GetFlagsAsSlice(name string) []string {
+	return strings.Split(e.GetParamAsString(name), "|")
 }
 
 // Release returns an event to the pool.
-func (kevt *Kevent) Release() {
-	*kevt = Kevent{} // clear kevent
-	pool.Put(kevt)
+func (e *Kevent) Release() {
+	*e = Kevent{} // clear event
+	pool.Put(e)
 }
 
 // SequenceBy returns the BY statement join field from event metadata.
-func (kevt *Kevent) SequenceBy() any { return kevt.Metadata[RuleSequenceByKey] }
+func (e *Kevent) SequenceBy() any { return e.Metadata[RuleSequenceByKey] }

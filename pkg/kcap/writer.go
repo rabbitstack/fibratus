@@ -29,9 +29,12 @@ import (
 )
 
 var (
-	errWriteMagic   = func(err error) error { return fmt.Errorf("couldn't write magic number: %v", err) }
-	errWriteVersion = func(v string, err error) error { return fmt.Errorf("couldn't write %s kcap digit: %v", v, err) }
-	errWriteSection = func(s section.Type, err error) error { return fmt.Errorf("couldn't write %s kcap section: %v", s, err) }
+	// ErrWriteMagic signals magic write errors
+	ErrWriteMagic = func(err error) error { return fmt.Errorf("couldn't write magic number: %v", err) }
+	// ErrWriteVersion signals version write errors
+	ErrWriteVersion = func(v string, err error) error { return fmt.Errorf("couldn't write %s kcap digit: %v", v, err) }
+	// ErrWriteSection signals section write errors
+	ErrWriteSection = func(s section.Type, err error) error { return fmt.Errorf("couldn't write %s kcap section: %v", s, err) }
 
 	handleWriteErrors     = expvar.NewInt("kcap.handle.write.errors")
 	kevtWriteErrors       = expvar.NewInt("kcap.kevt.write.errors")

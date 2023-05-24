@@ -6,7 +6,7 @@
     - TE
   rules:
     - name: only network category
-      def: kevt.category = 'net'
+      condition: kevt.category = 'net'
 
 - group: rouge processes
   rules:

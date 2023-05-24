@@ -35,44 +35,28 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kcap/section"
 	kcapver "github.com/rabbitstack/fibratus/pkg/kcap/version"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/bytes"
 	zstd "github.com/valyala/gozstd"
 )
 
 type stats struct {
-	kcapFile string
-
+	kcapFile       string
 	kevtsWritten   uint64
 	bytesWritten   uint64
 	handlesWritten uint64
 	procsWritten   uint64
-
-	pids map[uint32]bool
 }
 
 func (s *stats) incKevts(kevt *kevent.Kevent) {
-	switch kevt.Type {
-	case ktypes.FileRundown, ktypes.RegCreateKCB, ktypes.FileOpEnd,
-		ktypes.EnumProcess, ktypes.EnumThread, ktypes.EnumImage, ktypes.RegKCBRundown:
-	default:
+	if !kevt.Type.OnlyState() {
 		atomic.AddUint64(&s.kevtsWritten, 1)
 	}
 }
 func (s *stats) incBytes(bytes uint64) { atomic.AddUint64(&s.bytesWritten, bytes) }
 func (s *stats) incHandles()           { atomic.AddUint64(&s.handlesWritten, 1) }
 func (s *stats) incProcs(kevt *kevent.Kevent) {
-	// EnumProcess events can arrive twice for the same kernel session, so we
-	// ignore incrementing the number of processes if we've already seen the process
-	if kevt.Type == ktypes.EnumProcess {
-		pid, _ := kevt.Kparams.GetPid()
-		if _, ok := s.pids[pid]; ok {
-			return
-		}
-		s.pids[pid] = true
-	}
-	if kevt.Type == ktypes.CreateProcess || kevt.Type == ktypes.EnumProcess {
+	if kevt.IsCreateProcess() || kevt.IsProcessRundown() {
 		atomic.AddUint64(&s.procsWritten, 1)
 	}
 }
@@ -113,6 +97,8 @@ type writer struct {
 	stats *stats
 	// mu protects the underlying zstd buffer
 	mu sync.Mutex
+	// released indicates if the zstd buffer is disposed
+	released atomic.Bool
 }
 
 // NewWriter constructs a new instance of the kcap writer.
@@ -125,7 +111,7 @@ func NewWriter(filename string, psnap ps.Snapshotter, hsnap handle.Snapshotter) 
 		return nil, err
 	}
 	zw := zstd.NewWriter(f)
-	// start by writing the kcap header that is comprised
+	// start by writing the kcap header that is composed
 	// of magic number, major/minor digits and the optional
 	// flags bit vector. The flags bit vector is reserved
 	// for the future uses.
@@ -137,13 +123,13 @@ func NewWriter(filename string, psnap ps.Snapshotter, hsnap handle.Snapshotter) 
 	// in the snapshot. This information is used by the reader to
 	// restore the state of the snapshotters.
 	if _, err := zw.Write(bytes.WriteUint64(magic)); err != nil {
-		return nil, errWriteMagic(err)
+		return nil, ErrWriteMagic(err)
 	}
 	if _, err := zw.Write([]byte{major}); err != nil {
-		return nil, errWriteVersion("major", err)
+		return nil, ErrWriteVersion("major", err)
 	}
 	if _, err := zw.Write([]byte{minor}); err != nil {
-		return nil, errWriteVersion("minor", err)
+		return nil, ErrWriteVersion("minor", err)
 	}
 	if _, err := zw.Write(bytes.WriteUint64(flags)); err != nil {
 		return nil, err
@@ -156,7 +142,7 @@ func NewWriter(filename string, psnap ps.Snapshotter, hsnap handle.Snapshotter) 
 		psnap:   psnap,
 		hsnap:   hsnap,
 		stop:    make(chan struct{}),
-		stats:   &stats{kcapFile: filename, pids: make(map[uint32]bool)},
+		stats:   &stats{kcapFile: filename},
 	}
 
 	if err := w.writeSnapshots(); err != nil {
@@ -175,8 +161,20 @@ func (w *writer) writeSnapshots() error {
 	if err != nil {
 		return err
 	}
+
+	writeHandle := func(buf []byte) error {
+		l := bytes.WriteUint16(uint16(len(buf)))
+		if _, err := w.zw.Write(l); err != nil {
+			return err
+		}
+		if _, err := w.zw.Write(buf); err != nil {
+			return err
+		}
+		return nil
+	}
+
 	for _, khandle := range handles {
-		if err := w.writeHandle(khandle.Marshal()); err != nil {
+		if err := writeHandle(khandle.Marshal()); err != nil {
 			handleWriteErrors.Add(1)
 			continue
 		}
@@ -185,7 +183,7 @@ func (w *writer) writeSnapshots() error {
 	return w.zw.Flush()
 }
 
-func (w *writer) Write(kevtsc chan *kevent.Kevent, errs chan error) chan error {
+func (w *writer) Write(kevtsc <-chan *kevent.Kevent, errs <-chan error) chan error {
 	errsc := make(chan error, 100)
 	go func() {
 		for {
@@ -199,7 +197,7 @@ func (w *writer) Write(kevtsc chan *kevent.Kevent, errs chan error) chan error {
 				// write event buffer
 				err := w.write(b)
 				if err != nil {
-					errs <- err
+					errsc <- err
 					kevt.Release()
 					continue
 				}
@@ -226,7 +224,7 @@ func (w *writer) write(b []byte) error {
 	l := len(b)
 	if l > maxKevtSize {
 		overflowKevents.Add(1)
-		return fmt.Errorf("kevent size overflow by %d bytes", l-maxKevtSize)
+		return fmt.Errorf("event size overflow by %d bytes", l-maxKevtSize)
 	}
 	if err := w.ws(section.Kevt, kcapver.KevtSecV1, 0, uint32(l)); err != nil {
 		kevtWriteErrors.Add(1)
@@ -242,8 +240,9 @@ func (w *writer) write(b []byte) error {
 func (w *writer) Close() error {
 	w.stats.printStats()
 
+	close(w.stop)
+
 	w.flusher.Stop()
-	w.stop <- struct{}{}
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -252,6 +251,7 @@ func (w *writer) Close() error {
 			return err
 		}
 		w.zw.Release()
+		w.released.Store(true)
 	}
 	if w.f != nil {
 		return w.f.Close()
@@ -261,23 +261,19 @@ func (w *writer) Close() error {
 
 func (w *writer) flush() {
 	for {
-		<-w.flusher.C
-		w.mu.Lock()
-		err := w.zw.Flush()
-		w.mu.Unlock()
-		if err != nil {
-			flusherErrors.Add(err.Error(), 1)
+		select {
+		case <-w.flusher.C:
+			if w.released.Load() {
+				return
+			}
+			w.mu.Lock()
+			err := w.zw.Flush()
+			w.mu.Unlock()
+			if err != nil {
+				flusherErrors.Add(err.Error(), 1)
+			}
+		case <-w.stop:
+			return
 		}
 	}
-}
-
-func (w *writer) writeHandle(buf []byte) error {
-	l := bytes.WriteUint16(uint16(len(buf)))
-	if _, err := w.zw.Write(l); err != nil {
-		return err
-	}
-	if _, err := w.zw.Write(buf); err != nil {
-		return err
-	}
-	return nil
 }

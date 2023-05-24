@@ -28,7 +28,6 @@ import "C"
 import (
 	"errors"
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/fs"
 	"net"
 	"syscall"
 	"time"
@@ -183,8 +182,6 @@ func NewPyObjectFromValue(value interface{}) *PyObject {
 		ob = C.PyLong_FromUnsignedLongLong(C.u64(v))
 	case string:
 		ob = PyUnicodeFromString(v).asRaw()
-	case fs.FileDisposition:
-		ob = PyUnicodeFromString(v.String()).asRaw()
 	case time.Time:
 		ob = C.PyTime_FromDateTime(C.int(v.Year()), C.int(v.Month()), C.int(v.Day()), C.int(v.Hour()), C.int(v.Minute()), C.int(v.Second()), C.int(v.Nanosecond()/1000))
 	case net.IP:

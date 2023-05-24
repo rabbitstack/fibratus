@@ -19,7 +19,6 @@
 package kevent
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -52,25 +51,7 @@ func TestKparams(t *testing.T) {
 	assert.False(t, kpars.Contains(kparams.ThreadID))
 	assert.Equal(t, 4, kpars.Len())
 
-	require.NoError(t, kpars.Set(kparams.FileShareMask, fs.FileShareMode(5), kparams.Enum))
-
-	filemode, err := kpars.Get(kparams.FileShareMask)
-	require.NoError(t, err)
-	mode := filemode.(fs.FileShareMode)
-
-	assert.Equal(t, "r-d", mode.String())
-
-	fileObject, err := kpars.TryGetHexAsUint64(kparams.FileObject)
-	require.NoError(t, err)
-	assert.Equal(t, uint64(18446738026482168384), fileObject)
-
-	kpars1 := Kparams{
-		kparams.FileObject: {Name: kparams.FileObject, Type: kparams.HexInt64, Value: kparams.Hex("FFFFFA800528F240")},
-	}
-
-	fileObjectFromHex, err := kpars1.TryGetHexAsUint64(kparams.FileObject)
-	require.NoError(t, err)
-	assert.Equal(t, uint64(18446738026482168384), fileObjectFromHex)
+	require.NoError(t, kpars.Set(kparams.FileShareMask, uint32(5), kparams.Enum))
 
 	require.NoError(t, kpars.SetValue(kparams.FileName, "\\Device\\HarddiskVolume2\\Windows\\system32\\KERNEL32.dll"))
 	filename1, err := kpars.GetString(kparams.FileName)

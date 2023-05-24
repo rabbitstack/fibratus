@@ -22,7 +22,7 @@
 package fs
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/syscall/file"
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	"strings"
 )
 
@@ -44,8 +44,8 @@ func NewDevMapper() DevMapper {
 		cache: make(map[string]string),
 	}
 	// loop through logical drives and query the DOS device name
-	for _, drive := range file.GetLogicalDrives() {
-		device, err := file.QueryDosDevice(drive)
+	for _, drive := range sys.GetLogicalDrives() {
+		device, err := sys.QueryDosDevice(drive)
 		if err != nil {
 			continue
 		}
@@ -60,7 +60,10 @@ func (m *mapper) Convert(filename string) string {
 	}
 	i := strings.Index(filename[deviceOffset:], "\\")
 	if i < 0 {
-		return m.cache[filename]
+		if f, ok := m.cache[filename]; ok {
+			return f
+		}
+		return filename
 	}
 	dev := filename[:i+deviceOffset]
 	if drive, ok := m.cache[dev]; ok {

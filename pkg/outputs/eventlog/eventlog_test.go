@@ -20,6 +20,7 @@ package eventlog
 
 import (
 	"errors"
+	"golang.org/x/sys/windows"
 	"testing"
 	"time"
 
@@ -31,7 +32,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
-	shandle "github.com/rabbitstack/fibratus/pkg/syscall/handle"
 	"github.com/stretchr/testify/require"
 )
 
@@ -79,7 +79,7 @@ func getBatch() *kevent.Batch {
 			Ppid:      6304,
 			Name:      "firefox.exe",
 			Exe:       `C:\Program Files\Mozilla Firefox\firefox.exe`,
-			Comm:      `C:\Program Files\Mozilla Firefox\firefox.exe -contentproc --channel="6304.3.1055809391\1014207667" -childID 1 -isForBrowser -prefsHandle 2584 -prefMapHandle 2580 -prefsLen 70 -prefMapSize 216993 -parentBuildID 20200107212822 -greomni "C:\Program Files\Mozilla Firefox\omni.ja" -appomni "C:\Program Files\Mozilla Firefox\browser\omni.ja" -appdir "C:\Program Files\Mozilla Firefox\browser" - 6304 "\\.\pipe\gecko-crash-server-pipe.6304" 2596 tab`,
+			Cmdline:   `C:\Program Files\Mozilla Firefox\firefox.exe -contentproc --channel="6304.3.1055809391\1014207667" -childID 1 -isForBrowser -prefsHandle 2584 -prefMapHandle 2580 -prefsLen 70 -prefMapSize 216993 -parentBuildID 20200107212822 -greomni "C:\Program Files\Mozilla Firefox\omni.ja" -appomni "C:\Program Files\Mozilla Firefox\browser\omni.ja" -appdir "C:\Program Files\Mozilla Firefox\browser" - 6304 "\\.\pipe\gecko-crash-server-pipe.6304" 2596 tab`,
 			Cwd:       `C:\Program Files\Mozilla Firefox\`,
 			SID:       "archrabbit\\SYSTEM",
 			Args:      []string{"-contentproc", `--channel=6304.3.1055809391\1014207667`, "-childID", "1", "-isForBrowser", "-prefsHandle", "2584", "-prefMapHandle", "2580", "-prefsLen", "70", "-prefMapSize", "216993", "-parentBuildID"},
@@ -94,14 +94,14 @@ func getBatch() *kevent.Batch {
 				{Name: "user32.dll", Size: 212354, Checksum: 33123343, BaseAddress: kparams.Hex("fef23fff"), DefaultBaseAddress: kparams.Hex("fff124fd")},
 			},
 			Handles: []htypes.Handle{
-				{Num: shandle.Handle(0xffffd105e9baaf70),
+				{Num: windows.Handle(0xffffd105e9baaf70),
 					Name:   `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\Tcpip\Parameters\Interfaces\{b677c565-6ca5-45d3-b618-736b4e09b036}`,
 					Type:   "Key",
 					Object: 777488883434455544,
 					Pid:    uint32(1023),
 				},
 				{
-					Num:  shandle.Handle(0xffffd105e9adaf70),
+					Num:  windows.Handle(0xffffd105e9adaf70),
 					Name: `\RPC Control\OLEA61B27E13E028C4EA6C286932E80`,
 					Type: "ALPC Port",
 					Pid:  uint32(1023),
@@ -113,7 +113,7 @@ func getBatch() *kevent.Batch {
 					Object: 457488883434455544,
 				},
 				{
-					Num:  shandle.Handle(0xeaffd105e9adaf30),
+					Num:  windows.Handle(0xeaffd105e9adaf30),
 					Name: `C:\Users\bunny`,
 					Type: "File",
 					Pid:  uint32(1023),

@@ -24,19 +24,34 @@ import (
 )
 
 // Snapshotter is the interface that exposes a set of methods all process snapshotters have to satisfy. It stores the state
-// of all running processes in the system including its threads, dynamically referenced libraries, handles/file descriptors and other
-// metadata.
+// of all running processes in the system including its threads, dynamically loaded libraries, handles/file descriptors
+// and other metadata.
 type Snapshotter interface {
-	// Write appends a new process state to the snapshotter. It takes as an input the inbound kernel event to fetch
+	// Write appends a new process state to the snapshotter. It takes as an input the inbound event to fetch
 	// the basic data, but also enriches the process' state with extra metadata such as process' env variables, PE
 	// metadata for Windows binaries and so on.
-	Write(kevt *kevent.Kevent) error
+	Write(*kevent.Kevent) error
+	// AddThread builds thread state from the event representation.
+	AddThread(*kevent.Kevent) error
+	// AddModule builds module state from the event representation.
+	AddModule(*kevent.Kevent) error
+	// RemoveThread removes the thread from the given process.
+	RemoveThread(pid uint32, tid uint32) error
+	// RemoveModule removes the module the given process.
+	RemoveModule(pid uint32, mod string) error
 	// WriteFromKcap appends a new process state to the snapshotter from the captured kernel event.
 	WriteFromKcap(kevt *kevent.Kevent) error
 	// Remove deletes process's state from the snapshotter.
 	Remove(kevt *kevent.Kevent) error
-	// Find attempts to retrieve process' state for the specified process identifier.
-	Find(pid uint32) *pstypes.PS
+	// Find attempts to retrieve process' state for the specified process identifier. Returns true
+	// if the process was find in the state. Otherwise, returns false and constructs a fresh process
+	// state by querying the OS via API functions.
+	Find(pid uint32) (bool, *pstypes.PS)
+	// FindAndPut attempts to retrieve process' state for the specified process identifier.
+	// If the process is found, the snapshotter state is updated with the new process.
+	FindAndPut(pid uint32) *pstypes.PS
+	// Put inserts the process state into snapshotter.
+	Put(*pstypes.PS)
 	// Size returns the total number of process state items.
 	Size() uint32
 	// Close closes process snapshotter and disposes all allocated resources.

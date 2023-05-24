@@ -20,46 +20,79 @@ package kstream
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/config"
-	"github.com/rabbitstack/fibratus/pkg/errors"
-	"github.com/rabbitstack/fibratus/pkg/syscall/etw"
+	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"syscall"
 	"testing"
 	"time"
 )
 
-func TestStartKtrace(t *testing.T) {
-	startTrace = func(name string, flags *etw.EventTraceProperties) (etw.TraceHandle, error) {
-		return etw.TraceHandle(1), nil
+func TestStartTraces(t *testing.T) {
+	var tests = []struct {
+		name         string
+		cfg          config.KstreamConfig
+		wantSessions int
+		wantFlags    []etw.EventTraceFlags
+	}{
+		{"start kernel logger session",
+			config.KstreamConfig{
+				EnableThreadKevents: true,
+				EnableNetKevents:    true,
+				EnableFileIOKevents: true,
+				BufferSize:          1024,
+				FlushTimer:          time.Millisecond * 2300,
+			},
+			1,
+			[]etw.EventTraceFlags{0x6010203, 0},
+		},
+		{"start kernel logger and audit api sessions",
+			config.KstreamConfig{
+				EnableThreadKevents:   true,
+				EnableNetKevents:      true,
+				EnableFileIOKevents:   true,
+				EnableHandleKevents:   true,
+				EnableRegistryKevents: true,
+				BufferSize:            1024,
+				FlushTimer:            time.Millisecond * 2300,
+				EnableAuditAPIEvents:  true,
+			},
+			2,
+			[]etw.EventTraceFlags{0x6030203, 0x80000040},
+		},
 	}
-	enableTrace = func(guid syscall.GUID, handle etw.TraceHandle, keyword uint32) error {
-		return nil
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := NewController(tt.cfg)
+			require.NoError(t, ctrl.Start())
+			defer ctrl.Close()
+			assert.Equal(t, tt.wantSessions, len(ctrl.traces))
+			for _, trace := range ctrl.traces {
+				require.True(t, trace.Handle.IsValid())
+				require.NoError(t, etw.ControlTrace(0, trace.Name, trace.GUID, etw.Query))
+				if tt.wantFlags != nil && trace.IsKernelLogger() {
+					flags, err := etw.GetTraceSystemFlags(trace.Handle)
+					require.NoError(t, err)
+					// check enabled system event flags
+					require.Equal(t, tt.wantFlags[0], flags[0])
+					require.Equal(t, tt.wantFlags[1], flags[4])
+				}
+			}
+		})
 	}
-
-	ktracec := NewKtraceController(config.KstreamConfig{
-		EnableThreadKevents:           true,
-		EnableNetKevents:              true,
-		BufferSize:                    1024,
-		FlushTimer:                    time.Millisecond * 2300,
-		EnableAntimalwareEngineEvents: true,
-		EnableAuditAPIEvents:          true,
-	})
-
-	err := ktracec.StartKtrace()
-
-	require.NoError(t, err)
-	assert.Len(t, ktracec.(*ktraceController).traces, 4)
 }
 
-func TestStartKtraceNoSysResources(t *testing.T) {
-	startTrace = func(name string, props *etw.EventTraceProperties) (etw.TraceHandle, error) {
-		return etw.TraceHandle(0), errors.ErrTraceNoSysResources
+func TestRestartTrace(t *testing.T) {
+	cfg := config.KstreamConfig{
+		EnableThreadKevents: true,
+		EnableNetKevents:    true,
+		EnableFileIOKevents: true,
+		BufferSize:          1024,
+		FlushTimer:          time.Millisecond * 2300,
 	}
-
-	ktracec := NewKtraceController(config.KstreamConfig{EnableThreadKevents: true, BufferSize: 1024})
-
-	err := ktracec.StartKtrace()
-
-	require.Error(t, err)
+	ctrl := NewController(cfg)
+	require.NoError(t, ctrl.Start())
+	require.NoError(t, ctrl.Start())
+	require.NoError(t, etw.ControlTrace(0, ctrl.traces[0].Name, ctrl.traces[0].GUID, etw.Query))
+	require.NoError(t, ctrl.Close())
 }

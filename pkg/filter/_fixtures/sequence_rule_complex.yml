@@ -10,7 +10,7 @@
         ('firefox.exe', 'chrome.exe', 'edge.exe')
         | by ps.sibling.pid
 
-        |kevt.name = 'CreateFile' and file.operation = 'create'
+        |kevt.name = 'CreateFile' and file.operation = 'CREATE'
             and
         file.extension = '.exe'
         | by ps.pid

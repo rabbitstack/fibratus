@@ -19,13 +19,14 @@
 package ktypes
 
 import (
+	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"syscall"
+	"golang.org/x/sys/windows"
 	"testing"
 )
 
-func TestPack(t *testing.T) {
+func TestPackAllBytes(t *testing.T) {
 	assert.Equal(t, byte(0x3d), CreateProcess[0])
 	assert.Equal(t, byte(0x6f), CreateProcess[1])
 	assert.Equal(t, byte(0xa8), CreateProcess[2])
@@ -45,21 +46,52 @@ func TestPack(t *testing.T) {
 	assert.Equal(t, byte(0xd7), CreateProcess[13])
 	assert.Equal(t, byte(0xba), CreateProcess[14])
 	assert.Equal(t, byte(0x7c), CreateProcess[15])
-
 	assert.Equal(t, byte(0x1), CreateProcess[16])
+}
 
-	kt := Pack(syscall.GUID{Data1: 0x3d6fa8d0, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}, 1)
-	assert.Equal(t, CreateProcess, kt)
-
-	kt = Pack(syscall.GUID{Data1: 0x3d6fa8d0, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}, 2)
-	assert.NotEqual(t, CreateProcess, kt)
-	assert.Equal(t, TerminateProcess, kt)
-
-	switch kt {
-	case TerminateProcess:
-	default:
-		t.Fatal("expected TerminateProcess kernel event")
+func TestKtypeComparision(t *testing.T) {
+	var tests = []struct {
+		name  string
+		ktyp  Ktype
+		wants Ktype
+	}{
+		{
+			"equals CreateProcess",
+			pack(windows.GUID{Data1: 0x3d6fa8d0, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}, 1),
+			CreateProcess,
+		},
+		{
+			"equals TerminateProcess",
+			pack(windows.GUID{Data1: 0x3d6fa8d0, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}, 2),
+			TerminateProcess,
+		},
 	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lhs, rhs := tt.ktyp, tt.wants
+			assert.Equal(t, lhs, rhs)
+		})
+	}
+}
+
+func TestNewFromEventRecord(t *testing.T) {
+	assert.Equal(t, CreateProcess, NewFromEventRecord(&etw.EventRecord{
+		Header: etw.EventHeader{
+			ProviderID: windows.GUID{Data1: 0x3d6fa8d0, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}},
+			EventDescriptor: etw.EventDescriptor{
+				Opcode: 1,
+			},
+		},
+	}))
+	assert.Equal(t, OpenProcess, NewFromEventRecord(&etw.EventRecord{
+		Header: etw.EventHeader{
+			ProviderID: windows.GUID{Data1: 0xe02a841c, Data2: 0x75a3, Data3: 0x4fa7, Data4: [8]byte{0xaf, 0xc8, 0xae, 0x09, 0xcf, 0x9b, 0x7f, 0x23}},
+			EventDescriptor: etw.EventDescriptor{
+				ID: 5,
+			},
+		},
+	}))
 }
 
 func TestKtypeExists(t *testing.T) {

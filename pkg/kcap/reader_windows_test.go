@@ -23,13 +23,20 @@ package kcap
 
 import (
 	"context"
+	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
 
-func TestRead(t *testing.T) {
+func TestReadIncompatibleFormat(t *testing.T) {
 	r, err := NewReader("_fixtures/cap1.kcap", &config.Config{})
+	require.Nil(t, r)
+	require.EqualErrorf(t, err, fmt.Sprintf("incompatible kcap version format. Required version %d.%d but 1.0 found", major, minor), "incompatible kcap version format. Required version %d.%d but 1.0 found", major, minor)
+}
+
+func TestRead(t *testing.T) {
+	r, err := NewReader("_fixtures/cap2.kcap", &config.Config{})
 	if err != nil {
 		t.Fatal(err)
 	}

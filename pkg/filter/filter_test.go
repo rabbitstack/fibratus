@@ -128,23 +128,27 @@ func TestStringFields(t *testing.T) {
 	assert.Len(t, f.GetStringFields()[fields.PsName], 1)
 }
 
-func TestFilterRunProcessKevent(t *testing.T) {
+func TestProcFilter(t *testing.T) {
 	kpars := kevent.Kparams{
-		kparams.Comm:            {Name: kparams.Comm, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost-fake.exe -k RPCSS"},
+		kparams.Cmdline:         {Name: kparams.Cmdline, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost-fake.exe -k RPCSS"},
 		kparams.ProcessName:     {Name: kparams.ProcessName, Type: kparams.AnsiString, Value: "svchost-fake.exe"},
 		kparams.ProcessID:       {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1234)},
 		kparams.ProcessParentID: {Name: kparams.ProcessParentID, Type: kparams.PID, Value: uint32(345)},
-		kparams.UserSID:         {Name: kparams.UserSID, Type: kparams.UnicodeString, Value: "TITAN\\loki"},
+		kparams.UserSID:         {Name: kparams.UserSID, Type: kparams.WbemSID, Value: []byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0}},
+		kparams.Username:        {Name: kparams.Username, Type: kparams.UnicodeString, Value: "loki"},
+		kparams.Domain:          {Name: kparams.Domain, Type: kparams.UnicodeString, Value: "TITAN"},
 	}
 
 	kpars1 := kevent.Kparams{
-		kparams.DesiredAccessNames: {Name: kparams.DesiredAccessNames, Type: kparams.Slice, Value: []string{"QUERY_INFORMATION", "QUERY_LIMITED_INFORMATION"}},
+		kparams.DesiredAccess: {Name: kparams.DesiredAccess, Type: kparams.Flags, Value: uint32(0x1400), Flags: kevent.PsAccessRightFlags},
 	}
 
 	ps1 := &pstypes.PS{
-		Name: "wininit.exe",
-		SID:  "NT AUTHORITY\\SYSTEM",
-		PID:  5042,
+		Name:     "wininit.exe",
+		Username: "SYSTEM",
+		Domain:   "NT AUTHORITY",
+		SID:      "S-1-5-18",
+		PID:      5042,
 		Parent: &pstypes.PS{
 			Name: "services.exe",
 			SID:  "NT AUTHORITY\\SYSTEM",
@@ -162,12 +166,14 @@ func TestFilterRunProcessKevent(t *testing.T) {
 		Name:     "CreateProcess",
 		PID:      1023,
 		PS: &pstypes.PS{
-			Name:   "svchost.exe",
-			Comm:   "C:\\Windows\\System32\\svchost.exe",
-			Parent: ps1,
-			Ppid:   345,
-			SID:    "LOCAL\\tor",
-			Envs:   map[string]string{"ALLUSERSPROFILE": "C:\\ProgramData", "OS": "Windows_NT", "ProgramFiles(x86)": "C:\\Program Files (x86)"},
+			Name:     "svchost.exe",
+			Cmdline:  "C:\\Windows\\System32\\svchost.exe",
+			Parent:   ps1,
+			Ppid:     345,
+			Username: "SYSTEM",
+			Domain:   "NT AUTHORITY",
+			SID:      "S-1-5-18",
+			Envs:     map[string]string{"ALLUSERSPROFILE": "C:\\ProgramData", "OS": "Windows_NT", "ProgramFiles(x86)": "C:\\Program Files (x86)"},
 			Modules: []pstypes.Module{
 				{Name: "C:\\Windows\\System32\\kernel32.dll", Size: 12354, Checksum: 23123343, BaseAddress: kparams.Hex("fff23fff"), DefaultBaseAddress: kparams.Hex("fff124fd")},
 				{Name: "C:\\Windows\\System32\\user32.dll", Size: 212354, Checksum: 33123343, BaseAddress: kparams.Hex("fef23fff"), DefaultBaseAddress: kparams.Hex("fff124fd")},
@@ -205,9 +211,11 @@ func TestFilterRunProcessKevent(t *testing.T) {
 		{`ps.name ~= 'SVCHOST.exe'`, true},
 		{`ps.cmdline = 'C:\\Windows\\System32\\svchost.exe'`, true},
 		{`ps.child.cmdline = 'C:\\Windows\\system32\\svchost-fake.exe -k RPCSS'`, true},
-		{`ps.username = 'tor'`, true},
-		{`ps.domain = 'LOCAL'`, true},
+		{`ps.username = 'SYSTEM'`, true},
+		{`ps.domain = 'NT AUTHORITY'`, true},
+		{`ps.sid = 'S-1-5-18'`, true},
 		{`ps.pid = 1023`, true},
+		{`ps.child.sid = 'S-1-5-18'`, true},
 		{`ps.sibling.pid = 1234`, true},
 		{`ps.child.pid = 1234`, true},
 		{`ps.child.uuid > 0`, true},
@@ -248,7 +256,7 @@ func TestFilterRunProcessKevent(t *testing.T) {
 	}
 
 	psnap := new(ps.SnapshotterMock)
-	psnap.On("Find", uint32(1234)).Return(ps1)
+	psnap.On("FindAndPut", uint32(1234)).Return(ps1)
 
 	for i, tt := range tests {
 		f := New(tt.filter, cfg, WithPSnapshotter(psnap))
@@ -267,7 +275,8 @@ func TestFilterRunProcessKevent(t *testing.T) {
 		matches bool
 	}{
 
-		{`ps.access.mask.names in ('QUERY_INFORMATION')`, true},
+		{`ps.access.mask.names in ('QUERY_INFORMATION', 'QUERY_LIMITED_INFORMATION')`, true},
+		{`ps.access.mask.names in ('ALL_ACCESS')`, false},
 	}
 
 	for i, tt := range tests1 {
@@ -283,9 +292,9 @@ func TestFilterRunProcessKevent(t *testing.T) {
 	}
 }
 
-func TestFilterRunThreadKevent(t *testing.T) {
+func TestThreadFilter(t *testing.T) {
 	kpars := kevent.Kparams{
-		kparams.Comm:            {Name: kparams.Comm, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost.exe -k RPCSS"},
+		kparams.Cmdline:         {Name: kparams.Cmdline, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost.exe -k RPCSS"},
 		kparams.ProcessName:     {Name: kparams.ProcessName, Type: kparams.AnsiString, Value: "svchost.exe"},
 		kparams.ProcessID:       {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(1234)},
 		kparams.ProcessParentID: {Name: kparams.ProcessParentID, Type: kparams.Uint32, Value: uint32(345)},
@@ -323,7 +332,7 @@ func TestFilterRunThreadKevent(t *testing.T) {
 	}
 }
 
-func TestFilterRunFileKevent(t *testing.T) {
+func TestFileFilter(t *testing.T) {
 	kevt := &kevent.Kevent{
 		Type:        ktypes.CreateFile,
 		Tid:         2484,
@@ -398,7 +407,7 @@ func TestFilterRunFileKevent(t *testing.T) {
 	}
 }
 
-func TestFilterRunKevent(t *testing.T) {
+func TestKeventFilter(t *testing.T) {
 	kevt := &kevent.Kevent{
 		Type:        ktypes.CreateFile,
 		Tid:         2484,
@@ -473,7 +482,7 @@ func TestFilterRunKevent(t *testing.T) {
 	}
 }
 
-func TestFilterRunNetKevent(t *testing.T) {
+func TestNetFilter(t *testing.T) {
 	kevt := &kevent.Kevent{
 		Type: ktypes.SendTCPv4,
 		Tid:  2484,
@@ -530,7 +539,7 @@ func TestFilterRunNetKevent(t *testing.T) {
 	}
 }
 
-func TestFilterRunRegistryKevent(t *testing.T) {
+func TestRegistryFilter(t *testing.T) {
 	kevt := &kevent.Kevent{
 		Type:     ktypes.RegSetValue,
 		Tid:      2484,
@@ -538,7 +547,7 @@ func TestFilterRunRegistryKevent(t *testing.T) {
 		Category: ktypes.Registry,
 		Kparams: kevent.Kparams{
 			kparams.RegKeyName:   {Name: kparams.RegKeyName, Type: kparams.UnicodeString, Value: `HKEY_LOCAL_MACHINE\SYSTEM\Setup\Pid`},
-			kparams.RegValue:     {Name: kparams.RegValue, Type: kparams.Uint32, Value: 10234},
+			kparams.RegValue:     {Name: kparams.RegValue, Type: kparams.Uint32, Value: uint32(10234)},
 			kparams.RegValueType: {Name: kparams.RegValueType, Type: kparams.AnsiString, Value: "DWORD"},
 			kparams.NTStatus:     {Name: kparams.NTStatus, Type: kparams.AnsiString, Value: "success"},
 			kparams.RegKeyHandle: {Name: kparams.RegKeyHandle, Type: kparams.HexInt64, Value: kparams.NewHex(uint64(18446666033449935464))},
@@ -741,7 +750,7 @@ func BenchmarkFilterRun(b *testing.B) {
 	require.NoError(b, f.Compile())
 
 	kpars := kevent.Kparams{
-		kparams.Comm:            {Name: kparams.Comm, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost.exe -k RPCSS"},
+		kparams.Cmdline:         {Name: kparams.Cmdline, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost.exe -k RPCSS"},
 		kparams.ProcessName:     {Name: kparams.ProcessName, Type: kparams.AnsiString, Value: "svchost.exe"},
 		kparams.ProcessID:       {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(1234)},
 		kparams.ProcessParentID: {Name: kparams.ProcessParentID, Type: kparams.Uint32, Value: uint32(345)},

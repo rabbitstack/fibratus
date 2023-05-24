@@ -24,7 +24,7 @@ package yara
 const alertTextTmpl = `
 	{{ if .PS }}
 	Possible malicious process, {{ .PS.Name }} ({{ .PS.PID }}), detected at {{ .Timestamp }}.
-	
+
 	Rule matches
 	{{- with .Matches }}
 	{{ range . }}
@@ -34,18 +34,18 @@ const alertTextTmpl = `
 		Tags: {{ .Tags }}
 	{{ end }}
 	{{- end }}
-	
+
 	Process information
 
 	Name: 		{{ .PS.Name }}
 	PID:  		{{ .PS.PID }}
 	PPID: 		{{ .PS.Ppid }}
-	Comm:		{{ .PS.Comm }}
+	Cmdline:	{{ .PS.Cmdline }}
 	Cwd:		{{ .PS.Cwd }}
 	SID:		{{ .PS.SID }}
 	Session ID: {{ .PS.SessionID }}
 	{{ if .PS.Envs }}
-	Env:	
+	Env:
 			{{- with .PS.Envs }}
 			{{- range $k, $v := . }}
 			{{ $k }}: {{ $v }}
@@ -58,14 +58,14 @@ const alertTextTmpl = `
 			{{ . }}
 			{{- end }}
 			{{- end }}
-	Modules:	
+	Modules:
 			{{- with .PS.Modules }}
 			{{- range . }}
 			{{ . }}
 			{{- end }}
 			{{- end }}
 	{{ if .PS.Handles }}
-	Handles:    
+	Handles:
 			{{- with .PS.Handles }}
 			{{- range . }}
 			{{ . }}
@@ -77,11 +77,11 @@ const alertTextTmpl = `
 	Entrypoint:  		{{ .PS.PE.EntryPoint }}
 	Image base: 		{{ .PS.PE.ImageBase }}
 	Build date:  		{{ .PS.PE.LinkTime }}
-	
+
 	Number of symbols: 	{{ .PS.PE.NumberOfSymbols }}
 	Number of sections: {{ .PS.PE.NumberOfSections }}
 
-	Sections: 
+	Sections:
 			{{- with .PS.PE.Sections }}
 			{{- range . }}
 			{{ . }}
@@ -116,7 +116,7 @@ const alertTextTmpl = `
 	{{ else }}
 
 	Possible malicious file, {{ .Filename }}, detected at {{ .Timestamp }}.
-	
+
 	Rule matches
 	{{ with .Matches }}
 	{{ range . }}
