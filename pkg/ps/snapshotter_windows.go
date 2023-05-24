@@ -290,6 +290,7 @@ func (s *snapshotter) newProcState(pid, ppid uint32, e *kevent.Kevent) (*pstypes
 	if err != nil {
 		return proc, nil
 	}
+	//nolint:errcheck
 	defer windows.CloseHandle(process)
 
 	// read PEB
@@ -382,6 +383,7 @@ func (s *snapshotter) Find(pid uint32) (bool, *pstypes.PS) {
 			return false, proc
 		}
 	}
+	//nolint:errcheck
 	defer windows.CloseHandle(process)
 
 	// get process executable full path and name
