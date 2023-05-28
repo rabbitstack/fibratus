@@ -71,7 +71,7 @@
   expr: >
     load_module
       and
-    image.signature.level = 'UNCHECKED' or image.signature.level = 'UNSIGNED'
+    (image.signature.level = 'UNCHECKED' or image.signature.level = 'UNSIGNED')
   description: |
     Detects when untrusted executable or DLL is loaded into process address space.
     Windows must verify the trust chain by following the certificates to a trusted
