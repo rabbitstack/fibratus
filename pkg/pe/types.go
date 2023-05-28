@@ -76,6 +76,8 @@ type PE struct {
 	Imports []string `json:"imports"`
 	// VersionResources holds the version resources
 	VersionResources map[string]string `json:"resources"`
+	// IsSigned determines if the PE contains the digital signature.
+	IsSigned bool `json:"is_signed"`
 }
 
 // String returns the string representation of the PE metadata.

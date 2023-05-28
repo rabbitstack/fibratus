@@ -22,26 +22,64 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/ps"
+	"github.com/rabbitstack/fibratus/pkg/util/signature"
 )
 
 type imageProcessor struct {
-	psnap ps.Snapshotter
+	psnap      ps.Snapshotter
+	signatures map[uint32]*signature.Signature
 }
 
 func newImageProcessor(psnap ps.Snapshotter) Processor {
-	return &imageProcessor{psnap: psnap}
+	return &imageProcessor{psnap: psnap, signatures: make(map[uint32]*signature.Signature)}
 }
 
 func (imageProcessor) Name() ProcessorType { return Image }
 
-func (i *imageProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error) {
+func (m *imageProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error) {
+	if e.IsLoadImage() {
+		// image signature parameters exhibit unreliable behaviour. Allegedly,
+		// signature verification is not performed in certain circumstances
+		// which leads to the core system DLL or binaries to be reported with
+		// signature unchecked level.
+		// To mitigate this situation, we have to manually check/verify the signature
+		// for all unchecked signature levels
+		level := e.Kparams.MustGetUint32(kparams.ImageSignatureLevel)
+		if level == signature.UncheckedLevel {
+			m.checkSignature(e)
+		}
+	}
 	if e.IsUnloadImage() {
-		return e, false, i.psnap.RemoveModule(e.Kparams.MustGetPid(), e.GetParamAsString(kparams.ImageFilename))
+		return e, false, m.psnap.RemoveModule(e.Kparams.MustGetPid(), e.GetParamAsString(kparams.ImageFilename))
 	}
 	if e.IsLoadImage() {
-		return e, false, i.psnap.AddModule(e)
+		return e, false, m.psnap.AddModule(e)
 	}
 	return e, true, nil
 }
 
 func (imageProcessor) Close() {}
+
+// checkSignature consults the signature cache and if the signature
+// already exists for a particular image checksum, signature checking
+// is skipped. On the contrary, the signature verification is performed
+// and the cache is updated accordingly.
+func (m *imageProcessor) checkSignature(e *kevent.Kevent) {
+	checksum := e.Kparams.MustGetUint32(kparams.ImageCheckSum)
+	sign, ok := m.signatures[checksum]
+	if !ok {
+		filename := e.GetParamAsString(kparams.FileName)
+		sign = signature.Check(filename)
+		if sign == nil {
+			return
+		}
+		if sign.IsSigned() {
+			sign.Verify()
+		}
+		m.signatures[checksum] = sign
+	}
+	if sign != nil {
+		_ = e.Kparams.SetValue(kparams.ImageSignatureType, sign.Type)
+		_ = e.Kparams.SetValue(kparams.ImageSignatureLevel, sign.Level)
+	}
+}

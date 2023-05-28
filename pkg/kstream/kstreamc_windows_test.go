@@ -175,7 +175,10 @@ func TestConsumerEvents(t *testing.T) {
 			nil,
 			func(e *kevent.Kevent) bool {
 				img := filepath.Join(os.Getenv("windir"), "System32", "notepad.exe")
-				return e.IsLoadImage() && strings.EqualFold(img, e.GetParamAsString(kparams.ImageFilename))
+				// should get a catalog-signed binary
+				signatureType := e.GetParamAsString(kparams.ImageSignatureType)
+				return e.IsLoadImage() && strings.EqualFold(img, e.GetParamAsString(kparams.ImageFilename)) &&
+					signatureType == "CATALOG_CACHED"
 			},
 			false,
 		},

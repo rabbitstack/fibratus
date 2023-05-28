@@ -52,6 +52,7 @@ type opts struct {
 	parseSymbols   bool
 	parseSections  bool
 	parseResources bool
+	parseSecurity  bool
 	sectionEntropy bool
 	sectionMD5     bool
 	excludedImages []string
@@ -113,6 +114,14 @@ func WithVersionResources() Option {
 	}
 }
 
+// WithSecurity indicates if the security directory is parsed to extract signature information
+// like certificates or Authenticode hashes.
+func WithSecurity() Option {
+	return func(o *opts) {
+		o.parseSecurity = true
+	}
+}
+
 // ParseFile parses the PE given the file system path and parser options.
 func ParseFile(path string, opts ...Option) (*PE, error) {
 	return parse(path, nil, opts...)
@@ -171,7 +180,7 @@ func newParserOpts(opts opts) *peparser.Options {
 	return &peparser.Options{
 		DisableCertValidation:     true,
 		OmitIATDirectory:          true,
-		OmitSecurityDirectory:     true,
+		OmitSecurityDirectory:     !opts.parseSecurity,
 		OmitExceptionDirectory:    true,
 		OmitTLSDirectory:          true,
 		OmitCLRHeaderDirectory:    true,
@@ -284,6 +293,10 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 		if err != nil {
 			versionResourcesParseErrors.Add(1)
 		}
+	}
+
+	if opts.parseSecurity {
+		p.IsSigned = pe.IsSigned
 	}
 
 	return p, nil

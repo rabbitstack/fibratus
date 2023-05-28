@@ -42,20 +42,28 @@ var (
 	modntdll    = windows.NewLazySystemDLL("ntdll.dll")
 	modpsapi    = windows.NewLazySystemDLL("psapi.dll")
 	modshlwapi  = windows.NewLazySystemDLL("shlwapi.dll")
+	modwintrust = windows.NewLazySystemDLL("wintrust.dll")
 	modwtsapi32 = windows.NewLazySystemDLL("wtsapi32.dll")
 
-	procCreateThread                 = modkernel32.NewProc("CreateThread")
-	procGetProcessIdOfThread         = modkernel32.NewProc("GetProcessIdOfThread")
-	procTerminateThread              = modkernel32.NewProc("TerminateThread")
-	procNtAlpcQueryInformation       = modntdll.NewProc("NtAlpcQueryInformation")
-	procNtQueryMutant                = modntdll.NewProc("NtQueryMutant")
-	procNtQueryObject                = modntdll.NewProc("NtQueryObject")
-	procNtQueryVolumeInformationFile = modntdll.NewProc("NtQueryVolumeInformationFile")
-	procRtlNtStatusToDosError        = modntdll.NewProc("RtlNtStatusToDosError")
-	procEnumDeviceDrivers            = modpsapi.NewProc("EnumDeviceDrivers")
-	procGetDeviceDriverFileNameW     = modpsapi.NewProc("GetDeviceDriverFileNameW")
-	procPathIsDirectoryW             = modshlwapi.NewProc("PathIsDirectoryW")
-	procWTSQuerySessionInformationW  = modwtsapi32.NewProc("WTSQuerySessionInformationW")
+	procCreateThread                         = modkernel32.NewProc("CreateThread")
+	procGetProcessIdOfThread                 = modkernel32.NewProc("GetProcessIdOfThread")
+	procTerminateThread                      = modkernel32.NewProc("TerminateThread")
+	procNtAlpcQueryInformation               = modntdll.NewProc("NtAlpcQueryInformation")
+	procNtQueryMutant                        = modntdll.NewProc("NtQueryMutant")
+	procNtQueryObject                        = modntdll.NewProc("NtQueryObject")
+	procNtQueryVolumeInformationFile         = modntdll.NewProc("NtQueryVolumeInformationFile")
+	procRtlNtStatusToDosError                = modntdll.NewProc("RtlNtStatusToDosError")
+	procEnumDeviceDrivers                    = modpsapi.NewProc("EnumDeviceDrivers")
+	procGetDeviceDriverFileNameW             = modpsapi.NewProc("GetDeviceDriverFileNameW")
+	procPathIsDirectoryW                     = modshlwapi.NewProc("PathIsDirectoryW")
+	procCryptCATAdminAcquireContext2         = modwintrust.NewProc("CryptCATAdminAcquireContext2")
+	procCryptCATAdminCalcHashFromFileHandle2 = modwintrust.NewProc("CryptCATAdminCalcHashFromFileHandle2")
+	procCryptCATAdminEnumCatalogFromHash     = modwintrust.NewProc("CryptCATAdminEnumCatalogFromHash")
+	procCryptCATAdminReleaseCatalogContext   = modwintrust.NewProc("CryptCATAdminReleaseCatalogContext")
+	procCryptCATAdminReleaseContext          = modwintrust.NewProc("CryptCATAdminReleaseContext")
+	procCryptCATCatalogInfoFromContext       = modwintrust.NewProc("CryptCATCatalogInfoFromContext")
+	procWinVerifyTrust                       = modwintrust.NewProc("WinVerifyTrust")
+	procWTSQuerySessionInformationW          = modwtsapi32.NewProc("WTSQuerySessionInformationW")
 )
 
 func CreateThread(attributes *windows.SecurityAttributes, stackSize uint, startAddress uintptr, param uintptr, creationFlags uint32, threadID *uint32) (handle windows.Handle) {
@@ -133,6 +141,59 @@ func GetDeviceDriverFileName(imageBase uintptr, filename *uint16, size uint32) (
 func pathIsDirectory(path *uint16) (isDirectory bool) {
 	r0, _, _ := syscall.Syscall(procPathIsDirectoryW.Addr(), 1, uintptr(unsafe.Pointer(path)), 0, 0)
 	isDirectory = r0 != 0
+	return
+}
+
+func CryptCatalogAdminAcquireContext(handle *windows.Handle, subsystem *windows.GUID, hashAlgorithm *uint16, hashPolicy uintptr, flags uint32) (err error) {
+	r1, _, e1 := syscall.Syscall6(procCryptCATAdminAcquireContext2.Addr(), 5, uintptr(unsafe.Pointer(handle)), uintptr(unsafe.Pointer(subsystem)), uintptr(unsafe.Pointer(hashAlgorithm)), uintptr(hashPolicy), uintptr(flags), 0)
+	if r1 == 0 {
+		err = errnoErr(e1)
+	}
+	return
+}
+
+func CryptCatalogAdminCalcHashFromFileHandle(handle windows.Handle, fd uintptr, size *uint32, hash uintptr, flags uint32) (err error) {
+	r1, _, e1 := syscall.Syscall6(procCryptCATAdminCalcHashFromFileHandle2.Addr(), 5, uintptr(handle), uintptr(fd), uintptr(unsafe.Pointer(size)), uintptr(hash), uintptr(flags), 0)
+	if r1 == 0 {
+		err = errnoErr(e1)
+	}
+	return
+}
+
+func CryptCatalogAdminEnumCatalogFromHash(handle windows.Handle, hash uintptr, size uint32, flags uint32, prevCatalog *windows.Handle) (catalog windows.Handle) {
+	r0, _, _ := syscall.Syscall6(procCryptCATAdminEnumCatalogFromHash.Addr(), 5, uintptr(handle), uintptr(hash), uintptr(size), uintptr(flags), uintptr(unsafe.Pointer(prevCatalog)), 0)
+	catalog = windows.Handle(r0)
+	return
+}
+
+func CryptCatalogAdminReleaseCatalogContext(handle windows.Handle, info windows.Handle, flags uint32) (err error) {
+	r1, _, e1 := syscall.Syscall(procCryptCATAdminReleaseCatalogContext.Addr(), 3, uintptr(handle), uintptr(info), uintptr(flags))
+	if r1 == 0 {
+		err = errnoErr(e1)
+	}
+	return
+}
+
+func CryptCatalogAdminReleaseContext(handle windows.Handle, flags int32) (ok bool) {
+	r0, _, _ := syscall.Syscall(procCryptCATAdminReleaseContext.Addr(), 2, uintptr(handle), uintptr(flags), 0)
+	ok = r0 != 0
+	return
+}
+
+func CryptCatalogInfoFromContext(handle windows.Handle, catalog *CatalogInfo, flags uint32) (err error) {
+	r1, _, e1 := syscall.Syscall(procCryptCATCatalogInfoFromContext.Addr(), 3, uintptr(handle), uintptr(unsafe.Pointer(catalog)), uintptr(flags))
+	if r1 == 0 {
+		err = errnoErr(e1)
+	}
+	return
+}
+
+func WinVerifyTrust(handle windows.Handle, action *windows.GUID, data *WintrustData) (ret uint32, err error) {
+	r0, _, e1 := syscall.Syscall(procWinVerifyTrust.Addr(), 3, uintptr(handle), uintptr(unsafe.Pointer(action)), uintptr(unsafe.Pointer(data)))
+	ret = uint32(r0)
+	if ret != 0 {
+		err = errnoErr(e1)
+	}
 	return
 }
 

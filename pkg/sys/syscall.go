@@ -41,3 +41,12 @@ package sys
 
 // Windows Terminal Server Functions
 //sys WTSQuerySessionInformationA(handle windows.Handle, sessionID uint32, klass uint8, buf **uint16, size *uint32) (err error) = wtsapi32.WTSQuerySessionInformationW
+
+// Windows Trust Functions
+//sys WinVerifyTrust(handle windows.Handle, action *windows.GUID, data *WintrustData) (ret uint32, err error) [failretval!=0] = wintrust.WinVerifyTrust
+//sys CryptCatalogAdminAcquireContext(handle *windows.Handle, subsystem *windows.GUID, hashAlgorithm *uint16, hashPolicy uintptr, flags uint32) (err error) = wintrust.CryptCATAdminAcquireContext2
+//sys CryptCatalogAdminReleaseContext(handle windows.Handle, flags int32) (ok bool) = wintrust.CryptCATAdminReleaseContext
+//sys CryptCatalogAdminCalcHashFromFileHandle(handle windows.Handle, fd uintptr, size *uint32, hash uintptr, flags uint32) (err error) = wintrust.CryptCATAdminCalcHashFromFileHandle2
+//sys CryptCatalogAdminEnumCatalogFromHash(handle windows.Handle, hash uintptr, size uint32, flags uint32, prevCatalog *windows.Handle) (catalog windows.Handle) = wintrust.CryptCATAdminEnumCatalogFromHash
+//sys CryptCatalogInfoFromContext(handle windows.Handle, catalog *CatalogInfo, flags uint32) (err error) = wintrust.CryptCATCatalogInfoFromContext
+//sys CryptCatalogAdminReleaseCatalogContext(handle windows.Handle, info windows.Handle, flags uint32) (err error) = wintrust.CryptCATAdminReleaseCatalogContext

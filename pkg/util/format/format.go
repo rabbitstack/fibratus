@@ -18,7 +18,13 @@
 
 package format
 
-import "strconv"
+import (
+	"fmt"
+	"strconv"
+)
 
 // UintToHex converts an unsigned wide integer to hex string.
 func UintToHex(v uint64) string { return strconv.FormatUint(v, 16) }
+
+// BytesToHex converts a byte slice to hex representation
+func BytesToHex(b []byte) string { return fmt.Sprintf("%X", b) }
