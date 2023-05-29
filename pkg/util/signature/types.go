@@ -18,11 +18,6 @@
 
 package signature
 
-import "golang.org/x/sys/windows"
-
-// WintrustActionGenericVerifyV2 is the action that indicates the file or object should be verified by using the Authenticode policy provider.
-var WintrustActionGenericVerifyV2 = windows.GUID{Data1: 0xaac56b, Data2: 0xcd44, Data3: 0x11d0, Data4: [8]byte{0x8c, 0xc2, 0x0, 0xc0, 0x4f, 0xc2, 0x95, 0xee}}
-
 const (
 	// UncheckedLevel specifies signature unchecked level
 	UncheckedLevel uint32 = 0

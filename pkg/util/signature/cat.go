@@ -20,15 +20,14 @@ package signature
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/sys"
-	"github.com/rabbitstack/fibratus/pkg/util/format"
 	"golang.org/x/sys/windows"
 	"os"
 	"runtime"
 	"unsafe"
 )
 
-// isCatalogSigned determines if the provided file is catalog signed.
-func isCatalogSigned(filename string) bool {
+// IsCatalogSigned determines if the provided file is catalog signed.
+func IsCatalogSigned(filename string) bool {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
@@ -45,7 +44,6 @@ func isCatalogSigned(filename string) bool {
 	if err != nil {
 		return false
 	}
-	//nolint:errcheck
 	defer file.Close()
 	size := uint32(100)
 	hash := make([]byte, size)
@@ -67,10 +65,8 @@ func isCatalogSigned(filename string) bool {
 		uintptr(unsafe.Pointer(&hash[0])),
 		size, 0, nil,
 	)
-	if catalog == 0 {
-		return false
-	}
-	return true
+	defer sys.CryptCatalogAdminReleaseCatalogContext(catalogAdmin, catalog, 0)
+	return catalog != 0
 }
 
 // verifyCatalogSignature calculates the provided file hash and tries
@@ -93,7 +89,6 @@ func verifyCatalogSignature(filename string) bool {
 	if err != nil {
 		return false
 	}
-	//nolint:errcheck
 	defer file.Close()
 	size := uint32(100)
 	hash := make([]byte, size)
@@ -116,7 +111,6 @@ func verifyCatalogSignature(filename string) bool {
 	if catalog == 0 {
 		return false
 	}
-	//nolint:errcheck
 	defer sys.CryptCatalogAdminReleaseCatalogContext(catalogAdmin, catalog, 0)
 	var catalogInfo sys.CatalogInfo
 	catalogInfo.Size = uint32(unsafe.Sizeof(sys.CatalogInfo{}))
@@ -124,39 +118,7 @@ func verifyCatalogSignature(filename string) bool {
 	if err != nil {
 		return false
 	}
-
-	// tag is a hexadecimal representation of the hash of the file
-	tag := windows.StringToUTF16Ptr(format.BytesToHex(hash[:size]))
-
-	cat := &sys.WintrustCatalogInfo{
-		Size:            uint32(unsafe.Sizeof(sys.WintrustCatalogInfo{})),
-		CatalogFilePath: uintptr(unsafe.Pointer(&catalogInfo.Name[0])),
-		MemberFilePath:  uintptr(unsafe.Pointer(windows.StringToUTF16Ptr(filename))),
-		MemberFile:      windows.Handle(file.Fd()),
-		MemberTag:       uintptr(unsafe.Pointer(tag)),
-		FileHash:        uintptr(unsafe.Pointer(&hash[0])),
-		FileHashSize:    size,
-		CatalogAdmin:    catalogAdmin,
-	}
-	data := &sys.WintrustData{
-		Size:             uint32(unsafe.Sizeof(sys.WintrustData{})),
-		UIChoice:         sys.WtdUINone,
-		RevocationChecks: sys.WtdRevokeNone,
-		UnionChoice:      sys.WtdChoiceCatalog,
-		Union:            uintptr(unsafe.Pointer(cat)),
-		StateAction:      sys.WtdStateActionVerify,
-		ProviderFlags:    sys.WtdSaferFlag,
-	}
-
-	status, err := sys.WinVerifyTrust(windows.InvalidHandle, &WintrustActionGenericVerifyV2, data)
-	// release stata data by specifying the corresponding action
-	data.StateAction = sys.WtdStateActionClose
-	_, _ = sys.WinVerifyTrust(windows.InvalidHandle, &WintrustActionGenericVerifyV2, data)
-	if err != nil {
-		return false
-	}
-	if status != 0 {
-		return false
-	}
-	return true
+	t := sys.NewWintrustData(sys.WtdChoiceCatalog)
+	defer t.Close()
+	return t.VerifyCatalog(file.Fd(), filename, catalogAdmin, catalogInfo, hash, size)
 }

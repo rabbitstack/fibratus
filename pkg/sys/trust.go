@@ -19,6 +19,7 @@
 package sys
 
 import (
+	"github.com/rabbitstack/fibratus/pkg/util/format"
 	"golang.org/x/sys/windows"
 	"unsafe"
 )
@@ -56,6 +57,9 @@ const (
 	WtdSaferFlag = 0x100
 )
 
+// WintrustActionGenericVerifyV2 is the action that indicates the file or object should be verified by using the Authenticode policy provider.
+var WintrustActionGenericVerifyV2 = windows.GUID{Data1: 0xaac56b, Data2: 0xcd44, Data3: 0x11d0, Data4: [8]byte{0x8c, 0xc2, 0x0, 0xc0, 0x4f, 0xc2, 0x95, 0xee}}
+
 // WintrustData structure is used when calling WinVerifyTrust
 // to pass necessary information into the trust providers.
 type WintrustData struct {
@@ -72,6 +76,78 @@ type WintrustData struct {
 	ProviderFlags                 uint32
 	UIContext                     uint32
 	SignatureSettings             *WintrustSignatureSettings
+}
+
+// NewWintrustData creates a new instance of WintrustData prepared
+// to verify file or catalog trust.
+func NewWintrustData(choice uint32) *WintrustData {
+	return &WintrustData{
+		Size:             uint32(unsafe.Sizeof(WintrustData{})),
+		UnionChoice:      choice,
+		UIChoice:         WtdUINone,
+		RevocationChecks: WtdRevokeNone,
+		StateAction:      WtdStateActionVerify,
+		ProviderFlags:    WtdSaferFlag,
+	}
+}
+
+// VerifyFile verifies the provided file trust. The trust provider
+// should perform the verification action without the user's assistance.
+// This is achieved by providing INVALID_HANDLE_VALUE as a first parameter
+// in the WinVerifyTrust call.
+func (t *WintrustData) VerifyFile(filename string) bool {
+	fileinfo := &WintrustFileInfo{
+		Size:     uint32(unsafe.Sizeof(WintrustFileInfo{})),
+		FilePath: windows.StringToUTF16Ptr(filename),
+	}
+	t.Union = uintptr(unsafe.Pointer(fileinfo))
+	status, err := WinVerifyTrust(windows.InvalidHandle, &WintrustActionGenericVerifyV2, t)
+	if status != 0 || err != nil {
+		return false
+	}
+	return true
+}
+
+// VerifyCatalog verifies the provided catalog file.
+func (t *WintrustData) VerifyCatalog(
+	fd uintptr,
+	filename string,
+	catalogAdmin windows.Handle,
+	catalog CatalogInfo,
+	hash []byte,
+	hasSize uint32,
+) bool {
+	// tag is a hexadecimal representation of the hash of the file
+	tag := windows.StringToUTF16Ptr(format.BytesToHex(hash[:hasSize]))
+	catinfo := &WintrustCatalogInfo{
+		Size:            uint32(unsafe.Sizeof(WintrustCatalogInfo{})),
+		CatalogFilePath: uintptr(unsafe.Pointer(&catalog.Name[0])),
+		MemberFilePath:  uintptr(unsafe.Pointer(windows.StringToUTF16Ptr(filename))),
+		MemberFile:      windows.Handle(fd),
+		MemberTag:       uintptr(unsafe.Pointer(tag)),
+		FileHash:        uintptr(unsafe.Pointer(&hash[0])),
+		FileHashSize:    hasSize,
+		CatalogAdmin:    catalogAdmin,
+	}
+	t.Union = uintptr(unsafe.Pointer(catinfo))
+	status, err := WinVerifyTrust(windows.InvalidHandle, &WintrustActionGenericVerifyV2, t)
+	if status != 0 || err != nil {
+		return false
+	}
+	return true
+}
+
+// Close disposes state data by specifying the corresponding action
+func (t *WintrustData) Close() error {
+	t.StateAction = WtdStateActionClose
+	status, err := WinVerifyTrust(windows.InvalidHandle, &WintrustActionGenericVerifyV2, t)
+	if err != nil {
+		return err
+	}
+	if status != 0 {
+		return windows.GetLastError()
+	}
+	return nil
 }
 
 // WintrustSignatureSettings structure can be used to specify the signatures on a file.

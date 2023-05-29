@@ -22,10 +22,8 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/sys/windows"
 	"runtime"
 	"sync"
-	"unsafe"
 )
 
 var isWintrustDLLFound bool
@@ -59,7 +57,7 @@ func Check(filename string) *Signature {
 		return nil
 	}
 	// maybe the signature is in the catalog?
-	if isCatalogSigned(filename) {
+	if IsCatalogSigned(filename) {
 		s.Type = Catalog
 	}
 	return s
@@ -89,35 +87,7 @@ func (s *Signature) Verify() bool {
 func verifyFileSignature(filename string) bool {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
-
-	fileinfo := &sys.WintrustFileInfo{
-		Size:     uint32(unsafe.Sizeof(sys.WintrustFileInfo{})),
-		FilePath: windows.StringToUTF16Ptr(filename),
-	}
-	data := &sys.WintrustData{
-		Size:             uint32(unsafe.Sizeof(sys.WintrustData{})),
-		UIChoice:         sys.WtdUINone,
-		RevocationChecks: sys.WtdRevokeNone,
-		UnionChoice:      sys.WtdChoiceFile,
-		Union:            uintptr(unsafe.Pointer(fileinfo)),
-		StateAction:      sys.WtdStateActionVerify,
-		ProviderFlags:    sys.WtdSaferFlag,
-	}
-
-	// the trust provider should perform the verification
-	// action without the user's assistance. This is achieved
-	// by providing INVALID_HANDLE_VALUE as a first parameter
-	status, err := sys.WinVerifyTrust(windows.InvalidHandle, &WintrustActionGenericVerifyV2, data)
-	// release stata data by specifying the corresponding action
-	data.StateAction = sys.WtdStateActionClose
-	_, _ = sys.WinVerifyTrust(windows.InvalidHandle, &WintrustActionGenericVerifyV2, data)
-	if err != nil {
-		return false
-	}
-	if status != 0 {
-		return false
-	}
-	// trust provider verifies that the subject is trusted
-	// for the specified action, the return value is zero
-	return true
+	t := sys.NewWintrustData(sys.WtdChoiceFile)
+	defer t.Close()
+	return t.VerifyFile(filename)
 }
