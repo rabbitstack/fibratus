@@ -332,6 +332,10 @@ const (
 	ImageName Field = "image.name"
 	// ImagePID is the pid of the process where the image was loaded
 	ImagePID Field = "image.pid"
+	// ImageSignatureType represents the image signature type
+	ImageSignatureType Field = "image.signature.type"
+	// ImageSignatureLevel represents the image signature level
+	ImageSignatureLevel Field = "image.signature.level"
 
 	// None represents the unknown field
 	None Field = ""
@@ -497,6 +501,8 @@ var fields = map[Field]FieldInfo{
 	ImageSize:           {ImageSize, "image size", kparams.Uint32, []string{"image.size > 1024"}, nil},
 	ImageDefaultAddress: {ImageDefaultAddress, "default image address", kparams.HexInt64, []string{"image.default.address = '7efe0000'"}, nil},
 	ImagePID:            {ImagePID, "target process identifier", kparams.Uint32, []string{"image.pid = 80"}, nil},
+	ImageSignatureType:  {ImageSignatureType, "image signature type", kparams.AnsiString, []string{"image.signature.type != 'NONE'"}, nil},
+	ImageSignatureLevel: {ImageSignatureLevel, "image signature level", kparams.AnsiString, []string{"image.signature.level = 'AUTHENTICODE'"}, nil},
 
 	FileObject:     {FileObject, "file object address", kparams.Uint64, []string{"file.object = 18446738026482168384"}, nil},
 	FileName:       {FileName, "full file name", kparams.UnicodeString, []string{"file.name contains 'mimikatz'"}, nil},

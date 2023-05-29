@@ -23,8 +23,12 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/ps"
+	"github.com/rabbitstack/fibratus/pkg/util/signature"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -40,8 +44,11 @@ func TestImageProcessor(t *testing.T) {
 			&kevent.Kevent{
 				Type: ktypes.LoadImage,
 				Kparams: kevent.Kparams{
-					kparams.ImageFilename: {Name: kparams.ImageFilename, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\kernel32.dll"},
-					kparams.ProcessID:     {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1023)},
+					kparams.ImageFilename:       {Name: kparams.ImageFilename, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll")},
+					kparams.ProcessID:           {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1023)},
+					kparams.ImageCheckSum:       {Name: kparams.ImageCheckSum, Type: kparams.Uint32, Value: uint32(2323432)},
+					kparams.ImageSignatureType:  {Name: kparams.ImageSignatureType, Type: kparams.Enum, Value: uint32(0), Enum: signature.Types},
+					kparams.ImageSignatureLevel: {Name: kparams.ImageSignatureLevel, Type: kparams.Enum, Value: uint32(0), Enum: signature.Levels},
 				},
 			},
 			func() *ps.SnapshotterMock {
@@ -51,6 +58,9 @@ func TestImageProcessor(t *testing.T) {
 			},
 			func(e *kevent.Kevent, t *testing.T, psnap *ps.SnapshotterMock) {
 				psnap.AssertNumberOfCalls(t, "AddModule", 1)
+				// should get the signature verified
+				assert.Equal(t, "EMBEDDED", e.GetParamAsString(kparams.ImageSignatureType))
+				assert.Equal(t, "AUTHENTICODE", e.GetParamAsString(kparams.ImageSignatureLevel))
 			},
 		},
 		{

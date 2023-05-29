@@ -59,6 +59,30 @@
     loading of kernel driver by observing the object manager events and watching
     for driver objects being created.
 
+- macro: load_unsigned_module
+  expr: >
+    load_module and image.signature.type = 'NONE'
+  description: |
+    Detects when unsigned executable or DLL is loaded into process address space.
+    The module is considered as unsigned if it lacks the cert in the PE security
+    directory or the Authenticode hash is not present in any of the catalogs.
+
+- macro: load_untrusted_module
+  expr: >
+    load_module
+      and
+    (image.signature.level = 'UNCHECKED' or image.signature.level = 'UNSIGNED')
+  description: |
+    Detects when untrusted executable or DLL is loaded into process address space.
+    Windows must verify the trust chain by following the certificates to a trusted
+    root certificate. If the trust chain is not satisfied, the module is considered
+    untrusted.
+
+- macro: load_unsigned_or_untrusted_module
+  expr: (load_unsigned_module) or (load_untrusted_module)
+  description: >
+    Detects when either unsigned or untrusted module is loaded into process address space.
+
 - macro: write_minidump_file
   expr: >
     write_file

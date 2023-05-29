@@ -16,15 +16,37 @@
  * limitations under the License.
  */
 
-package format
+package signature
 
 import (
-	"fmt"
-	"strconv"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"os"
+	"path/filepath"
+	"testing"
 )
 
-// UintToHex converts an unsigned wide integer to hex string.
-func UintToHex(v uint64) string { return strconv.FormatUint(v, 16) }
+func TestIsCatalogSigned(t *testing.T) {
+	executable, err := os.Executable()
+	require.NoError(t, err)
 
-// BytesToHex converts a byte slice to hex representation
-func BytesToHex(b []byte) string { return fmt.Sprintf("%X", b) }
+	var tests = []struct {
+		filename string
+		want     bool
+	}{
+		{
+			executable,
+			false,
+		},
+		{
+			filepath.Join(os.Getenv("windir"), "notepad.exe"),
+			true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.filename, func(t *testing.T) {
+			assert.Equal(t, tt.want, IsCatalogSigned(tt.filename))
+		})
+	}
+}

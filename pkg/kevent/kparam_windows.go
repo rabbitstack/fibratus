@@ -29,6 +29,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/ip"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
 	"github.com/rabbitstack/fibratus/pkg/util/ntstatus"
+	"github.com/rabbitstack/fibratus/pkg/util/signature"
 	"golang.org/x/sys/windows"
 	"net"
 	"strconv"
@@ -328,10 +329,11 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 		ktypes.UnloadImage,
 		ktypes.ImageRundown:
 		var (
-			pid         uint32
-			checksum    uint32
-			defaultBase uint64
-			filename    string
+			pid               uint32
+			checksum          uint32
+			defaultBase       uint64
+			filename          string
+			sigLevel, sigType uint8
 		)
 		var offset uint16
 		imageBase := evt.ReadUint64(0)
@@ -344,6 +346,8 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 			defaultBase = evt.ReadUint64(30)
 		}
 		if evt.Version() >= 3 {
+			sigLevel = evt.ReadByte(28)
+			sigType = evt.ReadByte(29)
 			defaultBase = evt.ReadUint64(32)
 		}
 		switch {
@@ -363,6 +367,8 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 		e.AppendParam(kparams.ImageBase, kparams.Address, imageBase)
 		e.AppendParam(kparams.ImageSize, kparams.Uint64, imageSize)
 		e.AppendParam(kparams.ImageFilename, kparams.FileDosPath, filename)
+		e.AppendParam(kparams.ImageSignatureLevel, kparams.Enum, uint32(sigLevel), WithEnum(signature.Levels))
+		e.AppendParam(kparams.ImageSignatureType, kparams.Enum, uint32(sigType), WithEnum(signature.Types))
 	case ktypes.RegOpenKey, ktypes.RegCloseKey,
 		ktypes.RegCreateKCB, ktypes.RegDeleteKCB,
 		ktypes.RegKCBRundown, ktypes.RegCreateKey,

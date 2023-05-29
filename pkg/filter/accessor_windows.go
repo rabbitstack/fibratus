@@ -640,6 +640,10 @@ func (i *imageAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value,
 		return kevt.Kparams.GetUint32(kparams.ImageCheckSum)
 	case fields.ImagePID:
 		return kevt.Kparams.GetPid()
+	case fields.ImageSignatureType:
+		return kevt.GetParamAsString(kparams.ImageSignatureType), nil
+	case fields.ImageSignatureLevel:
+		return kevt.GetParamAsString(kparams.ImageSignatureLevel), nil
 	}
 	return nil, nil
 }

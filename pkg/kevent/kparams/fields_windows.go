@@ -127,6 +127,10 @@ const (
 	ImageDefaultBase = "default_address"
 	// ImageFilename is the parameter name that denotes file name and extension of the DLL/executable image.
 	ImageFilename = "file_name"
+	// ImageSignatureLevel is the parameter denoting the loaded module signature level
+	ImageSignatureLevel = "signature_level"
+	// ImageSignatureType is the parameter denoting the loaded module signature type
+	ImageSignatureType = "signature_type"
 
 	// NetSize identifies the parameter name that represents the packet size.
 	NetSize = "size"
