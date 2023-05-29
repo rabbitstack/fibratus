@@ -65,6 +65,7 @@ func IsCatalogSigned(filename string) bool {
 		uintptr(unsafe.Pointer(&hash[0])),
 		size, 0, nil,
 	)
+	//nolint:errcheck
 	defer sys.CryptCatalogAdminReleaseCatalogContext(catalogAdmin, catalog, 0)
 	return catalog != 0
 }
@@ -111,6 +112,7 @@ func verifyCatalogSignature(filename string) bool {
 	if catalog == 0 {
 		return false
 	}
+	//nolint:errcheck
 	defer sys.CryptCatalogAdminReleaseCatalogContext(catalogAdmin, catalog, 0)
 	var catalogInfo sys.CatalogInfo
 	catalogInfo.Size = uint32(unsafe.Sizeof(sys.CatalogInfo{}))
