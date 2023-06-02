@@ -151,9 +151,9 @@ const (
 	// NetSeqNum is the parameter name that represents the TCP sequence number.
 	NetSeqNum = "seqnum"
 	// NetStartTime is the parameter name that represents the TCP start time.
-	NetStartTime = "starttime"
+	NetStartTime = "start_time"
 	// NetEndTime is the parameter name that represents the TCP end time.
-	NetEndTime = "endtime"
+	NetEndTime = "end_time"
 	// NetConnID is the parameter name that represents a unique connection identifier.
 	NetConnID = "connid"
 	// NetL4Proto is the parameter name that identifies the Layer 4 protocol name.
