@@ -558,6 +558,17 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 		e.AppendParam(kparams.FileKey, kparams.Address, fileKey)
 		e.AppendParam(kparams.FileName, kparams.UnicodeString, filename)
 		e.AppendParam(kparams.FileInfoClass, kparams.Enum, infoClass, WithEnum(fs.FileInfoClasses))
+	case ktypes.MapViewFile, ktypes.UnmapViewFile:
+		var (
+			viewBase  uint64
+			fileKey   uint64
+			extraInfo uint64
+			viewSize  uint64
+		)
+		viewBase = evt.ReadUint64(0)
+		fileKey = evt.ReadUint64(8)
+		extraInfo = evt.ReadUint64(16)
+		viewSize = evt.ReadUint64(24)
 	case ktypes.SendTCPv4,
 		ktypes.SendUDPv4,
 		ktypes.RecvTCPv4,

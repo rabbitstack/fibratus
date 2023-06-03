@@ -101,6 +101,8 @@ const (
 	Syscall EventTraceFlags = 0x00000080
 	// Thread flag enables thread events.
 	Thread EventTraceFlags = 0x00000002
+	// VaMap enables map and unmap file events.
+	VaMap EventTraceFlags = 0x00008000
 )
 
 // String returns the string representation of enabled event trace flags.
@@ -138,6 +140,9 @@ func (f EventTraceFlags) String() string {
 	}
 	if f&Thread == Thread {
 		flags = append(flags, "Thread")
+	}
+	if f&VaMap == VaMap {
+		flags = append(flags, "VaMap")
 	}
 	return strings.Join(flags, ", ")
 }
