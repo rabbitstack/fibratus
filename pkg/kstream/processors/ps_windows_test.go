@@ -24,6 +24,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
+	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"os"
@@ -234,7 +235,7 @@ func TestPsProcessor(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			psnap := tt.psnap()
-			p := newPsProcessor(psnap)
+			p := newPsProcessor(psnap, va.NewRegionProber())
 			var err error
 			tt.e, _, err = p.ProcessEvent(tt.e)
 			require.NoError(t, err)

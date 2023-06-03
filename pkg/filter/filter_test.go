@@ -20,6 +20,7 @@ package filter
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
+	"github.com/rabbitstack/fibratus/pkg/kstream/processors"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/stretchr/testify/assert"
 	"net"
@@ -43,6 +44,7 @@ var cfg = &config.Config{
 		EnableFileIOKevents:   true,
 		EnableImageKevents:    true,
 		EnableThreadKevents:   true,
+		EnableMemKevents:      true,
 	},
 	Filters: &config.Filters{},
 	PE:      pe.Config{Enabled: true},
@@ -579,7 +581,7 @@ func TestRegistryFilter(t *testing.T) {
 	}
 }
 
-func TestFilterRunPE(t *testing.T) {
+func TestPEFilter(t *testing.T) {
 	kevt := &kevent.Kevent{
 		PS: &pstypes.PS{
 			PE: &pe.PE{
@@ -623,6 +625,55 @@ func TestFilterRunPE(t *testing.T) {
 		matches := f.Run(kevt)
 		if matches != tt.matches {
 			t.Errorf("%d. %q pe filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
+		}
+	}
+}
+
+func TestMemFilter(t *testing.T) {
+	kpars := kevent.Kparams{
+		kparams.MemRegionSize:  {Name: kparams.MemRegionSize, Type: kparams.Uint64, Value: uint64(8192)},
+		kparams.MemBaseAddress: {Name: kparams.MemBaseAddress, Type: kparams.Address, Value: uint64(1311246336000)},
+		kparams.MemAllocType:   {Name: kparams.MemAllocType, Type: kparams.Flags, Value: uint32(0x00001000 | 0x00002000), Flags: kevent.MemAllocationTypeFlags},
+		kparams.ProcessID:      {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(345)},
+		kparams.MemProtect:     {Name: kparams.MemProtect, Type: kparams.Flags, Value: uint32(0x40), Flags: processors.AllocationProtectFlags},
+		kparams.MemProtectMask: {Name: kparams.MemProtectMask, Type: kparams.AnsiString, Value: "RWX"},
+		kparams.MemPageType:    {Name: kparams.MemPageType, Type: kparams.Enum, Value: uint32(0x1000000), Enum: processors.MemPageTypes},
+	}
+
+	kevt := &kevent.Kevent{
+		Type:     ktypes.VirtualAlloc,
+		Kparams:  kpars,
+		Name:     "VirtualAlloc",
+		Category: ktypes.Mem,
+		PS: &pstypes.PS{
+			Name: "svchost.exe",
+			Envs: map[string]string{"ALLUSERSPROFILE": "C:\\ProgramData", "OS": "Windows_NT", "ProgramFiles(x86)": "C:\\Program Files (x86)"},
+		},
+	}
+
+	var tests = []struct {
+		filter  string
+		matches bool
+	}{
+
+		{`mem.size = 8192`, true},
+		{`mem.address = 1311246336000`, true},
+		{`mem.type = 'IMAGE'`, true},
+		{`mem.size = 8192`, true},
+		{`mem.alloc = 'COMMIT|RESERVE'`, true},
+		{`mem.protection = 'EXECUTE_READWRITE'`, true},
+		{`mem.protection.mask = 'RWX'`, true},
+	}
+
+	for i, tt := range tests {
+		f := New(tt.filter, cfg)
+		err := f.Compile()
+		if err != nil {
+			t.Fatal(err)
+		}
+		matches := f.Run(kevt)
+		if matches != tt.matches {
+			t.Errorf("%d. %q mem filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
 	}
 }

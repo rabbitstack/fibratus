@@ -218,6 +218,11 @@ func (e *Kevent) AppendEnum(name string, value uint32, enum ParamEnum) {
 	e.AppendParam(name, kparams.Enum, value, WithEnum(enum))
 }
 
+// AppendFlags adds the flags parameter to this event.
+func (e *Kevent) AppendFlags(name string, value uint32, flags ParamFlags) {
+	e.AppendParam(name, kparams.Flags, value, WithFlags(flags))
+}
+
 // GetParamAsString returns the specified parameter value as string.
 // Parameter values are resolved according to their types. For instance,
 // if the parameter type is `Status`, the system error code is converted

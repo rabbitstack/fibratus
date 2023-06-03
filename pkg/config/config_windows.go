@@ -342,6 +342,7 @@ func (c *Config) addFlags() {
 		c.flags.Bool(enableFileIOKevents, true, "Determines whether disk I/O kernel events are collected by Kernel Logger provider")
 		c.flags.Bool(enableImageKevents, true, "Determines whether file I/O kernel events are collected by Kernel Logger provider")
 		c.flags.Bool(enableHandleKevents, false, "Determines whether object manager kernel events (handle creation/destruction) are collected by Kernel Logger provider")
+		c.flags.Bool(enableMemKevents, true, "Determines whether memory manager kernel events are collected by Kernel Logger provider")
 		c.flags.Bool(enableAuditAPIEvents, true, "Determines whether kernel audit API calls events are published")
 		c.flags.Bool(enableAntimalwareEngineEvents, true, "Determines whether antimalware engine events are published")
 		c.flags.Int(bufferSize, int(maxBufferSize), "Represents the amount of memory allocated for each event tracing session buffer, in kilobytes. The buffer size affects the rate at which buffers fill and must be flushed (small buffer size requires less memory but it increases the rate at which buffers must be flushed)")

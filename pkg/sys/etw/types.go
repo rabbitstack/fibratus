@@ -101,6 +101,8 @@ const (
 	Syscall EventTraceFlags = 0x00000080
 	// Thread flag enables thread events.
 	Thread EventTraceFlags = 0x00000002
+	// VirtualAlloc enables virtual memory allocation and free events
+	VirtualAlloc EventTraceFlags = 0x00004000
 )
 
 // String returns the string representation of enabled event trace flags.
@@ -138,6 +140,9 @@ func (f EventTraceFlags) String() string {
 	}
 	if f&Thread == Thread {
 		flags = append(flags, "Thread")
+	}
+	if f&VirtualAlloc == VirtualAlloc {
+		flags = append(flags, "VirtualAlloc")
 	}
 	return strings.Join(flags, ", ")
 }

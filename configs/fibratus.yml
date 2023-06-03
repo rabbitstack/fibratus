@@ -181,6 +181,9 @@ kstream:
   # collected by Kernel Logger provider
   #enable-handle: false
 
+  # Determines whether memory manager kernel events are collected by Kernel Logger provider
+  #enable-mem: true
+
   # Determines whether kernel Audit API calls events are collected
   #enable-audit-api: true
 

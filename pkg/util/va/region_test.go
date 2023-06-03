@@ -19,12 +19,51 @@
 package va
 
 import (
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
 	"os"
 	"testing"
+	"time"
 	"unsafe"
 )
+
+func TestRegionProber(t *testing.T) {
+	base, err := windows.VirtualAlloc(0, 1024, windows.MEM_COMMIT|windows.MEM_RESERVE, windows.PAGE_READONLY)
+	require.NoError(t, err)
+	defer func() {
+		_ = windows.VirtualFree(base, 1024, windows.MEM_DECOMMIT)
+	}()
+	pid := uint32(os.Getpid())
+
+	regionProber := NewRegionProber()
+	region := regionProber.Query(pid, uint64(base))
+
+	require.NotNil(t, region)
+	regionProber.mu.Lock()
+	require.True(t, regionProber.procs[pid] != windows.InvalidHandle)
+	regionProber.mu.Unlock()
+
+	assert.Equal(t, uint32(windows.PAGE_READONLY), region.Protect)
+	assert.Equal(t, "R", region.ProtectMask())
+	assert.False(t, region.IsMapped())
+	assert.Equal(t, MemPrivate, region.Type)
+
+	// test limiter
+	for i := 0; i < 499; i++ {
+		assert.NotNil(t, regionProber.Query(pid, uint64(base)))
+	}
+	// all buckets consumed
+	assert.Nil(t, regionProber.Query(pid, uint64(base)))
+
+	// wait for the buckets to get refilled
+	time.Sleep(time.Second)
+	for i := 0; i < 300; i++ {
+		assert.NotNil(t, regionProber.Query(pid, uint64(base)))
+	}
+
+	require.True(t, regionProber.Remove(pid))
+}
 
 func TestReadRegion(t *testing.T) {
 	addr, err := getModuleBaseAddress(uint32(os.Getpid()))
@@ -75,7 +114,7 @@ func TestReadArea(t *testing.T) {
 	base, err := windows.VirtualAlloc(0, 1024, windows.MEM_COMMIT|windows.MEM_RESERVE, windows.PAGE_NOACCESS)
 	require.NoError(t, err)
 	defer func() {
-		_ = windows.VirtualFree(base, 1024, windows.MEM_RELEASE)
+		_ = windows.VirtualFree(base, 1024, windows.MEM_DECOMMIT)
 	}()
 	var oldProtect uint32
 	_ = windows.VirtualProtectEx(windows.CurrentProcess(), base, 16, windows.PAGE_NOACCESS, &oldProtect)

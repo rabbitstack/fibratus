@@ -157,3 +157,17 @@ var FileShareModeFlags = []ParamFlag{
 	{"WRITE", windows.FILE_SHARE_WRITE},
 	{"DELETE", windows.FILE_SHARE_DELETE},
 }
+
+// MemAllocationTypeFlags describes virtual allocation/free type flags
+var MemAllocationTypeFlags = []ParamFlag{
+	{"COMMIT", windows.MEM_COMMIT},
+	{"RESERVE", windows.MEM_RESERVE},
+	{"RESET", windows.MEM_RESET},
+	{"RESET_UNDO", windows.MEM_RESET_UNDO},
+	{"PHYSICAL", windows.MEM_PHYSICAL},
+	{"LARGE_PAGES", windows.MEM_LARGE_PAGES},
+	{"TOP_DOWN", windows.MEM_TOP_DOWN},
+	{"RELEASE", windows.MEM_RELEASE},
+	{"DECOMMIT", windows.MEM_DECOMMIT},
+	{"WRITE_WATCH", windows.MEM_WRITE_WATCH},
+}

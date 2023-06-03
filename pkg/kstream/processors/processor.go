@@ -36,6 +36,8 @@ const (
 	Net
 	// Handle represents the handle event processor.
 	Handle
+	// Mem represents the memory event processor.
+	Mem
 )
 
 // Processor is the minimal interface that each event stream processor has to satisfy. The event processor
@@ -68,6 +70,8 @@ func (typ ProcessorType) String() string {
 		return "net"
 	case Handle:
 		return "handle"
+	case Mem:
+		return "mem"
 	default:
 		return "unknown"
 	}

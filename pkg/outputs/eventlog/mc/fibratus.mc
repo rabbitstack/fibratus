@@ -39,6 +39,11 @@ SymbolicName=Other
 Language=English
 Other
 .
+MessageId=9
+SymbolicName=Other
+Language=English
+Memory
+.
 
 ;//*********** Event types **************
 MessageId=15
@@ -210,4 +215,14 @@ MessageId=48
 SymbolicName=LoadDriver
 Language=English
 LoadDriver loads the kernel driver.
+.
+MessageId=49
+SymbolicName=VirtualAlloc
+Language=English
+Reserves, commits, or changes the state of a region of memory within the process virtual address space.
+.
+MessageId=50
+SymbolicName=VirtualFree
+Language=English
+Releases or decommits a region of memory within the process virtual address space.
 .

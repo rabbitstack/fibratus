@@ -25,17 +25,19 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
+	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
 	"time"
 )
 
 type psProcessor struct {
-	psnap ps.Snapshotter
+	psnap        ps.Snapshotter
+	regionProber *va.RegionProber
 }
 
 // newPsProcessor creates a new event processor for process/thread events.
-func newPsProcessor(psnap ps.Snapshotter) Processor {
-	return &psProcessor{psnap: psnap}
+func newPsProcessor(psnap ps.Snapshotter, regionProber *va.RegionProber) Processor {
+	return &psProcessor{psnap: psnap, regionProber: regionProber}
 }
 
 func (p psProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error) {
@@ -43,6 +45,7 @@ func (p psProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error
 	case ktypes.CreateProcess, ktypes.TerminateProcess, ktypes.ProcessRundown:
 		evt, err := p.processEvent(e)
 		if evt.IsTerminateProcess() {
+			p.regionProber.Remove(evt.Kparams.MustGetPid())
 			return evt, false, multierror.Wrap(err, p.psnap.Remove(evt))
 		}
 		return evt, false, multierror.Wrap(err, p.psnap.Write(evt))

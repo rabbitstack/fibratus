@@ -76,6 +76,9 @@ func New(expr string, config *config.Config, options ...Option) Filter {
 	if kconfig.EnableHandleKevents {
 		accessors = append(accessors, newHandleAccessor())
 	}
+	if kconfig.EnableMemKevents {
+		accessors = append(accessors, newMemAccessor())
+	}
 	if config.PE.Enabled {
 		accessors = append(accessors, newPEAccessor())
 	}

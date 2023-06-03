@@ -161,6 +161,7 @@ var schema = `
 				"enable-fileio": 	{"type": "boolean"},
 				"enable-handle": 	{"type": "boolean"},
 				"enable-net": 		{"type": "boolean"},
+				"enable-mem": 		{"type": "boolean"},
 				"enable-audit-api": {"type": "boolean"},
 				"enable-antimalware-engine": {"type": "boolean"},
 				"min-buffers": 		{"type": "integer", "minimum": 1, "maximum": {{ .MinBuffers }}},

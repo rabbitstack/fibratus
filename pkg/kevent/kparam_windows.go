@@ -630,5 +630,22 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 	case ktypes.LoadDriver:
 		filename := evt.ConsumeUTF16String(4)
 		e.AppendParam(kparams.ImageFilename, kparams.FileDosPath, filename)
+	case ktypes.VirtualAlloc, ktypes.VirtualFree:
+		var (
+			baseAddress uint64
+			regionSize  uint64
+			pid         uint32
+			flags       uint32
+		)
+		if evt.Version() >= 1 {
+			baseAddress = evt.ReadUint64(0)
+			regionSize = evt.ReadUint64(8)
+			pid = evt.ReadUint32(16)
+			flags = evt.ReadUint32(20)
+		}
+		e.AppendParam(kparams.MemBaseAddress, kparams.Address, baseAddress)
+		e.AppendParam(kparams.MemRegionSize, kparams.Uint64, regionSize)
+		e.AppendParam(kparams.ProcessID, kparams.PID, pid)
+		e.AppendParam(kparams.MemAllocType, kparams.Flags, flags, WithFlags(MemAllocationTypeFlags))
 	}
 }

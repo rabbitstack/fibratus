@@ -128,6 +128,7 @@ func (f *filter) narrowAccessors() {
 		removeNetworkAccessor  = true
 		removeHandleAccessor   = true
 		removePEAccessor       = true
+		removeMemAccessor      = true
 	)
 	allFields := make([]fields.Field, 0)
 	allFields = append(allFields, f.fields...)
@@ -154,6 +155,8 @@ func (f *filter) narrowAccessors() {
 			removeHandleAccessor = false
 		case field.IsPeField():
 			removePEAccessor = false
+		case field.IsMemField():
+			removeMemAccessor = false
 		}
 	}
 	if removeKevtAccessor {
@@ -182,6 +185,9 @@ func (f *filter) narrowAccessors() {
 	}
 	if removePEAccessor {
 		f.removeAccessor(&peAccessor{})
+	}
+	if removeMemAccessor {
+		f.removeAccessor(&memAccessor{})
 	}
 }
 
