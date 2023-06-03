@@ -171,3 +171,21 @@ var MemAllocationTypeFlags = []ParamFlag{
 	{"DECOMMIT", windows.MEM_DECOMMIT},
 	{"WRITE_WATCH", windows.MEM_WRITE_WATCH},
 }
+
+// MemAllocationProtectFlags represents memory protection option flags.
+var MemAllocationProtectFlags = []ParamFlag{
+	{"NONE", 0},
+	{"EXECUTE", windows.PAGE_EXECUTE},
+	{"EXECUTE_READ", windows.PAGE_EXECUTE_READ},
+	{"EXECUTE_READWRITE", windows.PAGE_EXECUTE_READWRITE},
+	{"EXECUTE_WRITECOPY", windows.PAGE_EXECUTE_WRITECOPY},
+	{"NOACCESS", windows.PAGE_NOACCESS},
+	{"READONLY", windows.PAGE_READONLY},
+	{"READWRITE", windows.PAGE_READWRITE},
+	{"WRITECOPY", windows.PAGE_WRITECOPY},
+	{"TARGETS_INVALID", windows.PAGE_TARGETS_INVALID},
+	{"TARGETS_NO_UPDATE", windows.PAGE_TARGETS_NO_UPDATE},
+	{"GUARD", windows.PAGE_GUARD},
+	{"NOCACHE", windows.PAGE_NOCACHE},
+	{"WRITECOMBINE", windows.PAGE_WRITECOMBINE},
+}

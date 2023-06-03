@@ -24,26 +24,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	psnap "github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
-	"golang.org/x/sys/windows"
 )
-
-// AllocationProtectFlags represents memory protection option flags.
-var AllocationProtectFlags = []kevent.ParamFlag{
-	{"NONE", 0},
-	{"EXECUTE", windows.PAGE_EXECUTE},
-	{"EXECUTE_READ", windows.PAGE_EXECUTE_READ},
-	{"EXECUTE_READWRITE", windows.PAGE_EXECUTE_READWRITE},
-	{"EXECUTE_WRITECOPY", windows.PAGE_EXECUTE_WRITECOPY},
-	{"NOACCESS", windows.PAGE_NOACCESS},
-	{"READONLY", windows.PAGE_READONLY},
-	{"READWRITE", windows.PAGE_READWRITE},
-	{"WRITECOPY", windows.PAGE_WRITECOPY},
-	{"TARGETS_INVALID", windows.PAGE_TARGETS_INVALID},
-	{"TARGETS_NO_UPDATE", windows.PAGE_TARGETS_NO_UPDATE},
-	{"GUARD", windows.PAGE_GUARD},
-	{"NOCACHE", windows.PAGE_NOCACHE},
-	{"WRITECOMBINE", windows.PAGE_WRITECOMBINE},
-}
 
 // MemPageTypes represents the type of the pages in the allocated region.
 var MemPageTypes = kevent.ParamEnum{
@@ -82,7 +63,7 @@ func (m memProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, erro
 					e.AppendParam(kparams.FileName, kparams.FileDosPath, region.GetMappedFile())
 				}
 				e.AppendEnum(kparams.MemPageType, region.Type, MemPageTypes)
-				e.AppendFlags(kparams.MemProtect, region.Protect, AllocationProtectFlags)
+				e.AppendFlags(kparams.MemProtect, region.Protect, kevent.MemAllocationProtectFlags)
 				e.AppendParam(kparams.MemProtectMask, kparams.AnsiString, region.ProtectMask())
 			}
 		}
