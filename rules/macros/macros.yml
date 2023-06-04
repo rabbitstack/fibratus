@@ -43,6 +43,12 @@
 - macro: send_socket
   expr: kevt.name = 'Send'
 
+- macro: virtual_alloc
+  expr: kevt.name = 'VirtualAlloc'
+
+- macro: virtual_free
+  expr: kevt.name = 'VirtualFree'
+
 - macro: load_driver
   expr: >
     kevt.name = 'LoadDriver'

@@ -50,3 +50,6 @@ package sys
 //sys CryptCatalogAdminEnumCatalogFromHash(handle windows.Handle, hash uintptr, size uint32, flags uint32, prevCatalog *windows.Handle) (catalog windows.Handle) = wintrust.CryptCATAdminEnumCatalogFromHash
 //sys CryptCatalogInfoFromContext(handle windows.Handle, catalog *CatalogInfo, flags uint32) (err error) = wintrust.CryptCATCatalogInfoFromContext
 //sys CryptCatalogAdminReleaseCatalogContext(handle windows.Handle, info windows.Handle, flags uint32) (err error) = wintrust.CryptCATAdminReleaseCatalogContext
+
+// Process Status API Functions
+//sys GetMappedFileName(handle windows.Handle, addr uintptr, filename *uint16, size uint32) (n uint32) = psapi.GetMappedFileNameW

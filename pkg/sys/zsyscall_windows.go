@@ -55,6 +55,7 @@ var (
 	procRtlNtStatusToDosError                = modntdll.NewProc("RtlNtStatusToDosError")
 	procEnumDeviceDrivers                    = modpsapi.NewProc("EnumDeviceDrivers")
 	procGetDeviceDriverFileNameW             = modpsapi.NewProc("GetDeviceDriverFileNameW")
+	procGetMappedFileNameW                   = modpsapi.NewProc("GetMappedFileNameW")
 	procPathIsDirectoryW                     = modshlwapi.NewProc("PathIsDirectoryW")
 	procCryptCATAdminAcquireContext2         = modwintrust.NewProc("CryptCATAdminAcquireContext2")
 	procCryptCATAdminCalcHashFromFileHandle2 = modwintrust.NewProc("CryptCATAdminCalcHashFromFileHandle2")
@@ -134,6 +135,12 @@ func EnumDeviceDrivers(imageBase uintptr, size uint32, needed *uint32) (err erro
 
 func GetDeviceDriverFileName(imageBase uintptr, filename *uint16, size uint32) (n uint32) {
 	r0, _, _ := syscall.Syscall(procGetDeviceDriverFileNameW.Addr(), 3, uintptr(imageBase), uintptr(unsafe.Pointer(filename)), uintptr(size))
+	n = uint32(r0)
+	return
+}
+
+func GetMappedFileName(handle windows.Handle, addr uintptr, filename *uint16, size uint32) (n uint32) {
+	r0, _, _ := syscall.Syscall6(procGetMappedFileNameW.Addr(), 4, uintptr(handle), uintptr(addr), uintptr(unsafe.Pointer(filename)), uintptr(size), 0, 0)
 	n = uint32(r0)
 	return
 }

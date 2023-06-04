@@ -159,6 +159,8 @@ func categoryID(kevt *kevent.Kevent) uint16 {
 		return 7
 	case ktypes.Other:
 		return 8
+	case ktypes.Mem:
+		return 9
 	default:
 		return 0
 	}
@@ -235,6 +237,10 @@ func ktypeToEventID(kevt *kevent.Kevent) uint32 {
 		return 47
 	case ktypes.LoadDriver:
 		return 48
+	case ktypes.VirtualAlloc:
+		return 49
+	case ktypes.VirtualFree:
+		return 50
 	}
 	return unknownEventID
 }

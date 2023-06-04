@@ -42,6 +42,8 @@ const (
 	Handle Category = "handle"
 	// Driver is the category for driver events
 	Driver Category = "driver"
+	// Mem is the category for memory events
+	Mem Category = "mem"
 	// Other is the category for uncategorized events
 	Other Category = "other"
 	// Unknown is the category for events that couldn't match any of the previous categories

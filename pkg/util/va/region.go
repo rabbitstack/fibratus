@@ -19,9 +19,178 @@
 package va
 
 import (
+	"expvar"
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	"golang.org/x/sys/windows"
+	"golang.org/x/time/rate"
+	"strconv"
+	"sync"
 	"unsafe"
 )
+
+const (
+	// MemImage indicates that the memory pages within the region are mapped
+	// into the view of an image section.
+	MemImage uint32 = 0x1000000
+	// MemMapped indicates that the memory pages within the region are mapped
+	// into the view of a section.
+	MemMapped uint32 = 0x40000
+	// MemPrivate Indicates that the memory pages within the region are private
+	// that is, not shared by other processes.
+	MemPrivate uint32 = 0x20000
+)
+
+// RegionInfo  describes the allocated region page properties.
+type RegionInfo struct {
+	Type     uint32
+	Protect  uint32
+	BaseAddr uint64
+	proc     windows.Handle
+}
+
+// IsMapped determines if the region is backed by the section object.
+func (r RegionInfo) IsMapped() bool {
+	return r.Type == MemImage || r.Type == MemMapped
+}
+
+// GetMappedFile checks whether the specified address is within
+// a memory-mapped file in the address space of the specified process.
+// If so, it returns the name of the memory-mapped file.
+func (r RegionInfo) GetMappedFile() string {
+	var size uint32 = windows.MAX_PATH
+	n := make([]uint16, size)
+	if sys.GetMappedFileName(r.proc, uintptr(r.BaseAddr), &n[0], size) > 0 {
+		return windows.UTF16ToString(n)
+	}
+	return ""
+}
+
+// ProtectMask returns protection in mask notation.
+func (r RegionInfo) ProtectMask() string {
+	switch r.Protect {
+	case windows.PAGE_READONLY:
+		return "R"
+	case windows.PAGE_READWRITE:
+		return "RW"
+	case windows.PAGE_EXECUTE_READ:
+		return "RX"
+	case windows.PAGE_EXECUTE_READWRITE:
+		return "RWX"
+	case windows.PAGE_EXECUTE_WRITECOPY:
+		return "RWXC"
+	case windows.PAGE_EXECUTE:
+		return "X"
+	case windows.PAGE_WRITECOPY:
+		return "WC"
+	case windows.PAGE_NOACCESS:
+		return "NA"
+	case windows.PAGE_WRITECOMBINE:
+		return "WCB"
+	case windows.PAGE_GUARD, windows.PAGE_GUARD | windows.PAGE_READWRITE:
+		return "PG"
+	case windows.PAGE_NOCACHE:
+		return "NC"
+	case 0:
+		return "-"
+	default:
+		return "?"
+	}
+}
+
+// RegionProber examines metadata about the range of pages
+// within the process virtual address space. It keeps the
+// state of opened process handles for which VA spaces are
+// consulted. To avoid noisy processes putting too much pressure
+// on the `VirtualQueryEx` calls, the prober employs a set of
+// limiters with token bucket strategy.
+type RegionProber struct {
+	// procs contains opened process handles for
+	// which virtual address query was performed
+	procs map[uint32]windows.Handle
+	// lims contains token bucket limiters per pid
+	lims map[uint32]*rate.Limiter
+	mu   sync.Mutex
+}
+
+const (
+	burst = 500 // limiter initial bucket size
+	limit = 300 // rate of 300 region queries per second
+)
+
+// proberRateLimits accounts probe rate limits per process id
+var proberRateLimits = expvar.NewMap("va.region.prober.rate.limits")
+
+// NewRegionProber creates a fresh instance of the region prober.
+func NewRegionProber() *RegionProber {
+	return &RegionProber{procs: make(map[uint32]windows.Handle), lims: make(map[uint32]*rate.Limiter)}
+}
+
+// Query fetches region information for the specified process id and the
+// base address. It keeps a cache of opened process handles and reuses
+// them for subsequent calls to VirtualQueryEx. To defend against noisy
+// processes, the throttling mechanism is implemented with token bucket
+// limiters. If successful, this method returns the region info. Otherwise,
+// it returns nil.
+func (p *RegionProber) Query(pid uint32, addr uint64) *RegionInfo {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	lim, ok := p.lims[pid]
+	if !ok {
+		lim = rate.NewLimiter(limit, burst)
+		p.lims[pid] = lim
+	}
+	// check rate limit for the calling process
+	if !lim.Allow() {
+		proberRateLimits.Add(strconv.Itoa(int(pid)), 1)
+		return nil
+	}
+	process, ok := p.procs[pid]
+	if !ok {
+		var err error
+		process, err = windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION, false, pid)
+		if err != nil {
+			return nil
+		}
+		p.procs[pid] = process
+	}
+
+	// query VA region info
+	var mem windows.MemoryBasicInformation
+	err := windows.VirtualQueryEx(process, uintptr(addr), &mem, unsafe.Sizeof(mem))
+	if err != nil {
+		return nil
+	}
+
+	return &RegionInfo{
+		Type:     mem.Type,
+		Protect:  mem.AllocationProtect,
+		BaseAddr: addr,
+		proc:     process,
+	}
+}
+
+// Remove removes the process handle from cache and closes it.
+// It returns true if the handle was closed successfully.
+func (p *RegionProber) Remove(pid uint32) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	process, ok := p.procs[pid]
+	if !ok {
+		return false
+	}
+	delete(p.procs, pid)
+	delete(p.lims, pid)
+	return windows.Close(process) == nil
+}
+
+// Close closes all opened process handles.
+func (p *RegionProber) Close() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for _, process := range p.procs {
+		windows.Close(process)
+	}
+}
 
 // Region describes the state of a range of pages in the
 // process virtual address space and offers convenient

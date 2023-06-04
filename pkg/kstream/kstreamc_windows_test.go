@@ -124,6 +124,8 @@ func TestRundownEvents(t *testing.T) {
 
 func TestConsumerEvents(t *testing.T) {
 	kevent.DropCurrentProc = false
+	var freeAddress uintptr
+
 	var tests = []*struct {
 		name      string
 		gen       func() error
@@ -227,6 +229,40 @@ func TestConsumerEvents(t *testing.T) {
 			},
 			false,
 		},
+		{
+			"virtual alloc",
+			func() error {
+				base, err := windows.VirtualAlloc(0, 1024, windows.MEM_COMMIT|windows.MEM_RESERVE, windows.PAGE_EXECUTE_READWRITE)
+				if err != nil {
+					return err
+				}
+				defer func() {
+					_ = windows.VirtualFree(base, 1024, windows.MEM_RELEASE)
+				}()
+				return nil
+			},
+			func(e *kevent.Kevent) bool {
+				return e.CurrentPid() && e.Type == ktypes.VirtualAlloc &&
+					e.GetParamAsString(kparams.MemAllocType) == "COMMIT|RESERVE" && e.GetParamAsString(kparams.MemProtectMask) == "RWX"
+			},
+			false,
+		},
+		{
+			"virtual free",
+			func() error {
+				var err error
+				freeAddress, err = windows.VirtualAlloc(0, 1024, windows.MEM_COMMIT|windows.MEM_RESERVE, windows.PAGE_EXECUTE_READWRITE)
+				if err != nil {
+					return err
+				}
+				return windows.VirtualFree(freeAddress, 1024, windows.MEM_DECOMMIT)
+			},
+			func(e *kevent.Kevent) bool {
+				return e.CurrentPid() && e.Type == ktypes.VirtualFree &&
+					e.GetParamAsString(kparams.MemAllocType) == "DECOMMIT" && e.Kparams.MustGetUint64(kparams.MemBaseAddress) == uint64(freeAddress)
+			},
+			false,
+		},
 	}
 
 	psnap := new(ps.SnapshotterMock)
@@ -249,6 +285,7 @@ func TestConsumerEvents(t *testing.T) {
 		EnableFileIOKevents:   true,
 		EnableNetKevents:      true,
 		EnableRegistryKevents: true,
+		EnableMemKevents:      true,
 	}
 
 	kctrl := NewController(kstreamConfig)
