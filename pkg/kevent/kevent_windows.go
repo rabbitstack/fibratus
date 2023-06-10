@@ -230,6 +230,13 @@ func (e Kevent) RundownKey() uint64 {
 		binary.LittleEndian.PutUint64(b, fileObject)
 
 		return hashers.FnvUint64(b)
+	case ktypes.MapFileRundown:
+		b := make([]byte, 12)
+		fileKey, _ := e.Kparams.GetUint64(kparams.FileKey)
+		binary.LittleEndian.PutUint32(b, e.PID)
+		binary.LittleEndian.PutUint64(b, fileKey)
+
+		return hashers.FnvUint64(b)
 	case ktypes.RegKCBRundown:
 		key, _ := e.Kparams.GetString(kparams.RegKeyName)
 		b := make([]byte, 4+len(key))
@@ -253,6 +260,13 @@ func (e Kevent) PartialKey() uint64 {
 
 		binary.LittleEndian.PutUint32(b, e.PID)
 		binary.LittleEndian.PutUint64(b, object)
+
+		return hashers.FnvUint64(b)
+	case ktypes.MapFileRundown, ktypes.UnmapViewFile:
+		b := make([]byte, 12)
+		fileKey, _ := e.Kparams.GetUint64(kparams.FileKey)
+		binary.LittleEndian.PutUint32(b, e.PID)
+		binary.LittleEndian.PutUint64(b, fileKey)
 
 		return hashers.FnvUint64(b)
 	case ktypes.CreateFile:

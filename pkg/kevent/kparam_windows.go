@@ -558,17 +558,30 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 		e.AppendParam(kparams.FileKey, kparams.Address, fileKey)
 		e.AppendParam(kparams.FileName, kparams.UnicodeString, filename)
 		e.AppendParam(kparams.FileInfoClass, kparams.Enum, infoClass, WithEnum(fs.FileInfoClasses))
-	case ktypes.MapViewFile, ktypes.UnmapViewFile:
+	case ktypes.MapViewFile, ktypes.UnmapViewFile, ktypes.MapFileRundown:
 		var (
 			viewBase  uint64
 			fileKey   uint64
 			extraInfo uint64
 			viewSize  uint64
+			offset    uint64
 		)
 		viewBase = evt.ReadUint64(0)
 		fileKey = evt.ReadUint64(8)
 		extraInfo = evt.ReadUint64(16)
 		viewSize = evt.ReadUint64(24)
+		if evt.Version() >= 3 {
+			offset = evt.ReadUint64(32)
+		}
+		// protection flags and region type
+		flags := uint32(extraInfo >> 32)
+		e.AppendParam(kparams.FileViewBase, kparams.Address, viewBase)
+		e.AppendParam(kparams.FileKey, kparams.Address, fileKey)
+		e.AppendParam(kparams.FileExtraInfo, kparams.Address, extraInfo)
+		e.AppendParam(kparams.FileViewSize, kparams.Uint64, viewSize)
+		e.AppendParam(kparams.FileOffset, kparams.Uint64, offset)
+		e.AppendParam(kparams.FileInfoClass, kparams.Flags, flags, WithFlags(ViewProtectionFlags))
+		e.AppendParam("region_type", kparams.Enum, flags>>20, WithEnum(RegionTypes))
 	case ktypes.SendTCPv4,
 		ktypes.SendUDPv4,
 		ktypes.RecvTCPv4,
@@ -642,4 +655,10 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 		filename := evt.ConsumeUTF16String(4)
 		e.AppendParam(kparams.ImageFilename, kparams.FileDosPath, filename)
 	}
+}
+
+var RegionTypes = ParamEnum{
+	0x0: "MAPPED_DATA",
+	0x4: "MAPPED_IMAGE",
+	0xC: "MAPPED_PAGEFILE",
 }

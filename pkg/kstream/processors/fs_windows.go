@@ -26,6 +26,8 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/sys"
+	"golang.org/x/sys/windows"
 )
 
 var (
@@ -142,11 +144,24 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 		delete(f.files, fobj)
 	default:
 		fileKey := e.Kparams.MustGetUint64(kparams.FileKey)
-		fileObject := e.Kparams.MustGetUint64(kparams.FileObject)
+		fileObject, _ := e.Kparams.GetUint64(kparams.FileObject)
 		// attempt to get the file by file key. If there is no such file referenced
 		// by the file key, then try to fetch it by file object. Even if file object
 		// references fails, we search in the file handles for such file
 		fileinfo := f.findFile(fileKey, fileObject)
+		if fileinfo == nil && e.Type == ktypes.MapViewFile {
+			process, err := windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION, false, e.PID)
+			if err != nil {
+				break
+			}
+			defer windows.Close(process)
+			var size uint32 = windows.MAX_PATH
+			n := make([]uint16, size)
+			addr := uintptr(e.Kparams.MustGetUint64(kparams.FileViewBase) + e.Kparams.MustGetUint64(kparams.FileOffset))
+			sys.GetMappedFileName(process, addr, &n[0], size)
+			fileinfo = &FileInfo{Name: windows.UTF16ToString(n)}
+			f.files[fileKey] = fileinfo
+		}
 		// ignore object misses that are produced by CloseFile
 		if fileinfo == nil && e.IsCloseFile() {
 			fileObjectMisses.Add(1)

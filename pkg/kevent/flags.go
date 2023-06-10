@@ -157,3 +157,15 @@ var FileShareModeFlags = []ParamFlag{
 	{"WRITE", windows.FILE_SHARE_WRITE},
 	{"DELETE", windows.FILE_SHARE_DELETE},
 }
+
+var ViewProtectionFlags = []ParamFlag{
+	{"EXECUTE_READWRITE", 0x60000},
+	{"EXECUTE_WRITECOPY", 0x70000},
+	{"EXECUTE_READ", 0x30000},
+	{"READWRITE", 0x40000},
+	{"EXECUTE", 0x20000},
+	{"READONLY", 0x10000},
+	{"WRITECOPY", 0x50000},
+	{"NOCACHE", 0x80000},
+	{"WRITECOMBINE", 0x90000},
+}

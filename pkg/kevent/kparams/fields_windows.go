@@ -108,6 +108,9 @@ const (
 	// FileExtraInfo is the parameter that represents extra information returned by the file system for the operation. For example for a read request, the actual number of bytes that were read.
 	FileExtraInfo = "extra_info"
 
+	FileViewBase = "view_base"
+	FileViewSize = "view_size"
+
 	// RegKeyHandle identifies the parameter name for the registry key handle.
 	RegKeyHandle = "key_handle"
 	// RegKeyName represents the parameter name for the fully qualified key name.
