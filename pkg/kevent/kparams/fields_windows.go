@@ -108,8 +108,12 @@ const (
 	// FileExtraInfo is the parameter that represents extra information returned by the file system for the operation. For example for a read request, the actual number of bytes that were read.
 	FileExtraInfo = "extra_info"
 
+	// FileViewBase is the parameter that represents the base address of the mapped section.
 	FileViewBase = "view_base"
+	// FileViewSize is the parameter that represents the size of the mapped section.
 	FileViewSize = "view_size"
+	// FileViewSectionType is the parameter that represents the mapped section type.
+	FileViewSectionType = "section_type"
 
 	// RegKeyHandle identifies the parameter name for the registry key handle.
 	RegKeyHandle = "key_handle"
@@ -186,4 +190,17 @@ const (
 	HandleObjectName = "handle_name"
 	// HandleObjectTypeID identifies the parameter that represents the kernel object type identifier.
 	HandleObjectTypeID = "type_id"
+
+	// MemBaseAddress identifies the parameter that denotes the allocation base address.
+	MemBaseAddress = "base_address"
+	// MemRegionSize identifies the parameter that represents the allocated region size.
+	MemRegionSize = "region_size"
+	// MemAllocType identifies the parameter that represents allocation flags.
+	MemAllocType = "alloc_type"
+	// MemProtect identifies the parameter that represents the memory protection for the range of pages.
+	MemProtect = "protection"
+	// MemProtectMask identifies the parameter that represents the memory protection in mask notation
+	MemProtectMask = "protection_mask"
+	// MemPageType identifies the parameter that represents the allocated region type.
+	MemPageType = "page_type"
 )

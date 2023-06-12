@@ -44,7 +44,7 @@ func init() {
 func replay(cmd *cobra.Command, args []string) error {
 	app, err := bootstrap.NewApp(cfg, bootstrap.WithSignals(), bootstrap.WithCaptureReplay())
 	if err != nil {
-		return multierror.Wrap(err, app.Shutdown())
+		return err
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

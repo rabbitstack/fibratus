@@ -23,6 +23,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	"github.com/rabbitstack/fibratus/pkg/ps"
+	"github.com/rabbitstack/fibratus/pkg/util/va"
 )
 
 type chain struct {
@@ -44,12 +45,13 @@ func NewChain(
 		}
 		devMapper       = fs.NewDevMapper()
 		devPathResolver = fs.NewDevPathResolver()
+		vaRegionProber  = va.NewRegionProber()
 	)
 
-	chain.addProcessor(newPsProcessor(psnap))
+	chain.addProcessor(newPsProcessor(psnap, vaRegionProber))
 
 	if config.Kstream.EnableFileIOKevents {
-		chain.addProcessor(newFsProcessor(hsnap, devPathResolver))
+		chain.addProcessor(newFsProcessor(hsnap, devMapper, devPathResolver))
 	}
 	if config.Kstream.EnableRegistryKevents {
 		chain.addProcessor(newRegistryProcessor(hsnap))
@@ -62,6 +64,9 @@ func NewChain(
 	}
 	if config.Kstream.EnableHandleKevents {
 		chain.addProcessor(newHandleProcessor(hsnap, devMapper, devPathResolver))
+	}
+	if config.Kstream.EnableMemKevents {
+		chain.addProcessor(newMemProcessor(psnap, vaRegionProber))
 	}
 
 	return chain

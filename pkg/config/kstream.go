@@ -38,6 +38,7 @@ const (
 	enableFileIOKevents           = "kstream.enable-fileio"
 	enableImageKevents            = "kstream.enable-image"
 	enableHandleKevents           = "kstream.enable-handle"
+	enableMemKevents              = "kstream.enable-mem"
 	enableAuditAPIEvents          = "kstream.enable-audit-api"
 	enableAntimalwareEngineEvents = "kstream.enable-antimalware-engine"
 	bufferSize                    = "kstream.buffer-size"
@@ -71,6 +72,8 @@ type KstreamConfig struct {
 	EnableImageKevents bool `json:"enable-image" yaml:"enable-image"`
 	// EnableHandleKevents indicates whether handle creation/disposal events are enabled.
 	EnableHandleKevents bool `json:"enable-handle" yaml:"enable-handle"`
+	// EnableMemKevents indicates whether memory manager events are enabled.
+	EnableMemKevents bool `json:"enable-memory" yaml:"enable-memory"`
 	// EnableAuditAPIEvents indicates if kernel audit API calls events are enabled
 	EnableAuditAPIEvents bool `json:"enable-audit-api" yaml:"enable-audit-api"`
 	// EnableAntimalwareEngineEvents indicates if Antimalware Engine events are enabled
@@ -101,6 +104,7 @@ func (c *KstreamConfig) initFromViper(v *viper.Viper) {
 	c.EnableFileIOKevents = v.GetBool(enableFileIOKevents)
 	c.EnableImageKevents = v.GetBool(enableImageKevents)
 	c.EnableHandleKevents = v.GetBool(enableHandleKevents)
+	c.EnableMemKevents = v.GetBool(enableMemKevents)
 	c.EnableAuditAPIEvents = v.GetBool(enableAuditAPIEvents)
 	c.EnableAntimalwareEngineEvents = v.GetBool(enableAntimalwareEngineEvents)
 	c.BufferSize = uint32(v.GetInt(bufferSize))

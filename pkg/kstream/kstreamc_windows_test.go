@@ -28,6 +28,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -127,6 +128,8 @@ func TestRundownEvents(t *testing.T) {
 func TestConsumerEvents(t *testing.T) {
 	kevent.DropCurrentProc = false
 	var viewBase uintptr
+	var freeAddress uintptr
+
 	var tests = []*struct {
 		name      string
 		gen       func() error
@@ -231,24 +234,138 @@ func TestConsumerEvents(t *testing.T) {
 			false,
 		},
 		{
-			"unmap view section",
+			"map view section",
 			func() error {
-				sec, err := createSection()
-				if err != nil {
-					return nil
-				}
-				defer windows.Close(windows.Handle(sec))
-				viewBase, err = NtMapViewOfSection(windows.Handle(sec), windows.CurrentProcess(), 1024, windows.SUB_CONTAINERS_ONLY_INHERIT, windows.PAGE_READONLY)
+				const SecImage = 0x01000000
+				const SectionRead = 0x4
+
+				var sec windows.Handle
+				var offset uintptr
+				dll := "../yara/_fixtures/yara-test.dll"
+				f, err := os.Open(dll)
 				if err != nil {
 					return err
 				}
-				return NtUnmapViewSection(windows.CurrentProcess(), viewBase)
+				defer f.Close()
+				stat, err := f.Stat()
+				if err != nil {
+					return err
+				}
+				size := stat.Size()
+				if err := sys.NtCreateSection(
+					&sec,
+					SectionRead,
+					0,
+					uintptr(unsafe.Pointer(&size)),
+					windows.PAGE_READONLY,
+					SecImage,
+					windows.Handle(f.Fd()),
+				); err != nil {
+					return fmt.Errorf("NtCreateSection: %v", err)
+				}
+				defer windows.Close(sec)
+				err = sys.NtMapViewOfSection(
+					sec,
+					windows.CurrentProcess(),
+					uintptr(unsafe.Pointer(&viewBase)),
+					0,
+					0,
+					uintptr(unsafe.Pointer(&offset)),
+					uintptr(unsafe.Pointer(&size)),
+					windows.SUB_CONTAINERS_ONLY_INHERIT,
+					0,
+					windows.PAGE_READONLY)
+				if err != nil {
+					return fmt.Errorf("NtMapViewOfSection: %v", err)
+				}
+				return sys.NtUnmapViewOfSection(windows.CurrentProcess(), viewBase)
 			},
 			func(e *kevent.Kevent) bool {
-				if e.CurrentPid() && e.Type == ktypes.MapViewFile && e.Kparams.MustGetUint64(kparams.FileViewBase) == uint64(viewBase) {
-					fmt.Println(e)
+				return e.CurrentPid() && e.Type == ktypes.MapViewFile &&
+					e.GetParamAsString(kparams.MemProtect) == "EXECUTE_READWRITE|READONLY" &&
+					e.GetParamAsString(kparams.FileViewSectionType) == "IMAGE" &&
+					strings.Contains(e.GetParamAsString(kparams.FileName), "pkg\\yara\\_fixtures\\yara-test.dll")
+			},
+			false,
+		},
+		{
+			"unmap view section",
+			func() error {
+				const SecCommit = 0x8000000
+				const SectionWrite = 0x2
+				const SectionRead = 0x4
+				const SectionExecute = 0x8
+				const SectionRWX = SectionRead | SectionWrite | SectionExecute
+
+				var sec windows.Handle
+				var size uint64 = 1024
+				var offset uintptr
+				if err := sys.NtCreateSection(
+					&sec,
+					SectionRWX,
+					0,
+					uintptr(unsafe.Pointer(&size)),
+					windows.PAGE_READONLY,
+					SecCommit,
+					0,
+				); err != nil {
+					return fmt.Errorf("NtCreateSection: %v", err)
 				}
-				return e.CurrentPid() && e.Type == ktypes.UnmapViewFile && e.Kparams.MustGetUint64(kparams.FileViewBase) == uint64(viewBase)
+				defer windows.Close(sec)
+				err := sys.NtMapViewOfSection(
+					sec,
+					windows.CurrentProcess(),
+					uintptr(unsafe.Pointer(&viewBase)),
+					0,
+					0,
+					uintptr(unsafe.Pointer(&offset)),
+					uintptr(unsafe.Pointer(&size)),
+					windows.SUB_CONTAINERS_ONLY_INHERIT,
+					0,
+					windows.PAGE_READONLY)
+				if err != nil {
+					return fmt.Errorf("NtMapViewOfSection: %v", err)
+				}
+				return sys.NtUnmapViewOfSection(windows.CurrentProcess(), viewBase)
+			},
+			func(e *kevent.Kevent) bool {
+				return e.CurrentPid() && e.Type == ktypes.UnmapViewFile &&
+					e.GetParamAsString(kparams.MemProtect) == "READONLY" &&
+					e.Kparams.MustGetUint64(kparams.FileViewBase) == uint64(viewBase)
+			},
+			false,
+		},
+		{
+			"virtual alloc",
+			func() error {
+				base, err := windows.VirtualAlloc(0, 1024, windows.MEM_COMMIT|windows.MEM_RESERVE, windows.PAGE_EXECUTE_READWRITE)
+				if err != nil {
+					return err
+				}
+				defer func() {
+					_ = windows.VirtualFree(base, 1024, windows.MEM_RELEASE)
+				}()
+				return nil
+			},
+			func(e *kevent.Kevent) bool {
+				return e.CurrentPid() && e.Type == ktypes.VirtualAlloc &&
+					e.GetParamAsString(kparams.MemAllocType) == "COMMIT|RESERVE" && e.GetParamAsString(kparams.MemProtectMask) == "RWX"
+			},
+			false,
+		},
+		{
+			"virtual free",
+			func() error {
+				var err error
+				freeAddress, err = windows.VirtualAlloc(0, 1024, windows.MEM_COMMIT|windows.MEM_RESERVE, windows.PAGE_EXECUTE_READWRITE)
+				if err != nil {
+					return err
+				}
+				return windows.VirtualFree(freeAddress, 1024, windows.MEM_DECOMMIT)
+			},
+			func(e *kevent.Kevent) bool {
+				return e.CurrentPid() && e.Type == ktypes.VirtualFree &&
+					e.GetParamAsString(kparams.MemAllocType) == "DECOMMIT" && e.Kparams.MustGetUint64(kparams.MemBaseAddress) == uint64(freeAddress)
 			},
 			false,
 		},
@@ -276,6 +393,7 @@ func TestConsumerEvents(t *testing.T) {
 		EnableFileIOKevents:   true,
 		EnableNetKevents:      true,
 		EnableRegistryKevents: true,
+		EnableMemKevents:      true,
 	}
 
 	kctrl := NewController(kstreamConfig)
@@ -292,7 +410,7 @@ func TestConsumerEvents(t *testing.T) {
 	for _, tt := range tests {
 		gen := tt.gen
 		if gen != nil {
-			require.NoError(t, gen())
+			require.NoError(t, gen(), tt.name)
 		}
 	}
 
@@ -328,116 +446,4 @@ func TestConsumerEvents(t *testing.T) {
 			t.Fatal("FAIL: TestConsumerEvents")
 		}
 	}
-}
-
-const SEC_IMAGE = 0x01000000
-const SEC_COMMIT = 0x8000000
-const SEC_RESERVE = 0x04000000
-const SEC_NOCACHE = 0x10000000
-const SECTION_WRITE = 0x2
-const SECTION_READ = 0x4
-const SECTION_EXECUTE = 0x8
-const SECTION_RWX = SECTION_WRITE | SECTION_READ | SECTION_EXECUTE
-
-var flags uint64 = 0xC3000000000000
-
-var r = uint32(0x10000)
-var x = uint32(0x20000)
-var rx = uint32(0x30000)
-var rw = uint32(0x40000)
-
-//10000010000000000000000
-//00000010000000000000000
-
-func TestBitmasks(t *testing.T) {
-	f := uint32(flags >> 32)
-	fmt.Printf("%b\n %x\n", f, (f >> 20))
-	//if (flags & 1 << 31) != 0 {
-	//	fmt.Println("K")
-	//}
-	//fmt.Println(byte(flags>>28) & 0xF)
-}
-
-func createSection() (uintptr, error) {
-	var e error
-	var err uintptr
-	var ntdll *windows.LazyDLL
-	var section uintptr
-
-	// Load DLL
-	ntdll = windows.NewLazySystemDLL("ntdll")
-
-	f, err1 := os.Open("C:\\Users\\nedo\\Desktop\\fibratus-todo.txt")
-	if err1 != nil {
-		return 0, err1
-	}
-	fs, _ := f.Stat()
-	size := int64(fs.Size())
-	err, _, e = ntdll.NewProc("NtCreateSection").Call(
-		uintptr(unsafe.Pointer(&section)),
-		SECTION_READ|windows.STANDARD_RIGHTS_REQUIRED,
-		0,
-		uintptr(unsafe.Pointer(&size)),
-		windows.PAGE_READONLY,
-		SEC_RESERVE,
-		f.Fd(),
-	)
-	if err != 0 {
-		return section, fmt.Errorf("%0x: %s", uint32(err), e.Error())
-	} else if section == 0 {
-		return section, fmt.Errorf("NtCreateSection failed for unknown reason")
-	}
-	fmt.Printf("%0x\n", section)
-
-	return section, nil
-}
-
-func NtMapViewOfSection(
-	sHndl windows.Handle,
-	pHndl windows.Handle,
-	size uint64,
-	inheritPerms uintptr,
-	pagePerms uintptr,
-) (uintptr, error) {
-	var err uintptr
-	var proc string = "NtMapViewOfSection"
-	var scBase uintptr
-	var scOffset uintptr
-	var ntdll *windows.LazyDLL
-
-	ntdll = windows.NewLazySystemDLL("ntdll")
-	err, _, _ = ntdll.NewProc(proc).Call(
-		uintptr(sHndl),
-		uintptr(pHndl),
-		uintptr(unsafe.Pointer(&scBase)),
-		0,
-		0,
-		uintptr(unsafe.Pointer(&scOffset)),
-		uintptr(unsafe.Pointer(&size)),
-		inheritPerms,
-		0,
-		pagePerms,
-	)
-	if err != 0 {
-		return 0, fmt.Errorf("%s returned %0x", proc, uint32(err))
-	} else if scBase == 0 {
-		return 0, fmt.Errorf("%s failed for unknown reason", proc)
-	}
-
-	return scBase, nil
-}
-
-func NtUnmapViewSection(hndl windows.Handle, base uintptr) error {
-	var proc string = "NtUnmapViewOfSection"
-	var ntdll *windows.LazyDLL
-
-	ntdll = windows.NewLazySystemDLL("ntdll")
-	err, _, _ := ntdll.NewProc(proc).Call(
-		uintptr(hndl),
-		base,
-	)
-	if err != 0 {
-		return fmt.Errorf("ERROR Unmap")
-	}
-	return nil
 }

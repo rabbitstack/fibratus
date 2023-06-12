@@ -60,7 +60,7 @@ func run(cmd *cobra.Command, args []string) error {
 	ver.Set(version)
 	app, err := bootstrap.NewApp(cfg, bootstrap.WithSignals(), bootstrap.WithDebugPrivilege())
 	if err != nil {
-		return multierror.Wrap(err, app.Shutdown())
+		return err
 	}
 	if err := app.Run(args); err != nil {
 		return multierror.Wrap(err, app.Shutdown())

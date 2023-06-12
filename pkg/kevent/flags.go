@@ -158,14 +158,49 @@ var FileShareModeFlags = []ParamFlag{
 	{"DELETE", windows.FILE_SHARE_DELETE},
 }
 
+// MemAllocationFlags describes virtual allocation/free type flags
+var MemAllocationFlags = []ParamFlag{
+	{"COMMIT", windows.MEM_COMMIT},
+	{"RESERVE", windows.MEM_RESERVE},
+	{"RESET", windows.MEM_RESET},
+	{"RESET_UNDO", windows.MEM_RESET_UNDO},
+	{"PHYSICAL", windows.MEM_PHYSICAL},
+	{"LARGE_PAGES", windows.MEM_LARGE_PAGES},
+	{"TOP_DOWN", windows.MEM_TOP_DOWN},
+	{"RELEASE", windows.MEM_RELEASE},
+	{"DECOMMIT", windows.MEM_DECOMMIT},
+	{"WRITE_WATCH", windows.MEM_WRITE_WATCH},
+}
+
+// MemProtectionFlags represents memory protection option flags.
+var MemProtectionFlags = []ParamFlag{
+	{"NONE", 0},
+	{"EXECUTE", windows.PAGE_EXECUTE},
+	{"EXECUTE_READ", windows.PAGE_EXECUTE_READ},
+	{"EXECUTE_READWRITE", windows.PAGE_EXECUTE_READWRITE},
+	{"EXECUTE_WRITECOPY", windows.PAGE_EXECUTE_WRITECOPY},
+	{"NOACCESS", windows.PAGE_NOACCESS},
+	{"READONLY", windows.PAGE_READONLY},
+	{"READWRITE", windows.PAGE_READWRITE},
+	{"WRITECOPY", windows.PAGE_WRITECOPY},
+	{"TARGETS_INVALID", windows.PAGE_TARGETS_INVALID},
+	{"TARGETS_NO_UPDATE", windows.PAGE_TARGETS_NO_UPDATE},
+	{"GUARD", windows.PAGE_GUARD},
+	{"NOCACHE", windows.PAGE_NOCACHE},
+	{"WRITECOMBINE", windows.PAGE_WRITECOMBINE},
+}
+
+// ViewProtectionFlags describes section protection flags. These
+// have different values than the memory protection flags as they
+// are reported by the kernel.
 var ViewProtectionFlags = []ParamFlag{
 	{"EXECUTE_READWRITE", 0x60000},
 	{"EXECUTE_WRITECOPY", 0x70000},
-	{"EXECUTE_READ", 0x30000},
-	{"READWRITE", 0x40000},
-	{"EXECUTE", 0x20000},
-	{"READONLY", 0x10000},
-	{"WRITECOPY", 0x50000},
 	{"NOCACHE", 0x80000},
 	{"WRITECOMBINE", 0x90000},
+	{"READONLY", 0x10000},
+	{"EXECUTE", 0x20000},
+	{"EXECUTE_READ", 0x30000},
+	{"READWRITE", 0x40000},
+	{"WRITECOPY", 0x50000},
 }

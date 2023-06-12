@@ -26,6 +26,9 @@ package sys
 //sys NtAlpcQueryInformation(handle windows.Handle, alpcInfoClass int32, alpcInfo unsafe.Pointer, alpcInfoLen uint32, retLen *uint32) (ntstatus error) = ntdll.NtAlpcQueryInformation
 //sys NtQueryVolumeInformationFile(handle windows.Handle, ioStatusBlock *windows.IO_STATUS_BLOCK, fsInfo uintptr, retLen uint32, fsInfoClass int32) (ntstatus error) = ntdll.NtQueryVolumeInformationFile
 //sys RtlNtStatusToDosError(status uint32) (code uint32) = ntdll.RtlNtStatusToDosError
+//sys NtCreateSection(section *windows.Handle, desiredAccess uint32, objectAttributes uintptr, maxSize uintptr, protection uint32, allocation uint32, file windows.Handle) (ntstatus error) = ntdll.NtCreateSection
+//sys NtMapViewOfSection(section windows.Handle, process windows.Handle, sectionBase uintptr, zeroBits uintptr, commitSize uintptr, offset uintptr, size uintptr, inherit uint32, allocation uint32, protect uint32) (ntstatus error) = ntdll.NtMapViewOfSection
+//sys NtUnmapViewOfSection(process windows.Handle, addr uintptr) (ntstatus error) = ntdll.NtUnmapViewOfSection
 
 // Thread Functions
 //sys GetProcessIdOfThread(handle windows.Handle) (pid uint32) = kernel32.GetProcessIdOfThread
@@ -50,3 +53,6 @@ package sys
 //sys CryptCatalogAdminEnumCatalogFromHash(handle windows.Handle, hash uintptr, size uint32, flags uint32, prevCatalog *windows.Handle) (catalog windows.Handle) = wintrust.CryptCATAdminEnumCatalogFromHash
 //sys CryptCatalogInfoFromContext(handle windows.Handle, catalog *CatalogInfo, flags uint32) (err error) = wintrust.CryptCATCatalogInfoFromContext
 //sys CryptCatalogAdminReleaseCatalogContext(handle windows.Handle, info windows.Handle, flags uint32) (err error) = wintrust.CryptCATAdminReleaseCatalogContext
+
+// Process Status API Functions
+//sys GetMappedFileName(handle windows.Handle, addr uintptr, filename *uint16, size uint32) (n uint32) = psapi.GetMappedFileNameW

@@ -103,6 +103,8 @@ const (
 	Thread EventTraceFlags = 0x00000002
 	// VaMap enables map and unmap file events.
 	VaMap EventTraceFlags = 0x00008000
+	// VirtualAlloc enables virtual memory allocation and free events.
+	VirtualAlloc EventTraceFlags = 0x00004000
 )
 
 // String returns the string representation of enabled event trace flags.
@@ -143,6 +145,9 @@ func (f EventTraceFlags) String() string {
 	}
 	if f&VaMap == VaMap {
 		flags = append(flags, "VaMap")
+	}
+	if f&VirtualAlloc == VirtualAlloc {
+		flags = append(flags, "VirtualAlloc")
 	}
 	return strings.Join(flags, ", ")
 }

@@ -234,7 +234,7 @@ func TestFsProcessor(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			hsnap := tt.hsnap()
-			p := newFsProcessor(hsnap, fs.NewDevPathResolver())
+			p := newFsProcessor(hsnap, fs.NewDevMapper(), fs.NewDevPathResolver())
 			if tt.setupProcessor != nil {
 				tt.setupProcessor(p)
 			}

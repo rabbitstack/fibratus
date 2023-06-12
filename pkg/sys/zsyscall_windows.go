@@ -49,12 +49,16 @@ var (
 	procGetProcessIdOfThread                 = modkernel32.NewProc("GetProcessIdOfThread")
 	procTerminateThread                      = modkernel32.NewProc("TerminateThread")
 	procNtAlpcQueryInformation               = modntdll.NewProc("NtAlpcQueryInformation")
+	procNtCreateSection                      = modntdll.NewProc("NtCreateSection")
+	procNtMapViewOfSection                   = modntdll.NewProc("NtMapViewOfSection")
 	procNtQueryMutant                        = modntdll.NewProc("NtQueryMutant")
 	procNtQueryObject                        = modntdll.NewProc("NtQueryObject")
 	procNtQueryVolumeInformationFile         = modntdll.NewProc("NtQueryVolumeInformationFile")
+	procNtUnmapViewOfSection                 = modntdll.NewProc("NtUnmapViewOfSection")
 	procRtlNtStatusToDosError                = modntdll.NewProc("RtlNtStatusToDosError")
 	procEnumDeviceDrivers                    = modpsapi.NewProc("EnumDeviceDrivers")
 	procGetDeviceDriverFileNameW             = modpsapi.NewProc("GetDeviceDriverFileNameW")
+	procGetMappedFileNameW                   = modpsapi.NewProc("GetMappedFileNameW")
 	procPathIsDirectoryW                     = modshlwapi.NewProc("PathIsDirectoryW")
 	procCryptCATAdminAcquireContext2         = modwintrust.NewProc("CryptCATAdminAcquireContext2")
 	procCryptCATAdminCalcHashFromFileHandle2 = modwintrust.NewProc("CryptCATAdminCalcHashFromFileHandle2")
@@ -94,6 +98,22 @@ func NtAlpcQueryInformation(handle windows.Handle, alpcInfoClass int32, alpcInfo
 	return
 }
 
+func NtCreateSection(section *windows.Handle, desiredAccess uint32, objectAttributes uintptr, maxSize uintptr, protection uint32, allocation uint32, file windows.Handle) (ntstatus error) {
+	r0, _, _ := syscall.Syscall9(procNtCreateSection.Addr(), 7, uintptr(unsafe.Pointer(section)), uintptr(desiredAccess), uintptr(objectAttributes), uintptr(maxSize), uintptr(protection), uintptr(allocation), uintptr(file), 0, 0)
+	if r0 != 0 {
+		ntstatus = windows.NTStatus(r0)
+	}
+	return
+}
+
+func NtMapViewOfSection(section windows.Handle, process windows.Handle, sectionBase uintptr, zeroBits uintptr, commitSize uintptr, offset uintptr, size uintptr, inherit uint32, allocation uint32, protect uint32) (ntstatus error) {
+	r0, _, _ := syscall.Syscall12(procNtMapViewOfSection.Addr(), 10, uintptr(section), uintptr(process), uintptr(sectionBase), uintptr(zeroBits), uintptr(commitSize), uintptr(offset), uintptr(size), uintptr(inherit), uintptr(allocation), uintptr(protect), 0, 0)
+	if r0 != 0 {
+		ntstatus = windows.NTStatus(r0)
+	}
+	return
+}
+
 func NtQueryMutant(handle windows.Handle, mutantInfoClass int32, mutantInfo unsafe.Pointer, mutantInfoLen uint32, retLen *uint32) (ntstatus error) {
 	r0, _, _ := syscall.Syscall6(procNtQueryMutant.Addr(), 5, uintptr(handle), uintptr(mutantInfoClass), uintptr(mutantInfo), uintptr(mutantInfoLen), uintptr(unsafe.Pointer(retLen)), 0)
 	if r0 != 0 {
@@ -118,6 +138,14 @@ func NtQueryVolumeInformationFile(handle windows.Handle, ioStatusBlock *windows.
 	return
 }
 
+func NtUnmapViewOfSection(process windows.Handle, addr uintptr) (ntstatus error) {
+	r0, _, _ := syscall.Syscall(procNtUnmapViewOfSection.Addr(), 2, uintptr(process), uintptr(addr), 0)
+	if r0 != 0 {
+		ntstatus = windows.NTStatus(r0)
+	}
+	return
+}
+
 func RtlNtStatusToDosError(status uint32) (code uint32) {
 	r0, _, _ := syscall.Syscall(procRtlNtStatusToDosError.Addr(), 1, uintptr(status), 0, 0)
 	code = uint32(r0)
@@ -134,6 +162,12 @@ func EnumDeviceDrivers(imageBase uintptr, size uint32, needed *uint32) (err erro
 
 func GetDeviceDriverFileName(imageBase uintptr, filename *uint16, size uint32) (n uint32) {
 	r0, _, _ := syscall.Syscall(procGetDeviceDriverFileNameW.Addr(), 3, uintptr(imageBase), uintptr(unsafe.Pointer(filename)), uintptr(size))
+	n = uint32(r0)
+	return
+}
+
+func GetMappedFileName(handle windows.Handle, addr uintptr, filename *uint16, size uint32) (n uint32) {
+	r0, _, _ := syscall.Syscall6(procGetMappedFileNameW.Addr(), 4, uintptr(handle), uintptr(addr), uintptr(unsafe.Pointer(filename)), uintptr(size), 0, 0)
 	n = uint32(r0)
 	return
 }

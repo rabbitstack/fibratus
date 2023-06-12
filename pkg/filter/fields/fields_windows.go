@@ -308,6 +308,12 @@ const (
 	FileAttributes Field = "file.attributes"
 	// FileStatus represents the status message of the file operation
 	FileStatus Field = "file.status"
+	// FileViewBase represents the base address of the mapped view
+	FileViewBase Field = "file.view.base"
+	// FileViewSize represents the size of the mapped view
+	FileViewSize Field = "file.view.size"
+	// FileViewType represents the type of the mapped view section
+	FileViewType Field = "file.view.type"
 
 	// RegistryKeyName represents the registry key name
 	RegistryKeyName Field = "registry.key.name"
@@ -337,6 +343,19 @@ const (
 	// ImageSignatureLevel represents the image signature level
 	ImageSignatureLevel Field = "image.signature.level"
 
+	// MemBaseAddress identifies the field that denotes the allocation base address
+	MemBaseAddress Field = "mem.address"
+	// MemRegionSize Field identifies the field that represents the allocated region size
+	MemRegionSize Field = "mem.size"
+	// MemAllocType identifies the field that represents region allocation type
+	MemAllocType Field = "mem.alloc"
+	// MemPageType identifies the parameter that represents the allocated region type
+	MemPageType Field = "mem.type"
+	// MemProtection identifies the field that represents the memory protection for the range of pages
+	MemProtection Field = "mem.protection"
+	// MemProtectionMask identifies the field that represents the memory protection in mask notation
+	MemProtectionMask Field = "mem.protection.mask"
+
 	// None represents the unknown field
 	None Field = ""
 )
@@ -353,6 +372,7 @@ func (f Field) IsRegistryField() bool { return strings.HasPrefix(string(f), "reg
 func (f Field) IsNetworkField() bool  { return strings.HasPrefix(string(f), "net.") }
 func (f Field) IsHandleField() bool   { return strings.HasPrefix(string(f), "handle.") }
 func (f Field) IsPeField() bool       { return strings.HasPrefix(string(f), "pe.") }
+func (f Field) IsMemField() bool      { return strings.HasPrefix(string(f), "mem.") }
 
 // Segment represents the type alias for the segment. Segment
 // denotes the location of the value within an indexed field.
@@ -514,6 +534,9 @@ var fields = map[Field]FieldInfo{
 	FileExtension:  {FileExtension, "file extension", kparams.AnsiString, []string{"file.extension = '.dll'"}, nil},
 	FileAttributes: {FileAttributes, "file attributes", kparams.Slice, []string{"file.attributes in ('archive', 'hidden')"}, nil},
 	FileStatus:     {FileStatus, "file operation status message", kparams.UnicodeString, []string{"file.status != 'success'"}, nil},
+	FileViewBase:   {FileViewBase, "view base address", kparams.Address, []string{"file.view.base = '25d42170000'"}, nil},
+	FileViewSize:   {FileViewSize, "size of the mapped view", kparams.Uint64, []string{"file.view.size > 1024"}, nil},
+	FileViewType:   {FileViewType, "type of the mapped view section", kparams.Enum, []string{"file.view.type = 'IMAGE'"}, nil},
 
 	RegistryKeyName:   {RegistryKeyName, "fully qualified key name", kparams.UnicodeString, []string{"registry.key.name contains 'HKEY_LOCAL_MACHINE'"}, nil},
 	RegistryKeyHandle: {RegistryKeyHandle, "registry key object address", kparams.HexInt64, []string{"registry.key.handle = 'FFFFB905D60C2268'"}, nil},
@@ -552,6 +575,13 @@ var fields = map[Field]FieldInfo{
 	PeFileVersion:    {PeFileVersion, "file version supplied at compile-time", kparams.UnicodeString, []string{"pe.file.version = '10.0.18362.693 (WinBuild.160101.0800)'"}, nil},
 	PeProduct:        {PeProduct, "internal product name of the file provided at compile-time", kparams.UnicodeString, []string{"pe.product = 'Microsoft® Windows® Operating System'"}, nil},
 	PeProductVersion: {PeProductVersion, "internal product version of the file provided at compile-time", kparams.UnicodeString, []string{"pe.product.version = '10.0.18362.693'"}, nil},
+
+	MemBaseAddress:    {MemBaseAddress, "region base address", kparams.Address, []string{"mem.address = '211d13f2000'"}, nil},
+	MemRegionSize:     {MemRegionSize, "region size", kparams.Uint64, []string{"mem.size > 438272"}, nil},
+	MemAllocType:      {MemAllocType, "region allocation or release type", kparams.Flags, []string{"mem.alloc = 'COMMIT'"}, nil},
+	MemPageType:       {MemPageType, "page type of the allocated region", kparams.Enum, []string{"mem.type = 'PRIVATE'"}, nil},
+	MemProtection:     {MemProtection, "allocated region protection type", kparams.Enum, []string{"mem.protection = 'READWRITE'"}, nil},
+	MemProtectionMask: {MemProtectionMask, "allocated region protection in mask notation", kparams.Enum, []string{"mem.protection.mask = 'RWX'"}, nil},
 }
 
 // Lookup finds the field literal in the map. For the nested fields, it checks the pattern matches

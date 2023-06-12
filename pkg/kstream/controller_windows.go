@@ -137,6 +137,9 @@ func (c *Controller) Start() error {
 	if c.kstreamConfig.EnableFileIOKevents {
 		flags |= etw.DiskFileIO | etw.FileIO | etw.FileIOInit | etw.VaMap
 	}
+	if c.kstreamConfig.EnableMemKevents {
+		flags |= etw.VirtualAlloc
+	}
 
 	bufferSize := c.kstreamConfig.BufferSize
 	if bufferSize > maxBufferSize {

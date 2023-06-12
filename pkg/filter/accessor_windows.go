@@ -46,6 +46,7 @@ func getAccessors() []accessor {
 	return []accessor{
 		newPSAccessor(nil),
 		newPEAccessor(),
+		newMemAccessor(),
 		newFileAccessor(),
 		newKevtAccessor(),
 		newImageAccessor(),
@@ -607,6 +608,12 @@ func (l *fileAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, 
 			return nil, nil
 		}
 		return kevt.GetParamAsString(kparams.NTStatus), nil
+	case fields.FileViewBase:
+		return kevt.GetParamAsString(kparams.FileViewBase), nil
+	case fields.FileViewSize:
+		return kevt.Kparams.GetUint64(kparams.FileViewSize)
+	case fields.FileViewType:
+		return kevt.GetParamAsString(kparams.FileViewSectionType), nil
 	}
 	return nil, nil
 }
@@ -804,6 +811,31 @@ func (*peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, erro
 		}
 	}
 
+	return nil, nil
+}
+
+// memAccessor extracts parameters from memory alloc/free events.
+type memAccessor struct{}
+
+func newMemAccessor() accessor {
+	return &memAccessor{}
+}
+
+func (*memAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
+	switch f {
+	case fields.MemPageType:
+		return kevt.GetParamAsString(kparams.MemPageType), nil
+	case fields.MemAllocType:
+		return kevt.GetParamAsString(kparams.MemAllocType), nil
+	case fields.MemProtection:
+		return kevt.GetParamAsString(kparams.MemProtect), nil
+	case fields.MemBaseAddress:
+		return kevt.Kparams.GetUint64(kparams.MemBaseAddress)
+	case fields.MemRegionSize:
+		return kevt.Kparams.GetUint64(kparams.MemRegionSize)
+	case fields.MemProtectionMask:
+		return kevt.Kparams.GetString(kparams.MemProtectMask)
+	}
 	return nil, nil
 }
 

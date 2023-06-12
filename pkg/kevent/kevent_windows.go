@@ -185,6 +185,9 @@ func (e Kevent) IsLoadImage() bool        { return e.Type == ktypes.LoadImage }
 func (e Kevent) IsFileOpEnd() bool        { return e.Type == ktypes.FileOpEnd }
 func (e Kevent) IsRegSetValue() bool      { return e.Type == ktypes.RegSetValue }
 func (e Kevent) IsProcessRundown() bool   { return e.Type == ktypes.ProcessRundown }
+func (e Kevent) IsVirtualAlloc() bool     { return e.Type == ktypes.VirtualAlloc }
+func (e Kevent) IsMapViewFile() bool      { return e.Type == ktypes.MapViewFile }
+func (e Kevent) IsUnmapViewFile() bool    { return e.Type == ktypes.UnmapViewFile }
 
 // InvalidPid indicates if the process generating the event is invalid.
 func (e Kevent) InvalidPid() bool { return e.PID == sys.InvalidProcessID }
@@ -346,6 +349,14 @@ func (e Kevent) PartialKey() uint64 {
 		binary.LittleEndian.PutUint32(b, e.PID)
 		b = append(b, key...)
 		return hashers.FnvUint64(b)
+	case ktypes.VirtualAlloc, ktypes.VirtualFree:
+		b := make([]byte, 12)
+
+		addr, _ := e.Kparams.GetUint64(kparams.MemBaseAddress)
+
+		binary.LittleEndian.PutUint32(b, e.PID)
+		binary.LittleEndian.PutUint64(b, addr)
+		return hashers.FnvUint64(b)
 	}
 	return 0
 }
@@ -486,6 +497,12 @@ func (e *Kevent) Summary() string {
 	case ktypes.LoadDriver:
 		driver := e.GetParamAsString(kparams.ImageFilename)
 		return printSummary(e, fmt.Sprintf("loaded <code>%s</code> driver", driver))
+	case ktypes.VirtualAlloc:
+		addr := e.GetParamAsString(kparams.MemBaseAddress)
+		return printSummary(e, fmt.Sprintf("allocated memory at <code>%s</code> address", addr))
+	case ktypes.VirtualFree:
+		addr := e.GetParamAsString(kparams.MemBaseAddress)
+		return printSummary(e, fmt.Sprintf("released memory at <code>%s</code> address", addr))
 	}
 	return ""
 }

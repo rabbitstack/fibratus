@@ -91,3 +91,14 @@ func QueryDosDevice(drive string) (string, error) {
 func PathIsDirectory(path string) bool {
 	return pathIsDirectory(windows.StringToUTF16Ptr(path))
 }
+
+// GetMappedFile checks whether the specified address is within a memory-mapped file in the address
+// space of the specified process. If so, the function returns the name of the memory-mapped file.
+func GetMappedFile(process windows.Handle, addr uintptr) string {
+	var size uint32 = windows.MAX_PATH
+	n := make([]uint16, size)
+	if GetMappedFileName(process, addr, &n[0], size) > 0 {
+		return windows.UTF16ToString(n)
+	}
+	return ""
+}

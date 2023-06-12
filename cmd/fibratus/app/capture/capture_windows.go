@@ -62,7 +62,7 @@ func capture(cmd *cobra.Command, args []string) error {
 	app, err := bootstrap.NewApp(cfg, bootstrap.WithSignals(), bootstrap.WithDebugPrivilege(),
 		bootstrap.WithHandleSnapshotFn(fn))
 	if err != nil {
-		return multierror.Wrap(err, app.Shutdown())
+		return err
 	}
 	<-wait
 	if err := app.WriteCapture(args); err != nil {

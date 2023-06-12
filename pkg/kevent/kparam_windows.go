@@ -573,15 +573,14 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 		if evt.Version() >= 3 {
 			offset = evt.ReadUint64(32)
 		}
-		// protection flags and region type
-		flags := uint32(extraInfo >> 32)
+		protect := uint32(extraInfo >> 32)
+		section := uint32(extraInfo >> 52)
 		e.AppendParam(kparams.FileViewBase, kparams.Address, viewBase)
 		e.AppendParam(kparams.FileKey, kparams.Address, fileKey)
-		e.AppendParam(kparams.FileExtraInfo, kparams.Address, extraInfo)
 		e.AppendParam(kparams.FileViewSize, kparams.Uint64, viewSize)
 		e.AppendParam(kparams.FileOffset, kparams.Uint64, offset)
-		e.AppendParam(kparams.FileInfoClass, kparams.Flags, flags, WithFlags(ViewProtectionFlags))
-		e.AppendParam("region_type", kparams.Enum, flags>>20, WithEnum(RegionTypes))
+		e.AppendParam(kparams.MemProtect, kparams.Flags, protect, WithFlags(ViewProtectionFlags))
+		e.AppendParam(kparams.FileViewSectionType, kparams.Enum, section, WithEnum(ViewSectionTypes))
 	case ktypes.SendTCPv4,
 		ktypes.SendUDPv4,
 		ktypes.RecvTCPv4,
@@ -654,11 +653,22 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 	case ktypes.LoadDriver:
 		filename := evt.ConsumeUTF16String(4)
 		e.AppendParam(kparams.ImageFilename, kparams.FileDosPath, filename)
+	case ktypes.VirtualAlloc, ktypes.VirtualFree:
+		var (
+			baseAddress uint64
+			regionSize  uint64
+			pid         uint32
+			flags       uint32
+		)
+		if evt.Version() >= 1 {
+			baseAddress = evt.ReadUint64(0)
+			regionSize = evt.ReadUint64(8)
+			pid = evt.ReadUint32(16)
+			flags = evt.ReadUint32(20)
+		}
+		e.AppendParam(kparams.MemBaseAddress, kparams.Address, baseAddress)
+		e.AppendParam(kparams.MemRegionSize, kparams.Uint64, regionSize)
+		e.AppendParam(kparams.ProcessID, kparams.PID, pid)
+		e.AppendParam(kparams.MemAllocType, kparams.Flags, flags, WithFlags(MemAllocationFlags))
 	}
-}
-
-var RegionTypes = ParamEnum{
-	0x0: "MAPPED_DATA",
-	0x4: "MAPPED_IMAGE",
-	0xC: "MAPPED_PAGEFILE",
 }
