@@ -177,8 +177,8 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 				return e, nil
 			}
 			defer windows.Close(process)
-			addr := uintptr(e.Kparams.MustGetUint64(kparams.FileViewBase) + e.Kparams.MustGetUint64(kparams.FileOffset))
-			fileinfo = &FileInfo{Name: f.devMapper.Convert(sys.GetMappedFile(process, addr))}
+			addr := e.Kparams.MustGetUint64(kparams.FileViewBase) + (e.Kparams.MustGetUint64(kparams.FileOffset))
+			fileinfo = &FileInfo{Name: f.devMapper.Convert(sys.GetMappedFile(process, uintptr(addr)))}
 			f.files[fileKey] = fileinfo
 		}
 

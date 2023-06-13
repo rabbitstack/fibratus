@@ -241,6 +241,7 @@ func TestConsumerEvents(t *testing.T) {
 
 				var sec windows.Handle
 				var offset uintptr
+				var baseViewAddr uintptr
 				dll := "../yara/_fixtures/yara-test.dll"
 				f, err := os.Open(dll)
 				if err != nil {
@@ -267,7 +268,7 @@ func TestConsumerEvents(t *testing.T) {
 				err = sys.NtMapViewOfSection(
 					sec,
 					windows.CurrentProcess(),
-					uintptr(unsafe.Pointer(&viewBase)),
+					uintptr(unsafe.Pointer(&baseViewAddr)),
 					0,
 					0,
 					uintptr(unsafe.Pointer(&offset)),
@@ -278,12 +279,9 @@ func TestConsumerEvents(t *testing.T) {
 				if err != nil {
 					return fmt.Errorf("NtMapViewOfSection: %v", err)
 				}
-				return sys.NtUnmapViewOfSection(windows.CurrentProcess(), viewBase)
+				return nil
 			},
 			func(e *kevent.Kevent) bool {
-				if e.CurrentPid() && e.Type == ktypes.MapViewFile {
-					fmt.Println(e)
-				}
 				return e.CurrentPid() && e.Type == ktypes.MapViewFile &&
 					e.GetParamAsString(kparams.MemProtect) == "EXECUTE_READWRITE|READONLY" &&
 					e.GetParamAsString(kparams.FileViewSectionType) == "IMAGE" &&
