@@ -29,7 +29,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
 	"golang.org/x/sys/windows"
-	"os"
 )
 
 var devMapper = fs.NewDevMapper()
@@ -43,18 +42,11 @@ func Duplicate(handle windows.Handle, pid uint32, access uint32) (windows.Handle
 	}
 	//nolint:errcheck
 	defer windows.CloseHandle(source)
-	// this process receives the duplicated handle
-	target, err := windows.OpenProcess(windows.PROCESS_DUP_HANDLE, false, uint32(os.Getpid()))
-	if err != nil {
-		return windows.InvalidHandle, err
-	}
-	//nolint:errcheck
-	defer windows.CloseHandle(target)
 	// duplicate the remote handle in the current process's address space.
 	// Note that for certain handle types this operation might fail
 	// as they don't permit duplicate operations
 	var dup windows.Handle
-	err = windows.DuplicateHandle(source, handle, target, &dup, access, false, 0)
+	err = windows.DuplicateHandle(source, handle, windows.CurrentProcess(), &dup, access, false, 0)
 	if err != nil {
 		return windows.InvalidHandle, fmt.Errorf("unable to duplicate handle: %v", err)
 	}

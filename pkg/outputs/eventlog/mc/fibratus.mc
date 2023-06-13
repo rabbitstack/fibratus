@@ -226,3 +226,8 @@ SymbolicName=VirtualFree
 Language=English
 Releases or decommits a region of memory within the process virtual address space.
 .
+MessageId=50
+SymbolicName=DuplicateHandle
+Language=English
+Duplicates handle.
+.

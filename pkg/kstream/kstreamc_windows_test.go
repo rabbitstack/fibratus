@@ -125,6 +125,7 @@ func TestRundownEvents(t *testing.T) {
 func TestConsumerEvents(t *testing.T) {
 	kevent.DropCurrentProc = false
 	var freeAddress uintptr
+	var dupHandleID windows.Handle
 
 	var tests = []*struct {
 		name      string
@@ -263,6 +264,57 @@ func TestConsumerEvents(t *testing.T) {
 			},
 			false,
 		},
+		{
+			"duplicate handle",
+			func() error {
+				var si windows.StartupInfo
+				var pi windows.ProcessInformation
+				argv, err := windows.UTF16PtrFromString(filepath.Join(os.Getenv("windir"), "notepad.exe"))
+				if err != nil {
+					return err
+				}
+				err = windows.CreateProcess(
+					nil,
+					argv,
+					nil,
+					nil,
+					true,
+					0,
+					nil,
+					nil,
+					&si,
+					&pi)
+				if err != nil {
+					return err
+				}
+				time.Sleep(time.Second)
+				defer windows.TerminateProcess(pi.Process, 0)
+				hs := handle.NewSnapshotter(&config.Config{}, nil)
+				handles, err := hs.FindHandles(pi.ProcessId)
+				if err != nil {
+					return err
+				}
+				for _, h := range handles {
+					if h.Type == handle.Key {
+						dupHandleID = h.Num
+						break
+					}
+				}
+				assert.False(t, dupHandleID == 0)
+				dup, err := handle.Duplicate(dupHandleID, pi.ProcessId, windows.KEY_READ)
+				if err != nil {
+					return err
+				}
+				defer windows.Close(dup)
+				return nil
+			},
+			func(e *kevent.Kevent) bool {
+				return e.CurrentPid() && e.Type == ktypes.DuplicateHandle &&
+					e.GetParamAsString(kparams.HandleObjectTypeID) == handle.Key &&
+					windows.Handle(e.Kparams.MustGetUint32(kparams.HandleSourceID)) == dupHandleID
+			},
+			false,
+		},
 	}
 
 	psnap := new(ps.SnapshotterMock)
@@ -278,6 +330,8 @@ func TestConsumerEvents(t *testing.T) {
 	hsnap := new(handle.SnapshotterMock)
 	hsnap.On("FindByObject", mock.Anything).Return(htypes.Handle{}, false)
 	hsnap.On("FindHandles", mock.Anything).Return([]htypes.Handle{}, nil)
+	hsnap.On("Write", mock.Anything).Return(nil)
+	hsnap.On("Remove", mock.Anything).Return(nil)
 
 	kstreamConfig := config.KstreamConfig{
 		EnableThreadKevents:   true,
@@ -286,6 +340,7 @@ func TestConsumerEvents(t *testing.T) {
 		EnableNetKevents:      true,
 		EnableRegistryKevents: true,
 		EnableMemKevents:      true,
+		EnableHandleKevents:   true,
 	}
 
 	kctrl := NewController(kstreamConfig)

@@ -49,6 +49,9 @@
 - macro: virtual_free
   expr: kevt.name = 'VirtualFree'
 
+- macro: duplicate_handle
+  expr: kevt.name = 'DuplicateHandle'
+
 - macro: load_driver
   expr: >
     kevt.name = 'LoadDriver'
