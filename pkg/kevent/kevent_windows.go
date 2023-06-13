@@ -503,6 +503,12 @@ func (e *Kevent) Summary() string {
 	case ktypes.VirtualFree:
 		addr := e.GetParamAsString(kparams.MemBaseAddress)
 		return printSummary(e, fmt.Sprintf("released memory at <code>%s</code> address", addr))
+	case ktypes.MapViewFile:
+		sec := e.GetParamAsString(kparams.FileViewSectionType)
+		return printSummary(e, fmt.Sprintf("mapped view of <code>%s</code> section", sec))
+	case ktypes.UnmapViewFile:
+		sec := e.GetParamAsString(kparams.FileViewSectionType)
+		return printSummary(e, fmt.Sprintf("unmapped view of <code>%s</code> section", sec))
 	}
 	return ""
 }

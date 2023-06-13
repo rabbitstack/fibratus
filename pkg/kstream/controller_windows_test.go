@@ -43,7 +43,7 @@ func TestStartTraces(t *testing.T) {
 				FlushTimer:          time.Millisecond * 2300,
 			},
 			1,
-			[]etw.EventTraceFlags{0x6010203, 0},
+			[]etw.EventTraceFlags{0x6018203, 0},
 		},
 		{"start kernel logger and audit api sessions",
 			config.KstreamConfig{
@@ -57,7 +57,7 @@ func TestStartTraces(t *testing.T) {
 				EnableAuditAPIEvents:  true,
 			},
 			2,
-			[]etw.EventTraceFlags{0x6030203, 0x80000040},
+			[]etw.EventTraceFlags{0x6038203, 0x80000040},
 		},
 	}
 

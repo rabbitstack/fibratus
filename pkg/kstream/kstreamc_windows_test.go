@@ -281,6 +281,9 @@ func TestConsumerEvents(t *testing.T) {
 				return sys.NtUnmapViewOfSection(windows.CurrentProcess(), viewBase)
 			},
 			func(e *kevent.Kevent) bool {
+				if e.CurrentPid() && e.Type == ktypes.MapViewFile {
+					fmt.Println(e)
+				}
 				return e.CurrentPid() && e.Type == ktypes.MapViewFile &&
 					e.GetParamAsString(kparams.MemProtect) == "EXECUTE_READWRITE|READONLY" &&
 					e.GetParamAsString(kparams.FileViewSectionType) == "IMAGE" &&

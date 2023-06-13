@@ -98,7 +98,7 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 			f.files[fileObject] = &FileInfo{Name: filename, Type: fs.GetFileType(filename, 0)}
 		}
 	case ktypes.MapFileRundown:
-		// currently just forward map mapped file rundown events
+		// currently just forward mapped file rundown events
 		return e, nil
 	case ktypes.CreateFile:
 		// we defer the processing of the CreateFile event until we get
@@ -149,6 +149,10 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 		if !e.IsUnmapViewFile() {
 			fileObject = e.Kparams.MustGetUint64(kparams.FileObject)
 		}
+		fileinfo := f.findFile(fileKey, fileObject)
+		if fileinfo != nil && e.IsUnmapViewFile() {
+			e.AppendParam(kparams.FileName, kparams.FilePath, fileinfo.Name)
+		}
 		delete(f.files, fileKey)
 		delete(f.files, fileObject)
 	default:
@@ -157,7 +161,6 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 		if !e.IsMapViewFile() {
 			fileObject = e.Kparams.MustGetUint64(kparams.FileObject)
 		}
-
 		// attempt to get the file by file key. If there is no such file referenced
 		// by the file key, then try to fetch it by file object. Even if file object
 		// references fails, we search in the file handles for such file
