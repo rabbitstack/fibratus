@@ -53,7 +53,7 @@ func TestMemProcessor(t *testing.T) {
 				Kparams: kevent.Kparams{
 					kparams.MemRegionSize:  {Name: kparams.MemRegionSize, Type: kparams.Uint64, Value: uint64(1024)},
 					kparams.MemBaseAddress: {Name: kparams.MemBaseAddress, Type: kparams.Address, Value: uint64(base)},
-					kparams.MemAllocType:   {Name: kparams.MemAllocType, Type: kparams.Flags, Value: uint32(0x00001000 | 0x00002000), Flags: kevent.MemAllocationTypeFlags},
+					kparams.MemAllocType:   {Name: kparams.MemAllocType, Type: kparams.Flags, Value: uint32(0x00001000 | 0x00002000), Flags: kevent.MemAllocationFlags},
 					kparams.ProcessID:      {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(os.Getpid())},
 				},
 			},
@@ -79,7 +79,7 @@ func TestMemProcessor(t *testing.T) {
 				Kparams: kevent.Kparams{
 					kparams.MemRegionSize:  {Name: kparams.MemRegionSize, Type: kparams.Uint64, Value: uint64(1024)},
 					kparams.MemBaseAddress: {Name: kparams.MemBaseAddress, Type: kparams.Address, Value: uint64(base)},
-					kparams.MemAllocType:   {Name: kparams.MemAllocType, Type: kparams.Flags, Value: uint32(0x00008000), Flags: kevent.MemAllocationTypeFlags},
+					kparams.MemAllocType:   {Name: kparams.MemAllocType, Type: kparams.Flags, Value: uint32(0x00008000), Flags: kevent.MemAllocationFlags},
 					kparams.ProcessID:      {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(os.Getpid())},
 				},
 			},

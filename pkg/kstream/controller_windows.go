@@ -135,7 +135,7 @@ func (c *Controller) Start() error {
 		flags |= etw.Registry
 	}
 	if c.kstreamConfig.EnableFileIOKevents {
-		flags |= etw.DiskFileIO | etw.FileIO | etw.FileIOInit
+		flags |= etw.DiskFileIO | etw.FileIO | etw.FileIOInit | etw.VaMap
 	}
 	if c.kstreamConfig.EnableMemKevents {
 		flags |= etw.VirtualAlloc

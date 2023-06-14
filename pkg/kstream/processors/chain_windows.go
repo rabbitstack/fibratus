@@ -51,7 +51,7 @@ func NewChain(
 	chain.addProcessor(newPsProcessor(psnap, vaRegionProber))
 
 	if config.Kstream.EnableFileIOKevents {
-		chain.addProcessor(newFsProcessor(hsnap, devPathResolver))
+		chain.addProcessor(newFsProcessor(hsnap, devMapper, devPathResolver))
 	}
 	if config.Kstream.EnableRegistryKevents {
 		chain.addProcessor(newRegistryProcessor(hsnap))

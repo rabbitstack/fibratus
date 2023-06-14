@@ -308,6 +308,12 @@ const (
 	FileAttributes Field = "file.attributes"
 	// FileStatus represents the status message of the file operation
 	FileStatus Field = "file.status"
+	// FileViewBase represents the base address of the mapped view
+	FileViewBase Field = "file.view.base"
+	// FileViewSize represents the size of the mapped view
+	FileViewSize Field = "file.view.size"
+	// FileViewType represents the type of the mapped view section
+	FileViewType Field = "file.view.type"
 
 	// RegistryKeyName represents the registry key name
 	RegistryKeyName Field = "registry.key.name"
@@ -528,6 +534,9 @@ var fields = map[Field]FieldInfo{
 	FileExtension:  {FileExtension, "file extension", kparams.AnsiString, []string{"file.extension = '.dll'"}, nil},
 	FileAttributes: {FileAttributes, "file attributes", kparams.Slice, []string{"file.attributes in ('archive', 'hidden')"}, nil},
 	FileStatus:     {FileStatus, "file operation status message", kparams.UnicodeString, []string{"file.status != 'success'"}, nil},
+	FileViewBase:   {FileViewBase, "view base address", kparams.Address, []string{"file.view.base = '25d42170000'"}, nil},
+	FileViewSize:   {FileViewSize, "size of the mapped view", kparams.Uint64, []string{"file.view.size > 1024"}, nil},
+	FileViewType:   {FileViewType, "type of the mapped view section", kparams.Enum, []string{"file.view.type = 'IMAGE'"}, nil},
 
 	RegistryKeyName:   {RegistryKeyName, "fully qualified key name", kparams.UnicodeString, []string{"registry.key.name contains 'HKEY_LOCAL_MACHINE'"}, nil},
 	RegistryKeyHandle: {RegistryKeyHandle, "registry key object address", kparams.HexInt64, []string{"registry.key.handle = 'FFFFB905D60C2268'"}, nil},

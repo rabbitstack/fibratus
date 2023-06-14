@@ -63,7 +63,7 @@ func (m memProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, erro
 					e.AppendParam(kparams.FileName, kparams.FileDosPath, region.GetMappedFile())
 				}
 				e.AppendEnum(kparams.MemPageType, region.Type, MemPageTypes)
-				e.AppendFlags(kparams.MemProtect, region.Protect, kevent.MemAllocationProtectFlags)
+				e.AppendFlags(kparams.MemProtect, region.Protect, kevent.MemProtectionFlags)
 				e.AppendParam(kparams.MemProtectMask, kparams.AnsiString, region.ProtectMask())
 			}
 		}

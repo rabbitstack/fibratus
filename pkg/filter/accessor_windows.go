@@ -608,6 +608,12 @@ func (l *fileAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, 
 			return nil, nil
 		}
 		return kevt.GetParamAsString(kparams.NTStatus), nil
+	case fields.FileViewBase:
+		return kevt.GetParamAsString(kparams.FileViewBase), nil
+	case fields.FileViewSize:
+		return kevt.Kparams.GetUint64(kparams.FileViewSize)
+	case fields.FileViewType:
+		return kevt.GetParamAsString(kparams.FileViewSectionType), nil
 	}
 	return nil, nil
 }

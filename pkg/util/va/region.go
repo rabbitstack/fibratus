@@ -40,6 +40,19 @@ const (
 	MemPrivate uint32 = 0x20000
 )
 
+const (
+	// SectionData indicates a mapped view of a data file.
+	SectionData = 0x0
+	// SectionImage indicates a mapped view of an executable image.
+	SectionImage = 0x4
+	// SectionImageNoExecute indicates a mapped view an executable image file that will not be executed.
+	SectionImageNoExecute = 0x8
+	// SectionPagefile indicates a mapped view of pagefile-backed section.
+	SectionPagefile = 0xC
+	// SectionPhysical indicates that the allocation is a view of the \Device\PhysicalMemory section.
+	SectionPhysical = 0xD
+)
+
 // RegionInfo  describes the allocated region page properties.
 type RegionInfo struct {
 	Type     uint32
@@ -57,12 +70,7 @@ func (r RegionInfo) IsMapped() bool {
 // a memory-mapped file in the address space of the specified process.
 // If so, it returns the name of the memory-mapped file.
 func (r RegionInfo) GetMappedFile() string {
-	var size uint32 = windows.MAX_PATH
-	n := make([]uint16, size)
-	if sys.GetMappedFileName(r.proc, uintptr(r.BaseAddr), &n[0], size) > 0 {
-		return windows.UTF16ToString(n)
-	}
-	return ""
+	return sys.GetMappedFile(r.proc, uintptr(r.BaseAddr))
 }
 
 // ProtectMask returns protection in mask notation.

@@ -191,6 +191,8 @@ func (e Kevent) IsFileOpEnd() bool        { return e.Type == ktypes.FileOpEnd }
 func (e Kevent) IsRegSetValue() bool      { return e.Type == ktypes.RegSetValue }
 func (e Kevent) IsProcessRundown() bool   { return e.Type == ktypes.ProcessRundown }
 func (e Kevent) IsVirtualAlloc() bool     { return e.Type == ktypes.VirtualAlloc }
+func (e Kevent) IsMapViewFile() bool      { return e.Type == ktypes.MapViewFile }
+func (e Kevent) IsUnmapViewFile() bool    { return e.Type == ktypes.UnmapViewFile }
 
 // InvalidPid indicates if the process generating the event is invalid.
 func (e Kevent) InvalidPid() bool { return e.PID == sys.InvalidProcessID }
@@ -236,6 +238,13 @@ func (e Kevent) RundownKey() uint64 {
 		binary.LittleEndian.PutUint64(b, fileObject)
 
 		return hashers.FnvUint64(b)
+	case ktypes.MapFileRundown:
+		b := make([]byte, 12)
+		fileKey, _ := e.Kparams.GetUint64(kparams.FileKey)
+		binary.LittleEndian.PutUint32(b, e.PID)
+		binary.LittleEndian.PutUint64(b, fileKey)
+
+		return hashers.FnvUint64(b)
 	case ktypes.RegKCBRundown:
 		key, _ := e.Kparams.GetString(kparams.RegKeyName)
 		b := make([]byte, 4+len(key))
@@ -259,6 +268,13 @@ func (e Kevent) PartialKey() uint64 {
 
 		binary.LittleEndian.PutUint32(b, e.PID)
 		binary.LittleEndian.PutUint64(b, object)
+
+		return hashers.FnvUint64(b)
+	case ktypes.MapFileRundown, ktypes.UnmapViewFile:
+		b := make([]byte, 12)
+		fileKey, _ := e.Kparams.GetUint64(kparams.FileKey)
+		binary.LittleEndian.PutUint32(b, e.PID)
+		binary.LittleEndian.PutUint64(b, fileKey)
 
 		return hashers.FnvUint64(b)
 	case ktypes.CreateFile:
@@ -501,6 +517,12 @@ func (e *Kevent) Summary() string {
 	case ktypes.VirtualFree:
 		addr := e.GetParamAsString(kparams.MemBaseAddress)
 		return printSummary(e, fmt.Sprintf("released memory at <code>%s</code> address", addr))
+	case ktypes.MapViewFile:
+		sec := e.GetParamAsString(kparams.FileViewSectionType)
+		return printSummary(e, fmt.Sprintf("mapped view of <code>%s</code> section", sec))
+	case ktypes.UnmapViewFile:
+		sec := e.GetParamAsString(kparams.FileViewSectionType)
+		return printSummary(e, fmt.Sprintf("unmapped view of <code>%s</code> section", sec))
 	case ktypes.DuplicateHandle:
 		handleType := e.GetParamAsString(kparams.HandleObjectTypeID)
 		return printSummary(e, fmt.Sprintf("duplicated <code>%s</code> handle", handleType))

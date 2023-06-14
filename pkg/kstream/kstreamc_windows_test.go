@@ -19,6 +19,7 @@ package kstream
 
 import (
 	"context"
+	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
@@ -27,6 +28,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -37,6 +39,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unsafe"
 )
 
 // MockListener receives the event and does nothing but indicating the event was processed.
@@ -124,6 +127,7 @@ func TestRundownEvents(t *testing.T) {
 
 func TestConsumerEvents(t *testing.T) {
 	kevent.DropCurrentProc = false
+	var viewBase uintptr
 	var freeAddress uintptr
 	var dupHandleID windows.Handle
 
@@ -227,6 +231,109 @@ func TestConsumerEvents(t *testing.T) {
 			},
 			func(e *kevent.Kevent) bool {
 				return e.CurrentPid() && (e.Type == ktypes.ConnectTCPv4 || e.Type == ktypes.ConnectTCPv6)
+			},
+			false,
+		},
+		{
+			"map view section",
+			func() error {
+				const SecImage = 0x01000000
+				const SectionRead = 0x4
+
+				var sec windows.Handle
+				var offset uintptr
+				var baseViewAddr uintptr
+				dll := "../yara/_fixtures/yara-test.dll"
+				f, err := os.Open(dll)
+				if err != nil {
+					return err
+				}
+				defer f.Close()
+				stat, err := f.Stat()
+				if err != nil {
+					return err
+				}
+				size := stat.Size()
+				if err := sys.NtCreateSection(
+					&sec,
+					SectionRead,
+					0,
+					uintptr(unsafe.Pointer(&size)),
+					windows.PAGE_READONLY,
+					SecImage,
+					windows.Handle(f.Fd()),
+				); err != nil {
+					return fmt.Errorf("NtCreateSection: %v", err)
+				}
+				defer windows.Close(sec)
+				err = sys.NtMapViewOfSection(
+					sec,
+					windows.CurrentProcess(),
+					uintptr(unsafe.Pointer(&baseViewAddr)),
+					0,
+					0,
+					uintptr(unsafe.Pointer(&offset)),
+					uintptr(unsafe.Pointer(&size)),
+					windows.SUB_CONTAINERS_ONLY_INHERIT,
+					0,
+					windows.PAGE_READONLY)
+				if err != nil {
+					return fmt.Errorf("NtMapViewOfSection: %v", err)
+				}
+				return nil
+			},
+			func(e *kevent.Kevent) bool {
+				return e.CurrentPid() && e.Type == ktypes.MapViewFile &&
+					e.GetParamAsString(kparams.MemProtect) == "EXECUTE_READWRITE|READONLY" &&
+					e.GetParamAsString(kparams.FileViewSectionType) == "IMAGE" &&
+					strings.Contains(e.GetParamAsString(kparams.FileName), "pkg\\yara\\_fixtures\\yara-test.dll")
+			},
+			false,
+		},
+		{
+			"unmap view section",
+			func() error {
+				const SecCommit = 0x8000000
+				const SectionWrite = 0x2
+				const SectionRead = 0x4
+				const SectionExecute = 0x8
+				const SectionRWX = SectionRead | SectionWrite | SectionExecute
+
+				var sec windows.Handle
+				var size uint64 = 1024
+				var offset uintptr
+				if err := sys.NtCreateSection(
+					&sec,
+					SectionRWX,
+					0,
+					uintptr(unsafe.Pointer(&size)),
+					windows.PAGE_READONLY,
+					SecCommit,
+					0,
+				); err != nil {
+					return fmt.Errorf("NtCreateSection: %v", err)
+				}
+				defer windows.Close(sec)
+				err := sys.NtMapViewOfSection(
+					sec,
+					windows.CurrentProcess(),
+					uintptr(unsafe.Pointer(&viewBase)),
+					0,
+					0,
+					uintptr(unsafe.Pointer(&offset)),
+					uintptr(unsafe.Pointer(&size)),
+					windows.SUB_CONTAINERS_ONLY_INHERIT,
+					0,
+					windows.PAGE_READONLY)
+				if err != nil {
+					return fmt.Errorf("NtMapViewOfSection: %v", err)
+				}
+				return sys.NtUnmapViewOfSection(windows.CurrentProcess(), viewBase)
+			},
+			func(e *kevent.Kevent) bool {
+				return e.CurrentPid() && e.Type == ktypes.UnmapViewFile &&
+					e.GetParamAsString(kparams.MemProtect) == "READONLY" &&
+					e.Kparams.MustGetUint64(kparams.FileViewBase) == uint64(viewBase)
 			},
 			false,
 		},
@@ -357,7 +464,7 @@ func TestConsumerEvents(t *testing.T) {
 	for _, tt := range tests {
 		gen := tt.gen
 		if gen != nil {
-			require.NoError(t, gen())
+			require.NoError(t, gen(), tt.name)
 		}
 	}
 

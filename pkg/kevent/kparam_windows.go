@@ -571,6 +571,29 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 		e.AppendParam(kparams.FileKey, kparams.Address, fileKey)
 		e.AppendParam(kparams.FileName, kparams.UnicodeString, filename)
 		e.AppendParam(kparams.FileInfoClass, kparams.Enum, infoClass, WithEnum(fs.FileInfoClasses))
+	case ktypes.MapViewFile, ktypes.UnmapViewFile, ktypes.MapFileRundown:
+		var (
+			viewBase  uint64
+			fileKey   uint64
+			extraInfo uint64
+			viewSize  uint64
+			offset    uint64
+		)
+		viewBase = evt.ReadUint64(0)
+		fileKey = evt.ReadUint64(8)
+		extraInfo = evt.ReadUint64(16)
+		viewSize = evt.ReadUint64(24)
+		if evt.Version() >= 3 {
+			offset = evt.ReadUint64(32)
+		}
+		protect := uint32(extraInfo >> 32)
+		section := uint32(extraInfo >> 52)
+		e.AppendParam(kparams.FileViewBase, kparams.Address, viewBase)
+		e.AppendParam(kparams.FileKey, kparams.Address, fileKey)
+		e.AppendParam(kparams.FileViewSize, kparams.Uint64, viewSize)
+		e.AppendParam(kparams.FileOffset, kparams.Uint64, offset)
+		e.AppendParam(kparams.MemProtect, kparams.Flags, protect, WithFlags(ViewProtectionFlags))
+		e.AppendParam(kparams.FileViewSectionType, kparams.Enum, section, WithEnum(ViewSectionTypes))
 	case ktypes.SendTCPv4,
 		ktypes.SendUDPv4,
 		ktypes.RecvTCPv4,
@@ -659,6 +682,6 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 		e.AppendParam(kparams.MemBaseAddress, kparams.Address, baseAddress)
 		e.AppendParam(kparams.MemRegionSize, kparams.Uint64, regionSize)
 		e.AppendParam(kparams.ProcessID, kparams.PID, pid)
-		e.AppendParam(kparams.MemAllocType, kparams.Flags, flags, WithFlags(MemAllocationTypeFlags))
+		e.AppendParam(kparams.MemAllocType, kparams.Flags, flags, WithFlags(MemAllocationFlags))
 	}
 }

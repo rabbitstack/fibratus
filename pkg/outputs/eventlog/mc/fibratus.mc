@@ -226,7 +226,17 @@ SymbolicName=VirtualFree
 Language=English
 Releases or decommits a region of memory within the process virtual address space.
 .
-MessageId=50
+MessageId=51
+SymbolicName=MapViewFile
+Language=English
+Maps a view of a file mapping into the address space of a calling process.
+.
+MessageId=52
+SymbolicName=UnmapViewFile
+Language=English
+Unmaps a mapped view of a file from the calling process's address space.
+.
+MessageId=53
 SymbolicName=DuplicateHandle
 Language=English
 Duplicates handle.
