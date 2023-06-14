@@ -503,8 +503,7 @@ func (r *Rules) Compile() error {
 		// sequence rules we have to configure the FSM states and
 		// transitions
 		for _, rule := range group.Rules {
-			opts := []Option{WithPSnapshotter(r.psnap)}
-			f := New(rule.Condition, r.config, opts...)
+			f := New(rule.Condition, r.config, WithPSnapshotter(r.psnap))
 			err := f.Compile()
 			if err != nil {
 				return ErrInvalidFilter(rule.Name, group.Name, err)
@@ -516,7 +515,7 @@ func (r *Rules) Compile() error {
 						"was deprecated starting from version %s. "+
 						"Please consider migrating to [%s] field "+
 						"because [%s] will be removed in future versions.",
-						rule, field, d.Since, d.Field, field)
+						rule.Name, field, d.Since, d.Field, field)
 				}
 			}
 			filtersCount.Add(1)
