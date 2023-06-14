@@ -45,7 +45,7 @@ func (b *Backlog) Put(evt *Kevent) {
 		b.cache.RemoveOldest()
 	}
 	key := evt.DelayKey()
-	if key != 0 {
+	if key != 0 && evt.Delayed {
 		b.cache.Add(key, evt)
 	}
 }

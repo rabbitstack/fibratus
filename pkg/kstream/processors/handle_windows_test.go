@@ -24,6 +24,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -92,7 +93,8 @@ func TestHandleProcessor(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			hsnap := tt.hsnap()
-			p := newHandleProcessor(hsnap, fs.NewDevMapper(), fs.NewDevPathResolver())
+			psnap := new(ps.SnapshotterMock)
+			p := newHandleProcessor(hsnap, psnap, fs.NewDevMapper(), fs.NewDevPathResolver())
 			var err error
 			tt.e, _, err = p.ProcessEvent(tt.e)
 			require.NoError(t, err)

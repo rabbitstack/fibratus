@@ -325,6 +325,19 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 		e.AppendParam(kparams.HandleID, kparams.Uint32, handleID)
 		e.AppendParam(kparams.HandleObjectTypeID, kparams.HandleType, typeID)
 		e.AppendParam(kparams.HandleObjectName, kparams.UnicodeString, handleName)
+	case ktypes.DuplicateHandle:
+		object := evt.ReadUint64(0)
+		srcHandleID := evt.ReadUint32(8)
+		dstHandleID := evt.ReadUint32(12)
+		targetPID := evt.ReadUint32(16)
+		typeID := evt.ReadUint16(20)
+		sourcePID := evt.ReadUint32(22)
+		e.AppendParam(kparams.HandleObject, kparams.Address, object)
+		e.AppendParam(kparams.HandleID, kparams.Uint32, dstHandleID)
+		e.AppendParam(kparams.HandleSourceID, kparams.Uint32, srcHandleID)
+		e.AppendParam(kparams.HandleObjectTypeID, kparams.HandleType, typeID)
+		e.AppendParam(kparams.ProcessID, kparams.PID, sourcePID)
+		e.AppendParam(kparams.TargetProcessID, kparams.PID, targetPID)
 	case ktypes.LoadImage,
 		ktypes.UnloadImage,
 		ktypes.ImageRundown:

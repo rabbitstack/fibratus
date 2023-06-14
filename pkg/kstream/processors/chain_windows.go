@@ -63,7 +63,7 @@ func NewChain(
 		chain.addProcessor(newNetProcessor())
 	}
 	if config.Kstream.EnableHandleKevents {
-		chain.addProcessor(newHandleProcessor(hsnap, devMapper, devPathResolver))
+		chain.addProcessor(newHandleProcessor(hsnap, psnap, devMapper, devPathResolver))
 	}
 	if config.Kstream.EnableMemKevents {
 		chain.addProcessor(newMemProcessor(psnap, vaRegionProber))

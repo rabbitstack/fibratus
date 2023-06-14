@@ -78,6 +78,7 @@ var kevents = map[Ktype]KeventInfo{
 	UnloadImage:        {"UnloadImage", Image, "Unloads the module from the address space of the calling process"},
 	CreateHandle:       {"CreateHandle", Handle, "Creates a new handle"},
 	CloseHandle:        {"CloseHandle", Handle, "Closes the handle"},
+	DuplicateHandle:    {"DuplicateHandle", Handle, "Duplicates the handle"},
 	LoadDriver:         {"LoadDriver", Driver, "Loads the kernel driver"},
 	VirtualAlloc:       {"VirtualAlloc", Mem, "Reserves, commits, or changes the state of a region of memory within the process virtual address space"},
 	VirtualFree:        {"VirtualFree", Mem, "Releases or decommits a region of memory within the process virtual address space"},
@@ -130,6 +131,7 @@ var ktypes = map[string]Ktype{
 	"LoadDriver":         LoadDriver,
 	"VirtualAlloc":       VirtualAlloc,
 	"VirtualFree":        VirtualFree,
+	"DuplicateHandle":    DuplicateHandle,
 }
 
 // KtypeToKeventInfo maps the event type to the structure storing detailed information about the event.

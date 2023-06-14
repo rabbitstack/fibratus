@@ -24,23 +24,27 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
 	"strings"
 )
 
 type handleProcessor struct {
 	hsnap           handle.Snapshotter
+	psnap           ps.Snapshotter
 	devMapper       fs.DevMapper
 	devPathResolver fs.DevPathResolver
 }
 
 func newHandleProcessor(
 	hsnap handle.Snapshotter,
+	psnap ps.Snapshotter,
 	devMapper fs.DevMapper,
 	devPathResolver fs.DevPathResolver,
 ) Processor {
 	return &handleProcessor{
 		hsnap:           hsnap,
+		psnap:           psnap,
 		devMapper:       devMapper,
 		devPathResolver: devPathResolver,
 	}
@@ -55,6 +59,16 @@ func (h *handleProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, 
 }
 
 func (h *handleProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
+	if e.Type == ktypes.DuplicateHandle {
+		// enrich event with process parameters
+		pid := e.Kparams.MustGetPid()
+		proc := h.psnap.FindAndPut(pid)
+		if proc != nil {
+			e.AppendParam(kparams.Exe, kparams.FilePath, proc.Exe)
+			e.AppendParam(kparams.ProcessName, kparams.AnsiString, proc.Name)
+		}
+		return e, nil
+	}
 	name := e.GetParamAsString(kparams.HandleObjectName)
 	typ := e.GetParamAsString(kparams.HandleObjectTypeID)
 	if name != "" {

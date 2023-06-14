@@ -106,6 +106,11 @@ func (e *Kevent) adjustPID() {
 		}
 	case ktypes.Net:
 		e.PID, _ = e.Kparams.GetPid()
+	case ktypes.Handle:
+		if e.Type == ktypes.DuplicateHandle {
+			e.PID, _ = e.Kparams.GetUint32(kparams.TargetProcessID)
+			e.Kparams.Remove(kparams.TargetProcessID)
+		}
 	}
 }
 
@@ -341,6 +346,15 @@ func (e Kevent) PartialKey() uint64 {
 		binary.LittleEndian.PutUint32(b, e.PID)
 		binary.LittleEndian.PutUint64(b, addr)
 		return hashers.FnvUint64(b)
+	case ktypes.DuplicateHandle:
+		b := make([]byte, 16)
+		pid, _ := e.Kparams.GetUint32(kparams.ProcessID)
+		object, _ := e.Kparams.GetUint64(kparams.HandleObject)
+
+		binary.LittleEndian.PutUint32(b, e.PID)
+		binary.LittleEndian.PutUint32(b, pid)
+		binary.LittleEndian.PutUint64(b, object)
+		return hashers.FnvUint64(b)
 	}
 	return 0
 }
@@ -487,6 +501,9 @@ func (e *Kevent) Summary() string {
 	case ktypes.VirtualFree:
 		addr := e.GetParamAsString(kparams.MemBaseAddress)
 		return printSummary(e, fmt.Sprintf("released memory at <code>%s</code> address", addr))
+	case ktypes.DuplicateHandle:
+		handleType := e.GetParamAsString(kparams.HandleObjectTypeID)
+		return printSummary(e, fmt.Sprintf("duplicated <code>%s</code> handle", handleType))
 	}
 	return ""
 }
