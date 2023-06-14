@@ -236,3 +236,8 @@ SymbolicName=UnmapViewFile
 Language=English
 Unmaps a mapped view of a file from the calling process's address space.
 .
+MessageId=53
+SymbolicName=DuplicateHandle
+Language=English
+Duplicates handle.
+.

@@ -61,6 +61,9 @@
 - macro: unmap_view_of_section
   expr: unmap_view_file and file.view.type in ('IMAGE', 'IMAGE_NO_EXECUTE`)
 
+- macro: duplicate_handle
+  expr: kevt.name = 'DuplicateHandle'
+
 - macro: load_driver
   expr: >
     kevt.name = 'LoadDriver'

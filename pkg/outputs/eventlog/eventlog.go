@@ -245,6 +245,8 @@ func ktypeToEventID(kevt *kevent.Kevent) uint32 {
 		return 51
 	case ktypes.UnmapViewFile:
 		return 52
+	case ktypes.DuplicateHandle:
+		return 53
 	}
 	return unknownEventID
 }

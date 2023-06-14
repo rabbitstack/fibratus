@@ -24,6 +24,8 @@ const (
 
 	// ProcessID represents the process identifier.
 	ProcessID = "pid"
+	// TargetProcessID represents the target process identifier.
+	TargetProcessID = "target_pid"
 	// ProcessObject field represents the address of the process object in the kernel.
 	ProcessObject = "kproc"
 	// ThreadID field represents the thread identifier.
@@ -184,6 +186,8 @@ const (
 
 	// HandleID identifies the parameter that specifies the handle identifier.
 	HandleID = "handle_id"
+	// HandleSourceID identifies the parameter that specifies the source handle identifier.
+	HandleSourceID = "handle_source_id"
 	// HandleObject identifies the parameter that represents the kernel object to which handle is associated.
 	HandleObject = "handle_object"
 	// HandleObjectName identifies the parameter that represents the kernel object name.

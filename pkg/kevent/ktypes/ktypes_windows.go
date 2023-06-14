@@ -143,10 +143,12 @@ var (
 	// RetransmitTCPv6 is the TCP IPv6 network retransmit event.
 	RetransmitTCPv6 = pack(windows.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 30)
 
-	// CreateHandle represents handle creation kernel event
+	// CreateHandle represents handle creation event
 	CreateHandle = pack(windows.GUID{Data1: 0x89497f50, Data2: 0xeffe, Data3: 0x4440, Data4: [8]byte{0x8c, 0xf2, 0xce, 0x6b, 0x1c, 0xdc, 0xac, 0xa7}}, 32)
-	// CloseHandle represents handle closure kernel event
+	// CloseHandle represents handle closure event
 	CloseHandle = pack(windows.GUID{Data1: 0x89497f50, Data2: 0xeffe, Data3: 0x4440, Data4: [8]byte{0x8c, 0xf2, 0xce, 0x6b, 0x1c, 0xdc, 0xac, 0xa7}}, 33)
+	// DuplicateHandle represents handle duplication event
+	DuplicateHandle = pack(windows.GUID{Data1: 0x89497f50, Data2: 0xeffe, Data3: 0x4440, Data4: [8]byte{0x8c, 0xf2, 0xce, 0x6b, 0x1c, 0xdc, 0xac, 0xa7}}, 34)
 
 	// VirtualAlloc represents virtual memory allocation event
 	VirtualAlloc = pack(windows.GUID{Data1: 0x3d6fa8d3, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x00, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}, 98)
@@ -222,6 +224,8 @@ func (k Ktype) String() string {
 		return "CreateHandle"
 	case CloseHandle:
 		return "CloseHandle"
+	case DuplicateHandle:
+		return "DuplicateHandle"
 	case RegKCBRundown:
 		return "RegKCBRundown"
 	case RegOpenKey:
@@ -296,7 +300,7 @@ func (k Ktype) Category() Category {
 		SendTCPv4, SendTCPv6, SendUDPv4, SendUDPv6,
 		RecvTCPv4, RecvTCPv6, RecvUDPv4, RecvUDPv6:
 		return Net
-	case CreateHandle, CloseHandle:
+	case CreateHandle, CloseHandle, DuplicateHandle:
 		return Handle
 	case VirtualAlloc, VirtualFree:
 		return Mem
@@ -380,6 +384,8 @@ func (k Ktype) Description() string {
 		return "Creates a new handle"
 	case CloseHandle:
 		return "Closes the handle"
+	case DuplicateHandle:
+		return "Duplicates the handle"
 	case LoadDriver:
 		return "Loads the kernel driver"
 	case VirtualAlloc:
