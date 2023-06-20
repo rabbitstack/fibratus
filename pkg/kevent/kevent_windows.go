@@ -368,6 +368,17 @@ func (e *Kevent) CopyParams(evt *Kevent) {
 			e.Kparams.Append(kparams.ImageFilename, kparams.UnicodeString, imageFilename)
 		}
 		_ = e.Kparams.SetValue(kparams.HandleObjectName, evt.GetParamAsString(kparams.HandleObjectName))
+		e.AppendParam(kparams.ImageCertIssuer, kparams.UnicodeString, evt.GetParamAsString(kparams.ImageCertIssuer))
+		e.AppendParam(kparams.ImageCertSubject, kparams.UnicodeString, evt.GetParamAsString(kparams.ImageCertSubject))
+		e.AppendParam(kparams.ImageCertSerial, kparams.UnicodeString, evt.GetParamAsString(kparams.ImageCertSerial))
+		after, err := e.Kparams.GetTime(kparams.ImageCertNotAfter)
+		if err == nil {
+			e.AppendParam(kparams.ImageCertNotAfter, kparams.Time, after)
+		}
+		before, err := e.Kparams.GetTime(kparams.ImageCertNotBefore)
+		if err == nil {
+			e.AppendParam(kparams.ImageCertNotBefore, kparams.Time, before)
+		}
 	}
 }
 

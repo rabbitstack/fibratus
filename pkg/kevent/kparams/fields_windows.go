@@ -129,10 +129,21 @@ const (
 	ImageDefaultBase = "default_address"
 	// ImageFilename is the parameter name that denotes file name and extension of the DLL/executable image.
 	ImageFilename = "file_name"
-	// ImageSignatureLevel is the parameter denoting the loaded module signature level
+	// ImageSignatureLevel is the parameter denoting the loaded module signature level.
 	ImageSignatureLevel = "signature_level"
-	// ImageSignatureType is the parameter denoting the loaded module signature type
+	// ImageSignatureType is the parameter denoting the loaded module signature type.
 	ImageSignatureType = "signature_type"
+	// ImageCertSubject is the parameter that indicates the subject of the certificate is the entity its public key is associated with.
+	ImageCertSubject = "cert_subject"
+	// ImageCertIssuer is the parameter that represents the certificate authority (CA).
+	ImageCertIssuer = "cert_issuer"
+	// ImageCertSerial is the parameter that represents the serial number MUST be a positive integer assigned
+	// by the CA to each certificate.
+	ImageCertSerial = "cert_serial"
+	// ImageCertNotBefore  is the parameter that specifies the certificate won't be valid before this timestamp.
+	ImageCertNotBefore = "cert_not_before"
+	// ImageCertNotAfter is the parameter that specifies the certificate won't be valid after this timestamp.
+	ImageCertNotAfter = "cert_not_after"
 
 	// NetSize identifies the parameter name that represents the packet size.
 	NetSize = "size"

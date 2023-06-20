@@ -35,34 +35,52 @@ func TestSignature(t *testing.T) {
 		filename string
 		sigType  uint32
 		sigLevel uint32
+		err      error
+		opts     []Option
 	}{
 		{
 			"PE embedded signature",
 			filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll"),
 			Embedded,
 			AuthenticodeLevel,
+			nil,
+			nil,
 		},
 		{
 			"catalog signature",
 			filepath.Join(os.Getenv("windir"), "notepad.exe"),
 			Catalog,
 			AuthenticodeLevel,
+			nil,
+			nil,
 		},
 		{
 			"unsigned binary",
 			executable,
 			None,
 			UnsignedLevel,
+			ErrNotSigned,
+			nil,
+		},
+		{
+			"PE only cert",
+			filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll"),
+			None,
+			AuthenticodeLevel,
+			nil,
+			[]Option{OnlyCert()},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sig := Check(tt.filename)
-			require.NotNil(t, sig)
-			assert.Equal(t, tt.sigType, sig.Type)
-			sig.Verify()
-			assert.Equal(t, tt.sigLevel, sig.Level)
+			sig, err := CheckWithOpts(tt.filename, tt.opts...)
+			assert.True(t, err == tt.err)
+			if sig != nil {
+				assert.Equal(t, tt.sigType, sig.Type)
+				sig.Verify()
+				assert.Equal(t, tt.sigLevel, sig.Level)
+			}
 		})
 	}
 }

@@ -196,6 +196,9 @@ func (s *snapshotter) AddModule(e *kevent.Kevent) error {
 	moduleCount.Add(1)
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if pid == 0 {
+		pid = e.PID
+	}
 	proc, ok := s.procs[pid]
 	if !ok {
 		return nil
@@ -206,6 +209,8 @@ func (s *snapshotter) AddModule(e *kevent.Kevent) error {
 	module.Name = e.GetParamAsString(kparams.ImageFilename)
 	module.BaseAddress, _ = e.Kparams.GetHex(kparams.ImageBase)
 	module.DefaultBaseAddress, _ = e.Kparams.GetHex(kparams.ImageDefaultBase)
+	module.SignatureLevel = e.Kparams.MustGetUint32(kparams.ImageSignatureLevel)
+	module.SignatureType = e.Kparams.MustGetUint32(kparams.ImageSignatureType)
 	proc.AddModule(module)
 	return nil
 }

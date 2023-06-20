@@ -624,17 +624,9 @@ func (i *imageAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value,
 	case fields.ImageName:
 		return kevt.GetParamAsString(kparams.ImageFilename), nil
 	case fields.ImageDefaultAddress:
-		address, err := kevt.Kparams.GetHex(kparams.ImageDefaultBase)
-		if err != nil {
-			return nil, err
-		}
-		return address.String(), nil
+		return kevt.GetParamAsString(kparams.ImageDefaultBase), nil
 	case fields.ImageBase:
-		address, err := kevt.Kparams.GetHex(kparams.ImageBase)
-		if err != nil {
-			return nil, err
-		}
-		return address.String(), nil
+		return kevt.GetParamAsString(kparams.ImageBase), nil
 	case fields.ImageSize:
 		return kevt.Kparams.GetUint64(kparams.ImageSize)
 	case fields.ImageChecksum:
@@ -645,6 +637,16 @@ func (i *imageAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value,
 		return kevt.GetParamAsString(kparams.ImageSignatureType), nil
 	case fields.ImageSignatureLevel:
 		return kevt.GetParamAsString(kparams.ImageSignatureLevel), nil
+	case fields.ImageCertSubject:
+		return kevt.GetParamAsString(kparams.ImageCertSubject), nil
+	case fields.ImageCertIssuer:
+		return kevt.GetParamAsString(kparams.ImageCertIssuer), nil
+	case fields.ImageCertSerial:
+		return kevt.GetParamAsString(kparams.ImageCertSerial), nil
+	case fields.ImageCertBefore:
+		return kevt.Kparams.GetTime(kparams.ImageCertNotBefore)
+	case fields.ImageCertAfter:
+		return kevt.Kparams.GetTime(kparams.ImageCertNotAfter)
 	}
 	return nil, nil
 }
@@ -661,11 +663,7 @@ func (r *registryAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Val
 	case fields.RegistryKeyName:
 		return kevt.GetParamAsString(kparams.RegKeyName), nil
 	case fields.RegistryKeyHandle:
-		keyHandle, err := kevt.Kparams.GetHex(kparams.RegKeyHandle)
-		if err != nil {
-			return nil, err
-		}
-		return keyHandle.String(), nil
+		return kevt.GetParamAsString(kparams.RegKeyHandle), nil
 	case fields.RegistryValue:
 		return kevt.Kparams.GetRaw(kparams.RegValue)
 	case fields.RegistryValueType:
@@ -776,8 +774,8 @@ func (*peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, erro
 		switch {
 		case f.IsPeSectionsMap():
 			// get the section name
-			sname, segment := captureInBrackets(f.String())
-			sec := p.Section(sname)
+			section, segment := captureInBrackets(f.String())
+			sec := p.Section(section)
 			if sec == nil {
 				return nil, nil
 			}

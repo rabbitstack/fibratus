@@ -208,6 +208,10 @@ type Module struct {
 	BaseAddress kparams.Hex
 	// DefaultBaseAddress is the default base address.
 	DefaultBaseAddress kparams.Hex
+	// SignatureLevel designates the image signature level. (e.g. MICROSOFT)
+	SignatureLevel uint32
+	// SignatureType designates the image signature type (e.g. EMBEDDED)
+	SignatureType uint32
 }
 
 // String returns the string representation of the module.

@@ -297,6 +297,15 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 
 	if opts.parseSecurity {
 		p.IsSigned = pe.IsSigned
+		if pe.HasCertificate {
+			p.Cert = &Cert{
+				Issuer:       pe.Certificates.Info.Issuer,
+				Subject:      pe.Certificates.Info.Subject,
+				NotBefore:    pe.Certificates.Info.NotBefore,
+				NotAfter:     pe.Certificates.Info.NotAfter,
+				SerialNumber: pe.Certificates.Info.SerialNumber,
+			}
+		}
 	}
 
 	return p, nil

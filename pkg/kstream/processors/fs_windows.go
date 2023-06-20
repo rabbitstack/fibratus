@@ -123,10 +123,10 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 			opts := ev.Kparams.MustGetUint32(kparams.FileCreateOptions)
 			opts &= 0xFFFFFF
 			filename := ev.GetParamAsString(kparams.FileName)
-			f.devPathResolver.AddPath(filename)
 			fileinfo = f.getFileInfo(filename, opts)
 			f.files[fileObject] = fileinfo
 		}
+		f.devPathResolver.AddPath(ev.GetParamAsString(kparams.FileName))
 		ev.AppendParam(kparams.NTStatus, kparams.Status, status)
 		if fileinfo.Type != fs.Unknown {
 			ev.AppendEnum(kparams.FileType, uint32(fileinfo.Type), fs.FileTypes)
