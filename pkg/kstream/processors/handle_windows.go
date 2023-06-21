@@ -26,7 +26,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
-	"github.com/rabbitstack/fibratus/pkg/util/signature"
 	"strings"
 )
 
@@ -95,15 +94,6 @@ func (h *handleProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error)
 			}
 			h.devPathResolver.RemovePath(driverName)
 			e.Kparams.Append(kparams.ImageFilename, kparams.FilePath, driverPath)
-			// append driver certificate parameters
-			sign, err := signature.CheckWithOpts(driverPath, signature.OnlyCert())
-			if err == nil && sign.HasCertificate() {
-				e.AppendParam(kparams.ImageCertIssuer, kparams.UnicodeString, sign.Cert.Issuer)
-				e.AppendParam(kparams.ImageCertSubject, kparams.UnicodeString, sign.Cert.Subject)
-				e.AppendParam(kparams.ImageCertSerial, kparams.UnicodeString, sign.Cert.SerialNumber)
-				e.AppendParam(kparams.ImageCertNotAfter, kparams.Time, sign.Cert.NotAfter)
-				e.AppendParam(kparams.ImageCertNotBefore, kparams.Time, sign.Cert.NotBefore)
-			}
 		}
 		// assign the formatted handle name
 		if err := e.Kparams.SetValue(kparams.HandleObjectName, name); err != nil {

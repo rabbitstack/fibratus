@@ -65,7 +65,7 @@ func (b *Backlog) Pop(evt *Kevent) *Kevent {
 	b.cache.Remove(key)
 	e := ev.(*Kevent)
 	e.Delayed = false
-	e.CopyParams(evt)
+	e.CopyState(evt)
 	return e
 }
 
