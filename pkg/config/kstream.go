@@ -76,8 +76,6 @@ type KstreamConfig struct {
 	EnableMemKevents bool `json:"enable-memory" yaml:"enable-memory"`
 	// EnableAuditAPIEvents indicates if kernel audit API calls events are enabled
 	EnableAuditAPIEvents bool `json:"enable-audit-api" yaml:"enable-audit-api"`
-	// EnableAntimalwareEngineEvents indicates if Antimalware Engine events are enabled
-	EnableAntimalwareEngineEvents bool `json:"enable-antimalware-engine" yaml:"enable-antimalware-engine"`
 	// BufferSize represents the amount of memory allocated for each event tracing session buffer, in kilobytes.
 	// The buffer size affects the rate at which buffers fill and must be flushed (small buffer size requires
 	// less memory, but it increases the rate at which buffers must be flushed).
@@ -106,7 +104,6 @@ func (c *KstreamConfig) initFromViper(v *viper.Viper) {
 	c.EnableHandleKevents = v.GetBool(enableHandleKevents)
 	c.EnableMemKevents = v.GetBool(enableMemKevents)
 	c.EnableAuditAPIEvents = v.GetBool(enableAuditAPIEvents)
-	c.EnableAntimalwareEngineEvents = v.GetBool(enableAntimalwareEngineEvents)
 	c.BufferSize = uint32(v.GetInt(bufferSize))
 	c.MinBuffers = uint32(v.GetInt(minBuffers))
 	c.MaxBuffers = uint32(v.GetInt(maxBuffers))

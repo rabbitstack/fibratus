@@ -155,9 +155,6 @@ var (
 	// VirtualFree represents virtual memory release event
 	VirtualFree = pack(windows.GUID{Data1: 0x3d6fa8d3, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x00, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}, 99)
 
-	// LoadDriver represents kernel driver loading event.
-	LoadDriver = pack(windows.GUID{Data1: 0xa002690, Data2: 0x3839, Data3: 0x4e3a, Data4: [8]byte{0xb3, 0xb6, 0x96, 0xd8, 0xdf, 0x86, 0x8d, 0x99}}, 10)
-
 	// UnknownKtype designates unknown kernel event type
 	UnknownKtype = pack(windows.GUID{}, 0)
 )
@@ -165,7 +162,7 @@ var (
 // NewFromEventRecord creates a new event type from ETW event record.
 func NewFromEventRecord(ev *etw.EventRecord) Ktype {
 	switch ev.Header.ProviderID {
-	case etw.KernelAuditAPICallsGUID, etw.AntimalwareEngineGUID:
+	case etw.KernelAuditAPICallsGUID:
 		return pack(ev.Header.ProviderID, uint8(ev.Header.EventDescriptor.ID))
 	default:
 		return pack(ev.Header.ProviderID, ev.Header.EventDescriptor.Opcode)
@@ -270,8 +267,6 @@ func (k Ktype) String() string {
 		return "VirtualAlloc"
 	case VirtualFree:
 		return "VirtualFree"
-	case LoadDriver:
-		return "LoadDriver"
 	default:
 		return ""
 	}
@@ -304,8 +299,6 @@ func (k Ktype) Category() Category {
 		return Handle
 	case VirtualAlloc, VirtualFree:
 		return Mem
-	case LoadDriver:
-		return Driver
 	default:
 		return Unknown
 	}
@@ -386,8 +379,6 @@ func (k Ktype) Description() string {
 		return "Closes the handle"
 	case DuplicateHandle:
 		return "Duplicates the handle"
-	case LoadDriver:
-		return "Loads the kernel driver"
 	case VirtualAlloc:
 		return "Reserves, commits, or changes the state of a region of memory within the process virtual address space"
 	case VirtualFree:

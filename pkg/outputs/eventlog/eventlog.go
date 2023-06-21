@@ -235,8 +235,6 @@ func ktypeToEventID(kevt *kevent.Kevent) uint32 {
 		return 46
 	case ktypes.RegCloseKey:
 		return 47
-	case ktypes.LoadDriver:
-		return 48
 	case ktypes.VirtualAlloc:
 		return 49
 	case ktypes.VirtualFree:
