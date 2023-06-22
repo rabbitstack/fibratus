@@ -59,7 +59,6 @@ func TestHandleProcessor(t *testing.T) {
 				return hsnap
 			},
 			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock) {
-				assert.True(t, e.Delayed)
 				hsnap.AssertNumberOfCalls(t, "Write", 1)
 			},
 		},

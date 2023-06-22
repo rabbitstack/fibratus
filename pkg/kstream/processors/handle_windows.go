@@ -100,12 +100,6 @@ func (h *handleProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error)
 	}
 
 	if e.Type == ktypes.CreateHandle {
-		// mark CreateHandle events as delayed. Delayed events
-		// are stored in the assembler backlog queue. As soon as
-		// the corresponding CloseHandle event arrives, the event
-		// is removed from the backlog and pushed to the output
-		// channel
-		e.Delayed = true
 		return e, h.hsnap.Write(e)
 	}
 

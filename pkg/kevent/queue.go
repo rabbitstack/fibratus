@@ -18,7 +18,12 @@
 
 package kevent
 
-import "expvar"
+import (
+	"expvar"
+	"github.com/rabbitstack/fibratus/pkg/util/multierror"
+	"sync"
+	"time"
+)
 
 // keventsEnqueued counts the number of events that are pushed to the queue
 var keventsEnqueued = expvar.NewInt("kstream.kevents.enqueued")
@@ -37,11 +42,16 @@ type Listener interface {
 type Queue struct {
 	q         chan *Kevent
 	listeners []Listener
+	backlog   *backlog
 }
 
 // NewQueue constructs a new queue with the given channel size.
 func NewQueue(size int) *Queue {
-	return &Queue{q: make(chan *Kevent, size), listeners: make([]Listener, 0)}
+	return &Queue{
+		q:         make(chan *Kevent, size),
+		listeners: make([]Listener, 0),
+		backlog:   newBacklog(),
+	}
 }
 
 // RegisterListener registers a new queue event listener. The listener
@@ -59,6 +69,19 @@ func (q *Queue) Events() <-chan *Kevent { return q.q }
 // channel if one of the listeners agrees so and no
 // errors are thrown.
 func (q *Queue) Push(e *Kevent) error {
+	if q.isDelayed(e) {
+		q.backlog.put(e, time.Now().Add(expiration))
+		return nil
+	}
+	evt := q.backlog.pop(e)
+	if evt != nil {
+		evt.CopyParams(e)
+		return multierror.Wrap(q.push(evt), q.push(e))
+	}
+	return q.push(e)
+}
+
+func (q *Queue) push(e *Kevent) error {
 	var enqueue bool
 	for _, listener := range q.listeners {
 		enq, err := listener.ProcessEvent(e)
@@ -74,4 +97,43 @@ func (q *Queue) Push(e *Kevent) error {
 		keventsEnqueued.Add(1)
 	}
 	return nil
+}
+
+func (q *Queue) isDelayed(e *Kevent) bool {
+	return e.IsCreateHandle()
+}
+
+const expiration = time.Second * 4
+
+type elem struct {
+	e          *Kevent
+	expiration int64
+}
+
+type backlog struct {
+	store map[uint64]*elem
+	mu    sync.Mutex
+}
+
+func newBacklog() *backlog {
+	return &backlog{}
+}
+
+func (b *backlog) put(e *Kevent, expiration time.Time) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.store[e.BacklogKey()] = &elem{e: e, expiration: expiration.Unix()}
+}
+
+func (b *backlog) pop(e *Kevent) *Kevent {
+	key := e.BacklogKey()
+	if key == 0 {
+		return nil
+	}
+	el, ok := b.store[key]
+	if !ok {
+		return nil
+	}
+	delete(b.store, key)
+	return el.e
 }

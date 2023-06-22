@@ -375,6 +375,15 @@ func (e Kevent) PartialKey() uint64 {
 	return 0
 }
 
+// BacklogKey represents the key used to index the events in the backlog store.
+func (e *Kevent) BacklogKey() uint64 {
+	switch e.Type {
+	case ktypes.CreateHandle, ktypes.CloseHandle:
+		return e.Kparams.MustGetUint64(kparams.HandleObject)
+	}
+	return 0
+}
+
 // CopyParams appends parameters or other fields from the given event.
 func (e *Kevent) CopyParams(evt *Kevent) {
 	switch evt.Type {
