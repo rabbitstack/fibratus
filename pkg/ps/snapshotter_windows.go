@@ -209,8 +209,8 @@ func (s *snapshotter) AddModule(e *kevent.Kevent) error {
 	module.Name = e.GetParamAsString(kparams.ImageFilename)
 	module.BaseAddress, _ = e.Kparams.GetHex(kparams.ImageBase)
 	module.DefaultBaseAddress, _ = e.Kparams.GetHex(kparams.ImageDefaultBase)
-	module.SignatureLevel = e.Kparams.MustGetUint32(kparams.ImageSignatureLevel)
-	module.SignatureType = e.Kparams.MustGetUint32(kparams.ImageSignatureType)
+	module.SignatureLevel, _ = e.Kparams.GetUint32(kparams.ImageSignatureLevel)
+	module.SignatureType, _ = e.Kparams.GetUint32(kparams.ImageSignatureType)
 	proc.AddModule(module)
 	return nil
 }
