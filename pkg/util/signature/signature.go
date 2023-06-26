@@ -22,18 +22,35 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	log "github.com/sirupsen/logrus"
-	"runtime"
 	"sync"
 )
 
 var isWintrustDLLFound bool
 var once sync.Once
 
-// Check determines if the provided executable image or DLL is signed.
+type opts struct {
+	onlyCert bool
+}
+
+// Option represents the option that influences signature verification/checking process
+type Option func(o *opts)
+
+// OnlyCert indicates if only certificate info is fetched for the signature. If this
+// option is set, it is assumed the signature was already checked.
+func OnlyCert() Option {
+	return func(o *opts) {
+		o.onlyCert = true
+	}
+}
+
+// CheckWithOpts determines if the provided executable image or DLL is signed.
 // It first parses the PE security directory to look for the signature
 // information. If the certificate is not embedded inside the PE object
 // then this method will try to locate the hash in the catalog file.
-func Check(filename string) *Signature {
+// If OnlyCert option is specified, then only certificate information is
+// fetched for the particular executable image, DLL, or driver. If the function
+// returns a nil value, this indicates the provided image is not signed.
+func CheckWithOpts(filename string, options ...Option) (*Signature, error) {
 	once.Do(func() {
 		isWintrustDLLFound = sys.IsWintrustFound()
 		if !isWintrustDLLFound {
@@ -43,24 +60,60 @@ func Check(filename string) *Signature {
 				"image signature filter fields")
 		}
 	})
+	var opts opts
+	for _, opt := range options {
+		opt(&opts)
+	}
+	// the signature is assumed to be verified, so we just extract cert info
+	if opts.onlyCert {
+		f, err := pe.ParseFile(filename, pe.WithSecurity())
+		if err != nil {
+			return nil, err
+		}
+		if f.Cert != nil {
+			return &Signature{filename: filename, Cert: f.Cert}, nil
+		}
+		if !isWintrustDLLFound {
+			return nil, ErrWintrustUnavailable
+		}
+		// parse catalog certificate
+		catalog := NewCatalog()
+		if err := catalog.Open(filename); err != nil {
+			return nil, err
+		}
+		cert, err := catalog.ParseCertificate()
+		if err != nil {
+			return nil, err
+		}
+		return &Signature{filename: filename, Cert: cert}, nil
+	}
+
 	// check if the signature is embedded in PE
 	f, err := pe.ParseFile(filename, pe.WithSecurity())
 	if err != nil {
-		return nil
+		return nil, err
 	}
-	s := &Signature{filename: filename}
 	if f.IsSigned {
-		s.Type = Embedded
-		return s
+		return &Signature{filename: filename, Type: Embedded, Cert: f.Cert}, nil
 	}
+
 	if !isWintrustDLLFound {
-		return nil
+		return nil, ErrWintrustUnavailable
 	}
+
 	// maybe the signature is in the catalog?
-	if IsCatalogSigned(filename) {
-		s.Type = Catalog
+	catalog := NewCatalog()
+	if err := catalog.Open(filename); err != nil {
+		return nil, err
 	}
-	return s
+	if catalog.IsCatalogSigned() {
+		cert, err := catalog.ParseCertificate()
+		if err != nil {
+			return nil, err
+		}
+		return &Signature{filename: filename, Type: Catalog, Cert: cert}, nil
+	}
+	return nil, ErrNotSigned // image not signed
 }
 
 // Verify verifies the DLL or executable image signature.
@@ -74,20 +127,10 @@ func (s *Signature) Verify() bool {
 	if !isWintrustDLLFound {
 		return false
 	}
-	if verifyFileSignature(s.filename) || verifyCatalogSignature(s.filename) {
+	s.Level = UnsignedLevel
+	if s.VerifyEmbedded() || s.VerifyCatalog() {
 		s.Level = AuthenticodeLevel
 		return true
 	}
-	s.Level = UnsignedLevel
 	return false
-}
-
-// verifyFileSignature performs a trust verification action on the PE file
-// by passing the inquiry to a trust provider that supports the action identifier.
-func verifyFileSignature(filename string) bool {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
-	t := sys.NewWintrustData(sys.WtdChoiceFile)
-	defer t.Close()
-	return t.VerifyFile(filename)
 }

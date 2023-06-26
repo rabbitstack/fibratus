@@ -51,6 +51,30 @@ type Sec struct {
 	Md5     string
 }
 
+// Cert represents certificate information embedded in PE.
+type Cert struct {
+	// Issuer represents the certificate authority (CA) that charges customers to issue
+	// certificates for them.
+	Issuer string `json:"issuer"`
+
+	// Subject indicates the subject of the certificate is the entity its public key is associated
+	// with (i.e. the "owner" of the certificate).
+	Subject string `json:"subject"`
+
+	// NotBefore specifies the certificate won't be valid before this timestamp.
+	NotBefore time.Time `json:"not_before"`
+
+	// NotAfter specifies the certificate won't be valid after this timestamp.
+	NotAfter time.Time `json:"not_after"`
+
+	// SerialNumber represents the serial number MUST be a positive integer assigned
+	// by the CA to each certificate. It MUST be unique for each certificate issued by
+	// a given CA (i.e., the issuer name and serial number identify a unique certificate).
+	// CAs MUST force the serialNumber to be a non-negative integer.
+	// For convenience, we convert the big int to string.
+	SerialNumber string `json:"serial_number"`
+}
+
 // String returns the stirng representation of the section.
 func (s Sec) String() string {
 	return fmt.Sprintf("Name: %s, Size: %d, Entropy: %f, Md5: %s", s.Name, s.Size, s.Entropy, s.Md5)
@@ -78,6 +102,8 @@ type PE struct {
 	VersionResources map[string]string `json:"resources"`
 	// IsSigned determines if the PE contains the digital signature.
 	IsSigned bool `json:"is_signed"`
+	// Cert contains certificate information.
+	Cert *Cert `json:"cert"`
 }
 
 // String returns the string representation of the PE metadata.

@@ -69,8 +69,10 @@ func (h *handleProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error)
 		}
 		return e, nil
 	}
+
 	name := e.GetParamAsString(kparams.HandleObjectName)
 	typ := e.GetParamAsString(kparams.HandleObjectTypeID)
+
 	if name != "" {
 		switch typ {
 		case handle.Key:

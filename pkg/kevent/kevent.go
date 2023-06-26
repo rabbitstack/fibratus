@@ -108,18 +108,6 @@ type Kevent struct {
 	Delayed bool `json:"delayed"`
 }
 
-// DelayKey returns the value that is used to
-// store and reference delayed events in the event
-// backlog state. The delayed event is indexed by
-// the sequence identifier.
-func (e *Kevent) DelayKey() uint64 {
-	switch e.Type {
-	case ktypes.CreateHandle, ktypes.CloseHandle:
-		return e.Kparams.MustGetUint64(kparams.HandleObject)
-	}
-	return 0
-}
-
 // String returns event's string representation.
 func (e *Kevent) String() string {
 	if e.PS != nil {

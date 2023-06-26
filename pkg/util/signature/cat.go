@@ -19,108 +19,176 @@
 package signature
 
 import (
+	"encoding/hex"
+	"github.com/rabbitstack/fibratus/pkg/pe"
 	"github.com/rabbitstack/fibratus/pkg/sys"
+	"github.com/rabbitstack/fibratus/pkg/util/multierror"
+	"go.mozilla.org/pkcs7"
 	"golang.org/x/sys/windows"
+	"io"
 	"os"
+	"reflect"
 	"runtime"
 	"unsafe"
 )
 
-// IsCatalogSigned determines if the provided file is catalog signed.
-func IsCatalogSigned(filename string) bool {
+// Cat represents the catalog that acts as a digital signature
+// for an arbitrary collection of files. A catalog file contains
+// a collection of cryptographic hashes, or thumbprints. Each thumbprint
+// corresponds to a file that is included in the collection.
+type Cat struct {
+	admin       windows.Handle
+	catalog     windows.Handle
+	file        *os.File
+	catalogInfo sys.CatalogInfo
+
+	hash []byte
+	size uint32
+}
+
+const hashSize uint32 = 100
+
+// NewCatalog creates an instance of the catalog with default hash size.
+func NewCatalog() Cat {
+	return Cat{size: hashSize, hash: make([]byte, hashSize)}
+}
+
+// Open opens the catalog and acquires the hash for the given file. If the
+// file is catalog-signed, a valid catalog handle is stored internally.
+func (c *Cat) Open(filename string) error {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
-
 	// acquire handle to a catalog administrator context
-	var catalogAdmin windows.Handle
-	err := sys.CryptCatalogAdminAcquireContext(&catalogAdmin, nil, nil, 0, 0)
+	err := sys.CryptCatalogAdminAcquireContext(&c.admin, nil, nil, 0, 0)
 	if err != nil {
-		return false
+		return err
 	}
-	defer sys.CryptCatalogAdminReleaseContext(catalogAdmin, 0)
-
 	// calculate file hash
-	file, err := os.Open(filename)
+	c.file, err = os.Open(filename)
 	if err != nil {
-		return false
+		return err
 	}
-	defer file.Close()
-	size := uint32(100)
-	hash := make([]byte, size)
 	err = sys.CryptCatalogAdminCalcHashFromFileHandle(
-		catalogAdmin,
-		file.Fd(),
-		&size,
-		uintptr(unsafe.Pointer(&hash[0])), 0,
+		c.admin,
+		c.file.Fd(),
+		&c.size,
+		uintptr(unsafe.Pointer(&c.hash[0])), 0,
 	)
 	if err != nil {
-		return false
+		return err
 	}
-
 	// enumerate catalogs that contain the calculated hash.
 	// If no catalogs are found, we can deduce the file is
 	// not catalog signed
-	catalog := sys.CryptCatalogAdminEnumCatalogFromHash(
-		catalogAdmin,
-		uintptr(unsafe.Pointer(&hash[0])),
-		size, 0, nil,
+	c.catalog = sys.CryptCatalogAdminEnumCatalogFromHash(
+		c.admin,
+		uintptr(unsafe.Pointer(&c.hash[0])),
+		c.size, 0, nil,
 	)
-	//nolint:errcheck
-	defer sys.CryptCatalogAdminReleaseCatalogContext(catalogAdmin, catalog, 0)
-	return catalog != 0
+	c.catalogInfo.Size = uint32(unsafe.Sizeof(c.catalogInfo))
+	err = sys.CryptCatalogInfoFromContext(c.catalog, &c.catalogInfo, 0)
+	if err != nil {
+		return ErrNotSigned
+	}
+	return nil
 }
 
-// verifyCatalogSignature calculates the provided file hash and tries
-// to locate the hash within the catalog. If the hash is found in the
-// catalog, the signature verification process is performed.
-func verifyCatalogSignature(filename string) bool {
+// IsCatalogSigned determines if the file is catalog-signed.
+func (c *Cat) IsCatalogSigned() bool {
+	return c.catalog != 0
+}
+
+// Verify verifies the signature of the given file against the catalog.
+func (c *Cat) Verify(filename string) bool {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
-
-	// acquire handle to a catalog administrator context
-	var catalogAdmin windows.Handle
-	err := sys.CryptCatalogAdminAcquireContext(&catalogAdmin, nil, nil, 0, 0)
-	if err != nil {
-		return false
+	trust := sys.NewWintrustData(sys.WtdChoiceCatalog)
+	defer trust.Close()
+	if c.file == nil {
+		panic("catalog is not opened")
 	}
-	defer sys.CryptCatalogAdminReleaseContext(catalogAdmin, 0)
+	return trust.VerifyCatalog(c.file.Fd(), filename, c.admin, c.catalogInfo, c.hash, c.size)
+}
 
-	// calculate file hash
-	file, err := os.Open(filename)
+// ParseCertificate parses the catalog certificate.
+func (c *Cat) ParseCertificate() (*pe.Cert, error) {
+	f, err := os.Open(c.catalogInfo.CatalogFile())
 	if err != nil {
-		return false
+		return nil, err
 	}
-	defer file.Close()
-	size := uint32(100)
-	hash := make([]byte, size)
-	err = sys.CryptCatalogAdminCalcHashFromFileHandle(
-		catalogAdmin,
-		file.Fd(),
-		&size,
-		uintptr(unsafe.Pointer(&hash[0])), 0,
-	)
+	defer f.Close()
+	cert, err := io.ReadAll(f)
 	if err != nil {
-		return false
+		return nil, err
+	}
+	pkcs, err := pkcs7.Parse(cert)
+	if err != nil {
+		return nil, err
 	}
 
-	// enumerate catalogs that contain the calculated hash
-	catalog := sys.CryptCatalogAdminEnumCatalogFromHash(
-		catalogAdmin,
-		uintptr(unsafe.Pointer(&hash[0])),
-		size, 0, nil,
-	)
-	if catalog == 0 {
-		return false
+	certInfo := &pe.Cert{}
+	serialNumber := pkcs.Signers[0].IssuerAndSerialNumber.SerialNumber
+	for _, cert := range pkcs.Certificates {
+		if !reflect.DeepEqual(cert.SerialNumber, serialNumber) {
+			continue
+		}
+
+		certInfo.SerialNumber = hex.EncodeToString(cert.SerialNumber.Bytes())
+
+		certInfo.NotAfter = cert.NotAfter
+		certInfo.NotBefore = cert.NotBefore
+
+		// issuer information
+		if len(cert.Issuer.Country) > 0 {
+			certInfo.Issuer = cert.Issuer.Country[0]
+		}
+
+		if len(cert.Issuer.Province) > 0 {
+			certInfo.Issuer += ", " + cert.Issuer.Province[0]
+		}
+
+		if len(cert.Issuer.Locality) > 0 {
+			certInfo.Issuer += ", " + cert.Issuer.Locality[0]
+		}
+
+		certInfo.Issuer += ", " + cert.Issuer.CommonName
+
+		// subject information
+		if len(cert.Subject.Country) > 0 {
+			certInfo.Subject = cert.Subject.Country[0]
+		}
+
+		if len(cert.Subject.Province) > 0 {
+			certInfo.Subject += ", " + cert.Subject.Province[0]
+		}
+
+		if len(cert.Subject.Locality) > 0 {
+			certInfo.Subject += ", " + cert.Subject.Locality[0]
+		}
+
+		if len(cert.Subject.Organization) > 0 {
+			certInfo.Subject += ", " + cert.Subject.Organization[0]
+		}
+
+		certInfo.Subject += ", " + cert.Subject.CommonName
+
+		break
 	}
-	//nolint:errcheck
-	defer sys.CryptCatalogAdminReleaseCatalogContext(catalogAdmin, catalog, 0)
-	var catalogInfo sys.CatalogInfo
-	catalogInfo.Size = uint32(unsafe.Sizeof(sys.CatalogInfo{}))
-	err = sys.CryptCatalogInfoFromContext(catalog, &catalogInfo, 0)
-	if err != nil {
-		return false
+	return certInfo, nil
+}
+
+func (c *Cat) Close() error {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+	if c.admin != 0 {
+		defer sys.CryptCatalogAdminReleaseContext(c.admin, 0)
 	}
-	t := sys.NewWintrustData(sys.WtdChoiceCatalog)
-	defer t.Close()
-	return t.VerifyCatalog(file.Fd(), filename, catalogAdmin, catalogInfo, hash, size)
+	var err error
+	if c.admin != 0 && c.catalog != 0 {
+		err = sys.CryptCatalogAdminReleaseCatalogContext(c.admin, c.catalog, 0)
+	}
+	if c.file != nil {
+		return multierror.Wrap(c.file.Close(), err)
+	}
+	return err
 }

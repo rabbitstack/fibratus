@@ -31,22 +31,41 @@ func TestIsCatalogSigned(t *testing.T) {
 	require.NoError(t, err)
 
 	var tests = []struct {
-		filename string
-		want     bool
+		filename       string
+		want           bool
+		hasCertificate bool
+		issuer         string
+		subject        string
 	}{
 		{
 			executable,
 			false,
+			false,
+			"",
+			"",
 		},
 		{
 			filepath.Join(os.Getenv("windir"), "notepad.exe"),
 			true,
+			true,
+			"US, Washington, Redmond, Microsoft Windows Production PCA 2011",
+			"US, Washington, Redmond, Microsoft Corporation, Microsoft Windows",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.filename, func(t *testing.T) {
-			assert.Equal(t, tt.want, IsCatalogSigned(tt.filename))
+			c := NewCatalog()
+			err := c.Open(tt.filename)
+			defer c.Close()
+			assert.Equal(t, tt.want, err == nil && c.IsCatalogSigned())
+			cert, err := c.ParseCertificate()
+			assert.True(t, tt.hasCertificate == (cert != nil))
+			if cert != nil {
+				require.NoError(t, err)
+				assert.Equal(t, tt.subject, cert.Subject)
+				assert.Equal(t, tt.issuer, cert.Issuer)
+			}
 		})
 	}
 }

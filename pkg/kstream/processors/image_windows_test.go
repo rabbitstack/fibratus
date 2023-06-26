@@ -23,6 +23,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/ps"
+	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/util/signature"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -68,18 +69,32 @@ func TestImageProcessor(t *testing.T) {
 			&kevent.Kevent{
 				Type: ktypes.UnloadImage,
 				Kparams: kevent.Kparams{
-					kparams.ImageFilename: {Name: kparams.ImageFilename, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\kernel32.dll"},
-					kparams.ProcessName:   {Name: kparams.ProcessName, Type: kparams.AnsiString, Value: "csrss.exe"},
-					kparams.ProcessID:     {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(676)},
+					kparams.ImageFilename:       {Name: kparams.ImageFilename, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\kernel32.dll"},
+					kparams.ProcessName:         {Name: kparams.ProcessName, Type: kparams.AnsiString, Value: "csrss.exe"},
+					kparams.ProcessID:           {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(676)},
+					kparams.ImageSignatureType:  {Name: kparams.ImageSignatureType, Type: kparams.Enum, Value: uint32(0), Enum: signature.Types},
+					kparams.ImageSignatureLevel: {Name: kparams.ImageSignatureLevel, Type: kparams.Enum, Value: uint32(0), Enum: signature.Levels},
 				},
 			},
 			func() *ps.SnapshotterMock {
 				psnap := new(ps.SnapshotterMock)
+				psnap.On("FindAndPut", uint32(676)).Return(&pstypes.PS{
+					Modules: []pstypes.Module{
+						{
+							Name:           "C:\\Windows\\system32\\kernel32.dll",
+							SignatureLevel: signature.AuthenticodeLevel,
+							SignatureType:  signature.Embedded,
+						},
+					},
+				})
 				psnap.On("RemoveModule", uint32(676), "C:\\Windows\\system32\\kernel32.dll").Return(nil)
 				return psnap
 			},
 			func(e *kevent.Kevent, t *testing.T, psnap *ps.SnapshotterMock) {
 				psnap.AssertNumberOfCalls(t, "RemoveModule", 1)
+				psnap.AssertNumberOfCalls(t, "FindAndPut", 1)
+				assert.Equal(t, "EMBEDDED", e.GetParamAsString(kparams.ImageSignatureType))
+				assert.Equal(t, "AUTHENTICODE", e.GetParamAsString(kparams.ImageSignatureLevel))
 			},
 		},
 	}
