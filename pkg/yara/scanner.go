@@ -177,7 +177,6 @@ func (s scanner) Scan(evt *kevent.Kevent) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer sn.Destroy()
 	alertCtx := AlertContext{
 		Timestamp: time.Now().Format(tsLayout),
 	}
