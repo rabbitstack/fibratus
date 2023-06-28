@@ -68,7 +68,6 @@ func init() {
 }
 
 func TestScan(t *testing.T) {
-	t.SkipNow()
 	psnap := new(ps.SnapshotterMock)
 	require.NoError(t, alertsender.LoadAll([]alertsender.Config{{Type: alertsender.Noop}}))
 
