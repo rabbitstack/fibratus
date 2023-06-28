@@ -519,9 +519,6 @@ func (e *Kevent) Summary() string {
 		handleName := e.GetParamAsString(kparams.HandleObjectName)
 		return printSummary(e, fmt.Sprintf("closed <code>%s</code> handle of <code>%s</code> type",
 			handleName, handleType))
-	case ktypes.LoadDriver:
-		driver := e.GetParamAsString(kparams.ImageFilename)
-		return printSummary(e, fmt.Sprintf("loaded <code>%s</code> driver", driver))
 	case ktypes.VirtualAlloc:
 		addr := e.GetParamAsString(kparams.MemBaseAddress)
 		return printSummary(e, fmt.Sprintf("allocated memory at <code>%s</code> address", addr))

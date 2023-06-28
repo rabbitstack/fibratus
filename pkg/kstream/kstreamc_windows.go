@@ -112,9 +112,6 @@ func (k *consumer) Open() error {
 	if k.config.Kstream.EnableAuditAPIEvents {
 		traces = append(traces, etw.KernelAuditAPICallsSession)
 	}
-	if k.config.Kstream.EnableAntimalwareEngineEvents {
-		traces = append(traces, etw.AntimalwareEngineSession)
-	}
 
 	for _, name := range traces {
 		trace, err := k.openTrace(name)

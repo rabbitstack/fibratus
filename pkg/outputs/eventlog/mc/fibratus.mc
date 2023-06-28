@@ -211,11 +211,6 @@ SymbolicName=CloseKey
 Language=English
 CloseKey closes the registry key.
 .
-MessageId=48
-SymbolicName=LoadDriver
-Language=English
-LoadDriver loads the kernel driver.
-.
 MessageId=49
 SymbolicName=VirtualAlloc
 Language=English
