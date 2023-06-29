@@ -342,6 +342,17 @@ const (
 	ImageSignatureType Field = "image.signature.type"
 	// ImageSignatureLevel represents the image signature level
 	ImageSignatureLevel Field = "image.signature.level"
+	// ImageCertSubject is the field that indicates the subject of the certificate is the entity its public key is associated with.
+	ImageCertSubject = "image.cert.subject"
+	// ImageCertIssuer is the field that represents the certificate authority (CA).
+	ImageCertIssuer = "image.cert.issuer"
+	// ImageCertSerial is the field that represents the serial number MUST be a positive integer assigned
+	// by the CA to each certificate.
+	ImageCertSerial = "image.cert.serial"
+	// ImageCertBefore is the field that specifies the certificate won't be valid before this timestamp.
+	ImageCertBefore = "image.cert.before"
+	// ImageCertAfter is the field that specifies the certificate won't be valid after this timestamp.
+	ImageCertAfter = "image.cert.after"
 
 	// MemBaseAddress identifies the field that denotes the allocation base address
 	MemBaseAddress Field = "mem.address"
@@ -523,6 +534,11 @@ var fields = map[Field]FieldInfo{
 	ImagePID:            {ImagePID, "target process identifier", kparams.Uint32, []string{"image.pid = 80"}, nil},
 	ImageSignatureType:  {ImageSignatureType, "image signature type", kparams.AnsiString, []string{"image.signature.type != 'NONE'"}, nil},
 	ImageSignatureLevel: {ImageSignatureLevel, "image signature level", kparams.AnsiString, []string{"image.signature.level = 'AUTHENTICODE'"}, nil},
+	ImageCertSerial:     {ImageCertSerial, "image certificate serial number", kparams.UnicodeString, []string{"image.cert.serial = '330000023241fb59996dcc4dff000000000232'"}, nil},
+	ImageCertSubject:    {ImageCertSubject, "image certificate subject", kparams.UnicodeString, []string{"image.cert.subject contains 'Washington, Redmond, Microsoft Corporation'"}, nil},
+	ImageCertIssuer:     {ImageCertIssuer, "image certificate CA", kparams.UnicodeString, []string{"image.cert.issuer contains 'Washington, Redmond, Microsoft Corporation'"}, nil},
+	ImageCertAfter:      {ImageCertAfter, "image certificate expiration date", kparams.Time, []string{"image.cert.after contains '2024-02-01 00:05:42 +0000 UTC'"}, nil},
+	ImageCertBefore:     {ImageCertBefore, "image certificate enrollment date", kparams.Time, []string{"image.cert.before contains '2024-02-01 00:05:42 +0000 UTC'"}, nil},
 
 	FileObject:     {FileObject, "file object address", kparams.Uint64, []string{"file.object = 18446738026482168384"}, nil},
 	FileName:       {FileName, "full file name", kparams.UnicodeString, []string{"file.name contains 'mimikatz'"}, nil},

@@ -140,7 +140,7 @@ func (b *backlog) pop(evt *Kevent) *Kevent {
 	}
 	b.cache.Remove(key)
 	e := ev.(*Kevent)
-	e.CopyParams(evt)
+	e.CopyState(evt)
 	return e
 }
 

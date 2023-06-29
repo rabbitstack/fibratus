@@ -208,6 +208,10 @@ type Module struct {
 	BaseAddress kparams.Hex
 	// DefaultBaseAddress is the default base address.
 	DefaultBaseAddress kparams.Hex
+	// SignatureLevel designates the image signature level. (e.g. MICROSOFT)
+	SignatureLevel uint32
+	// SignatureType designates the image signature type (e.g. EMBEDDED)
+	SignatureType uint32
 }
 
 // String returns the string representation of the module.
@@ -280,17 +284,17 @@ func (ps *PS) RemoveHandle(handle windows.Handle) {
 
 // AddModule adds a new module to this process state.
 func (ps *PS) AddModule(mod Module) {
-	m := ps.FindModule(filepath.Base(mod.Name))
+	m := ps.FindModule(mod.Name)
 	if m != nil {
 		return
 	}
 	ps.Modules = append(ps.Modules, mod)
 }
 
-// RemoveModule removes a module with specified full-path from this process state.
-func (ps *PS) RemoveModule(name string) {
+// RemoveModule removes a specified module from this process state.
+func (ps *PS) RemoveModule(path string) {
 	for i, mod := range ps.Modules {
-		if mod.Name == name {
+		if filepath.Base(mod.Name) == filepath.Base(path) {
 			ps.Modules = append(ps.Modules[:i], ps.Modules[i+1:]...)
 			break
 		}
@@ -298,9 +302,9 @@ func (ps *PS) RemoveModule(name string) {
 }
 
 // FindModule finds the module by name.
-func (ps *PS) FindModule(name string) *Module {
+func (ps *PS) FindModule(path string) *Module {
 	for _, mod := range ps.Modules {
-		if filepath.Base(mod.Name) == name {
+		if filepath.Base(mod.Name) == filepath.Base(path) {
 			return &mod
 		}
 	}

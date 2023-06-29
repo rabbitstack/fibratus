@@ -399,7 +399,7 @@ func TestAddModule(t *testing.T) {
 			ok, proc := psnap.Find(evt.Kparams.MustGetPid())
 			require.Equal(t, exists, ok)
 			if ok {
-				require.NotNil(t, proc.FindModule(filepath.Base(evt.GetParamAsString(kparams.ImageFilename))))
+				require.NotNil(t, proc.FindModule(evt.GetParamAsString(kparams.ImageFilename)))
 			}
 		})
 	}

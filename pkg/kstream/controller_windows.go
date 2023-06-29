@@ -100,12 +100,6 @@ func NewController(cfg config.KstreamConfig) *Controller {
 			0x0, // no keywords, so we accept all events
 			cfg.EnableAuditAPIEvents,
 		},
-		{
-			etw.AntimalwareEngineSession,
-			etw.AntimalwareEngineGUID,
-			0x0,
-			cfg.EnableAntimalwareEngineEvents,
-		},
 	}
 	controller := &Controller{
 		kstreamConfig: cfg,

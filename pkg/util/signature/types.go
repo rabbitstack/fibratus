@@ -18,6 +18,13 @@
 
 package signature
 
+import (
+	"errors"
+	"github.com/rabbitstack/fibratus/pkg/pe"
+	"github.com/rabbitstack/fibratus/pkg/sys"
+	"runtime"
+)
+
 const (
 	// UncheckedLevel specifies signature unchecked level
 	UncheckedLevel uint32 = 0
@@ -33,6 +40,12 @@ const (
 	// Catalog indicates the executable or DLL signature is stored in the catalog
 	Catalog uint32 = 3
 )
+
+// ErrNotSigned represents the error which is raised when the image lacks the signature
+var ErrNotSigned = errors.New("image is not signed")
+
+// ErrWintrustUnavailable represents the error which is raised when wintrust platfrom is not available
+var ErrWintrustUnavailable = errors.New("wintrust is not available")
 
 // Types enum defines signature types which verified the image.
 var Types = map[uint32]string{
@@ -71,9 +84,35 @@ type Signature struct {
 	// type is equal to None.
 	Type uint32
 	// Level specifies the signature level at which the code was signed.
-	Level    uint32
+	Level uint32
+	// Cert represents certificate information for the particular signature.
+	Cert *pe.Cert
+	// filename represents the name of the executable image/DLL/driver
 	filename string
 }
 
-func (s *Signature) IsSigned() bool  { return s.Type != None }
-func (s *Signature) IsTrusted() bool { return s.Level != UncheckedLevel && s.Level != UnsignedLevel }
+func (s *Signature) IsSigned() bool       { return s.Type != None }
+func (s *Signature) IsTrusted() bool      { return s.Level != UncheckedLevel && s.Level != UnsignedLevel }
+func (s *Signature) HasCertificate() bool { return s.Cert != nil }
+
+// VerifyEmbedded performs a trust verification action on the PE file
+// by passing the inquiry to a trust provider that supports the action
+// identifier.
+func (s *Signature) VerifyEmbedded() bool {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+	trust := sys.NewWintrustData(sys.WtdChoiceFile)
+	defer trust.Close()
+	return trust.VerifyFile(s.filename)
+}
+
+// VerifyCatalog verifies the catalog-based file signature.
+func (s *Signature) VerifyCatalog() bool {
+	catalog := NewCatalog()
+	err := catalog.Open(s.filename)
+	if err != nil {
+		return false
+	}
+	defer catalog.Close()
+	return catalog.Verify(s.filename)
+}

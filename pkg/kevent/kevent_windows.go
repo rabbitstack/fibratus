@@ -131,6 +131,18 @@ func (e Kevent) IsDropped(capture bool) bool {
 	return DropCurrentProc && e.CurrentPid()
 }
 
+// DelayKey returns the value that is used to
+// store and reference delayed events in the event
+// backlog state. The delayed event is indexed by
+// the sequence identifier.
+func (e *Kevent) DelayKey() uint64 {
+	switch e.Type {
+	case ktypes.CreateHandle, ktypes.CloseHandle:
+		return e.Kparams.MustGetUint64(kparams.HandleObject)
+	}
+	return 0
+}
+
 // IsNetworkTCP determines whether the event pertains to network TCP events.
 func (e Kevent) IsNetworkTCP() bool {
 	return e.Category == ktypes.Net && !e.IsNetworkUDP()
@@ -384,13 +396,12 @@ func (e *Kevent) BacklogKey() uint64 {
 	return 0
 }
 
-// CopyParams appends parameters or other fields from the given event.
-func (e *Kevent) CopyParams(evt *Kevent) {
+// CopyState adds parameters, tags, or process state from the provided event.
+func (e *Kevent) CopyState(evt *Kevent) {
 	switch evt.Type {
 	case ktypes.CloseHandle:
 		if evt.Kparams.Contains(kparams.ImageFilename) {
-			imageFilename, _ := evt.Kparams.GetString(kparams.ImageFilename)
-			e.Kparams.Append(kparams.ImageFilename, kparams.UnicodeString, imageFilename)
+			e.Kparams.Append(kparams.ImageFilename, kparams.UnicodeString, evt.GetParamAsString(kparams.ImageFilename))
 		}
 		_ = e.Kparams.SetValue(kparams.HandleObjectName, evt.GetParamAsString(kparams.HandleObjectName))
 	}
@@ -517,9 +528,6 @@ func (e *Kevent) Summary() string {
 		handleName := e.GetParamAsString(kparams.HandleObjectName)
 		return printSummary(e, fmt.Sprintf("closed <code>%s</code> handle of <code>%s</code> type",
 			handleName, handleType))
-	case ktypes.LoadDriver:
-		driver := e.GetParamAsString(kparams.ImageFilename)
-		return printSummary(e, fmt.Sprintf("loaded <code>%s</code> driver", driver))
 	case ktypes.VirtualAlloc:
 		addr := e.GetParamAsString(kparams.MemBaseAddress)
 		return printSummary(e, fmt.Sprintf("allocated memory at <code>%s</code> address", addr))

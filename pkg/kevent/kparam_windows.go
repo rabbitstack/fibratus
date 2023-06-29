@@ -663,9 +663,6 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 		e.AppendParam(kparams.NetSIP, kparams.IPv6, sip)
 		e.AppendParam(kparams.NetDport, kparams.Port, dport)
 		e.AppendParam(kparams.NetSport, kparams.Port, sport)
-	case ktypes.LoadDriver:
-		filename := evt.ConsumeUTF16String(4)
-		e.AppendParam(kparams.ImageFilename, kparams.FileDosPath, filename)
 	case ktypes.VirtualAlloc, ktypes.VirtualFree:
 		var (
 			baseAddress uint64

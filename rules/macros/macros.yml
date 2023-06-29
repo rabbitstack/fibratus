@@ -31,6 +31,9 @@
 - macro: load_module
   expr: kevt.name = 'LoadImage'
 
+- macro: unload_module
+  expr: kevt.name = 'UnloadImage'
+
 - macro: set_value
   expr: kevt.name = 'RegSetValue'
 
@@ -64,21 +67,22 @@
 - macro: duplicate_handle
   expr: kevt.name = 'DuplicateHandle'
 
+- macro: create_handle
+  expr: kevt.name = 'CreateHandle'
+
 - macro: load_driver
   expr: >
-    kevt.name = 'LoadDriver'
+    (load_module and image.name iendswith '.sys')
       or
-    (
-      kevt.name = 'CreateHandle'
-        and
-      handle.type = 'Driver'
-    )
+    (create_handle and handle.type = 'Driver')
   description: |
-    Detects the loading of the kernel driver. Antimalware Engine ETW provider
-    publishes events related to driver loading, but only if Windows Defender
-    Antivirus realtime protection is enabled. On the contrary, we can also detect
-    loading of kernel driver by observing the object manager events and watching
-    for driver objects being created.
+    Detects the loading of the kernel driver. Image load events are published when
+    executable images, DLLs, or driver PE objects are loaded. On the contrary, we can
+    also detect loading of kernel driver by observing the object manager events and
+    watching for driver objects being created.
+
+- macro: unload_driver
+  expr: unload_image and image.name iendswith '.sys'
 
 - macro: load_unsigned_module
   expr: >
