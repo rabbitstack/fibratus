@@ -20,10 +20,14 @@ package kevent
 
 import (
 	"expvar"
+	"github.com/golang/groupcache/lru"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
-	"sync"
-	"time"
 )
+
+// backlogCacheSize specifies the max size of the backlog cache.
+// When the backlog cache size is reached, the oldest entries are
+// removed from the cache.
+const backlogCacheSize = 800
 
 // keventsEnqueued counts the number of events that are pushed to the queue
 var keventsEnqueued = expvar.NewInt("kstream.kevents.enqueued")
@@ -50,7 +54,7 @@ func NewQueue(size int) *Queue {
 	return &Queue{
 		q:         make(chan *Kevent, size),
 		listeners: make([]Listener, 0),
-		backlog:   newBacklog(),
+		backlog:   newBacklog(backlogCacheSize),
 	}
 }
 
@@ -67,15 +71,19 @@ func (q *Queue) Events() <-chan *Kevent { return q.q }
 // sending the event to the channel, all registered
 // listeners are invoked. The event is sent to the
 // channel if one of the listeners agrees so and no
-// errors are thrown.
+// errors are thrown. If the event depends on the state
+// of subsequent events, then we store it in the backlog
+// cache. The event is fetched from the backlog cache if
+// the matching event arrives, i.e. that backlog key holds
+// the value that was used to index the delayed event in the
+// backlog.
 func (q *Queue) Push(e *Kevent) error {
-	if q.isDelayed(e) {
-		q.backlog.put(e, time.Now().Add(expiration))
+	if isEventDelayed(e) {
+		q.backlog.put(e)
 		return nil
 	}
 	evt := q.backlog.pop(e)
 	if evt != nil {
-		evt.CopyParams(e)
 		return multierror.Wrap(q.push(evt), q.push(e))
 	}
 	return q.push(e)
@@ -99,41 +107,42 @@ func (q *Queue) push(e *Kevent) error {
 	return nil
 }
 
-func (q *Queue) isDelayed(e *Kevent) bool {
+func isEventDelayed(e *Kevent) bool {
 	return e.IsCreateHandle()
 }
 
-const expiration = time.Second * 4
-
-type elem struct {
-	e          *Kevent
-	expiration int64
-}
-
 type backlog struct {
-	store map[uint64]*elem
-	mu    sync.Mutex
+	cache *lru.Cache
 }
 
-func newBacklog() *backlog {
-	return &backlog{}
+func newBacklog(size int) *backlog {
+	return &backlog{cache: lru.New(size)}
 }
 
-func (b *backlog) put(e *Kevent, expiration time.Time) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	b.store[e.BacklogKey()] = &elem{e: e, expiration: expiration.Unix()}
+func (b *backlog) put(evt *Kevent) {
+	if b.cache.Len() > backlogCacheSize {
+		b.cache.RemoveOldest()
+	}
+	key := evt.BacklogKey()
+	if key != 0 {
+		b.cache.Add(key, evt)
+	}
 }
 
-func (b *backlog) pop(e *Kevent) *Kevent {
-	key := e.BacklogKey()
+func (b *backlog) pop(evt *Kevent) *Kevent {
+	key := evt.BacklogKey()
 	if key == 0 {
 		return nil
 	}
-	el, ok := b.store[key]
+	ev, ok := b.cache.Get(key)
 	if !ok {
 		return nil
 	}
-	delete(b.store, key)
-	return el.e
+	b.cache.Remove(key)
+	e := ev.(*Kevent)
+	e.CopyParams(evt)
+	return e
 }
+
+func (b *backlog) size() int   { return b.cache.Len() }
+func (b *backlog) empty() bool { return b.cache.Len() == 0 }
