@@ -145,4 +145,4 @@ func (b *backlog) pop(evt *Kevent) *Kevent {
 }
 
 func (b *backlog) size() int   { return b.cache.Len() }
-func (b *backlog) empty() bool { return b.cache.Len() == 0 }
+func (b *backlog) empty() bool { return b.size() == 0 }
