@@ -102,10 +102,6 @@ type Kevent struct {
 	// to propagate certain events when the related event arrives, and it is replaced
 	// by the event that was temporarily stored in processor's state.
 	WaitEnqueue bool `json:"waitenqueue"`
-	// Delayed indicates if this event should be enqueued in aggregator backlog.
-	// Backlog stores events that await for the acknowledgement from subsequent
-	// events.
-	Delayed bool `json:"delayed"`
 }
 
 // String returns event's string representation.

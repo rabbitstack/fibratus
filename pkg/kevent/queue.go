@@ -18,7 +18,16 @@
 
 package kevent
 
-import "expvar"
+import (
+	"expvar"
+	"github.com/golang/groupcache/lru"
+	"github.com/rabbitstack/fibratus/pkg/util/multierror"
+)
+
+// backlogCacheSize specifies the max size of the backlog cache.
+// When the backlog cache size is reached, the oldest entries are
+// removed from the cache.
+const backlogCacheSize = 800
 
 // keventsEnqueued counts the number of events that are pushed to the queue
 var keventsEnqueued = expvar.NewInt("kstream.kevents.enqueued")
@@ -37,11 +46,16 @@ type Listener interface {
 type Queue struct {
 	q         chan *Kevent
 	listeners []Listener
+	backlog   *backlog
 }
 
 // NewQueue constructs a new queue with the given channel size.
 func NewQueue(size int) *Queue {
-	return &Queue{q: make(chan *Kevent, size), listeners: make([]Listener, 0)}
+	return &Queue{
+		q:         make(chan *Kevent, size),
+		listeners: make([]Listener, 0),
+		backlog:   newBacklog(backlogCacheSize),
+	}
 }
 
 // RegisterListener registers a new queue event listener. The listener
@@ -57,8 +71,25 @@ func (q *Queue) Events() <-chan *Kevent { return q.q }
 // sending the event to the channel, all registered
 // listeners are invoked. The event is sent to the
 // channel if one of the listeners agrees so and no
-// errors are thrown.
+// errors are thrown. If the event depends on the state
+// of subsequent events, then we store it in the backlog
+// cache. The event is fetched from the backlog cache if
+// the matching event arrives, i.e. that backlog key holds
+// the value that was used to index the delayed event in the
+// backlog.
 func (q *Queue) Push(e *Kevent) error {
+	if isEventDelayed(e) {
+		q.backlog.put(e)
+		return nil
+	}
+	evt := q.backlog.pop(e)
+	if evt != nil {
+		return multierror.Wrap(q.push(evt), q.push(e))
+	}
+	return q.push(e)
+}
+
+func (q *Queue) push(e *Kevent) error {
 	var enqueue bool
 	for _, listener := range q.listeners {
 		enq, err := listener.ProcessEvent(e)
@@ -75,3 +106,43 @@ func (q *Queue) Push(e *Kevent) error {
 	}
 	return nil
 }
+
+func isEventDelayed(e *Kevent) bool {
+	return e.IsCreateHandle()
+}
+
+type backlog struct {
+	cache *lru.Cache
+}
+
+func newBacklog(size int) *backlog {
+	return &backlog{cache: lru.New(size)}
+}
+
+func (b *backlog) put(evt *Kevent) {
+	if b.cache.Len() > backlogCacheSize {
+		b.cache.RemoveOldest()
+	}
+	key := evt.BacklogKey()
+	if key != 0 {
+		b.cache.Add(key, evt)
+	}
+}
+
+func (b *backlog) pop(evt *Kevent) *Kevent {
+	key := evt.BacklogKey()
+	if key == 0 {
+		return nil
+	}
+	ev, ok := b.cache.Get(key)
+	if !ok {
+		return nil
+	}
+	b.cache.Remove(key)
+	e := ev.(*Kevent)
+	e.CopyState(evt)
+	return e
+}
+
+func (b *backlog) size() int   { return b.cache.Len() }
+func (b *backlog) empty() bool { return b.size() == 0 }

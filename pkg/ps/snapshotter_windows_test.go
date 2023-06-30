@@ -508,6 +508,7 @@ func TestFindQueryOS(t *testing.T) {
 	if notepadHandle == 0 {
 		t.Fatal("unable to spawn notepad process")
 	}
+	time.Sleep(time.Second * 1)
 	defer windows.TerminateProcess(notepadHandle, 257)
 
 	ok, proc := psnap.Find(notepadPID)

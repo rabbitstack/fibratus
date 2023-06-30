@@ -31,7 +31,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kstream/processors"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
-	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
 )
@@ -66,7 +65,6 @@ type consumer struct {
 	errs      chan error
 	q         *kevent.Queue
 	sequencer *kevent.Sequencer
-	backlog   *kevent.Backlog
 
 	processors processors.Chain
 
@@ -90,7 +88,6 @@ func NewConsumer(
 		traces:     make([]etw.TraceHandle, 0),
 		errs:       make(chan error, 1000),
 		q:          kevent.NewQueue(500),
-		backlog:    kevent.NewBacklog(),
 		config:     config,
 		psnap:      psnap,
 		capture:    config.KcapFile != "",
@@ -267,16 +264,5 @@ func (k *consumer) processEvent(ev *etw.EventRecord) error {
 	if !evt.IsState() {
 		k.sequencer.Increment()
 	}
-	if evt.Delayed {
-		k.backlog.Put(evt)
-		return nil
-	}
-	// Process backlog events
-	e := k.backlog.Pop(evt)
-	if e == nil {
-		// Forward current event to the output queue
-		return k.q.Push(evt)
-	}
-	// Forward delayed and current events
-	return multierror.Wrap(k.q.Push(e), k.q.Push(evt))
+	return k.q.Push(evt)
 }
