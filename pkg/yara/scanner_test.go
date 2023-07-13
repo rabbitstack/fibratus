@@ -202,7 +202,7 @@ func TestScan(t *testing.T) {
 
 	// test file scanning on DLL that merely contains
 	// the fmt.Println("Go Yara DLL Test") statement
-	match, err = s.Scan(kevt)
+	match, err := s.Scan(kevt)
 	require.NoError(t, err)
 	require.True(t, match)
 	require.NotNil(t, yaraAlert)
