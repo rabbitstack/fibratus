@@ -191,24 +191,24 @@ func TestScan(t *testing.T) {
 	}
 
 	// test attaching on pid
-	match, err := s.Scan(kevt)
-	require.NoError(t, err)
-	require.True(t, match)
-	require.NotNil(t, yaraAlert)
-
-	assert.Equal(t, "YARA alert on process notepad.exe", yaraAlert.Title)
-	assert.NotEmpty(t, yaraAlert.Text)
-	assert.Contains(t, yaraAlert.Tags, "notepad")
-
-	// test file scanning on DLL that merely contains
-	// the fmt.Println("Go Yara DLL Test") statement
-	//match, err = s.Scan(kevt)
+	//match, err := s.Scan(kevt)
 	//require.NoError(t, err)
 	//require.True(t, match)
 	//require.NotNil(t, yaraAlert)
 	//
-	//assert.Equal(t, "YARA alert on file _fixtures/yara-test.dll", yaraAlert.Title)
-	//assert.Contains(t, yaraAlert.Tags, "dll")
+	//assert.Equal(t, "YARA alert on process notepad.exe", yaraAlert.Title)
+	//assert.NotEmpty(t, yaraAlert.Text)
+	//assert.Contains(t, yaraAlert.Tags, "notepad")
+
+	// test file scanning on DLL that merely contains
+	// the fmt.Println("Go Yara DLL Test") statement
+	match, err = s.Scan(kevt)
+	require.NoError(t, err)
+	require.True(t, match)
+	require.NotNil(t, yaraAlert)
+
+	assert.Equal(t, "YARA alert on file _fixtures/yara-test.dll", yaraAlert.Title)
+	assert.Contains(t, yaraAlert.Tags, "dll")
 }
 
 func TestMatchesMeta(t *testing.T) {
