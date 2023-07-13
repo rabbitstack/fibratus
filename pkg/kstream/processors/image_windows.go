@@ -81,33 +81,41 @@ func (imageProcessor) Close() {}
 
 // processSignature consults the signature cache and if the signature
 // already exists for a particular image checksum, signature checking
-// is skipped. On the contrary, the signature verification is performed
-// and the cache is updated accordingly.
+// is skipped and only certificate info is fetched. On the contrary,
+// the signature verification is performed and the cache is updated
+// accordingly.
 func (m *imageProcessor) processSignature(e *kevent.Kevent) error {
 	checksum := e.Kparams.MustGetUint32(kparams.ImageCheckSum)
 	level := e.Kparams.MustGetUint32(kparams.ImageSignatureLevel)
+	typ := e.Kparams.MustGetUint32(kparams.ImageSignatureType)
 	sign, ok := m.signatures[checksum]
 	if !ok {
-		var opts []signature.Option
 		var filename = e.GetParamAsString(kparams.FileName)
-		if level != signature.UncheckedLevel {
-			opts = append(opts, signature.OnlyCert())
-		}
-		var err error
-		sign, err = signature.CheckWithOpts(filename, opts...)
-		if err != nil {
-			return err
-		}
-		if level == signature.UncheckedLevel && sign.IsSigned() {
-			sign.Verify()
+		if typ == signature.None {
+			var err error
+			sign, err = signature.Check(filename)
+			if err != nil {
+				return err
+			}
+			if sign.IsSigned() {
+				sign.Verify()
+			}
+		} else {
+			// signature checked, only obtain certificate info
+			sign = signature.Wrap(typ, level)
+			var err error
+			sign.Cert, err = signature.GetCertificate(filename)
+			if err != nil {
+				return err
+			}
 		}
 		m.signatures[checksum] = sign
 	}
-	if level == signature.UncheckedLevel {
-		// reset signature type/level parameters
-		_ = e.Kparams.SetValue(kparams.ImageSignatureType, sign.Type)
-		_ = e.Kparams.SetValue(kparams.ImageSignatureLevel, sign.Level)
-	}
+
+	// reset signature type/level parameters
+	_ = e.Kparams.SetValue(kparams.ImageSignatureLevel, sign.Level)
+	_ = e.Kparams.SetValue(kparams.ImageSignatureType, sign.Type)
+
 	// append certificate parameters
 	if sign.HasCertificate() {
 		e.AppendParam(kparams.ImageCertIssuer, kparams.UnicodeString, sign.Cert.Issuer)

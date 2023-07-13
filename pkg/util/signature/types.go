@@ -56,6 +56,7 @@ var Types = map[uint32]string{
 	4: "CATALOG_UNCACHED", // uncached catalog verified via Catalog Database or searching catalog directly
 	5: "CATALOG_HINT",     // successfully verified using an EA that informs CI that catalog to try first
 	6: "PACKAGE_CATALOG",  // AppX / MSIX package catalog verified
+	7: "FILE_VERIFIED",    // the file was verified
 }
 
 // Levels enum defines all possible image signature levels at which the code was verified.
