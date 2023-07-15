@@ -62,10 +62,11 @@ func GetCertificate(filename string) (*pe.Cert, error) {
 // Check determines if the provided executable image or DLL is signed.
 // It first parses the PE security directory to look for the signature
 // information. If the certificate is not embedded inside the PE object
-// then this method will try to locate the hash in the catalog file.
-// If OnlyCert option is specified, then only certificate information is
-// fetched for the particular executable image, DLL, or driver. If the function
-// returns a nil value, this indicates the provided image is not signed.
+// then this method will try to locate the hash in the catalog file. If
+// the certificate parsing is successful, this function returns the signature
+// structure containing the signature type and certificate info. If the signature
+// is not present, this function returns ErrNotSigned error. To verify the signature,
+// call the Verify method of the Signature structure.
 func Check(filename string) (*Signature, error) {
 	onceWintrustDLL()
 	// check if the signature is embedded in PE
