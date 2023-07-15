@@ -33,7 +33,8 @@ import (
 
 var (
 	// totalRundownFiles counts the number of opened files
-	totalRundownFiles = expvar.NewInt("fs.total.rundown.files")
+	totalRundownFiles    = expvar.NewInt("fs.total.rundown.files")
+	totalMapRundownFiles = expvar.NewInt("fs.total.map.rundown.files")
 	// fileObjectMisses computes file object cache misses
 	fileObjectMisses     = expvar.NewInt("fs.file.objects.misses")
 	fileObjectHandleHits = expvar.NewInt("fs.file.object.handle.hits")
@@ -43,6 +44,9 @@ var (
 type fsProcessor struct {
 	// files stores the file metadata indexed by file object
 	files map[uint64]*FileInfo
+	// mapped stores the mapped file metadata indexed by file key
+	mapped map[uint64]*MappedFileInfo
+
 	hsnap handle.Snapshotter
 	// irps contains a mapping between the IRP (I/O request packet) and CreateFile events
 	irps map[uint64]*kevent.Kevent
@@ -57,9 +61,16 @@ type FileInfo struct {
 	Type fs.FileType
 }
 
+// MappedFileInfo stores information of the memory-mapped file.
+type MappedFileInfo struct {
+	Name      string
+	ViewCount int
+}
+
 func newFsProcessor(hsnap handle.Snapshotter, devMapper fs.DevMapper, devPathResolver fs.DevPathResolver) Processor {
 	return &fsProcessor{
 		files:           make(map[uint64]*FileInfo),
+		mapped:          make(map[uint64]*MappedFileInfo),
 		irps:            make(map[uint64]*kevent.Kevent),
 		hsnap:           hsnap,
 		devMapper:       devMapper,
@@ -98,8 +109,38 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 			f.files[fileObject] = &FileInfo{Name: filename, Type: fs.GetFileType(filename, 0)}
 		}
 	case ktypes.MapFileRundown:
-		// currently just forward mapped file rundown events
+		sec := e.Kparams.MustGetUint32(kparams.FileViewSectionType)
+		isMapped := sec != va.SectionPagefile && sec != va.SectionPhysical
+		if !isMapped {
+			return e, nil
+		}
+		fileKey := e.Kparams.MustGetUint64(kparams.FileKey)
+		// increment count of mapped views
+		if _, ok := f.mapped[fileKey]; ok {
+			totalMapRundownFiles.Add(1)
+			f.mapped[fileKey].ViewCount++
+			return e, nil
+		}
+		// resolve memory mapped file name
+		_, _ = f.addMappedFile(e)
 		return e, nil
+	case ktypes.UnmapViewFile:
+		totalMapRundownFiles.Add(-1)
+		fileKey := e.Kparams.MustGetUint64(kparams.FileKey)
+		if _, ok := f.mapped[fileKey]; ok {
+			f.mapped[fileKey].ViewCount--
+		}
+		fileinfo, ok := f.files[fileKey]
+		if ok {
+			e.AppendParam(kparams.FileName, kparams.FilePath, fileinfo.Name)
+		}
+		mapinfo, ok := f.mapped[fileKey]
+		if ok {
+			e.AppendParam(kparams.FileName, kparams.FilePath, mapinfo.Name)
+		}
+		if ok && mapinfo.ViewCount == 0 {
+			delete(f.mapped, fileKey)
+		}
 	case ktypes.CreateFile:
 		// we defer the processing of the CreateFile event until we get
 		// the matching FileOpEnd event. This event contains the operation
@@ -141,18 +182,11 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 		}
 		ev.AppendEnum(kparams.FileOperation, uint32(dispo), fs.FileCreateDispositions)
 		return ev, nil
-	case ktypes.ReleaseFile, ktypes.UnmapViewFile:
-		var fileObject uint64
+	case ktypes.ReleaseFile:
 		fileReleaseCount.Add(1)
 		// delete both, the file object and the file key from files map
 		fileKey := e.Kparams.MustGetUint64(kparams.FileKey)
-		if !e.IsUnmapViewFile() {
-			fileObject = e.Kparams.MustGetUint64(kparams.FileObject)
-		}
-		fileinfo := f.findFile(fileKey, fileObject)
-		if fileinfo != nil && e.IsUnmapViewFile() {
-			e.AppendParam(kparams.FileName, kparams.FilePath, fileinfo.Name)
-		}
+		fileObject := e.Kparams.MustGetUint64(kparams.FileObject)
 		delete(f.files, fileKey)
 		delete(f.files, fileObject)
 	default:
@@ -165,21 +199,31 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 		// by the file key, then try to fetch it by file object. Even if file object
 		// references fails, we search in the file handles for such file
 		fileinfo := f.findFile(fileKey, fileObject)
-		// try to resolve mapped file name if not found in internal state
-		if fileinfo == nil && e.IsMapViewFile() {
+
+		// handle memory-mapped files
+		if e.IsMapViewFile() {
 			sec := e.Kparams.MustGetUint32(kparams.FileViewSectionType)
 			isMapped := sec != va.SectionPagefile && sec != va.SectionPhysical
 			if !isMapped {
 				return e, nil
 			}
-			process, err := windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION, false, e.PID)
-			if err != nil {
+			if fileinfo != nil {
+				e.AppendParam(kparams.FileName, kparams.FilePath, fileinfo.Name)
 				return e, nil
 			}
-			defer windows.Close(process)
-			addr := e.Kparams.MustGetUint64(kparams.FileViewBase) + (e.Kparams.MustGetUint64(kparams.FileOffset))
-			fileinfo = &FileInfo{Name: f.devMapper.Convert(sys.GetMappedFile(process, uintptr(addr)))}
-			f.files[fileKey] = fileinfo
+			mapinfo, ok := f.mapped[fileKey]
+			if ok {
+				totalMapRundownFiles.Add(1)
+				f.mapped[fileKey].ViewCount++
+				e.AppendParam(kparams.FileName, kparams.FilePath, mapinfo.Name)
+				return e, nil
+			}
+			// try to resolve mapped file name if not found in internal state
+			mappedFile, err := f.addMappedFile(e)
+			if err == nil {
+				e.AppendParam(kparams.FileName, kparams.FilePath, mappedFile)
+			}
+			return e, nil
 		}
 
 		// ignore object misses that are produced by CloseFile
@@ -225,4 +269,23 @@ func (f *fsProcessor) findFile(fileKey, fileObject uint64) *FileInfo {
 		return &FileInfo{Name: file.Name, Type: fs.GetFileType(file.Name, 0)}
 	}
 	return nil
+}
+
+func (f *fsProcessor) addMappedFile(e *kevent.Kevent) (string, error) {
+	fileKey := e.Kparams.MustGetUint64(kparams.FileKey)
+	viewBase := e.Kparams.MustGetUint64(kparams.FileViewBase)
+	viewOffset := e.Kparams.MustGetUint64(kparams.FileOffset)
+	process, err := windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION, false, e.PID)
+	if err != nil {
+		return "", err
+	}
+	defer windows.Close(process)
+	addr := viewBase + viewOffset
+	filename := f.devMapper.Convert(sys.GetMappedFile(process, uintptr(addr)))
+	if err != nil {
+		return "", err
+	}
+	totalMapRundownFiles.Add(1)
+	f.mapped[fileKey] = &MappedFileInfo{Name: filename, ViewCount: 1}
+	return filename, nil
 }
