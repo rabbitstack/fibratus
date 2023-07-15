@@ -62,6 +62,9 @@ func TestImageProcessor(t *testing.T) {
 				// should get the signature verified
 				assert.Equal(t, "EMBEDDED", e.GetParamAsString(kparams.ImageSignatureType))
 				assert.Equal(t, "AUTHENTICODE", e.GetParamAsString(kparams.ImageSignatureLevel))
+				// should contain certificate info
+				assert.True(t, e.Kparams.Contains(kparams.ImageCertSubject))
+				assert.True(t, e.Kparams.Contains(kparams.ImageCertIssuer))
 			},
 		},
 		{
