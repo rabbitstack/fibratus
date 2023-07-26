@@ -26,10 +26,10 @@ import (
 // ParamFlag defines the mapping between the flag value and its symbolical name.
 type ParamFlag struct {
 	Name  string
-	Value uint32
+	Value uint64
 }
 
-func (f ParamFlag) eval(v uint32) bool {
+func (f ParamFlag) eval(v uint64) bool {
 	return (v == 0 && f.Value == 0) || (f.Value != 0 && (v&f.Value) == f.Value && v != 0)
 }
 
@@ -38,7 +38,7 @@ type ParamFlags []ParamFlag
 
 // String produces a string with all flags present in the bitmask and delimited
 // with the `|` separator.
-func (flags ParamFlags) String(f uint32) string {
+func (flags ParamFlags) String(f uint64) string {
 	var (
 		n strings.Builder
 		s string
@@ -203,4 +203,28 @@ var ViewProtectionFlags = []ParamFlag{
 	{"EXECUTE_READ", 0x30000},
 	{"READWRITE", 0x40000},
 	{"WRITECOPY", 0x50000},
+}
+
+// DNSOptsFlags describes DNS query/response options.
+var DNSOptsFlags = []ParamFlag{
+	{"STANDARD", 0x00000000},
+	{"ACCEPT_TRUNCATED_RESPONSE", 0x00000001},
+	{"USE_TCP_ONLY", 0x00000002},
+	{"NO_RECURSION", 0x00000004},
+	{"BYPASS_CACHE", 0x00000008},
+	{"NO_WIRE_QUERY", 0x00000010},
+	{"NO_LOCAL_NAME", 0x00000020},
+	{"NO_NETBT", 0x00000080},
+	{"WIRE_ONLY", 0x00000100},
+	{"RETURN_MESSAGE", 0x00000200},
+	{"MULTICAST_ONLY", 0x00000400},
+	{"NO_MULTICAST", 0x00000800},
+	{"TREAT_AS_FQDN", 0x00001000},
+	{"ADDRCONFIG", 0x00002000},
+	{"DUAL_ADDR", 0x00004000},
+	{"MULTICAST_WAIT", 0x00020000},
+	{"MULTICAST_VERIFY", 0x00040000},
+	{"DONT_RESET_TTL_VALUES", 0x00100000},
+	{"DISABLE_IDN_ENCODING", 0x00200000},
+	{"APPEND_MULTILABEL", 0x00800000},
 }

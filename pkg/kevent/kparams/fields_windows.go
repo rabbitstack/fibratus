@@ -195,6 +195,17 @@ const (
 	// NetDIPNames is the field that denotes the destination IP address names.
 	NetDIPNames = "dip_names"
 
+	// DNSName is the field that represents the DNS query name
+	DNSName = "name"
+	// DNSRR is the field that represents the DNS record type
+	DNSRR = "rr"
+	// DNSOpts is the field that represents the DNS options
+	DNSOpts = "options"
+	// DNSRcode is the field that represents the DNS response code
+	DNSRcode = "rcode"
+	// DNSAnswers is the field that represents DNS response answers
+	DNSAnswers = "answers"
+
 	// HandleID identifies the parameter that specifies the handle identifier.
 	HandleID = "handle_id"
 	// HandleSourceID identifies the parameter that specifies the source handle identifier.

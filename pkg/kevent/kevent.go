@@ -181,7 +181,7 @@ func NewFromKcap(buf []byte) (*Kevent, error) {
 		Kparams:  make(Kparams),
 		Metadata: make(map[MetadataKey]any),
 	}
-	if err := e.UnmarshalRaw(buf, kcapver.KevtSecV1); err != nil {
+	if err := e.UnmarshalRaw(buf, kcapver.KevtSecV2); err != nil {
 		return nil, err
 	}
 	return e, nil

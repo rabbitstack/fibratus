@@ -105,7 +105,9 @@ func (e *Kevent) adjustPID() {
 			e.PID, _ = e.Kparams.GetPpid()
 		}
 	case ktypes.Net:
-		e.PID, _ = e.Kparams.GetPid()
+		if !e.IsDNS() {
+			e.PID, _ = e.Kparams.GetPid()
+		}
 	case ktypes.Handle:
 		if e.Type == ktypes.DuplicateHandle {
 			e.PID, _ = e.Kparams.GetUint32(kparams.TargetProcessID)
@@ -151,6 +153,11 @@ func (e Kevent) IsNetworkTCP() bool {
 // IsNetworkUDP determines whether the event pertains to network UDP events.
 func (e Kevent) IsNetworkUDP() bool {
 	return e.Type == ktypes.RecvUDPv4 || e.Type == ktypes.RecvUDPv6 || e.Type == ktypes.SendUDPv4 || e.Type == ktypes.SendUDPv6
+}
+
+// IsDNS determines whether the event is a DNS question/answer.
+func (e Kevent) IsDNS() bool {
+	return e.Type.Subcategory() == ktypes.DNS
 }
 
 // IsRundown determines if this is a rundown events.
@@ -382,6 +389,13 @@ func (e Kevent) PartialKey() uint64 {
 		binary.LittleEndian.PutUint32(b, e.PID)
 		binary.LittleEndian.PutUint32(b, pid)
 		binary.LittleEndian.PutUint64(b, object)
+		return hashers.FnvUint64(b)
+	case ktypes.QueryDNS, ktypes.ReplyDNS:
+		key, _ := e.Kparams.GetString(kparams.DNSName)
+		b := make([]byte, 4+len(key))
+
+		binary.LittleEndian.PutUint32(b, e.PID)
+		b = append(b, key...)
 		return hashers.FnvUint64(b)
 	}
 	return 0

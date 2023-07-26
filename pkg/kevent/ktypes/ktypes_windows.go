@@ -24,8 +24,8 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// Ktype identifies an event type. It comprises the event GUID + opcode to uniquely identify an event
-type Ktype [17]byte
+// Ktype identifies an event type. It comprises the event GUID + hook ID to uniquely identify the event
+type Ktype [18]byte
 
 var (
 	// CreateProcess identifies process creation kernel events
@@ -155,6 +155,11 @@ var (
 	// VirtualFree represents virtual memory release event
 	VirtualFree = pack(windows.GUID{Data1: 0x3d6fa8d3, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x00, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}, 99)
 
+	// QueryDNS represents DNS query events
+	QueryDNS = pack(windows.GUID{Data1: 0x1c95126e, Data2: 0x7eea, Data3: 0x49a9, Data4: [8]byte{0xa3, 0xfe, 0xa3, 0x78, 0xb0, 0x3d, 0xdb, 0x4d}}, 3006)
+	// ReplyDNS represents the DNS response events
+	ReplyDNS = pack(windows.GUID{Data1: 0x1c95126e, Data2: 0x7eea, Data3: 0x49a9, Data4: [8]byte{0xa3, 0xfe, 0xa3, 0x78, 0xb0, 0x3d, 0xdb, 0x4d}}, 3008)
+
 	// UnknownKtype designates unknown kernel event type
 	UnknownKtype = pack(windows.GUID{}, 0)
 )
@@ -162,10 +167,10 @@ var (
 // NewFromEventRecord creates a new event type from ETW event record.
 func NewFromEventRecord(ev *etw.EventRecord) Ktype {
 	switch ev.Header.ProviderID {
-	case etw.KernelAuditAPICallsGUID:
-		return pack(ev.Header.ProviderID, uint8(ev.Header.EventDescriptor.ID))
+	case etw.KernelAuditAPICallsGUID, etw.DNSClientGUID:
+		return pack(ev.Header.ProviderID, ev.Header.EventDescriptor.ID)
 	default:
-		return pack(ev.Header.ProviderID, ev.Header.EventDescriptor.Opcode)
+		return pack(ev.Header.ProviderID, uint16(ev.Header.EventDescriptor.Opcode))
 	}
 }
 
@@ -267,12 +272,16 @@ func (k Ktype) String() string {
 		return "VirtualAlloc"
 	case VirtualFree:
 		return "VirtualFree"
+	case QueryDNS:
+		return "QueryDns"
+	case ReplyDNS:
+		return "ReplyDns"
 	default:
 		return ""
 	}
 }
 
-// Category determines the category to which the ktype pertains.
+// Category determines the category to which the event type pertains.
 func (k Ktype) Category() Category {
 	switch k {
 	case CreateProcess, TerminateProcess, OpenProcess, ProcessRundown:
@@ -293,7 +302,8 @@ func (k Ktype) Category() Category {
 		RetransmitTCPv4, RetransmitTCPv6,
 		DisconnectTCPv4, DisconnectTCPv6,
 		SendTCPv4, SendTCPv6, SendUDPv4, SendUDPv6,
-		RecvTCPv4, RecvTCPv6, RecvUDPv4, RecvUDPv6:
+		RecvTCPv4, RecvTCPv6, RecvUDPv4, RecvUDPv6,
+		QueryDNS, ReplyDNS:
 		return Net
 	case CreateHandle, CloseHandle, DuplicateHandle:
 		return Handle
@@ -301,6 +311,16 @@ func (k Ktype) Category() Category {
 		return Mem
 	default:
 		return Unknown
+	}
+}
+
+// Subcategory determines the event subcategory, if any.
+func (k Ktype) Subcategory() Subcategory {
+	switch k {
+	case QueryDNS, ReplyDNS:
+		return DNS
+	default:
+		return None
 	}
 }
 
@@ -383,6 +403,10 @@ func (k Ktype) Description() string {
 		return "Reserves, commits, or changes the state of a region of memory within the process virtual address space"
 	case VirtualFree:
 		return "Releases or decommits a region of memory within the process virtual address space"
+	case QueryDNS:
+		return "Sends a DNS query to the name server"
+	case ReplyDNS:
+		return "Receives the response from the DNS server"
 	default:
 		return ""
 	}
@@ -431,13 +455,21 @@ func (k *Ktype) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-// pack merges event provider GUID and the op code into `Ktype` array. The type provides a convenient way
+// pack merges event provider GUID and the hook ID into `Ktype` array. The type provides a convenient way
 // for comparing event types.
-func pack(g windows.GUID, opcode uint8) Ktype {
-	return [17]byte{
+func pack(g windows.GUID, id uint16) Ktype {
+	return [18]byte{
 		byte(g.Data1 >> 24), byte(g.Data1 >> 16), byte(g.Data1 >> 8), byte(g.Data1),
-		byte(g.Data2 >> 8), byte(g.Data2), byte(g.Data3 >> 8), byte(g.Data3),
-		g.Data4[0], g.Data4[1], g.Data4[2], g.Data4[3], g.Data4[4], g.Data4[5], g.Data4[6], g.Data4[7],
-		opcode,
+		byte(g.Data2 >> 8), byte(g.Data2),
+		byte(g.Data3 >> 8), byte(g.Data3),
+		g.Data4[0],
+		g.Data4[1],
+		g.Data4[2],
+		g.Data4[3],
+		g.Data4[4],
+		g.Data4[5],
+		g.Data4[6],
+		g.Data4[7],
+		byte(id >> 8), byte(id),
 	}
 }

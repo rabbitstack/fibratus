@@ -33,6 +33,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
+	"strings"
 )
 
 const (
@@ -108,6 +109,9 @@ func (k *consumer) Open() error {
 	traces = append(traces, etw.KernelLoggerSession)
 	if k.config.Kstream.EnableAuditAPIEvents {
 		traces = append(traces, etw.KernelAuditAPICallsSession)
+	}
+	if k.config.Kstream.EnableDNSEvents {
+		traces = append(traces, etw.DNSClientSession)
 	}
 
 	for _, name := range traces {
@@ -219,13 +223,16 @@ func (k *consumer) isEventDropped(evt *kevent.Kevent) bool {
 }
 
 func (k *consumer) processEvent(ev *etw.EventRecord) error {
-	typ := ktypes.NewFromEventRecord(ev)
-	if !typ.Exists() {
+	if strings.EqualFold(ev.Header.ProviderID.String(), "{1c95126e") {
+		fmt.Println(ev)
+	}
+	ktype := ktypes.NewFromEventRecord(ev)
+	if !ktype.Exists() {
 		keventsUnknown.Add(1)
 		return nil
 	}
 	keventsProcessed.Add(1)
-	evt := kevent.New(k.sequencer.Get(), typ, ev)
+	evt := kevent.New(k.sequencer.Get(), ktype, ev)
 	// Dispatch each event to the processor chain.
 	// Processors may further augment the event with
 	// useful fields or play the role of state managers.
