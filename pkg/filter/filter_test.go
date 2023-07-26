@@ -45,6 +45,7 @@ var cfg = &config.Config{
 		EnableImageKevents:    true,
 		EnableThreadKevents:   true,
 		EnableMemKevents:      true,
+		EnableDNSEvents:       true,
 	},
 	Filters: &config.Filters{},
 	PE:      pe.Config{Enabled: true},
@@ -674,6 +675,49 @@ func TestMemFilter(t *testing.T) {
 		matches := f.Run(kevt)
 		if matches != tt.matches {
 			t.Errorf("%d. %q mem filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
+		}
+	}
+}
+
+func TestDNSFilter(t *testing.T) {
+	kevt := &kevent.Kevent{
+		Type: ktypes.ReplyDNS,
+		Tid:  2484,
+		PID:  859,
+		PS: &pstypes.PS{
+			Name: "cmd.exe",
+		},
+		Category: ktypes.Net,
+		Kparams: kevent.Kparams{
+			kparams.DNSName:    {Name: kparams.DNSName, Type: kparams.UnicodeString, Value: "r3.o.lencr.org"},
+			kparams.DNSRR:      {Name: kparams.DNSRR, Type: kparams.Enum, Value: uint32(0x0001), Enum: kevent.DNSRecordTypes},
+			kparams.DNSOpts:    {Name: kparams.DNSOpts, Type: kparams.Flags64, Value: uint64(0x00006000), Flags: kevent.DNSOptsFlags},
+			kparams.DNSRcode:   {Name: kparams.DNSRcode, Type: kparams.Enum, Value: uint32(0), Enum: kevent.DNSResponseCodes},
+			kparams.DNSAnswers: {Name: kparams.DNSAnswers, Type: kparams.Slice, Value: []string{"incoming.telemetry.mozilla.org", "a1887.dscq.akamai.net"}},
+		},
+	}
+
+	var tests = []struct {
+		filter  string
+		matches bool
+	}{
+
+		{`dns.name = 'r3.o.lencr.org'`, true},
+		{`dns.rr = 'A'`, true},
+		{`dns.options in ('ADDRCONFIG', 'DUAL_ADDR')`, true},
+		{`dns.rcode = 'NOERROR'`, true},
+		{`dns.answers in ('incoming.telemetry.mozilla.org')`, true},
+	}
+
+	for i, tt := range tests {
+		f := New(tt.filter, cfg)
+		err := f.Compile()
+		if err != nil {
+			t.Fatal(err)
+		}
+		matches := f.Run(kevt)
+		if matches != tt.matches {
+			t.Errorf("%d. %q dns filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
 	}
 }

@@ -47,6 +47,7 @@ func getAccessors() []accessor {
 		newPSAccessor(nil),
 		newPEAccessor(),
 		newMemAccessor(),
+		newDNSAccessor(),
 		newFileAccessor(),
 		newKevtAccessor(),
 		newImageAccessor(),
@@ -833,6 +834,29 @@ func (*memAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, err
 		return kevt.Kparams.GetUint64(kparams.MemRegionSize)
 	case fields.MemProtectionMask:
 		return kevt.Kparams.GetString(kparams.MemProtectMask)
+	}
+	return nil, nil
+}
+
+// dnsAccessor extracts values from DNS query/response event parameters.
+type dnsAccessor struct{}
+
+func newDNSAccessor() accessor {
+	return &dnsAccessor{}
+}
+
+func (*dnsAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
+	switch f {
+	case fields.DNSName:
+		return kevt.GetParamAsString(kparams.DNSName), nil
+	case fields.DNSRR:
+		return kevt.GetParamAsString(kparams.DNSRR), nil
+	case fields.DNSRcode:
+		return kevt.GetParamAsString(kparams.DNSRcode), nil
+	case fields.DNSOptions:
+		return kevt.GetFlagsAsSlice(kparams.DNSOpts), nil
+	case fields.DNSAnswers:
+		return kevt.Kparams.GetSlice(kparams.DNSAnswers)
 	}
 	return nil, nil
 }

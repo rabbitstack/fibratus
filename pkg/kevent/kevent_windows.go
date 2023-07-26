@@ -391,11 +391,11 @@ func (e Kevent) PartialKey() uint64 {
 		binary.LittleEndian.PutUint64(b, object)
 		return hashers.FnvUint64(b)
 	case ktypes.QueryDNS, ktypes.ReplyDNS:
-		key, _ := e.Kparams.GetString(kparams.DNSName)
-		b := make([]byte, 4+len(key))
+		n, _ := e.Kparams.GetString(kparams.DNSName)
+		b := make([]byte, 4+len(n))
 
 		binary.LittleEndian.PutUint32(b, e.PID)
-		b = append(b, key...)
+		b = append(b, n...)
 		return hashers.FnvUint64(b)
 	}
 	return 0
@@ -557,6 +557,12 @@ func (e *Kevent) Summary() string {
 	case ktypes.DuplicateHandle:
 		handleType := e.GetParamAsString(kparams.HandleObjectTypeID)
 		return printSummary(e, fmt.Sprintf("duplicated <code>%s</code> handle", handleType))
+	case ktypes.QueryDNS:
+		dnsName := e.GetParamAsString(kparams.DNSName)
+		return printSummary(e, fmt.Sprintf("sent <code>%s</code> DNS query", dnsName))
+	case ktypes.ReplyDNS:
+		dnsName := e.GetParamAsString(kparams.DNSName)
+		return printSummary(e, fmt.Sprintf("received DNS response for <code>%s</code> query", dnsName))
 	}
 	return ""
 }
