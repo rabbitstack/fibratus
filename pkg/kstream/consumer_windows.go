@@ -33,6 +33,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
+	"strings"
 )
 
 const (
@@ -222,6 +223,9 @@ func (k *consumer) isEventDropped(evt *kevent.Kevent) bool {
 }
 
 func (k *consumer) processEvent(ev *etw.EventRecord) error {
+	if strings.EqualFold(ev.Header.ProviderID.String(), "{1c95126e") {
+		fmt.Println(ev)
+	}
 	ktype := ktypes.NewFromEventRecord(ev)
 	if !ktype.Exists() {
 		keventsUnknown.Add(1)
