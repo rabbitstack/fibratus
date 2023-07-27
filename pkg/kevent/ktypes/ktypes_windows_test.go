@@ -46,7 +46,11 @@ func TestPackAllBytes(t *testing.T) {
 	assert.Equal(t, byte(0xd7), CreateProcess[13])
 	assert.Equal(t, byte(0xba), CreateProcess[14])
 	assert.Equal(t, byte(0x7c), CreateProcess[15])
-	assert.Equal(t, byte(0x1), CreateProcess[16])
+	assert.Equal(t, byte(0x0), CreateProcess[16])
+	assert.Equal(t, byte(0x1), CreateProcess[17])
+
+	assert.Equal(t, byte(0x0b), QueryDNS[16])
+	assert.Equal(t, byte(0xbe), QueryDNS[17])
 }
 
 func TestKtypeComparision(t *testing.T) {

@@ -144,16 +144,19 @@ func (k Kparam) String() string {
 			return ""
 		}
 		return k.Enum[v]
-	case kparams.Flags:
+	case kparams.Flags, kparams.Flags64:
 		if k.Flags == nil {
 			return ""
 		}
 		f := k.Value
-		v, ok := f.(uint32)
-		if !ok {
+		switch v := f.(type) {
+		case uint32:
+			return k.Flags.String(uint64(v))
+		case uint64:
+			return k.Flags.String(v)
+		default:
 			return ""
 		}
-		return k.Flags.String(v)
 	case kparams.Slice:
 		switch slice := k.Value.(type) {
 		case []string:
@@ -680,5 +683,29 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 		e.AppendParam(kparams.MemRegionSize, kparams.Uint64, regionSize)
 		e.AppendParam(kparams.ProcessID, kparams.PID, pid)
 		e.AppendParam(kparams.MemAllocType, kparams.Flags, flags, WithFlags(MemAllocationFlags))
+	case ktypes.QueryDNS, ktypes.ReplyDNS:
+		var (
+			name string
+			rr   uint32
+			opts uint64
+		)
+		var offset uint16
+		name, offset = evt.ReadUTF16String(0)
+		rr = evt.ReadUint32(offset)
+		opts = evt.ReadUint64(offset + 4)
+		e.AppendParam(kparams.DNSName, kparams.UnicodeString, name)
+		e.AppendParam(kparams.DNSRR, kparams.Enum, rr, WithEnum(DNSRecordTypes))
+		e.AppendParam(kparams.DNSOpts, kparams.Flags64, opts, WithFlags(DNSOptsFlags))
+		if e.Type == ktypes.ReplyDNS {
+			rcode := evt.ReadUint32(offset + 12)
+			answers := evt.ConsumeUTF16String(offset + 16)
+			e.AppendParam(kparams.DNSRcode, kparams.Enum, rcode, WithEnum(DNSResponseCodes))
+			e.AppendParam(kparams.DNSAnswers, kparams.Slice, strings.Split(sanitizeDNSAnswers(answers), ";"))
+		}
 	}
+}
+
+// sanitizeDNSAnswers removes the "type" string from DNS answers.
+func sanitizeDNSAnswers(answers string) string {
+	return strings.ReplaceAll(answers, "type: 5 ", "")
 }

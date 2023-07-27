@@ -22,7 +22,7 @@ import "testing"
 
 func TestParamFlags(t *testing.T) {
 	var tests = []struct {
-		flag     uint32
+		flag     uint64
 		flags    ParamFlags
 		expected string
 	}{

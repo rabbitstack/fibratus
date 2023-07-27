@@ -20,6 +20,7 @@ package kevent
 
 import (
 	"encoding/json"
+	kcapver "github.com/rabbitstack/fibratus/pkg/kcap/version"
 	"golang.org/x/sys/windows"
 	"os"
 	"testing"
@@ -75,7 +76,7 @@ func TestMarshaller(t *testing.T) {
 	b := kevt.MarshalRaw()
 	require.NotEmpty(t, b)
 
-	clone, err := NewFromKcap(b)
+	clone, err := NewFromKcap(b, kcapver.KevtSecV2)
 	require.NoError(t, err)
 
 	assert.Equal(t, uint64(2), clone.Seq)
@@ -275,7 +276,7 @@ func TestUnmarshalHugeHandles(t *testing.T) {
 	}
 
 	s := kevt.MarshalRaw()
-	clone, err := NewFromKcap(s)
+	clone, err := NewFromKcap(s, kcapver.KevtSecV2)
 	require.NoError(t, err)
 	require.NotNil(t, clone)
 }
@@ -583,7 +584,7 @@ func BenchmarkUnmarshal(b *testing.B) {
 	buf := kevt.MarshalRaw()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		ke, err := NewFromKcap(buf)
+		ke, err := NewFromKcap(buf, kcapver.KevtSecV2)
 		if err != nil {
 			b.Fatal(err)
 		}

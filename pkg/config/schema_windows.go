@@ -163,6 +163,7 @@ var schema = `
 				"enable-net": 		{"type": "boolean"},
 				"enable-mem": 		{"type": "boolean"},
 				"enable-audit-api": {"type": "boolean"},
+				"enable-dns": 		{"type": "boolean"},
 				"min-buffers": 		{"type": "integer", "minimum": 1, "maximum": {{ .MinBuffers }}},
 				"max-buffers": 		{"type": "integer", "minimum": 2, "maximum": {{ .MaxBuffers }}},
 				"buffer-size":		{"type": "integer", "maximum": {{ .MaxBufferSize }}},

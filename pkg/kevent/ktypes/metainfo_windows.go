@@ -83,6 +83,8 @@ var kevents = map[Ktype]KeventInfo{
 	VirtualFree:        {"VirtualFree", Mem, "Releases or decommits a region of memory within the process virtual address space"},
 	MapViewFile:        {"MapViewFile", File, "Maps a view of a file mapping into the address space of a calling process"},
 	UnmapViewFile:      {"UnmapViewFile", File, "Unmaps a mapped view of a file from the calling process's address space"},
+	QueryDNS:           {"QueryDns", Net, "Sends a DNS query to the name server"},
+	ReplyDNS:           {"ReplyDNS", Net, "Receives the response from the DNS server"},
 }
 
 var ktypes = map[string]Ktype{
@@ -134,6 +136,8 @@ var ktypes = map[string]Ktype{
 	"VirtualFree":        VirtualFree,
 	"MapViewFile":        MapViewFile,
 	"UnmapViewFile":      UnmapViewFile,
+	"QueryDns":           QueryDNS,
+	"ReplyDns":           ReplyDNS,
 }
 
 // KtypeToKeventInfo maps the event type to the structure storing detailed information about the event.

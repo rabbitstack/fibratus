@@ -25,6 +25,9 @@ import (
 // Category is the type alias for event categories
 type Category string
 
+// Subcategory is the type alias for event subcategories
+type Subcategory string
+
 const (
 	// Registry is the category for registry related kernel events
 	Registry Category = "registry"
@@ -48,6 +51,13 @@ const (
 	Other Category = "other"
 	// Unknown is the category for events that couldn't match any of the previous categories
 	Unknown Category = "unknown"
+)
+
+const (
+	// DNS designates the DNS (Domain Name Service) event subcategory
+	DNS Subcategory = "dns"
+	// None identifies no subcategory
+	None Subcategory = "none"
 )
 
 // Hash obtains the hash of the category string.

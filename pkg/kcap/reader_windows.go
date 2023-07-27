@@ -134,7 +134,7 @@ func (r *reader) Read(ctx context.Context) (chan *kevent.Kevent, chan error) {
 				}
 				break
 			}
-			kevt, err := kevent.NewFromKcap(buf)
+			kevt, err := kevent.NewFromKcap(buf, sec.Version())
 			if err != nil {
 				errsc <- fmt.Errorf("fail to unmarshal kevent: %v", err)
 				kcapKeventUnmarshalErrors.Add(1)

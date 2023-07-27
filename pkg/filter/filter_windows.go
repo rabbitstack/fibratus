@@ -79,6 +79,9 @@ func New(expr string, config *config.Config, options ...Option) Filter {
 	if kconfig.EnableMemKevents {
 		accessors = append(accessors, newMemAccessor())
 	}
+	if kconfig.EnableDNSEvents {
+		accessors = append(accessors, newDNSAccessor())
+	}
 	if config.PE.Enabled {
 		accessors = append(accessors, newPEAccessor())
 	}

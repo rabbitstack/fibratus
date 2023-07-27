@@ -367,6 +367,17 @@ const (
 	// MemProtectionMask identifies the field that represents the memory protection in mask notation
 	MemProtectionMask Field = "mem.protection.mask"
 
+	// DNSName identifies the field that represents the DNS name
+	DNSName Field = "dns.name"
+	// DNSRR identifies the field that represents the DNS record type
+	DNSRR Field = "dns.rr"
+	// DNSOptions identifies the field that represents the DNS options
+	DNSOptions Field = "dns.options"
+	// DNSAnswers identifies the field that represents the DNS answers
+	DNSAnswers Field = "dns.answers"
+	// DNSRcode identifies the field that represents the DNS response code
+	DNSRcode Field = "dns.rcode"
+
 	// None represents the unknown field
 	None Field = ""
 )
@@ -384,6 +395,7 @@ func (f Field) IsNetworkField() bool  { return strings.HasPrefix(string(f), "net
 func (f Field) IsHandleField() bool   { return strings.HasPrefix(string(f), "handle.") }
 func (f Field) IsPeField() bool       { return strings.HasPrefix(string(f), "pe.") }
 func (f Field) IsMemField() bool      { return strings.HasPrefix(string(f), "mem.") }
+func (f Field) IsDNSField() bool      { return strings.HasPrefix(string(f), "dns.") }
 
 // Segment represents the type alias for the segment. Segment
 // denotes the location of the value within an indexed field.
@@ -598,6 +610,12 @@ var fields = map[Field]FieldInfo{
 	MemPageType:       {MemPageType, "page type of the allocated region", kparams.Enum, []string{"mem.type = 'PRIVATE'"}, nil},
 	MemProtection:     {MemProtection, "allocated region protection type", kparams.Enum, []string{"mem.protection = 'READWRITE'"}, nil},
 	MemProtectionMask: {MemProtectionMask, "allocated region protection in mask notation", kparams.Enum, []string{"mem.protection.mask = 'RWX'"}, nil},
+
+	DNSName:    {DNSName, "dns query name", kparams.UnicodeString, []string{"dns.name = 'example.org'"}, nil},
+	DNSRR:      {DNSRR, "dns resource record type", kparams.AnsiString, []string{"dns.rr = 'AA'"}, nil},
+	DNSOptions: {DNSOptions, "dns query options", kparams.Flags64, []string{"dns.options in ('ADDRCONFIG', 'DUAL_ADDR')"}, nil},
+	DNSRcode:   {DNSRR, "dns response status", kparams.AnsiString, []string{"dns.rcode = 'NXDOMAIN'"}, nil},
+	DNSAnswers: {DNSAnswers, "dns response answers", kparams.Slice, []string{"dns.answers in ('o.lencr.edgesuite.net', 'a1887.dscq.akamai.net')"}, nil},
 }
 
 // Lookup finds the field literal in the map. For the nested fields, it checks the pattern matches
