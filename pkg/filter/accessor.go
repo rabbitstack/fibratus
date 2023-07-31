@@ -34,6 +34,8 @@ var (
 // kevtAccessor extracts generic event values.
 type kevtAccessor struct{}
 
+func (kevtAccessor) setFields(fields []fields.Field) {}
+
 func newKevtAccessor() accessor {
 	return &kevtAccessor{}
 }
@@ -194,6 +196,10 @@ func (f *filter) narrowAccessors() {
 	}
 	if removeDNSAccessor {
 		f.removeAccessor(&dnsAccessor{})
+	}
+
+	for _, accessor := range f.accessors {
+		accessor.setFields(allFields)
 	}
 }
 

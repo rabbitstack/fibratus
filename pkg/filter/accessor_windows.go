@@ -39,6 +39,8 @@ import (
 type accessor interface {
 	// get fetches the parameter value for the specified filter field.
 	get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error)
+	// setFields sets all fields declared in the expression
+	setFields(fields []fields.Field)
 }
 
 // getAccessors initializes and returns all available accessors.
@@ -69,6 +71,8 @@ func getParentPs(kevt *kevent.Kevent) *pstypes.PS {
 type psAccessor struct {
 	psnap psnap.Snapshotter
 }
+
+func (psAccessor) setFields(fields []fields.Field) {}
 
 func newPSAccessor(psnap psnap.Snapshotter) accessor { return &psAccessor{psnap: psnap} }
 
@@ -514,6 +518,8 @@ func ancestorFields(field string, kevt *kevent.Kevent) (kparams.Value, error) {
 // threadAccessor fetches thread parameters from thread kernel events.
 type threadAccessor struct{}
 
+func (threadAccessor) setFields(fields []fields.Field) {}
+
 func newThreadAccessor() accessor {
 	return &threadAccessor{}
 }
@@ -580,6 +586,8 @@ func (t *threadAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value
 // fileAccessor extracts file specific values.
 type fileAccessor struct{}
 
+func (fileAccessor) setFields(fields []fields.Field) {}
+
 func newFileAccessor() accessor {
 	return &fileAccessor{}
 }
@@ -622,6 +630,8 @@ func (l *fileAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, 
 // imageAccessor extracts image (DLL) event values.
 type imageAccessor struct{}
 
+func (imageAccessor) setFields(fields []fields.Field) {}
+
 func newImageAccessor() accessor {
 	return &imageAccessor{}
 }
@@ -661,6 +671,8 @@ func (i *imageAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value,
 // registryAccessor extracts registry specific parameters.
 type registryAccessor struct{}
 
+func (registryAccessor) setFields(fields []fields.Field) {}
+
 func newRegistryAccessor() accessor {
 	return &registryAccessor{}
 }
@@ -686,6 +698,8 @@ func (r *registryAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Val
 
 // networkAccessor deals with extracting the network specific kernel event parameters.
 type networkAccessor struct{}
+
+func (networkAccessor) setFields(fields []fields.Field) {}
 
 func newNetworkAccessor() accessor { return &networkAccessor{} }
 
@@ -718,6 +732,8 @@ func (n *networkAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Valu
 // handleAccessor extracts handle event values.
 type handleAccessor struct{}
 
+func (handleAccessor) setFields(fields []fields.Field) {}
+
 func newHandleAccessor() accessor { return &handleAccessor{} }
 
 func (h *handleAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
@@ -735,17 +751,63 @@ func (h *handleAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value
 }
 
 // peAccessor extracts PE specific values.
-type peAccessor struct{}
+type peAccessor struct {
+	fields []fields.Field
+	opts   []pe.Option
+}
+
+func (pa *peAccessor) setFields(fields []fields.Field) {
+	pa.fields = fields
+	pa.opts = pa.parserOpts(fields)
+}
+
+func (pa *peAccessor) parserOpts(fields []fields.Field) []pe.Option {
+	var opts []pe.Option
+	for _, f := range fields {
+		if f.IsPeSection() || f.IsPeSectionsMap() {
+			opts = append(opts, pe.WithSections())
+		}
+		if f.IsPeSymbol() {
+			opts = append(opts, pe.WithSymbols())
+		}
+		if f.IsPeSectionEntropy() {
+			opts = append(opts, pe.WithSectionEntropy())
+		}
+		if f.IsPeVersionResource() || f.IsPeResourcesMap() {
+			opts = append(opts, pe.WithVersionResources())
+		}
+		if f.IsPeImphash() {
+			opts = append(opts, pe.WithImphash())
+		}
+		if f.IsPeDotnet() {
+			opts = append(opts, pe.WithCLR())
+		}
+	}
+	return opts
+}
 
 func newPEAccessor() accessor {
 	return &peAccessor{}
 }
 
-func (*peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
+func (pa *peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
 	var p *pe.PE
 	if kevt.PS != nil && kevt.PS.PE != nil {
 		p = kevt.PS.PE
 	}
+	// PE enrichment is likely disabled. Load PE data lazily
+	// by only requesting parsing of the PE directories that
+	// are relevant to the fields present in the expression
+	if (kevt.PS != nil && kevt.PS.Exe != "") && p == nil {
+		var err error
+		exe := kevt.PS.Exe
+		p, err = pe.ParseFile(exe, pa.opts...)
+		if err != nil {
+			return nil, err
+		}
+		kevt.PS.PE = p
+	}
+
 	if p == nil {
 		return nil, nil
 	}
@@ -763,6 +825,16 @@ func (*peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, erro
 		return p.Symbols, nil
 	case fields.PeImports:
 		return p.Imports, nil
+	case fields.PeImphash:
+		return p.Imphash, nil
+	case fields.PeIsDotnet:
+		return p.IsDotnet, nil
+	case fields.PeIsDLL:
+		return kevt.Kparams.GetBool(kparams.FileIsDLL)
+	case fields.PeIsDriver:
+		return kevt.Kparams.GetBool(kparams.FileIsDriver)
+	case fields.PeIsExecutable:
+		return kevt.Kparams.GetBool(kparams.FileIsExecutable)
 	case fields.PeCompany:
 		return p.VersionResources[pe.Company], nil
 	case fields.PeCopyright:
@@ -816,6 +888,8 @@ func (*peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, erro
 // memAccessor extracts parameters from memory alloc/free events.
 type memAccessor struct{}
 
+func (memAccessor) setFields(fields []fields.Field) {}
+
 func newMemAccessor() accessor {
 	return &memAccessor{}
 }
@@ -840,6 +914,8 @@ func (*memAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, err
 
 // dnsAccessor extracts values from DNS query/response event parameters.
 type dnsAccessor struct{}
+
+func (dnsAccessor) setFields(fields []fields.Field) {}
 
 func newDNSAccessor() accessor {
 	return &dnsAccessor{}

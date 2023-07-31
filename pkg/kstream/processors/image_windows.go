@@ -22,6 +22,7 @@ import (
 	"expvar"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
+	"github.com/rabbitstack/fibratus/pkg/pe"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/signature"
 )
@@ -53,6 +54,15 @@ func (m *imageProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, e
 		if err != nil {
 			signatureErrors.Add(1)
 		}
+		// parse PE image data
+		filename := e.GetParamAsString(kparams.FileName)
+		pefile, err := pe.ParseFile(filename, pe.WithSymbols())
+		if err != nil {
+			return e, false, m.psnap.AddModule(e)
+		}
+		e.AppendParam(kparams.FileIsDLL, kparams.Bool, pefile.IsDLL)
+		e.AppendParam(kparams.FileIsDriver, kparams.Bool, pefile.IsDriver)
+		e.AppendParam(kparams.FileIsExecutable, kparams.Bool, pefile.IsExecutable)
 	}
 	if e.IsUnloadImage() {
 		pid := e.Kparams.MustGetPid()

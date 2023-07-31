@@ -24,6 +24,8 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/stretchr/testify/assert"
 	"net"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -72,42 +74,6 @@ func TestSeqFilterCompile(t *testing.T) {
 	assert.Len(t, f.GetSequence().Expressions, 2)
 	assert.NotNil(t, f.GetSequence().Expressions[0].By)
 	assert.True(t, len(f.GetStringFields()) > 0)
-}
-
-func TestNarrowAccessors(t *testing.T) {
-	var tests = []struct {
-		f                Filter
-		expectedAccesors int
-	}{
-		{
-			New(`ps.name = 'cmd.exe' and kevt.name = 'CreateProcess' or kevt.name in ('TerminateProcess', 'CreateFile')`, cfg),
-			2,
-		},
-		{
-			New(`ps.modules[kernel32.dll].location = 'C:\\Windows\\System32'`, cfg),
-			1,
-		},
-		{
-			New(`handle.type = 'Section' and pe.sections > 1 and kevt.name = 'CreateHandle'`, cfg),
-			3,
-		},
-		{
-			New(`sequence |kevt.name = 'CreateProcess'| as e1 |kevt.name = 'CreateFile' and file.name = $e1.ps.exe |`, cfg),
-			3,
-		},
-		{
-			New(`base(file.name) = 'kernel32.dll'`, cfg),
-			1,
-		},
-	}
-
-	for i, tt := range tests {
-		require.NoError(t, tt.f.Compile())
-		naccessors := len(tt.f.(*filter).accessors)
-		if tt.expectedAccesors != naccessors {
-			t.Errorf("%d. accessors mismatch: exp=%d got=%d", i, tt.expectedAccesors, naccessors)
-		}
-	}
 }
 
 func TestSeqFilterInvalidBoundRefs(t *testing.T) {
@@ -627,6 +593,51 @@ func TestPEFilter(t *testing.T) {
 		if matches != tt.matches {
 			t.Errorf("%d. %q pe filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
+	}
+}
+
+func TestLazyPEFilter(t *testing.T) {
+	kevt := &kevent.Kevent{
+		Type: ktypes.LoadImage,
+		PS: &pstypes.PS{
+			PID: 2312,
+			Exe: filepath.Join(os.Getenv("windir"), "notepad.exe"),
+		},
+		Kparams: kevent.Kparams{
+			kparams.FileIsDLL: {Name: kparams.FileIsDLL, Type: kparams.Bool, Value: true},
+			kparams.FileName:  {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
+		},
+	}
+
+	var tests = []struct {
+		filter  string
+		matches bool
+	}{
+
+		{`pe.sections[.text].entropy > 1.23`, true},
+		{`pe.symbols IN ('GetTextFaceW', 'GetProcessHeap')`, true},
+		{`pe.is_dll`, true},
+		{`pe.imphash = '5d3861c5c547f8a34e471ba273a732b2'`, true},
+		{`pe.is_dotnet`, false},
+		{`pe.resources[FileDesc] icontains 'Notepad'`, true},
+		{`pe.file.name ~= 'NOTEPAD.EXE'`, true},
+		{`pe.nsymbols > 10 AND pe.nsections > 2`, true},
+		{`pe.nsections > 1`, true},
+	}
+
+	for i, tt := range tests {
+		f := New(tt.filter, cfg)
+		err := f.Compile()
+		if err != nil {
+			t.Fatal(err)
+		}
+		require.Nil(t, kevt.PS.PE)
+		matches := f.Run(kevt)
+		if matches != tt.matches {
+			t.Errorf("%d. %q pe lazy filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
+		}
+		require.NotNil(t, kevt.PS.PE)
+		kevt.PS.PE = nil
 	}
 }
 

@@ -123,6 +123,8 @@ func (f *filter) Compile() error {
 					f.addBoundField(field)
 				}
 			}
+		case *ql.FieldLiteral:
+			f.addField(fields.Field(expr.Value))
 		}
 	}
 	if f.expr != nil {

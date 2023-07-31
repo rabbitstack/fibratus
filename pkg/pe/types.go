@@ -104,6 +104,18 @@ type PE struct {
 	IsSigned bool `json:"is_signed"`
 	// Cert contains certificate information.
 	Cert *Cert `json:"cert"`
+	// IsDriver indicates if the PE contains driver code.
+	IsDriver bool `json:"is_driver"`
+	// IsDLL indicates if the PE is a DLL.
+	IsDLL bool `json:"is_dll"`
+	// IsExecutable indicates if the PE is an executable image.
+	IsExecutable bool `json:"is_executable"`
+	// IsDotnet indicates if the PE contains CLR data.
+	IsDotnet bool `json:"is_dotnet"`
+	// Imphash represents the PE import hash.
+	Imphash string `json:"imphash"`
+	// Anomalies contains PE parsing anomalies.
+	Anomalies []string `json:"anomalies"`
 }
 
 // String returns the string representation of the PE metadata.
