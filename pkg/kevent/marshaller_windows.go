@@ -21,6 +21,7 @@ package kevent
 import (
 	"expvar"
 	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/util/convert"
 	"math"
 	"net"
 	"sort"
@@ -137,12 +138,7 @@ func (e *Kevent) MarshalRaw() []byte {
 		case kparams.PID, kparams.TID:
 			b = append(b, bytes.WriteUint32(kpar.Value.(uint32))...)
 		case kparams.Bool:
-			v := kpar.Value.(bool)
-			if v {
-				b = append(b, 1)
-			} else {
-				b = append(b, 0)
-			}
+			b = append(b, convert.Btoi(kpar.Value.(bool)))
 		case kparams.Time:
 			v := kpar.Value.(time.Time)
 			ts := make([]byte, 0)

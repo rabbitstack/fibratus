@@ -23,6 +23,8 @@ package pe
 
 import (
 	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/sys"
+	"runtime"
 	"time"
 )
 
@@ -51,8 +53,19 @@ type Sec struct {
 	Md5     string
 }
 
+// String returns the stirng representation of the section.
+func (s Sec) String() string {
+	return fmt.Sprintf("Name: %s, Size: %d, Entropy: %f, Md5: %s", s.Name, s.Size, s.Entropy, s.Md5)
+}
+
 // Cert represents certificate information embedded in PE.
 type Cert struct {
+	// NotBefore specifies the certificate won't be valid before this timestamp.
+	NotBefore time.Time `json:"not_before"`
+
+	// NotAfter specifies the certificate won't be valid after this timestamp.
+	NotAfter time.Time `json:"not_after"`
+
 	// Issuer represents the certificate authority (CA) that charges customers to issue
 	// certificates for them.
 	Issuer string `json:"issuer"`
@@ -61,23 +74,12 @@ type Cert struct {
 	// with (i.e. the "owner" of the certificate).
 	Subject string `json:"subject"`
 
-	// NotBefore specifies the certificate won't be valid before this timestamp.
-	NotBefore time.Time `json:"not_before"`
-
-	// NotAfter specifies the certificate won't be valid after this timestamp.
-	NotAfter time.Time `json:"not_after"`
-
 	// SerialNumber represents the serial number MUST be a positive integer assigned
 	// by the CA to each certificate. It MUST be unique for each certificate issued by
 	// a given CA (i.e., the issuer name and serial number identify a unique certificate).
 	// CAs MUST force the serialNumber to be a non-negative integer.
 	// For convenience, we convert the big int to string.
 	SerialNumber string `json:"serial_number"`
-}
-
-// String returns the stirng representation of the section.
-func (s Sec) String() string {
-	return fmt.Sprintf("Name: %s, Size: %d, Entropy: %f, Md5: %s", s.Name, s.Size, s.Entropy, s.Md5)
 }
 
 // PE contains various headers that identifies the format and characteristics of the executable files.
@@ -100,8 +102,10 @@ type PE struct {
 	Imports []string `json:"imports"`
 	// VersionResources holds the version resources
 	VersionResources map[string]string `json:"resources"`
-	// IsSigned determines if the PE contains the digital signature.
+	// IsSigned determines if the PE contains a digital signature.
 	IsSigned bool `json:"is_signed"`
+	// IsTrusted determines if the PE certificate chain is trusted.
+	IsTrusted bool `json:"is_trusted"`
 	// Cert contains certificate information.
 	Cert *Cert `json:"cert"`
 	// IsDriver indicates if the PE contains driver code.
@@ -116,10 +120,23 @@ type PE struct {
 	Imphash string `json:"imphash"`
 	// Anomalies contains PE parsing anomalies.
 	Anomalies []string `json:"anomalies"`
+
+	filename string
+}
+
+// VerifySignature checks if the embedded PE signature is trusted.
+func (pe *PE) VerifySignature() {
+	if sys.IsWintrustFound() {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+		trust := sys.NewWintrustData(sys.WtdChoiceFile)
+		defer trust.Close()
+		pe.IsTrusted = trust.VerifyFile(pe.filename)
+	}
 }
 
 // String returns the string representation of the PE metadata.
-func (pe PE) String() string {
+func (pe *PE) String() string {
 	return fmt.Sprintf(`
 		 Number of sections: %d
 		 Number of symbols: %d

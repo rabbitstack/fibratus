@@ -45,4 +45,6 @@ const (
 const (
 	// PESecV1 is the v1 of the PE section
 	PESecV1 Version = iota + 1
+	// PESecV2 is the v2 of the PE section
+	PESecV2
 )

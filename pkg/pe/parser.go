@@ -255,6 +255,7 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 		Imports:          make([]string, 0),
 		Sections:         make([]Sec, 0),
 		VersionResources: make(map[string]string),
+		filename:         path,
 	}
 	switch pe.Is64 {
 	case true:

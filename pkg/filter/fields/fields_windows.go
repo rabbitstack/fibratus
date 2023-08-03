@@ -216,10 +216,26 @@ const (
 	PeIsDriver Field = "pe.is_driver"
 	// PeIsExecutable indicates if the file is an executable
 	PeIsExecutable Field = "pe.is_exec"
-	PeAnomalies    Field = "pe.anomalies"
-	// PeImphash indicates the PE import hash
-	PeImphash  Field = "pe.imphash"
+	// PeAnomalies represents the field that contains PE anomalies detected during parsing
+	PeAnomalies Field = "pe.anomalies"
+	// PeImphash is the field that yields the PE import hash
+	PeImphash Field = "pe.imphash"
+	// PeIsDotnet is the field which indicates if the binary contains the .NET assembly
 	PeIsDotnet Field = "pe.is_dotnet"
+	// PeIsSigned is the field which indicates if the binary is signed, either by embedded or catalog signature
+	PeIsSigned Field = "pe.is_signed"
+	// PeIsTrusted is the field which indicates if the binary signature is trusted
+	PeIsTrusted Field = "pe.is_trusted"
+	// PeCertIssuer is the field which indicates the certificate issuer
+	PeCertIssuer Field = "pe.cert.issuer"
+	// PeCertSubject is the field which indicates the certificate subject
+	PeCertSubject Field = "pe.cert.subject"
+	// PeCertSerial is the field which indicates the certificate serial
+	PeCertSerial Field = "pe.cert.serial"
+	// PeCertAfter is the field which indicates the timestamp after certificate is no longer valid
+	PeCertAfter Field = "pe.cert.after"
+	// PeCertBefore is the field which indicates the timestamp of the certificate enrollment date
+	PeCertBefore Field = "pe.cert.before"
 
 	// KevtSeq is the event sequence number
 	KevtSeq Field = "kevt.seq"
@@ -416,8 +432,16 @@ func (f Field) IsPeSymbol() bool { return f == PeSymbols || f == PeNumSymbols ||
 func (f Field) IsPeVersionResource() bool {
 	return f == PeCompany || f == PeCopyright || f == PeDescription || f == PeFileName || f == PeFileVersion || f == PeProduct || f == PeProductVersion
 }
-func (f Field) IsPeImphash() bool { return f == PeImphash }
-func (f Field) IsPeDotnet() bool  { return f == PeIsDotnet }
+func (f Field) IsPeImphash() bool   { return f == PeImphash }
+func (f Field) IsPeDotnet() bool    { return f == PeIsDotnet }
+func (f Field) IsPeAnomalies() bool { return f == PeAnomalies }
+func (f Field) IsPeSignature() bool {
+	return f == PeIsTrusted || f == PeIsSigned || f == PeCertIssuer || f == PeCertSerial || f == PeCertSubject || f == PeCertBefore || f == PeCertAfter
+}
+func (f Field) IsPeIsTrusted() bool { return f == PeIsTrusted }
+func (f Field) IsPeIsSigned() bool  { return f == PeIsSigned }
+
+func (f Field) IsPeCert() bool { return strings.HasPrefix(string(f), "pe.cert.") }
 
 // Segment represents the type alias for the segment. Segment
 // denotes the location of the value within an indexed field.
@@ -630,6 +654,14 @@ var fields = map[Field]FieldInfo{
 	PeIsExecutable:   {PeIsExecutable, "indicates if the loaded image or created file is an executable", kparams.Bool, []string{"pe.is_exec'"}, nil},
 	PeImphash:        {PeImphash, "import hash", kparams.AnsiString, []string{"pe.impash = '5d3861c5c547f8a34e471ba273a732b2'"}, nil},
 	PeIsDotnet:       {PeIsDotnet, "indicates if PE contains CLR data", kparams.Bool, []string{"pe.is_dotnet"}, nil},
+	PeAnomalies:      {PeAnomalies, "contains PE anomalies detected during parsing", kparams.Slice, []string{"pe.anomalies in ('number of sections is 0')"}, nil},
+	PeIsSigned:       {PeIsSigned, "indicates if the PE has embedded or catalog signature", kparams.Bool, []string{"pe.is_signed"}, nil},
+	PeIsTrusted:      {PeIsTrusted, "indicates if the PE certificate chain is trusted", kparams.Bool, []string{"pe.is_trusted"}, nil},
+	PeCertSerial:     {PeCertSerial, "PE certificate serial number", kparams.UnicodeString, []string{"pe.cert.serial = '330000023241fb59996dcc4dff000000000232'"}, nil},
+	PeCertSubject:    {PeCertSubject, "PE certificate subject", kparams.UnicodeString, []string{"pe.cert.subject contains 'Washington, Redmond, Microsoft Corporation'"}, nil},
+	PeCertIssuer:     {PeCertIssuer, "PE certificate CA", kparams.UnicodeString, []string{"pe.cert.issuer contains 'Washington, Redmond, Microsoft Corporation'"}, nil},
+	PeCertAfter:      {PeCertAfter, "PE certificate expiration date", kparams.Time, []string{"pe.cert.after contains '2024-02-01 00:05:42 +0000 UTC'"}, nil},
+	PeCertBefore:     {PeCertBefore, "PE certificate enrollment date", kparams.Time, []string{"pe.cert.before contains '2024-02-01 00:05:42 +0000 UTC'"}, nil},
 
 	MemBaseAddress:    {MemBaseAddress, "region base address", kparams.Address, []string{"mem.address = '211d13f2000'"}, nil},
 	MemRegionSize:     {MemRegionSize, "region size", kparams.Uint64, []string{"mem.size > 438272"}, nil},

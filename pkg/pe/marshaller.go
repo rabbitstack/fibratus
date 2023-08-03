@@ -23,7 +23,9 @@ package pe
 
 import (
 	"fmt"
+	kcapver "github.com/rabbitstack/fibratus/pkg/kcap/version"
 	"github.com/rabbitstack/fibratus/pkg/util/bytes"
+	"github.com/rabbitstack/fibratus/pkg/util/convert"
 	"math"
 	"time"
 	"unsafe"
@@ -89,11 +91,37 @@ func (pe *PE) Marshal() []byte {
 		b = append(b, v...)
 	}
 
+	// signature and cert data
+	b = append(b, convert.Btoi(pe.IsSigned))
+	b = append(b, convert.Btoi(pe.IsTrusted))
+	if pe.Cert != nil {
+		b = append(b, pe.Cert.Marshal()...)
+	} else {
+		b = append(b, 0)
+	}
+
+	// PE binary format
+	b = append(b, convert.Btoi(pe.IsDriver))
+	b = append(b, convert.Btoi(pe.IsDLL))
+	b = append(b, convert.Btoi(pe.IsExecutable))
+	b = append(b, convert.Btoi(pe.IsDotnet))
+
+	// imphash
+	b = append(b, pe.Imphash...)
+
+	// anomalies
+	b = append(b, uint8('s'))
+	b = append(b, bytes.WriteUint16(uint16(len(pe.Anomalies)))...)
+	for _, s := range pe.Anomalies {
+		b = append(b, bytes.WriteUint16(uint16(len(s)))...)
+		b = append(b, s...)
+	}
+
 	return b
 }
 
 // Unmarshal recovers the PE metadata from the byte stream.
-func (pe *PE) Unmarshal(b []byte) error {
+func (pe *PE) Unmarshal(b []byte, ver kcapver.Version) error {
 	if len(b) < 6 {
 		return fmt.Errorf("expected at least 6 bytes but got %d bytes", len(b))
 	}
@@ -208,18 +236,35 @@ func (pe *PE) Unmarshal(b []byte) error {
 		}
 	}
 
+	offset += roffset
+
 	return nil
 }
 
+func (c Cert) Marshal() []byte {
+	b := make([]byte, 0)
+	b = append(b, bytes.WriteTime(c.NotBefore)...)
+	b = append(b, bytes.WriteTime(c.NotAfter)...)
+
+	b = append(b, bytes.WriteUint16(uint16(len(c.SerialNumber)))...)
+	b = append(b, c.SerialNumber...)
+	b = append(b, bytes.WriteUint16(uint16(len(c.Subject)))...)
+	b = append(b, c.Subject...)
+	b = append(b, bytes.WriteUint16(uint16(len(c.Issuer)))...)
+	b = append(b, c.Issuer...)
+
+	return b
+}
+
 // NewFromKcap restores the PE metadata from the byte stream.
-func NewFromKcap(b []byte) (*PE, error) {
+func NewFromKcap(b []byte, ver kcapver.Version) (*PE, error) {
 	pe := &PE{
 		Sections:         make([]Sec, 0),
 		Symbols:          make([]string, 0),
 		Imports:          make([]string, 0),
 		VersionResources: make(map[string]string),
 	}
-	if err := pe.Unmarshal(b); err != nil {
+	if err := pe.Unmarshal(b, ver); err != nil {
 		return nil, err
 	}
 	return pe, nil

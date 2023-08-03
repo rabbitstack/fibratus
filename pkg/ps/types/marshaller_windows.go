@@ -84,11 +84,11 @@ func (ps *PS) Marshal() []byte {
 	// write the PE metadata
 	if ps.PE != nil {
 		buf := ps.PE.Marshal()
-		sec := section.New(section.PE, kcapver.PESecV1, 0, uint32(len(buf)))
+		sec := section.New(section.PE, kcapver.PESecV2, 0, uint32(len(buf)))
 		b = append(b, sec[:]...)
 		b = append(b, buf...)
 	} else {
-		sec := section.New(section.PE, kcapver.PESecV1, 0, 0)
+		sec := section.New(section.PE, kcapver.PESecV2, 0, 0)
 		b = append(b, sec[:]...)
 	}
 
@@ -255,7 +255,7 @@ readpe:
 	}
 
 	var err error
-	ps.PE, err = pe.NewFromKcap(b[idx+offset:])
+	ps.PE, err = pe.NewFromKcap(b[idx+offset:], sec.Version())
 	if err != nil {
 		return err
 	}

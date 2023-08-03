@@ -19,9 +19,12 @@
 package filter
 
 import (
+	"errors"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	psnap "github.com/rabbitstack/fibratus/pkg/ps"
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
+	"github.com/rabbitstack/fibratus/pkg/util/signature"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -753,17 +756,15 @@ func (h *handleAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value
 // peAccessor extracts PE specific values.
 type peAccessor struct {
 	fields []fields.Field
-	opts   []pe.Option
 }
 
 func (pa *peAccessor) setFields(fields []fields.Field) {
 	pa.fields = fields
-	pa.opts = pa.parserOpts(fields)
 }
 
-func (pa *peAccessor) parserOpts(fields []fields.Field) []pe.Option {
+func (pa *peAccessor) parserOpts() []pe.Option {
 	var opts []pe.Option
-	for _, f := range fields {
+	for _, f := range pa.fields {
 		if f.IsPeSection() || f.IsPeSectionsMap() {
 			opts = append(opts, pe.WithSections())
 		}
@@ -782,9 +783,18 @@ func (pa *peAccessor) parserOpts(fields []fields.Field) []pe.Option {
 		if f.IsPeDotnet() {
 			opts = append(opts, pe.WithCLR())
 		}
+		if f.IsPeAnomalies() {
+			opts = append(opts, pe.WithSections(), pe.WithSymbols())
+		}
+		if f.IsPeSignature() {
+			opts = append(opts, pe.WithSecurity())
+		}
 	}
 	return opts
 }
+
+// ErrPENilCertificate indicates the PE certificate is not available
+var ErrPENilCertificate = errors.New("pe certificate is nil")
 
 func newPEAccessor() accessor {
 	return &peAccessor{}
@@ -801,9 +811,34 @@ func (pa *peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 	if (kevt.PS != nil && kevt.PS.Exe != "") && p == nil {
 		var err error
 		exe := kevt.PS.Exe
-		p, err = pe.ParseFile(exe, pa.opts...)
+		p, err = pe.ParseFile(exe, pa.parserOpts()...)
 		if err != nil {
 			return nil, err
+		}
+		if p != nil && f.IsPeSignature() {
+			// verify embedded signature
+			if p.IsSigned && f.IsPeIsTrusted() {
+				p.VerifySignature()
+			}
+			if !p.IsSigned {
+				if !sys.IsWintrustFound() {
+					goto cmp
+				}
+				// maybe the PE is catalog signed?
+				catalog := signature.NewCatalog()
+				err := catalog.Open(exe)
+				if err != nil {
+					goto cmp
+				}
+				defer catalog.Close()
+				p.IsSigned = catalog.IsCatalogSigned()
+				if p.IsSigned && f.IsPeIsTrusted() {
+					p.IsTrusted = catalog.Verify(exe)
+				}
+				if p.IsSigned && f.IsPeCert() {
+					p.Cert, _ = catalog.ParseCertificate()
+				}
+			}
 		}
 		kevt.PS.PE = p
 	}
@@ -812,6 +847,7 @@ func (pa *peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 		return nil, nil
 	}
 
+cmp:
 	switch f {
 	case fields.PeEntrypoint:
 		return p.EntryPoint, nil
@@ -829,6 +865,37 @@ func (pa *peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 		return p.Imphash, nil
 	case fields.PeIsDotnet:
 		return p.IsDotnet, nil
+	case fields.PeAnomalies:
+		return p.Anomalies, nil
+	case fields.PeIsSigned:
+		return p.IsSigned, nil
+	case fields.PeIsTrusted:
+		return p.IsTrusted, nil
+	case fields.PeCertIssuer:
+		if p.Cert == nil {
+			return nil, ErrPENilCertificate
+		}
+		return p.Cert.Issuer, nil
+	case fields.PeCertSubject:
+		if p.Cert == nil {
+			return nil, ErrPENilCertificate
+		}
+		return p.Cert.Subject, nil
+	case fields.PeCertSerial:
+		if p.Cert == nil {
+			return nil, ErrPENilCertificate
+		}
+		return p.Cert.SerialNumber, nil
+	case fields.PeCertAfter:
+		if p.Cert == nil {
+			return nil, ErrPENilCertificate
+		}
+		return p.Cert.NotAfter, nil
+	case fields.PeCertBefore:
+		if p.Cert == nil {
+			return nil, ErrPENilCertificate
+		}
+		return p.Cert.NotBefore, nil
 	case fields.PeIsDLL:
 		return kevt.Kparams.GetBool(kparams.FileIsDLL)
 	case fields.PeIsDriver:

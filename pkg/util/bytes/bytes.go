@@ -20,6 +20,7 @@ package bytes
 
 import (
 	"encoding/binary"
+	"time"
 	"unsafe"
 )
 
@@ -87,5 +88,15 @@ func WriteUint32(v uint32) (b []byte) {
 func WriteUint64(v uint64) (b []byte) {
 	b = make([]byte, 8)
 	NativeEndian.PutUint64(b, v)
+	return
+}
+
+// WriteTime writes the provided time structure in RFC3339Nano layout.
+func WriteTime(t time.Time) (b []byte) {
+	timestamp := make([]byte, 0)
+	timestamp = t.AppendFormat(timestamp, time.RFC3339Nano)
+	b = make([]byte, len(timestamp)+2)
+	b = append(b, WriteUint16(uint16(len(timestamp)))...)
+	b = append(b, timestamp...)
 	return
 }

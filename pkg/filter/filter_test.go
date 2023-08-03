@@ -623,6 +623,12 @@ func TestLazyPEFilter(t *testing.T) {
 		{`pe.file.name ~= 'NOTEPAD.EXE'`, true},
 		{`pe.nsymbols > 10 AND pe.nsections > 2`, true},
 		{`pe.nsections > 1`, true},
+		{`length(pe.anomalies) = 0`, true},
+		{`pe.is_signed`, true},
+		{`pe.is_trusted`, true},
+		{`pe.cert.subject icontains 'microsoft'`, true},
+		{`pe.cert.issuer icontains 'microsoft'`, true},
+		{`length(pe.cert.serial) > 0`, true},
 	}
 
 	for i, tt := range tests {

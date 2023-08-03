@@ -22,6 +22,7 @@
 package pe
 
 import (
+	kcapver "github.com/rabbitstack/fibratus/pkg/kcap/version"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"testing"
@@ -49,7 +50,7 @@ func TestMetadataMarshal(t *testing.T) {
 	b := pe.Marshal()
 
 	newPE := &PE{VersionResources: make(map[string]string)}
-	err := newPE.Unmarshal(b)
+	err := newPE.Unmarshal(b, kcapver.PESecV2)
 	require.NoError(t, err)
 
 	assert.Equal(t, uint16(7), newPE.NumberOfSections)
