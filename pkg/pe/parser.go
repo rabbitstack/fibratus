@@ -343,7 +343,7 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 		}
 	}
 
-	p.IsDotnet = pe.CLR.CLRHeader != nil
+	p.IsDotnet = pe.HasCLR
 	p.Anomalies = pe.Anomalies
 
 	return p, nil

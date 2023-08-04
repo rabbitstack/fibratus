@@ -95,9 +95,11 @@ func (pe *PE) Marshal() []byte {
 	b = append(b, convert.Btoi(pe.IsSigned))
 	b = append(b, convert.Btoi(pe.IsTrusted))
 	if pe.Cert != nil {
-		b = append(b, pe.Cert.Marshal()...)
+		crt := pe.Cert.Marshal()
+		b = append(b, bytes.WriteUint32(uint32(len(crt)))...)
+		b = append(b, crt...)
 	} else {
-		b = append(b, 0)
+		b = append(b, bytes.WriteUint32(0)...)
 	}
 
 	// PE binary format
@@ -107,10 +109,10 @@ func (pe *PE) Marshal() []byte {
 	b = append(b, convert.Btoi(pe.IsDotnet))
 
 	// imphash
+	b = append(b, bytes.WriteUint16(uint16(len(pe.Imphash)))...)
 	b = append(b, pe.Imphash...)
 
 	// anomalies
-	b = append(b, uint8('s'))
 	b = append(b, bytes.WriteUint16(uint16(len(pe.Anomalies)))...)
 	for _, s := range pe.Anomalies {
 		b = append(b, bytes.WriteUint16(uint16(len(s)))...)
@@ -238,13 +240,60 @@ func (pe *PE) Unmarshal(b []byte, ver kcapver.Version) error {
 
 	offset += roffset
 
+	if ver >= kcapver.PESecV2 {
+		pe.IsSigned = convert.Itob(b[20+offset])
+		pe.IsTrusted = convert.Itob(b[21+offset])
+
+		certSize := bytes.ReadUint32(b[22+offset:])
+		if certSize > 0 {
+			pe.Cert = &Cert{}
+			err := pe.Cert.Unmarshal(b, offset, certSize)
+			if err != nil {
+				return err
+			}
+		}
+
+		offset += certSize
+
+		pe.IsDriver = convert.Itob(b[26+offset])
+		pe.IsDLL = convert.Itob(b[27+offset])
+		pe.IsExecutable = convert.Itob(b[28+offset])
+		pe.IsDotnet = convert.Itob(b[29+offset])
+
+		// read impash
+		l = bytes.ReadUint16(b[30+offset:])
+		buf = b[32+offset:]
+		offset += uint32(l)
+		pe.Imphash = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
+
+		// read anomalies
+		nanomalies := bytes.ReadUint16(b[32+offset:])
+		pe.Anomalies = make([]string, nanomalies)
+		var off uint32
+		for n := uint16(0); n < nanomalies; n++ {
+			l := bytes.ReadUint16(b[34+offset+off:])
+			buf := b[36+offset+off:]
+			pe.Anomalies[n] = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
+			off += 2 + uint32(l)
+		}
+	}
+
 	return nil
 }
 
-func (c Cert) Marshal() []byte {
+// Marshal writes certificate info into a raw buffer.
+func (c *Cert) Marshal() []byte {
 	b := make([]byte, 0)
-	b = append(b, bytes.WriteTime(c.NotBefore)...)
-	b = append(b, bytes.WriteTime(c.NotAfter)...)
+
+	before := make([]byte, 0)
+	before = c.NotBefore.AppendFormat(before, time.RFC3339Nano)
+	b = append(b, bytes.WriteUint16(uint16(len(before)))...)
+	b = append(b, before...)
+
+	after := make([]byte, 0)
+	after = c.NotAfter.AppendFormat(after, time.RFC3339Nano)
+	b = append(b, bytes.WriteUint16(uint16(len(after)))...)
+	b = append(b, after...)
 
 	b = append(b, bytes.WriteUint16(uint16(len(c.SerialNumber)))...)
 	b = append(b, c.SerialNumber...)
@@ -254,6 +303,52 @@ func (c Cert) Marshal() []byte {
 	b = append(b, c.Issuer...)
 
 	return b
+}
+
+// Unmarshal decodes cert info from the raw buffer. This method
+// assumes the certificate structure size was already read.
+func (c *Cert) Unmarshal(b []byte, offset, certSize uint32) error {
+	if certSize > uint32(len(b)) {
+		return fmt.Errorf("invalid PE cert size. Got %d but max buffer size is %d", certSize, len(b))
+	}
+
+	o := offset
+
+	// read not before
+	l := bytes.ReadUint16(b[26+o:])
+	buf := b[28+o:]
+	o += uint32(l)
+	if len(buf) > 0 {
+		c.NotBefore, _ = time.Parse(time.RFC3339Nano, string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l]))
+	}
+
+	// read not after
+	l = bytes.ReadUint16(b[28+o:])
+	buf = b[30+o:]
+	o += uint32(l)
+	if len(buf) > 0 {
+		c.NotAfter, _ = time.Parse(time.RFC3339Nano, string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l]))
+	}
+
+	// read serial
+	l = bytes.ReadUint16(b[30+o:])
+	buf = b[32+o:]
+	o += uint32(l)
+	c.SerialNumber = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
+
+	// read subject
+	l = bytes.ReadUint16(b[32+o:])
+	buf = b[34+o:]
+	o += uint32(l)
+	c.Subject = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
+
+	// read issuer
+	l = bytes.ReadUint16(b[34+o:])
+	buf = b[36+o:]
+	o += uint32(l)
+	c.Issuer = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
+
+	return nil
 }
 
 // NewFromKcap restores the PE metadata from the byte stream.

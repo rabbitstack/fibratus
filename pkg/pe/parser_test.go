@@ -90,6 +90,12 @@ func TestParseFile(t *testing.T) {
 	}
 }
 
+func TestIsDotnet(t *testing.T) {
+	pe, err := ParseFile("./_fixtures/mscorlib.dll", WithCLR())
+	require.NoError(t, err)
+	require.True(t, pe.IsDotnet)
+}
+
 func TestParseMem(t *testing.T) {
 	var tests = []struct {
 		executable       string
