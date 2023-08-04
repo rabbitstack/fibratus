@@ -312,40 +312,38 @@ func (c *Cert) Unmarshal(b []byte, offset, certSize uint32) error {
 		return fmt.Errorf("invalid PE cert size. Got %d but max buffer size is %d", certSize, len(b))
 	}
 
-	o := offset
-
 	// read not before
-	l := bytes.ReadUint16(b[26+o:])
-	buf := b[28+o:]
-	o += uint32(l)
+	l := bytes.ReadUint16(b[26+offset:])
+	buf := b[28+offset:]
+	offset += uint32(l)
 	if len(buf) > 0 {
 		c.NotBefore, _ = time.Parse(time.RFC3339Nano, string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l]))
 	}
 
 	// read not after
-	l = bytes.ReadUint16(b[28+o:])
-	buf = b[30+o:]
-	o += uint32(l)
+	l = bytes.ReadUint16(b[28+offset:])
+	buf = b[30+offset:]
+	offset += uint32(l)
 	if len(buf) > 0 {
 		c.NotAfter, _ = time.Parse(time.RFC3339Nano, string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l]))
 	}
 
 	// read serial
-	l = bytes.ReadUint16(b[30+o:])
-	buf = b[32+o:]
-	o += uint32(l)
+	l = bytes.ReadUint16(b[30+offset:])
+	buf = b[32+offset:]
+	offset += uint32(l)
 	c.SerialNumber = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
 
 	// read subject
-	l = bytes.ReadUint16(b[32+o:])
-	buf = b[34+o:]
-	o += uint32(l)
+	l = bytes.ReadUint16(b[32+offset:])
+	buf = b[34+offset:]
+	offset += uint32(l)
 	c.Subject = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
 
 	// read issuer
-	l = bytes.ReadUint16(b[34+o:])
-	buf = b[36+o:]
-	o += uint32(l)
+	l = bytes.ReadUint16(b[34+offset:])
+	buf = b[36+offset:]
+	offset += uint32(l)
 	c.Issuer = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
 
 	return nil

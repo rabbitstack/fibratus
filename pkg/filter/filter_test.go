@@ -60,6 +60,10 @@ func TestFilterCompile(t *testing.T) {
 	require.EqualError(t, f.Compile(), "expected at least one field or operator but zero found")
 	f = New(`ps.name`, cfg)
 	require.EqualError(t, f.Compile(), "expected at least one field or operator but zero found")
+	f = New(`pe.is_exec`, cfg)
+	require.NoError(t, f.Compile())
+	f = New(`length(pe.imphash) > 0`, cfg)
+	require.NoError(t, f.Compile())
 	f = New(`ps.name =`, cfg)
 	require.EqualError(t, f.Compile(), "ps.name =\n╭─────────^\n|\n|\n╰─────────────────── expected field, bound field, string, number, bool, ip, function")
 }

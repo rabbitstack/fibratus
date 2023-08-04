@@ -28,8 +28,5 @@ func Btoi(b bool) uint8 {
 
 // Itob converts the provided uint8 integer to a bool value.
 func Itob(i uint8) bool {
-	if i > 0 {
-		return true
-	}
-	return false
+	return i > 0
 }
