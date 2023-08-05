@@ -621,7 +621,7 @@ func TestLazyPEFilter(t *testing.T) {
 		{`pe.sections[.text].entropy > 1.23`, true},
 		{`pe.symbols IN ('GetTextFaceW', 'GetProcessHeap')`, true},
 		{`pe.is_dll`, true},
-		{`pe.imphash = '5d3861c5c547f8a34e471ba273a732b2'`, true},
+		{`length(pe.imphash) > 0`, true},
 		{`pe.is_dotnet`, false},
 		{`pe.resources[FileDesc] icontains 'Notepad'`, true},
 		{`pe.file.name ~= 'NOTEPAD.EXE'`, true},

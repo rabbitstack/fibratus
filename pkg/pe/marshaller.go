@@ -343,7 +343,6 @@ func (c *Cert) Unmarshal(b []byte, offset, certSize uint32) error {
 	// read issuer
 	l = bytes.ReadUint16(b[34+offset:])
 	buf = b[36+offset:]
-	offset += uint32(l)
 	c.Issuer = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
 
 	return nil
