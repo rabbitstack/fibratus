@@ -62,3 +62,8 @@ func IsDeprecated(f Field) (bool, *Deprecation) {
 	}
 	return false, nil
 }
+
+// IsBoolean determines if the given field has the bool type.
+func IsBoolean(f Field) bool {
+	return fields[f].Type == kparams.Bool
+}

@@ -322,6 +322,19 @@ func (kpars Kparams) GetUint8(name string) (uint8, error) {
 	return v, nil
 }
 
+// GetBool returns the underlying boolean value from the parameter.
+func (kpars Kparams) GetBool(name string) (bool, error) {
+	kpar, err := kpars.findParam(name)
+	if err != nil {
+		return false, err
+	}
+	v, ok := kpar.Value.(bool)
+	if !ok {
+		return false, fmt.Errorf("unable to type cast %q parameter to bool value", name)
+	}
+	return v, nil
+}
+
 // GetInt8 returns the underlying int8 value from the parameter.
 func (kpars Kparams) GetInt8(name string) (int8, error) {
 	kpar, err := kpars.findParam(name)

@@ -109,6 +109,12 @@ const (
 	FileIrpPtr = "irp"
 	// FileExtraInfo is the parameter that represents extra information returned by the file system for the operation. For example for a read request, the actual number of bytes that were read.
 	FileExtraInfo = "extra_info"
+	// FileIsDLL is the parameter that indicates if the file is a DLL
+	FileIsDLL = "is_dll"
+	// FileIsDriver is the parameter that indicates if the file is a driver
+	FileIsDriver = "is_driver"
+	// FileIsExecutable is the parameter that indicates if the file is an executable
+	FileIsExecutable = "is_exec"
 
 	// FileViewBase is the parameter that represents the base address of the mapped section.
 	FileViewBase = "view_base"

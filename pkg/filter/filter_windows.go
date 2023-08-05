@@ -54,6 +54,8 @@ func New(expr string, config *config.Config, options ...Option) Filter {
 		newKevtAccessor(),
 		// process state and parameters
 		newPSAccessor(opts.psnap),
+		// PE metadata
+		newPEAccessor(),
 	}
 	kconfig := config.Kstream
 	fconfig := config.Filters
@@ -81,9 +83,6 @@ func New(expr string, config *config.Config, options ...Option) Filter {
 	}
 	if kconfig.EnableDNSEvents {
 		accessors = append(accessors, newDNSAccessor())
-	}
-	if config.PE.Enabled {
-		accessors = append(accessors, newPEAccessor())
 	}
 
 	var parser *ql.Parser
