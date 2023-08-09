@@ -24,6 +24,7 @@ package pe
 import (
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/sys"
+	peparser "github.com/saferwall/pe"
 	"runtime"
 	"time"
 )
@@ -120,6 +121,12 @@ type PE struct {
 	Imphash string `json:"imphash"`
 	// Anomalies contains PE parsing anomalies.
 	Anomalies []string `json:"anomalies"`
+	// Is64 indicates if the PE was built on the 64 bits machine
+	Is64 bool `json:"is_64"`
+
+	dosHeader      peparser.ImageDOSHeader
+	ntHeader       peparser.ImageNtHeader
+	sectionHeaders []peparser.ImageSectionHeader
 
 	filename string
 }

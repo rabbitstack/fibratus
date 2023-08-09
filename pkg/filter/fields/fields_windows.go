@@ -235,7 +235,8 @@ const (
 	// PeCertAfter is the field which indicates the timestamp after certificate is no longer valid
 	PeCertAfter Field = "pe.cert.after"
 	// PeCertBefore is the field which indicates the timestamp of the certificate enrollment date
-	PeCertBefore Field = "pe.cert.before"
+	PeCertBefore       Field = "pe.cert.before"
+	PeIsHeaderModified       = "pe.is_header_modified"
 
 	// KevtSeq is the event sequence number
 	KevtSeq Field = "kevt.seq"

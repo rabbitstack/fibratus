@@ -793,6 +793,21 @@ func (pa *peAccessor) parserOpts() []pe.Option {
 	return opts
 }
 
+func (pa *peAccessor) isHeaderModified(e *kevent.Kevent) bool {
+	exe := e.GetParamAsString(kparams.FileName)
+	if filepath.Ext(exe) != ".exe" {
+		return false
+	}
+	pid := e.Kparams.MustGetPid()
+	addr := e.Kparams.MustGetUint64(kparams.ImageBase)
+	file, err := pe.ParseFile(exe)
+	if err != nil {
+		return false
+	}
+	mem, err := pe.ParseMem(pid, uintptr(addr), false)
+	return err == nil && file.IsHeaderModified(mem)
+}
+
 // ErrPENilCertificate indicates the PE certificate is not available
 var ErrPENilCertificate = errors.New("pe certificate is nil")
 
@@ -840,7 +855,6 @@ func (pa *peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 				}
 			}
 		}
-		kevt.PS.PE = p
 	}
 
 	if p == nil {
@@ -848,6 +862,7 @@ func (pa *peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 	}
 
 cmp:
+	kevt.PS.PE = p
 	switch f {
 	case fields.PeEntrypoint:
 		return p.EntryPoint, nil
@@ -916,6 +931,11 @@ cmp:
 		return p.VersionResources[pe.ProductName], nil
 	case fields.PeProductVersion:
 		return p.VersionResources[pe.ProductVersion], nil
+	case fields.PeIsHeaderModified:
+		if kevt.IsLoadImage() {
+			return pa.isHeaderModified(kevt), nil
+		}
+		return nil, nil
 	default:
 		switch {
 		case f.IsPeSectionsMap():

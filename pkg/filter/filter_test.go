@@ -617,7 +617,6 @@ func TestLazyPEFilter(t *testing.T) {
 		filter  string
 		matches bool
 	}{
-
 		{`pe.sections[.text].entropy > 1.23`, true},
 		{`pe.symbols IN ('GetTextFaceW', 'GetProcessHeap')`, true},
 		{`pe.is_dll`, true},

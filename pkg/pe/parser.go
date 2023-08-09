@@ -24,6 +24,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"expvar"
+	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/util/format"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	peparser "github.com/saferwall/pe"
@@ -240,6 +241,7 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	// parse the NT header
 	err = pe.ParseNTHeader()
 	if err != nil {
@@ -255,8 +257,13 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 		Imports:          make([]string, 0),
 		Sections:         make([]Sec, 0),
 		VersionResources: make(map[string]string),
+		Is64:             pe.Is64,
 		filename:         path,
+		dosHeader:        pe.DOSHeader,
+		ntHeader:         pe.NtHeader,
+		sectionHeaders:   make([]peparser.ImageSectionHeader, 0),
 	}
+	return p, nil
 	switch pe.Is64 {
 	case true:
 		oh64 := pe.NtHeader.OptionalHeader.(peparser.ImageOptionalHeader64)
@@ -294,6 +301,11 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 	p.IsDLL = pe.IsDLL()
 	p.IsDriver = pe.IsDriver()
 	p.IsExecutable = pe.IsEXE()
+
+	// initialize raw section headers
+	for _, sec := range pe.Sections {
+		p.sectionHeaders = append(p.sectionHeaders, sec.Header)
+	}
 
 	if opts.parseSymbols || opts.parseResources || opts.parseSecurity ||
 		opts.calcImphash || opts.parseCLR {
@@ -334,7 +346,9 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 			}
 		}
 	}
-
+	if data == nil {
+		fmt.Println("P", pe.Header)
+	}
 	// calculate imphash
 	if opts.calcImphash {
 		p.Imphash, err = pe.ImpHash()
