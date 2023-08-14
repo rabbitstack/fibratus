@@ -172,12 +172,13 @@ func (s scanner) Scan(evt *kevent.Kevent) (bool, error) {
 	if !evt.IsCreateProcess() && !evt.IsLoadImage() {
 		return false, nil
 	}
+
 	var matches yara.MatchRules
 	sn, err := s.newInternalScanner()
 	if err != nil {
 		return false, err
 	}
-	defer sn.Destroy()
+
 	alertCtx := AlertContext{
 		Timestamp: time.Now().Format(tsLayout),
 	}

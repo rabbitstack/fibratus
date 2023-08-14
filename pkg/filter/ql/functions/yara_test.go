@@ -23,49 +23,59 @@ package functions
 
 import (
 	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/sys"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/sys/windows"
 	"os"
 	"path/filepath"
-	"syscall"
 	"testing"
+	"time"
 )
 
-var pi syscall.ProcessInformation
-
 func TestYara(t *testing.T) {
-	t.SkipNow()
+	pid, proc := runNotepad()
+	for {
+		if sys.IsProcessRunning(proc) {
+			break
+		}
+		time.Sleep(time.Millisecond * 100)
+		log.Infof("%d pid not yet ready", pid)
+	}
+	defer windows.TerminateProcess(proc, 0)
+
 	var tests = []struct {
 		args     []interface{}
 		expected bool
 	}{
 		{
-			[]interface{}{uint32(runNotepad()), `
-rule Notepad : notepad
-{
-	meta:
-		severity = "Normal"
-		date = "2016-07"
-	strings:
-		$c0 = "Notepad" fullword ascii
-	condition:
-		$c0
-}
-			`},
+			[]interface{}{pid, `
+		rule Notepad : notepad
+		{
+			meta:
+				severity = "Normal"
+				date = "2016-07"
+			strings:
+				$c0 = "Notepad" fullword ascii
+			condition:
+				$c0
+		}
+					`},
 			true,
 		},
 		{
 			[]interface{}{"_fixtures/yara-test.dll", `
-rule DLL : dll
-{
-	meta:
-		severity = "Critical"
-		date = "2020-07"
-	strings:
-		$c0 = "Go" fullword ascii
-	condition:
-		$c0
-}
-			`},
+		rule DLL : dll
+		{
+			meta:
+				severity = "Critical"
+				date = "2020-07"
+			strings:
+				$c0 = "Go" fullword ascii
+			condition:
+				$c0
+		}
+					`},
 			true,
 		},
 		{
@@ -84,22 +94,21 @@ rule Notepad : notepad
 			true,
 		},
 		{
-			[]interface{}{uint32(runNotepad()), `
-rule Notepad : notepad
-{
-	meta:
-		severity = "Normal"
-		date = "2016-07"
-	strings:
-		$c0 = "Notfound" fullword ascii
-	condition:
-		$c0
-}
-			`},
+			[]interface{}{pid, `
+		rule Notepad : notepad
+		{
+			meta:
+				severity = "Normal"
+				date = "2016-07"
+			strings:
+				$c0 = "Notfound" fullword ascii
+			condition:
+				$c0
+		}
+					`},
 			false,
 		},
 	}
-	defer syscall.TerminateProcess(pi.Process, uint32(257))
 
 	for i, tt := range tests {
 		f := Yara{}
@@ -108,24 +117,27 @@ rule Notepad : notepad
 	}
 }
 
-func runNotepad() uint32 {
-	var si syscall.StartupInfo
-	argv := syscall.StringToUTF16Ptr(filepath.Join(os.Getenv("windir"), "notepad.exe"))
-	err := syscall.CreateProcess(
+func runNotepad() (uint32, windows.Handle) {
+	var si windows.StartupInfo
+	si.Flags = windows.STARTF_USESHOWWINDOW
+	si.ShowWindow = windows.SW_HIDE
+	var pi windows.ProcessInformation
+	argv := windows.StringToUTF16Ptr(filepath.Join(os.Getenv("windir"), "notepad.exe"))
+	err := windows.CreateProcess(
 		nil,
 		argv,
 		nil,
 		nil,
-		true,
+		false,
 		0,
 		nil,
 		nil,
 		&si,
 		&pi)
 	if err != nil {
-		return 0
+		return 0, 0
 	}
-	return pi.ProcessId
+	return pi.ProcessId, pi.Process
 }
 
 func readNotepadBytes() []byte {
