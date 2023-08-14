@@ -23,6 +23,7 @@ package yara
 
 import (
 	"github.com/hillu/go-yara/v4"
+	log "github.com/sirupsen/logrus"
 	"os"
 	"path/filepath"
 	"testing"
@@ -87,6 +88,8 @@ func TestScan(t *testing.T) {
 	require.NoError(t, err)
 
 	var si windows.StartupInfo
+	si.Flags = windows.STARTF_USESHOWWINDOW
+	si.ShowWindow = windows.SW_HIDE
 	var pi windows.ProcessInformation
 
 	argv := windows.StringToUTF16Ptr(filepath.Join(os.Getenv("windir"), "notepad.exe"))
@@ -169,13 +172,14 @@ func TestScan(t *testing.T) {
 			VersionResources: map[string]string{"CompanyName": "Microsoft Corporation", "FileDescription": "Notepad", "FileVersion": "10.0.18362.693"},
 		},
 	}
-	psnap.On("Find", mock.Anything).Return(proc)
+	psnap.On("Find", mock.Anything).Return(true, proc)
 
 	for {
-		if !sys.IsProcessRunning(pi.Process) {
+		if sys.IsProcessRunning(pi.Process) {
 			break
 		}
 		time.Sleep(time.Millisecond * 100)
+		log.Infof("%d pid not yet ready", pi.Process)
 	}
 
 	kevt := &kevent.Kevent{
@@ -202,7 +206,18 @@ func TestScan(t *testing.T) {
 
 	// test file scanning on DLL that merely contains
 	// the fmt.Println("Go Yara DLL Test") statement
-	match, err = s.Scan(kevt)
+	kevt1 := &kevent.Kevent{
+		Type: ktypes.LoadImage,
+		Name: "LoadImage",
+		Tid:  2484,
+		PID:  859,
+		Kparams: kevent.Kparams{
+			kparams.ImageFilename: {Name: kparams.ImageFilename, Type: kparams.UnicodeString, Value: "_fixtures/yara-test.dll"},
+			kparams.ProcessID:     {Name: kparams.ProcessID, Type: kparams.PID, Value: pi.ProcessId},
+		},
+		Metadata: make(map[kevent.MetadataKey]any),
+	}
+	match, err = s.Scan(kevt1)
 	require.NoError(t, err)
 	require.True(t, match)
 	require.NotNil(t, yaraAlert)

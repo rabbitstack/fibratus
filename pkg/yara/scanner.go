@@ -172,11 +172,13 @@ func (s scanner) Scan(evt *kevent.Kevent) (bool, error) {
 	if !evt.IsCreateProcess() && !evt.IsLoadImage() {
 		return false, nil
 	}
+
 	var matches yara.MatchRules
 	sn, err := s.newInternalScanner()
 	if err != nil {
 		return false, err
 	}
+
 	alertCtx := AlertContext{
 		Timestamp: time.Now().Format(tsLayout),
 	}
@@ -192,11 +194,11 @@ func (s scanner) Scan(evt *kevent.Kevent) (bool, error) {
 			return false, nil
 		}
 		alertCtx.PS = proc
-		//err = sn.SetCallback(&matches).ScanProc(int(pid))
+		err = sn.SetCallback(&matches).ScanProc(int(pid))
 	case ktypes.LoadImage:
 		filename := evt.GetParamAsString(kparams.ImageFilename)
 		alertCtx.Filename = filename
-		//err = sn.SetCallback(&matches).ScanFile(filename)
+		err = sn.SetCallback(&matches).ScanFile(filename)
 	}
 
 	if err != nil {
