@@ -24,6 +24,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	"github.com/rabbitstack/fibratus/pkg/ps"
+	"github.com/rabbitstack/fibratus/pkg/util/hashers"
 	"github.com/rabbitstack/fibratus/pkg/util/signature"
 )
 
@@ -98,6 +99,12 @@ func (m *imageProcessor) processSignature(e *kevent.Kevent) error {
 	checksum := e.Kparams.MustGetUint32(kparams.ImageCheckSum)
 	level := e.Kparams.MustGetUint32(kparams.ImageSignatureLevel)
 	typ := e.Kparams.MustGetUint32(kparams.ImageSignatureType)
+	filename := e.GetParamAsString(kparams.FileName)
+	// some images report the checksum as a zero value. In this
+	// case use the hash of the image name + pid as checksum
+	if checksum == 0 {
+		checksum = hashers.FnvUint32([]byte(filename)) + e.PID
+	}
 	sign, ok := m.signatures[checksum]
 	if !ok {
 		var filename = e.GetParamAsString(kparams.FileName)
