@@ -580,6 +580,7 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 			fileKey   uint64
 			extraInfo uint64
 			viewSize  uint64
+			pid       uint32
 			offset    uint64
 		)
 		viewBase = evt.ReadUint64(0)
@@ -589,12 +590,18 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 		if evt.Version() >= 3 {
 			offset = evt.ReadUint64(32)
 		}
+		if evt.Version() >= 3 {
+			pid = evt.ReadUint32(40)
+		} else {
+			pid = evt.ReadUint32(32)
+		}
 		protect := uint32(extraInfo >> 32)
 		section := uint32(extraInfo >> 52)
 		e.AppendParam(kparams.FileViewBase, kparams.Address, viewBase)
 		e.AppendParam(kparams.FileKey, kparams.Address, fileKey)
 		e.AppendParam(kparams.FileViewSize, kparams.Uint64, viewSize)
 		e.AppendParam(kparams.FileOffset, kparams.Uint64, offset)
+		e.AppendParam(kparams.ProcessID, kparams.PID, pid)
 		e.AppendParam(kparams.MemProtect, kparams.Flags, protect, WithFlags(ViewProtectionFlags))
 		e.AppendParam(kparams.FileViewSectionType, kparams.Enum, section, WithEnum(ViewSectionTypes))
 	case ktypes.SendTCPv4,

@@ -84,9 +84,14 @@ func (e *Kevent) adjustPID() {
 		}
 	case ktypes.File:
 		e.Tid, _ = e.Kparams.GetTid()
-		// on some Windows versions the value of
-		// the PID is invalid in the event header
-		if e.InvalidPid() {
+		switch {
+		case e.InvalidPid() && e.Type == ktypes.MapFileRundown:
+			// a valid pid for map rundown events
+			// is located in the event parameters
+			e.PID = e.Kparams.MustGetPid()
+		case e.InvalidPid():
+			// on some Windows versions the value of
+			// the PID is invalid in the event header
 			access := uint32(windows.THREAD_QUERY_LIMITED_INFORMATION)
 			thread, err := windows.OpenThread(access, false, e.Tid)
 			if err != nil {

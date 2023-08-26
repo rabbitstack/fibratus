@@ -31,7 +31,7 @@ import (
 )
 
 // scanTimeout specifies the timeout interval for the scan operation
-const scanTimeout = time.Second * 10
+var scanTimeout = time.Second * 10
 
 // Yara provides signature-based detection in filters and rules.
 // YARA is a tool aimed at (but not limited to) helping malware
