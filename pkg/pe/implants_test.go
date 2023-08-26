@@ -19,6 +19,7 @@
 package pe
 
 import (
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
 	"os"
@@ -32,7 +33,7 @@ func TestIsHeaderModified(t *testing.T) {
 		executable string
 		modified   bool
 	}{
-		{filepath.Join(os.Getenv("windir"), "notepad.exe"), false},
+		{filepath.Join(os.Getenv("windir"), "explorer.exe"), false},
 	}
 
 	for _, tt := range tests {
@@ -51,7 +52,12 @@ func TestIsHeaderModified(t *testing.T) {
 			&si,
 			&pi)
 		require.NoError(t, err)
-		time.Sleep(time.Millisecond * 300)
+		for {
+			if sys.IsProcessRunning(pi.Process) {
+				break
+			}
+			time.Sleep(time.Millisecond * 100)
+		}
 		defer func() {
 			_ = windows.TerminateProcess(pi.Process, 0)
 		}()
