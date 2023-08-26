@@ -19,9 +19,12 @@
 package filter
 
 import (
+	"errors"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	psnap "github.com/rabbitstack/fibratus/pkg/ps"
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
+	"github.com/rabbitstack/fibratus/pkg/util/signature"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -39,6 +42,8 @@ import (
 type accessor interface {
 	// get fetches the parameter value for the specified filter field.
 	get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error)
+	// setFields sets all fields declared in the expression
+	setFields(fields []fields.Field)
 }
 
 // getAccessors initializes and returns all available accessors.
@@ -47,6 +52,7 @@ func getAccessors() []accessor {
 		newPSAccessor(nil),
 		newPEAccessor(),
 		newMemAccessor(),
+		newDNSAccessor(),
 		newFileAccessor(),
 		newKevtAccessor(),
 		newImageAccessor(),
@@ -68,6 +74,8 @@ func getParentPs(kevt *kevent.Kevent) *pstypes.PS {
 type psAccessor struct {
 	psnap psnap.Snapshotter
 }
+
+func (psAccessor) setFields(fields []fields.Field) {}
 
 func newPSAccessor(psnap psnap.Snapshotter) accessor { return &psAccessor{psnap: psnap} }
 
@@ -513,6 +521,8 @@ func ancestorFields(field string, kevt *kevent.Kevent) (kparams.Value, error) {
 // threadAccessor fetches thread parameters from thread kernel events.
 type threadAccessor struct{}
 
+func (threadAccessor) setFields(fields []fields.Field) {}
+
 func newThreadAccessor() accessor {
 	return &threadAccessor{}
 }
@@ -579,6 +589,8 @@ func (t *threadAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value
 // fileAccessor extracts file specific values.
 type fileAccessor struct{}
 
+func (fileAccessor) setFields(fields []fields.Field) {}
+
 func newFileAccessor() accessor {
 	return &fileAccessor{}
 }
@@ -621,6 +633,8 @@ func (l *fileAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, 
 // imageAccessor extracts image (DLL) event values.
 type imageAccessor struct{}
 
+func (imageAccessor) setFields(fields []fields.Field) {}
+
 func newImageAccessor() accessor {
 	return &imageAccessor{}
 }
@@ -660,6 +674,8 @@ func (i *imageAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value,
 // registryAccessor extracts registry specific parameters.
 type registryAccessor struct{}
 
+func (registryAccessor) setFields(fields []fields.Field) {}
+
 func newRegistryAccessor() accessor {
 	return &registryAccessor{}
 }
@@ -685,6 +701,8 @@ func (r *registryAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Val
 
 // networkAccessor deals with extracting the network specific kernel event parameters.
 type networkAccessor struct{}
+
+func (networkAccessor) setFields(fields []fields.Field) {}
 
 func newNetworkAccessor() accessor { return &networkAccessor{} }
 
@@ -717,6 +735,8 @@ func (n *networkAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Valu
 // handleAccessor extracts handle event values.
 type handleAccessor struct{}
 
+func (handleAccessor) setFields(fields []fields.Field) {}
+
 func newHandleAccessor() accessor { return &handleAccessor{} }
 
 func (h *handleAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
@@ -734,21 +754,100 @@ func (h *handleAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value
 }
 
 // peAccessor extracts PE specific values.
-type peAccessor struct{}
+type peAccessor struct {
+	fields []fields.Field
+}
+
+func (pa *peAccessor) setFields(fields []fields.Field) {
+	pa.fields = fields
+}
+
+func (pa *peAccessor) parserOpts() []pe.Option {
+	var opts []pe.Option
+	for _, f := range pa.fields {
+		if f.IsPeSection() || f.IsPeSectionsMap() {
+			opts = append(opts, pe.WithSections())
+		}
+		if f.IsPeSymbol() {
+			opts = append(opts, pe.WithSymbols())
+		}
+		if f.IsPeSectionEntropy() {
+			opts = append(opts, pe.WithSectionEntropy())
+		}
+		if f.IsPeVersionResource() || f.IsPeResourcesMap() {
+			opts = append(opts, pe.WithVersionResources())
+		}
+		if f.IsPeImphash() {
+			opts = append(opts, pe.WithImphash())
+		}
+		if f.IsPeDotnet() {
+			opts = append(opts, pe.WithCLR())
+		}
+		if f.IsPeAnomalies() {
+			opts = append(opts, pe.WithSections(), pe.WithSymbols())
+		}
+		if f.IsPeSignature() {
+			opts = append(opts, pe.WithSecurity())
+		}
+	}
+	return opts
+}
+
+// ErrPENilCertificate indicates the PE certificate is not available
+var ErrPENilCertificate = errors.New("pe certificate is nil")
 
 func newPEAccessor() accessor {
 	return &peAccessor{}
 }
 
-func (*peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
+func (pa *peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
 	var p *pe.PE
 	if kevt.PS != nil && kevt.PS.PE != nil {
 		p = kevt.PS.PE
 	}
+	// PE enrichment is likely disabled. Load PE data lazily
+	// by only requesting parsing of the PE directories that
+	// are relevant to the fields present in the expression
+	if (kevt.PS != nil && kevt.PS.Exe != "") && p == nil {
+		var err error
+		exe := kevt.PS.Exe
+		p, err = pe.ParseFile(exe, pa.parserOpts()...)
+		if err != nil {
+			return nil, err
+		}
+		if p != nil && f.IsPeSignature() {
+			// verify embedded signature
+			if p.IsSigned && f.IsPeIsTrusted() {
+				p.VerifySignature()
+			}
+			if !p.IsSigned {
+				if !sys.IsWintrustFound() {
+					goto cmp
+				}
+				// maybe the PE is catalog signed?
+				catalog := signature.NewCatalog()
+				err := catalog.Open(exe)
+				if err != nil {
+					goto cmp
+				}
+				defer catalog.Close()
+				p.IsSigned = catalog.IsCatalogSigned()
+				if p.IsSigned && f.IsPeIsTrusted() {
+					p.IsTrusted = catalog.Verify(exe)
+				}
+				if p.IsSigned && f.IsPeCert() {
+					p.Cert, _ = catalog.ParseCertificate()
+				}
+			}
+		}
+		kevt.PS.PE = p
+	}
+
 	if p == nil {
 		return nil, nil
 	}
 
+cmp:
 	switch f {
 	case fields.PeEntrypoint:
 		return p.EntryPoint, nil
@@ -762,6 +861,47 @@ func (*peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, erro
 		return p.Symbols, nil
 	case fields.PeImports:
 		return p.Imports, nil
+	case fields.PeImphash:
+		return p.Imphash, nil
+	case fields.PeIsDotnet:
+		return p.IsDotnet, nil
+	case fields.PeAnomalies:
+		return p.Anomalies, nil
+	case fields.PeIsSigned:
+		return p.IsSigned, nil
+	case fields.PeIsTrusted:
+		return p.IsTrusted, nil
+	case fields.PeCertIssuer:
+		if p.Cert == nil {
+			return nil, ErrPENilCertificate
+		}
+		return p.Cert.Issuer, nil
+	case fields.PeCertSubject:
+		if p.Cert == nil {
+			return nil, ErrPENilCertificate
+		}
+		return p.Cert.Subject, nil
+	case fields.PeCertSerial:
+		if p.Cert == nil {
+			return nil, ErrPENilCertificate
+		}
+		return p.Cert.SerialNumber, nil
+	case fields.PeCertAfter:
+		if p.Cert == nil {
+			return nil, ErrPENilCertificate
+		}
+		return p.Cert.NotAfter, nil
+	case fields.PeCertBefore:
+		if p.Cert == nil {
+			return nil, ErrPENilCertificate
+		}
+		return p.Cert.NotBefore, nil
+	case fields.PeIsDLL:
+		return kevt.Kparams.GetBool(kparams.FileIsDLL)
+	case fields.PeIsDriver:
+		return kevt.Kparams.GetBool(kparams.FileIsDriver)
+	case fields.PeIsExecutable:
+		return kevt.Kparams.GetBool(kparams.FileIsExecutable)
 	case fields.PeCompany:
 		return p.VersionResources[pe.Company], nil
 	case fields.PeCopyright:
@@ -815,6 +955,8 @@ func (*peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, erro
 // memAccessor extracts parameters from memory alloc/free events.
 type memAccessor struct{}
 
+func (memAccessor) setFields(fields []fields.Field) {}
+
 func newMemAccessor() accessor {
 	return &memAccessor{}
 }
@@ -833,6 +975,31 @@ func (*memAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, err
 		return kevt.Kparams.GetUint64(kparams.MemRegionSize)
 	case fields.MemProtectionMask:
 		return kevt.Kparams.GetString(kparams.MemProtectMask)
+	}
+	return nil, nil
+}
+
+// dnsAccessor extracts values from DNS query/response event parameters.
+type dnsAccessor struct{}
+
+func (dnsAccessor) setFields(fields []fields.Field) {}
+
+func newDNSAccessor() accessor {
+	return &dnsAccessor{}
+}
+
+func (*dnsAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
+	switch f {
+	case fields.DNSName:
+		return kevt.GetParamAsString(kparams.DNSName), nil
+	case fields.DNSRR:
+		return kevt.GetParamAsString(kparams.DNSRR), nil
+	case fields.DNSRcode:
+		return kevt.GetParamAsString(kparams.DNSRcode), nil
+	case fields.DNSOptions:
+		return kevt.GetFlagsAsSlice(kparams.DNSOpts), nil
+	case fields.DNSAnswers:
+		return kevt.Kparams.GetSlice(kparams.DNSAnswers)
 	}
 	return nil, nil
 }

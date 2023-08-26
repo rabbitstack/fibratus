@@ -46,6 +46,7 @@ var (
 	skippedImages               = expvar.NewInt("pe.skipped.images")
 	directoryParseErrors        = expvar.NewInt("pe.directory.parse.errors")
 	versionResourcesParseErrors = expvar.NewInt("pe.version.resources.parse.errors")
+	imphashErrors               = expvar.NewInt("pe.imphash.errors")
 )
 
 type opts struct {
@@ -53,8 +54,10 @@ type opts struct {
 	parseSections  bool
 	parseResources bool
 	parseSecurity  bool
+	parseCLR       bool
 	sectionEntropy bool
 	sectionMD5     bool
+	calcImphash    bool
 	excludedImages []string
 }
 
@@ -122,6 +125,20 @@ func WithSecurity() Option {
 	}
 }
 
+// WithImphash indicates if the import hash (imphash) is calculated as part of PE parsing.
+func WithImphash() Option {
+	return func(o *opts) {
+		o.calcImphash = true
+	}
+}
+
+// WithCLR indicates if CLR (Common Language Runtime) header is parsed.
+func WithCLR() Option {
+	return func(o *opts) {
+		o.parseCLR = true
+	}
+}
+
 // ParseFile parses the PE given the file system path and parser options.
 func ParseFile(path string, opts ...Option) (*PE, error) {
 	return parse(path, nil, opts...)
@@ -183,14 +200,14 @@ func newParserOpts(opts opts) *peparser.Options {
 		OmitSecurityDirectory:     !opts.parseSecurity,
 		OmitExceptionDirectory:    true,
 		OmitTLSDirectory:          true,
-		OmitCLRHeaderDirectory:    true,
+		OmitCLRHeaderDirectory:    !opts.parseCLR,
 		OmitDelayImportDirectory:  true,
 		OmitBoundImportDirectory:  true,
 		OmitArchitectureDirectory: true,
 		OmitDebugDirectory:        true,
 		OmitRelocDirectory:        true,
 		OmitResourceDirectory:     !opts.parseResources,
-		OmitImportDirectory:       !opts.parseSymbols,
+		OmitImportDirectory:       !opts.parseSymbols && !opts.calcImphash,
 		OmitExportDirectory:       true,
 		OmitLoadConfigDirectory:   true,
 		OmitGlobalPtrDirectory:    true,
@@ -238,6 +255,7 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 		Imports:          make([]string, 0),
 		Sections:         make([]Sec, 0),
 		VersionResources: make(map[string]string),
+		filename:         path,
 	}
 	switch pe.Is64 {
 	case true:
@@ -251,7 +269,7 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 	}
 
 	// parse section header
-	if opts.parseSections {
+	if opts.parseSections || opts.parseResources {
 		err = pe.ParseSectionHeader()
 		if err != nil {
 			return nil, err
@@ -272,10 +290,18 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 		p.Sections = append(p.Sections, sec)
 	}
 
-	// parse data directories
-	err = pe.ParseDataDirectories()
-	if err != nil {
-		directoryParseErrors.Add(1)
+	// retrieve basic PE data
+	p.IsDLL = pe.IsDLL()
+	p.IsDriver = pe.IsDriver()
+	p.IsExecutable = pe.IsEXE()
+
+	if opts.parseSymbols || opts.parseResources || opts.parseSecurity ||
+		opts.calcImphash || opts.parseCLR {
+		// parse data directories
+		err = pe.ParseDataDirectories()
+		if err != nil {
+			directoryParseErrors.Add(1)
+		}
 	}
 
 	// add imported symbols
@@ -289,12 +315,13 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 
 	if opts.parseResources {
 		// parse version resources
-		p.VersionResources, err = ParseVersionResources(pe)
+		p.VersionResources, err = pe.ParseVersionResources()
 		if err != nil {
 			versionResourcesParseErrors.Add(1)
 		}
 	}
 
+	// parse certificate info
 	if opts.parseSecurity {
 		p.IsSigned = pe.IsSigned
 		if pe.HasCertificate {
@@ -307,6 +334,17 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 			}
 		}
 	}
+
+	// calculate imphash
+	if opts.calcImphash {
+		p.Imphash, err = pe.ImpHash()
+		if err != nil {
+			imphashErrors.Add(1)
+		}
+	}
+
+	p.IsDotnet = pe.HasCLR
+	p.Anomalies = pe.Anomalies
 
 	return p, nil
 }

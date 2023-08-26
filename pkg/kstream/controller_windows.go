@@ -90,7 +90,7 @@ func NewController(cfg config.KstreamConfig) *Controller {
 			// core system events
 			etw.KernelLoggerSession,
 			etw.KernelTraceControlGUID,
-			0x0, // no keywords
+			0x0, // no keywords for system provider
 			true,
 		},
 		{
@@ -99,6 +99,12 @@ func NewController(cfg config.KstreamConfig) *Controller {
 			etw.KernelAuditAPICallsGUID,
 			0x0, // no keywords, so we accept all events
 			cfg.EnableAuditAPIEvents,
+		},
+		{
+			etw.DNSClientSession,
+			etw.DNSClientGUID,
+			0x0, // enables DNS query/reply events
+			cfg.EnableDNSEvents,
 		},
 	}
 	controller := &Controller{

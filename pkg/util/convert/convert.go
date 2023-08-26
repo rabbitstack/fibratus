@@ -16,25 +16,17 @@
  * limitations under the License.
  */
 
-package kevent
+package convert
 
-import "testing"
-
-func TestParamFlags(t *testing.T) {
-	var tests = []struct {
-		flag     uint64
-		flags    ParamFlags
-		expected string
-	}{
-		{0x1fffff, PsAccessRightFlags, "ALL_ACCESS"},
-		{0x1400, PsAccessRightFlags, "QUERY_INFORMATION|QUERY_LIMITED_INFORMATION"},
-		{0x1800, ThreadAccessRightFlags, "QUERY_LIMITED_INFORMATION"},
+// Btoi converts the provided bool value to uint8 integer.
+func Btoi(b bool) uint8 {
+	if b {
+		return 1
 	}
+	return 0
+}
 
-	for i, tt := range tests {
-		s := tt.flags.String(tt.flag)
-		if s != tt.expected {
-			t.Errorf("%d. %q flag mismatch: exp=%s got=%s", i, tt.expected, tt.expected, s)
-		}
-	}
+// Itob converts the provided uint8 integer to a bool value.
+func Itob(i uint8) bool {
+	return i > 0
 }

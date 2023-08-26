@@ -161,6 +161,8 @@ const (
 	Key
 	// Flags represents a bitmask of flags
 	Flags
+	// Flags64 represents an extended (64 bits) bitmask of flags
+	Flags64
 	// Address is the memory address reference
 	Address
 	// HandleType represents the handle type such as Mutex or File

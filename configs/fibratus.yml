@@ -187,6 +187,9 @@ kstream:
   # Determines whether kernel Audit API calls events are collected
   #enable-audit-api: true
 
+  # Determines whether DNS client events are collected
+  #enable-dns: true
+
   # Determines which events are dropped either by the event name or the process' image
   # name that triggered the event.
   blacklist:

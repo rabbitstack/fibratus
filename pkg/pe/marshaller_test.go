@@ -22,13 +22,14 @@
 package pe
 
 import (
+	kcapver "github.com/rabbitstack/fibratus/pkg/kcap/version"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
 )
 
-func TestMetadataMarshal(t *testing.T) {
+func TestPEMarshal(t *testing.T) {
 	now := time.Now()
 
 	pe := &PE{
@@ -44,12 +45,25 @@ func TestMetadataMarshal(t *testing.T) {
 		Symbols:          []string{"SelectObject", "GetTextFaceW", "EnumFontsW", "TextOutW", "GetProcessHeap"},
 		Imports:          []string{"GDI32.dll", "USER32.dll", "msvcrt.dll", "api-ms-win-core-libraryloader-l1-2-0.dl"},
 		VersionResources: map[string]string{"CompanyName": "Microsoft Corporation", "FileDescription": "Notepad", "FileVersion": "10.0.18362.693"},
+		IsSigned:         true,
+		IsTrusted:        true,
+		Cert: &Cert{
+			Issuer:       "Washington, Redmond, Microsoft Corporation",
+			Subject:      "Washington, Redmond, Microsoft Corporation",
+			SerialNumber: "330000023241fb59996dcc4dff000000000232",
+			NotBefore:    time.Now(),
+			NotAfter:     time.Now(),
+		},
+		IsExecutable: true,
+		IsDotnet:     true,
+		Imphash:      "5d3861c5c547f8a34e471ba273a732b2",
+		Anomalies:    []string{"optional header checksum is invalid", "image base is 0"},
 	}
 
 	b := pe.Marshal()
 
 	newPE := &PE{VersionResources: make(map[string]string)}
-	err := newPE.Unmarshal(b)
+	err := newPE.Unmarshal(b, kcapver.PESecV2)
 	require.NoError(t, err)
 
 	assert.Equal(t, uint16(7), newPE.NumberOfSections)
@@ -83,4 +97,23 @@ func TestMetadataMarshal(t *testing.T) {
 	assert.Equal(t, "10.0.18362.693", newPE.VersionResources["FileVersion"])
 	assert.Equal(t, "Microsoft Corporation", newPE.VersionResources["CompanyName"])
 	assert.Equal(t, "Notepad", newPE.VersionResources["FileDescription"])
+
+	assert.True(t, newPE.IsSigned)
+	assert.True(t, newPE.IsTrusted)
+
+	assert.NotNil(t, newPE.Cert)
+	assert.False(t, newPE.Cert.NotBefore.IsZero())
+	assert.False(t, newPE.Cert.NotAfter.IsZero())
+
+	assert.Equal(t, pe.Cert.SerialNumber, newPE.Cert.SerialNumber)
+	assert.Equal(t, pe.Cert.Subject, newPE.Cert.Subject)
+	assert.Equal(t, pe.Cert.Issuer, newPE.Cert.Issuer)
+
+	assert.False(t, newPE.IsDriver)
+	assert.False(t, newPE.IsDLL)
+	assert.True(t, newPE.IsExecutable)
+	assert.True(t, newPE.IsDotnet)
+	assert.Equal(t, pe.Imphash, newPE.Imphash)
+	assert.Equal(t, len(pe.Anomalies), len(newPE.Anomalies))
+	assert.Contains(t, newPE.Anomalies, "image base is 0")
 }

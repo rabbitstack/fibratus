@@ -34,6 +34,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -423,6 +424,36 @@ func TestConsumerEvents(t *testing.T) {
 			},
 			false,
 		},
+		{
+			"query dns",
+			func() error {
+				_, err := net.LookupHost("dns.google")
+				return err
+			},
+			func(e *kevent.Kevent) bool {
+				return e.CurrentPid() && e.Type == ktypes.QueryDNS && e.IsDNS() &&
+					e.Type.Subcategory() == ktypes.DNS &&
+					e.GetParamAsString(kparams.DNSName) == "dns.google" &&
+					e.GetParamAsString(kparams.DNSRR) == "A"
+			},
+			false,
+		},
+		{
+			"reply dns",
+			func() error {
+				_, err := net.LookupHost("dns.google")
+				return err
+			},
+			func(e *kevent.Kevent) bool {
+				return e.CurrentPid() && e.Type == ktypes.ReplyDNS && e.IsDNS() &&
+					e.Type.Subcategory() == ktypes.DNS &&
+					e.GetParamAsString(kparams.DNSName) == "dns.google" &&
+					e.GetParamAsString(kparams.DNSRR) == "AAAA" &&
+					e.GetParamAsString(kparams.DNSRcode) == "NOERROR" &&
+					e.GetParamAsString(kparams.DNSAnswers) != ""
+			},
+			false,
+		},
 	}
 
 	psnap := new(ps.SnapshotterMock)
@@ -449,6 +480,7 @@ func TestConsumerEvents(t *testing.T) {
 		EnableRegistryKevents: true,
 		EnableMemKevents:      true,
 		EnableHandleKevents:   true,
+		EnableDNSEvents:       true,
 	}
 
 	kctrl := NewController(kstreamConfig)

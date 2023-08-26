@@ -23,7 +23,9 @@ package pe
 
 import (
 	"fmt"
+	kcapver "github.com/rabbitstack/fibratus/pkg/kcap/version"
 	"github.com/rabbitstack/fibratus/pkg/util/bytes"
+	"github.com/rabbitstack/fibratus/pkg/util/convert"
 	"math"
 	"time"
 	"unsafe"
@@ -89,11 +91,39 @@ func (pe *PE) Marshal() []byte {
 		b = append(b, v...)
 	}
 
+	// signature and cert data
+	b = append(b, convert.Btoi(pe.IsSigned))
+	b = append(b, convert.Btoi(pe.IsTrusted))
+	if pe.Cert != nil {
+		crt := pe.Cert.Marshal()
+		b = append(b, bytes.WriteUint32(uint32(len(crt)))...)
+		b = append(b, crt...)
+	} else {
+		b = append(b, bytes.WriteUint32(0)...)
+	}
+
+	// PE binary format
+	b = append(b, convert.Btoi(pe.IsDriver))
+	b = append(b, convert.Btoi(pe.IsDLL))
+	b = append(b, convert.Btoi(pe.IsExecutable))
+	b = append(b, convert.Btoi(pe.IsDotnet))
+
+	// imphash
+	b = append(b, bytes.WriteUint16(uint16(len(pe.Imphash)))...)
+	b = append(b, pe.Imphash...)
+
+	// anomalies
+	b = append(b, bytes.WriteUint16(uint16(len(pe.Anomalies)))...)
+	for _, s := range pe.Anomalies {
+		b = append(b, bytes.WriteUint16(uint16(len(s)))...)
+		b = append(b, s...)
+	}
+
 	return b
 }
 
 // Unmarshal recovers the PE metadata from the byte stream.
-func (pe *PE) Unmarshal(b []byte) error {
+func (pe *PE) Unmarshal(b []byte, ver kcapver.Version) error {
 	if len(b) < 6 {
 		return fmt.Errorf("expected at least 6 bytes but got %d bytes", len(b))
 	}
@@ -208,18 +238,125 @@ func (pe *PE) Unmarshal(b []byte) error {
 		}
 	}
 
+	offset += roffset
+
+	if ver >= kcapver.PESecV2 {
+		pe.IsSigned = convert.Itob(b[20+offset])
+		pe.IsTrusted = convert.Itob(b[21+offset])
+
+		certSize := bytes.ReadUint32(b[22+offset:])
+		if certSize > 0 {
+			pe.Cert = &Cert{}
+			err := pe.Cert.Unmarshal(b, offset, certSize)
+			if err != nil {
+				return err
+			}
+		}
+
+		offset += certSize
+
+		pe.IsDriver = convert.Itob(b[26+offset])
+		pe.IsDLL = convert.Itob(b[27+offset])
+		pe.IsExecutable = convert.Itob(b[28+offset])
+		pe.IsDotnet = convert.Itob(b[29+offset])
+
+		// read impash
+		l = bytes.ReadUint16(b[30+offset:])
+		buf = b[32+offset:]
+		offset += uint32(l)
+		pe.Imphash = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
+
+		// read anomalies
+		nanomalies := bytes.ReadUint16(b[32+offset:])
+		pe.Anomalies = make([]string, nanomalies)
+		var off uint32
+		for n := uint16(0); n < nanomalies; n++ {
+			l := bytes.ReadUint16(b[34+offset+off:])
+			buf := b[36+offset+off:]
+			pe.Anomalies[n] = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
+			off += 2 + uint32(l)
+		}
+	}
+
+	return nil
+}
+
+// Marshal writes certificate info into a raw buffer.
+func (c *Cert) Marshal() []byte {
+	b := make([]byte, 0)
+
+	before := make([]byte, 0)
+	before = c.NotBefore.AppendFormat(before, time.RFC3339Nano)
+	b = append(b, bytes.WriteUint16(uint16(len(before)))...)
+	b = append(b, before...)
+
+	after := make([]byte, 0)
+	after = c.NotAfter.AppendFormat(after, time.RFC3339Nano)
+	b = append(b, bytes.WriteUint16(uint16(len(after)))...)
+	b = append(b, after...)
+
+	b = append(b, bytes.WriteUint16(uint16(len(c.SerialNumber)))...)
+	b = append(b, c.SerialNumber...)
+	b = append(b, bytes.WriteUint16(uint16(len(c.Subject)))...)
+	b = append(b, c.Subject...)
+	b = append(b, bytes.WriteUint16(uint16(len(c.Issuer)))...)
+	b = append(b, c.Issuer...)
+
+	return b
+}
+
+// Unmarshal decodes cert info from the raw buffer. This method
+// assumes the certificate structure size was already read.
+func (c *Cert) Unmarshal(b []byte, offset, certSize uint32) error {
+	if certSize > uint32(len(b)) {
+		return fmt.Errorf("invalid PE cert size. Got %d but max buffer size is %d", certSize, len(b))
+	}
+
+	// read not before
+	l := bytes.ReadUint16(b[26+offset:])
+	buf := b[28+offset:]
+	offset += uint32(l)
+	if len(buf) > 0 {
+		c.NotBefore, _ = time.Parse(time.RFC3339Nano, string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l]))
+	}
+
+	// read not after
+	l = bytes.ReadUint16(b[28+offset:])
+	buf = b[30+offset:]
+	offset += uint32(l)
+	if len(buf) > 0 {
+		c.NotAfter, _ = time.Parse(time.RFC3339Nano, string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l]))
+	}
+
+	// read serial
+	l = bytes.ReadUint16(b[30+offset:])
+	buf = b[32+offset:]
+	offset += uint32(l)
+	c.SerialNumber = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
+
+	// read subject
+	l = bytes.ReadUint16(b[32+offset:])
+	buf = b[34+offset:]
+	offset += uint32(l)
+	c.Subject = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
+
+	// read issuer
+	l = bytes.ReadUint16(b[34+offset:])
+	buf = b[36+offset:]
+	c.Issuer = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
+
 	return nil
 }
 
 // NewFromKcap restores the PE metadata from the byte stream.
-func NewFromKcap(b []byte) (*PE, error) {
+func NewFromKcap(b []byte, ver kcapver.Version) (*PE, error) {
 	pe := &PE{
 		Sections:         make([]Sec, 0),
 		Symbols:          make([]string, 0),
 		Imports:          make([]string, 0),
 		VersionResources: make(map[string]string),
 	}
-	if err := pe.Unmarshal(b); err != nil {
+	if err := pe.Unmarshal(b, ver); err != nil {
 		return nil, err
 	}
 	return pe, nil

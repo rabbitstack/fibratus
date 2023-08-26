@@ -28,66 +28,47 @@ import (
 var isWintrustDLLFound bool
 var once sync.Once
 
-type opts struct {
-	onlyCert bool
+// Wrap returns a new signature form signature type and level.
+func Wrap(typ, level uint32) *Signature {
+	return &Signature{Type: typ, Level: level}
 }
 
-// Option represents the option that influences signature verification/checking process
-type Option func(o *opts)
-
-// OnlyCert indicates if only certificate info is fetched for the signature. If this
-// option is set, it is assumed the signature was already checked.
-func OnlyCert() Option {
-	return func(o *opts) {
-		o.onlyCert = true
+// GetCertificate returns certificate details for the specific PE object.
+func GetCertificate(filename string) (*pe.Cert, error) {
+	onceWintrustDLL()
+	f, err := pe.ParseFile(filename, pe.WithSecurity())
+	if err != nil {
+		return nil, err
 	}
+	if f.Cert != nil {
+		return f.Cert, nil
+	}
+	if !isWintrustDLLFound {
+		return nil, ErrWintrustUnavailable
+	}
+	// parse catalog certificate
+	catalog := NewCatalog()
+	if err := catalog.Open(filename); err != nil {
+		return nil, err
+	}
+	defer catalog.Close()
+	cert, err := catalog.ParseCertificate()
+	if err != nil {
+		return nil, err
+	}
+	return cert, nil
 }
 
-// CheckWithOpts determines if the provided executable image or DLL is signed.
+// Check determines if the provided executable image or DLL is signed.
 // It first parses the PE security directory to look for the signature
 // information. If the certificate is not embedded inside the PE object
-// then this method will try to locate the hash in the catalog file.
-// If OnlyCert option is specified, then only certificate information is
-// fetched for the particular executable image, DLL, or driver. If the function
-// returns a nil value, this indicates the provided image is not signed.
-func CheckWithOpts(filename string, options ...Option) (*Signature, error) {
-	once.Do(func() {
-		isWintrustDLLFound = sys.IsWintrustFound()
-		if !isWintrustDLLFound {
-			log.Warn("unable to find wintrust.dll library. This will lead to " +
-				"PE objects signature verification to be skipped possibly " +
-				"causing false positive samples in detection rules relying on " +
-				"image signature filter fields")
-		}
-	})
-	var opts opts
-	for _, opt := range options {
-		opt(&opts)
-	}
-	// the signature is assumed to be verified, so we just extract cert info
-	if opts.onlyCert {
-		f, err := pe.ParseFile(filename, pe.WithSecurity())
-		if err != nil {
-			return nil, err
-		}
-		if f.Cert != nil {
-			return &Signature{filename: filename, Cert: f.Cert}, nil
-		}
-		if !isWintrustDLLFound {
-			return nil, ErrWintrustUnavailable
-		}
-		// parse catalog certificate
-		catalog := NewCatalog()
-		if err := catalog.Open(filename); err != nil {
-			return nil, err
-		}
-		cert, err := catalog.ParseCertificate()
-		if err != nil {
-			return nil, err
-		}
-		return &Signature{filename: filename, Cert: cert}, nil
-	}
-
+// then this method will try to locate the hash in the catalog file. If
+// the certificate parsing is successful, this function returns the signature
+// structure containing the signature type and certificate info. If the signature
+// is not present, this function returns ErrNotSigned error. To verify the signature,
+// call the Verify method of the Signature structure.
+func Check(filename string) (*Signature, error) {
+	onceWintrustDLL()
 	// check if the signature is embedded in PE
 	f, err := pe.ParseFile(filename, pe.WithSecurity())
 	if err != nil {
@@ -106,6 +87,7 @@ func CheckWithOpts(filename string, options ...Option) (*Signature, error) {
 	if err := catalog.Open(filename); err != nil {
 		return nil, err
 	}
+	defer catalog.Close()
 	if catalog.IsCatalogSigned() {
 		cert, err := catalog.ParseCertificate()
 		if err != nil {
@@ -128,9 +110,22 @@ func (s *Signature) Verify() bool {
 		return false
 	}
 	s.Level = UnsignedLevel
-	if s.VerifyEmbedded() || s.VerifyCatalog() {
+	isTrusted := s.VerifyEmbedded() || s.VerifyCatalog()
+	if isTrusted {
 		s.Level = AuthenticodeLevel
-		return true
+		return isTrusted
 	}
 	return false
+}
+
+func onceWintrustDLL() {
+	once.Do(func() {
+		isWintrustDLLFound = sys.IsWintrustFound()
+		if !isWintrustDLLFound {
+			log.Warn("unable to find wintrust.dll library. This will lead to " +
+				"PE objects signature verification to be skipped possibly " +
+				"causing false positive samples in detection rules relying on " +
+				"image signature filter fields")
+		}
+	})
 }

@@ -176,12 +176,12 @@ func Empty() *Kevent {
 }
 
 // NewFromKcap recovers the event instance from the capture byte buffer.
-func NewFromKcap(buf []byte) (*Kevent, error) {
+func NewFromKcap(buf []byte, ver kcapver.Version) (*Kevent, error) {
 	e := &Kevent{
 		Kparams:  make(Kparams),
 		Metadata: make(map[MetadataKey]any),
 	}
-	if err := e.UnmarshalRaw(buf, kcapver.KevtSecV1); err != nil {
+	if err := e.UnmarshalRaw(buf, ver); err != nil {
 		return nil, err
 	}
 	return e, nil

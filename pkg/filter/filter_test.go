@@ -24,6 +24,8 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/stretchr/testify/assert"
 	"net"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -45,6 +47,7 @@ var cfg = &config.Config{
 		EnableImageKevents:    true,
 		EnableThreadKevents:   true,
 		EnableMemKevents:      true,
+		EnableDNSEvents:       true,
 	},
 	Filters: &config.Filters{},
 	PE:      pe.Config{Enabled: true},
@@ -57,6 +60,10 @@ func TestFilterCompile(t *testing.T) {
 	require.EqualError(t, f.Compile(), "expected at least one field or operator but zero found")
 	f = New(`ps.name`, cfg)
 	require.EqualError(t, f.Compile(), "expected at least one field or operator but zero found")
+	f = New(`pe.is_exec`, cfg)
+	require.NoError(t, f.Compile())
+	f = New(`length(pe.imphash) > 0`, cfg)
+	require.NoError(t, f.Compile())
 	f = New(`ps.name =`, cfg)
 	require.EqualError(t, f.Compile(), "ps.name =\n╭─────────^\n|\n|\n╰─────────────────── expected field, bound field, string, number, bool, ip, function")
 }
@@ -71,42 +78,6 @@ func TestSeqFilterCompile(t *testing.T) {
 	assert.Len(t, f.GetSequence().Expressions, 2)
 	assert.NotNil(t, f.GetSequence().Expressions[0].By)
 	assert.True(t, len(f.GetStringFields()) > 0)
-}
-
-func TestNarrowAccessors(t *testing.T) {
-	var tests = []struct {
-		f                Filter
-		expectedAccesors int
-	}{
-		{
-			New(`ps.name = 'cmd.exe' and kevt.name = 'CreateProcess' or kevt.name in ('TerminateProcess', 'CreateFile')`, cfg),
-			2,
-		},
-		{
-			New(`ps.modules[kernel32.dll].location = 'C:\\Windows\\System32'`, cfg),
-			1,
-		},
-		{
-			New(`handle.type = 'Section' and pe.sections > 1 and kevt.name = 'CreateHandle'`, cfg),
-			3,
-		},
-		{
-			New(`sequence |kevt.name = 'CreateProcess'| as e1 |kevt.name = 'CreateFile' and file.name = $e1.ps.exe |`, cfg),
-			3,
-		},
-		{
-			New(`base(file.name) = 'kernel32.dll'`, cfg),
-			1,
-		},
-	}
-
-	for i, tt := range tests {
-		require.NoError(t, tt.f.Compile())
-		naccessors := len(tt.f.(*filter).accessors)
-		if tt.expectedAccesors != naccessors {
-			t.Errorf("%d. accessors mismatch: exp=%d got=%d", i, tt.expectedAccesors, naccessors)
-		}
-	}
 }
 
 func TestSeqFilterInvalidBoundRefs(t *testing.T) {
@@ -629,6 +600,57 @@ func TestPEFilter(t *testing.T) {
 	}
 }
 
+func TestLazyPEFilter(t *testing.T) {
+	kevt := &kevent.Kevent{
+		Type: ktypes.LoadImage,
+		PS: &pstypes.PS{
+			PID: 2312,
+			Exe: filepath.Join(os.Getenv("windir"), "notepad.exe"),
+		},
+		Kparams: kevent.Kparams{
+			kparams.FileIsDLL: {Name: kparams.FileIsDLL, Type: kparams.Bool, Value: true},
+			kparams.FileName:  {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
+		},
+	}
+
+	var tests = []struct {
+		filter  string
+		matches bool
+	}{
+
+		{`pe.sections[.text].entropy > 1.23`, true},
+		{`pe.symbols IN ('GetTextFaceW', 'GetProcessHeap')`, true},
+		{`pe.is_dll`, true},
+		{`length(pe.imphash) > 0`, true},
+		{`pe.is_dotnet`, false},
+		{`pe.resources[FileDesc] icontains 'Notepad'`, true},
+		{`pe.file.name ~= 'NOTEPAD.EXE'`, true},
+		{`pe.nsymbols > 10 AND pe.nsections > 2`, true},
+		{`pe.nsections > 1`, true},
+		{`length(pe.anomalies) = 0`, true},
+		{`pe.is_signed`, true},
+		{`pe.is_trusted`, true},
+		{`pe.cert.subject icontains 'microsoft'`, true},
+		{`pe.cert.issuer icontains 'microsoft'`, true},
+		{`length(pe.cert.serial) > 0`, true},
+	}
+
+	for i, tt := range tests {
+		f := New(tt.filter, cfg)
+		err := f.Compile()
+		if err != nil {
+			t.Fatal(err)
+		}
+		require.Nil(t, kevt.PS.PE)
+		matches := f.Run(kevt)
+		if matches != tt.matches {
+			t.Errorf("%d. %q pe lazy filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
+		}
+		require.NotNil(t, kevt.PS.PE)
+		kevt.PS.PE = nil
+	}
+}
+
 func TestMemFilter(t *testing.T) {
 	kpars := kevent.Kparams{
 		kparams.MemRegionSize:  {Name: kparams.MemRegionSize, Type: kparams.Uint64, Value: uint64(8192)},
@@ -674,6 +696,49 @@ func TestMemFilter(t *testing.T) {
 		matches := f.Run(kevt)
 		if matches != tt.matches {
 			t.Errorf("%d. %q mem filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
+		}
+	}
+}
+
+func TestDNSFilter(t *testing.T) {
+	kevt := &kevent.Kevent{
+		Type: ktypes.ReplyDNS,
+		Tid:  2484,
+		PID:  859,
+		PS: &pstypes.PS{
+			Name: "cmd.exe",
+		},
+		Category: ktypes.Net,
+		Kparams: kevent.Kparams{
+			kparams.DNSName:    {Name: kparams.DNSName, Type: kparams.UnicodeString, Value: "r3.o.lencr.org"},
+			kparams.DNSRR:      {Name: kparams.DNSRR, Type: kparams.Enum, Value: uint32(0x0001), Enum: kevent.DNSRecordTypes},
+			kparams.DNSOpts:    {Name: kparams.DNSOpts, Type: kparams.Flags64, Value: uint64(0x00006000), Flags: kevent.DNSOptsFlags},
+			kparams.DNSRcode:   {Name: kparams.DNSRcode, Type: kparams.Enum, Value: uint32(0), Enum: kevent.DNSResponseCodes},
+			kparams.DNSAnswers: {Name: kparams.DNSAnswers, Type: kparams.Slice, Value: []string{"incoming.telemetry.mozilla.org", "a1887.dscq.akamai.net"}},
+		},
+	}
+
+	var tests = []struct {
+		filter  string
+		matches bool
+	}{
+
+		{`dns.name = 'r3.o.lencr.org'`, true},
+		{`dns.rr = 'A'`, true},
+		{`dns.options in ('ADDRCONFIG', 'DUAL_ADDR')`, true},
+		{`dns.rcode = 'NOERROR'`, true},
+		{`dns.answers in ('incoming.telemetry.mozilla.org')`, true},
+	}
+
+	for i, tt := range tests {
+		f := New(tt.filter, cfg)
+		err := f.Compile()
+		if err != nil {
+			t.Fatal(err)
+		}
+		matches := f.Run(kevt)
+		if matches != tt.matches {
+			t.Errorf("%d. %q dns filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
 	}
 }

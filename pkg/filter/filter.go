@@ -68,10 +68,9 @@ type filter struct {
 	accessors   []accessor
 	fields      []fields.Field
 	boundFields []*ql.BoundFieldLiteral
-	// useFuncValuer determines whether we should supply the function valuer
-	useFuncValuer bool
 	// stringFields contains filter field names mapped to their string values
 	stringFields map[fields.Field][]string
+	hasFunctions bool
 }
 
 // Compile parsers the filter expression and builds a binary expression tree
@@ -114,7 +113,7 @@ func (f *filter) Compile() error {
 				f.addBoundField(rhs)
 			}
 		case *ql.Function:
-			f.useFuncValuer = true
+			f.hasFunctions = true
 			for _, arg := range expr.Args {
 				if field, ok := arg.(*ql.FieldLiteral); ok {
 					f.addField(fields.Field(field.Value))
@@ -122,6 +121,11 @@ func (f *filter) Compile() error {
 				if field, ok := arg.(*ql.BoundFieldLiteral); ok {
 					f.addBoundField(field)
 				}
+			}
+		case *ql.FieldLiteral:
+			field := fields.Field(expr.Value)
+			if fields.IsBoolean(field) {
+				f.addField(field)
 			}
 		}
 	}
@@ -138,7 +142,7 @@ func (f *filter) Compile() error {
 			}
 		}
 	}
-	if len(f.fields) == 0 && !f.useFuncValuer {
+	if len(f.fields) == 0 && !f.hasFunctions {
 		return ErrNoFields
 	}
 	// only retain accessors for declared filter fields
@@ -150,7 +154,7 @@ func (f *filter) Run(kevt *kevent.Kevent) bool {
 	if f.expr == nil {
 		return false
 	}
-	return ql.Eval(f.expr, f.mapValuer(kevt), f.useFuncValuer)
+	return ql.Eval(f.expr, f.mapValuer(kevt), f.hasFunctions)
 }
 
 func (f *filter) RunSequence(kevt *kevent.Kevent, seqID uint16, partials map[uint16][]*kevent.Kevent) bool {
@@ -208,7 +212,7 @@ func (f *filter) RunSequence(kevt *kevent.Kevent, seqID uint16, partials map[uin
 				}
 			}
 			n++
-			match = ql.Eval(expr.Expr, valuer, f.useFuncValuer)
+			match = ql.Eval(expr.Expr, valuer, f.hasFunctions)
 			if match {
 				break
 			}
@@ -231,9 +235,9 @@ func (f *filter) RunSequence(kevt *kevent.Kevent, seqID uint16, partials map[uin
 					}
 				}
 			}
-			match = joinsEqual(joins) && ql.Eval(expr.Expr, valuer, f.useFuncValuer)
+			match = joinsEqual(joins) && ql.Eval(expr.Expr, valuer, f.hasFunctions)
 		} else {
-			match = ql.Eval(expr.Expr, valuer, f.useFuncValuer)
+			match = ql.Eval(expr.Expr, valuer, f.hasFunctions)
 		}
 		if match && !by.IsEmpty() {
 			if v := valuer[by.String()]; v != nil {

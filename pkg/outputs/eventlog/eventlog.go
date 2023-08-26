@@ -245,6 +245,10 @@ func ktypeToEventID(kevt *kevent.Kevent) uint32 {
 		return 52
 	case ktypes.DuplicateHandle:
 		return 53
+	case ktypes.QueryDNS:
+		return 54
+	case ktypes.ReplyDNS:
+		return 55
 	}
 	return unknownEventID
 }

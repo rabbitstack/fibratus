@@ -109,6 +109,12 @@ const (
 	FileIrpPtr = "irp"
 	// FileExtraInfo is the parameter that represents extra information returned by the file system for the operation. For example for a read request, the actual number of bytes that were read.
 	FileExtraInfo = "extra_info"
+	// FileIsDLL is the parameter that indicates if the file is a DLL
+	FileIsDLL = "is_dll"
+	// FileIsDriver is the parameter that indicates if the file is a driver
+	FileIsDriver = "is_driver"
+	// FileIsExecutable is the parameter that indicates if the file is an executable
+	FileIsExecutable = "is_exec"
 
 	// FileViewBase is the parameter that represents the base address of the mapped section.
 	FileViewBase = "view_base"
@@ -194,6 +200,17 @@ const (
 	NetSIPNames = "sip_names"
 	// NetDIPNames is the field that denotes the destination IP address names.
 	NetDIPNames = "dip_names"
+
+	// DNSName is the field that represents the DNS query name
+	DNSName = "name"
+	// DNSRR is the field that represents the DNS record type
+	DNSRR = "rr"
+	// DNSOpts is the field that represents the DNS options
+	DNSOpts = "options"
+	// DNSRcode is the field that represents the DNS response code
+	DNSRcode = "rcode"
+	// DNSAnswers is the field that represents DNS response answers
+	DNSAnswers = "answers"
 
 	// HandleID identifies the parameter that specifies the handle identifier.
 	HandleID = "handle_id"

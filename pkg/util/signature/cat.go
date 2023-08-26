@@ -117,11 +117,11 @@ func (c *Cat) ParseCertificate() (*pe.Cert, error) {
 		return nil, err
 	}
 	defer f.Close()
-	cert, err := io.ReadAll(f)
+	crt, err := io.ReadAll(f)
 	if err != nil {
 		return nil, err
 	}
-	pkcs, err := pkcs7.Parse(cert)
+	pkcs, err := pkcs7.Parse(crt)
 	if err != nil {
 		return nil, err
 	}

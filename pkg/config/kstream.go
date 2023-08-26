@@ -40,6 +40,7 @@ const (
 	enableHandleKevents   = "kstream.enable-handle"
 	enableMemKevents      = "kstream.enable-mem"
 	enableAuditAPIEvents  = "kstream.enable-audit-api"
+	enableDNSEvents       = "kstream.enable-dns"
 	bufferSize            = "kstream.buffer-size"
 	minBuffers            = "kstream.min-buffers"
 	maxBuffers            = "kstream.max-buffers"
@@ -75,6 +76,8 @@ type KstreamConfig struct {
 	EnableMemKevents bool `json:"enable-memory" yaml:"enable-memory"`
 	// EnableAuditAPIEvents indicates if kernel audit API calls events are enabled
 	EnableAuditAPIEvents bool `json:"enable-audit-api" yaml:"enable-audit-api"`
+	// EnableDNSEvents indicates if DNS client events are enabled
+	EnableDNSEvents bool `json:"enable-dns" yaml:"enable-dns"`
 	// BufferSize represents the amount of memory allocated for each event tracing session buffer, in kilobytes.
 	// The buffer size affects the rate at which buffers fill and must be flushed (small buffer size requires
 	// less memory, but it increases the rate at which buffers must be flushed).
@@ -103,6 +106,7 @@ func (c *KstreamConfig) initFromViper(v *viper.Viper) {
 	c.EnableHandleKevents = v.GetBool(enableHandleKevents)
 	c.EnableMemKevents = v.GetBool(enableMemKevents)
 	c.EnableAuditAPIEvents = v.GetBool(enableAuditAPIEvents)
+	c.EnableDNSEvents = v.GetBool(enableDNSEvents)
 	c.BufferSize = uint32(v.GetInt(bufferSize))
 	c.MinBuffers = uint32(v.GetInt(minBuffers))
 	c.MaxBuffers = uint32(v.GetInt(maxBuffers))

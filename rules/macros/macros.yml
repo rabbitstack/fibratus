@@ -70,6 +70,12 @@
 - macro: create_handle
   expr: kevt.name = 'CreateHandle'
 
+- macro: query_dns
+  expr: kevt.name = 'QueryDns'
+
+- macro: reply_dns
+  expr: kevt.name = 'ReplyDns'
+
 - macro: load_driver
   expr: >
     (load_module and image.name iendswith '.sys')

@@ -34,6 +34,8 @@ var (
 // kevtAccessor extracts generic event values.
 type kevtAccessor struct{}
 
+func (kevtAccessor) setFields(fields []fields.Field) {}
+
 func newKevtAccessor() accessor {
 	return &kevtAccessor{}
 }
@@ -129,6 +131,7 @@ func (f *filter) narrowAccessors() {
 		removeHandleAccessor   = true
 		removePEAccessor       = true
 		removeMemAccessor      = true
+		removeDNSAccessor      = true
 	)
 	allFields := make([]fields.Field, 0)
 	allFields = append(allFields, f.fields...)
@@ -157,6 +160,8 @@ func (f *filter) narrowAccessors() {
 			removePEAccessor = false
 		case field.IsMemField():
 			removeMemAccessor = false
+		case field.IsDNSField():
+			removeDNSAccessor = false
 		}
 	}
 	if removeKevtAccessor {
@@ -188,6 +193,13 @@ func (f *filter) narrowAccessors() {
 	}
 	if removeMemAccessor {
 		f.removeAccessor(&memAccessor{})
+	}
+	if removeDNSAccessor {
+		f.removeAccessor(&dnsAccessor{})
+	}
+
+	for _, accessor := range f.accessors {
+		accessor.setFields(allFields)
 	}
 }
 

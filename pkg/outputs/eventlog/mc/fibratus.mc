@@ -236,3 +236,13 @@ SymbolicName=DuplicateHandle
 Language=English
 Duplicates handle.
 .
+MessageId=54
+SymbolicName=DuplicateHandle
+Language=English
+Query DNS.
+.
+MessageId=55
+SymbolicName=DuplicateHandle
+Language=English
+Receives DNS response.
+.

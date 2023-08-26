@@ -22,8 +22,10 @@ package version
 type Version uint16
 
 const (
-	// KevtSecV1 is the v1 of the kernel event section
+	// KevtSecV1 is the v1 of the event section
 	KevtSecV1 Version = iota + 1
+	// KevtSecV2 is the v2 of the event section
+	KevtSecV2
 )
 
 const (
@@ -43,4 +45,6 @@ const (
 const (
 	// PESecV1 is the v1 of the PE section
 	PESecV1 Version = iota + 1
+	// PESecV2 is the v2 of the PE section
+	PESecV2
 )

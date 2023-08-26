@@ -26,6 +26,7 @@ import (
 	ptypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -99,4 +100,50 @@ func TestCaptureInBrackets(t *testing.T) {
 	v, subfield = captureInBrackets("ps.pe.sections[.debug$S].entropy")
 	assert.Equal(t, ".debug$S", v)
 	assert.Equal(t, fields.SectionEntropy, subfield)
+}
+
+func TestNarrowAccessors(t *testing.T) {
+	var tests = []struct {
+		f                 Filter
+		expectedAccessors int
+	}{
+		{
+			New(`ps.name = 'cmd.exe' and kevt.name = 'CreateProcess' or kevt.name in ('TerminateProcess', 'CreateFile')`, cfg),
+			2,
+		},
+		{
+			New(`ps.modules[kernel32.dll].location = 'C:\\Windows\\System32'`, cfg),
+			1,
+		},
+		{
+			New(`handle.type = 'Section' and pe.sections > 1 and kevt.name = 'CreateHandle'`, cfg),
+			3,
+		},
+		{
+			New(`sequence |kevt.name = 'CreateProcess'| as e1 |kevt.name = 'CreateFile' and file.name = $e1.ps.exe |`, cfg),
+			3,
+		},
+		{
+			New(`base(file.name) = 'kernel32.dll'`, cfg),
+			1,
+		},
+	}
+
+	var pea *peAccessor
+
+	for i, tt := range tests {
+		require.NoError(t, tt.f.Compile())
+		naccessors := len(tt.f.(*filter).accessors)
+		if tt.expectedAccessors != naccessors {
+			t.Errorf("%d. accessors mismatch: exp=%d got=%d", i, tt.expectedAccessors, naccessors)
+		}
+		for _, a := range tt.f.(*filter).accessors {
+			if reflect.TypeOf(a) == reflect.TypeOf(&peAccessor{}) {
+				pea = a.(*peAccessor)
+			}
+		}
+	}
+	// check if fields are set in the accessor
+	require.NotNil(t, pea)
+	assert.Len(t, pea.fields, 3)
 }

@@ -37,6 +37,9 @@ var KernelTraceControlGUID = windows.GUID{Data1: 0x9e814aad, Data2: 0x3204, Data
 // KernelAuditAPICallsGUID represents the GUID for the kernel audit API provider
 var KernelAuditAPICallsGUID = windows.GUID{Data1: 0xe02a841c, Data2: 0x75a3, Data3: 0x4fa7, Data4: [8]byte{0xaf, 0xc8, 0xae, 0x09, 0xcf, 0x9b, 0x7f, 0x23}}
 
+// DNSClientGUID presents the GUID for the Windows DNS Client provider
+var DNSClientGUID = windows.GUID{Data1: 0x1c95126e, Data2: 0x7eea, Data3: 0x49a9, Data4: [8]byte{0xa3, 0xfe, 0xa3, 0x78, 0xb0, 0x3d, 0xdb, 0x4d}}
+
 const (
 	// TraceSystemTraceEnableFlagsInfo controls system logger event flags
 	TraceSystemTraceEnableFlagsInfo = uint8(4)
@@ -47,6 +50,8 @@ const (
 	KernelLoggerSession = "NT Kernel Logger"
 	// KernelAuditAPICallsSession represents the session name for the kernel audit API logger
 	KernelAuditAPICallsSession = "Kernel Audit API Calls Logger"
+	// DNSClientSession represents the session name for the DNS client logger
+	DNSClientSession = "DNS Client Logger"
 	// WnodeTraceFlagGUID indicates that the structure contains event tracing information
 	WnodeTraceFlagGUID = 0x00020000
 	// ProcessTraceModeRealtime denotes that there will be a real-time consumers for events forwarded from the providers
@@ -595,8 +600,27 @@ func (e *EventRecord) ReadUTF16String(offset uint16) (string, uint16) {
 	if offset > e.BufferLen {
 		return "", 0
 	}
-	s := (*[1<<30 - 1]uint16)(unsafe.Pointer(e.Buffer + uintptr(offset)))[: e.BufferLen-offset : e.BufferLen-offset]
-	return utf16.Decode(s[:len(s)/2-1-2]), uint16(len(s) + 2)
+	var length uint16
+	if offset > 0 {
+		length = e.BufferLen - offset
+	} else {
+		// we're reading the leading string. First, calculate
+		// the length of the null-terminated UTF16 string
+		var i uint16
+		for i < e.BufferLen {
+			c := *(*uint16)(unsafe.Pointer(e.Buffer + uintptr(i)))
+			if c == 0 {
+				break // null terminator
+			}
+			length += 2
+			i += 2
+		}
+	}
+	s := (*[1<<30 - 1]uint16)(unsafe.Pointer(e.Buffer + uintptr(offset)))[:length:length]
+	if offset > 0 {
+		return utf16.Decode(s[:len(s)/2-1-2]), uint16(len(s) + 2)
+	}
+	return utf16.Decode(s[:len(s)/2]), uint16(len(s) + 2)
 }
 
 // ConsumeUTF16String reads the byte slice with UTF16-encoded string

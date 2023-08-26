@@ -110,7 +110,9 @@ func (e *Kevent) adjustPID() {
 			e.PID, _ = e.Kparams.GetPpid()
 		}
 	case ktypes.Net:
-		e.PID, _ = e.Kparams.GetPid()
+		if !e.IsDNS() {
+			e.PID, _ = e.Kparams.GetPid()
+		}
 	case ktypes.Handle:
 		if e.Type == ktypes.DuplicateHandle {
 			e.PID, _ = e.Kparams.GetUint32(kparams.TargetProcessID)
@@ -156,6 +158,11 @@ func (e Kevent) IsNetworkTCP() bool {
 // IsNetworkUDP determines whether the event pertains to network UDP events.
 func (e Kevent) IsNetworkUDP() bool {
 	return e.Type == ktypes.RecvUDPv4 || e.Type == ktypes.RecvUDPv6 || e.Type == ktypes.SendUDPv4 || e.Type == ktypes.SendUDPv6
+}
+
+// IsDNS determines whether the event is a DNS question/answer.
+func (e Kevent) IsDNS() bool {
+	return e.Type.Subcategory() == ktypes.DNS
 }
 
 // IsRundown determines if this is a rundown events.
@@ -219,6 +226,11 @@ func (e Kevent) CurrentPid() bool { return e.PID == currentPid }
 
 // IsState indicates if this event is only used for state management.
 func (e Kevent) IsState() bool { return e.Type.OnlyState() }
+
+// IsCreatingFile determines if the event is creating a new file.
+func (e Kevent) IsCreatingFile() bool {
+	return e.IsCreateFile() && e.Kparams.MustGetUint32(kparams.FileOperation) != windows.FILE_OPEN
+}
 
 // RundownKey calculates the rundown event hash. The hash is
 // used to determine if the rundown event was already processed.
@@ -388,6 +400,13 @@ func (e Kevent) PartialKey() uint64 {
 		binary.LittleEndian.PutUint32(b, pid)
 		binary.LittleEndian.PutUint64(b, object)
 		return hashers.FnvUint64(b)
+	case ktypes.QueryDNS, ktypes.ReplyDNS:
+		n, _ := e.Kparams.GetString(kparams.DNSName)
+		b := make([]byte, 4+len(n))
+
+		binary.LittleEndian.PutUint32(b, e.PID)
+		b = append(b, n...)
+		return hashers.FnvUint64(b)
 	}
 	return 0
 }
@@ -548,6 +567,12 @@ func (e *Kevent) Summary() string {
 	case ktypes.DuplicateHandle:
 		handleType := e.GetParamAsString(kparams.HandleObjectTypeID)
 		return printSummary(e, fmt.Sprintf("duplicated <code>%s</code> handle", handleType))
+	case ktypes.QueryDNS:
+		dnsName := e.GetParamAsString(kparams.DNSName)
+		return printSummary(e, fmt.Sprintf("sent <code>%s</code> DNS query", dnsName))
+	case ktypes.ReplyDNS:
+		dnsName := e.GetParamAsString(kparams.DNSName)
+		return printSummary(e, fmt.Sprintf("received DNS response for <code>%s</code> query", dnsName))
 	}
 	return ""
 }
