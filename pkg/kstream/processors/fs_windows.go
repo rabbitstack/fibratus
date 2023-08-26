@@ -215,7 +215,7 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 		delete(f.mmaps[e.PID], fileKey)
 		if len(f.mmaps[e.PID]) == 0 {
 			// process terminated, all files unmapped
-			delete(f.mmaps, e.PID)
+			f.removeMmap(e.PID)
 		}
 	default:
 		var fileObject uint64

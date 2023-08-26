@@ -33,6 +33,10 @@ import (
 	"time"
 )
 
+func init() {
+	scanTimeout = time.Minute
+}
+
 func TestYara(t *testing.T) {
 	pid, proc := runNotepad()
 	for {

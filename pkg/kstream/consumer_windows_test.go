@@ -29,7 +29,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/sys"
-	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -507,9 +506,6 @@ func TestConsumerEvents(t *testing.T) {
 	for {
 		select {
 		case e := <-kstreamc.Events():
-			if e.CurrentPid() {
-				log.Info(e)
-			}
 			for _, tt := range tests {
 				if tt.completed {
 					continue
