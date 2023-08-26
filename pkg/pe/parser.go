@@ -315,7 +315,7 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 
 	if opts.parseResources {
 		// parse version resources
-		p.VersionResources, err = ParseVersionResources(pe)
+		p.VersionResources, err = pe.ParseVersionResources()
 		if err != nil {
 			versionResourcesParseErrors.Add(1)
 		}
