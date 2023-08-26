@@ -201,6 +201,10 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 		}
 		totalMapRundownFiles.Add(-1)
 		delete(f.mmaps[e.PID], fileKey)
+		if len(f.mmaps[e.PID]) == 0 {
+			// process terminated, all files unmapped
+			delete(f.mmaps, e.PID)
+		}
 	default:
 		var fileObject uint64
 		fileKey := e.Kparams.MustGetUint64(kparams.FileKey)
