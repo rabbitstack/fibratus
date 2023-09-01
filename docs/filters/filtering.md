@@ -9,6 +9,8 @@ At its simplest form, a filter is composed of the LHS (Left Hand Side) and RHS (
 kevt.category       =            'net'
 ```
 
+Boolean fields, that is the fields that always evaluate to either `true` or `false` can appear alone in the filter expression. For example, `pe.is_dll` is the short form of `pe.is_dll = true` expression.
+
 The RHS expressions can be strings, numbers, IP addresses, boolean values, and fields. In the above snippet, the RHS is a simple string literal, but we could have written filters with the following RHS expressions:
 
 - IP addresses: `net.sip = 127.0.0.1`

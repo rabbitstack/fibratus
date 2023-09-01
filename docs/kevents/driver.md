@@ -2,8 +2,7 @@
 
 #### LoadDriver
 
-Driver loading events are triggered when the driver object is loaded into the kernel. The `image_name` parameter represents the full path of the driver file located in the file system.
-Driver events are consumed from the `Microsoft Antimalware Engine` ETW provider, thus the events are only published if the Windows Defender Antivirus realtime protection is activated.
+Driver loading events are triggered when the driver object is loaded into the kernel. Regular `LoadImage` events are triggered when the kernel driver is loaded or when the driver is unloaded, the `UnloadImage` event is received.
 
 An alternative route for detecting driver loading events is based on observing the [handle manager](kevents/handle.md) events. For example, a filter expression for pinpointing such events could be arranged as follows.
 
