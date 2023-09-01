@@ -26,7 +26,7 @@ Sends data over the wire. The kernel generates `Send` events when a process tran
 
 #### Recv
 
-Receives data from the socket. The kernel produces `Recv` events a process is ready to consume data sent by local or remote socket.
+Receives data from the socket. The kernel produces `Recv` events when a process is ready to consume data sent by local or remote socket.
 
 #### Disconnect
 
@@ -40,6 +40,39 @@ Reconnects to the socket.
 #### Retransmit
 
 Retransmits unacknowledged TCP segments. The kernel networking stack generates retransmissions when packets are dropped due to network congestion, packets arriving out of order and other reasons. 
+
+### DNS queries/responses
+
+DNS telemetry uncovers all DNS query/reply interactions. More specifically, `QueryDns` and `ReplyDns` events are fired when the process sends a query to the name server and when it receives the response from the DNS server, respectively. DNS events are collected by default, but it is possible to disable them by setting the `kstream.enable-dns` config flag to `false`.
+
+#### QueryDns
+
+Sends a query to the name server. This event has the following parameters:
+
+- `name` represents the DNS query (e.g. `www.iana.org`)
+- `options` represents the DNS options. It can be the combination of the following values: `STANDARD`, `ACCEPT_TRUNCATED_RESPONSE`, `USE_TCP_ONLY`, `NO_RECURSION`, `BYPASS_CACHE`, `NO_WIRE_QUERY`, `NO_LOCAL_NAME`, `NO_NETBT`, 
+`WIRE_ONLY`, `RETURN_MESSAGE`, `MULTICAST_ONLY`, `NO_MULTICAST`, `TREAT_AS_FQDN`, `ADDRCONFIG`, `DUAL_ADDR`, `MULTICAST_WAIT`, 
+`MULTICAST_VERIFY`, `DONT_RESET_TTL_VALUES`, `DISABLE_IDN_ENCODING`, `APPEND_MULTILABEL`.
+- `rr` specifies the type of the resource record. It can be one of `A`,`NS`, `MD`, `MF`, `CNAME`, `SOA`, `MB`, `MG`, `MR`, `NULL`, `WKS`, `PTR`,`HINFO`, `MINFO`, `MX`, `TEXT`, `RP`, `AFSDB`, `X25`, `ISDN`, `NSAPPTR`, `SIG`, `KEY`, `PX`, `GPOS`,
+`AAAA`, `LOC`, `NXT`, `EID`, `NIMLOC`, `SRV`, `ATMA`, `NAPTR`, `KX`, `CERT`, `A6`, `DNAME`, `SINK`, `OPT`, `DS`, `RRSIG`,
+`NSEC`, `DNSKEY` `DHCID`, `UINFO`, `UID`, `GID`, `UNSPEC`, `ADDRS`, `TKEY`, `TSIG`, `IXFR`, `AXFR`, `MAILB`, `MAILA`, `ANY`,
+`WINS`, `WINSR`.
+
+#### ReplyDns
+
+Receives the response from the DNS server. DNS reply events contain the following parameters:
+
+- `name` represents the DNS query (e.g. `www.iana.org`)
+- `answers` contains the response answers (e.g. `151.101.194.132`, `151.101.130.132`)
+- `options` represents the DNS options. It can be the combination of the following values: `STANDARD`, `ACCEPT_TRUNCATED_RESPONSE`, `USE_TCP_ONLY`, `NO_RECURSION`, `BYPASS_CACHE`, `NO_WIRE_QUERY`, `NO_LOCAL_NAME`, `NO_NETBT`, 
+`WIRE_ONLY`, `RETURN_MESSAGE`, `MULTICAST_ONLY`, `NO_MULTICAST`, `TREAT_AS_FQDN`, `ADDRCONFIG`, `DUAL_ADDR`, `MULTICAST_WAIT`, 
+`MULTICAST_VERIFY`, `DONT_RESET_TTL_VALUES`, `DISABLE_IDN_ENCODING`, `APPEND_MULTILABEL`.
+- `rr` specifies the type of the resource record. It can be one of `A`,`NS`, `MD`, `MF`, `CNAME`, `SOA`, `MB`, `MG`, `MR`, `NULL`, `WKS`, `PTR`,`HINFO`, `MINFO`, `MX`, `TEXT`, `RP`, `AFSDB`, `X25`, `ISDN`, `NSAPPTR`, `SIG`, `KEY`, `PX`, `GPOS`,
+`AAAA`, `LOC`, `NXT`, `EID`, `NIMLOC`, `SRV`, `ATMA`, `NAPTR`, `KX`, `CERT`, `A6`, `DNAME`, `SINK`, `OPT`, `DS`, `RRSIG`,
+`NSEC`, `DNSKEY` `DHCID`, `UINFO`, `UID`, `GID`, `UNSPEC`, `ADDRS`, `TKEY`, `TSIG`, `IXFR`, `AXFR`, `MAILB`, `MAILA`, `ANY`,
+`WINS`, `WINSR`.
+- `rcode` designates the DNS response code. It can be one of `NOERROR`, `FORMERR`, `SERVFAIL`, `NXDOMAIN`, `NOTIMP`, `REFUSED`,
+`YXDOMAIN`, `YXRRSET`, `NXRRSET`, `NOTAUTH`, `NOTZONE`, `BADSIG`, `BADKEY`, `BADTIME`, `BADNAME`, `INVALID`, `NXDOMAIN`.
 
 ### DNS reverse lookups
 
