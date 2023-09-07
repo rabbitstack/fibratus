@@ -20,7 +20,7 @@
   expr: kevt.name = 'CreateFile' and file.operation = 'OPEN'
 
 - macro: create_file
-  expr: kevt.name = 'CreateFile' and file.operation != 'OPEN'
+  expr: kevt.name = 'CreateFile' and file.operation != 'OPEN' and file.status = 'Success'
 
 - macro: query_registry
   expr: kevt.name in ('RegQueryKey', 'RegQueryValue')
@@ -164,3 +164,21 @@
 
 - macro: vault_extensions
   list: [.vcrd, .vpol]
+
+- macro: startup_locations
+  list: [
+    "?:\\Users\\*\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\*",
+    "?:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\StartUp\\*",
+    ]
+
+- macro: registry_run_keys
+  list: [
+    "*\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\\*",
+    "*\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\*",
+    "*\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnceEx\\*",
+    "*\\Software\\Microsoft\\Windows\\CurrentVersion\\RunServices\\*",
+    "*\\Software\\Microsoft\\Windows\\CurrentVersion\\RunServicesOnce\\*",
+    "*\\Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Run\\*",
+    "*\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\\Run\\*",
+    "*\\Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\\Run\\*",
+    ]

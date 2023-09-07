@@ -1,0 +1,57 @@
+- group: Registry Run Keys / Startup Folder
+  description: |
+    Adversaries may achieve persistence by adding a program to a startup
+    folder or referencing it with a Registry run key. Adding an entry to
+    the run keys in the Registry or startup folder will cause the program
+    referenced to be executed when a user logs in. These programs will be
+    executed under the context of the user and will have the account's
+    associated permissions level.
+  labels:
+    tactic.id: TA0006
+    tactic.name: Persistence
+    tactic.ref: https://attack.mitre.org/tactics/TA0006/
+    technique.id: T1547
+    technique.name: Boot or Logon Autostart Execution
+    technique.ref: https://attack.mitre.org/techniques/T1547/
+    subtechnique.id: T1547.001
+    subtechnique.name: Registry Run Keys / Startup Folder
+    subtechnique.ref: https://attack.mitre.org/techniques/T1547/001/
+  rules:
+    - name: Unusual file written or modified in Startup folder
+      description: |
+        Identifies suspicious files written to the startup folder that would
+        allow adversaries to maintain persistence in the system.
+      condition: >
+        create_file
+            and
+          (
+            file.extension in ('.vbs', '.js', '.jar', '.exe', '.dll', '.com', '.ps1', '.hta', '.cmd', '.vbe')
+              or
+            (pe.is_exec or pe.is_dll)
+          )
+            and
+        file.name imatches startup_locations
+            and
+            not
+        ps.exe imatches
+          (
+            '?:\\Windows\\System32\\wuauclt.exe',
+            '?:\\Windows\\System32\\msiexec.exe',
+            '?:\\Windows\\SysWOW64\\msiexec.exe',
+            '?:\\Windows\\System32\\svchost.exe',
+            '?:\\ProgramData\\Microsoft\\Windows Defender\\Platform\\*.exe'
+          )
+      action: >
+        {{
+            emit . "Unusual file written or modified in Startup folder" ""
+        }}
+    - name: Unusual process modified the registry run key
+      description: |
+        Identifies unusual Windows native process modifying the run key
+        to gain persistence.
+      condition: >
+        modify_registry
+      action: >
+        {{
+            emit . "Unusual process modified the registry run key" ""
+        }}
