@@ -40,9 +40,9 @@ func InitFromConfig(c Config) error {
 	exe, err := os.Executable()
 	var path string
 	if err != nil {
-		path = filepath.Join(os.Getenv("PROGRAMFILES"), "fibratus", "logs")
+		path = filepath.Join(os.Getenv("PROGRAMFILES"), "Fibratus", "Logs")
 	} else {
-		path = filepath.Join(filepath.Dir(exe), "..", "logs")
+		path = filepath.Join(filepath.Dir(exe), "..", "Logs")
 	}
 	if c.Path != "" {
 		path = c.Path
