@@ -17,16 +17,16 @@
   expr: kevt.name = 'WriteFile'
 
 - macro: open_file
-  expr: kevt.name = 'CreateFile' and file.operation = 'OPEN'
+  expr: kevt.name = 'CreateFile' and file.operation = 'OPEN' and file.status = 'Success'
 
 - macro: create_file
-  expr: kevt.name = 'CreateFile' and file.operation != 'OPEN'
+  expr: kevt.name = 'CreateFile' and file.operation != 'OPEN' and file.status = 'Success'
 
 - macro: query_registry
-  expr: kevt.name in ('RegQueryKey', 'RegQueryValue')
+  expr: kevt.name in ('RegQueryKey', 'RegQueryValue') and registry.status = 'Success'
 
 - macro: open_registry
-  expr: kevt.name = 'RegOpenKey'
+  expr: kevt.name = 'RegOpenKey' and registry.status = 'Success'
 
 - macro: load_module
   expr: kevt.name = 'LoadImage'
@@ -35,16 +35,31 @@
   expr: kevt.name = 'UnloadImage'
 
 - macro: set_value
-  expr: kevt.name = 'RegSetValue'
+  expr: kevt.name = 'RegSetValue' and registry.status = 'Success'
 
 - macro: create_key
-  expr: kevt.name = 'RegCreateKey'
+  expr: kevt.name = 'RegCreateKey' and registry.status = 'Success'
 
 - macro: modify_registry
   expr: (set_value or create_key)
 
 - macro: send_socket
   expr: kevt.name = 'Send'
+
+- macro: recv_socket
+  expr: kevt.name = 'Recv'
+
+- macro: connect_socket
+  expr: kevt.name = 'Connect'
+
+- macro: accept_socket
+  expr: kevt.name = 'Accept'
+  
+- macro: inbound_network
+  expr: (recv_socket or accept_socket)
+
+- macro: outbound_network
+  expr: (send_socket or connect_socket)
 
 - macro: virtual_alloc
   expr: kevt.name = 'VirtualAlloc'
@@ -78,7 +93,7 @@
 
 - macro: load_driver
   expr: >
-    (load_module and image.name iendswith '.sys')
+    (load_module and (image.name iendswith '.sys' or pe.is_driver)
       or
     (create_handle and handle.type = 'Driver')
   description: |
@@ -88,7 +103,7 @@
     watching for driver objects being created.
 
 - macro: unload_driver
-  expr: unload_image and image.name iendswith '.sys'
+  expr: unload_image and (image.name iendswith '.sys' or pe.is_driver)
 
 - macro: load_unsigned_module
   expr: >
@@ -97,6 +112,18 @@
     Detects when unsigned executable or DLL is loaded into process address space.
     The module is considered as unsigned if it lacks the cert in the PE security
     directory or the Authenticode hash is not present in any of the catalogs.
+
+- macro: load_executable
+  expr: >
+    load_module and (image.name iendswith '.exe' or pe.is_exec)
+
+- macro: load_untrusted_executable
+  expr: >
+    load_executable 
+      and 
+    (image.signature.level = 'UNCHECKED' or image.signature.level = 'UNSIGNED')
+  description:
+    Detects when untrusted executable is loaded into process address space.
 
 - macro: load_untrusted_module
   expr: >
@@ -136,7 +163,7 @@
     the minidump signature.
 
 - macro: msoffice_binaries
-  list: [EXCEL.EXE, WINWORD.EXE, MSACCESS.EXE, POWERPNT.EXE, WORDPAD.EXE]
+  list: [EXCEL.EXE, WINWORD.EXE, MSACCESS.EXE, POWERPNT.EXE]
 
 - macro: web_browser_binaries
   list: [
@@ -164,3 +191,29 @@
 
 - macro: vault_extensions
   list: [.vcrd, .vpol]
+
+- macro: startup_locations
+  list: [
+    "?:\\Users\\*\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\*",
+    "?:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\StartUp\\*",
+    ]
+  description: |
+    Contains default Startup folder paths. Adversaries exploit the Startup folder
+    to maintain persistence on the endpoint.
+
+- macro: registry_run_keys
+  list: [
+    "*\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\\*",
+    "*\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\*",
+    "*\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnceEx\\*",
+    "*\\Software\\Microsoft\\Windows\\CurrentVersion\\RunServices\\*",
+    "*\\Software\\Microsoft\\Windows\\CurrentVersion\\RunServicesOnce\\*",
+    "*\\Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Run\\*",
+    "*\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\\Run\\*",
+    "*\\Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\\Run\\*",
+    ]
+  description: |
+    Contains wildcard patterns of commonly abused registry run keys.
+
+- macro: script_interpreters
+  list: ["powershell.exe", "pwsh.exe", "cscript.exe", "wscript.exe", "mshta.exe"]
