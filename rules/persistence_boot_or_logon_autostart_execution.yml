@@ -126,36 +126,7 @@
             not (pe.is_signed or pe.is_trusted)
           )
             and
-        registry.key.name imatches
-          (
-            'HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\\Userinit',
-            'HKEY_USERS\\*\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Windows\\Load',
-            'HKEY_USERS\\*\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Windows\\Run',
-            'HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Windows\\Load',
-            'HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Windows\\Run',
-            'HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\\Shell',
-            'HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\\Shell',
-            'HKEY_USERS\\*\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\\Shell',
-            'HKEY_USERS\\*\\Environment\\UserInitMprLogonScript',
-            'HKEY_USERS\\*\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System\\Shell',
-            'HKEY_USERS\\*\\SOFTWARE\\Policies\\Microsoft\\Windows\\System\\Scripts\\Logoff\\Script',
-            'HKEY_USERS\\*\\SOFTWARE\\Policies\\Microsoft\\Windows\\System\\Scripts\\Logon\\Script',
-            'HKEY_USERS\\*\\SOFTWARE\\Policies\\Microsoft\\Windows\\System\\Scripts\\Shutdown\\Script',
-            'HKEY_USERS\\*\\SOFTWARE\\Policies\\Microsoft\\Windows\\System\\Scripts\\Startup\\Script',
-            'HKEY_USERS\\*\\SOFTWARE\\Microsoft\\Ctf\\LangBarAddin\\*\\FilePath',
-            'HKEY_USERS\\*\\SOFTWARE\\Microsoft\\Internet Explorer\\Extensions\\*\\Exec',
-            'HKEY_USERS\\*\\SOFTWARE\\Microsoft\\Command Processor\\Autorun',
-            'HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\\Shell',
-            'HKEY_CURRENT_USER\\Environment\\UserInitMprLogonScript',
-            'HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System\\Shell',
-            'HKEY_CURRENT_USER\\SOFTWARE\\Policies\\Microsoft\\Windows\\System\\Scripts\\Logoff\\Script',
-            'HKEY_CURRENT_USER\\SOFTWARE\\Policies\\Microsoft\\Windows\\System\\Scripts\\Logon\\Script',
-            'HKEY_CURRENT_USER\\SOFTWARE\\Policies\\Microsoft\\Windows\\System\\Scripts\\Shutdown\\Script',
-            'HKEY_CURRENT_USER\\SOFTWARE\\Policies\\Microsoft\\Windows\\System\\Scripts\\Startup\\Script',
-            'HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Ctf\\LangBarAddin\\*\\FilePath',
-            'HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Internet Explorer\\Extensions\\*\\Exec',
-            'HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Command Processor\\Autorun'
-          )
+        registry.key.name imatches registry_persistence_keys
       action: >
         {{
             emit . "Suspicious persistence via registry modification" ""
@@ -168,15 +139,7 @@
       condition: >
         modify_registry
             and
-        registry.key.name imatches
-            (
-              'HKEY_USERS\\*\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\User Shell Folders\\Startup',
-              'HKEY_USERS\\*\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Folders\\Startup',
-              'HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Folders\\Startup',
-              'HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Folders\\Startup',
-              'HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\User Shell Folders\\Common Startup',
-              'HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Folders\\Common Startup'
-            )
+        registry.key.name imatches startup_shell_folder_registry_keys
             and
             not
           (
