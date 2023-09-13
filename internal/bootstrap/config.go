@@ -29,12 +29,11 @@ import (
 // loading fails. In this situation, the default config flag values are used
 // to tweak any of the internal behaviours.
 func InitConfigAndLogger(cfg *config.Config) error {
-	var cerr error
-	cerr = cfg.TryLoadFile(cfg.File())
+	isLoaded := cfg.TryLoadFile(cfg.File()) == nil
 	if err := cfg.Init(); err != nil {
 		return err
 	}
-	if cerr == nil {
+	if isLoaded {
 		if err := cfg.Validate(); err != nil {
 			return err
 		}
@@ -42,10 +41,10 @@ func InitConfigAndLogger(cfg *config.Config) error {
 	if err := log.InitFromConfig(cfg.Log); err != nil {
 		return err
 	}
-	if cerr != nil {
+	if !isLoaded {
 		logrus.Warnf("unable to load configuration "+
-			"from %s file: %v Continuing with default "+
-			"settings...", cfg.File(), cerr)
+			"from %s file. Falling back to default "+
+			"settings...", cfg.File())
 	}
 	return nil
 }
