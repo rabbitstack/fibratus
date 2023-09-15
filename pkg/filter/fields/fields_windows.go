@@ -235,8 +235,9 @@ const (
 	// PeCertAfter is the field which indicates the timestamp after certificate is no longer valid
 	PeCertAfter Field = "pe.cert.after"
 	// PeCertBefore is the field which indicates the timestamp of the certificate enrollment date
-	PeCertBefore       Field = "pe.cert.before"
-	PeIsHeaderModified       = "pe.is_header_modified"
+	PeCertBefore Field = "pe.cert.before"
+	// PeIsModified is the field that indicates whether disk and in-memory PE headers differ
+	PeIsModified Field = "pe.is_modified"
 
 	// KevtSeq is the event sequence number
 	KevtSeq Field = "kevt.seq"
@@ -443,6 +444,8 @@ func (f Field) IsPeIsTrusted() bool { return f == PeIsTrusted }
 func (f Field) IsPeIsSigned() bool  { return f == PeIsSigned }
 
 func (f Field) IsPeCert() bool { return strings.HasPrefix(string(f), "pe.cert.") }
+
+func (f Field) IsPeModified() bool { return f == PeIsModified }
 
 // Segment represents the type alias for the segment. Segment
 // denotes the location of the value within an indexed field.
@@ -663,6 +666,7 @@ var fields = map[Field]FieldInfo{
 	PeCertIssuer:     {PeCertIssuer, "PE certificate CA", kparams.UnicodeString, []string{"pe.cert.issuer contains 'Washington, Redmond, Microsoft Corporation'"}, nil},
 	PeCertAfter:      {PeCertAfter, "PE certificate expiration date", kparams.Time, []string{"pe.cert.after contains '2024-02-01 00:05:42 +0000 UTC'"}, nil},
 	PeCertBefore:     {PeCertBefore, "PE certificate enrollment date", kparams.Time, []string{"pe.cert.before contains '2024-02-01 00:05:42 +0000 UTC'"}, nil},
+	PeIsModified:     {PeIsModified, "indicates if disk and in-memory PE headers differ", kparams.Bool, []string{"pe.is_modified"}, nil},
 
 	MemBaseAddress:    {MemBaseAddress, "region base address", kparams.Address, []string{"mem.address = '211d13f2000'"}, nil},
 	MemRegionSize:     {MemRegionSize, "region size", kparams.Uint64, []string{"mem.size > 438272"}, nil},

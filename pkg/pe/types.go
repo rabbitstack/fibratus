@@ -123,6 +123,8 @@ type PE struct {
 	Anomalies []string `json:"anomalies"`
 	// Is64 indicates if the PE was built on the 64 bits machine
 	Is64 bool `json:"is_64"`
+	// IsModified indicates if PE differs from its in-memory state
+	IsModified bool `json:"is_modified"`
 
 	dosHeader      peparser.ImageDOSHeader
 	ntHeader       peparser.ImageNtHeader

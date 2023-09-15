@@ -19,13 +19,13 @@
 package pe
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/sys"
+	"fmt"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
-	"time"
 )
 
 func TestIsHeaderModified(t *testing.T) {
@@ -37,31 +37,9 @@ func TestIsHeaderModified(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		var si windows.StartupInfo
-		var pi windows.ProcessInformation
-		argv := windows.StringToUTF16Ptr(tt.executable)
-		err := windows.CreateProcess(
-			nil,
-			argv,
-			nil,
-			nil,
-			true,
-			0,
-			nil,
-			nil,
-			&si,
-			&pi)
+		pid, err := findProcessID(tt.executable)
 		require.NoError(t, err)
-		for {
-			if sys.IsProcessRunning(pi.Process) {
-				break
-			}
-			time.Sleep(time.Millisecond * 100)
-		}
-		defer func() {
-			_ = windows.TerminateProcess(pi.Process, 0)
-		}()
-		addr, err := getModuleBaseAddress(pi.ProcessId)
+		addr, err := getModuleBaseAddress(pid)
 		if err != nil {
 			t.Fatalf("%s: unable to get the base address: %v", tt.executable, err)
 		}
@@ -69,7 +47,7 @@ func TestIsHeaderModified(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v", tt.executable, err)
 		}
-		mem, err := ParseMem(pi.ProcessId, addr, false, WithSections())
+		mem, err := ParseMem(pid, addr, false, WithSections())
 		if err != nil {
 			t.Fatalf("%s: %v", tt.executable, err)
 		}
@@ -81,4 +59,25 @@ func TestIsHeaderModified(t *testing.T) {
 			t.Errorf("%s: expected %t, but got: %t", tt.executable, tt.modified, isHdrModified)
 		}
 	}
+}
+
+func findProcessID(image string) (uint32, error) {
+	const processEntrySize = 568
+	snap, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
+	if err != nil {
+		return 0, err
+	}
+	defer windows.Close(snap)
+	p := windows.ProcessEntry32{Size: processEntrySize}
+	for {
+		err := windows.Process32Next(snap, &p)
+		if err != nil {
+			break
+		}
+		s := windows.UTF16ToString(p.ExeFile[:])
+		if strings.EqualFold(s, filepath.Base(image)) {
+			return p.ProcessID, nil
+		}
+	}
+	return 0, fmt.Errorf("no process for %s image", image)
 }

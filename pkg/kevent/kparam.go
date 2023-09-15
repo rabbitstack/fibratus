@@ -335,6 +335,16 @@ func (kpars Kparams) GetBool(name string) (bool, error) {
 	return v, nil
 }
 
+// TryGetBool tries to retrieve the boolean value from the parameter.
+// Returns the underyling value on success, or false otherwise.
+func (kpars Kparams) TryGetBool(name string) bool {
+	val, err := kpars.GetBool(name)
+	if err != nil {
+		return false
+	}
+	return val
+}
+
 // GetInt8 returns the underlying int8 value from the parameter.
 func (kpars Kparams) GetInt8(name string) (int8, error) {
 	kpar, err := kpars.findParam(name)

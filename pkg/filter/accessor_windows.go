@@ -765,7 +765,7 @@ func (pa *peAccessor) setFields(fields []fields.Field) {
 func (pa *peAccessor) parserOpts() []pe.Option {
 	var opts []pe.Option
 	for _, f := range pa.fields {
-		if f.IsPeSection() || f.IsPeSectionsMap() {
+		if f.IsPeSection() || f.IsPeSectionsMap() || f.IsPeModified() {
 			opts = append(opts, pe.WithSections())
 		}
 		if f.IsPeSymbol() {
@@ -780,7 +780,7 @@ func (pa *peAccessor) parserOpts() []pe.Option {
 		if f.IsPeImphash() {
 			opts = append(opts, pe.WithImphash())
 		}
-		if f.IsPeDotnet() {
+		if f.IsPeDotnet() || f.IsPeModified() {
 			opts = append(opts, pe.WithCLR())
 		}
 		if f.IsPeAnomalies() {
@@ -793,23 +793,8 @@ func (pa *peAccessor) parserOpts() []pe.Option {
 	return opts
 }
 
-func (pa *peAccessor) isHeaderModified(e *kevent.Kevent) bool {
-	exe := e.GetParamAsString(kparams.FileName)
-	if filepath.Ext(exe) != ".exe" {
-		return false
-	}
-	pid := e.Kparams.MustGetPid()
-	addr := e.Kparams.MustGetUint64(kparams.ImageBase)
-	file, err := pe.ParseFile(exe)
-	if err != nil {
-		return false
-	}
-	mem, err := pe.ParseMem(pid, uintptr(addr), false)
-	return err == nil && file.IsHeaderModified(mem)
-}
-
-// ErrPENilCertificate indicates the PE certificate is not available
-var ErrPENilCertificate = errors.New("pe certificate is nil")
+// ErrPeNilCertificate indicates the PE certificate is not available
+var ErrPeNilCertificate = errors.New("pe certificate is nil")
 
 func newPEAccessor() accessor {
 	return &peAccessor{}
@@ -820,12 +805,15 @@ func (pa *peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 	if kevt.PS != nil && kevt.PS.PE != nil {
 		p = kevt.PS.PE
 	}
+
 	// PE enrichment is likely disabled. Load PE data lazily
 	// by only requesting parsing of the PE directories that
-	// are relevant to the fields present in the expression
-	if (kevt.PS != nil && kevt.PS.Exe != "") && p == nil {
+	// are relevant to the fields present in the expression.
+	if kevt.PS != nil && kevt.PS.Exe != "" && p == nil {
 		var err error
-		exe := kevt.PS.Exe
+		var exe string
+
+		exe = kevt.PS.Exe
 		p, err = pe.ParseFile(exe, pa.parserOpts()...)
 		if err != nil {
 			return nil, err
@@ -857,6 +845,35 @@ func (pa *peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 		}
 	}
 
+	// here we determine if the PE was tampered. This check
+	// consists of two steps starting with parsing the disk
+	// PE for loaded executables followed by fetching the PE
+	// from process' memory at the base address of the loaded
+	// executable image
+	if kevt.IsLoadImage() && f.IsPeModified() {
+		filename := kevt.GetParamAsString(kparams.FileName)
+		isExecutable := filepath.Ext(filename) == ".exe" || kevt.Kparams.TryGetBool(kparams.FileIsExecutable)
+		if !isExecutable {
+			return nil, nil
+		}
+
+		pid := kevt.Kparams.MustGetPid()
+		addr := kevt.Kparams.MustGetUint64(kparams.ImageBase)
+		file, err := pe.ParseFile(filename, pa.parserOpts()...)
+		if err != nil {
+			return nil, err
+		}
+		mem, err := pe.ParseMem(pid, uintptr(addr), false, pa.parserOpts()...)
+		if err != nil {
+			return nil, err
+		}
+		isModified := file.IsHeaderModified(mem)
+		if p != nil {
+			p.IsModified = isModified
+		}
+		return isModified, nil
+	}
+
 	if p == nil {
 		return nil, nil
 	}
@@ -886,29 +903,31 @@ cmp:
 		return p.IsSigned, nil
 	case fields.PeIsTrusted:
 		return p.IsTrusted, nil
+	case fields.PeIsModified:
+		return p.IsModified, nil
 	case fields.PeCertIssuer:
 		if p.Cert == nil {
-			return nil, ErrPENilCertificate
+			return nil, ErrPeNilCertificate
 		}
 		return p.Cert.Issuer, nil
 	case fields.PeCertSubject:
 		if p.Cert == nil {
-			return nil, ErrPENilCertificate
+			return nil, ErrPeNilCertificate
 		}
 		return p.Cert.Subject, nil
 	case fields.PeCertSerial:
 		if p.Cert == nil {
-			return nil, ErrPENilCertificate
+			return nil, ErrPeNilCertificate
 		}
 		return p.Cert.SerialNumber, nil
 	case fields.PeCertAfter:
 		if p.Cert == nil {
-			return nil, ErrPENilCertificate
+			return nil, ErrPeNilCertificate
 		}
 		return p.Cert.NotAfter, nil
 	case fields.PeCertBefore:
 		if p.Cert == nil {
-			return nil, ErrPENilCertificate
+			return nil, ErrPeNilCertificate
 		}
 		return p.Cert.NotBefore, nil
 	case fields.PeIsDLL:
@@ -931,11 +950,6 @@ cmp:
 		return p.VersionResources[pe.ProductName], nil
 	case fields.PeProductVersion:
 		return p.VersionResources[pe.ProductVersion], nil
-	case fields.PeIsHeaderModified:
-		if kevt.IsLoadImage() {
-			return pa.isHeaderModified(kevt), nil
-		}
-		return nil, nil
 	default:
 		switch {
 		case f.IsPeSectionsMap():

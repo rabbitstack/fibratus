@@ -19,14 +19,13 @@
 package pe
 
 import (
-	"fmt"
 	peparser "github.com/saferwall/pe"
 	"reflect"
 )
 
 // IsHeaderModified returns true if any of the DOS, NT, or
-// section headers located in on-disk PE structure differ from
-// their in-memory representations.
+// section headers located in on-disk PE structure differ
+// from their respective in-memory representations.
 func (pe *PE) IsHeaderModified(mem *PE) bool {
 	var (
 		epModified      bool
@@ -36,21 +35,22 @@ func (pe *PE) IsHeaderModified(mem *PE) bool {
 		fileHdrModified bool
 		secHdrModified  bool
 	)
+
 	epModified = pe.EntryPoint != mem.EntryPoint
 	archMismatch = pe.ntHeader.FileHeader.Machine != mem.ntHeader.FileHeader.Machine
 
 	dosHdrModified = pe.isDOSHdrModified(mem)
 	ntHdrModified = pe.isNTHdrModified(mem)
-	fileHdrModified = pe.isFileHdrModified(mem)
+	fileHdrModified = pe.isFileHdrModified(mem, false)
 	secHdrModified = pe.isSectionHdrModified(mem)
 
-	if epModified {
-
+	if pe.IsDotnet {
+		// some .NET modules overwrite their own headers. Discard them to avoid false positives
+		if !secHdrModified && !dosHdrModified && !pe.isFileHdrModified(mem, archMismatch) &&
+			(epModified || (archMismatch && ntHdrModified)) {
+			return false
+		}
 	}
-	if archMismatch {
-
-	}
-	fmt.Println(dosHdrModified, ntHdrModified, fileHdrModified, secHdrModified)
 
 	return dosHdrModified || ntHdrModified || fileHdrModified || secHdrModified
 }
@@ -69,16 +69,37 @@ func (pe *PE) isNTHdrModified(mem *PE) bool {
 	if pe.ntHeader == (peparser.ImageNtHeader{}) || mem.ntHeader == (peparser.ImageNtHeader{}) {
 		return true
 	}
+
+	// reset image base before comparing
+	switch pe.Is64 {
+	case true:
+		fileOH64 := pe.ntHeader.OptionalHeader.(peparser.ImageOptionalHeader64)
+		memOH64 := mem.ntHeader.OptionalHeader.(peparser.ImageOptionalHeader64)
+		fileOH64.ImageBase = 0
+		memOH64.ImageBase = 0
+		pe.ntHeader.OptionalHeader = fileOH64
+		mem.ntHeader.OptionalHeader = memOH64
+	case false:
+		fileOH32 := pe.ntHeader.OptionalHeader.(peparser.ImageOptionalHeader32)
+		memOH32 := mem.ntHeader.OptionalHeader.(peparser.ImageOptionalHeader32)
+		fileOH32.ImageBase = 0
+		memOH32.ImageBase = 0
+		pe.ntHeader.OptionalHeader = fileOH32
+		mem.ntHeader.OptionalHeader = memOH32
+	}
 	return !reflect.DeepEqual(pe.ntHeader, mem.ntHeader)
 }
 
-func (pe *PE) isFileHdrModified(mem *PE) bool {
+func (pe *PE) isFileHdrModified(mem *PE, archMismatch bool) bool {
 	fileHeader, memHeader := pe.ntHeader.FileHeader, mem.ntHeader.FileHeader
 	if fileHeader == (peparser.ImageFileHeader{}) && memHeader == (peparser.ImageFileHeader{}) {
 		return false
 	}
 	if fileHeader == (peparser.ImageFileHeader{}) || memHeader == (peparser.ImageFileHeader{}) {
 		return true
+	}
+	if !archMismatch {
+		return false
 	}
 	if fileHeader.Machine == memHeader.Machine &&
 		fileHeader.Characteristics == memHeader.Characteristics &&
@@ -94,11 +115,25 @@ func (pe *PE) isSectionHdrModified(mem *PE) bool {
 	if pe.NumberOfSections != mem.NumberOfSections {
 		return true
 	}
+	if len(pe.sectionHeaders) == 0 && len(mem.sectionHeaders) == 0 {
+		return false
+	}
+	if len(pe.sectionHeaders) != len(mem.sectionHeaders) {
+		return true
+	}
+
 	for n := uint16(0); n < pe.NumberOfSections; n++ {
 		fileSecHeader := pe.sectionHeaders[n]
-		memSecHeader := pe.sectionHeaders[n]
+		memSecHeader := mem.sectionHeaders[n]
 		if fileSecHeader == (peparser.ImageSectionHeader{}) && memSecHeader == (peparser.ImageSectionHeader{}) {
 			continue
+		}
+		// normalize unused sections before comparing
+		if fileSecHeader.SizeOfRawData == 0 {
+			fileSecHeader.PointerToRawData = 0
+		}
+		if memSecHeader.SizeOfRawData == 0 {
+			memSecHeader.PointerToRawData = 0
 		}
 		if fileSecHeader == (peparser.ImageSectionHeader{}) || memSecHeader == (peparser.ImageSectionHeader{}) {
 			return true

@@ -24,7 +24,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"expvar"
-	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/util/format"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	peparser "github.com/saferwall/pe"
@@ -263,7 +262,7 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 		ntHeader:         pe.NtHeader,
 		sectionHeaders:   make([]peparser.ImageSectionHeader, 0),
 	}
-	return p, nil
+
 	switch pe.Is64 {
 	case true:
 		oh64 := pe.NtHeader.OptionalHeader.(peparser.ImageOptionalHeader64)
@@ -346,9 +345,7 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 			}
 		}
 	}
-	if data == nil {
-		fmt.Println("P", pe.Header)
-	}
+
 	// calculate imphash
 	if opts.calcImphash {
 		p.Imphash, err = pe.ImpHash()
