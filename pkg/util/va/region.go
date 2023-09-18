@@ -20,7 +20,6 @@ package va
 
 import (
 	"expvar"
-	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"golang.org/x/sys/windows"
 	"golang.org/x/time/rate"
@@ -233,7 +232,6 @@ func ReadArea(process windows.Handle, base uintptr, bufSize, minSize uint, force
 	for i < bufSize {
 		chunk := base + uintptr(i)
 		region, err := NewRegion(process, chunk)
-		fmt.Println(err)
 		if err != nil {
 			break
 		}

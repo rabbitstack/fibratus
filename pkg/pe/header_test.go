@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -34,7 +35,14 @@ func TestIsHeaderModified(t *testing.T) {
 		modified   bool
 	}{
 		{filepath.Join(os.Getenv("windir"), "explorer.exe"), false},
+		{filepath.Join(os.Getenv("windir"), "system32", "calc.exe"), true},
 	}
+
+	// perform PE injection on the calc.exe executable with
+	// process overwriting technique as explained in the repo
+	// https://github.com/hasherezade/process_overwriting
+	cmd := exec.Command("_fixtures/process_overwriting.exe", "_fixtures/shellcode.bin")
+	require.NoError(t, cmd.Run())
 
 	for _, tt := range tests {
 		pid, err := findProcessID(tt.executable)
@@ -57,6 +65,14 @@ func TestIsHeaderModified(t *testing.T) {
 		isHdrModified := file.IsHeaderModified(mem)
 		if isHdrModified != tt.modified {
 			t.Errorf("%s: expected %t, but got: %t", tt.executable, tt.modified, isHdrModified)
+		}
+		// terminate injected process
+		if filepath.Base(tt.executable) == "calc.exe" {
+			proc, err := windows.OpenProcess(windows.PROCESS_TERMINATE, false, pid)
+			if err != nil {
+				continue
+			}
+			windows.TerminateProcess(proc, 1)
 		}
 	}
 }

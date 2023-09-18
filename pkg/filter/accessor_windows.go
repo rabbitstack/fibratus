@@ -762,6 +762,8 @@ func (pa *peAccessor) setFields(fields []fields.Field) {
 	pa.fields = fields
 }
 
+// parserOpts traverses all fields declared in the expression and
+// dynamically determines what aspects of the PE need to be parsed.
 func (pa *peAccessor) parserOpts() []pe.Option {
 	var opts []pe.Option
 	for _, f := range pa.fields {
@@ -859,6 +861,7 @@ func (pa *peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 
 		pid := kevt.Kparams.MustGetPid()
 		addr := kevt.Kparams.MustGetUint64(kparams.ImageBase)
+
 		file, err := pe.ParseFile(filename, pa.parserOpts()...)
 		if err != nil {
 			return nil, err

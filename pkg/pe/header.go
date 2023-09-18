@@ -128,15 +128,15 @@ func (pe *PE) isSectionHdrModified(mem *PE) bool {
 		if fileSecHeader == (peparser.ImageSectionHeader{}) && memSecHeader == (peparser.ImageSectionHeader{}) {
 			continue
 		}
+		if fileSecHeader == (peparser.ImageSectionHeader{}) || memSecHeader == (peparser.ImageSectionHeader{}) {
+			return true
+		}
 		// normalize unused sections before comparing
 		if fileSecHeader.SizeOfRawData == 0 {
 			fileSecHeader.PointerToRawData = 0
 		}
 		if memSecHeader.SizeOfRawData == 0 {
 			memSecHeader.PointerToRawData = 0
-		}
-		if fileSecHeader == (peparser.ImageSectionHeader{}) || memSecHeader == (peparser.ImageSectionHeader{}) {
-			return true
 		}
 		if fileSecHeader.VirtualAddress != memSecHeader.VirtualAddress {
 			return true
