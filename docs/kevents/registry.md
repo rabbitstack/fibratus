@@ -18,6 +18,10 @@ Deletes a subkey and all its values. This event has the same group of parameters
 
 Opens a registry key. This event has the same group of parameters as the `RegCreateKey` event.
 
+#### RegCloseKey
+
+Closes the registry key. This event has the same group of parameters as the `RegCreateKey` event.
+
 #### RegQueryKey
 
 Enumerates the subkeys of the specified key. The first subkey is referenced by index number 0, the second key by 1, and so on.

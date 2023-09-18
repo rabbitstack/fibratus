@@ -7,15 +7,18 @@ Process events are fired up as a stimulus to the process' life-cycle changes. Wh
 - `pid` is the process' identifier. This value is valid from the time a process is created until it is terminated.
 - `tid` is the thread identifier inside process address space that generated the event.
 - `ppid` represents the parent identifier of the child process. Process identifier numbers are reused, so they only identify a process for the lifetime of that process. It is possible that the process identified by `ppid` is terminated, so `ppid` may not refer to a running process. It is also possible that `ppid` incorrectly refers to a process that reuses a process identifier.
+- `real_ppid` is the process identifier useful for detecting process spoofing.
 - `name` is the process' image name including file extension (e.g. `cmd.exe`).
-- `comm` is the full process' command line (e.g. `C:\Windows\system32\cmd.exe /cdir /-C /W`).
+- `cmdline` is the full process' command line (e.g. `C:\Windows\system32\cmd.exe /cdir /-C /W`).
 - `exe` is the full name of the process' executable (e.g. `C:\Windows\system32\cmd.exe`)
-- `sid` is the security identifier under which this process is run.
+- `sid` is the security identifier under which this process is run. (e.g. `S-1-5-18`)
 - `kproc` represents the address of the process object in the kernel.
 - `directory_table_base` represents the address of the directory table that holds process' memory page mappings.
 - `session_id` is the unique identifier for the current session under which process was started or terminated.
-- `status` is the exit status of the stopped process.
+- `status` is the exit status of the started/stopped process.
 - `start_time` designates the instant when the process was started.
+- `domain` represents the domain name under which the process is started.
+- `username` represents the username that started the process.
 
 #### OpenProcess
 
@@ -26,7 +29,7 @@ Process events are fired up as a stimulus to the process' life-cycle changes. Wh
 - `name` is the name of the local process that was opened.
 - `exe` is the full path of the local process object that was open.
 - `pid` is the identifier of the local process that was opened.
-- `status` contains the result of the process object open operation. (e.g. `success`)
+- `status` contains the result of the process object open operation. (e.g. `Success`)
 
 ### Process state  {docsify-ignore}
 

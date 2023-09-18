@@ -14,6 +14,7 @@
   * [Network](kevents/network.md)
   * [Handle](kevents/handle.md)
   * [Driver](kevents/driver.md)
+  * [Memory](kevents/mem.md)
 * <ion-icon name="filter-outline"></ion-icon> Filters and Rules
   * [Needle In The Haystack](filters/introduction.md)
   * [Prefiltering](filters/prefiltering.md)

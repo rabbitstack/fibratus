@@ -20,6 +20,7 @@ package bootstrap
 
 import (
 	"context"
+	"errors"
 	"github.com/rabbitstack/fibratus/pkg/aggregator"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	"github.com/rabbitstack/fibratus/pkg/api"
@@ -35,8 +36,12 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/signals"
 	"github.com/rabbitstack/fibratus/pkg/yara"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sys/windows"
 	"os"
 )
+
+// ErrAlreadyRunning signals a Fibratus process is already running in the system
+var ErrAlreadyRunning = errors.New("an instance of Fibratus process is already running in the system")
 
 // App centralizes the core building blocks responsible
 // for event acquisition, captures handling, filament
@@ -151,6 +156,10 @@ func (f *App) Run(args []string) error {
 	}
 	cfg := f.config
 
+	if !f.isSingleInstance() {
+		return ErrAlreadyRunning
+	}
+
 	log.Infof("bootstrapping with pid %d", os.Getpid())
 	log.Infof("configuration state %s", cfg.Print())
 
@@ -249,6 +258,11 @@ func (f *App) WriteCapture(args []string) error {
 	if f.consumer == nil {
 		panic("consumer is nil")
 	}
+
+	if !f.isSingleInstance() {
+		return ErrAlreadyRunning
+	}
+
 	err := f.controller.Start()
 	if err != nil {
 		return err
@@ -397,4 +411,18 @@ func (f *App) stop() {
 	if f.signals != nil {
 		f.signals <- struct{}{}
 	}
+}
+
+// isSingleInstance checks if there is a single instance
+// of the Fibratus process running in the system. This is
+// accomplished by creating a global event object. If such
+// an object already exists, we can conclude Fibratus process
+// is already running.
+func (f *App) isSingleInstance() bool {
+	name, err := windows.UTF16PtrFromString("Global\\Fibratus")
+	if err != nil {
+		return false
+	}
+	event, err := windows.CreateEvent(nil, 0, 0, name)
+	return event != 0 && !errors.Is(err, windows.ERROR_ALREADY_EXISTS)
 }

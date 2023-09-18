@@ -11,15 +11,25 @@ Provisions a new handle in the address space of the calling process. The followi
 - `handle_id` represents the unique identifier of the handle.
 - `handle_object` represents the address of the kernel object to which the handle is associated
 - `handle_name` denotes the handle name. (e.g. `\RPC Control\OLEA61B27E13E028C4EA6C286932E80`)
-- `handle_type` designates the type of the handle. (e.g. `ALPC Port`, `File`, `Key`)
+- `type_id` designates the handle type. (e.g. `ALPC Port`, `File`, `Key`)
 
 #### CloseHandle
 
 The `CloseHandle` event is triggered when the handle is released by the process. It contains the same set of parameters found in the `CreateHandle` event.
 
+#### DuplicateHandle
+
+This event is fired when the process duplicates an object handle. The following parameters are present in `DuplicateHandle` events:
+
+- `handle_id` represents the duplicated handle identifier.
+- `handle_object` represents the address of the duplicated kernel object
+- `handle_source_id` represents the identifier of the handle to be duplicated.
+- `type_id` designates the duplicated handle type. (e.g. `DxgkCompositionObject`)
+- `pid`, `exe`, `name` represent the source process identifier, process executable path, and the process image name respectively.
+
 ### Handle state {docsify-ignore}
 
-During bootstrap, Fibratus builds a snapshot of currently allocated handles. Similarly, when a new process is created Fibratus fetches its handles and attaches them to the process state. However, you can prevent the initial handle snapshotting by running Fibratus with the `--handle.init-snapshot=false` or changing the corresponding key in the configuration file.
+During bootstrap, Fibratus builds a snapshot of currently allocated handles. Similarly, when a new process is created Fibratus fetches its handles and attaches them to the process state. However, the initial handle snapshot is disabled by default. You can enable it by modifying the `--handle.init-snapshot=true` config flag or changing the corresponding key in the configuration file.
 
 The handle state contains:
 

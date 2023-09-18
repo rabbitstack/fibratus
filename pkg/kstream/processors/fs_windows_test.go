@@ -19,12 +19,14 @@
 package processors
 
 import (
+	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"reflect"
@@ -60,6 +62,37 @@ func TestFsProcessor(t *testing.T) {
 				file := fsProcessor.files[124567380264]
 				assert.Equal(t, "C:\\Windows\\system32\\user32.dll", file.Name)
 				assert.Equal(t, fs.Regular, file.Type)
+			},
+		},
+		{
+			"process mapped file rundown",
+			&kevent.Kevent{
+				PID:      10233,
+				Type:     ktypes.MapFileRundown,
+				Category: ktypes.File,
+				Kparams: kevent.Kparams{
+					kparams.FileKey:             {Name: kparams.FileKey, Type: kparams.Uint64, Value: uint64(124567380264)},
+					kparams.FileViewSize:        {Name: kparams.FileViewSize, Type: kparams.Uint64, Value: uint64(3098)},
+					kparams.FileViewBase:        {Name: kparams.FileViewBase, Type: kparams.Uint64, Value: uint64(0xffff23433)},
+					kparams.FileViewSectionType: {Name: kparams.FileViewSectionType, Type: kparams.Enum, Value: uint32(va.SectionImage), Enum: kevent.ViewSectionTypes},
+				},
+			},
+			func(p Processor) {
+				fsProcessor := p.(*fsProcessor)
+				fsProcessor.files[124567380264] = &FileInfo{Name: "C:\\Windows\\System32\\kernel32.dll"}
+			},
+			func() *handle.SnapshotterMock {
+				hsnap := new(handle.SnapshotterMock)
+				return hsnap
+			},
+			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
+				fsProcessor := p.(*fsProcessor)
+				assert.Contains(t, fsProcessor.mmaps, uint32(10233))
+				mapinfo := fsProcessor.mmaps[10233][124567380264]
+				require.NotNil(t, mapinfo)
+				assert.Equal(t, "C:\\Windows\\System32\\kernel32.dll", mapinfo.File)
+				assert.Equal(t, uint64(3098), mapinfo.Size)
+				assert.Equal(t, uint64(0xffff23433), mapinfo.BaseAddr)
 			},
 		},
 		{
@@ -154,6 +187,34 @@ func TestFsProcessor(t *testing.T) {
 			},
 		},
 		{
+			"unmap view file",
+			&kevent.Kevent{
+				PID:      10233,
+				Type:     ktypes.UnmapViewFile,
+				Category: ktypes.File,
+				Kparams: kevent.Kparams{
+					kparams.FileKey:             {Name: kparams.FileKey, Type: kparams.Uint64, Value: uint64(124567380264)},
+					kparams.FileViewSize:        {Name: kparams.FileViewSize, Type: kparams.Uint64, Value: uint64(3098)},
+					kparams.FileViewBase:        {Name: kparams.FileViewBase, Type: kparams.Uint64, Value: uint64(0xffff23433)},
+					kparams.FileViewSectionType: {Name: kparams.FileViewSectionType, Type: kparams.Enum, Value: uint32(va.SectionImage), Enum: kevent.ViewSectionTypes},
+				},
+			},
+			func(p Processor) {
+				fsProcessor := p.(*fsProcessor)
+				fsProcessor.mmaps[10233] = make(map[uint64]*MmapInfo)
+				fsProcessor.mmaps[10233][124567380264] = &MmapInfo{File: "C:\\Windows\\System32\\kernel32.dll"}
+			},
+			func() *handle.SnapshotterMock {
+				hsnap := new(handle.SnapshotterMock)
+				return hsnap
+			},
+			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
+				fsProcessor := p.(*fsProcessor)
+				assert.True(t, e.Kparams.Contains(kparams.FileName))
+				assert.Nil(t, fsProcessor.mmaps[3098][124567380264])
+			},
+		},
+		{
 			"process write file",
 			&kevent.Kevent{
 				Type:     ktypes.WriteFile,
@@ -234,7 +295,7 @@ func TestFsProcessor(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			hsnap := tt.hsnap()
-			p := newFsProcessor(hsnap, fs.NewDevMapper(), fs.NewDevPathResolver())
+			p := newFsProcessor(hsnap, fs.NewDevMapper(), fs.NewDevPathResolver(), &config.Config{})
 			if tt.setupProcessor != nil {
 				tt.setupProcessor(p)
 			}

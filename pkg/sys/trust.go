@@ -20,7 +20,9 @@ package sys
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/util/format"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
+	"sync"
 	"unsafe"
 )
 
@@ -195,5 +197,19 @@ func (c CatalogInfo) CatalogFile() string {
 	return windows.UTF16ToString(p[:])
 }
 
-// IsWintrustFound indicates if the wintrust DLL is present in the system.
-func IsWintrustFound() bool { return modwintrust.Load() == nil }
+var isWintrustDLLFound bool
+var once sync.Once
+
+// IsWintrustFound indicates if the Wintrust DLL is present in the system.
+func IsWintrustFound() bool {
+	once.Do(func() {
+		isWintrustDLLFound = modwintrust.Load() == nil
+		if !isWintrustDLLFound {
+			log.Warn("unable to find wintrust.dll library. This will lead to " +
+				"PE objects signature verification to be skipped possibly " +
+				"causing false positive samples in detection rules relying on " +
+				"image signature filter fields")
+		}
+	})
+	return isWintrustDLLFound
+}

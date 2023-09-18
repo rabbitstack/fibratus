@@ -26,5 +26,4 @@ Thread events are comprised of the following parameters:
 - `exe` is the full path of the local process image whose thread object was open.
 - `pid` is the identifier of the local process whose thread object was opened.
 - `tid` is the identifier of the local thread that was opened.
-- `status` contains the result of the thread object open operation. (e.g. `success`)
-
+- `status` contains the result of the thread object open operation. (e.g. `Success`)

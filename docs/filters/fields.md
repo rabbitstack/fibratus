@@ -48,7 +48,7 @@ The following tables summarize available field names that can be used in filter 
 | ps.exe          | Full name of the process' executable | `ps.exe = 'C:\\Windows\\system32\\cmd.exe'`   |
 | ps.args         | Process command line arguments | `ps.args in ('/cdir', '/-C')`   |
 | ps.cwd          | Process current working directory | `ps.cwd = 'C:\\Users\\Default'`   |
-| ps.sid          | Security identifier under which this process is run | `ps.sid contains 'SYSTEM'`   |
+| ps.sid          | Security identifier under which this process is run | `ps.sid = 'S-1-5-18'`   |
 | ps.domain       | Process domain name  | `ps.domain = 'NT AUTHORITY'`   |
 | ps.username     | Process user name  | `ps.username = 'SYSTEM'`   |
 | ps.sessionid    | Unique identifier for the current session | `ps.sessionid = 1`   |
@@ -67,7 +67,7 @@ The following tables summarize available field names that can be used in filter 
 | ps.parent.cmdline| Parent process command line  | `ps.parent.cmdline contains 'attrib'`   |
 | ps.parent.exe    | Full name of the parent process executable  | `ps.parent.exe = 'C:\\Windows\\system32\\cmd.exe'`   |
 | ps.parent.cwd    | Parent process current working directory  | `ps.parent.cwd = 'C:\\Users\\Default'`   |
-| ps.parent.sid    | Security identifier under which the parent process is run  | `ps.parent.sid contains 'SYSTEM'`   |
+| ps.parent.sid    | Security identifier under which the parent process is run  | `ps.parent.sid = 'S-1-5-18'`   |
 | ps.parent.domain    | Parent process domain name  | `ps.parent.domain = 'NT AUTHORITY'`   |
 | ps.parent.username  | Parent process user name  | `ps.parent.username = 'SYSTEM'`   |
 | ps.parent.sessionid    | Unique identifier for the current session of the parent process  | `ps.parent.session = 1`   |
@@ -81,7 +81,7 @@ The following tables summarize available field names that can be used in filter 
 | ps.child.cmdline    | Child process command line  | `ps.child.cmdline contains '/k /v'`   |
 | ps.child.exe     | Child process executable full path  | `ps.child.exe = 'C:\\Windows\\system32\\cmd.exe'`   |
 | ps.child.args    | Child process command line arguments  | `ps.child.args in ('C:\\Windows\\system32\\cmd.exe')`   |
-| ps.child.sid     | Child process security identifier  | `ps.child.sid contains 'SYSTEM'`   |
+| ps.child.sid     | Child process security identifier  | `ps.child.sid = 'S-1-5-20'`   |
 | ps.child.sessionid   | Child process session identifier  | `ps.child.sessionid = 1`   |
 | ps.child.domain    | Child process domain name  | `ps.child.domain = 'NT AUTHORITY'`   |
 | ps.child.username  | Child process user name  | `ps.child.username = 'SYSTEM'`   |
@@ -103,7 +103,7 @@ The following tables summarize available field names that can be used in filter 
 | thread.entrypoint | Starting address of the function to be executed by the thread | `thread.entrypoint = '7efe0000'`   |
 | thread.access.mask | Thread access rights | `thread.access.mask = '0x1800'`   |
 | thread.access.mask.names | Thread access human-readable rights | `thread.access.mask.names in ('QUERY_LIMITED_INFORMATION')`   |
-| thread.access.status | Thread access status | `thread.access.status = 'success'`   |
+| thread.access.status | Thread access status | `thread.access.status = 'Success'`   |
 
 
 ### Image
@@ -114,20 +114,32 @@ The following tables summarize available field names that can be used in filter 
 | image.checksum  | Image checksum | `image.checksum = 746424`   |
 | image.size  | Image size | `image.size > 1024`   |
 | image.default.address  | Default image address | `image.default.address = '7efe0000'`   |
+| image.signature.type  | Image signature type | `image.signature.type != 'NONE'`   |
+| image.signature.level  | Image signature level | `image.signature.level = 'AUTHENTICODE'`   |
+| image.cert.serial  | Image certificate serial number | `image.cert.serial = '330000023241fb59996dcc4dff000000000232'`   |
+| image.cert.subject  | Image certificate subject | `image.cert.subject contains 'Washington, Redmond, Microsoft Corporation'`   |
+| image.cert.issuer  | Image certificate CA | `image.cert.issuer contains 'US, Washington, Redmond, Microsoft Windows Production PCA 2011`   |
+| image.cert.after  | Image certificate expiration date | `image.cert.after contains '2024-02-01 00:05:42 +0000 UTC'`   |
+| image.cert.before  | Image certificate enrollment date | `image.cert.before contains '2024-02-01 00:05:42 +0000 UTC'`   |
+
 
 ### File
 | Field Name  | Description | Example     |
 | :---        |    :----   |          :---: |
 | file.object     | File object address in the kernel space | `file.object = 18446738026482168384`   |
 | file.name       | Full file name | `file.name = 'C:\\Windows\\Sytem32\\regedit.exe'`   |
-| file.operation  | Operation performed on the file or I/O device | `file.operation = 'open'`   |
-| file.share.mask | File share mask | `file.share.mask = 'rw-'`   |
+| file.operation  | Operation performed on the file or I/O device | `file.operation = 'OPEN'`   |
+| file.share.mask | File share mask | `file.share.mask = 'READ'`   |
 | file.io.size    | I/O read/write size | `file.io.size > 512`   |
 | file.offset     | Read/write position in the file | `file.offset = 1024`   |
-| file.type       | File type. Possible values are `file`, `directory`, `pipe`, `console`, `mailslot`, `other`, `unknown` | `file.type = 'directory'`   |
+| file.type       | File type. Possible values are `File`, `Directory`, `Pipe`, `Console`, `Mailslot`, `Other`, `Unknown` | `file.type = 'Directory'`   |
 | file.extension  | File extension represents the file extension (e.g. .exe or .dll) | `file.extension = '.dll'`   |
-| file.attributes | List of file attributes | `file.attributes in ('hidden', 'temporary')`   |
-| file.status | System status message of the `CreateFile` operation | `file.status = 'success'`   |
+| file.attributes | List of file attributes | `file.attributes in ('HIDDEN', 'TEMPORARY')`   |
+| file.status | System status message of the `CreateFile` operation | `file.status = 'Success'`   |
+| file.view.base | Base address of the mapped/unmapped section view | `file.view.base = '25d42170000'`   |
+| file.view.size | Size of the mapped/unmapped section view | `file.view.size > 1024`   |
+| file.view.type | Type of the mapped/unmapped section view | `file.view.type = 'IMAGE'`   |
+
 
 ### Registry
 | Field Name  | Description | Example     |
@@ -136,7 +148,7 @@ The following tables summarize available field names that can be used in filter 
 | registry.key.handle | Registry key object address | `registry.key.handle = 'FFFFB905D60C2268'`   |
 | registry.value      | Registry value content | `registry.value = '%SystemRoot%\\system32'`   |
 | registry.value.type | Registry value type | `registry.value.type = 'REG_SZ'`   |
-| registry.status     | Registry operation status | `registry.status != 'success'`   |
+| registry.status     | Registry operation status | `registry.status != 'Success'`   |
 
 ### Network
 | Field Name  | Description | Example     |
@@ -160,6 +172,27 @@ The following tables summarize available field names that can be used in filter 
 | handle.name   | Handle name | `handle.name = '\\Device\\NamedPipe\\chrome.12644.28.105826381'`   |
 | handle.type   | Handle type | `handle.type = 'Mutant'`   |
 
+### Memory
+| Field Name  | Description | Example     |
+| :---        |    :----   |          :---: |
+| mem.address   	| Base address of the allocated region | `mem.address = '211d13f2000'`   |
+| mem.size   	| Size of the allocated region | `mem.size > 438272`   |
+| mem.alloc   	| Region allocation or release type | `mem.alloc = 'COMMIT'`   |
+| mem.type   	| Designates the page type of the allocated region | `mem.type = 'PRIVATE'`   |
+| mem.protection   	| Designates the protection type of the allocated region | `mem.protection = 'READWRITE'`   |
+| mem.protection.mask   	| Designates the allocated region protection in mask notation | `mem.protection.mask = 'RWX'`   |
+
+
+### DNS
+| Field Name  | Description | Example     |
+| :---        |    :----   |          :---: |
+| dns.name 	| DNS query name | `dns.name = 'example.org'`   |
+| dns.rr 	| DNS resource record type | `dns.rr = 'AA'`   |
+| dns.options 	| DNS query options | `dns.options in ('ADDRCONFIG', 'DUAL_ADDR')`   |
+| dns.rcode 	| DNS response status | `dns.rcode = 'NXDOMAIN'`   |
+| dns.answers 	| DNS response answers | `dns.answers in ('o.lencr.edgesuite.net', 'a1887.dscq.akamai.net')`   |
+
+
 ### PE
 | Field Name  | Description | Example     |
 | :---        |    :----   |          :---: |
@@ -180,4 +213,16 @@ The following tables summarize available field names that can be used in filter 
 | pe.file.version   | File version supplied at compile-time | `pe.file.version = '10.0.18362.693 (WinBuild.160101.0800)'`   |
 | pe.product   | Internal product name of the file provided at compile-time | `pe.product = 'Microsoft® Windows® Operating System'`   |
 | pe.product.name   | Internal product version of the file provided at compile-time | `pe.product.version = '10.0.18362.693'`   |
-
+| pe.is_dll   | Indicates if the loaded image or a created file is a DLL | `pe.is_dll`   |
+| pe.is_driver   | Indicates if the loaded image or a created file is a driver | `pe.is_driver`   |
+| pe.is_exec   | Indicates if the loaded image or a created file is an executable | `pe.is_exec`   |
+| pe.is_dotnet   | Indicates if the PE contains CLR (Common Language Runtime) data | `pe.is_dotnet`   |
+| pe.is_signed   | Indicates if the PE has embedded or catalog signature | `pe.is_signed`   |
+| pe.is_trusted   | Indicates if the PE certificate chain is trusted | `pe.is_trusted`   |
+| pe.imphash   | Import hash | `pe.impash = '5d3861c5c547f8a34e471ba273a732b2'`   |
+| pe.anomalies   | Contains PE anomalies detected during parsing | `pe.anomalies in ('number of sections is 0')`   |
+| pe.cert.serial  | PE certificate serial number | `pe.cert.serial = '330000023241fb59996dcc4dff000000000232'`   |
+| pe.cert.subject  | PE certificate subject | `pe.cert.subject contains 'Washington, Redmond, Microsoft Corporation'`   |
+| pe.cert.issuer  | PE certificate CA | `pe.cert.issuer contains 'US, Washington, Redmond, Microsoft Windows Production PCA 2011'`   |
+| pe.cert.after  | PE certificate expiration date | `pe.cert.after contains '2024-02-01 00:05:42 +0000 UTC'`   |
+| pe.cert.before  | PE certificate enrollment date | `pe.cert.before contains '2024-02-01 00:05:42 +0000 UTC'`   |

@@ -31,7 +31,7 @@ import (
 )
 
 // scanTimeout specifies the timeout interval for the scan operation
-const scanTimeout = time.Second * 10
+var scanTimeout = time.Second * 10
 
 // Yara provides signature-based detection in filters and rules.
 // YARA is a tool aimed at (but not limited to) helping malware
@@ -62,7 +62,6 @@ func (f Yara) Call(args []interface{}) (interface{}, bool) {
 		log.Warnf("erroneous scanner in YARA function: %v: %s", err, rules)
 		return false, true
 	}
-	defer scanner.Destroy()
 
 	var cb yara.MatchRules
 	switch n := args[0].(type) {
@@ -107,7 +106,6 @@ func (f Yara) newScanner(rules string, vars map[string]interface{}) (*yara.Scann
 	if err != nil {
 		return nil, err
 	}
-	defer c.Destroy()
 	if err := c.AddString(rules, ""); err != nil {
 		return nil, err
 	}

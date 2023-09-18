@@ -20,6 +20,7 @@ package processors
 
 import (
 	"expvar"
+	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
@@ -34,7 +35,8 @@ import (
 
 var (
 	// totalRundownFiles counts the number of opened files
-	totalRundownFiles = expvar.NewInt("fs.total.rundown.files")
+	totalRundownFiles    = expvar.NewInt("fs.total.rundown.files")
+	totalMapRundownFiles = expvar.NewInt("fs.total.map.rundown.files")
 	// fileObjectMisses computes file object cache misses
 	fileObjectMisses     = expvar.NewInt("fs.file.objects.misses")
 	fileObjectHandleHits = expvar.NewInt("fs.file.object.handle.hits")
@@ -44,12 +46,16 @@ var (
 type fsProcessor struct {
 	// files stores the file metadata indexed by file object
 	files map[uint64]*FileInfo
+	// mmaps stores memory-mapped files by pid and file object
+	mmaps map[uint32]map[uint64]*MmapInfo
+
 	hsnap handle.Snapshotter
 	// irps contains a mapping between the IRP (I/O request packet) and CreateFile events
 	irps map[uint64]*kevent.Kevent
 
 	devMapper       fs.DevMapper
 	devPathResolver fs.DevPathResolver
+	config          *config.Config
 }
 
 // FileInfo stores file information obtained from event state.
@@ -58,13 +64,22 @@ type FileInfo struct {
 	Type fs.FileType
 }
 
-func newFsProcessor(hsnap handle.Snapshotter, devMapper fs.DevMapper, devPathResolver fs.DevPathResolver) Processor {
+// MmapInfo stores information of the memory-mapped file.
+type MmapInfo struct {
+	File     string
+	BaseAddr uint64
+	Size     uint64
+}
+
+func newFsProcessor(hsnap handle.Snapshotter, devMapper fs.DevMapper, devPathResolver fs.DevPathResolver, config *config.Config) Processor {
 	return &fsProcessor{
 		files:           make(map[uint64]*FileInfo),
+		mmaps:           make(map[uint32]map[uint64]*MmapInfo),
 		irps:            make(map[uint64]*kevent.Kevent),
 		hsnap:           hsnap,
 		devMapper:       devMapper,
 		devPathResolver: devPathResolver,
+		config:          config,
 	}
 }
 
@@ -99,8 +114,33 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 			f.files[fileObject] = &FileInfo{Name: filename, Type: fs.GetFileType(filename, 0)}
 		}
 	case ktypes.MapFileRundown:
-		// currently just forward mapped file rundown events
-		return e, nil
+		// if the memory-mapped view refers to the image/data file
+		// we store it in internal state for each process. The state
+		// is consulted later when we process unmap events
+		sec := e.Kparams.MustGetUint32(kparams.FileViewSectionType)
+		isMapped := sec != va.SectionPagefile && sec != va.SectionPhysical
+		if !isMapped {
+			return e, nil
+		}
+		fileKey := e.Kparams.MustGetUint64(kparams.FileKey)
+		viewBase := e.Kparams.MustGetUint64(kparams.FileViewBase)
+		viewSize := e.Kparams.MustGetUint64(kparams.FileViewSize)
+		f.initMmap(e.PID)
+		fileinfo := f.files[fileKey]
+		if fileinfo != nil {
+			totalMapRundownFiles.Add(1)
+			f.mmaps[e.PID][fileKey] = &MmapInfo{File: fileinfo.Name, BaseAddr: viewBase, Size: viewSize}
+		} else {
+			process, err := windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION, false, e.PID)
+			if err != nil {
+				return e, nil
+			}
+			defer windows.Close(process)
+			totalMapRundownFiles.Add(1)
+			addr := e.Kparams.MustGetUint64(kparams.FileViewBase) + (e.Kparams.MustGetUint64(kparams.FileOffset))
+			name := f.devMapper.Convert(sys.GetMappedFile(process, uintptr(addr)))
+			f.mmaps[e.PID][fileKey] = &MmapInfo{File: name, BaseAddr: viewBase, Size: viewSize}
+		}
 	case ktypes.CreateFile:
 		// we defer the processing of the CreateFile event until we get
 		// the matching FileOpEnd event. This event contains the operation
@@ -135,7 +175,9 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 			fileinfo = f.getFileInfo(filename, opts)
 			f.files[fileObject] = fileinfo
 		}
-		f.devPathResolver.AddPath(ev.GetParamAsString(kparams.FileName))
+		if f.config.Kstream.EnableHandleKevents {
+			f.devPathResolver.AddPath(ev.GetParamAsString(kparams.FileName))
+		}
 		ev.AppendParam(kparams.NTStatus, kparams.Status, status)
 		if fileinfo.Type != fs.Unknown {
 			ev.AppendEnum(kparams.FileType, uint32(fileinfo.Type), fs.FileTypes)
@@ -153,20 +195,28 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 			ev.AppendParam(kparams.FileIsExecutable, kparams.Bool, pefile.IsExecutable)
 		}
 		return ev, nil
-	case ktypes.ReleaseFile, ktypes.UnmapViewFile:
-		var fileObject uint64
+	case ktypes.ReleaseFile:
 		fileReleaseCount.Add(1)
 		// delete both, the file object and the file key from files map
 		fileKey := e.Kparams.MustGetUint64(kparams.FileKey)
-		if !e.IsUnmapViewFile() {
-			fileObject = e.Kparams.MustGetUint64(kparams.FileObject)
-		}
-		fileinfo := f.findFile(fileKey, fileObject)
-		if fileinfo != nil && e.IsUnmapViewFile() {
-			e.AppendParam(kparams.FileName, kparams.FilePath, fileinfo.Name)
-		}
+		fileObject := e.Kparams.MustGetUint64(kparams.FileObject)
 		delete(f.files, fileKey)
 		delete(f.files, fileObject)
+	case ktypes.UnmapViewFile:
+		fileKey := e.Kparams.MustGetUint64(kparams.FileKey)
+		if _, ok := f.mmaps[e.PID]; !ok {
+			return e, nil
+		}
+		mmapinfo := f.mmaps[e.PID][fileKey]
+		if mmapinfo != nil {
+			e.AppendParam(kparams.FileName, kparams.FilePath, mmapinfo.File)
+		}
+		totalMapRundownFiles.Add(-1)
+		delete(f.mmaps[e.PID], fileKey)
+		if len(f.mmaps[e.PID]) == 0 {
+			// process terminated, all files unmapped
+			f.removeMmap(e.PID)
+		}
 	default:
 		var fileObject uint64
 		fileKey := e.Kparams.MustGetUint64(kparams.FileKey)
@@ -177,6 +227,7 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 		// by the file key, then try to fetch it by file object. Even if file object
 		// references fails, we search in the file handles for such file
 		fileinfo := f.findFile(fileKey, fileObject)
+
 		// try to resolve mapped file name if not found in internal state
 		if fileinfo == nil && e.IsMapViewFile() {
 			sec := e.Kparams.MustGetUint32(kparams.FileViewSectionType)
@@ -189,9 +240,14 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 				return e, nil
 			}
 			defer windows.Close(process)
+			viewBase := e.Kparams.MustGetUint64(kparams.FileViewBase)
+			viewSize := e.Kparams.MustGetUint64(kparams.FileViewSize)
 			addr := e.Kparams.MustGetUint64(kparams.FileViewBase) + (e.Kparams.MustGetUint64(kparams.FileOffset))
-			fileinfo = &FileInfo{Name: f.devMapper.Convert(sys.GetMappedFile(process, uintptr(addr)))}
-			f.files[fileKey] = fileinfo
+			name := f.devMapper.Convert(sys.GetMappedFile(process, uintptr(addr)))
+			f.initMmap(e.PID)
+			f.mmaps[e.PID][fileKey] = &MmapInfo{File: name, BaseAddr: viewBase, Size: viewSize}
+			e.AppendParam(kparams.FileName, kparams.FilePath, name)
+			return e, nil
 		}
 
 		// ignore object misses that are produced by CloseFile
@@ -237,4 +293,15 @@ func (f *fsProcessor) findFile(fileKey, fileObject uint64) *FileInfo {
 		return &FileInfo{Name: file.Name, Type: fs.GetFileType(file.Name, 0)}
 	}
 	return nil
+}
+
+func (f *fsProcessor) initMmap(pid uint32) {
+	m := f.mmaps[pid]
+	if m == nil {
+		f.mmaps[pid] = make(map[uint64]*MmapInfo)
+	}
+}
+
+func (f *fsProcessor) removeMmap(pid uint32) {
+	delete(f.mmaps, pid)
 }

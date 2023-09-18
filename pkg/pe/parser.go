@@ -19,7 +19,6 @@
 package pe
 
 import (
-	"bytes"
 	"crypto/md5"
 	"encoding/hex"
 	"errors"
@@ -28,7 +27,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	peparser "github.com/saferwall/pe"
 	"golang.org/x/sys/windows"
-	"golang.org/x/text/encoding/unicode"
 	"os"
 	"path/filepath"
 	"strings"
@@ -326,7 +324,7 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 
 	if opts.parseResources {
 		// parse version resources
-		p.VersionResources, err = ParseVersionResources(pe)
+		p.VersionResources, err = pe.ParseVersionResources()
 		if err != nil {
 			versionResourcesParseErrors.Add(1)
 		}
@@ -358,23 +356,4 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 	p.Anomalies = pe.Anomalies
 
 	return p, nil
-}
-
-// DecodeUTF16String decodes the UTF16 string from the byte slice.
-func DecodeUTF16String(b []byte) (string, error) {
-	n := bytes.Index(b, []byte{0, 0})
-	if n == 0 {
-		return "", nil
-	}
-	decoder := unicode.UTF16(unicode.LittleEndian, unicode.UseBOM).NewDecoder()
-	s, err := decoder.Bytes(b[0 : n+1])
-	if err != nil {
-		return "", err
-	}
-	return string(s), nil
-}
-
-// AlignDword aligns the offset on a 32-bit boundary.
-func AlignDword(offset, base uint32) uint32 {
-	return ((offset + base + 3) & 0xfffffffc) - (base & 0xfffffffc)
 }

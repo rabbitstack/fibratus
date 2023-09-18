@@ -36,6 +36,11 @@ import (
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 )
 
+var (
+	// ErrPENil indicates the PE (Portable Executable) data is nil
+	ErrPENil = errors.New("pe state is nil")
+)
+
 // accessor dictates the behaviour of the field accessors. One of the main responsibilities of the accessor is
 // to extract the underlying parameter for the field given in the filter expression. It can also produce a value
 // from the non-params constructs such as process' state or PE metadata.
@@ -878,11 +883,12 @@ func (pa *peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 	}
 
 	if p == nil {
-		return nil, nil
+		return nil, ErrPENil
 	}
 
 cmp:
 	kevt.PS.PE = p
+
 	switch f {
 	case fields.PeEntrypoint:
 		return p.EntryPoint, nil
