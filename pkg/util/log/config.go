@@ -70,7 +70,7 @@ func (c *Config) AddFlags(flags *pflag.FlagSet) {
 	flags.Int(logMaxAge, 0, "Sets he maximum number of days to retain old log files based on the timestamp encoded in their filename. By default no old log files will be removed")
 	flags.Int(logMaxBackups, 15, "Specifies the maximum number of old log files to retain")
 	flags.Int(logMaxSize, 100, "Specifies the maximum size in megabytes of the log file before it gets rotated")
-	flags.String(logFormatter, "json", "Represents the log formatter (json|text )")
+	flags.String(logFormatter, "text", "Represents the log formatter (json|text )")
 	flags.String(logPath, "", "Specifies the alternative paths for storing the logs")
 	flags.Bool(logStdout, false, "Indicates whether log lines are written to standard output in addition to writing them to log files")
 }

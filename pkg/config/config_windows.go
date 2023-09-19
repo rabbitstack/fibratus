@@ -317,7 +317,17 @@ func (c *Config) addFlags() {
 	c.flags.String(configFile, filepath.Join(os.Getenv("PROGRAMFILES"), "fibratus", "config", "fibratus.yml"), "Indicates the location of the configuration file")
 	if c.opts.run || c.opts.replay {
 		c.flags.StringP(filamentName, "f", "", "Specifies the filament to execute")
-		c.flags.StringSlice(rulesFromPaths, []string{}, "Comma-separated list of rules files")
+
+		// initialize default rules paths
+		exe, err := os.Executable()
+		if err != nil {
+			// fallback to default install directory
+			exe = filepath.Join(os.Getenv("ProgramFiles"), "Fibratus", "Bin", "fibratus.exe")
+		}
+		dir := filepath.Join(filepath.Dir(exe), "..", "Rules")
+
+		c.flags.StringSlice(rulesFromPaths, []string{filepath.Join(dir, "*")}, "Comma-separated list of rules files")
+		c.flags.StringSlice(macrosFromPaths, []string{filepath.Join(dir, "Macros", "*")}, "Comma-separated list of macro files")
 		c.flags.StringSlice(rulesFromURLs, []string{}, "Comma-separated list of rules URL resources")
 	}
 	if c.opts.capture {
