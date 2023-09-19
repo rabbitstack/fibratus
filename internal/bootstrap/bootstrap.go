@@ -161,7 +161,7 @@ func (f *App) Run(args []string) error {
 	}
 
 	log.Infof("bootstrapping with pid %d", os.Getpid())
-	log.Infof("configuration state %s", cfg.Print())
+	log.Infof("configuration settings %s", cfg.Print())
 
 	err := f.controller.Start()
 	if err != nil {
