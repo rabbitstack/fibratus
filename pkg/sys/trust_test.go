@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package signature
+package sys
 
 import (
 	"github.com/stretchr/testify/assert"

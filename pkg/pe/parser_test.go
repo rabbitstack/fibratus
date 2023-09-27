@@ -25,7 +25,6 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
-	"unsafe"
 )
 
 func TestParseFile(t *testing.T) {
@@ -149,13 +148,9 @@ func getModuleBaseAddress(pid uint32) (uintptr, error) {
 	if err != nil {
 		return 0, err
 	}
-	if err := windows.EnumProcessModules(proc, &moduleHandles[0], 1024, &cbNeeded); err != nil {
+	if err := windows.EnumProcessModulesEx(proc, &moduleHandles[0], 1024, &cbNeeded, windows.LIST_MODULES_ALL); err != nil {
 		return 0, err
 	}
 	moduleHandle := moduleHandles[0]
-	var moduleInfo windows.ModuleInfo
-	if err := windows.GetModuleInformation(proc, moduleHandle, &moduleInfo, uint32(unsafe.Sizeof(moduleInfo))); err != nil {
-		return 0, err
-	}
-	return moduleInfo.BaseOfDll, nil
+	return uintptr(moduleHandle), nil
 }

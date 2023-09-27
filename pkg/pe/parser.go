@@ -23,6 +23,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"expvar"
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/format"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	peparser "github.com/saferwall/pe"
@@ -238,6 +239,7 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	// parse the NT header
 	err = pe.ParseNTHeader()
 	if err != nil {
@@ -253,8 +255,13 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 		Imports:          make([]string, 0),
 		Sections:         make([]Sec, 0),
 		VersionResources: make(map[string]string),
+		Is64:             pe.Is64,
 		filename:         path,
+		dosHeader:        pe.DOSHeader,
+		ntHeader:         pe.NtHeader,
+		sectionHeaders:   make([]peparser.ImageSectionHeader, 0),
 	}
+
 	switch pe.Is64 {
 	case true:
 		oh64 := pe.NtHeader.OptionalHeader.(peparser.ImageOptionalHeader64)
@@ -293,6 +300,11 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 	p.IsDriver = pe.IsDriver()
 	p.IsExecutable = pe.IsEXE()
 
+	// initialize raw section headers
+	for _, sec := range pe.Sections {
+		p.sectionHeaders = append(p.sectionHeaders, sec.Header)
+	}
+
 	if opts.parseSymbols || opts.parseResources || opts.parseSecurity ||
 		opts.calcImphash || opts.parseCLR {
 		// parse data directories
@@ -323,7 +335,7 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 	if opts.parseSecurity {
 		p.IsSigned = pe.IsSigned
 		if pe.HasCertificate {
-			p.Cert = &Cert{
+			p.Cert = &sys.Cert{
 				Issuer:       pe.Certificates.Info.Issuer,
 				Subject:      pe.Certificates.Info.Subject,
 				NotBefore:    pe.Certificates.Info.NotBefore,

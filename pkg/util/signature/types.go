@@ -20,7 +20,6 @@ package signature
 
 import (
 	"errors"
-	"github.com/rabbitstack/fibratus/pkg/pe"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"runtime"
 )
@@ -87,7 +86,7 @@ type Signature struct {
 	// Level specifies the signature level at which the code was signed.
 	Level uint32
 	// Cert represents certificate information for the particular signature.
-	Cert *pe.Cert
+	Cert *sys.Cert
 	// filename represents the name of the executable image/DLL/driver
 	filename string
 }
@@ -109,7 +108,7 @@ func (s *Signature) VerifyEmbedded() bool {
 
 // VerifyCatalog verifies the catalog-based file signature.
 func (s *Signature) VerifyCatalog() bool {
-	catalog := NewCatalog()
+	catalog := sys.NewCatalog()
 	err := catalog.Open(s.filename)
 	if err != nil {
 		return false

@@ -21,12 +21,7 @@ package signature
 import (
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	"github.com/rabbitstack/fibratus/pkg/sys"
-	log "github.com/sirupsen/logrus"
-	"sync"
 )
-
-var isWintrustDLLFound bool
-var once sync.Once
 
 // Wrap returns a new signature form signature type and level.
 func Wrap(typ, level uint32) *Signature {
@@ -34,8 +29,7 @@ func Wrap(typ, level uint32) *Signature {
 }
 
 // GetCertificate returns certificate details for the specific PE object.
-func GetCertificate(filename string) (*pe.Cert, error) {
-	onceWintrustDLL()
+func GetCertificate(filename string) (*sys.Cert, error) {
 	f, err := pe.ParseFile(filename, pe.WithSecurity())
 	if err != nil {
 		return nil, err
@@ -43,11 +37,11 @@ func GetCertificate(filename string) (*pe.Cert, error) {
 	if f.Cert != nil {
 		return f.Cert, nil
 	}
-	if !isWintrustDLLFound {
+	if !sys.IsWintrustFound() {
 		return nil, ErrWintrustUnavailable
 	}
 	// parse catalog certificate
-	catalog := NewCatalog()
+	catalog := sys.NewCatalog()
 	if err := catalog.Open(filename); err != nil {
 		return nil, err
 	}
@@ -68,7 +62,6 @@ func GetCertificate(filename string) (*pe.Cert, error) {
 // is not present, this function returns ErrNotSigned error. To verify the signature,
 // call the Verify method of the Signature structure.
 func Check(filename string) (*Signature, error) {
-	onceWintrustDLL()
 	// check if the signature is embedded in PE
 	f, err := pe.ParseFile(filename, pe.WithSecurity())
 	if err != nil {
@@ -78,12 +71,12 @@ func Check(filename string) (*Signature, error) {
 		return &Signature{filename: filename, Type: Embedded, Cert: f.Cert}, nil
 	}
 
-	if !isWintrustDLLFound {
+	if !sys.IsWintrustFound() {
 		return nil, ErrWintrustUnavailable
 	}
 
 	// maybe the signature is in the catalog?
-	catalog := NewCatalog()
+	catalog := sys.NewCatalog()
 	if err := catalog.Open(filename); err != nil {
 		return nil, err
 	}
@@ -106,7 +99,7 @@ func Check(filename string) (*Signature, error) {
 // verify the signature in the catalog file is made. This method
 // returns a bool value indicating if the signature is trusted.
 func (s *Signature) Verify() bool {
-	if !isWintrustDLLFound {
+	if !sys.IsWintrustFound() {
 		return false
 	}
 	s.Level = UnsignedLevel
@@ -116,16 +109,4 @@ func (s *Signature) Verify() bool {
 		return isTrusted
 	}
 	return false
-}
-
-func onceWintrustDLL() {
-	once.Do(func() {
-		isWintrustDLLFound = sys.IsWintrustFound()
-		if !isWintrustDLLFound {
-			log.Warn("unable to find wintrust.dll library. This will lead to " +
-				"PE objects signature verification to be skipped possibly " +
-				"causing false positive samples in detection rules relying on " +
-				"image signature filter fields")
-		}
-	})
 }
