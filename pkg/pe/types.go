@@ -26,6 +26,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	peparser "github.com/saferwall/pe"
 	"runtime"
+	"sync"
 	"time"
 )
 
@@ -59,30 +60,6 @@ func (s Sec) String() string {
 	return fmt.Sprintf("Name: %s, Size: %d, Entropy: %f, Md5: %s", s.Name, s.Size, s.Entropy, s.Md5)
 }
 
-// Cert represents certificate information embedded in PE.
-type Cert struct {
-	// NotBefore specifies the certificate won't be valid before this timestamp.
-	NotBefore time.Time `json:"not_before"`
-
-	// NotAfter specifies the certificate won't be valid after this timestamp.
-	NotAfter time.Time `json:"not_after"`
-
-	// Issuer represents the certificate authority (CA) that charges customers to issue
-	// certificates for them.
-	Issuer string `json:"issuer"`
-
-	// Subject indicates the subject of the certificate is the entity its public key is associated
-	// with (i.e. the "owner" of the certificate).
-	Subject string `json:"subject"`
-
-	// SerialNumber represents the serial number MUST be a positive integer assigned
-	// by the CA to each certificate. It MUST be unique for each certificate issued by
-	// a given CA (i.e., the issuer name and serial number identify a unique certificate).
-	// CAs MUST force the serialNumber to be a non-negative integer.
-	// For convenience, we convert the big int to string.
-	SerialNumber string `json:"serial_number"`
-}
-
 // PE contains various headers that identifies the format and characteristics of the executable files.
 type PE struct {
 	// NumberOfSections designates the total number of sections found withing the binary.
@@ -108,7 +85,7 @@ type PE struct {
 	// IsTrusted determines if the PE certificate chain is trusted.
 	IsTrusted bool `json:"is_trusted"`
 	// Cert contains certificate information.
-	Cert *Cert `json:"cert"`
+	Cert *sys.Cert `json:"cert"`
 	// IsDriver indicates if the PE contains driver code.
 	IsDriver bool `json:"is_driver"`
 	// IsDLL indicates if the PE is a DLL.
@@ -131,17 +108,36 @@ type PE struct {
 	sectionHeaders []peparser.ImageSectionHeader
 
 	filename string
+	once     sync.Once
 }
 
-// VerifySignature checks if the embedded PE signature is trusted.
+// VerifySignature checks if the embedded or catalog PE signature is trusted.
 func (pe *PE) VerifySignature() {
-	if sys.IsWintrustFound() {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-		trust := sys.NewWintrustData(sys.WtdChoiceFile)
-		defer trust.Close()
-		pe.IsTrusted = trust.VerifyFile(pe.filename)
-	}
+	pe.once.Do(func() {
+		if sys.IsWintrustFound() {
+			runtime.LockOSThread()
+			defer runtime.UnlockOSThread()
+			trust := sys.NewWintrustData(sys.WtdChoiceFile)
+			defer trust.Close()
+			pe.IsTrusted = trust.VerifyFile(pe.filename)
+			// maybe the PE is catalog signed?
+			if !pe.IsSigned {
+				catalog := sys.NewCatalog()
+				err := catalog.Open(pe.filename)
+				defer catalog.Close()
+				if err != nil {
+					return
+				}
+				pe.IsSigned = catalog.IsCatalogSigned()
+				if pe.IsSigned {
+					pe.IsTrusted = catalog.Verify(pe.filename)
+				}
+				if pe.IsSigned && pe.IsTrusted {
+					pe.Cert, _ = catalog.ParseCertificate()
+				}
+			}
+		}
+	})
 }
 
 // String returns the string representation of the PE metadata.

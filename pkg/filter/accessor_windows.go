@@ -22,9 +22,7 @@ import (
 	"errors"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	psnap "github.com/rabbitstack/fibratus/pkg/ps"
-	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
-	"github.com/rabbitstack/fibratus/pkg/util/signature"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -818,37 +816,10 @@ func (pa *peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 	// are relevant to the fields present in the expression.
 	if kevt.PS != nil && kevt.PS.Exe != "" && p == nil {
 		var err error
-		var exe string
-
-		exe = kevt.PS.Exe
+		exe := kevt.PS.Exe
 		p, err = pe.ParseFile(exe, pa.parserOpts()...)
 		if err != nil {
 			return nil, err
-		}
-		if p != nil && f.IsPeSignature() {
-			// verify embedded signature
-			if p.IsSigned && f.IsPeIsTrusted() {
-				p.VerifySignature()
-			}
-			if !p.IsSigned {
-				if !sys.IsWintrustFound() {
-					goto cmp
-				}
-				// maybe the PE is catalog signed?
-				catalog := signature.NewCatalog()
-				err := catalog.Open(exe)
-				if err != nil {
-					goto cmp
-				}
-				defer catalog.Close()
-				p.IsSigned = catalog.IsCatalogSigned()
-				if p.IsSigned && f.IsPeIsTrusted() {
-					p.IsTrusted = catalog.Verify(exe)
-				}
-				if p.IsSigned && f.IsPeCert() {
-					p.Cert, _ = catalog.ParseCertificate()
-				}
-			}
 		}
 	}
 
@@ -886,7 +857,11 @@ func (pa *peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 		return nil, ErrPENil
 	}
 
-cmp:
+	// verify signature
+	if f.IsPeSignature() {
+		p.VerifySignature()
+	}
+
 	kevt.PS.PE = p
 
 	switch f {

@@ -23,6 +23,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"expvar"
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/format"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	peparser "github.com/saferwall/pe"
@@ -334,7 +335,7 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 	if opts.parseSecurity {
 		p.IsSigned = pe.IsSigned
 		if pe.HasCertificate {
-			p.Cert = &Cert{
+			p.Cert = &sys.Cert{
 				Issuer:       pe.Certificates.Info.Issuer,
 				Subject:      pe.Certificates.Info.Subject,
 				NotBefore:    pe.Certificates.Info.NotBefore,

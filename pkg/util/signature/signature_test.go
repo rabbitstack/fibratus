@@ -21,6 +21,7 @@ package signature
 import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sys/windows"
 	"os"
 	"path/filepath"
 	"testing"
@@ -56,7 +57,7 @@ func TestSignature(t *testing.T) {
 			executable,
 			None,
 			UnsignedLevel,
-			ErrNotSigned,
+			windows.ERROR_INVALID_PARAMETER,
 		},
 	}
 

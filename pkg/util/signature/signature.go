@@ -29,7 +29,7 @@ func Wrap(typ, level uint32) *Signature {
 }
 
 // GetCertificate returns certificate details for the specific PE object.
-func GetCertificate(filename string) (*pe.Cert, error) {
+func GetCertificate(filename string) (*sys.Cert, error) {
 	f, err := pe.ParseFile(filename, pe.WithSecurity())
 	if err != nil {
 		return nil, err
@@ -41,7 +41,7 @@ func GetCertificate(filename string) (*pe.Cert, error) {
 		return nil, ErrWintrustUnavailable
 	}
 	// parse catalog certificate
-	catalog := NewCatalog()
+	catalog := sys.NewCatalog()
 	if err := catalog.Open(filename); err != nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func Check(filename string) (*Signature, error) {
 	}
 
 	// maybe the signature is in the catalog?
-	catalog := NewCatalog()
+	catalog := sys.NewCatalog()
 	if err := catalog.Open(filename); err != nil {
 		return nil, err
 	}

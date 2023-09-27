@@ -23,6 +23,7 @@ package pe
 
 import (
 	kcapver "github.com/rabbitstack/fibratus/pkg/kcap/version"
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"testing"
@@ -47,7 +48,7 @@ func TestPEMarshal(t *testing.T) {
 		VersionResources: map[string]string{"CompanyName": "Microsoft Corporation", "FileDescription": "Notepad", "FileVersion": "10.0.18362.693"},
 		IsSigned:         true,
 		IsTrusted:        true,
-		Cert: &Cert{
+		Cert: &sys.Cert{
 			Issuer:       "Washington, Redmond, Microsoft Corporation",
 			Subject:      "Washington, Redmond, Microsoft Corporation",
 			SerialNumber: "330000023241fb59996dcc4dff000000000232",
