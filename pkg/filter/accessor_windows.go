@@ -23,6 +23,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	psnap "github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
+	"github.com/rabbitstack/fibratus/pkg/util/loldrivers"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -589,6 +590,25 @@ func (t *threadAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value
 	return nil, nil
 }
 
+func evalLOLDrivers(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
+	filename := kevt.GetParamAsString(kparams.FileName)
+	isDriver := filepath.Ext(filename) == ".sys" || kevt.Kparams.TryGetBool(kparams.FileIsDriver)
+	if !isDriver {
+		return nil, nil
+	}
+	ok, driver := loldrivers.GetClient().MatchHash(filename)
+	if !ok {
+		return nil, nil
+	}
+	if (f == fields.FileIsDriverVulnerable || f == fields.ImageIsDriverVulnerable) && driver.IsVulnerable {
+		return true, nil
+	}
+	if (f == fields.FileIsDriverMalicious || f == fields.ImageIsDriverMalicious) && driver.IsMalicious {
+		return true, nil
+	}
+	return false, nil
+}
+
 // fileAccessor extracts file specific values.
 type fileAccessor struct{}
 
@@ -629,6 +649,11 @@ func (l *fileAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, 
 		return kevt.Kparams.GetUint64(kparams.FileViewSize)
 	case fields.FileViewType:
 		return kevt.GetParamAsString(kparams.FileViewSectionType), nil
+	case fields.FileIsDriverVulnerable, fields.FileIsDriverMalicious:
+		if kevt.IsCreateDisposition() && kevt.IsSuccess() {
+			return evalLOLDrivers(f, kevt)
+		}
+		return false, nil
 	}
 	return nil, nil
 }
@@ -670,6 +695,11 @@ func (i *imageAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value,
 		return kevt.Kparams.GetTime(kparams.ImageCertNotBefore)
 	case fields.ImageCertAfter:
 		return kevt.Kparams.GetTime(kparams.ImageCertNotAfter)
+	case fields.ImageIsDriverVulnerable, fields.ImageIsDriverMalicious:
+		if kevt.IsLoadImage() {
+			return evalLOLDrivers(f, kevt)
+		}
+		return false, nil
 	}
 	return nil, nil
 }

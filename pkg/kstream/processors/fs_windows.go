@@ -184,7 +184,7 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 		}
 		ev.AppendEnum(kparams.FileOperation, uint32(dispo), fs.FileCreateDispositions)
 		// parse PE data for created files and append parameters
-		if ev.IsCreatingFile() && ev.IsSuccess() {
+		if ev.IsCreateDisposition() && ev.IsSuccess() {
 			filename := ev.GetParamAsString(kparams.FileName)
 			pefile, err := pe.ParseFile(filename, pe.WithSymbols())
 			if err != nil {
