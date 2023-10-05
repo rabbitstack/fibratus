@@ -20,12 +20,14 @@ package processors
 
 import (
 	"expvar"
+	libntfs "github.com/rabbitstack/fibratus/pkg/fs/ntfs"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/hashers"
 	"github.com/rabbitstack/fibratus/pkg/util/signature"
+	"os"
 )
 
 // signatureErrors counts signature check/verification errors
@@ -57,7 +59,13 @@ func (m *imageProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, e
 		}
 		// parse PE image data
 		filename := e.GetParamAsString(kparams.FileName)
-		pefile, err := pe.ParseFile(filename, pe.WithSymbols())
+		ntfs := libntfs.NewFS()
+		defer ntfs.Close()
+		data, _, err := ntfs.Read(filename, 0, int64(os.Getpagesize()))
+		if err != nil {
+			return e, false, m.psnap.AddModule(e)
+		}
+		pefile, err := pe.ParseBytes(data, pe.WithSymbols())
 		if err != nil {
 			return e, false, m.psnap.AddModule(e)
 		}
