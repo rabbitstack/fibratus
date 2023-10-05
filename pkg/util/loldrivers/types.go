@@ -36,9 +36,12 @@ func (d RawDriver) isMalicious() bool {
 	return d.Category == "malicious"
 }
 
-// Driver intermediate structure for storing driver data.
+// Driver intermediate structure for storing driver data
+// relevant for the hash matching.
 type Driver struct {
 	Filename     string
+	SHA1         string
+	SHA256       string
 	IsMalicious  bool
 	IsVulnerable bool
 }

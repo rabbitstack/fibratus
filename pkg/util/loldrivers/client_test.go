@@ -28,6 +28,18 @@ func TestDownload(t *testing.T) {
 	assert.Nil(t, client)
 	require.True(t, len(GetClient().Drivers()) > 0)
 	assert.NotNil(t, client)
+
+	var expectedSHA256 = "0440ef40c46fdd2b5d86e7feef8577a8591de862cfd7928cdbcc8f47b8fa3ffc"
+	var foundSHA256 string
+
+	for _, driver := range GetClient().Drivers() {
+		if driver.Filename == "prokiller64.sys" {
+			foundSHA256 = driver.SHA256
+			break
+		}
+	}
+
+	assert.Equal(t, expectedSHA256, foundSHA256)
 }
 
 func TestMatchHash(t *testing.T) {

@@ -590,6 +590,8 @@ func (t *threadAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value
 	return nil, nil
 }
 
+// evalLOLDrivers interacts with the loldrivers client to determine
+// whether the loaded/dropped driver is malicious or vulnerable.
 func evalLOLDrivers(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
 	filename := kevt.GetParamAsString(kparams.FileName)
 	isDriver := filepath.Ext(filename) == ".sys" || kevt.Kparams.TryGetBool(kparams.FileIsDriver)
@@ -807,7 +809,7 @@ func (pa *peAccessor) parserOpts() []pe.Option {
 			opts = append(opts, pe.WithSymbols())
 		}
 		if f.IsPeSectionEntropy() {
-			opts = append(opts, pe.WithSectionEntropy())
+			opts = append(opts, pe.WithSections(), pe.WithSectionEntropy())
 		}
 		if f.IsPeVersionResource() || f.IsPeResourcesMap() {
 			opts = append(opts, pe.WithVersionResources())

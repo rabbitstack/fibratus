@@ -20,10 +20,14 @@ package loldrivers
 
 import (
 	"context"
+	"crypto"
+	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	log "github.com/sirupsen/logrus"
+	"hash"
 	"io"
 	"net/http"
 	"os"
@@ -41,8 +45,8 @@ const apiURL = "https://www.loldrivers.io/api/drivers.json"
 const maxFileSizeMB = 40
 
 // Client is responsible for downloading loldrivers dataset.
-// Driver dataset is indexed by hash to provide more efficient
-// lookups.
+// Driver dataset is indexed by SHA hash to provide more
+// efficient lookups.
 type Client struct {
 	drivers map[string]Driver
 	mu      sync.Mutex
@@ -74,6 +78,7 @@ func WithRefresh(interval time.Duration) Option {
 
 var client *Client
 
+// GetClient constructs a singleton instance of the loldrivers client.
 func GetClient(options ...Option) *Client {
 	if client == nil {
 		var opts opts
@@ -103,43 +108,68 @@ func GetClient(options ...Option) *Client {
 	return client
 }
 
-func (c *Client) MatchHash(filename string) (bool, Driver) {
-	f, err := os.Open(filename)
+func (c *Client) MatchHash(path string) (bool, Driver) {
+	f, err := os.Open(path)
 	if err != nil {
-		return c.matchFilename(filename)
+		return c.matchPath(path)
 	}
 	defer f.Close()
 
 	fi, err := f.Stat()
 	if err == nil {
 		if (fi.Size() / 1024 / 1024) > maxFileSizeMB {
-			log.Warnf("%s driver exceeds maximum allowed file size", filename)
-			return c.matchFilename(filename)
+			log.Warnf("%s driver exceeds maximum allowed file size", path)
+			return c.matchPath(path)
 		}
 	}
 
-	hash := sha256.New()
-	if _, err := io.Copy(hash, f); err != nil {
-		return c.matchFilename(filename)
-	}
-	checksum := hex.EncodeToString(hash.Sum(nil))
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return true, c.drivers[checksum]
+	ok, driver := c.matchHash(crypto.SHA256, f, path)
+	if !ok {
+		// the driver doesn't have SHA256 hash, try with SHA1 hash
+		return c.matchHash(crypto.SHA1, f, path)
+	}
+	return ok, driver
 }
 
-func (c *Client) matchFilename(filename string) (bool, Driver) {
+func (c *Client) matchHash(h crypto.Hash, r io.Reader, path string) (bool, Driver) {
+	checksum, err := c.calculateHash(h, r)
+	if err != nil {
+		return c.matchPath(path)
+	}
+	driver, ok := c.drivers[strings.ToLower(checksum)]
+	return ok, driver
+}
+
+func (c *Client) matchPath(path string) (bool, Driver) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for _, d := range c.drivers {
 		if d.Filename == "" {
 			continue
 		}
-		if strings.EqualFold(filepath.Base(filename), d.Filename) {
+		if strings.EqualFold(filepath.Base(path), d.Filename) {
 			return true, d
 		}
 	}
 	return false, Driver{}
+}
+
+func (c *Client) calculateHash(h crypto.Hash, r io.Reader) (string, error) {
+	var w hash.Hash
+	switch h {
+	case crypto.SHA1:
+		w = sha1.New()
+	case crypto.SHA256:
+		w = sha256.New()
+	default:
+		return "", fmt.Errorf("%v: invalid hash", h)
+	}
+	if _, err := io.Copy(w, r); err != nil {
+		return "", err
+	}
+	return strings.ToLower(hex.EncodeToString(w.Sum(nil))), nil
 }
 
 func (c *Client) Drivers() []Driver {
@@ -180,12 +210,14 @@ func (c *Client) download() error {
 	defer c.mu.Unlock()
 	c.drivers = make(map[string]Driver)
 
-	for _, d := range drivers {
-		for _, s := range d.KnownVulnerableSamples {
-			c.drivers[s.SHA256] = Driver{
-				Filename:     s.Filename,
-				IsMalicious:  d.isMalicious(),
-				IsVulnerable: !d.isMalicious(),
+	for _, driver := range drivers {
+		for _, sample := range driver.KnownVulnerableSamples {
+			c.drivers[sample.SHA256] = Driver{
+				Filename:     sample.Filename,
+				SHA1:         strings.ToLower(sample.SHA1),
+				SHA256:       strings.ToLower(sample.SHA256),
+				IsMalicious:  driver.isMalicious(),
+				IsVulnerable: !driver.isMalicious(),
 			}
 		}
 	}
