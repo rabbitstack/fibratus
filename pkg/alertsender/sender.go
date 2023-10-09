@@ -106,7 +106,7 @@ func Load(config Config) (Sender, error) {
 	typ := config.Type
 	factory := factories[typ]
 	if factory == nil {
-		return nil, fmt.Errorf("%q alert sender not availaible in the factory", typ)
+		return nil, fmt.Errorf("%q alert sender not available in the factory", typ)
 	}
 	return factory(config)
 }

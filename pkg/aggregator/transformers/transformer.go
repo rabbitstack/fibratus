@@ -88,7 +88,7 @@ func Load(config Config) (Transformer, error) {
 	typ := config.Type
 	factory := transformers[typ]
 	if factory == nil {
-		return nil, fmt.Errorf("%q transformer not availaible in the factory", typ)
+		return nil, fmt.Errorf("%q transformer not available in the factory", typ)
 	}
 	return factory(config)
 }
