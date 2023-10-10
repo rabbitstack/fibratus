@@ -22,6 +22,7 @@ import (
 	"expvar"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/fs"
+	libntfs "github.com/rabbitstack/fibratus/pkg/fs/ntfs"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
@@ -31,6 +32,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
+	"os"
 )
 
 var (
@@ -186,7 +188,14 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 		// parse PE data for created files and append parameters
 		if ev.IsCreateDisposition() && ev.IsSuccess() {
 			filename := ev.GetParamAsString(kparams.FileName)
-			pefile, err := pe.ParseFile(filename, pe.WithSymbols())
+			// read file data blob from raw device
+			ntfs := libntfs.NewFS()
+			defer ntfs.Close()
+			data, _, err := ntfs.Read(filename, 0, int64(os.Getpagesize()))
+			if err != nil {
+				return ev, nil
+			}
+			pefile, err := pe.ParseBytes(data, pe.WithSymbols())
 			if err != nil {
 				return ev, nil
 			}
