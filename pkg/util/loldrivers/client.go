@@ -19,6 +19,7 @@
 package loldrivers
 
 import (
+	"bytes"
 	"context"
 	"crypto"
 	"crypto/sha1"
@@ -26,11 +27,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	libntfs "github.com/rabbitstack/fibratus/pkg/fs/ntfs"
+	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
 	log "github.com/sirupsen/logrus"
 	"hash"
 	"io"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -39,10 +41,6 @@ import (
 
 // apiURL represents the default loldrivers API endpoint
 const apiURL = "https://www.loldrivers.io/api/drivers.json"
-
-// maxFileSizeMB specifies the maximum allowed size of the driver file
-// for which the hash is calculated.
-const maxFileSizeMB = 40
 
 // Client is responsible for downloading loldrivers dataset.
 // Driver dataset is indexed by SHA hash to provide more
@@ -57,6 +55,7 @@ type Client struct {
 type opts struct {
 	apiURL          string
 	refreshInterval time.Duration
+	blocking        bool
 }
 
 // Option represents the option for the loldrivers client.
@@ -76,11 +75,23 @@ func WithRefresh(interval time.Duration) Option {
 	}
 }
 
-var client *Client
+// WithBlocking indicates if
+func WithBlocking() Option {
+	return func(o *opts) {
+		o.blocking = true
+	}
+}
+
+var c *Client
+
+// InitClient initializes the loldrivers by client by fetching the initial dataset.
+func InitClient(options ...Option) {
+	c = GetClient(options...)
+}
 
 // GetClient constructs a singleton instance of the loldrivers client.
 func GetClient(options ...Option) *Client {
-	if client == nil {
+	if c == nil {
 		var opts opts
 		for _, opt := range options {
 			opt(&opts)
@@ -93,42 +104,44 @@ func GetClient(options ...Option) *Client {
 			opts.refreshInterval = time.Hour
 		}
 
-		client = &Client{
+		c = &Client{
 			options: opts,
 			drivers: make(map[string]Driver),
 			tick:    time.NewTicker(opts.refreshInterval),
 		}
-		err := client.download()
-		if err != nil {
-			log.Warnf("unable to download loldrivers.io dataset: %v", err)
-		}
-
-		go client.refresh()
+		go func() {
+			err := c.download()
+			if err != nil {
+				log.Warnf("unable to download loldrivers.io dataset: %v", err)
+			}
+		}()
+		go c.refresh()
 	}
-	return client
+	return c
 }
 
+// MatchHash receives the full path of the driver file and tries to read
+// the blob data from the raw device. If it succeeds, then one of the SHA1/SHA256
+// hashes are computed for the read data and the calculated hash is evaluated
+// against loldrivers dataset. If the driver can't be read from the file system or
+// hash calculation fail, then the driver sample name is asserted against the
+// dataset to determine if the driver is either malicious or vulnerable.
 func (c *Client) MatchHash(path string) (bool, Driver) {
-	f, err := os.Open(path)
+	ntfs := libntfs.NewFS()
+	defer ntfs.Close()
+	data, _, err := ntfs.ReadFull(cmdline.ExpandSystemRoot(path))
 	if err != nil {
 		return c.matchPath(path)
 	}
-	defer f.Close()
 
-	fi, err := f.Stat()
-	if err == nil {
-		if (fi.Size() / 1024 / 1024) > maxFileSizeMB {
-			log.Warnf("%s driver exceeds maximum allowed file size", path)
-			return c.matchPath(path)
-		}
-	}
+	r := bytes.NewReader(data)
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	ok, driver := c.matchHash(crypto.SHA256, f, path)
+	ok, driver := c.matchHash(crypto.SHA256, r, path)
 	if !ok {
-		// the driver doesn't have SHA256 hash, try with SHA1 hash
-		return c.matchHash(crypto.SHA1, f, path)
+		// the driver sample doesn't have SHA256 hash, try with SHA1 hash
+		return c.matchHash(crypto.SHA1, r, path)
 	}
 	return ok, driver
 }
@@ -138,7 +151,7 @@ func (c *Client) matchHash(h crypto.Hash, r io.Reader, path string) (bool, Drive
 	if err != nil {
 		return c.matchPath(path)
 	}
-	driver, ok := c.drivers[strings.ToLower(checksum)]
+	driver, ok := c.drivers[checksum]
 	return ok, driver
 }
 
@@ -172,6 +185,7 @@ func (c *Client) calculateHash(h crypto.Hash, r io.Reader) (string, error) {
 	return strings.ToLower(hex.EncodeToString(w.Sum(nil))), nil
 }
 
+// Drivers returns a list of all drivers in the dataset.
 func (c *Client) Drivers() []Driver {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -212,7 +226,11 @@ func (c *Client) download() error {
 
 	for _, driver := range drivers {
 		for _, sample := range driver.KnownVulnerableSamples {
-			c.drivers[sample.SHA256] = Driver{
+			sha := sample.SHA256
+			if sha == "" {
+				sha = sample.SHA1
+			}
+			c.drivers[strings.ToLower(sha)] = Driver{
 				Filename:     sample.Filename,
 				SHA1:         strings.ToLower(sample.SHA1),
 				SHA256:       strings.ToLower(sample.SHA256),
@@ -228,6 +246,7 @@ func (c *Client) download() error {
 func (c *Client) refresh() {
 	for {
 		<-c.tick.C
+		log.Debug("refreshing loldrivers dataset...")
 		err := c.download()
 		if err != nil {
 			log.Warnf("unable to refresh loldrivers dataset: %v", err)

@@ -21,13 +21,15 @@ package loldrivers
 import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"path/filepath"
 	"testing"
 )
 
 func TestDownload(t *testing.T) {
-	assert.Nil(t, client)
+	assert.Nil(t, c)
+	InitClient()
 	require.True(t, len(GetClient().Drivers()) > 0)
-	assert.NotNil(t, client)
+	assert.NotNil(t, c)
 
 	var expectedSHA256 = "0440ef40c46fdd2b5d86e7feef8577a8591de862cfd7928cdbcc8f47b8fa3ffc"
 	var foundSHA256 string
@@ -43,7 +45,9 @@ func TestDownload(t *testing.T) {
 }
 
 func TestMatchHash(t *testing.T) {
-	ok, d := GetClient().MatchHash("_fixtures/d.sys")
+	abs, err := filepath.Abs("_fixtures/d.sys")
+	require.NoError(t, err)
+	ok, d := GetClient().MatchHash(abs)
 	require.True(t, ok)
 	assert.Equal(t, "d.sys", d.Filename)
 }

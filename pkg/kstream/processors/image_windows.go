@@ -65,7 +65,7 @@ func (m *imageProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, e
 		if err != nil {
 			return e, false, m.psnap.AddModule(e)
 		}
-		pefile, err := pe.ParseBytes(data, pe.WithSymbols())
+		pefile, err := pe.ParseBytes(data, pe.WithSymbols(), pe.WithSections())
 		if err != nil {
 			return e, false, m.psnap.AddModule(e)
 		}

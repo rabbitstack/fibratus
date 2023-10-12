@@ -95,6 +95,12 @@ func TestIsDotnet(t *testing.T) {
 	require.True(t, pe.IsDotnet)
 }
 
+func TestIsDriver(t *testing.T) {
+	pe, err := ParseFile("./_fixtures/054299e09cea38df2b84e6b29348b418.bin", WithSections(), WithSymbols())
+	require.NoError(t, err)
+	require.True(t, pe.IsDriver)
+}
+
 func TestParseMem(t *testing.T) {
 	var tests = []struct {
 		executable       string

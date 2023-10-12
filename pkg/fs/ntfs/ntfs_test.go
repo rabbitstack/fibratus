@@ -57,3 +57,20 @@ func TestRead(t *testing.T) {
 	require.True(t, n != 0)
 	assert.Equal(t, []byte("ntfs read with a bit more of read"), b[:33])
 }
+
+func TestReadFull(t *testing.T) {
+	file := filepath.Join(os.TempDir(), "ntfs-read-full.txt")
+	err := os.WriteFile(file, []byte("ntfs read from mars to sirius where the whales fly into oblivion"), os.ModePerm)
+	require.NoError(t, err)
+	defer os.Remove(file)
+
+	fs := NewFS()
+	defer fs.Close()
+
+	b, n, err := fs.ReadFull(file)
+	assert.NotNil(t, fs)
+	require.NoError(t, err)
+	require.True(t, n != 0)
+
+	assert.Equal(t, []byte("ntfs read from mars to sirius where the whales fly into oblivion"), b)
+}

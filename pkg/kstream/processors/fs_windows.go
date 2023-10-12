@@ -195,7 +195,7 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 			if err != nil {
 				return ev, nil
 			}
-			pefile, err := pe.ParseBytes(data, pe.WithSymbols())
+			pefile, err := pe.ParseBytes(data, pe.WithSections(), pe.WithSymbols())
 			if err != nil {
 				return ev, nil
 			}
