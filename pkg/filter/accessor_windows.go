@@ -611,16 +611,22 @@ func evalLOLDrivers(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) 
 	return false, nil
 }
 
+// initLOLDriversClient initializes the loldrivers client if the filter expression
+// contains any of the relevant fields.
+func initLOLDriversClient(flds []fields.Field) {
+	for _, f := range flds {
+		if f == fields.FileIsDriverVulnerable || f == fields.FileIsDriverMalicious ||
+			f == fields.ImageIsDriverVulnerable || f == fields.ImageIsDriverMalicious {
+			loldrivers.InitClient(loldrivers.WithAsyncDownload())
+		}
+	}
+}
+
 // fileAccessor extracts file specific values.
 type fileAccessor struct{}
 
-func (fileAccessor) setFields(flds []fields.Field) {
-	for _, f := range flds {
-		if f == fields.FileIsDriverVulnerable || f == fields.FileIsDriverMalicious {
-			loldrivers.InitClient()
-			break
-		}
-	}
+func (fileAccessor) setFields(fields []fields.Field) {
+	initLOLDriversClient(fields)
 }
 
 func newFileAccessor() accessor {
@@ -676,13 +682,8 @@ func (l *fileAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, 
 // imageAccessor extracts image (DLL) event values.
 type imageAccessor struct{}
 
-func (imageAccessor) setFields(flds []fields.Field) {
-	for _, f := range flds {
-		if f == fields.ImageIsDriverVulnerable || f == fields.ImageIsDriverMalicious {
-			loldrivers.InitClient()
-			break
-		}
-	}
+func (imageAccessor) setFields(fields []fields.Field) {
+	initLOLDriversClient(fields)
 }
 
 func newImageAccessor() accessor {

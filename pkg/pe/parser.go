@@ -359,7 +359,8 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 
 // isDriver determines if the PE is a Windows driver. This method is inherited
 // from the saferwall parser with the imports defensive check removed as some
-// driver samples may not contain an import directory.
+// driver samples may not contain an import directory, but section names may
+// reveal the PE is a kernel driver.
 func (pe *PE) isDriver() bool {
 	// DIRECTORY_ENTRY_IMPORT may exist, although it may be empty.
 	// If it imports from "ntoskrnl.exe" or other kernel components it should

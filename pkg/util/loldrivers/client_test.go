@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestDownload(t *testing.T) {
@@ -50,4 +51,14 @@ func TestMatchHash(t *testing.T) {
 	ok, d := GetClient().MatchHash(abs)
 	require.True(t, ok)
 	assert.Equal(t, "d.sys", d.Filename)
+}
+
+func TestRefresh(t *testing.T) {
+	c = nil
+	InitClient(WithRefresh(time.Second * 2))
+	require.True(t, len(GetClient().Drivers()) > 0)
+	GetClient().Clear()
+	require.True(t, len(GetClient().Drivers()) == 0)
+	time.Sleep(time.Second * 3)
+	require.True(t, len(GetClient().Drivers()) > 0)
 }

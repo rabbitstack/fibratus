@@ -27,7 +27,7 @@
           (
             file.extension in ('.vbs', '.js', '.jar', '.exe', '.dll', '.com', '.ps1', '.hta', '.cmd', '.vbe')
               or
-            (pe.is_exec or pe.is_dll)
+            (file.is_exec or file.is_dll)
           )
             and
         file.name imatches startup_locations
@@ -117,7 +117,7 @@
         processes.
       condition: >
         modify_registry
-            and   
+            and
           (
             (ps.name in script_interpreters or ps.name in ('reg.exe', 'rundll32.exe', 'regsvr32.exe'))
                 or
@@ -159,8 +159,8 @@
         (modify_registry or create_file)
             and
         (
-            ps.name in script_interpreters 
-                or 
+            ps.name in script_interpreters
+                or
             ps.parent.name in script_interpreters
                 or
             not pe.is_trusted

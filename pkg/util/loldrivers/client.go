@@ -55,7 +55,7 @@ type Client struct {
 type opts struct {
 	apiURL          string
 	refreshInterval time.Duration
-	blocking        bool
+	asyncDownload   bool
 }
 
 // Option represents the option for the loldrivers client.
@@ -75,10 +75,11 @@ func WithRefresh(interval time.Duration) Option {
 	}
 }
 
-// WithBlocking indicates if
-func WithBlocking() Option {
+// WithAsyncDownload indicates if the initial request to loldrivers API
+// is performed in a separate goroutine.
+func WithAsyncDownload() Option {
 	return func(o *opts) {
-		o.blocking = true
+		o.asyncDownload = true
 	}
 }
 
@@ -86,11 +87,22 @@ var c *Client
 
 // InitClient initializes the loldrivers by client by fetching the initial dataset.
 func InitClient(options ...Option) {
-	c = GetClient(options...)
+	if c == nil {
+		c = initClient(options...)
+	}
 }
 
 // GetClient constructs a singleton instance of the loldrivers client.
-func GetClient(options ...Option) *Client {
+// If the client wasn't initialized, this function creates a new client
+// with default sane settings.
+func GetClient() *Client {
+	if c == nil {
+		c = initClient()
+	}
+	return c
+}
+
+func initClient(options ...Option) *Client {
 	if c == nil {
 		var opts opts
 		for _, opt := range options {
@@ -109,12 +121,21 @@ func GetClient(options ...Option) *Client {
 			drivers: make(map[string]Driver),
 			tick:    time.NewTicker(opts.refreshInterval),
 		}
-		go func() {
+		download := func() {
 			err := c.download()
 			if err != nil {
 				log.Warnf("unable to download loldrivers.io dataset: %v", err)
 			}
-		}()
+		}
+		// if async download is enabled we'll
+		// fetch the initial dataset in a new
+		// goroutine
+		if opts.asyncDownload {
+			go download()
+		} else {
+			download()
+		}
+		// start refresh goroutine
 		go c.refresh()
 	}
 	return c
@@ -194,6 +215,13 @@ func (c *Client) Drivers() []Driver {
 		drivers = append(drivers, d)
 	}
 	return drivers
+}
+
+// Clear clears the internal dataset.
+func (c *Client) Clear() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.drivers = make(map[string]Driver)
 }
 
 func (c *Client) download() error {
