@@ -55,6 +55,9 @@
 - macro: accept_socket
   expr: kevt.name = 'Accept'
 
+- macro: set_thread_context
+  expr: kevt.name = 'SetThreadContext' and kevt.arg[status] = 'Success'
+
 - macro: inbound_network
   expr: (recv_socket or accept_socket) and ((net.sip != 0.0.0.0 or net.dip != 0.0.0.0) and (net.sip not in ('0:0:0:0:0:0:0:1', '::1') or net.dip not in ('0:0:0:0:0:0:0:1', '::1')) and not (cidr_contains(net.sip, '127.0.0.0/8') or cidr_contains(net.dip, '127.0.0.0/8')))
   description: |
