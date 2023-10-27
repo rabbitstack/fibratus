@@ -50,8 +50,6 @@ func NewKparam(name string, typ kparams.Type, value kparams.Value, options ...Pa
 	}
 	var v kparams.Value
 	switch typ {
-	case kparams.HexInt8, kparams.HexInt16, kparams.HexInt32, kparams.HexInt64:
-		v = kparams.NewHex(value)
 	case kparams.IPv4:
 		v = ip.ToIPv4(value.(uint32))
 	case kparams.IPv6:
@@ -105,9 +103,7 @@ func (k Kparam) String() string {
 		if !ok {
 			return ""
 		}
-		return kparams.NewHex(v).String()
-	case kparams.HexInt32, kparams.HexInt64, kparams.HexInt16, kparams.HexInt8:
-		return string(k.Value.(kparams.Hex))
+		return kparams.Addr(v).String()
 	case kparams.Int8:
 		return strconv.Itoa(int(k.Value.(int8)))
 	case kparams.Uint8:

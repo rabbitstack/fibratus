@@ -24,15 +24,7 @@ import (
 	"testing"
 )
 
-func TestNewHex(t *testing.T) {
-	hex := NewHex(uint32(7264))
-	assert.Equal(t, Hex("1c60"), hex)
-	assert.Equal(t, uint32(7264), hex.Uint32())
-
-	hex = NewHex(uint32(4294967295))
-	assert.Equal(t, Hex("ffffffff"), hex)
-
-	hex = NewHex(uint64(18446744073709551615))
-	assert.Equal(t, Hex("ffffffffffffffff"), hex)
-	assert.Equal(t, uint64(18446744073709551615), hex.Uint64())
+func TestAddr(t *testing.T) {
+	addr := Addr(uint32(86372352))
+	assert.Equal(t, "525f000", addr.String())
 }

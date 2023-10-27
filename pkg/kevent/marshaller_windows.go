@@ -107,14 +107,6 @@ func (e *Kevent) MarshalRaw() []byte {
 			b = append(b, kpar.Value.(uint8))
 		case kparams.Int8:
 			b = append(b, byte(kpar.Value.(int8)))
-		case kparams.HexInt8:
-			b = append(b, kpar.Value.(kparams.Hex).Uint8())
-		case kparams.HexInt16:
-			b = append(b, bytes.WriteUint16(kpar.Value.(kparams.Hex).Uint16())...)
-		case kparams.HexInt32:
-			b = append(b, bytes.WriteUint32(kpar.Value.(kparams.Hex).Uint32())...)
-		case kparams.HexInt64:
-			b = append(b, bytes.WriteUint64(kpar.Value.(kparams.Hex).Uint64())...)
 		case kparams.Uint16, kparams.Port:
 			b = append(b, bytes.WriteUint16(kpar.Value.(uint16))...)
 		case kparams.Int16:
@@ -325,22 +317,6 @@ func (e *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 		case kparams.Int8:
 			kval = int8(b[pi+offset+kparamNameLength+poffset : pi+offset+kparamNameLength+poffset+1][0])
 			poffset += kparamNameLength + 4 + 1
-		case kparams.HexInt8:
-			v := b[pi+offset+kparamNameLength+poffset : pi+offset+kparamNameLength+poffset+1][0]
-			kval = kparams.NewHex(v)
-			poffset += kparamNameLength + 4 + 1
-		case kparams.HexInt16:
-			v := bytes.ReadUint16(b[pi+offset+kparamNameLength+poffset:])
-			kval = kparams.NewHex(v)
-			poffset += kparamNameLength + 4 + 2
-		case kparams.HexInt32:
-			v := bytes.ReadUint32(b[pi+offset+kparamNameLength+poffset:])
-			kval = kparams.NewHex(v)
-			poffset += kparamNameLength + 4 + 4
-		case kparams.HexInt64:
-			v := bytes.ReadUint64(b[pi+offset+kparamNameLength+poffset:])
-			kval = kparams.NewHex(v)
-			poffset += kparamNameLength + 4 + 8
 		case kparams.Bool:
 			v := b[pi+offset+kparamNameLength+poffset : pi+offset+kparamNameLength+poffset+1][0]
 			if v == 1 {
@@ -497,8 +473,6 @@ func (e *Kevent) MarshalJSON() []byte {
 			js.writeUint32(kpar.Value.(uint32))
 		case kparams.IPv4, kparams.IPv6:
 			js.writeString(kpar.Value.(net.IP).String())
-		case kparams.HexInt8, kparams.HexInt16, kparams.HexInt32, kparams.HexInt64:
-			js.writeString(kpar.Value.(kparams.Hex).String())
 		case kparams.Bool:
 			js.writeBool(kpar.Value.(bool))
 		case kparams.Time:
@@ -673,7 +647,7 @@ func (e *Kevent) MarshalJSON() []byte {
 				js.writeObjectField("name").writeEscapeString(handle.Name).writeMore()
 				js.writeObjectField("type").writeString(handle.Type).writeMore()
 				js.writeObjectField("id").writeUint64(uint64(handle.Num)).writeMore()
-				js.writeObjectField("object").writeEscapeString(string(kparams.NewHex(handle.Object)))
+				js.writeObjectField("object").writeEscapeString(kparams.Addr(handle.Object).String())
 				js.writeObjectEnd()
 
 				if writeMore {
