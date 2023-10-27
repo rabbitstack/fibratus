@@ -5,16 +5,19 @@ on:
     tags:
       - 'v*'
 
+env:
+  GO_VERSION: 1.21.x
+
 jobs:
   build:
       runs-on: windows-latest
       steps:
       - name: Install Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v4
         with:
-           go-version: 1.19.x
+           go-version:  ${{ env.GO_VERSION }}
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Adjust pkg-config prefix
         shell: bash
         run: |
@@ -33,7 +36,7 @@ jobs:
             libtool
             autoconf
       - name: Cache yara
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         id: cache
         with:
           path: |
@@ -91,7 +94,7 @@ jobs:
            export PATH="/c/wix:$PATH"
            export VERSION=${{ steps.get_version.outputs.VERSION }}
            ./make.bat pkg
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           name: fibratus-${{ steps.get_version.outputs.VERSION }}-amd64.msi
           path: "./build/msi/fibratus-${{ steps.get_version.outputs.VERSION }}-amd64.msi"
@@ -100,11 +103,11 @@ jobs:
       runs-on: windows-latest
       steps:
       - name: Install Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v4
         with:
-           go-version: 1.19.x
+           go-version:  ${{ env.GO_VERSION }}
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Get version
         id: get_version
         shell: bash
@@ -133,7 +136,7 @@ jobs:
            export PATH="/c/wix:$PATH"
            export VERSION=${{ steps.get_version.outputs.VERSION }}
            ./make.bat pkg-slim
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           name: fibratus-${{ steps.get_version.outputs.VERSION }}-slim-amd64.msi
           path: "./build/msi/fibratus-${{ steps.get_version.outputs.VERSION }}-slim-amd64.msi"
@@ -145,17 +148,17 @@ jobs:
         - build-slim
       steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Get version
         id: get_version
         shell: bash
         run: |
           echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3 | cut -c2-)
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: fibratus-${{ steps.get_version.outputs.VERSION }}-amd64.msi
           path: build
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: fibratus-${{ steps.get_version.outputs.VERSION }}-slim-amd64.msi
           path: build
