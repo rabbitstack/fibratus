@@ -42,6 +42,11 @@ func TestSplit(t *testing.T) {
 			4,
 			`svchost.exe`,
 		},
+		{
+			`"C:\Program Files\Conexant\SAII\SmartAudio.exe" /c`,
+			2,
+			`"C:\Program Files\Conexant\SAII\SmartAudio.exe"`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -84,6 +89,11 @@ func TestCmdline(t *testing.T) {
 			`"fontdrvhost.exe"`,
 			`C:\Windows\System32\fontdrvhost.exe`,
 			`"fontdrvhost.exe"`,
+		},
+		{
+			`"fontdrvhost"`,
+			``,
+			`"fontdrvhost"`,
 		},
 		{
 			`"C:\Program Files\WindowsApps\Microsoft.WindowsTerminal_1.16.10261.0_x64__8wekyb3d8bbwe\WindowsTerminal.exe" Microsoft.WindowsTerminal_1.16.10261.0_x64__8wekyb3d8bbweApp`,

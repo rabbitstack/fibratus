@@ -93,7 +93,11 @@ func (p psProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 		CompleteSysProc(e.GetParamAsString(kparams.ProcessName))
 
 	// append executable path parameter
-	e.AppendParam(kparams.Exe, kparams.FilePath, cmndline.Exeline())
+	exe := cmndline.Exeline()
+	if exe == "" {
+		exe = e.GetParamAsString(kparams.ProcessName)
+	}
+	e.AppendParam(kparams.Exe, kparams.FilePath, exe)
 
 	if e.IsTerminateProcess() {
 		return e, nil

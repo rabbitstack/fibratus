@@ -25,6 +25,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
 	"golang.org/x/sys/windows"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
@@ -218,6 +219,9 @@ type Module struct {
 func (m Module) String() string {
 	return fmt.Sprintf("Name: %s, Size: %d, Checksum: %d, Base address: %s, Default base address: %s", m.Name, m.Size, m.Checksum, m.BaseAddress, m.DefaultBaseAddress)
 }
+
+// IsExecutable determines if the loaded module is an executable.
+func (m Module) IsExecutable() bool { return strings.ToLower(filepath.Ext(m.Name)) == ".exe" }
 
 // New produces a new process state.
 func New(pid, ppid uint32, name, cmndline, exe string, sid *windows.SID, sessionID uint32) *PS {
