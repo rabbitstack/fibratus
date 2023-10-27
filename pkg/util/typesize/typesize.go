@@ -20,7 +20,6 @@ package typesize
 
 import "unsafe"
 
-//nolint:unused
 var ptr uintptr
 
 // Pointer returns the pointer size on this machine.

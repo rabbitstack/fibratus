@@ -82,4 +82,4 @@ require (
 	www.velocidex.com/golang/go-ntfs v0.1.2-0.20230922133004-33eadbbaf1f2
 )
 
-go 1.19
+go 1.21
