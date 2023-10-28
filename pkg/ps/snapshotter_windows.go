@@ -179,14 +179,14 @@ func (s *snapshotter) AddThread(e *kevent.Kevent) error {
 	}
 	thread := pstypes.Thread{}
 	thread.Tid, _ = e.Kparams.GetTid()
-	thread.UstackBase, _ = e.Kparams.GetHex(kparams.UstackBase)
-	thread.UstackLimit, _ = e.Kparams.GetHex(kparams.UstackLimit)
-	thread.KstackBase, _ = e.Kparams.GetHex(kparams.KstackBase)
-	thread.KstackLimit, _ = e.Kparams.GetHex(kparams.KstackLimit)
+	thread.UstackBase = e.Kparams.TryGetAddress(kparams.UstackBase)
+	thread.UstackLimit = e.Kparams.TryGetAddress(kparams.UstackLimit)
+	thread.KstackBase = e.Kparams.TryGetAddress(kparams.KstackBase)
+	thread.KstackLimit = e.Kparams.TryGetAddress(kparams.KstackLimit)
 	thread.IOPrio, _ = e.Kparams.GetUint8(kparams.IOPrio)
 	thread.BasePrio, _ = e.Kparams.GetUint8(kparams.BasePrio)
 	thread.PagePrio, _ = e.Kparams.GetUint8(kparams.PagePrio)
-	thread.Entrypoint, _ = e.Kparams.GetHex(kparams.StartAddr)
+	thread.Entrypoint = e.Kparams.TryGetAddress(kparams.StartAddr)
 	proc.AddThread(thread)
 	return nil
 }
@@ -211,8 +211,8 @@ func (s *snapshotter) AddModule(e *kevent.Kevent) error {
 	module.Size, _ = e.Kparams.GetUint64(kparams.ImageSize)
 	module.Checksum, _ = e.Kparams.GetUint32(kparams.ImageCheckSum)
 	module.Name = e.GetParamAsString(kparams.ImageFilename)
-	module.BaseAddress, _ = e.Kparams.GetHex(kparams.ImageBase)
-	module.DefaultBaseAddress, _ = e.Kparams.GetHex(kparams.ImageDefaultBase)
+	module.BaseAddress = e.Kparams.TryGetAddress(kparams.ImageBase)
+	module.DefaultBaseAddress = e.Kparams.TryGetAddress(kparams.ImageDefaultBase)
 	module.SignatureLevel, _ = e.Kparams.GetUint32(kparams.ImageSignatureLevel)
 	module.SignatureType, _ = e.Kparams.GetUint32(kparams.ImageSignatureType)
 	if module.IsExecutable() && len(proc.Exe) < len(module.Name) {

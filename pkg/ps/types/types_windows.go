@@ -181,15 +181,15 @@ type Thread struct {
 	// PagePrio is a memory page priority hint for memory pages accessed by the thread.
 	PagePrio uint8
 	// UstackBase is the base address of the thread's user space stack.
-	UstackBase kparams.Hex
+	UstackBase kparams.Addr
 	// UstackLimit is the limit of the thread's user space stack.
-	UstackLimit kparams.Hex
+	UstackLimit kparams.Addr
 	// KStackBase is the base address of the thread's kernel space stack.
-	KstackBase kparams.Hex
+	KstackBase kparams.Addr
 	// KstackLimit is the limit of the thread's kernel space stack.
-	KstackLimit kparams.Hex
+	KstackLimit kparams.Addr
 	// Entrypoint is the starting address of the function to be executed by the thread.
-	Entrypoint kparams.Hex
+	Entrypoint kparams.Addr
 }
 
 // String returns the thread as a human-readable string.
@@ -206,9 +206,9 @@ type Module struct {
 	// Name represents the full path of this image.
 	Name string
 	// BaseAddress is the base address of process in which the image is loaded.
-	BaseAddress kparams.Hex
+	BaseAddress kparams.Addr
 	// DefaultBaseAddress is the default base address.
-	DefaultBaseAddress kparams.Hex
+	DefaultBaseAddress kparams.Addr
 	// SignatureLevel designates the image signature level. (e.g. MICROSOFT)
 	SignatureLevel uint32
 	// SignatureType designates the image signature type (e.g. EMBEDDED)

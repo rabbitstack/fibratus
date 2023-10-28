@@ -540,35 +540,15 @@ func (t *threadAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value
 	case fields.ThreadPagePrio:
 		return kevt.Kparams.GetUint8(kparams.PagePrio)
 	case fields.ThreadKstackBase:
-		v, err := kevt.Kparams.GetHex(kparams.KstackBase)
-		if err != nil {
-			return nil, err
-		}
-		return v.String(), nil
+		return kevt.GetParamAsString(kparams.KstackBase), nil
 	case fields.ThreadKstackLimit:
-		v, err := kevt.Kparams.GetHex(kparams.KstackLimit)
-		if err != nil {
-			return nil, err
-		}
-		return v.String(), nil
+		return kevt.GetParamAsString(kparams.KstackLimit), nil
 	case fields.ThreadUstackBase:
-		v, err := kevt.Kparams.GetHex(kparams.UstackBase)
-		if err != nil {
-			return nil, err
-		}
-		return v.String(), nil
+		return kevt.GetParamAsString(kparams.UstackBase), nil
 	case fields.ThreadUstackLimit:
-		v, err := kevt.Kparams.GetHex(kparams.UstackLimit)
-		if err != nil {
-			return nil, err
-		}
-		return v.String(), nil
+		return kevt.GetParamAsString(kparams.UstackLimit), nil
 	case fields.ThreadEntrypoint:
-		v, err := kevt.Kparams.GetHex(kparams.StartAddr)
-		if err != nil {
-			return nil, err
-		}
-		return v.String(), nil
+		return kevt.GetParamAsString(kparams.StartAddr), nil
 	case fields.ThreadPID:
 		return kevt.Kparams.GetUint32(kparams.ProcessID)
 	case fields.ThreadAccessMask:
@@ -804,7 +784,7 @@ func newHandleAccessor() accessor { return &handleAccessor{} }
 func (h *handleAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
 	switch f {
 	case fields.HandleID:
-		return kevt.Kparams.GetHexAsUint32(kparams.HandleID)
+		return kevt.Kparams.GetUint32(kparams.HandleID)
 	case fields.HandleType:
 		return kevt.GetParamAsString(kparams.HandleObjectTypeID), nil
 	case fields.HandleName:

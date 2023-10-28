@@ -508,44 +508,17 @@ func (kpars Kparams) GetDouble(name string) (float64, error) {
 	return v, nil
 }
 
-// GetHexAsUint32 returns the number hexadecimal representation as uint32 value.
-func (kpars Kparams) GetHexAsUint32(name string) (uint32, error) {
-	hex, err := kpars.GetHex(name)
-	if err != nil {
-		return uint32(0), err
-	}
-	return hex.Uint32(), nil
-}
-
-// GetHexAsUint8 returns the number hexadecimal representation as uint8 value.
-func (kpars Kparams) GetHexAsUint8(name string) (uint8, error) {
-	hex, err := kpars.GetHex(name)
-	if err != nil {
-		return uint8(0), err
-	}
-	return hex.Uint8(), nil
-}
-
-// GetHexAsUint64 returns the number hexadecimal representation as uint64 value.
-func (kpars Kparams) GetHexAsUint64(name string) (uint64, error) {
-	hex, err := kpars.GetHex(name)
-	if err != nil {
-		return uint64(0), err
-	}
-	return hex.Uint64(), nil
-}
-
-// GetHex returns the generic hexadecimal type for the specified parameter name.
-func (kpars Kparams) GetHex(name string) (kparams.Hex, error) {
+// TryGetAddress attempts to convert the underlying type to address.
+func (kpars Kparams) TryGetAddress(name string) kparams.Addr {
 	kpar, err := kpars.findParam(name)
 	if err != nil {
-		return "", err
+		return 0
 	}
-	v, ok := kpar.Value.(kparams.Hex)
+	v, ok := kpar.Value.(uint64)
 	if !ok {
-		return "", fmt.Errorf("unable to type cast %q parameter to Hex value", name)
+		return 0
 	}
-	return v, nil
+	return kparams.Addr(v)
 }
 
 // GetIPv4 returns the underlying IPv4 address from the parameter.

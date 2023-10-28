@@ -148,8 +148,8 @@ func TestProcFilter(t *testing.T) {
 			SID:      "S-1-5-18",
 			Envs:     map[string]string{"ALLUSERSPROFILE": "C:\\ProgramData", "OS": "Windows_NT", "ProgramFiles(x86)": "C:\\Program Files (x86)"},
 			Modules: []pstypes.Module{
-				{Name: "C:\\Windows\\System32\\kernel32.dll", Size: 12354, Checksum: 23123343, BaseAddress: kparams.Hex("fff23fff"), DefaultBaseAddress: kparams.Hex("fff124fd")},
-				{Name: "C:\\Windows\\System32\\user32.dll", Size: 212354, Checksum: 33123343, BaseAddress: kparams.Hex("fef23fff"), DefaultBaseAddress: kparams.Hex("fff124fd")},
+				{Name: "C:\\Windows\\System32\\kernel32.dll", Size: 12354, Checksum: 23123343, BaseAddress: kparams.Addr(4294066175), DefaultBaseAddress: kparams.Addr(4293993725)},
+				{Name: "C:\\Windows\\System32\\user32.dll", Size: 212354, Checksum: 33123343, BaseAddress: kparams.Addr(4277288959), DefaultBaseAddress: kparams.Addr(4293993725)},
 			},
 		},
 	}
@@ -167,8 +167,8 @@ func TestProcFilter(t *testing.T) {
 			Ppid:   345,
 			Envs:   map[string]string{"ALLUSERSPROFILE": "C:\\ProgramData", "OS": "Windows_NT", "ProgramFiles(x86)": "C:\\Program Files (x86)"},
 			Modules: []pstypes.Module{
-				{Name: "C:\\Windows\\System32\\kernel32.dll", Size: 12354, Checksum: 23123343, BaseAddress: kparams.Hex("fff23fff"), DefaultBaseAddress: kparams.Hex("fff124fd")},
-				{Name: "C:\\Windows\\System32\\user32.dll", Size: 212354, Checksum: 33123343, BaseAddress: kparams.Hex("fef23fff"), DefaultBaseAddress: kparams.Hex("fff124fd")},
+				{Name: "C:\\Windows\\System32\\kernel32.dll", Size: 12354, Checksum: 23123343, BaseAddress: kparams.Addr(4294066175), DefaultBaseAddress: kparams.Addr(4293993725)},
+				{Name: "C:\\Windows\\System32\\user32.dll", Size: 212354, Checksum: 33123343, BaseAddress: kparams.Addr(4277288959), DefaultBaseAddress: kparams.Addr(4293993725)},
 			},
 		},
 	}
@@ -523,7 +523,7 @@ func TestRegistryFilter(t *testing.T) {
 			kparams.RegValue:     {Name: kparams.RegValue, Type: kparams.Uint32, Value: uint32(10234)},
 			kparams.RegValueType: {Name: kparams.RegValueType, Type: kparams.AnsiString, Value: "DWORD"},
 			kparams.NTStatus:     {Name: kparams.NTStatus, Type: kparams.AnsiString, Value: "success"},
-			kparams.RegKeyHandle: {Name: kparams.RegKeyHandle, Type: kparams.HexInt64, Value: kparams.NewHex(uint64(18446666033449935464))},
+			kparams.RegKeyHandle: {Name: kparams.RegKeyHandle, Type: kparams.Address, Value: uint64(18446666033449935464)},
 		},
 	}
 

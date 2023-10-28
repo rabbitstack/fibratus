@@ -65,7 +65,7 @@ func TestMarshaller(t *testing.T) {
 			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.AnsiString, Value: "open"},
 			kparams.BasePrio:      {Name: kparams.BasePrio, Type: kparams.Int8, Value: int8(2)},
 			kparams.PagePrio:      {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(2)},
-			kparams.KstackLimit:   {Name: kparams.KstackLimit, Type: kparams.HexInt8, Value: kparams.Hex("ff")},
+			kparams.KstackLimit:   {Name: kparams.KstackLimit, Type: kparams.Address, Value: uint64(1888833888)},
 			kparams.StartTime:     {Name: kparams.StartTime, Type: kparams.Time, Value: time.Now()},
 			kparams.ProcessID:     {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1204)},
 			kparams.NetDIPNames:   {Name: kparams.NetDIPNames, Type: kparams.Slice, Value: []string{"dns.google.", "github.com."}},
@@ -145,8 +145,8 @@ func TestKeventMarshalJSON(t *testing.T) {
 			SessionID: 4,
 			Envs:      map[string]string{"ProgramData": "C:\\ProgramData", "COMPUTRENAME": "archrabbit"},
 			Threads: map[uint32]pstypes.Thread{
-				3453: {Tid: 3453, Entrypoint: kparams.Hex("0x7ffe2557ff80"), IOPrio: 2, PagePrio: 5, KstackBase: kparams.Hex("0xffffc307810d6000"), KstackLimit: kparams.Hex("0xffffc307810cf000"), UstackLimit: kparams.Hex("0x5260000"), UstackBase: kparams.Hex("0x525f000")},
-				3455: {Tid: 3455, Entrypoint: kparams.Hex("0x5efe2557ff80"), IOPrio: 3, PagePrio: 5, KstackBase: kparams.Hex("0xffffc307810d6000"), KstackLimit: kparams.Hex("0xffffc307810cf000"), UstackLimit: kparams.Hex("0x5260000"), UstackBase: kparams.Hex("0x525f000")},
+				3453: {Tid: 3453, Entrypoint: kparams.Addr(140729524944768), IOPrio: 2, PagePrio: 5, KstackBase: kparams.Addr(18446677035730165760), KstackLimit: kparams.Addr(18446677035730137088), UstackLimit: kparams.Addr(86376448), UstackBase: kparams.Addr(86372352)},
+				3455: {Tid: 3455, Entrypoint: kparams.Addr(140729524944768), IOPrio: 3, PagePrio: 5, KstackBase: kparams.Addr(18446677035730165760), KstackLimit: kparams.Addr(18446677035730137088), UstackLimit: kparams.Addr(86376448), UstackBase: kparams.Addr(86372352)},
 			},
 			Handles: []htypes.Handle{
 				{Num: windows.Handle(0xffffd105e9baaf70),
@@ -254,8 +254,8 @@ func TestUnmarshalHugeHandles(t *testing.T) {
 			SessionID: 4,
 			Envs:      map[string]string{"ProgramData": "C:\\ProgramData", "COMPUTRENAME": "archrabbit"},
 			Threads: map[uint32]pstypes.Thread{
-				3453: {Tid: 3453, Entrypoint: kparams.Hex("0x7ffe2557ff80"), IOPrio: 2, PagePrio: 5, KstackBase: kparams.Hex("0xffffc307810d6000"), KstackLimit: kparams.Hex("0xffffc307810cf000"), UstackLimit: kparams.Hex("0x5260000"), UstackBase: kparams.Hex("0x525f000")},
-				3455: {Tid: 3455, Entrypoint: kparams.Hex("0x5efe2557ff80"), IOPrio: 3, PagePrio: 5, KstackBase: kparams.Hex("0xffffc307810d6000"), KstackLimit: kparams.Hex("0xffffc307810cf000"), UstackLimit: kparams.Hex("0x5260000"), UstackBase: kparams.Hex("0x525f000")},
+				3453: {Tid: 3453, Entrypoint: kparams.Addr(140729524944768), IOPrio: 2, PagePrio: 5, KstackBase: kparams.Addr(18446677035730165760), KstackLimit: kparams.Addr(18446677035730137088), UstackLimit: kparams.Addr(86376448), UstackBase: kparams.Addr(86372352)},
+				3455: {Tid: 3455, Entrypoint: kparams.Addr(140729524944768), IOPrio: 3, PagePrio: 5, KstackBase: kparams.Addr(18446677035730165760), KstackLimit: kparams.Addr(18446677035730137088), UstackLimit: kparams.Addr(86376448), UstackBase: kparams.Addr(86372352)},
 			},
 			Handles: handles,
 			PE: &pex.PE{
@@ -316,8 +316,8 @@ func TestKeventMarshalJSONMultiple(t *testing.T) {
 				SessionID: 4,
 				Envs:      map[string]string{"ProgramData": "C:\\ProgramData", "COMPUTRENAME": "archrabbit"},
 				Threads: map[uint32]pstypes.Thread{
-					3453: {Tid: 3453, Entrypoint: kparams.Hex("0x7ffe2557ff80"), IOPrio: 2, PagePrio: 5, KstackBase: kparams.Hex("0xffffc307810d6000"), KstackLimit: kparams.Hex("0xffffc307810cf000"), UstackLimit: kparams.Hex("0x5260000"), UstackBase: kparams.Hex("0x525f000")},
-					3455: {Tid: 3455, Entrypoint: kparams.Hex("0x5efe2557ff80"), IOPrio: 3, PagePrio: 5, KstackBase: kparams.Hex("0xffffc307810d6000"), KstackLimit: kparams.Hex("0xffffc307810cf000"), UstackLimit: kparams.Hex("0x5260000"), UstackBase: kparams.Hex("0x525f000")},
+					3453: {Tid: 3453, Entrypoint: kparams.Addr(140729524944768), IOPrio: 2, PagePrio: 5, KstackBase: kparams.Addr(18446677035730165760), KstackLimit: kparams.Addr(18446677035730137088), UstackLimit: kparams.Addr(86376448), UstackBase: kparams.Addr(86372352)},
+					3455: {Tid: 3455, Entrypoint: kparams.Addr(140729524944768), IOPrio: 3, PagePrio: 5, KstackBase: kparams.Addr(18446677035730165760), KstackLimit: kparams.Addr(18446677035730137088), UstackLimit: kparams.Addr(86376448), UstackBase: kparams.Addr(86372352)},
 				},
 				Handles: []htypes.Handle{
 					{Num: windows.Handle(0xffffd105e9baaf70),

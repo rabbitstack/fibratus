@@ -18,9 +18,7 @@
 
 package kparams
 
-import (
-	"strconv"
-)
+import "strconv"
 
 const (
 	// NA defines absent parameter's value
@@ -33,53 +31,11 @@ type Value interface{}
 // Type defines kernel event parameter type
 type Type uint16
 
-// Hex is the type alias for hexadecimal values
-type Hex string
+// Addr represents the memory address
+type Addr uint64
 
-// NewHex creates a new Hex type from the given integer value.
-func NewHex(v Value) Hex {
-	switch n := v.(type) {
-	case uint8:
-		return Hex(strconv.FormatUint(uint64(n), 16))
-	case uint16:
-		return Hex(strconv.FormatUint(uint64(n), 16))
-	case uint32:
-		return Hex(strconv.FormatUint(uint64(n), 16))
-	case int32:
-		return Hex(strconv.FormatInt(int64(n), 16))
-	case uint64:
-		return Hex(strconv.FormatUint(n, 16))
-	case int64:
-		return Hex(strconv.FormatInt(n, 16))
-	default:
-		return ""
-	}
-}
-
-// Uint8 yields an uint8 value from its hex representation.
-func (hex Hex) Uint8() uint8 { return uint8(hex.parseUint(8)) }
-
-// Uint16 yields an uint16 value from its hex representation.
-func (hex Hex) Uint16() uint16 { return uint16(hex.parseUint(16)) }
-
-// Uint32 yields an uint32 value from its hex representation.
-func (hex Hex) Uint32() uint32 { return uint32(hex.parseUint(32)) }
-
-// Uint64 yields an uint64 value from its hex representation.
-func (hex Hex) Uint64() uint64 { return hex.parseUint(64) }
-
-func (hex Hex) parseUint(bitSize int) uint64 {
-	num, err := strconv.ParseUint(string(hex), 16, bitSize)
-	if err != nil {
-		return uint64(0)
-	}
-	return num
-}
-
-// String returns a string representation of the hex value.
-func (hex Hex) String() string {
-	return string(hex)
-}
+// Hex returns the hexadecimal representation of the memory address.
+func (a Addr) String() string { return strconv.FormatUint(uint64(a), 16) }
 
 const (
 	// Null is a null parameter type
@@ -125,14 +81,6 @@ const (
 	TID
 	// WbemSID is the Web-Based Enterprise Management security identifier.
 	WbemSID
-	// HexInt8 is the hexadecimal representation of 8-bit integer
-	HexInt8
-	// HexInt16 is the hexadecimal representation of 16-bit integer
-	HexInt16
-	// HexInt32 is the hexadecimal representation of 32-bit integer
-	HexInt32
-	// HexInt64 is the hexadecimal representation of 64-bit integer
-	HexInt64
 	// Port represents the endpoint port number
 	Port
 	// IP is the IP address
@@ -180,14 +128,10 @@ func (t Type) String() string {
 		return "int8"
 	case Uint8:
 		return "uint8"
-	case HexInt8:
-		return "hex8"
 	case Int16:
 		return "int16"
 	case Uint16:
 		return "uint16"
-	case HexInt16:
-		return "hex16"
 	case Int32:
 		return "int32"
 	case Uint32:
@@ -196,10 +140,6 @@ func (t Type) String() string {
 		return "int64"
 	case Uint64:
 		return "uint64"
-	case HexInt32:
-		return "hex32"
-	case HexInt64:
-		return "hex64"
 	case SID, WbemSID:
 		return "sid"
 	case TID:

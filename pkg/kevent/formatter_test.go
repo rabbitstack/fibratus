@@ -55,10 +55,10 @@ func TestFormat(t *testing.T) {
 	f, err := NewFormatter(template)
 	require.NoError(t, err)
 	params := Kparams{
-		kpars.ProcessID: {Name: kpars.ProcessID, Type: kpars.HexInt32, Value: kpars.Hex("0x36c")},
+		kpars.ProcessID: {Name: kpars.ProcessID, Type: kpars.PID, Value: uint32(876)},
 	}
 	s := f.Format(&Kevent{CPU: uint8(4), Name: "CreateProcess", Seq: uint64(1999), Kparams: params, Metadata: map[MetadataKey]any{"key1": "value1"}})
-	assert.Equal(t, "1999 4 -  (CreateProcess) -- pid: 0x36c (pid➜ 0x36c) key1: value1", string(s))
+	assert.Equal(t, "1999 4 -  (CreateProcess) -- pid: 876 (pid➜ 876) key1: value1", string(s))
 }
 
 func TestFormatPS(t *testing.T) {
@@ -66,7 +66,7 @@ func TestFormatPS(t *testing.T) {
 	f, err := NewFormatter(template)
 	require.NoError(t, err)
 	params := Kparams{
-		kpars.ProcessID: {Name: kpars.ProcessID, Type: kpars.HexInt32, Value: kpars.Hex("0x36c")},
+		kpars.ProcessID: {Name: kpars.ProcessID, Type: kpars.PID, Value: uint32(876)},
 	}
 	s := f.Format(&Kevent{
 		CPU:     uint8(4),
