@@ -14,7 +14,6 @@
 package fasttemplate
 
 import (
-	"reflect"
 	"unsafe"
 )
 
@@ -24,11 +23,5 @@ func bytesToString(b []byte) string {
 
 //nolint:govet
 func stringToBytes(s string) []byte {
-	sh := (*reflect.StringHeader)(unsafe.Pointer(&s))
-	bh := reflect.SliceHeader{
-		Data: sh.Data,
-		Len:  sh.Len,
-		Cap:  sh.Len,
-	}
-	return *(*[]byte)(unsafe.Pointer(&bh))
+	return unsafe.Slice(unsafe.StringData(s), len(s))
 }
