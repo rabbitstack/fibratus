@@ -227,9 +227,9 @@ func (e Kevent) CurrentPid() bool { return e.PID == currentPid }
 // IsState indicates if this event is only used for state management.
 func (e Kevent) IsState() bool { return e.Type.OnlyState() }
 
-// IsCreatingFile determines if the event is creating a new file.
-func (e Kevent) IsCreatingFile() bool {
-	return e.IsCreateFile() && e.Kparams.MustGetUint32(kparams.FileOperation) != windows.FILE_OPEN
+// IsCreateDisposition determines if the file disposition leads to creating a new file.
+func (e Kevent) IsCreateDisposition() bool {
+	return e.IsCreateFile() && e.Kparams.MustGetUint32(kparams.FileOperation) == windows.FILE_CREATE
 }
 
 // RundownKey calculates the rundown event hash. The hash is

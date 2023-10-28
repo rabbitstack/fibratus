@@ -39,8 +39,8 @@ func (f FieldInfo) IsDeprecated() bool { return f.Deprecation != nil }
 type Deprecation struct {
 	// Since denotes from which version the field is flagged as deprecated
 	Since string
-	// Field represents the field by which the deprecated field is superseded
-	Field Field
+	// Fields represents the fields by which the deprecated field is superseded
+	Fields []Field
 }
 
 // Get returns a slice of field information.

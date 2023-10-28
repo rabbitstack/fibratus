@@ -295,11 +295,6 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 		p.Sections = append(p.Sections, sec)
 	}
 
-	// retrieve basic PE data
-	p.IsDLL = pe.IsDLL()
-	p.IsDriver = pe.IsDriver()
-	p.IsExecutable = pe.IsEXE()
-
 	// initialize raw section headers
 	for _, sec := range pe.Sections {
 		p.sectionHeaders = append(p.sectionHeaders, sec.Header)
@@ -353,8 +348,56 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 		}
 	}
 
+	p.IsDLL = pe.IsDLL()
+	p.IsDriver = p.isDriver()
+	p.IsExecutable = pe.IsEXE()
 	p.IsDotnet = pe.HasCLR
 	p.Anomalies = pe.Anomalies
 
 	return p, nil
+}
+
+// isDriver determines if the PE is a Windows driver. This method is inherited
+// from the saferwall parser with the imports defensive check removed as some
+// driver samples may not contain an import directory, but section names may
+// reveal the PE is a kernel driver.
+func (pe *PE) isDriver() bool {
+	// DIRECTORY_ENTRY_IMPORT may exist, although it may be empty.
+	// If it imports from "ntoskrnl.exe" or other kernel components it should
+	// be a driver.
+	systemDLLs := []string{"ntoskrnl.exe", "hal.dll", "ndis.sys",
+		"bootvid.dll", "kdcom.dll"}
+	for _, imp := range pe.Imports {
+		for _, dll := range systemDLLs {
+			if strings.ToLower(imp) == dll {
+				return true
+			}
+		}
+	}
+
+	// If still we couldn't tell, check common driver section with combination
+	// of IMAGE_SUBSYSTEM_NATIVE or IMAGE_SUBSYSTEM_NATIVE_WINDOWS.
+	subsystem := peparser.ImageOptionalHeaderSubsystemType(0)
+	oh32 := peparser.ImageOptionalHeader32{}
+	oh64 := peparser.ImageOptionalHeader64{}
+	switch pe.Is64 {
+	case true:
+		oh64 = pe.ntHeader.OptionalHeader.(peparser.ImageOptionalHeader64)
+		subsystem = oh64.Subsystem
+	case false:
+		oh32 = pe.ntHeader.OptionalHeader.(peparser.ImageOptionalHeader32)
+		subsystem = oh32.Subsystem
+	}
+	commonDriverSectionNames := []string{"page", "paged", "nonpage", "init"}
+	for _, section := range pe.Sections {
+		s := strings.ToLower(section.Name)
+		for _, driverSection := range commonDriverSectionNames {
+			if s == driverSection &&
+				(subsystem&peparser.ImageSubsystemNativeWindows != 0 ||
+					subsystem&peparser.ImageSubsystemNative != 0) {
+				return true
+			}
+		}
+	}
+	return false
 }

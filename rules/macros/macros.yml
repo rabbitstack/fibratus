@@ -104,7 +104,7 @@
 
 - macro: load_driver
   expr: >
-    (load_module and (image.name iendswith '.sys' or pe.is_driver)
+    (load_module and (image.name iendswith '.sys' or image.is_driver)
       or
     (create_handle and handle.type = 'Driver')
   description: |
@@ -114,7 +114,7 @@
     watching for driver objects being created.
 
 - macro: unload_driver
-  expr: unload_image and (image.name iendswith '.sys' or pe.is_driver)
+  expr: unload_image and (image.name iendswith '.sys' or image.is_driver)
 
 - macro: load_unsigned_module
   expr: >
@@ -126,7 +126,7 @@
 
 - macro: load_executable
   expr: >
-    load_module and (image.name iendswith '.exe' or pe.is_exec)
+    load_module and (image.name iendswith '.exe' or image.is_exec)
 
 - macro: load_untrusted_executable
   expr: >

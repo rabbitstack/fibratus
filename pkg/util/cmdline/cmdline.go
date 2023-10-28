@@ -67,6 +67,12 @@ func New(cmdline string) *Cmdline {
 // a single argument in the process command line.
 func Split(cmdline string) []string { return splitRegexp.FindAllString(cmdline, -1) }
 
+// ExpandSystemRoot replaces all occurrences of the system root environment variable
+// with its respective value.
+func ExpandSystemRoot(exe string) string {
+	return systemRootRegexp.ReplaceAllString(exe, os.Getenv("SystemRoot"))
+}
+
 // CleanExe cleans the executable path and rejoins
 // the rest of the command line arguments.
 func (c *Cmdline) CleanExe() *Cmdline {

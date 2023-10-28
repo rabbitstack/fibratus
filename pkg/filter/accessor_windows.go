@@ -23,6 +23,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	psnap "github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
+	"github.com/rabbitstack/fibratus/pkg/util/loldrivers"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -589,10 +590,44 @@ func (t *threadAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value
 	return nil, nil
 }
 
+// evalLOLDrivers interacts with the loldrivers client to determine
+// whether the loaded/dropped driver is malicious or vulnerable.
+func evalLOLDrivers(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
+	filename := kevt.GetParamAsString(kparams.FileName)
+	isDriver := filepath.Ext(filename) == ".sys" || kevt.Kparams.TryGetBool(kparams.FileIsDriver)
+	if !isDriver {
+		return nil, nil
+	}
+	ok, driver := loldrivers.GetClient().MatchHash(filename)
+	if !ok {
+		return nil, nil
+	}
+	if (f == fields.FileIsDriverVulnerable || f == fields.ImageIsDriverVulnerable) && driver.IsVulnerable {
+		return true, nil
+	}
+	if (f == fields.FileIsDriverMalicious || f == fields.ImageIsDriverMalicious) && driver.IsMalicious {
+		return true, nil
+	}
+	return false, nil
+}
+
+// initLOLDriversClient initializes the loldrivers client if the filter expression
+// contains any of the relevant fields.
+func initLOLDriversClient(flds []fields.Field) {
+	for _, f := range flds {
+		if f == fields.FileIsDriverVulnerable || f == fields.FileIsDriverMalicious ||
+			f == fields.ImageIsDriverVulnerable || f == fields.ImageIsDriverMalicious {
+			loldrivers.InitClient(loldrivers.WithAsyncDownload())
+		}
+	}
+}
+
 // fileAccessor extracts file specific values.
 type fileAccessor struct{}
 
-func (fileAccessor) setFields(fields []fields.Field) {}
+func (fileAccessor) setFields(fields []fields.Field) {
+	initLOLDriversClient(fields)
+}
 
 func newFileAccessor() accessor {
 	return &fileAccessor{}
@@ -629,6 +664,17 @@ func (l *fileAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, 
 		return kevt.Kparams.GetUint64(kparams.FileViewSize)
 	case fields.FileViewType:
 		return kevt.GetParamAsString(kparams.FileViewSectionType), nil
+	case fields.FileIsDriverVulnerable, fields.FileIsDriverMalicious:
+		if kevt.IsCreateDisposition() && kevt.IsSuccess() {
+			return evalLOLDrivers(f, kevt)
+		}
+		return false, nil
+	case fields.FileIsDLL:
+		return kevt.Kparams.GetBool(kparams.FileIsDLL)
+	case fields.FileIsDriver:
+		return kevt.Kparams.GetBool(kparams.FileIsDriver)
+	case fields.FileIsExecutable:
+		return kevt.Kparams.GetBool(kparams.FileIsExecutable)
 	}
 	return nil, nil
 }
@@ -636,7 +682,9 @@ func (l *fileAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, 
 // imageAccessor extracts image (DLL) event values.
 type imageAccessor struct{}
 
-func (imageAccessor) setFields(fields []fields.Field) {}
+func (imageAccessor) setFields(fields []fields.Field) {
+	initLOLDriversClient(fields)
+}
 
 func newImageAccessor() accessor {
 	return &imageAccessor{}
@@ -670,6 +718,17 @@ func (i *imageAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value,
 		return kevt.Kparams.GetTime(kparams.ImageCertNotBefore)
 	case fields.ImageCertAfter:
 		return kevt.Kparams.GetTime(kparams.ImageCertNotAfter)
+	case fields.ImageIsDriverVulnerable, fields.ImageIsDriverMalicious:
+		if kevt.IsLoadImage() {
+			return evalLOLDrivers(f, kevt)
+		}
+		return false, nil
+	case fields.ImageIsDLL:
+		return kevt.Kparams.GetBool(kparams.FileIsDLL)
+	case fields.ImageIsDriver:
+		return kevt.Kparams.GetBool(kparams.FileIsDriver)
+	case fields.ImageIsExecutable:
+		return kevt.Kparams.GetBool(kparams.FileIsExecutable)
 	}
 	return nil, nil
 }
@@ -777,7 +836,7 @@ func (pa *peAccessor) parserOpts() []pe.Option {
 			opts = append(opts, pe.WithSymbols())
 		}
 		if f.IsPeSectionEntropy() {
-			opts = append(opts, pe.WithSectionEntropy())
+			opts = append(opts, pe.WithSections(), pe.WithSectionEntropy())
 		}
 		if f.IsPeVersionResource() || f.IsPeResourcesMap() {
 			opts = append(opts, pe.WithVersionResources())
