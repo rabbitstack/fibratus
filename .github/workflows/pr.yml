@@ -7,16 +7,19 @@ on:
     paths-ignore:
       - "docs/**"
 
+env:
+  GO_VERSION: 1.21.x
+
 jobs:
   build:
       runs-on: windows-latest
       steps:
       - name: Install Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v4
         with:
-           go-version: 1.19.x
+           go-version: ${{ env.GO_VERSION }}
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Adjust pkg-config prefix
         shell: bash
         run: |
@@ -35,7 +38,7 @@ jobs:
             libtool
             autoconf
       - name: Cache yara
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         id: cache
         with:
           path: |
@@ -79,15 +82,15 @@ jobs:
     continue-on-error: true
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Adjust pkg-config prefix
         shell: bash
         run: |
            sed -i 's/C:\/Python37/C:\/hostedtoolcache\/windows\/Python\/3.7.9\/x64/' pkg-config/python-37.pc
       - name: Install Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v4
         with:
-           go-version: 1.19.x
+           go-version: ${{ env.GO_VERSION }}
       - name: Setup msys2
         uses: msys2/setup-msys2@v2
         with:
@@ -101,7 +104,7 @@ jobs:
            libtool
            autoconf
       - name: Cache yara
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         id: cache
         with:
           path: |
@@ -129,15 +132,15 @@ jobs:
     continue-on-error: true
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Adjust pkg-config prefix
         shell: bash
         run: |
            sed -i 's/C:\/Python37/C:\/hostedtoolcache\/windows\/Python\/3.7.9\/x64/' pkg-config/python-37.pc
       - name: Install Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v4
         with:
-           go-version: 1.19.x
+           go-version: ${{ env.GO_VERSION }}
       - name: Setup msys2
         uses: msys2/setup-msys2@v2
         with:
@@ -151,7 +154,7 @@ jobs:
            libtool
            autoconf
       - name: Cache yara
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         id: cache
         with:
           path: |
@@ -169,7 +172,7 @@ jobs:
         run: |
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin $GOLANGCI_LINT_VER
         env:
-          GOLANGCI_LINT_VER: v1.50.1
+          GOLANGCI_LINT_VER: v1.55.1
       - name: Lint
         shell: bash
         run: |

@@ -18,7 +18,13 @@
 
 package processors
 
-import "github.com/rabbitstack/fibratus/pkg/kevent"
+import (
+	libntfs "github.com/rabbitstack/fibratus/pkg/fs/ntfs"
+	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
+	"github.com/rabbitstack/fibratus/pkg/pe"
+	"os"
+)
 
 // ProcessorType is an alias for the event processor type
 type ProcessorType uint8
@@ -75,4 +81,46 @@ func (typ ProcessorType) String() string {
 	default:
 		return "unknown"
 	}
+}
+
+// parseImageFileCharacteristics parses the PE structure for the file path
+// residing in the given event parameters. The preferred method for getting
+// the file data is accessing the raw device and consuming the blob data.
+// If this operation fails, we fallback to using the regular file access.
+// The given event is decorated with various parameters extracted from PE
+// data. Most notably, parameters that indicate whether the file is a DLL,
+// executable image, or a Windows driver.
+func parseImageFileCharacteristics(e *kevent.Kevent) error {
+	filename := e.GetParamAsString(kparams.FileName)
+	// read file data blob from raw device
+	ntfs := libntfs.NewFS()
+	var (
+		data []byte
+		err  error
+	)
+	data, _, err = ntfs.Read(filename, 0, int64(os.Getpagesize()))
+	defer ntfs.Close()
+	if err != nil {
+		// if we can't read from the raw device, try regular file access
+		f, err := os.Open(filename)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		data = make([]byte, os.Getpagesize())
+		if _, err = f.Read(data); err != nil {
+			return err
+		}
+	}
+	// parse image file
+	pefile, err := pe.ParseBytes(data, pe.WithSections(), pe.WithSymbols())
+	if err != nil {
+		return err
+	}
+	// append parameters
+	e.AppendParam(kparams.FileIsDLL, kparams.Bool, pefile.IsDLL)
+	e.AppendParam(kparams.FileIsDriver, kparams.Bool, pefile.IsDriver)
+	e.AppendParam(kparams.FileIsExecutable, kparams.Bool, pefile.IsExecutable)
+
+	return nil
 }

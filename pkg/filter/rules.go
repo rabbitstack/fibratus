@@ -513,9 +513,9 @@ func (r *Rules) Compile() error {
 				if deprecated {
 					log.Warnf("%s rule uses the [%s] field which "+
 						"was deprecated starting from version %s. "+
-						"Please consider migrating to [%s] field "+
+						"Please consider migrating to %s field(s) "+
 						"because [%s] will be removed in future versions.",
-						rule.Name, field, d.Since, d.Field, field)
+						rule.Name, field, d.Since, d.Fields, field)
 				}
 			}
 			filtersCount.Add(1)

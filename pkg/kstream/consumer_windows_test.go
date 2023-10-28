@@ -453,6 +453,16 @@ func TestConsumerEvents(t *testing.T) {
 			},
 			false,
 		},
+		{
+			"set thread context",
+			func() error {
+				return nil
+			},
+			func(e *kevent.Kevent) bool {
+				return e.CurrentPid() && e.Type == ktypes.SetThreadContext && e.GetParamAsString(kparams.NTStatus) == "Success"
+			},
+			false,
+		},
 	}
 
 	psnap := new(ps.SnapshotterMock)
@@ -480,6 +490,7 @@ func TestConsumerEvents(t *testing.T) {
 		EnableMemKevents:      true,
 		EnableHandleKevents:   true,
 		EnableDNSEvents:       true,
+		EnableAuditAPIEvents:  true,
 	}
 
 	kctrl := NewController(kstreamConfig)

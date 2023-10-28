@@ -55,6 +55,9 @@
 - macro: accept_socket
   expr: kevt.name = 'Accept'
 
+- macro: set_thread_context
+  expr: kevt.name = 'SetThreadContext' and kevt.arg[status] = 'Success'
+
 - macro: inbound_network
   expr: (recv_socket or accept_socket) and ((net.sip != 0.0.0.0 or net.dip != 0.0.0.0) and (net.sip not in ('0:0:0:0:0:0:0:1', '::1') or net.dip not in ('0:0:0:0:0:0:0:1', '::1')) and not (cidr_contains(net.sip, '127.0.0.0/8') or cidr_contains(net.dip, '127.0.0.0/8')))
   description: |
@@ -101,7 +104,7 @@
 
 - macro: load_driver
   expr: >
-    (load_module and (image.name iendswith '.sys' or pe.is_driver)
+    (load_module and (image.name iendswith '.sys' or image.is_driver)
       or
     (create_handle and handle.type = 'Driver')
   description: |
@@ -111,7 +114,7 @@
     watching for driver objects being created.
 
 - macro: unload_driver
-  expr: unload_image and (image.name iendswith '.sys' or pe.is_driver)
+  expr: unload_image and (image.name iendswith '.sys' or image.is_driver)
 
 - macro: load_unsigned_module
   expr: >
@@ -123,7 +126,7 @@
 
 - macro: load_executable
   expr: >
-    load_module and (image.name iendswith '.exe' or pe.is_exec)
+    load_module and (image.name iendswith '.exe' or image.is_exec)
 
 - macro: load_untrusted_executable
   expr: >

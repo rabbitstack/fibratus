@@ -26,6 +26,9 @@ import (
 	libntfs "www.velocidex.com/golang/go-ntfs/parser"
 )
 
+// MaxFullSizeRead specifies the maximum size in bytes for the file data
+const MaxFullSizeRead int64 = 1024 * 1024 * 1024 * 50
+
 // FS provides raw access to Master File Table (MFT)
 // and file data blobs mounted on the NTFS.
 type FS struct {
@@ -59,6 +62,50 @@ func (fs *FS) Read(path string, offset, size int64) ([]byte, int, error) {
 		return nil, 0, err
 	}
 	n, err := reader.ReadAt(data, offset)
+	return data, n, err
+}
+
+// ReadFull reads the entire content of the file into the byte buffer.
+func (fs *FS) ReadFull(path string) ([]byte, int, error) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Warnf("unable to read %s from raw device: %v", path, err)
+		}
+	}()
+	ntfs, err := fs.getNTFSContext(path)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer ntfs.Close()
+
+	// get root MFT entry
+	root, err := ntfs.GetMFT(5)
+	if err != nil {
+		return nil, 0, err
+	}
+	// get file size
+	filename := strings.ReplaceAll(path[3:], "\\", "/")
+	f, err := root.Open(ntfs, filename)
+	if err != nil {
+		return nil, 0, err
+	}
+	var size int64
+	if stats := libntfs.Stat(ntfs, f); len(stats) > 0 {
+		size = stats[0].Size
+	}
+	if size == 0 {
+		return nil, 0, nil
+	}
+	if size > MaxFullSizeRead {
+		return nil, 0, nil
+	}
+	// read file
+	data := make([]byte, size)
+	reader, err := libntfs.GetDataForPath(ntfs, filename)
+	if err != nil {
+		return nil, 0, err
+	}
+	n, err := reader.ReadAt(data, 0)
 	return data, n, err
 }
 

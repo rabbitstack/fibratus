@@ -342,6 +342,16 @@ const (
 	FileViewSize Field = "file.view.size"
 	// FileViewType represents the type of the mapped view section
 	FileViewType Field = "file.view.type"
+	// FileIsDriverVulnerable represents the field that denotes whether the created file is a vulnerable driver
+	FileIsDriverVulnerable Field = "file.is_driver_vulnerable"
+	// FileIsDriverMalicious represents the field that denotes whether the created file is a malicious driver
+	FileIsDriverMalicious Field = "file.is_driver_malicious"
+	// FileIsDLL indicates if the created file is a DLL
+	FileIsDLL Field = "file.is_dll"
+	// FileIsDriver indicates if the created file is a driver
+	FileIsDriver Field = "file.is_driver"
+	// FileIsExecutable indicates if the created file is an executable
+	FileIsExecutable Field = "file.is_exec"
 
 	// RegistryKeyName represents the registry key name
 	RegistryKeyName Field = "registry.key.name"
@@ -381,6 +391,16 @@ const (
 	ImageCertBefore = "image.cert.before"
 	// ImageCertAfter is the field that specifies the certificate won't be valid after this timestamp.
 	ImageCertAfter = "image.cert.after"
+	// ImageIsDriverVulnerable represents the field that denotes whether loaded driver is vulnerable
+	ImageIsDriverVulnerable Field = "image.is_driver_vulnerable"
+	// ImageIsDriverMalicious represents the field that denotes whether the loaded driver is malicious
+	ImageIsDriverMalicious Field = "image.is_driver_malicious"
+	// ImageIsDLL indicates if the loaded image is a DLL
+	ImageIsDLL Field = "image.is_dll"
+	// ImageIsDriver indicates if the loaded image is a driver
+	ImageIsDriver Field = "image.is_driver"
+	// ImageIsExecutable indicates if the loaded image is an executable
+	ImageIsExecutable Field = "image.is_exec"
 
 	// MemBaseAddress identifies the field that denotes the allocation base address
 	MemBaseAddress Field = "mem.address"
@@ -521,7 +541,7 @@ var fields = map[Field]FieldInfo{
 	PsPid:               {PsPid, "process identifier", kparams.PID, []string{"ps.pid = 1024"}, nil},
 	PsPpid:              {PsPpid, "parent process identifier", kparams.PID, []string{"ps.ppid = 45"}, nil},
 	PsName:              {PsName, "process image name including the file extension", kparams.UnicodeString, []string{"ps.name contains 'firefox'"}, nil},
-	PsComm:              {PsComm, "process command line", kparams.UnicodeString, []string{"ps.comm contains 'java'"}, &Deprecation{Since: "1.10.0", Field: PsCmdline}},
+	PsComm:              {PsComm, "process command line", kparams.UnicodeString, []string{"ps.comm contains 'java'"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsCmdline}}},
 	PsCmdline:           {PsCmdline, "process command line", kparams.UnicodeString, []string{"ps.cmdline contains 'java'"}, nil},
 	PsExe:               {PsExe, "full name of the process' executable", kparams.UnicodeString, []string{"ps.exe = 'C:\\Windows\\system32\\cmd.exe'"}, nil},
 	PsArgs:              {PsArgs, "process command line arguments", kparams.Slice, []string{"ps.args in ('/cdir', '/-C')"}, nil},
@@ -537,7 +557,7 @@ var fields = map[Field]FieldInfo{
 	PsModules:           {PsModules, "modules loaded by the process", kparams.Slice, []string{"ps.modules in ('crypt32.dll', 'xul.dll')"}, nil},
 	PsParentName:        {PsParentName, "parent process image name including the file extension", kparams.UnicodeString, []string{"ps.parent.name contains 'cmd.exe'"}, nil},
 	PsParentPid:         {PsParentPid, "parent process id", kparams.Uint32, []string{"ps.parent.pid = 4"}, nil},
-	PsParentComm:        {PsParentComm, "parent process command line", kparams.UnicodeString, []string{"ps.parent.comm contains 'java'"}, &Deprecation{Since: "1.10.0", Field: PsParentCmdline}},
+	PsParentComm:        {PsParentComm, "parent process command line", kparams.UnicodeString, []string{"ps.parent.comm contains 'java'"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsParentCmdline}}},
 	PsParentCmdline:     {PsParentCmdline, "parent process command line", kparams.UnicodeString, []string{"ps.parent.cmdline contains 'java'"}, nil},
 	PsParentExe:         {PsParentExe, "full name of the parent process' executable", kparams.UnicodeString, []string{"ps.parent.exe = 'C:\\Windows\\system32\\explorer.exe'"}, nil},
 	PsParentArgs:        {PsParentArgs, "parent process command line arguments", kparams.Slice, []string{"ps.parent.args in ('/cdir', '/-C')"}, nil},
@@ -553,23 +573,23 @@ var fields = map[Field]FieldInfo{
 	PsAccessMask:        {PsAccessMask, "process desired access rights", kparams.AnsiString, []string{"ps.access.mask = '0x1400'"}, nil},
 	PsAccessMaskNames:   {PsAccessMaskNames, "process desired access rights as a string list", kparams.Slice, []string{"ps.access.mask.names in ('SUSPEND_RESUME')"}, nil},
 	PsAccessStatus:      {PsAccessStatus, "process access status", kparams.UnicodeString, []string{"ps.access.status = 'access is denied.'"}, nil},
-	PsSiblingPid:        {PsSiblingPid, "created or terminated process identifier", kparams.PID, []string{"ps.sibling.pid = 320"}, &Deprecation{Since: "1.10.0", Field: PsChildPid}},
+	PsSiblingPid:        {PsSiblingPid, "created or terminated process identifier", kparams.PID, []string{"ps.sibling.pid = 320"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsChildPid}}},
 	PsChildPid:          {PsChildPid, "created or terminated process identifier", kparams.PID, []string{"ps.child.pid = 320"}, nil},
-	PsSiblingName:       {PsSiblingName, "created or terminated process name", kparams.UnicodeString, []string{"ps.sibling.name = 'notepad.exe'"}, &Deprecation{Since: "1.10.0", Field: PsChildName}},
+	PsSiblingName:       {PsSiblingName, "created or terminated process name", kparams.UnicodeString, []string{"ps.sibling.name = 'notepad.exe'"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsChildName}}},
 	PsChildName:         {PsChildName, "created or terminated process name", kparams.UnicodeString, []string{"ps.child.name = 'notepad.exe'"}, nil},
-	PsSiblingComm:       {PsSiblingComm, "created or terminated process command line", kparams.UnicodeString, []string{"ps.sibling.comm contains '\\k \\v'"}, &Deprecation{Since: "1.10.0", Field: PsChildCmdline}},
+	PsSiblingComm:       {PsSiblingComm, "created or terminated process command line", kparams.UnicodeString, []string{"ps.sibling.comm contains '\\k \\v'"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsChildCmdline}}},
 	PsChildCmdline:      {PsChildCmdline, "created or terminated process command line", kparams.UnicodeString, []string{"ps.child.cmdline contains '\\k \\v'"}, nil},
-	PsSiblingArgs:       {PsSiblingArgs, "created process command line arguments", kparams.Slice, []string{"ps.sibling.args in ('/cdir', '/-C')"}, &Deprecation{Since: "1.10.0", Field: PsChildArgs}},
+	PsSiblingArgs:       {PsSiblingArgs, "created process command line arguments", kparams.Slice, []string{"ps.sibling.args in ('/cdir', '/-C')"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsChildArgs}}},
 	PsChildArgs:         {PsChildArgs, "created process command line arguments", kparams.Slice, []string{"ps.child.args in ('/cdir', '/-C')"}, nil},
-	PsSiblingExe:        {PsSiblingExe, "created, terminated, or opened process id", kparams.UnicodeString, []string{"ps.sibling.exe contains '\\Windows\\cmd.exe'"}, &Deprecation{Since: "1.10.0", Field: PsChildExe}},
+	PsSiblingExe:        {PsSiblingExe, "created, terminated, or opened process id", kparams.UnicodeString, []string{"ps.sibling.exe contains '\\Windows\\cmd.exe'"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsChildExe}}},
 	PsChildExe:          {PsChildExe, "created, terminated, or opened process id", kparams.UnicodeString, []string{"ps.child.exe contains '\\Windows\\cmd.exe'"}, nil},
-	PsSiblingSID:        {PsSiblingSID, "created or terminated process security identifier", kparams.UnicodeString, []string{"ps.sibling.sid contains 'SERVICE'"}, &Deprecation{Since: "1.10.0", Field: PsChildSID}},
+	PsSiblingSID:        {PsSiblingSID, "created or terminated process security identifier", kparams.UnicodeString, []string{"ps.sibling.sid contains 'SERVICE'"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsChildSID}}},
 	PsChildSID:          {PsChildSID, "created or terminated process security identifier", kparams.UnicodeString, []string{"ps.child.sid contains 'SERVICE'"}, nil},
-	PsSiblingSessionID:  {PsSiblingSessionID, "created or terminated process session identifier", kparams.Int16, []string{"ps.sibling.sessionid == 1"}, &Deprecation{Since: "1.10.0", Field: PsChildSessionID}},
+	PsSiblingSessionID:  {PsSiblingSessionID, "created or terminated process session identifier", kparams.Int16, []string{"ps.sibling.sessionid == 1"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsChildSessionID}}},
 	PsChildSessionID:    {PsChildSessionID, "created or terminated process session identifier", kparams.Int16, []string{"ps.child.sessionid == 1"}, nil},
-	PsSiblingDomain:     {PsSiblingDomain, "created or terminated process domain", kparams.UnicodeString, []string{"ps.sibling.domain contains 'SERVICE'"}, &Deprecation{Since: "1.10.0", Field: PsChildDomain}},
+	PsSiblingDomain:     {PsSiblingDomain, "created or terminated process domain", kparams.UnicodeString, []string{"ps.sibling.domain contains 'SERVICE'"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsChildDomain}}},
 	PsChildDomain:       {PsChildDomain, "created or terminated process domain", kparams.UnicodeString, []string{"ps.child.domain contains 'SERVICE'"}, nil},
-	PsSiblingUsername:   {PsSiblingUsername, "created or terminated process username", kparams.UnicodeString, []string{"ps.sibling.username contains 'system'"}, &Deprecation{Since: "1.10.0", Field: PsChildUsername}},
+	PsSiblingUsername:   {PsSiblingUsername, "created or terminated process username", kparams.UnicodeString, []string{"ps.sibling.username contains 'system'"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsChildUsername}}},
 	PsChildUsername:     {PsChildUsername, "created or terminated process username", kparams.UnicodeString, []string{"ps.child.username contains 'system'"}, nil},
 	PsUUID:              {PsUUID, "unique process identifier", kparams.Uint64, []string{"ps.uuid > 6000054355"}, nil},
 	PsParentUUID:        {PsParentUUID, "unique parent process identifier", kparams.Uint64, []string{"ps.parent.uuid > 6000054355"}, nil},
@@ -588,33 +608,43 @@ var fields = map[Field]FieldInfo{
 	ThreadAccessMaskNames: {ThreadAccessMaskNames, "thread desired access rights as a string list", kparams.Slice, []string{"thread.access.mask.names in ('IMPERSONATE')"}, nil},
 	ThreadAccessStatus:    {ThreadAccessStatus, "thread access status", kparams.UnicodeString, []string{"thread.access.status = 'success'"}, nil},
 
-	ImageName:           {ImageName, "full image name", kparams.UnicodeString, []string{"image.name contains 'advapi32.dll'"}, nil},
-	ImageBase:           {ImageBase, "the base address of process in which the image is loaded", kparams.Address, []string{"image.base.address = 'a65d800000'"}, nil},
-	ImageChecksum:       {ImageChecksum, "image checksum", kparams.Uint32, []string{"image.checksum = 746424"}, nil},
-	ImageSize:           {ImageSize, "image size", kparams.Uint32, []string{"image.size > 1024"}, nil},
-	ImageDefaultAddress: {ImageDefaultAddress, "default image address", kparams.Address, []string{"image.default.address = '7efe0000'"}, nil},
-	ImagePID:            {ImagePID, "target process identifier", kparams.Uint32, []string{"image.pid = 80"}, nil},
-	ImageSignatureType:  {ImageSignatureType, "image signature type", kparams.AnsiString, []string{"image.signature.type != 'NONE'"}, nil},
-	ImageSignatureLevel: {ImageSignatureLevel, "image signature level", kparams.AnsiString, []string{"image.signature.level = 'AUTHENTICODE'"}, nil},
-	ImageCertSerial:     {ImageCertSerial, "image certificate serial number", kparams.UnicodeString, []string{"image.cert.serial = '330000023241fb59996dcc4dff000000000232'"}, nil},
-	ImageCertSubject:    {ImageCertSubject, "image certificate subject", kparams.UnicodeString, []string{"image.cert.subject contains 'Washington, Redmond, Microsoft Corporation'"}, nil},
-	ImageCertIssuer:     {ImageCertIssuer, "image certificate CA", kparams.UnicodeString, []string{"image.cert.issuer contains 'Washington, Redmond, Microsoft Corporation'"}, nil},
-	ImageCertAfter:      {ImageCertAfter, "image certificate expiration date", kparams.Time, []string{"image.cert.after contains '2024-02-01 00:05:42 +0000 UTC'"}, nil},
-	ImageCertBefore:     {ImageCertBefore, "image certificate enrollment date", kparams.Time, []string{"image.cert.before contains '2024-02-01 00:05:42 +0000 UTC'"}, nil},
+	ImageName:               {ImageName, "full image name", kparams.UnicodeString, []string{"image.name contains 'advapi32.dll'"}, nil},
+	ImageBase:               {ImageBase, "the base address of process in which the image is loaded", kparams.Address, []string{"image.base.address = 'a65d800000'"}, nil},
+	ImageChecksum:           {ImageChecksum, "image checksum", kparams.Uint32, []string{"image.checksum = 746424"}, nil},
+	ImageSize:               {ImageSize, "image size", kparams.Uint32, []string{"image.size > 1024"}, nil},
+	ImageDefaultAddress:     {ImageDefaultAddress, "default image address", kparams.Address, []string{"image.default.address = '7efe0000'"}, nil},
+	ImagePID:                {ImagePID, "target process identifier", kparams.Uint32, []string{"image.pid = 80"}, nil},
+	ImageSignatureType:      {ImageSignatureType, "image signature type", kparams.AnsiString, []string{"image.signature.type != 'NONE'"}, nil},
+	ImageSignatureLevel:     {ImageSignatureLevel, "image signature level", kparams.AnsiString, []string{"image.signature.level = 'AUTHENTICODE'"}, nil},
+	ImageCertSerial:         {ImageCertSerial, "image certificate serial number", kparams.UnicodeString, []string{"image.cert.serial = '330000023241fb59996dcc4dff000000000232'"}, nil},
+	ImageCertSubject:        {ImageCertSubject, "image certificate subject", kparams.UnicodeString, []string{"image.cert.subject contains 'Washington, Redmond, Microsoft Corporation'"}, nil},
+	ImageCertIssuer:         {ImageCertIssuer, "image certificate CA", kparams.UnicodeString, []string{"image.cert.issuer contains 'Washington, Redmond, Microsoft Corporation'"}, nil},
+	ImageCertAfter:          {ImageCertAfter, "image certificate expiration date", kparams.Time, []string{"image.cert.after contains '2024-02-01 00:05:42 +0000 UTC'"}, nil},
+	ImageCertBefore:         {ImageCertBefore, "image certificate enrollment date", kparams.Time, []string{"image.cert.before contains '2024-02-01 00:05:42 +0000 UTC'"}, nil},
+	ImageIsDriverMalicious:  {ImageIsDriverMalicious, "indicates if the loaded driver is malicious", kparams.Bool, []string{"image.is_driver_malicious"}, nil},
+	ImageIsDriverVulnerable: {ImageIsDriverVulnerable, "indicates if the loaded driver is vulnerable", kparams.Bool, []string{"image.is_driver_vulnerable"}, nil},
+	ImageIsDLL:              {ImageIsDLL, "indicates if the loaded image is a DLL", kparams.Bool, []string{"image.is_dll'"}, nil},
+	ImageIsDriver:           {ImageIsDriver, "indicates if the loaded image is a driver", kparams.Bool, []string{"image.is_driver'"}, nil},
+	ImageIsExecutable:       {ImageIsExecutable, "indicates if the loaded image is an executable", kparams.Bool, []string{"image.is_exec'"}, nil},
 
-	FileObject:     {FileObject, "file object address", kparams.Uint64, []string{"file.object = 18446738026482168384"}, nil},
-	FileName:       {FileName, "full file name", kparams.UnicodeString, []string{"file.name contains 'mimikatz'"}, nil},
-	FileOperation:  {FileOperation, "file operation", kparams.AnsiString, []string{"file.operation = 'open'"}, nil},
-	FileShareMask:  {FileShareMask, "file share mask", kparams.AnsiString, []string{"file.share.mask = 'rw-'"}, nil},
-	FileIOSize:     {FileIOSize, "file I/O size", kparams.Uint32, []string{"file.io.size > 512"}, nil},
-	FileOffset:     {FileOffset, "file offset", kparams.Uint64, []string{"file.offset = 1024"}, nil},
-	FileType:       {FileType, "file type", kparams.AnsiString, []string{"file.type = 'directory'"}, nil},
-	FileExtension:  {FileExtension, "file extension", kparams.AnsiString, []string{"file.extension = '.dll'"}, nil},
-	FileAttributes: {FileAttributes, "file attributes", kparams.Slice, []string{"file.attributes in ('archive', 'hidden')"}, nil},
-	FileStatus:     {FileStatus, "file operation status message", kparams.UnicodeString, []string{"file.status != 'success'"}, nil},
-	FileViewBase:   {FileViewBase, "view base address", kparams.Address, []string{"file.view.base = '25d42170000'"}, nil},
-	FileViewSize:   {FileViewSize, "size of the mapped view", kparams.Uint64, []string{"file.view.size > 1024"}, nil},
-	FileViewType:   {FileViewType, "type of the mapped view section", kparams.Enum, []string{"file.view.type = 'IMAGE'"}, nil},
+	FileObject:             {FileObject, "file object address", kparams.Uint64, []string{"file.object = 18446738026482168384"}, nil},
+	FileName:               {FileName, "full file name", kparams.UnicodeString, []string{"file.name contains 'mimikatz'"}, nil},
+	FileOperation:          {FileOperation, "file operation", kparams.AnsiString, []string{"file.operation = 'open'"}, nil},
+	FileShareMask:          {FileShareMask, "file share mask", kparams.AnsiString, []string{"file.share.mask = 'rw-'"}, nil},
+	FileIOSize:             {FileIOSize, "file I/O size", kparams.Uint32, []string{"file.io.size > 512"}, nil},
+	FileOffset:             {FileOffset, "file offset", kparams.Uint64, []string{"file.offset = 1024"}, nil},
+	FileType:               {FileType, "file type", kparams.AnsiString, []string{"file.type = 'directory'"}, nil},
+	FileExtension:          {FileExtension, "file extension", kparams.AnsiString, []string{"file.extension = '.dll'"}, nil},
+	FileAttributes:         {FileAttributes, "file attributes", kparams.Slice, []string{"file.attributes in ('archive', 'hidden')"}, nil},
+	FileStatus:             {FileStatus, "file operation status message", kparams.UnicodeString, []string{"file.status != 'success'"}, nil},
+	FileViewBase:           {FileViewBase, "view base address", kparams.Address, []string{"file.view.base = '25d42170000'"}, nil},
+	FileViewSize:           {FileViewSize, "size of the mapped view", kparams.Uint64, []string{"file.view.size > 1024"}, nil},
+	FileViewType:           {FileViewType, "type of the mapped view section", kparams.Enum, []string{"file.view.type = 'IMAGE'"}, nil},
+	FileIsDriverMalicious:  {FileIsDriverMalicious, "indicates if the dropped driver is malicious", kparams.Bool, []string{"file.is_driver_malicious"}, nil},
+	FileIsDriverVulnerable: {FileIsDriverVulnerable, "indicates if the dropped driver is vulnerable", kparams.Bool, []string{"file.is_driver_vulnerable"}, nil},
+	FileIsDLL:              {FileIsDLL, "indicates if the created file is a DLL", kparams.Bool, []string{"file.is_dll'"}, nil},
+	FileIsDriver:           {FileIsDriver, "indicates if the created file is a driver", kparams.Bool, []string{"file.is_driver'"}, nil},
+	FileIsExecutable:       {FileIsExecutable, "indicates if the created file is an executable", kparams.Bool, []string{"file.is_exec'"}, nil},
 
 	RegistryKeyName:   {RegistryKeyName, "fully qualified key name", kparams.UnicodeString, []string{"registry.key.name contains 'HKEY_LOCAL_MACHINE'"}, nil},
 	RegistryKeyHandle: {RegistryKeyHandle, "registry key object address", kparams.Address, []string{"registry.key.handle = 'FFFFB905D60C2268'"}, nil},
@@ -653,9 +683,9 @@ var fields = map[Field]FieldInfo{
 	PeFileVersion:    {PeFileVersion, "file version supplied at compile-time", kparams.UnicodeString, []string{"pe.file.version = '10.0.18362.693 (WinBuild.160101.0800)'"}, nil},
 	PeProduct:        {PeProduct, "internal product name of the file provided at compile-time", kparams.UnicodeString, []string{"pe.product = 'Microsoft® Windows® Operating System'"}, nil},
 	PeProductVersion: {PeProductVersion, "internal product version of the file provided at compile-time", kparams.UnicodeString, []string{"pe.product.version = '10.0.18362.693'"}, nil},
-	PeIsDLL:          {PeIsDLL, "indicates if the loaded image or created file is a DLL", kparams.Bool, []string{"pe.is_dll'"}, nil},
-	PeIsDriver:       {PeIsDriver, "indicates if the loaded image or created file is a driver", kparams.Bool, []string{"pe.is_driver'"}, nil},
-	PeIsExecutable:   {PeIsExecutable, "indicates if the loaded image or created file is an executable", kparams.Bool, []string{"pe.is_exec'"}, nil},
+	PeIsDLL:          {PeIsDLL, "indicates if the loaded image or created file is a DLL", kparams.Bool, []string{"pe.is_dll'"}, &Deprecation{Since: "2.0.0", Fields: []Field{FileIsDLL, ImageIsDLL}}},
+	PeIsDriver:       {PeIsDriver, "indicates if the loaded image or created file is a driver", kparams.Bool, []string{"pe.is_driver'"}, &Deprecation{Since: "2.0.0", Fields: []Field{FileIsDriver, ImageIsDriver}}},
+	PeIsExecutable:   {PeIsExecutable, "indicates if the loaded image or created file is an executable", kparams.Bool, []string{"pe.is_exec'"}, &Deprecation{Since: "2.0.0", Fields: []Field{FileIsExecutable, ImageIsExecutable}}},
 	PeImphash:        {PeImphash, "import hash", kparams.AnsiString, []string{"pe.impash = '5d3861c5c547f8a34e471ba273a732b2'"}, nil},
 	PeIsDotnet:       {PeIsDotnet, "indicates if PE contains CLR data", kparams.Bool, []string{"pe.is_dotnet"}, nil},
 	PeAnomalies:      {PeAnomalies, "contains PE anomalies detected during parsing", kparams.Slice, []string{"pe.anomalies in ('number of sections is 0')"}, nil},
