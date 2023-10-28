@@ -38,6 +38,9 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// SystemPID designates the pid of the system process that acts as the container for system threads
+const SystemPID uint32 = 4
+
 var (
 	// reapPeriod specifies the interval for triggering the housekeeping of dead processes
 	reapPeriod = time.Minute * 2
@@ -196,8 +199,9 @@ func (s *snapshotter) AddModule(e *kevent.Kevent) error {
 	moduleCount.Add(1)
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if pid == 0 {
-		pid = e.PID
+	if pid == 0 && e.IsImageRundown() {
+		// assume system process if pid is zero
+		pid = SystemPID
 	}
 	proc, ok := s.procs[pid]
 	if !ok {
@@ -211,6 +215,9 @@ func (s *snapshotter) AddModule(e *kevent.Kevent) error {
 	module.DefaultBaseAddress, _ = e.Kparams.GetHex(kparams.ImageDefaultBase)
 	module.SignatureLevel, _ = e.Kparams.GetUint32(kparams.ImageSignatureLevel)
 	module.SignatureType, _ = e.Kparams.GetUint32(kparams.ImageSignatureType)
+	if module.IsExecutable() && len(proc.Exe) < len(module.Name) {
+		proc.Exe = module.Name
+	}
 	proc.AddModule(module)
 	return nil
 }

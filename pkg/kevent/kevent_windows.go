@@ -211,6 +211,7 @@ func (e Kevent) IsTerminateProcess() bool { return e.Type == ktypes.TerminatePro
 func (e Kevent) IsTerminateThread() bool  { return e.Type == ktypes.TerminateThread }
 func (e Kevent) IsUnloadImage() bool      { return e.Type == ktypes.UnloadImage }
 func (e Kevent) IsLoadImage() bool        { return e.Type == ktypes.LoadImage }
+func (e Kevent) IsImageRundown() bool     { return e.Type == ktypes.ImageRundown }
 func (e Kevent) IsFileOpEnd() bool        { return e.Type == ktypes.FileOpEnd }
 func (e Kevent) IsRegSetValue() bool      { return e.Type == ktypes.RegSetValue }
 func (e Kevent) IsProcessRundown() bool   { return e.Type == ktypes.ProcessRundown }

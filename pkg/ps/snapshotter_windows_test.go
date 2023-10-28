@@ -355,7 +355,7 @@ func TestAddModule(t *testing.T) {
 			kparams.ProcessParentID: {Name: kparams.ProcessParentID, Type: kparams.PID, Value: uint32(os.Getppid())},
 			kparams.ProcessName:     {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "spotify.exe"},
 			kparams.Cmdline:         {Name: kparams.Cmdline, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`},
-			kparams.Exe:             {Name: kparams.Exe, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --parent`},
+			kparams.Exe:             {Name: kparams.Exe, Type: kparams.UnicodeString, Value: `Spotify.exe`},
 			kparams.UserSID:         {Name: kparams.UserSID, Type: kparams.WbemSID, Value: []byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0}},
 			kparams.StartTime:       {Name: kparams.StartTime, Type: kparams.Time, Value: time.Now()},
 			kparams.SessionID:       {Name: kparams.SessionID, Type: kparams.Uint32, Value: uint32(1)},
@@ -373,7 +373,7 @@ func TestAddModule(t *testing.T) {
 				Type: ktypes.LoadImage,
 				Kparams: kevent.Kparams{
 					kparams.ProcessID:     {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(os.Getpid())},
-					kparams.ImageFilename: {Name: kparams.ImageFilename, Type: kparams.UnicodeString, Value: "C:\\Windows\\System32\\notepad.exe"},
+					kparams.ImageFilename: {Name: kparams.ImageFilename, Type: kparams.UnicodeString, Value: "C:\\Users\\admin\\AppData\\Roaming\\Spotify\\Spotify.exe"},
 				},
 			},
 			true,
@@ -400,6 +400,7 @@ func TestAddModule(t *testing.T) {
 			require.Equal(t, exists, ok)
 			if ok {
 				require.NotNil(t, proc.FindModule(evt.GetParamAsString(kparams.ImageFilename)))
+				assert.Equal(t, "C:\\Users\\admin\\AppData\\Roaming\\Spotify\\Spotify.exe", proc.Exe)
 			}
 		})
 	}

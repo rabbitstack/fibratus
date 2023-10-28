@@ -27,7 +27,7 @@ import (
 
 var (
 	// splitRegexp declares the regular expression for splitting the string
-	// by white spaces if the string is not inside a double quote.
+	// by white spaces if the string is not surrounded inside double quotes.
 	splitRegexp = regexp.MustCompile(`("[^"]+?"\S*|\S+)`)
 
 	// systemRootRegexp is the regular expression for detecting path with unexpanded SystemRoot environment variable
@@ -118,7 +118,7 @@ func (c *Cmdline) Exeline() string {
 	if i > 0 {
 		return c.cmdline[0 : i+4] // dot + exe
 	}
-	return c.cmdline
+	return ""
 }
 
 // String returns the original command line string.

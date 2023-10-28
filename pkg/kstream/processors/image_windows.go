@@ -77,7 +77,7 @@ func (m *imageProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, e
 		}
 		return e, false, m.psnap.RemoveModule(pid, mod)
 	}
-	if e.IsLoadImage() {
+	if e.IsLoadImage() || e.IsImageRundown() {
 		return e, false, m.psnap.AddModule(e)
 	}
 	return e, true, nil
