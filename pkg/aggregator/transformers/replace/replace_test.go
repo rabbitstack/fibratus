@@ -35,7 +35,7 @@ func TestTransform(t *testing.T) {
 		PID:  859,
 		Kparams: kevent.Kparams{
 			kparams.RegKeyName:   {Name: kparams.RegKeyName, Type: kparams.UnicodeString, Value: `HKEY_LOCAL_MACHINE\SYSTEM\Setup\Pid`},
-			kparams.RegKeyHandle: {Name: kparams.RegKeyHandle, Type: kparams.HexInt64, Value: kparams.NewHex(uint64(18446666033449935464))},
+			kparams.RegKeyHandle: {Name: kparams.RegKeyHandle, Type: kparams.Address, Value: uint64(18446666033449935464)},
 		},
 	}
 

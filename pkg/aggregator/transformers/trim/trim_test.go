@@ -47,7 +47,7 @@ func TestTransform(t *testing.T) {
 			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.AnsiString, Value: "overwriteif"},
 			kparams.BasePrio:      {Name: kparams.BasePrio, Type: kparams.Int8, Value: int8(2)},
 			kparams.PagePrio:      {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(2)},
-			kparams.KstackLimit:   {Name: kparams.KstackLimit, Type: kparams.HexInt8, Value: kparams.Hex("ff")},
+			kparams.KstackLimit:   {Name: kparams.KstackLimit, Type: kparams.Address, Value: uint64(18884888488889)},
 			kparams.StartTime:     {Name: kparams.StartTime, Type: kparams.Time, Value: time.Now()},
 			kparams.ProcessID:     {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1204)},
 		},
