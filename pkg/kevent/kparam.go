@@ -137,11 +137,27 @@ func NewKparamFromKcap(name string, typ kparams.Type, value kparams.Value, ktype
 		enum = network.ProtoNames
 	case kparams.RegValueType:
 		enum = key.RegistryValueTypes
+	case kparams.MemAllocType:
+		flags = MemAllocationFlags
+	case kparams.FileViewSectionType:
+		enum = ViewSectionTypes
+	case kparams.DNSOpts:
+		flags = DNSOptsFlags
+	case kparams.DNSRR:
+		enum = DNSRecordTypes
+	case kparams.DNSRcode:
+		enum = DNSResponseCodes
 	case kparams.DesiredAccess:
 		if ktype == ktypes.OpenProcess {
 			flags = PsAccessRightFlags
 		} else {
 			flags = ThreadAccessRightFlags
+		}
+	case kparams.MemProtect:
+		if ktype == ktypes.VirtualAlloc || ktype == ktypes.VirtualFree {
+			flags = MemProtectionFlags
+		} else {
+			flags = ViewProtectionFlags
 		}
 	}
 	return &Kparam{Name: name, Type: typ, Value: value, Enum: enum, Flags: flags}
