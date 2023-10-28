@@ -46,11 +46,38 @@ func TestDownload(t *testing.T) {
 }
 
 func TestMatchHash(t *testing.T) {
-	abs, err := filepath.Abs("_fixtures/d.sys")
-	require.NoError(t, err)
-	ok, d := GetClient().MatchHash(abs)
-	require.True(t, ok)
-	assert.Equal(t, "d.sys", d.Filename)
+	absPath := func(path string) string {
+		abs, err := filepath.Abs(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return abs
+	}
+
+	var tests = []struct {
+		driverPath string
+		wantsName  string
+		ok         bool
+	}{
+		{
+			absPath("_fixtures/d.sys"),
+			"d.sys",
+			true,
+		},
+		{
+			absPath("_fixtures/iomem.sys"),
+			"iomem64.sys",
+			true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.driverPath, func(t *testing.T) {
+			ok, d := GetClient().MatchHash(tt.driverPath)
+			assert.True(t, ok == tt.ok)
+			assert.Equal(t, tt.wantsName, d.Filename)
+		})
+	}
 }
 
 func TestRefresh(t *testing.T) {
