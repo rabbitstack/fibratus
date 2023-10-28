@@ -45,6 +45,8 @@ var (
 	ThreadRundown = pack(windows.GUID{Data1: 0x3d6fa8d1, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}, 3)
 	// OpenThread identifies the kernel events that are triggered when the process acquires a thread handle
 	OpenThread = pack(windows.GUID{Data1: 0xe02a841c, Data2: 0x75a3, Data3: 0x4fa7, Data4: [8]byte{0xaf, 0xc8, 0xae, 0x09, 0xcf, 0x9b, 0x7f, 0x23}}, 6)
+	// SetThreadContext identifies the kernel event that is fired when the thread context is changed
+	SetThreadContext = pack(windows.GUID{Data1: 0xe02a841c, Data2: 0x75a3, Data3: 0x4fa7, Data4: [8]byte{0xaf, 0xc8, 0xae, 0x09, 0xcf, 0x9b, 0x7f, 0x23}}, 4)
 
 	// MapViewFile represents events that map a view of a file mapping into the address space of a calling process
 	MapViewFile = pack(windows.GUID{Data1: 0x90cbdc39, Data2: 0x4a3e, Data3: 0x11d1, Data4: [8]byte{0x84, 0xf4, 0x0, 0x0, 0xf8, 0x04, 0x64, 0xe3}}, 37)
@@ -194,6 +196,8 @@ func (k Ktype) String() string {
 		return "ThreadRundown"
 	case OpenThread:
 		return "OpenThread"
+	case SetThreadContext:
+		return "SetThreadContext"
 	case CreateFile:
 		return "CreateFile"
 	case CloseFile:
@@ -286,7 +290,7 @@ func (k Ktype) Category() Category {
 	switch k {
 	case CreateProcess, TerminateProcess, OpenProcess, ProcessRundown:
 		return Process
-	case CreateThread, TerminateThread, OpenThread, ThreadRundown:
+	case CreateThread, TerminateThread, OpenThread, SetThreadContext, ThreadRundown:
 		return Thread
 	case LoadImage, UnloadImage, ImageRundown:
 		return Image
@@ -339,6 +343,8 @@ func (k Ktype) Description() string {
 		return "Terminates a thread within the process"
 	case OpenThread:
 		return "Opens the thread handle"
+	case SetThreadContext:
+		return "Sets the thread context"
 	case ReadFile:
 		return "Reads data from the file or I/O device"
 	case WriteFile:

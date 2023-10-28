@@ -205,8 +205,10 @@ func (kpars Kparams) MustGetSID() *windows.SID {
 	return sid
 }
 
-// produceParams parses the event binary layout to extract the parameters. Each event is annotated with the
-// schema version number which helps us determine when the event schema changes in order to parse new fields.
+// produceParams parses the event binary layout to extract
+// the parameters. Each event is annotated with the schema
+// version number which helps us determine when the event
+// schema changes in order to parse new fields.
 func (e *Kevent) produceParams(evt *etw.EventRecord) {
 	switch e.Type {
 	case ktypes.ProcessRundown,
@@ -315,6 +317,9 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 		e.AppendParam(kparams.ProcessID, kparams.PID, processID)
 		e.AppendParam(kparams.ThreadID, kparams.TID, threadID)
 		e.AppendParam(kparams.DesiredAccess, kparams.Flags, desiredAccess, WithFlags(ThreadAccessRightFlags))
+		e.AppendParam(kparams.NTStatus, kparams.Status, status)
+	case ktypes.SetThreadContext:
+		status := evt.ReadUint32(0)
 		e.AppendParam(kparams.NTStatus, kparams.Status, status)
 	case ktypes.CreateHandle, ktypes.CloseHandle:
 		object := evt.ReadUint64(0)
