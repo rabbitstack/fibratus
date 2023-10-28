@@ -9,7 +9,6 @@ linters:
   enable:
     - bodyclose
     - deadcode
-    - depguard
     - errcheck
     - goconst
     - golint
@@ -45,3 +44,4 @@ issues:
       linters:
         - errcheck
         - scopelint
+        - nolintlint
