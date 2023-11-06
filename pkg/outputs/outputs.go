@@ -128,7 +128,7 @@ func FindFactory(typ Type) Factory {
 func Load(typ Type, config Config) (OutputGroup, error) {
 	factory := FindFactory(typ)
 	if factory == nil {
-		return OutputGroup{}, fmt.Errorf("output %q not availaible in the factory", typ)
+		return OutputGroup{}, fmt.Errorf("output %q not available in the factory", typ)
 	}
 	return factory(config)
 }
