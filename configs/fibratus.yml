@@ -190,6 +190,9 @@ kstream:
   # Determines whether DNS client events are collected
   #enable-dns: true
 
+  # Indicates if stack enrichment is enabled for eligible events
+  #stack-enrichment: true
+
   # Determines which events are dropped either by the event name or the process' image
   # name that triggered the event.
   blacklist:

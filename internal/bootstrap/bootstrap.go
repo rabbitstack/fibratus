@@ -31,6 +31,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kcap"
 	"github.com/rabbitstack/fibratus/pkg/kstream"
 	"github.com/rabbitstack/fibratus/pkg/ps"
+	"github.com/rabbitstack/fibratus/pkg/symbolize"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"github.com/rabbitstack/fibratus/pkg/util/signals"
@@ -133,7 +134,7 @@ func NewApp(config *config.Config, options ...Option) (*App, error) {
 
 	app := &App{
 		config:     config,
-		controller: kstream.NewController(config.Kstream),
+		controller: kstream.NewController(config),
 		hsnap:      hsnap,
 		psnap:      psnap,
 		consumer:   kstream.NewConsumer(psnap, hsnap, config),
@@ -219,8 +220,14 @@ func (f *App) Run(args []string) error {
 			}
 		}()
 	} else {
-		// register event listeners
+		// register stack symbolizer
+		if cfg.Kstream.StackEnrichment {
+			symbolizer := symbolize.NewSymbolizer()
+			f.consumer.RegisterEventListener(symbolizer)
+		}
+		// register rule engine
 		f.consumer.RegisterEventListener(rules)
+		// register YARA scanner
 		if cfg.Yara.Enabled {
 			scanner, err := yara.NewScanner(f.psnap, cfg.Yara)
 			if err != nil {

@@ -263,6 +263,9 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 		e.AppendParam(kparams.ProcessID, kparams.PID, processID)
 		e.AppendParam(kparams.DesiredAccess, kparams.Flags, desiredAccess, WithFlags(PsAccessRightFlags))
 		e.AppendParam(kparams.NTStatus, kparams.Status, status)
+		if evt.HasStackTrace() {
+			e.AppendParam(kparams.Callstack, kparams.Slice, evt.Callstack())
+		}
 	case ktypes.CreateThread,
 		ktypes.TerminateThread,
 		ktypes.ThreadRundown:
@@ -314,9 +317,15 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 		e.AppendParam(kparams.ThreadID, kparams.TID, threadID)
 		e.AppendParam(kparams.DesiredAccess, kparams.Flags, desiredAccess, WithFlags(ThreadAccessRightFlags))
 		e.AppendParam(kparams.NTStatus, kparams.Status, status)
+		if evt.HasStackTrace() {
+			e.AppendParam(kparams.Callstack, kparams.Slice, evt.Callstack())
+		}
 	case ktypes.SetThreadContext:
 		status := evt.ReadUint32(0)
 		e.AppendParam(kparams.NTStatus, kparams.Status, status)
+		if evt.HasStackTrace() {
+			e.AppendParam(kparams.Callstack, kparams.Slice, evt.Callstack())
+		}
 	case ktypes.CreateHandle, ktypes.CloseHandle:
 		object := evt.ReadUint64(0)
 		handleID := evt.ReadUint32(8)
@@ -710,6 +719,19 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 			e.AppendParam(kparams.DNSRcode, kparams.Enum, rcode, WithEnum(DNSResponseCodes))
 			e.AppendParam(kparams.DNSAnswers, kparams.Slice, strings.Split(sanitizeDNSAnswers(answers), ";"))
 		}
+	case ktypes.StackWalk:
+		e.AppendParam(kparams.ProcessID, kparams.PID, evt.ReadUint32(8))
+		e.AppendParam(kparams.ThreadID, kparams.TID, evt.ReadUint32(12))
+		var n uint16
+		var offset uint16 = 16
+		frames := (evt.BufferLen - offset) / 8
+		callstack := make([]uint64, frames)
+		for n < frames {
+			callstack[n] = evt.ReadUint64(offset)
+			offset += 8
+			n++
+		}
+		e.AppendParam(kparams.Callstack, kparams.Slice, callstack)
 	}
 }
 

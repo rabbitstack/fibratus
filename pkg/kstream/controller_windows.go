@@ -20,6 +20,7 @@ package kstream
 
 import (
 	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"golang.org/x/sys/windows"
 	"runtime"
@@ -75,8 +76,7 @@ func (p TraceProvider) IsKernelLogger() bool {
 
 // Controller is responsible for managing the life cycle of the tracing sessions.
 type Controller struct {
-	// kstreamConfig stores event stream specific settings
-	kstreamConfig config.KstreamConfig
+	config *config.Config
 	// traces contains initiated tracing sessions
 	traces []TraceSession
 	// providers contains a list of enabled ETW providers
@@ -84,7 +84,7 @@ type Controller struct {
 }
 
 // NewController spins up a new instance of the trace controller.
-func NewController(cfg config.KstreamConfig) *Controller {
+func NewController(cfg *config.Config) *Controller {
 	providers := []TraceProvider{
 		{
 			// core system events
@@ -94,23 +94,23 @@ func NewController(cfg config.KstreamConfig) *Controller {
 			true,
 		},
 		{
-			// supplies the `OpenProcess` and `OpenThread` events
+			// publishes `OpenProcess` and `OpenThread` events
 			etw.KernelAuditAPICallsSession,
 			etw.KernelAuditAPICallsGUID,
 			0x0, // no keywords, so we accept all events
-			cfg.EnableAuditAPIEvents,
+			cfg.Kstream.EnableAuditAPIEvents,
 		},
 		{
 			etw.DNSClientSession,
 			etw.DNSClientGUID,
 			0x0, // enables DNS query/reply events
-			cfg.EnableDNSEvents,
+			cfg.Kstream.EnableDNSEvents,
 		},
 	}
 	controller := &Controller{
-		kstreamConfig: cfg,
-		traces:        make([]TraceSession, 0),
-		providers:     providers,
+		config:    cfg,
+		traces:    make([]TraceSession, 0),
+		providers: providers,
 	}
 	return controller
 }
@@ -122,36 +122,36 @@ func NewController(cfg config.KstreamConfig) *Controller {
 // Logger tracing sessions.
 func (c *Controller) Start() error {
 	flags := etw.Process // process events are required
-	if c.kstreamConfig.EnableThreadKevents {
+	if c.config.Kstream.EnableThreadKevents {
 		flags |= etw.Thread
 	}
-	if c.kstreamConfig.EnableImageKevents {
+	if c.config.Kstream.EnableImageKevents {
 		flags |= etw.ImageLoad
 	}
-	if c.kstreamConfig.EnableNetKevents {
+	if c.config.Kstream.EnableNetKevents {
 		flags |= etw.NetTCPIP
 	}
-	if c.kstreamConfig.EnableRegistryKevents {
+	if c.config.Kstream.EnableRegistryKevents {
 		flags |= etw.Registry
 	}
-	if c.kstreamConfig.EnableFileIOKevents {
+	if c.config.Kstream.EnableFileIOKevents {
 		flags |= etw.DiskFileIO | etw.FileIO | etw.FileIOInit | etw.VaMap
 	}
-	if c.kstreamConfig.EnableMemKevents {
+	if c.config.Kstream.EnableMemKevents {
 		flags |= etw.VirtualAlloc
 	}
 
-	bufferSize := c.kstreamConfig.BufferSize
+	bufferSize := c.config.Kstream.BufferSize
 	if bufferSize > maxBufferSize {
 		bufferSize = maxBufferSize
 	}
 	// validate min/max buffers. The minimal
 	// number of buffers is 2 per CPU logical core
-	minBuffers := c.kstreamConfig.MinBuffers
+	minBuffers := c.config.Kstream.MinBuffers
 	if minBuffers < uint32(runtime.NumCPU()*2) {
 		minBuffers = uint32(runtime.NumCPU() * 2)
 	}
-	maxBuffers := c.kstreamConfig.MaxBuffers
+	maxBuffers := c.config.Kstream.MaxBuffers
 	maxBuffersAllowed := minBuffers + 20
 	if maxBuffers > maxBuffersAllowed {
 		maxBuffers = maxBuffersAllowed
@@ -160,7 +160,7 @@ func (c *Controller) Start() error {
 		minBuffers = maxBuffers - 20
 	}
 
-	flushTimer := c.kstreamConfig.FlushTimer
+	flushTimer := c.config.Kstream.FlushTimer
 	if flushTimer < time.Second {
 		flushTimer = time.Second
 	}
@@ -223,7 +223,7 @@ func (c *Controller) Start() error {
 				}
 				sysTraceFlags[0] = flags
 				// enable object manager tracking
-				if c.kstreamConfig.EnableHandleKevents {
+				if c.config.Kstream.EnableHandleKevents {
 					sysTraceFlags[4] = etw.Handle
 				}
 				// call again to enable all kernel events. Just to recap. The first call to
@@ -232,10 +232,27 @@ func (c *Controller) Start() error {
 				if err := etw.SetTraceSystemFlags(handleCopy, sysTraceFlags); err != nil {
 					log.Warnf("unable to set trace information: %v", err)
 				}
+				// enable stack enrichment
+				if c.config.Kstream.StackEnrichment {
+					if err := etw.EnableStackTracing(handleCopy, c.callstackEventSet()); err != nil {
+						// implicitly disable stack enrichment
+						c.config.Kstream.StackEnrichment = false
+						log.Warnf("unable to set kernel callstack tracing: %v", err)
+					}
+				}
 				c.insertTrace(traceName, handle, prov.GUID)
 			} else {
+				var enableParameters *etw.EnableTraceParameters
+				// enable callstack tracing
+				if c.config.Kstream.StackEnrichment {
+					enableParameters = &etw.EnableTraceParameters{
+						Version:        etw.EnableTraceParametersVersion,
+						EnableProperty: etw.EventEnablePropertyStacktrace,
+						SourceID:       prov.GUID,
+					}
+				}
 				// enable the specified trace provider
-				if err := etw.EnableTrace(prov.GUID, handle, prov.Keywords); err != nil {
+				if err := etw.EnableTrace(prov.GUID, handle, prov.Keywords, enableParameters); err != nil {
 					return fmt.Errorf("unable to activate %s provider: %v", traceName, err)
 				}
 				c.insertTrace(traceName, handle, prov.GUID)
@@ -282,7 +299,7 @@ func (c *Controller) Start() error {
 				}
 				sysTraceFlags[0] = flags
 				// enable object manager tracking
-				if c.kstreamConfig.EnableHandleKevents {
+				if c.config.Kstream.EnableHandleKevents {
 					sysTraceFlags[4] = etw.Handle
 				}
 				// call again to enable all kernel events. Just to recap. The first call to `TraceSetInformation` with empty
@@ -290,9 +307,23 @@ func (c *Controller) Start() error {
 				if err := etw.SetTraceSystemFlags(handleCopy, sysTraceFlags); err != nil {
 					log.Warnf("unable to set system flags: %v", err)
 				}
+				if c.config.Kstream.StackEnrichment {
+					if err := etw.EnableStackTracing(handleCopy, c.callstackEventSet()); err != nil {
+						c.config.Kstream.StackEnrichment = false
+						log.Warnf("unable to set kernel callstack tracing: %v", err)
+					}
+				}
 				c.insertTrace(traceName, handle, prov.GUID)
 			} else {
-				if err := etw.EnableTrace(prov.GUID, handle, prov.Keywords); err != nil {
+				var enableParameters *etw.EnableTraceParameters
+				if c.config.Kstream.StackEnrichment {
+					enableParameters = &etw.EnableTraceParameters{
+						Version:        etw.EnableTraceParametersVersion,
+						EnableProperty: etw.EventEnablePropertyStacktrace,
+						SourceID:       prov.GUID,
+					}
+				}
+				if err := etw.EnableTrace(prov.GUID, handle, prov.Keywords, enableParameters); err != nil {
 					return fmt.Errorf("unable to activate %s provider: %v", traceName, err)
 				}
 				c.insertTrace(traceName, handle, prov.GUID)
@@ -356,4 +387,25 @@ func (c *Controller) insertTrace(name string, handle etw.TraceHandle, guid windo
 		GUID:   guid,
 	}
 	c.traces = append(c.traces, trace)
+}
+
+// callstackEventSet identifies kernel events for which callstack tracing is enabled.
+func (*Controller) callstackEventSet() []etw.ClassicEventID {
+	ids := make([]etw.ClassicEventID, 0)
+	// FileOpEnd is state-oriented but we need it for stack enrichment
+	s := append(ktypes.All(), ktypes.FileOpEnd)
+	for _, ktype := range s {
+		if !ktype.CanEnrichStack() {
+			continue
+		}
+		switch ktype {
+		case ktypes.LoadImage:
+			ids = append(ids, etw.ClassicEventID{GUID: ktypes.ProcessEventGUID, Type: uint8(ktype.HookID())})
+		case ktypes.MapViewFile, ktypes.UnmapViewFile:
+			ids = append(ids, etw.ClassicEventID{GUID: ktypes.FileEventGUID, Type: uint8(ktype.HookID())})
+		default:
+			ids = append(ids, etw.ClassicEventID{GUID: ktype.GUID(), Type: uint8(ktype.HookID())})
+		}
+	}
+	return ids
 }

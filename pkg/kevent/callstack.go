@@ -16,23 +16,38 @@
  * limitations under the License.
  */
 
-package symbolize
+package kevent
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/gammazero/deque"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 )
 
-type Symbolizer struct {
+type CallstackQueue struct {
+	q *deque.Deque[*Kevent]
 }
 
-func NewSymbolizer() *Symbolizer { return &Symbolizer{} }
+func NewCallstackQueue() *CallstackQueue {
+	return &CallstackQueue{q: deque.New[*Kevent]()}
+}
 
-func (s *Symbolizer) ProcessEvent(e *kevent.Kevent) (bool, error) {
-	if !e.Kparams.Contains(kparams.Callstack) ||
-		(e.IsCreateFile() && e.Kparams.Contains(kparams.Callstack) && !e.IsCreateDisposition()) {
-		return true, nil
+func (cq *CallstackQueue) Push(e *Kevent) {
+	cq.q.PushBack(e)
+}
+
+func (cq *CallstackQueue) Pop(e *Kevent) *Kevent {
+	i := cq.q.RIndex(func(evt *Kevent) bool { return evt.StackID() == e.StackID() })
+	if i == -1 {
+		return e
 	}
 
-	return true, nil
+	evt := cq.q.Remove(i)
+	callstack := e.Kparams.MustGetSlice(kparams.Callstack)
+	evt.AppendParam(kparams.Callstack, kparams.Slice, callstack)
+
+	return evt
+}
+
+func (cq *CallstackQueue) Evict() []*Kevent {
+	return nil
 }

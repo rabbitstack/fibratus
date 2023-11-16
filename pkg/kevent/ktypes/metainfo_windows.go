@@ -142,6 +142,15 @@ var ktypes = map[string]Ktype{
 	"ReplyDns":           ReplyDNS,
 }
 
+// All returns all event types.
+func All() []Ktype {
+	s := make([]Ktype, 0, len(ktypes))
+	for _, ktype := range ktypes {
+		s = append(s, ktype)
+	}
+	return s
+}
+
 // KtypeToKeventInfo maps the event type to the structure storing detailed information about the event.
 func KtypeToKeventInfo(ktype Ktype) KeventInfo {
 	if kinfo, ok := kevents[ktype]; ok {

@@ -19,6 +19,7 @@
 package ktypes
 
 import (
+	"encoding/binary"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/rabbitstack/fibratus/pkg/util/hashers"
 	"golang.org/x/sys/windows"
@@ -26,6 +27,13 @@ import (
 
 // Ktype identifies an event type. It comprises the event GUID + hook ID to uniquely identify the event
 type Ktype [18]byte
+
+var (
+	// ProcessEventGUID represents process events GUID
+	ProcessEventGUID = windows.GUID{Data1: 0x3d6fa8d0, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}
+	// FileEventGUID represents file events GUID
+	FileEventGUID = windows.GUID{Data1: 0x90cbdc39, Data2: 0x4a3e, Data3: 0x11d1, Data4: [8]byte{0x84, 0xf4, 0x0, 0x0, 0xf8, 0x04, 0x64, 0xe3}}
+)
 
 var (
 	// CreateProcess identifies process creation kernel events
@@ -162,6 +170,9 @@ var (
 	// ReplyDNS represents the DNS response events
 	ReplyDNS = pack(windows.GUID{Data1: 0x1c95126e, Data2: 0x7eea, Data3: 0x49a9, Data4: [8]byte{0xa3, 0xfe, 0xa3, 0x78, 0xb0, 0x3d, 0xdb, 0x4d}}, 3008)
 
+	// StackWalk represents stack walk event with the collection of return addresses
+	StackWalk = pack(windows.GUID{Data1: 0xdef2fe46, Data2: 0x7bd6, Data3: 0x4b80, Data4: [8]byte{0xbd, 0x94, 0xf5, 0x7f, 0xe2, 0x0d, 0x0c, 0xe3}}, 32)
+
 	// UnknownKtype designates unknown kernel event type
 	UnknownKtype = pack(windows.GUID{}, 0)
 )
@@ -280,6 +291,8 @@ func (k Ktype) String() string {
 		return "QueryDns"
 	case ReplyDNS:
 		return "ReplyDns"
+	case StackWalk:
+		return "StackWalk"
 	default:
 		return ""
 	}
@@ -290,7 +303,7 @@ func (k Ktype) Category() Category {
 	switch k {
 	case CreateProcess, TerminateProcess, OpenProcess, ProcessRundown:
 		return Process
-	case CreateThread, TerminateThread, OpenThread, SetThreadContext, ThreadRundown:
+	case CreateThread, TerminateThread, OpenThread, SetThreadContext, ThreadRundown, StackWalk:
 		return Thread
 	case LoadImage, UnloadImage, ImageRundown:
 		return Image
@@ -443,7 +456,32 @@ func (k Ktype) OnlyState() bool {
 		ReleaseFile,
 		MapFileRundown,
 		RegCreateKCB,
-		RegDeleteKCB:
+		RegDeleteKCB,
+		StackWalk:
+		return true
+	default:
+		return false
+	}
+}
+
+// CanEnrichStack determines if the event can enrich the callstack.
+func (k Ktype) CanEnrichStack() bool {
+	switch k {
+	case
+		CreateProcess,
+		TerminateProcess,
+		CreateThread,
+		TerminateThread,
+		LoadImage,
+		UnloadImage,
+		VirtualAlloc,
+		MapViewFile,
+		UnmapViewFile,
+		RegCreateKey,
+		RegSetValue,
+		RegDeleteValue,
+		RegDeleteKey,
+		FileOpEnd:
 		return true
 	default:
 		return false
@@ -461,8 +499,23 @@ func (k *Ktype) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-// pack merges event provider GUID and the hook ID into `Ktype` array. The type provides a convenient way
-// for comparing event types.
+// GUID returns the event GUID from the raw ktype.
+func (k *Ktype) GUID() windows.GUID {
+	return windows.GUID{
+		Data1: binary.BigEndian.Uint32(k[0:4]),
+		Data2: binary.BigEndian.Uint16(k[4:6]),
+		Data3: binary.BigEndian.Uint16(k[6:8]),
+		Data4: [8]byte{k[8], k[9], k[10], k[11], k[12], k[13], k[14], k[15]},
+	}
+}
+
+// HookID returns the event operation code (hook ID) from the raw ktype.
+func (k *Ktype) HookID() uint16 {
+	return binary.BigEndian.Uint16(k[16:])
+}
+
+// pack merges event provider GUID and the hook ID into `Ktype` array.
+// The type provides a convenient way for comparing event types.
 func pack(g windows.GUID, id uint16) Ktype {
 	return [18]byte{
 		byte(g.Data1 >> 24), byte(g.Data1 >> 16), byte(g.Data1 >> 8), byte(g.Data1),

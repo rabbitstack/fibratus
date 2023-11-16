@@ -621,6 +621,16 @@ func (kpars Kparams) GetSlice(name string) (kparams.Value, error) {
 	return kpar.Value, nil
 }
 
+// MustGetSlice returns the slice of generic values from the parameter or
+// panics if the parameter cannot be found.
+func (kpars Kparams) MustGetSlice(name string) kparams.Value {
+	kpar, err := kpars.findParam(name)
+	if err != nil {
+		panic(err)
+	}
+	return kpar.Value
+}
+
 // String returns the string representation of the event parameters. Parameter names are rendered according
 // to the currently active parameter style case.
 func (kpars Kparams) String() string {

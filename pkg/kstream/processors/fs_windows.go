@@ -155,6 +155,9 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 			dispo  = e.Kparams.MustGetUint64(kparams.FileExtraInfo)
 			status = e.Kparams.MustGetUint32(kparams.NTStatus)
 		)
+		if dispo > windows.FILE_MAXIMUM_DISPOSITION {
+			return e, nil
+		}
 		ev, ok := f.irps[irp]
 		if !ok {
 			return e, nil

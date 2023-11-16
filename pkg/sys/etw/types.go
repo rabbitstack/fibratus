@@ -41,8 +41,15 @@ var KernelAuditAPICallsGUID = windows.GUID{Data1: 0xe02a841c, Data2: 0x75a3, Dat
 var DNSClientGUID = windows.GUID{Data1: 0x1c95126e, Data2: 0x7eea, Data3: 0x49a9, Data4: [8]byte{0xa3, 0xfe, 0xa3, 0x78, 0xb0, 0x3d, 0xdb, 0x4d}}
 
 const (
+	// TraceStackTracingInfo controls call stack tracing for kernel events
+	TraceStackTracingInfo = uint8(3)
 	// TraceSystemTraceEnableFlagsInfo controls system logger event flags
 	TraceSystemTraceEnableFlagsInfo = uint8(4)
+)
+
+const (
+	// EventHeaderExtTypeStackTrace64 indicates that the extended data contains the call stack if the event is captured on a 64-bit host
+	EventHeaderExtTypeStackTrace64 uint16 = 0x0006
 )
 
 const (
@@ -158,7 +165,7 @@ type WnodeHeader struct {
 	BufferSize uint32
 	// ProviderID is reserved for internal use.
 	ProviderID uint32
-	// HostricalContext is an union field with the following C representation:
+	// HostricalContext is union field with the following C representation:
 	// union {
 	//	ULONG64 HistoricalContext;
 	//	struct {
@@ -168,7 +175,7 @@ type WnodeHeader struct {
 	// };
 	// On output, HistoricalContext stores the handle to the event tracing session. Version and Linkage fields are reserved for internal use.
 	HistoricalContext [8]byte
-	// KernelHandle is an union with the following C representation:
+	// KernelHandle is union with the following C representation:
 	// union {
 	//	HANDLE        KernelHandle;
 	//	LARGE_INTEGER TimeStamp;
@@ -210,7 +217,7 @@ type EventTraceProperties struct {
 	MaximumFileSize uint32
 	// LogFileMode determines the logging modes for the event tracing session. You use this member to specify that you want events written to a
 	// log file, a real-time consumer, or both. In real-time logging mode, if no consumers are available, events will be written
-	// to disk, and when a consumers begins processing real-time events, the events in the playback file are consumed first.
+	// to disk, and when consumers begin processing real-time events, the events in the playback file are consumed first.
 	LogFileMode uint32
 	// FlushTimer specifies how often, in seconds, the trace buffers are forcibly flushed. The minimum flush time is 1 second.
 	// This forced flush is in addition to the automatic flush that occurs whenever a buffer is full and when the trace session
@@ -224,7 +231,7 @@ type EventTraceProperties struct {
 	// For the case of a realtime logger, a value of zero (the default value) means that the flush time will be set to 1 second.
 	// A realtime logger is when LogFileMode is set to `EventTraceRealTimeMode`.
 	FlushTimer uint32
-	// EnableFlags specifies which kernel events are delievered to the consumer when NT Kernel logger session is started.
+	// EnableFlags specifies which kernel events are delivered to the consumer when NT Kernel logger session is started.
 	// For example, registry events, process, disk IO and so on.
 	EnableFlags EventTraceFlags
 	// AgeLimit is not used.
@@ -257,7 +264,7 @@ type EventTraceHeader struct {
 	// Size represents the total number of bytes of the event. It includes the size of the header structure,
 	// plus the size of any event-specific data appended to the header.
 	Size uint16
-	// FieldTypeFlags is an union field represented as follow:
+	// FieldTypeFlags is union field represented as follows:
 	//  union {
 	//	USHORT FieldTypeFlags;
 	//	struct {
@@ -267,7 +274,7 @@ type EventTraceHeader struct {
 	// };
 	// All memebers of this union are reserved for internal use.
 	FieldTypeFlags [2]byte
-	// Versions in an union field with the following declaration:
+	// Versions in union field with the following declaration:
 	// union {
 	//	ULONG  Version;
 	//	struct {
@@ -280,13 +287,13 @@ type EventTraceHeader struct {
 	// `Level` designates the severity of the generated event and the `Version` tells the consumer which MOF class to use to
 	// decipher the event data.
 	Version [4]byte
-	// ThreadID identifes the thread that generated this event.
+	// ThreadID identifies the thread that generated this event.
 	ThreadID uint32
-	// ProcessID identifes the process that generated this event.
+	// ProcessID identifies the process that generated this event.
 	ProcessID uint32
 	// Timestamp contains the time that the event occurred.
 	Timestamp uint64
-	// GUID is an union:
+	// GUID is union:
 	// union {
 	//	GUID      Guid;
 	//	ULONGLONG GuidPtr;
@@ -316,7 +323,7 @@ type EventTrace struct {
 	Header EventTraceHeader
 	// InstanceID represents the instance identifier.
 	InstanceID uint32
-	// ParentInstanceID represents instance identifer for a parent event.
+	// ParentInstanceID represents instance identifier for a parent event.
 	ParentInstanceID uint32
 	// ParentGUID is the class GUID of the parent event.
 	ParentGUID windows.GUID
@@ -324,7 +331,7 @@ type EventTrace struct {
 	MofData uintptr
 	// MofLength represents the number of bytes to which `MofData` points.
 	MofLength uint32
-	// Context is an union type:
+	// Context is union type:
 	// union {
 	//	ULONG              ClientContext;
 	//	ETW_BUFFER_CONTEXT BufferContext;
@@ -354,7 +361,7 @@ type TraceLogfileHeader struct {
 	LogfileMode uint32
 	// BuffersWritten is the total number of buffers written by the event tracing session.
 	BuffersWritten uint32
-	// GUID is a an union type with the two first field reserved for internal usage. Other fields indicate
+	// GUID is union type with the two first field reserved for internal usage. Other fields indicate
 	// the number of events lost and the CPU speed in Mhz.
 	GUID [16]byte
 	// LoggerName is a reserved field.
@@ -482,7 +489,7 @@ type EventHeader struct {
 
 // BufferContext provides context information about the event.
 type BufferContext struct {
-	// ProcessorIndex is an union type that contains among other fields the number of the CPU on which
+	// ProcessorIndex is union type that contains among other fields the number of the CPU on which
 	// the provider process was running.
 	ProcessorIndex [2]byte
 	// LoggerID identifies of the session that logged the event.
@@ -491,17 +498,17 @@ type BufferContext struct {
 
 // Linkage is the inner struct for EventHeaderExtendedDataItem.
 type Linkage struct {
-	Linkage   uint16
-	Resreved2 uint16
+	Linkage uint16
 }
 
 // EventHeaderExtendedDataItem defines the extended data that ETW collects as part of the event data.
 type EventHeaderExtendedDataItem struct {
-	// Reserverd1 is a reserved field.
+	// Reserved1 is a reserved field.
 	Reserved1 uint16
 	// ExtType defines the type of extended data.
 	ExtType uint16
-	Linkage
+	// Linkage is a reserved field.
+	Linkage Linkage
 	// DataSize is the size in bytes, of the extended data
 	DataSize uint16
 	// DataPtr is the pointer to extended data.
@@ -525,6 +532,15 @@ type EventRecord struct {
 	Buffer uintptr
 	// UserContext is a pointer to custom user data passed in `EventTraceLogfile` structure.
 	UserContext uintptr
+}
+
+// ClassicEventID identifies the event for which the call stack is enabled.
+type ClassicEventID struct {
+	// GUID identifies the event class
+	GUID windows.GUID
+	// Type is type that identifies the event within the kernel event class to enable
+	Type uint8
+	_    [7]uint8 // reserved
 }
 
 // Version returns the version of the event schema.
@@ -653,4 +669,58 @@ func (e *EventRecord) ReadSID(offset uint16) ([]byte, uint16) {
 		i++
 	}
 	return b, end
+}
+
+// EventExtendedItemStackTrace64 defines a call stack on a 64-bit machine.
+type EventExtendedItemStackTrace64 struct {
+	// MatchID represents the unique identifier that you use to match
+	// the kernel-mode calls to the user-mode calls; the kernel-mode
+	// calls and user-mode calls are captured in separate events if
+	// the environment prevents both from being captured in the same event.
+	// If the kernel-mode and user-mode calls were captured in the same event,
+	// the value is zero.
+	MatchID uint64
+	// Address is an array of call addresses on the stack.
+	Address [1]uint64
+}
+
+// HasStackTrace determines if the event has the stack trace extended item.
+func (e *EventRecord) HasStackTrace() bool {
+	if e.ExtendedDataCount == 0 {
+		return false
+	}
+	data := (*[1 << 23]EventHeaderExtendedDataItem)(unsafe.Pointer(e.ExtendedData))[:e.ExtendedDataCount:e.ExtendedDataCount]
+	for _, n := range data {
+		if n.ExtType == EventHeaderExtTypeStackTrace64 {
+			return true
+		}
+	}
+	return false
+}
+
+// Callstack collects the event stack trace for
+// events emitted by non-system logger providers.
+func (e *EventRecord) Callstack() []uint64 {
+	if e.ExtendedDataCount == 0 {
+		return nil
+	}
+	data := (*[1 << 23]EventHeaderExtendedDataItem)(unsafe.Pointer(e.ExtendedData))[:e.ExtendedDataCount:e.ExtendedDataCount]
+	for _, n := range data {
+		if n.ExtType != EventHeaderExtTypeStackTrace64 {
+			continue
+		}
+		s := (*EventExtendedItemStackTrace64)(unsafe.Pointer(uintptr(n.DataPtr)))
+		if s == nil {
+			continue
+		}
+		// number of return addresses
+		length := (n.DataSize - 8) / 8
+		addrs := make([]uint64, length)
+		addresses := unsafe.Slice(&s.Address[0], length)
+		for i, addr := range addresses {
+			addrs[i] = addr
+		}
+		return addrs
+	}
+	return nil
 }
