@@ -70,7 +70,7 @@ func TestStartTraces(t *testing.T) {
 			for _, trace := range ctrl.traces {
 				require.True(t, trace.Handle.IsValid())
 				require.NoError(t, etw.ControlTrace(0, trace.Name, trace.GUID, etw.Query))
-				if tt.wantFlags != nil && trace.IsKernelLogger() {
+				if tt.wantFlags != nil && trace.IsKernelTrace() {
 					flags, err := etw.GetTraceSystemFlags(trace.Handle)
 					require.NoError(t, err)
 					// check enabled system event flags

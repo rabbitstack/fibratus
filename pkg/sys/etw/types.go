@@ -224,7 +224,7 @@ type EventTraceProperties struct {
 	// For the case of a realtime logger, a value of zero (the default value) means that the flush time will be set to 1 second.
 	// A realtime logger is when LogFileMode is set to `EventTraceRealTimeMode`.
 	FlushTimer uint32
-	// EnableFlags specifies which kernel events are delievered to the consumer when NT Kernel logger session is started.
+	// EnableFlags specifies which kernel events are delivered to the consumer when NT Kernel logger session is started.
 	// For example, registry events, process, disk IO and so on.
 	EnableFlags EventTraceFlags
 	// AgeLimit is not used.

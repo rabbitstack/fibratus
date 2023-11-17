@@ -79,7 +79,7 @@ func TestRundownEvents(t *testing.T) {
 	kctrl := NewController(kstreamConfig)
 	require.NoError(t, kctrl.Start())
 	defer kctrl.Close()
-	kstreamc := NewConsumer(psnap, hsnap, &config.Config{
+	kstreamc := NewConsumer(kctrl, psnap, hsnap, &config.Config{
 		Kstream:  kstreamConfig,
 		KcapFile: "fake.kcap", // simulate capture to receive state/rundown events
 		Filters:  &config.Filters{},
@@ -496,7 +496,7 @@ func TestConsumerEvents(t *testing.T) {
 	kctrl := NewController(kstreamConfig)
 	require.NoError(t, kctrl.Start())
 	defer kctrl.Close()
-	kstreamc := NewConsumer(psnap, hsnap, &config.Config{Kstream: kstreamConfig, Filters: &config.Filters{}})
+	kstreamc := NewConsumer(kctrl, psnap, hsnap, &config.Config{Kstream: kstreamConfig, Filters: &config.Filters{}})
 	l := &MockListener{}
 	kstreamc.RegisterEventListener(l)
 	require.NoError(t, kstreamc.Open())
