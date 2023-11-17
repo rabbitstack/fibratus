@@ -56,3 +56,10 @@ package sys
 
 // Process Status API Functions
 //sys GetMappedFileName(handle windows.Handle, addr uintptr, filename *uint16, size uint32) (n uint32) = psapi.GetMappedFileNameW
+
+// Debug Helper API Functions
+//sys SymInitialize(handle windows.Handle, searchPath *uint16, invadeProcess bool) (b bool) = dbghelp.SymInitialize
+//sys SymFromAddr(handle windows.Handle, addr uint64, offset *uint64, sym *SymbolInfo) (b bool) = dbghelp.SymFromAddrW
+//sys SymSetOptions(opts uint32) (options uint32) = dbghelp.SymSetOptions
+//sys SymLoadModule(handle windows.Handle, file windows.Handle, imageName *uint16, moduleName *uint16, baseDLL uint64, sizeDLL uint32, data uintptr, flags uint32) (base uint64) = dbghelp.SymLoadModuleExW
+//sys SymGetModuleInfo(handle windows.Handle, addr uint64, mod *ModuleInfo) (b bool) = dbghelp.SymGetModuleInfoW64

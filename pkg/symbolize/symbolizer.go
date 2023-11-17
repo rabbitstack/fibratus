@@ -19,14 +19,20 @@
 package symbolize
 
 import (
+	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
+	"github.com/rabbitstack/fibratus/pkg/sys"
 )
 
 type Symbolizer struct {
+	config *config.Config
 }
 
-func NewSymbolizer() *Symbolizer { return &Symbolizer{} }
+func NewSymbolizer(config *config.Config) *Symbolizer {
+	sys.SymSetOptions(sys.SymoptUndname)
+	return &Symbolizer{config: config}
+}
 
 func (s *Symbolizer) ProcessEvent(e *kevent.Kevent) (bool, error) {
 	if !e.Kparams.Contains(kparams.Callstack) ||

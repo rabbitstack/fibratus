@@ -391,11 +391,10 @@ func (c *Controller) insertTrace(name string, handle etw.TraceHandle, guid windo
 
 // callstackEventSet identifies kernel events for which callstack tracing is enabled.
 func (*Controller) callstackEventSet() []etw.ClassicEventID {
-	ids := make([]etw.ClassicEventID, 0)
 	// FileOpEnd is state-oriented but we need it for stack enrichment
-	s := append(ktypes.All(), ktypes.FileOpEnd)
-	for _, ktype := range s {
-		if !ktype.CanEnrichStack() {
+	ids := []etw.ClassicEventID{{GUID: ktypes.FileEventGUID, Type: uint8(ktypes.FileOpEnd.HookID())}}
+	for _, ktype := range ktypes.All() {
+		if !ktype.CanEnrichStack() || ktype == ktypes.CreateFile {
 			continue
 		}
 		switch ktype {

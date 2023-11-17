@@ -239,7 +239,7 @@ func (e Kevent) IsCreateDisposition() bool {
 	return e.IsCreateFile() && e.Kparams.MustGetUint32(kparams.FileOperation) == windows.FILE_CREATE
 }
 
-// StackID returns the integer that is used as a key in callstack buckets,
+// StackID returns the integer that is used to identify the callstack present in the StackWalk event.
 func (e Kevent) StackID() uint64 { return uint64(e.PID + e.Tid) }
 
 // RundownKey calculates the rundown event hash. The hash is

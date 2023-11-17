@@ -456,19 +456,17 @@ func (k Ktype) OnlyState() bool {
 		ReleaseFile,
 		MapFileRundown,
 		RegCreateKCB,
-		RegDeleteKCB,
-		StackWalk:
+		RegDeleteKCB:
 		return true
 	default:
 		return false
 	}
 }
 
-// CanEnrichStack determines if the event can enrich the callstack.
+// CanEnrichStack determines if the event can be enriched with a callstack.
 func (k Ktype) CanEnrichStack() bool {
 	switch k {
-	case
-		CreateProcess,
+	case CreateProcess,
 		TerminateProcess,
 		CreateThread,
 		TerminateThread,
@@ -481,7 +479,8 @@ func (k Ktype) CanEnrichStack() bool {
 		RegSetValue,
 		RegDeleteValue,
 		RegDeleteKey,
-		FileOpEnd:
+		CreateFile,
+		DeleteFile:
 		return true
 	default:
 		return false

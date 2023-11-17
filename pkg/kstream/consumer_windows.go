@@ -64,7 +64,6 @@ type consumer struct {
 
 	errs      chan error
 	q         *kevent.Queue
-	cq        *kevent.CallstackQueue
 	sequencer *kevent.Sequencer
 
 	processors processors.Chain
@@ -88,8 +87,7 @@ func NewConsumer(
 	kconsumer := &consumer{
 		traces:     make([]etw.TraceHandle, 0),
 		errs:       make(chan error, 1000),
-		q:          kevent.NewQueue(500),
-		cq:         kevent.NewCallstackQueue(),
+		q:          kevent.NewQueue(500, config.Kstream.StackEnrichment),
 		config:     config,
 		psnap:      psnap,
 		capture:    config.KcapFile != "",
@@ -206,6 +204,10 @@ func (k *consumer) processEventCallback(ev *etw.EventRecord) uintptr {
 }
 
 func (k *consumer) isEventDropped(evt *kevent.Kevent) bool {
+	if evt.IsStackWalk() {
+		// we always permit stack walk events
+		return false
+	}
 	if evt.IsDropped(k.capture) {
 		return true
 	}
@@ -241,27 +243,6 @@ func (k *consumer) processEvent(ev *etw.EventRecord) error {
 	evt, err = k.processors.ProcessEvent(evt)
 	if err != nil {
 		return err
-	}
-
-	// Perform callstack enrichment if enabled. We first
-	// check if the current event is eligible for stack
-	// enrichment. If such condition is given, the event
-	// is pushed into callstack FIFO queue.
-	// The stack return addresses are stored inside StackWalk
-	// event which is published after the acting event.
-	// Then, the originating event is popped from the queue,
-	// enriched with callstack parameter and forwarded to the
-	// event queue
-	if k.config.Kstream.StackEnrichment {
-		// Store pending events for callstack enrichment
-		if ktype.CanEnrichStack() && !evt.IsFileOpEnd() {
-			k.cq.Push(evt)
-			return nil
-		}
-		// Decorate events with callstack return addresses
-		if evt.IsStackWalk() {
-			evt = k.cq.Pop(evt)
-		}
 	}
 	if evt.WaitEnqueue {
 		return nil

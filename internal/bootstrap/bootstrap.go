@@ -222,8 +222,7 @@ func (f *App) Run(args []string) error {
 	} else {
 		// register stack symbolizer
 		if cfg.Kstream.StackEnrichment {
-			symbolizer := symbolize.NewSymbolizer()
-			f.consumer.RegisterEventListener(symbolizer)
+			f.consumer.RegisterEventListener(symbolize.NewSymbolizer(cfg))
 		}
 		// register rule engine
 		f.consumer.RegisterEventListener(rules)

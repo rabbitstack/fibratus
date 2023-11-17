@@ -21,33 +21,66 @@ package kevent
 import (
 	"github.com/gammazero/deque"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
+	"time"
 )
 
-type CallstackQueue struct {
-	q *deque.Deque[*Kevent]
+// maxDequeFlushPeriod specifies the maximum period in seconds for
+// the events to reside in the deque.
+const maxDequeFlushPeriod = 2
+
+// CallstackDecorator maintains a FIFO queue where events
+// eligible for stack enrichment are queued. Upon arrival
+// of the respective stack walk event, the acting event is
+// popped from the queue and enriched with return addresses
+// which are later subject to symbolization.
+type CallstackDecorator struct {
+	deq *deque.Deque[*Kevent]
+	q   *Queue
 }
 
-func NewCallstackQueue() *CallstackQueue {
-	return &CallstackQueue{q: deque.New[*Kevent]()}
+// NewCallstackDecorator creates a new callstack decorator
+// which receives the event queue for long-standing event
+// flushing.
+func NewCallstackDecorator(q *Queue) *CallstackDecorator {
+	return &CallstackDecorator{q: q, deq: deque.New[*Kevent]()}
 }
 
-func (cq *CallstackQueue) Push(e *Kevent) {
-	cq.q.PushBack(e)
+// Push pushes a new event to the queue.
+func (cd *CallstackDecorator) Push(e *Kevent) {
+	cd.deq.PushBack(e)
 }
 
-func (cq *CallstackQueue) Pop(e *Kevent) *Kevent {
-	i := cq.q.RIndex(func(evt *Kevent) bool { return evt.StackID() == e.StackID() })
+// Pop receives the stack walk event and pops the oldest
+// originating event with the same pid,tid tuple formerly
+// coined as stack identifier. The originating event is then
+// decorated with callstack return addresses.
+func (cd *CallstackDecorator) Pop(e *Kevent) *Kevent {
+	i := cd.deq.RIndex(func(evt *Kevent) bool { return evt.StackID() == e.StackID() })
 	if i == -1 {
 		return e
 	}
-
-	evt := cq.q.Remove(i)
+	evt := cd.deq.Remove(i)
 	callstack := e.Kparams.MustGetSlice(kparams.Callstack)
 	evt.AppendParam(kparams.Callstack, kparams.Slice, callstack)
-
 	return evt
 }
 
-func (cq *CallstackQueue) Evict() []*Kevent {
-	return nil
+// Flush pushes events to the event queue if they have
+// been living in the deque more than the maximum allowed
+// flush period.
+func (cd *CallstackDecorator) Flush() []error {
+	if cd.deq.Len() == 0 {
+		return nil
+	}
+	errs := make([]error, 0)
+	for i := 0; i < cd.deq.Len(); i++ {
+		evt := cd.deq.At(i)
+		if evt.Timestamp.Sub(time.Now()).Seconds() > maxDequeFlushPeriod {
+			err := cd.q.push(cd.deq.Remove(i))
+			if err != nil {
+				errs = append(errs, err)
+			}
+		}
+	}
+	return errs
 }

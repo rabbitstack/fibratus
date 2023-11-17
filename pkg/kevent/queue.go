@@ -44,18 +44,23 @@ type Listener interface {
 // Queue is the channel-backed data structure for
 // pushing captured events and invoking listeners.
 type Queue struct {
-	q         chan *Kevent
-	listeners []Listener
-	backlog   *backlog
+	q               chan *Kevent
+	listeners       []Listener
+	backlog         *backlog
+	cd              *CallstackDecorator
+	stackEnrichment bool
 }
 
 // NewQueue constructs a new queue with the given channel size.
-func NewQueue(size int) *Queue {
-	return &Queue{
-		q:         make(chan *Kevent, size),
-		listeners: make([]Listener, 0),
-		backlog:   newBacklog(backlogCacheSize),
+func NewQueue(size int, stackEnrichment bool) *Queue {
+	q := &Queue{
+		q:               make(chan *Kevent, size),
+		listeners:       make([]Listener, 0),
+		backlog:         newBacklog(backlogCacheSize),
+		stackEnrichment: stackEnrichment,
 	}
+	q.cd = NewCallstackDecorator(q)
+	return q
 }
 
 // RegisterListener registers a new queue event listener. The listener
@@ -77,7 +82,33 @@ func (q *Queue) Events() <-chan *Kevent { return q.q }
 // the matching event arrives, i.e. that backlog key holds
 // the value that was used to index the delayed event in the
 // backlog.
+// It is also the responsibility of the event queue to perform
+// callstack enrichment if enabled. We first
+// check if the current event is eligible for stack
+// enrichment. If such condition is given, the event
+// is pushed into callstack decorator FIFO queue.
+// The stack return addresses are stored inside StackWalk
+// event which is published after the acting event.
+// Then, the originating event is popped from the queue,
+// enriched with callstack parameter and forwarded to the
+// event queue.
 func (q *Queue) Push(e *Kevent) error {
+	if q.stackEnrichment {
+		// store pending event for callstack enrichment
+		if e.Type.CanEnrichStack() {
+			q.cd.Push(e)
+			return nil
+		}
+		// decorate events with callstack return addresses
+		if e.IsStackWalk() {
+			e = q.cd.Pop(e)
+		}
+		// flush long-standing events
+		errs := q.cd.Flush()
+		if len(errs) > 0 {
+			return multierror.Wrap(errs...)
+		}
+	}
 	if isEventDelayed(e) {
 		q.backlog.put(e)
 		return nil
@@ -85,6 +116,10 @@ func (q *Queue) Push(e *Kevent) error {
 	evt := q.backlog.pop(e)
 	if evt != nil {
 		return multierror.Wrap(q.push(evt), q.push(e))
+	}
+	// drop stack walk events
+	if e.IsStackWalk() {
+		return nil
 	}
 	return q.push(e)
 }
