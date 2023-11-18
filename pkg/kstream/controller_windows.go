@@ -137,7 +137,7 @@ func (t *Trace) Start(config config.KstreamConfig) error {
 	}
 	props := initEventTraceProps(config)
 	if t.IsKernelTrace() {
-		props.EnableFlags = t.flags(config)
+		props.EnableFlags = t.systemLoggerFlags(config)
 		props.Wnode.GUID = t.GUID
 		log.Debugf("starting kernel trace with %q event flags", props.EnableFlags)
 	}
@@ -175,7 +175,7 @@ func (t *Trace) Start(config config.KstreamConfig) error {
 			log.Warnf("unable to set empty system flags: %v", err)
 			return nil
 		}
-		sysTraceFlags[0] = t.flags(config)
+		sysTraceFlags[0] = t.systemLoggerFlags(config)
 		// enable object manager tracking
 		if config.EnableHandleKevents {
 			sysTraceFlags[4] = etw.Handle
@@ -193,12 +193,7 @@ func (t *Trace) IsStarted() bool { return t.s.IsValid() }
 
 // Stop stops the event tracing session.
 func (t *Trace) Stop() error {
-	err := etw.StopTrace(t.Name, t.GUID)
-	if err != nil {
-		return multierror.Wrap(kerrors.ErrStopTrace, err)
-	}
-	t.s = 0
-	return nil
+	return etw.StopTrace(t.Name, t.GUID)
 }
 
 // Flush causes an event tracing session to immediately deliver
@@ -250,14 +245,14 @@ func (t *Trace) Close() error {
 // IsKernelTrace determines if this is the system logger trace.
 func (t *Trace) IsKernelTrace() bool { return t.GUID == etw.KernelTraceControlGUID }
 
-// flags returns a bitmask that indicates which kernel events
+// systemLoggerFlags returns a bitmask that indicates which kernel events
 // are delivered to the consumer when system logger session is
 // started. At minimum, process events are published to the trace
 // session as they represent the foundation for building the state
 // machine. Note these flags are relevant to system logger traces
 // and initializing the EnableFlags field of the etw.EventTraceProperties
 // structure for non-system logger providers will result in an error.
-func (*Trace) flags(config config.KstreamConfig) etw.EventTraceFlags {
+func (*Trace) systemLoggerFlags(config config.KstreamConfig) etw.EventTraceFlags {
 	flags := etw.Process
 	if config.EnableThreadKevents {
 		flags |= etw.Thread
@@ -281,10 +276,14 @@ func (*Trace) flags(config config.KstreamConfig) etw.EventTraceFlags {
 }
 
 // Controller is responsible for managing the life cycle of the tracing sessions.
+// More specifically, the following sessions are governed by the trace controller
+// depending on whether they are enabled or not:
+//
+// - NT System Logger: emits core system events. Mandatory and always started
+// - Kernel Audit API Calls Logger: provides process/thread object events. Optional
+// - DNS Client Logger: publishes DNS queries/responses. Optional
 type Controller struct {
-	// traces contains all traces
 	traces []*Trace
-	// config stores event stream specific settings
 	config config.KstreamConfig
 }
 
@@ -361,11 +360,12 @@ func (c *Controller) Close() error {
 			log.Warnf("couldn't flush trace session for [%s]: %v", trace.Name, err)
 		}
 		time.Sleep(time.Millisecond * 150)
-		if err := trace.Stop(); err != nil {
-			log.Warnf("couldn't stop trace session for [%s]: %v", trace.Name, err)
-		}
 		if err := trace.Close(); err != nil {
 			log.Warnf("couldn't close trace session for [%s]: %v", trace.Name, err)
+		}
+		time.Sleep(time.Millisecond * 250)
+		if err := trace.Stop(); err != nil {
+			log.Warnf("couldn't stop trace session for [%s]: %v", trace.Name, err)
 		}
 	}
 	return nil

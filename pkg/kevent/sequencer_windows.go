@@ -112,7 +112,7 @@ func (s *Sequencer) Close() error {
 	return s.key.Close()
 }
 
-// Shutdown stores and closes the event sequencer.
+// Shutdown stores the sequence and closes the event sequencer.
 func (s *Sequencer) Shutdown() error {
 	return multierror.Wrap(s.Store(), s.Close())
 }

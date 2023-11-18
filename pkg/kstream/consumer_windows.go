@@ -120,8 +120,8 @@ func (k *consumer) Open() error {
 			return fmt.Errorf("unable to open %s trace: %v", trace.Name, err)
 		}
 		log.Infof("starting [%s] trace processing", trace.Name)
-		errch := make(chan error)
 
+		errch := make(chan error)
 		go trace.Process(errch)
 
 		go func(trace *Trace) {
@@ -129,6 +129,7 @@ func (k *consumer) Open() error {
 			case <-k.stop:
 				return
 			case err := <-errch:
+				log.Infof("stopping [%s] trace processing", trace.Name)
 				if err != nil && !errors.Is(err, kerrors.ErrTraceCancelled) {
 					k.errs <- fmt.Errorf("unable to process %s trace: %v", trace.Name, err)
 				}
