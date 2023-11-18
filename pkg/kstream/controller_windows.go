@@ -191,6 +191,11 @@ func (t *Trace) Start(config config.KstreamConfig) error {
 // IsStarted indicates if the trace is started successfully.
 func (t *Trace) IsStarted() bool { return t.s.IsValid() }
 
+// Handle returns the trace handle returned by etw.StartTrace function.
+func (t *Trace) Handle() etw.TraceHandle {
+	return t.s
+}
+
 // Stop stops the event tracing session.
 func (t *Trace) Stop() error {
 	return etw.StopTrace(t.Name, t.GUID)
