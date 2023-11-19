@@ -100,7 +100,8 @@ var schema = `
 		"handle": {
 			"type": "object",
 			"properties": {
-				"init-snapshot": 		{"type": "boolean"}
+				"init-snapshot": 		{"type": "boolean"},
+				"enumerate-handles": 	{"type": "boolean"}
 			},
 			"additionalProperties": false
 		},

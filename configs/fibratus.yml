@@ -112,9 +112,11 @@ filters:
 
 # =============================== Handle ===============================================
 
-# Indicates whether initial handle snapshot is built. The snapshot contains the state of system handles.
 handle:
+  # Indicates whether initial handle snapshot is built. The snapshot contains the state of system handles.
   init-snapshot: false
+  # Indicates if process handles are collected during startup or when a new process is spawn.
+  enumerate-handles: false
 
 # =============================== Kevent ===============================================
 
