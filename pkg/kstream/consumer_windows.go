@@ -31,14 +31,17 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kstream/processors"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
+	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/sys/windows"
 )
 
 const (
 	// callbackNext is the return callback value which designates that callback execution should progress
 	callbackNext = uintptr(1)
 )
+
+// EventCallback is the type alias for ETW event/buffer callbacks
+type EventCallback interface{}
 
 var (
 	// failedKevents counts the number of kevents that failed to process
@@ -60,7 +63,7 @@ var (
 )
 
 type consumer struct {
-	traces []etw.TraceHandle
+	controller *Controller
 
 	errs      chan error
 	q         *kevent.Queue
@@ -76,16 +79,19 @@ type consumer struct {
 
 	// capture indicates if events are dumped to capture files
 	capture bool
+
+	stop chan struct{}
 }
 
 // NewConsumer constructs a new event stream consumer.
 func NewConsumer(
+	controller *Controller,
 	psnap ps.Snapshotter,
 	hsnap handle.Snapshotter,
 	config *config.Config,
 ) Consumer {
 	kconsumer := &consumer{
-		traces:     make([]etw.TraceHandle, 0),
+		controller: controller,
 		errs:       make(chan error, 1000),
 		q:          kevent.NewQueue(500),
 		config:     config,
@@ -93,6 +99,7 @@ func NewConsumer(
 		capture:    config.KcapFile != "",
 		sequencer:  kevent.NewSequencer(),
 		processors: processors.NewChain(psnap, hsnap, config),
+		stop:       make(chan struct{}),
 	}
 	return kconsumer
 }
@@ -104,69 +111,38 @@ func (k *consumer) SetFilter(filter filter.Filter) { k.filter = filter }
 // to consume events from log buffers. This operation can fail if opening any tracing session
 // results in an error.
 func (k *consumer) Open() error {
-	traces := make([]string, 0)
-	traces = append(traces, etw.KernelLoggerSession)
-	if k.config.Kstream.EnableAuditAPIEvents {
-		traces = append(traces, etw.KernelAuditAPICallsSession)
-	}
-	if k.config.Kstream.EnableDNSEvents {
-		traces = append(traces, etw.DNSClientSession)
-	}
-
-	for _, name := range traces {
-		trace, err := k.openTrace(name)
+	for _, trace := range k.controller.Traces() {
+		if !trace.IsStarted() {
+			continue
+		}
+		err := trace.Open(k.bufferStatsCallback, k.processEventCallback)
 		if err != nil {
-			return fmt.Errorf("unable to open %s trace: %v", name, err)
+			return fmt.Errorf("unable to open %s trace: %v", trace.Name, err)
 		}
-		go k.processTrace(name, trace)
-	}
+		log.Infof("starting [%s] trace processing", trace.Name)
 
+		errch := make(chan error)
+		go trace.Process(errch)
+
+		go func(trace *Trace) {
+			select {
+			case <-k.stop:
+				return
+			case err := <-errch:
+				log.Infof("stopping [%s] trace processing", trace.Name)
+				if err != nil && !errors.Is(err, kerrors.ErrTraceCancelled) {
+					k.errs <- fmt.Errorf("unable to process %s trace: %v", trace.Name, err)
+				}
+			}
+		}(trace)
+	}
 	return nil
-}
-
-func (k *consumer) openTrace(name string) (etw.TraceHandle, error) {
-	logfile := etw.NewEventTraceLogfile(name)
-	logfile.SetBufferCallback(windows.NewCallback(k.bufferStatsCallback))
-	logfile.SetEventCallback(windows.NewCallback(k.processEventCallback))
-	logfile.SetModes(etw.ProcessTraceModeRealtime | etw.ProcessTraceModeEventRecord)
-	trace := etw.OpenTrace(logfile)
-	if !trace.IsValid() {
-		return 0, fmt.Errorf("unable to open %s trace: %v", name, windows.GetLastError())
-	}
-	return trace, nil
-}
-
-func (k *consumer) processTrace(name string, trace etw.TraceHandle) {
-	k.traces = append(k.traces, trace)
-	log.Infof("starting [%s] trace processing", name)
-	err := trace.Process()
-	log.Infof("stopping [%s] trace processing", name)
-	if err != nil && !errors.Is(err, kerrors.ErrTraceCancelled) {
-		select {
-		case k.errs <- err:
-		default:
-			log.Warn("errors channel is full")
-		}
-	}
 }
 
 // Close shutdowns the event stream consumer by closing all running traces.
 func (k *consumer) Close() error {
-	for _, trace := range k.traces {
-		if !trace.IsValid() {
-			continue
-		}
-		if err := trace.Close(); err != nil {
-			log.Warn(err)
-		}
-	}
-	if err := k.sequencer.Store(); err != nil {
-		log.Warn(err)
-	}
-	if err := k.sequencer.Close(); err != nil {
-		log.Warn(err)
-	}
-	return k.processors.Close()
+	close(k.stop)
+	return multierror.Wrap(k.sequencer.Shutdown(), k.processors.Close())
 }
 
 // RegisterEventListener registers a new event listener that is invoked before

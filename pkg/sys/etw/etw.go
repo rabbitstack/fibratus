@@ -59,16 +59,6 @@ type TraceHandle uintptr
 // IsValid determines if the trace handle is valid
 func (trace TraceHandle) IsValid() bool { return trace != 0 && trace != 0xffffffffffffffff }
 
-// Process starts trace processing. This operation blocks the main thread.
-func (trace TraceHandle) Process() error {
-	return ProcessTrace(trace)
-}
-
-// Close stops event processing on the trace session.
-func (trace TraceHandle) Close() error {
-	return CloseTrace(trace)
-}
-
 // StartTrace registers and starts an event tracing session for the specified provider. The trace assumes there will
 // be a real-time event consumer responsible for collecting and processing events. If the function succeeds, it returns
 // the handle to the tracing session.
