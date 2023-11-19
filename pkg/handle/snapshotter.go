@@ -149,6 +149,9 @@ func (s *snapshotter) FindByObject(object uint64) (htypes.Handle, bool) {
 }
 
 func (s *snapshotter) FindHandles(pid uint32) ([]htypes.Handle, error) {
+	if !s.config.EnumerateHandles {
+		return []htypes.Handle{}, nil
+	}
 	if pid == uint32(os.Getpid()) || pid == 0 { // ignore current, idle processes
 		return []htypes.Handle{}, nil
 	}

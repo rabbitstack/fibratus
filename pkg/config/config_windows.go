@@ -63,6 +63,7 @@ const (
 	configFile         = "config-file"
 	debugPrivilege     = "debug-privilege"
 	initHandleSnapshot = "handle.init-snapshot"
+	enumerateHandles   = "handle.enumerate-handles"
 
 	serializeThreads = "kevent.serialize-threads"
 	serializeImages  = "kevent.serialize-images"
@@ -83,8 +84,12 @@ type Config struct {
 	Output outputs.Config
 	// InitHandleSnapshot indicates whether initial handle snapshot is built
 	InitHandleSnapshot bool `json:"init-handle-snapshot" yaml:"init-handle-snapshot"`
-	DebugPrivilege     bool `json:"debug-privilege" yaml:"debug-privilege"`
-	KcapFile           string
+	// EnumerateHandles indicates if process handles are collected during startup or
+	// when a new process is spawn
+	EnumerateHandles bool `json:"enumerate-handles" yaml:"enumerate-handles"`
+
+	DebugPrivilege bool `json:"debug-privilege" yaml:"debug-privilege"`
+	KcapFile       string
 
 	// API stores global HTTP API preferences
 	API APIConfig `json:"api" yaml:"api"`
@@ -247,6 +252,7 @@ func (c *Config) Init() error {
 	c.Filters.initFromViper(c.viper)
 
 	c.InitHandleSnapshot = c.viper.GetBool(initHandleSnapshot)
+	c.EnumerateHandles = c.viper.GetBool(enumerateHandles)
 	c.DebugPrivilege = c.viper.GetBool(debugPrivilege)
 	c.KcapFile = c.viper.GetString(kcapFile)
 
@@ -345,6 +351,7 @@ func (c *Config) addFlags() {
 	}
 	if c.opts.run || c.opts.capture {
 		c.flags.Bool(initHandleSnapshot, false, "Indicates whether initial handle snapshot is built. This implies scanning the system handles table and producing an entry for each handle object")
+		c.flags.Bool(enumerateHandles, false, "Indicates if process handles are collected during startup or when a new process is spawn")
 
 		c.flags.Bool(enableThreadKevents, true, "Determines whether thread kernel events are collected by Kernel Logger provider")
 		c.flags.Bool(enableRegistryKevents, true, "Determines whether registry kernel events are collected by Kernel Logger provider")

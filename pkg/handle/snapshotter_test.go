@@ -43,7 +43,7 @@ func TestInitSnapshot(t *testing.T) {
 }
 
 func TestFindHandles(t *testing.T) {
-	snap := NewSnapshotter(&config.Config{InitHandleSnapshot: true}, nil)
+	snap := NewSnapshotter(&config.Config{InitHandleSnapshot: true, EnumerateHandles: true}, nil)
 	handles, err := snap.FindHandles(uint32(os.Getppid()))
 	require.NoError(t, err)
 	require.NotEmpty(t, handles)

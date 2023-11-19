@@ -397,7 +397,7 @@ func TestConsumerEvents(t *testing.T) {
 				}
 				time.Sleep(time.Second)
 				defer windows.TerminateProcess(pi.Process, 0)
-				hs := handle.NewSnapshotter(&config.Config{}, nil)
+				hs := handle.NewSnapshotter(&config.Config{EnumerateHandles: true}, nil)
 				handles, err := hs.FindHandles(pi.ProcessId)
 				if err != nil {
 					return err
