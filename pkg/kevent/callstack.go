@@ -28,6 +28,35 @@ import (
 // the events to reside in the deque.
 const maxDequeFlushPeriod = 2
 
+// Frame describes a single stack frame.
+type Frame struct {
+	Addr   uint64
+	Symbol string
+	Module string
+}
+
+func (f Frame) IsUnbacked() bool { return f.Module == "?" }
+
+// Callstack is a collection of stack frames.
+type Callstack []Frame
+
+// Init allocates the initial callstack length.
+func (s *Callstack) Init(n int) {
+	*s = make(Callstack, n)
+}
+
+// ContainsUnbacked returns true if there is a frame
+// pertaining to the function call initiated from the
+// unbacked memory section.
+func (s Callstack) ContainsUnbacked() bool {
+	for _, frame := range s {
+		if frame.IsUnbacked() {
+			return true
+		}
+	}
+	return false
+}
+
 // CallstackDecorator maintains a FIFO queue where events
 // eligible for stack enrichment are queued. Upon arrival
 // of the respective stack walk event, the acting event is

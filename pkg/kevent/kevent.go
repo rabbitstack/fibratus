@@ -102,6 +102,8 @@ type Kevent struct {
 	// to propagate certain events when the related event arrives, and it is replaced
 	// by the event that was temporarily stored in processor's state.
 	WaitEnqueue bool `json:"waitenqueue"`
+	// Callstack comprises the thread call stack.
+	Callstack Callstack `json:"callstack"`
 }
 
 // String returns event's string representation.

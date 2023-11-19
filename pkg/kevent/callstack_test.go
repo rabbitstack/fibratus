@@ -16,29 +16,4 @@
  * limitations under the License.
  */
 
-package symbolize
-
-import (
-	"github.com/rabbitstack/fibratus/pkg/config"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/sys"
-)
-
-type Symbolizer struct {
-	config *config.Config
-}
-
-func NewSymbolizer(config *config.Config) *Symbolizer {
-	sys.SymSetOptions(sys.SymUndname)
-	return &Symbolizer{config: config}
-}
-
-func (s *Symbolizer) ProcessEvent(e *kevent.Kevent) (bool, error) {
-	if !e.Kparams.Contains(kparams.Callstack) ||
-		(e.IsCreateFile() && e.Kparams.Contains(kparams.Callstack) && !e.IsCreateDisposition()) {
-		return true, nil
-	}
-
-	return true, nil
-}
+package kevent

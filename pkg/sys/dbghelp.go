@@ -25,10 +25,10 @@ import (
 )
 
 const (
-	// SymoptUndname This symbol option causes public symbol names to be
-	// undecorated when they are displayed, and causes searches for symbol
+	// SymUndname specifies the symbol option that causes public symbol names
+	// to be undecorated when they are displayed, and causes searches for symbol
 	// names to ignore symbol decorations.
-	SymoptUndname = 0x00000002
+	SymUndname = 0x00000002
 )
 
 // SymbolInfo contains symbol information.
