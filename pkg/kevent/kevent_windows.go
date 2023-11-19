@@ -239,6 +239,11 @@ func (e Kevent) IsCreateDisposition() bool {
 	return e.IsCreateFile() && e.Kparams.MustGetUint32(kparams.FileOperation) == windows.FILE_CREATE
 }
 
+// IsOpenDisposition determines if the file disposition leads to opening a file object.
+func (e Kevent) IsOpenDisposition() bool {
+	return e.IsCreateFile() && e.Kparams.MustGetUint32(kparams.FileOperation) == windows.FILE_OPEN
+}
+
 // StackID returns the integer that is used to identify the callstack present in the StackWalk event.
 func (e Kevent) StackID() uint64 { return uint64(e.PID + e.Tid) }
 

@@ -25,10 +25,25 @@ import (
 )
 
 const (
+	// SymCaseInsensitive causes all searches for symbol names to be case-insensitive.
+	SymCaseInsensitive = 0x00000001
+
 	// SymUndname specifies the symbol option that causes public symbol names
 	// to be undecorated when they are displayed, and causes searches for symbol
 	// names to ignore symbol decorations.
 	SymUndname = 0x00000002
+
+	// SymDeferredLoads this symbol option is called deferred symbol loading or
+	// lazy symbol loading. When it is active, symbols are not actually loaded
+	// when the target modules are loaded. Instead, symbols are loaded as they
+	// are needed.
+	SymDeferredLoads = 0x00000004
+
+	// SymAutoPublics causes DbgHelp to search the public symbol table in a .pdb
+	// file only as a last resort. If any matches are found when searching the
+	// private symbol data, the public symbols will not be searched. This improves
+	// symbol search speed.
+	SymAutoPublics = 0x00010000
 )
 
 // SymbolInfo contains symbol information.

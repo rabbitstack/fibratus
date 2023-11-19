@@ -25,18 +25,20 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/sys"
 )
 
+// Symbolizer is responsible for converting raw addresses
+// into symbol names and modules with the help of the Debug
+// Help API.
 type Symbolizer struct {
 	config *config.Config
 }
 
 func NewSymbolizer(config *config.Config) *Symbolizer {
-	sys.SymSetOptions(sys.SymUndname)
+	sys.SymSetOptions(sys.SymUndname | sys.SymCaseInsensitive | sys.SymDeferredLoads | sys.SymAutoPublics)
 	return &Symbolizer{config: config}
 }
 
 func (s *Symbolizer) ProcessEvent(e *kevent.Kevent) (bool, error) {
-	if !e.Kparams.Contains(kparams.Callstack) ||
-		(e.IsCreateFile() && e.Kparams.Contains(kparams.Callstack) && !e.IsCreateDisposition()) {
+	if !e.Kparams.Contains(kparams.Callstack) {
 		return true, nil
 	}
 

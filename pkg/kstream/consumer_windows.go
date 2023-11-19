@@ -204,12 +204,12 @@ func (k *consumer) processEventCallback(ev *etw.EventRecord) uintptr {
 }
 
 func (k *consumer) isEventDropped(evt *kevent.Kevent) bool {
+	if evt.IsDropped(k.capture) {
+		return true
+	}
 	if evt.IsStackWalk() {
 		// we always permit stack walk events
 		return false
-	}
-	if evt.IsDropped(k.capture) {
-		return true
 	}
 	if k.config.Kstream.ExcludeKevent(evt) {
 		excludedKevents.Add(1)
