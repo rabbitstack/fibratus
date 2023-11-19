@@ -218,8 +218,8 @@ func (t *Trace) Flush() error {
 // callback function that ETW calls for each event in the buffer.
 func (t *Trace) Open(bufferFn, eventFn EventCallback) error {
 	logfile := etw.NewEventTraceLogfile(t.Name)
-	logfile.SetBufferCallback(windows.NewCallback(bufferFn))
 	logfile.SetEventCallback(windows.NewCallback(eventFn))
+	logfile.SetBufferCallback(windows.NewCallback(bufferFn))
 	logfile.SetModes(etw.ProcessTraceModeRealtime | etw.ProcessTraceModeEventRecord)
 
 	t.p = etw.OpenTrace(logfile)
@@ -328,7 +328,7 @@ func (c *Controller) Start() error {
 				return err
 			}
 			time.Sleep(time.Millisecond * 100)
-			if err != trace.Start(c.config) {
+			if err := trace.Start(c.config); err != nil {
 				return multierror.Wrap(kerrors.ErrRestartTrace, err)
 			}
 		case kerrors.ErrTraceNoSysResources:
