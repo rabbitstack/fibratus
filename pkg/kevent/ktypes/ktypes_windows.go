@@ -467,19 +467,14 @@ func (k Ktype) OnlyState() bool {
 func (k Ktype) CanEnrichStack() bool {
 	switch k {
 	case CreateProcess,
-		TerminateProcess,
 		CreateThread,
 		TerminateThread,
 		LoadImage,
-		UnloadImage,
 		VirtualAlloc,
-		MapViewFile,
-		UnmapViewFile,
 		RegCreateKey,
 		RegSetValue,
 		RegDeleteValue,
 		RegDeleteKey,
-		CreateFile,
 		DeleteFile:
 		return true
 	default:

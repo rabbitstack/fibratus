@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
+	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
 	"path/filepath"
 	"strings"
@@ -30,7 +31,6 @@ import (
 
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/kcap/section"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 
 	"github.com/rabbitstack/fibratus/pkg/util/bootid"
@@ -181,15 +181,15 @@ type Thread struct {
 	// PagePrio is a memory page priority hint for memory pages accessed by the thread.
 	PagePrio uint8
 	// UstackBase is the base address of the thread's user space stack.
-	UstackBase kparams.Addr
+	UstackBase va.Address
 	// UstackLimit is the limit of the thread's user space stack.
-	UstackLimit kparams.Addr
+	UstackLimit va.Address
 	// KStackBase is the base address of the thread's kernel space stack.
-	KstackBase kparams.Addr
+	KstackBase va.Address
 	// KstackLimit is the limit of the thread's kernel space stack.
-	KstackLimit kparams.Addr
+	KstackLimit va.Address
 	// Entrypoint is the starting address of the function to be executed by the thread.
-	Entrypoint kparams.Addr
+	Entrypoint va.Address
 }
 
 // String returns the thread as a human-readable string.
@@ -206,9 +206,9 @@ type Module struct {
 	// Name represents the full path of this image.
 	Name string
 	// BaseAddress is the base address of process in which the image is loaded.
-	BaseAddress kparams.Addr
+	BaseAddress va.Address
 	// DefaultBaseAddress is the default base address.
-	DefaultBaseAddress kparams.Addr
+	DefaultBaseAddress va.Address
 	// SignatureLevel designates the image signature level. (e.g. MICROSOFT)
 	SignatureLevel uint32
 	// SignatureType designates the image signature type (e.g. EMBEDDED)
@@ -313,4 +313,15 @@ func (ps *PS) FindModule(path string) *Module {
 		}
 	}
 	return nil
+}
+
+// FindModuleByVa finds the module name by comparing
+// the range of the given virtual address.
+func (ps *PS) FindModuleByVa(addr va.Address) string {
+	for _, mod := range ps.Modules {
+		if addr >= mod.BaseAddress && addr <= mod.BaseAddress.Inc(mod.Size) {
+			return mod.Name
+		}
+	}
+	return "?"
 }

@@ -231,6 +231,9 @@ func (e Kevent) InvalidPid() bool { return e.PID == sys.InvalidProcessID }
 // CurrentPid indicates if Fibratus is the process generating the event.
 func (e Kevent) CurrentPid() bool { return e.PID == currentPid }
 
+// IsSystemPid indicates if the process generating the event is the System process.
+func (e Kevent) IsSystemPid() bool { return e.PID == 4 }
+
 // IsState indicates if this event is only used for state management.
 func (e Kevent) IsState() bool { return e.Type.OnlyState() }
 

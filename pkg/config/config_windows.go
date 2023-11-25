@@ -21,6 +21,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"golang.org/x/sys/windows"
 	"time"
 
 	"github.com/rabbitstack/fibratus/pkg/outputs/eventlog"
@@ -63,6 +64,8 @@ const (
 	configFile         = "config-file"
 	debugPrivilege     = "debug-privilege"
 	initHandleSnapshot = "handle.init-snapshot"
+	enumerateHandles   = "handle.enumerate-handles"
+	symbolPaths        = "symbol-paths"
 
 	serializeThreads = "kevent.serialize-threads"
 	serializeImages  = "kevent.serialize-images"
@@ -83,8 +86,15 @@ type Config struct {
 	Output outputs.Config
 	// InitHandleSnapshot indicates whether initial handle snapshot is built
 	InitHandleSnapshot bool `json:"init-handle-snapshot" yaml:"init-handle-snapshot"`
-	DebugPrivilege     bool `json:"debug-privilege" yaml:"debug-privilege"`
-	KcapFile           string
+	// EnumerateHandles indicates if process handles are collected during startup or
+	// when a new process is spawn
+	EnumerateHandles bool `json:"enumerate-handles" yaml:"enumerate-handles"`
+	// SymbolPaths designates the path or a series of paths separated by a semicolon
+	// that is used to search for symbols files.
+	SymbolPaths string `json:"symbol-paths" yaml:"symbols-paths"`
+
+	DebugPrivilege bool `json:"debug-privilege" yaml:"debug-privilege"`
+	KcapFile       string
 
 	// API stores global HTTP API preferences
 	API APIConfig `json:"api" yaml:"api"`
@@ -247,6 +257,8 @@ func (c *Config) Init() error {
 	c.Filters.initFromViper(c.viper)
 
 	c.InitHandleSnapshot = c.viper.GetBool(initHandleSnapshot)
+	c.EnumerateHandles = c.viper.GetBool(enumerateHandles)
+	c.SymbolPaths = c.viper.GetString(symbolPaths)
 	c.DebugPrivilege = c.viper.GetBool(debugPrivilege)
 	c.KcapFile = c.viper.GetString(kcapFile)
 
@@ -313,6 +325,13 @@ func (c *Config) Validate() error {
 // File returns the config file path.
 func (c *Config) File() string { return c.viper.GetString(configFile) }
 
+// SymbolPathsUTF16 returns the symbol paths as UTF16 string
+// suitable for use in the Debug Helper API functions.
+func (c *Config) SymbolPathsUTF16() *uint16 {
+	paths, _ := windows.UTF16PtrFromString(c.SymbolPaths)
+	return paths
+}
+
 func (c *Config) addFlags() {
 	c.flags.String(configFile, filepath.Join(os.Getenv("PROGRAMFILES"), "fibratus", "config", "fibratus.yml"), "Indicates the location of the configuration file")
 	if c.opts.run || c.opts.replay {
@@ -345,6 +364,8 @@ func (c *Config) addFlags() {
 	}
 	if c.opts.run || c.opts.capture {
 		c.flags.Bool(initHandleSnapshot, false, "Indicates whether initial handle snapshot is built. This implies scanning the system handles table and producing an entry for each handle object")
+		c.flags.Bool(enumerateHandles, false, "Indicates if process handles are collected during startup or when a new process is spawn")
+		c.flags.String(symbolPaths, "srv*c:\\\\SymCache*https://msdl.microsoft.com/download/symbols", "Designates the path or a series of paths separated by a semicolon that is used to search for symbols files")
 
 		c.flags.Bool(enableThreadKevents, true, "Determines whether thread kernel events are collected by Kernel Logger provider")
 		c.flags.Bool(enableRegistryKevents, true, "Determines whether registry kernel events are collected by Kernel Logger provider")

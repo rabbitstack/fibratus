@@ -21,6 +21,7 @@ package sys
 import (
 	"github.com/rabbitstack/fibratus/pkg/util/utf16"
 	"golang.org/x/sys/windows"
+	"runtime"
 	"unsafe"
 )
 
@@ -44,6 +45,14 @@ const (
 	// private symbol data, the public symbols will not be searched. This improves
 	// symbol search speed.
 	SymAutoPublics = 0x00010000
+
+	// SymOmapFindNearest code has been optimized and there is no symbol at
+	// the expected location, this option causes the nearest symbol to be used
+	// instead.
+	SymOmapFindNearest
+
+	// MaxSymName specifies the maximum length of the symbol name.
+	MaxSymName = 2000
 )
 
 // SymbolInfo contains symbol information.
@@ -63,6 +72,15 @@ type SymbolInfo struct {
 	Length     uint32
 	MaxLength  uint32
 	Name       [1]uint16
+}
+
+// NewSymbolInfo creates a new instance of symbol info with pertinent initializations.
+func NewSymbolInfo() *SymbolInfo {
+	b := make([]byte, int(unsafe.Sizeof(SymbolInfo{}))+MaxSymName*2)
+	sym := (*SymbolInfo)(unsafe.Pointer(&b[0]))
+	sym.SizeStruct = uint32(unsafe.Sizeof(SymbolInfo{}))
+	sym.MaxLength = uint32(MaxSymName)
+	return sym
 }
 
 // SymbolName returns the symbol name.
@@ -102,6 +120,13 @@ type ModuleInfo struct {
 	Reserved        uint32
 }
 
+// NewModuleInfo creates a new instance of module info.
+func NewModuleInfo() *ModuleInfo {
+	return &ModuleInfo{
+		SizeStruct: uint32(unsafe.Sizeof(ModuleInfo{})),
+	}
+}
+
 // Name returns the module name.
 func (m *ModuleInfo) Name() string {
 	n := windows.UTF16ToString(m.ImageName[:])
@@ -109,4 +134,57 @@ func (m *ModuleInfo) Name() string {
 		return windows.UTF16ToString(m.ModuleName[:])
 	}
 	return windows.UTF16ToString(m.LoadedImageName[:])
+}
+
+// GetSymModuleName retrieves the module where the symbol is imported.
+func GetSymModuleName(proc windows.Handle, addr uint64) string {
+	mod := NewModuleInfo()
+	if !SymGetModuleInfo(proc, addr, mod) {
+		return "?"
+	}
+	module := mod.Name()
+	if module == "" {
+		return "?"
+	}
+	return module
+}
+
+// GetSymName retrieves the symbol name and offset for the given address.
+func GetSymName(proc windows.Handle, addr uint64) (string, uint64) {
+	sym := NewSymbolInfo()
+	var offset uint64
+	if !SymFromAddr(proc, addr, &offset, sym) {
+		return "?", 0
+	}
+	symbol := sym.SymbolName()
+	if symbol == "" {
+		return "?", offset
+	}
+	return symbol, offset
+}
+
+// SymLoadKernelModules initializes the symbol
+// handler for the current process and loads
+// kernel modules debugging info.
+func SymLoadKernelModules(s string) bool {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+	SymSetOptions(SymUndname | SymCaseInsensitive | SymAutoPublics)
+
+	path, err := windows.UTF16PtrFromString(s)
+	if err != nil {
+		return false
+	}
+	if !SymInitialize(windows.CurrentProcess(), path, true) {
+		return false
+	}
+	devs := EnumDevices()
+	for _, dev := range devs {
+		m, err := windows.UTF16PtrFromString(dev.Filename)
+		if err != nil {
+			continue
+		}
+		SymLoadModule(windows.CurrentProcess(), 0, m, nil, uint64(dev.Addr), 0, 0, 0)
+	}
+	return true
 }

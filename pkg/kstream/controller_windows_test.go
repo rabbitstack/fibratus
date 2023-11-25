@@ -72,10 +72,10 @@ func TestStartTraces(t *testing.T) {
 			defer ctrl.Close()
 			assert.Equal(t, tt.wantSessions, len(ctrl.traces))
 			for _, trace := range ctrl.traces {
-				require.True(t, trace.Handle.IsValid())
+				require.True(t, trace.Handle().IsValid())
 				require.NoError(t, etw.ControlTrace(0, trace.Name, trace.GUID, etw.Query))
-				if tt.wantFlags != nil && trace.IsKernelLogger() {
-					flags, err := etw.GetTraceSystemFlags(trace.Handle)
+				if tt.wantFlags != nil && trace.IsKernelTrace() {
+					flags, err := etw.GetTraceSystemFlags(trace.Handle())
 					require.NoError(t, err)
 					// check enabled system event flags
 					require.Equal(t, tt.wantFlags[0], flags[0])

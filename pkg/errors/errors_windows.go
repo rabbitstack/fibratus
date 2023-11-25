@@ -35,8 +35,6 @@ var (
 	ErrTraceDiskFull = errors.New("not enough disk space for writing to log file")
 	// ErrInvalidTrace signals invalid trace handle
 	ErrInvalidTrace = errors.New("invalid trace handle")
-	// ErrStopTrace is bubbled when controller is not able to stop kernel trace session
-	ErrStopTrace = errors.New("an error occurred while stopping trace")
 	// ErrRestartTrace signals an error that is thrown when currently running kernel trace cannot be restarted
 	ErrRestartTrace = errors.New("couldn't restart an already running trace")
 	// ErrTraceAlreadyRunning identifies kernel trace already running errors

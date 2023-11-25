@@ -21,6 +21,8 @@ package kevent
 import (
 	"github.com/gammazero/deque"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
+	"github.com/rabbitstack/fibratus/pkg/util/va"
+	"strings"
 	"time"
 )
 
@@ -30,19 +32,39 @@ const maxDequeFlushPeriod = 2
 
 // Frame describes a single stack frame.
 type Frame struct {
-	Addr   uint64
-	Symbol string
-	Module string
+	Addr           va.Address
+	Offset         uint64
+	AllocationSize uint64
+	Symbol         string
+	Module         string
+	Protection     string
 }
 
+// IsUnbacked returns true if this frame is originated
+// from unbacked memory section
 func (f Frame) IsUnbacked() bool { return f.Module == "?" }
 
-// Callstack is a collection of stack frames.
+// Callstack is a sequence of stack frames
+// representing function executions.
 type Callstack []Frame
 
-// Init allocates the initial callstack length.
+// Init allocates the initial callstack capacity.
 func (s *Callstack) Init(n int) {
-	*s = make(Callstack, n)
+	*s = make(Callstack, 0, n)
+}
+
+// PushFrame pushes a new from to the call stack.
+func (s *Callstack) PushFrame(f Frame) {
+	*s = append(*s, f)
+}
+
+func (s Callstack) String() string {
+	var sb strings.Builder
+	for _, frame := range s {
+		sb.WriteString(frame.Addr.String() + ":" + frame.Module + "!" + frame.Symbol)
+		sb.WriteRune('\n')
+	}
+	return sb.String()
 }
 
 // ContainsUnbacked returns true if there is a frame

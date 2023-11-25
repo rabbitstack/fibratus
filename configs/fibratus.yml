@@ -112,9 +112,11 @@ filters:
 
 # =============================== Handle ===============================================
 
-# Indicates whether initial handle snapshot is built. The snapshot contains the state of system handles.
 handle:
+  # Indicates whether initial handle snapshot is built. The snapshot contains the state of system handles.
   init-snapshot: false
+  # Indicates if process handles are collected during startup or when a new process is spawn.
+  enumerate-handles: false
 
 # =============================== Kevent ===============================================
 
@@ -465,6 +467,11 @@ pe:
   #read-sections: false
 
 # =============================== Transformers =========================================
+
+# Designates the path or a series of paths separated by a semicolon that is used to search
+# for symbols files
+
+# symbol-paths: srv*c:\\SymCache*https://msdl.microsoft.com/download/symbols
 
 # Transformers are responsible for augmenting, parsing or enriching kernel events.
 transformers:

@@ -194,7 +194,7 @@ func TestLiveKcap(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	kstreamc := kstream.NewConsumer(psnap, hsnap, cfg)
+	kstreamc := kstream.NewConsumer(ktracec, psnap, hsnap, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}

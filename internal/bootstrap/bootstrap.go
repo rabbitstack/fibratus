@@ -131,13 +131,14 @@ func NewApp(config *config.Config, options ...Option) (*App, error) {
 
 	hsnap := handle.NewSnapshotter(config, opts.handleSnapshotFn)
 	psnap := ps.NewSnapshotter(hsnap, config)
+	controller := kstream.NewController(config.Kstream)
 
 	app := &App{
 		config:     config,
-		controller: kstream.NewController(config),
+		controller: controller,
 		hsnap:      hsnap,
 		psnap:      psnap,
-		consumer:   kstream.NewConsumer(psnap, hsnap, config),
+		consumer:   kstream.NewConsumer(controller, psnap, hsnap, config),
 		signals:    sigs,
 	}
 	return app, nil

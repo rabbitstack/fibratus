@@ -58,6 +58,7 @@ type RegionInfo struct {
 	Type     uint32
 	Protect  uint32
 	BaseAddr uint64
+	Size     uint64
 	proc     windows.Handle
 }
 
@@ -161,18 +162,21 @@ func (p *RegionProber) Query(pid uint32, addr uint64) *RegionInfo {
 		}
 		p.procs[pid] = process
 	}
+	return VirtualQuery(process, addr)
+}
 
-	// query VA region info
+// VirtualQuery queries the virtual address region info.
+func VirtualQuery(process windows.Handle, addr uint64) *RegionInfo {
 	var mem windows.MemoryBasicInformation
 	err := windows.VirtualQueryEx(process, uintptr(addr), &mem, unsafe.Sizeof(mem))
 	if err != nil {
 		return nil
 	}
-
 	return &RegionInfo{
 		Type:     mem.Type,
 		Protect:  mem.AllocationProtect,
 		BaseAddr: addr,
+		Size:     uint64(mem.RegionSize),
 		proc:     process,
 	}
 }

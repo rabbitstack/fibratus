@@ -24,6 +24,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/network"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
+	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 	"net"
@@ -509,7 +510,7 @@ func (kpars Kparams) GetDouble(name string) (float64, error) {
 }
 
 // TryGetAddress attempts to convert the underlying type to address.
-func (kpars Kparams) TryGetAddress(name string) kparams.Addr {
+func (kpars Kparams) TryGetAddress(name string) va.Address {
 	kpar, err := kpars.findParam(name)
 	if err != nil {
 		return 0
@@ -518,7 +519,7 @@ func (kpars Kparams) TryGetAddress(name string) kparams.Addr {
 	if !ok {
 		return 0
 	}
-	return kparams.Addr(v)
+	return va.Address(v)
 }
 
 // GetIPv4 returns the underlying IPv4 address from the parameter.
@@ -629,6 +630,17 @@ func (kpars Kparams) MustGetSlice(name string) kparams.Value {
 		panic(err)
 	}
 	return kpar.Value
+}
+
+// MustGetSliceAddrs returns the slice of addresses or panics if the parameter
+// is not found, or either a parameter is not a slice of addresses.
+func (kpars Kparams) MustGetSliceAddrs(name string) []va.Address {
+	val := kpars.MustGetSlice(name)
+	addrs, ok := val.([]va.Address)
+	if !ok {
+		panic("must be a slice of addresses")
+	}
+	return addrs
 }
 
 // String returns the string representation of the event parameters. Parameter names are rendered according

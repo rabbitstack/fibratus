@@ -22,6 +22,7 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"golang.org/x/sys/windows/registry"
 	"sync/atomic"
 	"syscall"
@@ -109,6 +110,11 @@ func (s *Sequencer) Reset() error {
 func (s *Sequencer) Close() error {
 	s.quit <- struct{}{}
 	return s.key.Close()
+}
+
+// Shutdown stores the sequence and closes the event sequencer.
+func (s *Sequencer) Shutdown() error {
+	return multierror.Wrap(s.Store(), s.Close())
 }
 
 // store periodically dumps the sequence number into registry value.

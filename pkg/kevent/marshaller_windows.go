@@ -22,6 +22,7 @@ import (
 	"expvar"
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/util/convert"
+	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"math"
 	"net"
 	"sort"
@@ -647,7 +648,7 @@ func (e *Kevent) MarshalJSON() []byte {
 				js.writeObjectField("name").writeEscapeString(handle.Name).writeMore()
 				js.writeObjectField("type").writeString(handle.Type).writeMore()
 				js.writeObjectField("id").writeUint64(uint64(handle.Num)).writeMore()
-				js.writeObjectField("object").writeEscapeString(kparams.Addr(handle.Object).String())
+				js.writeObjectField("object").writeEscapeString(va.Address(handle.Object).String())
 				js.writeObjectEnd()
 
 				if writeMore {

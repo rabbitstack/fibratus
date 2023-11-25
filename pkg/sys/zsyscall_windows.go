@@ -46,11 +46,13 @@ var (
 	modwintrust = windows.NewLazySystemDLL("wintrust.dll")
 	modwtsapi32 = windows.NewLazySystemDLL("wtsapi32.dll")
 
+	procSymCleanup                           = moddbghelp.NewProc("SymCleanup")
 	procSymFromAddrW                         = moddbghelp.NewProc("SymFromAddrW")
 	procSymGetModuleInfoW64                  = moddbghelp.NewProc("SymGetModuleInfoW64")
 	procSymInitialize                        = moddbghelp.NewProc("SymInitialize")
 	procSymLoadModuleExW                     = moddbghelp.NewProc("SymLoadModuleExW")
 	procSymSetOptions                        = moddbghelp.NewProc("SymSetOptions")
+	procSymUnloadModule64                    = moddbghelp.NewProc("SymUnloadModule64")
 	procCreateThread                         = modkernel32.NewProc("CreateThread")
 	procGetProcessIdOfThread                 = modkernel32.NewProc("GetProcessIdOfThread")
 	procTerminateThread                      = modkernel32.NewProc("TerminateThread")
@@ -75,6 +77,12 @@ var (
 	procWinVerifyTrust                       = modwintrust.NewProc("WinVerifyTrust")
 	procWTSQuerySessionInformationW          = modwtsapi32.NewProc("WTSQuerySessionInformationW")
 )
+
+func SymCleanup(handle windows.Handle) (b bool) {
+	r0, _, _ := syscall.Syscall(procSymCleanup.Addr(), 1, uintptr(handle), 0, 0)
+	b = r0 != 0
+	return
+}
 
 func SymFromAddr(handle windows.Handle, addr uint64, offset *uint64, sym *SymbolInfo) (b bool) {
 	r0, _, _ := syscall.Syscall6(procSymFromAddrW.Addr(), 4, uintptr(handle), uintptr(addr), uintptr(unsafe.Pointer(offset)), uintptr(unsafe.Pointer(sym)), 0, 0)
@@ -107,6 +115,11 @@ func SymLoadModule(handle windows.Handle, file windows.Handle, imageName *uint16
 func SymSetOptions(opts uint32) (options uint32) {
 	r0, _, _ := syscall.Syscall(procSymSetOptions.Addr(), 1, uintptr(opts), 0, 0)
 	options = uint32(r0)
+	return
+}
+
+func SymUnloadModule(handle windows.Handle, baseDLL uint64) {
+	syscall.Syscall(procSymUnloadModule64.Addr(), 2, uintptr(handle), uintptr(baseDLL), 0)
 	return
 }
 

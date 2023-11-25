@@ -97,10 +97,12 @@ var schema = `
 		},
 		"config-file": 		{"type": "string"},
 		"debug-privilege":  {"type": "boolean"},
+		"symbol-paths":		{"type": "string"},
 		"handle": {
 			"type": "object",
 			"properties": {
-				"init-snapshot": 		{"type": "boolean"}
+				"init-snapshot": 		{"type": "boolean"},
+				"enumerate-handles": 	{"type": "boolean"}
 			},
 			"additionalProperties": false
 		},

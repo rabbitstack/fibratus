@@ -18,8 +18,6 @@
 
 package kparams
 
-import "strconv"
-
 const (
 	// NA defines absent parameter's value
 	NA = "na"
@@ -30,12 +28,6 @@ type Value interface{}
 
 // Type defines kernel event parameter type
 type Type uint16
-
-// Addr represents the memory address
-type Addr uint64
-
-// Hex returns the hexadecimal representation of the memory address.
-func (a Addr) String() string { return strconv.FormatUint(uint64(a), 16) }
 
 const (
 	// Null is a null parameter type

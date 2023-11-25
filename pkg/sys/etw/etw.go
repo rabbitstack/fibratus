@@ -85,16 +85,6 @@ type TraceHandle uintptr
 // IsValid determines if the trace handle is valid
 func (trace TraceHandle) IsValid() bool { return trace != 0 && trace != 0xffffffffffffffff }
 
-// Process starts trace processing. This operation blocks the main thread.
-func (trace TraceHandle) Process() error {
-	return ProcessTrace(trace)
-}
-
-// Close stops event processing on the trace session.
-func (trace TraceHandle) Close() error {
-	return CloseTrace(trace)
-}
-
 // StartTrace registers and starts an event tracing session for the specified provider. The trace assumes there will
 // be a real-time event consumer responsible for collecting and processing events. If the function succeeds, it returns
 // the handle to the tracing session.
@@ -222,8 +212,31 @@ const (
 )
 
 // EnableTrace influences the behaviour of the specified event trace provider.
-func EnableTrace(guid windows.GUID, handle TraceHandle, keyword uint64, enableParams *EnableTraceParameters) error {
-	err := enableTraceEx2(handle, &guid, ControlCodeEnableProvider, TraceLevelInformation, keyword, 0, 0, enableParams)
+func EnableTrace(guid windows.GUID, handle TraceHandle, keyword uint64) error {
+	err := enableTraceEx2(handle, &guid, ControlCodeEnableProvider, TraceLevelInformation, keyword, 0, 0, nil)
+	if err != nil {
+		return os.NewSyscallError("EnableTraceEx2", err)
+	}
+	return nil
+}
+
+// EnableTraceOpts describes which properties are enabled in the event extended section.
+type EnableTraceOpts struct {
+	// WithStacktrace indicates call stack trace is added to the extended data of events.
+	WithStacktrace bool
+}
+
+// EnableTraceWithOpts influences the behaviour of the specified event trace provider
+// by providing extra options to configure how events are writing to the session buffer.
+func EnableTraceWithOpts(guid windows.GUID, handle TraceHandle, keyword uint64, opts EnableTraceOpts) error {
+	params := &EnableTraceParameters{
+		Version:  EnableTraceParametersVersion,
+		SourceID: guid,
+	}
+	if opts.WithStacktrace {
+		params.EnableProperty = EventEnablePropertyStacktrace
+	}
+	err := enableTraceEx2(handle, &guid, ControlCodeEnableProvider, TraceLevelInformation, keyword, 0, 0, params)
 	if err != nil {
 		return os.NewSyscallError("EnableTraceEx2", err)
 	}

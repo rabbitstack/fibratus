@@ -23,6 +23,7 @@ package etw
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/util/utf16"
+	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
 	"strings"
 	"unsafe"
@@ -543,6 +544,11 @@ type ClassicEventID struct {
 	_    [7]uint8 // reserved
 }
 
+// NewClassicEventID creates a new instance of classic event identifier.
+func NewClassicEventID(guid windows.GUID, typ uint16) ClassicEventID {
+	return ClassicEventID{GUID: guid, Type: uint8(typ)}
+}
+
 // Version returns the version of the event schema.
 func (e *EventRecord) Version() uint8 {
 	return e.Header.EventDescriptor.Version
@@ -700,7 +706,7 @@ func (e *EventRecord) HasStackTrace() bool {
 
 // Callstack collects the event stack trace for
 // events emitted by non-system logger providers.
-func (e *EventRecord) Callstack() []uint64 {
+func (e *EventRecord) Callstack() []va.Address {
 	if e.ExtendedDataCount == 0 {
 		return nil
 	}
@@ -715,10 +721,10 @@ func (e *EventRecord) Callstack() []uint64 {
 		}
 		// number of return addresses
 		length := (n.DataSize - 8) / 8
-		addrs := make([]uint64, length)
+		addrs := make([]va.Address, length)
 		addresses := unsafe.Slice(&s.Address[0], length)
 		for i, addr := range addresses {
-			addrs[i] = addr
+			addrs[i] = va.Address(addr)
 		}
 		return addrs
 	}
