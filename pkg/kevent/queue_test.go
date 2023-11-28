@@ -36,6 +36,8 @@ type AddParamListener struct {
 	mock.Mock
 }
 
+func (l *AddParamListener) CanEnqueue() bool { return true }
+
 func (l *AddParamListener) ProcessEvent(e *Kevent) (bool, error) {
 	args := l.Called(e)
 	e.AppendParam(kparams.FileAttributes, kparams.AnsiString, "HIDDEN")
@@ -44,6 +46,8 @@ func (l *AddParamListener) ProcessEvent(e *Kevent) (bool, error) {
 
 // DummyListener listeners just lets the event pass through
 type DummyListener struct{}
+
+func (l *DummyListener) CanEnqueue() bool { return true }
 
 func (l *DummyListener) ProcessEvent(e *Kevent) (bool, error) {
 	return true, nil
@@ -169,7 +173,7 @@ func TestQueuePush(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			q := NewQueue(100)
+			q := NewQueue(100, false)
 			for _, lis := range tt.listeners() {
 				q.RegisterListener(lis)
 			}
@@ -196,7 +200,7 @@ func TestPushBacklog(t *testing.T) {
 		Metadata: make(Metadata),
 	}
 
-	q := NewQueue(100)
+	q := NewQueue(100, false)
 	q.RegisterListener(&DummyListener{})
 
 	require.NoError(t, q.Push(e))

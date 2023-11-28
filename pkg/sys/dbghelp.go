@@ -131,9 +131,12 @@ func NewModuleInfo() *ModuleInfo {
 func (m *ModuleInfo) Name() string {
 	n := windows.UTF16ToString(m.ImageName[:])
 	if n == "" {
-		return windows.UTF16ToString(m.ModuleName[:])
+		n = windows.UTF16ToString(m.ModuleName[:])
 	}
-	return windows.UTF16ToString(m.LoadedImageName[:])
+	if n == "" {
+		n = windows.UTF16ToString(m.LoadedImageName[:])
+	}
+	return n
 }
 
 // GetSymModuleName retrieves the module where the symbol is imported.
@@ -175,7 +178,7 @@ func SymLoadKernelModules(s string) bool {
 	if err != nil {
 		return false
 	}
-	if !SymInitialize(windows.CurrentProcess(), path, true) {
+	if !SymInitialize(windows.CurrentProcess(), path, false) {
 		return false
 	}
 	devs := EnumDevices()

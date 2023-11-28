@@ -93,7 +93,7 @@ func NewConsumer(
 	kconsumer := &consumer{
 		controller: controller,
 		errs:       make(chan error, 1000),
-		q:          kevent.NewQueue(500, config.Kstream.StackEnrichment),
+		q:          kevent.NewQueue(800, config.Kstream.StackEnrichment),
 		config:     config,
 		psnap:      psnap,
 		capture:    config.KcapFile != "",

@@ -87,18 +87,19 @@ func initEventTraceProps(c config.KstreamConfig) etw.EventTraceProperties {
 	}
 }
 
-// stackTraceIds returns a list of event types for which the callstack tracing is enabled.
+// stackTraceIds returns a list of event types for which callstack tracing is enabled.
 func stackTraceIds() []etw.ClassicEventID {
 	// FileOpEnd is state-oriented but we need it for stack enrichment
 	ids := []etw.ClassicEventID{etw.NewClassicEventID(ktypes.FileEventGUID, ktypes.FileOpEnd.HookID())}
 	for _, ktype := range ktypes.All() {
+		// CreateFile is enriched with the callstack
+		//
 		if !ktype.CanEnrichStack() || ktype == ktypes.CreateFile {
 			continue
 		}
-		switch ktype {
-		case ktypes.LoadImage, ktypes.UnloadImage:
+		if ktype == ktypes.LoadImage {
 			ids = append(ids, etw.NewClassicEventID(ktypes.ProcessEventGUID, ktype.HookID()))
-		default:
+		} else {
 			ids = append(ids, etw.NewClassicEventID(ktype.GUID(), ktype.HookID()))
 		}
 	}

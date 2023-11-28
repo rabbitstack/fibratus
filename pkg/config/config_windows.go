@@ -60,12 +60,13 @@ import (
 )
 
 const (
-	kcapFile           = "kcap.file"
-	configFile         = "config-file"
-	debugPrivilege     = "debug-privilege"
-	initHandleSnapshot = "handle.init-snapshot"
-	enumerateHandles   = "handle.enumerate-handles"
-	symbolPaths        = "symbol-paths"
+	kcapFile                 = "kcap.file"
+	configFile               = "config-file"
+	debugPrivilege           = "debug-privilege"
+	initHandleSnapshot       = "handle.init-snapshot"
+	enumerateHandles         = "handle.enumerate-handles"
+	symbolPaths              = "symbol-paths"
+	symbolizeKernelAddresses = "symbolize-kernel-addresses"
 
 	serializeThreads = "kevent.serialize-threads"
 	serializeImages  = "kevent.serialize-images"
@@ -92,9 +93,15 @@ type Config struct {
 	// SymbolPaths designates the path or a series of paths separated by a semicolon
 	// that is used to search for symbols files.
 	SymbolPaths string `json:"symbol-paths" yaml:"symbols-paths"`
+	// SymbolizeKernelAddresses determines if kernel stack addresses are symbolized.
+	SymbolizeKernelAddresses bool `json:"symbolize-kernel-addresses" yaml:"symbolize-kernel-addresses"`
 
+	// DebugPrivilege dictates if the SeDebugPrivilege is injected into
+	// Fibratus process' access token.
 	DebugPrivilege bool `json:"debug-privilege" yaml:"debug-privilege"`
-	KcapFile       string
+
+	// KcapFile represents the name of the capture file.
+	KcapFile string
 
 	// API stores global HTTP API preferences
 	API APIConfig `json:"api" yaml:"api"`
@@ -259,6 +266,7 @@ func (c *Config) Init() error {
 	c.InitHandleSnapshot = c.viper.GetBool(initHandleSnapshot)
 	c.EnumerateHandles = c.viper.GetBool(enumerateHandles)
 	c.SymbolPaths = c.viper.GetString(symbolPaths)
+	c.SymbolizeKernelAddresses = c.viper.GetBool(symbolizeKernelAddresses)
 	c.DebugPrivilege = c.viper.GetBool(debugPrivilege)
 	c.KcapFile = c.viper.GetString(kcapFile)
 
@@ -366,6 +374,7 @@ func (c *Config) addFlags() {
 		c.flags.Bool(initHandleSnapshot, false, "Indicates whether initial handle snapshot is built. This implies scanning the system handles table and producing an entry for each handle object")
 		c.flags.Bool(enumerateHandles, false, "Indicates if process handles are collected during startup or when a new process is spawn")
 		c.flags.String(symbolPaths, "srv*c:\\\\SymCache*https://msdl.microsoft.com/download/symbols", "Designates the path or a series of paths separated by a semicolon that is used to search for symbols files")
+		c.flags.Bool(symbolizeKernelAddresses, false, "Determines if kernel stack addresses are symbolized")
 
 		c.flags.Bool(enableThreadKevents, true, "Determines whether thread kernel events are collected by Kernel Logger provider")
 		c.flags.Bool(enableRegistryKevents, true, "Determines whether registry kernel events are collected by Kernel Logger provider")

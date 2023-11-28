@@ -26,10 +26,13 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
+	"time"
 )
 
 // ErrSymInitialize is thrown if the process symbol handler fails to initialize
@@ -38,28 +41,108 @@ var ErrSymInitialize = func(pid uint32) error {
 }
 
 // callstackProcessErrors counts callstack process errors
-var callstackProcessErrors = expvar.NewInt("callstack.process.errors")
+var callstackProcessErrors = expvar.NewInt("symbolizer.process.errors")
+
+// symCleanups counts the number of symbol cleanups
+var symCleanups = expvar.NewInt("symbolizer.symbol.cleanups")
+
+// procTTLSeconds specifies the number of seconds
+// a process is allowed to remain in the map before
+// its handle and symbol resources are disposed
+const procTTLSeconds = 15
+
+type process struct {
+	pid      uint32
+	handle   windows.Handle
+	accessed time.Time
+	accesses uint64
+}
+
+func (p *process) keepalive() {
+	p.accessed = time.Now()
+	p.accesses++
+}
 
 // Symbolizer is responsible for converting raw addresses
 // into symbol names and modules with the assistance of the
 // Debug Helper API.
 type Symbolizer struct {
 	config *config.Config
-	procs  map[uint32]windows.Handle
+	procs  map[uint32]*process
+	mu     sync.Mutex
+
+	cleaner *time.Ticker
+	purger  *time.Ticker
 }
 
 // NewSymbolizer builds a new instance of address symbolizer.
 // It performs the initialization of symbol options, symbols
 // handlers and modules for kernel address symbolization.
 func NewSymbolizer(config *config.Config) *Symbolizer {
-	sys.SymLoadKernelModules(config.SymbolPaths)
-	return &Symbolizer{
-		config: config,
-		procs:  make(map[uint32]windows.Handle),
+	if config.SymbolizeKernelAddresses {
+		sys.SymLoadKernelModules(config.SymbolPaths)
+	}
+	sym := &Symbolizer{
+		config:  config,
+		procs:   make(map[uint32]*process),
+		cleaner: time.NewTicker(time.Second),
+		purger:  time.NewTicker(time.Minute * 5),
+	}
+
+	go sym.housekeep()
+
+	return sym
+}
+
+func (s *Symbolizer) CanEnqueue() bool { return false }
+
+func (s *Symbolizer) Close() {
+	s.cleaner.Stop()
+	s.purger.Stop()
+	s.cleanAllSyms()
+	if s.config.SymbolizeKernelAddresses {
+		for _, dev := range sys.EnumDevices() {
+			sys.SymUnloadModule(windows.CurrentProcess(), uint64(dev.Addr))
+		}
 	}
 }
 
 func (s *Symbolizer) ProcessEvent(e *kevent.Kevent) (bool, error) {
+	if e.IsTerminateProcess() {
+		// release symbol handler and process handle
+		pid := e.Kparams.MustGetPid()
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		proc, ok := s.procs[pid]
+		if !ok {
+			return true, nil
+		}
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+		sys.SymCleanup(proc.handle)
+		_ = windows.CloseHandle(proc.handle)
+		delete(s.procs, pid)
+		return true, nil
+	}
+	if e.IsLoadImage() || e.IsUnloadImage() {
+		filename := e.GetParamAsString(kparams.FileName)
+		// if the kernel driver is loaded or unloaded,
+		// load/unload symbol handlers respectively
+		if strings.ToLower(filepath.Ext(filename)) == ".sys" || e.Kparams.TryGetBool(kparams.FileIsDriver) {
+			m, err := windows.UTF16PtrFromString(filename)
+			if err != nil {
+				return true, nil
+			}
+			runtime.LockOSThread()
+			addr := e.Kparams.TryGetAddress(kparams.ImageBase)
+			if e.IsLoadImage() {
+				sys.SymLoadModule(windows.CurrentProcess(), 0, m, nil, addr.Uint64(), 0, 0, 0)
+			} else {
+				sys.SymUnloadModule(windows.CurrentProcess(), addr.Uint64())
+			}
+			runtime.UnlockOSThread()
+		}
+	}
 	if !e.Kparams.Contains(kparams.Callstack) {
 		return true, nil
 	}
@@ -68,80 +151,45 @@ func (s *Symbolizer) ProcessEvent(e *kevent.Kevent) (bool, error) {
 	if err != nil {
 		callstackProcessErrors.Add(1)
 	}
-	if e.IsTerminateProcess() {
-		// release symbol handler and process handle
-		pid := e.Kparams.MustGetPid()
-		proc := s.procs[pid]
-		sys.SymCleanup(proc)
-		_ = windows.CloseHandle(proc)
-		delete(s.procs, pid)
-	}
-	if e.IsLoadImage() || e.IsUnloadImage() {
-		filename := e.GetParamAsString(kparams.FileName)
-		if strings.ToLower(filepath.Ext(filename)) == ".sys" || e.Kparams.TryGetBool(kparams.FileIsDriver) {
-			// if the kernel driver is loaded or unloaded,
-			// load/unload symbol handlers respectively
-			m, err := windows.UTF16PtrFromString(filename)
-			if err != nil {
-				return true, nil
-			}
-			addr := e.Kparams.TryGetAddress(kparams.ImageBase)
-			if e.IsLoadImage() {
-				sys.SymLoadModule(windows.CurrentProcess(), 0, m, nil, addr.Uint64(), 0, 0, 0)
-			} else {
-				sys.SymUnloadModule(windows.CurrentProcess(), addr.Uint64())
-			}
-		}
-	}
 	return true, nil
 }
 
 func (s *Symbolizer) processCallstack(e *kevent.Kevent) error {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
-	// reserve callstack capacity
 	addrs := e.Kparams.MustGetSliceAddrs(kparams.Callstack)
 	e.Callstack.Init(len(addrs))
-	if e.IsVirtualAlloc() {
-		// virtual alloc requests can produce
-		// a considerable amount of events. To
-		// this extent, we can only afford
-		// decorating the frames when the fast
-		// mode is on. Sadly, fast mode can't
-		// resolve symbol names.
+	if e.IsVirtualAlloc() || (e.IsCreateFile() && !e.IsCreateDisposition()) {
+		// for high-volume events decorating
+		// the frames with symbol information
+		// is not viable. For this reason, the
+		// frames are decorated in fast mode.
+		// In this mode, symbolization is skipped
 		s.pushFrames(addrs, e, true)
 		return nil
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	proc, ok := s.procs[e.PID]
-	if ok && proc == windows.InvalidHandle {
-		s.pushFrames(addrs, e, true)
-		return nil
-	}
 	if !ok {
-		var err error
-		proc, err = windows.OpenProcess(windows.SYNCHRONIZE|windows.PROCESS_QUERY_INFORMATION, false, e.PID)
+		handle, err := windows.OpenProcess(windows.SYNCHRONIZE|windows.PROCESS_QUERY_INFORMATION, false, e.PID)
 		if err != nil {
-			// to avoid pressure on the OpenProcess call
-			// if the process object can't be acquired
-			s.procs[e.PID] = windows.InvalidHandle
 			s.pushFrames(addrs, e, true)
 			return err
 		}
+		// initialize symbol handler
+		sys.SymSetOptions(sys.SymUndname | sys.SymCaseInsensitive | sys.SymAutoPublics | sys.SymOmapFindNearest | sys.SymDeferredLoads)
+		if !sys.SymInitialize(handle, s.config.SymbolPathsUTF16(), true) {
+			s.pushFrames(addrs, e, true)
+			return ErrSymInitialize(e.PID)
+		}
+		proc = &process{e.PID, handle, time.Now(), 1}
 		s.procs[e.PID] = proc
 	}
 
-	// initialize symbol handler
-	sys.SymSetOptions(sys.SymUndname | sys.SymCaseInsensitive | sys.SymAutoPublics | sys.SymOmapFindNearest | sys.SymDeferredLoads)
-	if !sys.SymInitialize(proc, s.config.SymbolPathsUTF16(), true) {
-		// if we can't initialize the symbol handler
-		// let's resort to fast frame enrichment which
-		// doesn't require Debug Helper interaction
-		s.pushFrames(addrs, e, true)
-		return ErrSymInitialize(e.PID)
-	}
-	defer sys.SymCleanup(proc)
-
+	// full symbolization
 	s.pushFrames(addrs, e, false)
+	proc.keepalive()
 
 	return nil
 }
@@ -160,18 +208,22 @@ func (s *Symbolizer) pushFrames(addrs []va.Address, e *kevent.Kevent, fast bool)
 // decorated with the module name by iterating
 // through modules contained in the process
 // state. If fast mode is not enabled, the frame
-// is enriched with module and symbol name, and
-// memory section information such as allocation
-// size and protection type on the region of pages.
+// is enriched with module and symbol name by
+// calling into Debug Helper API.
 func (s *Symbolizer) produceFrame(addr va.Address, e *kevent.Kevent, fast bool) kevent.Frame {
 	frame := kevent.Frame{Addr: addr}
 	if addr.InSystemRange() {
-		frame.Module = sys.GetSymModuleName(windows.CurrentProcess(), addr.Uint64())
-		frame.Symbol, frame.Offset = sys.GetSymName(windows.CurrentProcess(), addr.Uint64())
+		if s.config.SymbolizeKernelAddresses {
+			frame.Module = sys.GetSymModuleName(windows.CurrentProcess(), addr.Uint64())
+			frame.Symbol, frame.Offset = sys.GetSymName(windows.CurrentProcess(), addr.Uint64())
+		}
 		return frame
 	}
 	if fast && e.PS != nil {
 		frame.Module = e.PS.FindModuleByVa(addr)
+		if frame.Module == "unbacked" {
+			frame.Module = e.PS.FindMappingByVa(addr)
+		}
 		return frame
 	}
 
@@ -182,20 +234,53 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *kevent.Kevent, fast bool) 
 		}
 		return frame
 	}
-	mod := sys.GetSymModuleName(proc, addr.Uint64())
+	mod := sys.GetSymModuleName(proc.handle, addr.Uint64())
 	if mod == "?" && e.PS != nil {
 		mod = e.PS.FindModuleByVa(addr)
 	}
+	if mod == "unbacked" {
+		mod = e.PS.FindMappingByVa(addr)
+	}
 	frame.Module = mod
-	frame.Symbol, frame.Offset = sys.GetSymName(proc, addr.Uint64())
+	frame.Symbol, frame.Offset = sys.GetSymName(proc.handle, addr.Uint64())
+	return frame
+}
 
-	region := va.VirtualQuery(proc, addr.Uint64())
-	if region != nil {
-		frame.AllocationSize = region.Size
-		frame.Protection = region.ProtectMask()
-		if frame.Module == "?" && region.IsMapped() {
-			frame.Module = region.GetMappedFile()
+func (s *Symbolizer) cleanSym() {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, proc := range s.procs {
+		if time.Now().Sub(proc.accessed).Seconds() > procTTLSeconds {
+			symCleanups.Add(1)
+			log.Debugf("deallocating symbol resources for pid %d. Accessed %d time(s)", proc.pid, proc.accesses)
+			sys.SymCleanup(proc.handle)
+			_ = windows.Close(proc.handle)
+			delete(s.procs, proc.pid)
 		}
 	}
-	return frame
+}
+
+func (s *Symbolizer) cleanAllSyms() {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, proc := range s.procs {
+		sys.SymCleanup(proc.handle)
+		_ = windows.Close(proc.handle)
+	}
+	s.procs = make(map[uint32]*process)
+}
+
+func (s *Symbolizer) housekeep() {
+	for {
+		select {
+		case <-s.cleaner.C:
+			s.cleanSym()
+		case <-s.purger.C:
+			s.cleanAllSyms()
+		}
+	}
 }

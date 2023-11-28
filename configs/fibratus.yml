@@ -466,12 +466,14 @@ pe:
   # consulted for computing section hashes, calculating the entropy, and so on
   #read-sections: false
 
-# =============================== Transformers =========================================
-
 # Designates the path or a series of paths separated by a semicolon that is used to search
 # for symbols files
-
 # symbol-paths: srv*c:\\SymCache*https://msdl.microsoft.com/download/symbols
+
+# Determines if kernel stack addresses are symbolized
+# symbolize-kernel-addresses: false
+
+# =============================== Transformers =========================================
 
 # Transformers are responsible for augmenting, parsing or enriching kernel events.
 transformers:

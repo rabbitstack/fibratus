@@ -95,9 +95,10 @@ var schema = `
 			},
 			"additionalProperties": false
 		},
-		"config-file": 		{"type": "string"},
-		"debug-privilege":  {"type": "boolean"},
-		"symbol-paths":		{"type": "string"},
+		"config-file": 						{"type": "string"},
+		"debug-privilege":  				{"type": "boolean"},
+		"symbol-paths":						{"type": "string"},
+		"symbolize-kernel-addresses":		{"type": "boolean"},
 		"handle": {
 			"type": "object",
 			"properties": {

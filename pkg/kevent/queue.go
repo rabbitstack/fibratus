@@ -39,6 +39,12 @@ type Listener interface {
 	// In case any errors occur during processing, this method returns
 	// the error and stops further event processing.
 	ProcessEvent(*Kevent) (bool, error)
+	// CanEnqueue indicates if the event listener is capable of
+	// submitting the event to the output queue if the ProcessEvent
+	// method returns true. In general, processors that merely
+	// mutate or enrich event state, shouldn't influence event
+	// queueing decisions.
+	CanEnqueue() bool
 }
 
 // Queue is the channel-backed data structure for
@@ -131,7 +137,7 @@ func (q *Queue) push(e *Kevent) error {
 		if err != nil {
 			return err
 		}
-		if enq {
+		if listener.CanEnqueue() && enq {
 			enqueue = true
 		}
 	}

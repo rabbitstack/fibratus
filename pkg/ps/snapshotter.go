@@ -21,6 +21,7 @@ package ps
 import (
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
+	"github.com/rabbitstack/fibratus/pkg/util/va"
 )
 
 // Snapshotter is the interface that exposes a set of methods all process snapshotters have to satisfy. It stores the state
@@ -39,6 +40,10 @@ type Snapshotter interface {
 	RemoveThread(pid uint32, tid uint32) error
 	// RemoveModule removes the module the given process.
 	RemoveModule(pid uint32, mod string) error
+	// AddFileMapping adds a new data memory-mapped file to this process state.
+	AddFileMapping(*kevent.Kevent) error
+	// RemoveFileMapping removes memory-mapped file at the given base address.
+	RemoveFileMapping(pid uint32, address va.Address) error
 	// WriteFromKcap appends a new process state to the snapshotter from the captured kernel event.
 	WriteFromKcap(kevt *kevent.Kevent) error
 	// Remove deletes process's state from the snapshotter.

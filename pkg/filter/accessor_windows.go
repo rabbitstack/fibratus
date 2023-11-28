@@ -566,6 +566,11 @@ func (t *threadAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value
 			return nil, nil
 		}
 		return kevt.GetParamAsString(kparams.NTStatus), nil
+	case fields.ThreadCallstack:
+		if kevt.Callstack.Depth() == 0 {
+			return nil, nil
+		}
+		return kevt.Callstack.String(), nil
 	}
 	return nil, nil
 }

@@ -630,6 +630,8 @@ func (r *Rules) hasExcludeGroups() bool {
 	return r.hasExclude
 }
 
+func (*Rules) CanEnqueue() bool { return true }
+
 func (r *Rules) ProcessEvent(evt *kevent.Kevent) (bool, error) {
 	// if no rules were loaded into the engine
 	// the event is forwarded to the aggregator

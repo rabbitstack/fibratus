@@ -164,6 +164,8 @@ func parseCompilerErrors(errors []yara.CompilerMessage) error {
 	return multierror.Wrap(errs...)
 }
 
+func (s scanner) CanEnqueue() bool { return false }
+
 func (s scanner) ProcessEvent(evt *kevent.Kevent) (bool, error) {
 	return s.Scan(evt)
 }

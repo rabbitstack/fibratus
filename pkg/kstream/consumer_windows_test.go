@@ -48,6 +48,8 @@ type MockListener struct {
 	gotEvent bool
 }
 
+func (l *MockListener) CanEnqueue() bool { return true }
+
 func (l *MockListener) ProcessEvent(e *kevent.Kevent) (bool, error) {
 	l.gotEvent = true
 	return true, nil

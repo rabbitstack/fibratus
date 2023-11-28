@@ -97,13 +97,13 @@ type Kevent struct {
 	Metadata Metadata `json:"metadata"`
 	// PS represents process' metadata and its allocated resources such as handles, DLLs, etc.
 	PS *pstypes.PS `json:"ps,omitempty"`
+	// Callstack represents the call stack for the thread that generated the event.
+	Callstack Callstack `json:"callstack"`
 	// WaitEnqueue indicates if this event should temporarily defer pushing to
 	// the consumer output queue. This is usually required in event processors
-	// to propagate certain events when the related event arrives, and it is replaced
-	// by the event that was temporarily stored in processor's state.
+	// to propagate certain events stored in processor's state when the related
+	// event arrives.
 	WaitEnqueue bool `json:"waitenqueue"`
-	// Callstack comprises the thread call stack.
-	Callstack Callstack `json:"callstack"`
 }
 
 // String returns event's string representation.

@@ -27,6 +27,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
@@ -49,6 +50,8 @@ type fsProcessor struct {
 	mmaps map[uint32]map[uint64]*MmapInfo
 
 	hsnap handle.Snapshotter
+	psnap ps.Snapshotter
+
 	// irps contains a mapping between the IRP (I/O request packet) and CreateFile events
 	irps map[uint64]*kevent.Kevent
 
@@ -70,12 +73,19 @@ type MmapInfo struct {
 	Size     uint64
 }
 
-func newFsProcessor(hsnap handle.Snapshotter, devMapper fs.DevMapper, devPathResolver fs.DevPathResolver, config *config.Config) Processor {
+func newFsProcessor(
+	hsnap handle.Snapshotter,
+	psnap ps.Snapshotter,
+	devMapper fs.DevMapper,
+	devPathResolver fs.DevPathResolver,
+	config *config.Config,
+) Processor {
 	return &fsProcessor{
 		files:           make(map[uint64]*FileInfo),
 		mmaps:           make(map[uint32]map[uint64]*MmapInfo),
 		irps:            make(map[uint64]*kevent.Kevent),
 		hsnap:           hsnap,
+		psnap:           psnap,
 		devMapper:       devMapper,
 		devPathResolver: devPathResolver,
 		config:          config,
@@ -140,6 +150,8 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 			name := f.devMapper.Convert(sys.GetMappedFile(process, uintptr(addr)))
 			f.mmaps[e.PID][fileKey] = &MmapInfo{File: name, BaseAddr: viewBase, Size: viewSize}
 		}
+		e.AppendParam(kparams.FileName, kparams.FilePath, f.mmaps[e.PID][fileKey].File)
+		return e, f.psnap.AddFileMapping(e)
 	case ktypes.CreateFile:
 		// we defer the processing of the CreateFile event until we get
 		// the matching FileOpEnd event. This event contains the operation
@@ -202,6 +214,7 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 		delete(f.files, fileKey)
 		delete(f.files, fileObject)
 	case ktypes.UnmapViewFile:
+		_ = f.psnap.RemoveFileMapping(e.PID, e.Kparams.TryGetAddress(kparams.FileViewBase))
 		fileKey := e.Kparams.MustGetUint64(kparams.FileKey)
 		if _, ok := f.mmaps[e.PID]; !ok {
 			return e, nil
@@ -246,7 +259,7 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 			f.initMmap(e.PID)
 			f.mmaps[e.PID][fileKey] = &MmapInfo{File: name, BaseAddr: viewBase, Size: viewSize}
 			e.AppendParam(kparams.FileName, kparams.FilePath, name)
-			return e, nil
+			return e, f.psnap.AddFileMapping(e)
 		}
 
 		// ignore object misses that are produced by CloseFile
@@ -267,6 +280,9 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 				e.AppendEnum(kparams.FileType, uint32(fileinfo.Type), fs.FileTypes)
 			}
 			e.AppendParam(kparams.FileName, kparams.FilePath, fileinfo.Name)
+		}
+		if e.IsMapViewFile() {
+			return e, f.psnap.AddFileMapping(e)
 		}
 	}
 	return e, nil

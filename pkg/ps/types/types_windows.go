@@ -67,6 +67,8 @@ type PS struct {
 	Threads map[uint32]Thread `json:"-"`
 	// Modules contains all the modules loaded by the process.
 	Modules []Module `json:"modules"`
+	// FileMappings contains all memory-mapped data files.
+	FileMappings []Mmap
 	// Handles represents the collection of handles allocated by the process.
 	Handles htypes.Handles `json:"handles"`
 	// PE stores the PE (Portable Executable) metadata.
@@ -223,20 +225,28 @@ func (m Module) String() string {
 // IsExecutable determines if the loaded module is an executable.
 func (m Module) IsExecutable() bool { return strings.ToLower(filepath.Ext(m.Name)) == ".exe" }
 
+// Mmap stores information of the memory-mapped file.
+type Mmap struct {
+	File        string
+	BaseAddress va.Address
+	Size        uint64
+}
+
 // New produces a new process state.
 func New(pid, ppid uint32, name, cmndline, exe string, sid *windows.SID, sessionID uint32) *PS {
 	ps := &PS{
-		PID:       pid,
-		Ppid:      ppid,
-		Name:      name,
-		Cmdline:   cmndline,
-		Exe:       exe,
-		Args:      cmdline.Split(cmndline),
-		SID:       sid.String(),
-		SessionID: sessionID,
-		Threads:   make(map[uint32]Thread),
-		Modules:   make([]Module, 0),
-		Handles:   make([]htypes.Handle, 0),
+		PID:          pid,
+		Ppid:         ppid,
+		Name:         name,
+		Cmdline:      cmndline,
+		Exe:          exe,
+		Args:         cmdline.Split(cmndline),
+		SID:          sid.String(),
+		SessionID:    sessionID,
+		Threads:      make(map[uint32]Thread),
+		Modules:      make([]Module, 0),
+		Handles:      make([]htypes.Handle, 0),
+		FileMappings: make([]Mmap, 0),
 	}
 	ps.Username, ps.Domain, _, _ = sid.LookupAccount("")
 	return ps
@@ -245,11 +255,12 @@ func New(pid, ppid uint32, name, cmndline, exe string, sid *windows.SID, session
 // NewFromKcap reconstructs the state of the process from the capture file.
 func NewFromKcap(buf []byte, sec section.Section) (*PS, error) {
 	ps := PS{
-		Args:    make([]string, 0),
-		Envs:    make(map[string]string),
-		Handles: make([]htypes.Handle, 0),
-		Modules: make([]Module, 0),
-		Threads: make(map[uint32]Thread),
+		Args:         make([]string, 0),
+		Envs:         make(map[string]string),
+		Handles:      make([]htypes.Handle, 0),
+		Modules:      make([]Module, 0),
+		Threads:      make(map[uint32]Thread),
+		FileMappings: make([]Mmap, 0),
 	}
 	if err := ps.Unmarshal(buf, sec); err != nil {
 		return nil, err
@@ -315,13 +326,39 @@ func (ps *PS) FindModule(path string) *Module {
 	return nil
 }
 
-// FindModuleByVa finds the module name by comparing
-// the range of the given virtual address.
+// FindModuleByVa finds the module name by
+// probing the range of the given virtual address.
 func (ps *PS) FindModuleByVa(addr va.Address) string {
 	for _, mod := range ps.Modules {
 		if addr >= mod.BaseAddress && addr <= mod.BaseAddress.Inc(mod.Size) {
 			return mod.Name
 		}
 	}
-	return "?"
+	return "unbacked"
+}
+
+// MapFile adds a new data-mapped file this process state.
+func (ps *PS) MapFile(mmap Mmap) {
+	ps.FileMappings = append(ps.FileMappings, mmap)
+}
+
+// UnmapFile removes a specified data-mapped file from this process state.
+func (ps *PS) UnmapFile(addr va.Address) {
+	for i, mmap := range ps.FileMappings {
+		if mmap.BaseAddress == addr {
+			ps.FileMappings = append(ps.FileMappings[:i], ps.FileMappings[i+1:]...)
+			break
+		}
+	}
+}
+
+// FindMappingByVa finds the memory-mapped file
+// by probing the range of the given virtual address.
+func (ps *PS) FindMappingByVa(addr va.Address) string {
+	for _, mmap := range ps.FileMappings {
+		if addr >= mmap.BaseAddress && addr <= mmap.BaseAddress.Inc(mmap.Size) {
+			return mmap.File
+		}
+	}
+	return "unbacked"
 }

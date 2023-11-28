@@ -177,6 +177,9 @@ const (
 	ThreadAccessMaskNames Field = "thread.access.mask.names"
 	// ThreadAccessStatus represents the thread access status field
 	ThreadAccessStatus Field = "thread.access.status"
+	// ThreadCallstack represents the thread callstack summary field
+	ThreadCallstack        = "thread.callstack"
+	ThreadCallstackSummary = "thread.callstack.summary"
 
 	// PeNumSections represents the number of sections
 	PeNumSections Field = "pe.nsections"
@@ -607,6 +610,7 @@ var fields = map[Field]FieldInfo{
 	ThreadAccessMask:      {ThreadAccessMask, "thread desired access rights", kparams.AnsiString, []string{"thread.access.mask = '0x1fffff'"}, nil},
 	ThreadAccessMaskNames: {ThreadAccessMaskNames, "thread desired access rights as a string list", kparams.Slice, []string{"thread.access.mask.names in ('IMPERSONATE')"}, nil},
 	ThreadAccessStatus:    {ThreadAccessStatus, "thread access status", kparams.UnicodeString, []string{"thread.access.status = 'success'"}, nil},
+	ThreadCallstack:       {ThreadCallstack, "thread callstack summary", kparams.UnicodeString, []string{"thread.callstack icontains 'ntdll.dll'"}, nil},
 
 	ImageName:               {ImageName, "full image name", kparams.UnicodeString, []string{"image.name contains 'advapi32.dll'"}, nil},
 	ImageBase:               {ImageBase, "the base address of process in which the image is loaded", kparams.Address, []string{"image.base.address = 'a65d800000'"}, nil},

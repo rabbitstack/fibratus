@@ -21,9 +21,11 @@ package ps
 import (
 	"expvar"
 	"github.com/rabbitstack/fibratus/pkg/sys"
+	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -50,6 +52,7 @@ var (
 	processCount              = expvar.NewInt("process.count")
 	threadCount               = expvar.NewInt("process.thread.count")
 	moduleCount               = expvar.NewInt("process.module.count")
+	mmapCount                 = expvar.NewInt("process.mmap.count")
 	pebReadErrors             = expvar.NewInt("process.peb.read.errors")
 )
 
@@ -243,6 +246,43 @@ func (s *snapshotter) RemoveModule(pid uint32, module string) error {
 	}
 	proc.RemoveModule(module)
 	moduleCount.Add(-1)
+	return nil
+}
+
+func (s *snapshotter) AddFileMapping(e *kevent.Kevent) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	proc, ok := s.procs[e.PID]
+	if !ok {
+		return nil
+	}
+
+	filename := e.GetParamAsString(kparams.FileName)
+	ext := strings.ToLower(filepath.Ext(filename))
+	// skip redundant or unneeded memory-mapped files
+	if ext == ".dll" || ext == ".exe" || ext == ".mui" {
+		return nil
+	}
+	mmapCount.Add(1)
+	mmap := pstypes.Mmap{}
+	mmap.File = filename
+	mmap.BaseAddress = e.Kparams.TryGetAddress(kparams.FileViewBase)
+	mmap.Size, _ = e.Kparams.GetUint64(kparams.FileViewSize)
+
+	proc.MapFile(mmap)
+
+	return nil
+}
+
+func (s *snapshotter) RemoveFileMapping(pid uint32, addr va.Address) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	proc, ok := s.procs[pid]
+	if !ok {
+		return nil
+	}
+	mmapCount.Add(-1)
+	proc.UnmapFile(addr)
 	return nil
 }
 

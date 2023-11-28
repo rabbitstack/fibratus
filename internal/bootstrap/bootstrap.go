@@ -50,6 +50,7 @@ var ErrAlreadyRunning = errors.New("an instance of Fibratus process is already r
 type App struct {
 	config     *config.Config
 	controller *kstream.Controller
+	symbolizer *symbolize.Symbolizer
 	hsnap      handle.Snapshotter
 	psnap      ps.Snapshotter
 	consumer   kstream.Consumer
@@ -223,7 +224,8 @@ func (f *App) Run(args []string) error {
 	} else {
 		// register stack symbolizer
 		if cfg.Kstream.StackEnrichment {
-			f.consumer.RegisterEventListener(symbolize.NewSymbolizer(cfg))
+			f.symbolizer = symbolize.NewSymbolizer(cfg)
+			f.consumer.RegisterEventListener(f.symbolizer)
 		}
 		// register rule engine
 		f.consumer.RegisterEventListener(rules)
@@ -369,6 +371,9 @@ func (f *App) Shutdown() error {
 		if err := f.controller.Close(); err != nil {
 			errs = append(errs, err)
 		}
+	}
+	if f.symbolizer != nil {
+		f.symbolizer.Close()
 	}
 	if f.consumer != nil {
 		if err := f.consumer.Close(); err != nil {
