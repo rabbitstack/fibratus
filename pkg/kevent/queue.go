@@ -109,10 +109,12 @@ func (q *Queue) Push(e *Kevent) error {
 		if e.IsStackWalk() {
 			e = q.cd.Pop(e)
 		}
-		// flush long-standing events
-		errs := q.cd.Flush()
-		if len(errs) > 0 {
-			return multierror.Wrap(errs...)
+		if !e.IsStackWalk() {
+			// flush long-standing events
+			errs := q.cd.Flush()
+			if len(errs) > 0 {
+				return multierror.Wrap(errs...)
+			}
 		}
 	}
 	if isEventDelayed(e) {
@@ -144,6 +146,8 @@ func (q *Queue) push(e *Kevent) error {
 	if enqueue {
 		q.q <- e
 		keventsEnqueued.Add(1)
+	} else {
+		e.Release()
 	}
 	return nil
 }

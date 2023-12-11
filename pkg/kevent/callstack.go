@@ -19,18 +19,23 @@
 package kevent
 
 import (
+	"expvar"
 	"github.com/gammazero/deque"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 )
 
-// maxDequeFlushPeriod specifies the maximum period in seconds for
-// the events to reside in the deque.
-const maxDequeFlushPeriod = 4
+// maxDequeFlushPeriod specifies the maximum period
+// for the events to reside in the deque.
+const maxDequeFlushPeriod = 2 * time.Minute
+
+// callstackFlushes computes overall callstack dequeue flushes
+var callstackFlushes = expvar.NewInt("callstack.flushes")
 
 // Frame describes a single stack frame.
 type Frame struct {
@@ -44,7 +49,7 @@ type Frame struct {
 
 // IsUnbacked returns true if this frame is originated
 // from unbacked memory section
-func (f Frame) IsUnbacked() bool { return f.Module == "?" }
+func (f Frame) IsUnbacked() bool { return f.Module == "unbacked" }
 
 // Callstack is a sequence of stack frames
 // representing function executions.
@@ -61,11 +66,24 @@ func (s *Callstack) PushFrame(f Frame) {
 }
 
 // Depth returns the number of frames in the call stack.
-func (s Callstack) Depth() int { return len(s) }
+func (s *Callstack) Depth() int { return len(*s) }
+
+// Summary returns a sequence of module names for each stack frame.
+func (s Callstack) Summary() string {
+	var sb strings.Builder
+	for i, frame := range s {
+		sb.WriteString(filepath.Base(frame.Module))
+		if i != len(s)-1 {
+			sb.WriteRune('|')
+		}
+	}
+	return sb.String()
+}
 
 func (s Callstack) String() string {
 	var sb strings.Builder
 	for i, frame := range s {
+		sb.WriteString("0x")
 		sb.WriteString(frame.Addr.String())
 		sb.WriteString(" ")
 		sb.WriteString(frame.Module)
@@ -113,7 +131,7 @@ type CallstackDecorator struct {
 // which receives the event queue for long-standing event
 // flushing.
 func NewCallstackDecorator(q *Queue) *CallstackDecorator {
-	return &CallstackDecorator{q: q, deq: deque.New[*Kevent]()}
+	return &CallstackDecorator{q: q, deq: deque.New[*Kevent](100)}
 }
 
 // Push pushes a new event to the queue.
@@ -130,7 +148,7 @@ func (cd *CallstackDecorator) Push(e *Kevent) {
 func (cd *CallstackDecorator) Pop(e *Kevent) *Kevent {
 	cd.mux.Lock()
 	defer cd.mux.Unlock()
-	i := cd.deq.RIndex(func(evt *Kevent) bool { return evt.StackID() == e.StackID() })
+	i := cd.deq.Index(func(evt *Kevent) bool { return evt.StackID() == e.StackID() })
 	if i == -1 {
 		return e
 	}
@@ -152,9 +170,10 @@ func (cd *CallstackDecorator) Flush() []error {
 	errs := make([]error, 0)
 	for i := 0; i < cd.deq.Len(); i++ {
 		evt := cd.deq.At(i)
-		if time.Now().Sub(evt.Timestamp).Seconds() < maxDequeFlushPeriod {
+		if time.Now().Sub(evt.Timestamp) < maxDequeFlushPeriod {
 			continue
 		}
+		callstackFlushes.Add(1)
 		err := cd.q.push(cd.deq.Remove(i))
 		if err != nil {
 			errs = append(errs, err)

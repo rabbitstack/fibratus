@@ -46,6 +46,7 @@ var (
 	modwintrust = windows.NewLazySystemDLL("wintrust.dll")
 	modwtsapi32 = windows.NewLazySystemDLL("wtsapi32.dll")
 
+	procEnumerateLoadedModulesW64            = moddbghelp.NewProc("EnumerateLoadedModulesW64")
 	procSymCleanup                           = moddbghelp.NewProc("SymCleanup")
 	procSymFromAddrW                         = moddbghelp.NewProc("SymFromAddrW")
 	procSymGetModuleInfoW64                  = moddbghelp.NewProc("SymGetModuleInfoW64")
@@ -77,6 +78,12 @@ var (
 	procWinVerifyTrust                       = modwintrust.NewProc("WinVerifyTrust")
 	procWTSQuerySessionInformationW          = modwtsapi32.NewProc("WTSQuerySessionInformationW")
 )
+
+func SymEnumLoadedModules(handle windows.Handle, callback uintptr, ctx uintptr) (b bool) {
+	r0, _, _ := syscall.Syscall(procEnumerateLoadedModulesW64.Addr(), 3, uintptr(handle), uintptr(callback), uintptr(ctx))
+	b = r0 != 0
+	return
+}
 
 func SymCleanup(handle windows.Handle) (b bool) {
 	r0, _, _ := syscall.Syscall(procSymCleanup.Addr(), 1, uintptr(handle), 0, 0)

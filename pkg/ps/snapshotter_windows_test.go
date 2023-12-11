@@ -27,6 +27,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/sys"
+	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -290,7 +291,7 @@ func TestAddThread(t *testing.T) {
 			require.Equal(t, exists, ok)
 			if ok {
 				assert.Contains(t, proc.Threads, evt.Kparams.MustGetTid())
-				assert.Equal(t, kparams.Addr(140729524944768), proc.Threads[evt.Kparams.MustGetTid()].Entrypoint)
+				assert.Equal(t, va.Address(140729524944768), proc.Threads[evt.Kparams.MustGetTid()].Entrypoint)
 			}
 		})
 	}
@@ -512,7 +513,6 @@ func TestFindQueryOS(t *testing.T) {
 	}
 	time.Sleep(time.Second * 1)
 	defer windows.TerminateProcess(notepadHandle, 257)
-
 	ok, proc := psnap.Find(notepadPID)
 	require.False(t, ok)
 	require.NotNil(t, proc)

@@ -21,7 +21,6 @@ package sys
 import (
 	"github.com/rabbitstack/fibratus/pkg/util/utf16"
 	"golang.org/x/sys/windows"
-	"runtime"
 	"unsafe"
 )
 
@@ -164,30 +163,4 @@ func GetSymName(proc windows.Handle, addr uint64) (string, uint64) {
 		return "?", offset
 	}
 	return symbol, offset
-}
-
-// SymLoadKernelModules initializes the symbol
-// handler for the current process and loads
-// kernel modules debugging info.
-func SymLoadKernelModules(s string) bool {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
-	SymSetOptions(SymUndname | SymCaseInsensitive | SymAutoPublics)
-
-	path, err := windows.UTF16PtrFromString(s)
-	if err != nil {
-		return false
-	}
-	if !SymInitialize(windows.CurrentProcess(), path, false) {
-		return false
-	}
-	devs := EnumDevices()
-	for _, dev := range devs {
-		m, err := windows.UTF16PtrFromString(dev.Filename)
-		if err != nil {
-			continue
-		}
-		SymLoadModule(windows.CurrentProcess(), 0, m, nil, uint64(dev.Addr), 0, 0, 0)
-	}
-	return true
 }

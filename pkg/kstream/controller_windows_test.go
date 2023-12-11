@@ -67,7 +67,7 @@ func TestStartTraces(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := NewController(tt.cfg)
+			ctrl := NewController(tt.cfg.Kstream)
 			require.NoError(t, ctrl.Start())
 			defer ctrl.Close()
 			assert.Equal(t, tt.wantSessions, len(ctrl.traces))
@@ -97,7 +97,7 @@ func TestRestartTrace(t *testing.T) {
 		},
 	}
 
-	ctrl := NewController(cfg)
+	ctrl := NewController(cfg.Kstream)
 	require.NoError(t, ctrl.Start())
 	require.NoError(t, ctrl.Start())
 	require.NoError(t, etw.ControlTrace(0, ctrl.traces[0].Name, ctrl.traces[0].GUID, etw.Query))

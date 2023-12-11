@@ -29,10 +29,14 @@ import (
 type Ktype [18]byte
 
 var (
-	// ProcessEventGUID represents process events GUID
+	// ProcessEventGUID represents process event GUID
 	ProcessEventGUID = windows.GUID{Data1: 0x3d6fa8d0, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}
-	// FileEventGUID represents file events GUID
+	// ThreadEventGUID represents thread evens GUID
+	ThreadEventGUID = windows.GUID{Data1: 0x3d6fa8d1, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}
+	// FileEventGUID represents file event GUID
 	FileEventGUID = windows.GUID{Data1: 0x90cbdc39, Data2: 0x4a3e, Data3: 0x11d1, Data4: [8]byte{0x84, 0xf4, 0x0, 0x0, 0xf8, 0x04, 0x64, 0xe3}}
+	// RegistryEventGUID represents registry event GUID
+	RegistryEventGUID = windows.GUID{Data1: 0xae53722e, Data2: 0xc863, Data3: 0x11d2, Data4: [8]byte{0x86, 0x59, 0x0, 0xc0, 0x4f, 0xa3, 0x21, 0xa1}}
 )
 
 var (
@@ -470,12 +474,10 @@ func (k Ktype) CanEnrichStack() bool {
 		CreateThread,
 		TerminateThread,
 		LoadImage,
-		VirtualAlloc,
 		RegCreateKey,
+		RegDeleteKey,
 		RegSetValue,
 		RegDeleteValue,
-		RegDeleteKey,
-		CreateFile,
 		DeleteFile,
 		RenameFile:
 		return true

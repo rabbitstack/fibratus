@@ -65,3 +65,4 @@ package sys
 //sys SymUnloadModule(handle windows.Handle, baseDLL uint64) = dbghelp.SymUnloadModule64
 //sys SymGetModuleInfo(handle windows.Handle, addr uint64, mod *ModuleInfo) (b bool) = dbghelp.SymGetModuleInfoW64
 //sys SymCleanup(handle windows.Handle) (b bool) = dbghelp.SymCleanup
+//sys SymEnumLoadedModules(handle windows.Handle, callback uintptr, ctx uintptr) (b bool) = dbghelp.EnumerateLoadedModulesW64

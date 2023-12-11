@@ -60,6 +60,12 @@ func (s Sec) String() string {
 	return fmt.Sprintf("Name: %s, Size: %d, Entropy: %f, Md5: %s", s.Name, s.Size, s.Entropy, s.Md5)
 }
 
+// Export describes the export attributes.
+type Export struct {
+	Function string
+	RVA      uint32
+}
+
 // PE contains various headers that identifies the format and characteristics of the executable files.
 type PE struct {
 	// NumberOfSections designates the total number of sections found withing the binary.
@@ -102,6 +108,8 @@ type PE struct {
 	Is64 bool `json:"is_64"`
 	// IsModified indicates if PE differs from its in-memory state
 	IsModified bool `json:"is_modified"`
+	// Exports contains exported function names indexed by RVA
+	Exports map[uint32]string `json:"exports"`
 
 	dosHeader      peparser.ImageDOSHeader
 	ntHeader       peparser.ImageNtHeader

@@ -33,6 +33,12 @@ func (a Address) Inc(offset uint64) Address {
 	return a
 }
 
+// Dec decrements the address by given offset.
+func (a Address) Dec(offset uint64) Address {
+	a -= Address(offset)
+	return a
+}
+
 // InSystemRange determines if this address is in the system address space range.
 // The kernel preferentially uses these two ranges to load DLLs at shared addresses.
 func (a Address) InSystemRange() bool { return a >= 0xfffff80000000000 && a < 0xffffffffffffffff }

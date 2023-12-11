@@ -17,3 +17,9 @@
  */
 
 package symbolize
+
+import "testing"
+
+func TestProcessCallstack(t *testing.T) {
+
+}

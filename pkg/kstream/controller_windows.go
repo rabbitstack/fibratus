@@ -47,6 +47,23 @@ const (
 	maxTracePropsSize = 2 * (maxLoggerNameSize + maxLogfileNameSize)
 )
 
+var (
+	// stackTraceEvents identifies the events for which stack tracing is enabled
+	stackTraceEvents = []etw.ClassicEventID{
+		etw.NewClassicEventID(ktypes.ProcessEventGUID, ktypes.CreateProcess.HookID()),
+		etw.NewClassicEventID(ktypes.ThreadEventGUID, ktypes.CreateThread.HookID()),
+		etw.NewClassicEventID(ktypes.ThreadEventGUID, ktypes.TerminateThread.HookID()),
+		etw.NewClassicEventID(ktypes.ProcessEventGUID, ktypes.LoadImage.HookID()),
+		etw.NewClassicEventID(ktypes.RegistryEventGUID, ktypes.RegCreateKey.HookID()),
+		etw.NewClassicEventID(ktypes.RegistryEventGUID, ktypes.RegDeleteKey.HookID()),
+		etw.NewClassicEventID(ktypes.RegistryEventGUID, ktypes.RegSetValue.HookID()),
+		etw.NewClassicEventID(ktypes.RegistryEventGUID, ktypes.RegDeleteValue.HookID()),
+		etw.NewClassicEventID(ktypes.FileEventGUID, ktypes.CreateFile.HookID()),
+		etw.NewClassicEventID(ktypes.FileEventGUID, ktypes.DeleteFile.HookID()),
+		etw.NewClassicEventID(ktypes.FileEventGUID, ktypes.RenameFile.HookID()),
+	}
+)
+
 // initEventTraceProps builds the trace properties descriptor which
 // influences the behaviour of event publishing to the trace session
 // buffers.
@@ -85,25 +102,6 @@ func initEventTraceProps(c config.KstreamConfig) etw.EventTraceProperties {
 		MaximumBuffers: maxBuffers,
 		FlushTimer:     uint32(flushTimer.Seconds()),
 	}
-}
-
-// stackTraceIds returns a list of event types for which callstack tracing is enabled.
-func stackTraceIds() []etw.ClassicEventID {
-	// FileOpEnd is state-oriented but we need it for stack enrichment
-	ids := []etw.ClassicEventID{etw.NewClassicEventID(ktypes.FileEventGUID, ktypes.FileOpEnd.HookID())}
-	for _, ktype := range ktypes.All() {
-		// CreateFile is enriched with the callstack
-		//
-		if !ktype.CanEnrichStack() || ktype == ktypes.CreateFile {
-			continue
-		}
-		if ktype == ktypes.LoadImage {
-			ids = append(ids, etw.NewClassicEventID(ktypes.ProcessEventGUID, ktype.HookID()))
-		} else {
-			ids = append(ids, etw.NewClassicEventID(ktype.GUID(), ktype.HookID()))
-		}
-	}
-	return ids
 }
 
 // Trace is the essential building block for controlling
@@ -202,7 +200,7 @@ func (t *Trace) Start(config config.KstreamConfig) error {
 		}
 		// enable stack enrichment
 		if config.StackEnrichment {
-			if err := etw.EnableStackTracing(handle, stackTraceIds()); err != nil {
+			if err := etw.EnableStackTracing(handle, stackTraceEvents); err != nil {
 				return fmt.Errorf("fail to enable kernel callstack tracing: %v", err)
 			}
 		}

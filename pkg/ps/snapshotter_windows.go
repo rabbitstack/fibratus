@@ -432,7 +432,7 @@ func (s *snapshotter) Find(pid uint32) (bool, *pstypes.PS) {
 		// image executable path or process times
 		process, err = windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
 		if err != nil {
-			return false, proc
+			return false, nil
 		}
 	}
 	//nolint:errcheck
@@ -440,6 +440,13 @@ func (s *snapshotter) Find(pid uint32) (bool, *pstypes.PS) {
 
 	// get process executable full path and name
 	proc.Exe, proc.Name = getProcExecutable(process)
+
+	// consult process parent id
+	info, err := sys.QueryInformationProcess[windows.PROCESS_BASIC_INFORMATION](process, windows.ProcessBasicInformation)
+	if err != nil {
+		return false, proc
+	}
+	proc.Ppid = uint32(info.InheritedFromUniqueProcessId)
 
 	// retrieve Portable Executable data
 	proc.PE, err = pe.ParseFileWithConfig(proc.Exe, s.config.PE)
@@ -473,13 +480,6 @@ func (s *snapshotter) Find(pid uint32) (bool, *pstypes.PS) {
 	}
 	proc.SID = usr.User.Sid.String()
 	proc.Username, proc.Domain, _, _ = usr.User.Sid.LookupAccount("")
-
-	// consult process parent id
-	info, err := sys.QueryInformationProcess[windows.PROCESS_BASIC_INFORMATION](process, windows.ProcessBasicInformation)
-	if err != nil {
-		return false, proc
-	}
-	proc.Ppid = uint32(info.InheritedFromUniqueProcessId)
 
 	// retrieve process handles
 	proc.Handles, err = s.hsnap.FindHandles(pid)

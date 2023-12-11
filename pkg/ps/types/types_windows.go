@@ -328,13 +328,13 @@ func (ps *PS) FindModule(path string) *Module {
 
 // FindModuleByVa finds the module name by
 // probing the range of the given virtual address.
-func (ps *PS) FindModuleByVa(addr va.Address) string {
+func (ps *PS) FindModuleByVa(addr va.Address) *Module {
 	for _, mod := range ps.Modules {
 		if addr >= mod.BaseAddress && addr <= mod.BaseAddress.Inc(mod.Size) {
-			return mod.Name
+			return &mod
 		}
 	}
-	return "unbacked"
+	return nil
 }
 
 // MapFile adds a new data-mapped file this process state.

@@ -26,6 +26,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -295,7 +296,8 @@ func TestFsProcessor(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			hsnap := tt.hsnap()
-			p := newFsProcessor(hsnap, fs.NewDevMapper(), fs.NewDevPathResolver(), &config.Config{})
+			psnap := new(ps.SnapshotterMock)
+			p := newFsProcessor(hsnap, psnap, fs.NewDevMapper(), fs.NewDevPathResolver(), &config.Config{})
 			if tt.setupProcessor != nil {
 				tt.setupProcessor(p)
 			}

@@ -224,7 +224,7 @@ func (f *App) Run(args []string) error {
 	} else {
 		// register stack symbolizer
 		if cfg.Kstream.StackEnrichment {
-			f.symbolizer = symbolize.NewSymbolizer(cfg)
+			f.symbolizer = symbolize.NewSymbolizer(symbolize.NewDebugHelpResolver(cfg), cfg, false)
 			f.consumer.RegisterEventListener(f.symbolizer)
 		}
 		// register rule engine
