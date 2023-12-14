@@ -491,8 +491,27 @@ var rulesSchema = `
 					"properties": {
 						"name": 		{"type": "string", "minLength": 3},
                         "description":  {"type": "string"},
+						"output": 		{"type": "string", "minLength": 5},
+						"severity":  	{"type": "string", "enum": ["low", "medium", "high", "critical"]},
 						"condition": 	{"type": "string", "minLength": 3},
-						"action": 		{"type": "string"}
+						"action": 		{
+							"type": "array",
+							"items": [
+								{
+									"type": "object",
+									"properties": {
+										"kill": {
+											"type": "object",
+											"properties": {
+												"pid":	{"type": "string", "minLength": 4}
+											}
+										}
+									}
+								}
+							]
+							},
+							"additionalProperties": false
+						}
 					},
 					"required": ["name", "condition"],
 					"minItems": 1,
@@ -502,7 +521,7 @@ var rulesSchema = `
 
 	"type": "object",
 	"properties": {
-		"group": {"type": "string", "minLength": 1},
+		"group": 		{"type": "string", "minLength": 1},
         "description":  {"type": "string"},
 		"enabled":  	{"type": "boolean"},
 		"tags":			{"type": "array", "items": [{"type": "string", "minLength": 1}]},

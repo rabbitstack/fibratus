@@ -29,10 +29,6 @@
               and
            ps.name iin msoffice_binaries
           | by ps.child.exe
-      action: >
-        {{
-            emit . "File execution via Microsoft Office process" ""
-        }}
     - name: Potentially malicious module loaded by Microsoft Office process
       condition: >
         sequence
@@ -47,7 +43,3 @@
               and
            ps.name iin msoffice_binaries
           | by image.name
-      action: >
-        {{
-            emit . "Potentially malicious module loaded by Microsoft Office process" ""
-        }}

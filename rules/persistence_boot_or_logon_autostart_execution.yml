@@ -41,10 +41,6 @@
             '?:\\Windows\\System32\\svchost.exe',
             '?:\\ProgramData\\Microsoft\\Windows Defender\\Platform\\*.exe'
           )
-      action: >
-        {{
-            emit . "Unusual file written or modified in Startup folder" ""
-        }}
     - name: Unusual process modified the registry run key
       description: |
         Identifies an attempt by unusual Windows native processes to modify
@@ -78,10 +74,6 @@
             '?:\\Windows\\System32\\conhost.exe',
             '?:\\Windows\\System32\\taskhostw.exe'
           )
-      action: >
-        {{
-            emit . "Unusual process modified the registry run key" ""
-        }}
     - name: Network connection via startup folder executable or script
       description: |
         Identifies the execution of unsigned binary or script from the
@@ -106,10 +98,6 @@
             )
           |
           |connect_socket or accept_socket|
-      action: >
-        {{
-            emit . "Network connection via startup folder executable or script" ""
-        }}
     - name: Suspicious persistence via registry modification
       description: |
         Adversaries may abuse the registry to achieve persistence
@@ -127,10 +115,6 @@
           )
             and
         registry.key.name imatches registry_persistence_keys
-      action: >
-        {{
-            emit . "Suspicious persistence via registry modification" ""
-        }}
     - name: Suspicious Startup shell folder modification
       description: |
         Detects when adversaries attempt to modify the default Startup
@@ -147,10 +131,6 @@
                 or
             registry.value imatches ('%ProgramData%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup')
           )
-      action: >
-        {{
-            emit . "Suspicious Startup shell folder modification" ""
-        }}
     - name: Script interpreter host or untrusted process persistence
       description: |
         Identifies the script interpreter or untrusted process writing
@@ -171,7 +151,6 @@
                 or
             file.name imatches startup_locations
         )
-      action: >
-        {{
-            emit . "Script interpreter host or untrusted process persistence" ""
-        }}
+      action:
+      - kill:
+        pid: ps.pid

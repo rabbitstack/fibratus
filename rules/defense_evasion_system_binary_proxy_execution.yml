@@ -38,10 +38,6 @@
               )
           | by ps.child.uuid
           |spawn_process| by ps.uuid
-      action: >
-        {{
-            emit . "System Binary Proxy Execution via Rundll32" ""
-        }}
 
 - group: System Binary Proxy Execution via Regsvr32
   description: |
@@ -82,7 +78,3 @@
             '*.sct*'
           )
         )
-      action: >
-       {{
-            emit . "Regsvr32 scriptlet execution" ""
-       }}

@@ -61,6 +61,16 @@ func TestLoadGroupsFromPaths(t *testing.T) {
 	assert.Len(t, g1.Rules, 1)
 	assert.Equal(t, "only network category", g1.Rules[0].Name)
 	assert.Equal(t, "kevt.category = 'net'", g1.Rules[0].Condition)
+	assert.Equal(t, "this rule matches all network signals", g1.Rules[0].Description)
+	assert.Equal(t, "low", g1.Rules[0].Severity)
+	assert.Equal(t, "`%ps.exe` attempted to reach out to `%net.sip` IP address\n", g1.Rules[0].Output)
+	assert.NotNil(t, g1.Rules[0].Action)
+
+	acts, err := g1.Rules[0].DecodeActions()
+	require.NoError(t, err)
+	require.IsType(t, KillAction{}, acts[0])
+
+	assert.Equal(t, "ps.pid", acts[0].(KillAction).Pid)
 
 	g2 := filters.groups[1]
 	assert.Equal(t, "rouge processes", g2.Name)

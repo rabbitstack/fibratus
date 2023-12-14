@@ -19,13 +19,11 @@
 package filter
 
 import (
-	"bytes"
 	"context"
-	"encoding/base64"
-	"errors"
 	"expvar"
 	"fmt"
 	fsm "github.com/qmuntal/stateless"
+	"github.com/rabbitstack/fibratus/pkg/filter/action"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
@@ -36,7 +34,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"text/template"
 	"time"
 
 	"github.com/rabbitstack/fibratus/pkg/config"
@@ -91,6 +88,8 @@ type Rules struct {
 	groups map[uint32]filterGroups
 	config *config.Config
 	psnap  ps.Snapshotter
+
+	actions []*action.Action
 }
 
 type filterGroup struct {
@@ -150,6 +149,15 @@ func newSequenceState(name, initialState string, maxSpan time.Duration) *sequenc
 	ss.initFSM(initialState)
 
 	return ss
+}
+
+func (s *sequenceState) events() []*kevent.Kevent {
+	events := make([]*kevent.Kevent, 0, len(s.matches))
+	for _, e := range s.matches {
+		events = append(events, e)
+	}
+	sort.Slice(events, func(i, j int) bool { return events[i].Timestamp.Before(events[j].Timestamp) })
+	return events
 }
 
 func (s *sequenceState) isStateSchedulable(state fsm.State) bool {
@@ -431,9 +439,9 @@ func (f compiledFilter) isScoped() bool {
 }
 
 // run execute the filter with either simple or sequence expressions.
-func (f compiledFilter) run(kevt *kevent.Kevent, i uint16) bool {
+func (f compiledFilter) run(kevt *kevent.Kevent, i int) bool {
 	if f.ss != nil {
-		return f.filter.RunSequence(kevt, i, f.ss.partials)
+		return f.filter.RunSequence(kevt, uint16(i), f.ss.partials)
 	}
 	return f.filter.Run(kevt)
 }
@@ -454,9 +462,10 @@ func (r *Rules) isGroupMapped(scopeHash, groupHash uint32) bool {
 // NewRules produces a fresh rules engine instance.
 func NewRules(psnap ps.Snapshotter, config *config.Config) *Rules {
 	rules := &Rules{
-		groups: make(map[uint32]filterGroups),
-		psnap:  psnap,
-		config: config,
+		groups:  make(map[uint32]filterGroups),
+		actions: make([]*action.Action, 0),
+		psnap:   psnap,
+		config:  config,
 	}
 	return rules
 }
@@ -591,6 +600,35 @@ func configureFSM(group config.FilterGroup, f Filter) *sequenceState {
 	return seqState
 }
 
+func (r *Rules) appendAction(f *config.FilterConfig, g config.FilterGroup, evts ...*kevent.Kevent) {
+	for _, evt := range evts {
+		evt.AddMeta(kevent.RuleNameKey, f.Name)
+		evt.AddMeta(kevent.RuleGroupKey, g.Name)
+		for k, v := range g.Labels {
+			evt.AddMeta(kevent.MetadataKey(k), v)
+		}
+	}
+	ctx := &config.ActionContext{
+		Events: evts,
+		Filter: f,
+		Group:  g,
+	}
+	r.actions = append(r.actions, &action.Action{Context: ctx})
+}
+
+func (r *Rules) clearActions() {
+	r.actions = make([]*action.Action, 0)
+}
+
+// hasGroups checks if rules were loaded into
+// the engine. If there are no rules the event is
+// forwarded to the aggregator.
+func (r *Rules) hasGroups() bool { return len(r.groups) > 0 }
+
+// findGroups collects all rule groups for a
+// particular event type or category. If no rule
+// groups are found the event is rejected from
+// the aggregator batch.
 func (r *Rules) findGroups(kevt *kevent.Kevent) filterGroups {
 	groups1 := r.groups[kevt.Type.Hash()]
 	groups2 := r.groups[kevt.Category.Hash()]
@@ -601,19 +639,10 @@ func (r *Rules) findGroups(kevt *kevent.Kevent) filterGroups {
 }
 
 func (r *Rules) ProcessEvent(evt *kevent.Kevent) (bool, error) {
-	// if no rules were loaded into the engine
-	// the event is forwarded to the aggregator
-	if len(r.groups) == 0 {
+	if !r.hasGroups() {
 		return true, nil
 	}
-	// find rule groups for a particular event type
-	// or category. If no rule groups are found the
-	// event is rejected from the aggregator batch
-	groups := r.findGroups(evt)
-	if len(groups) == 0 {
-		return false, nil
-	}
-	return r.runRules(groups, evt), nil
+	return r.runRules(r.findGroups(evt), evt), nil
 }
 
 func (r *Rules) runSequence(kevt *kevent.Kevent, f *compiledFilter) bool {
@@ -633,7 +662,7 @@ func (r *Rules) runSequence(kevt *kevent.Kevent, f *compiledFilter) bool {
 			continue
 		}
 		rule := expr.Expr.String()
-		matches := f.run(kevt, uint16(i))
+		matches := f.run(kevt, i)
 		log.Debugf("sequence expression [%s] = %t", rule, matches)
 		// append the partial and transition state machine
 		if matches && f.ss.isAfter(rule, kevt) {
@@ -665,6 +694,21 @@ func (r *Rules) runSequence(kevt *kevent.Kevent, f *compiledFilter) bool {
 	return isTerminal
 }
 
+func (r *Rules) triggerSequencesInGroup(e *kevent.Kevent, g *filterGroup) {
+	for _, f := range g.filters {
+		if !f.filter.IsSequence() || f.ss == nil {
+			continue
+		}
+		if f.ss.expire(e) {
+			continue
+		}
+		if r.runSequence(e, f) {
+			r.appendAction(f.config, g.group, f.ss.events()...)
+			f.ss.clear()
+		}
+	}
+}
+
 func (r *Rules) runRules(groups filterGroups, kevt *kevent.Kevent) bool {
 	for _, g := range groups {
 		for i, f := range g.filters {
@@ -675,48 +719,23 @@ func (r *Rules) runRules(groups filterGroups, kevt *kevent.Kevent) bool {
 				}
 				match = r.runSequence(kevt, f)
 			} else {
-				match = f.run(kevt, uint16(i))
+				match = f.run(kevt, i)
 				if match {
 					// transition sequence states since a match
 					// in a simple rule could trigger multiple
 					// matches in sequence rules
-					for _, f := range g.filters {
-						if !f.filter.IsSequence() || f.ss == nil {
-							continue
-						}
-						if f.ss.expire(kevt) {
-							continue
-						}
-						if r.runSequence(kevt, f) {
-							kevt.AddMeta(kevent.RuleNameKey, f.config.Name)
-							log.Debugf("rule [%s] in group [%s] matched", f.config.Name, g.group.Name)
-							err := runFilterAction(nil, f.ss.matches, g.group, f.config)
-							if err != nil {
-								log.Warnf("unable to execute %q rule action: %v", f.config.Name, err)
-							}
-							f.ss.clear()
-						}
-					}
+					r.triggerSequencesInGroup(kevt, g)
 				}
 			}
 			if match {
-				filterMatches.Add(f.config.Name, 1)
-				log.Debugf("rule [%s] in group [%s] matched", f.config.Name, g.group.Name)
-				// attach rule and group meta
-				kevt.AddMeta(kevent.RuleNameKey, f.config.Name)
-				kevt.AddMeta(kevent.RuleGroupKey, g.group.Name)
-				for k, v := range g.group.Labels {
-					kevt.AddMeta(kevent.MetadataKey(k), v)
-				}
-				var err error
 				if f.ss != nil {
-					err = runFilterAction(nil, f.ss.matches, g.group, f.config)
+					r.appendAction(f.config, g.group, f.ss.events()...)
 					f.ss.clear()
 				} else {
-					err = runFilterAction(kevt, nil, g.group, f.config)
+					r.appendAction(f.config, g.group, kevt)
 				}
-				if err != nil {
-					log.Warnf("unable to execute %q rule action: %v", f.config.Name, err)
+				if err := r.processActions(); err != nil {
+					log.Warnf("unable to execute rule action(s): %v", err)
 				}
 				return true
 			}
@@ -725,57 +744,41 @@ func (r *Rules) runRules(groups filterGroups, kevt *kevent.Kevent) bool {
 	return false
 }
 
-// runFilterAction executes the template
-// associated with the filter that has
-// produced a match in one of the rule
-// groups.
-func runFilterAction(
-	kevt *kevent.Kevent,
-	kevts map[uint16]*kevent.Kevent,
-	group config.FilterGroup,
-	filter *config.FilterConfig,
-) error {
-	if filter != nil && filter.Action == "" {
-		return nil
-	}
-	actionBlock, err := base64.StdEncoding.DecodeString(filter.Action)
-	if err != nil {
-		return fmt.Errorf("corrupted filter/group action: %v", err)
-	}
-
-	events := make([]*kevent.Kevent, 0)
-	matches := make(map[string]*kevent.Kevent, len(kevts))
-	if kevt != nil {
-		events = append(events, kevt)
-	} else {
-		for k, kevt := range kevts {
-			events = append(events, kevt)
-			matches["k"+strconv.Itoa(int(k))] = kevt
+// processActions executes rule actions.
+// Sending an alert is an implicit action
+// carried out each time there is a rule
+// match. Other actions are executed if
+// defined in the rule definition.
+func (r *Rules) processActions() error {
+	defer r.clearActions()
+	for _, act := range r.actions {
+		f, g, evts := act.Context.Filter, act.Context.Group, act.Context.Events
+		filterMatches.Add(f.Name, 1)
+		log.Debugf("rule [%s] in group [%s] matched", f.Name, g.Name)
+		// first, send an alert through
+		// all configured alert senders
+		err := action.Emit(act.Context, f.Name, InterpolateFields(f.Output, evts), f.Severity, g.Tags)
+		if err != nil {
+			return err
 		}
-		sort.Slice(events, func(i, j int) bool { return events[i].Timestamp.Before(events[j].Timestamp) })
-	}
-
-	fmap := NewFuncMap()
-	InitFuncs(fmap)
-	tmpl, err := template.New(group.Name).Funcs(fmap).Parse(string(actionBlock))
-	if err != nil {
-		return err
-	}
-
-	ctx := &config.ActionContext{
-		Kevt:   kevt,
-		Kevts:  matches,
-		Events: events,
-		Filter: filter,
-		Group:  group,
-	}
-
-	var bb bytes.Buffer
-	if err := tmpl.Execute(&bb, ctx); err != nil {
-		return err
-	}
-	if strings.TrimSpace(bb.String()) != "" {
-		return errors.New(bb.String())
+		// process explicit rule actions
+		acts, err := f.DecodeActions()
+		if err != nil {
+			return err
+		}
+		for _, a := range acts {
+			switch act := a.(type) {
+			case config.KillAction:
+				n := InterpolateFields("%"+act.Pid, evts)
+				pid, err := strconv.Atoi(n)
+				if err != nil {
+					return err
+				}
+				if err := action.Kill(uint32(pid)); err != nil {
+					return err
+				}
+			}
+		}
 	}
 	return nil
 }

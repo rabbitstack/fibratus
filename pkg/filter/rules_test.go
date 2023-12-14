@@ -517,7 +517,7 @@ func TestComplexSequenceRule(t *testing.T) {
 	kevt2 := &kevent.Kevent{
 		Seq:       2,
 		Type:      ktypes.CreateFile,
-		Timestamp: time.Now(),
+		Timestamp: time.Now().Add(time.Millisecond * 250),
 		Name:      "CreateFile",
 		Tid:       2484,
 		PID:       2243,
@@ -537,7 +537,7 @@ func TestComplexSequenceRule(t *testing.T) {
 	kevt3 := &kevent.Kevent{
 		Seq:       4,
 		Type:      ktypes.ConnectTCPv4,
-		Timestamp: time.Now(),
+		Timestamp: time.Now().Add(time.Second),
 		Category:  ktypes.Net,
 		Name:      "Connect",
 		Tid:       244,
@@ -809,7 +809,7 @@ func TestFilterActionEmitAlert(t *testing.T) {
 	require.True(t, wrapProcessEvent(kevt, rules.ProcessEvent))
 	time.Sleep(time.Millisecond * 25)
 	require.NotNil(t, emitAlert)
-	assert.Equal(t, "Test alert", emitAlert.Title)
+	assert.Equal(t, "match https connections", emitAlert.Title)
 	assert.Equal(t, "cmd.exe process received data on port 443", emitAlert.Text)
 	assert.Equal(t, alertsender.Critical, emitAlert.Severity)
 	assert.Equal(t, []string{"tag1", "tag2"}, emitAlert.Tags)
