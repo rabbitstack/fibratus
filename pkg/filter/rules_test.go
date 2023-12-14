@@ -144,14 +144,9 @@ func TestProcessRules(t *testing.T) {
 		config  *config.Config
 		matches bool
 	}{
-		{newConfig("_fixtures/exclude_policy_or.yml"), false},
-		{newConfig("_fixtures/exclude_policy_and.yml"), false},
-		{newConfig("_fixtures/exclude_policy_or_no_include_groups.yml"), true},
-		{newConfig("_fixtures/exclude_policy_and_no_include_groups.yml"), true},
-		{newConfig("_fixtures/exclude_policy_or_different_include_group.yml"), true},
-		{newConfig("_fixtures/include_policy_or.yml"), true},
-		{newConfig("_fixtures/include_policy_and.yml"), true},
-		{newConfig("_fixtures/include_policy_and_not_matches.yml"), false},
+		{newConfig("_fixtures/simple_matches.yml"), true},
+		{newConfig("_fixtures/simple_matches_multiple_groups.yml"), true},
+		{newConfig("_fixtures/simple_not_matches.yml"), false},
 	}
 
 	for i, tt := range tests {
@@ -160,27 +155,6 @@ func TestProcessRules(t *testing.T) {
 			t.Errorf("%d. %v process rules mismatch: exp=%t got=%t", i, tt.config.Filters, tt.matches, matches)
 		}
 	}
-}
-
-func TestIncludeExclude(t *testing.T) {
-	psnap := new(ps.SnapshotterMock)
-	rules := NewRules(psnap, newConfig("_fixtures/include_exclude_remote_threads.yml"))
-	require.NoError(t, rules.Compile())
-
-	kevt := &kevent.Kevent{
-		Type: ktypes.CreateThread,
-		Name: "CreateThread",
-		Tid:  2484,
-		PID:  859,
-		PS: &types.PS{
-			Exe: "C:\\Windows\\system32\\svchost.exe",
-		},
-		Kparams: kevent.Kparams{
-			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
-		},
-		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
-	}
-	require.False(t, wrapProcessEvent(kevt, rules.ProcessEvent))
 }
 
 func TestSequenceState(t *testing.T) {
@@ -811,7 +785,7 @@ func TestSequenceRuleBoundsFields(t *testing.T) {
 func TestFilterActionEmitAlert(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
 	require.NoError(t, alertsender.LoadAll([]alertsender.Config{{Type: alertsender.Noop}}))
-	rules := NewRules(psnap, newConfig("_fixtures/include_policy_emit_alert.yml"))
+	rules := NewRules(psnap, newConfig("_fixtures/simple_emit_alert.yml"))
 	require.NoError(t, rules.Compile())
 
 	kevt := &kevent.Kevent{

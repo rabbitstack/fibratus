@@ -27,15 +27,13 @@ import (
 	"fmt"
 	fsm "github.com/qmuntal/stateless"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
+	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/ps"
+	"github.com/rabbitstack/fibratus/pkg/util/atomic"
 	"github.com/rabbitstack/fibratus/pkg/util/hashers"
 	"net"
 	"sort"
-	"sync"
-
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-	"github.com/rabbitstack/fibratus/pkg/util/atomic"
 	"strconv"
 	"strings"
 	"text/template"
@@ -50,13 +48,9 @@ import (
 const maxOutstandingPartials = 1000
 
 var (
-	excludeOrFilterMatches    = expvar.NewMap("filter.exclude.or.matches")
-	excludeAndFilterMatches   = expvar.NewMap("filter.exclude.and.matches")
-	includeOrFilterMatches    = expvar.NewMap("filter.include.or.matches")
-	includeAndFilterMatches   = expvar.NewMap("filter.include.and.matches")
-	filterGroupsCount         = expvar.NewInt("filter.groups.count")
-	filterGroupsCountByPolicy = expvar.NewMap("filter.groups.count.policy")
-	filtersCount              = expvar.NewInt("filter.filters.count")
+	filterMatches     = expvar.NewMap("filter.matches")
+	filterGroupsCount = expvar.NewInt("filter.groups.count")
+	filtersCount      = expvar.NewInt("filter.filters.count")
 
 	matchTransitionErrors = expvar.NewInt("sequence.match.transition.errors")
 	partialsPerSequence   = expvar.NewMap("sequence.partials.count")
@@ -94,11 +88,9 @@ var (
 // an action, the former is executed when the
 // rule fires.
 type Rules struct {
-	groups     map[uint32]filterGroups
-	config     *config.Config
-	psnap      ps.Snapshotter
-	hasExclude bool // if any loaded groups have exclude policy
-	once       sync.Once
+	groups map[uint32]filterGroups
+	config *config.Config
+	psnap  ps.Snapshotter
 }
 
 type filterGroup struct {
@@ -448,15 +440,6 @@ func (f compiledFilter) run(kevt *kevent.Kevent, i uint16) bool {
 
 type filterGroups []*filterGroup
 
-func (groups filterGroups) hasPolicy(policy config.FilterGroupPolicy) bool {
-	for _, g := range groups {
-		if g.group.Policy == policy {
-			return true
-		}
-	}
-	return false
-}
-
 func (r *Rules) isGroupMapped(scopeHash, groupHash uint32) bool {
 	for h, groups := range r.groups {
 		for _, g := range groups {
@@ -495,7 +478,6 @@ func (r *Rules) Compile() error {
 			continue
 		}
 		filterGroupsCount.Add(1)
-		filterGroupsCountByPolicy.Add(group.Policy.String(), 1)
 
 		filters := make([]*compiledFilter, 0, len(group.Rules))
 
@@ -526,10 +508,9 @@ func (r *Rules) Compile() error {
 		}
 
 		g := newFilterGroup(group, filters)
-		log.Infof("loaded rule group [%s] with %q policy type. "+
+		log.Infof("loaded rule group [%s]. "+
 			"Number of rules: %d",
 			group.Name,
-			group.Policy,
 			len(filters))
 
 		// traverse all filters in the groups and determine
@@ -619,17 +600,6 @@ func (r *Rules) findGroups(kevt *kevent.Kevent) filterGroups {
 	return append(groups1, groups2...)
 }
 
-func (r *Rules) hasExcludeGroups() bool {
-	r.once.Do(func() {
-		for _, g := range r.groups {
-			if g.hasPolicy(config.ExcludePolicy) {
-				r.hasExclude = true
-			}
-		}
-	})
-	return r.hasExclude
-}
-
 func (r *Rules) ProcessEvent(evt *kevent.Kevent) (bool, error) {
 	// if no rules were loaded into the engine
 	// the event is forwarded to the aggregator
@@ -643,22 +613,7 @@ func (r *Rules) ProcessEvent(evt *kevent.Kevent) (bool, error) {
 	if len(groups) == 0 {
 		return false, nil
 	}
-	// exclude policies take precedence over groups
-	// with include policies, and so we first must
-	// evaluate exclude groups. If no rule matches
-	// happen, the event is dropped unless groups
-	// with include exist
-	if r.hasExcludeGroups() {
-		if r.runRules(groups, config.ExcludePolicy, evt) {
-			return false, nil
-		}
-		if !groups.hasPolicy(config.IncludePolicy) {
-			return true, nil
-		}
-	}
-	// run include policy rules. At this point none of
-	// the groups with exclude policies got matched
-	return r.runRules(groups, config.IncludePolicy, evt), nil
+	return r.runRules(groups, evt), nil
 }
 
 func (r *Rules) runSequence(kevt *kevent.Kevent, f *compiledFilter) bool {
@@ -710,17 +665,8 @@ func (r *Rules) runSequence(kevt *kevent.Kevent, f *compiledFilter) bool {
 	return isTerminal
 }
 
-func (r *Rules) runRules(groups filterGroups, policy config.FilterGroupPolicy, kevt *kevent.Kevent) bool {
-nextGroup:
+func (r *Rules) runRules(groups filterGroups, kevt *kevent.Kevent) bool {
 	for _, g := range groups {
-		if g.group.Policy != policy {
-			continue
-		}
-		var andMatched bool
-		// process include/exclude filter groups. Each of them
-		// may have `or` or `and` relation types to promote the
-		// group upon first match or either all rules in the group
-		// need to match
 		for i, f := range g.filters {
 			var match bool
 			if f.ss != nil {
@@ -753,86 +699,36 @@ nextGroup:
 					}
 				}
 			}
-			switch g.group.Policy {
-			case config.ExcludePolicy:
-				switch g.group.Relation {
-				case config.OrRelation:
-					if match {
-						excludeOrFilterMatches.Add(f.config.Name, 1)
-						return true
-					}
-				case config.AndRelation:
-					if !match {
-						// jump to the next exclude group
-						continue nextGroup
-					}
-					andMatched = true
+			if match {
+				filterMatches.Add(f.config.Name, 1)
+				log.Debugf("rule [%s] in group [%s] matched", f.config.Name, g.group.Name)
+				// attach rule and group meta
+				kevt.AddMeta(kevent.RuleNameKey, f.config.Name)
+				kevt.AddMeta(kevent.RuleGroupKey, g.group.Name)
+				for k, v := range g.group.Labels {
+					kevt.AddMeta(kevent.MetadataKey(k), v)
 				}
-			case config.IncludePolicy:
-				switch g.group.Relation {
-				case config.OrRelation:
-					if match {
-						includeOrFilterMatches.Add(f.config.Name, 1)
-						log.Debugf("rule [%s] in group [%s] matched", f.config.Name, g.group.Name)
-						// attach rule and group meta
-						kevt.AddMeta(kevent.RuleNameKey, f.config.Name)
-						kevt.AddMeta(kevent.RuleGroupKey, g.group.Name)
-						for k, v := range g.group.Labels {
-							kevt.AddMeta(kevent.MetadataKey(k), v)
-						}
-						var err error
-						if f.ss != nil {
-							err = runFilterAction(nil, f.ss.matches, g.group, f.config)
-							f.ss.clear()
-						} else {
-							err = runFilterAction(kevt, nil, g.group, f.config)
-						}
-						if err != nil {
-							log.Warnf("unable to execute %q rule action: %v", f.config.Name, err)
-						}
-						return true
-					}
-				case config.AndRelation:
-					if !match {
-						// jump to the next include group
-						continue nextGroup
-					}
-					andMatched = true
+				var err error
+				if f.ss != nil {
+					err = runFilterAction(nil, f.ss.matches, g.group, f.config)
+					f.ss.clear()
+				} else {
+					err = runFilterAction(kevt, nil, g.group, f.config)
 				}
+				if err != nil {
+					log.Warnf("unable to execute %q rule action: %v", f.config.Name, err)
+				}
+				return true
 			}
-		}
-		// got a match on the `and` relation group
-		if andMatched {
-			switch g.group.Policy {
-			case config.ExcludePolicy:
-				for _, f := range g.filters {
-					excludeAndFilterMatches.Add(f.config.Name, 1)
-				}
-			case config.IncludePolicy:
-				for _, f := range g.filters {
-					includeAndFilterMatches.Add(f.config.Name, 1)
-					log.Debugf("rule [%s] in group [%s] matched", f.config.Name, g.group.Name)
-					var err error
-					if f.ss != nil {
-						err = runFilterAction(nil, f.ss.matches, g.group, f.config)
-						f.ss.clear()
-					} else {
-						err = runFilterAction(kevt, nil, g.group, f.config)
-					}
-					if err != nil {
-						log.Warnf("unable to execute %q rule action: %v", f.config.Name, err)
-					}
-				}
-			}
-			return true
 		}
 	}
 	return false
 }
 
-// runFilterAction executes the template associated with the filter
-// that has produced a match in one of the rule groups with include
-// policy.
+// runFilterAction executes the template
+// associated with the filter that has
+// produced a match in one of the rule
+// groups.
 func runFilterAction(
 	kevt *kevent.Kevent,
 	kevts map[uint16]*kevent.Kevent,

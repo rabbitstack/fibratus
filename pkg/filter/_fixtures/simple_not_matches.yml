@@ -1,0 +1,5 @@
+- group: network events
+  enabled: true
+  rules:
+    - name: match https connections
+      condition:  kevt.name = 'Recv' and net.sip = 172.17.0.1
