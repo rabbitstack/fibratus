@@ -3,15 +3,6 @@
 
 - macro: open_process
   expr: kevt.name = 'OpenProcess' and ps.access.status = 'Success'
-  description: Acquires the local process object
-
-- macro: open_process_all_access
-  expr: open_process and ps.access.mask.names in ('ALL_ACCESS')
-  description: Acquires the local process object with all possible access rights
-
-- macro: spawn_msoffice_process
-  expr: spawn_process and ps.child.name iin msoffice_binaries
-  description: Identifies the execution of the MS Office process
 
 - macro: write_file
   expr: kevt.name = 'WriteFile'
@@ -58,20 +49,6 @@
 - macro: set_thread_context
   expr: kevt.name = 'SetThreadContext' and kevt.arg[status] = 'Success'
 
-- macro: inbound_network
-  expr: (recv_socket or accept_socket) and ((net.sip != 0.0.0.0 or net.dip != 0.0.0.0) and (net.sip not in ('0:0:0:0:0:0:0:1', '::1') or net.dip not in ('0:0:0:0:0:0:0:1', '::1')) and not (cidr_contains(net.sip, '127.0.0.0/8') or cidr_contains(net.dip, '127.0.0.0/8')))
-  description: |
-    Detects inbound network traffic excluding source/destination loopback addresses/address spaces.
-
-- macro: outbound_network
-  expr: >
-    (send_socket or connect_socket)
-        and
-    (net.dip != 0.0.0.0 and net.dip not in ('0:0:0:0:0:0:0:1', '::1') and not cidr_contains(net.dip, '127.0.0.0/8', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16'))
-  description: |
-    Detects outbound network traffic excluding unspecified destination IP addresses,
-    loopback addresses, and IP addresses pertaining to the RFC1918 address space.
-
 - macro: virtual_alloc
   expr: kevt.name = 'VirtualAlloc'
 
@@ -101,6 +78,23 @@
 
 - macro: reply_dns
   expr: kevt.name = 'ReplyDns'
+
+- macro: inbound_network
+  expr: >
+    (recv_socket or accept_socket)
+        and
+    ((net.sip != 0.0.0.0 or net.dip != 0.0.0.0) and (net.sip not in ('0:0:0:0:0:0:0:1', '::1') or net.dip not in ('0:0:0:0:0:0:0:1', '::1')) and not (cidr_contains(net.sip, '127.0.0.0/8') or cidr_contains(net.dip, '127.0.0.0/8')))
+  description: |
+    Detects inbound network traffic excluding source/destination loopback addresses/address spaces.
+
+- macro: outbound_network
+  expr: >
+    (send_socket or connect_socket)
+        and
+    (net.dip != 0.0.0.0 and net.dip not in ('0:0:0:0:0:0:0:1', '::1') and not cidr_contains(net.dip, '127.0.0.0/8', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16'))
+  description: |
+    Detects outbound network traffic excluding unspecified destination IP addresses,
+    loopback addresses, and IP addresses pertaining to the RFC1918 address space.
 
 - macro: load_driver
   expr: >
@@ -154,7 +148,7 @@
 
 - macro: write_minidump_file
   expr: >
-    write_file
+    create_file
       and
     (
       file.extension iin
