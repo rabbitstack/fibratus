@@ -1,9 +1,0 @@
-- group: network events
-  enabled: true
-  policy: include
-  relation: and
-  rules:
-    - name: match https connections
-      condition:  kevt.name = 'Recv' and net.dport = 443
-    - name: accept events where source port = 43123
-      condition:  kevt.name = 'Recv' and net.sport = 43123

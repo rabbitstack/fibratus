@@ -1,7 +1,5 @@
 - group: network events 1
   enabled: true
-  policy: include
-  relation: or
   rules:
     - name: match https connections
       condition: kevt.name = 'Recv' and net.dport = 443
@@ -10,16 +8,12 @@
 
 - group: network events 2
   enabled: true
-  policy: include
-  relation: or
   rules:
     - name: match http connections
       condition: kevt.category = 'net' and net.dport = 80
 
 - group: network events 3
   enabled: true
-  policy: include
-  relation: or
   rules:
     - name: match ssh connections
       condition: kevt.name = 'Recv' and net.dport = 22
