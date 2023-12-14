@@ -1,0 +1,9 @@
+- group: Process executions
+  enabled: true
+  rules:
+    - name: Kill calc.exe process
+      condition: kevt.name = 'CreateProcess' and ps.child.name = 'calc.exe'
+      severity: critical
+      action:
+      - kill:
+        pid: ps.child.pid

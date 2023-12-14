@@ -33,6 +33,7 @@ import (
 	u "net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"text/template"
 )
@@ -67,12 +68,20 @@ type KillAction struct {
 	Pid string `json:"pid" yaml:"pid"`
 }
 
+func (a KillAction) PidToInt(pid string) uint32 {
+	n, err := strconv.Atoi(pid)
+	if err != nil {
+		return 0
+	}
+	return uint32(n)
+}
+
 const (
 	killActionID = "kill"
 )
 
 // DecodeActions converts raw YAML map to
-// typed action structure.
+// typed action structures.
 func (f FilterConfig) DecodeActions() ([]any, error) {
 	actions := make([]any, 0, len(f.Action))
 

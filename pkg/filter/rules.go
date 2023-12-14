@@ -32,7 +32,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/hashers"
 	"net"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -55,6 +54,9 @@ var (
 
 	ErrInvalidFilter = func(rule, group string, err error) error {
 		return fmt.Errorf("syntax error in rule %q located in %q group: \n%v", rule, group, err)
+	}
+	ErrRuleAction = func(rule string, err error) error {
+		return fmt.Errorf("fail to execute action for %q rule: %v", rule, err)
 	}
 )
 
@@ -89,7 +91,11 @@ type Rules struct {
 	config *config.Config
 	psnap  ps.Snapshotter
 
-	actions []*action.Action
+	matches []*ruleMatch
+}
+
+type ruleMatch struct {
+	ctx *config.ActionContext
 }
 
 type filterGroup struct {
@@ -463,7 +469,7 @@ func (r *Rules) isGroupMapped(scopeHash, groupHash uint32) bool {
 func NewRules(psnap ps.Snapshotter, config *config.Config) *Rules {
 	rules := &Rules{
 		groups:  make(map[uint32]filterGroups),
-		actions: make([]*action.Action, 0),
+		matches: make([]*ruleMatch, 0),
 		psnap:   psnap,
 		config:  config,
 	}
@@ -486,8 +492,8 @@ func (r *Rules) Compile() error {
 			log.Warnf("rule group [%s] disabled", group.Name)
 			continue
 		}
-		filterGroupsCount.Add(1)
 
+		filterGroupsCount.Add(1)
 		filters := make([]*compiledFilter, 0, len(group.Rules))
 
 		// compile filters and populate the groups. Additionally, for
@@ -600,7 +606,7 @@ func configureFSM(group config.FilterGroup, f Filter) *sequenceState {
 	return seqState
 }
 
-func (r *Rules) appendAction(f *config.FilterConfig, g config.FilterGroup, evts ...*kevent.Kevent) {
+func (r *Rules) appendMatch(f *config.FilterConfig, g config.FilterGroup, evts ...*kevent.Kevent) {
 	for _, evt := range evts {
 		evt.AddMeta(kevent.RuleNameKey, f.Name)
 		evt.AddMeta(kevent.RuleGroupKey, g.Name)
@@ -613,11 +619,11 @@ func (r *Rules) appendAction(f *config.FilterConfig, g config.FilterGroup, evts 
 		Filter: f,
 		Group:  g,
 	}
-	r.actions = append(r.actions, &action.Action{Context: ctx})
+	r.matches = append(r.matches, &ruleMatch{ctx: ctx})
 }
 
-func (r *Rules) clearActions() {
-	r.actions = make([]*action.Action, 0)
+func (r *Rules) clearMatches() {
+	r.matches = make([]*ruleMatch, 0)
 }
 
 // hasGroups checks if rules were loaded into
@@ -703,7 +709,7 @@ func (r *Rules) triggerSequencesInGroup(e *kevent.Kevent, g *filterGroup) {
 			continue
 		}
 		if r.runSequence(e, f) {
-			r.appendAction(f.config, g.group, f.ss.events()...)
+			r.appendMatch(f.config, g.group, f.ss.events()...)
 			f.ss.clear()
 		}
 	}
@@ -729,13 +735,14 @@ func (r *Rules) runRules(groups filterGroups, kevt *kevent.Kevent) bool {
 			}
 			if match {
 				if f.ss != nil {
-					r.appendAction(f.config, g.group, f.ss.events()...)
+					r.appendMatch(f.config, g.group, f.ss.events()...)
 					f.ss.clear()
 				} else {
-					r.appendAction(f.config, g.group, kevt)
+					r.appendMatch(f.config, g.group, kevt)
 				}
-				if err := r.processActions(); err != nil {
-					log.Warnf("unable to execute rule action(s): %v", err)
+				err := r.processActions()
+				if err != nil {
+					log.Errorf("unable to execute rule action: %v", err)
 				}
 				return true
 			}
@@ -744,38 +751,36 @@ func (r *Rules) runRules(groups filterGroups, kevt *kevent.Kevent) bool {
 	return false
 }
 
-// processActions executes rule actions.
+// processActions executes rule actions
+// on behalf of rule matches. Actions are
+// categorized into implicit and explicit
+// actions.
 // Sending an alert is an implicit action
 // carried out each time there is a rule
 // match. Other actions are executed if
 // defined in the rule definition.
 func (r *Rules) processActions() error {
-	defer r.clearActions()
-	for _, act := range r.actions {
-		f, g, evts := act.Context.Filter, act.Context.Group, act.Context.Events
+	defer r.clearMatches()
+	for _, m := range r.matches {
+		f, g, evts := m.ctx.Filter, m.ctx.Group, m.ctx.Events
 		filterMatches.Add(f.Name, 1)
 		log.Debugf("rule [%s] in group [%s] matched", f.Name, g.Name)
-		// first, send an alert through
-		// all configured alert senders
-		err := action.Emit(act.Context, f.Name, InterpolateFields(f.Output, evts), f.Severity, g.Tags)
+		err := action.Emit(m.ctx, f.Name, InterpolateFields(f.Output, evts), f.Severity, g.Tags)
+		if err != nil {
+			return ErrRuleAction(f.Name, err)
+		}
+
+		actions, err := f.DecodeActions()
 		if err != nil {
 			return err
 		}
-		// process explicit rule actions
-		acts, err := f.DecodeActions()
-		if err != nil {
-			return err
-		}
-		for _, a := range acts {
-			switch act := a.(type) {
+		for _, act := range actions {
+			switch act := act.(type) {
 			case config.KillAction:
-				n := InterpolateFields("%"+act.Pid, evts)
-				pid, err := strconv.Atoi(n)
-				if err != nil {
-					return err
-				}
-				if err := action.Kill(uint32(pid)); err != nil {
-					return err
+				pid := act.PidToInt(InterpolateFields("%"+act.Pid, evts))
+				log.Infof("executing kill action: pid=%d rule=%s", pid, f.Name)
+				if err := action.Kill(pid); err != nil {
+					return ErrRuleAction(f.Name, err)
 				}
 			}
 		}

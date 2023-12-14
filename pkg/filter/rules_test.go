@@ -21,7 +21,9 @@ package filter
 import (
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/ps"
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 	"net"
 	"os"
@@ -913,6 +915,61 @@ func TestBoundFieldsWithFunctions(t *testing.T) {
 
 	require.False(t, wrapProcessEvent(kevt1, rules.ProcessEvent))
 	require.True(t, wrapProcessEvent(kevt2, rules.ProcessEvent))
+}
+
+func TestKillAction(t *testing.T) {
+	log.SetLevel(log.DebugLevel)
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, newConfig("_fixtures/kill_action.yml"))
+	require.NoError(t, rules.Compile())
+
+	// register alert sender
+	require.NoError(t, alertsender.LoadAll([]alertsender.Config{{Type: alertsender.None}}))
+
+	var si windows.StartupInfo
+	var pi windows.ProcessInformation
+	argv, err := windows.UTF16PtrFromString("calc.exe")
+	require.NoError(t, err)
+	err = windows.CreateProcess(
+		nil,
+		argv,
+		nil,
+		nil,
+		true,
+		0,
+		nil,
+		nil,
+		&si,
+		&pi)
+	require.NoError(t, err)
+
+	i := 0
+	for !sys.IsProcessRunning(pi.Process) && i < 10 {
+		i++
+		time.Sleep(time.Millisecond * 100 * time.Duration(i))
+	}
+
+	e := &kevent.Kevent{
+		Type:      ktypes.CreateProcess,
+		Timestamp: time.Now(),
+		Name:      "CreateProcess",
+		Tid:       2484,
+		PID:       859,
+		Category:  ktypes.Process,
+		PS: &types.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\svchost-temp.exe",
+		},
+		Kparams: kevent.Kparams{
+			kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: pi.ProcessId},
+			kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "calc.exe"},
+		},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+	}
+
+	require.True(t, sys.IsProcessRunning(pi.Process))
+	require.True(t, wrapProcessEvent(e, rules.ProcessEvent))
+	require.False(t, sys.IsProcessRunning(pi.Process))
 }
 
 func BenchmarkRunRules(b *testing.B) {
