@@ -172,7 +172,7 @@ var schema = `
 				"blacklist":		{
 					"type": "object",
 					"properties":	{
-						"events":	{"type": "array", "items": {"type": "string", "enum": ["CreateThread", "TerminateThread", "OpenProcess", "OpenThread", "SetThreadContext", "LoadImage", "UnloadImage", "CreateFile", "CloseFile", "ReadFile", "WriteFile", "DeleteFile", "RenameFile", "SetFileInformation", "EnumDirectory", "MapViewFile", "RegCreateKey", "RegOpenKey", "RegSetValue", "RegQueryValue", "RegQueryKey", "RegDeleteKey", "RegDeleteValue", "RegCloseKey", "Accept", "Send", "Recv", "Connect", "Disconnect", "Reconnect", "Retransmit", "CreateHandle", "CloseHandle", "DuplicateHandle", "QueryDns", "ReplyDns"]}},
+						"events":	{"type": "array", "items": {"type": "string", "enum": ["CreateThread", "TerminateThread", "OpenProcess", "OpenThread", "SetThreadContext", "LoadImage", "UnloadImage", "CreateFile", "CloseFile", "ReadFile", "WriteFile", "DeleteFile", "RenameFile", "SetFileInformation", "EnumDirectory", "MapViewFile", "UnmapViewFile", "RegCreateKey", "RegOpenKey", "RegSetValue", "RegQueryValue", "RegQueryKey", "RegDeleteKey", "RegDeleteValue", "RegCloseKey", "Accept", "Send", "Recv", "Connect", "Disconnect", "Reconnect", "Retransmit", "CreateHandle", "CloseHandle", "DuplicateHandle", "QueryDns", "ReplyDns"]}},
 						"images":	{"type": "array", "items": {"type": "string", "minLength": 1}}
 					},
 					"additionalProperties": false
