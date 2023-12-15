@@ -21,4 +21,4 @@ jobs:
         search_artifacts: true
     - name: Validate rules
       run: |
-        ./fibratus-amd64.exe rules validate --filters.rules.from-paths=rules\* --filters.macros.from-paths=rules\macros\*
+        ./fibratus.exe rules validate --filters.rules.from-paths=rules\* --filters.macros.from-paths=rules\macros\*
