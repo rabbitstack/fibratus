@@ -22,32 +22,13 @@ import (
 	"fmt"
 	"github.com/enescakir/emoji"
 	"github.com/rabbitstack/fibratus/internal/bootstrap"
-	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/filter"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
-	"github.com/spf13/cobra"
 	"path/filepath"
+	"strings"
 )
 
-var Command = &cobra.Command{
-	Use:   "rules",
-	Short: "Validate, list, or search detection rules",
-}
-
-var validateCmd = &cobra.Command{
-	Use:   "validate",
-	Short: "Validate rules for structural and syntactic correctness",
-	RunE:  validate,
-}
-
-var cfg = config.NewWithOpts(config.WithValidate())
-
-func init() {
-	cfg.MustViperize(Command)
-	Command.AddCommand(validateCmd)
-}
-
-func validate(cmd *cobra.Command, args []string) error {
+func validateRules() error {
 	if err := bootstrap.InitConfigAndLogger(cfg); err != nil {
 		return err
 	}
@@ -87,6 +68,9 @@ func validate(cmd *cobra.Command, args []string) error {
 	if err := cfg.Filters.LoadGroups(); err != nil {
 		return fmt.Errorf("%v %v", emoji.DisappointedFace, err)
 	}
+	if len(cfg.GetRuleGroups()) == 0 {
+		return fmt.Errorf("%v no rules found in %s", emoji.DisappointedFace, strings.Join(cfg.Filters.Rules.FromPaths, ","))
+	}
 
 	for _, group := range cfg.GetRuleGroups() {
 		for _, rule := range group.Rules {
@@ -108,10 +92,6 @@ func validate(cmd *cobra.Command, args []string) error {
 			}
 		}
 	}
-
 	emo("%v Detection rules OK. Ready to go!", emoji.Rocket)
-
 	return nil
 }
-
-func emo(s string, args ...any) { fmt.Printf(s, args...) }
