@@ -24,6 +24,7 @@ import (
 	"github.com/rabbitstack/fibratus/cmd/fibratus/app/config"
 	"github.com/rabbitstack/fibratus/cmd/fibratus/app/list"
 	"github.com/rabbitstack/fibratus/cmd/fibratus/app/replay"
+	"github.com/rabbitstack/fibratus/cmd/fibratus/app/rules"
 	"github.com/rabbitstack/fibratus/cmd/fibratus/app/service"
 	"github.com/rabbitstack/fibratus/cmd/fibratus/app/stats"
 	"github.com/spf13/cobra"
@@ -69,6 +70,7 @@ func init() {
 	RootCmd.AddCommand(stats.Command)
 	RootCmd.AddCommand(config.Command)
 	RootCmd.AddCommand(list.Command)
+	RootCmd.AddCommand(rules.Command)
 	RootCmd.AddCommand(runCmd)
 	RootCmd.AddCommand(docsCmd)
 	RootCmd.AddCommand(versionCmd)
