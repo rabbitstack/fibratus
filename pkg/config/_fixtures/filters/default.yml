@@ -1,7 +1,5 @@
 - group: internal network traffic
   enabled: true
-  policy: exclude
-  relation: and
   tags:
     - TE
   rules:

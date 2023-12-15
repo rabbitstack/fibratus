@@ -127,11 +127,12 @@ type Config struct {
 
 // Options determines which config flags are toggled depending on the command type.
 type Options struct {
-	capture bool
-	replay  bool
-	run     bool
-	list    bool
-	stats   bool
+	capture  bool
+	replay   bool
+	run      bool
+	list     bool
+	stats    bool
+	validate bool
 }
 
 // Option is the type alias for the config option.
@@ -169,6 +170,13 @@ func WithList() Option {
 func WithStats() Option {
 	return func(o *Options) {
 		o.stats = true
+	}
+}
+
+// WithValidate determines the validate command is executed.
+func WithValidate() Option {
+	return func(o *Options) {
+		o.validate = true
 	}
 }
 
@@ -342,7 +350,7 @@ func (c *Config) SymbolPathsUTF16() *uint16 {
 
 func (c *Config) addFlags() {
 	c.flags.String(configFile, filepath.Join(os.Getenv("PROGRAMFILES"), "fibratus", "config", "fibratus.yml"), "Indicates the location of the configuration file")
-	if c.opts.run || c.opts.replay {
+	if c.opts.run || c.opts.replay || c.opts.validate {
 		c.flags.StringP(filamentName, "f", "", "Specifies the filament to execute")
 
 		// initialize default rules paths
@@ -363,7 +371,7 @@ func (c *Config) addFlags() {
 	if c.opts.replay {
 		c.flags.StringP(kcapFile, "k", "", "The path of the input kcap file")
 	}
-	if c.opts.run || c.opts.replay || c.opts.list {
+	if c.opts.run || c.opts.replay || c.opts.list || c.opts.validate {
 		c.flags.String(filamentPath, filepath.Join(os.Getenv("PROGRAMFILES"), "fibratus", "filaments"), "Denotes the directory where filaments are located")
 	}
 	if c.opts.run || c.opts.replay || c.opts.capture || c.opts.stats {

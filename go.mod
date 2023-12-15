@@ -6,6 +6,8 @@ require (
 	github.com/antchfx/htmlquery v1.2.5
 	github.com/briandowns/spinner v1.12.0
 	github.com/dustin/go-humanize v1.0.0
+	github.com/enescakir/emoji v1.0.0
+	github.com/gammazero/deque v0.2.1
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e
 	github.com/hashicorp/go-version v1.2.1
 	github.com/hillu/go-yara/v4 v4.2.4
@@ -39,7 +41,6 @@ require (
 )
 
 require (
-	github.com/gammazero/deque v0.2.1 // indirect
 	github.com/rivo/uniseg v0.4.2 // indirect
 	github.com/rogpeppe/go-internal v1.11.0 // indirect
 )

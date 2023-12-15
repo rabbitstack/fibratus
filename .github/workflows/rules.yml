@@ -1,0 +1,21 @@
+name: rules
+
+on:
+  workflow_run:
+    workflows: ["master", "pr"]
+    types:
+      - completed
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - uses: actions/download-artifact@v3
+      with:
+        name: fibratus-amd64.exe
+        path: .
+    - name: Validate rules
+      run: |
+        ./fibratus-amd64.exe rules validate --filters.rules.from-paths=rules\* --filters.macros.from-paths=rules\macros\*

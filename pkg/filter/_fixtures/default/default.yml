@@ -17,8 +17,6 @@
 #
 - group: Windows userspace and common apps processes
   enabled: true
-  policy: exclude
-  relation: or
   rules:
     - name: Windows error reporting/telemetry, WMI provider host
       condition:  kevt.name = 'CreateProcess' and ps.comm startswith
@@ -109,8 +107,6 @@
 #
 - group: Suspicious network-connecting binaries
   enabled: true
-  policy: include
-  relation: or
   rules:
     - name: Suspicious sources for network-connecting binaries
       condition: kevt.name = 'Connect' and ps.exe startswith
@@ -200,8 +196,6 @@
 
 - group: Suspicious network-connecting binaries
   enabled: true
-  policy: exclude
-  relation: or
   rules:
     - name: Microsoft binaries
       condition: kevt.name = 'Connect' and  ps.exe startswith 'C:\\ProgramData\\Microsoft\\Windows Defender\\Platform\\'

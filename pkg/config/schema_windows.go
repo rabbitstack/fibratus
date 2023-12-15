@@ -508,8 +508,6 @@ var rulesSchema = `
 		"group": {"type": "string", "minLength": 1},
         "description":  {"type": "string"},
 		"enabled":  	{"type": "boolean"},
-		"policy":   	{"type": "string", "enum": ["include", "exclude", "INCLUDE", "EXCLUDE"]},
-		"relation": 	{"type": "string", "enum": ["or", "and", "OR", "AND"]},
 		"tags":			{"type": "array", "items": [{"type": "string", "minLength": 1}]},
 		"rules": 		{"$ref": "#rules"},
         "labels": {

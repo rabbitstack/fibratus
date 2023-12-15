@@ -57,8 +57,6 @@ func TestLoadGroupsFromPaths(t *testing.T) {
 	g1 := filters.groups[0]
 	assert.Equal(t, "internal network traffic", g1.Name)
 	assert.True(t, *g1.Enabled)
-	assert.Equal(t, ExcludePolicy, g1.Policy)
-	assert.Equal(t, AndRelation, g1.Relation)
 	assert.Contains(t, g1.Tags, "TE")
 	assert.Len(t, g1.Rules, 1)
 	assert.Equal(t, "only network category", g1.Rules[0].Name)
@@ -67,8 +65,6 @@ func TestLoadGroupsFromPaths(t *testing.T) {
 	g2 := filters.groups[1]
 	assert.Equal(t, "rouge processes", g2.Name)
 	assert.True(t, *g2.Enabled)
-	assert.Equal(t, IncludePolicy, g2.Policy)
-	assert.Equal(t, OrRelation, g2.Relation)
 	assert.Len(t, g2.Rules, 1)
 	assert.Equal(t, "suspicious network ACTIVITY", g2.Rules[0].Name)
 	assert.Equal(t, "kevt.category = 'net' and ps.name in ('at.exe', 'java.exe')", g2.Rules[0].Condition)
@@ -92,8 +88,6 @@ func TestLoadGroupsFromPathsNewAttributes(t *testing.T) {
 	g1 := filters.groups[0]
 	assert.Equal(t, "internal network traffic", g1.Name)
 	assert.False(t, *g1.Enabled)
-	assert.Equal(t, ExcludePolicy, g1.Policy)
-	assert.Equal(t, AndRelation, g1.Relation)
 	assert.Contains(t, g1.Tags, "TE")
 	assert.Len(t, g1.Rules, 1)
 	assert.Equal(t, "only network category", g1.Rules[0].Name)
@@ -102,8 +96,6 @@ func TestLoadGroupsFromPathsNewAttributes(t *testing.T) {
 	assert.Equal(t, "rouge processes", g2.Name)
 	assert.Nil(t, g2.Enabled)
 	assert.False(t, g2.IsDisabled())
-	assert.Equal(t, IncludePolicy, g2.Policy)
-	assert.Equal(t, OrRelation, g2.Relation)
 	assert.Len(t, g2.Rules, 1)
 	assert.Equal(t, "suspicious network ACTIVITY", g2.Rules[0].Name)
 	assert.Equal(t, "kevt.category = 'net' and ps.name in ('at.exe', 'java.exe')", g2.Rules[0].Condition)
@@ -155,7 +147,6 @@ func TestLoadGroupsInvalidTemplates(t *testing.T) {
 	}{
 		{newFilters("_fixtures/filters/invalid_filter_action.yml"), `invalid "suspicious network activity" rule action: syntax error in (suspicious network activity:1) at function "kil" not defined: function "kil" not defined`},
 		{newFilters("_fixtures/filters/invalid_filter_action_values.yml"), `invalid "suspicious network activity" rule action: syntax error in (suspicious network activity:1:13) at <.Kevt.Pid>: can't evaluate field Pid in type *kevent.Kevent`},
-		{newFilters("_fixtures/filters/filter_action_in_exclude_group.yml"), `"suspicious network activity" rule found in "rouge processes" group with exclude policy. Only groups with include policies can have rule actions`},
 	}
 	for i, tt := range tests {
 		err := tt.filters.LoadGroups()

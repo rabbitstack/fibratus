@@ -38,103 +38,6 @@ import (
 	"text/template"
 )
 
-// FilterGroupPolicy is the type alias for the filter group policy
-type FilterGroupPolicy uint8
-
-// FilterGroupRelation is the type alias for the filter group relation
-type FilterGroupRelation uint8
-
-const (
-	// IncludePolicy determines the policy type that allows for
-	// filtering the matching events.
-	IncludePolicy FilterGroupPolicy = iota
-	// ExcludePolicy determines the policy that allows for filtering
-	// out the matching events, that is, discarding them from the event
-	// flow.
-	ExcludePolicy
-	// UnknownPolicy determines the unknown group policy type.
-	UnknownPolicy
-)
-
-const (
-	// OrRelation is the group relation type that requires at
-	// least one matching filter to evaluate successfully.
-	OrRelation FilterGroupRelation = iota
-	// AndRelation is the group relation type that requires that
-	// all the filters to match in order to evaluate successfully.
-	AndRelation
-	// UnknownRelation determines the unknown group relation type.
-	UnknownRelation
-)
-
-// String yields a human-readable group policy.
-func (p FilterGroupPolicy) String() string {
-	switch p {
-	case IncludePolicy:
-		return "include"
-	case ExcludePolicy:
-		return "exclude"
-	default:
-		return ""
-	}
-}
-
-// String yields a human-readable group relation.
-func (r FilterGroupRelation) String() string {
-	switch r {
-	case OrRelation:
-		return "or"
-	case AndRelation:
-		return "and"
-	default:
-		return ""
-	}
-}
-
-// UnmarshalYAML converts the policy string to enum type.
-func (p *FilterGroupPolicy) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	var policy string
-	err := unmarshal(&policy)
-	if err != nil {
-		return err
-	}
-	*p = filterGroupPolicyFromString(policy)
-	return nil
-}
-
-// UnmarshalYAML converts the relation string to enum type.
-func (r *FilterGroupRelation) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	var relation string
-	err := unmarshal(&relation)
-	if err != nil {
-		return err
-	}
-	*r = filterGroupRelationFromString(relation)
-	return nil
-}
-
-func filterGroupPolicyFromString(s string) FilterGroupPolicy {
-	switch s {
-	case "include", "INCLUDE":
-		return IncludePolicy
-	case "exclude", "EXCLUDE":
-		return ExcludePolicy
-	default:
-		return UnknownPolicy
-	}
-}
-
-func filterGroupRelationFromString(s string) FilterGroupRelation {
-	switch s {
-	case "or", "OR":
-		return OrRelation
-	case "and", "AND":
-		return AndRelation
-	default:
-		return UnknownRelation
-	}
-}
-
 // FilterConfig is the descriptor of a single filter.
 type FilterConfig struct {
 	Name        string            `json:"name" yaml:"name"`
@@ -165,14 +68,12 @@ func (f FilterConfig) parseTmpl(resource string) error {
 
 // FilterGroup represents the container for filters.
 type FilterGroup struct {
-	Name        string              `json:"group" yaml:"group"`
-	Description string              `json:"description" yaml:"description"`
-	Enabled     *bool               `json:"enabled" yaml:"enabled"`
-	Policy      FilterGroupPolicy   `json:"policy" yaml:"policy"`
-	Relation    FilterGroupRelation `json:"relation" yaml:"relation"`
-	Rules       []*FilterConfig     `json:"rules" yaml:"rules"`
-	Tags        []string            `json:"tags" yaml:"tags"`
-	Labels      map[string]string   `json:"labels" yaml:"labels"`
+	Name        string            `json:"group" yaml:"group"`
+	Description string            `json:"description" yaml:"description"`
+	Enabled     *bool             `json:"enabled" yaml:"enabled"`
+	Rules       []*FilterConfig   `json:"rules" yaml:"rules"`
+	Tags        []string          `json:"tags" yaml:"tags"`
+	Labels      map[string]string `json:"labels" yaml:"labels"`
 }
 
 // IsDisabled determines if this group is disabled.
@@ -180,10 +81,6 @@ func (g FilterGroup) IsDisabled() bool { return g.Enabled != nil && !*g.Enabled 
 
 func (g FilterGroup) validate(resource string) error {
 	for _, filter := range g.Rules {
-		if filter.Action != "" && g.Policy == ExcludePolicy {
-			return fmt.Errorf("%q rule found in %q group with exclude policy. "+
-				"Only groups with include policies can have rule actions", filter.Name, g.Name)
-		}
 		if err := filter.parseTmpl(resource); err != nil {
 			return fmt.Errorf("invalid %q rule action: %v", filter.Name, err)
 		}
@@ -193,7 +90,7 @@ func (g FilterGroup) validate(resource string) error {
 
 // Hash calculates the filter group hash.
 func (g FilterGroup) Hash() uint32 {
-	return hashers.FnvUint32([]byte(g.Policy.String() + g.Name))
+	return hashers.FnvUint32([]byte(g.Name))
 }
 
 // Filters contains references to rule groups and macro definitions.
@@ -374,13 +271,12 @@ func (f *Filters) LoadGroups() error {
 	// check for duplicate rule groups
 	groupNames := make(map[string]bool)
 	for _, group := range f.groups {
-		key := group.Policy.String() + group.Name
-		_, isDup := groupNames[key]
+		_, isDup := groupNames[group.Name]
 		if isDup {
 			return fmt.Errorf("group names must be unique. "+
-				"Found duplicate %q group with %q policy", group.Name, group.Policy)
+				"Found duplicate %q group", group.Name)
 		}
-		groupNames[key] = true
+		groupNames[group.Name] = true
 	}
 	return nil
 }
