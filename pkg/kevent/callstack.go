@@ -72,7 +72,11 @@ func (s *Callstack) Depth() int { return len(*s) }
 func (s Callstack) Summary() string {
 	var sb strings.Builder
 	for i, frame := range s {
-		sb.WriteString(filepath.Base(frame.Module))
+		if frame.IsUnbacked() {
+			sb.WriteString("unbacked")
+		} else {
+			sb.WriteString(filepath.Base(frame.Module))
+		}
 		if i != len(s)-1 {
 			sb.WriteRune('|')
 		}

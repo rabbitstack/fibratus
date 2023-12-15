@@ -51,7 +51,7 @@ func TestCallstack(t *testing.T) {
 	assert.Equal(t, 5, cap(e.Callstack))
 
 	e.Callstack.PushFrame(Frame{0x7ffb5c1d0396, 0x66, 100, "CreateProcessW", "C:\\WINDOWS\\System32\\KERNELBASE.dll", ""})
-	e.Callstack.PushFrame(Frame{0x7ffb5d8e61f4, 0x54, 100, "CreateProcessW", " C:\\WINDOWS\\System32\\KERNEL32.DLL", ""})
+	e.Callstack.PushFrame(Frame{0x7ffb5d8e61f4, 0x54, 100, "CreateProcessW", "C:\\WINDOWS\\System32\\KERNEL32.DLL", ""})
 	e.Callstack.PushFrame(Frame{0x7ffb3138592e, 0x3a2, 200, "Java_java_lang_ProcessImpl_waitForTimeoutInterruptibly", "C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll", ""})
 	e.Callstack.PushFrame(Frame{0x7ffb313853b2, 0x10a, 200, "Java_java_lang_ProcessImpl_create", "C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll", ""})
 	e.Callstack.PushFrame(Frame{0x2638e59e0a5, 0, 400, "?", "unbacked", ""})

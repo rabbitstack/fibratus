@@ -50,7 +50,7 @@ var symCleanups = expvar.NewInt("symbolizer.symbol.cleanups")
 // procTTL specifies the number of interval
 // a process is allowed to remain in the map before
 // its handle and symbol resources are disposed
-const procTTL = 15 * time.Second
+var procTTL = 15 * time.Second
 
 type process struct {
 	pid      uint32
@@ -228,7 +228,7 @@ func (s *Symbolizer) pushFrames(addrs []va.Address, e *kevent.Kevent, fast, look
 // the standard symbol resolver methods fail to
 // retrieve this information.
 func (s *Symbolizer) produceFrame(addr va.Address, e *kevent.Kevent, fast, lookupExport bool) kevent.Frame {
-	frame := kevent.Frame{Addr: addr}
+	frame := kevent.Frame{Addr: addr, Module: "unbacked"}
 	if addr.InSystemRange() {
 		if s.config.SymbolizeKernelAddresses {
 			frame.Module = s.r.GetModuleName(windows.CurrentProcess(), addr)
@@ -267,7 +267,7 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *kevent.Kevent, fast, looku
 			module = mod.Name
 		}
 	}
-	if module == "?" || module == "unbacked" {
+	if (module == "?" || module == "unbacked") && e.PS != nil {
 		module = e.PS.FindMappingByVa(addr)
 	}
 	frame.Module = module
@@ -340,4 +340,10 @@ func (s *Symbolizer) housekeep() {
 			return
 		}
 	}
+}
+
+func (s *Symbolizer) procsSize() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.procs)
 }
