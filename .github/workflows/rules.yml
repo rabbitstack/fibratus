@@ -21,8 +21,8 @@ jobs:
         search_artifacts: true
     - name: Install Fibratus
       run: |
-        msiexec /i "fibratus-0.0.0-amd64.msi" /quiet /qn /norestart /log "$env:temp\install.log"
-        cat $env:temp\install.log
+        msiexec /i "fibratus-0.0.0-amd64.msi" /quiet /qn /norestart /l*v "install.log"
+        cat install.log
     - name: Validate rules
       run: |
-        fibratus.exe rules validate
+        fibratus rules validate
