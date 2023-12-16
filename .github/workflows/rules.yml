@@ -24,4 +24,5 @@ jobs:
         msiexec /i fibratus-0.0.0-amd64.msi /qn /l*v install.log || cat install.log
     - name: Validate rules
       run: |
+        $env:PATH += ";$env:ProgramFiles\Fibratus\Bin"
         fibratus rules validate
