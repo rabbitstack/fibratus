@@ -21,8 +21,10 @@ jobs:
         search_artifacts: true
     - name: Install Fibratus
       run: |
-        msiexec /i fibratus-0.0.0-amd64.msi /qn /l*v install.log || cat install.log
+        $exec = Start-Process "msiexec" "/i fibratus-0.0.0-amd64.msi /qn /l*! install.log" -NoNewWindow -PassThru;
+        $tail = Start-Process "powershell" "Get-Content -Path install.log -Wait" -NoNewWindow -PassThru;
+        $exec.WaitForExit();
+        $tail.Kill()
     - name: Validate rules
       run: |
-        $env:PATH += ";$env:ProgramFiles\Fibratus\Bin"
         fibratus rules validate
