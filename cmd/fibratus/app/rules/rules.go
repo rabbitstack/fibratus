@@ -37,18 +37,22 @@ var validateCmd = &cobra.Command{
 
 var listCmd = &cobra.Command{
 	Use:   "list",
-	Short: "Explore the rule catalog",
+	Short: "List rules",
 	RunE:  list,
 }
 
 var cfg = config.NewWithOpts(config.WithValidate(), config.WithList())
+
+var (
+	summarized bool
+)
 
 func init() {
 	cfg.MustViperize(Command)
 
 	Command.AddCommand(validateCmd)
 
-	listCmd.PersistentFlags().BoolP("summary", "s", false, "render rules summary")
+	listCmd.PersistentFlags().BoolVarP(&summarized, "summary", "s", false, "Show rules summary by MITRE tactics and techniques")
 	Command.AddCommand(listCmd)
 }
 

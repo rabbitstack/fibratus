@@ -25,7 +25,6 @@ import (
 	"github.com/rabbitstack/fibratus/internal/bootstrap"
 	"github.com/spf13/cobra"
 	"os"
-	"strconv"
 	"strings"
 )
 
@@ -45,8 +44,8 @@ func listRules(cmd *cobra.Command) error {
 	t.SetOutputMirror(os.Stdout)
 	t.SetStyle(table.StyleLight)
 
-	renderSummary, _ := strconv.ParseBool(cmd.Flag("summary").Value.String())
-	if renderSummary {
+	// render summary
+	if summarized {
 		t.AppendHeader(table.Row{"Tactic", "# Rules"})
 		t.SetColumnConfigs([]table.ColumnConfig{
 			{Name: "Tactic", WidthMin: 50, WidthMax: 50},
@@ -74,6 +73,7 @@ func listRules(cmd *cobra.Command) error {
 
 		t.AppendFooter(table.Row{"TOTAL", tot})
 	} else {
+		// show all rules
 		t.AppendHeader(table.Row{"#", "Rule", "Technique", "Tactic"})
 		t.SetColumnConfigs([]table.ColumnConfig{
 			{Name: "#", WidthMax: 5},
