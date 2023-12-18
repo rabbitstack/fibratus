@@ -6,24 +6,17 @@
     - name: only network category
       description: this rule matches all network signals
       condition: kevt.category = 'net'
-<<<<<<< HEAD
       severity: low
       output: >
         `%ps.exe` attempted to reach out to `%net.sip` IP address
       action:
       - kill:
         pid: ps.pid
-=======
       min-engine-version: 2.0.0
->>>>>>> master
 
 - group: rouge processes
   enabled: true
   rules:
     - name: suspicious network {{ upper "activity" }}
       condition: kevt.category = 'net' and ps.name in ('at.exe', 'java.exe')
-<<<<<<< HEAD
-
-=======
       min-engine-version: 2.0.0
->>>>>>> master
