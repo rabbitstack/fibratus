@@ -62,6 +62,8 @@ type FilterGroup struct {
 // FilterAction wraps all possible filter actions.
 type FilterAction any
 
+// KillAction defines an action for killing the process
+// indicates by the filter field expression.
 type KillAction struct {
 	// Pid indicates the field for which
 	// the process id is resolved
