@@ -3,5 +3,6 @@
   rules:
     - name: suspicious network activity
       condition: kevt.category = 'net' and ps.name in ('at.exe', 'java.exe')
+      min-engine-version: 2.0.0
       action: |
         {{ kil .Kevt.PID }}

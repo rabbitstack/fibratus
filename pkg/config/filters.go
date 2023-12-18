@@ -40,11 +40,12 @@ import (
 
 // FilterConfig is the descriptor of a single filter.
 type FilterConfig struct {
-	Name        string            `json:"name" yaml:"name"`
-	Description string            `json:"description" yaml:"description"`
-	Condition   string            `json:"condition" yaml:"condition"`
-	Action      string            `json:"action" yaml:"action"`
-	Labels      map[string]string `json:"labels" yaml:"labels"`
+	Name             string            `json:"name" yaml:"name"`
+	Description      string            `json:"description" yaml:"description"`
+	Condition        string            `json:"condition" yaml:"condition"`
+	Action           string            `json:"action" yaml:"action"`
+	Labels           map[string]string `json:"labels" yaml:"labels"`
+	MinEngineVersion string            `json:"min-engine-version" yaml:"min-engine-version"`
 }
 
 // parseTmpl ensures the correctness of the rule

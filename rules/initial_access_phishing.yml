@@ -33,6 +33,7 @@
         {{
             emit . "File execution via Microsoft Office process" ""
         }}
+      min-engine-version: 2.0.0
     - name: Potentially malicious module loaded by Microsoft Office process
       condition: >
         sequence
@@ -51,3 +52,4 @@
         {{
             emit . "Potentially malicious module loaded by Microsoft Office process" ""
         }}
+      min-engine-version: 2.0.0
