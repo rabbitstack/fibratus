@@ -58,7 +58,7 @@ func TestCallstack(t *testing.T) {
 
 	assert.True(t, e.Callstack.ContainsUnbacked())
 	assert.Equal(t, 5, e.Callstack.Depth())
-	assert.Equal(t, "0x7ffb5c1d0396 C:\\WINDOWS\\System32\\KERNELBASE.dll!CreateProcessW+0x66|0x7ffb5d8e61f4  C:\\WINDOWS\\System32\\KERNEL32.DLL!CreateProcessW+0x54|0x7ffb3138592e C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll!Java_java_lang_ProcessImpl_waitForTimeoutInterruptibly+0x3a2|0x7ffb313853b2 C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll!Java_java_lang_ProcessImpl_create+0x10a|0x2638e59e0a5 unbacked!?", e.Callstack.String())
+	assert.Equal(t, "0x7ffb5c1d0396 C:\\WINDOWS\\System32\\KERNELBASE.dll!CreateProcessW+0x66|0x7ffb5d8e61f4 C:\\WINDOWS\\System32\\KERNEL32.DLL!CreateProcessW+0x54|0x7ffb3138592e C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll!Java_java_lang_ProcessImpl_waitForTimeoutInterruptibly+0x3a2|0x7ffb313853b2 C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll!Java_java_lang_ProcessImpl_create+0x10a|0x2638e59e0a5 unbacked!?", e.Callstack.String())
 	assert.Equal(t, "KERNELBASE.dll|KERNEL32.DLL|java.dll|java.dll|unbacked", e.Callstack.Summary())
 }
 
@@ -123,6 +123,10 @@ func TestCallstackDecorator(t *testing.T) {
 	assert.Equal(t, ktypes.CreateFile, evt.Type)
 	assert.True(t, evt.Kparams.Contains(kparams.Callstack))
 	assert.Equal(t, "C:\\Windows\\system32\\user32.dll", evt.GetParamAsString(kparams.FileName))
+}
+
+func init() {
+	maxDequeFlushPeriod = time.Second * 2
 }
 
 func TestCallstackDecoratorFlush(t *testing.T) {

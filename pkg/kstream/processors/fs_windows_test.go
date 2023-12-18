@@ -29,6 +29,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"reflect"
 	"testing"
@@ -297,6 +298,8 @@ func TestFsProcessor(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			hsnap := tt.hsnap()
 			psnap := new(ps.SnapshotterMock)
+			psnap.On("AddFileMapping", mock.Anything).Return(nil)
+			psnap.On("RemoveFileMapping", mock.Anything, mock.Anything).Return(nil)
 			p := newFsProcessor(hsnap, psnap, fs.NewDevMapper(), fs.NewDevPathResolver(), &config.Config{})
 			if tt.setupProcessor != nil {
 				tt.setupProcessor(p)

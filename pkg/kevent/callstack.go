@@ -32,7 +32,7 @@ import (
 
 // maxDequeFlushPeriod specifies the maximum period
 // for the events to reside in the deque.
-const maxDequeFlushPeriod = 2 * time.Minute
+var maxDequeFlushPeriod = 2 * time.Minute
 
 // callstackFlushes computes overall callstack dequeue flushes
 var callstackFlushes = expvar.NewInt("callstack.flushes")
