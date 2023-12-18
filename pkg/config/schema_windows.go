@@ -489,12 +489,13 @@ var rulesSchema = `
 				{
 					"type": "object",
 					"properties": {
-						"name": 		{"type": "string", "minLength": 3},
-                        "description":  {"type": "string"},
-						"condition": 	{"type": "string", "minLength": 3},
-						"action": 		{"type": "string"}
+						"name": 				{"type": "string", "minLength": 3},
+                        "description":  		{"type": "string"},
+ 						"min-engine-version":  	{"type": "string", "minLength": 5, "pattern": "^([0-9]+.)([0-9]+.)([0-9]+)$"},
+						"condition": 			{"type": "string", "minLength": 3},
+						"action": 				{"type": "string"}
 					},
-					"required": ["name", "condition"],
+					"required": ["name", "condition", "min-engine-version"],
 					"minItems": 1,
 					"additionalProperties": false
 				}}},

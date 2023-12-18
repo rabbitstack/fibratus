@@ -25,3 +25,4 @@
             "Phishing dropper outbound communication"
             (printf "%s process initiated outbound communication to %s" .Kevts.k2.PS.Name .Kevts.k3.Kparams.dip)
         }}
+      min-engine-version: 2.0.0

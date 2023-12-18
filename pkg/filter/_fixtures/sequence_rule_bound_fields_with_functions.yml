@@ -43,3 +43,4 @@
              registered the password filter DLL under %2.registry.key.name registry key
             `
         }}
+      min-engine-version: 2.0.0
