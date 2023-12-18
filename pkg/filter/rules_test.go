@@ -274,7 +274,6 @@ func TestMinEngineVersion(t *testing.T) {
 	require.Error(t, rules.Compile())
 	rules = NewRules(psnap, newConfig("_fixtures/min-engine-ver-ok.yml"))
 	require.NoError(t, rules.Compile())
-
 }
 
 func TestSimpleSequenceRule(t *testing.T) {
