@@ -7,3 +7,4 @@
       action:
       - kill:
         pid: ps.child.pid
+      min-engine-version: 2.0.0

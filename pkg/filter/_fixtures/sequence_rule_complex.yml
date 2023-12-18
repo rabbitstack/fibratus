@@ -18,3 +18,4 @@
           kevt.name in ('Send', 'Connect')
         | by ps.pid
       output: "%2.ps.name process initiated outbound communication to %3.net.dip"
+      min-engine-version: 2.0.0

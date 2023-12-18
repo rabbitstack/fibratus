@@ -22,6 +22,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/sys"
+	"github.com/rabbitstack/fibratus/pkg/util/version"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
@@ -266,6 +267,15 @@ func TestSequenceState(t *testing.T) {
 	require.False(t, ss.inExpired)
 
 	assert.Equal(t, "kevt.name = CreateFile AND file.name ICONTAINS temp", ss.currentState())
+}
+
+func TestMinEngineVersion(t *testing.T) {
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, newConfig("_fixtures/min-engine-ver-fail.yml"))
+	version.Set("2.0.0")
+	require.Error(t, rules.Compile())
+	rules = NewRules(psnap, newConfig("_fixtures/min-engine-ver-ok.yml"))
+	require.NoError(t, rules.Compile())
 }
 
 func TestSimpleSequenceRule(t *testing.T) {

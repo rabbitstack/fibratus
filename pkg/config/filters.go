@@ -40,13 +40,14 @@ import (
 
 // FilterConfig is the descriptor of a single filter.
 type FilterConfig struct {
-	Name        string            `json:"name" yaml:"name"`
-	Description string            `json:"description" yaml:"description"`
-	Condition   string            `json:"condition" yaml:"condition"`
-	Action      []FilterAction    `json:"action" yaml:"action"`
-	Output      string            `json:"output" yaml:"output"`
-	Severity    string            `json:"severity" yaml:"severity"`
-	Labels      map[string]string `json:"labels" yaml:"labels"`
+	Name             string            `json:"name" yaml:"name"`
+	Description      string            `json:"description" yaml:"description"`
+	Condition        string            `json:"condition" yaml:"condition"`
+	Action           []FilterAction    `json:"action" yaml:"action"`
+	Output           string            `json:"output" yaml:"output"`
+	Severity         string            `json:"severity" yaml:"severity"`
+	Labels           map[string]string `json:"labels" yaml:"labels"`
+	MinEngineVersion string            `json:"min-engine-version" yaml:"min-engine-version"`
 }
 
 // FilterGroup represents the container for filters.

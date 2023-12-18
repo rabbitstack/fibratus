@@ -38,6 +38,7 @@
               )
           | by ps.child.uuid
           |spawn_process| by ps.uuid
+      min-engine-version: 2.0.0
 
 - group: System Binary Proxy Execution via Regsvr32
   description: |
@@ -78,3 +79,4 @@
             '*.sct*'
           )
         )
+      min-engine-version: 2.0.0

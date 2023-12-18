@@ -41,6 +41,7 @@
             '?:\\Windows\\System32\\svchost.exe',
             '?:\\ProgramData\\Microsoft\\Windows Defender\\Platform\\*.exe'
           )
+      min-engine-version: 2.0.0
     - name: Unusual process modified the registry run key
       description: |
         Identifies an attempt by unusual Windows native processes to modify
@@ -74,6 +75,7 @@
             '?:\\Windows\\System32\\conhost.exe',
             '?:\\Windows\\System32\\taskhostw.exe'
           )
+      min-engine-version: 2.0.0
     - name: Network connection via startup folder executable or script
       description: |
         Identifies the execution of unsigned binary or script from the
@@ -98,6 +100,7 @@
             )
           |
           |connect_socket or accept_socket|
+      min-engine-version: 2.0.0
     - name: Suspicious persistence via registry modification
       description: |
         Adversaries may abuse the registry to achieve persistence
@@ -115,6 +118,7 @@
           )
             and
         registry.key.name imatches registry_persistence_keys
+      min-engine-version: 2.0.0
     - name: Suspicious Startup shell folder modification
       description: |
         Detects when adversaries attempt to modify the default Startup
@@ -131,6 +135,7 @@
                 or
             registry.value imatches ('%ProgramData%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup')
           )
+      min-engine-version: 2.0.0
     - name: Script interpreter host or untrusted process persistence
       description: |
         Identifies the script interpreter or untrusted process writing
@@ -154,3 +159,4 @@
       action:
       - kill:
         pid: ps.pid
+      min-engine-version: 2.0.0

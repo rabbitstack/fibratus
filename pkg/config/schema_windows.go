@@ -489,11 +489,12 @@ var rulesSchema = `
 				{
 					"type": "object",
 					"properties": {
-						"name": 		{"type": "string", "minLength": 3},
-                        "description":  {"type": "string"},
-						"output": 		{"type": "string", "minLength": 5},
-						"severity":  	{"type": "string", "enum": ["low", "medium", "high", "critical"]},
-						"condition": 	{"type": "string", "minLength": 3},
+						"name": 				{"type": "string", "minLength": 3},
+                        "description":  		{"type": "string"},
+						"output": 				{"type": "string", "minLength": 5},
+						"severity":  			{"type": "string", "enum": ["low", "medium", "high", "critical"]},
+						"min-engine-version":  	{"type": "string", "minLength": 5, "pattern": "^([0-9]+.)([0-9]+.)([0-9]+)$"},
+						"condition": 			{"type": "string", "minLength": 3},
 						"action": 		{
 							"type": "array",
 							"items": [
@@ -513,7 +514,7 @@ var rulesSchema = `
 							"additionalProperties": false
 						}
 					},
-					"required": ["name", "condition"],
+					"required": ["name", "condition", "min-engine-version"],
 					"minItems": 1,
 					"additionalProperties": false
 				}}},

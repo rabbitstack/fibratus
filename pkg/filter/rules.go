@@ -30,11 +30,13 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/atomic"
 	"github.com/rabbitstack/fibratus/pkg/util/hashers"
+	"github.com/rabbitstack/fibratus/pkg/util/version"
 	"net"
 	"sort"
 	"strings"
 	"time"
 
+	semver "github.com/hashicorp/go-version"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	log "github.com/sirupsen/logrus"
@@ -57,6 +59,12 @@ var (
 	}
 	ErrRuleAction = func(rule string, err error) error {
 		return fmt.Errorf("fail to execute action for %q rule: %v", rule, err)
+	}
+	ErrIncompatibleFilter = func(rule, v string) error {
+		return fmt.Errorf("rule %q needs engine version [%s] but current version is [%s]", rule, v, version.Get())
+	}
+	ErrMalformedMinEngineVer = func(rule, v string, err error) error {
+		return fmt.Errorf("rule %q has a malformed minimum engine version: %s: %v", rule, v, err)
 	}
 )
 
@@ -504,6 +512,16 @@ func (r *Rules) Compile() error {
 			err := f.Compile()
 			if err != nil {
 				return ErrInvalidFilter(rule.Name, group.Name, err)
+			}
+			// check version requirements
+			if !version.IsDev() {
+				minEngineVer, err := semver.NewSemver(rule.MinEngineVersion)
+				if err != nil {
+					return ErrMalformedMinEngineVer(rule.Name, rule.MinEngineVersion, err)
+				}
+				if minEngineVer.GreaterThan(version.Sem()) {
+					return ErrIncompatibleFilter(rule.Name, rule.MinEngineVersion)
+				}
 			}
 			for _, field := range f.GetFields() {
 				deprecated, d := fields.IsDeprecated(field)

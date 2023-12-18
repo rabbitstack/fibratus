@@ -29,6 +29,7 @@
               and
            ps.name iin msoffice_binaries
           | by ps.child.exe
+      min-engine-version: 2.0.0
     - name: Potentially malicious module loaded by Microsoft Office process
       condition: >
         sequence
@@ -43,3 +44,4 @@
               and
            ps.name iin msoffice_binaries
           | by image.name
+      min-engine-version: 2.0.0
