@@ -25,7 +25,6 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/spf13/viper"
@@ -143,10 +142,10 @@ func (c *KstreamConfig) Init() {
 	}
 }
 
-// ExcludeKevent determines whether the supplied event is present in the list of
+// ExcludeKevent determines whether the supplied event type is present in the list of
 // excluded event types.
-func (c *KstreamConfig) ExcludeKevent(kevt *kevent.Kevent) bool {
-	return c.excludedKtypes[kevt.Type]
+func (c *KstreamConfig) ExcludeKevent(ktype ktypes.Ktype) bool {
+	return c.excludedKtypes[ktype]
 }
 
 // ExcludeImage determines whether the process generating event is present in the

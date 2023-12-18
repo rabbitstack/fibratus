@@ -19,9 +19,9 @@
       condition: >
         sequence
         maxspan 1h
-          |write_file
+          |create_file
               and
-           file.extension iin executable_extensions
+           (file.extension iin executable_extensions or file.is_exec)
               and
            ps.name iin msoffice_binaries
           | by file.name
@@ -33,9 +33,9 @@
       condition: >
         sequence
         maxspan 1h
-          |write_file
+          |create_file
               and
-           file.extension iin module_extensions
+           (file.extension iin module_extensions or file.is_dll)
               and
            ps.name iin msoffice_binaries
           | by file.name
