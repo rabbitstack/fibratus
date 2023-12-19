@@ -6,9 +6,11 @@
       action: |
         {{ $text := cat .Kevt.PS.Name "process received data on port" .Kevt.Kparams.dport }}
         {{ emit . "Test alert" $text "critical" "tag1" "tag2" }}
+      min-engine-version: 2.0.0
     - name: Windows error reporting/telemetry, WMI provider host
       condition:  kevt.name = 'Recv' and ps.comm startswith
         (
           ' \"C:\\Windows\\system32\\wermgr.exe\\" \"-queuereporting_svc\" ',
           'C:\\Windows\\system32\\DllHost.exe /Processid'
         )
+      min-engine-version: 2.0.0

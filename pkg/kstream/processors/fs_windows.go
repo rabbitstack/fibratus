@@ -165,7 +165,9 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 		e.WaitEnqueue = true
 		f.irps[irp] = e
 	case ktypes.StackWalk:
-		f.deq.PushBack(e)
+		if !kevent.IsCurrentProcDropped(e.PID) {
+			f.deq.PushBack(e)
+		}
 	case ktypes.FileOpEnd:
 		// get the CreateFile pending event by IRP identifier
 		// and fetch the file create disposition value

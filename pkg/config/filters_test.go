@@ -61,6 +61,7 @@ func TestLoadGroupsFromPaths(t *testing.T) {
 	assert.Len(t, g1.Rules, 1)
 	assert.Equal(t, "only network category", g1.Rules[0].Name)
 	assert.Equal(t, "kevt.category = 'net'", g1.Rules[0].Condition)
+	assert.Equal(t, "2.0.0", g1.Rules[0].MinEngineVersion)
 
 	g2 := filters.groups[1]
 	assert.Equal(t, "rouge processes", g2.Name)

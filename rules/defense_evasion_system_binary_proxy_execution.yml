@@ -42,6 +42,7 @@
         {{
             emit . "System Binary Proxy Execution via Rundll32" ""
         }}
+      min-engine-version: 2.0.0
 
 - group: System Binary Proxy Execution via Regsvr32
   description: |
@@ -86,3 +87,4 @@
        {{
             emit . "Regsvr32 scriptlet execution" ""
        }}
+      min-engine-version: 2.0.0

@@ -113,6 +113,7 @@ var ktypes = map[string]Ktype{
 	"RegQueryKey":        RegQueryKey,
 	"RegDeleteKey":       RegDeleteKey,
 	"RegDeleteValue":     RegDeleteValue,
+	"RegCloseKey":        RegCloseKey,
 	"AcceptTCP4":         AcceptTCPv4,
 	"AcceptTCP6":         AcceptTCPv6,
 	"SendTCP4":           SendTCPv4,
