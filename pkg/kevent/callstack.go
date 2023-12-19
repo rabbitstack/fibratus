@@ -174,7 +174,7 @@ func (cd *CallstackDecorator) Flush() []error {
 	errs := make([]error, 0)
 	for i := 0; i < cd.deq.Len(); i++ {
 		evt := cd.deq.At(i)
-		if time.Now().Sub(evt.Timestamp) < maxDequeFlushPeriod {
+		if time.Since(evt.Timestamp) < maxDequeFlushPeriod {
 			continue
 		}
 		callstackFlushes.Add(1)

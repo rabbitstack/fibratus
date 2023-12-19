@@ -225,7 +225,7 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 			// evict unmatched stack traces
 			for i := 0; i < f.deq.Len(); i++ {
 				evt := f.deq.At(i)
-				if time.Now().Sub(evt.Timestamp) > time.Minute*3 {
+				if time.Since(evt.Timestamp) > time.Minute*3 {
 					f.deq.Remove(i)
 				}
 			}

@@ -60,12 +60,6 @@ func (s Sec) String() string {
 	return fmt.Sprintf("Name: %s, Size: %d, Entropy: %f, Md5: %s", s.Name, s.Size, s.Entropy, s.Md5)
 }
 
-// Export describes the export attributes.
-type Export struct {
-	Function string
-	RVA      uint32
-}
-
 // PE contains various headers that identifies the format and characteristics of the executable files.
 type PE struct {
 	// NumberOfSections designates the total number of sections found withing the binary.

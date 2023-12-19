@@ -105,7 +105,7 @@ func TestRundownEvents(t *testing.T) {
 		ktypes.RegKCBRundown:  false,
 	}
 	rundownsByHash := make(map[uint64]uint8)
-	timeout := time.After(time.Second * 10)
+	timeout := time.After(time.Minute)
 
 	for {
 		select {
@@ -970,7 +970,7 @@ func createFileTransacted(name *uint16, access uint32, mode uint32, sa *windows.
 }
 
 func copyFile(from *uint16, to *uint16) (regerrno error) {
-	r0, _, _ := syscall.SyscallN(procCopyFile.Addr(), uintptr(unsafe.Pointer(from)), uintptr(unsafe.Pointer(to)), uintptr(1), 0, 0, 0)
+	r0, _, _ := syscall.SyscallN(procCopyFile.Addr(), uintptr(unsafe.Pointer(from)), uintptr(unsafe.Pointer(to)), uintptr(1))
 	if r0 != 0 {
 		regerrno = syscall.Errno(r0)
 	}

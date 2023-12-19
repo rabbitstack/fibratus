@@ -277,12 +277,12 @@ func TestProcessCallstackProcsTTL(t *testing.T) {
 		}
 		_, _ = s.ProcessEvent(e)
 		n--
-		time.Sleep(time.Millisecond * time.Duration(rand.Intn(5)*n))
+		time.Sleep(time.Millisecond * time.Duration(rand.Intn(15)*n))
 	}
 	// process should be present
 	assert.Equal(t, 1, s.procsSize())
 
-	time.Sleep(time.Second * 2)
+	time.Sleep(time.Millisecond * 2250)
 
 	// evicted
 	r.AssertNumberOfCalls(t, "Cleanup", 1)

@@ -89,7 +89,7 @@ func NewSymbolizer(r Resolver, config *config.Config, enqueue bool) *Symbolizer 
 	sym := &Symbolizer{
 		config:  config,
 		procs:   make(map[uint32]*process),
-		cleaner: time.NewTicker(time.Second),
+		cleaner: time.NewTicker(time.Second * 2),
 		purger:  time.NewTicker(time.Minute * 5),
 		quit:    make(chan struct{}, 1),
 		enqueue: enqueue,
