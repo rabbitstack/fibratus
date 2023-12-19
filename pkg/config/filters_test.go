@@ -28,17 +28,6 @@ import (
 	"testing"
 )
 
-func newFilters(paths ...string) Filters {
-	return Filters{
-		Rules{
-			FromPaths: paths,
-		},
-		Macros{FromPaths: nil},
-		map[string]*Macro{},
-		[]FilterGroup{},
-	}
-}
-
 func TestLoadGroupsFromPaths(t *testing.T) {
 	filters := Filters{
 		Rules{
@@ -61,6 +50,16 @@ func TestLoadGroupsFromPaths(t *testing.T) {
 	assert.Len(t, g1.Rules, 1)
 	assert.Equal(t, "only network category", g1.Rules[0].Name)
 	assert.Equal(t, "kevt.category = 'net'", g1.Rules[0].Condition)
+	assert.Equal(t, "this rule matches all network signals", g1.Rules[0].Description)
+	assert.Equal(t, "low", g1.Rules[0].Severity)
+	assert.Equal(t, "`%ps.exe` attempted to reach out to `%net.sip` IP address\n", g1.Rules[0].Output)
+	assert.NotNil(t, g1.Rules[0].Action)
+
+	acts, err := g1.Rules[0].DecodeActions()
+	require.NoError(t, err)
+	require.IsType(t, KillAction{}, acts[0])
+
+	assert.Equal(t, "ps.pid", acts[0].(KillAction).Pid)
 	assert.Equal(t, "2.0.0", g1.Rules[0].MinEngineVersion)
 
 	g2 := filters.groups[1]
@@ -139,20 +138,4 @@ func TestLoadGroupsFromURLs(t *testing.T) {
 	g1 := filters.groups[0]
 	assert.Equal(t, "internal network traffic", g1.Name)
 	assert.True(t, *g1.Enabled)
-}
-
-func TestLoadGroupsInvalidTemplates(t *testing.T) {
-	var tests = []struct {
-		filters Filters
-		errMsg  string
-	}{
-		{newFilters("_fixtures/filters/invalid_filter_action.yml"), `invalid "suspicious network activity" rule action: syntax error in (suspicious network activity:1) at function "kil" not defined: function "kil" not defined`},
-		{newFilters("_fixtures/filters/invalid_filter_action_values.yml"), `invalid "suspicious network activity" rule action: syntax error in (suspicious network activity:1:13) at <.Kevt.Pid>: can't evaluate field Pid in type *kevent.Kevent`},
-	}
-	for i, tt := range tests {
-		err := tt.filters.LoadGroups()
-		if err.Error() != tt.errMsg {
-			t.Errorf("%d. filter group error mismatch: exp=%s got=%v", i, tt.errMsg, err)
-		}
-	}
 }

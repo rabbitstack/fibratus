@@ -20,7 +20,6 @@ package config
 
 import (
 	"bytes"
-	"encoding/base64"
 	"fmt"
 	"github.com/Masterminds/sprig/v3"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
@@ -34,6 +33,7 @@ import (
 	u "net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"text/template"
 )
@@ -43,28 +43,11 @@ type FilterConfig struct {
 	Name             string            `json:"name" yaml:"name"`
 	Description      string            `json:"description" yaml:"description"`
 	Condition        string            `json:"condition" yaml:"condition"`
-	Action           string            `json:"action" yaml:"action"`
+	Action           []FilterAction    `json:"action" yaml:"action"`
+	Output           string            `json:"output" yaml:"output"`
+	Severity         string            `json:"severity" yaml:"severity"`
 	Labels           map[string]string `json:"labels" yaml:"labels"`
 	MinEngineVersion string            `json:"min-engine-version" yaml:"min-engine-version"`
-}
-
-// parseTmpl ensures the correctness of the rule
-// action template by trying to parse the template
-// string from the base64 payload.
-func (f FilterConfig) parseTmpl(resource string) error {
-	if f.Action == "" {
-		return nil
-	}
-	decoded, err := base64.StdEncoding.DecodeString(f.Action)
-	if err != nil {
-		return err
-	}
-	tmpl, err := template.New(f.Name).Funcs(FilterFuncMap()).Parse(string(decoded))
-	if err != nil {
-		return cleanupParseError(resource, err)
-	}
-	var bb bytes.Buffer
-	return cleanupParseError(resource, tmpl.Execute(&bb, tmplData()))
 }
 
 // FilterGroup represents the container for filters.
@@ -77,17 +60,60 @@ type FilterGroup struct {
 	Labels      map[string]string `json:"labels" yaml:"labels"`
 }
 
-// IsDisabled determines if this group is disabled.
-func (g FilterGroup) IsDisabled() bool { return g.Enabled != nil && !*g.Enabled }
+// FilterAction wraps all possible filter actions.
+type FilterAction any
 
-func (g FilterGroup) validate(resource string) error {
-	for _, filter := range g.Rules {
-		if err := filter.parseTmpl(resource); err != nil {
-			return fmt.Errorf("invalid %q rule action: %v", filter.Name, err)
+// KillAction defines an action for killing the process
+// indicates by the filter field expression.
+type KillAction struct {
+	// Pid indicates the field for which
+	// the process id is resolved
+	Pid string `json:"pid" yaml:"pid"`
+}
+
+func (a KillAction) PidToInt(pid string) uint32 {
+	n, err := strconv.Atoi(pid)
+	if err != nil {
+		return 0
+	}
+	return uint32(n)
+}
+
+const (
+	killActionID = "kill"
+)
+
+// DecodeActions converts raw YAML map to
+// typed action structures.
+func (f FilterConfig) DecodeActions() ([]any, error) {
+	actions := make([]any, 0, len(f.Action))
+
+	dec := func(m map[string]any, o any) error {
+		err := decode(m, &o)
+		if err != nil {
+			return err
+		}
+		actions = append(actions, o)
+		return nil
+	}
+
+	for _, act := range f.Action {
+		m, ok := act.(map[string]any)
+		if !ok {
+			continue
+		}
+		if _, ok := m[killActionID]; ok {
+			var kill KillAction
+			if err := dec(m, kill); err != nil {
+				return nil, err
+			}
 		}
 	}
-	return nil
+	return actions, nil
 }
+
+// IsDisabled determines if this group is disabled.
+func (g FilterGroup) IsDisabled() bool { return g.Enabled != nil && !*g.Enabled }
 
 // Hash calculates the filter group hash.
 func (g FilterGroup) Hash() uint32 {
@@ -130,6 +156,21 @@ type Macro struct {
 	Description string   `json:"description" yaml:"description"`
 	Expr        string   `json:"expr" yaml:"expr"`
 	List        []string `json:"list" yaml:"list"`
+}
+
+// ActionContext is the convenient structure
+// for grouping the event that resulted in
+// matched filter along with filter group
+// information.
+type ActionContext struct {
+	// Events contains a single element for non-sequence
+	// group policies or a list of ordered matched events
+	// for sequence group policies
+	Events []*kevent.Kevent
+	// Filter represents the filter that matched the event
+	Filter *FilterConfig
+	// Group represents the group where the filter is declared
+	Group FilterGroup
 }
 
 const (
@@ -307,31 +348,15 @@ func decodeFilterGroups(resource string, b []byte) ([]FilterGroup, error) {
 				"%v in %s: %v", rawGroup, resource, multierror.Wrap(errs...))
 		}
 	}
-	// convert filter action template to
-	// base64 before executing the global
-	// template. The rendered template yields
-	// a yaml payload with template directives
-	// expanded
-	b, err = encodeFilterActions(b)
-	if err != nil {
-		return nil, err
-	}
+	// render template
 	b, err = renderTmpl(resource, b)
 	if err != nil {
 		return nil, err
 	}
-
 	// now unmarshal into typed group slice
 	var groups []FilterGroup
 	if err := yaml.Unmarshal(b, &groups); err != nil {
 		return nil, err
-	}
-	// try to validate filter action template
-	for _, group := range groups {
-		err := group.validate(resource)
-		if err != nil {
-			return nil, err
-		}
 	}
 	return groups, nil
 }
@@ -340,7 +365,7 @@ func decodeFilterGroups(resource string, b []byte) ([]FilterGroup, error) {
 // file group yaml file. It returns the byte slice
 // with yaml content after template expansion.
 func renderTmpl(filename string, b []byte) ([]byte, error) {
-	tmpl, err := template.New(filename).Funcs(FilterFuncMap()).Parse(string(b))
+	tmpl, err := template.New(filename).Funcs(sprig.FuncMap()).Parse(string(b))
 	if err != nil {
 		return nil, cleanupParseError(filename, err)
 	}
@@ -378,112 +403,4 @@ func cleanupParseError(filename string, err error) error {
 		errMsg = tokens[len(tokens)-1]
 	}
 	return fmt.Errorf("syntax error in (%s) at %s: %s", location, key, errMsg)
-}
-
-// ActionContext is the convenient structure
-// for grouping the event that resulted in
-// matched filter along with filter group
-// information.
-type ActionContext struct {
-	Kevt *kevent.Kevent
-	// Kevts contains matched events for sequence group
-	// policies indexed by `k` + the slot number of the
-	// rule that produced a partial match
-	Kevts map[string]*kevent.Kevent
-	// Events contains a single element for non-sequence
-	// group policies or a list of ordered matched events
-	// for sequence group policies
-	Events []*kevent.Kevent
-	Filter *FilterConfig
-	Group  FilterGroup
-}
-
-// FilterFuncMap returns the template func map
-// populated with some useful template functions
-// that can be used in rule actions.
-func FilterFuncMap() template.FuncMap {
-	f := sprig.TxtFuncMap()
-
-	extra := template.FuncMap{
-		// This is a placeholder for the functions that might be
-		// late-bound to a template. By declaring them here, we
-		// can still execute the template associated with the
-		// filter action to ensure template syntax is correct
-		"emit": func(ctx *ActionContext, title string, text string, args ...string) string { return "" },
-		"kill": func(pid uint32) string { return "" },
-	}
-
-	for k, v := range extra {
-		f[k] = v
-	}
-
-	return f
-}
-
-func tmplData() *ActionContext {
-	return &ActionContext{
-		Filter: &FilterConfig{},
-		Group:  FilterGroup{},
-		Kevt:   kevent.Empty(),
-		Events: make([]*kevent.Kevent, 0),
-		Kevts:  make(map[string]*kevent.Kevent),
-	}
-}
-
-const (
-	actionNode      = "action"
-	defNode         = "def"
-	fromStringsNode = "from-strings"
-	rulesNode       = "rules"
-)
-
-// encodeFilterActions convert the filter action template
-// to base64 payload. Because we only want to execute
-// the action template when a filter matches in runtime,
-// encoding the template to base64 prevents the Go templating
-// engine from expanding the template in parse time, when we
-// first load all the filter groups.
-func encodeFilterActions(buf []byte) ([]byte, error) {
-	var yn yaml.Node
-	if err := yaml.Unmarshal(buf, &yn); err != nil {
-		return nil, err
-	}
-
-	// for each group
-	for _, n := range yn.Content[0].Content {
-		// for each group node
-		for i, gn := range n.Content {
-			// sequence groups action
-			if gn.Value == actionNode && n.Content[i+1].Value != "" {
-				n.Content[i+1].Value =
-					base64.StdEncoding.EncodeToString([]byte(n.Content[i+1].Value))
-			}
-			if gn.Value == fromStringsNode {
-				log.Warnf("`from-strings` attribute is deprecated and will be " +
-					"removed in future versions. Please consider switching to `rules` attribute")
-			}
-			if gn.Value == fromStringsNode || gn.Value == rulesNode {
-				content := n.Content[i+1]
-				// for each node in from-strings
-				for _, s := range content.Content {
-					for j, e := range s.Content {
-						if e.Value == defNode {
-							log.Warnf("`def` attribute is deprecated and will be " +
-								"removed in future versions. Please consider switching to `condition` attribute")
-						}
-						if e.Value == actionNode && s.Content[j+1].Value != "" {
-							s.Content[j+1].Value =
-								base64.StdEncoding.EncodeToString([]byte(s.Content[j+1].Value))
-						}
-					}
-				}
-			}
-		}
-	}
-
-	b, err := yaml.Marshal(&yn)
-	if err != nil {
-		return nil, err
-	}
-	return b, nil
 }

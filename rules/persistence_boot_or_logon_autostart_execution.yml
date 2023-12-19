@@ -41,10 +41,6 @@
             '?:\\Windows\\System32\\svchost.exe',
             '?:\\ProgramData\\Microsoft\\Windows Defender\\Platform\\*.exe'
           )
-      action: >
-        {{
-            emit . "Unusual file written or modified in Startup folder" ""
-        }}
       min-engine-version: 2.0.0
     - name: Unusual process modified the registry run key
       description: |
@@ -79,10 +75,6 @@
             '?:\\Windows\\System32\\conhost.exe',
             '?:\\Windows\\System32\\taskhostw.exe'
           )
-      action: >
-        {{
-            emit . "Unusual process modified the registry run key" ""
-        }}
       min-engine-version: 2.0.0
     - name: Network connection via startup folder executable or script
       description: |
@@ -108,10 +100,6 @@
             )
           |
           |connect_socket or accept_socket|
-      action: >
-        {{
-            emit . "Network connection via startup folder executable or script" ""
-        }}
       min-engine-version: 2.0.0
     - name: Suspicious persistence via registry modification
       description: |
@@ -130,10 +118,6 @@
           )
             and
         registry.key.name imatches registry_persistence_keys
-      action: >
-        {{
-            emit . "Suspicious persistence via registry modification" ""
-        }}
       min-engine-version: 2.0.0
     - name: Suspicious Startup shell folder modification
       description: |
@@ -151,10 +135,6 @@
                 or
             registry.value imatches ('%ProgramData%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup')
           )
-      action: >
-        {{
-            emit . "Suspicious Startup shell folder modification" ""
-        }}
       min-engine-version: 2.0.0
     - name: Script interpreter host or untrusted process persistence
       description: |
@@ -176,8 +156,7 @@
                 or
             file.name imatches startup_locations
         )
-      action: >
-        {{
-            emit . "Script interpreter host or untrusted process persistence" ""
-        }}
+      action:
+      - kill:
+        pid: ps.pid
       min-engine-version: 2.0.0

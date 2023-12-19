@@ -29,10 +29,6 @@
               and
            ps.name iin msoffice_binaries
           | by ps.child.exe
-      action: >
-        {{
-            emit . "File execution via Microsoft Office process" ""
-        }}
       min-engine-version: 2.0.0
     - name: Potentially malicious module loaded by Microsoft Office process
       condition: >
@@ -48,8 +44,4 @@
               and
            ps.name iin msoffice_binaries
           | by image.name
-      action: >
-        {{
-            emit . "Potentially malicious module loaded by Microsoft Office process" ""
-        }}
       min-engine-version: 2.0.0

@@ -33,14 +33,8 @@
               and
            get_reg_value(registry.key.name) iin (base($e1.file.name, false))
           |
-      action: >
-        {{
-            emit
-              .
-            "Suspicious password filter DLL registered"
-            `<code>%1.ps.exe</code> process dropped potentially malicious
-             <code>%1.file.name</code> password filter and <code>%2.ps.name</code>
-             registered the password filter DLL under %2.registry.key.name registry key
-            `
-        }}
+      output: >
+        <code>%1.ps.exe</code> process dropped potentially malicious
+        <code>%1.file.name</code> password filter and <code>%2.ps.name</code>
+        registered the password filter DLL under %2.registry.key.name registry key
       min-engine-version: 2.0.0
