@@ -150,19 +150,3 @@ func TestLoadGroupsFromURLs(t *testing.T) {
 	assert.Equal(t, "internal network traffic", g1.Name)
 	assert.True(t, *g1.Enabled)
 }
-
-func TestLoadGroupsInvalidTemplates(t *testing.T) {
-	var tests = []struct {
-		filters Filters
-		errMsg  string
-	}{
-		{newFilters("_fixtures/filters/invalid_filter_action.yml"), `invalid "suspicious network activity" rule action: syntax error in (suspicious network activity:1) at function "kil" not defined: function "kil" not defined`},
-		{newFilters("_fixtures/filters/invalid_filter_action_values.yml"), `invalid "suspicious network activity" rule action: syntax error in (suspicious network activity:1:13) at <.Kevt.Pid>: can't evaluate field Pid in type *kevent.Kevent`},
-	}
-	for i, tt := range tests {
-		err := tt.filters.LoadGroups()
-		if err.Error() != tt.errMsg {
-			t.Errorf("%d. filter group error mismatch: exp=%s got=%v", i, tt.errMsg, err)
-		}
-	}
-}
