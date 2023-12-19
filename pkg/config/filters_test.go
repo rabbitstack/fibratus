@@ -28,17 +28,6 @@ import (
 	"testing"
 )
 
-func newFilters(paths ...string) Filters {
-	return Filters{
-		Rules{
-			FromPaths: paths,
-		},
-		Macros{FromPaths: nil},
-		map[string]*Macro{},
-		[]FilterGroup{},
-	}
-}
-
 func TestLoadGroupsFromPaths(t *testing.T) {
 	filters := Filters{
 		Rules{
