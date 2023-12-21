@@ -23,6 +23,7 @@ import (
 	"github.com/enescakir/emoji"
 	"github.com/rabbitstack/fibratus/internal/bootstrap"
 	"github.com/rabbitstack/fibratus/pkg/filter"
+	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"path/filepath"
 	"strings"
 )
@@ -45,7 +46,7 @@ func validateRules() error {
 			if !isValidExt(path) {
 				continue
 			}
-			emo("%v Loading macros from %s\n", emoji.Magnet, path)
+			emo("%v Loading macros from %s\n", emoji.Hook, path)
 		}
 	}
 	if err := cfg.Filters.LoadMacros(); err != nil {
@@ -71,6 +72,7 @@ func validateRules() error {
 		return fmt.Errorf("%v no rules found in %s", emoji.DisappointedFace, strings.Join(cfg.Filters.Rules.FromPaths, ","))
 	}
 
+	warnings := make([]string, 0)
 	// validate rule for every group
 	for _, group := range cfg.GetRuleGroups() {
 		for _, rule := range group.Rules {
@@ -79,8 +81,21 @@ func validateRules() error {
 			if err != nil {
 				return fmt.Errorf("%v %v", emoji.DisappointedFace, filter.ErrInvalidFilter(rule.Name, group.Name, err))
 			}
+			for _, fld := range f.GetFields() {
+				if isDeprecated, dep := fields.IsDeprecated(fld); isDeprecated {
+					warnings = append(warnings,
+						fmt.Sprintf("%s field deprecated in favor of %v in rule %s", fld.String(), dep.Fields, rule.Name))
+				}
+			}
 		}
 	}
+	if len(warnings) > 0 {
+		for _, warn := range warnings {
+			emo("%v %s\n", emoji.Warning, warn)
+		}
+		fmt.Printf("%d warning(s)\n", len(warnings))
+	}
+
 	emo("%v Validation successful. Ready to go!", emoji.Rocket)
 	return nil
 }
