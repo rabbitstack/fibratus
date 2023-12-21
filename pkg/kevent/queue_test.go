@@ -179,7 +179,9 @@ func TestQueuePush(t *testing.T) {
 			}
 			err := q.Push(tt.e)
 			assert.Equal(t, err, tt.err)
-			assert.True(t, tt.e.Kparams.Contains(kparams.FileAttributes))
+			if tt.isEnqueued {
+				assert.True(t, tt.e.Kparams.Contains(kparams.FileAttributes))
+			}
 			assert.True(t, len(q.Events()) > 0 == tt.isEnqueued)
 		})
 	}
