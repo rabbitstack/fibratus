@@ -60,7 +60,7 @@
       description: |
         Identifies the execution of a scriptlet file by regsvr32.exe process. Regsvr32
         is usually abused by adversaries to execute malicious payloads without triggering
-        AV product alerts.
+        EDR/AV product alerts.
       condition: >
         spawn_process
             and
