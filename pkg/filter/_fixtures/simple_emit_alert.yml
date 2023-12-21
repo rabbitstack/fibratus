@@ -3,12 +3,18 @@
   rules:
     - name: match https connections
       condition:  kevt.name = 'Recv' and net.dport = 443
-      action: |
-        {{ $text := cat .Kevt.PS.Name "process received data on port" .Kevt.Kparams.dport }}
-        {{ emit . "Test alert" $text "critical" "tag1" "tag2" }}
+      output: "%ps.name process received data on port %net.dport"
+      severity: critical
+      min-engine-version: 2.0.0
     - name: Windows error reporting/telemetry, WMI provider host
       condition:  kevt.name = 'Recv' and ps.comm startswith
         (
           ' \"C:\\Windows\\system32\\wermgr.exe\\" \"-queuereporting_svc\" ',
           'C:\\Windows\\system32\\DllHost.exe /Processid'
         )
+      min-engine-version: 2.0.0
+  tags:
+    - tag1
+    - tag2
+
+

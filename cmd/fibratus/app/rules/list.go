@@ -96,7 +96,7 @@ func listRules(cmd *cobra.Command) error {
 				techniques[tec] = 1
 			}
 			for _, rule := range group.Rules {
-				t.AppendRow(table.Row{n, rule.Name, group.Name, group.Labels["tactic.name"]})
+				t.AppendRow(table.Row{n + 1, rule.Name, group.Name, group.Labels["tactic.name"]})
 				n++
 			}
 		}

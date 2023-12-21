@@ -38,10 +38,7 @@
               )
           | by ps.child.uuid
           |spawn_process| by ps.uuid
-      action: >
-        {{
-            emit . "System Binary Proxy Execution via Rundll32" ""
-        }}
+      min-engine-version: 2.0.0
 
 - group: System Binary Proxy Execution via Regsvr32
   description: |
@@ -63,7 +60,7 @@
       description: |
         Identifies the execution of a scriptlet file by regsvr32.exe process. Regsvr32
         is usually abused by adversaries to execute malicious payloads without triggering
-        AV product alerts.
+        EDR/AV product alerts.
       condition: >
         spawn_process
             and
@@ -82,7 +79,4 @@
             '*.sct*'
           )
         )
-      action: >
-       {{
-            emit . "Regsvr32 scriptlet execution" ""
-       }}
+      min-engine-version: 2.0.0

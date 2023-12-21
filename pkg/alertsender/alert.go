@@ -34,6 +34,8 @@ const (
 	Normal Severity = iota
 	// Medium designates alert's medium level
 	Medium
+	// High designates alert's high level
+	High
 	// Critical designates alert's critical level
 	Critical
 )
@@ -45,6 +47,8 @@ func (s Severity) String() string {
 		return "low"
 	case Medium:
 		return "medium"
+	case High:
+		return "high"
 	case Critical:
 		return "critical"
 	default:
@@ -59,7 +63,9 @@ func ParseSeverityFromString(sever string) Severity {
 		return Normal
 	case "medium", "Medium", "MEDIUM":
 		return Medium
-	case "critical", "Critical", "high", "High", "HIGH":
+	case "high", "High", "HIGH":
+		return High
+	case "critical", "Critical", "CRITICAL":
 		return Critical
 	default:
 		return Normal

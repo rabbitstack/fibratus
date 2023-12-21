@@ -12,10 +12,21 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
-    - uses: actions/download-artifact@v3
+    - name: Download MSI
+      uses: dawidd6/action-download-artifact@v2
       with:
-        name: fibratus-amd64.exe
+        run_id: ${{ github.event.workflow_run.id }}
+        name: fibratus-amd64.msi
         path: .
+        search_artifacts: true
+    - name: Install Fibratus
+      run: |
+        $exec = Start-Process "msiexec" "/i fibratus-0.0.0-amd64.msi /qn /l*! install.log" -NoNewWindow -PassThru
+        Start-Sleep -Seconds 2
+        $tail = Start-Process "powershell" "Get-Content -Path install.log -Wait" -NoNewWindow -PassThru
+        $exec.WaitForExit()
+        $tail.Kill()
     - name: Validate rules
       run: |
-        ./fibratus-amd64.exe rules validate --filters.rules.from-paths=rules\* --filters.macros.from-paths=rules\macros\*
+        $env:Path += ";$env:ProgramFiles\Fibratus\Bin\"
+        fibratus rules validate

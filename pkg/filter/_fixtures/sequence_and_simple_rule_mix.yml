@@ -4,6 +4,7 @@
     - name: Process spawned by powershell
       condition: >
         kevt.name = 'CreateProcess' and ps.name = 'powershell.exe'
+      min-engine-version: 2.0.0
     - name: Powershell created a temp file
       condition: >
         sequence
@@ -13,11 +14,14 @@
             and
          file.name icontains 'temp'
         | by ps.pid
+      min-engine-version: 2.0.0
     - name: Spawn Chrome browser
       condition: >
         kevt.name = 'CreateProcess' and ps.sibling.name = 'chrome.exe'
+      min-engine-version: 2.0.0
     - name: Command shell spawned Chrome browser
       condition: >
         sequence maxspan 1s
         |kevt.name = 'CreateProcess' and ps.name = 'powershell.exe'| by ps.pid
         |kevt.name = 'CreateProcess' and ps.sibling.name = 'chrome.exe'| by ps.pid
+      min-engine-version: 2.0.0

@@ -27,23 +27,13 @@ import (
 )
 
 // Emit sends the rule alert via all configured alert senders.
-func Emit(ctx *config.ActionContext, title string, text string, args ...string) error {
+func Emit(ctx *config.ActionContext, title string, text string, severity string, tags []string) error {
 	log.Debugf("sending alert: %s. Text: %s", title, text)
 
 	senders := alertsender.FindAll()
 	if len(senders) == 0 {
 		return fmt.Errorf("no alertsenders registered. Alert won't be sent")
 	}
-
-	severity := "medium"
-	tags := make([]string, 0)
-	if len(args) > 0 {
-		severity = args[0]
-	}
-	if len(args) > 1 {
-		tags = args[1:]
-	}
-
 	for _, s := range senders {
 		alert := alertsender.NewAlert(
 			title,

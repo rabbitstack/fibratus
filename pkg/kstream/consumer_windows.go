@@ -183,10 +183,6 @@ func (k *consumer) isEventDropped(evt *kevent.Kevent) bool {
 	if evt.IsDropped(k.capture) {
 		return true
 	}
-	if k.config.Kstream.ExcludeKevent(evt) {
-		excludedKevents.Add(1)
-		return true
-	}
 	if k.config.Kstream.ExcludeImage(evt.PS) {
 		excludedProcs.Add(1)
 		return true
@@ -198,9 +194,16 @@ func (k *consumer) isEventDropped(evt *kevent.Kevent) bool {
 }
 
 func (k *consumer) processEvent(ev *etw.EventRecord) error {
+	if kevent.IsCurrentProcDropped(ev.Header.ProcessID) {
+		return nil
+	}
 	ktype := ktypes.NewFromEventRecord(ev)
 	if !ktype.Exists() {
 		keventsUnknown.Add(1)
+		return nil
+	}
+	if k.config.Kstream.ExcludeKevent(ktype) {
+		excludedKevents.Add(1)
 		return nil
 	}
 	keventsProcessed.Add(1)

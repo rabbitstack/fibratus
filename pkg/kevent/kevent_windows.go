@@ -135,8 +135,12 @@ func (e Kevent) IsDropped(capture bool) bool {
 	if e.IsRundown() && e.IsRundownProcessed() {
 		return true
 	}
-	return DropCurrentProc && e.CurrentPid()
+	return IsCurrentProcDropped(e.PID)
 }
+
+// IsCurrentProcDropped determines if the event originated from the
+// current process is dropped.
+func IsCurrentProcDropped(pid uint32) bool { return DropCurrentProc && pid == currentPid }
 
 // DelayKey returns the value that is used to
 // store and reference delayed events in the event

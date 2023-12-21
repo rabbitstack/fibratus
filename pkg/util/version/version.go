@@ -20,11 +20,13 @@ package version
 
 import (
 	"fmt"
+	semver "github.com/hashicorp/go-version"
 	"os"
 	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/jedib0t/go-pretty/v6/table"
 )
@@ -43,11 +45,29 @@ var versionRegexp = regexp.MustCompile(`(\d+\.\d+\.\d+)`)
 
 var version string
 
+var once sync.Once
+var sem *semver.Version
+
 // Set initializes the version string as global variable.
 func Set(v string) { version = v }
 
 // Get returns the version string.
 func Get() string { return version }
+
+// IsDev determines if this is a dev version.
+func IsDev() bool { return version == "dev" || version == "" }
+
+// Sem returns a semver spec.
+func Sem() *semver.Version {
+	once.Do(func() {
+		var err error
+		sem, err = semver.NewSemver(version)
+		if err != nil {
+			panic(err)
+		}
+	})
+	return sem
+}
 
 // ProductToken returns a tag to be poked in User Agent headers.
 func ProductToken() string { return fmt.Sprintf("fibratus/%s", version) }

@@ -26,6 +26,7 @@
             'C:\\Windows\\system32\\wbem\\wmiprvse.exe -Embedding',
             'C:\\Windows\\system32\\wbem\\wmiprvse.exe -secured -Embedding'
           )
+      min-engine-version: 2.0.0
     - name: Windows error reporting/telemetry, Search Indexer, Session Manager, Auto check utility
       condition: kevt.name = 'CreateProcess' and ps.comm in
           (
@@ -36,6 +37,7 @@
             '\\SystemRoot\\System32\\smss.exe',
             'C:\\Windows\\System32\\RuntimeBroker.exe -Embedding'
           )
+      min-engine-version: 2.0.0
     - name: Various Windows processes
       condition: kevt.name = 'CreateProcess' and ps.exe in
           (
@@ -62,10 +64,13 @@
             'C:\\WINDOWS\\system32\\devicecensus.exe UserCxt',
             'C:\\Windows\\System32\\usocoreworker.exe -Embedding'
           )
+      min-engine-version: 2.0.0
     - name: svchost
       condition: kevt.name = 'CreateProcess' and ps.comm in ('svchost.exe')
+      min-engine-version: 2.0.0
     - name: Microsoft edge
       condition: kevt.name = 'CreateProcess' and ps.comm startswith '\"C:\\Program Files (x86)\\Microsoft\\Edge Dev\\Application\\msedge.exe\" --type='
+      min-engine-version: 2.0.0
     - name: Microsoft dotNet
       condition: kevt.name = 'CreateProcess' and ps.comm startswith
           (
@@ -79,6 +84,7 @@
             'C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\mscorsvw.exe',
             'C:\\Windows\\Microsoft.Net\\Framework64\\v3.0\\WPF\\PresentationFontCache.exe'
           )
+      min-engine-version: 2.0.0
     - name: Microsoft Office
       condition: kevt.name = 'CreateProcess' and ps.exe in
           (
@@ -89,16 +95,19 @@
             'C:\\Program Files (x86)\\Microsoft Office\\root\\Office16\\officebackgroundtaskhandler.exe',
             'C:\\Program Files\\Common Files\\Microsoft Shared\\ClickToRun\\OfficeC2RClient.exe'
           )
+      min-engine-version: 2.0.0
     - name: Media Player
       condition: kevt.name = 'CreateProcess' and ps.exe = 'C:\\Program Files\\Windows Media Player\\wmpnscfg.exe'
+      min-engine-version: 2.0.0
     - name: Google
       condition: kevt.name = 'CreateProcess' and ps.comm in
           (
             '\"C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe\\\" --type='
           )
+      min-engine-version: 2.0.0
     - name: Loaded suspicious module
       condition: kevt.name = 'LoadImage' and image.name = 'svchost.dll'
-
+      min-engine-version: 2.0.0
 
 # ======================= Network connection initiated ================================
 #
@@ -121,6 +130,7 @@
             'C:\\Windows\\fonts',
             'C:\\Windows\\system32\\config'
           )
+      min-engine-version: 2.0.0
     - name: Suspicious Windows tools network-connecting binaries
       condition: kevt.name = 'Connect' and ps.name in
           (
@@ -160,6 +170,7 @@
             'wmic.exe',
             'wscript.exe'
           )
+      min-engine-version: 2.0.0
     - name: Relevant 3rd Party Tools
       condition: kevt.name = 'Connect' and ps.name in
           (
@@ -175,6 +186,7 @@
             'nmap.exe',
             'psinfo.exe'
           )
+      min-engine-version: 2.0.0
     - name: Suspicious ports
       condition: kevt.name = 'Connect' and net.dport in
           (
@@ -193,6 +205,7 @@
             9001,
             9030
           )
+      min-engine-version: 2.0.0
 
 - group: Suspicious network-connecting binaries
   enabled: true
@@ -208,7 +221,10 @@
               'microsoft.com.akadns.net',
               'microsoft.com.nsatc.net'
            )
+      min-engine-version: 2.0.0
     - name: OCSP protocol known addresses
       condition: kevt.name = 'Connect' and net.dip in (23.4.43.27, 72.21.91.29)
+      min-engine-version: 2.0.0
     - name: Loopback addresses
       condition: kevt.name = 'Connect' and net.dip = 127.0.0.1 or net.dip startswith 'fe80:0:0:0'
+      min-engine-version: 2.0.0
