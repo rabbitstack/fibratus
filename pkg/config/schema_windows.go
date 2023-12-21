@@ -484,59 +484,46 @@ var schema = `
 var rulesSchema = `
 {
 	"$schema": "http://json-schema.org/draft-07/schema#",
-    "definitions": {"rules": {"$id": "#rules", "type": "object", "type": "array",
-			"items":
-				{
-					"type": "object",
-					"properties": {
-						"name": 				{"type": "string", "minLength": 3},
-                        "description":  		{"type": "string"},
-						"output": 				{"type": "string", "minLength": 5},
-						"severity":  			{"type": "string", "enum": ["low", "medium", "high", "critical"]},
-						"min-engine-version":  	{"type": "string", "minLength": 5, "pattern": "^([0-9]+.)([0-9]+.)([0-9]+)$"},
-						"condition": 			{"type": "string", "minLength": 3},
-						"action": 		{
-							"type": "array",
-							"items": [
-								{
-									"type": "object",
-									"properties": {
-										"kill": {
-											"type": "object",
-											"properties": {
-												"pid":	{"type": "string", "minLength": 4}
-											}
-										}
-									}
-								}
-							]
-							},
-							"additionalProperties": false
-						}
-					},
-					"required": ["name", "condition", "min-engine-version"],
-					"minItems": 1,
-					"additionalProperties": false
-				}}},
-
-
 	"type": "object",
 	"properties": {
 		"group": 		{"type": "string", "minLength": 1},
         "description":  {"type": "string"},
 		"enabled":  	{"type": "boolean"},
 		"tags":			{"type": "array", "items": [{"type": "string", "minLength": 1}]},
-		"rules": 		{"$ref": "#rules"},
+		"rules": 		{"type": "array", "items": {
+								"type": "object",
+								"properties": {
+									"name": 				{"type": "string", "minLength": 3},
+                			        "description":  		{"type": "string"},
+									"output": 				{"type": "string", "minLength": 5},
+									"severity":  			{"type": "string", "enum": ["low", "medium", "high", "critical"]},
+									"min-engine-version":  	{"type": "string", "minLength": 5, "pattern": "^([0-9]+.)([0-9]+.)([0-9]+)$"},
+									"condition": 			{"type": "string", "minLength": 3},
+									"action": 				{
+										"type": "array",
+										"items": {
+												"type": "object",
+												"properties": {
+													"name": 	{"type": "string", "enum": ["kill"]},
+													"pid": 		{"type": "string", "minLength": 5}
+												},
+												"required": ["name"],
+												"additionalProperties": false
+											}
+										}
+									}
+								},
+								"required": ["name", "condition", "min-engine-version"],
+								"minItems": 1,
+								"additionalProperties": false
+							}
+						},
         "labels": {
   			"type": "object",
   			"additionalProperties": { "type": "string" }
 		}
 	},
-	"required": ["group"],
-	"oneOf": [
-		{"required": ["from-strings"]},
-		{"required": ["rules"]}
-	],
+	"required": ["group", "rules"],
 	"additionalProperties": false
 }
 `
