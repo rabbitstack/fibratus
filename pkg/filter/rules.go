@@ -542,7 +542,7 @@ func (r *Rules) Compile() error {
 
 		g := newFilterGroup(group, filters)
 		log.Infof("loaded rule group [%s]. "+
-			"Number of rules: %d",
+			"Number of rules: [%d]",
 			group.Name,
 			len(filters))
 
@@ -795,7 +795,11 @@ func (r *Rules) processActions() error {
 		for _, act := range actions {
 			switch act := act.(type) {
 			case config.KillAction:
-				pid := act.PidToInt(InterpolateFields("%"+act.Pid, evts))
+				field := act.Pid
+				if field == "" {
+					field = "ps.pid"
+				}
+				pid := act.PidToInt(InterpolateFields("%"+field, evts))
 				log.Infof("executing kill action: pid=%d rule=%s", pid, f.Name)
 				if err := action.Kill(pid); err != nil {
 					return ErrRuleAction(f.Name, err)

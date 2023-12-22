@@ -99,7 +99,7 @@
               ps.cmdline imatches startup_locations
             )
           |
-          |connect_socket or accept_socket|
+          |(inbound_network) or (outbound_network)|
       min-engine-version: 2.0.0
     - name: Suspicious persistence via registry modification
       description: |
@@ -157,6 +157,5 @@
             file.name imatches startup_locations
         )
       action:
-      - kill:
-        pid: ps.pid
+      - name: kill
       min-engine-version: 2.0.0
