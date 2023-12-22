@@ -779,33 +779,31 @@ func TestCallstackEnrichment(t *testing.T) {
 			},
 			false,
 		},
-		{
-			"copy file callstack",
-			func() error {
-				// TODO: Investigate CopyFile API call not working in Github CI
-				return nil
-				f, err := os.CreateTemp(os.TempDir(), "fibratus-copy-file")
-				if err != nil {
-					return err
-				}
-				f.Close()
-				from, _ := windows.UTF16PtrFromString(f.Name())
-				to, _ := windows.UTF16PtrFromString(filepath.Join(os.TempDir(), "copied-file"))
-				return copyFile(from, to)
-			},
-			func(e *kevent.Kevent) bool {
-				return true
-				if e.CurrentPid() && e.Type == ktypes.CreateFile &&
-					strings.HasPrefix(filepath.Base(e.GetParamAsString(kparams.FileName)), "copied-file") &&
-					e.GetParamAsString(kparams.FileOperation) != "OPEN" {
-					callstack := e.Callstack.String()
-					return callstackContainsTestExe(callstack) &&
-						strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\System32\\KERNELBASE.dll!CopyFileExW"))
-				}
-				return false
-			},
-			false,
-		},
+		//{
+		//	"copy file callstack",
+		//	func() error {
+		//		// TODO: Investigate CopyFile API call not working in Github CI
+		//		f, err := os.CreateTemp(os.TempDir(), "fibratus-copy-file")
+		//		if err != nil {
+		//			return err
+		//		}
+		//		f.Close()
+		//		from, _ := windows.UTF16PtrFromString(f.Name())
+		//		to, _ := windows.UTF16PtrFromString(filepath.Join(os.TempDir(), "copied-file"))
+		//		return copyFile(from, to)
+		//	},
+		//	func(e *kevent.Kevent) bool {
+		//		if e.CurrentPid() && e.Type == ktypes.CreateFile &&
+		//			strings.HasPrefix(filepath.Base(e.GetParamAsString(kparams.FileName)), "copied-file") &&
+		//			e.GetParamAsString(kparams.FileOperation) != "OPEN" {
+		//			callstack := e.Callstack.String()
+		//			return callstackContainsTestExe(callstack) &&
+		//				strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\System32\\KERNELBASE.dll!CopyFileExW"))
+		//		}
+		//		return false
+		//	},
+		//	false,
+		//},
 		{
 			"delete file callstack",
 			func() error {
