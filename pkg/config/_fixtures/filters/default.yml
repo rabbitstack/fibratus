@@ -10,7 +10,7 @@
       output: >
         `%ps.exe` attempted to reach out to `%net.sip` IP address
       action:
-      - kill:
+      - name: kill
         pid: ps.pid
       min-engine-version: 2.0.0
 

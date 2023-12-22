@@ -157,6 +157,5 @@
             file.name imatches startup_locations
         )
       action:
-      - kill:
-        pid: ps.pid
+      - name: kill
       min-engine-version: 2.0.0

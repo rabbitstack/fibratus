@@ -79,10 +79,6 @@ func (a KillAction) PidToInt(pid string) uint32 {
 	return uint32(n)
 }
 
-const (
-	killActionID = "kill"
-)
-
 // DecodeActions converts raw YAML map to
 // typed action structures.
 func (f FilterConfig) DecodeActions() ([]any, error) {
@@ -102,7 +98,8 @@ func (f FilterConfig) DecodeActions() ([]any, error) {
 		if !ok {
 			continue
 		}
-		if _, ok := m[killActionID]; ok {
+		switch m["name"] {
+		case "kill":
 			var kill KillAction
 			if err := dec(m, kill); err != nil {
 				return nil, err
