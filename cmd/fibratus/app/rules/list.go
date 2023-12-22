@@ -23,12 +23,11 @@ import (
 	"github.com/enescakir/emoji"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/rabbitstack/fibratus/internal/bootstrap"
-	"github.com/spf13/cobra"
 	"os"
 	"strings"
 )
 
-func listRules(cmd *cobra.Command) error {
+func listRules() error {
 	if err := bootstrap.InitConfigAndLogger(cfg); err != nil {
 		return err
 	}

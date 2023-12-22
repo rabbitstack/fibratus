@@ -61,7 +61,7 @@ func validate(cmd *cobra.Command, args []string) error {
 }
 
 func list(cmd *cobra.Command, args []string) error {
-	return listRules(cmd)
+	return listRules()
 }
 
 func emo(s string, args ...any) { fmt.Printf(s, args...) }
