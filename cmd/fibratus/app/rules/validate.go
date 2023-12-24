@@ -22,32 +22,13 @@ import (
 	"fmt"
 	"github.com/enescakir/emoji"
 	"github.com/rabbitstack/fibratus/internal/bootstrap"
-	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/filter"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
-	"github.com/spf13/cobra"
 	"path/filepath"
+	"strings"
 )
 
-var Command = &cobra.Command{
-	Use:   "rules",
-	Short: "Validate, list, or search detection rules",
-}
-
-var validateCmd = &cobra.Command{
-	Use:   "validate",
-	Short: "Validate rules for structural and syntactic correctness",
-	RunE:  validate,
-}
-
-var cfg = config.NewWithOpts(config.WithValidate())
-
-func init() {
-	cfg.MustViperize(Command)
-	Command.AddCommand(validateCmd)
-}
-
-func validate(cmd *cobra.Command, args []string) error {
+func validateRules() error {
 	if err := bootstrap.InitConfigAndLogger(cfg); err != nil {
 		return err
 	}
@@ -55,7 +36,7 @@ func validate(cmd *cobra.Command, args []string) error {
 	isValidExt := func(path string) bool {
 		return filepath.Ext(path) == ".yml" || filepath.Ext(path) == ".yaml"
 	}
-
+	// load macros and rules
 	for _, m := range cfg.Filters.Macros.FromPaths {
 		paths, err := filepath.Glob(m)
 		if err != nil {
@@ -65,7 +46,7 @@ func validate(cmd *cobra.Command, args []string) error {
 			if !isValidExt(path) {
 				continue
 			}
-			emo("%v Loading macros from %s\n", emoji.Magnet, path)
+			emo("%v Loading macros from %s\n", emoji.Hook, path)
 		}
 	}
 	if err := cfg.Filters.LoadMacros(); err != nil {
@@ -87,7 +68,12 @@ func validate(cmd *cobra.Command, args []string) error {
 	if err := cfg.Filters.LoadGroups(); err != nil {
 		return fmt.Errorf("%v %v", emoji.DisappointedFace, err)
 	}
+	if len(cfg.GetRuleGroups()) == 0 {
+		return fmt.Errorf("%v no rules found in %s", emoji.DisappointedFace, strings.Join(cfg.Filters.Rules.FromPaths, ","))
+	}
 
+	warnings := make([]string, 0)
+	// validate rule for every group
 	for _, group := range cfg.GetRuleGroups() {
 		for _, rule := range group.Rules {
 			f := filter.New(rule.Condition, cfg)
@@ -95,23 +81,21 @@ func validate(cmd *cobra.Command, args []string) error {
 			if err != nil {
 				return fmt.Errorf("%v %v", emoji.DisappointedFace, filter.ErrInvalidFilter(rule.Name, group.Name, err))
 			}
-			for _, field := range f.GetFields() {
-				deprecated, d := fields.IsDeprecated(field)
-				if deprecated {
-					emo("%v Deprecation: %s rule uses "+
-						"the [%s] field which was deprecated starting "+
-						"from version %s. "+
-						"Please consider migrating to %s field(s) "+
-						"because [%s] will be removed in future versions\n",
-						emoji.Warning, rule.Name, field, d.Since, d.Fields, field)
+			for _, fld := range f.GetFields() {
+				if isDeprecated, dep := fields.IsDeprecated(fld); isDeprecated {
+					warnings = append(warnings,
+						fmt.Sprintf("%s field deprecated in favor of %v in rule %s", fld.String(), dep.Fields, rule.Name))
 				}
 			}
 		}
 	}
+	if len(warnings) > 0 {
+		for _, warn := range warnings {
+			emo("%v %s\n", emoji.Warning, warn)
+		}
+		fmt.Printf("%d warning(s)\n", len(warnings))
+	}
 
-	emo("%v Detection rules OK. Ready to go!", emoji.Rocket)
-
+	emo("%v Validation successful. Ready to go!", emoji.Rocket)
 	return nil
 }
-
-func emo(s string, args ...any) { fmt.Printf(s, args...) }
