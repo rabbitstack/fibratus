@@ -30,6 +30,8 @@ import (
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/symbolize"
 	"github.com/rabbitstack/fibratus/pkg/sys"
+	"github.com/rabbitstack/fibratus/pkg/util/va"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -560,6 +562,31 @@ func callstackContainsTestExe(callstack string) bool {
 	return strings.Contains(callstack, "kstream.test.exe")
 }
 
+// NoopPsSnapshotter is the process noop snapshotter  used in tests.
+// The main motivation for a noop snapshotter is to reduce the pressure
+// on internal mock calls which lead to excessive memory usage when
+// the snapshotter Find method is invoked for each incoming event. This
+// may create flaky tests.
+type NoopPsSnapshotter struct{}
+
+var fakeProc = &pstypes.PS{PID: 111111, Name: "fake.exe"}
+
+func (s *NoopPsSnapshotter) Write(kevt *kevent.Kevent) error                        { return nil }
+func (s *NoopPsSnapshotter) Remove(kevt *kevent.Kevent) error                       { return nil }
+func (s *NoopPsSnapshotter) Find(pid uint32) (bool, *pstypes.PS)                    { return true, fakeProc }
+func (s *NoopPsSnapshotter) FindAndPut(pid uint32) *pstypes.PS                      { return fakeProc }
+func (s *NoopPsSnapshotter) Put(ps *pstypes.PS)                                     {}
+func (s *NoopPsSnapshotter) Size() uint32                                           { return 1 }
+func (s *NoopPsSnapshotter) Close() error                                           { return nil }
+func (s *NoopPsSnapshotter) GetSnapshot() []*pstypes.PS                             { return nil }
+func (s *NoopPsSnapshotter) AddThread(kevt *kevent.Kevent) error                    { return nil }
+func (s *NoopPsSnapshotter) AddModule(kevt *kevent.Kevent) error                    { return nil }
+func (s *NoopPsSnapshotter) RemoveThread(pid uint32, tid uint32) error              { return nil }
+func (s *NoopPsSnapshotter) RemoveModule(pid uint32, mod string) error              { return nil }
+func (s *NoopPsSnapshotter) WriteFromKcap(kevt *kevent.Kevent) error                { return nil }
+func (s *NoopPsSnapshotter) AddFileMapping(kevt *kevent.Kevent) error               { return nil }
+func (s *NoopPsSnapshotter) RemoveFileMapping(pid uint32, address va.Address) error { return nil }
+
 func TestCallstackEnrichment(t *testing.T) {
 	kevent.DropCurrentProc = false
 
@@ -601,6 +628,7 @@ func TestCallstackEnrichment(t *testing.T) {
 				if e.IsCreateProcess() && e.CurrentPid() &&
 					strings.EqualFold(e.GetParamAsString(kparams.ProcessName), "notepad.exe") {
 					callstack := e.Callstack.String()
+					log.Infof("create process event %s: %s", e.String(), callstack)
 					return callstackContainsTestExe(callstack) &&
 						strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\system32\\ntoskrnl.exe!SeLocateProcessImageName")) &&
 						strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\System32\\KERNELBASE.dll!CreateProcessW"))
@@ -628,6 +656,7 @@ func TestCallstackEnrichment(t *testing.T) {
 			func(e *kevent.Kevent) bool {
 				if e.IsCreateThread() {
 					callstack := e.Callstack.String()
+					log.Infof("create thread event %s: %s", e.String(), callstack)
 					return strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\SYSTEM32\\ntdll.dll!ZwCreateThreadEx")) &&
 						strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\System32\\KERNEL32.DLL!CreateThread"))
 				}
@@ -641,6 +670,7 @@ func TestCallstackEnrichment(t *testing.T) {
 			func(e *kevent.Kevent) bool {
 				if e.IsTerminateThread() {
 					callstack := e.Callstack.String()
+					log.Infof("terminate thread event %s: %s", e.String(), callstack)
 					return strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\SYSTEM32\\ntdll.dll!ZwTerminateThread"))
 				}
 				return false
@@ -664,6 +694,7 @@ func TestCallstackEnrichment(t *testing.T) {
 			func(e *kevent.Kevent) bool {
 				if e.CurrentPid() && e.Type == ktypes.RegCreateKey && e.GetParamAsString(kparams.RegKeyName) == "HKEY_CURRENT_USER\\Volatile Environment\\CallstackTest" {
 					callstack := e.Callstack.String()
+					log.Infof("create key event %s: %s", e.String(), callstack)
 					return callstackContainsTestExe(callstack) &&
 						strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\SYSTEM32\\ntdll.dll!NtCreateKey")) &&
 						strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\System32\\KERNELBASE.dll!RegCreateKeyExW"))
@@ -678,6 +709,7 @@ func TestCallstackEnrichment(t *testing.T) {
 			func(e *kevent.Kevent) bool {
 				if e.CurrentPid() && e.Type == ktypes.RegDeleteKey {
 					callstack := e.Callstack.String()
+					log.Infof("delete key event %s: %s", e.String(), callstack)
 					return callstackContainsTestExe(callstack) &&
 						strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\System32\\advapi32.dll!RegDeleteKeyW"))
 				}
@@ -699,6 +731,7 @@ func TestCallstackEnrichment(t *testing.T) {
 			func(e *kevent.Kevent) bool {
 				if e.CurrentPid() && e.Type == ktypes.RegSetValue && strings.HasSuffix(e.GetParamAsString(kparams.RegKeyName), "FibratusCallstack") {
 					callstack := e.Callstack.String()
+					log.Infof("set value event %s: %s", e.String(), callstack)
 					return callstackContainsTestExe(callstack) &&
 						strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\System32\\KERNELBASE.dll!RegSetValueExW")) &&
 						strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\SYSTEM32\\ntdll.dll!ZwSetValueKey"))
@@ -713,6 +746,7 @@ func TestCallstackEnrichment(t *testing.T) {
 			func(e *kevent.Kevent) bool {
 				if e.CurrentPid() && e.Type == ktypes.RegDeleteValue {
 					callstack := e.Callstack.String()
+					log.Infof("delete value event %s: %s", e.String(), callstack)
 					return callstackContainsTestExe(callstack) &&
 						strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\System32\\KERNELBASE.dll!RegDeleteValueW"))
 				}
@@ -745,6 +779,7 @@ func TestCallstackEnrichment(t *testing.T) {
 					strings.HasPrefix(filepath.Base(e.GetParamAsString(kparams.FileName)), "fibratus-callstack") &&
 					e.GetParamAsString(kparams.FileOperation) != "OPEN" {
 					callstack := e.Callstack.String()
+					log.Infof("create file event %s: %s", e.String(), callstack)
 					return callstackContainsTestExe(callstack) &&
 						strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\System32\\KERNELBASE.dll!CreateFileW"))
 				}
@@ -772,6 +807,7 @@ func TestCallstackEnrichment(t *testing.T) {
 					strings.HasPrefix(filepath.Base(e.GetParamAsString(kparams.FileName)), "fibratus-file-transacted") &&
 					e.GetParamAsString(kparams.FileOperation) != "OPEN" {
 					callstack := e.Callstack.String()
+					log.Infof("create transacted file event %s: %s", e.String(), callstack)
 					return callstackContainsTestExe(callstack) &&
 						strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\System32\\KERNEL32.dll!CreateFileTransactedW"))
 				}
@@ -779,31 +815,32 @@ func TestCallstackEnrichment(t *testing.T) {
 			},
 			false,
 		},
-		//{
-		//	"copy file callstack",
-		//	func() error {
-		//		// TODO: Investigate CopyFile API call not working in Github CI
-		//		f, err := os.CreateTemp(os.TempDir(), "fibratus-copy-file")
-		//		if err != nil {
-		//			return err
-		//		}
-		//		f.Close()
-		//		from, _ := windows.UTF16PtrFromString(f.Name())
-		//		to, _ := windows.UTF16PtrFromString(filepath.Join(os.TempDir(), "copied-file"))
-		//		return copyFile(from, to)
-		//	},
-		//	func(e *kevent.Kevent) bool {
-		//		if e.CurrentPid() && e.Type == ktypes.CreateFile &&
-		//			strings.HasPrefix(filepath.Base(e.GetParamAsString(kparams.FileName)), "copied-file") &&
-		//			e.GetParamAsString(kparams.FileOperation) != "OPEN" {
-		//			callstack := e.Callstack.String()
-		//			return callstackContainsTestExe(callstack) &&
-		//				strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\System32\\KERNELBASE.dll!CopyFileExW"))
-		//		}
-		//		return false
-		//	},
-		//	false,
-		//},
+		{
+			"copy file callstack",
+			func() error {
+				// TODO: Investigate CopyFile API call not working in Github CI
+				f, err := os.CreateTemp(os.TempDir(), "fibratus-copy-file")
+				if err != nil {
+					return err
+				}
+				f.Close()
+				from, _ := windows.UTF16PtrFromString(f.Name())
+				to, _ := windows.UTF16PtrFromString(filepath.Join(os.TempDir(), "copied-file"))
+				return copyFile(from, to)
+			},
+			func(e *kevent.Kevent) bool {
+				if e.CurrentPid() && e.Type == ktypes.CreateFile &&
+					strings.HasPrefix(filepath.Base(e.GetParamAsString(kparams.FileName)), "copied-file") &&
+					e.GetParamAsString(kparams.FileOperation) != "OPEN" {
+					callstack := e.Callstack.String()
+					log.Infof("copy file event %s: %s", e.String(), callstack)
+					return callstackContainsTestExe(callstack) &&
+						strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\System32\\KERNELBASE.dll!CopyFileExW"))
+				}
+				return false
+			},
+			false,
+		},
 		{
 			"delete file callstack",
 			func() error {
@@ -818,6 +855,7 @@ func TestCallstackEnrichment(t *testing.T) {
 				if e.CurrentPid() && e.Type == ktypes.DeleteFile &&
 					strings.HasPrefix(filepath.Base(e.GetParamAsString(kparams.FileName)), "fibratus-delete") {
 					callstack := e.Callstack.String()
+					log.Infof("delete file event %s: %s", e.String(), callstack)
 					return callstackContainsTestExe(callstack) &&
 						strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\System32\\KERNELBASE.dll!DeleteFileW"))
 				}
@@ -839,6 +877,7 @@ func TestCallstackEnrichment(t *testing.T) {
 				if e.CurrentPid() && e.Type == ktypes.RenameFile &&
 					strings.HasPrefix(filepath.Base(e.GetParamAsString(kparams.FileName)), "fibratus-rename") {
 					callstack := e.Callstack.String()
+					log.Infof("rename file event %s: %s", e.String(), callstack)
 					return callstackContainsTestExe(callstack) &&
 						strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\System32\\KERNELBASE.dll!MoveFileExW"))
 				}
@@ -848,19 +887,7 @@ func TestCallstackEnrichment(t *testing.T) {
 		},
 	}
 
-	fakeProc := &pstypes.PS{}
-	psnap := new(ps.SnapshotterMock)
-	psnap.On("Write", mock.Anything).Return(nil)
-	psnap.On("AddThread", mock.Anything).Return(nil)
-	psnap.On("AddModule", mock.Anything).Return(nil)
-	psnap.On("AddFileMapping", mock.Anything).Return(nil)
-	psnap.On("RemoveThread", mock.Anything, mock.Anything).Return(nil)
-	psnap.On("RemoveModule", mock.Anything, mock.Anything).Return(nil)
-	psnap.On("RemoveFileMapping", mock.Anything, mock.Anything).Return(nil)
-	psnap.On("FindAndPut", mock.Anything).Return(fakeProc)
-	psnap.On("Find", mock.Anything).Return(true, fakeProc)
-	psnap.On("Remove", mock.Anything).Return(nil)
-
+	psnap := new(NoopPsSnapshotter)
 	hsnap := new(handle.SnapshotterMock)
 	hsnap.On("FindByObject", mock.Anything).Return(htypes.Handle{}, false)
 	hsnap.On("FindHandles", mock.Anything).Return([]htypes.Handle{}, nil)
@@ -901,8 +928,10 @@ func TestCallstackEnrichment(t *testing.T) {
 
 	time.Sleep(time.Second * 5)
 
+	log.Infof("current process id is [%d]", os.Getpid())
 	for _, tt := range tests {
 		gen := tt.gen
+		log.Infof("executing [%s] test generator", tt.name)
 		if gen != nil {
 			require.NoError(t, gen(), tt.name)
 		}
@@ -971,7 +1000,7 @@ func createFileTransacted(name *uint16, access uint32, mode uint32, sa *windows.
 }
 
 func copyFile(from *uint16, to *uint16) (regerrno error) {
-	r0, _, _ := syscall.SyscallN(procCopyFile.Addr(), uintptr(unsafe.Pointer(from)), uintptr(unsafe.Pointer(to)), uintptr(1))
+	r0, _, _ := procCopyFile.Call(uintptr(unsafe.Pointer(from)), uintptr(unsafe.Pointer(to)), uintptr(1))
 	if r0 != 0 {
 		regerrno = syscall.Errno(r0)
 	}
