@@ -213,7 +213,7 @@ func TestConsumerEvents(t *testing.T) {
 			func(e *kevent.Kevent) bool {
 				return e.CurrentPid() && e.Type == ktypes.CreateFile &&
 					strings.HasPrefix(filepath.Base(e.GetParamAsString(kparams.FileName)), "fibratus-test") &&
-					e.GetParamAsString(kparams.FileOperation) != "OPEN"
+					!e.IsOpenDisposition()
 			},
 			false,
 		},
@@ -683,7 +683,7 @@ func TestCallstackEnrichment(t *testing.T) {
 				var h syscall.Handle
 				var d uint32
 				path := "Volatile Environment\\CallstackTest"
-				err := regCreateKeyEx(syscall.Handle(registry.CURRENT_USER), syscall.StringToUTF16Ptr(path),
+				err := regCreateKeyEx(syscall.Handle(registry.CURRENT_USER), windows.StringToUTF16Ptr(path),
 					0, nil, 1, registry.ALL_ACCESS, nil, &h, &d)
 				if err != nil {
 					return err
@@ -777,7 +777,7 @@ func TestCallstackEnrichment(t *testing.T) {
 			func(e *kevent.Kevent) bool {
 				if e.CurrentPid() && e.Type == ktypes.CreateFile &&
 					strings.HasPrefix(filepath.Base(e.GetParamAsString(kparams.FileName)), "fibratus-callstack") &&
-					e.GetParamAsString(kparams.FileOperation) != "OPEN" {
+					!e.IsOpenDisposition() {
 					callstack := e.Callstack.String()
 					log.Infof("create file event %s: %s", e.String(), callstack)
 					return callstackContainsTestExe(callstack) &&
@@ -805,7 +805,7 @@ func TestCallstackEnrichment(t *testing.T) {
 			func(e *kevent.Kevent) bool {
 				if e.CurrentPid() && e.Type == ktypes.CreateFile &&
 					strings.HasPrefix(filepath.Base(e.GetParamAsString(kparams.FileName)), "fibratus-file-transacted") &&
-					e.GetParamAsString(kparams.FileOperation) != "OPEN" {
+					!e.IsOpenDisposition() {
 					callstack := e.Callstack.String()
 					log.Infof("create transacted file event %s: %s", e.String(), callstack)
 					return callstackContainsTestExe(callstack) &&
@@ -831,7 +831,7 @@ func TestCallstackEnrichment(t *testing.T) {
 			func(e *kevent.Kevent) bool {
 				if e.CurrentPid() && e.Type == ktypes.CreateFile &&
 					strings.HasPrefix(filepath.Base(e.GetParamAsString(kparams.FileName)), "copied-file") &&
-					e.GetParamAsString(kparams.FileOperation) != "OPEN" {
+					!e.IsOpenDisposition() {
 					callstack := e.Callstack.String()
 					log.Infof("copy file event %s: %s", e.String(), callstack)
 					return callstackContainsTestExe(callstack) &&
