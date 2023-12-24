@@ -156,6 +156,6 @@
                 or
             file.name imatches startup_locations
         )
-      min-engine-version: 2.0.0
       action:
       - name: kill
+      min-engine-version: 2.0.0
