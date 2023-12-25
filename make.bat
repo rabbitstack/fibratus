@@ -49,6 +49,8 @@ if "%~1"=="pkg-slim" goto pkg-slim
 if "%~1"=="deps" goto deps
 if "%~1"=="rsrc" goto rsrc
 if "%~1"=="mc" goto mc
+if "%~1"=="install-msi" goto install-msi
+if "%~1"=="validate-rules" goto validate-rules
 
 :build
 :: set PKG_CONFIG_PATH=pkg-config
@@ -175,6 +177,24 @@ goto :EOF
 
 :clean
 rm cmd\fibratus\fibratus.exe
+goto :EOF
+
+:: Install the dev MSI. This target executes
+:: the msiexec in the background, and waits
+:: for process completion. Once the command
+:: finishes, the install log is dumped to
+:: help diagnosing installer failures
+:install-msi
+echo "Installing Fibratus..."
+start /b /wait msiexec /i fibratus-0.0.0-amd64.msi /qn /l*! install.log
+timeout 2 > NUL
+type install.log
+goto :EOF
+
+:validate-rules
+set PATH="%PATH%;%ProgramFiles%\Fibratus\Bin"
+fibratus rules list
+fibratus rules validate
 goto :EOF
 
 :fail
