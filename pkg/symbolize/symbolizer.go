@@ -309,7 +309,7 @@ func (s *Symbolizer) cleanSym() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, proc := range s.procs {
-		if time.Now().Sub(proc.accessed) > procTTL {
+		if time.Since(proc.accessed) > procTTL {
 			symCleanups.Add(1)
 			log.Debugf("deallocating symbol resources for pid %d. Accessed %d time(s)", proc.pid, proc.accesses)
 			s.r.Cleanup(proc.handle)

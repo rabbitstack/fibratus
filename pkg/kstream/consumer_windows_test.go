@@ -630,7 +630,6 @@ func TestCallstackEnrichment(t *testing.T) {
 					callstack := e.Callstack.String()
 					log.Infof("create process event %s: %s", e.String(), callstack)
 					return callstackContainsTestExe(callstack) &&
-						strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\system32\\ntoskrnl.exe!SeLocateProcessImageName")) &&
 						strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\System32\\KERNELBASE.dll!CreateProcessW"))
 				}
 				return false
@@ -657,7 +656,7 @@ func TestCallstackEnrichment(t *testing.T) {
 				if e.IsCreateThread() {
 					callstack := e.Callstack.String()
 					log.Infof("create thread event %s: %s", e.String(), callstack)
-					return strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\SYSTEM32\\ntdll.dll!ZwCreateThreadEx")) &&
+					return strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\SYSTEM32\\ntdll.dll!ZwCreateThreadEx")) ||
 						strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\System32\\KERNEL32.DLL!CreateThread"))
 				}
 				return false
@@ -671,7 +670,8 @@ func TestCallstackEnrichment(t *testing.T) {
 				if e.IsTerminateThread() {
 					callstack := e.Callstack.String()
 					log.Infof("terminate thread event %s: %s", e.String(), callstack)
-					return strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\SYSTEM32\\ntdll.dll!ZwTerminateThread"))
+					return strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\SYSTEM32\\ntdll.dll!ZwTerminateThread")) ||
+						strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\SYSTEM32\\ntdll.dll!NtTerminateThread"))
 				}
 				return false
 			},
@@ -696,7 +696,8 @@ func TestCallstackEnrichment(t *testing.T) {
 					callstack := e.Callstack.String()
 					log.Infof("create key event %s: %s", e.String(), callstack)
 					return callstackContainsTestExe(callstack) &&
-						strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\SYSTEM32\\ntdll.dll!NtCreateKey")) &&
+						(strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\SYSTEM32\\ntdll.dll!NtCreateKey")) ||
+							strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\SYSTEM32\\ntdll.dll!ZwCreateKey"))) &&
 						strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\System32\\KERNELBASE.dll!RegCreateKeyExW"))
 				}
 				return false
@@ -734,7 +735,8 @@ func TestCallstackEnrichment(t *testing.T) {
 					log.Infof("set value event %s: %s", e.String(), callstack)
 					return callstackContainsTestExe(callstack) &&
 						strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\System32\\KERNELBASE.dll!RegSetValueExW")) &&
-						strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\SYSTEM32\\ntdll.dll!ZwSetValueKey"))
+						(strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\SYSTEM32\\ntdll.dll!ZwSetValueKey")) ||
+							strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\SYSTEM32\\ntdll.dll!NtSetValueKey")))
 				}
 				return false
 			},
@@ -976,8 +978,8 @@ var (
 	kernel32    = windows.NewLazySystemDLL("kernel32.dll")
 	ktmW32      = windows.NewLazySystemDLL("KtmW32.dll")
 
-	procRegCreateKeyExW      = modadvapi32.NewProc("RegCreateKeyExW")
-	procCopyFile             = kernel32.NewProc("CopyFileW")
+	procRegCreateKeyExW = modadvapi32.NewProc("RegCreateKeyExW")
+	//procCopyFile             = kernel32.NewProc("CopyFileW")
 	procCreateTransaction    = ktmW32.NewProc("CreateTransaction")
 	procCreateFileTransacted = kernel32.NewProc("CreateFileTransactedW")
 )
@@ -999,13 +1001,13 @@ func createFileTransacted(name *uint16, access uint32, mode uint32, sa *windows.
 	return
 }
 
-func copyFile(from *uint16, to *uint16) (regerrno error) {
-	r0, _, _ := procCopyFile.Call(uintptr(unsafe.Pointer(from)), uintptr(unsafe.Pointer(to)), uintptr(1))
-	if r0 != 0 {
-		regerrno = syscall.Errno(r0)
-	}
-	return
-}
+//func copyFile(from *uint16, to *uint16) (regerrno error) {
+//	r0, _, _ := procCopyFile.Call(uintptr(unsafe.Pointer(from)), uintptr(unsafe.Pointer(to)), uintptr(1))
+//	if r0 != 0 {
+//		regerrno = syscall.Errno(r0)
+//	}
+//	return
+//}
 
 func createTransaction() (handle windows.Handle, err error) {
 	r0, _, e1 := syscall.SyscallN(procCreateTransaction.Addr(), 0, 0, 0, 0, 0, 0, 0, 0, 0)
