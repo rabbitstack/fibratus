@@ -20,6 +20,7 @@ package processors
 
 import (
 	"expvar"
+	"github.com/gammazero/deque"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/handle"
@@ -27,9 +28,11 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
+	"time"
 )
 
 var (
@@ -49,12 +52,16 @@ type fsProcessor struct {
 	mmaps map[uint32]map[uint64]*MmapInfo
 
 	hsnap handle.Snapshotter
+	psnap ps.Snapshotter
+
 	// irps contains a mapping between the IRP (I/O request packet) and CreateFile events
 	irps map[uint64]*kevent.Kevent
 
 	devMapper       fs.DevMapper
 	devPathResolver fs.DevPathResolver
 	config          *config.Config
+
+	deq *deque.Deque[*kevent.Kevent]
 }
 
 // FileInfo stores file information obtained from event state.
@@ -70,20 +77,28 @@ type MmapInfo struct {
 	Size     uint64
 }
 
-func newFsProcessor(hsnap handle.Snapshotter, devMapper fs.DevMapper, devPathResolver fs.DevPathResolver, config *config.Config) Processor {
+func newFsProcessor(
+	hsnap handle.Snapshotter,
+	psnap ps.Snapshotter,
+	devMapper fs.DevMapper,
+	devPathResolver fs.DevPathResolver,
+	config *config.Config,
+) Processor {
 	return &fsProcessor{
 		files:           make(map[uint64]*FileInfo),
 		mmaps:           make(map[uint32]map[uint64]*MmapInfo),
 		irps:            make(map[uint64]*kevent.Kevent),
 		hsnap:           hsnap,
+		psnap:           psnap,
 		devMapper:       devMapper,
 		devPathResolver: devPathResolver,
 		config:          config,
+		deq:             deque.New[*kevent.Kevent](100),
 	}
 }
 
 func (f *fsProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error) {
-	if e.Category == ktypes.File {
+	if e.Category == ktypes.File || e.IsStackWalk() {
 		evt, err := f.processEvent(e)
 		return evt, false, err
 	}
@@ -140,6 +155,8 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 			name := f.devMapper.Convert(sys.GetMappedFile(process, uintptr(addr)))
 			f.mmaps[e.PID][fileKey] = &MmapInfo{File: name, BaseAddr: viewBase, Size: viewSize}
 		}
+		e.AppendParam(kparams.FileName, kparams.FilePath, f.mmaps[e.PID][fileKey].File)
+		return e, f.psnap.AddFileMapping(e)
 	case ktypes.CreateFile:
 		// we defer the processing of the CreateFile event until we get
 		// the matching FileOpEnd event. This event contains the operation
@@ -147,6 +164,10 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 		irp := e.Kparams.MustGetUint64(kparams.FileIrpPtr)
 		e.WaitEnqueue = true
 		f.irps[irp] = e
+	case ktypes.StackWalk:
+		if !kevent.IsCurrentProcDropped(e.PID) {
+			f.deq.PushBack(e)
+		}
 	case ktypes.FileOpEnd:
 		// get the CreateFile pending event by IRP identifier
 		// and fetch the file create disposition value
@@ -155,6 +176,9 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 			dispo  = e.Kparams.MustGetUint64(kparams.FileExtraInfo)
 			status = e.Kparams.MustGetUint32(kparams.NTStatus)
 		)
+		if dispo > windows.FILE_MAXIMUM_DISPOSITION {
+			return e, nil
+		}
 		ev, ok := f.irps[irp]
 		if !ok {
 			return e, nil
@@ -183,6 +207,32 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 		}
 		ev.AppendEnum(kparams.FileOperation, uint32(dispo), fs.FileCreateDispositions)
 
+		// attach stack walk return addresses. CreateFile events
+		// represent an edge case in callstack enrichment. Since
+		// the events are delayed until the respective FileOpEnd
+		// event arrives, we enable stack tracing for CreateFile
+		// events. When the CreateFile event is generated, we store
+		// it pending IRP map. Subsequently, the stack walk event is
+		// generated which we put inside the queue. After FileOpEnd
+		// arrives, the previous stack walk for CreateFile is popped
+		// from the queue and the callstack parameter attached to the
+		// event.
+		if f.config.Kstream.StackEnrichment {
+			i := f.deq.RIndex(func(evt *kevent.Kevent) bool { return evt.StackID() == ev.StackID() })
+			if i != -1 {
+				s := f.deq.Remove(i)
+				callstack := s.Kparams.MustGetSlice(kparams.Callstack)
+				ev.AppendParam(kparams.Callstack, kparams.Slice, callstack)
+			}
+			// evict unmatched stack traces
+			for i := 0; i < f.deq.Len(); i++ {
+				evt := f.deq.At(i)
+				if time.Since(evt.Timestamp) > time.Minute*3 {
+					f.deq.Remove(i)
+				}
+			}
+		}
+
 		// parse PE data for created files and append parameters
 		if ev.IsCreateDisposition() && ev.IsSuccess() {
 			err := parseImageFileCharacteristics(ev)
@@ -199,6 +249,7 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 		delete(f.files, fileKey)
 		delete(f.files, fileObject)
 	case ktypes.UnmapViewFile:
+		_ = f.psnap.RemoveFileMapping(e.PID, e.Kparams.TryGetAddress(kparams.FileViewBase))
 		fileKey := e.Kparams.MustGetUint64(kparams.FileKey)
 		if _, ok := f.mmaps[e.PID]; !ok {
 			return e, nil
@@ -219,6 +270,7 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 		if !e.IsMapViewFile() {
 			fileObject = e.Kparams.MustGetUint64(kparams.FileObject)
 		}
+
 		// attempt to get the file by file key. If there is no such file referenced
 		// by the file key, then try to fetch it by file object. Even if file object
 		// references fails, we search in the file handles for such file
@@ -243,7 +295,7 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 			f.initMmap(e.PID)
 			f.mmaps[e.PID][fileKey] = &MmapInfo{File: name, BaseAddr: viewBase, Size: viewSize}
 			e.AppendParam(kparams.FileName, kparams.FilePath, name)
-			return e, nil
+			return e, f.psnap.AddFileMapping(e)
 		}
 
 		// ignore object misses that are produced by CloseFile
@@ -264,6 +316,9 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 				e.AppendEnum(kparams.FileType, uint32(fileinfo.Type), fs.FileTypes)
 			}
 			e.AppendParam(kparams.FileName, kparams.FilePath, fileinfo.Name)
+		}
+		if e.IsMapViewFile() {
+			return e, f.psnap.AddFileMapping(e)
 		}
 	}
 	return e, nil

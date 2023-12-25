@@ -30,6 +30,8 @@ const (
 	ProcessObject = "kproc"
 	// ThreadID field represents the thread identifier.
 	ThreadID = "tid"
+	// Callstack field represents the thread callstack.
+	Callstack = "callstack"
 	// ProcessParentID field represents the parent process identifier.
 	ProcessParentID = "ppid"
 	// ProcessRealParentID field presents the real parent process identifier.

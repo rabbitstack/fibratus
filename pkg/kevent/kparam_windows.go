@@ -30,6 +30,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/key"
 	"github.com/rabbitstack/fibratus/pkg/util/ntstatus"
 	"github.com/rabbitstack/fibratus/pkg/util/signature"
+	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
 	"net"
 	"strconv"
@@ -103,7 +104,7 @@ func (k Kparam) String() string {
 		if !ok {
 			return ""
 		}
-		return kparams.Addr(v).String()
+		return va.Address(v).String()
 	case kparams.Int8:
 		return strconv.Itoa(int(k.Value.(int8)))
 	case kparams.Uint8:
@@ -317,6 +318,9 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 	case ktypes.SetThreadContext:
 		status := evt.ReadUint32(0)
 		e.AppendParam(kparams.NTStatus, kparams.Status, status)
+		if evt.HasStackTrace() {
+			e.AppendParam(kparams.Callstack, kparams.Slice, evt.Callstack())
+		}
 	case ktypes.CreateHandle, ktypes.CloseHandle:
 		object := evt.ReadUint64(0)
 		handleID := evt.ReadUint32(8)
@@ -710,6 +714,19 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 			e.AppendParam(kparams.DNSRcode, kparams.Enum, rcode, WithEnum(DNSResponseCodes))
 			e.AppendParam(kparams.DNSAnswers, kparams.Slice, strings.Split(sanitizeDNSAnswers(answers), ";"))
 		}
+	case ktypes.StackWalk:
+		e.AppendParam(kparams.ProcessID, kparams.PID, evt.ReadUint32(8))
+		e.AppendParam(kparams.ThreadID, kparams.TID, evt.ReadUint32(12))
+		var n uint16
+		var offset uint16 = 16
+		frames := (evt.BufferLen - offset) / 8
+		callstack := make([]va.Address, frames)
+		for n < frames {
+			callstack[n] = va.Address(evt.ReadUint64(offset))
+			offset += 8
+			n++
+		}
+		e.AppendParam(kparams.Callstack, kparams.Slice, callstack)
 	}
 }
 

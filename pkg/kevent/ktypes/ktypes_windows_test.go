@@ -102,3 +102,29 @@ func TestKtypeExists(t *testing.T) {
 	require.True(t, AcceptTCPv4.Exists())
 	require.True(t, AcceptTCPv6.Exists())
 }
+
+func TestGUIDAndHookIDFromKtype(t *testing.T) {
+	var tests = []struct {
+		ktype  Ktype
+		opcode uint16
+		guid   windows.GUID
+	}{
+		{
+			LoadImage,
+			10,
+			windows.GUID{Data1: 0x2cb15d1d, Data2: 0x5fc1, Data3: 0x11d2, Data4: [8]byte{0xab, 0xe1, 0x0, 0xa0, 0xc9, 0x11, 0xf5, 0x18}},
+		},
+		{
+			WriteFile,
+			68,
+			windows.GUID{Data1: 0x90cbdc39, Data2: 0x4a3e, Data3: 0x11d1, Data4: [8]byte{0x84, 0xf4, 0x0, 0x0, 0xf8, 0x04, 0x64, 0xe3}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.ktype.String(), func(t *testing.T) {
+			assert.Equal(t, tt.guid.String(), tt.ktype.GUID().String())
+			assert.Equal(t, tt.opcode, tt.ktype.HookID())
+		})
+	}
+}

@@ -569,6 +569,7 @@ func (f *filament) onInterval(fn *cpython.PyObject) {
 			}
 			f.gil.Unlock()
 		case <-f.close:
+			return
 		}
 	}
 }

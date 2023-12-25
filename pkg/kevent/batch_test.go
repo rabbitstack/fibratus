@@ -25,6 +25,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
+	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
 	"testing"
@@ -64,8 +65,8 @@ func TestBatchMarshalJSON(t *testing.T) {
 			SessionID: 4,
 			Envs:      map[string]string{"ProgramData": "C:\\ProgramData", "COMPUTRENAME": "archrabbit"},
 			Threads: map[uint32]pstypes.Thread{
-				3453: {Tid: 3453, Entrypoint: kparams.Addr(140729524944768), IOPrio: 2, PagePrio: 5, KstackBase: kparams.Addr(18446677035730165760), KstackLimit: kparams.Addr(18446677035730137088), UstackLimit: kparams.Addr(86376448), UstackBase: kparams.Addr(86372352)},
-				3455: {Tid: 3455, Entrypoint: kparams.Addr(140729524944768), IOPrio: 3, PagePrio: 5, KstackBase: kparams.Addr(18446677035730165760), KstackLimit: kparams.Addr(18446677035730137088), UstackLimit: kparams.Addr(86376448), UstackBase: kparams.Addr(86372352)},
+				3453: {Tid: 3453, Entrypoint: va.Address(140729524944768), IOPrio: 2, PagePrio: 5, KstackBase: va.Address(18446677035730165760), KstackLimit: va.Address(18446677035730137088), UstackLimit: va.Address(86376448), UstackBase: va.Address(86372352)},
+				3455: {Tid: 3455, Entrypoint: va.Address(140729524944768), IOPrio: 3, PagePrio: 5, KstackBase: va.Address(18446677035730165760), KstackLimit: va.Address(18446677035730137088), UstackLimit: va.Address(86376448), UstackBase: va.Address(86372352)},
 			},
 			Handles: []htypes.Handle{
 				{Num: windows.Handle(0xffffd105e9baaf70),
@@ -132,8 +133,8 @@ func TestBatchMarshalJSON(t *testing.T) {
 			SessionID: 4,
 			Envs:      map[string]string{"ProgramData": "C:\\ProgramData", "COMPUTRENAME": "archrabbit"},
 			Threads: map[uint32]pstypes.Thread{
-				3453: {Tid: 3453, Entrypoint: kparams.Addr(140729524944768), IOPrio: 2, PagePrio: 5, KstackBase: kparams.Addr(18446677035730165760), KstackLimit: kparams.Addr(18446677035730137088), UstackLimit: kparams.Addr(86376448), UstackBase: kparams.Addr(86372352)},
-				3455: {Tid: 3455, Entrypoint: kparams.Addr(140729524944768), IOPrio: 3, PagePrio: 5, KstackBase: kparams.Addr(18446677035730165760), KstackLimit: kparams.Addr(18446677035730137088), UstackLimit: kparams.Addr(86376448), UstackBase: kparams.Addr(86372352)},
+				3453: {Tid: 3453, Entrypoint: va.Address(140729524944768), IOPrio: 2, PagePrio: 5, KstackBase: va.Address(18446677035730165760), KstackLimit: va.Address(18446677035730137088), UstackLimit: va.Address(86376448), UstackBase: va.Address(86372352)},
+				3455: {Tid: 3455, Entrypoint: va.Address(140729524944768), IOPrio: 3, PagePrio: 5, KstackBase: va.Address(18446677035730165760), KstackLimit: va.Address(18446677035730137088), UstackLimit: va.Address(86376448), UstackBase: va.Address(86372352)},
 			},
 			Handles: []htypes.Handle{
 				{Num: windows.Handle(0xffffd105e9baaf70),
@@ -200,8 +201,8 @@ func TestBatchMarshalJSON(t *testing.T) {
 			SessionID: 4,
 			Envs:      map[string]string{"ProgramData": "C:\\ProgramData", "COMPUTRENAME": "archrabbit"},
 			Threads: map[uint32]pstypes.Thread{
-				3453: {Tid: 3453, Entrypoint: kparams.Addr(140729524944768), IOPrio: 2, PagePrio: 5, KstackBase: kparams.Addr(18446677035730165760), KstackLimit: kparams.Addr(18446677035730137088), UstackLimit: kparams.Addr(86376448), UstackBase: kparams.Addr(86372352)},
-				3455: {Tid: 3455, Entrypoint: kparams.Addr(140729524944768), IOPrio: 3, PagePrio: 5, KstackBase: kparams.Addr(18446677035730165760), KstackLimit: kparams.Addr(18446677035730137088), UstackLimit: kparams.Addr(86376448), UstackBase: kparams.Addr(86372352)},
+				3453: {Tid: 3453, Entrypoint: va.Address(140729524944768), IOPrio: 2, PagePrio: 5, KstackBase: va.Address(18446677035730165760), KstackLimit: va.Address(18446677035730137088), UstackLimit: va.Address(86376448), UstackBase: va.Address(86372352)},
+				3455: {Tid: 3455, Entrypoint: va.Address(140729524944768), IOPrio: 3, PagePrio: 5, KstackBase: va.Address(18446677035730165760), KstackLimit: va.Address(18446677035730137088), UstackLimit: va.Address(86376448), UstackBase: va.Address(86372352)},
 			},
 			Handles: []htypes.Handle{
 				{Num: windows.Handle(0xffffd105e9baaf70),

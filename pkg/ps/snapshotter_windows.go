@@ -21,9 +21,11 @@ package ps
 import (
 	"expvar"
 	"github.com/rabbitstack/fibratus/pkg/sys"
+	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -50,6 +52,7 @@ var (
 	processCount              = expvar.NewInt("process.count")
 	threadCount               = expvar.NewInt("process.thread.count")
 	moduleCount               = expvar.NewInt("process.module.count")
+	mmapCount                 = expvar.NewInt("process.mmap.count")
 	pebReadErrors             = expvar.NewInt("process.peb.read.errors")
 )
 
@@ -246,6 +249,43 @@ func (s *snapshotter) RemoveModule(pid uint32, module string) error {
 	return nil
 }
 
+func (s *snapshotter) AddFileMapping(e *kevent.Kevent) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	proc, ok := s.procs[e.PID]
+	if !ok {
+		return nil
+	}
+
+	filename := e.GetParamAsString(kparams.FileName)
+	ext := strings.ToLower(filepath.Ext(filename))
+	// skip redundant or unneeded memory-mapped files
+	if ext == ".dll" || ext == ".exe" || ext == ".mui" {
+		return nil
+	}
+	mmapCount.Add(1)
+	mmap := pstypes.Mmap{}
+	mmap.File = filename
+	mmap.BaseAddress = e.Kparams.TryGetAddress(kparams.FileViewBase)
+	mmap.Size, _ = e.Kparams.GetUint64(kparams.FileViewSize)
+
+	proc.MapFile(mmap)
+
+	return nil
+}
+
+func (s *snapshotter) RemoveFileMapping(pid uint32, addr va.Address) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	proc, ok := s.procs[pid]
+	if !ok {
+		return nil
+	}
+	mmapCount.Add(-1)
+	proc.UnmapFile(addr)
+	return nil
+}
+
 func (s *snapshotter) Close() error {
 	s.quit <- struct{}{}
 	return nil
@@ -392,7 +432,7 @@ func (s *snapshotter) Find(pid uint32) (bool, *pstypes.PS) {
 		// image executable path or process times
 		process, err = windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
 		if err != nil {
-			return false, proc
+			return false, nil
 		}
 	}
 	//nolint:errcheck
@@ -400,6 +440,13 @@ func (s *snapshotter) Find(pid uint32) (bool, *pstypes.PS) {
 
 	// get process executable full path and name
 	proc.Exe, proc.Name = getProcExecutable(process)
+
+	// consult process parent id
+	info, err := sys.QueryInformationProcess[windows.PROCESS_BASIC_INFORMATION](process, windows.ProcessBasicInformation)
+	if err != nil {
+		return false, proc
+	}
+	proc.Ppid = uint32(info.InheritedFromUniqueProcessId)
 
 	// retrieve Portable Executable data
 	proc.PE, err = pe.ParseFileWithConfig(proc.Exe, s.config.PE)
@@ -433,13 +480,6 @@ func (s *snapshotter) Find(pid uint32) (bool, *pstypes.PS) {
 	}
 	proc.SID = usr.User.Sid.String()
 	proc.Username, proc.Domain, _, _ = usr.User.Sid.LookupAccount("")
-
-	// consult process parent id
-	info, err := sys.QueryInformationProcess[windows.PROCESS_BASIC_INFORMATION](process, windows.ProcessBasicInformation)
-	if err != nil {
-		return false, proc
-	}
-	proc.Ppid = uint32(info.InheritedFromUniqueProcessId)
 
 	// retrieve process handles
 	proc.Handles, err = s.hsnap.FindHandles(pid)

@@ -21,6 +21,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"golang.org/x/sys/windows"
 	"time"
 
 	"github.com/rabbitstack/fibratus/pkg/outputs/eventlog"
@@ -59,11 +60,13 @@ import (
 )
 
 const (
-	kcapFile           = "kcap.file"
-	configFile         = "config-file"
-	debugPrivilege     = "debug-privilege"
-	initHandleSnapshot = "handle.init-snapshot"
-	enumerateHandles   = "handle.enumerate-handles"
+	kcapFile                 = "kcap.file"
+	configFile               = "config-file"
+	debugPrivilege           = "debug-privilege"
+	initHandleSnapshot       = "handle.init-snapshot"
+	enumerateHandles         = "handle.enumerate-handles"
+	symbolPaths              = "symbol-paths"
+	symbolizeKernelAddresses = "symbolize-kernel-addresses"
 
 	serializeThreads = "kevent.serialize-threads"
 	serializeImages  = "kevent.serialize-images"
@@ -72,9 +75,9 @@ const (
 	serializeEnvs    = "kevent.serialize-envs"
 )
 
-// Config stores configuration options for fine tuning the behaviour of Fibratus.
+// Config stores configuration options for fine-tuning the behaviour of Fibratus.
 type Config struct {
-	// Kstream stores different configuration options for fine tuning kstream consumer/controller settings.
+	// Kstream stores different configuration options for fine-tuning kstream consumer/controller settings.
 	Kstream KstreamConfig `json:"kstream" yaml:"kstream"`
 	// Filament contains filament settings
 	Filament FilamentConfig `json:"filament" yaml:"filament"`
@@ -87,9 +90,18 @@ type Config struct {
 	// EnumerateHandles indicates if process handles are collected during startup or
 	// when a new process is spawn
 	EnumerateHandles bool `json:"enumerate-handles" yaml:"enumerate-handles"`
+	// SymbolPaths designates the path or a series of paths separated by a semicolon
+	// that is used to search for symbols files.
+	SymbolPaths string `json:"symbol-paths" yaml:"symbols-paths"`
+	// SymbolizeKernelAddresses determines if kernel stack addresses are symbolized.
+	SymbolizeKernelAddresses bool `json:"symbolize-kernel-addresses" yaml:"symbolize-kernel-addresses"`
 
+	// DebugPrivilege dictates if the SeDebugPrivilege is injected into
+	// Fibratus process' access token.
 	DebugPrivilege bool `json:"debug-privilege" yaml:"debug-privilege"`
-	KcapFile       string
+
+	// KcapFile represents the name of the capture file.
+	KcapFile string
 
 	// API stores global HTTP API preferences
 	API APIConfig `json:"api" yaml:"api"`
@@ -261,6 +273,8 @@ func (c *Config) Init() error {
 
 	c.InitHandleSnapshot = c.viper.GetBool(initHandleSnapshot)
 	c.EnumerateHandles = c.viper.GetBool(enumerateHandles)
+	c.SymbolPaths = c.viper.GetString(symbolPaths)
+	c.SymbolizeKernelAddresses = c.viper.GetBool(symbolizeKernelAddresses)
 	c.DebugPrivilege = c.viper.GetBool(debugPrivilege)
 	c.KcapFile = c.viper.GetString(kcapFile)
 
@@ -327,6 +341,13 @@ func (c *Config) Validate() error {
 // File returns the config file path.
 func (c *Config) File() string { return c.viper.GetString(configFile) }
 
+// SymbolPathsUTF16 returns the symbol paths as UTF16 string
+// suitable for use in the Debug Helper API functions.
+func (c *Config) SymbolPathsUTF16() *uint16 {
+	paths, _ := windows.UTF16PtrFromString(c.SymbolPaths)
+	return paths
+}
+
 func (c *Config) addFlags() {
 	c.flags.String(configFile, filepath.Join(os.Getenv("PROGRAMFILES"), "fibratus", "config", "fibratus.yml"), "Indicates the location of the configuration file")
 	if c.opts.run || c.opts.replay || c.opts.validate {
@@ -360,6 +381,8 @@ func (c *Config) addFlags() {
 	if c.opts.run || c.opts.capture {
 		c.flags.Bool(initHandleSnapshot, false, "Indicates whether initial handle snapshot is built. This implies scanning the system handles table and producing an entry for each handle object")
 		c.flags.Bool(enumerateHandles, false, "Indicates if process handles are collected during startup or when a new process is spawn")
+		c.flags.String(symbolPaths, "srv*c:\\\\SymCache*https://msdl.microsoft.com/download/symbols", "Designates the path or a series of paths separated by a semicolon that is used to search for symbols files")
+		c.flags.Bool(symbolizeKernelAddresses, false, "Determines if kernel stack addresses are symbolized")
 
 		c.flags.Bool(enableThreadKevents, true, "Determines whether thread kernel events are collected by Kernel Logger provider")
 		c.flags.Bool(enableRegistryKevents, true, "Determines whether registry kernel events are collected by Kernel Logger provider")
@@ -370,6 +393,7 @@ func (c *Config) addFlags() {
 		c.flags.Bool(enableMemKevents, true, "Determines whether memory manager kernel events are collected by Kernel Logger provider")
 		c.flags.Bool(enableAuditAPIEvents, true, "Determines whether kernel audit API calls events are published")
 		c.flags.Bool(enableDNSEvents, true, "Determines whether DNS client events are enabled")
+		c.flags.Bool(stackEnrichment, true, "Indicates if stack enrichment is enabled for eligible events")
 		c.flags.Int(bufferSize, int(maxBufferSize), "Represents the amount of memory allocated for each event tracing session buffer, in kilobytes. The buffer size affects the rate at which buffers fill and must be flushed (small buffer size requires less memory but it increases the rate at which buffers must be flushed)")
 		c.flags.Int(minBuffers, int(defaultMinBuffers), "Determines the minimum number of buffers allocated for the event tracing session's buffer pool")
 		c.flags.Int(maxBuffers, int(defaultMaxBuffers), "Determines the maximum number of buffers allocated for the event tracing session's buffer pool")

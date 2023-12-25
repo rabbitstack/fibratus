@@ -54,6 +54,7 @@ type opts struct {
 	parseResources bool
 	parseSecurity  bool
 	parseCLR       bool
+	parseExports   bool
 	sectionEntropy bool
 	sectionMD5     bool
 	calcImphash    bool
@@ -92,6 +93,13 @@ func WithSymbols() Option {
 func WithSections() Option {
 	return func(o *opts) {
 		o.parseSections = true
+	}
+}
+
+// WithExports indicates if the export directory is parsed.
+func WithExports() Option {
+	return func(o *opts) {
+		o.parseExports = true
 	}
 }
 
@@ -207,7 +215,7 @@ func newParserOpts(opts opts) *peparser.Options {
 		OmitRelocDirectory:        true,
 		OmitResourceDirectory:     !opts.parseResources,
 		OmitImportDirectory:       !opts.parseSymbols && !opts.calcImphash,
-		OmitExportDirectory:       true,
+		OmitExportDirectory:       !opts.parseExports,
 		OmitLoadConfigDirectory:   true,
 		OmitGlobalPtrDirectory:    true,
 		SectionEntropy:            opts.sectionEntropy,
@@ -254,6 +262,7 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 		Symbols:          make([]string, 0),
 		Imports:          make([]string, 0),
 		Sections:         make([]Sec, 0),
+		Exports:          make(map[uint32]string, 0),
 		VersionResources: make(map[string]string),
 		Is64:             pe.Is64,
 		filename:         path,
@@ -301,7 +310,7 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 	}
 
 	if opts.parseSymbols || opts.parseResources || opts.parseSecurity ||
-		opts.calcImphash || opts.parseCLR {
+		opts.calcImphash || opts.parseCLR || opts.parseExports {
 		// parse data directories
 		err = pe.ParseDataDirectories()
 		if err != nil {
@@ -317,6 +326,15 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 		}
 	}
 	p.NumberOfSymbols = uint32(len(p.Symbols))
+
+	// add exports
+	for _, exp := range pe.Export.Functions {
+		if exp.Forwarder != "" {
+			p.Exports[exp.ForwarderRVA] = exp.Forwarder
+		} else {
+			p.Exports[exp.FunctionRVA] = exp.Name
+		}
+	}
 
 	if opts.parseResources {
 		// parse version resources

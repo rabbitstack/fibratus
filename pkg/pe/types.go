@@ -102,6 +102,8 @@ type PE struct {
 	Is64 bool `json:"is_64"`
 	// IsModified indicates if PE differs from its in-memory state
 	IsModified bool `json:"is_modified"`
+	// Exports contains exported function names indexed by RVA
+	Exports map[uint32]string `json:"exports"`
 
 	dosHeader      peparser.ImageDOSHeader
 	ntHeader       peparser.ImageNtHeader

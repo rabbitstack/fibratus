@@ -93,7 +93,7 @@ func NewConsumer(
 	kconsumer := &consumer{
 		controller: controller,
 		errs:       make(chan error, 1000),
-		q:          kevent.NewQueue(500),
+		q:          kevent.NewQueue(500, config.Kstream.StackEnrichment),
 		config:     config,
 		psnap:      psnap,
 		capture:    config.KcapFile != "",
@@ -183,6 +183,10 @@ func (k *consumer) isEventDropped(evt *kevent.Kevent) bool {
 	if evt.IsDropped(k.capture) {
 		return true
 	}
+	if evt.IsStackWalk() {
+		// we always permit stack walk events
+		return false
+	}
 	if k.config.Kstream.ExcludeImage(evt.PS) {
 		excludedProcs.Add(1)
 		return true
@@ -238,7 +242,6 @@ func (k *consumer) processEvent(ev *etw.EventRecord) error {
 		evt.PS = proc
 	}
 	if k.isEventDropped(evt) {
-		evt.Release()
 		keventsDropped.Add(1)
 		return nil
 	}

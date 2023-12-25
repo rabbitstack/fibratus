@@ -33,6 +33,7 @@ const DevSize = 1024
 // the system.
 type Driver struct {
 	Filename string
+	Addr     uintptr
 }
 
 // String returns the driver string representation.
@@ -64,7 +65,9 @@ func EnumDevices() []Driver {
 	}
 	drivers := make([]Driver, len(addrs))
 	for i, addr := range addrs {
-		drv := Driver{}
+		drv := Driver{
+			Addr: addr,
+		}
 		filename := make([]uint16, syscall.MAX_PATH)
 		n := GetDeviceDriverFileName(addr, &filename[0], syscall.MAX_PATH)
 		if n == 0 {

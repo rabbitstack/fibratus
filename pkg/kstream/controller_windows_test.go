@@ -30,31 +30,35 @@ import (
 func TestStartTraces(t *testing.T) {
 	var tests = []struct {
 		name         string
-		cfg          config.KstreamConfig
+		cfg          *config.Config
 		wantSessions int
 		wantFlags    []etw.EventTraceFlags
 	}{
 		{"start kernel logger session",
-			config.KstreamConfig{
-				EnableThreadKevents: true,
-				EnableNetKevents:    true,
-				EnableFileIOKevents: true,
-				BufferSize:          1024,
-				FlushTimer:          time.Millisecond * 2300,
+			&config.Config{
+				Kstream: config.KstreamConfig{
+					EnableThreadKevents: true,
+					EnableNetKevents:    true,
+					EnableFileIOKevents: true,
+					BufferSize:          1024,
+					FlushTimer:          time.Millisecond * 2300,
+				},
 			},
 			1,
 			[]etw.EventTraceFlags{0x6018203, 0},
 		},
 		{"start kernel logger and audit api sessions",
-			config.KstreamConfig{
-				EnableThreadKevents:   true,
-				EnableNetKevents:      true,
-				EnableFileIOKevents:   true,
-				EnableHandleKevents:   true,
-				EnableRegistryKevents: true,
-				BufferSize:            1024,
-				FlushTimer:            time.Millisecond * 2300,
-				EnableAuditAPIEvents:  true,
+			&config.Config{
+				Kstream: config.KstreamConfig{
+					EnableThreadKevents:   true,
+					EnableNetKevents:      true,
+					EnableFileIOKevents:   true,
+					EnableHandleKevents:   true,
+					EnableRegistryKevents: true,
+					BufferSize:            1024,
+					FlushTimer:            time.Millisecond * 2300,
+					EnableAuditAPIEvents:  true,
+				},
 			},
 			2,
 			[]etw.EventTraceFlags{0x6038203, 0x80000040},
@@ -63,7 +67,7 @@ func TestStartTraces(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := NewController(tt.cfg)
+			ctrl := NewController(tt.cfg.Kstream)
 			require.NoError(t, ctrl.Start())
 			defer ctrl.Close()
 			assert.Equal(t, tt.wantSessions, len(ctrl.traces))
@@ -83,14 +87,17 @@ func TestStartTraces(t *testing.T) {
 }
 
 func TestRestartTrace(t *testing.T) {
-	cfg := config.KstreamConfig{
-		EnableThreadKevents: true,
-		EnableNetKevents:    true,
-		EnableFileIOKevents: true,
-		BufferSize:          1024,
-		FlushTimer:          time.Millisecond * 2300,
+	cfg := &config.Config{
+		Kstream: config.KstreamConfig{
+			EnableThreadKevents: true,
+			EnableNetKevents:    true,
+			EnableFileIOKevents: true,
+			BufferSize:          1024,
+			FlushTimer:          time.Millisecond * 2300,
+		},
 	}
-	ctrl := NewController(cfg)
+
+	ctrl := NewController(cfg.Kstream)
 	require.NoError(t, ctrl.Start())
 	require.NoError(t, ctrl.Start())
 	require.NoError(t, etw.ControlTrace(0, ctrl.traces[0].Name, ctrl.traces[0].GUID, etw.Query))

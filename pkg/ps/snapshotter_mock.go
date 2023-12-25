@@ -21,6 +21,7 @@ package ps
 import (
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
+	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -94,3 +95,15 @@ func (s *SnapshotterMock) RemoveModule(pid uint32, mod string) error {
 
 // WriteFromKcap method
 func (s *SnapshotterMock) WriteFromKcap(kevt *kevent.Kevent) error { return nil }
+
+// AddFileMapping method
+func (s *SnapshotterMock) AddFileMapping(kevt *kevent.Kevent) error {
+	args := s.Called(kevt)
+	return args.Error(0)
+}
+
+// RemoveFileMapping method
+func (s *SnapshotterMock) RemoveFileMapping(pid uint32, address va.Address) error {
+	args := s.Called(pid, address)
+	return args.Error(0)
+}

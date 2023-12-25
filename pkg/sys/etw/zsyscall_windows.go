@@ -42,7 +42,7 @@ var (
 
 	procCloseTrace            = modadvapi32.NewProc("CloseTrace")
 	procControlTraceW         = modadvapi32.NewProc("ControlTraceW")
-	procEnableTraceEx         = modadvapi32.NewProc("EnableTraceEx")
+	procEnableTraceEx2        = modadvapi32.NewProc("EnableTraceEx2")
 	procOpenTraceW            = modadvapi32.NewProc("OpenTraceW")
 	procProcessTrace          = modadvapi32.NewProc("ProcessTrace")
 	procStartTraceW           = modadvapi32.NewProc("StartTraceW")
@@ -75,8 +75,8 @@ func _controlTrace(handle TraceHandle, name *uint16, props *EventTraceProperties
 	return
 }
 
-func enableTraceEx(providerID *windows.GUID, sourceID *windows.GUID, handle TraceHandle, isEnabled uint32, level uint8, matchAnyKeyword uint64, matchAllKeyword uint64, enableProperty uint32, enableFilterDesc uintptr) (err error) {
-	r1, _, e1 := syscall.Syscall9(procEnableTraceEx.Addr(), 9, uintptr(unsafe.Pointer(providerID)), uintptr(unsafe.Pointer(sourceID)), uintptr(handle), uintptr(isEnabled), uintptr(level), uintptr(matchAnyKeyword), uintptr(matchAllKeyword), uintptr(enableProperty), uintptr(enableFilterDesc))
+func enableTraceEx2(handle TraceHandle, providerID *windows.GUID, controlCode uint32, level uint8, matchAnyKeyword uint64, matchAllKeyword uint64, timeout uint32, enableParameters *EnableTraceParameters) (err error) {
+	r1, _, e1 := syscall.Syscall9(procEnableTraceEx2.Addr(), 8, uintptr(handle), uintptr(unsafe.Pointer(providerID)), uintptr(controlCode), uintptr(level), uintptr(matchAnyKeyword), uintptr(matchAllKeyword), uintptr(timeout), uintptr(unsafe.Pointer(enableParameters)), 0)
 	if r1 != 0 {
 		err = errnoErr(e1)
 	}

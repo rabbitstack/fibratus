@@ -31,6 +31,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kcap"
 	"github.com/rabbitstack/fibratus/pkg/kstream"
 	"github.com/rabbitstack/fibratus/pkg/ps"
+	"github.com/rabbitstack/fibratus/pkg/symbolize"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"github.com/rabbitstack/fibratus/pkg/util/signals"
@@ -49,6 +50,7 @@ var ErrAlreadyRunning = errors.New("an instance of Fibratus process is already r
 type App struct {
 	config     *config.Config
 	controller *kstream.Controller
+	symbolizer *symbolize.Symbolizer
 	hsnap      handle.Snapshotter
 	psnap      ps.Snapshotter
 	consumer   kstream.Consumer
@@ -220,8 +222,14 @@ func (f *App) Run(args []string) error {
 			}
 		}()
 	} else {
-		// register event listeners
+		// register stack symbolizer
+		if cfg.Kstream.StackEnrichment {
+			f.symbolizer = symbolize.NewSymbolizer(symbolize.NewDebugHelpResolver(cfg), cfg, false)
+			f.consumer.RegisterEventListener(f.symbolizer)
+		}
+		// register rule engine
 		f.consumer.RegisterEventListener(rules)
+		// register YARA scanner
 		if cfg.Yara.Enabled {
 			scanner, err := yara.NewScanner(f.psnap, cfg.Yara)
 			if err != nil {
@@ -363,6 +371,9 @@ func (f *App) Shutdown() error {
 		if err := f.controller.Close(); err != nil {
 			errs = append(errs, err)
 		}
+	}
+	if f.symbolizer != nil {
+		f.symbolizer.Close()
 	}
 	if f.consumer != nil {
 		if err := f.consumer.Close(); err != nil {

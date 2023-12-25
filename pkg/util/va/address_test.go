@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 by Nedim Sabic Sabic
+ * Copyright 2021-2022 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -16,15 +16,27 @@
  * limitations under the License.
  */
 
-package kparams
+package va
 
 import (
 	"github.com/stretchr/testify/assert"
-
+	"strconv"
 	"testing"
 )
 
-func TestAddr(t *testing.T) {
-	addr := Addr(uint32(86372352))
-	assert.Equal(t, "525f000", addr.String())
+func TestAddressRanges(t *testing.T) {
+	var tests = []struct {
+		addr       Address
+		inSysRange bool
+	}{
+		{0xfffff8036710ad28, true},
+		{0x7ffd38e326e4, false},
+		{0xfffff803672274e5, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(strconv.FormatUint(tt.addr.Uint64(), 16), func(t *testing.T) {
+			assert.Equal(t, tt.inSysRange, tt.addr.InSystemRange())
+		})
+	}
 }

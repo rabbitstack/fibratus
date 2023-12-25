@@ -37,7 +37,33 @@ import (
 //sys processTrace(handle *TraceHandle, count uint32, start *windows.Filetime, end *windows.Filetime) (err error) [failretval!=0] = advapi32.ProcessTrace
 //sys traceSetInformation(handle TraceHandle, infoClass uint8, info uintptr, length uint32) (err error) [failretval!=0] = advapi32.TraceSetInformation
 //sys traceQueryInformation(handle TraceHandle, infoClass uint8, info uintptr, length uint32, size *uint32) (err error) [failretval!=0] = advapi32.TraceQueryInformation
-//sys enableTraceEx(providerID *windows.GUID, sourceID *windows.GUID, handle TraceHandle, isEnabled uint32, level uint8, matchAnyKeyword uint64, matchAllKeyword uint64, enableProperty uint32, enableFilterDesc uintptr) (err error) [failretval!=0] = advapi32.EnableTraceEx
+//sys enableTraceEx2(handle TraceHandle, providerID *windows.GUID, controlCode uint32, level uint8, matchAnyKeyword uint64, matchAllKeyword uint64, timeout uint32, enableParameters *EnableTraceParameters) (err error) [failretval!=0] = advapi32.EnableTraceEx2
+
+// EnableTraceParametersVersion determines the version of the EnableTraceParameters structure.
+const EnableTraceParametersVersion = 2
+
+// EnableTraceParameters contains information used to enable a provider via EnableTraceEx2.
+type EnableTraceParameters struct {
+	// Version represents the version of this struct. Should be set to EnableTraceParametersVersion.
+	Version uint32
+	// EnableProperty represents optional settings that ETW can include
+	// when writing the event. Some settings write extra data to the extended
+	// data item section of each event. Other settings control which events
+	// will be included in the trace.
+	EnableProperty uint32
+	// ControlFlags is a reserved field and should be set to 0.
+	ControlFlags uint32
+	// SourceID denotes a GUID that uniquely identifies the caller that
+	// is enabling or disabling the provider.
+	SourceID windows.GUID
+	// EnableFilterDesc is a  pointer to an array of event filter descriptor structures
+	// that points to the filter data. The number of elements in the array is specified
+	// in the FilterDescCount member.
+	EnableFilterDesc uintptr
+	// FilterDescCount is the number of elements (filters) in the event filter descriptor
+	// array.
+	FilterDescCount uint32
+}
 
 // TraceOperation is the type alias for the trace operation.
 type TraceOperation uint32
@@ -171,11 +197,57 @@ func GetTraceSystemFlags(handle TraceHandle) ([]EventTraceFlags, error) {
 	return flags, nil
 }
 
+// EventEnablePropertyStacktrace adds a call stack trace to the extended data of events.
+// If the stack is longer than the maximum number of frames (192), the frames will be cut
+// from the bottom of the stack.
+const EventEnablePropertyStacktrace = 0x00000004
+
+const (
+	// TraceLevelInformation is the value that indicates the maximum
+	// level of events that the provider is susceptible to write.
+	TraceLevelInformation = 4
+	// ControlCodeEnableProvider updates the session configuration so
+	// that the session receives the requested events from the provider.
+	ControlCodeEnableProvider = 1
+)
+
 // EnableTrace influences the behaviour of the specified event trace provider.
 func EnableTrace(guid windows.GUID, handle TraceHandle, keyword uint64) error {
-	err := enableTraceEx(&guid, nil, handle, 1, 0, keyword, 0, 0, 0)
+	err := enableTraceEx2(handle, &guid, ControlCodeEnableProvider, TraceLevelInformation, keyword, 0, 0, nil)
 	if err != nil {
-		return os.NewSyscallError("EnableTraceEx", err)
+		return os.NewSyscallError("EnableTraceEx2", err)
+	}
+	return nil
+}
+
+// EnableTraceOpts describes which properties are enabled in the event extended section.
+type EnableTraceOpts struct {
+	// WithStacktrace indicates call stack trace is added to the extended data of events.
+	WithStacktrace bool
+}
+
+// EnableTraceWithOpts influences the behaviour of the specified event trace provider
+// by providing extra options to configure how events are writing to the session buffer.
+func EnableTraceWithOpts(guid windows.GUID, handle TraceHandle, keyword uint64, opts EnableTraceOpts) error {
+	params := &EnableTraceParameters{
+		Version:  EnableTraceParametersVersion,
+		SourceID: guid,
+	}
+	if opts.WithStacktrace {
+		params.EnableProperty = EventEnablePropertyStacktrace
+	}
+	err := enableTraceEx2(handle, &guid, ControlCodeEnableProvider, TraceLevelInformation, keyword, 0, 0, params)
+	if err != nil {
+		return os.NewSyscallError("EnableTraceEx2", err)
+	}
+	return nil
+}
+
+// EnableStackTracing enables stack tracing for the provided events.
+func EnableStackTracing(handle TraceHandle, eventIDs []ClassicEventID) error {
+	err := traceSetInformation(handle, TraceStackTracingInfo, uintptr(unsafe.Pointer(&eventIDs[0])), uint32(unsafe.Sizeof(ClassicEventID{})*uintptr(len(eventIDs))))
+	if err != nil {
+		return os.NewSyscallError("TraceSetInformation", err)
 	}
 	return nil
 }

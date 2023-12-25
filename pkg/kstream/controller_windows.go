@@ -20,6 +20,7 @@ package kstream
 
 import (
 	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"golang.org/x/sys/windows"
 	"runtime"
@@ -44,6 +45,23 @@ const (
 	maxLogfileNameSize = 1024
 	// maxTracePropsSize must make room for logger name and log file name
 	maxTracePropsSize = 2 * (maxLoggerNameSize + maxLogfileNameSize)
+)
+
+var (
+	// stackTraceEvents identifies the events for which stack tracing is enabled
+	stackTraceEvents = []etw.ClassicEventID{
+		etw.NewClassicEventID(ktypes.ProcessEventGUID, ktypes.CreateProcess.HookID()),
+		etw.NewClassicEventID(ktypes.ThreadEventGUID, ktypes.CreateThread.HookID()),
+		etw.NewClassicEventID(ktypes.ThreadEventGUID, ktypes.TerminateThread.HookID()),
+		etw.NewClassicEventID(ktypes.ProcessEventGUID, ktypes.LoadImage.HookID()),
+		etw.NewClassicEventID(ktypes.RegistryEventGUID, ktypes.RegCreateKey.HookID()),
+		etw.NewClassicEventID(ktypes.RegistryEventGUID, ktypes.RegDeleteKey.HookID()),
+		etw.NewClassicEventID(ktypes.RegistryEventGUID, ktypes.RegSetValue.HookID()),
+		etw.NewClassicEventID(ktypes.RegistryEventGUID, ktypes.RegDeleteValue.HookID()),
+		etw.NewClassicEventID(ktypes.FileEventGUID, ktypes.CreateFile.HookID()),
+		etw.NewClassicEventID(ktypes.FileEventGUID, ktypes.DeleteFile.HookID()),
+		etw.NewClassicEventID(ktypes.FileEventGUID, ktypes.RenameFile.HookID()),
+	}
 )
 
 // initEventTraceProps builds the trace properties descriptor which
@@ -106,20 +124,20 @@ type Trace struct {
 	// API.
 	Keywords uint64
 
-	// s is the session handle returned by the
+	// startHandle is the session handle returned by the
 	// etw.StartTrace function. This handle is
 	// used for subsequent calls to other API
 	// functions, but also to indicate if the
 	// trace was started successfully. In this
 	// case the trace handle is different from
 	// zero.
-	s etw.TraceHandle
-	// p is the trace processing handle obtained
+	startHandle etw.TraceHandle
+	// openHandle is the trace processing handle obtained
 	// after the call to etw.OpenTrace function.
 	// This handle is later handed over to the
 	// trace processing function to consume events
 	// from the real-time tracing session.
-	p etw.TraceHandle
+	openHandle etw.TraceHandle
 }
 
 // NewTrace creates a new trace with specified name, provider GUID, and keywords.
@@ -145,19 +163,19 @@ func (t *Trace) Start(config config.KstreamConfig) error {
 	log.Debugf("starting trace [%s]", t.Name)
 
 	var err error
-	t.s, err = etw.StartTrace(
+	t.startHandle, err = etw.StartTrace(
 		t.Name,
 		props,
 	)
 	if err != nil {
 		return err
 	}
-	if !t.s.IsValid() {
+	if !t.startHandle.IsValid() {
 		return kerrors.ErrInvalidTrace
 	}
 
 	if t.IsKernelTrace() {
-		handle := t.s
+		handle := t.startHandle
 		// poorly documented ETW feature that allows for enabling an extended set of
 		// kernel event tracing flags. According to the MSDN documentation, aside from
 		// invoking `EventTraceProperties` function to enable object manager tracking
@@ -180,20 +198,35 @@ func (t *Trace) Start(config config.KstreamConfig) error {
 		if config.EnableHandleKevents {
 			sysTraceFlags[4] = etw.Handle
 		}
+		// enable stack enrichment
+		if config.StackEnrichment {
+			if err := etw.EnableStackTracing(handle, stackTraceEvents); err != nil {
+				return fmt.Errorf("fail to enable kernel callstack tracing: %v", err)
+			}
+		}
 		// call again to enable all kernel events. Just to recap. The first call to
 		// `TraceSetInformation` with empty group masks activates rundown events,
 		// while this second call enables the rest of the kernel events specified in flags.
 		return etw.SetTraceSystemFlags(handle, sysTraceFlags)
 	}
-	return etw.EnableTrace(t.GUID, t.s, t.Keywords)
+	// if we're starting a trace for non-system logger, the call
+	// to etw.EnableTrace is needed to configure how an ETW provider
+	// publishes events to the trace session. For instance, if stack
+	// enrichment is enabled, it is necessary to instruct the provider
+	// to emit stack addresses in the extended data item section when
+	// writing events to the session buffers
+	if config.StackEnrichment {
+		return etw.EnableTraceWithOpts(t.GUID, t.startHandle, t.Keywords, etw.EnableTraceOpts{WithStacktrace: true})
+	}
+	return etw.EnableTrace(t.GUID, t.startHandle, t.Keywords)
 }
 
 // IsStarted indicates if the trace is started successfully.
-func (t *Trace) IsStarted() bool { return t.s.IsValid() }
+func (t *Trace) IsStarted() bool { return t.startHandle.IsValid() }
 
 // Handle returns the trace handle returned by etw.StartTrace function.
 func (t *Trace) Handle() etw.TraceHandle {
-	return t.s
+	return t.startHandle
 }
 
 // Stop stops the event tracing session.
@@ -222,8 +255,8 @@ func (t *Trace) Open(bufferFn, eventFn EventCallback) error {
 	logfile.SetBufferCallback(windows.NewCallback(bufferFn))
 	logfile.SetModes(etw.ProcessTraceModeRealtime | etw.ProcessTraceModeEventRecord)
 
-	t.p = etw.OpenTrace(logfile)
-	if !t.p.IsValid() {
+	t.openHandle = etw.OpenTrace(logfile)
+	if !t.openHandle.IsValid() {
 		return fmt.Errorf("unable to open %s trace: %v", t.Name, windows.GetLastError().Error())
 	}
 	return nil
@@ -237,14 +270,14 @@ func (t *Trace) Open(bufferFn, eventFn EventCallback) error {
 // to spawn a dedicated goroutine and use the provided error channel to
 // stream any errors.
 func (t *Trace) Process(ch chan error) {
-	ch <- etw.ProcessTrace(t.p)
+	ch <- etw.ProcessTrace(t.openHandle)
 }
 
 // Close closes a trace processing session that was initiated
 // with the etw.OpenTrace function. This method should be called
 // after the respective session processing worker is started.
 func (t *Trace) Close() error {
-	return etw.CloseTrace(t.p)
+	return etw.CloseTrace(t.openHandle)
 }
 
 // IsKernelTrace determines if this is the system logger trace.
@@ -281,18 +314,17 @@ func (*Trace) systemLoggerFlags(config config.KstreamConfig) etw.EventTraceFlags
 }
 
 // Controller is responsible for managing the life cycle of the tracing sessions.
-// More specifically, the following sessions are governed by the trace controller
-// depending on whether they are enabled or not:
+// More specifically, the following sessions are governed by the trace controller:
 //
-// - NT System Logger: emits core system events. Mandatory and always started
-// - Kernel Audit API Calls Logger: provides process/thread object events. Optional
-// - DNS Client Logger: publishes DNS queries/responses. Optional
+// NT System Logger: publishes core system events. Mandatory and always started
+// Kernel Audit API Calls Logger: provides process/thread object events. Optional
+// DNS Client Logger: publishes DNS queries/responses. Optional
 type Controller struct {
 	traces []*Trace
 	config config.KstreamConfig
 }
 
-func (c *Controller) registerTrace(name string, guid windows.GUID, keywords uint64) {
+func (c *Controller) addTrace(name string, guid windows.GUID, keywords uint64) {
 	c.traces = append(c.traces, NewTrace(name, guid, keywords))
 }
 
@@ -303,13 +335,13 @@ func NewController(cfg config.KstreamConfig) *Controller {
 		traces: make([]*Trace, 0),
 	}
 
-	controller.registerTrace(etw.KernelLoggerSession, etw.KernelTraceControlGUID, 0x0)
+	controller.addTrace(etw.KernelLoggerSession, etw.KernelTraceControlGUID, 0x0)
 
 	if cfg.EnableDNSEvents {
-		controller.registerTrace(etw.DNSClientSession, etw.DNSClientGUID, 0x0)
+		controller.addTrace(etw.DNSClientSession, etw.DNSClientGUID, 0x0)
 	}
 	if cfg.EnableAuditAPIEvents {
-		controller.registerTrace(etw.KernelAuditAPICallsSession, etw.KernelAuditAPICallsGUID, 0x0)
+		controller.addTrace(etw.KernelAuditAPICallsSession, etw.KernelAuditAPICallsGUID, 0x0)
 	}
 
 	return controller

@@ -95,8 +95,10 @@ var schema = `
 			},
 			"additionalProperties": false
 		},
-		"config-file": 		{"type": "string"},
-		"debug-privilege":  {"type": "boolean"},
+		"config-file": 						{"type": "string"},
+		"debug-privilege":  				{"type": "boolean"},
+		"symbol-paths":						{"type": "string"},
+		"symbolize-kernel-addresses":		{"type": "boolean"},
 		"handle": {
 			"type": "object",
 			"properties": {
@@ -165,6 +167,7 @@ var schema = `
 				"enable-mem": 		{"type": "boolean"},
 				"enable-audit-api": {"type": "boolean"},
 				"enable-dns": 		{"type": "boolean"},
+				"stack-enrichment": {"type": "boolean"},
 				"min-buffers": 		{"type": "integer", "minimum": 1, "maximum": {{ .MinBuffers }}},
 				"max-buffers": 		{"type": "integer", "minimum": 2, "maximum": {{ .MaxBuffers }}},
 				"buffer-size":		{"type": "integer", "maximum": {{ .MaxBufferSize }}},

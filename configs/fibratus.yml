@@ -192,6 +192,9 @@ kstream:
   # Determines whether DNS client events are collected
   #enable-dns: true
 
+  # Indicates if stack enrichment is enabled for eligible events
+  #stack-enrichment: true
+
   # Determines which events are dropped either by the event name or the process' image
   # name that triggered the event.
   blacklist:
@@ -462,6 +465,13 @@ pe:
   # Indicates if full section inspection is allowed. When se to true, section's individual bytes are
   # consulted for computing section hashes, calculating the entropy, and so on
   #read-sections: false
+
+# Designates the path or a series of paths separated by a semicolon that is used to search
+# for symbols files
+# symbol-paths: srv*c:\\SymCache*https://msdl.microsoft.com/download/symbols
+
+# Determines if kernel stack addresses are symbolized
+# symbolize-kernel-addresses: false
 
 # =============================== Transformers =========================================
 

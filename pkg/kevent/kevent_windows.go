@@ -118,6 +118,11 @@ func (e *Kevent) adjustPID() {
 			e.PID, _ = e.Kparams.GetUint32(kparams.TargetProcessID)
 			e.Kparams.Remove(kparams.TargetProcessID)
 		}
+	case ktypes.Thread:
+		if e.Type == ktypes.StackWalk {
+			e.PID, _ = e.Kparams.GetPid()
+			e.Tid, _ = e.Kparams.GetTid()
+		}
 	}
 }
 
@@ -222,12 +227,16 @@ func (e Kevent) IsProcessRundown() bool   { return e.Type == ktypes.ProcessRundo
 func (e Kevent) IsVirtualAlloc() bool     { return e.Type == ktypes.VirtualAlloc }
 func (e Kevent) IsMapViewFile() bool      { return e.Type == ktypes.MapViewFile }
 func (e Kevent) IsUnmapViewFile() bool    { return e.Type == ktypes.UnmapViewFile }
+func (e Kevent) IsStackWalk() bool        { return e.Type == ktypes.StackWalk }
 
 // InvalidPid indicates if the process generating the event is invalid.
 func (e Kevent) InvalidPid() bool { return e.PID == sys.InvalidProcessID }
 
 // CurrentPid indicates if Fibratus is the process generating the event.
 func (e Kevent) CurrentPid() bool { return e.PID == currentPid }
+
+// IsSystemPid indicates if the process generating the event is the System process.
+func (e Kevent) IsSystemPid() bool { return e.PID == 4 }
 
 // IsState indicates if this event is only used for state management.
 func (e Kevent) IsState() bool { return e.Type.OnlyState() }
@@ -236,6 +245,14 @@ func (e Kevent) IsState() bool { return e.Type.OnlyState() }
 func (e Kevent) IsCreateDisposition() bool {
 	return e.IsCreateFile() && e.Kparams.MustGetUint32(kparams.FileOperation) == windows.FILE_CREATE
 }
+
+// IsOpenDisposition determines if the file disposition leads to opening a file object.
+func (e Kevent) IsOpenDisposition() bool {
+	return e.IsCreateFile() && e.Kparams.MustGetUint32(kparams.FileOperation) == windows.FILE_OPEN
+}
+
+// StackID returns the integer that is used to identify the callstack present in the StackWalk event.
+func (e Kevent) StackID() uint64 { return uint64(e.PID + e.Tid) }
 
 // RundownKey calculates the rundown event hash. The hash is
 // used to determine if the rundown event was already processed.

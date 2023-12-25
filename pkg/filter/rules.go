@@ -662,6 +662,8 @@ func (r *Rules) findGroups(kevt *kevent.Kevent) filterGroups {
 	return append(groups1, groups2...)
 }
 
+func (*Rules) CanEnqueue() bool { return true }
+
 func (r *Rules) ProcessEvent(evt *kevent.Kevent) (bool, error) {
 	if !r.hasGroups() {
 		return true, nil

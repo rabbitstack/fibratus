@@ -28,6 +28,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	pex "github.com/rabbitstack/fibratus/pkg/pe"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
+	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
@@ -91,8 +92,8 @@ func TestHTMLFormatterRuleAlert(t *testing.T) {
 					SessionID: 4,
 					Envs:      map[string]string{"ProgramData": "C:\\ProgramData", "COMPUTRENAME": "archrabbit", "Path": "C:\\Program Files (x86)\\Common Files\\Oracle\\Java\\javapath;C:\\WINDOWS\\system32;C:\\WINDOWS;C:\\WINDOWS\\System32\\Wbem;C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\;C:\\Program Files\\Git\\cmd;C:\\msys64\\mingw64\\bin;C:\\WINDOWS\\System32\\OpenSSH\\;C:\\Program Files (x86)\\Windows Kits\\10\\Windows Performance Toolkit\\;C:\\Program Files\\nodejs\\;C:\\rubyinstaller-2.5.7-1-x64\\bin;C:\\Program Files (x86)\\WiX Toolset v3.11\\bin;C:\\Program Files (x86)\\Windows Kits\\10\\App Certification Kit;C:\\Program Files (x86)\\Graphviz2.38\\bin;C:\\Program Files (x86)\\NSIS\\Bin;C:\\Program Files\\Jdk11\\bin;C:\\Python310;C:\\msys64\\usr\\bin;C:\\Program Files\\dotnet\\;C:\\Program Files\\Go\\bin;C:\\Program Files\\Fibratus\\Bin;C:\\Program Files\\AutoFirma\\AutoFirma;C:\\Users\\nedo\\AppData\\Local\\Programs\\Python\\Launcher\\;C:\\Scripts\\;C:\\;C:\\Users\\nedo\\AppData\\Local\\Programs\\Microsoft VS Code\\bin;C:\\Users\\nedo\\AppData\\Local\\Microsoft\\WindowsApps;C:\\Users\\nedo\\AppData\\Roaming\\npm;C:\\Users\\nedo\\AppData\\Local\\Programs\\oh-my-posh\\bin;C:\\Users\\nedo\\go\\bin"},
 					Threads: map[uint32]pstypes.Thread{
-						3453: {Tid: 3453, Entrypoint: kparams.Addr(140729524944768), IOPrio: 2, PagePrio: 5, KstackBase: kparams.Addr(18446677035730165760), KstackLimit: kparams.Addr(18446677035730137088), UstackLimit: kparams.Addr(86376448), UstackBase: kparams.Addr(86372352)},
-						3455: {Tid: 3455, Entrypoint: kparams.Addr(140729524944768), IOPrio: 3, PagePrio: 5, KstackBase: kparams.Addr(18446677035730165760), KstackLimit: kparams.Addr(18446677035730137088), UstackLimit: kparams.Addr(86376448), UstackBase: kparams.Addr(86372352)},
+						3453: {Tid: 3453, Entrypoint: va.Address(140729524944768), IOPrio: 2, PagePrio: 5, KstackBase: va.Address(18446677035730165760), KstackLimit: va.Address(18446677035730137088), UstackLimit: va.Address(86376448), UstackBase: va.Address(86372352)},
+						3455: {Tid: 3455, Entrypoint: va.Address(140729524944768), IOPrio: 3, PagePrio: 5, KstackBase: va.Address(18446677035730165760), KstackLimit: va.Address(18446677035730137088), UstackLimit: va.Address(86376448), UstackBase: va.Address(86372352)},
 					},
 					Modules: []pstypes.Module{
 						{Name: "C:\\Windows\\System32\\kernel32.dll", Size: 1233405456},
@@ -185,8 +186,8 @@ func TestHTMLFormatterRuleAlert(t *testing.T) {
 					SessionID: 4,
 					Envs:      map[string]string{"ProgramData": "C:\\ProgramData", "COMPUTRENAME": "archrabbit"},
 					Threads: map[uint32]pstypes.Thread{
-						3453: {Tid: 3453, Entrypoint: kparams.Addr(140729524944768), IOPrio: 2, PagePrio: 5, KstackBase: kparams.Addr(18446677035730165760), KstackLimit: kparams.Addr(18446677035730137088), UstackLimit: kparams.Addr(86376448), UstackBase: kparams.Addr(86372352)},
-						3455: {Tid: 3455, Entrypoint: kparams.Addr(140729524944768), IOPrio: 3, PagePrio: 5, KstackBase: kparams.Addr(18446677035730165760), KstackLimit: kparams.Addr(18446677035730137088), UstackLimit: kparams.Addr(86376448), UstackBase: kparams.Addr(86372352)},
+						3453: {Tid: 3453, Entrypoint: va.Address(140729524944768), IOPrio: 2, PagePrio: 5, KstackBase: va.Address(18446677035730165760), KstackLimit: va.Address(18446677035730137088), UstackLimit: va.Address(86376448), UstackBase: va.Address(86372352)},
+						3455: {Tid: 3455, Entrypoint: va.Address(140729524944768), IOPrio: 3, PagePrio: 5, KstackBase: va.Address(18446677035730165760), KstackLimit: va.Address(18446677035730137088), UstackLimit: va.Address(86376448), UstackBase: va.Address(86372352)},
 					},
 					Modules: []pstypes.Module{
 						{Name: "C:\\Windows\\System32\\kernel32.dll", Size: 1233405456},
