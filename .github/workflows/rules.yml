@@ -26,4 +26,6 @@ jobs:
     - name: Validate rules
       shell: bash
       run: |
-        ./make.bat validate-rules
+        export PATH="/c/Program Files/Fibratus/Bin:$PATH"
+        fibratus rules list
+        fibratus rules validate
