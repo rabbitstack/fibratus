@@ -191,12 +191,6 @@ timeout 2 > NUL
 type install.log
 goto :EOF
 
-:validate-rules
-set PATH="%PATH%;%ProgramFiles%\Fibratus\Bin"
-fibratus rules list
-fibratus rules validate
-goto :EOF
-
 :fail
 echo Failed with error #%errorlevel%.
 exit /b %errorlevel%
