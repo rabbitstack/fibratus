@@ -23,6 +23,8 @@ import (
 	"github.com/gammazero/deque"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
+	"golang.org/x/arch/x86/x86asm"
+	"golang.org/x/sys/windows"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -37,19 +39,78 @@ var maxDequeFlushPeriod = 2 * time.Minute
 // callstackFlushes computes overall callstack dequeue flushes
 var callstackFlushes = expvar.NewInt("callstack.flushes")
 
+// unbacked represents the identifier for unbacked regions in stack frames
+const unbacked = "unbacked"
+
 // Frame describes a single stack frame.
 type Frame struct {
-	Addr           va.Address
-	Offset         uint64
-	AllocationSize uint64
-	Symbol         string
-	Module         string
-	Protection     string
+	Addr   va.Address // return address
+	Offset uint64     // symbol offset
+	Symbol string     // symbol name
+	Module string     // module name
 }
 
 // IsUnbacked returns true if this frame is originated
 // from unbacked memory section
-func (f Frame) IsUnbacked() bool { return f.Module == "unbacked" }
+func (f Frame) IsUnbacked() bool { return f.Module == unbacked }
+
+// AllocationSize calculates the region size
+// to which the frame return address pertains if
+// the memory pages within the region are private.
+func (f *Frame) AllocationSize(proc windows.Handle) uint64 {
+	if f.Addr.InSystemRange() {
+		return 0
+	}
+	r := va.VirtualQuery(proc, f.Addr.Uint64())
+	if r == nil || r.Type != va.MemPrivate {
+		return 0
+	}
+	return r.Size
+}
+
+// Protection resolves the memory protection
+// of the pages within the region that contains the
+// frame return address.
+func (f *Frame) Protection(proc windows.Handle) string {
+	if f.Addr.InSystemRange() {
+		return ""
+	}
+	r := va.VirtualQuery(proc, f.Addr.Uint64())
+	if r == nil {
+		return "?"
+	}
+	return r.ProtectMask()
+}
+
+// CallsiteAssembly decodes the callsite trailing/leading
+// bytes depending on the value of the `pre` argument.
+// The resulting string contains the decoded x86 machine
+// opcodes in Intel assembler syntax.
+func (f *Frame) CallsiteAssembly(proc windows.Handle, pre bool) string {
+	if f.Addr.InSystemRange() {
+		return ""
+	}
+	size := uint(512)
+	base := f.Addr.Uintptr()
+	if pre {
+		base -= uintptr(size) - 1
+	}
+	b := va.ReadArea(proc, base, size, size, false)
+	if len(b) == 0 || va.Zeroed(b) {
+		return ""
+	}
+	var asm strings.Builder
+	for i := 0; i < len(b); {
+		ins, err := x86asm.Decode(b[i:], 64)
+		if err != nil {
+			return asm.String()
+		}
+		asm.WriteString(x86asm.IntelSyntax(ins, f.Addr.Uint64(), nil))
+		asm.WriteRune(' ')
+		i += ins.Len
+	}
+	return asm.String()
+}
 
 // Callstack is a sequence of stack frames
 // representing function executions.
@@ -68,29 +129,54 @@ func (s *Callstack) PushFrame(f Frame) {
 // Depth returns the number of frames in the call stack.
 func (s *Callstack) Depth() int { return len(*s) }
 
-// Summary returns a sequence of module names for each stack frame.
+// IsEmpty returns true if the callstack has no frames.
+func (s *Callstack) IsEmpty() bool { return s.Depth() == 0 }
+
+// Summary returns a sequence of non-repeated module names.
 func (s Callstack) Summary() string {
 	var sb strings.Builder
-	for i, frame := range s {
+	var prev string
+	var removeSep bool
+	for i := range s {
+		frame := s[len(s)-i-1]
+		var n string
 		if frame.IsUnbacked() {
-			sb.WriteString("unbacked")
+			n = unbacked
 		} else {
-			sb.WriteString(filepath.Base(frame.Module))
+			n = filepath.Base(frame.Module)
 		}
+		if n == prev {
+			if i == len(s)-1 {
+				// last module equals to the previous
+				// which renders redundant separator
+				removeSep = true
+			}
+			continue
+		}
+		sb.WriteString(n)
 		if i != len(s)-1 {
 			sb.WriteRune('|')
 		}
+		prev = n
+	}
+	if removeSep {
+		return strings.TrimSuffix(sb.String(), "|")
 	}
 	return sb.String()
 }
 
 func (s Callstack) String() string {
 	var sb strings.Builder
-	for i, frame := range s {
+	for i := range s {
+		frame := s[len(s)-i-1]
 		sb.WriteString("0x")
 		sb.WriteString(frame.Addr.String())
 		sb.WriteString(" ")
-		sb.WriteString(frame.Module)
+		if frame.Addr.InSystemRange() && frame.Module == unbacked {
+			sb.WriteString("?")
+		} else {
+			sb.WriteString(frame.Module)
+		}
 		sb.WriteRune('!')
 		if frame.Symbol != "" && frame.Symbol != "?" {
 			sb.WriteString(frame.Symbol)
@@ -110,14 +196,79 @@ func (s Callstack) String() string {
 
 // ContainsUnbacked returns true if there is a frame
 // pertaining to the function call initiated from the
-// unbacked memory section.
+// unbacked memory section. This method only checks
+// user space frames for such a condition.
 func (s Callstack) ContainsUnbacked() bool {
 	for _, frame := range s {
-		if frame.IsUnbacked() {
+		if !frame.Addr.InSystemRange() && frame.IsUnbacked() {
 			return true
 		}
 	}
 	return false
+}
+
+// Modules returns all modules comprising the thread stack.
+func (s Callstack) Modules() []string {
+	mods := make([]string, len(s))
+	for i, f := range s {
+		mods[i] = f.Module
+	}
+	return mods
+}
+
+// Symbols returns all symbols comprising the call stack.
+// Each symbol name is prefixed with the source module.
+func (s Callstack) Symbols() []string {
+	syms := make([]string, len(s))
+	for i, f := range s {
+		syms[i] = filepath.Base(f.Module) + "!" + f.Symbol
+	}
+	return syms
+}
+
+// AllocationSizes returns allocation size of each stack frame
+// in terms of allocation/module private non-shareable pages.
+func (s Callstack) AllocationSizes(pid uint32) []uint64 {
+	proc, err := windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION, false, pid)
+	if err != nil {
+		return nil
+	}
+	defer windows.Close(proc)
+	sizes := make([]uint64, len(s))
+	for i, f := range s {
+		sizes[i] = f.AllocationSize(proc)
+	}
+	return sizes
+}
+
+// Protections returns page protection mask for every
+// frame comprising the stack.
+func (s Callstack) Protections(pid uint32) []string {
+	proc, err := windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION, false, pid)
+	if err != nil {
+		return nil
+	}
+	defer windows.Close(proc)
+	prots := make([]string, len(s))
+	for i, f := range s {
+		prots[i] = f.Protection(proc)
+	}
+	return prots
+}
+
+// CallsiteInsns returns callsite assembly opcodes
+// for leading/trailing bytes contained in each frame.
+func (s Callstack) CallsiteInsns(pid uint32, pre bool) []string {
+	proc, err := windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION|windows.PROCESS_VM_READ, false, pid)
+	if err != nil {
+		return nil
+	}
+	defer windows.Close(proc)
+	opcodes := make([]string, len(s))
+	for i, f := range s {
+		opcodes[i] = f.CallsiteAssembly(proc, pre)
+	}
+	return opcodes
 }
 
 // CallstackDecorator maintains a FIFO queue where events

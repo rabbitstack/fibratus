@@ -24,6 +24,7 @@ import (
 	psnap "github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
 	"github.com/rabbitstack/fibratus/pkg/util/loldrivers"
+	"golang.org/x/sys/windows"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -433,8 +434,12 @@ func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 }
 
 const (
-	rootAncestor = "root" // represents the root ancestor
-	anyAncestor  = "any"  // represents any ancestor in the hierarchy
+	rootAncestor = "root"   // represents the root ancestor
+	anyAncestor  = "any"    // represents any ancestor in the hierarchy
+	frameUEnd    = "uend"   // represents the last user space stack frame
+	frameUStart  = "ustart" // represents the first user space stack frame
+	frameKEnd    = "kend"   // represents the last kernel space stack frame
+	frameKStart  = "kstart" // represents the first kernel space stack frame
 )
 
 // ancestorFields recursively walks the process ancestors and extracts
@@ -566,6 +571,112 @@ func (t *threadAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value
 			return nil, nil
 		}
 		return kevt.GetParamAsString(kparams.NTStatus), nil
+	case fields.ThreadCallstackSummary:
+		return kevt.Callstack.Summary(), nil
+	case fields.ThreadCallstackDetail:
+		return kevt.Callstack.String(), nil
+	case fields.ThreadCallstackModules:
+		return kevt.Callstack.Modules(), nil
+	case fields.ThreadCallstackSymbols:
+		return kevt.Callstack.Symbols(), nil
+	case fields.ThreadCallstackAllocationSizes:
+		return kevt.Callstack.AllocationSizes(kevt.PID), nil
+	case fields.ThreadCallstackProtections:
+		return kevt.Callstack.Protections(kevt.PID), nil
+	case fields.ThreadCallstackCallsiteLeadingAssembly:
+		return kevt.Callstack.CallsiteInsns(kevt.PID, true), nil
+	case fields.ThreadCallstackCallsiteTrailingAssembly:
+		return kevt.Callstack.CallsiteInsns(kevt.PID, false), nil
+	case fields.ThreadCallstackIsUnbacked:
+		return kevt.Callstack.ContainsUnbacked(), nil
+	default:
+		if f.IsCallstackMap() {
+			return callstackFields(f.String(), kevt)
+		}
+	}
+	return nil, nil
+}
+
+// callstackFields is responsible for extracting
+// the stack frame data for the specified frame
+// index. The index 0 represents the least-recent
+// frame, usually the base thread initialization
+// frames.
+func callstackFields(field string, kevt *kevent.Kevent) (kparams.Value, error) {
+	if kevt.Callstack.IsEmpty() {
+		return nil, nil
+	}
+	key, segment := captureInBrackets(field)
+	if key == "" || segment == "" {
+		return nil, nil
+	}
+	var i int
+	switch key {
+	case frameUStart:
+		i = 0
+	case frameUEnd:
+		for ; i < kevt.Callstack.Depth()-1 && !kevt.Callstack[i].Addr.InSystemRange(); i++ {
+		}
+		i--
+	case frameKStart:
+		for i = kevt.Callstack.Depth() - 1; i >= 0 && kevt.Callstack[i].Addr.InSystemRange(); i-- {
+		}
+		i++
+	case frameKEnd:
+		i = kevt.Callstack.Depth() - 1
+	default:
+		if strings.HasSuffix(key, ".dll") {
+			for n, frame := range kevt.Callstack {
+				if strings.EqualFold(filepath.Base(frame.Module), key) {
+					i = n
+					break
+				}
+			}
+		} else {
+			var err error
+			i, err = strconv.Atoi(key)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	if i > kevt.Callstack.Depth() || i < 0 {
+		i = 0
+	}
+	f := kevt.Callstack[i]
+
+	switch segment {
+	case fields.FrameAddress:
+		return f.Addr.String(), nil
+	case fields.FrameSymbolOffset:
+		return f.Offset, nil
+	case fields.FrameModule:
+		return f.Module, nil
+	case fields.FrameSymbol:
+		return f.Symbol, nil
+	case fields.FrameProtection, fields.FrameAllocationSize:
+		proc, err := windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION, false, kevt.PID)
+		if err != nil {
+			return nil, err
+		}
+		defer windows.Close(proc)
+		if segment == fields.FrameProtection {
+			return f.Protection(proc), nil
+		}
+		return f.AllocationSize(proc), nil
+	case fields.FrameCallsiteLeadingAssembly, fields.FrameCallsiteTrailingAssembly:
+		proc, err := windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION|windows.PROCESS_VM_READ, false, kevt.PID)
+		if err != nil {
+			return nil, err
+		}
+		defer windows.Close(proc)
+		if segment == fields.FrameCallsiteLeadingAssembly {
+			return f.CallsiteAssembly(proc, true), nil
+		}
+		return f.CallsiteAssembly(proc, false), nil
+	case fields.FrameIsUnbacked:
+		return f.IsUnbacked(), nil
 	}
 	return nil, nil
 }

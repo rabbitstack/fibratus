@@ -24,8 +24,9 @@ import "strconv"
 type Address uint64
 
 // Hex returns the hexadecimal representation of the memory address.
-func (a Address) String() string { return strconv.FormatUint(uint64(a), 16) }
-func (a Address) Uint64() uint64 { return uint64(a) }
+func (a Address) String() string   { return strconv.FormatUint(uint64(a), 16) }
+func (a Address) Uint64() uint64   { return uint64(a) }
+func (a Address) Uintptr() uintptr { return uintptr(a) }
 
 // Inc increments the address by given offset.
 func (a Address) Inc(offset uint64) Address {

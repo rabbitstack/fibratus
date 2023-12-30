@@ -150,7 +150,7 @@ func TestProcessCallstackFastMode(t *testing.T) {
 
 	assert.Len(t, e.Callstack, 5)
 	assert.Equal(t, "0x7ffb5c1d0396 kernel32.dll!?|0x7ffb5d8e61f4 user32.dll!?|0x7ffb3138592e ntdll.dll!?|0x7ffb313853b2 ntdll.dll!?|0x2638e59e0a5 unbacked!?", e.Callstack.String())
-	assert.Equal(t, "kernel32.dll|user32.dll|ntdll.dll|ntdll.dll|unbacked", e.Callstack.Summary())
+	assert.Equal(t, "kernel32.dll|user32.dll|ntdll.dll|unbacked", e.Callstack.Summary())
 	assert.True(t, e.Callstack.ContainsUnbacked())
 }
 
@@ -215,7 +215,7 @@ func TestProcessCallstackFullMode(t *testing.T) {
 	_, err := s.ProcessEvent(e)
 	require.NoError(t, err)
 	assert.Equal(t, 1, s.procsSize())
-	assert.Equal(t, `0x7ffb5c1d0396 C:\WINDOWS\System32\KERNEL32.DLL!CreateProcessW+0x54|0x7ffb5d8e61f4 C:\WINDOWS\System32\KERNELBASE.dll!CreateProcessW+0x66|0x7ffb3138592e C:\WINDOWS\System32\ntdll.dll!NtCreateProcess+0x3a2|0x7ffb313853b2 C:\WINDOWS\System32\ntdll.dll!NtCreateProcessEx+0x3a2|0x2638e59e0a5 C:\WINDOWS\System32\ntdll.dll!NtCreateProcessEx+0x3a2`, e.Callstack.String())
+	assert.Equal(t, "0x7ffb5c1d0396 C:\\WINDOWS\\System32\\ntdll.dll!NtCreateProcessEx+0x3a2|0x7ffb5d8e61f4 C:\\WINDOWS\\System32\\ntdll.dll!NtCreateProcessEx+0x3a2|0x7ffb3138592e C:\\WINDOWS\\System32\\ntdll.dll!NtCreateProcess+0x3a2|0x7ffb313853b2 C:\\WINDOWS\\System32\\KERNELBASE.dll!CreateProcessW+0x66|0x2638e59e0a5 C:\\WINDOWS\\System32\\KERNEL32.DLL!CreateProcessW+0x54", e.Callstack.String())
 
 	e1 := &kevent.Kevent{
 		Type:      ktypes.TerminateProcess,

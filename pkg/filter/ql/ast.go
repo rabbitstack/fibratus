@@ -508,6 +508,43 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 				return lhs >= rhs
 			}
 		}
+	case []uint64:
+		switch rhs := rhs.(type) {
+		case uint64:
+			switch expr.Op {
+			case Gt:
+				for _, i := range lhs {
+					if i > rhs {
+						return true
+					}
+				}
+				return false
+			case Gte:
+				for _, i := range lhs {
+					if i >= rhs {
+						return true
+					}
+				}
+				return false
+			}
+		case int64:
+			switch expr.Op {
+			case Gt:
+				for _, i := range lhs {
+					if i > uint64(rhs) {
+						return true
+					}
+				}
+				return false
+			case Gte:
+				for _, i := range lhs {
+					if i >= uint64(rhs) {
+						return true
+					}
+				}
+				return false
+			}
+		}
 	case uint32:
 		switch rhs := rhs.(type) {
 		case float64:
@@ -1008,6 +1045,7 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 						}
 					}
 				}
+				return false
 			}
 			for _, val := range lhs {
 				if val == s {
