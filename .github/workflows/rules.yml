@@ -22,7 +22,7 @@ jobs:
     - name: Install Fibratus
       shell: bash
       run: |
-        ./make.bat install-msi
+        ./make.bat install
     - name: Validate rules
       shell: bash
       run: |

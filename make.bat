@@ -46,11 +46,10 @@ if "%~1"=="fmt" goto fmt
 if "%~1"=="clean" goto clean
 if "%~1"=="pkg" goto pkg
 if "%~1"=="pkg-slim" goto pkg-slim
+if "%~1"=="install" goto install
 if "%~1"=="deps" goto deps
 if "%~1"=="rsrc" goto rsrc
 if "%~1"=="mc" goto mc
-if "%~1"=="install-msi" goto install-msi
-if "%~1"=="validate-rules" goto validate-rules
 
 :build
 :: set PKG_CONFIG_PATH=pkg-config
@@ -184,7 +183,7 @@ goto :EOF
 :: for process completion. Once the command
 :: finishes, the install log is dumped to
 :: help diagnosing installer failures
-:install-msi
+:install
 echo "Installing Fibratus..."
 start /b /wait msiexec /i fibratus-0.0.0-amd64.msi /qn /l*! install.log
 timeout 2 > NUL
