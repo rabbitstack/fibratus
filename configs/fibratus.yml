@@ -103,6 +103,9 @@ filament:
 # rules from different directory locations.
 filters:
   rules:
+    # Indicates if the rule engine is enabled and rules loaded
+    enabled: true
+
     from-paths:
      # - C:\Program Files\Fibratus\Rules\*.yml
     #from-urls:

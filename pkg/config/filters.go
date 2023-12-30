@@ -136,6 +136,7 @@ func FiltersWithMacros(macros map[string]*Macro) *Filters {
 // Rules contains attributes that describe the location of
 // rule resources.
 type Rules struct {
+	Enabled   bool     `json:"enabled" yaml:"enabled"`
 	FromPaths []string `json:"from-paths" yaml:"from-paths"`
 	FromURLs  []string `json:"from-urls" yaml:"from-urls"`
 }
@@ -171,12 +172,14 @@ type ActionContext struct {
 }
 
 const (
+	rulesEnabled    = "filters.rules.enabled"
 	rulesFromPaths  = "filters.rules.from-paths"
 	rulesFromURLs   = "filters.rules.from-urls"
 	macrosFromPaths = "filters.macros.from-paths"
 )
 
 func (f *Filters) initFromViper(v *viper.Viper) {
+	f.Rules.Enabled = v.GetBool(rulesEnabled)
 	f.Rules.FromPaths = v.GetStringSlice(rulesFromPaths)
 	f.Rules.FromURLs = v.GetStringSlice(rulesFromURLs)
 	f.Macros.FromPaths = v.GetStringSlice(macrosFromPaths)
