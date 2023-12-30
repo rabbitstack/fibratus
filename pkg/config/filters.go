@@ -310,6 +310,10 @@ func (f *Filters) LoadGroups() error {
 		f.groups = append(f.groups, groups...)
 	}
 
+	if len(f.groups) == 0 {
+		log.Warnf("no rules were loaded from [%s] path(s)", strings.Join(f.Rules.FromPaths, ","))
+	}
+
 	// check for duplicate rule groups
 	groupNames := make(map[string]bool)
 	for _, group := range f.groups {

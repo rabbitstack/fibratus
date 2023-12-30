@@ -178,6 +178,8 @@ func (f *App) Run(args []string) error {
 		if err != nil {
 			return err
 		}
+	} else {
+		log.Info("rule engine is disabled")
 	}
 	// build the filter from the CLI argument. If we got
 	// a valid expression the filter is attached to the
