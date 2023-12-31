@@ -129,6 +129,7 @@ var schema = `
 				"rules": {
 					"type": "object",
 					"properties": {
+						"enabled": 		{"type": "boolean"},
 						"from-paths": 	{"type": ["array", "null"], "items": [{"type": "string", "minLength": 4}]},
 						"from-urls":	{"type": ["array", "null"], "items": [{"type": "string", "minLength": 8}]}
 					},

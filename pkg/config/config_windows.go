@@ -361,6 +361,7 @@ func (c *Config) addFlags() {
 		}
 		dir := filepath.Join(filepath.Dir(exe), "..", "Rules")
 
+		c.flags.Bool(rulesEnabled, true, "Indicates if the rule engine is enabled and rules loaded")
 		c.flags.StringSlice(rulesFromPaths, []string{filepath.Join(dir, "*")}, "Comma-separated list of rules files")
 		c.flags.StringSlice(macrosFromPaths, []string{filepath.Join(dir, "Macros", "*")}, "Comma-separated list of macro files")
 		c.flags.StringSlice(rulesFromURLs, []string{}, "Comma-separated list of rules URL resources")

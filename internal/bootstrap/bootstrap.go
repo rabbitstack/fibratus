@@ -171,10 +171,15 @@ func (f *App) Run(args []string) error {
 		return err
 	}
 	// initialize rules engine
-	rules := filter.NewRules(f.psnap, cfg)
-	err = rules.Compile()
-	if err != nil {
-		return err
+	var rules *filter.Rules
+	if f.config.Filters.Rules.Enabled {
+		rules = filter.NewRules(f.psnap, cfg)
+		err = rules.Compile()
+		if err != nil {
+			return err
+		}
+	} else {
+		log.Info("rule engine is disabled")
 	}
 	// build the filter from the CLI argument. If we got
 	// a valid expression the filter is attached to the
@@ -228,7 +233,9 @@ func (f *App) Run(args []string) error {
 			f.consumer.RegisterEventListener(f.symbolizer)
 		}
 		// register rule engine
-		f.consumer.RegisterEventListener(rules)
+		if rules != nil {
+			f.consumer.RegisterEventListener(rules)
+		}
 		// register YARA scanner
 		if cfg.Yara.Enabled {
 			scanner, err := yara.NewScanner(f.psnap, cfg.Yara)

@@ -103,10 +103,15 @@ filament:
 # rules from different directory locations.
 filters:
   rules:
+    # Indicates if the rule engine is enabled and rules loaded
+    enabled: true
+
+    # The list of file system paths were rule files are located. Supports glob expressions in path names.
     from-paths:
      # - C:\Program Files\Fibratus\Rules\*.yml
     #from-urls:
   macros:
+    # The list of file system paths were macro library files are located. Supports glob expressions in path names.
     from-paths:
       #- C:\Program Files\Fibratus\Rules\Macros\*.yml
 
