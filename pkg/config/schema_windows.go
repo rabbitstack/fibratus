@@ -81,6 +81,15 @@ var schema = `
 								"properties": {"url": {"type": "string", "format": "uri", "minLength": 1, "pattern": "^(https?|http?)://"}}
 							},
 							"additionalProperties": false
+						},
+						"systray": {
+							"type": "object",
+							"properties": {
+								"enabled": 		{"type": "boolean"},
+								"sound": 		{"type": "boolean"},
+								"quiet-mode": 	{"type": "boolean"}
+							},
+							"additionalProperties": false
 						}
 					},
 					"additionalProperties": false

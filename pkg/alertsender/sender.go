@@ -18,7 +18,10 @@
 
 package alertsender
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/util/multierror"
+)
 
 // ErrInvalidConfig signals an invalid sender config
 var ErrInvalidConfig = func(name Type) error { return fmt.Errorf("invalid config for %q sender", name) }
@@ -39,6 +42,8 @@ const (
 	Slack
 	// Noop is a noop alert sender. Useful for testing.
 	Noop
+	// Systray designates the systray notification alert sender
+	Systray
 	// None is the type for unknown alert sender
 	None
 )
@@ -52,6 +57,8 @@ func (s Type) String() string {
 		return "slack"
 	case Noop:
 		return "noop"
+	case Systray:
+		return "systray"
 	default:
 		return "none"
 	}
@@ -63,6 +70,12 @@ type Sender interface {
 	Send(Alert) error
 	// Type returns the type that identifies a particular sender.
 	Type() Type
+	// Shutdown performs cleanup tasks possibly disposing any resources
+	// allocated by the sender.
+	Shutdown() error
+	// SupportsMarkdown indicates if the sender supports Markdown
+	// rendering in alert text string.
+	SupportsMarkdown() bool
 }
 
 // ToType converts the string representation of the alert sender to its corresponding type.
@@ -74,6 +87,8 @@ func ToType(s string) Type {
 		return Slack
 	case "noop":
 		return Noop
+	case "systray":
+		return Systray
 	default:
 		return None
 	}
@@ -99,6 +114,18 @@ func FindAll() []Sender {
 		senders = append(senders, s)
 	}
 	return senders
+}
+
+// ShutdownAll shutdowns all registered senders.
+func ShutdownAll() error {
+	errs := make([]error, 0)
+	for _, s := range alertsenders {
+		err := s.Shutdown()
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return multierror.Wrap(errs...)
 }
 
 // Load loads an alert sender from the registry.

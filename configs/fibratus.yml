@@ -16,6 +16,20 @@ aggregator:
 
 # Alert senders deal with emitting alerts via different channels.
 alertsenders:
+  # Systray sender sends alerts as notifications to the taskbar status area.
+  systray:
+    # Enables/disables systray alert sender
+    enabled: true
+
+    # Indicates if the associated sound is played when the balloon notification is shown
+    sound: true
+
+    # Instructs not to display the balloon notification if the current user is in quiet time.
+    # During this time, most notifications should not be sent or shown. This lets a user become
+    # accustomed to a new computer system without those distractions. Quiet time also occurs for
+    # each user after an operating system upgrade or clean installation.
+    quiet-mode: false
+
   # Mail sender transports the alerts via SMTP protocol.
   mail:
     # Enables/disables mail alert sender
@@ -27,7 +41,7 @@ alertsenders:
     # Represents the port of the SMTP server
     #port: 587
 
-    # Specifies the user name when authenticating to the SMTP server
+    # Specifies the username when authenticating to the SMTP server
     #user:
 
     # Specifies the password when authenticating to the SMTP server

@@ -52,6 +52,8 @@ func (s mail) Send(alert alertsender.Alert) error {
 }
 
 func (s mail) Type() alertsender.Type { return alertsender.Mail }
+func (s mail) Shutdown() error        { return nil }
+func (s mail) SupportsMarkdown() bool { return true }
 
 func (s mail) composeMessage(from string, to []string, alert alertsender.Alert) *gomail.Message {
 	msg := gomail.NewMessage()

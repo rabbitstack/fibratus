@@ -61,6 +61,9 @@ func (s *mockSender) Type() alertsender.Type {
 	return alertsender.Noop
 }
 
+func (s *mockSender) Shutdown() error        { return nil }
+func (s *mockSender) SupportsMarkdown() bool { return true }
+
 func makeSender(config alertsender.Config) (alertsender.Sender, error) {
 	return &mockSender{}, nil
 }
