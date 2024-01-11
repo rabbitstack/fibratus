@@ -208,9 +208,14 @@ func (s *Symbolizer) processCallstack(e *kevent.Kevent) error {
 	return nil
 }
 
+// pushFrames populates the stack frames. The
+// addresses slice contains the original return
+// addresses where the first element is the
+// most recent kernel return address that is
+// pushed last into the event callstack.
 func (s *Symbolizer) pushFrames(addrs []va.Address, e *kevent.Kevent, fast, lookupExport bool) {
-	for _, addr := range addrs {
-		e.Callstack.PushFrame(s.produceFrame(addr, e, fast, lookupExport))
+	for i := len(addrs) - 1; i >= 0; i-- {
+		e.Callstack.PushFrame(s.produceFrame(addrs[i], e, fast, lookupExport))
 	}
 }
 
@@ -267,6 +272,7 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *kevent.Kevent, fast, looku
 			module = mod.Name
 		}
 	}
+
 	if (module == "?" || module == "unbacked") && e.PS != nil {
 		module = e.PS.FindMappingByVa(addr)
 	}

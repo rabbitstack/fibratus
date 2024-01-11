@@ -43,6 +43,7 @@ require (
 require (
 	github.com/rivo/uniseg v0.4.2 // indirect
 	github.com/rogpeppe/go-internal v1.11.0 // indirect
+	golang.org/x/arch v0.6.0 // indirect
 )
 
 require (

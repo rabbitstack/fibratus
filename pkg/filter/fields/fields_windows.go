@@ -27,7 +27,7 @@ import (
 
 // pathRegexp splits the provided path into different components. The first capture
 // contains the indexed field name. Next is the indexed key and, finally the segment.
-var pathRegexp = regexp.MustCompile(`(pe.sections|pe.resources|ps.envs|ps.modules|ps.ancestor|kevt.arg)\[(.+\s*)].?(.*)`)
+var pathRegexp = regexp.MustCompile(`(pe.sections|pe.resources|ps.envs|ps.modules|ps.ancestor|kevt.arg|thread.callstack)\[(.+\s*)].?(.*)`)
 
 // Field represents the type alias for the field
 type Field string
@@ -177,6 +177,26 @@ const (
 	ThreadAccessMaskNames Field = "thread.access.mask.names"
 	// ThreadAccessStatus represents the thread access status field
 	ThreadAccessStatus Field = "thread.access.status"
+	// ThreadCallstack represents the field that provides access to stack frames
+	ThreadCallstack Field = "thread.callstack"
+	// ThreadCallstackSummary represents the thread callstack summary field
+	ThreadCallstackSummary Field = "thread.callstack.summary"
+	// ThreadCallstackDetail represents the thread callstack detail field
+	ThreadCallstackDetail Field = "thread.callstack.detail"
+	// ThreadCallstackModules represents the callstack modules field
+	ThreadCallstackModules Field = "thread.callstack.modules"
+	// ThreadCallstackSymbols represents the callstack symbols field
+	ThreadCallstackSymbols Field = "thread.callstack.symbols"
+	// ThreadCallstackProtections represents the callstack region protections field
+	ThreadCallstackProtections Field = "thread.callstack.protections"
+	// ThreadCallstackAllocationSizes represents the private region page sizes field
+	ThreadCallstackAllocationSizes Field = "thread.callstack.allocation_sizes"
+	// ThreadCallstackCallsiteLeadingAssembly represents the callsite prelude opcodes field
+	ThreadCallstackCallsiteLeadingAssembly Field = "thread.callstack.callsite_leading_assembly"
+	// ThreadCallstackCallsiteTrailingAssembly represents the callsite postlude opcodes field
+	ThreadCallstackCallsiteTrailingAssembly Field = "thread.callstack.callsite_trailing_assembly"
+	// ThreadCallstackIsUnbacked represents the field that indicates if there is an unbacked stack frame
+	ThreadCallstackIsUnbacked Field = "thread.callstack.is_unbacked"
 
 	// PeNumSections represents the number of sections
 	PeNumSections Field = "pe.nsections"
@@ -506,7 +526,39 @@ const (
 	ProcessSID Segment = "sid"
 	// ProcessSessionID represents the session id bound to the process
 	ProcessSessionID Segment = "sessionid"
+
+	// FrameAddress represents the stack frame return address
+	FrameAddress Segment = "address"
+	// FrameSymbolOffset represents the symbol offset
+	FrameSymbolOffset Segment = "offset"
+	// FrameSymbol represents the symbol name
+	FrameSymbol Segment = "symbol"
+	// FrameModule represents the symbol module
+	FrameModule Segment = "module"
+	// FrameAllocationSize represents the frame region allocation size
+	FrameAllocationSize Segment = "allocation_size"
+	// FrameProtection represents the region page protection where the frame instruction lives
+	FrameProtection Segment = "protection"
+	// FrameIsUnbacked determines if the frame is unbacked
+	FrameIsUnbacked Segment = "is_unbacked"
+	// FrameCallsiteLeadingAssembly represents the leading callsite opcodes
+	FrameCallsiteLeadingAssembly = "callsite_leading_assembly"
+	// FrameCallsiteTrailingAssembly represents the trailing callsite opcodes
+	FrameCallsiteTrailingAssembly = "callsite_trailing_assembly"
 )
+
+func (s Segment) IsSection() bool {
+	return s == SectionEntropy || s == SectionSize || s == SectionMD5Hash
+}
+func (s Segment) IsModule() bool {
+	return s == ModuleChecksum || s == ModuleLocation || s == ModuleBaseAddress || s == ModuleDefaultAddress || s == ModuleSize
+}
+func (s Segment) IsProcess() bool {
+	return s == ProcessID || s == ProcessName || s == ProcessCmdline || s == ProcessExe || s == ProcessArgs || s == ProcessCwd || s == ProcessSID || s == ProcessSessionID
+}
+func (s Segment) IsCallstack() bool {
+	return s == FrameAddress || s == FrameSymbolOffset || s == FrameSymbol || s == FrameModule || s == FrameAllocationSize || s == FrameProtection || s == FrameIsUnbacked || s == FrameCallsiteLeadingAssembly || s == FrameCallsiteTrailingAssembly
+}
 
 func (f Field) IsEnvsMap() bool        { return strings.HasPrefix(f.String(), "ps.envs[") }
 func (f Field) IsModsMap() bool        { return strings.HasPrefix(f.String(), "ps.modules[") }
@@ -514,6 +566,7 @@ func (f Field) IsAncestorMap() bool    { return strings.HasPrefix(f.String(), "p
 func (f Field) IsPeSectionsMap() bool  { return strings.HasPrefix(f.String(), "pe.sections[") }
 func (f Field) IsPeResourcesMap() bool { return strings.HasPrefix(f.String(), "pe.resources[") }
 func (f Field) IsKevtArgMap() bool     { return strings.HasPrefix(f.String(), "kevt.arg[") }
+func (f Field) IsCallstackMap() bool   { return strings.HasPrefix(f.String(), "thread.callstack[") }
 
 var fields = map[Field]FieldInfo{
 	KevtSeq:         {KevtSeq, "event sequence number", kparams.Uint64, []string{"kevt.seq > 666"}, nil},
@@ -595,18 +648,27 @@ var fields = map[Field]FieldInfo{
 	PsParentUUID:        {PsParentUUID, "unique parent process identifier", kparams.Uint64, []string{"ps.parent.uuid > 6000054355"}, nil},
 	PsChildUUID:         {PsChildUUID, "unique child process identifier", kparams.Uint64, []string{"ps.child.uuid > 6000054355"}, nil},
 
-	ThreadBasePrio:        {ThreadBasePrio, "scheduler priority of the thread", kparams.Int8, []string{"thread.prio = 5"}, nil},
-	ThreadIOPrio:          {ThreadIOPrio, "I/O priority hint for scheduling I/O operations", kparams.Int8, []string{"thread.io.prio = 4"}, nil},
-	ThreadPagePrio:        {ThreadPagePrio, "memory page priority hint for memory pages accessed by the thread", kparams.Int8, []string{"thread.page.prio = 12"}, nil},
-	ThreadKstackBase:      {ThreadKstackBase, "base address of the thread's kernel space stack", kparams.Address, []string{"thread.kstack.base = 'a65d800000'"}, nil},
-	ThreadKstackLimit:     {ThreadKstackLimit, "limit of the thread's kernel space stack", kparams.Address, []string{"thread.kstack.limit = 'a85d800000'"}, nil},
-	ThreadUstackBase:      {ThreadUstackBase, "base address of the thread's user space stack", kparams.Address, []string{"thread.ustack.base = '7ffe0000'"}, nil},
-	ThreadUstackLimit:     {ThreadUstackLimit, "limit of the thread's user space stack", kparams.Address, []string{"thread.ustack.limit = '8ffe0000'"}, nil},
-	ThreadEntrypoint:      {ThreadEntrypoint, "starting address of the function to be executed by the thread", kparams.Address, []string{"thread.entrypoint = '7efe0000'"}, nil},
-	ThreadPID:             {ThreadPID, "the process identifier where the thread is created", kparams.Uint32, []string{"kevt.pid != thread.pid"}, nil},
-	ThreadAccessMask:      {ThreadAccessMask, "thread desired access rights", kparams.AnsiString, []string{"thread.access.mask = '0x1fffff'"}, nil},
-	ThreadAccessMaskNames: {ThreadAccessMaskNames, "thread desired access rights as a string list", kparams.Slice, []string{"thread.access.mask.names in ('IMPERSONATE')"}, nil},
-	ThreadAccessStatus:    {ThreadAccessStatus, "thread access status", kparams.UnicodeString, []string{"thread.access.status = 'success'"}, nil},
+	ThreadBasePrio:                          {ThreadBasePrio, "scheduler priority of the thread", kparams.Int8, []string{"thread.prio = 5"}, nil},
+	ThreadIOPrio:                            {ThreadIOPrio, "I/O priority hint for scheduling I/O operations", kparams.Int8, []string{"thread.io.prio = 4"}, nil},
+	ThreadPagePrio:                          {ThreadPagePrio, "memory page priority hint for memory pages accessed by the thread", kparams.Int8, []string{"thread.page.prio = 12"}, nil},
+	ThreadKstackBase:                        {ThreadKstackBase, "base address of the thread's kernel space stack", kparams.Address, []string{"thread.kstack.base = 'a65d800000'"}, nil},
+	ThreadKstackLimit:                       {ThreadKstackLimit, "limit of the thread's kernel space stack", kparams.Address, []string{"thread.kstack.limit = 'a85d800000'"}, nil},
+	ThreadUstackBase:                        {ThreadUstackBase, "base address of the thread's user space stack", kparams.Address, []string{"thread.ustack.base = '7ffe0000'"}, nil},
+	ThreadUstackLimit:                       {ThreadUstackLimit, "limit of the thread's user space stack", kparams.Address, []string{"thread.ustack.limit = '8ffe0000'"}, nil},
+	ThreadEntrypoint:                        {ThreadEntrypoint, "starting address of the function to be executed by the thread", kparams.Address, []string{"thread.entrypoint = '7efe0000'"}, nil},
+	ThreadPID:                               {ThreadPID, "the process identifier where the thread is created", kparams.Uint32, []string{"kevt.pid != thread.pid"}, nil},
+	ThreadAccessMask:                        {ThreadAccessMask, "thread desired access rights", kparams.AnsiString, []string{"thread.access.mask = '0x1fffff'"}, nil},
+	ThreadAccessMaskNames:                   {ThreadAccessMaskNames, "thread desired access rights as a string list", kparams.Slice, []string{"thread.access.mask.names in ('IMPERSONATE')"}, nil},
+	ThreadAccessStatus:                      {ThreadAccessStatus, "thread access status", kparams.UnicodeString, []string{"thread.access.status = 'success'"}, nil},
+	ThreadCallstackSummary:                  {ThreadCallstackSummary, "callstack summary", kparams.UnicodeString, []string{"thread.callstack.summary contains 'ntdll.dll|KERNELBASE.dll'"}, nil},
+	ThreadCallstackDetail:                   {ThreadCallstackDetail, "detailed information of each stack frame", kparams.UnicodeString, []string{"thread.callstack.detail contains 'KERNELBASE.dll!CreateProcessW'"}, nil},
+	ThreadCallstackModules:                  {ThreadCallstackModules, "list of modules comprising the callstack", kparams.Slice, []string{"thread.callstack.modules in ('C:\\WINDOWS\\System32\\KERNELBASE.dll')"}, nil},
+	ThreadCallstackSymbols:                  {ThreadCallstackSymbols, "list of symbols comprising the callstack", kparams.Slice, []string{"thread.callstack.symbols in ('ntdll.dll!NtCreateProcess')"}, nil},
+	ThreadCallstackAllocationSizes:          {ThreadCallstackAllocationSizes, "allocation sizes of private pages", kparams.Slice, []string{"thread.callstack.allocation_sizes > 10000"}, nil},
+	ThreadCallstackProtections:              {ThreadCallstackProtections, "page protections masks of each frame", kparams.Slice, []string{"thread.callstack.protections in ('RWX', 'WX')"}, nil},
+	ThreadCallstackCallsiteLeadingAssembly:  {ThreadCallstackCallsiteLeadingAssembly, "callsite leading assembly instructions", kparams.Slice, []string{"thread.callstack.callsite_leading_assembly in ('mov r10,rcx', 'syscall')"}, nil},
+	ThreadCallstackCallsiteTrailingAssembly: {ThreadCallstackCallsiteTrailingAssembly, "callsite trailing assembly instructions", kparams.Slice, []string{"thread.callstack.callsite_trailing_assembly in ('add esp, 0xab')"}, nil},
+	ThreadCallstackIsUnbacked:               {ThreadCallstackIsUnbacked, "indicates if the callstack contains unbacked regions", kparams.Bool, []string{"thread.callstack.is_unbacked"}, nil},
 
 	ImageName:               {ImageName, "full image name", kparams.UnicodeString, []string{"image.name contains 'advapi32.dll'"}, nil},
 	ImageBase:               {ImageBase, "the base address of process in which the image is loaded", kparams.Address, []string{"image.base.address = 'a65d800000'"}, nil},
@@ -733,28 +795,14 @@ func Lookup(name string) Field {
 		if segment == "" {
 			return None
 		}
-		switch Segment(segment) {
-		case SectionEntropy:
-			return Field(name)
-		case SectionMD5Hash:
-			return Field(name)
-		case SectionSize:
+		if Segment(segment).IsSection() {
 			return Field(name)
 		}
 	case PsModules:
 		if segment == "" {
 			return None
 		}
-		switch Segment(segment) {
-		case ModuleSize:
-			return Field(name)
-		case ModuleChecksum:
-			return Field(name)
-		case ModuleDefaultAddress:
-			return Field(name)
-		case ModuleBaseAddress:
-			return Field(name)
-		case ModuleLocation:
+		if Segment(segment).IsModule() {
 			return Field(name)
 		}
 	case PsAncestor:
@@ -769,30 +817,38 @@ func Lookup(name string) Field {
 		// we can also get the `any` keyword
 		// that collects the fields of all
 		// ancestor processes
-		var keyRegexp = regexp.MustCompile(`[1-9]+|root|any`)
+		var keyRegexp = regexp.MustCompile(`^[1-9]+$|^root$|^any$`)
 		if !keyRegexp.MatchString(key) {
 			return None
 		}
-		switch Segment(segment) {
-		case ProcessName:
-			return Field(name)
-		case ProcessID:
-			return Field(name)
-		case ProcessArgs:
-			return Field(name)
-		case ProcessCmdline:
-			return Field(name)
-		case ProcessCwd:
-			return Field(name)
-		case ProcessExe:
-			return Field(name)
-		case ProcessSID:
-			return Field(name)
-		case ProcessSessionID:
+		if Segment(segment).IsProcess() {
 			return Field(name)
 		}
-	case PeResources, PsEnvs, KevtArg:
+	case PeResources:
 		if key != "" && segment == "" {
+			return Field(name)
+		}
+	case PsEnvs, KevtArg:
+		if key != "" {
+			return Field(name)
+		}
+	case ThreadCallstack:
+		if segment == "" {
+			return None
+		}
+		// the key can be the stack frame
+		// index with 0 being the bottom
+		// userspace frame. u/k start/end
+		// keys identify the start/end
+		// user and kernel space frames.
+		// Lastly, it is possible to specify
+		// the name of the module from which
+		// the call was originated
+		var keyRegexp = regexp.MustCompile(`^[0-9]+$|^uend$|^ustart$|^kend$|^kstart$|^[a-zA-Z0-9]+\.dll$`)
+		if !keyRegexp.MatchString(key) {
+			return None
+		}
+		if Segment(segment).IsCallstack() {
 			return Field(name)
 		}
 	}

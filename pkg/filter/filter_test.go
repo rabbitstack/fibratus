@@ -19,24 +19,24 @@
 package filter
 
 import (
+	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
+	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/kstream/processors"
+	"github.com/rabbitstack/fibratus/pkg/pe"
 	"github.com/rabbitstack/fibratus/pkg/ps"
+	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"golang.org/x/sys/windows"
 	"net"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
-
-	"github.com/rabbitstack/fibratus/pkg/config"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-	"github.com/rabbitstack/fibratus/pkg/pe"
-	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
-	"github.com/stretchr/testify/require"
 )
 
 var cfg = &config.Config{
@@ -268,16 +268,22 @@ func TestProcFilter(t *testing.T) {
 
 func TestThreadFilter(t *testing.T) {
 	kpars := kevent.Kparams{
-		kparams.Cmdline:         {Name: kparams.Cmdline, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost.exe -k RPCSS"},
-		kparams.ProcessName:     {Name: kparams.ProcessName, Type: kparams.AnsiString, Value: "svchost.exe"},
-		kparams.ProcessID:       {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(1234)},
-		kparams.ProcessParentID: {Name: kparams.ProcessParentID, Type: kparams.Uint32, Value: uint32(345)},
+		kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(os.Getpid())},
+		kparams.ThreadID:    {Name: kparams.ThreadID, Type: kparams.TID, Value: uint32(3453)},
+		kparams.BasePrio:    {Name: kparams.BasePrio, Type: kparams.Uint8, Value: uint8(13)},
+		kparams.StartAddr:   {Name: kparams.StartAddr, Type: kparams.Address, Value: uint64(140729524944768)},
+		kparams.IOPrio:      {Name: kparams.IOPrio, Type: kparams.Uint8, Value: uint8(2)},
+		kparams.KstackBase:  {Name: kparams.KstackBase, Type: kparams.Address, Value: uint64(18446677035730165760)},
+		kparams.KstackLimit: {Name: kparams.KstackLimit, Type: kparams.Address, Value: uint64(18446677035730137088)},
+		kparams.PagePrio:    {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(5)},
+		kparams.UstackBase:  {Name: kparams.UstackBase, Type: kparams.Address, Value: uint64(86376448)},
+		kparams.UstackLimit: {Name: kparams.UstackLimit, Type: kparams.Address, Value: uint64(86372352)},
 	}
-
 	kevt := &kevent.Kevent{
 		Type:     ktypes.CreateThread,
 		Kparams:  kpars,
 		Name:     "CreateThread",
+		PID:      windows.GetCurrentProcessId(),
 		Category: ktypes.Thread,
 		PS: &pstypes.PS{
 			Name: "svchost.exe",
@@ -285,12 +291,63 @@ func TestThreadFilter(t *testing.T) {
 		},
 	}
 
+	// simulate unbacked RWX frame
+	base, err := windows.VirtualAlloc(0, 1024, windows.MEM_COMMIT|windows.MEM_RESERVE, windows.PAGE_EXECUTE_READWRITE)
+	require.NoError(t, err)
+	defer func() {
+		_ = windows.VirtualFree(base, 1024, windows.MEM_DECOMMIT)
+	}()
+	insns := []byte{
+		0x4C, 0x8B, 0xD1, // mov r10, rcx
+		0xB8, 0x55, 0x0, 0x0, 0x0, // mov eax, 55h
+		0xF6, 0x04, 0x25, 0x08, 0x03, 0xFE, 0x7F, 0x01, // test byte ptr[7FFE0308h]
+		0x0F, 0x05, // syscall
+		0xC3, // ret
+	}
+	require.NoError(t, windows.WriteProcessMemory(windows.CurrentProcess(), base, &insns[0], uintptr(len(insns)), nil))
+
+	kevt.Callstack.Init(8)
+	kevt.Callstack.PushFrame(kevent.Frame{Addr: 0x2638e59e0a5, Offset: 0, Symbol: "?", Module: "unbacked"})
+	kevt.Callstack.PushFrame(kevent.Frame{Addr: va.Address(base), Offset: 0, Symbol: "?", Module: "unbacked"})
+	kevt.Callstack.PushFrame(kevent.Frame{Addr: 0x7ffb313853b2, Offset: 0x10a, Symbol: "Java_java_lang_ProcessImpl_create", Module: "C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll"})
+	kevt.Callstack.PushFrame(kevent.Frame{Addr: 0x7ffb3138592e, Offset: 0x3a2, Symbol: "Java_java_lang_ProcessImpl_waitForTimeoutInterruptibly", Module: "C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll"})
+	kevt.Callstack.PushFrame(kevent.Frame{Addr: 0x7ffb5d8e61f4, Offset: 0x54, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNEL32.DLL"})
+	kevt.Callstack.PushFrame(kevent.Frame{Addr: 0x7ffb5c1d0396, Offset: 0x66, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"})
+	kevt.Callstack.PushFrame(kevent.Frame{Addr: 0xfffff8072ebc1f6f, Offset: 0x4ef, Symbol: "FltRequestFileInfoOnCreateCompletion", Module: "C:\\WINDOWS\\System32\\drivers\\FLTMGR.SYS"})
+	kevt.Callstack.PushFrame(kevent.Frame{Addr: 0xfffff8072eb8961b, Offset: 0x20cb, Symbol: "FltGetStreamContext", Module: "C:\\WINDOWS\\System32\\drivers\\FLTMGR.SYS"})
+
 	var tests = []struct {
 		filter  string
 		matches bool
 	}{
 
-		{`ps.name = 'svchost.exe'`, true},
+		{`thread.ustack.base = '5260000'`, true},
+		{`thread.ustack.limit = '525f000'`, true},
+		{`thread.kstack.base = 'ffffc307810d6000'`, true},
+		{`thread.kstack.limit = 'ffffc307810cf000'`, true},
+		{`thread.callstack.summary = 'FLTMGR.SYS|KERNELBASE.dll|KERNEL32.DLL|java.dll|unbacked'`, true},
+		{`thread.callstack.detail icontains 'C:\\WINDOWS\\System32\\KERNELBASE.dll!CreateProcessW+0x66'`, true},
+		{`thread.callstack.modules in ('C:\\WINDOWS\\System32\\KERNELBASE.dll', 'C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll')`, true},
+		{`thread.callstack.symbols imatches ('KERNELBASE.dll!CreateProcess*', 'Java_java_lang_ProcessImpl_create')`, true},
+		{`thread.callstack.protections in ('RWX')`, true},
+		{`thread.callstack.allocation_sizes > 500`, true},
+		{`length(thread.callstack.callsite_leading_assembly) > 0`, true},
+		{`thread.callstack.callsite_trailing_assembly matches ('*mov r10, rcx mov eax, 0x* syscall*')`, true},
+		{`thread.callstack.is_unbacked`, true},
+		{`thread.callstack[ustart].address = '2638e59e0a5' and thread.callstack[0].address = '2638e59e0a5'`, true},
+		{`thread.callstack[uend].address = '7ffb5c1d0396'`, true},
+		{`thread.callstack[kstart].address = 'fffff8072ebc1f6f'`, true},
+		{`thread.callstack[kend].address = 'fffff8072eb8961b'`, true},
+		{`thread.callstack[112222].address = '2638e59e0a5'`, true},
+		{`thread.callstack[2].symbol = 'Java_java_lang_ProcessImpl_create'`, true},
+		{`thread.callstack[2].offset = 266`, true},
+		{`thread.callstack[2].module = 'C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll'`, true},
+		{`thread.callstack[0].is_unbacked = true`, true},
+		{`thread.callstack[2].is_unbacked = false`, true},
+		{`thread.callstack[kernelbase.dll].symbol = 'CreateProcessW'`, true},
+		{`thread.callstack[1].allocation_size >= 400`, true},
+		{`thread.callstack[1].protection = 'RWX'`, true},
+		{`thread.callstack[1].callsite_trailing_assembly matches ('*mov r10, rcx mov eax, 0x* syscall*')`, true},
 	}
 
 	for i, tt := range tests {
