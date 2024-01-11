@@ -93,7 +93,7 @@ func (f *Frame) CallsiteAssembly(proc windows.Handle, pre bool) string {
 	size := uint(512)
 	base := f.Addr.Uintptr()
 	if pre {
-		base -= uintptr(size) - 1
+		base -= uintptr(size)
 	}
 	b := va.ReadArea(proc, base, size, size, false)
 	if len(b) == 0 || va.Zeroed(b) {
