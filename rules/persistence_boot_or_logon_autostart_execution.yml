@@ -24,23 +24,23 @@
       condition: >
         create_file
             and
-          (
-            file.extension in ('.vbs', '.js', '.jar', '.exe', '.dll', '.com', '.ps1', '.hta', '.cmd', '.vbe')
-              or
-            (file.is_exec or file.is_dll)
-          )
+            (
+              file.extension in ('.vbs', '.js', '.jar', '.exe', '.dll', '.com', '.ps1', '.hta', '.cmd', '.vbe')
+                or
+              (file.is_exec or file.is_dll)
+            )
             and
         file.name imatches startup_locations
             and
             not
         ps.exe imatches
-          (
-            '?:\\Windows\\System32\\wuauclt.exe',
-            '?:\\Windows\\System32\\msiexec.exe',
-            '?:\\Windows\\SysWOW64\\msiexec.exe',
-            '?:\\Windows\\System32\\svchost.exe',
-            '?:\\ProgramData\\Microsoft\\Windows Defender\\Platform\\*.exe'
-          )
+            (
+              '?:\\Windows\\System32\\wuauclt.exe',
+              '?:\\Windows\\System32\\msiexec.exe',
+              '?:\\Windows\\SysWOW64\\msiexec.exe',
+              '?:\\Windows\\System32\\svchost.exe',
+              '?:\\ProgramData\\Microsoft\\Windows Defender\\Platform\\*.exe'
+            )
       min-engine-version: 2.0.0
     - name: Unusual process modified the registry run key
       description: |
@@ -55,26 +55,26 @@
             and
             not
         ps.exe imatches
-          (
-            '?:\\Windows\\System32\\svchost.exe',
-            '?:\\Windows\\SysWOW64\\msiexec.exe',
-            '?:\\Windows\\System32\\msiexec.exe',
-            '?:\\Windows\\System32\\drvinst.exe',
-            '?:\\Windows\\System32\\WinSAT.exe',
-            '?:\\Windows\\System32\\reg.exe',
-            '?:\\Windows\\regedit.exe',
-            '?:\\Windows\\SysWOW64\\reg.exe',
-            '?:\\Windows\\System32\\csrss.exe',
-            '?:\\Windows\\SysWOW64\\DriverStore\\*.exe',
-            '?:\\Windows\\System32\\DriverStore\\*.exe',
-            '?:\\Windows\\Installer\\*.exe',
-            '?:\\Windows\\explorer.exe',
-            '?:\\Windows\\IMECache\\*.exe',
-            '?:\\Windows\\System32\\sihost.exe',
-            '?:\\Windows\\SysWOW64\\prevhost.exe',
-            '?:\\Windows\\System32\\conhost.exe',
-            '?:\\Windows\\System32\\taskhostw.exe'
-          )
+            (
+              '?:\\Windows\\System32\\svchost.exe',
+              '?:\\Windows\\SysWOW64\\msiexec.exe',
+              '?:\\Windows\\System32\\msiexec.exe',
+              '?:\\Windows\\System32\\drvinst.exe',
+              '?:\\Windows\\System32\\WinSAT.exe',
+              '?:\\Windows\\System32\\reg.exe',
+              '?:\\Windows\\regedit.exe',
+              '?:\\Windows\\SysWOW64\\reg.exe',
+              '?:\\Windows\\System32\\csrss.exe',
+              '?:\\Windows\\SysWOW64\\DriverStore\\*.exe',
+              '?:\\Windows\\System32\\DriverStore\\*.exe',
+              '?:\\Windows\\Installer\\*.exe',
+              '?:\\Windows\\explorer.exe',
+              '?:\\Windows\\IMECache\\*.exe',
+              '?:\\Windows\\System32\\sihost.exe',
+              '?:\\Windows\\SysWOW64\\prevhost.exe',
+              '?:\\Windows\\System32\\conhost.exe',
+              '?:\\Windows\\System32\\taskhostw.exe'
+            )
       min-engine-version: 2.0.0
     - name: Network connection via startup folder executable or script
       description: |
