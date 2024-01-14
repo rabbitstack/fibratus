@@ -22,7 +22,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	"github.com/stretchr/testify/require"
 	"testing"
-	"time"
 )
 
 func TestSystraySender(t *testing.T) {
@@ -34,5 +33,4 @@ func TestSystraySender(t *testing.T) {
 		Text: `Detected an attempt by mimikatz.exe process to access and read
 the memory of the Local Security And Authority Subsystem Service
 and subsequently write the C:\\temp\lsass.dmp dump file to the disk device`}))
-	time.Sleep(time.Second * 2)
 }

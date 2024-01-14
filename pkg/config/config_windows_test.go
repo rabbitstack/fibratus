@@ -24,6 +24,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	"github.com/rabbitstack/fibratus/pkg/alertsender/mail"
 	"github.com/rabbitstack/fibratus/pkg/alertsender/slack"
+	"github.com/rabbitstack/fibratus/pkg/alertsender/systray"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"testing"
@@ -47,7 +48,7 @@ func TestNewFromYamlFile(t *testing.T) {
 	assert.Equal(t, time.Millisecond*230, c.Aggregator.FlushPeriod)
 	assert.Equal(t, time.Second*8, c.Aggregator.FlushTimeout)
 
-	assert.Len(t, c.Alertsenders, 2)
+	assert.Len(t, c.Alertsenders, 3)
 
 	for _, c := range c.Alertsenders {
 		switch c.Type {
@@ -62,6 +63,12 @@ func TestNewFromYamlFile(t *testing.T) {
 			assert.Equal(t, "changeit", mailConfig.Pass)
 			assert.Equal(t, "bunny@gmail.com", mailConfig.From)
 			assert.Equal(t, []string{"bunny@gmail.com", "rabbit@gmail.com", "cuniculus@gmail.com"}, mailConfig.To)
+		case alertsender.Systray:
+			assert.IsType(t, systray.Config{}, c.Sender)
+			systrayConfig := c.Sender.(systray.Config)
+			assert.True(t, systrayConfig.Enabled)
+			assert.True(t, systrayConfig.Sound)
+			assert.False(t, systrayConfig.QuietMode)
 		}
 	}
 
