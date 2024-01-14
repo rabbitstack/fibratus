@@ -423,6 +423,9 @@ func (f *App) Shutdown() error {
 	if err := api.CloseServer(); err != nil {
 		errs = append(errs, err)
 	}
+	if err := alertsender.ShutdownAll(); err != nil {
+		errs = append(errs, err)
+	}
 	return multierror.Wrap(errs...)
 }
 

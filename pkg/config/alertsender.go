@@ -24,6 +24,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	"github.com/rabbitstack/fibratus/pkg/alertsender/mail"
 	"github.com/rabbitstack/fibratus/pkg/alertsender/slack"
+	"github.com/rabbitstack/fibratus/pkg/alertsender/systray"
 	"reflect"
 )
 
@@ -60,7 +61,6 @@ func (c *Config) tryLoadAlertSenders() error {
 				Sender: mailConfig,
 			}
 			configs = append(configs, config)
-
 		case "slack":
 			var slackConfig slack.Config
 			if err := decode(config, &slackConfig); err != nil {
@@ -72,6 +72,19 @@ func (c *Config) tryLoadAlertSenders() error {
 			config := alertsender.Config{
 				Type:   alertsender.Slack,
 				Sender: slackConfig,
+			}
+			configs = append(configs, config)
+		case "systray":
+			var systrayConfig systray.Config
+			if err := decode(config, &systrayConfig); err != nil {
+				return errAlertsenderConfig(typ, err)
+			}
+			if !systrayConfig.Enabled {
+				continue
+			}
+			config := alertsender.Config{
+				Type:   alertsender.Systray,
+				Sender: systrayConfig,
 			}
 			configs = append(configs, config)
 		}

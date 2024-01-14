@@ -42,7 +42,9 @@ var (
 	modkernel32 = windows.NewLazySystemDLL("kernel32.dll")
 	modntdll    = windows.NewLazySystemDLL("ntdll.dll")
 	modpsapi    = windows.NewLazySystemDLL("psapi.dll")
+	modshell32  = windows.NewLazySystemDLL("shell32.dll")
 	modshlwapi  = windows.NewLazySystemDLL("shlwapi.dll")
+	moduser32   = windows.NewLazySystemDLL("user32.dll")
 	modwintrust = windows.NewLazySystemDLL("wintrust.dll")
 	modwtsapi32 = windows.NewLazySystemDLL("wtsapi32.dll")
 
@@ -68,7 +70,15 @@ var (
 	procEnumDeviceDrivers                    = modpsapi.NewProc("EnumDeviceDrivers")
 	procGetDeviceDriverFileNameW             = modpsapi.NewProc("GetDeviceDriverFileNameW")
 	procGetMappedFileNameW                   = modpsapi.NewProc("GetMappedFileNameW")
+	procSHGetStockIconInfo                   = modshell32.NewProc("SHGetStockIconInfo")
+	procShell_NotifyIconW                    = modshell32.NewProc("Shell_NotifyIconW")
 	procPathIsDirectoryW                     = modshlwapi.NewProc("PathIsDirectoryW")
+	procCreateWindowExW                      = moduser32.NewProc("CreateWindowExW")
+	procDefWindowProcW                       = moduser32.NewProc("DefWindowProcW")
+	procDestroyIcon                          = moduser32.NewProc("DestroyIcon")
+	procDestroyWindow                        = moduser32.NewProc("DestroyWindow")
+	procLoadImageW                           = moduser32.NewProc("LoadImageW")
+	procRegisterClassExW                     = moduser32.NewProc("RegisterClassExW")
 	procCryptCATAdminAcquireContext2         = modwintrust.NewProc("CryptCATAdminAcquireContext2")
 	procCryptCATAdminCalcHashFromFileHandle2 = modwintrust.NewProc("CryptCATAdminCalcHashFromFileHandle2")
 	procCryptCATAdminEnumCatalogFromHash     = modwintrust.NewProc("CryptCATAdminEnumCatalogFromHash")
@@ -232,9 +242,67 @@ func GetMappedFileName(handle windows.Handle, addr uintptr, filename *uint16, si
 	return
 }
 
+func SHGetStockIconInfo(id uint, flags uint, icon *ShStockIcon) (err error) {
+	r1, _, e1 := syscall.Syscall(procSHGetStockIconInfo.Addr(), 3, uintptr(id), uintptr(flags), uintptr(unsafe.Pointer(icon)))
+	if r1 != 0 {
+		err = errnoErr(e1)
+	}
+	return
+}
+
+func ShellNotifyIcon(msg NotifyIconMessage, data *NotifyIconData) (err error) {
+	r1, _, e1 := syscall.Syscall(procShell_NotifyIconW.Addr(), 2, uintptr(msg), uintptr(unsafe.Pointer(data)), 0)
+	if r1 == 0 {
+		err = errnoErr(e1)
+	}
+	return
+}
+
 func pathIsDirectory(path *uint16) (isDirectory bool) {
 	r0, _, _ := syscall.Syscall(procPathIsDirectoryW.Addr(), 1, uintptr(unsafe.Pointer(path)), 0, 0)
 	isDirectory = r0 != 0
+	return
+}
+
+func CreateWindowEx(exStyle uint32, className *uint16, windowName *uint16, style uint32, x int32, y int32, w int32, h int32, parent Hwnd, menu uintptr, instance windows.Handle, param uintptr) (hwnd Hwnd, err error) {
+	r0, _, e1 := syscall.Syscall12(procCreateWindowExW.Addr(), 12, uintptr(exStyle), uintptr(unsafe.Pointer(className)), uintptr(unsafe.Pointer(windowName)), uintptr(style), uintptr(x), uintptr(y), uintptr(w), uintptr(h), uintptr(parent), uintptr(menu), uintptr(instance), uintptr(param))
+	hwnd = Hwnd(r0)
+	if hwnd == 0 {
+		err = errnoErr(e1)
+	}
+	return
+}
+
+func DefWindowProc(hwnd uintptr, msg uint32, wparam uintptr, lparam uintptr) (result uintptr) {
+	r0, _, _ := syscall.Syscall6(procDefWindowProcW.Addr(), 4, uintptr(hwnd), uintptr(msg), uintptr(wparam), uintptr(lparam), 0, 0)
+	result = uintptr(r0)
+	return
+}
+
+func DestroyIcon(icon Hicon) {
+	syscall.Syscall(procDestroyIcon.Addr(), 1, uintptr(icon), 0, 0)
+	return
+}
+
+func DestroyWindow(hwnd Hwnd) {
+	syscall.Syscall(procDestroyWindow.Addr(), 1, uintptr(hwnd), 0, 0)
+	return
+}
+
+func LoadImage(inst windows.Handle, name *uint16, typ uint, cx int, cy int, flags uint) (handle windows.Handle, err error) {
+	r0, _, e1 := syscall.Syscall6(procLoadImageW.Addr(), 6, uintptr(inst), uintptr(unsafe.Pointer(name)), uintptr(typ), uintptr(cx), uintptr(cy), uintptr(flags))
+	handle = windows.Handle(r0)
+	if handle == 0 {
+		err = errnoErr(e1)
+	}
+	return
+}
+
+func RegisterClass(class *WndClassEx) (err error) {
+	r1, _, e1 := syscall.Syscall(procRegisterClassExW.Addr(), 1, uintptr(unsafe.Pointer(class)), 0, 0)
+	if r1 == 0 {
+		err = errnoErr(e1)
+	}
 	return
 }
 

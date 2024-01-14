@@ -128,3 +128,5 @@ func (s slack) Send(alert alertsender.Alert) error {
 }
 
 func (s slack) Type() alertsender.Type { return alertsender.Slack }
+func (s slack) Shutdown() error        { return nil }
+func (s slack) SupportsMarkdown() bool { return true }

@@ -66,3 +66,15 @@ package sys
 //sys SymGetModuleInfo(handle windows.Handle, addr uint64, mod *ModuleInfo) (b bool) = dbghelp.SymGetModuleInfoW64
 //sys SymCleanup(handle windows.Handle) (b bool) = dbghelp.SymCleanup
 //sys SymEnumLoadedModules(handle windows.Handle, callback uintptr, ctx uintptr) (b bool) = dbghelp.EnumerateLoadedModulesW64
+
+// User interface functions
+//sys CreateWindowEx(exStyle uint32, className *uint16, windowName *uint16, style uint32, x int32, y int32, w int32, h int32, parent Hwnd, menu uintptr, instance windows.Handle, param uintptr) (hwnd Hwnd, err error) [failretval==0] = user32.CreateWindowExW
+//sys DestroyWindow(hwnd Hwnd) = user32.DestroyWindow
+//sys RegisterClass(class *WndClassEx) (err error) [failretval==0] = user32.RegisterClassExW
+//sys DefWindowProc(hwnd uintptr, msg uint32, wparam uintptr, lparam uintptr) (result uintptr) = user32.DefWindowProcW
+//sys LoadImage(inst windows.Handle, name *uint16, typ uint, cx int, cy int, flags uint) (handle windows.Handle, err error) [failretval==0] = user32.LoadImageW
+//sys DestroyIcon(icon Hicon) = user32.DestroyIcon
+
+// Shell functions
+//sys ShellNotifyIcon(msg NotifyIconMessage, data *NotifyIconData) (err error) [failretval==0]  = shell32.Shell_NotifyIconW
+//sys SHGetStockIconInfo(id int32, flags uint32, icon *ShStockIcon) (err error) [failretval!=0] = shell32.SHGetStockIconInfo

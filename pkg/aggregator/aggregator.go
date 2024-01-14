@@ -40,6 +40,7 @@ import (
 	// initialize alert senders
 	_ "github.com/rabbitstack/fibratus/pkg/alertsender/mail"
 	_ "github.com/rabbitstack/fibratus/pkg/alertsender/slack"
+	_ "github.com/rabbitstack/fibratus/pkg/alertsender/systray"
 
 	// initialize transformers
 	_ "github.com/rabbitstack/fibratus/pkg/aggregator/transformers/remove"
