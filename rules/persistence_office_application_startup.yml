@@ -1,0 +1,50 @@
+- group: Office Template Macros
+  description: |
+    Adversaries may abuse Microsoft Office templates to obtain
+    persistence on a compromised system. Microsoft Office contains
+    templates that are part of common Office applications and are
+    used to customize styles. The base templates within
+    the application are used each time an application starts.
+    Office Visual Basic for Applications (VBA) macros can be
+    inserted into the base template and used to execute code
+    when the respective Office application starts in order to
+    obtain persistence. Examples for both Word and Excel have
+    been discovered and published.
+    By default, Word has a Normal.dotm template created that
+    can be modified to include a malicious macro.
+    Excel does not have a template file created by default, but
+    one can be added that will automatically be loaded. Shared
+    templates may also be stored and pulled from remote locations.
+  labels:
+    tactic.id: TA0006
+    tactic.name: Persistence
+    tactic.ref: https://attack.mitre.org/tactics/TA0006/
+    technique.id: T1137
+    technique.name: Office Application Startup
+    technique.ref: https://attack.mitre.org/techniques/T1137/
+    subtechnique.id: T1137.001
+    subtechnique.name: Office Template Macros
+    subtechnique.ref: https://attack.mitre.org/techniques/T1137/001/
+  rules:
+    - name: Suspicious Office template created
+      description: |
+        Detects when attackers drop macro-enabled files in specific
+        folders to trigger their execution every time the victim user
+        opens an Office application.
+      condition: >
+        create_file
+            and
+        file.name imatches
+            (
+              '?:\\Users\\*\\AppData\\Roaming\\Microsoft\\Word\\Startup\\*',
+              '?:\\Users\\*\\AppData\\Roaming\\Microsoft\\Templates\\*.dotm',
+              '?:\\Users\\*\\AppData\\Roaming\\Microsoft\\Excel\\XLSTART\\*',
+              '?:\\Users\\*\\AppData\\Roaming\\Microsoft\\AddIns\\*',
+              '?:\\Users\\*\\AppData\\Roaming\\Microsoft\\Outlook\\*.otm'
+            )
+            and
+            not
+        ps.name iin msoffice_binaries
+      output: >
+          %file.name Office template written by unusual %ps.exe process
+      min-engine-version: 2.0.0
