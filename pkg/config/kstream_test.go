@@ -56,8 +56,8 @@ func TestKstreamConfig(t *testing.T) {
 	assert.False(t, c.Kstream.EnableImageKevents)
 	assert.False(t, c.Kstream.EnableFileIOKevents)
 
-	assert.True(t, c.Kstream.ExcludeKevent(ktypes.CloseHandle))
-	assert.False(t, c.Kstream.ExcludeKevent(ktypes.CreateProcess))
+	assert.True(t, c.Kstream.ExcludeKevent(ktypes.CloseHandle.GUID(), ktypes.CloseHandle.HookID()))
+	assert.False(t, c.Kstream.ExcludeKevent(ktypes.CreateProcess.GUID(), ktypes.CreateProcess.HookID()))
 
 	assert.True(t, c.Kstream.ExcludeImage(&pstypes.PS{Name: "svchost.exe"}))
 	assert.False(t, c.Kstream.ExcludeImage(&pstypes.PS{Name: "explorer.exe"}))

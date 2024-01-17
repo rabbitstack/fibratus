@@ -201,13 +201,13 @@ func (k *consumer) processEvent(ev *etw.EventRecord) error {
 	if kevent.IsCurrentProcDropped(ev.Header.ProcessID) {
 		return nil
 	}
+	if k.config.Kstream.ExcludeKevent(ev.Header.ProviderID, ev.HookID()) {
+		excludedKevents.Add(1)
+		return nil
+	}
 	ktype := ktypes.NewFromEventRecord(ev)
 	if !ktype.Exists() {
 		keventsUnknown.Add(1)
-		return nil
-	}
-	if k.config.Kstream.ExcludeKevent(ktype) {
-		excludedKevents.Add(1)
 		return nil
 	}
 	keventsProcessed.Add(1)
