@@ -25,18 +25,34 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+// ProvidersCount designates the number of interesting providers.
+// Remember to increment if a new event source is introduced.
+const ProvidersCount = 10
+
 // Ktype identifies an event type. It comprises the event GUID + hook ID to uniquely identify the event
 type Ktype [18]byte
 
 var (
-	// ProcessEventGUID represents process event GUID
+	// ProcessEventGUID represents process provider event GUID
 	ProcessEventGUID = windows.GUID{Data1: 0x3d6fa8d0, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}
-	// ThreadEventGUID represents thread evens GUID
+	// ThreadEventGUID represents thread provider event GUID
 	ThreadEventGUID = windows.GUID{Data1: 0x3d6fa8d1, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}
-	// FileEventGUID represents file event GUID
+	// ImageEventGUID represents image provider event GUID
+	ImageEventGUID = windows.GUID{Data1: 0x2cb15d1d, Data2: 0x5fc1, Data3: 0x11d2, Data4: [8]byte{0xab, 0xe1, 0x0, 0xa0, 0xc9, 0x11, 0xf5, 0x18}}
+	// FileEventGUID represents file provider event GUID
 	FileEventGUID = windows.GUID{Data1: 0x90cbdc39, Data2: 0x4a3e, Data3: 0x11d1, Data4: [8]byte{0x84, 0xf4, 0x0, 0x0, 0xf8, 0x04, 0x64, 0xe3}}
-	// RegistryEventGUID represents registry event GUID
+	// RegistryEventGUID represents registry provider event GUID
 	RegistryEventGUID = windows.GUID{Data1: 0xae53722e, Data2: 0xc863, Data3: 0x11d2, Data4: [8]byte{0x86, 0x59, 0x0, 0xc0, 0x4f, 0xa3, 0x21, 0xa1}}
+	// NetworkEventGUID represents network provider event GUID
+	NetworkEventGUID = windows.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}
+	// HandleEventGUID represents handle provider event GUID
+	HandleEventGUID = windows.GUID{Data1: 0x89497f50, Data2: 0xeffe, Data3: 0x4440, Data4: [8]byte{0x8c, 0xf2, 0xce, 0x6b, 0x1c, 0xdc, 0xac, 0xa7}}
+	// MemEventGUID represents memory provider event GUID
+	MemEventGUID = windows.GUID{Data1: 0x3d6fa8d3, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x00, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}
+	// AuditAPIEventGUID represents audit API calls event GUID
+	AuditAPIEventGUID = windows.GUID{Data1: 0xe02a841c, Data2: 0x75a3, Data3: 0x4fa7, Data4: [8]byte{0xaf, 0xc8, 0xae, 0x09, 0xcf, 0x9b, 0x7f, 0x23}}
+	// DNSEventGUID represents DNS provider event GUID
+	DNSEventGUID = windows.GUID{Data1: 0x1c95126e, Data2: 0x7eea, Data3: 0x49a9, Data4: [8]byte{0xa3, 0xfe, 0xa3, 0x78, 0xb0, 0x3d, 0xdb, 0x4d}}
 )
 
 var (
@@ -183,12 +199,7 @@ var (
 
 // NewFromEventRecord creates a new event type from ETW event record.
 func NewFromEventRecord(ev *etw.EventRecord) Ktype {
-	switch ev.Header.ProviderID {
-	case etw.KernelAuditAPICallsGUID, etw.DNSClientGUID:
-		return pack(ev.Header.ProviderID, ev.Header.EventDescriptor.ID)
-	default:
-		return pack(ev.Header.ProviderID, uint16(ev.Header.EventDescriptor.Opcode))
-	}
+	return pack(ev.Header.ProviderID, ev.HookID())
 }
 
 // String returns the string representation of the event type. Returns an empty string

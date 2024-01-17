@@ -22,6 +22,7 @@
 package config
 
 import (
+	"golang.org/x/sys/windows"
 	"runtime"
 	"time"
 
@@ -95,7 +96,8 @@ type KstreamConfig struct {
 	// ExcludedImages are process image names that will be rejected if they generate a kernel event.
 	ExcludedImages []string `json:"blacklist.images" yaml:"blacklist.images"`
 
-	excludedKtypes map[ktypes.Ktype]bool
+	eventsetMasks ktypes.EventsetMasks
+
 	excludedImages map[string]bool
 }
 
@@ -117,12 +119,11 @@ func (c *KstreamConfig) initFromViper(v *viper.Viper) {
 	c.ExcludedKevents = v.GetStringSlice(excludedEvents)
 	c.ExcludedImages = v.GetStringSlice(excludedImages)
 
-	c.excludedKtypes = make(map[ktypes.Ktype]bool)
 	c.excludedImages = make(map[string]bool)
 
 	for _, name := range c.ExcludedKevents {
 		if ktype := ktypes.KeventNameToKtype(name); ktype != ktypes.UnknownKtype {
-			c.excludedKtypes[ktype] = true
+			c.eventsetMasks.Set(ktype)
 		}
 	}
 	for _, name := range c.ExcludedImages {
@@ -132,12 +133,11 @@ func (c *KstreamConfig) initFromViper(v *viper.Viper) {
 
 // Init is an exported method to allow initializing exclusion maps from external modules.
 func (c *KstreamConfig) Init() {
-	c.excludedKtypes = make(map[ktypes.Ktype]bool)
 	c.excludedImages = make(map[string]bool)
 	for _, name := range c.ExcludedKevents {
 		for _, ktype := range ktypes.KeventNameToKtypes(name) {
 			if ktype != ktypes.UnknownKtype {
-				c.excludedKtypes[ktype] = true
+				c.eventsetMasks.Set(ktype)
 			}
 		}
 	}
@@ -146,10 +146,10 @@ func (c *KstreamConfig) Init() {
 	}
 }
 
-// ExcludeKevent determines whether the supplied event type is present in the list of
-// excluded event types.
-func (c *KstreamConfig) ExcludeKevent(ktype ktypes.Ktype) bool {
-	return c.excludedKtypes[ktype]
+// ExcludeKevent determines whether the supplied provider GUID
+// and the hook identifier are in the bitset of excluded events.
+func (c *KstreamConfig) ExcludeKevent(guid windows.GUID, hookID uint16) bool {
+	return c.eventsetMasks.Test(guid, hookID)
 }
 
 // ExcludeImage determines whether the process generating event is present in the

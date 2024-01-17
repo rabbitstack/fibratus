@@ -554,6 +554,14 @@ func (e *EventRecord) Version() uint8 {
 	return e.Header.EventDescriptor.Version
 }
 
+// HookID returns either the opcode or the event ID.
+func (e *EventRecord) HookID() uint16 {
+	if e.Header.EventDescriptor.Opcode > 0 {
+		return uint16(e.Header.EventDescriptor.Opcode)
+	}
+	return e.Header.EventDescriptor.ID
+}
+
 // ReadByte reads the byte from the buffer at the specified offset.
 func (e *EventRecord) ReadByte(offset uint16) byte {
 	if offset > e.BufferLen {
