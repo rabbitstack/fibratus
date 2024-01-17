@@ -148,6 +148,13 @@ func (e *Kevent) MarshalRaw() []byte {
 					b = append(b, bytes.WriteUint16(uint16(len(s)))...)
 					b = append(b, s...)
 				}
+			case []va.Address:
+				// 8 byte integers
+				b = append(b, uint8('8'))
+				b = append(b, bytes.WriteUint16(uint16(len(slice)))...)
+				for _, v := range slice {
+					b = append(b, bytes.WriteUint64(v.Uint64())...)
+				}
 			}
 		case kparams.Binary, kparams.SID, kparams.WbemSID:
 			b = append(b, bytes.WriteUint32(uint32(len(kpar.Value.([]byte))))...)
@@ -354,6 +361,13 @@ func (e *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 					off += 2 + uint32(size)
 				}
 				kval = s
+			case '8':
+				v := make([]uint64, l)
+				for i := 0; i < int(l); i++ {
+					bytes.ReadUint64(b[inc(idx, 22)+offset+kparamNameLength+poffset+off:])
+					off += 8
+				}
+				kval = v
 			}
 			poffset += kparamNameLength + 4 + 1 + 2 + off
 		case kparams.Binary, kparams.SID, kparams.WbemSID:

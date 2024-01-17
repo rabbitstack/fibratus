@@ -226,7 +226,7 @@ func (w *writer) write(b []byte) error {
 		overflowKevents.Add(1)
 		return fmt.Errorf("event size overflow by %d bytes", l-maxKevtSize)
 	}
-	if err := w.ws(section.Kevt, kcapver.KevtSecV1, 0, uint32(l)); err != nil {
+	if err := w.ws(section.Kevt, kcapver.KevtSecV2, 0, uint32(l)); err != nil {
 		kevtWriteErrors.Add(1)
 		return err
 	}
