@@ -19,6 +19,7 @@
 package ktypes
 
 import (
+	"fmt"
 	"github.com/bits-and-blooms/bitset"
 	"golang.org/x/sys/windows"
 )
@@ -34,11 +35,12 @@ type EventsetMasks struct {
 
 // Set puts a new event type into the bitset.
 func (e *EventsetMasks) Set(ktype Ktype) {
-	i := e.bitsetIndex(ktype.GUID())
+	g := ktype.GUID()
+	i := e.bitsetIndex(g)
 	if i < 0 {
-		panic("invalid bitset index")
+		panic(fmt.Sprintf("invalid event bitset index: %s", g.String()))
 	}
-	e.masks[i].Set(uint(ktype.HookID()))
+	e.masks[e.bitsetIndex(ktype.GUID())].Set(uint(ktype.HookID()))
 }
 
 // Test checks if the given provider GUID and
@@ -48,16 +50,16 @@ func (e *EventsetMasks) Test(guid windows.GUID, hookID uint16) bool {
 	if i < 0 {
 		return false
 	}
-	return e.masks[i].Test(uint(hookID))
+	return e.masks[e.bitsetIndex(guid)].Test(uint(hookID))
 }
 
 // Clear clears the bitset for a given provider GUID.
 func (e *EventsetMasks) Clear(guid windows.GUID) {
 	i := e.bitsetIndex(guid)
 	if i < 0 {
-		panic("invalid bitset index")
+		panic(fmt.Sprintf("invalid event bitset index: %s", guid.String()))
 	}
-	e.masks[i].ClearAll()
+	e.masks[e.bitsetIndex(guid)].ClearAll()
 }
 
 func (e *EventsetMasks) bitsetIndex(guid windows.GUID) int {
@@ -72,16 +74,19 @@ func (e *EventsetMasks) bitsetIndex(guid windows.GUID) int {
 		return 3
 	case RegistryEventGUID:
 		return 4
-	case NetworkEventGUID:
+	case NetworkTCPEventGUID:
 		return 5
-	case HandleEventGUID:
+	case NetworkUDPEventGUID:
 		return 6
-	case MemEventGUID:
+	case HandleEventGUID:
 		return 7
-	case AuditAPIEventGUID:
+	case MemEventGUID:
 		return 8
-	case DNSEventGUID:
+	case AuditAPIEventGUID:
 		return 9
+	case DNSEventGUID:
+		return 10
+	default:
+		return -1
 	}
-	return -1
 }

@@ -36,6 +36,7 @@ const (
 	enableRegistryKevents = "kstream.enable-registry"
 	enableNetKevents      = "kstream.enable-net"
 	enableFileIOKevents   = "kstream.enable-fileio"
+	enableVAMapKevents    = "kstream.enable-vamap"
 	enableImageKevents    = "kstream.enable-image"
 	enableHandleKevents   = "kstream.enable-handle"
 	enableMemKevents      = "kstream.enable-mem"
@@ -69,6 +70,8 @@ type KstreamConfig struct {
 	EnableNetKevents bool `json:"enable-net" yaml:"enable-net"`
 	// EnableFileIOKevents indicates if file I/O kernel events are collected by the ETW provider.
 	EnableFileIOKevents bool `json:"enable-fileio" yaml:"enable-fileio"`
+	// EnableVAMapKevents indicates if VA map/unmap events are collected by the ETW provider.
+	EnableVAMapKevents bool `json:"enable-vamap" yaml:"enable-vamap"`
 	// EnableImageKevents indicates if image kernel events are collected by the ETW provider.
 	EnableImageKevents bool `json:"enable-image" yaml:"enable-image"`
 	// EnableHandleKevents indicates whether handle creation/disposal events are enabled.
@@ -96,7 +99,7 @@ type KstreamConfig struct {
 	// ExcludedImages are process image names that will be rejected if they generate a kernel event.
 	ExcludedImages []string `json:"blacklist.images" yaml:"blacklist.images"`
 
-	eventsetMasks ktypes.EventsetMasks
+	dropMasks ktypes.EventsetMasks
 
 	excludedImages map[string]bool
 }
@@ -106,6 +109,7 @@ func (c *KstreamConfig) initFromViper(v *viper.Viper) {
 	c.EnableRegistryKevents = v.GetBool(enableRegistryKevents)
 	c.EnableNetKevents = v.GetBool(enableNetKevents)
 	c.EnableFileIOKevents = v.GetBool(enableFileIOKevents)
+	c.EnableVAMapKevents = v.GetBool(enableVAMapKevents)
 	c.EnableImageKevents = v.GetBool(enableImageKevents)
 	c.EnableHandleKevents = v.GetBool(enableHandleKevents)
 	c.EnableMemKevents = v.GetBool(enableMemKevents)
@@ -123,7 +127,7 @@ func (c *KstreamConfig) initFromViper(v *viper.Viper) {
 
 	for _, name := range c.ExcludedKevents {
 		if ktype := ktypes.KeventNameToKtype(name); ktype != ktypes.UnknownKtype {
-			c.eventsetMasks.Set(ktype)
+			c.dropMasks.Set(ktype)
 		}
 	}
 	for _, name := range c.ExcludedImages {
@@ -137,7 +141,7 @@ func (c *KstreamConfig) Init() {
 	for _, name := range c.ExcludedKevents {
 		for _, ktype := range ktypes.KeventNameToKtypes(name) {
 			if ktype != ktypes.UnknownKtype {
-				c.eventsetMasks.Set(ktype)
+				c.dropMasks.Set(ktype)
 			}
 		}
 	}
@@ -146,10 +150,23 @@ func (c *KstreamConfig) Init() {
 	}
 }
 
+// SetDropMask inserts the event mask in the bitset to
+// instruct the given event type should be dropped from
+// the event stream.
+func (c *KstreamConfig) SetDropMask(ktype ktypes.Ktype) {
+	c.dropMasks.Set(ktype)
+}
+
+// TestDropMask checks if the specified event type has
+// the drop mask in the bitset.
+func (c *KstreamConfig) TestDropMask(ktype ktypes.Ktype) bool {
+	return c.dropMasks.Test(ktype.GUID(), ktype.HookID())
+}
+
 // ExcludeKevent determines whether the supplied provider GUID
 // and the hook identifier are in the bitset of excluded events.
 func (c *KstreamConfig) ExcludeKevent(guid windows.GUID, hookID uint16) bool {
-	return c.eventsetMasks.Test(guid, hookID)
+	return c.dropMasks.Test(guid, hookID)
 }
 
 // ExcludeImage determines whether the process generating event is present in the

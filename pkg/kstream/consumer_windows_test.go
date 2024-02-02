@@ -86,7 +86,7 @@ func TestRundownEvents(t *testing.T) {
 		EnableRegistryKevents: true,
 	}
 
-	kctrl := NewController(kstreamConfig)
+	kctrl := NewController(&config.Config{Kstream: kstreamConfig}, nil)
 	require.NoError(t, kctrl.Start())
 	defer kctrl.Close()
 	kstreamc := NewConsumer(kctrl, psnap, hsnap, &config.Config{
@@ -497,6 +497,7 @@ func TestConsumerEvents(t *testing.T) {
 		EnableThreadKevents:   true,
 		EnableImageKevents:    true,
 		EnableFileIOKevents:   true,
+		EnableVAMapKevents:    true,
 		EnableNetKevents:      true,
 		EnableRegistryKevents: true,
 		EnableMemKevents:      true,
@@ -506,7 +507,7 @@ func TestConsumerEvents(t *testing.T) {
 		StackEnrichment:       false,
 	}
 
-	kctrl := NewController(kstreamConfig)
+	kctrl := NewController(&config.Config{Kstream: kstreamConfig}, nil)
 	require.NoError(t, kctrl.Start())
 	defer kctrl.Close()
 	kstreamc := NewConsumer(kctrl, psnap, hsnap, &config.Config{Kstream: kstreamConfig, Filters: &config.Filters{}})
@@ -918,7 +919,7 @@ func TestCallstackEnrichment(t *testing.T) {
 		SymbolizeKernelAddresses: true,
 	}
 
-	kctrl := NewController(kstreamConfig)
+	kctrl := NewController(&config.Config{Kstream: kstreamConfig}, nil)
 	require.NoError(t, kctrl.Start())
 	defer kctrl.Close()
 	kstreamc := NewConsumer(kctrl, psnap, hsnap, cfg)

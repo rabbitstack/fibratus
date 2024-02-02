@@ -206,8 +206,11 @@
             9030
           )
       min-engine-version: 2.0.0
+    - name: Suspicious domains
+      condition: kevt.name = 'QueryDns' and dns.name = 'fishy.domain.dot'
+      min-engine-version: 2.0.0
 
-- group: Suspicious network-connecting binaries
+- group: Legitimate network-connecting binaries
   enabled: true
   rules:
     - name: Microsoft binaries

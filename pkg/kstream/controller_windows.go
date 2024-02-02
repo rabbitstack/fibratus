@@ -47,22 +47,18 @@ const (
 	maxTracePropsSize = 2 * (maxLoggerNameSize + maxLogfileNameSize)
 )
 
-var (
-	// stackTraceEvents identifies the events for which stack tracing is enabled
-	stackTraceEvents = []etw.ClassicEventID{
-		etw.NewClassicEventID(ktypes.ProcessEventGUID, ktypes.CreateProcess.HookID()),
-		etw.NewClassicEventID(ktypes.ThreadEventGUID, ktypes.CreateThread.HookID()),
-		etw.NewClassicEventID(ktypes.ThreadEventGUID, ktypes.TerminateThread.HookID()),
-		etw.NewClassicEventID(ktypes.ProcessEventGUID, ktypes.LoadImage.HookID()),
-		etw.NewClassicEventID(ktypes.RegistryEventGUID, ktypes.RegCreateKey.HookID()),
-		etw.NewClassicEventID(ktypes.RegistryEventGUID, ktypes.RegDeleteKey.HookID()),
-		etw.NewClassicEventID(ktypes.RegistryEventGUID, ktypes.RegSetValue.HookID()),
-		etw.NewClassicEventID(ktypes.RegistryEventGUID, ktypes.RegDeleteValue.HookID()),
-		etw.NewClassicEventID(ktypes.FileEventGUID, ktypes.CreateFile.HookID()),
-		etw.NewClassicEventID(ktypes.FileEventGUID, ktypes.DeleteFile.HookID()),
-		etw.NewClassicEventID(ktypes.FileEventGUID, ktypes.RenameFile.HookID()),
-	}
-)
+// StackEventIdentifiers is the type alias for stack events identifiers
+type StackEventIdentifiers []etw.ClassicEventID
+
+// Add enables stack tracing for the specified event type.
+func (s *StackEventIdentifiers) Add(ktype ktypes.Ktype) {
+	*s = append(*s, etw.NewClassicEventID(ktype.GUID(), ktype.HookID()))
+}
+
+// AddWith enable stack tracing for the specified provider GUID and event hook identifier.
+func (s *StackEventIdentifiers) AddWith(guid windows.GUID, hookID uint16) {
+	*s = append(*s, etw.NewClassicEventID(guid, hookID))
+}
 
 // initEventTraceProps builds the trace properties descriptor which
 // influences the behaviour of event publishing to the trace session
@@ -154,8 +150,9 @@ func (t *Trace) Start(config config.KstreamConfig) error {
 		return fmt.Errorf("trace name [%s] is too long", t.Name)
 	}
 	props := initEventTraceProps(config)
+	flags, ids := t.enableFlagsDynamically(config)
 	if t.IsKernelTrace() {
-		props.EnableFlags = t.systemLoggerFlags(config)
+		props.EnableFlags = flags
 		props.Wnode.GUID = t.GUID
 		log.Debugf("starting kernel trace with %q event flags", props.EnableFlags)
 	}
@@ -193,14 +190,14 @@ func (t *Trace) Start(config config.KstreamConfig) error {
 			log.Warnf("unable to set empty system flags: %v", err)
 			return nil
 		}
-		sysTraceFlags[0] = t.systemLoggerFlags(config)
+		sysTraceFlags[0] = flags
 		// enable object manager tracking
 		if config.EnableHandleKevents {
 			sysTraceFlags[4] = etw.Handle
 		}
 		// enable stack enrichment
 		if config.StackEnrichment {
-			if err := etw.EnableStackTracing(handle, stackTraceEvents); err != nil {
+			if err := etw.EnableStackTracing(handle, ids); err != nil {
 				return fmt.Errorf("fail to enable kernel callstack tracing: %v", err)
 			}
 		}
@@ -283,34 +280,80 @@ func (t *Trace) Close() error {
 // IsKernelTrace determines if this is the system logger trace.
 func (t *Trace) IsKernelTrace() bool { return t.GUID == etw.KernelTraceControlGUID }
 
-// systemLoggerFlags returns a bitmask that indicates which kernel events
+// enableFlagsDynamically crafts the system logger event mask
+// and call stack event identifiers conditionally, depending on
+// the compiled rules result or the config state.
+// System logger flags is a bitmask that indicates which kernel events
 // are delivered to the consumer when system logger session is
 // started. At minimum, process events are published to the trace
 // session as they represent the foundation for building the state
 // machine. Note these flags are relevant to system logger traces
 // and initializing the EnableFlags field of the etw.EventTraceProperties
 // structure for non-system logger providers will result in an error.
-func (*Trace) systemLoggerFlags(config config.KstreamConfig) etw.EventTraceFlags {
-	flags := etw.Process
+func (t *Trace) enableFlagsDynamically(config config.KstreamConfig) (etw.EventTraceFlags, []etw.ClassicEventID) {
+	if !t.IsKernelTrace() {
+		return 0, nil
+	}
+
+	var flags etw.EventTraceFlags
+	ids := make(StackEventIdentifiers, 0)
+
+	flags |= etw.Process
+	ids.Add(ktypes.CreateProcess)
+
 	if config.EnableThreadKevents {
 		flags |= etw.Thread
+		if !config.TestDropMask(ktypes.CreateThread) {
+			ids.Add(ktypes.CreateThread)
+		}
+		if !config.TestDropMask(ktypes.TerminateThread) {
+			ids.Add(ktypes.TerminateThread)
+		}
 	}
 	if config.EnableImageKevents {
 		flags |= etw.ImageLoad
+		if !config.TestDropMask(ktypes.LoadImage) {
+			ids.AddWith(ktypes.ProcessEventGUID, ktypes.LoadImage.HookID())
+		}
 	}
 	if config.EnableNetKevents {
 		flags |= etw.NetTCPIP
 	}
 	if config.EnableRegistryKevents {
 		flags |= etw.Registry
+		if !config.TestDropMask(ktypes.RegCreateKey) {
+			ids.Add(ktypes.RegCreateKey)
+		}
+		if !config.TestDropMask(ktypes.RegDeleteKey) {
+			ids.Add(ktypes.RegDeleteKey)
+		}
+		if !config.TestDropMask(ktypes.RegSetValue) {
+			ids.Add(ktypes.RegSetValue)
+		}
+		if !config.TestDropMask(ktypes.RegDeleteValue) {
+			ids.Add(ktypes.RegDeleteValue)
+		}
 	}
 	if config.EnableFileIOKevents {
-		flags |= etw.DiskFileIO | etw.FileIO | etw.FileIOInit | etw.VaMap
+		flags |= etw.DiskFileIO | etw.FileIO | etw.FileIOInit
+		if !config.TestDropMask(ktypes.CreateFile) {
+			ids.Add(ktypes.CreateFile)
+		}
+		if !config.TestDropMask(ktypes.DeleteFile) {
+			ids.Add(ktypes.DeleteFile)
+		}
+		if !config.TestDropMask(ktypes.RenameFile) {
+			ids.Add(ktypes.RenameFile)
+		}
+	}
+	if config.EnableVAMapKevents {
+		flags |= etw.VaMap
 	}
 	if config.EnableMemKevents {
 		flags |= etw.VirtualAlloc
 	}
-	return flags
+
+	return flags, ids
 }
 
 // Controller is responsible for managing the life cycle of the tracing sessions.
@@ -321,29 +364,63 @@ func (*Trace) systemLoggerFlags(config config.KstreamConfig) etw.EventTraceFlags
 // DNS Client Logger: publishes DNS queries/responses. Optional
 type Controller struct {
 	traces []*Trace
-	config config.KstreamConfig
+	config *config.Config
 }
 
-func (c *Controller) addTrace(name string, guid windows.GUID, keywords uint64) {
-	c.traces = append(c.traces, NewTrace(name, guid, keywords))
+func (c *Controller) addTrace(name string, guid windows.GUID) {
+	c.traces = append(c.traces, NewTrace(name, guid, 0x0))
 }
 
 // NewController spins up a new instance of the trace controller.
-func NewController(cfg config.KstreamConfig) *Controller {
+// The traces are populated depending on what the config state
+// dictates unless the rule engine is enabled. In this case, the
+// decision-maker is the rules compile result which drives the
+// enablement of providers and controls bitmask setup.
+func NewController(c *config.Config, r *config.RulesCompileResult) *Controller {
 	controller := &Controller{
-		config: cfg,
+		config: c,
 		traces: make([]*Trace, 0),
 	}
 
-	controller.addTrace(etw.KernelLoggerSession, etw.KernelTraceControlGUID, 0x0)
+	controller.addTrace(etw.KernelLoggerSession, etw.KernelTraceControlGUID)
 
-	if cfg.EnableDNSEvents {
-		controller.addTrace(etw.DNSClientSession, etw.DNSClientGUID, 0x0)
+	// dynamically enable event providers
+	// and set up drop masks if the rule
+	// engine is enabled. For any event
+	// not present in the rule set, the
+	// drop mask instructs to reject the
+	// event as soon as it is consumed
+	// from the session buffer
+	if r != nil {
+		c.Kstream.EnableThreadKevents = r.HasThreadEvents
+		c.Kstream.EnableImageKevents = r.HasFileEvents
+		c.Kstream.EnableNetKevents = r.HasNetworkEvents
+		c.Kstream.EnableRegistryKevents = r.HasRegistryEvents
+		c.Kstream.EnableFileIOKevents = r.HasFileEvents
+		c.Kstream.EnableVAMapKevents = r.HasVAMapEvents
+		c.Kstream.EnableMemKevents = r.HasMemEvents
+		for _, ktype := range ktypes.All() {
+			if ktype == ktypes.CreateProcess || ktype == ktypes.TerminateProcess {
+				continue
+			}
+			if !r.ContainsEvent(ktype) {
+				c.Kstream.SetDropMask(ktype)
+			}
+		}
+		if r.HasDNSEvents {
+			controller.addTrace(etw.DNSClientSession, etw.DNSClientGUID)
+		}
+		if r.HasAuditAPIEvents {
+			controller.addTrace(etw.KernelAuditAPICallsSession, etw.KernelAuditAPICallsGUID)
+		}
+		return controller
 	}
-	if cfg.EnableAuditAPIEvents {
-		controller.addTrace(etw.KernelAuditAPICallsSession, etw.KernelAuditAPICallsGUID, 0x0)
+	if c.Kstream.EnableDNSEvents {
+		controller.addTrace(etw.DNSClientSession, etw.DNSClientGUID)
 	}
-
+	if c.Kstream.EnableAuditAPIEvents {
+		controller.addTrace(etw.KernelAuditAPICallsSession, etw.KernelAuditAPICallsGUID)
+	}
 	return controller
 }
 
@@ -352,7 +429,7 @@ func NewController(cfg config.KstreamConfig) *Controller {
 // events are forwarded from the system logger provider.
 func (c *Controller) Start() error {
 	for _, trace := range c.traces {
-		err := trace.Start(c.config)
+		err := trace.Start(c.config.Kstream)
 		switch err {
 		case kerrors.ErrTraceAlreadyRunning:
 			log.Debugf("%s trace is already running. Trying to restart...", trace.Name)
@@ -360,7 +437,7 @@ func (c *Controller) Start() error {
 				return err
 			}
 			time.Sleep(time.Millisecond * 100)
-			if err := trace.Start(c.config); err != nil {
+			if err := trace.Start(c.config.Kstream); err != nil {
 				return multierror.Wrap(kerrors.ErrRestartTrace, err)
 			}
 		case kerrors.ErrTraceNoSysResources:

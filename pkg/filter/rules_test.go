@@ -92,6 +92,12 @@ func wrapProcessEvent(e *kevent.Kevent, fn func(*kevent.Kevent) (bool, error)) b
 	return match
 }
 
+func compileRules(t *testing.T, rules *Rules) {
+	stats, err := rules.Compile()
+	require.NoError(t, err)
+	require.NotNil(t, stats)
+}
+
 func fireRules(t *testing.T, c *config.Config) bool {
 	psnap := new(ps.SnapshotterMock)
 	rules := NewRules(psnap, c)
@@ -110,8 +116,7 @@ func fireRules(t *testing.T, c *config.Config) bool {
 		},
 		Metadata: make(map[kevent.MetadataKey]any),
 	}
-
-	require.NoError(t, rules.Compile())
+	compileRules(t, rules)
 	return wrapProcessEvent(kevt, rules.ProcessEvent)
 }
 
@@ -138,7 +143,7 @@ func newConfig(fromFiles ...string) *config.Config {
 func TestCompileMergeGroups(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
 	rules := NewRules(psnap, newConfig("_fixtures/merged_groups.yml"))
-	require.NoError(t, rules.Compile())
+	compileRules(t, rules)
 
 	assert.Len(t, rules.groups, 2)
 	assert.Len(t, rules.groups[ktypes.RecvTCPv4.Hash()], 2)
@@ -169,7 +174,7 @@ func TestProcessRules(t *testing.T) {
 func TestSequenceState(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
 	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_simple.yml"))
-	require.NoError(t, rules.Compile())
+	compileRules(t, rules)
 	log.SetLevel(log.DebugLevel)
 
 	kevt1 := &kevent.Kevent{
@@ -279,15 +284,35 @@ func TestMinEngineVersion(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
 	rules := NewRules(psnap, newConfig("_fixtures/min-engine-ver-fail.yml"))
 	version.Set("2.0.0")
-	require.Error(t, rules.Compile())
+	_, err := rules.Compile()
+	require.Error(t, err)
 	rules = NewRules(psnap, newConfig("_fixtures/min-engine-ver-ok.yml"))
-	require.NoError(t, rules.Compile())
+	compileRules(t, rules)
+}
+
+func TestRuleCompileStats(t *testing.T) {
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, newConfig("_fixtures/default/default.yml"))
+	stats, err := rules.Compile()
+	require.NoError(t, err)
+	require.NotNil(t, stats)
+
+	assert.True(t, stats.HasImageEvents)
+	assert.True(t, stats.HasProcEvents)
+	assert.False(t, stats.HasMemEvents)
+	assert.False(t, stats.HasAuditAPIEvents)
+	assert.True(t, stats.HasDNSEvents)
+	assert.Contains(t, stats.UsedEvents, ktypes.CreateProcess)
+	assert.Contains(t, stats.UsedEvents, ktypes.LoadImage)
+	assert.Contains(t, stats.UsedEvents, ktypes.QueryDNS)
+	assert.Contains(t, stats.UsedEvents, ktypes.ConnectTCPv4)
+	assert.Contains(t, stats.UsedEvents, ktypes.ConnectTCPv6)
 }
 
 func TestSimpleSequenceRule(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
 	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_simple.yml"))
-	require.NoError(t, rules.Compile())
+	compileRules(t, rules)
 
 	kevt1 := &kevent.Kevent{
 		Type:      ktypes.CreateProcess,
@@ -334,7 +359,7 @@ func TestSimpleSequenceRule(t *testing.T) {
 func TestSimpleSequenceRuleMultiplePartials(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
 	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_simple_max_span.yml"))
-	require.NoError(t, rules.Compile())
+	compileRules(t, rules)
 
 	// create random matches which don't satisfy the BY statement
 	for i, pid := range []uint32{2343, 1024, 11122, 3450, 12319} {
@@ -419,7 +444,7 @@ func TestSimpleSequenceRuleMultiplePartials(t *testing.T) {
 func TestSimpleSequenceRuleWithMaxSpanReached(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
 	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_simple_max_span.yml"))
-	require.NoError(t, rules.Compile())
+	compileRules(t, rules)
 
 	kevt1 := &kevent.Kevent{
 		Type:      ktypes.CreateProcess,
@@ -468,7 +493,7 @@ func TestSimpleSequenceRuleWithMaxSpanReached(t *testing.T) {
 func TestSimpleSequencePolicyWithMaxSpanNotReached(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
 	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_simple_max_span.yml"))
-	require.NoError(t, rules.Compile())
+	compileRules(t, rules)
 
 	kevt1 := &kevent.Kevent{
 		Type:      ktypes.CreateProcess,
@@ -510,7 +535,7 @@ func TestSimpleSequencePolicyWithMaxSpanNotReached(t *testing.T) {
 func TestComplexSequenceRule(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
 	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_complex.yml"))
-	require.NoError(t, rules.Compile())
+	compileRules(t, rules)
 	log.SetLevel(log.DebugLevel)
 
 	kevt1 := &kevent.Kevent{
@@ -602,7 +627,7 @@ func TestComplexSequenceRule(t *testing.T) {
 func TestSequencePsUUID(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
 	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_ps_uuid.yml"))
-	require.NoError(t, rules.Compile())
+	compileRules(t, rules)
 	log.SetLevel(log.DebugLevel)
 
 	kevt1 := &kevent.Kevent{
@@ -653,7 +678,7 @@ func TestSequencePsUUID(t *testing.T) {
 func TestSequenceAndSimpleRuleMix(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
 	rules := NewRules(psnap, newConfig("_fixtures/sequence_and_simple_rule_mix.yml"))
-	require.NoError(t, rules.Compile())
+	compileRules(t, rules)
 	log.SetLevel(log.DebugLevel)
 
 	kevt1 := &kevent.Kevent{
@@ -722,7 +747,7 @@ func TestSequenceAndSimpleRuleMix(t *testing.T) {
 func TestSequenceRuleBoundsFields(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
 	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_bound_fields.yml"))
-	require.NoError(t, rules.Compile())
+	compileRules(t, rules)
 
 	kevt := &kevent.Kevent{
 		Type:      ktypes.CreateProcess,
@@ -804,7 +829,7 @@ func TestFilterActionEmitAlert(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
 	require.NoError(t, alertsender.LoadAll([]alertsender.Config{{Type: alertsender.Noop}}))
 	rules := NewRules(psnap, newConfig("_fixtures/simple_emit_alert.yml"))
-	require.NoError(t, rules.Compile())
+	compileRules(t, rules)
 
 	kevt := &kevent.Kevent{
 		Type:     ktypes.RecvTCPv4,
@@ -837,7 +862,7 @@ func TestFilterActionEmitAlert(t *testing.T) {
 func TestIsExpressionEvaluable(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
 	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_simple.yml"))
-	require.NoError(t, rules.Compile())
+	compileRules(t, rules)
 	log.SetLevel(log.DebugLevel)
 
 	kevt1 := &kevent.Kevent{
@@ -885,7 +910,7 @@ func TestBoundFieldsWithFunctions(t *testing.T) {
 	log.SetLevel(log.DebugLevel)
 	psnap := new(ps.SnapshotterMock)
 	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_bound_fields_with_functions.yml"))
-	require.NoError(t, rules.Compile())
+	compileRules(t, rules)
 
 	kevt1 := &kevent.Kevent{
 		Type:     ktypes.CreateFile,
@@ -937,7 +962,7 @@ func TestKillAction(t *testing.T) {
 	log.SetLevel(log.DebugLevel)
 	psnap := new(ps.SnapshotterMock)
 	rules := NewRules(psnap, newConfig("_fixtures/kill_action.yml"))
-	require.NoError(t, rules.Compile())
+	compileRules(t, rules)
 
 	// register alert sender
 	require.NoError(t, alertsender.LoadAll([]alertsender.Config{{Type: alertsender.None}}))
@@ -992,7 +1017,9 @@ func BenchmarkRunRules(b *testing.B) {
 	b.ReportAllocs()
 	psnap := new(ps.SnapshotterMock)
 	rules := NewRules(psnap, newConfig("_fixtures/default/default.yml"))
-	require.NoError(b, rules.Compile())
+	stats, err := rules.Compile()
+	require.NoError(b, err)
+	require.NotNil(b, stats)
 
 	b.ResetTimer()
 	kevts := []*kevent.Kevent{
