@@ -488,12 +488,12 @@ func NewRules(psnap ps.Snapshotter, config *config.Config) *Rules {
 // indicated resources and creates the rules for
 // each filter group. It also sets up the state
 // machine transitions for sequence rules.
-func (r *Rules) Compile() error {
+func (r *Rules) Compile() (*config.RulesCompileResult, error) {
 	if err := r.config.Filters.LoadMacros(); err != nil {
-		return err
+		return nil, err
 	}
 	if err := r.config.Filters.LoadGroups(); err != nil {
-		return err
+		return nil, err
 	}
 	for _, group := range r.config.GetRuleGroups() {
 		if group.IsDisabled() {
@@ -511,16 +511,16 @@ func (r *Rules) Compile() error {
 			f := New(rule.Condition, r.config, WithPSnapshotter(r.psnap))
 			err := f.Compile()
 			if err != nil {
-				return ErrInvalidFilter(rule.Name, group.Name, err)
+				return nil, ErrInvalidFilter(rule.Name, group.Name, err)
 			}
 			// check version requirements
 			if !version.IsDev() {
 				minEngineVer, err := semver.NewSemver(rule.MinEngineVersion)
 				if err != nil {
-					return ErrMalformedMinEngineVer(rule.Name, rule.MinEngineVersion, err)
+					return nil, ErrMalformedMinEngineVer(rule.Name, rule.MinEngineVersion, err)
 				}
 				if minEngineVer.GreaterThan(version.Sem()) {
-					return ErrIncompatibleFilter(rule.Name, rule.MinEngineVersion)
+					return nil, ErrIncompatibleFilter(rule.Name, rule.MinEngineVersion)
 				}
 			}
 			for _, field := range f.GetFields() {
@@ -575,7 +575,10 @@ func (r *Rules) Compile() error {
 			}
 		}
 	}
-	return nil
+	if len(r.groups) == 0 {
+		return nil, nil
+	}
+	return r.buildCompileResult(), nil
 }
 
 func configureFSM(group config.FilterGroup, f Filter) *sequenceState {
@@ -622,6 +625,64 @@ func configureFSM(group config.FilterGroup, f Filter) *sequenceState {
 		Configure(sequenceExpiredState).
 		Permit(resetTransition, initialState)
 	return seqState
+}
+
+func (r *Rules) buildCompileResult() *config.RulesCompileResult {
+	rs := &config.RulesCompileResult{}
+
+	m := make(map[ktypes.Ktype]bool)
+	events := make([]ktypes.Ktype, 0)
+
+	for _, fg := range r.groups {
+		for _, g := range fg { // filter groups
+			for _, f := range g.filters { // filters
+				rs.NumberRules++
+				for name, values := range f.filter.GetStringFields() { // filter fields
+					for _, v := range values {
+						if name == fields.KevtName || name == fields.KevtCategory {
+							types := ktypes.KeventNameToKtypes(v)
+							for _, typ := range types {
+								switch typ.Category() {
+								case ktypes.Process:
+									rs.HasProcEvents = true
+								case ktypes.Thread:
+									rs.HasThreadEvents = true
+								case ktypes.Image:
+									rs.HasImageEvents = true
+								case ktypes.File:
+									rs.HasFileEvents = true
+								case ktypes.Net:
+									rs.HasNetworkEvents = true
+								case ktypes.Registry:
+									rs.HasRegistryEvents = true
+								case ktypes.Mem:
+									rs.HasMemEvents = true
+								case ktypes.Handle:
+									rs.HasHandleEvents = true
+								}
+								if typ == ktypes.MapViewFile || typ == ktypes.UnmapViewFile {
+									rs.HasVAMapEvents = true
+								}
+								if typ == ktypes.OpenProcess || typ == ktypes.OpenThread || typ == ktypes.SetThreadContext {
+									rs.HasAuditAPIEvents = true
+								}
+								if typ.Subcategory() == ktypes.DNS {
+									rs.HasDNSEvents = true
+								}
+								if m[typ] {
+									continue
+								}
+								events = append(events, typ)
+								m[typ] = true
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	rs.UsedEvents = events
+	return rs
 }
 
 func (r *Rules) appendMatch(f *config.FilterConfig, g config.FilterGroup, evts ...*kevent.Kevent) {

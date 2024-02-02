@@ -391,6 +391,7 @@ func (c *Config) addFlags() {
 		c.flags.Bool(enableRegistryKevents, true, "Determines whether registry kernel events are collected by Kernel Logger provider")
 		c.flags.Bool(enableNetKevents, true, "Determines whether network (TCP/UDP) kernel events are collected by Kernel Logger provider")
 		c.flags.Bool(enableFileIOKevents, true, "Determines whether disk I/O kernel events are collected by Kernel Logger provider")
+		c.flags.Bool(enableVAMapKevents, true, "Determines whether VA map/unmap events are collected by Kernel Logger provider")
 		c.flags.Bool(enableImageKevents, true, "Determines whether file I/O kernel events are collected by Kernel Logger provider")
 		c.flags.Bool(enableHandleKevents, false, "Determines whether object manager kernel events (handle creation/destruction) are collected by Kernel Logger provider")
 		c.flags.Bool(enableMemKevents, true, "Determines whether memory manager kernel events are collected by Kernel Logger provider")

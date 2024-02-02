@@ -20,6 +20,7 @@ package kstream
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -40,6 +41,7 @@ func TestStartTraces(t *testing.T) {
 					EnableThreadKevents: true,
 					EnableNetKevents:    true,
 					EnableFileIOKevents: true,
+					EnableVAMapKevents:  true,
 					BufferSize:          1024,
 					FlushTimer:          time.Millisecond * 2300,
 				},
@@ -53,6 +55,7 @@ func TestStartTraces(t *testing.T) {
 					EnableThreadKevents:   true,
 					EnableNetKevents:      true,
 					EnableFileIOKevents:   true,
+					EnableVAMapKevents:    true,
 					EnableHandleKevents:   true,
 					EnableRegistryKevents: true,
 					BufferSize:            1024,
@@ -67,7 +70,7 @@ func TestStartTraces(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := NewController(tt.cfg.Kstream)
+			ctrl := NewController(tt.cfg, nil)
 			require.NoError(t, ctrl.Start())
 			defer ctrl.Close()
 			assert.Equal(t, tt.wantSessions, len(ctrl.traces))
@@ -97,9 +100,54 @@ func TestRestartTrace(t *testing.T) {
 		},
 	}
 
-	ctrl := NewController(cfg.Kstream)
+	ctrl := NewController(cfg, nil)
 	require.NoError(t, ctrl.Start())
 	require.NoError(t, ctrl.Start())
 	require.NoError(t, etw.ControlTrace(0, ctrl.traces[0].Name, ctrl.traces[0].GUID, etw.Query))
 	require.NoError(t, ctrl.Close())
+}
+
+func TestEnableFlagsDynamically(t *testing.T) {
+	r := &config.RulesCompileResult{
+		HasProcEvents:     true,
+		HasImageEvents:    true,
+		HasRegistryEvents: true,
+		HasNetworkEvents:  true,
+		HasFileEvents:     true,
+		HasThreadEvents:   true,
+		HasVAMapEvents:    true,
+		HasAuditAPIEvents: true,
+		UsedEvents: []ktypes.Ktype{
+			ktypes.CreateProcess,
+			ktypes.LoadImage,
+			ktypes.RegCreateKey,
+			ktypes.RegSetValue,
+			ktypes.CreateFile,
+			ktypes.RenameFile,
+			ktypes.MapViewFile,
+			ktypes.OpenProcess,
+		},
+	}
+	cfg := &config.Config{
+		Kstream: config.KstreamConfig{
+			EnableThreadKevents:   true,
+			EnableRegistryKevents: true,
+			EnableImageKevents:    true,
+		},
+	}
+	ctrl := NewController(cfg, r)
+	require.Len(t, ctrl.Traces(), 2)
+	flags, ids := ctrl.Traces()[0].enableFlagsDynamically(cfg.Kstream)
+	require.Len(t, ids, 6)
+	require.True(t, flags&etw.Process != 0)
+	require.True(t, flags&etw.Thread != 0)
+	require.True(t, flags&etw.ImageLoad != 0)
+	require.True(t, flags&etw.Registry != 0)
+	require.True(t, flags&etw.NetTCPIP != 0)
+	require.True(t, flags&etw.FileIO != 0)
+	require.True(t, flags&etw.VaMap != 0)
+	require.True(t, cfg.Kstream.TestDropMask(ktypes.UnloadImage))
+	require.True(t, cfg.Kstream.TestDropMask(ktypes.WriteFile))
+	require.True(t, cfg.Kstream.TestDropMask(ktypes.UnmapViewFile))
+	require.False(t, cfg.Kstream.TestDropMask(ktypes.OpenProcess))
 }

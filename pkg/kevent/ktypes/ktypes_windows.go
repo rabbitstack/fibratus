@@ -27,7 +27,19 @@ import (
 
 // ProvidersCount designates the number of interesting providers.
 // Remember to increment if a new event source is introduced.
-const ProvidersCount = 10
+const ProvidersCount = 11
+
+// EventSource is the type that designates the provenance of the event
+type EventSource uint8
+
+const (
+	// SystemLogger event is emitted by the system provider
+	SystemLogger EventSource = iota
+	// AuditAPICallsLogger event is emitted by Audit API calls provider
+	AuditAPICallsLogger
+	// DNSLogger event is emitted by DNS provider
+	DNSLogger
+)
 
 // Ktype identifies an event type. It comprises the event GUID + hook ID to uniquely identify the event
 type Ktype [18]byte
@@ -43,8 +55,10 @@ var (
 	FileEventGUID = windows.GUID{Data1: 0x90cbdc39, Data2: 0x4a3e, Data3: 0x11d1, Data4: [8]byte{0x84, 0xf4, 0x0, 0x0, 0xf8, 0x04, 0x64, 0xe3}}
 	// RegistryEventGUID represents registry provider event GUID
 	RegistryEventGUID = windows.GUID{Data1: 0xae53722e, Data2: 0xc863, Data3: 0x11d2, Data4: [8]byte{0x86, 0x59, 0x0, 0xc0, 0x4f, 0xa3, 0x21, 0xa1}}
-	// NetworkEventGUID represents network provider event GUID
-	NetworkEventGUID = windows.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}
+	// NetworkTCPEventGUID represents network TCP provider event GUID
+	NetworkTCPEventGUID = windows.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}
+	// NetworkUDPEventGUID represents network UDP provider event GUID
+	NetworkUDPEventGUID = windows.GUID{Data1: 0xbf3a50c5, Data2: 0xa9c9, Data3: 0x4988, Data4: [8]byte{0xa0, 0x05, 0x2d, 0xf0, 0xb7, 0xc8, 0x0f, 0x80}}
 	// HandleEventGUID represents handle provider event GUID
 	HandleEventGUID = windows.GUID{Data1: 0x89497f50, Data2: 0xeffe, Data3: 0x4440, Data4: [8]byte{0x8c, 0xf2, 0xce, 0x6b, 0x1c, 0xdc, 0xac, 0xa7}}
 	// MemEventGUID represents memory provider event GUID
@@ -57,138 +71,138 @@ var (
 
 var (
 	// CreateProcess identifies process creation kernel events
-	CreateProcess = pack(windows.GUID{Data1: 0x3d6fa8d0, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}, 1)
+	CreateProcess = pack(ProcessEventGUID, 1)
 	// TerminateProcess identifies process termination kernel events
-	TerminateProcess = pack(windows.GUID{Data1: 0x3d6fa8d0, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}, 2)
+	TerminateProcess = pack(ProcessEventGUID, 2)
 	// ProcessRundown represents the start data collection process event that enumerates processes that are currently running at the time the kernel session starts
-	ProcessRundown = pack(windows.GUID{Data1: 0x3d6fa8d0, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}, 3)
+	ProcessRundown = pack(ProcessEventGUID, 3)
 	// OpenProcess identifies the kernel events that are triggered when the process handle is acquired
-	OpenProcess = pack(windows.GUID{Data1: 0xe02a841c, Data2: 0x75a3, Data3: 0x4fa7, Data4: [8]byte{0xaf, 0xc8, 0xae, 0x09, 0xcf, 0x9b, 0x7f, 0x23}}, 5)
+	OpenProcess = pack(AuditAPIEventGUID, 5)
 
 	// CreateThread identifies thread creation kernel events
-	CreateThread = pack(windows.GUID{Data1: 0x3d6fa8d1, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}, 1)
+	CreateThread = pack(ThreadEventGUID, 1)
 	// TerminateThread identifies thread termination kernel events
-	TerminateThread = pack(windows.GUID{Data1: 0x3d6fa8d1, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}, 2)
+	TerminateThread = pack(ThreadEventGUID, 2)
 	// ThreadRundown represents the start data collection thread event that enumerates threads that are currently running at the time the kernel session starts
-	ThreadRundown = pack(windows.GUID{Data1: 0x3d6fa8d1, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}, 3)
+	ThreadRundown = pack(ThreadEventGUID, 3)
 	// OpenThread identifies the kernel events that are triggered when the process acquires a thread handle
-	OpenThread = pack(windows.GUID{Data1: 0xe02a841c, Data2: 0x75a3, Data3: 0x4fa7, Data4: [8]byte{0xaf, 0xc8, 0xae, 0x09, 0xcf, 0x9b, 0x7f, 0x23}}, 6)
+	OpenThread = pack(AuditAPIEventGUID, 6)
 	// SetThreadContext identifies the kernel event that is fired when the thread context is changed
-	SetThreadContext = pack(windows.GUID{Data1: 0xe02a841c, Data2: 0x75a3, Data3: 0x4fa7, Data4: [8]byte{0xaf, 0xc8, 0xae, 0x09, 0xcf, 0x9b, 0x7f, 0x23}}, 4)
+	SetThreadContext = pack(AuditAPIEventGUID, 4)
 
 	// MapViewFile represents events that map a view of a file mapping into the address space of a calling process
-	MapViewFile = pack(windows.GUID{Data1: 0x90cbdc39, Data2: 0x4a3e, Data3: 0x11d1, Data4: [8]byte{0x84, 0xf4, 0x0, 0x0, 0xf8, 0x04, 0x64, 0xe3}}, 37)
+	MapViewFile = pack(FileEventGUID, 37)
 	// UnmapViewFile represents events that unmap a view of a file mapping from the address space of a calling process
-	UnmapViewFile = pack(windows.GUID{Data1: 0x90cbdc39, Data2: 0x4a3e, Data3: 0x11d1, Data4: [8]byte{0x84, 0xf4, 0x0, 0x0, 0xf8, 0x04, 0x64, 0xe3}}, 38)
+	UnmapViewFile = pack(FileEventGUID, 38)
 	// MapFileRundown represents the event that is emitted at the start of the tracing session to enumerate I/O mapped files
-	MapFileRundown = pack(windows.GUID{Data1: 0x90cbdc39, Data2: 0x4a3e, Data3: 0x11d1, Data4: [8]byte{0x84, 0xf4, 0x0, 0x0, 0xf8, 0x04, 0x64, 0xe3}}, 39)
+	MapFileRundown = pack(FileEventGUID, 39)
 
 	// FileRundown events are generated by kernel rundown logger to enumerate all open files on the start of the kernel session
-	FileRundown = pack(windows.GUID{Data1: 0x90cbdc39, Data2: 0x4a3e, Data3: 0x11d1, Data4: [8]byte{0x84, 0xf4, 0x0, 0x0, 0xf8, 0x04, 0x64, 0xe3}}, 36)
+	FileRundown = pack(FileEventGUID, 36)
 	// CreateFile represents events that create/open a file or I/O device
-	CreateFile = pack(windows.GUID{Data1: 0x90cbdc39, Data2: 0x4a3e, Data3: 0x11d1, Data4: [8]byte{0x84, 0xf4, 0x0, 0x0, 0xf8, 0x04, 0x64, 0xe3}}, 64)
+	CreateFile = pack(FileEventGUID, 64)
 	// ReleaseFile represents events that occur when the last file handle is disposed
-	ReleaseFile = pack(windows.GUID{Data1: 0x90cbdc39, Data2: 0x4a3e, Data3: 0x11d1, Data4: [8]byte{0x84, 0xf4, 0x0, 0x0, 0xf8, 0x04, 0x64, 0xe3}}, 65)
+	ReleaseFile = pack(FileEventGUID, 65)
 	// CloseFile represents events that dispose existing kernel file objects
-	CloseFile = pack(windows.GUID{Data1: 0x90cbdc39, Data2: 0x4a3e, Data3: 0x11d1, Data4: [8]byte{0x84, 0xf4, 0x0, 0x0, 0xf8, 0x04, 0x64, 0xe3}}, 66)
+	CloseFile = pack(FileEventGUID, 66)
 	// ReadFile represents events that read data from the file or I/O device
-	ReadFile = pack(windows.GUID{Data1: 0x90cbdc39, Data2: 0x4a3e, Data3: 0x11d1, Data4: [8]byte{0x84, 0xf4, 0x0, 0x0, 0xf8, 0x04, 0x64, 0xe3}}, 67)
+	ReadFile = pack(FileEventGUID, 67)
 	// WriteFile represents events that write data to the file or I/O device
-	WriteFile = pack(windows.GUID{Data1: 0x90cbdc39, Data2: 0x4a3e, Data3: 0x11d1, Data4: [8]byte{0x84, 0xf4, 0x0, 0x0, 0xf8, 0x04, 0x64, 0xe3}}, 68)
+	WriteFile = pack(FileEventGUID, 68)
 	// SetFileInformation represents events that set file information
-	SetFileInformation = pack(windows.GUID{Data1: 0x90cbdc39, Data2: 0x4a3e, Data3: 0x11d1, Data4: [8]byte{0x84, 0xf4, 0x0, 0x0, 0xf8, 0x04, 0x64, 0xe3}}, 69)
+	SetFileInformation = pack(FileEventGUID, 69)
 	// DeleteFile identifies file deletion events
-	DeleteFile = pack(windows.GUID{Data1: 0x90cbdc39, Data2: 0x4a3e, Data3: 0x11d1, Data4: [8]byte{0x84, 0xf4, 0x0, 0x0, 0xf8, 0x04, 0x64, 0xe3}}, 70)
+	DeleteFile = pack(FileEventGUID, 70)
 	// RenameFile identifies events that are responsible for renaming files
-	RenameFile = pack(windows.GUID{Data1: 0x90cbdc39, Data2: 0x4a3e, Data3: 0x11d1, Data4: [8]byte{0x84, 0xf4, 0x0, 0x0, 0xf8, 0x04, 0x64, 0xe3}}, 71)
+	RenameFile = pack(FileEventGUID, 71)
 	// EnumDirectory identifies enumerate directory and directory notification events
-	EnumDirectory = pack(windows.GUID{Data1: 0x90cbdc39, Data2: 0x4a3e, Data3: 0x11d1, Data4: [8]byte{0x84, 0xf4, 0x0, 0x0, 0xf8, 0x04, 0x64, 0xe3}}, 72)
+	EnumDirectory = pack(FileEventGUID, 72)
 	// FileOpEnd signals the finalization of the file operation
-	FileOpEnd = pack(windows.GUID{Data1: 0x90cbdc39, Data2: 0x4a3e, Data3: 0x11d1, Data4: [8]byte{0x84, 0xf4, 0x0, 0x0, 0xf8, 0x04, 0x64, 0xe3}}, 76)
+	FileOpEnd = pack(FileEventGUID, 76)
 
 	// RegCreateKey represents registry key creation kernel events
-	RegCreateKey = pack(windows.GUID{Data1: 0xae53722e, Data2: 0xc863, Data3: 0x11d2, Data4: [8]byte{0x86, 0x59, 0x0, 0xc0, 0x4f, 0xa3, 0x21, 0xa1}}, 10)
+	RegCreateKey = pack(RegistryEventGUID, 10)
 	// RegOpenKey represents registry open key kernel events
-	RegOpenKey = pack(windows.GUID{Data1: 0xae53722e, Data2: 0xc863, Data3: 0x11d2, Data4: [8]byte{0x86, 0x59, 0x0, 0xc0, 0x4f, 0xa3, 0x21, 0xa1}}, 11)
+	RegOpenKey = pack(RegistryEventGUID, 11)
 	// RegCloseKey represents registry close key kernel event.
-	RegCloseKey = pack(windows.GUID{Data1: 0xae53722e, Data2: 0xc863, Data3: 0x11d2, Data4: [8]byte{0x86, 0x59, 0x0, 0xc0, 0x4f, 0xa3, 0x21, 0xa1}}, 27)
+	RegCloseKey = pack(RegistryEventGUID, 27)
 	// RegDeleteKey represents registry key deletion kernel events
-	RegDeleteKey = pack(windows.GUID{Data1: 0xae53722e, Data2: 0xc863, Data3: 0x11d2, Data4: [8]byte{0x86, 0x59, 0x0, 0xc0, 0x4f, 0xa3, 0x21, 0xa1}}, 12)
+	RegDeleteKey = pack(RegistryEventGUID, 12)
 	// RegQueryKey represents registry query key kernel events
-	RegQueryKey = pack(windows.GUID{Data1: 0xae53722e, Data2: 0xc863, Data3: 0x11d2, Data4: [8]byte{0x86, 0x59, 0x0, 0xc0, 0x4f, 0xa3, 0x21, 0xa1}}, 13)
+	RegQueryKey = pack(RegistryEventGUID, 13)
 	// RegSetValue represents registry set value kernel events
-	RegSetValue = pack(windows.GUID{Data1: 0xae53722e, Data2: 0xc863, Data3: 0x11d2, Data4: [8]byte{0x86, 0x59, 0x0, 0xc0, 0x4f, 0xa3, 0x21, 0xa1}}, 14)
+	RegSetValue = pack(RegistryEventGUID, 14)
 	// RegDeleteValue are kernel events for registry value removals
-	RegDeleteValue = pack(windows.GUID{Data1: 0xae53722e, Data2: 0xc863, Data3: 0x11d2, Data4: [8]byte{0x86, 0x59, 0x0, 0xc0, 0x4f, 0xa3, 0x21, 0xa1}}, 15)
+	RegDeleteValue = pack(RegistryEventGUID, 15)
 	// RegQueryValue are kernel events for registry value queries
-	RegQueryValue = pack(windows.GUID{Data1: 0xae53722e, Data2: 0xc863, Data3: 0x11d2, Data4: [8]byte{0x86, 0x59, 0x0, 0xc0, 0x4f, 0xa3, 0x21, 0xa1}}, 16)
+	RegQueryValue = pack(RegistryEventGUID, 16)
 	// RegCreateKCB represents kernel events for KCB (Key Control Block) creation requests
-	RegCreateKCB = pack(windows.GUID{Data1: 0xae53722e, Data2: 0xc863, Data3: 0x11d2, Data4: [8]byte{0x86, 0x59, 0x0, 0xc0, 0x4f, 0xa3, 0x21, 0xa1}}, 22)
+	RegCreateKCB = pack(RegistryEventGUID, 22)
 	// RegDeleteKCB represents kernel events for KCB(Key Control Block) closures
-	RegDeleteKCB = pack(windows.GUID{Data1: 0xae53722e, Data2: 0xc863, Data3: 0x11d2, Data4: [8]byte{0x86, 0x59, 0x0, 0xc0, 0x4f, 0xa3, 0x21, 0xa1}}, 23)
+	RegDeleteKCB = pack(RegistryEventGUID, 23)
 	// RegKCBRundown enumerates the registry keys open at the start of the kernel session.
-	RegKCBRundown = pack(windows.GUID{Data1: 0xae53722e, Data2: 0xc863, Data3: 0x11d2, Data4: [8]byte{0x86, 0x59, 0x0, 0xc0, 0x4f, 0xa3, 0x21, 0xa1}}, 25)
+	RegKCBRundown = pack(RegistryEventGUID, 25)
 
 	// UnloadImage represents unload image kernel events
-	UnloadImage = pack(windows.GUID{Data1: 0x2cb15d1d, Data2: 0x5fc1, Data3: 0x11d2, Data4: [8]byte{0xab, 0xe1, 0x0, 0xa0, 0xc9, 0x11, 0xf5, 0x18}}, 2)
+	UnloadImage = pack(ImageEventGUID, 2)
 	// ImageRundown represents kernel events that is triggered to enumerate all loaded images
-	ImageRundown = pack(windows.GUID{Data1: 0x2cb15d1d, Data2: 0x5fc1, Data3: 0x11d2, Data4: [8]byte{0xab, 0xe1, 0x0, 0xa0, 0xc9, 0x11, 0xf5, 0x18}}, 3)
+	ImageRundown = pack(ImageEventGUID, 3)
 	// LoadImage represents load image kernel events that are triggered when a DLL or executable file  is loaded
-	LoadImage = pack(windows.GUID{Data1: 0x2cb15d1d, Data2: 0x5fc1, Data3: 0x11d2, Data4: [8]byte{0xab, 0xe1, 0x0, 0xa0, 0xc9, 0x11, 0xf5, 0x18}}, 10)
+	LoadImage = pack(ImageEventGUID, 10)
 
 	// AcceptTCPv4 represents the TCPv4 kernel events for accepting connection requests from the socket queue.
-	AcceptTCPv4 = pack(windows.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 15)
+	AcceptTCPv4 = pack(NetworkTCPEventGUID, 15)
 	// AcceptTCPv6 represents the TCPv6 kernel events for accepting connection requests from the socket queue.
-	AcceptTCPv6 = pack(windows.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 31)
+	AcceptTCPv6 = pack(NetworkTCPEventGUID, 31)
 	// SendTCPv4 represents the TCPv4 kernel events for sending data to the connected socket.
-	SendTCPv4 = pack(windows.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 10)
+	SendTCPv4 = pack(NetworkTCPEventGUID, 10)
 	// SendTCPv6 represents the TCPv6 kernel events for sending data to the connected socket.
-	SendTCPv6 = pack(windows.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 26)
+	SendTCPv6 = pack(NetworkTCPEventGUID, 26)
 	// SendUDPv4 represents the UDPv4 kernel events for sending datagrams to connectionless sockets.
-	SendUDPv4 = pack(windows.GUID{Data1: 0xbf3a50c5, Data2: 0xa9c9, Data3: 0x4988, Data4: [8]byte{0xa0, 0x05, 0x2d, 0xf0, 0xb7, 0xc8, 0x0f, 0x80}}, 10)
+	SendUDPv4 = pack(NetworkUDPEventGUID, 10)
 	// SendUDPv6 represents the UDPv6 kernel events for sending datagrams to connectionless sockets.
-	SendUDPv6 = pack(windows.GUID{Data1: 0xbf3a50c5, Data2: 0xa9c9, Data3: 0x4988, Data4: [8]byte{0xa0, 0x05, 0x2d, 0xf0, 0xb7, 0xc8, 0x0f, 0x80}}, 26)
+	SendUDPv6 = pack(NetworkUDPEventGUID, 26)
 	// RecvTCPv4 represents the TCP IPv4 network receive event.
-	RecvTCPv4 = pack(windows.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 11)
+	RecvTCPv4 = pack(NetworkTCPEventGUID, 11)
 	// RecvTCPv6 represents the TCP IPv6 network receive event.
-	RecvTCPv6 = pack(windows.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 27)
+	RecvTCPv6 = pack(NetworkTCPEventGUID, 27)
 	// RecvUDPv4 represents the UDP IPv4 network receive event.
-	RecvUDPv4 = pack(windows.GUID{Data1: 0xbf3a50c5, Data2: 0xa9c9, Data3: 0x4988, Data4: [8]byte{0xa0, 0x05, 0x2d, 0xf0, 0xb7, 0xc8, 0x0f, 0x80}}, 11)
+	RecvUDPv4 = pack(NetworkUDPEventGUID, 11)
 	// RecvUDPv6 represents the UDP IPv6 network receive event.
-	RecvUDPv6 = pack(windows.GUID{Data1: 0xbf3a50c5, Data2: 0xa9c9, Data3: 0x4988, Data4: [8]byte{0xa0, 0x05, 0x2d, 0xf0, 0xb7, 0xc8, 0x0f, 0x80}}, 27)
+	RecvUDPv6 = pack(NetworkUDPEventGUID, 27)
 	// ConnectTCPv4 represents the TCP IPv4 network connect event.
-	ConnectTCPv4 = pack(windows.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 12)
+	ConnectTCPv4 = pack(NetworkTCPEventGUID, 12)
 	// ConnectTCPv6 represents the TCP IPv6 network connect event.
-	ConnectTCPv6 = pack(windows.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 28)
+	ConnectTCPv6 = pack(NetworkTCPEventGUID, 28)
 	// DisconnectTCPv4 is the TCP IPv4 network disconnect event.
-	DisconnectTCPv4 = pack(windows.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 13)
+	DisconnectTCPv4 = pack(NetworkTCPEventGUID, 13)
 	// DisconnectTCPv6 is the TCP IPv6 network disconnect event.
-	DisconnectTCPv6 = pack(windows.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 29)
+	DisconnectTCPv6 = pack(NetworkTCPEventGUID, 29)
 	// ReconnectTCPv4 is the TCP IPv4 network reconnect event.
-	ReconnectTCPv4 = pack(windows.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 16)
+	ReconnectTCPv4 = pack(NetworkTCPEventGUID, 16)
 	// ReconnectTCPv6 is the TCP IPv6 network reconnect event.
-	ReconnectTCPv6 = pack(windows.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 32)
+	ReconnectTCPv6 = pack(NetworkTCPEventGUID, 32)
 	// RetransmitTCPv4 is the TCP IPv4 network retransmit event.
-	RetransmitTCPv4 = pack(windows.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 14)
+	RetransmitTCPv4 = pack(NetworkTCPEventGUID, 14)
 	// RetransmitTCPv6 is the TCP IPv6 network retransmit event.
-	RetransmitTCPv6 = pack(windows.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}, 30)
+	RetransmitTCPv6 = pack(NetworkTCPEventGUID, 30)
 
 	// CreateHandle represents handle creation event
-	CreateHandle = pack(windows.GUID{Data1: 0x89497f50, Data2: 0xeffe, Data3: 0x4440, Data4: [8]byte{0x8c, 0xf2, 0xce, 0x6b, 0x1c, 0xdc, 0xac, 0xa7}}, 32)
+	CreateHandle = pack(HandleEventGUID, 32)
 	// CloseHandle represents handle closure event
-	CloseHandle = pack(windows.GUID{Data1: 0x89497f50, Data2: 0xeffe, Data3: 0x4440, Data4: [8]byte{0x8c, 0xf2, 0xce, 0x6b, 0x1c, 0xdc, 0xac, 0xa7}}, 33)
+	CloseHandle = pack(HandleEventGUID, 33)
 	// DuplicateHandle represents handle duplication event
-	DuplicateHandle = pack(windows.GUID{Data1: 0x89497f50, Data2: 0xeffe, Data3: 0x4440, Data4: [8]byte{0x8c, 0xf2, 0xce, 0x6b, 0x1c, 0xdc, 0xac, 0xa7}}, 34)
+	DuplicateHandle = pack(HandleEventGUID, 34)
 
 	// VirtualAlloc represents virtual memory allocation event
-	VirtualAlloc = pack(windows.GUID{Data1: 0x3d6fa8d3, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x00, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}, 98)
+	VirtualAlloc = pack(MemEventGUID, 98)
 	// VirtualFree represents virtual memory release event
-	VirtualFree = pack(windows.GUID{Data1: 0x3d6fa8d3, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x00, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}, 99)
+	VirtualFree = pack(MemEventGUID, 99)
 
 	// QueryDNS represents DNS query events
-	QueryDNS = pack(windows.GUID{Data1: 0x1c95126e, Data2: 0x7eea, Data3: 0x49a9, Data4: [8]byte{0xa3, 0xfe, 0xa3, 0x78, 0xb0, 0x3d, 0xdb, 0x4d}}, 3006)
+	QueryDNS = pack(DNSEventGUID, 3006)
 	// ReplyDNS represents the DNS response events
-	ReplyDNS = pack(windows.GUID{Data1: 0x1c95126e, Data2: 0x7eea, Data3: 0x49a9, Data4: [8]byte{0xa3, 0xfe, 0xa3, 0x78, 0xb0, 0x3d, 0xdb, 0x4d}}, 3008)
+	ReplyDNS = pack(DNSEventGUID, 3008)
 
 	// StackWalk represents stack walk event with the collection of return addresses
 	StackWalk = pack(windows.GUID{Data1: 0xdef2fe46, Data2: 0x7bd6, Data3: 0x4b80, Data4: [8]byte{0xbd, 0x94, 0xf5, 0x7f, 0xe2, 0x0d, 0x0c, 0xe3}}, 32)
@@ -521,6 +535,18 @@ func (k *Ktype) GUID() windows.GUID {
 // HookID returns the event operation code (hook ID) from the raw ktype.
 func (k *Ktype) HookID() uint16 {
 	return binary.BigEndian.Uint16(k[16:])
+}
+
+// Source designates the provenance of this event type.
+func (k Ktype) Source() EventSource {
+	switch k {
+	case OpenProcess, OpenThread, SetThreadContext:
+		return AuditAPICallsLogger
+	case QueryDNS, ReplyDNS:
+		return DNSLogger
+	default:
+		return SystemLogger
+	}
 }
 
 // pack merges event provider GUID and the hook ID into `Ktype` array.

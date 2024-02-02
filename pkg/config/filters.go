@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"github.com/Masterminds/sprig/v3"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/util/hashers"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	log "github.com/sirupsen/logrus"
@@ -33,6 +34,7 @@ import (
 	u "net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"text/template"
@@ -169,6 +171,75 @@ type ActionContext struct {
 	Filter *FilterConfig
 	// Group represents the group where the filter is declared
 	Group FilterGroup
+}
+
+// RulesCompileResult contains the stats of the
+// compiled ruleset, like which event types or
+// categories are used. This information permits
+// enabling/disabling event providers/types
+// dynamically.
+type RulesCompileResult struct {
+	HasProcEvents     bool
+	HasThreadEvents   bool
+	HasImageEvents    bool
+	HasFileEvents     bool
+	HasNetworkEvents  bool
+	HasRegistryEvents bool
+	HasHandleEvents   bool
+	HasMemEvents      bool
+	HasVAMapEvents    bool
+	HasDNSEvents      bool
+	HasAuditAPIEvents bool
+	UsedEvents        []ktypes.Ktype
+	NumberRules       int
+}
+
+func (r RulesCompileResult) ContainsEvent(ktype ktypes.Ktype) bool {
+	for _, ktyp := range r.UsedEvents {
+		if ktyp == ktype {
+			return true
+		}
+	}
+	return false
+}
+
+func (r RulesCompileResult) String() string {
+	m := map[string]bool{}
+	events := make([]string, 0)
+	for _, ktyp := range r.UsedEvents {
+		if m[ktyp.String()] {
+			continue
+		}
+		events = append(events, ktyp.String())
+		m[ktyp.String()] = true
+	}
+	slices.Sort(events)
+	return fmt.Sprintf(`
+		HasProcEvents: %t
+		HasThreadEvents: %t
+		HasImageEvents: %t
+		HasFileEvents: %t
+		HasRegistryEvents: %t
+		HasNetworkEvents: %t
+		HasHandleEvents: %t
+		HasMemEvents: %t
+		HasVAMapEvents: %t
+		HasAuditAPIEvents: %t
+		HasDNSEvents: %t
+		Events: %s`,
+		r.HasProcEvents,
+		r.HasThreadEvents,
+		r.HasImageEvents,
+		r.HasFileEvents,
+		r.HasRegistryEvents,
+		r.HasNetworkEvents,
+		r.HasHandleEvents,
+		r.HasMemEvents,
+		r.HasVAMapEvents,
+		r.HasAuditAPIEvents,
+		r.HasDNSEvents,
+		strings.Join(events, ", "),
+	)
 }
 
 const (

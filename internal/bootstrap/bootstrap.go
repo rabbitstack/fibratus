@@ -51,6 +51,7 @@ type App struct {
 	config     *config.Config
 	controller *kstream.Controller
 	symbolizer *symbolize.Symbolizer
+	rules      *filter.Rules
 	hsnap      handle.Snapshotter
 	psnap      ps.Snapshotter
 	consumer   kstream.Consumer
@@ -102,8 +103,8 @@ func WithHandleSnapshotFn(fn handle.SnapshotBuildCompleted) Option {
 // NewApp constructs a new bootstrap application with the specified configuration
 // and a list of options. The configuration is passed from individual command work
 // functions.
-func NewApp(config *config.Config, options ...Option) (*App, error) {
-	if err := InitConfigAndLogger(config); err != nil {
+func NewApp(cfg *config.Config, options ...Option) (*App, error) {
+	if err := InitConfigAndLogger(cfg); err != nil {
 		return nil, err
 	}
 	var opts opts
@@ -111,35 +112,55 @@ func NewApp(config *config.Config, options ...Option) (*App, error) {
 	for _, opt := range options {
 		opt(&opts)
 	}
-	if config.DebugPrivilege && opts.setDebugPrivilege {
+	if cfg.DebugPrivilege && opts.setDebugPrivilege {
 		sys.SetDebugPrivilege()
 	}
 	if opts.installSignals {
 		sigs = signals.Install()
 	}
 	if opts.isCaptureReplay {
-		reader, err := kcap.NewReader(config.KcapFile, config)
+		reader, err := kcap.NewReader(cfg.KcapFile, cfg)
 		if err != nil {
 			return nil, err
 		}
 		app := &App{
-			config:  config,
+			config:  cfg,
 			reader:  reader,
 			signals: sigs,
 		}
 		return app, nil
 	}
 
-	hsnap := handle.NewSnapshotter(config, opts.handleSnapshotFn)
-	psnap := ps.NewSnapshotter(hsnap, config)
-	controller := kstream.NewController(config.Kstream)
+	hsnap := handle.NewSnapshotter(cfg, opts.handleSnapshotFn)
+	psnap := ps.NewSnapshotter(hsnap, cfg)
+
+	var (
+		rules *filter.Rules
+		res   *config.RulesCompileResult
+	)
+	if cfg.Filters.Rules.Enabled {
+		rules = filter.NewRules(psnap, cfg)
+		var err error
+		res, err = rules.Compile()
+		if err != nil {
+			return nil, err
+		}
+		if res != nil {
+			log.Infof("rules compile summary: %s", res)
+		}
+	} else {
+		log.Info("rule engine is disabled")
+	}
+
+	controller := kstream.NewController(cfg, res)
 
 	app := &App{
-		config:     config,
+		config:     cfg,
 		controller: controller,
+		rules:      rules,
 		hsnap:      hsnap,
 		psnap:      psnap,
-		consumer:   kstream.NewConsumer(controller, psnap, hsnap, config),
+		consumer:   kstream.NewConsumer(controller, psnap, hsnap, cfg),
 		signals:    sigs,
 	}
 	return app, nil
@@ -170,17 +191,7 @@ func (f *App) Run(args []string) error {
 	if err != nil {
 		return err
 	}
-	// initialize rules engine
-	var rules *filter.Rules
-	if f.config.Filters.Rules.Enabled {
-		rules = filter.NewRules(f.psnap, cfg)
-		err = rules.Compile()
-		if err != nil {
-			return err
-		}
-	} else {
-		log.Info("rule engine is disabled")
-	}
+
 	// build the filter from the CLI argument. If we got
 	// a valid expression the filter is attached to the
 	// event consumer
@@ -233,8 +244,8 @@ func (f *App) Run(args []string) error {
 			f.consumer.RegisterEventListener(f.symbolizer)
 		}
 		// register rule engine
-		if rules != nil {
-			f.consumer.RegisterEventListener(rules)
+		if f.rules != nil {
+			f.consumer.RegisterEventListener(f.rules)
 		}
 		// register YARA scanner
 		if cfg.Yara.Enabled {

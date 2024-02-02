@@ -188,7 +188,7 @@ func TestLiveKcap(t *testing.T) {
 	<-wait
 
 	// initiate the kernel trace and start consuming from the event stream
-	ktracec := kstream.NewController(cfg.Kstream)
+	ktracec := kstream.NewController(cfg, nil)
 	err := ktracec.Start()
 	if err != nil {
 		t.Fatal(err)

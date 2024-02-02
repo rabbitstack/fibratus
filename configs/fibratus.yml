@@ -195,6 +195,9 @@ kstream:
   # Determines whether file kernel events are collected by Kernel Logger provider
   #enable-fileio: true
 
+  # Determines whether VA map/unmap events are collected by Kernel Logger provider
+  #enable-vamap: true
+
   # Determines whether image kernel events are collected by Kernel Logger provider
   #enable-image: true
 

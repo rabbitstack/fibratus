@@ -172,6 +172,7 @@ var schema = `
 				"enable-image": 	{"type": "boolean"},
 				"enable-registry": 	{"type": "boolean"},
 				"enable-fileio": 	{"type": "boolean"},
+				"enable-vamap":		{"type": "boolean"},
 				"enable-handle": 	{"type": "boolean"},
 				"enable-net": 		{"type": "boolean"},
 				"enable-mem": 		{"type": "boolean"},
@@ -185,7 +186,7 @@ var schema = `
 				"blacklist":		{
 					"type": "object",
 					"properties":	{
-						"events":	{"type": "array", "items": {"type": "string", "enum": ["CreateThread", "TerminateThread", "OpenProcess", "OpenThread", "SetThreadContext", "LoadImage", "UnloadImage", "CreateFile", "CloseFile", "ReadFile", "WriteFile", "DeleteFile", "RenameFile", "SetFileInformation", "EnumDirectory", "MapViewFile", "UnmapViewFile", "RegCreateKey", "RegOpenKey", "RegSetValue", "RegQueryValue", "RegQueryKey", "RegDeleteKey", "RegDeleteValue", "RegCloseKey", "Accept", "Send", "Recv", "Connect", "Disconnect", "Reconnect", "Retransmit", "CreateHandle", "CloseHandle", "DuplicateHandle", "QueryDns", "ReplyDns"]}},
+						"events":	{"type": "array", "items": {"type": "string", "enum": ["CreateThread", "TerminateThread", "OpenProcess", "OpenThread", "SetThreadContext", "LoadImage", "UnloadImage", "CreateFile", "CloseFile", "ReadFile", "WriteFile", "DeleteFile", "RenameFile", "SetFileInformation", "EnumDirectory", "MapViewFile", "UnmapViewFile", "RegCreateKey", "RegOpenKey", "RegSetValue", "RegQueryValue", "RegQueryKey", "RegDeleteKey", "RegDeleteValue", "RegCloseKey", "Accept", "Send", "Recv", "Connect", "Disconnect", "Reconnect", "Retransmit", "CreateHandle", "CloseHandle", "DuplicateHandle", "QueryDns", "ReplyDns", "VirtualAlloc", "VirtualFree"]}},
 						"images":	{"type": "array", "items": {"type": "string", "minLength": 1}}
 					},
 					"additionalProperties": false
