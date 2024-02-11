@@ -300,6 +300,10 @@ func (c *Config) Init() error {
 	return nil
 }
 
+// IsCaptureSet determines if the events are stored
+// in the capture file.
+func (c *Config) IsCaptureSet() bool { return c.KcapFile != "" }
+
 // TryLoadFile attempts to load the configuration file from specified path on the file system.
 func (c *Config) TryLoadFile(file string) error {
 	c.viper.SetConfigFile(file)

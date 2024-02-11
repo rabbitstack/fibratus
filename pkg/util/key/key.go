@@ -30,8 +30,8 @@ import (
 )
 
 var (
-	hklmPrefixes = []string{"\\REGISTRY\\MACHINE", "\\Registry\\Machine", "\\Registry\\MACHINE"}
-	hkcrPrefixes = []string{"\\REGISTRY\\MACHINE\\SOFTWARE\\CLASSES", "\\Registry\\Machine\\Software\\Classes"}
+	hklmPrefixes = []string{"\\REGISTRY\\MACHINE", "\\Registry\\Machine", "\\Registry\\MACHINE", "\\registry\\machine"}
+	hkcrPrefixes = []string{"\\REGISTRY\\MACHINE\\SOFTWARE\\CLASSES", "\\Registry\\Machine\\Software\\Classes", "\\REGISTRY\\COMROOT\\CLASSES"}
 	hkuPrefixes  = []string{"\\REGISTRY\\USER", "\\Registry\\User"}
 )
 

@@ -31,7 +31,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kstream/processors"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
-	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -55,32 +54,38 @@ var (
 
 	// excludedKevents counts the number of excluded events
 	excludedKevents = expvar.NewInt("kstream.excluded.kevents")
-	// excludedProcs counts the number of excluded events by process executable image name
-	excludedProcs = expvar.NewInt("kstream.excluded.procs")
 
 	// buffersRead amount of buffers fetched from the ETW session
 	buffersRead = expvar.NewInt("kstream.kbuffers.read")
 )
 
+// consumer is responsible for opening trace
+// sessions and allocating event sinks.
+// For each running session, a separate instance
+// of the event sink is assigned.
 type consumer struct {
 	controller *Controller
+	errs       chan error
+	evts       chan *kevent.Kevent
+	sequencer  *kevent.Sequencer
+	eventSinks map[string]*sink
+	config     *config.Config
+	stop       chan struct{}
+}
 
-	errs      chan error
-	q         *kevent.Queue
-	sequencer *kevent.Sequencer
-
+// sink receives events from the consumer
+// process event callbacks, parses the event,
+// runs registered listeners, and forwards
+// events to the main output channel.
+type sink struct {
+	q          *kevent.Queue
+	sequencer  *kevent.Sequencer
 	processors processors.Chain
-
-	config *config.Config
-
-	psnap ps.Snapshotter
-
-	filter filter.Filter
-
-	// capture indicates if events are dumped to capture files
-	capture bool
-
-	stop chan struct{}
+	psnap      ps.Snapshotter
+	config     *config.Config
+	errs       chan error
+	filter     filter.Filter
+	quit       chan struct{}
 }
 
 // NewConsumer constructs a new event stream consumer.
@@ -91,21 +96,26 @@ func NewConsumer(
 	config *config.Config,
 ) Consumer {
 	kconsumer := &consumer{
+		eventSinks: make(map[string]*sink, 0),
 		controller: controller,
+		evts:       make(chan *kevent.Kevent, 500),
 		errs:       make(chan error, 1000),
-		q:          kevent.NewQueue(500, config.Kstream.StackEnrichment),
 		config:     config,
-		psnap:      psnap,
-		capture:    config.KcapFile != "",
-		sequencer:  kevent.NewSequencer(),
-		processors: processors.NewChain(psnap, hsnap, config),
 		stop:       make(chan struct{}),
+		sequencer:  kevent.NewSequencer(),
 	}
+
+	kconsumer.initSinks(psnap, hsnap)
+
 	return kconsumer
 }
 
 // SetFilter sets the filter to run on every captured event.
-func (k *consumer) SetFilter(filter filter.Filter) { k.filter = filter }
+func (k *consumer) SetFilter(filter filter.Filter) {
+	for _, s := range k.eventSinks {
+		s.filter = filter
+	}
+}
 
 // Open initializes the event stream by setting the event record callback and instructing it
 // to consume events from log buffers. This operation can fail if opening any tracing session
@@ -115,7 +125,11 @@ func (k *consumer) Open() error {
 		if !trace.IsStarted() {
 			continue
 		}
-		err := trace.Open(k.bufferStatsCallback, k.processEventCallback)
+		sink := k.eventSinks[trace.Name]
+		if sink == nil {
+			return fmt.Errorf("consumer sink not allocated for %s trace", trace.Name)
+		}
+		err := trace.Open(k.bufferStatsCallback, sink.processEventCallback)
 		if err != nil {
 			return fmt.Errorf("unable to open %s trace: %v", trace.Name, err)
 		}
@@ -141,14 +155,22 @@ func (k *consumer) Open() error {
 
 // Close shutdowns the event stream consumer by closing all running traces.
 func (k *consumer) Close() error {
+	for _, s := range k.eventSinks {
+		err := s.stop()
+		if err != nil {
+			return err
+		}
+	}
 	close(k.stop)
-	return multierror.Wrap(k.sequencer.Shutdown(), k.processors.Close())
+	return k.sequencer.Shutdown()
 }
 
 // RegisterEventListener registers a new event listener that is invoked before
 // the event is pushed to the output queue.
 func (k *consumer) RegisterEventListener(listener kevent.Listener) {
-	k.q.RegisterListener(listener)
+	for _, s := range k.eventSinks {
+		s.q.RegisterListener(listener)
+	}
 }
 
 // Errors returns a channel where errors are pushed.
@@ -158,7 +180,7 @@ func (k *consumer) Errors() <-chan error {
 
 // Events returns the buffered channel where collected events are pushed
 func (k *consumer) Events() <-chan *kevent.Kevent {
-	return k.q.Events()
+	return k.evts
 }
 
 // bufferStatsCallback is periodically triggered by ETW subsystem for the purpose of reporting
@@ -168,40 +190,58 @@ func (k *consumer) bufferStatsCallback(logfile *etw.EventTraceLogfile) uintptr {
 	return callbackNext
 }
 
+// initSinks creates an event sink per tracing session.
+func (k *consumer) initSinks(psnap ps.Snapshotter, hsnap handle.Snapshotter) {
+	for _, trace := range k.controller.Traces() {
+		s := &sink{
+			q:          kevent.NewQueue(500, k.config.Kstream.StackEnrichment, k.config.Filters.Rules.Enabled),
+			sequencer:  k.sequencer,
+			processors: processors.NewChain(psnap, hsnap, k.config),
+			psnap:      psnap,
+			errs:       k.errs,
+			config:     k.config,
+			quit:       make(chan struct{}),
+		}
+		go s.run(k.evts)
+		k.eventSinks[trace.Name] = s
+	}
+}
+
+// run awaits events from the event queue and
+// forwards to the main output channel.
+func (s *sink) run(evts chan *kevent.Kevent) {
+	for {
+		select {
+		case evt := <-s.q.Events():
+			evts <- evt
+		case <-s.quit:
+			return
+		}
+	}
+}
+
+// stop stops sink processing.
+func (s *sink) stop() error {
+	close(s.quit)
+	return s.processors.Close()
+}
+
 // processEventCallback is the event callback function signature that is called each time
 // a new event is available on the session buffer. It does the heavy lifting of parsing inbound
 // ETW events from raw data buffers, building the state machine, and pushing events to the channel.
-func (k *consumer) processEventCallback(ev *etw.EventRecord) uintptr {
-	if err := k.processEvent(ev); err != nil {
-		k.errs <- err
+func (s *sink) processEventCallback(ev *etw.EventRecord) uintptr {
+	if err := s.processEvent(ev); err != nil {
+		s.errs <- err
 		failedKevents.Add(err.Error(), 1)
 	}
 	return callbackNext
 }
 
-func (k *consumer) isEventDropped(evt *kevent.Kevent) bool {
-	if evt.IsDropped(k.capture) {
-		return true
-	}
-	if evt.IsStackWalk() {
-		// we always permit stack walk events
-		return false
-	}
-	if k.config.Kstream.ExcludeImage(evt.PS) {
-		excludedProcs.Add(1)
-		return true
-	}
-	if k.filter != nil {
-		return !k.filter.Run(evt)
-	}
-	return false
-}
-
-func (k *consumer) processEvent(ev *etw.EventRecord) error {
+func (s *sink) processEvent(ev *etw.EventRecord) error {
 	if kevent.IsCurrentProcDropped(ev.Header.ProcessID) {
 		return nil
 	}
-	if k.config.Kstream.ExcludeKevent(ev.Header.ProviderID, ev.HookID()) {
+	if s.config.Kstream.ExcludeKevent(ev.Header.ProviderID, ev.HookID()) {
 		excludedKevents.Add(1)
 		return nil
 	}
@@ -211,7 +251,7 @@ func (k *consumer) processEvent(ev *etw.EventRecord) error {
 		return nil
 	}
 	keventsProcessed.Add(1)
-	evt := kevent.New(k.sequencer.Get(), ktype, ev)
+	evt := kevent.New(s.sequencer.Get(), ktype, ev)
 	// Dispatch each event to the processor chain.
 	// Processors may further augment the event with
 	// useful fields or play the role of state managers.
@@ -219,16 +259,16 @@ func (k *consumer) processEvent(ev *etw.EventRecord) error {
 	// at the beginning of the kernel trace session is an
 	// example of state management
 	var err error
-	evt, err = k.processors.ProcessEvent(evt)
+	evt, err = s.processors.ProcessEvent(evt)
 	if err != nil {
 		return err
 	}
 	if evt.WaitEnqueue {
 		return nil
 	}
-	ok, proc := k.psnap.Find(evt.PID)
+	ok, proc := s.psnap.Find(evt.PID)
 	if !ok {
-		k.psnap.Put(proc)
+		s.psnap.Put(proc)
 	}
 	// Associate process' state with the event.
 	// We only override the process' state if it hasn't
@@ -241,13 +281,24 @@ func (k *consumer) processEvent(ev *etw.EventRecord) error {
 	if evt.PS == nil {
 		evt.PS = proc
 	}
-	if k.isEventDropped(evt) {
+	// Drop any events if it is originated by the
+	// current process, state event, or if the
+	// process image is in the exclusion list.
+	// Stack walk events are forwarded to the
+	// event queue for stack enrichment. Lastly,
+	// the filter is evaluated on the event to
+	// decide whether it should get dropped
+	if (evt.IsDropped(s.config.IsCaptureSet()) ||
+		s.config.Kstream.ExcludeImage(evt.PS)) && !evt.IsStackWalk() {
 		keventsDropped.Add(1)
+		return nil
+	}
+	if s.filter != nil && !s.filter.Run(evt) {
 		return nil
 	}
 	// Increment sequence
 	if !evt.IsState() {
-		k.sequencer.Increment()
+		s.sequencer.Increment()
 	}
-	return k.q.Push(evt)
+	return s.q.Push(evt)
 }

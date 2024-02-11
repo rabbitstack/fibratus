@@ -32,6 +32,7 @@ import (
 	"golang.org/x/sys/windows"
 	"os"
 	"strings"
+	"sync"
 	"unsafe"
 )
 
@@ -42,6 +43,7 @@ var (
 	currentPid = uint32(os.Getpid())
 	// rundowns stores the hashes of processed rundown events
 	rundowns = map[uint64]bool{}
+	mu       sync.Mutex
 )
 
 // New constructs a fresh event instance with basic fields and parameters. If the published
@@ -198,7 +200,9 @@ func (e Kevent) IsSuccess() bool {
 // function which causes duplicate rundown events.
 // For more pointers check `kstream/controller_windows.go`
 // and the `etw.SetTraceInformation` API function.
-func (e Kevent) IsRundownProcessed() bool {
+func (e *Kevent) IsRundownProcessed() bool {
+	mu.Lock()
+	defer mu.Unlock()
 	key := e.RundownKey()
 	_, isProcessed := rundowns[key]
 	if isProcessed {

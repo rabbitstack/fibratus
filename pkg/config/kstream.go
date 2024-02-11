@@ -51,7 +51,7 @@ const (
 	excludedEvents = "kstream.blacklist.events"
 	excludedImages = "kstream.blacklist.images"
 
-	maxBufferSize = uint32(1024)
+	maxBufferSize = uint32(512)
 )
 
 var (

@@ -549,6 +549,9 @@ func (k Ktype) Source() EventSource {
 	}
 }
 
+// FromParts builds ktype from provider GUID and hook ID.
+func FromParts(g windows.GUID, id uint16) Ktype { return pack(g, id) }
+
 // pack merges event provider GUID and the hook ID into `Ktype` array.
 // The type provides a convenient way for comparing event types.
 func pack(g windows.GUID, id uint16) Ktype {

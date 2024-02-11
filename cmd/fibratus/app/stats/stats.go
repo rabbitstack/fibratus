@@ -88,7 +88,6 @@ type Stats struct {
 	KstreamUnknownKevents               int            `json:"kstream.kevents.unknown"`
 	KstreamKeventsProcessed             int            `json:"kstream.kevents.processed"`
 	KstreamExcludedKevents              int            `json:"kstream.excluded.kevents"`
-	KstreamExcludedProcs                int            `json:"kstream.excluded.procs"`
 	KstreamKeventsFailures              map[string]int `json:"kstream.kevents.failures"`
 	LoggerErrors                        map[string]int `json:"logger.errors"`
 	OutputAMQPChannelFailures           int            `json:"output.amqp.channel.failures"`
