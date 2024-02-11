@@ -27,7 +27,7 @@ import (
 // EventsetMasks allows efficient testing
 // of a group of bitsets containing event
 // hook identifiers. For each provider
-// is represented by a GUID, a dedicated
+// represented by a GUID, a dedicated
 // bitset is defined.
 type EventsetMasks struct {
 	masks [ProvidersCount]bitset.BitSet

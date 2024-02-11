@@ -64,7 +64,7 @@ func TestCallstack(t *testing.T) {
 }
 
 func TestCallstackDecorator(t *testing.T) {
-	q := NewQueue(50, false)
+	q := NewQueue(50, false, true)
 	cd := NewCallstackDecorator(q)
 
 	e := &Kevent{
@@ -131,7 +131,7 @@ func init() {
 }
 
 func TestCallstackDecoratorFlush(t *testing.T) {
-	q := NewQueue(50, false)
+	q := NewQueue(50, false, true)
 	q.RegisterListener(&DummyListener{})
 	cd := NewCallstackDecorator(q)
 

@@ -118,9 +118,9 @@ func (pe *PE) VerifySignature() {
 	pe.once.Do(func() {
 		if sys.IsWintrustFound() {
 			runtime.LockOSThread()
-			defer runtime.UnlockOSThread()
 			trust := sys.NewWintrustData(sys.WtdChoiceFile)
 			defer trust.Close()
+			defer runtime.UnlockOSThread()
 			pe.IsTrusted = trust.VerifyFile(pe.filename)
 			// maybe the PE is catalog signed?
 			if !pe.IsSigned {

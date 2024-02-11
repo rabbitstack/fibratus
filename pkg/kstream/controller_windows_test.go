@@ -73,16 +73,20 @@ func TestStartTraces(t *testing.T) {
 			ctrl := NewController(tt.cfg, nil)
 			require.NoError(t, ctrl.Start())
 			defer ctrl.Close()
-			assert.Equal(t, tt.wantSessions, len(ctrl.traces))
+			if !SupportsSystemProviders() {
+				assert.Equal(t, tt.wantSessions, len(ctrl.traces))
+			}
 			for _, trace := range ctrl.traces {
 				require.True(t, trace.Handle().IsValid())
 				require.NoError(t, etw.ControlTrace(0, trace.Name, trace.GUID, etw.Query))
-				if tt.wantFlags != nil && trace.IsKernelTrace() {
-					flags, err := etw.GetTraceSystemFlags(trace.Handle())
-					require.NoError(t, err)
-					// check enabled system event flags
-					require.Equal(t, tt.wantFlags[0], flags[0])
-					require.Equal(t, tt.wantFlags[1], flags[4])
+				if !SupportsSystemProviders() {
+					if tt.wantFlags != nil && trace.IsKernelTrace() {
+						flags, err := etw.GetTraceSystemFlags(trace.Handle())
+						require.NoError(t, err)
+						// check enabled system event flags
+						require.Equal(t, tt.wantFlags[0], flags[0])
+						require.Equal(t, tt.wantFlags[1], flags[4])
+					}
 				}
 			}
 		})
@@ -136,16 +140,22 @@ func TestEnableFlagsDynamically(t *testing.T) {
 		},
 	}
 	ctrl := NewController(cfg, r)
-	require.Len(t, ctrl.Traces(), 2)
-	flags, ids := ctrl.Traces()[0].enableFlagsDynamically(cfg.Kstream)
-	require.Len(t, ids, 6)
-	require.True(t, flags&etw.Process != 0)
-	require.True(t, flags&etw.Thread != 0)
-	require.True(t, flags&etw.ImageLoad != 0)
-	require.True(t, flags&etw.Registry != 0)
-	require.True(t, flags&etw.NetTCPIP != 0)
-	require.True(t, flags&etw.FileIO != 0)
-	require.True(t, flags&etw.VaMap != 0)
+	flags := ctrl.Traces()[0].enableFlagsDynamically(cfg.Kstream)
+
+	if SupportsSystemProviders() {
+		require.Len(t, ctrl.Traces(), 6)
+		require.True(t, flags&etw.FileIO != 0)
+	} else {
+		require.Len(t, ctrl.Traces(), 2)
+		require.True(t, flags&etw.Process != 0)
+		require.True(t, flags&etw.Thread != 0)
+		require.True(t, flags&etw.ImageLoad != 0)
+		require.True(t, flags&etw.Registry != 0)
+		require.True(t, flags&etw.NetTCPIP != 0)
+		require.True(t, flags&etw.FileIO != 0)
+		require.True(t, flags&etw.VaMap != 0)
+	}
+
 	require.True(t, cfg.Kstream.TestDropMask(ktypes.UnloadImage))
 	require.True(t, cfg.Kstream.TestDropMask(ktypes.WriteFile))
 	require.True(t, cfg.Kstream.TestDropMask(ktypes.UnmapViewFile))

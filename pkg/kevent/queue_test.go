@@ -173,7 +173,7 @@ func TestQueuePush(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			q := NewQueue(100, false)
+			q := NewQueue(100, false, true)
 			for _, lis := range tt.listeners() {
 				q.RegisterListener(lis)
 			}
@@ -202,7 +202,7 @@ func TestPushBacklog(t *testing.T) {
 		Metadata: make(Metadata),
 	}
 
-	q := NewQueue(100, false)
+	q := NewQueue(100, false, true)
 	q.RegisterListener(&DummyListener{})
 
 	require.NoError(t, q.Push(e))
