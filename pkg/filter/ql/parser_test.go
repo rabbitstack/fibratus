@@ -280,6 +280,16 @@ func TestParseSequence(t *testing.T) {
 			time.Second * 30,
 			false,
 		},
+		{
+
+			`maxspan 40h
+			 |kevt.name = 'CreateProcess'| as e1
+			 |kevt.name = 'CreateFile' and $e1.ps.ame = file.name |
+			`,
+			errors.New("maximum span 40h0m0s cannot be greater than 4h"),
+			time.Hour * 40,
+			false,
+		},
 	}
 
 	for i, tt := range tests {
@@ -290,6 +300,7 @@ func TestParseSequence(t *testing.T) {
 		} else if err != nil && tt.err == nil {
 			t.Errorf("%d. exp=%s got error=\n%v", i, tt.expr, err)
 		}
+
 		if seq != nil {
 			if seq.MaxSpan != tt.maxSpan {
 				t.Errorf("%d. exp=%s maxspan=%s got maxspan=%v", i, tt.expr, tt.maxSpan, seq.MaxSpan)

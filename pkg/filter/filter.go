@@ -50,7 +50,7 @@ type Filter interface {
 	// RunSequence runs a filter with sequence expressions. Sequence rules depend
 	// on the state machine transitions and partial matches to decide whether the
 	// rule is fired.
-	RunSequence(kevt *kevent.Kevent, seqID uint16, partials map[uint16][]*kevent.Kevent) bool
+	RunSequence(kevt *kevent.Kevent, seqID uint16, partials map[uint16][]*kevent.Kevent, rawMatch bool) bool
 	// GetStringFields returns field names mapped to their string values.
 	GetStringFields() map[fields.Field][]string
 	// GetFields returns all field used in the filter expression.
@@ -157,7 +157,7 @@ func (f *filter) Run(kevt *kevent.Kevent) bool {
 	return ql.Eval(f.expr, f.mapValuer(kevt), f.hasFunctions)
 }
 
-func (f *filter) RunSequence(kevt *kevent.Kevent, seqID uint16, partials map[uint16][]*kevent.Kevent) bool {
+func (f *filter) RunSequence(kevt *kevent.Kevent, seqID uint16, partials map[uint16][]*kevent.Kevent, rawMatch bool) bool {
 	if f.seq == nil {
 		return false
 	}
@@ -168,6 +168,11 @@ func (f *filter) RunSequence(kevt *kevent.Kevent, seqID uint16, partials map[uin
 	valuer := f.mapValuer(kevt)
 	expr := f.seq.Expressions[seqID]
 
+	if rawMatch {
+		// only check if the condition matches
+		// without evaluating joins/bound fields
+		return ql.Eval(expr.Expr, valuer, f.hasFunctions)
+	}
 	var match bool
 	if seqID >= 1 && expr.HasBoundFields() {
 		// if a sequence expression contains references to

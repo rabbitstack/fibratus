@@ -218,12 +218,12 @@ func TestSequenceState(t *testing.T) {
 	assert.True(t, ss.isInitialState())
 	assert.Equal(t, "kevt.name = CreateProcess AND ps.name = cmd.exe", ss.initialState)
 
-	ss.addPartial("kevt.name = CreateProcess AND ps.name = cmd.exe", kevt1)
+	ss.addPartial("kevt.name = CreateProcess AND ps.name = cmd.exe", kevt1, false)
 	require.NoError(t, ss.matchTransition("kevt.name = CreateProcess AND ps.name = cmd.exe", kevt1))
 	assert.False(t, ss.isInitialState())
 	assert.Equal(t, "kevt.name = CreateFile AND file.name ICONTAINS temp", ss.currentState())
 
-	ss.addPartial("kevt.name = CreateFile AND file.name ICONTAINS temp", kevt2)
+	ss.addPartial("kevt.name = CreateFile AND file.name ICONTAINS temp", kevt2, false)
 	require.NoError(t, ss.matchTransition("kevt.name = CreateFile AND file.name ICONTAINS temp", kevt2))
 
 	assert.Len(t, ss.partials[1], 1)
@@ -252,7 +252,7 @@ func TestSequenceState(t *testing.T) {
 	ss.clear()
 	assert.True(t, ss.isInitialState())
 	require.NoError(t, ss.matchTransition("kevt.name = CreateProcess AND ps.name = cmd.exe", kevt1))
-	ss.addPartial("kevt.name = CreateProcess AND ps.name = cmd.exe", kevt1)
+	ss.addPartial("kevt.name = CreateProcess AND ps.name = cmd.exe", kevt1, false)
 	require.False(t, ss.inDeadline.Load())
 
 	// test expiration
@@ -272,21 +272,21 @@ func TestSequenceState(t *testing.T) {
 	}
 
 	require.True(t, ss.expire(terminateProcess))
-	require.True(t, ss.inExpired)
+	require.True(t, ss.inExpired.Load())
 
 	require.NoError(t, ss.matchTransition("kevt.name = CreateProcess AND ps.name = cmd.exe", kevt1))
-	require.False(t, ss.inExpired)
+	require.False(t, ss.inExpired.Load())
 
 	assert.Equal(t, "kevt.name = CreateFile AND file.name ICONTAINS temp", ss.currentState())
 }
 
 func TestMinEngineVersion(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
-	rules := NewRules(psnap, newConfig("_fixtures/min-engine-ver-fail.yml"))
+	rules := NewRules(psnap, newConfig("_fixtures/min_engine_ver_fail.yml"))
 	version.Set("2.0.0")
 	_, err := rules.Compile()
 	require.Error(t, err)
-	rules = NewRules(psnap, newConfig("_fixtures/min-engine-ver-ok.yml"))
+	rules = NewRules(psnap, newConfig("_fixtures/min_engine_ver_ok.yml"))
 	compileRules(t, rules)
 }
 
@@ -675,6 +675,96 @@ func TestSequencePsUUID(t *testing.T) {
 	require.True(t, wrapProcessEvent(kevt2, rules.ProcessEvent))
 }
 
+func TestSequenceOutOfOrder(t *testing.T) {
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_out_of_order.yml"))
+	compileRules(t, rules)
+
+	now := time.Now()
+	kevt1 := &kevent.Kevent{
+		Type:      ktypes.OpenProcess,
+		Timestamp: now,
+		Name:      "OpenProcess",
+		Tid:       2484,
+		PID:       859,
+		PS: &types.PS{
+			PID:  859,
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\svchost-temp.exe",
+		},
+		Kparams: kevent.Kparams{
+			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
+		},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+	}
+
+	kevt2 := &kevent.Kevent{
+		Type:      ktypes.CreateFile,
+		Timestamp: now.Add(time.Millisecond * 200),
+		Name:      "CreateFile",
+		Tid:       2484,
+		PID:       859,
+		Category:  ktypes.File,
+		PS: &types.PS{
+			PID:  859,
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\svchost.exe",
+		},
+		Kparams: kevent.Kparams{
+			kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\lsass.dmp"},
+			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: uint32(2), Enum: fs.FileCreateDispositions},
+		},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+	}
+
+	ss := rules.groups[ktypes.CreateFile.Hash()][0].filters[0].ss
+
+	require.False(t, wrapProcessEvent(kevt2, rules.ProcessEvent))
+	assert.Len(t, ss.partials[2], 1)
+	assert.True(t, ss.partials[2][0].ContainsMeta(kevent.RuleSequenceOutOfOrderKey))
+
+	require.True(t, wrapProcessEvent(kevt1, rules.ProcessEvent))
+}
+
+func init() {
+	sequenceGcInterval = time.Millisecond * 300
+	maxSequencePartialLifetime = time.Millisecond * 500
+}
+
+func TestGCSequence(t *testing.T) {
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, newConfig("_fixtures/sequence_gc.yml"))
+	compileRules(t, rules)
+
+	now := time.Now()
+	kevt1 := &kevent.Kevent{
+		Type:      ktypes.OpenProcess,
+		Timestamp: now,
+		Name:      "OpenProcess",
+		Tid:       2484,
+		PID:       859,
+		PS: &types.PS{
+			PID:  859,
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\svchost-temp.exe",
+		},
+		Kparams: kevent.Kparams{
+			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
+		},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+	}
+
+	ss := rules.groups[ktypes.OpenProcess.Hash()][0].filters[0].ss
+
+	require.False(t, wrapProcessEvent(kevt1, rules.ProcessEvent))
+
+	assert.Len(t, ss.partials[1], 1)
+
+	time.Sleep(time.Second)
+
+	assert.Len(t, ss.partials[1], 0)
+}
+
 func TestSequenceAndSimpleRuleMix(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
 	rules := NewRules(psnap, newConfig("_fixtures/sequence_and_simple_rule_mix.yml"))
@@ -703,7 +793,7 @@ func TestSequenceAndSimpleRuleMix(t *testing.T) {
 	kevt2 := &kevent.Kevent{
 		Seq:       2,
 		Type:      ktypes.CreateFile,
-		Timestamp: time.Now(),
+		Timestamp: time.Now().Add(time.Millisecond * 544),
 		Name:      "CreateFile",
 		Tid:       2484,
 		PID:       2243,
@@ -725,7 +815,7 @@ func TestSequenceAndSimpleRuleMix(t *testing.T) {
 	kevt3 := &kevent.Kevent{
 		Seq:       10,
 		Type:      ktypes.CreateProcess,
-		Timestamp: time.Now(),
+		Timestamp: time.Now().Add(time.Second * 2),
 		Category:  ktypes.Process,
 		Name:      "CreateProcess",
 		Tid:       2484,
