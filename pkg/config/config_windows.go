@@ -401,7 +401,7 @@ func (c *Config) addFlags() {
 		c.flags.Bool(enableMemKevents, true, "Determines whether memory manager kernel events are collected by Kernel Logger provider")
 		c.flags.Bool(enableAuditAPIEvents, true, "Determines whether kernel audit API calls events are published")
 		c.flags.Bool(enableDNSEvents, true, "Determines whether DNS client events are enabled")
-		c.flags.Bool(stackEnrichment, true, "Indicates if stack enrichment is enabled for eligible events")
+		c.flags.Bool(stackEnrichment, c.boolFromFlagSet(rulesEnabled), "Indicates if stack enrichment is enabled for eligible events")
 		c.flags.Int(bufferSize, int(maxBufferSize), "Represents the amount of memory allocated for each event tracing session buffer, in kilobytes. The buffer size affects the rate at which buffers fill and must be flushed (small buffer size requires less memory but it increases the rate at which buffers must be flushed)")
 		c.flags.Int(minBuffers, int(defaultMinBuffers), "Determines the minimum number of buffers allocated for the event tracing session's buffer pool")
 		c.flags.Int(maxBuffers, int(defaultMaxBuffers), "Determines the maximum number of buffers allocated for the event tracing session's buffer pool")
@@ -416,4 +416,9 @@ func (c *Config) addFlags() {
 		c.flags.Bool(serializeEnvs, true, "Indicates if environment variables are serialized as part of the process state")
 	}
 	c.Log.AddFlags(c.flags)
+}
+
+func (c *Config) boolFromFlagSet(f string) bool {
+	b, _ := c.flags.GetBool(f)
+	return b
 }
