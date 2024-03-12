@@ -249,6 +249,19 @@ func (s *snapshotter) RemoveModule(pid uint32, module string) error {
 	return nil
 }
 
+func (s *snapshotter) FindModule(addr va.Address) (bool, *pstypes.Module) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, proc := range s.procs {
+		for _, mod := range proc.Modules {
+			if mod.BaseAddress == addr {
+				return true, &mod
+			}
+		}
+	}
+	return false, nil
+}
+
 func (s *snapshotter) AddFileMapping(e *kevent.Kevent) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

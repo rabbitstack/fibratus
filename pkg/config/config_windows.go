@@ -419,6 +419,9 @@ func (c *Config) addFlags() {
 }
 
 func (c *Config) boolFromFlagSet(f string) bool {
-	b, _ := c.flags.GetBool(f)
+	b, err := c.flags.GetBool(f)
+	if err != nil {
+		return false
+	}
 	return b
 }

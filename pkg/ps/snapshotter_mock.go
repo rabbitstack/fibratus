@@ -48,6 +48,15 @@ func (s *SnapshotterMock) Find(pid uint32) (bool, *pstypes.PS) {
 	return args.Bool(0), args.Get(1).(*pstypes.PS)
 }
 
+func (s *SnapshotterMock) FindModule(addr va.Address) (bool, *pstypes.Module) {
+	args := s.Called(addr)
+	mod := args.Get(1)
+	if mod != nil {
+		return args.Bool(0), mod.(*pstypes.Module)
+	}
+	return args.Bool(0), nil
+}
+
 // FindAndPut method
 func (s *SnapshotterMock) FindAndPut(pid uint32) *pstypes.PS {
 	args := s.Called(pid)

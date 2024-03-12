@@ -25,6 +25,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/pe"
+	"github.com/rabbitstack/fibratus/pkg/ps"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
@@ -48,11 +49,20 @@ var (
 	// symCleanups counts the number of symbol cleanups
 	symCleanups = expvar.NewInt("symbolizer.symbol.cleanups")
 
+	// symCacheHits counts the number of cache hits in the symbols cache
+	symCacheHits = expvar.NewInt("symbolizer.cache.hits")
+
 	// debugHelpFallbacks counts how many times we Debug Help API was called
 	// to resolve symbol information since we fail to do this from process
 	// modules and PE export directory data
 	debugHelpFallbacks = expvar.NewInt("symbolizer.debughelp.fallbacks")
 )
+
+// parsePeFile wraps the PE parsing function to permit
+// overriding the function in unit tests.
+var parsePeFile = func(name string, option ...pe.Option) (*pe.PE, error) {
+	return pe.ParseFile(name, pe.WithSections(), pe.WithExports())
+}
 
 // procTTL specifies the number of interval
 // a process is allowed to remain in the map before
@@ -72,20 +82,7 @@ func (p *process) keepalive() {
 }
 
 type module struct {
-	pids    map[uint32]struct{}
 	exports map[uint32]string
-}
-
-func (m *module) addPid(pid uint32) {
-	m.pids[pid] = struct{}{}
-}
-
-func (m *module) removePid(pid uint32) {
-	delete(m.pids, pid)
-}
-
-func (m *module) canRemove() bool {
-	return len(m.pids) == 0
 }
 
 // Symbolizer is responsible for converting raw addresses
@@ -107,7 +104,8 @@ type Symbolizer struct {
 	// in process state
 	symbols map[uint32]map[va.Address]string
 
-	r Resolver
+	r     Resolver
+	psnap ps.Snapshotter
 
 	cleaner *time.Ticker
 	purger  *time.Ticker
@@ -120,7 +118,7 @@ type Symbolizer struct {
 // NewSymbolizer builds a new instance of address symbolizer.
 // It performs the initialization of symbol options, symbols
 // handlers and modules for kernel address symbolization.
-func NewSymbolizer(r Resolver, config *config.Config, enqueue bool) *Symbolizer {
+func NewSymbolizer(r Resolver, psnap ps.Snapshotter, config *config.Config, enqueue bool) *Symbolizer {
 	sym := &Symbolizer{
 		config:  config,
 		procs:   make(map[uint32]*process),
@@ -131,6 +129,7 @@ func NewSymbolizer(r Resolver, config *config.Config, enqueue bool) *Symbolizer 
 		quit:    make(chan struct{}, 1),
 		enqueue: enqueue,
 		r:       r,
+		psnap:   psnap,
 	}
 
 	if config.SymbolizeKernelAddresses {
@@ -200,27 +199,10 @@ func (s *Symbolizer) ProcessEvent(e *kevent.Kevent) (bool, error) {
 		// remove module if it has been unmapped from
 		// all process VAS. If the new module is loaded
 		// populate its export directory entries
-		s.mu.Lock()
-		if e.IsUnloadImage() {
-			if mod, ok := s.mods[addr]; ok {
-				mod.removePid(e.PID)
-				if mod.canRemove() {
-					delete(s.mods, addr)
-					log.Debugf("released [%s] module exports", filename)
-				}
-			}
-		} else {
-			if s.mods[addr] == nil {
-				px, err := pe.ParseFile(filename, pe.WithSections(), pe.WithExports())
-				if err != nil {
-					log.Debugf("unable to parse PE for [%s] module: %v", filename, err)
-				} else {
-					log.Debugf("parsed exports for [%s] module", filename)
-					s.mods[addr] = &module{exports: px.Exports, pids: map[uint32]struct{}{e.PS.PID: {}}}
-				}
-			}
+		err := s.syncModules(e)
+		if err != nil {
+			log.Error(err)
 		}
-		s.mu.Unlock()
 	}
 	if !e.Kparams.Contains(kparams.Callstack) {
 		return true, nil
@@ -233,10 +215,39 @@ func (s *Symbolizer) ProcessEvent(e *kevent.Kevent) (bool, error) {
 	return true, nil
 }
 
+// syncModules reconciles the state of loaded modules.
+// When the module is unloaded from all processes in
+// the snapshost state, its exports map is pruned. If
+// the new module is loaded and not already present in
+// the map, we parse its export directory and insert
+// into the map.
+func (s *Symbolizer) syncModules(e *kevent.Kevent) error {
+	filename := e.GetParamAsString(kparams.FileName)
+	addr := e.Kparams.TryGetAddress(kparams.ImageBase)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if e.IsUnloadImage() {
+		ok, _ := s.psnap.FindModule(addr)
+		if !ok {
+			delete(s.mods, addr)
+		}
+		return nil
+	}
+	if s.mods[addr] != nil {
+		return nil
+	}
+	px, err := parsePeFile(filename, pe.WithSections(), pe.WithExports())
+	if err != nil {
+		return fmt.Errorf("unable to parse PE for [%s] module: %v", filename, err)
+	}
+	s.mods[addr] = &module{exports: px.Exports}
+	return nil
+}
+
 func (s *Symbolizer) processCallstack(e *kevent.Kevent) error {
 	addrs := e.Kparams.MustGetSliceAddrs(kparams.Callstack)
 	e.Callstack.Init(len(addrs))
-	if e.IsCreateFile() && e.IsOpenDisposition() {
+	if (e.IsCreateFile() && e.IsOpenDisposition()) || e.PID == ps.SystemPID {
 		// for high-volume events decorating
 		// the frames with symbol information
 		// is not viable. For this reason, the
@@ -333,37 +344,27 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *kevent.Kevent, fast, looku
 		mod := e.PS.FindModuleByVa(addr)
 		if mod != nil {
 			frame.Module = mod.Name
-			base := mod.BaseAddress
-			rva := addr.Dec(base.Uint64())
-			m, ok := s.mods[base]
-			if ok {
-				// if the module export directory is already
-				// parsed, just increment the pid owning the
-				// module. When the number of processes having
-				// the module mapped inside their address spaces
-				// reaches zero, the corresponding entry is removed
-				// from the map
-				m.addPid(e.PS.PID)
-			} else {
+			m, ok := s.mods[mod.BaseAddress]
+			if !ok {
 				// parse export directory to resolve symbols
-				px, err := pe.ParseFile(mod.Name, pe.WithSections(), pe.WithExports())
-				if err != nil {
-					goto lookupSyms
+				m = &module{exports: make(map[uint32]string)}
+				px, err := parsePeFile(mod.Name, pe.WithSections(), pe.WithExports())
+				if err == nil {
+					m.exports = px.Exports
 				}
-				m = &module{exports: px.Exports, pids: map[uint32]struct{}{e.PS.PID: {}}}
-				s.mods[base] = m
+				s.mods[mod.BaseAddress] = m
 			}
-			if m != nil {
-				frame.Symbol = symbolFromRVA(rva, m.exports)
-			}
+			rva := addr.Dec(mod.BaseAddress.Uint64())
+			frame.Symbol = symbolFromRVA(rva, m.exports)
 		}
 		if frame.Module != "" && frame.Symbol != "" {
 			return frame
 		}
 	}
-lookupSyms:
+
 	// did we hit this address previously?
 	if sym, ok := s.symbols[e.PID]; ok && sym[addr] != "" {
+		symCacheHits.Add(1)
 		n := strings.Split(sym[addr], "!")
 		if len(n) > 1 {
 			frame.Module, frame.Symbol = n[0], n[1]
@@ -373,8 +374,9 @@ lookupSyms:
 		return frame
 	}
 
-	// fallback to Debug Help API
 	debugHelpFallbacks.Add(1)
+
+	// fallback to Debug Help API
 	proc, ok := s.procs[e.PID]
 	if !ok {
 		handle, err := windows.OpenProcess(windows.SYNCHRONIZE|windows.PROCESS_QUERY_INFORMATION, false, e.PID)
@@ -399,6 +401,9 @@ lookupSyms:
 			mod = e.PS.FindMappingByVa(addr)
 		}
 		frame.Module = mod
+		if frame.Module == "?" {
+			frame.Module = "unbacked"
+		}
 	}
 	if frame.Symbol == "" {
 		frame.Symbol, frame.Offset = s.r.GetSymbolNameAndOffset(proc.handle, addr)
@@ -424,7 +429,7 @@ func (s *Symbolizer) resolveSymbolFromExportDirectory(addr va.Address, mod *psty
 	if mod == nil {
 		return ""
 	}
-	px, err := pe.ParseFile(mod.Name, pe.WithSections(), pe.WithExports())
+	px, err := parsePeFile(mod.Name, pe.WithSections(), pe.WithExports())
 	if err != nil {
 		return ""
 	}

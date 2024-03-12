@@ -123,6 +123,9 @@ func (s *Callstack) Init(n int) {
 
 // PushFrame pushes a new from to the call stack.
 func (s *Callstack) PushFrame(f Frame) {
+	if f.Module == "" {
+		f.Module = unbacked
+	}
 	*s = append(*s, f)
 }
 
