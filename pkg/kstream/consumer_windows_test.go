@@ -583,6 +583,7 @@ func (s *NoopPsSnapshotter) Close() error                                       
 func (s *NoopPsSnapshotter) GetSnapshot() []*pstypes.PS                             { return nil }
 func (s *NoopPsSnapshotter) AddThread(kevt *kevent.Kevent) error                    { return nil }
 func (s *NoopPsSnapshotter) AddModule(kevt *kevent.Kevent) error                    { return nil }
+func (s *NoopPsSnapshotter) FindModule(addr va.Address) (bool, *pstypes.Module)     { return false, nil }
 func (s *NoopPsSnapshotter) RemoveThread(pid uint32, tid uint32) error              { return nil }
 func (s *NoopPsSnapshotter) RemoveModule(pid uint32, mod string) error              { return nil }
 func (s *NoopPsSnapshotter) WriteFromKcap(kevt *kevent.Kevent) error                { return nil }
@@ -590,6 +591,33 @@ func (s *NoopPsSnapshotter) AddFileMapping(kevt *kevent.Kevent) error           
 func (s *NoopPsSnapshotter) RemoveFileMapping(pid uint32, address va.Address) error { return nil }
 
 func TestCallstackEnrichment(t *testing.T) {
+	hsnap := new(handle.SnapshotterMock)
+	hsnap.On("FindByObject", mock.Anything).Return(htypes.Handle{}, false)
+	hsnap.On("FindHandles", mock.Anything).Return([]htypes.Handle{}, nil)
+	hsnap.On("Write", mock.Anything).Return(nil)
+	hsnap.On("Remove", mock.Anything).Return(nil)
+
+	// exercise callstack enrichment with a noop
+	// process snapshotter. This will make the
+	// symbolizer to always fallback to Debug Help
+	// API when resolving symbolic information
+	nopsnap := new(NoopPsSnapshotter)
+	log.Info("test callstack enrichment with noop ps snapshotter")
+	testCallstackEnrichment(t, hsnap, nopsnap)
+
+	// now use a real process snapshotter to
+	// enrich the callstacks. This way, we
+	// should only resort to Debug Help API
+	// when the symbol is not found in PE
+	// export directory or the module doesn't
+	// exist in process state
+	cfg := &config.Config{}
+	psnap := ps.NewSnapshotter(hsnap, cfg)
+	log.Info("test callstack enrichment with real ps snapshotter")
+	testCallstackEnrichment(t, hsnap, psnap)
+}
+
+func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Snapshotter) {
 	kevent.DropCurrentProc = false
 
 	var procHandle windows.Handle
@@ -799,6 +827,7 @@ func TestCallstackEnrichment(t *testing.T) {
 				if err != nil {
 					return err
 				}
+				defer windows.Close(t)
 				h, err := createFileTransacted(n, windows.GENERIC_READ|windows.GENERIC_WRITE, windows.FILE_SHARE_WRITE, nil, 1, 0, 0, t, 0)
 				if err != nil {
 					return err
@@ -875,7 +904,10 @@ func TestCallstackEnrichment(t *testing.T) {
 					return err
 				}
 				f.Close()
-				return os.Rename(f.Name(), filepath.Join(os.TempDir(), "fibratus-ren"))
+				if err := os.Rename(f.Name(), filepath.Join(os.TempDir(), "fibratus-ren")); err != nil {
+					return err
+				}
+				return os.Remove(filepath.Join(os.TempDir(), "fibratus-ren"))
 			},
 			func(e *kevent.Kevent) bool {
 				if e.CurrentPid() && e.Type == ktypes.RenameFile &&
@@ -890,13 +922,6 @@ func TestCallstackEnrichment(t *testing.T) {
 			false,
 		},
 	}
-
-	psnap := new(NoopPsSnapshotter)
-	hsnap := new(handle.SnapshotterMock)
-	hsnap.On("FindByObject", mock.Anything).Return(htypes.Handle{}, false)
-	hsnap.On("FindHandles", mock.Anything).Return([]htypes.Handle{}, nil)
-	hsnap.On("Write", mock.Anything).Return(nil)
-	hsnap.On("Remove", mock.Anything).Return(nil)
 
 	kstreamConfig := config.KstreamConfig{
 		EnableThreadKevents:   true,
@@ -924,7 +949,7 @@ func TestCallstackEnrichment(t *testing.T) {
 	require.NoError(t, kctrl.Start())
 	defer kctrl.Close()
 	kstreamc := NewConsumer(kctrl, psnap, hsnap, cfg)
-	symbolizer := symbolize.NewSymbolizer(symbolize.NewDebugHelpResolver(cfg), cfg, true)
+	symbolizer := symbolize.NewSymbolizer(symbolize.NewDebugHelpResolver(cfg), psnap, cfg, true)
 	defer symbolizer.Close()
 	kstreamc.RegisterEventListener(symbolizer)
 	require.NoError(t, kstreamc.Open())

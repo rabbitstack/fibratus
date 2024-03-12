@@ -52,6 +52,9 @@ type Snapshotter interface {
 	// if the process was find in the state. Otherwise, returns false and constructs a fresh process
 	// state by querying the OS via API functions.
 	Find(pid uint32) (bool, *pstypes.PS)
+	// FindModule traverses loaded modules of all processes in the snapshot and
+	// if there is module with the specified base address, it returns its metadata.
+	FindModule(addr va.Address) (bool, *pstypes.Module)
 	// FindAndPut attempts to retrieve process' state for the specified process identifier.
 	// If the process is found, the snapshotter state is updated with the new process.
 	FindAndPut(pid uint32) *pstypes.PS

@@ -34,7 +34,7 @@ import (
 
 // maxDequeFlushPeriod specifies the maximum period
 // for the events to reside in the deque.
-var maxDequeFlushPeriod = 2 * time.Minute
+var maxDequeFlushPeriod = time.Minute
 
 // callstackFlushes computes overall callstack dequeue flushes
 var callstackFlushes = expvar.NewInt("callstack.flushes")
@@ -123,6 +123,9 @@ func (s *Callstack) Init(n int) {
 
 // PushFrame pushes a new from to the call stack.
 func (s *Callstack) PushFrame(f Frame) {
+	if f.Module == "" {
+		f.Module = unbacked
+	}
 	*s = append(*s, f)
 }
 

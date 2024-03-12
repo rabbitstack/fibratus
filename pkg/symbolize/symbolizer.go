@@ -25,6 +25,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/pe"
+	"github.com/rabbitstack/fibratus/pkg/ps"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
@@ -41,11 +42,27 @@ var ErrSymInitialize = func(pid uint32) error {
 	return fmt.Errorf("unable to initialize symbol handler for pid %d", pid)
 }
 
-// callstackProcessErrors counts callstack process errors
-var callstackProcessErrors = expvar.NewInt("symbolizer.process.errors")
+var (
+	// callstackProcessErrors counts callstack process errors
+	callstackProcessErrors = expvar.NewInt("symbolizer.process.errors")
 
-// symCleanups counts the number of symbol cleanups
-var symCleanups = expvar.NewInt("symbolizer.symbol.cleanups")
+	// symCleanups counts the number of symbol cleanups
+	symCleanups = expvar.NewInt("symbolizer.symbol.cleanups")
+
+	// symCacheHits counts the number of cache hits in the symbols cache
+	symCacheHits = expvar.NewInt("symbolizer.cache.hits")
+
+	// debugHelpFallbacks counts how many times we Debug Help API was called
+	// to resolve symbol information since we fail to do this from process
+	// modules and PE export directory data
+	debugHelpFallbacks = expvar.NewInt("symbolizer.debughelp.fallbacks")
+)
+
+// parsePeFile wraps the PE parsing function to permit
+// overriding the function in unit tests.
+var parsePeFile = func(name string, option ...pe.Option) (*pe.PE, error) {
+	return pe.ParseFile(name, pe.WithSections(), pe.WithExports())
+}
 
 // procTTL specifies the number of interval
 // a process is allowed to remain in the map before
@@ -64,15 +81,31 @@ func (p *process) keepalive() {
 	p.accesses++
 }
 
+type module struct {
+	exports map[uint32]string
+}
+
 // Symbolizer is responsible for converting raw addresses
 // into symbol names and modules with the assistance of the
 // symbol resolver.
 type Symbolizer struct {
 	config *config.Config
 	procs  map[uint32]*process
+	mods   map[va.Address]*module
 	mu     sync.Mutex
 
-	r Resolver
+	// symbols stores the mapping of stack
+	// return address and the symbol information
+	// identifying the originated call. It is populated
+	// by the Debug Help API function when the module
+	// doesn't exist in process state. Subsequent
+	// calls to the produceFrame method will inspect
+	// this cache whenever the module is not located
+	// in process state
+	symbols map[uint32]map[va.Address]string
+
+	r     Resolver
+	psnap ps.Snapshotter
 
 	cleaner *time.Ticker
 	purger  *time.Ticker
@@ -85,15 +118,18 @@ type Symbolizer struct {
 // NewSymbolizer builds a new instance of address symbolizer.
 // It performs the initialization of symbol options, symbols
 // handlers and modules for kernel address symbolization.
-func NewSymbolizer(r Resolver, config *config.Config, enqueue bool) *Symbolizer {
+func NewSymbolizer(r Resolver, psnap ps.Snapshotter, config *config.Config, enqueue bool) *Symbolizer {
 	sym := &Symbolizer{
 		config:  config,
 		procs:   make(map[uint32]*process),
+		mods:    make(map[va.Address]*module),
+		symbols: make(map[uint32]map[va.Address]string),
 		cleaner: time.NewTicker(time.Second * 2),
 		purger:  time.NewTicker(time.Minute * 5),
 		quit:    make(chan struct{}, 1),
 		enqueue: enqueue,
 		r:       r,
+		psnap:   psnap,
 	}
 
 	if config.SymbolizeKernelAddresses {
@@ -133,6 +169,7 @@ func (s *Symbolizer) ProcessEvent(e *kevent.Kevent) (bool, error) {
 		pid := e.Kparams.MustGetPid()
 		s.mu.Lock()
 		defer s.mu.Unlock()
+		delete(s.symbols, pid)
 		proc, ok := s.procs[pid]
 		if !ok {
 			return true, nil
@@ -144,10 +181,11 @@ func (s *Symbolizer) ProcessEvent(e *kevent.Kevent) (bool, error) {
 	}
 	if e.IsLoadImage() || e.IsUnloadImage() {
 		filename := e.GetParamAsString(kparams.FileName)
+		addr := e.Kparams.TryGetAddress(kparams.ImageBase)
 		// if the kernel driver is loaded or unloaded,
 		// load/unload symbol handlers respectively
-		if strings.ToLower(filepath.Ext(filename)) == ".sys" || e.Kparams.TryGetBool(kparams.FileIsDriver) {
-			addr := e.Kparams.TryGetAddress(kparams.ImageBase)
+		if (strings.ToLower(filepath.Ext(filename)) == ".sys" ||
+			e.Kparams.TryGetBool(kparams.FileIsDriver)) && s.config.SymbolizeKernelAddresses {
 			if e.IsLoadImage() {
 				err := s.r.LoadModule(windows.CurrentProcess(), filename, addr)
 				if err != nil {
@@ -156,6 +194,14 @@ func (s *Symbolizer) ProcessEvent(e *kevent.Kevent) (bool, error) {
 			} else {
 				s.r.UnloadModule(windows.CurrentProcess(), addr)
 			}
+		}
+
+		// remove module if it has been unmapped from
+		// all process VAS. If the new module is loaded
+		// populate its export directory entries
+		err := s.syncModules(e)
+		if err != nil {
+			log.Error(err)
 		}
 	}
 	if !e.Kparams.Contains(kparams.Callstack) {
@@ -169,10 +215,39 @@ func (s *Symbolizer) ProcessEvent(e *kevent.Kevent) (bool, error) {
 	return true, nil
 }
 
+// syncModules reconciles the state of loaded modules.
+// When the module is unloaded from all processes in
+// the snapshost state, its exports map is pruned. If
+// the new module is loaded and not already present in
+// the map, we parse its export directory and insert
+// into the map.
+func (s *Symbolizer) syncModules(e *kevent.Kevent) error {
+	filename := e.GetParamAsString(kparams.FileName)
+	addr := e.Kparams.TryGetAddress(kparams.ImageBase)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if e.IsUnloadImage() {
+		ok, _ := s.psnap.FindModule(addr)
+		if !ok {
+			delete(s.mods, addr)
+		}
+		return nil
+	}
+	if s.mods[addr] != nil {
+		return nil
+	}
+	px, err := parsePeFile(filename, pe.WithSections(), pe.WithExports())
+	if err != nil {
+		return fmt.Errorf("unable to parse PE for [%s] module: %v", filename, err)
+	}
+	s.mods[addr] = &module{exports: px.Exports}
+	return nil
+}
+
 func (s *Symbolizer) processCallstack(e *kevent.Kevent) error {
 	addrs := e.Kparams.MustGetSliceAddrs(kparams.Callstack)
 	e.Callstack.Init(len(addrs))
-	if e.IsCreateFile() && e.IsOpenDisposition() {
+	if (e.IsCreateFile() && e.IsOpenDisposition()) || e.PID == ps.SystemPID {
 		// for high-volume events decorating
 		// the frames with symbol information
 		// is not viable. For this reason, the
@@ -183,6 +258,14 @@ func (s *Symbolizer) processCallstack(e *kevent.Kevent) error {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if e.PS != nil {
+		// try to resolve addresses from process
+		// state and PE export directory data
+		s.pushFrames(addrs, e, false, true)
+		return nil
+	}
+
 	proc, ok := s.procs[e.PID]
 	if !ok {
 		handle, err := windows.OpenProcess(windows.SYNCHRONIZE|windows.PROCESS_QUERY_INFORMATION, false, e.PID)
@@ -203,6 +286,7 @@ func (s *Symbolizer) processCallstack(e *kevent.Kevent) error {
 
 	// perform full symbolization
 	s.pushFrames(addrs, e, false, true)
+
 	proc.keepalive()
 
 	return nil
@@ -226,14 +310,12 @@ func (s *Symbolizer) pushFrames(addrs []va.Address, e *kevent.Kevent, fast, look
 // fast mode is enabled, the frame is solely
 // decorated with the module name by iterating
 // through modules contained in the process
-// state. If fast mode is not enabled, the frame
-// is enriched with module and symbol name by
-// calling into Debug Helper API. Finally, export
-// directory is consulted for the symbol name if
-// the standard symbol resolver methods fail to
-// retrieve this information.
+// state. All symbols are resolved from the
+// PE export directory entries. If either the
+// symbol or module are not resolved, then we
+// fallback to Debug API.
 func (s *Symbolizer) produceFrame(addr va.Address, e *kevent.Kevent, fast, lookupExport bool) kevent.Frame {
-	frame := kevent.Frame{Addr: addr, Module: "unbacked"}
+	frame := kevent.Frame{Addr: addr}
 	if addr.InSystemRange() {
 		if s.config.SymbolizeKernelAddresses {
 			frame.Module = s.r.GetModuleName(windows.CurrentProcess(), addr)
@@ -241,46 +323,102 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *kevent.Kevent, fast, looku
 		}
 		return frame
 	}
-	if fast && e.PS != nil {
-		mod := e.PS.FindModuleByVa(addr)
-		if mod != nil {
-			frame.Module = mod.Name
-		}
-		if frame.Module == "unbacked" {
-			frame.Module = e.PS.FindMappingByVa(addr)
-		}
-		if lookupExport {
-			frame.Symbol = s.resolveSymbolFromExportDirectory(addr, mod)
-		}
-		return frame
-	}
-
-	proc, ok := s.procs[e.PID]
-	if !ok {
+	if fast {
 		if e.PS != nil {
 			mod := e.PS.FindModuleByVa(addr)
 			if mod != nil {
 				frame.Module = mod.Name
 			}
-			frame.Symbol = s.resolveSymbolFromExportDirectory(addr, mod)
+			if frame.Module == "unbacked" || frame.Module == "" {
+				frame.Module = e.PS.FindMappingByVa(addr)
+			}
+			if lookupExport {
+				frame.Symbol = s.resolveSymbolFromExportDirectory(addr, mod)
+			}
+			return frame
 		}
 		return frame
 	}
-	module := s.r.GetModuleName(proc.handle, addr)
-	if module == "?" && e.PS != nil {
-		if mod := e.PS.FindModuleByVa(addr); mod != nil {
-			module = mod.Name
+
+	if e.PS != nil {
+		mod := e.PS.FindModuleByVa(addr)
+		if mod != nil {
+			frame.Module = mod.Name
+			m, ok := s.mods[mod.BaseAddress]
+			if !ok {
+				// parse export directory to resolve symbols
+				m = &module{exports: make(map[uint32]string)}
+				px, err := parsePeFile(mod.Name, pe.WithSections(), pe.WithExports())
+				if err == nil {
+					m.exports = px.Exports
+				}
+				s.mods[mod.BaseAddress] = m
+			}
+			rva := addr.Dec(mod.BaseAddress.Uint64())
+			frame.Symbol = symbolFromRVA(rva, m.exports)
+		}
+		if frame.Module != "" && frame.Symbol != "" {
+			return frame
 		}
 	}
 
-	if (module == "?" || module == "unbacked") && e.PS != nil {
-		module = e.PS.FindMappingByVa(addr)
+	// did we hit this address previously?
+	if sym, ok := s.symbols[e.PID]; ok && sym[addr] != "" {
+		symCacheHits.Add(1)
+		n := strings.Split(sym[addr], "!")
+		if len(n) > 1 {
+			frame.Module, frame.Symbol = n[0], n[1]
+		}
 	}
-	frame.Module = module
-	frame.Symbol, frame.Offset = s.r.GetSymbolNameAndOffset(proc.handle, addr)
-	if frame.Symbol == "?" {
-		frame.Symbol = s.resolveSymbolFromExportDirectory(addr, e.PS.FindModuleByVa(addr))
+	if frame.Module != "" && frame.Symbol != "" {
+		return frame
 	}
+
+	debugHelpFallbacks.Add(1)
+
+	// fallback to Debug Help API
+	proc, ok := s.procs[e.PID]
+	if !ok {
+		handle, err := windows.OpenProcess(windows.SYNCHRONIZE|windows.PROCESS_QUERY_INFORMATION, false, e.PID)
+		if err != nil {
+			return frame
+		}
+		// initialize symbol handler
+		opts := uint32(sys.SymUndname | sys.SymCaseInsensitive | sys.SymAutoPublics | sys.SymOmapFindNearest | sys.SymDeferredLoads)
+		err = s.r.Initialize(handle, opts)
+		if err != nil {
+			return frame
+		}
+		proc = &process{e.PID, handle, time.Now(), 1}
+		s.procs[e.PID] = proc
+	}
+
+	proc.keepalive()
+
+	if frame.Module == "" {
+		mod := s.r.GetModuleName(proc.handle, addr)
+		if mod == "?" && e.PS != nil {
+			mod = e.PS.FindMappingByVa(addr)
+		}
+		frame.Module = mod
+		if frame.Module == "?" {
+			frame.Module = "unbacked"
+		}
+	}
+	if frame.Symbol == "" {
+		frame.Symbol, frame.Offset = s.r.GetSymbolNameAndOffset(proc.handle, addr)
+	}
+
+	// store resolved symbol information in cache
+	sym := frame.Module + "!" + frame.Symbol
+	if mod, ok := s.symbols[e.PID]; ok {
+		if _, ok := mod[addr]; !ok {
+			s.symbols[e.PID][addr] = sym
+		}
+	} else {
+		s.symbols[e.PID] = map[va.Address]string{addr: sym}
+	}
+
 	return frame
 }
 
@@ -291,14 +429,18 @@ func (s *Symbolizer) resolveSymbolFromExportDirectory(addr va.Address, mod *psty
 	if mod == nil {
 		return ""
 	}
-	p, err := pe.ParseFile(mod.Name, pe.WithSections(), pe.WithExports())
+	px, err := parsePeFile(mod.Name, pe.WithSections(), pe.WithExports())
 	if err != nil {
 		return ""
 	}
-	var exp uint32
 	rva := addr.Dec(mod.BaseAddress.Uint64())
-	// find the closest export address before RVA
-	for f := range p.Exports {
+	return symbolFromRVA(rva, px.Exports)
+}
+
+// symbolFromRVA finds the closest export address before RVA.
+func symbolFromRVA(rva va.Address, exports map[uint32]string) string {
+	var exp uint32
+	for f := range exports {
 		if uint64(f) <= rva.Uint64() {
 			if exp < f {
 				exp = f
@@ -306,7 +448,7 @@ func (s *Symbolizer) resolveSymbolFromExportDirectory(addr va.Address, mod *psty
 		}
 	}
 	if exp != 0 {
-		return p.Exports[exp]
+		return exports[exp]
 	}
 	return ""
 }
