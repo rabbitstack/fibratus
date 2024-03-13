@@ -211,6 +211,8 @@ func TestRemove(t *testing.T) {
 			require.NoError(t, psnap.Write(evt))
 			require.True(t, psnap.Size() > 0)
 			require.NoError(t, psnap.Remove(evt))
+			// process in dirty map, wait 6 seconds before lookup
+			time.Sleep(time.Second * 6)
 			ok, _ := psnap.Find(evt.Kparams.MustGetPid())
 			assert.Equal(t, exists, ok)
 		})

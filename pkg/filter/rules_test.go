@@ -280,6 +280,55 @@ func TestSequenceState(t *testing.T) {
 	assert.Equal(t, "kevt.name = CreateFile AND file.name ICONTAINS temp", ss.currentState())
 }
 
+func TestExpireSequences(t *testing.T) {
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_expire.yml"))
+	compileRules(t, rules)
+	log.SetLevel(log.DebugLevel)
+
+	kevt1 := &kevent.Kevent{
+		Type: ktypes.CreateProcess,
+		Name: "CreateProcess",
+		Tid:  2484,
+		PID:  859,
+		PS: &types.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\svchost.exe",
+		},
+		Kparams: kevent.Kparams{
+			kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(4143)},
+			kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.AnsiString, Value: "powershell.exe"},
+		},
+		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+	}
+
+	kevt2 := &kevent.Kevent{
+		Type: ktypes.TerminateProcess,
+		Name: "TerminateProcess",
+		Tid:  2484,
+		PID:  859,
+		PS: &types.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\svchost.exe",
+		},
+		Kparams: kevent.Kparams{
+			kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(4143)},
+			kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.AnsiString, Value: "powershell.exe"},
+		},
+	}
+
+	ss := rules.groups[ktypes.CreateProcess.Hash()][0].filters[0].ss
+
+	require.False(t, wrapProcessEvent(kevt1, rules.ProcessEvent))
+	require.False(t, wrapProcessEvent(kevt2, rules.ProcessEvent))
+	require.False(t, ss.inExpired.Load())
+
+	// wait for expire function to kick in
+	time.Sleep(time.Second * 3)
+
+	require.True(t, ss.inExpired.Load())
+}
+
 func TestMinEngineVersion(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
 	rules := NewRules(psnap, newConfig("_fixtures/min_engine_ver_fail.yml"))
@@ -726,15 +775,14 @@ func TestSequenceOutOfOrder(t *testing.T) {
 	require.True(t, wrapProcessEvent(kevt1, rules.ProcessEvent))
 }
 
-func init() {
+func TestGCSequence(t *testing.T) {
 	sequenceGcInterval = time.Millisecond * 300
 	maxSequencePartialLifetime = time.Millisecond * 500
-}
 
-func TestGCSequence(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
 	rules := NewRules(psnap, newConfig("_fixtures/sequence_gc.yml"))
 	compileRules(t, rules)
+	log.SetLevel(log.DebugLevel)
 
 	now := time.Now()
 	kevt1 := &kevent.Kevent{

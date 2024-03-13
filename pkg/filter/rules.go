@@ -56,6 +56,7 @@ var (
 	matchTransitionErrors = expvar.NewInt("sequence.match.transition.errors")
 	partialsPerSequence   = expvar.NewMap("sequence.partials.count")
 	partialExpirations    = expvar.NewMap("sequence.partial.expirations")
+	partialBreaches       = expvar.NewMap("sequence.partial.breaches")
 
 	ErrInvalidFilter = func(rule, group string, err error) error {
 		return fmt.Errorf("syntax error in rule %q located in %q group: \n%v", rule, group, err)
@@ -280,7 +281,8 @@ func (s *sequenceState) addPartial(rule string, kevt *kevent.Kevent, outOfOrder 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if len(s.partials[i]) > maxOutstandingPartials {
-		log.Debugf("max partials encountered in sequence %s slot [%d]. "+
+		partialBreaches.Add(s.name, 1)
+		log.Warnf("max partials encountered in sequence %s slot [%d]. "+
 			"Dropping incoming partial", s.name, s.idxs[rule])
 		return
 	}
@@ -817,9 +819,17 @@ func (r *Rules) ProcessEvent(evt *kevent.Kevent) (bool, error) {
 		// process referenced in any
 		// partials has terminated
 		for _, seq := range r.sequences {
-			if seq.expire(evt) {
-				partialExpirations.Add(seq.name, 1)
+			expire := func(seq *sequenceState) func() {
+				return func() {
+					if seq.expire(evt) {
+						partialExpirations.Add(seq.name, 1)
+					}
+				}
 			}
+			// defer expiration stage as process
+			// termination event could arrive
+			// before other events
+			time.AfterFunc(time.Second*2, expire(seq))
 		}
 	}
 	return r.runRules(r.findGroups(evt), evt), nil
