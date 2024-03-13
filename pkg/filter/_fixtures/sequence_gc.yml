@@ -1,0 +1,16 @@
+- group: Out of order arrivals
+  rules:
+    - name: Out of order sequence
+      condition: >
+        sequence
+        by ps.uuid
+        |kevt.name = 'OpenProcess'|
+        |kevt.name = 'CreateFile' and file.operation = 'CREATE'
+            and
+        file.extension = '.dmp'
+        |
+      output: >
+        Detected an attempt by `%1.ps.name` process to access and read
+        the memory of the **Local Security And Authority Subsystem Service**
+        and subsequently write the `%2.file.name` dump file to the disk device
+      min-engine-version: 2.0.0

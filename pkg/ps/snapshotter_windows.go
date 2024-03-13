@@ -59,6 +59,8 @@ var (
 type snapshotter struct {
 	mu      sync.RWMutex
 	procs   map[uint32]*pstypes.PS
+	dirty   map[uint32]*pstypes.PS
+	dmu     sync.RWMutex
 	quit    chan struct{}
 	config  *config.Config
 	hsnap   handle.Snapshotter
@@ -69,6 +71,7 @@ type snapshotter struct {
 func NewSnapshotter(hsnap handle.Snapshotter, config *config.Config) Snapshotter {
 	s := &snapshotter{
 		procs:  make(map[uint32]*pstypes.PS),
+		dirty:  make(map[uint32]*pstypes.PS),
 		quit:   make(chan struct{}, 1),
 		config: config,
 		hsnap:  hsnap,
@@ -89,6 +92,7 @@ func NewSnapshotter(hsnap handle.Snapshotter, config *config.Config) Snapshotter
 func NewSnapshotterFromKcap(hsnap handle.Snapshotter, config *config.Config) Snapshotter {
 	s := &snapshotter{
 		procs:   make(map[uint32]*pstypes.PS),
+		dirty:   make(map[uint32]*pstypes.PS),
 		quit:    make(chan struct{}, 1),
 		config:  config,
 		hsnap:   hsnap,
@@ -377,6 +381,28 @@ func (s *snapshotter) Remove(e *kevent.Kevent) error {
 	if err != nil {
 		return err
 	}
+	// remove process from primary map and
+	// move to dirty map. This is required
+	// to prevent dropping process state from
+	// events when TerminateProcess event is
+	// emitted before subsequent events
+	if proc := s.procs[pid]; proc != nil {
+		s.dmu.Lock()
+		defer s.dmu.Unlock()
+		s.dirty[pid] = proc
+		// schedule removal
+		remove := func(pid uint32) func() {
+			return func() {
+				s.dmu.Lock()
+				defer s.dmu.Unlock()
+				if ps, ok := s.dirty[pid]; ok {
+					delete(s.dirty, pid)
+					log.Debugf("dirty process removed: %s. Dirty procs: %d", ps.Name, len(s.dirty))
+				}
+			}
+		}
+		time.AfterFunc(time.Second*5, remove(pid))
+	}
 	delete(s.procs, pid)
 	processCount.Add(-1)
 	// reset parent if it died after spawning a process
@@ -413,6 +439,13 @@ func (s *snapshotter) Find(pid uint32) (bool, *pstypes.PS) {
 	}
 	if s.capture || pid == sys.InvalidProcessID {
 		return false, nil
+	}
+
+	// check if the process is in dirty map
+	s.dmu.RLock()
+	defer s.dmu.RUnlock()
+	if ps := s.dirty[pid]; ps != nil {
+		return true, ps
 	}
 
 	processLookupFailureCount.Add(strconv.Itoa(int(pid)), 1)

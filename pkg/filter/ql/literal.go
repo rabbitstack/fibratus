@@ -271,6 +271,7 @@ func (e *SequenceExpr) walk() {
 			}
 		}
 	}
+
 	WalkFunc(e.Expr, walk)
 
 	// initialize event type/category buckets for every such field

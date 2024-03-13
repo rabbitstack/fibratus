@@ -151,8 +151,6 @@ func (q *Queue) push(e *Kevent) error {
 	if enqueue || len(q.listeners) == 0 {
 		q.q <- e
 		keventsEnqueued.Add(1)
-	} else {
-		e.Release()
 	}
 	return nil
 }

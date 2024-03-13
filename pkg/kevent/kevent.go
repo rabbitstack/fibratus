@@ -54,6 +54,11 @@ const (
 	RuleGroupKey MetadataKey = "rule.group"
 	// RuleSequenceByKey represents the join field value in sequence rules
 	RuleSequenceByKey MetadataKey = "rule.seq.by"
+	// RuleExpressionKey represents the rule filter expression
+	RuleExpressionKey MetadataKey = "rule.expr"
+	// RuleSequenceOutOfOrderKey the presence of this metadata key indicates the
+	// event in the partials list arrived out of order and requires reevaluation
+	RuleSequenceOutOfOrderKey MetadataKey = "rule.seq.outoforder"
 )
 
 func (key MetadataKey) String() string { return string(key) }
@@ -62,7 +67,7 @@ func (key MetadataKey) String() string { return string(key) }
 func (md Metadata) String() string {
 	var sb strings.Builder
 	for k, v := range md {
-		sb.WriteString(k.String() + ": " + fmt.Sprintf("%s", v) + ", ")
+		sb.WriteString(k.String() + ": " + fmt.Sprintf("%v", v) + ", ")
 	}
 	return strings.TrimSuffix(sb.String(), ", ")
 }
@@ -192,6 +197,26 @@ func NewFromKcap(buf []byte, ver kcapver.Version) (*Kevent, error) {
 // AddMeta appends a key/value pair to event's metadata.
 func (e *Kevent) AddMeta(k MetadataKey, v any) {
 	e.Metadata[k] = v
+}
+
+// RemoveMeta removes the event metadata index by given key.
+func (e *Kevent) RemoveMeta(k MetadataKey) {
+	delete(e.Metadata, k)
+}
+
+// GetMetaAsString returns the metadata as a string value.
+func (e *Kevent) GetMetaAsString(k MetadataKey) string {
+	if v, ok := e.Metadata[k]; ok {
+		if s, ok := v.(string); ok {
+			return s
+		}
+	}
+	return ""
+}
+
+// ContainsMeta returns true if the metadata contains the specified key.
+func (e *Kevent) ContainsMeta(k MetadataKey) bool {
+	return e.Metadata[k] != nil
 }
 
 // AppendParam adds a new parameter to this event.

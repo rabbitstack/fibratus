@@ -64,6 +64,9 @@ func (p *Parser) ParseSequence() (*Sequence, error) {
 		if err != nil {
 			return nil, err
 		}
+		if seq.MaxSpan > time.Hour*4 {
+			return nil, fmt.Errorf("maximum span %v cannot be greater than 4h", seq.MaxSpan)
+		}
 	} else {
 		p.unscan()
 	}

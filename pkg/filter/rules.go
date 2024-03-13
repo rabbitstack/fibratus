@@ -34,6 +34,7 @@ import (
 	"net"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	semver "github.com/hashicorp/go-version"
@@ -42,8 +43,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// maxOutstandingPartials determines the maximum number of partials per sequence index
-const maxOutstandingPartials = 1000
+const (
+	// maxOutstandingPartials determines the maximum number of partials per sequence index
+	maxOutstandingPartials = 1000
+)
 
 var (
 	filterMatches     = expvar.NewMap("filter.matches")
@@ -53,6 +56,7 @@ var (
 	matchTransitionErrors = expvar.NewInt("sequence.match.transition.errors")
 	partialsPerSequence   = expvar.NewMap("sequence.partials.count")
 	partialExpirations    = expvar.NewMap("sequence.partial.expirations")
+	partialBreaches       = expvar.NewMap("sequence.partial.breaches")
 
 	ErrInvalidFilter = func(rule, group string, err error) error {
 		return fmt.Errorf("syntax error in rule %q located in %q group: \n%v", rule, group, err)
@@ -66,6 +70,13 @@ var (
 	ErrMalformedMinEngineVer = func(rule, v string, err error) error {
 		return fmt.Errorf("rule %q has a malformed minimum engine version: %s: %v", rule, v, err)
 	}
+
+	// sequenceGcInterval determines how often sequence GC kicks in
+	sequenceGcInterval = time.Minute
+	// maxSequencePartialLifetime indicates the maximum time for the
+	// partial to exist in the sequence state. If the partial has been
+	// placed in the sequence state more than allowed, it is removed
+	maxSequencePartialLifetime = time.Hour * 4
 )
 
 var (
@@ -99,7 +110,10 @@ type Rules struct {
 	config *config.Config
 	psnap  ps.Snapshotter
 
-	matches []*ruleMatch
+	matches   []*ruleMatch
+	sequences []*sequenceState
+
+	scavenger *time.Ticker
 }
 
 type ruleMatch struct {
@@ -128,10 +142,15 @@ type sequenceState struct {
 
 	// partials keeps the state of all matched events per expression
 	partials map[uint16][]*kevent.Kevent
+	// mu guards the partials map
+	mu sync.RWMutex
+
 	// matches stores only the event that matched
 	// the upstream partials. These events will be propagated
 	// in the rule action context
 	matches map[uint16]*kevent.Kevent
+	// mmu guards the matches map
+	mmu sync.RWMutex
 
 	fsm *fsm.StateMachine
 
@@ -139,12 +158,14 @@ type sequenceState struct {
 	idxs          map[fsm.State]uint16
 	spanDeadlines map[fsm.State]*time.Timer
 	inDeadline    atomic.Bool
-	inExpired     bool
+	inExpired     atomic.Bool
 	initialState  fsm.State
 
 	// matchedRules keeps the mapping between rule indexes and
-	// their matches.
+	// their matches. Indices start at 1
 	matchedRules map[uint16]bool
+	// mrm guards the matchedRules map
+	mrm sync.RWMutex
 }
 
 func newSequenceState(name, initialState string, maxSpan time.Duration) *sequenceState {
@@ -166,6 +187,8 @@ func newSequenceState(name, initialState string, maxSpan time.Duration) *sequenc
 }
 
 func (s *sequenceState) events() []*kevent.Kevent {
+	s.mmu.RLock()
+	defer s.mmu.RUnlock()
 	events := make([]*kevent.Kevent, 0, len(s.matches))
 	for _, e := range s.matches {
 		events = append(events, e)
@@ -191,13 +214,15 @@ func (s *sequenceState) initFSM(initialState string) {
 		if transition.Source == s.initialState && s.inDeadline.Load() {
 			s.inDeadline.Store(false)
 		}
-		if transition.Source == s.initialState && s.inExpired {
-			s.inExpired = false
+		if transition.Source == s.initialState && s.inExpired.Load() {
+			s.inExpired.Store(false)
 		}
 		// clear state in case of expire/deadline transitions
-		if transition.Trigger == cancelTransition ||
-			transition.Trigger == expireTransition {
+		if transition.Trigger == expireTransition {
 			s.clear()
+		}
+		if transition.Trigger == cancelTransition {
+			s.clearLocked()
 		}
 		if transition.Trigger == matchTransition {
 			log.Debugf("state trigger from rule [%s]", transition.Source)
@@ -208,13 +233,15 @@ func (s *sequenceState) initFSM(initialState string) {
 				span.Stop()
 				delete(s.spanDeadlines, transition.Source)
 			}
-			// save rule match
+			// save rule matches
 			s.matchedRules[s.idxs[transition.Source]] = true
 		}
 	})
 }
 
 func (s *sequenceState) matchTransition(rule string, kevt *kevent.Kevent) error {
+	s.mrm.Lock()
+	defer s.mrm.Unlock()
 	shouldFire := !s.matchedRules[s.idxs[rule]]
 	if shouldFire {
 		return s.fsm.Fire(matchTransition, kevt)
@@ -249,9 +276,12 @@ func (s *sequenceState) currentState() fsm.State {
 	return s.fsm.MustState()
 }
 
-func (s *sequenceState) addPartial(rule string, kevt *kevent.Kevent) {
+func (s *sequenceState) addPartial(rule string, kevt *kevent.Kevent, outOfOrder bool) {
 	i := s.idxs[rule]
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if len(s.partials[i]) > maxOutstandingPartials {
+		partialBreaches.Add(s.name, 1)
 		log.Warnf("max partials encountered in sequence %s slot [%d]. "+
 			"Dropping incoming partial", s.name, s.idxs[rule])
 		return
@@ -265,17 +295,59 @@ func (s *sequenceState) addPartial(rule string, kevt *kevent.Kevent) {
 			}
 		}
 	}
+	if outOfOrder {
+		kevt.AddMeta(kevent.RuleExpressionKey, rule)
+		kevt.AddMeta(kevent.RuleSequenceOutOfOrderKey, true)
+	}
 	log.Debugf("adding partial to slot [%d] for rule %q: %s", i, rule, kevt)
 	partialsPerSequence.Add(s.name, 1)
 	s.partials[i] = append(s.partials[i], kevt)
+	sort.Slice(s.partials[i], func(n, m int) bool { return s.partials[i][n].Timestamp.Before(s.partials[i][m].Timestamp) })
 }
 
-func (s *sequenceState) isAfter(rule string, kevt *kevent.Kevent) bool {
+// gc prunes the sequence partial if it remained
+// more time than specified by max span or if max
+// span is omitted, the partial is allowed to remain
+// in sequence state for four hours.
+func (s *sequenceState) gc() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	dur := s.maxSpan
+	if dur == 0 {
+		dur = maxSequencePartialLifetime
+	}
+	for idx, partials := range s.partials {
+		for i, p := range partials {
+			if time.Since(p.Timestamp) > dur {
+				log.Debugf("garbage collecting partial: [%s]", p)
+				// remove partial event from the corresponding slot
+				s.partials[idx] = append(
+					s.partials[idx][:i],
+					s.partials[idx][i+1:]...)
+				partialsPerSequence.Add(s.name, -1)
+			}
+		}
+	}
+}
+
+// meetsTemporalDistance determines if the temporal occurrence of the
+// given event is encountered between the last partial of its sequence
+// slot and the first partial of its next downstream sequence.
+func (s *sequenceState) meetsTemporalDistance(rule string, kevt *kevent.Kevent, lock bool) bool {
+	if lock {
+		s.mu.RLock()
+		defer s.mu.RUnlock()
+	}
 	i := s.idxs[rule]
 	if len(s.partials[i]) == 0 {
 		return true
 	}
-	return kevt.Timestamp.After(s.partials[i][len(s.partials[i])-1].Timestamp)
+	isBefore := true
+	if len(s.partials[i+1]) > 0 {
+		isBefore = kevt.Timestamp.Before(s.partials[i+1][0].Timestamp)
+	}
+	isAfter := kevt.Timestamp.After(s.partials[i][len(s.partials[i])-1].Timestamp)
+	return (isAfter && isBefore) || (kevt.Timestamp == s.partials[i][len(s.partials[i])-1].Timestamp && isBefore)
 }
 
 func (s *sequenceState) clear() {
@@ -284,6 +356,16 @@ func (s *sequenceState) clear() {
 	s.matchedRules = make(map[uint16]bool)
 	s.spanDeadlines = make(map[fsm.State]*time.Timer)
 	partialsPerSequence.Delete(s.name)
+}
+
+func (s *sequenceState) clearLocked() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.mrm.Lock()
+	defer s.mrm.Unlock()
+	s.mmu.Lock()
+	defer s.mmu.Unlock()
+	s.clear()
 }
 
 func compareSeqJoin(s1, s2 any) bool {
@@ -345,14 +427,23 @@ func compareSeqJoin(s1, s2 any) bool {
 
 // next determines whether the next rule in the
 // sequence should be evaluated. The rule is evaluated
-// if its upstream sequence rule produced a match and
+// if all its upstream sequence rules produced a match and
 // the sequence is not stuck in deadline or expired state.
 func (s *sequenceState) next(i int) bool {
 	// always evaluate the first rule in the sequence
 	if i == 0 {
 		return true
 	}
-	return s.matchedRules[uint16(i)] && !s.inDeadline.Load() && !s.inExpired
+	var next bool
+	s.mrm.RLock()
+	defer s.mrm.RUnlock()
+	for n := 0; n < i; n++ {
+		next = s.matchedRules[uint16(n+1)]
+		if !next {
+			break
+		}
+	}
+	return next && !s.inDeadline.Load() && !s.inExpired.Load()
 }
 
 func (s *sequenceState) scheduleMaxSpanDeadline(rule fsm.State, maxSpan time.Duration) {
@@ -387,8 +478,13 @@ func (s *sequenceState) expire(e *kevent.Kevent) bool {
 			p2, _ := rhs.Kparams.GetPid()
 			return p1 == p2
 		}
-		return lhs.PID == rhs.PID
+		pid, _ := rhs.Kparams.GetPid()
+		return lhs.PID == pid
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.mrm.RLock()
+	defer s.mrm.RUnlock()
 	for _, idx := range s.idxs {
 		for i := len(s.partials[idx]) - 1; i >= 0; i-- {
 			if len(s.partials[idx]) > 0 && !canExpire(s.partials[idx][i], e) {
@@ -413,11 +509,10 @@ func (s *sequenceState) expire(e *kevent.Kevent) bool {
 
 				if len(s.partials[idx]) == 0 {
 					log.Infof("%q sequence expired. All partials retracted", s.name)
-					partialExpirations.Add(s.name, 1)
-					s.inExpired = true
+					s.inExpired.Store(true)
 					err := s.expireTransition()
 					if err != nil {
-						s.inExpired = false
+						s.inExpired.Store(false)
 						log.Warnf("expire transition failed: %v", err)
 					}
 					// transitions from expired state to initial state
@@ -453,9 +548,9 @@ func (f compiledFilter) isScoped() bool {
 }
 
 // run execute the filter with either simple or sequence expressions.
-func (f compiledFilter) run(kevt *kevent.Kevent, i int) bool {
+func (f compiledFilter) run(kevt *kevent.Kevent, i int, rawMatch bool) bool {
 	if f.ss != nil {
-		return f.filter.RunSequence(kevt, uint16(i), f.ss.partials)
+		return f.filter.RunSequence(kevt, uint16(i), f.ss.partials, rawMatch)
 	}
 	return f.filter.Run(kevt)
 }
@@ -476,11 +571,16 @@ func (r *Rules) isGroupMapped(scopeHash, groupHash uint32) bool {
 // NewRules produces a fresh rules engine instance.
 func NewRules(psnap ps.Snapshotter, config *config.Config) *Rules {
 	rules := &Rules{
-		groups:  make(map[uint32]filterGroups),
-		matches: make([]*ruleMatch, 0),
-		psnap:   psnap,
-		config:  config,
+		groups:    make(map[uint32]filterGroups),
+		matches:   make([]*ruleMatch, 0),
+		sequences: make([]*sequenceState, 0),
+		psnap:     psnap,
+		config:    config,
+		scavenger: time.NewTicker(sequenceGcInterval),
 	}
+
+	go rules.gcSequences()
+
 	return rules
 }
 
@@ -508,8 +608,8 @@ func (r *Rules) Compile() (*config.RulesCompileResult, error) {
 		// sequence rules we have to configure the FSM states and
 		// transitions
 		for _, rule := range group.Rules {
-			f := New(rule.Condition, r.config, WithPSnapshotter(r.psnap))
-			err := f.Compile()
+			fltr := New(rule.Condition, r.config, WithPSnapshotter(r.psnap))
+			err := fltr.Compile()
 			if err != nil {
 				return nil, ErrInvalidFilter(rule.Name, group.Name, err)
 			}
@@ -523,7 +623,7 @@ func (r *Rules) Compile() (*config.RulesCompileResult, error) {
 					return nil, ErrIncompatibleFilter(rule.Name, rule.MinEngineVersion)
 				}
 			}
-			for _, field := range f.GetFields() {
+			for _, field := range fltr.GetFields() {
 				deprecated, d := fields.IsDeprecated(field)
 				if deprecated {
 					log.Warnf("%s rule uses the [%s] field which "+
@@ -534,10 +634,13 @@ func (r *Rules) Compile() (*config.RulesCompileResult, error) {
 				}
 			}
 			filtersCount.Add(1)
-			filters = append(
-				filters,
-				newCompiledFilter(f, rule, configureFSM(group, f)),
-			)
+			f := newCompiledFilter(fltr, rule, configureFSM(group, fltr))
+			if fltr.IsSequence() && f.ss != nil {
+				// store the sequences in rules
+				// for more convenient tracking
+				r.sequences = append(r.sequences, f.ss)
+			}
+			filters = append(filters, f)
 		}
 
 		g := newFilterGroup(group, filters)
@@ -575,9 +678,11 @@ func (r *Rules) Compile() (*config.RulesCompileResult, error) {
 			}
 		}
 	}
+
 	if len(r.groups) == 0 {
 		return nil, nil
 	}
+
 	return r.buildCompileResult(), nil
 }
 
@@ -685,26 +790,6 @@ func (r *Rules) buildCompileResult() *config.RulesCompileResult {
 	return rs
 }
 
-func (r *Rules) appendMatch(f *config.FilterConfig, g config.FilterGroup, evts ...*kevent.Kevent) {
-	for _, evt := range evts {
-		evt.AddMeta(kevent.RuleNameKey, f.Name)
-		evt.AddMeta(kevent.RuleGroupKey, g.Name)
-		for k, v := range g.Labels {
-			evt.AddMeta(kevent.MetadataKey(k), v)
-		}
-	}
-	ctx := &config.ActionContext{
-		Events: evts,
-		Filter: f,
-		Group:  g,
-	}
-	r.matches = append(r.matches, &ruleMatch{ctx: ctx})
-}
-
-func (r *Rules) clearMatches() {
-	r.matches = make([]*ruleMatch, 0)
-}
-
 // hasGroups checks if rules were loaded into
 // the engine. If there are no rules the event is
 // forwarded to the aggregator.
@@ -729,7 +814,34 @@ func (r *Rules) ProcessEvent(evt *kevent.Kevent) (bool, error) {
 	if !r.hasGroups() {
 		return true, nil
 	}
+	if evt.IsTerminateProcess() {
+		// expire all sequences if the
+		// process referenced in any
+		// partials has terminated
+		for _, seq := range r.sequences {
+			expire := func(seq *sequenceState) func() {
+				return func() {
+					if seq.expire(evt) {
+						partialExpirations.Add(seq.name, 1)
+					}
+				}
+			}
+			// defer expiration stage as process
+			// termination event could arrive
+			// before other events
+			time.AfterFunc(time.Second*2, expire(seq))
+		}
+	}
 	return r.runRules(r.findGroups(evt), evt), nil
+}
+
+func (r *Rules) gcSequences() {
+	for {
+		<-r.scavenger.C
+		for _, seq := range r.sequences {
+			seq.gc()
+		}
+	}
 }
 
 func (r *Rules) runSequence(kevt *kevent.Kevent, f *compiledFilter) bool {
@@ -741,6 +853,17 @@ func (r *Rules) runSequence(kevt *kevent.Kevent, f *compiledFilter) bool {
 		// only try to evaluate the expression
 		// if upstream expressions have matched
 		if !f.ss.next(i) {
+			// it could be the event arrived out
+			// of order because certain provider
+			// flushed its buffers first. When this
+			// happens the event timestamp serves as
+			// a temporal reference.
+			// If this sequence expression can evaluate
+			// against the current event, mark it as
+			// out-of-order and store in partials list
+			if seq.Expressions[i].IsEvaluable(kevt) && f.run(kevt, i, true) {
+				f.ss.addPartial(expr.Expr.String(), kevt, true)
+			}
 			continue
 		}
 		// prevent running the filter if the expression
@@ -749,16 +872,24 @@ func (r *Rules) runSequence(kevt *kevent.Kevent, f *compiledFilter) bool {
 			continue
 		}
 		rule := expr.Expr.String()
-		matches := f.run(kevt, i)
-		log.Debugf("sequence expression [%s] = %t", rule, matches)
+		matches := f.run(kevt, i, false)
+		meetsDistance := f.ss.meetsTemporalDistance(rule, kevt, true)
+		log.Debugf("sequence expression [%s] = %t, temporal distance = %t event = %s",
+			rule,
+			matches,
+			meetsDistance,
+			kevt)
 		// append the partial and transition state machine
-		if matches && f.ss.isAfter(rule, kevt) {
-			f.ss.addPartial(rule, kevt)
+		if matches && meetsDistance {
+			f.ss.addPartial(rule, kevt, false)
 			err := f.ss.matchTransition(rule, kevt)
 			if err != nil {
 				matchTransitionErrors.Add(1)
 				log.Warnf("match transition failure: %v", err)
 			}
+			// now try to match all pending out-of-order
+			// events from downstream sequence slots
+			r.evaluateOutOfOrderPartials(i, f)
 		}
 	}
 	// if both the terminal state is reached and the partials
@@ -767,12 +898,24 @@ func (r *Rules) runSequence(kevt *kevent.Kevent, f *compiledFilter) bool {
 	// collect all events involved in the rule match
 	isTerminal := f.ss.isTerminalState()
 	if isTerminal {
+		f.ss.mu.RLock()
+		defer f.ss.mu.RUnlock()
 		nseqs := uint16(len(f.ss.partials))
+
+		setMatch := func(idx uint16, e *kevent.Kevent) {
+			f.ss.mmu.Lock()
+			defer f.ss.mmu.Unlock()
+			if f.ss.matches[idx] == nil {
+				f.ss.matches[idx] = e
+			}
+		}
+
 		for i := uint16(1); i < nseqs+1; i++ {
 			for _, outer := range f.ss.partials[i] {
 				for _, inner := range f.ss.partials[i+1] {
 					if compareSeqJoin(outer.SequenceBy(), inner.SequenceBy()) {
-						f.ss.matches[i], f.ss.matches[i+1] = outer, inner
+						setMatch(i, outer)
+						setMatch(i+1, inner)
 					}
 				}
 			}
@@ -781,17 +924,45 @@ func (r *Rules) runSequence(kevt *kevent.Kevent, f *compiledFilter) bool {
 	return isTerminal
 }
 
+func (r *Rules) evaluateOutOfOrderPartials(i int, f *compiledFilter) {
+	f.ss.mu.Lock()
+	defer f.ss.mu.Unlock()
+	for n, partials := range f.ss.partials {
+		if int(n)-1 == i {
+			// ignore partials from current slot
+			continue
+		}
+		for _, partial := range partials {
+			// only contemplate out of order partials
+			canMatch := partial.ContainsMeta(kevent.RuleSequenceOutOfOrderKey)
+			if !canMatch {
+				continue
+			}
+
+			matches := f.run(partial, int(n)-1, false)
+			rule := partial.GetMetaAsString(kevent.RuleExpressionKey)
+			meetsDistance := f.ss.meetsTemporalDistance(rule, partial, false)
+
+			if matches && meetsDistance {
+				partial.RemoveMeta(kevent.RuleSequenceOutOfOrderKey)
+				err := f.ss.matchTransition(rule, partial)
+				if err != nil {
+					matchTransitionErrors.Add(1)
+					log.Warnf("out of order match transition failure: %v", err)
+				}
+			}
+		}
+	}
+}
+
 func (r *Rules) triggerSequencesInGroup(e *kevent.Kevent, g *filterGroup) {
 	for _, f := range g.filters {
 		if !f.filter.IsSequence() || f.ss == nil {
 			continue
 		}
-		if f.ss.expire(e) {
-			continue
-		}
 		if r.runSequence(e, f) {
 			r.appendMatch(f.config, g.group, f.ss.events()...)
-			f.ss.clear()
+			f.ss.clearLocked()
 		}
 	}
 }
@@ -801,12 +972,9 @@ func (r *Rules) runRules(groups filterGroups, kevt *kevent.Kevent) bool {
 		for i, f := range g.filters {
 			var match bool
 			if f.ss != nil {
-				if f.ss.expire(kevt) {
-					continue
-				}
 				match = r.runSequence(kevt, f)
 			} else {
-				match = f.run(kevt, i)
+				match = f.run(kevt, i, false)
 				if match {
 					// transition sequence states since a match
 					// in a simple rule could trigger multiple
@@ -817,7 +985,7 @@ func (r *Rules) runRules(groups filterGroups, kevt *kevent.Kevent) bool {
 			if match {
 				if f.ss != nil {
 					r.appendMatch(f.config, g.group, f.ss.events()...)
-					f.ss.clear()
+					f.ss.clearLocked()
 				} else {
 					r.appendMatch(f.config, g.group, kevt)
 				}
@@ -871,4 +1039,24 @@ func (r *Rules) processActions() error {
 		}
 	}
 	return nil
+}
+
+func (r *Rules) appendMatch(f *config.FilterConfig, g config.FilterGroup, evts ...*kevent.Kevent) {
+	for _, evt := range evts {
+		evt.AddMeta(kevent.RuleNameKey, f.Name)
+		evt.AddMeta(kevent.RuleGroupKey, g.Name)
+		for k, v := range g.Labels {
+			evt.AddMeta(kevent.MetadataKey(k), v)
+		}
+	}
+	ctx := &config.ActionContext{
+		Events: evts,
+		Filter: f,
+		Group:  g,
+	}
+	r.matches = append(r.matches, &ruleMatch{ctx: ctx})
+}
+
+func (r *Rules) clearMatches() {
+	r.matches = make([]*ruleMatch, 0)
 }
