@@ -635,7 +635,7 @@ func (r *Rules) Compile() (*config.RulesCompileResult, error) {
 				}
 			}
 			filtersCount.Add(1)
-			f := newCompiledFilter(fltr, rule, configureFSM(group, fltr))
+			f := newCompiledFilter(fltr, rule, configureFSM(rule, fltr))
 			if fltr.IsSequence() && f.ss != nil {
 				// store the sequences in rules
 				// for more convenient tracking
@@ -687,7 +687,7 @@ func (r *Rules) Compile() (*config.RulesCompileResult, error) {
 	return r.buildCompileResult(), nil
 }
 
-func configureFSM(group config.FilterGroup, f Filter) *sequenceState {
+func configureFSM(filter *config.FilterConfig, f Filter) *sequenceState {
 	if !f.IsSequence() {
 		return nil
 	}
@@ -697,7 +697,7 @@ func configureFSM(group config.FilterGroup, f Filter) *sequenceState {
 		return nil
 	}
 	initialState := expressions[0].Expr.String()
-	seqState := newSequenceState(group.Name, initialState, seq.MaxSpan)
+	seqState := newSequenceState(filter.Name, initialState, seq.MaxSpan)
 	// setup finite state machine states. The last rule
 	// in the sequence transitions to the terminal state
 	// if all rules match
