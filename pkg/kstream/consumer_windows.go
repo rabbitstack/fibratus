@@ -293,7 +293,7 @@ func (s *sink) processEvent(ev *etw.EventRecord) error {
 		keventsDropped.Add(1)
 		return nil
 	}
-	if s.filter != nil && !s.filter.Run(evt) {
+	if s.filter != nil && !evt.IsStackWalk() && !s.filter.Run(evt) {
 		return nil
 	}
 	// Increment sequence
