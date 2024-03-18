@@ -862,7 +862,7 @@ func (r *Rules) runSequence(kevt *kevent.Kevent, f *compiledFilter) bool {
 			// If this sequence expression can evaluate
 			// against the current event, mark it as
 			// out-of-order and store in partials list
-			if seq.Expressions[i].IsEvaluable(kevt) && f.run(kevt, i, true) {
+			if expr.IsEvaluable(kevt) && f.run(kevt, i, true) {
 				f.ss.addPartial(expr.Expr.String(), kevt, true)
 			}
 			continue
@@ -889,8 +889,12 @@ func (r *Rules) runSequence(kevt *kevent.Kevent, f *compiledFilter) bool {
 				log.Warnf("match transition failure: %v", err)
 			}
 			// now try to match all pending out-of-order
-			// events from downstream sequence slots
-			r.evaluateOutOfOrderPartials(i, f)
+			// events from downstream sequence slots if
+			// the previous match hasn't reached terminal
+			// state
+			if f.ss.currentState() != sequenceTerminalState {
+				r.evaluateOutOfOrderPartials(i, f)
+			}
 		}
 	}
 	// if both the terminal state is reached and the partials
@@ -939,18 +943,17 @@ func (r *Rules) evaluateOutOfOrderPartials(i int, f *compiledFilter) {
 			if !canMatch {
 				continue
 			}
-
 			matches := f.run(partial, int(n)-1, false)
 			rule := partial.GetMetaAsString(kevent.RuleExpressionKey)
 			meetsDistance := f.ss.meetsTemporalDistance(rule, partial, false)
-
-			if matches && meetsDistance {
-				partial.RemoveMeta(kevent.RuleSequenceOutOfOrderKey)
-				err := f.ss.matchTransition(rule, partial)
-				if err != nil {
-					matchTransitionErrors.Add(1)
-					log.Warnf("out of order match transition failure: %v", err)
-				}
+			if !matches && !meetsDistance {
+				continue
+			}
+			partial.RemoveMeta(kevent.RuleSequenceOutOfOrderKey)
+			err := f.ss.matchTransition(rule, partial)
+			if err != nil {
+				matchTransitionErrors.Add(1)
+				log.Warnf("out of order match transition failure: %v", err)
 			}
 		}
 	}
