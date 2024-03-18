@@ -31,13 +31,6 @@ func NewBatch(evts ...*Kevent) *Batch {
 // Len returns the length of the batch.
 func (b *Batch) Len() int64 { return int64(len(b.Events)) }
 
-// Release releases all events from the batch and returns them to the pool.
-func (b *Batch) Release() {
-	for _, e := range b.Events {
-		e.Release()
-	}
-}
-
 // MarshalJSON serializes the batch of events to JSON format.
 func (b *Batch) MarshalJSON() []byte {
 	buf := make([]byte, 0)

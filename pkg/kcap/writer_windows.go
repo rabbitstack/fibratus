@@ -198,15 +198,12 @@ func (w *writer) Write(kevtsc <-chan *kevent.Kevent, errs <-chan error) chan err
 				err := w.write(b)
 				if err != nil {
 					errsc <- err
-					kevt.Release()
 					continue
 				}
 				// update stats
 				w.stats.incKevts(kevt)
 				w.stats.incBytes(uint64(l))
 				w.stats.incProcs(kevt)
-				// return to pool
-				kevt.Release()
 			case err := <-errs:
 				errsc <- err
 				kstreamConsumerErrors.Add(1)

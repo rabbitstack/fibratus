@@ -29,13 +29,6 @@ import (
 	"time"
 )
 
-// pool is used to alleviate the pressure on the heap allocator
-var pool = sync.Pool{
-	New: func() interface{} {
-		return &Kevent{}
-	},
-}
-
 // TimestampFormat is the Go valid format for the event timestamp
 var TimestampFormat string
 
@@ -252,7 +245,7 @@ func (e *Kevent) AppendFlags(name string, value uint32, flags ParamFlags) {
 // to the error message.
 // Returns an empty string if the given parameter name is not found
 // in event parameters.
-func (e Kevent) GetParamAsString(name string) string {
+func (e *Kevent) GetParamAsString(name string) string {
 	par, err := e.Kparams.Get(name)
 	if err != nil {
 		return ""
@@ -261,14 +254,8 @@ func (e Kevent) GetParamAsString(name string) string {
 }
 
 // GetFlagsAsSlice returns parameter flags as a slice of bitmask string values.
-func (e Kevent) GetFlagsAsSlice(name string) []string {
+func (e *Kevent) GetFlagsAsSlice(name string) []string {
 	return strings.Split(e.GetParamAsString(name), "|")
-}
-
-// Release returns an event to the pool.
-func (e *Kevent) Release() {
-	*e = Kevent{} // clear event
-	pool.Put(e)
 }
 
 // SequenceBy returns the BY statement join field from event metadata.

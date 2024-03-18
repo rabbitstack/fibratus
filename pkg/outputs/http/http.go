@@ -81,7 +81,6 @@ func (h *_http) Close() error   { return nil }
 
 func (h *_http) Publish(batch *kevent.Batch) error {
 	var buf []byte
-	defer batch.Release()
 	switch h.config.Serializer {
 	case outputs.JSON:
 		buf = batch.MarshalJSON()
