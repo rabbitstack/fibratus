@@ -408,7 +408,6 @@ func (f *filament) pushKevents(b kbatch) error {
 	defer f.gil.Unlock()
 	for _, kevt := range b {
 		kdict, err := newKDict(kevt)
-		kevt.Release()
 		if err != nil {
 			kdict.DecRef()
 			kdictErrors.Add(1)

@@ -100,14 +100,11 @@ func (e *evtlog) Close() error {
 }
 
 func (e *evtlog) Publish(batch *kevent.Batch) error {
-	defer batch.Release()
-
 	for _, kevt := range batch.Events {
 		if err := e.publish(kevt); err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 
