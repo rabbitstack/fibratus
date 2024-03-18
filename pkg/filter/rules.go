@@ -316,10 +316,10 @@ func (s *sequenceState) gc() {
 	if dur == 0 {
 		dur = maxSequencePartialLifetime
 	}
-	for idx, partials := range s.partials {
-		for i, p := range partials {
-			if time.Since(p.Timestamp) > dur {
-				log.Debugf("garbage collecting partial: [%s]", p)
+	for _, idx := range s.idxs {
+		for i := len(s.partials[idx]) - 1; i >= 0; i-- {
+			if len(s.partials[idx]) > 0 && time.Since(s.partials[idx][i].Timestamp) > dur {
+				log.Debugf("garbage collecting partial: [%s]", s.partials[idx][i])
 				// remove partial event from the corresponding slot
 				s.partials[idx] = append(
 					s.partials[idx][:i],
@@ -328,6 +328,7 @@ func (s *sequenceState) gc() {
 			}
 		}
 	}
+
 }
 
 // meetsTemporalDistance determines if the temporal occurrence of the
