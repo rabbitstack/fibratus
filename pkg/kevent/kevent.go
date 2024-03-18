@@ -100,6 +100,8 @@ type Kevent struct {
 	Kparams Kparams `json:"params"`
 	// Metadata represents any tags that are meaningful to this event.
 	Metadata Metadata `json:"metadata"`
+	// mmux guards the metadata map
+	mmux sync.RWMutex
 	// PS represents process' metadata and its allocated resources such as handles, DLLs, etc.
 	PS *pstypes.PS `json:"ps,omitempty"`
 	// Callstack represents the call stack for the thread that generated the event.
@@ -113,6 +115,8 @@ type Kevent struct {
 
 // String returns event's string representation.
 func (e *Kevent) String() string {
+	e.mmux.RLock()
+	defer e.mmux.RUnlock()
 	if e.PS != nil {
 		return fmt.Sprintf(`
 		Seq: %d
@@ -196,16 +200,22 @@ func NewFromKcap(buf []byte, ver kcapver.Version) (*Kevent, error) {
 
 // AddMeta appends a key/value pair to event's metadata.
 func (e *Kevent) AddMeta(k MetadataKey, v any) {
+	e.mmux.Lock()
+	defer e.mmux.Unlock()
 	e.Metadata[k] = v
 }
 
 // RemoveMeta removes the event metadata index by given key.
 func (e *Kevent) RemoveMeta(k MetadataKey) {
+	e.mmux.Lock()
+	defer e.mmux.Unlock()
 	delete(e.Metadata, k)
 }
 
 // GetMetaAsString returns the metadata as a string value.
 func (e *Kevent) GetMetaAsString(k MetadataKey) string {
+	e.mmux.RLock()
+	defer e.mmux.RUnlock()
 	if v, ok := e.Metadata[k]; ok {
 		if s, ok := v.(string); ok {
 			return s
@@ -216,6 +226,8 @@ func (e *Kevent) GetMetaAsString(k MetadataKey) string {
 
 // ContainsMeta returns true if the metadata contains the specified key.
 func (e *Kevent) ContainsMeta(k MetadataKey) bool {
+	e.mmux.RLock()
+	defer e.mmux.RUnlock()
 	return e.Metadata[k] != nil
 }
 
@@ -260,4 +272,8 @@ func (e *Kevent) Release() {
 }
 
 // SequenceBy returns the BY statement join field from event metadata.
-func (e *Kevent) SequenceBy() any { return e.Metadata[RuleSequenceByKey] }
+func (e *Kevent) SequenceBy() any {
+	e.mmux.RLock()
+	defer e.mmux.RUnlock()
+	return e.Metadata[RuleSequenceByKey]
+}
