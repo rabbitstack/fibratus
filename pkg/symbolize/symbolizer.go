@@ -247,7 +247,7 @@ func (s *Symbolizer) syncModules(e *kevent.Kevent) error {
 func (s *Symbolizer) processCallstack(e *kevent.Kevent) error {
 	addrs := e.Kparams.MustGetSliceAddrs(kparams.Callstack)
 	e.Callstack.Init(len(addrs))
-	if (e.IsCreateFile() && e.IsOpenDisposition()) || e.PID == ps.SystemPID {
+	if (e.IsCreateFile() && e.IsOpenDisposition()) || (e.IsSystemPid() && !e.IsLoadImage()) {
 		// for high-volume events decorating
 		// the frames with symbol information
 		// is not viable. For this reason, the
