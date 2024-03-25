@@ -473,8 +473,12 @@ func (s *sequenceState) expire(e *kevent.Kevent) bool {
 	if !e.IsTerminateProcess() {
 		return false
 	}
-	canExpire := func(lhs, rhs *kevent.Kevent) bool {
-		if lhs.Type == ktypes.CreateProcess {
+	canExpire := func(lhs, rhs *kevent.Kevent, isFinalSlot bool) bool {
+		// if the TerminateProcess event arrives for the
+		// process spawned by CreateProcess, and it pertains
+		// to the final sequence slot, it is safe to expire
+		// the whole sequence
+		if lhs.Type == ktypes.CreateProcess && isFinalSlot {
 			p1, _ := lhs.Kparams.GetPid()
 			p2, _ := rhs.Kparams.GetPid()
 			return p1 == p2
@@ -488,41 +492,35 @@ func (s *sequenceState) expire(e *kevent.Kevent) bool {
 	defer s.mrm.RUnlock()
 	for _, idx := range s.idxs {
 		for i := len(s.partials[idx]) - 1; i >= 0; i-- {
-			if len(s.partials[idx]) > 0 && !canExpire(s.partials[idx][i], e) {
+			if len(s.partials[idx]) > 0 && !canExpire(s.partials[idx][i], e, idx == uint16(len(s.idxs))) {
 				continue
 			}
-			// if downstream rule didn't match, and the prev condition
-			// is referencing a CreateProcess event for which we just
-			// got the termination event, it is safe to expire all pending
-			// partials and dispose the state
-			matched := s.matchedRules[idx+1]
-			if !matched {
-				log.Debugf("removing event originated from %s (%d) "+
-					"in partials pertaining to sequence [%s]",
-					e.Kparams.MustGetString(kparams.ProcessName),
-					e.Kparams.MustGetPid(),
-					s.name)
-				// remove partial event from the corresponding slot
-				s.partials[idx] = append(
-					s.partials[idx][:i],
-					s.partials[idx][i+1:]...)
-				partialsPerSequence.Add(s.name, -1)
 
-				if len(s.partials[idx]) == 0 {
-					log.Infof("%q sequence expired. All partials retracted", s.name)
-					s.inExpired.Store(true)
-					err := s.expireTransition()
-					if err != nil {
-						s.inExpired.Store(false)
-						log.Warnf("expire transition failed: %v", err)
-					}
-					// transitions from expired state to initial state
-					err = s.fsm.Fire(resetTransition)
-					if err != nil {
-						log.Warnf("unable to transition to initial state: %v", err)
-					}
-					return true
+			log.Debugf("removing event originated from %s (%d) "+
+				"in partials pertaining to sequence [%s]",
+				e.Kparams.MustGetString(kparams.ProcessName),
+				e.Kparams.MustGetPid(),
+				s.name)
+			// remove partial event from the corresponding slot
+			s.partials[idx] = append(
+				s.partials[idx][:i],
+				s.partials[idx][i+1:]...)
+			partialsPerSequence.Add(s.name, -1)
+
+			if len(s.partials[idx]) == 0 {
+				log.Infof("%q sequence expired. All partials retracted", s.name)
+				s.inExpired.Store(true)
+				err := s.expireTransition()
+				if err != nil {
+					s.inExpired.Store(false)
+					log.Warnf("expire transition failed: %v", err)
 				}
+				// transitions from expired state to initial state
+				err = s.fsm.Fire(resetTransition)
+				if err != nil {
+					log.Warnf("unable to transition to initial state: %v", err)
+				}
+				return true
 			}
 		}
 	}
