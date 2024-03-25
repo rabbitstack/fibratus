@@ -24,6 +24,7 @@ import (
 	"github.com/Masterminds/sprig/v3"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/util/convert"
 	"github.com/rabbitstack/fibratus/pkg/util/hashers"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	log "github.com/sirupsen/logrus"
@@ -35,7 +36,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"text/template"
 )
@@ -67,19 +67,7 @@ type FilterAction any
 
 // KillAction defines an action for killing the process
 // indicates by the filter field expression.
-type KillAction struct {
-	// Pid indicates the field for which
-	// the process id is resolved
-	Pid string `json:"pid" yaml:"pid"`
-}
-
-func (a KillAction) PidToInt(pid string) uint32 {
-	n, err := strconv.Atoi(pid)
-	if err != nil {
-		return 0
-	}
-	return uint32(n)
-}
+type KillAction struct{}
 
 // DecodeActions converts raw YAML map to
 // typed action structures.
@@ -171,6 +159,21 @@ type ActionContext struct {
 	Filter *FilterConfig
 	// Group represents the group where the filter is declared
 	Group FilterGroup
+}
+
+// UniquePids returns a set of process identifiers
+// from each matched event to be used in actions
+// such as the process kill action.
+func (ctx *ActionContext) UniquePids() []uint32 {
+	pids := make(map[uint32]struct{})
+	for _, e := range ctx.Events {
+		if e.IsCreateProcess() {
+			pids[e.Kparams.MustGetPid()] = struct{}{}
+		} else {
+			pids[e.PID] = struct{}{}
+		}
+	}
+	return convert.MapKeysToSlice(pids)
 }
 
 // RulesCompileResult contains the stats of the
