@@ -3,7 +3,8 @@
     Adversaries may abuse rundll32.exe to proxy execution of malicious code.
     Using rundll32.exe, vice executing directly (i.e. Shared Modules),
     may avoid triggering security tools that may not monitor execution of the
-    rundll32.exe process because of allowlists or false positives from normal operations.
+    rundll32.exe process because of allowlists or false positives from normal
+    operations.
     Rundll32.exe is commonly associated with executing DLL payloads.
   labels:
     tactic.id: TA0005
@@ -19,7 +20,7 @@
     - name: System Binary Proxy Execution via Rundll32
       description: |
         Detects the execution of rundll32.exe process with suspicious command line
-        followed by the creation of a child process which would probably unleash
+        followed by the creation of a child process that would probably unleash
         nefarious actions in the system.
       condition: >
         sequence
@@ -28,16 +29,43 @@
               and
            ps.child.name ~= 'rundll32.exe'
               and
-           ps.child.cmdline imatches
-              (
-                '*javascript:*',
-                '*vbscript:*',
-                '*shell32.dll*ShellExec_RunDLL*',
-                '*-sta*',
-                '*RunHTMLApplication*'
-              )
+           (
+              ps.child.cmdline imatches
+                (
+                  '*javascript:*',
+                  '*vbscript:*',
+                  '*shell32.dll*ShellExec_RunDLL*',
+                  '*shell32*WaitForExplorerRestart*',
+                  '*-sta*',
+                  '*ActiveXObject*',
+                  '*WScript.Shell*',
+                  '*RunHTMLApplication*',
+                  '*advpack*#12*',
+                  '*advpack*RegisterOCX*',
+                  '*advpack*LaunchINFSection*',
+                  '*url.dll*FileProtocolHandler*file://*',
+                  '*url.dll*FileProtocolHandler*.exe*',
+                  '*zipfldr*RouteTheCall*',
+                  '*pcwutl*LaunchApplication*',
+                  '*pcwutl*#1*',
+                  '*desk*InstallScreenSaver*',
+                  '*PointFunctionCall*'
+                )
+                or
+              regex(ps.child.cmdline, '(?i)[A-Z]:\\\\.+:.+$')
+          )
           | by ps.child.uuid
-          |spawn_process| by ps.uuid
+          |spawn_process
+              and
+              not
+           ps.child.exe imatches
+              (
+                '?:\\Program Files\\*.exe',
+                '?:\\Program Files (x86)\\*.exe'
+              )
+          | by ps.uuid
+      action:
+      - name: kill
       min-engine-version: 2.0.0
 
 - group: System Binary Proxy Execution via Regsvr32
