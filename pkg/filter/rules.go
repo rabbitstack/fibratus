@@ -549,6 +549,8 @@ func (f compiledFilter) isScoped() bool {
 // run execute the filter with either simple or sequence expressions.
 func (f compiledFilter) run(kevt *kevent.Kevent, i int, rawMatch bool) bool {
 	if f.ss != nil {
+		f.ss.mu.RLock()
+		defer f.ss.mu.RUnlock()
 		return f.filter.RunSequence(kevt, uint16(i), f.ss.partials, rawMatch)
 	}
 	return f.filter.Run(kevt)
