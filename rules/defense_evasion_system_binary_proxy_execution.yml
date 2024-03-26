@@ -72,7 +72,8 @@
   description: |
     Adversaries may abuse Regsvr32.exe to proxy execution of malicious code.
     Regsvr32.exe is a command-line program used to register and unregister object
-    linking and embedding controls, including dynamic link libraries (DLLs), on Windows systems.
+    linking and embedding controls, including dynamic link libraries (DLLs), on
+    Windows systems.
   labels:
     tactic.id: TA0005
     tactic.name: Defense Evasion
@@ -86,25 +87,58 @@
   rules:
     - name: Regsvr32 scriptlet execution
       description: |
-        Identifies the execution of a scriptlet file by regsvr32.exe process. Regsvr32
-        is usually abused by adversaries to execute malicious payloads without triggering
-        AV product alerts.
+        Identifies the execution of a scriptlet file by regsvr32.exe process. regsvr32.exe
+        allows attackers to run arbitrary scripts to proxy execution of malicious code.
       condition: >
         spawn_process
             and
-        ps.child.name ~= 'regsvr32.exe'
+        (ps.child.name ~= 'regsvr32.exe' or pe.ps.child.file.name ~= 'regsvr32.exe')
             and
         (
-          ps.child.cmdline imatches
-          (
-            '*scrobj*'
-          )
-            and
-          ps.child.cmdline imatches
-          (
-            '*/i:*',
-            '*-i:*',
-            '*.sct*'
-          )
+          (ps.child.cmdline imatches '*scrobj*'
+                and
+           ps.child.cmdline imatches
+             (
+               '*/i:*',
+               '*-i:*',
+               '*.sct*'
+             )
+           )
+              or
+           (ps.child.cmdline imatches '* /u*'
+                and
+            ps.child.cmdline imatches
+              (
+                '* -i:*http*',
+                '* /i:*http*',
+                '* -i:*ftp*',
+                '* /i:*ftp*',
+                '* -i:C:\\*',
+                '* /i:\"C:\\*',
+                '* /i:C:\\*',
+                '* -i:\"C:\\*'
+              )
+           )
+              or
+           (ps.child.cmdline imatches
+              (
+                '* /i:*',
+                '* -i:*'
+              )
+                and
+                not
+            ps.child.cmdline imatches
+              (
+                '* /n*',
+                '* -n*'
+              )
+           )
         )
-      min-engine-version: 2.0.0
+            and
+            not
+        ps.child.exe imatches
+          (
+            '?:\\Program Files\\*.exe',
+            '?:\\Program Files (x86)\\*.exe'
+          )
+      min-engine-version: 2.2.0
