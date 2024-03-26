@@ -59,7 +59,6 @@ func TestLoadGroupsFromPaths(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, KillAction{}, acts[0])
 
-	assert.Equal(t, "ps.pid", acts[0].(KillAction).Pid)
 	assert.Equal(t, "2.0.0", g1.Rules[0].MinEngineVersion)
 
 	g2 := filters.groups[1]

@@ -1024,15 +1024,10 @@ func (r *Rules) processActions() error {
 			return err
 		}
 		for _, act := range actions {
-			switch act := act.(type) {
+			switch act.(type) {
 			case config.KillAction:
-				field := act.Pid
-				if field == "" {
-					field = "ps.pid"
-				}
-				pid := act.PidToInt(InterpolateFields("%"+field, evts))
-				log.Infof("executing kill action: pid=%d rule=%s", pid, f.Name)
-				if err := action.Kill(pid); err != nil {
+				log.Infof("executing kill action: pids=%v rule=%s", m.ctx.UniquePids(), f.Name)
+				if err := action.Kill(m.ctx.UniquePids()); err != nil {
 					return ErrRuleAction(f.Name, err)
 				}
 			}

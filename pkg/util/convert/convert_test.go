@@ -18,24 +18,15 @@
 
 package convert
 
-// Btoi converts the provided bool value to uint8 integer.
-func Btoi(b bool) uint8 {
-	if b {
-		return 1
-	}
-	return 0
-}
+import (
+	"github.com/stretchr/testify/assert"
+	"testing"
+)
 
-// Itob converts the provided uint8 integer to a bool value.
-func Itob(i uint8) bool {
-	return i > 0
-}
-
-// MapKeysToSlice given the map, it converts the map keys to a slice.
-func MapKeysToSlice[K comparable, V any](m map[K]V) []K {
-	s := make([]K, 0, len(m))
-	for k := range m {
-		s = append(s, k)
-	}
-	return s
+func TestMapKeysToSlice(t *testing.T) {
+	m := map[uint32]bool{1245: true, 2233: false, 341234: true}
+	s := MapKeysToSlice(m)
+	assert.Len(t, s, 3)
+	assert.Contains(t, s, uint32(1245))
+	assert.Contains(t, s, uint32(341234))
 }

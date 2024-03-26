@@ -518,8 +518,7 @@ var rulesSchema = `
 									"items": {
 										"type": "object",
 										"properties": {
-											"name": 	{"type": "string", "enum": ["kill"]},
-											"pid": 		{"type": "string", "minLength": 5}
+											"name": 	{"type": "string", "enum": ["kill"]}
 										},
 										"required": ["name"],
 										"additionalProperties": false
