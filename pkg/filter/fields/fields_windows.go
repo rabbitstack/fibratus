@@ -258,6 +258,8 @@ const (
 	PeCertBefore Field = "pe.cert.before"
 	// PeIsModified is the field that indicates whether disk and in-memory PE headers differ
 	PeIsModified Field = "pe.is_modified"
+	// PePsChildFileName represents the original file name of the child process executable provided at compile-time
+	PePsChildFileName Field = "pe.ps.child.file.name"
 
 	// KevtSeq is the event sequence number
 	KevtSeq Field = "kevt.seq"
@@ -472,7 +474,7 @@ func (f Field) IsPeSectionEntropy() bool {
 }
 func (f Field) IsPeSymbol() bool { return f == PeSymbols || f == PeNumSymbols || f == PeImports }
 func (f Field) IsPeVersionResource() bool {
-	return f == PeCompany || f == PeCopyright || f == PeDescription || f == PeFileName || f == PeFileVersion || f == PeProduct || f == PeProductVersion
+	return f == PeCompany || f == PeCopyright || f == PeDescription || f == PeFileName || f == PeFileVersion || f == PeProduct || f == PeProductVersion || f == PePsChildFileName
 }
 func (f Field) IsPeImphash() bool   { return f == PeImphash }
 func (f Field) IsPeDotnet() bool    { return f == PeIsDotnet }
@@ -730,35 +732,36 @@ var fields = map[Field]FieldInfo{
 	HandleName:   {HandleName, "handle name", kparams.UnicodeString, []string{"handle.name = '\\Device\\NamedPipe\\chrome.12644.28.105826381'"}, nil},
 	HandleType:   {HandleType, "handle type", kparams.AnsiString, []string{"handle.type = 'Mutant'"}, nil},
 
-	PeNumSections:    {PeNumSections, "number of sections", kparams.Uint16, []string{"pe.nsections < 5"}, nil},
-	PeNumSymbols:     {PeNumSymbols, "number of entries in the symbol table", kparams.Uint32, []string{"pe.nsymbols > 230"}, nil},
-	PeBaseAddress:    {PeBaseAddress, "image base address", kparams.Address, []string{"pe.address.base = '140000000'"}, nil},
-	PeEntrypoint:     {PeEntrypoint, "address of the entrypoint function", kparams.Address, []string{"pe.address.entrypoint = '20110'"}, nil},
-	PeSections:       {PeSections, "PE sections", kparams.Object, []string{"pe.sections[.text].entropy > 6.2"}, nil},
-	PeSymbols:        {PeSymbols, "imported symbols", kparams.Slice, []string{"pe.symbols in ('GetTextFaceW', 'GetProcessHeap')"}, nil},
-	PeImports:        {PeImports, "imported dynamic linked libraries", kparams.Slice, []string{"pe.imports in ('msvcrt.dll', 'GDI32.dll'"}, nil},
-	PeResources:      {PeResources, "version and other resources", kparams.Map, []string{"pe.resources[FileDescription] = 'Notepad'"}, nil},
-	PeCompany:        {PeCompany, "internal company name of the file provided at compile-time", kparams.UnicodeString, []string{"pe.company = 'Microsoft Corporation'"}, nil},
-	PeCopyright:      {PeCopyright, "copyright notice for the file emitted at compile-time", kparams.UnicodeString, []string{"pe.copyright = '© Microsoft Corporation'"}, nil},
-	PeDescription:    {PeDescription, "internal description of the file provided at compile-time", kparams.UnicodeString, []string{"pe.description = 'Notepad'"}, nil},
-	PeFileName:       {PeFileName, "original file name supplied at compile-time", kparams.UnicodeString, []string{"pe.file.name = 'NOTEPAD.EXE'"}, nil},
-	PeFileVersion:    {PeFileVersion, "file version supplied at compile-time", kparams.UnicodeString, []string{"pe.file.version = '10.0.18362.693 (WinBuild.160101.0800)'"}, nil},
-	PeProduct:        {PeProduct, "internal product name of the file provided at compile-time", kparams.UnicodeString, []string{"pe.product = 'Microsoft® Windows® Operating System'"}, nil},
-	PeProductVersion: {PeProductVersion, "internal product version of the file provided at compile-time", kparams.UnicodeString, []string{"pe.product.version = '10.0.18362.693'"}, nil},
-	PeIsDLL:          {PeIsDLL, "indicates if the loaded image or created file is a DLL", kparams.Bool, []string{"pe.is_dll'"}, &Deprecation{Since: "2.0.0", Fields: []Field{FileIsDLL, ImageIsDLL}}},
-	PeIsDriver:       {PeIsDriver, "indicates if the loaded image or created file is a driver", kparams.Bool, []string{"pe.is_driver'"}, &Deprecation{Since: "2.0.0", Fields: []Field{FileIsDriver, ImageIsDriver}}},
-	PeIsExecutable:   {PeIsExecutable, "indicates if the loaded image or created file is an executable", kparams.Bool, []string{"pe.is_exec'"}, &Deprecation{Since: "2.0.0", Fields: []Field{FileIsExecutable, ImageIsExecutable}}},
-	PeImphash:        {PeImphash, "import hash", kparams.AnsiString, []string{"pe.impash = '5d3861c5c547f8a34e471ba273a732b2'"}, nil},
-	PeIsDotnet:       {PeIsDotnet, "indicates if PE contains CLR data", kparams.Bool, []string{"pe.is_dotnet"}, nil},
-	PeAnomalies:      {PeAnomalies, "contains PE anomalies detected during parsing", kparams.Slice, []string{"pe.anomalies in ('number of sections is 0')"}, nil},
-	PeIsSigned:       {PeIsSigned, "indicates if the PE has embedded or catalog signature", kparams.Bool, []string{"pe.is_signed"}, nil},
-	PeIsTrusted:      {PeIsTrusted, "indicates if the PE certificate chain is trusted", kparams.Bool, []string{"pe.is_trusted"}, nil},
-	PeCertSerial:     {PeCertSerial, "PE certificate serial number", kparams.UnicodeString, []string{"pe.cert.serial = '330000023241fb59996dcc4dff000000000232'"}, nil},
-	PeCertSubject:    {PeCertSubject, "PE certificate subject", kparams.UnicodeString, []string{"pe.cert.subject contains 'Washington, Redmond, Microsoft Corporation'"}, nil},
-	PeCertIssuer:     {PeCertIssuer, "PE certificate CA", kparams.UnicodeString, []string{"pe.cert.issuer contains 'Washington, Redmond, Microsoft Corporation'"}, nil},
-	PeCertAfter:      {PeCertAfter, "PE certificate expiration date", kparams.Time, []string{"pe.cert.after contains '2024-02-01 00:05:42 +0000 UTC'"}, nil},
-	PeCertBefore:     {PeCertBefore, "PE certificate enrollment date", kparams.Time, []string{"pe.cert.before contains '2024-02-01 00:05:42 +0000 UTC'"}, nil},
-	PeIsModified:     {PeIsModified, "indicates if disk and in-memory PE headers differ", kparams.Bool, []string{"pe.is_modified"}, nil},
+	PeNumSections:     {PeNumSections, "number of sections", kparams.Uint16, []string{"pe.nsections < 5"}, nil},
+	PeNumSymbols:      {PeNumSymbols, "number of entries in the symbol table", kparams.Uint32, []string{"pe.nsymbols > 230"}, nil},
+	PeBaseAddress:     {PeBaseAddress, "image base address", kparams.Address, []string{"pe.address.base = '140000000'"}, nil},
+	PeEntrypoint:      {PeEntrypoint, "address of the entrypoint function", kparams.Address, []string{"pe.address.entrypoint = '20110'"}, nil},
+	PeSections:        {PeSections, "PE sections", kparams.Object, []string{"pe.sections[.text].entropy > 6.2"}, nil},
+	PeSymbols:         {PeSymbols, "imported symbols", kparams.Slice, []string{"pe.symbols in ('GetTextFaceW', 'GetProcessHeap')"}, nil},
+	PeImports:         {PeImports, "imported dynamic linked libraries", kparams.Slice, []string{"pe.imports in ('msvcrt.dll', 'GDI32.dll'"}, nil},
+	PeResources:       {PeResources, "version and other resources", kparams.Map, []string{"pe.resources[FileDescription] = 'Notepad'"}, nil},
+	PeCompany:         {PeCompany, "internal company name of the file provided at compile-time", kparams.UnicodeString, []string{"pe.company = 'Microsoft Corporation'"}, nil},
+	PeCopyright:       {PeCopyright, "copyright notice for the file emitted at compile-time", kparams.UnicodeString, []string{"pe.copyright = '© Microsoft Corporation'"}, nil},
+	PeDescription:     {PeDescription, "internal description of the file provided at compile-time", kparams.UnicodeString, []string{"pe.description = 'Notepad'"}, nil},
+	PeFileName:        {PeFileName, "original file name supplied at compile-time", kparams.UnicodeString, []string{"pe.file.name = 'NOTEPAD.EXE'"}, nil},
+	PeFileVersion:     {PeFileVersion, "file version supplied at compile-time", kparams.UnicodeString, []string{"pe.file.version = '10.0.18362.693 (WinBuild.160101.0800)'"}, nil},
+	PeProduct:         {PeProduct, "internal product name of the file provided at compile-time", kparams.UnicodeString, []string{"pe.product = 'Microsoft® Windows® Operating System'"}, nil},
+	PeProductVersion:  {PeProductVersion, "internal product version of the file provided at compile-time", kparams.UnicodeString, []string{"pe.product.version = '10.0.18362.693'"}, nil},
+	PeIsDLL:           {PeIsDLL, "indicates if the loaded image or created file is a DLL", kparams.Bool, []string{"pe.is_dll'"}, &Deprecation{Since: "2.0.0", Fields: []Field{FileIsDLL, ImageIsDLL}}},
+	PeIsDriver:        {PeIsDriver, "indicates if the loaded image or created file is a driver", kparams.Bool, []string{"pe.is_driver'"}, &Deprecation{Since: "2.0.0", Fields: []Field{FileIsDriver, ImageIsDriver}}},
+	PeIsExecutable:    {PeIsExecutable, "indicates if the loaded image or created file is an executable", kparams.Bool, []string{"pe.is_exec'"}, &Deprecation{Since: "2.0.0", Fields: []Field{FileIsExecutable, ImageIsExecutable}}},
+	PeImphash:         {PeImphash, "import hash", kparams.AnsiString, []string{"pe.impash = '5d3861c5c547f8a34e471ba273a732b2'"}, nil},
+	PeIsDotnet:        {PeIsDotnet, "indicates if PE contains CLR data", kparams.Bool, []string{"pe.is_dotnet"}, nil},
+	PeAnomalies:       {PeAnomalies, "contains PE anomalies detected during parsing", kparams.Slice, []string{"pe.anomalies in ('number of sections is 0')"}, nil},
+	PeIsSigned:        {PeIsSigned, "indicates if the PE has embedded or catalog signature", kparams.Bool, []string{"pe.is_signed"}, nil},
+	PeIsTrusted:       {PeIsTrusted, "indicates if the PE certificate chain is trusted", kparams.Bool, []string{"pe.is_trusted"}, nil},
+	PeCertSerial:      {PeCertSerial, "PE certificate serial number", kparams.UnicodeString, []string{"pe.cert.serial = '330000023241fb59996dcc4dff000000000232'"}, nil},
+	PeCertSubject:     {PeCertSubject, "PE certificate subject", kparams.UnicodeString, []string{"pe.cert.subject contains 'Washington, Redmond, Microsoft Corporation'"}, nil},
+	PeCertIssuer:      {PeCertIssuer, "PE certificate CA", kparams.UnicodeString, []string{"pe.cert.issuer contains 'Washington, Redmond, Microsoft Corporation'"}, nil},
+	PeCertAfter:       {PeCertAfter, "PE certificate expiration date", kparams.Time, []string{"pe.cert.after contains '2024-02-01 00:05:42 +0000 UTC'"}, nil},
+	PeCertBefore:      {PeCertBefore, "PE certificate enrollment date", kparams.Time, []string{"pe.cert.before contains '2024-02-01 00:05:42 +0000 UTC'"}, nil},
+	PeIsModified:      {PeIsModified, "indicates if disk and in-memory PE headers differ", kparams.Bool, []string{"pe.is_modified"}, nil},
+	PePsChildFileName: {PePsChildFileName, "original file name of the child process executable supplied at compile-time", kparams.UnicodeString, []string{"pe.ps.child.file.name = 'NOTEPAD.EXE'"}, nil},
 
 	MemBaseAddress:    {MemBaseAddress, "region base address", kparams.Address, []string{"mem.address = '211d13f2000'"}, nil},
 	MemRegionSize:     {MemRegionSize, "region size", kparams.Uint64, []string{"mem.size > 438272"}, nil},

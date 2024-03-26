@@ -964,9 +964,18 @@ func (pa *peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 	// PE enrichment is likely disabled. Load PE data lazily
 	// by only requesting parsing of the PE directories that
 	// are relevant to the fields present in the expression.
-	if kevt.PS != nil && kevt.PS.Exe != "" && p == nil {
+	// If the field references a child process executable
+	// original file name as part of the CreateProcess event,
+	// then the parser obtains the PE metadata for the executable
+	// path parameter
+	if (kevt.PS != nil && kevt.PS.Exe != "" && p == nil) || f == fields.PePsChildFileName {
 		var err error
-		exe := kevt.PS.Exe
+		var exe string
+		if f == fields.PePsChildFileName && kevt.IsCreateProcess() {
+			exe = kevt.GetParamAsString(kparams.Exe)
+		} else {
+			exe = kevt.PS.Exe
+		}
 		p, err = pe.ParseFile(exe, pa.parserOpts()...)
 		if err != nil {
 			return nil, err
@@ -1012,7 +1021,9 @@ func (pa *peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 		p.VerifySignature()
 	}
 
-	kevt.PS.PE = p
+	if f != fields.PePsChildFileName {
+		kevt.PS.PE = p
+	}
 
 	switch f {
 	case fields.PeEntrypoint:
@@ -1076,7 +1087,7 @@ func (pa *peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 		return p.VersionResources[pe.LegalCopyright], nil
 	case fields.PeDescription:
 		return p.VersionResources[pe.FileDescription], nil
-	case fields.PeFileName:
+	case fields.PeFileName, fields.PePsChildFileName:
 		return p.VersionResources[pe.OriginalFilename], nil
 	case fields.PeFileVersion:
 		return p.VersionResources[pe.FileVersion], nil
