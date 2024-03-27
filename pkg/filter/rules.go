@@ -328,7 +328,6 @@ func (s *sequenceState) gc() {
 			}
 		}
 	}
-
 }
 
 // meetsTemporalDistance determines if the temporal occurrence of the
@@ -939,8 +938,7 @@ func (r *Rules) evaluateOutOfOrderPartials(i int, f *compiledFilter) {
 		}
 		for _, partial := range partials {
 			// only contemplate out of order partials
-			canMatch := partial.ContainsMeta(kevent.RuleSequenceOutOfOrderKey)
-			if !canMatch {
+			if !partial.ContainsMeta(kevent.RuleSequenceOutOfOrderKey) {
 				continue
 			}
 			matches := f.run(partial, int(n)-1, false)

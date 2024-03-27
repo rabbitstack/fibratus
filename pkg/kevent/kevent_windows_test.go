@@ -30,13 +30,17 @@ import (
 )
 
 func TestKeventIsNetworkTCP(t *testing.T) {
-	assert.True(t, Kevent{Type: ktypes.AcceptTCPv4, Category: ktypes.Net}.IsNetworkTCP())
-	assert.False(t, Kevent{Type: ktypes.SendUDPv6, Category: ktypes.Net}.IsNetworkTCP())
+	e1 := Kevent{Type: ktypes.AcceptTCPv4, Category: ktypes.Net}
+	e2 := Kevent{Type: ktypes.SendUDPv6, Category: ktypes.Net}
+	assert.True(t, e1.IsNetworkTCP())
+	assert.False(t, e2.IsNetworkTCP())
 }
 
 func TestKeventIsNetworkUDP(t *testing.T) {
-	assert.True(t, Kevent{Type: ktypes.RecvUDPv4}.IsNetworkUDP())
-	assert.False(t, Kevent{Type: ktypes.SendTCPv6}.IsNetworkUDP())
+	e1 := Kevent{Type: ktypes.RecvUDPv4}
+	e2 := Kevent{Type: ktypes.SendTCPv6}
+	assert.True(t, e1.IsNetworkUDP())
+	assert.False(t, e2.IsNetworkUDP())
 }
 
 func TestKeventSummary(t *testing.T) {
