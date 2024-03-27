@@ -68,7 +68,6 @@ func (q *rabbitmq) Close() error {
 
 func (q *rabbitmq) Publish(batch *kevent.Batch) error {
 	body := batch.MarshalJSON()
-	defer batch.Release()
 
 	err := q.client.publish(body)
 	if err != nil {

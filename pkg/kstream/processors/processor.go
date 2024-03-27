@@ -92,26 +92,24 @@ func (typ ProcessorType) String() string {
 // executable image, or a Windows driver.
 func parseImageFileCharacteristics(e *kevent.Kevent) error {
 	filename := e.GetParamAsString(kparams.FileName)
-	// read file data blob from raw device
-	ntfs := libntfs.NewFS()
-	var (
-		data []byte
-		err  error
-	)
-	data, _, err = ntfs.Read(filename, 0, int64(os.Getpagesize()))
-	defer ntfs.Close()
+	data := make([]byte, os.Getpagesize())
+	f, err := os.Open(filename)
 	if err != nil {
-		// if we can't read from the raw device, try regular file access
-		f, err := os.Open(filename)
+		// read file data blob from raw device
+		// if the regular file access fails
+		ntfs := libntfs.NewFS()
+		data, _, err = ntfs.Read(filename, 0, int64(os.Getpagesize()))
+		defer ntfs.Close()
 		if err != nil {
 			return err
 		}
-		defer f.Close()
-		data = make([]byte, os.Getpagesize())
-		if _, err = f.Read(data); err != nil {
-			return err
-		}
+		goto parsePe
 	}
+	defer f.Close()
+	if _, err = f.Read(data); err != nil {
+		return err
+	}
+parsePe:
 	// parse image file
 	pefile, err := pe.ParseBytes(data, pe.WithSections(), pe.WithSymbols())
 	if err != nil {

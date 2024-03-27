@@ -48,6 +48,7 @@ func TestImageProcessor(t *testing.T) {
 					kparams.ImageFilename:       {Name: kparams.ImageFilename, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll")},
 					kparams.ProcessID:           {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1023)},
 					kparams.ImageCheckSum:       {Name: kparams.ImageCheckSum, Type: kparams.Uint32, Value: uint32(2323432)},
+					kparams.ImageBase:           {Name: kparams.ImageBase, Type: kparams.Address, Value: uint64(0x7ffb313833a3)},
 					kparams.ImageSignatureType:  {Name: kparams.ImageSignatureType, Type: kparams.Enum, Value: uint32(0), Enum: signature.Types},
 					kparams.ImageSignatureLevel: {Name: kparams.ImageSignatureLevel, Type: kparams.Enum, Value: uint32(0), Enum: signature.Levels},
 				},
@@ -75,6 +76,7 @@ func TestImageProcessor(t *testing.T) {
 					kparams.ImageFilename:       {Name: kparams.ImageFilename, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\kernel32.dll"},
 					kparams.ProcessName:         {Name: kparams.ProcessName, Type: kparams.AnsiString, Value: "csrss.exe"},
 					kparams.ProcessID:           {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(676)},
+					kparams.ImageBase:           {Name: kparams.ImageBase, Type: kparams.Address, Value: uint64(0xfffb313833a3)},
 					kparams.ImageSignatureType:  {Name: kparams.ImageSignatureType, Type: kparams.Enum, Value: uint32(0), Enum: signature.Types},
 					kparams.ImageSignatureLevel: {Name: kparams.ImageSignatureLevel, Type: kparams.Enum, Value: uint32(0), Enum: signature.Levels},
 				},
@@ -91,6 +93,7 @@ func TestImageProcessor(t *testing.T) {
 					},
 				})
 				psnap.On("RemoveModule", uint32(676), "C:\\Windows\\system32\\kernel32.dll").Return(nil)
+				psnap.On("FindModule", mock.Anything).Return(false, nil)
 				return psnap
 			},
 			func(e *kevent.Kevent, t *testing.T, psnap *ps.SnapshotterMock) {

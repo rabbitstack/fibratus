@@ -179,8 +179,6 @@ func (e *elasticsearch) Publish(batch *kevent.Batch) error {
 		e.bulkProcessor.Add(newBulkIndexRequest(indexName, kevt))
 		totalBulkedDocs.Add(1)
 	}
-	batch.Release()
-
 	return nil
 }
 

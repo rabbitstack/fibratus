@@ -41,6 +41,5 @@ func (null) Close() error   { return nil }
 func (null) Connect() error { return nil }
 func (null) Publish(batch *kevent.Batch) error {
 	blackholeEventsCount.Add(batch.Len())
-	batch.Release()
 	return nil
 }

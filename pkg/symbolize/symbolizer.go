@@ -52,6 +52,9 @@ var (
 	// symCacheHits counts the number of cache hits in the symbols cache
 	symCacheHits = expvar.NewInt("symbolizer.cache.hits")
 
+	// symModulesCount counts the number of loaded module exports
+	symModulesCount = expvar.NewInt("symbolizer.modules.count")
+
 	// debugHelpFallbacks counts how many times we Debug Help API was called
 	// to resolve symbol information since we fail to do this from process
 	// modules and PE export directory data
@@ -229,6 +232,7 @@ func (s *Symbolizer) syncModules(e *kevent.Kevent) error {
 	if e.IsUnloadImage() {
 		ok, _ := s.psnap.FindModule(addr)
 		if !ok {
+			symModulesCount.Add(-1)
 			delete(s.mods, addr)
 		}
 		return nil
@@ -240,6 +244,7 @@ func (s *Symbolizer) syncModules(e *kevent.Kevent) error {
 	if err != nil {
 		return fmt.Errorf("unable to parse PE for [%s] module: %v", filename, err)
 	}
+	symModulesCount.Add(1)
 	s.mods[addr] = &module{exports: px.Exports}
 	return nil
 }
@@ -247,7 +252,7 @@ func (s *Symbolizer) syncModules(e *kevent.Kevent) error {
 func (s *Symbolizer) processCallstack(e *kevent.Kevent) error {
 	addrs := e.Kparams.MustGetSliceAddrs(kparams.Callstack)
 	e.Callstack.Init(len(addrs))
-	if (e.IsCreateFile() && e.IsOpenDisposition()) || e.PID == ps.SystemPID {
+	if (e.IsCreateFile() && e.IsOpenDisposition()) || (e.IsSystemPid() && !e.IsLoadImage()) {
 		// for high-volume events decorating
 		// the frames with symbol information
 		// is not viable. For this reason, the
@@ -352,6 +357,7 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *kevent.Kevent, fast, looku
 				if err == nil {
 					m.exports = px.Exports
 				}
+				symModulesCount.Add(1)
 				s.mods[mod.BaseAddress] = m
 			}
 			rva := addr.Dec(mod.BaseAddress.Uint64())

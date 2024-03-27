@@ -78,8 +78,6 @@ func initConsole(config outputs.Config) (outputs.OutputGroup, error) {
 func (c *console) Close() error   { return c.writer.Flush() }
 func (c *console) Connect() error { return nil }
 func (c *console) Publish(batch *kevent.Batch) error {
-	defer batch.Release()
-
 	for _, kevt := range batch.Events {
 		var buf []byte
 		switch c.format {

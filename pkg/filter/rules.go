@@ -316,10 +316,10 @@ func (s *sequenceState) gc() {
 	if dur == 0 {
 		dur = maxSequencePartialLifetime
 	}
-	for idx, partials := range s.partials {
-		for i, p := range partials {
-			if time.Since(p.Timestamp) > dur {
-				log.Debugf("garbage collecting partial: [%s]", p)
+	for _, idx := range s.idxs {
+		for i := len(s.partials[idx]) - 1; i >= 0; i-- {
+			if len(s.partials[idx]) > 0 && time.Since(s.partials[idx][i].Timestamp) > dur {
+				log.Debugf("garbage collecting partial: [%s]", s.partials[idx][i])
 				// remove partial event from the corresponding slot
 				s.partials[idx] = append(
 					s.partials[idx][:i],
@@ -472,8 +472,12 @@ func (s *sequenceState) expire(e *kevent.Kevent) bool {
 	if !e.IsTerminateProcess() {
 		return false
 	}
-	canExpire := func(lhs, rhs *kevent.Kevent) bool {
-		if lhs.Type == ktypes.CreateProcess {
+	canExpire := func(lhs, rhs *kevent.Kevent, isFinalSlot bool) bool {
+		// if the TerminateProcess event arrives for the
+		// process spawned by CreateProcess, and it pertains
+		// to the final sequence slot, it is safe to expire
+		// the whole sequence
+		if lhs.Type == ktypes.CreateProcess && isFinalSlot {
 			p1, _ := lhs.Kparams.GetPid()
 			p2, _ := rhs.Kparams.GetPid()
 			return p1 == p2
@@ -487,41 +491,35 @@ func (s *sequenceState) expire(e *kevent.Kevent) bool {
 	defer s.mrm.RUnlock()
 	for _, idx := range s.idxs {
 		for i := len(s.partials[idx]) - 1; i >= 0; i-- {
-			if len(s.partials[idx]) > 0 && !canExpire(s.partials[idx][i], e) {
+			if len(s.partials[idx]) > 0 && !canExpire(s.partials[idx][i], e, idx == uint16(len(s.idxs))) {
 				continue
 			}
-			// if downstream rule didn't match, and the prev condition
-			// is referencing a CreateProcess event for which we just
-			// got the termination event, it is safe to expire all pending
-			// partials and dispose the state
-			matched := s.matchedRules[idx+1]
-			if !matched {
-				log.Debugf("removing event originated from %s (%d) "+
-					"in partials pertaining to sequence [%s]",
-					e.Kparams.MustGetString(kparams.ProcessName),
-					e.Kparams.MustGetPid(),
-					s.name)
-				// remove partial event from the corresponding slot
-				s.partials[idx] = append(
-					s.partials[idx][:i],
-					s.partials[idx][i+1:]...)
-				partialsPerSequence.Add(s.name, -1)
 
-				if len(s.partials[idx]) == 0 {
-					log.Infof("%q sequence expired. All partials retracted", s.name)
-					s.inExpired.Store(true)
-					err := s.expireTransition()
-					if err != nil {
-						s.inExpired.Store(false)
-						log.Warnf("expire transition failed: %v", err)
-					}
-					// transitions from expired state to initial state
-					err = s.fsm.Fire(resetTransition)
-					if err != nil {
-						log.Warnf("unable to transition to initial state: %v", err)
-					}
-					return true
+			log.Debugf("removing event originated from %s (%d) "+
+				"in partials pertaining to sequence [%s]",
+				e.Kparams.MustGetString(kparams.ProcessName),
+				e.Kparams.MustGetPid(),
+				s.name)
+			// remove partial event from the corresponding slot
+			s.partials[idx] = append(
+				s.partials[idx][:i],
+				s.partials[idx][i+1:]...)
+			partialsPerSequence.Add(s.name, -1)
+
+			if len(s.partials[idx]) == 0 {
+				log.Infof("%q sequence expired. All partials retracted", s.name)
+				s.inExpired.Store(true)
+				err := s.expireTransition()
+				if err != nil {
+					s.inExpired.Store(false)
+					log.Warnf("expire transition failed: %v", err)
 				}
+				// transitions from expired state to initial state
+				err = s.fsm.Fire(resetTransition)
+				if err != nil {
+					log.Warnf("unable to transition to initial state: %v", err)
+				}
+				return true
 			}
 		}
 	}
@@ -550,6 +548,8 @@ func (f compiledFilter) isScoped() bool {
 // run execute the filter with either simple or sequence expressions.
 func (f compiledFilter) run(kevt *kevent.Kevent, i int, rawMatch bool) bool {
 	if f.ss != nil {
+		f.ss.mu.RLock()
+		defer f.ss.mu.RUnlock()
 		return f.filter.RunSequence(kevt, uint16(i), f.ss.partials, rawMatch)
 	}
 	return f.filter.Run(kevt)
@@ -634,7 +634,7 @@ func (r *Rules) Compile() (*config.RulesCompileResult, error) {
 				}
 			}
 			filtersCount.Add(1)
-			f := newCompiledFilter(fltr, rule, configureFSM(group, fltr))
+			f := newCompiledFilter(fltr, rule, configureFSM(rule, fltr))
 			if fltr.IsSequence() && f.ss != nil {
 				// store the sequences in rules
 				// for more convenient tracking
@@ -686,7 +686,7 @@ func (r *Rules) Compile() (*config.RulesCompileResult, error) {
 	return r.buildCompileResult(), nil
 }
 
-func configureFSM(group config.FilterGroup, f Filter) *sequenceState {
+func configureFSM(filter *config.FilterConfig, f Filter) *sequenceState {
 	if !f.IsSequence() {
 		return nil
 	}
@@ -696,7 +696,7 @@ func configureFSM(group config.FilterGroup, f Filter) *sequenceState {
 		return nil
 	}
 	initialState := expressions[0].Expr.String()
-	seqState := newSequenceState(group.Name, initialState, seq.MaxSpan)
+	seqState := newSequenceState(filter.Name, initialState, seq.MaxSpan)
 	// setup finite state machine states. The last rule
 	// in the sequence transitions to the terminal state
 	// if all rules match
@@ -861,7 +861,7 @@ func (r *Rules) runSequence(kevt *kevent.Kevent, f *compiledFilter) bool {
 			// If this sequence expression can evaluate
 			// against the current event, mark it as
 			// out-of-order and store in partials list
-			if seq.Expressions[i].IsEvaluable(kevt) && f.run(kevt, i, true) {
+			if expr.IsEvaluable(kevt) && f.run(kevt, i, true) {
 				f.ss.addPartial(expr.Expr.String(), kevt, true)
 			}
 			continue
@@ -888,8 +888,12 @@ func (r *Rules) runSequence(kevt *kevent.Kevent, f *compiledFilter) bool {
 				log.Warnf("match transition failure: %v", err)
 			}
 			// now try to match all pending out-of-order
-			// events from downstream sequence slots
-			r.evaluateOutOfOrderPartials(i, f)
+			// events from downstream sequence slots if
+			// the previous match hasn't reached terminal
+			// state
+			if f.ss.currentState() != sequenceTerminalState {
+				r.evaluateOutOfOrderPartials(i, f)
+			}
 		}
 	}
 	// if both the terminal state is reached and the partials
@@ -934,22 +938,20 @@ func (r *Rules) evaluateOutOfOrderPartials(i int, f *compiledFilter) {
 		}
 		for _, partial := range partials {
 			// only contemplate out of order partials
-			canMatch := partial.ContainsMeta(kevent.RuleSequenceOutOfOrderKey)
-			if !canMatch {
+			if !partial.ContainsMeta(kevent.RuleSequenceOutOfOrderKey) {
 				continue
 			}
-
 			matches := f.run(partial, int(n)-1, false)
 			rule := partial.GetMetaAsString(kevent.RuleExpressionKey)
 			meetsDistance := f.ss.meetsTemporalDistance(rule, partial, false)
-
-			if matches && meetsDistance {
-				partial.RemoveMeta(kevent.RuleSequenceOutOfOrderKey)
-				err := f.ss.matchTransition(rule, partial)
-				if err != nil {
-					matchTransitionErrors.Add(1)
-					log.Warnf("out of order match transition failure: %v", err)
-				}
+			if !matches && !meetsDistance {
+				continue
+			}
+			partial.RemoveMeta(kevent.RuleSequenceOutOfOrderKey)
+			err := f.ss.matchTransition(rule, partial)
+			if err != nil {
+				matchTransitionErrors.Add(1)
+				log.Warnf("out of order match transition failure: %v", err)
 			}
 		}
 	}

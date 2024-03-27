@@ -23,7 +23,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/ps"
-	"github.com/rabbitstack/fibratus/pkg/util/hashers"
 	"github.com/rabbitstack/fibratus/pkg/util/signature"
 )
 
@@ -32,11 +31,11 @@ var signatureErrors = expvar.NewInt("image.signature.errors")
 
 type imageProcessor struct {
 	psnap      ps.Snapshotter
-	signatures map[uint32]*signature.Signature
+	signatures map[uint64]*signature.Signature
 }
 
 func newImageProcessor(psnap ps.Snapshotter) Processor {
-	return &imageProcessor{psnap: psnap, signatures: make(map[uint32]*signature.Signature)}
+	return &imageProcessor{psnap: psnap, signatures: make(map[uint64]*signature.Signature)}
 }
 
 func (imageProcessor) Name() ProcessorType { return Image }
@@ -75,6 +74,11 @@ func (m *imageProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, e
 				_ = e.Kparams.SetValue(kparams.ImageSignatureLevel, module.SignatureLevel)
 			}
 		}
+		// remove signature info if the last module was unloaded
+		addr := e.Kparams.TryGetAddress(kparams.ImageBase)
+		if ok, _ := m.psnap.FindModule(addr); !ok {
+			delete(m.signatures, addr.Uint64())
+		}
 		return e, false, m.psnap.RemoveModule(pid, mod)
 	}
 	if e.IsLoadImage() || e.IsImageRundown() {
@@ -86,21 +90,16 @@ func (m *imageProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, e
 func (imageProcessor) Close() {}
 
 // processSignature consults the signature cache and if the signature
-// already exists for a particular image checksum, signature checking
+// already exists for a particular  base address, signature checking
 // is skipped and only certificate info is fetched. On the contrary,
 // the signature verification is performed and the cache is updated
 // accordingly.
 func (m *imageProcessor) processSignature(e *kevent.Kevent) error {
-	checksum := e.Kparams.MustGetUint32(kparams.ImageCheckSum)
+	addr := e.Kparams.MustGetUint64(kparams.ImageBase)
 	level := e.Kparams.MustGetUint32(kparams.ImageSignatureLevel)
 	typ := e.Kparams.MustGetUint32(kparams.ImageSignatureType)
-	filename := e.GetParamAsString(kparams.FileName)
-	// some images report the checksum as a zero value. In this
-	// case use the hash of the image name + pid as checksum
-	if checksum == 0 {
-		checksum = hashers.FnvUint32([]byte(filename)) + e.PID
-	}
-	sign, ok := m.signatures[checksum]
+
+	sign, ok := m.signatures[addr]
 	if !ok {
 		var filename = e.GetParamAsString(kparams.FileName)
 		if typ == signature.None {
@@ -121,7 +120,7 @@ func (m *imageProcessor) processSignature(e *kevent.Kevent) error {
 				return err
 			}
 		}
-		m.signatures[checksum] = sign
+		m.signatures[addr] = sign
 	}
 
 	// reset signature type/level parameters
