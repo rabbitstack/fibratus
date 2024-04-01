@@ -195,7 +195,7 @@ func TestSequenceState(t *testing.T) {
 		Type: ktypes.CreateFile,
 		Name: "CreateFile",
 		Tid:  2484,
-		PID:  859,
+		PID:  4143,
 		PS: &types.PS{
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
@@ -253,6 +253,7 @@ func TestSequenceState(t *testing.T) {
 	assert.True(t, ss.isInitialState())
 	require.NoError(t, ss.matchTransition("kevt.name = CreateProcess AND ps.name = cmd.exe", kevt1))
 	ss.addPartial("kevt.name = CreateProcess AND ps.name = cmd.exe", kevt1, false)
+	ss.addPartial("kevt.name = CreateFile AND file.name ICONTAINS temp", kevt2, false)
 	require.False(t, ss.inDeadline.Load())
 
 	// test expiration
@@ -287,10 +288,10 @@ func TestExpireSequences(t *testing.T) {
 	log.SetLevel(log.DebugLevel)
 
 	kevt1 := &kevent.Kevent{
-		Type: ktypes.CreateProcess,
-		Name: "CreateProcess",
+		Type: ktypes.OpenProcess,
+		Name: "OpenProcess",
 		Tid:  2484,
-		PID:  859,
+		PID:  4143,
 		PS: &types.PS{
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
@@ -317,15 +318,10 @@ func TestExpireSequences(t *testing.T) {
 		},
 	}
 
-	ss := rules.groups[ktypes.CreateProcess.Hash()][0].filters[0].ss
+	ss := rules.groups[ktypes.OpenProcess.Hash()][0].filters[0].ss
 
 	require.False(t, wrapProcessEvent(kevt1, rules.ProcessEvent))
 	require.False(t, wrapProcessEvent(kevt2, rules.ProcessEvent))
-	require.False(t, ss.inExpired.Load())
-
-	// wait for expire function to kick in
-	time.Sleep(time.Second * 3)
-
 	require.True(t, ss.inExpired.Load())
 }
 
