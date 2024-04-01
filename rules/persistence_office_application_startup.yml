@@ -45,6 +45,13 @@
             and
             not
         ps.name iin msoffice_binaries
+            and
+            not
+        ps.exe imatches
+            (
+              '?:\\Program Files\\*.exe',
+              '?:\\Program Files (x86)\\*.exe'
+            )
       output: >
-          %file.name Office template written by unusual %ps.exe process
+          Office template %file.name created by suspicious process %ps.exe
       min-engine-version: 2.0.0
