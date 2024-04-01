@@ -152,24 +152,18 @@ func NewTrace(name string, guid windows.GUID, keywords uint64, config *config.Co
 }
 
 func (t *Trace) prepareStackTracing() {
-	if t.IsKernelTrace() && SupportsSystemProviders() {
+	if t.IsKernelTrace() {
 		// Enabling stack tracing for kernel trace
 		// with granular system providers support.
 		// In this situation, only stack tracing for
 		// file system events is enabled
+		t.stackExtensions.EnableProcessStackTracing()
+		if !SupportsSystemProviders() {
+			t.stackExtensions.EnableRegistryStackTracing()
+		}
 		t.stackExtensions.EnableFileStackTracing()
 	}
-	if t.IsKernelTrace() && !SupportsSystemProviders() {
-		// Enabling stack tracing for kernel trace
-		// without granular system providers support
-		t.stackExtensions.EnableProcessStackTracing()
-		t.stackExtensions.EnableRegistryStackTracing()
-		t.stackExtensions.EnableFileStackTracing()
-	}
-	switch t.GUID {
-	case etw.SystemProcessProviderID:
-		t.stackExtensions.EnableProcessStackTracing()
-	case etw.SystemRegistryProviderID:
+	if t.IsSystemRegistryTrace() {
 		t.stackExtensions.EnableRegistryStackTracing()
 	}
 }
@@ -354,23 +348,9 @@ func (t *Trace) IsSystemProvider() bool {
 // structure for non-system logger providers will result in an error.
 func (t *Trace) enableFlagsDynamically(config config.KstreamConfig) etw.EventTraceFlags {
 	var flags etw.EventTraceFlags
-	if SupportsSystemProviders() && !t.config.IsCaptureSet() {
-		// System File I/O is the only provider
-		// enabled when granular system providers
-		// are supported. The rationale behind this
-		// is backed by the fact System I/O provider
-		// can't emit file system events, regardless
-		// of the enabled keywords. The rest of the
-		// providers will run in their independent
-		// system session
-		if config.EnableFileIOKevents {
-			flags |= etw.DiskFileIO | etw.FileIO | etw.FileIOInit
-		}
-		return flags
-	}
 
 	if !t.IsKernelTrace() {
-		return 0
+		return flags
 	}
 
 	flags |= etw.Process
@@ -395,6 +375,16 @@ func (t *Trace) enableFlagsDynamically(config config.KstreamConfig) etw.EventTra
 	}
 	if config.EnableMemKevents {
 		flags |= etw.VirtualAlloc
+	}
+
+	if !SupportsSystemProviders() || t.config.IsCaptureSet() {
+		// Registry is the only provider started
+		// in its own tracing session because it
+		// generates an  overwhelming amount of
+		// events
+		if config.EnableRegistryKevents {
+			flags |= etw.Registry
+		}
 	}
 
 	return flags
@@ -430,6 +420,8 @@ func NewController(c *config.Config, r *config.RulesCompileResult) *Controller {
 		traces: make([]*Trace, 0),
 	}
 
+	controller.addTrace(etw.KernelLoggerSession, etw.KernelTraceControlGUID)
+
 	// set up drop masks if the rule
 	// engine is enabled. For any event
 	// not present in the rule set, the
@@ -447,7 +439,9 @@ func NewController(c *config.Config, r *config.RulesCompileResult) *Controller {
 		c.Kstream.EnableAuditAPIEvents = r.HasAuditAPIEvents
 		c.Kstream.EnableDNSEvents = r.HasDNSEvents
 		for _, ktype := range ktypes.All() {
-			if ktype == ktypes.CreateProcess || ktype == ktypes.TerminateProcess {
+			if ktype == ktypes.CreateProcess || ktype == ktypes.TerminateProcess ||
+				ktype == ktypes.LoadImage || ktype == ktypes.UnloadImage {
+				// always allow fundamental events
 				continue
 			}
 			if !r.ContainsEvent(ktype) {
@@ -456,34 +450,10 @@ func NewController(c *config.Config, r *config.RulesCompileResult) *Controller {
 		}
 	}
 
-	controller.addTrace(etw.KernelLoggerSession, etw.KernelTraceControlGUID)
-
 	if SupportsSystemProviders() && !c.IsCaptureSet() {
 		log.Info("system providers support detected")
-		var keywords uint64 = etw.ProcessKeywordGeneral
-		if c.Kstream.EnableThreadKevents {
-			keywords |= etw.ProcessKeywordThread
-		}
-		if c.Kstream.EnableImageKevents {
-			keywords |= etw.ProcessKeywordLoader
-		}
-		controller.addTraceKeywords(etw.SystemProcessSession, etw.SystemProcessProviderID, keywords)
-
 		if c.Kstream.EnableRegistryKevents {
 			controller.addTraceKeywords(etw.SystemRegistrySession, etw.SystemRegistryProviderID, etw.RegistryKeywordGeneral)
-		}
-		if c.Kstream.EnableNetKevents {
-			controller.addTraceKeywords(etw.SystemIOSession, etw.SystemIOProviderID, etw.IOKeywordNetwork)
-		}
-		if c.Kstream.EnableMemKevents || c.Kstream.EnableVAMapKevents {
-			var keywords uint64
-			if c.Kstream.EnableMemKevents {
-				keywords = etw.MemoryVirtualAlloc
-			}
-			if c.Kstream.EnableVAMapKevents {
-				keywords |= etw.MemoryVAMap
-			}
-			controller.addTraceKeywords(etw.SystemMemorySession, etw.SystemMemoryProviderID, keywords)
 		}
 	}
 
