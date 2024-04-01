@@ -48,6 +48,8 @@ var (
 
 	// symCleanups counts the number of symbol cleanups
 	symCleanups = expvar.NewInt("symbolizer.symbol.cleanups")
+	// modCleanups counts the number of module cleanups
+	modCleanups = expvar.NewInt("symbolizer.module.cleanups")
 
 	// symCacheHits counts the number of cache hits in the symbols cache
 	symCacheHits = expvar.NewInt("symbolizer.cache.hits")
@@ -72,6 +74,10 @@ var parsePeFile = func(name string, option ...pe.Option) (*pe.PE, error) {
 // its handle and symbol resources are disposed
 var procTTL = 15 * time.Second
 
+// modTTL maximum time for the module to remain in
+// the state until all its exports are removed
+var modTTL = 8 * time.Minute
+
 type process struct {
 	pid      uint32
 	handle   windows.Handle
@@ -85,7 +91,12 @@ func (p *process) keepalive() {
 }
 
 type module struct {
-	exports map[uint32]string
+	exports  map[uint32]string
+	accessed time.Time
+}
+
+func (m *module) keepalive() {
+	m.accessed = time.Now()
 }
 
 // Symbolizer is responsible for converting raw addresses
@@ -235,6 +246,10 @@ func (s *Symbolizer) syncModules(e *kevent.Kevent) error {
 			symModulesCount.Add(-1)
 			delete(s.mods, addr)
 		}
+		// remove executable images
+		if strings.EqualFold(filepath.Ext(filename), ".exe") {
+			delete(s.mods, addr)
+		}
 		return nil
 	}
 	if s.mods[addr] != nil {
@@ -245,7 +260,7 @@ func (s *Symbolizer) syncModules(e *kevent.Kevent) error {
 		return fmt.Errorf("unable to parse PE for [%s] module: %v", filename, err)
 	}
 	symModulesCount.Add(1)
-	s.mods[addr] = &module{exports: px.Exports}
+	s.mods[addr] = &module{exports: px.Exports, accessed: time.Now()}
 	return nil
 }
 
@@ -352,7 +367,7 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *kevent.Kevent, fast, looku
 			m, ok := s.mods[mod.BaseAddress]
 			if !ok {
 				// parse export directory to resolve symbols
-				m = &module{exports: make(map[uint32]string)}
+				m = &module{exports: make(map[uint32]string), accessed: time.Now()}
 				px, err := parsePeFile(mod.Name, pe.WithSections(), pe.WithExports())
 				if err == nil {
 					m.exports = px.Exports
@@ -362,6 +377,8 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *kevent.Kevent, fast, looku
 			}
 			rva := addr.Dec(mod.BaseAddress.Uint64())
 			frame.Symbol = symbolFromRVA(rva, m.exports)
+			// keep to module alive from purger
+			m.keepalive()
 		}
 		if frame.Module != "" && frame.Symbol != "" {
 			return frame
@@ -462,6 +479,14 @@ func symbolFromRVA(rva va.Address, exports map[uint32]string) string {
 func (s *Symbolizer) cleanSym() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	for addr, m := range s.mods {
+		if time.Since(m.accessed) > modTTL {
+			modCleanups.Add(1)
+			symModulesCount.Add(-1)
+			log.Debugf("removing module exports for addr [%s]", addr)
+			delete(s.mods, addr)
+		}
+	}
 	for _, proc := range s.procs {
 		if time.Since(proc.accessed) > procTTL {
 			symCleanups.Add(1)
