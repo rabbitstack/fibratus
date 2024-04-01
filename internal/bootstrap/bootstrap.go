@@ -138,7 +138,7 @@ func NewApp(cfg *config.Config, options ...Option) (*App, error) {
 		rules *filter.Rules
 		res   *config.RulesCompileResult
 	)
-	if cfg.Filters.Rules.Enabled {
+	if cfg.Filters.Rules.Enabled && !cfg.IsCaptureSet() {
 		rules = filter.NewRules(psnap, cfg)
 		var err error
 		res, err = rules.Compile()
