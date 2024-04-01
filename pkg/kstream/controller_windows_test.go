@@ -143,7 +143,7 @@ func TestEnableFlagsDynamically(t *testing.T) {
 	flags := ctrl.Traces()[0].enableFlagsDynamically(cfg.Kstream)
 
 	if SupportsSystemProviders() {
-		require.Len(t, ctrl.Traces(), 6)
+		require.Len(t, ctrl.Traces(), 3)
 		require.True(t, flags&etw.FileIO != 0)
 	} else {
 		require.Len(t, ctrl.Traces(), 2)
@@ -156,7 +156,7 @@ func TestEnableFlagsDynamically(t *testing.T) {
 		require.True(t, flags&etw.VaMap != 0)
 	}
 
-	require.True(t, cfg.Kstream.TestDropMask(ktypes.UnloadImage))
+	require.False(t, cfg.Kstream.TestDropMask(ktypes.UnloadImage))
 	require.True(t, cfg.Kstream.TestDropMask(ktypes.WriteFile))
 	require.True(t, cfg.Kstream.TestDropMask(ktypes.UnmapViewFile))
 	require.False(t, cfg.Kstream.TestDropMask(ktypes.OpenProcess))
