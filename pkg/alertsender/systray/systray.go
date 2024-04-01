@@ -145,7 +145,13 @@ func (s systray) Send(alert alertsender.Alert) error {
 	if s.systrayIcon == nil {
 		return nil
 	}
-	return s.systrayIcon.ShowBalloonNotification(alert.Title, alert.Text, s.config.Sound, s.config.QuietMode)
+	text := alert.Text
+	// the balloon notification fails to
+	// popup when the text is empty
+	if text == "" {
+		text = " "
+	}
+	return s.systrayIcon.ShowBalloonNotification(alert.Title, text, s.config.Sound, s.config.QuietMode)
 }
 
 func (s systray) Type() alertsender.Type { return alertsender.Systray }

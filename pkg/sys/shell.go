@@ -165,7 +165,7 @@ func (s *SystrayIcon) ShowBalloonNotification(title string, text string, sound, 
 		s1 = s1[:64]
 	}
 	if len(s2) > 256 {
-		s2 = s1[:256]
+		s2 = s2[:256]
 	}
 	copy(data.Info[:], s2)
 	copy(data.InfoTitle[:], s1)
