@@ -5,7 +5,7 @@
       condition: >
         sequence
         maxspan 1m
-        |kevt.name = 'CreateProcess' and ps.name = 'cmd.exe'| by ps.exe
+        |kevt.name = 'OpenProcess' and ps.name = 'cmd.exe'| by ps.exe
         |kevt.name = 'CreateFile'
             and
          file.name icontains 'temp'

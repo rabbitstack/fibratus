@@ -218,11 +218,8 @@ func (s *sequenceState) initFSM(initialState string) {
 			s.inExpired.Store(false)
 		}
 		// clear state in case of expire/deadline transitions
-		if transition.Trigger == expireTransition {
+		if transition.Trigger == expireTransition || transition.Trigger == cancelTransition {
 			s.clear()
-		}
-		if transition.Trigger == cancelTransition {
-			s.clearLocked()
 		}
 		if transition.Trigger == matchTransition {
 			log.Debugf("state trigger from rule [%s]", transition.Source)
@@ -452,6 +449,10 @@ func (s *sequenceState) scheduleMaxSpanDeadline(rule fsm.State, maxSpan time.Dur
 		if inState {
 			log.Infof("max span of %v exceded for rule %s", maxSpan, rule)
 			s.inDeadline.Store(true)
+			s.mu.Lock()
+			defer s.mu.Unlock()
+			s.mrm.Lock()
+			defer s.mrm.Unlock()
 			// transitions to deadline state
 			err := s.cancelTransition(rule)
 			if err != nil {
@@ -496,10 +497,11 @@ func (s *sequenceState) expire(e *kevent.Kevent) bool {
 			}
 
 			log.Debugf("removing event originated from %s (%d) "+
-				"in partials pertaining to sequence [%s]",
+				"in partials pertaining to sequence [%s] and slot [%d]",
 				e.Kparams.MustGetString(kparams.ProcessName),
 				e.Kparams.MustGetPid(),
-				s.name)
+				s.name,
+				idx)
 			// remove partial event from the corresponding slot
 			s.partials[idx] = append(
 				s.partials[idx][:i],
@@ -507,7 +509,8 @@ func (s *sequenceState) expire(e *kevent.Kevent) bool {
 			partialsPerSequence.Add(s.name, -1)
 
 			if len(s.partials[idx]) == 0 {
-				log.Infof("%q sequence expired. All partials retracted", s.name)
+				partialExpirations.Add(s.name, 1)
+				log.Debugf("%q sequence expired. All partials retracted", s.name)
 				s.inExpired.Store(true)
 				err := s.expireTransition()
 				if err != nil {
@@ -546,10 +549,12 @@ func (f compiledFilter) isScoped() bool {
 }
 
 // run execute the filter with either simple or sequence expressions.
-func (f compiledFilter) run(kevt *kevent.Kevent, i int, rawMatch bool) bool {
+func (f compiledFilter) run(kevt *kevent.Kevent, i int, rawMatch, lock bool) bool {
 	if f.ss != nil {
-		f.ss.mu.RLock()
-		defer f.ss.mu.RUnlock()
+		if lock {
+			f.ss.mu.RLock()
+			defer f.ss.mu.RUnlock()
+		}
 		return f.filter.RunSequence(kevt, uint16(i), f.ss.partials, rawMatch)
 	}
 	return f.filter.Run(kevt)
@@ -819,17 +824,7 @@ func (r *Rules) ProcessEvent(evt *kevent.Kevent) (bool, error) {
 		// process referenced in any
 		// partials has terminated
 		for _, seq := range r.sequences {
-			expire := func(seq *sequenceState) func() {
-				return func() {
-					if seq.expire(evt) {
-						partialExpirations.Add(seq.name, 1)
-					}
-				}
-			}
-			// defer expiration stage as process
-			// termination event could arrive
-			// before other events
-			time.AfterFunc(time.Second*2, expire(seq))
+			seq.expire(evt)
 		}
 	}
 	return r.runRules(r.findGroups(evt), evt), nil
@@ -861,7 +856,7 @@ func (r *Rules) runSequence(kevt *kevent.Kevent, f *compiledFilter) bool {
 			// If this sequence expression can evaluate
 			// against the current event, mark it as
 			// out-of-order and store in partials list
-			if expr.IsEvaluable(kevt) && f.run(kevt, i, true) {
+			if expr.IsEvaluable(kevt) && f.run(kevt, i, true, true) {
 				f.ss.addPartial(expr.Expr.String(), kevt, true)
 			}
 			continue
@@ -872,13 +867,8 @@ func (r *Rules) runSequence(kevt *kevent.Kevent, f *compiledFilter) bool {
 			continue
 		}
 		rule := expr.Expr.String()
-		matches := f.run(kevt, i, false)
+		matches := f.run(kevt, i, false, true)
 		meetsDistance := f.ss.meetsTemporalDistance(rule, kevt, true)
-		log.Debugf("sequence expression [%s] = %t, temporal distance = %t event = %s",
-			rule,
-			matches,
-			meetsDistance,
-			kevt)
 		// append the partial and transition state machine
 		if matches && meetsDistance {
 			f.ss.addPartial(rule, kevt, false)
@@ -941,9 +931,10 @@ func (r *Rules) evaluateOutOfOrderPartials(i int, f *compiledFilter) {
 			if !partial.ContainsMeta(kevent.RuleSequenceOutOfOrderKey) {
 				continue
 			}
-			matches := f.run(partial, int(n)-1, false)
+			matches := f.run(partial, int(n)-1, false, false)
 			rule := partial.GetMetaAsString(kevent.RuleExpressionKey)
 			meetsDistance := f.ss.meetsTemporalDistance(rule, partial, false)
+
 			if !matches && !meetsDistance {
 				continue
 			}
@@ -976,7 +967,7 @@ func (r *Rules) runRules(groups filterGroups, kevt *kevent.Kevent) bool {
 			if f.ss != nil {
 				match = r.runSequence(kevt, f)
 			} else {
-				match = f.run(kevt, i, false)
+				match = f.run(kevt, i, false, false)
 				if match {
 					// transition sequence states since a match
 					// in a simple rule could trigger multiple
