@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/util/hashers"
 	"net"
 	"reflect"
@@ -221,6 +222,7 @@ type SequenceExpr struct {
 	By          fields.Field
 	BoundFields []*BoundFieldLiteral
 	Alias       string
+	Unordered   bool
 
 	buckets map[uint32]bool
 }
@@ -279,6 +281,9 @@ func (e *SequenceExpr) walk() {
 		if name == fields.KevtName || name == fields.KevtCategory {
 			for _, v := range values {
 				e.buckets[hashers.FnvUint32([]byte(v))] = true
+				if ktyp := ktypes.KeventNameToKtype(v); ktyp.CanArriveOutOfOrder() {
+					e.Unordered = true
+				}
 			}
 		}
 	}
@@ -307,6 +312,17 @@ type Sequence struct {
 // IsConstrained determines if the sequence has the global or per-expression `BY` statement.
 func (s Sequence) IsConstrained() bool {
 	return !s.By.IsEmpty() || !s.Expressions[0].By.IsEmpty()
+}
+
+// IsUnordered returns true if any of the sequence expression event types
+// is susceptible of arriving out of order.
+func (s Sequence) IsUnordered() bool {
+	for _, expr := range s.Expressions {
+		if expr.Unordered {
+			return true
+		}
+	}
+	return false
 }
 
 func (s Sequence) impairBy() bool {

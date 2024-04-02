@@ -549,6 +549,15 @@ func (k Ktype) Source() EventSource {
 	}
 }
 
+// CanArriveOutOfOrder indicates if the event can be
+// emitted by the provider in out-of-order fashion, i.e.
+// its timestamp is perfectly aligned in relation to other
+// events, but it appears first on the consumer callback
+// before other events published before it.
+func (k Ktype) CanArriveOutOfOrder() bool {
+	return k.Category() == Registry || k.Subcategory() == DNS || k == OpenProcess || k == OpenThread || k == SetThreadContext
+}
+
 // FromParts builds ktype from provider GUID and hook ID.
 func FromParts(g windows.GUID, id uint16) Ktype { return pack(g, id) }
 

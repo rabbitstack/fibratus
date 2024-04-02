@@ -21,6 +21,7 @@ package ql
 import (
 	"errors"
 	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
 )
@@ -308,6 +309,42 @@ func TestParseSequence(t *testing.T) {
 			if seq.IsConstrained() != tt.isConstrained {
 				t.Errorf("%d. exp=%s isConstrained=%t got isConstrained=%t", i, tt.expr, tt.isConstrained, seq.IsConstrained())
 			}
+		}
+	}
+}
+
+func TestIsSequenceUnordered(t *testing.T) {
+	var tests = []struct {
+		expr        string
+		isUnordered bool
+	}{
+		{
+			`|kevt.name = 'CreateProcess'| by ps.uuid
+			 |kevt.name = 'OpenProcess'| by ps.uuid
+			`,
+			true,
+		},
+		{
+			`|kevt.name = 'CreateProcess'|
+			 |kevt.name = 'CreateFile'|
+			`,
+			false,
+		},
+		{
+			`|kevt.name = 'CreateProcess'|
+			 |kevt.name = 'SetThreadContext'|
+			`,
+			true,
+		},
+	}
+
+	for i, tt := range tests {
+		p := NewParser(tt.expr)
+		seq, err := p.ParseSequence()
+		require.NoError(t, err)
+
+		if seq.IsUnordered() != tt.isUnordered {
+			t.Errorf("%d. exp=%s isUnordered=%t got isUnordered=%t", i, tt.expr, tt.isUnordered, seq.IsUnordered())
 		}
 	}
 }
