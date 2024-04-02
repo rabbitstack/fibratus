@@ -97,6 +97,9 @@ func (p *Parser) ParseSequence() (*Sequence, error) {
 			if seq.impairBy() {
 				return nil, fmt.Errorf("%s: all expressions require the 'by' statement", p.expr)
 			}
+			if seq.incompatibleConstraints() {
+				return nil, fmt.Errorf("%s: sequence mixes global and per-expression 'by' statements", p.expr)
+			}
 			return seq, nil
 		}
 		p.unscan()

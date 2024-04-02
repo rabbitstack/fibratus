@@ -243,7 +243,6 @@ func TestParseSequence(t *testing.T) {
 		{
 
 			`maxspan 20s
-             by ps.pid
 			 |kevt.name = 'CreateProcess'| by ps.pid
 			 |kevt.name = 'CreateFile'| by ps.pid
 			`,
@@ -290,6 +289,17 @@ func TestParseSequence(t *testing.T) {
 			errors.New("maximum span 40h0m0s cannot be greater than 4h"),
 			time.Hour * 40,
 			false,
+		},
+		{
+
+			`by ps.uuid
+			 maxspan 2m
+			 |kevt.name = 'CreateProcess'| by ps.child.uuid
+			 |kevt.name = 'CreateFile'| by ps.uuid
+			`,
+			errors.New("sequence mixes global and per-expression 'by' statements"),
+			time.Minute * 2,
+			true,
 		},
 	}
 

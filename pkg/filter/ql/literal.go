@@ -281,6 +281,9 @@ func (e *SequenceExpr) walk() {
 		if name == fields.KevtName || name == fields.KevtCategory {
 			for _, v := range values {
 				e.buckets[hashers.FnvUint32([]byte(v))] = true
+				// mark sequence expression as unordered if
+				// it references an event type that can arrive
+				// out-of-order
 				if ktyp := ktypes.KeventNameToKtype(v); ktyp.CanArriveOutOfOrder() {
 					e.Unordered = true
 				}
@@ -334,4 +337,16 @@ func (s Sequence) impairBy() bool {
 		return false
 	}
 	return b[true] > 0 && b[false] > 0
+}
+
+// incompatibleConstraints checks if the sequence has
+// both global and per-expression `BY` statements and
+// returns true if such condition is satisfied.
+func (s Sequence) incompatibleConstraints() bool {
+	for _, expr := range s.Expressions {
+		if !expr.By.IsEmpty() && !s.By.IsEmpty() {
+			return true
+		}
+	}
+	return false
 }
