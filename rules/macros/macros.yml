@@ -98,7 +98,7 @@
 
 - macro: load_driver
   expr: >
-    (load_module and (image.name iendswith '.sys' or image.is_driver)
+    (load_module and (image.name iendswith '.sys' or image.is_driver))
       or
     (create_handle and handle.type = 'Driver')
   description: |
