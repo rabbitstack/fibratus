@@ -318,60 +318,49 @@ func (e *Kevent) PartialKey() uint64 {
 	case ktypes.WriteFile, ktypes.ReadFile:
 		b := make([]byte, 12)
 		object, _ := e.Kparams.GetUint64(kparams.FileObject)
-
 		binary.LittleEndian.PutUint32(b, e.PID)
 		binary.LittleEndian.PutUint64(b, object)
-
 		return hashers.FnvUint64(b)
-	case ktypes.MapFileRundown, ktypes.UnmapViewFile:
+	case ktypes.MapViewFile, ktypes.UnmapViewFile:
 		b := make([]byte, 12)
-		fileKey, _ := e.Kparams.GetUint64(kparams.FileKey)
+		viewAddr, _ := e.Kparams.GetUint64(kparams.FileViewBase)
 		binary.LittleEndian.PutUint32(b, e.PID)
-		binary.LittleEndian.PutUint64(b, fileKey)
-
+		binary.LittleEndian.PutUint64(b, viewAddr)
 		return hashers.FnvUint64(b)
 	case ktypes.CreateFile:
 		file, _ := e.Kparams.GetString(kparams.FileName)
 		b := make([]byte, 4+len(file))
-
 		binary.LittleEndian.PutUint32(b, e.PID)
 		b = append(b, []byte(file)...)
-
 		return hashers.FnvUint64(b)
 	case ktypes.OpenProcess:
-		b := make([]byte, 8)
+		b := make([]byte, 12)
 		pid, _ := e.Kparams.GetUint32(kparams.ProcessID)
 		access, _ := e.Kparams.GetUint32(kparams.DesiredAccess)
-
 		binary.LittleEndian.PutUint32(b, e.PID)
 		binary.LittleEndian.PutUint32(b, pid)
 		binary.LittleEndian.PutUint32(b, access)
 		return hashers.FnvUint64(b)
 	case ktypes.OpenThread:
-		b := make([]byte, 8)
+		b := make([]byte, 12)
 		tid, _ := e.Kparams.GetUint32(kparams.ThreadID)
 		access, _ := e.Kparams.GetUint32(kparams.DesiredAccess)
-
 		binary.LittleEndian.PutUint32(b, e.PID)
 		binary.LittleEndian.PutUint32(b, tid)
 		binary.LittleEndian.PutUint32(b, access)
 		return hashers.FnvUint64(b)
 	case ktypes.AcceptTCPv4, ktypes.RecvTCPv4, ktypes.RecvUDPv4:
 		b := make([]byte, 10)
-
 		ip, _ := e.Kparams.GetIP(kparams.NetSIP)
 		port, _ := e.Kparams.GetUint16(kparams.NetSport)
-
 		binary.LittleEndian.PutUint32(b, e.PID)
 		binary.LittleEndian.PutUint32(b, binary.BigEndian.Uint32(ip.To4()))
 		binary.LittleEndian.PutUint16(b, port)
 		return hashers.FnvUint64(b)
 	case ktypes.AcceptTCPv6, ktypes.RecvTCPv6, ktypes.RecvUDPv6:
 		b := make([]byte, 22)
-
 		ip, _ := e.Kparams.GetIP(kparams.NetSIP)
 		port, _ := e.Kparams.GetUint16(kparams.NetSport)
-
 		binary.LittleEndian.PutUint32(b, e.PID)
 		binary.LittleEndian.PutUint64(b, binary.BigEndian.Uint64(ip.To16()[0:8]))
 		binary.LittleEndian.PutUint64(b, binary.BigEndian.Uint64(ip.To16()[8:16]))
@@ -379,20 +368,16 @@ func (e *Kevent) PartialKey() uint64 {
 		return hashers.FnvUint64(b)
 	case ktypes.ConnectTCPv4, ktypes.SendTCPv4, ktypes.SendUDPv4:
 		b := make([]byte, 10)
-
 		ip, _ := e.Kparams.GetIP(kparams.NetDIP)
 		port, _ := e.Kparams.GetUint16(kparams.NetDport)
-
 		binary.LittleEndian.PutUint32(b, e.PID)
 		binary.LittleEndian.PutUint32(b, binary.BigEndian.Uint32(ip.To4()))
 		binary.LittleEndian.PutUint16(b, port)
 		return hashers.FnvUint64(b)
 	case ktypes.ConnectTCPv6, ktypes.SendTCPv6, ktypes.SendUDPv6:
 		b := make([]byte, 22)
-
 		ip, _ := e.Kparams.GetIP(kparams.NetDIP)
 		port, _ := e.Kparams.GetUint16(kparams.NetDport)
-
 		binary.LittleEndian.PutUint32(b, e.PID)
 		binary.LittleEndian.PutUint64(b, binary.BigEndian.Uint64(ip.To16()[0:8]))
 		binary.LittleEndian.PutUint64(b, binary.BigEndian.Uint64(ip.To16()[8:16]))
@@ -403,15 +388,12 @@ func (e *Kevent) PartialKey() uint64 {
 		ktypes.RegCloseKey:
 		key, _ := e.Kparams.GetString(kparams.RegKeyName)
 		b := make([]byte, 4+len(key))
-
 		binary.LittleEndian.PutUint32(b, e.PID)
 		b = append(b, key...)
 		return hashers.FnvUint64(b)
 	case ktypes.VirtualAlloc, ktypes.VirtualFree:
 		b := make([]byte, 12)
-
 		addr, _ := e.Kparams.GetUint64(kparams.MemBaseAddress)
-
 		binary.LittleEndian.PutUint32(b, e.PID)
 		binary.LittleEndian.PutUint64(b, addr)
 		return hashers.FnvUint64(b)
@@ -419,7 +401,6 @@ func (e *Kevent) PartialKey() uint64 {
 		b := make([]byte, 16)
 		pid, _ := e.Kparams.GetUint32(kparams.ProcessID)
 		object, _ := e.Kparams.GetUint64(kparams.HandleObject)
-
 		binary.LittleEndian.PutUint32(b, e.PID)
 		binary.LittleEndian.PutUint32(b, pid)
 		binary.LittleEndian.PutUint64(b, object)
@@ -427,7 +408,6 @@ func (e *Kevent) PartialKey() uint64 {
 	case ktypes.QueryDNS, ktypes.ReplyDNS:
 		n, _ := e.Kparams.GetString(kparams.DNSName)
 		b := make([]byte, 4+len(n))
-
 		binary.LittleEndian.PutUint32(b, e.PID)
 		b = append(b, n...)
 		return hashers.FnvUint64(b)
