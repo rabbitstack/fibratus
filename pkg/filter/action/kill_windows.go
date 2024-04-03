@@ -42,7 +42,7 @@ func terminate(pid uint32) error {
 	proc, err := windows.OpenProcess(syscall.PROCESS_TERMINATE, false, pid)
 	if err != nil {
 		errno, ok := err.(windows.Errno)
-		if ok && errno.Is(os.ErrNotExist) {
+		if ok && (errno.Is(os.ErrNotExist) || err == windows.ERROR_INVALID_PARAMETER) {
 			return nil
 		}
 		return fmt.Errorf("couldn't open pid %d for termination: %v", pid, err)

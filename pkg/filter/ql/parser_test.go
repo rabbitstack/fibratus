@@ -21,6 +21,7 @@ package ql
 import (
 	"errors"
 	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
 )
@@ -242,7 +243,6 @@ func TestParseSequence(t *testing.T) {
 		{
 
 			`maxspan 20s
-             by ps.pid
 			 |kevt.name = 'CreateProcess'| by ps.pid
 			 |kevt.name = 'CreateFile'| by ps.pid
 			`,
@@ -290,6 +290,17 @@ func TestParseSequence(t *testing.T) {
 			time.Hour * 40,
 			false,
 		},
+		{
+
+			`by ps.uuid
+			 maxspan 2m
+			 |kevt.name = 'CreateProcess'| by ps.child.uuid
+			 |kevt.name = 'CreateFile'| by ps.uuid
+			`,
+			errors.New("sequence mixes global and per-expression 'by' statements"),
+			time.Minute * 2,
+			true,
+		},
 	}
 
 	for i, tt := range tests {
@@ -308,6 +319,73 @@ func TestParseSequence(t *testing.T) {
 			if seq.IsConstrained() != tt.isConstrained {
 				t.Errorf("%d. exp=%s isConstrained=%t got isConstrained=%t", i, tt.expr, tt.isConstrained, seq.IsConstrained())
 			}
+		}
+	}
+}
+
+func TestIsSequenceUnordered(t *testing.T) {
+	var tests = []struct {
+		expr        string
+		isUnordered bool
+	}{
+		{
+			`|kevt.name = 'CreateProcess'| by ps.uuid
+			 |kevt.name = 'OpenProcess'| by ps.uuid
+			`,
+			true,
+		},
+		{
+			`|kevt.name = 'CreateProcess'|
+			 |kevt.name = 'CreateFile'|
+			`,
+			false,
+		},
+		{
+			`|kevt.name = 'CreateProcess'|
+			 |kevt.name = 'UnmapViewFile'|
+ 			 |kevt.name = 'LoadImage'|
+			`,
+			false,
+		},
+		{
+			`|kevt.name = 'CreateProcess'|
+			 |kevt.name = 'SetThreadContext'|
+			`,
+			true,
+		},
+		{
+			`|kevt.name = 'OpenThread'| by ps.uuid
+			 |kevt.name = 'OpenProcess'| by ps.uuid
+			`,
+			false,
+		},
+		{
+			`|kevt.name = 'OpenThread' or kevt.name = 'OpenProcess'| by ps.uuid
+			 |kevt.name = 'SetThreadContext'| by ps.uuid
+			`,
+			false,
+		},
+		{
+			`|kevt.name = 'RegSetValue'| by ps.uuid
+			 |kevt.name = 'SetThreadContext'| by ps.uuid
+			`,
+			true,
+		},
+		{
+			`|kevt.name = 'RegSetValue'| by ps.uuid
+			 |kevt.name = 'RegDeleteValue'| by ps.uuid
+			`,
+			false,
+		},
+	}
+
+	for i, tt := range tests {
+		p := NewParser(tt.expr)
+		seq, err := p.ParseSequence()
+		require.NoError(t, err)
+
+		if seq.IsUnordered != tt.isUnordered {
+			t.Errorf("%d. exp=%s isUnordered=%t got isUnordered=%t", i, tt.expr, tt.isUnordered, seq.IsUnordered)
 		}
 	}
 }

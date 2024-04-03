@@ -848,6 +848,9 @@ func (r *Rules) runSequence(kevt *kevent.Kevent, f *compiledFilter) bool {
 		// only try to evaluate the expression
 		// if upstream expressions have matched
 		if !f.ss.next(i) {
+			if !seq.IsUnordered {
+				continue
+			}
 			// it could be the event arrived out
 			// of order because certain provider
 			// flushed its buffers first. When this
