@@ -25,6 +25,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/util/hashers"
+	"golang.org/x/sys/windows"
 	"net"
 	"reflect"
 	"strconv"
@@ -222,13 +223,14 @@ type SequenceExpr struct {
 	By          fields.Field
 	BoundFields []*BoundFieldLiteral
 	Alias       string
-	Unordered   bool
 
 	buckets map[uint32]bool
+	ktypes  []ktypes.Ktype
 }
 
 func (e *SequenceExpr) init() {
 	e.buckets = make(map[uint32]bool)
+	e.ktypes = make([]ktypes.Ktype, 0)
 	e.BoundFields = make([]*BoundFieldLiteral, 0)
 }
 
@@ -281,11 +283,8 @@ func (e *SequenceExpr) walk() {
 		if name == fields.KevtName || name == fields.KevtCategory {
 			for _, v := range values {
 				e.buckets[hashers.FnvUint32([]byte(v))] = true
-				// mark sequence expression as unordered if
-				// it references an event type that can arrive
-				// out-of-order
-				if ktyp := ktypes.KeventNameToKtype(v); ktyp.CanArriveOutOfOrder() {
-					e.Unordered = true
+				if ktyp := ktypes.KeventNameToKtype(v); ktyp.Exists() {
+					e.ktypes = append(e.ktypes, ktyp)
 				}
 			}
 		}
@@ -310,6 +309,7 @@ type Sequence struct {
 	MaxSpan     time.Duration
 	By          fields.Field
 	Expressions []SequenceExpr
+	IsUnordered bool
 }
 
 // IsConstrained determines if the sequence has the global or per-expression `BY` statement.
@@ -317,15 +317,24 @@ func (s Sequence) IsConstrained() bool {
 	return !s.By.IsEmpty() || !s.Expressions[0].By.IsEmpty()
 }
 
-// IsUnordered returns true if any of the sequence expression event types
-// is susceptible of arriving out of order.
-func (s Sequence) IsUnordered() bool {
+func (s *Sequence) init() {
+	// determine if the sequence references
+	// an event type that can arrive out-of-order.
+	// The edge case is for unordered events emitted
+	// by the same provider where the temporal order
+	// is guaranteed
+	guids := make(map[windows.GUID]bool)
 	for _, expr := range s.Expressions {
-		if expr.Unordered {
-			return true
+		for _, k := range expr.ktypes {
+			if k.CanArriveOutOfOrder() {
+				s.IsUnordered = true
+			}
+			guids[k.GUID()] = true
 		}
 	}
-	return false
+	if s.IsUnordered && len(guids) == 1 {
+		s.IsUnordered = false
+	}
 }
 
 func (s Sequence) impairBy() bool {

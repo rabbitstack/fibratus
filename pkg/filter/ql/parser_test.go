@@ -342,9 +342,40 @@ func TestIsSequenceUnordered(t *testing.T) {
 		},
 		{
 			`|kevt.name = 'CreateProcess'|
+			 |kevt.name = 'UnmapViewFile'|
+ 			 |kevt.name = 'LoadImage'|
+			`,
+			false,
+		},
+		{
+			`|kevt.name = 'CreateProcess'|
 			 |kevt.name = 'SetThreadContext'|
 			`,
 			true,
+		},
+		{
+			`|kevt.name = 'OpenThread'| by ps.uuid
+			 |kevt.name = 'OpenProcess'| by ps.uuid
+			`,
+			false,
+		},
+		{
+			`|kevt.name = 'OpenThread' or kevt.name = 'OpenProcess'| by ps.uuid
+			 |kevt.name = 'SetThreadContext'| by ps.uuid
+			`,
+			false,
+		},
+		{
+			`|kevt.name = 'RegSetValue'| by ps.uuid
+			 |kevt.name = 'SetThreadContext'| by ps.uuid
+			`,
+			true,
+		},
+		{
+			`|kevt.name = 'RegSetValue'| by ps.uuid
+			 |kevt.name = 'RegDeleteValue'| by ps.uuid
+			`,
+			false,
 		},
 	}
 
@@ -353,8 +384,8 @@ func TestIsSequenceUnordered(t *testing.T) {
 		seq, err := p.ParseSequence()
 		require.NoError(t, err)
 
-		if seq.IsUnordered() != tt.isUnordered {
-			t.Errorf("%d. exp=%s isUnordered=%t got isUnordered=%t", i, tt.expr, tt.isUnordered, seq.IsUnordered())
+		if seq.IsUnordered != tt.isUnordered {
+			t.Errorf("%d. exp=%s isUnordered=%t got isUnordered=%t", i, tt.expr, tt.isUnordered, seq.IsUnordered)
 		}
 	}
 }
