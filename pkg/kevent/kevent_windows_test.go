@@ -89,3 +89,33 @@ func TestKeventSummary(t *testing.T) {
 	kevt.PS = nil
 	require.Equal(t, "process with <code>859</code> id opened a file <code>C:\\Windows\\system32\\user32.dll</code>", kevt.Summary())
 }
+
+func TestPartialKey(t *testing.T) {
+	var tests = []struct {
+		evt *Kevent
+		key uint64
+	}{
+		{
+			&Kevent{Type: ktypes.OpenProcess, PID: 1234, Kparams: Kparams{kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1221)}, kparams.DesiredAccess: {Name: kparams.DesiredAccess, Type: kparams.Uint32, Value: uint32(5)}}},
+			0x60c8c701773d1a5e,
+		},
+		{
+			&Kevent{Type: ktypes.OpenThread, PID: 11234, Kparams: Kparams{kparams.ThreadID: {Name: kparams.ThreadID, Type: kparams.TID, Value: uint32(8452)}}},
+			0x5467b0da1d106495,
+		},
+		{
+			&Kevent{Type: ktypes.CreateFile, PID: 4321, Kparams: Kparams{kparams.FileName: {Name: kparams.FileName, Type: kparams.FileDosPath, Value: "C:\\Windows\\System32\\kernelbase.dll"}}},
+			0x7ec254f31df879ec,
+		},
+		{
+			&Kevent{Type: ktypes.CreateFile, PID: 4321, Kparams: Kparams{kparams.FileName: {Name: kparams.FileName, Type: kparams.FileDosPath, Value: "C:\\Windows\\System32\\kernel32.dll"}}},
+			0xb6380d9159ccd174,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.evt.Type.String(), func(t *testing.T) {
+			assert.Equal(t, tt.key, tt.evt.PartialKey())
+		})
+	}
+}
