@@ -327,26 +327,6 @@ func (s *sequenceState) gc() {
 	}
 }
 
-// meetsTemporalDistance determines if the temporal occurrence of the
-// given event is encountered between the last partial of its sequence
-// slot and the first partial of its next downstream sequence.
-func (s *sequenceState) meetsTemporalDistance(rule string, kevt *kevent.Kevent, lock bool) bool {
-	if lock {
-		s.mu.RLock()
-		defer s.mu.RUnlock()
-	}
-	i := s.idxs[rule]
-	if len(s.partials[i]) == 0 {
-		return true
-	}
-	isBefore := true
-	if len(s.partials[i+1]) > 0 {
-		isBefore = kevt.Timestamp.Before(s.partials[i+1][0].Timestamp)
-	}
-	isAfter := kevt.Timestamp.After(s.partials[i][len(s.partials[i])-1].Timestamp)
-	return (isAfter && isBefore) || (kevt.Timestamp == s.partials[i][len(s.partials[i])-1].Timestamp && isBefore)
-}
-
 func (s *sequenceState) clear() {
 	s.partials = make(map[uint16][]*kevent.Kevent)
 	s.matches = make(map[uint16]*kevent.Kevent)
@@ -871,9 +851,8 @@ func (r *Rules) runSequence(kevt *kevent.Kevent, f *compiledFilter) bool {
 		}
 		rule := expr.Expr.String()
 		matches := f.run(kevt, i, false, true)
-		meetsDistance := f.ss.meetsTemporalDistance(rule, kevt, true)
 		// append the partial and transition state machine
-		if matches && meetsDistance {
+		if matches {
 			f.ss.addPartial(rule, kevt, false)
 			err := f.ss.matchTransition(rule, kevt)
 			if err != nil {
@@ -884,8 +863,8 @@ func (r *Rules) runSequence(kevt *kevent.Kevent, f *compiledFilter) bool {
 			// events from downstream sequence slots if
 			// the previous match hasn't reached terminal
 			// state
-			if f.ss.currentState() != sequenceTerminalState {
-				r.evaluateOutOfOrderPartials(i, f)
+			if seq.IsUnordered && f.ss.currentState() != sequenceTerminalState {
+				r.matchUnorderedPartials(f)
 			}
 		}
 	}
@@ -921,31 +900,24 @@ func (r *Rules) runSequence(kevt *kevent.Kevent, f *compiledFilter) bool {
 	return isTerminal
 }
 
-func (r *Rules) evaluateOutOfOrderPartials(i int, f *compiledFilter) {
+func (r *Rules) matchUnorderedPartials(f *compiledFilter) {
 	f.ss.mu.Lock()
 	defer f.ss.mu.Unlock()
 	for n, partials := range f.ss.partials {
-		if int(n)-1 == i {
-			// ignore partials from current slot
-			continue
-		}
 		for _, partial := range partials {
-			// only contemplate out of order partials
 			if !partial.ContainsMeta(kevent.RuleSequenceOutOfOrderKey) {
 				continue
 			}
 			matches := f.run(partial, int(n)-1, false, false)
 			rule := partial.GetMetaAsString(kevent.RuleExpressionKey)
-			meetsDistance := f.ss.meetsTemporalDistance(rule, partial, false)
-
-			if !matches && !meetsDistance {
-				continue
-			}
-			partial.RemoveMeta(kevent.RuleSequenceOutOfOrderKey)
-			err := f.ss.matchTransition(rule, partial)
-			if err != nil {
-				matchTransitionErrors.Add(1)
-				log.Warnf("out of order match transition failure: %v", err)
+			// transition the state machine
+			if matches {
+				err := f.ss.matchTransition(rule, partial)
+				if err != nil {
+					matchTransitionErrors.Add(1)
+					log.Warnf("out of order match transition failure: %v", err)
+				}
+				partial.RemoveMeta(kevent.RuleSequenceOutOfOrderKey)
 			}
 		}
 	}
