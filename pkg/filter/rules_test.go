@@ -281,6 +281,30 @@ func TestSequenceState(t *testing.T) {
 	assert.Equal(t, "kevt.name = CreateFile AND file.name ICONTAINS temp", ss.currentState())
 }
 
+func TestSequenceStateNext(t *testing.T) {
+	psnap := new(ps.SnapshotterMock)
+	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_simple.yml"))
+	compileRules(t, rules)
+	log.SetLevel(log.DebugLevel)
+
+	assert.Len(t, rules.groups, 2)
+
+	ss := rules.groups[ktypes.CreateProcess.Hash()][0].filters[0].ss
+
+	assert.True(t, ss.next(0))
+	assert.False(t, ss.next(1))
+
+	// first rule matched, should be able to proceed
+	// to the next rule but can't still reach the third rule
+	ss.matchedRules[1] = true
+	assert.True(t, ss.next(1))
+	assert.False(t, ss.next(2))
+
+	// should be able to reach the third rule
+	ss.matchedRules[2] = true
+	assert.True(t, ss.next(2))
+}
+
 func TestExpireSequences(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
 	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_expire.yml"))
