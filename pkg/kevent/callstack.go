@@ -22,7 +22,9 @@ import (
 	"expvar"
 	"github.com/gammazero/deque"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
+	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/arch/x86/x86asm"
 	"golang.org/x/sys/windows"
 	"path/filepath"
@@ -34,7 +36,7 @@ import (
 
 // maxDequeFlushPeriod specifies the maximum period
 // for the events to reside in the deque.
-var maxDequeFlushPeriod = time.Minute
+var maxDequeFlushPeriod = time.Second * 30
 
 // callstackFlushes computes overall callstack dequeue flushes
 var callstackFlushes = expvar.NewInt("callstack.flushes")
@@ -283,13 +285,17 @@ type CallstackDecorator struct {
 	deq *deque.Deque[*Kevent]
 	q   *Queue
 	mux sync.Mutex
+
+	flusher *time.Ticker
 }
 
 // NewCallstackDecorator creates a new callstack decorator
 // which receives the event queue for long-standing event
 // flushing.
 func NewCallstackDecorator(q *Queue) *CallstackDecorator {
-	return &CallstackDecorator{q: q, deq: deque.New[*Kevent](100)}
+	c := &CallstackDecorator{q: q, deq: deque.New[*Kevent](100), flusher: time.NewTicker(time.Second * 5)}
+	go c.doFlush()
+	return c
 }
 
 // Push pushes a new event to the queue.
@@ -316,10 +322,20 @@ func (cd *CallstackDecorator) Pop(e *Kevent) *Kevent {
 	return evt
 }
 
-// Flush pushes events to the event queue if they have
+func (cd *CallstackDecorator) doFlush() {
+	for {
+		<-cd.flusher.C
+		errs := cd.flush()
+		if len(errs) > 0 {
+			log.Warnf("callstack: unable to flush queued events: %v", multierror.Wrap(errs...))
+		}
+	}
+}
+
+// flush pushes events to the event queue if they have
 // been living in the deque more than the maximum allowed
 // flush period.
-func (cd *CallstackDecorator) Flush() []error {
+func (cd *CallstackDecorator) flush() []error {
 	cd.mux.Lock()
 	defer cd.mux.Unlock()
 	if cd.deq.Len() == 0 {
