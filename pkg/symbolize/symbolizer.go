@@ -362,6 +362,10 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *kevent.Kevent, fast, looku
 
 	if e.PS != nil {
 		mod := e.PS.FindModuleByVa(addr)
+		// perform lookup against parent modules
+		if mod == nil && e.PS.Parent != nil {
+			mod = e.PS.Parent.FindModuleByVa(addr)
+		}
 		if mod != nil {
 			frame.Module = mod.Name
 			m, ok := s.mods[mod.BaseAddress]
@@ -377,6 +381,10 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *kevent.Kevent, fast, looku
 			}
 			rva := addr.Dec(mod.BaseAddress.Uint64())
 			frame.Symbol = symbolFromRVA(rva, m.exports)
+			// permit unknown symbols for executable modules
+			if frame.Symbol == "" && strings.EqualFold(filepath.Ext(mod.Name), ".exe") {
+				frame.Symbol = "?"
+			}
 			// keep to module alive from purger
 			m.keepalive()
 		}
