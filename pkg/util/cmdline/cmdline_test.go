@@ -106,10 +106,11 @@ func TestCmdline(t *testing.T) {
 			`C:\WINDOWS\system32\svchost.exe -k RPCSS -p`,
 		},
 		{
-			`"C:\Program Files\Conexant\SAII\CxUtilSvc.exe"`,
-			`C:\Program Files\Conexant\SAII\CxUtilSvc.exe`,
-			`"C:\Program Files\Conexant\SAII\CxUtilSvc.exe"`,
+			`\\?\C:\Windows\System32\SecurityHealth\1.0.2402.27001-0\SecurityHealthHost.exe {E041C90B-68BA-42C9-991E-477B73A75C90} -Embedding`,
+			`C:\Windows\System32\SecurityHealth\1.0.2402.27001-0\SecurityHealthHost.exe`,
+			`\\?\C:\Windows\System32\SecurityHealth\1.0.2402.27001-0\SecurityHealthHost.exe {E041C90B-68BA-42C9-991E-477B73A75C90} -Embedding`,
 		},
+		{},
 	}
 
 	for _, tt := range tests {
