@@ -73,7 +73,8 @@
               '?:\\Windows\\System32\\sihost.exe',
               '?:\\Windows\\SysWOW64\\prevhost.exe',
               '?:\\Windows\\System32\\conhost.exe',
-              '?:\\Windows\\System32\\taskhostw.exe'
+              '?:\\Windows\\System32\\taskhostw.exe',
+              '?:\\Windows\\System32\\backgroundTaskHost.exe'
             )
       min-engine-version: 2.0.0
     - name: Network connection via startup folder executable or script

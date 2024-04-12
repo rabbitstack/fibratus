@@ -53,15 +53,15 @@
         sequence
         maxspan 2m
         by ps.uuid
-        |create_file
-            and
-         thread.callstack.symbols imatches
-            (
-              'kernel32.dll!CreateFileTransacted*',
-              'ntdll.dll!RtlSetCurrentTransaction'
-            )
-        |
-        |spawn_process|
+          |create_file
+              and
+           thread.callstack.symbols imatches
+              (
+                'kernel32.dll!CreateFileTransacted*',
+                'ntdll.dll!RtlSetCurrentTransaction'
+              )
+          |
+          |spawn_process|
       action:
       - name: kill
       min-engine-version: 2.2.0
@@ -98,9 +98,9 @@
       condition: >
         sequence
         maxspan 2m
-        |spawn_process| by ps.child.uuid
-        |unmap_view_of_section and (length(file.name) = 0 or not ext(file.name) = '.dll')| by ps.uuid
-        |load_executable and pe.is_modified| by ps.uuid
+          |spawn_process| by ps.child.uuid
+          |unmap_view_of_section and (length(file.name) = 0 or not ext(file.name) = '.dll')| by ps.uuid
+          |load_executable and pe.is_modified| by ps.uuid
       action:
       - name: kill
       min-engine-version: 2.0.0
