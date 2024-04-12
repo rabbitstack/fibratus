@@ -23,7 +23,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/ps"
-	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/util/signature"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -49,8 +48,8 @@ func TestImageProcessor(t *testing.T) {
 					kparams.ProcessID:           {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1023)},
 					kparams.ImageCheckSum:       {Name: kparams.ImageCheckSum, Type: kparams.Uint32, Value: uint32(2323432)},
 					kparams.ImageBase:           {Name: kparams.ImageBase, Type: kparams.Address, Value: uint64(0x7ffb313833a3)},
-					kparams.ImageSignatureType:  {Name: kparams.ImageSignatureType, Type: kparams.Enum, Value: uint32(0), Enum: signature.Types},
-					kparams.ImageSignatureLevel: {Name: kparams.ImageSignatureLevel, Type: kparams.Enum, Value: uint32(0), Enum: signature.Levels},
+					kparams.ImageSignatureType:  {Name: kparams.ImageSignatureType, Type: kparams.Enum, Value: uint32(1), Enum: signature.Types},
+					kparams.ImageSignatureLevel: {Name: kparams.ImageSignatureLevel, Type: kparams.Enum, Value: uint32(4), Enum: signature.Levels},
 				},
 			},
 			func() *ps.SnapshotterMock {
@@ -63,9 +62,6 @@ func TestImageProcessor(t *testing.T) {
 				// should get the signature verified
 				assert.Equal(t, "EMBEDDED", e.GetParamAsString(kparams.ImageSignatureType))
 				assert.Equal(t, "AUTHENTICODE", e.GetParamAsString(kparams.ImageSignatureLevel))
-				// should contain certificate info
-				assert.True(t, e.Kparams.Contains(kparams.ImageCertSubject))
-				assert.True(t, e.Kparams.Contains(kparams.ImageCertIssuer))
 			},
 		},
 		{
@@ -83,24 +79,12 @@ func TestImageProcessor(t *testing.T) {
 			},
 			func() *ps.SnapshotterMock {
 				psnap := new(ps.SnapshotterMock)
-				psnap.On("FindAndPut", uint32(676)).Return(&pstypes.PS{
-					Modules: []pstypes.Module{
-						{
-							Name:           "C:\\Windows\\system32\\kernel32.dll",
-							SignatureLevel: signature.AuthenticodeLevel,
-							SignatureType:  signature.Embedded,
-						},
-					},
-				})
 				psnap.On("RemoveModule", uint32(676), "C:\\Windows\\system32\\kernel32.dll").Return(nil)
 				psnap.On("FindModule", mock.Anything).Return(false, nil)
 				return psnap
 			},
 			func(e *kevent.Kevent, t *testing.T, psnap *ps.SnapshotterMock) {
 				psnap.AssertNumberOfCalls(t, "RemoveModule", 1)
-				psnap.AssertNumberOfCalls(t, "FindAndPut", 1)
-				assert.Equal(t, "EMBEDDED", e.GetParamAsString(kparams.ImageSignatureType))
-				assert.Equal(t, "AUTHENTICODE", e.GetParamAsString(kparams.ImageSignatureLevel))
 			},
 		},
 	}

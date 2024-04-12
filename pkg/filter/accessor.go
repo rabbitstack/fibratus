@@ -31,19 +31,35 @@ var (
 	ErrPsNil = errors.New("process state is nil")
 )
 
+// Accessor dictates the behaviour of the field accessors. One of the main responsibilities of the accessor is
+// to extract the underlying parameter for the field given in the filter expression. It can also produce a value
+// from the non-params constructs such as process' state or PE metadata.
+type Accessor interface {
+	// Get fetches the parameter value for the specified filter field.
+	Get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error)
+	// SetFields sets all fields declared in the expression
+	SetFields(fields []fields.Field)
+	// IsFieldAccessible determines if the field can be extracted from the
+	// given event. The condition is usually based on the event category,
+	// but it can also include different circumstances, like the presence
+	// of the process state or callstacks.
+	IsFieldAccessible(kevt *kevent.Kevent) bool
+}
+
 // kevtAccessor extracts generic event values.
 type kevtAccessor struct{}
 
-func (kevtAccessor) setFields(fields []fields.Field) {}
+func (kevtAccessor) SetFields([]fields.Field)              {}
+func (kevtAccessor) IsFieldAccessible(*kevent.Kevent) bool { return true }
 
-func newKevtAccessor() accessor {
+func newKevtAccessor() Accessor {
 	return &kevtAccessor{}
 }
 
 const timeFmt = "15:04:05"
 const dateFmt = "2006-01-02"
 
-func (k *kevtAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
+func (k *kevtAccessor) Get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
 	switch f {
 	case fields.KevtSeq:
 		return kevt.Seq, nil
@@ -199,11 +215,11 @@ func (f *filter) narrowAccessors() {
 	}
 
 	for _, accessor := range f.accessors {
-		accessor.setFields(allFields)
+		accessor.SetFields(allFields)
 	}
 }
 
-func (f *filter) removeAccessor(removed accessor) {
+func (f *filter) removeAccessor(removed Accessor) {
 	for i, accessor := range f.accessors {
 		if reflect.TypeOf(accessor) == reflect.TypeOf(removed) {
 			f.accessors = append(f.accessors[:i], f.accessors[i+1:]...)

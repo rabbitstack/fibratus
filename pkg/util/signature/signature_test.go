@@ -63,13 +63,12 @@ func TestSignature(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sig, err := Check(tt.filename)
+			sign := &Signature{Filename: tt.filename}
+			typ, _, err := sign.Check()
 			assert.True(t, err == tt.err)
-			if sig != nil {
-				assert.Equal(t, tt.sigType, sig.Type)
-				sig.Verify()
-				assert.Equal(t, tt.sigLevel, sig.Level)
-			}
+			sign.Verify()
+			assert.Equal(t, tt.sigType, typ)
+			assert.Equal(t, tt.sigLevel, sign.Level)
 		})
 	}
 }

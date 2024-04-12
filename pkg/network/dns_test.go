@@ -27,7 +27,7 @@ import (
 )
 
 func TestLookupAddr(t *testing.T) {
-	reverseDNS := NewReverseDNS(100, time.Minute, time.Minute)
+	reverseDNS := GetReverseDNS(100, time.Minute, time.Minute)
 	names, err := reverseDNS.Add(AddressFromIP(net.ParseIP("8.8.8.8")))
 
 	require.NoError(t, err)
@@ -40,7 +40,7 @@ func TestLookupAddr(t *testing.T) {
 }
 
 func TestLookupAddrBlacklisted(t *testing.T) {
-	reverseDNS := NewReverseDNS(100, time.Minute, time.Minute)
+	reverseDNS := GetReverseDNS(100, time.Minute, time.Minute)
 	for i := 0; i < maxFailedDNSLookups+1; i++ {
 		_, err := reverseDNS.Add(AddressFromIP(net.ParseIP("1.2.3.1")))
 		require.Error(t, err)
@@ -50,7 +50,7 @@ func TestLookupAddrBlacklisted(t *testing.T) {
 }
 
 func TestLookupAddrExpiration(t *testing.T) {
-	reverseDNS := NewReverseDNS(100, time.Millisecond*5, time.Minute)
+	reverseDNS := GetReverseDNS(100, time.Millisecond*5, time.Minute)
 
 	names, err := reverseDNS.Add(AddressFromIP(net.ParseIP("8.8.8.8")))
 
@@ -68,7 +68,7 @@ func TestLookupAddrExpiration(t *testing.T) {
 }
 
 func TestLookupAddrTickerExpiration(t *testing.T) {
-	reverseDNS := NewReverseDNS(100, time.Millisecond*50, time.Millisecond*80)
+	reverseDNS := GetReverseDNS(100, time.Millisecond*50, time.Millisecond*80)
 
 	names, err := reverseDNS.Add(AddressFromIP(net.ParseIP("8.8.8.8")))
 	require.NoError(t, err)

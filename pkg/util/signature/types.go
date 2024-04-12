@@ -22,6 +22,7 @@ import (
 	"errors"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"runtime"
+	"time"
 )
 
 const (
@@ -88,7 +89,13 @@ type Signature struct {
 	// Cert represents certificate information for the particular signature.
 	Cert *sys.Cert
 	// filename represents the name of the executable image/DLL/driver
-	filename string
+	Filename string
+	// accessed the timestamp of the signature access by field extractor
+	accessed time.Time
+}
+
+func (s *Signature) keepalive() {
+	s.accessed = time.Now()
 }
 
 func (s *Signature) IsSigned() bool       { return s.Type != None }
@@ -103,16 +110,16 @@ func (s *Signature) VerifyEmbedded() bool {
 	defer runtime.UnlockOSThread()
 	trust := sys.NewWintrustData(sys.WtdChoiceFile)
 	defer trust.Close()
-	return trust.VerifyFile(s.filename)
+	return trust.VerifyFile(s.Filename)
 }
 
 // VerifyCatalog verifies the catalog-based file signature.
 func (s *Signature) VerifyCatalog() bool {
 	catalog := sys.NewCatalog()
-	err := catalog.Open(s.filename)
+	err := catalog.Open(s.Filename)
 	if err != nil {
 		return false
 	}
 	defer catalog.Close()
-	return catalog.Verify(s.filename)
+	return catalog.Verify(s.Filename)
 }

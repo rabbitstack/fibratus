@@ -54,10 +54,6 @@ func TestNetworkProcessor(t *testing.T) {
 				assert.Equal(t, "8.8.8.8", e.GetParamAsString(kparams.NetDIP))
 				assert.Equal(t, "443", e.GetParamAsString(kparams.NetDport))
 				assert.Equal(t, "43123", e.GetParamAsString(kparams.NetSport))
-
-				names, err := e.Kparams.GetStringSlice(kparams.NetDIPNames)
-				require.NoError(t, err)
-				assert.Contains(t, names, "dns.google.")
 			},
 		},
 		{

@@ -485,7 +485,8 @@ func (f Field) IsPeSignature() bool {
 func (f Field) IsPeIsTrusted() bool { return f == PeIsTrusted }
 func (f Field) IsPeIsSigned() bool  { return f == PeIsSigned }
 
-func (f Field) IsPeCert() bool { return strings.HasPrefix(string(f), "pe.cert.") }
+func (f Field) IsPeCert() bool    { return strings.HasPrefix(string(f), "pe.cert.") }
+func (f Field) IsImageCert() bool { return strings.HasPrefix(string(f), "image.cert.") }
 
 func (f Field) IsPeModified() bool { return f == PeIsModified }
 

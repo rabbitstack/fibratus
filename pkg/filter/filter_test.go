@@ -28,6 +28,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
+	"github.com/rabbitstack/fibratus/pkg/util/signature"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -523,12 +524,10 @@ func TestNetFilter(t *testing.T) {
 		},
 		Category: ktypes.Net,
 		Kparams: kevent.Kparams{
-			kparams.NetDport:    {Name: kparams.NetDport, Type: kparams.Uint16, Value: uint16(443)},
-			kparams.NetSport:    {Name: kparams.NetSport, Type: kparams.Uint16, Value: uint16(43123)},
-			kparams.NetSIP:      {Name: kparams.NetSIP, Type: kparams.IPv4, Value: net.ParseIP("127.0.0.1")},
-			kparams.NetDIP:      {Name: kparams.NetDIP, Type: kparams.IPv4, Value: net.ParseIP("216.58.201.174")},
-			kparams.NetDIPNames: {Name: kparams.NetDIPNames, Type: kparams.Slice, Value: []string{"dns.google.", "github.com."}},
-			kparams.NetSIPNames: {Name: kparams.NetSIPNames, Type: kparams.Slice, Value: []string{"local.domain."}},
+			kparams.NetDport: {Name: kparams.NetDport, Type: kparams.Uint16, Value: uint16(443)},
+			kparams.NetSport: {Name: kparams.NetSport, Type: kparams.Uint16, Value: uint16(43123)},
+			kparams.NetSIP:   {Name: kparams.NetSIP, Type: kparams.IPv4, Value: net.ParseIP("127.0.0.1")},
+			kparams.NetDIP:   {Name: kparams.NetDIP, Type: kparams.IPv4, Value: net.ParseIP("216.58.201.174")},
 		},
 	}
 
@@ -544,8 +543,6 @@ func TestNetFilter(t *testing.T) {
 		{`net.dip endswith '.174'`, true},
 		{`net.dport = 443`, true},
 		{`net.dport in (123, 443)`, true},
-		{`net.dip.names in ('dns.google.')`, true},
-		{`net.sip.names matches ('*.domain.')`, true},
 		{`net.dip != 116.58.201.174`, true},
 		{`net.dip not in ('116.58.201.172', '16.58.201.176')`, true},
 		{`net.dip not in (116.58.201.172, 16.58.201.176)`, true},
@@ -564,6 +561,43 @@ func TestNetFilter(t *testing.T) {
 			t.Fatal(err)
 		}
 		matches := f.Run(kevt)
+		if matches != tt.matches {
+			t.Errorf("%d. %q net filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
+		}
+	}
+
+	kevt1 := &kevent.Kevent{
+		Type: ktypes.SendTCPv4,
+		Tid:  2484,
+		PID:  859,
+		PS: &pstypes.PS{
+			Name: "cmd.exe",
+		},
+		Category: ktypes.Net,
+		Kparams: kevent.Kparams{
+			kparams.NetDport: {Name: kparams.NetDport, Type: kparams.Uint16, Value: uint16(53)},
+			kparams.NetSport: {Name: kparams.NetSport, Type: kparams.Uint16, Value: uint16(43123)},
+			kparams.NetSIP:   {Name: kparams.NetSIP, Type: kparams.IPv4, Value: net.ParseIP("127.0.0.1")},
+			kparams.NetDIP:   {Name: kparams.NetDIP, Type: kparams.IPv4, Value: net.ParseIP("8.8.8.8")},
+		},
+	}
+
+	var tests1 = []struct {
+		filter  string
+		matches bool
+	}{
+
+		{`net.dip.names in ('dns.google.')`, true},
+		{`length(net.sip.names) > 0`, true},
+	}
+
+	for i, tt := range tests1 {
+		f := New(tt.filter, cfg)
+		err := f.Compile()
+		if err != nil {
+			t.Fatal(err)
+		}
+		matches := f.Run(kevt1)
 		if matches != tt.matches {
 			t.Errorf("%d. %q net filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
@@ -608,6 +642,98 @@ func TestRegistryFilter(t *testing.T) {
 			t.Errorf("%d. %q registry filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
 	}
+}
+
+func TestImageFilter(t *testing.T) {
+	kevt := &kevent.Kevent{
+		Type:     ktypes.LoadImage,
+		Category: ktypes.Image,
+		Kparams: kevent.Kparams{
+			kparams.ImageFilename:       {Name: kparams.ImageFilename, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll")},
+			kparams.ProcessID:           {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1023)},
+			kparams.ImageCheckSum:       {Name: kparams.ImageCheckSum, Type: kparams.Uint32, Value: uint32(2323432)},
+			kparams.ImageBase:           {Name: kparams.ImageBase, Type: kparams.Address, Value: uint64(0x7ffb313833a3)},
+			kparams.ImageSignatureType:  {Name: kparams.ImageSignatureType, Type: kparams.Enum, Value: uint32(1), Enum: signature.Types},
+			kparams.ImageSignatureLevel: {Name: kparams.ImageSignatureLevel, Type: kparams.Enum, Value: uint32(4), Enum: signature.Levels},
+		},
+	}
+
+	var tests = []struct {
+		filter  string
+		matches bool
+	}{
+
+		{`image.signature.type = 'EMBEDDED'`, true},
+		{`image.signature.level = 'AUTHENTICODE'`, true},
+		{`image.pid = 1023`, true},
+		{`image.name endswith 'kernel32.dll'`, true},
+		{`image.checksum = 2323432`, true},
+		{`image.base.address = '7ffb313833a3'`, true},
+		{`image.cert.issuer icontains 'Microsoft Windows'`, true},
+		{`image.cert.subject icontains 'Microsoft Corporation'`, true},
+	}
+
+	for i, tt := range tests {
+		f := New(tt.filter, cfg)
+		err := f.Compile()
+		if err != nil {
+			t.Fatal(err)
+		}
+		matches := f.Run(kevt)
+		if matches != tt.matches {
+			t.Errorf("%d. %q image filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
+		}
+	}
+
+	// check signatures expectations
+	sig := signature.GetSignatures().GetSignature(0x7ffb313833a3)
+	assert.NotNil(t, sig)
+	assert.Equal(t, filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll"), sig.Filename)
+	assert.Equal(t, signature.Embedded, sig.Type)
+	assert.Equal(t, signature.AuthenticodeLevel, sig.Level)
+
+	// now exercise unsigned/unchecked signature
+	kevt1 := &kevent.Kevent{
+		Type:     ktypes.LoadImage,
+		Category: ktypes.Image,
+		Kparams: kevent.Kparams{
+			kparams.ImageFilename:       {Name: kparams.ImageFilename, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll")},
+			kparams.ProcessID:           {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1023)},
+			kparams.ImageCheckSum:       {Name: kparams.ImageCheckSum, Type: kparams.Uint32, Value: uint32(2323432)},
+			kparams.ImageBase:           {Name: kparams.ImageBase, Type: kparams.Address, Value: uint64(0x7ccb313833a3)},
+			kparams.ImageSignatureType:  {Name: kparams.ImageSignatureType, Type: kparams.Enum, Value: uint32(0), Enum: signature.Types},
+			kparams.ImageSignatureLevel: {Name: kparams.ImageSignatureLevel, Type: kparams.Enum, Value: uint32(0), Enum: signature.Levels},
+		},
+	}
+
+	var tests1 = []struct {
+		filter  string
+		matches bool
+	}{
+
+		{`image.signature.type = 'EMBEDDED'`, true},
+		{`image.signature.level = 'AUTHENTICODE'`, true},
+		{`image.pid = 1023`, true},
+		{`image.name endswith 'kernel32.dll'`, true},
+		{`image.checksum = 2323432`, true},
+		{`image.base.address = '7ccb313833a3'`, true},
+		{`image.cert.issuer icontains 'Microsoft Windows'`, true},
+		{`image.cert.subject icontains 'Microsoft Corporation'`, true},
+	}
+
+	for i, tt := range tests1 {
+		f := New(tt.filter, cfg)
+		err := f.Compile()
+		if err != nil {
+			t.Fatal(err)
+		}
+		matches := f.Run(kevt1)
+		if matches != tt.matches {
+			t.Errorf("%d. %q image filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
+		}
+	}
+
+	assert.NotNil(t, signature.GetSignatures().GetSignature(0x7ccb313833a3))
 }
 
 func TestPEFilter(t *testing.T) {
