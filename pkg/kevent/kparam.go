@@ -353,7 +353,7 @@ func (kpars Kparams) GetBool(name string) (bool, error) {
 }
 
 // TryGetBool tries to retrieve the boolean value from the parameter.
-// Returns the underyling value on success, or false otherwise.
+// Returns the underlying value on success, or false otherwise.
 func (kpars Kparams) TryGetBool(name string) bool {
 	val, err := kpars.GetBool(name)
 	if err != nil {
@@ -396,6 +396,16 @@ func (kpars Kparams) MustGetUint16(name string) uint16 {
 		panic(err)
 	}
 	return v
+}
+
+// TryGetUint16 tries to retrieve the uint16 value from the parameter.
+// Returns the underlying value on success, or zero otherwise.
+func (kpars Kparams) TryGetUint16(name string) uint16 {
+	val, err := kpars.GetUint16(name)
+	if err != nil {
+		return 0
+	}
+	return val
 }
 
 // GetInt16 returns the underlying int16 value from the parameter.
@@ -568,6 +578,15 @@ func (kpars Kparams) GetIP(name string) (net.IP, error) {
 		return net.IP{}, fmt.Errorf("unable to type cast %q parameter to net.IP value", name)
 	}
 	return v, nil
+}
+
+// MustGetIP returns the IP address parameter or panics if an error occurs.
+func (kpars Kparams) MustGetIP(name string) net.IP {
+	ip, err := kpars.GetIP(name)
+	if err != nil {
+		panic(err)
+	}
+	return ip
 }
 
 // GetTime returns the underlying time structure from the parameter.

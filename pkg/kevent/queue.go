@@ -80,6 +80,9 @@ func (q *Queue) RegisterListener(listener Listener) {
 // Events returns the channel with all queued events.
 func (q *Queue) Events() <-chan *Kevent { return q.q }
 
+// Close closes the queue disposing allocated resources.
+func (q *Queue) Close() { q.cd.Stop() }
+
 // Push pushes a new event to the channel. Prior to
 // sending the event to the channel, all registered
 // listeners are invoked. The event is sent to the
@@ -110,13 +113,6 @@ func (q *Queue) Push(e *Kevent) error {
 		// decorate events with callstack return addresses
 		if e.IsStackWalk() {
 			e = q.cd.Pop(e)
-		}
-		if !e.IsStackWalk() {
-			// flush long-standing events
-			errs := q.cd.Flush()
-			if len(errs) > 0 {
-				return multierror.Wrap(errs...)
-			}
 		}
 	}
 	if isEventDelayed(e) {

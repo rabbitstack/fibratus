@@ -21,74 +21,136 @@ package signature
 import (
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	"github.com/rabbitstack/fibratus/pkg/sys"
+	log "github.com/sirupsen/logrus"
+	"sync"
+	"time"
 )
 
-// Wrap returns a new signature form signature type and level.
-func Wrap(typ, level uint32) *Signature {
-	return &Signature{Type: typ, Level: level}
+// Signatures manages and caches DLL and executable signatures.
+type Signatures struct {
+	signatures map[uint64]*Signature
+	mux        sync.Mutex
+	purger     *time.Ticker
 }
 
-// GetCertificate returns certificate details for the specific PE object.
-func GetCertificate(filename string) (*sys.Cert, error) {
-	f, err := pe.ParseFile(filename, pe.WithSecurity())
-	if err != nil {
-		return nil, err
+var sigs *Signatures
+
+// sigTTL maximum time for the signature to remain in the
+// internal store before it is purged.
+var sigTTL = 10 * time.Minute
+
+// GetSignatures creates a new signatures singleton.
+func GetSignatures() *Signatures {
+	if sigs != nil {
+		return sigs
 	}
-	if f.Cert != nil {
-		return f.Cert, nil
+	sigs = &Signatures{
+		signatures: make(map[uint64]*Signature),
+		purger:     time.NewTicker(time.Minute),
+	}
+
+	go sigs.gcSignatures()
+
+	return sigs
+}
+
+// GetSignature retrieves the signature by base address. If
+// the signature exists, its accessed timestamp is updated
+// to prevent it being purged by the gc.
+func (s *Signatures) GetSignature(addr uint64) *Signature {
+	s.mux.Lock()
+	defer s.mux.Unlock()
+	sign, ok := s.signatures[addr]
+	if !ok {
+		return nil
+	}
+	sign.keepalive()
+	return sign
+}
+
+// PutSignature links the signature data to the specified base address.
+func (s *Signatures) PutSignature(addr uint64, sign *Signature) {
+	s.mux.Lock()
+	defer s.mux.Unlock()
+	if s.signatures[addr] == nil {
+		s.signatures[addr] = sign
+	}
+}
+
+func (s *Signatures) gcSignatures() {
+	for {
+		<-s.purger.C
+		s.mux.Lock()
+		for addr, sig := range s.signatures {
+			if time.Since(sig.accessed) > sigTTL {
+				log.Debugf("removing signature info for file %s", sig.Filename)
+				delete(s.signatures, addr)
+			}
+		}
+		s.mux.Unlock()
+	}
+}
+
+// ParseCertificate parses the certificate data for catalog-based
+// signatures.
+func (s *Signature) ParseCertificate() error {
+	// the certificate exists in the PE security directory
+	if s.Cert != nil {
+		return nil
 	}
 	if !sys.IsWintrustFound() {
-		return nil, ErrWintrustUnavailable
+		return ErrWintrustUnavailable
 	}
 	// parse catalog certificate
 	catalog := sys.NewCatalog()
-	if err := catalog.Open(filename); err != nil {
-		return nil, err
+	if err := catalog.Open(s.Filename); err != nil {
+		return err
 	}
 	defer catalog.Close()
-	cert, err := catalog.ParseCertificate()
+	var err error
+	s.Cert, err = catalog.ParseCertificate()
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return cert, nil
+	return nil
 }
 
 // Check determines if the provided executable image or DLL is signed.
 // It first parses the PE security directory to look for the signature
 // information. If the certificate is not embedded inside the PE object
 // then this method will try to locate the hash in the catalog file. If
-// the certificate parsing is successful, this function returns the signature
-// structure containing the signature type and certificate info. If the signature
-// is not present, this function returns ErrNotSigned error. To verify the signature,
-// call the Verify method of the Signature structure.
-func Check(filename string) (*Signature, error) {
+// the certificate parsing is successful, this function returns the
+// signature structure containing the signature type and certificate info.
+// If the signature is not present, this function returns ErrNotSigned error.
+// To verify the signature, call the Verify method of the Signature structure.
+// On success, this method returns the signature type and the signature level.
+// The signature level is either unchecked or unsigned. It is necessary to
+// call the Verify method to determine the signature chain trust.
+func (s *Signature) Check() (uint32, uint32, error) {
 	// check if the signature is embedded in PE
-	f, err := pe.ParseFile(filename, pe.WithSecurity())
+	f, err := pe.ParseFile(s.Filename, pe.WithSecurity())
 	if err != nil {
-		return nil, err
+		return None, UncheckedLevel, err
 	}
 	if f.IsSigned {
-		return &Signature{filename: filename, Type: Embedded, Cert: f.Cert}, nil
+		s.Cert = f.Cert
+		return Embedded, UncheckedLevel, nil
 	}
 
 	if !sys.IsWintrustFound() {
-		return nil, ErrWintrustUnavailable
+		return None, UncheckedLevel, ErrWintrustUnavailable
 	}
 
 	// maybe the signature is in the catalog?
 	catalog := sys.NewCatalog()
-	if err := catalog.Open(filename); err != nil {
-		return nil, err
+	if err := catalog.Open(s.Filename); err != nil {
+		return None, UncheckedLevel, err
 	}
 	defer catalog.Close()
 	if catalog.IsCatalogSigned() {
-		cert, err := catalog.ParseCertificate()
-		if err != nil {
-			return nil, err
-		}
-		return &Signature{filename: filename, Type: Catalog, Cert: cert}, nil
+		return Catalog, UncheckedLevel, nil
 	}
-	return nil, ErrNotSigned // image not signed
+	return None, UnsignedLevel, ErrNotSigned // image not signed
 }
 
 // Verify verifies the DLL or executable image signature.

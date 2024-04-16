@@ -21,6 +21,7 @@ package filter
 import (
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	psnapshotter "github.com/rabbitstack/fibratus/pkg/ps"
 	ptypes "github.com/rabbitstack/fibratus/pkg/ps/types"
@@ -40,15 +41,15 @@ func TestPSAccessor(t *testing.T) {
 		},
 	}
 
-	env, err := ps.get("ps.envs[ALLUSERSPROFILE]", kevt)
+	env, err := ps.Get("ps.envs[ALLUSERSPROFILE]", kevt)
 	require.NoError(t, err)
 	assert.Equal(t, "C:\\ProgramData", env)
 
-	env, err = ps.get("ps.envs[ALLUSER]", kevt)
+	env, err = ps.Get("ps.envs[ALLUSER]", kevt)
 	require.NoError(t, err)
 	assert.Equal(t, "C:\\ProgramData", env)
 
-	env, err = ps.get("ps.envs[ProgramFiles]", kevt)
+	env, err = ps.Get("ps.envs[ProgramFiles]", kevt)
 	require.NoError(t, err)
 	assert.Equal(t, "C:\\Program Files (x86)", env)
 }
@@ -74,20 +75,20 @@ func TestPEAccessor(t *testing.T) {
 		},
 	}
 
-	entropy, err := pea.get("pe.sections[.text].entropy", kevt)
+	entropy, err := pea.Get("pe.sections[.text].entropy", kevt)
 	require.NoError(t, err)
 	assert.Equal(t, 6.368381, entropy)
 
-	v, err := pea.get("pe.sections[.text].md6", kevt)
+	v, err := pea.Get("pe.sections[.text].md6", kevt)
 	require.NoError(t, err)
 	require.Nil(t, v)
 
-	md5, err := pea.get("pe.sections[.rdata].md5", kevt)
+	md5, err := pea.Get("pe.sections[.rdata].md5", kevt)
 	require.NoError(t, err)
 	require.Nil(t, v)
 	assert.Equal(t, "ffa5c960b421ca9887e54966588e97e8", md5)
 
-	company, err := pea.get("pe.resources[CompanyName]", kevt)
+	company, err := pea.Get("pe.resources[CompanyName]", kevt)
 	require.NoError(t, err)
 	assert.Equal(t, "Microsoft Corporation", company)
 }
@@ -146,4 +147,85 @@ func TestNarrowAccessors(t *testing.T) {
 	// check if fields are set in the accessor
 	require.NotNil(t, pea)
 	assert.Len(t, pea.fields, 3)
+}
+
+func TestIsFieldAccessible(t *testing.T) {
+	var tests = []struct {
+		a            Accessor
+		e            *kevent.Kevent
+		isAccessible bool
+	}{
+		{
+			newKevtAccessor(),
+			&kevent.Kevent{Type: ktypes.QueryDNS, Category: ktypes.Net},
+			true,
+		},
+		{
+			newPSAccessor(nil),
+			&kevent.Kevent{Type: ktypes.CreateProcess, Category: ktypes.Process},
+			true,
+		},
+		{
+			newPSAccessor(nil),
+			&kevent.Kevent{PS: &ptypes.PS{}, Type: ktypes.CreateFile, Category: ktypes.File},
+			true,
+		},
+		{
+			newPSAccessor(nil),
+			&kevent.Kevent{Type: ktypes.SetThreadContext, Category: ktypes.Thread},
+			false,
+		},
+		{
+			newThreadAccessor(),
+			&kevent.Kevent{Type: ktypes.SetThreadContext, Category: ktypes.Thread},
+			true,
+		},
+		{
+			newThreadAccessor(),
+			&kevent.Kevent{Type: ktypes.CreateProcess, Category: ktypes.Process, Callstack: []kevent.Frame{kevent.Frame{Addr: 0x7ffb5c1d0396, Offset: 0x61, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"}}},
+			true,
+		},
+		{
+			newThreadAccessor(),
+			&kevent.Kevent{Type: ktypes.RegSetValue, Category: ktypes.Registry, Callstack: []kevent.Frame{kevent.Frame{Addr: 0x7ffb5c1d0396, Offset: 0x61, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"}}},
+			true,
+		},
+		{
+			newRegistryAccessor(),
+			&kevent.Kevent{Type: ktypes.RegSetValue, Category: ktypes.Registry, Callstack: []kevent.Frame{kevent.Frame{Addr: 0x7ffb5c1d0396, Offset: 0x61, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"}}},
+			true,
+		},
+		{
+			newNetworkAccessor(),
+			&kevent.Kevent{Type: ktypes.RegSetValue, Category: ktypes.Registry, Callstack: []kevent.Frame{kevent.Frame{Addr: 0x7ffb5c1d0396, Offset: 0x61, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"}}},
+			false,
+		},
+		{
+			newNetworkAccessor(),
+			&kevent.Kevent{Type: ktypes.ConnectTCPv6, Category: ktypes.Net},
+			true,
+		},
+		{
+			newDNSAccessor(),
+			&kevent.Kevent{Type: ktypes.ReplyDNS, Category: ktypes.Net},
+			true,
+		},
+		{
+			newImageAccessor(),
+			&kevent.Kevent{Type: ktypes.LoadImage, Category: ktypes.Image},
+			true,
+		},
+		{
+			newMemAccessor(),
+			&kevent.Kevent{Type: ktypes.VirtualAlloc, Category: ktypes.Mem},
+			true,
+		},
+	}
+
+	for i, tt := range tests {
+		isAccessible := tt.a.IsFieldAccessible(tt.e)
+		if tt.isAccessible != isAccessible {
+			t.Errorf("%d. accessors is field accessible condition mismatch: exp=%t got=%t", i, tt.isAccessible, isAccessible)
+		}
+	}
 }

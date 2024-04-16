@@ -20,14 +20,19 @@ package filter
 
 import (
 	"errors"
+	"expvar"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/network"
 	psnap "github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
 	"github.com/rabbitstack/fibratus/pkg/util/loldrivers"
+	"github.com/rabbitstack/fibratus/pkg/util/signature"
 	"golang.org/x/sys/windows"
+	"net"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
@@ -41,19 +46,15 @@ var (
 	ErrPENil = errors.New("pe state is nil")
 )
 
-// accessor dictates the behaviour of the field accessors. One of the main responsibilities of the accessor is
-// to extract the underlying parameter for the field given in the filter expression. It can also produce a value
-// from the non-params constructs such as process' state or PE metadata.
-type accessor interface {
-	// get fetches the parameter value for the specified filter field.
-	get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error)
-	// setFields sets all fields declared in the expression
-	setFields(fields []fields.Field)
-}
+// signatureErrors counts signature check/verification errors
+var signatureErrors = expvar.NewInt("image.signature.errors")
 
-// getAccessors initializes and returns all available accessors.
-func getAccessors() []accessor {
-	return []accessor{
+// certErrors counts certificate parse errors
+var certErrors = expvar.NewInt("image.certificate.errors")
+
+// GetAccessors initializes and returns all available accessors.
+func GetAccessors() []Accessor {
+	return []Accessor{
 		newPSAccessor(nil),
 		newPEAccessor(),
 		newMemAccessor(),
@@ -80,11 +81,14 @@ type psAccessor struct {
 	psnap psnap.Snapshotter
 }
 
-func (psAccessor) setFields(fields []fields.Field) {}
+func (psAccessor) SetFields(fields []fields.Field) {}
+func (psAccessor) IsFieldAccessible(kevt *kevent.Kevent) bool {
+	return kevt.PS != nil || kevt.Category == ktypes.Process
+}
 
-func newPSAccessor(psnap psnap.Snapshotter) accessor { return &psAccessor{psnap: psnap} }
+func newPSAccessor(psnap psnap.Snapshotter) Accessor { return &psAccessor{psnap: psnap} }
 
-func (ps *psAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
+func (ps *psAccessor) Get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
 	switch f {
 	case fields.PsPid:
 		// the process id that is generating the event
@@ -527,16 +531,19 @@ func ancestorFields(field string, kevt *kevent.Kevent) (kparams.Value, error) {
 	return nil, nil
 }
 
-// threadAccessor fetches thread parameters from thread kernel events.
+// threadAccessor fetches thread parameters from thread events.
 type threadAccessor struct{}
 
-func (threadAccessor) setFields(fields []fields.Field) {}
+func (threadAccessor) SetFields(fields []fields.Field) {}
+func (threadAccessor) IsFieldAccessible(kevt *kevent.Kevent) bool {
+	return !kevt.Callstack.IsEmpty() || kevt.Category == ktypes.Thread
+}
 
-func newThreadAccessor() accessor {
+func newThreadAccessor() Accessor {
 	return &threadAccessor{}
 }
 
-func (t *threadAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
+func (t *threadAccessor) Get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
 	switch f {
 	case fields.ThreadBasePrio:
 		return kevt.Kparams.GetUint8(kparams.BasePrio)
@@ -681,50 +688,19 @@ func callstackFields(field string, kevt *kevent.Kevent) (kparams.Value, error) {
 	return nil, nil
 }
 
-// evalLOLDrivers interacts with the loldrivers client to determine
-// whether the loaded/dropped driver is malicious or vulnerable.
-func evalLOLDrivers(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
-	filename := kevt.GetParamAsString(kparams.FileName)
-	isDriver := filepath.Ext(filename) == ".sys" || kevt.Kparams.TryGetBool(kparams.FileIsDriver)
-	if !isDriver {
-		return nil, nil
-	}
-	ok, driver := loldrivers.GetClient().MatchHash(filename)
-	if !ok {
-		return nil, nil
-	}
-	if (f == fields.FileIsDriverVulnerable || f == fields.ImageIsDriverVulnerable) && driver.IsVulnerable {
-		return true, nil
-	}
-	if (f == fields.FileIsDriverMalicious || f == fields.ImageIsDriverMalicious) && driver.IsMalicious {
-		return true, nil
-	}
-	return false, nil
-}
-
-// initLOLDriversClient initializes the loldrivers client if the filter expression
-// contains any of the relevant fields.
-func initLOLDriversClient(flds []fields.Field) {
-	for _, f := range flds {
-		if f == fields.FileIsDriverVulnerable || f == fields.FileIsDriverMalicious ||
-			f == fields.ImageIsDriverVulnerable || f == fields.ImageIsDriverMalicious {
-			loldrivers.InitClient(loldrivers.WithAsyncDownload())
-		}
-	}
-}
-
 // fileAccessor extracts file specific values.
 type fileAccessor struct{}
 
-func (fileAccessor) setFields(fields []fields.Field) {
+func (fileAccessor) SetFields(fields []fields.Field) {
 	initLOLDriversClient(fields)
 }
+func (fileAccessor) IsFieldAccessible(kevt *kevent.Kevent) bool { return kevt.Category == ktypes.File }
 
-func newFileAccessor() accessor {
+func newFileAccessor() Accessor {
 	return &fileAccessor{}
 }
 
-func (l *fileAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
+func (l *fileAccessor) Get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
 	switch f {
 	case fields.FileName:
 		return kevt.GetParamAsString(kparams.FileName), nil
@@ -757,7 +733,7 @@ func (l *fileAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, 
 		return kevt.GetParamAsString(kparams.FileViewSectionType), nil
 	case fields.FileIsDriverVulnerable, fields.FileIsDriverMalicious:
 		if kevt.IsCreateDisposition() && kevt.IsSuccess() {
-			return evalLOLDrivers(f, kevt)
+			return isLOLDriver(f, kevt)
 		}
 		return false, nil
 	case fields.FileIsDLL:
@@ -770,18 +746,85 @@ func (l *fileAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, 
 	return nil, nil
 }
 
-// imageAccessor extracts image (DLL) event values.
+// imageAccessor extracts image (DLL, executable, driver) event values.
 type imageAccessor struct{}
 
-func (imageAccessor) setFields(fields []fields.Field) {
+func (imageAccessor) SetFields(fields []fields.Field) {
 	initLOLDriversClient(fields)
 }
+func (imageAccessor) IsFieldAccessible(kevt *kevent.Kevent) bool {
+	return kevt.Category == ktypes.Image
+}
 
-func newImageAccessor() accessor {
+func newImageAccessor() Accessor {
 	return &imageAccessor{}
 }
 
-func (i *imageAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
+func (i *imageAccessor) Get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
+	if kevt.IsLoadImage() && (f == fields.ImageSignatureType || f == fields.ImageSignatureLevel || f.IsImageCert()) {
+		filename := kevt.GetParamAsString(kparams.FileName)
+		addr := kevt.Kparams.MustGetUint64(kparams.ImageBase)
+		typ := kevt.Kparams.MustGetUint32(kparams.ImageSignatureType)
+		level := kevt.Kparams.MustGetUint32(kparams.ImageSignatureLevel)
+
+		sign := signature.GetSignatures().GetSignature(addr)
+
+		// signature already checked
+		if typ != signature.None {
+			if sign == nil {
+				sign = &signature.Signature{
+					Type:     typ,
+					Level:    level,
+					Filename: filename,
+				}
+			}
+			if f.IsImageCert() {
+				err := sign.ParseCertificate()
+				if err != nil {
+					certErrors.Add(1)
+				}
+			}
+			signature.GetSignatures().PutSignature(addr, sign)
+		} else {
+			// image signature parameters exhibit unreliable behaviour. Allegedly,
+			// signature verification is not performed in certain circumstances
+			// which leads to the core system DLL or binaries to be reported with
+			// signature unchecked level.
+			// To mitigate this situation, we have to manually check/verify the
+			// signature for all unchecked signature levels.
+			if sign == nil {
+				var err error
+				sign = &signature.Signature{Filename: filename}
+				sign.Type, sign.Level, err = sign.Check()
+				if err != nil {
+					signatureErrors.Add(1)
+				}
+				if sign.IsSigned() {
+					sign.Verify()
+				}
+				if f.IsImageCert() {
+					err := sign.ParseCertificate()
+					if err != nil {
+						certErrors.Add(1)
+					}
+				}
+				signature.GetSignatures().PutSignature(addr, sign)
+			}
+			// reset signature type/level parameters
+			_ = kevt.Kparams.SetValue(kparams.ImageSignatureType, sign.Type)
+			_ = kevt.Kparams.SetValue(kparams.ImageSignatureLevel, sign.Level)
+		}
+
+		// append certificate parameters
+		if sign.HasCertificate() {
+			kevt.AppendParam(kparams.ImageCertIssuer, kparams.UnicodeString, sign.Cert.Issuer)
+			kevt.AppendParam(kparams.ImageCertSubject, kparams.UnicodeString, sign.Cert.Subject)
+			kevt.AppendParam(kparams.ImageCertSerial, kparams.UnicodeString, sign.Cert.SerialNumber)
+			kevt.AppendParam(kparams.ImageCertNotAfter, kparams.Time, sign.Cert.NotAfter)
+			kevt.AppendParam(kparams.ImageCertNotBefore, kparams.Time, sign.Cert.NotBefore)
+		}
+	}
+
 	switch f {
 	case fields.ImageName:
 		return kevt.GetParamAsString(kparams.ImageFilename), nil
@@ -811,7 +854,7 @@ func (i *imageAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value,
 		return kevt.Kparams.GetTime(kparams.ImageCertNotAfter)
 	case fields.ImageIsDriverVulnerable, fields.ImageIsDriverMalicious:
 		if kevt.IsLoadImage() {
-			return evalLOLDrivers(f, kevt)
+			return isLOLDriver(f, kevt)
 		}
 		return false, nil
 	case fields.ImageIsDLL:
@@ -827,13 +870,16 @@ func (i *imageAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value,
 // registryAccessor extracts registry specific parameters.
 type registryAccessor struct{}
 
-func (registryAccessor) setFields(fields []fields.Field) {}
+func (registryAccessor) SetFields(fields []fields.Field) {}
+func (registryAccessor) IsFieldAccessible(kevt *kevent.Kevent) bool {
+	return kevt.Category == ktypes.Registry
+}
 
-func newRegistryAccessor() accessor {
+func newRegistryAccessor() Accessor {
 	return &registryAccessor{}
 }
 
-func (r *registryAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
+func (r *registryAccessor) Get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
 	switch f {
 	case fields.RegistryKeyName:
 		return kevt.GetParamAsString(kparams.RegKeyName), nil
@@ -844,22 +890,32 @@ func (r *registryAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Val
 	case fields.RegistryValueType:
 		return kevt.Kparams.GetString(kparams.RegValueType)
 	case fields.RegistryStatus:
-		if kevt.Category != ktypes.Registry {
-			return nil, nil
-		}
 		return kevt.GetParamAsString(kparams.NTStatus), nil
 	}
 	return nil, nil
 }
 
-// networkAccessor deals with extracting the network specific kernel event parameters.
-type networkAccessor struct{}
+// networkAccessor deals with extracting the network specific event parameters.
+type networkAccessor struct {
+	reverseDNS *network.ReverseDNS
+}
 
-func (networkAccessor) setFields(fields []fields.Field) {}
+func (n *networkAccessor) SetFields(flds []fields.Field) {
+	for _, f := range flds {
+		if f == fields.NetSIPNames || f == fields.NetDIPNames {
+			n.reverseDNS = network.GetReverseDNS(2000, time.Minute*30, time.Minute*2)
+			break
+		}
+	}
+}
 
-func newNetworkAccessor() accessor { return &networkAccessor{} }
+func (networkAccessor) IsFieldAccessible(kevt *kevent.Kevent) bool {
+	return kevt.Category == ktypes.Net
+}
 
-func (n *networkAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
+func newNetworkAccessor() Accessor { return &networkAccessor{} }
+
+func (n *networkAccessor) Get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
 	switch f {
 	case fields.NetDIP:
 		return kevt.Kparams.GetIP(kparams.NetDIP)
@@ -877,22 +933,36 @@ func (n *networkAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Valu
 		return kevt.GetParamAsString(kparams.NetL4Proto), nil
 	case fields.NetPacketSize:
 		return kevt.Kparams.GetUint32(kparams.NetSize)
-	case fields.NetSIPNames:
-		return kevt.Kparams.GetStringSlice(kparams.NetSIPNames)
 	case fields.NetDIPNames:
-		return kevt.Kparams.GetStringSlice(kparams.NetDIPNames)
+		return n.resolveNamesForIP(kevt.Kparams.MustGetIP(kparams.NetDIP))
+	case fields.NetSIPNames:
+		return n.resolveNamesForIP(kevt.Kparams.MustGetIP(kparams.NetSIP))
 	}
 	return nil, nil
+}
+
+func (n *networkAccessor) resolveNamesForIP(ip net.IP) ([]string, error) {
+	if n.reverseDNS == nil {
+		return nil, nil
+	}
+	names, err := n.reverseDNS.Add(network.AddressFromIP(ip))
+	if err != nil {
+		return nil, err
+	}
+	return names, nil
 }
 
 // handleAccessor extracts handle event values.
 type handleAccessor struct{}
 
-func (handleAccessor) setFields(fields []fields.Field) {}
+func (handleAccessor) SetFields(fields []fields.Field) {}
+func (handleAccessor) IsFieldAccessible(kevt *kevent.Kevent) bool {
+	return kevt.Category == ktypes.Handle
+}
 
-func newHandleAccessor() accessor { return &handleAccessor{} }
+func newHandleAccessor() Accessor { return &handleAccessor{} }
 
-func (h *handleAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
+func (h *handleAccessor) Get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
 	switch f {
 	case fields.HandleID:
 		return kevt.Kparams.GetUint32(kparams.HandleID)
@@ -911,8 +981,11 @@ type peAccessor struct {
 	fields []fields.Field
 }
 
-func (pa *peAccessor) setFields(fields []fields.Field) {
+func (pa *peAccessor) SetFields(fields []fields.Field) {
 	pa.fields = fields
+}
+func (peAccessor) IsFieldAccessible(kevt *kevent.Kevent) bool {
+	return kevt.PS != nil || kevt.IsLoadImage()
 }
 
 // parserOpts traverses all fields declared in the expression and
@@ -951,11 +1024,11 @@ func (pa *peAccessor) parserOpts() []pe.Option {
 // ErrPeNilCertificate indicates the PE certificate is not available
 var ErrPeNilCertificate = errors.New("pe certificate is nil")
 
-func newPEAccessor() accessor {
+func newPEAccessor() Accessor {
 	return &peAccessor{}
 }
 
-func (pa *peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
+func (pa *peAccessor) Get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
 	var p *pe.PE
 	if kevt.PS != nil && kevt.PS.PE != nil {
 		p = kevt.PS.PE
@@ -1134,13 +1207,14 @@ func (pa *peAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 // memAccessor extracts parameters from memory alloc/free events.
 type memAccessor struct{}
 
-func (memAccessor) setFields(fields []fields.Field) {}
+func (memAccessor) SetFields(fields []fields.Field)            {}
+func (memAccessor) IsFieldAccessible(kevt *kevent.Kevent) bool { return kevt.Category == ktypes.Mem }
 
-func newMemAccessor() accessor {
+func newMemAccessor() Accessor {
 	return &memAccessor{}
 }
 
-func (*memAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
+func (*memAccessor) Get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
 	switch f {
 	case fields.MemPageType:
 		return kevt.GetParamAsString(kparams.MemPageType), nil
@@ -1161,13 +1235,16 @@ func (*memAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, err
 // dnsAccessor extracts values from DNS query/response event parameters.
 type dnsAccessor struct{}
 
-func (dnsAccessor) setFields(fields []fields.Field) {}
+func (dnsAccessor) SetFields(fields []fields.Field) {}
+func (dnsAccessor) IsFieldAccessible(kevt *kevent.Kevent) bool {
+	return kevt.Type.Subcategory() == ktypes.DNS
+}
 
-func newDNSAccessor() accessor {
+func newDNSAccessor() Accessor {
 	return &dnsAccessor{}
 }
 
-func (*dnsAccessor) get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
+func (*dnsAccessor) Get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
 	switch f {
 	case fields.DNSName:
 		return kevt.GetParamAsString(kparams.DNSName), nil
@@ -1199,4 +1276,36 @@ func captureInBrackets(s string) (string, fields.Segment) {
 		return s[lbracket+1 : rbracket], fields.Segment(s[rbracket+2:])
 	}
 	return s[lbracket+1 : rbracket], ""
+}
+
+// isLOLDriver interacts with the loldrivers client to determine
+// whether the loaded/dropped driver is malicious or vulnerable.
+func isLOLDriver(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
+	filename := kevt.GetParamAsString(kparams.FileName)
+	isDriver := filepath.Ext(filename) == ".sys" || kevt.Kparams.TryGetBool(kparams.FileIsDriver)
+	if !isDriver {
+		return nil, nil
+	}
+	ok, driver := loldrivers.GetClient().MatchHash(filename)
+	if !ok {
+		return nil, nil
+	}
+	if (f == fields.FileIsDriverVulnerable || f == fields.ImageIsDriverVulnerable) && driver.IsVulnerable {
+		return true, nil
+	}
+	if (f == fields.FileIsDriverMalicious || f == fields.ImageIsDriverMalicious) && driver.IsMalicious {
+		return true, nil
+	}
+	return false, nil
+}
+
+// initLOLDriversClient initializes the loldrivers client if the filter expression
+// contains any of the relevant fields.
+func initLOLDriversClient(flds []fields.Field) {
+	for _, f := range flds {
+		if f == fields.FileIsDriverVulnerable || f == fields.FileIsDriverMalicious ||
+			f == fields.ImageIsDriverVulnerable || f == fields.ImageIsDriverMalicious {
+			loldrivers.InitClient(loldrivers.WithAsyncDownload())
+		}
+	}
 }

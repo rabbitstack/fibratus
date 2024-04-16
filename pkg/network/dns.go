@@ -64,9 +64,15 @@ type dnsNames struct {
 	expiration int64
 }
 
-// NewReverseDNS creates a new DNS reverser with the specified size and TTL period.
-func NewReverseDNS(size int, ttl, exp time.Duration) *ReverseDNS {
-	reverseDNS := &ReverseDNS{
+var r *ReverseDNS
+
+// GetReverseDNS creates a new singleton instance of DNS reverser with the specified size and TTL period.
+func GetReverseDNS(size int, ttl, exp time.Duration) *ReverseDNS {
+	if r != nil {
+		return r
+	}
+
+	r = &ReverseDNS{
 		domains:   make(map[Address]*dnsNames),
 		blacklist: make(map[Address]int),
 		size:      size,
@@ -79,14 +85,15 @@ func NewReverseDNS(size int, ttl, exp time.Duration) *ReverseDNS {
 		for {
 			select {
 			case <-tick.C:
-				reverseDNS.Expire()
-			case <-reverseDNS.close:
+				r.Expire()
+			case <-r.close:
 				tick.Stop()
 				return
 			}
 		}
 	}()
-	return reverseDNS
+
+	return r
 }
 
 // Add performs a reverse lookup for the given address, returning a list

@@ -215,6 +215,7 @@ func (s *sink) run(evts chan *kevent.Kevent) {
 		case evt := <-s.q.Events():
 			evts <- evt
 		case <-s.quit:
+			s.q.Close()
 			return
 		}
 	}

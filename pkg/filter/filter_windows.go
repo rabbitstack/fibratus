@@ -49,7 +49,7 @@ func New(expr string, config *config.Config, options ...Option) Filter {
 	for _, opt := range options {
 		opt(&opts)
 	}
-	accessors := []accessor{
+	accessors := []Accessor{
 		// general event parameters
 		newKevtAccessor(),
 		// process state and parameters
@@ -122,7 +122,7 @@ func NewFromCLIWithAllAccessors(args []string) (Filter, error) {
 	}
 	filter := &filter{
 		parser:       ql.NewParser(expr),
-		accessors:    getAccessors(),
+		accessors:    GetAccessors(),
 		fields:       make([]fields.Field, 0),
 		stringFields: make(map[fields.Field][]string),
 		boundFields:  make([]*ql.BoundFieldLiteral, 0),

@@ -65,7 +65,7 @@ type filter struct {
 	expr        ql.Expr
 	seq         *ql.Sequence
 	parser      *ql.Parser
-	accessors   []accessor
+	accessors   []Accessor
 	fields      []fields.Field
 	boundFields []*ql.BoundFieldLiteral
 	// stringFields contains filter field names mapped to their string values
@@ -205,7 +205,7 @@ func (f *filter) RunSequence(kevt *kevent.Kevent, seqID uint16, partials map[uin
 					evt = evts[n]
 				}
 				for _, accessor := range f.accessors {
-					v, err := accessor.get(field.Field(), evt)
+					v, err := accessor.Get(field.Field(), evt)
 					if err != nil && !kerrors.IsKparamNotFound(err) {
 						accessorErrors.Add(err.Error(), 1)
 						continue
@@ -298,9 +298,9 @@ func InterpolateFields(s string, evts []*kevent.Kevent) string {
 			kevt := evts[i-1]
 			// extract field value from the event and replace in string
 			var val any
-			for _, accessor := range getAccessors() {
+			for _, accessor := range GetAccessors() {
 				var err error
-				val, err = accessor.get(fields.Field(m[2]), kevt)
+				val, err = accessor.Get(fields.Field(m[2]), kevt)
 				if err != nil {
 					continue
 				}
@@ -328,7 +328,10 @@ func (f *filter) mapValuer(kevt *kevent.Kevent) map[string]interface{} {
 	valuer := make(map[string]interface{}, len(f.fields))
 	for _, field := range f.fields {
 		for _, accessor := range f.accessors {
-			v, err := accessor.get(field, kevt)
+			if !accessor.IsFieldAccessible(kevt) {
+				continue
+			}
+			v, err := accessor.Get(field, kevt)
 			if err != nil && !kerrors.IsKparamNotFound(err) {
 				accessorErrors.Add(err.Error(), 1)
 				continue

@@ -89,6 +89,11 @@ func (c *Cmdline) CleanExe() *Cmdline {
 			c.cmdline = strings.Join(append([]string{exe[4:]}, args[1:]...), " ")
 			return c
 		}
+		// remove \\?\ prefix from executable path
+		if len(exe) > 4 && exe[2] == '?' && exe[3] == '\\' {
+			c.cmdline = strings.Join(append([]string{exe[4:]}, args[1:]...), " ")
+			return c
+		}
 	}
 	return c
 }
