@@ -37,6 +37,7 @@ import (
 // maxDequeFlushPeriod specifies the maximum period
 // for the events to reside in the deque.
 var maxDequeFlushPeriod = time.Second * 30
+var flusherInterval = time.Second * 5
 
 // callstackFlushes computes overall callstack dequeue flushes
 var callstackFlushes = expvar.NewInt("callstack.flushes")
@@ -287,13 +288,19 @@ type CallstackDecorator struct {
 	mux sync.Mutex
 
 	flusher *time.Ticker
+	quit    chan struct{}
 }
 
 // NewCallstackDecorator creates a new callstack decorator
 // which receives the event queue for long-standing event
 // flushing.
 func NewCallstackDecorator(q *Queue) *CallstackDecorator {
-	c := &CallstackDecorator{q: q, deq: deque.New[*Kevent](100), flusher: time.NewTicker(time.Second * 5)}
+	c := &CallstackDecorator{
+		q:       q,
+		deq:     deque.New[*Kevent](100),
+		flusher: time.NewTicker(flusherInterval),
+		quit:    make(chan struct{}, 1),
+	}
 	go c.doFlush()
 	return c
 }
@@ -322,12 +329,21 @@ func (cd *CallstackDecorator) Pop(e *Kevent) *Kevent {
 	return evt
 }
 
+// Stop shutdowns the callstack decorator flusher.
+func (cd *CallstackDecorator) Stop() {
+	cd.quit <- struct{}{}
+}
+
 func (cd *CallstackDecorator) doFlush() {
 	for {
-		<-cd.flusher.C
-		errs := cd.flush()
-		if len(errs) > 0 {
-			log.Warnf("callstack: unable to flush queued events: %v", multierror.Wrap(errs...))
+		select {
+		case <-cd.flusher.C:
+			errs := cd.flush()
+			if len(errs) > 0 {
+				log.Warnf("callstack: unable to flush queued events: %v", multierror.Wrap(errs...))
+			}
+		case <-cd.quit:
+			return
 		}
 	}
 }

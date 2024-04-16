@@ -32,6 +32,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
+	"sync"
 	"time"
 )
 
@@ -61,7 +62,11 @@ type fsProcessor struct {
 	devPathResolver fs.DevPathResolver
 	config          *config.Config
 
-	deq *deque.Deque[*kevent.Kevent]
+	deq    *deque.Deque[*kevent.Kevent]
+	mu     sync.Mutex
+	purger *time.Ticker
+
+	quit chan struct{}
 }
 
 // FileInfo stores file information obtained from event state.
@@ -84,7 +89,7 @@ func newFsProcessor(
 	devPathResolver fs.DevPathResolver,
 	config *config.Config,
 ) Processor {
-	return &fsProcessor{
+	f := &fsProcessor{
 		files:           make(map[uint64]*FileInfo),
 		mmaps:           make(map[uint32]map[uint64]*MmapInfo),
 		irps:            make(map[uint64]*kevent.Kevent),
@@ -94,7 +99,13 @@ func newFsProcessor(
 		devPathResolver: devPathResolver,
 		config:          config,
 		deq:             deque.New[*kevent.Kevent](100),
+		purger:          time.NewTicker(time.Second * 5),
+		quit:            make(chan struct{}, 1),
 	}
+
+	go f.purge()
+
+	return f
 }
 
 func (f *fsProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error) {
@@ -106,7 +117,7 @@ func (f *fsProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, erro
 }
 
 func (*fsProcessor) Name() ProcessorType { return Fs }
-func (f *fsProcessor) Close()            {}
+func (f *fsProcessor) Close()            { f.quit <- struct{}{} }
 
 func (f *fsProcessor) getFileInfo(name string, opts uint32) *FileInfo {
 	return &FileInfo{Name: name, Type: fs.GetFileType(name, opts)}
@@ -166,6 +177,8 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 		f.irps[irp] = e
 	case ktypes.StackWalk:
 		if !kevent.IsCurrentProcDropped(e.PID) {
+			f.mu.Lock()
+			defer f.mu.Unlock()
 			f.deq.PushBack(e)
 		}
 	case ktypes.FileOpEnd:
@@ -218,18 +231,13 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 		// from the queue and the callstack parameter attached to the
 		// event.
 		if f.config.Kstream.StackEnrichment {
+			f.mu.Lock()
+			defer f.mu.Unlock()
 			i := f.deq.RIndex(func(evt *kevent.Kevent) bool { return evt.StackID() == ev.StackID() })
 			if i != -1 {
 				s := f.deq.Remove(i)
 				callstack := s.Kparams.MustGetSlice(kparams.Callstack)
 				ev.AppendParam(kparams.Callstack, kparams.Slice, callstack)
-			}
-			// evict unmatched stack traces
-			for i := 0; i < f.deq.Len(); i++ {
-				evt := f.deq.At(i)
-				if time.Since(evt.Timestamp) > time.Minute*3 {
-					f.deq.Remove(i)
-				}
 			}
 		}
 
@@ -355,4 +363,23 @@ func (f *fsProcessor) initMmap(pid uint32) {
 
 func (f *fsProcessor) removeMmap(pid uint32) {
 	delete(f.mmaps, pid)
+}
+
+func (f *fsProcessor) purge() {
+	for {
+		select {
+		case <-f.purger.C:
+			f.mu.Lock()
+			// evict unmatched stack traces
+			for i := 0; i < f.deq.Len(); i++ {
+				evt := f.deq.At(i)
+				if time.Since(evt.Timestamp) > time.Second*30 {
+					f.deq.Remove(i)
+				}
+			}
+			f.mu.Unlock()
+		case <-f.quit:
+			return
+		}
+	}
 }

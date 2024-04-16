@@ -50,6 +50,8 @@ func TestLookupAddrBlacklisted(t *testing.T) {
 }
 
 func TestLookupAddrExpiration(t *testing.T) {
+	r = nil // request a fresh reverse DNS
+
 	reverseDNS := GetReverseDNS(100, time.Millisecond*5, time.Minute)
 
 	names, err := reverseDNS.Add(AddressFromIP(net.ParseIP("8.8.8.8")))
@@ -68,6 +70,8 @@ func TestLookupAddrExpiration(t *testing.T) {
 }
 
 func TestLookupAddrTickerExpiration(t *testing.T) {
+	r = nil // request a fresh reverse DNS
+
 	reverseDNS := GetReverseDNS(100, time.Millisecond*50, time.Millisecond*80)
 
 	names, err := reverseDNS.Add(AddressFromIP(net.ParseIP("8.8.8.8")))

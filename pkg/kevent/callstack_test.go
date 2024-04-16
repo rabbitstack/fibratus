@@ -24,7 +24,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
 )
@@ -128,12 +127,14 @@ func TestCallstackDecorator(t *testing.T) {
 
 func init() {
 	maxDequeFlushPeriod = time.Second * 2
+	flusherInterval = time.Second
 }
 
 func TestCallstackDecoratorFlush(t *testing.T) {
 	q := NewQueue(50, false, true)
 	q.RegisterListener(&DummyListener{})
 	cd := NewCallstackDecorator(q)
+	defer cd.Stop()
 
 	e := &Kevent{
 		Type:      ktypes.CreateFile,
@@ -154,9 +155,7 @@ func TestCallstackDecoratorFlush(t *testing.T) {
 
 	cd.Push(e)
 	assert.True(t, cd.deq.Len() == 1)
-	time.Sleep(time.Millisecond * 4100)
-
-	require.Len(t, cd.Flush(), 0)
+	time.Sleep(time.Millisecond * 3100)
 
 	evt := <-q.Events()
 	assert.True(t, cd.deq.Len() == 0)
