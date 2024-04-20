@@ -100,3 +100,42 @@
           (file.is_exec or file.is_dll)
         )
       min-engine-version: 2.2.0
+    - name: Macro execution via script interpreters
+      description: |
+        Identifies the execution of the Windows scripting interpreter spawning
+        a Microsoft Office process to execute suspicious Visual Basic macro.
+      condition: >
+        sequence
+        maxspan 5m
+          |spawn_process
+              and
+           ps.parent.name iin script_interpreters
+              and
+           ps.child.name iin msoffice_binaries
+          | by ps.child.uuid
+          |ps.name iin msoffice_binaries
+              and
+           thread.callstack.modules imatches '*vbe?.dll'
+              and
+           (
+              spawn_process
+                  or
+              (create_remote_thread)
+                  or
+              (modify_registry)
+                  or
+              (create_file)
+                  or
+              (
+                load_module
+                    and
+                    not
+                image.name imatches
+                    (
+                      '?:\\Program Files\\*',
+                      '?:\\Program Files (x86)\\*'
+                    )
+              )
+           )
+          | by ps.uuid
+      min-engine-version: 2.2.0
