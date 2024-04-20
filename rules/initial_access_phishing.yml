@@ -45,3 +45,25 @@
            ps.name iin msoffice_binaries
           | by image.name
       min-engine-version: 2.0.0
+    - name: Executable file creation from a macro-enabled Microsoft Office document
+      description: |
+        Identifies the Microsoft Office process writing an executable file type and
+        the call stack reveals the file creation was originated from the Microsoft
+        Visual Basic for Applications module. This may be an indicator of initial
+        access using malicious macro-enabled documents.
+      condition: >
+        create_file
+            and
+        ps.name in msoffice_binaries
+            and
+        thread.callstack.modules imatches 'vbe?.dll'
+            and
+        (
+          file.extension iin ('.vbs', '.js', '.jar', '.exe', '.dll', '.com',
+                              '.ps1', '.hta', '.cmd', '.vbe', '.rar.', '.zip',
+                              '.iso', '.img', '.wsh', '.bat', '.cpl', '.7z'
+                              )
+              or
+          (file.is_exec or file.is_dll)
+        )
+      min-engine-version: 2.2.0
