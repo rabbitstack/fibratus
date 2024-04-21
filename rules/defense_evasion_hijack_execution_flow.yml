@@ -1,0 +1,54 @@
+- group: DLL Side-Loading
+  description: |
+    Adversaries may execute their own malicious payloads by side-loading DLLs.
+    Similar to DLL Search Order Hijacking, side-loading involves hijacking which
+    DLL a program loads. But rather than just planting the DLL within the search
+    order of a program then waiting for the victim application to be invoked,
+    adversaries may directly side-load their payloads by planting then invoking
+    a legitimate application that executes their payload(s).
+
+    Side-loading takes advantage of the DLL search order used by the loader by positioning
+    both the victim application and malicious payload(s) alongside each other. Adversaries
+    likely use side-loading as a means of masking actions they perform under a legitimate,
+    trusted, and potentially elevated system or software process. Benign executables used
+    to side-load payloads may not be flagged during delivery and/or execution. Adversary
+    payloads may also be encrypted/packed or otherwise obfuscated until loaded into the
+    memory of the trusted process.
+  labels:
+    tactic.id: TA0005
+    tactic.name: Defense Evasion
+    tactic.ref: https://attack.mitre.org/tactics/TA0005/
+    technique.id: T1574
+    technique.name: Hijack Execution Flow
+    technique.ref: https://attack.mitre.org/techniques/T1574/
+    subtechnique.id: T1574.002
+    subtechnique.name: DLL Side-Loading
+    subtechnique.ref: https://attack.mitre.org/techniques/T1574/002/
+  rules:
+    - name: DLL Side-Loading via a copied binary
+      description: |
+        Identifies when a binary is copied to a directory and shortly followed
+        by the loading of an unsigned DLL from the same directory. Adversaries may
+        opt for moving legitimate signed binaries to a random directory and use them
+        to side-load a malicious library.
+      condition: >
+        sequence
+        maxspan 8m
+          |create_file
+              and
+           file.is_exec
+              and
+              not
+           ps.sid in ('S-1-5-18', 'S-1-5-19', 'S-1-5-20')
+              and
+           thread.callstack.symbols imatches ('*CopyFile*', '*MoveFile*')
+          | by file.name
+          |(load_dll)
+              and
+           dir(image.name) ~= dir(ps.exe)
+              and
+           pe.cert.subject icontains 'Microsoft' and pe.is_trusted
+              and
+           (image.signature.type = 'NONE' or image.signature.level = 'UNCHECKED' or image.signature.level = 'UNSIGNED')
+          | by ps.exe
+      min-engine-version: 2.2.0
