@@ -194,7 +194,7 @@
     the minidump signature.
 
 - macro: msoffice_binaries
-  list: [EXCEL.EXE, WINWORD.EXE, MSACCESS.EXE, POWERPNT.EXE]
+  list: [EXCEL.EXE, WINWORD.EXE, MSACCESS.EXE, POWERPNT.EXE, visio.exe, mspub.exe, fltldr.exe]
 
 - macro: web_browser_binaries
   list: [

@@ -45,6 +45,39 @@
            ps.name iin msoffice_binaries
           | by image.name
       min-engine-version: 2.0.0
+    - name: Process spawned from macro-enabled Microsoft Office document
+      description: |
+        Identifies the execution of the child process spawned by Microsoft
+        Office parent process where the call stack contains the Visual Basic
+        for Applications modules or suspicious symbols. This is a strong
+        indicative of the presence of a weaponized macro-enabled document.
+      condition: >
+        spawn_process
+            and
+        ps.parent.name iin msoffice_binaries
+            and
+        (
+          thread.callstack.modules imatches '*vbe?.dll'
+              or
+          thread.callstack.symbols imatches
+              (
+                '*!xlAutoOpen*',
+                '*!wlAutoOpen*',
+                '*!wdAutoOpen*',
+                'kernel32.dll!WinExec*',
+                'shell32.dll!ShellExecute*'
+              )
+        )
+            and
+            not
+        ps.child.exe imatches
+            (
+              '?:\\Windows\\explorer.exe',
+              '?:\\Windows\\hh.exe',
+              '?:\\Windows\\System32\\spool\\drivers\\*',
+              '?:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
+            )
+      min-engine-version: 2.2.0
     - name: Executable file creation from a macro-enabled Microsoft Office document
       description: |
         Identifies the Microsoft Office process writing an executable file type and
