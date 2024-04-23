@@ -104,3 +104,47 @@
       action:
       - name: kill
       min-engine-version: 2.0.0
+
+- group: Process Injection
+  description: |
+    Adversaries may inject code into processes in order to evade process-based defenses as well
+    as possibly elevate privileges. Process injection is a method of executing arbitrary code in
+    the address space of a separate live process. Running code in the context of another process
+    may allow access to the process's memory, system/network resources, and possibly elevated privileges.
+
+    Execution via process injection may also evade detection from security products since the execution is
+    masked under a legitimate process.
+
+    There are many different ways to inject code into a process, many of which abuse legitimate functionalities.
+    These implementations exist for every major OS but are typically platform specific.
+    More sophisticated samples may perform multiple process injections to segment modules and further evade
+    detection, utilizing named pipes or other inter-process communication (IPC) mechanisms as a communication
+    channel.
+  labels:
+    tactic.id: TA0005
+    tactic.name: Defense Evasion
+    tactic.ref: https://attack.mitre.org/tactics/TA0005/
+    technique.id: T1055
+    technique.name: Process Injection
+    technique.ref: https://attack.mitre.org/techniques/T1055/
+  rules:
+    - name: Process spawned via remote thread
+      description: |
+        Identifies the creation of a process with the parent call stack not
+        revealing normal API functions for process creation. This is a potential
+        sign of process injection.
+      condition: >
+        spawn_process
+            and
+        thread.callstack.symbols imatches
+            (
+              'ntdll.dll!ZwCreateThreadEx*',
+              'ntdll.dll!NtCreateThreadEx*',
+              'ntdll.dll!RtlCreateUserThread'
+            )
+            and
+            not
+        thread.callstack.symbols imatches ('*CreateProcess*', '*CreateUserProcess*')
+      action:
+      - name: kill
+      min-engine-version: 2.2.0
