@@ -148,3 +148,53 @@
       action:
       - name: kill
       min-engine-version: 2.2.0
+    - name: Potential process injection via tainted memory section
+      description: |
+        Identifies potential process injection when the adversary creates and maps a memory
+        section with RW protection rights followed by mapping of the same memory section in
+        the remote process with RX protection.
+        By definition, the mapped view in the target process mirrors the content of the local
+        process' address space. The attacker can poison the local section memory with shellcode
+        and execute it in the context of the remote process.
+      condition: >
+        sequence
+        maxspan 1m
+          |map_view_of_section and file.view.protection = 'READWRITE' and kevt.pid != 4 and file.view.size >= 4096| as e1
+          |map_view_of_section and file.view.protection = 'READONLY|EXECUTE' and file.key = $e1.file.key and kevt.pid != $e1.kevt.pid|
+      action:
+      - name: kill
+      min-engine-version: 2.2.0
+
+- group: Dynamic-link Library Injection
+  description: |
+    Adversaries may inject dynamic-link libraries (DLLs) into processes in order to evade process-based defenses
+    as well as possibly elevate privileges. DLL injection is a method of executing arbitrary code in the address
+    space of a separate live process.
+
+    DLL injection is commonly performed by writing the path to a DLL in the virtual address space of the target
+    process before loading the DLL by invoking a new thread. The write can be performed with native Windows API
+    calls such as VirtualAllocEx and WriteProcessMemory, then invoked with CreateRemoteThread, which calls the
+    LoadLibrary API responsible for loading the DLL.
+  labels:
+    tactic.id: TA0005
+    tactic.name: Defense Evasion
+    tactic.ref: https://attack.mitre.org/tactics/TA0005/
+    technique.id: T1055
+    technique.name: Process Injection
+    technique.ref: https://attack.mitre.org/techniques/T1055/
+    subtechnique.id: T1055.001
+    subtechnique.name: Dynamic-link Library Injection
+    subtechnique.ref: https://attack.mitre.org/techniques/T1055/001/
+  rules:
+    - name: Suspicious DLL loaded via memory section mapping
+      description: |
+        Identifies the mapping of a memory section with RX protection followed by unsigned DLL loading.
+      condition: >
+        sequence
+        maxspan 2m
+        by ps.uuid
+          |map_view_of_section and file.view.protection = 'READONLY|EXECUTE' and kevt.pid != 4 and file.view.size >= 4096|
+          |(load_unsigned_or_untrusted_dll)|
+      action:
+      - name: kill
+      min-engine-version: 2.2.0
