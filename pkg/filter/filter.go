@@ -205,6 +205,9 @@ func (f *filter) RunSequence(kevt *kevent.Kevent, seqID uint16, partials map[uin
 					evt = evts[n]
 				}
 				for _, accessor := range f.accessors {
+					if !accessor.IsFieldAccessible(evt) {
+						continue
+					}
 					v, err := accessor.Get(field.Field(), evt)
 					if err != nil && !kerrors.IsKparamNotFound(err) {
 						accessorErrors.Add(err.Error(), 1)
