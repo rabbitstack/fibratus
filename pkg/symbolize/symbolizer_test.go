@@ -248,7 +248,7 @@ func TestProcessCallstackPeExports(t *testing.T) {
 	assert.Equal(t, "ntdll.dll!RtlSetSearchPathMode", e.Callstack.Symbols()[1])
 	assert.Equal(t, "ntdll.dll!RtlCreateQueryDebugBuffer", e.Callstack.Symbols()[2])
 	assert.Equal(t, "user32.dll!LoadKeyboardLayoutW", e.Callstack.Symbols()[3])
-	assert.Equal(t, "kernel32.dll!CreateProcessW", e.Callstack.Symbols()[4])
+	assert.Equal(t, "kernel32.dll!?", e.Callstack.Symbols()[4]) // unexported symbol
 
 	assert.Equal(t, "kernel32.dll|user32.dll|ntdll.dll|unbacked", e.Callstack.Summary())
 	assert.True(t, e.Callstack.ContainsUnbacked())
@@ -258,7 +258,7 @@ func TestProcessCallstackPeExports(t *testing.T) {
 
 	// should have populated the symbols cache
 	assert.Len(t, s.symbols, 1)
-	assert.Equal(t, "C:\\Windows\\System32\\kernel32.dll!CreateProcessW", s.symbols[e.PID][0x7ffb5c1d0396])
+	assert.Equal(t, "unbacked!?", s.symbols[e.PID][0x2638e59e0a5])
 
 	// image load event should add module exports
 	// and when the image is unloaded and there are
@@ -435,4 +435,68 @@ func TestProcessCallstackProcsTTL(t *testing.T) {
 	// evicted
 	r.AssertNumberOfCalls(t, "Cleanup", 1)
 	assert.Equal(t, 0, s.procsSize())
+}
+
+func TestSymbolFromRVA(t *testing.T) {
+	var tests = []struct {
+		rva            va.Address
+		exports        map[uint32]string
+		expectedSymbol string
+	}{
+		{va.Address(317949), map[uint32]string{
+			9824:   "SHCreateScopeItemFromShellItem",
+			23248:  "SHCreateScopeItemFromIDList",
+			165392: "DllGetClassObject",
+			186368: "SHCreateSearchIDListFromAutoList",
+			238048: "DllCanUnloadNow",
+			240112: "IsShellItemInSearchIndex",
+			240304: "IsMSSearchEnabled",
+			272336: "SHSaveBinaryAutoListToStream",
+			310672: "DllMain",
+			317920: "",
+			320864: "",
+			434000: "SHCreateAutoList",
+			434016: "SHCreateAutoListWithID",
+			555040: "CreateDefaultProviderResolver",
+			571136: "GetGatherAdmin",
+			572592: "SEARCH_RemoteLocationsCscStateCache_IsRemoteLocationInCsc"},
+			"?",
+		},
+		{va.Address(434011), map[uint32]string{
+			9824:   "SHCreateScopeItemFromShellItem",
+			23248:  "SHCreateScopeItemFromIDList",
+			165392: "DllGetClassObject",
+			186368: "SHCreateSearchIDListFromAutoList",
+			238048: "DllCanUnloadNow",
+			240112: "IsShellItemInSearchIndex",
+			240304: "IsMSSearchEnabled",
+			272336: "SHSaveBinaryAutoListToStream",
+			310672: "DllMain",
+			317920: "",
+			320864: "",
+			434000: "SHCreateAutoList",
+			434016: "SHCreateAutoListWithID",
+			555040: "CreateDefaultProviderResolver",
+			571136: "GetGatherAdmin",
+			572592: "SEARCH_RemoteLocationsCscStateCache_IsRemoteLocationInCsc"},
+			"SHCreateAutoList",
+		},
+		{va.Address(4532), map[uint32]string{
+			9824:   "SHCreateScopeItemFromShellItem",
+			23248:  "SHCreateScopeItemFromIDList",
+			165392: "DllGetClassObject",
+			186368: "SHCreateSearchIDListFromAutoList",
+			238048: "DllCanUnloadNow",
+			240112: "IsShellItemInSearchIndex",
+			240304: "IsMSSearchEnabled",
+			572592: "SEARCH_RemoteLocationsCscStateCache_IsRemoteLocationInCsc"},
+			"",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.expectedSymbol, func(t *testing.T) {
+			assert.Equal(t, tt.expectedSymbol, symbolFromRVA(tt.rva, tt.exports))
+		})
+	}
 }

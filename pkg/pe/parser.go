@@ -23,6 +23,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"expvar"
+	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/format"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
@@ -329,10 +330,12 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 
 	// add exports
 	for _, exp := range pe.Export.Functions {
-		if exp.Forwarder != "" {
+		if exp.Name != "" {
+			p.Exports[exp.FunctionRVA] = exp.Name
+		} else if exp.Forwarder != "" {
 			p.Exports[exp.ForwarderRVA] = exp.Forwarder
 		} else {
-			p.Exports[exp.FunctionRVA] = exp.Name
+			p.Exports[exp.FunctionRVA] = fmt.Sprintf("Ordinal%d", exp.Ordinal)
 		}
 	}
 
