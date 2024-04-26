@@ -28,10 +28,12 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/sys"
+	"github.com/rabbitstack/fibratus/pkg/util/convert"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -91,12 +93,21 @@ func (p *process) keepalive() {
 }
 
 type module struct {
-	exports  map[uint32]string
-	accessed time.Time
+	exports                    map[uint32]string
+	accessed                   time.Time
+	minExportRVA, maxExportRVA uint32
+	hasExports                 bool
 }
 
 func (m *module) keepalive() {
 	m.accessed = time.Now()
+}
+
+func (m *module) isUnexported(rva va.Address) bool {
+	if m.minExportRVA == 0 || m.maxExportRVA == 0 {
+		return false
+	}
+	return rva.Uint64() < uint64(m.minExportRVA) || rva.Uint64() > uint64(m.maxExportRVA)
 }
 
 // Symbolizer is responsible for converting raw addresses
@@ -257,10 +268,17 @@ func (s *Symbolizer) syncModules(e *kevent.Kevent) error {
 	}
 	px, err := parsePeFile(filename, pe.WithSections(), pe.WithExports())
 	if err != nil {
-		return fmt.Errorf("unable to parse PE for [%s] module: %v", filename, err)
+		return fmt.Errorf("unable to parse PE exports for module [%s]: %v", filename, err)
 	}
 	symModulesCount.Add(1)
-	s.mods[addr] = &module{exports: px.Exports, accessed: time.Now()}
+	m := &module{exports: px.Exports, accessed: time.Now(), hasExports: true}
+	exportRVAs := convert.MapKeysToSlice(m.exports)
+	if len(exportRVAs) > 0 {
+		m.minExportRVA, m.maxExportRVA = slices.Min(exportRVAs), slices.Max(exportRVAs)
+	} else {
+		m.hasExports = false
+	}
+	s.mods[addr] = m
 	return nil
 }
 
@@ -371,10 +389,17 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *kevent.Kevent, fast, looku
 			m, ok := s.mods[mod.BaseAddress]
 			if !ok {
 				// parse export directory to resolve symbols
-				m = &module{exports: make(map[uint32]string), accessed: time.Now()}
+				m = &module{exports: make(map[uint32]string), accessed: time.Now(), hasExports: true}
 				px, err := parsePeFile(mod.Name, pe.WithSections(), pe.WithExports())
-				if err == nil {
+				if err != nil {
+					m.hasExports = false
+				} else {
 					m.exports = px.Exports
+					m.hasExports = len(m.exports) > 0
+					exportRVAs := convert.MapKeysToSlice(m.exports)
+					if m.hasExports {
+						m.minExportRVA, m.maxExportRVA = slices.Min(exportRVAs), slices.Max(exportRVAs)
+					}
 				}
 				symModulesCount.Add(1)
 				s.mods[mod.BaseAddress] = m
@@ -383,6 +408,15 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *kevent.Kevent, fast, looku
 			frame.Symbol = symbolFromRVA(rva, m.exports)
 			// permit unknown symbols for executable modules
 			if frame.Symbol == "" && strings.EqualFold(filepath.Ext(mod.Name), ".exe") {
+				frame.Symbol = "?"
+			}
+			// empirical observations revealed that if the syscall
+			// is performed within the DLL unexported symbol, its RVA
+			// is not in the range of exported symbols RVAs. Mark the
+			// symbol as unknown. Likewise, if the module doesn't export
+			// any symbols, don't try resolving symbol information with
+			// Debug Help API
+			if frame.Symbol == "" && (m.isUnexported(rva) || !m.hasExports) {
 				frame.Symbol = "?"
 			}
 			// keep to module alive from purger
@@ -479,7 +513,11 @@ func symbolFromRVA(rva va.Address, exports map[uint32]string) string {
 		}
 	}
 	if exp != 0 {
-		return exports[exp]
+		sym, ok := exports[exp]
+		if ok && sym == "" {
+			return "?"
+		}
+		return sym
 	}
 	return ""
 }
