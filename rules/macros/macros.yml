@@ -4,6 +4,9 @@
 - macro: open_process
   expr: kevt.name = 'OpenProcess' and ps.access.status = 'Success'
 
+- macro: open_thread
+  expr: kevt.name = 'OpenThread' and thread.access.status = 'Success'
+
 - macro: write_file
   expr: kevt.name = 'WriteFile'
 
