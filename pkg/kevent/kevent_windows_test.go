@@ -97,11 +97,11 @@ func TestPartialKey(t *testing.T) {
 	}{
 		{
 			&Kevent{Type: ktypes.OpenProcess, PID: 1234, Kparams: Kparams{kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1221)}, kparams.DesiredAccess: {Name: kparams.DesiredAccess, Type: kparams.Uint32, Value: uint32(5)}}},
-			0x60c8c701773d1a5e,
+			0x99c,
 		},
 		{
-			&Kevent{Type: ktypes.OpenThread, PID: 11234, Kparams: Kparams{kparams.ThreadID: {Name: kparams.ThreadID, Type: kparams.TID, Value: uint32(8452)}}},
-			0x5467b0da1d106495,
+			&Kevent{Type: ktypes.OpenThread, PID: 11234, Kparams: Kparams{kparams.ThreadID: {Name: kparams.ThreadID, Type: kparams.TID, Value: uint32(8452)}, kparams.DesiredAccess: {Name: kparams.DesiredAccess, Type: kparams.Uint32, Value: uint32(15)}}},
+			0x4cf5,
 		},
 		{
 			&Kevent{Type: ktypes.CreateFile, PID: 4321, Kparams: Kparams{kparams.FileName: {Name: kparams.FileName, Type: kparams.FileDosPath, Value: "C:\\Windows\\System32\\kernelbase.dll"}}},

@@ -316,17 +316,9 @@ func (e *Kevent) RundownKey() uint64 {
 func (e *Kevent) PartialKey() uint64 {
 	switch e.Type {
 	case ktypes.WriteFile, ktypes.ReadFile:
-		b := make([]byte, 12)
-		object, _ := e.Kparams.GetUint64(kparams.FileObject)
-		binary.LittleEndian.PutUint32(b, e.PID)
-		binary.LittleEndian.PutUint64(b, object)
-		return hashers.FnvUint64(b)
+		return e.Kparams.MustGetUint64(kparams.FileObject) + uint64(e.PID)
 	case ktypes.MapViewFile, ktypes.UnmapViewFile:
-		b := make([]byte, 12)
-		viewAddr, _ := e.Kparams.GetUint64(kparams.FileViewBase)
-		binary.LittleEndian.PutUint32(b, e.PID)
-		binary.LittleEndian.PutUint64(b, viewAddr)
-		return hashers.FnvUint64(b)
+		return e.Kparams.MustGetUint64(kparams.FileViewBase) + uint64(e.PID)
 	case ktypes.CreateFile:
 		file, _ := e.Kparams.GetString(kparams.FileName)
 		b := make([]byte, 4+len(file))
@@ -334,21 +326,13 @@ func (e *Kevent) PartialKey() uint64 {
 		b = append(b, []byte(file)...)
 		return hashers.FnvUint64(b)
 	case ktypes.OpenProcess:
-		b := make([]byte, 12)
-		pid, _ := e.Kparams.GetUint32(kparams.ProcessID)
-		access, _ := e.Kparams.GetUint32(kparams.DesiredAccess)
-		binary.LittleEndian.PutUint32(b, e.PID)
-		binary.LittleEndian.PutUint32(b, pid)
-		binary.LittleEndian.PutUint32(b, access)
-		return hashers.FnvUint64(b)
+		pid := e.Kparams.MustGetUint32(kparams.ProcessID)
+		access := e.Kparams.MustGetUint32(kparams.DesiredAccess)
+		return uint64(pid + access + e.PID)
 	case ktypes.OpenThread:
-		b := make([]byte, 12)
-		tid, _ := e.Kparams.GetUint32(kparams.ThreadID)
-		access, _ := e.Kparams.GetUint32(kparams.DesiredAccess)
-		binary.LittleEndian.PutUint32(b, e.PID)
-		binary.LittleEndian.PutUint32(b, tid)
-		binary.LittleEndian.PutUint32(b, access)
-		return hashers.FnvUint64(b)
+		tid := e.Kparams.MustGetUint32(kparams.ThreadID)
+		access := e.Kparams.MustGetUint32(kparams.DesiredAccess)
+		return uint64(tid + access + e.PID)
 	case ktypes.AcceptTCPv4, ktypes.RecvTCPv4, ktypes.RecvUDPv4:
 		b := make([]byte, 10)
 		ip, _ := e.Kparams.GetIP(kparams.NetSIP)
@@ -392,19 +376,11 @@ func (e *Kevent) PartialKey() uint64 {
 		b = append(b, key...)
 		return hashers.FnvUint64(b)
 	case ktypes.VirtualAlloc, ktypes.VirtualFree:
-		b := make([]byte, 12)
-		addr, _ := e.Kparams.GetUint64(kparams.MemBaseAddress)
-		binary.LittleEndian.PutUint32(b, e.PID)
-		binary.LittleEndian.PutUint64(b, addr)
-		return hashers.FnvUint64(b)
+		return e.Kparams.MustGetUint64(kparams.MemBaseAddress) + uint64(e.PID)
 	case ktypes.DuplicateHandle:
-		b := make([]byte, 16)
-		pid, _ := e.Kparams.GetUint32(kparams.ProcessID)
-		object, _ := e.Kparams.GetUint64(kparams.HandleObject)
-		binary.LittleEndian.PutUint32(b, e.PID)
-		binary.LittleEndian.PutUint32(b, pid)
-		binary.LittleEndian.PutUint64(b, object)
-		return hashers.FnvUint64(b)
+		pid := e.Kparams.MustGetUint32(kparams.ProcessID)
+		object := e.Kparams.MustGetUint64(kparams.HandleObject)
+		return object + uint64(pid+e.PID)
 	case ktypes.QueryDNS, ktypes.ReplyDNS:
 		n, _ := e.Kparams.GetString(kparams.DNSName)
 		b := make([]byte, 4+len(n))
