@@ -321,8 +321,9 @@ func TestExpireSequences(t *testing.T) {
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
 		},
 		Kparams: kevent.Kparams{
-			kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(4143)},
-			kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.AnsiString, Value: "powershell.exe"},
+			kparams.ProcessID:     {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(4143)},
+			kparams.DesiredAccess: {Name: kparams.DesiredAccess, Type: kparams.Uint32, Value: uint32(5)},
+			kparams.ProcessName:   {Name: kparams.ProcessName, Type: kparams.AnsiString, Value: "powershell.exe"},
 		},
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
@@ -762,7 +763,8 @@ func TestSequenceOutOfOrder(t *testing.T) {
 			Exe:  "C:\\Windows\\system32\\svchost-temp.exe",
 		},
 		Kparams: kevent.Kparams{
-			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
+			kparams.ProcessID:     {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
+			kparams.DesiredAccess: {Name: kparams.DesiredAccess, Type: kparams.Uint32, Value: uint32(5)},
 		},
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
@@ -817,7 +819,8 @@ func TestGCSequence(t *testing.T) {
 			Exe:  "C:\\Windows\\system32\\svchost-temp.exe",
 		},
 		Kparams: kevent.Kparams{
-			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
+			kparams.ProcessID:     {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
+			kparams.DesiredAccess: {Name: kparams.DesiredAccess, Type: kparams.Uint32, Value: uint32(5)},
 		},
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
