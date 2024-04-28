@@ -364,6 +364,8 @@ const (
 	FileViewSize Field = "file.view.size"
 	// FileViewType represents the type of the mapped view section
 	FileViewType Field = "file.view.type"
+	// FileViewProtection represents the protection attributes of the section view
+	FileViewProtection Field = "file.view.protection"
 	// FileIsDriverVulnerable represents the field that denotes whether the created file is a vulnerable driver
 	FileIsDriverVulnerable Field = "file.is_driver_vulnerable"
 	// FileIsDriverMalicious represents the field that denotes whether the created file is a malicious driver
@@ -374,6 +376,10 @@ const (
 	FileIsDriver Field = "file.is_driver"
 	// FileIsExecutable indicates if the created file is an executable
 	FileIsExecutable Field = "file.is_exec"
+	// FilePID represents the field that denotes the process id performing file operations
+	FilePID Field = "file.pid"
+	// FileKey represents the field that uniquely identifies the file object.
+	FileKey Field = "file.key"
 
 	// RegistryKeyName represents the registry key name
 	RegistryKeyName Field = "registry.key.name"
@@ -705,11 +711,14 @@ var fields = map[Field]FieldInfo{
 	FileViewBase:           {FileViewBase, "view base address", kparams.Address, []string{"file.view.base = '25d42170000'"}, nil},
 	FileViewSize:           {FileViewSize, "size of the mapped view", kparams.Uint64, []string{"file.view.size > 1024"}, nil},
 	FileViewType:           {FileViewType, "type of the mapped view section", kparams.Enum, []string{"file.view.type = 'IMAGE'"}, nil},
+	FileViewProtection:     {FileViewProtection, "protection rights of the section view", kparams.AnsiString, []string{"file.view.protection = 'READONLY'"}, nil},
 	FileIsDriverMalicious:  {FileIsDriverMalicious, "indicates if the dropped driver is malicious", kparams.Bool, []string{"file.is_driver_malicious"}, nil},
 	FileIsDriverVulnerable: {FileIsDriverVulnerable, "indicates if the dropped driver is vulnerable", kparams.Bool, []string{"file.is_driver_vulnerable"}, nil},
 	FileIsDLL:              {FileIsDLL, "indicates if the created file is a DLL", kparams.Bool, []string{"file.is_dll'"}, nil},
 	FileIsDriver:           {FileIsDriver, "indicates if the created file is a driver", kparams.Bool, []string{"file.is_driver'"}, nil},
 	FileIsExecutable:       {FileIsExecutable, "indicates if the created file is an executable", kparams.Bool, []string{"file.is_exec'"}, nil},
+	FilePID:                {FilePID, "denotes the process id performing file operation", kparams.PID, []string{"file.pid = 4"}, nil},
+	FileKey:                {FileKey, "uniquely identifies the file object", kparams.Uint64, []string{"file.key = 12446738026482168384"}, nil},
 
 	RegistryKeyName:   {RegistryKeyName, "fully qualified key name", kparams.UnicodeString, []string{"registry.key.name contains 'HKEY_LOCAL_MACHINE'"}, nil},
 	RegistryKeyHandle: {RegistryKeyHandle, "registry key object address", kparams.Address, []string{"registry.key.handle = 'FFFFB905D60C2268'"}, nil},

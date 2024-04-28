@@ -731,6 +731,8 @@ func (l *fileAccessor) Get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, 
 		return kevt.Kparams.GetUint64(kparams.FileViewSize)
 	case fields.FileViewType:
 		return kevt.GetParamAsString(kparams.FileViewSectionType), nil
+	case fields.FileViewProtection:
+		return kevt.GetParamAsString(kparams.MemProtect), nil
 	case fields.FileIsDriverVulnerable, fields.FileIsDriverMalicious:
 		if kevt.IsCreateDisposition() && kevt.IsSuccess() {
 			return isLOLDriver(f, kevt)
@@ -742,6 +744,10 @@ func (l *fileAccessor) Get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, 
 		return kevt.Kparams.GetBool(kparams.FileIsDriver)
 	case fields.FileIsExecutable:
 		return kevt.Kparams.GetBool(kparams.FileIsExecutable)
+	case fields.FilePID:
+		return kevt.Kparams.GetPid()
+	case fields.FileKey:
+		return kevt.Kparams.GetUint64(kparams.FileKey)
 	}
 	return nil, nil
 }

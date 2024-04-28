@@ -65,7 +65,7 @@
   expr: kevt.name = 'UnmapViewFile'
 
 - macro: map_view_of_section
-  expr: map_view_file and file.view.type in ('IMAGE', 'IMAGE_NO_EXECUTE')
+  expr: map_view_file and file.view.type in ('IMAGE', 'IMAGE_NO_EXECUTE', 'PAGEFILE')
 
 - macro: unmap_view_of_section
   expr: unmap_view_file and file.view.type in ('IMAGE', 'IMAGE_NO_EXECUTE')
@@ -113,17 +113,13 @@
 - macro: unload_driver
   expr: unload_image and (image.name iendswith '.sys' or image.is_driver)
 
-- macro: load_unsigned_module
-  expr: >
-    load_module and image.signature.type = 'NONE'
-  description: |
-    Detects when unsigned executable or DLL is loaded into process address space.
-    The module is considered as unsigned if it lacks the cert in the PE security
-    directory or the Authenticode hash is not present in any of the catalogs.
-
 - macro: load_executable
   expr: >
     load_module and (image.name iendswith '.exe' or image.is_exec)
+
+- macro: load_dll
+  expr: >
+    load_module and (image.name iendswith '.dll' or image.is_dll)
 
 - macro: load_untrusted_executable
   expr: >
@@ -132,6 +128,28 @@
     (image.signature.level = 'UNCHECKED' or image.signature.level = 'UNSIGNED')
   description:
     Detects when untrusted executable is loaded into process address space.
+
+- macro: load_untrusted_dll
+  expr: >
+    load_dll
+      and
+    (image.signature.level = 'UNCHECKED' or image.signature.level = 'UNSIGNED')
+  description:
+    Detects when untrusted DLL is loaded into process address space.
+
+- macro: load_unsigned_module
+  expr: >
+    load_module and image.signature.type = 'NONE'
+  description: |
+    Detects when unsigned executable or DLL is loaded into process address space.
+    The module is considered as unsigned if it lacks the cert in the PE security
+    directory or the Authenticode hash is not present in any of the catalogs.
+
+- macro: load_unsigned_dll
+  expr: >
+    load_dll and image.signature.type = 'NONE'
+  description: |
+    Detects when unsigned executable DLL is loaded into process address space.
 
 - macro: load_untrusted_module
   expr: >
@@ -148,6 +166,11 @@
   expr: (load_unsigned_module) or (load_untrusted_module)
   description: >
     Detects when either unsigned or untrusted module is loaded into process address space.
+
+- macro: load_unsigned_or_untrusted_dll
+  expr: (load_unsigned_dll) or (load_untrusted_dll)
+  description: >
+    Detects when either unsigned or untrusted DLL is loaded into process address space.
 
 - macro: write_minidump_file
   expr: >
