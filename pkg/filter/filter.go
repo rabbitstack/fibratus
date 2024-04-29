@@ -26,6 +26,9 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/filter/ql"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/util/bytes"
+	"github.com/rabbitstack/fibratus/pkg/util/hashers"
+	"net"
 	"regexp"
 	"strconv"
 	"strings"
@@ -192,11 +195,12 @@ func (f *filter) RunSequence(kevt *kevent.Kevent, seqID uint16, partials map[uin
 		}
 		// process until partials from all slots are consumed
 		n := 0
+		hash := make([]byte, 0)
 		for nslots > 0 {
 			nslots--
+			var evt *kevent.Kevent
 			for _, field := range expr.BoundFields {
 				evts := p[field.Alias()]
-				var evt *kevent.Kevent
 				if n > len(evts)-1 {
 					// pick the latest event if all
 					// events for this slot are consumed
@@ -215,6 +219,32 @@ func (f *filter) RunSequence(kevt *kevent.Kevent, seqID uint16, partials map[uin
 					}
 					if v != nil {
 						valuer[field.String()] = v
+						switch val := v.(type) {
+						case uint8:
+							hash = append(hash, val)
+						case uint16:
+							hash = append(hash, bytes.WriteUint16(val)...)
+						case uint32:
+							hash = append(hash, bytes.WriteUint32(val)...)
+						case uint64:
+							hash = append(hash, bytes.WriteUint64(val)...)
+						case int8:
+							hash = append(hash, byte(val))
+						case int16:
+							hash = append(hash, bytes.WriteUint16(uint16(val))...)
+						case int32:
+							hash = append(hash, bytes.WriteUint32(uint32(val))...)
+						case int64:
+							hash = append(hash, bytes.WriteUint64(uint64(val))...)
+						case int:
+							hash = append(hash, bytes.WriteUint64(uint64(val))...)
+						case uint:
+							hash = append(hash, bytes.WriteUint64(uint64(val))...)
+						case string:
+							hash = append(hash, val...)
+						case net.IP:
+							hash = append(hash, val...)
+						}
 						break
 					}
 				}
@@ -222,6 +252,9 @@ func (f *filter) RunSequence(kevt *kevent.Kevent, seqID uint16, partials map[uin
 			n++
 			match = ql.Eval(expr.Expr, valuer, f.hasFunctions)
 			if match {
+				// compute sequence key hash to tie the events
+				evt.AddMeta(kevent.RuleSequenceByKey, hashers.FnvUint64(hash))
+				kevt.AddMeta(kevent.RuleSequenceByKey, hashers.FnvUint64(hash))
 				break
 			}
 		}
