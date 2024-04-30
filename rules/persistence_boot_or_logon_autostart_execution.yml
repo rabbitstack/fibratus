@@ -163,3 +163,36 @@
       action:
       - name: kill
       min-engine-version: 2.0.0
+
+- group: Boot or Logon Autostart Execution
+  description: |
+    Adversaries may configure system settings to automatically execute a
+    program during system boot or logon to maintain persistence or gain
+    higher-level privileges on compromised systems. Operating systems may
+    have mechanisms for automatically running a program on system boot or
+    account logon. These mechanisms may include automatically executing
+    programs that are placed in specially designated directories or are
+    referenced by repositories that store configuration information, such
+    as the Windows Registry.
+    An adversary may achieve the same goal by modifying or extending features
+    of the kernel.
+    Since some boot or logon autostart programs run with higher privileges,
+    an adversary may leverage these to elevate privileges.
+  labels:
+    tactic.id: TA0006
+    tactic.name: Persistence
+    tactic.ref: https://attack.mitre.org/tactics/TA0006/
+    technique.id: T1547
+    technique.name: Boot or Logon Autostart Execution
+    technique.ref: https://attack.mitre.org/techniques/T1547/
+  rules:
+    - name: RID Hijacking
+      description: |
+        RID (Relative ID part of security identifier) hijacking allows an attacker with SYSTEM
+        level privileges to covertly replace the RID of a low privileged account effectively making
+        the low privileged account assume Administrator privileges on the next logon.
+      condition: >
+        set_value and registry.key.name imatches 'HKEY_LOCAL_MACHINE\\SAM\\SAM\\Domains\\Account\\Users\\*\\F'
+          and
+        ps.sid in ('S-1-5-18', 'S-1-5-19', 'S-1-5-20')
+      min-engine-version: 2.0.0
