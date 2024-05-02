@@ -387,6 +387,7 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *kevent.Kevent, fast, looku
 		if mod != nil {
 			frame.Module = mod.Name
 			m, ok := s.mods[mod.BaseAddress]
+			peOK := false
 			if !ok {
 				// parse export directory to resolve symbols
 				m = &module{exports: make(map[uint32]string), accessed: time.Now(), hasExports: true}
@@ -394,6 +395,7 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *kevent.Kevent, fast, looku
 				if err != nil {
 					m.hasExports = false
 				} else {
+					peOK = true
 					m.exports = px.Exports
 					m.hasExports = len(m.exports) > 0
 					exportRVAs := convert.MapKeysToSlice(m.exports)
@@ -416,7 +418,7 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *kevent.Kevent, fast, looku
 			// symbol as unknown. Likewise, if the module doesn't export
 			// any symbols, don't try resolving symbol information with
 			// Debug Help API
-			if frame.Symbol == "" && (m.isUnexported(rva) || !m.hasExports) {
+			if frame.Symbol == "" && (m.isUnexported(rva) || (!m.hasExports && peOK)) {
 				frame.Symbol = "?"
 			}
 			// keep to module alive from purger
