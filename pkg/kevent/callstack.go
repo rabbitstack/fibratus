@@ -145,6 +145,9 @@ func (s Callstack) Summary() string {
 	var removeSep bool
 	for i := range s {
 		frame := s[len(s)-i-1]
+		if frame.Addr.InSystemRange() {
+			continue
+		}
 		var n string
 		if frame.IsUnbacked() {
 			n = unbacked
