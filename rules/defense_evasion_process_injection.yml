@@ -221,6 +221,13 @@
       action:
       - name: kill
       min-engine-version: 2.2.0
+    - name: Thread context set from unbacked memory
+      description: |
+        Identifies manipulation of the thread context from unbacked memory region. This may be
+        indicative of process injection.
+      condition: >
+        set_thread_context and thread.callstack.summary imatches ('ntdll.dll|kernelbase.dll|unbacked')
+      min-engine-version: 2.2.0
 
 - group: Dynamic-link Library Injection
   description: |
