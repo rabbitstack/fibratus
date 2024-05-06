@@ -326,7 +326,7 @@ func TestThreadFilter(t *testing.T) {
 		{`thread.ustack.limit = '525f000'`, true},
 		{`thread.kstack.base = 'ffffc307810d6000'`, true},
 		{`thread.kstack.limit = 'ffffc307810cf000'`, true},
-		{`thread.callstack.summary = 'FLTMGR.SYS|KERNELBASE.dll|KERNEL32.DLL|java.dll|unbacked'`, true},
+		{`thread.callstack.summary = 'KERNELBASE.dll|KERNEL32.DLL|java.dll|unbacked'`, true},
 		{`thread.callstack.detail icontains 'C:\\WINDOWS\\System32\\KERNELBASE.dll!CreateProcessW+0x66'`, true},
 		{`thread.callstack.modules in ('C:\\WINDOWS\\System32\\KERNELBASE.dll', 'C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll')`, true},
 		{`thread.callstack.symbols imatches ('KERNELBASE.dll!CreateProcess*', 'Java_java_lang_ProcessImpl_create')`, true},
