@@ -139,3 +139,21 @@
            )
           | by ps.uuid
       min-engine-version: 2.2.0
+    - name: Suspicious Microsoft Office embedded object
+      description: |
+        Identifies Microsoft Office processes dropping a file with suspicious
+        extension and with the call stack indicating operations to save or load
+        the file from an embedded OLE object.
+      condition: >
+        create_file
+            and
+        ps.name iin msoffice_binaries
+            and
+        thread.callstack.symbols imatches ('*!OleSaveStream*', '*!OleLoad*', '*!OleCreate*')
+            and
+        (
+          file.extension iin ('.exe', '.dll', '.js', '.vbs', '.vbe', '.jse', '.url', '.chm', '.bat', '.mht', '.hta', '.search-ms')
+              or
+          (file.is_exec or file.is_dll)
+        )
+      min-engine-version: 2.2.0
