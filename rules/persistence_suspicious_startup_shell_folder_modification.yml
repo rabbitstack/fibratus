@@ -1,0 +1,29 @@
+name: Suspicious Startup shell folder modification
+description: |
+  Detects when adversaries attempt to modify the default Startup
+  folder path to to circumvent runtime rules that hunt for file
+  creations in the default Startup folder.
+labels:
+  tactic.id: TA0006
+  tactic.name: Persistence
+  tactic.ref: https://attack.mitre.org/tactics/TA0006/
+  technique.id: T1547
+  technique.name: Boot or Logon Autostart Execution
+  technique.ref: https://attack.mitre.org/techniques/T1547/
+  subtechnique.id: T1547.001
+  subtechnique.name: Registry Run Keys / Startup Folder
+  subtechnique.ref: https://attack.mitre.org/techniques/T1547/001/
+
+condition: >
+  modify_registry
+    and
+  registry.key.name imatches startup_shell_folder_registry_keys
+    and
+    not
+  (
+    registry.value imatches startup_locations
+      or
+    registry.value imatches ('%ProgramData%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup')
+  )
+
+min-engine-version: 2.0.0

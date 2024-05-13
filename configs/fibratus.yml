@@ -111,7 +111,7 @@ filament:
 
 # =============================== Filters ===============================================
 
-# Contains the definition of detection rules. Rules are contained within rule group files.
+# Contains the definition of detection rules. Rules are contained within rule YAML files.
 # Rule definitions can reside in the local file system or also can be served over HTTP/S.
 # For local file system rule paths, it is possible to use the glob expression to load the
 # rules from different directory locations.

@@ -1,0 +1,31 @@
+name: Unsigned DLL injection via remote thread
+description: |
+  Identifies unsigned DLL injection via remote thread creation.
+  Adversaries may inject dynamic-link libraries (DLLs) into processes in order to evade process-based defenses
+  as well as possibly elevate privileges. DLL injection is a method of executing arbitrary code in the address
+  space of a separate live process.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1055
+  technique.name: Process Injection
+  technique.ref: https://attack.mitre.org/techniques/T1055/
+  subtechnique.id: T1055.001
+  subtechnique.name: Dynamic-link Library Injection
+  subtechnique.ref: https://attack.mitre.org/techniques/T1055/001/
+
+condition: >
+  sequence
+  maxspan 1m
+    |create_remote_thread| by thread.pid
+    |(load_unsigned_or_untrusted_dll)
+      and
+      not
+     file.name imatches
+      (
+        '?:\\Program Files\\Git\\mingw64\\bin\\*.dll'
+      )
+    | by ps.pid
+
+min-engine-version: 2.0.0

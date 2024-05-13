@@ -1,0 +1,29 @@
+name: Execution via Microsoft Office process
+description:
+  Identifies the execution of the file dropped by Microsoft Office process.
+labels:
+  tactic.id: TA0001
+  tactic.name: Initial Access
+  tactic.ref: https://attack.mitre.org/tactics/TA0001/
+  technique.id: T1566
+  technique.name: Phishing
+  technique.ref: https://attack.mitre.org/techniques/T1566/
+  subtechnique.id: T1566.001
+  subtechnique.name: Spearphishing Attachment
+  subtechnique.ref: https://attack.mitre.org/techniques/T1566/001/
+
+condition: >
+  sequence
+  maxspan 1h
+    |create_file
+      and
+     (file.extension iin executable_extensions or file.is_exec)
+      and
+     ps.name iin msoffice_binaries
+    | by file.name
+    |spawn_process
+      and
+     ps.name iin msoffice_binaries
+    | by ps.child.exe
+
+min-engine-version: 2.0.0

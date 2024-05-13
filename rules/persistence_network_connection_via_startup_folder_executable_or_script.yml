@@ -1,0 +1,40 @@
+name: Network connection via startup folder executable or script
+description: |
+  Identifies the execution of unsigned binary or script from the
+  Startup folder followed by network inbound or outbound connection.
+labels:
+  tactic.id: TA0006
+  tactic.name: Persistence
+  tactic.ref: https://attack.mitre.org/tactics/TA0006/
+  technique.id: T1547
+  technique.name: Boot or Logon Autostart Execution
+  technique.ref: https://attack.mitre.org/techniques/T1547/
+  subtechnique.id: T1547.001
+  subtechnique.name: Registry Run Keys / Startup Folder
+  subtechnique.ref: https://attack.mitre.org/techniques/T1547/001/
+
+condition: >
+  sequence
+  maxspan 5m
+  by ps.uuid
+    |
+      (
+        load_untrusted_executable
+          and
+        image.name imatches startup_locations
+      )
+        or
+      (
+        load_executable
+          and
+        ps.name in script_interpreters
+          and
+        ps.cmdline imatches startup_locations
+      )
+    |
+    |((inbound_network) or (outbound_network))
+      and
+     ps.cmdline imatches startup_locations
+    |
+
+min-engine-version: 2.0.0

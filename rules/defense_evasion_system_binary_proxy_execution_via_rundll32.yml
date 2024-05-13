@@ -1,0 +1,65 @@
+name: System Binary Proxy Execution via Rundll32
+description: |
+  Detects the execution of rundll32.exe process with suspicious command line
+  followed by the creation of a possibly malicious child process.
+  Adversaries may abuse rundll32.exe to proxy execution of malicious code.
+  Using rundll32.exe, vice executing directly may avoid triggering security
+  tools that may not monitor execution of the rundll32.exe process because of
+  allowlists or false positives from normal operations.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1218
+  technique.name: System Binary Proxy Execution
+  technique.ref: https://attack.mitre.org/techniques/T1218/
+  subtechnique.id: T1218.011
+  subtechnique.name: Rundll32
+  subtechnique.ref: https://attack.mitre.org/techniques/T1218/011/
+
+condition: >
+  sequence
+  maxspan 1m
+    |spawn_process
+      and
+     (ps.child.name ~= 'rundll32.exe' or pe.ps.child.file.name ~= 'rundll32.exe')
+      and
+     (
+      ps.child.cmdline imatches
+        (
+          '*javascript:*',
+          '*vbscript:*',
+          '*shell32.dll*ShellExec_RunDLL*',
+          '*shell32*WaitForExplorerRestart*',
+          '*-sta*',
+          '*ActiveXObject*',
+          '*WScript.Shell*',
+          '*RunHTMLApplication*',
+          '*advpack*#12*',
+          '*advpack*RegisterOCX*',
+          '*advpack*LaunchINFSection*',
+          '*url.dll*FileProtocolHandler*file://*',
+          '*url.dll*FileProtocolHandler*.exe*',
+          '*zipfldr*RouteTheCall*',
+          '*pcwutl*LaunchApplication*',
+          '*pcwutl*#1*',
+          '*desk*InstallScreenSaver*',
+          '*PointFunctionCall*'
+        )
+        or
+      regex(ps.child.cmdline, '(?i)[A-Z]:\\\\.+:.+$')
+     )
+    | by ps.child.uuid
+    |spawn_process
+      and
+      not
+     ps.child.exe imatches
+      (
+        '?:\\Program Files\\*.exe',
+        '?:\\Program Files (x86)\\*.exe'
+      )
+    | by ps.uuid
+action:
+  - name: kill
+
+min-engine-version: 2.0.0

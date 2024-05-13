@@ -1,0 +1,19 @@
+name: RID Hijacking
+description: |
+  RID (Relative ID part of security identifier) hijacking allows an attacker with SYSTEM
+  level privileges to covertly replace the RID of a low privileged account effectively making
+  the low privileged account assume Administrator privileges on the next logon.
+labels:
+  tactic.id: TA0006
+  tactic.name: Persistence
+  tactic.ref: https://attack.mitre.org/tactics/TA0006/
+  technique.id: T1547
+  technique.name: Boot or Logon Autostart Execution
+  technique.ref: https://attack.mitre.org/techniques/T1547/
+
+condition: >
+  set_value and registry.key.name imatches 'HKEY_LOCAL_MACHINE\\SAM\\SAM\\Domains\\Account\\Users\\*\\F'
+    and
+  ps.sid in ('S-1-5-18', 'S-1-5-19', 'S-1-5-20')
+
+min-engine-version: 2.0.0

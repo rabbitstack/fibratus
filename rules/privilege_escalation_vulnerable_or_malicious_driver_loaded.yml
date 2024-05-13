@@ -1,0 +1,22 @@
+name: Vulnerable or malicious driver loaded
+description: |
+  Detects when adversaries load a vulnerable/malicious driver
+  into the compromised system to exploit the vulnerability and
+  execute code in kernel mode to bypass security controls.
+labels:
+  tactic.id: TA0004
+  tactic.name: Privilege Escalation
+  tactic.ref: https://attack.mitre.org/tactics/TA0004/
+  technique.id: T1068
+  technique.name: Exploitation for Privilege Escalation
+  technique.ref: https://attack.mitre.org/techniques/T1068/
+
+condition: >
+  (load_driver)
+    and
+  (image.is_driver_vulnerable or image.is_driver_malicious)
+
+output: >
+  Vulnerable or malicious %image.name driver loaded
+
+min-engine-version: 2.0.0

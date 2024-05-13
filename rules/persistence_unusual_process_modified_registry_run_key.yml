@@ -1,0 +1,47 @@
+name: Unusual process modified registry run key
+description: |
+  Identifies an attempt by unusual Windows native processes to modify
+  the run key and gain persistence on users logons or machine reboots.
+labels:
+  tactic.id: TA0006
+  tactic.name: Persistence
+  tactic.ref: https://attack.mitre.org/tactics/TA0006/
+  technique.id: T1547
+  technique.name: Boot or Logon Autostart Execution
+  technique.ref: https://attack.mitre.org/techniques/T1547/
+  subtechnique.id: T1547.001
+  subtechnique.name: Registry Run Keys / Startup Folder
+  subtechnique.ref: https://attack.mitre.org/techniques/T1547/001/
+
+condition: >
+  modify_registry
+    and
+  ps.exe imatches '?:\\Windows\\*'
+    and
+  registry.key.name imatches registry_run_keys
+    and
+    not
+  ps.exe imatches
+    (
+      '?:\\Windows\\System32\\svchost.exe',
+      '?:\\Windows\\SysWOW64\\msiexec.exe',
+      '?:\\Windows\\System32\\msiexec.exe',
+      '?:\\Windows\\System32\\drvinst.exe',
+      '?:\\Windows\\System32\\WinSAT.exe',
+      '?:\\Windows\\System32\\reg.exe',
+      '?:\\Windows\\regedit.exe',
+      '?:\\Windows\\SysWOW64\\reg.exe',
+      '?:\\Windows\\System32\\csrss.exe',
+      '?:\\Windows\\SysWOW64\\DriverStore\\*.exe',
+      '?:\\Windows\\System32\\DriverStore\\*.exe',
+      '?:\\Windows\\Installer\\*.exe',
+      '?:\\Windows\\explorer.exe',
+      '?:\\Windows\\IMECache\\*.exe',
+      '?:\\Windows\\System32\\sihost.exe',
+      '?:\\Windows\\SysWOW64\\prevhost.exe',
+      '?:\\Windows\\System32\\conhost.exe',
+      '?:\\Windows\\System32\\taskhostw.exe',
+      '?:\\Windows\\System32\\backgroundTaskHost.exe'
+    )
+
+min-engine-version: 2.0.0

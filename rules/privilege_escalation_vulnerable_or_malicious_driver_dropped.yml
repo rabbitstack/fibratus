@@ -1,0 +1,22 @@
+name: Vulnerable or malicious driver dropped
+description: |
+  Detects when adversaries drop a vulnerable/malicious driver
+  onto a compromised system as a preparation for vulnerability
+  exploitation that leads to code execution in kernel mode.
+labels:
+  tactic.id: TA0004
+  tactic.name: Privilege Escalation
+  tactic.ref: https://attack.mitre.org/tactics/TA0004/
+  technique.id: T1068
+  technique.name: Exploitation for Privilege Escalation
+  technique.ref: https://attack.mitre.org/techniques/T1068/
+
+condition: >
+  create_file
+    and
+  (file.is_driver_vulnerable or file.is_driver_malicious)
+
+output: >
+  Vulnerable or malicious %file.name driver dropped
+
+min-engine-version: 2.0.0
