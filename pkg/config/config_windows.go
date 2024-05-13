@@ -118,7 +118,7 @@ type Config struct {
 	// Alertsenders stores alert sender configurations
 	Alertsenders []alertsender.Config
 
-	// Filters contains filter group definitions
+	// Filters contains filter/rule definitions
 	Filters *Filters `json:"filters" yaml:"filters"`
 
 	flags *pflag.FlagSet
@@ -241,12 +241,12 @@ func (c Config) GetConfigFile() string {
 	return c.viper.GetString(configFile)
 }
 
-// GetRuleGroups returns all rule groups loaded into the engine.
-func (c Config) GetRuleGroups() []FilterGroup {
+// GetFilters returns all rule filters loaded into the engine.
+func (c Config) GetFilters() []*FilterConfig {
 	if c.Filters == nil {
 		return nil
 	}
-	return c.Filters.groups
+	return c.Filters.filters
 }
 
 // MustViperize adds the flag set to the Cobra command and binds them within the Viper flags.

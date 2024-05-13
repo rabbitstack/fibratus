@@ -1,0 +1,3 @@
+name: suspicious network {{ upper "activity" }}
+condition: kevt.category = 'net' and ps.name in ('at.exe', 'java.exe')
+min-engine-version: 2.0.0

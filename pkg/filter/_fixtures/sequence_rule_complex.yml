@@ -1,21 +1,18 @@
-- group: Phishing dropper outbound communication
-  enabled: true
-  rules:
-    - name: Phishing dropper outbound communication
-      condition: >
-        sequence
-        maxspan 1h
-        |kevt.name = 'CreateProcess' and ps.sibling.name
-            in
-        ('firefox.exe', 'chrome.exe', 'edge.exe')
-        | by ps.sibling.pid
+name: Phishing dropper outbound communication
+condition: >
+  sequence
+  maxspan 1h
+  |kevt.name = 'CreateProcess' and ps.sibling.name
+      in
+  ('firefox.exe', 'chrome.exe', 'edge.exe')
+  | by ps.sibling.pid
 
-        |kevt.name = 'CreateFile' and file.operation = 'CREATE'
-            and
-        file.extension = '.exe'
-        | by ps.pid
-        |
-          kevt.name in ('Send', 'Connect')
-        | by ps.pid
-      output: "%2.ps.name process initiated outbound communication to %3.net.dip"
-      min-engine-version: 2.0.0
+  |kevt.name = 'CreateFile' and file.operation = 'CREATE'
+      and
+  file.extension = '.exe'
+  | by ps.pid
+  |
+    kevt.name in ('Send', 'Connect')
+  | by ps.pid
+output: "%2.ps.name process initiated outbound communication to %3.net.dip"
+min-engine-version: 2.0.0

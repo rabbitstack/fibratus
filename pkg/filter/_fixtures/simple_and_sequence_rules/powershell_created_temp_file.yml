@@ -1,10 +1,10 @@
-name: Command shell created a temp file
+name: Powershell created a temp file
 condition: >
   sequence
   maxspan 100ms
-  |kevt.name = 'CreateProcess' and ps.name = 'cmd.exe'| by ps.exe
+  |kevt.name = 'CreateProcess' and ps.name = 'powershell.exe'| by ps.pid
   |kevt.name = 'CreateFile'
       and
    file.name icontains 'temp'
-  | by file.name
+  | by ps.pid
 min-engine-version: 2.0.0

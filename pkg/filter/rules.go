@@ -31,9 +31,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/atomic"
 	"github.com/rabbitstack/fibratus/pkg/util/hashers"
 	"github.com/rabbitstack/fibratus/pkg/util/version"
-	"net"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -49,17 +47,16 @@ const (
 )
 
 var (
-	filterMatches     = expvar.NewMap("filter.matches")
-	filterGroupsCount = expvar.NewInt("filter.groups.count")
-	filtersCount      = expvar.NewInt("filter.filters.count")
+	filterMatches = expvar.NewMap("filter.matches")
+	filtersCount  = expvar.NewInt("filter.filters.count")
 
 	matchTransitionErrors = expvar.NewInt("sequence.match.transition.errors")
 	partialsPerSequence   = expvar.NewMap("sequence.partials.count")
 	partialExpirations    = expvar.NewMap("sequence.partial.expirations")
 	partialBreaches       = expvar.NewMap("sequence.partial.breaches")
 
-	ErrInvalidFilter = func(rule, group string, err error) error {
-		return fmt.Errorf("syntax error in rule %q located in %q group: \n%v", rule, group, err)
+	ErrInvalidFilter = func(rule string, err error) error {
+		return fmt.Errorf("syntax error in rule %q: \n%v", rule, err)
 	}
 	ErrRuleAction = func(rule string, err error) error {
 		return fmt.Errorf("fail to execute action for %q rule: %v", rule, err)
@@ -81,7 +78,7 @@ var (
 
 var (
 	// sequenceTerminalState represents the final state in the FSM.
-	// This state is transitioned when the last rule in the group
+	// This state is transitioned when the last rule in the sequence
 	// produces a match
 	sequenceTerminalState = fsm.State("terminal")
 	// sequenceDeadlineState represents the state to which other
@@ -98,17 +95,15 @@ var (
 	expireTransition = fsm.Trigger("expire")
 )
 
-// Rules stores the compiled filter groups
+// Rules stores the compiled filter exprs
 // and for each incoming event, it applies
-// the corresponding filtering policies to
-// the event, dropping the event or passing
-// it accordingly. If the filter rule has
-// an action, the former is executed when the
-// rule fires.
+// the corresponding filter to the event.
+// If the filter rule has an action, the
+// former is executed when the rule fires.
 type Rules struct {
-	groups map[uint32]filterGroups
-	config *config.Config
-	psnap  ps.Snapshotter
+	filters map[uint32][]*compiledFilter
+	config  *config.Config
+	psnap   ps.Snapshotter
 
 	matches   []*ruleMatch
 	sequences []*sequenceState
@@ -118,11 +113,6 @@ type Rules struct {
 
 type ruleMatch struct {
 	ctx *config.ActionContext
-}
-
-type filterGroup struct {
-	group   config.FilterGroup
-	filters []*compiledFilter
 }
 
 type compiledFilter struct {
@@ -345,63 +335,6 @@ func (s *sequenceState) clearLocked() {
 	s.clear()
 }
 
-func compareSeqJoin(s1, s2 any) bool {
-	if s1 == nil || s2 == nil {
-		return false
-	}
-	switch v := s1.(type) {
-	case string:
-		s, ok := s2.(string)
-		if !ok {
-			return false
-		}
-		return strings.EqualFold(v, s)
-	case uint8:
-		n, ok := s2.(uint8)
-		if !ok {
-			return false
-		}
-		return v == n
-	case uint16:
-		n, ok := s2.(uint16)
-		if !ok {
-			return false
-		}
-		return v == n
-	case uint32:
-		n, ok := s2.(uint32)
-		if !ok {
-			return false
-		}
-		return v == n
-	case uint64:
-		n, ok := s2.(uint64)
-		if !ok {
-			return false
-		}
-		return v == n
-	case int:
-		n, ok := s2.(int)
-		if !ok {
-			return false
-		}
-		return v == n
-	case uint:
-		n, ok := s2.(uint)
-		if !ok {
-			return false
-		}
-		return v == n
-	case net.IP:
-		ip, ok := s2.(net.IP)
-		if !ok {
-			return false
-		}
-		return v.Equal(ip)
-	}
-	return false
-}
-
 // next determines whether the next rule in the
 // sequence should be evaluated. The rule is evaluated
 // if all its upstream sequence rules produced a match and
@@ -509,10 +442,6 @@ func (s *sequenceState) expire(e *kevent.Kevent) bool {
 	return false
 }
 
-func newFilterGroup(g config.FilterGroup, filters []*compiledFilter) *filterGroup {
-	return &filterGroup{group: g, filters: filters}
-}
-
 func newCompiledFilter(f Filter, filterConfig *config.FilterConfig, ss *sequenceState) *compiledFilter {
 	return &compiledFilter{config: filterConfig, filter: f, ss: ss}
 }
@@ -540,23 +469,10 @@ func (f compiledFilter) run(kevt *kevent.Kevent, i int, rawMatch, lock bool) boo
 	return f.filter.Run(kevt)
 }
 
-type filterGroups []*filterGroup
-
-func (r *Rules) isGroupMapped(scopeHash, groupHash uint32) bool {
-	for h, groups := range r.groups {
-		for _, g := range groups {
-			if h == scopeHash && g.group.Hash() == groupHash {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 // NewRules produces a fresh rules engine instance.
 func NewRules(psnap ps.Snapshotter, config *config.Config) *Rules {
 	rules := &Rules{
-		groups:    make(map[uint32]filterGroups),
+		filters:   make(map[uint32][]*compiledFilter),
 		matches:   make([]*ruleMatch, 0),
 		sequences: make([]*sequenceState, 0),
 		psnap:     psnap,
@@ -569,102 +485,85 @@ func NewRules(psnap ps.Snapshotter, config *config.Config) *Rules {
 	return rules
 }
 
-// Compile loads macros and rule groups from all
-// indicated resources and creates the rules for
-// each filter group. It also sets up the state
-// machine transitions for sequence rules.
+// Compile loads macros and rules from all
+// indicated resources and compiles the filters.
+// It also sets up the state machine transitions
+// for sequence rules.
 func (r *Rules) Compile() (*config.RulesCompileResult, error) {
 	if err := r.config.Filters.LoadMacros(); err != nil {
 		return nil, err
 	}
-	if err := r.config.Filters.LoadGroups(); err != nil {
+	if err := r.config.Filters.LoadFilters(); err != nil {
 		return nil, err
 	}
-	for _, group := range r.config.GetRuleGroups() {
-		if group.IsDisabled() {
-			log.Warnf("rule group [%s] disabled", group.Name)
+
+	for _, f := range r.config.GetFilters() {
+		if f.IsDisabled() {
+			log.Warnf("[%s] rule is disabled", f.Name)
 			continue
 		}
 
-		filterGroupsCount.Add(1)
-		filters := make([]*compiledFilter, 0, len(group.Rules))
+		filtersCount.Add(1)
 
-		// compile filters and populate the groups. Additionally, for
-		// sequence rules we have to configure the FSM states and
-		// transitions
-		for _, rule := range group.Rules {
-			fltr := New(rule.Condition, r.config, WithPSnapshotter(r.psnap))
-			err := fltr.Compile()
+		// compile filter and for sequence rules
+		// configure the FSM states and transitions
+		fltr := New(f.Condition, r.config, WithPSnapshotter(r.psnap))
+		err := fltr.Compile()
+		if err != nil {
+			return nil, ErrInvalidFilter(f.Name, err)
+		}
+		// check version requirements
+		if !version.IsDev() {
+			minEngineVer, err := semver.NewSemver(f.MinEngineVersion)
 			if err != nil {
-				return nil, ErrInvalidFilter(rule.Name, group.Name, err)
+				return nil, ErrMalformedMinEngineVer(f.Name, f.MinEngineVersion, err)
 			}
-			// check version requirements
-			if !version.IsDev() {
-				minEngineVer, err := semver.NewSemver(rule.MinEngineVersion)
-				if err != nil {
-					return nil, ErrMalformedMinEngineVer(rule.Name, rule.MinEngineVersion, err)
-				}
-				if minEngineVer.GreaterThan(version.Sem()) {
-					return nil, ErrIncompatibleFilter(rule.Name, rule.MinEngineVersion)
-				}
+			if minEngineVer.GreaterThan(version.Sem()) {
+				return nil, ErrIncompatibleFilter(f.Name, f.MinEngineVersion)
 			}
-			for _, field := range fltr.GetFields() {
-				deprecated, d := fields.IsDeprecated(field)
-				if deprecated {
-					log.Warnf("%s rule uses the [%s] field which "+
-						"was deprecated starting from version %s. "+
-						"Please consider migrating to %s field(s) "+
-						"because [%s] will be removed in future versions.",
-						rule.Name, field, d.Since, d.Fields, field)
-				}
+		}
+		for _, field := range fltr.GetFields() {
+			deprecated, d := fields.IsDeprecated(field)
+			if deprecated {
+				log.Warnf("%s rule uses the [%s] field which "+
+					"was deprecated starting from version %s. "+
+					"Please consider migrating to %s field(s) "+
+					"because [%s] will be removed in future versions.",
+					f.Name, field, d.Since, d.Fields, field)
 			}
-			filtersCount.Add(1)
-			f := newCompiledFilter(fltr, rule, configureFSM(rule, fltr))
-			if fltr.IsSequence() && f.ss != nil {
-				// store the sequences in rules
-				// for more convenient tracking
-				r.sequences = append(r.sequences, f.ss)
-			}
-			filters = append(filters, f)
+		}
+		cf := newCompiledFilter(fltr, f, configureFSM(f, fltr))
+		if fltr.IsSequence() && cf.ss != nil {
+			// store the sequences in rules
+			// for more convenient tracking
+			r.sequences = append(r.sequences, cf.ss)
 		}
 
-		g := newFilterGroup(group, filters)
-		log.Infof("loaded rule group [%s]. "+
-			"Number of rules: [%d]",
-			group.Name,
-			len(filters))
-
-		// traverse all filters in the groups and determine
+		// traverse all event name or category fields and determine
 		// the event type from the filter field name expression.
-		// We end up with a map of rule groups indexed by event name
-		// or event category hash which is used to collect all groups
-		// for the inbound event
-		for _, f := range filters {
-			if !f.isScoped() {
-				log.Warnf("%q rule in %q group doesn't have "+
-					"event type or event category condition! "+
-					"This may lead to rule being discarded by "+
-					"the engine. Please consider narrowing the "+
-					"scope of this rule by including the `kevt.name` "+
-					"or `kevt.category` condition",
-					f.config.Name, g.group.Name)
-				continue
-			}
-			for name, values := range f.filter.GetStringFields() {
-				for _, v := range values {
-					if name == fields.KevtName || name == fields.KevtCategory {
-						hash := hashers.FnvUint32([]byte(v))
-						if r.isGroupMapped(hash, g.group.Hash()) {
-							continue
-						}
-						r.groups[hash] = append(r.groups[hash], g)
-					}
+		// We end up with a map of rules indexed by event name
+		// or event category hash
+		if !cf.isScoped() {
+			log.Warnf("%q rule doesn't have "+
+				"event type or event category condition! "+
+				"This rule is being discarded by "+
+				"the engine. Please consider narrowing the "+
+				"scope of this rule by including the `kevt.name` "+
+				"or `kevt.category` condition",
+				f.Name)
+			continue
+		}
+		for name, values := range fltr.GetStringFields() {
+			for _, v := range values {
+				if name == fields.KevtName || name == fields.KevtCategory {
+					hash := hashers.FnvUint32([]byte(v))
+					r.filters[hash] = append(r.filters[hash], cf)
 				}
 			}
 		}
 	}
 
-	if len(r.groups) == 0 {
+	if len(r.filters) == 0 {
 		return nil, nil
 	}
 
@@ -723,80 +622,79 @@ func (r *Rules) buildCompileResult() *config.RulesCompileResult {
 	m := make(map[ktypes.Ktype]bool)
 	events := make([]ktypes.Ktype, 0)
 
-	for _, fg := range r.groups {
-		for _, g := range fg { // filter groups
-			for _, f := range g.filters { // filters
-				rs.NumberRules++
-				for name, values := range f.filter.GetStringFields() { // filter fields
-					for _, v := range values {
-						if name == fields.KevtName || name == fields.KevtCategory {
-							types := ktypes.KeventNameToKtypes(v)
-							for _, typ := range types {
-								switch typ.Category() {
-								case ktypes.Process:
-									rs.HasProcEvents = true
-								case ktypes.Thread:
-									rs.HasThreadEvents = true
-								case ktypes.Image:
-									rs.HasImageEvents = true
-								case ktypes.File:
-									rs.HasFileEvents = true
-								case ktypes.Net:
-									rs.HasNetworkEvents = true
-								case ktypes.Registry:
-									rs.HasRegistryEvents = true
-								case ktypes.Mem:
-									rs.HasMemEvents = true
-								case ktypes.Handle:
-									rs.HasHandleEvents = true
-								}
-								if typ == ktypes.MapViewFile || typ == ktypes.UnmapViewFile {
-									rs.HasVAMapEvents = true
-								}
-								if typ == ktypes.OpenProcess || typ == ktypes.OpenThread || typ == ktypes.SetThreadContext {
-									rs.HasAuditAPIEvents = true
-								}
-								if typ.Subcategory() == ktypes.DNS {
-									rs.HasDNSEvents = true
-								}
-								if m[typ] {
-									continue
-								}
-								events = append(events, typ)
-								m[typ] = true
+	for _, fltrs := range r.filters {
+		for _, cf := range fltrs {
+			rs.NumberRules++
+			for name, values := range cf.filter.GetStringFields() {
+				for _, v := range values {
+					if name == fields.KevtName || name == fields.KevtCategory {
+						types := ktypes.KeventNameToKtypes(v)
+						for _, typ := range types {
+							switch typ.Category() {
+							case ktypes.Process:
+								rs.HasProcEvents = true
+							case ktypes.Thread:
+								rs.HasThreadEvents = true
+							case ktypes.Image:
+								rs.HasImageEvents = true
+							case ktypes.File:
+								rs.HasFileEvents = true
+							case ktypes.Net:
+								rs.HasNetworkEvents = true
+							case ktypes.Registry:
+								rs.HasRegistryEvents = true
+							case ktypes.Mem:
+								rs.HasMemEvents = true
+							case ktypes.Handle:
+								rs.HasHandleEvents = true
 							}
+							if typ == ktypes.MapViewFile || typ == ktypes.UnmapViewFile {
+								rs.HasVAMapEvents = true
+							}
+							if typ == ktypes.OpenProcess || typ == ktypes.OpenThread || typ == ktypes.SetThreadContext {
+								rs.HasAuditAPIEvents = true
+							}
+							if typ.Subcategory() == ktypes.DNS {
+								rs.HasDNSEvents = true
+							}
+							if m[typ] {
+								continue
+							}
+							events = append(events, typ)
+							m[typ] = true
 						}
 					}
 				}
 			}
 		}
 	}
+
 	rs.UsedEvents = events
 	return rs
 }
 
-// hasGroups checks if rules were loaded into
+// hasRules checks if rules were loaded into
 // the engine. If there are no rules the event is
 // forwarded to the aggregator.
-func (r *Rules) hasGroups() bool { return len(r.groups) > 0 }
+func (r *Rules) hasRules() bool { return len(r.filters) > 0 }
 
-// findGroups collects all rule groups for a
-// particular event type or category. If no rule
-// groups are found the event is rejected from
-// the aggregator batch.
-func (r *Rules) findGroups(kevt *kevent.Kevent) filterGroups {
-	groups1 := r.groups[kevt.Type.Hash()]
-	groups2 := r.groups[kevt.Category.Hash()]
-	if groups1 == nil && groups2 == nil {
+// findFilters collects all compiled filters for a
+// particular event type or category. If no filters
+// are found the event is rejected from the aggregator
+// batch.
+func (r *Rules) findFilters(evt *kevent.Kevent) []*compiledFilter {
+	filters1 := r.filters[evt.Type.Hash()]
+	filters2 := r.filters[evt.Category.Hash()]
+	if filters1 == nil && filters2 == nil {
 		return nil
 	}
-	return append(groups1, groups2...)
+	return append(filters1, filters2...)
 }
 
 func (*Rules) CanEnqueue() bool { return true }
 
 func (r *Rules) ProcessEvent(evt *kevent.Kevent) (bool, error) {
-	if !r.hasGroups() {
+	if !r.hasRules() {
 		return true, nil
 	}
 	if evt.IsTerminateProcess() {
@@ -807,7 +705,7 @@ func (r *Rules) ProcessEvent(evt *kevent.Kevent) (bool, error) {
 			seq.expire(evt)
 		}
 	}
-	return r.runRules(r.findGroups(evt), evt), nil
+	return r.runRules(r.findFilters(evt), evt), nil
 }
 
 func (r *Rules) gcSequences() {
@@ -923,46 +821,44 @@ func (r *Rules) matchUnorderedPartials(f *compiledFilter) {
 	}
 }
 
-func (r *Rules) triggerSequencesInGroup(e *kevent.Kevent, g *filterGroup) {
-	for _, f := range g.filters {
+func (r *Rules) triggerSequencesInFilters(e *kevent.Kevent, filters []*compiledFilter) {
+	for _, f := range filters {
 		if !f.filter.IsSequence() || f.ss == nil {
 			continue
 		}
 		if r.runSequence(e, f) {
-			r.appendMatch(f.config, g.group, f.ss.events()...)
+			r.appendMatch(f.config, f.ss.events()...)
 			f.ss.clearLocked()
 		}
 	}
 }
 
-func (r *Rules) runRules(groups filterGroups, kevt *kevent.Kevent) bool {
-	for _, g := range groups {
-		for i, f := range g.filters {
-			var match bool
-			if f.ss != nil {
-				match = r.runSequence(kevt, f)
-			} else {
-				match = f.run(kevt, i, false, false)
-				if match {
-					// transition sequence states since a match
-					// in a simple rule could trigger multiple
-					// matches in sequence rules
-					r.triggerSequencesInGroup(kevt, g)
-				}
-			}
+func (r *Rules) runRules(filters []*compiledFilter, kevt *kevent.Kevent) bool {
+	for i, f := range filters {
+		var match bool
+		if f.ss != nil {
+			match = r.runSequence(kevt, f)
+		} else {
+			match = f.run(kevt, i, false, false)
 			if match {
-				if f.ss != nil {
-					r.appendMatch(f.config, g.group, f.ss.events()...)
-					f.ss.clearLocked()
-				} else {
-					r.appendMatch(f.config, g.group, kevt)
-				}
-				err := r.processActions()
-				if err != nil {
-					log.Errorf("unable to execute rule action: %v", err)
-				}
-				return true
+				// transition sequence states since a match
+				// in a simple rule could trigger multiple
+				// matches in sequence rules
+				r.triggerSequencesInFilters(kevt, filters)
 			}
+		}
+		if match {
+			if f.ss != nil {
+				r.appendMatch(f.config, f.ss.events()...)
+				f.ss.clearLocked()
+			} else {
+				r.appendMatch(f.config, kevt)
+			}
+			err := r.processActions()
+			if err != nil {
+				log.Errorf("unable to execute rule action: %v", err)
+			}
+			return true
 		}
 	}
 	return false
@@ -979,10 +875,10 @@ func (r *Rules) runRules(groups filterGroups, kevt *kevent.Kevent) bool {
 func (r *Rules) processActions() error {
 	defer r.clearMatches()
 	for _, m := range r.matches {
-		f, g, evts := m.ctx.Filter, m.ctx.Group, m.ctx.Events
+		f, evts := m.ctx.Filter, m.ctx.Events
 		filterMatches.Add(f.Name, 1)
-		log.Debugf("rule [%s] in group [%s] matched", f.Name, g.Name)
-		err := action.Emit(m.ctx, f.Name, InterpolateFields(f.Output, evts), f.Severity, g.Tags)
+		log.Debugf("[%s] rule matched", f.Name)
+		err := action.Emit(m.ctx, f.Name, InterpolateFields(f.Output, evts), f.Severity, f.Tags)
 		if err != nil {
 			return ErrRuleAction(f.Name, err)
 		}
@@ -1004,18 +900,16 @@ func (r *Rules) processActions() error {
 	return nil
 }
 
-func (r *Rules) appendMatch(f *config.FilterConfig, g config.FilterGroup, evts ...*kevent.Kevent) {
+func (r *Rules) appendMatch(f *config.FilterConfig, evts ...*kevent.Kevent) {
 	for _, evt := range evts {
 		evt.AddMeta(kevent.RuleNameKey, f.Name)
-		evt.AddMeta(kevent.RuleGroupKey, g.Name)
-		for k, v := range g.Labels {
+		for k, v := range f.Labels {
 			evt.AddMeta(kevent.MetadataKey(k), v)
 		}
 	}
 	ctx := &config.ActionContext{
 		Events: evts,
 		Filter: f,
-		Group:  g,
 	}
 	r.matches = append(r.matches, &ruleMatch{ctx: ctx})
 }

@@ -1,14 +1,11 @@
-- group: Command shell execution and temp files
-  enabled: true
-  rules:
-    - name: Command shell created a temp file
-      condition: >
-        sequence
-        maxspan 200ms
-        by ps.pid
-        |kevt.name = 'CreateProcess' and ps.name = 'cmd.exe'|
-        |kevt.name = 'CreateFile'
-            and
-         file.name icontains 'temp'
-        |
-      min-engine-version: 2.0.0
+name: Command shell created a temp file
+condition: >
+  sequence
+  maxspan 200ms
+  by ps.pid
+    |kevt.name = 'CreateProcess' and ps.name = 'cmd.exe'|
+    |kevt.name = 'CreateFile'
+      and
+     file.name icontains 'temp'
+    |
+min-engine-version: 2.0.0

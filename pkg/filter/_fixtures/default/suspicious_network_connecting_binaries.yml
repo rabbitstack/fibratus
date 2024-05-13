@@ -1,0 +1,14 @@
+name: Suspicious sources for network-connecting binaries
+condition: kevt.name = 'Connect' and ps.exe startswith
+  (
+    'C:\\Users',
+    'C:\\Recycle',
+    'C:\\ProgramData',
+    'C:\\Windows\\Temp',
+    '\\',
+    'C:\\perflogs',
+    'C:\\intel',
+    'C:\\Windows\\fonts',
+    'C:\\Windows\\system32\\config'
+  )
+min-engine-version: 2.0.0

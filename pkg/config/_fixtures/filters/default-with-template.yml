@@ -4,9 +4,9 @@ description: this rule matches all network signals
 condition: kevt.category = 'net'
 severity: low
 output: >
-  `%ps.exe` attempted to reach out to `%net.sip` IP address
+  {{ upper "all network events" }}
 action:
-- name: kill
+  - name: kill
 min-engine-version: 2.0.0
 tags:
   - TE

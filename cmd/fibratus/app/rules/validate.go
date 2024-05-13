@@ -62,33 +62,32 @@ func validateRules() error {
 			if !isValidExt(path) {
 				continue
 			}
-			emo("%v Loading rules from %s\n", emoji.Package, path)
+			emo("%v Loading rule %s\n", emoji.Package, path)
 		}
 	}
-	if err := cfg.Filters.LoadGroups(); err != nil {
+	if err := cfg.Filters.LoadFilters(); err != nil {
 		return fmt.Errorf("%v %v", emoji.DisappointedFace, err)
 	}
-	if len(cfg.GetRuleGroups()) == 0 {
+	if len(cfg.GetFilters()) == 0 {
 		return fmt.Errorf("%v no rules found in %s", emoji.DisappointedFace, strings.Join(cfg.Filters.Rules.FromPaths, ","))
 	}
 
 	warnings := make([]string, 0)
-	// validate rule for every group
-	for _, group := range cfg.GetRuleGroups() {
-		for _, rule := range group.Rules {
-			f := filter.New(rule.Condition, cfg)
-			err := f.Compile()
-			if err != nil {
-				return fmt.Errorf("%v %v", emoji.DisappointedFace, filter.ErrInvalidFilter(rule.Name, group.Name, err))
-			}
-			for _, fld := range f.GetFields() {
-				if isDeprecated, dep := fields.IsDeprecated(fld); isDeprecated {
-					warnings = append(warnings,
-						fmt.Sprintf("%s field deprecated in favor of %v in rule %s", fld.String(), dep.Fields, rule.Name))
-				}
+	// validate rules
+	for _, rule := range cfg.GetFilters() {
+		f := filter.New(rule.Condition, cfg)
+		err := f.Compile()
+		if err != nil {
+			return fmt.Errorf("%v %v", emoji.DisappointedFace, filter.ErrInvalidFilter(rule.Name, err))
+		}
+		for _, fld := range f.GetFields() {
+			if isDeprecated, dep := fields.IsDeprecated(fld); isDeprecated {
+				warnings = append(warnings,
+					fmt.Sprintf("%s field deprecated in favor of %v in rule %s", fld.String(), dep.Fields, rule.Name))
 			}
 		}
 	}
+
 	if len(warnings) > 0 {
 		for _, warn := range warnings {
 			emo("%v %s\n", emoji.Warning, warn)
