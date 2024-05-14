@@ -32,7 +32,8 @@ func TestLoadRulesFromPaths(t *testing.T) {
 	filters := Filters{
 		Rules{
 			FromPaths: []string{
-				"_fixtures/filters/default*.yml",
+				"_fixtures/filters/default.yml",
+				"_fixtures/filters/default1.yml",
 			},
 		},
 		Macros{FromPaths: nil},
