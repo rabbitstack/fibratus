@@ -1,4 +1,6 @@
 name: Command shell spawned Chrome browser
+id: 2155539d-31bd-429e-81f9-c17ee1c01f93
+version: 1.0.0
 condition: >
   sequence maxspan 1s
   |kevt.name = 'CreateProcess' and ps.name = 'powershell.exe'| by ps.pid

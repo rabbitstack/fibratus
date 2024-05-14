@@ -1,4 +1,6 @@
 name: Spawn Chrome browser
+id: 5155539d-31bd-429e-81f9-c17ee1c01f93
+version: 1.0.0
 condition: >
   kevt.name = 'CreateProcess' and ps.sibling.name = 'chrome.exe'
 min-engine-version: 2.0.0

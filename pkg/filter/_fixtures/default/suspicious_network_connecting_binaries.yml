@@ -1,4 +1,6 @@
 name: Suspicious sources for network-connecting binaries
+id: 0a8c6a06-eaf2-48c1-9b05-d0e706142311
+version: 1.0.0
 condition: kevt.name = 'Connect' and ps.exe startswith
   (
     'C:\\Users',

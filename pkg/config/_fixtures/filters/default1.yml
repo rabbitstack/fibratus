@@ -1,3 +1,5 @@
 name: suspicious network {{ upper "activity" }}
+id: 1a06b6e0-a3f4-44a0-a1f0-89028273761b
+version: 1.1.0
 condition: kevt.category = 'net' and ps.name in ('at.exe', 'java.exe')
 min-engine-version: 2.0.0

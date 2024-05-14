@@ -41,14 +41,18 @@ import (
 
 // FilterConfig is the descriptor of a single filter.
 type FilterConfig struct {
+	ID               string            `json:"id" yaml:"id"`
 	Name             string            `json:"name" yaml:"name"`
 	Description      string            `json:"description" yaml:"description"`
+	Version          string            `json:"version" yaml:"version"`
 	Condition        string            `json:"condition" yaml:"condition"`
 	Action           []FilterAction    `json:"action" yaml:"action"`
 	Output           string            `json:"output" yaml:"output"`
 	Severity         string            `json:"severity" yaml:"severity"`
 	Labels           map[string]string `json:"labels" yaml:"labels"`
 	Tags             []string          `json:"tags" yaml:"tags"`
+	References       []string          `json:"references" yaml:"references"`
+	Notes            string            `json:"notes" yaml:"notes"`
 	MinEngineVersion string            `json:"min-engine-version" yaml:"min-engine-version"`
 	Enabled          *bool             `json:"enabled" yaml:"enabled"`
 }
@@ -312,6 +316,8 @@ func isValidExt(path string) bool {
 // LoadFilters loads rules from YAML files or URL addresses.
 func (f *Filters) LoadFilters() error {
 	f.filters = make([]*FilterConfig, 0)
+	ids := make(map[string]bool)
+
 	for _, p := range f.Rules.FromPaths {
 		paths, err := filepath.Glob(p)
 		if err != nil {
@@ -331,6 +337,10 @@ func (f *Filters) LoadFilters() error {
 			if err != nil {
 				return err
 			}
+			if ids[flt.ID] {
+				return fmt.Errorf("%q rule uses duplicate id %s", flt.Name, flt.ID)
+			}
+			ids[flt.ID] = true
 			f.filters = append(f.filters, flt)
 		}
 	}
@@ -360,6 +370,10 @@ func (f *Filters) LoadFilters() error {
 		if err != nil {
 			return err
 		}
+		if ids[flt.ID] {
+			return fmt.Errorf("%q rule uses duplicate id %s", flt.Name, flt.ID)
+		}
+		ids[flt.ID] = true
 		f.filters = append(f.filters, flt)
 	}
 

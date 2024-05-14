@@ -1,4 +1,6 @@
 name: Unique process id
+id: 872902be-76e9-4ee7-a48a-6275fa571cf4
+version: 1.0.0
 condition: >
   sequence
   maxspan 1h
