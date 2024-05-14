@@ -1,4 +1,6 @@
 name: Suspicious Microsoft Office template
+id: c4be3b30-9d23-4a33-b974-fb12e17487a2
+version: 1.0.0
 description: |
   Detects when attackers drop macro-enabled files in specific
   folders to trigger their execution every time the victim user
@@ -13,6 +15,8 @@ labels:
   subtechnique.id: T1137.001
   subtechnique.name: Office Template Macros
   subtechnique.ref: https://attack.mitre.org/techniques/T1137/001/
+references:
+  - https://cyberint.com/blog/research/office-templates-and-globaldotname-a-stealthy-office-persistence-technique/
 
 condition: >
   create_file

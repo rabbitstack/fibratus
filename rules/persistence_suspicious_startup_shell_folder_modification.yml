@@ -1,4 +1,6 @@
 name: Suspicious Startup shell folder modification
+id: 7a4082f6-f7e3-49bd-9514-dbc8dd4e68ad
+version: 1.0.0
 description: |
   Detects when adversaries attempt to modify the default Startup
   folder path to to circumvent runtime rules that hunt for file

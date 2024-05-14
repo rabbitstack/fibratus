@@ -1,4 +1,6 @@
 name: Potential Process Doppelganging
+id: eb34cf6e-ccc3-4bce-bbcf-013720640a28
+version: 1.0.0
 description: |
   Adversaries may inject malicious code into process via process doppelganging
   in order to evade process-based defenses as well as possibly elevate privileges.
@@ -41,6 +43,9 @@ labels:
   subtechnique.id: T1055.013
   subtechnique.name: Process Doppelganging
   subtechnique.ref: https://attack.mitre.org/techniques/T1055/013/
+references:
+  - https://www.ired.team/offensive-security/code-injection-process-injection/process-doppelganging
+  - https://www.malwarebytes.com/blog/news/2018/08/process-doppelganging-meets-process-hollowing_osiris
 
 condition: >
   sequence

@@ -1,4 +1,6 @@
 name: Network connection via startup folder executable or script
+id: 09b7278d-42e3-4792-9f00-dee38baecfad
+version: 1.0.0
 description: |
   Identifies the execution of unsigned binary or script from the
   Startup folder followed by network inbound or outbound connection.

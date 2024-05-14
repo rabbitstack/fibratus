@@ -1,4 +1,6 @@
 name: Executable file creation from a macro-enabled Microsoft Office document
+id: fffcce75-2427-406e-9597-1f49b0c9ad5b
+version: 1.0.0
 description: |
   Identifies the Microsoft Office process writing an executable file type and
   the call stack reveals the file creation was originated from the Microsoft
