@@ -75,14 +75,14 @@ var ruleAlertHTMLTemplate = `
                   {{ $text := (regexReplaceAll "<code>" .Alert.Text "<code style='border-radius: 5px; color: #404243; font-size: .8rem; margin: 0 2px; padding: 3px 5px; line-height: 1.7rem; white-space: pre-wrap; font-weight: 600; font-family: Consolas, Roboto, monaco, monospace; background-color: #e1e3e4;'>") }}
                   <p style="font-size: .8rem; margin: 0 0 4px 0px; padding: 3px 0px; white-space: pre-wrap; line-height: 1.5em;">{{ regexReplaceAll "\\s+" $text " " }}</p>
                   {{- end }}
-                  {{ if hasKey .Group.Labels "tactic.name" }}
-                  <div class="tag" style="display: inline-block; border-radius: 5px; color: #404243; font-size: .8rem; margin: 2px 2px; padding: 3px 5px; white-space: pre-wrap; font-weight: 600; background-color: #bad1fb;"><a style="text-decoration: none; color: inherit;" href="{{ index .Group.Labels "tactic.ref"}}">{{ index .Group.Labels "tactic.name"}}</a></div>
+                  {{ if hasKey .Filter.Labels "tactic.name" }}
+                  <div class="tag" style="display: inline-block; border-radius: 5px; color: #404243; font-size: .8rem; margin: 2px 2px; padding: 3px 5px; white-space: pre-wrap; font-weight: 600; background-color: #bad1fb;"><a style="text-decoration: none; color: inherit;" href="{{ index .Filter.Labels "tactic.ref"}}">{{ index .Filter.Labels "tactic.name"}}</a></div>
                   {{ end }}
-                  {{ if hasKey .Group.Labels "technique.name" }}
-                  <div class="tag" style="display: inline-block; border-radius: 5px; color: #404243; font-size: .8rem; margin: 2px 2px; padding: 3px 5px; white-space: pre-wrap; font-weight: 600; background-color: #84cad7;"><a style="text-decoration: none; color: inherit;" href="{{ index .Group.Labels "technique.ref"}}">{{ index .Group.Labels "technique.name"}}</a></div>
+                  {{ if hasKey .Filter.Labels "technique.name" }}
+                  <div class="tag" style="display: inline-block; border-radius: 5px; color: #404243; font-size: .8rem; margin: 2px 2px; padding: 3px 5px; white-space: pre-wrap; font-weight: 600; background-color: #84cad7;"><a style="text-decoration: none; color: inherit;" href="{{ index .Filter.Labels "technique.ref"}}">{{ index .Filter.Labels "technique.name"}}</a></div>
                   {{ end }}
-                  {{ if hasKey .Group.Labels "subtechnique.name" }}
-                  <div class="tag" style="display: inline-block; border-radius: 5px; color: #404243; font-size: .8rem; margin: 2px 2px; padding: 3px 5px; white-space: pre-wrap; font-weight: 600; background-color: #fcbcba;"><a style="text-decoration: none; color: inherit;" href="{{ index .Group.Labels "subtechnique.ref"}}">{{ index .Group.Labels "subtechnique.name"}}</a></div>
+                  {{ if hasKey .Filter.Labels "subtechnique.name" }}
+                  <div class="tag" style="display: inline-block; border-radius: 5px; color: #404243; font-size: .8rem; margin: 2px 2px; padding: 3px 5px; white-space: pre-wrap; font-weight: 600; background-color: #fcbcba;"><a style="text-decoration: none; color: inherit;" href="{{ index .Filter.Labels "subtechnique.ref"}}">{{ index .Filter.Labels "subtechnique.name"}}</a></div>
                   {{ end }}
                 </td>
               </tr>

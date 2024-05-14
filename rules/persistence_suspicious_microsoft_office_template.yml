@@ -1,0 +1,42 @@
+name: Suspicious Microsoft Office template
+description: |
+  Detects when attackers drop macro-enabled files in specific
+  folders to trigger their execution every time the victim user
+  opens an Office application.
+labels:
+  tactic.id: TA0006
+  tactic.name: Persistence
+  tactic.ref: https://attack.mitre.org/tactics/TA0006/
+  technique.id: T1137
+  technique.name: Office Application Startup
+  technique.ref: https://attack.mitre.org/techniques/T1137/
+  subtechnique.id: T1137.001
+  subtechnique.name: Office Template Macros
+  subtechnique.ref: https://attack.mitre.org/techniques/T1137/001/
+
+condition: >
+  create_file
+    and
+  file.name imatches
+    (
+      '?:\\Users\\*\\AppData\\Roaming\\Microsoft\\Word\\Startup\\*',
+      '?:\\Users\\*\\AppData\\Roaming\\Microsoft\\Templates\\*.dotm',
+      '?:\\Users\\*\\AppData\\Roaming\\Microsoft\\Excel\\XLSTART\\*',
+      '?:\\Users\\*\\AppData\\Roaming\\Microsoft\\AddIns\\*',
+      '?:\\Users\\*\\AppData\\Roaming\\Microsoft\\Outlook\\*.otm'
+    )
+    and
+    not
+  ps.name iin msoffice_binaries
+    and
+    not
+  ps.exe imatches
+    (
+      '?:\\Program Files\\*.exe',
+      '?:\\Program Files (x86)\\*.exe'
+    )
+
+output: >
+  Office template %file.name created by suspicious process %ps.exe
+
+min-engine-version: 2.0.0

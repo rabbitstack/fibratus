@@ -1,17 +1,14 @@
-- group: Unique process id
-  enabled: true
-  rules:
-    - name: Unique process id
-      condition: >
-        sequence
-        maxspan 1h
-        by ps.uuid
-        |kevt.name = 'CreateProcess' and ps.child.name
-            in
-        ('firefox.exe', 'chrome.exe', 'edge.exe')
-        |
-        |kevt.name = 'CreateFile' and file.operation = 'CREATE'
-            and
-        file.extension = '.exe'
-        |
-      min-engine-version: 2.0.0
+name: Unique process id
+condition: >
+  sequence
+  maxspan 1h
+  by ps.uuid
+  |kevt.name = 'CreateProcess' and ps.child.name
+      in
+  ('firefox.exe', 'chrome.exe', 'edge.exe')
+  |
+  |kevt.name = 'CreateFile' and file.operation = 'CREATE'
+      and
+  file.extension = '.exe'
+  |
+min-engine-version: 2.0.0

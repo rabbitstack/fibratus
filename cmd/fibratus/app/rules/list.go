@@ -31,11 +31,11 @@ func listRules() error {
 	if err := bootstrap.InitConfigAndLogger(cfg); err != nil {
 		return err
 	}
-	if err := cfg.Filters.LoadGroups(); err != nil {
+	if err := cfg.Filters.LoadFilters(); err != nil {
 		return fmt.Errorf("%v %v", emoji.DisappointedFace, err)
 	}
-	groups := cfg.GetRuleGroups()
-	if len(groups) == 0 {
+	filters := cfg.GetFilters()
+	if len(filters) == 0 {
 		return fmt.Errorf("%v no rules found in %s", emoji.DisappointedFace, strings.Join(cfg.Filters.Rules.FromPaths, ","))
 	}
 
@@ -52,9 +52,9 @@ func listRules() error {
 		})
 		tactics := make(map[string]int)
 		techniques := make(map[string]int)
-		for _, group := range groups {
-			tactics[group.Labels["tactic.name"]] += len(group.Rules)
-			techniques[group.Labels["technique.name"]] += len(group.Rules)
+		for _, f := range filters {
+			tactics[f.Labels["tactic.name"]]++
+			techniques[f.Labels["technique.name"]]++
 		}
 		tot := 0
 		for tac, n := range tactics {
@@ -85,19 +85,17 @@ func listRules() error {
 		tactics := make(map[string]int)
 		techniques := make(map[string]int)
 
-		for _, group := range groups {
-			tac := group.Labels["tactic.name"]
-			tec := group.Labels["technique.name"]
+		for _, f := range filters {
+			tac := f.Labels["tactic.name"]
+			tec := f.Labels["technique.name"]
 			if _, ok := tactics[tac]; !ok {
 				tactics[tac] = 1
 			}
 			if _, ok := tactics[tec]; !ok {
 				techniques[tec] = 1
 			}
-			for _, rule := range group.Rules {
-				t.AppendRow(table.Row{n + 1, rule.Name, group.Name, group.Labels["tactic.name"]})
-				n++
-			}
+			t.AppendRow(table.Row{n + 1, f.Name, tec, tac})
+			n++
 		}
 
 		var (

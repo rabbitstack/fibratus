@@ -1,0 +1,29 @@
+name: Process spawned via remote thread
+description: |
+  Identifies the creation of a process with the parent call stack not
+  revealing normal API functions for process creation. This may be a
+  sign of process injection.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1055
+  technique.name: Process Injection
+  technique.ref: https://attack.mitre.org/techniques/T1055/
+
+condition: >
+  spawn_process
+    and
+  thread.callstack.symbols imatches
+    (
+      'ntdll.dll!ZwCreateThreadEx*',
+      'ntdll.dll!NtCreateThreadEx*',
+      'ntdll.dll!RtlCreateUserThread'
+    )
+    and
+    not
+  thread.callstack.symbols imatches ('*CreateProcess*', '*CreateUserProcess*')
+action:
+  - name: kill
+
+min-engine-version: 2.2.0

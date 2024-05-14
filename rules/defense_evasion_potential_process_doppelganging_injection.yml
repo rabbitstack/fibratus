@@ -1,0 +1,59 @@
+name: Potential Process Doppelganging
+description: |
+  Adversaries may inject malicious code into process via process doppelganging
+  in order to evade process-based defenses as well as possibly elevate privileges.
+  Process doppelganging is a method of executing arbitrary code in the address space
+  of a separate live process.
+
+  Windows Transactional NTFS (TxF) was introduced in Vista as a method to perform
+  safe file operations. To ensure data integrity, TxF enables only one transacted
+  handle to write to a file at a given time. Until the write handle transaction is
+  terminated, all other handles are isolated from the writer and may only read the
+  committed version of the file that existed at the time the handle was opened. To
+  avoid corruption, TxF performs an automatic rollback if the system or application
+  fails during a write transaction.
+
+  Although deprecated, the TxF application programming interface (API) is still enabled
+  as of Windows 11.
+
+  Adversaries may abuse TxF to a perform a file-less variation of Process Injection.
+  Similar to Process Hollowing, process doppelganging involves replacing the memory of
+  a legitimate process, enabling the veiled execution of malicious code that may evade
+  defenses and detection. Process doppelganging's use of TxF also avoids the use of
+  highly-monitored API functions such as NtUnmapViewOfSection, VirtualProtectEx, and
+  SetThreadContext.
+
+  Process Doppelganging is implemented in 4 steps:
+
+  1. Transact – Create a TxF transaction using a legitimate executable then overwrite
+  the file with malicious code.
+  2. Load – Create a shared section of memory and load the malicious executable.
+  3. Rollback – Undo changes to original executable, effectively removing malicious code
+  from the file system.
+  4. Animate – Create a process from the tainted section of memory and initiate execution.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1055
+  technique.name: Process Injection
+  technique.ref: https://attack.mitre.org/techniques/T1055/
+  subtechnique.id: T1055.013
+  subtechnique.name: Process Doppelganging
+  subtechnique.ref: https://attack.mitre.org/techniques/T1055/013/
+
+condition: >
+  sequence
+  maxspan 2m
+  by ps.uuid
+    |create_file and thread.callstack.symbols imatches
+      (
+        'kernel32.dll!CreateFileTransacted*',
+        'ntdll.dll!RtlSetCurrentTransaction'
+      )
+    |
+    |spawn_process|
+action:
+  - name: kill
+
+min-engine-version: 2.2.0

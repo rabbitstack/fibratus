@@ -1,0 +1,3 @@
+name: match http connections
+condition: kevt.category = 'net' and net.dport = 80
+min-engine-version: 2.0.0

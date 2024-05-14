@@ -39,8 +39,7 @@ import (
 
 func TestHTMLFormatterRuleAlert(t *testing.T) {
 	out, err := RenderHTMLRuleAlert(&config.ActionContext{
-		Group: config.FilterGroup{
-			Description: "Identifies attempts from adversaries to acquire credentials from Vault files.",
+		Filter: &config.FilterConfig{
 			Labels: map[string]string{
 				"tactic.name":       "Credential Access",
 				"tactic.ref":        "https://attack.mitre.org/tactics/TA0006/",

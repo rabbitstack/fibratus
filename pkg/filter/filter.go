@@ -429,3 +429,62 @@ func (f *filter) checkBoundRefs() error {
 	}
 	return nil
 }
+
+// compareSeqJoin returns true if both values
+// representing the sequence joins are equal.
+func compareSeqJoin(s1, s2 any) bool {
+	if s1 == nil || s2 == nil {
+		return false
+	}
+	switch v := s1.(type) {
+	case string:
+		s, ok := s2.(string)
+		if !ok {
+			return false
+		}
+		return strings.EqualFold(v, s)
+	case uint8:
+		n, ok := s2.(uint8)
+		if !ok {
+			return false
+		}
+		return v == n
+	case uint16:
+		n, ok := s2.(uint16)
+		if !ok {
+			return false
+		}
+		return v == n
+	case uint32:
+		n, ok := s2.(uint32)
+		if !ok {
+			return false
+		}
+		return v == n
+	case uint64:
+		n, ok := s2.(uint64)
+		if !ok {
+			return false
+		}
+		return v == n
+	case int:
+		n, ok := s2.(int)
+		if !ok {
+			return false
+		}
+		return v == n
+	case uint:
+		n, ok := s2.(uint)
+		if !ok {
+			return false
+		}
+		return v == n
+	case net.IP:
+		ip, ok := s2.(net.IP)
+		if !ok {
+			return false
+		}
+		return v.Equal(ip)
+	}
+	return false
+}

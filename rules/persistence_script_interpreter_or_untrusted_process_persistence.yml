@@ -1,0 +1,35 @@
+name: Script interpreter host or untrusted process persistence
+description: |
+  Identifies the script interpreter or untrusted process writing
+  to commonly abused run keys or the Startup folder locations.
+labels:
+  tactic.id: TA0006
+  tactic.name: Persistence
+  tactic.ref: https://attack.mitre.org/tactics/TA0006/
+  technique.id: T1547
+  technique.name: Boot or Logon Autostart Execution
+  technique.ref: https://attack.mitre.org/techniques/T1547/
+  subtechnique.id: T1547.001
+  subtechnique.name: Registry Run Keys / Startup Folder
+  subtechnique.ref: https://attack.mitre.org/techniques/T1547/001/
+
+condition: >
+  (modify_registry or create_file)
+    and
+  (
+    ps.name in script_interpreters
+      or
+    ps.parent.name in script_interpreters
+      or
+    not pe.is_trusted
+  )
+    and
+  (
+    registry.key.name imatches registry_run_keys
+      or
+    file.name imatches startup_locations
+  )
+action:
+  - name: kill
+
+min-engine-version: 2.0.0

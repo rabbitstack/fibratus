@@ -1,0 +1,12 @@
+name: only network category
+enabled: true
+description: this rule matches all network signals
+condition: kevt.category = 'net'
+severity: low
+output: >
+  {{ upper "all network events" }}
+action:
+  - name: kill
+min-engine-version: 2.0.0
+tags:
+  - TE

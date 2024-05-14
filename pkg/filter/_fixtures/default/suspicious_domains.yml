@@ -1,0 +1,3 @@
+name: Suspicious domains
+condition: kevt.name = 'QueryDns' and dns.name = 'fishy.domain.dot'
+min-engine-version: 2.0.0

@@ -1,0 +1,3 @@
+name: match https connections
+condition: kevt.name = 'Recv' and net.dport = 443
+min-engine-version: 2.0.0

@@ -1,0 +1,27 @@
+name: Suspicious DLL loaded via memory section mapping
+description: |
+  Identifies the mapping of a memory section with RX protection followed by unsigned DLL loading.
+  Adversaries may inject dynamic-link libraries (DLLs) into processes in order to evade process-based defenses
+  as well as possibly elevate privileges. DLL injection is a method of executing arbitrary code in the address
+  space of a separate live process.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1055
+  technique.name: Process Injection
+  technique.ref: https://attack.mitre.org/techniques/T1055/
+  subtechnique.id: T1055.001
+  subtechnique.name: Dynamic-link Library Injection
+  subtechnique.ref: https://attack.mitre.org/techniques/T1055/001/
+
+condition: >
+  sequence
+  maxspan 2m
+  by ps.uuid
+    |map_view_of_section and file.view.protection = 'READONLY|EXECUTE' and kevt.pid != 4 and file.view.size >= 4096|
+    |(load_unsigned_or_untrusted_dll)|
+action:
+  - name: kill
+
+min-engine-version: 2.2.0

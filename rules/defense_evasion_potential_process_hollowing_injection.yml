@@ -1,0 +1,34 @@
+name: Potential Process Hollowing
+description: |
+  Adversaries may inject malicious code into suspended and hollowed processes in order to
+  evade process-based defenses. Process hollowing is a method of executing arbitrary code
+  in the address space of a separate live process.
+
+  Process hollowing is commonly performed by creating a process in a suspended state then
+  unmapping/hollowing its memory, which can then be replaced with malicious code. A victim
+  process can be created with native Windows API calls such as CreateProcess, which includes
+  a flag to suspend the processes primary thread. At this point the process can be unmapped
+  using APIs calls such as ZwUnmapViewOfSection or NtUnmapViewOfSection before being written
+  to, realigned to the injected code, and resumed via VirtualAllocEx, WriteProcessMemory,
+  SetThreadContext, then ResumeThread/ResumeProcess respectively.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1055
+  technique.name: Process Injection
+  technique.ref: https://attack.mitre.org/techniques/T1055/
+  subtechnique.id: T1055.012
+  subtechnique.name: Process Hollowing
+  subtechnique.ref: https://attack.mitre.org/techniques/T1055/012/
+
+condition: >
+  sequence
+  maxspan 2m
+    |spawn_process| by ps.child.uuid
+    |unmap_view_of_section and file.view.size > 4096 and (length(file.name) = 0 or not ext(file.name) = '.dll')| by ps.uuid
+    |load_executable and pe.is_modified| by ps.uuid
+action:
+  - name: kill
+
+min-engine-version: 2.0.0

@@ -1,0 +1,3 @@
+name: Microsoft edge
+condition: kevt.name = 'CreateProcess' and ps.comm startswith '\"C:\\Program Files (x86)\\Microsoft\\Edge Dev\\Application\\msedge.exe\" --type='
+min-engine-version: 2.0.0

@@ -19,26 +19,25 @@
 package filter
 
 import (
+	"github.com/rabbitstack/fibratus/pkg/alertsender"
+	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/fs"
+	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/ps"
+	"github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/version"
 	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 	"net"
 	"os"
 	"testing"
 	"time"
-
-	"github.com/rabbitstack/fibratus/pkg/alertsender"
-	"github.com/rabbitstack/fibratus/pkg/config"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-	"github.com/rabbitstack/fibratus/pkg/ps/types"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 type mockNoopSender struct{}
@@ -140,17 +139,18 @@ func newConfig(fromFiles ...string) *config.Config {
 	return c
 }
 
-func TestCompileMergeGroups(t *testing.T) {
+func TestCompileMergeFilters(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
-	rules := NewRules(psnap, newConfig("_fixtures/merged_groups.yml"))
+	rules := NewRules(psnap, newConfig("_fixtures/merged_filters/filter*.yml"))
 	compileRules(t, rules)
 
-	assert.Len(t, rules.groups, 2)
-	assert.Len(t, rules.groups[ktypes.RecvTCPv4.Hash()], 2)
-	assert.Len(t, rules.groups[ktypes.Net.Hash()], 1)
+	assert.Len(t, rules.filters, 2)
+	assert.Len(t, rules.filters[ktypes.RecvTCPv4.Hash()], 3)
+	assert.Len(t, rules.filters[ktypes.Net.Hash()], 1)
 
-	groups := rules.findGroups(&kevent.Kevent{Type: ktypes.RecvUDPv6, Category: ktypes.Net})
-	assert.Len(t, groups, 3)
+	assert.Len(t, rules.findFilters(&kevent.Kevent{Type: ktypes.RecvUDPv6}), 3)
+	assert.Len(t, rules.findFilters(&kevent.Kevent{Type: ktypes.RecvTCPv4}), 3)
+	assert.Len(t, rules.findFilters(&kevent.Kevent{Type: ktypes.RecvTCPv4, Category: ktypes.Net}), 4)
 }
 
 func TestProcessRules(t *testing.T) {
@@ -159,8 +159,7 @@ func TestProcessRules(t *testing.T) {
 		matches bool
 	}{
 		{newConfig("_fixtures/simple_matches.yml"), true},
-		{newConfig("_fixtures/simple_matches_multiple_groups.yml"), true},
-		{newConfig("_fixtures/simple_not_matches.yml"), false},
+		{newConfig("_fixtures/simple_matches/filter*.yml"), true},
 	}
 
 	for i, tt := range tests {
@@ -177,7 +176,7 @@ func TestSequenceState(t *testing.T) {
 	compileRules(t, rules)
 	log.SetLevel(log.DebugLevel)
 
-	kevt1 := &kevent.Kevent{
+	e1 := &kevent.Kevent{
 		Type: ktypes.CreateProcess,
 		Name: "CreateProcess",
 		Tid:  2484,
@@ -191,7 +190,7 @@ func TestSequenceState(t *testing.T) {
 			kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.AnsiString, Value: "powershell.exe"},
 		},
 	}
-	kevt2 := &kevent.Kevent{
+	e2 := &kevent.Kevent{
 		Type: ktypes.CreateFile,
 		Name: "CreateFile",
 		Tid:  2484,
@@ -205,10 +204,10 @@ func TestSequenceState(t *testing.T) {
 		},
 	}
 
-	assert.Len(t, rules.groups, 2)
+	assert.Len(t, rules.filters, 2)
 
-	ss := rules.groups[ktypes.CreateProcess.Hash()][0].filters[0].ss
-	ss1 := rules.groups[ktypes.CreateFile.Hash()][0].filters[0].ss
+	ss := rules.filters[ktypes.CreateProcess.Hash()][0].ss
+	ss1 := rules.filters[ktypes.CreateFile.Hash()][0].ss
 
 	// should reference the same sequence state
 	assert.Equal(t, ss, ss1)
@@ -218,13 +217,13 @@ func TestSequenceState(t *testing.T) {
 	assert.True(t, ss.isInitialState())
 	assert.Equal(t, "kevt.name = CreateProcess AND ps.name = cmd.exe", ss.initialState)
 
-	ss.addPartial("kevt.name = CreateProcess AND ps.name = cmd.exe", kevt1, false)
-	require.NoError(t, ss.matchTransition("kevt.name = CreateProcess AND ps.name = cmd.exe", kevt1))
+	ss.addPartial("kevt.name = CreateProcess AND ps.name = cmd.exe", e1, false)
+	require.NoError(t, ss.matchTransition("kevt.name = CreateProcess AND ps.name = cmd.exe", e1))
 	assert.False(t, ss.isInitialState())
 	assert.Equal(t, "kevt.name = CreateFile AND file.name ICONTAINS temp", ss.currentState())
 
-	ss.addPartial("kevt.name = CreateFile AND file.name ICONTAINS temp", kevt2, false)
-	require.NoError(t, ss.matchTransition("kevt.name = CreateFile AND file.name ICONTAINS temp", kevt2))
+	ss.addPartial("kevt.name = CreateFile AND file.name ICONTAINS temp", e2, false)
+	require.NoError(t, ss.matchTransition("kevt.name = CreateFile AND file.name ICONTAINS temp", e2))
 
 	assert.Len(t, ss.partials[1], 1)
 	assert.Len(t, ss.partials[2], 1)
@@ -237,7 +236,7 @@ func TestSequenceState(t *testing.T) {
 	// reset transition leads back to initial state
 	assert.Equal(t, "kevt.name = CreateProcess AND ps.name = cmd.exe", ss.currentState())
 	// deadline exceeded
-	require.NoError(t, ss.matchTransition("kevt.name = CreateProcess AND ps.name = cmd.exe", kevt1))
+	require.NoError(t, ss.matchTransition("kevt.name = CreateProcess AND ps.name = cmd.exe", e1))
 	assert.Equal(t, "kevt.name = CreateFile AND file.name ICONTAINS temp", ss.currentState())
 	time.Sleep(time.Millisecond * 120)
 	assert.True(t, ss.isInitialState())
@@ -246,14 +245,14 @@ func TestSequenceState(t *testing.T) {
 	require.False(t, ss.next(1))
 	if ss.next(1) {
 		// this shouldn't happen
-		require.NoError(t, ss.matchTransition("kevt.name = CreateFile AND file.name ICONTAINS temp", kevt2))
+		require.NoError(t, ss.matchTransition("kevt.name = CreateFile AND file.name ICONTAINS temp", e2))
 	}
 
 	ss.clear()
 	assert.True(t, ss.isInitialState())
-	require.NoError(t, ss.matchTransition("kevt.name = CreateProcess AND ps.name = cmd.exe", kevt1))
-	ss.addPartial("kevt.name = CreateProcess AND ps.name = cmd.exe", kevt1, false)
-	ss.addPartial("kevt.name = CreateFile AND file.name ICONTAINS temp", kevt2, false)
+	require.NoError(t, ss.matchTransition("kevt.name = CreateProcess AND ps.name = cmd.exe", e1))
+	ss.addPartial("kevt.name = CreateProcess AND ps.name = cmd.exe", e2, false)
+	ss.addPartial("kevt.name = CreateFile AND file.name ICONTAINS temp", e2, false)
 	require.False(t, ss.inDeadline.Load())
 
 	// test expiration
@@ -275,7 +274,7 @@ func TestSequenceState(t *testing.T) {
 	require.True(t, ss.expire(terminateProcess))
 	require.True(t, ss.inExpired.Load())
 
-	require.NoError(t, ss.matchTransition("kevt.name = CreateProcess AND ps.name = cmd.exe", kevt1))
+	require.NoError(t, ss.matchTransition("kevt.name = CreateProcess AND ps.name = cmd.exe", e1))
 	require.False(t, ss.inExpired.Load())
 
 	assert.Equal(t, "kevt.name = CreateFile AND file.name ICONTAINS temp", ss.currentState())
@@ -287,9 +286,9 @@ func TestSequenceStateNext(t *testing.T) {
 	compileRules(t, rules)
 	log.SetLevel(log.DebugLevel)
 
-	assert.Len(t, rules.groups, 2)
+	assert.Len(t, rules.filters, 2)
 
-	ss := rules.groups[ktypes.CreateProcess.Hash()][0].filters[0].ss
+	ss := rules.filters[ktypes.CreateProcess.Hash()][0].ss
 
 	assert.True(t, ss.next(0))
 	assert.False(t, ss.next(1))
@@ -311,7 +310,7 @@ func TestExpireSequences(t *testing.T) {
 	compileRules(t, rules)
 	log.SetLevel(log.DebugLevel)
 
-	kevt1 := &kevent.Kevent{
+	e1 := &kevent.Kevent{
 		Type: ktypes.OpenProcess,
 		Name: "OpenProcess",
 		Tid:  2484,
@@ -328,7 +327,7 @@ func TestExpireSequences(t *testing.T) {
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
-	kevt2 := &kevent.Kevent{
+	e2 := &kevent.Kevent{
 		Type: ktypes.TerminateProcess,
 		Name: "TerminateProcess",
 		Tid:  2484,
@@ -343,26 +342,26 @@ func TestExpireSequences(t *testing.T) {
 		},
 	}
 
-	ss := rules.groups[ktypes.OpenProcess.Hash()][0].filters[0].ss
+	ss := rules.filters[ktypes.OpenProcess.Hash()][0].ss
 
-	require.False(t, wrapProcessEvent(kevt1, rules.ProcessEvent))
-	require.False(t, wrapProcessEvent(kevt2, rules.ProcessEvent))
+	require.False(t, wrapProcessEvent(e1, rules.ProcessEvent))
+	require.False(t, wrapProcessEvent(e2, rules.ProcessEvent))
 	require.True(t, ss.inExpired.Load())
 }
 
 func TestMinEngineVersion(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
-	rules := NewRules(psnap, newConfig("_fixtures/min_engine_ver_fail.yml"))
+	rules := NewRules(psnap, newConfig("_fixtures/min_engine_version/fail/*.yml"))
 	version.Set("2.0.0")
 	_, err := rules.Compile()
 	require.Error(t, err)
-	rules = NewRules(psnap, newConfig("_fixtures/min_engine_ver_ok.yml"))
+	rules = NewRules(psnap, newConfig("_fixtures/min_engine_version/ok/*.yml"))
 	compileRules(t, rules)
 }
 
 func TestRuleCompileStats(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
-	rules := NewRules(psnap, newConfig("_fixtures/default/default.yml"))
+	rules := NewRules(psnap, newConfig("_fixtures/default/*.yml"))
 	stats, err := rules.Compile()
 	require.NoError(t, err)
 	require.NotNil(t, stats)
@@ -384,7 +383,7 @@ func TestSimpleSequenceRule(t *testing.T) {
 	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_simple.yml"))
 	compileRules(t, rules)
 
-	kevt1 := &kevent.Kevent{
+	e1 := &kevent.Kevent{
 		Type:      ktypes.CreateProcess,
 		Timestamp: time.Now(),
 		Name:      "CreateProcess",
@@ -400,7 +399,7 @@ func TestSimpleSequenceRule(t *testing.T) {
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
-	kevt2 := &kevent.Kevent{
+	e2 := &kevent.Kevent{
 		Type:      ktypes.CreateFile,
 		Timestamp: time.Now(),
 		Name:      "CreateFile",
@@ -416,14 +415,14 @@ func TestSimpleSequenceRule(t *testing.T) {
 		},
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
-	require.False(t, wrapProcessEvent(kevt1, rules.ProcessEvent))
-	require.True(t, wrapProcessEvent(kevt2, rules.ProcessEvent))
+	require.False(t, wrapProcessEvent(e1, rules.ProcessEvent))
+	require.True(t, wrapProcessEvent(e2, rules.ProcessEvent))
 
 	// if we alter the process executable in the first event, it shouldn't match
-	kevt1.PS.Exe = "C:\\System32\\cmd.exe"
+	e1.PS.Exe = "C:\\System32\\cmd.exe"
 
-	require.False(t, wrapProcessEvent(kevt1, rules.ProcessEvent))
-	require.False(t, wrapProcessEvent(kevt2, rules.ProcessEvent))
+	require.False(t, wrapProcessEvent(e1, rules.ProcessEvent))
+	require.False(t, wrapProcessEvent(e2, rules.ProcessEvent))
 }
 
 func TestSimpleSequenceRuleMultiplePartials(t *testing.T) {
@@ -468,11 +467,11 @@ func TestSimpleSequenceRuleMultiplePartials(t *testing.T) {
 		require.False(t, wrapProcessEvent(e1, rules.ProcessEvent))
 	}
 
-	ss := rules.groups[ktypes.CreateProcess.Hash()][0].filters[0].ss
+	ss := rules.filters[ktypes.CreateProcess.Hash()][0].ss
 	assert.Len(t, ss.partials[1], 5)
 	assert.Len(t, ss.partials[2], 0)
 
-	kevt1 := &kevent.Kevent{
+	e1 := &kevent.Kevent{
 		Seq:       20,
 		Type:      ktypes.CreateProcess,
 		Timestamp: time.Now().Add(time.Second),
@@ -488,7 +487,7 @@ func TestSimpleSequenceRuleMultiplePartials(t *testing.T) {
 		},
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
-	kevt2 := &kevent.Kevent{
+	e2 := &kevent.Kevent{
 		Type:      ktypes.CreateFile,
 		Seq:       22,
 		Timestamp: time.Now().Add(time.Second * time.Duration(2)),
@@ -505,10 +504,10 @@ func TestSimpleSequenceRuleMultiplePartials(t *testing.T) {
 		},
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
-	require.False(t, wrapProcessEvent(kevt1, rules.ProcessEvent))
+	require.False(t, wrapProcessEvent(e1, rules.ProcessEvent))
 	assert.Len(t, ss.partials[1], 6)
 	assert.Len(t, ss.partials[2], 0)
-	require.True(t, wrapProcessEvent(kevt2, rules.ProcessEvent))
+	require.True(t, wrapProcessEvent(e2, rules.ProcessEvent))
 }
 
 func TestSimpleSequenceRuleWithMaxSpanReached(t *testing.T) {
@@ -516,7 +515,7 @@ func TestSimpleSequenceRuleWithMaxSpanReached(t *testing.T) {
 	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_simple_max_span.yml"))
 	compileRules(t, rules)
 
-	kevt1 := &kevent.Kevent{
+	e1 := &kevent.Kevent{
 		Type:      ktypes.CreateProcess,
 		Timestamp: time.Now(),
 		Name:      "CreateProcess",
@@ -532,7 +531,7 @@ func TestSimpleSequenceRuleWithMaxSpanReached(t *testing.T) {
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
-	kevt2 := &kevent.Kevent{
+	e2 := &kevent.Kevent{
 		Type:      ktypes.CreateFile,
 		Timestamp: time.Now(),
 		Name:      "CreateFile",
@@ -548,16 +547,16 @@ func TestSimpleSequenceRuleWithMaxSpanReached(t *testing.T) {
 		},
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
-	require.False(t, wrapProcessEvent(kevt1, rules.ProcessEvent))
+	require.False(t, wrapProcessEvent(e1, rules.ProcessEvent))
 	time.Sleep(time.Millisecond * 110)
-	require.True(t, wrapProcessEvent(kevt2, rules.ProcessEvent))
+	require.True(t, wrapProcessEvent(e2, rules.ProcessEvent))
 
 	// now the state machine has transitioned
 	// to the initial state, which means we should
 	// be able to match the sequence if we reinsert
 	// the events
-	require.False(t, wrapProcessEvent(kevt1, rules.ProcessEvent))
-	require.True(t, wrapProcessEvent(kevt2, rules.ProcessEvent))
+	require.False(t, wrapProcessEvent(e1, rules.ProcessEvent))
+	require.True(t, wrapProcessEvent(e2, rules.ProcessEvent))
 }
 
 func TestSimpleSequencePolicyWithMaxSpanNotReached(t *testing.T) {
@@ -565,7 +564,7 @@ func TestSimpleSequencePolicyWithMaxSpanNotReached(t *testing.T) {
 	rules := NewRules(psnap, newConfig("_fixtures/sequence_rule_simple_max_span.yml"))
 	compileRules(t, rules)
 
-	kevt1 := &kevent.Kevent{
+	e1 := &kevent.Kevent{
 		Type:      ktypes.CreateProcess,
 		Timestamp: time.Now(),
 		Name:      "CreateProcess",
@@ -581,7 +580,7 @@ func TestSimpleSequencePolicyWithMaxSpanNotReached(t *testing.T) {
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
-	kevt2 := &kevent.Kevent{
+	e2 := &kevent.Kevent{
 		Type:      ktypes.CreateFile,
 		Timestamp: time.Now(),
 		Name:      "CreateFile",
@@ -597,9 +596,9 @@ func TestSimpleSequencePolicyWithMaxSpanNotReached(t *testing.T) {
 		},
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
-	require.False(t, wrapProcessEvent(kevt1, rules.ProcessEvent))
+	require.False(t, wrapProcessEvent(e1, rules.ProcessEvent))
 	time.Sleep(time.Millisecond * 110)
-	require.True(t, wrapProcessEvent(kevt2, rules.ProcessEvent))
+	require.True(t, wrapProcessEvent(e2, rules.ProcessEvent))
 }
 
 func TestComplexSequenceRule(t *testing.T) {
@@ -608,7 +607,7 @@ func TestComplexSequenceRule(t *testing.T) {
 	compileRules(t, rules)
 	log.SetLevel(log.DebugLevel)
 
-	kevt1 := &kevent.Kevent{
+	e1 := &kevent.Kevent{
 		Seq:       1,
 		Type:      ktypes.CreateProcess,
 		Timestamp: time.Now(),
@@ -627,7 +626,7 @@ func TestComplexSequenceRule(t *testing.T) {
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
-	kevt2 := &kevent.Kevent{
+	e2 := &kevent.Kevent{
 		Seq:       2,
 		Type:      ktypes.CreateFile,
 		Timestamp: time.Now().Add(time.Millisecond * 250),
@@ -647,7 +646,7 @@ func TestComplexSequenceRule(t *testing.T) {
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
-	kevt3 := &kevent.Kevent{
+	e3 := &kevent.Kevent{
 		Seq:       4,
 		Type:      ktypes.ConnectTCPv4,
 		Timestamp: time.Now().Add(time.Second),
@@ -669,15 +668,15 @@ func TestComplexSequenceRule(t *testing.T) {
 	// register alert sender
 	require.NoError(t, alertsender.LoadAll([]alertsender.Config{{Type: alertsender.None}}))
 
-	require.False(t, wrapProcessEvent(kevt1, rules.ProcessEvent))
-	require.False(t, wrapProcessEvent(kevt2, rules.ProcessEvent))
+	require.False(t, wrapProcessEvent(e1, rules.ProcessEvent))
+	require.False(t, wrapProcessEvent(e2, rules.ProcessEvent))
 
-	ss := rules.groups[ktypes.CreateProcess.Hash()][0].filters[0].ss
+	ss := rules.filters[ktypes.CreateProcess.Hash()][0].ss
 	assert.Len(t, ss.partials[1], 1)
 	assert.Len(t, ss.partials[2], 1)
 
 	time.Sleep(time.Millisecond * 30)
-	require.True(t, wrapProcessEvent(kevt3, rules.ProcessEvent))
+	require.True(t, wrapProcessEvent(e3, rules.ProcessEvent))
 
 	time.Sleep(time.Millisecond * 50)
 
@@ -688,10 +687,10 @@ func TestComplexSequenceRule(t *testing.T) {
 	seqAlert = nil
 
 	// FSM should transition from terminal to initial state
-	require.False(t, wrapProcessEvent(kevt1, rules.ProcessEvent))
-	require.False(t, wrapProcessEvent(kevt2, rules.ProcessEvent))
+	require.False(t, wrapProcessEvent(e1, rules.ProcessEvent))
+	require.False(t, wrapProcessEvent(e2, rules.ProcessEvent))
 	time.Sleep(time.Millisecond * 15)
-	require.True(t, wrapProcessEvent(kevt3, rules.ProcessEvent))
+	require.True(t, wrapProcessEvent(e3, rules.ProcessEvent))
 }
 
 func TestSequencePsUUID(t *testing.T) {
@@ -751,7 +750,7 @@ func TestSequenceOutOfOrder(t *testing.T) {
 	compileRules(t, rules)
 
 	now := time.Now()
-	kevt1 := &kevent.Kevent{
+	e1 := &kevent.Kevent{
 		Type:      ktypes.OpenProcess,
 		Timestamp: now,
 		Name:      "OpenProcess",
@@ -769,7 +768,7 @@ func TestSequenceOutOfOrder(t *testing.T) {
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
-	kevt2 := &kevent.Kevent{
+	e2 := &kevent.Kevent{
 		Type:      ktypes.CreateFile,
 		Timestamp: now.Add(time.Millisecond * 200),
 		Name:      "CreateFile",
@@ -788,13 +787,13 @@ func TestSequenceOutOfOrder(t *testing.T) {
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
-	ss := rules.groups[ktypes.CreateFile.Hash()][0].filters[0].ss
+	ss := rules.filters[ktypes.CreateFile.Hash()][0].ss
 
-	require.False(t, wrapProcessEvent(kevt2, rules.ProcessEvent))
+	require.False(t, wrapProcessEvent(e2, rules.ProcessEvent))
 	assert.Len(t, ss.partials[2], 1)
 	assert.True(t, ss.partials[2][0].ContainsMeta(kevent.RuleSequenceOutOfOrderKey))
 
-	require.True(t, wrapProcessEvent(kevt1, rules.ProcessEvent))
+	require.True(t, wrapProcessEvent(e1, rules.ProcessEvent))
 }
 
 func TestGCSequence(t *testing.T) {
@@ -825,7 +824,7 @@ func TestGCSequence(t *testing.T) {
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
-	ss := rules.groups[ktypes.OpenProcess.Hash()][0].filters[0].ss
+	ss := rules.filters[ktypes.OpenProcess.Hash()][0].ss
 
 	require.False(t, wrapProcessEvent(kevt1, rules.ProcessEvent))
 
@@ -838,7 +837,7 @@ func TestGCSequence(t *testing.T) {
 
 func TestSequenceAndSimpleRuleMix(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
-	rules := NewRules(psnap, newConfig("_fixtures/sequence_and_simple_rule_mix.yml"))
+	rules := NewRules(psnap, newConfig("_fixtures/simple_and_sequence_rules/*.yml"))
 	compileRules(t, rules)
 	log.SetLevel(log.DebugLevel)
 
@@ -1026,7 +1025,7 @@ func TestIsExpressionEvaluable(t *testing.T) {
 	compileRules(t, rules)
 	log.SetLevel(log.DebugLevel)
 
-	kevt1 := &kevent.Kevent{
+	e1 := &kevent.Kevent{
 		Type: ktypes.CreateProcess,
 		Name: "CreateProcess",
 		Tid:  2484,
@@ -1041,7 +1040,7 @@ func TestIsExpressionEvaluable(t *testing.T) {
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
-	kevt2 := &kevent.Kevent{
+	e2 := &kevent.Kevent{
 		Type: ktypes.RenameFile,
 		Name: "RenameFile",
 		Tid:  2484,
@@ -1056,13 +1055,11 @@ func TestIsExpressionEvaluable(t *testing.T) {
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
-	for _, groups := range rules.groups {
-		for _, g := range groups {
-			for _, f := range g.filters {
-				e := f.filter.GetSequence().Expressions[0]
-				assert.False(t, e.IsEvaluable(kevt2))
-				assert.True(t, e.IsEvaluable(kevt1))
-			}
+	for _, f := range rules.filters {
+		for _, cf := range f {
+			e := cf.filter.GetSequence().Expressions[0]
+			assert.False(t, e.IsEvaluable(e2))
+			assert.True(t, e.IsEvaluable(e1))
 		}
 	}
 }
@@ -1177,7 +1174,7 @@ func TestKillAction(t *testing.T) {
 func BenchmarkRunRules(b *testing.B) {
 	b.ReportAllocs()
 	psnap := new(ps.SnapshotterMock)
-	rules := NewRules(psnap, newConfig("_fixtures/default/default.yml"))
+	rules := NewRules(psnap, newConfig("_fixtures/default/*.yml"))
 	stats, err := rules.Compile()
 	require.NoError(b, err)
 	require.NotNil(b, stats)

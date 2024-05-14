@@ -1,0 +1,44 @@
+name: Potential thread execution hijacking
+description: |
+  Adversaries may inject malicious code into hijacked processes in order to evade process-based
+  defenses as well as possibly elevate privileges. Thread Execution Hijacking is a method of
+  executing arbitrary code in the address space of a separate live process.
+
+  This is very similar to Process Hollowing but targets an existing process rather than creating
+  a process in a suspended state.
+
+  Running code in the context of another process may allow access to the process's memory,
+  system/network resources, and possibly elevated privileges. Execution via Thread Execution
+  Hijacking may also evade detection from security products since the execution is masked under
+  a legitimate process.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1055
+  technique.name: Process Injection
+  technique.ref: https://attack.mitre.org/techniques/T1055/
+  subtechnique.id: T1055.003
+  subtechnique.name: Thread Execution Hijacking
+  subtechnique.ref: https://attack.mitre.org/techniques/T1055/003/
+
+condition: >
+  sequence
+  maxspan 2m
+  by ps.uuid
+    |open_thread and kevt.pid != 4 and kevt.pid != kevt.arg[pid]
+      and
+     thread.access.mask.names in ('ALL_ACCESS', 'SUSPEND_THREAD')
+      and
+      not
+     ps.exe imatches
+      (
+        '?:\\Program Files\\*',
+        '?:\\Program Files (x86)\\*'
+      )
+    |
+    |set_thread_context|
+action:
+  - name: kill
+
+min-engine-version: 2.0.0

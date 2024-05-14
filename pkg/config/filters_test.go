@@ -28,76 +28,61 @@ import (
 	"testing"
 )
 
-func TestLoadGroupsFromPaths(t *testing.T) {
+func TestLoadRulesFromPaths(t *testing.T) {
 	filters := Filters{
 		Rules{
 			FromPaths: []string{
 				"_fixtures/filters/default.yml",
+				"_fixtures/filters/default1.yml",
 			},
 		},
 		Macros{FromPaths: nil},
 		map[string]*Macro{},
-		[]FilterGroup{},
+		[]*FilterConfig{},
 	}
-	err := filters.LoadGroups()
+	err := filters.LoadFilters()
 	require.NoError(t, err)
-	require.Len(t, filters.groups, 2)
+	require.Len(t, filters.filters, 2)
 
-	g1 := filters.groups[0]
-	assert.Equal(t, "internal network traffic", g1.Name)
-	assert.True(t, *g1.Enabled)
-	assert.Contains(t, g1.Tags, "TE")
-	assert.Len(t, g1.Rules, 1)
-	assert.Equal(t, "only network category", g1.Rules[0].Name)
-	assert.Equal(t, "kevt.category = 'net'", g1.Rules[0].Condition)
-	assert.Equal(t, "this rule matches all network signals", g1.Rules[0].Description)
-	assert.Equal(t, "low", g1.Rules[0].Severity)
-	assert.Equal(t, "`%ps.exe` attempted to reach out to `%net.sip` IP address\n", g1.Rules[0].Output)
-	assert.NotNil(t, g1.Rules[0].Action)
+	f1 := filters.filters[0]
+	assert.Equal(t, "only network category", f1.Name)
+	assert.True(t, *f1.Enabled)
+	assert.Contains(t, f1.Tags, "TE")
+	assert.Equal(t, "kevt.category = 'net'", f1.Condition)
+	assert.Equal(t, "this rule matches all network signals", f1.Description)
+	assert.Equal(t, "low", f1.Severity)
+	assert.Equal(t, "`%ps.exe` attempted to reach out to `%net.sip` IP address\n", f1.Output)
+	assert.NotNil(t, f1.Action)
 
-	acts, err := g1.Rules[0].DecodeActions()
+	acts, err := f1.DecodeActions()
 	require.NoError(t, err)
 	require.IsType(t, KillAction{}, acts[0])
 
-	assert.Equal(t, "2.0.0", g1.Rules[0].MinEngineVersion)
+	assert.Equal(t, "2.0.0", f1.MinEngineVersion)
 
-	g2 := filters.groups[1]
-	assert.Equal(t, "rouge processes", g2.Name)
-	assert.True(t, *g2.Enabled)
-	assert.Len(t, g2.Rules, 1)
-	assert.Equal(t, "suspicious network ACTIVITY", g2.Rules[0].Name)
-	assert.Equal(t, "kevt.category = 'net' and ps.name in ('at.exe', 'java.exe')", g2.Rules[0].Condition)
+	f2 := filters.filters[1]
+	assert.False(t, f2.IsDisabled())
+	assert.Equal(t, "suspicious network ACTIVITY", f2.Name)
+	assert.Equal(t, "kevt.category = 'net' and ps.name in ('at.exe', 'java.exe')", f2.Condition)
 }
 
-func TestLoadGroupsFromPathsNewAttributes(t *testing.T) {
+func TestLoadRulesFromPathsWithTemplate(t *testing.T) {
 	filters := Filters{
 		Rules{
 			FromPaths: []string{
-				"_fixtures/filters/default-new-attributes.yml",
+				"_fixtures/filters/default-with-template.yml",
 			},
 		},
 		Macros{FromPaths: nil},
 		map[string]*Macro{},
-		[]FilterGroup{},
+		[]*FilterConfig{},
 	}
-	err := filters.LoadGroups()
+	err := filters.LoadFilters()
 	require.NoError(t, err)
-	require.Len(t, filters.groups, 2)
+	require.Len(t, filters.filters, 1)
 
-	g1 := filters.groups[0]
-	assert.Equal(t, "internal network traffic", g1.Name)
-	assert.False(t, *g1.Enabled)
-	assert.Contains(t, g1.Tags, "TE")
-	assert.Len(t, g1.Rules, 1)
-	assert.Equal(t, "only network category", g1.Rules[0].Name)
-
-	g2 := filters.groups[1]
-	assert.Equal(t, "rouge processes", g2.Name)
-	assert.Nil(t, g2.Enabled)
-	assert.False(t, g2.IsDisabled())
-	assert.Len(t, g2.Rules, 1)
-	assert.Equal(t, "suspicious network ACTIVITY", g2.Rules[0].Name)
-	assert.Equal(t, "kevt.category = 'net' and ps.name in ('at.exe', 'java.exe')", g2.Rules[0].Condition)
+	f1 := filters.filters[0]
+	assert.Equal(t, "ALL NETWORK EVENTS\n", f1.Output)
 }
 
 func TestLoadGroupsFromURLs(t *testing.T) {
@@ -128,13 +113,25 @@ func TestLoadGroupsFromURLs(t *testing.T) {
 		},
 		Macros{FromPaths: nil},
 		map[string]*Macro{},
-		[]FilterGroup{},
+		[]*FilterConfig{},
 	}
-	err = filters.LoadGroups()
+	err = filters.LoadFilters()
 	require.NoError(t, err)
-	require.Len(t, filters.groups, 2)
+	require.Len(t, filters.filters, 1)
 
-	g1 := filters.groups[0]
-	assert.Equal(t, "internal network traffic", g1.Name)
-	assert.True(t, *g1.Enabled)
+	f1 := filters.filters[0]
+	assert.Equal(t, "only network category", f1.Name)
+	assert.True(t, *f1.Enabled)
+	assert.Contains(t, f1.Tags, "TE")
+	assert.Equal(t, "kevt.category = 'net'", f1.Condition)
+	assert.Equal(t, "this rule matches all network signals", f1.Description)
+	assert.Equal(t, "low", f1.Severity)
+	assert.Equal(t, "`%ps.exe` attempted to reach out to `%net.sip` IP address\n", f1.Output)
+	assert.NotNil(t, f1.Action)
+
+	acts, err := f1.DecodeActions()
+	require.NoError(t, err)
+	require.IsType(t, KillAction{}, acts[0])
+
+	assert.Equal(t, "2.0.0", f1.MinEngineVersion)
 }

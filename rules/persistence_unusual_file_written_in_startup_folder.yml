@@ -1,0 +1,37 @@
+name: Unusual file written in Startup folder
+description: |
+  Identifies suspicious files written to the startup folder that would
+  allow adversaries to maintain persistence on the endpoint.
+labels:
+  tactic.id: TA0006
+  tactic.name: Persistence
+  tactic.ref: https://attack.mitre.org/tactics/TA0006/
+  technique.id: T1547
+  technique.name: Boot or Logon Autostart Execution
+  technique.ref: https://attack.mitre.org/techniques/T1547/
+  subtechnique.id: T1547.001
+  subtechnique.name: Registry Run Keys / Startup Folder
+  subtechnique.ref: https://attack.mitre.org/techniques/T1547/001/
+
+condition: >
+  create_file
+    and
+  (
+    file.extension in ('.vbs', '.js', '.jar', '.exe', '.dll', '.com', '.ps1', '.hta', '.cmd', '.vbe')
+      or
+    (file.is_exec or file.is_dll)
+  )
+    and
+  file.name imatches startup_locations
+    and
+    not
+  ps.exe imatches
+    (
+      '?:\\Windows\\System32\\wuauclt.exe',
+      '?:\\Windows\\System32\\msiexec.exe',
+      '?:\\Windows\\SysWOW64\\msiexec.exe',
+      '?:\\Windows\\System32\\svchost.exe',
+      '?:\\ProgramData\\Microsoft\\Windows Defender\\Platform\\*.exe'
+    )
+
+min-engine-version: 2.0.0

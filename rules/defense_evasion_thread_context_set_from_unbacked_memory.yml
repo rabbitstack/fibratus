@@ -1,0 +1,16 @@
+name: Thread context set from unbacked memory
+description: |
+  Identifies manipulation of the thread context from unbacked memory region. This may be
+  indicative of process injection.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1055
+  technique.name: Process Injection
+  technique.ref: https://attack.mitre.org/techniques/T1055/
+
+condition: >
+  set_thread_context and thread.callstack.summary imatches ('ntdll.dll|kernelbase.dll|unbacked')
+
+min-engine-version: 2.2.0

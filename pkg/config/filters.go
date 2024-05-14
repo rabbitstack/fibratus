@@ -25,7 +25,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/util/convert"
-	"github.com/rabbitstack/fibratus/pkg/util/hashers"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -49,17 +48,9 @@ type FilterConfig struct {
 	Output           string            `json:"output" yaml:"output"`
 	Severity         string            `json:"severity" yaml:"severity"`
 	Labels           map[string]string `json:"labels" yaml:"labels"`
+	Tags             []string          `json:"tags" yaml:"tags"`
 	MinEngineVersion string            `json:"min-engine-version" yaml:"min-engine-version"`
-}
-
-// FilterGroup represents the container for filters.
-type FilterGroup struct {
-	Name        string            `json:"group" yaml:"group"`
-	Description string            `json:"description" yaml:"description"`
-	Enabled     *bool             `json:"enabled" yaml:"enabled"`
-	Rules       []*FilterConfig   `json:"rules" yaml:"rules"`
-	Tags        []string          `json:"tags" yaml:"tags"`
-	Labels      map[string]string `json:"labels" yaml:"labels"`
+	Enabled          *bool             `json:"enabled" yaml:"enabled"`
 }
 
 // FilterAction wraps all possible filter actions.
@@ -99,28 +90,21 @@ func (f FilterConfig) DecodeActions() ([]any, error) {
 	return actions, nil
 }
 
-// IsDisabled determines if this group is disabled.
-func (g FilterGroup) IsDisabled() bool { return g.Enabled != nil && !*g.Enabled }
+// IsDisabled determines if this filter is disabled.
+func (f FilterConfig) IsDisabled() bool { return f.Enabled != nil && !*f.Enabled }
 
-// Hash calculates the filter group hash.
-func (g FilterGroup) Hash() uint32 {
-	return hashers.FnvUint32([]byte(g.Name))
-}
-
-// Filters contains references to rule groups and macro definitions.
-// Each filter group can contain multiple filter expressions which
-// represent the rules.
+// Filters contains references to rule and macro definitions.
 type Filters struct {
-	Rules  Rules  `json:"rules" yaml:"rules"`
-	Macros Macros `json:"macros" yaml:"macros"`
-	macros map[string]*Macro
-	groups []FilterGroup
+	Rules   Rules  `json:"rules" yaml:"rules"`
+	Macros  Macros `json:"macros" yaml:"macros"`
+	macros  map[string]*Macro
+	filters []*FilterConfig
 }
 
 // FiltersWithMacros builds the filter config with the map of
 // predefined macros. Only used for testing purposes.
 func FiltersWithMacros(macros map[string]*Macro) *Filters {
-	return &Filters{macros: macros, groups: make([]FilterGroup, 0)}
+	return &Filters{macros: macros, filters: make([]*FilterConfig, 0)}
 }
 
 // Rules contains attributes that describe the location of
@@ -148,17 +132,14 @@ type Macro struct {
 
 // ActionContext is the convenient structure
 // for grouping the event that resulted in
-// matched filter along with filter group
-// information.
+// matched filter along with filter information.
 type ActionContext struct {
-	// Events contains a single element for non-sequence
-	// group policies or a list of ordered matched events
-	// for sequence group policies
+	// Events contains a single element simple rules
+	// or a list of ordered matched events for sequence
+	// policies
 	Events []*kevent.Kevent
 	// Filter represents the filter that matched the event
 	Filter *FilterConfig
-	// Group represents the group where the filter is declared
-	Group FilterGroup
 }
 
 // UniquePids returns a set of process identifiers
@@ -328,10 +309,9 @@ func isValidExt(path string) bool {
 	return filepath.Ext(path) == ".yml" || filepath.Ext(path) == ".yaml"
 }
 
-// LoadGroups for each rule group file it decodes the
-// groups and ensures the correctness of the yaml file.
-func (f *Filters) LoadGroups() error {
-	f.groups = make([]FilterGroup, 0)
+// LoadFilters loads rules from YAML files or URL addresses.
+func (f *Filters) LoadFilters() error {
+	f.filters = make([]*FilterConfig, 0)
 	for _, p := range f.Rules.FromPaths {
 		paths, err := filepath.Glob(p)
 		if err != nil {
@@ -341,22 +321,21 @@ func (f *Filters) LoadGroups() error {
 			if !isValidExt(path) {
 				continue
 			}
-			log.Infof("loading rules from file %s", path)
-			// read the file group yaml file and produce
-			// the corresponding filter groups from it
+			log.Infof("loading rule from %s", path)
+			// read the rule file and decode to filter config
 			rawConfig, err := os.ReadFile(path)
 			if err != nil {
-				return fmt.Errorf("couldn't load rule file: %v", err)
+				return fmt.Errorf("couldn't load rule file: %s: %v", path, err)
 			}
-			groups, err := decodeFilterGroups(path, rawConfig)
+			flt, err := decodeFilter(path, rawConfig)
 			if err != nil {
 				return err
 			}
-			f.groups = append(f.groups, groups...)
+			f.filters = append(f.filters, flt)
 		}
 	}
 	for _, url := range f.Rules.FromURLs {
-		log.Infof("loading rules from URL %s", url)
+		log.Infof("loading rule from URL %s", url)
 		if _, err := u.Parse(url); err != nil {
 			return fmt.Errorf("%q is an invalid URL", url)
 		}
@@ -377,70 +356,52 @@ func (f *Filters) LoadGroups() error {
 		if err != nil {
 			return fmt.Errorf("cannot copy rule file from %q: %v", url, err)
 		}
-		groups, err := decodeFilterGroups(url, rawConfig.Bytes())
+		flt, err := decodeFilter(url, rawConfig.Bytes())
 		if err != nil {
 			return err
 		}
-		f.groups = append(f.groups, groups...)
+		f.filters = append(f.filters, flt)
 	}
 
-	if len(f.groups) == 0 {
+	if len(f.filters) == 0 {
 		log.Warnf("no rules were loaded from [%s] path(s)", strings.Join(f.Rules.FromPaths, ","))
 	}
 
-	// check for duplicate rule groups
-	groupNames := make(map[string]bool)
-	for _, group := range f.groups {
-		_, isDup := groupNames[group.Name]
-		if isDup {
-			return fmt.Errorf("group names must be unique. "+
-				"Found duplicate %q group", group.Name)
-		}
-		groupNames[group.Name] = true
-	}
 	return nil
 }
 
-func decodeFilterGroups(resource string, b []byte) ([]FilterGroup, error) {
+func decodeFilter(resource string, b []byte) (*FilterConfig, error) {
 	var out interface{}
 	err := yaml.Unmarshal(b, &out)
 	if err != nil {
-		return nil, fmt.Errorf("%q is invalid yaml file: %v", resource, err)
+		return nil, fmt.Errorf("%q is an invalid yaml file: %v", resource, err)
 	}
-	rawGroups, ok := out.([]interface{})
-	if !ok {
-		return nil, fmt.Errorf("invalid rule group "+
-			"file %s: expected array(s) of groups", resource)
-	}
-	// apply validation to each group
-	// declared in the yml config file
-	for _, group := range rawGroups {
-		valid, errs := validate(rulesSchema, group)
-		if !valid || len(errs) > 0 {
-			rawGroup := group
-			b, err := yaml.Marshal(&rawGroup)
-			if err == nil {
-				rawGroup = string(b)
-			}
-			return nil, fmt.Errorf("invalid rule group: \n\n"+
-				"%v in %s: %v", rawGroup, resource, multierror.Wrap(errs...))
+	// apply validation to rule definition
+	valid, errs := validate(rulesSchema, out)
+	if !valid || len(errs) > 0 {
+		rawRule := out
+		b, err := yaml.Marshal(&rawRule)
+		if err == nil {
+			rawRule = string(b)
 		}
+		return nil, fmt.Errorf("invalid rule definition: \n\n"+
+			"%v in %s: %v", rawRule, resource, multierror.Wrap(errs...))
 	}
 	// render template
 	b, err = renderTmpl(resource, b)
 	if err != nil {
 		return nil, err
 	}
-	// now unmarshal into typed group slice
-	var groups []FilterGroup
-	if err := yaml.Unmarshal(b, &groups); err != nil {
+	// now unmarshal into typed filter config
+	var flt FilterConfig
+	if err := yaml.Unmarshal(b, &flt); err != nil {
 		return nil, err
 	}
-	return groups, nil
+	return &flt, nil
 }
 
 // renderTmpl executes templating directives in the
-// file group yaml file. It returns the byte slice
+// rule yaml file. It returns the byte slice
 // with yaml content after template expansion.
 func renderTmpl(filename string, b []byte) ([]byte, error) {
 	tmpl, err := template.New(filename).Funcs(sprig.FuncMap()).Parse(string(b))

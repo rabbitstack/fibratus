@@ -1,21 +1,12 @@
-- group: internal network traffic
-  enabled: true
-  tags:
-    - TE
-  rules:
-    - name: only network category
-      description: this rule matches all network signals
-      condition: kevt.category = 'net'
-      severity: low
-      output: >
-        `%ps.exe` attempted to reach out to `%net.sip` IP address
-      action:
-      - name: kill
-      min-engine-version: 2.0.0
-
-- group: rouge processes
-  enabled: true
-  rules:
-    - name: suspicious network {{ upper "activity" }}
-      condition: kevt.category = 'net' and ps.name in ('at.exe', 'java.exe')
-      min-engine-version: 2.0.0
+name: only network category
+enabled: true
+description: this rule matches all network signals
+condition: kevt.category = 'net'
+severity: low
+output: >
+  `%ps.exe` attempted to reach out to `%net.sip` IP address
+action:
+- name: kill
+min-engine-version: 2.0.0
+tags:
+  - TE
