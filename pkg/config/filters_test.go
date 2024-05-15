@@ -46,6 +46,8 @@ func TestLoadRulesFromPaths(t *testing.T) {
 
 	f1 := filters.filters[0]
 	assert.Equal(t, "only network category", f1.Name)
+	assert.Equal(t, "313933e7-8eb9-45d9-81af-0305fee70e29", f1.ID)
+	assert.Equal(t, "1.0.0", f1.Version)
 	assert.True(t, *f1.Enabled)
 	assert.Contains(t, f1.Tags, "TE")
 	assert.Equal(t, "kevt.category = 'net'", f1.Condition)
@@ -53,6 +55,8 @@ func TestLoadRulesFromPaths(t *testing.T) {
 	assert.Equal(t, "low", f1.Severity)
 	assert.Equal(t, "`%ps.exe` attempted to reach out to `%net.sip` IP address\n", f1.Output)
 	assert.NotNil(t, f1.Action)
+	assert.Contains(t, f1.References, "ref2")
+	assert.NotEmpty(t, f1.Notes)
 
 	acts, err := f1.DecodeActions()
 	require.NoError(t, err)

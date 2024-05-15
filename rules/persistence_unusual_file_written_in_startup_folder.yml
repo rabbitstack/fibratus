@@ -1,4 +1,6 @@
 name: Unusual file written in Startup folder
+id: c5ffe15c-d94f-416b-bec7-c47f89843267
+version: 1.0.0
 description: |
   Identifies suspicious files written to the startup folder that would
   allow adversaries to maintain persistence on the endpoint.

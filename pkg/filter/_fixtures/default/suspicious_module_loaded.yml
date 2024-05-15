@@ -1,3 +1,5 @@
 name: Loaded suspicious module
+id: 1e4c3fbf-ed3a-4df4-9c54-8693d7397a75
+version: 1.0.0
 condition: kevt.name = 'LoadImage' and image.name = 'svchost.dll'
 min-engine-version: 2.0.0

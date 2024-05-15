@@ -500,9 +500,12 @@ var rulesSchema = `
 	"$schema": "http://json-schema.org/draft-07/schema#",
 	"type": "object",
 	"properties": {
+		"id": 					{"type": "string", "minLength": 36, "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"},
+		"version": 				{"type": "string", "minLength": 5, "pattern": "^([0-9]+.)([0-9]+.)([0-9]+)$"},
 		"name": 				{"type": "string", "minLength": 3},
         "description":  		{"type": "string"},
 		"output": 				{"type": "string", "minLength": 5},
+		"notes": 				{"type": "string"},
 		"severity":  			{"type": "string", "enum": ["low", "medium", "high", "critical"]},
 		"min-engine-version":  	{"type": "string", "minLength": 5, "pattern": "^([0-9]+.)([0-9]+.)([0-9]+)$"},
 		"enabled":  			{"type": "boolean"},
@@ -512,6 +515,7 @@ var rulesSchema = `
   			"additionalProperties": { "type": "string"}
 		},
 		"tags":					{"type": "array", "items": [{"type": "string", "minLength": 1}]},
+		"references":			{"type": "array", "items": [{"type": "string", "minLength": 1}]},
 		"action": 				{
 			"type": "array",
 			"items": {
@@ -524,7 +528,7 @@ var rulesSchema = `
 			}
 		}
 	},
-	"required": ["name", "condition", "min-engine-version"],
+	"required": ["id", "version", "name", "condition", "min-engine-version"],
 	"additionalProperties": false
 }
 `

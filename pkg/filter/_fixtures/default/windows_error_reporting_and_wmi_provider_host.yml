@@ -1,4 +1,6 @@
 name: Windows error reporting/telemetry, WMI provider host
+id: 0fe67e44-94e2-44cb-bc40-052bc2e0fdb2
+version: 1.0.0
 condition:  kevt.name = 'CreateProcess' and ps.comm startswith
   (
     ' \"C:\\Windows\\system32\\wermgr.exe\\" \"-queuereporting_svc\" ',

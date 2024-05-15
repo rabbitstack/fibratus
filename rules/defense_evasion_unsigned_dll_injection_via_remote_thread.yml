@@ -1,4 +1,6 @@
 name: Unsigned DLL injection via remote thread
+id: 21bdd944-3bda-464b-9a72-58fd37ba9163
+version: 1.0.0
 description: |
   Identifies unsigned DLL injection via remote thread creation.
   Adversaries may inject dynamic-link libraries (DLLs) into processes in order to evade process-based defenses
@@ -14,6 +16,8 @@ labels:
   subtechnique.id: T1055.001
   subtechnique.name: Dynamic-link Library Injection
   subtechnique.ref: https://attack.mitre.org/techniques/T1055/001/
+references:
+  - https://www.ired.team/offensive-security/code-injection-process-injection/dll-injection
 
 condition: >
   sequence

@@ -1,4 +1,6 @@
 name: Suspicious Microsoft Office embedded object
+id: 47368d49-1192-4059-9c55-6bbc4fd1a73a
+version: 1.0.0
 description: |
   Identifies Microsoft Office processes dropping a file with suspicious
   extension and with the call stack indicating operations to save or load

@@ -1,4 +1,6 @@
 name: Vulnerable or malicious driver loaded
+id: e8005f1d-b4ec-45ee-a3ea-4247eac123db
+version: 1.0.0
 description: |
   Detects when adversaries load a vulnerable/malicious driver
   into the compromised system to exploit the vulnerability and
@@ -10,6 +12,8 @@ labels:
   technique.id: T1068
   technique.name: Exploitation for Privilege Escalation
   technique.ref: https://attack.mitre.org/techniques/T1068/
+references:
+  - https://www.loldrivers.io/
 
 condition: >
   (load_driver)

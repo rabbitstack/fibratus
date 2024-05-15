@@ -1,4 +1,6 @@
 name: RID Hijacking
+id: 5c25666a-4a9f-4b7c-b02f-db0b5cdbde83
+version: 1.0.0
 description: |
   RID (Relative ID part of security identifier) hijacking allows an attacker with SYSTEM
   level privileges to covertly replace the RID of a low privileged account effectively making
@@ -10,6 +12,9 @@ labels:
   technique.id: T1547
   technique.name: Boot or Logon Autostart Execution
   technique.ref: https://attack.mitre.org/techniques/T1547/
+references:
+  - https://github.com/r4wd3r/RID-Hijacking
+  - https://www.ired.team/offensive-security/persistence/rid-hijacking
 
 condition: >
   set_value and registry.key.name imatches 'HKEY_LOCAL_MACHINE\\SAM\\SAM\\Domains\\Account\\Users\\*\\F'

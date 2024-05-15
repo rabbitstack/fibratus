@@ -1,4 +1,6 @@
 name: Command shell created a temp file
+id: 40ffc2a8-0bde-45c4-9e20-46158250fa91
+version: 1.0.0
 condition: >
   sequence
   maxspan 200ms

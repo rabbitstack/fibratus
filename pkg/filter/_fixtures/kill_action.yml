@@ -1,4 +1,6 @@
 name: Kill calc.exe process
+id: 172902be-76e9-4ee7-a48a-6275fa571cf4
+version: 1.0.0
 condition: kevt.name = 'CreateProcess' and ps.child.name = 'calc.exe'
 severity: critical
 action:

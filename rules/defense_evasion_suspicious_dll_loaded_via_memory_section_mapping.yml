@@ -1,4 +1,6 @@
 name: Suspicious DLL loaded via memory section mapping
+id: b06653fb-227e-4e63-9a69-55a5a90c79e5
+version: 1.0.0
 description: |
   Identifies the mapping of a memory section with RX protection followed by unsigned DLL loading.
   Adversaries may inject dynamic-link libraries (DLLs) into processes in order to evade process-based defenses

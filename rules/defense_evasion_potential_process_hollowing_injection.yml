@@ -1,4 +1,6 @@
 name: Potential Process Hollowing
+id: 2a3fbae8-5e8c-4b71-b9da-56c3958c0d53
+version: 1.0.0
 description: |
   Adversaries may inject malicious code into suspended and hollowed processes in order to
   evade process-based defenses. Process hollowing is a method of executing arbitrary code
@@ -21,6 +23,8 @@ labels:
   subtechnique.id: T1055.012
   subtechnique.name: Process Hollowing
   subtechnique.ref: https://attack.mitre.org/techniques/T1055/012/
+references:
+  - https://www.ired.team/offensive-security/code-injection-process-injection/process-hollowing-and-pe-image-relocations
 
 condition: >
   sequence

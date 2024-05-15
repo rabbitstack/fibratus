@@ -1,4 +1,6 @@
 name: Vulnerable or malicious driver dropped
+id: d4742163-cf68-4ebd-b9a2-3ad17bbf63d5
+version: 1.0.0
 description: |
   Detects when adversaries drop a vulnerable/malicious driver
   onto a compromised system as a preparation for vulnerability
@@ -10,6 +12,8 @@ labels:
   technique.id: T1068
   technique.name: Exploitation for Privilege Escalation
   technique.ref: https://attack.mitre.org/techniques/T1068/
+references:
+  - https://www.loldrivers.io/
 
 condition: >
   create_file

@@ -1,3 +1,5 @@
 name: match http connections
+id: 6f36f8e0-a5c2-498f-9563-eea306daa586
+version: 1.0.0
 condition: kevt.category = 'net' and net.dport = 80
 min-engine-version: 2.0.0

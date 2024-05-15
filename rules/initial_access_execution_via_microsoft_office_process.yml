@@ -1,4 +1,6 @@
 name: Execution via Microsoft Office process
+id: a10ebe66-1b55-4005-a374-840f1e2933a3
+version: 1.0.0
 description:
   Identifies the execution of the file dropped by Microsoft Office process.
 labels:

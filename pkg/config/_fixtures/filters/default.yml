@@ -1,4 +1,6 @@
 name: only network category
+id: 313933e7-8eb9-45d9-81af-0305fee70e29
+version: 1.0.0
 enabled: true
 description: this rule matches all network signals
 condition: kevt.category = 'net'
@@ -10,3 +12,10 @@ action:
 min-engine-version: 2.0.0
 tags:
   - TE
+references:
+  - ref1
+  - ref2
+notes: |
+  Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+  Ut ut ante id ligula molestie varius. Duis efficitur eros
+  quis turpis accumsan, nec scelerisque libero euismod.

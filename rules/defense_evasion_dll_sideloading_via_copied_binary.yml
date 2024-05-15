@@ -1,4 +1,6 @@
 name: DLL Side-Loading via a copied binary
+id: 80798e2c-6c37-472b-936c-1d2d6b95ff3c
+version: 1.0.0
 description: |
   Identifies when a binary is copied to a directory and shortly followed
   by the loading of an unsigned DLL from the same directory. Adversaries may

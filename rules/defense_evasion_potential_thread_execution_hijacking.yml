@@ -1,4 +1,6 @@
 name: Potential thread execution hijacking
+id: 8b9f6d47-e9ba-4b3a-9da2-d7bf27e08ca9
+version: 1.0.0
 description: |
   Adversaries may inject malicious code into hijacked processes in order to evade process-based
   defenses as well as possibly elevate privileges. Thread Execution Hijacking is a method of
@@ -21,6 +23,8 @@ labels:
   subtechnique.id: T1055.003
   subtechnique.name: Thread Execution Hijacking
   subtechnique.ref: https://attack.mitre.org/techniques/T1055/003/
+references:
+  - https://www.ired.team/offensive-security/code-injection-process-injection/injecting-to-remote-process-via-thread-hijacking
 
 condition: >
   sequence
