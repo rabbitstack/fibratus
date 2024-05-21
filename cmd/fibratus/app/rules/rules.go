@@ -21,7 +21,9 @@ package rules
 import (
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/util/convert"
 	"github.com/spf13/cobra"
+	"strings"
 )
 
 var Command = &cobra.Command{
@@ -41,10 +43,17 @@ var listCmd = &cobra.Command{
 	RunE:  list,
 }
 
+var createCmd = &cobra.Command{
+	Use:   "create",
+	Short: "Create a new rule template",
+	RunE:  create,
+}
+
 var cfg = config.NewWithOpts(config.WithValidate(), config.WithList())
 
 var (
 	summarized bool
+	tacticID   string
 )
 
 func init() {
@@ -54,6 +63,9 @@ func init() {
 
 	listCmd.PersistentFlags().BoolVarP(&summarized, "summary", "s", false, "Show rules summary by MITRE tactics and techniques")
 	Command.AddCommand(listCmd)
+
+	createCmd.PersistentFlags().StringVarP(&tacticID, "tactic-id", "t", "", "Specifies the MITRE tactic identifier for the rule (e.g. TA0001)")
+	Command.AddCommand(createCmd)
 }
 
 func validate(cmd *cobra.Command, args []string) error {
@@ -62,6 +74,17 @@ func validate(cmd *cobra.Command, args []string) error {
 
 func list(cmd *cobra.Command, args []string) error {
 	return listRules()
+}
+
+func create(cmd *cobra.Command, args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("rule name is required")
+	}
+	if tacticID != "" && tactics[tacticID] == "" {
+		tacts := fmt.Sprintf("Did you mean any of %s?", strings.Join(convert.MapKeysToSlice(tactics), ", "))
+		return fmt.Errorf("invalid tactic id: %s. %s", tacticID, tacts)
+	}
+	return createRule(args[0])
 }
 
 func emo(s string, args ...any) { fmt.Printf(s, args...) }
