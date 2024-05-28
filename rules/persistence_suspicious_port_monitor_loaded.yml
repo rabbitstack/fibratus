@@ -1,0 +1,27 @@
+name: Suspicious port monitor loaded
+id: d6ab6bfa-1a97-46cb-a69a-7a6c98a699f1
+version: 1.0.0
+description: |
+  Identifies the loading of an unsigned DLL by the print spool service. Adversaries may use port
+  monitors to run an adversary supplied DLL during system boot for persistence or privilege escalation.
+labels:
+   tactic.id: TA0003
+   tactic.name: Persistence
+   tactic.ref: https://attack.mitre.org/tactics/TA0003/
+   technique.id: T1547
+   technique.name: Boot or Logon Autostart Execution
+   technique.ref: https://attack.mitre.org/techniques/T1547/
+   subtechnique.id: T1547.010
+   subtechnique.name: Port Monitors
+   subtechnique.ref: https://attack.mitre.org/techniques/T1547/010/
+references:
+  - https://www.ired.team/offensive-security/persistence/t1013-addmonitor
+
+condition: >
+  load_dll and ps.name ~= 'spoolsv.exe'
+    and
+  thread.callstack.symbols imatches ('localspl.dll!SplAddMonitor*', 'spoolsv.exe!PrvAddMonitor*')
+    and
+  (image.signature.level = 'UNCHECKED' or image.signature.level = 'UNSIGNED')
+
+min-engine-version: 2.2.0
