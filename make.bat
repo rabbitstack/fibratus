@@ -107,7 +107,7 @@ copy /y ".\configs\fibratus.yml" "%RELEASE_DIR%\Config\fibratus.yml"
 copy /y ".\pkg\outputs\eventlog\mc\fibratus.dll" "%RELEASE_DIR%\fibratus.dll"
 
 robocopy ".\filaments" "%RELEASE_DIR%\Filaments" /E /S /XF *.md /XD __pycache__ .idea
-robocopy ".\rules" "%RELEASE_DIR%\Rules" /E /S
+robocopy ".\rules" "%RELEASE_DIR%\Rules" /E /S /XF *.md *.png
 
 :: download the embedded Python distribution
 echo Downloading Python %PYTHON_VER%...
@@ -123,23 +123,26 @@ echo Downloading get-pip.py...
 powershell -Command "Invoke-WebRequest https://bootstrap.pypa.io/get-pip.py -OutFile %RELEASE_DIR%\get-pip.py"
 %RELEASE_DIR%\python\python.exe %RELEASE_DIR%\get-pip.py
 
-rm %RELEASE_DIR%\get-pip.py
-rm %RELEASE_DIR%\python.zip
+del %RELEASE_DIR%\get-pip.py
+del %RELEASE_DIR%\python.zip
 
-:: Move Python DLLs and other dependencies to the same directory where the fibratus binary
-:: is located to advise Windows on the DLL search path strategy.
+:: Move Python DLLs and other dependencies to the same directory
+:: where the fibratus binary is located to advise Windows on the
+:: DLL search path strategy.
 move %RELEASE_DIR%\python\*.dll %RELEASE_DIR%\bin
 
 :: Rename libcrypto-1_1.dll to libcrypto-3-x64.dll
 ren "%RELEASE_DIR%\bin\libcrypto-1_1.dll" "libcrypto-3-x64.dll"
+:: Copy Debug Help DLL
+copy %SystemRoot%\System32\dbghelp.dll "%RELEASE_DIR%\Bin"
 
 echo "Building MSI package..."
-heat dir %RELEASE_DIR%\ -cg Fibratus -dr INSTALLDIR -suid -gg -sfrag -srd -var var.FibratusDir -out build/msi/components.wxs || exit /b
-:: To target win64 builds
-powershell -Command "(Get-Content -path build/msi/components.wxs) -replace 'Component ','Component Win64=\"yes\" ' | Set-Content -Path build/msi/components.wxs" || exit /b
-candle build/msi/components.wxs -dFibratusDir=%RELEASE_DIR% -out build/msi/components.wixobj || exit /b
-candle build/msi/fibratus.wxs -ext WiXUtilExtension -dFibratusDir=%RELEASE_DIR% -out build/msi/fibratus.wixobj || exit /b
-light build/msi/fibratus.wixobj build/msi/components.wixobj -out build/msi/fibratus-%VERSION%-amd64.msi -ext WixUIExtension -ext WiXUtilExtension
+pushd .
+cd build/msi
+wix extension add WixToolset.UI.wixext || exit /b
+wix build -ext WixToolset.UI.wixext -b dir=fibratus-%VERSION% fibratus.wxs -arch x64 -d VERSION=%VERSION% -o fibratus-%VERSION%-amd64.msi || exit /b
+popd
+echo "fibratus-%VERSION%-amd64.msi MSI package built successfully"
 
 if errorlevel 1 goto fail
 
@@ -160,15 +163,18 @@ copy /y ".\cmd\fibratus\fibratus.exe" "%RELEASE_DIR%\Bin"
 copy /y ".\configs\fibratus.yml" "%RELEASE_DIR%\Config\fibratus.yml"
 copy /y ".\pkg\outputs\eventlog\mc\fibratus.dll" "%RELEASE_DIR%\fibratus.dll"
 
-robocopy ".\rules" "%RELEASE_DIR%\Rules" /E /S
+robocopy ".\rules" "%RELEASE_DIR%\Rules" /E /S /XF *.md *.png
+
+:: Copy Debug Help DLL
+copy %SystemRoot%\System32\dbghelp.dll "%RELEASE_DIR%\Bin"
 
 echo "Building MSI package..."
-heat dir %RELEASE_DIR%\ -cg Fibratus -dr INSTALLDIR -suid -gg -sfrag -srd -var var.FibratusDir -out build/msi/components.wxs || exit /b
-:: To target win64 builds
-powershell -Command "(Get-Content -path build/msi/components.wxs) -replace 'Component ','Component Win64=\"yes\" ' | Set-Content -Path build/msi/components.wxs" || exit /b
-candle build/msi/components.wxs -dFibratusDir=%RELEASE_DIR% -out build/msi/components.wixobj || exit /b
-candle build/msi/fibratus.wxs -ext WiXUtilExtension -dFibratusDir=%RELEASE_DIR% -out build/msi/fibratus.wixobj || exit /b
-light build/msi/fibratus.wixobj build/msi/components.wixobj -out build/msi/fibratus-%VERSION%-slim-amd64.msi -ext WixUIExtension -ext WiXUtilExtension
+pushd .
+cd build/msi
+wix extension add WixToolset.UI.wixext || exit /b
+wix build -ext WixToolset.UI.wixext -b dir=fibratus-%VERSION%-slim fibratus.wxs -arch x64 -d VERSION=%VERSION% -o fibratus-%VERSION%-slim-amd64.msi || exit /b
+popd
+echo "fibratus-%VERSION%-slim-amd64.msi MSI package built successfully"
 
 if errorlevel 1 goto fail
 
@@ -193,4 +199,3 @@ goto :EOF
 :fail
 echo Failed with error #%errorlevel%.
 exit /b %errorlevel%
-

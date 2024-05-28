@@ -1,87 +1,45 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+  xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
+  xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
 
-<?define VERSION="!(bind.fileVersion.fibratus.exe)"?>
-
-<Wix
-  xmlns="http://schemas.microsoft.com/wix/2006/wi"
-  xmlns:util="http://schemas.microsoft.com/wix/UtilExtension"
-  >
-
-  <Product
-    Id="*"
-    UpgradeCode="E81B8794-3277-47F9-BE58-2EF2D20930EC"
-    Name="Fibratus"
-    Version="$(var.VERSION)"
-    Manufacturer="Nedim Sabic Sabic &lt;https://www.fibratus.io&gt;"
-    Language="1033"
-    >
-    <Package
-      Id="*"
-      Description="Fibratus Installer"
+  <Package Name="Fibratus"
+      Version="$(var.VERSION)"
+      Manufacturer="Nedim Sabic Sabic &lt;https://www.fibratus.io&gt;"
+      UpgradeCode="E81B8794-3277-47F9-BE58-2EF2D20930EC"
       InstallerVersion="200"
       Compressed="yes"
-      Languages="1033"
-      Platform="x64"
-      />
-    <MajorUpgrade
-        Schedule="afterInstallInitialize"
-        DowngradeErrorMessage="A later version of [ProductName] is already installed"
-        AllowSameVersionUpgrades="yes" />
-    <UIRef
-      Id="WixUI_InstallDir"
-      />
-    <Property
-      Id="WIXUI_INSTALLDIR"
-      Value="INSTALLDIR"
-      />
-    <WixVariable
-      Id="WixUIDialogBmp"
-      Value="background.png"
-      />
-    <WixVariable
-      Id="WixUIBannerBmp"
-      Value="banner.png"
-      />
-    <WixVariable
-      Id="WixUILicenseRtf"
-      Value="LICENSE.rtf"
-      />
-    <Media
-      Id="1"
-      Cabinet="fibratus.cab"
-      EmbedCab="yes"
-      />
-    <Directory
-      Id="TARGETDIR"
-      Name="SourceDir"
-      >
-      <Directory
-        Id="ProgramFiles64Folder"
-        >
-        <Directory
-          Id="INSTALLDIR"
-          Name="Fibratus"
-          >
-          <Component Win64='yes' Id="Path" KeyPath="yes" Guid="E81B8794-3277-47F9-BE58-2EF2D20930EC">
-              <Environment Id="PATH" Name="PATH" Value="[INSTALLDIR]Bin" Permanent="no" Part="last" Action="set" System="yes" />
-          </Component>
-        </Directory>
-      </Directory>
-    </Directory>
+      Language="1033">
+    <SummaryInformation Description="Fibratus Installer" />
 
-    <Feature
-      Id="Fibratus"
-      Description="The complete installation."
-      Level="1"
-      Display="expand"
-      ConfigurableDirectory="INSTALLDIR"
-      >
-      <ComponentGroupRef
-              Id="Fibratus"
-      />
-      <ComponentRef
-              Id="Path"
-      />
+    <Media Id="1" Cabinet="fibratus.cab" EmbedCab="yes" />
+
+    <MajorUpgrade Schedule="afterInstallInitialize" DowngradeErrorMessage="A later version of [ProductName] is already installed" AllowSameVersionUpgrades="yes" />
+
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLDIR" />
+
+    <!-- Custom banners -->
+    <WixVariable Id="WixUIDialogBmp" Value="background.png" /> <!-- Background bitmap used on the welcome and completion dialogs, should be 493 × 312 pixels -->
+    <WixVariable Id="WixUIBannerBmp" Value="banner.png" />  <!-- Top banner, should be 493 × 58 pixels -->
+
+    <!-- License -->
+    <WixVariable Id="WixUILicenseRtf" Value="LICENSE.rtf"/>
+
+    <ComponentGroup Id="Files" Subdirectory="Fibratus" Directory="ProgramFiles64Folder">
+      <Files Include="!(bindpath.dir)**" />
+    </ComponentGroup>
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLDIR" Name="Fibratus">
+        <Component Id="Path" KeyPath="yes" Guid="E81B8794-3277-47F9-BE58-2EF2D20930EC">
+          <Environment Id="PATH" Name="PATH" Value="[INSTALLDIR]Bin" Permanent="no" Part="last" Action="set" System="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <Feature Id="Fibratus" Description="Fibratus" Level="1" ConfigurableDirectory="INSTALLDIR">
+      <ComponentGroupRef Id="Files" />
+      <ComponentRef Id="Path" />
     </Feature>
-  </Product>
+  </Package>
 </Wix>
