@@ -1,0 +1,50 @@
+name: Potential privilege escalation via phantom DLL hijacking
+id: 5ccdb5c2-3a30-4e14-87d2-d7aeb4c45fad
+version: 1.0.0
+description: |
+  Identifies the loading of the phantom DLL that was previously dropped
+  to the System directory. Adversaries may exploit this flow to escalate
+  privileges by placing a custom version of the DLL and initiating the
+  execution of an auto-elevated high integrity Windows native process.
+labels:
+   tactic.id: TA0004
+   tactic.name: Privilege Escalation
+   tactic.ref: https://attack.mitre.org/tactics/TA0004/
+   technique.id: T1574
+   technique.name: Hijack Execution Flow
+   technique.ref: https://attack.mitre.org/techniques/T1574/
+   subtechnique.id: T1574.001
+   subtechnique.name: DLL Search Order Hijacking
+   subtechnique.ref: https://attack.mitre.org/techniques/T1574/001/
+references:
+  - http://waleedassar.blogspot.com/2013/01/wow64logdll.html
+  - http://www.hexacorn.com/blog/2013/12/08/beyond-good-ol-run-key-part-5/
+  - https://www.sentinelone.com/blog/deep-hooks-monitoring-native-execution-wow64-applications-part-1/
+  - https://shellz.club/posts/edgegdi-dll-for-persistence-and-lateral-movement/
+  - https://www.mdsec.co.uk/2020/10/i-live-to-move-it-windows-lateral-movement-part-3-dll-hijacking/
+  - https://posts.specterops.io/lateral-movement-scm-and-dll-hijacking-primer-d2f61e8ab992
+
+condition: >
+  sequence
+  maxspan 10m
+    |create_file and file.name imatches
+      (
+        '?:\\Windows\\System32\\wow64log.dll',
+        '?:\\Windows\\wbemcomn.dll',
+        '?:\\Windows\\System\\Ualapi.dll',
+        '?:\\Windows\\System32\\EdgeGdi.dll',
+        '?:\\Windows\\*\\wbem\\wbemcomn.dll',
+        '?:\\Windows\\System32\\WindowsPowerShell\\*\\wbemcomn.dll',
+        '?:\\Windows\\*\\Ualapi.dll',
+        '?:\\Windows\\System32\\spool\\drivers\\x64\\PrintConfig.dll',
+        '?:\\Windows\\System32\\wlbsctrl.dll',
+        '?:\\Windows\\System32\\Tsmsisrv.dll',
+        '?:\\Windows\\System32\\TSVIPSrv.dll',
+        '?:\\Windows\\System32\\fveapi.dll',
+        '?:\\Windows\\System32\\Speech\\Engines\\TTS\\MSTTSLocEnUS.dll',
+        '?:\\Windows\\System32\\DXGIDebug.dll'
+      )
+    | by file.name
+    |load_dll| by image.name
+
+min-engine-version: 2.0.0
