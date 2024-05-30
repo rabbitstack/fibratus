@@ -27,6 +27,7 @@ import (
 )
 
 const deviceOffset = 8
+const vmsmbDevice = `\Device\vmsmb`
 
 // DevMapper is the minimal interface for the device converters.
 type DevMapper interface {
@@ -66,6 +67,13 @@ func (m *mapper) Convert(filename string) string {
 		return filename
 	}
 	dev := filename[:i+deviceOffset]
+	// convert Windows Sandbox path to native path
+	if dev == vmsmbDevice {
+		n := strings.Index(filename, "os")
+		if n > 0 {
+			return "C:" + filename[n+2:]
+		}
+	}
 	if drive, ok := m.cache[dev]; ok {
 		return strings.Replace(filename, dev, drive, 1)
 	}

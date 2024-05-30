@@ -71,3 +71,9 @@ func TestConvertDosDevice(t *testing.T) {
 	}
 	assert.Contains(t, files, filename)
 }
+
+func TestConvertVmsmbDevice(t *testing.T) {
+	mapper := NewDevMapper()
+	path := "\\Device\\vmsmb\\VSMB-{dcc079ae-60ba-4d07-847c-3493609c0870}\\os\\Windows\\System32\\ntdll.dll"
+	assert.Equal(t, "C:\\Windows\\System32\\ntdll.dll", mapper.Convert(path))
+}
