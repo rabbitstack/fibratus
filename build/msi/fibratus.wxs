@@ -22,11 +22,32 @@
     <WixVariable Id="WixUIDialogBmp" Value="background.png" /> <!-- Background bitmap used on the welcome and completion dialogs, should be 493 × 312 pixels -->
     <WixVariable Id="WixUIBannerBmp" Value="banner.png" />  <!-- Top banner, should be 493 × 58 pixels -->
 
+    <Property Id="WIXUI_EXITDIALOGOPTIONALTEXT" Value="You're all set up! Fibratus is running and securing your endpoint." />
+
     <!-- License -->
     <WixVariable Id="WixUILicenseRtf" Value="LICENSE.rtf"/>
 
-    <ComponentGroup Id="Files" Subdirectory="Fibratus" Directory="ProgramFiles64Folder">
-      <Files Include="!(bindpath.dir)**" />
+    <!--Files -->
+    <ComponentGroup Id="Files" Directory="INSTALLDIR">
+      <Files Include="!(bindpath.dir)**">
+        <!-- Exclude from harvesting as its need fine-grained authoring in Windows Service -->
+        <Exclude Files="!(bindpath.dir)Bin\fibratus.exe" />
+      </Files>
+
+      <!-- Windows Service -->
+      <Component Directory="BINDIR">
+        <File Source="!(bindpath.dir)Bin\fibratus.exe" />
+        <ServiceInstall Name="Fibratus" DisplayName="Fibratus"
+            Description="Adversary tradecraft detection, protection, and hunting"
+            Account="LocalSystem"
+            Type="ownProcess"
+            Start="auto"
+            ErrorControl="normal" Vital="yes">
+          <util:ServiceConfig FirstFailureActionType="restart" SecondFailureActionType="restart"
+              ThirdFailureActionType="restart" RestartServiceDelayInSeconds="60" />
+        </ServiceInstall>
+        <ServiceControl Id="Fibratus" Name="Fibratus" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
+      </Component>
     </ComponentGroup>
 
     <StandardDirectory Id="ProgramFiles64Folder">
@@ -34,6 +55,7 @@
         <Component Id="Path" KeyPath="yes" Guid="E81B8794-3277-47F9-BE58-2EF2D20930EC">
           <Environment Id="PATH" Name="PATH" Value="[INSTALLDIR]Bin" Permanent="no" Part="last" Action="set" System="yes" />
         </Component>
+        <Directory Id="BINDIR" Name="Bin" />
       </Directory>
     </StandardDirectory>
 
@@ -41,5 +63,18 @@
       <ComponentGroupRef Id="Files" />
       <ComponentRef Id="Path" />
     </Feature>
+
+    <!-- Enable recovery actions for the Windows Service -->
+    <Property Id="EnableRecoveryActions" Value="&quot;SC.EXE&quot; failureflag fibratus 1"/>
+    <CustomAction Id="EnableRecoveryActions"
+                      BinaryRef="Wix4UtilCA_X86"
+                      DllEntry="WixQuietExec"
+                      Impersonate="no"
+                      Execute="deferred"
+                      Return="ignore"/>
+
+    <InstallExecuteSequence>
+      <Custom Action="EnableRecoveryActions" Before="InstallFinalize" Condition="NOT REMOVE" />
+    </InstallExecuteSequence>
   </Package>
 </Wix>

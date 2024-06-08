@@ -25,6 +25,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/alertsender/mail"
 	"github.com/rabbitstack/fibratus/pkg/alertsender/slack"
 	"github.com/rabbitstack/fibratus/pkg/alertsender/systray"
+	"golang.org/x/sys/windows/svc"
 	"reflect"
 )
 
@@ -79,6 +80,12 @@ func (c *Config) tryLoadAlertSenders() error {
 			if err := decode(config, &systrayConfig); err != nil {
 				return errAlertsenderConfig(typ, err)
 			}
+
+			isSvc, err := svc.IsWindowsService()
+			if isSvc && err == nil {
+				systrayConfig.Enabled = false
+			}
+
 			if !systrayConfig.Enabled {
 				continue
 			}
