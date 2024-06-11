@@ -65,8 +65,8 @@
     </Feature>
 
     <!-- Enable recovery actions for the Windows Service -->
-    <Property Id="EnableRecoveryActions" Value="&quot;SC.EXE&quot; failureflag fibratus 1"/>
-    <CustomAction Id="EnableRecoveryActions"
+    <Property Id="ConfigureServiceRecovery" Value="&quot;SC.EXE&quot; failureflag fibratus 1"/>
+    <CustomAction Id="ConfigureServiceRecovery"
                       BinaryRef="Wix4UtilCA_X86"
                       DllEntry="WixQuietExec"
                       Impersonate="no"
@@ -74,7 +74,7 @@
                       Return="ignore"/>
 
     <InstallExecuteSequence>
-      <Custom Action="EnableRecoveryActions" Before="InstallFinalize" Condition="NOT REMOVE" />
+      <Custom Action="ConfigureServiceRecovery" Before="InstallFinalize" Condition="NOT REMOVE" />
     </InstallExecuteSequence>
   </Package>
 </Wix>

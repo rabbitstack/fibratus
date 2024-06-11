@@ -67,6 +67,7 @@ func init() {
 	RootCmd.AddCommand(service.StartCommand)
 	RootCmd.AddCommand(service.StopCommand)
 	RootCmd.AddCommand(service.RestartCommand)
+	RootCmd.AddCommand(service.StatusCommand)
 	RootCmd.AddCommand(stats.Command)
 	RootCmd.AddCommand(config.Command)
 	RootCmd.AddCommand(list.Command)

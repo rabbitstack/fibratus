@@ -21,6 +21,7 @@ package service
 import (
 	"fmt"
 	"github.com/rabbitstack/fibratus/internal/bootstrap"
+	log "github.com/sirupsen/logrus"
 	"time"
 
 	"github.com/rabbitstack/fibratus/pkg/config"
@@ -218,6 +219,7 @@ func Run() {
 
 	err = svc.Run(svcName, &fsvc{})
 	if err != nil {
+		log.Error(err)
 		_ = evtlog.Error(0xc0000008, err.Error())
 		return
 	}
