@@ -25,6 +25,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/alertsender/mail"
 	"github.com/rabbitstack/fibratus/pkg/alertsender/slack"
 	"github.com/rabbitstack/fibratus/pkg/alertsender/systray"
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	"reflect"
 )
 
@@ -79,6 +80,11 @@ func (c *Config) tryLoadAlertSenders() error {
 			if err := decode(config, &systrayConfig); err != nil {
 				return errAlertsenderConfig(typ, err)
 			}
+
+			if sys.IsWindowsService() {
+				systrayConfig.Enabled = false
+			}
+
 			if !systrayConfig.Enabled {
 				continue
 			}

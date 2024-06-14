@@ -22,9 +22,12 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/log/rotate"
 	fs "github.com/rifflock/lfshook"
+	"github.com/saferwall/pe/log"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sys/windows"
 	"io"
 	"os"
 	"path/filepath"
@@ -95,6 +98,14 @@ func InitFromConfig(c Config) error {
 		Filename:   file,
 	})
 
+	// redirect stderr to a file if running as Windows Service
+	if sys.IsWindowsService() {
+		err = redirectStderrToFile(file)
+		if err != nil {
+			log.Warnf("stderr redirection: %v", err)
+		}
+	}
+
 	if err != nil {
 		loggerErrors.Add(err.Error(), 1)
 		// failed to initialize log rotate, so we fallback on simple log hook
@@ -108,5 +119,19 @@ func InitFromConfig(c Config) error {
 	}
 	logrus.AddHook(rhook)
 
+	return nil
+}
+
+func redirectStderrToFile(file string) error {
+	f, err := os.OpenFile(file, os.O_WRONLY|os.O_SYNC|os.O_APPEND, 0644)
+	if err != nil {
+		return fmt.Errorf("unable to open %s for stderr redirection: %v", file, err)
+	}
+	defer f.Close()
+	err = windows.SetStdHandle(windows.STD_ERROR_HANDLE, windows.Handle(f.Fd()))
+	if err != nil {
+		return fmt.Errorf("failed to redirect stderr to file: %v", err)
+	}
+	os.Stderr = f
 	return nil
 }

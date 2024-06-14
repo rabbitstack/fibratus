@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 by Nedim Sabic Sabic
+ * Copyright 2021-2022 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -19,22 +19,19 @@
 package service
 
 import (
-	"errors"
 	"fmt"
 	"github.com/spf13/cobra"
-	"golang.org/x/sys/windows/svc/eventlog"
+	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
 )
 
-var removeCommand = &cobra.Command{
-	Use:   "remove",
-	Short: "Remove fibratus from the Windows service control manager",
-	RunE:  removeService,
+var statusCommand = &cobra.Command{
+	Use:   "status",
+	Short: "Check the status of the Fibratus service",
+	RunE:  statusService,
 }
 
-var errServiceNotInstalled = errors.New("fibratus service is not installed")
-
-func removeService(cmd *cobra.Command, args []string) error {
+func statusService(cmd *cobra.Command, args []string) error {
 	m, err := mgr.Connect()
 	if err != nil {
 		return err
@@ -44,18 +41,20 @@ func removeService(cmd *cobra.Command, args []string) error {
 	}()
 	s, err := m.OpenService(svcName)
 	if err != nil {
-		return errServiceNotInstalled
+		fmt.Printf("Fibratus service is not installed")
+		return nil
 	}
 	defer func() {
-		_ = s.Close()
+		s.Close()
 	}()
-	err = s.Delete()
+	status, err := s.Query()
 	if err != nil {
 		return err
 	}
-	err = eventlog.Remove(svcName)
-	if err != nil {
-		return fmt.Errorf("couldn't create eventlog remove record: %v", err)
+	if status.State != svc.Running {
+		fmt.Printf("Fibratus service is not running")
+		return nil
 	}
+	fmt.Printf("Fibratus service is running")
 	return nil
 }

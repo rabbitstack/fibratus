@@ -20,6 +20,7 @@ package sys
 
 import (
 	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/svc"
 	"unsafe"
 )
 
@@ -70,4 +71,11 @@ func IsProcessRunning(proc windows.Handle) bool {
 		return false
 	}
 	return exitcode == ProcessStatusStillActive
+}
+
+// IsWindowsService reports whether the process is currently executing
+// as a Windows service.
+func IsWindowsService() bool {
+	isSvc, err := svc.IsWindowsService()
+	return isSvc && err == nil
 }

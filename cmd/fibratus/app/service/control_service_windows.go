@@ -21,6 +21,7 @@ package service
 import (
 	"fmt"
 	"github.com/rabbitstack/fibratus/internal/bootstrap"
+	log "github.com/sirupsen/logrus"
 	"time"
 
 	"github.com/rabbitstack/fibratus/pkg/config"
@@ -32,22 +33,27 @@ import (
 	"golang.org/x/sys/windows/svc/mgr"
 )
 
-var StartCommand = &cobra.Command{
-	Use:   "start-service",
-	RunE:  start,
+var startCommand = &cobra.Command{
+	Use:   "start",
+	RunE:  startService,
 	Short: "Start fibratus service",
 }
 
-var StopCommand = &cobra.Command{
-	Use:   "stop-service",
+var stopCommand = &cobra.Command{
+	Use:   "stop",
 	RunE:  stopService,
 	Short: "Stop fibratus service",
 }
 
-var RestartCommand = &cobra.Command{
-	Use:   "restart-service",
+var restartCommand = &cobra.Command{
+	Use:   "restart",
 	RunE:  restartService,
 	Short: "Restart fibratus service",
+}
+
+var Command = &cobra.Command{
+	Use:   "service",
+	Short: "Install, remove, and control fibratus service",
 }
 
 var (
@@ -63,10 +69,12 @@ var (
 
 func init() {
 	// initialize service config
-	cfg.MustViperize(StartCommand)
+	cfg.MustViperize(startCommand)
+
+	Command.AddCommand(startCommand, stopCommand, restartCommand, installCommand, removeCommand, statusCommand)
 }
 
-func start(cmd *cobra.Command, args []string) error {
+func startService(cmd *cobra.Command, args []string) error {
 	h, err := windows.OpenSCManager(nil, nil, windows.SC_MANAGER_CONNECT)
 	if err != nil {
 		return fmt.Errorf("couldn't connect to Windows Service Manager: %v", err)
@@ -115,7 +123,7 @@ func restartService(cmd *cobra.Command, args []string) error {
 	if err := stopSvc(); err != nil {
 		return err
 	}
-	return start(cmd, args)
+	return startService(cmd, args)
 }
 
 func stopSvc() error {
@@ -218,6 +226,7 @@ func Run() {
 
 	err = svc.Run(svcName, &fsvc{})
 	if err != nil {
+		log.Error(err)
 		_ = evtlog.Error(0xc0000008, err.Error())
 		return
 	}

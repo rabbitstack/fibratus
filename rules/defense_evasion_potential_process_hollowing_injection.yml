@@ -30,7 +30,7 @@ condition: >
   sequence
   maxspan 2m
     |spawn_process| by ps.child.uuid
-    |unmap_view_of_section and file.view.size > 4096 and (length(file.name) = 0 or not ext(file.name) = '.dll')| by ps.uuid
+    |unmap_view_of_section and file.view.size > 10000 and (length(file.name) = 0 or not ext(file.name) = '.dll')| by ps.uuid
     |load_executable and pe.is_modified| by ps.uuid
 action:
   - name: kill
