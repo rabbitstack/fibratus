@@ -62,12 +62,7 @@ var RootCmd = &cobra.Command{
 func init() {
 	RootCmd.AddCommand(capture.Command)
 	RootCmd.AddCommand(replay.Command)
-	RootCmd.AddCommand(service.InstallCommand)
-	RootCmd.AddCommand(service.RemoveCommand)
-	RootCmd.AddCommand(service.StartCommand)
-	RootCmd.AddCommand(service.StopCommand)
-	RootCmd.AddCommand(service.RestartCommand)
-	RootCmd.AddCommand(service.StatusCommand)
+	RootCmd.AddCommand(service.Command)
 	RootCmd.AddCommand(stats.Command)
 	RootCmd.AddCommand(config.Command)
 	RootCmd.AddCommand(list.Command)

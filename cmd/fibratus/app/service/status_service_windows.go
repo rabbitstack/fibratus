@@ -25,9 +25,9 @@ import (
 	"golang.org/x/sys/windows/svc/mgr"
 )
 
-var StatusCommand = &cobra.Command{
-	Use:   "status-service",
-	Short: "Check the status of the fibratus service",
+var statusCommand = &cobra.Command{
+	Use:   "status",
+	Short: "Check the status of the Fibratus service",
 	RunE:  statusService,
 }
 

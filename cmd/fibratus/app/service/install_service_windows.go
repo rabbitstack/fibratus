@@ -29,10 +29,11 @@ import (
 
 const svcName = "fibratus"
 
-var errServiceAlreadyInstalled = errors.New("fibratus service is already installed")
+// ErrServiceAlreadyInstalled indicates the fibratus service is already installed
+var ErrServiceAlreadyInstalled = errors.New("fibratus service is already installed")
 
-var InstallCommand = &cobra.Command{
-	Use:   "install-service",
+var installCommand = &cobra.Command{
+	Use:   "install",
 	Short: "Install fibratus within the Windows service control manager",
 	RunE:  installService,
 }
@@ -54,7 +55,7 @@ func installService(cmd *cobra.Command, args []string) error {
 		if err := s.Close(); err != nil {
 			return err
 		}
-		return errServiceAlreadyInstalled
+		return ErrServiceAlreadyInstalled
 	}
 
 	svccfg := mgr.Config{

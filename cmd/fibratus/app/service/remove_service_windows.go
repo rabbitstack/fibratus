@@ -26,15 +26,15 @@ import (
 	"golang.org/x/sys/windows/svc/mgr"
 )
 
-var RemoveCommand = &cobra.Command{
-	Use:   "remove-service",
+var removeCommand = &cobra.Command{
+	Use:   "remove",
 	Short: "Remove fibratus from the Windows service control manager",
-	RunE:  remove,
+	RunE:  removeService,
 }
 
 var errServiceNotInstalled = errors.New("fibratus service is not installed")
 
-func remove(cmd *cobra.Command, args []string) error {
+func removeService(cmd *cobra.Command, args []string) error {
 	m, err := mgr.Connect()
 	if err != nil {
 		return err
