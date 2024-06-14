@@ -22,11 +22,12 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/log/rotate"
 	fs "github.com/rifflock/lfshook"
+	"github.com/saferwall/pe/log"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
-	"golang.org/x/sys/windows/svc"
 	"io"
 	"os"
 	"path/filepath"
@@ -98,18 +99,11 @@ func InitFromConfig(c Config) error {
 	})
 
 	// redirect stderr to a file if running as Windows Service
-	isSvc, err := svc.IsWindowsService()
-	if isSvc && err == nil {
-		f, err := os.OpenFile(file, os.O_WRONLY|os.O_SYNC|os.O_APPEND, 0644)
+	if sys.IsWindowsService() {
+		err = redirectStderrToFile(file)
 		if err != nil {
-			return fmt.Errorf("unable to open %s for stderr redirection: %v", file, err)
+			log.Warnf("stderr redirection: %v", err)
 		}
-		defer f.Close()
-		err = windows.SetStdHandle(windows.STD_ERROR_HANDLE, windows.Handle(f.Fd()))
-		if err != nil {
-			logrus.Warnf("failed to redirect stderr to file: %v", err)
-		}
-		os.Stderr = f
 	}
 
 	if err != nil {
@@ -125,5 +119,19 @@ func InitFromConfig(c Config) error {
 	}
 	logrus.AddHook(rhook)
 
+	return nil
+}
+
+func redirectStderrToFile(file string) error {
+	f, err := os.OpenFile(file, os.O_WRONLY|os.O_SYNC|os.O_APPEND, 0644)
+	if err != nil {
+		return fmt.Errorf("unable to open %s for stderr redirection: %v", file, err)
+	}
+	defer f.Close()
+	err = windows.SetStdHandle(windows.STD_ERROR_HANDLE, windows.Handle(f.Fd()))
+	if err != nil {
+		return fmt.Errorf("failed to redirect stderr to file: %v", err)
+	}
+	os.Stderr = f
 	return nil
 }
