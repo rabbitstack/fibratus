@@ -41,7 +41,7 @@ func (f *Formatter) Format(kevt *Kevent) []byte {
 		kparameters: kevt.Kparams.String(),
 	}
 
-	// add process' metadata
+	// add process metadata
 	ps := kevt.PS
 	if ps != nil {
 		values[proc] = ps.Name
@@ -60,9 +60,13 @@ func (f *Formatter) Format(kevt *Kevent) []byte {
 			values[pe] = ps.PE.String()
 		}
 	}
+	// add callstack summary
+	if !kevt.Callstack.IsEmpty() {
+		values[callstack] = kevt.Callstack.String()
+	}
 
 	if f.expandKparamsDot {
-		// expand all parameters into the map so we can ask
+		// expand all parameters into the map, so we can ask
 		// for specific parameter names in the template
 		for _, kpar := range kevt.Kparams {
 			values[".Kparams."+caser.String(kpar.Name)] = kpar.String()
