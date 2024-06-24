@@ -23,6 +23,9 @@ import "golang.org/x/sys/windows"
 // Hwnd defines the window handle type
 type Hwnd uintptr
 
+// InvalidHwnd designates an invalid window handle
+const InvalidHwnd = 0
+
 // Hicon defines the icon handle type
 type Hicon uintptr
 

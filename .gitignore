@@ -1,12 +1,13 @@
 cmd/fibratus/fibratus.exe
 cmd/fibratus/fibratus.syso
 
+cmd/systray/fibratus-systray.exe
+cmd/systray/fibratus-systray.syso
+
 pkg/outputs/eventlog/mc/*
 !pkg/outputs/eventlog/mc/fibratus.mc
 
 build/msi/fibratus-*
-build/msi/components.wxs
-build/msi/*.wixobj
 build/msi/*.wixpdb
 build/msi/*.msi
 

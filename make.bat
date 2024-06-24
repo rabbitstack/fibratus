@@ -29,7 +29,7 @@ set LDFLAGS="-s -w -X github.com/rabbitstack/fibratus/cmd/fibratus/app.version=%
 ::
 :: kcap: enables capture support
 :: filament: enables running filaments and thus interacting with the CPython interpreter
-:: yara: activates Yara process scanning
+:: yara: enables YARA scanner via cgo bindings
 if NOT DEFINED TAGS (
     set TAGS=""
 )
@@ -54,6 +54,7 @@ if "%~1"=="mc" goto mc
 :build
 :: set PKG_CONFIG_PATH=pkg-config
 go build -ldflags %LDFLAGS% -tags %TAGS% -o .\cmd\fibratus\fibratus.exe .\cmd\fibratus
+go build -ldflags %LDFLAGS% -o .\cmd\systray\fibratus-systray.exe .\cmd\systray
 if errorlevel 1 goto fail
 goto :EOF
 
@@ -78,6 +79,7 @@ goto :EOF
 :rsrc
 set RC_VER=%VERSION:.=,%
 windres --define RC_VER=%RC_VER% --define VER=%VERSION% -i cmd\fibratus\fibratus.rc -O coff -o cmd\fibratus\fibratus.syso
+windres --define RC_VER=%RC_VER% --define VER=%VERSION% -i cmd\systray\fibratus-systray.rc -O coff -o cmd\systray\fibratus-systray.syso
 if errorlevel 1 goto fail
 goto :EOF
 
@@ -103,6 +105,7 @@ mkdir "%~dp0\%RELEASE_DIR%\Filaments"
 echo Copying artifacts...
 :: Copy artifacts
 copy /y ".\cmd\fibratus\fibratus.exe" "%RELEASE_DIR%\Bin"
+copy /y ".\cmd\systray\fibratus-systray.exe" "%RELEASE_DIR%\Bin"
 copy /y ".\configs\fibratus.yml" "%RELEASE_DIR%\Config\fibratus.yml"
 copy /y ".\pkg\outputs\eventlog\mc\fibratus.dll" "%RELEASE_DIR%\fibratus.dll"
 
@@ -161,6 +164,7 @@ mkdir "%~dp0\%RELEASE_DIR%\Rules"
 echo Copying artifacts...
 :: Copy artifacts
 copy /y ".\cmd\fibratus\fibratus.exe" "%RELEASE_DIR%\Bin"
+copy /y ".\cmd\systray\fibratus-systray.exe" "%RELEASE_DIR%\Bin"
 copy /y ".\configs\fibratus.yml" "%RELEASE_DIR%\Config\fibratus.yml"
 copy /y ".\pkg\outputs\eventlog\mc\fibratus.dll" "%RELEASE_DIR%\fibratus.dll"
 
@@ -184,6 +188,7 @@ goto :EOF
 
 :clean
 del cmd\fibratus\fibratus.exe
+del cmd\systray\fibratus-systray.exe
 goto :EOF
 
 :: Install the dev MSI. This target executes

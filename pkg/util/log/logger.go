@@ -39,7 +39,7 @@ var (
 )
 
 // InitFromConfig initializes a Logrus instance from config options.
-func InitFromConfig(c Config) error {
+func InitFromConfig(c Config, filename string) error {
 	exe, err := os.Executable()
 	var path string
 	if err != nil {
@@ -63,7 +63,7 @@ func InitFromConfig(c Config) error {
 		}
 	}
 
-	file := filepath.Join(path, "fibratus.log")
+	file := filepath.Join(path, filename)
 
 	// setup log formatter
 	var formatter logrus.Formatter

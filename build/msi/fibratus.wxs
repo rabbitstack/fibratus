@@ -16,7 +16,14 @@
 
     <MajorUpgrade Schedule="afterInstallInitialize" DowngradeErrorMessage="A later version of [ProductName] is already installed" AllowSameVersionUpgrades="yes" />
 
-    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLDIR" />
+    <UI Id="UI">
+      <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLDIR" />
+      <Publish Dialog="ExitDialog"
+              Control="Finish"
+              Event="DoAction"
+              Value="LaunchSystray"
+              Condition="NOT Installed"/>
+    </UI>
 
     <!-- Custom banners -->
     <WixVariable Id="WixUIDialogBmp" Value="background.png" /> <!-- Background bitmap used on the welcome and completion dialogs, should be 493 × 312 pixels -->
@@ -32,10 +39,12 @@
       <Files Include="!(bindpath.dir)**">
         <!-- Exclude from harvesting as its need fine-grained authoring in Windows Service -->
         <Exclude Files="!(bindpath.dir)Bin\fibratus.exe" />
+        <!-- Exclude from harvesting as it is used in custom action -->
+        <Exclude Files="!(bindpath.dir)Bin\fibratus-systray.exe" />
       </Files>
 
       <!-- Windows Service -->
-      <Component Directory="BINDIR">
+      <Component Directory="BINDIR" Guid="F2C06EDD-C830-4FCD-BAFA-0D15C697EE76">
         <File Source="!(bindpath.dir)Bin\fibratus.exe" />
         <ServiceInstall Name="Fibratus" DisplayName="Fibratus"
             Description="Adversary tradecraft detection, protection, and hunting"
@@ -47,6 +56,14 @@
               ThirdFailureActionType="restart" RestartServiceDelayInSeconds="60" />
         </ServiceInstall>
         <ServiceControl Id="Fibratus" Name="Fibratus" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
+      </Component>
+      <Component Id="Systray" Guid="F3C06EDD-C830-4FCD-BAFA-0D15C697EE76">
+        <File Id="Systray" Source="!(bindpath.dir)Bin\fibratus-systray.exe" KeyPath="yes" Checksum="yes"/>
+        <RegistryValue Root="HKMU" Action="write"
+                       Key="Software\Microsoft\Windows\CurrentVersion\Run"
+                       Name="Fibratus Systray"
+                       Value="[BINDIR]fibratus-systray.exe"
+                       Type="string" />
       </Component>
     </ComponentGroup>
 
@@ -65,16 +82,17 @@
     </Feature>
 
     <!-- Enable recovery actions for the Windows Service -->
-    <Property Id="ConfigureServiceRecovery" Value="&quot;SC.EXE&quot; failureflag fibratus 1"/>
-    <CustomAction Id="ConfigureServiceRecovery"
-                      BinaryRef="Wix4UtilCA_X86"
-                      DllEntry="WixQuietExec"
-                      Impersonate="no"
-                      Execute="deferred"
-                      Return="ignore"/>
+    <Property Id="ConfigureServiceRecovery" Value="&quot;SC.EXE&quot; failureflag fibratus 1" />
+    <CustomAction Id="ConfigureServiceRecovery" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" DllEntry="WixQuietExec" Impersonate="no" Execute="deferred" Return="ignore" />
+
+    <!-- Systray -->
+    <Property Id="WixShellExecTarget" Value="[#Systray]"/>
+    <CustomAction Id="LaunchSystray" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" DllEntry="WixShellExec" Impersonate="yes" />
+    <util:CloseApplication Id="CloseSystray" CloseMessage="yes" Target="fibratus-systray.exe" RebootPrompt="no" />
 
     <InstallExecuteSequence>
-      <Custom Action="ConfigureServiceRecovery" Before="InstallFinalize" Condition="NOT REMOVE" />
+      <Custom Action="ConfigureServiceRecovery" After="InstallServices" Condition="NOT REMOVE" />
     </InstallExecuteSequence>
+
   </Package>
 </Wix>

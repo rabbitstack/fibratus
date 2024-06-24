@@ -57,6 +57,7 @@ var (
 	procSymSetOptions                        = moddbghelp.NewProc("SymSetOptions")
 	procSymUnloadModule64                    = moddbghelp.NewProc("SymUnloadModule64")
 	procCreateThread                         = modkernel32.NewProc("CreateThread")
+	procFreeConsole                          = modkernel32.NewProc("FreeConsole")
 	procGetProcessIdOfThread                 = modkernel32.NewProc("GetProcessIdOfThread")
 	procTerminateThread                      = modkernel32.NewProc("TerminateThread")
 	procNtAlpcQueryInformation               = modntdll.NewProc("NtAlpcQueryInformation")
@@ -143,6 +144,11 @@ func SymUnloadModule(handle windows.Handle, baseDLL uint64) {
 func CreateThread(attributes *windows.SecurityAttributes, stackSize uint, startAddress uintptr, param uintptr, creationFlags uint32, threadID *uint32) (handle windows.Handle) {
 	r0, _, _ := syscall.Syscall6(procCreateThread.Addr(), 6, uintptr(unsafe.Pointer(attributes)), uintptr(stackSize), uintptr(startAddress), uintptr(param), uintptr(creationFlags), uintptr(unsafe.Pointer(threadID)))
 	handle = windows.Handle(r0)
+	return
+}
+
+func FreeConsole() {
+	syscall.Syscall(procFreeConsole.Addr(), 0, 0, 0, 0)
 	return
 }
 
@@ -242,7 +248,7 @@ func GetMappedFileName(handle windows.Handle, addr uintptr, filename *uint16, si
 	return
 }
 
-func SHGetStockIconInfo(id uint, flags uint, icon *ShStockIcon) (err error) {
+func SHGetStockIconInfo(id int32, flags uint32, icon *ShStockIcon) (err error) {
 	r1, _, e1 := syscall.Syscall(procSHGetStockIconInfo.Addr(), 3, uintptr(id), uintptr(flags), uintptr(unsafe.Pointer(icon)))
 	if r1 != 0 {
 		err = errnoErr(e1)
