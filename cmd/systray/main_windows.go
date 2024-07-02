@@ -28,6 +28,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/alertsender/systray"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/log"
+	"github.com/rabbitstack/fibratus/pkg/util/signals"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
 	"io"
@@ -44,7 +45,6 @@ type MsgType uint8
 const (
 	Config MsgType = iota
 	Balloon
-	Shutdown
 )
 
 var (
@@ -88,7 +88,7 @@ func newSystray() (*Systray, error) {
 		return nil, err
 	}
 
-	tray := &Systray{quit: make(chan struct{}, 1)}
+	tray := &Systray{quit: signals.Install()}
 
 	hwnd, err := tray.createNotifyIconWindow(mod)
 	if err != nil {
@@ -113,11 +113,11 @@ func newSystray() (*Systray, error) {
 	return tray, nil
 }
 
-func (s *Systray) shutdown() {
+func (s *Systray) shutdown() error {
 	if s.window.IsValid() {
 		s.window.Destroy()
 	}
-	s.systrayIcon.Delete()
+	return s.systrayIcon.Delete()
 }
 
 func (s *Systray) createNotifyIconWindow(mod windows.Handle) (sys.Hwnd, error) {
@@ -125,7 +125,7 @@ func (s *Systray) createNotifyIconWindow(mod windows.Handle) (sys.Hwnd, error) {
 	var wc sys.WndClassEx
 	wc.Size = uint32(unsafe.Sizeof(wc))
 	wc.Instance = mod
-	wc.WndProc = windows.NewCallback(wndProc)
+	wc.WndProc = windows.NewCallback(s.wndProc)
 	wc.ClassName = className
 	err := sys.RegisterClass(&wc)
 	if err != nil {
@@ -181,6 +181,7 @@ func (s *Systray) loadIconFromResource(mod windows.Handle) (windows.Handle, erro
 
 func (s *Systray) handlePipeClient(conn net.Conn) {
 	buf := make([]byte, 1024)
+	defer conn.Close()
 	for {
 		n, err := conn.Read(buf)
 		if err != nil {
@@ -225,9 +226,6 @@ func (s *Systray) handleMessage(m Msg) error {
 			text = " "
 		}
 		return s.systrayIcon.ShowBalloonNotification(alert.Title, text, s.config.Sound, s.config.QuietMode)
-	case Shutdown:
-		logrus.Info("shutting down...")
-		s.quit <- struct{}{}
 	}
 	return nil
 }
@@ -255,7 +253,10 @@ func main() {
 	go func() {
 		<-tray.quit
 		l.Close()
-		tray.shutdown()
+		err := tray.shutdown()
+		if err != nil {
+			logrus.Warnf("fail to shutdown: %v", err)
+		}
 	}()
 
 	// server loop
@@ -271,6 +272,9 @@ func main() {
 	}
 }
 
-func wndProc(hwnd uintptr, msg uint32, wparam, lparam uintptr) uintptr {
+func (s *Systray) wndProc(hwnd uintptr, msg uint32, wparam, lparam uintptr) uintptr {
+	if msg == sys.WmClose {
+		s.quit <- struct{}{}
+	}
 	return sys.DefWindowProc(hwnd, msg, wparam, lparam)
 }

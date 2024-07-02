@@ -42,6 +42,7 @@ require (
 
 require (
 	github.com/bits-and-blooms/bitset v1.13.0 // indirect
+	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/rivo/uniseg v0.4.2 // indirect
 	github.com/rogpeppe/go-internal v1.11.0 // indirect
 	golang.org/x/arch v0.6.0 // indirect

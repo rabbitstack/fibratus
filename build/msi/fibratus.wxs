@@ -88,7 +88,7 @@
     <!-- Systray -->
     <Property Id="WixShellExecTarget" Value="[#Systray]"/>
     <CustomAction Id="LaunchSystray" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" DllEntry="WixShellExec" Impersonate="yes" />
-    <util:CloseApplication Id="CloseSystray" CloseMessage="yes" Target="fibratus-systray.exe" RebootPrompt="no" />
+    <util:CloseApplication Id="CloseSystray" CloseMessage="yes" Target="fibratus-systray" RebootPrompt="no" />
 
     <InstallExecuteSequence>
       <Custom Action="ConfigureServiceRecovery" After="InstallServices" Condition="NOT REMOVE" />

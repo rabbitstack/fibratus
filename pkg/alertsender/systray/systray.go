@@ -19,12 +19,13 @@
 package systray
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/Microsoft/go-winio"
+	"github.com/cenkalti/backoff/v4"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	log "github.com/sirupsen/logrus"
-	"net"
 	"os"
 	"time"
 )
@@ -43,15 +44,15 @@ const systrayPipe = `\\.\pipe\fibratus-systray`
 // by the systray sender.
 type systray struct {
 	config Config
-	npipe  net.Conn
 }
 
+// MsgType determines the type of the message sent
+// to the systray named pipe server.
 type MsgType uint8
 
 const (
 	Conf MsgType = iota
 	Balloon
-	Shutdown
 )
 
 // Msg represents the data exchanged between systray client/server.
@@ -83,60 +84,64 @@ func makeSender(config alertsender.Config) (alertsender.Sender, error) {
 		return &systray{}, nil
 	}
 
-	retries := 20
+	s := &systray{config: c}
+	b := &backoff.ExponentialBackOff{
+		// first backoff timeout will be somewhere in the 100 - 300 ms range given the default multiplier
+		InitialInterval:     time.Millisecond * 200,
+		RandomizationFactor: backoff.DefaultRandomizationFactor,
+		Multiplier:          backoff.DefaultMultiplier,
+		MaxInterval:         time.Second * 10,
+		MaxElapsedTime:      time.Minute * 30,
+		Stop:                backoff.Stop,
+		Clock:               backoff.SystemClock,
+	}
+
+	b.Reset()
+
 	for {
-		if retries == 0 {
-			break
-		}
 		if !pipeExists() {
-			log.Warnf("systray pipe not ready yet. Trying in 1s...")
-			time.Sleep(time.Second)
-			retries--
+			backoffTime := b.NextBackOff()
+			if backoffTime == backoff.Stop {
+				return nil, fmt.Errorf("%s named pipe didn't appear after 30m", systrayPipe)
+			}
+			log.Warnf("systray pipe not ready. Trying to dial in %v...", backoffTime)
+			time.Sleep(backoffTime)
 			continue
 		}
 		break
 	}
 
-	npipe, err := winio.DialPipe(systrayPipe, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	s := &systray{
-		config: c,
-		npipe:  npipe,
-	}
-
 	return s, s.writePipe(&Msg{Type: Conf, Data: c})
 }
 
-func (s systray) Send(alert alertsender.Alert) error {
-	m := &Msg{Type: Balloon, Data: alert}
-	return s.writePipe(m)
+func (s *systray) Send(alert alertsender.Alert) error {
+	return s.writePipe(&Msg{Type: Balloon, Data: alert})
 }
 
-func (s systray) Type() alertsender.Type { return alertsender.Systray }
-func (s systray) SupportsMarkdown() bool { return false }
+func (*systray) Type() alertsender.Type { return alertsender.Systray }
+func (*systray) SupportsMarkdown() bool { return false }
 
-func (s systray) Shutdown() error {
-	m := &Msg{Type: Shutdown}
-	return s.writePipe(m)
-}
+func (s *systray) Shutdown() error { return nil }
 
-func (s systray) writePipe(m *Msg) error {
+func (s *systray) writePipe(m *Msg) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	conn, err := winio.DialPipeContext(ctx, systrayPipe)
+	if err != nil {
+		return fmt.Errorf("unable to dial %s pipe: %v", systrayPipe, err)
+	}
+	defer conn.Close()
 	b, err := m.encode()
 	if err != nil {
 		return err
 	}
-	err = s.npipe.SetWriteDeadline(time.Now().Add(time.Second * 5))
-	if err != nil {
+	if err = conn.SetDeadline(time.Now().Add(time.Second * 5)); err != nil {
 		return err
 	}
-	n, err := s.npipe.Write(b)
-	if n < len(b) {
-		return fmt.Errorf("write I/O error: buffer size: %d written: %d", len(b), n)
+	if _, err = conn.Write(b); err != nil {
+		return fmt.Errorf("unable to write systray pipe: %v", err)
 	}
-	return err
+	return nil
 }
 
 func pipeExists() bool {
