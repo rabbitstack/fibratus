@@ -23,6 +23,13 @@ import "golang.org/x/sys/windows"
 // Hwnd defines the window handle type
 type Hwnd uintptr
 
+// InvalidHwnd designates an invalid window handle
+const InvalidHwnd = 0
+
+// WmClose is the message sent to the window procedure
+// when the application is about to shut down
+const WmClose = 0x10
+
 // Hicon defines the icon handle type
 type Hicon uintptr
 

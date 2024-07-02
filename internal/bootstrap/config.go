@@ -38,7 +38,7 @@ func InitConfigAndLogger(cfg *config.Config) error {
 			return err
 		}
 	}
-	if err := log.InitFromConfig(cfg.Log); err != nil {
+	if err := log.InitFromConfig(cfg.Log, "fibratus.log"); err != nil {
 		return err
 	}
 	if !isLoaded {

@@ -19,34 +19,54 @@
 package systray
 
 import (
-	"errors"
+	"context"
+	"encoding/json"
 	"fmt"
+	"github.com/Microsoft/go-winio"
+	"github.com/cenkalti/backoff/v4"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
-	"github.com/rabbitstack/fibratus/pkg/sys"
-	"golang.org/x/sys/windows"
+	log "github.com/sirupsen/logrus"
 	"os"
-	"path/filepath"
-	"unsafe"
+	"time"
 )
 
-var (
-	// ErrSystrayIconRegisterClass is raised when the systray window class fails o register
-	ErrSystrayIconRegisterClass = errors.New("unable to register systray icon window class")
-	// ErrSystrayIconWindow is raised when the systray icon window can't be created
-	ErrSystrayIconWindow = errors.New("unable to create systray icon window")
-
-	className = windows.StringToUTF16Ptr("fibratus")
-)
+const systrayPipe = `\\.\pipe\fibratus-systray`
 
 // systray interops with the status area
 // to show balloon notifications with the
 // desired title and text. Both, regular
 // and balloon icons are also rendered when
-// displaying the notification message.
+// displaying the notification message. The
+// interactions with the status area are
+// performed via IPC through named pipe.
+// Systray process exposes the named pipe server
+// and listen for incoming messages published
+// by the systray sender.
 type systray struct {
-	wnd         sys.Hwnd // systray icon window handle
-	systrayIcon *sys.SystrayIcon
-	config      Config
+	config Config
+}
+
+// MsgType determines the type of the message sent
+// to the systray named pipe server.
+type MsgType uint8
+
+const (
+	Conf MsgType = iota
+	Balloon
+)
+
+// Msg represents the data exchanged between systray client/server.
+type Msg struct {
+	Type MsgType `json:"type"`
+	Data any     `json:"data"`
+}
+
+func (m Msg) encode() ([]byte, error) {
+	b, err := json.Marshal(m)
+	if err != nil {
+		return nil, err
+	}
+	return b, err
 }
 
 func init() {
@@ -64,109 +84,67 @@ func makeSender(config alertsender.Config) (alertsender.Sender, error) {
 		return &systray{}, nil
 	}
 
-	var mod windows.Handle
-	err := windows.GetModuleHandleEx(0, nil, &mod)
-	if err != nil {
-		return nil, err
-	}
-	// register notification icon window class
-	var wc sys.WndClassEx
-	wc.Size = uint32(unsafe.Sizeof(wc))
-	wc.Instance = mod
-	wc.WndProc = windows.NewCallback(wndProc)
-	wc.ClassName = className
-	err = sys.RegisterClass(&wc)
-	if err != nil {
-		return nil, errors.Join(ErrSystrayIconRegisterClass, err)
-	}
-	// create the notification icon window
-	hwnd, err := sys.CreateWindowEx(
-		0,
-		className,
-		className,
-		sys.WindowStyleOverlapped,
-		sys.CwUseDefault,
-		sys.CwUseDefault,
-		100,
-		100,
-		0,
-		0,
-		mod,
-		0,
-	)
-	if err != nil {
-		return nil, errors.Join(ErrSystrayIconWindow, err)
+	s := &systray{config: c}
+	b := &backoff.ExponentialBackOff{
+		// first backoff timeout will be somewhere in the 100 - 300 ms range given the default multiplier
+		InitialInterval:     time.Millisecond * 200,
+		RandomizationFactor: backoff.DefaultRandomizationFactor,
+		Multiplier:          backoff.DefaultMultiplier,
+		MaxInterval:         time.Second * 10,
+		MaxElapsedTime:      time.Minute * 30,
+		Stop:                backoff.Stop,
+		Clock:               backoff.SystemClock,
 	}
 
-	systrayIcon, err := sys.NewSystrayIcon(hwnd)
-	if err != nil {
-		return nil, err
-	}
-	// find the icon in the same directory where the binary is loaded
-	exe, err := os.Executable()
-	if err != nil {
-		return nil, err
-	}
-	ico, err := sys.LoadImage(
-		mod,
-		windows.StringToUTF16Ptr(filepath.Join(filepath.Dir(exe), "fibratus.ico")),
-		1, // load icon
-		0,
-		0,
-		sys.LoadResourceDefaultSize|sys.LoadResourceFromFile,
-	)
-	if err != nil {
-		// load stock informational system icon
-		var icon sys.ShStockIcon
-		icon.Size = uint32(unsafe.Sizeof(icon))
-		err := sys.SHGetStockIconInfo(79, 0x000000100, &icon)
-		if err != nil {
-			return nil, fmt.Errorf("unable to load systray icon resource: %v", err)
+	b.Reset()
+
+	for {
+		if !pipeExists() {
+			backoffTime := b.NextBackOff()
+			if backoffTime == backoff.Stop {
+				return nil, fmt.Errorf("%s named pipe didn't appear after 30m", systrayPipe)
+			}
+			log.Warnf("systray pipe not ready. Trying to dial in %v...", backoffTime)
+			time.Sleep(backoffTime)
+			continue
 		}
-		ico = windows.Handle(icon.Icon)
+		break
 	}
 
-	// set systray icon and tooltip
-	if err := systrayIcon.SetIcon(sys.Hicon(ico)); err != nil {
-		return nil, fmt.Errorf("unable to set systray icon: %v", err)
-	}
-	if err := systrayIcon.SetTooltip("Fibratus"); err != nil {
-		return nil, fmt.Errorf("unable to set systray icon tooltip: %v", err)
-	}
-	s := &systray{
-		wnd:         hwnd,
-		systrayIcon: systrayIcon,
-		config:      c,
-	}
-	return s, nil
+	return s, s.writePipe(&Msg{Type: Conf, Data: c})
 }
 
-func (s systray) Send(alert alertsender.Alert) error {
-	if s.systrayIcon == nil {
-		return nil
-	}
-	text := alert.Text
-	// the balloon notification fails to
-	// popup when the text is empty
-	if text == "" {
-		text = " "
-	}
-	return s.systrayIcon.ShowBalloonNotification(alert.Title, text, s.config.Sound, s.config.QuietMode)
+func (s *systray) Send(alert alertsender.Alert) error {
+	return s.writePipe(&Msg{Type: Balloon, Data: alert})
 }
 
-func (s systray) Type() alertsender.Type { return alertsender.Systray }
-func (s systray) SupportsMarkdown() bool { return false }
+func (*systray) Type() alertsender.Type { return alertsender.Systray }
+func (*systray) SupportsMarkdown() bool { return false }
 
-func (s systray) Shutdown() error {
-	if s.wnd.IsValid() {
-		s.wnd.Destroy()
+func (s *systray) Shutdown() error { return nil }
+
+func (s *systray) writePipe(m *Msg) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	conn, err := winio.DialPipeContext(ctx, systrayPipe)
+	if err != nil {
+		return fmt.Errorf("unable to dial %s pipe: %v", systrayPipe, err)
 	}
-	if s.systrayIcon != nil {
-		return s.systrayIcon.Delete()
+	defer conn.Close()
+	b, err := m.encode()
+	if err != nil {
+		return err
+	}
+	if err = conn.SetDeadline(time.Now().Add(time.Second * 5)); err != nil {
+		return err
+	}
+	if _, err = conn.Write(b); err != nil {
+		return fmt.Errorf("unable to write systray pipe: %v", err)
 	}
 	return nil
 }
 
-func wndProc(hwnd uintptr, msg uint32, wparam, lparam uintptr) uintptr {
-	return sys.DefWindowProc(hwnd, msg, wparam, lparam)
+func pipeExists() bool {
+	_, err := os.Stat(systrayPipe)
+	return err == nil
 }

@@ -71,7 +71,13 @@ func init() {
 	// initialize service config
 	cfg.MustViperize(startCommand)
 
-	Command.AddCommand(startCommand, stopCommand, restartCommand, installCommand, removeCommand, statusCommand)
+	Command.AddCommand(startCommand)
+	Command.AddCommand(stopCommand)
+	Command.AddCommand(restartCommand)
+	Command.AddCommand(statusCommand)
+
+	Command.AddCommand(installCommand)
+	Command.AddCommand(removeCommand)
 }
 
 func startService(cmd *cobra.Command, args []string) error {

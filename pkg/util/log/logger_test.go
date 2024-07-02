@@ -26,8 +26,8 @@ import (
 )
 
 func TestInitFromConfig(t *testing.T) {
-	require.Error(t, InitFromConfig(Config{}))
-	require.NoError(t, InitFromConfig(Config{Path: "_fixtures", Level: "info", Formatter: "text"}))
+	require.Error(t, InitFromConfig(Config{}, "fibratus.log"))
+	require.NoError(t, InitFromConfig(Config{Path: "_fixtures", Level: "info", Formatter: "text"}, "fibratus.log"))
 
 	os.Remove("_fixtures\\fibratus.log")
 
