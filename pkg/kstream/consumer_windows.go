@@ -194,7 +194,7 @@ func (k *consumer) bufferStatsCallback(logfile *etw.EventTraceLogfile) uintptr {
 func (k *consumer) initSinks(psnap ps.Snapshotter, hsnap handle.Snapshotter) {
 	for _, trace := range k.controller.Traces() {
 		s := &sink{
-			q:          kevent.NewQueue(500, k.config.Kstream.StackEnrichment, k.config.Filters.Rules.Enabled),
+			q:          kevent.NewQueue(500, k.config.Kstream.StackEnrichment, k.config.ForwardMode || k.config.IsCaptureSet()),
 			sequencer:  k.sequencer,
 			processors: processors.NewChain(psnap, hsnap, k.config),
 			psnap:      psnap,

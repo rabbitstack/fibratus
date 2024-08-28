@@ -55,17 +55,17 @@ type Queue struct {
 	backlog         *backlog
 	cd              *CallstackDecorator
 	stackEnrichment bool
-	engineEnabled   bool
+	enqueueAlways   bool
 }
 
 // NewQueue constructs a new queue with the given channel size.
-func NewQueue(size int, stackEnrichment bool, engineEnabled bool) *Queue {
+func NewQueue(size int, stackEnrichment bool, enqueueAlways bool) *Queue {
 	q := &Queue{
 		q:               make(chan *Kevent, size),
 		listeners:       make([]Listener, 0),
 		backlog:         newBacklog(backlogCacheSize),
 		stackEnrichment: stackEnrichment,
-		engineEnabled:   engineEnabled,
+		enqueueAlways:   enqueueAlways,
 	}
 	q.cd = NewCallstackDecorator(q)
 	return q
@@ -132,7 +132,7 @@ func (q *Queue) Push(e *Kevent) error {
 
 func (q *Queue) push(e *Kevent) error {
 	var enqueue bool
-	if !q.engineEnabled {
+	if q.enqueueAlways {
 		enqueue = true
 	}
 	for _, listener := range q.listeners {

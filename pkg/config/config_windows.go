@@ -68,6 +68,7 @@ const (
 	enumerateHandles         = "handle.enumerate-handles"
 	symbolPaths              = "symbol-paths"
 	symbolizeKernelAddresses = "symbolize-kernel-addresses"
+	forwardMode              = "forward"
 
 	serializeThreads = "kevent.serialize-threads"
 	serializeImages  = "kevent.serialize-images"
@@ -100,6 +101,8 @@ type Config struct {
 	// DebugPrivilege dictates if the SeDebugPrivilege is injected into
 	// Fibratus process' access token.
 	DebugPrivilege bool `json:"debug-privilege" yaml:"debug-privilege"`
+	// ForwardMode designates if event forwarding mode is engaged
+	ForwardMode bool `json:"forward" yaml:"forward"`
 
 	// KcapFile represents the name of the capture file.
 	KcapFile string
@@ -278,6 +281,7 @@ func (c *Config) Init() error {
 	c.SymbolPaths = c.viper.GetString(symbolPaths)
 	c.SymbolizeKernelAddresses = c.viper.GetBool(symbolizeKernelAddresses)
 	c.DebugPrivilege = c.viper.GetBool(debugPrivilege)
+	c.ForwardMode = c.viper.GetBool(forwardMode)
 	c.KcapFile = c.viper.GetString(kcapFile)
 
 	kevent.SerializeThreads = c.viper.GetBool(serializeThreads)
@@ -356,6 +360,9 @@ func (c *Config) SymbolPathsUTF16() *uint16 {
 
 func (c *Config) addFlags() {
 	c.flags.String(configFile, filepath.Join(os.Getenv("PROGRAMFILES"), "fibratus", "config", "fibratus.yml"), "Indicates the location of the configuration file")
+	if c.opts.run {
+		c.flags.Bool(forwardMode, false, "Designates if event forwarding mode is engaged")
+	}
 	if c.opts.run || c.opts.replay || c.opts.validate {
 		c.flags.StringP(filamentName, "f", "", "Specifies the filament to execute")
 
@@ -387,6 +394,7 @@ func (c *Config) addFlags() {
 	}
 	if c.opts.run || c.opts.capture {
 		c.flags.Bool(initHandleSnapshot, false, "Indicates whether initial handle snapshot is built. This implies scanning the system handles table and producing an entry for each handle object")
+		c.flags.Bool(debugPrivilege, true, "Dictates if the SeDebugPrivilege is injected into Fibratus process' access token")
 		c.flags.Bool(enumerateHandles, false, "Indicates if process handles are collected during startup or when a new process is spawn")
 		c.flags.String(symbolPaths, "srv*c:\\\\SymCache*https://msdl.microsoft.com/download/symbols", "Designates the path or a series of paths separated by a semicolon that is used to search for symbols files")
 		c.flags.Bool(symbolizeKernelAddresses, false, "Determines if kernel stack addresses are symbolized")

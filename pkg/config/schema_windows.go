@@ -106,6 +106,7 @@ var schema = `
 		},
 		"config-file": 						{"type": "string"},
 		"debug-privilege":  				{"type": "boolean"},
+		"forward":  						{"type": "boolean"},
 		"symbol-paths":						{"type": "string"},
 		"symbolize-kernel-addresses":		{"type": "boolean"},
 		"handle": {
