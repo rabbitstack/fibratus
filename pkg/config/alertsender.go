@@ -35,6 +35,10 @@ var errAlertsenderConfig = func(sender string, err error) error {
 }
 
 func (c *Config) tryLoadAlertSenders() error {
+	if c.ForwardMode {
+		// In event forwarding mode, alert senders are useless
+		return nil
+	}
 	configs := make([]alertsender.Config, 0)
 	alertsenders := c.viper.AllSettings()["alertsenders"]
 	if alertsenders == nil {

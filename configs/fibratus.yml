@@ -93,6 +93,8 @@ api:
 # regions.
 debug-privilege: true
 
+# Indicates if event forwarding mode is engaged.
+forward: false
 
 # =============================== Filament =============================================
 
