@@ -57,11 +57,12 @@ var ErrCantEnqueue = errors.New("cannot push event into the queue")
 
 func TestQueuePush(t *testing.T) {
 	var tests = []struct {
-		name       string
-		e          *Kevent
-		err        error
-		listeners  func() []Listener
-		isEnqueued bool
+		name          string
+		e             *Kevent
+		err           error
+		listeners     func() []Listener
+		enqueueAlways bool
+		isEnqueued    bool
 	}{
 		{
 			"push event ok",
@@ -88,6 +89,7 @@ func TestQueuePush(t *testing.T) {
 				return []Listener{l}
 			},
 			true,
+			true,
 		},
 		{
 			"push event listener error",
@@ -113,6 +115,7 @@ func TestQueuePush(t *testing.T) {
 				l.On("ProcessEvent", mock.Anything).Return(true, ErrCantEnqueue)
 				return []Listener{l}
 			},
+			true,
 			false,
 		},
 		{
@@ -140,6 +143,7 @@ func TestQueuePush(t *testing.T) {
 				l2.On("ProcessEvent", mock.Anything).Return(false, nil)
 				return []Listener{l1, l2}
 			},
+			false,
 			true,
 		},
 		{
@@ -168,12 +172,13 @@ func TestQueuePush(t *testing.T) {
 				return []Listener{l1, l2}
 			},
 			false,
+			false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			q := NewQueue(100, false, true)
+			q := NewQueue(100, false, tt.enqueueAlways)
 			for _, lis := range tt.listeners() {
 				q.RegisterListener(lis)
 			}
