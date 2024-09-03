@@ -55,7 +55,7 @@ func Set(v string) { version = v }
 func Get() string { return version }
 
 // IsDev determines if this is a dev version.
-func IsDev() bool { return version == "dev" || version == "" }
+func IsDev() bool { return version == "0.0.0" || version == "" }
 
 // Sem returns a semver spec.
 func Sem() *semver.Version {
