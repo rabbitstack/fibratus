@@ -90,7 +90,7 @@ jobs:
         run: |
            export VERSION=${{ steps.get_version.outputs.VERSION }}
            ./make.bat pkg
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: fibratus-${{ steps.get_version.outputs.VERSION }}-amd64.msi
           path: "./build/msi/fibratus-${{ steps.get_version.outputs.VERSION }}-amd64.msi"
@@ -127,7 +127,7 @@ jobs:
         run: |
            export VERSION=${{ steps.get_version.outputs.VERSION }}
            ./make.bat pkg-slim
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: fibratus-${{ steps.get_version.outputs.VERSION }}-slim-amd64.msi
           path: "./build/msi/fibratus-${{ steps.get_version.outputs.VERSION }}-slim-amd64.msi"
