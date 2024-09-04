@@ -145,11 +145,11 @@ jobs:
         shell: bash
         run: |
           echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3 | cut -c2-)
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: fibratus-${{ steps.get_version.outputs.VERSION }}-amd64.msi
           path: build
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: fibratus-${{ steps.get_version.outputs.VERSION }}-slim-amd64.msi
           path: build
