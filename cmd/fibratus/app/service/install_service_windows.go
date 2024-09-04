@@ -60,7 +60,8 @@ func installService(cmd *cobra.Command, args []string) error {
 
 	svccfg := mgr.Config{
 		DisplayName: "Fibratus Service",
-		Description: "Exploration and tracing of the Windows kernel",
+		Description: "Adversary tradecraft detection, protection, and hunting",
+		StartType:   mgr.StartAutomatic,
 	}
 	s, err = m.CreateService(svcName, exe, svccfg)
 	if err != nil {
