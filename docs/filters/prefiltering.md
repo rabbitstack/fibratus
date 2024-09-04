@@ -2,7 +2,7 @@
 
 Sometimes it is useful to drop certain events either by image (process) name or event type once the event is peeked from the tracing buffer. Besides this, the kernel stream consumer can be configured to ignore events at the `ETW` session level. This can drastically reduce the impact on the system load if you're not interested in events that may produce an immense volume of data. 
 
-The above is the summary of configuration options that influence the collection of kernel events by the `Kernel Logger`. These options are placed in the `kstream` section of the configuration file.
+The above is the summary of configuration options that influence the collection of events. These options are placed in the `kstream` section of the configuration file.
 
 - `enable-thread` enables/disables the collection of the thread-related kernel events
 - `enable-registry` enables/disables the collection of registry kernel events

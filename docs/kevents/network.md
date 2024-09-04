@@ -76,10 +76,9 @@ Receives the response from the DNS server. DNS reply events contain the followin
 
 ### DNS reverse lookups
 
-Fibratus can perform reverse DNS lookups on IP addresses and return a list of domain names that correspond to a particular IP address. Domain names are represented as slice event parameters:
+Fibratus can perform reverse DNS lookups on IP addresses and return a list of domain names that correspond to a particular IP address.
 
-- `dip_names` contains the destination IP address domain names (e.g.`47.224.186.35.bc.googleusercontent.com.`)
-- `sip_names` contains the source IP address domain names (e.g. `a-0001.a-msedge.net.`)
+For example, `47.224.186.35.bc.googleusercontent.com` is the reverse lookup representation of the Google IP address.
 
 You can use domain names in [filters](filters/introduction) in conjunction with the `matches`, `contains` or `in` operators. For example, the following filter would match all events that have at least one domain ending with `.domain.`
 

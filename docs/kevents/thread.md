@@ -27,3 +27,9 @@ Thread events are comprised of the following parameters:
 - `pid` is the identifier of the local process whose thread object was opened.
 - `tid` is the identifier of the local thread that was opened.
 - `status` contains the result of the thread object open operation. (e.g. `Success`)
+
+#### SetThreadContext
+
+`SetThreadContext` sets the thread context. Thread context represents the set of CPU registers.
+
+- `status` contains the result of operation. (e.g. `Success`)

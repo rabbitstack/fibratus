@@ -1,5 +1,8 @@
 # What is Fibratus?
 
-[Fibratus](https://github.com/rabbitstack/fibratus) is a tool for exploration and tracing of the **Windows** kernel. It lets you trap system-wide events such as process life-cycle, file system I/O, registry modifications or network requests among many other observability signals. Once collected, the events can be shipped to a number of [sinks](/outputs/introduction), sliced and diced with [filaments](/filaments/introduction) or dumped to specialized [capture](/captures/introduction) files for local inspection and analysis. You can use the powerful filtering engine to dig into the event stream. The built-in [rules engine](https://www.fibratus.io/#/filters/rules) enables threat detection capabilities.
+[Fibratus](https://github.com/rabbitstack/fibratus) detects, protects, and erradicates advanced adversary tradecraft by scrutinizing
+and asserting a wide spectrum of system events against a behaviour-driven [rule engine](/filters/rules) and [YARA](/yara/introduction) memory scanner.
 
-Fibratus is mainly targeted to malware researchers, security analysts, reverse engineers or DFIR oriented folks, even though software developers and system administrators might also benefit from it. Even if you don't pertain to any of those aforementioned IT collectives, but you are curious to comprehend what Windows and applications are doing under the hood, Fibratus is the right tool.
+Events can also be shipped to a wide array of [output sinks](/outputs/introduction) or dumped to [capture](/captures/introduction) files for local inspection and forensics analysis. You can use [filaments](/filaments/introduction) to extend Fibratus with your own arsenal of tools and so leverage the power of the Python ecosystem.
+
+In a nuthsell, Fibratus mantra is defined by the pillars of **realtime behaviour detection**, **memory scanning**, and **forensics capabilities**.

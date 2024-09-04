@@ -2,8 +2,9 @@
   * [What is Fibratus?](overview/what-is-fibratus.md)
 * <ion-icon name="rocket-outline"></ion-icon> Setup
   * [Installation](setup/installation.md)
-  * [Running](setup/running.md)
+  * [Quick Start](setup/quick-start.md)
   * [Configuration](setup/configuration.md)
+  * [CLI](setup/cli.md)
 * <ion-icon name="apps-outline"></ion-icon> Events
   * [Anatomy Of An Event](kevents/anatomy.md)
   * [Process](kevents/process.md)
@@ -22,8 +23,8 @@
   * [Operators](filters/operators.md)
   * [Paths](filters/paths.md)
   * [Functions](filters/functions.md)
-  * [Fields](filters/fields.md)
   * [Rules](filters/rules.md)
+  * [Fields](filters/fields.md)
 * <ion-icon name="server-outline"></ion-icon> Captures
   * [Immortalizing The Event Flux](captures/introduction.md)
   * [Capturing](captures/capturing.md)
@@ -34,7 +35,7 @@
   * [Internals](filaments/internals.md)
   * [Writing Filaments](filaments/writing.md)
 * <ion-icon name="send-outline"></ion-icon> Outputs
-  * [Transporting Kernel Events](outputs/introduction.md)
+  * [Transporting Events](outputs/introduction.md)
   * [Console](outputs/console.md)
   * [Null](outputs/null.md)
   * [RabbitMQ](outputs/rabbitmq.md)
@@ -49,7 +50,7 @@
   * <ion-icon name="pricetags-outline"></ion-icon> [Tags](transformers/tags.md)
   * <ion-icon name="cut-outline"></ion-icon> [Trim](transformers/trim.md)
 * <ion-icon name="locate-outline"></ion-icon> Alerts
-  * [Watchdogging Kernel Events](alerts/introduction.md)
+  * [Firing Alerts](alerts/introduction.md)
   * [Alert Senders](alerts/senders.md)
     * <ion-icon name="mail-unread-outline"></ion-icon> [Mail](alerts/senders/mail.md)
     * <ion-icon name="logo-slack"></ion-icon> [Slack](alerts/senders/slack.md)
