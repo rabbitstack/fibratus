@@ -18,7 +18,7 @@ jobs:
       runs-on: windows-latest
       steps:
       - name: Install Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
            go-version: ${{ env.GO_VERSION }}
       - name: Checkout
@@ -41,7 +41,7 @@ jobs:
             libtool
             autoconf
       - name: Cache yara
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         id: cache
         with:
           path: |
@@ -80,7 +80,7 @@ jobs:
           ./make.bat
         env:
           TAGS: kcap,filament,yara,yara_static
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
           name: "fibratus-amd64.exe"
           path: "./cmd/fibratus/fibratus.exe"
@@ -93,7 +93,7 @@ jobs:
         run: |
            export VERSION=0.0.0
            ./make.bat pkg
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: "fibratus-amd64.msi"
           path: "./build/msi/fibratus-0.0.0-amd64.msi"
@@ -102,7 +102,7 @@ jobs:
       runs-on: windows-latest
       steps:
       - name: Install Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
            go-version: ${{ env.GO_VERSION }}
       - name: Checkout
@@ -112,7 +112,7 @@ jobs:
         run: |
           export COMMIT=$(echo $GITHUB_SHA | cut -c1-8)
           ./make.bat
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: "fibratus-amd64-slim.exe"
           path: "./cmd/fibratus/fibratus.exe"
@@ -131,7 +131,7 @@ jobs:
         run: |
            sed -i 's/C:\/Python37/C:\/hostedtoolcache\/windows\/Python\/3.7.9\/x64/' pkg-config/python-37.pc
       - name: Install Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
            go-version: ${{ env.GO_VERSION }}
       - name: Setup msys2
@@ -147,7 +147,7 @@ jobs:
            libtool
            autoconf
       - name: Cache yara
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         id: cache
         with:
           path: |
@@ -181,7 +181,7 @@ jobs:
         run: |
            sed -i 's/C:\/Python37/C:\/hostedtoolcache\/windows\/Python\/3.7.9\/x64/' pkg-config/python-37.pc
       - name: Install Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
            go-version: ${{ env.GO_VERSION }}
       - name: Setup msys2
@@ -197,7 +197,7 @@ jobs:
            libtool
            autoconf
       - name: Cache yara
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         id: cache
         with:
           path: |
