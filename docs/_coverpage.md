@@ -4,14 +4,13 @@
   <img src='logo.png'></img>
 </div>
 
-# fibratus <small>2.0.0</small>
+# fibratus <small>2.2.0</small>
 
-> A modern tool for Windows kernel exploration and observability with a focus on security
+>  Adversary tradecraft detection, protection, and hunting
 
-- <ion-icon class="fast-icon" name="flash"></ion-icon> Fast
-- <ion-icon class="extensible-icon" name="cube"></ion-icon> Extensible
-- <ion-icon class="comprehensive-icon" name="magnet"></ion-icon> Comprehensive
-
+- <ion-icon class="fast-icon" name="flash"></ion-icon> Runtime behaviour detection
+- <ion-icon class="comprehensive-icon" name="magnet"></ion-icon> Forensics capabilities
+- <ion-icon class="extensible-icon" name="cube"></ion-icon> Memory scanning
 
 <a href="https://github.com/rabbitstack/fibratus/releases" target="_blank" rel="noopener"><ion-icon name="download"></ion-icon> Download</a>
 <a href="#/setup/installation"><ion-icon name="rocket"></ion-icon> Get Started</a>

@@ -15,8 +15,8 @@ The following tables summarize available field names that can be used in filter 
 | Field Name  | Description | Example     |
 | :---        |    :----   |          :---: |
 | kevt.seq      | Monotonic event sequence number       | `kevt.seq > 666`   |
-| kevt.pid      | Process identifier generating the kernel event       | `kevt.pid = 6`   |
-| kevt.tid      | Thread identifier generating the kernel event       | `kevt.tid = 1024`   |
+| kevt.pid      | Process identifier generating the event       | `kevt.pid = 6`   |
+| kevt.tid      | Thread identifier generating the event       | `kevt.tid = 1024`   |
 | kevt.cpu      | Logical processor core where the event was generated       | `kevt.cpu = 2`   |
 | kevt.name      | Symbolical event name       | `kevt.name = 'CreateThread'`   |
 | kevt.category      | Category to which the event pertains      | `kevt.category = 'registry'`   |
@@ -41,8 +41,8 @@ The following tables summarize available field names that can be used in filter 
 ### Process
 | Field Name  | Description | Example     |
 | :---        |    :----   |          :---: |
-| ps.pid         | Process identifier generating the kernel event. Alias for `kevt.pid` | `ps.pid = 1024`   |
-| ps.ppid         | Parent process identifier of the process generating the kernel event | `ps.ppid = 25`   |
+| ps.pid         | Process identifier generating the event. Alias for `kevt.pid` | `ps.pid = 1024`   |
+| ps.ppid         | Parent process identifier of the process generating the event | `ps.ppid = 25`   |
 | ps.name         | Process (image) path name that generates an event | `ps.name = 'cmd.exe'`   |
 | ps.cmdline      | Process command line | `ps.cmdline contains '/E c:\\ads\\file.txt:regfile.reg'`   |
 | ps.exe          | Full name of the process' executable | `ps.exe = 'C:\\Windows\\system32\\cmd.exe'`   |
@@ -106,6 +106,20 @@ The following tables summarize available field names that can be used in filter 
 | thread.access.status | Thread access status | `thread.access.status = 'Success'`   |
 
 
+### Callstack
+| Field Name  | Description | Example     |
+| :---        |    :----   |          :---: |
+| thread.callstack.summary     | Callstack summary showing involved modules | `thread.callstack.summary contains 'ntdll.dll\|KERNELBASE.dll'` |
+| thread.callstack.detail      | Detailed information of each stack frame | `thread.callstack.detail contains 'KERNELBASE.dll!CreateProcessW'` |
+| thread.callstack.modules     | List of modules comprising the callstack | `thread.callstack.modules in ('C:\WINDOWS\System32\KERNELBASE.dll')` |
+| thread.callstack.symbols     | List of symbols comprising the callstack | `thread.callstack.symbols in ('ntdll.dll!NtCreateProcess')` |
+| thread.callstack.allocation_sizes | Allocation sizes of private pages | `thread.callstack.allocation_sizes > 10000` |
+| thread.callstack.protections    | Page protections masks of each frame | `thread.callstack.protections in ('RWX', 'WX')'` |
+| thread.callstack.callsite_leading_assembly    | Callsite leading assembly instructions | `thread.callstack.callsite_leading_assembly in ('mov r10,rcx', 'syscall')` |
+| thread.callstack.callsite_trailing_assembly    | Callsite trailing assembly instructions | `thread.callstack.callsite_trailing_assembly in ('add esp, 0xab')` |
+| thread.callstack.is_unbacked    | Indicates if the callstack contains unbacked regions | `thread.callstack.is_unbacked` |
+
+
 ### Image
 | Field Name  | Description | Example     |
 | :---        |    :----   |          :---: |
@@ -121,7 +135,11 @@ The following tables summarize available field names that can be used in filter 
 | image.cert.issuer  | Image certificate CA | `image.cert.issuer contains 'US, Washington, Redmond, Microsoft Windows Production PCA 2011`   |
 | image.cert.after  | Image certificate expiration date | `image.cert.after contains '2024-02-01 00:05:42 +0000 UTC'`   |
 | image.cert.before  | Image certificate enrollment date | `image.cert.before contains '2024-02-01 00:05:42 +0000 UTC'`   |
-
+| image.is_driver_malicious  | Indicates if the loaded driver is malicious | `image.is_driver_malicious`  |
+| image.is_driver_vulnerable | Indicates if the loaded driver is vulnerable | `image.is_driver_vulnerable` |
+| image.is_dll | Indicates if the loaded image is a DLL | `image.is_dll` |
+| image.is_driver | Indicates if the loaded image is a driver | `image.is_driver` |
+| image.is_exec | Indicates if the loaded image is an executable | `image.is_exec` |
 
 ### File
 | Field Name  | Description | Example     |
@@ -139,6 +157,12 @@ The following tables summarize available field names that can be used in filter 
 | file.view.base | Base address of the mapped/unmapped section view | `file.view.base = '25d42170000'`   |
 | file.view.size | Size of the mapped/unmapped section view | `file.view.size > 1024`   |
 | file.view.type | Type of the mapped/unmapped section view | `file.view.type = 'IMAGE'`   |
+| file.view.protection | Protection rights of the section view | `file.view.protection = 'READONLY'` |
+| file.is_driver_malicious  | Indicates if the dropped driver is malicious | `file.is_driver_malicious`  |
+| file.is_driver_vulnerable | Indicates if the dropped driver is vulnerable | `file.is_driver_vulnerable` |
+| file.is_dll | Indicates if the created file is a DLL | `file.is_dll` |
+| file.is_driver | Indicates if the created file is a driver | `file.is_driver` |
+| file.is_exec | Indicates if the crated file is an executable | `file.is_exec` |
 
 
 ### Registry
@@ -164,6 +188,7 @@ The following tables summarize available field names that can be used in filter 
 | net.dip.names | List of destination IP address domain names | `net.dip.names in ('github.com.')` |
 | net.sip.names | List of source IP address domain names | `net.sip.names in ('github.com.')` |
 
+
 ### Handle
 | Field Name  | Description | Example     |
 | :---        |    :----   |          :---: |
@@ -171,6 +196,7 @@ The following tables summarize available field names that can be used in filter 
 | handle.object | Handle kernel object address | `handle.object = 'FFFFB905DBF61988'`   |
 | handle.name   | Handle name | `handle.name = '\\Device\\NamedPipe\\chrome.12644.28.105826381'`   |
 | handle.type   | Handle type | `handle.type = 'Mutant'`   |
+
 
 ### Memory
 | Field Name  | Description | Example     |
@@ -226,3 +252,6 @@ The following tables summarize available field names that can be used in filter 
 | pe.cert.issuer  | PE certificate CA | `pe.cert.issuer contains 'US, Washington, Redmond, Microsoft Windows Production PCA 2011'`   |
 | pe.cert.after  | PE certificate expiration date | `pe.cert.after contains '2024-02-01 00:05:42 +0000 UTC'`   |
 | pe.cert.before  | PE certificate enrollment date | `pe.cert.before contains '2024-02-01 00:05:42 +0000 UTC'`   |
+| pe.is_modified | Indicates if on-disk and in-memory PE headers differ | `pe.is_modified'`   |
+| pe.is_modified | Indicates if on-disk and in-memory PE headers differ | `pe.is_modified'`   |
+| pe.ps.child.file.name | Original file name of the child process executable supplied at compile-time | `pe.ps.child.file.name = 'NOTEPAD.EXE'` |

@@ -1,11 +1,26 @@
 # Installation
 
-### Minimum requirements {docsify-ignore}
+### System requirements {docsify-ignore}
 
 - 64-bits Windows operating system starting from Windows 7
 - 40 MB of free disk space
 - 1 (V)CPU
 - 50 MB of available memory
+
+### Permission requirements {docsify-ignore}
+
+Fibratus requires **administrator** or **SYSTEM** privileges to capture system events from the ETW subsystem. During execution, Fibratus performs the following operations on your system:
+
+- takes a snapshot of allocated system handles. You can control this option through [configuration](/kevents/handle?id=handle-state) flags. Disabled by default.
+- periodically writes the current event sequence into volatile registry value
+- writes logs to disk. The default logs directory location is `%PROGRAMFILES%\Fibratus\Logs`
+- grants the `SeDebugPrivilege` to its process token. However, you can disable granting this privilege by setting the `debug-privilege` option to `false`
+- transports event messages over the wire if the eligible output sink is active.
+- inspects process image [PE](/pe/introduction.md) metadata. Again, you can disable this feature through [config](/pe/introduction) file
+- executes [YARA](/yara/introduction.md) rules on freshly created process images or other image files when the [YARA scanner](/yara/introduction) is enabled
+- spins up an embedded Python interpreter to run [filaments](/filaments/introduction)
+- accesses raw disk devices to read file data
+
 
 ### Deployment  {docsify-ignore}
 
@@ -21,43 +36,24 @@ There are two flavors of Windows MSI installers:
 - __full installers__ ship with all features ([captures](captures/introduction), [filaments](filaments/introduction), [yara](yara/introduction)) and bundle the embedded Python distribution
 - __slim installers__ support less features but are more portable and have lower disk space requirements
 
-After the install completes, you can verify if Fibratus was correctly installed. Spin up a command line prompt. Alternatively, you can use [Windows Terminal](https://github.com/microsoft/terminal) or [Cmder](https://cmder.net/) consoles which is the recommended choice for better user experience. Run the following command:
-
+The installer will automatically register and start Fibratus as **Windows Service**. To verify if the service is running correctly, spin up a command line prompt and execute the following command:
 
 ```
-$ fibratus -h
-
-Usage:
-  fibratus [command]
-
-Available Commands:
-  capture         Capture kernel event stream to the kcap file
-  config          Show runtime config
-  docs            Open Fibratus docs in the web browser
-  help            Help about any command
-  install-service Install fibratus within the Windows service control manager
-  list            Show info about filaments, filter fields or kernel event types
-  remove-service  Remove fibratus from the Windows service control manager
-  replay          Replay kernel event flow from the kcap file
-  restart-service Restart fibratus service
-  run             Bootstrap fibratus or a filament
-  start-service   Start fibratus service
-  stats           Show runtime stats
-  stop-service    Stop fibratus service
-  version         Show version info
+$ fibratus service status
+Fibratus service is running
 ```
 
-If you're able to see the output like in the snippet above, congratulations! You have successfully installed Fibratus. Jump to [running](/setup/running).
+If you're able to see the output like in the snippet above, congratulations! You have successfully installed Fibratus. Jump to [quick start](/setup/quick-start).
 
 ### Uninstall {docsify-ignore}
 
-To remove Fibratus from your system, head to the Control Panel > Programs and Features and start the uninstall process. The uninstaller will make sure to get rid of all installation data.
+To remove Fibratus from your system, head to the Control Panel > Programs and Features and start the uninstall process. The uninstaller will make sure to stop/remove the Windows Service and get rid of all installation data.
 
 ## Building from source {docsify-ignore}
 
-To build Fibratus directly from source code you have satisfy the following requirements:
+To build Fibratus directly from source code you have to satisfy the following requirements:
 
-- Go compiler 1.15
+- Go compiler 1.21+
 - C compiler (optional)
 - Python headers (optional)
 - [libyara](https://github.com/VirusTotal/yara/tree/master/libyara) (optional)

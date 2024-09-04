@@ -22,16 +22,16 @@ The RHS expressions can be strings, numbers, IP addresses, boolean values, and f
 
 As previously mentioned, filters can be engaged in various stages of event collection and processing. The filter expression is given  to `run`, `capture`, and `replay` commands in form of the command line argument.
 
-The `run` command applies the filter expression to each inbound kernel event and prevents upstream propagation if the event doesn't match the filter. The above command filters events that occur on `Monday` and are produced by `cmd.exe` and `svchost.exe` processes.
+The `run` command applies the filter expression to each inbound event and prevents the routing the the output sink if the event doesn't match the filter. The above command filters events that occur on `Monday` and are produced by `cmd.exe` and `svchost.exe` processes.
 
 ```
-$ fibratus run kevt.date.weekday = 'Monday' and ps.name in ('cmd.exe', 'svchost.exe')
+$ fibratus run --forward kevt.date.weekday = 'Monday' and ps.name in ('cmd.exe', 'svchost.exe')
 ```
 
-!> If you're using PowerShell, it is necessary to enclose the entire filter expression in quotes. For example, `fibratus run "kevt.category = 'net'"`
+!> If you're using PowerShell, it is necessary to enclose the entire filter expression in quotes. For example, `fibratus run --forward "kevt.category = 'net'"`
 
 
-In a similar fashion, the `capture` command only dumps events that match the provided filter. In this case, the capture would boil down to  `registry` kernel events.
+In a similar fashion, the `capture` command only dumps events that match the provided filter. In this case, the capture would boil down to `registry` events.
 
 ```
 $ fibratus capture kevt.category = 'registry' -o events
@@ -50,8 +50,8 @@ Lastly, filtering is possible during filament execution. If the filter is set in
 As you might have noticed, string values are enclosed in single quotes `''`. If the string contains characters that would result in an illegal identifier, you'll have to escape the offending characters accordingly. For example, path delimiters (backslashes) or quotes need to be escaped:
 
 ```
-$ fibratus run file.name = 'C:\\Windows\\System32'
-$ fibratus run file.name contains '\"hosts\"'
+$ fibratus run --forward file.name = 'C:\\Windows\\System32'
+$ fibratus run --forward file.name contains '\"hosts\"'
 ```
 
 Filter expressions can accept escape sequences, such as newline characters (`\n`).

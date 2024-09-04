@@ -1,6 +1,6 @@
-# Watchdogging Kernel Events
+# Firing Alerts
 
-Fibratus has the ability to generate alerts when an unexpected flow is detected in the system. Some alerts are generated out of the box, for example, when the [YARA scanner](/yara/scanning) yields rule matches. Other alerts are emitted directly from [filaments](/alerts/filaments) when the conditions are met.
+Fibratus has the ability to generate security alerts when the detection or [YARA](/yara/scanning) rule matches. Additionally, alerts can be emitted directly from [filaments](/alerts/filaments).
 
 The alert has the following key components:
 

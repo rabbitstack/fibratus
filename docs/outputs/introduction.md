@@ -1,4 +1,4 @@
-# Transporting Kernel Events
+# Transporting Events
 
 Fibratus delivers a diverse array of output sinks to route the events. When captures are not enough, you may opt for forwarding the event stream to remote destinations such as RabbitMQ brokers or Elasticsearch clusters. Outputs expose a rich set of configuration knobs that enable to fine-tune the behaviour of the event flow transmission.
 

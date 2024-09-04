@@ -9,13 +9,15 @@
 <h2 align="center">Fibratus</h2>
 
 <p align="center">
-  A modern tool for Windows kernel exploration and observability with a focus on security
+  Adversary tradecraft detection, protection, and hunting
   <br>
   <a href="https://www.fibratus.io/#/setup/installation"><strong>Get Started »</strong></a>
   <br>
   <br>
   <strong>
     <a href="https://www.fibratus.io">Docs</a>
+    &nbsp;&nbsp;&bull;&nbsp;&nbsp;
+    <a href="https://github.com/rabbitstack/fibratus/tree/master/rules">Rules</a>
     &nbsp;&nbsp;&bull;&nbsp;&nbsp;
     <a href="https://github.com/rabbitstack/fibratus/tree/master/filaments">Filaments</a>
     &nbsp;&nbsp;&bull;&nbsp;&nbsp;
@@ -27,150 +29,28 @@
 
 ### What is Fibratus?
 
-Fibratus is a tool for exploration and tracing of the **Windows** kernel. It lets you trap system-wide [events](https://www.fibratus.io/#/kevents/anatomy) such as process life-cycle, file system I/O, registry modifications or network requests among many other observability signals. In a nutshell, Fibratus allows for gaining deep operational visibility into the Windows kernel but also processes running on top of it. It requires no drivers nor third-party software.
+Fibratus detects, protects, and erradicates advanced adversary tradecraft by scrutinizing
+and asserting a wide spectrum of system events against a behaviour-driven [rule engine](https://www.fibratus.io/#/filters/rules) and [YARA](https://www.fibratus.io/#/yara/introduction) memory scanner.
 
-Events can be shipped to a wide array of [output sinks](https://www.fibratus.io/#/outputs/introduction) or dumped to [capture](https://www.fibratus.io/#/captures/introduction) files for local inspection and forensics analysis. The powerful [filtering](https://www.fibratus.io/#/filters/introduction) engine permits drilling into the event flux entrails and the [rules engine](https://www.fibratus.io/#/filters/rules) is capable of detecting stealthy adversary attacks and sophisticated threats.
+Events can also be shipped to a wide array of [output sinks](https://www.fibratus.io/#/outputs/introduction) or dumped to [capture](https://www.fibratus.io/#/captures/introduction) files for local inspection and forensics analysis. You can use [filaments](https://www.fibratus.io/#/filaments/introduction) to extend Fibratus with your own arsenal of tools and so leverage the power of the Python ecosystem. 
 
-You can use [filaments](https://www.fibratus.io/#/filaments/introduction) to extend Fibratus with your own arsenal of tools and so leverage the power of the Python ecosystem
+In a nuthsell, Fibratus mantra is defined by the pillars of **realtime behaviour detection**, **memory scanning**, and **forensics** capabilities.
 
 ### Quick start
 
-Check the [walkthrough](https://www.fibratus.io/#/filters/rules?id=loading-rules) on how to load and create detection rules.
-
-- Observe Microsoft Outlook attachments creating on the file system
-
-```
-fibratus run file.operation = 'create' and file.name icontains '\\Content.Outlook\\'
-```
-
-- Hunt remote thread creations
-
-```
-fibratus run kevt.name = 'CreateThread' and kevt.pid != thread.pid
-```
-
-- Record network interactions to the capture file
-
-```
-fibratus capture kevt.category = 'net' -o conns.kcap
-```
-
-- Replay events from the capture
-
-```
-fibratus replay net.dport in (443, 80) -k conns.kcap
-```
-
-- Run the filament for watching file system changes
-
-```
-fibratus run -f watch_files
-```
-
-### Features
-
-- :zap: blazing fast
-- :satellite: collects a wide spectrum of kernel events - from process to network observability signals
-- :mag: super powerful filtering and rule engine
-- :snake: running Python scriptlets on top of kernel event flow
-- :minidisc: capturing event flux to **kcap** files and replaying anywhere
-- :rocket: transporting events to Elasticsearch, RabbitMQ or console sinks
-- :scissors: transforming kernel events
-- :dart: scanning malicious processes and files with Yara
-- :file_folder: PE (Portable Executable) introspection
-
-### [Documentation](https://www.fibratus.io)
 ---
 
-### Setup
+- [Install](https://www.fibratus.io/#/setup/installation) Fibratus from the latest [MSI package](https://github.com/rabbitstack/fibratus/releases)
+- spin up a command line prompt
+- list credentials from the vault by using the `VaultCmd` tool
+```
+$ VaultCmd.exe /listcreds:"Windows Credentials" /all
+```
+- `Credential discovery via VaultCmd.exe` rule should trigger displaying the alert in the systray notification area
 
-* [**Installation**](https://www.fibratus.io/#/setup/installation)
-* [**Building from source**](https://www.fibratus.io/#/setup/installation?id=building-from-source)
-* [**Running as standalone binary**](https://www.fibratus.io/#/setup/running?id=standalone-binary)
-* [**Running as Windows Service**](https://www.fibratus.io/#/setup/running?id=windows-service)
-* [**CLI**](https://www.fibratus.io/#/setup/running?id=cli)
-* [**Configuration**](https://www.fibratus.io/#/setup/configuration)
+### Documentation
 
-### Events
-
-* [**Anatomy of an event**](https://www.fibratus.io/#/kevents/anatomy)
-* [**Process**](https://www.fibratus.io/#/kevents/process)
-* [**Thread**](https://www.fibratus.io/#/kevents/thread)
-* [**Image**](https://www.fibratus.io/#/kevents/image)
-* [**File**](https://www.fibratus.io/#/kevents/file)
-* [**Registry**](https://www.fibratus.io/#/kevents/registry)
-* [**Network**](https://www.fibratus.io/#/kevents/network)
-* [**Handle**](https://www.fibratus.io/#/kevents/handle)
-
-### Filters and Rules
-
-* [**Needle in the haystack**](https://www.fibratus.io/#/filters/introduction)
-* [**Prefiltering**](https://www.fibratus.io/#/filters/prefiltering)
-* [**Filtering**](https://www.fibratus.io/#/filters/filtering)
-* [**Operators**](https://www.fibratus.io/#/filters/operators)
-* [**Functions**](https://www.fibratus.io/#/filters/functions)
-* [**Paths**](https://www.fibratus.io/#/filters/paths)
-* [**Fields**](https://www.fibratus.io/#/filters/fields)
-* [**Rules**](https://www.fibratus.io/#/filters/rules)
-
-### Captures
-
-* [**Immortalizing the event flux**](https://www.fibratus.io/#/captures/introduction)
-* [**Capturing**](https://www.fibratus.io/#/captures/capturing)
-* [**Replaying**](https://www.fibratus.io/#/captures/replaying)
-
-### Filaments
-
-* [**Python meets kernel events**](https://www.fibratus.io/#/filaments/introduction)
-* [**Executing**](https://www.fibratus.io/#/filaments/executing)
-* [**Internals**](https://www.fibratus.io/#/filaments/internals)
-* [**Writing filaments**](https://www.fibratus.io/#/filaments/writing)
-
-### Outputs
-
-* [**Transporting kernel events**](https://www.fibratus.io/#/outputs/introduction)
-* [**Console**](https://www.fibratus.io/#/outputs/console)
-* [**Null**](https://www.fibratus.io/#/outputs/null)
-* [**RabbitMQ**](https://www.fibratus.io/#/outputs/rabbitmq)
-* [**Elasticsearch**](https://www.fibratus.io/#/outputs/elasticsearch)
-* [**Eventlog**](https://www.fibratus.io/#/outputs/eventlog)
-* [**HTTP**](https://www.fibratus.io/#/outputs/http)
-
-
-### Transformers
-
-* [**Parsing, enriching, transforming**](https://www.fibratus.io/#/transformers/introduction)
-* [**Remove**](https://www.fibratus.io/#/transformers/remove)
-* [**Rename**](https://www.fibratus.io/#/transformers/rename)
-* [**Replace**](https://www.fibratus.io/#/transformers/replace)
-* [**Tags**](https://www.fibratus.io/#/transformers/tags)
-* [**Trim**](https://www.fibratus.io/#/transformers/trim)
-
-### Alerts
-
-* [**Watchdogging kernel events**](https://www.fibratus.io/#/alerts/introduction)
-* [**Mail**](https://www.fibratus.io/#/alerts/senders/mail)
-* [**Slack**](https://www.fibratus.io/#/alerts/senders/slack)
-* [**Filament alerting**](https://www.fibratus.io/#/alerts/filaments)
-
-### PE (Portable Executable)
-
-* [**Portable Executable introspection**](https://www.fibratus.io/#/pe/introduction)
-* [**Sections**](https://www.fibratus.io/#/pe/sections)
-* [**Symbols**](https://www.fibratus.io/#/pe/symbols)
-* [**Resources**](https://www.fibratus.io/#/pe/resources)
-
-### YARA
-
-* [**Pattern matching swiss knife**](https://www.fibratus.io/#/yara/introduction)
-* [**Scanning processes**](https://www.fibratus.io/#/yara/scanning)
-* [**Alerts**](https://www.fibratus.io/#/yara/alerts)
-
-### Troubleshooting
-
-* [**Logs**](https://www.fibratus.io/#/troubleshooting/logs)
-* [**Stats**](https://www.fibratus.io/#/troubleshooting/stats)
-* [**Profiling**](https://www.fibratus.io/#/troubleshooting/pprof)
+To fully exploit and learn about Fibratus capabilities, read the [docs](https://www.fibratus.io).
 
 ---
 
