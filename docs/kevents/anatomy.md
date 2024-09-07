@@ -57,6 +57,7 @@ Stack enrichment is performed for the following event set:
 - `CreateProcess`
 - `CreateThread`
 - `TerminateThread`
+- `SetThreadContext`
 - `LoadImage`
 - `RegCreateKey`
 - `RegDeleteKey`

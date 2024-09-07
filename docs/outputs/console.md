@@ -58,6 +58,7 @@ The following field modifiers are supported:
 - `.Host`
 - `.PE`
 - `.Kparams.`
+- `.Callstack`
 
 **Examples**
 
