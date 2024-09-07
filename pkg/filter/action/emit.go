@@ -25,11 +25,17 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/util/markdown"
 	log "github.com/sirupsen/logrus"
+	"strings"
 )
 
 // Emit sends the rule alert via all configured alert senders.
 func Emit(ctx *config.ActionContext, title string, text string, severity string, tags []string) error {
-	log.Infof("sending alert: [%s]. Text: %s", title, text)
+	var b strings.Builder
+	for _, evt := range ctx.Events {
+		b.WriteString(evt.String())
+		b.WriteByte('\n')
+	}
+	log.Infof("sending alert: [%s]. Text: %s Event(s): %s", title, text, b.String())
 
 	senders := alertsender.FindAll()
 	if len(senders) == 0 {
