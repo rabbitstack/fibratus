@@ -1,6 +1,6 @@
 # Quick start
 
-By default, Fibratus operates in rule engine mode. It loads the rule set from the `%PROGRAM FILES%\Fibratus\Rules` directory and sends security alerts to the [systray](/alerts/senders/systray) notification area. Optionally, it takes response actions when the rule is fired, such as killing the process. The see Fibratus in action, we can trigger a rule by performing the following actions:
+By default, Fibratus operates in rule engine mode. It loads the rule set from the `%PROGRAM FILES%\Fibratus\Rules` directory and sends security alerts to the [systray](/alerts/senders/systray) notification area. Optionally, it takes response actions when the rule is fired, such as killing the process. To see Fibratus in action, we can trigger a rule by performing the following actions:
 
 - spin up a command line prompt
 - list credentials from the vault by using the `VaultCmd` tool
