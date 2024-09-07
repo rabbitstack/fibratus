@@ -71,7 +71,7 @@ func InitFromConfig(c Config, filename string) error {
 	case "json":
 		formatter = &logrus.JSONFormatter{}
 	case "text":
-		formatter = &logrus.TextFormatter{}
+		formatter = &logrus.TextFormatter{DisableQuote: true}
 	default:
 		formatter = &logrus.JSONFormatter{}
 	}
