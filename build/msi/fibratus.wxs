@@ -57,7 +57,7 @@
         </ServiceInstall>
         <ServiceControl Id="Fibratus" Name="Fibratus" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
       </Component>
-      <Component Id="Systray" Guid="F3C06EDD-C830-4FCD-BAFA-0D15C697EE76">
+      <Component Directory="BINDIR" Id="Systray" Guid="F3C06EDD-C830-4FCD-BAFA-0D15C697EE76">
         <File Id="Systray" Source="!(bindpath.dir)Bin\fibratus-systray.exe" KeyPath="yes" Checksum="yes"/>
         <RegistryValue Root="HKMU" Action="write"
                        Key="Software\Microsoft\Windows\CurrentVersion\Run"
