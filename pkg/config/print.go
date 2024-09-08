@@ -99,8 +99,6 @@ func (c *Config) Print() string {
 	}
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].k < sorted[j].k })
 
-	buffer.WriteString("\n")
-
 	// print the options
 	for _, kv := range sorted {
 		c.printLine(&buffer, maxKeyLen, kv.k, c.print(kv.v))

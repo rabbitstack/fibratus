@@ -35,6 +35,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"github.com/rabbitstack/fibratus/pkg/util/signals"
+	"github.com/rabbitstack/fibratus/pkg/util/version"
 	"github.com/rabbitstack/fibratus/pkg/yara"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
@@ -184,8 +185,8 @@ func (f *App) Run(args []string) error {
 		return ErrAlreadyRunning
 	}
 
-	log.Infof("bootstrapping with pid %d", os.Getpid())
-	log.Infof("configuration settings %s", cfg.Print())
+	log.Infof("bootstrapping with pid %d. Version: %s", os.Getpid(), version.Get())
+	log.Infof("configuration dump %s", cfg.Print())
 
 	err := f.controller.Start()
 	if err != nil {
