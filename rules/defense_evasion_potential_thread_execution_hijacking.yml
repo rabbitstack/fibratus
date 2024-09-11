@@ -30,9 +30,7 @@ condition: >
   sequence
   maxspan 2m
   by ps.uuid
-    |open_thread and kevt.pid != 4 and kevt.pid != kevt.arg[pid]
-      and
-     thread.access.mask.names in ('ALL_ACCESS', 'SUSPEND_THREAD')
+    |open_remote_thread and thread.access.mask.names in ('ALL_ACCESS', 'SUSPEND_THREAD')
       and
       not
      ps.exe imatches

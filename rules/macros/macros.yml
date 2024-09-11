@@ -13,6 +13,9 @@
 - macro: open_thread
   expr: kevt.name = 'OpenThread' and thread.access.status = 'Success'
 
+- macro: open_remote_thread
+  expr: open_thread and kevt.pid != 4 and kevt.pid != kevt.arg[pid]
+
 - macro: write_file
   expr: kevt.name = 'WriteFile'
 
