@@ -34,6 +34,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"os/user"
 	"path/filepath"
 	"unsafe"
 )
@@ -236,8 +237,17 @@ func main() {
 		fmt.Printf("%v", err)
 		os.Exit(1)
 	}
+	logrus.Info("starting systray server...")
+	usr, err := user.Current()
+	if err != nil {
+		logrus.Fatalf("failed to retrieve the current user: %v", err)
+	}
+	// Named pipe security and access rights.
+	// Give generic read/write access to the
+	// current user SID
+	descriptor := "D:P(A;;GA;;;" + usr.Uid + ")"
 	// spin up named-pipe server
-	l, err := winio.ListenPipe(systrayPipe, nil)
+	l, err := winio.ListenPipe(systrayPipe, &winio.PipeConfig{SecurityDescriptor: descriptor})
 	if err != nil {
 		logrus.Fatalf("unable to listen on named pipe: %s: %v", systrayPipe, err)
 	}
