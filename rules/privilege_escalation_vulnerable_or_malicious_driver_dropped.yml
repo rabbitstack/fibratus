@@ -16,7 +16,7 @@ references:
   - https://www.loldrivers.io/
 
 condition: >
-  create_file
+  create_file and file.is_driver
     and
   (file.is_driver_vulnerable or file.is_driver_malicious)
 
