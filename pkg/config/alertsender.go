@@ -35,8 +35,8 @@ var errAlertsenderConfig = func(sender string, err error) error {
 }
 
 func (c *Config) tryLoadAlertSenders() error {
-	if c.ForwardMode {
-		// In event forwarding mode, alert senders are useless
+	if c.ForwardMode || c.IsCaptureSet() {
+		// In event forwarding mode or capture control, alert senders are useless
 		return nil
 	}
 	configs := make([]alertsender.Config, 0)
