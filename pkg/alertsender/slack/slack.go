@@ -73,15 +73,17 @@ func (s slack) Send(alert alertsender.Alert) error {
 	switch alert.Severity {
 	case alertsender.Medium:
 		color = "warning"
-	case alertsender.Critical:
+	case alertsender.Critical, alertsender.High:
 		color = "danger"
 	default:
 		color = "good"
 	}
 
+	text := fmt.Sprintf("%s\n%s", alert.Title, alert.Text)
+
 	attach := attachment{
-		Fallback: alert.Text,
-		Text:     alert.Text,
+		Fallback: text,
+		Text:     text,
 		Color:    color,
 		Mdin:     []string{"text"},
 	}
