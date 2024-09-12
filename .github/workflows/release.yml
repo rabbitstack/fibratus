@@ -14,7 +14,7 @@ jobs:
       runs-on: windows-latest
       steps:
       - name: Install Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
            go-version:  ${{ env.GO_VERSION }}
       - name: Checkout
@@ -99,7 +99,7 @@ jobs:
       runs-on: windows-latest
       steps:
       - name: Install Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
            go-version:  ${{ env.GO_VERSION }}
       - name: Checkout
@@ -108,7 +108,7 @@ jobs:
         id: get_version
         shell: bash
         run: |
-          echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3 | cut -c2-)
+          echo "VERSION=$(echo $GITHUB_REF | cut -d / -f 3 | cut -c2-)" >> $GITHUB_OUTPUT
       - name: Build
         shell: bash
         run: |
@@ -144,7 +144,7 @@ jobs:
         id: get_version
         shell: bash
         run: |
-          echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3 | cut -c2-)
+          echo "VERSION=$(echo $GITHUB_REF | cut -d / -f 3 | cut -c2-)" >> $GITHUB_OUTPUT
       - uses: actions/download-artifact@v4
         with:
           name: fibratus-${{ steps.get_version.outputs.VERSION }}-amd64.msi
@@ -154,7 +154,7 @@ jobs:
           name: fibratus-${{ steps.get_version.outputs.VERSION }}-slim-amd64.msi
           path: build
       - name: Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
           draft: true
