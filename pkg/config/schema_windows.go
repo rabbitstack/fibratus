@@ -474,7 +474,7 @@ var schema = `
 						"additionalProperties": false
 					}]
 				},
-				"alert-via":		{"type": "string", "enum": ["slack", "mail"]},
+				"alert-via":		{"type": "string", "enum": ["slack", "mail", "systray"]},
 				"alert-template":   {
 						"type": 		"object",
 						"properties": {
