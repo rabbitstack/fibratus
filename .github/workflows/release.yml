@@ -68,7 +68,7 @@ jobs:
         id: get_version
         shell: bash
         run: |
-          echo ::set-output name=VERSION::$(echo $GITHUB_REF | cut -d / -f 3 | cut -c2-)
+          echo "VERSION=$(echo $GITHUB_REF | cut -d / -f 3 | cut -c2-)" >> $GITHUB_OUTPUT
       - name: Build
         shell: bash
         run: |
