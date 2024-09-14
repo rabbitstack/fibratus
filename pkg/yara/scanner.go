@@ -26,12 +26,14 @@ import (
 	"encoding/json"
 	"expvar"
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"html/template"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"golang.org/x/sys/windows"
 
 	"github.com/hillu/go-yara/v4"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
@@ -171,7 +173,7 @@ func (s scanner) ProcessEvent(evt *kevent.Kevent) (bool, error) {
 }
 
 func (s scanner) Scan(evt *kevent.Kevent) (bool, error) {
-	if !evt.IsCreateProcess() && !evt.IsLoadImage() {
+	if !evt.IsCreateProcess() && !evt.IsLoadImage() && !evt.IsVirtualAlloc() {
 		return false, nil
 	}
 
@@ -201,6 +203,24 @@ func (s scanner) Scan(evt *kevent.Kevent) (bool, error) {
 		filename := evt.GetParamAsString(kparams.ImageFilename)
 		alertCtx.Filename = filename
 		err = sn.SetCallback(&matches).ScanFile(filename)
+	case ktypes.VirtualAlloc:
+		pid := evt.Kparams.MustGetPid()
+		_, proc := s.psnap.Find(pid)
+		if proc == nil {
+			return false, fmt.Errorf("%d process not found in snapshotter", pid)
+		}
+		if s.config.ShouldSkipProcess(proc.Name) {
+			return false, nil
+		}
+		if evt.Kparams.Find(kparams.MemProtect) == nil {
+			return false, nil
+		}
+		protectVal, _ := evt.Kparams.GetUint32(kparams.MemProtect)
+		if protectVal != windows.PAGE_EXECUTE_READWRITE {
+			return false, nil
+		}
+		alertCtx.PS = proc
+		err = sn.SetCallback(&matches).ScanProc(int(pid))
 	}
 
 	if err != nil {
