@@ -1,6 +1,12 @@
 name: pr
 
 on:
+  pull_request_target:
+    types:
+      - opened
+      - edited
+      - synchronize
+      - reopened
   pull_request:
     branches:
       - master
@@ -15,6 +21,10 @@ jobs:
   build:
       runs-on: windows-latest
       steps:
+      - name: Validate PR title
+        uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Install Go
         uses: actions/setup-go@v5
         with:
