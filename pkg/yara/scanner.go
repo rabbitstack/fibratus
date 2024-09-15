@@ -212,11 +212,11 @@ func (s scanner) Scan(evt *kevent.Kevent) (bool, error) {
 		if s.config.ShouldSkipProcess(proc.Name) {
 			return false, nil
 		}
-		if evt.Kparams.Find(kparams.MemProtect) == nil {
-			return false, nil
+		protect, err := evt.Kparams.GetUint32(kparams.MemProtect)
+		if err != nil {
+			return false, err
 		}
-		protectVal, _ := evt.Kparams.GetUint32(kparams.MemProtect)
-		if protectVal != windows.PAGE_EXECUTE_READWRITE {
+		if protect != windows.PAGE_EXECUTE_READWRITE {
 			return false, nil
 		}
 		alertCtx.PS = proc
