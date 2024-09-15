@@ -22,12 +22,13 @@
 package yara
 
 import (
-	"github.com/hillu/go-yara/v4"
-	log "github.com/sirupsen/logrus"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/hillu/go-yara/v4"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
@@ -228,6 +229,30 @@ func TestScan(t *testing.T) {
 
 	assert.Equal(t, "YARA alert on file _fixtures/yara-test.dll", yaraAlert.Title)
 	assert.Contains(t, yaraAlert.Tags, "dll")
+
+	// test file scanning notepad.exe triggered by a VirtualAlloc
+	// event with RWX protection flags.
+	kevt2 := &kevent.Kevent{
+		Type: ktypes.VirtualAlloc,
+		Name: "VirtualAlloc",
+		Tid:  2484,
+		PID:  859,
+		Kparams: kevent.Kparams{
+			kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "svchost.exe"},
+			kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: pi.ProcessId},
+			kparams.MemProtect:  {Name: kparams.MemProtect, Type: kparams.Flags, Value: uint32(windows.PAGE_EXECUTE_READWRITE), Flags: kevent.MemProtectionFlags},
+		},
+		Metadata: make(map[kevent.MetadataKey]any),
+	}
+	match, err = s.Scan(kevt2)
+	require.NoError(t, err)
+	require.True(t, match)
+	require.NotNil(t, yaraAlert)
+
+	assert.Equal(t, "YARA alert on process notepad.exe", yaraAlert.Title)
+	assert.NotEmpty(t, yaraAlert.Text)
+	assert.Contains(t, yaraAlert.Tags, "notepad")
+
 }
 
 func TestMatchesMeta(t *testing.T) {
