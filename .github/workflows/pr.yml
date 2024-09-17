@@ -1,12 +1,6 @@
 name: pr
 
 on:
-  pull_request_target:
-    types:
-      - opened
-      - edited
-      - synchronize
-      - reopened
   pull_request:
     branches:
       - master
