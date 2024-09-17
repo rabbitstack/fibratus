@@ -20,12 +20,13 @@ package kstream
 
 import (
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-	"github.com/rabbitstack/fibratus/pkg/util/multierror"
-	"golang.org/x/sys/windows"
 	"runtime"
 	"time"
 	"unsafe"
+
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/util/multierror"
+	"golang.org/x/sys/windows"
 
 	"github.com/rabbitstack/fibratus/pkg/config"
 	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
@@ -442,6 +443,10 @@ func NewController(c *config.Config, r *config.RulesCompileResult) *Controller {
 			if ktype == ktypes.CreateProcess || ktype == ktypes.TerminateProcess ||
 				ktype == ktypes.LoadImage || ktype == ktypes.UnloadImage {
 				// always allow fundamental events
+				continue
+			}
+			if c.Yara.Enabled && ktype == ktypes.VirtualAlloc {
+				c.Kstream.EnableMemKevents = true
 				continue
 			}
 			if !r.ContainsEvent(ktype) {
