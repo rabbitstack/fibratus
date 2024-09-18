@@ -563,6 +563,8 @@ func (t *threadAccessor) Get(f fields.Field, kevt *kevent.Kevent) (kparams.Value
 		return kevt.GetParamAsString(kparams.StartAddr), nil
 	case fields.ThreadPID:
 		return kevt.Kparams.GetUint32(kparams.ProcessID)
+	case fields.ThreadTEB:
+		return kevt.GetParamAsString(kparams.TEB), nil
 	case fields.ThreadAccessMask:
 		if kevt.Type != ktypes.OpenThread {
 			return nil, nil
