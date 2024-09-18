@@ -559,8 +559,8 @@ func (t *threadAccessor) Get(f fields.Field, kevt *kevent.Kevent) (kparams.Value
 		return kevt.GetParamAsString(kparams.UstackBase), nil
 	case fields.ThreadUstackLimit:
 		return kevt.GetParamAsString(kparams.UstackLimit), nil
-	case fields.ThreadEntrypoint:
-		return kevt.GetParamAsString(kparams.StartAddr), nil
+	case fields.ThreadEntrypoint, fields.ThreadStartAddress:
+		return kevt.GetParamAsString(kparams.StartAddress), nil
 	case fields.ThreadPID:
 		return kevt.Kparams.GetUint32(kparams.ProcessID)
 	case fields.ThreadAccessMask:

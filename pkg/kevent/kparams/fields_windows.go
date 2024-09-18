@@ -74,8 +74,8 @@ const (
 	UstackBase = "ustack"
 	// UstackLimit field is the end address of the user space stack.
 	UstackLimit = "ustack_limit"
-	// StartAddr field is the address of the thread main function.
-	StartAddr = "entrypoint"
+	// StartAddress field is the thread start address.
+	StartAddress = "start_address"
 
 	// FileObject determines the field name for the file object pointer.
 	FileObject = "file_object"

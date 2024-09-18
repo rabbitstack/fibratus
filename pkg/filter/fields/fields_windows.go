@@ -169,6 +169,8 @@ const (
 	ThreadUstackLimit Field = "thread.ustack.limit"
 	// ThreadEntrypoint is the thread entrypoint address
 	ThreadEntrypoint Field = "thread.entrypoint"
+	// ThreadStartAddress is the thread start address
+	ThreadStartAddress Field = "thread.start_address"
 	// ThreadPID is the process identifier where the thread is created
 	ThreadPID Field = "thread.pid"
 	// ThreadAccessMask represents the thread access rights field
@@ -664,7 +666,8 @@ var fields = map[Field]FieldInfo{
 	ThreadKstackLimit:                       {ThreadKstackLimit, "limit of the thread's kernel space stack", kparams.Address, []string{"thread.kstack.limit = 'a85d800000'"}, nil},
 	ThreadUstackBase:                        {ThreadUstackBase, "base address of the thread's user space stack", kparams.Address, []string{"thread.ustack.base = '7ffe0000'"}, nil},
 	ThreadUstackLimit:                       {ThreadUstackLimit, "limit of the thread's user space stack", kparams.Address, []string{"thread.ustack.limit = '8ffe0000'"}, nil},
-	ThreadEntrypoint:                        {ThreadEntrypoint, "starting address of the function to be executed by the thread", kparams.Address, []string{"thread.entrypoint = '7efe0000'"}, nil},
+	ThreadEntrypoint:                        {ThreadEntrypoint, "starting address of the function to be executed by the thread", kparams.Address, []string{"thread.entrypoint = '7efe0000'"}, &Deprecation{Since: "2.3.0", Fields: []Field{ThreadStartAddress}}},
+	ThreadStartAddress:                      {ThreadStartAddress, "thread start address", kparams.Address, []string{"thread.start_address = '7efe0000'"}, nil},
 	ThreadPID:                               {ThreadPID, "the process identifier where the thread is created", kparams.Uint32, []string{"kevt.pid != thread.pid"}, nil},
 	ThreadAccessMask:                        {ThreadAccessMask, "thread desired access rights", kparams.AnsiString, []string{"thread.access.mask = '0x1fffff'"}, nil},
 	ThreadAccessMaskNames:                   {ThreadAccessMaskNames, "thread desired access rights as a string list", kparams.Slice, []string{"thread.access.mask.names in ('IMPERSONATE')"}, nil},
