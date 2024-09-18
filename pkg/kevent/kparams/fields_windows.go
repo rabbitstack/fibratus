@@ -76,6 +76,8 @@ const (
 	UstackLimit = "ustack_limit"
 	// StartAddr field is the address of the thread main function.
 	StartAddr = "entrypoint"
+	// TEB field is the address of the Thread Environment Block (TEB)
+	TEB = "teb"
 
 	// FileObject determines the field name for the file object pointer.
 	FileObject = "file_object"
