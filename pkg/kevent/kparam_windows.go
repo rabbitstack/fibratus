@@ -278,6 +278,7 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 			kstack, klimit uint64
 			ustack, ulimit uint64
 			startAddress   uint64
+			teb            uint64
 			basePrio       uint8
 			pagePrio       uint8
 			ioPrio         uint8
@@ -295,6 +296,7 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 			ustack = evt.ReadUint64(24)
 			ulimit = evt.ReadUint64(32)
 			startAddress = evt.ReadUint64(48)
+			teb = evt.ReadUint64(56)
 		}
 		if evt.Version() >= 3 {
 			basePrio = evt.ReadByte(69)
@@ -308,6 +310,7 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 		e.AppendParam(kparams.UstackBase, kparams.Address, ustack)
 		e.AppendParam(kparams.UstackLimit, kparams.Address, ulimit)
 		e.AppendParam(kparams.StartAddress, kparams.Address, startAddress)
+		e.AppendParam(kparams.TEB, kparams.Address, teb)
 		e.AppendParam(kparams.BasePrio, kparams.Uint8, basePrio)
 		e.AppendParam(kparams.PagePrio, kparams.Uint8, pagePrio)
 		e.AppendParam(kparams.IOPrio, kparams.Uint8, ioPrio)
