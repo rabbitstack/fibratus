@@ -190,13 +190,13 @@ type Thread struct {
 	KstackBase va.Address
 	// KstackLimit is the limit of the thread's kernel space stack.
 	KstackLimit va.Address
-	// Entrypoint is the starting address of the function to be executed by the thread.
-	Entrypoint va.Address
+	// StartAddress is thread start address.
+	StartAddress va.Address
 }
 
 // String returns the thread as a human-readable string.
 func (t Thread) String() string {
-	return fmt.Sprintf("ID: %d IO prio: %d, Base prio: %d, Page prio: %d, Ustack base: %s, Ustack limit: %s, Kstack base: %s, Kstack limit: %s, Entrypoint: %s", t.Tid, t.IOPrio, t.BasePrio, t.PagePrio, t.UstackBase, t.UstackLimit, t.KstackBase, t.UstackLimit, t.Entrypoint)
+	return fmt.Sprintf("ID: %d IO prio: %d, Base prio: %d, Page prio: %d, Ustack base: %s, Ustack limit: %s, Kstack base: %s, Kstack limit: %s, Start address: %s", t.Tid, t.IOPrio, t.BasePrio, t.PagePrio, t.UstackBase, t.UstackLimit, t.KstackBase, t.UstackLimit, t.StartAddress)
 }
 
 // Module represents the data for all dynamic libraries/executables that reside in the process' address space.

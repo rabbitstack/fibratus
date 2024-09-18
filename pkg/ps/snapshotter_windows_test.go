@@ -249,16 +249,16 @@ func TestAddThread(t *testing.T) {
 			&kevent.Kevent{
 				Type: ktypes.CreateThread,
 				Kparams: kevent.Kparams{
-					kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(os.Getpid())},
-					kparams.ThreadID:    {Name: kparams.ThreadID, Type: kparams.TID, Value: uint32(3453)},
-					kparams.BasePrio:    {Name: kparams.BasePrio, Type: kparams.Uint8, Value: uint8(13)},
-					kparams.StartAddr:   {Name: kparams.StartAddr, Type: kparams.Address, Value: uint64(140729524944768)},
-					kparams.IOPrio:      {Name: kparams.IOPrio, Type: kparams.Uint8, Value: uint8(2)},
-					kparams.KstackBase:  {Name: kparams.KstackBase, Type: kparams.Address, Value: uint64(18446677035730165760)},
-					kparams.KstackLimit: {Name: kparams.KstackLimit, Type: kparams.Address, Value: uint64(18446677035730137088)},
-					kparams.PagePrio:    {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(5)},
-					kparams.UstackBase:  {Name: kparams.UstackBase, Type: kparams.Address, Value: uint64(86376448)},
-					kparams.UstackLimit: {Name: kparams.UstackLimit, Type: kparams.Address, Value: uint64(86372352)},
+					kparams.ProcessID:    {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(os.Getpid())},
+					kparams.ThreadID:     {Name: kparams.ThreadID, Type: kparams.TID, Value: uint32(3453)},
+					kparams.BasePrio:     {Name: kparams.BasePrio, Type: kparams.Uint8, Value: uint8(13)},
+					kparams.StartAddress: {Name: kparams.StartAddress, Type: kparams.Address, Value: uint64(140729524944768)},
+					kparams.IOPrio:       {Name: kparams.IOPrio, Type: kparams.Uint8, Value: uint8(2)},
+					kparams.KstackBase:   {Name: kparams.KstackBase, Type: kparams.Address, Value: uint64(18446677035730165760)},
+					kparams.KstackLimit:  {Name: kparams.KstackLimit, Type: kparams.Address, Value: uint64(18446677035730137088)},
+					kparams.PagePrio:     {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(5)},
+					kparams.UstackBase:   {Name: kparams.UstackBase, Type: kparams.Address, Value: uint64(86376448)},
+					kparams.UstackLimit:  {Name: kparams.UstackLimit, Type: kparams.Address, Value: uint64(86372352)},
 				},
 			},
 			true,
@@ -267,16 +267,16 @@ func TestAddThread(t *testing.T) {
 			&kevent.Kevent{
 				Type: ktypes.CreateThread,
 				Kparams: kevent.Kparams{
-					kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(os.Getpid() + 1)},
-					kparams.ThreadID:    {Name: kparams.ThreadID, Type: kparams.TID, Value: uint32(3453)},
-					kparams.BasePrio:    {Name: kparams.BasePrio, Type: kparams.Uint8, Value: uint8(13)},
-					kparams.StartAddr:   {Name: kparams.StartAddr, Type: kparams.Address, Value: uint64(140729524944768)},
-					kparams.IOPrio:      {Name: kparams.IOPrio, Type: kparams.Uint8, Value: uint8(2)},
-					kparams.KstackBase:  {Name: kparams.KstackBase, Type: kparams.Address, Value: uint64(18446677035730165760)},
-					kparams.KstackLimit: {Name: kparams.KstackLimit, Type: kparams.Address, Value: uint64(18446677035730137088)},
-					kparams.PagePrio:    {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(5)},
-					kparams.UstackBase:  {Name: kparams.UstackBase, Type: kparams.Address, Value: uint64(86376448)},
-					kparams.UstackLimit: {Name: kparams.UstackLimit, Type: kparams.Address, Value: uint64(86372352)},
+					kparams.ProcessID:    {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(os.Getpid() + 1)},
+					kparams.ThreadID:     {Name: kparams.ThreadID, Type: kparams.TID, Value: uint32(3453)},
+					kparams.BasePrio:     {Name: kparams.BasePrio, Type: kparams.Uint8, Value: uint8(13)},
+					kparams.StartAddress: {Name: kparams.StartAddress, Type: kparams.Address, Value: uint64(140729524944768)},
+					kparams.IOPrio:       {Name: kparams.IOPrio, Type: kparams.Uint8, Value: uint8(2)},
+					kparams.KstackBase:   {Name: kparams.KstackBase, Type: kparams.Address, Value: uint64(18446677035730165760)},
+					kparams.KstackLimit:  {Name: kparams.KstackLimit, Type: kparams.Address, Value: uint64(18446677035730137088)},
+					kparams.PagePrio:     {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(5)},
+					kparams.UstackBase:   {Name: kparams.UstackBase, Type: kparams.Address, Value: uint64(86376448)},
+					kparams.UstackLimit:  {Name: kparams.UstackLimit, Type: kparams.Address, Value: uint64(86372352)},
 				},
 			},
 			false,
@@ -293,7 +293,7 @@ func TestAddThread(t *testing.T) {
 			require.Equal(t, exists, ok)
 			if ok {
 				assert.Contains(t, proc.Threads, evt.Kparams.MustGetTid())
-				assert.Equal(t, va.Address(140729524944768), proc.Threads[evt.Kparams.MustGetTid()].Entrypoint)
+				assert.Equal(t, va.Address(140729524944768), proc.Threads[evt.Kparams.MustGetTid()].StartAddress)
 			}
 		})
 	}
@@ -323,16 +323,16 @@ func TestRemoveThread(t *testing.T) {
 	tevt := &kevent.Kevent{
 		Type: ktypes.CreateThread,
 		Kparams: kevent.Kparams{
-			kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(os.Getpid())},
-			kparams.ThreadID:    {Name: kparams.ThreadID, Type: kparams.TID, Value: uint32(3453)},
-			kparams.BasePrio:    {Name: kparams.BasePrio, Type: kparams.Uint8, Value: uint8(13)},
-			kparams.StartAddr:   {Name: kparams.StartAddr, Type: kparams.Address, Value: uint64(140729524944768)},
-			kparams.IOPrio:      {Name: kparams.IOPrio, Type: kparams.Uint8, Value: uint8(2)},
-			kparams.KstackBase:  {Name: kparams.KstackBase, Type: kparams.Address, Value: uint64(18446677035730165760)},
-			kparams.KstackLimit: {Name: kparams.KstackLimit, Type: kparams.Address, Value: uint64(18446677035730137088)},
-			kparams.PagePrio:    {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(5)},
-			kparams.UstackBase:  {Name: kparams.UstackBase, Type: kparams.Address, Value: uint64(86376448)},
-			kparams.UstackLimit: {Name: kparams.UstackLimit, Type: kparams.Address, Value: uint64(86372352)},
+			kparams.ProcessID:    {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(os.Getpid())},
+			kparams.ThreadID:     {Name: kparams.ThreadID, Type: kparams.TID, Value: uint32(3453)},
+			kparams.BasePrio:     {Name: kparams.BasePrio, Type: kparams.Uint8, Value: uint8(13)},
+			kparams.StartAddress: {Name: kparams.StartAddress, Type: kparams.Address, Value: uint64(140729524944768)},
+			kparams.IOPrio:       {Name: kparams.IOPrio, Type: kparams.Uint8, Value: uint8(2)},
+			kparams.KstackBase:   {Name: kparams.KstackBase, Type: kparams.Address, Value: uint64(18446677035730165760)},
+			kparams.KstackLimit:  {Name: kparams.KstackLimit, Type: kparams.Address, Value: uint64(18446677035730137088)},
+			kparams.PagePrio:     {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(5)},
+			kparams.UstackBase:   {Name: kparams.UstackBase, Type: kparams.Address, Value: uint64(86376448)},
+			kparams.UstackLimit:  {Name: kparams.UstackLimit, Type: kparams.Address, Value: uint64(86372352)},
 		},
 	}
 

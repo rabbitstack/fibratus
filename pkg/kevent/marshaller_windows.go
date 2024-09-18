@@ -609,7 +609,7 @@ func (e *Kevent) MarshalJSON() []byte {
 				js.writeObjectField("ioprio").writeUint8(thread.IOPrio).writeMore()
 				js.writeObjectField("baseprio").writeUint8(thread.BasePrio).writeMore()
 				js.writeObjectField("pageprio").writeUint8(thread.PagePrio).writeMore()
-				js.writeObjectField("entrypoint").writeString(thread.Entrypoint.String()).writeMore()
+				js.writeObjectField("start_address").writeString(thread.StartAddress.String()).writeMore()
 				js.writeObjectField("ustack_base").writeString(thread.UstackBase.String()).writeMore()
 				js.writeObjectField("ustack_limit").writeString(thread.UstackLimit.String()).writeMore()
 				js.writeObjectField("kstack_base").writeString(thread.KstackBase.String()).writeMore()

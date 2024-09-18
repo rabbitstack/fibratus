@@ -193,7 +193,7 @@ func (s *snapshotter) AddThread(e *kevent.Kevent) error {
 	thread.IOPrio, _ = e.Kparams.GetUint8(kparams.IOPrio)
 	thread.BasePrio, _ = e.Kparams.GetUint8(kparams.BasePrio)
 	thread.PagePrio, _ = e.Kparams.GetUint8(kparams.PagePrio)
-	thread.Entrypoint = e.Kparams.TryGetAddress(kparams.StartAddr)
+	thread.StartAddress = e.Kparams.TryGetAddress(kparams.StartAddress)
 	proc.AddThread(thread)
 	return nil
 }

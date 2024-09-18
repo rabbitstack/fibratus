@@ -430,12 +430,12 @@ func (e *Kevent) Summary() string {
 			exe, access))
 	case ktypes.CreateThread:
 		tid, _ := e.Kparams.GetTid()
-		addr := e.GetParamAsString(kparams.StartAddr)
+		addr := e.GetParamAsString(kparams.StartAddress)
 		return printSummary(e, fmt.Sprintf("spawned a new thread with <code>%d</code> id at <code>%s</code> address",
 			tid, addr))
 	case ktypes.TerminateThread:
 		tid, _ := e.Kparams.GetTid()
-		addr := e.GetParamAsString(kparams.StartAddr)
+		addr := e.GetParamAsString(kparams.StartAddress)
 		return printSummary(e, fmt.Sprintf("terminated a thread with <code>%d</code> id at <code>%s</code> address",
 			tid, addr))
 	case ktypes.OpenThread:
