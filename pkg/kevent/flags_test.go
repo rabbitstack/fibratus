@@ -29,6 +29,7 @@ func TestParamFlags(t *testing.T) {
 		{0x1fffff, PsAccessRightFlags, "ALL_ACCESS"},
 		{0x1400, PsAccessRightFlags, "QUERY_INFORMATION|QUERY_LIMITED_INFORMATION"},
 		{0x1800, ThreadAccessRightFlags, "QUERY_LIMITED_INFORMATION"},
+		{0x00000002, PsCreationFlags, "WOW64"},
 	}
 
 	for i, tt := range tests {

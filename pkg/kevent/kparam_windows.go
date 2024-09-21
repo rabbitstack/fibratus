@@ -217,6 +217,7 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 			sessionID  uint32
 			exitStatus uint32
 			dtb        uint64
+			flags      uint32
 			sid        []byte
 			name       string
 			cmdline    string
@@ -236,6 +237,9 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 		if evt.Version() >= 3 {
 			dtb = evt.ReadUint64(24)
 		}
+		if evt.Version() >= 4 {
+			flags = evt.ReadUint32(32)
+		}
 		switch {
 		case evt.Version() >= 4:
 			offset = 36
@@ -254,6 +258,7 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 		e.AppendParam(kparams.SessionID, kparams.Uint32, sessionID)
 		e.AppendParam(kparams.ExitStatus, kparams.Status, exitStatus)
 		e.AppendParam(kparams.DTB, kparams.Address, dtb)
+		e.AppendParam(kparams.ProcessFlags, kparams.Flags, flags, WithFlags(PsCreationFlags))
 		e.AppendParam(kparams.UserSID, kparams.WbemSID, sid)
 		e.AppendParam(kparams.ProcessName, kparams.AnsiString, name)
 		e.AppendParam(kparams.Cmdline, kparams.UnicodeString, cmdline)
