@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
+	"github.com/rabbitstack/fibratus/pkg/alertsender/eventlog"
 	"github.com/rabbitstack/fibratus/pkg/alertsender/mail"
 	"github.com/rabbitstack/fibratus/pkg/alertsender/slack"
 	"github.com/rabbitstack/fibratus/pkg/alertsender/systray"
@@ -39,6 +40,7 @@ func (c *Config) tryLoadAlertSenders() error {
 		// In event forwarding mode or capture control, alert senders are useless
 		return nil
 	}
+
 	configs := make([]alertsender.Config, 0)
 	alertsenders := c.viper.AllSettings()["alertsenders"]
 	if alertsenders == nil {
@@ -89,6 +91,20 @@ func (c *Config) tryLoadAlertSenders() error {
 			config := alertsender.Config{
 				Type:   alertsender.Systray,
 				Sender: systrayConfig,
+			}
+			configs = append(configs, config)
+
+		case "eventlog":
+			var eventlogConfig eventlog.Config
+			if err := decode(config, &eventlogConfig); err != nil {
+				return errAlertsenderConfig(typ, err)
+			}
+			if !eventlogConfig.Enabled {
+				continue
+			}
+			config := alertsender.Config{
+				Type:   alertsender.Eventlog,
+				Sender: eventlogConfig,
 			}
 			configs = append(configs, config)
 		}

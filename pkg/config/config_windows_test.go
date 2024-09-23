@@ -22,6 +22,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers"
 	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers/rename"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
+	"github.com/rabbitstack/fibratus/pkg/alertsender/eventlog"
 	"github.com/rabbitstack/fibratus/pkg/alertsender/mail"
 	"github.com/rabbitstack/fibratus/pkg/alertsender/slack"
 	"github.com/rabbitstack/fibratus/pkg/alertsender/systray"
@@ -48,7 +49,7 @@ func TestNewFromYamlFile(t *testing.T) {
 	assert.Equal(t, time.Millisecond*230, c.Aggregator.FlushPeriod)
 	assert.Equal(t, time.Second*8, c.Aggregator.FlushTimeout)
 
-	assert.Len(t, c.Alertsenders, 3)
+	assert.Len(t, c.Alertsenders, 4)
 
 	for _, c := range c.Alertsenders {
 		switch c.Type {
@@ -69,6 +70,10 @@ func TestNewFromYamlFile(t *testing.T) {
 			assert.True(t, systrayConfig.Enabled)
 			assert.True(t, systrayConfig.Sound)
 			assert.False(t, systrayConfig.QuietMode)
+		case alertsender.Eventlog:
+			assert.IsType(t, eventlog.Config{}, c.Sender)
+			eventlogConfig := c.Sender.(eventlog.Config)
+			assert.True(t, eventlogConfig.Enabled)
 		}
 	}
 
