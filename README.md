@@ -27,8 +27,6 @@
   </strong>
 </p>
 
-### What is Fibratus?
-
 Fibratus detects, protects, and eradicates advanced adversary tradecraft by scrutinizing
 and asserting a wide spectrum of system events against a behavior-driven [rule engine](https://www.fibratus.io/#/filters/rules) and [YARA](https://www.fibratus.io/#/yara/introduction) memory scanner.
 
@@ -51,6 +49,10 @@ $ VaultCmd.exe /listcreds:"Windows Credentials" /all
 ### Documentation
 
 To fully exploit and learn about Fibratus capabilities, read the [docs](https://www.fibratus.io).
+
+### Contributing
+
+We love contributions. To start contributing to Fibratus, please read our [contribution guidelines](https://github.com/rabbitstack/fibratus/blob/master/CONTRIBUTING.md).
 
 ---
 
