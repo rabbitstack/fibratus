@@ -150,12 +150,12 @@ type PyObject struct {
 	rawptr *C.PyObject
 }
 
-//nolint:golint // NewPyNone creates a new none Python object.
+// NewPyNone creates a new none Python object.
 func NewPyNone() *C.PyObject {
 	return C.Py_None
 }
 
-//nolint:golint // NewPyLong creates a new 64-bit signed integer Python object.
+// NewPyLong creates a new 64-bit signed integer Python object.
 func NewPyLong(v int64) *C.PyObject {
 	return C.PyLong_FromLongLong(C.i64(v))
 }

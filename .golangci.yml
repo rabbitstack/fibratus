@@ -8,10 +8,8 @@ linters:
   disable-all: true
   enable:
     - bodyclose
-    - deadcode
     - errcheck
     - goconst
-    - golint
     - goprintffuncname
     - gosimple
     - govet
@@ -20,15 +18,12 @@ linters:
     - noctx
     - nolintlint
     - rowserrcheck
-    - scopelint
     - staticcheck
-    - structcheck
     - stylecheck
     - typecheck
     - unconvert
     - unparam
     - unused
-    - varcheck
     - whitespace
 
 issues:
@@ -43,5 +38,4 @@ issues:
     - path: _test\.go
       linters:
         - errcheck
-        - scopelint
         - nolintlint
