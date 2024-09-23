@@ -49,6 +49,7 @@ import (
 	"strings"
 
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
+	eventlogsender "github.com/rabbitstack/fibratus/pkg/alertsender/eventlog"
 	mailsender "github.com/rabbitstack/fibratus/pkg/alertsender/mail"
 	slacksender "github.com/rabbitstack/fibratus/pkg/alertsender/slack"
 	systraysender "github.com/rabbitstack/fibratus/pkg/alertsender/systray"
@@ -227,6 +228,7 @@ func NewWithOpts(options ...Option) *Config {
 		mailsender.AddFlags(flagSet)
 		slacksender.AddFlags(flagSet)
 		systraysender.AddFlags(flagSet)
+		eventlogsender.AddFlags(flagSet)
 		yara.AddFlags(flagSet)
 	}
 

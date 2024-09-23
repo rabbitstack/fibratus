@@ -90,6 +90,14 @@ var schema = `
 								"quiet-mode": 	{"type": "boolean"}
 							},
 							"additionalProperties": false
+
+						},
+		                "eventlog": {
+							"type": "object",
+							"properties": {
+								"enabled": {"type": "boolean"}
+							},
+							"additionalProperties": false
 						}
 					},
 					"additionalProperties": false

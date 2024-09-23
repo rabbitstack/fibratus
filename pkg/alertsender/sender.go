@@ -44,6 +44,8 @@ const (
 	Noop
 	// Systray designates the systray notification alert sender
 	Systray
+	// Eventlog designate the eventlog alert sender
+	Eventlog
 	// None is the type for unknown alert sender
 	None
 )
@@ -59,6 +61,8 @@ func (s Type) String() string {
 		return "noop"
 	case Systray:
 		return "systray"
+	case Eventlog:
+		return "eventlog"
 	default:
 		return "none"
 	}

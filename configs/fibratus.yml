@@ -73,6 +73,10 @@ alertsenders:
     # Represents the emoji icon surrounded in ':' characters for the Slack bot
     #emoji: ""
 
+  # Event Log sender transports alerts to the Windows Event Log.
+  eventlog:
+    enabled: true  # Enable or disable the event log sender
+
 # =============================== API ==================================================
 
 # Settings that influence the behaviour of the HTTP server that exposes a number of endpoints such as
