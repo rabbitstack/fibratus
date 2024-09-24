@@ -55,6 +55,27 @@ func (flags ParamFlags) String(f uint64) string {
 	return n.String()
 }
 
+const (
+	// PsApplicationID identifies the packaged process
+	PsApplicationID = 0x00000001
+	// PsWOW64 indicates if the 32-bit process is created in 64-bit Windows system
+	PsWOW64 = 0x00000002
+	// PsProtected process is to be run as a protected process. The system restricts
+	// access to protected processes and the threads of protected processes.
+	PsProtected = 0x00000004
+	// PsPackaged represents a process packaged with the MSIX technology and thus has
+	// package identity.
+	PsPackaged = 0x00000008
+)
+
+// PsCreationFlags describes the process creation flags.
+var PsCreationFlags = []ParamFlag{
+	{"APPLICATION_ID", PsApplicationID},
+	{"WOW64", PsWOW64},
+	{"PROTECTED", PsProtected},
+	{"PACKAGED", PsPackaged},
+}
+
 // PsAccessRightFlags describes flags for the process access rights.
 var PsAccessRightFlags = []ParamFlag{
 	{"ALL_ACCESS", windows.STANDARD_RIGHTS_REQUIRED | windows.SYNCHRONIZE | 0xFFFF},

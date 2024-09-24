@@ -52,6 +52,8 @@ const (
 	Cmdline = "cmdline"
 	// DTB field denotes the address of the process directory table.
 	DTB = "directory_table_base"
+	// ProcessFlags field denotes the process creation flags
+	ProcessFlags = "flags"
 	// ExitStatus is the field that represents the process exit status.
 	ExitStatus = "exit_status"
 	// StartTime field denotes the process start time.
