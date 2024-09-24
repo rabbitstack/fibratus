@@ -74,6 +74,10 @@ func ParseSeverityFromString(sever string) Severity {
 
 // Alert encapsulates the state of an alert.
 type Alert struct {
+	// ID identifies the alert. Note that the ID may not be unique
+	// for every distinct instance of the generated alert. For runtime
+	// rules, the alert id equals to the rule identifier.
+	ID string
 	// Title is the short title that summarizes the purpose of the alert.
 	Title string
 	// Text is the longer textual content that further explains what this alert is about.
@@ -86,7 +90,7 @@ type Alert struct {
 
 // String returns the alert string representation.
 func (a Alert) String() string {
-	return fmt.Sprintf("Title: %s, Text: %s, Severity: %s, Tags: %v", a.Title, a.Text, a.Severity, a.Tags)
+	return fmt.Sprintf("UUID: %s Title: %s, Text: %s, Severity: %s, Tags: %v", a.ID, a.Title, a.Text, a.Severity, a.Tags)
 }
 
 // MDToHTML converts alert's text Markdown elements to HTML blocks.
