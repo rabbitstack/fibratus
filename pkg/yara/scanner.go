@@ -26,6 +26,7 @@ import (
 	"encoding/json"
 	"expvar"
 	"fmt"
+	"github.com/google/uuid"
 	"html/template"
 	"os"
 	"path/filepath"
@@ -271,6 +272,7 @@ func (s scanner) send(ctx AlertContext) error {
 		tagsFromMatches(ctx.Matches),
 		alertsender.Normal,
 	)
+	alert.ID = uuid.New().String()
 
 	log.Infof("emitting yara alert via %q sender: %s", s.config.AlertVia, alert)
 

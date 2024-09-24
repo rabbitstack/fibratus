@@ -49,6 +49,8 @@ func Emit(ctx *config.ActionContext, title string, text string, severity string,
 			tags,
 			alertsender.ParseSeverityFromString(severity),
 		)
+		alert.ID = ctx.Filter.ID
+
 		// strip markdown
 		if !sender.SupportsMarkdown() {
 			alert.Text = markdown.Strip(alert.Text)
