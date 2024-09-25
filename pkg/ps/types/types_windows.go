@@ -130,6 +130,40 @@ func querySequenceNumber(pid uint32) uint64 {
 
 // String returns a string representation of the process' state.
 func (ps *PS) String() string {
+	parent := ps.Parent
+	if parent != nil {
+		return fmt.Sprintf(`
+		Pid:  %d
+		Ppid: %d
+		Name: %s
+		Parent name: %s
+		Cmdline: %s
+		Parent cmdline: %s
+		Exe:  %s
+		Cwd:  %s
+		SID:  %s
+		Username: %s
+		Domain: %s
+		Args: %s
+		Session ID: %d
+		Envs: %v
+		`,
+			ps.PID,
+			ps.Ppid,
+			ps.Name,
+			parent.Name,
+			ps.Cmdline,
+			parent.Cmdline,
+			ps.Exe,
+			ps.Cwd,
+			ps.SID,
+			ps.Username,
+			ps.Domain,
+			ps.Args,
+			ps.SessionID,
+			ps.Envs,
+		)
+	}
 	return fmt.Sprintf(`
 		Pid:  %d
 		Ppid: %d
@@ -142,7 +176,7 @@ func (ps *PS) String() string {
 		Domain: %s
 		Args: %s
 		Session ID: %d
-		Envs: %s
+		Envs: %v
 		`,
 		ps.PID,
 		ps.Ppid,

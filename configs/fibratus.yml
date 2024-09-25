@@ -67,7 +67,7 @@ alertsenders:
     # Designates the Slack workspace where alerts will be routed
     #workspace:
 
-    # Is the slack channel in which to post alerts
+    # Is the Slack channel in which to post alerts
     #channel:
 
     # Represents the emoji icon surrounded in ':' characters for the Slack bot
@@ -75,7 +75,13 @@ alertsenders:
 
   # Event Log sender transports alerts to the Windows Event Log.
   eventlog:
-    enabled: true  # Enable or disable the event log sender
+    # Enables/disables the event log sender
+    enabled: true
+
+    # Enables/disables the verbose mode. In verbose mode, the full event
+    # context, including all parameters and the process information are included
+    # in the log message.
+    verbose: false
 
 # =============================== API ==================================================
 
