@@ -95,7 +95,8 @@ var schema = `
 		                "eventlog": {
 							"type": "object",
 							"properties": {
-								"enabled": {"type": "boolean"}
+								"enabled": {"type": "boolean"},
+								"verbose": {"type": "boolean"}
 							},
 							"additionalProperties": false
 						}

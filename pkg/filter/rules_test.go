@@ -683,6 +683,7 @@ func TestComplexSequenceRule(t *testing.T) {
 	// check the format of the generated alert
 	require.NotNil(t, seqAlert)
 	assert.Equal(t, "572902be-76e9-4ee7-a48a-6275fa571cf4", seqAlert.ID)
+	assert.Len(t, seqAlert.Events, 3)
 	assert.Equal(t, "Phishing dropper outbound communication", seqAlert.Title)
 	assert.Equal(t, "firefox.exe process initiated outbound communication to 10.0.2.3", seqAlert.Text)
 	seqAlert = nil

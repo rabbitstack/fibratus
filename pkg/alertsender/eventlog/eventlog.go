@@ -23,21 +23,25 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	"golang.org/x/sys/windows"
 	"strings"
-	"syscall"
 )
 
 // source represents the event source that generates the alerts
 const source = "Fibratus"
 
 type eventlog struct {
-	log windows.Handle
+	log    windows.Handle
+	config Config
 }
 
 func init() {
 	alertsender.Register(alertsender.Eventlog, makeSender)
 }
 
-func makeSender(alertsender.Config) (alertsender.Sender, error) {
+func makeSender(config alertsender.Config) (alertsender.Sender, error) {
+	c, ok := config.Sender.(Config)
+	if !ok {
+		return nil, alertsender.ErrInvalidConfig(alertsender.Eventlog)
+	}
 	sourceName, err := windows.UTF16PtrFromString(source)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert source name: %v", err)
@@ -47,7 +51,7 @@ func makeSender(alertsender.Config) (alertsender.Sender, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not register event source: %v", err)
 	}
-	return &eventlog{log: h}, nil
+	return &eventlog{log: h, config: c}, nil
 }
 
 // Send logs the alert to the eventlog.
@@ -64,27 +68,18 @@ func (s *eventlog) Send(alert alertsender.Alert) error {
 		etype = windows.EVENTLOG_INFORMATION_TYPE
 	}
 
-	msg := fmt.Sprintf("%s\n\n%s", alert.Title, alert.Text)
-	lines := strings.Split(msg, "\n")
-	ss := make([]*uint16, len(lines))
-	for i, line := range lines {
-		// line breaks
-		if len(line) == 0 {
-			line = "\n"
-		}
-		s, err := syscall.UTF16PtrFromString(line)
-		if err != nil {
-			continue
-		}
-		ss[i] = s
-	}
+	msg := alert.String(s.config.Verbose)
+
+	// trim null characters to avoid
+	// UTF16PtrFromString complaints
+	msg = strings.Replace(msg, "\x00", "", -1)
+
 	m, err := windows.UTF16PtrFromString(msg)
 	if err != nil {
-		return fmt.Errorf("could not convert eventlog message to UTF16: %v", err)
+		return fmt.Errorf("could not convert eventlog message to UTF16: %v: %s", err, msg)
 	}
-	msgs := []*uint16{m}
 
-	return windows.ReportEvent(s.log, etype, 0, 0, uintptr(0), uint16(len(msgs)), 0, &msgs[0], nil)
+	return windows.ReportEvent(s.log, etype, 0, 0, uintptr(0), 1, 0, &m, nil)
 }
 
 // Shutdown deregisters the event source.
@@ -95,5 +90,5 @@ func (s *eventlog) Shutdown() error {
 	return nil
 }
 
-func (s *eventlog) Type() alertsender.Type { return alertsender.Systray }
-func (s *eventlog) SupportsMarkdown() bool { return true }
+func (s *eventlog) Type() alertsender.Type { return alertsender.Eventlog }
+func (s *eventlog) SupportsMarkdown() bool { return false }
