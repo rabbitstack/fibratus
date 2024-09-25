@@ -230,6 +230,7 @@ func TestEventlogSender(t *testing.T) {
 				},
 			},
 		},
+		ID:    "e3ce664-c620d-4d11-9d57-62a4d341f117",
 		Title: "LSASS memory dumping via legitimate or offensive tools",
 		Text: `Detected an attempt by mimikatz.exe process to access and read
 	the memory of the Local Security And Authority Subsystem Service

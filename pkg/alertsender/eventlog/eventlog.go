@@ -22,11 +22,14 @@ import (
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	"golang.org/x/sys/windows"
+	"hash/crc32"
 	"strings"
 )
 
 // source represents the event source that generates the alerts
 const source = "Fibratus"
+
+const minIDChars = 12
 
 type eventlog struct {
 	log    windows.Handle
@@ -68,8 +71,27 @@ func (s *eventlog) Send(alert alertsender.Alert) error {
 		etype = windows.EVENTLOG_INFORMATION_TYPE
 	}
 
-	msg := alert.String(s.config.Verbose)
+	var eventID uint32
 
+	// despite the event id is 4-byte long
+	// we can only use 2 bytes to store the
+	// event identifier. Calculate the hash
+	// of the event id from alert identifier
+	// but keeping in mind collisions are
+	// possible since we're mapping a larger
+	// space to a smaller one
+	if len(alert.ID) > minIDChars {
+		// assume alert ID has the UUID format
+		// where we build the short version by
+		// taking the first 12 characters
+		id := strings.Replace(alert.ID, "-", "", -1)
+		h := crc32.ChecksumIEEE([]byte(id[:minIDChars]))
+		// take the lower 16 bits of the CRC32 hash
+		eid := uint16(h & 0xFFFF)
+		eventID = uint32(eid)
+	}
+
+	msg := alert.String(s.config.Verbose)
 	// trim null characters to avoid
 	// UTF16PtrFromString complaints
 	msg = strings.Replace(msg, "\x00", "", -1)
@@ -79,7 +101,7 @@ func (s *eventlog) Send(alert alertsender.Alert) error {
 		return fmt.Errorf("could not convert eventlog message to UTF16: %v: %s", err, msg)
 	}
 
-	return windows.ReportEvent(s.log, etype, 0, 0, uintptr(0), 1, 0, &m, nil)
+	return windows.ReportEvent(s.log, etype, 0, eventID, uintptr(0), 1, 0, &m, nil)
 }
 
 // Shutdown deregisters the event source.
