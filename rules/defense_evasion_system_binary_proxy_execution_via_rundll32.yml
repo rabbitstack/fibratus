@@ -26,7 +26,7 @@ condition: >
   maxspan 1m
     |spawn_process
       and
-     (ps.child.name ~= 'rundll32.exe' or pe.ps.child.file.name ~= 'rundll32.exe')
+     (ps.child.name ~= 'rundll32.exe' or ps.child.pe.file.name ~= 'rundll32.exe')
       and
      (
       ps.child.cmdline imatches

@@ -152,6 +152,8 @@ const (
 	PsChildDomain Field = "ps.child.domain"
 	// PsChildUsername represents the child process username field
 	PsChildUsername Field = "ps.child.username"
+	// PsChildPeFilename represents the original file name of the child process executable provided at compile-time
+	PsChildPeFilename Field = "ps.child.pe.file.name"
 
 	// ThreadBasePrio is the base thread priority
 	ThreadBasePrio Field = "thread.prio"
@@ -471,7 +473,7 @@ func (f Field) IsFileField() bool     { return strings.HasPrefix(string(f), "fil
 func (f Field) IsRegistryField() bool { return strings.HasPrefix(string(f), "registry.") }
 func (f Field) IsNetworkField() bool  { return strings.HasPrefix(string(f), "net.") }
 func (f Field) IsHandleField() bool   { return strings.HasPrefix(string(f), "handle.") }
-func (f Field) IsPeField() bool       { return strings.HasPrefix(string(f), "pe.") }
+func (f Field) IsPeField() bool       { return strings.HasPrefix(string(f), "pe.") || f == PsChildPeFilename }
 func (f Field) IsMemField() bool      { return strings.HasPrefix(string(f), "mem.") }
 func (f Field) IsDNSField() bool      { return strings.HasPrefix(string(f), "dns.") }
 
@@ -482,7 +484,7 @@ func (f Field) IsPeSectionEntropy() bool {
 }
 func (f Field) IsPeSymbol() bool { return f == PeSymbols || f == PeNumSymbols || f == PeImports }
 func (f Field) IsPeVersionResource() bool {
-	return f == PeCompany || f == PeCopyright || f == PeDescription || f == PeFileName || f == PeFileVersion || f == PeProduct || f == PeProductVersion || f == PePsChildFileName
+	return f == PeCompany || f == PeCopyright || f == PeDescription || f == PeFileName || f == PeFileVersion || f == PeProduct || f == PeProductVersion || f == PePsChildFileName || f == PsChildPeFilename
 }
 func (f Field) IsPeImphash() bool   { return f == PeImphash }
 func (f Field) IsPeDotnet() bool    { return f == PeIsDotnet }
@@ -658,6 +660,7 @@ var fields = map[Field]FieldInfo{
 	PsUUID:              {PsUUID, "unique process identifier", kparams.Uint64, []string{"ps.uuid > 6000054355"}, nil},
 	PsParentUUID:        {PsParentUUID, "unique parent process identifier", kparams.Uint64, []string{"ps.parent.uuid > 6000054355"}, nil},
 	PsChildUUID:         {PsChildUUID, "unique child process identifier", kparams.Uint64, []string{"ps.child.uuid > 6000054355"}, nil},
+	PsChildPeFilename:   {PsChildPeFilename, "original file name of the child process executable supplied at compile-time", kparams.UnicodeString, []string{"ps.child.pe.file.name = 'NOTEPAD.EXE'"}, nil},
 
 	ThreadBasePrio:                          {ThreadBasePrio, "scheduler priority of the thread", kparams.Int8, []string{"thread.prio = 5"}, nil},
 	ThreadIOPrio:                            {ThreadIOPrio, "I/O priority hint for scheduling I/O operations", kparams.Int8, []string{"thread.io.prio = 4"}, nil},
@@ -774,7 +777,7 @@ var fields = map[Field]FieldInfo{
 	PeCertAfter:       {PeCertAfter, "PE certificate expiration date", kparams.Time, []string{"pe.cert.after contains '2024-02-01 00:05:42 +0000 UTC'"}, nil},
 	PeCertBefore:      {PeCertBefore, "PE certificate enrollment date", kparams.Time, []string{"pe.cert.before contains '2024-02-01 00:05:42 +0000 UTC'"}, nil},
 	PeIsModified:      {PeIsModified, "indicates if disk and in-memory PE headers differ", kparams.Bool, []string{"pe.is_modified"}, nil},
-	PePsChildFileName: {PePsChildFileName, "original file name of the child process executable supplied at compile-time", kparams.UnicodeString, []string{"pe.ps.child.file.name = 'NOTEPAD.EXE'"}, nil},
+	PePsChildFileName: {PePsChildFileName, "original file name of the child process executable supplied at compile-time", kparams.UnicodeString, []string{"pe.ps.child.file.name = 'NOTEPAD.EXE'"}, &Deprecation{Since: "2.3.0", Fields: []Field{PsChildPeFilename}}},
 
 	MemBaseAddress:    {MemBaseAddress, "region base address", kparams.Address, []string{"mem.address = '211d13f2000'"}, nil},
 	MemRegionSize:     {MemRegionSize, "region size", kparams.Uint64, []string{"mem.size > 438272"}, nil},

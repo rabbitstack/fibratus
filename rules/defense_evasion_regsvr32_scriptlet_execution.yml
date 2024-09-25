@@ -18,7 +18,7 @@ labels:
 condition: >
   spawn_process
     and
-  (ps.child.name ~= 'regsvr32.exe' or pe.ps.child.file.name ~= 'regsvr32.exe')
+  (ps.child.name ~= 'regsvr32.exe' or ps.child.pe.file.name ~= 'regsvr32.exe')
     and
   (
     (ps.child.cmdline imatches '*scrobj*'

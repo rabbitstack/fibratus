@@ -1047,10 +1047,10 @@ func (pa *peAccessor) Get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 	// original file name as part of the CreateProcess event,
 	// then the parser obtains the PE metadata for the executable
 	// path parameter
-	if (kevt.PS != nil && kevt.PS.Exe != "" && p == nil) || f == fields.PePsChildFileName {
+	if (kevt.PS != nil && kevt.PS.Exe != "" && p == nil) || f == fields.PePsChildFileName || f == fields.PsChildPeFilename {
 		var err error
 		var exe string
-		if f == fields.PePsChildFileName && kevt.IsCreateProcess() {
+		if (f == fields.PePsChildFileName || f == fields.PsChildPeFilename) && kevt.IsCreateProcess() {
 			exe = kevt.GetParamAsString(kparams.Exe)
 		} else {
 			exe = kevt.PS.Exe
@@ -1166,7 +1166,7 @@ func (pa *peAccessor) Get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 		return p.VersionResources[pe.LegalCopyright], nil
 	case fields.PeDescription:
 		return p.VersionResources[pe.FileDescription], nil
-	case fields.PeFileName, fields.PePsChildFileName:
+	case fields.PeFileName, fields.PePsChildFileName, fields.PsChildPeFilename:
 		return p.VersionResources[pe.OriginalFilename], nil
 	case fields.PeFileVersion:
 		return p.VersionResources[pe.FileVersion], nil
