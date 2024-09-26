@@ -52,7 +52,8 @@ var schema = `
 								"password": 	{"type": "string"},
 								"from": 		{"type": "string"},
 								"to": 			{"type": "array", "items": {"type": "string", "format": "email"}},
-								"content-type": {"type": "string"}
+								"content-type": {"type": "string"},
+								"use-template": {"type": "boolean"}
 							},
 							"if": {
 								"properties": {"enabled": { "const": true }}

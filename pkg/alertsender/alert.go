@@ -86,6 +86,12 @@ type Alert struct {
 	Text string
 	// Tags contains a sequence of tags for categorizing the alerts.
 	Tags []string
+	// Labels is an arbitrary collection of key-value pairs.
+	Labels map[string]string
+	// Description represents a longer explanation of the alert. It is
+	// typically a description of adversary tactics, techniques or any
+	// information valuable to the analyst.
+	Description string
 	// Severity determines the severity of this alert.
 	Severity Severity
 	// Events contains a list of events that trigger the alert.

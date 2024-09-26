@@ -48,18 +48,34 @@ func (s mail) Send(alert alertsender.Alert) error {
 		return err
 	}
 	defer sender.Close()
-	return gomail.Send(sender, s.composeMessage(s.c.From, s.c.To, alert))
+	msg, err := s.composeMessage(s.c.From, s.c.To, alert)
+	if err != nil {
+		return err
+	}
+	return gomail.Send(sender, msg)
 }
 
 func (s mail) Type() alertsender.Type { return alertsender.Mail }
 func (s mail) Shutdown() error        { return nil }
 func (s mail) SupportsMarkdown() bool { return true }
 
-func (s mail) composeMessage(from string, to []string, alert alertsender.Alert) *gomail.Message {
+func (s mail) composeMessage(from string, to []string, alert alertsender.Alert) (*gomail.Message, error) {
 	msg := gomail.NewMessage()
 	msg.SetHeader("From", from)
 	msg.SetHeader("To", to...)
 	msg.SetHeader("Subject", alert.Title)
-	msg.SetBody(s.c.ContentType, alert.Text)
-	return msg
+
+	body := alert.Text
+
+	var err error
+	if s.c.UseTemplate {
+		body, err = renderHTMLTemplate(alert)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	msg.SetBody(s.c.ContentType, body)
+
+	return msg, nil
 }
