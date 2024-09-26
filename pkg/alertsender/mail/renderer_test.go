@@ -16,12 +16,11 @@
  * limitations under the License.
  */
 
-package renderer
+package mail
 
 import (
 	"github.com/antchfx/htmlquery"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
-	"github.com/rabbitstack/fibratus/pkg/config"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
@@ -37,17 +36,19 @@ import (
 	"time"
 )
 
-func TestHTMLFormatterRuleAlert(t *testing.T) {
-	out, err := RenderHTMLRuleAlert(&config.ActionContext{
-		Filter: &config.FilterConfig{
-			Labels: map[string]string{
-				"tactic.name":       "Credential Access",
-				"tactic.ref":        "https://attack.mitre.org/tactics/TA0006/",
-				"technique.name":    "Credentials from Password Stores",
-				"technique.ref":     "https://attack.mitre.org/techniques/T1555/",
-				"subtechnique.name": "Windows Credential Manager",
-				"subtechnique.ref":  "https://attack.mitre.org/techniques/T1555/004/",
-			},
+func TestRenderHTMLTemplate(t *testing.T) {
+	out, err := renderHTMLTemplate(alertsender.Alert{
+		Title:       "Suspicious access to Windows Vault files",
+		Text:        "`cmd.exe` attempted to access Windows Vault files which was considered as a suspicious activity",
+		Severity:    alertsender.Critical,
+		Description: "Identifies attempts from adversaries to acquire credentials from Vault files",
+		Labels: map[string]string{
+			"tactic.name":       "Credential Access",
+			"tactic.ref":        "https://attack.mitre.org/tactics/TA0006/",
+			"technique.name":    "Credentials from Password Stores",
+			"technique.ref":     "https://attack.mitre.org/techniques/T1555/",
+			"subtechnique.name": "Windows Credential Manager",
+			"subtechnique.ref":  "https://attack.mitre.org/techniques/T1555/004/",
 		},
 		Events: []*kevent.Kevent{
 			{
@@ -240,11 +241,8 @@ func TestHTMLFormatterRuleAlert(t *testing.T) {
 				},
 			},
 		},
-	},
-		alertsender.Alert{
-			Title:    "Suspicious access to Windows Vault files",
-			Text:     "`cmd.exe` attempted to access Windows Vault files which was considered as a suspicious activity",
-			Severity: alertsender.Critical})
+	})
+
 	require.NoError(t, err)
 	doc, err := htmlquery.Parse(strings.NewReader(out))
 	require.NoError(t, err)

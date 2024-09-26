@@ -56,6 +56,9 @@ alertsenders:
     # Specifies the email body content type
     #content-type: text/html
 
+    # Indicates if the alert is rendered with HTML template
+    #use-template: true
+
   # Slack sender transports the alerts to the Slack workspace.
   slack:
     # Enables/disables Slack alert sender

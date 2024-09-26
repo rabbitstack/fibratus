@@ -16,36 +16,34 @@
  * limitations under the License.
  */
 
-package renderer
+package mail
 
 import (
 	"bytes"
 	"github.com/Masterminds/sprig/v3"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
-	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/util/hostname"
 	"github.com/rabbitstack/fibratus/pkg/util/version"
 	"text/template"
 	"time"
 )
 
-// RenderHTMLRuleAlert produces HTML template for rule alerts. This function generates
-// inlined CSS to maximize the compatibility between email clients when the alert is
-// transported via email sender or other senders that may render HTML content.
-func RenderHTMLRuleAlert(ctx *config.ActionContext, alert alertsender.Alert) (string, error) {
+// renderHTMLTemplate produces HTML template for the alert.
+// This function generates inlined CSS to maximize the compatibility
+// across email clients.
+func renderHTMLTemplate(alert alertsender.Alert) (string, error) {
 	data := struct {
-		*config.ActionContext
 		Alert       alertsender.Alert
 		TriggeredAt time.Time
 		Hostname    string
 		Version     string
 	}{
-		ctx,
 		alert,
 		time.Now(),
 		hostname.Get(),
 		version.Get(),
 	}
+
 	_ = data.Alert.MDToHTML()
 	funcmap := sprig.TxtFuncMap()
 
@@ -56,7 +54,7 @@ func RenderHTMLRuleAlert(ctx *config.ActionContext, alert alertsender.Alert) (st
 		}
 		return false
 	}
-	tmpl, err := template.New("rule-alert").Funcs(funcmap).Parse(ruleAlertHTMLTemplate)
+	tmpl, err := template.New("alert").Funcs(funcmap).Parse(htmlTemplate)
 	if err != nil {
 		return "", err
 	}

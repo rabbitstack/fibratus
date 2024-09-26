@@ -16,9 +16,9 @@
  * limitations under the License.
  */
 
-package renderer
+package mail
 
-var ruleAlertHTMLTemplate = `
+var htmlTemplate = `
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
@@ -75,28 +75,26 @@ var ruleAlertHTMLTemplate = `
                   {{ $text := (regexReplaceAll "<code>" .Alert.Text "<code style='border-radius: 5px; color: #404243; font-size: .8rem; margin: 0 2px; padding: 3px 5px; line-height: 1.7rem; white-space: pre-wrap; font-weight: 600; font-family: Consolas, Roboto, monaco, monospace; background-color: #e1e3e4;'>") }}
                   <p style="font-size: .8rem; margin: 0 0 4px 0px; padding: 3px 0px; white-space: pre-wrap; line-height: 1.5em;">{{ regexReplaceAll "\\s+" $text " " }}</p>
                   {{- end }}
-                  {{ if hasKey .Filter.Labels "tactic.name" }}
-                  <div class="tag" style="display: inline-block; border-radius: 5px; color: #404243; font-size: .8rem; margin: 2px 2px; padding: 3px 5px; white-space: pre-wrap; font-weight: 600; background-color: #bad1fb;"><a style="text-decoration: none; color: inherit;" href="{{ index .Filter.Labels "tactic.ref"}}">{{ index .Filter.Labels "tactic.name"}}</a></div>
+                  {{ if hasKey .Alert.Labels "tactic.name" }}
+                  <div class="tag" style="display: inline-block; border-radius: 5px; color: #404243; font-size: .8rem; margin: 2px 2px; padding: 3px 5px; white-space: pre-wrap; font-weight: 600; background-color: #bad1fb;"><a style="text-decoration: none; color: inherit;" href="{{ index .Alert.Labels "tactic.ref"}}">{{ index .Alert.Labels "tactic.name"}}</a></div>
                   {{ end }}
-                  {{ if hasKey .Filter.Labels "technique.name" }}
-                  <div class="tag" style="display: inline-block; border-radius: 5px; color: #404243; font-size: .8rem; margin: 2px 2px; padding: 3px 5px; white-space: pre-wrap; font-weight: 600; background-color: #84cad7;"><a style="text-decoration: none; color: inherit;" href="{{ index .Filter.Labels "technique.ref"}}">{{ index .Filter.Labels "technique.name"}}</a></div>
+                  {{ if hasKey .Alert.Labels "technique.name" }}
+                  <div class="tag" style="display: inline-block; border-radius: 5px; color: #404243; font-size: .8rem; margin: 2px 2px; padding: 3px 5px; white-space: pre-wrap; font-weight: 600; background-color: #84cad7;"><a style="text-decoration: none; color: inherit;" href="{{ index .Alert.Labels "technique.ref"}}">{{ index .Alert.Labels "technique.name"}}</a></div>
                   {{ end }}
-                  {{ if hasKey .Filter.Labels "subtechnique.name" }}
-                  <div class="tag" style="display: inline-block; border-radius: 5px; color: #404243; font-size: .8rem; margin: 2px 2px; padding: 3px 5px; white-space: pre-wrap; font-weight: 600; background-color: #fcbcba;"><a style="text-decoration: none; color: inherit;" href="{{ index .Filter.Labels "subtechnique.ref"}}">{{ index .Filter.Labels "subtechnique.name"}}</a></div>
+                  {{ if hasKey .Alert.Labels "subtechnique.name" }}
+                  <div class="tag" style="display: inline-block; border-radius: 5px; color: #404243; font-size: .8rem; margin: 2px 2px; padding: 3px 5px; white-space: pre-wrap; font-weight: 600; background-color: #fcbcba;"><a style="text-decoration: none; color: inherit;" href="{{ index .Alert.Labels "subtechnique.ref"}}">{{ index .Alert.Labels "subtechnique.name"}}</a></div>
                   {{ end }}
                 </td>
               </tr>
+             {{- if .Alert.Description }}
               <tr>
                 <td style="padding: 5px 0px 0px 15px;">
                   <p style="background: #efefef; display: inline-block; border-radius: 5px; font-size: .8rem; margin: 4px 4px 25px 0px; padding: 3px 5px; white-space: pre-wrap; line-height: 1.5em;">
-                     {{- if .Filter -}}
-                     {{- .Filter.Description | trimSuffix "." }}
-                     {{- else }}
-                     {{- .Group.Description | trimSuffix "." }}
-                     {{- end -}}
+                     {{- .Alert.Description | trimSuffix "." }}
                   </p>
                 </td>
               </tr>
+			 {{ end }}
             </table>
           </td>
         </tr>
@@ -109,7 +107,7 @@ var ruleAlertHTMLTemplate = `
                   <h1 style="font-weight: bold; margin-bottom: 22px; margin-top: 0px; font-size: 16px;">
                     Security events involved in this incident
                   </h1>
-                  {{- range $i, $evt := .Events }}
+                  {{- range $i, $evt := .Alert.Events }}
                   {{ with $evt }}
                   <table style="width: 100%; margin: 0; padding: 35px 0; border-collapse: collapse;" width="100%" cellpadding="0" cellspacing="0">
                     <tr>

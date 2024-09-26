@@ -29,6 +29,7 @@ const (
 	to          = "alertsenders.mail.to"
 	enabled     = "alertsenders.mail.enabled"
 	contentType = "alertsenders.mail.content-type"
+	useTemplate = "alertsenders.mail.use-template"
 )
 
 // Config contains the configuration for the mail alert sender.
@@ -37,7 +38,7 @@ type Config struct {
 	Host string `mapstructure:"host"`
 	// Port is the port of the SMTP server.
 	Port int `mapstructure:"port"`
-	// User specifies the user name when authenticating to the SMTP server.
+	// User specifies the username when authenticating to the SMTP server.
 	User string `mapstructure:"user"`
 	// Pass specifies the password when authenticating to the SMTP server.
 	Pass string `mapstructure:"password"`
@@ -49,6 +50,9 @@ type Config struct {
 	Enabled bool `mapstructure:"enabled"`
 	// ContentType represents the email body content type.
 	ContentType string `mapstructure:"content-type"`
+	// UseTemplate indicates if the alert is rendered with HTML template.
+	// If set to false, the plain text email is sent instead.
+	UseTemplate bool `mapstructure:"use-template"`
 }
 
 // AddFlags registers persistent flags.
@@ -61,4 +65,5 @@ func AddFlags(flags *pflag.FlagSet) {
 	flags.StringSlice(to, []string{}, "Specifies all the recipients that'll receive the alert")
 	flags.Bool(enabled, false, "Indicates whether mail alert sender is enabled")
 	flags.String(contentType, "text/html", "Represents the email body content type")
+	flags.Bool(useTemplate, true, "Indicates if the alert is rendered with HTML template")
 }
