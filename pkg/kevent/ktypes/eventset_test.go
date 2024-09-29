@@ -50,7 +50,7 @@ func BenchmarkEventsetMasks(b *testing.B) {
 	masks.Set(CreateThread)
 	masks.Set(TerminateProcess)
 	masks.Set(CreateFile)
-	
+
 	evt := etw.EventRecord{Header: etw.EventHeader{ProviderID: ThreadEventGUID, EventDescriptor: etw.EventDescriptor{Opcode: 2}}}
 
 	for i := 0; i < b.N; i++ {
