@@ -71,6 +71,19 @@ func NewQueue(size int, stackEnrichment bool, enqueueAlways bool) *Queue {
 	return q
 }
 
+// NewQueueWithChannel constructs a new queue with a custom channel.
+func NewQueueWithChannel(ch chan *Kevent, stackEnrichment bool, enqueueAlways bool) *Queue {
+	q := &Queue{
+		q:               ch,
+		listeners:       make([]Listener, 0),
+		backlog:         newBacklog(backlogCacheSize),
+		stackEnrichment: stackEnrichment,
+		enqueueAlways:   enqueueAlways,
+	}
+	q.cd = NewCallstackDecorator(q)
+	return q
+}
+
 // RegisterListener registers a new queue event listener. The listener
 // is invoked before the event is pushed to the queue.
 func (q *Queue) RegisterListener(listener Listener) {

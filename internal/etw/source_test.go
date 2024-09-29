@@ -15,7 +15,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
  */
-package kstream
+package etw
 
 import (
 	"context"
@@ -30,6 +30,7 @@ import (
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/symbolize"
 	"github.com/rabbitstack/fibratus/pkg/sys"
+	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -61,7 +62,175 @@ func (l *MockListener) ProcessEvent(e *kevent.Kevent) (bool, error) {
 	return true, nil
 }
 
-func TestRundownEvents(t *testing.T) {
+func TestEventSourceStartTraces(t *testing.T) {
+	psnap := new(ps.SnapshotterMock)
+	psnap.On("Write", mock.Anything).Return(nil)
+	psnap.On("AddThread", mock.Anything).Return(nil)
+	psnap.On("AddModule", mock.Anything).Return(nil)
+	psnap.On("AddFileMapping", mock.Anything).Return(nil)
+	psnap.On("RemoveFileMapping", mock.Anything, mock.Anything).Return(nil)
+	psnap.On("RemoveThread", mock.Anything, mock.Anything).Return(nil)
+	psnap.On("RemoveModule", mock.Anything, mock.Anything).Return(nil)
+	psnap.On("FindModule", mock.Anything).Return(false, nil)
+	psnap.On("FindAndPut", mock.Anything).Return(&pstypes.PS{})
+	psnap.On("Find", mock.Anything).Return(true, &pstypes.PS{})
+	psnap.On("Remove", mock.Anything).Return(nil)
+
+	hsnap := new(handle.SnapshotterMock)
+	hsnap.On("FindByObject", mock.Anything).Return(htypes.Handle{}, false)
+	hsnap.On("FindHandles", mock.Anything).Return([]htypes.Handle{}, nil)
+
+	var tests = []struct {
+		name         string
+		cfg          *config.Config
+		wantSessions int
+		wantFlags    []etw.EventTraceFlags
+	}{
+		{"start kernel logger session",
+			&config.Config{
+				Kstream: config.KstreamConfig{
+					EnableThreadKevents: true,
+					EnableNetKevents:    true,
+					EnableFileIOKevents: true,
+					EnableVAMapKevents:  true,
+					BufferSize:          1024,
+					FlushTimer:          time.Millisecond * 2300,
+				},
+				Filters: &config.Filters{},
+			},
+			1,
+			[]etw.EventTraceFlags{0x6018203, 0},
+		},
+		{"start kernel logger and audit api sessions",
+			&config.Config{
+				Kstream: config.KstreamConfig{
+					EnableThreadKevents:   true,
+					EnableNetKevents:      true,
+					EnableFileIOKevents:   true,
+					EnableVAMapKevents:    true,
+					EnableHandleKevents:   true,
+					EnableRegistryKevents: true,
+					BufferSize:            1024,
+					FlushTimer:            time.Millisecond * 2300,
+					EnableAuditAPIEvents:  true,
+				},
+				Filters: &config.Filters{},
+			},
+			2,
+			[]etw.EventTraceFlags{0x6038203, 0x80000040},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			evs := NewEventSource(psnap, hsnap, tt.cfg, nil)
+			require.NoError(t, evs.Open(tt.cfg))
+			defer evs.Close()
+			if !SupportsSystemProviders() {
+				assert.Equal(t, tt.wantSessions, len(evs.(*EventSource).traces))
+			}
+
+			for _, trace := range evs.(*EventSource).traces {
+				require.True(t, trace.Handle().IsValid())
+				require.NoError(t, etw.ControlTrace(0, trace.Name, trace.GUID, etw.Query))
+				if !SupportsSystemProviders() {
+					if tt.wantFlags != nil && trace.IsKernelTrace() {
+						flags, err := etw.GetTraceSystemFlags(trace.Handle())
+						require.NoError(t, err)
+						// check enabled system event flags
+						require.Equal(t, tt.wantFlags[0], flags[0])
+						require.Equal(t, tt.wantFlags[1], flags[4])
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestEventSourceEnableFlagsDynamically(t *testing.T) {
+	psnap := new(ps.SnapshotterMock)
+	psnap.On("Write", mock.Anything).Return(nil)
+	psnap.On("AddThread", mock.Anything).Return(nil)
+	psnap.On("AddModule", mock.Anything).Return(nil)
+	psnap.On("AddFileMapping", mock.Anything).Return(nil)
+	psnap.On("RemoveFileMapping", mock.Anything, mock.Anything).Return(nil)
+	psnap.On("RemoveThread", mock.Anything, mock.Anything).Return(nil)
+	psnap.On("RemoveModule", mock.Anything, mock.Anything).Return(nil)
+	psnap.On("FindModule", mock.Anything).Return(false, nil)
+	psnap.On("FindAndPut", mock.Anything).Return(&pstypes.PS{})
+	psnap.On("Find", mock.Anything).Return(true, &pstypes.PS{})
+	psnap.On("Remove", mock.Anything).Return(nil)
+
+	hsnap := new(handle.SnapshotterMock)
+	hsnap.On("FindByObject", mock.Anything).Return(htypes.Handle{}, false)
+	hsnap.On("FindHandles", mock.Anything).Return([]htypes.Handle{}, nil)
+
+	r := &config.RulesCompileResult{
+		HasProcEvents:     true,
+		HasImageEvents:    true,
+		HasRegistryEvents: true,
+		HasNetworkEvents:  true,
+		HasFileEvents:     true,
+		HasThreadEvents:   false,
+		HasVAMapEvents:    true,
+		HasAuditAPIEvents: true,
+		UsedEvents: []ktypes.Ktype{
+			ktypes.CreateProcess,
+			ktypes.LoadImage,
+			ktypes.RegCreateKey,
+			ktypes.RegSetValue,
+			ktypes.CreateFile,
+			ktypes.RenameFile,
+			ktypes.MapViewFile,
+			ktypes.OpenProcess,
+			ktypes.ConnectTCPv4,
+		},
+	}
+	cfg := &config.Config{
+		Kstream: config.KstreamConfig{
+			EnableThreadKevents:   true,
+			EnableRegistryKevents: true,
+			EnableImageKevents:    true,
+			EnableFileIOKevents:   true,
+			EnableAuditAPIEvents:  true,
+		},
+		Filters: &config.Filters{},
+	}
+
+	evs := NewEventSource(psnap, hsnap, cfg, r)
+	require.NoError(t, evs.Open(cfg))
+	defer evs.Close()
+
+	flags := evs.(*EventSource).traces[0].enableFlagsDynamically(cfg.Kstream)
+
+	if SupportsSystemProviders() {
+		require.Len(t, evs.(*EventSource).traces, 3)
+	} else {
+		require.Len(t, evs.(*EventSource).traces, 2)
+	}
+
+	require.True(t, flags&etw.FileIO != 0)
+	require.True(t, flags&etw.Process != 0)
+	// rules compile result doesn't have the thread event
+	// and thread events are enabled in the config
+	require.True(t, flags&etw.Thread == 0)
+	require.True(t, flags&etw.ImageLoad != 0)
+	require.True(t, flags&etw.Registry != 0)
+	// rules compile result has the network event
+	// but network I/O is disabled in the config
+	require.True(t, flags&etw.NetTCPIP == 0)
+	require.True(t, flags&etw.FileIO != 0)
+	// rules compile result has MapViewFile event
+	// but VAMap is disabled in the config
+	require.True(t, flags&etw.VaMap == 0)
+
+	require.False(t, cfg.Kstream.TestDropMask(ktypes.UnloadImage))
+	require.True(t, cfg.Kstream.TestDropMask(ktypes.WriteFile))
+	require.True(t, cfg.Kstream.TestDropMask(ktypes.UnmapViewFile))
+	require.False(t, cfg.Kstream.TestDropMask(ktypes.OpenProcess))
+}
+
+func TestEventSourceRundownEvents(t *testing.T) {
 	psnap := new(ps.SnapshotterMock)
 	psnap.On("Write", mock.Anything).Return(nil)
 	psnap.On("AddThread", mock.Anything).Return(nil)
@@ -92,14 +261,12 @@ func TestRundownEvents(t *testing.T) {
 		Filters:  &config.Filters{},
 	}
 
-	kctrl := NewController(cfg, nil)
-	require.NoError(t, kctrl.Start())
-	defer kctrl.Close()
-	kstreamc := NewConsumer(kctrl, psnap, hsnap, cfg)
+	evs := NewEventSource(psnap, hsnap, cfg, nil)
+
 	l := &MockListener{}
-	kstreamc.RegisterEventListener(l)
-	require.NoError(t, kstreamc.Open())
-	defer kstreamc.Close()
+	evs.RegisterEventListener(l)
+	require.NoError(t, evs.Open(cfg))
+	defer evs.Close()
 
 	rundownsByType := map[ktypes.Ktype]bool{
 		ktypes.ProcessRundown: false,
@@ -113,13 +280,13 @@ func TestRundownEvents(t *testing.T) {
 
 	for {
 		select {
-		case e := <-kstreamc.Events():
+		case e := <-evs.Events():
 			if !e.IsRundown() {
 				continue
 			}
 			rundownsByType[e.Type] = true
 			rundownsByHash[e.RundownKey()]++
-		case err := <-kstreamc.Errors():
+		case err := <-evs.Errors():
 			t.Fatalf("FAIL: %v", err)
 		case <-timeout:
 			t.Logf("got %d rundown events", len(rundownsByHash))
@@ -138,7 +305,7 @@ func TestRundownEvents(t *testing.T) {
 	}
 }
 
-func TestConsumerEvents(t *testing.T) {
+func TestEventSourceAllEvents(t *testing.T) {
 	kevent.DropCurrentProc = false
 	var viewBase uintptr
 	var freeAddress uintptr
@@ -253,7 +420,7 @@ func TestConsumerEvents(t *testing.T) {
 				var sec windows.Handle
 				var offset uintptr
 				var baseViewAddr uintptr
-				dll := "../yara/_fixtures/yara-test.dll"
+				dll := "../../pkg/yara/_fixtures/yara-test.dll"
 				f, err := os.Open(dll)
 				if err != nil {
 					return err
@@ -507,14 +674,13 @@ func TestConsumerEvents(t *testing.T) {
 		StackEnrichment:       false,
 	}
 
-	kctrl := NewController(&config.Config{Kstream: kstreamConfig}, nil)
-	require.NoError(t, kctrl.Start())
-	defer kctrl.Close()
-	kstreamc := NewConsumer(kctrl, psnap, hsnap, &config.Config{Kstream: kstreamConfig, Filters: &config.Filters{}})
+	cfg := &config.Config{Kstream: kstreamConfig, Filters: &config.Filters{}}
+	evs := NewEventSource(psnap, hsnap, cfg, nil)
+
 	l := &MockListener{}
-	kstreamc.RegisterEventListener(l)
-	require.NoError(t, kstreamc.Open())
-	defer kstreamc.Close()
+	evs.RegisterEventListener(l)
+	require.NoError(t, evs.Open(cfg))
+	defer evs.Close()
 
 	time.Sleep(time.Second * 2)
 
@@ -530,7 +696,7 @@ func TestConsumerEvents(t *testing.T) {
 
 	for {
 		select {
-		case e := <-kstreamc.Events():
+		case e := <-evs.Events():
 			for _, tt := range tests {
 				if tt.completed {
 					continue
@@ -546,7 +712,7 @@ func TestConsumerEvents(t *testing.T) {
 					return
 				}
 			}
-		case err := <-kstreamc.Errors():
+		case err := <-evs.Errors():
 			t.Fatalf("FAIL: %v", err)
 		case <-timeout:
 			for _, tt := range tests {
@@ -944,15 +1110,12 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 		SymbolizeKernelAddresses: true,
 	}
 
-	kctrl := NewController(&config.Config{Kstream: kstreamConfig}, nil)
-	require.NoError(t, kctrl.Start())
-	defer kctrl.Close()
-	kstreamc := NewConsumer(kctrl, psnap, hsnap, cfg)
+	evs := NewEventSource(psnap, hsnap, cfg, nil)
 	symbolizer := symbolize.NewSymbolizer(symbolize.NewDebugHelpResolver(cfg), psnap, cfg, true)
 	defer symbolizer.Close()
-	kstreamc.RegisterEventListener(symbolizer)
-	require.NoError(t, kstreamc.Open())
-	defer kstreamc.Close()
+	evs.RegisterEventListener(symbolizer)
+	require.NoError(t, evs.Open(cfg))
+	defer evs.Close()
 
 	time.Sleep(time.Second * 5)
 
@@ -971,7 +1134,7 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 
 	for {
 		select {
-		case e := <-kstreamc.Events():
+		case e := <-evs.Events():
 			for _, tt := range tests {
 				if tt.completed {
 					continue
@@ -986,7 +1149,7 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 					return
 				}
 			}
-		case err := <-kstreamc.Errors():
+		case err := <-evs.Errors():
 			t.Fatalf("FAIL: %v", err)
 		case <-timeout:
 			for _, tt := range tests {

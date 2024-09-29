@@ -22,13 +22,13 @@
 package kcap
 
 import (
+	"github.com/rabbitstack/fibratus/internal/etw"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-	"github.com/rabbitstack/fibratus/pkg/kstream"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	log "github.com/sirupsen/logrus"
@@ -187,19 +187,8 @@ func TestLiveKcap(t *testing.T) {
 
 	<-wait
 
-	// initiate the kernel trace and start consuming from the event stream
-	ktracec := kstream.NewController(cfg, nil)
-	err := ktracec.Start()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	kstreamc := kstream.NewConsumer(ktracec, psnap, hsnap, cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = kstreamc.Open()
+	evs := etw.NewEventSource(psnap, hsnap, cfg, nil)
+	err := evs.Open(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,13 +198,12 @@ func TestLiveKcap(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	writer.Write(kstreamc.Events(), kstreamc.Errors())
+	writer.Write(evs.Events(), evs.Errors())
 
 	// capture for a minute
 	<-time.After(time.Minute)
 
 	writer.Close()
 
-	_ = kstreamc.Close()
-	_ = ktracec.Close()
+	_ = evs.Close()
 }

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package kstream
+package etw
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/config"
