@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 by Nedim Sabic Sabic
+ * Copyright 2021-2022 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -16,46 +16,19 @@
  * limitations under the License.
  */
 
-package kstream
+package etw
 
 import (
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-	"github.com/rabbitstack/fibratus/pkg/util/multierror"
-	"golang.org/x/sys/windows"
-	"runtime"
-	"time"
-	"unsafe"
-
 	"github.com/rabbitstack/fibratus/pkg/config"
 	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/sys/windows/registry"
+	"golang.org/x/sys/windows"
+	"runtime"
+	"time"
+	"unsafe"
 )
-
-const (
-	// maxBufferSize specifies the maximum buffer size for event tracing session buffer
-	maxBufferSize = 1024
-	// etwMaxLoggersPath is the registry subkey that contains ETW logger preferences
-	etwMaxLoggersPath = `SYSTEM\CurrentControlSet\Control\WMI`
-	// etwMaxLoggersValue is the registry value that dictates the maximum number of loggers. Default value is 64 on most systems
-	etwMaxLoggersValue = "EtwMaxLoggers"
-	maxLoggerNameSize  = 128
-	maxLogfileNameSize = 1024
-	// maxTracePropsSize must make room for logger name and log file name
-	maxTracePropsSize = 2 * (maxLoggerNameSize + maxLogfileNameSize)
-)
-
-// SupportsSystemProviders determines if the support for granular
-// system providers in present.
-func SupportsSystemProviders() bool {
-	maj, _, patch := windows.RtlGetNtVersionNumbers()
-	if maj > 10 {
-		return true
-	}
-	return maj >= 10 && patch >= 20348
-}
 
 // initEventTraceProps builds the trace properties descriptor which
 // influences the behaviour of event publishing to the trace session
@@ -142,6 +115,11 @@ type Trace struct {
 	openHandle etw.TraceHandle
 	// config represents global configuration store
 	config *config.Config
+	// consumer is the instance of the event consumer
+	// responsible for processing events for the trace
+	consumer *Consumer
+	// errs receives event consumer errors
+	errs chan error
 }
 
 // NewTrace creates a new trace with specified name, provider GUID, and keywords.
@@ -172,12 +150,13 @@ func (t *Trace) prepareStackTracing() {
 // The session remains active until the session is stopped,
 // the machine is restarted, or an error occurs that would
 // interrupt the session.
-func (t *Trace) Start(config config.KstreamConfig) error {
+func (t *Trace) Start() error {
 	if len(t.Name) > maxLoggerNameSize {
 		return fmt.Errorf("trace name [%s] is too long", t.Name)
 	}
-	props := initEventTraceProps(config)
-	flags := t.enableFlagsDynamically(config)
+	cfg := t.config.Kstream
+	props := initEventTraceProps(cfg)
+	flags := t.enableFlagsDynamically(cfg)
 	if t.IsKernelTrace() {
 		props.EnableFlags = flags
 		props.Wnode.GUID = t.GUID
@@ -219,11 +198,11 @@ func (t *Trace) Start(config config.KstreamConfig) error {
 		}
 		sysTraceFlags[0] = flags
 		// enable object manager tracking
-		if config.EnableHandleKevents {
+		if cfg.EnableHandleKevents {
 			sysTraceFlags[4] = etw.Handle
 		}
 		// enable stack enrichment
-		if config.StackEnrichment {
+		if cfg.StackEnrichment {
 			if err := etw.EnableStackTracing(handle, t.stackExtensions.EventIds()); err != nil {
 				return fmt.Errorf("fail to enable kernel callstack tracing: %v", err)
 			}
@@ -240,9 +219,9 @@ func (t *Trace) Start(config config.KstreamConfig) error {
 	// enrichment is enabled, it is necessary to instruct the provider
 	// to emit stack addresses in the extended data item section when
 	// writing events to the session buffers
-	if config.StackEnrichment && !t.IsSystemProvider() {
+	if cfg.StackEnrichment && !t.IsSystemProvider() {
 		return etw.EnableTraceWithOpts(t.GUID, t.startHandle, t.Keywords, etw.EnableTraceOpts{WithStacktrace: true})
-	} else if config.StackEnrichment && len(t.stackExtensions.EventIds()) > 0 {
+	} else if cfg.StackEnrichment && len(t.stackExtensions.EventIds()) > 0 {
 		if err := etw.EnableStackTracing(t.startHandle, t.stackExtensions.EventIds()); err != nil {
 			return fmt.Errorf("fail to enable system events callstack tracing: %v", err)
 		}
@@ -270,6 +249,9 @@ func (t *Trace) Start(config config.KstreamConfig) error {
 // IsStarted indicates if the trace is started successfully.
 func (t *Trace) IsStarted() bool { return t.startHandle.IsValid() }
 
+// IsRunning determines if the current trace is running.
+func (t *Trace) IsRunning() bool { return etw.ControlTrace(0, t.Name, t.GUID, etw.Query) == nil }
+
 // Handle returns the trace handle returned by etw.StartTrace function.
 func (t *Trace) Handle() etw.TraceHandle {
 	return t.startHandle
@@ -291,14 +273,16 @@ func (t *Trace) Flush() error {
 // Open opens an ETW trace processing handle for consuming events
 // from an ETW real-time trace. It specifies the callbacks the consumer
 // wants to use to receive the events or trace buffer statistics. The
-// first parameter is the callback function that receives buffer-related
+// first callback function that receives buffer-related
 // statistics for each buffer ETW flushes. ETW calls this callback after
-// it delivers all the events in the buffer. The second parameter is the
-// callback function that ETW calls for each event in the buffer.
-func (t *Trace) Open(bufferFn, eventFn EventCallback) error {
+// it delivers all the events in the buffer. The second callback function
+// that ETW calls for each event in the buffer.
+func (t *Trace) Open(consumer *Consumer, errs chan error) error {
+	t.consumer = consumer
+	t.errs = errs
 	logfile := etw.NewEventTraceLogfile(t.Name)
-	logfile.SetEventCallback(windows.NewCallback(eventFn))
-	logfile.SetBufferCallback(windows.NewCallback(bufferFn))
+	logfile.SetEventCallback(windows.NewCallback(t.processEventCallback))
+	logfile.SetBufferCallback(windows.NewCallback(t.bufferStatsCallback))
 	logfile.SetModes(etw.ProcessTraceModeRealtime | etw.ProcessTraceModeEventRecord)
 
 	t.openHandle = etw.OpenTrace(logfile)
@@ -306,6 +290,27 @@ func (t *Trace) Open(bufferFn, eventFn EventCallback) error {
 		return fmt.Errorf("unable to open %s trace: %v", t.Name, windows.GetLastError().Error())
 	}
 	return nil
+}
+
+// processEventCallback is the event callback function signature that is called each time
+// a new event is available on the session buffer. It does the heavy lifting of parsing incoming
+// ETW events from raw data buffers, building the state machine, and pushing events to the channel.
+func (t *Trace) processEventCallback(ev *etw.EventRecord) uintptr {
+	if t.consumer == nil {
+		panic("consumer is nil")
+	}
+	if err := t.consumer.ProcessEvent(ev); err != nil {
+		t.errs <- err
+		failedKevents.Add(err.Error(), 1)
+	}
+	return callbackNext
+}
+
+// bufferStatsCallback is periodically triggered by ETW subsystem for the purpose of reporting
+// buffer statistics, such as the number of buffers processed.
+func (t *Trace) bufferStatsCallback(logfile *etw.EventTraceLogfile) uintptr {
+	buffersRead.Add(int64(logfile.BuffersRead))
+	return callbackNext
 }
 
 // Process delivers events from the ETW trace processing sessions
@@ -388,147 +393,4 @@ func (t *Trace) enableFlagsDynamically(config config.KstreamConfig) etw.EventTra
 	}
 
 	return flags
-}
-
-// Controller is responsible for managing the life cycle of the tracing sessions.
-// More specifically, the following sessions are governed by the trace controller:
-//
-// NT System Logger: publishes core system events. Mandatory and always started
-// Kernel Audit API Calls Logger: provides process/thread object events. Optional
-// DNS Client Logger: publishes DNS queries/responses. Optional
-type Controller struct {
-	traces []*Trace
-	config *config.Config
-}
-
-func (c *Controller) addTrace(name string, guid windows.GUID) {
-	c.traces = append(c.traces, NewTrace(name, guid, 0x0, c.config))
-}
-
-func (c *Controller) addTraceKeywords(name string, guid windows.GUID, keywords uint64) {
-	c.traces = append(c.traces, NewTrace(name, guid, keywords, c.config))
-}
-
-// NewController spins up a new instance of the trace controller.
-// The traces are populated depending on what the config state
-// dictates unless the rule engine is enabled. In this case, the
-// decision-maker is the rules compile result which drives the
-// enablement of providers and controls bitmask setup.
-func NewController(c *config.Config, r *config.RulesCompileResult) *Controller {
-	controller := &Controller{
-		config: c,
-		traces: make([]*Trace, 0),
-	}
-
-	controller.addTrace(etw.KernelLoggerSession, etw.KernelTraceControlGUID)
-
-	// set up drop masks if the rule
-	// engine is enabled. For any event
-	// not present in the rule set, the
-	// drop mask instructs to reject the
-	// event as soon as it is consumed
-	// from the session buffer
-	if r != nil {
-		c.Kstream.EnableThreadKevents = r.HasThreadEvents
-		c.Kstream.EnableImageKevents = r.HasFileEvents
-		c.Kstream.EnableNetKevents = r.HasNetworkEvents
-		c.Kstream.EnableRegistryKevents = r.HasRegistryEvents
-		c.Kstream.EnableFileIOKevents = r.HasFileEvents
-		c.Kstream.EnableVAMapKevents = r.HasVAMapEvents
-		c.Kstream.EnableMemKevents = r.HasMemEvents
-		c.Kstream.EnableAuditAPIEvents = r.HasAuditAPIEvents
-		c.Kstream.EnableDNSEvents = r.HasDNSEvents
-		for _, ktype := range ktypes.All() {
-			if ktype == ktypes.CreateProcess || ktype == ktypes.TerminateProcess ||
-				ktype == ktypes.LoadImage || ktype == ktypes.UnloadImage {
-				// always allow fundamental events
-				continue
-			}
-			if !r.ContainsEvent(ktype) {
-				c.Kstream.SetDropMask(ktype)
-			}
-		}
-	}
-
-	if SupportsSystemProviders() && !c.IsCaptureSet() {
-		log.Info("system providers support detected")
-		if c.Kstream.EnableRegistryKevents {
-			controller.addTraceKeywords(etw.SystemRegistrySession, etw.SystemRegistryProviderID, etw.RegistryKeywordGeneral)
-		}
-	}
-
-	if c.Kstream.EnableDNSEvents {
-		controller.addTrace(etw.DNSClientSession, etw.DNSClientGUID)
-	}
-	if c.Kstream.EnableAuditAPIEvents {
-		controller.addTrace(etw.KernelAuditAPICallsSession, etw.KernelAuditAPICallsGUID)
-	}
-
-	return controller
-}
-
-// Start starts configured tracing sessions. User has the ability to disable
-// a specific subset of collected kernel events, even though by default most
-// events are forwarded from the system logger provider.
-func (c *Controller) Start() error {
-	for _, trace := range c.traces {
-		err := trace.Start(c.config.Kstream)
-		switch err {
-		case kerrors.ErrTraceAlreadyRunning:
-			log.Debugf("%s trace is already running. Trying to restart...", trace.Name)
-			if err := trace.Stop(); err != nil {
-				return err
-			}
-			time.Sleep(time.Millisecond * 100)
-			if err := trace.Start(c.config.Kstream); err != nil {
-				return multierror.Wrap(kerrors.ErrRestartTrace, err)
-			}
-		case kerrors.ErrTraceNoSysResources:
-			// get the number of maximum allowed loggers from registry
-			key, err := registry.OpenKey(registry.LOCAL_MACHINE, etwMaxLoggersPath, registry.QUERY_VALUE)
-			if err != nil {
-				return err
-			}
-			v, _, err := key.GetIntegerValue(etwMaxLoggersValue)
-			if err != nil {
-				_ = key.Close()
-				return err
-			}
-			_ = key.Close()
-			return fmt.Errorf(`the limit for logging sessions on your system is %d. Please consider increasing this number `+
-				`by editing HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\WMI\EtwMaxLoggers key in registry. `+
-				`Permissible values are 32 through 256 inclusive, and a reboot is required for any change to take effect`, v)
-		default:
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-// Close stops currently running tracing sessions.
-func (c *Controller) Close() error {
-	for _, trace := range c.traces {
-		if !trace.IsStarted() {
-			continue
-		}
-		if err := trace.Flush(); err != nil {
-			log.Warnf("couldn't flush trace session for [%s]: %v", trace.Name, err)
-		}
-		time.Sleep(time.Millisecond * 150)
-		if err := trace.Close(); err != nil {
-			log.Warnf("couldn't close trace session for [%s]: %v", trace.Name, err)
-		}
-		time.Sleep(time.Millisecond * 250)
-		if err := trace.Stop(); err != nil {
-			log.Warnf("couldn't stop trace session for [%s]: %v", trace.Name, err)
-		}
-	}
-	return nil
-}
-
-// Traces returns all configured tracing sessions.
-func (c *Controller) Traces() []*Trace {
-	return c.traces
 }

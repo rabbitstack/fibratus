@@ -29,7 +29,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/filter"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	"github.com/rabbitstack/fibratus/pkg/kcap"
-	"github.com/rabbitstack/fibratus/pkg/kstream"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/symbolize"
 	"github.com/rabbitstack/fibratus/pkg/sys"
@@ -46,16 +45,16 @@ import (
 var ErrAlreadyRunning = errors.New("an instance of Fibratus process is already running in the system")
 
 // App centralizes the core building blocks responsible
-// for event acquisition, captures handling, filament
-// execution and event routing to the output sinks.
+// for event acquisition, rule engine initialization,
+// captures handling, filament execution and event routing
+// to the output sinks.
 type App struct {
 	config     *config.Config
-	controller *kstream.Controller
+	evs        *EventSourceControl
 	symbolizer *symbolize.Symbolizer
 	rules      *filter.Rules
 	hsnap      handle.Snapshotter
 	psnap      ps.Snapshotter
-	consumer   kstream.Consumer
 	filament   filament.Filament
 	agg        *aggregator.BufferedAggregator
 	writer     kcap.Writer
@@ -153,31 +152,26 @@ func NewApp(cfg *config.Config, options ...Option) (*App, error) {
 		log.Info("rule engine is disabled")
 	}
 
-	controller := kstream.NewController(cfg, res)
+	evs := NewEventSourceControl(psnap, hsnap, cfg, res)
 
 	app := &App{
-		config:     cfg,
-		controller: controller,
-		rules:      rules,
-		hsnap:      hsnap,
-		psnap:      psnap,
-		consumer:   kstream.NewConsumer(controller, psnap, hsnap, cfg),
-		signals:    sigs,
+		config:  cfg,
+		evs:     evs,
+		rules:   rules,
+		hsnap:   hsnap,
+		psnap:   psnap,
+		signals: sigs,
 	}
 	return app, nil
 }
 
-// Run starts configured tracing sessions and opens the event
-// stream to start consuming events. Depending on whether the
-// filament is provided, this method will either spin up a filament
-// or set up the aggregator to start forwarding events to the rule
-// engine and output sinks.
+// Run configure and opens the event source to start consuming events.
+// Depending on whether the filament is provided, this method will either
+// spin up a filament or set up the aggregator to start forwarding events
+// to the rule engine and output sinks.
 func (f *App) Run(args []string) error {
-	if f.controller == nil {
-		panic("controller is nil")
-	}
-	if f.consumer == nil {
-		panic("consumer is nil")
+	if f.evs == nil {
+		panic("event source is nil")
 	}
 	cfg := f.config
 
@@ -188,11 +182,6 @@ func (f *App) Run(args []string) error {
 	log.Infof("bootstrapping with pid %d. Version: %s", os.Getpid(), version.Get())
 	log.Infof("configuration dump %s", cfg.Print())
 
-	err := f.controller.Start()
-	if err != nil {
-		return err
-	}
-
 	// build the filter from the CLI argument. If we got
 	// a valid expression the filter is attached to the
 	// event consumer
@@ -201,14 +190,14 @@ func (f *App) Run(args []string) error {
 		return err
 	}
 	if kfilter != nil {
-		f.consumer.SetFilter(kfilter)
+		f.evs.SetFilter(kfilter)
 	}
 	// user can either instruct to bootstrap a filament or
 	// start a regular run. We'll set up the corresponding
 	// components accordingly to what we got from the CLI options.
 	// If a filament was given, we'll assign it the previous filter
 	// if it wasn't provided in the filament init function.
-	// Finally, we open the kernel stream flow and run the filament i.e.
+	// Finally, we open the event source and run the filament i.e.
 	// Python main thread in a new goroutine.
 	// In case of a regular run, we additionally set up the aggregator.
 	// The aggregator will grab the events from the queue, assemble them
@@ -220,11 +209,11 @@ func (f *App) Run(args []string) error {
 			return err
 		}
 		if f.filament.Filter() != nil {
-			f.consumer.SetFilter(f.filament.Filter())
+			f.evs.SetFilter(f.filament.Filter())
 		}
-		err = f.consumer.Open()
+		err = f.evs.Open(cfg)
 		if err != nil {
-			return multierror.Wrap(err, f.controller.Close())
+			return multierror.Wrap(err, f.evs.Close())
 		}
 		// load alert senders so emitting alerts is possible from filaments
 		err = alertsender.LoadAll(cfg.Alertsenders)
@@ -232,7 +221,7 @@ func (f *App) Run(args []string) error {
 			log.Warnf("couldn't load alertsenders: %v", err)
 		}
 		go func() {
-			err = f.filament.Run(f.consumer.Events(), f.consumer.Errors())
+			err = f.filament.Run(f.evs.Events(), f.evs.Errors())
 			if err != nil {
 				log.Errorf("filament failed: %v", err)
 				f.stop()
@@ -242,11 +231,11 @@ func (f *App) Run(args []string) error {
 		// register stack symbolizer
 		if cfg.Kstream.StackEnrichment {
 			f.symbolizer = symbolize.NewSymbolizer(symbolize.NewDebugHelpResolver(cfg), f.psnap, cfg, false)
-			f.consumer.RegisterEventListener(f.symbolizer)
+			f.evs.RegisterEventListener(f.symbolizer)
 		}
 		// register rule engine
 		if f.rules != nil {
-			f.consumer.RegisterEventListener(f.rules)
+			f.evs.RegisterEventListener(f.rules)
 		}
 		// register YARA scanner
 		if cfg.Yara.Enabled {
@@ -254,17 +243,16 @@ func (f *App) Run(args []string) error {
 			if err != nil {
 				return err
 			}
-			f.consumer.RegisterEventListener(scanner)
+			f.evs.RegisterEventListener(scanner)
 		}
-		err = f.consumer.Open()
+		err = f.evs.Open(cfg)
 		if err != nil {
-			return multierror.Wrap(err, f.controller.Close())
+			return multierror.Wrap(err, f.evs.Close())
 		}
 		// set up the aggregator that forwards events to outputs
-		// and calls event listeners such as the rule engine
 		f.agg, err = aggregator.NewBuffered(
-			f.consumer.Events(),
-			f.consumer.Errors(),
+			f.evs.Events(),
+			f.evs.Errors(),
 			cfg.Aggregator,
 			cfg.Output,
 			cfg.Transformers,
@@ -280,29 +268,22 @@ func (f *App) Run(args []string) error {
 
 // WriteCapture writes the event stream to the capture file.
 func (f *App) WriteCapture(args []string) error {
-	if f.controller == nil {
-		panic("controller is nil")
-	}
-	if f.consumer == nil {
-		panic("consumer is nil")
+	if f.evs == nil {
+		panic("event source is nil")
 	}
 
 	if !f.isSingleInstance() {
 		return ErrAlreadyRunning
 	}
 
-	err := f.controller.Start()
-	if err != nil {
-		return err
-	}
 	kfilter, err := filter.NewFromCLI(args, f.config)
 	if err != nil {
 		return err
 	}
 	if kfilter != nil {
-		f.consumer.SetFilter(kfilter)
+		f.evs.SetFilter(kfilter)
 	}
-	err = f.consumer.Open()
+	err = f.evs.Open(f.config)
 	if err != nil {
 		return err
 	}
@@ -310,7 +291,7 @@ func (f *App) WriteCapture(args []string) error {
 	if err != nil {
 		return err
 	}
-	errsChan := f.writer.Write(f.consumer.Events(), f.consumer.Errors())
+	errsChan := f.writer.Write(f.evs.Events(), f.evs.Errors())
 	go func() {
 		for err := range errsChan {
 			log.Warnf("fail to write event to capture: %v", err)
@@ -386,16 +367,11 @@ func (f *App) Wait() {
 // Shutdown is responsible for tearing down everything gracefully.
 func (f *App) Shutdown() error {
 	errs := make([]error, 0)
-	if f.controller != nil {
-		if err := f.controller.Close(); err != nil {
-			errs = append(errs, err)
-		}
-	}
 	if f.symbolizer != nil {
 		f.symbolizer.Close()
 	}
-	if f.consumer != nil {
-		if err := f.consumer.Close(); err != nil {
+	if f.evs != nil {
+		if err := f.evs.Close(); err != nil {
 			errs = append(errs, err)
 		}
 	}

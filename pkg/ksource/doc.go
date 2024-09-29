@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 by Nedim Sabic Sabic
+ * Copyright 2019-2020 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -16,4 +16,5 @@
  * limitations under the License.
  */
 
-package kstream
+// Package ksource defines the contract all event sources have to satisfy.
+package ksource
