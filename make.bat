@@ -69,7 +69,7 @@ if errorlevel 1 goto fail
 goto :EOF
 
 :fmt
-%GOFMT% pkg cmd
+%GOFMT% pkg cmd internal
 goto :EOF
 
 :deps

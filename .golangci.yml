@@ -13,6 +13,7 @@ linters:
     - goprintffuncname
     - gosimple
     - govet
+    - gofmt
     - ineffassign
     - nakedret
     - noctx
@@ -25,6 +26,10 @@ linters:
     - unparam
     - unused
     - whitespace
+
+linters-settings:
+  gofmt:
+    simplify: false
 
 issues:
   # List of regexps of issue texts to exclude.

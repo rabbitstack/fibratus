@@ -1,2 +1,4 @@
 build/* linguist-detectable=false
 make.bat linguist-detectable=false
+
+*.go text eol=lf

@@ -182,22 +182,22 @@ func TestIsFieldAccessible(t *testing.T) {
 		},
 		{
 			newThreadAccessor(),
-			&kevent.Kevent{Type: ktypes.CreateProcess, Category: ktypes.Process, Callstack: []kevent.Frame{kevent.Frame{Addr: 0x7ffb5c1d0396, Offset: 0x61, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"}}},
+			&kevent.Kevent{Type: ktypes.CreateProcess, Category: ktypes.Process, Callstack: []kevent.Frame{{Addr: 0x7ffb5c1d0396, Offset: 0x61, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"}}},
 			true,
 		},
 		{
 			newThreadAccessor(),
-			&kevent.Kevent{Type: ktypes.RegSetValue, Category: ktypes.Registry, Callstack: []kevent.Frame{kevent.Frame{Addr: 0x7ffb5c1d0396, Offset: 0x61, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"}}},
+			&kevent.Kevent{Type: ktypes.RegSetValue, Category: ktypes.Registry, Callstack: []kevent.Frame{{Addr: 0x7ffb5c1d0396, Offset: 0x61, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"}}},
 			true,
 		},
 		{
 			newRegistryAccessor(),
-			&kevent.Kevent{Type: ktypes.RegSetValue, Category: ktypes.Registry, Callstack: []kevent.Frame{kevent.Frame{Addr: 0x7ffb5c1d0396, Offset: 0x61, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"}}},
+			&kevent.Kevent{Type: ktypes.RegSetValue, Category: ktypes.Registry, Callstack: []kevent.Frame{{Addr: 0x7ffb5c1d0396, Offset: 0x61, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"}}},
 			true,
 		},
 		{
 			newNetworkAccessor(),
-			&kevent.Kevent{Type: ktypes.RegSetValue, Category: ktypes.Registry, Callstack: []kevent.Frame{kevent.Frame{Addr: 0x7ffb5c1d0396, Offset: 0x61, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"}}},
+			&kevent.Kevent{Type: ktypes.RegSetValue, Category: ktypes.Registry, Callstack: []kevent.Frame{{Addr: 0x7ffb5c1d0396, Offset: 0x61, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"}}},
 			false,
 		},
 		{
