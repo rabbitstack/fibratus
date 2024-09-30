@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"golang.org/x/sys/windows/registry"
+	"os"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -31,7 +32,7 @@ import (
 
 const (
 	// seqVName is the name of the registry value that stores the QWORD sequence.
-	seqVName   = "KeventSeq"
+	seqVName   = "EventSequence"
 	invalidKey = registry.Key(syscall.InvalidHandle)
 )
 
@@ -103,7 +104,13 @@ func (s *Sequencer) Reset() error {
 	if s.key == invalidKey {
 		return errInvalidVolatileKey
 	}
-	return s.key.DeleteValue(seqVName)
+	err := s.key.DeleteValue(seqVName)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+	}
+	return nil
 }
 
 // Close shutdowns the event sequencer.
