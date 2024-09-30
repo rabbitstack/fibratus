@@ -26,6 +26,7 @@ import (
 
 func TestSequencer(t *testing.T) {
 	sequencer := NewSequencer()
+	require.NoError(t, sequencer.Reset())
 	sequencer.seq = 0
 	defer sequencer.Close()
 
@@ -45,6 +46,7 @@ func TestSequencer(t *testing.T) {
 
 func TestSequencerMonotonic(t *testing.T) {
 	sequencer := NewSequencer()
+	require.NoError(t, sequencer.Reset())
 	sequencer.seq = 0
 	defer sequencer.Close()
 
