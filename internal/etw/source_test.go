@@ -726,7 +726,7 @@ func TestEventSourceAllEvents(t *testing.T) {
 }
 
 func callstackContainsTestExe(callstack string) bool {
-	return strings.Contains(callstack, "kstream.test.exe")
+	return strings.Contains(callstack, "etw.test.exe")
 }
 
 // NoopPsSnapshotter is the process noop snapshotter  used in tests.
