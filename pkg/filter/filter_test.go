@@ -672,6 +672,7 @@ func TestImageFilter(t *testing.T) {
 		{`image.base.address = '7ffb313833a3'`, true},
 		{`image.cert.issuer icontains 'Microsoft Windows'`, true},
 		{`image.cert.subject icontains 'Microsoft Corporation'`, true},
+		{`image.is_dotnet`, false},
 	}
 
 	for i, tt := range tests {
@@ -735,6 +736,41 @@ func TestImageFilter(t *testing.T) {
 	}
 
 	assert.NotNil(t, signature.GetSignatures().GetSignature(0x7ccb313833a3))
+
+	kevt2 := &kevent.Kevent{
+		Type:     ktypes.LoadImage,
+		Category: ktypes.Image,
+		Kparams: kevent.Kparams{
+			kparams.ImageFilename:       {Name: kparams.ImageFilename, Type: kparams.UnicodeString, Value: "_fixtures\\mscorlib.dll"},
+			kparams.ProcessID:           {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1023)},
+			kparams.ImageCheckSum:       {Name: kparams.ImageCheckSum, Type: kparams.Uint32, Value: uint32(2323432)},
+			kparams.ImageBase:           {Name: kparams.ImageBase, Type: kparams.Address, Value: uint64(0xfff313833a3)},
+			kparams.ImageSignatureType:  {Name: kparams.ImageSignatureType, Type: kparams.Enum, Value: uint32(0), Enum: signature.Types},
+			kparams.ImageSignatureLevel: {Name: kparams.ImageSignatureLevel, Type: kparams.Enum, Value: uint32(0), Enum: signature.Levels},
+		},
+	}
+
+	var tests2 = []struct {
+		filter  string
+		matches bool
+	}{
+
+		{`image.pid = 1023`, true},
+		{`image.name endswith 'mscorlib.dll'`, true},
+		{`image.is_dotnet`, true},
+	}
+
+	for i, tt := range tests2 {
+		f := New(tt.filter, cfg)
+		err := f.Compile()
+		if err != nil {
+			t.Fatal(err)
+		}
+		matches := f.Run(kevt2)
+		if matches != tt.matches {
+			t.Errorf("%d. %q image filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
+		}
+	}
 }
 
 func TestPEFilter(t *testing.T) {
