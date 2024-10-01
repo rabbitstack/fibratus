@@ -433,6 +433,8 @@ const (
 	ImageIsDriver Field = "image.is_driver"
 	// ImageIsExecutable indicates if the loaded image is an executable
 	ImageIsExecutable Field = "image.is_exec"
+	// ImageIsDotnet indicates if the loaded image is a .NET assembly
+	ImageIsDotnet Field = "image.is_dotnet"
 
 	// MemBaseAddress identifies the field that denotes the allocation base address
 	MemBaseAddress Field = "mem.address"
@@ -703,6 +705,7 @@ var fields = map[Field]FieldInfo{
 	ImageIsDLL:              {ImageIsDLL, "indicates if the loaded image is a DLL", kparams.Bool, []string{"image.is_dll'"}, nil},
 	ImageIsDriver:           {ImageIsDriver, "indicates if the loaded image is a driver", kparams.Bool, []string{"image.is_driver'"}, nil},
 	ImageIsExecutable:       {ImageIsExecutable, "indicates if the loaded image is an executable", kparams.Bool, []string{"image.is_exec'"}, nil},
+	ImageIsDotnet:           {ImageIsDotnet, "indicates if the loaded image is a .NET assembly", kparams.Bool, []string{"image.is_dotnet'"}, nil},
 
 	FileObject:             {FileObject, "file object address", kparams.Uint64, []string{"file.object = 18446738026482168384"}, nil},
 	FileName:               {FileName, "full file name", kparams.UnicodeString, []string{"file.name contains 'mimikatz'"}, nil},
