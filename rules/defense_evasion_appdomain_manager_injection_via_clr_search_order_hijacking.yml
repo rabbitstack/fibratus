@@ -1,0 +1,36 @@
+name: AppDomain Manager injection via CLR search order hijacking
+id: 9319fafd-b7dc-4d85-b41a-54a8d4f1ab18
+version: 1.0.0
+description: |
+  Adversaries may execute their own malicious payloads by hijacking how the .NET AppDomainManager loads assemblies. 
+  The .NET framework uses the AppDomainManager class to create and manage one or more isolated runtime environments 
+  (called application domains) inside a process to host the execution of .NET applications. Assemblies may be loaded 
+  into an application domain as executable code.
+ 
+  Adversaries can abuse the CLR search order to load the malicious assembly from a writable directory by
+  simply following the assembly file naming conventions and ensuring the .NET LOBIN is executed with the
+  right environment variables set.
+labels:
+   tactic.id: TA0005
+   tactic.name: Defense Evasion
+   tactic.ref: https://attack.mitre.org/tactics/TA0005/
+   technique.id: T1574
+   technique.name: Hijack Execution Flow
+   technique.ref: https://attack.mitre.org/techniques/T1574/
+   subtechnique.id: T1574.014
+   subtechnique.name: AppDomainManager
+   subtechnique.ref: https://attack.mitre.org/techniques/T1574/014/
+references:
+  - https://ipslav.github.io/2023-12-12-let-me-manage-your-appdomain/
+  - https://www.rapid7.com/blog/post/2023/05/05/appdomain-manager-injection-new-techniques-for-red-teams/
+
+condition: >
+  (load_unsigned_or_untrusted_module) and ((base(dir(image.name)) ~= base(image.name, false)) or (ps.envs[APPDOMAIN_MANAGER_ASM] istartswith base(image.name, false)))
+    and
+  pe.is_dotnet and (image.is_dotnet or thread.callstack.symbols imatches ('clr.dll!ParseManifest*'))
+
+output: >
+  Process %ps.exe loaded untrusted .NET assembly %image.name from suspicious location
+severity: high
+
+min-engine-version: 2.3.0
