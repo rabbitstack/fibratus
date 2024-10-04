@@ -110,7 +110,8 @@ func (p PEB) GetEnvs() map[string]string {
 	}
 	start, end := 0, 0
 	envs := make(map[string]string)
-	s := readUTF16(p.proc, uintptr(p.procParams.Environment), uint32(p.procParams.EnvironmentSize))
+	l := uint32(p.procParams.EnvironmentSize)
+	s := readUTF16(p.proc, uintptr(p.procParams.Environment), l)
 	for i, r := range s {
 		// each env variable key/value pair terminates with the NUL character
 		if r == 0 {
@@ -123,7 +124,7 @@ func (p PEB) GetEnvs() map[string]string {
 				break
 			}
 			env := string(utf16.Decode(s[start:end]))
-			if kv := strings.Split(env, "="); len(kv) == 2 {
+			if kv := strings.SplitN(env, "=", 2); len(kv) == 2 {
 				envs[kv[0]] = kv[1]
 			}
 			start = end + 1
@@ -133,8 +134,8 @@ func (p PEB) GetEnvs() map[string]string {
 }
 
 func readUTF16(proc windows.Handle, addr uintptr, size uint32) []uint16 {
-	b := make([]byte, size*2)
-	err := windows.ReadProcessMemory(proc, addr, &b[0], uintptr(size), nil)
+	b := make([]byte, size*2+1)
+	err := windows.ReadProcessMemory(proc, addr, &b[0], uintptr(len(b)), nil)
 	if err != nil {
 		return nil
 	}
