@@ -22,6 +22,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/util/log"
 	"github.com/sirupsen/logrus"
+	"os"
 )
 
 // InitConfigAndLogger initializes the configuration and sets up the logger.
@@ -29,11 +30,15 @@ import (
 // loading fails. In this situation, the default config flag values are used
 // to tweak any of the internal behaviours.
 func InitConfigAndLogger(cfg *config.Config) error {
-	isLoaded := cfg.TryLoadFile(cfg.File()) == nil
+	err := cfg.TryLoadFile(cfg.File())
+	notExists := os.IsNotExist(err)
+	if err != nil && !notExists {
+		return err
+	}
 	if err := cfg.Init(); err != nil {
 		return err
 	}
-	if isLoaded {
+	if err == nil {
 		if err := cfg.Validate(); err != nil {
 			return err
 		}
@@ -41,9 +46,9 @@ func InitConfigAndLogger(cfg *config.Config) error {
 	if err := log.InitFromConfig(cfg.Log, "fibratus.log"); err != nil {
 		return err
 	}
-	if !isLoaded {
-		logrus.Warnf("unable to load configuration "+
-			"from %s file. Falling back to default "+
+	if notExists {
+		logrus.Infof("configuration file "+
+			"%s not found. Continuing with default "+
 			"settings...", cfg.File())
 	}
 	return nil
