@@ -41,6 +41,7 @@ require (
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v3 v3.0.1
+	www.velocidex.com/golang/go-ntfs v0.2.1-0.20240818145200-04736de821dc
 )
 
 require (
@@ -84,7 +85,6 @@ require (
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 	gopkg.in/ini.v1 v1.51.0 // indirect
 	gopkg.in/yaml.v2 v2.3.0 // indirect
-	www.velocidex.com/golang/go-ntfs v0.1.2-0.20230922133004-33eadbbaf1f2
 )
 
 go 1.21
