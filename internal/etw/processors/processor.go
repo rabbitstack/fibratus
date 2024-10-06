@@ -98,10 +98,14 @@ func parseImageFileCharacteristics(e *kevent.Kevent) error {
 		// read file data blob from raw device
 		// if the regular file access fails
 		ntfs := libntfs.NewFS()
-		data, _, err = ntfs.Read(filename, 0, int64(os.Getpagesize()))
+		var n int
+		data, n, err = ntfs.Read(filename, 0, int64(os.Getpagesize()))
 		defer ntfs.Close()
 		if err != nil {
 			return err
+		}
+		if n > 0 {
+			data = data[:n]
 		}
 		goto parsePe
 	}
