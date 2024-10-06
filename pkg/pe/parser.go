@@ -177,6 +177,9 @@ func ParseFileWithConfig(path string, config Config) (*PE, error) {
 
 // ParseBytes tries to parse the PE from the given byte slice and parser options.
 func ParseBytes(data []byte, opts ...Option) (*PE, error) {
+	if len(data) == 0 || va.Zeroed(data) {
+		return nil, ErrEmptyVArea
+	}
 	return parse("", data, opts...)
 }
 
@@ -195,9 +198,6 @@ func ParseMem(pid uint32, base uintptr, changeProtection bool, opts ...Option) (
 	}
 	defer windows.Close(process)
 	area := va.ReadArea(process, base, MaxHeaderSize, MinHeaderSize, changeProtection)
-	if len(area) == 0 || va.Zeroed(area) {
-		return nil, ErrEmptyVArea
-	}
 	return ParseBytes(area, opts...)
 }
 
