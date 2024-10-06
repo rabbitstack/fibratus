@@ -28,6 +28,18 @@ import (
 	"strings"
 )
 
+type warning struct {
+	rule     string
+	messages []string
+}
+
+func (w *warning) addMessage(msg string) {
+	if w.messages == nil {
+		w.messages = make([]string, 0)
+	}
+	w.messages = append(w.messages, msg)
+}
+
 func validateRules() error {
 	if err := bootstrap.InitConfigAndLogger(cfg); err != nil {
 		return err
@@ -72,7 +84,8 @@ func validateRules() error {
 		return fmt.Errorf("%v no rules found in %s", emoji.DisappointedFace, strings.Join(cfg.Filters.Rules.FromPaths, ","))
 	}
 
-	warnings := make([]string, 0)
+	warnings := make([]warning, 0)
+
 	// validate rules
 	for _, rule := range cfg.GetFilters() {
 		f := filter.New(rule.Condition, cfg)
@@ -80,19 +93,43 @@ func validateRules() error {
 		if err != nil {
 			return fmt.Errorf("%v %v", emoji.DisappointedFace, filter.ErrInvalidFilter(rule.Name, err))
 		}
+
+		w := warning{rule: rule.Name}
 		for _, fld := range f.GetFields() {
 			if isDeprecated, dep := fields.IsDeprecated(fld); isDeprecated {
-				warnings = append(warnings,
-					fmt.Sprintf("%s field deprecated in favor of %v in rule %s", fld.String(), dep.Fields, rule.Name))
+				w.addMessage(fmt.Sprintf("%s field deprecated in favor of %v", fld.String(), dep.Fields))
 			}
+		}
+
+		if !rule.HasLabel("tactic.id") {
+			w.addMessage("tactic.id label is missing")
+		}
+		if !rule.HasLabel("tactic.name") {
+			w.addMessage("tactic.name label is missing")
+		}
+		if !rule.HasLabel("tactic.ref") {
+			w.addMessage("tactic.ref label is missing")
+		}
+		if !rule.HasLabel("technique.id") {
+			w.addMessage("technique.id label is missing")
+		}
+		if !rule.HasLabel("technique.name") {
+			w.addMessage("technique.name label is missing")
+		}
+		if !rule.HasLabel("technique.ref") {
+			w.addMessage("technique.ref label is missing")
+		}
+
+		if len(w.messages) > 0 {
+			warnings = append(warnings, w)
 		}
 	}
 
-	if len(warnings) > 0 {
-		for _, warn := range warnings {
-			emo("%v %s\n", emoji.Warning, warn)
+	for _, warn := range warnings {
+		emo("%v %d warning(s) in rule %s:\n", emoji.Warning, len(warn.messages), warn.rule)
+		for _, msg := range warn.messages {
+			fmt.Printf("  %v %s\n", emoji.Warning, msg)
 		}
-		fmt.Printf("%d warning(s)\n", len(warnings))
 	}
 
 	emo("%v Validation successful. Ready to go!", emoji.Rocket)

@@ -97,6 +97,9 @@ func (f FilterConfig) DecodeActions() ([]any, error) {
 // IsDisabled determines if this filter is disabled.
 func (f FilterConfig) IsDisabled() bool { return f.Enabled != nil && !*f.Enabled }
 
+// HasLabel determines if the filter has the given label.
+func (f FilterConfig) HasLabel(l string) bool { return f.Labels[l] != "" }
+
 // Filters contains references to rule and macro definitions.
 type Filters struct {
 	Rules   Rules  `json:"rules" yaml:"rules"`
