@@ -28,6 +28,8 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/format"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	peparser "github.com/saferwall/pe"
+	peparserlog "github.com/saferwall/pe/log"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
 	"os"
 	"path/filepath"
@@ -220,7 +222,27 @@ func newParserOpts(opts opts) *peparser.Options {
 		OmitLoadConfigDirectory:   true,
 		OmitGlobalPtrDirectory:    true,
 		SectionEntropy:            opts.sectionEntropy,
+		Logger:                    &Logger{},
 	}
+}
+
+// Logger is the adapter for routing PE package logs to logrus.
+type Logger struct{}
+
+func (l Logger) Log(level peparserlog.Level, keyvals ...interface{}) error {
+	switch level {
+	case peparserlog.LevelDebug:
+		log.Debug(keyvals[1:]...)
+	case peparserlog.LevelInfo:
+		log.Info(keyvals[1:]...)
+	case peparserlog.LevelWarn:
+		log.Warn(keyvals[1:]...)
+	case peparserlog.LevelError, peparserlog.LevelFatal:
+		log.Error(keyvals[1:]...)
+	default:
+		log.Info(keyvals[1:]...)
+	}
+	return nil
 }
 
 func parse(path string, data []byte, options ...Option) (*PE, error) {
@@ -350,13 +372,14 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 	// parse certificate info
 	if opts.parseSecurity {
 		p.IsSigned = pe.IsSigned
-		if pe.HasCertificate {
+		if pe.HasCertificate && len(pe.Certificates.Certificates) > 0 {
+			cert := pe.Certificates.Certificates[0]
 			p.Cert = &sys.Cert{
-				Issuer:       pe.Certificates.Info.Issuer,
-				Subject:      pe.Certificates.Info.Subject,
-				NotBefore:    pe.Certificates.Info.NotBefore,
-				NotAfter:     pe.Certificates.Info.NotAfter,
-				SerialNumber: pe.Certificates.Info.SerialNumber,
+				Issuer:       cert.Info.Issuer,
+				Subject:      cert.Info.Subject,
+				NotBefore:    cert.Info.NotBefore,
+				NotAfter:     cert.Info.NotAfter,
+				SerialNumber: cert.Info.SerialNumber,
 			}
 		}
 	}
