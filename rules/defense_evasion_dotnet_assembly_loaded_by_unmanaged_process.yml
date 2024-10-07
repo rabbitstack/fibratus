@@ -1,0 +1,35 @@
+name: .NET assembly loaded by unmanaged process
+id: 34be8bd1-1143-4fa8-bed4-ae2566b1394a
+version: 1.0.0
+description: |
+  Identifies the loading of the .NET assembly by an unmanaged process. Adversaries can load the CLR runtime
+  inside unmanaged process and execute the assembly via the ICLRRuntimeHost::ExecuteInDefaultAppDomain method.
+labels:
+   tactic.id: TA0005
+   tactic.name: Defense Evasion
+   tactic.ref: https://attack.mitre.org/tactics/TA0005/
+   technique.id: T1055
+   technique.name: Process Injection
+   technique.ref: https://attack.mitre.org/techniques/T1055/
+references:
+  - https://detect.fyi/exploring-execute-assembly-a-deep-dive-into-in-memory-threat-execution-60adc61aef8
+  - https://www.ired.team/offensive-security/code-injection-process-injection/injecting-and-executing-.net-assemblies-to-unmanaged-process
+
+condition: >
+  (load_unsigned_or_untrusted_module) and pe.is_dotnet = false
+    and
+  (image.is_dotnet or thread.callstack.modules imatches ('*clr.dll'))
+    and
+    not
+  image.name imatches
+    (
+      '?:\\Windows\\assembly\\*\\*.ni.dll',
+      '?:\\Program Files\\WindowsPowerShell\\Modules\\*\\*.dll',
+      '?:\\Windows\\Microsoft.NET\\assembly\\*\\*.dll'
+    )
+
+output: >
+  .NET assembly %image.name loaded by unmanaged process %ps.exe
+severity: high
+
+min-engine-version: 2.3.0
