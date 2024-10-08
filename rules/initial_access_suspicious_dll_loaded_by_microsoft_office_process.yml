@@ -17,15 +17,7 @@ labels:
 condition: >
   sequence
   maxspan 1h
-    |create_file
-      and
-     (file.extension iin module_extensions or file.is_dll)
-      and
-     ps.name iin msoffice_binaries
-    | by file.name
-    |load_module
-      and
-     ps.name iin msoffice_binaries
-    | by image.name
+    |create_file and (file.extension iin module_extensions or file.is_dll) and ps.name iin msoffice_binaries| by file.name
+    |load_module and ps.name iin msoffice_binaries| by image.name
 
 min-engine-version: 2.0.0

@@ -18,15 +18,8 @@ labels:
 condition: >
   sequence
   maxspan 5m
-    |spawn_process
-      and
-     ps.parent.name iin script_interpreters
-      and
-     ps.child.name iin msoffice_binaries
-    | by ps.child.uuid
-    |ps.name iin msoffice_binaries
-      and
-     thread.callstack.modules imatches '*vbe?.dll'
+    |spawn_process and ps.parent.name iin script_interpreters and ps.child.name iin msoffice_binaries| by ps.child.uuid
+    |ps.name iin msoffice_binaries and thread.callstack.modules imatches '*vbe?.dll'
       and
      (
       spawn_process

@@ -34,9 +34,6 @@ condition: >
         ps.cmdline imatches startup_locations
       )
     |
-    |((inbound_network) or (outbound_network))
-      and
-     ps.cmdline imatches startup_locations
-    |
+    |((inbound_network) or (outbound_network)) and ps.cmdline imatches startup_locations|
 
 min-engine-version: 2.0.0

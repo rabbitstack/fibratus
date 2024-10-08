@@ -23,9 +23,7 @@ condition: >
   sequence
   maxspan 1m
     |map_view_of_section and file.view.protection = 'READWRITE' and kevt.pid != 4 and file.view.size >= 4096| as e1
-    |map_view_of_section and file.view.protection = 'READONLY|EXECUTE' and file.key = $e1.file.key
-      and
-     kevt.pid != $e1.kevt.pid
+    |map_view_of_section and file.view.protection = 'READONLY|EXECUTE' and file.key = $e1.file.key and kevt.pid != $e1.kevt.pid
       and
       not
      ps.exe imatches
