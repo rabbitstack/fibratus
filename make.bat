@@ -64,7 +64,7 @@ if errorlevel 1 goto fail
 goto :EOF
 
 :lint
-%GOLINT% run
+%GOLINT% run --timeout 10m
 if errorlevel 1 goto fail
 goto :EOF
 
