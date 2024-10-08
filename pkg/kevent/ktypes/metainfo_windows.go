@@ -19,7 +19,8 @@
 package ktypes
 
 import (
-	"sort"
+	"cmp"
+	"slices"
 )
 
 // KeventInfo describes the kernel event meta info such as human-readable name, category
@@ -143,6 +144,64 @@ var ktypes = map[string]Ktype{
 	"ReplyDns":           ReplyDNS,
 }
 
+// indexedKevents keeps the slice of event infos. When the
+// new event type is added, MAKE SURE TO ADD the event info
+// at the END of the slice. This way the event index is guaranteed
+// to remain static which is important for eventlog message identifiers.
+var indexedKevents = []KeventInfo{
+	kevents[CreateProcess],
+	kevents[TerminateProcess],
+	kevents[OpenProcess],
+	kevents[CreateThread],
+	kevents[TerminateThread],
+	kevents[OpenThread],
+	kevents[SetThreadContext],
+	kevents[LoadImage],
+	kevents[UnloadImage],
+	kevents[CreateFile],
+	kevents[CloseFile],
+	kevents[ReadFile],
+	kevents[WriteFile],
+	kevents[SetFileInformation],
+	kevents[DeleteFile],
+	kevents[RenameFile],
+	kevents[EnumDirectory],
+	kevents[RegCreateKey],
+	kevents[RegOpenKey],
+	kevents[RegSetValue],
+	kevents[RegQueryValue],
+	kevents[RegQueryKey],
+	kevents[RegDeleteKey],
+	kevents[RegDeleteValue],
+	kevents[AcceptTCPv4],
+	kevents[AcceptTCPv6],
+	kevents[SendTCPv4],
+	kevents[SendTCPv6],
+	kevents[SendUDPv4],
+	kevents[SendUDPv6],
+	kevents[RecvTCPv4],
+	kevents[RecvTCPv6],
+	kevents[RecvUDPv4],
+	kevents[RecvUDPv6],
+	kevents[ConnectTCPv4],
+	kevents[ConnectTCPv6],
+	kevents[ReconnectTCPv4],
+	kevents[ReconnectTCPv6],
+	kevents[DisconnectTCPv4],
+	kevents[DisconnectTCPv6],
+	kevents[RetransmitTCPv4],
+	kevents[RetransmitTCPv6],
+	kevents[CreateHandle],
+	kevents[CloseHandle],
+	kevents[DuplicateHandle],
+	kevents[VirtualAlloc],
+	kevents[VirtualFree],
+	kevents[MapViewFile],
+	kevents[UnmapViewFile],
+	kevents[QueryDNS],
+	kevents[ReplyDNS],
+}
+
 // All returns all event types.
 func All() []Ktype {
 	s := make([]Ktype, 0, len(ktypes))
@@ -204,6 +263,12 @@ outer:
 		}
 		ktypes = append(ktypes, ktyp)
 	}
-	sort.Slice(ktypes, func(i, j int) bool { return ktypes[i].Category < ktypes[j].Category })
+	slices.SortFunc(ktypes, func(a, b KeventInfo) int {
+		return cmp.Or(cmp.Compare(a.Category, b.Category), cmp.Compare(a.Name, b.Name))
+	})
 	return ktypes
 }
+
+// GetKtypesMetaIndexed returns indexed event types metadata
+// that is guaranteed to always return the same event indices.
+func GetKtypesMetaIndexed() []KeventInfo { return indexedKevents }
