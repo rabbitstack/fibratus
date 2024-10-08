@@ -17,15 +17,7 @@ labels:
 condition: >
   sequence
   maxspan 1h
-    |create_file
-      and
-     (file.extension iin executable_extensions or file.is_exec)
-      and
-     ps.name iin msoffice_binaries
-    | by file.name
-    |spawn_process
-      and
-     ps.name iin msoffice_binaries
-    | by ps.child.exe
+    |create_file and (file.extension iin executable_extensions or file.is_exec) and ps.name iin msoffice_binaries| by file.name
+    |spawn_process and ps.name iin msoffice_binaries| by ps.child.exe
 
 min-engine-version: 2.0.0

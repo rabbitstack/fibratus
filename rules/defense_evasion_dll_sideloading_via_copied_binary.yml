@@ -20,10 +20,7 @@ labels:
 condition: >
   sequence
   maxspan 8m
-    |create_file and file.is_exec
-      and
-      not
-     ps.sid in ('S-1-5-18', 'S-1-5-19', 'S-1-5-20')
+    |create_file and file.is_exec and not ps.sid in ('S-1-5-18', 'S-1-5-19', 'S-1-5-20')
       and
      thread.callstack.symbols imatches ('*CopyFile*', '*MoveFile*')
     | by file.name

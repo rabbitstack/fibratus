@@ -51,12 +51,7 @@ condition: >
   sequence
   maxspan 2m
   by ps.uuid
-    |create_file and thread.callstack.symbols imatches
-      (
-        'kernel32.dll!CreateFileTransacted*',
-        'ntdll.dll!RtlSetCurrentTransaction'
-      )
-    |
+    |create_file and thread.callstack.symbols imatches ('kernel32.dll!CreateFileTransacted*', 'ntdll.dll!RtlSetCurrentTransaction')|
     |spawn_process|
 action:
   - name: kill
