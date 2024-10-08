@@ -64,3 +64,20 @@ const (
 func (c Category) Hash() uint32 {
 	return hashers.FnvUint32([]byte(c))
 }
+
+// Categories returns all available categories.
+func Categories() []string {
+	return []string{
+		string(Registry),
+		string(File),
+		string(Net),
+		string(Process),
+		string(Thread),
+		string(Image),
+		string(Handle),
+		string(Mem),
+		string(Driver),
+		string(Other),
+		string(Unknown),
+	}
+}

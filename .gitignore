@@ -5,7 +5,7 @@ cmd/systray/fibratus-systray.exe
 cmd/systray/fibratus-systray.syso
 
 pkg/outputs/eventlog/mc/*
-!pkg/outputs/eventlog/mc/fibratus.mc
+!pkg/outputs/eventlog/mc/gen.go
 
 build/msi/fibratus-*
 build/msi/*.wixpdb

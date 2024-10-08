@@ -16,6 +16,8 @@
  * limitations under the License.
  */
 
+//go:generate go run github.com/rabbitstack/fibratus/pkg/outputs/eventlog/mc
+
 package eventlog
 
 import (
@@ -35,8 +37,9 @@ const (
 	levels = uint32(Info | Warn | Erro)
 	// msgFile specifies the location of the eventlog message DLL
 	msgFile = "%ProgramFiles%\\Fibratus\\fibratus.dll"
-	// unknownEventID represents the unknown event identifier
-	unknownEventID = 0
+
+	// categoryOffset specifies the start of the event id number space
+	categoryOffset = 25
 )
 
 // ErrUnknownEventID represents the error for signaling unknown event identifiers. This error
@@ -47,6 +50,8 @@ type evtlog struct {
 	evtlog *Eventlog // eventlog writer
 	config Config
 	tmpl   *template.Template
+	events []ktypes.KeventInfo
+	cats   []string
 }
 
 func init() {
@@ -67,6 +72,8 @@ func initEventlog(config outputs.Config) (outputs.OutputGroup, error) {
 	}
 	evtlog := &evtlog{
 		config: cfg,
+		events: ktypes.GetKtypesMetaIndexed(),
+		cats:   ktypes.Categories(),
 	}
 	evtlog.tmpl, err = cfg.parseTemplate()
 	if err != nil {
@@ -113,11 +120,11 @@ func (e *evtlog) publish(kevt *kevent.Kevent) error {
 	if err != nil {
 		return err
 	}
-	eventID := ktypeToEventID(kevt)
-	if eventID == unknownEventID {
+	eid := e.eventID(kevt)
+	if eid == 0 {
 		return ErrUnknownEventID
 	}
-	err = e.log(eventID, categoryID(kevt), buf)
+	err = e.log(eid, e.categoryID(kevt), buf)
 	if err != nil {
 		return err
 	}
@@ -138,114 +145,21 @@ func (e *evtlog) log(eventID uint32, categoryID uint16, buf []byte) error {
 }
 
 // categoryID maps category name to eventlog identifier.
-func categoryID(kevt *kevent.Kevent) uint16 {
-	switch kevt.Category {
-	case ktypes.Registry:
-		return 1
-	case ktypes.File:
-		return 2
-	case ktypes.Net:
-		return 3
-	case ktypes.Process:
-		return 4
-	case ktypes.Thread:
-		return 5
-	case ktypes.Image:
-		return 6
-	case ktypes.Handle:
-		return 7
-	case ktypes.Other:
-		return 8
-	case ktypes.Mem:
-		return 9
-	default:
-		return 0
+func (e *evtlog) categoryID(kevt *kevent.Kevent) uint16 {
+	for i, cat := range e.cats {
+		if cat == string(kevt.Category) {
+			return uint16(i + 1)
+		}
 	}
+	return 0
 }
 
-// ktypeToEventID returns the event ID from the event type.
-func ktypeToEventID(kevt *kevent.Kevent) uint32 {
-	switch kevt.Type {
-	case ktypes.CreateProcess:
-		return 15
-	case ktypes.TerminateProcess:
-		return 16
-	case ktypes.OpenProcess:
-		return 17
-	case ktypes.LoadImage:
-		return 18
-	case ktypes.ConnectTCPv4, ktypes.ConnectTCPv6:
-		return 19
-	case ktypes.CreateFile:
-		return 20
-	case ktypes.RegDeleteKey:
-		return 21
-	case ktypes.RegDeleteValue:
-		return 22
-	case ktypes.RegCreateKey:
-		return 23
-	case ktypes.RegSetValue:
-		return 24
-	case ktypes.CreateHandle:
-		return 25
-	case ktypes.DeleteFile:
-		return 26
-	case ktypes.CreateThread:
-		return 27
-	case ktypes.TerminateThread:
-		return 28
-	case ktypes.OpenThread:
-		return 29
-	case ktypes.UnloadImage:
-		return 30
-	case ktypes.WriteFile:
-		return 31
-	case ktypes.ReadFile:
-		return 32
-	case ktypes.RenameFile:
-		return 33
-	case ktypes.CloseFile:
-		return 34
-	case ktypes.SetFileInformation:
-		return 35
-	case ktypes.EnumDirectory:
-		return 36
-	case ktypes.RegOpenKey:
-		return 37
-	case ktypes.RegQueryKey:
-		return 38
-	case ktypes.RegQueryValue:
-		return 39
-	case ktypes.AcceptTCPv4, ktypes.AcceptTCPv6:
-		return 40
-	case ktypes.SendTCPv4, ktypes.SendTCPv6, ktypes.SendUDPv4, ktypes.SendUDPv6:
-		return 41
-	case ktypes.RecvTCPv4, ktypes.RecvTCPv6, ktypes.RecvUDPv4, ktypes.RecvUDPv6:
-		return 42
-	case ktypes.DisconnectTCPv4, ktypes.DisconnectTCPv6:
-		return 43
-	case ktypes.ReconnectTCPv4, ktypes.ReconnectTCPv6:
-		return 44
-	case ktypes.RetransmitTCPv4, ktypes.RetransmitTCPv6:
-		return 45
-	case ktypes.CloseHandle:
-		return 46
-	case ktypes.RegCloseKey:
-		return 47
-	case ktypes.VirtualAlloc:
-		return 49
-	case ktypes.VirtualFree:
-		return 50
-	case ktypes.MapViewFile:
-		return 51
-	case ktypes.UnmapViewFile:
-		return 52
-	case ktypes.DuplicateHandle:
-		return 53
-	case ktypes.QueryDNS:
-		return 54
-	case ktypes.ReplyDNS:
-		return 55
+// eventID returns the event ID from the event type.
+func (e *evtlog) eventID(kevt *kevent.Kevent) uint32 {
+	for i, evt := range e.events {
+		if evt.Name == kevt.Name {
+			return uint32(i + categoryOffset)
+		}
 	}
-	return unknownEventID
+	return 0
 }
