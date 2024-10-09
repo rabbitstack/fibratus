@@ -62,19 +62,23 @@ func TestWrite(t *testing.T) {
 					kparams.UserSID:         {Name: kparams.UserSID, Type: kparams.WbemSID, Value: []byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0}},
 					kparams.StartTime:       {Name: kparams.StartTime, Type: kparams.Time, Value: time.Now()},
 					kparams.SessionID:       {Name: kparams.SessionID, Type: kparams.Uint32, Value: uint32(1)},
+					kparams.ProcessFlags:    {Name: kparams.ProcessFlags, Type: kparams.Flags, Value: uint32(0x00000010)},
 				},
 			},
 			&pstypes.PS{
-				PID:       uint32(os.Getpid()),
-				Ppid:      uint32(os.Getppid()),
-				Name:      "spotify.exe",
-				Cmdline:   `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`,
-				Exe:       `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --parent`,
-				Cwd:       "C:\\fibratus\\pkg\\ps",
-				SessionID: 1,
-				SID:       "S-1-5-18",
-				Username:  "SYSTEM",
-				Domain:    "NT AUTHORITY",
+				PID:         uint32(os.Getpid()),
+				Ppid:        uint32(os.Getppid()),
+				Name:        "spotify.exe",
+				Cmdline:     `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`,
+				Exe:         `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --parent`,
+				Cwd:         "C:\\fibratus\\pkg\\ps",
+				SessionID:   1,
+				SID:         "S-1-5-18",
+				Username:    "SYSTEM",
+				Domain:      "NT AUTHORITY",
+				IsWOW64:     true,
+				IsPackaged:  true,
+				IsProtected: false,
 			},
 		},
 		{"write state from spawned process with parent",
@@ -89,6 +93,7 @@ func TestWrite(t *testing.T) {
 					kparams.UserSID:         {Name: kparams.UserSID, Type: kparams.WbemSID, Value: []byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0}},
 					kparams.StartTime:       {Name: kparams.StartTime, Type: kparams.Time, Value: time.Now()},
 					kparams.SessionID:       {Name: kparams.SessionID, Type: kparams.Uint32, Value: uint32(1)},
+					kparams.ProcessFlags:    {Name: kparams.ProcessFlags, Type: kparams.Flags, Value: uint32(0x00000010)},
 				},
 				PID: uint32(os.Getpid()),
 			},
@@ -102,10 +107,13 @@ func TestWrite(t *testing.T) {
 				Parent: &pstypes.PS{
 					PID: uint32(os.Getpid()),
 				},
-				SessionID: 1,
-				SID:       "S-1-5-18",
-				Username:  "SYSTEM",
-				Domain:    "NT AUTHORITY",
+				SessionID:   1,
+				SID:         "S-1-5-18",
+				Username:    "SYSTEM",
+				Domain:      "NT AUTHORITY",
+				IsWOW64:     true,
+				IsPackaged:  true,
+				IsProtected: false,
 			},
 		},
 		{"write state from rundown event",
@@ -120,19 +128,23 @@ func TestWrite(t *testing.T) {
 					kparams.UserSID:         {Name: kparams.UserSID, Type: kparams.WbemSID, Value: []byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0}},
 					kparams.StartTime:       {Name: kparams.StartTime, Type: kparams.Time, Value: time.Now()},
 					kparams.SessionID:       {Name: kparams.SessionID, Type: kparams.Uint32, Value: uint32(1)},
+					kparams.ProcessFlags:    {Name: kparams.ProcessFlags, Type: kparams.Flags, Value: uint32(0x00000010)},
 				},
 			},
 			&pstypes.PS{
-				PID:       uint32(os.Getpid()),
-				Ppid:      8390,
-				Name:      "spotify.exe",
-				Cmdline:   `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`,
-				Exe:       `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --parent`,
-				Cwd:       "C:\\fibratus\\pkg\\ps",
-				SessionID: 1,
-				SID:       "S-1-5-18",
-				Username:  "SYSTEM",
-				Domain:    "NT AUTHORITY",
+				PID:         uint32(os.Getpid()),
+				Ppid:        8390,
+				Name:        "spotify.exe",
+				Cmdline:     `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`,
+				Exe:         `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --parent`,
+				Cwd:         "C:\\fibratus\\pkg\\ps",
+				SessionID:   1,
+				SID:         "S-1-5-18",
+				Username:    "SYSTEM",
+				Domain:      "NT AUTHORITY",
+				IsWOW64:     true,
+				IsPackaged:  true,
+				IsProtected: false,
 			},
 		},
 	}
@@ -197,6 +209,7 @@ func TestRemove(t *testing.T) {
 					kparams.UserSID:         {Name: kparams.UserSID, Type: kparams.WbemSID, Value: []byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0}},
 					kparams.StartTime:       {Name: kparams.StartTime, Type: kparams.Time, Value: time.Now()},
 					kparams.SessionID:       {Name: kparams.SessionID, Type: kparams.Uint32, Value: uint32(1)},
+					kparams.ProcessFlags:    {Name: kparams.ProcessFlags, Type: kparams.Flags, Value: uint32(0x00000010)},
 				},
 			},
 			false,
@@ -236,6 +249,7 @@ func TestAddThread(t *testing.T) {
 			kparams.UserSID:         {Name: kparams.UserSID, Type: kparams.WbemSID, Value: []byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0}},
 			kparams.StartTime:       {Name: kparams.StartTime, Type: kparams.Time, Value: time.Now()},
 			kparams.SessionID:       {Name: kparams.SessionID, Type: kparams.Uint32, Value: uint32(1)},
+			kparams.ProcessFlags:    {Name: kparams.ProcessFlags, Type: kparams.Flags, Value: uint32(0x00000010)},
 		},
 	}
 	require.NoError(t, psnap.Write(evt))
@@ -316,6 +330,7 @@ func TestRemoveThread(t *testing.T) {
 			kparams.UserSID:         {Name: kparams.UserSID, Type: kparams.WbemSID, Value: []byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0}},
 			kparams.StartTime:       {Name: kparams.StartTime, Type: kparams.Time, Value: time.Now()},
 			kparams.SessionID:       {Name: kparams.SessionID, Type: kparams.Uint32, Value: uint32(1)},
+			kparams.ProcessFlags:    {Name: kparams.ProcessFlags, Type: kparams.Flags, Value: uint32(0x00000010)},
 		},
 	}
 	require.NoError(t, psnap.Write(pevt))
@@ -363,6 +378,7 @@ func TestAddModule(t *testing.T) {
 			kparams.UserSID:         {Name: kparams.UserSID, Type: kparams.WbemSID, Value: []byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0}},
 			kparams.StartTime:       {Name: kparams.StartTime, Type: kparams.Time, Value: time.Now()},
 			kparams.SessionID:       {Name: kparams.SessionID, Type: kparams.Uint32, Value: uint32(1)},
+			kparams.ProcessFlags:    {Name: kparams.ProcessFlags, Type: kparams.Flags, Value: uint32(0x00000010)},
 		},
 	}
 	require.NoError(t, psnap.Write(evt))
@@ -427,6 +443,7 @@ func TestRemoveModule(t *testing.T) {
 			kparams.UserSID:         {Name: kparams.UserSID, Type: kparams.WbemSID, Value: []byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0}},
 			kparams.StartTime:       {Name: kparams.StartTime, Type: kparams.Time, Value: time.Now()},
 			kparams.SessionID:       {Name: kparams.SessionID, Type: kparams.Uint32, Value: uint32(1)},
+			kparams.ProcessFlags:    {Name: kparams.ProcessFlags, Type: kparams.Flags, Value: uint32(0x00000010)},
 		},
 	}
 	require.NoError(t, psnap.Write(pevt))
@@ -476,6 +493,7 @@ func TestReapDeadProcesses(t *testing.T) {
 				kparams.UserSID:         {Name: kparams.UserSID, Type: kparams.WbemSID, Value: []byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0}},
 				kparams.StartTime:       {Name: kparams.StartTime, Type: kparams.Time, Value: time.Now()},
 				kparams.SessionID:       {Name: kparams.SessionID, Type: kparams.Uint32, Value: uint32(1)},
+				kparams.ProcessFlags:    {Name: kparams.ProcessFlags, Type: kparams.Flags, Value: uint32(0x00000010)},
 			},
 		},
 		{
@@ -489,6 +507,7 @@ func TestReapDeadProcesses(t *testing.T) {
 				kparams.UserSID:         {Name: kparams.UserSID, Type: kparams.WbemSID, Value: []byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0}},
 				kparams.StartTime:       {Name: kparams.StartTime, Type: kparams.Time, Value: time.Now()},
 				kparams.SessionID:       {Name: kparams.SessionID, Type: kparams.Uint32, Value: uint32(1)},
+				kparams.ProcessFlags:    {Name: kparams.ProcessFlags, Type: kparams.Flags, Value: uint32(0x00000010)},
 			},
 		},
 	}
@@ -520,8 +539,11 @@ func TestFindQueryOS(t *testing.T) {
 	require.NotNil(t, proc)
 
 	assert.Equal(t, notepadPID, proc.PID)
-	assert.Equal(t, "notepad.exe", proc.Name)
+	assert.Equal(t, "notepad.exe", strings.ToLower(proc.Name))
 	assert.Equal(t, uint32(os.Getpid()), proc.Ppid)
+	assert.True(t, proc.IsPackaged)
+	assert.False(t, proc.IsWOW64)
+	assert.False(t, proc.IsProtected)
 	assert.Equal(t, strings.ToLower(filepath.Join(os.Getenv("windir"), "notepad.exe")), strings.ToLower(proc.Exe))
 	assert.Equal(t, filepath.Join(os.Getenv("windir"), "notepad.exe"), proc.Cmdline)
 	assert.True(t, len(proc.Envs) > 0)

@@ -83,6 +83,14 @@ type PS struct {
 	Username string `json:"username"`
 	// Domain represents the domain under which the process is run. (e.g. NT AUTHORITY)
 	Domain string `json:"domain"`
+	// IsWOW64 indicates if this is 32-bit process created in 64-bit Windows system (Windows on Windows)
+	IsWOW64 bool `json:"is_wow_64"`
+	// IsPackaged denotes that the process is packaged with the MSIX technology and thus has
+	// associated package identity.
+	IsPackaged bool `json:"is_packaged"`
+	// IsProtected denotes a protected process. The system restricts access to protected
+	// processes and the threads of protected processes.
+	IsProtected bool `json:"is_protected"`
 }
 
 // UUID is meant to offer a more robust version of process ID that

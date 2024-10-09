@@ -320,6 +320,9 @@ func (s *snapshotter) newProcState(pid, ppid uint32, e *kevent.Kevent) (*pstypes
 	)
 	proc.Parent = s.procs[ppid]
 	proc.StartTime, _ = e.Kparams.GetTime(kparams.StartTime)
+	proc.IsWOW64 = (e.Kparams.MustGetUint32(kparams.ProcessFlags) & kevent.PsWOW64) != 0
+	proc.IsPackaged = (e.Kparams.MustGetUint32(kparams.ProcessFlags) & kevent.PsPackaged) != 0
+	proc.IsProtected = (e.Kparams.MustGetUint32(kparams.ProcessFlags) & kevent.PsProtected) != 0
 
 	if !s.capture {
 		if proc.Username != "" {
@@ -543,6 +546,16 @@ func (s *snapshotter) Find(pid uint32) (bool, *pstypes.PS) {
 	proc.Cmdline = peb.GetCommandLine()
 	proc.SessionID = peb.GetSessionID()
 	proc.Cwd = peb.GetCurrentWorkingDirectory()
+
+	// get process creation attributes
+	var isWOW64 bool
+	if err := windows.IsWow64Process(process, &isWOW64); err != nil && isWOW64 {
+		proc.IsWOW64 = true
+	}
+	if p, err := sys.QueryInformationProcess[sys.PsProtection](process, sys.ProcessProtectionInformation); err != nil && p != nil {
+		proc.IsProtected = p.IsProtected()
+	}
+	proc.IsPackaged = sys.IsProcessPackaged(process)
 
 	return false, proc
 }

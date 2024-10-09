@@ -58,6 +58,7 @@ var (
 	procSymUnloadModule64                    = moddbghelp.NewProc("SymUnloadModule64")
 	procCreateThread                         = modkernel32.NewProc("CreateThread")
 	procFreeConsole                          = modkernel32.NewProc("FreeConsole")
+	procGetPackageId                         = modkernel32.NewProc("GetPackageId")
 	procGetProcessIdOfThread                 = modkernel32.NewProc("GetProcessIdOfThread")
 	procTerminateThread                      = modkernel32.NewProc("TerminateThread")
 	procNtAlpcQueryInformation               = modntdll.NewProc("NtAlpcQueryInformation")
@@ -149,6 +150,14 @@ func CreateThread(attributes *windows.SecurityAttributes, stackSize uint, startA
 
 func FreeConsole() {
 	syscall.Syscall(procFreeConsole.Addr(), 0, 0, 0, 0)
+	return
+}
+
+func GetPackageID(handle windows.Handle, length *uint32, buf uintptr) (err error) {
+	r1, _, e1 := syscall.Syscall(procGetPackageId.Addr(), 3, uintptr(handle), uintptr(unsafe.Pointer(length)), uintptr(buf))
+	if r1 == 0 {
+		err = errnoErr(e1)
+	}
 	return
 }
 
