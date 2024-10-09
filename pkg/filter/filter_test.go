@@ -112,6 +112,7 @@ func TestProcFilter(t *testing.T) {
 		kparams.UserSID:         {Name: kparams.UserSID, Type: kparams.WbemSID, Value: []byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0}},
 		kparams.Username:        {Name: kparams.Username, Type: kparams.UnicodeString, Value: "loki"},
 		kparams.Domain:          {Name: kparams.Domain, Type: kparams.UnicodeString, Value: "TITAN"},
+		kparams.ProcessFlags:    {Name: kparams.ProcessFlags, Type: kparams.Flags, Value: uint32(0x000000E)},
 	}
 
 	kpars1 := kevent.Kparams{
@@ -132,6 +133,9 @@ func TestProcFilter(t *testing.T) {
 				Name: "System",
 			},
 		},
+		IsWOW64:     false,
+		IsProtected: true,
+		IsPackaged:  false,
 	}
 
 	kevt := &kevent.Kevent{
@@ -153,6 +157,9 @@ func TestProcFilter(t *testing.T) {
 				{Name: "C:\\Windows\\System32\\kernel32.dll", Size: 12354, Checksum: 23123343, BaseAddress: va.Address(4294066175), DefaultBaseAddress: va.Address(4293993725)},
 				{Name: "C:\\Windows\\System32\\user32.dll", Size: 212354, Checksum: 33123343, BaseAddress: va.Address(4277288959), DefaultBaseAddress: va.Address(4293993725)},
 			},
+			IsProtected: false,
+			IsPackaged:  true,
+			IsWOW64:     false,
 		},
 	}
 	kevt.Timestamp, _ = time.Parse(time.RFC3339, "2011-05-03T15:04:05.323Z")
@@ -204,6 +211,15 @@ func TestProcFilter(t *testing.T) {
 		{`ps.parent.username = 'SYSTEM'`, true},
 		{`ps.parent.domain = 'NT AUTHORITY'`, true},
 		{`ps.envs in ('ALLUSERSPROFILE')`, true},
+		{`ps.child.is_wow64`, true},
+		{`ps.child.is_packaged`, true},
+		{`ps.child.is_protected`, true},
+		{`ps.is_wow64`, false},
+		{`ps.is_packaged`, true},
+		{`ps.is_protected`, false},
+		{`ps.parent.is_wow64`, false},
+		{`ps.parent.is_packaged`, false},
+		{`ps.parent.is_protected`, true},
 		{`kevt.name='CreateProcess' and ps.name contains 'svchost'`, true},
 
 		{`ps.modules IN ('kernel32.dll')`, true},

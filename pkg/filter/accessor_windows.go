@@ -184,6 +184,39 @@ func (ps *psAccessor) Get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 			return nil, nil
 		}
 		return kevt.Kparams.GetString(kparams.Username)
+	case fields.PsChildIsWOW64Field:
+		if kevt.Category != ktypes.Process {
+			return nil, nil
+		}
+		return (kevt.Kparams.MustGetUint32(kparams.ProcessFlags) & kevent.PsWOW64) != 0, nil
+	case fields.PsChildIsPackagedField:
+		if kevt.Category != ktypes.Process {
+			return nil, nil
+		}
+		return (kevt.Kparams.MustGetUint32(kparams.ProcessFlags) & kevent.PsPackaged) != 0, nil
+	case fields.PsChildIsProtectedField:
+		if kevt.Category != ktypes.Process {
+			return nil, nil
+		}
+		return (kevt.Kparams.MustGetUint32(kparams.ProcessFlags) & kevent.PsProtected) != 0, nil
+	case fields.PsIsWOW64Field:
+		ps := kevt.PS
+		if ps == nil {
+			return nil, ErrPsNil
+		}
+		return ps.IsWOW64, nil
+	case fields.PsIsPackagedField:
+		ps := kevt.PS
+		if ps == nil {
+			return nil, ErrPsNil
+		}
+		return ps.IsPackaged, nil
+	case fields.PsIsProtectedField:
+		ps := kevt.PS
+		if ps == nil {
+			return nil, ErrPsNil
+		}
+		return ps.IsProtected, nil
 	case fields.PsDomain:
 		ps := kevt.PS
 		if ps == nil {
@@ -387,6 +420,24 @@ func (ps *psAccessor) Get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 			types[i] = handle.Type
 		}
 		return types, nil
+	case fields.PsParentIsWOW64Field:
+		ps := getParentPs(kevt)
+		if ps == nil {
+			return nil, ErrPsNil
+		}
+		return ps.IsWOW64, nil
+	case fields.PsParentIsPackagedField:
+		ps := getParentPs(kevt)
+		if ps == nil {
+			return nil, ErrPsNil
+		}
+		return ps.IsPackaged, nil
+	case fields.PsParentIsProtectedField:
+		ps := getParentPs(kevt)
+		if ps == nil {
+			return nil, ErrPsNil
+		}
+		return ps.IsProtected, nil
 	default:
 		switch {
 		case f.IsEnvsMap():
