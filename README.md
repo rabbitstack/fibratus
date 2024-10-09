@@ -50,6 +50,34 @@ $ VaultCmd.exe /listcreds:"Windows Credentials" /all
 
 To fully exploit and learn about Fibratus capabilities, read the [docs](https://www.fibratus.io).
 
+### Rules
+
+Detection rules live in the [`rules`](/rules) directory of this repository. The CLI provides a set of
+commands to explore the rule catalog, validate the rules, or [create a new rule](https://github.com/rabbitstack/fibratus/tree/master/rules#structure) from the template.
+
+To describe all rules in the catalog, use the `fibratus rules list` command. It is possible to pass the
+`-s` flag to show rules summary by MITRE tactics and techniques.
+
+```
+$ fibratus rules list
+┌───────┬────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│     # │ RULE                                                  │ TECHNIQUE                             │ TACTIC               │
+├───────┼────────────────────────────────────────────────────────────────────────────────────────────────────────────── |
+│     1 │ File access to SAM database                           │ OS Credential Dumping                 │ Credential Access    │
+│     2 │ Credentials access from backups via Rundll32          │ Credentials from Password Stores      │ Credential Access    │
+│     3 │ Credential discovery via VaultCmd.exe                 │ Credentials from Password Stores      │ Credential Access    │
+│     4 │ LSASS memory dump preparation via SilentProcessExit   │ OS Credential Dumping                 │ Credential Access    │
+│     5 │ LSASS memory dump via Windows Error Reporting         │ OS Credential Dumping                 │ Credential Access    │
+│     6 │ LSASS memory dumping via legitimate or offensive tools│ OS Credential Dumping                 │ Credential Access    │
+│     7 │ Potential thread execution hijacking                  │ Process Injection                     │ Defense Evasion      │
+│     8 │ Process spawned via remote thread                     │ Process Injection                     │ Defense Evasion      │
+│     9 │ Regsvr32 scriptlet execution                          │ System Binary Proxy Execution         │ Defense Evasion      │
+│    10 │ Suspicious DLL loaded via memory section mapping      │ Process Injection                     │ Defense Evasion      │
+│    11 │ System Binary Proxy Execution via Rundll32            │ System Binary Proxy Execution         │ Defense Evasion      |
+|    ...                                                                                                                       |            
+├───────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────────
+```
+
 ### Contributing
 
 We love contributions. To start contributing to Fibratus, please read our [contribution guidelines](https://github.com/rabbitstack/fibratus/blob/master/CONTRIBUTING.md).

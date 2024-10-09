@@ -14,6 +14,16 @@ Detection rules are organized in `yaml` files. Rules can live in different direc
 However, the recommended practice is to follow the `tactic_name_rule_name.yml` naming nomenclature. By default, all rules reside within
 the `rules` directory of this repository.
 
+The CLI provides a command to create a new rule from the template. For example, if you want to create the `Potential Process Doppelganging`
+rule that belongs to the `Defense Evasion` MITRE tactic, you would use the following command.
+
+```
+$ fibratus rules create "Potential Process Doppelganging Injection" -t TA0005
+```
+
+The `-t` flag specifies the MITRE tactic id. The end result is the `defense_evasion_potential_process_doppelganging_injection.yml` file with the most
+required attributes such as rule identifier, name, and the minimum engine version, filled out automatically.
+
 ## Guidelines
 
 ### Read the docs
