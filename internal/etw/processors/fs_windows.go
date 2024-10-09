@@ -307,7 +307,7 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 		}
 
 		// ignore object misses that are produced by CloseFile
-		if fileinfo == nil && e.IsCloseFile() {
+		if fileinfo == nil && !e.IsCloseFile() {
 			fileObjectMisses.Add(1)
 		}
 		if e.IsDeleteFile() {
