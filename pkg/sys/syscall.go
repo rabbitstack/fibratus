@@ -56,6 +56,7 @@ package sys
 
 // Process Status API Functions
 //sys GetMappedFileName(handle windows.Handle, addr uintptr, filename *uint16, size uint32) (n uint32) = psapi.GetMappedFileNameW
+//sys GetPackageID(handle windows.Handle, length *uint32, buf uintptr) (err error) = kernel32.GetPackageId
 
 // Debug Helper API Functions
 //sys SymInitialize(handle windows.Handle, searchPath *uint16, invadeProcess bool) (b bool) = dbghelp.SymInitialize

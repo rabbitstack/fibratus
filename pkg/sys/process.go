@@ -31,6 +31,32 @@ const (
 	ProcessStatusStillActive uint32 = 259
 )
 
+// ProcessProtectionInformation is the information class that returns a
+// value indicating the type of protected process and the protected process
+// signer.
+const ProcessProtectionInformation = 61
+
+// PsProtection describes the process protection attributes.
+type PsProtection struct {
+	// S is the C union field describing protection attributes.
+	//	union {
+	//		struct {
+	//			PS_PROTECTED_TYPE Type : 3;
+	//			BOOLEAN Audit : 1;
+	//			PS_PROTECTED_SIGNER Signer : 4;
+	//	 } s;
+	// }
+	S     byte
+	Level byte
+}
+
+// IsProtected determines if the process has the protected flag.
+// The protected mask is stored in the bit field comprising the
+// bits 1 to 3.
+func (pp PsProtection) IsProtected() bool {
+	return int((pp.S>>1)&((1<<3)-1)) != 0
+}
+
 // QueryInformationProcess consults the specified process information class and returns
 // a pointer to the structure containing process information.
 func QueryInformationProcess[C any](proc windows.Handle, class int32) (*C, error) {
@@ -71,6 +97,18 @@ func IsProcessRunning(proc windows.Handle) bool {
 		return false
 	}
 	return exitcode == ProcessStatusStillActive
+}
+
+// IsProcessPackaged determines if the process is packaged by trying
+// to resolve the package identifier.
+func IsProcessPackaged(proc windows.Handle) bool {
+	var n uint32
+	err := GetPackageID(proc, &n, 0)
+	if err == windows.ERROR_INSUFFICIENT_BUFFER {
+		b := make([]byte, n)
+		err = GetPackageID(proc, &n, uintptr(unsafe.Pointer(&b[0])))
+	}
+	return err == nil
 }
 
 // IsWindowsService reports whether the process is currently executing
