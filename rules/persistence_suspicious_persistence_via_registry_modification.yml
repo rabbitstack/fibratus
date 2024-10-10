@@ -24,7 +24,7 @@ condition: >
       or
      ps.exe imatches '?:\\Users\\Public\\*'
       or
-     not (pe.is_signed and pe.is_trusted)
+     pe.is_signed = false or pe.is_trusted = false
   )
     and
   registry.key.name imatches registry_persistence_keys

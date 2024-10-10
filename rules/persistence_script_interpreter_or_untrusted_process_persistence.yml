@@ -1,6 +1,6 @@
 name: Script interpreter host or untrusted process persistence
 id: cc41ee3a-6e44-4903-85a4-0147ec6a7eea
-version: 1.0.0
+version: 1.0.1
 description: |
   Identifies the script interpreter or untrusted process writing
   to commonly abused run keys or the Startup folder locations.
@@ -23,7 +23,7 @@ condition: >
       or
     ps.parent.name in script_interpreters
       or
-    not pe.is_trusted
+    pe.is_trusted = false
   )
     and
   (
