@@ -39,7 +39,10 @@ condition: >
       not
      image.name imatches
       (
-        '?:\\Program Files\\Git\\mingw64\\bin\\*.dll'
+        '?:\\Program Files\\Git\\mingw64\\bin\\*.dll',
+        '?:\\Windows\\assembly\\*\\*.ni.dll',
+        '?:\\Program Files\\WindowsPowerShell\\Modules\\*\\*.dll',
+        '?:\\Windows\\Microsoft.NET\\assembly\\*\\*.dll'
       )
     | by ps.pid
 
