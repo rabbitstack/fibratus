@@ -84,6 +84,8 @@ if errorlevel 1 goto fail
 goto :EOF
 
 :mc
+:: Generate eventlog message compiler input file
+go generate github.com/rabbitstack/fibratus/pkg/outputs/eventlog
 windmc -r pkg/outputs/eventlog/mc pkg/outputs/eventlog/mc/fibratus.mc
 windres -O coff -r -fo pkg/outputs/eventlog/mc/fibratus.res pkg/outputs/eventlog/mc/fibratus.rc
 :: Link the resulting resource object

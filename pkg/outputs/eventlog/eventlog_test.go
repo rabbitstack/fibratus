@@ -25,8 +25,6 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/sys/windows/svc/eventlog"
-
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
@@ -45,8 +43,10 @@ func TestEvtlogPublish(t *testing.T) {
 	el := &evtlog{
 		config: c,
 		tmpl:   tmpl,
+		events: ktypes.GetKtypesMetaIndexed(),
+		cats:   ktypes.Categories(),
 	}
-	err = eventlog.InstallAsEventCreate(source, levels)
+	err = Install(source, msgFile, false, levels)
 	if err != nil && !errors.Is(err, ErrKeyExists) {
 		require.NoError(t, err)
 	}
