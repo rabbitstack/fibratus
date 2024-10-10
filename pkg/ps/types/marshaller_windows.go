@@ -25,6 +25,7 @@ import (
 	kcapver "github.com/rabbitstack/fibratus/pkg/kcap/version"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	"github.com/rabbitstack/fibratus/pkg/util/bytes"
+	"github.com/rabbitstack/fibratus/pkg/util/convert"
 	"time"
 	"unsafe"
 )
@@ -108,6 +109,11 @@ func (ps *PS) Marshal() []byte {
 	// write domain
 	b = append(b, bytes.WriteUint16(uint16(len(ps.Domain)))...)
 	b = append(b, ps.Domain...)
+
+	// write process flags
+	b = append(b, convert.Btoi(ps.IsWOW64))
+	b = append(b, convert.Btoi(ps.IsPackaged))
+	b = append(b, convert.Btoi(ps.IsProtected))
 
 	return b
 }
@@ -249,8 +255,19 @@ readpe:
 			// read domain
 			l = bytes.ReadUint16(b[idx+offset:])
 			buf = b[:]
+			idx += 2
+			offset += uint32(l)
 			ps.Domain = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
 		}
+		if psec.Version() >= kcapver.ProcessSecV4 {
+			// process flags
+			ps.IsWOW64 = convert.Itob(b[idx+offset])
+			idx++
+			ps.IsPackaged = convert.Itob(b[idx+offset])
+			idx++
+			ps.IsProtected = convert.Itob(b[idx+offset])
+		}
+
 		return nil
 	}
 
@@ -285,7 +302,17 @@ readpe:
 		// read domain
 		l = bytes.ReadUint16(b[idx+offset:])
 		buf = b[:]
+		idx += 2
+		offset += uint32(l)
 		ps.Domain = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
+	}
+	if psec.Version() >= kcapver.ProcessSecV4 {
+		// process flags
+		ps.IsWOW64 = convert.Itob(b[idx+offset])
+		idx++
+		ps.IsPackaged = convert.Itob(b[idx+offset])
+		idx++
+		ps.IsProtected = convert.Itob(b[idx+offset])
 	}
 
 	return nil
