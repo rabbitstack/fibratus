@@ -20,5 +20,8 @@ condition: >
   set_value and registry.key.name imatches 'HKEY_LOCAL_MACHINE\\SAM\\SAM\\Domains\\Account\\Users\\*\\F'
     and
   ps.sid in ('S-1-5-18', 'S-1-5-19', 'S-1-5-20')
+    and
+    not
+  ps.exe imatches '?:\\Windows\\System32\\lsass.exe'
 
 min-engine-version: 2.0.0
