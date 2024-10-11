@@ -40,14 +40,11 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/ps"
-	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"github.com/rabbitstack/fibratus/pkg/yara/config"
 	ytypes "github.com/rabbitstack/fibratus/pkg/yara/types"
 	log "github.com/sirupsen/logrus"
 )
-
-const alertTitleTmpl = `{{if .PS }}YARA alert on process {{ .PS.Name }}{{ else }}YARA alert on file {{ .Filename }}{{ end }}`
 
 var (
 	// ruleMatches computes all the rule matches
@@ -58,6 +55,13 @@ var (
 	totalScans = expvar.NewInt("yara.total.scans")
 )
 
+type ScanKind uint8
+
+const (
+	ProcScan ScanKind = iota + 1
+	FileScan
+)
+
 type scanner struct {
 	c      *yara.Compiler
 	rules  *yara.Rules
@@ -65,16 +69,6 @@ type scanner struct {
 
 	psnap ps.Snapshotter
 }
-
-// AlertContext contains the process state or file name along with all the rule matches.
-type AlertContext struct {
-	PS        *pstypes.PS
-	Filename  string
-	Matches   []yara.MatchRule
-	Timestamp string
-}
-
-const tsLayout = "02 Jan 2006 15:04:05 MST"
 
 // NewScanner creates a new YARA scanner.
 func NewScanner(psnap ps.Snapshotter, config config.Config) (Scanner, error) {
@@ -237,6 +231,10 @@ func (s scanner) Scan(evt *kevent.Kevent) (bool, error) {
 		return true, err
 	}
 	return true, s.send(alertCtx)
+}
+
+func (s scanner) scan() (yara.MatchRules, error) {
+	return nil, nil
 }
 
 func (s scanner) send(ctx AlertContext) error {

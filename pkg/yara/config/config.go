@@ -28,15 +28,13 @@ import (
 )
 
 const (
-	enabled            = "yara.enabled"
-	alertVia           = "yara.alert-via"
-	alertTextTemplate  = "yara.alert-template.text"
-	alertTitleTemplate = "yara.alert-template.title"
-	fastScanMode       = "yara.fastscan"
-	scanTimeout        = "yara.scan-timeout"
-	skipFiles          = "yara.skip-files"
-	excludedProcesses  = "yara.excluded-procs"
-	excludedFiles      = "yara.excluded-files"
+	enabled           = "yara.enabled"
+	alertTemplate     = "yara.alert-template"
+	fastScanMode      = "yara.fastscan"
+	scanTimeout       = "yara.scan-timeout"
+	skipFiles         = "yara.skip-files"
+	excludedProcesses = "yara.excluded-procs"
+	excludedFiles     = "yara.excluded-files"
 )
 
 // RulePath contains the rule path information.
@@ -65,12 +63,8 @@ type Config struct {
 	Enabled bool `json:"yara.enabled" yaml:"yara.enabled"`
 	// Rule contains rule-specific settings.
 	Rule Rule `json:"yara.rule" yaml:"yara.rule" mapstructure:"rule"`
-	// AlertVia defines which alert sender is used to emit the alert on rule matches.
-	AlertVia string `json:"yara.alert-via" yaml:"yara.alert-via"`
-	// AlertTemplate defines the template that is used to render the text of the alert.
-	AlertTextTemplate string `json:"yara.alert-text-template" yaml:"yara.alert-text-template"`
-	// AlertTitle represents the template for the alert title
-	AlertTitleTemplate string `json:"yara.alert-title-template" yaml:"yara.alert-title-template"`
+	// AlertTemplate represents the template for the alert title
+	AlertTemplate string `json:"yara.alert-template" yaml:"yara.alert-template"`
 	// FastScanMode avoids multiple matches of the same string when not necessary.
 	FastScanMode bool `json:"yara.fastscan" yaml:"yara.fastscan"`
 	// ScanTimeout sets the timeout for the scanner. If the timeout is reached, the scan operation is cancelled.
@@ -86,9 +80,7 @@ type Config struct {
 // InitFromViper initializes Yara config from Viper.
 func (c *Config) InitFromViper(v *viper.Viper) {
 	c.Enabled = v.GetBool(enabled)
-	c.AlertVia = v.GetString(alertVia)
-	c.AlertTextTemplate = v.GetString(alertTextTemplate)
-	c.AlertTitleTemplate = v.GetString(alertTitleTemplate)
+	c.AlertTemplate = v.GetString(alertTemplate)
 	c.FastScanMode = v.GetBool(fastScanMode)
 	c.ScanTimeout = v.GetDuration(scanTimeout)
 	c.SkipFiles = v.GetBool(skipFiles)
@@ -111,9 +103,7 @@ func (c *Config) InitFromViper(v *viper.Viper) {
 // AddFlags registers persistent flags.
 func AddFlags(flags *pflag.FlagSet) {
 	flags.Bool(enabled, false, "Specifies if Yara scanner is enabled")
-	flags.String(alertVia, "mail", "Defines which alert sender is used to emit the alert on rule matches")
-	flags.String(alertTextTemplate, "", "Defines the template that is used to render the text of the alert")
-	flags.String(alertTitleTemplate, "", "Defines the template that is used to render the title of the alert")
+	flags.String(alertTemplate, "", "Defines the template that is used to render the alert")
 	flags.Bool(fastScanMode, true, "Avoids multiple matches of the same string when not necessary")
 	flags.Duration(scanTimeout, time.Second*10, "Specifies the timeout for the scanner. If the timeout is reached, the scan operation is cancelled")
 	flags.Bool(skipFiles, true, "Indicates whether file scanning is disabled")
