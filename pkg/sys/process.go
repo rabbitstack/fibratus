@@ -101,14 +101,14 @@ func IsProcessRunning(proc windows.Handle) bool {
 
 // IsProcessPackaged determines if the process is packaged by trying
 // to resolve the package identifier.
-func IsProcessPackaged(proc windows.Handle) bool {
+func IsProcessPackaged(proc windows.Handle) (bool, error) {
 	var n uint32
 	err := GetPackageID(proc, &n, 0)
 	if err == windows.ERROR_INSUFFICIENT_BUFFER {
 		b := make([]byte, n)
 		err = GetPackageID(proc, &n, uintptr(unsafe.Pointer(&b[0])))
 	}
-	return err == nil
+	return err == nil, err
 }
 
 // IsWindowsService reports whether the process is currently executing
