@@ -19,11 +19,15 @@
 package config
 
 import (
+	"bytes"
+	"fmt"
+	"github.com/hillu/go-yara/v4"
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"path/filepath"
 	"strings"
+	"text/template"
 	"time"
 )
 
@@ -35,6 +39,11 @@ const (
 	skipFiles         = "yara.skip-files"
 	excludedProcesses = "yara.excluded-procs"
 	excludedFiles     = "yara.excluded-files"
+)
+
+const (
+	FileThreatAlertTitle   = "File Threat Detected"
+	MemoryThreatAlertTitle = "Memory Threat Detected"
 )
 
 // RulePath contains the rule path information.
@@ -129,6 +138,43 @@ func (c Config) ShouldSkipFile(file string) bool {
 		}
 	}
 	return false
+}
+
+const (
+	// threatField represents the rule metadata field that
+	// identifies the threat name or family.
+	threatField = "threat_name"
+)
+
+func (c Config) AlertTitle(isFile bool) string {
+	if isFile {
+		return FileThreatAlertTitle
+	}
+	return MemoryThreatAlertTitle
+}
+
+func (c Config) AlertText(match yara.MatchRule) (string, error) {
+	if c.AlertTemplate == "" {
+		threat := match.Rule
+		for _, meta := range match.Metas {
+			if meta.Identifier == threatField {
+				if s, ok := meta.Value.(string); ok {
+					threat = s
+				}
+			}
+		}
+		return fmt.Sprintf("Threat detected %s", threat), nil
+	}
+	var writer bytes.Buffer
+	tmpl, err := template.New("yara").Parse(c.AlertTemplate)
+	if err != nil {
+		return "", fmt.Errorf("template syntax error: %v", err)
+	}
+	err = tmpl.Execute(&writer, match)
+	if err != nil {
+		return "", fmt.Errorf("couldn't execute template: %v", err)
+	}
+	return writer.String(), nil
 }
 
 func decode(input, output interface{}) error {

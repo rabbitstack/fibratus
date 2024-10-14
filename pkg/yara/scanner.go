@@ -22,22 +22,14 @@
 package yara
 
 import (
-	"bytes"
-	"encoding/json"
 	"expvar"
 	"fmt"
-	"github.com/google/uuid"
-	"html/template"
-	"os"
-	"path/filepath"
-	"time"
-
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-	"golang.org/x/sys/windows"
+	"os"
+	"path/filepath"
 
 	"github.com/hillu/go-yara/v4"
-	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
@@ -53,13 +45,6 @@ var (
 	rulesInCompiler = expvar.NewInt("yara.rules.in.compiler")
 	// totalScans computes the number of process/file scans
 	totalScans = expvar.NewInt("yara.total.scans")
-)
-
-type ScanKind uint8
-
-const (
-	ProcScan ScanKind = iota + 1
-	FileScan
 )
 
 type scanner struct {
@@ -167,144 +152,99 @@ func (s scanner) ProcessEvent(evt *kevent.Kevent) (bool, error) {
 	return s.Scan(evt)
 }
 
-func (s scanner) Scan(evt *kevent.Kevent) (bool, error) {
-	if !evt.IsCreateProcess() && !evt.IsLoadImage() && !evt.IsVirtualAlloc() {
+// Scan initiates the Yara rule scan when the specific signal is observed.
+func (s scanner) Scan(e *kevent.Kevent) (bool, error) {
+	var matches yara.MatchRules
+	var isScanned bool
+	var err error
+
+	switch e.Type {
+	case ktypes.CreateProcess:
+		// scan the created child process
+		pid := e.Kparams.MustGetPid()
+		log.Debugf("scanning child process. pid: %d, exe: %s", pid, e.GetParamAsString(kparams.Exe))
+		matches, err = s.scan(pid)
+		isScanned = true
+	case ktypes.LoadImage:
+		// scan the process loading unsigned/untrusted module
+		pid := e.PID
+		filename := evt.GetParamAsString(kparams.ImageFilename)
+		log.Debugf("scanning unsigned/untrusted module. pid: %d, module: %s", pid, filename)
+		matches, err = s.scan(pid)
+		isScanned = true
+	case ktypes.CreateFile:
+		// scan dropped PE files
+		isScanned = true
+	case ktypes.VirtualAlloc:
+		// scan process allocating RWX memory region
+		if e.PID != 4 && e.Kparams.TryGetUint32(kparams.MemProtect) == windows.PAGE_EXECUTE_READWRITE {
+			log.Debugf("scanning RWX allocation. pid: %d, exe: %s, addr: %s", pid, e.GetParamAsString(kparams.Exe),
+				e.GetParamAsString(kparams.MemBaseAddress))
+			matches, err = s.scan(pid)
+			isScanned = true
+		}
+	case ktypes.MapViewFile:
+		// scan process mapping RX view of section
+		isScanned = true
+	case ktypes.RegSetValue:
+		// scan registry binary values
+		isScanned = true
+	}
+
+	if err != nil {
+		return false, err
+	}
+	if len(matches) == 0 || !isScanned {
 		return false, nil
 	}
 
+	if isScanned {
+		totalScans.Add(1)
+	}
+
+	ruleMatches.Add(int64(len(matches)))
+
+	return len(matches) > 0, s.emit(matches, err)
+}
+
+func (s scanner) scan(target any) (yara.MatchRules, error) {
 	var matches yara.MatchRules
 	sn, err := s.newInternalScanner()
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 
-	alertCtx := AlertContext{
-		Timestamp: time.Now().Format(tsLayout),
+	switch n := target.(type) {
+	case uint32: // pid
+		// skip the scan for this process?
+		//_, proc := s.psnap.Find(pid)
+		//if proc == nil {
+		//	return false, fmt.Errorf("%d process not found in snapshotter", pid)
+		//}
+		err = sn.SetCallback(&matches).ScanProc(int(n))
+	case string: // file
+		err = sn.SetCallback(&matches).ScanFile(n)
+	case []byte: // mem
+		err = sn.SetCallback(&matches).ScanMem(n)
 	}
-
-	switch evt.Type {
-	case ktypes.CreateProcess:
-		pid := evt.Kparams.MustGetPid()
-		_, proc := s.psnap.Find(pid)
-		if proc == nil {
-			return false, fmt.Errorf("%d process not found in snapshotter", pid)
-		}
-		if s.config.ShouldSkipProcess(proc.Name) {
-			return false, nil
-		}
-		alertCtx.PS = proc
-		err = sn.SetCallback(&matches).ScanProc(int(pid))
-	case ktypes.LoadImage:
-		filename := evt.GetParamAsString(kparams.ImageFilename)
-		alertCtx.Filename = filename
-		err = sn.SetCallback(&matches).ScanFile(filename)
-	case ktypes.VirtualAlloc:
-		pid := evt.Kparams.MustGetPid()
-		_, proc := s.psnap.Find(pid)
-		if proc == nil {
-			return false, fmt.Errorf("%d process not found in snapshotter", pid)
-		}
-		if s.config.ShouldSkipProcess(proc.Name) {
-			return false, nil
-		}
-		protect, err := evt.Kparams.GetUint32(kparams.MemProtect)
-		if err != nil {
-			return false, err
-		}
-		if protect != windows.PAGE_EXECUTE_READWRITE {
-			return false, nil
-		}
-		alertCtx.PS = proc
-		err = sn.SetCallback(&matches).ScanProc(int(pid))
-	}
-
 	if err != nil {
-		return false, err
+		return nil, err
 	}
-	totalScans.Add(1)
-	if len(matches) == 0 {
-		return false, nil
-	}
-	alertCtx.Matches = matches
-	ruleMatches.Add(int64(len(matches)))
-	if err := putMatchesMeta(matches, evt); err != nil {
-		return true, err
-	}
-	return true, s.send(alertCtx)
+
+	return matches, nil
 }
 
-func (s scanner) scan() (yara.MatchRules, error) {
-	return nil, nil
-}
-
-func (s scanner) send(ctx AlertContext) error {
-	if s.config.AlertTitleTemplate == "" {
-		s.config.AlertTitleTemplate = alertTitleTmpl
-	}
-	if s.config.AlertTextTemplate == "" {
-		s.config.AlertTextTemplate = alertTextTmpl
-	}
-	// build a new yara alert template from the config options
-	// or use a default template string. We'll feed the alertsender
-	// with the output of the parsed template. Template content is
-	// rendered by employing the Go templating engine. For more
-	// details see https://golang.org/pkg/text/template/
-	title, err := executeTmpl(s.config.AlertTitleTemplate, ctx)
-	if err != nil {
-		return err
-	}
-	text, err := executeTmpl(s.config.AlertTextTemplate, ctx)
-	if err != nil {
-		return err
+func (s scanner) emit(matches yara.MatchRules, e *kevent.Kevent) error {
+	senders := alertsender.FindAll()
+	if len(senders) == 0 {
+		return fmt.Errorf("no alertsenders registered. Alert won't be sent")
 	}
 
-	// fetch the alert sender that is specified in the config
-	sender := alertsender.Find(alertsender.ToType(s.config.AlertVia))
-	if sender == nil {
-		return fmt.Errorf("%q alert sender is not initialized", s.config.AlertVia)
-	}
+	title := s.config.AlertTitle(e.Category == ktypes.File || e.Category == ktypes.Registry)
 
-	alert := alertsender.NewAlert(
-		title,
-		text,
-		tagsFromMatches(ctx.Matches),
-		alertsender.Normal,
-	)
-	alert.ID = uuid.New().String()
-
-	log.Infof("emitting yara alert via %q sender: %s", s.config.AlertVia, alert)
-
-	return sender.Send(alert)
-}
-
-func executeTmpl(body string, ctx AlertContext) (string, error) {
-	var writer bytes.Buffer
-
-	tmpl, err := template.New("yara").Parse(body)
-	if err != nil {
-		return "", fmt.Errorf("template syntax error: %v", err)
-	}
-	err = tmpl.Execute(&writer, ctx)
-	if err != nil {
-		return "", fmt.Errorf("couldn't execute template: %v", err)
-	}
-
-	return writer.String(), nil
-}
-
-func tagsFromMatches(matches []yara.MatchRule) []string {
-	tags := make([]string, 0)
 	for _, match := range matches {
-		tags = append(tags, match.Tags...)
-	}
-	return tags
-}
-
-// putMatchesMeta injects rule matches into event metadata as a JSON payload.
-func putMatchesMeta(matches yara.MatchRules, kevt *kevent.Kevent) error {
-	ruleMatches := make([]ytypes.MatchRule, 0)
-	for _, m := range matches {
-		match := ytypes.MatchRule{
+		// encode rule matches as JSON and append to event metadata
+		m := ytypes.MatchRule{
 			Rule:      m.Rule,
 			Namespace: m.Namespace,
 			Tags:      m.Tags,
@@ -312,19 +252,43 @@ func putMatchesMeta(matches yara.MatchRules, kevt *kevent.Kevent) error {
 			Strings:   make([]ytypes.MatchString, 0),
 		}
 		for _, meta := range m.Metas {
-			match.Metas = append(match.Metas, ytypes.Meta{Value: meta.Value, Identifier: meta.Identifier})
+			m.Metas = append(match.Metas, ytypes.Meta{Value: meta.Value, Identifier: meta.Identifier})
 		}
 		for _, s := range m.Strings {
-			match.Strings = append(match.Strings, ytypes.MatchString{Name: s.Name, Base: s.Base, Data: s.Data, Offset: s.Offset})
+			m.Strings = append(match.Strings, ytypes.MatchString{Name: s.Name, Base: s.Base, Data: s.Data, Offset: s.Offset})
 		}
-		ruleMatches = append(ruleMatches, match)
+		b, err := json.Marshal(m)
+		if err != nil {
+			return err
+		}
+		e.AddMeta(kevent.YaraMatchesKey, string(b))
+
+		text, err := s.config.AlertText(match)
+		if err != nil {
+			return true, err
+		}
+		// send alert via all registered alert senders
+		for _, sender := range senders {
+			log.Infof("sending alert: [%s]. Text: %s Event: %s", title, text, e.String())
+
+			alert := alertsender.NewAlert(
+				title,
+				text,
+				m.Tags,
+				m.SeverityFromScore(),
+			)
+
+			id := m.ID()
+			// generate id if it doesn't exist in meta fields
+			if id == "" {
+				id = uuid.New().String()
+			}
+			alert.ID = id
+			alert.Events = []*kevent.Kevent{e}
+			alert.Labels = m.Labels()
+			alert.Description = m.Description()
+		}
 	}
-	b, err := json.Marshal(ruleMatches)
-	if err != nil {
-		return err
-	}
-	kevt.AddMeta(kevent.YaraMatchesKey, string(b))
-	return nil
 }
 
 func (s scanner) Close() {

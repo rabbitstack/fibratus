@@ -18,6 +18,15 @@
 
 package types
 
+import "github.com/rabbitstack/fibratus/pkg/alertsender"
+
+const (
+	id          = "id"
+	threat      = "threat_name"
+	severity    = "severity"
+	description = "description"
+)
+
 // A MatchRule represents a rule successfully matched against a block
 // of data.
 type MatchRule struct {
@@ -26,6 +35,38 @@ type MatchRule struct {
 	Tags      []string      `json:"tags"`
 	Metas     []Meta        `json:"metas"`
 	Strings   []MatchString `json:"strings"`
+}
+
+// ID returns the identifier from the rule metadata fields.
+func (m MatchRule) ID() string {
+	for _, meta := range m.Metas {
+		if meta.Identifier == id {
+			if i, ok := meta.Value.(string); ok {
+				return i
+			}
+		}
+	}
+	return ""
+}
+
+// Description returns the rule description from the metadata fields.
+func (m MatchRule) Description() string {
+	for _, meta := range m.Metas {
+		if meta.Identifier == description {
+			if i, ok := meta.Value.(string); ok {
+				return i
+			}
+		}
+	}
+	return ""
+}
+
+func (m MatchRule) SeverityFromScore() alertsender.Severity {
+	return alertsender.High
+}
+
+func (m MatchRule) Labels() map[string]string {
+	return nil
 }
 
 // A MatchString represents a string declared and matched in a rule.
