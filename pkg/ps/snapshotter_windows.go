@@ -549,13 +549,15 @@ func (s *snapshotter) Find(pid uint32) (bool, *pstypes.PS) {
 
 	// get process creation attributes
 	var isWOW64 bool
-	if err := windows.IsWow64Process(process, &isWOW64); err != nil && isWOW64 {
+	if err := windows.IsWow64Process(process, &isWOW64); err == nil && isWOW64 {
 		proc.IsWOW64 = true
 	}
-	if p, err := sys.QueryInformationProcess[sys.PsProtection](process, sys.ProcessProtectionInformation); err != nil && p != nil {
+	if isPackaged, err := sys.IsProcessPackaged(process); err == nil && isPackaged {
+		proc.IsPackaged = true
+	}
+	if p, err := sys.QueryInformationProcess[sys.PsProtection](process, sys.ProcessProtectionInformation); err == nil && p != nil {
 		proc.IsProtected = p.IsProtected()
 	}
-	proc.IsPackaged = sys.IsProcessPackaged(process)
 
 	return false, proc
 }
