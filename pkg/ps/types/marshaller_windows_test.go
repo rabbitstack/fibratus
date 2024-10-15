@@ -77,10 +77,13 @@ func TestPSMarshaler(t *testing.T) {
 				Object: 357488883434455544,
 			},
 		},
+		IsProtected: true,
+		IsWOW64:     true,
+		IsPackaged:  false,
 	}
 
 	b := ps.Marshal()
-	sec := section.New(section.Process, kcapver.ProcessSecV3, 0, 0)
+	sec := section.New(section.Process, kcapver.ProcessSecV4, 0, 0)
 	clone, err := NewFromKcap(b, sec)
 	require.NoError(t, err)
 
@@ -96,6 +99,9 @@ func TestPSMarshaler(t *testing.T) {
 	assert.Equal(t, []string{"-contentproc", `--channel="6304.3.1055809391\1014207667`, "-childID", "1", "-isForBrowser", "-prefsHandle", "2584", "-prefMapHandle", "2580", "-prefsLen", "70", "-prefMapSize", "216993", "-parentBuildID"}, clone.Args)
 	assert.Equal(t, uint32(4), clone.SessionID)
 	assert.Equal(t, map[string]string{"ProgramData": "C:\\ProgramData", "COMPUTRENAME": "archrabbit"}, clone.Envs)
+	assert.True(t, clone.IsProtected)
+	assert.True(t, clone.IsWOW64)
+	assert.False(t, clone.IsPackaged)
 
 	require.Len(t, clone.Handles, 3)
 

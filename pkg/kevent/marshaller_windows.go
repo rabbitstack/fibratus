@@ -175,11 +175,11 @@ func (e *Kevent) MarshalRaw() []byte {
 	// write process state
 	if e.PS != nil && (e.IsCreateProcess() || e.IsProcessRundown()) {
 		buf := e.PS.Marshal()
-		sec := section.New(section.Process, kcapver.ProcessSecV3, 0, uint32(len(buf)))
+		sec := section.New(section.Process, kcapver.ProcessSecV4, 0, uint32(len(buf)))
 		b = append(b, sec[:]...)
 		b = append(b, buf...)
 	} else {
-		sec := section.New(section.Process, kcapver.ProcessSecV3, 0, 0)
+		sec := section.New(section.Process, kcapver.ProcessSecV4, 0, 0)
 		b = append(b, sec[:]...)
 	}
 
