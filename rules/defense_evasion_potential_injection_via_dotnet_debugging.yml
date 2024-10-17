@@ -1,0 +1,37 @@
+name: Potential injection via .NET debugging
+id: 193ebf2f-e365-4f57-a639-275b7cdf0319
+version: 1.0.0
+description: |
+  Identifies creation of a process on behalf of the CLR debugging facility which may
+  be indicative of code injection. The CLR interface utilizes the OpenVirtualProcess
+  method to attach the debugger to the remote process.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1055
+  technique.name: Process Injection
+  technique.ref: https://attack.mitre.org/techniques/T1055/
+references:
+  - https://blog.xpnsec.com/debugging-into-net/
+  - https://learn.microsoft.com/en-us/dotnet/framework/unmanaged-api/debugging/iclrdebugging-openvirtualprocess-method
+
+condition: >
+  spawn_process and thread.callstack.symbols imatches ('mscordbi.dll!OpenVirtualProcess')
+    and
+    not
+  ps.child.exe imatches
+    (
+      '?:\\Visual Studio\\Common?\\IDE\\devenv.exe',
+      '?:\\Program Files\\Microsoft Visual Studio\\*.exe',
+      '?:\\Program Files (x86)\\Microsoft Visual Studio\\*.exe',
+      '?:\\Program Files\\IIS Express\\iisexpress.exe',
+      '?:\\Program Files (x86)\\IIS Express\\iisexpress.exe'
+    )
+  and not ps.exe imatches '?:\\Program Files (x86)\\Microsoft Visual Studio\\*.exe'
+
+output: >
+  Process %ps.exe attached the .NET debugger to process %ps.child.exe for potential code injection
+severity: high
+
+min-engine-version: 2.0.0
