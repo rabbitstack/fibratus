@@ -26,6 +26,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"syscall"
 
 	"golang.org/x/sys/windows"
@@ -34,7 +35,7 @@ import (
 
 const addKeyName = `SYSTEM\CurrentControlSet\Services\EventLog\Application`
 
-const categoryCount = 8
+var categoryCount = len(ktypes.Categories())
 
 // ErrKeyExists signals that the registry key already exists
 var ErrKeyExists = fmt.Errorf("%s\\%s already exists", addKeyName, source)
@@ -119,7 +120,7 @@ func Install(src, msgFile string, useExpandKey bool, eventsSupported uint32) err
 	if err != nil {
 		return err
 	}
-	err = sk.SetDWordValue("CategoryCount", categoryCount)
+	err = sk.SetDWordValue("CategoryCount", uint32(categoryCount))
 	if err != nil {
 		return err
 	}
