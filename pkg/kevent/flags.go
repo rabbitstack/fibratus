@@ -211,17 +211,24 @@ var MemProtectionFlags = []ParamFlag{
 	{"WRITECOMBINE", windows.PAGE_WRITECOMBINE},
 }
 
+const (
+	// SectionRX designates section read/execute protection
+	SectionRX = 0x30000
+	// SectionRWX designates section read/write/execute protection
+	SectionRWX = 0x60000
+)
+
 // ViewProtectionFlags describes section protection flags. These
 // have different values than the memory protection flags as they
 // are reported by the kernel.
 var ViewProtectionFlags = []ParamFlag{
-	{"EXECUTE_READWRITE", 0x60000},
+	{"EXECUTE_READWRITE", SectionRWX},
 	{"EXECUTE_WRITECOPY", 0x70000},
 	{"NOCACHE", 0x80000},
 	{"WRITECOMBINE", 0x90000},
 	{"READONLY", 0x10000},
 	{"EXECUTE", 0x20000},
-	{"EXECUTE_READ", 0x30000},
+	{"EXECUTE_READ", SectionRX},
 	{"READWRITE", 0x40000},
 	{"WRITECOPY", 0x50000},
 }
