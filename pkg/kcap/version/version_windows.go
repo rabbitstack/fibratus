@@ -35,6 +35,8 @@ const (
 	ProcessSecV2
 	// ProcessSecV3 is the v3 of the process section
 	ProcessSecV3
+	// ProcessSecV4 is the v4 of the process section
+	ProcessSecV4
 )
 
 const (
