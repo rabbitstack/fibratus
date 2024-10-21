@@ -72,6 +72,7 @@ func TestScan(t *testing.T) {
 	var tests = []struct {
 		name          string
 		setup         func() (*kevent.Kevent, error)
+		newScanner    func() (Scanner, error)
 		expectedAlert alertsender.Alert
 		matches       bool
 	}{
@@ -134,6 +135,20 @@ func TestScan(t *testing.T) {
 				}
 				return e, nil
 			},
+			func() (Scanner, error) {
+				return NewScanner(psnap, config.Config{
+					Enabled:     true,
+					ScanTimeout: time.Minute,
+					Rule: config.Rule{
+						Paths: []config.RulePath{
+							{
+								Namespace: "default",
+								Path:      "_fixtures/rules",
+							},
+						},
+					},
+				})
+			},
 			alertsender.Alert{
 				Title: "Memory Threat Detected",
 				Text:  "Threat detected X.Notepad",
@@ -149,18 +164,7 @@ func TestScan(t *testing.T) {
 			require.NoError(t, err)
 
 			// initialize scanner
-			s, err := NewScanner(psnap, config.Config{
-				Enabled:     true,
-				ScanTimeout: time.Minute,
-				Rule: config.Rule{
-					Paths: []config.RulePath{
-						{
-							Namespace: "default",
-							Path:      "_fixtures/rules",
-						},
-					},
-				},
-			})
+			s, err := tt.newScanner()
 			require.NoError(t, err)
 			defer s.Close()
 
