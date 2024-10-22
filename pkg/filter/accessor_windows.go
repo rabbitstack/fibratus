@@ -21,6 +21,7 @@ package filter
 import (
 	"errors"
 	"expvar"
+	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/network"
 	psnap "github.com/rabbitstack/fibratus/pkg/ps"
@@ -799,6 +800,19 @@ func (l *fileAccessor) Get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, 
 		return kevt.Kparams.GetPid()
 	case fields.FileKey:
 		return kevt.Kparams.GetUint64(kparams.FileKey)
+	case fields.FileInfoClass:
+		return kevt.GetParamAsString(kparams.FileInfoClass), nil
+	case fields.FileInfoAllocationSize:
+		if kevt.Kparams.TryGetUint32(kparams.FileInfoClass) == fs.AllocationClass {
+			return kevt.Kparams.GetUint64(kparams.FileExtraInfo)
+		}
+	case fields.FileInfoEOFSize:
+		if kevt.Kparams.TryGetUint32(kparams.FileInfoClass) == fs.EOFClass {
+			return kevt.Kparams.GetUint64(kparams.FileExtraInfo)
+		}
+	case fields.FileInfoIsDispositionDeleteFile:
+		return kevt.Kparams.TryGetUint32(kparams.FileInfoClass) == fs.DispositionClass &&
+			kevt.Kparams.TryGetUint64(kparams.FileExtraInfo) > 0, nil
 	}
 	return nil, nil
 }

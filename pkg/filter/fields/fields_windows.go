@@ -402,6 +402,14 @@ const (
 	FilePID Field = "file.pid"
 	// FileKey represents the field that uniquely identifies the file object.
 	FileKey Field = "file.key"
+	// FileInfoClass represents the field that identifies the file information class
+	FileInfoClass Field = "file.info_class"
+	// FileInfoAllocationSize represents the field that contains the file allocation size
+	FileInfoAllocationSize Field = "file.info.allocation_size"
+	// FileInfoEOFSize represents the field that contains the EOF size
+	FileInfoEOFSize Field = "file.info.eof_size"
+	// FileInfoIsDispositionDeleteFile represents the field that indicates if the file is deleted when its handle is closed
+	FileInfoIsDispositionDeleteFile Field = "file.info.is_disposition_delete_file"
 
 	// RegistryKeyName represents the registry key name
 	RegistryKeyName Field = "registry.key.name"
@@ -734,27 +742,31 @@ var fields = map[Field]FieldInfo{
 	ImageIsExecutable:       {ImageIsExecutable, "indicates if the loaded image is an executable", kparams.Bool, []string{"image.is_exec'"}, nil},
 	ImageIsDotnet:           {ImageIsDotnet, "indicates if the loaded image is a .NET assembly", kparams.Bool, []string{"image.is_dotnet'"}, nil},
 
-	FileObject:             {FileObject, "file object address", kparams.Uint64, []string{"file.object = 18446738026482168384"}, nil},
-	FileName:               {FileName, "full file name", kparams.UnicodeString, []string{"file.name contains 'mimikatz'"}, nil},
-	FileOperation:          {FileOperation, "file operation", kparams.AnsiString, []string{"file.operation = 'open'"}, nil},
-	FileShareMask:          {FileShareMask, "file share mask", kparams.AnsiString, []string{"file.share.mask = 'rw-'"}, nil},
-	FileIOSize:             {FileIOSize, "file I/O size", kparams.Uint32, []string{"file.io.size > 512"}, nil},
-	FileOffset:             {FileOffset, "file offset", kparams.Uint64, []string{"file.offset = 1024"}, nil},
-	FileType:               {FileType, "file type", kparams.AnsiString, []string{"file.type = 'directory'"}, nil},
-	FileExtension:          {FileExtension, "file extension", kparams.AnsiString, []string{"file.extension = '.dll'"}, nil},
-	FileAttributes:         {FileAttributes, "file attributes", kparams.Slice, []string{"file.attributes in ('archive', 'hidden')"}, nil},
-	FileStatus:             {FileStatus, "file operation status message", kparams.UnicodeString, []string{"file.status != 'success'"}, nil},
-	FileViewBase:           {FileViewBase, "view base address", kparams.Address, []string{"file.view.base = '25d42170000'"}, nil},
-	FileViewSize:           {FileViewSize, "size of the mapped view", kparams.Uint64, []string{"file.view.size > 1024"}, nil},
-	FileViewType:           {FileViewType, "type of the mapped view section", kparams.Enum, []string{"file.view.type = 'IMAGE'"}, nil},
-	FileViewProtection:     {FileViewProtection, "protection rights of the section view", kparams.AnsiString, []string{"file.view.protection = 'READONLY'"}, nil},
-	FileIsDriverMalicious:  {FileIsDriverMalicious, "indicates if the dropped driver is malicious", kparams.Bool, []string{"file.is_driver_malicious"}, nil},
-	FileIsDriverVulnerable: {FileIsDriverVulnerable, "indicates if the dropped driver is vulnerable", kparams.Bool, []string{"file.is_driver_vulnerable"}, nil},
-	FileIsDLL:              {FileIsDLL, "indicates if the created file is a DLL", kparams.Bool, []string{"file.is_dll'"}, nil},
-	FileIsDriver:           {FileIsDriver, "indicates if the created file is a driver", kparams.Bool, []string{"file.is_driver'"}, nil},
-	FileIsExecutable:       {FileIsExecutable, "indicates if the created file is an executable", kparams.Bool, []string{"file.is_exec'"}, nil},
-	FilePID:                {FilePID, "denotes the process id performing file operation", kparams.PID, []string{"file.pid = 4"}, nil},
-	FileKey:                {FileKey, "uniquely identifies the file object", kparams.Uint64, []string{"file.key = 12446738026482168384"}, nil},
+	FileObject:                      {FileObject, "file object address", kparams.Uint64, []string{"file.object = 18446738026482168384"}, nil},
+	FileName:                        {FileName, "full file name", kparams.UnicodeString, []string{"file.name contains 'mimikatz'"}, nil},
+	FileOperation:                   {FileOperation, "file operation", kparams.AnsiString, []string{"file.operation = 'open'"}, nil},
+	FileShareMask:                   {FileShareMask, "file share mask", kparams.AnsiString, []string{"file.share.mask = 'rw-'"}, nil},
+	FileIOSize:                      {FileIOSize, "file I/O size", kparams.Uint32, []string{"file.io.size > 512"}, nil},
+	FileOffset:                      {FileOffset, "file offset", kparams.Uint64, []string{"file.offset = 1024"}, nil},
+	FileType:                        {FileType, "file type", kparams.AnsiString, []string{"file.type = 'directory'"}, nil},
+	FileExtension:                   {FileExtension, "file extension", kparams.AnsiString, []string{"file.extension = '.dll'"}, nil},
+	FileAttributes:                  {FileAttributes, "file attributes", kparams.Slice, []string{"file.attributes in ('archive', 'hidden')"}, nil},
+	FileStatus:                      {FileStatus, "file operation status message", kparams.UnicodeString, []string{"file.status != 'success'"}, nil},
+	FileViewBase:                    {FileViewBase, "view base address", kparams.Address, []string{"file.view.base = '25d42170000'"}, nil},
+	FileViewSize:                    {FileViewSize, "size of the mapped view", kparams.Uint64, []string{"file.view.size > 1024"}, nil},
+	FileViewType:                    {FileViewType, "type of the mapped view section", kparams.Enum, []string{"file.view.type = 'IMAGE'"}, nil},
+	FileViewProtection:              {FileViewProtection, "protection rights of the section view", kparams.AnsiString, []string{"file.view.protection = 'READONLY'"}, nil},
+	FileIsDriverMalicious:           {FileIsDriverMalicious, "indicates if the dropped driver is malicious", kparams.Bool, []string{"file.is_driver_malicious"}, nil},
+	FileIsDriverVulnerable:          {FileIsDriverVulnerable, "indicates if the dropped driver is vulnerable", kparams.Bool, []string{"file.is_driver_vulnerable"}, nil},
+	FileIsDLL:                       {FileIsDLL, "indicates if the created file is a DLL", kparams.Bool, []string{"file.is_dll'"}, nil},
+	FileIsDriver:                    {FileIsDriver, "indicates if the created file is a driver", kparams.Bool, []string{"file.is_driver'"}, nil},
+	FileIsExecutable:                {FileIsExecutable, "indicates if the created file is an executable", kparams.Bool, []string{"file.is_exec'"}, nil},
+	FilePID:                         {FilePID, "denotes the process id performing file operation", kparams.PID, []string{"file.pid = 4"}, nil},
+	FileKey:                         {FileKey, "uniquely identifies the file object", kparams.Uint64, []string{"file.key = 12446738026482168384"}, nil},
+	FileInfoClass:                   {FileInfoClass, "identifies the file information class", kparams.Enum, []string{"file.info_class = 'Allocation'"}, nil},
+	FileInfoAllocationSize:          {FileInfoAllocationSize, "file allocation size", kparams.Uint64, []string{"file.info.allocation_size > 645400"}, nil},
+	FileInfoEOFSize:                 {FileInfoEOFSize, "file EOF size", kparams.Uint64, []string{"file.info.eof_size > 1000"}, nil},
+	FileInfoIsDispositionDeleteFile: {FileInfoIsDispositionDeleteFile, "indicates if the file is deleted when its handle is closed", kparams.Bool, []string{"file.info.is_disposition_file_delete = true"}, nil},
 
 	RegistryKeyName:   {RegistryKeyName, "fully qualified key name", kparams.UnicodeString, []string{"registry.key.name contains 'HKEY_LOCAL_MACHINE'"}, nil},
 	RegistryKeyHandle: {RegistryKeyHandle, "registry key object address", kparams.Address, []string{"registry.key.handle = 'FFFFB905D60C2268'"}, nil},
