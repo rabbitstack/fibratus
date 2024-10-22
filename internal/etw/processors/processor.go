@@ -84,22 +84,22 @@ func (typ ProcessorType) String() string {
 }
 
 // parseImageFileCharacteristics parses the PE structure for the file path
-// residing in the given event parameters. The preferred method for getting
-// the file data is accessing the raw device and consuming the blob data.
-// If this operation fails, we fallback to using the regular file access.
+// residing in the given event parameters. The preferred method for reading
+// the PE metadata is by directly accessing the file.
+// If this operation fails, the file data is read form the raw device and
+// the blob is passed to the PE parser.
 // The given event is decorated with various parameters extracted from PE
 // data. Most notably, parameters that indicate whether the file is a DLL,
 // executable image, or a Windows driver.
 func parseImageFileCharacteristics(e *kevent.Kevent) error {
+	var pefile *pe.PE
 	filename := e.GetParamAsString(kparams.FileName)
-	data := make([]byte, os.Getpagesize())
 	f, err := os.Open(filename)
 	if err != nil {
 		// read file data blob from raw device
 		// if the regular file access fails
 		ntfs := libntfs.NewFS()
-		var n int
-		data, n, err = ntfs.Read(filename, 0, int64(os.Getpagesize()))
+		data, n, err := ntfs.Read(filename, 0, int64(os.Getpagesize()))
 		defer ntfs.Close()
 		if err != nil {
 			return err
@@ -107,18 +107,20 @@ func parseImageFileCharacteristics(e *kevent.Kevent) error {
 		if n > 0 {
 			data = data[:n]
 		}
-		goto parsePe
+		// parse PE file from byte slice
+		pefile, err = pe.ParseBytes(data, pe.WithSections(), pe.WithSymbols())
+		if err != nil {
+			return err
+		}
+	} else {
+		defer f.Close()
+		// parse PE file from on-disk file
+		pefile, err = pe.ParseFile(filename, pe.WithSections(), pe.WithSymbols())
+		if err != nil {
+			return err
+		}
 	}
-	defer f.Close()
-	if _, err = f.Read(data); err != nil {
-		return err
-	}
-parsePe:
-	// parse image file
-	pefile, err := pe.ParseBytes(data, pe.WithSections(), pe.WithSymbols())
-	if err != nil {
-		return err
-	}
+
 	// append parameters
 	e.AppendParam(kparams.FileIsDLL, kparams.Bool, pefile.IsDLL)
 	e.AppendParam(kparams.FileIsDriver, kparams.Bool, pefile.IsDriver)
