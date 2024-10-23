@@ -53,20 +53,17 @@ var (
 	rulesInCompiler = expvar.NewInt("yara.rules.in.compiler")
 	// totalScans computes the number of process/file scans
 	totalScans = expvar.NewInt("yara.total.scans")
+
+	procScans     = expvar.NewInt("yara.proc.spawned.scans")
+	moduleScans   = expvar.NewInt("yara.module.loaded.scans")
+	fileScans     = expvar.NewInt("yara.file.created.scans")
+	streamScans   = expvar.NewInt("yara.ads.created.scans")
+	allocScans    = expvar.NewInt("yara.alloc.scans")
+	mmapScans     = expvar.NewInt("yara.mmap.scans")
+	registryScans = expvar.NewInt("yara.registry.value.set.scans")
 )
 
-type scannerStats struct {
-	procs   int
-	modules int
-	files   int
-	streams int
-	allocs  int
-	mmaps   int
-	values  int
-}
-
 type scanner struct {
-	scannerStats
 	c      *yara.Compiler
 	rules  *yara.Rules
 	config config.Config
@@ -182,7 +179,7 @@ func (s scanner) Scan(e *kevent.Kevent) (bool, error) {
 		pid := e.Kparams.MustGetPid()
 		log.Debugf("scanning child process. pid: %d, exe: %s", pid, e.GetParamAsString(kparams.Exe))
 		matches, err = s.scan(pid)
-		s.procs++
+		procScans.Add(1)
 		isScanned = true
 	case ktypes.LoadImage:
 		// scan the process loading unsigned/untrusted module
@@ -210,7 +207,7 @@ func (s scanner) Scan(e *kevent.Kevent) (bool, error) {
 		if !sign.IsSigned() || !sign.IsTrusted() || (!e.Callstack.IsEmpty() && e.Callstack.ContainsUnbacked()) {
 			log.Debugf("scanning suspicious module loading. pid: %d, module: %s", pid, filename)
 			matches, err = s.scan(pid)
-			s.modules++
+			moduleScans.Add(1)
 			isScanned = true
 		}
 	case ktypes.CreateFile:
@@ -222,7 +219,7 @@ func (s scanner) Scan(e *kevent.Kevent) (bool, error) {
 		}
 
 		filename := e.GetParamAsString(kparams.FileName)
-		if s.config.ShouldSkipFile(filename) {
+		if s.config.ShouldSkipFile(filename) || (e.PS != nil && s.config.ShouldSkipProcess(e.PS.Exe)) {
 			return false, nil
 		}
 
@@ -233,7 +230,7 @@ func (s scanner) Scan(e *kevent.Kevent) (bool, error) {
 		if isExe || isDLL || isDriver {
 			log.Debugf("scanning PE file %s. pid: %d", filename, e.PID)
 			matches, err = s.scan(filename)
-			s.files++
+			fileScans.Add(1)
 			isScanned = true
 		}
 
@@ -252,7 +249,7 @@ func (s scanner) Scan(e *kevent.Kevent) (bool, error) {
 				data = data[:n]
 				log.Debugf("scanning ADS %s. pid: %d", filename, e.PID)
 				matches, err = s.scan(data)
-				s.streams++
+				streamScans.Add(1)
 				isScanned = true
 			}
 		}
@@ -266,7 +263,7 @@ func (s scanner) Scan(e *kevent.Kevent) (bool, error) {
 			log.Debugf("scanning RWX allocation. pid: %d, exe: %s, addr: %s", pid, e.GetParamAsString(kparams.Exe),
 				e.GetParamAsString(kparams.MemBaseAddress))
 			matches, err = s.scan(pid)
-			s.allocs++
+			allocScans.Add(1)
 			isScanned = true
 		}
 	case ktypes.MapViewFile:
@@ -285,6 +282,9 @@ func (s scanner) Scan(e *kevent.Kevent) (bool, error) {
 			if filename != "" {
 				log.Debugf("scanning %s section view mapping. filename: %s pid: %d, addr: %s", e.GetParamAsString(kparams.MemProtect),
 					filename, pid, e.GetParamAsString(kparams.FileViewBase))
+				if s.config.ShouldSkipFile(filename) {
+					return false, nil
+				}
 				matches, err = s.scan(filename)
 			} else {
 				// otherwise, scan the process
@@ -292,7 +292,7 @@ func (s scanner) Scan(e *kevent.Kevent) (bool, error) {
 					e.GetParamAsString(kparams.FileViewBase))
 				matches, err = s.scan(pid)
 			}
-			s.mmaps++
+			mmapScans.Add(1)
 			isScanned = true
 		}
 	case ktypes.RegSetValue:
@@ -312,7 +312,7 @@ func (s scanner) Scan(e *kevent.Kevent) (bool, error) {
 			if b, ok := v.Value.([]byte); ok && len(b) > 0 {
 				log.Debugf("scanning registry binary value %s. pid: %d", e.GetParamAsString(kparams.RegKeyName), e.PID)
 				matches, err = s.scan(b)
-				s.values++
+				registryScans.Add(1)
 				isScanned = true
 			}
 		}

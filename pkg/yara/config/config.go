@@ -84,11 +84,11 @@ type Config struct {
 	// ScanTimeout sets the timeout for the scanner. If the timeout is reached, the scan operation is cancelled.
 	ScanTimeout time.Duration `json:"yara.scan-timeout" yaml:"yara.scan-timeout"`
 	// SkipFiles indicates whether file scanning is disabled.
-	SkipFiles    bool `json:"yara.skip-files" yaml:"yara.skip-files"`
+	SkipFiles bool `json:"yara.skip-files" yaml:"yara.skip-files"`
 	// SkipAllocs indicates whether scanning on suspicious memory allocations is disabled.
-	SkipAllocs   bool `json:"yara.skip-allocs" yaml:"yara.skip-allocs"`
+	SkipAllocs bool `json:"yara.skip-allocs" yaml:"yara.skip-allocs"`
 	// SkipMmaps indicates whether scanning on suspicious mappings of sections is disabled.
-	SkipMmaps    bool `json:"yara.skip-mmaps" yaml:"yara.skip-mmaps"`
+	SkipMmaps bool `json:"yara.skip-mmaps" yaml:"yara.skip-mmaps"`
 	// SkipRegistry indicates whether registry value scanning is disabled.
 	SkipRegistry bool `json:"yara.skip-registry" yaml:"yara.skip-registry"`
 	// ExcludedProcesses contains the list of the comma-separated process image paths that shouldn't be scanned.

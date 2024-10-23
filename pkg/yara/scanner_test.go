@@ -27,6 +27,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/sys"
+	"github.com/rabbitstack/fibratus/pkg/util/signature"
 	"github.com/rabbitstack/fibratus/pkg/yara/config"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -66,6 +67,7 @@ func init() {
 }
 
 func TestScan(t *testing.T) {
+	log.SetLevel(log.DebugLevel)
 	psnap := new(ps.SnapshotterMock)
 	require.NoError(t, alertsender.LoadAll([]alertsender.Config{{Type: alertsender.Noop}}))
 
@@ -153,8 +155,136 @@ func TestScan(t *testing.T) {
 				Title: "Memory Threat Detected",
 				Text:  "Threat detected X.Notepad",
 				ID:    "babf9101-1e6e-4268-a530-e99e2c905b0d",
+				Tags:  []string{"T1", "T2"},
 			},
 			true,
+		},
+		{
+			"scan spawned process excluded by config",
+			func() (*kevent.Kevent, error) {
+				var si windows.StartupInfo
+				si.Flags = windows.STARTF_USESHOWWINDOW
+				si.ShowWindow = windows.SW_HIDE
+				var pi windows.ProcessInformation
+
+				argv := windows.StringToUTF16Ptr(filepath.Join(os.Getenv("windir"), "notepad.exe"))
+
+				err := windows.CreateProcess(
+					nil,
+					argv,
+					nil,
+					nil,
+					true,
+					0,
+					nil,
+					nil,
+					&si,
+					&pi)
+				if err != nil {
+					return nil, err
+				}
+
+				for {
+					if sys.IsProcessRunning(pi.Process) {
+						break
+					}
+					time.Sleep(time.Millisecond * 100)
+					log.Infof("%d pid not yet ready", pi.Process)
+				}
+
+				proc := &pstypes.PS{
+					Name:      "notepad.exe",
+					PID:       11,
+					Ppid:      2434,
+					Exe:       `C:\Windows\notepad.exe`,
+					Cmdline:   `C:\Windows\notepad.exe`,
+					SID:       "S-1-1-18",
+					Cwd:       `C:\Windows\`,
+					SessionID: 1,
+				}
+				psnap.On("Find", pi.ProcessId).Return(true, proc)
+
+				e := &kevent.Kevent{
+					Type: ktypes.CreateProcess,
+					Name: "CreateProcess",
+					Tid:  2484,
+					PID:  859,
+					Kparams: kevent.Kparams{
+						kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "notepad.exe"},
+						kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: pi.ProcessId},
+					},
+					Metadata: make(map[kevent.MetadataKey]any),
+					PS:       proc,
+				}
+				return e, nil
+			},
+			func() (Scanner, error) {
+				return NewScanner(psnap, config.Config{
+					Enabled:     true,
+					ScanTimeout: time.Minute,
+					Rule: config.Rule{
+						Paths: []config.RulePath{
+							{
+								Namespace: "default",
+								Path:      "_fixtures/rules",
+							},
+						},
+					},
+					ExcludedProcesses: []string{"?:\\*\\notepad.exe"},
+				})
+			},
+			alertsender.Alert{},
+			false,
+		},
+		{
+			"scan unsigned module loading",
+			func() (*kevent.Kevent, error) {
+
+				pid := windows.GetCurrentProcessId()
+				proc := &pstypes.PS{
+					Name:      "tests.exe",
+					PID:       pid,
+					Ppid:      uint32(os.Getppid()),
+					Exe:       `C:\ProgramData\tests.exe`,
+					Cmdline:   `C:\ProgramData\tests.exe`,
+					SID:       "S-1-1-18",
+					Cwd:       `C:\ProgramData\`,
+					SessionID: 1,
+				}
+				psnap.On("Find", pid).Return(true, proc)
+
+				e := &kevent.Kevent{
+					Type: ktypes.LoadImage,
+					Name: "LoadImage",
+					Tid:  2484,
+					PID:  pid,
+					Kparams: kevent.Kparams{
+						kparams.FileName:           {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "tests.exe"},
+						kparams.ImageBase:          {Name: kparams.ImageBase, Type: kparams.Uint64, Value: uint64(0x74888fd99)},
+						kparams.ImageSignatureType: {Name: kparams.ImageSignatureType, Type: kparams.Uint32, Value: signature.None},
+						kparams.ProcessID:          {Name: kparams.ProcessID, Type: kparams.PID, Value: pid},
+					},
+					Metadata: make(map[kevent.MetadataKey]any),
+					PS:       proc,
+				}
+				return e, nil
+			},
+			func() (Scanner, error) {
+				return NewScanner(psnap, config.Config{
+					Enabled:     true,
+					ScanTimeout: time.Minute,
+					Rule: config.Rule{
+						Paths: []config.RulePath{
+							{
+								Namespace: "default",
+								Path:      "_fixtures/rules",
+							},
+						},
+					},
+				})
+			},
+			alertsender.Alert{},
+			false,
 		},
 	}
 
@@ -178,6 +308,9 @@ func TestScan(t *testing.T) {
 				assert.Equal(t, tt.expectedAlert.Title, yaraAlert.Title)
 				assert.Equal(t, tt.expectedAlert.Text, yaraAlert.Text)
 				assert.Equal(t, tt.expectedAlert.ID, yaraAlert.ID)
+				assert.Equal(t, tt.expectedAlert.Tags, yaraAlert.Tags)
+				assert.True(t, len(yaraAlert.Labels) > 0)
+				assert.Len(t, yaraAlert.Events, 1)
 			}
 
 			if e.IsCreateProcess() {
