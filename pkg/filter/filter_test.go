@@ -22,6 +22,7 @@ import (
 	"github.com/rabbitstack/fibratus/internal/etw/processors"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
+	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
@@ -455,6 +456,90 @@ func TestFileFilter(t *testing.T) {
 		if matches != tt.matches {
 			t.Errorf("%d. %q file filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
+	}
+}
+
+func TestFileInfoFilter(t *testing.T) {
+	var tests = []struct {
+		f       string
+		e       *kevent.Kevent
+		matches bool
+	}{
+		{
+			`file.info_class = 'Allocation'`,
+			&kevent.Kevent{
+				Category: ktypes.File,
+				Type:     ktypes.SetFileInformation,
+				Name:     "SetFileInformation",
+				Kparams: kevent.Kparams{
+					kparams.FileInfoClass: {Name: kparams.FileInfoClass, Type: kparams.Enum, Value: fs.AllocationClass, Enum: fs.FileInfoClasses},
+				},
+			},
+			true,
+		},
+		{
+			`file.info.allocation_size = 64500`,
+			&kevent.Kevent{
+				Category: ktypes.File,
+				Type:     ktypes.SetFileInformation,
+				Name:     "SetFileInformation",
+				Kparams: kevent.Kparams{
+					kparams.FileInfoClass: {Name: kparams.FileInfoClass, Type: kparams.Enum, Value: fs.AllocationClass, Enum: fs.FileInfoClasses},
+					kparams.FileExtraInfo: {Name: kparams.FileExtraInfo, Type: kparams.Uint64, Value: uint64(64500)},
+				},
+			},
+			true,
+		},
+		{
+			`file.info.eof_size = 64500`,
+			&kevent.Kevent{
+				Category: ktypes.File,
+				Type:     ktypes.SetFileInformation,
+				Name:     "SetFileInformation",
+				Kparams: kevent.Kparams{
+					kparams.FileInfoClass: {Name: kparams.FileInfoClass, Type: kparams.Enum, Value: fs.EOFClass, Enum: fs.FileInfoClasses},
+					kparams.FileExtraInfo: {Name: kparams.FileExtraInfo, Type: kparams.Uint64, Value: uint64(64500)},
+				},
+			},
+			true,
+		},
+		{
+			`file.info.eof_size = 64500`,
+			&kevent.Kevent{
+				Category: ktypes.File,
+				Type:     ktypes.SetFileInformation,
+				Name:     "SetFileInformation",
+				Kparams: kevent.Kparams{
+					kparams.FileInfoClass: {Name: kparams.FileInfoClass, Type: kparams.Enum, Value: fs.DispositionClass, Enum: fs.FileInfoClasses},
+					kparams.FileExtraInfo: {Name: kparams.FileExtraInfo, Type: kparams.Uint64, Value: uint64(1)},
+				},
+			},
+			false,
+		},
+		{
+			`file.info.is_disposition_delete_file = true`,
+			&kevent.Kevent{
+				Category: ktypes.File,
+				Type:     ktypes.DeleteFile,
+				Name:     "DeleteFile",
+				Kparams: kevent.Kparams{
+					kparams.FileInfoClass: {Name: kparams.FileInfoClass, Type: kparams.Enum, Value: fs.DispositionClass, Enum: fs.FileInfoClasses},
+					kparams.FileExtraInfo: {Name: kparams.FileExtraInfo, Type: kparams.Uint64, Value: uint64(1)},
+				},
+			},
+			true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.f, func(t *testing.T) {
+			f := New(tt.f, cfg)
+			err := f.Compile()
+			if err != nil {
+				t.Fatal(err)
+			}
+			assert.Equal(t, tt.matches, f.Run(tt.e))
+		})
 	}
 }
 

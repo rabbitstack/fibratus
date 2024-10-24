@@ -444,6 +444,16 @@ func (kpars Kparams) MustGetUint32(name string) uint32 {
 	return v
 }
 
+// TryGetUint32 tries to retrieve the uint32 value from the parameter.
+// Returns the underlying value on success, or zero otherwise.
+func (kpars Kparams) TryGetUint32(name string) uint32 {
+	val, err := kpars.GetUint32(name)
+	if err != nil {
+		return 0
+	}
+	return val
+}
+
 // GetInt32 returns the underlying int32 value from the parameter.
 func (kpars Kparams) GetInt32(name string) (int32, error) {
 	kpar, err := kpars.findParam(name)
@@ -478,6 +488,16 @@ func (kpars Kparams) MustGetUint64(name string) uint64 {
 		panic(err)
 	}
 	return v
+}
+
+// TryGetUint64 tries to retrieve the uint64 value from the parameter.
+// Returns the underlying value on success, or zero otherwise.
+func (kpars Kparams) TryGetUint64(name string) uint64 {
+	val, err := kpars.GetUint64(name)
+	if err != nil {
+		return 0
+	}
+	return val
 }
 
 // GetInt64 returns the underlying int64 value from the parameter.

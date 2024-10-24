@@ -18,6 +18,12 @@
 
 package fs
 
+const (
+	DispositionClass uint32 = 13
+	AllocationClass  uint32 = 19
+	EOFClass         uint32 = 20
+)
+
 // FileInfoClasses contains the values that specify which structure to use to query or set information for a file object.
 // For more information see https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ne-wdm-_file_information_class
 var FileInfoClasses = map[uint32]string{
