@@ -32,6 +32,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
+	yara "github.com/rabbitstack/fibratus/pkg/yara/config"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -228,6 +229,71 @@ func TestEventSourceEnableFlagsDynamically(t *testing.T) {
 	require.True(t, cfg.Kstream.TestDropMask(ktypes.WriteFile))
 	require.True(t, cfg.Kstream.TestDropMask(ktypes.UnmapViewFile))
 	require.False(t, cfg.Kstream.TestDropMask(ktypes.OpenProcess))
+}
+
+func TestEventSourceEnableFlagsDynamicallyWithYaraEnabled(t *testing.T) {
+	psnap := new(ps.SnapshotterMock)
+	psnap.On("Write", mock.Anything).Return(nil)
+	psnap.On("AddThread", mock.Anything).Return(nil)
+	psnap.On("AddModule", mock.Anything).Return(nil)
+	psnap.On("AddFileMapping", mock.Anything).Return(nil)
+	psnap.On("RemoveFileMapping", mock.Anything, mock.Anything).Return(nil)
+	psnap.On("RemoveThread", mock.Anything, mock.Anything).Return(nil)
+	psnap.On("RemoveModule", mock.Anything, mock.Anything).Return(nil)
+	psnap.On("FindModule", mock.Anything).Return(false, nil)
+	psnap.On("FindAndPut", mock.Anything).Return(&pstypes.PS{})
+	psnap.On("Find", mock.Anything).Return(true, &pstypes.PS{})
+	psnap.On("Remove", mock.Anything).Return(nil)
+
+	hsnap := new(handle.SnapshotterMock)
+	hsnap.On("FindByObject", mock.Anything).Return(htypes.Handle{}, false)
+	hsnap.On("FindHandles", mock.Anything).Return([]htypes.Handle{}, nil)
+
+	r := &config.RulesCompileResult{
+		HasProcEvents:     true,
+		HasImageEvents:    true,
+		HasRegistryEvents: true,
+		HasNetworkEvents:  true,
+		HasFileEvents:     false,
+		HasThreadEvents:   false,
+		HasVAMapEvents:    true,
+		HasAuditAPIEvents: true,
+		UsedEvents: []ktypes.Ktype{
+			ktypes.CreateProcess,
+			ktypes.LoadImage,
+			ktypes.RegCreateKey,
+			ktypes.RegSetValue,
+			ktypes.RenameFile,
+			ktypes.OpenProcess,
+			ktypes.ConnectTCPv4,
+		},
+	}
+	cfg := &config.Config{
+		Kstream: config.KstreamConfig{
+			EnableThreadKevents:   true,
+			EnableRegistryKevents: true,
+			EnableImageKevents:    true,
+			EnableFileIOKevents:   true,
+			EnableAuditAPIEvents:  true,
+		},
+		Filters: &config.Filters{},
+		Yara: yara.Config{
+			Enabled:   true,
+			SkipFiles: false,
+		},
+	}
+
+	evs := NewEventSource(psnap, hsnap, cfg, r)
+	require.NoError(t, evs.Open(cfg))
+	defer evs.Close()
+
+	flags := evs.(*EventSource).traces[0].enableFlagsDynamically(cfg.Kstream)
+
+	// rules compile result doesn't have file events
+	// but Yara file scanning is enabled
+	require.True(t, flags&etw.FileIO != 0)
+
+	require.False(t, cfg.Kstream.TestDropMask(ktypes.CreateFile))
 }
 
 func TestEventSourceRundownEvents(t *testing.T) {
