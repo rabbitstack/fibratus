@@ -141,10 +141,10 @@ func (e *EventSource) Open(config *config.Config) error {
 		config.Kstream.EnableThreadKevents = config.Kstream.EnableThreadKevents && e.r.HasThreadEvents
 		config.Kstream.EnableImageKevents = config.Kstream.EnableImageKevents && e.r.HasImageEvents
 		config.Kstream.EnableNetKevents = config.Kstream.EnableNetKevents && e.r.HasNetworkEvents
-		config.Kstream.EnableRegistryKevents = config.Kstream.EnableRegistryKevents && e.r.HasRegistryEvents
-		config.Kstream.EnableFileIOKevents = config.Kstream.EnableFileIOKevents && e.r.HasFileEvents
-		config.Kstream.EnableVAMapKevents = config.Kstream.EnableVAMapKevents && e.r.HasVAMapEvents
-		config.Kstream.EnableMemKevents = config.Kstream.EnableMemKevents && e.r.HasMemEvents
+		config.Kstream.EnableRegistryKevents = config.Kstream.EnableRegistryKevents && (e.r.HasRegistryEvents || (config.Yara.Enabled && !config.Yara.SkipRegistry))
+		config.Kstream.EnableFileIOKevents = config.Kstream.EnableFileIOKevents && (e.r.HasFileEvents || (config.Yara.Enabled && !config.Yara.SkipFiles))
+		config.Kstream.EnableVAMapKevents = config.Kstream.EnableVAMapKevents && (e.r.HasVAMapEvents || (config.Yara.Enabled && !config.Yara.SkipMmaps))
+		config.Kstream.EnableMemKevents = config.Kstream.EnableMemKevents && (e.r.HasMemEvents || (config.Yara.Enabled && !config.Yara.SkipAllocs))
 		config.Kstream.EnableDNSEvents = config.Kstream.EnableDNSEvents && e.r.HasDNSEvents
 		config.Kstream.EnableAuditAPIEvents = config.Kstream.EnableAuditAPIEvents && e.r.HasAuditAPIEvents
 		for _, ktype := range ktypes.All() {
@@ -153,6 +153,21 @@ func (e *EventSource) Open(config *config.Config) error {
 				// always allow fundamental events
 				continue
 			}
+
+			// allow events required for memory/file scanning
+			if ktype == ktypes.MapViewFile && config.Yara.Enabled && !config.Yara.SkipMmaps {
+				continue
+			}
+			if ktype == ktypes.VirtualAlloc && config.Yara.Enabled && !config.Yara.SkipAllocs {
+				continue
+			}
+			if ktype == ktypes.CreateFile && config.Yara.Enabled && !config.Yara.SkipFiles {
+				continue
+			}
+			if ktype == ktypes.RegSetValue && config.Yara.Enabled && !config.Yara.SkipRegistry {
+				continue
+			}
+
 			if !e.r.ContainsEvent(ktype) {
 				config.Kstream.SetDropMask(ktype)
 			}
