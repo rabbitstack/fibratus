@@ -120,10 +120,10 @@ func (e *Kevent) String() string {
 		Name: %s
 		Category: %s
 		Description: %s
-		Host: %s,
-		Timestamp: %s,
-		Kparams: %s,
-		Metadata: %s,
+		Host: %s
+		Timestamp: %s
+		Kparams: %s
+		Metadata: %s
 	    %s
 	`,
 			e.Seq,
@@ -150,9 +150,9 @@ func (e *Kevent) String() string {
 		Name: %s
 		Category: %s
 		Description: %s
-		Host: %s,
-		Timestamp: %s,
-		Kparams: %s,
+		Host: %s
+		Timestamp: %s
+		Kparams: %s
 		Metadata: %s
 	`,
 		e.Seq,
@@ -167,6 +167,55 @@ func (e *Kevent) String() string {
 		e.Timestamp,
 		e.Kparams,
 		e.Metadata,
+	)
+}
+
+// StringShort returns event's string representation
+// by removing some irrelevant event/process fields.
+func (e *Kevent) StringShort() string {
+	e.mmux.RLock()
+	defer e.mmux.RUnlock()
+	if e.PS != nil {
+		return fmt.Sprintf(`
+		Seq: %d
+		Pid: %d
+		Tid: %d
+		Name: %s
+		Category: %s
+		Host: %s
+		Timestamp: %s
+		Parameters: %s
+    %s
+	`,
+			e.Seq,
+			e.PID,
+			e.Tid,
+			e.Name,
+			e.Category,
+			e.Host,
+			e.Timestamp,
+			e.Kparams,
+			e.PS.StringShort(),
+		)
+	}
+	return fmt.Sprintf(`
+		Seq: %d
+		Pid: %d
+		Tid: %d
+		Name: %s
+		Category: %s
+		Host: %s
+		Timestamp: %s
+		Parameters: %s
+	`,
+		e.Seq,
+		e.PID,
+		e.Tid,
+		e.Name,
+		e.Category,
+		e.Host,
+		e.Timestamp,
+		e.Kparams,
 	)
 }
 

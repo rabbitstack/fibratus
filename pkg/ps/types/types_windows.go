@@ -201,6 +201,72 @@ func (ps *PS) String() string {
 	)
 }
 
+// StringShort returns a string representation of the process' state
+// by removing some verbose attributes such as the env variables block.
+func (ps *PS) StringShort() string {
+	parent := ps.Parent
+	if parent != nil {
+		return fmt.Sprintf(`
+		Pid:  %d
+		Ppid: %d
+		Name: %s
+		Parent name: %s
+		Cmdline: %s
+		Parent cmdline: %s
+		Exe:  %s
+		Cwd:  %s
+		SID:  %s
+		Username: %s
+		Domain: %s
+		Args: %s
+		Session ID: %d
+		Ancestors: %s
+	`,
+			ps.PID,
+			ps.Ppid,
+			ps.Name,
+			parent.Name,
+			ps.Cmdline,
+			parent.Cmdline,
+			ps.Exe,
+			ps.Cwd,
+			ps.SID,
+			ps.Username,
+			ps.Domain,
+			ps.Args,
+			ps.SessionID,
+			strings.Join(ps.Ancestors(), " > "),
+		)
+	}
+	return fmt.Sprintf(`
+		Pid:  %d
+		Ppid: %d
+		Name: %s
+		Cmdline: %s
+		Exe:  %s
+		Cwd:  %s
+		SID:  %s
+		Username: %s
+		Domain: %s
+		Args: %s
+		Session ID: %d
+		Ancestors: %s
+	`,
+		ps.PID,
+		ps.Ppid,
+		ps.Name,
+		ps.Cmdline,
+		ps.Exe,
+		ps.Cwd,
+		ps.SID,
+		ps.Username,
+		ps.Domain,
+		ps.Args,
+		ps.SessionID,
+		strings.Join(ps.Ancestors(), " > "),
+	)
+}
+
 // Ancestors returns all ancestors of this process. The string slice contains
 // the process image name followed by the process id.
 func (ps *PS) Ancestors() []string {

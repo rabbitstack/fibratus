@@ -19,7 +19,6 @@
 package eventlog
 
 import (
-	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"text/template"
 
@@ -32,31 +31,6 @@ const (
 	remoteHost = "output.eventlog.remote-host"
 	tmpl       = "output.eventlog.template"
 )
-
-// Level is the type definition for the eventlog log level
-type Level uint16
-
-const (
-	// Info represents the info log level
-	Info Level = 4
-	// Warn represents the warning info level
-	Warn Level = 2
-	// Erro represents the error log level
-	Erro Level = 1
-)
-
-func levelFromString(s string) Level {
-	switch s {
-	case "info", "INFO":
-		return Info
-	case "warn", "warning", "WARN", "WARNING":
-		return Warn
-	case "erro", "error", "ERRO", "ERROR":
-		return Erro
-	default:
-		panic(fmt.Sprintf("unrecognized evtlog level: %s", s))
-	}
-}
 
 // Config contains configuration properties for fine-tuning the eventlog output.
 type Config struct {
