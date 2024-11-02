@@ -484,17 +484,12 @@ var schema = `
 						"additionalProperties": false
 					}]
 				},
-				"alert-via":		{"type": "string", "enum": ["slack", "mail", "systray"]},
-				"alert-template":   {
-						"type": 		"object",
-						"properties": {
-							"text":	 	{"type": "string"},
-							"title": 	{"type": "string"}
-						},
-						"additionalProperties": false
-				},
+				"alert-template":	{"type": "string"},
 				"fastscan":			{"type": "boolean"},
 				"skip-files":		{"type": "boolean"},
+				"skip-allocs":		{"type": "boolean"},
+				"skip-mmaps":		{"type": "boolean"},
+				"skip-registry":	{"type": "boolean"},
 				"scan-timeout":		{"type": "string", "minLength": 2, "pattern": "[0-9]+s"},
 				"excluded-files":	{"type": "array", "items": [{"type": "string", "minLength": 1}]},
 				"excluded-procs":	{"type": "array", "items": [{"type": "string", "minLength": 1}]}

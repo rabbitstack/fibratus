@@ -18,6 +18,20 @@
 
 package types
 
+import (
+	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/alertsender"
+	"strconv"
+)
+
+const (
+	id          = "id"
+	threat      = "threat_name"
+	severity    = "severity"
+	score       = "score"
+	description = "description"
+)
+
 // A MatchRule represents a rule successfully matched against a block
 // of data.
 type MatchRule struct {
@@ -26,6 +40,83 @@ type MatchRule struct {
 	Tags      []string      `json:"tags"`
 	Metas     []Meta        `json:"metas"`
 	Strings   []MatchString `json:"strings"`
+}
+
+// ID returns the identifier from the rule metadata fields.
+func (m MatchRule) ID() string {
+	return m.getMetaString(id)
+}
+
+// Description returns the rule description from the metadata fields.
+func (m MatchRule) Description() string {
+	return m.getMetaString(description)
+}
+
+// ThreatName returns the threat matching the rule signature.
+func (m MatchRule) ThreatName() string {
+	return m.getMetaString(threat)
+}
+
+// SeverityFromScore returns the alert severity from the numerical score
+// defined in the rule meta tags. If the score tag is not defined, the
+// high severity is returned.
+func (m MatchRule) SeverityFromScore() alertsender.Severity {
+	s := m.getMetaInt(score)
+	if s == 0 {
+		s = m.getMetaInt(severity)
+	}
+	switch {
+	case s > 0 && s <= 39:
+		return alertsender.Normal
+	case s >= 40 && s <= 59:
+		return alertsender.Medium
+	case s >= 60 && s <= 79:
+		return alertsender.High
+	case s >= 80:
+		return alertsender.Critical
+	default:
+		return alertsender.High
+	}
+}
+
+// Labels returns all meta tags as alert labels.
+func (m MatchRule) Labels() map[string]string {
+	labels := make(map[string]string)
+	for _, meta := range m.Metas {
+		switch v := meta.Value.(type) {
+		case string:
+			labels[meta.Identifier] = v
+		case int:
+			labels[meta.Identifier] = strconv.Itoa(v)
+		case bool:
+			labels[meta.Identifier] = strconv.FormatBool(v)
+		default:
+			labels[meta.Identifier] = fmt.Sprintf("%s", v)
+		}
+	}
+	return labels
+}
+
+func (m MatchRule) getMetaString(id string) string {
+	for _, meta := range m.Metas {
+		if meta.Identifier == id {
+			if i, ok := meta.Value.(string); ok {
+				return i
+			}
+		}
+	}
+	return ""
+}
+
+func (m MatchRule) getMetaInt(id string) int {
+	for _, meta := range m.Metas {
+		if meta.Identifier == id {
+			if i, ok := meta.Value.(int); ok {
+				return i
+			}
+		}
+	}
+	return 0
 }
 
 // A MatchString represents a string declared and matched in a rule.

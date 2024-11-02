@@ -223,13 +223,13 @@ yara:
     strings:
       - string: "rule test : tag1 { meta: author = \"Hilko Bengen\" strings: $a = \"abc\" fullword condition: $a }"
         namespace: default
-  alert-via: slack
-  alert-template:
-    title: ""
-    text: ""
+  alert-template: ""
   fastscan: true
   scan-timeout: 20s
   skip-files: true
+  skip-mmaps: false
+  skip-allocs: false
+  skip-registry: false
   excluded-files:
     - kernel32.dll
   excluded-procs:

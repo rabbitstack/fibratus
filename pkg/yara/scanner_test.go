@@ -22,30 +22,24 @@
 package yara
 
 import (
+	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/ps"
+	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
+	"github.com/rabbitstack/fibratus/pkg/sys"
+	"github.com/rabbitstack/fibratus/pkg/util/signature"
+	"github.com/rabbitstack/fibratus/pkg/yara/config"
+	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"golang.org/x/sys/windows/registry"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/hillu/go-yara/v4"
-	log "github.com/sirupsen/logrus"
-
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
-	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/pe"
-	"github.com/rabbitstack/fibratus/pkg/ps"
-	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
-	"github.com/rabbitstack/fibratus/pkg/sys"
-	"github.com/rabbitstack/fibratus/pkg/util/va"
-	"github.com/rabbitstack/fibratus/pkg/yara/config"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-
 	"golang.org/x/sys/windows"
 )
 
@@ -74,207 +68,935 @@ func init() {
 }
 
 func TestScan(t *testing.T) {
+	log.SetLevel(log.DebugLevel)
 	psnap := new(ps.SnapshotterMock)
 	require.NoError(t, alertsender.LoadAll([]alertsender.Config{{Type: alertsender.Noop}}))
 
-	s, err := NewScanner(psnap, config.Config{
-		Enabled:     true,
-		ScanTimeout: time.Minute,
-		AlertVia:    "noop",
-		Rule: config.Rule{
-			Paths: []config.RulePath{
-				{
-					Namespace: "default",
-					Path:      "_fixtures/rules",
-				},
+	var tests = []struct {
+		name          string
+		setup         func() (*kevent.Kevent, error)
+		newScanner    func() (Scanner, error)
+		expectedAlert alertsender.Alert
+		matches       bool
+	}{
+		{
+			"scan spawned process",
+			func() (*kevent.Kevent, error) {
+				var si windows.StartupInfo
+				si.Flags = windows.STARTF_USESHOWWINDOW
+				var pi windows.ProcessInformation
+
+				argv := windows.StringToUTF16Ptr(filepath.Join(os.Getenv("windir"), "notepad.exe"))
+
+				err := windows.CreateProcess(
+					nil,
+					argv,
+					nil,
+					nil,
+					true,
+					0,
+					nil,
+					nil,
+					&si,
+					&pi)
+				if err != nil {
+					return nil, err
+				}
+
+				for {
+					if sys.IsProcessRunning(pi.Process) {
+						break
+					}
+					time.Sleep(time.Millisecond * 100)
+					log.Infof("%d pid not yet ready", pi.Process)
+				}
+
+				proc := &pstypes.PS{
+					Name:      "notepad.exe",
+					PID:       11,
+					Ppid:      2434,
+					Exe:       `C:\Windows\notepad.exe`,
+					Cmdline:   `C:\Windows\notepad.exe`,
+					SID:       "S-1-1-18",
+					Cwd:       `C:\Windows\`,
+					SessionID: 1,
+				}
+				psnap.On("Find", pi.ProcessId).Return(true, proc)
+
+				e := &kevent.Kevent{
+					Type: ktypes.CreateProcess,
+					Name: "CreateProcess",
+					Tid:  2484,
+					PID:  859,
+					Kparams: kevent.Kparams{
+						kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "notepad.exe"},
+						kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: pi.ProcessId},
+					},
+					Metadata: make(map[kevent.MetadataKey]any),
+					PS:       proc,
+				}
+				return e, nil
 			},
-		},
-	})
-	require.NoError(t, err)
-
-	var si windows.StartupInfo
-	si.Flags = windows.STARTF_USESHOWWINDOW
-	si.ShowWindow = windows.SW_HIDE
-	var pi windows.ProcessInformation
-
-	argv := windows.StringToUTF16Ptr(filepath.Join(os.Getenv("windir"), "notepad.exe"))
-
-	err = windows.CreateProcess(
-		nil,
-		argv,
-		nil,
-		nil,
-		true,
-		0,
-		nil,
-		nil,
-		&si,
-		&pi)
-	require.NoError(t, err)
-	//nolint:errcheck
-	defer windows.TerminateProcess(pi.Process, uint32(257))
-
-	proc := &pstypes.PS{
-		Name:      "notepad.exe",
-		PID:       pi.ProcessId,
-		Ppid:      2434,
-		Exe:       `C:\Windows\notepad.exe`,
-		Cmdline:   `C:\Windows\notepad.exe`,
-		SID:       "S-1-1-18",
-		Cwd:       `C:\Windows\`,
-		SessionID: 1,
-		Threads: map[uint32]pstypes.Thread{
-			3453: {Tid: 3453, StartAddress: va.Address(140729524944768), IOPrio: 2, PagePrio: 5, KstackBase: va.Address(18446677035730165760), KstackLimit: va.Address(18446677035730137088), UstackLimit: va.Address(86376448), UstackBase: va.Address(86372352)},
-			3455: {Tid: 3455, StartAddress: va.Address(140729524944768), IOPrio: 3, PagePrio: 5, KstackBase: va.Address(18446677035730165760), KstackLimit: va.Address(18446677035730137088), UstackLimit: va.Address(86376448), UstackBase: va.Address(86372352)},
-		},
-		Envs: map[string]string{"ProgramData": "C:\\ProgramData", "COMPUTRENAME": "archrabbit"},
-		Modules: []pstypes.Module{
-			{Name: "kernel32.dll", Size: 12354, Checksum: 23123343, BaseAddress: va.Address(4294066175), DefaultBaseAddress: va.Address(4293993725)},
-			{Name: "user32.dll", Size: 212354, Checksum: 33123343, BaseAddress: va.Address(4277288959), DefaultBaseAddress: va.Address(4293993725)},
-		},
-		Handles: []htypes.Handle{
-			{Num: windows.Handle(0xffffd105e9baaf70),
-				Name:   `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\Tcpip\Parameters\Interfaces\{b677c565-6ca5-45d3-b618-736b4e09b036}`,
-				Type:   "Key",
-				Object: 777488883434455544,
-				Pid:    uint32(1023),
+			func() (Scanner, error) {
+				return NewScanner(psnap, config.Config{
+					Enabled:     true,
+					ScanTimeout: time.Minute,
+					Rule: config.Rule{
+						Paths: []config.RulePath{
+							{
+								Namespace: "default",
+								Path:      "_fixtures/rules",
+							},
+						},
+					},
+				})
 			},
-			{
-				Num:  windows.Handle(0xffffd105e9adaf70),
-				Name: `\RPC Control\OLEA61B27E13E028C4EA6C286932E80`,
-				Type: "ALPC Port",
-				Pid:  uint32(1023),
-				MD: &htypes.AlpcPortInfo{
-					Seqno:   1,
-					Context: 0x0,
-					Flags:   0x0,
-				},
-				Object: 457488883434455544,
+			alertsender.Alert{
+				Title: "Memory Threat Detected",
+				Text:  "Threat detected Notepad.Shell",
+				ID:    "babf9101-1e6e-4268-a530-e99e2c905b0d",
+				Tags:  []string{"T1", "T2"},
 			},
-			{
-				Num:  windows.Handle(0xeaffd105e9adaf30),
-				Name: `C:\Users\bunny`,
-				Type: "File",
-				Pid:  uint32(1023),
-				MD: &htypes.FileInfo{
-					IsDirectory: true,
-				},
-				Object: 357488883434455544,
+			true,
+		},
+		{
+			"scan spawned process excluded by config",
+			func() (*kevent.Kevent, error) {
+				var si windows.StartupInfo
+				si.Flags = windows.STARTF_USESHOWWINDOW
+				si.ShowWindow = windows.SW_HIDE
+				var pi windows.ProcessInformation
+
+				argv := windows.StringToUTF16Ptr(filepath.Join(os.Getenv("windir"), "notepad.exe"))
+
+				err := windows.CreateProcess(
+					nil,
+					argv,
+					nil,
+					nil,
+					true,
+					0,
+					nil,
+					nil,
+					&si,
+					&pi)
+				if err != nil {
+					return nil, err
+				}
+
+				for {
+					if sys.IsProcessRunning(pi.Process) {
+						break
+					}
+					time.Sleep(time.Millisecond * 100)
+					log.Infof("%d pid not yet ready", pi.Process)
+				}
+
+				proc := &pstypes.PS{
+					Name:      "notepad.exe",
+					PID:       11,
+					Ppid:      2434,
+					Exe:       `C:\Windows\notepad.exe`,
+					Cmdline:   `C:\Windows\notepad.exe`,
+					SID:       "S-1-1-18",
+					Cwd:       `C:\Windows\`,
+					SessionID: 1,
+				}
+				psnap.On("Find", pi.ProcessId).Return(true, proc)
+
+				e := &kevent.Kevent{
+					Type: ktypes.CreateProcess,
+					Name: "CreateProcess",
+					Tid:  2484,
+					PID:  859,
+					Kparams: kevent.Kparams{
+						kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "notepad.exe"},
+						kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: pi.ProcessId},
+					},
+					Metadata: make(map[kevent.MetadataKey]any),
+					PS:       proc,
+				}
+				return e, nil
 			},
-		},
-		PE: &pe.PE{
-			NumberOfSections: 2,
-			NumberOfSymbols:  10,
-			EntryPoint:       "0x20110",
-			ImageBase:        "0x140000000",
-			LinkTime:         time.Now(),
-			Sections: []pe.Sec{
-				{Name: ".text", Size: 132608, Entropy: 6.368381, Md5: "db23dce3911a42e987041d98abd4f7cd"},
-				{Name: ".rdata", Size: 35840, Entropy: 5.996976, Md5: "ffa5c960b421ca9887e54966588e97e8"},
+			func() (Scanner, error) {
+				return NewScanner(psnap, config.Config{
+					Enabled:     true,
+					ScanTimeout: time.Minute,
+					Rule: config.Rule{
+						Paths: []config.RulePath{
+							{
+								Namespace: "default",
+								Path:      "_fixtures/rules",
+							},
+						},
+					},
+					ExcludedProcesses: []string{"?:\\*\\notepad.exe"},
+				})
 			},
-			Symbols:          []string{"SelectObject", "GetTextFaceW", "EnumFontsW", "TextOutW", "GetProcessHeap"},
-			Imports:          []string{"GDI32.dll", "USER32.dll", "msvcrt.dll", "api-ms-win-core-libraryloader-l1-2-0.dl"},
-			VersionResources: map[string]string{"CompanyName": "Microsoft Corporation", "FileDescription": "Notepad", "FileVersion": "10.0.18362.693"},
+			alertsender.Alert{},
+			false,
+		},
+		{
+			"scan unsigned module loading",
+			func() (*kevent.Kevent, error) {
+				var si windows.StartupInfo
+				si.Flags = windows.STARTF_USESHOWWINDOW
+				var pi windows.ProcessInformation
+
+				argv := windows.StringToUTF16Ptr(filepath.Join(os.Getenv("windir"), "regedit.exe"))
+
+				err := windows.CreateProcess(
+					nil,
+					argv,
+					nil,
+					nil,
+					true,
+					0,
+					nil,
+					nil,
+					&si,
+					&pi)
+				if err != nil {
+					return nil, err
+				}
+
+				for {
+					if sys.IsProcessRunning(pi.Process) {
+						break
+					}
+					time.Sleep(time.Millisecond * 100)
+					log.Infof("%d pid not yet ready", pi.Process)
+				}
+
+				pid := pi.ProcessId
+				proc := &pstypes.PS{
+					Name:      "tests.exe",
+					PID:       pid,
+					Ppid:      uint32(os.Getppid()),
+					Exe:       `C:\ProgramData\tests.exe`,
+					Cmdline:   `C:\ProgramData\tests.exe`,
+					SID:       "S-1-1-18",
+					Cwd:       `C:\ProgramData\`,
+					SessionID: 1,
+				}
+				psnap.On("Find", pid).Return(true, proc)
+
+				e := &kevent.Kevent{
+					Type: ktypes.LoadImage,
+					Name: "LoadImage",
+					Tid:  2484,
+					PID:  pid,
+					Kparams: kevent.Kparams{
+						kparams.FileName:           {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "tests.exe"},
+						kparams.ImageBase:          {Name: kparams.ImageBase, Type: kparams.Uint64, Value: uint64(0x74888fd99)},
+						kparams.ImageSignatureType: {Name: kparams.ImageSignatureType, Type: kparams.Uint32, Value: signature.None},
+						kparams.ProcessID:          {Name: kparams.ProcessID, Type: kparams.PID, Value: pid},
+					},
+					Metadata: make(map[kevent.MetadataKey]any),
+					PS:       proc,
+				}
+				return e, nil
+			},
+			func() (Scanner, error) {
+				return NewScanner(psnap, config.Config{
+					Enabled:     true,
+					ScanTimeout: time.Minute,
+					Rule: config.Rule{
+						Paths: []config.RulePath{
+							{
+								Namespace: "default",
+								Path:      "_fixtures/rules",
+							},
+						},
+					},
+				})
+			},
+			alertsender.Alert{
+				Title: "Memory Threat Detected",
+				Text:  "Threat detected Regedit",
+				ID:    "1abf9101-1e6e-4268-a530-e99e2c905b0d",
+				Tags:  []string{"T1"},
+			},
+			true,
+		},
+		{
+			"scan pe file created in the file system",
+			func() (*kevent.Kevent, error) {
+
+				proc := &pstypes.PS{
+					Name:      "tests.exe",
+					PID:       565,
+					Ppid:      uint32(os.Getppid()),
+					Exe:       `C:\ProgramData\tests.exe`,
+					Cmdline:   `C:\ProgramData\tests.exe`,
+					SID:       "S-1-1-18",
+					Cwd:       `C:\ProgramData\`,
+					SessionID: 1,
+				}
+				psnap.On("Find", 565).Return(true, proc)
+
+				e := &kevent.Kevent{
+					Type:     ktypes.CreateFile,
+					Name:     "CreateFile",
+					Category: ktypes.File,
+					Tid:      2484,
+					PID:      565,
+					Kparams: kevent.Kparams{
+						kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "notepad.exe")},
+						kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Uint32, Value: uint32(windows.FILE_CREATE)},
+					},
+					Metadata: make(map[kevent.MetadataKey]any),
+					PS:       proc,
+				}
+				return e, nil
+			},
+			func() (Scanner, error) {
+				return NewScanner(psnap, config.Config{
+					Enabled:     true,
+					ScanTimeout: time.Minute,
+					Rule: config.Rule{
+						Paths: []config.RulePath{
+							{
+								Namespace: "default",
+								Path:      "_fixtures/rules",
+							},
+						},
+					},
+				})
+			},
+			alertsender.Alert{
+				Title: "File Threat Detected",
+				Text:  "Threat detected Notepad.Shell",
+				ID:    "babf9101-1e6e-4268-a530-e99e2c905b0d",
+				Tags:  []string{"T1", "T2"},
+			},
+			true,
+		},
+		{
+			"scan pe file excluded by config",
+			func() (*kevent.Kevent, error) {
+
+				proc := &pstypes.PS{
+					Name:      "tests.exe",
+					PID:       565,
+					Ppid:      uint32(os.Getppid()),
+					Exe:       `C:\ProgramData\tests.exe`,
+					Cmdline:   `C:\ProgramData\tests.exe`,
+					SID:       "S-1-1-18",
+					Cwd:       `C:\ProgramData\`,
+					SessionID: 1,
+				}
+				psnap.On("Find", 565).Return(true, proc)
+
+				e := &kevent.Kevent{
+					Type:     ktypes.CreateFile,
+					Name:     "CreateFile",
+					Category: ktypes.File,
+					Tid:      2484,
+					PID:      565,
+					Kparams: kevent.Kparams{
+						kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "cmd.exe")},
+						kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Uint32, Value: uint32(windows.FILE_CREATE)},
+					},
+					Metadata: make(map[kevent.MetadataKey]any),
+					PS:       proc,
+				}
+				return e, nil
+			},
+			func() (Scanner, error) {
+				return NewScanner(psnap, config.Config{
+					Enabled:     true,
+					ScanTimeout: time.Minute,
+					Rule: config.Rule{
+						Paths: []config.RulePath{
+							{
+								Namespace: "default",
+								Path:      "_fixtures/rules",
+							},
+						},
+					},
+					ExcludedFiles: []string{
+						`?:\WINDOWS\*\*.exe`,
+					},
+				})
+			},
+			alertsender.Alert{},
+			false,
+		},
+		{
+			"scan non-pe file created in the file system",
+			func() (*kevent.Kevent, error) {
+
+				proc := &pstypes.PS{
+					Name:      "tests.exe",
+					PID:       565,
+					Ppid:      uint32(os.Getppid()),
+					Exe:       `C:\ProgramData\tests.exe`,
+					Cmdline:   `C:\ProgramData\tests.exe`,
+					SID:       "S-1-1-18",
+					Cwd:       `C:\ProgramData\`,
+					SessionID: 1,
+				}
+				psnap.On("Find", 565).Return(true, proc)
+
+				e := &kevent.Kevent{
+					Type:     ktypes.CreateFile,
+					Name:     "CreateFile",
+					Category: ktypes.File,
+					Tid:      2484,
+					PID:      565,
+					Kparams: kevent.Kparams{
+						kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "splwow64.xml")},
+						kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Uint32, Value: uint32(windows.FILE_CREATE)},
+					},
+					Metadata: make(map[kevent.MetadataKey]any),
+					PS:       proc,
+				}
+				return e, nil
+			},
+			func() (Scanner, error) {
+				return NewScanner(psnap, config.Config{
+					Enabled:     true,
+					ScanTimeout: time.Minute,
+					Rule: config.Rule{
+						Paths: []config.RulePath{
+							{
+								Namespace: "default",
+								Path:      "_fixtures/rules",
+							},
+						},
+					},
+				})
+			},
+			alertsender.Alert{},
+			false,
+		},
+		{
+			"scan pe file excluded by generating process name",
+			func() (*kevent.Kevent, error) {
+
+				proc := &pstypes.PS{
+					Name:      "tests.exe",
+					PID:       565,
+					Ppid:      uint32(os.Getppid()),
+					Exe:       `C:\ProgramData\tests.exe`,
+					Cmdline:   `C:\ProgramData\tests.exe`,
+					SID:       "S-1-1-18",
+					Cwd:       `C:\ProgramData\`,
+					SessionID: 1,
+				}
+				psnap.On("Find", 565).Return(true, proc)
+
+				e := &kevent.Kevent{
+					Type:     ktypes.CreateFile,
+					Name:     "CreateFile",
+					Category: ktypes.File,
+					Tid:      2484,
+					PID:      565,
+					Kparams: kevent.Kparams{
+						kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "cmd.exe")},
+						kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Uint32, Value: uint32(windows.FILE_CREATE)},
+					},
+					Metadata: make(map[kevent.MetadataKey]any),
+					PS:       proc,
+				}
+				return e, nil
+			},
+			func() (Scanner, error) {
+				return NewScanner(psnap, config.Config{
+					Enabled:     true,
+					ScanTimeout: time.Minute,
+					Rule: config.Rule{
+						Paths: []config.RulePath{
+							{
+								Namespace: "default",
+								Path:      "_fixtures/rules",
+							},
+						},
+					},
+					ExcludedFiles: []string{
+						`tests.exe`,
+					},
+				})
+			},
+			alertsender.Alert{},
+			false,
+		},
+		{
+			"scan ads created in the file system",
+			func() (*kevent.Kevent, error) {
+				ads := filepath.Join(os.TempDir(), "suspicious-ads.txt:mal")
+				f, err := os.Create(ads)
+				if err != nil {
+					return nil, err
+				}
+				data := []byte{0x6F, 0x66, 0x74, 0x2E, 0x4E, 0x6F, 0x74, 0x65, 0x70, 0x61, 0x64, 0x00, 0x13, 0x00, 0x01, 0x1A}
+				if err := os.WriteFile(ads, data, os.ModePerm); err != nil {
+					return nil, err
+				}
+				defer f.Close()
+				defer os.Remove(ads)
+
+				proc := &pstypes.PS{
+					Name:      "tests.exe",
+					PID:       565,
+					Ppid:      uint32(os.Getppid()),
+					Exe:       `C:\ProgramData\tests.exe`,
+					Cmdline:   `C:\ProgramData\tests.exe`,
+					SID:       "S-1-1-18",
+					Cwd:       `C:\ProgramData\`,
+					SessionID: 1,
+				}
+				psnap.On("Find", 565).Return(true, proc)
+
+				e := &kevent.Kevent{
+					Type:     ktypes.CreateFile,
+					Name:     "CreateFile",
+					Category: ktypes.File,
+					Tid:      2484,
+					PID:      565,
+					Kparams: kevent.Kparams{
+						kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: ads},
+						kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Uint32, Value: uint32(windows.FILE_CREATE)},
+					},
+					Metadata: make(map[kevent.MetadataKey]any),
+					PS:       proc,
+				}
+				return e, nil
+			},
+			func() (Scanner, error) {
+				return NewScanner(psnap, config.Config{
+					Enabled:     true,
+					ScanTimeout: time.Minute,
+					Rule: config.Rule{
+						Paths: []config.RulePath{
+							{
+								Namespace: "default",
+								Path:      "_fixtures/rules",
+							},
+						},
+					},
+				})
+			},
+			alertsender.Alert{
+				Title: "File Threat Detected",
+				Text:  "Threat detected Notepad.Shell",
+				ID:    "babf9101-1e6e-4268-a530-e99e2c905b0d",
+				Tags:  []string{"T1", "T2"},
+			},
+			true,
+		},
+		{
+			"scan rwx memory region allocation",
+			func() (*kevent.Kevent, error) {
+				var si windows.StartupInfo
+				si.Flags = windows.STARTF_USESHOWWINDOW
+				var pi windows.ProcessInformation
+
+				argv := windows.StringToUTF16Ptr(filepath.Join(os.Getenv("windir"), "regedit.exe"))
+
+				err := windows.CreateProcess(
+					nil,
+					argv,
+					nil,
+					nil,
+					true,
+					0,
+					nil,
+					nil,
+					&si,
+					&pi)
+				if err != nil {
+					return nil, err
+				}
+
+				for {
+					if sys.IsProcessRunning(pi.Process) {
+						break
+					}
+					time.Sleep(time.Millisecond * 100)
+					log.Infof("%d pid not yet ready", pi.Process)
+				}
+
+				pid := pi.ProcessId
+
+				proc := &pstypes.PS{
+					Name:      "tests.exe",
+					PID:       565,
+					Ppid:      uint32(os.Getppid()),
+					Exe:       `C:\ProgramData\tests.exe`,
+					Cmdline:   `C:\ProgramData\tests.exe`,
+					SID:       "S-1-1-18",
+					Cwd:       `C:\ProgramData\`,
+					SessionID: 1,
+				}
+				psnap.On("Find", pid).Return(true, proc)
+
+				e := &kevent.Kevent{
+					Type:     ktypes.VirtualAlloc,
+					Name:     "VirtualAlloc",
+					Category: ktypes.Mem,
+					Tid:      2484,
+					PID:      565,
+					Kparams: kevent.Kparams{
+						kparams.ProcessID:      {Name: kparams.ProcessID, Type: kparams.PID, Value: pid},
+						kparams.MemBaseAddress: {Name: kparams.MemBaseAddress, Type: kparams.Address, Value: uint64(0x7ffe0000)},
+						kparams.MemProtect:     {Name: kparams.MemProtect, Type: kparams.Flags, Value: uint32(windows.PAGE_EXECUTE_READWRITE), Flags: kevent.MemProtectionFlags},
+					},
+					Metadata: make(map[kevent.MetadataKey]any),
+					PS:       proc,
+				}
+				return e, nil
+			},
+			func() (Scanner, error) {
+				return NewScanner(psnap, config.Config{
+					Enabled:     true,
+					ScanTimeout: time.Minute,
+					Rule: config.Rule{
+						Paths: []config.RulePath{
+							{
+								Namespace: "default",
+								Path:      "_fixtures/rules",
+							},
+						},
+					},
+				})
+			},
+			alertsender.Alert{
+				Title: "Memory Threat Detected",
+				Text:  "Threat detected Regedit",
+				ID:    "1abf9101-1e6e-4268-a530-e99e2c905b0d",
+				Tags:  []string{"T1"},
+			},
+			true,
+		},
+		{
+			"scan rx pagefile mmap",
+			func() (*kevent.Kevent, error) {
+				var si windows.StartupInfo
+				si.Flags = windows.STARTF_USESHOWWINDOW
+				var pi windows.ProcessInformation
+
+				argv := windows.StringToUTF16Ptr(filepath.Join(os.Getenv("windir"), "regedit.exe"))
+
+				err := windows.CreateProcess(
+					nil,
+					argv,
+					nil,
+					nil,
+					true,
+					0,
+					nil,
+					nil,
+					&si,
+					&pi)
+				if err != nil {
+					return nil, err
+				}
+
+				for {
+					if sys.IsProcessRunning(pi.Process) {
+						break
+					}
+					time.Sleep(time.Millisecond * 100)
+					log.Infof("%d pid not yet ready", pi.Process)
+				}
+
+				pid := pi.ProcessId
+
+				proc := &pstypes.PS{
+					Name:      "tests.exe",
+					PID:       pid,
+					Ppid:      uint32(os.Getppid()),
+					Exe:       `C:\ProgramData\tests.exe`,
+					Cmdline:   `C:\ProgramData\tests.exe`,
+					SID:       "S-1-1-18",
+					Cwd:       `C:\ProgramData\`,
+					SessionID: 1,
+				}
+				psnap.On("Find", pid).Return(true, proc)
+
+				e := &kevent.Kevent{
+					Type:     ktypes.MapViewFile,
+					Name:     "MapViewFile",
+					Category: ktypes.File,
+					Tid:      2484,
+					PID:      565,
+					Kparams: kevent.Kparams{
+						kparams.ProcessID:    {Name: kparams.ProcessID, Type: kparams.PID, Value: pid},
+						kparams.FileViewBase: {Name: kparams.FileViewBase, Type: kparams.Address, Value: uint64(0x7ffe0000)},
+						kparams.MemProtect:   {Name: kparams.MemProtect, Type: kparams.Flags, Value: uint32(kevent.SectionRX), Flags: kevent.ViewProtectionFlags},
+					},
+					Metadata: make(map[kevent.MetadataKey]any),
+					PS:       proc,
+				}
+				return e, nil
+			},
+			func() (Scanner, error) {
+				return NewScanner(psnap, config.Config{
+					Enabled:     true,
+					ScanTimeout: time.Minute,
+					Rule: config.Rule{
+						Paths: []config.RulePath{
+							{
+								Namespace: "default",
+								Path:      "_fixtures/rules",
+							},
+						},
+					},
+				})
+			},
+			alertsender.Alert{
+				Title: "Memory Threat Detected",
+				Text:  "Threat detected Regedit",
+				ID:    "1abf9101-1e6e-4268-a530-e99e2c905b0d",
+				Tags:  []string{"T1"},
+			},
+			true,
+		},
+		{
+			"scan rx pagefile mmap address for signed module",
+			func() (*kevent.Kevent, error) {
+				proc := &pstypes.PS{
+					Name:      "tests.exe",
+					PID:       1123,
+					Ppid:      uint32(os.Getppid()),
+					Exe:       `C:\ProgramData\tests.exe`,
+					Cmdline:   `C:\ProgramData\tests.exe`,
+					SID:       "S-1-1-18",
+					Cwd:       `C:\ProgramData\`,
+					SessionID: 1,
+				}
+				psnap.On("Find", 1123).Return(true, proc)
+
+				signature.GetSignatures().PutSignature(uint64(0x7f3e1000), &signature.Signature{Level: signature.AuthenticodeLevel, Type: signature.Catalog})
+
+				e := &kevent.Kevent{
+					Type:     ktypes.MapViewFile,
+					Name:     "MapViewFile",
+					Category: ktypes.File,
+					Tid:      2484,
+					PID:      565,
+					Kparams: kevent.Kparams{
+						kparams.ProcessID:    {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1123)},
+						kparams.FileViewBase: {Name: kparams.FileViewBase, Type: kparams.Address, Value: uint64(0x7f3e1000)},
+						kparams.MemProtect:   {Name: kparams.MemProtect, Type: kparams.Flags, Value: uint32(kevent.SectionRX), Flags: kevent.ViewProtectionFlags},
+					},
+					Metadata: make(map[kevent.MetadataKey]any),
+					PS:       proc,
+				}
+				return e, nil
+			},
+			func() (Scanner, error) {
+				return NewScanner(psnap, config.Config{
+					Enabled:     true,
+					ScanTimeout: time.Minute,
+					Rule: config.Rule{
+						Paths: []config.RulePath{
+							{
+								Namespace: "default",
+								Path:      "_fixtures/rules",
+							},
+						},
+					},
+				})
+			},
+			alertsender.Alert{},
+			false,
+		},
+		{
+			"scan rx pagefile readonly mmap",
+			func() (*kevent.Kevent, error) {
+				proc := &pstypes.PS{
+					Name:      "tests.exe",
+					PID:       321321,
+					Ppid:      uint32(os.Getppid()),
+					Exe:       `C:\ProgramData\tests.exe`,
+					Cmdline:   `C:\ProgramData\tests.exe`,
+					SID:       "S-1-1-18",
+					Cwd:       `C:\ProgramData\`,
+					SessionID: 1,
+				}
+				psnap.On("Find", uint32(321321)).Return(true, proc)
+
+				e := &kevent.Kevent{
+					Type:     ktypes.MapViewFile,
+					Name:     "MapViewFile",
+					Category: ktypes.File,
+					Tid:      2484,
+					PID:      321321,
+					Kparams: kevent.Kparams{
+						kparams.ProcessID:    {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(321321)},
+						kparams.FileViewBase: {Name: kparams.FileViewBase, Type: kparams.Address, Value: uint64(0x7ffe0000)},
+						kparams.MemProtect:   {Name: kparams.MemProtect, Type: kparams.Flags, Value: uint32(0x10000), Flags: kevent.ViewProtectionFlags},
+					},
+					Metadata: make(map[kevent.MetadataKey]any),
+					PS:       proc,
+				}
+				return e, nil
+			},
+			func() (Scanner, error) {
+				return NewScanner(psnap, config.Config{
+					Enabled:     true,
+					ScanTimeout: time.Minute,
+					Rule: config.Rule{
+						Paths: []config.RulePath{
+							{
+								Namespace: "default",
+								Path:      "_fixtures/rules",
+							},
+						},
+					},
+				})
+			},
+			alertsender.Alert{},
+			false,
+		},
+		{
+			"scan rwx image file mmap",
+			func() (*kevent.Kevent, error) {
+				proc := &pstypes.PS{
+					Name:      "tests.exe",
+					PID:       1123,
+					Ppid:      uint32(os.Getppid()),
+					Exe:       `C:\ProgramData\tests.exe`,
+					Cmdline:   `C:\ProgramData\tests.exe`,
+					SID:       "S-1-1-18",
+					Cwd:       `C:\ProgramData\`,
+					SessionID: 1,
+				}
+				psnap.On("Find", 1123).Return(true, proc)
+
+				e := &kevent.Kevent{
+					Type:     ktypes.MapViewFile,
+					Name:     "MapViewFile",
+					Category: ktypes.File,
+					Tid:      2484,
+					PID:      565,
+					Kparams: kevent.Kparams{
+						kparams.ProcessID:    {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1123)},
+						kparams.FileName:     {Name: kparams.FileName, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "regedit.exe")},
+						kparams.FileViewBase: {Name: kparams.FileViewBase, Type: kparams.Address, Value: uint64(0x7ffe0000)},
+						kparams.MemProtect:   {Name: kparams.MemProtect, Type: kparams.Flags, Value: uint32(kevent.SectionRWX), Flags: kevent.ViewProtectionFlags},
+					},
+					Metadata: make(map[kevent.MetadataKey]any),
+					PS:       proc,
+				}
+				return e, nil
+			},
+			func() (Scanner, error) {
+				return NewScanner(psnap, config.Config{
+					Enabled:     true,
+					ScanTimeout: time.Minute,
+					Rule: config.Rule{
+						Paths: []config.RulePath{
+							{
+								Namespace: "default",
+								Path:      "_fixtures/rules",
+							},
+						},
+					},
+				})
+			},
+			alertsender.Alert{
+				Title: "File Threat Detected",
+				Text:  "Threat detected Regedit",
+				ID:    "1abf9101-1e6e-4268-a530-e99e2c905b0d",
+				Tags:  []string{"T1"},
+			},
+			true,
+		},
+		{
+			"scan registry binary value",
+			func() (*kevent.Kevent, error) {
+				proc := &pstypes.PS{
+					Name:      "tests.exe",
+					PID:       1123,
+					Ppid:      uint32(os.Getppid()),
+					Exe:       `C:\ProgramData\tests.exe`,
+					Cmdline:   `C:\ProgramData\tests.exe`,
+					SID:       "S-1-1-18",
+					Cwd:       `C:\ProgramData\`,
+					SessionID: 1,
+				}
+				psnap.On("Find", 1123).Return(true, proc)
+
+				data := []byte{0x6F, 0x66, 0x74, 0x2E, 0x4E, 0x6F, 0x74, 0x65, 0x70, 0x61, 0x64, 0x00, 0x13, 0x00, 0x01, 0x1A}
+				e := &kevent.Kevent{
+					Type:     ktypes.RegSetValue,
+					Name:     "RegSetValue",
+					Category: ktypes.Registry,
+					Tid:      2484,
+					PID:      565,
+					Kparams: kevent.Kparams{
+						kparams.RegValueType: {Name: kparams.RegValueType, Type: kparams.Uint32, Value: uint32(registry.BINARY)},
+						kparams.RegValue:     {Name: kparams.RegValue, Type: kparams.Binary, Value: data},
+						kparams.RegKeyName:   {Name: kparams.RegKeyName, Type: kparams.UnicodeString, Value: `HKEY_LOCAL_MACHINE\CurrentControlSet\Control\DeviceGuard\Mal`},
+					},
+					Metadata: make(map[kevent.MetadataKey]any),
+					PS:       proc,
+				}
+				return e, nil
+			},
+			func() (Scanner, error) {
+				return NewScanner(psnap, config.Config{
+					Enabled:     true,
+					ScanTimeout: time.Minute,
+					Rule: config.Rule{
+						Paths: []config.RulePath{
+							{
+								Namespace: "default",
+								Path:      "_fixtures/rules",
+							},
+						},
+					},
+				})
+			},
+			alertsender.Alert{
+				Title: "File Threat Detected",
+				Text:  "Threat detected Notepad.Shell",
+				ID:    "babf9101-1e6e-4268-a530-e99e2c905b0d",
+				Tags:  []string{"T1", "T2"},
+			},
+			true,
 		},
 	}
-	psnap.On("Find", mock.Anything).Return(true, proc)
 
-	for {
-		if sys.IsProcessRunning(pi.Process) {
-			break
-		}
-		time.Sleep(time.Millisecond * 100)
-		log.Infof("%d pid not yet ready", pi.Process)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e, err := tt.setup()
+			require.NoError(t, err)
+
+			// initialize scanner
+			s, err := tt.newScanner()
+			require.NoError(t, err)
+			defer s.Close()
+
+			matches, err := s.Scan(e)
+			require.NoError(t, err)
+			require.Equal(t, matches, tt.matches)
+
+			if matches {
+				// compare alert content
+				require.NotNil(t, yaraAlert)
+				assert.Equal(t, tt.expectedAlert.Title, yaraAlert.Title)
+				assert.Equal(t, tt.expectedAlert.Text, yaraAlert.Text)
+				assert.Equal(t, tt.expectedAlert.ID, yaraAlert.ID)
+				assert.Equal(t, tt.expectedAlert.Tags, yaraAlert.Tags)
+				assert.True(t, len(yaraAlert.Labels) > 0)
+				assert.Len(t, yaraAlert.Events, 1)
+				assert.NotEmpty(t, e.Metadata)
+				assert.Contains(t, e.Metadata, kevent.YaraMatchesKey)
+			}
+
+			if e.IsCreateProcess() || e.IsLoadImage() || e.IsVirtualAlloc() || e.IsMapViewFile() {
+				// cleanup
+				proc, err := windows.OpenProcess(windows.PROCESS_TERMINATE, false, e.Kparams.MustGetPid())
+				if err == nil {
+					windows.TerminateProcess(proc, uint32(257))
+					windows.Close(proc)
+				}
+			}
+		})
 	}
-
-	kevt := &kevent.Kevent{
-		Type: ktypes.CreateProcess,
-		Name: "CreateProcess",
-		Tid:  2484,
-		PID:  859,
-		Kparams: kevent.Kparams{
-			kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "svchost.exe"},
-			kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: pi.ProcessId},
-		},
-		Metadata: make(map[kevent.MetadataKey]any),
-	}
-
-	// test attaching on pid
-	match, err := s.Scan(kevt)
-	require.NoError(t, err)
-	require.True(t, match)
-	require.NotNil(t, yaraAlert)
-
-	assert.Equal(t, "YARA alert on process notepad.exe", yaraAlert.Title)
-	assert.NotEmpty(t, yaraAlert.Text)
-	assert.Contains(t, yaraAlert.Tags, "notepad")
-
-	// test file scanning on DLL that merely contains
-	// the fmt.Println("Go Yara DLL Test") statement
-	kevt1 := &kevent.Kevent{
-		Type: ktypes.LoadImage,
-		Name: "LoadImage",
-		Tid:  2484,
-		PID:  859,
-		Kparams: kevent.Kparams{
-			kparams.ImageFilename: {Name: kparams.ImageFilename, Type: kparams.UnicodeString, Value: "_fixtures/yara-test.dll"},
-			kparams.ProcessID:     {Name: kparams.ProcessID, Type: kparams.PID, Value: pi.ProcessId},
-		},
-		Metadata: make(map[kevent.MetadataKey]any),
-	}
-	match, err = s.Scan(kevt1)
-	require.NoError(t, err)
-	require.True(t, match)
-	require.NotNil(t, yaraAlert)
-
-	assert.Equal(t, "YARA alert on file _fixtures/yara-test.dll", yaraAlert.Title)
-	assert.Contains(t, yaraAlert.Tags, "dll")
-
-	// test file scanning notepad.exe triggered by a VirtualAlloc
-	// event with RWX protection flags.
-	kevt2 := &kevent.Kevent{
-		Type: ktypes.VirtualAlloc,
-		Name: "VirtualAlloc",
-		Tid:  2484,
-		PID:  859,
-		Kparams: kevent.Kparams{
-			kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "svchost.exe"},
-			kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: pi.ProcessId},
-			kparams.MemProtect:  {Name: kparams.MemProtect, Type: kparams.Flags, Value: uint32(windows.PAGE_EXECUTE_READWRITE), Flags: kevent.MemProtectionFlags},
-		},
-		Metadata: make(map[kevent.MetadataKey]any),
-	}
-	match, err = s.Scan(kevt2)
-	require.NoError(t, err)
-	require.True(t, match)
-	require.NotNil(t, yaraAlert)
-
-	assert.Equal(t, "YARA alert on process notepad.exe", yaraAlert.Title)
-	assert.NotEmpty(t, yaraAlert.Text)
-	assert.Contains(t, yaraAlert.Tags, "notepad")
-
-}
-
-func TestMatchesMeta(t *testing.T) {
-	yaraMatches := []yara.MatchRule{
-		{Rule: "test", Namespace: "ns1"},
-		{Rule: "test2", Namespace: "ns2", Tags: []string{"dropper"}, Metas: []yara.Meta{{Identifier: "author", Value: "rabbit"}}},
-	}
-
-	kevt := &kevent.Kevent{
-		Type: ktypes.CreateProcess,
-		Name: "CreateProcess",
-		Tid:  2484,
-		PID:  859,
-		Kparams: kevent.Kparams{
-			kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "svchost.exe"},
-		},
-		Metadata: make(map[kevent.MetadataKey]any),
-	}
-	assert.Empty(t, kevt.Metadata)
-
-	putMatchesMeta(yaraMatches, kevt)
-
-	assert.NotEmpty(t, kevt.Metadata)
-	assert.Contains(t, kevt.Metadata, kevent.YaraMatchesKey)
 }
