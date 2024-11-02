@@ -25,20 +25,16 @@ package eventlog
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/util/eventlog"
 	"syscall"
 
 	"golang.org/x/sys/windows"
-	"golang.org/x/sys/windows/registry"
 )
 
 const addKeyName = `SYSTEM\CurrentControlSet\Services\EventLog\Application`
 
 var categoryCount = len(ktypes.Categories())
-
-// ErrKeyExists signals that the registry key already exists
-var ErrKeyExists = fmt.Errorf("%s\\%s already exists", addKeyName, source)
 
 // Eventlog provides access to the system log.
 type Eventlog struct {
@@ -74,59 +70,6 @@ func OpenRemote(host, source string) (*Eventlog, error) {
 	return &Eventlog{Handle: h}, nil
 }
 
-// Install modifies PC registry to allow logging with an event source src.
-// It adds all required keys and values to the event log registry key.
-// Install uses msgFile as the event message file. If useExpandKey is true,
-// the event message file is installed as REG_EXPAND_SZ value,
-// otherwise as REG_SZ. Use bitwise of log.Error, log.Warning and
-// log.Info to specify events supported by the new event source.
-func Install(src, msgFile string, useExpandKey bool, eventsSupported uint32) error {
-	appkey, err := registry.OpenKey(registry.LOCAL_MACHINE, addKeyName, registry.CREATE_SUB_KEY)
-	if err != nil {
-		return err
-	}
-	defer appkey.Close()
-
-	sk, alreadyExist, err := registry.CreateKey(appkey, src, registry.SET_VALUE)
-	if err != nil {
-		return err
-	}
-	defer sk.Close()
-	if alreadyExist {
-		return ErrKeyExists
-	}
-
-	err = sk.SetDWordValue("CustomSource", 1)
-	if err != nil {
-		return err
-	}
-	if useExpandKey {
-		err = sk.SetExpandStringValue("EventMessageFile", msgFile)
-	} else {
-		err = sk.SetStringValue("EventMessageFile", msgFile)
-	}
-	if err != nil {
-		return err
-	}
-	if useExpandKey {
-		err = sk.SetExpandStringValue("CategoryMessageFile", msgFile)
-	} else {
-		err = sk.SetStringValue("CategoryMessageFile", msgFile)
-	}
-	if err != nil {
-		return err
-	}
-	err = sk.SetDWordValue("TypesSupported", eventsSupported)
-	if err != nil {
-		return err
-	}
-	err = sk.SetDWordValue("CategoryCount", uint32(categoryCount))
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 // Close closes event log.
 func (l *Eventlog) Close() error {
 	return windows.DeregisterEventSource(l.Handle)
@@ -151,15 +94,15 @@ func (l *Eventlog) report(etype uint16, eid uint32, category uint16, msg []byte)
 
 // Info writes an information event msg with event id eid to the end of event log.
 func (l *Eventlog) Info(eid uint32, category uint16, msg []byte) error {
-	return l.report(uint16(Info), eid, category, msg)
+	return l.report(uint16(eventlog.Info), eid, category, msg)
 }
 
 // Warning writes a warning event msg with event id eid to the end of event log.
 func (l *Eventlog) Warning(eid uint32, category uint16, msg []byte) error {
-	return l.report(uint16(Warn), eid, category, msg)
+	return l.report(uint16(eventlog.Warn), eid, category, msg)
 }
 
 // Error writes an error event msg with event id eid to the end of event log.
 func (l *Eventlog) Error(eid uint32, category uint16, msg []byte) error {
-	return l.report(uint16(Erro), eid, category, msg)
+	return l.report(uint16(eventlog.Erro), eid, category, msg)
 }

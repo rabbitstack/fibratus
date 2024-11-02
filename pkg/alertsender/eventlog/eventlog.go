@@ -19,15 +19,26 @@
 package eventlog
 
 import (
+	"errors"
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	evlog "github.com/rabbitstack/fibratus/pkg/util/eventlog"
 	"golang.org/x/sys/windows"
 	"hash/crc32"
 	"strings"
 )
 
-// source represents the event source that generates the alerts
-const source = "Fibratus"
+const (
+	// source represents the event source that generates the alerts
+	source = "Fibratus"
+	// levels designates the supported eventlog levels
+	levels = uint32(evlog.Info | evlog.Warn | evlog.Erro)
+	// msgFile specifies the location of the eventlog message DLL
+	msgFile = "%ProgramFiles%\\Fibratus\\fibratus.dll"
+	// keyName represents the registry key under which the eventlog source is registered
+	keyName = `SYSTEM\CurrentControlSet\Services\EventLog`
+)
 
 const minIDChars = 12
 
@@ -48,6 +59,13 @@ func makeSender(config alertsender.Config) (alertsender.Sender, error) {
 	sourceName, err := windows.UTF16PtrFromString(source)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert source name: %v", err)
+	}
+
+	err = evlog.Install(source, msgFile, keyName, false, levels, uint32(len(ktypes.Categories())))
+	if err != nil {
+		if !errors.Is(err, evlog.ErrKeyExists{}) {
+			return nil, err
+		}
 	}
 
 	h, err := windows.RegisterEventSource(nil, sourceName)

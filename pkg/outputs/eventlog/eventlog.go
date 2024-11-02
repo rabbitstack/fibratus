@@ -22,6 +22,7 @@ package eventlog
 
 import (
 	"errors"
+	"github.com/rabbitstack/fibratus/pkg/util/eventlog"
 	"text/template"
 
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
@@ -34,7 +35,7 @@ const (
 	// source under which eventlog events are reported
 	source = "Fibratus"
 	// levels designates the supported eventlog levels
-	levels = uint32(Info | Warn | Erro)
+	levels = uint32(eventlog.Info | eventlog.Warn | eventlog.Erro)
 	// msgFile specifies the location of the eventlog message DLL
 	msgFile = "%ProgramFiles%\\Fibratus\\fibratus.dll"
 
@@ -63,10 +64,10 @@ func initEventlog(config outputs.Config) (outputs.OutputGroup, error) {
 	if !ok {
 		return outputs.Fail(outputs.ErrInvalidConfig(outputs.Eventlog, config.Output))
 	}
-	err := Install(source, msgFile, false, levels)
+	err := eventlog.Install(source, msgFile, addKeyName, false, levels, uint32(categoryCount))
 	if err != nil {
 		// ignore error if the key already exists
-		if !errors.Is(err, ErrKeyExists) {
+		if !errors.Is(err, eventlog.ErrKeyExists{}) {
 			return outputs.Fail(err)
 		}
 	}
@@ -132,12 +133,12 @@ func (e *evtlog) publish(kevt *kevent.Kevent) error {
 }
 
 func (e *evtlog) log(eventID uint32, categoryID uint16, buf []byte) error {
-	switch levelFromString(e.config.Level) {
-	case Info:
+	switch eventlog.LevelFromString(e.config.Level) {
+	case eventlog.Info:
 		return e.evtlog.Info(eventID, categoryID, buf)
-	case Warn:
+	case eventlog.Warn:
 		return e.evtlog.Warning(eventID, categoryID, buf)
-	case Erro:
+	case eventlog.Erro:
 		return e.evtlog.Error(eventID, categoryID, buf)
 	default:
 		panic("unknown eventlog level")
