@@ -256,7 +256,6 @@ func TestEventSourceEnableFlagsDynamicallyWithYaraEnabled(t *testing.T) {
 		HasNetworkEvents:  true,
 		HasFileEvents:     false,
 		HasThreadEvents:   false,
-		HasVAMapEvents:    true,
 		HasAuditAPIEvents: true,
 		UsedEvents: []ktypes.Ktype{
 			ktypes.CreateProcess,
@@ -275,11 +274,15 @@ func TestEventSourceEnableFlagsDynamicallyWithYaraEnabled(t *testing.T) {
 			EnableImageKevents:    true,
 			EnableFileIOKevents:   true,
 			EnableAuditAPIEvents:  true,
+			EnableVAMapKevents:    false,
+			EnableMemKevents:      true,
 		},
 		Filters: &config.Filters{},
 		Yara: yara.Config{
-			Enabled:   true,
-			SkipFiles: false,
+			Enabled:    true,
+			SkipFiles:  false,
+			SkipMmaps:  true,
+			SkipAllocs: false,
 		},
 	}
 
@@ -292,8 +295,15 @@ func TestEventSourceEnableFlagsDynamicallyWithYaraEnabled(t *testing.T) {
 	// rules compile result doesn't have file events
 	// but Yara file scanning is enabled
 	require.True(t, flags&etw.FileIO != 0)
+	// VAMap events are not in the ruleset and VaMap is disabled
+	require.False(t, flags&etw.VaMap != 0)
+	// VirtualAlloc is not present in the ruleset, but Yara
+	// alloc scanning is enabled
+	require.True(t, flags&etw.VirtualAlloc != 0)
 
 	require.False(t, cfg.Kstream.TestDropMask(ktypes.CreateFile))
+	require.True(t, cfg.Kstream.TestDropMask(ktypes.MapViewFile))
+	require.False(t, cfg.Kstream.TestDropMask(ktypes.VirtualAlloc))
 }
 
 func TestEventSourceRundownEvents(t *testing.T) {
@@ -486,7 +496,7 @@ func TestEventSourceAllEvents(t *testing.T) {
 				var sec windows.Handle
 				var offset uintptr
 				var baseViewAddr uintptr
-				dll := "../../pkg/yara/_fixtures/yara-test.dll"
+				dll := "_fixtures/yara-test.dll"
 				f, err := os.Open(dll)
 				if err != nil {
 					return err
@@ -529,7 +539,7 @@ func TestEventSourceAllEvents(t *testing.T) {
 				return e.CurrentPid() && e.Type == ktypes.MapViewFile &&
 					e.GetParamAsString(kparams.MemProtect) == "EXECUTE_READWRITE|READONLY" &&
 					e.GetParamAsString(kparams.FileViewSectionType) == "IMAGE" &&
-					strings.Contains(e.GetParamAsString(kparams.FileName), "pkg\\yara\\_fixtures\\yara-test.dll")
+					strings.Contains(e.GetParamAsString(kparams.FileName), "_fixtures\\yara-test.dll")
 			},
 			false,
 		},

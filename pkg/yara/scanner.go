@@ -22,32 +22,29 @@
 package yara
 
 import (
-	"bytes"
 	"encoding/json"
 	"expvar"
 	"fmt"
 	"github.com/google/uuid"
-	"html/template"
-	"os"
-	"path/filepath"
-	"time"
-
+	"github.com/rabbitstack/fibratus/pkg/alertsender"
+	libntfs "github.com/rabbitstack/fibratus/pkg/fs/ntfs"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/util/signature"
 	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/registry"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/hillu/go-yara/v4"
-	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/ps"
-	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"github.com/rabbitstack/fibratus/pkg/yara/config"
 	ytypes "github.com/rabbitstack/fibratus/pkg/yara/types"
 	log "github.com/sirupsen/logrus"
 )
-
-const alertTitleTmpl = `{{if .PS }}YARA alert on process {{ .PS.Name }}{{ else }}YARA alert on file {{ .Filename }}{{ end }}`
 
 var (
 	// ruleMatches computes all the rule matches
@@ -56,6 +53,14 @@ var (
 	rulesInCompiler = expvar.NewInt("yara.rules.in.compiler")
 	// totalScans computes the number of process/file scans
 	totalScans = expvar.NewInt("yara.total.scans")
+
+	procScans     = expvar.NewInt("yara.proc.spawned.scans")
+	moduleScans   = expvar.NewInt("yara.module.loaded.scans")
+	fileScans     = expvar.NewInt("yara.file.created.scans")
+	streamScans   = expvar.NewInt("yara.ads.created.scans")
+	allocScans    = expvar.NewInt("yara.alloc.scans")
+	mmapScans     = expvar.NewInt("yara.mmap.scans")
+	registryScans = expvar.NewInt("yara.registry.value.set.scans")
 )
 
 type scanner struct {
@@ -65,16 +70,6 @@ type scanner struct {
 
 	psnap ps.Snapshotter
 }
-
-// AlertContext contains the process state or file name along with all the rule matches.
-type AlertContext struct {
-	PS        *pstypes.PS
-	Filename  string
-	Matches   []yara.MatchRule
-	Timestamp string
-}
-
-const tsLayout = "02 Jan 2006 15:04:05 MST"
 
 // NewScanner creates a new YARA scanner.
 func NewScanner(psnap ps.Snapshotter, config config.Config) (Scanner, error) {
@@ -173,159 +168,271 @@ func (s scanner) ProcessEvent(evt *kevent.Kevent) (bool, error) {
 	return s.Scan(evt)
 }
 
-func (s scanner) Scan(evt *kevent.Kevent) (bool, error) {
-	if !evt.IsCreateProcess() && !evt.IsLoadImage() && !evt.IsVirtualAlloc() {
+func (s scanner) Scan(e *kevent.Kevent) (bool, error) {
+	var matches yara.MatchRules
+	var isScanned bool
+	var err error
+
+	switch e.Type {
+	case ktypes.CreateProcess:
+		// scan the created child process
+		pid := e.Kparams.MustGetPid()
+		log.Debugf("scanning child process. pid: %d, exe: %s", pid, e.GetParamAsString(kparams.Exe))
+		matches, err = s.scan(pid)
+		procScans.Add(1)
+		isScanned = true
+	case ktypes.LoadImage:
+		// scan the process loading unsigned/untrusted module
+		// or loading the module from unbacked memory region
+		pid := e.PID
+		addr := e.Kparams.MustGetUint64(kparams.ImageBase)
+		typ := e.Kparams.MustGetUint32(kparams.ImageSignatureType)
+		if typ != signature.None {
+			return false, nil
+		}
+		filename := e.GetParamAsString(kparams.ImageFilename)
+		if s.config.ShouldSkipFile(filename) {
+			return false, nil
+		}
+
+		// get module signature
+		sign := signature.GetSignatures().GetSignature(addr)
+		if sign == nil {
+			sign = &signature.Signature{Filename: filename}
+			sign.Type, sign.Level, err = sign.Check()
+			if sign.IsSigned() {
+				sign.Verify()
+			}
+		}
+
+		if !sign.IsSigned() || !sign.IsTrusted() || (!e.Callstack.IsEmpty() && e.Callstack.ContainsUnbacked()) {
+			log.Debugf("scanning suspicious module loading. pid: %d, module: %s", pid, filename)
+			matches, err = s.scan(pid)
+			moduleScans.Add(1)
+			isScanned = true
+		}
+	case ktypes.CreateFile:
+		if s.config.SkipFiles {
+			return false, nil
+		}
+		if e.IsOpenDisposition() {
+			return false, nil
+		}
+
+		filename := e.GetParamAsString(kparams.FileName)
+		if s.config.ShouldSkipFile(filename) || (e.PS != nil && s.config.ShouldSkipProcess(e.PS.Exe)) {
+			return false, nil
+		}
+
+		// scan dropped PE files
+		isDLL := strings.ToLower(filepath.Ext(filename)) == ".dll" || e.Kparams.TryGetBool(kparams.FileIsDLL)
+		isDriver := strings.ToLower(filepath.Ext(filename)) == ".sys" || e.Kparams.TryGetBool(kparams.FileIsDriver)
+		isExe := strings.ToLower(filepath.Ext(filename)) == ".exe" || e.Kparams.TryGetBool(kparams.FileIsExecutable)
+
+		if isExe || isDLL || isDriver {
+			log.Debugf("scanning PE file %s. pid: %d", filename, e.PID)
+			matches, err = s.scan(filename)
+			fileScans.Add(1)
+			isScanned = true
+			break
+		}
+
+		// scan dropped ADS (Alternate Data Stream)
+		n := strings.LastIndex(filename, ":")
+		ads := n > 2 && n+1 <= len(filename)
+		if !ads {
+			return false, nil
+		}
+		// read ADS data
+		ntfs := libntfs.NewFS()
+		data, n, err := ntfs.Read(filename, 0, 1024*1024)
+		defer ntfs.Close()
+		if err != nil {
+			return false, nil
+		}
+		if n > 0 {
+			data = data[:n]
+			log.Debugf("scanning ADS %s. pid: %d", filename, e.PID)
+			matches, err = s.scan(data)
+			streamScans.Add(1)
+			isScanned = true
+		}
+	case ktypes.VirtualAlloc:
+		if s.config.SkipAllocs {
+			return false, nil
+		}
+		// scan process allocating RWX memory region
+		pid := e.Kparams.MustGetPid()
+		if e.PID != 4 && e.Kparams.TryGetUint32(kparams.MemProtect) == windows.PAGE_EXECUTE_READWRITE {
+			log.Debugf("scanning RWX allocation. pid: %d, exe: %s, addr: %s", pid, e.GetParamAsString(kparams.Exe),
+				e.GetParamAsString(kparams.MemBaseAddress))
+			matches, err = s.scan(pid)
+			allocScans.Add(1)
+			isScanned = true
+		}
+	case ktypes.MapViewFile:
+		if s.config.SkipMmaps {
+			return false, nil
+		}
+		// scan process mapping a suspicious RX/RWX section view
+		pid := e.Kparams.MustGetPid()
+		prot := e.Kparams.MustGetUint32(kparams.MemProtect)
+		if e.PID != 4 && ((prot&kevent.SectionRX) != 0 && (prot&kevent.SectionRWX) != 0) {
+			filename := e.GetParamAsString(kparams.FileName)
+			// skip mappings of signed images
+			addr := e.Kparams.MustGetUint64(kparams.FileViewBase)
+			sign := signature.GetSignatures().GetSignature(addr)
+			if sign != nil && sign.IsSigned() && sign.IsTrusted() {
+				return false, nil
+			}
+			// data/image file was mapped?
+			if filename != "" {
+				if s.config.ShouldSkipFile(filename) {
+					return false, nil
+				}
+				log.Debugf("scanning %s section view mapping. filename: %s pid: %d, addr: %s", e.GetParamAsString(kparams.MemProtect),
+					filename, pid, e.GetParamAsString(kparams.FileViewBase))
+				matches, err = s.scan(filename)
+			} else {
+				// otherwise, scan the process
+				log.Debugf("scanning %s section view mapping. pid: %d, addr: %s", e.GetParamAsString(kparams.MemProtect), pid,
+					e.GetParamAsString(kparams.FileViewBase))
+				matches, err = s.scan(pid)
+			}
+			mmapScans.Add(1)
+			isScanned = true
+		}
+	case ktypes.RegSetValue:
+		if s.config.SkipRegistry {
+			return false, nil
+		}
+		if e.PS != nil && s.config.ShouldSkipProcess(e.PS.Exe) {
+			return false, nil
+		}
+		// scan registry binary values
+		if typ := e.Kparams.TryGetUint32(kparams.RegValueType); typ != registry.BINARY {
+			return false, nil
+		}
+		v, err := e.Kparams.Get(kparams.RegValue)
+		if err != nil {
+			// value not attached to the event
+			return false, nil
+		}
+		if b, ok := v.Value.([]byte); ok && len(b) > 0 {
+			log.Debugf("scanning registry binary value %s. pid: %d", e.GetParamAsString(kparams.RegKeyName), e.PID)
+			matches, err = s.scan(b)
+			registryScans.Add(1)
+			isScanned = true
+		}
+	}
+
+	if err != nil {
+		return false, err
+	}
+	if len(matches) == 0 || !isScanned {
 		return false, nil
 	}
 
+	totalScans.Add(1)
+	ruleMatches.Add(int64(len(matches)))
+
+	return len(matches) > 0, s.emit(matches, e)
+}
+
+func (s scanner) scan(target any) (yara.MatchRules, error) {
 	var matches yara.MatchRules
 	sn, err := s.newInternalScanner()
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 
-	alertCtx := AlertContext{
-		Timestamp: time.Now().Format(tsLayout),
-	}
-
-	switch evt.Type {
-	case ktypes.CreateProcess:
-		pid := evt.Kparams.MustGetPid()
-		_, proc := s.psnap.Find(pid)
-		if proc == nil {
-			return false, fmt.Errorf("%d process not found in snapshotter", pid)
+	switch n := target.(type) {
+	case uint32: // pid
+		// skip the scan for this process?
+		ok, proc := s.psnap.Find(n)
+		if ok && s.config.ShouldSkipProcess(proc.Exe) {
+			return matches, nil
 		}
-		if s.config.ShouldSkipProcess(proc.Name) {
-			return false, nil
-		}
-		alertCtx.PS = proc
-		err = sn.SetCallback(&matches).ScanProc(int(pid))
-	case ktypes.LoadImage:
-		filename := evt.GetParamAsString(kparams.ImageFilename)
-		alertCtx.Filename = filename
-		err = sn.SetCallback(&matches).ScanFile(filename)
-	case ktypes.VirtualAlloc:
-		pid := evt.Kparams.MustGetPid()
-		_, proc := s.psnap.Find(pid)
-		if proc == nil {
-			return false, fmt.Errorf("%d process not found in snapshotter", pid)
-		}
-		if s.config.ShouldSkipProcess(proc.Name) {
-			return false, nil
-		}
-		protect, err := evt.Kparams.GetUint32(kparams.MemProtect)
-		if err != nil {
-			return false, err
-		}
-		if protect != windows.PAGE_EXECUTE_READWRITE {
-			return false, nil
-		}
-		alertCtx.PS = proc
-		err = sn.SetCallback(&matches).ScanProc(int(pid))
+		err = sn.SetCallback(&matches).ScanProc(int(n))
+	case string: // file
+		err = sn.SetCallback(&matches).ScanFile(n)
+	case []byte: // mem
+		err = sn.SetCallback(&matches).ScanMem(n)
 	}
 
 	if err != nil {
-		return false, err
+		return nil, err
 	}
-	totalScans.Add(1)
-	if len(matches) == 0 {
-		return false, nil
-	}
-	alertCtx.Matches = matches
-	ruleMatches.Add(int64(len(matches)))
-	if err := putMatchesMeta(matches, evt); err != nil {
-		return true, err
-	}
-	return true, s.send(alertCtx)
+
+	return matches, nil
 }
 
-func (s scanner) send(ctx AlertContext) error {
-	if s.config.AlertTitleTemplate == "" {
-		s.config.AlertTitleTemplate = alertTitleTmpl
-	}
-	if s.config.AlertTextTemplate == "" {
-		s.config.AlertTextTemplate = alertTextTmpl
-	}
-	// build a new yara alert template from the config options
-	// or use a default template string. We'll feed the alertsender
-	// with the output of the parsed template. Template content is
-	// rendered by employing the Go templating engine. For more
-	// details see https://golang.org/pkg/text/template/
-	title, err := executeTmpl(s.config.AlertTitleTemplate, ctx)
-	if err != nil {
-		return err
-	}
-	text, err := executeTmpl(s.config.AlertTextTemplate, ctx)
-	if err != nil {
-		return err
+func (s scanner) emit(matches yara.MatchRules, e *kevent.Kevent) error {
+	senders := alertsender.FindAll()
+	if len(senders) == 0 {
+		return fmt.Errorf("no alertsenders registered. Alert won't be sent")
 	}
 
-	// fetch the alert sender that is specified in the config
-	sender := alertsender.Find(alertsender.ToType(s.config.AlertVia))
-	if sender == nil {
-		return fmt.Errorf("%q alert sender is not initialized", s.config.AlertVia)
-	}
+	ymatches := make([]ytypes.MatchRule, 0)
 
-	alert := alertsender.NewAlert(
-		title,
-		text,
-		tagsFromMatches(ctx.Matches),
-		alertsender.Normal,
-	)
-	alert.ID = uuid.New().String()
-
-	log.Infof("emitting yara alert via %q sender: %s", s.config.AlertVia, alert)
-
-	return sender.Send(alert)
-}
-
-func executeTmpl(body string, ctx AlertContext) (string, error) {
-	var writer bytes.Buffer
-
-	tmpl, err := template.New("yara").Parse(body)
-	if err != nil {
-		return "", fmt.Errorf("template syntax error: %v", err)
-	}
-	err = tmpl.Execute(&writer, ctx)
-	if err != nil {
-		return "", fmt.Errorf("couldn't execute template: %v", err)
-	}
-
-	return writer.String(), nil
-}
-
-func tagsFromMatches(matches []yara.MatchRule) []string {
-	tags := make([]string, 0)
 	for _, match := range matches {
-		tags = append(tags, match.Tags...)
-	}
-	return tags
-}
-
-// putMatchesMeta injects rule matches into event metadata as a JSON payload.
-func putMatchesMeta(matches yara.MatchRules, kevt *kevent.Kevent) error {
-	ruleMatches := make([]ytypes.MatchRule, 0)
-	for _, m := range matches {
-		match := ytypes.MatchRule{
-			Rule:      m.Rule,
-			Namespace: m.Namespace,
-			Tags:      m.Tags,
+		// encode rule matches as JSON and append to event metadata
+		m := ytypes.MatchRule{
+			Rule:      match.Rule,
+			Namespace: match.Namespace,
+			Tags:      match.Tags,
 			Metas:     make([]ytypes.Meta, 0),
 			Strings:   make([]ytypes.MatchString, 0),
 		}
-		for _, meta := range m.Metas {
-			match.Metas = append(match.Metas, ytypes.Meta{Value: meta.Value, Identifier: meta.Identifier})
+		for _, meta := range match.Metas {
+			m.Metas = append(m.Metas, ytypes.Meta{Value: meta.Value, Identifier: meta.Identifier})
 		}
-		for _, s := range m.Strings {
-			match.Strings = append(match.Strings, ytypes.MatchString{Name: s.Name, Base: s.Base, Data: s.Data, Offset: s.Offset})
+		for _, s := range match.Strings {
+			m.Strings = append(m.Strings, ytypes.MatchString{Name: s.Name, Base: s.Base, Data: s.Data, Offset: s.Offset})
 		}
-		ruleMatches = append(ruleMatches, match)
+		ymatches = append(ymatches, m)
+
+		b, err := json.Marshal(ymatches)
+		if err != nil {
+			return err
+		}
+		e.AddMeta(kevent.YaraMatchesKey, string(b))
+
+		// render alert title and text
+		title := s.config.AlertTitle(e)
+		text, err := s.config.AlertText(e, m)
+		if err != nil {
+			return err
+		}
+
+		// send alert via all registered alert senders
+		for _, sender := range senders {
+			log.Infof("sending alert: [%s]. Text: %s Event: %s", title, text, e.String())
+
+			alert := alertsender.NewAlert(
+				title,
+				text,
+				m.Tags,
+				m.SeverityFromScore(),
+			)
+
+			id := m.ID()
+			// generate id if it doesn't exist in meta fields
+			if id == "" {
+				id = uuid.New().String()
+			}
+			alert.ID = id
+			alert.Events = []*kevent.Kevent{e}
+			alert.Labels = m.Labels()
+			alert.Description = m.Description()
+
+			err := sender.Send(alert)
+			if err != nil {
+				return fmt.Errorf("unable to emit YARA alert via [%s] sender: %v", sender.Type(), err)
+			}
+		}
 	}
-	b, err := json.Marshal(ruleMatches)
-	if err != nil {
-		return err
-	}
-	kevt.AddMeta(kevent.YaraMatchesKey, string(b))
+
 	return nil
 }
 

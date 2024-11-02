@@ -19,24 +19,37 @@
 package config
 
 import (
+	"bytes"
+	"fmt"
 	"github.com/mitchellh/mapstructure"
+	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/util/wildcard"
+	ytypes "github.com/rabbitstack/fibratus/pkg/yara/types"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"path/filepath"
 	"strings"
+	"text/template"
 	"time"
 )
 
 const (
-	enabled            = "yara.enabled"
-	alertVia           = "yara.alert-via"
-	alertTextTemplate  = "yara.alert-template.text"
-	alertTitleTemplate = "yara.alert-template.title"
-	fastScanMode       = "yara.fastscan"
-	scanTimeout        = "yara.scan-timeout"
-	skipFiles          = "yara.skip-files"
-	excludedProcesses  = "yara.excluded-procs"
-	excludedFiles      = "yara.excluded-files"
+	enabled           = "yara.enabled"
+	alertTemplate     = "yara.alert-template"
+	fastScanMode      = "yara.fastscan"
+	scanTimeout       = "yara.scan-timeout"
+	skipFiles         = "yara.skip-files"
+	skipAllocs        = "yara.skip-allocs"
+	skipMmaps         = "yara.skip-mmaps"
+	skipRegistry      = "yara.skip-registry"
+	excludedProcesses = "yara.excluded-procs"
+	excludedFiles     = "yara.excluded-files"
+)
+
+const (
+	FileThreatAlertTitle   = "File Threat Detected"
+	MemoryThreatAlertTitle = "Memory Threat Detected"
 )
 
 // RulePath contains the rule path information.
@@ -59,39 +72,44 @@ type Rule struct {
 	Strings []RuleString `json:"yara.rule.strings" yaml:"yara.rule.strings" mapstructure:"strings"`
 }
 
-// Config stores YARA watcher specific configuration.
+// Config stores YARA scanner specific configuration.
 type Config struct {
 	// Enabled indicates if YARA watcher is enabled.
 	Enabled bool `json:"yara.enabled" yaml:"yara.enabled"`
 	// Rule contains rule-specific settings.
 	Rule Rule `json:"yara.rule" yaml:"yara.rule" mapstructure:"rule"`
-	// AlertVia defines which alert sender is used to emit the alert on rule matches.
-	AlertVia string `json:"yara.alert-via" yaml:"yara.alert-via"`
-	// AlertTemplate defines the template that is used to render the text of the alert.
-	AlertTextTemplate string `json:"yara.alert-text-template" yaml:"yara.alert-text-template"`
-	// AlertTitle represents the template for the alert title
-	AlertTitleTemplate string `json:"yara.alert-title-template" yaml:"yara.alert-title-template"`
+	// AlertTemplate represents the template for the alert title
+	AlertTemplate string `json:"yara.alert-template" yaml:"yara.alert-template"`
 	// FastScanMode avoids multiple matches of the same string when not necessary.
 	FastScanMode bool `json:"yara.fastscan" yaml:"yara.fastscan"`
 	// ScanTimeout sets the timeout for the scanner. If the timeout is reached, the scan operation is cancelled.
 	ScanTimeout time.Duration `json:"yara.scan-timeout" yaml:"yara.scan-timeout"`
-	// SkipFiles indicates whether file scanning is disabled
+	// SkipFiles indicates whether file scanning is disabled.
 	SkipFiles bool `json:"yara.skip-files" yaml:"yara.skip-files"`
-	// ExcludedProcesses contains the list of the process' image names that shouldn't be scanned
+	// SkipAllocs indicates whether scanning on suspicious memory allocations is disabled.
+	SkipAllocs bool `json:"yara.skip-allocs" yaml:"yara.skip-allocs"`
+	// SkipMmaps indicates whether scanning on suspicious mappings of sections is disabled.
+	SkipMmaps bool `json:"yara.skip-mmaps" yaml:"yara.skip-mmaps"`
+	// SkipRegistry indicates whether registry value scanning is disabled.
+	SkipRegistry bool `json:"yara.skip-registry" yaml:"yara.skip-registry"`
+	// ExcludedProcesses contains the list of the comma-separated process image paths that shouldn't be scanned.
+	// Wildcard matching is possible.
 	ExcludedProcesses []string `json:"yara.excluded-procs" yaml:"yara.excluded-procs"`
-	// ExcludedProcesses contains the list of the file names that shouldn't be scanned
+	// ExcludedProcesses contains the list of the comma-separated file paths that shouldn't be scanned.
+	// Wildcard matching is possible.
 	ExcludedFiles []string `json:"yara.excluded-files" yaml:"yara.excluded-files"`
 }
 
 // InitFromViper initializes Yara config from Viper.
 func (c *Config) InitFromViper(v *viper.Viper) {
 	c.Enabled = v.GetBool(enabled)
-	c.AlertVia = v.GetString(alertVia)
-	c.AlertTextTemplate = v.GetString(alertTextTemplate)
-	c.AlertTitleTemplate = v.GetString(alertTitleTemplate)
+	c.AlertTemplate = v.GetString(alertTemplate)
 	c.FastScanMode = v.GetBool(fastScanMode)
 	c.ScanTimeout = v.GetDuration(scanTimeout)
 	c.SkipFiles = v.GetBool(skipFiles)
+	c.SkipAllocs = v.GetBool(skipAllocs)
+	c.SkipMmaps = v.GetBool(skipMmaps)
+	c.SkipRegistry = v.GetBool(skipRegistry)
 	c.ExcludedFiles = v.GetStringSlice(excludedFiles)
 	c.ExcludedProcesses = v.GetStringSlice(excludedProcesses)
 
@@ -111,34 +129,79 @@ func (c *Config) InitFromViper(v *viper.Viper) {
 // AddFlags registers persistent flags.
 func AddFlags(flags *pflag.FlagSet) {
 	flags.Bool(enabled, false, "Specifies if Yara scanner is enabled")
-	flags.String(alertVia, "mail", "Defines which alert sender is used to emit the alert on rule matches")
-	flags.String(alertTextTemplate, "", "Defines the template that is used to render the text of the alert")
-	flags.String(alertTitleTemplate, "", "Defines the template that is used to render the title of the alert")
+	flags.String(alertTemplate, "", "Defines the template that is used to render the alert. By default only the threat/rule name is rendered")
 	flags.Bool(fastScanMode, true, "Avoids multiple matches of the same string when not necessary")
 	flags.Duration(scanTimeout, time.Second*10, "Specifies the timeout for the scanner. If the timeout is reached, the scan operation is cancelled")
-	flags.Bool(skipFiles, true, "Indicates whether file scanning is disabled")
-	flags.StringSlice(excludedFiles, []string{}, "Contains the list of the comma-separated file names that shouldn't be scanned")
-	flags.StringSlice(excludedProcesses, []string{}, "Contains the list of the comma-separated process' image names that shouldn't be scanned")
+	flags.Bool(skipFiles, false, "Indicates whether file scanning is disabled")
+	flags.Bool(skipAllocs, false, "Indicates whether scanning on suspicious memory allocations is disabled")
+	flags.Bool(skipMmaps, false, "Indicates whether scanning on suspicious mappings of sections is disabled")
+	flags.Bool(skipRegistry, false, "Indicates whether registry value scanning is disabled")
+	flags.StringSlice(excludedFiles, []string{}, "Contains the list of the comma-separated file paths that shouldn't be scanned. Wildcard matching is possible")
+	flags.StringSlice(excludedProcesses, []string{}, "Contains the list of the comma-separated process image paths that shouldn't be scanned. Wildcard matching is possible")
 }
 
-// ShouldSkipProcess determines whether the specified process name is rejected by the scanner.
-func (c Config) ShouldSkipProcess(ps string) bool {
-	for _, proc := range c.ExcludedProcesses {
-		if strings.EqualFold(proc, ps) {
+// ShouldSkipProcess determines whether the specified full process image path is rejected by the scanner.
+// Wildcard matching is possible.
+func (c Config) ShouldSkipProcess(proc string) bool {
+	for _, p := range c.ExcludedProcesses {
+		if wildcard.Match(strings.ToLower(p), strings.ToLower(proc)) {
 			return true
 		}
 	}
 	return false
 }
 
-// ShouldSkipFile determines whether the specified file name is rejected by the scanner.
+// ShouldSkipFile determines whether the specified full file path is rejected by the scanner.
 func (c Config) ShouldSkipFile(file string) bool {
 	for _, f := range c.ExcludedFiles {
-		if strings.EqualFold(f, filepath.Base(file)) {
+		if wildcard.Match(strings.ToLower(f), strings.ToLower(file)) {
 			return true
 		}
 	}
 	return false
+}
+
+// AlertTitle returns the brief alert title depending on
+// whether the process scan took place or a file/registry
+// key was scanned.
+func (c Config) AlertTitle(e *kevent.Kevent) string {
+	if (e.Category == ktypes.File && e.Kparams.Contains(kparams.FileName)) || e.Category == ktypes.Registry {
+		return FileThreatAlertTitle
+	}
+	return MemoryThreatAlertTitle
+}
+
+// AlertText returns the short alert text if the Go template is
+// not specified. On the contrary, the provided Go template is
+// parsed and executing yielding the alert text.
+func (c Config) AlertText(e *kevent.Kevent, match ytypes.MatchRule) (string, error) {
+	if c.AlertTemplate == "" {
+		threat := match.ThreatName()
+		if threat == "" {
+			threat = match.Rule
+		}
+		return fmt.Sprintf("Threat detected %s", threat), nil
+	}
+
+	var writer bytes.Buffer
+	var data = struct {
+		Match ytypes.MatchRule
+		Event *kevent.Kevent
+	}{
+		match,
+		e,
+	}
+
+	tmpl, err := template.New("yara").Parse(c.AlertTemplate)
+	if err != nil {
+		return "", fmt.Errorf("yara alert template syntax error: %v", err)
+	}
+	err = tmpl.Execute(&writer, data)
+	if err != nil {
+		return "", fmt.Errorf("couldn't execute yara alert template: %v", err)
+	}
+
+	return writer.String(), nil
 }
 
 func decode(input, output interface{}) error {
