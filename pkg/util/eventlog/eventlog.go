@@ -20,8 +20,26 @@ package eventlog
 
 import (
 	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"golang.org/x/sys/windows/registry"
 )
+
+const (
+	// Source represents the event source that generates the alerts
+	Source = "Fibratus"
+	// Levels designates the supported eventlog levels
+	Levels = uint32(Info | Warn | Erro)
+	// msgFile specifies the location of the eventlog message DLL
+	msgFile = "%ProgramFiles%\\Fibratus\\fibratus.dll"
+	// keyName represents the registry key under which the eventlog source is registered
+	keyName = `SYSTEM\CurrentControlSet\Services\EventLog\Application`
+)
+
+// ErrKeyExists signals that the registry key already exists
+var ErrKeyExists = fmt.Errorf("%s\\%s already exists", keyName, Source)
+
+// categoryCount indicates the number of current event categories
+var categoryCount = uint32(len(ktypes.Categories()))
 
 // Level is the type definition for the eventlog log level
 type Level uint16
@@ -35,69 +53,37 @@ const (
 	Erro Level = 1
 )
 
-// LevelFromString resolves the eventlog levle from string
-func LevelFromString(s string) Level {
-	switch s {
-	case "info", "INFO":
-		return Info
-	case "warn", "warning", "WARN", "WARNING":
-		return Warn
-	case "erro", "error", "ERRO", "ERROR":
-		return Erro
-	default:
-		panic(fmt.Sprintf("unrecognized evtlog level: %s", s))
-	}
-}
-
-// ErrKeyExists signals that the registry key already exists
-type ErrKeyExists struct {
-	src string
-	key string
-}
-
-func (e ErrKeyExists) Error() string {
-	return fmt.Sprintf("%s\\%s already exists", e.key, e.src)
-}
-
 // Install modifies PC registry to allow logging with an event source src.
 // It adds all required keys and values to the event log registry key.
 // Install uses msgFile as the event message file. If useExpandKey is true,
 // the event message file is installed as REG_EXPAND_SZ value,
-// otherwise as REG_SZ. Use bitwise of log.Error, log.Warning and
-// log.Info to specify events supported by the new event source.
-func Install(src, f, key string, useExpandKey bool, eventsSupported, cats uint32) error {
-	appkey, err := registry.OpenKey(registry.LOCAL_MACHINE, key, registry.CREATE_SUB_KEY)
+// otherwise as REG_SZ. Use bitwise of Errr, Warn, and Info to specify events
+// supported by the new event source.
+func Install(eventsSupported uint32) error {
+	key, err := registry.OpenKey(registry.LOCAL_MACHINE, keyName, registry.CREATE_SUB_KEY)
 	if err != nil {
 		return err
 	}
-	defer appkey.Close()
+	defer key.Close()
 
-	sk, alreadyExist, err := registry.CreateKey(appkey, src, registry.SET_VALUE)
+	sk, exists, err := registry.CreateKey(key, Source, registry.SET_VALUE)
 	if err != nil {
 		return err
 	}
 	defer sk.Close()
-	if alreadyExist {
-		return ErrKeyExists{src, key}
+	if exists {
+		return ErrKeyExists
 	}
 
 	err = sk.SetDWordValue("CustomSource", 1)
 	if err != nil {
 		return err
 	}
-	if useExpandKey {
-		err = sk.SetExpandStringValue("EventMessageFile", f)
-	} else {
-		err = sk.SetStringValue("EventMessageFile", f)
-	}
+	err = sk.SetExpandStringValue("EventMessageFile", msgFile)
 	if err != nil {
 		return err
 	}
-	if useExpandKey {
-		err = sk.SetExpandStringValue("CategoryMessageFile", f)
-	} else {
-		err = sk.SetStringValue("CategoryMessageFile", f)
-	}
+	err = sk.SetExpandStringValue("CategoryMessageFile", msgFile)
 	if err != nil {
 		return err
 	}
@@ -105,7 +91,7 @@ func Install(src, f, key string, useExpandKey bool, eventsSupported, cats uint32
 	if err != nil {
 		return err
 	}
-	err = sk.SetDWordValue("CategoryCount", cats)
+	err = sk.SetDWordValue("CategoryCount", categoryCount)
 	if err != nil {
 		return err
 	}
