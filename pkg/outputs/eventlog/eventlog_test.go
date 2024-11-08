@@ -20,6 +20,7 @@ package eventlog
 
 import (
 	"errors"
+	"github.com/rabbitstack/fibratus/pkg/util/eventlog"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
 	"testing"
@@ -46,8 +47,8 @@ func TestEvtlogPublish(t *testing.T) {
 		events: ktypes.GetKtypesMetaIndexed(),
 		cats:   ktypes.Categories(),
 	}
-	err = Install(source, msgFile, false, levels)
-	if err != nil && !errors.Is(err, ErrKeyExists) {
+	err = eventlog.Install(eventlog.Levels)
+	if err != nil && !errors.Is(err, eventlog.ErrKeyExists) {
 		require.NoError(t, err)
 	}
 	require.NoError(t, el.Connect())

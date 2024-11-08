@@ -22,22 +22,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	evlog "github.com/rabbitstack/fibratus/pkg/util/eventlog"
 	"golang.org/x/sys/windows"
 	"hash/crc32"
 	"strings"
-)
-
-const (
-	// source represents the event source that generates the alerts
-	source = "Fibratus"
-	// levels designates the supported eventlog levels
-	levels = uint32(evlog.Info | evlog.Warn | evlog.Erro)
-	// msgFile specifies the location of the eventlog message DLL
-	msgFile = "%ProgramFiles%\\Fibratus\\fibratus.dll"
-	// keyName represents the registry key under which the eventlog source is registered
-	keyName = `SYSTEM\CurrentControlSet\Services\EventLog`
 )
 
 const minIDChars = 12
@@ -56,14 +44,14 @@ func makeSender(config alertsender.Config) (alertsender.Sender, error) {
 	if !ok {
 		return nil, alertsender.ErrInvalidConfig(alertsender.Eventlog)
 	}
-	sourceName, err := windows.UTF16PtrFromString(source)
+	sourceName, err := windows.UTF16PtrFromString(evlog.Source)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert source name: %v", err)
 	}
 
-	err = evlog.Install(source, msgFile, keyName, false, levels, uint32(len(ktypes.Categories())))
+	err = evlog.Install(evlog.Levels)
 	if err != nil {
-		if !errors.Is(err, evlog.ErrKeyExists{}) {
+		if !errors.Is(err, evlog.ErrKeyExists) {
 			return nil, err
 		}
 	}
@@ -77,24 +65,11 @@ func makeSender(config alertsender.Config) (alertsender.Sender, error) {
 
 // Send logs the alert to the eventlog.
 func (s *eventlog) Send(alert alertsender.Alert) error {
-	var etype uint16
-	switch alert.Severity {
-	case alertsender.Normal:
-		etype = windows.EVENTLOG_INFORMATION_TYPE
-	case alertsender.Medium:
-		etype = windows.EVENTLOG_WARNING_TYPE
-	case alertsender.High, alertsender.Critical:
-		etype = windows.EVENTLOG_ERROR_TYPE
-	default:
-		etype = windows.EVENTLOG_INFORMATION_TYPE
-	}
-
-	var eventID uint32
-
+	var code uint16
 	// despite the event id is 4-byte long
 	// we can only use 2 bytes to store the
-	// event identifier. Calculate the hash
-	// of the event id from alert identifier
+	// event code. Calculate the hash
+	// of the event code from alert identifier
 	// but keeping in mind collisions are
 	// possible since we're mapping a larger
 	// space to a smaller one
@@ -105,8 +80,7 @@ func (s *eventlog) Send(alert alertsender.Alert) error {
 		id := strings.Replace(alert.ID, "-", "", -1)
 		h := crc32.ChecksumIEEE([]byte(id[:minIDChars]))
 		// take the lower 16 bits of the CRC32 hash
-		eid := uint16(h & 0xFFFF)
-		eventID = uint32(eid)
+		code = uint16(h & 0xFFFF)
 	}
 
 	msg := alert.String(s.config.Verbose)
@@ -119,7 +93,10 @@ func (s *eventlog) Send(alert alertsender.Alert) error {
 		return fmt.Errorf("could not convert eventlog message to UTF16: %v: %s", err, msg)
 	}
 
-	return windows.ReportEvent(s.log, etype, 0, eventID, uintptr(0), 1, 0, &m, nil)
+	return windows.ReportEvent(s.log, windows.EVENTLOG_INFORMATION_TYPE, 0,
+		evlog.EventID(windows.EVENTLOG_INFORMATION_TYPE, code),
+		uintptr(0),
+		1, 0, &m, nil)
 }
 
 // Shutdown deregisters the event source.

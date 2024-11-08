@@ -104,14 +104,19 @@ type Alert struct {
 func (a Alert) String(verbose bool) string {
 	if verbose {
 		var b strings.Builder
+		if len(a.Events) > 1 {
+			b.WriteString("System events involved in this alert:\n\n")
+		} else {
+			b.WriteString("System event involved in this alert:\n\n")
+		}
 		for n, evt := range a.Events {
-			b.WriteString(fmt.Sprintf("Event #%d:\n", n+1))
-			b.WriteString(evt.String())
+			b.WriteString(fmt.Sprintf("\tEvent #%d:\n", n+1))
+			b.WriteString(strings.TrimSuffix(evt.StringShort(), "\t"))
 		}
 		if a.Text == "" {
-			return fmt.Sprintf("%s\n\n%s", a.Title, b.String())
+			return fmt.Sprintf("%s\n\nSeverity: %s\n\n%s", a.Title, a.Severity, b.String())
 		}
-		return fmt.Sprintf("%s\n\n%s\n\n%s", a.Title, a.Text, b.String())
+		return fmt.Sprintf("%s\n\n%s\n\nSeverity: %s\n\n%s", a.Title, a.Text, a.Severity, b.String())
 	}
 
 	if a.Text == "" {
