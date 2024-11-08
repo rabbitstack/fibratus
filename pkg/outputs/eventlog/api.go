@@ -25,16 +25,11 @@ package eventlog
 import (
 	"bytes"
 	"errors"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/util/eventlog"
 	"syscall"
 
 	"golang.org/x/sys/windows"
 )
-
-const addKeyName = `SYSTEM\CurrentControlSet\Services\EventLog\Application`
-
-var categoryCount = len(ktypes.Categories())
 
 // Eventlog provides access to the system log.
 type Eventlog struct {

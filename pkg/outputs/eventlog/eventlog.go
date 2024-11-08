@@ -23,6 +23,7 @@ package eventlog
 import (
 	"errors"
 	"github.com/rabbitstack/fibratus/pkg/util/eventlog"
+	"golang.org/x/sys/windows"
 	"text/template"
 
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
@@ -32,13 +33,6 @@ import (
 )
 
 const (
-	// source under which eventlog events are reported
-	source = "Fibratus"
-	// levels designates the supported eventlog levels
-	levels = uint32(eventlog.Info | eventlog.Warn | eventlog.Erro)
-	// msgFile specifies the location of the eventlog message DLL
-	msgFile = "%ProgramFiles%\\Fibratus\\fibratus.dll"
-
 	// categoryOffset specifies the start of the event id number space
 	categoryOffset = 25
 )
@@ -64,10 +58,10 @@ func initEventlog(config outputs.Config) (outputs.OutputGroup, error) {
 	if !ok {
 		return outputs.Fail(outputs.ErrInvalidConfig(outputs.Eventlog, config.Output))
 	}
-	err := eventlog.Install(source, msgFile, addKeyName, false, levels, uint32(categoryCount))
+	err := eventlog.Install(eventlog.Levels)
 	if err != nil {
 		// ignore error if the key already exists
-		if !errors.Is(err, eventlog.ErrKeyExists{}) {
+		if !errors.Is(err, eventlog.ErrKeyExists) {
 			return outputs.Fail(err)
 		}
 	}
@@ -89,9 +83,9 @@ func (e *evtlog) Connect() error {
 		err error
 	)
 	if e.config.RemoteHost != "" {
-		evl, err = OpenRemote(e.config.RemoteHost, source)
+		evl, err = OpenRemote(e.config.RemoteHost, eventlog.Source)
 	} else {
-		evl, err = Open(source)
+		evl, err = Open(eventlog.Source)
 	}
 	if err != nil {
 		return err
@@ -121,28 +115,16 @@ func (e *evtlog) publish(kevt *kevent.Kevent) error {
 	if err != nil {
 		return err
 	}
-	eid := e.eventID(kevt)
-	if eid == 0 {
+	categoryID := e.categoryID(kevt)
+	eventID := eventlog.EventID(windows.EVENTLOG_INFORMATION_TYPE, uint16(e.eventCode(kevt)))
+	if eventID == 0 {
 		return ErrUnknownEventID
 	}
-	err = e.log(eid, e.categoryID(kevt), buf)
+	err = e.evtlog.Info(eventID, categoryID, buf)
 	if err != nil {
 		return err
 	}
 	return nil
-}
-
-func (e *evtlog) log(eventID uint32, categoryID uint16, buf []byte) error {
-	switch eventlog.LevelFromString(e.config.Level) {
-	case eventlog.Info:
-		return e.evtlog.Info(eventID, categoryID, buf)
-	case eventlog.Warn:
-		return e.evtlog.Warning(eventID, categoryID, buf)
-	case eventlog.Erro:
-		return e.evtlog.Error(eventID, categoryID, buf)
-	default:
-		panic("unknown eventlog level")
-	}
 }
 
 // categoryID maps category name to eventlog identifier.
@@ -155,8 +137,8 @@ func (e *evtlog) categoryID(kevt *kevent.Kevent) uint16 {
 	return 0
 }
 
-// eventID returns the event ID from the event type.
-func (e *evtlog) eventID(kevt *kevent.Kevent) uint32 {
+// eventCode returns the event ID from the event type.
+func (e *evtlog) eventCode(kevt *kevent.Kevent) uint32 {
 	for i, evt := range e.events {
 		if evt.Name == kevt.Name {
 			return uint32(i + categoryOffset)
