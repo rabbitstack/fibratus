@@ -1,0 +1,30 @@
+name: Process execution from a self-deleting binary
+id: 0f0da517-b22c-4d14-9adc-36baeb621cf7
+version: 1.0.0
+description: |
+  Identifies the execution of the process from a self-deleting binary. The attackers can
+  abuse undocumented API functions to create a process from a file-backed section. The file 
+  is put into a delete-pending state allowing the attacker to bypass kernel callback controls
+  by closing the handle to the file before the main thread is spawned.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1055
+  technique.name: Process Injection
+  technique.ref: https://attack.mitre.org/techniques/T1055/
+references:
+  - https://github.com/hasherezade/process_ghosting
+  - https://www.elastic.co/es/blog/process-ghosting-a-new-executable-image-tampering-attack
+
+condition: >
+  sequence
+  maxspan 1m
+    |delete_file and file.info.is_disposition_delete_file| by file.name
+    |load_module| by image.name
+
+output: >
+  Process %2.image.name spawned from self-deleting binary
+severity: high
+
+min-engine-version: 2.3.0

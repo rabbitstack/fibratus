@@ -25,6 +25,9 @@
 - macro: create_file
   expr: kevt.name = 'CreateFile' and file.operation != 'OPEN' and file.status = 'Success'
 
+- macro: delete_file
+  expr: kevt.name = 'DeleteFile'
+
 - macro: query_registry
   expr: kevt.name in ('RegQueryKey', 'RegQueryValue') and registry.status = 'Success'
 
