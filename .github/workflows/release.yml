@@ -88,12 +88,29 @@ jobs:
       - name: Package
         shell: bash
         run: |
-           export VERSION=${{ steps.get_version.outputs.VERSION }}
-           ./make.bat pkg
+          export VERSION=${{ steps.get_version.outputs.VERSION }}
+          ./make.bat pkg
+          mkdir ./build/msi/signed
       - uses: actions/upload-artifact@v4
+        id: upload-msi
         with:
           name: fibratus-${{ steps.get_version.outputs.VERSION }}-amd64.msi
           path: "./build/msi/fibratus-${{ steps.get_version.outputs.VERSION }}-amd64.msi"
+      - name: Sign MSI
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: "${{ secrets.SIGNPATH_API_TOKEN }}"
+          organization-id: "${{ secrets.SIGNPATH_ORG_ID }}"
+          project-slug: "fibratus"
+          signing-policy-slug: "release-signing"
+          github-artifact-id: "${{ steps.upload-msi.outputs.artifact-id }}"
+          wait-for-completion: true
+          output-artifact-directory: "./build/msi/signed"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fibratus-${{ steps.get_version.outputs.VERSION }}-amd64.msi
+          path: "./build/msi/signed/fibratus-${{ steps.get_version.outputs.VERSION }}-amd64.msi"
+          overwrite: true
 
   build-slim:
       runs-on: windows-latest
@@ -125,12 +142,30 @@ jobs:
       - name: Package
         shell: bash
         run: |
-           export VERSION=${{ steps.get_version.outputs.VERSION }}
-           ./make.bat pkg-slim
+          export VERSION=${{ steps.get_version.outputs.VERSION }}
+          ./make.bat pkg-slim
+          mkdir ./build/msi/signed
       - uses: actions/upload-artifact@v4
+        id: upload-msi
         with:
           name: fibratus-${{ steps.get_version.outputs.VERSION }}-slim-amd64.msi
           path: "./build/msi/fibratus-${{ steps.get_version.outputs.VERSION }}-slim-amd64.msi"
+      - name: Sign MSI
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: "${{ secrets.SIGNPATH_API_TOKEN }}"
+          organization-id: "${{ secrets.SIGNPATH_ORG_ID }}"
+          project-slug: "fibratus"
+          signing-policy-slug: "release-signing"
+          artifact-configuration-slug: "fibratus-slim"
+          github-artifact-id: "${{ steps.upload-msi.outputs.artifact-id }}"
+          wait-for-completion: true
+          output-artifact-directory: "./build/msi/signed"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fibratus-${{ steps.get_version.outputs.VERSION }}-slim-amd64.msi
+          path: "./build/msi/signed/fibratus-${{ steps.get_version.outputs.VERSION }}-slim-amd64.msi"
+          overwrite: true
 
   release:
       runs-on: windows-latest

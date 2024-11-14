@@ -62,6 +62,14 @@ To describe all rules in the catalog, use the `fibratus rules list` command. It 
 
 We love contributions. To start contributing to Fibratus, please read our [contribution guidelines](https://github.com/rabbitstack/fibratus/blob/master/CONTRIBUTING.md).
 
+### Code Signing Policy
+
+Free code signing provided by [SignPath.io], certificate by
+[SignPath Foundation]. All releases are automatically signed.
+
+[SignPath.io]: https://signpath.io
+[SignPath Foundation]: https://signpath.org
+
 ---
 
 <p align="center">
