@@ -1,0 +1,28 @@
+name: Image load via NTFS transaction
+id: ce8de3d0-0768-41a7-bab9-4eca27ed1e3c
+version: 1.0.0
+description: |
+  Identifies image loading of a file written to disk via NTFS transaction. Adversaries may exploit 
+  the transactional API to execute code in the address space of the running process without committing 
+  the code to disk.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1055
+  technique.name: Process Injection
+  technique.ref: https://attack.mitre.org/techniques/T1055/
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/fileio/about-transactional-ntfs
+
+condition: >
+  sequence
+  maxspan 2m
+    |create_file and thread.callstack.symbols imatches ('kernel32.dll!CreateFileTransacted*', 'ntdll.dll!RtlSetCurrentTransaction')| by file.name
+    |load_module and kevt.pid != 4| by image.name
+
+output: >
+  Image %2.image.name written via transactional NTFS and loaded afterward
+severity: high
+
+min-engine-version: 2.0.0
