@@ -251,10 +251,8 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 		return ev, nil
 	case ktypes.ReleaseFile:
 		fileReleaseCount.Add(1)
-		// delete both, the file object and the file key from files map
-		fileKey := e.Kparams.MustGetUint64(kparams.FileKey)
+		// delete file metadata by file object address
 		fileObject := e.Kparams.MustGetUint64(kparams.FileObject)
-		delete(f.files, fileKey)
 		delete(f.files, fileObject)
 	case ktypes.UnmapViewFile:
 		_ = f.psnap.RemoveFileMapping(e.PID, e.Kparams.TryGetAddress(kparams.FileViewBase))
