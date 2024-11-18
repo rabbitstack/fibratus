@@ -28,6 +28,9 @@
 - macro: delete_file
   expr: kevt.name = 'DeleteFile'
 
+- macro: set_file_information
+  expr: kevt.name = 'SetFileInformation'
+
 - macro: query_registry
   expr: kevt.name in ('RegQueryKey', 'RegQueryValue') and registry.status = 'Success'
 

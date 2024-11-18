@@ -1,0 +1,29 @@
+name: Clear Eventlog
+id: 692d3143-e1fb-4dab-8c9c-3109ff80ec85
+version: 1.0.0
+description: |
+  Identifies attempts to clear Windows event log stores. Adversaries attempt to evade detection or 
+  destroy forensic evidence on a system to cover their trails and slow down incident response.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1070
+  technique.name: Indicator Removal
+  technique.ref: https://attack.mitre.org/techniques/T1070/
+  subtechnique.id: T1070.001
+  subtechnique.name: Clear Windows Event Logs
+  subtechnique.ref: https://attack.mitre.org/techniques/T1070/001/
+
+condition: >
+  sequence
+  maxspan 1m
+  by file.object
+    |set_file_information and file.info_class = 'EOF' and file.info.eof_size > 50000 and file.name imatches '?:\\Windows\\System32\\winevt\\Logs\\*.evtx'|
+    |set_file_information and file.info_class = 'Allocation' and file.info.allocation_size > 50000|
+
+output: >
+  Windows Eventlog store %1.file.name was cleared
+severity: high
+
+min-engine-version: 2.3.0
