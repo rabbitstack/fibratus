@@ -19,7 +19,7 @@ alertsenders:
   # Systray sender sends alerts as notifications to the taskbar status area.
   systray:
     # Enables/disables systray alert sender
-    enabled: true
+    enabled: false
 
     # Indicates if the associated sound is played when the balloon notification is shown
     sound: true
@@ -84,7 +84,7 @@ alertsenders:
     # Enables/disables the verbose mode. In verbose mode, the full event
     # context, including all parameters and the process information are included
     # in the log message.
-    verbose: false
+    verbose: true
 
 # =============================== API ==================================================
 

@@ -40,5 +40,5 @@ type Config struct {
 // AddFlags registers persistent flags.
 func AddFlags(flags *pflag.FlagSet) {
 	flags.Bool(enabled, true, "Indicates if eventlog alert sender is enabled")
-	flags.Bool(verbose, false, "Enables/disables the verbose mode. In verbose mode, the full event context, including all parameters and the process information are included in the log message")
+	flags.Bool(verbose, true, "Enables/disables the verbose mode. In verbose mode, the full event context, including all parameters and the process information are included in the log message")
 }
