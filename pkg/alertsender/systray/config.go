@@ -40,7 +40,7 @@ type Config struct {
 
 // AddFlags registers persistent flags.
 func AddFlags(flags *pflag.FlagSet) {
-	flags.Bool(enabled, true, "Determines whether systray alert sender is enabled")
+	flags.Bool(enabled, false, "Determines whether systray alert sender is enabled")
 	flags.Bool(sound, true, "Indicates if the associated sound is played when the balloon notification is shown")
 	flags.Bool(quietMode, false, "Instructs not to display the balloon notification if the current user is in quiet time")
 }
