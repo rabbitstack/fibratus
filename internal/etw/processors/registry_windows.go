@@ -124,6 +124,11 @@ func (r *registryProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, erro
 			return e, nil
 		}
 
+		// values within hidden keys cannot be read
+		if strings.HasSuffix(keyName, "\\") {
+			return e, nil
+		}
+
 		rootkey, subkey := key.Format(keyName)
 		if rootkey != key.Invalid {
 			typ, val, err := rootkey.ReadValue(subkey)
