@@ -725,6 +725,7 @@ func TestScan(t *testing.T) {
 					Kparams: kevent.Kparams{
 						kparams.ProcessID:    {Name: kparams.ProcessID, Type: kparams.PID, Value: pid},
 						kparams.FileViewBase: {Name: kparams.FileViewBase, Type: kparams.Address, Value: uint64(0x7ffe0000)},
+						kparams.FileViewSize: {Name: kparams.FileViewSize, Type: kparams.Uint64, Value: uint64(12333)},
 						kparams.MemProtect:   {Name: kparams.MemProtect, Type: kparams.Flags, Value: uint32(kevent.SectionRX), Flags: kevent.ViewProtectionFlags},
 					},
 					Metadata: make(map[kevent.MetadataKey]any),
@@ -780,6 +781,7 @@ func TestScan(t *testing.T) {
 					Kparams: kevent.Kparams{
 						kparams.ProcessID:    {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1123)},
 						kparams.FileViewBase: {Name: kparams.FileViewBase, Type: kparams.Address, Value: uint64(0x7f3e1000)},
+						kparams.FileViewSize: {Name: kparams.FileViewSize, Type: kparams.Uint64, Value: uint64(12333)},
 						kparams.MemProtect:   {Name: kparams.MemProtect, Type: kparams.Flags, Value: uint32(kevent.SectionRX), Flags: kevent.ViewProtectionFlags},
 					},
 					Metadata: make(map[kevent.MetadataKey]any),
@@ -828,6 +830,7 @@ func TestScan(t *testing.T) {
 					Kparams: kevent.Kparams{
 						kparams.ProcessID:    {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(321321)},
 						kparams.FileViewBase: {Name: kparams.FileViewBase, Type: kparams.Address, Value: uint64(0x7ffe0000)},
+						kparams.FileViewSize: {Name: kparams.FileViewSize, Type: kparams.Uint64, Value: uint64(12333)},
 						kparams.MemProtect:   {Name: kparams.MemProtect, Type: kparams.Flags, Value: uint32(0x10000), Flags: kevent.ViewProtectionFlags},
 					},
 					Metadata: make(map[kevent.MetadataKey]any),
@@ -877,6 +880,7 @@ func TestScan(t *testing.T) {
 						kparams.ProcessID:    {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1123)},
 						kparams.FileName:     {Name: kparams.FileName, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "regedit.exe")},
 						kparams.FileViewBase: {Name: kparams.FileViewBase, Type: kparams.Address, Value: uint64(0x7ffe0000)},
+						kparams.FileViewSize: {Name: kparams.FileViewSize, Type: kparams.Uint64, Value: uint64(12333)},
 						kparams.MemProtect:   {Name: kparams.MemProtect, Type: kparams.Flags, Value: uint32(kevent.SectionRWX), Flags: kevent.ViewProtectionFlags},
 					},
 					Metadata: make(map[kevent.MetadataKey]any),
