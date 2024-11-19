@@ -103,6 +103,7 @@ func NewScanner(psnap ps.Snapshotter, config config.Config) (Scanner, error) {
 				return nil
 			}
 			rulesInCompiler.Add(1)
+			log.Infof("loading yara rule(s) from %s", filepath.Join(path, fi.Name()))
 
 			return nil
 		})
@@ -277,7 +278,8 @@ func (s scanner) Scan(e *kevent.Kevent) (bool, error) {
 		// scan process mapping a suspicious RX/RWX section view
 		pid := e.Kparams.MustGetPid()
 		prot := e.Kparams.MustGetUint32(kparams.MemProtect)
-		if e.PID != 4 && ((prot&kevent.SectionRX) != 0 && (prot&kevent.SectionRWX) != 0) {
+		size := e.Kparams.MustGetUint64(kparams.FileViewSize)
+		if e.PID != 4 && size >= 4096 && ((prot&kevent.SectionRX) != 0 && (prot&kevent.SectionRWX) != 0) {
 			filename := e.GetParamAsString(kparams.FileName)
 			// skip mappings of signed images
 			addr := e.Kparams.MustGetUint64(kparams.FileViewBase)
