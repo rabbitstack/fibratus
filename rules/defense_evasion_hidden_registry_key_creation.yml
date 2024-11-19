@@ -1,0 +1,27 @@
+name: Hidden registry key creation
+id: 65deda38-9b1d-42a0-9f40-a68903e81b49
+version: 1.0.0
+description: |
+  Identifies the creation of a hidden registry key. Adversaries can utilize the
+  native NtSetValueKey API to create a hidden registry key and conceal payloads
+  or commands used to maintain persistence.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1112
+  technique.name: Modify Registry
+  technique.ref: https://attack.mitre.org/techniques/T1112/
+references:
+  - https://github.com/outflanknl/SharpHide
+
+condition: >
+  set_value and kevt.pid != 4 and registry.key.name endswith '\\' 
+    and 
+  thread.callstack.symbols not imatches ('KernelBase.dll!RegSetValue*', 'KernelBase.dll!RegLoadAppKey*', 'KernelBase.dll!GetFileAttributes*')
+
+output: >
+  Hidden registry key %registry.key.name created by process %ps.exe
+severity: high
+
+min-engine-version: 2.2.0
