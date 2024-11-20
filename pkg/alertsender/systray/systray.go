@@ -25,6 +25,7 @@ import (
 	"github.com/Microsoft/go-winio"
 	"github.com/cenkalti/backoff/v4"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
+	"github.com/rabbitstack/fibratus/pkg/kevent"
 	log "github.com/sirupsen/logrus"
 	"os"
 	"time"
@@ -111,11 +112,13 @@ func makeSender(config alertsender.Config) (alertsender.Sender, error) {
 		break
 	}
 
-	return s, s.writePipe(&Msg{Type: Conf, Data: c})
+	return s, s.send(&Msg{Type: Conf, Data: c})
 }
 
 func (s *systray) Send(alert alertsender.Alert) error {
-	return s.writePipe(&Msg{Type: Balloon, Data: alert})
+	// remove all events to avoid decoding errors on systray server end
+	alert.Events = make([]*kevent.Kevent, 0)
+	return s.send(&Msg{Type: Balloon, Data: alert})
 }
 
 func (*systray) Type() alertsender.Type { return alertsender.Systray }
@@ -123,7 +126,7 @@ func (*systray) SupportsMarkdown() bool { return false }
 
 func (s *systray) Shutdown() error { return nil }
 
-func (s *systray) writePipe(m *Msg) error {
+func (s *systray) send(m *Msg) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	conn, err := winio.DialPipeContext(ctx, systrayPipe)
@@ -131,6 +134,7 @@ func (s *systray) writePipe(m *Msg) error {
 		return fmt.Errorf("unable to dial %s pipe: %v", systrayPipe, err)
 	}
 	defer conn.Close()
+
 	b, err := m.encode()
 	if err != nil {
 		return err
@@ -141,10 +145,12 @@ func (s *systray) writePipe(m *Msg) error {
 	if _, err = conn.Write(b); err != nil {
 		return fmt.Errorf("unable to write systray pipe: %v", err)
 	}
+
 	return nil
 }
 
 func pipeExists() bool {
 	_, err := os.Stat(systrayPipe)
+	log.Warnf("pipe not found: %v", err)
 	return err == nil
 }
