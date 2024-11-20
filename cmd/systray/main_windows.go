@@ -181,10 +181,9 @@ func (s *Systray) loadIconFromResource(mod windows.Handle) (windows.Handle, erro
 }
 
 func (s *Systray) handlePipeClient(conn net.Conn) {
-	buf := make([]byte, 1024)
 	defer conn.Close()
 	for {
-		n, err := conn.Read(buf)
+		buf, err := io.ReadAll(conn)
 		if err != nil {
 			if err != io.EOF {
 				logrus.Errorf("pipe read: %v", err)
@@ -192,7 +191,7 @@ func (s *Systray) handlePipeClient(conn net.Conn) {
 			break
 		}
 		var m Msg
-		err = json.Unmarshal(buf[:n], &m)
+		err = json.Unmarshal(buf, &m)
 		if err != nil {
 			logrus.Error(err)
 			break
@@ -218,6 +217,7 @@ func (s *Systray) handleMessage(m Msg) error {
 		var alert alertsender.Alert
 		err := m.decode(&alert)
 		if err != nil {
+			logrus.Errorf("unable to decode alert: %v", err)
 			return err
 		}
 		text := alert.Text
@@ -246,7 +246,7 @@ func main() {
 	// Give generic read/write access to the
 	// current user SID
 	descriptor := "D:P(A;;GA;;;" + usr.Uid + ")"
-	// spin up named-pipe server
+	// spin up the named-pipe server
 	l, err := winio.ListenPipe(systrayPipe, &winio.PipeConfig{SecurityDescriptor: descriptor})
 	if err != nil {
 		logrus.Fatalf("unable to listen on named pipe: %s: %v", systrayPipe, err)
