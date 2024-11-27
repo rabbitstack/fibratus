@@ -31,15 +31,8 @@ condition: >
       (create_file)
         or
       (
-        load_module
-          and
-          not
-        image.name imatches
-          (
-            '?:\\Program Files\\*',
-            '?:\\Program Files (x86)\\*'
-          )
-       )
+        load_module and not image.name imatches ('?:\\Program Files\\*', '?:\\Program Files (x86)\\*')
+      )
      )
     | by ps.uuid
 
