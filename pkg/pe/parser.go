@@ -305,6 +305,11 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 		p.EntryPoint = format.UintToHex(uint64(oh32.AddressOfEntryPoint))
 	}
 
+	// CLR directory parsing piggybacks on sections
+	if opts.parseCLR {
+		opts.parseSections = true
+	}
+
 	// parse section header
 	if opts.parseSections || opts.parseResources {
 		err = pe.ParseSectionHeader()
