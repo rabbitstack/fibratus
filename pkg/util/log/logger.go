@@ -122,16 +122,30 @@ func InitFromConfig(c Config, filename string) error {
 	return nil
 }
 
+// redirectStderrToFile redirects the standard output stream to a log file.
+// Helpful to capture panics and send them to the file.
 func redirectStderrToFile(file string) error {
-	f, err := os.OpenFile(file, os.O_WRONLY|os.O_SYNC|os.O_APPEND, 0644)
+	f, err := os.OpenFile(file, os.O_WRONLY|os.O_CREATE|os.O_SYNC|os.O_APPEND, 0644)
 	if err != nil {
 		return fmt.Errorf("unable to open %s for stderr redirection: %v", file, err)
 	}
 	defer f.Close()
-	err = windows.SetStdHandle(windows.STD_ERROR_HANDLE, windows.Handle(f.Fd()))
+
+	fd, err := dupFD(f.Fd())
+	if err != nil {
+		return fmt.Errorf("failed to duplicate file handle: %v", err)
+	}
+
+	err = windows.SetStdHandle(windows.STD_ERROR_HANDLE, fd)
 	if err != nil {
 		return fmt.Errorf("failed to redirect stderr to file: %v", err)
 	}
-	os.Stderr = f
+
 	return nil
+}
+
+func dupFD(fd uintptr) (windows.Handle, error) {
+	proc := windows.CurrentProcess()
+	var h windows.Handle
+	return h, windows.DuplicateHandle(proc, windows.Handle(fd), proc, &h, 0, true, windows.DUPLICATE_SAME_ACCESS)
 }
