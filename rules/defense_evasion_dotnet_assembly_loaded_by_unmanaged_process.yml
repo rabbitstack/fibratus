@@ -1,6 +1,6 @@
 name: .NET assembly loaded by unmanaged process
 id: 34be8bd1-1143-4fa8-bed4-ae2566b1394a
-version: 1.0.0
+version: 1.0.1
 description: |
   Identifies the loading of the .NET assembly by an unmanaged process. Adversaries can load the CLR runtime
   inside unmanaged process and execute the assembly via the ICLRRuntimeHost::ExecuteInDefaultAppDomain method.
@@ -26,6 +26,12 @@ condition: >
       '?:\\Windows\\assembly\\*\\*.ni.dll',
       '?:\\Program Files\\WindowsPowerShell\\Modules\\*\\*.dll',
       '?:\\Windows\\Microsoft.NET\\assembly\\*\\*.dll'
+    )
+    and
+    not
+  ps.exe imatches
+    (
+      '?:\\Program Files\\WindowsApps\\*\\CrossDeviceService.exe'
     )
 
 output: >

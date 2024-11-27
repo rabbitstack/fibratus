@@ -1,6 +1,6 @@
 name: Potential Process Hollowing
 id: 2a3fbae8-5e8c-4b71-b9da-56c3958c0d53
-version: 1.1.0
+version: 1.1.1
 description: |
   Adversaries may inject malicious code into suspended and hollowed processes in order to
   evade process-based defenses. Process hollowing is a method of executing arbitrary code
@@ -29,7 +29,12 @@ references:
 condition: >
   sequence
   maxspan 2m
-    |spawn_process| by ps.child.uuid
+    |spawn_process and not ps.sid in ('S-1-5-18', 'S-1-5-19', 'S-1-5-20') and not ps.exe imatches 
+      (
+        '?:\\Program Files\\*', 
+        '?:\\Program Files (x86)\\*'
+      )
+    | by ps.child.uuid
     |unmap_view_of_section and file.view.size > 20000 and file.view.protection != 'READONLY' and (length(file.name) = 0 or not ext(file.name) = '.dll')| by ps.uuid
     |load_executable| by ps.uuid
 action:

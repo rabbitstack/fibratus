@@ -22,15 +22,12 @@ references:
 condition: >
   sequence
   maxspan 1m
-    |create_remote_thread
-      and
-      not
-     (ps.exe imatches
-        (
-          '?:\\Program Files\\*',
-          '?:\\Program Files (x86)\\*'
-        )
-      or
+    |create_remote_thread and not (ps.exe imatches
+      (
+        '?:\\Program Files\\*',
+        '?:\\Program Files (x86)\\*'
+      )
+        or
       (ps.exe imatches 'C:\\Windows\\System32\\svchost.exe' and ps.args iin ('-k', 'DcomLaunch'))
      )
     | by thread.pid
