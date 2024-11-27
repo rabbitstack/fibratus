@@ -180,7 +180,7 @@ func (f *App) Run(args []string) error {
 	}
 
 	log.Infof("bootstrapping with pid %d. Version: %s", os.Getpid(), version.Get())
-	log.Infof("rendering config flags... %s", cfg.Print())
+	log.Infof("configuration options: %s", cfg.Print())
 
 	// build the filter from the CLI argument. If we got
 	// a valid expression the filter is attached to the
