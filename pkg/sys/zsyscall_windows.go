@@ -61,6 +61,7 @@ var (
 	procGetPackageId                         = modkernel32.NewProc("GetPackageId")
 	procGetProcessIdOfThread                 = modkernel32.NewProc("GetProcessIdOfThread")
 	procTerminateThread                      = modkernel32.NewProc("TerminateThread")
+	procWTSGetActiveConsoleSessionId         = modkernel32.NewProc("WTSGetActiveConsoleSessionId")
 	procNtAlpcQueryInformation               = modntdll.NewProc("NtAlpcQueryInformation")
 	procNtCreateSection                      = modntdll.NewProc("NtCreateSection")
 	procNtMapViewOfSection                   = modntdll.NewProc("NtMapViewOfSection")
@@ -89,6 +90,7 @@ var (
 	procCryptCATCatalogInfoFromContext       = modwintrust.NewProc("CryptCATCatalogInfoFromContext")
 	procWinVerifyTrust                       = modwintrust.NewProc("WinVerifyTrust")
 	procWTSQuerySessionInformationW          = modwtsapi32.NewProc("WTSQuerySessionInformationW")
+	procWTSQueryUserToken                    = modwtsapi32.NewProc("WTSQueryUserToken")
 )
 
 func SymEnumLoadedModules(handle windows.Handle, callback uintptr, ctx uintptr) (b bool) {
@@ -172,6 +174,12 @@ func TerminateThread(handle windows.Handle, exitCode uint32) (err error) {
 	if r1 == 0 {
 		err = errnoErr(e1)
 	}
+	return
+}
+
+func WTSGetActiveConsoleSessionID() (n uint32) {
+	r0, _, _ := syscall.Syscall(procWTSGetActiveConsoleSessionId.Addr(), 0, 0, 0, 0)
+	n = uint32(r0)
 	return
 }
 
@@ -379,5 +387,11 @@ func WTSQuerySessionInformationA(handle windows.Handle, sessionID uint32, klass 
 	if r1 == 0 {
 		err = errnoErr(e1)
 	}
+	return
+}
+
+func WTSQueryUserToken(sessionID uint32, token *windows.Token) (ok bool) {
+	r0, _, _ := syscall.Syscall(procWTSQueryUserToken.Addr(), 2, uintptr(sessionID), uintptr(unsafe.Pointer(token)), 0)
+	ok = r0 != 0
 	return
 }

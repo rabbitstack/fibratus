@@ -29,6 +29,8 @@ import (
 const (
 	// SeDebugPrivilege is the name of the privilege used to debug programs.
 	SeDebugPrivilege = "SeDebugPrivilege"
+	// SeTcbPrivilege privilege identifies its holder as part of the trusted computer base.
+	SeTcbPrivilege = "SeTcbPrivilege"
 )
 
 // Errors returned by AdjustTokenPrivileges.
@@ -41,6 +43,8 @@ const (
 const (
 	// PrivilegedEnabled enables the privilege.
 	PrivilegedEnabled uint32 = 0x00000002
+	// PrivilegeRemoved removes the privilege.
+	PrivilegeRemoved uint32 = 0x00000004
 )
 
 // mapPrivileges maps privilege names to LUID values.
@@ -57,10 +61,10 @@ func mapPrivileges(names []string) ([]windows.LUID, error) {
 	return privileges, nil
 }
 
-// EnableTokenPrivileges enables the specified privileges in the given
+// adjustTokenPrivileges enables/disables the specified privileges in the given
 // Token. The token must have TOKEN_ADJUST_PRIVILEGES access. If the token
 // does not already contain the privilege it cannot be enabled.
-func EnableTokenPrivileges(token windows.Token, privileges ...string) error {
+func adjustTokenPrivileges(token windows.Token, state uint32, privileges ...string) error {
 	privValues, err := mapPrivileges(privileges)
 	if err != nil {
 		return err
@@ -74,7 +78,7 @@ func EnableTokenPrivileges(token windows.Token, privileges ...string) error {
 		if err := binary.Write(&b, binary.LittleEndian, p); err != nil {
 			continue
 		}
-		if err := binary.Write(&b, binary.LittleEndian, PrivilegedEnabled); err != nil {
+		if err := binary.Write(&b, binary.LittleEndian, state); err != nil {
 			continue
 		}
 	}
@@ -90,9 +94,29 @@ func EnableTokenPrivileges(token windows.Token, privileges ...string) error {
 	return nil
 }
 
-// SetDebugPrivilege sets the debug privilege in the current running process.
+// SetDebugPrivilege sets the debug privilege in the current process token.
 func SetDebugPrivilege() {
+	enablePrivileges(SeDebugPrivilege)
+}
+
+// SetTcbPrivilege sets the TCB privilege in the current process token.
+func SetTcbPrivilege() {
+	enablePrivileges(SeTcbPrivilege)
+}
+
+// RemoveTcbPrivilege removes the TCB privilege from the access token of the current process.
+func RemoveTcbPrivilege() {
+	removePrivileges(SeTcbPrivilege)
+}
+
+func enablePrivileges(privs ...string) {
 	var token windows.Token
 	_ = windows.OpenProcessToken(windows.CurrentProcess(), windows.TOKEN_ADJUST_PRIVILEGES|windows.TOKEN_QUERY, &token)
-	_ = EnableTokenPrivileges(token, SeDebugPrivilege)
+	_ = adjustTokenPrivileges(token, PrivilegedEnabled, privs...)
+}
+
+func removePrivileges(privs ...string) {
+	var token windows.Token
+	_ = windows.OpenProcessToken(windows.CurrentProcess(), windows.TOKEN_ADJUST_PRIVILEGES|windows.TOKEN_QUERY, &token)
+	_ = adjustTokenPrivileges(token, PrivilegeRemoved, privs...)
 }

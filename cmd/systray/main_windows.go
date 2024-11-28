@@ -181,25 +181,24 @@ func (s *Systray) loadIconFromResource(mod windows.Handle) (windows.Handle, erro
 
 func (s *Systray) handlePipeClient(conn net.Conn) {
 	defer conn.Close()
-	for {
-		buf, err := io.ReadAll(conn)
-		if err != nil {
-			if err != io.EOF {
-				logrus.Errorf("pipe read: %v", err)
-			}
-			break
+	buf, err := io.ReadAll(conn)
+	if err != nil {
+		if err != io.EOF {
+			logrus.Errorf("pipe read: %v", err)
 		}
-		var m Msg
-		err = json.Unmarshal(buf, &m)
-		if err != nil {
-			logrus.Error(err)
-			break
-		}
-		err = s.handleMessage(m)
-		if err != nil {
-			logrus.Error(err)
-			break
-		}
+	}
+	if len(buf) == 0 {
+		return
+	}
+	var m Msg
+	err = json.Unmarshal(buf, &m)
+	if err != nil {
+		logrus.Error(err)
+		return
+	}
+	err = s.handleMessage(m)
+	if err != nil {
+		logrus.Error(err)
 	}
 }
 
@@ -209,6 +208,7 @@ func (s *Systray) handleMessage(m Msg) error {
 		var c systray.Config
 		err := m.decode(&c)
 		if err != nil {
+			logrus.Errorf("unable to decode systray server config: %v", err)
 			return err
 		}
 		s.config = c
@@ -231,7 +231,7 @@ func (s *Systray) handleMessage(m Msg) error {
 }
 
 func main() {
-	err := log.InitFromConfig(log.Config{Level: "info", LogStdout: true}, "fibratus-systray.log")
+	err := log.InitFromConfig(log.Config{Level: "info", LogStdout: true, Formatter: "text"}, "fibratus-systray.log")
 	if err != nil {
 		fmt.Printf("%v", err)
 		os.Exit(1)
@@ -257,9 +257,6 @@ func main() {
 			logrus.Warnf("fail to shutdown: %v", err)
 		}
 	}()
-
-	// detach console
-	sys.FreeConsole()
 
 	// server loop
 	for {

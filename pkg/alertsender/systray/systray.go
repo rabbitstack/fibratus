@@ -26,8 +26,12 @@ import (
 	"github.com/cenkalti/backoff/v4"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sys/windows"
+	"math"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -45,6 +49,7 @@ const systrayPipe = `\\.\pipe\fibratus-systray`
 // by the systray sender.
 type systray struct {
 	config Config
+	proc   windows.Handle // systray server process handle
 }
 
 // MsgType determines the type of the message sent
@@ -85,6 +90,78 @@ func makeSender(config alertsender.Config) (alertsender.Sender, error) {
 		return &systray{}, nil
 	}
 
+	// spin up systray server process
+	var si windows.StartupInfo
+	var pi windows.ProcessInformation
+
+	exe, err := os.Executable()
+	if err != nil {
+		return nil, err
+	}
+	cmdline := filepath.Join(filepath.Dir(exe), "fibratus-systray.exe")
+	argv, err := windows.UTF16PtrFromString(cmdline)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Infof("starting systray server process %q", cmdline)
+
+	if sys.IsWindowsService() {
+		// if we're running inside Windows Service, the systray server
+		// process must be created in the console session and with the
+		// currently logged-in user access token
+		var token windows.Token
+
+		// enable TCB privilege to obtain the console session user token
+		sys.SetTcbPrivilege()
+
+		consoleSessionID := sys.WTSGetActiveConsoleSessionID()
+		if consoleSessionID == math.MaxUint32 && sys.IsInSandbox() {
+			// if we failed to obtain the console session ID and
+			// are running inside Windows Sandbox, use session 1
+			consoleSessionID = 1
+		}
+
+		if sys.WTSQueryUserToken(consoleSessionID, &token) {
+			log.Infof("obtained user token for console session ID %d", consoleSessionID)
+			err = windows.CreateProcessAsUser(
+				token,
+				nil,
+				argv,
+				nil,
+				nil,
+				false,
+				windows.CREATE_NO_WINDOW,
+				nil,
+				nil,
+				&si,
+				&pi,
+			)
+		} else {
+			err = fmt.Errorf("unable to obtain user token for console session ID %d", consoleSessionID)
+		}
+
+		// drop TCB privilege and close the token handle
+		sys.RemoveTcbPrivilege()
+		_ = windows.CloseHandle(windows.Handle(token))
+	} else {
+		err = windows.CreateProcess(
+			nil,
+			argv,
+			nil,
+			nil,
+			false,
+			windows.CREATE_NO_WINDOW,
+			nil,
+			nil,
+			&si,
+			&pi)
+	}
+
+	if err != nil {
+		log.Warnf("unable to start systray server process: %v", err)
+	}
+
 	s := &systray{config: c}
 	b := &backoff.ExponentialBackOff{
 		// first backoff timeout will be somewhere in the 100 - 300 ms range given the default multiplier
@@ -112,6 +189,10 @@ func makeSender(config alertsender.Config) (alertsender.Sender, error) {
 		break
 	}
 
+	log.Info("established connection to systray server")
+
+	s.proc = pi.Process
+
 	return s, s.send(&Msg{Type: Conf, Data: c})
 }
 
@@ -124,11 +205,17 @@ func (s *systray) Send(alert alertsender.Alert) error {
 func (*systray) Type() alertsender.Type { return alertsender.Systray }
 func (*systray) SupportsMarkdown() bool { return false }
 
-func (s *systray) Shutdown() error { return nil }
+func (s *systray) Shutdown() error {
+	if s.proc != 0 && sys.IsProcessRunning(s.proc) {
+		return windows.TerminateProcess(s.proc, 1)
+	}
+	return nil
+}
 
 func (s *systray) send(m *Msg) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
+
 	conn, err := winio.DialPipeContext(ctx, systrayPipe)
 	if err != nil {
 		return fmt.Errorf("unable to dial %s pipe: %v", systrayPipe, err)
@@ -151,6 +238,5 @@ func (s *systray) send(m *Msg) error {
 
 func pipeExists() bool {
 	_, err := os.Stat(systrayPipe)
-	log.Warnf("pipe not found: %v", err)
 	return err == nil
 }
