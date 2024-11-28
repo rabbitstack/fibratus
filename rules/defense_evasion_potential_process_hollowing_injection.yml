@@ -29,7 +29,7 @@ references:
 condition: >
   sequence
   maxspan 2m
-    |spawn_process and not ps.sid in ('S-1-5-18', 'S-1-5-19', 'S-1-5-20') and not ps.exe imatches 
+    |spawn_process and ps.sid not in ('S-1-5-18', 'S-1-5-19', 'S-1-5-20') and not ps.exe imatches 
       (
         '?:\\Program Files\\*', 
         '?:\\Program Files (x86)\\*'
