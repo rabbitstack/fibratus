@@ -44,6 +44,8 @@ package sys
 
 // Windows Terminal Server Functions
 //sys WTSQuerySessionInformationA(handle windows.Handle, sessionID uint32, klass uint8, buf **uint16, size *uint32) (err error) = wtsapi32.WTSQuerySessionInformationW
+//sys WTSGetActiveConsoleSessionID() (n uint32) = kernel32.WTSGetActiveConsoleSessionId
+//sys WTSQueryUserToken(sessionID uint32, token *windows.Token) (ok bool) = wtsapi32.WTSQueryUserToken
 
 // Windows Trust Functions
 //sys WinVerifyTrust(handle windows.Handle, action *windows.GUID, data *WintrustData) (ret uint32, err error) [failretval!=0] = wintrust.WinVerifyTrust
