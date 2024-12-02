@@ -22,7 +22,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/qmuntal/stateless v1.6.0
 	github.com/rifflock/lfshook v0.0.0-20180920164130-b9218ef580f5
-	github.com/saferwall/pe v1.5.4
+	github.com/saferwall/pe v1.5.6
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v0.0.3
 	github.com/spf13/pflag v1.0.5
@@ -87,4 +87,4 @@ require (
 	gopkg.in/yaml.v2 v2.3.0 // indirect
 )
 
-go 1.21
+go 1.23
