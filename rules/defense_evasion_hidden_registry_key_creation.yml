@@ -1,6 +1,6 @@
 name: Hidden registry key creation
 id: 65deda38-9b1d-42a0-9f40-a68903e81b49
-version: 1.0.1
+version: 1.1.0
 description: |
   Identifies the creation of a hidden registry key. Adversaries can utilize the
   native NtSetValueKey API to create a hidden registry key and conceal payloads
@@ -17,7 +17,9 @@ references:
 
 condition: >
   set_value and kevt.pid != 4 and registry.key.name endswith '\\' 
-    and 
+    and
+  thread.callstack.symbols imatches ('ntdll.dll!NtSetValueKey', 'ntdll.dll!ZwSetValueKey')
+    and
   thread.callstack.symbols not imatches ('KernelBase.dll!RegSetValue*', 'KernelBase.dll!RegLoadAppKey*', 'KernelBase.dll!GetFileAttributes*')
     and
     not
@@ -25,7 +27,9 @@ condition: >
     (
       '?:\\Program Files (x86)\\Microsoft\\EdgeUpdate\\MicrosoftEdgeUpdate.exe',
       '?:\\Program Files\\Microsoft\\EdgeUpdate\\MicrosoftEdgeUpdate.exe',
-      '?:\\Windows\\System32\\sppsvc.exe'
+      '?:\\Windows\\System32\\sppsvc.exe',
+      '?:\\Windows\\System32\\compattelrunner.exe',
+      '?:\\Windows\\explorer.exe'
     )
 
 output: >
