@@ -31,6 +31,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/util/signature"
+	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 	"os"
@@ -69,6 +70,8 @@ type scanner struct {
 	config config.Config
 
 	psnap ps.Snapshotter
+
+	rwxs map[uint32]va.Address // contains scanned and matched RWX process allocations
 }
 
 // NewScanner creates a new YARA scanner.
@@ -103,7 +106,7 @@ func NewScanner(psnap ps.Snapshotter, config config.Config) (Scanner, error) {
 				return nil
 			}
 			rulesInCompiler.Add(1)
-			log.Infof("loading yara rule(s) from %s", filepath.Join(path, fi.Name()))
+			log.Infof("loading yara rule(s) from %s", path)
 
 			return nil
 		})
@@ -136,6 +139,7 @@ func NewScanner(psnap ps.Snapshotter, config config.Config) (Scanner, error) {
 		rules:  rules,
 		config: config,
 		psnap:  psnap,
+		rwxs:   make(map[uint32]va.Address),
 	}, nil
 }
 
@@ -165,7 +169,11 @@ func parseCompilerErrors(errors []yara.CompilerMessage) error {
 
 func (s scanner) CanEnqueue() bool { return false }
 
-func (s scanner) ProcessEvent(evt *kevent.Kevent) (bool, error) {
+func (s *scanner) ProcessEvent(evt *kevent.Kevent) (bool, error) {
+	if evt.IsTerminateProcess() {
+		// cleanup
+		delete(s.rwxs, evt.Kparams.MustGetPid())
+	}
 	return s.Scan(evt)
 }
 
@@ -264,12 +272,16 @@ func (s scanner) Scan(e *kevent.Kevent) (bool, error) {
 		}
 		// scan process allocating RWX memory region
 		pid := e.Kparams.MustGetPid()
-		if e.PID != 4 && e.Kparams.TryGetUint32(kparams.MemProtect) == windows.PAGE_EXECUTE_READWRITE {
+		addr := e.Kparams.TryGetAddress(kparams.MemBaseAddress)
+		if e.PID != 4 && e.Kparams.TryGetUint32(kparams.MemProtect) == windows.PAGE_EXECUTE_READWRITE && !s.isRwxMatched(pid) {
 			log.Debugf("scanning RWX allocation. pid: %d, exe: %s, addr: %s", pid, e.GetParamAsString(kparams.Exe),
 				e.GetParamAsString(kparams.MemBaseAddress))
 			matches, err = s.scan(pid)
 			allocScans.Add(1)
 			isScanned = true
+			if len(matches) > 0 {
+				s.rwxs[pid] = addr
+			}
 		}
 	case ktypes.MapViewFile:
 		if s.config.SkipMmaps {
@@ -442,4 +454,10 @@ func (s scanner) Close() {
 	if s.c != nil {
 		s.c.Destroy()
 	}
+}
+
+// isRwxMatched returns true if the process already triggered RWX allocation rule match.
+func (s *scanner) isRwxMatched(pid uint32) (ok bool) {
+	_, ok = s.rwxs[pid]
+	return ok
 }
