@@ -1,6 +1,6 @@
 name: Script interpreter host or untrusted process persistence
 id: cc41ee3a-6e44-4903-85a4-0147ec6a7eea
-version: 1.0.1
+version: 1.0.2
 description: |
   Identifies the script interpreter or untrusted process writing
   to commonly abused run keys or the Startup folder locations.
@@ -31,6 +31,14 @@ condition: >
       or
     file.name imatches startup_locations
   )
+    and
+    not
+  ps.exe imatches
+    (
+      '?:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+      '?:\\Program Files (x86)\\Microsoft\\Edge\\Application\\*\\msedge.exe',
+      '?:\\Program Files\\Microsoft\\Edge\\Application\\*\\msedge.exe'
+    )
 action:
   - name: kill
 
