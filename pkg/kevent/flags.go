@@ -76,9 +76,11 @@ var PsCreationFlags = []ParamFlag{
 	{"PACKAGED", PsPackaged},
 }
 
+const AllAccess = windows.STANDARD_RIGHTS_REQUIRED | windows.SYNCHRONIZE | 0xFFFF
+
 // PsAccessRightFlags describes flags for the process access rights.
 var PsAccessRightFlags = []ParamFlag{
-	{"ALL_ACCESS", windows.STANDARD_RIGHTS_REQUIRED | windows.SYNCHRONIZE | 0xFFFF},
+	{"ALL_ACCESS", AllAccess},
 	{"DELETE", windows.DELETE},
 	{"READ_CONTROL", windows.READ_CONTROL},
 	{"SYNCHRONIZE", windows.SYNCHRONIZE},
@@ -102,7 +104,7 @@ var PsAccessRightFlags = []ParamFlag{
 
 // ThreadAccessRightFlags describes flags for the thread access rights.
 var ThreadAccessRightFlags = []ParamFlag{
-	{"ALL_ACCESS", windows.STANDARD_RIGHTS_REQUIRED | windows.SYNCHRONIZE | 0xFFFF},
+	{"ALL_ACCESS", AllAccess},
 	{"DELETE", windows.DELETE},
 	{"READ_CONTROL", windows.READ_CONTROL},
 	{"SYNCHRONIZE", windows.SYNCHRONIZE},
