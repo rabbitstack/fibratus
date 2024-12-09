@@ -55,7 +55,7 @@ $ msiexec /i fibratus-2.3.0-amd64.msi /qn
 $ VaultCmd.exe /listcreds:"Windows Credentials" /all
 ```
 
-`Credential discovery via VaultCmd.exe` rule should trigger and emit the alert to the [Eventlog](https://www.fibratus.io/#/alerts/senders/eventlog). Check the short demo [here](https://www.fibratus.io/#/alerts/senders/images/eventlog.gif).
+`Credential discovery via VaultCmd.exe` rule should trigger and emit the alert to the [Eventlog](https://www.fibratus.io/#/alerts/senders/eventlog). Check the short demo [here](https://www.fibratus.io/alerts/senders/images/eventlog.gif).
 
 ### Documentation
 
