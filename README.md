@@ -34,17 +34,28 @@ Events can also be shipped to a wide array of [output sinks](https://www.fibratu
 
 In a nutshell, the Fibratus mantra is defined by the pillars of **realtime behavior detection**, **memory scanning**, and **forensics** capabilities.
 
+
+### Installation
+
+- Download the latest [MSI package](https://github.com/rabbitstack/fibratus/releases) and follow the [UI](https://www.fibratus.io/#/setup/installation) wizard or
+alternatively install via `msiexec` in silent mode
+
+```
+$ msiexec /i fibratus-2.3.0-amd64.msi /qn
+```
+
 ### Quick start
 
 ---
 
-- [Install](https://www.fibratus.io/#/setup/installation) Fibratus from the latest [MSI package](https://github.com/rabbitstack/fibratus/releases)
 - spin up a command line prompt
 - list credentials from the vault by using the `VaultCmd` tool
+
 ```
 $ VaultCmd.exe /listcreds:"Windows Credentials" /all
 ```
-- `Credential discovery via VaultCmd.exe` rule should trigger displaying the alert in the systray notification area
+
+`Credential discovery via VaultCmd.exe` rule should trigger and emit the alert to the [Eventlog](https://www.fibratus.io/#/alerts/senders/eventlog). Check the short demo [here](https://www.fibratus.io/#/alerts/senders/images/eventlog.gif).
 
 ### Documentation
 

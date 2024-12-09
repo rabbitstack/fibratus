@@ -5,4 +5,5 @@ You can send alert notifications to your team through email, Slack, or incident 
 - [Mail](/alerts/senders/mail)
 - [Slack](/alerts/senders/mail)
 - [Systray](/alerts/senders/systray)
+- [Eventlog](/alerts/senders/eventlog)
 

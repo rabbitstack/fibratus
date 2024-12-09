@@ -118,7 +118,7 @@ $ ./make
 
 ### Running For The First Time
 
-By default, Fibratus operates in rule engine mode. It loads the rule set from the `%PROGRAM FILES%\Fibratus\Rules` directory and sends security alerts to the [systray](/alerts/senders/systray) notification area. Optionally, it takes response actions when the rule is fired, such as killing the process.
+By default, Fibratus operates in rule engine mode. It loads the rule set from the `%PROGRAM FILES%\Fibratus\Rules` directory and sends security alerts to [Eventlog](/alerts/senders/eventlog). Optionally, it takes response actions when the rule is fired, such as killing the process.
 Alternatively, Fibratus can forward events to [output](/outputs/introduction) sinks, if it started in event forwarding mode.
 
 To start Fibratus in event forwarding mode run the next command from the root directory of this repo:
@@ -129,7 +129,6 @@ $ .\cmd\fibratus\fibratus.exe run --forward
 
 If you want to run Fibratus in rule engine mode, follow the next steps:
 
-- run the systray server or disable the systray alert sender in the configuration file. You can start the systray server by running the `.\cmd\fibratus\fibratus-systray.exe` binary.
 - modify the configuration file to set the location to the rule files. Go to the `filters` section, and specify the absolute path to the `Rules` and `Macros` directories of this repository.
   ```
   filters:
@@ -169,5 +168,3 @@ $ ./make.bat pkg
 ```
 
 The resulting MSI is placed in the `build\msi` directory.
-
-

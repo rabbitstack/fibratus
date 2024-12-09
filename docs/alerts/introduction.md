@@ -4,6 +4,7 @@ Fibratus has the ability to generate security alerts when the detection or [YARA
 
 The alert has the following key components:
 
+- **id** the alert identifier represented as UUID.
 - **title** summarizes the purpose of the alert.
 - **text** is the message that further explains what this alert is about as well as actors involved.
 - **tags** contains a sequence of tags for categorizing the alerts.

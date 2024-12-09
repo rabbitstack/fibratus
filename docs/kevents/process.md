@@ -19,6 +19,7 @@ Process events are fired up as a stimulus to the process' life-cycle changes. Wh
 - `start_time` designates the instant when the process was started.
 - `domain` represents the domain name under which the process is started.
 - `username` represents the username that started the process.
+- `flags` represents process creation flags. Can be `WOW64`, `PROTECTED`, or `PACKAGED` to designate 32-bit process is created in 64-bit Windows system,  process is to be run as a protected process, or a process packaged with the **MSIX** technology respectively.
 
 #### OpenProcess
 
