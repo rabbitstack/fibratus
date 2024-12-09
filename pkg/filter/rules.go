@@ -651,7 +651,8 @@ func (r *Rules) buildCompileResult() *config.RulesCompileResult {
 							if typ == ktypes.MapViewFile || typ == ktypes.UnmapViewFile {
 								rs.HasVAMapEvents = true
 							}
-							if typ == ktypes.OpenProcess || typ == ktypes.OpenThread || typ == ktypes.SetThreadContext {
+							if typ == ktypes.OpenProcess || typ == ktypes.OpenThread || typ == ktypes.SetThreadContext ||
+								typ == ktypes.CreateSymbolicLinkObject {
 								rs.HasAuditAPIEvents = true
 							}
 							if typ.Subcategory() == ktypes.DNS {
