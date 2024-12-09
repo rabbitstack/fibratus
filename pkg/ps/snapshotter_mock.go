@@ -97,8 +97,8 @@ func (s *SnapshotterMock) RemoveThread(pid uint32, tid uint32) error {
 }
 
 // RemoveModule method
-func (s *SnapshotterMock) RemoveModule(pid uint32, mod string) error {
-	args := s.Called(pid, mod)
+func (s *SnapshotterMock) RemoveModule(pid uint32, addr va.Address) error {
+	args := s.Called(pid, addr)
 	return args.Error(0)
 }
 
