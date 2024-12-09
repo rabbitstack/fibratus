@@ -78,6 +78,10 @@ const (
 	UstackLimit = "ustack_limit"
 	// StartAddress field is the thread start address.
 	StartAddress = "start_address"
+	// StartAddressSymbol field is the symbol associated with the thread start address.
+	StartAddressSymbol = "start_address_symbol"
+	// StartAddressModule field is the module where the thread start address is mapped.
+	StartAddressModule = "start_address_module"
 	// TEB field is the address of the Thread Environment Block (TEB)
 	TEB = "teb"
 

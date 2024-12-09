@@ -298,9 +298,36 @@ func (s *Symbolizer) processCallstack(e *kevent.Kevent) error {
 	defer s.mu.Unlock()
 
 	if e.PS != nil {
+		// symbolize thread start address
+		if e.IsCreateThread() {
+			addr := e.Kparams.TryGetAddress(kparams.StartAddress)
+			mod := e.PS.FindModuleByVa(addr)
+
+			symbol, ok := s.symbols[e.PID][addr]
+			if !ok && mod != nil {
+				// resolve symbol from scratch and cache
+				symbol = s.resolveSymbolFromExportDirectory(addr, mod)
+				if addrs, ok := s.symbols[e.PID]; ok {
+					if _, ok := addrs[addr]; !ok {
+						s.symbols[e.PID][addr] = symbol
+					}
+				} else {
+					s.symbols[e.PID] = map[va.Address]string{addr: symbol}
+				}
+			}
+
+			if symbol != "" {
+				e.Kparams.Append(kparams.StartAddressSymbol, kparams.UnicodeString, symbol)
+			}
+			if mod != nil {
+				e.Kparams.Append(kparams.StartAddressModule, kparams.UnicodeString, mod.Name)
+			}
+		}
+
 		// try to resolve addresses from process
 		// state and PE export directory data
 		s.pushFrames(addrs, e, false, true)
+
 		return nil
 	}
 
