@@ -88,6 +88,16 @@ The following tables summarize available field names that can be used in filter 
 | ps.uuid  | Unique process identifier resistant to repetition | `ps.uuid > 10000400`   |
 | ps.parent.uuid  | Unique parent process identifier resistant to repetition  | `ps.parent.uuid = 1843450000440`   |
 | ps.child.uuid  | Unique child process identifier resistant to repetition  | `ps.child.uuid > 20030000000`   |
+| ps.child.pe.file.name | Original file name of the child process executable supplied at compile-time | `ps.child.pe.file.name = 'NOTEPAD.EXE'` |
+| ps.child.is_wow64 | Indicates if the 32-bit child process is created in 64-bit Windows system | `ps.child.is_wow64` |
+| ps.child.is_packaged | Indicates if the child process is packaged with the MSIX technology | `ps.child.is_packaged` |
+| ps.child.is_protected | Indicates if the child process is a protected process | `ps.child.is_protected` |
+| ps.is_wow64 | Indicates if the process generating the event is a 32-bit child process is created in 64-bit Windows system | `ps.is_wow64` |
+| ps.is_packaged | Indicates if the process process generating the event is packaged with the MSIX technology | `ps.is_packaged` |
+| ps.is_protected | Indicates if the process generating the event is a protected process | `ps.is_protected` |
+| ps.parent.is_wow64 | Indicates if the parent process generating the event is a 32-bit process created in 64-bit Windows system | `ps.parent.is_wow64` |
+| ps.parent.is_packaged | Indicates if the parent process generating the event is packaged with the MSIX technology | `ps.parent.is_packaged` |
+| ps.parent.is_protected | Indicates if the parent process generating the event is a protected process | `ps.parent.is_protected` |
 
 
 ### Thread
@@ -100,11 +110,11 @@ The following tables summarize available field names that can be used in filter 
 | thread.kstack.limit | Limit of the thread's kernel space stack | `thread.kstack.limit = 'a85d800000'`   |
 | thread.ustack.base | Base address of the thread's user space stack | `thread.ustack.base = '7ffe0000'`   |
 | thread.ustack.limit | Limit of the thread's user space stack | `thread.ustack.limit = '8ffe0000'`   |
-| thread.entrypoint | Starting address of the function to be executed by the thread | `thread.entrypoint = '7efe0000'`   |
+| thread.start_address | Start address of the function to be executed by the thread | `thread.start_address = '7efe0000'`   |
 | thread.access.mask | Thread access rights | `thread.access.mask = '0x1800'`   |
 | thread.access.mask.names | Thread access human-readable rights | `thread.access.mask.names in ('QUERY_LIMITED_INFORMATION')`   |
 | thread.access.status | Thread access status | `thread.access.status = 'Success'`   |
-
+| thread.teb_address | The base address of the thread environment block | `thread.teb_address = '8f30893000'`   |
 
 ### Callstack
 | Field Name  | Description | Example     |
@@ -140,6 +150,7 @@ The following tables summarize available field names that can be used in filter 
 | image.is_dll | Indicates if the loaded image is a DLL | `image.is_dll` |
 | image.is_driver | Indicates if the loaded image is a driver | `image.is_driver` |
 | image.is_exec | Indicates if the loaded image is an executable | `image.is_exec` |
+| image.is_dotnet | Indicates if the loaded image is a .NET assembly | `image.is_dotnet` |
 
 ### File
 | Field Name  | Description | Example     |
@@ -162,7 +173,11 @@ The following tables summarize available field names that can be used in filter 
 | file.is_driver_vulnerable | Indicates if the dropped driver is vulnerable | `file.is_driver_vulnerable` |
 | file.is_dll | Indicates if the created file is a DLL | `file.is_dll` |
 | file.is_driver | Indicates if the created file is a driver | `file.is_driver` |
-| file.is_exec | Indicates if the crated file is an executable | `file.is_exec` |
+| file.is_exec | Indicates if the created file is an executable | `file.is_exec` |
+| file.info_class | Identifies the file information class | `file.info_class = 'Allocation'` |
+| file.info.allocation_size | Represents the file allocation size set via `NtSetInformationFile` syscall | `file.info.allocation_size > 645400` |
+| file.info.eof_size | Represents the file EOF size set via `NtSetInformationFile` syscall | `file.info.eof_size > 1000` |
+| file.info.is_disposition_file_delete | Indicates if the file is deleted when its handle is closed | `file.info.is_disposition_file_delete = true` |
 
 
 ### Registry
@@ -254,4 +269,3 @@ The following tables summarize available field names that can be used in filter 
 | pe.cert.before  | PE certificate enrollment date | `pe.cert.before contains '2024-02-01 00:05:42 +0000 UTC'`   |
 | pe.is_modified | Indicates if on-disk and in-memory PE headers differ | `pe.is_modified'`   |
 | pe.is_modified | Indicates if on-disk and in-memory PE headers differ | `pe.is_modified'`   |
-| pe.ps.child.file.name | Original file name of the child process executable supplied at compile-time | `pe.ps.child.file.name = 'NOTEPAD.EXE'` |

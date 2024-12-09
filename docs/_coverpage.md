@@ -4,7 +4,7 @@
   <img src='logo.png'></img>
 </div>
 
-# fibratus <small>2.2.1</small>
+# fibratus <small>2.3.0</small>
 
 >  Adversary tradecraft detection, protection, and hunting
 

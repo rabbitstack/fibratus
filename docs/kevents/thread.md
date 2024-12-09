@@ -14,7 +14,8 @@ Thread events are comprised of the following parameters:
 - `ustack_limit` is the limit of the thread's user space stack.
 - `kstack_base` is the base address of the thread's kernel space stack.
 - `kstack_limit` is the limit of the thread's kernel space stack.
-- `entrypoint` is the starting address of the function to be executed by the thread.
+- `start_address` is the start address of the function to be executed by the thread.
+- `teb` is the address of the Thread Environment Block (TEB).
 
 #### OpenThread
 

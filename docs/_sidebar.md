@@ -54,6 +54,8 @@
   * [Alert Senders](alerts/senders.md)
     * <ion-icon name="mail-unread-outline"></ion-icon> [Mail](alerts/senders/mail.md)
     * <ion-icon name="logo-slack"></ion-icon> [Slack](alerts/senders/slack.md)
+    * <ion-icon name="chatbubble"></ion-icon> [Systray](alerts/senders/systray.md)
+    * <ion-icon name="server"></ion-icon> [Eventlog](alerts/senders/eventlog.md)
   * [Filament Alerting](alerts/filaments.md)
 * <ion-icon name="terminal-outline"></ion-icon> PE
   * [Portable Executable Introspection](/pe/introduction.md)
