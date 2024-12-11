@@ -83,7 +83,10 @@ func (e *Kevent) adjustPID() {
 			e.PID, _ = e.Kparams.GetPid()
 		}
 	case ktypes.File:
-		e.Tid, _ = e.Kparams.GetTid()
+		if !e.IsMapViewFile() && !e.IsUnmapViewFile() {
+			// take thread id from the event parameters
+			e.Tid, _ = e.Kparams.GetTid()
+		}
 		switch {
 		case e.InvalidPid() && e.Type == ktypes.MapFileRundown:
 			// a valid pid for map rundown events
