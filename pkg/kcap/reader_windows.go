@@ -191,8 +191,8 @@ func (r *reader) updateSnapshotters(kevt *kevent.Kevent) error {
 		}
 	case ktypes.UnloadImage:
 		pid := kevt.Kparams.MustGetPid()
-		mod := kevt.GetParamAsString(kparams.ImagePath)
-		if err := r.psnapshotter.RemoveModule(pid, mod); err != nil {
+		addr := kevt.Kparams.TryGetAddress(kparams.ImageBase)
+		if err := r.psnapshotter.RemoveModule(pid, addr); err != nil {
 			return err
 		}
 	case ktypes.CreateProcess,

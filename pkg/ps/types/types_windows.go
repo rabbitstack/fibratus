@@ -415,7 +415,7 @@ func (ps *PS) RemoveHandle(handle windows.Handle) {
 
 // AddModule adds a new module to this process state.
 func (ps *PS) AddModule(mod Module) {
-	m := ps.FindModule(mod.Name)
+	m := ps.FindModuleByAddr(mod.BaseAddress)
 	if m != nil {
 		return
 	}
@@ -423,9 +423,9 @@ func (ps *PS) AddModule(mod Module) {
 }
 
 // RemoveModule removes a specified module from this process state.
-func (ps *PS) RemoveModule(path string) {
+func (ps *PS) RemoveModule(addr va.Address) {
 	for i, mod := range ps.Modules {
-		if filepath.Base(mod.Name) == filepath.Base(path) {
+		if mod.BaseAddress == addr {
 			ps.Modules = append(ps.Modules[:i], ps.Modules[i+1:]...)
 			break
 		}
@@ -436,6 +436,16 @@ func (ps *PS) RemoveModule(path string) {
 func (ps *PS) FindModule(path string) *Module {
 	for _, mod := range ps.Modules {
 		if filepath.Base(mod.Name) == filepath.Base(path) {
+			return &mod
+		}
+	}
+	return nil
+}
+
+// FindModuleByAddr finds the module by its base address.
+func (ps *PS) FindModuleByAddr(addr va.Address) *Module {
+	for _, mod := range ps.Modules {
+		if mod.BaseAddress == addr {
 			return &mod
 		}
 	}

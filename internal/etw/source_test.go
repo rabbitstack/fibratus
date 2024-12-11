@@ -826,10 +826,10 @@ func (s *NoopPsSnapshotter) AddThread(kevt *kevent.Kevent) error                
 func (s *NoopPsSnapshotter) AddModule(kevt *kevent.Kevent) error                { return nil }
 func (s *NoopPsSnapshotter) FindModule(addr va.Address) (bool, *pstypes.Module) { return false, nil }
 func (s *NoopPsSnapshotter) RemoveThread(pid uint32, tid uint32) error          { return nil }
-func (s *NoopPsSnapshotter) RemoveModule(pid uint32, mod string) error          { return nil }
+func (s *NoopPsSnapshotter) RemoveModule(pid uint32, addr va.Address) error     { return nil }
 func (s *NoopPsSnapshotter) WriteFromKcap(kevt *kevent.Kevent) error            { return nil }
 func (s *NoopPsSnapshotter) AddMmap(kevt *kevent.Kevent) error                  { return nil }
-func (s *NoopPsSnapshotter) RemoveMmap(pid uint32, address va.Address) error    { return nil }
+func (s *NoopPsSnapshotter) RemoveMmap(pid uint32, addr va.Address) error       { return nil }
 
 func TestCallstackEnrichment(t *testing.T) {
 	hsnap := new(handle.SnapshotterMock)
@@ -840,7 +840,7 @@ func TestCallstackEnrichment(t *testing.T) {
 
 	// exercise callstack enrichment with a noop
 	// process snapshotter. This will make the
-	// symbolizer to always fallback to Debug Help
+	// symbolizer to always fall back to Debug Help
 	// API when resolving symbolic information
 	nopsnap := new(NoopPsSnapshotter)
 	log.Info("test callstack enrichment with noop ps snapshotter")
