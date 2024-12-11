@@ -54,12 +54,12 @@ func (s *StackExtensions) AddStackTracingWith(guid windows.GUID, hookID uint16) 
 // EventIds returns all event types eligible for stack tracing.
 func (s *StackExtensions) EventIds() []etw.ClassicEventID { return s.ids }
 
-// EnableProcessStackTracing populates the stack identifiers
+// EnableProcessCallstack populates the stack identifiers
 // with event types eligible for emitting stack walk events
 // related to process telemetry, such as creating a process,
 // creating/terminating a thread or loading an image into
 // process address space.
-func (s *StackExtensions) EnableProcessStackTracing() {
+func (s *StackExtensions) EnableProcessCallstack() {
 	s.AddStackTracing(ktypes.CreateProcess)
 	if s.config.EnableThreadKevents {
 		s.AddStackTracing(ktypes.CreateThread)
@@ -70,10 +70,10 @@ func (s *StackExtensions) EnableProcessStackTracing() {
 	}
 }
 
-// EnableFileStackTracing populates the stack identifiers
+// EnableFileCallstack populates the stack identifiers
 // with event types eligible for publishing call stack
 // return addresses for file system activity.
-func (s *StackExtensions) EnableFileStackTracing() {
+func (s *StackExtensions) EnableFileCallstack() {
 	if s.config.EnableFileIOKevents {
 		s.AddStackTracing(ktypes.CreateFile)
 		s.AddStackTracing(ktypes.DeleteFile)
@@ -81,14 +81,22 @@ func (s *StackExtensions) EnableFileStackTracing() {
 	}
 }
 
-// EnableRegistryStackTracing populates the stack identifiers
+// EnableRegistryCallstack populates the stack identifiers
 // with event types eligible for publishing call stack
 // return addresses for registry operations.
-func (s *StackExtensions) EnableRegistryStackTracing() {
+func (s *StackExtensions) EnableRegistryCallstack() {
 	if s.config.EnableRegistryKevents {
 		s.AddStackTracing(ktypes.RegCreateKey)
 		s.AddStackTracing(ktypes.RegDeleteKey)
 		s.AddStackTracing(ktypes.RegSetValue)
 		s.AddStackTracing(ktypes.RegDeleteValue)
+	}
+}
+
+// EnableMemoryCallstack enables stack tracing for the memory
+// events such as memory allocations.
+func (s *StackExtensions) EnableMemoryCallstack() {
+	if s.config.EnableMemKevents {
+		s.AddStackTracing(ktypes.VirtualAlloc)
 	}
 }
