@@ -240,14 +240,14 @@ func (s *snapshotter) RemoveThread(pid uint32, tid uint32) error {
 	return nil
 }
 
-func (s *snapshotter) RemoveModule(pid uint32, module string) error {
+func (s *snapshotter) RemoveModule(pid uint32, addr va.Address) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	proc, ok := s.procs[pid]
 	if !ok {
 		return nil
 	}
-	proc.RemoveModule(module)
+	proc.RemoveModule(addr)
 	moduleCount.Add(-1)
 	return nil
 }

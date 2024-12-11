@@ -44,11 +44,11 @@ func (m *imageProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, e
 	}
 	if e.IsUnloadImage() {
 		pid := e.Kparams.MustGetPid()
-		mod := e.GetParamAsString(kparams.ImagePath)
+		addr := e.Kparams.TryGetAddress(kparams.ImageBase)
 		if pid == 0 {
 			pid = e.PID
 		}
-		return e, false, m.psnap.RemoveModule(pid, mod)
+		return e, false, m.psnap.RemoveModule(pid, addr)
 	}
 	if e.IsLoadImage() || e.IsImageRundown() {
 		return e, false, m.psnap.AddModule(e)

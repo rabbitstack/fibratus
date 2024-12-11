@@ -453,6 +453,7 @@ func TestRemoveModule(t *testing.T) {
 		Kparams: kevent.Kparams{
 			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(os.Getpid())},
 			kparams.ImagePath: {Name: kparams.ImagePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\System32\\notepad.exe"},
+			kparams.ImageBase: {Name: kparams.ImageBase, Type: kparams.Address, Value: uint64(0xffff7656)},
 		},
 	}
 
@@ -462,7 +463,7 @@ func TestRemoveModule(t *testing.T) {
 	require.True(t, ok)
 	require.NotNil(t, ps)
 	require.Len(t, ps.Modules, 1)
-	require.NoError(t, psnap.RemoveModule(uint32(os.Getpid()), "C:\\Windows\\System32\\notepad.exe"))
+	require.NoError(t, psnap.RemoveModule(uint32(os.Getpid()), va.Address(0xffff7656)))
 	require.Len(t, ps.Modules, 0)
 }
 
