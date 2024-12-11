@@ -125,24 +125,30 @@ type Trace struct {
 // NewTrace creates a new trace with specified name, provider GUID, and keywords.
 func NewTrace(name string, guid windows.GUID, keywords uint64, config *config.Config) *Trace {
 	t := &Trace{Name: name, GUID: guid, Keywords: keywords, stackExtensions: NewStackExtensions(config.Kstream), config: config}
-	t.prepareStackTracing()
+	t.enableCallstacks()
 	return t
 }
 
-func (t *Trace) prepareStackTracing() {
+func (t *Trace) enableCallstacks() {
 	if t.IsKernelTrace() {
+		t.stackExtensions.EnableProcessCallstack()
+
 		// Enabling stack tracing for kernel trace
 		// with granular system providers support.
-		// In this situation, only stack tracing for
-		// file system events is enabled
-		t.stackExtensions.EnableProcessStackTracing()
+		// In this situation, registry event callstacks
+		// are enabled if system provider support is not
+		// detected
 		if !SupportsSystemProviders() {
-			t.stackExtensions.EnableRegistryStackTracing()
+			t.stackExtensions.EnableRegistryCallstack()
 		}
-		t.stackExtensions.EnableFileStackTracing()
+
+		t.stackExtensions.EnableFileCallstack()
+
+		t.stackExtensions.EnableMemoryCallstack()
 	}
+
 	if t.IsSystemRegistryTrace() {
-		t.stackExtensions.EnableRegistryStackTracing()
+		t.stackExtensions.EnableRegistryCallstack()
 	}
 }
 

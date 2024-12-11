@@ -1089,6 +1089,27 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 			},
 			false,
 		},
+		{
+			"virtual alloc callstack",
+			func() error {
+				_, err := windows.VirtualAlloc(0, 1024, windows.MEM_COMMIT|windows.MEM_RESERVE, windows.PAGE_EXECUTE_READ)
+				if err != nil {
+					return err
+				}
+				return nil
+			},
+			func(e *kevent.Kevent) bool {
+				if e.CurrentPid() && e.Type == ktypes.VirtualAlloc &&
+					e.GetParamAsString(kparams.MemAllocType) == "COMMIT|RESERVE" {
+					callstack := e.Callstack.String()
+					log.Infof("virtual alloc event %s: %s", e.String(), callstack)
+					return callstackContainsTestExe(callstack) &&
+						strings.Contains(strings.ToLower(callstack), strings.ToLower("\\Windows\\System32\\KernelBase.dll!VirtualAlloc"))
+				}
+				return false
+			},
+			false,
+		},
 		//{
 		//	"copy file callstack",
 		//	func() error {
@@ -1196,6 +1217,7 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 	time.Sleep(time.Second * 5)
 
 	log.Infof("current process id is [%d]", os.Getpid())
+
 	for _, tt := range tests {
 		gen := tt.gen
 		log.Infof("executing [%s] test generator", tt.name)

@@ -504,7 +504,8 @@ func (k Ktype) CanEnrichStack() bool {
 		RegSetValue,
 		RegDeleteValue,
 		DeleteFile,
-		RenameFile:
+		RenameFile,
+		VirtualAlloc:
 		return true
 	default:
 		return false

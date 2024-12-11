@@ -33,6 +33,7 @@ func TestStackExtensions(t *testing.T) {
 			EnableThreadKevents: true,
 			EnableNetKevents:    true,
 			EnableFileIOKevents: true,
+			EnableMemKevents:    true,
 			BufferSize:          1024,
 			FlushTimer:          time.Millisecond * 2300,
 		},
@@ -40,15 +41,17 @@ func TestStackExtensions(t *testing.T) {
 	exts := NewStackExtensions(cfg.Kstream)
 	assert.Len(t, exts.EventIds(), 0)
 
-	exts.EnableProcessStackTracing()
-	exts.EnableRegistryStackTracing()
-	exts.EnableFileStackTracing()
+	exts.EnableProcessCallstack()
+	exts.EnableRegistryCallstack()
+	exts.EnableFileCallstack()
+	exts.EnableMemoryCallstack()
 
-	assert.Len(t, exts.EventIds(), 6)
+	assert.Len(t, exts.EventIds(), 7)
 	assert.Contains(t, exts.EventIds(), etw.ClassicEventID{GUID: ktypes.ProcessEventGUID, Type: uint8(ktypes.CreateProcess.HookID())})
 	assert.Contains(t, exts.EventIds(), etw.ClassicEventID{GUID: ktypes.ThreadEventGUID, Type: uint8(ktypes.CreateThread.HookID())})
 	assert.Contains(t, exts.EventIds(), etw.ClassicEventID{GUID: ktypes.ThreadEventGUID, Type: uint8(ktypes.TerminateThread.HookID())})
 	assert.Contains(t, exts.EventIds(), etw.ClassicEventID{GUID: ktypes.FileEventGUID, Type: uint8(ktypes.CreateFile.HookID())})
 	assert.Contains(t, exts.EventIds(), etw.ClassicEventID{GUID: ktypes.FileEventGUID, Type: uint8(ktypes.RenameFile.HookID())})
 	assert.Contains(t, exts.EventIds(), etw.ClassicEventID{GUID: ktypes.FileEventGUID, Type: uint8(ktypes.DeleteFile.HookID())})
+	assert.Contains(t, exts.EventIds(), etw.ClassicEventID{GUID: ktypes.MemEventGUID, Type: uint8(ktypes.VirtualAlloc.HookID())})
 }
