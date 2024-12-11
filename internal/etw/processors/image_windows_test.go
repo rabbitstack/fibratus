@@ -24,6 +24,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/signature"
+	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -79,7 +80,7 @@ func TestImageProcessor(t *testing.T) {
 			},
 			func() *ps.SnapshotterMock {
 				psnap := new(ps.SnapshotterMock)
-				psnap.On("RemoveModule", uint32(676), "C:\\Windows\\system32\\kernel32.dll").Return(nil)
+				psnap.On("RemoveModule", uint32(676), va.Address(0xfffb313833a3)).Return(nil)
 				psnap.On("FindModule", mock.Anything).Return(false, nil)
 				return psnap
 			},
