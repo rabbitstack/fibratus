@@ -269,6 +269,14 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 		e.AppendParam(kparams.ProcessID, kparams.PID, processID)
 		e.AppendParam(kparams.DesiredAccess, kparams.Flags, desiredAccess, WithFlags(PsAccessRightFlags))
 		e.AppendParam(kparams.NTStatus, kparams.Status, status)
+
+		// append callstack for interested flags
+		if desiredAccess == AllAccess || ((desiredAccess & windows.PROCESS_VM_READ) != 0) || ((desiredAccess & windows.PROCESS_VM_WRITE) != 0) ||
+			((desiredAccess & windows.PROCESS_VM_OPERATION) != 0) || ((desiredAccess & windows.PROCESS_DUP_HANDLE) != 0) ||
+			((desiredAccess & windows.PROCESS_TERMINATE) != 0) || ((desiredAccess & windows.PROCESS_CREATE_PROCESS) != 0) ||
+			((desiredAccess & windows.PROCESS_CREATE_THREAD) != 0) || ((desiredAccess & windows.PROCESS_SET_INFORMATION) != 0) {
+			e.AppendParam(kparams.Callstack, kparams.Slice, evt.Callstack())
+		}
 	case ktypes.CreateThread,
 		ktypes.TerminateThread,
 		ktypes.ThreadRundown:
@@ -323,6 +331,14 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 		e.AppendParam(kparams.ThreadID, kparams.TID, threadID)
 		e.AppendParam(kparams.DesiredAccess, kparams.Flags, desiredAccess, WithFlags(ThreadAccessRightFlags))
 		e.AppendParam(kparams.NTStatus, kparams.Status, status)
+
+		// append callstack for interested flags
+		if desiredAccess == AllAccess || ((desiredAccess & windows.THREAD_SET_CONTEXT) != 0) || ((desiredAccess & windows.THREAD_SET_THREAD_TOKEN) != 0) ||
+			((desiredAccess & windows.THREAD_IMPERSONATE) != 0) || ((desiredAccess & windows.THREAD_DIRECT_IMPERSONATION) != 0) ||
+			((desiredAccess & windows.THREAD_SUSPEND_RESUME) != 0) || ((desiredAccess & windows.THREAD_TERMINATE) != 0) ||
+			((desiredAccess & windows.THREAD_SET_INFORMATION) != 0) {
+			e.AppendParam(kparams.Callstack, kparams.Slice, evt.Callstack())
+		}
 	case ktypes.SetThreadContext:
 		status := evt.ReadUint32(0)
 		e.AppendParam(kparams.NTStatus, kparams.Status, status)
