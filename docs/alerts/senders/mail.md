@@ -1,6 +1,7 @@
 # Mail
 
 The mail alert sender emits alert notifications through the `SMTP` protocol.
+!> If you are using a Gmail SMTP provider, you might need to configure [App Passwords](https://support.google.com/accounts/answer/185833?hl=en) for your account
 
 ### Configuration {docsify-ignore}
 
