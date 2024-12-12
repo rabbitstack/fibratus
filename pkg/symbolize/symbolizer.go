@@ -298,9 +298,25 @@ func (s *Symbolizer) processCallstack(e *kevent.Kevent) error {
 	defer s.mu.Unlock()
 
 	if e.PS != nil {
+		// symbolize thread start address
+		if e.IsCreateThread() && !e.IsSystemPid() {
+			addr := e.Kparams.TryGetAddress(kparams.StartAddress)
+
+			mod := e.PS.FindModuleByVa(addr)
+			symbol := s.symbolizeAddress(e.Kparams.MustGetPid(), addr, mod)
+
+			if symbol != "" {
+				e.Kparams.Append(kparams.StartAddressSymbol, kparams.UnicodeString, symbol)
+			}
+			if mod != nil {
+				e.Kparams.Append(kparams.StartAddressModule, kparams.UnicodeString, mod.Name)
+			}
+		}
+
 		// try to resolve addresses from process
 		// state and PE export directory data
 		s.pushFrames(addrs, e, false, true)
+
 		return nil
 	}
 
@@ -502,6 +518,60 @@ func (s *Symbolizer) resolveSymbolFromExportDirectory(addr va.Address, mod *psty
 	}
 	rva := addr.Dec(mod.BaseAddress.Uint64())
 	return symbolFromRVA(rva, px.Exports)
+}
+
+// symbolizeAddress resolves the given address to a symbol. If the symbol
+// for this address was resolved previously, we fetch it from the cache.
+// On the contrary, the symbol is first consulted in the export directory.
+// If not found, the Debug Help API is used to symbolize the address.
+func (s *Symbolizer) symbolizeAddress(pid uint32, addr va.Address, mod *pstypes.Module) string {
+	if addr.InSystemRange() {
+		return ""
+	}
+
+	symbol, ok := s.symbols[pid][addr]
+	if !ok && mod != nil {
+		// resolve symbol from the export directory
+		symbol = s.resolveSymbolFromExportDirectory(addr, mod)
+	}
+
+	// try to get the symbol via Debug Help API
+	if symbol == "" {
+		proc, ok := s.procs[pid]
+		if !ok {
+			handle, err := windows.OpenProcess(windows.SYNCHRONIZE|windows.PROCESS_QUERY_INFORMATION, false, pid)
+			if err != nil {
+				return ""
+			}
+
+			// initialize symbol handler
+			opts := uint32(sys.SymUndname | sys.SymCaseInsensitive | sys.SymAutoPublics | sys.SymOmapFindNearest | sys.SymDeferredLoads)
+			err = s.r.Initialize(handle, opts)
+			if err != nil {
+				return ""
+			}
+
+			proc = &process{pid, handle, time.Now(), 1}
+			s.procs[pid] = proc
+
+			// resolve address to symbol
+			symbol, _ = s.r.GetSymbolNameAndOffset(handle, addr)
+		} else {
+			symbol, _ = s.r.GetSymbolNameAndOffset(proc.handle, addr)
+			proc.keepalive()
+		}
+	}
+
+	// cache the resolved symbol
+	if addrs, ok := s.symbols[pid]; ok {
+		if _, ok := addrs[addr]; !ok {
+			s.symbols[pid][addr] = symbol
+		}
+	} else {
+		s.symbols[pid] = map[va.Address]string{addr: symbol}
+	}
+
+	return symbol
 }
 
 // symbolFromRVA finds the closest export address before RVA.
