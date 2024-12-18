@@ -73,7 +73,7 @@ func (p psProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error
 		}
 		proc := p.psnap.FindAndPut(pid)
 		if proc != nil {
-			e.AppendParam(kparams.Exe, kparams.FilePath, proc.Exe)
+			e.AppendParam(kparams.Exe, kparams.Path, proc.Exe)
 			e.AppendParam(kparams.ProcessName, kparams.AnsiString, proc.Name)
 		}
 		return e, false, nil
@@ -97,7 +97,7 @@ func (p psProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 	if exe == "" {
 		exe = e.GetParamAsString(kparams.ProcessName)
 	}
-	e.AppendParam(kparams.Exe, kparams.FilePath, exe)
+	e.AppendParam(kparams.Exe, kparams.Path, exe)
 
 	if e.IsTerminateProcess() {
 		return e, nil

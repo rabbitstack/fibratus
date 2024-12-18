@@ -71,7 +71,7 @@ func (k Kparam) String() string {
 		return ""
 	}
 	switch k.Type {
-	case kparams.UnicodeString, kparams.AnsiString, kparams.FilePath:
+	case kparams.UnicodeString, kparams.AnsiString, kparams.Path:
 		return k.Value.(string)
 	case kparams.SID, kparams.WbemSID:
 		sid, err := getSID(&k)
@@ -79,7 +79,7 @@ func (k Kparam) String() string {
 			return ""
 		}
 		return sid.String()
-	case kparams.FileDosPath:
+	case kparams.DOSPath:
 		return devMapper.Convert(k.Value.(string))
 	case kparams.Key:
 		rootKey, keyName := key.Format(k.Value.(string))
@@ -395,7 +395,7 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 		e.AppendParam(kparams.ImageDefaultBase, kparams.Address, defaultBase)
 		e.AppendParam(kparams.ImageBase, kparams.Address, imageBase)
 		e.AppendParam(kparams.ImageSize, kparams.Uint64, imageSize)
-		e.AppendParam(kparams.ImageFilename, kparams.FileDosPath, filename)
+		e.AppendParam(kparams.ImagePath, kparams.DOSPath, filename)
 		e.AppendParam(kparams.ImageSignatureLevel, kparams.Enum, uint32(sigLevel), WithEnum(signature.Levels))
 		e.AppendParam(kparams.ImageSignatureType, kparams.Enum, uint32(sigType), WithEnum(signature.Types))
 	case ktypes.RegOpenKey, ktypes.RegCloseKey,
@@ -422,7 +422,7 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 			keyName = evt.ConsumeUTF16String(20)
 		}
 		e.AppendParam(kparams.RegKeyHandle, kparams.Address, keyHandle)
-		e.AppendParam(kparams.RegKeyName, kparams.Key, keyName)
+		e.AppendParam(kparams.RegPath, kparams.Key, keyName)
 		e.AppendParam(kparams.NTStatus, kparams.Status, status)
 	case ktypes.CreateFile:
 		var (
@@ -452,7 +452,7 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 		e.AppendParam(kparams.FileShareMask, kparams.Flags, shareAccess, WithFlags(FileShareModeFlags))
 		e.AppendParam(kparams.FileAttributes, kparams.Flags, fileAttributes, WithFlags(FileAttributeFlags))
 		e.AppendParam(kparams.FileCreateOptions, kparams.Flags, createOptions, WithFlags(FileCreateOptionsFlags))
-		e.AppendParam(kparams.FileName, kparams.FileDosPath, filename)
+		e.AppendParam(kparams.FilePath, kparams.DOSPath, filename)
 	case ktypes.FileOpEnd:
 		var (
 			irp       uint64
@@ -477,7 +477,7 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 			filename = evt.ConsumeUTF16String(8)
 		}
 		e.AppendParam(kparams.FileObject, kparams.Address, fileObject)
-		e.AppendParam(kparams.FileName, kparams.FileDosPath, filename)
+		e.AppendParam(kparams.FilePath, kparams.DOSPath, filename)
 	case ktypes.ReleaseFile, ktypes.CloseFile:
 		var (
 			irp        uint64
@@ -585,7 +585,7 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 		e.AppendParam(kparams.FileObject, kparams.Address, fileObject)
 		e.AppendParam(kparams.ThreadID, kparams.TID, tid)
 		e.AppendParam(kparams.FileKey, kparams.Address, fileKey)
-		e.AppendParam(kparams.FileName, kparams.UnicodeString, filename)
+		e.AppendParam(kparams.FilePath, kparams.UnicodeString, filename)
 		e.AppendParam(kparams.FileInfoClass, kparams.Enum, infoClass, WithEnum(fs.FileInfoClasses))
 	case ktypes.MapViewFile, ktypes.UnmapViewFile, ktypes.MapFileRundown:
 		var (

@@ -199,7 +199,7 @@ func (s scanner) Scan(e *kevent.Kevent) (bool, error) {
 		if typ != signature.None {
 			return false, nil
 		}
-		filename := e.GetParamAsString(kparams.ImageFilename)
+		filename := e.GetParamAsString(kparams.ImagePath)
 		if s.config.ShouldSkipFile(filename) {
 			return false, nil
 		}
@@ -228,7 +228,7 @@ func (s scanner) Scan(e *kevent.Kevent) (bool, error) {
 			return false, nil
 		}
 
-		filename := e.GetParamAsString(kparams.FileName)
+		filename := e.GetParamAsString(kparams.FilePath)
 		if s.config.ShouldSkipFile(filename) || (e.PS != nil && s.config.ShouldSkipProcess(e.PS.Exe)) {
 			return false, nil
 		}
@@ -292,7 +292,7 @@ func (s scanner) Scan(e *kevent.Kevent) (bool, error) {
 		prot := e.Kparams.MustGetUint32(kparams.MemProtect)
 		size := e.Kparams.MustGetUint64(kparams.FileViewSize)
 		if e.PID != 4 && size >= 4096 && ((prot&kevent.SectionRX) != 0 && (prot&kevent.SectionRWX) != 0) {
-			filename := e.GetParamAsString(kparams.FileName)
+			filename := e.GetParamAsString(kparams.FilePath)
 			// skip mappings of signed images
 			addr := e.Kparams.MustGetUint64(kparams.FileViewBase)
 			sign := signature.GetSignatures().GetSignature(addr)
@@ -333,7 +333,7 @@ func (s scanner) Scan(e *kevent.Kevent) (bool, error) {
 			return false, nil
 		}
 		if b, ok := v.Value.([]byte); ok && len(b) > 0 {
-			log.Debugf("scanning registry binary value %s. pid: %d", e.GetParamAsString(kparams.RegKeyName), e.PID)
+			log.Debugf("scanning registry binary value %s. pid: %d", e.GetParamAsString(kparams.RegPath), e.PID)
 			matches, err = s.scan(b)
 			registryScans.Add(1)
 			isScanned = true

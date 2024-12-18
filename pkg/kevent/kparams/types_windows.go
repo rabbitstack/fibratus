@@ -91,10 +91,10 @@ const (
 	Map
 	// Object is the generic object type
 	Object
-	// FileDosPath represents the file system path in DOS device notation
-	FileDosPath
-	// FilePath represents the file system path with normalized drive letter notation
-	FilePath
+	// DOSPath represents the file system path in DOS device notation
+	DOSPath
+	// Path represents the file system path with normalized drive letter notation
+	Path
 	// Status represents the system error code message
 	Status
 	// Key represents the registry key

@@ -30,14 +30,14 @@ func TestKparams(t *testing.T) {
 		kparams.FileObject:        {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(18446738026482168384)},
 		kparams.ThreadID:          {Name: kparams.ThreadID, Type: kparams.Uint32, Value: uint32(1484)},
 		kparams.FileCreateOptions: {Name: kparams.FileCreateOptions, Type: kparams.Uint32, Value: uint32(1223456)},
-		kparams.FileName:          {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\kernel32.dll"},
+		kparams.FilePath:          {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\kernel32.dll"},
 		kparams.FileShareMask:     {Name: kparams.FileShareMask, Type: kparams.Uint32, Value: uint32(5)},
 	}
 
 	assert.True(t, kpars.Contains(kparams.FileObject))
 	assert.False(t, kpars.Contains(kparams.FileOffset))
 
-	filename, err := kpars.GetString(kparams.FileName)
+	filename, err := kpars.GetString(kparams.FilePath)
 	require.NoError(t, err)
 	assert.Equal(t, "\\Device\\HarddiskVolume2\\Windows\\system32\\kernel32.dll", filename)
 
@@ -53,8 +53,8 @@ func TestKparams(t *testing.T) {
 
 	require.NoError(t, kpars.Set(kparams.FileShareMask, uint32(5), kparams.Enum))
 
-	require.NoError(t, kpars.SetValue(kparams.FileName, "\\Device\\HarddiskVolume2\\Windows\\system32\\KERNEL32.dll"))
-	filename1, err := kpars.GetString(kparams.FileName)
+	require.NoError(t, kpars.SetValue(kparams.FilePath, "\\Device\\HarddiskVolume2\\Windows\\system32\\KERNEL32.dll"))
+	filename1, err := kpars.GetString(kparams.FilePath)
 	require.NoError(t, err)
 	assert.Equal(t, "\\Device\\HarddiskVolume2\\Windows\\system32\\KERNEL32.dll", filename1)
 }

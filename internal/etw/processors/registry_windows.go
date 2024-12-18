@@ -88,7 +88,7 @@ func (r *registryProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, erro
 	case ktypes.RegKCBRundown, ktypes.RegCreateKCB:
 		khandle := e.Kparams.MustGetUint64(kparams.RegKeyHandle)
 		if _, ok := r.keys[khandle]; !ok {
-			r.keys[khandle], _ = e.Kparams.GetString(kparams.RegKeyName)
+			r.keys[khandle], _ = e.Kparams.GetString(kparams.RegPath)
 		}
 		kcbCount.Add(1)
 	case ktypes.RegDeleteKCB:
@@ -106,7 +106,7 @@ func (r *registryProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, erro
 		// last resort is to scan process' handles and check if any of the
 		// key handles contain the partial key name. In this case we assume
 		// the correct key is encountered.
-		keyName := e.Kparams.MustGetString(kparams.RegKeyName)
+		keyName := e.Kparams.MustGetString(kparams.RegPath)
 		if khandle != 0 {
 			if baseKey, ok := r.keys[khandle]; ok {
 				keyName = baseKey + "\\" + keyName
@@ -114,7 +114,7 @@ func (r *registryProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, erro
 				kcbMissCount.Add(1)
 				keyName = r.findMatchingKey(e.PID, keyName)
 			}
-			if err := e.Kparams.SetValue(kparams.RegKeyName, keyName); err != nil {
+			if err := e.Kparams.SetValue(kparams.RegPath, keyName); err != nil {
 				return e, err
 			}
 		}

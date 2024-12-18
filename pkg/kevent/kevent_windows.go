@@ -281,7 +281,7 @@ func (e *Kevent) RundownKey() uint64 {
 		return hashers.FnvUint64(b)
 	case ktypes.ImageRundown:
 		pid, _ := e.Kparams.GetPid()
-		mod, _ := e.Kparams.GetString(kparams.ImageFilename)
+		mod, _ := e.Kparams.GetString(kparams.ImagePath)
 		b := make([]byte, 4+len(mod))
 
 		binary.LittleEndian.PutUint32(b, pid)
@@ -302,7 +302,7 @@ func (e *Kevent) RundownKey() uint64 {
 
 		return hashers.FnvUint64(b)
 	case ktypes.RegKCBRundown:
-		key, _ := e.Kparams.GetString(kparams.RegKeyName)
+		key, _ := e.Kparams.GetString(kparams.RegPath)
 		b := make([]byte, 4+len(key))
 
 		binary.LittleEndian.PutUint32(b, e.PID)
@@ -323,7 +323,7 @@ func (e *Kevent) PartialKey() uint64 {
 	case ktypes.MapViewFile, ktypes.UnmapViewFile:
 		return e.Kparams.MustGetUint64(kparams.FileViewBase) + uint64(e.PID)
 	case ktypes.CreateFile:
-		file, _ := e.Kparams.GetString(kparams.FileName)
+		file, _ := e.Kparams.GetString(kparams.FilePath)
 		b := make([]byte, 4+len(file))
 		binary.LittleEndian.PutUint32(b, e.PID)
 		b = append(b, []byte(file)...)
@@ -373,7 +373,7 @@ func (e *Kevent) PartialKey() uint64 {
 	case ktypes.RegOpenKey, ktypes.RegQueryKey, ktypes.RegQueryValue,
 		ktypes.RegDeleteKey, ktypes.RegDeleteValue, ktypes.RegSetValue,
 		ktypes.RegCloseKey:
-		key, _ := e.Kparams.GetString(kparams.RegKeyName)
+		key, _ := e.Kparams.GetString(kparams.RegPath)
 		b := make([]byte, 4+len(key))
 		binary.LittleEndian.PutUint32(b, e.PID)
 		b = append(b, key...)
@@ -407,8 +407,8 @@ func (e *Kevent) BacklogKey() uint64 {
 func (e *Kevent) CopyState(evt *Kevent) {
 	switch evt.Type {
 	case ktypes.CloseHandle:
-		if evt.Kparams.Contains(kparams.ImageFilename) {
-			e.Kparams.Append(kparams.ImageFilename, kparams.UnicodeString, evt.GetParamAsString(kparams.ImageFilename))
+		if evt.Kparams.Contains(kparams.ImagePath) {
+			e.Kparams.Append(kparams.ImagePath, kparams.UnicodeString, evt.GetParamAsString(kparams.ImagePath))
 		}
 		_ = e.Kparams.SetValue(kparams.HandleObjectName, evt.GetParamAsString(kparams.HandleObjectName))
 	}
@@ -447,63 +447,63 @@ func (e *Kevent) Summary() string {
 		return printSummary(e, fmt.Sprintf("opened <code>%s</code> process' thread object with <code>%s</code> access right(s)",
 			exe, access))
 	case ktypes.LoadImage:
-		filename := e.GetParamAsString(kparams.FileName)
+		filename := e.GetParamAsString(kparams.FilePath)
 		return printSummary(e, fmt.Sprintf("loaded </code>%s</code> module", filename))
 	case ktypes.UnloadImage:
-		filename := e.GetParamAsString(kparams.FileName)
+		filename := e.GetParamAsString(kparams.FilePath)
 		return printSummary(e, fmt.Sprintf("unloaded </code>%s</code> module", filename))
 	case ktypes.CreateFile:
 		op := e.GetParamAsString(kparams.FileOperation)
-		filename := e.GetParamAsString(kparams.FileName)
+		filename := e.GetParamAsString(kparams.FilePath)
 		return printSummary(e, fmt.Sprintf("%sed a file <code>%s</code>", strings.ToLower(op), filename))
 	case ktypes.ReadFile:
-		filename := e.GetParamAsString(kparams.FileName)
+		filename := e.GetParamAsString(kparams.FilePath)
 		size, _ := e.Kparams.GetUint32(kparams.FileIoSize)
 		return printSummary(e, fmt.Sprintf("read <code>%d</code> bytes from <code>%s</code> file", size, filename))
 	case ktypes.WriteFile:
-		filename := e.GetParamAsString(kparams.FileName)
+		filename := e.GetParamAsString(kparams.FilePath)
 		size, _ := e.Kparams.GetUint32(kparams.FileIoSize)
 		return printSummary(e, fmt.Sprintf("wrote <code>%d</code> bytes to <code>%s</code> file", size, filename))
 	case ktypes.SetFileInformation:
-		filename := e.GetParamAsString(kparams.FileName)
+		filename := e.GetParamAsString(kparams.FilePath)
 		class := e.GetParamAsString(kparams.FileInfoClass)
 		return printSummary(e, fmt.Sprintf("set <code>%s</code> information class on <code>%s</code> file", class, filename))
 	case ktypes.DeleteFile:
-		filename := e.GetParamAsString(kparams.FileName)
+		filename := e.GetParamAsString(kparams.FilePath)
 		return printSummary(e, fmt.Sprintf("deleted <code>%s</code> file", filename))
 	case ktypes.RenameFile:
-		filename := e.GetParamAsString(kparams.FileName)
+		filename := e.GetParamAsString(kparams.FilePath)
 		return printSummary(e, fmt.Sprintf("renamed <code>%s</code> file", filename))
 	case ktypes.CloseFile:
-		filename := e.GetParamAsString(kparams.FileName)
+		filename := e.GetParamAsString(kparams.FilePath)
 		return printSummary(e, fmt.Sprintf("closed <code>%s</code> file", filename))
 	case ktypes.EnumDirectory:
-		filename := e.GetParamAsString(kparams.FileName)
+		filename := e.GetParamAsString(kparams.FilePath)
 		return printSummary(e, fmt.Sprintf("enumerated <code>%s</code> directory", filename))
 	case ktypes.RegCreateKey:
-		key := e.GetParamAsString(kparams.RegKeyName)
+		key := e.GetParamAsString(kparams.RegPath)
 		return printSummary(e, fmt.Sprintf("created <code>%s</code> key", key))
 	case ktypes.RegOpenKey:
-		key := e.GetParamAsString(kparams.RegKeyName)
+		key := e.GetParamAsString(kparams.RegPath)
 		return printSummary(e, fmt.Sprintf("opened <code>%s</code> key", key))
 	case ktypes.RegDeleteKey:
-		key := e.GetParamAsString(kparams.RegKeyName)
+		key := e.GetParamAsString(kparams.RegPath)
 		return printSummary(e, fmt.Sprintf("deleted <code>%s</code> key", key))
 	case ktypes.RegQueryKey:
-		key := e.GetParamAsString(kparams.RegKeyName)
+		key := e.GetParamAsString(kparams.RegPath)
 		return printSummary(e, fmt.Sprintf("queried <code>%s</code> key", key))
 	case ktypes.RegSetValue:
-		key := e.GetParamAsString(kparams.RegKeyName)
+		key := e.GetParamAsString(kparams.RegPath)
 		val, err := e.Kparams.GetString(kparams.RegValue)
 		if err != nil {
 			return printSummary(e, fmt.Sprintf("set <code>%s</code> value", key))
 		}
 		return printSummary(e, fmt.Sprintf("set <code>%s</code> payload in <code>%s</code> value", val, key))
 	case ktypes.RegDeleteValue:
-		key := e.GetParamAsString(kparams.RegKeyName)
+		key := e.GetParamAsString(kparams.RegPath)
 		return printSummary(e, fmt.Sprintf("deleted <code>%s</code> value", key))
 	case ktypes.RegQueryValue:
-		key := e.GetParamAsString(kparams.RegKeyName)
+		key := e.GetParamAsString(kparams.RegPath)
 		return printSummary(e, fmt.Sprintf("queried <code>%s</code> value", key))
 	case ktypes.AcceptTCPv4, ktypes.AcceptTCPv6:
 		ip, _ := e.Kparams.GetIP(kparams.NetSIP)

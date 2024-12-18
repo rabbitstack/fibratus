@@ -287,7 +287,7 @@ func TestScan(t *testing.T) {
 					Tid:  2484,
 					PID:  pid,
 					Kparams: kevent.Kparams{
-						kparams.FileName:           {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "tests.exe"},
+						kparams.FilePath:           {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "tests.exe"},
 						kparams.ImageBase:          {Name: kparams.ImageBase, Type: kparams.Uint64, Value: uint64(0x74888fd99)},
 						kparams.ImageSignatureType: {Name: kparams.ImageSignatureType, Type: kparams.Uint32, Value: signature.None},
 						kparams.ProcessID:          {Name: kparams.ProcessID, Type: kparams.PID, Value: pid},
@@ -342,7 +342,7 @@ func TestScan(t *testing.T) {
 					Tid:      2484,
 					PID:      565,
 					Kparams: kevent.Kparams{
-						kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "notepad.exe")},
+						kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "notepad.exe")},
 						kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Uint32, Value: uint32(windows.FILE_CREATE)},
 					},
 					Metadata: make(map[kevent.MetadataKey]any),
@@ -395,7 +395,7 @@ func TestScan(t *testing.T) {
 					Tid:      2484,
 					PID:      565,
 					Kparams: kevent.Kparams{
-						kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "cmd.exe")},
+						kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "cmd.exe")},
 						kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Uint32, Value: uint32(windows.FILE_CREATE)},
 					},
 					Metadata: make(map[kevent.MetadataKey]any),
@@ -446,7 +446,7 @@ func TestScan(t *testing.T) {
 					Tid:      2484,
 					PID:      565,
 					Kparams: kevent.Kparams{
-						kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "splwow64.xml")},
+						kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "splwow64.xml")},
 						kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Uint32, Value: uint32(windows.FILE_CREATE)},
 					},
 					Metadata: make(map[kevent.MetadataKey]any),
@@ -494,7 +494,7 @@ func TestScan(t *testing.T) {
 					Tid:      2484,
 					PID:      565,
 					Kparams: kevent.Kparams{
-						kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "cmd.exe")},
+						kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "cmd.exe")},
 						kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Uint32, Value: uint32(windows.FILE_CREATE)},
 					},
 					Metadata: make(map[kevent.MetadataKey]any),
@@ -556,7 +556,7 @@ func TestScan(t *testing.T) {
 					Tid:      2484,
 					PID:      565,
 					Kparams: kevent.Kparams{
-						kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: ads},
+						kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: ads},
 						kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Uint32, Value: uint32(windows.FILE_CREATE)},
 					},
 					Metadata: make(map[kevent.MetadataKey]any),
@@ -878,7 +878,7 @@ func TestScan(t *testing.T) {
 					PID:      565,
 					Kparams: kevent.Kparams{
 						kparams.ProcessID:    {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1123)},
-						kparams.FileName:     {Name: kparams.FileName, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "regedit.exe")},
+						kparams.FilePath:     {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "regedit.exe")},
 						kparams.FileViewBase: {Name: kparams.FileViewBase, Type: kparams.Address, Value: uint64(0x7ffe0000)},
 						kparams.FileViewSize: {Name: kparams.FileViewSize, Type: kparams.Uint64, Value: uint64(12333)},
 						kparams.MemProtect:   {Name: kparams.MemProtect, Type: kparams.Flags, Value: uint32(kevent.SectionRWX), Flags: kevent.ViewProtectionFlags},
@@ -935,7 +935,7 @@ func TestScan(t *testing.T) {
 					Kparams: kevent.Kparams{
 						kparams.RegValueType: {Name: kparams.RegValueType, Type: kparams.Uint32, Value: uint32(registry.BINARY)},
 						kparams.RegValue:     {Name: kparams.RegValue, Type: kparams.Binary, Value: data},
-						kparams.RegKeyName:   {Name: kparams.RegKeyName, Type: kparams.UnicodeString, Value: `HKEY_LOCAL_MACHINE\CurrentControlSet\Control\DeviceGuard\Mal`},
+						kparams.RegPath:      {Name: kparams.RegPath, Type: kparams.UnicodeString, Value: `HKEY_LOCAL_MACHINE\CurrentControlSet\Control\DeviceGuard\Mal`},
 					},
 					Metadata: make(map[kevent.MetadataKey]any),
 					PS:       proc,

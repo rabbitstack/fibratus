@@ -128,15 +128,15 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 	case ktypes.FileRundown:
 		// when the file rundown event comes in we store the file info
 		// in internal state in order to augment the rest of file events
-		// that lack the file name field
-		filename := e.GetParamAsString(kparams.FileName)
+		// that lack the file path field
+		filepath := e.GetParamAsString(kparams.FilePath)
 		fileObject, err := e.Kparams.GetUint64(kparams.FileObject)
 		if err != nil {
 			return nil, err
 		}
 		if _, ok := f.files[fileObject]; !ok {
 			totalRundownFiles.Add(1)
-			f.files[fileObject] = &FileInfo{Name: filename, Type: fs.GetFileType(filename, 0)}
+			f.files[fileObject] = &FileInfo{Name: filepath, Type: fs.GetFileType(filepath, 0)}
 		}
 	case ktypes.MapFileRundown:
 		// if the memory-mapped view refers to the image/data file
@@ -166,7 +166,7 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 			name := f.devMapper.Convert(sys.GetMappedFile(process, uintptr(addr)))
 			f.mmaps[e.PID][fileKey] = &MmapInfo{File: name, BaseAddr: viewBase, Size: viewSize}
 		}
-		e.AppendParam(kparams.FileName, kparams.FilePath, f.mmaps[e.PID][fileKey].File)
+		e.AppendParam(kparams.FilePath, kparams.Path, f.mmaps[e.PID][fileKey].File)
 		return e, f.psnap.AddFileMapping(e)
 	case ktypes.CreateFile:
 		// we defer the processing of the CreateFile event until we get
@@ -207,12 +207,12 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 		if !ok {
 			opts := ev.Kparams.MustGetUint32(kparams.FileCreateOptions)
 			opts &= 0xFFFFFF
-			filename := ev.GetParamAsString(kparams.FileName)
-			fileinfo = f.getFileInfo(filename, opts)
+			filepath := ev.GetParamAsString(kparams.FilePath)
+			fileinfo = f.getFileInfo(filepath, opts)
 			f.files[fileObject] = fileinfo
 		}
 		if f.config.Kstream.EnableHandleKevents {
-			f.devPathResolver.AddPath(ev.GetParamAsString(kparams.FileName))
+			f.devPathResolver.AddPath(ev.GetParamAsString(kparams.FilePath))
 		}
 		ev.AppendParam(kparams.NTStatus, kparams.Status, status)
 		if fileinfo.Type != fs.Unknown {
@@ -262,7 +262,7 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 		}
 		mmapinfo := f.mmaps[e.PID][fileKey]
 		if mmapinfo != nil {
-			e.AppendParam(kparams.FileName, kparams.FilePath, mmapinfo.File)
+			e.AppendParam(kparams.FilePath, kparams.Path, mmapinfo.File)
 		}
 		totalMapRundownFiles.Add(-1)
 		delete(f.mmaps[e.PID], fileKey)
@@ -300,7 +300,7 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 			name := f.devMapper.Convert(sys.GetMappedFile(process, uintptr(addr)))
 			f.initMmap(e.PID)
 			f.mmaps[e.PID][fileKey] = &MmapInfo{File: name, BaseAddr: viewBase, Size: viewSize}
-			e.AppendParam(kparams.FileName, kparams.FilePath, name)
+			e.AppendParam(kparams.FilePath, kparams.Path, name)
 			return e, f.psnap.AddFileMapping(e)
 		}
 
@@ -313,7 +313,7 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 		}
 		if e.IsEnumDirectory() {
 			if fileinfo != nil {
-				e.AppendParam(kparams.FileDirectory, kparams.FilePath, fileinfo.Name)
+				e.AppendParam(kparams.FileDirectory, kparams.Path, fileinfo.Name)
 			}
 			return e, nil
 		}
@@ -321,7 +321,7 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 			if fileinfo.Type != fs.Unknown {
 				e.AppendEnum(kparams.FileType, uint32(fileinfo.Type), fs.FileTypes)
 			}
-			e.AppendParam(kparams.FileName, kparams.FilePath, fileinfo.Name)
+			e.AppendParam(kparams.FilePath, kparams.Path, fileinfo.Name)
 		}
 		if e.IsMapViewFile() {
 			return e, f.psnap.AddFileMapping(e)
