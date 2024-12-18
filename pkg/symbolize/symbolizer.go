@@ -367,9 +367,6 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *kevent.Kevent, fast, looku
 			if mod != nil {
 				frame.Module = mod.Name
 			}
-			if frame.Module == "unbacked" || frame.Module == "" {
-				frame.Module = e.PS.FindMappingByVa(addr)
-			}
 			if lookupExport {
 				frame.Symbol = s.resolveSymbolFromExportDirectory(addr, mod)
 			}
@@ -464,9 +461,6 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *kevent.Kevent, fast, looku
 
 	if frame.Module == "" {
 		mod := s.r.GetModuleName(proc.handle, addr)
-		if mod == "?" && e.PS != nil {
-			mod = e.PS.FindMappingByVa(addr)
-		}
 		frame.Module = mod
 		if frame.Module == "?" {
 			frame.Module = "unbacked"
