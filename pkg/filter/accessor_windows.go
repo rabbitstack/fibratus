@@ -756,8 +756,12 @@ func newFileAccessor() Accessor {
 
 func (l *fileAccessor) Get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
 	switch f {
+	case fields.FilePath:
+		return kevt.GetParamAsString(kparams.FilePath), nil
 	case fields.FileName:
-		return kevt.GetParamAsString(kparams.FileName), nil
+		return filepath.Base(kevt.GetParamAsString(kparams.FilePath)), nil
+	case fields.FileExtension:
+		return filepath.Ext(kevt.GetParamAsString(kparams.FilePath)), nil
 	case fields.FileOffset:
 		return kevt.Kparams.GetUint64(kparams.FileOffset)
 	case fields.FileIOSize:
@@ -770,8 +774,6 @@ func (l *fileAccessor) Get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, 
 		return kevt.Kparams.GetUint64(kparams.FileObject)
 	case fields.FileType:
 		return kevt.GetParamAsString(kparams.FileType), nil
-	case fields.FileExtension:
-		return filepath.Ext(kevt.GetParamAsString(kparams.FileName)), nil
 	case fields.FileAttributes:
 		return kevt.GetFlagsAsSlice(kparams.FileAttributes), nil
 	case fields.FileStatus:
@@ -835,7 +837,7 @@ func newImageAccessor() Accessor {
 
 func (i *imageAccessor) Get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
 	if kevt.IsLoadImage() && (f == fields.ImageSignatureType || f == fields.ImageSignatureLevel || f.IsImageCert()) {
-		filename := kevt.GetParamAsString(kparams.FileName)
+		filename := kevt.GetParamAsString(kparams.ImagePath)
 		addr := kevt.Kparams.MustGetUint64(kparams.ImageBase)
 		typ := kevt.Kparams.MustGetUint32(kparams.ImageSignatureType)
 		level := kevt.Kparams.MustGetUint32(kparams.ImageSignatureLevel)
@@ -899,8 +901,10 @@ func (i *imageAccessor) Get(f fields.Field, kevt *kevent.Kevent) (kparams.Value,
 	}
 
 	switch f {
+	case fields.ImagePath:
+		return kevt.GetParamAsString(kparams.ImagePath), nil
 	case fields.ImageName:
-		return kevt.GetParamAsString(kparams.ImageFilename), nil
+		return filepath.Base(kevt.GetParamAsString(kparams.ImagePath)), nil
 	case fields.ImageDefaultAddress:
 		return kevt.GetParamAsString(kparams.ImageDefaultBase), nil
 	case fields.ImageBase:
@@ -937,7 +941,7 @@ func (i *imageAccessor) Get(f fields.Field, kevt *kevent.Kevent) (kparams.Value,
 	case fields.ImageIsExecutable:
 		return kevt.Kparams.GetBool(kparams.FileIsExecutable)
 	case fields.ImageIsDotnet:
-		p, err := pe.ParseFile(kevt.GetParamAsString(kparams.ImageFilename), pe.WithCLR())
+		p, err := pe.ParseFile(kevt.GetParamAsString(kparams.ImagePath), pe.WithCLR())
 		if err != nil {
 			return nil, err
 		}
@@ -960,8 +964,14 @@ func newRegistryAccessor() Accessor {
 
 func (r *registryAccessor) Get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
 	switch f {
+	case fields.RegistryPath:
+		return kevt.GetParamAsString(kparams.RegPath), nil
 	case fields.RegistryKeyName:
-		return kevt.GetParamAsString(kparams.RegKeyName), nil
+		if kevt.IsRegSetValue() {
+			return filepath.Base(filepath.Dir(kevt.GetParamAsString(kparams.RegPath))), nil
+		} else {
+			return filepath.Base(kevt.GetParamAsString(kparams.RegPath)), nil
+		}
 	case fields.RegistryKeyHandle:
 		return kevt.GetParamAsString(kparams.RegKeyHandle), nil
 	case fields.RegistryValue:
@@ -1140,7 +1150,7 @@ func (pa *peAccessor) Get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, e
 	// from process' memory at the base address of the loaded
 	// executable image
 	if kevt.IsLoadImage() && f.IsPeModified() {
-		filename := kevt.GetParamAsString(kparams.FileName)
+		filename := kevt.GetParamAsString(kparams.ImagePath)
 		isExecutable := filepath.Ext(filename) == ".exe" || kevt.Kparams.TryGetBool(kparams.FileIsExecutable)
 		if !isExecutable {
 			return nil, nil
@@ -1360,7 +1370,12 @@ func captureInBrackets(s string) (string, fields.Segment) {
 // isLOLDriver interacts with the loldrivers client to determine
 // whether the loaded/dropped driver is malicious or vulnerable.
 func isLOLDriver(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
-	filename := kevt.GetParamAsString(kparams.FileName)
+	var filename string
+	if kevt.Category == ktypes.File {
+		filename = kevt.GetParamAsString(kparams.FilePath)
+	} else {
+		filename = kevt.GetParamAsString(kparams.ImagePath)
+	}
 	isDriver := filepath.Ext(filename) == ".sys" || kevt.Kparams.TryGetBool(kparams.FileIsDriver)
 	if !isDriver {
 		return nil, nil

@@ -79,7 +79,7 @@ func TestWrite(t *testing.T) {
 			Description: "Creates or opens a new file, directory, I/O device, pipe, console",
 			Kparams: kevent.Kparams{
 				kparams.FileObject:    {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(12456738026482168384)},
-				kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
+				kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
 				kparams.FileType:      {Name: kparams.FileType, Type: kparams.AnsiString, Value: "file"},
 				kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.AnsiString, Value: "open"},
 			},

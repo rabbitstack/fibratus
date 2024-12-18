@@ -64,7 +64,7 @@ func (h *handleProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error)
 		pid := e.Kparams.MustGetPid()
 		proc := h.psnap.FindAndPut(pid)
 		if proc != nil {
-			e.AppendParam(kparams.Exe, kparams.FilePath, proc.Exe)
+			e.AppendParam(kparams.Exe, kparams.Path, proc.Exe)
 			e.AppendParam(kparams.ProcessName, kparams.AnsiString, proc.Name)
 		}
 		return e, nil
@@ -93,7 +93,7 @@ func (h *handleProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error)
 				driverPath = driverName
 			}
 			h.devPathResolver.RemovePath(driverName)
-			e.Kparams.Append(kparams.ImageFilename, kparams.FilePath, driverPath)
+			e.Kparams.Append(kparams.ImagePath, kparams.Path, driverPath)
 		}
 		// assign the formatted handle name
 		if err := e.Kparams.SetValue(kparams.HandleObjectName, name); err != nil {

@@ -87,8 +87,8 @@ const (
 
 	// FileObject determines the field name for the file object pointer.
 	FileObject = "file_object"
-	// FileName represents the field that designates the absolute path of the file.
-	FileName = "file_name"
+	// FilePath represents the field that designates the absolute path of the file.
+	FilePath = "file_path"
 	// FileCreateOptions is the field that represents the values passed in the CreateDispositions parameter to the NtCreateFile function.
 	FileCreateOptions = "create_options"
 	// FileOperation is the field that represents the values passed in the CreateOptions parameter to the NtCreateFile function.
@@ -135,8 +135,8 @@ const (
 
 	// RegKeyHandle identifies the parameter name for the registry key handle.
 	RegKeyHandle = "key_handle"
-	// RegKeyName represents the parameter name for the fully qualified key name.
-	RegKeyName = "key_name"
+	// RegPath represents the parameter name for the fully qualified key path.
+	RegPath = "key_path"
 	// RegValue identifies the parameter name that contains the value
 	RegValue = "value"
 	// RegValueType identifies the parameter that represents registry value type e.g (DWORD, BINARY)
@@ -150,8 +150,8 @@ const (
 	ImageCheckSum = "checksum"
 	// ImageDefaultBase is the parameter name that represents image's base address.
 	ImageDefaultBase = "default_address"
-	// ImageFilename is the parameter name that denotes file name and extension of the DLL/executable image.
-	ImageFilename = "file_name"
+	// ImagePath is the parameter name that denotes the file path and extension of the DLL/executable image.
+	ImagePath = "file_path"
 	// ImageSignatureLevel is the parameter denoting the loaded module signature level.
 	ImageSignatureLevel = "signature_level"
 	// ImageSignatureType is the parameter denoting the loaded module signature type.

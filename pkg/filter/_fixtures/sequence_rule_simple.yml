@@ -7,6 +7,6 @@ condition: >
   |kevt.name = 'CreateProcess' and ps.name = 'cmd.exe'| by ps.exe
   |kevt.name = 'CreateFile'
       and
-   file.name icontains 'temp'
-  | by file.name
+   file.path icontains 'temp'
+  | by file.path
 min-engine-version: 2.0.0

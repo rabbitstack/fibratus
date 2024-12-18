@@ -57,7 +57,7 @@ func TestKeventSummary(t *testing.T) {
 		Description: "Creates or opens a new file, directory, I/O device, pipe, console",
 		Kparams: Kparams{
 			kparams.FileObject:    {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(12456738026482168384)},
-			kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
+			kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
 			kparams.FileType:      {Name: kparams.FileType, Type: kparams.AnsiString, Value: "file"},
 			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: uint32(1), Enum: fs.FileCreateDispositions},
 		},
@@ -104,11 +104,11 @@ func TestPartialKey(t *testing.T) {
 			0x4cf5,
 		},
 		{
-			&Kevent{Type: ktypes.CreateFile, PID: 4321, Kparams: Kparams{kparams.FileName: {Name: kparams.FileName, Type: kparams.FileDosPath, Value: "C:\\Windows\\System32\\kernelbase.dll"}}},
+			&Kevent{Type: ktypes.CreateFile, PID: 4321, Kparams: Kparams{kparams.FilePath: {Name: kparams.FilePath, Type: kparams.DOSPath, Value: "C:\\Windows\\System32\\kernelbase.dll"}}},
 			0x7ec254f31df879ec,
 		},
 		{
-			&Kevent{Type: ktypes.CreateFile, PID: 4321, Kparams: Kparams{kparams.FileName: {Name: kparams.FileName, Type: kparams.FileDosPath, Value: "C:\\Windows\\System32\\kernel32.dll"}}},
+			&Kevent{Type: ktypes.CreateFile, PID: 4321, Kparams: Kparams{kparams.FilePath: {Name: kparams.FilePath, Type: kparams.DOSPath, Value: "C:\\Windows\\System32\\kernel32.dll"}}},
 			0xb6380d9159ccd174,
 		},
 	}

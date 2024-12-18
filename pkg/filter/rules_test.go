@@ -200,7 +200,7 @@ func TestSequenceState(t *testing.T) {
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
 		},
 		Kparams: kevent.Kparams{
-			kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper"},
+			kparams.FilePath: {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper"},
 		},
 	}
 
@@ -220,10 +220,10 @@ func TestSequenceState(t *testing.T) {
 	ss.addPartial("kevt.name = CreateProcess AND ps.name = cmd.exe", e1, false)
 	require.NoError(t, ss.matchTransition("kevt.name = CreateProcess AND ps.name = cmd.exe", e1))
 	assert.False(t, ss.isInitialState())
-	assert.Equal(t, "kevt.name = CreateFile AND file.name ICONTAINS temp", ss.currentState())
+	assert.Equal(t, "kevt.name = CreateFile AND file.path ICONTAINS temp", ss.currentState())
 
-	ss.addPartial("kevt.name = CreateFile AND file.name ICONTAINS temp", e2, false)
-	require.NoError(t, ss.matchTransition("kevt.name = CreateFile AND file.name ICONTAINS temp", e2))
+	ss.addPartial("kevt.name = CreateFile AND file.path ICONTAINS temp", e2, false)
+	require.NoError(t, ss.matchTransition("kevt.name = CreateFile AND file.path ICONTAINS temp", e2))
 
 	assert.Len(t, ss.partials[1], 1)
 	assert.Len(t, ss.partials[2], 1)
@@ -237,7 +237,7 @@ func TestSequenceState(t *testing.T) {
 	assert.Equal(t, "kevt.name = CreateProcess AND ps.name = cmd.exe", ss.currentState())
 	// deadline exceeded
 	require.NoError(t, ss.matchTransition("kevt.name = CreateProcess AND ps.name = cmd.exe", e1))
-	assert.Equal(t, "kevt.name = CreateFile AND file.name ICONTAINS temp", ss.currentState())
+	assert.Equal(t, "kevt.name = CreateFile AND file.path ICONTAINS temp", ss.currentState())
 	time.Sleep(time.Millisecond * 120)
 	assert.True(t, ss.isInitialState())
 
@@ -245,14 +245,14 @@ func TestSequenceState(t *testing.T) {
 	require.False(t, ss.next(1))
 	if ss.next(1) {
 		// this shouldn't happen
-		require.NoError(t, ss.matchTransition("kevt.name = CreateFile AND file.name ICONTAINS temp", e2))
+		require.NoError(t, ss.matchTransition("kevt.name = CreateFile AND file.path ICONTAINS temp", e2))
 	}
 
 	ss.clear()
 	assert.True(t, ss.isInitialState())
 	require.NoError(t, ss.matchTransition("kevt.name = CreateProcess AND ps.name = cmd.exe", e1))
 	ss.addPartial("kevt.name = CreateProcess AND ps.name = cmd.exe", e2, false)
-	ss.addPartial("kevt.name = CreateFile AND file.name ICONTAINS temp", e2, false)
+	ss.addPartial("kevt.name = CreateFile AND file.path ICONTAINS temp", e2, false)
 	require.False(t, ss.inDeadline.Load())
 
 	// test expiration
@@ -277,7 +277,7 @@ func TestSequenceState(t *testing.T) {
 	require.NoError(t, ss.matchTransition("kevt.name = CreateProcess AND ps.name = cmd.exe", e1))
 	require.False(t, ss.inExpired.Load())
 
-	assert.Equal(t, "kevt.name = CreateFile AND file.name ICONTAINS temp", ss.currentState())
+	assert.Equal(t, "kevt.name = CreateFile AND file.path ICONTAINS temp", ss.currentState())
 }
 
 func TestSequenceStateNext(t *testing.T) {
@@ -411,7 +411,7 @@ func TestSimpleSequenceRule(t *testing.T) {
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
 		},
 		Kparams: kevent.Kparams{
-			kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost-temp.exe"},
+			kparams.FilePath: {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost-temp.exe"},
 		},
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
@@ -459,7 +459,7 @@ func TestSimpleSequenceRuleMultiplePartials(t *testing.T) {
 				Exe:  "C:\\Windows\\system32\\cmd.exe",
 			},
 			Kparams: kevent.Kparams{
-				kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost-temp.exe"},
+				kparams.FilePath: {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost-temp.exe"},
 			},
 			Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 		}
@@ -500,7 +500,7 @@ func TestSimpleSequenceRuleMultiplePartials(t *testing.T) {
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
 		},
 		Kparams: kevent.Kparams{
-			kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost-temp.exe"},
+			kparams.FilePath: {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost-temp.exe"},
 		},
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
@@ -543,7 +543,7 @@ func TestSimpleSequenceRuleWithMaxSpanReached(t *testing.T) {
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
 		},
 		Kparams: kevent.Kparams{
-			kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper"},
+			kparams.FilePath: {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper"},
 		},
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
@@ -592,7 +592,7 @@ func TestSimpleSequencePolicyWithMaxSpanNotReached(t *testing.T) {
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
 		},
 		Kparams: kevent.Kparams{
-			kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper"},
+			kparams.FilePath: {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper"},
 		},
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
@@ -640,7 +640,7 @@ func TestComplexSequenceRule(t *testing.T) {
 			Cmdline: "C:\\Program Files\\Mozilla Firefox\\firefox.exe\" -contentproc --channel=\"10464.7.539748228\\1366525930\" -childID 6 -isF",
 		},
 		Kparams: kevent.Kparams{
-			kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
+			kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
 			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: uint32(2), Enum: fs.FileCreateDispositions},
 		},
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
@@ -736,7 +736,7 @@ func TestSequencePsUUID(t *testing.T) {
 			Cmdline: "C:\\Program Files\\Mozilla Firefox\\firefox.exe\" -contentproc --channel=\"10464.7.539748228\\1366525930\" -childID 6 -isF",
 		},
 		Kparams: kevent.Kparams{
-			kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
+			kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
 			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: uint32(2), Enum: fs.FileCreateDispositions},
 		},
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
@@ -783,7 +783,7 @@ func TestSequenceOutOfOrder(t *testing.T) {
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
 		},
 		Kparams: kevent.Kparams{
-			kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\lsass.dmp"},
+			kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\lsass.dmp"},
 			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: uint32(2), Enum: fs.FileCreateDispositions},
 		},
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
@@ -875,7 +875,7 @@ func TestSequenceAndSimpleRuleMix(t *testing.T) {
 			Exe:  "C:\\Windows\\system32\\cmd.exe",
 		},
 		Kparams: kevent.Kparams{
-			kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
+			kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
 			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: uint32(2)},
 		},
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
@@ -958,7 +958,7 @@ func TestSequenceRuleBoundsFields(t *testing.T) {
 			SID:  "nusret",
 		},
 		Kparams: kevent.Kparams{
-			kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost-temp.exe"},
+			kparams.FilePath: {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost-temp.exe"},
 		},
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
@@ -1052,7 +1052,7 @@ func TestIsExpressionEvaluable(t *testing.T) {
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
 		},
 		Kparams: kevent.Kparams{
-			kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper"},
+			kparams.FilePath: {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper"},
 		},
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
@@ -1083,7 +1083,7 @@ func TestBoundFieldsWithFunctions(t *testing.T) {
 			Exe:  "C:\\Windows\\system32\\cmd.exe",
 		},
 		Kparams: kevent.Kparams{
-			kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\System32\\passwdflt.dll"},
+			kparams.FilePath: {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\System32\\passwdflt.dll"},
 		},
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
@@ -1099,7 +1099,7 @@ func TestBoundFieldsWithFunctions(t *testing.T) {
 			Exe:  "C:\\Windows\\system32\\cmd.exe",
 		},
 		Kparams: kevent.Kparams{
-			kparams.RegKeyName: {Name: kparams.RegKeyName, Type: kparams.UnicodeString, Value: "HKEY_CURRENT_USER\\Volatile Environment\\Notification Packages"},
+			kparams.RegPath: {Name: kparams.RegPath, Type: kparams.UnicodeString, Value: "HKEY_CURRENT_USER\\Volatile Environment\\Notification Packages"},
 		},
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
