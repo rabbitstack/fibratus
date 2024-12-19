@@ -144,7 +144,7 @@ func TestProcessCallstackFastMode(t *testing.T) {
 		Description: "Creates or opens a new file, directory, I/O device, pipe, console",
 		Kparams: kevent.Kparams{
 			kparams.FileObject:    {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(12456738026482168384)},
-			kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
+			kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
 			kparams.FileType:      {Name: kparams.FileType, Type: kparams.AnsiString, Value: "file"},
 			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: uint32(1), Enum: fs.FileCreateDispositions},
 			kparams.Callstack:     {Name: kparams.Callstack, Type: kparams.Slice, Value: []va.Address{0x7ffb5c1d0396, 0x7ffb5d8e61f4, 0x7ffb3138592e, 0x7ffb313853b2, 0x2638e59e0a5}},
@@ -217,7 +217,7 @@ func TestProcessCallstackPeExports(t *testing.T) {
 		Description: "Creates or opens a new file, directory, I/O device, pipe, console",
 		Kparams: kevent.Kparams{
 			kparams.FileObject:    {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(12456738026482168384)},
-			kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\mimi.dll"},
+			kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\mimi.dll"},
 			kparams.FileType:      {Name: kparams.FileType, Type: kparams.AnsiString, Value: "file"},
 			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: uint32(2), Enum: fs.FileCreateDispositions},
 			kparams.Callstack:     {Name: kparams.Callstack, Type: kparams.Slice, Value: []va.Address{0x7ffb5c1d0396, 0x7ffb5d8e61f4, 0x7ffb3138592e, 0x7ffb313853b2, 0x2638e59e0a5}},
@@ -275,7 +275,7 @@ func TestProcessCallstackPeExports(t *testing.T) {
 		Category:  ktypes.Image,
 		Kparams: kevent.Kparams{
 			kparams.ImageBase: {Name: kparams.ImageBase, Type: kparams.Address, Value: uint64(0x12345f)},
-			kparams.FileName:  {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\System32\\bcrypt32.dll"},
+			kparams.FilePath:  {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\System32\\bcrypt32.dll"},
 		},
 		PS: proc,
 	}
@@ -294,7 +294,7 @@ func TestProcessCallstackPeExports(t *testing.T) {
 		Category:  ktypes.Image,
 		Kparams: kevent.Kparams{
 			kparams.ImageBase: {Name: kparams.ImageBase, Type: kparams.Address, Value: uint64(0x12345f)},
-			kparams.FileName:  {Name: kparams.FileName, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("SystemRoot"), "System32", "bcrypt32.dll")},
+			kparams.FilePath:  {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("SystemRoot"), "System32", "bcrypt32.dll")},
 		},
 		PS: proc,
 	}

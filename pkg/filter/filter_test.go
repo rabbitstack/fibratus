@@ -397,7 +397,7 @@ func TestFileFilter(t *testing.T) {
 		Description: "Creates or opens a new file, directory, I/O device, pipe, console",
 		Kparams: kevent.Kparams{
 			kparams.FileObject:    {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(12456738026482168384)},
-			kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
+			kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
 			kparams.FileType:      {Name: kparams.FileType, Type: kparams.AnsiString, Value: "file"},
 			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.AnsiString, Value: "open"},
 		},
@@ -409,7 +409,8 @@ func TestFileFilter(t *testing.T) {
 		matches bool
 	}{
 
-		{`file.name = 'C:\\Windows\\system32\\user32.dll'`, true},
+		{`file.name = 'user32.dll'`, true},
+		{`file.path = 'C:\\Windows\\system32\\user32.dll'`, true},
 		{`file.extension  = '.dll'`, true},
 		{`file.extension not contains '.exe'`, true},
 		{`file.extension contains '.exe' or (file.extension contains '.dll' and file.name endswith 'user32.dll')`, true},
@@ -419,31 +420,31 @@ func TestFileFilter(t *testing.T) {
 		{`file.extension not contains '.exe' and file.extension not contains '.com' and file.extension not in ('.vba', '.exe')`, true},
 		{`file.extension not in ('.exe', '.com')`, true},
 		{`file.extension not in ('.exe', '.dll')`, false},
-		{`file.name matches 'C:\\*\\user32.dll'`, true},
-		{`file.name not matches 'C:\\*.exe'`, true},
-		{`file.name imatches 'C:\\*\\USER32.dll'`, true},
-		{`file.name matches ('C:\\*\\user3?.dll', 'C:\\*\\user32.*')`, true},
-		{`file.name contains ('C:\\Windows\\system32\\kernel32.dll', 'C:\\Windows\\system32\\user32.dll')`, true},
-		{`file.name not matches ('C:\\*.exe', 'C:\\Windows\\*.com')`, true},
-		{`file.name endswith ('.exe', 'kernel32.dll', 'user32.dll')`, true},
-		{`file.name iendswith ('.EXE', 'KERNEL32.dll', 'user32.dll')`, true},
-		{`file.name istartswith ('C:\\WINDOWS', 'KERNEL32.dll', 'user32.dll')`, true},
-		{`file.name iin ('C:\\WINDOWS\\system32\\user32.dll')`, true},
-		{`file.name fuzzy 'C:\\Windows\\system32\\ser3ll'`, true},
-		{`file.name ifuzzy 'C:\\WINDOWS\\sYS\\ser3ll'`, true},
-		{`file.name ifuzzy 'C:\\WINDOWS\\sYS\\32dll'`, true},
-		{`file.name fuzzy ('C:\\Windows\\system32\\kernel', 'C:\\Windows\\system32\\ser3ll')`, true},
-		{`file.name ifuzzynorm 'C:\\WINDOWS\\sÝS\\32dll'`, true},
-		{`base(file.name) = 'user32.dll'`, true},
-		{`ext(base(file.name)) = '.dll'`, true},
-		{`base(file.name, false) = 'user32'`, true},
-		{`dir(file.name) = 'C:\\Windows\\system32'`, true},
-		{`ext(file.name) = '.dll'`, true},
-		{`ext(file.name, false) = 'dll'`, true},
-		{`is_abs(file.name)`, true},
-		{`is_abs(base(file.name))`, false},
-		{`file.name iin glob('C:\\Windows\\System32\\*.dll')`, true},
-		{`volume(file.name) = 'C:'`, true},
+		{`file.path matches 'C:\\*\\user32.dll'`, true},
+		{`file.path not matches 'C:\\*.exe'`, true},
+		{`file.path imatches 'C:\\*\\USER32.dll'`, true},
+		{`file.path matches ('C:\\*\\user3?.dll', 'C:\\*\\user32.*')`, true},
+		{`file.path contains ('C:\\Windows\\system32\\kernel32.dll', 'C:\\Windows\\system32\\user32.dll')`, true},
+		{`file.path not matches ('C:\\*.exe', 'C:\\Windows\\*.com')`, true},
+		{`file.path endswith ('.exe', 'kernel32.dll', 'user32.dll')`, true},
+		{`file.path iendswith ('.EXE', 'KERNEL32.dll', 'user32.dll')`, true},
+		{`file.path istartswith ('C:\\WINDOWS', 'KERNEL32.dll', 'user32.dll')`, true},
+		{`file.path iin ('C:\\WINDOWS\\system32\\user32.dll')`, true},
+		{`file.path fuzzy 'C:\\Windows\\system32\\ser3ll'`, true},
+		{`file.path ifuzzy 'C:\\WINDOWS\\sYS\\ser3ll'`, true},
+		{`file.path ifuzzy 'C:\\WINDOWS\\sYS\\32dll'`, true},
+		{`file.path fuzzy ('C:\\Windows\\system32\\kernel', 'C:\\Windows\\system32\\ser3ll')`, true},
+		{`file.path ifuzzynorm 'C:\\WINDOWS\\sÝS\\32dll'`, true},
+		{`base(file.path) = 'user32.dll'`, true},
+		{`ext(base(file.path)) = '.dll'`, true},
+		{`base(file.path, false) = 'user32'`, true},
+		{`dir(file.path) = 'C:\\Windows\\system32'`, true},
+		{`ext(file.path) = '.dll'`, true},
+		{`ext(file.path, false) = 'dll'`, true},
+		{`is_abs(file.path)`, true},
+		{`is_abs(base(file.path))`, false},
+		{`file.path iin glob('C:\\Windows\\System32\\*.dll')`, true},
+		{`volume(file.path) = 'C:'`, true},
 	}
 
 	for i, tt := range tests {
@@ -557,7 +558,7 @@ func TestKeventFilter(t *testing.T) {
 		Kparams: kevent.Kparams{
 			kparams.ProcessID:     {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(3434)},
 			kparams.FileObject:    {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(12456738026482168384)},
-			kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
+			kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
 			kparams.FileType:      {Name: kparams.FileType, Type: kparams.AnsiString, Value: "file"},
 			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.AnsiString, Value: "open"},
 		},
@@ -579,7 +580,7 @@ func TestKeventFilter(t *testing.T) {
 		{`kevt.category = 'file'`, true},
 		{`kevt.host = 'archrabbit'`, true},
 		{`kevt.nparams = 5`, true},
-		{`kevt.arg[file_name] = '\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll'`, true},
+		{`kevt.arg[file_path] = '\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll'`, true},
 		{`kevt.arg[type] = 'file'`, true},
 		{`kevt.arg[pid] = 3434`, true},
 
@@ -594,15 +595,15 @@ func TestKeventFilter(t *testing.T) {
 		{`upper(rtrim(kevt.name, 'File')) = 'CREATE'`, true},
 		{`replace(kevt.host, 'rabbit', '_bunny') = 'arch_bunny'`, true},
 		{`replace(kevt.host, 'rabbit', '_bunny', '_bunny', 'bunny') = 'archbunny'`, true},
-		{`split(file.name, '\\') IN ('windows', 'system32')`, true},
-		{`length(file.name) = 51`, true},
-		{`indexof(file.name, '\\') = 0`, true},
-		{`indexof(file.name, '\\', 'last') = 40`, true},
-		{`indexof(file.name, 'h2', 'any') = 22`, true},
-		{`substr(file.name, indexof(file.name, '\\'), indexof(file.name, '\\Hard')) = '\\Device'`, true},
+		{`split(file.path, '\\') IN ('windows', 'system32')`, true},
+		{`length(file.path) = 51`, true},
+		{`indexof(file.path, '\\') = 0`, true},
+		{`indexof(file.path, '\\', 'last') = 40`, true},
+		{`indexof(file.path, 'h2', 'any') = 22`, true},
+		{`substr(file.path, indexof(file.path, '\\'), indexof(file.path, '\\Hard')) = '\\Device'`, true},
 		{`substr(kevt.desc, indexof(kevt.desc, '\\'), indexof(kevt.desc, 'NOT')) = 'Creates or opens a new file, directory, I/O device, pipe, console'`, true},
-		{`entropy(file.name) > 120`, true},
-		{`regex(file.name, '\\\\Device\\\\HarddiskVolume[2-9]+\\\\.*')`, true},
+		{`entropy(file.path) > 120`, true},
+		{`regex(file.path, '\\\\Device\\\\HarddiskVolume[2-9]+\\\\.*')`, true},
 	}
 
 	for i, tt := range tests {
@@ -715,7 +716,7 @@ func TestRegistryFilter(t *testing.T) {
 		PID:      859,
 		Category: ktypes.Registry,
 		Kparams: kevent.Kparams{
-			kparams.RegKeyName:   {Name: kparams.RegKeyName, Type: kparams.UnicodeString, Value: `HKEY_LOCAL_MACHINE\SYSTEM\Setup\Pid`},
+			kparams.RegPath:      {Name: kparams.RegPath, Type: kparams.UnicodeString, Value: `HKEY_LOCAL_MACHINE\SYSTEM\Setup\Pid`},
 			kparams.RegValue:     {Name: kparams.RegValue, Type: kparams.Uint32, Value: uint32(10234)},
 			kparams.RegValueType: {Name: kparams.RegValueType, Type: kparams.AnsiString, Value: "DWORD"},
 			kparams.NTStatus:     {Name: kparams.NTStatus, Type: kparams.AnsiString, Value: "success"},
@@ -729,10 +730,11 @@ func TestRegistryFilter(t *testing.T) {
 	}{
 
 		{`registry.status startswith ('key not', 'succ')`, true},
-		{`registry.key.name icontains ('hkey_local_machine', 'HKEY_LOCAL')`, true},
+		{`registry.path = 'HKEY_LOCAL_MACHINE\\SYSTEM\\Setup\\Pid'`, true},
+		{`registry.key.name icontains ('Setup', 'setup')`, true},
 		{`registry.value = 10234`, true},
 		{`registry.value.type in ('DWORD', 'QWORD')`, true},
-		{`MD5(registry.key.name) = 'eab870b2a516206575d2ffa2b98d8af5'`, true},
+		{`MD5(registry.path) = 'eab870b2a516206575d2ffa2b98d8af5'`, true},
 	}
 
 	for i, tt := range tests {
@@ -753,7 +755,7 @@ func TestImageFilter(t *testing.T) {
 		Type:     ktypes.LoadImage,
 		Category: ktypes.Image,
 		Kparams: kevent.Kparams{
-			kparams.ImageFilename:       {Name: kparams.ImageFilename, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll")},
+			kparams.ImagePath:           {Name: kparams.ImagePath, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll")},
 			kparams.ProcessID:           {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1023)},
 			kparams.ImageCheckSum:       {Name: kparams.ImageCheckSum, Type: kparams.Uint32, Value: uint32(2323432)},
 			kparams.ImageBase:           {Name: kparams.ImageBase, Type: kparams.Address, Value: uint64(0x7ffb313833a3)},
@@ -770,7 +772,8 @@ func TestImageFilter(t *testing.T) {
 		{`image.signature.type = 'EMBEDDED'`, true},
 		{`image.signature.level = 'AUTHENTICODE'`, true},
 		{`image.pid = 1023`, true},
-		{`image.name endswith 'kernel32.dll'`, true},
+		{`image.path endswith 'System32\\kernel32.dll'`, true},
+		{`image.name = 'kernel32.dll'`, true},
 		{`image.checksum = 2323432`, true},
 		{`image.base.address = '7ffb313833a3'`, true},
 		{`image.cert.issuer icontains 'Microsoft Windows'`, true},
@@ -802,7 +805,7 @@ func TestImageFilter(t *testing.T) {
 		Type:     ktypes.LoadImage,
 		Category: ktypes.Image,
 		Kparams: kevent.Kparams{
-			kparams.ImageFilename:       {Name: kparams.ImageFilename, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll")},
+			kparams.ImagePath:           {Name: kparams.ImagePath, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll")},
 			kparams.ProcessID:           {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1023)},
 			kparams.ImageCheckSum:       {Name: kparams.ImageCheckSum, Type: kparams.Uint32, Value: uint32(2323432)},
 			kparams.ImageBase:           {Name: kparams.ImageBase, Type: kparams.Address, Value: uint64(0x7ccb313833a3)},
@@ -844,7 +847,7 @@ func TestImageFilter(t *testing.T) {
 		Type:     ktypes.LoadImage,
 		Category: ktypes.Image,
 		Kparams: kevent.Kparams{
-			kparams.ImageFilename:       {Name: kparams.ImageFilename, Type: kparams.UnicodeString, Value: "_fixtures\\mscorlib.dll"},
+			kparams.ImagePath:           {Name: kparams.ImagePath, Type: kparams.UnicodeString, Value: "_fixtures\\mscorlib.dll"},
 			kparams.ProcessID:           {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1023)},
 			kparams.ImageCheckSum:       {Name: kparams.ImageCheckSum, Type: kparams.Uint32, Value: uint32(2323432)},
 			kparams.ImageBase:           {Name: kparams.ImageBase, Type: kparams.Address, Value: uint64(0xfff313833a3)},
@@ -933,7 +936,7 @@ func TestLazyPEFilter(t *testing.T) {
 		},
 		Kparams: kevent.Kparams{
 			kparams.FileIsDLL: {Name: kparams.FileIsDLL, Type: kparams.Bool, Value: true},
-			kparams.FileName:  {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
+			kparams.FilePath:  {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
 		},
 	}
 
@@ -1104,7 +1107,7 @@ func TestInterpolateFields(t *testing.T) {
 		{
 			original: `Detected an attempt by <code>%1.ps.name</code> process to access
 and read the memory of the <b>Local Security And Authority Subsystem Service</b>
-and subsequently write the <code>%2.file.name</code> dump file to the disk device`,
+and subsequently write the <code>%2.file.path</code> dump file to the disk device`,
 			interpolated: `Detected an attempt by <code>taskmgr.exe</code> process to access
 and read the memory of the <b>Local Security And Authority Subsystem Service</b>
 and subsequently write the <code>C:\Users
@@ -1127,7 +1130,7 @@ eo\Temp\lsass.dump</code> dump file to the disk device`,
 					Name:     "WriteFile",
 					PID:      1023,
 					Kparams: kevent.Kparams{
-						kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Users\neo\\Temp\\lsass.dump"},
+						kparams.FilePath: {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Users\neo\\Temp\\lsass.dump"},
 					},
 					PS: &pstypes.PS{
 						Name: "taskmgr.exe",
@@ -1140,7 +1143,7 @@ eo\Temp\lsass.dump</code> dump file to the disk device`,
 		{
 			original: `Detected an attempt by <code>%ps.name</code> process to access
 and read the memory of the <b>Local Security And Authority Subsystem Service</b>
-and subsequently write the <code>%2.file.name</code> dump file to the disk device`,
+and subsequently write the <code>%2.file.path</code> dump file to the disk device`,
 			interpolated: `Detected an attempt by <code>taskmgr.exe</code> process to access
 and read the memory of the <b>Local Security And Authority Subsystem Service</b>
 and subsequently write the <code>C:\Users
@@ -1163,7 +1166,7 @@ eo\Temp\lsass.dump</code> dump file to the disk device`,
 					Name:     "WriteFile",
 					PID:      1023,
 					Kparams: kevent.Kparams{
-						kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Users\neo\\Temp\\lsass.dump"},
+						kparams.FilePath: {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Users\neo\\Temp\\lsass.dump"},
 					},
 					PS: &pstypes.PS{
 						Name: "taskmgr.exe",

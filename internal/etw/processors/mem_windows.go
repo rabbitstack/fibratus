@@ -60,7 +60,7 @@ func (m memProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, erro
 			region := m.regionProber.Query(pid, addr)
 			if region != nil {
 				if region.IsMapped() {
-					e.AppendParam(kparams.FileName, kparams.FileDosPath, region.GetMappedFile())
+					e.AppendParam(kparams.FilePath, kparams.DOSPath, region.GetMappedFile())
 				}
 				e.AppendEnum(kparams.MemPageType, region.Type, MemPageTypes)
 				e.AppendFlags(kparams.MemProtect, region.Protect, kevent.MemProtectionFlags)
@@ -69,7 +69,7 @@ func (m memProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, erro
 		}
 		proc := m.psnap.FindAndPut(pid)
 		if proc != nil {
-			e.AppendParam(kparams.Exe, kparams.FilePath, proc.Exe)
+			e.AppendParam(kparams.Exe, kparams.Path, proc.Exe)
 			e.AppendParam(kparams.ProcessName, kparams.AnsiString, proc.Name)
 		}
 		return e, false, nil

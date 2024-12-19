@@ -11,16 +11,16 @@ condition: >
   maxspan 5m
     |kevt.name = 'CreateFile'
         and
-     file.name imatches '?:\\Windows\\System32\\*.dll'
+     file.path imatches '?:\\Windows\\System32\\*.dll'
     | as e1
     |kevt.name = 'RegSetValue'
         and
-     registry.key.name ~= 'HKEY_CURRENT_USER\\Volatile Environment\\Notification Packages'
+     registry.path ~= 'HKEY_CURRENT_USER\\Volatile Environment\\Notification Packages'
         and
-     get_reg_value(registry.key.name) iin (base($e1.file.name, false))
+     get_reg_value(registry.path) iin (base($e1.file.path, false))
     |
 output: >
   <code>%1.ps.exe</code> process dropped potentially malicious
-  <code>%1.file.name</code> password filter and <code>%2.ps.name</code>
-  registered the password filter DLL under %2.registry.key.name registry key
+  <code>%1.file.path</code> password filter and <code>%2.ps.name</code>
+  registered the password filter DLL under %2.registry.path registry key
 min-engine-version: 2.0.0

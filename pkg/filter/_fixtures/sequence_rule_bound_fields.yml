@@ -7,7 +7,7 @@ condition: >
   |kevt.name = 'CreateProcess' and ps.name = 'cmd.exe'| as e1
   |kevt.name = 'CreateFile'
       and
-   file.name icontains 'temp'
+   file.path icontains 'temp'
       and
    $e1.ps.sid = ps.sid
   | as e2

@@ -107,7 +107,7 @@ type Kparam struct {
 // on the target where the capture is being taken.
 func (k Kparam) KcapType() kparams.Type {
 	switch k.Type {
-	case kparams.HandleType, kparams.FileDosPath, kparams.Key:
+	case kparams.HandleType, kparams.DOSPath, kparams.Key:
 		return kparams.UnicodeString
 	default:
 		return k.Type

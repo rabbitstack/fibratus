@@ -205,7 +205,7 @@ func (s *Symbolizer) ProcessEvent(e *kevent.Kevent) (bool, error) {
 		return true, nil
 	}
 	if e.IsLoadImage() || e.IsUnloadImage() {
-		filename := e.GetParamAsString(kparams.FileName)
+		filename := e.GetParamAsString(kparams.ImagePath)
 		addr := e.Kparams.TryGetAddress(kparams.ImageBase)
 		// if the kernel driver is loaded or unloaded,
 		// load/unload symbol handlers respectively
@@ -247,10 +247,11 @@ func (s *Symbolizer) ProcessEvent(e *kevent.Kevent) (bool, error) {
 // the map, we parse its export directory and insert
 // into the map.
 func (s *Symbolizer) syncModules(e *kevent.Kevent) error {
-	filename := e.GetParamAsString(kparams.FileName)
+	filename := e.GetParamAsString(kparams.ImagePath)
 	addr := e.Kparams.TryGetAddress(kparams.ImageBase)
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
 	if e.IsUnloadImage() {
 		ok, _ := s.psnap.FindModule(addr)
 		if !ok {
@@ -263,6 +264,7 @@ func (s *Symbolizer) syncModules(e *kevent.Kevent) error {
 		}
 		return nil
 	}
+
 	if s.mods[addr] != nil {
 		return nil
 	}
@@ -270,7 +272,9 @@ func (s *Symbolizer) syncModules(e *kevent.Kevent) error {
 	if err != nil {
 		return fmt.Errorf("unable to parse PE exports for module [%s]: %v", filename, err)
 	}
+
 	symModulesCount.Add(1)
+
 	m := &module{exports: px.Exports, accessed: time.Now(), hasExports: true}
 	exportRVAs := convert.MapKeysToSlice(m.exports)
 	if len(exportRVAs) > 0 {
@@ -279,6 +283,7 @@ func (s *Symbolizer) syncModules(e *kevent.Kevent) error {
 		m.hasExports = false
 	}
 	s.mods[addr] = m
+
 	return nil
 }
 

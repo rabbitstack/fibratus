@@ -364,8 +364,10 @@ const (
 
 	// FileObject represents the address of the file object
 	FileObject Field = "file.object"
-	// FileName represents the fie name
+	// FileName represents the file base name (e.g. cmd.exe)
 	FileName Field = "file.name"
+	// FilePath represents the file full path (e.g. C:\Windows\System32\cmd.exe)
+	FilePath Field = "file.path"
 	// FileExtension represents the file extension (e.g. .exe or .dll)
 	FileExtension Field = "file.extension"
 	// FileOperation represents the file operation (e.g. create)
@@ -413,6 +415,8 @@ const (
 	// FileInfoIsDispositionDeleteFile represents the field that indicates if the file is deleted when its handle is closed
 	FileInfoIsDispositionDeleteFile Field = "file.info.is_disposition_delete_file"
 
+	// RegistryPath represents the full registry path
+	RegistryPath Field = "registry.path"
 	// RegistryKeyName represents the registry key name
 	RegistryKeyName Field = "registry.key.name"
 	// RegistryKeyHandle represents the registry KCB address
@@ -432,7 +436,9 @@ const (
 	ImageChecksum Field = "image.checksum"
 	// ImageDefaultAddress represents the module address
 	ImageDefaultAddress Field = "image.default.address"
-	// ImageName is the module full name
+	// ImagePath is the module full path
+	ImagePath Field = "image.path"
+	// ImageName is the module name
 	ImageName Field = "image.name"
 	// ImagePID is the pid of the process where the image was loaded
 	ImagePID Field = "image.pid"
@@ -725,7 +731,8 @@ var fields = map[Field]FieldInfo{
 	ThreadCallstackCallsiteTrailingAssembly: {ThreadCallstackCallsiteTrailingAssembly, "callsite trailing assembly instructions", kparams.Slice, []string{"thread.callstack.callsite_trailing_assembly in ('add esp, 0xab')"}, nil},
 	ThreadCallstackIsUnbacked:               {ThreadCallstackIsUnbacked, "indicates if the callstack contains unbacked regions", kparams.Bool, []string{"thread.callstack.is_unbacked"}, nil},
 
-	ImageName:               {ImageName, "full image name", kparams.UnicodeString, []string{"image.name contains 'advapi32.dll'"}, nil},
+	ImagePath:               {ImagePath, "full image path", kparams.UnicodeString, []string{"image.patj = 'C:\\Windows\\System32\\advapi32.dll'"}, nil},
+	ImageName:               {ImageName, "image name", kparams.UnicodeString, []string{"image.name = 'advapi32.dll'"}, nil},
 	ImageBase:               {ImageBase, "the base address of process in which the image is loaded", kparams.Address, []string{"image.base.address = 'a65d800000'"}, nil},
 	ImageChecksum:           {ImageChecksum, "image checksum", kparams.Uint32, []string{"image.checksum = 746424"}, nil},
 	ImageSize:               {ImageSize, "image size", kparams.Uint32, []string{"image.size > 1024"}, nil},
@@ -746,6 +753,7 @@ var fields = map[Field]FieldInfo{
 	ImageIsDotnet:           {ImageIsDotnet, "indicates if the loaded image is a .NET assembly", kparams.Bool, []string{"image.is_dotnet'"}, nil},
 
 	FileObject:                      {FileObject, "file object address", kparams.Uint64, []string{"file.object = 18446738026482168384"}, nil},
+	FilePath:                        {FilePath, "full file path", kparams.UnicodeString, []string{"file.path = 'C:\\Windows\\System32'"}, nil},
 	FileName:                        {FileName, "full file name", kparams.UnicodeString, []string{"file.name contains 'mimikatz'"}, nil},
 	FileOperation:                   {FileOperation, "file operation", kparams.AnsiString, []string{"file.operation = 'open'"}, nil},
 	FileShareMask:                   {FileShareMask, "file share mask", kparams.AnsiString, []string{"file.share.mask = 'rw-'"}, nil},
@@ -771,7 +779,8 @@ var fields = map[Field]FieldInfo{
 	FileInfoEOFSize:                 {FileInfoEOFSize, "file EOF size", kparams.Uint64, []string{"file.info.eof_size > 1000"}, nil},
 	FileInfoIsDispositionDeleteFile: {FileInfoIsDispositionDeleteFile, "indicates if the file is deleted when its handle is closed", kparams.Bool, []string{"file.info.is_disposition_file_delete = true"}, nil},
 
-	RegistryKeyName:   {RegistryKeyName, "fully qualified key name", kparams.UnicodeString, []string{"registry.key.name contains 'HKEY_LOCAL_MACHINE'"}, nil},
+	RegistryPath:      {RegistryPath, "fully qualified registry path", kparams.UnicodeString, []string{"registry.path = 'HKEY_LOCAL_MACHINE\\SYSTEM'"}, nil},
+	RegistryKeyName:   {RegistryKeyName, "registry key name", kparams.UnicodeString, []string{"registry.key.name = 'CurrentControlSet'"}, nil},
 	RegistryKeyHandle: {RegistryKeyHandle, "registry key object address", kparams.Address, []string{"registry.key.handle = 'FFFFB905D60C2268'"}, nil},
 	RegistryValue:     {RegistryValue, "registry value content", kparams.UnicodeString, []string{"registry.value = '%SystemRoot%\\system32'"}, nil},
 	RegistryValueType: {RegistryValueType, "type of registry value", kparams.UnicodeString, []string{"registry.value.type = 'REG_SZ'"}, nil},

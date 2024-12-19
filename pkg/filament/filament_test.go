@@ -79,7 +79,7 @@ func TestOnNextKevent(t *testing.T) {
 			Seq:       uint64(i),
 			Timestamp: time.Now(),
 			Kparams: kevent.Kparams{
-				kparams.RegKeyName:   {Name: kparams.RegKeyName, Type: kparams.UnicodeString, Value: `HKEY_LOCAL_MACHINE\SYSTEM\Setup`},
+				kparams.RegPath:      {Name: kparams.RegPath, Type: kparams.UnicodeString, Value: `HKEY_LOCAL_MACHINE\SYSTEM\Setup`},
 				kparams.RegKeyHandle: {Name: kparams.RegKeyHandle, Type: kparams.Address, Value: uint64(18446666033449935464)},
 				kparams.NetDIP:       {Name: kparams.NetDIP, Type: kparams.IPv4, Value: net.ParseIP("216.58.201.174")},
 			},

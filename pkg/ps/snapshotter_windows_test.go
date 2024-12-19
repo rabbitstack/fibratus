@@ -392,8 +392,8 @@ func TestAddModule(t *testing.T) {
 			&kevent.Kevent{
 				Type: ktypes.LoadImage,
 				Kparams: kevent.Kparams{
-					kparams.ProcessID:     {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(os.Getpid())},
-					kparams.ImageFilename: {Name: kparams.ImageFilename, Type: kparams.UnicodeString, Value: "C:\\Users\\admin\\AppData\\Roaming\\Spotify\\Spotify.exe"},
+					kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(os.Getpid())},
+					kparams.ImagePath: {Name: kparams.ImagePath, Type: kparams.UnicodeString, Value: "C:\\Users\\admin\\AppData\\Roaming\\Spotify\\Spotify.exe"},
 				},
 			},
 			true,
@@ -402,8 +402,8 @@ func TestAddModule(t *testing.T) {
 			&kevent.Kevent{
 				Type: ktypes.LoadImage,
 				Kparams: kevent.Kparams{
-					kparams.ProcessID:     {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(os.Getpid() + 1)},
-					kparams.ImageFilename: {Name: kparams.ImageFilename, Type: kparams.UnicodeString, Value: "C:\\Windows\\System32\\notepad.exe"},
+					kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(os.Getpid() + 1)},
+					kparams.ImagePath: {Name: kparams.ImagePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\System32\\notepad.exe"},
 				},
 			},
 			false,
@@ -419,7 +419,7 @@ func TestAddModule(t *testing.T) {
 			ok, proc := psnap.Find(evt.Kparams.MustGetPid())
 			require.Equal(t, exists, ok)
 			if ok {
-				require.NotNil(t, proc.FindModule(evt.GetParamAsString(kparams.ImageFilename)))
+				require.NotNil(t, proc.FindModule(evt.GetParamAsString(kparams.ImagePath)))
 				assert.Equal(t, "C:\\Users\\admin\\AppData\\Roaming\\Spotify\\Spotify.exe", proc.Exe)
 			}
 		})
@@ -451,8 +451,8 @@ func TestRemoveModule(t *testing.T) {
 	mevt := &kevent.Kevent{
 		Type: ktypes.LoadImage,
 		Kparams: kevent.Kparams{
-			kparams.ProcessID:     {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(os.Getpid())},
-			kparams.ImageFilename: {Name: kparams.ImageFilename, Type: kparams.UnicodeString, Value: "C:\\Windows\\System32\\notepad.exe"},
+			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(os.Getpid())},
+			kparams.ImagePath: {Name: kparams.ImagePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\System32\\notepad.exe"},
 		},
 	}
 

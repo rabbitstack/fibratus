@@ -100,7 +100,7 @@ func (e *Kevent) MarshalRaw() []byte {
 		case kparams.AnsiString, kparams.UnicodeString:
 			b = append(b, bytes.WriteUint16(uint16(len(kpar.Value.(string))))...)
 			b = append(b, kpar.Value.(string)...)
-		case kparams.Key, kparams.FilePath, kparams.FileDosPath, kparams.HandleType:
+		case kparams.Key, kparams.Path, kparams.DOSPath, kparams.HandleType:
 			v := e.GetParamAsString(kpar.Name)
 			b = append(b, bytes.WriteUint16(uint16(len(v)))...)
 			b = append(b, v...)
@@ -272,7 +272,7 @@ func (e *Kevent) UnmarshalRaw(b []byte, ver kcapver.Version) error {
 
 		var kval kparams.Value
 		switch kparams.Type(typ) {
-		case kparams.AnsiString, kparams.UnicodeString, kparams.FilePath:
+		case kparams.AnsiString, kparams.UnicodeString, kparams.Path:
 			// read string parameter
 			l := bytes.ReadUint16(b[pi+offset+kparamNameLength+poffset:])
 			buf = b[inc(idx, 18)+offset+kparamNameLength+poffset:]

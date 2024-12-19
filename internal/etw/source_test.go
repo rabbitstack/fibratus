@@ -438,7 +438,7 @@ func TestEventSourceAllEvents(t *testing.T) {
 			nil,
 			func(e *kevent.Kevent) bool {
 				img := filepath.Join(os.Getenv("windir"), "System32", "notepad.exe")
-				return e.IsLoadImage() && strings.EqualFold(img, e.GetParamAsString(kparams.ImageFilename))
+				return e.IsLoadImage() && strings.EqualFold(img, e.GetParamAsString(kparams.ImagePath))
 			},
 			false,
 		},
@@ -454,7 +454,7 @@ func TestEventSourceAllEvents(t *testing.T) {
 			},
 			func(e *kevent.Kevent) bool {
 				return e.CurrentPid() && e.Type == ktypes.CreateFile &&
-					strings.HasPrefix(filepath.Base(e.GetParamAsString(kparams.FileName)), "fibratus-test") &&
+					strings.HasPrefix(filepath.Base(e.GetParamAsString(kparams.FilePath)), "fibratus-test") &&
 					!e.IsOpenDisposition()
 			},
 			false,
@@ -539,7 +539,7 @@ func TestEventSourceAllEvents(t *testing.T) {
 				return e.CurrentPid() && e.Type == ktypes.MapViewFile &&
 					e.GetParamAsString(kparams.MemProtect) == "EXECUTE_READWRITE|READONLY" &&
 					e.GetParamAsString(kparams.FileViewSectionType) == "IMAGE" &&
-					strings.Contains(e.GetParamAsString(kparams.FileName), "_fixtures\\yara-test.dll")
+					strings.Contains(e.GetParamAsString(kparams.FilePath), "_fixtures\\yara-test.dll")
 			},
 			false,
 		},
@@ -911,7 +911,7 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 			"load image callstack",
 			nil,
 			func(e *kevent.Kevent) bool {
-				if e.IsLoadImage() && filepath.Ext(e.GetParamAsString(kparams.FileName)) == ".dll" {
+				if e.IsLoadImage() && filepath.Ext(e.GetParamAsString(kparams.FilePath)) == ".dll" {
 					callstack := e.Callstack.String()
 					return strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\System32\\KERNELBASE.dll!LoadLibraryExW")) &&
 						strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\system32\\ntoskrnl.exe!NtMapViewOfSection"))
@@ -963,7 +963,7 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 				return nil
 			},
 			func(e *kevent.Kevent) bool {
-				if e.CurrentPid() && e.Type == ktypes.RegCreateKey && e.GetParamAsString(kparams.RegKeyName) == "HKEY_CURRENT_USER\\Volatile Environment\\CallstackTest" {
+				if e.CurrentPid() && e.Type == ktypes.RegCreateKey && e.GetParamAsString(kparams.RegPath) == "HKEY_CURRENT_USER\\Volatile Environment\\CallstackTest" {
 					callstack := e.Callstack.String()
 					log.Infof("create key event %s: %s", e.String(), callstack)
 					return callstackContainsTestExe(callstack) &&
@@ -1001,7 +1001,7 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 				return key.SetStringValue("FibratusCallstack", "Callstack")
 			},
 			func(e *kevent.Kevent) bool {
-				if e.CurrentPid() && e.Type == ktypes.RegSetValue && strings.HasSuffix(e.GetParamAsString(kparams.RegKeyName), "FibratusCallstack") {
+				if e.CurrentPid() && e.Type == ktypes.RegSetValue && strings.HasSuffix(e.GetParamAsString(kparams.RegPath), "FibratusCallstack") {
 					callstack := e.Callstack.String()
 					log.Infof("set value event %s: %s", e.String(), callstack)
 					return callstackContainsTestExe(callstack) &&
@@ -1049,7 +1049,7 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 			},
 			func(e *kevent.Kevent) bool {
 				if e.CurrentPid() && e.Type == ktypes.CreateFile &&
-					strings.HasPrefix(filepath.Base(e.GetParamAsString(kparams.FileName)), "fibratus-callstack") &&
+					strings.HasPrefix(filepath.Base(e.GetParamAsString(kparams.FilePath)), "fibratus-callstack") &&
 					!e.IsOpenDisposition() {
 					callstack := e.Callstack.String()
 					log.Infof("create file event %s: %s", e.String(), callstack)
@@ -1078,7 +1078,7 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 			},
 			func(e *kevent.Kevent) bool {
 				if e.CurrentPid() && e.Type == ktypes.CreateFile &&
-					strings.HasPrefix(filepath.Base(e.GetParamAsString(kparams.FileName)), "fibratus-file-transacted") &&
+					strings.HasPrefix(filepath.Base(e.GetParamAsString(kparams.FilePath)), "fibratus-file-transacted") &&
 					!e.IsOpenDisposition() {
 					callstack := e.Callstack.String()
 					log.Infof("create transacted file event %s: %s", e.String(), callstack)
@@ -1148,7 +1148,7 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 			},
 			func(e *kevent.Kevent) bool {
 				if e.CurrentPid() && e.Type == ktypes.DeleteFile &&
-					strings.HasPrefix(filepath.Base(e.GetParamAsString(kparams.FileName)), "fibratus-delete") {
+					strings.HasPrefix(filepath.Base(e.GetParamAsString(kparams.FilePath)), "fibratus-delete") {
 					callstack := e.Callstack.String()
 					log.Infof("delete file event %s: %s", e.String(), callstack)
 					return callstackContainsTestExe(callstack) &&
@@ -1173,7 +1173,7 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 			},
 			func(e *kevent.Kevent) bool {
 				if e.CurrentPid() && e.Type == ktypes.RenameFile &&
-					strings.HasPrefix(filepath.Base(e.GetParamAsString(kparams.FileName)), "fibratus-rename") {
+					strings.HasPrefix(filepath.Base(e.GetParamAsString(kparams.FilePath)), "fibratus-rename") {
 					callstack := e.Callstack.String()
 					log.Infof("rename file event %s: %s", e.String(), callstack)
 					return callstackContainsTestExe(callstack) &&

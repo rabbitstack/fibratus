@@ -93,7 +93,7 @@ func (typ ProcessorType) String() string {
 // executable image, or a Windows driver.
 func parseImageFileCharacteristics(e *kevent.Kevent) error {
 	var pefile *pe.PE
-	filename := e.GetParamAsString(kparams.FileName)
+	filename := e.GetParamAsString(kparams.FilePath)
 	f, err := os.Open(filename)
 	if err != nil {
 		// read file data blob from raw device

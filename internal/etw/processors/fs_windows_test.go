@@ -50,7 +50,7 @@ func TestFsProcessor(t *testing.T) {
 				Category: ktypes.File,
 				Kparams: kevent.Kparams{
 					kparams.FileObject: {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(124567380264)},
-					kparams.FileName:   {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
+					kparams.FilePath:   {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
 				},
 			},
 			nil,
@@ -106,7 +106,7 @@ func TestFsProcessor(t *testing.T) {
 					kparams.FileObject:        {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(18446738026482168384)},
 					kparams.ThreadID:          {Name: kparams.ThreadID, Type: kparams.Uint32, Value: uint32(1484)},
 					kparams.FileCreateOptions: {Name: kparams.FileCreateOptions, Type: kparams.Uint32, Value: uint32(1223456)},
-					kparams.FileName:          {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\kernel32.dll"},
+					kparams.FilePath:          {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\kernel32.dll"},
 					kparams.FileShareMask:     {Name: kparams.FileShareMask, Type: kparams.Uint32, Value: uint32(5)},
 					kparams.FileIrpPtr:        {Name: kparams.FileIrpPtr, Type: kparams.Uint64, Value: uint64(1234543123112321)},
 				},
@@ -143,7 +143,7 @@ func TestFsProcessor(t *testing.T) {
 					Kparams: kevent.Kparams{
 						kparams.FileObject:        {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(12446738026482168384)},
 						kparams.FileCreateOptions: {Name: kparams.FileCreateOptions, Type: kparams.Uint32, Value: uint32(18874368)},
-						kparams.FileName:          {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\temp\\idxx.exe"},
+						kparams.FilePath:          {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\temp\\idxx.exe"},
 						kparams.FileShareMask:     {Name: kparams.FileShareMask, Type: kparams.Uint32, Value: uint32(5)},
 						kparams.FileIrpPtr:        {Name: kparams.FileIrpPtr, Type: kparams.Uint64, Value: uint64(1334543123112321)},
 					},
@@ -212,7 +212,7 @@ func TestFsProcessor(t *testing.T) {
 			},
 			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
 				fsProcessor := p.(*fsProcessor)
-				assert.True(t, e.Kparams.Contains(kparams.FileName))
+				assert.True(t, e.Kparams.Contains(kparams.FilePath))
 				assert.Nil(t, fsProcessor.mmaps[3098][124567380264])
 			},
 		},
@@ -237,8 +237,8 @@ func TestFsProcessor(t *testing.T) {
 			},
 			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
 				assert.Equal(t, ktypes.WriteFile, e.Type)
-				assert.Contains(t, e.Kparams, kparams.FileName, kparams.FileType)
-				assert.Equal(t, "C:\\Windows\\temp\\idxx.exe", e.GetParamAsString(kparams.FileName))
+				assert.Contains(t, e.Kparams, kparams.FilePath, kparams.FileType)
+				assert.Equal(t, "C:\\Windows\\temp\\idxx.exe", e.GetParamAsString(kparams.FilePath))
 				assert.Equal(t, "File", e.GetParamAsString(kparams.FileType))
 			},
 		},
@@ -262,8 +262,8 @@ func TestFsProcessor(t *testing.T) {
 			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
 				assert.Equal(t, ktypes.WriteFile, e.Type)
 				hsnap.AssertNumberOfCalls(t, "FindByObject", 1)
-				assert.Contains(t, e.Kparams, kparams.FileName, kparams.FileType)
-				assert.Equal(t, "C:\\Windows\\temp\\doc.docx", e.GetParamAsString(kparams.FileName))
+				assert.Contains(t, e.Kparams, kparams.FilePath, kparams.FileType)
+				assert.Equal(t, "C:\\Windows\\temp\\doc.docx", e.GetParamAsString(kparams.FilePath))
 				assert.Equal(t, "File", e.GetParamAsString(kparams.FileType))
 			},
 		},
@@ -275,7 +275,7 @@ func TestFsProcessor(t *testing.T) {
 				Kparams: kevent.Kparams{
 					kparams.FileObject: {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(18446738026482168384)},
 					kparams.FileKey:    {Name: kparams.FileKey, Type: kparams.Uint64, Value: uint64(14446538026482168384)},
-					kparams.FileName:   {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "*"},
+					kparams.FilePath:   {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "*"},
 				},
 			},
 			func(p Processor) {
@@ -288,7 +288,7 @@ func TestFsProcessor(t *testing.T) {
 			},
 			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
 				assert.Equal(t, ktypes.EnumDirectory, e.Type)
-				assert.Contains(t, e.Kparams, kparams.FileName, kparams.FileDirectory)
+				assert.Contains(t, e.Kparams, kparams.FilePath, kparams.FileDirectory)
 				assert.Equal(t, "C:\\Windows\\temp", e.GetParamAsString(kparams.FileDirectory))
 			},
 		},

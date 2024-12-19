@@ -1,6 +1,6 @@
 name: Unusual file written in Startup folder
 id: c5ffe15c-d94f-416b-bec7-c47f89843267
-version: 1.0.0
+version: 1.0.1
 description: |
   Identifies suspicious files written to the startup folder that would
   allow adversaries to maintain persistence on the endpoint.
@@ -24,7 +24,7 @@ condition: >
     (file.is_exec or file.is_dll)
   )
     and
-  file.name imatches startup_locations
+  file.path imatches startup_locations
     and
     not
   ps.exe imatches
@@ -36,4 +36,4 @@ condition: >
       '?:\\ProgramData\\Microsoft\\Windows Defender\\Platform\\*.exe'
     )
 
-min-engine-version: 2.0.0
+min-engine-version: 2.4.0

@@ -43,7 +43,7 @@ func TestRegistryProcessor(t *testing.T) {
 				Type:     ktypes.RegKCBRundown,
 				Category: ktypes.Registry,
 				Kparams: kevent.Kparams{
-					kparams.RegKeyName:   {Name: kparams.RegKeyName, Type: kparams.UnicodeString, Value: `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\bthserv\Parameters`},
+					kparams.RegPath:      {Name: kparams.RegPath, Type: kparams.UnicodeString, Value: `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\bthserv\Parameters`},
 					kparams.RegKeyHandle: {Name: kparams.RegKeyHandle, Type: kparams.Uint64, Value: uint64(18446666033549154696)},
 				},
 			},
@@ -64,7 +64,7 @@ func TestRegistryProcessor(t *testing.T) {
 				Type:     ktypes.RegDeleteKCB,
 				Category: ktypes.Registry,
 				Kparams: kevent.Kparams{
-					kparams.RegKeyName:   {Name: kparams.RegKeyName, Type: kparams.UnicodeString, Value: `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\bthserv\Parameters`},
+					kparams.RegPath:      {Name: kparams.RegPath, Type: kparams.UnicodeString, Value: `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\bthserv\Parameters`},
 					kparams.RegKeyHandle: {Name: kparams.RegKeyHandle, Type: kparams.Uint64, Value: uint64(18446666033549154696)},
 				},
 			},
@@ -86,7 +86,7 @@ func TestRegistryProcessor(t *testing.T) {
 				Type:     ktypes.RegOpenKey,
 				Category: ktypes.Registry,
 				Kparams: kevent.Kparams{
-					kparams.RegKeyName:   {Name: kparams.RegKeyName, Type: kparams.Key, Value: `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\bthserv\Parameters`},
+					kparams.RegPath:      {Name: kparams.RegPath, Type: kparams.Key, Value: `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\bthserv\Parameters`},
 					kparams.RegKeyHandle: {Name: kparams.RegKeyHandle, Type: kparams.Uint64, Value: uint64(0)},
 				},
 			},
@@ -96,7 +96,7 @@ func TestRegistryProcessor(t *testing.T) {
 				return hsnap
 			},
 			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
-				assert.Equal(t, `HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\bthserv\Parameters`, e.GetParamAsString(kparams.RegKeyName))
+				assert.Equal(t, `HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\bthserv\Parameters`, e.GetParamAsString(kparams.RegPath))
 			},
 		},
 		{
@@ -105,7 +105,7 @@ func TestRegistryProcessor(t *testing.T) {
 				Type:     ktypes.RegOpenKey,
 				Category: ktypes.Registry,
 				Kparams: kevent.Kparams{
-					kparams.RegKeyName:   {Name: kparams.RegKeyName, Type: kparams.Key, Value: `Pid`},
+					kparams.RegPath:      {Name: kparams.RegPath, Type: kparams.Key, Value: `Pid`},
 					kparams.RegKeyHandle: {Name: kparams.RegKeyHandle, Type: kparams.Uint64, Value: uint64(18446666033549154696)},
 				},
 			},
@@ -117,7 +117,7 @@ func TestRegistryProcessor(t *testing.T) {
 				return hsnap
 			},
 			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
-				assert.Equal(t, `HKEY_LOCAL_MACHINE\SYSTEM\Setup\Pid`, e.GetParamAsString(kparams.RegKeyName))
+				assert.Equal(t, `HKEY_LOCAL_MACHINE\SYSTEM\Setup\Pid`, e.GetParamAsString(kparams.RegPath))
 			},
 		},
 		{
@@ -127,7 +127,7 @@ func TestRegistryProcessor(t *testing.T) {
 				Category: ktypes.Registry,
 				PID:      23234,
 				Kparams: kevent.Kparams{
-					kparams.RegKeyName:   {Name: kparams.RegKeyName, Type: kparams.Key, Value: `Pid`},
+					kparams.RegPath:      {Name: kparams.RegPath, Type: kparams.Key, Value: `Pid`},
 					kparams.RegKeyHandle: {Name: kparams.RegKeyHandle, Type: kparams.Uint64, Value: uint64(18446666033549154696)},
 				},
 			},
@@ -140,7 +140,7 @@ func TestRegistryProcessor(t *testing.T) {
 			},
 			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
 				hsnap.AssertNumberOfCalls(t, "FindHandles", 1)
-				assert.Equal(t, `HKEY_LOCAL_MACHINE\SYSTEM\Setup\Pid`, e.GetParamAsString(kparams.RegKeyName))
+				assert.Equal(t, `HKEY_LOCAL_MACHINE\SYSTEM\Setup\Pid`, e.GetParamAsString(kparams.RegPath))
 			},
 		},
 		{
@@ -150,7 +150,7 @@ func TestRegistryProcessor(t *testing.T) {
 				Category: ktypes.Registry,
 				PID:      23234,
 				Kparams: kevent.Kparams{
-					kparams.RegKeyName:   {Name: kparams.RegKeyName, Type: kparams.Key, Value: `\REGISTRY\MACHINE\SYSTEM\CurrentControlSet\Control\Windows\Directory`},
+					kparams.RegPath:      {Name: kparams.RegPath, Type: kparams.Key, Value: `\REGISTRY\MACHINE\SYSTEM\CurrentControlSet\Control\Windows\Directory`},
 					kparams.RegKeyHandle: {Name: kparams.RegKeyHandle, Type: kparams.Uint64, Value: uint64(0)},
 				},
 			},
@@ -160,7 +160,7 @@ func TestRegistryProcessor(t *testing.T) {
 				return hsnap
 			},
 			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
-				assert.Equal(t, `HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Windows\Directory`, e.GetParamAsString(kparams.RegKeyName))
+				assert.Equal(t, `HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Windows\Directory`, e.GetParamAsString(kparams.RegPath))
 				assert.Equal(t, `REG_EXPAND_SZ`, e.GetParamAsString(kparams.RegValueType))
 				assert.Equal(t, `%SystemRoot%`, e.GetParamAsString(kparams.RegValue))
 			},

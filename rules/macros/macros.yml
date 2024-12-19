@@ -207,7 +207,7 @@
         '.dump'
       )
         or
-      is_minidump(file.name)
+      is_minidump(file.path)
     )
   description: |
     Detects a process writing the minidump file. Minidump files are used for crash

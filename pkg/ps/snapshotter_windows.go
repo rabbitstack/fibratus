@@ -217,7 +217,7 @@ func (s *snapshotter) AddModule(e *kevent.Kevent) error {
 	module := pstypes.Module{}
 	module.Size, _ = e.Kparams.GetUint64(kparams.ImageSize)
 	module.Checksum, _ = e.Kparams.GetUint32(kparams.ImageCheckSum)
-	module.Name = e.GetParamAsString(kparams.ImageFilename)
+	module.Name = e.GetParamAsString(kparams.ImagePath)
 	module.BaseAddress = e.Kparams.TryGetAddress(kparams.ImageBase)
 	module.DefaultBaseAddress = e.Kparams.TryGetAddress(kparams.ImageDefaultBase)
 	module.SignatureLevel, _ = e.Kparams.GetUint32(kparams.ImageSignatureLevel)
@@ -274,7 +274,7 @@ func (s *snapshotter) AddFileMapping(e *kevent.Kevent) error {
 		return nil
 	}
 
-	filename := e.GetParamAsString(kparams.FileName)
+	filename := e.GetParamAsString(kparams.FilePath)
 	ext := strings.ToLower(filepath.Ext(filename))
 	// skip redundant or unneeded memory-mapped files
 	if ext == ".dll" || ext == ".exe" || ext == ".mui" {

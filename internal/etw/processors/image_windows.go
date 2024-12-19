@@ -44,7 +44,7 @@ func (m *imageProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, e
 	}
 	if e.IsUnloadImage() {
 		pid := e.Kparams.MustGetPid()
-		mod := e.GetParamAsString(kparams.ImageFilename)
+		mod := e.GetParamAsString(kparams.ImagePath)
 		if pid == 0 {
 			pid = e.PID
 		}

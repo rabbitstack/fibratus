@@ -44,7 +44,7 @@ func TestImageProcessor(t *testing.T) {
 			&kevent.Kevent{
 				Type: ktypes.LoadImage,
 				Kparams: kevent.Kparams{
-					kparams.ImageFilename:       {Name: kparams.ImageFilename, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll")},
+					kparams.ImagePath:           {Name: kparams.ImagePath, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll")},
 					kparams.ProcessID:           {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1023)},
 					kparams.ImageCheckSum:       {Name: kparams.ImageCheckSum, Type: kparams.Uint32, Value: uint32(2323432)},
 					kparams.ImageBase:           {Name: kparams.ImageBase, Type: kparams.Address, Value: uint64(0x7ffb313833a3)},
@@ -69,7 +69,7 @@ func TestImageProcessor(t *testing.T) {
 			&kevent.Kevent{
 				Type: ktypes.UnloadImage,
 				Kparams: kevent.Kparams{
-					kparams.ImageFilename:       {Name: kparams.ImageFilename, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\kernel32.dll"},
+					kparams.ImagePath:           {Name: kparams.ImagePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\kernel32.dll"},
 					kparams.ProcessName:         {Name: kparams.ProcessName, Type: kparams.AnsiString, Value: "csrss.exe"},
 					kparams.ProcessID:           {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(676)},
 					kparams.ImageBase:           {Name: kparams.ImageBase, Type: kparams.Address, Value: uint64(0xfffb313833a3)},

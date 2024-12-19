@@ -1,6 +1,6 @@
 name: AppDomain Manager injection via CLR search order hijacking
 id: 9319fafd-b7dc-4d85-b41a-54a8d4f1ab18
-version: 1.0.0
+version: 1.0.1
 description: |
   Adversaries may execute their own malicious payloads by hijacking how the .NET AppDomainManager loads assemblies. 
   The .NET framework uses the AppDomainManager class to create and manage one or more isolated runtime environments 
@@ -25,12 +25,12 @@ references:
   - https://www.rapid7.com/blog/post/2023/05/05/appdomain-manager-injection-new-techniques-for-red-teams/
 
 condition: >
-  (load_unsigned_or_untrusted_module) and ((base(dir(image.name)) ~= base(image.name, false)) or (ps.envs[APPDOMAIN_MANAGER_ASM] istartswith base(image.name, false)))
+  (load_unsigned_or_untrusted_module) and ((base(dir(image.path)) ~= base(image.path, false)) or (ps.envs[APPDOMAIN_MANAGER_ASM] istartswith image.name))
     and
   pe.is_dotnet and (image.is_dotnet or thread.callstack.symbols imatches ('clr.dll!ParseManifest*'))
 
 output: >
-  Process %ps.exe loaded untrusted .NET assembly %image.name from suspicious location
+  Process %ps.exe loaded untrusted .NET assembly %image.path from suspicious location
 severity: high
 
-min-engine-version: 2.3.0
+min-engine-version: 2.4.0
