@@ -68,8 +68,8 @@ func TestEventSourceStartTraces(t *testing.T) {
 	psnap.On("Write", mock.Anything).Return(nil)
 	psnap.On("AddThread", mock.Anything).Return(nil)
 	psnap.On("AddModule", mock.Anything).Return(nil)
-	psnap.On("AddFileMapping", mock.Anything).Return(nil)
-	psnap.On("RemoveFileMapping", mock.Anything, mock.Anything).Return(nil)
+	psnap.On("AddMmap", mock.Anything).Return(nil)
+	psnap.On("RemoveMmap", mock.Anything, mock.Anything).Return(nil)
 	psnap.On("RemoveThread", mock.Anything, mock.Anything).Return(nil)
 	psnap.On("RemoveModule", mock.Anything, mock.Anything).Return(nil)
 	psnap.On("FindModule", mock.Anything).Return(false, nil)
@@ -153,8 +153,8 @@ func TestEventSourceEnableFlagsDynamically(t *testing.T) {
 	psnap.On("Write", mock.Anything).Return(nil)
 	psnap.On("AddThread", mock.Anything).Return(nil)
 	psnap.On("AddModule", mock.Anything).Return(nil)
-	psnap.On("AddFileMapping", mock.Anything).Return(nil)
-	psnap.On("RemoveFileMapping", mock.Anything, mock.Anything).Return(nil)
+	psnap.On("AddMmap", mock.Anything).Return(nil)
+	psnap.On("RemoveMmap", mock.Anything, mock.Anything).Return(nil)
 	psnap.On("RemoveThread", mock.Anything, mock.Anything).Return(nil)
 	psnap.On("RemoveModule", mock.Anything, mock.Anything).Return(nil)
 	psnap.On("FindModule", mock.Anything).Return(false, nil)
@@ -236,8 +236,8 @@ func TestEventSourceEnableFlagsDynamicallyWithYaraEnabled(t *testing.T) {
 	psnap.On("Write", mock.Anything).Return(nil)
 	psnap.On("AddThread", mock.Anything).Return(nil)
 	psnap.On("AddModule", mock.Anything).Return(nil)
-	psnap.On("AddFileMapping", mock.Anything).Return(nil)
-	psnap.On("RemoveFileMapping", mock.Anything, mock.Anything).Return(nil)
+	psnap.On("AddMmap", mock.Anything).Return(nil)
+	psnap.On("RemoveMmap", mock.Anything, mock.Anything).Return(nil)
 	psnap.On("RemoveThread", mock.Anything, mock.Anything).Return(nil)
 	psnap.On("RemoveModule", mock.Anything, mock.Anything).Return(nil)
 	psnap.On("FindModule", mock.Anything).Return(false, nil)
@@ -311,8 +311,8 @@ func TestEventSourceRundownEvents(t *testing.T) {
 	psnap.On("Write", mock.Anything).Return(nil)
 	psnap.On("AddThread", mock.Anything).Return(nil)
 	psnap.On("AddModule", mock.Anything).Return(nil)
-	psnap.On("AddFileMapping", mock.Anything).Return(nil)
-	psnap.On("RemoveFileMapping", mock.Anything, mock.Anything).Return(nil)
+	psnap.On("AddMmap", mock.Anything).Return(nil)
+	psnap.On("RemoveMmap", mock.Anything, mock.Anything).Return(nil)
 	psnap.On("RemoveThread", mock.Anything, mock.Anything).Return(nil)
 	psnap.On("RemoveModule", mock.Anything, mock.Anything).Return(nil)
 	psnap.On("FindModule", mock.Anything).Return(false, nil)
@@ -721,11 +721,11 @@ func TestEventSourceAllEvents(t *testing.T) {
 	psnap.On("Write", mock.Anything).Return(nil)
 	psnap.On("AddThread", mock.Anything).Return(nil)
 	psnap.On("AddModule", mock.Anything).Return(nil)
-	psnap.On("AddFileMapping", mock.Anything).Return(nil)
+	psnap.On("AddMmap", mock.Anything).Return(nil)
 	psnap.On("RemoveThread", mock.Anything, mock.Anything).Return(nil)
 	psnap.On("RemoveModule", mock.Anything, mock.Anything).Return(nil)
 	psnap.On("FindModule", mock.Anything).Return(false, nil)
-	psnap.On("RemoveFileMapping", mock.Anything, mock.Anything).Return(nil)
+	psnap.On("RemoveMmap", mock.Anything, mock.Anything).Return(nil)
 	psnap.On("FindAndPut", mock.Anything).Return(&pstypes.PS{})
 	psnap.On("Find", mock.Anything).Return(true, &pstypes.PS{})
 	psnap.On("Remove", mock.Anything).Return(nil)
@@ -814,22 +814,22 @@ type NoopPsSnapshotter struct{}
 
 var fakeProc = &pstypes.PS{PID: 111111, Name: "fake.exe"}
 
-func (s *NoopPsSnapshotter) Write(kevt *kevent.Kevent) error                        { return nil }
-func (s *NoopPsSnapshotter) Remove(kevt *kevent.Kevent) error                       { return nil }
-func (s *NoopPsSnapshotter) Find(pid uint32) (bool, *pstypes.PS)                    { return true, fakeProc }
-func (s *NoopPsSnapshotter) FindAndPut(pid uint32) *pstypes.PS                      { return fakeProc }
-func (s *NoopPsSnapshotter) Put(ps *pstypes.PS)                                     {}
-func (s *NoopPsSnapshotter) Size() uint32                                           { return 1 }
-func (s *NoopPsSnapshotter) Close() error                                           { return nil }
-func (s *NoopPsSnapshotter) GetSnapshot() []*pstypes.PS                             { return nil }
-func (s *NoopPsSnapshotter) AddThread(kevt *kevent.Kevent) error                    { return nil }
-func (s *NoopPsSnapshotter) AddModule(kevt *kevent.Kevent) error                    { return nil }
-func (s *NoopPsSnapshotter) FindModule(addr va.Address) (bool, *pstypes.Module)     { return false, nil }
-func (s *NoopPsSnapshotter) RemoveThread(pid uint32, tid uint32) error              { return nil }
-func (s *NoopPsSnapshotter) RemoveModule(pid uint32, mod string) error              { return nil }
-func (s *NoopPsSnapshotter) WriteFromKcap(kevt *kevent.Kevent) error                { return nil }
-func (s *NoopPsSnapshotter) AddFileMapping(kevt *kevent.Kevent) error               { return nil }
-func (s *NoopPsSnapshotter) RemoveFileMapping(pid uint32, address va.Address) error { return nil }
+func (s *NoopPsSnapshotter) Write(kevt *kevent.Kevent) error                    { return nil }
+func (s *NoopPsSnapshotter) Remove(kevt *kevent.Kevent) error                   { return nil }
+func (s *NoopPsSnapshotter) Find(pid uint32) (bool, *pstypes.PS)                { return true, fakeProc }
+func (s *NoopPsSnapshotter) FindAndPut(pid uint32) *pstypes.PS                  { return fakeProc }
+func (s *NoopPsSnapshotter) Put(ps *pstypes.PS)                                 {}
+func (s *NoopPsSnapshotter) Size() uint32                                       { return 1 }
+func (s *NoopPsSnapshotter) Close() error                                       { return nil }
+func (s *NoopPsSnapshotter) GetSnapshot() []*pstypes.PS                         { return nil }
+func (s *NoopPsSnapshotter) AddThread(kevt *kevent.Kevent) error                { return nil }
+func (s *NoopPsSnapshotter) AddModule(kevt *kevent.Kevent) error                { return nil }
+func (s *NoopPsSnapshotter) FindModule(addr va.Address) (bool, *pstypes.Module) { return false, nil }
+func (s *NoopPsSnapshotter) RemoveThread(pid uint32, tid uint32) error          { return nil }
+func (s *NoopPsSnapshotter) RemoveModule(pid uint32, mod string) error          { return nil }
+func (s *NoopPsSnapshotter) WriteFromKcap(kevt *kevent.Kevent) error            { return nil }
+func (s *NoopPsSnapshotter) AddMmap(kevt *kevent.Kevent) error                  { return nil }
+func (s *NoopPsSnapshotter) RemoveMmap(pid uint32, address va.Address) error    { return nil }
 
 func TestCallstackEnrichment(t *testing.T) {
 	hsnap := new(handle.SnapshotterMock)
