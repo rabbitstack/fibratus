@@ -1,6 +1,6 @@
 name: Script interpreter host or untrusted process persistence
 id: cc41ee3a-6e44-4903-85a4-0147ec6a7eea
-version: 1.0.2
+version: 1.0.3
 description: |
   Identifies the script interpreter or untrusted process writing
   to commonly abused run keys or the Startup folder locations.
@@ -27,9 +27,9 @@ condition: >
   )
     and
   (
-    registry.key.name imatches registry_run_keys
+    registry.path imatches registry_run_keys
       or
-    file.name imatches startup_locations
+    file.path imatches startup_locations
   )
     and
     not
@@ -42,4 +42,4 @@ condition: >
 action:
   - name: kill
 
-min-engine-version: 2.0.0
+min-engine-version: 2.4.0

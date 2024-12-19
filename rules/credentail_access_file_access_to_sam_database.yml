@@ -1,6 +1,6 @@
 name: File access to SAM database
 id: e3dace20-4962-4381-884e-40dcdde66626
-version: 1.0.0
+version: 1.0.1
 description: |
   Identifies access to the Security Account Manager on-disk database.
 labels:
@@ -17,7 +17,7 @@ labels:
 condition: >
   open_file
     and
-  file.name imatches
+  file.path imatches
     (
       '?:\\WINDOWS\\SYSTEM32\\CONFIG\\SAM',
       '\\Device\\HarddiskVolumeShadowCopy*\\WINDOWS\\SYSTEM32\\CONFIG\\SAM',
@@ -32,4 +32,4 @@ condition: >
       '?:\\Windows\\System32\\lsass.exe'
     )
 
-min-engine-version: 2.0.0
+min-engine-version: 2.4.0
