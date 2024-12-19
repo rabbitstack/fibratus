@@ -1,6 +1,6 @@
 name: Hidden local account creation
 id: bfa83754-3730-4c46-a0fd-cc71365f64df
-version: 1.0.0
+version: 1.0.1
 description: |
   Identifies the creation of a hidden local account. Adversaries can create hidden accounts by
   appending the dollar sign to the account name. This technique renders the account name hidden
@@ -17,7 +17,7 @@ labels:
   subtechnique.ref: https://attack.mitre.org/techniques/T1136/001/
 
 condition: >
-  set_value and registry.key.name imatches 
+  set_value and registry.path imatches 
     (
       'HKEY_LOCAL_MACHINE\\SAM\\SAM\\Domains\\Account\\Users\\Names\\*$\\',
       'HKEY_LOCAL_MACHINE\\SAM\\SAM\\Domains\\Account\\Users\\*$\\'
@@ -25,4 +25,4 @@ condition: >
 
 severity: high
 
-min-engine-version: 2.0.0
+min-engine-version: 2.4.0
