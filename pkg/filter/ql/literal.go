@@ -19,7 +19,6 @@
 package ql
 
 import (
-	"bytes"
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
@@ -129,16 +128,23 @@ type ListLiteral struct {
 
 // String returns a string representation of the literal.
 func (s *ListLiteral) String() string {
-	var buf bytes.Buffer
-	_, _ = buf.WriteString("(")
-	for idx, tagKey := range s.Values {
-		if idx != 0 {
-			_, _ = buf.WriteString(", ")
-		}
-		_, _ = buf.WriteString(tagKey)
+	var n int
+	for _, elem := range s.Values {
+		n += len(elem) + 2
 	}
-	_, _ = buf.WriteString(")")
-	return buf.String()
+
+	var b strings.Builder
+	b.Grow(n + 2)
+	b.WriteString("(")
+	for idx, elem := range s.Values {
+		if idx != 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(elem)
+	}
+	b.WriteString(")")
+
+	return b.String()
 }
 
 // Function represents a function call.
