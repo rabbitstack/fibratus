@@ -22,6 +22,7 @@ package ql
 
 import (
 	fuzzysearch "github.com/lithammer/fuzzysearch/fuzzy"
+	"github.com/rabbitstack/fibratus/pkg/util/sets"
 	"github.com/rabbitstack/fibratus/pkg/util/wildcard"
 	"net"
 	"strconv"
@@ -1152,6 +1153,18 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 				}
 			}
 			return false
+		case Intersects:
+			rhs, ok := rhs.([]string)
+			if !ok {
+				return false
+			}
+			return len(sets.IntersectionStrings(lhs, rhs, false)) == len(rhs)
+		case IIntersects:
+			rhs, ok := rhs.([]string)
+			if !ok {
+				return false
+			}
+			return len(sets.IntersectionStrings(lhs, rhs, true)) == len(rhs)
 		}
 	}
 
