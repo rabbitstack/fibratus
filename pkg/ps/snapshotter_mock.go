@@ -106,13 +106,13 @@ func (s *SnapshotterMock) RemoveModule(pid uint32, mod string) error {
 func (s *SnapshotterMock) WriteFromKcap(kevt *kevent.Kevent) error { return nil }
 
 // AddFileMapping method
-func (s *SnapshotterMock) AddFileMapping(kevt *kevent.Kevent) error {
+func (s *SnapshotterMock) AddMmap(kevt *kevent.Kevent) error {
 	args := s.Called(kevt)
 	return args.Error(0)
 }
 
 // RemoveFileMapping method
-func (s *SnapshotterMock) RemoveFileMapping(pid uint32, address va.Address) error {
+func (s *SnapshotterMock) RemoveMmap(pid uint32, address va.Address) error {
 	args := s.Called(pid, address)
 	return args.Error(0)
 }

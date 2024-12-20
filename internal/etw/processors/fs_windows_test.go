@@ -27,6 +27,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/ps"
+	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -89,12 +90,11 @@ func TestFsProcessor(t *testing.T) {
 			},
 			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
 				fsProcessor := p.(*fsProcessor)
-				assert.Contains(t, fsProcessor.mmaps, uint32(10233))
-				mapinfo := fsProcessor.mmaps[10233][124567380264]
-				require.NotNil(t, mapinfo)
-				assert.Equal(t, "C:\\Windows\\System32\\kernel32.dll", mapinfo.File)
-				assert.Equal(t, uint64(3098), mapinfo.Size)
-				assert.Equal(t, uint64(0xffff23433), mapinfo.BaseAddr)
+
+				assert.Equal(t, "C:\\Windows\\System32\\kernel32.dll", e.GetParamAsString(kparams.FilePath))
+
+				psnap := fsProcessor.psnap.(*ps.SnapshotterMock)
+				psnap.AssertNumberOfCalls(t, "AddMmap", 1)
 			},
 		},
 		{
@@ -201,19 +201,16 @@ func TestFsProcessor(t *testing.T) {
 					kparams.FileViewSectionType: {Name: kparams.FileViewSectionType, Type: kparams.Enum, Value: uint32(va.SectionImage), Enum: kevent.ViewSectionTypes},
 				},
 			},
-			func(p Processor) {
-				fsProcessor := p.(*fsProcessor)
-				fsProcessor.mmaps[10233] = make(map[uint64]*MmapInfo)
-				fsProcessor.mmaps[10233][124567380264] = &MmapInfo{File: "C:\\Windows\\System32\\kernel32.dll"}
-			},
+			nil,
 			func() *handle.SnapshotterMock {
 				hsnap := new(handle.SnapshotterMock)
 				return hsnap
 			},
 			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
 				fsProcessor := p.(*fsProcessor)
-				assert.True(t, e.Kparams.Contains(kparams.FilePath))
-				assert.Nil(t, fsProcessor.mmaps[3098][124567380264])
+
+				psnap := fsProcessor.psnap.(*ps.SnapshotterMock)
+				psnap.AssertNumberOfCalls(t, "RemoveMmap", 1)
 			},
 		},
 		{
@@ -298,8 +295,13 @@ func TestFsProcessor(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			hsnap := tt.hsnap()
 			psnap := new(ps.SnapshotterMock)
-			psnap.On("AddFileMapping", mock.Anything).Return(nil)
-			psnap.On("RemoveFileMapping", mock.Anything, mock.Anything).Return(nil)
+			psnap.On("AddMmap", mock.Anything).Return(nil)
+			psnap.On("RemoveMmap", mock.Anything, mock.Anything).Return(nil)
+			psnap.On("Find", mock.Anything).Return(true, &pstypes.PS{
+				Mmaps: []pstypes.Mmap{
+					{File: "C:\\Windows\\System32\\kernel32.dll", BaseAddress: va.Address(0xffff23433), Size: 3098},
+				},
+			})
 			p := newFsProcessor(hsnap, psnap, fs.NewDevMapper(), fs.NewDevPathResolver(), &config.Config{})
 			if tt.setupProcessor != nil {
 				tt.setupProcessor(p)

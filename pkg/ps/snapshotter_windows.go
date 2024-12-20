@@ -25,7 +25,6 @@ import (
 	"golang.org/x/sys/windows"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -266,7 +265,7 @@ func (s *snapshotter) FindModule(addr va.Address) (bool, *pstypes.Module) {
 	return false, nil
 }
 
-func (s *snapshotter) AddFileMapping(e *kevent.Kevent) error {
+func (s *snapshotter) AddMmap(e *kevent.Kevent) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	proc, ok := s.procs[e.PID]
@@ -274,24 +273,21 @@ func (s *snapshotter) AddFileMapping(e *kevent.Kevent) error {
 		return nil
 	}
 
-	filename := e.GetParamAsString(kparams.FilePath)
-	ext := strings.ToLower(filepath.Ext(filename))
-	// skip redundant or unneeded memory-mapped files
-	if ext == ".dll" || ext == ".exe" || ext == ".mui" {
-		return nil
-	}
 	mmapCount.Add(1)
+
 	mmap := pstypes.Mmap{}
-	mmap.File = filename
+	mmap.File = e.GetParamAsString(kparams.FilePath)
 	mmap.BaseAddress = e.Kparams.TryGetAddress(kparams.FileViewBase)
 	mmap.Size, _ = e.Kparams.GetUint64(kparams.FileViewSize)
+	mmap.Protection, _ = e.Kparams.GetUint32(kparams.MemProtect)
+	mmap.Type = e.GetParamAsString(kparams.FileViewSectionType)
 
-	proc.MapFile(mmap)
+	proc.AddMmap(mmap)
 
 	return nil
 }
 
-func (s *snapshotter) RemoveFileMapping(pid uint32, addr va.Address) error {
+func (s *snapshotter) RemoveMmap(pid uint32, addr va.Address) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	proc, ok := s.procs[pid]
@@ -299,7 +295,7 @@ func (s *snapshotter) RemoveFileMapping(pid uint32, addr va.Address) error {
 		return nil
 	}
 	mmapCount.Add(-1)
-	proc.UnmapFile(addr)
+	proc.RemoveMmap(addr)
 	return nil
 }
 
