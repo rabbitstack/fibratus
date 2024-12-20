@@ -115,7 +115,7 @@ func TestAlertTitle(t *testing.T) {
 		},
 		{
 			&kevent.Kevent{Type: ktypes.MapViewFile, Category: ktypes.File,
-				Kparams: kevent.Kparams{kparams.FileName: {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\System32\\wusa.exe"}},
+				Kparams: kevent.Kparams{kparams.FilePath: {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\System32\\wusa.exe"}},
 			},
 			FileThreatAlertTitle,
 		},

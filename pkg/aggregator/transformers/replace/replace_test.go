@@ -34,17 +34,17 @@ func TestTransform(t *testing.T) {
 		Tid:  2484,
 		PID:  859,
 		Kparams: kevent.Kparams{
-			kparams.RegKeyName:   {Name: kparams.RegKeyName, Type: kparams.UnicodeString, Value: `HKEY_LOCAL_MACHINE\SYSTEM\Setup\Pid`},
+			kparams.RegPath:      {Name: kparams.RegPath, Type: kparams.UnicodeString, Value: `HKEY_LOCAL_MACHINE\SYSTEM\Setup\Pid`},
 			kparams.RegKeyHandle: {Name: kparams.RegKeyHandle, Type: kparams.Address, Value: uint64(18446666033449935464)},
 		},
 	}
 
-	transf, err := transformers.Load(transformers.Config{Type: transformers.Replace, Transformer: Config{Replacements: []Replacement{{Kpar: "key_name", Old: "HKEY_LOCAL_MACHINE", New: "HKLM"}}}})
+	transf, err := transformers.Load(transformers.Config{Type: transformers.Replace, Transformer: Config{Replacements: []Replacement{{Kpar: "key_path", Old: "HKEY_LOCAL_MACHINE", New: "HKLM"}}}})
 	require.NoError(t, err)
 
 	require.NoError(t, transf.Transform(kevt))
 
-	keyName, _ := kevt.Kparams.GetString(kparams.RegKeyName)
+	keyName, _ := kevt.Kparams.GetString(kparams.RegPath)
 
 	assert.Equal(t, `HKLM\SYSTEM\Setup\Pid`, keyName)
 }

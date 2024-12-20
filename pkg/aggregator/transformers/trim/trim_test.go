@@ -42,7 +42,7 @@ func TestTransform(t *testing.T) {
 		Description: "Creates or opens a new file, directory, I/O device, pipe, console",
 		Kparams: kevent.Kparams{
 			kparams.FileObject:    {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(12456738026482168384)},
-			kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
+			kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
 			kparams.FileType:      {Name: kparams.FileType, Type: kparams.AnsiString, Value: "file"},
 			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.AnsiString, Value: "overwriteif"},
 			kparams.BasePrio:      {Name: kparams.BasePrio, Type: kparams.Int8, Value: int8(2)},
@@ -54,11 +54,11 @@ func TestTransform(t *testing.T) {
 		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barz"},
 	}
 
-	transf, err := transformers.Load(transformers.Config{Type: transformers.Trim, Transformer: Config{Prefixes: []Trim{{Name: "file_name", Trim: "\\Device"}}, Suffixes: []Trim{{Name: "create_disposition", Trim: "if"}}}})
+	transf, err := transformers.Load(transformers.Config{Type: transformers.Trim, Transformer: Config{Prefixes: []Trim{{Name: "file_path", Trim: "\\Device"}}, Suffixes: []Trim{{Name: "create_disposition", Trim: "if"}}}})
 	require.NoError(t, err)
 
 	require.NoError(t, transf.Transform(kevt))
-	filename, _ := kevt.Kparams.GetString(kparams.FileName)
+	filename, _ := kevt.Kparams.GetString(kparams.FilePath)
 	dispo, _ := kevt.Kparams.GetString(kparams.FileOperation)
 
 	assert.Equal(t, "\\HarddiskVolume2\\Windows\\system32\\user32.dll", filename)
