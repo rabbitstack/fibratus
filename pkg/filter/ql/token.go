@@ -63,6 +63,8 @@ const (
 	IFuzzy      // ifuzzy
 	Fuzzynorm   // fuzzynorm
 	IFuzzynorm  // ifuzzynorm
+	Intersects  // intersects
+	IIntersects // iintersects
 	Eq          // =
 	IEq         // ~=
 	Neq         // !=
@@ -91,7 +93,7 @@ func init() {
 	for _, tok := range []token{And, Or, Contains, IContains, In,
 		IIn, Not, Startswith, IStartswith, Endswith, IEndswith,
 		Matches, IMatches, Fuzzy, IFuzzy, Fuzzynorm, IFuzzynorm,
-		Seq, MaxSpan, By, As} {
+		Intersects, IIntersects, Seq, MaxSpan, By, As} {
 		keywords[strings.ToLower(tokens[tok])] = tok
 	}
 	keywords["true"] = True
@@ -134,6 +136,8 @@ var tokens = [...]string{
 	IFuzzy:      "IFUZZY",
 	Fuzzynorm:   "FUZZYNORM",
 	IFuzzynorm:  "IFUZZYNORM",
+	Intersects:  "INTERSECTS",
+	IIntersects: "IINTERSECTS",
 
 	Eq:  "=",
 	IEq: "~=",
@@ -178,7 +182,7 @@ func (tok token) precedence() int {
 	case Eq, IEq, Neq, Lt, Lte, Gt, Gte:
 		return 4
 	case In, IIn, Contains, IContains, Startswith, IStartswith, Endswith, IEndswith,
-		Matches, IMatches, Fuzzy, IFuzzy, Fuzzynorm, IFuzzynorm:
+		Matches, IMatches, Fuzzy, IFuzzy, Fuzzynorm, IFuzzynorm, Intersects, IIntersects:
 		return 5
 	}
 	return 0

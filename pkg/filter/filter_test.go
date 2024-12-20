@@ -153,6 +153,7 @@ func TestProcFilter(t *testing.T) {
 			Username: "SYSTEM",
 			Domain:   "NT AUTHORITY",
 			SID:      "S-1-5-18",
+			Args:     []string{"-k", "DcomLaunch", "-p", "-s", "LSM"},
 			Envs:     map[string]string{"ALLUSERSPROFILE": "C:\\ProgramData", "OS": "Windows_NT", "ProgramFiles(x86)": "C:\\Program Files (x86)"},
 			Modules: []pstypes.Module{
 				{Name: "C:\\Windows\\System32\\kernel32.dll", Size: 12354, Checksum: 23123343, BaseAddress: va.Address(4294066175), DefaultBaseAddress: va.Address(4293993725)},
@@ -245,6 +246,11 @@ func TestProcFilter(t *testing.T) {
 		{`ps.ancestor[any].name contains ('Sys')`, true},
 		{`ps.ancestor[any].name icontains ('sys')`, true},
 		{`ps.ancestor[any].pid in (2034, 343)`, true},
+
+		{`ps.args intersects ('-k', 'DcomLaunch')`, true},
+		{`ps.args intersects ('-w', 'DcomLaunch')`, false},
+		{`ps.args iintersects ('-K', 'DComLaunch')`, true},
+		{`ps.args iintersects ('-W', 'DcomLaunch')`, false},
 	}
 
 	psnap := new(ps.SnapshotterMock)
