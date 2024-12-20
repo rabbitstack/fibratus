@@ -40,10 +40,10 @@ type Snapshotter interface {
 	RemoveThread(pid uint32, tid uint32) error
 	// RemoveModule removes the module the given process.
 	RemoveModule(pid uint32, mod string) error
-	// AddFileMapping adds a new data memory-mapped file to this process state.
-	AddFileMapping(*kevent.Kevent) error
-	// RemoveFileMapping removes memory-mapped file at the given base address.
-	RemoveFileMapping(pid uint32, address va.Address) error
+	// AddMmap adds a new memory mapping (data memory-mapped file, image, or pagefile) to this process state.
+	AddMmap(*kevent.Kevent) error
+	// RemoveMmap removes memory mapping at the given base address.
+	RemoveMmap(pid uint32, address va.Address) error
 	// WriteFromKcap appends a new process state to the snapshotter from the captured kernel event.
 	WriteFromKcap(kevt *kevent.Kevent) error
 	// Remove deletes process's state from the snapshotter.
