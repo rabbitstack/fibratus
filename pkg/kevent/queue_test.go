@@ -77,7 +77,7 @@ func TestQueuePush(t *testing.T) {
 				Category:  ktypes.File,
 				Kparams: Kparams{
 					kparams.FileObject:    {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(12456738026482168384)},
-					kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
+					kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
 					kparams.FileType:      {Name: kparams.FileType, Type: kparams.AnsiString, Value: "file"},
 					kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: uint32(1), Enum: fs.FileCreateDispositions},
 				},
@@ -104,7 +104,7 @@ func TestQueuePush(t *testing.T) {
 				Category:  ktypes.File,
 				Kparams: Kparams{
 					kparams.FileObject:    {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(12456738026482168384)},
-					kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
+					kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
 					kparams.FileType:      {Name: kparams.FileType, Type: kparams.AnsiString, Value: "file"},
 					kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: uint32(1), Enum: fs.FileCreateDispositions},
 				},
@@ -131,7 +131,7 @@ func TestQueuePush(t *testing.T) {
 				Category:  ktypes.File,
 				Kparams: Kparams{
 					kparams.FileObject:    {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(12456738026482168384)},
-					kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
+					kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
 					kparams.FileType:      {Name: kparams.FileType, Type: kparams.AnsiString, Value: "file"},
 					kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: uint32(1), Enum: fs.FileCreateDispositions},
 				},
@@ -159,7 +159,7 @@ func TestQueuePush(t *testing.T) {
 				Category:  ktypes.File,
 				Kparams: Kparams{
 					kparams.FileObject:    {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(12456738026482168384)},
-					kparams.FileName:      {Name: kparams.FileName, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
+					kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
 					kparams.FileType:      {Name: kparams.FileType, Type: kparams.AnsiString, Value: "file"},
 					kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: uint32(1), Enum: fs.FileCreateDispositions},
 				},
