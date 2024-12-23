@@ -73,6 +73,7 @@ var (
 	procEnumDeviceDrivers                    = modpsapi.NewProc("EnumDeviceDrivers")
 	procGetDeviceDriverFileNameW             = modpsapi.NewProc("GetDeviceDriverFileNameW")
 	procGetMappedFileNameW                   = modpsapi.NewProc("GetMappedFileNameW")
+	procQueryWorkingSetEx                    = modpsapi.NewProc("QueryWorkingSetEx")
 	procSHGetStockIconInfo                   = modshell32.NewProc("SHGetStockIconInfo")
 	procShell_NotifyIconW                    = modshell32.NewProc("Shell_NotifyIconW")
 	procPathIsDirectoryW                     = modshlwapi.NewProc("PathIsDirectoryW")
@@ -262,6 +263,14 @@ func GetDeviceDriverFileName(imageBase uintptr, filename *uint16, size uint32) (
 func GetMappedFileName(handle windows.Handle, addr uintptr, filename *uint16, size uint32) (n uint32) {
 	r0, _, _ := syscall.Syscall6(procGetMappedFileNameW.Addr(), 4, uintptr(handle), uintptr(addr), uintptr(unsafe.Pointer(filename)), uintptr(size), 0, 0)
 	n = uint32(r0)
+	return
+}
+
+func QueryWorkingSet(handle windows.Handle, ws *MemoryWorkingSetExInformation, size uint32) (err error) {
+	r1, _, e1 := syscall.Syscall(procQueryWorkingSetEx.Addr(), 3, uintptr(handle), uintptr(unsafe.Pointer(ws)), uintptr(size))
+	if r1 == 0 {
+		err = errnoErr(e1)
+	}
 	return
 }
 
