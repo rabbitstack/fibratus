@@ -1183,6 +1183,40 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 			},
 			false,
 		},
+		{
+			"open process callstack",
+			func() error {
+				_, err := windows.OpenProcess(windows.PROCESS_VM_READ, false, uint32(os.Getpid()))
+				return err
+			},
+			func(e *kevent.Kevent) bool {
+				if e.CurrentPid() && e.Type == ktypes.OpenProcess {
+					callstack := e.Callstack.String()
+					log.Infof("open process event %s: %s", e.String(), callstack)
+					return callstackContainsTestExe(callstack) &&
+						strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\System32\\KERNELBASE.dll!OpenProcess"))
+				}
+				return false
+			},
+			false,
+		},
+		{
+			"open thread callstack",
+			func() error {
+				_, err := windows.OpenThread(windows.THREAD_IMPERSONATE, false, windows.GetCurrentThreadId())
+				return err
+			},
+			func(e *kevent.Kevent) bool {
+				if e.CurrentPid() && e.Type == ktypes.OpenThread {
+					callstack := e.Callstack.String()
+					log.Infof("open thread event %s: %s", e.String(), callstack)
+					return callstackContainsTestExe(callstack) &&
+						strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\System32\\KERNELBASE.dll!OpenThread"))
+				}
+				return false
+			},
+			false,
+		},
 	}
 
 	kstreamConfig := config.KstreamConfig{
