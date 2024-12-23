@@ -29,8 +29,10 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/signature"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
@@ -39,6 +41,7 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+	"unsafe"
 )
 
 var cfg = &config.Config{
@@ -351,7 +354,7 @@ func TestThreadFilter(t *testing.T) {
 		{`thread.callstack.modules in ('C:\\WINDOWS\\System32\\KERNELBASE.dll', 'C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll')`, true},
 		{`thread.callstack.symbols imatches ('KERNELBASE.dll!CreateProcess*', 'Java_java_lang_ProcessImpl_create')`, true},
 		{`thread.callstack.protections in ('RWX')`, true},
-		{`thread.callstack.allocation_sizes > 500`, true},
+		{`thread.callstack.allocation_sizes > 0`, false},
 		{`length(thread.callstack.callsite_leading_assembly) > 0`, true},
 		{`thread.callstack.callsite_trailing_assembly matches ('*mov r10, rcx mov eax, 0x* syscall*')`, true},
 		{`thread.callstack.is_unbacked`, true},
@@ -366,12 +369,83 @@ func TestThreadFilter(t *testing.T) {
 		{`thread.callstack[0].is_unbacked = true`, true},
 		{`thread.callstack[2].is_unbacked = false`, true},
 		{`thread.callstack[kernelbase.dll].symbol = 'CreateProcessW'`, true},
-		{`thread.callstack[1].allocation_size >= 400`, true},
+		{`thread.callstack[1].allocation_size = 0`, true},
 		{`thread.callstack[1].protection = 'RWX'`, true},
 		{`thread.callstack[1].callsite_trailing_assembly matches ('*mov r10, rcx mov eax, 0x* syscall*')`, true},
 	}
 
 	for i, tt := range tests {
+		f := New(tt.filter, cfg)
+		err := f.Compile()
+		if err != nil {
+			t.Fatal(err)
+		}
+		matches := f.Run(kevt)
+		if matches != tt.matches {
+			t.Errorf("%d. %q thread filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
+		}
+	}
+
+	// spawn a new process
+	var si windows.StartupInfo
+	si.Flags = windows.STARTF_USESHOWWINDOW
+	var pi windows.ProcessInformation
+
+	argv := windows.StringToUTF16Ptr(filepath.Join(os.Getenv("windir"), "regedit.exe"))
+
+	err = windows.CreateProcess(
+		nil,
+		argv,
+		nil,
+		nil,
+		true,
+		0,
+		nil,
+		nil,
+		&si,
+		&pi)
+	require.NoError(t, err)
+
+	for {
+		if sys.IsProcessRunning(pi.Process) {
+			break
+		}
+		time.Sleep(time.Millisecond * 100)
+		log.Infof("%d pid not yet ready", pi.ProcessId)
+	}
+	defer windows.TerminateProcess(pi.Process, 0)
+
+	kevt.PID = pi.ProcessId
+
+	// try until a valid address is returned
+	// or fail if max attempts are exhausted
+	j := 50
+	ntdll := getNtdllAddress(pi.ProcessId)
+	for ntdll == 0 && j > 0 {
+		ntdll = getNtdllAddress(pi.ProcessId)
+		time.Sleep(time.Millisecond * 250)
+		j--
+	}
+
+	// overwrite ntdll address with dummy bytes
+	// to reproduce module stomping technique
+	var protect uint32
+	require.NoError(t, windows.VirtualProtectEx(pi.Process, ntdll, uintptr(len(insns)), windows.PAGE_EXECUTE_READWRITE, &protect))
+
+	var n uintptr
+	require.NoError(t, windows.WriteProcessMemory(pi.Process, ntdll, &insns[0], uintptr(len(insns)), &n))
+
+	kevt.Callstack.PushFrame(kevent.Frame{Addr: va.Address(ntdll), Offset: 0, Symbol: "?", Module: "C:\\Windows\\System32\\ntdll.dll"})
+
+	var tests1 = []struct {
+		filter  string
+		matches bool
+	}{
+
+		{`thread.callstack.allocation_sizes > 0`, true},
+	}
+
+	for i, tt := range tests1 {
 		f := New(tt.filter, cfg)
 		err := f.Compile()
 		if err != nil {
@@ -1207,4 +1281,22 @@ func BenchmarkFilterRun(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		f.Run(kevt)
 	}
+}
+
+func getNtdllAddress(pid uint32) uintptr {
+	var moduleHandles [1024]windows.Handle
+	var cbNeeded uint32
+	proc, err := windows.OpenProcess(windows.PROCESS_ALL_ACCESS, false, pid)
+	if err != nil {
+		return 0
+	}
+	if err := windows.EnumProcessModules(proc, &moduleHandles[0], 1024, &cbNeeded); err != nil {
+		return 0
+	}
+	moduleHandle := moduleHandles[1]
+	var moduleInfo windows.ModuleInfo
+	if err := windows.GetModuleInformation(proc, moduleHandle, &moduleInfo, uint32(unsafe.Sizeof(moduleInfo))); err != nil {
+		return 0
+	}
+	return moduleInfo.BaseOfDll
 }

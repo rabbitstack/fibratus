@@ -27,6 +27,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/arch/x86/x86asm"
 	"golang.org/x/sys/windows"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -45,6 +46,11 @@ var callstackFlushes = expvar.NewInt("callstack.flushes")
 // unbacked represents the identifier for unbacked regions in stack frames
 const unbacked = "unbacked"
 
+var pageSize = uint64(os.Getpagesize())
+
+// buildNumber stores the Windows OS build number
+var _, _, buildNumber = windows.RtlGetNtVersionNumbers()
+
 // Frame describes a single stack frame.
 type Frame struct {
 	Addr   va.Address // return address
@@ -57,18 +63,43 @@ type Frame struct {
 // from unbacked memory section
 func (f Frame) IsUnbacked() bool { return f.Module == unbacked }
 
-// AllocationSize calculates the region size
-// to which the frame return address pertains if
-// the memory pages within the region are private.
+// AllocationSize calculates the private region size
+// to which the frame return address pertains if the
+// memory pages within the region are private and
+// non-shareable pages.
 func (f *Frame) AllocationSize(proc windows.Handle) uint64 {
 	if f.Addr.InSystemRange() {
 		return 0
 	}
+
 	r := va.VirtualQuery(proc, f.Addr.Uint64())
-	if r == nil || r.Type != va.MemPrivate {
+	if r == nil || (r.State != windows.MEM_COMMIT || r.Protect == windows.PAGE_NOACCESS || r.Type != va.MemImage) {
 		return 0
 	}
-	return r.Size
+
+	var size uint64
+
+	// traverse all pages in the region
+	for n := uint64(0); n < r.Size; n += pageSize {
+		addr := f.Addr.Inc(n)
+		ws := va.QueryWorkingSet(proc, addr.Uint64())
+		if ws == nil || !ws.Valid() {
+			continue
+		}
+
+		// use SharedOriginal after RS3/1709
+		if buildNumber >= 16299 {
+			if !ws.SharedOriginal() {
+				size += pageSize
+			}
+		} else {
+			if !ws.Shared() {
+				size += pageSize
+			}
+		}
+	}
+
+	return size
 }
 
 // Protection resolves the memory protection
@@ -93,6 +124,7 @@ func (f *Frame) CallsiteAssembly(proc windows.Handle, pre bool) string {
 	if f.Addr.InSystemRange() {
 		return ""
 	}
+
 	size := uint(512)
 	base := f.Addr.Uintptr()
 	if pre {
@@ -102,6 +134,7 @@ func (f *Frame) CallsiteAssembly(proc windows.Handle, pre bool) string {
 	if len(b) == 0 || va.Zeroed(b) {
 		return ""
 	}
+
 	var asm strings.Builder
 	for i := 0; i < len(b); {
 		ins, err := x86asm.Decode(b[i:], 64)
@@ -112,6 +145,7 @@ func (f *Frame) CallsiteAssembly(proc windows.Handle, pre bool) string {
 		asm.WriteRune(' ')
 		i += ins.Len
 	}
+
 	return asm.String()
 }
 

@@ -60,6 +60,7 @@ type RegionInfo struct {
 	BaseAddr uint64
 	Size     uint64
 	proc     windows.Handle
+	State    uint32
 }
 
 // IsMapped determines if the region is backed by the section object.
@@ -178,7 +179,21 @@ func VirtualQuery(process windows.Handle, addr uint64) *RegionInfo {
 		BaseAddr: addr,
 		Size:     uint64(mem.RegionSize),
 		proc:     process,
+		State:    mem.State,
 	}
+}
+
+// QueryWorkingSet retrieves extended information about
+// the pages at specific virtual addresses in the address
+// space of the specified process.
+func QueryWorkingSet(process windows.Handle, addr uint64) *sys.MemoryWorkingSetExBlock {
+	var ws sys.MemoryWorkingSetExInformation
+	ws.VirtualAddress = uintptr(addr)
+	err := sys.QueryWorkingSet(process, &ws, uint32(unsafe.Sizeof(sys.MemoryWorkingSetExInformation{})))
+	if err != nil {
+		return nil
+	}
+	return &ws.VirtualAttributes
 }
 
 // Remove removes the process handle from cache and closes it.

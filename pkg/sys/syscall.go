@@ -82,3 +82,6 @@ package sys
 //sys ShellNotifyIcon(msg NotifyIconMessage, data *NotifyIconData) (err error) [failretval==0]  = shell32.Shell_NotifyIconW
 //sys SHGetStockIconInfo(id int32, flags uint32, icon *ShStockIcon) (err error) [failretval!=0] = shell32.SHGetStockIconInfo
 //sys FreeConsole() = kernel32.FreeConsole
+
+// Memory functions
+//sys QueryWorkingSet(handle windows.Handle, ws *MemoryWorkingSetExInformation, size uint32) (err error) = psapi.QueryWorkingSetEx
