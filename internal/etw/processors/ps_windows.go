@@ -48,6 +48,7 @@ func (p psProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error
 			p.regionProber.Remove(evt.Kparams.MustGetPid())
 			return evt, false, multierror.Wrap(err, p.psnap.Remove(evt))
 		}
+
 		return evt, false, multierror.Wrap(err, p.psnap.Write(evt))
 	case ktypes.CreateThread, ktypes.TerminateThread, ktypes.ThreadRundown:
 		pid, err := e.Kparams.GetPid()
@@ -65,6 +66,7 @@ func (p psProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error
 		if err != nil {
 			return e, false, err
 		}
+
 		return e, false, p.psnap.RemoveThread(pid, tid)
 	case ktypes.OpenProcess, ktypes.OpenThread:
 		pid, err := e.Kparams.GetPid()
@@ -76,8 +78,10 @@ func (p psProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error
 			e.AppendParam(kparams.Exe, kparams.FilePath, proc.Exe)
 			e.AppendParam(kparams.ProcessName, kparams.AnsiString, proc.Name)
 		}
+
 		return e, false, nil
 	}
+
 	return e, true, nil
 }
 
@@ -105,7 +109,7 @@ func (p psProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 
 	// query process start time
 	pid := e.Kparams.MustGetPid()
-	started, err := getStartTime(pid)
+	started, err := getStartTime(pid, e)
 	if err != nil {
 		started = e.Timestamp
 	}
@@ -117,10 +121,10 @@ func (p psProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 func (psProcessor) Name() ProcessorType { return Ps }
 func (p psProcessor) Close()            {}
 
-func getStartTime(pid uint32) (time.Time, error) {
+func getStartTime(pid uint32, e *kevent.Kevent) (time.Time, error) {
 	proc, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
 	if err != nil {
-		return time.Now(), err
+		return e.Timestamp, err
 	}
 	//nolint:errcheck
 	defer windows.CloseHandle(proc)
@@ -132,7 +136,7 @@ func getStartTime(pid uint32) (time.Time, error) {
 	)
 	err = windows.GetProcessTimes(proc, &ct, &xt, &kt, &ut)
 	if err != nil {
-		return time.Now(), err
+		return e.Timestamp, err
 	}
 	return time.Unix(0, ct.Nanoseconds()), nil
 }
