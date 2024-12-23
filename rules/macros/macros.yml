@@ -297,7 +297,11 @@
     "HKEY_CURRENT_USER\\SOFTWARE\\Policies\\Microsoft\\Windows\\System\\Scripts\\Startup\\Script",
     "HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Ctf\\LangBarAddin\\*\\FilePath",
     "HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Internet Explorer\\Extensions\\*\\Exec",
-    "HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Command Processor\\Autorun"
+    "HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Command Processor\\Autorun",
+    "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\BootExecute",
+    "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\SetupExecute",
+    "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Execute",
+    "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\S0InitialCommand"
    ]
   description: |
     Contains the patterns for the registry keys which are commonly abused for
