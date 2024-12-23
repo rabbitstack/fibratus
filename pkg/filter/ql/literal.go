@@ -19,8 +19,6 @@
 package ql
 
 import (
-	"bytes"
-	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
@@ -129,16 +127,25 @@ type ListLiteral struct {
 
 // String returns a string representation of the literal.
 func (s *ListLiteral) String() string {
-	var buf bytes.Buffer
-	_, _ = buf.WriteString("(")
-	for idx, tagKey := range s.Values {
-		if idx != 0 {
-			_, _ = buf.WriteString(", ")
-		}
-		_, _ = buf.WriteString(tagKey)
+	var n int
+	for _, elem := range s.Values {
+		n += len(elem) + 2
 	}
-	_, _ = buf.WriteString(")")
-	return buf.String()
+
+	var b strings.Builder
+	b.Grow(n + 2)
+	b.WriteRune('(')
+
+	for idx, elem := range s.Values {
+		if idx != 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(elem)
+	}
+
+	b.WriteRune(')')
+
+	return b.String()
 }
 
 // Function represents a function call.
@@ -158,14 +165,18 @@ func (f *Function) ArgsSlice() []string {
 
 // String returns a string representation of the call.
 func (f *Function) String() string {
-	// join arguments.
-	var str []string
-	for _, arg := range f.Args {
-		str = append(str, arg.String())
-	}
+	args := strings.Join(f.ArgsSlice(), ", ")
+
+	var b strings.Builder
+	b.Grow(len(args) + len(f.Name) + 2)
+
+	b.WriteString(f.Name)
+	b.WriteRune('(')
+	b.WriteString(args)
+	b.WriteRune(')')
 
 	// Write function name and args.
-	return fmt.Sprintf("%s(%s)", f.Name, strings.Join(str, ", "))
+	return b.String()
 }
 
 // validate ensures that the function name obtained

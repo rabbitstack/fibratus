@@ -18,7 +18,9 @@
 
 package ql
 
-import "fmt"
+import (
+	"strings"
+)
 
 // Node represents a node in the abstract syntax tree.
 type Node interface {
@@ -36,7 +38,14 @@ type ParenExpr struct {
 }
 
 // String returns a string representation of the parenthesized expression.
-func (e *ParenExpr) String() string { return fmt.Sprintf("(%s)", e.Expr.String()) }
+func (e *ParenExpr) String() string {
+	var b strings.Builder
+	b.Grow(len(e.Expr.String()) + 2)
+	b.WriteRune('(')
+	b.WriteString(e.Expr.String())
+	b.WriteRune(')')
+	return b.String()
+}
 
 // BinaryExpr represents an operation between two expressions.
 type BinaryExpr struct {
@@ -47,7 +56,21 @@ type BinaryExpr struct {
 
 // String returns a string representation of the binary expression.
 func (e *BinaryExpr) String() string {
-	return fmt.Sprintf("%s %s %s", e.LHS.String(), e.Op.String(), e.RHS.String())
+	var b strings.Builder
+
+	lhs := e.LHS.String()
+	op := e.Op.String()
+	rhs := e.RHS.String()
+
+	b.Grow(len(lhs) + len(op) + len(rhs) + 2)
+
+	b.WriteString(lhs)
+	b.WriteString(" ")
+	b.WriteString(op)
+	b.WriteString(" ")
+	b.WriteString(rhs)
+
+	return b.String()
 }
 
 // NotExpr represents an unary not expression.
@@ -56,4 +79,11 @@ type NotExpr struct {
 }
 
 // String returns a string representation of the not expression.
-func (e *NotExpr) String() string { return fmt.Sprintf("(%s)", e.Expr.String()) }
+func (e *NotExpr) String() string {
+	var b strings.Builder
+	b.Grow(len(e.Expr.String()) + 2)
+	b.WriteRune('(')
+	b.WriteString(e.Expr.String())
+	b.WriteRune(')')
+	return b.String()
+}
