@@ -2,7 +2,7 @@
 
 <p align="center" >
   <a href="https://www.fibratus.io" >
-    <img src="logo.png" alt="Fibratus">
+    <img width="800" height="800" src="logo.png" alt="Fibratus">
   </a>
 </p>
 
@@ -86,6 +86,4 @@ Free code signing provided by [SignPath.io], certificate by
 <p align="center">
   Developed with ❤️ by <strong>Nedim Šabić Šabić</strong>
 </p>
-<p align="center">
-  Logo designed with ❤️ by <strong><a name="logo" target="_blank" href="https://github.com/karinkasweet/">Karina Slizova</a></strong>
-</p>
+
