@@ -245,4 +245,9 @@ const (
 	MemProtectMask = "protection_mask"
 	// MemPageType identifies the parameter that represents the allocated region type.
 	MemPageType = "page_type"
+
+	// LinkSource identifies the parameter that represents the source symbolic link object or other kernel object
+	LinkSource = "source"
+	// LinkTarget identifies the parameter that represents the target symbolic link object or other kernel object
+	LinkTarget = "target"
 )

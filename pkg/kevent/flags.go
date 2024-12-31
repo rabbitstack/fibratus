@@ -259,3 +259,20 @@ var DNSOptsFlags = []ParamFlag{
 	{"DISABLE_IDN_ENCODING", 0x00200000},
 	{"APPEND_MULTILABEL", 0x00800000},
 }
+
+// AccessMaskFlags describes the generic and specific access rights
+var AccessMaskFlags = []ParamFlag{
+	{"DELETE", windows.DELETE},
+	{"READ_CONTROL", windows.READ_CONTROL},
+	{"WRITE_DAC", windows.WRITE_DAC},
+	{"WRITE_OWNER", windows.WRITE_OWNER},
+	{"SYNCHRONIZE", windows.SYNCHRONIZE},
+	{"STANDARD_RIGHTS_REQUIRED", windows.STANDARD_RIGHTS_REQUIRED},
+	{"STANDARD_RIGHTS_ALL", windows.STANDARD_RIGHTS_ALL},
+	{"ACCESS_SYSTEM_SECURITY", windows.ACCESS_SYSTEM_SECURITY},
+	{"MAXIMUM_ALLOWED", windows.MAXIMUM_ALLOWED},
+	{"GENERIC_READ", windows.GENERIC_READ},
+	{"GENERIC_WRITE", windows.GENERIC_WRITE},
+	{"GENERIC_EXECUTE", windows.GENERIC_EXECUTE},
+	{"GENERIC_ALL", windows.GENERIC_ALL},
+}

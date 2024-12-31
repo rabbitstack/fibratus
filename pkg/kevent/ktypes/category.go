@@ -47,6 +47,8 @@ const (
 	Driver Category = "driver"
 	// Mem is the category for memory events
 	Mem Category = "mem"
+	// Object the category for object manager events
+	Object Category = "object"
 	// Other is the category for uncategorized events
 	Other Category = "other"
 	// Unknown is the category for events that couldn't match any of the previous categories
@@ -79,5 +81,6 @@ func Categories() []string {
 		string(Driver),
 		string(Other),
 		string(Unknown),
+		string(Object),
 	}
 }

@@ -207,6 +207,9 @@ var (
 	// StackWalk represents stack walk event with the collection of return addresses
 	StackWalk = pack(windows.GUID{Data1: 0xdef2fe46, Data2: 0x7bd6, Data3: 0x4b80, Data4: [8]byte{0xbd, 0x94, 0xf5, 0x7f, 0xe2, 0x0d, 0x0c, 0xe3}}, 32)
 
+	// CreateSymbolicLinkObject represents the event emitted by the object manager when the new symbolic link is created within the object manager directory
+	CreateSymbolicLinkObject = pack(AuditAPIEventGUID, 3)
+
 	// UnknownKtype designates unknown kernel event type
 	UnknownKtype = pack(windows.GUID{}, 0)
 )
@@ -322,6 +325,8 @@ func (k Ktype) String() string {
 		return "ReplyDns"
 	case StackWalk:
 		return "StackWalk"
+	case CreateSymbolicLinkObject:
+		return "CreateSymbolicLinkObject"
 	default:
 		return ""
 	}
@@ -355,6 +360,8 @@ func (k Ktype) Category() Category {
 		return Handle
 	case VirtualAlloc, VirtualFree:
 		return Mem
+	case CreateSymbolicLinkObject:
+		return Object
 	default:
 		return Unknown
 	}
@@ -455,6 +462,8 @@ func (k Ktype) Description() string {
 		return "Sends a DNS query to the name server"
 	case ReplyDNS:
 		return "Receives the response from the DNS server"
+	case CreateSymbolicLinkObject:
+		return "Creates the symbolic link within the object manager directory"
 	default:
 		return ""
 	}
@@ -541,7 +550,7 @@ func (k *Ktype) HookID() uint16 {
 // Source designates the provenance of this event type.
 func (k Ktype) Source() EventSource {
 	switch k {
-	case OpenProcess, OpenThread, SetThreadContext:
+	case OpenProcess, OpenThread, SetThreadContext, CreateSymbolicLinkObject:
 		return AuditAPICallsLogger
 	case QueryDNS, ReplyDNS:
 		return DNSLogger
@@ -556,7 +565,7 @@ func (k Ktype) Source() EventSource {
 // events, but it appears first on the consumer callback
 // before other events published before it.
 func (k Ktype) CanArriveOutOfOrder() bool {
-	return k.Category() == Registry || k.Subcategory() == DNS || k == OpenProcess || k == OpenThread || k == SetThreadContext
+	return k.Category() == Registry || k.Subcategory() == DNS || k == OpenProcess || k == OpenThread || k == SetThreadContext || k == CreateSymbolicLinkObject
 }
 
 // FromParts builds ktype from provider GUID and hook ID.
