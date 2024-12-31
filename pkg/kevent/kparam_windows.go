@@ -735,6 +735,18 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 			n++
 		}
 		e.AppendParam(kparams.Callstack, kparams.Slice, callstack)
+	case ktypes.CreateSymbolicLinkObject:
+		source, offset := evt.ReadUTF16String(0)
+		target, offset := evt.ReadUTF16String(offset)
+		desiredAccess := evt.ReadUint32(offset)
+		status := evt.ReadUint32(offset + 4)
+		e.AppendParam(kparams.LinkSource, kparams.UnicodeString, source)
+		e.AppendParam(kparams.LinkTarget, kparams.UnicodeString, target)
+		e.AppendParam(kparams.DesiredAccess, kparams.Flags, desiredAccess, WithFlags(AccessMaskFlags))
+		e.AppendParam(kparams.NTStatus, kparams.Status, status)
+		if evt.HasStackTrace() {
+			e.AppendParam(kparams.Callstack, kparams.Slice, evt.Callstack())
+		}
 	}
 }
 
