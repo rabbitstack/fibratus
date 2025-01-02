@@ -763,6 +763,30 @@ func (e *Kevent) produceParams(evt *etw.EventRecord) {
 		if evt.HasStackTrace() {
 			e.AppendParam(kparams.Callstack, kparams.Slice, evt.Callstack())
 		}
+	case ktypes.SubmitThreadpoolWork, ktypes.SubmitThreadpoolCallback:
+		poolID := evt.ReadUint64(0)
+		taskID := evt.ReadUint64(8)
+		callback := evt.ReadUint64(16)
+		ctx := evt.ReadUint64(24)
+		tag := evt.ReadUint64(32)
+		e.AppendParam(kparams.ThreadpoolPoolID, kparams.Address, poolID)
+		e.AppendParam(kparams.ThreadpoolTaskID, kparams.Address, taskID)
+		e.AppendParam(kparams.ThreadpoolCallback, kparams.Address, callback)
+		e.AppendParam(kparams.ThreadpoolContext, kparams.Address, ctx)
+		e.AppendParam(kparams.ThreadpoolSubprocessTag, kparams.Address, tag)
+	case ktypes.SetThreadpoolTimer:
+		duetime := evt.ReadUint64(0)
+		subqueue := evt.ReadUint64(8)
+		timer := evt.ReadUint64(16)
+		period := evt.ReadUint32(24)
+		window := evt.ReadUint32(28)
+		absolute := evt.ReadUint32(32)
+		e.AppendParam(kparams.ThreadpoolTimerDuetime, kparams.Uint64, duetime)
+		e.AppendParam(kparams.ThreadpoolTimerSubqueue, kparams.Address, subqueue)
+		e.AppendParam(kparams.ThreadpoolTimer, kparams.Address, timer)
+		e.AppendParam(kparams.ThreadpoolTimerPeriod, kparams.Uint32, period)
+		e.AppendParam(kparams.ThreadpoolTimerWindow, kparams.Uint32, window)
+		e.AppendParam(kparams.ThreadpoolTimerAbsolute, kparams.Bool, absolute > 0)
 	}
 }
 

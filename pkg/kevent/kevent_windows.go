@@ -556,6 +556,16 @@ func (e *Kevent) Summary() string {
 	case ktypes.ReplyDNS:
 		dnsName := e.GetParamAsString(kparams.DNSName)
 		return printSummary(e, fmt.Sprintf("received DNS response for <code>%s</code> query", dnsName))
+	case ktypes.CreateSymbolicLinkObject:
+		src := e.GetParamAsString(kparams.LinkSource)
+		target := e.GetParamAsString(kparams.LinkTarget)
+		return printSummary(e, fmt.Sprintf("created symbolic link from %s to %s", src, target))
+	case ktypes.SubmitThreadpoolWork:
+		return printSummary(e, "enqueued the work item to the thread pool")
+	case ktypes.SubmitThreadpoolCallback:
+		return printSummary(e, "Submitted the thread pool callback for execution within the work item")
+	case ktypes.SetThreadpoolTimer:
+		return printSummary(e, "set thread pool timer object")
 	}
 	return ""
 }

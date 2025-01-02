@@ -43,7 +43,7 @@ type Snapshotter interface {
 	// AddMmap adds a new memory mapping (data memory-mapped file, image, or pagefile) to this process state.
 	AddMmap(*kevent.Kevent) error
 	// RemoveMmap removes memory mapping at the given base address.
-	RemoveMmap(pid uint32, address va.Address) error
+	RemoveMmap(pid uint32, addr va.Address) error
 	// WriteFromKcap appends a new process state to the snapshotter from the captured kernel event.
 	WriteFromKcap(kevt *kevent.Kevent) error
 	// Remove deletes process's state from the snapshotter.

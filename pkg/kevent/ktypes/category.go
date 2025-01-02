@@ -49,6 +49,8 @@ const (
 	Mem Category = "mem"
 	// Object the category for object manager events
 	Object Category = "object"
+	// Threadpool is the category for thread pool events
+	Threadpool Category = "threadpool"
 	// Other is the category for uncategorized events
 	Other Category = "other"
 	// Unknown is the category for events that couldn't match any of the previous categories
@@ -82,5 +84,6 @@ func Categories() []string {
 		string(Other),
 		string(Unknown),
 		string(Object),
+		string(Threadpool),
 	}
 }

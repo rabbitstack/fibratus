@@ -170,19 +170,20 @@ func (ctx *ActionContext) UniquePids() []uint32 {
 // enabling/disabling event providers/types
 // dynamically.
 type RulesCompileResult struct {
-	HasProcEvents     bool
-	HasThreadEvents   bool
-	HasImageEvents    bool
-	HasFileEvents     bool
-	HasNetworkEvents  bool
-	HasRegistryEvents bool
-	HasHandleEvents   bool
-	HasMemEvents      bool
-	HasVAMapEvents    bool
-	HasDNSEvents      bool
-	HasAuditAPIEvents bool
-	UsedEvents        []ktypes.Ktype
-	NumberRules       int
+	HasProcEvents       bool
+	HasThreadEvents     bool
+	HasImageEvents      bool
+	HasFileEvents       bool
+	HasNetworkEvents    bool
+	HasRegistryEvents   bool
+	HasHandleEvents     bool
+	HasMemEvents        bool
+	HasVAMapEvents      bool
+	HasDNSEvents        bool
+	HasAuditAPIEvents   bool
+	HasThreadpoolEvents bool
+	UsedEvents          []ktypes.Ktype
+	NumberRules         int
 }
 
 func (r RulesCompileResult) ContainsEvent(ktype ktypes.Ktype) bool {
@@ -217,6 +218,7 @@ func (r RulesCompileResult) String() string {
 		HasVAMapEvents: %t
 		HasAuditAPIEvents: %t
 		HasDNSEvents: %t
+		HasThreadpoolEvents: %t
 		Events: %s`,
 		r.HasProcEvents,
 		r.HasThreadEvents,
@@ -229,6 +231,7 @@ func (r RulesCompileResult) String() string {
 		r.HasVAMapEvents,
 		r.HasAuditAPIEvents,
 		r.HasDNSEvents,
+		r.HasThreadpoolEvents,
 		strings.Join(events, ", "),
 	)
 }

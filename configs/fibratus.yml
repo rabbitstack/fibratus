@@ -229,6 +229,9 @@ kstream:
   # Determines whether DNS client events are collected
   #enable-dns: true
 
+  # Determines whether thread pool events are collected
+  #enable-threadpool: true
+
   # Indicates if stack enrichment is enabled for eligible events
   #stack-enrichment: true
 

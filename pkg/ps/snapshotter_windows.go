@@ -314,6 +314,7 @@ func (s *snapshotter) newProcState(pid, ppid uint32, e *kevent.Kevent) (*pstypes
 		e.Kparams.MustGetSID(),
 		e.Kparams.MustGetUint32(kparams.SessionID),
 	)
+
 	proc.Parent = s.procs[ppid]
 	proc.StartTime, _ = e.Kparams.GetTime(kparams.StartTime)
 	proc.IsWOW64 = (e.Kparams.MustGetUint32(kparams.ProcessFlags) & kevent.PsWOW64) != 0

@@ -32,21 +32,22 @@ import (
 )
 
 const (
-	enableThreadKevents   = "kstream.enable-thread"
-	enableRegistryKevents = "kstream.enable-registry"
-	enableNetKevents      = "kstream.enable-net"
-	enableFileIOKevents   = "kstream.enable-fileio"
-	enableVAMapKevents    = "kstream.enable-vamap"
-	enableImageKevents    = "kstream.enable-image"
-	enableHandleKevents   = "kstream.enable-handle"
-	enableMemKevents      = "kstream.enable-mem"
-	enableAuditAPIEvents  = "kstream.enable-audit-api"
-	enableDNSEvents       = "kstream.enable-dns"
-	stackEnrichment       = "kstream.stack-enrichment"
-	bufferSize            = "kstream.buffer-size"
-	minBuffers            = "kstream.min-buffers"
-	maxBuffers            = "kstream.max-buffers"
-	flushInterval         = "kstream.flush-interval"
+	enableThreadKevents    = "kstream.enable-thread"
+	enableRegistryKevents  = "kstream.enable-registry"
+	enableNetKevents       = "kstream.enable-net"
+	enableFileIOKevents    = "kstream.enable-fileio"
+	enableVAMapKevents     = "kstream.enable-vamap"
+	enableImageKevents     = "kstream.enable-image"
+	enableHandleKevents    = "kstream.enable-handle"
+	enableMemKevents       = "kstream.enable-mem"
+	enableAuditAPIEvents   = "kstream.enable-audit-api"
+	enableDNSEvents        = "kstream.enable-dns"
+	enableThreadpoolEvents = "kstream.enable-threadpool"
+	stackEnrichment        = "kstream.stack-enrichment"
+	bufferSize             = "kstream.buffer-size"
+	minBuffers             = "kstream.min-buffers"
+	maxBuffers             = "kstream.max-buffers"
+	flushInterval          = "kstream.flush-interval"
 
 	excludedEvents = "kstream.blacklist.events"
 	excludedImages = "kstream.blacklist.images"
@@ -82,6 +83,8 @@ type KstreamConfig struct {
 	EnableAuditAPIEvents bool `json:"enable-audit-api" yaml:"enable-audit-api"`
 	// EnableDNSEvents indicates if DNS client events are enabled
 	EnableDNSEvents bool `json:"enable-dns" yaml:"enable-dns"`
+	// EnableThreadpoolEvents indicates if thread pool events are enabled
+	EnableThreadpoolEvents bool `json:"enable-threadpool" yaml:"enable-threadpool"`
 	// StackEnrichment indicates if stack enrichment is enabled for eligible events.
 	StackEnrichment bool `json:"stack-enrichment" yaml:"stack-enrichment"`
 	// BufferSize represents the amount of memory allocated for each event tracing session buffer, in kilobytes.
@@ -115,6 +118,7 @@ func (c *KstreamConfig) initFromViper(v *viper.Viper) {
 	c.EnableMemKevents = v.GetBool(enableMemKevents)
 	c.EnableAuditAPIEvents = v.GetBool(enableAuditAPIEvents)
 	c.EnableDNSEvents = v.GetBool(enableDNSEvents)
+	c.EnableThreadpoolEvents = v.GetBool(enableThreadpoolEvents)
 	c.StackEnrichment = v.GetBool(stackEnrichment)
 	c.BufferSize = uint32(v.GetInt(bufferSize))
 	c.MinBuffers = uint32(v.GetInt(minBuffers))
