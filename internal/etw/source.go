@@ -147,6 +147,7 @@ func (e *EventSource) Open(config *config.Config) error {
 		config.Kstream.EnableMemKevents = config.Kstream.EnableMemKevents && (e.r.HasMemEvents || (config.Yara.Enabled && !config.Yara.SkipAllocs))
 		config.Kstream.EnableDNSEvents = config.Kstream.EnableDNSEvents && e.r.HasDNSEvents
 		config.Kstream.EnableAuditAPIEvents = config.Kstream.EnableAuditAPIEvents && e.r.HasAuditAPIEvents
+		config.Kstream.EnableThreadpoolEvents = config.Kstream.EnableThreadpoolEvents && e.r.HasThreadpoolEvents
 		for _, ktype := range ktypes.All() {
 			if ktype == ktypes.CreateProcess || ktype == ktypes.TerminateProcess ||
 				ktype == ktypes.LoadImage || ktype == ktypes.UnloadImage {
@@ -189,6 +190,9 @@ func (e *EventSource) Open(config *config.Config) error {
 	if config.Kstream.EnableAuditAPIEvents {
 		e.addTrace(etw.KernelAuditAPICallsSession, etw.KernelAuditAPICallsGUID)
 	}
+	if config.Kstream.EnableThreadpoolEvents {
+		e.addTrace(etw.ThreadpoolSession, etw.ThreadpoolGUID)
+	}
 
 	for _, trace := range e.traces {
 		err := trace.Start()
@@ -226,6 +230,7 @@ func (e *EventSource) Open(config *config.Config) error {
 		// Init consumer and open the trace for processing
 		consumer := NewConsumer(e.psnap, e.hsnap, config, e.sequencer, e.evts)
 		consumer.SetFilter(e.filter)
+
 		// Attach event listeners
 		for _, lis := range e.listeners {
 			consumer.q.RegisterListener(lis)

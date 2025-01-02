@@ -385,6 +385,111 @@ func TestProcessCallstackFullMode(t *testing.T) {
 	assert.Equal(t, 0, s.procsSize())
 }
 
+func TestSymbolizeEventParamAddress(t *testing.T) {
+	r := new(MockResolver)
+	c := &config.Config{}
+
+	psnap := new(ps.SnapshotterMock)
+
+	opts := uint32(sys.SymUndname | sys.SymCaseInsensitive | sys.SymAutoPublics | sys.SymOmapFindNearest | sys.SymDeferredLoads)
+	r.On("Initialize", mock.Anything, opts).Return(nil)
+	r.On("LoadModule", windows.CurrentProcess(), mock.Anything).Return(nil)
+
+	r.On("GetModuleName", mock.Anything, mock.Anything).Return("C:\\WINDOWS\\System32\\KERNEL32.DLL").Once()
+	r.On("GetModuleName", mock.Anything, mock.Anything).Return("C:\\WINDOWS\\System32\\KERNELBASE.dll").Once()
+	r.On("GetModuleName", mock.Anything, mock.Anything).Return("C:\\WINDOWS\\System32\\ntdll.dll").Times(3)
+
+	r.On("GetSymbolNameAndOffset", mock.Anything, mock.Anything).Return("CreateProcessW", 0x54).Times(2)
+	r.On("GetSymbolNameAndOffset", mock.Anything, mock.Anything).Return("CreateProcessW", 0x66).Once()
+	r.On("GetSymbolNameAndOffset", mock.Anything, mock.Anything).Return("NtCreateProcess", 0x3a2).Once()
+	r.On("GetSymbolNameAndOffset", mock.Anything, mock.Anything).Return("NtCreateProcessEx", 0x3a2).Times(2)
+
+	r.On("Cleanup", mock.Anything)
+
+	s := NewSymbolizer(r, psnap, c, false)
+	require.NotNil(t, s)
+
+	parsePeFile = func(name string, option ...pe.Option) (*pe.PE, error) {
+		exports := map[uint32]string{
+			8192:  "RtlSetSearchPathMode",
+			9344:  "CreateProcessW",
+			20352: "LoadKeyboardLayoutW",
+		}
+		px := &pe.PE{
+			Exports: exports,
+		}
+		return px, nil
+	}
+
+	proc := &pstypes.PS{
+		Name:      "notepad.exe",
+		PID:       23234,
+		Ppid:      2434,
+		Exe:       `C:\Windows\notepad.exe`,
+		Cmdline:   `C:\Windows\notepad.exe`,
+		SID:       "S-1-1-18",
+		Cwd:       `C:\Windows\`,
+		SessionID: 1,
+		Threads: map[uint32]pstypes.Thread{
+			3453: {Tid: 3453, StartAddress: va.Address(140729524944768), IOPrio: 2, PagePrio: 5, KstackBase: va.Address(18446677035730165760), KstackLimit: va.Address(18446677035730137088), UstackLimit: va.Address(86376448), UstackBase: va.Address(86372352)},
+			3455: {Tid: 3455, StartAddress: va.Address(140729524944768), IOPrio: 3, PagePrio: 5, KstackBase: va.Address(18446677035730165760), KstackLimit: va.Address(18446677035730137088), UstackLimit: va.Address(86376448), UstackBase: va.Address(86372352)},
+		},
+		Envs: map[string]string{"ProgramData": "C:\\ProgramData", "COMPUTRENAME": "archrabbit"},
+		Modules: []pstypes.Module{
+			{Name: "C:\\Windows\\System32\\ntdll.dll", Size: 32358, Checksum: 23123343, BaseAddress: va.Address(0x7ffb313833a3), DefaultBaseAddress: va.Address(0x7ffb313833a3)},
+			{Name: "C:\\Windows\\System32\\kernel32.dll", Size: 12354, Checksum: 23123343, BaseAddress: va.Address(0x7ffb5c1d0126), DefaultBaseAddress: va.Address(0x7ffb5c1d0126)},
+			{Name: "C:\\Windows\\System32\\user32.dll", Size: 212354, Checksum: 33123343, BaseAddress: va.Address(0x7ffb5d8e11c4), DefaultBaseAddress: va.Address(0x7ffb5d8e11c4)},
+		},
+	}
+	e := &kevent.Kevent{
+		Type:      ktypes.CreateThread,
+		Tid:       2484,
+		PID:       uint32(os.Getpid()),
+		CPU:       1,
+		Seq:       2,
+		Name:      "CreateThread",
+		Timestamp: time.Now(),
+		Category:  ktypes.Thread,
+		Host:      "archrabbit",
+		Kparams: kevent.Kparams{
+			kparams.Callstack:    {Name: kparams.Callstack, Type: kparams.Slice, Value: []va.Address{0x7ffb5c1d0396, 0x7ffb5d8e61f4, 0x7ffb3138592e, 0x7ffb313853b2, 0x2638e59e0a5}},
+			kparams.StartAddress: {Name: kparams.StartAddress, Type: kparams.Address, Value: uint64(0x7ffb3138592e)},
+			kparams.ProcessID:    {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(os.Getpid())},
+		},
+		PS: proc,
+	}
+
+	_, err := s.ProcessEvent(e)
+	require.NoError(t, err)
+
+	assert.Equal(t, "CreateProcessW", e.GetParamAsString(kparams.StartAddressSymbol))
+	assert.Equal(t, "C:\\Windows\\System32\\ntdll.dll", e.GetParamAsString(kparams.StartAddressModule))
+
+	e1 := &kevent.Kevent{
+		Type:      ktypes.SubmitThreadpoolCallback,
+		Tid:       2484,
+		PID:       uint32(os.Getpid()),
+		CPU:       1,
+		Seq:       2,
+		Name:      "SubmitThreadpoolCallback",
+		Timestamp: time.Now(),
+		Category:  ktypes.Threadpool,
+		Host:      "archrabbit",
+		Kparams: kevent.Kparams{
+			kparams.Callstack:          {Name: kparams.Callstack, Type: kparams.Slice, Value: []va.Address{0x7ffb5c1d0396}},
+			kparams.ThreadpoolCallback: {Name: kparams.ThreadpoolCallback, Type: kparams.Address, Value: uint64(0x7ffb3138592e)},
+			kparams.ThreadpoolContext:  {Name: kparams.ThreadpoolContext, Type: kparams.Address, Value: uint64(0)},
+		},
+		PS: proc,
+	}
+
+	_, err = s.ProcessEvent(e1)
+	require.NoError(t, err)
+
+	assert.Equal(t, "CreateProcessW", e1.GetParamAsString(kparams.ThreadpoolCallbackSymbol))
+	assert.Equal(t, "C:\\Windows\\System32\\ntdll.dll", e1.GetParamAsString(kparams.ThreadpoolCallbackModule))
+}
+
 func init() {
 	procTTL = time.Second
 }

@@ -150,6 +150,10 @@ func (t *Trace) enableCallstacks() {
 	if t.IsSystemRegistryTrace() {
 		t.stackExtensions.EnableRegistryCallstack()
 	}
+
+	if t.IsThreadpoolTrace() {
+		t.stackExtensions.EnableThreadpoolCallstack()
+	}
 }
 
 // Start registers and starts an event tracing session.
@@ -202,7 +206,9 @@ func (t *Trace) Start() error {
 			log.Warnf("unable to set empty system flags: %v", err)
 			return nil
 		}
+
 		sysTraceFlags[0] = flags
+
 		// enable object manager tracking
 		if cfg.EnableHandleKevents {
 			sysTraceFlags[4] = etw.Handle
@@ -225,13 +231,14 @@ func (t *Trace) Start() error {
 	// enrichment is enabled, it is necessary to instruct the provider
 	// to emit stack addresses in the extended data item section when
 	// writing events to the session buffers
-	if cfg.StackEnrichment && !t.IsSystemProvider() {
+	if cfg.StackEnrichment && !t.IsSystemProvider() && !t.IsThreadpoolTrace() {
 		return etw.EnableTraceWithOpts(t.GUID, t.startHandle, t.Keywords, etw.EnableTraceOpts{WithStacktrace: true})
 	} else if cfg.StackEnrichment && len(t.stackExtensions.EventIds()) > 0 {
 		if err := etw.EnableStackTracing(t.startHandle, t.stackExtensions.EventIds()); err != nil {
 			return fmt.Errorf("fail to enable system events callstack tracing: %v", err)
 		}
 	}
+
 	if t.IsSystemRegistryTrace() {
 		if err := etw.EnableTrace(t.GUID, t.startHandle, t.Keywords); err != nil {
 			return err
@@ -249,6 +256,7 @@ func (t *Trace) Start() error {
 		sysTraceFlags[0] = etw.Registry
 		return etw.SetTraceSystemFlags(handle, sysTraceFlags)
 	}
+
 	return etw.EnableTrace(t.GUID, t.startHandle, t.Keywords)
 }
 
@@ -342,6 +350,9 @@ func (t *Trace) IsKernelTrace() bool { return t.GUID == etw.KernelTraceControlGU
 
 // IsSystemRegistryTrace determines if this is the system registry logger trace.
 func (t *Trace) IsSystemRegistryTrace() bool { return t.GUID == etw.SystemRegistryProviderID }
+
+// IsThreadpoolTrace determines if this is the thread pool logger trace.
+func (t *Trace) IsThreadpoolTrace() bool { return t.GUID == etw.ThreadpoolGUID }
 
 // IsSystemProvider determines if this is one of the granular system provider traces.
 func (t *Trace) IsSystemProvider() bool {

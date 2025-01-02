@@ -24,11 +24,13 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
+	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/convert"
+	"github.com/rabbitstack/fibratus/pkg/util/threadcontext"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
@@ -311,18 +313,66 @@ func (s *Symbolizer) processCallstack(e *kevent.Kevent) error {
 	defer s.mu.Unlock()
 
 	if e.PS != nil {
-		// symbolize thread start address
-		if e.IsCreateThread() && !e.IsSystemPid() {
-			addr := e.Kparams.TryGetAddress(kparams.StartAddress)
+		var (
+			addr va.Address
+			pid  uint32
+		)
 
+		// get the address that we want to symbolize
+		switch e.Type {
+		case ktypes.CreateThread:
+			pid = e.Kparams.MustGetPid()
+			addr = e.Kparams.TryGetAddress(kparams.StartAddress)
+		case ktypes.SubmitThreadpoolWork, ktypes.SubmitThreadpoolCallback:
+			pid = e.PID
+			addr = e.Kparams.TryGetAddress(kparams.ThreadpoolCallback)
+		}
+
+		// symbolize thread start or thread pool callback address
+		// and resolve the module name that contains the function
+		if addr != 0 {
 			mod := e.PS.FindModuleByVa(addr)
-			symbol := s.symbolizeAddress(e.Kparams.MustGetPid(), addr, mod)
+			symbol := s.symbolizeAddress(pid, addr, mod)
 
-			if symbol != "" {
-				e.Kparams.Append(kparams.StartAddressSymbol, kparams.UnicodeString, symbol)
+			if symbol != "" && symbol != "?" {
+				switch e.Type {
+				case ktypes.CreateThread:
+					e.Kparams.Append(kparams.StartAddressSymbol, kparams.UnicodeString, symbol)
+				case ktypes.SubmitThreadpoolWork, ktypes.SubmitThreadpoolCallback:
+					e.Kparams.Append(kparams.ThreadpoolCallbackSymbol, kparams.UnicodeString, symbol)
+
+					ctx := e.Kparams.TryGetAddress(kparams.ThreadpoolContext)
+
+					// if the callback resolves to one of the functions
+					// that receive the CONTEXT structure as a parameter
+					// try to read the thread context and resolve the
+					// function address stored in the instruction pointer
+					if ctx != 0 && threadcontext.IsParamOfFunc(symbol) {
+						rip := threadcontext.Rip(pid, ctx)
+						if rip != 0 {
+							e.Kparams.Append(kparams.ThreadpoolContextRip, kparams.Address, rip.Uint64())
+
+							m := e.PS.FindModuleByVa(rip)
+							if m != nil {
+								e.Kparams.Append(kparams.ThreadpoolContextRipModule, kparams.UnicodeString, m.Name)
+							}
+
+							sym := s.symbolizeAddress(pid, rip, m)
+							if sym != "" && sym != "?" {
+								e.Kparams.Append(kparams.ThreadpoolContextRipSymbol, kparams.UnicodeString, sym)
+							}
+						}
+					}
+				}
 			}
+
 			if mod != nil {
-				e.Kparams.Append(kparams.StartAddressModule, kparams.UnicodeString, mod.Name)
+				switch e.Type {
+				case ktypes.CreateThread:
+					e.Kparams.Append(kparams.StartAddressModule, kparams.UnicodeString, mod.Name)
+				case ktypes.SubmitThreadpoolWork, ktypes.SubmitThreadpoolCallback:
+					e.Kparams.Append(kparams.ThreadpoolCallbackModule, kparams.UnicodeString, mod.Name)
+				}
 			}
 		}
 

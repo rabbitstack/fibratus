@@ -27,7 +27,7 @@ import (
 
 // ProvidersCount designates the number of interesting providers.
 // Remember to increment if a new event source is introduced.
-const ProvidersCount = 11
+const ProvidersCount = 12
 
 // EventSource is the type that designates the provenance of the event
 type EventSource uint8
@@ -39,6 +39,8 @@ const (
 	AuditAPICallsLogger
 	// DNSLogger event is emitted by DNS provider
 	DNSLogger
+	// ThreadpoolLogger event is emitted by thread pool provider
+	ThreadpoolLogger
 )
 
 // Ktype identifies an event type. It comprises the event GUID + hook ID to uniquely identify the event
@@ -67,6 +69,8 @@ var (
 	AuditAPIEventGUID = windows.GUID{Data1: 0xe02a841c, Data2: 0x75a3, Data3: 0x4fa7, Data4: [8]byte{0xaf, 0xc8, 0xae, 0x09, 0xcf, 0x9b, 0x7f, 0x23}}
 	// DNSEventGUID represents DNS provider event GUID
 	DNSEventGUID = windows.GUID{Data1: 0x1c95126e, Data2: 0x7eea, Data3: 0x49a9, Data4: [8]byte{0xa3, 0xfe, 0xa3, 0x78, 0xb0, 0x3d, 0xdb, 0x4d}}
+	// ThreadpoolGUID represents the thread pool event GUID
+	ThreadpoolGUID = windows.GUID{Data1: 0xc861d0e2, Data2: 0xa2c1, Data3: 0x4d36, Data4: [8]byte{0x9f, 0x9c, 0x97, 0x0b, 0xab, 0x94, 0x3a, 0x12}}
 )
 
 var (
@@ -210,6 +214,13 @@ var (
 	// CreateSymbolicLinkObject represents the event emitted by the object manager when the new symbolic link is created within the object manager directory
 	CreateSymbolicLinkObject = pack(AuditAPIEventGUID, 3)
 
+	// SubmitThreadpoolWork represents the event that enqueues the work item to the thread pool
+	SubmitThreadpoolWork = pack(ThreadpoolGUID, 32)
+	//SubmitThreadpoolCallback represents the event that submits the thread pool callback for execution within the work item
+	SubmitThreadpoolCallback = pack(ThreadpoolGUID, 34)
+	// SetThreadpoolTimer represents the event that sets the thread pool timer object
+	SetThreadpoolTimer = pack(ThreadpoolGUID, 44)
+
 	// UnknownKtype designates unknown kernel event type
 	UnknownKtype = pack(windows.GUID{}, 0)
 )
@@ -327,6 +338,12 @@ func (k Ktype) String() string {
 		return "StackWalk"
 	case CreateSymbolicLinkObject:
 		return "CreateSymbolicLinkObject"
+	case SubmitThreadpoolWork:
+		return "SubmitThreadpoolWork"
+	case SubmitThreadpoolCallback:
+		return "SubmitThreadpoolCallback"
+	case SetThreadpoolTimer:
+		return "SetThreadpoolTimer"
 	default:
 		return ""
 	}
@@ -362,6 +379,8 @@ func (k Ktype) Category() Category {
 		return Mem
 	case CreateSymbolicLinkObject:
 		return Object
+	case SubmitThreadpoolWork, SubmitThreadpoolCallback, SetThreadpoolTimer:
+		return Threadpool
 	default:
 		return Unknown
 	}
@@ -464,6 +483,12 @@ func (k Ktype) Description() string {
 		return "Receives the response from the DNS server"
 	case CreateSymbolicLinkObject:
 		return "Creates the symbolic link within the object manager directory"
+	case SubmitThreadpoolWork:
+		return "Enqueues the work item to the thread pool"
+	case SubmitThreadpoolCallback:
+		return "Submits the thread pool callback for execution within the work item"
+	case SetThreadpoolTimer:
+		return "Sets the thread pool timer object"
 	default:
 		return ""
 	}
@@ -514,7 +539,10 @@ func (k Ktype) CanEnrichStack() bool {
 		RegDeleteValue,
 		DeleteFile,
 		RenameFile,
-		VirtualAlloc:
+		VirtualAlloc,
+		SubmitThreadpoolWork,
+		SubmitThreadpoolCallback,
+		SetThreadpoolTimer:
 		return true
 	default:
 		return false
@@ -554,6 +582,8 @@ func (k Ktype) Source() EventSource {
 		return AuditAPICallsLogger
 	case QueryDNS, ReplyDNS:
 		return DNSLogger
+	case SubmitThreadpoolWork, SubmitThreadpoolCallback, SetThreadpoolTimer:
+		return ThreadpoolLogger
 	default:
 		return SystemLogger
 	}
@@ -565,7 +595,8 @@ func (k Ktype) Source() EventSource {
 // events, but it appears first on the consumer callback
 // before other events published before it.
 func (k Ktype) CanArriveOutOfOrder() bool {
-	return k.Category() == Registry || k.Subcategory() == DNS || k == OpenProcess || k == OpenThread || k == SetThreadContext || k == CreateSymbolicLinkObject
+	return k.Category() == Registry || k.Category() == Threadpool || k.Subcategory() == DNS ||
+		k == OpenProcess || k == OpenThread || k == SetThreadContext || k == CreateSymbolicLinkObject
 }
 
 // FromParts builds ktype from provider GUID and hook ID.

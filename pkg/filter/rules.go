@@ -647,6 +647,8 @@ func (r *Rules) buildCompileResult() *config.RulesCompileResult {
 								rs.HasMemEvents = true
 							case ktypes.Handle:
 								rs.HasHandleEvents = true
+							case ktypes.Threadpool:
+								rs.HasThreadpoolEvents = true
 							}
 							if typ == ktypes.MapViewFile || typ == ktypes.UnmapViewFile {
 								rs.HasVAMapEvents = true

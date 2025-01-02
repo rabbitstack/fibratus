@@ -250,4 +250,37 @@ const (
 	LinkSource = "source"
 	// LinkTarget identifies the parameter that represents the target symbolic link object or other kernel object
 	LinkTarget = "target"
+
+	// ThreadpoolPoolID represents the thread pool identifier.
+	ThreadpoolPoolID = "pool_id"
+	// ThreadpoolTaskID represents the thread pool task identifier.
+	ThreadpoolTaskID = "task_id"
+	// ThreadpoolCallback represents the address of the callback function.
+	ThreadpoolCallback = "callback"
+	// ThreadpoolCallbackSymbol represents the callback symbol.
+	ThreadpoolCallbackSymbol = "callback_symbol"
+	// ThreadpoolCallbackModule represents the module containing the callback symbol.
+	ThreadpoolCallbackModule = "callback_module"
+	// ThreadpoolContext represents the address of the callback context.
+	ThreadpoolContext = "context"
+	// ThreadpoolContextRip represents the value of instruction pointer contained in the callback context.
+	ThreadpoolContextRip = "context_rip"
+	// ThreadpoolContextRipSymbol represents the symbol name associated with the instruction pointer in callback context.
+	ThreadpoolContextRipSymbol = "context_rip_symbol"
+	// ThreadpoolContextRipModule represents the module name associated with the instruction pointer in callback context.
+	ThreadpoolContextRipModule = "context_rip_module"
+	// ThreadpoolSubprocessTag represents the service identifier associated with the thread pool.
+	ThreadpoolSubprocessTag = "subprocess_tag"
+	// ThreadpoolTimerDuetime represents the timer due time.
+	ThreadpoolTimerDuetime = "duetime"
+	// ThreadpoolTimerSubqueue represents the memory address of the timer subqueue.
+	ThreadpoolTimerSubqueue = "subqueue"
+	// ThreadpoolTimer represents the memory address of the timer object.
+	ThreadpoolTimer = "timer"
+	// ThreadpoolTimerPeriod represents the period of the timer
+	ThreadpoolTimerPeriod = "period"
+	// ThreadpoolTimerWindow represents the timer tolerate period.
+	ThreadpoolTimerWindow = "window"
+	// ThreadpoolTimerAbsolute indicates if the timer is absolute or relative.
+	ThreadpoolTimerAbsolute = "absolute"
 )

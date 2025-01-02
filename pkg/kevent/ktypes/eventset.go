@@ -86,6 +86,8 @@ func (e *EventsetMasks) bitsetIndex(guid windows.GUID) int {
 		return 9
 	case DNSEventGUID:
 		return 10
+	case ThreadpoolGUID:
+		return 11
 	default:
 		return -1
 	}

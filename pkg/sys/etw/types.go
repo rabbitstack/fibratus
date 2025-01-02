@@ -38,8 +38,11 @@ var KernelTraceControlGUID = windows.GUID{Data1: 0x9e814aad, Data2: 0x3204, Data
 // KernelAuditAPICallsGUID represents the GUID for the kernel audit API provider
 var KernelAuditAPICallsGUID = windows.GUID{Data1: 0xe02a841c, Data2: 0x75a3, Data3: 0x4fa7, Data4: [8]byte{0xaf, 0xc8, 0xae, 0x09, 0xcf, 0x9b, 0x7f, 0x23}}
 
-// DNSClientGUID presents the GUID for the Windows DNS Client provider
+// DNSClientGUID represents the GUID for the Windows DNS Client provider
 var DNSClientGUID = windows.GUID{Data1: 0x1c95126e, Data2: 0x7eea, Data3: 0x49a9, Data4: [8]byte{0xa3, 0xfe, 0xa3, 0x78, 0xb0, 0x3d, 0xdb, 0x4d}}
+
+// ThreadpoolGUID represents the GUID for the thread pool provider
+var ThreadpoolGUID = windows.GUID{Data1: 0xc861d0e2, Data2: 0xa2c1, Data3: 0x4d36, Data4: [8]byte{0x9f, 0x9c, 0x97, 0x0b, 0xab, 0x94, 0x3a, 0x12}}
 
 const (
 	// TraceStackTracingInfo controls call stack tracing for kernel events
@@ -60,15 +63,11 @@ const (
 	KernelAuditAPICallsSession = "Kernel Audit API Calls Logger"
 	// DNSClientSession represents the session name for the DNS client logger
 	DNSClientSession = "DNS Client Logger"
+	// ThreadpoolSession represents the session name for the thread pool logger
+	ThreadpoolSession = "Threadpool Logger"
 
-	// SystemProcessSession represents system process provider logger
-	SystemProcessSession = "System Process Logger"
-	// SystemIOSession represents system I/O provider logger
-	SystemIOSession = "System I/O Logger"
 	// SystemRegistrySession represents system registry logger
 	SystemRegistrySession = "System Registry Logger"
-	// SystemMemorySession represents system memory logger
-	SystemMemorySession = "System Memory Logger"
 
 	// WnodeTraceFlagGUID indicates that the structure contains event tracing information
 	WnodeTraceFlagGUID = 0x00020000
