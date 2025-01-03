@@ -368,7 +368,7 @@ func TestThreadFilter(t *testing.T) {
 		{`thread.callstack[uend].address = '7ffb5c1d0396'`, true},
 		{`thread.callstack[kstart].address = 'fffff8072ebc1f6f'`, true},
 		{`thread.callstack[kend].address = 'fffff8072eb8961b'`, true},
-		{`thread.callstack[112222].address = '2638e59e0a5'`, true},
+		{`thread.callstack[112222].address = 'fffff8072eb8961b'`, true},
 		{`thread.callstack[2].symbol = 'Java_java_lang_ProcessImpl_create'`, true},
 		{`thread.callstack[2].offset = 266`, true},
 		{`thread.callstack[2].module = 'C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll'`, true},
