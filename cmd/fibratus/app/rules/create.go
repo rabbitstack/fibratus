@@ -20,6 +20,7 @@ package rules
 
 import (
 	"fmt"
+	"github.com/enescakir/emoji"
 	"github.com/google/uuid"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/util/version"
@@ -37,7 +38,7 @@ description: |
 {{- if .Labels }}
 labels:
 {{- range $key, $value := .Labels }}
-   {{ $key }}: {{ $value }}
+  {{ $key }}: {{ $value }}
 {{- end -}}
 {{ end }}
 
@@ -98,6 +99,8 @@ func createRule(name string) error {
 	if err := tmpl.Execute(f, data); err != nil {
 		return err
 	}
+
+	emo("%v created %s. Open the file and craft the rule condition, define an optional action, or fill out other attributes", emoji.Rocket, n)
 
 	return nil
 }
