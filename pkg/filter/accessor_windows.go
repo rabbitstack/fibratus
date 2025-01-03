@@ -667,10 +667,12 @@ func callstackFields(field string, kevt *kevent.Kevent) (kparams.Value, error) {
 	if kevt.Callstack.IsEmpty() {
 		return nil, nil
 	}
+
 	key, segment := captureInBrackets(field)
 	if key == "" || segment == "" {
 		return nil, nil
 	}
+
 	var i int
 	switch key {
 	case frameUStart:
@@ -702,9 +704,13 @@ func callstackFields(field string, kevt *kevent.Kevent) (kparams.Value, error) {
 		}
 	}
 
-	if i > kevt.Callstack.Depth() || i < 0 {
+	if i >= kevt.Callstack.Depth() {
+		i = kevt.Callstack.Depth() - 1
+	}
+	if i < 0 {
 		i = 0
 	}
+
 	f := kevt.Callstack[i]
 
 	switch segment {
