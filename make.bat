@@ -54,6 +54,7 @@ if "%~1"=="mc" goto mc
 :build
 :: set PKG_CONFIG_PATH=pkg-config
 go build -ldflags %LDFLAGS% -tags %TAGS% -o .\cmd\fibratus\fibratus.exe .\cmd\fibratus
+if errorlevel 1 goto fail
 go build -ldflags %LDFLAGS% -o .\cmd\systray\fibratus-systray.exe .\cmd\systray
 if errorlevel 1 goto fail
 goto :EOF
@@ -79,6 +80,7 @@ goto :EOF
 :rsrc
 set RC_VER=%VERSION:.=,%
 windres --define RC_VER=%RC_VER% --define VER=%VERSION% -i cmd\fibratus\fibratus.rc -O coff -o cmd\fibratus\fibratus.syso
+if errorlevel 1 goto fail
 windres --define RC_VER=%RC_VER% --define VER=%VERSION% -i cmd\systray\fibratus-systray.rc -O coff -o cmd\systray\fibratus-systray.syso
 if errorlevel 1 goto fail
 goto :EOF
