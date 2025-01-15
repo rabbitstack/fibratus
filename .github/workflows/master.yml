@@ -12,17 +12,22 @@ on:
 env:
   GO_VERSION: 1.23.x
   WIX_VERSION: 5.0.0
+  PYTHON_VERSION: 3.7.9
 
 jobs:
   build:
       runs-on: windows-latest
       steps:
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Install Go
         uses: actions/setup-go@v5
         with:
-           go-version: ${{ env.GO_VERSION }}
-      - name: Checkout
-        uses: actions/checkout@v4
+          go-version: ${{ env.GO_VERSION }}
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
       - name: Adjust pkg-config prefix
         shell: bash
         run: |
@@ -101,12 +106,12 @@ jobs:
   build-slim:
       runs-on: windows-latest
       steps:
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Install Go
         uses: actions/setup-go@v5
         with:
-           go-version: ${{ env.GO_VERSION }}
-      - name: Checkout
-        uses: actions/checkout@v4
+          go-version: ${{ env.GO_VERSION }}
       - name: Build
         shell: bash
         run: |
@@ -126,14 +131,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
       - name: Adjust pkg-config prefix
         shell: bash
         run: |
            sed -i 's/C:\/Python37/C:\/hostedtoolcache\/windows\/Python\/3.7.9\/x64/' pkg-config/python-37.pc
-      - name: Install Go
-        uses: actions/setup-go@v5
-        with:
-           go-version: ${{ env.GO_VERSION }}
       - name: Setup msys2
         uses: msys2/setup-msys2@v2
         with:
@@ -176,14 +185,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
       - name: Adjust pkg-config prefix
         shell: bash
         run: |
            sed -i 's/C:\/Python37/C:\/hostedtoolcache\/windows\/Python\/3.7.9\/x64/' pkg-config/python-37.pc
-      - name: Install Go
-        uses: actions/setup-go@v5
-        with:
-           go-version: ${{ env.GO_VERSION }}
       - name: Setup msys2
         uses: msys2/setup-msys2@v2
         with:
