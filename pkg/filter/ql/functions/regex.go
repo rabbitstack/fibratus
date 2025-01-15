@@ -73,7 +73,7 @@ func (f *Regex) Desc() FunctionDesc {
 	desc := FunctionDesc{
 		Name: RegexFn,
 		Args: []FunctionArgDesc{
-			{Keyword: "string", Types: []ArgType{Field, String, Func}, Required: true},
+			{Keyword: "string", Types: []ArgType{Field, BoundField, String, Func}, Required: true},
 			{Keyword: "regexp", Types: []ArgType{String}, Required: true},
 		},
 	}

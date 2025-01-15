@@ -39,7 +39,7 @@ func (f Length) Desc() FunctionDesc {
 	desc := FunctionDesc{
 		Name: LengthFn,
 		Args: []FunctionArgDesc{
-			{Keyword: "string|slice", Types: []ArgType{Field, Slice, Func}, Required: true},
+			{Keyword: "string|slice", Types: []ArgType{Field, BoundField, Slice, Func}, Required: true},
 		},
 	}
 	return desc

@@ -88,7 +88,7 @@ type Signature struct {
 	Level uint32
 	// Cert represents certificate information for the particular signature.
 	Cert *sys.Cert
-	// filename represents the name of the executable image/DLL/driver
+	// Filename represents the name of the executable image/DLL/driver
 	Filename string
 	// accessed the timestamp of the signature access by field extractor
 	accessed time.Time

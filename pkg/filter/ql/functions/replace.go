@@ -58,9 +58,9 @@ func (f Replace) Desc() FunctionDesc {
 	desc := FunctionDesc{
 		Name: ReplaceFn,
 		Args: []FunctionArgDesc{
-			{Keyword: "string", Types: []ArgType{String, Field, Func}, Required: true},
-			{Keyword: "old", Types: []ArgType{String, Field, Func}, Required: true},
-			{Keyword: "new", Types: []ArgType{String, Field, Func}, Required: true},
+			{Keyword: "string", Types: []ArgType{String, Field, BoundField, Func}, Required: true},
+			{Keyword: "old", Types: []ArgType{String, Field, BoundField, Func}, Required: true},
+			{Keyword: "new", Types: []ArgType{String, Field, BoundField, Func}, Required: true},
 		},
 		ArgsValidationFunc: func(args []string) error {
 			if len(args) == 3 {
@@ -75,8 +75,8 @@ func (f Replace) Desc() FunctionDesc {
 	offset := len(desc.Args)
 	// add optional old/new pair arguments
 	for i := offset; i < maxArgs; i++ {
-		desc.Args = append(desc.Args, FunctionArgDesc{Keyword: fmt.Sprintf("old%d", i+1), Types: []ArgType{String, Field, Func}})
-		desc.Args = append(desc.Args, FunctionArgDesc{Keyword: fmt.Sprintf("new%d", i+1), Types: []ArgType{String, Field, Func}})
+		desc.Args = append(desc.Args, FunctionArgDesc{Keyword: fmt.Sprintf("old%d", i+1), Types: []ArgType{String, Field, BoundField, Func}})
+		desc.Args = append(desc.Args, FunctionArgDesc{Keyword: fmt.Sprintf("new%d", i+1), Types: []ArgType{String, Field, BoundField, Func}})
 	}
 	return desc
 }

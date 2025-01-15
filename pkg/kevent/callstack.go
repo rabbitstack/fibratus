@@ -53,6 +53,7 @@ var _, _, buildNumber = windows.RtlGetNtVersionNumbers()
 
 // Frame describes a single stack frame.
 type Frame struct {
+	PID    uint32     // pid owning thread's stack
 	Addr   va.Address // return address
 	Offset uint64     // symbol offset
 	Symbol string     // symbol name
@@ -117,36 +118,38 @@ func (f *Frame) Protection(proc windows.Handle) string {
 }
 
 // CallsiteAssembly decodes the callsite trailing/leading
-// bytes depending on the value of the `pre` argument.
+// bytes depending on the value of the `leading` argument.
 // The resulting string contains the decoded x86 machine
 // opcodes in Intel assembler syntax.
-func (f *Frame) CallsiteAssembly(proc windows.Handle, pre bool) string {
+func (f *Frame) CallsiteAssembly(proc windows.Handle, leading bool) string {
 	if f.Addr.InSystemRange() {
 		return ""
 	}
 
 	size := uint(512)
 	base := f.Addr.Uintptr()
-	if pre {
+	if leading {
 		base -= uintptr(size)
 	}
-	b := va.ReadArea(proc, base, size, size, false)
-	if len(b) == 0 || va.Zeroed(b) {
+
+	buf := va.ReadArea(proc, base, size, size, false)
+	if len(buf) == 0 || va.Zeroed(buf) {
 		return ""
 	}
 
-	var asm strings.Builder
-	for i := 0; i < len(b); {
-		ins, err := x86asm.Decode(b[i:], 64)
+	var b strings.Builder
+
+	for i := 0; i < len(buf); {
+		ins, err := x86asm.Decode(buf[i:], 64)
 		if err != nil {
-			return asm.String()
+			return b.String()
 		}
-		asm.WriteString(x86asm.IntelSyntax(ins, f.Addr.Uint64(), nil))
-		asm.WriteRune(' ')
+		b.WriteString(x86asm.IntelSyntax(ins, f.Addr.Uint64(), nil))
+		b.WriteRune('|')
 		i += ins.Len
 	}
 
-	return asm.String()
+	return b.String()
 }
 
 // Callstack is a sequence of stack frames
@@ -166,6 +169,14 @@ func (s *Callstack) PushFrame(f Frame) {
 	*s = append(*s, f)
 }
 
+// FrameAt returns the stack frame at the specified index.
+func (s *Callstack) FrameAt(i int) Frame {
+	if i > len(*s)-1 {
+		return Frame{}
+	}
+	return (*s)[i]
+}
+
 // Depth returns the number of frames in the call stack.
 func (s *Callstack) Depth() int { return len(*s) }
 
@@ -174,20 +185,23 @@ func (s *Callstack) IsEmpty() bool { return s.Depth() == 0 }
 
 // Summary returns a sequence of non-repeated module names.
 func (s Callstack) Summary() string {
-	var sb strings.Builder
+	var b strings.Builder
 	var prev string
 	var removeSep bool
+
 	for i := range s {
 		frame := s[len(s)-i-1]
 		if frame.Addr.InSystemRange() {
 			continue
 		}
+
 		var n string
 		if frame.IsUnbacked() {
 			n = unbacked
 		} else {
 			n = filepath.Base(frame.Module)
 		}
+
 		if n == prev {
 			if i == len(s)-1 {
 				// last module equals to the previous
@@ -196,45 +210,53 @@ func (s Callstack) Summary() string {
 			}
 			continue
 		}
-		sb.WriteString(n)
+
+		b.WriteString(n)
 		if i != len(s)-1 {
-			sb.WriteRune('|')
+			b.WriteRune('|')
 		}
 		prev = n
 	}
+
 	if removeSep {
-		return strings.TrimSuffix(sb.String(), "|")
+		return strings.TrimSuffix(b.String(), "|")
 	}
-	return sb.String()
+
+	return b.String()
 }
 
 func (s Callstack) String() string {
-	var sb strings.Builder
+	var b strings.Builder
+
 	for i := range s {
 		frame := s[len(s)-i-1]
-		sb.WriteString("0x")
-		sb.WriteString(frame.Addr.String())
-		sb.WriteString(" ")
+		b.WriteString("0x")
+		b.WriteString(frame.Addr.String())
+		b.WriteString(" ")
+
 		if frame.Addr.InSystemRange() && frame.Module == unbacked {
-			sb.WriteString("?")
+			b.WriteString("?")
 		} else {
-			sb.WriteString(frame.Module)
+			b.WriteString(frame.Module)
 		}
-		sb.WriteRune('!')
+
+		b.WriteRune('!')
 		if frame.Symbol != "" && frame.Symbol != "?" {
-			sb.WriteString(frame.Symbol)
+			b.WriteString(frame.Symbol)
 		} else {
-			sb.WriteRune('?')
+			b.WriteRune('?')
 		}
+
 		if frame.Offset != 0 {
-			sb.WriteString("+0x")
-			sb.WriteString(strconv.FormatUint(frame.Offset, 16))
+			b.WriteString("+0x")
+			b.WriteString(strconv.FormatUint(frame.Offset, 16))
 		}
+
 		if i != len(s)-1 {
-			sb.WriteRune('|')
+			b.WriteRune('|')
 		}
 	}
-	return sb.String()
+	return b.String()
 }
 
 // ContainsUnbacked returns true if there is a frame
@@ -301,7 +323,7 @@ func (s Callstack) Protections(pid uint32) []string {
 
 // CallsiteInsns returns callsite assembly opcodes
 // for leading/trailing bytes contained in each frame.
-func (s Callstack) CallsiteInsns(pid uint32, pre bool) []string {
+func (s Callstack) CallsiteInsns(pid uint32, leading bool) []string {
 	proc, err := windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION|windows.PROCESS_VM_READ, false, pid)
 	if err != nil {
 		return nil
@@ -309,7 +331,7 @@ func (s Callstack) CallsiteInsns(pid uint32, pre bool) []string {
 	defer windows.Close(proc)
 	opcodes := make([]string, len(s))
 	for i, f := range s {
-		opcodes[i] = f.CallsiteAssembly(proc, pre)
+		opcodes[i] = f.CallsiteAssembly(proc, leading)
 	}
 	return opcodes
 }

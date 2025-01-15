@@ -432,7 +432,7 @@ func (s *Symbolizer) pushFrames(addrs []va.Address, e *kevent.Kevent, fast, look
 // symbol or module are not resolved, then we
 // fallback to Debug API.
 func (s *Symbolizer) produceFrame(addr va.Address, e *kevent.Kevent, fast, lookupExport bool) kevent.Frame {
-	frame := kevent.Frame{Addr: addr}
+	frame := kevent.Frame{PID: e.PID, Addr: addr}
 	if addr.InSystemRange() {
 		if s.config.SymbolizeKernelAddresses {
 			frame.Module = s.r.GetModuleName(windows.CurrentProcess(), addr)

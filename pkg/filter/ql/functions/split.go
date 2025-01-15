@@ -38,7 +38,7 @@ func (f Split) Desc() FunctionDesc {
 	desc := FunctionDesc{
 		Name: SplitFn,
 		Args: []FunctionArgDesc{
-			{Keyword: "string", Types: []ArgType{String, Field, Func}, Required: true},
+			{Keyword: "string", Types: []ArgType{String, Field, BoundField, Func}, Required: true},
 			{Keyword: "sep", Types: []ArgType{String}, Required: true},
 		},
 	}

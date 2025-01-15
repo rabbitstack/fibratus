@@ -348,6 +348,39 @@ type Mmap struct {
 	File string
 }
 
+var mmapProtections = map[uint32]string{
+	sys.SectionR:   "R",
+	sys.SectionX:   "X",
+	sys.SectionRW:  "RW",
+	sys.SectionRX:  "RX",
+	sys.SectionRWX: "RWX",
+	sys.SectionWC:  "WC",
+	sys.SectionWXC: "WXC",
+	sys.SectionWCB: "WCB",
+	sys.SectionNC:  "NC",
+}
+
+// ProtectMask returns the view protection in mask notation.
+func (m *Mmap) ProtectMask() string {
+	var (
+		b strings.Builder
+		s string
+	)
+
+	f := m.Protection
+
+	for protect, mask := range mmapProtections {
+		if (f&protect) == protect && protect != 0 {
+			b.WriteString(s)
+			b.WriteString(mask)
+			s = "|"
+			f &= ^protect
+		}
+	}
+
+	return b.String()
+}
+
 // New produces a new process state.
 func New(pid, ppid uint32, name, cmndline, exe string, sid *windows.SID, sessionID uint32) *PS {
 	ps := &PS{

@@ -18,6 +18,27 @@
 
 package sys
 
+const (
+	// SectionR designates section readonly protection
+	SectionR = 0x10000
+	// SectionX designates section execute protection
+	SectionX = 0x20000
+	// SectionRW designates section read/write protection
+	SectionRW = 0x40000
+	// SectionRX designates section read/execute protection
+	SectionRX = 0x30000
+	// SectionRWX designates section read/write/execute protection
+	SectionRWX = 0x60000
+	// SectionWC designates section writ/copy protection
+	SectionWC = 0x50000
+	// SectionWCB designates section write combine protection
+	SectionWCB = 0x90000
+	// SectionWXC designates section write/execute/writecopy protection
+	SectionWXC = 0x70000
+	// SectionNC designates section nocache protection
+	SectionNC = 0x80000
+)
+
 // MemoryWorkingSetExInformation describes the attributes of the memory region.
 type MemoryWorkingSetExInformation struct {
 	VirtualAddress    uintptr

@@ -91,9 +91,9 @@ func (f Yara) Desc() FunctionDesc {
 	desc := FunctionDesc{
 		Name: YaraFn,
 		Args: []FunctionArgDesc{
-			{Keyword: "pid|file|bytes", Types: []ArgType{Field, Func, String, Number}, Required: true},
-			{Keyword: "rules", Types: []ArgType{Field, Func, String}, Required: true},
-			{Keyword: "vars", Types: []ArgType{Field, Func, String}},
+			{Keyword: "pid|file|bytes", Types: []ArgType{Field, BoundField, Func, String, Number}, Required: true},
+			{Keyword: "rules", Types: []ArgType{Field, BoundField, Func, String}, Required: true},
+			{Keyword: "vars", Types: []ArgType{Field, BoundField, Func, String}},
 		},
 	}
 	return desc

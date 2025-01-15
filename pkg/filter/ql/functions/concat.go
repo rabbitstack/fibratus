@@ -65,8 +65,8 @@ func (f Concat) Desc() FunctionDesc {
 	desc := FunctionDesc{
 		Name: ConcatFn,
 		Args: []FunctionArgDesc{
-			{Keyword: "string1", Types: []ArgType{String, Number, Field, Func}, Required: true},
-			{Keyword: "string2", Types: []ArgType{String, Number, Field, Func}, Required: true},
+			{Keyword: "string1", Types: []ArgType{String, Number, Field, BoundField, Func}, Required: true},
+			{Keyword: "string2", Types: []ArgType{String, Number, Field, BoundField, Func}, Required: true},
 		},
 	}
 	offset := len(desc.Args)

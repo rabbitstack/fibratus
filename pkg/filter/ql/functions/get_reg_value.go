@@ -74,7 +74,7 @@ func (f GetRegValue) Desc() FunctionDesc {
 	desc := FunctionDesc{
 		Name: GetRegValueFn,
 		Args: []FunctionArgDesc{
-			{Keyword: "path", Types: []ArgType{Field, String, Func}, Required: true},
+			{Keyword: "path", Types: []ArgType{Field, BoundField, String, Func}, Required: true},
 		},
 	}
 	return desc

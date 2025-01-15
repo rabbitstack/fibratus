@@ -35,7 +35,7 @@ func (f Upper) Desc() FunctionDesc {
 	desc := FunctionDesc{
 		Name: UpperFn,
 		Args: []FunctionArgDesc{
-			{Keyword: "string", Types: []ArgType{String, Field, Func}, Required: true},
+			{Keyword: "string", Types: []ArgType{String, Field, BoundField, Func}, Required: true},
 		},
 	}
 	return desc

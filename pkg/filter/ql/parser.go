@@ -310,8 +310,8 @@ func (p *Parser) parseUnaryExpr() (Expr, error) {
 		return &FieldLiteral{Value: lit}, nil
 	case BoundField:
 		n := strings.Index(lit, ".")
-		if n > 0 && fields.Lookup(lit[n+1:]) == "" {
-			return nil, newParseError(tokstr(tok, lit), []string{"field after bound ref"}, pos+n, p.expr)
+		if n > 0 && fields.Lookup(lit[n+1:]) == "" && !fields.IsSegment(lit[n+1:]) {
+			return nil, newParseError(tokstr(tok, lit), []string{"field/segment after bound ref"}, pos+n, p.expr)
 		}
 		return &BoundFieldLiteral{Value: lit}, nil
 	case True, False:
