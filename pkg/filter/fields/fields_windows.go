@@ -26,8 +26,8 @@ import (
 )
 
 // pathRegexp splits the provided path into different components. The first capture
-// contains the indexed field name. Next is the indexed key and, finally the segment.
-var pathRegexp = regexp.MustCompile(`(pe.sections|pe.resources|ps.envs|ps.modules|ps.ancestor|kevt.arg|thread.callstack)\[(.+\s*)].?(.*)`)
+// contains the indexed field name and the second capture contains the argument key.
+var pathRegexp = regexp.MustCompile(`(pe.resources|ps.envs|kevt.arg)\[(.+\s*)]`)
 
 // Field represents the type alias for the field
 type Field string
@@ -62,14 +62,14 @@ const (
 	PsSessionID Field = "ps.sessionid"
 	// PsEnvs represents the process environment variables
 	PsEnvs Field = "ps.envs"
-	// PsHandles represents the process handles
-	PsHandles Field = "ps.handles"
+	// PsHandleNames represents the process handles
+	PsHandleNames Field = "ps.handles"
 	// PsHandleTypes represents the process handle types
 	PsHandleTypes Field = "ps.handle.types"
 	// PsDTB represents the process directory table base address
 	PsDTB Field = "ps.dtb"
-	// PsModules represents the process modules
-	PsModules Field = "ps.modules"
+	// PsModuleNames represents the process module file names
+	PsModuleNames Field = "ps.modules"
 	// PsParentPid represents the parent process identifier field
 	PsParentPid Field = "ps.parent.pid"
 	// PsParentName represents the parent process name field
@@ -201,8 +201,6 @@ const (
 	ThreadAccessMaskNames Field = "thread.access.mask.names"
 	// ThreadAccessStatus represents the thread access status field
 	ThreadAccessStatus Field = "thread.access.status"
-	// ThreadCallstack represents the field that provides access to stack frames
-	ThreadCallstack Field = "thread.callstack"
 	// ThreadCallstackSummary represents the thread callstack summary field
 	ThreadCallstackSummary Field = "thread.callstack.summary"
 	// ThreadCallstackDetail represents the thread callstack detail field
@@ -224,8 +222,6 @@ const (
 
 	// PeNumSections represents the number of sections
 	PeNumSections Field = "pe.nsections"
-	// PeSections represents distinct section inside PE
-	PeSections Field = "pe.sections"
 	// PeNumSymbols represents the number of exported symbols
 	PeNumSymbols Field = "pe.nsymbols"
 	// PeSymbols represents imported symbols
@@ -516,7 +512,7 @@ func (f Field) IsDNSField() bool      { return strings.HasPrefix(string(f), "dns
 func (f Field) IsPeSection() bool { return f == PeNumSections }
 func (f Field) IsPeSectionEntropy() bool {
 	fld := string(f)
-	return strings.HasPrefix(fld, "pe.sections[") && strings.HasSuffix(fld, ".entropy")
+	return fld == "entropy"
 }
 func (f Field) IsPeSymbol() bool { return f == PeSymbols || f == PeNumSymbols || f == PeImports }
 func (f Field) IsPeVersionResource() bool {
@@ -537,85 +533,149 @@ func (f Field) IsImageCert() bool { return strings.HasPrefix(string(f), "image.c
 func (f Field) IsPeModified() bool { return f == PeIsModified }
 
 // Segment represents the type alias for the segment. Segment
-// denotes the location of the value within an indexed field.
+// denotes the property anchored to the bound field reference.
+// Let's look through an example. $module.name is the literal
+// composed of bound field ($module) and the segment (name).
+// Segments are most commonly used in the context of bound
+// variables in foreach function.
 type Segment string
 
 const (
-	// SectionEntropy is the entropy value of the specific PE section
-	SectionEntropy Segment = "entropy"
-	// SectionMD5Hash refers to the section md5 sum
-	SectionMD5Hash Segment = "md5"
-	// SectionSize is the section size
-	SectionSize Segment = "size"
+	PathSegment     Segment = "path"
+	NameSegment     Segment = "name"
+	TypeSegment     Segment = "type"
+	SizeSegment     Segment = "size"
+	ChecksumSegment Segment = "checksum"
+	AddressSegment  Segment = "address"
+	OffsetSegment   Segment = "offset"
+	EntropySegment  Segment = "entropy"
+	MD5Segment      Segment = "md5"
 
-	// ModuleSize is the module size
-	ModuleSize Segment = "size"
-	// ModuleChecksum is the module checksum
-	ModuleChecksum Segment = "checksum"
-	// ModuleLocation is the module location
-	ModuleLocation Segment = "location"
-	// ModuleBaseAddress is the module base address
-	ModuleBaseAddress Segment = "address.base"
-	// ModuleDefaultAddress is the module address
-	ModuleDefaultAddress Segment = "address.default"
+	PIDSegment       Segment = "pid"
+	CmdlineSegment   Segment = "cmdline"
+	ExeSegment       Segment = "exe"
+	ArgsSegment      Segment = "args"
+	CwdSegment       Segment = "cwd"
+	SIDSegment       Segment = "sid"
+	SessionIDSegment Segment = "sessionid"
+	UsernameSegment  Segment = "username"
+	DomainSegment    Segment = "domain"
 
-	// ProcessID represents the process id
-	ProcessID Segment = "pid"
-	// ProcessName represents the process name
-	ProcessName Segment = "name"
-	// ProcessCmdline represents the process command line
-	ProcessCmdline Segment = "cmdline"
-	// ProcessExe represents the process image path
-	ProcessExe Segment = "exe"
-	// ProcessArgs represents the process command line arguments
-	ProcessArgs Segment = "args"
-	// ProcessCwd represents the process current working directory
-	ProcessCwd Segment = "cwd"
-	// ProcessSID represents the process security identifier
-	ProcessSID Segment = "sid"
-	// ProcessSessionID represents the session id bound to the process
-	ProcessSessionID Segment = "sessionid"
+	TidSegment              Segment = "tid"
+	StartAddressSegment     Segment = "start_address"
+	UserStackBaseSegment    Segment = "user_stack_base"
+	UserStackLimitSegment   Segment = "user_stack_limit"
+	KernelStackBaseSegment  Segment = "kernel_stack_base"
+	KernelStackLimitSegment Segment = "kernel_stack_limit"
 
-	// FrameAddress represents the stack frame return address
-	FrameAddress Segment = "address"
-	// FrameSymbolOffset represents the symbol offset
-	FrameSymbolOffset Segment = "offset"
-	// FrameSymbol represents the symbol name
-	FrameSymbol Segment = "symbol"
-	// FrameModule represents the symbol module
-	FrameModule Segment = "module"
-	// FrameAllocationSize represents the frame region allocation size
-	FrameAllocationSize Segment = "allocation_size"
-	// FrameProtection represents the region page protection where the frame instruction lives
-	FrameProtection Segment = "protection"
-	// FrameIsUnbacked determines if the frame is unbacked
-	FrameIsUnbacked Segment = "is_unbacked"
-	// FrameCallsiteLeadingAssembly represents the leading callsite opcodes
-	FrameCallsiteLeadingAssembly = "callsite_leading_assembly"
-	// FrameCallsiteTrailingAssembly represents the trailing callsite opcodes
-	FrameCallsiteTrailingAssembly = "callsite_trailing_assembly"
+	SymbolSegment                   Segment = "symbol"
+	ModuleSegment                   Segment = "module"
+	AllocationSizeSegment           Segment = "allocation_size"
+	ProtectionSegment               Segment = "protection"
+	IsUnbackedSegment               Segment = "is_unbacked"
+	CallsiteLeadingAssemblySegment  Segment = "callsite_leading_assembly"
+	CallsiteTrailingAssemblySegment Segment = "callsite_trailing_assembly"
 )
 
-func (s Segment) IsSection() bool {
-	return s == SectionEntropy || s == SectionSize || s == SectionMD5Hash
+var segments = map[Segment]bool{
+	NameSegment:                     true,
+	PathSegment:                     true,
+	TypeSegment:                     true,
+	EntropySegment:                  true,
+	SizeSegment:                     true,
+	MD5Segment:                      true,
+	AddressSegment:                  true,
+	ChecksumSegment:                 true,
+	PIDSegment:                      true,
+	CmdlineSegment:                  true,
+	ExeSegment:                      true,
+	ArgsSegment:                     true,
+	CwdSegment:                      true,
+	SIDSegment:                      true,
+	SessionIDSegment:                true,
+	UsernameSegment:                 true,
+	DomainSegment:                   true,
+	TidSegment:                      true,
+	StartAddressSegment:             true,
+	UserStackBaseSegment:            true,
+	UserStackLimitSegment:           true,
+	KernelStackBaseSegment:          true,
+	KernelStackLimitSegment:         true,
+	OffsetSegment:                   true,
+	SymbolSegment:                   true,
+	ModuleSegment:                   true,
+	AllocationSizeSegment:           true,
+	ProtectionSegment:               true,
+	IsUnbackedSegment:               true,
+	CallsiteLeadingAssemblySegment:  true,
+	CallsiteTrailingAssemblySegment: true,
 }
-func (s Segment) IsModule() bool {
-	return s == ModuleChecksum || s == ModuleLocation || s == ModuleBaseAddress || s == ModuleDefaultAddress || s == ModuleSize
+
+var allowedSegments = map[Field][]Segment{
+	PsAncestors:     {NameSegment, PIDSegment, CmdlineSegment, ExeSegment, ArgsSegment, CwdSegment, SIDSegment, SessionIDSegment, UsernameSegment, DomainSegment},
+	PsThreads:       {TidSegment, StartAddressSegment, UserStackBaseSegment, UserStackLimitSegment, KernelStackBaseSegment, KernelStackLimitSegment},
+	PsModules:       {PathSegment, NameSegment, AddressSegment, SizeSegment, ChecksumSegment},
+	PsMmaps:         {AddressSegment, TypeSegment, AddressSegment, SizeSegment, ProtectionSegment, PathSegment},
+	PeSections:      {NameSegment, SizeSegment, EntropySegment, MD5Segment},
+	ThreadCallstack: {AddressSegment, OffsetSegment, SymbolSegment, ModuleSegment, AllocationSizeSegment, ProtectionSegment, IsUnbackedSegment, CallsiteLeadingAssemblySegment, CallsiteTrailingAssemblySegment},
 }
-func (s Segment) IsProcess() bool {
-	return s == ProcessID || s == ProcessName || s == ProcessCmdline || s == ProcessExe || s == ProcessArgs || s == ProcessCwd || s == ProcessSID || s == ProcessSessionID
+
+// IsSegmentAllowed determines if the segment is valid for the pseudo field.
+func IsSegmentAllowed(f Field, s Segment) bool {
+	segs := allowedSegments[f]
+	if len(segs) == 0 {
+		return false
+	}
+
+	for _, seg := range segs {
+		if seg == s {
+			return true
+		}
+	}
+
+	return false
 }
-func (s Segment) IsCallstack() bool {
-	return s == FrameAddress || s == FrameSymbolOffset || s == FrameSymbol || s == FrameModule || s == FrameAllocationSize || s == FrameProtection || s == FrameIsUnbacked || s == FrameCallsiteLeadingAssembly || s == FrameCallsiteTrailingAssembly
+
+// SegmentsHint returns the sequence of available segments for the pseudo field.
+func SegmentsHint(f Field) string {
+	segs := allowedSegments[f]
+	if len(segs) == 0 {
+		return ""
+	}
+
+	s := make([]string, len(segs))
+	for i, seg := range segs {
+		s[i] = string(seg)
+	}
+
+	return strings.Join(s, ", ")
+}
+
+// IsSegment indicates if the given string is recognized as a known segment.
+func IsSegment(s string) bool {
+	return segments[Segment(s)]
+}
+
+// Pseudo fields provide access to the process/event internal state. They
+// are typically used in conjunction with the foreach function as its
+// first argument.
+
+var (
+	PsModules       Field = "ps._modules"
+	PsThreads       Field = "ps._threads"
+	PsMmaps         Field = "ps._mmaps"
+	PsAncestors     Field = "ps._ancestors"
+	ThreadCallstack Field = "thread._callstack"
+	PeSections      Field = "pe._sections"
+)
+
+func IsPseudoField(f Field) bool {
+	return f == PsAncestors || f == PsModules || f == PsThreads || f == PsMmaps || f == ThreadCallstack || f == PeSections
 }
 
 func (f Field) IsEnvsMap() bool        { return strings.HasPrefix(f.String(), "ps.envs[") }
-func (f Field) IsModsMap() bool        { return strings.HasPrefix(f.String(), "ps.modules[") }
-func (f Field) IsAncestorMap() bool    { return strings.HasPrefix(f.String(), "ps.ancestor[") }
-func (f Field) IsPeSectionsMap() bool  { return strings.HasPrefix(f.String(), "pe.sections[") }
 func (f Field) IsPeResourcesMap() bool { return strings.HasPrefix(f.String(), "pe.resources[") }
 func (f Field) IsKevtArgMap() bool     { return strings.HasPrefix(f.String(), "kevt.arg[") }
-func (f Field) IsCallstackMap() bool   { return strings.HasPrefix(f.String(), "thread.callstack[") }
 
 var fields = map[Field]FieldInfo{
 	KevtSeq:         {KevtSeq, "event sequence number", kparams.Uint64, []string{"kevt.seq > 666"}, nil},
@@ -653,10 +713,10 @@ var fields = map[Field]FieldInfo{
 	PsDomain:                 {PsDomain, "process domain", kparams.UnicodeString, []string{"ps.domain contains 'SERVICE'"}, nil},
 	PsUsername:               {PsUsername, "process username", kparams.UnicodeString, []string{"ps.username contains 'system'"}, nil},
 	PsEnvs:                   {PsEnvs, "process environment variables", kparams.Slice, []string{"ps.envs in ('MOZ_CRASHREPORTER_DATA_DIRECTORY')"}, nil},
-	PsHandles:                {PsHandles, "allocated process handle names", kparams.Slice, []string{"ps.handles in ('\\BaseNamedObjects\\__ComCatalogCache__')"}, nil},
+	PsHandleNames:            {PsHandleNames, "allocated process handle names", kparams.Slice, []string{"ps.handles in ('\\BaseNamedObjects\\__ComCatalogCache__')"}, nil},
 	PsHandleTypes:            {PsHandleTypes, "allocated process handle types", kparams.Slice, []string{"ps.handle.types in ('Key', 'Mutant', 'Section')"}, nil},
 	PsDTB:                    {PsDTB, "process directory table base address", kparams.Address, []string{"ps.dtb = '7ffe0000'"}, nil},
-	PsModules:                {PsModules, "modules loaded by the process", kparams.Slice, []string{"ps.modules in ('crypt32.dll', 'xul.dll')"}, nil},
+	PsModuleNames:            {PsModuleNames, "modules loaded by the process", kparams.Slice, []string{"ps.modules in ('crypt32.dll', 'xul.dll')"}, nil},
 	PsParentName:             {PsParentName, "parent process image name including the file extension", kparams.UnicodeString, []string{"ps.parent.name contains 'cmd.exe'"}, nil},
 	PsParentPid:              {PsParentPid, "parent process id", kparams.Uint32, []string{"ps.parent.pid = 4"}, nil},
 	PsParentComm:             {PsParentComm, "parent process command line", kparams.UnicodeString, []string{"ps.parent.comm contains 'java'"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsParentCmdline}}},
@@ -806,7 +866,6 @@ var fields = map[Field]FieldInfo{
 	PeNumSymbols:      {PeNumSymbols, "number of entries in the symbol table", kparams.Uint32, []string{"pe.nsymbols > 230"}, nil},
 	PeBaseAddress:     {PeBaseAddress, "image base address", kparams.Address, []string{"pe.address.base = '140000000'"}, nil},
 	PeEntrypoint:      {PeEntrypoint, "address of the entrypoint function", kparams.Address, []string{"pe.address.entrypoint = '20110'"}, nil},
-	PeSections:        {PeSections, "PE sections", kparams.Object, []string{"pe.sections[.text].entropy > 6.2"}, nil},
 	PeSymbols:         {PeSymbols, "imported symbols", kparams.Slice, []string{"pe.symbols in ('GetTextFaceW', 'GetProcessHeap')"}, nil},
 	PeImports:         {PeImports, "imported dynamic linked libraries", kparams.Slice, []string{"pe.imports in ('msvcrt.dll', 'GDI32.dll'"}, nil},
 	PeResources:       {PeResources, "version and other resources", kparams.Map, []string{"pe.resources[FileDescription] = 'Notepad'"}, nil},
@@ -848,82 +907,36 @@ var fields = map[Field]FieldInfo{
 }
 
 // Lookup finds the field literal in the map. For the nested fields, it checks the pattern matches
-// the expected one and compares the paths. If all checks pass, the full segment field literal
-// is returned.
+// the expected one and compares the paths. If all checks pass, the full argument key is returned.
 func Lookup(name string) Field {
-	if _, ok := fields[Field(name)]; ok {
-		return Field(name)
+	f := Field(name)
+
+	if IsPseudoField(f) {
+		return f
 	}
+
+	if _, ok := fields[f]; ok {
+		return f
+	}
+
 	groups := pathRegexp.FindStringSubmatch(name)
-	if len(groups) != 4 {
+	if len(groups) != 3 {
 		return None
 	}
 
-	field := groups[1]   // `ps.envs` is a field in ps.envs[PATH]
-	key := groups[2]     // `PATH` is a key in ps.envs[PATH]
-	segment := groups[3] // `entropy` is a segment in pe.sections[.text].entropy
+	field := groups[1] // `ps.envs` is a field in ps.envs[PATH]
+	key := groups[2]   // `PATH` is a key in ps.envs[PATH]
 
 	switch Field(field) {
-	case PeSections:
-		if segment == "" {
-			return None
-		}
-		if Segment(segment).IsSection() {
-			return Field(name)
-		}
-	case PsModules:
-		if segment == "" {
-			return None
-		}
-		if Segment(segment).IsModule() {
-			return Field(name)
-		}
-	case PsAncestor:
-		if segment == "" {
-			return None
-		}
-		// the key is either the number
-		// that represents the depth of
-		// the ancestor process node or the
-		// `root` keyword to designate the
-		// root ancestor process node. Additionally,
-		// we can also get the `any` keyword
-		// that collects the fields of all
-		// ancestor processes
-		var keyRegexp = regexp.MustCompile(`^[1-9]+$|^root$|^any$`)
-		if !keyRegexp.MatchString(key) {
-			return None
-		}
-		if Segment(segment).IsProcess() {
-			return Field(name)
-		}
 	case PeResources:
-		if key != "" && segment == "" {
+		if key != "" {
 			return Field(name)
 		}
 	case PsEnvs, KevtArg:
 		if key != "" {
 			return Field(name)
 		}
-	case ThreadCallstack:
-		if segment == "" {
-			return None
-		}
-		// the key can be the stack frame
-		// index with 0 being the bottom
-		// userspace frame. u/k start/end
-		// keys identify the start/end
-		// user and kernel space frames.
-		// Lastly, it is possible to specify
-		// the name of the module from which
-		// the call was originated
-		var keyRegexp = regexp.MustCompile(`^[0-9]+$|^uend$|^ustart$|^kend$|^kstart$|^[a-zA-Z0-9]+\.dll$`)
-		if !keyRegexp.MatchString(key) {
-			return None
-		}
-		if Segment(segment).IsCallstack() {
-			return Field(name)
-		}
 	}
+
 	return None
 }

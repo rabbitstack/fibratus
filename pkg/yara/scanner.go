@@ -30,6 +30,7 @@ import (
 	libntfs "github.com/rabbitstack/fibratus/pkg/fs/ntfs"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/signature"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
@@ -291,7 +292,7 @@ func (s scanner) Scan(e *kevent.Kevent) (bool, error) {
 		pid := e.Kparams.MustGetPid()
 		prot := e.Kparams.MustGetUint32(kparams.MemProtect)
 		size := e.Kparams.MustGetUint64(kparams.FileViewSize)
-		if e.PID != 4 && size >= 4096 && ((prot&kevent.SectionRX) != 0 && (prot&kevent.SectionRWX) != 0) {
+		if e.PID != 4 && size >= 4096 && ((prot&sys.SectionRX) != 0 && (prot&sys.SectionRWX) != 0) {
 			filename := e.GetParamAsString(kparams.FilePath)
 			// skip mappings of signed images
 			addr := e.Kparams.MustGetUint64(kparams.FileViewBase)

@@ -45,7 +45,7 @@ func (f Ext) Desc() FunctionDesc {
 	desc := FunctionDesc{
 		Name: ExtFn,
 		Args: []FunctionArgDesc{
-			{Keyword: "path", Types: []ArgType{Field, Func, String}, Required: true},
+			{Keyword: "path", Types: []ArgType{Field, BoundField, Func, String}, Required: true},
 			{Keyword: "dot", Types: []ArgType{Bool}, Required: false},
 		},
 	}

@@ -131,7 +131,7 @@ func TestProcFilter(t *testing.T) {
 		PID:      5042,
 		Parent: &pstypes.PS{
 			Name: "services.exe",
-			SID:  "NT AUTHORITY\\SYSTEM",
+			SID:  "S-1-5-8",
 			PID:  2034,
 			Parent: &pstypes.PS{
 				Name: "System",
@@ -161,6 +161,14 @@ func TestProcFilter(t *testing.T) {
 			Modules: []pstypes.Module{
 				{Name: "C:\\Windows\\System32\\kernel32.dll", Size: 12354, Checksum: 23123343, BaseAddress: va.Address(4294066175), DefaultBaseAddress: va.Address(4293993725)},
 				{Name: "C:\\Windows\\System32\\user32.dll", Size: 212354, Checksum: 33123343, BaseAddress: va.Address(4277288959), DefaultBaseAddress: va.Address(4293993725)},
+			},
+			Threads: map[uint32]pstypes.Thread{
+				3453: {Tid: 3453, StartAddress: va.Address(144229524944769), IOPrio: 2, PagePrio: 5, KstackBase: va.Address(18446677035730165760), KstackLimit: va.Address(18446677035730137088), UstackLimit: va.Address(86376448), UstackBase: va.Address(86372352)},
+				3455: {Tid: 3455, StartAddress: va.Address(140729524944768), IOPrio: 3, PagePrio: 5, KstackBase: va.Address(18446687035730165760), KstackLimit: va.Address(18446698035730165760), UstackLimit: va.Address(86376448), UstackBase: va.Address(46375352)},
+			},
+			Mmaps: []pstypes.Mmap{
+				{Size: 34545, BaseAddress: va.Address(144229524944769), Protection: 4653056, File: "C:\\Windows\\System32\\ucrtbase.dll", Type: "IMAGE"}, //EXECUTE_READWRITE|READONLY
+				{Size: 4096, BaseAddress: va.Address(145229445447666), Protection: 12845056, Type: "PAGEFILE"},                                           // READWRITE 12845056
 			},
 			IsProtected: false,
 			IsPackaged:  true,
@@ -225,35 +233,46 @@ func TestProcFilter(t *testing.T) {
 		{`ps.parent.is_wow64`, false},
 		{`ps.parent.is_packaged`, false},
 		{`ps.parent.is_protected`, true},
-		{`kevt.name='CreateProcess' and ps.name contains 'svchost'`, true},
+		{`kevt.name = 'CreateProcess' and ps.name contains 'svchost'`, true},
 
 		{`ps.modules IN ('kernel32.dll')`, true},
-		{`ps.modules[kernel32.dll].size = 12354`, true},
-		{`ps.modules[kernel32.dll].checksum = 23123343`, true},
-		{`ps.modules[kernel32.dll].address.default = 'fff124fd'`, true},
-		{`ps.modules[kernel32.dll].address.base = 'fff23fff'`, true},
-		{`ps.modules[kernel32.dll].location = 'C:\\Windows\\System32'`, true},
-		{`ps.modules[xul.dll].size = 12354`, false},
 		{`kevt.name = 'CreateProcess' and kevt.pid != ps.ppid`, true},
 		{`ps.parent.name = 'wininit.exe'`, true},
-		{`ps.ancestor[1].name = 'wininit.exe'`, true},
-		{`ps.ancestor[2].name = 'services.exe'`, true},
-		{`ps.ancestor[2].sid = 'NT AUTHORITY\\SYSTEM'`, true},
-		{`ps.ancestor[root].name = 'System'`, true},
-		{`ps.ancestor[any].name in ('services.exe', 'System')`, true},
-		{`ps.ancestor[any].name not in ('svchost.exe')`, true},
-		{`ps.ancestor[any].name endswith ('ices.exe')`, true},
-		{`ps.ancestor[any].name iendswith ('TeM')`, true},
-		{`ps.ancestor[any].name startswith ('serv')`, true},
-		{`ps.ancestor[any].name istartswith ('Serv')`, true},
-		{`ps.ancestor[any].name contains ('Sys')`, true},
-		{`ps.ancestor[any].name icontains ('sys')`, true},
-		{`ps.ancestor[any].pid in (2034, 343)`, true},
+
+		{`foreach(ps._ancestors, $proc, $proc.name in ('wininit.exe', 'services.exe', 'System'))`, true},
+		{`foreach(ps._ancestors, $proc, $proc.name in ('wininit.exe', 'services.exe', 'System') and ps.is_packaged, ps.is_packaged)`, true},
+		{`foreach(ps._ancestors, $proc, $proc.name not in ('svchost.exe', 'WmiPrvSE.exe'))`, true},
+		{`foreach(ps._ancestors, $proc, $proc.sid = 'S-1-5-8'))`, true},
+		{`foreach(ps._ancestors, $proc, $proc.name endswith 'ices.exe'))`, true},
+		{`foreach(ps._ancestors, $proc, $proc.pid in (2034, 343) and $proc.name = 'services.exe')`, true},
+		{`foreach(ps._ancestors, $proc, $proc.username = 'SYSTEM')`, true},
+		{`foreach(ps._ancestors, $proc, $proc.domain = 'NT AUTHORITY')`, true},
+		{`foreach(ps._ancestors, $proc, $proc.username = upper('system'))`, true},
 
 		{`ps.args intersects ('-k', 'DcomLaunch')`, true},
 		{`ps.args intersects ('-w', 'DcomLaunch')`, false},
 		{`ps.args iintersects ('-K', 'DComLaunch')`, true},
 		{`ps.args iintersects ('-W', 'DcomLaunch')`, false},
+
+		{`foreach(ps.modules, $mod, $mod imatches 'us?r32.dll')`, true},
+		{`foreach(ps._modules, $mod, $mod.path imatches '?:\\Windows\\System32\\us?r32.dll')`, true},
+		{`foreach(ps._modules, $mod, $mod.name imatches 'USER32.*')`, true},
+		{`foreach(ps._modules, $mod, $mod.name imatches 'USER32.*' and $mod.size >= 212354)`, true},
+		{`foreach(ps._modules, $mod, ($mod.name imatches 'USER32.*' and $mod.size >= 212354) or $mod.name imatches '*winhttp.dll')`, true},
+		{`foreach(ps._modules, $mod, ($mod.name imatches 'winhttp.dll' and $mod.size >= 11212354) or $mod.name matches 'user32.dll')`, true},
+		{`foreach(ps._modules, $mod, $mod.checksum = 23123343)`, true},
+		{`foreach(ps._modules, $mod, $mod.address = 'fff23fff')`, true},
+
+		{`foreach(ps._threads, $t, $t.start_address = '7ffe2557ff80')`, true},
+		{`foreach(ps._threads, $t, $t.start_address = '7ffe2557ff80' or $t.user_stack_base = '2251760466')`, true},
+		{`foreach(ps._threads, $t, $t.tid = 3453)`, true},
+		{`foreach(ps._threads, $t, $t.start_address = '7ffe2557ff80' or $t.user_stack_base = '2251760466')`, true},
+		{`foreach(ps._threads, $t, $t.kernel_stack_base = 'ffffcc1fcf800000' and $t.kernel_stack_limit = 'ffffd620f297b000')`, true},
+
+		{`foreach(ps._mmaps, $mmap, $mmap.protection = 'RW')`, true},
+		{`foreach(ps._mmaps, $mmap, $mmap.path = 'C:\\Windows\\System32\\ucrtbase.dll' and $mmap.type = 'IMAGE')`, true},
+		{`foreach(ps._mmaps, $mmap, $mmap.address = '8415dd81bff2')`, true},
+		{`foreach(ps._mmaps, $mmap, $mmap.size = 4096)`, true},
 	}
 
 	psnap := new(ps.SnapshotterMock)
@@ -335,14 +354,14 @@ func TestThreadFilter(t *testing.T) {
 	require.NoError(t, windows.WriteProcessMemory(windows.CurrentProcess(), base, &insns[0], uintptr(len(insns)), nil))
 
 	kevt.Callstack.Init(8)
-	kevt.Callstack.PushFrame(kevent.Frame{Addr: 0x2638e59e0a5, Offset: 0, Symbol: "?", Module: "unbacked"})
-	kevt.Callstack.PushFrame(kevent.Frame{Addr: va.Address(base), Offset: 0, Symbol: "?", Module: "unbacked"})
-	kevt.Callstack.PushFrame(kevent.Frame{Addr: 0x7ffb313853b2, Offset: 0x10a, Symbol: "Java_java_lang_ProcessImpl_create", Module: "C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll"})
-	kevt.Callstack.PushFrame(kevent.Frame{Addr: 0x7ffb3138592e, Offset: 0x3a2, Symbol: "Java_java_lang_ProcessImpl_waitForTimeoutInterruptibly", Module: "C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll"})
-	kevt.Callstack.PushFrame(kevent.Frame{Addr: 0x7ffb5d8e61f4, Offset: 0x54, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNEL32.DLL"})
-	kevt.Callstack.PushFrame(kevent.Frame{Addr: 0x7ffb5c1d0396, Offset: 0x66, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"})
-	kevt.Callstack.PushFrame(kevent.Frame{Addr: 0xfffff8072ebc1f6f, Offset: 0x4ef, Symbol: "FltRequestFileInfoOnCreateCompletion", Module: "C:\\WINDOWS\\System32\\drivers\\FLTMGR.SYS"})
-	kevt.Callstack.PushFrame(kevent.Frame{Addr: 0xfffff8072eb8961b, Offset: 0x20cb, Symbol: "FltGetStreamContext", Module: "C:\\WINDOWS\\System32\\drivers\\FLTMGR.SYS"})
+	kevt.Callstack.PushFrame(kevent.Frame{PID: kevt.PID, Addr: 0x2638e59e0a5, Offset: 0, Symbol: "?", Module: "unbacked"})
+	kevt.Callstack.PushFrame(kevent.Frame{PID: kevt.PID, Addr: va.Address(base), Offset: 0, Symbol: "?", Module: "unbacked"})
+	kevt.Callstack.PushFrame(kevent.Frame{PID: kevt.PID, Addr: 0x7ffb313853b2, Offset: 0x10a, Symbol: "Java_java_lang_ProcessImpl_create", Module: "C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll"})
+	kevt.Callstack.PushFrame(kevent.Frame{PID: kevt.PID, Addr: 0x7ffb3138592e, Offset: 0x3a2, Symbol: "Java_java_lang_ProcessImpl_waitForTimeoutInterruptibly", Module: "C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll"})
+	kevt.Callstack.PushFrame(kevent.Frame{PID: kevt.PID, Addr: 0x7ffb5d8e61f4, Offset: 0x54, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNEL32.DLL"})
+	kevt.Callstack.PushFrame(kevent.Frame{PID: kevt.PID, Addr: 0x7ffb5c1d0396, Offset: 0x66, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"})
+	kevt.Callstack.PushFrame(kevent.Frame{PID: kevt.PID, Addr: 0xfffff8072ebc1f6f, Offset: 0x4ef, Symbol: "FltRequestFileInfoOnCreateCompletion", Module: "C:\\WINDOWS\\System32\\drivers\\FLTMGR.SYS"})
+	kevt.Callstack.PushFrame(kevent.Frame{PID: kevt.PID, Addr: 0xfffff8072eb8961b, Offset: 0x20cb, Symbol: "FltGetStreamContext", Module: "C:\\WINDOWS\\System32\\drivers\\FLTMGR.SYS"})
 
 	var tests = []struct {
 		filter  string
@@ -362,22 +381,22 @@ func TestThreadFilter(t *testing.T) {
 		{`thread.callstack.protections in ('RWX')`, true},
 		{`thread.callstack.allocation_sizes > 0`, false},
 		{`length(thread.callstack.callsite_leading_assembly) > 0`, true},
-		{`thread.callstack.callsite_trailing_assembly matches ('*mov r10, rcx mov eax, 0x* syscall*')`, true},
+		{`thread.callstack.callsite_trailing_assembly matches ('*mov r10, rcx|mov eax, 0x*|syscall*')`, true},
 		{`thread.callstack.is_unbacked`, true},
-		{`thread.callstack[ustart].address = '2638e59e0a5' and thread.callstack[0].address = '2638e59e0a5'`, true},
-		{`thread.callstack[uend].address = '7ffb5c1d0396'`, true},
-		{`thread.callstack[kstart].address = 'fffff8072ebc1f6f'`, true},
-		{`thread.callstack[kend].address = 'fffff8072eb8961b'`, true},
-		{`thread.callstack[112222].address = '2638e59e0a5'`, true},
-		{`thread.callstack[2].symbol = 'Java_java_lang_ProcessImpl_create'`, true},
-		{`thread.callstack[2].offset = 266`, true},
-		{`thread.callstack[2].module = 'C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll'`, true},
-		{`thread.callstack[0].is_unbacked = true`, true},
-		{`thread.callstack[2].is_unbacked = false`, true},
-		{`thread.callstack[kernelbase.dll].symbol = 'CreateProcessW'`, true},
-		{`thread.callstack[1].allocation_size = 0`, true},
-		{`thread.callstack[1].protection = 'RWX'`, true},
-		{`thread.callstack[1].callsite_trailing_assembly matches ('*mov r10, rcx mov eax, 0x* syscall*')`, true},
+
+		{`foreach(thread._callstack, $frame, $frame.address = '2638e59e0a5' or $frame.address = '7ffb5c1d0396')`, true},
+		{`foreach(thread._callstack, $frame, $frame.address = 'fffff8072ebc1f6f' or $frame.address = 'fffff8072eb8961b')`, true},
+		{`foreach(thread._callstack, $frame, $frame.address = 'ffffffffff')`, false},
+		{`foreach(thread._callstack, $frame, $frame.symbol imatches '?:\\Program Files\\*java.dll!Java_java_lang_ProcessImpl_create')`, true},
+		{`foreach(thread._callstack, $frame, $frame.symbol imatches '*CreateProcessW')`, true},
+		{`foreach(thread._callstack, $frame, $frame.module = 'C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll')`, true},
+		{`foreach(thread._callstack, $frame, base($frame.module) = 'java.dll' and $frame.symbol imatches '*Java_java_lang_ProcessImpl_create')`, true},
+		{`foreach(thread._callstack, $frame, $frame.offset = 266)`, true},
+		{`foreach(thread._callstack, $frame, $frame.is_unbacked = true)`, true},
+		{`ps.name = 'svchost.exe' and not foreach(thread._callstack, $frame, $frame.symbol imatches '*LoadLibrary')`, true},
+		{`foreach(thread._callstack, $frame, $frame.allocation_size = 0)`, true},
+		{`foreach(thread._callstack, $frame, $frame.protection = 'RWX')`, true},
+		{`foreach(thread._callstack, $frame, $frame.callsite_trailing_assembly matches '*mov r10, rcx|mov eax, 0x*|syscall*' and $frame.module = 'unbacked')`, true},
 	}
 
 	for i, tt := range tests {
@@ -441,7 +460,7 @@ func TestThreadFilter(t *testing.T) {
 	var n uintptr
 	require.NoError(t, windows.WriteProcessMemory(pi.Process, ntdll, &insns[0], uintptr(len(insns)), &n))
 
-	kevt.Callstack.PushFrame(kevent.Frame{Addr: va.Address(ntdll), Offset: 0, Symbol: "?", Module: "C:\\Windows\\System32\\ntdll.dll"})
+	kevt.Callstack[0] = kevent.Frame{PID: kevt.PID, Addr: va.Address(ntdll), Offset: 0, Symbol: "?", Module: "C:\\Windows\\System32\\ntdll.dll"}
 
 	var tests1 = []struct {
 		filter  string
@@ -449,6 +468,7 @@ func TestThreadFilter(t *testing.T) {
 	}{
 
 		{`thread.callstack.allocation_sizes > 0`, true},
+		{`foreach(thread._callstack, $frame, $frame.allocation_size > 2048 and $frame.protection = 'RWXC')`, true},
 	}
 
 	for i, tt := range tests1 {
@@ -984,9 +1004,11 @@ func TestPEFilter(t *testing.T) {
 		matches bool
 	}{
 
-		{`pe.sections[.text].entropy = 6.368381`, true},
-		{`pe.sections[.text].entropy > 4.45`, true},
-		{`pe.sections[.text].size = 132608`, true},
+		{`foreach(pe._sections, $section, $section.entropy = 6.368381)`, true},
+		{`foreach(pe._sections, $section, $section.entropy > 4.45)`, true},
+		{`foreach(pe._sections, $section, $section.name = '.rdata' and $section.entropy < 9.45)`, true},
+		{`foreach(pe._sections, $section, $section.size = 132608)`, true},
+		{`foreach(pe._sections, $section, $section.md5 = 'ffa5c960b421ca9887e54966588e97e8')`, true},
 		{`pe.symbols IN ('GetTextFaceW', 'GetProcessHeap')`, true},
 		{`pe.resources[FileDesc] = 'Notepad'`, true},
 		{`pe.nsymbols = 10 AND pe.nsections = 2`, true},
@@ -1024,7 +1046,7 @@ func TestLazyPEFilter(t *testing.T) {
 		filter  string
 		matches bool
 	}{
-		{`pe.sections[.text].entropy > 1.23`, true},
+		{`foreach(pe._sections, $s, $s.entropy > 1.23)`, true},
 		{`pe.symbols IN ('GetTextFaceW', 'GetProcessHeap')`, true},
 		{`pe.is_dll`, true},
 		{`length(pe.imphash) > 0`, true},

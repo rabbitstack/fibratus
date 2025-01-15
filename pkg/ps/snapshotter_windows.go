@@ -177,12 +177,14 @@ func (s *snapshotter) AddThread(e *kevent.Kevent) error {
 		return err
 	}
 	threadCount.Add(1)
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	proc, ok := s.procs[pid]
 	if !ok {
 		return nil
 	}
+
 	thread := pstypes.Thread{}
 	thread.Tid, _ = e.Kparams.GetTid()
 	thread.UstackBase = e.Kparams.TryGetAddress(kparams.UstackBase)
@@ -193,7 +195,9 @@ func (s *snapshotter) AddThread(e *kevent.Kevent) error {
 	thread.BasePrio, _ = e.Kparams.GetUint8(kparams.BasePrio)
 	thread.PagePrio, _ = e.Kparams.GetUint8(kparams.PagePrio)
 	thread.StartAddress = e.Kparams.TryGetAddress(kparams.StartAddress)
+
 	proc.AddThread(thread)
+
 	return nil
 }
 
@@ -205,6 +209,7 @@ func (s *snapshotter) AddModule(e *kevent.Kevent) error {
 	moduleCount.Add(1)
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
 	if pid == 0 && e.IsImageRundown() {
 		// assume system process if pid is zero
 		pid = SystemPID
@@ -213,6 +218,7 @@ func (s *snapshotter) AddModule(e *kevent.Kevent) error {
 	if !ok {
 		return nil
 	}
+
 	module := pstypes.Module{}
 	module.Size, _ = e.Kparams.GetUint64(kparams.ImageSize)
 	module.Checksum, _ = e.Kparams.GetUint32(kparams.ImageCheckSum)
@@ -221,10 +227,13 @@ func (s *snapshotter) AddModule(e *kevent.Kevent) error {
 	module.DefaultBaseAddress = e.Kparams.TryGetAddress(kparams.ImageDefaultBase)
 	module.SignatureLevel, _ = e.Kparams.GetUint32(kparams.ImageSignatureLevel)
 	module.SignatureType, _ = e.Kparams.GetUint32(kparams.ImageSignatureType)
+
 	if module.IsExecutable() && len(proc.Exe) < len(module.Name) {
 		proc.Exe = module.Name
 	}
+
 	proc.AddModule(module)
+
 	return nil
 }
 

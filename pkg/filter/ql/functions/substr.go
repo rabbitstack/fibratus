@@ -44,7 +44,7 @@ func (f Substr) Desc() FunctionDesc {
 	desc := FunctionDesc{
 		Name: SubstrFn,
 		Args: []FunctionArgDesc{
-			{Keyword: "string", Types: []ArgType{Func, Field}, Required: true},
+			{Keyword: "string", Types: []ArgType{Func, Field, BoundField}, Required: true},
 			{Keyword: "start", Types: []ArgType{Func, Number}, Required: true},
 			{Keyword: "end", Types: []ArgType{Func, Number}, Required: true},
 		},

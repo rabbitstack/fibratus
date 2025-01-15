@@ -109,7 +109,15 @@ func (b BoundFieldLiteral) Field() fields.Field {
 	if n > 0 {
 		return fields.Field(b.Value[n+1:])
 	}
-	return fields.Field(b.Value)
+	return ""
+}
+
+func (b BoundFieldLiteral) Segment() fields.Segment {
+	n := strings.Index(b.Value, ".")
+	if n > 0 {
+		return fields.Segment(b.Value[n+1:])
+	}
+	return ""
 }
 
 func (b BoundFieldLiteral) Alias() string {
@@ -179,6 +187,30 @@ func (f *Function) String() string {
 	return b.String()
 }
 
+func (f *Function) IsForeach() bool {
+	return f.Name == "foreach" || f.Name == "FOREACH"
+}
+
+func (f *Function) IsBinaryExprArg(i int) bool {
+	_, ok := f.Args[i].(*BinaryExpr)
+	return ok
+}
+
+func (f *Function) IsNotExprArg(i int) bool {
+	_, ok := f.Args[i].(*NotExpr)
+	return ok
+}
+
+func (f *Function) IsBoundFieldArg(i int) bool {
+	_, ok := f.Args[i].(*BoundFieldLiteral)
+	return ok
+}
+
+func (f *Function) IsFieldArg(i int) bool {
+	_, ok := f.Args[i].(*FieldLiteral)
+	return ok
+}
+
 // validate ensures that the function name obtained
 // from the parser exists within the internal functions
 // catalog. It also validates the function signature to
@@ -205,9 +237,12 @@ func (f *Function) validate() error {
 	for i, expr := range f.Args {
 		arg := fn.Desc().Args[i]
 		typ := functions.Unknown
+
 		switch reflect.TypeOf(expr) {
-		case reflect.TypeOf(&FieldLiteral{}), reflect.TypeOf(&BoundFieldLiteral{}):
+		case reflect.TypeOf(&FieldLiteral{}):
 			typ = functions.Field
+		case reflect.TypeOf(&BoundFieldLiteral{}):
+			typ = functions.BoundField
 		case reflect.TypeOf(&IPLiteral{}):
 			typ = functions.IP
 		case reflect.TypeOf(&StringLiteral{}):
@@ -220,11 +255,15 @@ func (f *Function) validate() error {
 			typ = functions.Slice
 		case reflect.TypeOf(&BoolLiteral{}):
 			typ = functions.Bool
+		case reflect.TypeOf(&BinaryExpr{}), reflect.TypeOf(&ParenExpr{}), reflect.TypeOf(&NotExpr{}):
+			typ = functions.Expression
 		}
+
 		if !arg.ContainsType(typ) {
 			return ErrArgumentTypeMismatch(i, arg.Keyword, fn.Name(), arg.Types)
 		}
 	}
+
 	return nil
 }
 

@@ -72,6 +72,8 @@ const (
 	GetRegValueFn
 	// YaraFn represents the YARA function
 	YaraFn
+	// ForeachFn represents the FOREACH function
+	ForeachFn
 )
 
 // ArgType is the type alias for the argument value type.
@@ -98,6 +100,10 @@ const (
 	Slice
 	// Bool represents the boolean argument type.
 	Bool
+	// Expression represents the raw expression argument type.
+	Expression
+	// BoundField represents the bound field argument type.
+	BoundField
 	// Unknown is the unknown argument type.
 	Unknown
 )
@@ -119,6 +125,10 @@ func (typ ArgType) String() string {
 		return "slice"
 	case Bool:
 		return "bool"
+	case Expression:
+		return "expression"
+	case BoundField:
+		return "boundfield"
 	}
 	return "unknown"
 }
@@ -208,6 +218,8 @@ func (f Fn) String() string {
 		return "GET_REG_VALUE"
 	case YaraFn:
 		return "YARA"
+	case ForeachFn:
+		return "FOREACH"
 	default:
 		return "UNDEFINED"
 	}

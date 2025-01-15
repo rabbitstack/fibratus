@@ -132,6 +132,7 @@ func (f *filter) Compile() error {
 			}
 		}
 	}
+
 	if f.expr != nil {
 		ql.WalkFunc(f.expr, walk)
 	} else {
@@ -148,8 +149,10 @@ func (f *filter) Compile() error {
 	if len(f.fields) == 0 && !f.hasFunctions {
 		return ErrNoFields
 	}
+
 	// only retain accessors for declared filter fields
 	f.narrowAccessors()
+
 	return f.checkBoundRefs()
 }
 

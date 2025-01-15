@@ -19,7 +19,6 @@
 package filter
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/pe"
@@ -75,19 +74,6 @@ func TestPEAccessor(t *testing.T) {
 		},
 	}
 
-	entropy, err := pea.Get("pe.sections[.text].entropy", kevt)
-	require.NoError(t, err)
-	assert.Equal(t, 6.368381, entropy)
-
-	v, err := pea.Get("pe.sections[.text].md6", kevt)
-	require.NoError(t, err)
-	require.Nil(t, v)
-
-	md5, err := pea.Get("pe.sections[.rdata].md5", kevt)
-	require.NoError(t, err)
-	require.Nil(t, v)
-	assert.Equal(t, "ffa5c960b421ca9887e54966588e97e8", md5)
-
 	company, err := pea.Get("pe.resources[CompanyName]", kevt)
 	require.NoError(t, err)
 	assert.Equal(t, "Microsoft Corporation", company)
@@ -97,10 +83,6 @@ func TestCaptureInBrackets(t *testing.T) {
 	v, subfield := captureInBrackets("ps.envs[ALLUSERSPROFILE]")
 	assert.Equal(t, "ALLUSERSPROFILE", v)
 	assert.Empty(t, subfield)
-
-	v, subfield = captureInBrackets("ps.pe.sections[.debug$S].entropy")
-	assert.Equal(t, ".debug$S", v)
-	assert.Equal(t, fields.SectionEntropy, subfield)
 }
 
 func TestNarrowAccessors(t *testing.T) {
@@ -113,11 +95,11 @@ func TestNarrowAccessors(t *testing.T) {
 			2,
 		},
 		{
-			New(`ps.modules[kernel32.dll].location = 'C:\\Windows\\System32'`, cfg),
+			New(`foreach(ps._modules, $mod, $mod.path = 'C:\\Windows\\System32')`, cfg),
 			1,
 		},
 		{
-			New(`handle.type = 'Section' and pe.sections > 1 and kevt.name = 'CreateHandle'`, cfg),
+			New(`handle.type = 'Section' and pe.nsections > 1 and kevt.name = 'CreateHandle'`, cfg),
 			3,
 		},
 		{
