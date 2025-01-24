@@ -36,20 +36,23 @@ var (
 // from the non-params constructs such as process' state or PE metadata.
 type Accessor interface {
 	// Get fetches the parameter value for the specified filter field.
-	Get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error)
-	// SetFields sets all fields declared in the expression
-	SetFields(fields []fields.Field)
+	Get(f Field, evt *kevent.Kevent) (kparams.Value, error)
+	// SetFields sets all fields declared in the expression.
+	SetFields(fields []Field)
+	// SetSegments sets all segments utilized in the function predicate expression.
+	SetSegments(segments []fields.Segment)
 	// IsFieldAccessible determines if the field can be extracted from the
 	// given event. The condition is usually based on the event category,
 	// but it can also include different circumstances, like the presence
 	// of the process state or callstacks.
-	IsFieldAccessible(kevt *kevent.Kevent) bool
+	IsFieldAccessible(evt *kevent.Kevent) bool
 }
 
 // kevtAccessor extracts generic event values.
 type kevtAccessor struct{}
 
-func (kevtAccessor) SetFields([]fields.Field)              {}
+func (kevtAccessor) SetFields([]Field)                     {}
+func (kevtAccessor) SetSegments([]fields.Segment)          {}
 func (kevtAccessor) IsFieldAccessible(*kevent.Kevent) bool { return true }
 
 func newKevtAccessor() Accessor {
@@ -59,8 +62,8 @@ func newKevtAccessor() Accessor {
 const timeFmt = "15:04:05"
 const dateFmt = "2006-01-02"
 
-func (k *kevtAccessor) Get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
-	switch f {
+func (k *kevtAccessor) Get(f Field, kevt *kevent.Kevent) (kparams.Value, error) {
+	switch f.Name {
 	case fields.KevtSeq:
 		return kevt.Seq, nil
 	case fields.KevtPID:
@@ -105,30 +108,35 @@ func (k *kevtAccessor) Get(f fields.Field, kevt *kevent.Kevent) (kparams.Value, 
 		return kevt.Timestamp.Weekday().String(), nil
 	case fields.KevtNparams:
 		return uint64(kevt.Kparams.Len()), nil
-	default:
-		if f.IsKevtArgMap() {
-			name, _ := captureInBrackets(f.String())
-			kpar, err := kevt.Kparams.Get(name)
-			if err != nil {
-				return nil, err
-			}
-			switch kpar.Type {
-			case kparams.Uint8:
-				return kevt.Kparams.GetUint8(name)
-			case kparams.Uint16, kparams.Port:
-				return kevt.Kparams.GetUint16(name)
-			case kparams.Uint32, kparams.PID, kparams.TID:
-				return kevt.Kparams.GetUint32(name)
-			case kparams.Uint64:
-				return kevt.Kparams.GetUint64(name)
-			case kparams.Time:
-				return kevt.Kparams.GetTime(name)
-			default:
-				return kevt.GetParamAsString(name), nil
-			}
+	case fields.KevtArg:
+		// lookup the parameter from the field argument
+		// and depending on the parameter type, return
+		// the respective value. The field format is
+		// expressed as kevt.arg[cmdline] where the string
+		// inside brackets represents the parameter name
+		name := f.Arg
+		par, err := kevt.Kparams.Get(name)
+		if err != nil {
+			return nil, err
 		}
-		return nil, nil
+
+		switch par.Type {
+		case kparams.Uint8:
+			return kevt.Kparams.GetUint8(name)
+		case kparams.Uint16, kparams.Port:
+			return kevt.Kparams.GetUint16(name)
+		case kparams.Uint32, kparams.PID, kparams.TID:
+			return kevt.Kparams.GetUint32(name)
+		case kparams.Uint64:
+			return kevt.Kparams.GetUint64(name)
+		case kparams.Time:
+			return kevt.Kparams.GetTime(name)
+		default:
+			return kevt.GetParamAsString(name), nil
+		}
 	}
+
+	return nil, nil
 }
 
 // narrowAccessors dynamically disables filter accessors by walking
@@ -149,37 +157,34 @@ func (f *filter) narrowAccessors() {
 		removeMemAccessor      = true
 		removeDNSAccessor      = true
 	)
-	allFields := make([]fields.Field, 0)
-	allFields = append(allFields, f.fields...)
-	for _, field := range f.boundFields {
-		allFields = append(allFields, field.Field())
-	}
-	for _, field := range allFields {
+
+	for _, field := range f.fields {
 		switch {
-		case field.IsKevtField():
+		case field.Name.IsKevtField():
 			removeKevtAccessor = false
-		case field.IsPsField():
+		case field.Name.IsPsField():
 			removePsAccessor = false
-		case field.IsThreadField():
+		case field.Name.IsThreadField():
 			removeThreadAccessor = false
-		case field.IsImageField():
+		case field.Name.IsImageField():
 			removeImageAccessor = false
-		case field.IsFileField():
+		case field.Name.IsFileField():
 			removeFileAccessor = false
-		case field.IsRegistryField():
+		case field.Name.IsRegistryField():
 			removeRegistryAccessor = false
-		case field.IsNetworkField():
+		case field.Name.IsNetworkField():
 			removeNetworkAccessor = false
-		case field.IsHandleField():
+		case field.Name.IsHandleField():
 			removeHandleAccessor = false
-		case field.IsPeField():
+		case field.Name.IsPeField():
 			removePEAccessor = false
-		case field.IsMemField():
+		case field.Name.IsMemField():
 			removeMemAccessor = false
-		case field.IsDNSField():
+		case field.Name.IsDNSField():
 			removeDNSAccessor = false
 		}
 	}
+
 	if removeKevtAccessor {
 		f.removeAccessor(&kevtAccessor{})
 	}
@@ -215,7 +220,8 @@ func (f *filter) narrowAccessors() {
 	}
 
 	for _, accessor := range f.accessors {
-		accessor.SetFields(allFields)
+		accessor.SetFields(f.fields)
+		accessor.SetSegments(f.segments)
 	}
 }
 

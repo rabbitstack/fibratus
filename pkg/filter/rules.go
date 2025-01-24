@@ -523,7 +523,7 @@ func (r *Rules) Compile() (*config.RulesCompileResult, error) {
 			}
 		}
 		for _, field := range fltr.GetFields() {
-			deprecated, d := fields.IsDeprecated(field)
+			deprecated, d := fields.IsDeprecated(field.Name)
 			if deprecated {
 				log.Warnf("%s rule uses the [%s] field which "+
 					"was deprecated starting from version %s. "+

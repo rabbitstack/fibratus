@@ -49,19 +49,33 @@ type Filter interface {
 	Compile() error
 	// Run runs a filter with a single expression. The return value decides
 	// if the incoming event has successfully matched the filter expression.
-	Run(kevt *kevent.Kevent) bool
+	Run(evt *kevent.Kevent) bool
 	// RunSequence runs a filter with sequence expressions. Sequence rules depend
 	// on the state machine transitions and partial matches to decide whether the
 	// rule is fired.
-	RunSequence(kevt *kevent.Kevent, seqID uint16, partials map[uint16][]*kevent.Kevent, rawMatch bool) bool
+	RunSequence(evt *kevent.Kevent, seqID uint16, partials map[uint16][]*kevent.Kevent, rawMatch bool) bool
 	// GetStringFields returns field names mapped to their string values.
 	GetStringFields() map[fields.Field][]string
-	// GetFields returns all field used in the filter expression.
-	GetFields() []fields.Field
+	// GetFields returns all fields used in the filter expression.
+	GetFields() []Field
 	// GetSequence returns the sequence descriptor or nil if this filter is not a sequence.
 	GetSequence() *ql.Sequence
 	// IsSequence determines if this filter is a sequence.
 	IsSequence() bool
+}
+
+// Field contains field meta attributes all accessors need to extract the value.
+type Field struct {
+	Name  fields.Field
+	Value string
+	Arg   string
+}
+
+// BoundField contains the field meta attributes in addition to bound field specific fields.
+type BoundField struct {
+	Field    Field
+	Value    string
+	BoundVar string
 }
 
 type filter struct {
@@ -69,8 +83,11 @@ type filter struct {
 	seq         *ql.Sequence
 	parser      *ql.Parser
 	accessors   []Accessor
-	fields      []fields.Field
+	fields      []Field
+	segments    []fields.Segment
 	boundFields []*ql.BoundFieldLiteral
+	// seqBoundFields contains per-sequence bound fields resolved from bound field literals
+	seqBoundFields map[uint16][]BoundField
 	// stringFields contains filter field names mapped to their string values
 	stringFields map[fields.Field][]string
 	hasFunctions bool
@@ -100,35 +117,44 @@ func (f *filter) Compile() error {
 		switch expr := n.(type) {
 		case *ql.BinaryExpr:
 			if lhs, ok := expr.LHS.(*ql.FieldLiteral); ok {
-				field := fields.Field(lhs.Value)
-				f.addField(field)
-				f.addStringFields(field, expr.RHS)
+				f.addField(lhs)
+				f.addStringFields(lhs.Field, expr.RHS)
 			}
 			if rhs, ok := expr.RHS.(*ql.FieldLiteral); ok {
-				field := fields.Field(rhs.Value)
-				f.addField(field)
-				f.addStringFields(field, expr.LHS)
+				f.addField(rhs)
+				f.addStringFields(rhs.Field, expr.LHS)
 			}
 			if lhs, ok := expr.LHS.(*ql.BoundFieldLiteral); ok {
+				f.addField(lhs.Field)
 				f.addBoundField(lhs)
 			}
 			if rhs, ok := expr.RHS.(*ql.BoundFieldLiteral); ok {
+				f.addField(rhs.Field)
 				f.addBoundField(rhs)
 			}
 		case *ql.Function:
 			f.hasFunctions = true
 			for _, arg := range expr.Args {
 				if field, ok := arg.(*ql.FieldLiteral); ok {
-					f.addField(fields.Field(field.Value))
+					f.addField(field)
 				}
 				if field, ok := arg.(*ql.BoundFieldLiteral); ok {
+					f.addField(field.Field)
 					f.addBoundField(field)
+				}
+				switch exp := arg.(type) {
+				case *ql.BinaryExpr:
+					if segment, ok := exp.LHS.(*ql.BoundSegmentLiteral); ok {
+						f.addSegment(segment)
+					}
+					if segment, ok := exp.RHS.(*ql.BoundSegmentLiteral); ok {
+						f.addSegment(segment)
+					}
 				}
 			}
 		case *ql.FieldLiteral:
-			field := fields.Field(expr.Value)
-			if fields.IsBoolean(field) {
-				f.addField(field)
+			if fields.IsBoolean(expr.Field) {
+				f.addField(expr)
 			}
 		}
 	}
@@ -136,12 +162,12 @@ func (f *filter) Compile() error {
 	if f.expr != nil {
 		ql.WalkFunc(f.expr, walk)
 	} else {
-		if !f.seq.By.IsEmpty() {
+		if f.seq.By != nil {
 			f.addField(f.seq.By)
 		}
 		for _, expr := range f.seq.Expressions {
 			ql.WalkFunc(expr.Expr, walk)
-			if !expr.By.IsEmpty() {
+			if expr.By != nil {
 				f.addField(expr.By)
 			}
 		}
@@ -179,6 +205,7 @@ func (f *filter) RunSequence(kevt *kevent.Kevent, seqID uint16, partials map[uin
 		// without evaluating joins/bound fields
 		return ql.Eval(expr.Expr, valuer, f.hasFunctions)
 	}
+
 	var match bool
 	if seqID >= 1 && expr.HasBoundFields() {
 		// if a sequence expression contains references to
@@ -196,14 +223,21 @@ func (f *filter) RunSequence(kevt *kevent.Kevent, seqID uint16, partials map[uin
 				nslots = len(p[alias])
 			}
 		}
+
+		flds, ok := f.seqBoundFields[seqID]
+		if !ok {
+			flds = f.addSeqBoundFields(seqID, expr.BoundFields)
+		}
+
 		// process until partials from all slots are consumed
 		n := 0
 		hash := make([]byte, 0)
 		for nslots > 0 {
 			nslots--
 			var evt *kevent.Kevent
-			for _, field := range expr.BoundFields {
-				evts := p[field.Alias()]
+			for _, field := range flds {
+				// get all events pertaining to the bounded event
+				evts := p[field.BoundVar]
 				if n > len(evts)-1 {
 					// pick the latest event if all
 					// events for this slot are consumed
@@ -211,17 +245,19 @@ func (f *filter) RunSequence(kevt *kevent.Kevent, seqID uint16, partials map[uin
 				} else {
 					evt = evts[n]
 				}
+
+				// resolve the bound field value
 				for _, accessor := range f.accessors {
 					if !accessor.IsFieldAccessible(evt) {
 						continue
 					}
-					v, err := accessor.Get(field.Field(), evt)
+					v, err := accessor.Get(field.Field, evt)
 					if err != nil && !kerrors.IsKparamNotFound(err) {
 						accessorErrors.Add(err.Error(), 1)
 						continue
 					}
 					if v != nil {
-						valuer[field.String()] = v
+						valuer[field.Value] = v
 						switch val := v.(type) {
 						case uint8:
 							hash = append(hash, val)
@@ -263,13 +299,14 @@ func (f *filter) RunSequence(kevt *kevent.Kevent, seqID uint16, partials map[uin
 		}
 	} else {
 		by := f.seq.By
-		if by.IsEmpty() {
+		if by == nil {
 			by = expr.By
 		}
-		if seqID >= 1 && !by.IsEmpty() {
+
+		if seqID >= 1 && by != nil {
 			// traverse upstream partials for join equality
 			joins := make([]bool, seqID)
-			joinID := valuer[by.String()]
+			joinID := valuer[by.Value]
 		outer:
 			for i := uint16(0); i < seqID; i++ {
 				for _, p := range partials[i+1] {
@@ -283,8 +320,9 @@ func (f *filter) RunSequence(kevt *kevent.Kevent, seqID uint16, partials map[uin
 		} else {
 			match = ql.Eval(expr.Expr, valuer, f.hasFunctions)
 		}
-		if match && !by.IsEmpty() {
-			if v := valuer[by.String()]; v != nil {
+
+		if match && by != nil {
+			if v := valuer[by.Value]; v != nil {
 				kevt.AddMeta(kevent.RuleSequenceByKey, v)
 			}
 		}
@@ -302,7 +340,7 @@ func joinsEqual(joins []bool) bool {
 }
 
 func (f *filter) GetStringFields() map[fields.Field][]string { return f.stringFields }
-func (f *filter) GetFields() []fields.Field                  { return f.fields }
+func (f *filter) GetFields() []Field                         { return f.fields }
 
 func (f *filter) IsSequence() bool          { return f.seq != nil }
 func (f *filter) GetSequence() *ql.Sequence { return f.seq }
@@ -339,7 +377,8 @@ func InterpolateFields(s string, evts []*kevent.Kevent) string {
 			var val any
 			for _, accessor := range GetAccessors() {
 				var err error
-				val, err = accessor.Get(fields.Field(m[2]), kevt)
+				f := Field{Value: m[2], Name: fields.Field(m[2])}
+				val, err = accessor.Get(f, kevt)
 				if err != nil {
 					continue
 				}
@@ -363,20 +402,20 @@ func InterpolateFields(s string, evts []*kevent.Kevent) string {
 // accessors and extract the field values that are
 // supplied to the valuer. The valuer feeds the
 // expression with correct values.
-func (f *filter) mapValuer(kevt *kevent.Kevent) map[string]interface{} {
+func (f *filter) mapValuer(evt *kevent.Kevent) map[string]interface{} {
 	valuer := make(map[string]interface{}, len(f.fields))
 	for _, field := range f.fields {
 		for _, accessor := range f.accessors {
-			if !accessor.IsFieldAccessible(kevt) {
+			if !accessor.IsFieldAccessible(evt) {
 				continue
 			}
-			v, err := accessor.Get(field, kevt)
+			v, err := accessor.Get(field, evt)
 			if err != nil && !kerrors.IsKparamNotFound(err) {
 				accessorErrors.Add(err.Error(), 1)
 				continue
 			}
 			if v != nil {
-				valuer[field.String()] = v
+				valuer[field.Value] = v
 				break
 			}
 		}
@@ -385,13 +424,13 @@ func (f *filter) mapValuer(kevt *kevent.Kevent) map[string]interface{} {
 }
 
 // addField appends a new field to the filter fields list.
-func (f *filter) addField(field fields.Field) {
+func (f *filter) addField(field *ql.FieldLiteral) {
 	for _, f := range f.fields {
-		if f.String() == field.String() {
+		if f.Value == field.Value {
 			return
 		}
 	}
-	f.fields = append(f.fields, field)
+	f.fields = append(f.fields, Field{Value: field.Value, Name: field.Field, Arg: field.Arg})
 }
 
 // addStringFields appends values for all string field expressions.
@@ -404,9 +443,31 @@ func (f *filter) addStringFields(field fields.Field, expr ql.Expr) {
 	}
 }
 
-// addBoundField appends a new bound field
+// addBoundField appends a new bound field.
 func (f *filter) addBoundField(field *ql.BoundFieldLiteral) {
 	f.boundFields = append(f.boundFields, field)
+}
+
+// addSegment adds a new bound segment.
+func (f *filter) addSegment(segment *ql.BoundSegmentLiteral) {
+	f.segments = append(f.segments, segment.Segment)
+}
+
+// addSeqBoundFields receives the sequence id and the list of bound field literals
+// and populates the list of bound fields containing the field structure convenient
+// for accessors.
+func (f *filter) addSeqBoundFields(seqID uint16, fields []*ql.BoundFieldLiteral) []BoundField {
+	flds := make([]BoundField, 0, len(fields))
+	for _, field := range fields {
+		flds = append(flds,
+			BoundField{
+				Field:    Field{Name: field.Field.Field, Value: field.Field.Value, Arg: field.Field.Arg},
+				Value:    field.Value,
+				BoundVar: field.BoundVar.Value,
+			})
+	}
+	f.seqBoundFields[seqID] = flds
+	return flds
 }
 
 // checkBoundRefs checks if the bound field is referencing a valid alias.
@@ -416,6 +477,7 @@ func (f *filter) checkBoundRefs() error {
 	if f.seq == nil {
 		return nil
 	}
+
 	aliases := make(map[string]bool)
 	for _, expr := range f.seq.Expressions {
 		if expr.Alias == "" {
@@ -423,13 +485,15 @@ func (f *filter) checkBoundRefs() error {
 		}
 		aliases[expr.Alias] = true
 	}
+
 	for _, field := range f.boundFields {
-		if _, ok := aliases[field.Alias()]; !ok {
+		if _, ok := aliases[field.BoundVar.Value]; !ok {
 			return fmt.Errorf("%s bound field references "+
 				"an invalid '$%s' event alias",
-				field.String(), field.Alias())
+				field.String(), field.BoundVar.Value)
 		}
 	}
+
 	return nil
 }
 

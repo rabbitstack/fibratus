@@ -93,11 +93,13 @@ func New(expr string, config *config.Config, options ...Option) Filter {
 	}
 
 	return &filter{
-		parser:       parser,
-		accessors:    accessors,
-		fields:       make([]fields.Field, 0),
-		stringFields: make(map[fields.Field][]string),
-		boundFields:  make([]*ql.BoundFieldLiteral, 0),
+		parser:         parser,
+		accessors:      accessors,
+		fields:         make([]Field, 0),
+		segments:       make([]fields.Segment, 0),
+		stringFields:   make(map[fields.Field][]string),
+		boundFields:    make([]*ql.BoundFieldLiteral, 0),
+		seqBoundFields: make(map[uint16][]BoundField),
 	}
 }
 
@@ -121,11 +123,13 @@ func NewFromCLIWithAllAccessors(args []string) (Filter, error) {
 		return nil, nil
 	}
 	filter := &filter{
-		parser:       ql.NewParser(expr),
-		accessors:    GetAccessors(),
-		fields:       make([]fields.Field, 0),
-		stringFields: make(map[fields.Field][]string),
-		boundFields:  make([]*ql.BoundFieldLiteral, 0),
+		parser:         ql.NewParser(expr),
+		accessors:      GetAccessors(),
+		fields:         make([]Field, 0),
+		segments:       make([]fields.Segment, 0),
+		stringFields:   make(map[fields.Field][]string),
+		boundFields:    make([]*ql.BoundFieldLiteral, 0),
+		seqBoundFields: make(map[uint16][]BoundField),
 	}
 	if err := filter.Compile(); err != nil {
 		return nil, fmt.Errorf("bad filter:\n %v", err)
