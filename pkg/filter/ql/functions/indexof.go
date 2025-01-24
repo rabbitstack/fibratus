@@ -75,7 +75,7 @@ func (f IndexOf) Desc() FunctionDesc {
 	desc := FunctionDesc{
 		Name: IndexOfFn,
 		Args: []FunctionArgDesc{
-			{Keyword: "string", Types: []ArgType{Field, BoundField, Func}, Required: true},
+			{Keyword: "string", Types: []ArgType{Field, BoundField, BoundSegment, BareBoundVariable, Func}, Required: true},
 			{Keyword: "substr", Types: []ArgType{String, Func}, Required: true},
 			{Keyword: "index", Types: []ArgType{String}},
 		},

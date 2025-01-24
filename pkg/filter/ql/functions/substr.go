@@ -25,18 +25,34 @@ func (f Substr) Call(args []interface{}) (interface{}, bool) {
 	if len(args) < 3 {
 		return false, false
 	}
+
 	s := parseString(0, args)
-	start, ok := args[1].(int)
-	if !ok {
+
+	var start int
+	var end int
+
+	switch v := args[1].(type) {
+	case int:
+		start = v
+	case int64:
+		start = int(v)
+	default:
 		return false, false
 	}
-	end, ok := args[2].(int)
-	if !ok {
+
+	switch v := args[2].(type) {
+	case int:
+		end = v
+	case int64:
+		end = int(v)
+	default:
 		return false, false
 	}
+
 	if start >= 0 && (end >= start && end < len(s)) {
 		return s[start:end], true
 	}
+
 	return s, true
 }
 
@@ -44,7 +60,7 @@ func (f Substr) Desc() FunctionDesc {
 	desc := FunctionDesc{
 		Name: SubstrFn,
 		Args: []FunctionArgDesc{
-			{Keyword: "string", Types: []ArgType{Func, Field, BoundField}, Required: true},
+			{Keyword: "string", Types: []ArgType{Func, Field, BoundField, BoundSegment, BareBoundVariable}, Required: true},
 			{Keyword: "start", Types: []ArgType{Func, Number}, Required: true},
 			{Keyword: "end", Types: []ArgType{Func, Number}, Required: true},
 		},

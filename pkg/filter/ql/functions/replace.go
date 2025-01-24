@@ -58,9 +58,9 @@ func (f Replace) Desc() FunctionDesc {
 	desc := FunctionDesc{
 		Name: ReplaceFn,
 		Args: []FunctionArgDesc{
-			{Keyword: "string", Types: []ArgType{String, Field, BoundField, Func}, Required: true},
-			{Keyword: "old", Types: []ArgType{String, Field, BoundField, Func}, Required: true},
-			{Keyword: "new", Types: []ArgType{String, Field, BoundField, Func}, Required: true},
+			{Keyword: "string", Types: []ArgType{String, Field, BoundField, BoundSegment, BareBoundVariable, Func}, Required: true},
+			{Keyword: "old", Types: []ArgType{String, Field, BoundField, BoundSegment, BareBoundVariable, Func}, Required: true},
+			{Keyword: "new", Types: []ArgType{String, Field, BoundField, BoundSegment, BareBoundVariable, Func}, Required: true},
 		},
 		ArgsValidationFunc: func(args []string) error {
 			if len(args) == 3 {

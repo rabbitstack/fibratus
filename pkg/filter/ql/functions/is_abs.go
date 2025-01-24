@@ -35,7 +35,7 @@ func (f IsAbs) Desc() FunctionDesc {
 	desc := FunctionDesc{
 		Name: IsAbsFn,
 		Args: []FunctionArgDesc{
-			{Keyword: "path", Types: []ArgType{Field, BoundField, Func, String}, Required: true},
+			{Keyword: "path", Types: []ArgType{Field, BoundField, Func, BoundSegment, BareBoundVariable, String}, Required: true},
 		},
 	}
 	return desc

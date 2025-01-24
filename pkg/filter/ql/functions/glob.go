@@ -41,7 +41,7 @@ func (f Glob) Desc() FunctionDesc {
 	desc := FunctionDesc{
 		Name: GlobFn,
 		Args: []FunctionArgDesc{
-			{Keyword: "pattern", Types: []ArgType{Field, BoundField, Func, String}, Required: true},
+			{Keyword: "pattern", Types: []ArgType{Field, BoundField, Func, BoundSegment, BareBoundVariable, String}, Required: true},
 		},
 	}
 	return desc

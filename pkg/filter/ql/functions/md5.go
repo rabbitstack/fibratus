@@ -51,7 +51,7 @@ func (f MD5) Desc() FunctionDesc {
 	return FunctionDesc{
 		Name: MD5Fn,
 		Args: []FunctionArgDesc{
-			{Keyword: "data", Types: []ArgType{Field, String, BoundField, Func}, Required: true},
+			{Keyword: "data", Types: []ArgType{Field, String, BoundField, BoundSegment, BareBoundVariable, Func}, Required: true},
 		},
 	}
 }
