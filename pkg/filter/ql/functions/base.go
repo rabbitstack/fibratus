@@ -47,7 +47,7 @@ func (f Base) Desc() FunctionDesc {
 	desc := FunctionDesc{
 		Name: BaseFn,
 		Args: []FunctionArgDesc{
-			{Keyword: "path", Types: []ArgType{Field, BoundField, Func, String, Slice}, Required: true},
+			{Keyword: "path", Types: []ArgType{Field, BoundField, BoundSegment, BareBoundVariable, Func, String, Slice}, Required: true},
 			{Keyword: "ext", Types: []ArgType{Bool}, Required: false},
 		},
 	}

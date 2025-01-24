@@ -104,6 +104,10 @@ const (
 	Expression
 	// BoundField represents the bound field argument type.
 	BoundField
+	// BoundSegment represents the bound segment argument type.
+	BoundSegment
+	// BareBoundVariable represents the bare bound variable argument type.
+	BareBoundVariable
 	// Unknown is the unknown argument type.
 	Unknown
 )
@@ -129,6 +133,10 @@ func (typ ArgType) String() string {
 		return "expression"
 	case BoundField:
 		return "boundfield"
+	case BoundSegment:
+		return "boundsegment"
+	case BareBoundVariable:
+		return "bareboundvar"
 	}
 	return "unknown"
 }

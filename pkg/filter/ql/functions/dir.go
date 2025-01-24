@@ -44,7 +44,7 @@ func (f Dir) Desc() FunctionDesc {
 	desc := FunctionDesc{
 		Name: DirFn,
 		Args: []FunctionArgDesc{
-			{Keyword: "path", Types: []ArgType{Field, BoundField, Func, String, Slice}, Required: true},
+			{Keyword: "path", Types: []ArgType{Field, BoundField, BoundSegment, BareBoundVariable, Func, String, Slice}, Required: true},
 		},
 	}
 	return desc

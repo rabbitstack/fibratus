@@ -69,7 +69,7 @@ func (f CIDRContains) Desc() FunctionDesc {
 	desc := FunctionDesc{
 		Name: CIDRContainsFn,
 		Args: []FunctionArgDesc{
-			{Keyword: "ip", Types: []ArgType{IP, Field, BoundField}, Required: true},
+			{Keyword: "ip", Types: []ArgType{IP, Field, BoundField, BoundSegment, BareBoundVariable}, Required: true},
 			{Keyword: "cidr", Types: []ArgType{String}, Required: true},
 		},
 	}

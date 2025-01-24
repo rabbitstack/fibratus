@@ -36,7 +36,7 @@ func (f Rtrim) Desc() FunctionDesc {
 	desc := FunctionDesc{
 		Name: LtrimFn,
 		Args: []FunctionArgDesc{
-			{Keyword: "string", Types: []ArgType{String, Field, BoundField, Func}, Required: true},
+			{Keyword: "string", Types: []ArgType{String, Field, BoundField, BoundSegment, BareBoundVariable, Func}, Required: true},
 			{Keyword: "suffix", Types: []ArgType{String, Func}, Required: true},
 		},
 	}

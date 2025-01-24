@@ -55,7 +55,7 @@ func (f Entropy) Desc() FunctionDesc {
 	desc := FunctionDesc{
 		Name: LengthFn,
 		Args: []FunctionArgDesc{
-			{Keyword: "string", Types: []ArgType{Field, BoundField, Func}, Required: true},
+			{Keyword: "string", Types: []ArgType{Field, BoundField, BoundSegment, BareBoundVariable, Func}, Required: true},
 			{Keyword: "algo", Types: []ArgType{String}},
 		},
 		ArgsValidationFunc: func(args []string) error {

@@ -55,7 +55,7 @@ func (f IsMinidump) Desc() FunctionDesc {
 	desc := FunctionDesc{
 		Name: IsMinidumpFn,
 		Args: []FunctionArgDesc{
-			{Keyword: "path", Types: []ArgType{String, Field, BoundField, Func}, Required: true},
+			{Keyword: "path", Types: []ArgType{String, Field, BoundField, BoundSegment, BareBoundVariable, Func}, Required: true},
 		},
 	}
 	return desc
