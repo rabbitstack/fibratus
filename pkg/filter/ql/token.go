@@ -19,7 +19,6 @@
 package ql
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"strings"
 )
 
@@ -31,9 +30,8 @@ const (
 	WS
 	EOF
 
-	Field      // ps.name
-	BoundField // $evt1.file.name
-	Str        // 'cmd.exe'
+	BoundVar // $evt1.file.name
+	Str      // 'cmd.exe'
 	Badstr
 	Badesc
 	Ident
@@ -74,11 +72,13 @@ const (
 	Gte         // >=
 	opEnd
 
-	Lparen // (
-	Rparen // )
-	Comma  // ,
-	Dot    // .
-	Pipe   // |
+	Lparen   // (
+	Rparen   // )
+	Comma    // ,
+	Dot      // .
+	Pipe     // |
+	LBracket // [
+	RBracket // ]
 
 	Seq     // SEQUENCE
 	MaxSpan // MAXSPAN
@@ -105,19 +105,18 @@ var tokens = [...]string{
 	EOF:     "EOF",
 	WS:      "WS",
 
-	Ident:      "IDENT",
-	Field:      "FIELD",
-	BoundField: "BOUNDFIELD",
-	Integer:    "INTEGER",
-	Decimal:    "DECIMAL",
-	Duration:   "DURATION",
-	Str:        "STRING",
-	Badstr:     "BADSTRING",
-	Badesc:     "BADESCAPE",
-	IP:         "IPADDRESS",
-	BadIP:      "BADIPADDRESS",
-	True:       "TRUE",
-	False:      "FALSE",
+	Ident:    "IDENT",
+	BoundVar: "BOUNDVAR",
+	Integer:  "INTEGER",
+	Decimal:  "DECIMAL",
+	Duration: "DURATION",
+	Str:      "STRING",
+	Badstr:   "BADSTRING",
+	Badesc:   "BADESCAPE",
+	IP:       "IPADDRESS",
+	BadIP:    "BADIPADDRESS",
+	True:     "TRUE",
+	False:    "FALSE",
 
 	And:         "AND",
 	Or:          "OR",
@@ -147,11 +146,13 @@ var tokens = [...]string{
 	Gt:  ">",
 	Gte: ">=",
 
-	Lparen: "(",
-	Rparen: ")",
-	Comma:  ",",
-	Dot:    ".",
-	Pipe:   "|",
+	Lparen:   "(",
+	Rparen:   ")",
+	Comma:    ",",
+	Dot:      ".",
+	Pipe:     "|",
+	LBracket: "[",
+	RBracket: "]",
 
 	Seq:     "SEQUENCE",
 	MaxSpan: "MAXSPAN",
@@ -199,9 +200,6 @@ func tokstr(tok token, lit string) string {
 func lookup(id string) (token, string) {
 	if tok, ok := keywords[strings.ToLower(id)]; ok {
 		return tok, ""
-	}
-	if tok := fields.Lookup(id); tok != "" {
-		return Field, id
 	}
 	return Ident, id
 }

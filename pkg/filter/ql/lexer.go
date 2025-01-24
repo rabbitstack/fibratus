@@ -109,12 +109,16 @@ func (s *scanner) scan() (tok token, pos int, lit string) {
 		return Pipe, pos, ""
 	case ',':
 		return Comma, pos, ""
+	case '[':
+		return LBracket, pos, ""
+	case ']':
+		return RBracket, pos, ""
 	case '$':
 		tok, _, lit = s.scanIdent()
 		if tok != Ident {
 			return tok, pos, "$" + lit
 		}
-		return BoundField, pos, "$" + lit
+		return BoundVar, pos, "$" + lit
 	}
 	return Illegal, pos, string(ch0)
 }
@@ -515,5 +519,5 @@ func isDigit(ch rune) bool { return ch >= '0' && ch <= '9' }
 
 // isIdentChar returns true if the rune can be used in an unquoted identifier. $ rune is for special PE section names (e.g. .debug$ | .tls$)
 func isIdentChar(ch rune) bool {
-	return isLetter(ch) || isDigit(ch) || ch == '_' || ch == '.' || ch == '[' || ch == ']' || ch == '$'
+	return isLetter(ch) || isDigit(ch) || ch == '_' || ch == '.' || ch == '$'
 }

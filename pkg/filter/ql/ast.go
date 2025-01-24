@@ -138,7 +138,7 @@ func (v *ValuerEval) Eval(expr Expr) interface{} {
 						// binary and unary expressions.
 						if exp.IsForeach() {
 							switch {
-							case exp.IsBinaryExprArg(i) || exp.IsNotExprArg(i) || exp.IsBoundFieldArg(i):
+							case exp.IsBinaryExprArg(i) || exp.IsNotExprArg(i) || exp.IsBareBoundVariableArg(i):
 								args[i] = exp.Args[i]
 							case exp.IsFieldArg(i):
 								if i != 0 {
@@ -209,6 +209,18 @@ func (v *ValuerEval) Eval(expr Expr) interface{} {
 			return nil
 		}
 		return val
+	case *BoundSegmentLiteral:
+		val, ok := v.Valuer.Value(expr.Value)
+		if !ok {
+			return nil
+		}
+		return val
+	case *BareBoundVariableLiteral:
+		val, ok := v.Valuer.Value(expr.Value)
+		if !ok {
+			return nil
+		}
+		return val
 	case *IPLiteral:
 		return expr.Value
 	case *Function:
@@ -224,7 +236,7 @@ func (v *ValuerEval) Eval(expr Expr) interface{} {
 					// binary and unary expressions.
 					if expr.IsForeach() {
 						switch {
-						case expr.IsBinaryExprArg(i) || expr.IsNotExprArg(i) || expr.IsBoundFieldArg(i):
+						case expr.IsBinaryExprArg(i) || expr.IsNotExprArg(i) || expr.IsBareBoundVariableArg(i):
 							args[i] = expr.Args[i]
 						case expr.IsFieldArg(i):
 							if i != 0 {

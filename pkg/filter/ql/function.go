@@ -164,7 +164,7 @@ func (f *Foreach) Call(args []interface{}) (interface{}, bool) {
 		return false, false
 	}
 
-	v, ok := args[1].(*BoundFieldLiteral) // item (variable)
+	v, ok := args[1].(*BareBoundVariableLiteral) // item (variable)
 	if !ok {
 		return false, false
 	}
@@ -185,14 +185,14 @@ func (f *Foreach) Call(args []interface{}) (interface{}, bool) {
 		}
 	}
 
-	flds := make([]*BoundFieldLiteral, 0)
+	segments := make([]*BoundSegmentLiteral, 0)
 
-	// obtain bound fields used in expression
+	// obtain bound segments used in expression
 	var useCallValuer bool
 	walk := func(n Node) {
 		switch exp := n.(type) {
-		case *BoundFieldLiteral:
-			flds = append(flds, exp)
+		case *BoundSegmentLiteral:
+			segments = append(segments, exp)
 		case *Function:
 			useCallValuer = true
 		}
@@ -214,31 +214,31 @@ func (f *Foreach) Call(args []interface{}) (interface{}, bool) {
 		}
 	case []*pstypes.PS:
 		for _, proc := range elems {
-			if f.evalExpr(e, useCallValuer, f.procMapValuer(flds, proc), valuer) {
+			if f.evalExpr(e, useCallValuer, f.procMapValuer(segments, proc), valuer) {
 				return true, true
 			}
 		}
 	case []pstypes.Module:
 		for _, mod := range elems {
-			if f.evalExpr(e, useCallValuer, f.moduleMapValuer(flds, mod), valuer) {
+			if f.evalExpr(e, useCallValuer, f.moduleMapValuer(segments, mod), valuer) {
 				return true, true
 			}
 		}
 	case map[uint32]pstypes.Thread:
 		for _, thread := range elems {
-			if f.evalExpr(e, useCallValuer, f.threadMapValuer(flds, thread), valuer) {
+			if f.evalExpr(e, useCallValuer, f.threadMapValuer(segments, thread), valuer) {
 				return true, true
 			}
 		}
 	case []pstypes.Mmap:
 		for _, mmap := range elems {
-			if f.evalExpr(e, useCallValuer, f.mmapMapValuer(flds, mmap), valuer) {
+			if f.evalExpr(e, useCallValuer, f.mmapMapValuer(segments, mmap), valuer) {
 				return true, true
 			}
 		}
 	case []pe.Sec:
 		for _, sec := range elems {
-			if f.evalExpr(e, useCallValuer, f.sectionMapValuer(flds, sec), valuer) {
+			if f.evalExpr(e, useCallValuer, f.sectionMapValuer(segments, sec), valuer) {
 				return true, true
 			}
 		}
@@ -254,9 +254,10 @@ func (f *Foreach) Call(args []interface{}) (interface{}, bool) {
 		// open process handle with required access mask
 		var desiredAccess uint32
 	loop:
-		for _, fld := range flds {
-			switch fld.Segment() {
+		for _, seg := range segments {
+			switch seg.Segment {
 			case fields.CallsiteLeadingAssemblySegment, fields.CallsiteTrailingAssemblySegment:
+				// break on broader access rights
 				desiredAccess = windows.PROCESS_QUERY_INFORMATION | windows.PROCESS_VM_READ
 				break loop
 			case fields.AllocationSizeSegment, fields.ProtectionSegment:
@@ -272,7 +273,7 @@ func (f *Foreach) Call(args []interface{}) (interface{}, bool) {
 		}
 
 		for _, frame := range elems {
-			if f.evalExpr(e, useCallValuer, f.callstackMapValuer(flds, frame, proc), valuer) {
+			if f.evalExpr(e, useCallValuer, f.callstackMapValuer(segments, frame, proc), valuer) {
 				return true, true
 			}
 		}
@@ -286,7 +287,7 @@ func (f *Foreach) Desc() functions.FunctionDesc {
 		Name: functions.ForeachFn,
 		Args: []functions.FunctionArgDesc{
 			{Keyword: "iterable", Types: []functions.ArgType{functions.Field}, Required: true},
-			{Keyword: "var", Types: []functions.ArgType{functions.BoundField}, Required: true},
+			{Keyword: "var", Types: []functions.ArgType{functions.BareBoundVariable}, Required: true},
 			{Keyword: "predicate", Types: []functions.ArgType{functions.Expression}, Required: true},
 		},
 		ArgsValidationFunc: func(args []string) error {
@@ -313,10 +314,10 @@ func (f *Foreach) Desc() functions.FunctionDesc {
 			}
 
 			var hasBoundVar bool
-			var boundFieldRegexp = regexp.MustCompile(`(\$[a-zA-Z_0-9]+)\.?([a-zA-Z0-9_.$]*)`)
+			var boundSegmentRegexp = regexp.MustCompile(`(\$[a-zA-Z_0-9]+)\.?([a-zA-Z0-9_.$]*)`)
 
 			// scan all bound fields inside expression
-			matches := boundFieldRegexp.FindAllStringSubmatch(e, -1)
+			matches := boundSegmentRegexp.FindAllStringSubmatch(e, -1)
 
 			for _, match := range matches {
 				// check the bound variable references
@@ -433,16 +434,16 @@ func (f *Foreach) evalExpr(e any, useCallValuer bool, valuers ...Valuer) bool {
 }
 
 // stringMapValuer returns the map valuer composed of primitive string values.
-func (f *Foreach) stringMapValuer(v *BoundFieldLiteral, s string) MapValuer {
-	return MapValuer{v.Alias(): s}
+func (f *Foreach) stringMapValuer(v *BareBoundVariableLiteral, s string) MapValuer {
+	return MapValuer{v.Value: s}
 }
 
 // moduleMapValuer returns the map valuer with process module attributes.
-func (f *Foreach) moduleMapValuer(flds []*BoundFieldLiteral, mod pstypes.Module) MapValuer {
+func (f *Foreach) moduleMapValuer(segments []*BoundSegmentLiteral, mod pstypes.Module) MapValuer {
 	var valuer = MapValuer{}
-	for _, field := range flds {
-		key := field.Value
-		switch field.Segment() {
+	for _, seg := range segments {
+		key := seg.Value
+		switch seg.Segment {
 		case fields.PathSegment:
 			valuer[key] = mod.Name
 		case fields.NameSegment:
@@ -459,11 +460,11 @@ func (f *Foreach) moduleMapValuer(flds []*BoundFieldLiteral, mod pstypes.Module)
 }
 
 // procMapValuer returns the map valuer with process attributes.
-func (f *Foreach) procMapValuer(flds []*BoundFieldLiteral, proc *pstypes.PS) MapValuer {
+func (f *Foreach) procMapValuer(segments []*BoundSegmentLiteral, proc *pstypes.PS) MapValuer {
 	var valuer = MapValuer{}
-	for _, field := range flds {
-		key := field.Value
-		switch field.Segment() {
+	for _, seg := range segments {
+		key := seg.Value
+		switch seg.Segment {
 		case fields.PIDSegment:
 			valuer[key] = proc.PID
 		case fields.NameSegment:
@@ -490,11 +491,11 @@ func (f *Foreach) procMapValuer(flds []*BoundFieldLiteral, proc *pstypes.PS) Map
 }
 
 // threadMapValuer returns the map valuer with thread information.
-func (f *Foreach) threadMapValuer(flds []*BoundFieldLiteral, thread pstypes.Thread) MapValuer {
+func (f *Foreach) threadMapValuer(segments []*BoundSegmentLiteral, thread pstypes.Thread) MapValuer {
 	var valuer = MapValuer{}
-	for _, field := range flds {
-		key := field.Value
-		switch field.Segment() {
+	for _, seg := range segments {
+		key := seg.Value
+		switch seg.Segment {
 		case fields.TidSegment:
 			valuer[key] = thread.Tid
 		case fields.StartAddressSegment:
@@ -513,11 +514,11 @@ func (f *Foreach) threadMapValuer(flds []*BoundFieldLiteral, thread pstypes.Thre
 }
 
 // mmapMapValuer returns map valuer with memory mapping details.
-func (f *Foreach) mmapMapValuer(flds []*BoundFieldLiteral, mmap pstypes.Mmap) MapValuer {
+func (f *Foreach) mmapMapValuer(segments []*BoundSegmentLiteral, mmap pstypes.Mmap) MapValuer {
 	var valuer = MapValuer{}
-	for _, field := range flds {
-		key := field.Value
-		switch field.Segment() {
+	for _, seg := range segments {
+		key := seg.Value
+		switch seg.Segment {
 		case fields.AddressSegment:
 			valuer[key] = mmap.BaseAddress.String()
 		case fields.SizeSegment:
@@ -534,11 +535,11 @@ func (f *Foreach) mmapMapValuer(flds []*BoundFieldLiteral, mmap pstypes.Mmap) Ma
 }
 
 // callstackMapValuer returns map valuer with thread stack frame data.
-func (f *Foreach) callstackMapValuer(flds []*BoundFieldLiteral, frame kevent.Frame, proc windows.Handle) MapValuer {
+func (f *Foreach) callstackMapValuer(segments []*BoundSegmentLiteral, frame kevent.Frame, proc windows.Handle) MapValuer {
 	var valuer = MapValuer{}
-	for _, field := range flds {
-		key := field.Value
-		switch field.Segment() {
+	for _, seg := range segments {
+		key := seg.Value
+		switch seg.Segment {
 		case fields.AddressSegment:
 			valuer[key] = frame.Addr.String()
 		case fields.OffsetSegment:
@@ -563,11 +564,11 @@ func (f *Foreach) callstackMapValuer(flds []*BoundFieldLiteral, frame kevent.Fra
 }
 
 // sectionMapValuer returns map valuer with PE section data.
-func (f *Foreach) sectionMapValuer(flds []*BoundFieldLiteral, section pe.Sec) MapValuer {
+func (f *Foreach) sectionMapValuer(segments []*BoundSegmentLiteral, section pe.Sec) MapValuer {
 	var valuer = MapValuer{}
-	for _, field := range flds {
-		key := field.Value
-		switch field.Segment() {
+	for _, seg := range segments {
+		key := seg.Value
+		switch seg.Segment {
 		case fields.NameSegment:
 			valuer[key] = section.Name
 		case fields.SizeSegment:
