@@ -21,6 +21,8 @@ package ql
 import (
 	"errors"
 	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/filter/fields"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
@@ -34,37 +36,39 @@ func TestParser(t *testing.T) {
 		{expr: "ps.name = 'cmd.exe'"},
 		{expr: "ps.name != 'cmd.exe'"},
 		{expr: "ps.name <> 'cmd.exe'"},
-		{expr: "ps.name <> 'cmd.exe", err: errors.New("ps.name <> 'cmd.exe\n" +
-			"           ^ expected field, string, number, bool, ip")},
+		{expr: "ps.name <> 'cmd.exe", err: errors.New("ps.name <> 'cmd.exe\n╭─────────^\n|\n|\n╰─────────────────── expected a valid string but bad string or escape found")},
 		{expr: "ps.name = 123"},
 		{expr: "net.dip = 172.17.0.9"},
 		{expr: "net.dip = 172.17.0.9 and net.dip in ('172.15.9.2')"},
 		{expr: "net.dip = 172.17.0.9 and (net.dip not in ('172.15.9.2'))"},
 
-		{expr: "net.dip = 172.17.0", err: errors.New("net.dip = 172.17.0\n" +
-			"           ^ expected a valid IP address")},
+		{expr: "net.dip = 172.17.0", err: errors.New("net.dip = 172.17.0\n╭─────────^\n|\n|\n╰─────────────────── expected a valid IP address")},
 
 		{expr: "ps.name = 'cmd.exe' OR ps.name contains 'svc'"},
 		{expr: "ps.name = 'cmd.exe' AND (ps.name contains 'svc' OR ps.name != 'lsass')"},
-		{expr: "ps.name = 'cmd.exe' AND (ps.name contains 'svc' OR ps.name != 'lsass'", err: errors.New("ps.name = 'cmd.exe' AND (ps.name contains 'svc' OR ps.name != 'lsass'" +
-			"^ expected")},
+		{expr: "ps.name = 'cmd.exe' AND (ps.name contains 'svc' OR ps.name != 'lsass'", err: errors.New("ps.name = 'cmd.exe' AND (ps.name contains 'svc' OR ps.name != 'lsass'\n╭─────────────────────────────────────────────────────────────────────^\n|\n|\n╰─────────────────── expected ')'")},
 
 		{expr: "ps.name = 'cmd.exe' OR ((ps.name contains 'svc' AND ps.name != 'lsass') AND ps.ppid != 1)"},
 
-		{expr: "ps.name = 'cmd.exe' OR ((ps.name contains 'svc' AND ps.name != 'lsass' AND ps.ppid != 1)", err: errors.New("ps.name = 'cmd.exe' OR ((ps.name contains 'svc' AND ps.name != 'lsass' AND ps.ppid != 1)" +
-			"	^ expected )")},
+		{expr: "ps.name = 'cmd.exe' OR ((ps.name contains 'svc' AND ps.name != 'lsass' AND ps.ppid != 1)", err: errors.New("ps.name = 'cmd.exe' OR ((ps.name contains 'svc' AND ps.name != 'lsass' AND ps.ppid != 1)\n╭────────────────────────────────────────────────────────────────────────────────────────^\n|\n|\n╰─────────────────── expected ')'")},
 
-		{expr: "ps.name = 'cmd.exe' OR ((ps.name contains 'svc' AND ps.name != 'lsass') AND ps.ppid != 1", err: errors.New("ps.name = 'cmd.exe' OR ((ps.name contains 'svc' AND ps.name != 'lsass') AND ps.ppid != 1" +
-			"	^ expected )")},
+		{expr: "ps.name = 'cmd.exe' OR ((ps.name contains 'svc' AND ps.name != 'lsass') AND ps.ppid != 1", err: errors.New("ps.name = 'cmd.exe' OR ((ps.name contains 'svc' AND ps.name != 'lsass') AND ps.ppid != 1\n╭────────────────────────────────────────────────────────────────────────────────────────^\n|\n|\n╰─────────────────── expected ')'")},
 
-		{expr: "ps.none = 'cmd.exe'", err: errors.New("ps.none = 'cmd.exe'" +
-			"	^ expected field, string, number, bool, ip")},
+		{expr: "ps.none = 'cmd.exe'", err: errors.New("ps.none = 'cmd.exe'\n╭^\n|\n|\n╰─────────────────── expected field, bound field, string, number, bool, ip, function")},
 
-		{expr: "ps.name = 'cmd.exe' AND ps.name IN ('exe') ps.name", err: errors.New("ps.name = 'cmd.exe' AND ps.name IN ('exe') ps.name" +
-			"	^ expected operator")},
-		{expr: "ip_cidr(net.dip) = '24'", err: errors.New("ip_cidr function is undefined. Did you mean one of CIDR_CONTAINS|MD5?")},
+		{expr: "ps.name = 'cmd.exe' AND ps.name IN ('exe') ps.name", err: errors.New("ps.name = 'cmd.exe' AND ps.name IN ('exe') ps.name\n╭──────────────────────────────────────────^\n|\n|\n╰─────────────────── expected operator, ')', ',', '|'")},
+		{expr: "ip_cidr(net.dip) = '24'", err: errors.New("ip_cidr function is undefined. Did you mean one of BASE|CIDR_CONTAINS|CONCAT|DIR|ENTROPY|EXT|FOREACH|GET_REG_VALUE|GLOB|INDEXOF|IS_ABS|IS_MINIDUMP|LENGTH|LOWER|LTRIM|MD5|REGEX|REPLACE|RTRIM|SPLIT|SUBSTR|UNDEFINED|UPPER|VOLUME|YARA?")},
 
 		{expr: "ps.name = 'cmd.exe' and not cidr_contains(net.sip, '172.14.0.0')"},
+		{expr: `ps.envs[ProgramFiles] = 'C:\\Program Files'`},
+		{expr: `ps.envs imatches 'C:\\Program Files'`},
+		{expr: `ps.pid[1] = 'svchost.exe'`, err: errors.New("ps.pid[1] = 'svchost.exe'\n╭──────^\n|\n|\n╰─────────────────── expected field without argument")},
+		{expr: `ps.envs[ProgramFiles = 'svchost.exe'`, err: errors.New("ps.envs[ProgramFiles = 'svchost.exe'\n╭───────────────────^\n|\n|\n╰─────────────────── expected ]")},
+		{expr: `kevt.arg = 'svchost.exe'`, err: errors.New("kevt.arg = 'svchost.exe'\n╭───────^\n|\n|\n╰─────────────────── expected field argument")},
+		{expr: `kevt.arg[name] = 'svchost.exe'`},
+		{expr: `kevt.arg[Name$] = 'svchost.exe'`, err: errors.New("kevt.arg[Name$] = 'svchost.exe'\n╭────────^\n|\n|\n╰─────────────────── expected a valid field argument matching the pattern [a-z0-9_]+")},
+		{expr: `ps.ancestor[0] = 'svchost.exe'`},
+		{expr: `ps.ancestor[l0l] = 'svchost.exe'`, err: errors.New("ps.ancestor[l0l] = 'svchost.exe'\n╭───────────^\n|\n|\n╰─────────────────── expected a valid field argument matching the pattern [0-9]+")},
 	}
 
 	for i, tt := range tests {
@@ -72,9 +76,64 @@ func TestParser(t *testing.T) {
 		_, err := p.ParseExpr()
 		if err == nil && tt.err != nil {
 			t.Errorf("%d. exp=%s expected error=%v", i, tt.expr, tt.err)
+		} else if err != nil && tt.err != nil {
+			assert.EqualError(t, tt.err, err.Error())
 		} else if err != nil && tt.err == nil {
 			t.Errorf("%d. exp=%s got error=%v", i, tt.expr, err)
 		}
+	}
+}
+
+func TestParseUnaryExpr(t *testing.T) {
+	var tests = []struct {
+		expr       string
+		ee         Expr
+		err        string
+		assertions func(t *testing.T, e Expr)
+	}{
+		{"ps.name", &FieldLiteral{}, "", nil},
+		{"ps.name[", &FieldLiteral{}, "expected ident, integer", nil},
+		{"ps.name[svchost.exe]", &FieldLiteral{}, "expected field without argument", nil},
+		{"ps.ancestor[1]", &FieldLiteral{}, "", func(t *testing.T, e Expr) {
+			f := e.(*FieldLiteral)
+			assert.Equal(t, "1", f.Arg)
+		}},
+		{"$entry", &BareBoundVariableLiteral{}, "", nil},
+		{"$entry.entropy", &BoundSegmentLiteral{}, "", func(t *testing.T, e Expr) {
+			s := e.(*BoundSegmentLiteral)
+			assert.Equal(t, fields.EntropySegment, s.Segment)
+			assert.Equal(t, "$entry.entropy", s.Value)
+		}},
+		{"$entry.file.path", &BoundFieldLiteral{}, "", func(t *testing.T, e Expr) {
+			f := e.(*BoundFieldLiteral)
+			assert.Equal(t, fields.FilePath, f.Field.Field)
+			assert.Equal(t, "$entry.file.path", f.Value)
+		}},
+		{"$entry.foo", nil, "expected field/segment after bound ref", nil},
+		{"('a', 'b', 'c')", &ListLiteral{}, "", nil},
+		{"('a', 'b', 'c'", nil, "expected ')'", nil},
+		{"base(file.path)", &Function{}, "", nil},
+		{"base(file.path,", &Function{}, "expected field, bound field, string, number, bool, ip, function", nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.expr, func(t *testing.T) {
+			p := NewParser(tt.expr)
+
+			expr, err := p.parseUnaryExpr()
+			if err != nil && tt.err != "" {
+				require.ErrorContains(t, err, tt.err)
+			}
+			if err != nil && tt.err == "" {
+				assert.Fail(t, err.Error())
+			}
+
+			assert.IsType(t, tt.ee, expr)
+
+			if tt.assertions != nil {
+				tt.assertions(t, expr)
+			}
+		})
 	}
 }
 

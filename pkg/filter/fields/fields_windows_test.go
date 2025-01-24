@@ -23,15 +23,24 @@ import (
 	"testing"
 )
 
-func TestLookup(t *testing.T) {
-	assert.Equal(t, PsPid, Lookup("ps.pid"))
-	assert.Equal(t, Field("ps.envs[ALLUSERSPROFILE]"), Lookup("ps.envs[ALLUSERSPROFILE]"))
-	assert.Empty(t, Lookup("ps.envs[ALLUSERSPROFILE"))
-	assert.Empty(t, Lookup("ps.envs["))
-	assert.Empty(t, Lookup("ps.envs[]"))
-	assert.Equal(t, PsEnvs, Lookup("ps.envs"))
-	assert.Equal(t, Field("kevt.arg[exe]"), Lookup("kevt.arg[exe]"))
-	assert.Empty(t, Lookup("kevt.arg"))
+func TestIsField(t *testing.T) {
+	var tests = []struct {
+		name    string
+		isField bool
+	}{
+		{"ps.pid", true},
+		{"ps.none", false},
+		{"ps.envs[ALLUSERSPROFILE]", false},
+		{"kevt.arg", true},
+		{"thread._callstack", true},
+		{"kevt._callstack", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.isField, IsField(tt.name))
+		})
+	}
 }
 
 func TestIsDeprecated(t *testing.T) {

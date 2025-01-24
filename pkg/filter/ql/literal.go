@@ -41,6 +41,8 @@ type StringLiteral struct {
 // FieldLiteral represents a field literal.
 type FieldLiteral struct {
 	Value string
+	Field fields.Field
+	Arg   string
 }
 
 // IntegerLiteral represents a signed number literal.
@@ -68,7 +70,21 @@ type IPLiteral struct {
 	Value net.IP
 }
 
+// BoundFieldLiteral represents the bound field literal.
 type BoundFieldLiteral struct {
+	Value    string
+	BoundVar BareBoundVariableLiteral
+	Field    *FieldLiteral
+}
+
+// BoundSegmentLiteral represents the bound segment literal.
+type BoundSegmentLiteral struct {
+	Value    string
+	BoundVar BareBoundVariableLiteral
+	Segment  fields.Segment
+}
+
+type BareBoundVariableLiteral struct {
 	Value string
 }
 
@@ -104,27 +120,11 @@ func (b BoundFieldLiteral) String() string {
 	return b.Value
 }
 
-func (b BoundFieldLiteral) Field() fields.Field {
-	n := strings.Index(b.Value, ".")
-	if n > 0 {
-		return fields.Field(b.Value[n+1:])
-	}
-	return ""
+func (b BoundSegmentLiteral) String() string {
+	return b.Value
 }
 
-func (b BoundFieldLiteral) Segment() fields.Segment {
-	n := strings.Index(b.Value, ".")
-	if n > 0 {
-		return fields.Segment(b.Value[n+1:])
-	}
-	return ""
-}
-
-func (b BoundFieldLiteral) Alias() string {
-	n := strings.Index(b.Value, ".")
-	if n > 0 {
-		return b.Value[1:n]
-	}
+func (b BareBoundVariableLiteral) String() string {
 	return b.Value
 }
 
@@ -201,8 +201,8 @@ func (f *Function) IsNotExprArg(i int) bool {
 	return ok
 }
 
-func (f *Function) IsBoundFieldArg(i int) bool {
-	_, ok := f.Args[i].(*BoundFieldLiteral)
+func (f *Function) IsBareBoundVariableArg(i int) bool {
+	_, ok := f.Args[i].(*BareBoundVariableLiteral)
 	return ok
 }
 
@@ -243,6 +243,10 @@ func (f *Function) validate() error {
 			typ = functions.Field
 		case reflect.TypeOf(&BoundFieldLiteral{}):
 			typ = functions.BoundField
+		case reflect.TypeOf(&BoundSegmentLiteral{}):
+			typ = functions.BoundSegment
+		case reflect.TypeOf(&BareBoundVariableLiteral{}):
+			typ = functions.BareBoundVariable
 		case reflect.TypeOf(&IPLiteral{}):
 			typ = functions.IP
 		case reflect.TypeOf(&StringLiteral{}):
@@ -269,10 +273,13 @@ func (f *Function) validate() error {
 
 // SequenceExpr represents a single binary expression within the sequence.
 type SequenceExpr struct {
-	Expr        Expr
-	By          fields.Field
+	Expr Expr
+	// By contains the field literal if the sequence expression is constrained.
+	By *FieldLiteral
+	// BoundFields is a group of bound fields referenced in the sequence expression.
 	BoundFields []*BoundFieldLiteral
-	Alias       string
+	// Alias represents the sequence expression alias.
+	Alias string
 
 	buckets map[uint32]bool
 	ktypes  []ktypes.Ktype
@@ -300,6 +307,7 @@ func (e *SequenceExpr) walk() {
 					stringFields[field] = append(stringFields[field], v.Values...)
 				}
 			}
+
 			switch rhs := expr.RHS.(type) {
 			case *BoundFieldLiteral:
 				e.BoundFields = append(e.BoundFields, rhs)
@@ -313,6 +321,7 @@ func (e *SequenceExpr) walk() {
 				}
 			}
 		}
+
 		if expr, ok := n.(*Function); ok {
 			for _, arg := range expr.Args {
 				switch v := arg.(type) {
@@ -357,14 +366,14 @@ func (e *SequenceExpr) HasBoundFields() bool {
 // Sequence is a collection of two or more sequence expressions.
 type Sequence struct {
 	MaxSpan     time.Duration
-	By          fields.Field
+	By          *FieldLiteral
 	Expressions []SequenceExpr
 	IsUnordered bool
 }
 
 // IsConstrained determines if the sequence has the global or per-expression `BY` statement.
 func (s Sequence) IsConstrained() bool {
-	return !s.By.IsEmpty() || !s.Expressions[0].By.IsEmpty()
+	return s.By != nil || s.Expressions[0].By != nil
 }
 
 func (s *Sequence) init() {
@@ -382,6 +391,7 @@ func (s *Sequence) init() {
 			guids[k.GUID()] = true
 		}
 	}
+
 	if s.IsUnordered && len(guids) == 1 {
 		s.IsUnordered = false
 	}
@@ -390,9 +400,9 @@ func (s *Sequence) init() {
 func (s Sequence) impairBy() bool {
 	b := make(map[bool]int, len(s.Expressions))
 	for _, expr := range s.Expressions {
-		b[!expr.By.IsEmpty()]++
+		b[expr.By != nil]++
 	}
-	if !s.By.IsEmpty() && (b[true] == len(s.Expressions) || b[false] == len(s.Expressions)) {
+	if s.By != nil && (b[true] == len(s.Expressions) || b[false] == len(s.Expressions)) {
 		return false
 	}
 	return b[true] > 0 && b[false] > 0
@@ -403,7 +413,7 @@ func (s Sequence) impairBy() bool {
 // returns true if such condition is satisfied.
 func (s Sequence) incompatibleConstraints() bool {
 	for _, expr := range s.Expressions {
-		if !expr.By.IsEmpty() && !s.By.IsEmpty() {
+		if expr.By != nil && s.By != nil {
 			return true
 		}
 	}

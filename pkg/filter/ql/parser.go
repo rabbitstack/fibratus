@@ -75,10 +75,14 @@ func (p *Parser) ParseSequence() (*Sequence, error) {
 	tok, _, _ = p.scanIgnoreWhitespace()
 	if tok == By {
 		tok, pos, lit := p.scanIgnoreWhitespace()
-		if tok != Field {
+		if !fields.IsField(lit) {
 			return nil, newParseError(tokstr(tok, lit), []string{"field"}, pos, p.expr)
 		}
-		seq.By = fields.Field(lit)
+		var err error
+		seq.By, err = p.parseField(lit)
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		p.unscan()
 	}
@@ -89,6 +93,7 @@ func (p *Parser) ParseSequence() (*Sequence, error) {
 			if len(exprs) < 1 {
 				return nil, fmt.Errorf("%s: sequences require at least two expressions", p.expr)
 			}
+
 			const maxExpressions = 5
 			if len(exprs) > maxExpressions {
 				return nil, fmt.Errorf("%s: maximum number of expressions reached", p.expr)
@@ -100,7 +105,9 @@ func (p *Parser) ParseSequence() (*Sequence, error) {
 			if seq.incompatibleConstraints() {
 				return nil, fmt.Errorf("%s: sequence mixes global and per-expression 'by' statements", p.expr)
 			}
+
 			seq.init()
+
 			return seq, nil
 		}
 		p.unscan()
@@ -119,14 +126,20 @@ func (p *Parser) ParseSequence() (*Sequence, error) {
 		}
 
 		var seqexpr SequenceExpr
+
+		// parse sequence BY or AS constraints
 		tok, _, _ = p.scanIgnoreWhitespace()
 		switch tok {
 		case By:
 			tok, pos, lit := p.scanIgnoreWhitespace()
-			if tok != Field {
+			if !fields.IsField(lit) {
 				return nil, newParseError(tokstr(tok, lit), []string{"field"}, pos, p.expr)
 			}
-			seqexpr = SequenceExpr{Expr: expr, By: fields.Field(lit)}
+			field, err := p.parseField(lit)
+			if err != nil {
+				return nil, err
+			}
+			seqexpr = SequenceExpr{Expr: expr, By: field}
 		case As:
 			tok, pos, lit := p.scanIgnoreWhitespace()
 			if tok != Ident {
@@ -137,6 +150,7 @@ func (p *Parser) ParseSequence() (*Sequence, error) {
 			seqexpr = SequenceExpr{Expr: expr}
 			p.unscan()
 		}
+
 		seqexpr.init()
 		seqexpr.walk()
 		exprs = append(exprs, seqexpr)
@@ -279,6 +293,10 @@ func (p *Parser) parseUnaryExpr() (Expr, error) {
 	tok, pos, lit := p.scanIgnoreWhitespace()
 	switch tok {
 	case Ident:
+		if fields.IsField(lit) {
+			return p.parseField(lit)
+		}
+
 		if tok0, _, _ := p.scan(); tok0 == Lparen {
 			return p.parseFunction(lit)
 		}
@@ -306,14 +324,28 @@ func (p *Parser) parseUnaryExpr() (Expr, error) {
 		return &IPLiteral{Value: net.ParseIP(lit)}, nil
 	case Str:
 		return &StringLiteral{Value: lit}, nil
-	case Field:
-		return &FieldLiteral{Value: lit}, nil
-	case BoundField:
+	case BoundVar:
 		n := strings.Index(lit, ".")
-		if n > 0 && fields.Lookup(lit[n+1:]) == "" && !fields.IsSegment(lit[n+1:]) {
-			return nil, newParseError(tokstr(tok, lit), []string{"field/segment after bound ref"}, pos+n, p.expr)
+		if n == -1 {
+			return &BareBoundVariableLiteral{Value: lit}, nil
 		}
-		return &BoundFieldLiteral{Value: lit}, nil
+
+		// for recognized segment return bound segment literal
+		s := lit[n+1:]
+		if fields.IsSegment(s) {
+			return &BoundSegmentLiteral{Value: lit, BoundVar: BareBoundVariableLiteral{lit[1:n]}, Segment: fields.Segment(s)}, nil
+		}
+
+		// parse field literal for recognized field
+		if fields.IsField(s) {
+			field, err := p.parseField(s)
+			if err != nil {
+				return nil, err
+			}
+			return &BoundFieldLiteral{Value: lit, BoundVar: BareBoundVariableLiteral{lit[1:n]}, Field: field}, nil
+		}
+
+		return nil, newParseError(tokstr(tok, lit), []string{"field/segment after bound ref"}, pos+n, p.expr)
 	case True, False:
 		return &BoolLiteral{Value: tok == True}, nil
 	case Integer:
@@ -346,6 +378,49 @@ func (p *Parser) parseUnaryExpr() (Expr, error) {
 	return nil, newParseError(tokstr(tok, lit), expectations, pos, p.expr)
 }
 
+// parseField parses the field and its argument. This method
+// assumes the field name has been consumed.
+func (p *Parser) parseField(name string) (*FieldLiteral, error) {
+	argument := fields.ArgumentOf(name)
+
+	// parse field argument
+	tok, pos, lit := p.scan()
+	if tok == LBracket {
+		arg, pos, lit := p.scan()
+		if arg != Ident && arg != Integer {
+			return nil, newParseError(tokstr(arg, lit), []string{"ident", "integer"}, pos, p.expr)
+		}
+
+		// field argument given, but the field doesn't require one
+		if argument == nil {
+			return nil, newParseError(tokstr(tok, lit), []string{"field without argument"}, pos, p.expr)
+		}
+
+		// validate argument
+		if argument != nil && !argument.Validate(lit) {
+			exp := fmt.Sprintf("a valid field argument matching the pattern %s", argument.Pattern)
+			return nil, newParseError(tokstr(arg, lit), []string{exp}, pos, p.expr)
+		}
+
+		if tok, pos, lit := p.scan(); tok != RBracket {
+			return nil, newParseError(tokstr(tok, lit), []string{"]"}, pos, p.expr)
+		}
+
+		return &FieldLiteral{Value: name, Field: fields.Field(name), Arg: lit}, nil
+	} else {
+		// unscan lbracket
+		p.unscan()
+		// field argument not given, but it is required
+		if argument != nil && !argument.Optional {
+			return nil, newParseError(tokstr(tok, lit), []string{"field argument"}, pos, p.expr)
+		}
+
+		return &FieldLiteral{Value: name, Field: fields.Field(name)}, nil
+	}
+}
+
+// parseList parses the list of strings. This method assumes the
+// LPAREN token has been consumed.
 func (p *Parser) parseList() ([]string, error) {
 	tok, pos, lit := p.scanIgnoreWhitespace()
 	if tok != Str && tok != IP && tok != Integer {
@@ -369,7 +444,7 @@ func (p *Parser) parseList() ([]string, error) {
 	}
 }
 
-// parseFunction parses a function call. This function assumes
+// parseFunction parses a function call. This method assumes
 // the function name and LPAREN have been consumed.
 func (p *Parser) parseFunction(name string) (*Function, error) {
 	name = strings.ToLower(name)

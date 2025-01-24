@@ -59,11 +59,6 @@ func TestScanner(t *testing.T) {
 		{s: `,`, tok: Comma},
 		{s: `|`, tok: Pipe},
 
-		// fields
-		{s: `ps.name`, tok: Field, lit: "ps.name"},
-		{s: `pe.is_exec`, tok: Field, lit: "pe.is_exec"},
-		{s: `ps.envs[CommonProgramFiles86]`, tok: Field, lit: "ps.envs[CommonProgramFiles86]"},
-
 		// identifiers
 		{s: `foo`, tok: Ident, lit: `foo`},
 		{s: `_foo`, tok: Ident, lit: `_foo`},
