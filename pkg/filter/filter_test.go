@@ -327,17 +327,19 @@ func TestProcFilter(t *testing.T) {
 
 func TestThreadFilter(t *testing.T) {
 	kpars := kevent.Kparams{
-		kparams.ProcessID:    {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(os.Getpid())},
-		kparams.ThreadID:     {Name: kparams.ThreadID, Type: kparams.TID, Value: uint32(3453)},
-		kparams.BasePrio:     {Name: kparams.BasePrio, Type: kparams.Uint8, Value: uint8(13)},
-		kparams.StartAddress: {Name: kparams.StartAddress, Type: kparams.Address, Value: uint64(140729524944768)},
-		kparams.TEB:          {Name: kparams.TEB, Type: kparams.Address, Value: uint64(614994620416)},
-		kparams.IOPrio:       {Name: kparams.IOPrio, Type: kparams.Uint8, Value: uint8(2)},
-		kparams.KstackBase:   {Name: kparams.KstackBase, Type: kparams.Address, Value: uint64(18446677035730165760)},
-		kparams.KstackLimit:  {Name: kparams.KstackLimit, Type: kparams.Address, Value: uint64(18446677035730137088)},
-		kparams.PagePrio:     {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(5)},
-		kparams.UstackBase:   {Name: kparams.UstackBase, Type: kparams.Address, Value: uint64(86376448)},
-		kparams.UstackLimit:  {Name: kparams.UstackLimit, Type: kparams.Address, Value: uint64(86372352)},
+		kparams.ProcessID:          {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(os.Getpid())},
+		kparams.ThreadID:           {Name: kparams.ThreadID, Type: kparams.TID, Value: uint32(3453)},
+		kparams.BasePrio:           {Name: kparams.BasePrio, Type: kparams.Uint8, Value: uint8(13)},
+		kparams.StartAddress:       {Name: kparams.StartAddress, Type: kparams.Address, Value: uint64(140729524944768)},
+		kparams.TEB:                {Name: kparams.TEB, Type: kparams.Address, Value: uint64(614994620416)},
+		kparams.IOPrio:             {Name: kparams.IOPrio, Type: kparams.Uint8, Value: uint8(2)},
+		kparams.KstackBase:         {Name: kparams.KstackBase, Type: kparams.Address, Value: uint64(18446677035730165760)},
+		kparams.KstackLimit:        {Name: kparams.KstackLimit, Type: kparams.Address, Value: uint64(18446677035730137088)},
+		kparams.PagePrio:           {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(5)},
+		kparams.UstackBase:         {Name: kparams.UstackBase, Type: kparams.Address, Value: uint64(86376448)},
+		kparams.UstackLimit:        {Name: kparams.UstackLimit, Type: kparams.Address, Value: uint64(86372352)},
+		kparams.StartAddressSymbol: {Name: kparams.StartAddressSymbol, Type: kparams.UnicodeString, Value: "LoadImage"},
+		kparams.StartAddressModule: {Name: kparams.StartAddressModule, Type: kparams.UnicodeString, Value: "C:\\Windows\\System32\\kernel32.dll"},
 	}
 	kevt := &kevent.Kevent{
 		Type:     ktypes.CreateThread,
@@ -396,6 +398,8 @@ func TestThreadFilter(t *testing.T) {
 		{`length(thread.callstack.callsite_leading_assembly) > 0`, true},
 		{`thread.callstack.callsite_trailing_assembly matches ('*mov r10, rcx|mov eax, 0x*|syscall*')`, true},
 		{`thread.callstack.is_unbacked`, true},
+		{`thread.start_address.symbol = 'LoadImage'`, true},
+		{`thread.start_address.module = 'C:\\Windows\\System32\\kernel32.dll'`, true},
 
 		{`foreach(thread._callstack, $frame, $frame.address = '2638e59e0a5' or $frame.address = '7ffb5c1d0396')`, true},
 		{`foreach(thread._callstack, $frame, $frame.address = 'fffff8072ebc1f6f' or $frame.address = 'fffff8072eb8961b')`, true},

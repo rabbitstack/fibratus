@@ -212,6 +212,10 @@ const (
 	ThreadCallstackCallsiteTrailingAssembly Field = "thread.callstack.callsite_trailing_assembly"
 	// ThreadCallstackIsUnbacked represents the field that indicates if there is an unbacked stack frame
 	ThreadCallstackIsUnbacked Field = "thread.callstack.is_unbacked"
+	// ThreadStartAddressSymbol represents the symbol corresponding to the thread start address
+	ThreadStartAddressSymbol Field = "thread.start_address.symbol"
+	// ThreadStartAddressModule represents the module corresponding to the thread start address
+	ThreadStartAddressModule Field = "thread.start_address.module"
 
 	// PeNumSections represents the number of sections
 	PeNumSections Field = "pe.nsections"
@@ -797,6 +801,8 @@ var fields = map[Field]FieldInfo{
 	ThreadCallstackCallsiteLeadingAssembly:  {ThreadCallstackCallsiteLeadingAssembly, "callsite leading assembly instructions", kparams.Slice, []string{"thread.callstack.callsite_leading_assembly in ('mov r10,rcx', 'syscall')"}, nil, nil},
 	ThreadCallstackCallsiteTrailingAssembly: {ThreadCallstackCallsiteTrailingAssembly, "callsite trailing assembly instructions", kparams.Slice, []string{"thread.callstack.callsite_trailing_assembly in ('add esp, 0xab')"}, nil, nil},
 	ThreadCallstackIsUnbacked:               {ThreadCallstackIsUnbacked, "indicates if the callstack contains unbacked regions", kparams.Bool, []string{"thread.callstack.is_unbacked"}, nil, nil},
+	ThreadStartAddressSymbol:                {ThreadStartAddressSymbol, "thread start address symbol", kparams.UnicodeString, []string{"thread.start_address.symbol = 'LoadImage'"}, nil, nil},
+	ThreadStartAddressModule:                {ThreadStartAddressModule, "thread start address module", kparams.UnicodeString, []string{"thread.start_address.module endswith 'kernel32.dll'"}, nil, nil},
 
 	ImagePath:               {ImagePath, "full image path", kparams.UnicodeString, []string{"image.patj = 'C:\\Windows\\System32\\advapi32.dll'"}, nil, nil},
 	ImageName:               {ImageName, "image name", kparams.UnicodeString, []string{"image.name = 'advapi32.dll'"}, nil, nil},
