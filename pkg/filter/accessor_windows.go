@@ -596,6 +596,16 @@ func (t *threadAccessor) Get(f Field, kevt *kevent.Kevent) (kparams.Value, error
 		return kevt.Callstack.ContainsUnbacked(), nil
 	case fields.ThreadCallstack:
 		return kevt.Callstack, nil
+	case fields.ThreadStartAddressSymbol:
+		if kevt.Type != ktypes.CreateThread {
+			return nil, nil
+		}
+		return kevt.GetParamAsString(kparams.StartAddressSymbol), nil
+	case fields.ThreadStartAddressModule:
+		if kevt.Type != ktypes.CreateThread {
+			return nil, nil
+		}
+		return kevt.GetParamAsString(kparams.StartAddressModule), nil
 	}
 
 	return nil, nil
