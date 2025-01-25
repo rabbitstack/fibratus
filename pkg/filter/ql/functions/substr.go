@@ -22,7 +22,7 @@ package functions
 type Substr struct{}
 
 func (f Substr) Call(args []interface{}) (interface{}, bool) {
-	if len(args) < 3 {
+	if len(args) < 2 {
 		return false, false
 	}
 
@@ -40,17 +40,23 @@ func (f Substr) Call(args []interface{}) (interface{}, bool) {
 		return false, false
 	}
 
-	switch v := args[2].(type) {
-	case int:
-		end = v
-	case int64:
-		end = int(v)
-	default:
-		return false, false
-	}
+	if len(args) > 2 {
+		switch v := args[2].(type) {
+		case int:
+			end = v
+		case int64:
+			end = int(v)
+		default:
+			return false, false
+		}
 
-	if start >= 0 && (end >= start && end < len(s)) {
-		return s[start:end], true
+		if start >= 0 && (end >= start && end < len(s)) {
+			return s[start:end], true
+		}
+	} else {
+		if start >= 0 && start < len(s) {
+			return s[start:], true
+		}
 	}
 
 	return s, true
@@ -62,7 +68,7 @@ func (f Substr) Desc() FunctionDesc {
 		Args: []FunctionArgDesc{
 			{Keyword: "string", Types: []ArgType{Func, Field, BoundField, BoundSegment, BareBoundVariable}, Required: true},
 			{Keyword: "start", Types: []ArgType{Func, Number}, Required: true},
-			{Keyword: "end", Types: []ArgType{Func, Number}, Required: true},
+			{Keyword: "end", Types: []ArgType{Func, Number}},
 		},
 	}
 	return desc

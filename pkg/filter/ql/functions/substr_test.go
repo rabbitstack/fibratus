@@ -50,6 +50,14 @@ func TestSubstr(t *testing.T) {
 			[]interface{}{"Hello World!", 6, 7},
 			"W",
 		},
+		{
+			[]interface{}{"Hello World!", 6},
+			"World!",
+		},
+		{
+			[]interface{}{"Hello World!", 20},
+			"Hello World!",
+		},
 	}
 
 	for i, tt := range tests {
