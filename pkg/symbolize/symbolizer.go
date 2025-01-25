@@ -206,6 +206,7 @@ func (s *Symbolizer) ProcessEvent(e *kevent.Kevent) (bool, error) {
 		delete(s.procs, pid)
 		return true, nil
 	}
+
 	if e.IsLoadImage() || e.IsUnloadImage() {
 		filename := e.GetParamAsString(kparams.ImagePath)
 		addr := e.Kparams.TryGetAddress(kparams.ImageBase)
@@ -231,14 +232,17 @@ func (s *Symbolizer) ProcessEvent(e *kevent.Kevent) (bool, error) {
 			log.Error(err)
 		}
 	}
+
 	if !e.Kparams.Contains(kparams.Callstack) {
 		return true, nil
 	}
 	defer e.Kparams.Remove(kparams.Callstack)
+
 	err := s.processCallstack(e)
 	if err != nil {
 		callstackProcessErrors.Add(1)
 	}
+
 	return true, nil
 }
 
@@ -332,6 +336,10 @@ func (s *Symbolizer) processCallstack(e *kevent.Kevent) error {
 		// and resolve the module name that contains the function
 		if addr != 0 {
 			mod := e.PS.FindModuleByVa(addr)
+			// perform lookup against parent modules
+			if mod == nil && e.PS.Parent != nil {
+				mod = e.PS.Parent.FindModuleByVa(addr)
+			}
 			symbol := s.symbolizeAddress(pid, addr, mod)
 
 			if symbol != "" && symbol != "?" {
