@@ -21,6 +21,7 @@ package fields
 import (
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"sort"
+	"unicode"
 )
 
 // FieldInfo is the field metadata descriptor.
@@ -31,6 +32,17 @@ type FieldInfo struct {
 	Examples    []string
 	Deprecation *Deprecation
 	Argument    *Argument
+}
+
+// isNumber is the field argument validation function that
+// returns true if all characters are digits.
+var isNumber = func(s string) bool {
+	for _, c := range s {
+		if !unicode.IsNumber(c) {
+			return false
+		}
+	}
+	return true
 }
 
 // Argument defines field argument information.

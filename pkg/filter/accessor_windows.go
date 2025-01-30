@@ -26,7 +26,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/network"
 	psnap "github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
-	"github.com/rabbitstack/fibratus/pkg/util/loldrivers"
 	"github.com/rabbitstack/fibratus/pkg/util/signature"
 	"net"
 	"path/filepath"
@@ -539,73 +538,167 @@ func newThreadAccessor() Accessor {
 	return &threadAccessor{}
 }
 
-func (t *threadAccessor) Get(f Field, kevt *kevent.Kevent) (kparams.Value, error) {
+func (t *threadAccessor) Get(f Field, e *kevent.Kevent) (kparams.Value, error) {
 	switch f.Name {
 	case fields.ThreadBasePrio:
-		return kevt.Kparams.GetUint8(kparams.BasePrio)
+		return e.Kparams.GetUint8(kparams.BasePrio)
 	case fields.ThreadIOPrio:
-		return kevt.Kparams.GetUint8(kparams.IOPrio)
+		return e.Kparams.GetUint8(kparams.IOPrio)
 	case fields.ThreadPagePrio:
-		return kevt.Kparams.GetUint8(kparams.PagePrio)
+		return e.Kparams.GetUint8(kparams.PagePrio)
 	case fields.ThreadKstackBase:
-		return kevt.GetParamAsString(kparams.KstackBase), nil
+		return e.GetParamAsString(kparams.KstackBase), nil
 	case fields.ThreadKstackLimit:
-		return kevt.GetParamAsString(kparams.KstackLimit), nil
+		return e.GetParamAsString(kparams.KstackLimit), nil
 	case fields.ThreadUstackBase:
-		return kevt.GetParamAsString(kparams.UstackBase), nil
+		return e.GetParamAsString(kparams.UstackBase), nil
 	case fields.ThreadUstackLimit:
-		return kevt.GetParamAsString(kparams.UstackLimit), nil
+		return e.GetParamAsString(kparams.UstackLimit), nil
 	case fields.ThreadEntrypoint, fields.ThreadStartAddress:
-		return kevt.GetParamAsString(kparams.StartAddress), nil
+		return e.GetParamAsString(kparams.StartAddress), nil
 	case fields.ThreadPID:
-		return kevt.Kparams.GetUint32(kparams.ProcessID)
+		return e.Kparams.GetUint32(kparams.ProcessID)
 	case fields.ThreadTEB:
-		return kevt.GetParamAsString(kparams.TEB), nil
+		return e.GetParamAsString(kparams.TEB), nil
 	case fields.ThreadAccessMask:
-		if kevt.Type != ktypes.OpenThread {
+		if e.Type != ktypes.OpenThread {
 			return nil, nil
 		}
-		return kevt.Kparams.GetString(kparams.DesiredAccess)
+		return e.Kparams.GetString(kparams.DesiredAccess)
 	case fields.ThreadAccessMaskNames:
-		if kevt.Type != ktypes.OpenThread {
+		if e.Type != ktypes.OpenThread {
 			return nil, nil
 		}
-		return kevt.GetFlagsAsSlice(kparams.DesiredAccess), nil
+		return e.GetFlagsAsSlice(kparams.DesiredAccess), nil
 	case fields.ThreadAccessStatus:
-		if kevt.Type != ktypes.OpenThread {
+		if e.Type != ktypes.OpenThread {
 			return nil, nil
 		}
-		return kevt.GetParamAsString(kparams.NTStatus), nil
+		return e.GetParamAsString(kparams.NTStatus), nil
 	case fields.ThreadCallstackSummary:
-		return kevt.Callstack.Summary(), nil
+		return e.Callstack.Summary(), nil
 	case fields.ThreadCallstackDetail:
-		return kevt.Callstack.String(), nil
+		return e.Callstack.String(), nil
 	case fields.ThreadCallstackModules:
-		return kevt.Callstack.Modules(), nil
+		// return the module at the given frame level
+		if f.Arg != "" {
+			n, err := strconv.Atoi(f.Arg)
+			if err != nil {
+				return nil, err
+			}
+
+			if n > e.Callstack.Depth() {
+				return "", nil
+			}
+
+			return e.Callstack.FrameAt(n).Module, nil
+		}
+
+		return e.Callstack.Modules(), nil
 	case fields.ThreadCallstackSymbols:
-		return kevt.Callstack.Symbols(), nil
+		// return the symbol at the given frame level
+		if f.Arg != "" {
+			n, err := strconv.Atoi(f.Arg)
+			if err != nil {
+				return nil, err
+			}
+
+			if n > e.Callstack.Depth() {
+				return "", nil
+			}
+
+			return e.Callstack.FrameAt(n).Symbol, nil
+		}
+
+		return e.Callstack.Symbols(), nil
 	case fields.ThreadCallstackAllocationSizes:
-		return kevt.Callstack.AllocationSizes(kevt.PID), nil
+		return e.Callstack.AllocationSizes(e.PID), nil
 	case fields.ThreadCallstackProtections:
-		return kevt.Callstack.Protections(kevt.PID), nil
+		return e.Callstack.Protections(e.PID), nil
 	case fields.ThreadCallstackCallsiteLeadingAssembly:
-		return kevt.Callstack.CallsiteInsns(kevt.PID, true), nil
+		return e.Callstack.CallsiteInsns(e.PID, true), nil
 	case fields.ThreadCallstackCallsiteTrailingAssembly:
-		return kevt.Callstack.CallsiteInsns(kevt.PID, false), nil
+		return e.Callstack.CallsiteInsns(e.PID, false), nil
 	case fields.ThreadCallstackIsUnbacked:
-		return kevt.Callstack.ContainsUnbacked(), nil
+		return e.Callstack.ContainsUnbacked(), nil
 	case fields.ThreadCallstack:
-		return kevt.Callstack, nil
+		return e.Callstack, nil
 	case fields.ThreadStartAddressSymbol:
-		if kevt.Type != ktypes.CreateThread {
+		if e.Type != ktypes.CreateThread {
 			return nil, nil
 		}
-		return kevt.GetParamAsString(kparams.StartAddressSymbol), nil
+		return e.GetParamAsString(kparams.StartAddressSymbol), nil
 	case fields.ThreadStartAddressModule:
-		if kevt.Type != ktypes.CreateThread {
+		if e.Type != ktypes.CreateThread {
 			return nil, nil
 		}
-		return kevt.GetParamAsString(kparams.StartAddressModule), nil
+		return e.GetParamAsString(kparams.StartAddressModule), nil
+	case fields.ThreadCallstackAddresses:
+		return e.Callstack.Addresses(), nil
+	case fields.ThreadCallstackFinalUserModuleName, fields.ThreadCallstackFinalUserModulePath:
+		frame := e.Callstack.FinalUserFrame()
+		if frame != nil {
+			if f.Name == fields.ThreadCallstackFinalUserModuleName {
+				return filepath.Base(frame.Module), nil
+			}
+			return frame.Module, nil
+		}
+		return nil, nil
+	case fields.ThreadCallstackFinalUserSymbolName:
+		frame := e.Callstack.FinalUserFrame()
+		if frame != nil {
+			return frame.Symbol, nil
+		}
+		return nil, nil
+	case fields.ThreadCallstackFinalKernelModuleName, fields.ThreadCallstackFinalKernelModulePath:
+		frame := e.Callstack.FinalKernelFrame()
+		if frame != nil {
+			if f.Name == fields.ThreadCallstackFinalKernelModuleName {
+				return filepath.Base(frame.Module), nil
+			}
+			return frame.Module, nil
+		}
+		return nil, nil
+	case fields.ThreadCallstackFinalKernelSymbolName:
+		frame := e.Callstack.FinalKernelFrame()
+		if frame != nil {
+			return frame.Symbol, nil
+		}
+		return nil, nil
+	case fields.ThreadCallstackFinalUserModuleSignatureIsSigned, fields.ThreadCallstackFinalUserModuleSignatureIsTrusted:
+		frame := e.Callstack.FinalUserFrame()
+		if frame == nil || (frame != nil && frame.ModuleAddress.IsZero()) {
+			return nil, nil
+		}
+
+		sign := getSignature(frame.ModuleAddress, frame.Module, false)
+		if sign == nil {
+			return nil, nil
+		}
+
+		if f.Name == fields.ThreadCallstackFinalUserModuleSignatureIsSigned {
+			return sign.IsSigned(), nil
+		}
+
+		return sign.IsTrusted(), nil
+	case fields.ThreadCallstackFinalUserModuleSignatureCertIssuer, fields.ThreadCallstackFinalUserModuleSignatureCertSubject:
+		frame := e.Callstack.FinalUserFrame()
+		if frame == nil || (frame != nil && frame.ModuleAddress.IsZero()) {
+			return nil, nil
+		}
+
+		sign := getSignature(frame.ModuleAddress, frame.Module, true)
+		if sign == nil {
+			return nil, nil
+		}
+
+		if sign.HasCertificate() && f.Name == fields.ThreadCallstackFinalUserModuleSignatureCertIssuer {
+			return sign.Cert.Issuer, nil
+		}
+
+		if sign.HasCertificate() {
+			return sign.Cert.Subject, nil
+		}
 	}
 
 	return nil, nil
@@ -1243,43 +1336,4 @@ func (*dnsAccessor) Get(f Field, kevt *kevent.Kevent) (kparams.Value, error) {
 	}
 
 	return nil, nil
-}
-
-// isLOLDriver interacts with the loldrivers client to determine
-// whether the loaded/dropped driver is malicious or vulnerable.
-func isLOLDriver(f fields.Field, kevt *kevent.Kevent) (kparams.Value, error) {
-	var filename string
-
-	if kevt.Category == ktypes.File {
-		filename = kevt.GetParamAsString(kparams.FilePath)
-	} else {
-		filename = kevt.GetParamAsString(kparams.ImagePath)
-	}
-
-	isDriver := filepath.Ext(filename) == ".sys" || kevt.Kparams.TryGetBool(kparams.FileIsDriver)
-	if !isDriver {
-		return nil, nil
-	}
-	ok, driver := loldrivers.GetClient().MatchHash(filename)
-	if !ok {
-		return nil, nil
-	}
-	if (f == fields.FileIsDriverVulnerable || f == fields.ImageIsDriverVulnerable) && driver.IsVulnerable {
-		return true, nil
-	}
-	if (f == fields.FileIsDriverMalicious || f == fields.ImageIsDriverMalicious) && driver.IsMalicious {
-		return true, nil
-	}
-	return false, nil
-}
-
-// initLOLDriversClient initializes the loldrivers client if the filter expression
-// contains any of the relevant fields.
-func initLOLDriversClient(flds []Field) {
-	for _, f := range flds {
-		if f.Name == fields.FileIsDriverVulnerable || f.Name == fields.FileIsDriverMalicious ||
-			f.Name == fields.ImageIsDriverVulnerable || f.Name == fields.ImageIsDriverMalicious {
-			loldrivers.InitClient(loldrivers.WithAsyncDownload())
-		}
-	}
 }

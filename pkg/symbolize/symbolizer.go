@@ -453,6 +453,7 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *kevent.Kevent, fast, looku
 			mod := e.PS.FindModuleByVa(addr)
 			if mod != nil {
 				frame.Module = mod.Name
+				frame.ModuleAddress = mod.BaseAddress
 			}
 			if lookupExport {
 				frame.Symbol = s.resolveSymbolFromExportDirectory(addr, mod)
@@ -470,6 +471,7 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *kevent.Kevent, fast, looku
 		}
 		if mod != nil {
 			frame.Module = mod.Name
+			frame.ModuleAddress = mod.BaseAddress
 			m, ok := s.mods[mod.BaseAddress]
 			peOK := true
 			if !ok {

@@ -27,6 +27,7 @@ type Address uint64
 func (a Address) String() string   { return strconv.FormatUint(uint64(a), 16) }
 func (a Address) Uint64() uint64   { return uint64(a) }
 func (a Address) Uintptr() uintptr { return uintptr(a) }
+func (a Address) IsZero() bool     { return a == 0 }
 
 // Inc increments the address by given offset.
 func (a Address) Inc(offset uint64) Address {

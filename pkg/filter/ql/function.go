@@ -24,6 +24,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
+	"github.com/rabbitstack/fibratus/pkg/util/signature"
 	"golang.org/x/sys/windows"
 	"maps"
 	"path/filepath"
@@ -558,6 +559,57 @@ func (f *Foreach) callstackMapValuer(segments []*BoundSegmentLiteral, frame keve
 			valuer[key] = frame.CallsiteAssembly(proc, false)
 		case fields.CallsiteLeadingAssemblySegment:
 			valuer[key] = frame.CallsiteAssembly(proc, true)
+		case fields.ModuleSignatureIsSignedSegment, fields.ModuleSignatureIsTrustedSegment,
+			fields.ModuleSignatureCertIssuerSegment, fields.ModuleSignatureCertSubjectSegment:
+
+			if frame.ModuleAddress.IsZero() {
+				continue
+			}
+
+			segment := seg.Segment
+			sign := signature.GetSignatures().GetSignature(frame.ModuleAddress.Uint64())
+			if sign == nil && frame.Module != "" {
+				// register signature if not present in the cache
+				var err error
+				sign = &signature.Signature{Filename: frame.Module}
+				sign.Type, sign.Level, err = sign.Check()
+				if err != nil {
+					continue
+				}
+
+				if sign.IsSigned() {
+					sign.Verify()
+				}
+
+				if segment == fields.ModuleSignatureCertIssuerSegment || segment == fields.ModuleSignatureCertSubjectSegment {
+					if err := sign.ParseCertificate(); err != nil {
+						continue
+					}
+				}
+
+				signature.GetSignatures().PutSignature(frame.ModuleAddress.Uint64(), sign)
+			}
+
+			switch segment {
+			case fields.ModuleSignatureIsSignedSegment:
+				valuer[key] = sign.IsSigned()
+			case fields.ModuleSignatureIsTrustedSegment:
+				valuer[key] = sign.IsTrusted()
+			case fields.ModuleSignatureCertIssuerSegment:
+				if err := sign.ParseCertificate(); err != nil {
+					continue
+				}
+				if sign.HasCertificate() {
+					valuer[key] = sign.Cert.Issuer
+				}
+			case fields.ModuleSignatureCertSubjectSegment:
+				if err := sign.ParseCertificate(); err != nil {
+					continue
+				}
+				if sign.HasCertificate() {
+					valuer[key] = sign.Cert.Subject
+				}
+			}
 		}
 	}
 	return valuer
