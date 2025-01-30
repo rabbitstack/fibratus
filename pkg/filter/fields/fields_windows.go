@@ -216,6 +216,28 @@ const (
 	ThreadStartAddressSymbol Field = "thread.start_address.symbol"
 	// ThreadStartAddressModule represents the module corresponding to the thread start address
 	ThreadStartAddressModule Field = "thread.start_address.module"
+	// ThreadCallstackAddresses represents the all callstack return addresses
+	ThreadCallstackAddresses Field = "thread.callstack.addresses"
+	// ThreadCallstackFinalUserModuleName represents the final user space stack frame module name
+	ThreadCallstackFinalUserModuleName Field = "thread.callstack.final_user_module.name"
+	// ThreadCallstackFinalUserModulePath represents the final user space stack frame module path
+	ThreadCallstackFinalUserModulePath Field = "thread.callstack.final_user_module.path"
+	// ThreadCallstackFinalUserSymbolName represents the final user space stack frame symbol name
+	ThreadCallstackFinalUserSymbolName Field = "thread.callstack.final_user_symbol.name"
+	// ThreadCallstackFinalKernelModuleName represents the final kernel space stack frame module name
+	ThreadCallstackFinalKernelModuleName Field = "thread.callstack.final_kernel_module.name"
+	// ThreadCallstackFinalKernelModulePath represents the final kernel space stack frame module name
+	ThreadCallstackFinalKernelModulePath Field = "thread.callstack.final_kernel_module.path"
+	// ThreadCallstackFinalKernelSymbolName represents the final kernel space stack frame symbol name
+	ThreadCallstackFinalKernelSymbolName Field = "thread.callstack.final_kernel_symbol.name"
+	// ThreadCallstackFinalUserModuleSignatureIsSigned represents the signature status of the final user space stack frame module
+	ThreadCallstackFinalUserModuleSignatureIsSigned Field = "thread.callstack.final_user_module.signature.is_signed"
+	// ThreadCallstackFinalUserModuleSignatureIsTrusted represents the trust status of the final user space stack frame module signature
+	ThreadCallstackFinalUserModuleSignatureIsTrusted Field = "thread.callstack.final_user_module.signature.is_trusted"
+	// ThreadCallstackFinalUserModuleSignatureCertIssuer represents the final user space stack frame module certificate issuer
+	ThreadCallstackFinalUserModuleSignatureCertIssuer Field = "thread.callstack.final_user_module.signature.cert.issuer"
+	// ThreadCallstackFinalUserModuleSignatureCertSubject represents the final user space stack frame module certificate subject
+	ThreadCallstackFinalUserModuleSignatureCertSubject Field = "thread.callstack.final_user_module.signature.cert.subject"
 
 	// PeNumSections represents the number of sections
 	PeNumSections Field = "pe.nsections"
@@ -566,40 +588,49 @@ const (
 	IsUnbackedSegment               Segment = "is_unbacked"
 	CallsiteLeadingAssemblySegment  Segment = "callsite_leading_assembly"
 	CallsiteTrailingAssemblySegment Segment = "callsite_trailing_assembly"
+
+	ModuleSignatureIsSignedSegment    Segment = "module.signature.is_signed"
+	ModuleSignatureIsTrustedSegment   Segment = "module.signature.is_trusted"
+	ModuleSignatureCertIssuerSegment  Segment = "module.signature.cert.issuer"
+	ModuleSignatureCertSubjectSegment Segment = "module.signature.cert.subject"
 )
 
 var segments = map[Segment]bool{
-	NameSegment:                     true,
-	PathSegment:                     true,
-	TypeSegment:                     true,
-	EntropySegment:                  true,
-	SizeSegment:                     true,
-	MD5Segment:                      true,
-	AddressSegment:                  true,
-	ChecksumSegment:                 true,
-	PIDSegment:                      true,
-	CmdlineSegment:                  true,
-	ExeSegment:                      true,
-	ArgsSegment:                     true,
-	CwdSegment:                      true,
-	SIDSegment:                      true,
-	SessionIDSegment:                true,
-	UsernameSegment:                 true,
-	DomainSegment:                   true,
-	TidSegment:                      true,
-	StartAddressSegment:             true,
-	UserStackBaseSegment:            true,
-	UserStackLimitSegment:           true,
-	KernelStackBaseSegment:          true,
-	KernelStackLimitSegment:         true,
-	OffsetSegment:                   true,
-	SymbolSegment:                   true,
-	ModuleSegment:                   true,
-	AllocationSizeSegment:           true,
-	ProtectionSegment:               true,
-	IsUnbackedSegment:               true,
-	CallsiteLeadingAssemblySegment:  true,
-	CallsiteTrailingAssemblySegment: true,
+	NameSegment:                       true,
+	PathSegment:                       true,
+	TypeSegment:                       true,
+	EntropySegment:                    true,
+	SizeSegment:                       true,
+	MD5Segment:                        true,
+	AddressSegment:                    true,
+	ChecksumSegment:                   true,
+	PIDSegment:                        true,
+	CmdlineSegment:                    true,
+	ExeSegment:                        true,
+	ArgsSegment:                       true,
+	CwdSegment:                        true,
+	SIDSegment:                        true,
+	SessionIDSegment:                  true,
+	UsernameSegment:                   true,
+	DomainSegment:                     true,
+	TidSegment:                        true,
+	StartAddressSegment:               true,
+	UserStackBaseSegment:              true,
+	UserStackLimitSegment:             true,
+	KernelStackBaseSegment:            true,
+	KernelStackLimitSegment:           true,
+	OffsetSegment:                     true,
+	SymbolSegment:                     true,
+	ModuleSegment:                     true,
+	AllocationSizeSegment:             true,
+	ProtectionSegment:                 true,
+	IsUnbackedSegment:                 true,
+	CallsiteLeadingAssemblySegment:    true,
+	CallsiteTrailingAssemblySegment:   true,
+	ModuleSignatureIsSignedSegment:    true,
+	ModuleSignatureIsTrustedSegment:   true,
+	ModuleSignatureCertIssuerSegment:  true,
+	ModuleSignatureCertSubjectSegment: true,
 }
 
 var allowedSegments = map[Field][]Segment{
@@ -608,7 +639,7 @@ var allowedSegments = map[Field][]Segment{
 	PsModules:       {PathSegment, NameSegment, AddressSegment, SizeSegment, ChecksumSegment},
 	PsMmaps:         {AddressSegment, TypeSegment, AddressSegment, SizeSegment, ProtectionSegment, PathSegment},
 	PeSections:      {NameSegment, SizeSegment, EntropySegment, MD5Segment},
-	ThreadCallstack: {AddressSegment, OffsetSegment, SymbolSegment, ModuleSegment, AllocationSizeSegment, ProtectionSegment, IsUnbackedSegment, CallsiteLeadingAssemblySegment, CallsiteTrailingAssemblySegment},
+	ThreadCallstack: {AddressSegment, OffsetSegment, SymbolSegment, ModuleSegment, AllocationSizeSegment, ProtectionSegment, IsUnbackedSegment, CallsiteLeadingAssemblySegment, CallsiteTrailingAssemblySegment, ModuleSignatureIsSignedSegment, ModuleSignatureIsTrustedSegment, ModuleSignatureCertIssuerSegment, ModuleSignatureCertSubjectSegment},
 }
 
 func (s Segment) IsEntropy() bool { return s == EntropySegment }
@@ -769,40 +800,44 @@ var fields = map[Field]FieldInfo{
 	PsParentIsWOW64Field:     {PsParentIsWOW64Field, "indicates if the parent process generating the event is a 32-bit process created in 64-bit Windows system", kparams.Bool, []string{"ps.parent.is_wow64"}, nil, nil},
 	PsParentIsPackagedField:  {PsParentIsPackagedField, "indicates if the parent process generating the event is packaged with the MSIX technology", kparams.Bool, []string{"ps.parent.is_packaged"}, nil, nil},
 	PsParentIsProtectedField: {PsParentIsProtectedField, "indicates if the the parent process generating the event is a protected process", kparams.Bool, []string{"ps.parent.is_protected"}, nil, nil},
-	PsAncestor: {PsAncestor, "the process ancestor name", kparams.UnicodeString, []string{"ps.ancestor[1] = 'svchost.exe'", "ps.ancestor in ('winword.exe')"}, nil, &Argument{Optional: true, Pattern: "[0-9]+", ValidationFunc: func(s string) bool {
-		for _, c := range s {
-			if !unicode.IsNumber(c) {
-				return false
-			}
-		}
-		return true
-	}}},
+	PsAncestor:               {PsAncestor, "the process ancestor name", kparams.UnicodeString, []string{"ps.ancestor[1] = 'svchost.exe'", "ps.ancestor in ('winword.exe')"}, nil, &Argument{Optional: true, Pattern: "[0-9]+", ValidationFunc: isNumber}},
 
-	ThreadBasePrio:                          {ThreadBasePrio, "scheduler priority of the thread", kparams.Int8, []string{"thread.prio = 5"}, nil, nil},
-	ThreadIOPrio:                            {ThreadIOPrio, "I/O priority hint for scheduling I/O operations", kparams.Int8, []string{"thread.io.prio = 4"}, nil, nil},
-	ThreadPagePrio:                          {ThreadPagePrio, "memory page priority hint for memory pages accessed by the thread", kparams.Int8, []string{"thread.page.prio = 12"}, nil, nil},
-	ThreadKstackBase:                        {ThreadKstackBase, "base address of the thread's kernel space stack", kparams.Address, []string{"thread.kstack.base = 'a65d800000'"}, nil, nil},
-	ThreadKstackLimit:                       {ThreadKstackLimit, "limit of the thread's kernel space stack", kparams.Address, []string{"thread.kstack.limit = 'a85d800000'"}, nil, nil},
-	ThreadUstackBase:                        {ThreadUstackBase, "base address of the thread's user space stack", kparams.Address, []string{"thread.ustack.base = '7ffe0000'"}, nil, nil},
-	ThreadUstackLimit:                       {ThreadUstackLimit, "limit of the thread's user space stack", kparams.Address, []string{"thread.ustack.limit = '8ffe0000'"}, nil, nil},
-	ThreadEntrypoint:                        {ThreadEntrypoint, "starting address of the function to be executed by the thread", kparams.Address, []string{"thread.entrypoint = '7efe0000'"}, &Deprecation{Since: "2.3.0", Fields: []Field{ThreadStartAddress}}, nil},
-	ThreadStartAddress:                      {ThreadStartAddress, "thread start address", kparams.Address, []string{"thread.start_address = '7efe0000'"}, nil, nil},
-	ThreadPID:                               {ThreadPID, "the process identifier where the thread is created", kparams.Uint32, []string{"kevt.pid != thread.pid"}, nil, nil},
-	ThreadTEB:                               {ThreadTEB, "the base address of the thread environment block", kparams.Address, []string{"thread.teb_address = '8f30893000'"}, nil, nil},
-	ThreadAccessMask:                        {ThreadAccessMask, "thread desired access rights", kparams.AnsiString, []string{"thread.access.mask = '0x1fffff'"}, nil, nil},
-	ThreadAccessMaskNames:                   {ThreadAccessMaskNames, "thread desired access rights as a string list", kparams.Slice, []string{"thread.access.mask.names in ('IMPERSONATE')"}, nil, nil},
-	ThreadAccessStatus:                      {ThreadAccessStatus, "thread access status", kparams.UnicodeString, []string{"thread.access.status = 'success'"}, nil, nil},
-	ThreadCallstackSummary:                  {ThreadCallstackSummary, "callstack summary", kparams.UnicodeString, []string{"thread.callstack.summary contains 'ntdll.dll|KERNELBASE.dll'"}, nil, nil},
-	ThreadCallstackDetail:                   {ThreadCallstackDetail, "detailed information of each stack frame", kparams.UnicodeString, []string{"thread.callstack.detail contains 'KERNELBASE.dll!CreateProcessW'"}, nil, nil},
-	ThreadCallstackModules:                  {ThreadCallstackModules, "list of modules comprising the callstack", kparams.Slice, []string{"thread.callstack.modules in ('C:\\WINDOWS\\System32\\KERNELBASE.dll')"}, nil, nil},
-	ThreadCallstackSymbols:                  {ThreadCallstackSymbols, "list of symbols comprising the callstack", kparams.Slice, []string{"thread.callstack.symbols in ('ntdll.dll!NtCreateProcess')"}, nil, nil},
-	ThreadCallstackAllocationSizes:          {ThreadCallstackAllocationSizes, "allocation sizes of private pages", kparams.Slice, []string{"thread.callstack.allocation_sizes > 10000"}, nil, nil},
-	ThreadCallstackProtections:              {ThreadCallstackProtections, "page protections masks of each frame", kparams.Slice, []string{"thread.callstack.protections in ('RWX', 'WX')"}, nil, nil},
-	ThreadCallstackCallsiteLeadingAssembly:  {ThreadCallstackCallsiteLeadingAssembly, "callsite leading assembly instructions", kparams.Slice, []string{"thread.callstack.callsite_leading_assembly in ('mov r10,rcx', 'syscall')"}, nil, nil},
-	ThreadCallstackCallsiteTrailingAssembly: {ThreadCallstackCallsiteTrailingAssembly, "callsite trailing assembly instructions", kparams.Slice, []string{"thread.callstack.callsite_trailing_assembly in ('add esp, 0xab')"}, nil, nil},
-	ThreadCallstackIsUnbacked:               {ThreadCallstackIsUnbacked, "indicates if the callstack contains unbacked regions", kparams.Bool, []string{"thread.callstack.is_unbacked"}, nil, nil},
-	ThreadStartAddressSymbol:                {ThreadStartAddressSymbol, "thread start address symbol", kparams.UnicodeString, []string{"thread.start_address.symbol = 'LoadImage'"}, nil, nil},
-	ThreadStartAddressModule:                {ThreadStartAddressModule, "thread start address module", kparams.UnicodeString, []string{"thread.start_address.module endswith 'kernel32.dll'"}, nil, nil},
+	ThreadBasePrio:                                     {ThreadBasePrio, "scheduler priority of the thread", kparams.Int8, []string{"thread.prio = 5"}, nil, nil},
+	ThreadIOPrio:                                       {ThreadIOPrio, "I/O priority hint for scheduling I/O operations", kparams.Int8, []string{"thread.io.prio = 4"}, nil, nil},
+	ThreadPagePrio:                                     {ThreadPagePrio, "memory page priority hint for memory pages accessed by the thread", kparams.Int8, []string{"thread.page.prio = 12"}, nil, nil},
+	ThreadKstackBase:                                   {ThreadKstackBase, "base address of the thread's kernel space stack", kparams.Address, []string{"thread.kstack.base = 'a65d800000'"}, nil, nil},
+	ThreadKstackLimit:                                  {ThreadKstackLimit, "limit of the thread's kernel space stack", kparams.Address, []string{"thread.kstack.limit = 'a85d800000'"}, nil, nil},
+	ThreadUstackBase:                                   {ThreadUstackBase, "base address of the thread's user space stack", kparams.Address, []string{"thread.ustack.base = '7ffe0000'"}, nil, nil},
+	ThreadUstackLimit:                                  {ThreadUstackLimit, "limit of the thread's user space stack", kparams.Address, []string{"thread.ustack.limit = '8ffe0000'"}, nil, nil},
+	ThreadEntrypoint:                                   {ThreadEntrypoint, "starting address of the function to be executed by the thread", kparams.Address, []string{"thread.entrypoint = '7efe0000'"}, &Deprecation{Since: "2.3.0", Fields: []Field{ThreadStartAddress}}, nil},
+	ThreadStartAddress:                                 {ThreadStartAddress, "thread start address", kparams.Address, []string{"thread.start_address = '7efe0000'"}, nil, nil},
+	ThreadStartAddressSymbol:                           {ThreadStartAddressSymbol, "thread start address symbol", kparams.UnicodeString, []string{"thread.start_address.symbol = 'LoadImage'"}, nil, nil},
+	ThreadStartAddressModule:                           {ThreadStartAddressModule, "thread start address module", kparams.UnicodeString, []string{"thread.start_address.module endswith 'kernel32.dll'"}, nil, nil},
+	ThreadPID:                                          {ThreadPID, "the process identifier where the thread is created", kparams.Uint32, []string{"kevt.pid != thread.pid"}, nil, nil},
+	ThreadTEB:                                          {ThreadTEB, "the base address of the thread environment block", kparams.Address, []string{"thread.teb_address = '8f30893000'"}, nil, nil},
+	ThreadAccessMask:                                   {ThreadAccessMask, "thread desired access rights", kparams.AnsiString, []string{"thread.access.mask = '0x1fffff'"}, nil, nil},
+	ThreadAccessMaskNames:                              {ThreadAccessMaskNames, "thread desired access rights as a string list", kparams.Slice, []string{"thread.access.mask.names in ('IMPERSONATE')"}, nil, nil},
+	ThreadAccessStatus:                                 {ThreadAccessStatus, "thread access status", kparams.UnicodeString, []string{"thread.access.status = 'success'"}, nil, nil},
+	ThreadCallstackSummary:                             {ThreadCallstackSummary, "callstack summary", kparams.UnicodeString, []string{"thread.callstack.summary contains 'ntdll.dll|KERNELBASE.dll'"}, nil, nil},
+	ThreadCallstackDetail:                              {ThreadCallstackDetail, "detailed information of each stack frame", kparams.UnicodeString, []string{"thread.callstack.detail contains 'KERNELBASE.dll!CreateProcessW'"}, nil, nil},
+	ThreadCallstackModules:                             {ThreadCallstackModules, "list of modules comprising the callstack", kparams.Slice, []string{"thread.callstack.modules in ('C:\\WINDOWS\\System32\\KERNELBASE.dll')", "base(thread.callstack.modules[7]) = 'ntdll.dll'"}, nil, &Argument{Optional: true, Pattern: "[0-9]+", ValidationFunc: isNumber}},
+	ThreadCallstackSymbols:                             {ThreadCallstackSymbols, "list of symbols comprising the callstack", kparams.Slice, []string{"thread.callstack.symbols in ('ntdll.dll!NtCreateProcess')", "thread.callstack.symbols[3] = 'ntdll!NtCreateProcess'"}, nil, &Argument{Optional: true, Pattern: "[0-9]+", ValidationFunc: isNumber}},
+	ThreadCallstackAllocationSizes:                     {ThreadCallstackAllocationSizes, "allocation sizes of private pages", kparams.Slice, []string{"thread.callstack.allocation_sizes > 10000"}, nil, nil},
+	ThreadCallstackProtections:                         {ThreadCallstackProtections, "page protections masks of each frame", kparams.Slice, []string{"thread.callstack.protections in ('RWX', 'WX')"}, nil, nil},
+	ThreadCallstackCallsiteLeadingAssembly:             {ThreadCallstackCallsiteLeadingAssembly, "callsite leading assembly instructions", kparams.Slice, []string{"thread.callstack.callsite_leading_assembly in ('mov r10,rcx', 'syscall')"}, nil, nil},
+	ThreadCallstackCallsiteTrailingAssembly:            {ThreadCallstackCallsiteTrailingAssembly, "callsite trailing assembly instructions", kparams.Slice, []string{"thread.callstack.callsite_trailing_assembly in ('add esp, 0xab')"}, nil, nil},
+	ThreadCallstackIsUnbacked:                          {ThreadCallstackIsUnbacked, "indicates if the callstack contains unbacked regions", kparams.Bool, []string{"thread.callstack.is_unbacked"}, nil, nil},
+	ThreadCallstackAddresses:                           {ThreadCallstackAddresses, "list of all stack return addresses", kparams.Slice, []string{"thread.callstack.addresses in ('7ffb5c1d0396')"}, nil, nil},
+	ThreadCallstackFinalUserModuleName:                 {ThreadCallstackFinalUserModuleName, "final user space stack frame module name", kparams.UnicodeString, []string{"thread.callstack.final_user_module.name != 'ntdll.dll'"}, nil, nil},
+	ThreadCallstackFinalUserModulePath:                 {ThreadCallstackFinalUserModulePath, "final user space stack frame module path", kparams.UnicodeString, []string{"thread.callstack.final_user_module.path imatches '?:\\Windows\\System32\\ntdll.dll'"}, nil, nil},
+	ThreadCallstackFinalUserSymbolName:                 {ThreadCallstackFinalUserSymbolName, "final user space stack symbol name", kparams.UnicodeString, []string{"thread.callstack.final_user_symbol.name imatches 'CreateProcess*'"}, nil, nil},
+	ThreadCallstackFinalKernelModuleName:               {ThreadCallstackFinalKernelModuleName, "final kernel space stack frame module name", kparams.UnicodeString, []string{"thread.callstack.final_kernel_module.name = 'FLTMGR.SYS'"}, nil, nil},
+	ThreadCallstackFinalKernelModulePath:               {ThreadCallstackFinalKernelModulePath, "final kernel space stack frame module path", kparams.UnicodeString, []string{"thread.callstack.final_kernel_module.path imatches '?:\\WINDOWS\\System32\\drivers\\FLTMGR.SYS'"}, nil, nil},
+	ThreadCallstackFinalKernelSymbolName:               {ThreadCallstackFinalKernelSymbolName, "final kernel space stack symbol name", kparams.UnicodeString, []string{"thread.callstack.final_kernel_symbol.name = 'FltGetStreamContext'"}, nil, nil},
+	ThreadCallstackFinalUserModuleSignatureIsSigned:    {ThreadCallstackFinalUserModuleSignatureIsSigned, "signature status of the final user space stack frame module", kparams.Bool, []string{"thread.callstack.final_user_module.signature.is_signed = true"}, nil, nil},
+	ThreadCallstackFinalUserModuleSignatureIsTrusted:   {ThreadCallstackFinalUserModuleSignatureIsTrusted, "signature trust status of the final user space stack frame module", kparams.Bool, []string{"thread.callstack.final_user_module.signature.is_trusted = true"}, nil, nil},
+	ThreadCallstackFinalUserModuleSignatureCertIssuer:  {ThreadCallstackFinalUserModuleSignatureCertIssuer, "final user space stack frame module signature certificate issuer", kparams.UnicodeString, []string{"thread.callstack.final_user_module.signature.cert.issuer imatches '*Microsoft Corporation*'"}, nil, nil},
+	ThreadCallstackFinalUserModuleSignatureCertSubject: {ThreadCallstackFinalUserModuleSignatureCertSubject, "final user space stack frame module signature certificate subject", kparams.UnicodeString, []string{"thread.callstack.final_user_module.signature.cert.subject imatches '*Microsoft Windows*'"}, nil, nil},
 
 	ImagePath:               {ImagePath, "full image path", kparams.UnicodeString, []string{"image.patj = 'C:\\Windows\\System32\\advapi32.dll'"}, nil, nil},
 	ImageName:               {ImageName, "image name", kparams.UnicodeString, []string{"image.name = 'advapi32.dll'"}, nil, nil},

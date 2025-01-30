@@ -53,11 +53,12 @@ var _, _, buildNumber = windows.RtlGetNtVersionNumbers()
 
 // Frame describes a single stack frame.
 type Frame struct {
-	PID    uint32     // pid owning thread's stack
-	Addr   va.Address // return address
-	Offset uint64     // symbol offset
-	Symbol string     // symbol name
-	Module string     // module name
+	PID           uint32     // pid owning thread's stack
+	Addr          va.Address // return address
+	Offset        uint64     // symbol offset
+	Symbol        string     // symbol name
+	Module        string     // module name
+	ModuleAddress va.Address // module base address
 }
 
 // IsUnbacked returns true if this frame is originated
@@ -183,6 +184,32 @@ func (s *Callstack) Depth() int { return len(*s) }
 // IsEmpty returns true if the callstack has no frames.
 func (s *Callstack) IsEmpty() bool { return s.Depth() == 0 }
 
+// FinalUserFrame returns the final user space frame.
+func (s *Callstack) FinalUserFrame() *Frame {
+	var i int
+	if s.IsEmpty() {
+		return nil
+	}
+
+	for ; i < s.Depth()-1 && !(*s)[i].Addr.InSystemRange(); i++ {
+	}
+	i--
+
+	if i > 0 && i < s.Depth()-1 {
+		return &(*s)[i]
+	}
+
+	return nil
+}
+
+// FinalKernelFrame returns the final kernel space frame.
+func (s *Callstack) FinalKernelFrame() *Frame {
+	if s.IsEmpty() {
+		return nil
+	}
+	return &(*s)[s.Depth()-1]
+}
+
 // Summary returns a sequence of non-repeated module names.
 func (s Callstack) Summary() string {
 	var b strings.Builder
@@ -270,6 +297,15 @@ func (s Callstack) ContainsUnbacked() bool {
 		}
 	}
 	return false
+}
+
+// Addresses returns stack retrun addresses.
+func (s Callstack) Addresses() []string {
+	addrs := make([]string, len(s))
+	for i, frame := range s {
+		addrs[i] = frame.Addr.String()
+	}
+	return addrs
 }
 
 // Modules returns all modules comprising the thread stack.

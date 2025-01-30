@@ -350,8 +350,16 @@ func TestThreadFilter(t *testing.T) {
 		PS: &pstypes.PS{
 			Name: "svchost.exe",
 			Envs: map[string]string{"ALLUSERSPROFILE": "C:\\ProgramData", "OS": "Windows_NT", "ProgramFiles(x86)": "C:\\Program Files (x86)"},
+			Modules: []pstypes.Module{
+				{Name: "C:\\Windows\\System32\\kernel32.dll", Size: 2312354, Checksum: 23123343, BaseAddress: va.Address(0x7ffb5c1d0396), DefaultBaseAddress: va.Address(0x7ffb5c1d0396)},
+				{Name: "C:\\Windows\\System32\\user32.dll", Size: 32212354, Checksum: 33123343, BaseAddress: va.Address(0x7ffb313953b2), DefaultBaseAddress: va.Address(0x7ffb313953b2)},
+			},
 		},
 	}
+
+	// append the module signature
+	cert := &sys.Cert{Subject: "US, Washington, Redmond, Microsoft Corporation, Microsoft Windows", Issuer: "US, Washington, Redmond, Microsoft Corporation, Microsoft Windows Production PCA 2011"}
+	signature.GetSignatures().PutSignature(0x7ffb5c1d0396, &signature.Signature{Filename: "C:\\Windows\\System32\\kernel32.dll", Level: 4, Type: 1, Cert: cert})
 
 	// simulate unbacked RWX frame
 	base, err := windows.VirtualAlloc(0, 1024, windows.MEM_COMMIT|windows.MEM_RESERVE, windows.PAGE_EXECUTE_READWRITE)
@@ -374,7 +382,7 @@ func TestThreadFilter(t *testing.T) {
 	kevt.Callstack.PushFrame(kevent.Frame{PID: kevt.PID, Addr: 0x7ffb313853b2, Offset: 0x10a, Symbol: "Java_java_lang_ProcessImpl_create", Module: "C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll"})
 	kevt.Callstack.PushFrame(kevent.Frame{PID: kevt.PID, Addr: 0x7ffb3138592e, Offset: 0x3a2, Symbol: "Java_java_lang_ProcessImpl_waitForTimeoutInterruptibly", Module: "C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll"})
 	kevt.Callstack.PushFrame(kevent.Frame{PID: kevt.PID, Addr: 0x7ffb5d8e61f4, Offset: 0x54, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNEL32.DLL"})
-	kevt.Callstack.PushFrame(kevent.Frame{PID: kevt.PID, Addr: 0x7ffb5c1d0396, Offset: 0x66, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"})
+	kevt.Callstack.PushFrame(kevent.Frame{PID: kevt.PID, Addr: 0x7ffb5c1d0396, ModuleAddress: 0x7ffb5c1d0396, Offset: 0x66, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"})
 	kevt.Callstack.PushFrame(kevent.Frame{PID: kevt.PID, Addr: 0xfffff8072ebc1f6f, Offset: 0x4ef, Symbol: "FltRequestFileInfoOnCreateCompletion", Module: "C:\\WINDOWS\\System32\\drivers\\FLTMGR.SYS"})
 	kevt.Callstack.PushFrame(kevent.Frame{PID: kevt.PID, Addr: 0xfffff8072eb8961b, Offset: 0x20cb, Symbol: "FltGetStreamContext", Module: "C:\\WINDOWS\\System32\\drivers\\FLTMGR.SYS"})
 
@@ -389,17 +397,33 @@ func TestThreadFilter(t *testing.T) {
 		{`thread.kstack.limit = 'ffffc307810cf000'`, true},
 		{`thread.start_address = '7ffe2557ff80'`, true},
 		{`thread.teb_address = '8f30893000'`, true},
+		{`thread.start_address.symbol = 'LoadImage'`, true},
+		{`thread.start_address.module = 'C:\\Windows\\System32\\kernel32.dll'`, true},
 		{`thread.callstack.summary = 'KERNELBASE.dll|KERNEL32.DLL|java.dll|unbacked'`, true},
 		{`thread.callstack.detail icontains 'C:\\WINDOWS\\System32\\KERNELBASE.dll!CreateProcessW+0x66'`, true},
 		{`thread.callstack.modules in ('C:\\WINDOWS\\System32\\KERNELBASE.dll', 'C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll')`, true},
+		{`thread.callstack.modules[5] = 'C:\\WINDOWS\\System32\\KERNELBASE.dll'`, true},
+		{`thread.callstack.modules[7] = 'C:\\WINDOWS\\System32\\drivers\\FLTMGR.SYS'`, true},
+		{`thread.callstack.modules[8] = ''`, true},
 		{`thread.callstack.symbols imatches ('KERNELBASE.dll!CreateProcess*', 'Java_java_lang_ProcessImpl_create')`, true},
+		{`thread.callstack.symbols[2] = 'Java_java_lang_ProcessImpl_create'`, true},
+		{`thread.callstack.symbols[8] = ''`, true},
 		{`thread.callstack.protections in ('RWX')`, true},
 		{`thread.callstack.allocation_sizes > 0`, false},
 		{`length(thread.callstack.callsite_leading_assembly) > 0`, true},
 		{`thread.callstack.callsite_trailing_assembly matches ('*mov r10, rcx|mov eax, 0x*|syscall*')`, true},
 		{`thread.callstack.is_unbacked`, true},
-		{`thread.start_address.symbol = 'LoadImage'`, true},
-		{`thread.start_address.module = 'C:\\Windows\\System32\\kernel32.dll'`, true},
+		{`thread.callstack.addresses intersects ('7ffb5d8e61f4', 'fffff8072eb8961b')`, true},
+		{`thread.callstack.final_user_module.name = 'KERNELBASE.dll'`, true},
+		{`thread.callstack.final_user_module.path = 'C:\\WINDOWS\\System32\\KERNELBASE.dll'`, true},
+		{`thread.callstack.final_user_symbol.name = 'CreateProcessW'`, true},
+		{`thread.callstack.final_kernel_module.name = 'FLTMGR.SYS'`, true},
+		{`thread.callstack.final_kernel_module.path = 'C:\\WINDOWS\\System32\\drivers\\FLTMGR.SYS'`, true},
+		{`thread.callstack.final_kernel_symbol.name = 'FltGetStreamContext'`, true},
+		{`thread.callstack.final_user_module.signature.is_signed = true`, true},
+		{`thread.callstack.final_user_module.signature.is_trusted = true`, true},
+		{`thread.callstack.final_user_module.signature.cert.issuer imatches '*Microsoft Corporation*'`, true},
+		{`thread.callstack.final_user_module.signature.cert.subject imatches '*Microsoft Windows*'`, true},
 
 		{`foreach(thread._callstack, $frame, $frame.address = '2638e59e0a5' or $frame.address = '7ffb5c1d0396')`, true},
 		{`foreach(thread._callstack, $frame, $frame.address = 'fffff8072ebc1f6f' or $frame.address = 'fffff8072eb8961b')`, true},
@@ -414,6 +438,9 @@ func TestThreadFilter(t *testing.T) {
 		{`foreach(thread._callstack, $frame, $frame.allocation_size = 0)`, true},
 		{`foreach(thread._callstack, $frame, $frame.protection = 'RWX')`, true},
 		{`foreach(thread._callstack, $frame, $frame.callsite_trailing_assembly matches '*mov r10, rcx|mov eax, 0x*|syscall*' and $frame.module = 'unbacked')`, true},
+		{`foreach(thread._callstack, $frame, $frame.module.signature.is_signed and $frame.module.signature.is_trusted)`, true},
+		{`foreach(thread._callstack, $frame, $frame.module.signature.cert.issuer imatches '*Microsoft Corporation*')`, true},
+		{`foreach(thread._callstack, $frame, $frame.module.signature.cert.subject imatches '*Microsoft Windows*')`, true},
 	}
 
 	for i, tt := range tests {
