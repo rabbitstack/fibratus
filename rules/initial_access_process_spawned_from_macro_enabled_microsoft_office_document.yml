@@ -20,10 +20,10 @@ labels:
 condition: >
   spawn_process
     and
-  ps.parent.name iin msoffice_binaries
+  ps.name iin msoffice_binaries
     and
   (
-    thread.callstack.modules imatches '*vbe?.dll'
+    thread.callstack.modules imatches ('*vbe?.dll')
       or
     thread.callstack.symbols imatches
       (
