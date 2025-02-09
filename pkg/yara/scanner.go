@@ -72,7 +72,8 @@ type scanner struct {
 
 	psnap ps.Snapshotter
 
-	rwxs map[uint32]va.Address // contains scanned and matched RWX process allocations
+	rwxs  map[uint32]va.Address // contains scanned and matched RWX process allocations
+	mmaps map[uint32]va.Address // contains scanned and matched suspicious memory mappings
 }
 
 // NewScanner creates a new YARA scanner.
@@ -141,6 +142,7 @@ func NewScanner(psnap ps.Snapshotter, config config.Config) (Scanner, error) {
 		config: config,
 		psnap:  psnap,
 		rwxs:   make(map[uint32]va.Address),
+		mmaps:  make(map[uint32]va.Address),
 	}, nil
 }
 
@@ -173,7 +175,9 @@ func (s scanner) CanEnqueue() bool { return false }
 func (s *scanner) ProcessEvent(evt *kevent.Kevent) (bool, error) {
 	if evt.IsTerminateProcess() {
 		// cleanup
-		delete(s.rwxs, evt.Kparams.MustGetPid())
+		pid := evt.Kparams.MustGetPid()
+		delete(s.rwxs, pid)
+		delete(s.mmaps, pid)
 	}
 	return s.Scan(evt)
 }
@@ -292,7 +296,7 @@ func (s scanner) Scan(e *kevent.Kevent) (bool, error) {
 		pid := e.Kparams.MustGetPid()
 		prot := e.Kparams.MustGetUint32(kparams.MemProtect)
 		size := e.Kparams.MustGetUint64(kparams.FileViewSize)
-		if e.PID != 4 && size >= 4096 && ((prot&sys.SectionRX) != 0 && (prot&sys.SectionRWX) != 0) {
+		if e.PID != 4 && size >= 4096 && ((prot&sys.SectionRX) != 0 && (prot&sys.SectionRWX) != 0) && !s.isMmapMatched(pid) {
 			filename := e.GetParamAsString(kparams.FilePath)
 			// skip mappings of signed images
 			addr := e.Kparams.MustGetUint64(kparams.FileViewBase)
@@ -313,6 +317,9 @@ func (s scanner) Scan(e *kevent.Kevent) (bool, error) {
 				log.Debugf("scanning %s section view mapping. pid: %d, addr: %s", e.GetParamAsString(kparams.MemProtect), pid,
 					e.GetParamAsString(kparams.FileViewBase))
 				matches, err = s.scan(pid)
+			}
+			if len(matches) > 0 {
+				s.mmaps[pid] = va.Address(addr)
 			}
 			mmapScans.Add(1)
 			isScanned = true
@@ -460,5 +467,11 @@ func (s scanner) Close() {
 // isRwxMatched returns true if the process already triggered RWX allocation rule match.
 func (s *scanner) isRwxMatched(pid uint32) (ok bool) {
 	_, ok = s.rwxs[pid]
+	return ok
+}
+
+// isMmapMatched returns true if the process already triggered suspicious mmap rule match.
+func (s *scanner) isMmapMatched(pid uint32) (ok bool) {
+	_, ok = s.mmaps[pid]
 	return ok
 }
