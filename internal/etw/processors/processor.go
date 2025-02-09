@@ -19,10 +19,12 @@
 package processors
 
 import (
+	"expvar"
 	libntfs "github.com/rabbitstack/fibratus/pkg/fs/ntfs"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/pe"
+	"golang.org/x/time/rate"
 	"os"
 )
 
@@ -83,6 +85,10 @@ func (typ ProcessorType) String() string {
 	}
 }
 
+var lim = rate.NewLimiter(30, 40) // allow 30 parse ops per second or bursts of 40 ops
+
+var parseImageFileCharacteristicsRateLimits = expvar.NewInt("processors.image.file.characteristics.rate.limits")
+
 // parseImageFileCharacteristics parses the PE structure for the file path
 // residing in the given event parameters. The preferred method for reading
 // the PE metadata is by directly accessing the file.
@@ -92,6 +98,11 @@ func (typ ProcessorType) String() string {
 // data. Most notably, parameters that indicate whether the file is a DLL,
 // executable image, or a Windows driver.
 func parseImageFileCharacteristics(e *kevent.Kevent) error {
+	if !lim.Allow() {
+		parseImageFileCharacteristicsRateLimits.Add(1)
+		return nil
+	}
+
 	var pefile *pe.PE
 	filename := e.GetParamAsString(kparams.FilePath)
 	f, err := os.Open(filename)
