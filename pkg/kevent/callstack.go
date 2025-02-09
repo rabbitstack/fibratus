@@ -20,7 +20,6 @@ package kevent
 
 import (
 	"expvar"
-	"github.com/gammazero/deque"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
@@ -378,9 +377,9 @@ func (s Callstack) CallsiteInsns(pid uint32, leading bool) []string {
 // popped from the queue and enriched with return addresses
 // which are later subject to symbolization.
 type CallstackDecorator struct {
-	deq *deque.Deque[*Kevent]
-	q   *Queue
-	mux sync.Mutex
+	buckets map[uint64][]*Kevent
+	q       *Queue
+	mux     sync.Mutex
 
 	flusher *time.Ticker
 	quit    chan struct{}
@@ -392,11 +391,13 @@ type CallstackDecorator struct {
 func NewCallstackDecorator(q *Queue) *CallstackDecorator {
 	c := &CallstackDecorator{
 		q:       q,
-		deq:     deque.New[*Kevent](100),
+		buckets: make(map[uint64][]*Kevent),
 		flusher: time.NewTicker(flusherInterval),
 		quit:    make(chan struct{}, 1),
 	}
+
 	go c.doFlush()
+
 	return c
 }
 
@@ -404,7 +405,15 @@ func NewCallstackDecorator(q *Queue) *CallstackDecorator {
 func (cd *CallstackDecorator) Push(e *Kevent) {
 	cd.mux.Lock()
 	defer cd.mux.Unlock()
-	cd.deq.PushBack(e)
+
+	// append the event to the bucket indexed by stack id
+	id := e.StackID()
+	q, ok := cd.buckets[id]
+	if !ok {
+		cd.buckets[id] = []*Kevent{e}
+	} else {
+		cd.buckets[id] = append(q, e)
+	}
 }
 
 // Pop receives the stack walk event and pops the oldest
@@ -414,19 +423,38 @@ func (cd *CallstackDecorator) Push(e *Kevent) {
 func (cd *CallstackDecorator) Pop(e *Kevent) *Kevent {
 	cd.mux.Lock()
 	defer cd.mux.Unlock()
-	i := cd.deq.Index(func(evt *Kevent) bool { return evt.StackID() == e.StackID() })
-	if i == -1 {
+
+	id := e.StackID()
+	q, ok := cd.buckets[id]
+	if !ok {
 		return e
 	}
-	evt := cd.deq.Remove(i)
+
+	var evt *Kevent
+	if len(q) > 0 {
+		evt, cd.buckets[id] = q[0], q[1:]
+	}
+
+	if evt == nil {
+		return e
+	}
+
 	callstack := e.Kparams.MustGetSlice(kparams.Callstack)
 	evt.AppendParam(kparams.Callstack, kparams.Slice, callstack)
+
 	return evt
 }
 
 // Stop shutdowns the callstack decorator flusher.
 func (cd *CallstackDecorator) Stop() {
 	cd.quit <- struct{}{}
+}
+
+// RemoveBucket removes the bucket and all enqueued events.
+func (cd *CallstackDecorator) RemoveBucket(id uint64) {
+	cd.mux.Lock()
+	defer cd.mux.Unlock()
+	delete(cd.buckets, id)
 }
 
 func (cd *CallstackDecorator) doFlush() {
@@ -449,20 +477,26 @@ func (cd *CallstackDecorator) doFlush() {
 func (cd *CallstackDecorator) flush() []error {
 	cd.mux.Lock()
 	defer cd.mux.Unlock()
-	if cd.deq.Len() == 0 {
+
+	if len(cd.buckets) == 0 {
 		return nil
 	}
+
 	errs := make([]error, 0)
-	for i := 0; i < cd.deq.Len(); i++ {
-		evt := cd.deq.At(i)
-		if time.Since(evt.Timestamp) < maxDequeFlushPeriod {
-			continue
-		}
-		callstackFlushes.Add(1)
-		err := cd.q.push(cd.deq.Remove(i))
-		if err != nil {
-			errs = append(errs, err)
+
+	for id, q := range cd.buckets {
+		for i, evt := range q {
+			if time.Since(evt.Timestamp) < maxDequeFlushPeriod {
+				continue
+			}
+			callstackFlushes.Add(1)
+			err := cd.q.push(evt)
+			if err != nil {
+				errs = append(errs, err)
+			}
+			cd.buckets[id] = append(q[:i], q[i+1:]...)
 		}
 	}
+
 	return errs
 }
