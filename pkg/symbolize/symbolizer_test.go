@@ -258,7 +258,7 @@ func TestProcessCallstackPeExports(t *testing.T) {
 
 	// should have populated the symbols cache
 	assert.Len(t, s.symbols, 1)
-	assert.Equal(t, "unbacked!?", s.symbols[e.PID][0x2638e59e0a5])
+	assert.Equal(t, syminfo{module: "unbacked", symbol: "?"}, s.symbols[e.PID][0x2638e59e0a5])
 
 	// image load event should add module exports
 	// and when the image is unloaded and there are
