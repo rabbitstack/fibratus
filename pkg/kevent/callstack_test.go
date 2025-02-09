@@ -113,7 +113,7 @@ func TestCallstackDecorator(t *testing.T) {
 	cd.Push(e)
 	cd.Push(e1)
 
-	assert.True(t, cd.deq.Len() == 2)
+	assert.Len(t, cd.buckets[e.StackID()], 2)
 
 	sw := &Kevent{
 		Type:      ktypes.StackWalk,
@@ -129,7 +129,7 @@ func TestCallstackDecorator(t *testing.T) {
 	}
 
 	evt := cd.Pop(sw)
-	assert.True(t, cd.deq.Len() == 1)
+	assert.Len(t, cd.buckets[e.StackID()], 1)
 	assert.Equal(t, ktypes.CreateFile, evt.Type)
 	assert.True(t, evt.Kparams.Contains(kparams.Callstack))
 	assert.Equal(t, "C:\\Windows\\system32\\user32.dll", evt.GetParamAsString(kparams.FilePath))
@@ -164,11 +164,11 @@ func TestCallstackDecoratorFlush(t *testing.T) {
 	}
 
 	cd.Push(e)
-	assert.True(t, cd.deq.Len() == 1)
+	assert.Len(t, cd.buckets[e.StackID()], 1)
 	time.Sleep(time.Millisecond * 3100)
 
 	evt := <-q.Events()
-	assert.True(t, cd.deq.Len() == 0)
+	assert.Len(t, cd.buckets[e.StackID()], 0)
 	assert.Equal(t, ktypes.CreateFile, evt.Type)
 	assert.False(t, evt.Kparams.Contains(kparams.Callstack))
 }

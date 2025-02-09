@@ -20,7 +20,6 @@ package processors
 
 import (
 	"expvar"
-	"github.com/gammazero/deque"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/handle"
@@ -60,9 +59,10 @@ type fsProcessor struct {
 	devPathResolver fs.DevPathResolver
 	config          *config.Config
 
-	deq    *deque.Deque[*kevent.Kevent]
-	mu     sync.Mutex
-	purger *time.Ticker
+	// buckets stores stack walk events per stack id
+	buckets map[uint64][]*kevent.Kevent
+	mu      sync.Mutex
+	purger  *time.Ticker
 
 	quit chan struct{}
 }
@@ -88,7 +88,7 @@ func newFsProcessor(
 		devMapper:       devMapper,
 		devPathResolver: devPathResolver,
 		config:          config,
-		deq:             deque.New[*kevent.Kevent](100),
+		buckets:         make(map[uint64][]*kevent.Kevent),
 		purger:          time.NewTicker(time.Second * 5),
 		quit:            make(chan struct{}, 1),
 	}
@@ -159,7 +159,15 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 		if !kevent.IsCurrentProcDropped(e.PID) {
 			f.mu.Lock()
 			defer f.mu.Unlock()
-			f.deq.PushBack(e)
+
+			// append the event to the bucket indexed by stack id
+			id := e.StackID()
+			q, ok := f.buckets[id]
+			if !ok {
+				f.buckets[id] = []*kevent.Kevent{e}
+			} else {
+				f.buckets[id] = append(q, e)
+			}
 		}
 	case ktypes.FileOpEnd:
 		// get the CreateFile pending event by IRP identifier
@@ -169,6 +177,7 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 			dispo  = e.Kparams.MustGetUint64(kparams.FileExtraInfo)
 			status = e.Kparams.MustGetUint32(kparams.NTStatus)
 		)
+
 		if dispo > windows.FILE_MAXIMUM_DISPOSITION {
 			return e, nil
 		}
@@ -177,10 +186,12 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 			return e, nil
 		}
 		delete(f.irps, irp)
+
 		// reset the wait status to allow passage of this event to
 		// the aggregator queue. Additionally, append params to it
 		ev.WaitEnqueue = false
 		fileObject := ev.Kparams.MustGetUint64(kparams.FileObject)
+
 		// try to get extended file info. If the file object is already
 		// present in the map, we'll reuse the existing file information
 		fileinfo, ok := f.files[fileObject]
@@ -191,9 +202,11 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 			fileinfo = f.getFileInfo(filepath, opts)
 			f.files[fileObject] = fileinfo
 		}
+
 		if f.config.Kstream.EnableHandleKevents {
 			f.devPathResolver.AddPath(ev.GetParamAsString(kparams.FilePath))
 		}
+
 		ev.AppendParam(kparams.NTStatus, kparams.Status, status)
 		if fileinfo.Type != fs.Unknown {
 			ev.AppendEnum(kparams.FileType, uint32(fileinfo.Type), fs.FileTypes)
@@ -205,17 +218,20 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 		// the events are delayed until the respective FileOpEnd
 		// event arrives, we enable stack tracing for CreateFile
 		// events. When the CreateFile event is generated, we store
-		// it pending IRP map. Subsequently, the stack walk event is
-		// generated which we put inside the queue. After FileOpEnd
-		// arrives, the previous stack walk for CreateFile is popped
-		// from the queue and the callstack parameter attached to the
+		// it in pending IRP map. Subsequently, the stack walk event
+		// is put inside the queue. After FileOpEnd event arrives,
+		// the previous stack walk for CreateFile is popped from
+		// the queue and the callstack parameter attached to the
 		// event.
 		if f.config.Kstream.StackEnrichment {
 			f.mu.Lock()
 			defer f.mu.Unlock()
-			i := f.deq.RIndex(func(evt *kevent.Kevent) bool { return evt.StackID() == ev.StackID() })
-			if i != -1 {
-				s := f.deq.Remove(i)
+
+			id := ev.StackID()
+			q, ok := f.buckets[id]
+			if ok && len(q) > 0 {
+				var s *kevent.Kevent
+				s, f.buckets[id] = q[len(q)-1], q[:len(q)-1]
 				callstack := s.Kparams.MustGetSlice(kparams.Callstack)
 				ev.AppendParam(kparams.Callstack, kparams.Slice, callstack)
 			}
@@ -228,6 +244,7 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 				return ev, nil
 			}
 		}
+
 		return ev, nil
 	case ktypes.ReleaseFile:
 		fileReleaseCount.Add(1)
@@ -297,6 +314,7 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 			return e, f.psnap.AddMmap(e)
 		}
 	}
+
 	return e, nil
 }
 
@@ -336,13 +354,16 @@ func (f *fsProcessor) purge() {
 		select {
 		case <-f.purger.C:
 			f.mu.Lock()
+
 			// evict unmatched stack traces
-			for i := 0; i < f.deq.Len(); i++ {
-				evt := f.deq.At(i)
-				if time.Since(evt.Timestamp) > time.Second*30 {
-					f.deq.Remove(i)
+			for id, q := range f.buckets {
+				for i, evt := range q {
+					if time.Since(evt.Timestamp) > time.Second*30 {
+						f.buckets[id] = append(q[:i], q[i+1:]...)
+					}
 				}
 			}
+
 			f.mu.Unlock()
 		case <-f.quit:
 			return

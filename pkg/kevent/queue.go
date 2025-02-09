@@ -157,6 +157,10 @@ func (q *Queue) push(e *Kevent) error {
 			enqueue = true
 		}
 	}
+	if q.stackEnrichment && e.IsTerminateThread() {
+		id := uint64(e.Kparams.MustGetPid() + e.Kparams.MustGetTid())
+		q.cd.RemoveBucket(id)
+	}
 	if enqueue || len(q.listeners) == 0 {
 		q.q <- e
 		keventsEnqueued.Add(1)
