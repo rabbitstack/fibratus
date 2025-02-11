@@ -19,8 +19,13 @@ references:
 
 condition: >
   sequence
-  maxspan 1m
-    |delete_file and file.info.is_disposition_delete_file| by file.name
+  maxspan 1m 
+    |delete_file 
+      and 
+    file.info.is_disposition_delete_file
+      and
+    not file.name imatches '?:\\Windows\\SoftwareDistribution\\Download\\*'
+    | by file.name
     |load_module| by image.name
 
 output: >
