@@ -20,8 +20,8 @@ package ql
 
 import (
 	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/callstack"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/util/signature"
@@ -243,7 +243,7 @@ func (f *Foreach) Call(args []interface{}) (interface{}, bool) {
 				return true, true
 			}
 		}
-	case kevent.Callstack:
+	case callstack.Callstack:
 		var pid uint32
 		var proc windows.Handle
 		var err error
@@ -536,7 +536,7 @@ func (f *Foreach) mmapMapValuer(segments []*BoundSegmentLiteral, mmap pstypes.Mm
 }
 
 // callstackMapValuer returns map valuer with thread stack frame data.
-func (f *Foreach) callstackMapValuer(segments []*BoundSegmentLiteral, frame kevent.Frame, proc windows.Handle) MapValuer {
+func (f *Foreach) callstackMapValuer(segments []*BoundSegmentLiteral, frame callstack.Frame, proc windows.Handle) MapValuer {
 	var valuer = MapValuer{}
 	for _, seg := range segments {
 		key := seg.Value

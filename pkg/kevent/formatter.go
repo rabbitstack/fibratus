@@ -55,7 +55,7 @@ const (
 	host          = ".Host"
 	pe            = ".PE"
 	kparsAccessor = ".Kparams."
-	callstack     = ".Callstack"
+	cstack        = ".Callstack"
 )
 
 var (
@@ -90,7 +90,7 @@ var kfields = map[string]bool{
 	meta:        true,
 	host:        true,
 	pe:          true,
-	callstack:   true,
+	cstack:      true,
 }
 
 func hintFields() string {

@@ -16,31 +16,17 @@
  * limitations under the License.
  */
 
-package kevent
+package callstack
 
 import (
-	"expvar"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
-	log "github.com/sirupsen/logrus"
 	"golang.org/x/arch/x86/x86asm"
 	"golang.org/x/sys/windows"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
-	"time"
 )
-
-// maxDequeFlushPeriod specifies the maximum period
-// for the events to reside in the deque.
-var maxDequeFlushPeriod = time.Second * 30
-var flusherInterval = time.Second * 5
-
-// callstackFlushes computes overall callstack dequeue flushes
-var callstackFlushes = expvar.NewInt("callstack.flushes")
 
 // unbacked represents the identifier for unbacked regions in stack frames
 const unbacked = "unbacked"
@@ -369,134 +355,4 @@ func (s Callstack) CallsiteInsns(pid uint32, leading bool) []string {
 		opcodes[i] = f.CallsiteAssembly(proc, leading)
 	}
 	return opcodes
-}
-
-// CallstackDecorator maintains a FIFO queue where events
-// eligible for stack enrichment are queued. Upon arrival
-// of the respective stack walk event, the acting event is
-// popped from the queue and enriched with return addresses
-// which are later subject to symbolization.
-type CallstackDecorator struct {
-	buckets map[uint64][]*Kevent
-	q       *Queue
-	mux     sync.Mutex
-
-	flusher *time.Ticker
-	quit    chan struct{}
-}
-
-// NewCallstackDecorator creates a new callstack decorator
-// which receives the event queue for long-standing event
-// flushing.
-func NewCallstackDecorator(q *Queue) *CallstackDecorator {
-	c := &CallstackDecorator{
-		q:       q,
-		buckets: make(map[uint64][]*Kevent),
-		flusher: time.NewTicker(flusherInterval),
-		quit:    make(chan struct{}, 1),
-	}
-
-	go c.doFlush()
-
-	return c
-}
-
-// Push pushes a new event to the queue.
-func (cd *CallstackDecorator) Push(e *Kevent) {
-	cd.mux.Lock()
-	defer cd.mux.Unlock()
-
-	// append the event to the bucket indexed by stack id
-	id := e.StackID()
-	q, ok := cd.buckets[id]
-	if !ok {
-		cd.buckets[id] = []*Kevent{e}
-	} else {
-		cd.buckets[id] = append(q, e)
-	}
-}
-
-// Pop receives the stack walk event and pops the oldest
-// originating event with the same pid,tid tuple formerly
-// coined as stack identifier. The originating event is then
-// decorated with callstack return addresses.
-func (cd *CallstackDecorator) Pop(e *Kevent) *Kevent {
-	cd.mux.Lock()
-	defer cd.mux.Unlock()
-
-	id := e.StackID()
-	q, ok := cd.buckets[id]
-	if !ok {
-		return e
-	}
-
-	var evt *Kevent
-	if len(q) > 0 {
-		evt, cd.buckets[id] = q[0], q[1:]
-	}
-
-	if evt == nil {
-		return e
-	}
-
-	callstack := e.Kparams.MustGetSlice(kparams.Callstack)
-	evt.AppendParam(kparams.Callstack, kparams.Slice, callstack)
-
-	return evt
-}
-
-// Stop shutdowns the callstack decorator flusher.
-func (cd *CallstackDecorator) Stop() {
-	cd.quit <- struct{}{}
-}
-
-// RemoveBucket removes the bucket and all enqueued events.
-func (cd *CallstackDecorator) RemoveBucket(id uint64) {
-	cd.mux.Lock()
-	defer cd.mux.Unlock()
-	delete(cd.buckets, id)
-}
-
-func (cd *CallstackDecorator) doFlush() {
-	for {
-		select {
-		case <-cd.flusher.C:
-			errs := cd.flush()
-			if len(errs) > 0 {
-				log.Warnf("callstack: unable to flush queued events: %v", multierror.Wrap(errs...))
-			}
-		case <-cd.quit:
-			return
-		}
-	}
-}
-
-// flush pushes events to the event queue if they have
-// been living in the deque more than the maximum allowed
-// flush period.
-func (cd *CallstackDecorator) flush() []error {
-	cd.mux.Lock()
-	defer cd.mux.Unlock()
-
-	if len(cd.buckets) == 0 {
-		return nil
-	}
-
-	errs := make([]error, 0)
-
-	for id, q := range cd.buckets {
-		for i, evt := range q {
-			if time.Since(evt.Timestamp) < maxDequeFlushPeriod {
-				continue
-			}
-			callstackFlushes.Add(1)
-			err := cd.q.push(evt)
-			if err != nil {
-				errs = append(errs, err)
-			}
-			cd.buckets[id] = append(q[:i], q[i+1:]...)
-		}
-	}
-
-	return errs
 }
