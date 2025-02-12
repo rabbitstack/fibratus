@@ -21,6 +21,7 @@ package symbolize
 import (
 	"expvar"
 	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/callstack"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
@@ -436,8 +437,8 @@ func (s *Symbolizer) pushFrames(addrs []va.Address, e *kevent.Kevent) {
 // PE export directory entries. If either the
 // symbol or module are not resolved, then we
 // fall back to Debug API.
-func (s *Symbolizer) produceFrame(addr va.Address, e *kevent.Kevent) kevent.Frame {
-	frame := kevent.Frame{PID: e.PID, Addr: addr}
+func (s *Symbolizer) produceFrame(addr va.Address, e *kevent.Kevent) callstack.Frame {
+	frame := callstack.Frame{PID: e.PID, Addr: addr}
 	if addr.InSystemRange() {
 		if s.config.SymbolizeKernelAddresses {
 			frame.Module = s.r.GetModuleName(windows.CurrentProcess(), addr)
@@ -547,7 +548,7 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *kevent.Kevent) kevent.Fram
 	return frame
 }
 
-func (s *Symbolizer) cacheSymbol(pid uint32, addr va.Address, frame *kevent.Frame) {
+func (s *Symbolizer) cacheSymbol(pid uint32, addr va.Address, frame *callstack.Frame) {
 	if sym, ok := s.symbols[pid]; ok {
 		if _, ok := sym[addr]; !ok {
 			symCachedSymbols.Add(1)

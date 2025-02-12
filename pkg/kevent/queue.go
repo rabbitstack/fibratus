@@ -53,7 +53,7 @@ type Queue struct {
 	q               chan *Kevent
 	listeners       []Listener
 	backlog         *backlog
-	cd              *CallstackDecorator
+	decorator       *StackwalkDecorator
 	stackEnrichment bool
 	enqueueAlways   bool
 }
@@ -67,7 +67,7 @@ func NewQueue(size int, stackEnrichment bool, enqueueAlways bool) *Queue {
 		stackEnrichment: stackEnrichment,
 		enqueueAlways:   enqueueAlways,
 	}
-	q.cd = NewCallstackDecorator(q)
+	q.decorator = NewStackwalkDecorator(q)
 	return q
 }
 
@@ -80,7 +80,7 @@ func NewQueueWithChannel(ch chan *Kevent, stackEnrichment bool, enqueueAlways bo
 		stackEnrichment: stackEnrichment,
 		enqueueAlways:   enqueueAlways,
 	}
-	q.cd = NewCallstackDecorator(q)
+	q.decorator = NewStackwalkDecorator(q)
 	return q
 }
 
@@ -94,7 +94,7 @@ func (q *Queue) RegisterListener(listener Listener) {
 func (q *Queue) Events() <-chan *Kevent { return q.q }
 
 // Close closes the queue disposing allocated resources.
-func (q *Queue) Close() { q.cd.Stop() }
+func (q *Queue) Close() { q.decorator.Stop() }
 
 // Push pushes a new event to the channel. Prior to
 // sending the event to the channel, all registered
@@ -120,12 +120,12 @@ func (q *Queue) Push(e *Kevent) error {
 	if q.stackEnrichment {
 		// store pending event for callstack enrichment
 		if e.Type.CanEnrichStack() {
-			q.cd.Push(e)
+			q.decorator.Push(e)
 			return nil
 		}
 		// decorate events with callstack return addresses
 		if e.IsStackWalk() {
-			e = q.cd.Pop(e)
+			e = q.decorator.Pop(e)
 		}
 	}
 	if isEventDelayed(e) {
@@ -159,7 +159,7 @@ func (q *Queue) push(e *Kevent) error {
 	}
 	if q.stackEnrichment && e.IsTerminateThread() {
 		id := uint64(e.Kparams.MustGetPid() + e.Kparams.MustGetTid())
-		q.cd.RemoveBucket(id)
+		q.decorator.RemoveBucket(id)
 	}
 	if enqueue || len(q.listeners) == 0 {
 		q.q <- e

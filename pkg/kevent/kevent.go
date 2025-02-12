@@ -20,6 +20,7 @@ package kevent
 
 import (
 	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/callstack"
 	kcapver "github.com/rabbitstack/fibratus/pkg/kcap/version"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
@@ -98,7 +99,7 @@ type Kevent struct {
 	// PS represents process' metadata and its allocated resources such as handles, DLLs, etc.
 	PS *pstypes.PS `json:"ps,omitempty"`
 	// Callstack represents the call stack for the thread that generated the event.
-	Callstack Callstack `json:"callstack"`
+	Callstack callstack.Callstack `json:"callstack"`
 	// WaitEnqueue indicates if this event should temporarily defer pushing to
 	// the consumer output queue. This is usually required in event processors
 	// to propagate certain events stored in processor's state when the related

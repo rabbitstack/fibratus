@@ -62,7 +62,7 @@ func (f *Formatter) Format(kevt *Kevent) []byte {
 	}
 	// add callstack summary
 	if !kevt.Callstack.IsEmpty() {
-		values[callstack] = kevt.Callstack.String()
+		values[cstack] = kevt.Callstack.String()
 	}
 
 	if f.expandKparamsDot {
