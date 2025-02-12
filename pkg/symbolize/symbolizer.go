@@ -318,16 +318,6 @@ func (s *Symbolizer) processCallstack(e *kevent.Kevent) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if e.IsCreateFile() && e.IsOpenDisposition() {
-		// for high-volume events decorating
-		// the frames with symbol information
-		// is not viable. For this reason, the
-		// frames are decorated in fast mode.
-		// In this mode, symbolization is skipped
-		s.pushFrames(addrs, e, true, false)
-		return nil
-	}
-
 	if e.PS != nil {
 		var (
 			addr va.Address
@@ -398,7 +388,7 @@ func (s *Symbolizer) processCallstack(e *kevent.Kevent) error {
 
 		// try to resolve addresses from process
 		// state and PE export directory data
-		s.pushFrames(addrs, e, false, true)
+		s.pushFrames(addrs, e)
 
 		return nil
 	}
@@ -407,22 +397,21 @@ func (s *Symbolizer) processCallstack(e *kevent.Kevent) error {
 	if !ok {
 		handle, err := windows.OpenProcess(windows.SYNCHRONIZE|windows.PROCESS_QUERY_INFORMATION, false, e.PID)
 		if err != nil {
-			s.pushFrames(addrs, e, true, true)
+			s.pushFrames(addrs, e)
 			return err
 		}
 		// initialize symbol handler
 		opts := uint32(sys.SymUndname | sys.SymCaseInsensitive | sys.SymAutoPublics | sys.SymOmapFindNearest | sys.SymDeferredLoads)
 		err = s.r.Initialize(handle, opts)
 		if err != nil {
-			s.pushFrames(addrs, e, true, true)
+			s.pushFrames(addrs, e)
 			return ErrSymInitialize(e.PID)
 		}
 		proc = &process{e.PID, handle, time.Now(), 1}
 		s.procs[e.PID] = proc
 	}
 
-	// perform full symbolization
-	s.pushFrames(addrs, e, false, true)
+	s.pushFrames(addrs, e)
 
 	proc.keepalive()
 
@@ -434,24 +423,20 @@ func (s *Symbolizer) processCallstack(e *kevent.Kevent) error {
 // addresses where the first element is the
 // most recent kernel return address that is
 // pushed last into the event callstack.
-func (s *Symbolizer) pushFrames(addrs []va.Address, e *kevent.Kevent, fast, lookupExport bool) {
+func (s *Symbolizer) pushFrames(addrs []va.Address, e *kevent.Kevent) {
 	for i := len(addrs) - 1; i >= 0; i-- {
-		e.Callstack.PushFrame(s.produceFrame(addrs[i], e, fast, lookupExport))
+		e.Callstack.PushFrame(s.produceFrame(addrs[i], e))
 	}
 }
 
 // produceFrame fabrics a decorated stack frame.
 // For return addresses residing in the kernel
 // address space, the symbolization is always
-// performed. For userspace address range, if
-// fast mode is enabled, the frame is solely
-// decorated with the module name by iterating
-// through modules contained in the process
-// state. All symbols are resolved from the
+// performed. All symbols are resolved from the
 // PE export directory entries. If either the
 // symbol or module are not resolved, then we
 // fall back to Debug API.
-func (s *Symbolizer) produceFrame(addr va.Address, e *kevent.Kevent, fast, lookupExport bool) kevent.Frame {
+func (s *Symbolizer) produceFrame(addr va.Address, e *kevent.Kevent) kevent.Frame {
 	frame := kevent.Frame{PID: e.PID, Addr: addr}
 	if addr.InSystemRange() {
 		if s.config.SymbolizeKernelAddresses {
@@ -468,21 +453,6 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *kevent.Kevent, fast, looku
 			frame.Module, frame.Symbol = symbol.module, symbol.symbol
 			return frame
 		}
-	}
-
-	if fast {
-		if e.PS != nil {
-			mod := e.PS.FindModuleByVa(addr)
-			if mod != nil {
-				frame.Module = mod.Name
-				frame.ModuleAddress = mod.BaseAddress
-			}
-			if lookupExport {
-				frame.Symbol = s.resolveSymbolFromExportDirectory(addr, mod)
-			}
-			return frame
-		}
-		return frame
 	}
 
 	if e.PS != nil {
