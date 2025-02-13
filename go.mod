@@ -28,6 +28,7 @@ require (
 	github.com/spf13/viper v1.6.2
 	github.com/streadway/amqp v1.0.0
 	github.com/stretchr/testify v1.8.1
+	github.com/tailscale/wf v0.0.0-20240214030419-6fbb0a674ee6
 	github.com/valyala/bytebufferpool v1.0.0
 	github.com/valyala/gozstd v1.11.0
 	github.com/xeipuuv/gojsonschema v1.2.0
@@ -44,9 +45,16 @@ require (
 )
 
 require (
+	github.com/BurntSushi/toml v0.4.1 // indirect
 	github.com/rivo/uniseg v0.4.2 // indirect
 	github.com/rogpeppe/go-internal v1.11.0 // indirect
 	github.com/secDre4mer/pkcs7 v0.0.0-20240322103146-665324a4461d // indirect
+	go4.org/netipx v0.0.0-20220725152314-7e7bdc8411bf // indirect
+	golang.org/x/exp/typeparams v0.0.0-20220218215828-6cf2b201936e // indirect
+	golang.org/x/mod v0.17.0 // indirect
+	golang.org/x/sync v0.10.0 // indirect
+	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
+	honnef.co/go/tools v0.3.2 // indirect
 )
 
 require (

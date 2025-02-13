@@ -304,7 +304,7 @@ func (e *Engine) ProcessEvent(evt *kevent.Kevent) (bool, error) {
 // Sending an alert is an implicit action
 // carried out each time there is a rule
 // match. Other actions are executed if
-// defined in the rule definition.
+// declared in the rule definition.
 func (e *Engine) processActions() error {
 	defer e.clearMatches()
 	e.mmu.Lock()
@@ -324,15 +324,21 @@ func (e *Engine) processActions() error {
 		}
 
 		for _, act := range actions {
-			switch act.(type) {
+			switch t := act.(type) {
 			case config.KillAction:
 				log.Infof("executing kill action: pids=%v rule=%s", m.ctx.UniquePids(), f.Name)
 				if err := action.Kill(m.ctx.UniquePids()); err != nil {
 					return ErrRuleAction(f.Name, err)
 				}
+			case config.IsolateAction:
+				log.Infof("executing isolate action: rule=%s", f.Name)
+				if err := action.Isolate(t.Whitelist); err != nil {
+					return ErrRuleAction(f.Name, err)
+				}
 			}
 		}
 	}
+
 	return nil
 }
 

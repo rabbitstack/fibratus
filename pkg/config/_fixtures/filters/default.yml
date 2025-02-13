@@ -9,6 +9,10 @@ output: >
   `%ps.exe` attempted to reach out to `%net.sip` IP address
 action:
 - name: kill
+- name: isolate
+  whitelist:
+    - 127.0.0.1
+    - 8.8.8.8
 min-engine-version: 2.0.0
 tags:
   - TE
