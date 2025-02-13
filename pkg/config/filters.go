@@ -30,6 +30,7 @@ import (
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 	"io"
+	"net"
 	"net/http"
 	u "net/url"
 	"os"
@@ -64,6 +65,13 @@ type FilterAction any
 // indicates by the filter field expression.
 type KillAction struct{}
 
+// IsolateAction defines an action for isolating the host
+// via firewall rules.
+type IsolateAction struct {
+	// Whitelist contains IP addresses that should remain accessible.
+	Whitelist []net.IP `mapstructure:"whitelist"`
+}
+
 // DecodeActions converts raw YAML map to
 // typed action structures.
 func (f FilterConfig) DecodeActions() ([]any, error) {
@@ -89,8 +97,14 @@ func (f FilterConfig) DecodeActions() ([]any, error) {
 			if err := dec(m, kill); err != nil {
 				return nil, err
 			}
+		case "isolate":
+			var isolate IsolateAction
+			if err := dec(m, isolate); err != nil {
+				return nil, err
+			}
 		}
 	}
+
 	return actions, nil
 }
 

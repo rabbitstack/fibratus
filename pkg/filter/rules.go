@@ -23,7 +23,6 @@ import (
 	"expvar"
 	"fmt"
 	fsm "github.com/qmuntal/stateless"
-	"github.com/rabbitstack/fibratus/pkg/filter/action"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
@@ -865,42 +864,6 @@ func (r *Rules) runRules(filters []*compiledFilter, kevt *kevent.Kevent) bool {
 		}
 	}
 	return false
-}
-
-// processActions executes rule actions
-// on behalf of rule matches. Actions are
-// categorized into implicit and explicit
-// actions.
-// Sending an alert is an implicit action
-// carried out each time there is a rule
-// match. Other actions are executed if
-// defined in the rule definition.
-func (r *Rules) processActions() error {
-	defer r.clearMatches()
-	for _, m := range r.matches {
-		f, evts := m.ctx.Filter, m.ctx.Events
-		filterMatches.Add(f.Name, 1)
-		log.Debugf("[%s] rule matched", f.Name)
-		err := action.Emit(m.ctx, f.Name, InterpolateFields(f.Output, evts), f.Severity, f.Tags)
-		if err != nil {
-			return ErrRuleAction(f.Name, err)
-		}
-
-		actions, err := f.DecodeActions()
-		if err != nil {
-			return err
-		}
-		for _, act := range actions {
-			switch act.(type) {
-			case config.KillAction:
-				log.Infof("executing kill action: pids=%v rule=%s", m.ctx.UniquePids(), f.Name)
-				if err := action.Kill(m.ctx.UniquePids()); err != nil {
-					return ErrRuleAction(f.Name, err)
-				}
-			}
-		}
-	}
-	return nil
 }
 
 func (r *Rules) appendMatch(f *config.FilterConfig, evts ...*kevent.Kevent) {
