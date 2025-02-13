@@ -18,7 +18,11 @@
 
 package config
 
-import "github.com/mitchellh/mapstructure"
+import (
+	"github.com/mitchellh/mapstructure"
+	"net"
+	"reflect"
+)
 
 func decode(input, output interface{}) error {
 	var decoderConfig = &mapstructure.DecoderConfig{
@@ -28,6 +32,7 @@ func decode(input, output interface{}) error {
 		DecodeHook: mapstructure.ComposeDecodeHookFunc(
 			mapstructure.StringToTimeDurationHookFunc(),
 			mapstructure.StringToSliceHookFunc(","),
+			ipSliceDecodeHook(),
 		),
 	}
 	decoder, err := mapstructure.NewDecoder(decoderConfig)
@@ -35,4 +40,25 @@ func decode(input, output interface{}) error {
 		return err
 	}
 	return decoder.Decode(input)
+}
+
+func ipSliceDecodeHook() mapstructure.DecodeHookFunc {
+	return func(from reflect.Type, to reflect.Type, data interface{}) (interface{}, error) {
+		if to.Kind() == reflect.Slice && to.Elem() == reflect.TypeOf(net.IP(nil)) {
+			switch v := data.(type) {
+			case []interface{}:
+				var ips []net.IP
+				for _, s := range v {
+					ip, ok := s.(string)
+					if !ok {
+						continue
+					}
+					ips = append(ips, net.ParseIP(ip))
+				}
+				return ips, nil
+			}
+		}
+
+		return data, nil
+	}
 }
