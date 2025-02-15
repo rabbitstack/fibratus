@@ -14,6 +14,8 @@ SetLocal EnableDelayedExpansion
 set PYTHON_VER=3.7.9
 set PYTHON_URL=https://www.python.org/ftp/python/%PYTHON_VER%/python-%PYTHON_VER%-embed-amd64.zip
 
+set WIX_VERSION=5.0.0
+
 set GOBIN=%USERPROFILE%\go\bin
 
 set GOTEST=go test -timeout=10m -v -gcflags=all=-d=checkptr=0
@@ -118,7 +120,7 @@ robocopy ".\rules" "%RELEASE_DIR%\Rules" /E /S /XF *.md *.png
 
 :: Download the embedded Python distribution
 echo Downloading Python %PYTHON_VER%...
-powershell -Command "Invoke-WebRequest %PYTHON_URL% -OutFile %RELEASE_DIR%\python.zip"
+powershell -Command "Invoke-WebRequest %PYTHON_URL% -OutFile %RELEASE_DIR%\python.zip" || goto :fail
 
 echo Extracting Python distribution...
 powershell -Command "Expand-Archive %RELEASE_DIR%\python.zip -DestinationPath %RELEASE_DIR%\python"
@@ -146,9 +148,9 @@ copy %SystemRoot%\System32\dbghelp.dll "%RELEASE_DIR%\Bin"
 echo Building MSI package...
 pushd .
 cd build/msi
-wix extension add WixToolset.UI.wixext || exit /b
-wix extension add WixToolset.Util.wixext || exit /b
-wix build -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext -b dir=fibratus-%VERSION% fibratus.wxs -arch x64 -d VERSION=%VERSION% -o fibratus-%VERSION%-amd64.msi || exit /b
+wix extension add WixToolset.UI.wixext/%WIX_VERSION% || goto :fail
+wix extension add WixToolset.Util.wixext/%WIX_VERSION% || goto :fail
+wix build -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext -b dir=fibratus-%VERSION% fibratus.wxs -arch x64 -d VERSION=%VERSION% -o fibratus-%VERSION%-amd64.msi || goto :fail
 popd
 echo fibratus-%VERSION%-amd64.msi MSI package built successfully
 
@@ -180,13 +182,11 @@ copy %SystemRoot%\System32\dbghelp.dll "%RELEASE_DIR%\Bin"
 echo Building MSI package...
 pushd .
 cd build/msi
-wix extension add WixToolset.UI.wixext || exit /b
-wix extension add WixToolset.Util.wixext || exit /b
-wix build -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext -b dir=fibratus-%VERSION%-slim fibratus.wxs -arch x64 -d VERSION=%VERSION% -o fibratus-%VERSION%-slim-amd64.msi || exit /b
+wix extension add WixToolset.UI.wixext/%WIX_VERSION% || goto :fail
+wix extension add WixToolset.Util.wixext/%WIX_VERSION% || goto :fail
+wix build -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext -b dir=fibratus-%VERSION%-slim fibratus.wxs -arch x64 -d VERSION=%VERSION% -o fibratus-%VERSION%-slim-amd64.msi ||  goto :fail
 popd
 echo fibratus-%VERSION%-slim-amd64.msi MSI package built successfully
-
-if errorlevel 1 goto fail
 
 goto :EOF
 
