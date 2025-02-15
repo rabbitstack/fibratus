@@ -217,3 +217,25 @@ jobs:
            export PATH="/c/msys64/mingw64/bin:$PATH"
            export PKG_CONFIG_PATH=$(pwd)/pkg-config
            ./make.bat lint
+
+  validate-rules:
+    runs-on: windows-latest
+    needs: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Download MSI
+        uses: actions/download-artifact@v4
+        with:
+          name: "fibratus-amd64.msi"
+          path: .
+      - name: Install MSI
+        shell: bash
+        run: |
+          ./make.bat install
+      - name: Validate
+        shell: bash
+        run: |
+          export PATH="/c/Program Files/Fibratus/Bin:$PATH"
+          fibratus rules list
+          fibratus rules validate
