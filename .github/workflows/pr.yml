@@ -224,12 +224,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
       - name: Download MSI
         uses: actions/download-artifact@v4
         with:
           name: "fibratus-amd64.msi"
           path: .
-      - name: Install MSI
+      - name: Install Fibratus
         shell: bash
         run: |
           ./make.bat install
@@ -239,3 +241,25 @@ jobs:
           export PATH="/c/Program Files/Fibratus/Bin:$PATH"
           fibratus rules list
           fibratus rules validate
+      - name: Get changed rules
+        id: changed-rules
+        uses: tj-actions/changed-files@v45
+        with:
+          files: |
+            rules/**.yml
+      - name: Check version increment
+        if: steps.changed-rules.outputs.any_changed == 'true'
+        env:
+          CHANGED_RULES: ${{ steps.changed-rules.outputs.all_changed_files }}
+        shell: bash
+        run: |
+          choco install yq -y
+          for rule in ${CHANGED_RULES}; do
+            RULE="${rule//\\//}"
+            HEAD_VERSION=$(git show HEAD~1:$RULE | yq '.version')
+            CURR_VERSION=$(yq '.version' $rule)
+            if [[ "$HEAD_VERSION" == "$CURR_VERSION" ]]; then
+              echo "$(basename $rule) changed but the version is not incremented. HEAD version: $HEAD_VERSION"
+              exit 1
+            fi
+          done

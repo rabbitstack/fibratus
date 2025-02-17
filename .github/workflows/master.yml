@@ -247,7 +247,7 @@ jobs:
         with:
           name: "fibratus-amd64.msi"
           path: .
-      - name: Install MSI
+      - name: Install Fibratus
         shell: bash
         run: |
           ./make.bat install
