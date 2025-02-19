@@ -66,48 +66,12 @@ const (
 	// ThreadpoolSession represents the session name for the thread pool logger
 	ThreadpoolSession = "Threadpool Logger"
 
-	// SystemRegistrySession represents system registry logger
-	SystemRegistrySession = "System Registry Logger"
-
 	// WnodeTraceFlagGUID indicates that the structure contains event tracing information
 	WnodeTraceFlagGUID = 0x00020000
 	// ProcessTraceModeRealtime denotes that there will be a real-time consumers for events forwarded from the providers
 	ProcessTraceModeRealtime = 0x00000100
 	// ProcessTraceModeEventRecord is the mode that enables the "event record" format for kernel events
 	ProcessTraceModeEventRecord = 0x10000000
-	// EventTraceSystemLoggerMode enables events from system loggers
-	EventTraceSystemLoggerMode = 0x02000000
-)
-
-var (
-	// SystemProcessProviderID provides events related to the process, including lifetime information, image load events, and thread related events.
-	SystemProcessProviderID = windows.GUID{Data1: 0x151f55dc, Data2: 0x467d, Data3: 0x471f, Data4: [8]byte{0x83, 0xb5, 0x5f, 0x88, 0x9d, 0x46, 0xff, 0x66}}
-	// SystemIOProviderID provides events related to multiple kinds of IO including disk, cache, and network.
-	SystemIOProviderID = windows.GUID{Data1: 0x3d5c43e3, Data2: 0x0f1c, Data3: 0x4202, Data4: [8]byte{0xb8, 0x17, 0x17, 0x4c, 0x00, 0x70, 0xdc, 0x79}}
-	// SystemRegistryProviderID provides events related to the registry.
-	SystemRegistryProviderID = windows.GUID{Data1: 0x16156bd9, Data2: 0xfab4, Data3: 0x4cfa, Data4: [8]byte{0xa2, 0x32, 0x89, 0xd1, 0x09, 0x90, 0x58, 0xe3}}
-	// SystemMemoryProviderID provides events related to the memory manager.
-	SystemMemoryProviderID = windows.GUID{Data1: 0x82958ca9, Data2: 0xb6cd, Data3: 0x47f8, Data4: [8]byte{0xa3, 0xa8, 0x03, 0xae, 0x85, 0xa4, 0xbc, 0x24}}
-)
-
-const (
-	// ProcessKeywordGeneral enables process events
-	ProcessKeywordGeneral = 0x1
-	// ProcessKeywordThread enables thread events
-	ProcessKeywordThread = 0x800
-	// ProcessKeywordLoader enables image load/unload events
-	ProcessKeywordLoader = 0x1000
-
-	// RegistryKeywordGeneral enables registry events
-	RegistryKeywordGeneral = 0x1
-
-	// IOKeywordNetwork enables network events
-	IOKeywordNetwork = 0x200
-
-	// MemoryVirtualAlloc enables memory alloc events
-	MemoryVirtualAlloc = 0x400
-	// MemoryVAMap enables section mapping/unmapping events
-	MemoryVAMap = 0x4000
 )
 
 const (

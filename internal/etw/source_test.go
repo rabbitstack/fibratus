@@ -127,21 +127,17 @@ func TestEventSourceStartTraces(t *testing.T) {
 			evs := NewEventSource(psnap, hsnap, tt.cfg, nil)
 			require.NoError(t, evs.Open(tt.cfg))
 			defer evs.Close()
-			if !SupportsSystemProviders() {
-				assert.Equal(t, tt.wantSessions, len(evs.(*EventSource).traces))
-			}
+			assert.Equal(t, tt.wantSessions, len(evs.(*EventSource).traces))
 
 			for _, trace := range evs.(*EventSource).traces {
 				require.True(t, trace.Handle().IsValid())
 				require.NoError(t, etw.ControlTrace(0, trace.Name, trace.GUID, etw.Query))
-				if !SupportsSystemProviders() {
-					if tt.wantFlags != nil && trace.IsKernelTrace() {
-						flags, err := etw.GetTraceSystemFlags(trace.Handle())
-						require.NoError(t, err)
-						// check enabled system event flags
-						require.Equal(t, tt.wantFlags[0], flags[0])
-						require.Equal(t, tt.wantFlags[1], flags[4])
-					}
+				if tt.wantFlags != nil && trace.IsKernelTrace() {
+					flags, err := etw.GetTraceSystemFlags(trace.Handle())
+					require.NoError(t, err)
+					// check enabled system event flags
+					require.Equal(t, tt.wantFlags[0], flags[0])
+					require.Equal(t, tt.wantFlags[1], flags[4])
 				}
 			}
 		})
@@ -204,11 +200,7 @@ func TestEventSourceEnableFlagsDynamically(t *testing.T) {
 
 	flags := evs.(*EventSource).traces[0].enableFlagsDynamically(cfg.Kstream)
 
-	if SupportsSystemProviders() {
-		require.Len(t, evs.(*EventSource).traces, 3)
-	} else {
-		require.Len(t, evs.(*EventSource).traces, 2)
-	}
+	require.Len(t, evs.(*EventSource).traces, 2)
 
 	require.True(t, flags&etw.FileIO != 0)
 	require.True(t, flags&etw.Process != 0)
