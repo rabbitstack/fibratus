@@ -71,16 +71,6 @@ var (
 	buffersRead = expvar.NewInt("kstream.kbuffers.read")
 )
 
-// SupportsSystemProviders determines if the support for granular
-// system providers in present.
-func SupportsSystemProviders() bool {
-	maj, _, patch := windows.RtlGetNtVersionNumbers()
-	if maj > 10 {
-		return true
-	}
-	return maj >= 10 && patch >= 20348
-}
-
 // EventSource is the core component responsible for
 // starting ETW tracing sessions and setting up event
 // consumers.
@@ -176,13 +166,6 @@ func (e *EventSource) Open(config *config.Config) error {
 	}
 
 	e.addTrace(etw.KernelLoggerSession, etw.KernelTraceControlGUID)
-
-	if SupportsSystemProviders() && !config.IsCaptureSet() {
-		log.Info("system providers support detected")
-		if config.Kstream.EnableRegistryKevents {
-			e.addTraceKeywords(etw.SystemRegistrySession, etw.SystemRegistryProviderID, etw.RegistryKeywordGeneral)
-		}
-	}
 
 	if config.Kstream.EnableDNSEvents {
 		e.addTrace(etw.DNSClientSession, etw.DNSClientGUID)
@@ -320,8 +303,4 @@ func (e *EventSource) RegisterEventListener(lis kevent.Listener) {
 
 func (e *EventSource) addTrace(name string, guid windows.GUID) {
 	e.traces = append(e.traces, NewTrace(name, guid, 0x0, e.config))
-}
-
-func (e *EventSource) addTraceKeywords(name string, guid windows.GUID, keywords uint64) {
-	e.traces = append(e.traces, NewTrace(name, guid, keywords, e.config))
 }
