@@ -87,9 +87,7 @@ func (r *registryProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, erro
 	switch e.Type {
 	case ktypes.RegKCBRundown, ktypes.RegCreateKCB:
 		khandle := e.Kparams.MustGetUint64(kparams.RegKeyHandle)
-		if _, ok := r.keys[khandle]; !ok {
-			r.keys[khandle], _ = e.Kparams.GetString(kparams.RegPath)
-		}
+		r.keys[khandle] = e.Kparams.MustGetString(kparams.RegPath)
 		kcbCount.Add(1)
 	case ktypes.RegDeleteKCB:
 		khandle := e.Kparams.MustGetUint64(kparams.RegKeyHandle)
