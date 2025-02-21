@@ -47,13 +47,13 @@ const (
 )
 
 var (
-	filterMatches = expvar.NewMap("filter.matches")
-	filtersCount  = expvar.NewInt("filter.filters.count")
+	filterMatches = expvar.NewMap("filter.matches1")
+	filtersCount  = expvar.NewInt("filter.filters.count1")
 
-	matchTransitionErrors = expvar.NewInt("sequence.match.transition.errors")
-	partialsPerSequence   = expvar.NewMap("sequence.partials.count")
-	partialExpirations    = expvar.NewMap("sequence.partial.expirations")
-	partialBreaches       = expvar.NewMap("sequence.partial.breaches")
+	matchTransitionErrors = expvar.NewInt("sequence.match.transition.errors1")
+	partialsPerSequence   = expvar.NewMap("sequence.partials.count1")
+	partialExpirations    = expvar.NewMap("sequence.partial.expirations1")
+	partialBreaches       = expvar.NewMap("sequence.partial.breaches1")
 
 	ErrInvalidFilter = func(rule string, err error) error {
 		return fmt.Errorf("syntax error in rule %q: \n%v", rule, err)
@@ -464,7 +464,7 @@ func (f compiledFilter) run(kevt *kevent.Kevent, i int, rawMatch, lock bool) boo
 			f.ss.mu.RLock()
 			defer f.ss.mu.RUnlock()
 		}
-		return f.filter.RunSequence(kevt, uint16(i), f.ss.partials, rawMatch)
+		return f.filter.RunSequence(kevt, i, nil, rawMatch)
 	}
 	return f.filter.Run(kevt)
 }
@@ -790,7 +790,7 @@ func (r *Rules) runSequence(kevt *kevent.Kevent, f *compiledFilter) bool {
 		for i := uint16(1); i < nseqs+1; i++ {
 			for _, outer := range f.ss.partials[i] {
 				for _, inner := range f.ss.partials[i+1] {
-					if compareSeqJoin(outer.SequenceBy(), inner.SequenceBy()) {
+					if CompareSeqJoin(outer.SequenceBy(), inner.SequenceBy()) {
 						setMatch(i, outer)
 						setMatch(i+1, inner)
 					}

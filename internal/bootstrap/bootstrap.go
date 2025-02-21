@@ -30,6 +30,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	"github.com/rabbitstack/fibratus/pkg/kcap"
 	"github.com/rabbitstack/fibratus/pkg/ps"
+	"github.com/rabbitstack/fibratus/pkg/rules"
 	"github.com/rabbitstack/fibratus/pkg/symbolize"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
@@ -52,7 +53,7 @@ type App struct {
 	config     *config.Config
 	evs        *EventSourceControl
 	symbolizer *symbolize.Symbolizer
-	rules      *filter.Rules
+	engine     *rules.Engine
 	hsnap      handle.Snapshotter
 	psnap      ps.Snapshotter
 	filament   filament.Filament
@@ -134,34 +135,34 @@ func NewApp(cfg *config.Config, options ...Option) (*App, error) {
 	hsnap := handle.NewSnapshotter(cfg, opts.handleSnapshotFn)
 	psnap := ps.NewSnapshotter(hsnap, cfg)
 
-	var (
-		rules *filter.Rules
-		res   *config.RulesCompileResult
-	)
+	var engine *rules.Engine
+	var rs *config.RulesCompileResult
+
 	if cfg.Filters.Rules.Enabled && !cfg.ForwardMode && !cfg.IsCaptureSet() {
-		rules = filter.NewRules(psnap, cfg)
+		engine = rules.NewEngine(psnap, cfg)
 		var err error
-		res, err = rules.Compile()
+		rs, err = engine.Compile()
 		if err != nil {
 			return nil, err
 		}
-		if res != nil {
-			log.Infof("rules compile summary: %s", res)
+		if rs != nil {
+			log.Infof("rules compile summary: %s", rs)
 		}
 	} else {
 		log.Info("rule engine is disabled")
 	}
 
-	evs := NewEventSourceControl(psnap, hsnap, cfg, res)
+	evs := NewEventSourceControl(psnap, hsnap, cfg, rs)
 
 	app := &App{
 		config:  cfg,
 		evs:     evs,
-		rules:   rules,
+		engine:  engine,
 		hsnap:   hsnap,
 		psnap:   psnap,
 		signals: sigs,
 	}
+
 	return app, nil
 }
 
@@ -234,8 +235,8 @@ func (f *App) Run(args []string) error {
 			f.evs.RegisterEventListener(f.symbolizer)
 		}
 		// register rule engine
-		if f.rules != nil {
-			f.evs.RegisterEventListener(f.rules)
+		if f.engine != nil {
+			f.evs.RegisterEventListener(f.engine)
 		}
 		// register YARA scanner
 		if cfg.Yara.Enabled {
