@@ -27,24 +27,38 @@ references:
 condition: >
   sequence
   maxspan 10m
-    |create_file and file.path imatches
-      (
-        '?:\\Windows\\System32\\wow64log.dll',
-        '?:\\Windows\\wbemcomn.dll',
-        '?:\\Windows\\System\\Ualapi.dll',
-        '?:\\Windows\\System32\\EdgeGdi.dll',
-        '?:\\Windows\\*\\wbem\\wbemcomn.dll',
-        '?:\\Windows\\System32\\WindowsPowerShell\\*\\wbemcomn.dll',
-        '?:\\Windows\\*\\Ualapi.dll',
-        '?:\\Windows\\System32\\spool\\drivers\\x64\\PrintConfig.dll',
-        '?:\\Windows\\System32\\wlbsctrl.dll',
-        '?:\\Windows\\System32\\Tsmsisrv.dll',
-        '?:\\Windows\\System32\\TSVIPSrv.dll',
-        '?:\\Windows\\System32\\fveapi.dll',
-        '?:\\Windows\\System32\\Speech\\Engines\\TTS\\MSTTSLocEnUS.dll',
-        '?:\\Windows\\System32\\DXGIDebug.dll'
-      )
-    | by file.path
-    |load_dll| by image.path
+    |create_file 
+      and file.name imatches
+        (
+          '?:\\Windows\\System32\\wow64log.dll',
+          '?:\\Windows\\wbemcomn.dll',
+          '?:\\Windows\\System\\Ualapi.dll',
+          '?:\\Windows\\System32\\EdgeGdi.dll',
+          '?:\\Windows\\*\\wbem\\wbemcomn.dll',
+          '?:\\Windows\\System32\\WindowsPowerShell\\*\\wbemcomn.dll',
+          '?:\\Windows\\*\\Ualapi.dll',
+          '?:\\Windows\\System32\\spool\\drivers\\x64\\PrintConfig.dll',
+          '?:\\Windows\\System32\\wlbsctrl.dll',
+          '?:\\Windows\\System32\\Tsmsisrv.dll',
+          '?:\\Windows\\System32\\TSVIPSrv.dll',
+          '?:\\Windows\\System32\\fveapi.dll',
+          '?:\\Windows\\System32\\Speech\\Engines\\TTS\\MSTTSLocEnUS.dll',
+          '?:\\Windows\\System32\\DXGIDebug.dll'
+        )
+      and not ps.name in
+        (
+          'RuntimeBroker.exe',
+          'svchost.exe',
+          'services.exe',
+          'System',
+          'smss.exe',
+          'csrss.exe',
+          'wininit.exe',
+          'winlogon.exe'
+        )
+    | by file.name
+    |load_dll
+      and not ps.name = 'RuntimeBroker.exe'
+    | by image.name
 
 min-engine-version: 2.4.0
