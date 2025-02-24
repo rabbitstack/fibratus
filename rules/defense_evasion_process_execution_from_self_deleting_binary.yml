@@ -19,30 +19,15 @@ references:
 
 condition: >
   sequence
-  maxspan 1m 
-    |delete_file and file.info.is_disposition_delete_file
+    maxspan 1m
+    |delete_file
       and
-      not
-     ps.exe imatches 
-      (
-        '?:\\$WINDOWS.~BT\\Sources\\SetupHost.exe',
-        '?:\\WINDOWS\\uus\\packages\\preview\\*\\wuaucltcore.exe'
-      )
-      and 
-      not
-     ps.cmdline imatches 
-      (
-        '?:\\Windows\\system32\\svchost.exe -k wsappx -p -s AppXSvc'
-      )
+    file.info.is_disposition_delete_file
       and
-      not 
-     file.path imatches 
-      (
-        '?:\\Windows\\SoftwareDistribution\\Download\\*',
-        '?:\\Windows\\uus\\packages\\preview\\*'
-      )
+    not file.name imatches '?:\\Windows\\SoftwareDistribution\\Download\\*'
     | by file.name
-    |load_module and ext(image.path) != '.dll'| by image.name
+    |load_module
+    | by image.name
 
 output: >
   Process %2.image.path spawned from self-deleting binary
