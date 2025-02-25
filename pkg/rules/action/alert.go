@@ -27,8 +27,8 @@ import (
 	"strings"
 )
 
-// Emit sends the rule alert via all configured alert senders.
-func Emit(ctx *config.ActionContext, title string, text string, severity string, tags []string) error {
+// Alert sends the rule alert via all configured alert senders.
+func Alert(ctx *config.ActionContext, title string, text string, severity string, tags []string) error {
 	var b strings.Builder
 	for _, evt := range ctx.Events {
 		b.WriteString(evt.String())

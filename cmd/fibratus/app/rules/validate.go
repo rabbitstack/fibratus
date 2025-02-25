@@ -24,6 +24,7 @@ import (
 	"github.com/rabbitstack/fibratus/internal/bootstrap"
 	"github.com/rabbitstack/fibratus/pkg/filter"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
+	"github.com/rabbitstack/fibratus/pkg/rules"
 	"path/filepath"
 	"strings"
 )
@@ -91,7 +92,7 @@ func validateRules() error {
 		f := filter.New(rule.Condition, cfg)
 		err := f.Compile()
 		if err != nil {
-			return fmt.Errorf("%v %v", emoji.DisappointedFace, filter.ErrInvalidFilter(rule.Name, err))
+			return fmt.Errorf("%v %v", emoji.DisappointedFace, rules.ErrInvalidFilter(rule.Name, err))
 		}
 
 		w := warning{rule: rule.Name}

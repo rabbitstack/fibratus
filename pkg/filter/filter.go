@@ -53,7 +53,7 @@ type Filter interface {
 	// RunSequence runs a filter with sequence expressions. Sequence rules depend
 	// on the state machine transitions and partial matches to decide whether the
 	// rule is fired.
-	RunSequence(evt *kevent.Kevent, seqID uint16, partials map[uint16][]*kevent.Kevent, rawMatch bool) bool
+	RunSequence(evt *kevent.Kevent, seqID int, partials map[int][]*kevent.Kevent, rawMatch bool) bool
 	// GetStringFields returns field names mapped to their string values.
 	GetStringFields() map[fields.Field][]string
 	// GetFields returns all fields used in the filter expression.
@@ -87,7 +87,7 @@ type filter struct {
 	segments    []fields.Segment
 	boundFields []*ql.BoundFieldLiteral
 	// seqBoundFields contains per-sequence bound fields resolved from bound field literals
-	seqBoundFields map[uint16][]BoundField
+	seqBoundFields map[int][]BoundField
 	// stringFields contains filter field names mapped to their string values
 	stringFields map[fields.Field][]string
 	hasFunctions bool
@@ -182,22 +182,22 @@ func (f *filter) Compile() error {
 	return f.checkBoundRefs()
 }
 
-func (f *filter) Run(kevt *kevent.Kevent) bool {
+func (f *filter) Run(e *kevent.Kevent) bool {
 	if f.expr == nil {
 		return false
 	}
-	return ql.Eval(f.expr, f.mapValuer(kevt), f.hasFunctions)
+	return ql.Eval(f.expr, f.mapValuer(e), f.hasFunctions)
 }
 
-func (f *filter) RunSequence(kevt *kevent.Kevent, seqID uint16, partials map[uint16][]*kevent.Kevent, rawMatch bool) bool {
+func (f *filter) RunSequence(e *kevent.Kevent, seqID int, partials map[int][]*kevent.Kevent, rawMatch bool) bool {
 	if f.seq == nil {
 		return false
 	}
-	nseqs := uint16(len(f.seq.Expressions))
+	nseqs := len(f.seq.Expressions)
 	if seqID > nseqs-1 {
 		return false
 	}
-	valuer := f.mapValuer(kevt)
+	valuer := f.mapValuer(e)
 	expr := f.seq.Expressions[seqID]
 
 	if rawMatch {
@@ -213,12 +213,12 @@ func (f *filter) RunSequence(kevt *kevent.Kevent, seqID uint16, partials map[uin
 		// aliases
 		p := make(map[string][]*kevent.Kevent)
 		nslots := len(partials[seqID])
-		for i := uint16(0); i < seqID; i++ {
+		for i := 0; i < seqID; i++ {
 			alias := f.seq.Expressions[i].Alias
 			if alias == "" {
 				continue
 			}
-			p[alias] = partials[i+1]
+			p[alias] = partials[i]
 			if len(p[alias]) > nslots {
 				nslots = len(p[alias])
 			}
@@ -292,8 +292,8 @@ func (f *filter) RunSequence(kevt *kevent.Kevent, seqID uint16, partials map[uin
 			match = ql.Eval(expr.Expr, valuer, f.hasFunctions)
 			if match {
 				// compute sequence key hash to tie the events
-				evt.AddMeta(kevent.RuleSequenceByKey, hashers.FnvUint64(hash))
-				kevt.AddMeta(kevent.RuleSequenceByKey, hashers.FnvUint64(hash))
+				evt.AddMeta(kevent.RuleSequenceLink, hashers.FnvUint64(hash))
+				e.AddMeta(kevent.RuleSequenceLink, hashers.FnvUint64(hash))
 				break
 			}
 		}
@@ -308,9 +308,9 @@ func (f *filter) RunSequence(kevt *kevent.Kevent, seqID uint16, partials map[uin
 			joins := make([]bool, seqID)
 			joinID := valuer[by.Value]
 		outer:
-			for i := uint16(0); i < seqID; i++ {
-				for _, p := range partials[i+1] {
-					if compareSeqJoin(joinID, p.SequenceBy()) {
+			for i := 0; i < seqID; i++ {
+				for _, p := range partials[i] {
+					if CompareSeqLink(joinID, p.SequenceLink()) {
 						joins[i] = true
 						continue outer
 					}
@@ -323,7 +323,7 @@ func (f *filter) RunSequence(kevt *kevent.Kevent, seqID uint16, partials map[uin
 
 		if match && by != nil {
 			if v := valuer[by.Value]; v != nil {
-				kevt.AddMeta(kevent.RuleSequenceByKey, v)
+				e.AddMeta(kevent.RuleSequenceLink, v)
 			}
 		}
 	}
@@ -456,7 +456,7 @@ func (f *filter) addSegment(segment *ql.BoundSegmentLiteral) {
 // addSeqBoundFields receives the sequence id and the list of bound field literals
 // and populates the list of bound fields containing the field structure convenient
 // for accessors.
-func (f *filter) addSeqBoundFields(seqID uint16, fields []*ql.BoundFieldLiteral) []BoundField {
+func (f *filter) addSeqBoundFields(seqID int, fields []*ql.BoundFieldLiteral) []BoundField {
 	flds := make([]BoundField, 0, len(fields))
 	for _, field := range fields {
 		flds = append(flds,
@@ -497,9 +497,9 @@ func (f *filter) checkBoundRefs() error {
 	return nil
 }
 
-// compareSeqJoin returns true if both values
+// CompareSeqLink returns true if both values
 // representing the sequence joins are equal.
-func compareSeqJoin(s1, s2 any) bool {
+func CompareSeqLink(s1, s2 any) bool {
 	if s1 == nil || s2 == nil {
 		return false
 	}
