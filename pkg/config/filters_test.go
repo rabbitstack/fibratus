@@ -37,6 +37,7 @@ func TestLoadRulesFromPaths(t *testing.T) {
 			},
 		},
 		Macros{FromPaths: nil},
+		false,
 		map[string]*Macro{},
 		[]*FilterConfig{},
 	}
@@ -78,6 +79,7 @@ func TestLoadRulesFromPathsWithTemplate(t *testing.T) {
 			},
 		},
 		Macros{FromPaths: nil},
+		false,
 		map[string]*Macro{},
 		[]*FilterConfig{},
 	}
@@ -116,6 +118,7 @@ func TestLoadGroupsFromURLs(t *testing.T) {
 			},
 		},
 		Macros{FromPaths: nil},
+		false,
 		map[string]*Macro{},
 		[]*FilterConfig{},
 	}

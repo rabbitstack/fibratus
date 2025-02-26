@@ -146,6 +146,7 @@ var schema = `
 		"filters": {
 			"type": "object",
 			"properties": {
+				"match-all": {"type": "boolean"},
 				"rules": {
 					"type": "object",
 					"properties": {
@@ -510,7 +511,7 @@ var rulesSchema = `
 		"id": 					{"type": "string", "minLength": 36, "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"},
 		"version": 				{"type": "string", "minLength": 5, "pattern": "^([0-9]+.)([0-9]+.)([0-9]+)$"},
 		"name": 				{"type": "string", "minLength": 3},
-        "description":  		{"type": "string"},
+		"description":  		{"type": "string"},
 		"output": 				{"type": "string", "minLength": 5},
 		"notes": 				{"type": "string"},
 		"severity":  			{"type": "string", "enum": ["low", "medium", "high", "critical"]},

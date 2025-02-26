@@ -158,7 +158,7 @@ func TestCompileIndexableFilters(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.evt.Type.String(), func(t *testing.T) {
-			assert.Len(t, e.findFilters(tt.evt), tt.wants)
+			assert.Len(t, e.filters.collect(e.hashCache, tt.evt), tt.wants)
 		})
 	}
 
@@ -333,8 +333,9 @@ func TestRunSimpleAndSequenceRules(t *testing.T) {
 	log.SetLevel(log.DebugLevel)
 
 	expectedMatches := make(map[string][]uint64)
-
-	e := NewEngine(new(ps.SnapshotterMock), newConfig("_fixtures/simple_and_sequence_rules/*.yml"))
+	c := newConfig("_fixtures/simple_and_sequence_rules/*.yml")
+	c.Filters.MatchAll = true
+	e := NewEngine(new(ps.SnapshotterMock), c)
 	e.RegisterMatchFunc(func(f *config.FilterConfig, evts ...*kevent.Kevent) {
 		ids := make([]uint64, 0)
 		for _, evt := range evts {
