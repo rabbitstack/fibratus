@@ -380,6 +380,7 @@ func (c *Config) addFlags() {
 		c.flags.StringSlice(rulesFromPaths, []string{filepath.Join(dir, "*")}, "Comma-separated list of rules files")
 		c.flags.StringSlice(macrosFromPaths, []string{filepath.Join(dir, "Macros", "*")}, "Comma-separated list of macro files")
 		c.flags.StringSlice(rulesFromURLs, []string{}, "Comma-separated list of rules URL resources")
+		c.flags.Bool(matchAll, true, "Indicates if the match all strategy is enabled for the rule engine. If the match all strategy is enabled, a single event can trigger multiple rules")
 	}
 	if c.opts.capture {
 		c.flags.StringP(kcapFile, "o", "", "The path of the output kcap file")

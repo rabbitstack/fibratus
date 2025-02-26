@@ -54,7 +54,7 @@ var (
 // the collection of compiled filters that are derived
 // from the loaded ruleset.
 type Engine struct {
-	filters map[uint32][]*compiledFilter
+	filters compiledFilters
 	config  *config.Config
 	psnap   ps.Snapshotter
 
@@ -118,6 +118,29 @@ type compiledFilter struct {
 	filter filter.Filter
 	config *config.FilterConfig
 	ss     *sequenceState
+}
+
+type compiledFilters map[uint32][]*compiledFilter
+
+// collect collects all compiled filters for a
+// particular event type or category. If no filters
+// are found, the event is not asserted against the
+// ruleset.
+func (filters compiledFilters) collect(hashCache *hashCache, e *kevent.Kevent) []*compiledFilter {
+	h := hashCache.typeHash(e)
+	if h == 0 {
+		h = hashCache.addTypeHash(e)
+	}
+
+	if !hashCache.lookupCategory {
+		return filters[h]
+	}
+
+	c := hashCache.categoryHash(e)
+	if c == 0 {
+		c = hashCache.addCategoryHash(e)
+	}
+	return append(filters[h], filters[c]...)
 }
 
 func newCompiledFilter(f filter.Filter, c *config.FilterConfig, ss *sequenceState) *compiledFilter {
@@ -231,13 +254,14 @@ func (e *Engine) RegisterMatchFunc(fn RuleMatchFunc) {
 func (*Engine) CanEnqueue() bool { return true }
 
 // ProcessEvent processes the system event against compiled filters.
-// Filter is the internal lingo to designate the rule condition. The
-// filters can be simple direct-event matchers or sequence states that
+// Filter is the internal lingo that designates a rule condition.
+// Filters can be simple direct-event matchers or sequence states that
 // track an ordered series of events over a short period of time.
 func (e *Engine) ProcessEvent(evt *kevent.Kevent) (bool, error) {
 	if len(e.filters) == 0 {
 		return true, nil
 	}
+	var matches bool
 	if evt.IsTerminateProcess() {
 		// expire all sequences if the
 		// process referenced in any
@@ -246,45 +270,30 @@ func (e *Engine) ProcessEvent(evt *kevent.Kevent) (bool, error) {
 			seq.expire(evt)
 		}
 	}
-	filters := e.findFilters(evt)
+	filters := e.filters.collect(e.hashCache, evt)
 	for _, f := range filters {
 		match := f.run(evt)
-		if match {
-			if f.isSequence() {
-				e.appendMatch(f.config, f.ss.events()...)
-				f.ss.clearLocked()
-			} else {
-				e.appendMatch(f.config, evt)
-			}
-			err := e.processActions()
-			if err != nil {
-				log.Errorf("unable to execute rule action: %v", err)
-			}
+		if !match {
+			continue
+		}
+		if f.isSequence() {
+			e.appendMatch(f.config, f.ss.events()...)
+			f.ss.clearLocked()
+		} else {
+			e.appendMatch(f.config, evt)
+		}
+		err := e.processActions()
+		if err != nil {
+			log.Errorf("unable to execute rule action: %v", err)
+		}
+		switch {
+		case e.config.Filters.MatchAll:
+			matches = true
+		default:
 			return true, nil
 		}
 	}
-	return false, nil
-}
-
-// findFilters collects all compiled filters for a
-// particular event type or category. If no filters
-// are found, the event is not asserted against the
-// ruleset.
-func (e *Engine) findFilters(evt *kevent.Kevent) []*compiledFilter {
-	h := e.hashCache.typeHash(evt)
-	if h == 0 {
-		h = e.hashCache.addTypeHash(evt)
-	}
-	switch {
-	case !e.hashCache.lookupCategory:
-		return e.filters[h]
-	default:
-		c := e.hashCache.categoryHash(evt)
-		if c == 0 {
-			c = e.hashCache.addCategoryHash(evt)
-		}
-		return append(e.filters[h], e.filters[c]...)
-	}
+	return matches, nil
 }
 
 // processActions executes rule actions
@@ -310,6 +319,7 @@ func (e *Engine) processActions() error {
 		if err != nil {
 			return err
 		}
+
 		for _, act := range actions {
 			switch act.(type) {
 			case config.KillAction:

@@ -102,10 +102,13 @@ func (f FilterConfig) HasLabel(l string) bool { return f.Labels[l] != "" }
 
 // Filters contains references to rule and macro definitions.
 type Filters struct {
-	Rules   Rules  `json:"rules" yaml:"rules"`
-	Macros  Macros `json:"macros" yaml:"macros"`
-	macros  map[string]*Macro
-	filters []*FilterConfig
+	Rules  Rules  `json:"rules" yaml:"rules"`
+	Macros Macros `json:"macros" yaml:"macros"`
+	// MatchAll indicates if the match all strategy is enabled for the rule engine.
+	// If the match all strategy is enabled, a single event can trigger multiple rules.
+	MatchAll bool `json:"match-all" yaml:"match-all"`
+	macros   map[string]*Macro
+	filters  []*FilterConfig
 }
 
 // FiltersWithMacros builds the filter config with the map of
@@ -241,6 +244,7 @@ const (
 	rulesFromPaths  = "filters.rules.from-paths"
 	rulesFromURLs   = "filters.rules.from-urls"
 	macrosFromPaths = "filters.macros.from-paths"
+	matchAll        = "filters.match-all"
 )
 
 func (f *Filters) initFromViper(v *viper.Viper) {
@@ -248,6 +252,7 @@ func (f *Filters) initFromViper(v *viper.Viper) {
 	f.Rules.FromPaths = v.GetStringSlice(rulesFromPaths)
 	f.Rules.FromURLs = v.GetStringSlice(rulesFromURLs)
 	f.Macros.FromPaths = v.GetStringSlice(macrosFromPaths)
+	f.MatchAll = v.GetBool(matchAll)
 }
 
 func (f Filters) HasMacros() bool           { return len(f.macros) > 0 }
