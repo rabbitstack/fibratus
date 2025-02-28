@@ -59,6 +59,7 @@ type Engine struct {
 	psnap   ps.Snapshotter
 
 	matches   []*ruleMatch
+	mmu       sync.Mutex // guards the rule matches slice
 	sequences []*sequenceState
 
 	scavenger *time.Ticker
@@ -306,6 +307,8 @@ func (e *Engine) ProcessEvent(evt *kevent.Kevent) (bool, error) {
 // defined in the rule definition.
 func (e *Engine) processActions() error {
 	defer e.clearMatches()
+	e.mmu.Lock()
+	defer e.mmu.Unlock()
 	for _, m := range e.matches {
 		f, evts := m.ctx.Filter, m.ctx.Events
 		filterMatches.Add(f.Name, 1)
@@ -344,6 +347,8 @@ func (e *Engine) appendMatch(f *config.FilterConfig, evts ...*kevent.Kevent) {
 		Events: evts,
 		Filter: f,
 	}
+	e.mmu.Lock()
+	defer e.mmu.Unlock()
 	e.matches = append(e.matches, &ruleMatch{ctx: ctx})
 	if e.matchFunc != nil {
 		e.matchFunc(f, evts...)
@@ -351,5 +356,7 @@ func (e *Engine) appendMatch(f *config.FilterConfig, evts ...*kevent.Kevent) {
 }
 
 func (e *Engine) clearMatches() {
+	e.mmu.Lock()
+	defer e.mmu.Unlock()
 	e.matches = make([]*ruleMatch, 0)
 }
