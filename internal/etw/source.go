@@ -90,6 +90,8 @@ type EventSource struct {
 
 	filter    filter.Filter
 	listeners []kevent.Listener
+
+	isClosed bool
 }
 
 // NewEventSource creates the new ETW event source.
@@ -251,11 +253,16 @@ func (e *EventSource) Open(config *config.Config) error {
 // signal the event callback to stop consuming more events.
 // Finally, the trace is stopped along with all event consumers.
 func (e *EventSource) Close() error {
+	if e.isClosed {
+		return nil
+	}
+
 	for _, consumer := range e.consumers {
 		if err := consumer.Close(); err != nil {
 			log.Warnf("couldn't close consumer: %v", err)
 		}
 	}
+
 	for _, trace := range e.traces {
 		if !trace.IsStarted() {
 			continue
@@ -274,6 +281,8 @@ func (e *EventSource) Close() error {
 	}
 
 	close(e.stop)
+
+	e.isClosed = true
 
 	return e.sequencer.Shutdown()
 }
