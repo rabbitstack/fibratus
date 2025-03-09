@@ -66,6 +66,33 @@ func TestImageProcessor(t *testing.T) {
 			},
 		},
 		{
+			"parse image characteristics",
+			&kevent.Kevent{
+				Type: ktypes.LoadImage,
+				Kparams: kevent.Kparams{
+					kparams.ImagePath:           {Name: kparams.ImagePath, Type: kparams.UnicodeString, Value: "../_fixtures/mscorlib.dll"},
+					kparams.ProcessID:           {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1023)},
+					kparams.ImageCheckSum:       {Name: kparams.ImageCheckSum, Type: kparams.Uint32, Value: uint32(2323432)},
+					kparams.ImageBase:           {Name: kparams.ImageBase, Type: kparams.Address, Value: uint64(0x7ffb313833a3)},
+					kparams.ImageSignatureType:  {Name: kparams.ImageSignatureType, Type: kparams.Enum, Value: uint32(1), Enum: signature.Types},
+					kparams.ImageSignatureLevel: {Name: kparams.ImageSignatureLevel, Type: kparams.Enum, Value: uint32(4), Enum: signature.Levels},
+				},
+			},
+			func() *ps.SnapshotterMock {
+				psnap := new(ps.SnapshotterMock)
+				psnap.On("AddModule", mock.Anything).Return(nil)
+				return psnap
+			},
+			func(e *kevent.Kevent, t *testing.T, psnap *ps.SnapshotterMock) {
+				psnap.AssertNumberOfCalls(t, "AddModule", 1)
+				// should be enriched with image characteristics params
+				assert.True(t, e.Kparams.MustGetBool(kparams.FileIsDLL))
+				assert.True(t, e.Kparams.MustGetBool(kparams.FileIsDotnet))
+				assert.False(t, e.Kparams.MustGetBool(kparams.FileIsExecutable))
+				assert.False(t, e.Kparams.MustGetBool(kparams.FileIsDriver))
+			},
+		},
+		{
 			"unload image",
 			&kevent.Kevent{
 				Type: ktypes.UnloadImage,

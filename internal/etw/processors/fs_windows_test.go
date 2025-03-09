@@ -32,11 +32,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"os"
 	"reflect"
 	"testing"
 )
 
 func TestFsProcessor(t *testing.T) {
+	exe, err := os.Executable()
+	require.NoError(t, err)
+
 	var tests = []struct {
 		name           string
 		e              *kevent.Kevent
@@ -143,7 +147,7 @@ func TestFsProcessor(t *testing.T) {
 					Kparams: kevent.Kparams{
 						kparams.FileObject:        {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(12446738026482168384)},
 						kparams.FileCreateOptions: {Name: kparams.FileCreateOptions, Type: kparams.Uint32, Value: uint32(18874368)},
-						kparams.FilePath:          {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\temp\\idxx.exe"},
+						kparams.FilePath:          {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: exe},
 						kparams.FileShareMask:     {Name: kparams.FileShareMask, Type: kparams.Uint32, Value: uint32(5)},
 						kparams.FileIrpPtr:        {Name: kparams.FileIrpPtr, Type: kparams.Uint64, Value: uint64(1334543123112321)},
 					},
@@ -159,10 +163,14 @@ func TestFsProcessor(t *testing.T) {
 				assert.NotContains(t, fsProcessor.irps, uint64(1334543123112321))
 				assert.False(t, e.WaitEnqueue)
 				assert.Contains(t, fsProcessor.files, uint64(12446738026482168384))
-				assert.Equal(t, "C:\\Windows\\temp\\idxx.exe", fsProcessor.files[12446738026482168384].Name)
+				assert.Equal(t, exe, fsProcessor.files[12446738026482168384].Name)
 				assert.Equal(t, "Success", e.GetParamAsString(kparams.NTStatus))
 				assert.Equal(t, "File", e.GetParamAsString(kparams.FileType))
 				assert.Equal(t, "CREATE", e.GetParamAsString(kparams.FileOperation))
+				assert.True(t, e.Kparams.MustGetBool(kparams.FileIsExecutable))
+				assert.False(t, e.Kparams.MustGetBool(kparams.FileIsDotnet))
+				assert.False(t, e.Kparams.MustGetBool(kparams.FileIsDLL))
+				assert.False(t, e.Kparams.MustGetBool(kparams.FileIsDriver))
 			},
 		},
 		{
@@ -186,6 +194,33 @@ func TestFsProcessor(t *testing.T) {
 			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
 				fsProcessor := p.(*fsProcessor)
 				assert.Empty(t, fsProcessor.files)
+			},
+		},
+		{
+			"parse created file characteristics",
+			&kevent.Kevent{
+				Type:     ktypes.CreateFile,
+				Category: ktypes.File,
+				Kparams: kevent.Kparams{
+					kparams.FileObject:        {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(18446738026482168384)},
+					kparams.ThreadID:          {Name: kparams.ThreadID, Type: kparams.Uint32, Value: uint32(1484)},
+					kparams.FileCreateOptions: {Name: kparams.FileCreateOptions, Type: kparams.Uint32, Value: uint32(1223456)},
+					kparams.FilePath:          {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: exe},
+					kparams.FileShareMask:     {Name: kparams.FileShareMask, Type: kparams.Uint32, Value: uint32(5)},
+					kparams.FileIrpPtr:        {Name: kparams.FileIrpPtr, Type: kparams.Uint64, Value: uint64(1234543123112321)},
+					kparams.FileOperation:     {Name: kparams.FileOperation, Type: kparams.Uint64, Value: uint64(2)},
+				},
+			},
+			nil,
+			func() *handle.SnapshotterMock {
+				hsnap := new(handle.SnapshotterMock)
+				return hsnap
+			},
+			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
+				fsProcessor := p.(*fsProcessor)
+				assert.True(t, e.WaitEnqueue)
+				assert.Contains(t, fsProcessor.irps, uint64(1234543123112321))
+				assert.True(t, reflect.DeepEqual(e, fsProcessor.irps[1234543123112321]))
 			},
 		},
 		{

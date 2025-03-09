@@ -125,6 +125,8 @@ const (
 	FileIsDriver = "is_driver"
 	// FileIsExecutable is the parameter that indicates if the file is an executable
 	FileIsExecutable = "is_exec"
+	// FileIsDotnet is the parameter that indicates if the file is a .NET assembly
+	FileIsDotnet = "is_dotnet"
 
 	// FileViewBase is the parameter that represents the base address of the mapped section.
 	FileViewBase = "view_base"

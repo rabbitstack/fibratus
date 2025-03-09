@@ -19,29 +19,71 @@
 package processors
 
 import (
+	"expvar"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/ps"
+	"sync"
+	"time"
 )
 
+var imageFileCharacteristicsCacheHits = expvar.NewInt("image.file.characteristics.cache.hits")
+
+var modTTL = time.Minute * 10
+
 type imageProcessor struct {
-	psnap ps.Snapshotter
+	psnap  ps.Snapshotter
+	mods   map[string]*imageFileCharacteristics
+	mu     sync.Mutex
+	purger *time.Ticker
+	quit   chan struct{}
 }
 
 func newImageProcessor(psnap ps.Snapshotter) Processor {
-	return &imageProcessor{psnap: psnap}
+	m := &imageProcessor{
+		psnap:  psnap,
+		mods:   make(map[string]*imageFileCharacteristics),
+		purger: time.NewTicker(time.Minute),
+		quit:   make(chan struct{}, 1),
+	}
+
+	go m.purge()
+
+	return m
 }
 
-func (imageProcessor) Name() ProcessorType { return Image }
+func (*imageProcessor) Name() ProcessorType { return Image }
 
 func (m *imageProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error) {
 	if e.IsLoadImage() {
-		// parse PE image data
-		err := parseImageFileCharacteristics(e)
-		if err != nil {
-			return e, false, m.psnap.AddModule(e)
+		// is image characteristics data cached?
+		path := e.GetParamAsString(kparams.ImagePath)
+		key := path + e.GetParamAsString(kparams.ImageCheckSum)
+
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		c, ok := m.mods[key]
+		if !ok {
+			// parse PE image data
+			var err error
+			c, err = parseImageFileCharacteristics(path)
+			if err != nil {
+				return e, false, m.psnap.AddModule(e)
+			}
+			c.keepalive()
+			m.mods[key] = c
+		} else {
+			imageFileCharacteristicsCacheHits.Add(1)
+			c.keepalive()
 		}
+
+		// append event parameters
+		e.AppendParam(kparams.FileIsDLL, kparams.Bool, c.isDLL)
+		e.AppendParam(kparams.FileIsDriver, kparams.Bool, c.isDriver)
+		e.AppendParam(kparams.FileIsExecutable, kparams.Bool, c.isExe)
+		e.AppendParam(kparams.FileIsDotnet, kparams.Bool, c.isDotnet)
 	}
+
 	if e.IsUnloadImage() {
 		pid := e.Kparams.MustGetPid()
 		addr := e.Kparams.TryGetAddress(kparams.ImageBase)
@@ -50,10 +92,30 @@ func (m *imageProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, e
 		}
 		return e, false, m.psnap.RemoveModule(pid, addr)
 	}
+
 	if e.IsLoadImage() || e.IsImageRundown() {
 		return e, false, m.psnap.AddModule(e)
 	}
 	return e, true, nil
 }
 
-func (imageProcessor) Close() {}
+func (m *imageProcessor) Close() {
+	m.quit <- struct{}{}
+}
+
+func (m *imageProcessor) purge() {
+	for {
+		select {
+		case <-m.purger.C:
+			m.mu.Lock()
+			for key, mod := range m.mods {
+				if time.Since(mod.accessed) > modTTL {
+					delete(m.mods, key)
+				}
+			}
+			m.mu.Unlock()
+		case <-m.quit:
+			return
+		}
+	}
+}
