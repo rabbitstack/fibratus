@@ -92,7 +92,7 @@ func TestStackwalkDecorator(t *testing.T) {
 }
 
 func init() {
-	maxDequeFlushPeriod = time.Second * 2
+	maxQueueTTLPeriod = time.Second * 2
 	flusherInterval = time.Second
 }
 
