@@ -21,9 +21,9 @@ package processors
 import (
 	libntfs "github.com/rabbitstack/fibratus/pkg/fs/ntfs"
 	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	"os"
+	"time"
 )
 
 // ProcessorType is an alias for the event processor type
@@ -83,6 +83,18 @@ func (typ ProcessorType) String() string {
 	}
 }
 
+type imageFileCharacteristics struct {
+	isExe    bool
+	isDLL    bool
+	isDriver bool
+	isDotnet bool
+	accessed time.Time
+}
+
+func (c *imageFileCharacteristics) keepalive() {
+	c.accessed = time.Now()
+}
+
 // parseImageFileCharacteristics parses the PE structure for the file path
 // residing in the given event parameters. The preferred method for reading
 // the PE metadata is by directly accessing the file.
@@ -91,40 +103,42 @@ func (typ ProcessorType) String() string {
 // The given event is decorated with various parameters extracted from PE
 // data. Most notably, parameters that indicate whether the file is a DLL,
 // executable image, or a Windows driver.
-func parseImageFileCharacteristics(e *kevent.Kevent) error {
+func parseImageFileCharacteristics(path string) (*imageFileCharacteristics, error) {
 	var pefile *pe.PE
-	filename := e.GetParamAsString(kparams.FilePath)
-	f, err := os.Open(filename)
+
+	f, err := os.Open(path)
 	if err != nil {
 		// read file data blob from raw device
 		// if the regular file access fails
 		ntfs := libntfs.NewFS()
-		data, n, err := ntfs.Read(filename, 0, int64(os.Getpagesize()))
+		data, n, err := ntfs.Read(path, 0, int64(os.Getpagesize()))
 		defer ntfs.Close()
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if n > 0 {
 			data = data[:n]
 		}
 		// parse PE file from byte slice
-		pefile, err = pe.ParseBytes(data, pe.WithSections(), pe.WithSymbols())
+		pefile, err = pe.ParseBytes(data, pe.WithSections(), pe.WithSymbols(), pe.WithCLR())
 		if err != nil {
-			return err
+			return nil, err
 		}
 	} else {
 		defer f.Close()
 		// parse PE file from on-disk file
-		pefile, err = pe.ParseFile(filename, pe.WithSections(), pe.WithSymbols())
+		pefile, err = pe.ParseFile(path, pe.WithSections(), pe.WithSymbols(), pe.WithCLR())
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	// append parameters
-	e.AppendParam(kparams.FileIsDLL, kparams.Bool, pefile.IsDLL)
-	e.AppendParam(kparams.FileIsDriver, kparams.Bool, pefile.IsDriver)
-	e.AppendParam(kparams.FileIsExecutable, kparams.Bool, pefile.IsExecutable)
+	c := &imageFileCharacteristics{
+		isExe:    pefile.IsExecutable,
+		isDLL:    pefile.IsDLL,
+		isDriver: pefile.IsDriver,
+		isDotnet: pefile.IsDotnet,
+	}
 
-	return nil
+	return c, nil
 }
