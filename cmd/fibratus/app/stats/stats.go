@@ -108,6 +108,10 @@ type Stats struct {
 	RegistryKcbMisses                   int            `json:"registry.kcb.misses"`
 	RegistryKeyHandleHits               int            `json:"registry.key.handle.hits"`
 	RegistryUnknownKeysCount            int            `json:"registry.unknown.keys.count"`
+	StackwalkEnqueued                   int            `json:"stackwalk.enqueued"`
+	StackwalkFlushes                    int            `json:"stackwalk.flushes"`
+	StackwalkFlushesProcs               map[string]int `json:"stackwalk.flushes.procs"`
+	StackwalkFlushesEvents              map[string]int `json:"stackwalk.flushes.events"`
 	YaraImageScans                      int            `json:"yara.image.scans"`
 	YaraProcScans                       int            `json:"yara.proc.scans"`
 	YaraRuleMatches                     int            `json:"yara.rule.matches"`

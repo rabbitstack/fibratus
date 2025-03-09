@@ -27,15 +27,27 @@ import (
 	"time"
 )
 
-// maxDequeFlushPeriod specifies the maximum period
+// maxQueueTTLPeriod specifies the maximum period
 // for the events to reside in the queue.
-var maxDequeFlushPeriod = time.Second * 30
+var maxQueueTTLPeriod = time.Second * 10
 
 // flusherInterval specifies the interval for the queue flushing.
 var flusherInterval = time.Second * 5
 
-// callstackFlushes computes overall callstack dequeue flushes
-var callstackFlushes = expvar.NewInt("callstack.flushes")
+// stackwalkFlushes computes overall flushes for unmatched stackwalk events
+var stackwalkFlushes = expvar.NewInt("stackwalk.flushes")
+
+// stackwalkFlushesProcs computes overall flushes for unmatched stackwalk events per process
+var stackwalkFlushesProcs = expvar.NewMap("stackwalk.flushes.procs")
+
+// stackwalkFlushesEvents computes overall flushes for unmatched stackwalks per event type
+var stackwalkFlushesEvents = expvar.NewMap("stackwalk.flushes.events")
+
+// stackwalkEnqueued counts the number of enqueued events in individual buckets
+var stackwalkEnqueued = expvar.NewInt("stackwalk.enqueued")
+
+// stackwalkBuckets counts the number of overall stackwalk buckets per stack id
+var stackwalkBuckets = expvar.NewInt("stackwalk.buckets")
 
 // StackwalkDecorator maintains a FIFO queue where events
 // eligible for stack enrichment are queued. Upon arrival
@@ -80,6 +92,9 @@ func (s *StackwalkDecorator) Push(e *Kevent) {
 	} else {
 		s.buckets[id] = append(q, e)
 	}
+
+	stackwalkBuckets.Set(int64(len(s.buckets)))
+	stackwalkEnqueued.Add(int64(len(s.buckets[id])))
 }
 
 // Pop receives the stack walk event and pops the oldest
@@ -99,6 +114,7 @@ func (s *StackwalkDecorator) Pop(e *Kevent) *Kevent {
 	var evt *Kevent
 	if len(q) > 0 {
 		evt, s.buckets[id] = q[0], q[1:]
+		stackwalkEnqueued.Add(-int64(len(s.buckets[id])))
 	}
 
 	if evt == nil {
@@ -121,6 +137,7 @@ func (s *StackwalkDecorator) RemoveBucket(id uint64) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	delete(s.buckets, id)
+	stackwalkBuckets.Set(int64(len(s.buckets)))
 }
 
 func (s *StackwalkDecorator) doFlush() {
@@ -138,8 +155,8 @@ func (s *StackwalkDecorator) doFlush() {
 }
 
 // flush pushes events to the event queue if they have
-// been living in the deque more than the maximum allowed
-// flush period.
+// been living in the queue more than the maximum allowed
+// TTL period.
 func (s *StackwalkDecorator) flush() []error {
 	s.mux.Lock()
 	defer s.mux.Unlock()
@@ -152,15 +169,22 @@ func (s *StackwalkDecorator) flush() []error {
 
 	for id, q := range s.buckets {
 		for i, evt := range q {
-			if time.Since(evt.Timestamp) < maxDequeFlushPeriod {
+			if time.Since(evt.Timestamp) < maxQueueTTLPeriod {
 				continue
 			}
-			callstackFlushes.Add(1)
+			stackwalkFlushes.Add(1)
 			err := s.q.push(evt)
 			if err != nil {
 				errs = append(errs, err)
 			}
 			s.buckets[id] = append(q[:i], q[i+1:]...)
+			if stackwalkEnqueued.Value() > 0 {
+				stackwalkEnqueued.Add(-1)
+			}
+			if evt.PS != nil {
+				stackwalkFlushesProcs.Add(evt.PS.Name, 1)
+			}
+			stackwalkFlushesEvents.Add(evt.Name, 1)
 		}
 	}
 
