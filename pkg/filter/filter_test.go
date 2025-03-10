@@ -896,7 +896,7 @@ func TestRegistryFilter(t *testing.T) {
 }
 
 func TestImageFilter(t *testing.T) {
-	kevt := &kevent.Kevent{
+	e1 := &kevent.Kevent{
 		Type:     ktypes.LoadImage,
 		Category: ktypes.Image,
 		Kparams: kevent.Kparams{
@@ -906,6 +906,7 @@ func TestImageFilter(t *testing.T) {
 			kparams.ImageBase:           {Name: kparams.ImageBase, Type: kparams.Address, Value: uint64(0x7ffb313833a3)},
 			kparams.ImageSignatureType:  {Name: kparams.ImageSignatureType, Type: kparams.Enum, Value: uint32(1), Enum: signature.Types},
 			kparams.ImageSignatureLevel: {Name: kparams.ImageSignatureLevel, Type: kparams.Enum, Value: uint32(4), Enum: signature.Levels},
+			kparams.FileIsDotnet:        {Name: kparams.FileIsDotnet, Type: kparams.Bool, Value: false},
 		},
 	}
 
@@ -932,7 +933,7 @@ func TestImageFilter(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		matches := f.Run(kevt)
+		matches := f.Run(e1)
 		if matches != tt.matches {
 			t.Errorf("%d. %q image filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
@@ -946,7 +947,7 @@ func TestImageFilter(t *testing.T) {
 	assert.Equal(t, signature.AuthenticodeLevel, sig.Level)
 
 	// now exercise unsigned/unchecked signature
-	kevt1 := &kevent.Kevent{
+	e2 := &kevent.Kevent{
 		Type:     ktypes.LoadImage,
 		Category: ktypes.Image,
 		Kparams: kevent.Kparams{
@@ -956,6 +957,7 @@ func TestImageFilter(t *testing.T) {
 			kparams.ImageBase:           {Name: kparams.ImageBase, Type: kparams.Address, Value: uint64(0x7ccb313833a3)},
 			kparams.ImageSignatureType:  {Name: kparams.ImageSignatureType, Type: kparams.Enum, Value: uint32(0), Enum: signature.Types},
 			kparams.ImageSignatureLevel: {Name: kparams.ImageSignatureLevel, Type: kparams.Enum, Value: uint32(0), Enum: signature.Levels},
+			kparams.FileIsDotnet:        {Name: kparams.FileIsDotnet, Type: kparams.Bool, Value: false},
 		},
 	}
 
@@ -980,7 +982,7 @@ func TestImageFilter(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		matches := f.Run(kevt1)
+		matches := f.Run(e2)
 		if matches != tt.matches {
 			t.Errorf("%d. %q image filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
@@ -988,16 +990,17 @@ func TestImageFilter(t *testing.T) {
 
 	assert.NotNil(t, signature.GetSignatures().GetSignature(0x7ccb313833a3))
 
-	kevt2 := &kevent.Kevent{
+	e3 := &kevent.Kevent{
 		Type:     ktypes.LoadImage,
 		Category: ktypes.Image,
 		Kparams: kevent.Kparams{
-			kparams.ImagePath:           {Name: kparams.ImagePath, Type: kparams.UnicodeString, Value: "_fixtures\\mscorlib.dll"},
+			kparams.ImagePath:           {Name: kparams.ImagePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\System32\\mscorlib.dll"},
 			kparams.ProcessID:           {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1023)},
 			kparams.ImageCheckSum:       {Name: kparams.ImageCheckSum, Type: kparams.Uint32, Value: uint32(2323432)},
 			kparams.ImageBase:           {Name: kparams.ImageBase, Type: kparams.Address, Value: uint64(0xfff313833a3)},
 			kparams.ImageSignatureType:  {Name: kparams.ImageSignatureType, Type: kparams.Enum, Value: uint32(0), Enum: signature.Types},
 			kparams.ImageSignatureLevel: {Name: kparams.ImageSignatureLevel, Type: kparams.Enum, Value: uint32(0), Enum: signature.Levels},
+			kparams.FileIsDotnet:        {Name: kparams.FileIsDotnet, Type: kparams.Bool, Value: true},
 		},
 	}
 
@@ -1017,7 +1020,7 @@ func TestImageFilter(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		matches := f.Run(kevt2)
+		matches := f.Run(e3)
 		if matches != tt.matches {
 			t.Errorf("%d. %q image filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}

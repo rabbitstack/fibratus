@@ -908,11 +908,7 @@ func (i *imageAccessor) Get(f Field, kevt *kevent.Kevent) (kparams.Value, error)
 	case fields.ImageIsExecutable:
 		return kevt.Kparams.GetBool(kparams.FileIsExecutable)
 	case fields.ImageIsDotnet:
-		p, err := pe.ParseFile(kevt.GetParamAsString(kparams.ImagePath), pe.WithCLR())
-		if err != nil {
-			return nil, err
-		}
-		return p.IsDotnet, nil
+		return kevt.Kparams.GetBool(kparams.FileIsDotnet)
 	}
 
 	return nil, nil

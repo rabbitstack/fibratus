@@ -352,6 +352,16 @@ func (kpars Kparams) GetBool(name string) (bool, error) {
 	return v, nil
 }
 
+// MustGetBool returns the underlying boolean value from the parameter or
+// panics if the parameter can't be retrieved.
+func (kpars Kparams) MustGetBool(name string) bool {
+	val, err := kpars.GetBool(name)
+	if err != nil {
+		panic(err)
+	}
+	return val
+}
+
 // TryGetBool tries to retrieve the boolean value from the parameter.
 // Returns the underlying value on success, or false otherwise.
 func (kpars Kparams) TryGetBool(name string) bool {
