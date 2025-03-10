@@ -130,7 +130,7 @@ func TestGUIDAndHookIDFromKtype(t *testing.T) {
 }
 
 func TestCanArriveOutOfOrder(t *testing.T) {
-	assert.True(t, RegSetValue.CanArriveOutOfOrder())
+	assert.False(t, RegSetValue.CanArriveOutOfOrder())
 	assert.False(t, VirtualAlloc.CanArriveOutOfOrder())
 	assert.True(t, OpenProcess.CanArriveOutOfOrder())
 }

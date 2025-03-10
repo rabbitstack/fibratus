@@ -44,15 +44,11 @@ const (
 	YaraMatchesKey MetadataKey = "yara.matches"
 	// RuleNameKey identifies the rule that was triggered by the event
 	RuleNameKey MetadataKey = "rule.name"
-	// RuleGroupKey identifies the group to which the triggered rule pertains
-	RuleGroupKey MetadataKey = "rule.group"
-	// RuleSequenceByKey represents the join field value in sequence rules
-	RuleSequenceByKey MetadataKey = "rule.seq.by"
-	// RuleExpressionKey represents the rule filter expression
-	RuleExpressionKey MetadataKey = "rule.expr"
-	// RuleSequenceOutOfOrderKey the presence of this metadata key indicates the
+	// RuleSequenceLink represents the join link value in sequence rules
+	RuleSequenceLink MetadataKey = "rule.seq.link"
+	// RuleSequenceOOOKey the presence of this metadata key indicates the
 	// event in the partials list arrived out of order and requires reevaluation
-	RuleSequenceOutOfOrderKey MetadataKey = "rule.seq.outoforder"
+	RuleSequenceOOOKey MetadataKey = "rule.seq.ooo"
 )
 
 func (key MetadataKey) String() string { return string(key) }
@@ -308,9 +304,9 @@ func (e *Kevent) GetFlagsAsSlice(name string) []string {
 	return strings.Split(e.GetParamAsString(name), "|")
 }
 
-// SequenceBy returns the BY statement join field from event metadata.
-func (e *Kevent) SequenceBy() any {
+// SequenceLink returns the sequence link value from event metadata.
+func (e *Kevent) SequenceLink() any {
 	e.mmux.RLock()
 	defer e.mmux.RUnlock()
-	return e.Metadata[RuleSequenceByKey]
+	return e.Metadata[RuleSequenceLink]
 }
