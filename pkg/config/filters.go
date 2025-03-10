@@ -30,6 +30,7 @@ import (
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 	"io"
+	"net"
 	"net/http"
 	u "net/url"
 	"os"
@@ -64,6 +65,13 @@ type FilterAction any
 // indicates by the filter field expression.
 type KillAction struct{}
 
+// IsolateAction defines an action for isolating the host
+// via firewall rules.
+type IsolateAction struct {
+	// Whitelist contains IP addresses that should remain accessible.
+	Whitelist []net.IP `mapstructure:"whitelist"`
+}
+
 // DecodeActions converts raw YAML map to
 // typed action structures.
 func (f FilterConfig) DecodeActions() ([]any, error) {
@@ -89,8 +97,14 @@ func (f FilterConfig) DecodeActions() ([]any, error) {
 			if err := dec(m, kill); err != nil {
 				return nil, err
 			}
+		case "isolate":
+			var isolate IsolateAction
+			if err := dec(m, isolate); err != nil {
+				return nil, err
+			}
 		}
 	}
+
 	return actions, nil
 }
 
@@ -102,10 +116,13 @@ func (f FilterConfig) HasLabel(l string) bool { return f.Labels[l] != "" }
 
 // Filters contains references to rule and macro definitions.
 type Filters struct {
-	Rules   Rules  `json:"rules" yaml:"rules"`
-	Macros  Macros `json:"macros" yaml:"macros"`
-	macros  map[string]*Macro
-	filters []*FilterConfig
+	Rules  Rules  `json:"rules" yaml:"rules"`
+	Macros Macros `json:"macros" yaml:"macros"`
+	// MatchAll indicates if the match all strategy is enabled for the rule engine.
+	// If the match all strategy is enabled, a single event can trigger multiple rules.
+	MatchAll bool `json:"match-all" yaml:"match-all"`
+	macros   map[string]*Macro
+	filters  []*FilterConfig
 }
 
 // FiltersWithMacros builds the filter config with the map of
@@ -241,6 +258,7 @@ const (
 	rulesFromPaths  = "filters.rules.from-paths"
 	rulesFromURLs   = "filters.rules.from-urls"
 	macrosFromPaths = "filters.macros.from-paths"
+	matchAll        = "filters.match-all"
 )
 
 func (f *Filters) initFromViper(v *viper.Viper) {
@@ -248,6 +266,7 @@ func (f *Filters) initFromViper(v *viper.Viper) {
 	f.Rules.FromPaths = v.GetStringSlice(rulesFromPaths)
 	f.Rules.FromURLs = v.GetStringSlice(rulesFromURLs)
 	f.Macros.FromPaths = v.GetStringSlice(macrosFromPaths)
+	f.MatchAll = v.GetBool(matchAll)
 }
 
 func (f Filters) HasMacros() bool           { return len(f.macros) > 0 }

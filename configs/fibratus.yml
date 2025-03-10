@@ -131,6 +131,10 @@ filament:
 # For local file system rule paths, it is possible to use the glob expression to load the
 # rules from different directory locations.
 filters:
+  # Indicates if the rule engine match all strategy is enabled. When the match all strategy
+  # is enabled, a single event can trigger multiple rules.
+  match-all: true
+
   rules:
     # Indicates if the rule engine is enabled and rules loaded
     enabled: true

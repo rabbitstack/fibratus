@@ -57,9 +57,7 @@ func initEventTraceProps(c config.KstreamConfig) etw.EventTraceProperties {
 		flushTimer = time.Second
 	}
 	mode := uint32(etw.ProcessTraceModeRealtime)
-	if SupportsSystemProviders() {
-		mode |= etw.EventTraceSystemLoggerMode
-	}
+
 	return etw.EventTraceProperties{
 		Wnode: etw.WnodeHeader{
 			BufferSize:    uint32(unsafe.Sizeof(etw.EventTraceProperties{})) + maxTracePropsSize,
@@ -133,22 +131,11 @@ func (t *Trace) enableCallstacks() {
 	if t.IsKernelTrace() {
 		t.stackExtensions.EnableProcessCallstack()
 
-		// Enabling stack tracing for kernel trace
-		// with granular system providers support.
-		// In this situation, registry event callstacks
-		// are enabled if system provider support is not
-		// detected
-		if !SupportsSystemProviders() {
-			t.stackExtensions.EnableRegistryCallstack()
-		}
+		t.stackExtensions.EnableRegistryCallstack()
 
 		t.stackExtensions.EnableFileCallstack()
 
 		t.stackExtensions.EnableMemoryCallstack()
-	}
-
-	if t.IsSystemRegistryTrace() {
-		t.stackExtensions.EnableRegistryCallstack()
 	}
 
 	if t.IsThreadpoolTrace() {
@@ -231,30 +218,12 @@ func (t *Trace) Start() error {
 	// enrichment is enabled, it is necessary to instruct the provider
 	// to emit stack addresses in the extended data item section when
 	// writing events to the session buffers
-	if cfg.StackEnrichment && !t.IsSystemProvider() && !t.IsThreadpoolTrace() {
+	if cfg.StackEnrichment && !t.IsThreadpoolTrace() {
 		return etw.EnableTraceWithOpts(t.GUID, t.startHandle, t.Keywords, etw.EnableTraceOpts{WithStacktrace: true})
 	} else if cfg.StackEnrichment && len(t.stackExtensions.EventIds()) > 0 {
 		if err := etw.EnableStackTracing(t.startHandle, t.stackExtensions.EventIds()); err != nil {
 			return fmt.Errorf("fail to enable system events callstack tracing: %v", err)
 		}
-	}
-
-	if t.IsSystemRegistryTrace() {
-		if err := etw.EnableTrace(t.GUID, t.startHandle, t.Keywords); err != nil {
-			return err
-		}
-		// when the registry provider is started
-		// in a separate session, we can trigger
-		// KCB rundown events by using a similar
-		// approach described previously
-		handle := t.startHandle
-		sysTraceFlags := make([]etw.EventTraceFlags, 8)
-		if err := etw.SetTraceSystemFlags(handle, sysTraceFlags); err != nil {
-			log.Warnf("unable to set empty system flags on registry provider: %v", err)
-			return nil
-		}
-		sysTraceFlags[0] = etw.Registry
-		return etw.SetTraceSystemFlags(handle, sysTraceFlags)
 	}
 
 	return etw.EnableTrace(t.GUID, t.startHandle, t.Keywords)
@@ -348,16 +317,8 @@ func (t *Trace) Close() error {
 // IsKernelTrace determines if this is the system logger trace.
 func (t *Trace) IsKernelTrace() bool { return t.GUID == etw.KernelTraceControlGUID }
 
-// IsSystemRegistryTrace determines if this is the system registry logger trace.
-func (t *Trace) IsSystemRegistryTrace() bool { return t.GUID == etw.SystemRegistryProviderID }
-
 // IsThreadpoolTrace determines if this is the thread pool logger trace.
 func (t *Trace) IsThreadpoolTrace() bool { return t.GUID == etw.ThreadpoolGUID }
-
-// IsSystemProvider determines if this is one of the granular system provider traces.
-func (t *Trace) IsSystemProvider() bool {
-	return t.GUID == etw.SystemIOProviderID || t.GUID == etw.SystemRegistryProviderID || t.GUID == etw.SystemProcessProviderID || t.GUID == etw.SystemMemoryProviderID
-}
 
 // enableFlagsDynamically crafts the system logger event mask
 // depending on the compiled rules result or the config state.
@@ -398,15 +359,8 @@ func (t *Trace) enableFlagsDynamically(config config.KstreamConfig) etw.EventTra
 	if config.EnableMemKevents {
 		flags |= etw.VirtualAlloc
 	}
-
-	if !SupportsSystemProviders() || t.config.IsCaptureSet() {
-		// Registry is the only provider started
-		// in its own tracing session because it
-		// generates an  overwhelming amount of
-		// events
-		if config.EnableRegistryKevents {
-			flags |= etw.Registry
-		}
+	if config.EnableRegistryKevents {
+		flags |= etw.Registry
 	}
 
 	return flags
