@@ -50,7 +50,7 @@
   expr: kevt.name = 'RegCreateKey' and registry.status = 'Success'
 
 - macro: modify_registry
-  expr: (set_value or create_key)
+  expr: ((set_value) or (create_key))
 
 - macro: send_socket
   expr: kevt.name = 'Send'
