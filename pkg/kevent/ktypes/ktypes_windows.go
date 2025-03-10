@@ -595,7 +595,7 @@ func (k Ktype) Source() EventSource {
 // events, but it appears first on the consumer callback
 // before other events published before it.
 func (k Ktype) CanArriveOutOfOrder() bool {
-	return k.Category() == Registry || k.Category() == Threadpool || k.Subcategory() == DNS ||
+	return k.Category() == Threadpool || k.Subcategory() == DNS ||
 		k == OpenProcess || k == OpenThread || k == SetThreadContext || k == CreateSymbolicLinkObject
 }
 

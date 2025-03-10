@@ -99,7 +99,7 @@ func New(expr string, config *config.Config, options ...Option) Filter {
 		segments:       make([]fields.Segment, 0),
 		stringFields:   make(map[fields.Field][]string),
 		boundFields:    make([]*ql.BoundFieldLiteral, 0),
-		seqBoundFields: make(map[uint16][]BoundField),
+		seqBoundFields: make(map[int][]BoundField),
 	}
 }
 
@@ -129,7 +129,7 @@ func NewFromCLIWithAllAccessors(args []string) (Filter, error) {
 		segments:       make([]fields.Segment, 0),
 		stringFields:   make(map[fields.Field][]string),
 		boundFields:    make([]*ql.BoundFieldLiteral, 0),
-		seqBoundFields: make(map[uint16][]BoundField),
+		seqBoundFields: make(map[int][]BoundField),
 	}
 	if err := filter.Compile(); err != nil {
 		return nil, fmt.Errorf("bad filter:\n %v", err)

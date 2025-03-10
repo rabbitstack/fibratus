@@ -37,6 +37,7 @@ func TestLoadRulesFromPaths(t *testing.T) {
 			},
 		},
 		Macros{FromPaths: nil},
+		false,
 		map[string]*Macro{},
 		[]*FilterConfig{},
 	}
@@ -61,6 +62,11 @@ func TestLoadRulesFromPaths(t *testing.T) {
 	acts, err := f1.DecodeActions()
 	require.NoError(t, err)
 	require.IsType(t, KillAction{}, acts[0])
+	require.IsType(t, IsolateAction{}, acts[1])
+
+	isolate := acts[1].(IsolateAction)
+	require.Len(t, isolate.Whitelist, 2)
+	require.Contains(t, isolate.Whitelist, net.ParseIP("127.0.0.1"))
 
 	assert.Equal(t, "2.0.0", f1.MinEngineVersion)
 
@@ -78,6 +84,7 @@ func TestLoadRulesFromPathsWithTemplate(t *testing.T) {
 			},
 		},
 		Macros{FromPaths: nil},
+		false,
 		map[string]*Macro{},
 		[]*FilterConfig{},
 	}
@@ -116,6 +123,7 @@ func TestLoadGroupsFromURLs(t *testing.T) {
 			},
 		},
 		Macros{FromPaths: nil},
+		false,
 		map[string]*Macro{},
 		[]*FilterConfig{},
 	}
