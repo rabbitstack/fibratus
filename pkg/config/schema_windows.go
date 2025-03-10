@@ -146,6 +146,7 @@ var schema = `
 		"filters": {
 			"type": "object",
 			"properties": {
+				"match-all": {"type": "boolean"},
 				"rules": {
 					"type": "object",
 					"properties": {
@@ -507,12 +508,12 @@ var rulesSchema = `
 	"$schema": "http://json-schema.org/draft-07/schema#",
 	"type": "object",
 	"properties": {
-		"id": 					{"type": "string", "minLength": 36, "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"},
+		"id": 						{"type": "string", "minLength": 36, "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"},
 		"version": 				{"type": "string", "minLength": 5, "pattern": "^([0-9]+.)([0-9]+.)([0-9]+)$"},
-		"name": 				{"type": "string", "minLength": 3},
-        "description":  		{"type": "string"},
+		"name": 					{"type": "string", "minLength": 3},
+		"description":  	{"type": "string"},
 		"output": 				{"type": "string", "minLength": 5},
-		"notes": 				{"type": "string"},
+		"notes": 					{"type": "string"},
 		"severity":  			{"type": "string", "enum": ["low", "medium", "high", "critical"]},
 		"min-engine-version":  	{"type": "string", "minLength": 5, "pattern": "^([0-9]+.)([0-9]+.)([0-9]+)$"},
 		"enabled":  			{"type": "boolean"},
@@ -521,17 +522,32 @@ var rulesSchema = `
   			"type": "object",
   			"additionalProperties": { "type": "string"}
 		},
-		"tags":					{"type": "array", "items": [{"type": "string", "minLength": 1}]},
+		"tags":						{"type": "array", "items": [{"type": "string", "minLength": 1}]},
 		"references":			{"type": "array", "items": [{"type": "string", "minLength": 1}]},
 		"action": 				{
 			"type": "array",
 			"items": {
 				"type": "object",
+				"additionalProperties": false,
 				"properties": {
-					"name": 	{"type": "string", "enum": ["kill"]}
+					"name": 							 	{"type": "string", "enum": ["kill", "isolate"]},
+					"whitelist":						true
 				},
 				"required": ["name"],
-				"additionalProperties": false
+			 	"if": {
+					"properties": {"name": {"const": "isolate"}}
+				},
+				"then": {
+					"properties": {
+						"whitelist": {"type": "array", "minItems": 1, "items": {"type": "string", "format": "ipv4"}}
+					}
+				},
+				"else": {
+					"properties": {
+						"name": 							{"type": "string", "enum": ["kill", "isolate"]}
+					},
+ 					"additionalProperties": false
+				}
 			}
 		}
 	},

@@ -71,16 +71,6 @@ var (
 	buffersRead = expvar.NewInt("kstream.kbuffers.read")
 )
 
-// SupportsSystemProviders determines if the support for granular
-// system providers in present.
-func SupportsSystemProviders() bool {
-	maj, _, patch := windows.RtlGetNtVersionNumbers()
-	if maj > 10 {
-		return true
-	}
-	return maj >= 10 && patch >= 20348
-}
-
 // EventSource is the core component responsible for
 // starting ETW tracing sessions and setting up event
 // consumers.
@@ -100,6 +90,8 @@ type EventSource struct {
 
 	filter    filter.Filter
 	listeners []kevent.Listener
+
+	isClosed bool
 }
 
 // NewEventSource creates the new ETW event source.
@@ -176,13 +168,6 @@ func (e *EventSource) Open(config *config.Config) error {
 	}
 
 	e.addTrace(etw.KernelLoggerSession, etw.KernelTraceControlGUID)
-
-	if SupportsSystemProviders() && !config.IsCaptureSet() {
-		log.Info("system providers support detected")
-		if config.Kstream.EnableRegistryKevents {
-			e.addTraceKeywords(etw.SystemRegistrySession, etw.SystemRegistryProviderID, etw.RegistryKeywordGeneral)
-		}
-	}
 
 	if config.Kstream.EnableDNSEvents {
 		e.addTrace(etw.DNSClientSession, etw.DNSClientGUID)
@@ -268,11 +253,16 @@ func (e *EventSource) Open(config *config.Config) error {
 // signal the event callback to stop consuming more events.
 // Finally, the trace is stopped along with all event consumers.
 func (e *EventSource) Close() error {
+	if e.isClosed {
+		return nil
+	}
+
 	for _, consumer := range e.consumers {
 		if err := consumer.Close(); err != nil {
 			log.Warnf("couldn't close consumer: %v", err)
 		}
 	}
+
 	for _, trace := range e.traces {
 		if !trace.IsStarted() {
 			continue
@@ -291,6 +281,8 @@ func (e *EventSource) Close() error {
 	}
 
 	close(e.stop)
+
+	e.isClosed = true
 
 	return e.sequencer.Shutdown()
 }
@@ -320,8 +312,4 @@ func (e *EventSource) RegisterEventListener(lis kevent.Listener) {
 
 func (e *EventSource) addTrace(name string, guid windows.GUID) {
 	e.traces = append(e.traces, NewTrace(name, guid, 0x0, e.config))
-}
-
-func (e *EventSource) addTraceKeywords(name string, guid windows.GUID, keywords uint64) {
-	e.traces = append(e.traces, NewTrace(name, guid, keywords, e.config))
 }
