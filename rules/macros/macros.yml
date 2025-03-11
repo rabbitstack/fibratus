@@ -25,6 +25,12 @@
 - macro: create_file
   expr: kevt.name = 'CreateFile' and file.operation != 'OPEN' and file.status = 'Success'
 
+- macro: rename_file
+  expr: kevt.name = 'RenameFile'
+
+- macro: read_file
+  expr: kevt.name = 'ReadFile'
+
 - macro: delete_file
   expr: kevt.name = 'DeleteFile'
 
