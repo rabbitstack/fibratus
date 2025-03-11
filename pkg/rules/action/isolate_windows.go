@@ -53,7 +53,9 @@ type firewall struct {
 }
 
 func newFirewall() (*firewall, error) {
-	opts := &wf.Options{}
+	opts := &wf.Options{
+		Dynamic: true, // remove filters when the process terminates
+	}
 
 	sess, err := wf.New(opts)
 	if err != nil {
