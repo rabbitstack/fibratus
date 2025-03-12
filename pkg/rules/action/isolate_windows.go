@@ -157,8 +157,6 @@ func (f *firewall) hasAllowRules() bool {
 }
 
 func (f *firewall) addIPCondition(addr net.IP) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
 	ip := netip.AddrFrom4([4]byte(addr))
 	f.inbound.Conditions = append(f.inbound.Conditions, &wf.Match{Field: wf.FieldIPLocalAddress, Op: wf.MatchTypeEqual, Value: ip})
 	f.inbound.Conditions = append(f.inbound.Conditions, &wf.Match{Field: wf.FieldIPRemoteAddress, Op: wf.MatchTypeEqual, Value: ip})
