@@ -69,25 +69,28 @@ func (f *firewall) allow(whitelist []net.IP) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.inbound = &wf.Rule{
-		ID:     inboundAllowRuleID,
-		Name:   inboundAllowRuleName,
-		Layer:  wf.LayerInboundIPPacketV4,
-		Action: wf.ActionPermit,
-		Conditions: []*wf.Match{
-			{Field: wf.FieldIPLocalAddress, Op: wf.MatchTypeEqual, Value: netip.AddrFrom4([4]byte{127, 0, 0, 1})},
-			{Field: wf.FieldIPRemoteAddress, Op: wf.MatchTypeEqual, Value: netip.AddrFrom4([4]byte{127, 0, 0, 1})},
-		},
+		ID:         inboundAllowRuleID,
+		Name:       inboundAllowRuleName,
+		Layer:      wf.LayerInboundIPPacketV4,
+		Action:     wf.ActionPermit,
+		Conditions: make([]*wf.Match, 0),
 	}
 
 	f.outbound = &wf.Rule{
-		ID:     outboundAllowRuleID,
-		Name:   outboundAllowRuleName,
-		Layer:  wf.LayerOutboundIPPacketV4,
-		Action: wf.ActionPermit,
-		Conditions: []*wf.Match{
-			{Field: wf.FieldIPLocalAddress, Op: wf.MatchTypeEqual, Value: netip.AddrFrom4([4]byte{127, 0, 0, 1})},
-			{Field: wf.FieldIPRemoteAddress, Op: wf.MatchTypeEqual, Value: netip.AddrFrom4([4]byte{127, 0, 0, 1})},
-		},
+		ID:         outboundAllowRuleID,
+		Name:       outboundAllowRuleName,
+		Layer:      wf.LayerOutboundIPPacketV4,
+		Action:     wf.ActionPermit,
+		Conditions: make([]*wf.Match, 0),
+	}
+
+	// The current limitation of the fw
+	// library, makes it impossible to
+	// install a filter with multiple IP
+	// addresses, so we shrink the list
+	// to use a single item
+	if len(whitelist) > 0 {
+		whitelist = whitelist[:1]
 	}
 
 	for _, addr := range whitelist {
@@ -144,6 +147,7 @@ func (f *firewall) findAllowRules() error {
 	return nil
 }
 
+//nolint:unused
 func (f *firewall) removeAllowRules() error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -157,13 +161,16 @@ func (f *firewall) hasAllowRules() bool {
 }
 
 func (f *firewall) addIPCondition(addr net.IP) {
-	ip := netip.AddrFrom4([4]byte(addr))
-	f.inbound.Conditions = append(f.inbound.Conditions, &wf.Match{Field: wf.FieldIPLocalAddress, Op: wf.MatchTypeEqual, Value: ip})
-	f.inbound.Conditions = append(f.inbound.Conditions, &wf.Match{Field: wf.FieldIPRemoteAddress, Op: wf.MatchTypeEqual, Value: ip})
-	f.outbound.Conditions = append(f.outbound.Conditions, &wf.Match{Field: wf.FieldIPLocalAddress, Op: wf.MatchTypeEqual, Value: ip})
-	f.outbound.Conditions = append(f.outbound.Conditions, &wf.Match{Field: wf.FieldIPRemoteAddress, Op: wf.MatchTypeEqual, Value: ip})
+	ip, err := netip.ParseAddr(addr.String())
+	if err == nil {
+		f.inbound.Conditions = append(f.inbound.Conditions, &wf.Match{Field: wf.FieldIPLocalAddress, Op: wf.MatchTypeEqual, Value: ip})
+		f.inbound.Conditions = append(f.inbound.Conditions, &wf.Match{Field: wf.FieldIPRemoteAddress, Op: wf.MatchTypeEqual, Value: ip})
+		f.outbound.Conditions = append(f.outbound.Conditions, &wf.Match{Field: wf.FieldIPLocalAddress, Op: wf.MatchTypeEqual, Value: ip})
+		f.outbound.Conditions = append(f.outbound.Conditions, &wf.Match{Field: wf.FieldIPRemoteAddress, Op: wf.MatchTypeEqual, Value: ip})
+	}
 }
 
+//nolint:unused
 func (f *firewall) hasIPCondition(addr net.IP) bool {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -177,7 +184,12 @@ func (f *firewall) hasIPCondition(addr net.IP) bool {
 			continue
 		}
 
-		if netip.AddrFrom4([4]byte(addr)) == address {
+		netaddr, err := netip.ParseAddr(addr.String())
+		if err != nil {
+			continue
+		}
+
+		if netaddr == address {
 			return true
 		}
 	}
@@ -192,7 +204,12 @@ func (f *firewall) hasIPCondition(addr net.IP) bool {
 			continue
 		}
 
-		if netip.AddrFrom4([4]byte(addr)) == address {
+		netaddr, err := netip.ParseAddr(addr.String())
+		if err != nil {
+			continue
+		}
+
+		if netaddr == address {
 			return true
 		}
 	}
@@ -223,30 +240,6 @@ func Isolate(whitelist []net.IP) error {
 	}
 
 	switch {
-	case fw.hasAllowRules() && len(whitelist) > 0:
-		// rules were added and the whitelist
-		// is given in the action. Check if
-		// the given permitted addresses contain
-		// an item that is not already in the
-		// allowed rules conditions.
-		refresh := true
-		for _, addr := range whitelist {
-			if fw.hasIPCondition(addr) {
-				refresh = false
-				break
-			} else {
-				fw.addIPCondition(addr)
-			}
-		}
-
-		if refresh {
-			if err := fw.removeAllowRules(); err != nil {
-				return err
-			}
-			return fw.allow(whitelist)
-		}
-
-		return nil
 	case fw.hasAllowRules():
 		// rules were added and no new permitted
 		// addresses are supplied in the action
