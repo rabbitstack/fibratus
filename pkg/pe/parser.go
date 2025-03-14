@@ -407,6 +407,12 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 // driver samples may not contain an import directory, but section names may
 // reveal the PE is a kernel driver.
 func (pe *PE) isDriver() bool {
+	// Prevent false positives such as ntdll.dll
+	// because it has the PAGE section which is
+	// driver-typical
+	if pe.IsDLL {
+		return false
+	}
 	// DIRECTORY_ENTRY_IMPORT may exist, although it may be empty.
 	// If it imports from "ntoskrnl.exe" or other kernel components it should
 	// be a driver.
