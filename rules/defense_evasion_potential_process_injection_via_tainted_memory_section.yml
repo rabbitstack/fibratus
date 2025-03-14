@@ -25,7 +25,10 @@ condition: >
     |map_view_of_section and file.view.protection = 'READWRITE' and kevt.pid != 4 and file.view.size >= 4096 and not ps.exe imatches 
       (
         '?:\\Program Files\\*.exe', 
-        '?:\\Program Files (x86)\\*.exe'
+        '?:\\Program Files (x86)\\*.exe',
+        '?:\\ProgramData\\Microsoft\\Windows Defender\\*\\MsMpEng.exe',
+        '?:\\ProgramData\\Microsoft\\Windows Defender\\*\\NisSrv.exe',
+        '?:\\WINDOWS\\system32\\csrss.exe'
       )
     | as e1
     |map_view_of_section and file.view.protection = 'READONLY|EXECUTE' and file.key = $e1.file.key and kevt.pid != $e1.kevt.pid|
