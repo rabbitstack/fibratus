@@ -356,6 +356,18 @@ func InterpolateFields(s string, evts []*kevent.Kevent) string {
 	if len(matches) == 0 {
 		return s
 	}
+
+	split := func(s string) (string, string) {
+		n, m := strings.Index(s, "["), strings.Index(s, "]")
+		if n < 0 || m < 0 {
+			return s, ""
+		}
+		if n > m {
+			return s, ""
+		}
+		return s[0:n], s[n+1 : m]
+	}
+
 	for _, m := range matches {
 		switch {
 		case len(m) == 3:
@@ -376,8 +388,9 @@ func InterpolateFields(s string, evts []*kevent.Kevent) string {
 			// extract field value from the event and replace in string
 			var val any
 			for _, accessor := range GetAccessors() {
+				name, arg := split(m[2])
+				f := Field{Value: m[2], Name: fields.Field(name), Arg: arg}
 				var err error
-				f := Field{Value: m[2], Name: fields.Field(m[2])}
 				val, err = accessor.Get(f, kevt)
 				if err != nil {
 					continue
