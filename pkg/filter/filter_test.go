@@ -1228,8 +1228,8 @@ func TestInterpolateFields(t *testing.T) {
 		evts         []*kevent.Kevent
 	}{
 		{
-			original:     "Credential discovery via %ps.name and user %ps.sid",
-			interpolated: "Credential discovery via VaultCmd.exe and user LOCAL\\tor",
+			original:     "Credential discovery via %ps.name (%kevt.arg[cmdline]) and user %ps.sid",
+			interpolated: "Credential discovery via VaultCmd.exe (VaultCmd.exe /listcreds:Windows Credentials /all) and user LOCAL\\tor",
 			evts: []*kevent.Kevent{
 				{
 					Type:     ktypes.CreateProcess,
@@ -1240,6 +1240,9 @@ func TestInterpolateFields(t *testing.T) {
 						Name: "VaultCmd.exe",
 						Ppid: 345,
 						SID:  "LOCAL\\tor",
+					},
+					Kparams: kevent.Kparams{
+						kparams.Cmdline: {Name: kparams.Cmdline, Type: kparams.UnicodeString, Value: `VaultCmd.exe /listcreds:Windows Credentials /all`},
 					},
 				},
 			},
