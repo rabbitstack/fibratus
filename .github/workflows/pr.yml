@@ -250,7 +250,7 @@ jobs:
       - name: Check version increment
         if: steps.changed-rules.outputs.any_changed == 'true'
         env:
-          CHANGED_RULES: ${{ steps.changed-rules.outputs.all_changed_files }}
+          CHANGED_RULES: ${{ steps.changed-rules.outputs.modified_files }}
         shell: bash
         run: |
           choco install yq -y
