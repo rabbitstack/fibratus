@@ -1,0 +1,37 @@
+name: Suspicious object symbolic link creation
+id: f9306355-1f5f-4a06-9779-195aa681db80
+version: 1.0.0
+description: |
+  Identifies the creation of the object symbolic link inside the object manager namespace
+  by untrusted or unusual processes.
+  Adversaries may exploit object symbolic links to trick system processes into executing
+  malicious payloads.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1211
+  technique.name: Exploitation for Defense Evasion
+  technique.ref: https://attack.mitre.org/techniques/T1211/
+references:
+  - https://www.cyberark.com/resources/threat-research-blog/follow-the-link-exploiting-symbolic-links-with-ease
+  - https://www.elastic.co/kr/blog/detect-block-unknown-knowndlls-windows-acl-hardening-attacks-cache-poisoning-escalation
+
+condition: >
+  create_symbolic_link_object and kevt.pid != 4 
+    and 
+  (pe.is_signed = false or pe.is_trusted = false or not ps.exe imatches
+    (
+      '?:\\ProgramData\\Microsoft\\Windows Defender\\*\\MsMpEng.exe',
+      '?:\\WINDOWS\\system32\\svchost.exe',
+      '?:\\Program Files\\*',
+      '?:\\Program Files (x86)\\*',
+      '?:\\Windows\\System32\\vmwp.exe'
+    )
+  )
+
+output: >
+  Suspicious object symbolic link %kevt.arg[target] created by process %ps.exe
+severity: high
+
+min-engine-version: 2.4.0
