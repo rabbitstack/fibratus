@@ -103,6 +103,9 @@
 - macro: reply_dns
   expr: kevt.name = 'ReplyDns'
 
+- macro: create_symbolic_link_object
+  expr: kevt.name = 'CreateSymbolicLinkObject' and kevt.arg[status] = 'Success'
+
 - macro: inbound_network
   expr: >
     (recv_socket or accept_socket)
