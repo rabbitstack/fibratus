@@ -538,12 +538,19 @@ func (s *sequenceState) expire(e *kevent.Kevent) bool {
 		// process spawned by CreateProcess, and it pertains
 		// to the final sequence slot, it is safe to expire
 		// the whole sequence
+		pid := rhs.Kparams.MustGetPid()
 		if lhs.Type == ktypes.CreateProcess && isFinalSlot {
-			p1, _ := lhs.Kparams.GetPid()
-			p2, _ := rhs.Kparams.GetPid()
-			return p1 == p2
+			return lhs.Kparams.MustGetPid() == pid
 		}
-		pid, _ := rhs.Kparams.GetPid()
+		if lhs.Type == ktypes.CreateThread {
+			// if the pids differ, the thread
+			// is created in a remote process.
+			// Sequence can be expired only if
+			// the remote process terminates
+			if lhs.PID != lhs.Kparams.MustGetPid() {
+				return lhs.Kparams.MustGetPid() == pid
+			}
+		}
 		return lhs.PID == pid
 	}
 	s.mu.Lock()
