@@ -84,6 +84,9 @@ func New(expr string, config *config.Config, options ...Option) Filter {
 	if kconfig.EnableDNSEvents {
 		accessors = append(accessors, newDNSAccessor())
 	}
+	if kconfig.EnableThreadpoolEvents {
+		accessors = append(accessors, newThreadpoolAccessor())
+	}
 
 	var parser *ql.Parser
 	if fconfig.HasMacros() {

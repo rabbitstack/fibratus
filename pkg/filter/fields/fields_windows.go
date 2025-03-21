@@ -508,22 +508,56 @@ const (
 	DNSAnswers Field = "dns.answers"
 	// DNSRcode identifies the field that represents the DNS response code
 	DNSRcode Field = "dns.rcode"
+
+	// ThreadpoolPoolID identifies the field that represents the thread pool identifier
+	ThreadpoolPoolID = "threadpool.id"
+	// ThreadpoolTaskID identifies the field that represents the thread pool task identifier
+	ThreadpoolTaskID = "threadpool.task.id"
+	// ThreadpoolCallbackAddress identifies the field that represents the address of the callback function
+	ThreadpoolCallbackAddress = "threadpool.callback.address"
+	// ThreadpoolCallbackSymbol identifies the field that represents the callback symbol
+	ThreadpoolCallbackSymbol = "threadpool.callback.symbol"
+	// ThreadpoolCallbackModule identifies the field that represents the module containing the callback symbol
+	ThreadpoolCallbackModule = "threadpool.callback.module"
+	// ThreadpoolCallbackContext identifies the field that represents the address of the callback context
+	ThreadpoolCallbackContext = "threadpool.callback.context"
+	// ThreadpoolCallbackContextRip identifies the field that represents the value of instruction pointer contained in the callback context
+	ThreadpoolCallbackContextRip = "threadpool.callback.context.rip"
+	// ThreadpoolCallbackContextRipSymbol identifies the field that represents the symbol name associated with the instruction pointer in callback context
+	ThreadpoolCallbackContextRipSymbol = "threadpool.callback.context.rip.symbol"
+	// ThreadpoolCallbackContextRipModule identifies the field that represents the module name associated with the instruction pointer in callback context
+	ThreadpoolCallbackContextRipModule = "threadpool.callback.context.rip.module"
+	// ThreadpoolSubprocessTag identifies the field that represents the service identifier associated with the thread pool
+	ThreadpoolSubprocessTag = "threadpool.subprocess_tag"
+	// ThreadpoolTimerDuetime identifies the field that represents the timer due time
+	ThreadpoolTimerDuetime = "threadpool.timer.duetime"
+	// ThreadpoolTimerSubqueue identifies the field that represents the memory address of the timer subqueue
+	ThreadpoolTimerSubqueue = "threadpool.timer.subqueue"
+	// ThreadpoolTimer identifies the field that represents the memory address of the timer object
+	ThreadpoolTimer = "threadpool.timer.address"
+	// ThreadpoolTimerPeriod identifies the field that represents the period of the timer
+	ThreadpoolTimerPeriod = "threadpool.timer.period"
+	// ThreadpoolTimerWindow identifies the field that represents the timer tolerate period
+	ThreadpoolTimerWindow = "threadpool.timer.window"
+	// ThreadpoolTimerAbsolute identifies the field that indicates if the timer is absolute or relative
+	ThreadpoolTimerAbsolute = "threadpool.timer.is_absolute"
 )
 
 // String casts the field type to string.
 func (f Field) String() string { return string(f) }
 
-func (f Field) IsPsField() bool       { return strings.HasPrefix(string(f), "ps.") }
-func (f Field) IsKevtField() bool     { return strings.HasPrefix(string(f), "kevt.") }
-func (f Field) IsThreadField() bool   { return strings.HasPrefix(string(f), "thread.") }
-func (f Field) IsImageField() bool    { return strings.HasPrefix(string(f), "image.") }
-func (f Field) IsFileField() bool     { return strings.HasPrefix(string(f), "file.") }
-func (f Field) IsRegistryField() bool { return strings.HasPrefix(string(f), "registry.") }
-func (f Field) IsNetworkField() bool  { return strings.HasPrefix(string(f), "net.") }
-func (f Field) IsHandleField() bool   { return strings.HasPrefix(string(f), "handle.") }
-func (f Field) IsPeField() bool       { return strings.HasPrefix(string(f), "pe.") || f == PsChildPeFilename }
-func (f Field) IsMemField() bool      { return strings.HasPrefix(string(f), "mem.") }
-func (f Field) IsDNSField() bool      { return strings.HasPrefix(string(f), "dns.") }
+func (f Field) IsPsField() bool         { return strings.HasPrefix(string(f), "ps.") }
+func (f Field) IsKevtField() bool       { return strings.HasPrefix(string(f), "kevt.") }
+func (f Field) IsThreadField() bool     { return strings.HasPrefix(string(f), "thread.") }
+func (f Field) IsImageField() bool      { return strings.HasPrefix(string(f), "image.") }
+func (f Field) IsFileField() bool       { return strings.HasPrefix(string(f), "file.") }
+func (f Field) IsRegistryField() bool   { return strings.HasPrefix(string(f), "registry.") }
+func (f Field) IsNetworkField() bool    { return strings.HasPrefix(string(f), "net.") }
+func (f Field) IsHandleField() bool     { return strings.HasPrefix(string(f), "handle.") }
+func (f Field) IsPeField() bool         { return strings.HasPrefix(string(f), "pe.") || f == PsChildPeFilename }
+func (f Field) IsMemField() bool        { return strings.HasPrefix(string(f), "mem.") }
+func (f Field) IsDNSField() bool        { return strings.HasPrefix(string(f), "dns.") }
+func (f Field) IsThreadpoolField() bool { return strings.HasPrefix(string(f), "threadpool.") }
 
 func (f Field) IsPeSection() bool { return f == PeNumSections }
 func (f Field) IsPeSymbol() bool  { return f == PeSymbols || f == PeNumSymbols || f == PeImports }
@@ -966,6 +1000,23 @@ var fields = map[Field]FieldInfo{
 	DNSOptions: {DNSOptions, "dns query options", kparams.Flags64, []string{"dns.options in ('ADDRCONFIG', 'DUAL_ADDR')"}, nil, nil},
 	DNSRcode:   {DNSRR, "dns response status", kparams.AnsiString, []string{"dns.rcode = 'NXDOMAIN'"}, nil, nil},
 	DNSAnswers: {DNSAnswers, "dns response answers", kparams.Slice, []string{"dns.answers in ('o.lencr.edgesuite.net', 'a1887.dscq.akamai.net')"}, nil, nil},
+
+	ThreadpoolPoolID:                   {ThreadpoolPoolID, "thread pool identifier", kparams.Address, []string{"threadpool.id = '20f5fc02440'"}, nil, nil},
+	ThreadpoolTaskID:                   {ThreadpoolTaskID, "thread pool task identifier", kparams.Address, []string{"threadpool.task.id = '20f7ecd21f8'"}, nil, nil},
+	ThreadpoolCallbackAddress:          {ThreadpoolCallbackAddress, "thread pool callback address", kparams.Address, []string{"threadpool.callback.address = '7ff868739ed0'"}, nil, nil},
+	ThreadpoolCallbackSymbol:           {ThreadpoolCallbackSymbol, "thread pool callback symbol", kparams.UnicodeString, []string{"threadpool.callback.symbol = 'RtlDestroyQueryDebugBuffer'"}, nil, nil},
+	ThreadpoolCallbackModule:           {ThreadpoolCallbackModule, "thread pool module containing the callback symbol", kparams.UnicodeString, []string{"threadpool.callback.module contains 'ntdll.dll'"}, nil, nil},
+	ThreadpoolCallbackContext:          {ThreadpoolCallbackContext, "thread pool callback context address", kparams.Address, []string{"threadpool.callback.context = '1df41e07bd0'"}, nil, nil},
+	ThreadpoolCallbackContextRip:       {ThreadpoolCallbackContextRip, "thread pool callback thread context instruction pointer", kparams.Address, []string{"threadpool.callback.context.rip = '1df42ffc1f8'"}, nil, nil},
+	ThreadpoolCallbackContextRipSymbol: {ThreadpoolCallbackContextRipSymbol, "thread pool callback thread context instruction pointer symbol", kparams.UnicodeString, []string{"threadpool.callback.context.rip.symbol = 'VirtualProtect'"}, nil, nil},
+	ThreadpoolCallbackContextRipModule: {ThreadpoolCallbackContextRipModule, "thread pool callback thread context instruction pointer symbol module", kparams.UnicodeString, []string{"threadpool.callback.context.rip.module contains 'ntdll.dll'"}, nil, nil},
+	ThreadpoolSubprocessTag:            {ThreadpoolSubprocessTag, "thread pool service identifier", kparams.Address, []string{"threadpool.subprocess_tag = '10d'"}, nil, nil},
+	ThreadpoolTimerDuetime:             {ThreadpoolTimerDuetime, "thread pool timer due time", kparams.Uint64, []string{"threadpool.timer.duetime > 10"}, nil, nil},
+	ThreadpoolTimerSubqueue:            {ThreadpoolTimerSubqueue, "thread pool timer subqueue address", kparams.Address, []string{"threadpool.timer.subqueue = '1db401703e8'"}, nil, nil},
+	ThreadpoolTimer:                    {ThreadpoolTimer, "thread pool timer address", kparams.Address, []string{"threadpool.timer.address = '3e8'"}, nil, nil},
+	ThreadpoolTimerPeriod:              {ThreadpoolTimerPeriod, "thread pool timer period", kparams.Uint32, []string{"threadpool.timer.period = 0'"}, nil, nil},
+	ThreadpoolTimerWindow:              {ThreadpoolTimerWindow, "thread pool timer tolerate period", kparams.Uint32, []string{"threadpool.timer.window = 0'"}, nil, nil},
+	ThreadpoolTimerAbsolute:            {ThreadpoolTimerAbsolute, "indicates if the thread pool timer is absolute or relative", kparams.Bool, []string{"threadpool.timer.is_absolute = true'"}, nil, nil},
 }
 
 // ArgumentOf returns argument data for the specified field.

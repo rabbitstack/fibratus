@@ -65,6 +65,7 @@ func GetAccessors() []Accessor {
 		newHandleAccessor(),
 		newNetworkAccessor(),
 		newRegistryAccessor(),
+		newThreadpoolAccessor(),
 	}
 }
 
@@ -1333,6 +1334,58 @@ func (*dnsAccessor) Get(f Field, kevt *kevent.Kevent) (kparams.Value, error) {
 		return kevt.GetFlagsAsSlice(kparams.DNSOpts), nil
 	case fields.DNSAnswers:
 		return kevt.Kparams.GetSlice(kparams.DNSAnswers)
+	}
+
+	return nil, nil
+}
+
+// threadpoolAccessor extracts values from thread pool events
+type threadpoolAccessor struct{}
+
+func (threadpoolAccessor) SetFields([]Field)            {}
+func (threadpoolAccessor) SetSegments([]fields.Segment) {}
+func (threadpoolAccessor) IsFieldAccessible(e *kevent.Kevent) bool {
+	return e.Category == ktypes.Threadpool
+}
+
+func newThreadpoolAccessor() Accessor {
+	return &threadpoolAccessor{}
+}
+
+func (*threadpoolAccessor) Get(f Field, e *kevent.Kevent) (kparams.Value, error) {
+	switch f.Name {
+	case fields.ThreadpoolPoolID:
+		return e.GetParamAsString(kparams.ThreadpoolPoolID), nil
+	case fields.ThreadpoolTaskID:
+		return e.GetParamAsString(kparams.ThreadpoolTaskID), nil
+	case fields.ThreadpoolCallbackAddress:
+		return e.GetParamAsString(kparams.ThreadpoolCallback), nil
+	case fields.ThreadpoolCallbackSymbol:
+		return e.GetParamAsString(kparams.ThreadpoolCallbackSymbol), nil
+	case fields.ThreadpoolCallbackModule:
+		return e.GetParamAsString(kparams.ThreadpoolCallbackModule), nil
+	case fields.ThreadpoolCallbackContext:
+		return e.GetParamAsString(kparams.ThreadpoolContext), nil
+	case fields.ThreadpoolCallbackContextRip:
+		return e.GetParamAsString(kparams.ThreadpoolContextRip), nil
+	case fields.ThreadpoolCallbackContextRipSymbol:
+		return e.GetParamAsString(kparams.ThreadpoolContextRipSymbol), nil
+	case fields.ThreadpoolCallbackContextRipModule:
+		return e.GetParamAsString(kparams.ThreadpoolContextRipModule), nil
+	case fields.ThreadpoolSubprocessTag:
+		return e.GetParamAsString(kparams.ThreadpoolSubprocessTag), nil
+	case fields.ThreadpoolTimer:
+		return e.GetParamAsString(kparams.ThreadpoolTimer), nil
+	case fields.ThreadpoolTimerSubqueue:
+		return e.GetParamAsString(kparams.ThreadpoolTimerSubqueue), nil
+	case fields.ThreadpoolTimerDuetime:
+		return e.Kparams.GetUint64(kparams.ThreadpoolTimerDuetime)
+	case fields.ThreadpoolTimerPeriod:
+		return e.Kparams.GetUint32(kparams.ThreadpoolTimerPeriod)
+	case fields.ThreadpoolTimerWindow:
+		return e.Kparams.GetUint32(kparams.ThreadpoolTimerWindow)
+	case fields.ThreadpoolTimerAbsolute:
+		return e.Kparams.GetBool(kparams.ThreadpoolTimerAbsolute)
 	}
 
 	return nil, nil

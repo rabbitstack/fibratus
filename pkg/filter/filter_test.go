@@ -47,14 +47,15 @@ import (
 
 var cfg = &config.Config{
 	Kstream: config.KstreamConfig{
-		EnableHandleKevents:   true,
-		EnableNetKevents:      true,
-		EnableRegistryKevents: true,
-		EnableFileIOKevents:   true,
-		EnableImageKevents:    true,
-		EnableThreadKevents:   true,
-		EnableMemKevents:      true,
-		EnableDNSEvents:       true,
+		EnableHandleKevents:    true,
+		EnableNetKevents:       true,
+		EnableRegistryKevents:  true,
+		EnableFileIOKevents:    true,
+		EnableImageKevents:     true,
+		EnableThreadKevents:    true,
+		EnableMemKevents:       true,
+		EnableDNSEvents:        true,
+		EnableThreadpoolEvents: true,
 	},
 	Filters: &config.Filters{},
 	PE:      pe.Config{Enabled: true},
@@ -1214,6 +1215,71 @@ func TestDNSFilter(t *testing.T) {
 		matches := f.Run(kevt)
 		if matches != tt.matches {
 			t.Errorf("%d. %q dns filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
+		}
+	}
+}
+
+func TestThreadpoolFilter(t *testing.T) {
+	e := &kevent.Kevent{
+		Type:      ktypes.SubmitThreadpoolCallback,
+		Tid:       2484,
+		PID:       1023,
+		CPU:       1,
+		Seq:       2,
+		Name:      "SubmitThreadpoolCallback",
+		Timestamp: time.Now(),
+		Category:  ktypes.Threadpool,
+		Kparams: kevent.Kparams{
+			kparams.ThreadpoolPoolID:           {Name: kparams.ThreadpoolPoolID, Type: kparams.Address, Value: uint64(0x20f5fc02440)},
+			kparams.ThreadpoolTaskID:           {Name: kparams.ThreadpoolTaskID, Type: kparams.Address, Value: uint64(0x20f7ecd21f8)},
+			kparams.ThreadpoolCallback:         {Name: kparams.ThreadpoolCallback, Type: kparams.Address, Value: uint64(0x7ffb3138592e)},
+			kparams.ThreadpoolContext:          {Name: kparams.ThreadpoolContext, Type: kparams.Address, Value: uint64(0x14d0d16fed8)},
+			kparams.ThreadpoolContextRip:       {Name: kparams.ThreadpoolContextRip, Type: kparams.Address, Value: uint64(0x143c9b07bd0)},
+			kparams.ThreadpoolSubprocessTag:    {Name: kparams.ThreadpoolSubprocessTag, Type: kparams.Address, Value: uint64(0x10d)},
+			kparams.ThreadpoolContextRipSymbol: {Name: kparams.ThreadpoolContextRipSymbol, Type: kparams.UnicodeString, Value: "VirtualProtect"},
+			kparams.ThreadpoolContextRipModule: {Name: kparams.ThreadpoolContextRipModule, Type: kparams.UnicodeString, Value: "C:\\Windows\\System32\\kernelbase.dll"},
+			kparams.ThreadpoolCallbackSymbol:   {Name: kparams.ThreadpoolCallbackSymbol, Type: kparams.UnicodeString, Value: "RtlDestroyQueryDebugBuffer"},
+			kparams.ThreadpoolCallbackModule:   {Name: kparams.ThreadpoolCallbackModule, Type: kparams.UnicodeString, Value: "C:\\Windows\\System32\\ntdll.dll"},
+			kparams.ThreadpoolTimerSubqueue:    {Name: kparams.ThreadpoolTimerSubqueue, Type: kparams.Address, Value: uint64(0x1db401703e8)},
+			kparams.ThreadpoolTimerDuetime:     {Name: kparams.ThreadpoolTimerDuetime, Type: kparams.Uint64, Value: uint64(18446744073699551616)},
+			kparams.ThreadpoolTimer:            {Name: kparams.ThreadpoolTimer, Type: kparams.Address, Value: uint64(0x3e8)},
+			kparams.ThreadpoolTimerPeriod:      {Name: kparams.ThreadpoolTimerPeriod, Type: kparams.Uint32, Value: uint32(100)},
+			kparams.ThreadpoolTimerWindow:      {Name: kparams.ThreadpoolTimerWindow, Type: kparams.Uint32, Value: uint32(50)},
+			kparams.ThreadpoolTimerAbsolute:    {Name: kparams.ThreadpoolTimerAbsolute, Type: kparams.Bool, Value: true},
+		},
+	}
+
+	var tests = []struct {
+		filter  string
+		matches bool
+	}{
+
+		{`threadpool.id = '20f5fc02440'`, true},
+		{`threadpool.task.id = '20f7ecd21f8'`, true},
+		{`threadpool.callback.address = '7ffb3138592e'`, true},
+		{`threadpool.callback.symbol = 'RtlDestroyQueryDebugBuffer'`, true},
+		{`threadpool.callback.module = 'C:\\Windows\\System32\\ntdll.dll'`, true},
+		{`threadpool.callback.context = '14d0d16fed8'`, true},
+		{`threadpool.callback.context.rip = '143c9b07bd0'`, true},
+		{`threadpool.callback.context.rip.symbol = 'VirtualProtect'`, true},
+		{`threadpool.callback.context.rip.module = 'C:\\Windows\\System32\\kernelbase.dll'`, true},
+		{`threadpool.timer.address = '3e8'`, true},
+		{`threadpool.timer.subqueue = '1db401703e8'`, true},
+		{`threadpool.timer.duetime = 18446744073699551616`, true},
+		{`threadpool.timer.period = 100`, true},
+		{`threadpool.timer.window = 50`, true},
+		{`threadpool.timer.is_absolute = true`, true},
+	}
+
+	for i, tt := range tests {
+		f := New(tt.filter, cfg)
+		err := f.Compile()
+		if err != nil {
+			t.Fatal(err)
+		}
+		matches := f.Run(e)
+		if matches != tt.matches {
+			t.Errorf("%d. %q threadpool filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
 	}
 }

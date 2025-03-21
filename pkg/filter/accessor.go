@@ -145,17 +145,18 @@ func (k *kevtAccessor) Get(f Field, kevt *kevent.Kevent) (kparams.Value, error) 
 // referenced in the bound field.
 func (f *filter) narrowAccessors() {
 	var (
-		removeKevtAccessor     = true
-		removePsAccessor       = true
-		removeThreadAccessor   = true
-		removeImageAccessor    = true
-		removeFileAccessor     = true
-		removeRegistryAccessor = true
-		removeNetworkAccessor  = true
-		removeHandleAccessor   = true
-		removePEAccessor       = true
-		removeMemAccessor      = true
-		removeDNSAccessor      = true
+		removeKevtAccessor       = true
+		removePsAccessor         = true
+		removeThreadAccessor     = true
+		removeImageAccessor      = true
+		removeFileAccessor       = true
+		removeRegistryAccessor   = true
+		removeNetworkAccessor    = true
+		removeHandleAccessor     = true
+		removePEAccessor         = true
+		removeMemAccessor        = true
+		removeDNSAccessor        = true
+		removeThreadpoolAccessor = true
 	)
 
 	for _, field := range f.fields {
@@ -182,6 +183,8 @@ func (f *filter) narrowAccessors() {
 			removeMemAccessor = false
 		case field.Name.IsDNSField():
 			removeDNSAccessor = false
+		case field.Name.IsThreadpoolField():
+			removeThreadpoolAccessor = false
 		}
 	}
 
@@ -217,6 +220,9 @@ func (f *filter) narrowAccessors() {
 	}
 	if removeDNSAccessor {
 		f.removeAccessor(&dnsAccessor{})
+	}
+	if removeThreadpoolAccessor {
+		f.removeAccessor(&threadpoolAccessor{})
 	}
 
 	for _, accessor := range f.accessors {
