@@ -1,6 +1,6 @@
 name: Unusual process modified registry run key
 id: 921508a5-b627-4c02-a295-6c6863c0897b
-version: 1.0.1
+version: 1.0.2
 description: |
   Identifies an attempt by unusual Windows native processes to modify
   the run key and gain persistence on users logons or machine reboots.
@@ -16,9 +16,7 @@ labels:
   subtechnique.ref: https://attack.mitre.org/techniques/T1547/001/
 
 condition: >
-  modify_registry
-    and
-  ps.exe imatches '?:\\Windows\\*'
+  modify_registry and ps.exe imatches '?:\\Windows\\*'
     and
   registry.path imatches registry_run_keys
     and
