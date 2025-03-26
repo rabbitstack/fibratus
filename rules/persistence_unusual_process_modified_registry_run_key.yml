@@ -41,7 +41,8 @@ condition: >
       '?:\\Windows\\SysWOW64\\prevhost.exe',
       '?:\\Windows\\System32\\conhost.exe',
       '?:\\Windows\\System32\\taskhostw.exe',
-      '?:\\Windows\\System32\\backgroundTaskHost.exe'
+      '?:\\Windows\\System32\\backgroundTaskHost.exe',
+      '?:\\Windows\\System32\\CompatTelRunner.exe'
     )
 
 min-engine-version: 2.4.0
