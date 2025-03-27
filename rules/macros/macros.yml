@@ -150,6 +150,12 @@
   expr: >
     load_module and (image.name iendswith '.dll' or image.is_dll)
 
+- macro: load_unsigned_executable
+  expr: >
+    load_executable
+      and
+    image.signature.type = 'NONE'
+
 - macro: load_untrusted_executable
   expr: >
     load_executable
