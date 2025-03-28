@@ -25,6 +25,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/ps"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -50,7 +51,7 @@ func TestSequenceState(t *testing.T) {
 
 	require.NoError(t, f.Compile())
 
-	ss := newSequenceState(f, c)
+	ss := newSequenceState(f, c, new(ps.SnapshotterMock))
 
 	assert.Equal(t, 0, ss.currentState())
 	assert.True(t, ss.isInitialState())
@@ -190,7 +191,7 @@ func TestSimpleSequence(t *testing.T) {
 	`, &config.Config{Kstream: config.KstreamConfig{EnableFileIOKevents: true}, Filters: &config.Filters{}})
 	require.NoError(t, f.Compile())
 
-	ss := newSequenceState(f, c)
+	ss := newSequenceState(f, c, new(ps.SnapshotterMock))
 
 	var tests = []struct {
 		evts    []*kevent.Kevent
@@ -276,7 +277,7 @@ func TestSimpleSequenceMultiplePartials(t *testing.T) {
 	`, &config.Config{Kstream: config.KstreamConfig{EnableFileIOKevents: true}, Filters: &config.Filters{}})
 	require.NoError(t, f.Compile())
 
-	ss := newSequenceState(f, c)
+	ss := newSequenceState(f, c, new(ps.SnapshotterMock))
 
 	// create random matches which don't satisfy the sequence link
 	for i, pid := range []uint32{2343, 1024, 11122, 3450, 12319} {
@@ -382,7 +383,7 @@ func TestSimpleSequenceDeadline(t *testing.T) {
 	`, &config.Config{Kstream: config.KstreamConfig{EnableFileIOKevents: true}, Filters: &config.Filters{}})
 	require.NoError(t, f.Compile())
 
-	ss := newSequenceState(f, c)
+	ss := newSequenceState(f, c, new(ps.SnapshotterMock))
 
 	e1 := &kevent.Kevent{
 		Type:      ktypes.CreateProcess,
@@ -453,7 +454,7 @@ func TestComplexSequence(t *testing.T) {
 	`, &config.Config{Kstream: config.KstreamConfig{EnableFileIOKevents: true}, Filters: &config.Filters{}})
 	require.NoError(t, f.Compile())
 
-	ss := newSequenceState(f, c)
+	ss := newSequenceState(f, c, new(ps.SnapshotterMock))
 
 	e1 := &kevent.Kevent{
 		Seq:       1,
@@ -546,7 +547,7 @@ func TestSequenceOOO(t *testing.T) {
 	`, &config.Config{Kstream: config.KstreamConfig{EnableFileIOKevents: true}, Filters: &config.Filters{}})
 	require.NoError(t, f.Compile())
 
-	ss := newSequenceState(f, c)
+	ss := newSequenceState(f, c, new(ps.SnapshotterMock))
 
 	e1 := &kevent.Kevent{
 		Type:      ktypes.CreateFile,
@@ -606,7 +607,7 @@ func TestSequenceGC(t *testing.T) {
 	`, &config.Config{Kstream: config.KstreamConfig{EnableFileIOKevents: true}, Filters: &config.Filters{}})
 	require.NoError(t, f.Compile())
 
-	ss := newSequenceState(f, c)
+	ss := newSequenceState(f, c, new(ps.SnapshotterMock))
 
 	e := &kevent.Kevent{
 		Type:      ktypes.OpenProcess,
@@ -755,7 +756,7 @@ func TestSequenceExpire(t *testing.T) {
 			f := filter.New(tt.expr, &config.Config{Kstream: config.KstreamConfig{EnableFileIOKevents: true}, Filters: &config.Filters{}})
 			require.NoError(t, f.Compile())
 
-			ss := newSequenceState(f, tt.c)
+			ss := newSequenceState(f, tt.c, new(ps.SnapshotterMock))
 			for _, evt := range tt.evts {
 				if evt.IsTerminateProcess() {
 					ss.expire(evt)
@@ -787,7 +788,7 @@ func TestSequenceBoundFields(t *testing.T) {
 	`, &config.Config{Kstream: config.KstreamConfig{EnableFileIOKevents: true}, Filters: &config.Filters{}})
 	require.NoError(t, f.Compile())
 
-	ss := newSequenceState(f, c)
+	ss := newSequenceState(f, c, new(ps.SnapshotterMock))
 
 	e1 := &kevent.Kevent{
 		Type:      ktypes.CreateProcess,
@@ -882,7 +883,7 @@ func TestSequenceBoundFieldsWithFunctions(t *testing.T) {
 	`, &config.Config{Kstream: config.KstreamConfig{EnableFileIOKevents: true, EnableRegistryKevents: true}, Filters: &config.Filters{}})
 	require.NoError(t, f.Compile())
 
-	ss := newSequenceState(f, c)
+	ss := newSequenceState(f, c, new(ps.SnapshotterMock))
 
 	e1 := &kevent.Kevent{
 		Type:     ktypes.CreateFile,
@@ -942,7 +943,7 @@ func TestIsExpressionEvaluable(t *testing.T) {
 	`, &config.Config{Kstream: config.KstreamConfig{EnableFileIOKevents: true}, Filters: &config.Filters{}})
 	require.NoError(t, f.Compile())
 
-	ss := newSequenceState(f, c)
+	ss := newSequenceState(f, c, new(ps.SnapshotterMock))
 
 	e1 := &kevent.Kevent{
 		Type: ktypes.CreateProcess,
