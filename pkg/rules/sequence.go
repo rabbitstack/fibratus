@@ -28,6 +28,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/atomic"
 	log "github.com/sirupsen/logrus"
 	"sort"
@@ -114,9 +115,11 @@ type sequenceState struct {
 	states map[fsm.State]bool
 	// smu guards the states map
 	smu sync.RWMutex
+
+	psnap ps.Snapshotter
 }
 
-func newSequenceState(f filter.Filter, c *config.FilterConfig) *sequenceState {
+func newSequenceState(f filter.Filter, c *config.FilterConfig, psnap ps.Snapshotter) *sequenceState {
 	ss := &sequenceState{
 		filter:        f,
 		seq:           f.GetSequence(),
@@ -129,6 +132,7 @@ func newSequenceState(f filter.Filter, c *config.FilterConfig) *sequenceState {
 		spanDeadlines: make(map[fsm.State]*time.Timer),
 		initialState:  sequenceInitialState,
 		inDeadline:    atomic.MakeBool(false),
+		psnap:         psnap,
 	}
 
 	ss.initFSM()
@@ -479,6 +483,10 @@ func (s *sequenceState) runSequence(e *kevent.Kevent) bool {
 					for _, evt := range s.partials[seqID] {
 						if !evt.ContainsMeta(kevent.RuleSequenceOOOKey) {
 							continue
+						}
+						// try to initialize process state before evaluating the event
+						if evt.PS == nil {
+							_, evt.PS = s.psnap.Find(evt.PID)
 						}
 						matches = s.filter.RunSequence(evt, seqID, s.partials, false)
 						// transition the state machine

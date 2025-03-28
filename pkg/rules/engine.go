@@ -210,7 +210,7 @@ func (e *Engine) Compile() (*config.RulesCompileResult, error) {
 	for c, f := range filters {
 		var ss *sequenceState
 		if f.IsSequence() {
-			ss = newSequenceState(f, c)
+			ss = newSequenceState(f, c, e.psnap)
 		}
 		fltr := newCompiledFilter(f, c, ss)
 		if ss != nil {
