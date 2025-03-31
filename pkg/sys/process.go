@@ -117,3 +117,59 @@ func IsWindowsService() bool {
 	isSvc, err := svc.IsWindowsService()
 	return isSvc && err == nil
 }
+
+// ProcessModule describes the process loaded module.
+type ProcessModule struct {
+	windows.ModuleInfo
+	Name string
+}
+
+// EnumProcessModules returns all loaded modules in the process address space.
+func EnumProcessModules(pid uint32) []ProcessModule {
+	n := uint32(1024)
+	mods := make([]windows.Handle, n)
+	proc, err := windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION|windows.PROCESS_VM_READ, false, pid)
+	if err != nil {
+		return nil
+	}
+	defer windows.Close(proc)
+
+	if err := windows.EnumProcessModules(proc, &mods[0], 1024, &n); err != nil {
+		// needs bigger buffer
+		if n > 1024 {
+			mods = make([]windows.Handle, n)
+			if err := windows.EnumProcessModules(proc, &mods[0], n, &n); err != nil {
+				return nil
+			}
+		}
+		return nil
+	}
+
+	modules := make([]ProcessModule, 0)
+	for _, mod := range mods {
+		if mod == 0 {
+			continue
+		}
+		var moduleInfo windows.ModuleInfo
+		if err := windows.GetModuleInformation(proc, mod, &moduleInfo, uint32(unsafe.Sizeof(moduleInfo))); err != nil {
+			continue
+		}
+		module := ProcessModule{ModuleInfo: moduleInfo}
+		if name, err := getModuleFileName(proc, mod); err == nil {
+			module.Name = name
+		}
+		modules = append(modules, module)
+	}
+
+	return modules
+}
+
+func getModuleFileName(proc, mod windows.Handle) (string, error) {
+	n := uint32(1024)
+	buf := make([]uint16, n)
+	err := windows.GetModuleFileNameEx(proc, mod, &buf[0], n)
+	if err != nil {
+		return "", err
+	}
+	return windows.UTF16ToString(buf), nil
+}
