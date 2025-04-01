@@ -1326,6 +1326,21 @@ func TestInterpolateFields(t *testing.T) {
 			},
 		},
 		{
+			original:     "Suspicious thread start module %thread.start_address.module",
+			interpolated: "Suspicious thread start module C:\\Windows\\System32\\vault.dll",
+			evts: []*kevent.Kevent{
+				{
+					Type:     ktypes.CreateThread,
+					Category: ktypes.Thread,
+					Name:     "CreateThread",
+					PID:      1023,
+					Kparams: kevent.Kparams{
+						kparams.StartAddressModule: {Name: kparams.StartAddressModule, Type: kparams.UnicodeString, Value: "C:\\Windows\\System32\\vault.dll"},
+					},
+				},
+			},
+		},
+		{
 			original: `Detected an attempt by <code>%1.ps.name</code> process to access
 and read the memory of the <b>Local Security And Authority Subsystem Service</b>
 and subsequently write the <code>%2.file.path</code> dump file to the disk device`,

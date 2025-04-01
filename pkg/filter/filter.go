@@ -350,7 +350,7 @@ func (f *filter) GetSequence() *ql.Sequence { return f.seq }
 // which refers to the event in particular sequence stage. Otherwise, the modifier is
 // a well-known field name prepended with the `%` symbol.
 func InterpolateFields(s string, evts []*kevent.Kevent) string {
-	var fieldsReplRegexp = regexp.MustCompile(`%([1-9]?)\.?([a-z0-9A-Z\[\].]+)`)
+	var fieldsReplRegexp = regexp.MustCompile(`%([1-9]?)\.?([a-z0-9A-Z\[\]._]+)`)
 	matches := fieldsReplRegexp.FindAllStringSubmatch(s, -1)
 	r := s
 	if len(matches) == 0 {
