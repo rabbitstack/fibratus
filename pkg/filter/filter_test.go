@@ -355,13 +355,14 @@ func TestThreadFilter(t *testing.T) {
 			Modules: []pstypes.Module{
 				{Name: "C:\\Windows\\System32\\kernel32.dll", Size: 2312354, Checksum: 23123343, BaseAddress: va.Address(0x7ffb5c1d0396), DefaultBaseAddress: va.Address(0x7ffb5c1d0396)},
 				{Name: "C:\\Windows\\System32\\user32.dll", Size: 32212354, Checksum: 33123343, BaseAddress: va.Address(0x7ffb313953b2), DefaultBaseAddress: va.Address(0x7ffb313953b2)},
+				{Name: "C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll", Size: 32212354, Checksum: 33123343, BaseAddress: va.Address(0x7ffb3138592e), DefaultBaseAddress: va.Address(0x7ffb3138592e)},
 			},
 		},
 	}
 
 	// append the module signature
 	cert := &sys.Cert{Subject: "US, Washington, Redmond, Microsoft Corporation, Microsoft Windows", Issuer: "US, Washington, Redmond, Microsoft Corporation, Microsoft Windows Production PCA 2011"}
-	signature.GetSignatures().PutSignature(0x7ffb5c1d0396, &signature.Signature{Filename: "C:\\Windows\\System32\\kernel32.dll", Level: 4, Type: 1, Cert: cert})
+	signature.GetSignatures().PutSignature(0x7ffb3138592e, &signature.Signature{Filename: "C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll", Level: 4, Type: 1, Cert: cert})
 
 	// simulate unbacked RWX frame
 	base, err := windows.VirtualAlloc(0, 1024, windows.MEM_COMMIT|windows.MEM_RESERVE, windows.PAGE_EXECUTE_READWRITE)
@@ -382,9 +383,9 @@ func TestThreadFilter(t *testing.T) {
 	kevt.Callstack.PushFrame(callstack.Frame{PID: kevt.PID, Addr: 0x2638e59e0a5, Offset: 0, Symbol: "?", Module: "unbacked"})
 	kevt.Callstack.PushFrame(callstack.Frame{PID: kevt.PID, Addr: va.Address(base), Offset: 0, Symbol: "?", Module: "unbacked"})
 	kevt.Callstack.PushFrame(callstack.Frame{PID: kevt.PID, Addr: 0x7ffb313853b2, Offset: 0x10a, Symbol: "Java_java_lang_ProcessImpl_create", Module: "C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll"})
-	kevt.Callstack.PushFrame(callstack.Frame{PID: kevt.PID, Addr: 0x7ffb3138592e, Offset: 0x3a2, Symbol: "Java_java_lang_ProcessImpl_waitForTimeoutInterruptibly", Module: "C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll"})
+	kevt.Callstack.PushFrame(callstack.Frame{PID: kevt.PID, Addr: 0x7ffb3138592e, ModuleAddress: 0x7ffb3138592e, Offset: 0x3a2, Symbol: "Java_java_lang_ProcessImpl_waitForTimeoutInterruptibly", Module: "C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll"})
 	kevt.Callstack.PushFrame(callstack.Frame{PID: kevt.PID, Addr: 0x7ffb5d8e61f4, Offset: 0x54, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNEL32.DLL"})
-	kevt.Callstack.PushFrame(callstack.Frame{PID: kevt.PID, Addr: 0x7ffb5c1d0396, ModuleAddress: 0x7ffb5c1d0396, Offset: 0x66, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"})
+	kevt.Callstack.PushFrame(callstack.Frame{PID: kevt.PID, Addr: 0x7ffb5c1d0396, Offset: 0x66, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"})
 	kevt.Callstack.PushFrame(callstack.Frame{PID: kevt.PID, Addr: 0xfffff8072ebc1f6f, Offset: 0x4ef, Symbol: "FltRequestFileInfoOnCreateCompletion", Module: "C:\\WINDOWS\\System32\\drivers\\FLTMGR.SYS"})
 	kevt.Callstack.PushFrame(callstack.Frame{PID: kevt.PID, Addr: 0xfffff8072eb8961b, Offset: 0x20cb, Symbol: "FltGetStreamContext", Module: "C:\\WINDOWS\\System32\\drivers\\FLTMGR.SYS"})
 
@@ -416,9 +417,9 @@ func TestThreadFilter(t *testing.T) {
 		{`thread.callstack.callsite_trailing_assembly matches ('*mov r10, rcx|mov eax, 0x*|syscall*')`, true},
 		{`thread.callstack.is_unbacked`, true},
 		{`thread.callstack.addresses intersects ('7ffb5d8e61f4', 'fffff8072eb8961b')`, true},
-		{`thread.callstack.final_user_module.name = 'KERNELBASE.dll'`, true},
-		{`thread.callstack.final_user_module.path = 'C:\\WINDOWS\\System32\\KERNELBASE.dll'`, true},
-		{`thread.callstack.final_user_symbol.name = 'CreateProcessW'`, true},
+		{`thread.callstack.final_user_module.name = 'java.dll'`, true},
+		{`thread.callstack.final_user_module.path = 'C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll'`, true},
+		{`thread.callstack.final_user_symbol.name = 'Java_java_lang_ProcessImpl_waitForTimeoutInterruptibly'`, true},
 		{`thread.callstack.final_kernel_module.name = 'FLTMGR.SYS'`, true},
 		{`thread.callstack.final_kernel_module.path = 'C:\\WINDOWS\\System32\\drivers\\FLTMGR.SYS'`, true},
 		{`thread.callstack.final_kernel_symbol.name = 'FltGetStreamContext'`, true},
