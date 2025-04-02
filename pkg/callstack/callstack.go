@@ -169,19 +169,28 @@ func (s *Callstack) Depth() int { return len(*s) }
 // IsEmpty returns true if the callstack has no frames.
 func (s *Callstack) IsEmpty() bool { return s.Depth() == 0 }
 
-// FinalUserFrame returns the final user space frame.
+// FinalUserFrame returns the final frame that corresponds
+// to the user code execution. That usually translates to
+// the last frame before ntdll or kernel32 modules.
 func (s *Callstack) FinalUserFrame() *Frame {
-	var i int
 	if s.IsEmpty() {
 		return nil
 	}
 
-	for ; i < s.Depth()-1 && !(*s)[i].Addr.InSystemRange(); i++ {
+	var n int
+	for n = s.Depth() - 1; n > 0; n-- {
+		f := (*s)[n]
+		if f.Addr.InSystemRange() {
+			continue
+		}
+		mod := filepath.Base(strings.ToLower(f.Module))
+		if mod != "ntdll.dll" && mod != "kernel32.dll" && mod != "kernelbase.dll" {
+			break
+		}
 	}
-	i--
 
-	if i > 0 && i < s.Depth()-1 {
-		return &(*s)[i]
+	if n >= 0 && n < s.Depth()-1 {
+		return &(*s)[n]
 	}
 
 	return nil
