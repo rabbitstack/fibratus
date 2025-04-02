@@ -1,0 +1,35 @@
+name: Potential shellcode execution via ETW logger thread
+id: 3e915273-5ea0-4576-afc9-b018e2d53545
+version: 1.0.0
+description: |
+  Adversaries may employ the undocumented EtwpCreateEtwThread function to execute shellcode 
+  within the local process address space.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1055
+  technique.name: Process Injection
+  technique.ref: https://attack.mitre.org/techniques/T1055/
+references:
+  - https://www.geoffchappell.com/studies/windows/win32/ntdll/api/etw/index.htm
+  - https://github.com/Ne0nd0g/go-shellcode/tree/master?tab=readme-ov-file#EtwpCreateEtwThread
+
+condition: >
+  create_thread and kevt.pid != 4 and thread.callstack.symbols iin ('ntdll.dll!EtwpCreateEtwThread')
+    and
+    not
+  (ps.exe imatches
+    (
+      '?:\\WINDOWS\\System32\\ProvTool.exe',
+      '?:\\Windows\\System32\\LogonUI.exe'
+    )
+    or
+   thread.callstack.symbols imatches ('ntdll.dll!EtwProcessPrivateLoggerRequest', 'sechost.dll!ControlTrace*')
+  )
+
+output: >
+  Potential shellcode execution via EtwpCreateEtwThread API initiated by process %ps.exe
+severity: high
+
+min-engine-version: 2.2.0
