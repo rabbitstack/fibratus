@@ -1,6 +1,6 @@
 name: Potential privilege escalation via phantom DLL hijacking
 id: 5ccdb5c2-3a30-4e14-87d2-d7aeb4c45fad
-version: 1.0.1
+version: 1.0.2
 description: |
   Identifies the loading of the phantom DLL that was previously dropped
   to the System directory. Adversaries may exploit this flow to escalate
@@ -27,7 +27,7 @@ references:
 condition: >
   sequence
   maxspan 10m
-    |create_file and file.path imatches
+    |create_file and kevt.pid != 4 and file.path imatches
       (
         '?:\\Windows\\System32\\wow64log.dll',
         '?:\\Windows\\wbemcomn.dll',
@@ -43,6 +43,18 @@ condition: >
         '?:\\Windows\\System32\\fveapi.dll',
         '?:\\Windows\\System32\\Speech\\Engines\\TTS\\MSTTSLocEnUS.dll',
         '?:\\Windows\\System32\\DXGIDebug.dll'
+      )
+      and 
+      not 
+     ps.exe imatches
+      (
+        '?:\\Windows\\System32\\RuntimeBroker.exe',
+        '?:\\Windows\\System32\\svchost.exe',
+        '?:\\Windows\\System32\\services.exe',
+        '?:\\Windows\\System32\\smss.exe',
+        '?:\\Windows\\System32\\csrss.exe',
+        '?:\\Windows\\System32\\wininit.exe',
+        '?:\\Windows\\System32\\winlogon.exe'
       )
     | by file.path
     |load_dll| by image.path
