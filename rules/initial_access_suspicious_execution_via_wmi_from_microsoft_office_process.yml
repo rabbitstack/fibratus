@@ -1,0 +1,94 @@
+name: Suspicious execution via WMI from a Microsoft Office process
+id: cc3f0bbe-ec53-40a7-9eed-f0a8a3f7d7fa
+version: 1.0.0
+description: |
+  Identifies a suspicious process execution via Windows Management Instrumentation (WMI)
+  originated from the Microsoft Office process loading an unusual WMI DLL. This technique
+  can indicate code execution evading traditional parent/child processes spawned from Microsoft 
+  Office products.
+labels:
+  tactic.id: TA0001
+  tactic.name: Initial Access
+  tactic.ref: https://attack.mitre.org/tactics/TA0001/
+  technique.id: T1566
+  technique.name: Phishing
+  technique.ref: https://attack.mitre.org/techniques/T1566/
+  subtechnique.id: T1566.001
+  subtechnique.name: Spearphishing Attachment
+  subtechnique.ref: https://attack.mitre.org/techniques/T1566/001/
+references:
+  - https://threathunterplaybook.com/hunts/windows/190811-WMIModuleLoad/notebook.html
+  - https://medium.com/threatpunter/detecting-adversary-tradecraft-with-image-load-event-logging-and-eql-8de93338c16
+
+condition: >
+  sequence
+  maxspan 1m
+    |load_dll and image.name iin ('wmiclnt.dll', 'wbemcomn.dll', 'wmiprov.dll', 'wbemprox.dll', 'wmutils.dll', 'fastprox.dll', 'WMINet_Utils.dll') 
+      and 
+     (ps.name iin msoffice_binaries or thread.callstack.modules imatches ('*vbe?.dll'))
+    | by ps.sid
+    |spawn_process and ps.name iin ('wmiprvse.exe', 'wmiapsrv.exe') and (ps.child.exe imatches ('?:\\Users\\*.exe', '?:\\ProgramData\\*.exe')
+        or
+      ps.child.name iin 
+        (
+          'rundll32.exe',
+          'regsvr32.exe',
+          'hh.exe',
+          'cmd.exe',
+          'pwsh.exe',
+          'powershell.exe',
+          'mshta.exe',
+          'certutil.exe',
+          'bitsadmin.exe',
+          'cscript.exe',
+          'wscript.exe',
+          'jsc.exe',
+          'vssadmin.exe',
+          'curl.exe',
+          'wget.exe',
+          'sc.exe',
+          'reg.exe',
+          'schtasks.exe',
+          'msxsl.exe',
+          'msbuild.exe',
+          'regasm.exe',
+          'regsvcs.exe',
+          'wmic.exe',
+          'msiexec.exe'
+        )
+        or
+      ps.child.pe.file.name iin 
+        (
+          'rundll32.exe',
+          'regsvr32.exe',
+          'hh.exe',
+          'cmd.exe',
+          'pwsh.exe',
+          'powershell.exe',
+          'mshta.exe',
+          'certutil.exe',
+          'bitsadmin.exe',
+          'cscript.exe',
+          'wscript.exe',
+          'jsc.exe',
+          'vssadmin.exe',
+          'curl.exe',
+          'wget.exe',
+          'sc.exe',
+          'reg.exe',
+          'schtasks.exe',
+          'msxsl.exe',
+          'msbuild.exe',
+          'regasm.exe',
+          'regsvcs.exe',
+          'wmic.exe',
+          'msiexec.exe'
+        )
+     )
+    | by ps.child.sid
+
+output: >
+  Suspicious process %2.ps.child.exe launched via WMI from Microsoft Office process %1.ps.cmdline
+severity: high
+
+min-engine-version: 2.2.0
