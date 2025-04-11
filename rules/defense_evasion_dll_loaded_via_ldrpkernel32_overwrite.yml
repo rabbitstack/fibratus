@@ -1,0 +1,38 @@
+name: DLL loaded via LdrpKernel32 overwrite
+id: 56739eda-210f-4a30-a114-d55ca60976df
+version: 1.0.0
+description: |
+  Detects attempts to bypass the standard NTDLL bootstrap process by loading a malicious DLL early through hijacking. 
+  The malicious DLL, containing attacker-controlled code, is loaded in place of the legitimate kernel32 DLL.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.name: Hijack Execution Flow
+  technique.ref: https://attack.mitre.org/techniques/T1574/
+  subtechnique.id: T1574.001
+  subtechnique.name: DLL Search Order Hijacking
+  subtechnique.ref: https://attack.mitre.org/techniques/T1574/001/
+references:
+  - https://github.com/rbmm/LdrpKernel32DllName
+  - https://www.elastic.co/security-labs/peeling-back-the-curtain-with-call-stacks
+
+condition: >
+  (load_unsigned_or_untrusted_dll) and thread.callstack.symbols imatches ('*!BaseThreadInitThunk*')
+    and
+    not
+  foreach(thread._callstack, $frame, 
+          $frame.symbol imatches ('?:\\Windows\\System32\\kernel32.dll!BaseThreadInitThunk*',
+                                  '?:\\Windows\\SysWOW64\\kernel32.dll!BaseThreadInitThunk*',
+                                  '?:\\Windows\\WinSxS\\*\\kernel32.dll!BaseThreadInitThunk*',
+                                  '?:\\Windows\\WinSxS\\Temp\\PendingDeletes\\*!BaseThreadInitThunk*',
+                                  '\\Device\\*\\Windows\\*\\kernel32.dll!BaseThreadInitThunk*')) and
+  not image.path imatches '?:\\Windows\\assembly\\NativeImages_*\\System.Numerics.ni.dll'
+action:
+  - name: kill
+
+output: >
+  DLL %image.path loaded via LdrpKernel32 overwrite evasion by process %ps.exe
+severity: high
+
+min-engine-version: 2.4.0
