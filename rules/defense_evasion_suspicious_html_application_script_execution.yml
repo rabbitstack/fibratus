@@ -1,0 +1,64 @@
+name: Suspicious HTML Application script execution
+id: 4ec64ac2-851d-41b4-b7d2-910c21de334d
+version: 1.0.0
+description: |  
+  Identifies the execution of scripts via Microsoft HTML Application Host interpreter. Adversaries 
+  can proxy the execution of arbitrary script code through a trusted, signed utility to evade defenses.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1218
+  technique.name: System Binary Proxy Execution
+  technique.ref: https://attack.mitre.org/techniques/T1218/
+  subtechnique.id: T1218.005
+  subtechnique.name: Mshta
+  subtechnique.ref: https://attack.mitre.org/techniques/T1218/005/
+references:
+  - https://redcanary.com/threat-detection-report/techniques/mshta/
+  - https://www.ired.team/offensive-security/code-execution/t1170-mshta-code-execution
+
+condition: >
+  spawn_process and (ps.child.name ~= 'mshta.exe' or ps.child.pe.file.name ~= 'mshta.exe')
+    and
+  ps.child.cmdline imatches
+    (
+      '*WScript.Shell*',
+      '*mshtml*RunHTMLApplication*',
+      '*http*',
+      '*https*',
+      '*hXXps',
+      '*ftp*',
+      '*.run*',
+      '*window.close*',
+      '*mshta*',
+      '*mshtml*',
+      '*).Exec()*',
+      '*script*eval(*',
+      '*script*GetObject*',
+      '*vbscript*',
+      '*\\Users\\*\\Downloads\\*.hta*',
+      '*.rtf*',
+      '*.bat*',
+      '*.dll*',
+      '*.zip*',
+      '*.jpg*',
+      '*.png*',
+      '*.lnk*',
+      '*.doc*',
+      '*.xls*'
+    )
+    and
+    not
+  ps.exe imatches
+    (
+      '?:\\Program Files (x86)\\Microsoft Office\\Office*\\MSACCESS.EXE'
+    )
+action:
+  - name: kill
+
+output: >
+  Suspicious HTML Application script execution by mshta process with command line arguments %ps.child.cmdline
+severity: high
+
+min-engine-version: 2.2.0
