@@ -47,13 +47,79 @@ func TestCallstack(t *testing.T) {
 
 	uframe := callstack.FinalUserFrame()
 	require.NotNil(t, uframe)
-	assert.Equal(t, "7ffb5c1d0396", uframe.Addr.String())
-	assert.Equal(t, "CreateProcessW", uframe.Symbol)
-	assert.Equal(t, "C:\\WINDOWS\\System32\\KERNELBASE.dll", uframe.Module)
+	assert.Equal(t, "7ffb3138592e", uframe.Addr.String())
+	assert.Equal(t, "Java_java_lang_ProcessImpl_waitForTimeoutInterruptibly", uframe.Symbol)
+	assert.Equal(t, "C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll", uframe.Module)
 
 	kframe := callstack.FinalKernelFrame()
 	require.NotNil(t, kframe)
 	assert.Equal(t, "fffff8015690b644", kframe.Addr.String())
 	assert.Equal(t, "ObDeleteCapturedInsertInfo", kframe.Symbol)
 	assert.Equal(t, "C:\\WINDOWS\\system32\\ntoskrnl.exe", kframe.Module)
+}
+
+func TestCallstackFinalUserFrame(t *testing.T) {
+	var tests = []struct {
+		callstack   Callstack
+		expectedMod string
+		expectedSym string
+	}{
+		{callstack: callstackFromFrames(
+			Frame{Addr: 0xf259de, Module: unbacked, Symbol: "?"},
+			Frame{Addr: 0x7ffe4fda6e3b, Module: "C:\\Windows\\System32\\KernelBase.dll", Symbol: "SetThreadContext"},
+			Frame{Addr: 0x7ffe52942b24, Module: "C:\\Windows\\System32\\ntdll.dll", Symbol: "ZwSetContextThread"},
+			Frame{Addr: 0xfffff807e228c555, Module: "C:\\WINDOWS\\system32\\ntoskrnl.exe", Symbol: "setjmpex"},
+			Frame{Addr: 0xfffff807e264805c, Module: "C:\\WINDOWS\\system32\\ntoskrnl.exe", Symbol: "ObOpenObjectByPointerWithTag"}),
+			expectedMod: "unbacked",
+			expectedSym: "?",
+		},
+		{callstack: callstackFromFrames(
+			Frame{Addr: 0x7ffff0f3bf6c, Module: "C:\\Windows\\System32\\ntdll.dll", Symbol: "RtlUserThreadStart"},
+			Frame{Addr: 0x7ffff03ee8d7, Module: "C:\\Windows\\System32\\ntdll.dll", Symbol: "BaseThreadInitThunk"},
+			Frame{Addr: 0x7ffff0ee5f13, Module: "C:\\Windows\\System32\\ntdll.dll", Symbol: "TpCallbackMayRunLong"},
+			Frame{Addr: 0x7ffff0c78788, Module: "C:\\Windows\\System32\\rpcrt4.dll", Symbol: "RpcGetBufferWithObject"},
+			Frame{Addr: 0x7ffff0c797e3, Module: "C:\\Windows\\System32\\rpcrt4.dll", Symbol: "RpcImpersonateClient"},
+			Frame{Addr: 0x7fffee58d16a, Module: "C:\\Windows\\System32\\KernelBase.dll", Symbol: "CreateProcessInternalW"},
+			Frame{Addr: 0x7ffff0fe1204, Module: "C:\\Windows\\System32\\ntdll.dll", Symbol: "ZwCreateUserProcess"}),
+			expectedMod: "C:\\Windows\\System32\\rpcrt4.dll",
+			expectedSym: "RpcImpersonateClient",
+		},
+		{callstack: callstackFromFrames(
+			Frame{Addr: 0x7fffa7e3bf6c, Module: "C:\\Windows\\System32\\ntdll.dll", Symbol: "RtlUserThreadStart"},
+			Frame{Addr: 0x7fffa60de8d7, Module: "C:\\Windows\\System32\\ntdll.dll", Symbol: "BaseThreadInitThunk"},
+			Frame{Addr: 0x7ff6163cfc68, Module: "C:\\Program Files\\Mozilla Firefox\\firefox.exe", Symbol: "TargetCreateThread"},
+			Frame{Addr: 0x7fffee58d16a, Module: "C:\\Windows\\System32\\ntdll.dll", Symbol: "ZwMapViewOfSection"},
+			Frame{Addr: 0xfffff8028deeed1d, Module: "C:\\WINDOWS\\system32\\ntoskrnl.exe", Symbol: "NtMapViewOfSection"}),
+			expectedMod: "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
+			expectedSym: "TargetCreateThread",
+		},
+		{callstack: callstackFromFrames(
+			Frame{Addr: 0x7fffa7e3bf6c, Module: "C:\\Windows\\System32\\ntdll.dll", Symbol: "RtlUserThreadStart"},
+			Frame{Addr: 0x7fffa60de8d7, Module: "C:\\Windows\\System32\\ntdll.dll", Symbol: "BaseThreadInitThunk"},
+			Frame{Addr: 0x7ffff0c78788, Module: "C:\\Windows\\System32\\rpcrt4.dll", Symbol: "NdrServerCallNdr64"},
+			Frame{Addr: 0x7ffff0c574ed, Module: "C:\\Windows\\System32\\rpcrt4.dll", Symbol: "NdrStubCall2"},
+			Frame{Addr: 0x7ffff03fb090, Module: "C:\\Windows\\System32\\kernel32.dll", Symbol: "CreateProcessInternalW"},
+			Frame{Addr: 0x7fffee58a923, Module: "C:\\Windows\\System32\\kernel32.dll", Symbol: "CreateProcessAsUserW"},
+			Frame{Addr: 0x7ffff0fe1204, Module: "C:\\Windows\\System32\\ntdll.dll", Symbol: "ZwCreateUserProcess"}),
+			expectedMod: "C:\\Windows\\System32\\rpcrt4.dll",
+			expectedSym: "NdrStubCall2",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.expectedMod+"!"+tt.expectedSym, func(t *testing.T) {
+			f := tt.callstack.FinalUserFrame()
+			require.NotNil(t, f)
+			assert.Equal(t, tt.expectedMod, f.Module)
+			assert.Equal(t, tt.expectedSym, f.Symbol)
+		})
+	}
+}
+
+func callstackFromFrames(frames ...Frame) Callstack {
+	var c Callstack
+	for _, frame := range frames {
+		c.PushFrame(frame)
+	}
+	return c
 }
