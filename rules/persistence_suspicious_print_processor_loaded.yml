@@ -1,0 +1,32 @@
+name: Suspicious print processor loaded
+id: 3e0f5ef7-8a0a-4604-b2bf-d09606f45483
+version: 1.0.0
+description: |
+  Identifies when the print spooler service loads unsigned or untrusted DLL and the callstack pattern
+  indicates the print processor is loaded. Adversaries may abuse print processors to run malicious DLLs 
+  during system boot for persistence and/or privilege escalation.
+labels:
+  tactic.id: TA0003
+  tactic.name: Persistence
+  tactic.ref: https://attack.mitre.org/tactics/TA0003/
+  technique.id: T1547
+  technique.name: Boot or Logon Autostart Execution
+  technique.ref: https://attack.mitre.org/techniques/T1547/
+  subtechnique.id: T1547.012
+  subtechnique.name: Print Processors
+  subtechnique.ref: https://attack.mitre.org/techniques/T1547/012/
+references:
+  - https://stmxcsr.com/persistence/print-processor.html
+
+condition: >
+  (load_unsigned_or_untrusted_dll) and ps.name ~= 'spoolsv.exe' 
+    and
+  thread.callstack.summary imatches 'ntdll.dll|KernelBase.dll|localspl.dll|spoolsv.exe|kernel32.dll|ntdll.dll'
+    and
+  thread.callstack.symbols imatches ('localspl.dll!SplSetPrinterData') and thread.callstack.symbols not imatches ('KernelBase.dll!RegisterGPNotificationInternal')
+
+output: >
+  Print spooler service loaded suspicious print processor DLL %image.path
+severity: high
+
+min-engine-version: 2.4.0
