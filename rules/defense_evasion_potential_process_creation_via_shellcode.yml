@@ -1,0 +1,27 @@
+name: Potential process creation via shellcode
+id: 7a918532-12d1-4aa2-8c46-8769c67cac07
+version: 1.0.0
+description: |
+  Identifies the creation of a process with stack frames originating from floating memory area while 
+  invoking commonly used Windows API functions like WinExec. This behavior is a typical indicator of 
+  code injection employing offensive shellcode maneuvering.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1055
+  technique.name: Process Injection
+  technique.ref: https://attack.mitre.org/techniques/T1055/
+references:
+  - https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-winexec
+
+condition: >
+  spawn_process and thread.callstack.is_unbacked = true and thread.callstack.summary imatches '*kernel32.dll|unbacked*'
+    and
+  thread.callstack.symbols imatches ('kernel32.dll!WinExec*')
+
+output: >
+  Process %ps.child.exe created via potential shellcode injection by process %ps.exe
+severity: high
+
+min-engine-version: 2.2.0
