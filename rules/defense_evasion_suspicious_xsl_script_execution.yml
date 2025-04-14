@@ -1,0 +1,49 @@
+name: Suspicious XSL script execution
+id: 65136b30-14ae-46dd-b8e5-9dfa99690d74
+version: 1.0.0
+description: |
+  Identifies a suspicious execution of XSL script via Windows Management Instrumentation command line tool or XSL
+  transformation utility. Adversaries may bypass application control and obscure the execution of code by embedding 
+  scripts inside XSL files. Extensible Stylesheet Language (XSL) files are commonly used to describe the processing 
+  and rendering of data within XML files.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1220
+  technique.name: XSL Script Processing
+  technique.ref: https://attack.mitre.org/techniques/T1220/
+references:
+  - https://www.ired.team/offensive-security/code-execution/application-whitelisting-bypass-with-wmic-and-xsl
+
+condition: >
+  sequence
+  maxspan 3m
+    |spawn_process and (((ps.child.name ~= 'wmic.exe' or ps.child.pe.file.name ~= 'wmic.exe') and ps.child.cmdline imatches
+      ('* format*:*', '*/format*:*', '*-format*:*')
+        and
+        not
+      ps.child.cmdline imatches
+        (
+          '*format:list*',
+          '*format:htable*',
+          '*format:hform*',
+          '*format:table*',
+          '*format:mof*',
+          '*format:value*',
+          '*format:rawxml*',
+          '*format:xml*',
+          '*format:csv*'
+        )
+      )
+        or
+      ps.child.name ~= 'msxsl.exe' or ps.child.pe.file.name ~= 'msxsl.exe'
+     )
+    | by ps.child.uuid
+    |load_dll and image.name iin ('scrobj.dll', 'vbscript.dll', 'jscript.dll', 'jscript9.dll')| by ps.uuid
+
+output: >
+  Suspicious XSL script executed by process %1.ps.child.name with command line arguments %1.ps.child.args
+severity: high
+
+min-engine-version: 2.4.0
