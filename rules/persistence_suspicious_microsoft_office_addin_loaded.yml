@@ -1,0 +1,32 @@
+name: Suspicious Microsoft Office add-in loaded
+id: fe4daff8-d8aa-48d3-bf09-a9d868375a3c
+version: 1.0.0
+description: |
+  Identifies attempts to load unsigned executables from known Microsoft Office 
+  add-ins directories, which adversaries may exploit to maintain persistence.
+labels:
+  tactic.id: TA0003
+  tactic.name: Persistence
+  tactic.ref: https://attack.mitre.org/tactics/TA0003/
+  technique.id: T1137
+  technique.name: Office Application Startup
+  technique.ref: https://attack.mitre.org/techniques/T1137/
+references:
+  - https://github.com/3gstudent/Office-Persistence/blob/master/OfficePersistence.ps1
+
+condition: >
+  (load_unsigned_or_untrusted_module) and ps.name iin ('excel.exe', 'winword.exe', 'outlook.exe', 'powerpnt.exe')
+    and
+  image.path imatches
+    (
+      '?:\\Users\\*\\AppData\\Roaming\\Microsoft\\AddIns\\*',
+      '?:\\Users\\*\\AppData\\Roaming\\Microsoft\\Excel\\XLSTART\\*',
+      '?:\\Users\\*\\AppData\\Roaming\\Microsoft\\Word\\Startup\\*',
+      '?:\\Users\\*\\AppData\\Roaming\\Microsoft\\Outlook\\*'
+    )
+
+output:
+  Microsoft Office process %ps.name loaded a suspicious add-in %image.path
+severity: high
+
+min-engine-version: 2.4.0
