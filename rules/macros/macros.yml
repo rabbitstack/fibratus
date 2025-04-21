@@ -323,7 +323,7 @@
     gaining persistence on the compromised endpoint.
 
 - macro: script_interpreters
-  list: ["powershell.exe", "pwsh.exe", "cscript.exe", "wscript.exe", "mshta.exe"]
+  list: ["powershell.exe", "pwsh.exe", "cscript.exe", "wscript.exe", "mshta.exe", "cmd.exe"]
 
 - macro: startup_shell_folder_registry_keys
   list: [
