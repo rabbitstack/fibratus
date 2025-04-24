@@ -81,9 +81,8 @@ type NotExpr struct {
 // String returns a string representation of the not expression.
 func (e *NotExpr) String() string {
 	var b strings.Builder
-	b.Grow(len(e.Expr.String()) + 2)
-	b.WriteRune('(')
+	b.Grow(len(e.Expr.String()) + 4)
+	b.WriteString("NOT ")
 	b.WriteString(e.Expr.String())
-	b.WriteRune(')')
 	return b.String()
 }
