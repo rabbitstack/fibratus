@@ -467,6 +467,72 @@ func TestRemoveModule(t *testing.T) {
 	require.Len(t, ps.Modules, 0)
 }
 
+func TestOverrideProcExecutable(t *testing.T) {
+	hsnap := new(handle.SnapshotterMock)
+	hsnap.On("FindHandles", mock.Anything).Return([]htypes.Handle{}, nil)
+	psnap := NewSnapshotter(hsnap, &config.Config{})
+	defer psnap.Close()
+
+	evt := &kevent.Kevent{
+		Type: ktypes.CreateProcess,
+		Kparams: kevent.Kparams{
+			kparams.ProcessID:       {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(os.Getpid())},
+			kparams.ProcessParentID: {Name: kparams.ProcessParentID, Type: kparams.PID, Value: uint32(os.Getppid())},
+			kparams.ProcessName:     {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "spotify.exe"},
+			kparams.Cmdline:         {Name: kparams.Cmdline, Type: kparams.UnicodeString, Value: `Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`},
+			kparams.Exe:             {Name: kparams.Exe, Type: kparams.UnicodeString, Value: `Spotify.exe`},
+			kparams.UserSID:         {Name: kparams.UserSID, Type: kparams.WbemSID, Value: []byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0}},
+			kparams.StartTime:       {Name: kparams.StartTime, Type: kparams.Time, Value: time.Now()},
+			kparams.SessionID:       {Name: kparams.SessionID, Type: kparams.Uint32, Value: uint32(1)},
+			kparams.ProcessFlags:    {Name: kparams.ProcessFlags, Type: kparams.Flags, Value: uint32(0x00000010)},
+		},
+	}
+	require.NoError(t, psnap.Write(evt))
+
+	var tests = []struct {
+		expectedExe string
+		evt         *kevent.Kevent
+	}{
+		{`Spotify.exe`,
+			&kevent.Kevent{
+				Type: ktypes.LoadImage,
+				Kparams: kevent.Kparams{
+					kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(os.Getpid())},
+					kparams.ImagePath: {Name: kparams.ImagePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\assembly\\NativeImages_v4.0.30319_32\\Microsoft.Dee252aac#\\707569faabe821b47fa4f59ecd9eb6ea\\Microsoft.Developer.IdentityService.ni.exe"},
+				},
+			},
+		},
+		{`Spotify.exe`,
+			&kevent.Kevent{
+				Type: ktypes.LoadImage,
+				Kparams: kevent.Kparams{
+					kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(os.Getpid())},
+					kparams.ImagePath: {Name: kparams.ImagePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\System32\\notepad.exe"},
+				},
+			},
+		},
+		{`C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe`,
+			&kevent.Kevent{
+				Type: ktypes.LoadImage,
+				Kparams: kevent.Kparams{
+					kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(os.Getpid())},
+					kparams.ImagePath: {Name: kparams.ImagePath, Type: kparams.UnicodeString, Value: "C:\\Users\\admin\\AppData\\Roaming\\Spotify\\Spotify.exe"},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.expectedExe, func(t *testing.T) {
+			evt := tt.evt
+			require.NoError(t, psnap.AddModule(evt))
+			ok, ps := psnap.Find(uint32(os.Getpid()))
+			require.True(t, ok)
+			assert.Equal(t, tt.expectedExe, ps.Exe)
+		})
+	}
+}
+
 func init() {
 	reapPeriod = time.Millisecond * 45
 }
