@@ -1,6 +1,6 @@
 name: Potential privilege escalation via phantom DLL hijacking
 id: 5ccdb5c2-3a30-4e14-87d2-d7aeb4c45fad
-version: 1.0.2
+version: 1.0.3
 description: |
   Identifies the loading of the phantom DLL that was previously dropped
   to the System directory. Adversaries may exploit this flow to escalate
@@ -44,9 +44,8 @@ condition: >
         '?:\\Windows\\System32\\Speech\\Engines\\TTS\\MSTTSLocEnUS.dll',
         '?:\\Windows\\System32\\DXGIDebug.dll'
       )
-      and 
-      not 
-     ps.exe imatches
+      and  
+     ps.exe not imatches
       (
         '?:\\Windows\\System32\\RuntimeBroker.exe',
         '?:\\Windows\\System32\\svchost.exe',

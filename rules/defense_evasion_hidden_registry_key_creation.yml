@@ -1,6 +1,6 @@
 name: Hidden registry key creation
 id: 65deda38-9b1d-42a0-9f40-a68903e81b49
-version: 1.1.2
+version: 1.1.3
 description: |
   Identifies the creation of a hidden registry key. Adversaries can utilize the
   native NtSetValueKey API to create a hidden registry key and conceal payloads
@@ -22,8 +22,7 @@ condition: >
     and
   thread.callstack.symbols not imatches ('KernelBase.dll!RegSetValue*', 'KernelBase.dll!RegLoadAppKey*', 'KernelBase.dll!GetFileAttributes*')
     and
-    not
-  ps.exe imatches
+  ps.exe not imatches
     (
       '?:\\Program Files (x86)\\Microsoft\\EdgeUpdate\\MicrosoftEdgeUpdate.exe',
       '?:\\Program Files\\Microsoft\\EdgeUpdate\\MicrosoftEdgeUpdate.exe',
