@@ -1,6 +1,6 @@
 name: Potential ClickFix infection chain via Run window
 id: ffe1fc54-2893-4760-ab50-51a83bd71d13
-version: 1.0.0
+version: 1.0.1
 description: |
   Identifies the execution of the process via the Run command dialog box followed by spawning of the potential 
   infostealer process. 
@@ -32,7 +32,7 @@ condition: >
       (thread.callstack.summary imatches '*shell32.dll|explorer.exe|*' and thread.callstack.symbols imatches ('*shell32.dll!GetFileNameFromBrowse*'))
      )
     | by ps.child.uuid
-    |spawn_process and not ps.child.exe imatches 
+    |spawn_process and ps.child.exe not imatches 
       (
         '?:\\Program Files\\*.exe',
         '?:\\Program Files (x86)\\*.exe',

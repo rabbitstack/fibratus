@@ -1,6 +1,6 @@
 name: Suspicious access to the hosts file
 id: f7b2c9d3-99e7-41d5-bb4a-6ea1a5f7f9e2
-version: 1.0.0
+version: 1.0.1
 description: >
   Identifies suspicious process accessing the Windows hosts file for potential tampering.
   Adversaries can hijack the hosts files to block traffic to download/update servers or redirect the
@@ -18,7 +18,7 @@ references:
 condition: >
   sequence
   maxspan 5m
-    |spawn_process and not ps.child.exe imatches 
+    |spawn_process and ps.child.exe not imatches 
       (
         '?:\\Windows\\servicing\\TrustedInstaller.exe',
         '?:\\Windows\\System32\\svchost.exe',

@@ -1,6 +1,6 @@
 name: Potential process injection via tainted memory section
 id: 8e4182f3-02e7-4e95-afc3-93d18c9a9c09
-version: 1.0.1
+version: 1.0.2
 description: |
   Identifies potential process injection when the adversary creates and maps a memory
   section with RW protection rights followed by mapping of the same memory section in
@@ -22,7 +22,7 @@ references:
 condition: >
   sequence
   maxspan 1m
-    |map_view_of_section and file.view.protection = 'READWRITE' and kevt.pid != 4 and file.view.size >= 4096 and not ps.exe imatches 
+    |map_view_of_section and file.view.protection = 'READWRITE' and kevt.pid != 4 and file.view.size >= 4096 and ps.exe not imatches 
       (
         '?:\\Program Files\\*.exe', 
         '?:\\Program Files (x86)\\*.exe',

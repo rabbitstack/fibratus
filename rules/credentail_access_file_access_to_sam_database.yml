@@ -1,6 +1,6 @@
 name: File access to SAM database
 id: e3dace20-4962-4381-884e-40dcdde66626
-version: 1.0.1
+version: 1.0.2
 description: |
   Identifies access to the Security Account Manager on-disk database.
 labels:
@@ -24,8 +24,7 @@ condition: >
       '\\??\\GLOBALROOT\\Device\\HarddiskVolumeShadowCopy*\\WINDOWS\\SYSTEM32\\CONFIG\\SAM'
     )
     and
-    not
-  ps.exe imatches
+  ps.exe not imatches
     (
       '?:\\Program Files\\*',
       '?:\\Program Files (x86)\\*',

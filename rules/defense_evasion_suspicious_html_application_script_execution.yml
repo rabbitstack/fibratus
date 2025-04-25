@@ -1,6 +1,6 @@
 name: Suspicious HTML Application script execution
 id: 4ec64ac2-851d-41b4-b7d2-910c21de334d
-version: 1.0.0
+version: 1.0.1
 description: |  
   Identifies the execution of scripts via Microsoft HTML Application Host interpreter. Adversaries 
   can proxy the execution of arbitrary script code through a trusted, signed utility to evade defenses.
@@ -49,8 +49,7 @@ condition: >
       '*.xls*'
     )
     and
-    not
-  ps.exe imatches
+  ps.exe not imatches
     (
       '?:\\Program Files (x86)\\Microsoft Office\\Office*\\MSACCESS.EXE'
     )
