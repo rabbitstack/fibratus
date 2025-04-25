@@ -25,6 +25,7 @@ import (
 	"golang.org/x/sys/windows"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -228,7 +229,10 @@ func (s *snapshotter) AddModule(e *kevent.Kevent) error {
 	module.SignatureLevel, _ = e.Kparams.GetUint32(kparams.ImageSignatureLevel)
 	module.SignatureType, _ = e.Kparams.GetUint32(kparams.ImageSignatureType)
 
-	if module.IsExecutable() && len(proc.Exe) < len(module.Name) {
+	if strings.EqualFold(proc.Name, filepath.Base(module.Name)) && len(proc.Exe) < len(module.Name) {
+		// if the module is loaded for the process executable, and
+		// we don't have the full executable path, override with
+		// the one from the image path
 		proc.Exe = module.Name
 	}
 
