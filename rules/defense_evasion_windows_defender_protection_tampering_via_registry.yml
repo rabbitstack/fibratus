@@ -1,0 +1,65 @@
+name: Windows Defender protection tampering via registry
+id: 47ad962b-be0f-44f8-9467-34109f41e5ff
+version: 1.0.0
+description: |
+  Detects suspicious processes modifying Windows Defender configuration settings via registry 
+  to disable protection features.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1562
+  technique.name: Impair Defenses
+  technique.ref: https://attack.mitre.org/techniques/T1562/
+  subtechnique.id: T1562.001
+  subtechnique.name: Disable or Modify Tools
+  subtechnique.ref: https://attack.mitre.org/techniques/T1562/001
+references:
+  - https://symantec-enterprise-blogs.security.com/blogs/threat-intelligence/ransomware-hive-conti-avoslocker
+
+condition: >
+  set_value 
+    and 
+  ((base(registry.path) iin 
+    (
+      'DisableAntiSpyware',
+      'DisableAntiVirus',
+      'DisableBehaviorMonitoring',
+      'DisableBlockAtFirstSeen',
+      'DisableEnhancedNotifications',
+      'DisableIntrusionPreventionSystem',
+      'DisableIOAVProtection',
+      'DisableOnAccessProtection',
+      'DisableRealtimeMonitoring',
+      'DisableScanOnRealtimeEnable',
+      'DisableScriptScanning',
+      'DisableArchiveScanning',
+      'DisableRawWriteNotification'
+    ) and registry.value = 1)
+      or
+    (registry.path imatches
+      (
+        '*\\Windows Defender\\Spynet\\SpyNetReporting',
+        '*\\Windows Defender\\Spynet\\SubmitSamplesConsent',
+        '*\\DisallowExploitProtectionOverride',
+        '*\\Windows Defender\\Features\\TamperProtection',
+        '*\\Windows Defender\\MpEngine\\MpEnablePus'
+      ) and registry.value = 0
+    )
+  )
+    and
+  ps.exe not imatches
+    (
+      '?:\\Program Files\\Symantec\\Symantec Endpoint Protection\\sepWscSvc64.exe',
+      '?:\\ProgramData\\Microsoft\\Windows Defender\\Platform\\*\\ConfigSecurityPolicy.exe',
+      '?:\\ProgramData\\Microsoft\\Windows Defender\\Platform\\*\\MsMpEng.exe',
+      '?:\\ProgramData\\Microsoft\\Windows Defender\\*\\NisSrv.exe'
+    )
+action:
+  - name: kill
+
+output: >
+  Suspicious process %ps.exe tampered Windows Defender security settings in registry value %registry.path
+severity: high
+
+min-engine-version: 2.4.0
