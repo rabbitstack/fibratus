@@ -1,6 +1,6 @@
 name: Potential process injection via tainted memory section
 id: 8e4182f3-02e7-4e95-afc3-93d18c9a9c09
-version: 1.0.2
+version: 1.0.3
 description: |
   Identifies potential process injection when the adversary creates and maps a memory
   section with RW protection rights followed by mapping of the same memory section in
@@ -28,14 +28,21 @@ condition: >
         '?:\\Program Files (x86)\\*.exe',
         '?:\\ProgramData\\Microsoft\\Windows Defender\\*\\MsMpEng.exe',
         '?:\\ProgramData\\Microsoft\\Windows Defender\\*\\NisSrv.exe',
+        '?:\\ProgramData\\Microsoft\\Windows Defender\\*\\MpDefenderCoreService.exe',
         '?:\\WINDOWS\\System32\\csrss.exe',
         '?:\\WINDOWS\\Explorer.exe',
         '?:\\WINDOWS\\System32\\svchost.exe',
         '?:\\WINDOWS\\System32\\lsass.exe',
-        '?:\\WINDOWS\\System32\\SecurityHealthService.exe'
+        '?:\\WINDOWS\\System32\\SecurityHealthService.exe',
+        '?:\\WINDOWS\\System32\\services.exe'
       )
     | as e1
-    |map_view_of_section and file.view.protection = 'READONLY|EXECUTE' and file.key = $e1.file.key and kevt.pid != $e1.kevt.pid|
+    |map_view_of_section and file.view.protection = 'READONLY|EXECUTE' and file.key = $e1.file.key and kevt.pid != $e1.kevt.pid and ps.exe not imatches
+      (
+        '?:\\Program Files\\Mozilla Firefox\\firefox.exe',
+        '?:\\Program Files (x86)\\Mozilla Firefox\\firefox.exe'
+      )
+    |
 action:
   - name: kill
 
