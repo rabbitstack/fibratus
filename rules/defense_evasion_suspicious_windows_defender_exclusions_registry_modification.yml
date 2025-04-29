@@ -1,0 +1,48 @@
+name: Suspicious Windows Defender exclusions registry modification
+id: 92fdbbea-e177-494e-8a6a-d8b055daf0e9
+version: 1.0.0
+description: |
+  Identifies the modification of the Windows Defender process, path, or IP address registry key exclusions 
+  by suspicious processes. Adversaries may alter the Windows Defender exclusions to bypass defenses.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1562
+  technique.name: Impair Defenses
+  technique.ref: https://attack.mitre.org/techniques/T1562/
+  subtechnique.id: T1562.001
+  subtechnique.name: Disable or Modify Tools
+  subtechnique.ref: https://attack.mitre.org/techniques/T1562/001
+
+condition: >
+  set_value and registry.path imatches 'HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows Defender\\Exclusions\\*'
+    and
+  (
+    ps.exe imatches
+      (
+        '?:\\Users\\*\\AppData\\*', 
+        '?:\\Users\\Public\\*', 
+        '?:\\Windows\\Microsoft.NET\\*', 
+        '?:\\ProgramData\\*'
+      )
+      or
+    ps.name iin ('pwsh.exe', 'rundll32.exe', 'regsvr32.exe', 'cscript.exe', 'reg.exe', 'wscript.exe', 'mshta.exe', 'msbuild.exe', 'powershell.exe', 'cmd.exe')
+      or
+    pe.is_signed = false or pe.is_trusted = false
+  )
+    and
+  ps.exe not imatches
+    (
+      '?:\\ProgramData\\Microsoft\\Windows Defender\\Platform\\*\\ConfigSecurityPolicy.exe',
+      '?:\\ProgramData\\Microsoft\\Windows Defender\\Platform\\*\\MsMpEng.exe',
+      '?:\\ProgramData\\Microsoft\\Windows Defender\\*\\NisSrv.exe'
+    )
+action:
+  - name: kill
+
+output: >
+  Windows Defender exclusion %registry.path added by suspicious process %ps.exe
+severity: high
+
+min-engine-version: 2.4.0
