@@ -1,6 +1,6 @@
 name: Suspicious DLL loaded via memory section mapping
 id: b06653fb-227e-4e63-9a69-55a5a90c79e5
-version: 1.0.0
+version: 1.0.1
 description: |
   Identifies the mapping of a memory section with RX protection followed by unsigned DLL loading.
   Adversaries may inject dynamic-link libraries (DLLs) into processes in order to evade process-based defenses
@@ -21,7 +21,13 @@ condition: >
   sequence
   maxspan 2m
   by ps.uuid
-    |map_view_of_section and file.view.protection = 'READONLY|EXECUTE' and kevt.pid != 4 and file.view.size >= 4096|
+    |map_view_of_section and file.view.protection = 'READONLY|EXECUTE' and kevt.pid != 4 and file.view.size >= 4096
+      and
+     ps.exe not imatches 
+      (
+        '?:\\Program Files\\Mozilla Firefox\\firefox.exe'
+      )
+    |
     |(load_unsigned_or_untrusted_dll)|
 action:
   - name: kill

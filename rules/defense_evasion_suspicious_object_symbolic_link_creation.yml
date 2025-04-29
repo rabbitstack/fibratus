@@ -1,6 +1,6 @@
 name: Suspicious object symbolic link creation
 id: f9306355-1f5f-4a06-9779-195aa681db80
-version: 1.0.1
+version: 1.0.2
 description: |
   Identifies the creation of the object symbolic link inside the object manager namespace
   by untrusted or unusual processes.
@@ -26,9 +26,13 @@ condition: >
       '?:\\WINDOWS\\system32\\svchost.exe',
       '?:\\Program Files\\*',
       '?:\\Program Files (x86)\\*',
-      '?:\\Windows\\System32\\vmwp.exe'
+      '?:\\Windows\\System32\\vmwp.exe',
+      '?:\\Windows\\System32\\spoolsv.exe',
+      '?:\\Windows\\System32\\csrss.exe'
     )
   )
+    and
+  kevt.arg[target] not imatches '\\Sessions\\*\\AppContainerNamedObjects\\*'
 
 output: >
   Suspicious object symbolic link %kevt.arg[target] created by process %ps.exe

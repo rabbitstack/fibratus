@@ -1,6 +1,6 @@
 name: Unsigned DLL injection via remote thread
 id: 21bdd944-3bda-464b-9a72-58fd37ba9163
-version: 1.1.1
+version: 1.1.2
 description: |
   Identifies unsigned DLL injection via remote thread creation.
   Adversaries may inject dynamic-link libraries (DLLs) into processes in order to evade process-based defenses
@@ -42,6 +42,8 @@ condition: >
         '?:\\Program Files\\WindowsPowerShell\\Modules\\*\\*.dll',
         '?:\\Windows\\Microsoft.NET\\assembly\\*\\*.dll'
       )
+      and
+     ps.exe not imatches '?:\\Program Files\\Common Files\\microsoft shared\\ClickToRun\\Updates\\*\\OfficeClickToRun.exe'
     | by ps.pid
 
 min-engine-version: 2.4.0
