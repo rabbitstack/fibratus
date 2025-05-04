@@ -1,5 +1,3 @@
----
-
 <p align="center" >
   <a href="https://www.fibratus.io" >
     <img src="logo.png" alt="Fibratus">
@@ -41,7 +39,7 @@ In a nutshell, the Fibratus mantra is defined by the pillars of **realtime behav
 alternatively install via `msiexec` in silent mode
 
 ```
-$ msiexec /i fibratus-2.3.0-amd64.msi /qn
+$ msiexec /i fibratus-2.4.0-amd64.msi /qn
 ```
 
 ### Quick start
@@ -55,7 +53,7 @@ $ msiexec /i fibratus-2.3.0-amd64.msi /qn
 $ VaultCmd.exe /listcreds:"Windows Credentials" /all
 ```
 
-`Credential discovery via VaultCmd.exe` rule should trigger and emit the alert to the [Eventlog](https://www.fibratus.io/#/alerts/senders/eventlog). Check the short demo [here](https://www.fibratus.io/alerts/senders/images/eventlog.gif).
+`Credential discovery via VaultCmd tool` rule should trigger and emit the alert to the [Eventlog](https://www.fibratus.io/#/alerts/senders/eventlog). Check the short demo [here](https://www.fibratus.io/alerts/senders/images/eventlog.gif).
 
 ### Documentation
 
@@ -85,7 +83,4 @@ Free code signing provided by [SignPath.io], certificate by
 
 <p align="center">
   Developed with ❤️ by <strong>Nedim Šabić Šabić</strong>
-</p>
-<p align="center">
-  Logo designed with ❤️ by <strong><a name="logo" target="_blank" href="https://github.com/karinkasweet/">Karina Slizova</a></strong>
 </p>

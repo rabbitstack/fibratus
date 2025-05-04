@@ -776,7 +776,7 @@ section.cover {
 
 section.cover.show {
 	display: flex;
-	background: linear-gradient(#6da9e2,#c7def4) !important;
+	background: linear-gradient(#1180e0,#c7def4) !important;
 }
 
 section.cover.has-mask .mask {
