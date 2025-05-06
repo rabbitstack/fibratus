@@ -1,7 +1,7 @@
 <!-- _coverpage.md -->
 
-<div>
-  <img src='logo.png'></img>
+<div style='margin-top: 150px'>
+  <img src='logo.png' height="800px" width="800px"></img>
 </div>
 
 # fibratus <small>2.3.0</small>
