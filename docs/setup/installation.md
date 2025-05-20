@@ -2,10 +2,10 @@
 
 ### System requirements {docsify-ignore}
 
-- 64-bits Windows operating system starting from Windows 7
+- **Windows 10** and higher or **Windows Server 2016** or higher
 - 40 MB of free disk space
 - 1 (V)CPU
-- 50 MB of available memory
+- 90 MB of available physical memory
 
 ### Permission requirements {docsify-ignore}
 
@@ -15,20 +15,20 @@ Fibratus requires **administrator** or **SYSTEM** privileges to capture system e
 - periodically writes the current event sequence into volatile registry value
 - writes logs to disk. The default logs directory location is `%PROGRAMFILES%\Fibratus\Logs`
 - grants the `SeDebugPrivilege` to its process token. However, you can disable granting this privilege by setting the `debug-privilege` option to `false`
-- transports event messages over the wire if the eligible output sink is active.
+- transports event messages over the wire if the eligible output sink is active
 - inspects process image [PE](/pe/introduction.md) metadata. Again, you can disable this feature through [config](/pe/introduction) file
 - executes [YARA](/yara/introduction.md) rules on freshly created process images or other image files when the [YARA scanner](/yara/introduction) is enabled
 - spins up an embedded Python interpreter to run [filaments](/filaments/introduction)
 - accesses raw disk devices to read file data
 
 
-### Deployment  {docsify-ignore}
+### Installation  {docsify-ignore}
 
 The easiest way to get started with Fibratus is by downloading the Windows installer. Head over to the [releases](https://github.com/rabbitstack/fibratus/releases) and pick your download. Latest releases are recommended as they ship with new features, bug fixes and tend to improve the performance.
 Windows installers are automatically built by the CI platform each time new Fibratus release is published.
 
 <p align="center">
-  <a href="https://github.com/rabbitstack/fibratus/releases"><img src="setup/images/fibratus-installer-msi.png"/></a>
+  <a href="https://github.com/rabbitstack/fibratus/releases"><img src="setup/images/fibratus-msi.png"/ width="700px" height="600px"></a>
 </p>
 
 There are two flavors of Windows MSI installers:
@@ -47,7 +47,7 @@ If you're able to see the output like in the snippet above, congratulations! You
 
 ### Uninstall {docsify-ignore}
 
-To remove Fibratus from your system, head to the Control Panel > Programs and Features and start the uninstall process. The uninstaller will make sure to stop/remove the Windows Service and get rid of all installation data.
+To remove Fibratus from your system, head to the **Control Panel > Programs and Features** and start the uninstall process. The uninstaller will make sure to stop/remove the Windows Service and get rid of all installation data.
 
 ## Building from source {docsify-ignore}
 

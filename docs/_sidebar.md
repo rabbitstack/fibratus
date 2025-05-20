@@ -14,6 +14,7 @@
   * [Registry](kevents/registry.md)
   * [Network](kevents/network.md)
   * [Handle](kevents/handle.md)
+  * [Object](kevents/object.md)
   * [Driver](kevents/driver.md)
   * [Memory](kevents/mem.md)
 * <ion-icon name="filter-outline"></ion-icon> Filters and Rules
@@ -21,7 +22,7 @@
   * [Prefiltering](filters/prefiltering.md)
   * [Filtering](filters/filtering.md)
   * [Operators](filters/operators.md)
-  * [Paths](filters/paths.md)
+  * [Iterators](filters/iterators.md)
   * [Functions](filters/functions.md)
   * [Rules](filters/rules.md)
   * [Fields](filters/fields.md)

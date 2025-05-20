@@ -13,6 +13,7 @@ The above is the summary of configuration options that influence the collection 
 - `enable-audit-api` enables/disables kernel audit API calls events
 - `enable-mem` enables/disables the collection of memory events
 - `enable-dns` enables/disables DNS telemetry
+- `enable-threadpool` enables/disables thread pool telemetry
 
 ### Excluding processes or events {docsify-ignore}
 

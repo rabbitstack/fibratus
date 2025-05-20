@@ -118,6 +118,19 @@ String operators are applied to string field types or string literals.
 
    ```
    fibratus run ps.name endswith '.exe'
+    ```
+
+### intersects, iintersects
+
+`intersects` operator and its case-insensitive `iintersects` variant operate on string slices. If all elements in the RHS slice are present in the slice given by LHS, the operator evaluates to `true`. Otherwise, it evaluates to `false`.
+
+- **Example**
+
+   Filter events where the originating process command line arguments contain both `DcomLaunch` and `LSM` arguments
+
+   ```
+   fibratus run ps.args intersects ('DcomLaunch', 'LSM')
+   ```
 
 ### matches, imatches
 

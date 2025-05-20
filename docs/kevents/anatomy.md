@@ -63,9 +63,17 @@ Stack enrichment is performed for the following event set:
 - `RegDeleteKey`
 - `RegSetValue`
 - `RegDeleteValue`
-- `CreateFile` (full symbolization is performed on events where create disposition is different than `OPEN`)
+- `CreateFile`
 - `DeleteFile`
 - `RenameFile`
+- `VirtualAlloc`
+- `OpenProcess`
+- `OpenThread`
+- `CreateSymbolicLinkObject`
+- `SubmitThreadpoolWork`
+- `SubmitThreadpoolCallback`
+- `SetThreadpoolTimer`
+
 
 To enable stack enrichment for kernel space return addresses, the `symbolize-kernel-addresses` config option needs to be set to `true`. Callstack data is used by [filter fields](/filters/fields?id=callstack) to permit crafting advanced detection rules.
 

@@ -48,4 +48,5 @@ Process state comprises the following attributes and resources:
 - threads
 - modules
 - handles
+- memory mappings
 - PE metadata

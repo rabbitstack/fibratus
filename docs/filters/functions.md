@@ -237,7 +237,7 @@ Additionally, some functions may return a collection of values. Function names a
     ```
     - `string`: Input string
     - `start`: Substring start index
-    - `end`: Substring end index
+    - `end`: Substring end index (optional)
     - `return` a substring contained within start and end indices
 
 - **Examples**
@@ -246,6 +246,7 @@ Additionally, some functions may return a collection of values. Function names a
 
     ```
     substr(file.name, indexof(file.name, '\\'), indexof(file.name, '\\Hard')) = '\\Device'
+    substr(file.name, indexof(file.name, 'system32')) = 'system32\\user32.dll'
     ```
 
 #### entropy

@@ -15,7 +15,10 @@ Thread events are comprised of the following parameters:
 - `kstack_base` is the base address of the thread's kernel space stack.
 - `kstack_limit` is the limit of the thread's kernel space stack.
 - `start_address` is the start address of the function to be executed by the thread.
+- `start_address_symbol` the symbol the represents the thread start address (e.g. `LoadLibraryEx`). Only present in `CreateThread` events.
+- `start_address_module` the module that maps to the thread start address (e.g. `ntdll.dll`). Only present in `CreateThread` events.
 - `teb` is the address of the Thread Environment Block (TEB).
+
 
 #### OpenThread
 
@@ -34,3 +37,42 @@ Thread events are comprised of the following parameters:
 `SetThreadContext` sets the thread context. Thread context represents the set of CPU registers.
 
 - `status` contains the result of operation. (e.g. `Success`)
+
+## Thread pool events {docsify-ignore}
+
+A thread pool is a collection of worker threads that efficiently execute asynchronous callbacks on behalf of the application. The thread pool is primarily used to reduce the number of application threads and provide management of the worker threads.
+
+
+#### SubmitThreadpoolWork
+
+Enqueues the work item to the thread pool. This event has the following parameters:
+
+- `pool_id` represents the thread pool identifier.
+- `task_id` represents the thread pool task identifier.
+- `callback` represents the address of the callback function.
+- `context` represents the address of the callback context.
+- `subprocess_tag` represents the thread pool identifier.
+- `pool_id` represents the service identifier associated with the thread pool.
+- `callback_symbol` represents the callback symbol (e.g. `RtlCaputreContext`)
+- `callback_module` represents the module containing the callback symbol (e.g. `C:\Windows\System32\ntdll.dll`)
+- `context_rip` represents the value of instruction pointer contained in the callback context.
+- `context_rip_symbol` represents the symbol name associated with the instruction pointer in callback context.
+- `context_rip_module` represents the module name associated with the instruction pointer in callback context.
+
+
+#### SubmitThreadpoolCallback
+
+Submits the thread pool callback for execution within the work item. This event has the same parameter set as the `SubmitThreadpoolWork` events.
+
+
+#### SetThreadpoolTimer
+
+Sets the thread pool timer object. This event consists of the following parameters:
+
+- `duetime` represents the timer due time.
+- `subqueue` represents the memory address of the timer subqueue.
+- `timer` represents the memory address of the timer object.
+- `period` represents the period of the timer.
+- `window` represents the timer tolerate period.
+- `absolute` indicates if the timer is absolute or relative.
+
