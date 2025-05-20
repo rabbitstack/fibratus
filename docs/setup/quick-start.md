@@ -8,7 +8,7 @@ By default, Fibratus operates in rule engine mode. It loads the rule set from th
 $ VaultCmd.exe /listcreds:"Windows Credentials" /all
 ```
 
-- `Credential discovery via VaultCmd.exe` rule should trigger displaying the alert in the Eventlog `Application` channel.
+- `Credential discovery via VaultCmd tool` rule should trigger displaying the alert in the Eventlog `Application` channel.
 
 To learn more about detection rules, head to [rules](/filters/rules).
 

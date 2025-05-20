@@ -115,6 +115,31 @@ The following tables summarize available field names that can be used in filter 
 | thread.access.mask.names | Thread access human-readable rights | `thread.access.mask.names in ('QUERY_LIMITED_INFORMATION')`   |
 | thread.access.status | Thread access status | `thread.access.status = 'Success'`   |
 | thread.teb_address | The base address of the thread environment block | `thread.teb_address = '8f30893000'`   |
+| thread.start_address.symbol | Thread start address symbol | `thread.start_address.symbol = 'LoadImage'`   |
+| thread.start_address.module | Thread start address module | `thread.start_address.module endswith 'kernel32.dll'`   |
+
+
+### Threadpool
+
+| Field Name  | Description | Example     |
+| :---        |    :----   |          :---: |
+| threadpool.id     | Thread pool identifier | `threadpool.id = '20f5fc02440'`   |
+| threadpool.task.id     | Thread pool task identifier | `threadpool.task.id = '20f7ecd21f8'`   |
+| threadpool.callback.address     | Thread pool callback address | `threadpool.callback.address = '7ff868739ed0'` |
+| threadpool.callback.symbol     | Thread pool callback address symbol | `threadpool.callback.symbol = 'RtlDestroyQueryDebugBuffer'`   |
+| threadpool.callback.module     | Thread pool callback address module | `threadpool.callback.module contains 'ntdll.dll'`   |
+| threadpool.callback.context     | Thread pool callback context address | `threadpool.callback.context = '1df41e07bd0'`   |
+| threadpool.callback.context.rip     | Thread pool callback thread context instruction pointer | `threadpool.callback.context.rip = '1df42ffc1f8'`   |
+| threadpool.callback.context.rip.symbol     | Thread pool callback thread context instruction pointer symbol | `threadpool.callback.context.rip.symbol = 'VirtualProtect'`   |
+| threadpool.callback.context.rip.module     | Thread pool callback thread context instruction pointer module | `threadpool.callback.context.rip.module contains 'ntdll.dll'`   |
+| threadpool.subprocess_tag     | Thread pool service identifier | `threadpool.subprocess_tag = '10d'`   |
+| threadpool.timer.duetime     | Thread pool timer due time | `threadpool.timer.duetime > 10`   |
+| threadpool.timer.subqueue     | Thread pool timer subqueue address | `threadpool.timer.subqueue = '1db401703e8'`   |
+| threadpool.timer.address     | Thread pool timer address | `threadpool.timer.address = '3e8'`   |
+| threadpool.timer.period     | Thread pool timer period | `threadpool.timer.period = 0`   |
+| threadpool.timer.window     | Thread pool timer tolerate period | `threadpool.timer.window = 0`   |
+| threadpool.timer.is_absolute     | Indicates if the thread pool timer is absolute or relative | `threadpool.timer.is_absolute = true`   |
+
 
 ### Callstack
 | Field Name  | Description | Example     |
@@ -128,12 +153,23 @@ The following tables summarize available field names that can be used in filter 
 | thread.callstack.callsite_leading_assembly    | Callsite leading assembly instructions | `thread.callstack.callsite_leading_assembly in ('mov r10,rcx', 'syscall')` |
 | thread.callstack.callsite_trailing_assembly    | Callsite trailing assembly instructions | `thread.callstack.callsite_trailing_assembly in ('add esp, 0xab')` |
 | thread.callstack.is_unbacked    | Indicates if the callstack contains unbacked regions | `thread.callstack.is_unbacked` |
-
+| thread.callstack.addresses    | List of all callstack return addresses | `thread.callstack.addresses in ('7ffb5c1d0396')` |
+| thread.callstack.final_user_module.name  | The final user module name | `thread.callstack.final_user_module.name != 'ntdll.dll'` |
+| thread.callstack.final_user_module.path  | The final user module path | `thread.callstack.final_user_module.path imatches '?:\\Windows\\System32\\ntdll.dll'` |
+| thread.callstack.final_user_symbol.name  | The final user symbol name | `thread.callstack.final_user_symbol.name imatches 'CreateProcess*'` |
+| thread.callstack.final_kernel_module.name  | The final kernel module name | `thread.callstack.final_kernel_module.name = 'FLTMGR.SYS'` |
+| thread.callstack.final_kernel_module.path  | The final kernel module path | `thread.callstack.final_kernel_module.path imatches '?:\\WINDOWS\\System32\\drivers\\FLTMGR.SYS'` |
+| thread.callstack.final_kernel_symbol.name  | The final kernel symbol name | `thread.callstack.final_kernel_symbol.name = 'FltGetStreamContext'` |
+| thread.callstack.final_user_module.signature.is_signed  | Indicates if the final user module is signed | `thread.callstack.final_user_module.signature.is_signed = true` |
+| thread.callstack.final_user_module.signature.is_trusted   | Indicates if the final user module signature is trusted | `thread.callstack.final_user_module.signature.is_trusted = true` |
+| thread.callstack.final_user_module.signature.cert.issuer  | The final user module signature certificate issuer | `thread.callstack.final_user_module.signature.cert.issuer imatches '*Microsoft Corporation*'` |
+| thread.callstack.final_user_module.signature.cert.subject  |  The final user module signature certificate subject | `thread.callstack.final_user_module.signature.cert.subject imatches '*Microsoft Windows*'` |
 
 ### Image
 | Field Name  | Description | Example     |
 | :---        |    :----   |          :---: |
-| image.name     | Full image path | `image.name = 'C:\\Windows\\System32\\advapi32.dll'`   |
+| image.path     | Full image path | `image.name = 'C:\\Windows\\System32\\advapi32.dll'`   |
+| image.name     | Image name | `image.name = 'advapi32.dll'`   |
 | image.base.address  | Base address of the process in which the image is loaded | `image.base.address = 'a65d800000'`   |
 | image.checksum  | Image checksum | `image.checksum = 746424`   |
 | image.size  | Image size | `image.size > 1024`   |
@@ -156,7 +192,8 @@ The following tables summarize available field names that can be used in filter 
 | Field Name  | Description | Example     |
 | :---        |    :----   |          :---: |
 | file.object     | File object address in the kernel space | `file.object = 18446738026482168384`   |
-| file.name       | Full file name | `file.name = 'C:\\Windows\\Sytem32\\regedit.exe'`   |
+| file.path       | Full file path | `file.name = 'C:\\Windows\\Sytem32\\regedit.exe'`   |
+| file.name       | File name | `file.name = 'regedit.exe'`   |
 | file.operation  | Operation performed on the file or I/O device | `file.operation = 'OPEN'`   |
 | file.share.mask | File share mask | `file.share.mask = 'READ'`   |
 | file.io.size    | I/O read/write size | `file.io.size > 512`   |
@@ -183,7 +220,8 @@ The following tables summarize available field names that can be used in filter 
 ### Registry
 | Field Name  | Description | Example     |
 | :---        |    :----   |          :---: |
-| registry.key.name   | Fully qualified key name | `registry.key.name = 'HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services'`   |
+| registry.path   | Fully qualified registry path | `registry.path = 'HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services'`   |
+| registry.key.name   | Base registry key name | `registry.key.name = 'Services'`   |
 | registry.key.handle | Registry key object address | `registry.key.handle = 'FFFFB905D60C2268'`   |
 | registry.value      | Registry value content | `registry.value = '%SystemRoot%\\system32'`   |
 | registry.value.type | Registry value type | `registry.value.type = 'REG_SZ'`   |

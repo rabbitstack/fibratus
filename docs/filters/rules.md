@@ -247,6 +247,17 @@ action:
   - name: kill
 ```
 
+#### Isolating endpoints
+
+`isolate` action isolates the host by installing **Windows Filtering Platform** (WFP) rules. To revert the effects of the `isolate` action, simply restart the Fibratus service. The action can be combined with other actions. For example, the following snippet will kill the process and isolate the endpoint.
+
+
+```yaml
+action:
+  - name: kill
+  - name: isolate
+```
+
 ### Advanced patterns
 
 Adversaries often employ sophisticated techniques which may be daunting to detect without combining events from different data sources. For example, detecting a remote connection attempt followed by the execution of a command shell by the same process that initiated the connection can't be expressed with a simple rule expecting to match on a single event. Enter `sequence` rules.
