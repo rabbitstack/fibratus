@@ -31,10 +31,9 @@ import (
 	"time"
 
 	"github.com/olivere/elastic/v7"
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -97,7 +96,7 @@ func TestElasticsearchPublish(t *testing.T) {
 			defer r.Body.Close()
 			// check we have the correct index name
 			assert.True(t, bytes.Contains(body, []byte("fibratus-2018-03")))
-			// check kevent name is present
+			// check event name is present
 			assert.True(t, bytes.Contains(body, []byte("CreateFile")))
 
 			// create the bulk response
@@ -133,7 +132,7 @@ func TestElasticsearchPublish(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	kevent.SerializeHandles = true
+	event.SerializeHandles = true
 
 	cfg := Config{
 		Servers:      []string{srv.URL},
@@ -158,29 +157,29 @@ func TestElasticsearchPublish(t *testing.T) {
 	assert.Equal(t, int64(0), failedDocs.Value())
 }
 
-func getBatch() *kevent.Batch {
+func getBatch() *event.Batch {
 	ts, _ := time.Parse(time.RFC3339, "2018-05-03T15:04:05.323Z")
 
-	kevt := &kevent.Kevent{
-		Type:        ktypes.CreateFile,
+	evt := &event.Event{
+		Type:        event.CreateFile,
 		Tid:         2484,
 		PID:         859,
 		CPU:         1,
 		Seq:         2,
 		Name:        "CreateFile",
 		Timestamp:   ts,
-		Category:    ktypes.File,
+		Category:    event.File,
 		Host:        "archrabbit",
 		Description: "Creates or opens a new file, directory, I/O device, pipe, console",
-		Kparams: kevent.Kparams{
-			kparams.FileObject:    {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(12456738026482168384)},
-			kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
-			kparams.FileType:      {Name: kparams.FileType, Type: kparams.AnsiString, Value: "file"},
-			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.AnsiString, Value: "open"},
-			kparams.BasePrio:      {Name: kparams.BasePrio, Type: kparams.Int8, Value: int8(2)},
-			kparams.PagePrio:      {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(2)},
+		Params: event.Params{
+			params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
+			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
+			params.FileType:      {Name: params.FileType, Type: params.AnsiString, Value: "file"},
+			params.FileOperation: {Name: params.FileOperation, Type: params.AnsiString, Value: "open"},
+			params.BasePrio:      {Name: params.BasePrio, Type: params.Int8, Value: int8(2)},
+			params.PagePrio:      {Name: params.PagePrio, Type: params.Uint8, Value: uint8(2)},
 		},
-		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "baarz"},
+		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "baarz"},
 		PS: &pstypes.PS{
 			PID:       2436,
 			Ppid:      6304,
@@ -229,26 +228,26 @@ func getBatch() *kevent.Batch {
 		},
 	}
 
-	kevt1 := &kevent.Kevent{
-		Type:        ktypes.CreateFile,
+	evt1 := &event.Event{
+		Type:        event.CreateFile,
 		Tid:         2484,
 		PID:         459,
 		CPU:         1,
 		Seq:         2,
 		Name:        "CreateFile",
 		Timestamp:   ts,
-		Category:    ktypes.File,
+		Category:    event.File,
 		Host:        "archrabbit",
 		Description: "Creates or opens a new file, directory, I/O device, pipe, console",
-		Kparams: kevent.Kparams{
-			kparams.FileObject:    {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(12456738026482168384)},
-			kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
-			kparams.FileType:      {Name: kparams.FileType, Type: kparams.AnsiString, Value: "file"},
-			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.AnsiString, Value: "open"},
-			kparams.BasePrio:      {Name: kparams.BasePrio, Type: kparams.Int8, Value: int8(2)},
-			kparams.PagePrio:      {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(2)},
+		Params: event.Params{
+			params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
+			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
+			params.FileType:      {Name: params.FileType, Type: params.AnsiString, Value: "file"},
+			params.FileOperation: {Name: params.FileOperation, Type: params.AnsiString, Value: "open"},
+			params.BasePrio:      {Name: params.BasePrio, Type: params.Int8, Value: int8(2)},
+			params.PagePrio:      {Name: params.PagePrio, Type: params.Uint8, Value: uint8(2)},
 		},
-		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "baarz"},
+		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "baarz"},
 		PS: &pstypes.PS{
 			PID:       2436,
 			Ppid:      6304,
@@ -297,26 +296,26 @@ func getBatch() *kevent.Batch {
 		},
 	}
 
-	kevt2 := &kevent.Kevent{
-		Type:        ktypes.CreateFile,
+	evt2 := &event.Event{
+		Type:        event.CreateFile,
 		Tid:         2484,
 		PID:         829,
 		CPU:         1,
 		Seq:         2,
 		Name:        "CreateFile",
 		Timestamp:   ts,
-		Category:    ktypes.File,
+		Category:    event.File,
 		Host:        "archrabbit",
 		Description: "Creates or opens a new file, directory, I/O device, pipe, console",
-		Kparams: kevent.Kparams{
-			kparams.FileObject:    {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(12456738026482168384)},
-			kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
-			kparams.FileType:      {Name: kparams.FileType, Type: kparams.AnsiString, Value: "file"},
-			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.AnsiString, Value: "open"},
-			kparams.BasePrio:      {Name: kparams.BasePrio, Type: kparams.Int8, Value: int8(2)},
-			kparams.PagePrio:      {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(2)},
+		Params: event.Params{
+			params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
+			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
+			params.FileType:      {Name: params.FileType, Type: params.AnsiString, Value: "file"},
+			params.FileOperation: {Name: params.FileOperation, Type: params.AnsiString, Value: "open"},
+			params.BasePrio:      {Name: params.BasePrio, Type: params.Int8, Value: int8(2)},
+			params.PagePrio:      {Name: params.PagePrio, Type: params.Uint8, Value: uint8(2)},
 		},
-		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "baarz"},
+		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "baarz"},
 		PS: &pstypes.PS{
 			PID:       829,
 			Ppid:      6304,
@@ -365,5 +364,5 @@ func getBatch() *kevent.Batch {
 		},
 	}
 
-	return kevent.NewBatch(kevt, kevt1, kevt2)
+	return event.NewBatch(evt, evt1, evt2)
 }

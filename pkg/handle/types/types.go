@@ -87,7 +87,7 @@ func (h Handle) Len() int {
 	return l
 }
 
-// NewFromKcap restores handle state from the kcap buffer.
+// NewFromKcap restores handle state from the cap buffer.
 func NewFromKcap(buf []byte) (Handle, error) {
 	h := Handle{}
 	err := h.Unmarshal(buf)

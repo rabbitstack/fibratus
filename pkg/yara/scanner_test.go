@@ -22,8 +22,7 @@
 package yara
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/sys"
@@ -39,7 +38,7 @@ import (
 	"time"
 
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"golang.org/x/sys/windows"
 )
 
@@ -74,14 +73,14 @@ func TestScan(t *testing.T) {
 
 	var tests = []struct {
 		name          string
-		setup         func() (*kevent.Kevent, error)
+		setup         func() (*event.Event, error)
 		newScanner    func() (Scanner, error)
 		expectedAlert alertsender.Alert
 		matches       bool
 	}{
 		{
 			"scan spawned process",
-			func() (*kevent.Kevent, error) {
+			func() (*event.Event, error) {
 				var si windows.StartupInfo
 				si.Flags = windows.STARTF_USESHOWWINDOW
 				var pi windows.ProcessInformation
@@ -123,16 +122,16 @@ func TestScan(t *testing.T) {
 				}
 				psnap.On("Find", pi.ProcessId).Return(true, proc)
 
-				e := &kevent.Kevent{
-					Type: ktypes.CreateProcess,
+				e := &event.Event{
+					Type: event.CreateProcess,
 					Name: "CreateProcess",
 					Tid:  2484,
 					PID:  859,
-					Kparams: kevent.Kparams{
-						kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "notepad.exe"},
-						kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: pi.ProcessId},
+					Params: event.Params{
+						params.ProcessName: {Name: params.ProcessName, Type: params.UnicodeString, Value: "notepad.exe"},
+						params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: pi.ProcessId},
 					},
-					Metadata: make(map[kevent.MetadataKey]any),
+					Metadata: make(map[event.MetadataKey]any),
 					PS:       proc,
 				}
 				return e, nil
@@ -161,7 +160,7 @@ func TestScan(t *testing.T) {
 		},
 		{
 			"scan spawned process excluded by config",
-			func() (*kevent.Kevent, error) {
+			func() (*event.Event, error) {
 				var si windows.StartupInfo
 				si.Flags = windows.STARTF_USESHOWWINDOW
 				si.ShowWindow = windows.SW_HIDE
@@ -204,16 +203,16 @@ func TestScan(t *testing.T) {
 				}
 				psnap.On("Find", pi.ProcessId).Return(true, proc)
 
-				e := &kevent.Kevent{
-					Type: ktypes.CreateProcess,
+				e := &event.Event{
+					Type: event.CreateProcess,
 					Name: "CreateProcess",
 					Tid:  2484,
 					PID:  859,
-					Kparams: kevent.Kparams{
-						kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "notepad.exe"},
-						kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: pi.ProcessId},
+					Params: event.Params{
+						params.ProcessName: {Name: params.ProcessName, Type: params.UnicodeString, Value: "notepad.exe"},
+						params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: pi.ProcessId},
 					},
-					Metadata: make(map[kevent.MetadataKey]any),
+					Metadata: make(map[event.MetadataKey]any),
 					PS:       proc,
 				}
 				return e, nil
@@ -238,7 +237,7 @@ func TestScan(t *testing.T) {
 		},
 		{
 			"scan unsigned module loading",
-			func() (*kevent.Kevent, error) {
+			func() (*event.Event, error) {
 				var si windows.StartupInfo
 				si.Flags = windows.STARTF_USESHOWWINDOW
 				var pi windows.ProcessInformation
@@ -281,18 +280,18 @@ func TestScan(t *testing.T) {
 				}
 				psnap.On("Find", pid).Return(true, proc)
 
-				e := &kevent.Kevent{
-					Type: ktypes.LoadImage,
+				e := &event.Event{
+					Type: event.LoadImage,
 					Name: "LoadImage",
 					Tid:  2484,
 					PID:  pid,
-					Kparams: kevent.Kparams{
-						kparams.FilePath:           {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "tests.exe"},
-						kparams.ImageBase:          {Name: kparams.ImageBase, Type: kparams.Uint64, Value: uint64(0x74888fd99)},
-						kparams.ImageSignatureType: {Name: kparams.ImageSignatureType, Type: kparams.Uint32, Value: signature.None},
-						kparams.ProcessID:          {Name: kparams.ProcessID, Type: kparams.PID, Value: pid},
+					Params: event.Params{
+						params.FilePath:           {Name: params.FilePath, Type: params.UnicodeString, Value: "tests.exe"},
+						params.ImageBase:          {Name: params.ImageBase, Type: params.Uint64, Value: uint64(0x74888fd99)},
+						params.ImageSignatureType: {Name: params.ImageSignatureType, Type: params.Uint32, Value: signature.None},
+						params.ProcessID:          {Name: params.ProcessID, Type: params.PID, Value: pid},
 					},
-					Metadata: make(map[kevent.MetadataKey]any),
+					Metadata: make(map[event.MetadataKey]any),
 					PS:       proc,
 				}
 				return e, nil
@@ -321,7 +320,7 @@ func TestScan(t *testing.T) {
 		},
 		{
 			"scan pe file created in the file system",
-			func() (*kevent.Kevent, error) {
+			func() (*event.Event, error) {
 
 				proc := &pstypes.PS{
 					Name:      "tests.exe",
@@ -335,17 +334,17 @@ func TestScan(t *testing.T) {
 				}
 				psnap.On("Find", 565).Return(true, proc)
 
-				e := &kevent.Kevent{
-					Type:     ktypes.CreateFile,
+				e := &event.Event{
+					Type:     event.CreateFile,
 					Name:     "CreateFile",
-					Category: ktypes.File,
+					Category: event.File,
 					Tid:      2484,
 					PID:      565,
-					Kparams: kevent.Kparams{
-						kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "notepad.exe")},
-						kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Uint32, Value: uint32(windows.FILE_CREATE)},
+					Params: event.Params{
+						params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "notepad.exe")},
+						params.FileOperation: {Name: params.FileOperation, Type: params.Uint32, Value: uint32(windows.FILE_CREATE)},
 					},
-					Metadata: make(map[kevent.MetadataKey]any),
+					Metadata: make(map[event.MetadataKey]any),
 					PS:       proc,
 				}
 				return e, nil
@@ -374,7 +373,7 @@ func TestScan(t *testing.T) {
 		},
 		{
 			"scan pe file excluded by config",
-			func() (*kevent.Kevent, error) {
+			func() (*event.Event, error) {
 
 				proc := &pstypes.PS{
 					Name:      "tests.exe",
@@ -388,17 +387,17 @@ func TestScan(t *testing.T) {
 				}
 				psnap.On("Find", 565).Return(true, proc)
 
-				e := &kevent.Kevent{
-					Type:     ktypes.CreateFile,
+				e := &event.Event{
+					Type:     event.CreateFile,
 					Name:     "CreateFile",
-					Category: ktypes.File,
+					Category: event.File,
 					Tid:      2484,
 					PID:      565,
-					Kparams: kevent.Kparams{
-						kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "cmd.exe")},
-						kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Uint32, Value: uint32(windows.FILE_CREATE)},
+					Params: event.Params{
+						params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "cmd.exe")},
+						params.FileOperation: {Name: params.FileOperation, Type: params.Uint32, Value: uint32(windows.FILE_CREATE)},
 					},
-					Metadata: make(map[kevent.MetadataKey]any),
+					Metadata: make(map[event.MetadataKey]any),
 					PS:       proc,
 				}
 				return e, nil
@@ -425,7 +424,7 @@ func TestScan(t *testing.T) {
 		},
 		{
 			"scan non-pe file created in the file system",
-			func() (*kevent.Kevent, error) {
+			func() (*event.Event, error) {
 
 				proc := &pstypes.PS{
 					Name:      "tests.exe",
@@ -439,17 +438,17 @@ func TestScan(t *testing.T) {
 				}
 				psnap.On("Find", 565).Return(true, proc)
 
-				e := &kevent.Kevent{
-					Type:     ktypes.CreateFile,
+				e := &event.Event{
+					Type:     event.CreateFile,
 					Name:     "CreateFile",
-					Category: ktypes.File,
+					Category: event.File,
 					Tid:      2484,
 					PID:      565,
-					Kparams: kevent.Kparams{
-						kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "splwow64.xml")},
-						kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Uint32, Value: uint32(windows.FILE_CREATE)},
+					Params: event.Params{
+						params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "splwow64.xml")},
+						params.FileOperation: {Name: params.FileOperation, Type: params.Uint32, Value: uint32(windows.FILE_CREATE)},
 					},
-					Metadata: make(map[kevent.MetadataKey]any),
+					Metadata: make(map[event.MetadataKey]any),
 					PS:       proc,
 				}
 				return e, nil
@@ -473,7 +472,7 @@ func TestScan(t *testing.T) {
 		},
 		{
 			"scan pe file excluded by generating process name",
-			func() (*kevent.Kevent, error) {
+			func() (*event.Event, error) {
 
 				proc := &pstypes.PS{
 					Name:      "tests.exe",
@@ -487,17 +486,17 @@ func TestScan(t *testing.T) {
 				}
 				psnap.On("Find", 565).Return(true, proc)
 
-				e := &kevent.Kevent{
-					Type:     ktypes.CreateFile,
+				e := &event.Event{
+					Type:     event.CreateFile,
 					Name:     "CreateFile",
-					Category: ktypes.File,
+					Category: event.File,
 					Tid:      2484,
 					PID:      565,
-					Kparams: kevent.Kparams{
-						kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "cmd.exe")},
-						kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Uint32, Value: uint32(windows.FILE_CREATE)},
+					Params: event.Params{
+						params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "cmd.exe")},
+						params.FileOperation: {Name: params.FileOperation, Type: params.Uint32, Value: uint32(windows.FILE_CREATE)},
 					},
-					Metadata: make(map[kevent.MetadataKey]any),
+					Metadata: make(map[event.MetadataKey]any),
 					PS:       proc,
 				}
 				return e, nil
@@ -524,7 +523,7 @@ func TestScan(t *testing.T) {
 		},
 		{
 			"scan ads created in the file system",
-			func() (*kevent.Kevent, error) {
+			func() (*event.Event, error) {
 				ads := filepath.Join(os.TempDir(), "suspicious-ads.txt:mal")
 				f, err := os.Create(ads)
 				if err != nil {
@@ -549,17 +548,17 @@ func TestScan(t *testing.T) {
 				}
 				psnap.On("Find", 565).Return(true, proc)
 
-				e := &kevent.Kevent{
-					Type:     ktypes.CreateFile,
+				e := &event.Event{
+					Type:     event.CreateFile,
 					Name:     "CreateFile",
-					Category: ktypes.File,
+					Category: event.File,
 					Tid:      2484,
 					PID:      565,
-					Kparams: kevent.Kparams{
-						kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: ads},
-						kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Uint32, Value: uint32(windows.FILE_CREATE)},
+					Params: event.Params{
+						params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: ads},
+						params.FileOperation: {Name: params.FileOperation, Type: params.Uint32, Value: uint32(windows.FILE_CREATE)},
 					},
-					Metadata: make(map[kevent.MetadataKey]any),
+					Metadata: make(map[event.MetadataKey]any),
 					PS:       proc,
 				}
 				return e, nil
@@ -588,7 +587,7 @@ func TestScan(t *testing.T) {
 		},
 		{
 			"scan rwx memory region allocation",
-			func() (*kevent.Kevent, error) {
+			func() (*event.Event, error) {
 				var si windows.StartupInfo
 				si.Flags = windows.STARTF_USESHOWWINDOW
 				var pi windows.ProcessInformation
@@ -632,18 +631,18 @@ func TestScan(t *testing.T) {
 				}
 				psnap.On("Find", pid).Return(true, proc)
 
-				e := &kevent.Kevent{
-					Type:     ktypes.VirtualAlloc,
+				e := &event.Event{
+					Type:     event.VirtualAlloc,
 					Name:     "VirtualAlloc",
-					Category: ktypes.Mem,
+					Category: event.Mem,
 					Tid:      2484,
 					PID:      565,
-					Kparams: kevent.Kparams{
-						kparams.ProcessID:      {Name: kparams.ProcessID, Type: kparams.PID, Value: pid},
-						kparams.MemBaseAddress: {Name: kparams.MemBaseAddress, Type: kparams.Address, Value: uint64(0x7ffe0000)},
-						kparams.MemProtect:     {Name: kparams.MemProtect, Type: kparams.Flags, Value: uint32(windows.PAGE_EXECUTE_READWRITE), Flags: kevent.MemProtectionFlags},
+					Params: event.Params{
+						params.ProcessID:      {Name: params.ProcessID, Type: params.PID, Value: pid},
+						params.MemBaseAddress: {Name: params.MemBaseAddress, Type: params.Address, Value: uint64(0x7ffe0000)},
+						params.MemProtect:     {Name: params.MemProtect, Type: params.Flags, Value: uint32(windows.PAGE_EXECUTE_READWRITE), Flags: event.MemProtectionFlags},
 					},
-					Metadata: make(map[kevent.MetadataKey]any),
+					Metadata: make(map[event.MetadataKey]any),
 					PS:       proc,
 				}
 				return e, nil
@@ -672,7 +671,7 @@ func TestScan(t *testing.T) {
 		},
 		{
 			"scan rx pagefile mmap",
-			func() (*kevent.Kevent, error) {
+			func() (*event.Event, error) {
 				var si windows.StartupInfo
 				si.Flags = windows.STARTF_USESHOWWINDOW
 				var pi windows.ProcessInformation
@@ -716,19 +715,19 @@ func TestScan(t *testing.T) {
 				}
 				psnap.On("Find", pid).Return(true, proc)
 
-				e := &kevent.Kevent{
-					Type:     ktypes.MapViewFile,
+				e := &event.Event{
+					Type:     event.MapViewFile,
 					Name:     "MapViewFile",
-					Category: ktypes.File,
+					Category: event.File,
 					Tid:      2484,
 					PID:      565,
-					Kparams: kevent.Kparams{
-						kparams.ProcessID:    {Name: kparams.ProcessID, Type: kparams.PID, Value: pid},
-						kparams.FileViewBase: {Name: kparams.FileViewBase, Type: kparams.Address, Value: uint64(0x7ffe0000)},
-						kparams.FileViewSize: {Name: kparams.FileViewSize, Type: kparams.Uint64, Value: uint64(12333)},
-						kparams.MemProtect:   {Name: kparams.MemProtect, Type: kparams.Flags, Value: uint32(sys.SectionRX), Flags: kevent.ViewProtectionFlags},
+					Params: event.Params{
+						params.ProcessID:    {Name: params.ProcessID, Type: params.PID, Value: pid},
+						params.FileViewBase: {Name: params.FileViewBase, Type: params.Address, Value: uint64(0x7ffe0000)},
+						params.FileViewSize: {Name: params.FileViewSize, Type: params.Uint64, Value: uint64(12333)},
+						params.MemProtect:   {Name: params.MemProtect, Type: params.Flags, Value: uint32(sys.SectionRX), Flags: event.ViewProtectionFlags},
 					},
-					Metadata: make(map[kevent.MetadataKey]any),
+					Metadata: make(map[event.MetadataKey]any),
 					PS:       proc,
 				}
 				return e, nil
@@ -757,7 +756,7 @@ func TestScan(t *testing.T) {
 		},
 		{
 			"scan rx pagefile mmap address for signed module",
-			func() (*kevent.Kevent, error) {
+			func() (*event.Event, error) {
 				proc := &pstypes.PS{
 					Name:      "tests.exe",
 					PID:       1123,
@@ -772,19 +771,19 @@ func TestScan(t *testing.T) {
 
 				signature.GetSignatures().PutSignature(uint64(0x7f3e1000), &signature.Signature{Level: signature.AuthenticodeLevel, Type: signature.Catalog})
 
-				e := &kevent.Kevent{
-					Type:     ktypes.MapViewFile,
+				e := &event.Event{
+					Type:     event.MapViewFile,
 					Name:     "MapViewFile",
-					Category: ktypes.File,
+					Category: event.File,
 					Tid:      2484,
 					PID:      565,
-					Kparams: kevent.Kparams{
-						kparams.ProcessID:    {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1123)},
-						kparams.FileViewBase: {Name: kparams.FileViewBase, Type: kparams.Address, Value: uint64(0x7f3e1000)},
-						kparams.FileViewSize: {Name: kparams.FileViewSize, Type: kparams.Uint64, Value: uint64(12333)},
-						kparams.MemProtect:   {Name: kparams.MemProtect, Type: kparams.Flags, Value: uint32(sys.SectionRX), Flags: kevent.ViewProtectionFlags},
+					Params: event.Params{
+						params.ProcessID:    {Name: params.ProcessID, Type: params.PID, Value: uint32(1123)},
+						params.FileViewBase: {Name: params.FileViewBase, Type: params.Address, Value: uint64(0x7f3e1000)},
+						params.FileViewSize: {Name: params.FileViewSize, Type: params.Uint64, Value: uint64(12333)},
+						params.MemProtect:   {Name: params.MemProtect, Type: params.Flags, Value: uint32(sys.SectionRX), Flags: event.ViewProtectionFlags},
 					},
-					Metadata: make(map[kevent.MetadataKey]any),
+					Metadata: make(map[event.MetadataKey]any),
 					PS:       proc,
 				}
 				return e, nil
@@ -808,7 +807,7 @@ func TestScan(t *testing.T) {
 		},
 		{
 			"scan rx pagefile readonly mmap",
-			func() (*kevent.Kevent, error) {
+			func() (*event.Event, error) {
 				proc := &pstypes.PS{
 					Name:      "tests.exe",
 					PID:       321321,
@@ -821,19 +820,19 @@ func TestScan(t *testing.T) {
 				}
 				psnap.On("Find", uint32(321321)).Return(true, proc)
 
-				e := &kevent.Kevent{
-					Type:     ktypes.MapViewFile,
+				e := &event.Event{
+					Type:     event.MapViewFile,
 					Name:     "MapViewFile",
-					Category: ktypes.File,
+					Category: event.File,
 					Tid:      2484,
 					PID:      321321,
-					Kparams: kevent.Kparams{
-						kparams.ProcessID:    {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(321321)},
-						kparams.FileViewBase: {Name: kparams.FileViewBase, Type: kparams.Address, Value: uint64(0x7ffe0000)},
-						kparams.FileViewSize: {Name: kparams.FileViewSize, Type: kparams.Uint64, Value: uint64(12333)},
-						kparams.MemProtect:   {Name: kparams.MemProtect, Type: kparams.Flags, Value: uint32(0x10000), Flags: kevent.ViewProtectionFlags},
+					Params: event.Params{
+						params.ProcessID:    {Name: params.ProcessID, Type: params.PID, Value: uint32(321321)},
+						params.FileViewBase: {Name: params.FileViewBase, Type: params.Address, Value: uint64(0x7ffe0000)},
+						params.FileViewSize: {Name: params.FileViewSize, Type: params.Uint64, Value: uint64(12333)},
+						params.MemProtect:   {Name: params.MemProtect, Type: params.Flags, Value: uint32(0x10000), Flags: event.ViewProtectionFlags},
 					},
-					Metadata: make(map[kevent.MetadataKey]any),
+					Metadata: make(map[event.MetadataKey]any),
 					PS:       proc,
 				}
 				return e, nil
@@ -857,7 +856,7 @@ func TestScan(t *testing.T) {
 		},
 		{
 			"scan rwx image file mmap",
-			func() (*kevent.Kevent, error) {
+			func() (*event.Event, error) {
 				proc := &pstypes.PS{
 					Name:      "tests.exe",
 					PID:       1123,
@@ -870,20 +869,20 @@ func TestScan(t *testing.T) {
 				}
 				psnap.On("Find", 1123).Return(true, proc)
 
-				e := &kevent.Kevent{
-					Type:     ktypes.MapViewFile,
+				e := &event.Event{
+					Type:     event.MapViewFile,
 					Name:     "MapViewFile",
-					Category: ktypes.File,
+					Category: event.File,
 					Tid:      2484,
 					PID:      565,
-					Kparams: kevent.Kparams{
-						kparams.ProcessID:    {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1123)},
-						kparams.FilePath:     {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "regedit.exe")},
-						kparams.FileViewBase: {Name: kparams.FileViewBase, Type: kparams.Address, Value: uint64(0x7ffe0000)},
-						kparams.FileViewSize: {Name: kparams.FileViewSize, Type: kparams.Uint64, Value: uint64(12333)},
-						kparams.MemProtect:   {Name: kparams.MemProtect, Type: kparams.Flags, Value: uint32(sys.SectionRWX), Flags: kevent.ViewProtectionFlags},
+					Params: event.Params{
+						params.ProcessID:    {Name: params.ProcessID, Type: params.PID, Value: uint32(1123)},
+						params.FilePath:     {Name: params.FilePath, Type: params.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "regedit.exe")},
+						params.FileViewBase: {Name: params.FileViewBase, Type: params.Address, Value: uint64(0x7ffe0000)},
+						params.FileViewSize: {Name: params.FileViewSize, Type: params.Uint64, Value: uint64(12333)},
+						params.MemProtect:   {Name: params.MemProtect, Type: params.Flags, Value: uint32(sys.SectionRWX), Flags: event.ViewProtectionFlags},
 					},
-					Metadata: make(map[kevent.MetadataKey]any),
+					Metadata: make(map[event.MetadataKey]any),
 					PS:       proc,
 				}
 				return e, nil
@@ -912,7 +911,7 @@ func TestScan(t *testing.T) {
 		},
 		{
 			"scan registry binary value",
-			func() (*kevent.Kevent, error) {
+			func() (*event.Event, error) {
 				proc := &pstypes.PS{
 					Name:      "tests.exe",
 					PID:       1123,
@@ -926,18 +925,18 @@ func TestScan(t *testing.T) {
 				psnap.On("Find", 1123).Return(true, proc)
 
 				data := []byte{0x6F, 0x66, 0x74, 0x2E, 0x4E, 0x6F, 0x74, 0x65, 0x70, 0x61, 0x64, 0x00, 0x13, 0x00, 0x01, 0x1A}
-				e := &kevent.Kevent{
-					Type:     ktypes.RegSetValue,
+				e := &event.Event{
+					Type:     event.RegSetValue,
 					Name:     "RegSetValue",
-					Category: ktypes.Registry,
+					Category: event.Registry,
 					Tid:      2484,
 					PID:      565,
-					Kparams: kevent.Kparams{
-						kparams.RegValueType: {Name: kparams.RegValueType, Type: kparams.Uint32, Value: uint32(registry.BINARY)},
-						kparams.RegValue:     {Name: kparams.RegValue, Type: kparams.Binary, Value: data},
-						kparams.RegPath:      {Name: kparams.RegPath, Type: kparams.UnicodeString, Value: `HKEY_LOCAL_MACHINE\CurrentControlSet\Control\DeviceGuard\Mal`},
+					Params: event.Params{
+						params.RegValueType: {Name: params.RegValueType, Type: params.Uint32, Value: uint32(registry.BINARY)},
+						params.RegValue:     {Name: params.RegValue, Type: params.Binary, Value: data},
+						params.RegPath:      {Name: params.RegPath, Type: params.UnicodeString, Value: `HKEY_LOCAL_MACHINE\CurrentControlSet\Control\DeviceGuard\Mal`},
 					},
-					Metadata: make(map[kevent.MetadataKey]any),
+					Metadata: make(map[event.MetadataKey]any),
 					PS:       proc,
 				}
 				return e, nil
@@ -990,12 +989,12 @@ func TestScan(t *testing.T) {
 				assert.True(t, len(yaraAlert.Labels) > 0)
 				assert.Len(t, yaraAlert.Events, 1)
 				assert.NotEmpty(t, e.Metadata)
-				assert.Contains(t, e.Metadata, kevent.YaraMatchesKey)
+				assert.Contains(t, e.Metadata, event.YaraMatchesKey)
 			}
 
 			if e.IsCreateProcess() || e.IsLoadImage() || e.IsVirtualAlloc() || e.IsMapViewFile() {
 				// cleanup
-				proc, err := windows.OpenProcess(windows.PROCESS_TERMINATE, false, e.Kparams.MustGetPid())
+				proc, err := windows.OpenProcess(windows.PROCESS_TERMINATE, false, e.Params.MustGetPid())
 				if err == nil {
 					windows.TerminateProcess(proc, uint32(257))
 					windows.Close(proc)

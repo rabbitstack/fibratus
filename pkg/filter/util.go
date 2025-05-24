@@ -19,10 +19,9 @@
 package filter
 
 import (
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/util/loldrivers"
 	"github.com/rabbitstack/fibratus/pkg/util/signature"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
@@ -31,16 +30,16 @@ import (
 
 // isLOLDriver interacts with the loldrivers client to determine
 // whether the loaded/dropped driver is malicious or vulnerable.
-func isLOLDriver(f fields.Field, e *kevent.Kevent) (kparams.Value, error) {
+func isLOLDriver(f fields.Field, e *event.Event) (params.Value, error) {
 	var filename string
 
-	if e.Category == ktypes.File {
-		filename = e.GetParamAsString(kparams.FilePath)
+	if e.Category == event.File {
+		filename = e.GetParamAsString(params.FilePath)
 	} else {
-		filename = e.GetParamAsString(kparams.ImagePath)
+		filename = e.GetParamAsString(params.ImagePath)
 	}
 
-	isDriver := filepath.Ext(filename) == ".sys" || e.Kparams.TryGetBool(kparams.FileIsDriver)
+	isDriver := filepath.Ext(filename) == ".sys" || e.Params.TryGetBool(params.FileIsDriver)
 	if !isDriver {
 		return nil, nil
 	}

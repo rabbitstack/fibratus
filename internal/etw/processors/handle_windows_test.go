@@ -19,11 +19,10 @@
 package processors
 
 import (
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/handle"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -34,56 +33,56 @@ import (
 func TestHandleProcessor(t *testing.T) {
 	var tests = []struct {
 		name       string
-		e          *kevent.Kevent
+		e          *event.Event
 		hsnap      func() *handle.SnapshotterMock
-		assertions func(*kevent.Kevent, *testing.T, *handle.SnapshotterMock)
+		assertions func(*event.Event, *testing.T, *handle.SnapshotterMock)
 	}{
 		{
 			"process create handle",
-			&kevent.Kevent{
-				Type:     ktypes.CreateHandle,
+			&event.Event{
+				Type:     event.CreateHandle,
 				Tid:      2484,
 				PID:      859,
-				Category: ktypes.Handle,
-				Kparams: kevent.Kparams{
-					kparams.HandleID:           {Name: kparams.HandleID, Type: kparams.Uint32, Value: uint32(21)},
-					kparams.HandleObjectTypeID: {Name: kparams.HandleObjectTypeID, Type: kparams.AnsiString, Value: "Key"},
-					kparams.HandleObject:       {Name: kparams.HandleObject, Type: kparams.Uint64, Value: uint64(18446692422059208560)},
-					kparams.HandleObjectName:   {Name: kparams.HandleObjectName, Type: kparams.UnicodeString, Value: ""},
+				Category: event.Handle,
+				Params: event.Params{
+					params.HandleID:           {Name: params.HandleID, Type: params.Uint32, Value: uint32(21)},
+					params.HandleObjectTypeID: {Name: params.HandleObjectTypeID, Type: params.AnsiString, Value: "Key"},
+					params.HandleObject:       {Name: params.HandleObject, Type: params.Uint64, Value: uint64(18446692422059208560)},
+					params.HandleObjectName:   {Name: params.HandleObjectName, Type: params.UnicodeString, Value: ""},
 				},
-				Metadata: make(kevent.Metadata),
+				Metadata: make(event.Metadata),
 			},
 			func() *handle.SnapshotterMock {
 				hsnap := new(handle.SnapshotterMock)
 				hsnap.On("Write", mock.Anything).Return(nil)
 				return hsnap
 			},
-			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock) {
+			func(e *event.Event, t *testing.T, hsnap *handle.SnapshotterMock) {
 				hsnap.AssertNumberOfCalls(t, "Write", 1)
 			},
 		},
 		{
 			"process close handle",
-			&kevent.Kevent{
-				Type:     ktypes.CloseHandle,
+			&event.Event{
+				Type:     event.CloseHandle,
 				Tid:      2484,
 				PID:      859,
-				Category: ktypes.Handle,
-				Kparams: kevent.Kparams{
-					kparams.HandleID:           {Name: kparams.HandleID, Type: kparams.Uint32, Value: uint32(21)},
-					kparams.HandleObjectTypeID: {Name: kparams.HandleObjectTypeID, Type: kparams.AnsiString, Value: "Key"},
-					kparams.HandleObject:       {Name: kparams.HandleObject, Type: kparams.Uint64, Value: uint64(18446692422059208560)},
-					kparams.HandleObjectName:   {Name: kparams.HandleObjectName, Type: kparams.UnicodeString, Value: `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\Tcpip\Parameters\Interfaces\{b677c565-6ca5-45d3-b618-736b4e09b036}`},
+				Category: event.Handle,
+				Params: event.Params{
+					params.HandleID:           {Name: params.HandleID, Type: params.Uint32, Value: uint32(21)},
+					params.HandleObjectTypeID: {Name: params.HandleObjectTypeID, Type: params.AnsiString, Value: "Key"},
+					params.HandleObject:       {Name: params.HandleObject, Type: params.Uint64, Value: uint64(18446692422059208560)},
+					params.HandleObjectName:   {Name: params.HandleObjectName, Type: params.UnicodeString, Value: `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\Tcpip\Parameters\Interfaces\{b677c565-6ca5-45d3-b618-736b4e09b036}`},
 				},
-				Metadata: make(kevent.Metadata),
+				Metadata: make(event.Metadata),
 			},
 			func() *handle.SnapshotterMock {
 				hsnap := new(handle.SnapshotterMock)
 				hsnap.On("Remove", mock.Anything).Return(nil)
 				return hsnap
 			},
-			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock) {
-				assert.Equal(t, `HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\Tcpip\Parameters\Interfaces\{b677c565-6ca5-45d3-b618-736b4e09b036}`, e.GetParamAsString(kparams.HandleObjectName))
+			func(e *event.Event, t *testing.T, hsnap *handle.SnapshotterMock) {
+				assert.Equal(t, `HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\Tcpip\Parameters\Interfaces\{b677c565-6ca5-45d3-b618-736b4e09b036}`, e.GetParamAsString(params.HandleObjectName))
 				hsnap.AssertNumberOfCalls(t, "Remove", 1)
 			},
 		},

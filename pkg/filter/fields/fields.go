@@ -19,7 +19,7 @@
 package fields
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"sort"
 	"unicode"
 )
@@ -28,7 +28,7 @@ import (
 type FieldInfo struct {
 	Field       Field
 	Desc        string
-	Type        kparams.Type
+	Type        params.Type
 	Examples    []string
 	Deprecation *Deprecation
 	Argument    *Argument
@@ -99,5 +99,5 @@ func IsDeprecated(f Field) (bool, *Deprecation) {
 
 // IsBoolean determines if the given field has the bool type.
 func IsBoolean(f Field) bool {
-	return fields[f].Type == kparams.Bool
+	return fields[f].Type == params.Bool
 }

@@ -127,7 +127,7 @@ var schema = `
 			},
 			"additionalProperties": false
 		},
-		"kcap": {
+		"cap": {
 			"type": "object",
 			"properties": {
 				"file":				{"type": "string"}
@@ -166,7 +166,7 @@ var schema = `
 			},
 			"additionalProperties": false
 		},
-		"kevent": {
+		"event": {
 			"type": "object",
 			"properties": {
 				"serialize-threads":	{"type": "boolean"},
@@ -339,13 +339,13 @@ var schema = `
 							"type": "object",
 							"properties": {
 								"enabled":  {"type": "boolean"},
-								"kparams": 	{"type": "array", "items": [{"type": "string"}]}
+								"params": 	{"type": "array", "items": [{"type": "string"}]}
 							},
 							"if": {
 								"properties": {"enabled": { "const": true }}
 							},
 							"then": {
-								"properties": {"kparams": 	{"type": "array", "minItems": 1, "items": [{"type": "string"}]}}
+								"properties": {"params": 	{"type": "array", "minItems": 1, "items": [{"type": "string"}]}}
 							},
 							"additionalProperties": false
 						},
@@ -353,7 +353,7 @@ var schema = `
 							"type": "object",
 							"properties": {
 								"enabled":  {"type": "boolean"},
-								"kparams": 	{"type": "array", "items": [
+								"params": 	{"type": "array", "items": [
 														{
 															"type": "object",
 															"properties": {
@@ -368,7 +368,7 @@ var schema = `
 								"properties": {"enabled": { "const": true }}
 							},
 							"then": {
-								"properties": {"kparams": {"minItems": 1}}
+								"properties": {"params": {"minItems": 1}}
 							},
 							"additionalProperties": false
 						},
@@ -380,7 +380,7 @@ var schema = `
 														{
 															"type": "object",
 															"properties": {
-																"kparam": 	{"type": "string", "minLength": 1},
+																"Param": 	{"type": "string", "minLength": 1},
 																"old": 		{"type": "string", "minLength": 1},
 																"new": 		{"type": "string"}
 															},
@@ -427,7 +427,7 @@ var schema = `
 														{
 															"type": "object",
 															"properties": {
-																"kparam": 	{"type": "string", "minLength": 1},
+																"Param": 	{"type": "string", "minLength": 1},
 																"trim": 	{"type": "string", "minLength": 1}
 															},
 															"additionalProperties": false
@@ -437,7 +437,7 @@ var schema = `
 														{
 															"type": "object",
 															"properties": {
-																"kparam": 	{"type": "string", "minLength": 1},
+																"Param": 	{"type": "string", "minLength": 1},
 																"trim": 	{"type": "string", "minLength": 1}
 															},
 															"additionalProperties": false

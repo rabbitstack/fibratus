@@ -18,17 +18,17 @@
 
 package yara
 
-import "github.com/rabbitstack/fibratus/pkg/kevent"
+import "github.com/rabbitstack/fibratus/pkg/event"
 
 // Scanner watches for certain events such as process creation or image loading and
 // triggers the scanning either on the process memory or on-disk file. If matches occur,
 // an alert is emitted via registered alert senders.
 type Scanner interface {
-	kevent.Listener
+	event.Listener
 	// Scan runs a scan when the specified signal is observed. The signal
 	// can be the creation of a new process, image loading, writing the PE
 	// file or ADS to the file system, or a suspicious memory allocation.
-	Scan(*kevent.Kevent) (bool, error)
+	Scan(*event.Event) (bool, error)
 	// Close disposes any resources allocated by the scanner.
 	Close()
 }

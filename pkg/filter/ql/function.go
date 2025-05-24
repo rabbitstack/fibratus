@@ -308,7 +308,7 @@ func (f *Foreach) Desc() functions.FunctionDesc {
 				"$mem":        true,
 				"$handle":     true,
 				"$dns":        true,
-				"$kevt":       true,
+				"$evt":        true,
 			}
 
 			if reserved[v] {
@@ -349,7 +349,7 @@ func (f *Foreach) Desc() functions.FunctionDesc {
 				return fmt.Errorf("unused bound variable %s in predicate %q", v, e)
 			}
 
-			var fieldRegexp = regexp.MustCompile(`(ps|pe|file|image|thread|registry|net|mem|handle|dns|kevt)\.[a-zA-Z0-9_.$]+`)
+			var fieldRegexp = regexp.MustCompile(`(ps|pe|file|image|thread|registry|net|mem|handle|dns|evt)\.[a-zA-Z0-9_.$]+`)
 			matches = fieldRegexp.FindAllStringSubmatch(e, -1)
 
 			if len(args) > 3 {

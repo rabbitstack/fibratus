@@ -23,9 +23,9 @@ import (
 	"fmt"
 	semver "github.com/hashicorp/go-version"
 	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/filter"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/version"
 	log "github.com/sirupsen/logrus"
@@ -114,44 +114,44 @@ func (c *compiler) compile() (map[*config.FilterConfig]filter.Filter, *config.Ru
 func (c *compiler) buildCompileResult(filters map[*config.FilterConfig]filter.Filter) *config.RulesCompileResult {
 	rs := &config.RulesCompileResult{}
 
-	m := make(map[ktypes.Ktype]bool)
-	events := make([]ktypes.Ktype, 0)
+	m := make(map[event.Type]bool)
+	events := make([]event.Type, 0)
 
 	for _, f := range filters {
 		rs.NumberRules++
 		for name, values := range f.GetStringFields() {
 			for _, v := range values {
 				if name == fields.KevtName || name == fields.KevtCategory {
-					types := ktypes.KeventNameToKtypes(v)
+					types := event.NameToTypes(v)
 					for _, typ := range types {
 						switch typ.Category() {
-						case ktypes.Process:
+						case event.Process:
 							rs.HasProcEvents = true
-						case ktypes.Thread:
+						case event.Thread:
 							rs.HasThreadEvents = true
-						case ktypes.Image:
+						case event.Image:
 							rs.HasImageEvents = true
-						case ktypes.File:
+						case event.File:
 							rs.HasFileEvents = true
-						case ktypes.Net:
+						case event.Net:
 							rs.HasNetworkEvents = true
-						case ktypes.Registry:
+						case event.Registry:
 							rs.HasRegistryEvents = true
-						case ktypes.Mem:
+						case event.Mem:
 							rs.HasMemEvents = true
-						case ktypes.Handle:
+						case event.Handle:
 							rs.HasHandleEvents = true
-						case ktypes.Threadpool:
+						case event.Threadpool:
 							rs.HasThreadpoolEvents = true
 						}
-						if typ.Subcategory() == ktypes.DNS {
+						if typ.Subcategory() == event.DNS {
 							rs.HasDNSEvents = true
 						}
-						if typ == ktypes.MapViewFile || typ == ktypes.UnmapViewFile {
+						if typ == event.MapViewFile || typ == event.UnmapViewFile {
 							rs.HasVAMapEvents = true
 						}
-						if typ == ktypes.OpenProcess || typ == ktypes.OpenThread || typ == ktypes.SetThreadContext ||
-							typ == ktypes.CreateSymbolicLinkObject {
+						if typ == event.OpenProcess || typ == event.OpenThread || typ == event.SetThreadContext ||
+							typ == event.CreateSymbolicLinkObject {
 							rs.HasAuditAPIEvents = true
 						}
 

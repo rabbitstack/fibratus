@@ -20,12 +20,11 @@ package processors
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
@@ -43,19 +42,19 @@ func TestFsProcessor(t *testing.T) {
 
 	var tests = []struct {
 		name           string
-		e              *kevent.Kevent
+		e              *event.Event
 		setupProcessor func(Processor)
 		hsnap          func() *handle.SnapshotterMock
-		assertions     func(*kevent.Kevent, *testing.T, *handle.SnapshotterMock, Processor)
+		assertions     func(*event.Event, *testing.T, *handle.SnapshotterMock, Processor)
 	}{
 		{
 			"process file rundown",
-			&kevent.Kevent{
-				Type:     ktypes.FileRundown,
-				Category: ktypes.File,
-				Kparams: kevent.Kparams{
-					kparams.FileObject: {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(124567380264)},
-					kparams.FilePath:   {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
+			&event.Event{
+				Type:     event.FileRundown,
+				Category: event.File,
+				Params: event.Params{
+					params.FileObject: {Name: params.FileObject, Type: params.Uint64, Value: uint64(124567380264)},
+					params.FilePath:   {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
 				},
 			},
 			nil,
@@ -63,7 +62,7 @@ func TestFsProcessor(t *testing.T) {
 				hsnap := new(handle.SnapshotterMock)
 				return hsnap
 			},
-			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
+			func(e *event.Event, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
 				fsProcessor := p.(*fsProcessor)
 				assert.Contains(t, fsProcessor.files, uint64(124567380264))
 				file := fsProcessor.files[124567380264]
@@ -73,15 +72,15 @@ func TestFsProcessor(t *testing.T) {
 		},
 		{
 			"process mapped file rundown",
-			&kevent.Kevent{
+			&event.Event{
 				PID:      10233,
-				Type:     ktypes.MapFileRundown,
-				Category: ktypes.File,
-				Kparams: kevent.Kparams{
-					kparams.FileKey:             {Name: kparams.FileKey, Type: kparams.Uint64, Value: uint64(124567380264)},
-					kparams.FileViewSize:        {Name: kparams.FileViewSize, Type: kparams.Uint64, Value: uint64(3098)},
-					kparams.FileViewBase:        {Name: kparams.FileViewBase, Type: kparams.Uint64, Value: uint64(0xffff23433)},
-					kparams.FileViewSectionType: {Name: kparams.FileViewSectionType, Type: kparams.Enum, Value: uint32(va.SectionImage), Enum: kevent.ViewSectionTypes},
+				Type:     event.MapFileRundown,
+				Category: event.File,
+				Params: event.Params{
+					params.FileKey:             {Name: params.FileKey, Type: params.Uint64, Value: uint64(124567380264)},
+					params.FileViewSize:        {Name: params.FileViewSize, Type: params.Uint64, Value: uint64(3098)},
+					params.FileViewBase:        {Name: params.FileViewBase, Type: params.Uint64, Value: uint64(0xffff23433)},
+					params.FileViewSectionType: {Name: params.FileViewSectionType, Type: params.Enum, Value: uint32(va.SectionImage), Enum: event.ViewSectionTypes},
 				},
 			},
 			func(p Processor) {
@@ -92,10 +91,10 @@ func TestFsProcessor(t *testing.T) {
 				hsnap := new(handle.SnapshotterMock)
 				return hsnap
 			},
-			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
+			func(e *event.Event, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
 				fsProcessor := p.(*fsProcessor)
 
-				assert.Equal(t, "C:\\Windows\\System32\\kernel32.dll", e.GetParamAsString(kparams.FilePath))
+				assert.Equal(t, "C:\\Windows\\System32\\kernel32.dll", e.GetParamAsString(params.FilePath))
 
 				psnap := fsProcessor.psnap.(*ps.SnapshotterMock)
 				psnap.AssertNumberOfCalls(t, "AddMmap", 1)
@@ -103,16 +102,16 @@ func TestFsProcessor(t *testing.T) {
 		},
 		{
 			"wait enqueue for create file events",
-			&kevent.Kevent{
-				Type:     ktypes.CreateFile,
-				Category: ktypes.File,
-				Kparams: kevent.Kparams{
-					kparams.FileObject:        {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(18446738026482168384)},
-					kparams.ThreadID:          {Name: kparams.ThreadID, Type: kparams.Uint32, Value: uint32(1484)},
-					kparams.FileCreateOptions: {Name: kparams.FileCreateOptions, Type: kparams.Uint32, Value: uint32(1223456)},
-					kparams.FilePath:          {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\kernel32.dll"},
-					kparams.FileShareMask:     {Name: kparams.FileShareMask, Type: kparams.Uint32, Value: uint32(5)},
-					kparams.FileIrpPtr:        {Name: kparams.FileIrpPtr, Type: kparams.Uint64, Value: uint64(1234543123112321)},
+			&event.Event{
+				Type:     event.CreateFile,
+				Category: event.File,
+				Params: event.Params{
+					params.FileObject:        {Name: params.FileObject, Type: params.Uint64, Value: uint64(18446738026482168384)},
+					params.ThreadID:          {Name: params.ThreadID, Type: params.Uint32, Value: uint32(1484)},
+					params.FileCreateOptions: {Name: params.FileCreateOptions, Type: params.Uint32, Value: uint32(1223456)},
+					params.FilePath:          {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\kernel32.dll"},
+					params.FileShareMask:     {Name: params.FileShareMask, Type: params.Uint32, Value: uint32(5)},
+					params.FileIrpPtr:        {Name: params.FileIrpPtr, Type: params.Uint64, Value: uint64(1234543123112321)},
 				},
 			},
 			nil,
@@ -120,7 +119,7 @@ func TestFsProcessor(t *testing.T) {
 				hsnap := new(handle.SnapshotterMock)
 				return hsnap
 			},
-			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
+			func(e *event.Event, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
 				fsProcessor := p.(*fsProcessor)
 				assert.True(t, e.WaitEnqueue)
 				assert.Contains(t, fsProcessor.irps, uint64(1234543123112321))
@@ -129,27 +128,27 @@ func TestFsProcessor(t *testing.T) {
 		},
 		{
 			"get IRP completion for create file event",
-			&kevent.Kevent{
-				Type:     ktypes.FileOpEnd,
-				Category: ktypes.File,
-				Kparams: kevent.Kparams{
-					kparams.FileObject:    {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(18446738026482168384)},
-					kparams.FileExtraInfo: {Name: kparams.FileExtraInfo, Type: kparams.Uint64, Value: uint64(2)},
-					kparams.FileIrpPtr:    {Name: kparams.FileIrpPtr, Type: kparams.Uint64, Value: uint64(1334543123112321)},
-					kparams.NTStatus:      {Name: kparams.NTStatus, Type: kparams.Status, Value: uint32(0)},
+			&event.Event{
+				Type:     event.FileOpEnd,
+				Category: event.File,
+				Params: event.Params{
+					params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(18446738026482168384)},
+					params.FileExtraInfo: {Name: params.FileExtraInfo, Type: params.Uint64, Value: uint64(2)},
+					params.FileIrpPtr:    {Name: params.FileIrpPtr, Type: params.Uint64, Value: uint64(1334543123112321)},
+					params.NTStatus:      {Name: params.NTStatus, Type: params.Status, Value: uint32(0)},
 				},
 			},
 			func(p Processor) {
 				fsProcessor := p.(*fsProcessor)
-				fsProcessor.irps[1334543123112321] = &kevent.Kevent{
-					Type:     ktypes.CreateFile,
-					Category: ktypes.File,
-					Kparams: kevent.Kparams{
-						kparams.FileObject:        {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(12446738026482168384)},
-						kparams.FileCreateOptions: {Name: kparams.FileCreateOptions, Type: kparams.Uint32, Value: uint32(18874368)},
-						kparams.FilePath:          {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: exe},
-						kparams.FileShareMask:     {Name: kparams.FileShareMask, Type: kparams.Uint32, Value: uint32(5)},
-						kparams.FileIrpPtr:        {Name: kparams.FileIrpPtr, Type: kparams.Uint64, Value: uint64(1334543123112321)},
+				fsProcessor.irps[1334543123112321] = &event.Event{
+					Type:     event.CreateFile,
+					Category: event.File,
+					Params: event.Params{
+						params.FileObject:        {Name: params.FileObject, Type: params.Uint64, Value: uint64(12446738026482168384)},
+						params.FileCreateOptions: {Name: params.FileCreateOptions, Type: params.Uint32, Value: uint32(18874368)},
+						params.FilePath:          {Name: params.FilePath, Type: params.UnicodeString, Value: exe},
+						params.FileShareMask:     {Name: params.FileShareMask, Type: params.Uint32, Value: uint32(5)},
+						params.FileIrpPtr:        {Name: params.FileIrpPtr, Type: params.Uint64, Value: uint64(1334543123112321)},
 					},
 				}
 			},
@@ -157,30 +156,30 @@ func TestFsProcessor(t *testing.T) {
 				hsnap := new(handle.SnapshotterMock)
 				return hsnap
 			},
-			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
+			func(e *event.Event, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
 				fsProcessor := p.(*fsProcessor)
-				assert.Equal(t, ktypes.CreateFile, e.Type)
+				assert.Equal(t, event.CreateFile, e.Type)
 				assert.NotContains(t, fsProcessor.irps, uint64(1334543123112321))
 				assert.False(t, e.WaitEnqueue)
 				assert.Contains(t, fsProcessor.files, uint64(12446738026482168384))
 				assert.Equal(t, exe, fsProcessor.files[12446738026482168384].Name)
-				assert.Equal(t, "Success", e.GetParamAsString(kparams.NTStatus))
-				assert.Equal(t, "File", e.GetParamAsString(kparams.FileType))
-				assert.Equal(t, "CREATE", e.GetParamAsString(kparams.FileOperation))
-				assert.True(t, e.Kparams.MustGetBool(kparams.FileIsExecutable))
-				assert.False(t, e.Kparams.MustGetBool(kparams.FileIsDotnet))
-				assert.False(t, e.Kparams.MustGetBool(kparams.FileIsDLL))
-				assert.False(t, e.Kparams.MustGetBool(kparams.FileIsDriver))
+				assert.Equal(t, "Success", e.GetParamAsString(params.NTStatus))
+				assert.Equal(t, "File", e.GetParamAsString(params.FileType))
+				assert.Equal(t, "CREATE", e.GetParamAsString(params.FileOperation))
+				assert.True(t, e.Params.MustGetBool(params.FileIsExecutable))
+				assert.False(t, e.Params.MustGetBool(params.FileIsDotnet))
+				assert.False(t, e.Params.MustGetBool(params.FileIsDLL))
+				assert.False(t, e.Params.MustGetBool(params.FileIsDriver))
 			},
 		},
 		{
 			"release file and remove file info",
-			&kevent.Kevent{
-				Type:     ktypes.ReleaseFile,
-				Category: ktypes.File,
-				Kparams: kevent.Kparams{
-					kparams.FileObject: {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(18446738026482168384)},
-					kparams.FileKey:    {Name: kparams.FileKey, Type: kparams.Uint64, Value: uint64(14446538026482168384)},
+			&event.Event{
+				Type:     event.ReleaseFile,
+				Category: event.File,
+				Params: event.Params{
+					params.FileObject: {Name: params.FileObject, Type: params.Uint64, Value: uint64(18446738026482168384)},
+					params.FileKey:    {Name: params.FileKey, Type: params.Uint64, Value: uint64(14446538026482168384)},
 				},
 			},
 			func(p Processor) {
@@ -191,24 +190,24 @@ func TestFsProcessor(t *testing.T) {
 				hsnap := new(handle.SnapshotterMock)
 				return hsnap
 			},
-			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
+			func(e *event.Event, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
 				fsProcessor := p.(*fsProcessor)
 				assert.Empty(t, fsProcessor.files)
 			},
 		},
 		{
 			"parse created file characteristics",
-			&kevent.Kevent{
-				Type:     ktypes.CreateFile,
-				Category: ktypes.File,
-				Kparams: kevent.Kparams{
-					kparams.FileObject:        {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(18446738026482168384)},
-					kparams.ThreadID:          {Name: kparams.ThreadID, Type: kparams.Uint32, Value: uint32(1484)},
-					kparams.FileCreateOptions: {Name: kparams.FileCreateOptions, Type: kparams.Uint32, Value: uint32(1223456)},
-					kparams.FilePath:          {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: exe},
-					kparams.FileShareMask:     {Name: kparams.FileShareMask, Type: kparams.Uint32, Value: uint32(5)},
-					kparams.FileIrpPtr:        {Name: kparams.FileIrpPtr, Type: kparams.Uint64, Value: uint64(1234543123112321)},
-					kparams.FileOperation:     {Name: kparams.FileOperation, Type: kparams.Uint64, Value: uint64(2)},
+			&event.Event{
+				Type:     event.CreateFile,
+				Category: event.File,
+				Params: event.Params{
+					params.FileObject:        {Name: params.FileObject, Type: params.Uint64, Value: uint64(18446738026482168384)},
+					params.ThreadID:          {Name: params.ThreadID, Type: params.Uint32, Value: uint32(1484)},
+					params.FileCreateOptions: {Name: params.FileCreateOptions, Type: params.Uint32, Value: uint32(1223456)},
+					params.FilePath:          {Name: params.FilePath, Type: params.UnicodeString, Value: exe},
+					params.FileShareMask:     {Name: params.FileShareMask, Type: params.Uint32, Value: uint32(5)},
+					params.FileIrpPtr:        {Name: params.FileIrpPtr, Type: params.Uint64, Value: uint64(1234543123112321)},
+					params.FileOperation:     {Name: params.FileOperation, Type: params.Uint64, Value: uint64(2)},
 				},
 			},
 			nil,
@@ -216,7 +215,7 @@ func TestFsProcessor(t *testing.T) {
 				hsnap := new(handle.SnapshotterMock)
 				return hsnap
 			},
-			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
+			func(e *event.Event, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
 				fsProcessor := p.(*fsProcessor)
 				assert.True(t, e.WaitEnqueue)
 				assert.Contains(t, fsProcessor.irps, uint64(1234543123112321))
@@ -225,15 +224,15 @@ func TestFsProcessor(t *testing.T) {
 		},
 		{
 			"unmap view file",
-			&kevent.Kevent{
+			&event.Event{
 				PID:      10233,
-				Type:     ktypes.UnmapViewFile,
-				Category: ktypes.File,
-				Kparams: kevent.Kparams{
-					kparams.FileKey:             {Name: kparams.FileKey, Type: kparams.Uint64, Value: uint64(124567380264)},
-					kparams.FileViewSize:        {Name: kparams.FileViewSize, Type: kparams.Uint64, Value: uint64(3098)},
-					kparams.FileViewBase:        {Name: kparams.FileViewBase, Type: kparams.Uint64, Value: uint64(0xffff23433)},
-					kparams.FileViewSectionType: {Name: kparams.FileViewSectionType, Type: kparams.Enum, Value: uint32(va.SectionImage), Enum: kevent.ViewSectionTypes},
+				Type:     event.UnmapViewFile,
+				Category: event.File,
+				Params: event.Params{
+					params.FileKey:             {Name: params.FileKey, Type: params.Uint64, Value: uint64(124567380264)},
+					params.FileViewSize:        {Name: params.FileViewSize, Type: params.Uint64, Value: uint64(3098)},
+					params.FileViewBase:        {Name: params.FileViewBase, Type: params.Uint64, Value: uint64(0xffff23433)},
+					params.FileViewSectionType: {Name: params.FileViewSectionType, Type: params.Enum, Value: uint32(va.SectionImage), Enum: event.ViewSectionTypes},
 				},
 			},
 			nil,
@@ -241,7 +240,7 @@ func TestFsProcessor(t *testing.T) {
 				hsnap := new(handle.SnapshotterMock)
 				return hsnap
 			},
-			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
+			func(e *event.Event, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
 				fsProcessor := p.(*fsProcessor)
 
 				psnap := fsProcessor.psnap.(*ps.SnapshotterMock)
@@ -250,13 +249,13 @@ func TestFsProcessor(t *testing.T) {
 		},
 		{
 			"process write file",
-			&kevent.Kevent{
-				Type:     ktypes.WriteFile,
-				Category: ktypes.File,
-				Kparams: kevent.Kparams{
-					kparams.FileObject: {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(18446738026482168384)},
-					kparams.FileKey:    {Name: kparams.FileKey, Type: kparams.Uint64, Value: uint64(14446538026482168384)},
-					kparams.FileIoSize: {Name: kparams.FileIoSize, Type: kparams.Uint32, Value: uint32(1024)},
+			&event.Event{
+				Type:     event.WriteFile,
+				Category: event.File,
+				Params: event.Params{
+					params.FileObject: {Name: params.FileObject, Type: params.Uint64, Value: uint64(18446738026482168384)},
+					params.FileKey:    {Name: params.FileKey, Type: params.Uint64, Value: uint64(14446538026482168384)},
+					params.FileIoSize: {Name: params.FileIoSize, Type: params.Uint32, Value: uint32(1024)},
 				},
 			},
 			func(p Processor) {
@@ -267,22 +266,22 @@ func TestFsProcessor(t *testing.T) {
 				hsnap := new(handle.SnapshotterMock)
 				return hsnap
 			},
-			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
-				assert.Equal(t, ktypes.WriteFile, e.Type)
-				assert.Contains(t, e.Kparams, kparams.FilePath, kparams.FileType)
-				assert.Equal(t, "C:\\Windows\\temp\\idxx.exe", e.GetParamAsString(kparams.FilePath))
-				assert.Equal(t, "File", e.GetParamAsString(kparams.FileType))
+			func(e *event.Event, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
+				assert.Equal(t, event.WriteFile, e.Type)
+				assert.Contains(t, e.Params, params.FilePath, params.FileType)
+				assert.Equal(t, "C:\\Windows\\temp\\idxx.exe", e.GetParamAsString(params.FilePath))
+				assert.Equal(t, "File", e.GetParamAsString(params.FileType))
 			},
 		},
 		{
 			"process write file consult handle snapshotter",
-			&kevent.Kevent{
-				Type:     ktypes.WriteFile,
-				Category: ktypes.File,
-				Kparams: kevent.Kparams{
-					kparams.FileObject: {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(18446738026482168384)},
-					kparams.FileKey:    {Name: kparams.FileKey, Type: kparams.Uint64, Value: uint64(14446538026482168384)},
-					kparams.FileIoSize: {Name: kparams.FileIoSize, Type: kparams.Uint32, Value: uint32(1024)},
+			&event.Event{
+				Type:     event.WriteFile,
+				Category: event.File,
+				Params: event.Params{
+					params.FileObject: {Name: params.FileObject, Type: params.Uint64, Value: uint64(18446738026482168384)},
+					params.FileKey:    {Name: params.FileKey, Type: params.Uint64, Value: uint64(14446538026482168384)},
+					params.FileIoSize: {Name: params.FileIoSize, Type: params.Uint32, Value: uint32(1024)},
 				},
 			},
 			nil,
@@ -291,23 +290,23 @@ func TestFsProcessor(t *testing.T) {
 				hsnap.On("FindByObject", uint64(18446738026482168384)).Return(htypes.Handle{Type: handle.File, Name: "C:\\Windows\\temp\\doc.docx"}, true)
 				return hsnap
 			},
-			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
-				assert.Equal(t, ktypes.WriteFile, e.Type)
+			func(e *event.Event, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
+				assert.Equal(t, event.WriteFile, e.Type)
 				hsnap.AssertNumberOfCalls(t, "FindByObject", 1)
-				assert.Contains(t, e.Kparams, kparams.FilePath, kparams.FileType)
-				assert.Equal(t, "C:\\Windows\\temp\\doc.docx", e.GetParamAsString(kparams.FilePath))
-				assert.Equal(t, "File", e.GetParamAsString(kparams.FileType))
+				assert.Contains(t, e.Params, params.FilePath, params.FileType)
+				assert.Equal(t, "C:\\Windows\\temp\\doc.docx", e.GetParamAsString(params.FilePath))
+				assert.Equal(t, "File", e.GetParamAsString(params.FileType))
 			},
 		},
 		{
 			"process enum directory",
-			&kevent.Kevent{
-				Type:     ktypes.EnumDirectory,
-				Category: ktypes.File,
-				Kparams: kevent.Kparams{
-					kparams.FileObject: {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(18446738026482168384)},
-					kparams.FileKey:    {Name: kparams.FileKey, Type: kparams.Uint64, Value: uint64(14446538026482168384)},
-					kparams.FilePath:   {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "*"},
+			&event.Event{
+				Type:     event.EnumDirectory,
+				Category: event.File,
+				Params: event.Params{
+					params.FileObject: {Name: params.FileObject, Type: params.Uint64, Value: uint64(18446738026482168384)},
+					params.FileKey:    {Name: params.FileKey, Type: params.Uint64, Value: uint64(14446538026482168384)},
+					params.FilePath:   {Name: params.FilePath, Type: params.UnicodeString, Value: "*"},
 				},
 			},
 			func(p Processor) {
@@ -318,10 +317,10 @@ func TestFsProcessor(t *testing.T) {
 				hsnap := new(handle.SnapshotterMock)
 				return hsnap
 			},
-			func(e *kevent.Kevent, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
-				assert.Equal(t, ktypes.EnumDirectory, e.Type)
-				assert.Contains(t, e.Kparams, kparams.FilePath, kparams.FileDirectory)
-				assert.Equal(t, "C:\\Windows\\temp", e.GetParamAsString(kparams.FileDirectory))
+			func(e *event.Event, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
+				assert.Equal(t, event.EnumDirectory, e.Type)
+				assert.Contains(t, e.Params, params.FilePath, params.FileDirectory)
+				assert.Equal(t, "C:\\Windows\\temp", e.GetParamAsString(params.FileDirectory))
 			},
 		},
 	}

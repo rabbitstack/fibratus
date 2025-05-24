@@ -19,9 +19,8 @@
 package processors
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/signature"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
@@ -36,21 +35,21 @@ import (
 func TestImageProcessor(t *testing.T) {
 	var tests = []struct {
 		name       string
-		e          *kevent.Kevent
+		e          *event.Event
 		psnap      func() *ps.SnapshotterMock
-		assertions func(*kevent.Kevent, *testing.T, *ps.SnapshotterMock)
+		assertions func(*event.Event, *testing.T, *ps.SnapshotterMock)
 	}{
 		{
 			"load new image",
-			&kevent.Kevent{
-				Type: ktypes.LoadImage,
-				Kparams: kevent.Kparams{
-					kparams.ImagePath:           {Name: kparams.ImagePath, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll")},
-					kparams.ProcessID:           {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1023)},
-					kparams.ImageCheckSum:       {Name: kparams.ImageCheckSum, Type: kparams.Uint32, Value: uint32(2323432)},
-					kparams.ImageBase:           {Name: kparams.ImageBase, Type: kparams.Address, Value: uint64(0x7ffb313833a3)},
-					kparams.ImageSignatureType:  {Name: kparams.ImageSignatureType, Type: kparams.Enum, Value: uint32(1), Enum: signature.Types},
-					kparams.ImageSignatureLevel: {Name: kparams.ImageSignatureLevel, Type: kparams.Enum, Value: uint32(4), Enum: signature.Levels},
+			&event.Event{
+				Type: event.LoadImage,
+				Params: event.Params{
+					params.ImagePath:           {Name: params.ImagePath, Type: params.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll")},
+					params.ProcessID:           {Name: params.ProcessID, Type: params.PID, Value: uint32(1023)},
+					params.ImageCheckSum:       {Name: params.ImageCheckSum, Type: params.Uint32, Value: uint32(2323432)},
+					params.ImageBase:           {Name: params.ImageBase, Type: params.Address, Value: uint64(0x7ffb313833a3)},
+					params.ImageSignatureType:  {Name: params.ImageSignatureType, Type: params.Enum, Value: uint32(1), Enum: signature.Types},
+					params.ImageSignatureLevel: {Name: params.ImageSignatureLevel, Type: params.Enum, Value: uint32(4), Enum: signature.Levels},
 				},
 			},
 			func() *ps.SnapshotterMock {
@@ -58,24 +57,24 @@ func TestImageProcessor(t *testing.T) {
 				psnap.On("AddModule", mock.Anything).Return(nil)
 				return psnap
 			},
-			func(e *kevent.Kevent, t *testing.T, psnap *ps.SnapshotterMock) {
+			func(e *event.Event, t *testing.T, psnap *ps.SnapshotterMock) {
 				psnap.AssertNumberOfCalls(t, "AddModule", 1)
 				// should get the signature verified
-				assert.Equal(t, "EMBEDDED", e.GetParamAsString(kparams.ImageSignatureType))
-				assert.Equal(t, "AUTHENTICODE", e.GetParamAsString(kparams.ImageSignatureLevel))
+				assert.Equal(t, "EMBEDDED", e.GetParamAsString(params.ImageSignatureType))
+				assert.Equal(t, "AUTHENTICODE", e.GetParamAsString(params.ImageSignatureLevel))
 			},
 		},
 		{
 			"parse image characteristics",
-			&kevent.Kevent{
-				Type: ktypes.LoadImage,
-				Kparams: kevent.Kparams{
-					kparams.ImagePath:           {Name: kparams.ImagePath, Type: kparams.UnicodeString, Value: "../_fixtures/mscorlib.dll"},
-					kparams.ProcessID:           {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1023)},
-					kparams.ImageCheckSum:       {Name: kparams.ImageCheckSum, Type: kparams.Uint32, Value: uint32(2323432)},
-					kparams.ImageBase:           {Name: kparams.ImageBase, Type: kparams.Address, Value: uint64(0x7ffb313833a3)},
-					kparams.ImageSignatureType:  {Name: kparams.ImageSignatureType, Type: kparams.Enum, Value: uint32(1), Enum: signature.Types},
-					kparams.ImageSignatureLevel: {Name: kparams.ImageSignatureLevel, Type: kparams.Enum, Value: uint32(4), Enum: signature.Levels},
+			&event.Event{
+				Type: event.LoadImage,
+				Params: event.Params{
+					params.ImagePath:           {Name: params.ImagePath, Type: params.UnicodeString, Value: "../_fixtures/mscorlib.dll"},
+					params.ProcessID:           {Name: params.ProcessID, Type: params.PID, Value: uint32(1023)},
+					params.ImageCheckSum:       {Name: params.ImageCheckSum, Type: params.Uint32, Value: uint32(2323432)},
+					params.ImageBase:           {Name: params.ImageBase, Type: params.Address, Value: uint64(0x7ffb313833a3)},
+					params.ImageSignatureType:  {Name: params.ImageSignatureType, Type: params.Enum, Value: uint32(1), Enum: signature.Types},
+					params.ImageSignatureLevel: {Name: params.ImageSignatureLevel, Type: params.Enum, Value: uint32(4), Enum: signature.Levels},
 				},
 			},
 			func() *ps.SnapshotterMock {
@@ -83,26 +82,26 @@ func TestImageProcessor(t *testing.T) {
 				psnap.On("AddModule", mock.Anything).Return(nil)
 				return psnap
 			},
-			func(e *kevent.Kevent, t *testing.T, psnap *ps.SnapshotterMock) {
+			func(e *event.Event, t *testing.T, psnap *ps.SnapshotterMock) {
 				psnap.AssertNumberOfCalls(t, "AddModule", 1)
 				// should be enriched with image characteristics params
-				assert.True(t, e.Kparams.MustGetBool(kparams.FileIsDLL))
-				assert.True(t, e.Kparams.MustGetBool(kparams.FileIsDotnet))
-				assert.False(t, e.Kparams.MustGetBool(kparams.FileIsExecutable))
-				assert.False(t, e.Kparams.MustGetBool(kparams.FileIsDriver))
+				assert.True(t, e.Params.MustGetBool(params.FileIsDLL))
+				assert.True(t, e.Params.MustGetBool(params.FileIsDotnet))
+				assert.False(t, e.Params.MustGetBool(params.FileIsExecutable))
+				assert.False(t, e.Params.MustGetBool(params.FileIsDriver))
 			},
 		},
 		{
 			"unload image",
-			&kevent.Kevent{
-				Type: ktypes.UnloadImage,
-				Kparams: kevent.Kparams{
-					kparams.ImagePath:           {Name: kparams.ImagePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\kernel32.dll"},
-					kparams.ProcessName:         {Name: kparams.ProcessName, Type: kparams.AnsiString, Value: "csrss.exe"},
-					kparams.ProcessID:           {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(676)},
-					kparams.ImageBase:           {Name: kparams.ImageBase, Type: kparams.Address, Value: uint64(0xfffb313833a3)},
-					kparams.ImageSignatureType:  {Name: kparams.ImageSignatureType, Type: kparams.Enum, Value: uint32(0), Enum: signature.Types},
-					kparams.ImageSignatureLevel: {Name: kparams.ImageSignatureLevel, Type: kparams.Enum, Value: uint32(0), Enum: signature.Levels},
+			&event.Event{
+				Type: event.UnloadImage,
+				Params: event.Params{
+					params.ImagePath:           {Name: params.ImagePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\kernel32.dll"},
+					params.ProcessName:         {Name: params.ProcessName, Type: params.AnsiString, Value: "csrss.exe"},
+					params.ProcessID:           {Name: params.ProcessID, Type: params.PID, Value: uint32(676)},
+					params.ImageBase:           {Name: params.ImageBase, Type: params.Address, Value: uint64(0xfffb313833a3)},
+					params.ImageSignatureType:  {Name: params.ImageSignatureType, Type: params.Enum, Value: uint32(0), Enum: signature.Types},
+					params.ImageSignatureLevel: {Name: params.ImageSignatureLevel, Type: params.Enum, Value: uint32(0), Enum: signature.Levels},
 				},
 			},
 			func() *ps.SnapshotterMock {
@@ -111,7 +110,7 @@ func TestImageProcessor(t *testing.T) {
 				psnap.On("FindModule", mock.Anything).Return(false, nil)
 				return psnap
 			},
-			func(e *kevent.Kevent, t *testing.T, psnap *ps.SnapshotterMock) {
+			func(e *event.Event, t *testing.T, psnap *ps.SnapshotterMock) {
 				psnap.AssertNumberOfCalls(t, "RemoveModule", 1)
 			},
 		},

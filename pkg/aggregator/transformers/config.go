@@ -20,7 +20,7 @@ package transformers
 
 import "fmt"
 
-// ErrInvalidConfig signals an invalid configuration input
+// ErrInvalidConfig signals an invalid transformer configuration
 var ErrInvalidConfig = func(name Type) error { return fmt.Errorf("invalid config for %q transformer", name) }
 
 // Config acts as a container for the transformer configuration structures.

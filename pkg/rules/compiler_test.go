@@ -19,7 +19,7 @@
 package rules
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/version"
 	"github.com/stretchr/testify/assert"
@@ -39,11 +39,11 @@ func TestCompile(t *testing.T) {
 	assert.False(t, rs.HasMemEvents)
 	assert.False(t, rs.HasAuditAPIEvents)
 	assert.True(t, rs.HasDNSEvents)
-	assert.Contains(t, rs.UsedEvents, ktypes.CreateProcess)
-	assert.Contains(t, rs.UsedEvents, ktypes.LoadImage)
-	assert.Contains(t, rs.UsedEvents, ktypes.QueryDNS)
-	assert.Contains(t, rs.UsedEvents, ktypes.ConnectTCPv4)
-	assert.Contains(t, rs.UsedEvents, ktypes.ConnectTCPv6)
+	assert.Contains(t, rs.UsedEvents, event.CreateProcess)
+	assert.Contains(t, rs.UsedEvents, event.LoadImage)
+	assert.Contains(t, rs.UsedEvents, event.QueryDNS)
+	assert.Contains(t, rs.UsedEvents, event.ConnectTCPv4)
+	assert.Contains(t, rs.UsedEvents, event.ConnectTCPv6)
 }
 
 func TestCompileMinEngineVersion(t *testing.T) {

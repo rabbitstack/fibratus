@@ -33,7 +33,7 @@ import (
 	removet "github.com/rabbitstack/fibratus/pkg/aggregator/transformers/remove"
 	replacet "github.com/rabbitstack/fibratus/pkg/aggregator/transformers/replace"
 	tagst "github.com/rabbitstack/fibratus/pkg/aggregator/transformers/tags"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/outputs/amqp"
 	"github.com/rabbitstack/fibratus/pkg/outputs/elasticsearch"
 	"github.com/rabbitstack/fibratus/pkg/util/log"
@@ -62,7 +62,7 @@ import (
 )
 
 const (
-	kcapFile                 = "kcap.file"
+	kcapFile                 = "cap.file"
 	configFile               = "config-file"
 	debugPrivilege           = "debug-privilege"
 	initHandleSnapshot       = "handle.init-snapshot"
@@ -71,11 +71,11 @@ const (
 	symbolizeKernelAddresses = "symbolize-kernel-addresses"
 	forwardMode              = "forward"
 
-	serializeThreads = "kevent.serialize-threads"
-	serializeImages  = "kevent.serialize-images"
-	serializeHandles = "kevent.serialize-handles"
-	serializePE      = "kevent.serialize-pe"
-	serializeEnvs    = "kevent.serialize-envs"
+	serializeThreads = "event.serialize-threads"
+	serializeImages  = "event.serialize-images"
+	serializeHandles = "event.serialize-handles"
+	serializePE      = "event.serialize-pe"
+	serializeEnvs    = "event.serialize-envs"
 )
 
 // Config stores configuration options for fine-tuning the behaviour of Fibratus.
@@ -286,11 +286,11 @@ func (c *Config) Init() error {
 	c.ForwardMode = c.viper.GetBool(forwardMode)
 	c.KcapFile = c.viper.GetString(kcapFile)
 
-	kevent.SerializeThreads = c.viper.GetBool(serializeThreads)
-	kevent.SerializeImages = c.viper.GetBool(serializeImages)
-	kevent.SerializeHandles = c.viper.GetBool(serializeHandles)
-	kevent.SerializePE = c.viper.GetBool(serializePE)
-	kevent.SerializeEnvs = c.viper.GetBool(serializeEnvs)
+	event.SerializeThreads = c.viper.GetBool(serializeThreads)
+	event.SerializeImages = c.viper.GetBool(serializeImages)
+	event.SerializeHandles = c.viper.GetBool(serializeHandles)
+	event.SerializePE = c.viper.GetBool(serializePE)
+	event.SerializeEnvs = c.viper.GetBool(serializeEnvs)
 
 	if c.opts.run || c.opts.replay {
 		if err := c.tryLoadOutput(); err != nil {
@@ -383,10 +383,10 @@ func (c *Config) addFlags() {
 		c.flags.Bool(matchAll, true, "Indicates if the match all strategy is enabled for the rule engine. If the match all strategy is enabled, a single event can trigger multiple rules")
 	}
 	if c.opts.capture {
-		c.flags.StringP(kcapFile, "o", "", "The path of the output kcap file")
+		c.flags.StringP(kcapFile, "o", "", "The path of the output cap file")
 	}
 	if c.opts.replay {
-		c.flags.StringP(kcapFile, "k", "", "The path of the input kcap file")
+		c.flags.StringP(kcapFile, "k", "", "The path of the input cap file")
 	}
 	if c.opts.run || c.opts.replay || c.opts.list || c.opts.validate {
 		c.flags.String(filamentPath, filepath.Join(os.Getenv("PROGRAMFILES"), "fibratus", "filaments"), "Denotes the directory where filaments are located")

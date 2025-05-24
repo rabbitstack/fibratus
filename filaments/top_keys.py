@@ -26,15 +26,15 @@ __keys__ = collections.Counter()
 
 
 def on_init():
-    kfilter("kevt.category = 'registry'")
+    set_filter("evt.category = 'registry'")
     columns(["Key", "#Ops"])
     sort_by('#Ops')
     interval(1)
 
 
 @dotdictify
-def on_next_kevent(kevent):
-    key = kevent.kparams.key_name
+def on_next_event(event):
+    key = event.params.key_name
     if key:
         __keys__.update((key, ))
 

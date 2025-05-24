@@ -47,13 +47,13 @@ func init() {
 type Stats struct {
 	AggregatorBatchEvents               int            `json:"aggregator.batch.events"`
 	AggregatorFlushesCount              int            `json:"aggregator.flushes.count"`
-	AggregatorKeventErrors              int            `json:"aggregator.kevent.errors"`
+	AggregatorEventErrors               int            `json:"aggregator.event.errors"`
 	AggregatorTransformerErrors         map[string]int `json:"aggregator.transformer.errors"`
 	AggregatorWorkerClientPublishErrors int            `json:"aggregator.worker.client.publish.errors"`
-	FilamentKdictErrors                 int            `json:"filament.kdict.errors"`
-	FilamentKeventBatchFlushes          int            `json:"filament.kevent.batch.flushes"`
-	FilamentKeventErrors                map[string]int `json:"filament.kevent.errors"`
-	FilamentKeventProcessErrors         int            `json:"filament.kevent.process.errors"`
+	FilamentDictErrors                  int            `json:"filament.dict.errors"`
+	FilamentEventBatchFlushes           int            `json:"filament.event.batch.flushes"`
+	FilamentEventErrors                 map[string]int `json:"filament.event.errors"`
+	FilamentEventProcessErrors          int            `json:"filament.event.process.errors"`
 	FilterAccessorErrors                map[string]int `json:"filter.accessor.errors"`
 	FsFileObjectHandleHits              int            `json:"fs.file.object.handle.hits"`
 	FsFileObjectMisses                  int            `json:"fs.file.object.misses"`
@@ -67,28 +67,27 @@ type Stats struct {
 	HandleTypeNameMisses                int            `json:"handle.type.name.misses"`
 	HandleWaitTimeouts                  int            `json:"handle.wait.timeouts"`
 	HostnameErrors                      map[string]int `json:"hostname.errors"`
-	KcapFlusherErrors                   map[string]int `json:"kcap.flusher.errors"`
-	KcapHandleWriteErrors               int            `json:"kcap.handle.write.errors"`
-	KcapKeventUnmarshalErrors           int            `json:"kcap.kevent.unmarshal.errors"`
-	KcapKeventWriteErrors               int            `json:"kcap.kevent.write.errors"`
-	KcapKstreamConsumerErrors           int            `json:"kcap.kstream.consumer.errors"`
-	KcapOverflowErrors                  int            `json:"kcap.overflow.errors"`
-	KcapReadBytes                       int            `json:"kcap.read.bytes"`
-	KcapReadKevents                     int            `json:"kcap.read.kevents"`
-	KcapReaderDroppedByFilter           int            `json:"kcap.reader.dropped.by.filter"`
-	KcapReaderHandleUnmarshalErrors     int            `json:"kcap.reader.handle.unmarshal.errors"`
-	KeventPrcoessorFailures             int            `json:"kevent.processor.failures"`
-	KeventSeqInitErrors                 map[string]int `json:"kevent.seq.init.errors"`
-	KeventSeqStoreErrors                int            `json:"kevent.seq.store.errors"`
-	KeventTimestampUnmarshalErrors      int            `json:"kevent.timestamp.unmarshal.errors"`
-	KstreamDroppedKevents               int            `json:"kstream.dropped.kevents"`
-	KstreamKbuffersRead                 int            `json:"kstream.kbuffers.read"`
-	KstreamKeventsEnqueued              int            `json:"kstream.kevents.enqueued"`
-	KstreamKeventsDequeued              int            `json:"kstream.kevents.dequeued"`
-	KstreamUnknownKevents               int            `json:"kstream.kevents.unknown"`
-	KstreamKeventsProcessed             int            `json:"kstream.kevents.processed"`
-	KstreamExcludedKevents              int            `json:"kstream.excluded.kevents"`
-	KstreamKeventsFailures              map[string]int `json:"kstream.kevents.failures"`
+	CapFlusherErrors                    map[string]int `json:"cap.flusher.errors"`
+	CapHandleWriteErrors                int            `json:"cap.handle.write.errors"`
+	CapEventUnmarshalErrors             int            `json:"cap.event.unmarshal.errors"`
+	CapEventWriteErrors                 int            `json:"cap.event.write.errors"`
+	CapEventSourceConsumerErrors        int            `json:"cap.eventsource.consumer.errors"`
+	CapOverflowErrors                   int            `json:"cap.overflow.errors"`
+	CapReadBytes                        int            `json:"cap.read.bytes"`
+	CapReadEvents                       int            `json:"cap.read.events"`
+	CapReaderDroppedByFilter            int            `json:"cap.reader.dropped.by.filter"`
+	CapReaderHandleUnmarshalErrors      int            `json:"cap.reader.handle.unmarshal.errors"`
+	EventProcessorFailures              int            `json:"event.processor.failures"`
+	EventSeqInitErrors                  map[string]int `json:"event.seq.init.errors"`
+	EventSeqStoreErrors                 int            `json:"event.seq.store.errors"`
+	EventTimestampUnmarshalErrors       int            `json:"event.timestamp.unmarshal.errors"`
+	EventSourceBuffersRead              int            `json:"eventsource.buffers.read"`
+	EventSourceEventsEnqueued           int            `json:"eventsource.events.enqueued"`
+	EventSourceEventsDequeued           int            `json:"eventsource.events.dequeued"`
+	EventSourceUnknownEvents            int            `json:"eventsource.events.unknown"`
+	EventSourceEventsProcessed          int            `json:"eventsource.events.processed"`
+	EventSourceExcludedEvents           int            `json:"eventsource.excluded.events"`
+	EventSourceEventsFailures           map[string]int `json:"eventsource.events.failures"`
 	LoggerErrors                        map[string]int `json:"logger.errors"`
 	OutputAMQPChannelFailures           int            `json:"output.amqp.channel.failures"`
 	OutputAMQPConnectionFailures        int            `json:"output.amqp.connection.failures"`

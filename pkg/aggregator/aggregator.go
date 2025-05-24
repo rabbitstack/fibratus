@@ -25,7 +25,7 @@ import (
 
 	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/outputs"
 	log "github.com/sirupsen/logrus"
 
@@ -51,27 +51,27 @@ import (
 )
 
 var (
-	// keventsDequeued counts the number of dequeued events
-	keventsDequeued = expvar.NewInt("kstream.kevents.dequeued")
+	// eventsDequeued counts the number of dequeued events
+	eventsDequeued = expvar.NewInt("aggregator.events.dequeued")
 	// flushesCount computes the total count of aggregator flushes
 	flushesCount = expvar.NewInt("aggregator.flushes.count")
 	// batchEvents represents the overall number of processed batches
 	batchEvents = expvar.NewInt("aggregator.batch.events")
 	// transformerErrors is the count of errors occurred when applying transformers
 	transformerErrors = expvar.NewMap("aggregator.transformer.errors")
-	// keventErrors is the number of event errors
-	keventErrors = expvar.NewInt("aggregator.kevent.errors")
+	// eventsErrors is the number of event errors
+	eventsErrors = expvar.NewInt("aggregator.event.errors")
 )
 
 // BufferedAggregator collects events from the inbound channel and produces batches on regular intervals. The batches
 // are pushed to the work queue from which load-balanced configured workers consume the batches and publish to the outputs.
 type BufferedAggregator struct {
-	kevtsc  <-chan *kevent.Kevent
+	evtsc   <-chan *event.Event
 	errsc   <-chan error
 	stop    chan struct{}
 	flusher *time.Ticker
-	// queue of inbound kernel events
-	kevts []*kevent.Kevent
+	// queue of inbound events
+	evts []*event.Event
 	// work queue that forwarder passes to outputs
 	wq         queue
 	submitter  *submitter
@@ -81,7 +81,7 @@ type BufferedAggregator struct {
 
 // NewBuffered creates a new instance of the event aggregator.
 func NewBuffered(
-	evts <-chan *kevent.Kevent,
+	evts <-chan *event.Event,
 	errs <-chan error,
 	aggConfig Config,
 	outputConfig outputs.Config,
@@ -93,12 +93,12 @@ func NewBuffered(
 		flushInterval = time.Millisecond * 250
 	}
 	agg := &BufferedAggregator{
-		kevtsc:  evts,
-		kevts:   make([]*kevent.Kevent, 0),
+		evtsc:   evts,
+		evts:    make([]*event.Event, 0),
 		errsc:   errs,
 		stop:    make(chan struct{}, 1),
 		flusher: time.NewTicker(flushInterval),
-		wq:      make(chan *kevent.Batch),
+		wq:      make(chan *event.Batch),
 		c:       aggConfig,
 	}
 
@@ -127,7 +127,7 @@ func (agg *BufferedAggregator) Stop() error {
 	agg.stop <- struct{}{}
 
 	// flush enqueued events
-	b := kevent.NewBatch(agg.kevts...)
+	b := event.NewBatch(agg.evts...)
 	if b.Len() > 0 {
 		done := make(chan struct{}, 1)
 		go func() {
@@ -163,10 +163,10 @@ func (agg *BufferedAggregator) run() {
 			agg.flusher.Stop()
 			return
 		case <-agg.flusher.C:
-			if len(agg.kevts) == 0 {
+			if len(agg.evts) == 0 {
 				continue
 			}
-			b := kevent.NewBatch(agg.kevts...)
+			b := event.NewBatch(agg.evts...)
 			l := b.Len()
 			batchEvents.Add(l)
 			// push the batch to the work queue
@@ -175,8 +175,8 @@ func (agg *BufferedAggregator) run() {
 			}
 			flushesCount.Add(1)
 			// clear the queue
-			agg.kevts = nil
-		case evt := <-agg.kevtsc:
+			agg.evts = nil
+		case evt := <-agg.evtsc:
 			for _, transform := range agg.transforms {
 				err := transform.Transform(evt)
 				if err != nil {
@@ -184,10 +184,10 @@ func (agg *BufferedAggregator) run() {
 				}
 			}
 			// push the event to the queue
-			agg.kevts = append(agg.kevts, evt)
-			keventsDequeued.Add(1)
+			agg.evts = append(agg.evts, evt)
+			eventsDequeued.Add(1)
 		case err := <-agg.errsc:
-			keventErrors.Add(1)
+			eventsErrors.Add(1)
 			log.Errorf("event processing failure: %v", err)
 		}
 	}

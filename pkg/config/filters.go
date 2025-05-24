@@ -22,8 +22,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/Masterminds/sprig/v3"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/util/convert"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	log "github.com/sirupsen/logrus"
@@ -161,7 +160,7 @@ type ActionContext struct {
 	// Events contains a single element simple rules
 	// or a list of ordered matched events for sequence
 	// policies
-	Events []*kevent.Kevent
+	Events []*event.Event
 	// Filter represents the filter that matched the event
 	Filter *FilterConfig
 }
@@ -173,7 +172,7 @@ func (ctx *ActionContext) UniquePids() []uint32 {
 	pids := make(map[uint32]struct{})
 	for _, e := range ctx.Events {
 		if e.IsCreateProcess() {
-			pids[e.Kparams.MustGetPid()] = struct{}{}
+			pids[e.Params.MustGetPid()] = struct{}{}
 		} else {
 			pids[e.PID] = struct{}{}
 		}
@@ -199,13 +198,13 @@ type RulesCompileResult struct {
 	HasDNSEvents        bool
 	HasAuditAPIEvents   bool
 	HasThreadpoolEvents bool
-	UsedEvents          []ktypes.Ktype
+	UsedEvents          []event.Type
 	NumberRules         int
 }
 
-func (r RulesCompileResult) ContainsEvent(ktype ktypes.Ktype) bool {
+func (r RulesCompileResult) ContainsEvent(Type event.Type) bool {
 	for _, ktyp := range r.UsedEvents {
-		if ktyp == ktype {
+		if ktyp == Type {
 			return true
 		}
 	}

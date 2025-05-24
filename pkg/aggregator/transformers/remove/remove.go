@@ -21,12 +21,12 @@ package remove
 import (
 	"expvar"
 	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/event"
 )
 
 var removedCount = expvar.NewInt("transformers.removed.params")
 
-// remove transformer deletes kparams that are given in the list.
+// remove transformer deletes params that are given in the list.
 type remove struct {
 	c Config
 }
@@ -43,9 +43,9 @@ func initRemoveTransformer(config transformers.Config) (transformers.Transformer
 	return &remove{c: cfg}, nil
 }
 
-func (r remove) Transform(kevt *kevent.Kevent) error {
-	for _, kpar := range r.c.Kparams {
-		delete(kevt.Kparams, kpar)
+func (r remove) Transform(evt *event.Event) error {
+	for _, par := range r.c.Params {
+		delete(evt.Params, par)
 		removedCount.Add(1)
 	}
 	return nil

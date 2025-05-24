@@ -32,8 +32,8 @@ type Rename struct {
 
 // Config stores the configuration of the rename transformer.
 type Config struct {
-	// Kparams is the list of parameters that will be renamed.
-	Kparams []Rename
+	// Params is the list of parameters that will be renamed.
+	Params []Rename
 	// Enabled indicates whether this transformer is enabled.
 	Enabled bool
 }

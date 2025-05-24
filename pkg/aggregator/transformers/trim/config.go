@@ -26,15 +26,15 @@ const (
 
 // Trim defines the trim configuration for a single event parameter.
 type Trim struct {
-	Name string `mapstructure:"kparam"`
+	Name string `mapstructure:"Param"`
 	Trim string `mapstructure:"trim"`
 }
 
 // Config stores the configuration for the trim transformer.
 type Config struct {
-	// Prefixes contains the mapping between distinct kparam names and the prefixes that will get trimmed from their values.
+	// Prefixes contains the mapping between distinct Param names and the prefixes that will get trimmed from their values.
 	Prefixes []Trim `mapstructure:"prefixes"`
-	// Suffixes contains the mapping between distinct kparam names and the suffixes that will get trimmed from their values.
+	// Suffixes contains the mapping between distinct Param names and the suffixes that will get trimmed from their values.
 	Suffixes []Trim `mapstructure:"suffixes"`
 	// Enabled determines whether trim transformer is enabled or disabled.
 	Enabled bool `mapstructure:"enabled"`

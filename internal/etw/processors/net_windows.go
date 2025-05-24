@@ -19,9 +19,8 @@
 package processors
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/network"
 	"github.com/rabbitstack/fibratus/pkg/util/ports"
 )
@@ -38,13 +37,13 @@ func (netProcessor) Name() ProcessorType { return Net }
 
 func (n netProcessor) Close() {}
 
-func (n *netProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error) {
-	if e.Category == ktypes.Net {
+func (n *netProcessor) ProcessEvent(e *event.Event) (*event.Event, bool, error) {
+	if e.Category == event.Net {
 		if e.IsNetworkTCP() && !e.IsDNS() {
-			e.AppendEnum(kparams.NetL4Proto, uint32(network.TCP), network.ProtoNames)
+			e.AppendEnum(params.NetL4Proto, uint32(network.TCP), network.ProtoNames)
 		}
 		if e.IsNetworkUDP() && !e.IsDNS() {
-			e.AppendEnum(kparams.NetL4Proto, uint32(network.UDP), network.ProtoNames)
+			e.AppendEnum(params.NetL4Proto, uint32(network.UDP), network.ProtoNames)
 		}
 
 		if e.IsDNS() {
@@ -60,25 +59,25 @@ func (n *netProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, err
 
 // resolvePortName resolves the IANA service name for the particular port and transport protocol as
 // per https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.xhtml.
-func (n netProcessor) resolvePortName(e *kevent.Kevent) *kevent.Kevent {
-	dport := e.Kparams.TryGetUint16(kparams.NetDport)
-	sport := e.Kparams.TryGetUint16(kparams.NetSport)
+func (n netProcessor) resolvePortName(e *event.Event) *event.Event {
+	dport := e.Params.TryGetUint16(params.NetDport)
+	sport := e.Params.TryGetUint16(params.NetSport)
 
 	if e.IsNetworkTCP() {
 		if name, ok := ports.TCPPortNames[dport]; ok {
-			e.Kparams.Append(kparams.NetDportName, kparams.AnsiString, name)
+			e.Params.Append(params.NetDportName, params.AnsiString, name)
 		}
 		if name, ok := ports.TCPPortNames[sport]; ok {
-			e.Kparams.Append(kparams.NetSportName, kparams.AnsiString, name)
+			e.Params.Append(params.NetSportName, params.AnsiString, name)
 		}
 		return e
 	}
 
 	if name, ok := ports.UDPPortNames[dport]; ok {
-		e.Kparams.Append(kparams.NetDportName, kparams.AnsiString, name)
+		e.Params.Append(params.NetDportName, params.AnsiString, name)
 	}
 	if name, ok := ports.UDPPortNames[sport]; ok {
-		e.Kparams.Append(kparams.NetSportName, kparams.AnsiString, name)
+		e.Params.Append(params.NetSportName, params.AnsiString, name)
 	}
 	return e
 }

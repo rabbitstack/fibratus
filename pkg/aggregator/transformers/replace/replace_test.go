@@ -20,31 +20,30 @@ package replace
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
 
 func TestTransform(t *testing.T) {
-	kevt := &kevent.Kevent{
-		Type: ktypes.RegCreateKey,
+	evt := &event.Event{
+		Type: event.RegCreateKey,
 		Tid:  2484,
 		PID:  859,
-		Kparams: kevent.Kparams{
-			kparams.RegPath:      {Name: kparams.RegPath, Type: kparams.UnicodeString, Value: `HKEY_LOCAL_MACHINE\SYSTEM\Setup\Pid`},
-			kparams.RegKeyHandle: {Name: kparams.RegKeyHandle, Type: kparams.Address, Value: uint64(18446666033449935464)},
+		Params: event.Params{
+			params.RegPath:      {Name: params.RegPath, Type: params.UnicodeString, Value: `HKEY_LOCAL_MACHINE\SYSTEM\Setup\Pid`},
+			params.RegKeyHandle: {Name: params.RegKeyHandle, Type: params.Address, Value: uint64(18446666033449935464)},
 		},
 	}
 
-	transf, err := transformers.Load(transformers.Config{Type: transformers.Replace, Transformer: Config{Replacements: []Replacement{{Kpar: "key_path", Old: "HKEY_LOCAL_MACHINE", New: "HKLM"}}}})
+	transf, err := transformers.Load(transformers.Config{Type: transformers.Replace, Transformer: Config{Replacements: []Replacement{{Param: "key_path", Old: "HKEY_LOCAL_MACHINE", New: "HKLM"}}}})
 	require.NoError(t, err)
 
-	require.NoError(t, transf.Transform(kevt))
+	require.NoError(t, transf.Transform(evt))
 
-	keyName, _ := kevt.Kparams.GetString(kparams.RegPath)
+	keyName, _ := evt.Params.GetString(params.RegPath)
 
 	assert.Equal(t, `HKLM\SYSTEM\Setup\Pid`, keyName)
 }

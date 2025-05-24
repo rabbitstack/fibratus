@@ -29,6 +29,6 @@ def on_init():
     sort_by("1")
 
 
-def on_next_kevent(kevent):
+def on_next_kevent(Event):
     pass
 

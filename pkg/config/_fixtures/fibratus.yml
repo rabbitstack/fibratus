@@ -119,9 +119,9 @@ handle:
 kcap:
   file: ""
 
-# =============================== Kevent ===============================================
+# =============================== Event ===============================================
 
-kevent:
+Event:
   serialize-threads: false
   serialize-images: false
   serialize-handles: false
@@ -197,11 +197,11 @@ pe:
 transformers:
   remove:
     enabled: true
-    kparams:
+    params:
       - disposition
   rename:
     enabled: true
-    kparams:
+    params:
       - old: "a"
         new: "b"
       - old: "c"
@@ -209,7 +209,7 @@ transformers:
   replace:
     enabled: false
     replacements:
-      - kparam: key_name
+      - Param: key_name
         old: HKEY_CURRENT_USER
         new: HCU
   tags:
@@ -220,10 +220,10 @@ transformers:
   trim:
     enabled: false
     prefixes:
-      - kparam: key_name
+      - Param: key_name
         trim: CurrentControlSet
     suffixes:
-      - kparam: file_name
+      - Param: file_name
         trim: .exe
 
 # =============================== YARA =================================================

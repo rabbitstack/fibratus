@@ -30,11 +30,10 @@ import (
 	"time"
 
 	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	log "github.com/sirupsen/logrus"
@@ -88,8 +87,8 @@ func NewSnapshotter(hsnap handle.Snapshotter, config *config.Config) Snapshotter
 	return s
 }
 
-// NewSnapshotterFromKcap restores the snapshotter state from the kcap file.
-func NewSnapshotterFromKcap(hsnap handle.Snapshotter, config *config.Config) Snapshotter {
+// NewSnapshotterFromCapture restores the snapshotter state from the cap file.
+func NewSnapshotterFromCapture(hsnap handle.Snapshotter, config *config.Config) Snapshotter {
 	s := &snapshotter{
 		procs:   make(map[uint32]*pstypes.PS),
 		dirty:   make(map[uint32]*pstypes.PS),
@@ -105,20 +104,20 @@ func NewSnapshotterFromKcap(hsnap handle.Snapshotter, config *config.Config) Sna
 	return s
 }
 
-func (s *snapshotter) WriteFromKcap(e *kevent.Kevent) error {
+func (s *snapshotter) WriteFromCapture(e *event.Event) error {
 	switch e.Type {
-	case ktypes.CreateProcess, ktypes.ProcessRundown:
+	case event.CreateProcess, event.ProcessRundown:
 		s.mu.Lock()
 		defer s.mu.Unlock()
 		proc := e.PS
 		if proc == nil {
 			return nil
 		}
-		pid, err := e.Kparams.GetPid()
+		pid, err := e.Params.GetPid()
 		if err != nil {
 			return err
 		}
-		ppid, err := e.Kparams.GetPpid()
+		ppid, err := e.Params.GetPpid()
 		if err != nil {
 			return err
 		}
@@ -135,23 +134,23 @@ func (s *snapshotter) WriteFromKcap(e *kevent.Kevent) error {
 			}
 		}
 		s.procs[pid] = proc
-	case ktypes.CreateThread, ktypes.ThreadRundown:
+	case event.CreateThread, event.ThreadRundown:
 		return s.AddThread(e)
-	case ktypes.LoadImage, ktypes.ImageRundown:
+	case event.LoadImage, event.ImageRundown:
 		return s.AddModule(e)
 	}
 	return nil
 }
 
-func (s *snapshotter) Write(e *kevent.Kevent) error {
+func (s *snapshotter) Write(e *event.Event) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	processCount.Add(1)
-	pid, err := e.Kparams.GetPid()
+	pid, err := e.Params.GetPid()
 	if err != nil {
 		return err
 	}
-	ppid, err := e.Kparams.GetPpid()
+	ppid, err := e.Params.GetPpid()
 	if err != nil {
 		return err
 	}
@@ -172,8 +171,8 @@ func (s *snapshotter) Write(e *kevent.Kevent) error {
 	return err
 }
 
-func (s *snapshotter) AddThread(e *kevent.Kevent) error {
-	pid, err := e.Kparams.GetPid()
+func (s *snapshotter) AddThread(e *event.Event) error {
+	pid, err := e.Params.GetPid()
 	if err != nil {
 		return err
 	}
@@ -187,23 +186,23 @@ func (s *snapshotter) AddThread(e *kevent.Kevent) error {
 	}
 
 	thread := pstypes.Thread{}
-	thread.Tid, _ = e.Kparams.GetTid()
-	thread.UstackBase = e.Kparams.TryGetAddress(kparams.UstackBase)
-	thread.UstackLimit = e.Kparams.TryGetAddress(kparams.UstackLimit)
-	thread.KstackBase = e.Kparams.TryGetAddress(kparams.KstackBase)
-	thread.KstackLimit = e.Kparams.TryGetAddress(kparams.KstackLimit)
-	thread.IOPrio, _ = e.Kparams.GetUint8(kparams.IOPrio)
-	thread.BasePrio, _ = e.Kparams.GetUint8(kparams.BasePrio)
-	thread.PagePrio, _ = e.Kparams.GetUint8(kparams.PagePrio)
-	thread.StartAddress = e.Kparams.TryGetAddress(kparams.StartAddress)
+	thread.Tid, _ = e.Params.GetTid()
+	thread.UstackBase = e.Params.TryGetAddress(params.UstackBase)
+	thread.UstackLimit = e.Params.TryGetAddress(params.UstackLimit)
+	thread.KstackBase = e.Params.TryGetAddress(params.KstackBase)
+	thread.KstackLimit = e.Params.TryGetAddress(params.KstackLimit)
+	thread.IOPrio, _ = e.Params.GetUint8(params.IOPrio)
+	thread.BasePrio, _ = e.Params.GetUint8(params.BasePrio)
+	thread.PagePrio, _ = e.Params.GetUint8(params.PagePrio)
+	thread.StartAddress = e.Params.TryGetAddress(params.StartAddress)
 
 	proc.AddThread(thread)
 
 	return nil
 }
 
-func (s *snapshotter) AddModule(e *kevent.Kevent) error {
-	pid, err := e.Kparams.GetPid()
+func (s *snapshotter) AddModule(e *event.Event) error {
+	pid, err := e.Params.GetPid()
 	if err != nil {
 		return err
 	}
@@ -221,13 +220,13 @@ func (s *snapshotter) AddModule(e *kevent.Kevent) error {
 	}
 
 	module := pstypes.Module{}
-	module.Size, _ = e.Kparams.GetUint64(kparams.ImageSize)
-	module.Checksum, _ = e.Kparams.GetUint32(kparams.ImageCheckSum)
-	module.Name = e.GetParamAsString(kparams.ImagePath)
-	module.BaseAddress = e.Kparams.TryGetAddress(kparams.ImageBase)
-	module.DefaultBaseAddress = e.Kparams.TryGetAddress(kparams.ImageDefaultBase)
-	module.SignatureLevel, _ = e.Kparams.GetUint32(kparams.ImageSignatureLevel)
-	module.SignatureType, _ = e.Kparams.GetUint32(kparams.ImageSignatureType)
+	module.Size, _ = e.Params.GetUint64(params.ImageSize)
+	module.Checksum, _ = e.Params.GetUint32(params.ImageCheckSum)
+	module.Name = e.GetParamAsString(params.ImagePath)
+	module.BaseAddress = e.Params.TryGetAddress(params.ImageBase)
+	module.DefaultBaseAddress = e.Params.TryGetAddress(params.ImageDefaultBase)
+	module.SignatureLevel, _ = e.Params.GetUint32(params.ImageSignatureLevel)
+	module.SignatureType, _ = e.Params.GetUint32(params.ImageSignatureType)
 
 	if strings.EqualFold(proc.Name, filepath.Base(module.Name)) && len(proc.Exe) < len(module.Name) {
 		// if the module is loaded for the process executable, and
@@ -278,7 +277,7 @@ func (s *snapshotter) FindModule(addr va.Address) (bool, *pstypes.Module) {
 	return false, nil
 }
 
-func (s *snapshotter) AddMmap(e *kevent.Kevent) error {
+func (s *snapshotter) AddMmap(e *event.Event) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	proc, ok := s.procs[e.PID]
@@ -289,11 +288,11 @@ func (s *snapshotter) AddMmap(e *kevent.Kevent) error {
 	mmapCount.Add(1)
 
 	mmap := pstypes.Mmap{}
-	mmap.File = e.GetParamAsString(kparams.FilePath)
-	mmap.BaseAddress = e.Kparams.TryGetAddress(kparams.FileViewBase)
-	mmap.Size, _ = e.Kparams.GetUint64(kparams.FileViewSize)
-	mmap.Protection, _ = e.Kparams.GetUint32(kparams.MemProtect)
-	mmap.Type = e.GetParamAsString(kparams.FileViewSectionType)
+	mmap.File = e.GetParamAsString(params.FilePath)
+	mmap.BaseAddress = e.Params.TryGetAddress(params.FileViewBase)
+	mmap.Size, _ = e.Params.GetUint64(params.FileViewSize)
+	mmap.Protection, _ = e.Params.GetUint32(params.MemProtect)
+	mmap.Type = e.GetParamAsString(params.FileViewSectionType)
 
 	proc.AddMmap(mmap)
 
@@ -317,29 +316,29 @@ func (s *snapshotter) Close() error {
 	return nil
 }
 
-func (s *snapshotter) newProcState(pid, ppid uint32, e *kevent.Kevent) (*pstypes.PS, error) {
+func (s *snapshotter) newProcState(pid, ppid uint32, e *event.Event) (*pstypes.PS, error) {
 	proc := pstypes.New(
 		pid,
 		ppid,
-		e.GetParamAsString(kparams.ProcessName),
-		e.GetParamAsString(kparams.Cmdline),
-		e.GetParamAsString(kparams.Exe),
-		e.Kparams.MustGetSID(),
-		e.Kparams.MustGetUint32(kparams.SessionID),
+		e.GetParamAsString(params.ProcessName),
+		e.GetParamAsString(params.Cmdline),
+		e.GetParamAsString(params.Exe),
+		e.Params.MustGetSID(),
+		e.Params.MustGetUint32(params.SessionID),
 	)
 
 	proc.Parent = s.procs[ppid]
-	proc.StartTime, _ = e.Kparams.GetTime(kparams.StartTime)
-	proc.IsWOW64 = (e.Kparams.MustGetUint32(kparams.ProcessFlags) & kevent.PsWOW64) != 0
-	proc.IsPackaged = (e.Kparams.MustGetUint32(kparams.ProcessFlags) & kevent.PsPackaged) != 0
-	proc.IsProtected = (e.Kparams.MustGetUint32(kparams.ProcessFlags) & kevent.PsProtected) != 0
+	proc.StartTime, _ = e.Params.GetTime(params.StartTime)
+	proc.IsWOW64 = (e.Params.MustGetUint32(params.ProcessFlags) & event.PsWOW64) != 0
+	proc.IsPackaged = (e.Params.MustGetUint32(params.ProcessFlags) & event.PsPackaged) != 0
+	proc.IsProtected = (e.Params.MustGetUint32(params.ProcessFlags) & event.PsProtected) != 0
 
 	if !s.capture {
 		if proc.Username != "" {
-			e.AppendParam(kparams.Username, kparams.UnicodeString, proc.Username)
+			e.AppendParam(params.Username, params.UnicodeString, proc.Username)
 		}
 		if proc.Domain != "" {
-			e.AppendParam(kparams.Domain, kparams.UnicodeString, proc.Domain)
+			e.AppendParam(params.Domain, params.UnicodeString, proc.Domain)
 		}
 		// retrieve process handles
 		var err error
@@ -352,8 +351,8 @@ func (s *snapshotter) newProcState(pid, ppid uint32, e *kevent.Kevent) (*pstypes
 	// return early if we're reading from the capture file
 	if s.capture {
 		// reset username/domain from captured event parameters
-		proc.Domain = e.GetParamAsString(kparams.Domain)
-		proc.Username = e.GetParamAsString(kparams.Username)
+		proc.Domain = e.GetParamAsString(params.Domain)
+		proc.Username = e.GetParamAsString(params.Username)
 		return proc, nil
 	}
 
@@ -387,10 +386,10 @@ func (s *snapshotter) newProcState(pid, ppid uint32, e *kevent.Kevent) (*pstypes
 	return proc, nil
 }
 
-func (s *snapshotter) Remove(e *kevent.Kevent) error {
+func (s *snapshotter) Remove(e *event.Event) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	pid, err := e.Kparams.GetPid()
+	pid, err := e.Params.GetPid()
 	if err != nil {
 		return err
 	}

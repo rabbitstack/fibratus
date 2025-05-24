@@ -22,9 +22,8 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/mitchellh/mapstructure"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/util/wildcard"
 	ytypes "github.com/rabbitstack/fibratus/pkg/yara/types"
 	"github.com/spf13/pflag"
@@ -164,8 +163,8 @@ func (c Config) ShouldSkipFile(file string) bool {
 // AlertTitle returns the brief alert title depending on
 // whether the process scan took place or a file/registry
 // key was scanned.
-func (c Config) AlertTitle(e *kevent.Kevent) string {
-	if (e.Category == ktypes.File && e.GetParamAsString(kparams.FilePath) != "") || e.Category == ktypes.Registry {
+func (c Config) AlertTitle(e *event.Event) string {
+	if (e.Category == event.File && e.GetParamAsString(params.FilePath) != "") || e.Category == event.Registry {
 		return FileThreatAlertTitle
 	}
 	return MemoryThreatAlertTitle
@@ -174,7 +173,7 @@ func (c Config) AlertTitle(e *kevent.Kevent) string {
 // AlertText returns the short alert text if the Go template is
 // not specified. On the contrary, the provided Go template is
 // parsed and executing yielding the alert text.
-func (c Config) AlertText(e *kevent.Kevent, match ytypes.MatchRule) (string, error) {
+func (c Config) AlertText(e *event.Event, match ytypes.MatchRule) (string, error) {
 	if c.AlertTemplate == "" {
 		threat := match.ThreatName()
 		if threat == "" {
@@ -186,7 +185,7 @@ func (c Config) AlertText(e *kevent.Kevent, match ytypes.MatchRule) (string, err
 	var writer bytes.Buffer
 	var data = struct {
 		Match ytypes.MatchRule
-		Event *kevent.Kevent
+		Event *event.Event
 	}{
 		match,
 		e,

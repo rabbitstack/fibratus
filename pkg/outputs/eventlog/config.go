@@ -19,7 +19,7 @@
 package eventlog
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"text/template"
 
 	"github.com/spf13/pflag"
@@ -47,7 +47,7 @@ type Config struct {
 func (c Config) parseTemplate() (*template.Template, error) {
 	if c.Template == "" {
 		// use built-in template
-		return template.New("evtlog").Parse(kevent.Template)
+		return template.New("evtlog").Parse(event.Template)
 	}
 	return template.New("evtlog").Parse(c.Template)
 }

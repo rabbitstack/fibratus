@@ -20,10 +20,9 @@ package symbolize
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/fs"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
@@ -142,23 +141,23 @@ func TestProcessCallstackPeExports(t *testing.T) {
 		},
 	}
 
-	e := &kevent.Kevent{
-		Type:        ktypes.CreateFile,
+	e := &event.Event{
+		Type:        event.CreateFile,
 		Tid:         2484,
 		PID:         uint32(os.Getpid()),
 		CPU:         1,
 		Seq:         2,
 		Name:        "CreateFile",
 		Timestamp:   time.Now(),
-		Category:    ktypes.File,
+		Category:    event.File,
 		Host:        "archrabbit",
 		Description: "Creates or opens a new file, directory, I/O device, pipe, console",
-		Kparams: kevent.Kparams{
-			kparams.FileObject:    {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(12456738026482168384)},
-			kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\mimi.dll"},
-			kparams.FileType:      {Name: kparams.FileType, Type: kparams.AnsiString, Value: "file"},
-			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: uint32(2), Enum: fs.FileCreateDispositions},
-			kparams.Callstack:     {Name: kparams.Callstack, Type: kparams.Slice, Value: []va.Address{0x7ffb5c1d0396, 0x7ffb5d8e61f4, 0x7ffb3138592e, 0x7ffb313853b2, 0x2638e59e0a5}},
+		Params: event.Params{
+			params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
+			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\mimi.dll"},
+			params.FileType:      {Name: params.FileType, Type: params.AnsiString, Value: "file"},
+			params.FileOperation: {Name: params.FileOperation, Type: params.Enum, Value: uint32(2), Enum: fs.FileCreateDispositions},
+			params.Callstack:     {Name: params.Callstack, Type: params.Slice, Value: []va.Address{0x7ffb5c1d0396, 0x7ffb5d8e61f4, 0x7ffb3138592e, 0x7ffb313853b2, 0x2638e59e0a5}},
 		},
 		PS: proc,
 	}
@@ -202,18 +201,18 @@ func TestProcessCallstackPeExports(t *testing.T) {
 	// and when the image is unloaded and there are
 	// no processes with the image section mapped
 	// inside their VAS, we can remove the module
-	e2 := &kevent.Kevent{
-		Type:      ktypes.LoadImage,
+	e2 := &event.Event{
+		Type:      event.LoadImage,
 		Tid:       2484,
 		PID:       uint32(12328),
 		CPU:       1,
 		Seq:       2,
 		Name:      "LoadImage",
 		Timestamp: time.Now(),
-		Category:  ktypes.Image,
-		Kparams: kevent.Kparams{
-			kparams.ImageBase: {Name: kparams.ImageBase, Type: kparams.Address, Value: uint64(0x12345f)},
-			kparams.FilePath:  {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\System32\\bcrypt32.dll"},
+		Category:  event.Image,
+		Params: event.Params{
+			params.ImageBase: {Name: params.ImageBase, Type: params.Address, Value: uint64(0x12345f)},
+			params.FilePath:  {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\System32\\bcrypt32.dll"},
 		},
 		PS: proc,
 	}
@@ -221,18 +220,18 @@ func TestProcessCallstackPeExports(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, s.mods, 4)
 
-	e3 := &kevent.Kevent{
-		Type:      ktypes.UnloadImage,
+	e3 := &event.Event{
+		Type:      event.UnloadImage,
 		Tid:       2484,
 		PID:       uint32(12328),
 		CPU:       1,
 		Seq:       2,
 		Name:      "UnloadImage",
 		Timestamp: time.Now(),
-		Category:  ktypes.Image,
-		Kparams: kevent.Kparams{
-			kparams.ImageBase: {Name: kparams.ImageBase, Type: kparams.Address, Value: uint64(0x12345f)},
-			kparams.FilePath:  {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("SystemRoot"), "System32", "bcrypt32.dll")},
+		Category:  event.Image,
+		Params: event.Params{
+			params.ImageBase: {Name: params.ImageBase, Type: params.Address, Value: uint64(0x12345f)},
+			params.FilePath:  {Name: params.FilePath, Type: params.UnicodeString, Value: filepath.Join(os.Getenv("SystemRoot"), "System32", "bcrypt32.dll")},
 		},
 		PS: proc,
 	}
@@ -280,18 +279,18 @@ func TestProcessCallstack(t *testing.T) {
 		},
 		Envs: map[string]string{"ProgramData": "C:\\ProgramData", "COMPUTRENAME": "archrabbit"},
 	}
-	e := &kevent.Kevent{
-		Type:      ktypes.CreateProcess,
+	e := &event.Event{
+		Type:      event.CreateProcess,
 		Tid:       2484,
 		PID:       uint32(os.Getpid()),
 		CPU:       1,
 		Seq:       2,
 		Name:      "CreatedProcess",
 		Timestamp: time.Now(),
-		Category:  ktypes.Process,
+		Category:  event.Process,
 		Host:      "archrabbit",
-		Kparams: kevent.Kparams{
-			kparams.Callstack: {Name: kparams.Callstack, Type: kparams.Slice, Value: []va.Address{0x7ffb5c1d0396, 0x7ffb5d8e61f4, 0x7ffb3138592e, 0x7ffb313853b2, 0x2638e59e0a5}},
+		Params: event.Params{
+			params.Callstack: {Name: params.Callstack, Type: params.Slice, Value: []va.Address{0x7ffb5c1d0396, 0x7ffb5d8e61f4, 0x7ffb3138592e, 0x7ffb313853b2, 0x2638e59e0a5}},
 		},
 		PS: proc,
 	}
@@ -301,18 +300,18 @@ func TestProcessCallstack(t *testing.T) {
 	assert.Equal(t, 1, s.procsSize())
 	assert.Equal(t, "0x7ffb5c1d0396 C:\\WINDOWS\\System32\\ntdll.dll!NtCreateProcessEx+0x3a2|0x7ffb5d8e61f4 C:\\WINDOWS\\System32\\ntdll.dll!NtCreateProcessEx+0x3a2|0x7ffb3138592e C:\\WINDOWS\\System32\\ntdll.dll!NtCreateProcess+0x3a2|0x7ffb313853b2 C:\\WINDOWS\\System32\\KERNELBASE.dll!CreateProcessW+0x66|0x2638e59e0a5 C:\\WINDOWS\\System32\\KERNEL32.DLL!CreateProcessW+0x54", e.Callstack.String())
 
-	e1 := &kevent.Kevent{
-		Type:      ktypes.TerminateProcess,
+	e1 := &event.Event{
+		Type:      event.TerminateProcess,
 		Tid:       2484,
 		PID:       12345,
 		CPU:       1,
 		Seq:       3,
 		Name:      "TerminateProcess",
 		Timestamp: time.Now(),
-		Category:  ktypes.Process,
+		Category:  event.Process,
 		Host:      "archrabbit",
-		Kparams: kevent.Kparams{
-			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(os.Getpid())},
+		Params: event.Params{
+			params.ProcessID: {Name: params.ProcessID, Type: params.PID, Value: uint32(os.Getpid())},
 		},
 		PS: proc,
 	}
@@ -379,20 +378,20 @@ func TestSymbolizeEventParamAddress(t *testing.T) {
 			{Name: "C:\\Windows\\System32\\user32.dll", Size: 212354, Checksum: 33123343, BaseAddress: va.Address(0x7ffb5d8e11c4), DefaultBaseAddress: va.Address(0x7ffb5d8e11c4)},
 		},
 	}
-	e := &kevent.Kevent{
-		Type:      ktypes.CreateThread,
+	e := &event.Event{
+		Type:      event.CreateThread,
 		Tid:       2484,
 		PID:       uint32(os.Getpid()),
 		CPU:       1,
 		Seq:       2,
 		Name:      "CreateThread",
 		Timestamp: time.Now(),
-		Category:  ktypes.Thread,
+		Category:  event.Thread,
 		Host:      "archrabbit",
-		Kparams: kevent.Kparams{
-			kparams.Callstack:    {Name: kparams.Callstack, Type: kparams.Slice, Value: []va.Address{0x7ffb5c1d0396, 0x7ffb5d8e61f4, 0x7ffb3138592e, 0x7ffb313853b2, 0x2638e59e0a5}},
-			kparams.StartAddress: {Name: kparams.StartAddress, Type: kparams.Address, Value: uint64(0x7ffb3138592e)},
-			kparams.ProcessID:    {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(os.Getpid())},
+		Params: event.Params{
+			params.Callstack:    {Name: params.Callstack, Type: params.Slice, Value: []va.Address{0x7ffb5c1d0396, 0x7ffb5d8e61f4, 0x7ffb3138592e, 0x7ffb313853b2, 0x2638e59e0a5}},
+			params.StartAddress: {Name: params.StartAddress, Type: params.Address, Value: uint64(0x7ffb3138592e)},
+			params.ProcessID:    {Name: params.ProcessID, Type: params.PID, Value: uint32(os.Getpid())},
 		},
 		PS: proc,
 	}
@@ -400,23 +399,23 @@ func TestSymbolizeEventParamAddress(t *testing.T) {
 	_, err := s.ProcessEvent(e)
 	require.NoError(t, err)
 
-	assert.Equal(t, "CreateProcessW", e.GetParamAsString(kparams.StartAddressSymbol))
-	assert.Equal(t, "C:\\Windows\\System32\\ntdll.dll", e.GetParamAsString(kparams.StartAddressModule))
+	assert.Equal(t, "CreateProcessW", e.GetParamAsString(params.StartAddressSymbol))
+	assert.Equal(t, "C:\\Windows\\System32\\ntdll.dll", e.GetParamAsString(params.StartAddressModule))
 
-	e1 := &kevent.Kevent{
-		Type:      ktypes.SubmitThreadpoolCallback,
+	e1 := &event.Event{
+		Type:      event.SubmitThreadpoolCallback,
 		Tid:       2484,
 		PID:       uint32(os.Getpid()),
 		CPU:       1,
 		Seq:       2,
 		Name:      "SubmitThreadpoolCallback",
 		Timestamp: time.Now(),
-		Category:  ktypes.Threadpool,
+		Category:  event.Threadpool,
 		Host:      "archrabbit",
-		Kparams: kevent.Kparams{
-			kparams.Callstack:          {Name: kparams.Callstack, Type: kparams.Slice, Value: []va.Address{0x7ffb5c1d0396}},
-			kparams.ThreadpoolCallback: {Name: kparams.ThreadpoolCallback, Type: kparams.Address, Value: uint64(0x7ffb3138592e)},
-			kparams.ThreadpoolContext:  {Name: kparams.ThreadpoolContext, Type: kparams.Address, Value: uint64(0)},
+		Params: event.Params{
+			params.Callstack:          {Name: params.Callstack, Type: params.Slice, Value: []va.Address{0x7ffb5c1d0396}},
+			params.ThreadpoolCallback: {Name: params.ThreadpoolCallback, Type: params.Address, Value: uint64(0x7ffb3138592e)},
+			params.ThreadpoolContext:  {Name: params.ThreadpoolContext, Type: params.Address, Value: uint64(0)},
 		},
 		PS: proc,
 	}
@@ -424,8 +423,8 @@ func TestSymbolizeEventParamAddress(t *testing.T) {
 	_, err = s.ProcessEvent(e1)
 	require.NoError(t, err)
 
-	assert.Equal(t, "CreateProcessW", e1.GetParamAsString(kparams.ThreadpoolCallbackSymbol))
-	assert.Equal(t, "C:\\Windows\\System32\\ntdll.dll", e1.GetParamAsString(kparams.ThreadpoolCallbackModule))
+	assert.Equal(t, "CreateProcessW", e1.GetParamAsString(params.ThreadpoolCallbackSymbol))
+	assert.Equal(t, "C:\\Windows\\System32\\ntdll.dll", e1.GetParamAsString(params.ThreadpoolCallbackModule))
 }
 
 func init() {
@@ -452,18 +451,18 @@ func TestProcessCallstackProcsTTL(t *testing.T) {
 
 	n := 10
 	for n > 0 {
-		e := &kevent.Kevent{
-			Type:      ktypes.CreateProcess,
+		e := &event.Event{
+			Type:      event.CreateProcess,
 			Tid:       2484,
 			PID:       uint32(os.Getpid()),
 			CPU:       1,
 			Seq:       2,
 			Name:      "CreatedProcess",
 			Timestamp: time.Now().Add(time.Millisecond * time.Duration(n)),
-			Category:  ktypes.Process,
+			Category:  event.Process,
 			Host:      "archrabbit",
-			Kparams: kevent.Kparams{
-				kparams.Callstack: {Name: kparams.Callstack, Type: kparams.Slice, Value: []va.Address{0x7ffb5c1d0396, 0x7ffb5d8e61f4, 0x7ffb3138592e, 0x7ffb313853b2, 0x2638e59e0a5}},
+			Params: event.Params{
+				params.Callstack: {Name: params.Callstack, Type: params.Slice, Value: []va.Address{0x7ffb5c1d0396, 0x7ffb5d8e61f4, 0x7ffb3138592e, 0x7ffb313853b2, 0x2638e59e0a5}},
 			},
 		}
 		_, _ = s.ProcessEvent(e)

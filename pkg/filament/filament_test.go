@@ -25,9 +25,8 @@ import (
 	"bufio"
 	"bytes"
 	"github.com/rabbitstack/fibratus/pkg/config"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"net"
@@ -65,26 +64,26 @@ func TestOnNextKevent(t *testing.T) {
 		filament.Close()
 	})
 
-	kevents := make(chan *kevent.Kevent, 100)
+	kevents := make(chan *event.Event, 100)
 	errs := make(chan error, 10)
 	for i := 1; i <= 100; i++ {
-		kevt := &kevent.Kevent{
-			Type:      ktypes.RegCreateKey,
+		evt := &event.Event{
+			Type:      event.RegCreateKey,
 			Tid:       2484,
 			PID:       859,
 			Name:      "RegCreateKey",
 			Host:      "archrabbit",
 			CPU:       uint8(i / 2),
-			Category:  ktypes.Registry,
+			Category:  event.Registry,
 			Seq:       uint64(i),
 			Timestamp: time.Now(),
-			Kparams: kevent.Kparams{
-				kparams.RegPath:      {Name: kparams.RegPath, Type: kparams.UnicodeString, Value: `HKEY_LOCAL_MACHINE\SYSTEM\Setup`},
-				kparams.RegKeyHandle: {Name: kparams.RegKeyHandle, Type: kparams.Address, Value: uint64(18446666033449935464)},
-				kparams.NetDIP:       {Name: kparams.NetDIP, Type: kparams.IPv4, Value: net.ParseIP("216.58.201.174")},
+			Params: event.Params{
+				params.RegPath:      {Name: params.RegPath, Type: params.UnicodeString, Value: `HKEY_LOCAL_MACHINE\SYSTEM\Setup`},
+				params.RegKeyHandle: {Name: params.RegKeyHandle, Type: params.Address, Value: uint64(18446666033449935464)},
+				params.NetDIP:       {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("216.58.201.174")},
 			},
 		}
-		kevents <- kevt
+		kevents <- evt
 	}
 	err = filament.Run(kevents, errs)
 	require.Nil(t, err)
@@ -105,18 +104,18 @@ func TestFilamentFilter(t *testing.T) {
 	require.NotNil(t, filament)
 	defer filament.Close()
 	require.NotNil(t, filament.Filter())
-	kpars := kevent.Kparams{
-		kparams.Cmdline:         {Name: kparams.Cmdline, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost.exe -k RPCSS"},
-		kparams.ProcessName:     {Name: kparams.ProcessName, Type: kparams.AnsiString, Value: "svchost.exe"},
-		kparams.ProcessID:       {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(1234)},
-		kparams.ProcessParentID: {Name: kparams.ProcessParentID, Type: kparams.Uint32, Value: uint32(345)},
+	kpars := event.Params{
+		params.Cmdline:         {Name: params.Cmdline, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\svchost.exe -k RPCSS"},
+		params.ProcessName:     {Name: params.ProcessName, Type: params.AnsiString, Value: "svchost.exe"},
+		params.ProcessID:       {Name: params.ProcessID, Type: params.Uint32, Value: uint32(1234)},
+		params.ProcessParentID: {Name: params.ProcessParentID, Type: params.Uint32, Value: uint32(345)},
 	}
 
-	kevt := &kevent.Kevent{
-		Type:    ktypes.CreateProcess,
-		Kparams: kpars,
-		Name:    "CreateProcess",
+	evt := &event.Event{
+		Type:   event.CreateProcess,
+		Params: kpars,
+		Name:   "CreateProcess",
 	}
 
-	require.True(t, filament.Filter().Run(kevt))
+	require.True(t, filament.Filter().Run(evt))
 }

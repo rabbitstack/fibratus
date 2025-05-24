@@ -22,7 +22,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/Masterminds/sprig/v3"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"io"
 	"log"
 	"math"
@@ -33,13 +33,13 @@ import (
 // Source contains the required data for producing the input for the message compiler.
 type Source struct {
 	Categories []string
-	Events     []ktypes.KeventInfo
+	Events     []event.Info
 	MaxEvents  uint16
 }
 
 func (s *Source) Generate(w io.Writer) error {
 	funcmap := sprig.TxtFuncMap()
-	funcmap["length"] = func(evts []ktypes.KeventInfo) int {
+	funcmap["length"] = func(evts []event.Info) int {
 		return len(evts)
 	}
 	funcmap["N"] = func(start, end int) (stream chan int) {
@@ -64,8 +64,8 @@ func main() {
 	var buf bytes.Buffer
 
 	src := &Source{
-		Categories: ktypes.Categories(),
-		Events:     ktypes.GetKtypesMetaIndexed(),
+		Categories: event.Categories(),
+		Events:     event.GetTypesMetaIndexed(),
 		MaxEvents:  math.MaxUint16,
 	}
 

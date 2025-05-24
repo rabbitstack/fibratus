@@ -20,8 +20,7 @@ package filter
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/callstack"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	ptypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -35,7 +34,7 @@ func TestNarrowAccessors(t *testing.T) {
 		expectedAccessors int
 	}{
 		{
-			New(`ps.name = 'cmd.exe' and kevt.name = 'CreateProcess' or kevt.name in ('TerminateProcess', 'CreateFile')`, cfg),
+			New(`ps.name = 'cmd.exe' and evt.name = 'CreateProcess' or evt.name in ('TerminateProcess', 'CreateFile')`, cfg),
 			2,
 		},
 		{
@@ -43,11 +42,11 @@ func TestNarrowAccessors(t *testing.T) {
 			1,
 		},
 		{
-			New(`handle.type = 'Section' and pe.nsections > 1 and kevt.name = 'CreateHandle'`, cfg),
+			New(`handle.type = 'Section' and pe.nsections > 1 and evt.name = 'CreateHandle'`, cfg),
 			3,
 		},
 		{
-			New(`sequence |kevt.name = 'CreateProcess'| as e1 |kevt.name = 'CreateFile' and file.name = $e1.ps.exe |`, cfg),
+			New(`sequence |evt.name = 'CreateProcess'| as e1 |evt.name = 'CreateFile' and file.name = $e1.ps.exe |`, cfg),
 			3,
 		},
 		{
@@ -78,72 +77,72 @@ func TestNarrowAccessors(t *testing.T) {
 func TestIsFieldAccessible(t *testing.T) {
 	var tests = []struct {
 		a            Accessor
-		e            *kevent.Kevent
+		e            *event.Event
 		isAccessible bool
 	}{
 		{
-			newKevtAccessor(),
-			&kevent.Kevent{Type: ktypes.QueryDNS, Category: ktypes.Net},
+			newEventAccessor(),
+			&event.Event{Type: event.QueryDNS, Category: event.Net},
 			true,
 		},
 		{
 			newPSAccessor(nil),
-			&kevent.Kevent{Type: ktypes.CreateProcess, Category: ktypes.Process},
+			&event.Event{Type: event.CreateProcess, Category: event.Process},
 			true,
 		},
 		{
 			newPSAccessor(nil),
-			&kevent.Kevent{PS: &ptypes.PS{}, Type: ktypes.CreateFile, Category: ktypes.File},
+			&event.Event{PS: &ptypes.PS{}, Type: event.CreateFile, Category: event.File},
 			true,
 		},
 		{
 			newPSAccessor(nil),
-			&kevent.Kevent{Type: ktypes.SetThreadContext, Category: ktypes.Thread},
+			&event.Event{Type: event.SetThreadContext, Category: event.Thread},
 			false,
 		},
 		{
 			newThreadAccessor(),
-			&kevent.Kevent{Type: ktypes.SetThreadContext, Category: ktypes.Thread},
+			&event.Event{Type: event.SetThreadContext, Category: event.Thread},
 			true,
 		},
 		{
 			newThreadAccessor(),
-			&kevent.Kevent{Type: ktypes.CreateProcess, Category: ktypes.Process, Callstack: []callstack.Frame{{Addr: 0x7ffb5c1d0396, Offset: 0x61, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"}}},
+			&event.Event{Type: event.CreateProcess, Category: event.Process, Callstack: []callstack.Frame{{Addr: 0x7ffb5c1d0396, Offset: 0x61, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"}}},
 			true,
 		},
 		{
 			newThreadAccessor(),
-			&kevent.Kevent{Type: ktypes.RegSetValue, Category: ktypes.Registry, Callstack: []callstack.Frame{{Addr: 0x7ffb5c1d0396, Offset: 0x61, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"}}},
+			&event.Event{Type: event.RegSetValue, Category: event.Registry, Callstack: []callstack.Frame{{Addr: 0x7ffb5c1d0396, Offset: 0x61, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"}}},
 			true,
 		},
 		{
 			newRegistryAccessor(),
-			&kevent.Kevent{Type: ktypes.RegSetValue, Category: ktypes.Registry, Callstack: []callstack.Frame{{Addr: 0x7ffb5c1d0396, Offset: 0x61, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"}}},
+			&event.Event{Type: event.RegSetValue, Category: event.Registry, Callstack: []callstack.Frame{{Addr: 0x7ffb5c1d0396, Offset: 0x61, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"}}},
 			true,
 		},
 		{
 			newNetworkAccessor(),
-			&kevent.Kevent{Type: ktypes.RegSetValue, Category: ktypes.Registry, Callstack: []callstack.Frame{{Addr: 0x7ffb5c1d0396, Offset: 0x61, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"}}},
+			&event.Event{Type: event.RegSetValue, Category: event.Registry, Callstack: []callstack.Frame{{Addr: 0x7ffb5c1d0396, Offset: 0x61, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"}}},
 			false,
 		},
 		{
 			newNetworkAccessor(),
-			&kevent.Kevent{Type: ktypes.ConnectTCPv6, Category: ktypes.Net},
+			&event.Event{Type: event.ConnectTCPv6, Category: event.Net},
 			true,
 		},
 		{
 			newDNSAccessor(),
-			&kevent.Kevent{Type: ktypes.ReplyDNS, Category: ktypes.Net},
+			&event.Event{Type: event.ReplyDNS, Category: event.Net},
 			true,
 		},
 		{
 			newImageAccessor(),
-			&kevent.Kevent{Type: ktypes.LoadImage, Category: ktypes.Image},
+			&event.Event{Type: event.LoadImage, Category: event.Image},
 			true,
 		},
 		{
 			newMemAccessor(),
-			&kevent.Kevent{Type: ktypes.VirtualAlloc, Category: ktypes.Mem},
+			&event.Event{Type: event.VirtualAlloc, Category: event.Mem},
 			true,
 		},
 	}

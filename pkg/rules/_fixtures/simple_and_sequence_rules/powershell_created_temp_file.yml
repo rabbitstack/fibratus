@@ -4,8 +4,8 @@ version: 1.0.0
 condition: >
   sequence
   maxspan 100ms
-  |kevt.name = 'CreateProcess' and ps.name = 'powershell.exe'| by ps.pid
-  |kevt.name = 'CreateFile'
+  |evt.name = 'CreateProcess' and ps.name = 'powershell.exe'| by ps.pid
+  |evt.name = 'CreateFile'
       and
    file.path icontains 'temp'
   | by ps.pid

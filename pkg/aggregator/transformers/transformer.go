@@ -20,7 +20,7 @@ package transformers
 
 import (
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/event"
 )
 
 var transformers = map[Type]Factory{}
@@ -34,11 +34,11 @@ type Type uint8
 const (
 	// Remove represents the remove transformer type. This transformer deletes the given list of parameters from the event.
 	Remove Type = iota
-	// Rename represents the rename transformer type. It renames a sequence of kparam from old to new names.
+	// Rename represents the rename transformer type. It renames a sequence of Param from old to new names.
 	Rename
-	// Replace represents the replace tranformer type. It applies string replacements on specific kparams.
+	// Replace represents the replace transformer type. It applies string replacements on specific params.
 	Replace
-	// Trim represents the trim transformer type that that removes suffix/prefix from string kparams.
+	// Trim represents the trim transformer type that that removes suffix/prefix from string params.
 	Trim
 	// Tags represents the tags transformer type. This transformer appends tags to the event's metadata.
 	Tags
@@ -95,5 +95,5 @@ func Load(config Config) (Transformer, error) {
 
 // Transformer is the minimal interface all transformers have to satisfy.
 type Transformer interface {
-	Transform(*kevent.Kevent) error
+	Transform(*event.Event) error
 }

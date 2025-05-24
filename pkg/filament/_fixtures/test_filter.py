@@ -23,5 +23,5 @@ kevents = []
 def on_init():
     kfilter('ps.name in (%s)' % ','.join(["'svchost.exe'", "'cmd.exe'", "'mimikatz.exe'"]))
 
-def on_next_kevent(kevent):
+def on_next_kevent(Event):
     pass

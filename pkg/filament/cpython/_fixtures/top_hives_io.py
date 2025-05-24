@@ -32,8 +32,8 @@ def on_init():
     #set_interval(1)
 
 
-def on_next_kevent(kevent):
-    print("KEVENT\n", kevent["kparams"])
+def on_next_kevent(Event):
+    print("Event\n", Event["params"])
     #raise Exception('eggs', 'eggs')
 
 def on_interval():

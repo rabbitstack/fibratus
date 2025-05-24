@@ -31,9 +31,9 @@ func TestIsField(t *testing.T) {
 		{"ps.pid", true},
 		{"ps.none", false},
 		{"ps.envs[ALLUSERSPROFILE]", false},
-		{"kevt.arg", true},
+		{"evt.arg", true},
 		{"thread._callstack", true},
-		{"kevt._callstack", false},
+		{"evt._callstack", false},
 	}
 
 	for _, tt := range tests {

@@ -22,11 +22,10 @@ import (
 	"github.com/rabbitstack/fibratus/internal/etw/processors"
 	"github.com/rabbitstack/fibratus/pkg/callstack"
 	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/fs"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
@@ -78,8 +77,8 @@ func TestFilterCompile(t *testing.T) {
 
 func TestSeqFilterCompile(t *testing.T) {
 	f := New(`sequence
-|kevt.name = 'CreateProcess'| by ps.exe
-|kevt.name = 'CreateFile' and file.operation = 'create'| by file.name
+|evt.name = 'CreateProcess'| by ps.exe
+|evt.name = 'CreateFile' and file.operation = 'create'| by file.name
 `, cfg)
 	require.NoError(t, f.Compile())
 	require.NotNil(t, f.GetSequence())
@@ -90,19 +89,19 @@ func TestSeqFilterCompile(t *testing.T) {
 
 func TestSeqFilterInvalidBoundRefs(t *testing.T) {
 	f := New(`sequence
-|kevt.name = 'CreateProcess'| as e1
-|kevt.name = 'CreateFile' and file.name = $e.ps.exe |
+|evt.name = 'CreateProcess'| as e1
+|evt.name = 'CreateFile' and file.name = $e.ps.exe |
 `, cfg)
 	require.Error(t, f.Compile())
 	f1 := New(`sequence
-|kevt.name = 'CreateProcess'| as e1
-|kevt.name = 'CreateFile' and file.name = $e1.ps.exe |
+|evt.name = 'CreateProcess'| as e1
+|evt.name = 'CreateFile' and file.name = $e1.ps.exe |
 `, cfg)
 	require.NoError(t, f1.Compile())
 }
 
 func TestStringFields(t *testing.T) {
-	f := New(`ps.name = 'cmd.exe' and kevt.name = 'CreateProcess' or kevt.name in ('TerminateProcess', 'CreateFile')`, cfg)
+	f := New(`ps.name = 'cmd.exe' and evt.name = 'CreateProcess' or evt.name in ('TerminateProcess', 'CreateFile')`, cfg)
 	require.NoError(t, f.Compile())
 	assert.Len(t, f.GetStringFields(), 2)
 	assert.Len(t, f.GetStringFields()[fields.KevtName], 3)
@@ -110,19 +109,19 @@ func TestStringFields(t *testing.T) {
 }
 
 func TestProcFilter(t *testing.T) {
-	kpars := kevent.Kparams{
-		kparams.Cmdline:         {Name: kparams.Cmdline, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost-fake.exe -k RPCSS"},
-		kparams.ProcessName:     {Name: kparams.ProcessName, Type: kparams.AnsiString, Value: "svchost-fake.exe"},
-		kparams.ProcessID:       {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1234)},
-		kparams.ProcessParentID: {Name: kparams.ProcessParentID, Type: kparams.PID, Value: uint32(345)},
-		kparams.UserSID:         {Name: kparams.UserSID, Type: kparams.WbemSID, Value: []byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0}},
-		kparams.Username:        {Name: kparams.Username, Type: kparams.UnicodeString, Value: "loki"},
-		kparams.Domain:          {Name: kparams.Domain, Type: kparams.UnicodeString, Value: "TITAN"},
-		kparams.ProcessFlags:    {Name: kparams.ProcessFlags, Type: kparams.Flags, Value: uint32(0x000000E)},
+	pars := event.Params{
+		params.Cmdline:         {Name: params.Cmdline, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\svchost-fake.exe -k RPCSS"},
+		params.ProcessName:     {Name: params.ProcessName, Type: params.AnsiString, Value: "svchost-fake.exe"},
+		params.ProcessID:       {Name: params.ProcessID, Type: params.PID, Value: uint32(1234)},
+		params.ProcessParentID: {Name: params.ProcessParentID, Type: params.PID, Value: uint32(345)},
+		params.UserSID:         {Name: params.UserSID, Type: params.WbemSID, Value: []byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0}},
+		params.Username:        {Name: params.Username, Type: params.UnicodeString, Value: "loki"},
+		params.Domain:          {Name: params.Domain, Type: params.UnicodeString, Value: "TITAN"},
+		params.ProcessFlags:    {Name: params.ProcessFlags, Type: params.Flags, Value: uint32(0x000000E)},
 	}
 
-	kpars1 := kevent.Kparams{
-		kparams.DesiredAccess: {Name: kparams.DesiredAccess, Type: kparams.Flags, Value: uint32(0x1400), Flags: kevent.PsAccessRightFlags},
+	pars1 := event.Params{
+		params.DesiredAccess: {Name: params.DesiredAccess, Type: params.Flags, Value: uint32(0x1400), Flags: event.PsAccessRightFlags},
 	}
 
 	ps1 := &pstypes.PS{
@@ -144,10 +143,10 @@ func TestProcFilter(t *testing.T) {
 		IsPackaged:  false,
 	}
 
-	kevt := &kevent.Kevent{
-		Type:     ktypes.CreateProcess,
-		Category: ktypes.Process,
-		Kparams:  kpars,
+	evt := &event.Event{
+		Type:     event.CreateProcess,
+		Category: event.Process,
+		Params:   pars,
 		Name:     "CreateProcess",
 		PID:      1023,
 		PS: &pstypes.PS{
@@ -177,12 +176,12 @@ func TestProcFilter(t *testing.T) {
 			IsWOW64:     false,
 		},
 	}
-	kevt.Timestamp, _ = time.Parse(time.RFC3339, "2011-05-03T15:04:05.323Z")
+	evt.Timestamp, _ = time.Parse(time.RFC3339, "2011-05-03T15:04:05.323Z")
 
-	kevt1 := &kevent.Kevent{
-		Type:     ktypes.OpenProcess,
-		Category: ktypes.Process,
-		Kparams:  kpars1,
+	evt1 := &event.Event{
+		Type:     event.OpenProcess,
+		Category: event.Process,
+		Params:   pars1,
 		Name:     "OpenProcess",
 		PID:      1023,
 		PS: &pstypes.PS{
@@ -241,10 +240,10 @@ func TestProcFilter(t *testing.T) {
 		{`ps.parent.is_wow64`, false},
 		{`ps.parent.is_packaged`, false},
 		{`ps.parent.is_protected`, true},
-		{`kevt.name = 'CreateProcess' and ps.name contains 'svchost'`, true},
+		{`evt.name = 'CreateProcess' and ps.name contains 'svchost'`, true},
 
 		{`ps.modules IN ('kernel32.dll')`, true},
-		{`kevt.name = 'CreateProcess' and kevt.pid != ps.ppid`, true},
+		{`evt.name = 'CreateProcess' and evt.pid != ps.ppid`, true},
 		{`ps.parent.name = 'wininit.exe'`, true},
 
 		{`ps.ancestor[0] = 'svchost.exe'`, false},
@@ -299,7 +298,7 @@ func TestProcFilter(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		matches := f.Run(kevt)
+		matches := f.Run(evt)
 		if matches != tt.matches {
 			t.Errorf("%d. %q ps filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
@@ -320,7 +319,7 @@ func TestProcFilter(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		matches := f.Run(kevt1)
+		matches := f.Run(evt1)
 		if matches != tt.matches {
 			t.Errorf("%d. %q ps filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
@@ -328,27 +327,27 @@ func TestProcFilter(t *testing.T) {
 }
 
 func TestThreadFilter(t *testing.T) {
-	kpars := kevent.Kparams{
-		kparams.ProcessID:          {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(os.Getpid())},
-		kparams.ThreadID:           {Name: kparams.ThreadID, Type: kparams.TID, Value: uint32(3453)},
-		kparams.BasePrio:           {Name: kparams.BasePrio, Type: kparams.Uint8, Value: uint8(13)},
-		kparams.StartAddress:       {Name: kparams.StartAddress, Type: kparams.Address, Value: uint64(140729524944768)},
-		kparams.TEB:                {Name: kparams.TEB, Type: kparams.Address, Value: uint64(614994620416)},
-		kparams.IOPrio:             {Name: kparams.IOPrio, Type: kparams.Uint8, Value: uint8(2)},
-		kparams.KstackBase:         {Name: kparams.KstackBase, Type: kparams.Address, Value: uint64(18446677035730165760)},
-		kparams.KstackLimit:        {Name: kparams.KstackLimit, Type: kparams.Address, Value: uint64(18446677035730137088)},
-		kparams.PagePrio:           {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(5)},
-		kparams.UstackBase:         {Name: kparams.UstackBase, Type: kparams.Address, Value: uint64(86376448)},
-		kparams.UstackLimit:        {Name: kparams.UstackLimit, Type: kparams.Address, Value: uint64(86372352)},
-		kparams.StartAddressSymbol: {Name: kparams.StartAddressSymbol, Type: kparams.UnicodeString, Value: "LoadImage"},
-		kparams.StartAddressModule: {Name: kparams.StartAddressModule, Type: kparams.UnicodeString, Value: "C:\\Windows\\System32\\kernel32.dll"},
+	pars := event.Params{
+		params.ProcessID:          {Name: params.ProcessID, Type: params.PID, Value: uint32(os.Getpid())},
+		params.ThreadID:           {Name: params.ThreadID, Type: params.TID, Value: uint32(3453)},
+		params.BasePrio:           {Name: params.BasePrio, Type: params.Uint8, Value: uint8(13)},
+		params.StartAddress:       {Name: params.StartAddress, Type: params.Address, Value: uint64(140729524944768)},
+		params.TEB:                {Name: params.TEB, Type: params.Address, Value: uint64(614994620416)},
+		params.IOPrio:             {Name: params.IOPrio, Type: params.Uint8, Value: uint8(2)},
+		params.KstackBase:         {Name: params.KstackBase, Type: params.Address, Value: uint64(18446677035730165760)},
+		params.KstackLimit:        {Name: params.KstackLimit, Type: params.Address, Value: uint64(18446677035730137088)},
+		params.PagePrio:           {Name: params.PagePrio, Type: params.Uint8, Value: uint8(5)},
+		params.UstackBase:         {Name: params.UstackBase, Type: params.Address, Value: uint64(86376448)},
+		params.UstackLimit:        {Name: params.UstackLimit, Type: params.Address, Value: uint64(86372352)},
+		params.StartAddressSymbol: {Name: params.StartAddressSymbol, Type: params.UnicodeString, Value: "LoadImage"},
+		params.StartAddressModule: {Name: params.StartAddressModule, Type: params.UnicodeString, Value: "C:\\Windows\\System32\\kernel32.dll"},
 	}
-	kevt := &kevent.Kevent{
-		Type:     ktypes.CreateThread,
-		Kparams:  kpars,
+	evt := &event.Event{
+		Type:     event.CreateThread,
+		Params:   pars,
 		Name:     "CreateThread",
 		PID:      windows.GetCurrentProcessId(),
-		Category: ktypes.Thread,
+		Category: event.Thread,
 		PS: &pstypes.PS{
 			Name: "svchost.exe",
 			Envs: map[string]string{"ALLUSERSPROFILE": "C:\\ProgramData", "OS": "Windows_NT", "ProgramFiles(x86)": "C:\\Program Files (x86)"},
@@ -379,15 +378,15 @@ func TestThreadFilter(t *testing.T) {
 	}
 	require.NoError(t, windows.WriteProcessMemory(windows.CurrentProcess(), base, &insns[0], uintptr(len(insns)), nil))
 
-	kevt.Callstack.Init(8)
-	kevt.Callstack.PushFrame(callstack.Frame{PID: kevt.PID, Addr: 0x2638e59e0a5, Offset: 0, Symbol: "?", Module: "unbacked"})
-	kevt.Callstack.PushFrame(callstack.Frame{PID: kevt.PID, Addr: va.Address(base), Offset: 0, Symbol: "?", Module: "unbacked"})
-	kevt.Callstack.PushFrame(callstack.Frame{PID: kevt.PID, Addr: 0x7ffb313853b2, Offset: 0x10a, Symbol: "Java_java_lang_ProcessImpl_create", Module: "C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll"})
-	kevt.Callstack.PushFrame(callstack.Frame{PID: kevt.PID, Addr: 0x7ffb3138592e, ModuleAddress: 0x7ffb3138592e, Offset: 0x3a2, Symbol: "Java_java_lang_ProcessImpl_waitForTimeoutInterruptibly", Module: "C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll"})
-	kevt.Callstack.PushFrame(callstack.Frame{PID: kevt.PID, Addr: 0x7ffb5d8e61f4, Offset: 0x54, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNEL32.DLL"})
-	kevt.Callstack.PushFrame(callstack.Frame{PID: kevt.PID, Addr: 0x7ffb5c1d0396, Offset: 0x66, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"})
-	kevt.Callstack.PushFrame(callstack.Frame{PID: kevt.PID, Addr: 0xfffff8072ebc1f6f, Offset: 0x4ef, Symbol: "FltRequestFileInfoOnCreateCompletion", Module: "C:\\WINDOWS\\System32\\drivers\\FLTMGR.SYS"})
-	kevt.Callstack.PushFrame(callstack.Frame{PID: kevt.PID, Addr: 0xfffff8072eb8961b, Offset: 0x20cb, Symbol: "FltGetStreamContext", Module: "C:\\WINDOWS\\System32\\drivers\\FLTMGR.SYS"})
+	evt.Callstack.Init(8)
+	evt.Callstack.PushFrame(callstack.Frame{PID: evt.PID, Addr: 0x2638e59e0a5, Offset: 0, Symbol: "?", Module: "unbacked"})
+	evt.Callstack.PushFrame(callstack.Frame{PID: evt.PID, Addr: va.Address(base), Offset: 0, Symbol: "?", Module: "unbacked"})
+	evt.Callstack.PushFrame(callstack.Frame{PID: evt.PID, Addr: 0x7ffb313853b2, Offset: 0x10a, Symbol: "Java_java_lang_ProcessImpl_create", Module: "C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll"})
+	evt.Callstack.PushFrame(callstack.Frame{PID: evt.PID, Addr: 0x7ffb3138592e, ModuleAddress: 0x7ffb3138592e, Offset: 0x3a2, Symbol: "Java_java_lang_ProcessImpl_waitForTimeoutInterruptibly", Module: "C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll"})
+	evt.Callstack.PushFrame(callstack.Frame{PID: evt.PID, Addr: 0x7ffb5d8e61f4, Offset: 0x54, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNEL32.DLL"})
+	evt.Callstack.PushFrame(callstack.Frame{PID: evt.PID, Addr: 0x7ffb5c1d0396, Offset: 0x66, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"})
+	evt.Callstack.PushFrame(callstack.Frame{PID: evt.PID, Addr: 0xfffff8072ebc1f6f, Offset: 0x4ef, Symbol: "FltRequestFileInfoOnCreateCompletion", Module: "C:\\WINDOWS\\System32\\drivers\\FLTMGR.SYS"})
+	evt.Callstack.PushFrame(callstack.Frame{PID: evt.PID, Addr: 0xfffff8072eb8961b, Offset: 0x20cb, Symbol: "FltGetStreamContext", Module: "C:\\WINDOWS\\System32\\drivers\\FLTMGR.SYS"})
 
 	var tests = []struct {
 		filter  string
@@ -452,7 +451,7 @@ func TestThreadFilter(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		matches := f.Run(kevt)
+		matches := f.Run(evt)
 		if matches != tt.matches {
 			t.Errorf("%d. %q thread filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
@@ -487,7 +486,7 @@ func TestThreadFilter(t *testing.T) {
 	}
 	defer windows.TerminateProcess(pi.Process, 0)
 
-	kevt.PID = pi.ProcessId
+	evt.PID = pi.ProcessId
 
 	// try until a valid address is returned
 	// or fail if max attempts are exhausted
@@ -507,7 +506,7 @@ func TestThreadFilter(t *testing.T) {
 	var n uintptr
 	require.NoError(t, windows.WriteProcessMemory(pi.Process, ntdll, &insns[0], uintptr(len(insns)), &n))
 
-	kevt.Callstack[0] = callstack.Frame{PID: kevt.PID, Addr: va.Address(ntdll), Offset: 0, Symbol: "?", Module: "C:\\Windows\\System32\\ntdll.dll"}
+	evt.Callstack[0] = callstack.Frame{PID: evt.PID, Addr: va.Address(ntdll), Offset: 0, Symbol: "?", Module: "C:\\Windows\\System32\\ntdll.dll"}
 
 	var tests1 = []struct {
 		filter  string
@@ -524,7 +523,7 @@ func TestThreadFilter(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		matches := f.Run(kevt)
+		matches := f.Run(evt)
 		if matches != tt.matches {
 			t.Errorf("%d. %q thread filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
@@ -532,23 +531,23 @@ func TestThreadFilter(t *testing.T) {
 }
 
 func TestFileFilter(t *testing.T) {
-	kevt := &kevent.Kevent{
-		Type:        ktypes.CreateFile,
+	evt := &event.Event{
+		Type:        event.CreateFile,
 		Tid:         2484,
 		PID:         859,
 		CPU:         1,
 		Seq:         2,
 		Name:        "CreateFile",
-		Category:    ktypes.File,
+		Category:    event.File,
 		Host:        "archrabbit",
 		Description: "Creates or opens a new file, directory, I/O device, pipe, console",
-		Kparams: kevent.Kparams{
-			kparams.FileObject:    {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(12456738026482168384)},
-			kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
-			kparams.FileType:      {Name: kparams.FileType, Type: kparams.AnsiString, Value: "file"},
-			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.AnsiString, Value: "open"},
+		Params: event.Params{
+			params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
+			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
+			params.FileType:      {Name: params.FileType, Type: params.AnsiString, Value: "file"},
+			params.FileOperation: {Name: params.FileOperation, Type: params.AnsiString, Value: "open"},
 		},
-		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
 	var tests = []struct {
@@ -600,7 +599,7 @@ func TestFileFilter(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		matches := f.Run(kevt)
+		matches := f.Run(evt)
 		if matches != tt.matches {
 			t.Errorf("%d. %q file filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
@@ -610,69 +609,69 @@ func TestFileFilter(t *testing.T) {
 func TestFileInfoFilter(t *testing.T) {
 	var tests = []struct {
 		f       string
-		e       *kevent.Kevent
+		e       *event.Event
 		matches bool
 	}{
 		{
 			`file.info_class = 'Allocation'`,
-			&kevent.Kevent{
-				Category: ktypes.File,
-				Type:     ktypes.SetFileInformation,
+			&event.Event{
+				Category: event.File,
+				Type:     event.SetFileInformation,
 				Name:     "SetFileInformation",
-				Kparams: kevent.Kparams{
-					kparams.FileInfoClass: {Name: kparams.FileInfoClass, Type: kparams.Enum, Value: fs.AllocationClass, Enum: fs.FileInfoClasses},
+				Params: event.Params{
+					params.FileInfoClass: {Name: params.FileInfoClass, Type: params.Enum, Value: fs.AllocationClass, Enum: fs.FileInfoClasses},
 				},
 			},
 			true,
 		},
 		{
 			`file.info.allocation_size = 64500`,
-			&kevent.Kevent{
-				Category: ktypes.File,
-				Type:     ktypes.SetFileInformation,
+			&event.Event{
+				Category: event.File,
+				Type:     event.SetFileInformation,
 				Name:     "SetFileInformation",
-				Kparams: kevent.Kparams{
-					kparams.FileInfoClass: {Name: kparams.FileInfoClass, Type: kparams.Enum, Value: fs.AllocationClass, Enum: fs.FileInfoClasses},
-					kparams.FileExtraInfo: {Name: kparams.FileExtraInfo, Type: kparams.Uint64, Value: uint64(64500)},
+				Params: event.Params{
+					params.FileInfoClass: {Name: params.FileInfoClass, Type: params.Enum, Value: fs.AllocationClass, Enum: fs.FileInfoClasses},
+					params.FileExtraInfo: {Name: params.FileExtraInfo, Type: params.Uint64, Value: uint64(64500)},
 				},
 			},
 			true,
 		},
 		{
 			`file.info.eof_size = 64500`,
-			&kevent.Kevent{
-				Category: ktypes.File,
-				Type:     ktypes.SetFileInformation,
+			&event.Event{
+				Category: event.File,
+				Type:     event.SetFileInformation,
 				Name:     "SetFileInformation",
-				Kparams: kevent.Kparams{
-					kparams.FileInfoClass: {Name: kparams.FileInfoClass, Type: kparams.Enum, Value: fs.EOFClass, Enum: fs.FileInfoClasses},
-					kparams.FileExtraInfo: {Name: kparams.FileExtraInfo, Type: kparams.Uint64, Value: uint64(64500)},
+				Params: event.Params{
+					params.FileInfoClass: {Name: params.FileInfoClass, Type: params.Enum, Value: fs.EOFClass, Enum: fs.FileInfoClasses},
+					params.FileExtraInfo: {Name: params.FileExtraInfo, Type: params.Uint64, Value: uint64(64500)},
 				},
 			},
 			true,
 		},
 		{
 			`file.info.eof_size = 64500`,
-			&kevent.Kevent{
-				Category: ktypes.File,
-				Type:     ktypes.SetFileInformation,
+			&event.Event{
+				Category: event.File,
+				Type:     event.SetFileInformation,
 				Name:     "SetFileInformation",
-				Kparams: kevent.Kparams{
-					kparams.FileInfoClass: {Name: kparams.FileInfoClass, Type: kparams.Enum, Value: fs.DispositionClass, Enum: fs.FileInfoClasses},
-					kparams.FileExtraInfo: {Name: kparams.FileExtraInfo, Type: kparams.Uint64, Value: uint64(1)},
+				Params: event.Params{
+					params.FileInfoClass: {Name: params.FileInfoClass, Type: params.Enum, Value: fs.DispositionClass, Enum: fs.FileInfoClasses},
+					params.FileExtraInfo: {Name: params.FileExtraInfo, Type: params.Uint64, Value: uint64(1)},
 				},
 			},
 			false,
 		},
 		{
 			`file.info.is_disposition_delete_file = true`,
-			&kevent.Kevent{
-				Category: ktypes.File,
-				Type:     ktypes.DeleteFile,
+			&event.Event{
+				Category: event.File,
+				Type:     event.DeleteFile,
 				Name:     "DeleteFile",
-				Kparams: kevent.Kparams{
-					kparams.FileInfoClass: {Name: kparams.FileInfoClass, Type: kparams.Enum, Value: fs.DispositionClass, Enum: fs.FileInfoClasses},
-					kparams.FileExtraInfo: {Name: kparams.FileExtraInfo, Type: kparams.Uint64, Value: uint64(1)},
+				Params: event.Params{
+					params.FileInfoClass: {Name: params.FileInfoClass, Type: params.Enum, Value: fs.DispositionClass, Enum: fs.FileInfoClasses},
+					params.FileExtraInfo: {Name: params.FileExtraInfo, Type: params.Uint64, Value: uint64(1)},
 				},
 			},
 			true,
@@ -692,63 +691,63 @@ func TestFileInfoFilter(t *testing.T) {
 }
 
 func TestKeventFilter(t *testing.T) {
-	kevt := &kevent.Kevent{
-		Type:        ktypes.CreateFile,
+	evt := &event.Event{
+		Type:        event.CreateFile,
 		Tid:         2484,
 		PID:         859,
 		CPU:         1,
 		Seq:         2,
 		Name:        "CreateFile",
-		Category:    ktypes.File,
+		Category:    event.File,
 		Host:        "archrabbit",
 		Description: "Creates or opens a new file, directory, I/O device, pipe, console",
-		Kparams: kevent.Kparams{
-			kparams.ProcessID:     {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(3434)},
-			kparams.FileObject:    {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(12456738026482168384)},
-			kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
-			kparams.FileType:      {Name: kparams.FileType, Type: kparams.AnsiString, Value: "file"},
-			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.AnsiString, Value: "open"},
+		Params: event.Params{
+			params.ProcessID:     {Name: params.ProcessID, Type: params.PID, Value: uint32(3434)},
+			params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
+			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
+			params.FileType:      {Name: params.FileType, Type: params.AnsiString, Value: "file"},
+			params.FileOperation: {Name: params.FileOperation, Type: params.AnsiString, Value: "open"},
 		},
-		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barz"},
+		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barz"},
 	}
 
-	kevt.Timestamp, _ = time.Parse(time.RFC3339, "2011-05-03T15:04:05.323Z")
+	evt.Timestamp, _ = time.Parse(time.RFC3339, "2011-05-03T15:04:05.323Z")
 
 	var tests = []struct {
 		filter  string
 		matches bool
 	}{
 
-		{`kevt.seq = 2`, true},
-		{`kevt.pid = 859`, true},
-		{`kevt.tid = 2484`, true},
-		{`kevt.cpu = 1`, true},
-		{`kevt.name = 'CreateFile'`, true},
-		{`kevt.category = 'file'`, true},
-		{`kevt.host = 'archrabbit'`, true},
-		{`kevt.nparams = 5`, true},
-		{`kevt.arg[file_path] = '\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll'`, true},
-		{`kevt.arg[type] = 'file'`, true},
-		{`kevt.arg[pid] = 3434`, true},
+		{`evt.seq = 2`, true},
+		{`evt.pid = 859`, true},
+		{`evt.tid = 2484`, true},
+		{`evt.cpu = 1`, true},
+		{`evt.name = 'CreateFile'`, true},
+		{`evt.category = 'file'`, true},
+		{`evt.host = 'archrabbit'`, true},
+		{`evt.nparams = 5`, true},
+		{`evt.arg[file_path] = '\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll'`, true},
+		{`evt.arg[type] = 'file'`, true},
+		{`evt.arg[pid] = 3434`, true},
 
-		{`kevt.desc contains 'Creates or opens a new file'`, true},
+		{`evt.desc contains 'Creates or opens a new file'`, true},
 
-		{`kevt.date.d = 3 AND kevt.date.m = 5 AND kevt.time.s = 5 AND kevt.time.m = 4 and kevt.time.h = 15`, true},
-		{`kevt.time = '15:04:05'`, true},
-		{`concat(kevt.name, kevt.host, kevt.nparams) = 'CreateFilearchrabbit5'`, true},
-		{`ltrim(kevt.host, 'arch') = 'rabbit'`, true},
-		{`concat(ltrim(kevt.name, 'Create'), kevt.host) = 'Filearchrabbit'`, true},
-		{`lower(rtrim(kevt.name, 'File')) = 'create'`, true},
-		{`upper(rtrim(kevt.name, 'File')) = 'CREATE'`, true},
-		{`replace(kevt.host, 'rabbit', '_bunny') = 'arch_bunny'`, true},
-		{`replace(kevt.host, 'rabbit', '_bunny', '_bunny', 'bunny') = 'archbunny'`, true},
+		{`evt.date.d = 3 AND evt.date.m = 5 AND evt.time.s = 5 AND evt.time.m = 4 and evt.time.h = 15`, true},
+		{`evt.time = '15:04:05'`, true},
+		{`concat(evt.name, evt.host, evt.nparams) = 'CreateFilearchrabbit5'`, true},
+		{`ltrim(evt.host, 'arch') = 'rabbit'`, true},
+		{`concat(ltrim(evt.name, 'Create'), evt.host) = 'Filearchrabbit'`, true},
+		{`lower(rtrim(evt.name, 'File')) = 'create'`, true},
+		{`upper(rtrim(evt.name, 'File')) = 'CREATE'`, true},
+		{`replace(evt.host, 'rabbit', '_bunny') = 'arch_bunny'`, true},
+		{`replace(evt.host, 'rabbit', '_bunny', '_bunny', 'bunny') = 'archbunny'`, true},
 		{`split(file.path, '\\') IN ('windows', 'system32')`, true},
 		{`length(file.path) = 51`, true},
 		{`indexof(file.path, '\\') = 0`, true},
 		{`indexof(file.path, '\\', 'last') = 40`, true},
 		{`indexof(file.path, 'h2', 'any') = 22`, true},
 		{`substr(file.path, indexof(file.path, '\\'), indexof(file.path, '\\Hard')) = '\\Device'`, true},
-		{`substr(kevt.desc, indexof(kevt.desc, '\\'), indexof(kevt.desc, 'NOT')) = 'Creates or opens a new file, directory, I/O device, pipe, console'`, true},
+		{`substr(evt.desc, indexof(evt.desc, '\\'), indexof(evt.desc, 'NOT')) = 'Creates or opens a new file, directory, I/O device, pipe, console'`, true},
 		{`entropy(file.path) > 120`, true},
 		{`regex(file.path, '\\\\Device\\\\HarddiskVolume[2-9]+\\\\.*')`, true},
 	}
@@ -759,27 +758,27 @@ func TestKeventFilter(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		matches := f.Run(kevt)
+		matches := f.Run(evt)
 		if matches != tt.matches {
-			t.Errorf("%d. %q kevt filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
+			t.Errorf("%d. %q evt filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
 	}
 }
 
 func TestNetFilter(t *testing.T) {
-	kevt := &kevent.Kevent{
-		Type: ktypes.SendTCPv4,
+	evt := &event.Event{
+		Type: event.SendTCPv4,
 		Tid:  2484,
 		PID:  859,
 		PS: &pstypes.PS{
 			Name: "cmd.exe",
 		},
-		Category: ktypes.Net,
-		Kparams: kevent.Kparams{
-			kparams.NetDport: {Name: kparams.NetDport, Type: kparams.Uint16, Value: uint16(443)},
-			kparams.NetSport: {Name: kparams.NetSport, Type: kparams.Uint16, Value: uint16(43123)},
-			kparams.NetSIP:   {Name: kparams.NetSIP, Type: kparams.IPv4, Value: net.ParseIP("127.0.0.1")},
-			kparams.NetDIP:   {Name: kparams.NetDIP, Type: kparams.IPv4, Value: net.ParseIP("216.58.201.174")},
+		Category: event.Net,
+		Params: event.Params{
+			params.NetDport: {Name: params.NetDport, Type: params.Uint16, Value: uint16(443)},
+			params.NetSport: {Name: params.NetSport, Type: params.Uint16, Value: uint16(43123)},
+			params.NetSIP:   {Name: params.NetSIP, Type: params.IPv4, Value: net.ParseIP("127.0.0.1")},
+			params.NetDIP:   {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("216.58.201.174")},
 		},
 	}
 
@@ -802,8 +801,8 @@ func TestNetFilter(t *testing.T) {
 		{`ps.name = 'cmd.exe' and not ((net.sip in (222.1.1.1)) or (net.sip in (12.3.4.5)))`, true},
 		{`cidr_contains(net.dip, '216.58.201.1/24') = true`, true},
 		{`cidr_contains(net.dip, '226.58.201.1/24') = false`, true},
-		{`cidr_contains(net.dip, '216.58.201.1/24', '216.58.201.10/24') = true and kevt.pid = 859`, true},
-		{`kevt.name not in ('CreateProcess', 'Connect') and cidr_contains(net.dip, '216.58.201.1/24') = true`, true},
+		{`cidr_contains(net.dip, '216.58.201.1/24', '216.58.201.10/24') = true and evt.pid = 859`, true},
+		{`evt.name not in ('CreateProcess', 'Connect') and cidr_contains(net.dip, '216.58.201.1/24') = true`, true},
 	}
 
 	for i, tt := range tests {
@@ -812,25 +811,25 @@ func TestNetFilter(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		matches := f.Run(kevt)
+		matches := f.Run(evt)
 		if matches != tt.matches {
 			t.Errorf("%d. %q net filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
 	}
 
-	kevt1 := &kevent.Kevent{
-		Type: ktypes.SendTCPv4,
+	evt1 := &event.Event{
+		Type: event.SendTCPv4,
 		Tid:  2484,
 		PID:  859,
 		PS: &pstypes.PS{
 			Name: "cmd.exe",
 		},
-		Category: ktypes.Net,
-		Kparams: kevent.Kparams{
-			kparams.NetDport: {Name: kparams.NetDport, Type: kparams.Uint16, Value: uint16(53)},
-			kparams.NetSport: {Name: kparams.NetSport, Type: kparams.Uint16, Value: uint16(43123)},
-			kparams.NetSIP:   {Name: kparams.NetSIP, Type: kparams.IPv4, Value: net.ParseIP("127.0.0.1")},
-			kparams.NetDIP:   {Name: kparams.NetDIP, Type: kparams.IPv4, Value: net.ParseIP("8.8.8.8")},
+		Category: event.Net,
+		Params: event.Params{
+			params.NetDport: {Name: params.NetDport, Type: params.Uint16, Value: uint16(53)},
+			params.NetSport: {Name: params.NetSport, Type: params.Uint16, Value: uint16(43123)},
+			params.NetSIP:   {Name: params.NetSIP, Type: params.IPv4, Value: net.ParseIP("127.0.0.1")},
+			params.NetDIP:   {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("8.8.8.8")},
 		},
 	}
 
@@ -849,7 +848,7 @@ func TestNetFilter(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		matches := f.Run(kevt1)
+		matches := f.Run(evt1)
 		if matches != tt.matches {
 			t.Errorf("%d. %q net filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
@@ -857,17 +856,17 @@ func TestNetFilter(t *testing.T) {
 }
 
 func TestRegistryFilter(t *testing.T) {
-	kevt := &kevent.Kevent{
-		Type:     ktypes.RegSetValue,
+	evt := &event.Event{
+		Type:     event.RegSetValue,
 		Tid:      2484,
 		PID:      859,
-		Category: ktypes.Registry,
-		Kparams: kevent.Kparams{
-			kparams.RegPath:      {Name: kparams.RegPath, Type: kparams.UnicodeString, Value: `HKEY_LOCAL_MACHINE\SYSTEM\Setup\Pid`},
-			kparams.RegValue:     {Name: kparams.RegValue, Type: kparams.Uint32, Value: uint32(10234)},
-			kparams.RegValueType: {Name: kparams.RegValueType, Type: kparams.AnsiString, Value: "DWORD"},
-			kparams.NTStatus:     {Name: kparams.NTStatus, Type: kparams.AnsiString, Value: "success"},
-			kparams.RegKeyHandle: {Name: kparams.RegKeyHandle, Type: kparams.Address, Value: uint64(18446666033449935464)},
+		Category: event.Registry,
+		Params: event.Params{
+			params.RegPath:      {Name: params.RegPath, Type: params.UnicodeString, Value: `HKEY_LOCAL_MACHINE\SYSTEM\Setup\Pid`},
+			params.RegValue:     {Name: params.RegValue, Type: params.Uint32, Value: uint32(10234)},
+			params.RegValueType: {Name: params.RegValueType, Type: params.AnsiString, Value: "DWORD"},
+			params.NTStatus:     {Name: params.NTStatus, Type: params.AnsiString, Value: "success"},
+			params.RegKeyHandle: {Name: params.RegKeyHandle, Type: params.Address, Value: uint64(18446666033449935464)},
 		},
 	}
 
@@ -890,7 +889,7 @@ func TestRegistryFilter(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		matches := f.Run(kevt)
+		matches := f.Run(evt)
 		if matches != tt.matches {
 			t.Errorf("%d. %q registry filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
@@ -898,17 +897,17 @@ func TestRegistryFilter(t *testing.T) {
 }
 
 func TestImageFilter(t *testing.T) {
-	e1 := &kevent.Kevent{
-		Type:     ktypes.LoadImage,
-		Category: ktypes.Image,
-		Kparams: kevent.Kparams{
-			kparams.ImagePath:           {Name: kparams.ImagePath, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll")},
-			kparams.ProcessID:           {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1023)},
-			kparams.ImageCheckSum:       {Name: kparams.ImageCheckSum, Type: kparams.Uint32, Value: uint32(2323432)},
-			kparams.ImageBase:           {Name: kparams.ImageBase, Type: kparams.Address, Value: uint64(0x7ffb313833a3)},
-			kparams.ImageSignatureType:  {Name: kparams.ImageSignatureType, Type: kparams.Enum, Value: uint32(1), Enum: signature.Types},
-			kparams.ImageSignatureLevel: {Name: kparams.ImageSignatureLevel, Type: kparams.Enum, Value: uint32(4), Enum: signature.Levels},
-			kparams.FileIsDotnet:        {Name: kparams.FileIsDotnet, Type: kparams.Bool, Value: false},
+	e1 := &event.Event{
+		Type:     event.LoadImage,
+		Category: event.Image,
+		Params: event.Params{
+			params.ImagePath:           {Name: params.ImagePath, Type: params.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll")},
+			params.ProcessID:           {Name: params.ProcessID, Type: params.PID, Value: uint32(1023)},
+			params.ImageCheckSum:       {Name: params.ImageCheckSum, Type: params.Uint32, Value: uint32(2323432)},
+			params.ImageBase:           {Name: params.ImageBase, Type: params.Address, Value: uint64(0x7ffb313833a3)},
+			params.ImageSignatureType:  {Name: params.ImageSignatureType, Type: params.Enum, Value: uint32(1), Enum: signature.Types},
+			params.ImageSignatureLevel: {Name: params.ImageSignatureLevel, Type: params.Enum, Value: uint32(4), Enum: signature.Levels},
+			params.FileIsDotnet:        {Name: params.FileIsDotnet, Type: params.Bool, Value: false},
 		},
 	}
 
@@ -949,17 +948,17 @@ func TestImageFilter(t *testing.T) {
 	assert.Equal(t, signature.AuthenticodeLevel, sig.Level)
 
 	// now exercise unsigned/unchecked signature
-	e2 := &kevent.Kevent{
-		Type:     ktypes.LoadImage,
-		Category: ktypes.Image,
-		Kparams: kevent.Kparams{
-			kparams.ImagePath:           {Name: kparams.ImagePath, Type: kparams.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll")},
-			kparams.ProcessID:           {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1023)},
-			kparams.ImageCheckSum:       {Name: kparams.ImageCheckSum, Type: kparams.Uint32, Value: uint32(2323432)},
-			kparams.ImageBase:           {Name: kparams.ImageBase, Type: kparams.Address, Value: uint64(0x7ccb313833a3)},
-			kparams.ImageSignatureType:  {Name: kparams.ImageSignatureType, Type: kparams.Enum, Value: uint32(0), Enum: signature.Types},
-			kparams.ImageSignatureLevel: {Name: kparams.ImageSignatureLevel, Type: kparams.Enum, Value: uint32(0), Enum: signature.Levels},
-			kparams.FileIsDotnet:        {Name: kparams.FileIsDotnet, Type: kparams.Bool, Value: false},
+	e2 := &event.Event{
+		Type:     event.LoadImage,
+		Category: event.Image,
+		Params: event.Params{
+			params.ImagePath:           {Name: params.ImagePath, Type: params.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll")},
+			params.ProcessID:           {Name: params.ProcessID, Type: params.PID, Value: uint32(1023)},
+			params.ImageCheckSum:       {Name: params.ImageCheckSum, Type: params.Uint32, Value: uint32(2323432)},
+			params.ImageBase:           {Name: params.ImageBase, Type: params.Address, Value: uint64(0x7ccb313833a3)},
+			params.ImageSignatureType:  {Name: params.ImageSignatureType, Type: params.Enum, Value: uint32(0), Enum: signature.Types},
+			params.ImageSignatureLevel: {Name: params.ImageSignatureLevel, Type: params.Enum, Value: uint32(0), Enum: signature.Levels},
+			params.FileIsDotnet:        {Name: params.FileIsDotnet, Type: params.Bool, Value: false},
 		},
 	}
 
@@ -992,17 +991,17 @@ func TestImageFilter(t *testing.T) {
 
 	assert.NotNil(t, signature.GetSignatures().GetSignature(0x7ccb313833a3))
 
-	e3 := &kevent.Kevent{
-		Type:     ktypes.LoadImage,
-		Category: ktypes.Image,
-		Kparams: kevent.Kparams{
-			kparams.ImagePath:           {Name: kparams.ImagePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\System32\\mscorlib.dll"},
-			kparams.ProcessID:           {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1023)},
-			kparams.ImageCheckSum:       {Name: kparams.ImageCheckSum, Type: kparams.Uint32, Value: uint32(2323432)},
-			kparams.ImageBase:           {Name: kparams.ImageBase, Type: kparams.Address, Value: uint64(0xfff313833a3)},
-			kparams.ImageSignatureType:  {Name: kparams.ImageSignatureType, Type: kparams.Enum, Value: uint32(0), Enum: signature.Types},
-			kparams.ImageSignatureLevel: {Name: kparams.ImageSignatureLevel, Type: kparams.Enum, Value: uint32(0), Enum: signature.Levels},
-			kparams.FileIsDotnet:        {Name: kparams.FileIsDotnet, Type: kparams.Bool, Value: true},
+	e3 := &event.Event{
+		Type:     event.LoadImage,
+		Category: event.Image,
+		Params: event.Params{
+			params.ImagePath:           {Name: params.ImagePath, Type: params.UnicodeString, Value: "C:\\Windows\\System32\\mscorlib.dll"},
+			params.ProcessID:           {Name: params.ProcessID, Type: params.PID, Value: uint32(1023)},
+			params.ImageCheckSum:       {Name: params.ImageCheckSum, Type: params.Uint32, Value: uint32(2323432)},
+			params.ImageBase:           {Name: params.ImageBase, Type: params.Address, Value: uint64(0xfff313833a3)},
+			params.ImageSignatureType:  {Name: params.ImageSignatureType, Type: params.Enum, Value: uint32(0), Enum: signature.Types},
+			params.ImageSignatureLevel: {Name: params.ImageSignatureLevel, Type: params.Enum, Value: uint32(0), Enum: signature.Levels},
+			params.FileIsDotnet:        {Name: params.FileIsDotnet, Type: params.Bool, Value: true},
 		},
 	}
 
@@ -1030,7 +1029,7 @@ func TestImageFilter(t *testing.T) {
 }
 
 func TestPEFilter(t *testing.T) {
-	kevt := &kevent.Kevent{
+	evt := &event.Event{
 		PS: &pstypes.PS{
 			PE: &pe.PE{
 				NumberOfSections: 2,
@@ -1074,7 +1073,7 @@ func TestPEFilter(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		matches := f.Run(kevt)
+		matches := f.Run(evt)
 		if matches != tt.matches {
 			t.Errorf("%d. %q pe filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
@@ -1082,15 +1081,15 @@ func TestPEFilter(t *testing.T) {
 }
 
 func TestLazyPEFilter(t *testing.T) {
-	kevt := &kevent.Kevent{
-		Type: ktypes.LoadImage,
+	evt := &event.Event{
+		Type: event.LoadImage,
 		PS: &pstypes.PS{
 			PID: 2312,
 			Exe: filepath.Join(os.Getenv("windir"), "notepad.exe"),
 		},
-		Kparams: kevent.Kparams{
-			kparams.FileIsDLL: {Name: kparams.FileIsDLL, Type: kparams.Bool, Value: true},
-			kparams.FilePath:  {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
+		Params: event.Params{
+			params.FileIsDLL: {Name: params.FileIsDLL, Type: params.Bool, Value: true},
+			params.FilePath:  {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
 		},
 	}
 
@@ -1121,32 +1120,32 @@ func TestLazyPEFilter(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		require.Nil(t, kevt.PS.PE)
-		matches := f.Run(kevt)
+		require.Nil(t, evt.PS.PE)
+		matches := f.Run(evt)
 		if matches != tt.matches {
 			t.Errorf("%d. %q pe lazy filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
-		require.NotNil(t, kevt.PS.PE)
-		kevt.PS.PE = nil
+		require.NotNil(t, evt.PS.PE)
+		evt.PS.PE = nil
 	}
 }
 
 func TestMemFilter(t *testing.T) {
-	kpars := kevent.Kparams{
-		kparams.MemRegionSize:  {Name: kparams.MemRegionSize, Type: kparams.Uint64, Value: uint64(8192)},
-		kparams.MemBaseAddress: {Name: kparams.MemBaseAddress, Type: kparams.Address, Value: uint64(1311246336000)},
-		kparams.MemAllocType:   {Name: kparams.MemAllocType, Type: kparams.Flags, Value: uint32(0x00001000 | 0x00002000), Flags: kevent.MemAllocationFlags},
-		kparams.ProcessID:      {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(345)},
-		kparams.MemProtect:     {Name: kparams.MemProtect, Type: kparams.Flags, Value: uint32(0x40), Flags: kevent.MemProtectionFlags},
-		kparams.MemProtectMask: {Name: kparams.MemProtectMask, Type: kparams.AnsiString, Value: "RWX"},
-		kparams.MemPageType:    {Name: kparams.MemPageType, Type: kparams.Enum, Value: uint32(0x1000000), Enum: processors.MemPageTypes},
+	pars := event.Params{
+		params.MemRegionSize:  {Name: params.MemRegionSize, Type: params.Uint64, Value: uint64(8192)},
+		params.MemBaseAddress: {Name: params.MemBaseAddress, Type: params.Address, Value: uint64(1311246336000)},
+		params.MemAllocType:   {Name: params.MemAllocType, Type: params.Flags, Value: uint32(0x00001000 | 0x00002000), Flags: event.MemAllocationFlags},
+		params.ProcessID:      {Name: params.ProcessID, Type: params.Uint32, Value: uint32(345)},
+		params.MemProtect:     {Name: params.MemProtect, Type: params.Flags, Value: uint32(0x40), Flags: event.MemProtectionFlags},
+		params.MemProtectMask: {Name: params.MemProtectMask, Type: params.AnsiString, Value: "RWX"},
+		params.MemPageType:    {Name: params.MemPageType, Type: params.Enum, Value: uint32(0x1000000), Enum: processors.MemPageTypes},
 	}
 
-	kevt := &kevent.Kevent{
-		Type:     ktypes.VirtualAlloc,
-		Kparams:  kpars,
+	evt := &event.Event{
+		Type:     event.VirtualAlloc,
+		Params:   pars,
 		Name:     "VirtualAlloc",
-		Category: ktypes.Mem,
+		Category: event.Mem,
 		PS: &pstypes.PS{
 			Name: "svchost.exe",
 			Envs: map[string]string{"ALLUSERSPROFILE": "C:\\ProgramData", "OS": "Windows_NT", "ProgramFiles(x86)": "C:\\Program Files (x86)"},
@@ -1173,7 +1172,7 @@ func TestMemFilter(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		matches := f.Run(kevt)
+		matches := f.Run(evt)
 		if matches != tt.matches {
 			t.Errorf("%d. %q mem filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
@@ -1181,20 +1180,20 @@ func TestMemFilter(t *testing.T) {
 }
 
 func TestDNSFilter(t *testing.T) {
-	kevt := &kevent.Kevent{
-		Type: ktypes.ReplyDNS,
+	evt := &event.Event{
+		Type: event.ReplyDNS,
 		Tid:  2484,
 		PID:  859,
 		PS: &pstypes.PS{
 			Name: "cmd.exe",
 		},
-		Category: ktypes.Net,
-		Kparams: kevent.Kparams{
-			kparams.DNSName:    {Name: kparams.DNSName, Type: kparams.UnicodeString, Value: "r3.o.lencr.org"},
-			kparams.DNSRR:      {Name: kparams.DNSRR, Type: kparams.Enum, Value: uint32(0x0001), Enum: kevent.DNSRecordTypes},
-			kparams.DNSOpts:    {Name: kparams.DNSOpts, Type: kparams.Flags64, Value: uint64(0x00006000), Flags: kevent.DNSOptsFlags},
-			kparams.DNSRcode:   {Name: kparams.DNSRcode, Type: kparams.Enum, Value: uint32(0), Enum: kevent.DNSResponseCodes},
-			kparams.DNSAnswers: {Name: kparams.DNSAnswers, Type: kparams.Slice, Value: []string{"incoming.telemetry.mozilla.org", "a1887.dscq.akamai.net"}},
+		Category: event.Net,
+		Params: event.Params{
+			params.DNSName:    {Name: params.DNSName, Type: params.UnicodeString, Value: "r3.o.lencr.org"},
+			params.DNSRR:      {Name: params.DNSRR, Type: params.Enum, Value: uint32(0x0001), Enum: event.DNSRecordTypes},
+			params.DNSOpts:    {Name: params.DNSOpts, Type: params.Flags64, Value: uint64(0x00006000), Flags: event.DNSOptsFlags},
+			params.DNSRcode:   {Name: params.DNSRcode, Type: params.Enum, Value: uint32(0), Enum: event.DNSResponseCodes},
+			params.DNSAnswers: {Name: params.DNSAnswers, Type: params.Slice, Value: []string{"incoming.telemetry.mozilla.org", "a1887.dscq.akamai.net"}},
 		},
 	}
 
@@ -1216,7 +1215,7 @@ func TestDNSFilter(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		matches := f.Run(kevt)
+		matches := f.Run(evt)
 		if matches != tt.matches {
 			t.Errorf("%d. %q dns filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
@@ -1224,32 +1223,32 @@ func TestDNSFilter(t *testing.T) {
 }
 
 func TestThreadpoolFilter(t *testing.T) {
-	e := &kevent.Kevent{
-		Type:      ktypes.SubmitThreadpoolCallback,
+	e := &event.Event{
+		Type:      event.SubmitThreadpoolCallback,
 		Tid:       2484,
 		PID:       1023,
 		CPU:       1,
 		Seq:       2,
 		Name:      "SubmitThreadpoolCallback",
 		Timestamp: time.Now(),
-		Category:  ktypes.Threadpool,
-		Kparams: kevent.Kparams{
-			kparams.ThreadpoolPoolID:           {Name: kparams.ThreadpoolPoolID, Type: kparams.Address, Value: uint64(0x20f5fc02440)},
-			kparams.ThreadpoolTaskID:           {Name: kparams.ThreadpoolTaskID, Type: kparams.Address, Value: uint64(0x20f7ecd21f8)},
-			kparams.ThreadpoolCallback:         {Name: kparams.ThreadpoolCallback, Type: kparams.Address, Value: uint64(0x7ffb3138592e)},
-			kparams.ThreadpoolContext:          {Name: kparams.ThreadpoolContext, Type: kparams.Address, Value: uint64(0x14d0d16fed8)},
-			kparams.ThreadpoolContextRip:       {Name: kparams.ThreadpoolContextRip, Type: kparams.Address, Value: uint64(0x143c9b07bd0)},
-			kparams.ThreadpoolSubprocessTag:    {Name: kparams.ThreadpoolSubprocessTag, Type: kparams.Address, Value: uint64(0x10d)},
-			kparams.ThreadpoolContextRipSymbol: {Name: kparams.ThreadpoolContextRipSymbol, Type: kparams.UnicodeString, Value: "VirtualProtect"},
-			kparams.ThreadpoolContextRipModule: {Name: kparams.ThreadpoolContextRipModule, Type: kparams.UnicodeString, Value: "C:\\Windows\\System32\\kernelbase.dll"},
-			kparams.ThreadpoolCallbackSymbol:   {Name: kparams.ThreadpoolCallbackSymbol, Type: kparams.UnicodeString, Value: "RtlDestroyQueryDebugBuffer"},
-			kparams.ThreadpoolCallbackModule:   {Name: kparams.ThreadpoolCallbackModule, Type: kparams.UnicodeString, Value: "C:\\Windows\\System32\\ntdll.dll"},
-			kparams.ThreadpoolTimerSubqueue:    {Name: kparams.ThreadpoolTimerSubqueue, Type: kparams.Address, Value: uint64(0x1db401703e8)},
-			kparams.ThreadpoolTimerDuetime:     {Name: kparams.ThreadpoolTimerDuetime, Type: kparams.Uint64, Value: uint64(18446744073699551616)},
-			kparams.ThreadpoolTimer:            {Name: kparams.ThreadpoolTimer, Type: kparams.Address, Value: uint64(0x3e8)},
-			kparams.ThreadpoolTimerPeriod:      {Name: kparams.ThreadpoolTimerPeriod, Type: kparams.Uint32, Value: uint32(100)},
-			kparams.ThreadpoolTimerWindow:      {Name: kparams.ThreadpoolTimerWindow, Type: kparams.Uint32, Value: uint32(50)},
-			kparams.ThreadpoolTimerAbsolute:    {Name: kparams.ThreadpoolTimerAbsolute, Type: kparams.Bool, Value: true},
+		Category:  event.Threadpool,
+		Params: event.Params{
+			params.ThreadpoolPoolID:           {Name: params.ThreadpoolPoolID, Type: params.Address, Value: uint64(0x20f5fc02440)},
+			params.ThreadpoolTaskID:           {Name: params.ThreadpoolTaskID, Type: params.Address, Value: uint64(0x20f7ecd21f8)},
+			params.ThreadpoolCallback:         {Name: params.ThreadpoolCallback, Type: params.Address, Value: uint64(0x7ffb3138592e)},
+			params.ThreadpoolContext:          {Name: params.ThreadpoolContext, Type: params.Address, Value: uint64(0x14d0d16fed8)},
+			params.ThreadpoolContextRip:       {Name: params.ThreadpoolContextRip, Type: params.Address, Value: uint64(0x143c9b07bd0)},
+			params.ThreadpoolSubprocessTag:    {Name: params.ThreadpoolSubprocessTag, Type: params.Address, Value: uint64(0x10d)},
+			params.ThreadpoolContextRipSymbol: {Name: params.ThreadpoolContextRipSymbol, Type: params.UnicodeString, Value: "VirtualProtect"},
+			params.ThreadpoolContextRipModule: {Name: params.ThreadpoolContextRipModule, Type: params.UnicodeString, Value: "C:\\Windows\\System32\\kernelbase.dll"},
+			params.ThreadpoolCallbackSymbol:   {Name: params.ThreadpoolCallbackSymbol, Type: params.UnicodeString, Value: "RtlDestroyQueryDebugBuffer"},
+			params.ThreadpoolCallbackModule:   {Name: params.ThreadpoolCallbackModule, Type: params.UnicodeString, Value: "C:\\Windows\\System32\\ntdll.dll"},
+			params.ThreadpoolTimerSubqueue:    {Name: params.ThreadpoolTimerSubqueue, Type: params.Address, Value: uint64(0x1db401703e8)},
+			params.ThreadpoolTimerDuetime:     {Name: params.ThreadpoolTimerDuetime, Type: params.Uint64, Value: uint64(18446744073699551616)},
+			params.ThreadpoolTimer:            {Name: params.ThreadpoolTimer, Type: params.Address, Value: uint64(0x3e8)},
+			params.ThreadpoolTimerPeriod:      {Name: params.ThreadpoolTimerPeriod, Type: params.Uint32, Value: uint32(100)},
+			params.ThreadpoolTimerWindow:      {Name: params.ThreadpoolTimerWindow, Type: params.Uint32, Value: uint32(50)},
+			params.ThreadpoolTimerAbsolute:    {Name: params.ThreadpoolTimerAbsolute, Type: params.Bool, Value: true},
 		},
 	}
 
@@ -1292,15 +1291,15 @@ func TestInterpolateFields(t *testing.T) {
 	var tests = []struct {
 		original     string
 		interpolated string
-		evts         []*kevent.Kevent
+		evts         []*event.Event
 	}{
 		{
-			original:     "Credential discovery via %ps.name (%kevt.arg[cmdline]) and user %ps.sid",
+			original:     "Credential discovery via %ps.name (%evt.arg[cmdline]) and user %ps.sid",
 			interpolated: "Credential discovery via VaultCmd.exe (VaultCmd.exe /listcreds:Windows Credentials /all) and user LOCAL\\tor",
-			evts: []*kevent.Kevent{
+			evts: []*event.Event{
 				{
-					Type:     ktypes.CreateProcess,
-					Category: ktypes.Process,
+					Type:     event.CreateProcess,
+					Category: event.Process,
 					Name:     "CreateProcess",
 					PID:      1023,
 					PS: &pstypes.PS{
@@ -1308,19 +1307,19 @@ func TestInterpolateFields(t *testing.T) {
 						Ppid: 345,
 						SID:  "LOCAL\\tor",
 					},
-					Kparams: kevent.Kparams{
-						kparams.Cmdline: {Name: kparams.Cmdline, Type: kparams.UnicodeString, Value: `VaultCmd.exe /listcreds:Windows Credentials /all`},
+					Params: event.Params{
+						params.Cmdline: {Name: params.Cmdline, Type: params.UnicodeString, Value: `VaultCmd.exe /listcreds:Windows Credentials /all`},
 					},
 				},
 			},
 		},
 		{
-			original:     "Credential discovery via %ps.name and pid %kevt.pid",
+			original:     "Credential discovery via %ps.name and pid %evt.pid",
 			interpolated: "Credential discovery via N/A and pid 1023",
-			evts: []*kevent.Kevent{
+			evts: []*event.Event{
 				{
-					Type:     ktypes.CreateProcess,
-					Category: ktypes.Process,
+					Type:     event.CreateProcess,
+					Category: event.Process,
 					Name:     "CreateProcess",
 					PID:      1023,
 				},
@@ -1329,14 +1328,14 @@ func TestInterpolateFields(t *testing.T) {
 		{
 			original:     "Suspicious thread start module %thread.start_address.module",
 			interpolated: "Suspicious thread start module C:\\Windows\\System32\\vault.dll",
-			evts: []*kevent.Kevent{
+			evts: []*event.Event{
 				{
-					Type:     ktypes.CreateThread,
-					Category: ktypes.Thread,
+					Type:     event.CreateThread,
+					Category: event.Thread,
 					Name:     "CreateThread",
 					PID:      1023,
-					Kparams: kevent.Kparams{
-						kparams.StartAddressModule: {Name: kparams.StartAddressModule, Type: kparams.UnicodeString, Value: "C:\\Windows\\System32\\vault.dll"},
+					Params: event.Params{
+						params.StartAddressModule: {Name: params.StartAddressModule, Type: params.UnicodeString, Value: "C:\\Windows\\System32\\vault.dll"},
 					},
 				},
 			},
@@ -1349,10 +1348,10 @@ and subsequently write the <code>%2.file.path</code> dump file to the disk devic
 and read the memory of the <b>Local Security And Authority Subsystem Service</b>
 and subsequently write the <code>C:\Users
 eo\Temp\lsass.dump</code> dump file to the disk device`,
-			evts: []*kevent.Kevent{
+			evts: []*event.Event{
 				{
-					Type:     ktypes.OpenProcess,
-					Category: ktypes.Process,
+					Type:     event.OpenProcess,
+					Category: event.Process,
 					Name:     "OpenProcess",
 					PID:      1023,
 					PS: &pstypes.PS{
@@ -1362,12 +1361,12 @@ eo\Temp\lsass.dump</code> dump file to the disk device`,
 					},
 				},
 				{
-					Type:     ktypes.WriteFile,
-					Category: ktypes.File,
+					Type:     event.WriteFile,
+					Category: event.File,
 					Name:     "WriteFile",
 					PID:      1023,
-					Kparams: kevent.Kparams{
-						kparams.FilePath: {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Users\neo\\Temp\\lsass.dump"},
+					Params: event.Params{
+						params.FilePath: {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Users\neo\\Temp\\lsass.dump"},
 					},
 					PS: &pstypes.PS{
 						Name: "taskmgr.exe",
@@ -1385,10 +1384,10 @@ and subsequently write the <code>%2.file.path</code> dump file to the disk devic
 and read the memory of the <b>Local Security And Authority Subsystem Service</b>
 and subsequently write the <code>C:\Users
 eo\Temp\lsass.dump</code> dump file to the disk device`,
-			evts: []*kevent.Kevent{
+			evts: []*event.Event{
 				{
-					Type:     ktypes.OpenProcess,
-					Category: ktypes.Process,
+					Type:     event.OpenProcess,
+					Category: event.Process,
 					Name:     "OpenProcess",
 					PID:      1023,
 					PS: &pstypes.PS{
@@ -1398,12 +1397,12 @@ eo\Temp\lsass.dump</code> dump file to the disk device`,
 					},
 				},
 				{
-					Type:     ktypes.WriteFile,
-					Category: ktypes.File,
+					Type:     event.WriteFile,
+					Category: event.File,
 					Name:     "WriteFile",
 					PID:      1023,
-					Kparams: kevent.Kparams{
-						kparams.FilePath: {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Users\neo\\Temp\\lsass.dump"},
+					Params: event.Params{
+						params.FilePath: {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Users\neo\\Temp\\lsass.dump"},
 					},
 					PS: &pstypes.PS{
 						Name: "taskmgr.exe",
@@ -1428,21 +1427,21 @@ func BenchmarkFilterRun(b *testing.B) {
 	f := New(`ps.name = 'mimikatz.exe' or ps.name contains 'svc'`, cfg)
 	require.NoError(b, f.Compile())
 
-	kpars := kevent.Kparams{
-		kparams.Cmdline:         {Name: kparams.Cmdline, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost.exe -k RPCSS"},
-		kparams.ProcessName:     {Name: kparams.ProcessName, Type: kparams.AnsiString, Value: "svchost.exe"},
-		kparams.ProcessID:       {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(1234)},
-		kparams.ProcessParentID: {Name: kparams.ProcessParentID, Type: kparams.Uint32, Value: uint32(345)},
+	pars := event.Params{
+		params.Cmdline:         {Name: params.Cmdline, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\svchost.exe -k RPCSS"},
+		params.ProcessName:     {Name: params.ProcessName, Type: params.AnsiString, Value: "svchost.exe"},
+		params.ProcessID:       {Name: params.ProcessID, Type: params.Uint32, Value: uint32(1234)},
+		params.ProcessParentID: {Name: params.ProcessParentID, Type: params.Uint32, Value: uint32(345)},
 	}
 
-	kevt := &kevent.Kevent{
-		Type:    ktypes.CreateProcess,
-		Kparams: kpars,
-		Name:    "CreateProcess",
+	evt := &event.Event{
+		Type:   event.CreateProcess,
+		Params: pars,
+		Name:   "CreateProcess",
 	}
 
 	for i := 0; i < b.N; i++ {
-		f.Run(kevt)
+		f.Run(evt)
 	}
 }
 

@@ -29,8 +29,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/rabbitstack/fibratus/pkg/cap/section"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
-	"github.com/rabbitstack/fibratus/pkg/kcap/section"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 
 	"github.com/rabbitstack/fibratus/pkg/util/bootid"

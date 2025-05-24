@@ -5,11 +5,11 @@ condition: >
   sequence
   maxspan 1h
   by ps.uuid
-  |kevt.name = 'CreateProcess' and ps.child.name
+  |evt.name = 'CreateProcess' and ps.child.name
       in
   ('firefox.exe', 'chrome.exe', 'edge.exe')
   |
-  |kevt.name = 'CreateFile' and file.operation = 'CREATE'
+  |evt.name = 'CreateFile' and file.operation = 'CREATE'
       and
   file.extension = '.exe'
   |

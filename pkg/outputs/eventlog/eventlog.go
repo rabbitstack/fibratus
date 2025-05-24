@@ -26,9 +26,7 @@ import (
 	"golang.org/x/sys/windows"
 	"text/template"
 
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-
-	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/outputs"
 )
 
@@ -45,7 +43,7 @@ type evtlog struct {
 	evtlog *Eventlog // eventlog writer
 	config Config
 	tmpl   *template.Template
-	events []ktypes.KeventInfo
+	events []event.Info
 	cats   []string
 }
 
@@ -67,8 +65,8 @@ func initEventlog(config outputs.Config) (outputs.OutputGroup, error) {
 	}
 	evtlog := &evtlog{
 		config: cfg,
-		events: ktypes.GetKtypesMetaIndexed(),
-		cats:   ktypes.Categories(),
+		events: event.GetTypesMetaIndexed(),
+		cats:   event.Categories(),
 	}
 	evtlog.tmpl, err = cfg.parseTemplate()
 	if err != nil {
@@ -101,22 +99,22 @@ func (e *evtlog) Close() error {
 	return nil
 }
 
-func (e *evtlog) Publish(batch *kevent.Batch) error {
-	for _, kevt := range batch.Events {
-		if err := e.publish(kevt); err != nil {
+func (e *evtlog) Publish(batch *event.Batch) error {
+	for _, evt := range batch.Events {
+		if err := e.publish(evt); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (e *evtlog) publish(kevt *kevent.Kevent) error {
-	buf, err := kevt.RenderCustomTemplate(e.tmpl)
+func (e *evtlog) publish(evt *event.Event) error {
+	buf, err := evt.RenderCustomTemplate(e.tmpl)
 	if err != nil {
 		return err
 	}
-	categoryID := e.categoryID(kevt)
-	eventID := eventlog.EventID(windows.EVENTLOG_INFORMATION_TYPE, uint16(e.eventCode(kevt)))
+	categoryID := e.categoryID(evt)
+	eventID := eventlog.EventID(windows.EVENTLOG_INFORMATION_TYPE, uint16(e.eventCode(evt)))
 	if eventID == 0 {
 		return ErrUnknownEventID
 	}
@@ -128,9 +126,9 @@ func (e *evtlog) publish(kevt *kevent.Kevent) error {
 }
 
 // categoryID maps category name to eventlog identifier.
-func (e *evtlog) categoryID(kevt *kevent.Kevent) uint16 {
+func (e *evtlog) categoryID(evt *event.Event) uint16 {
 	for i, cat := range e.cats {
-		if cat == string(kevt.Category) {
+		if cat == string(evt.Category) {
 			return uint16(i + 1)
 		}
 	}
@@ -138,9 +136,9 @@ func (e *evtlog) categoryID(kevt *kevent.Kevent) uint16 {
 }
 
 // eventCode returns the event ID from the event type.
-func (e *evtlog) eventCode(kevt *kevent.Kevent) uint32 {
-	for i, evt := range e.events {
-		if evt.Name == kevt.Name {
+func (e *evtlog) eventCode(evt *event.Event) uint32 {
+	for i, e := range e.events {
+		if evt.Name == e.Name {
 			return uint32(i + categoryOffset)
 		}
 	}

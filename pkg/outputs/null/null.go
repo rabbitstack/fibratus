@@ -20,7 +20,7 @@ package null
 
 import (
 	"expvar"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/outputs"
 )
 
@@ -39,7 +39,7 @@ func initNull(config outputs.Config) (outputs.OutputGroup, error) {
 
 func (null) Close() error   { return nil }
 func (null) Connect() error { return nil }
-func (null) Publish(batch *kevent.Batch) error {
+func (null) Publish(batch *event.Batch) error {
 	blackholeEventsCount.Add(batch.Len())
 	return nil
 }

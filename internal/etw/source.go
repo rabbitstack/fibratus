@@ -23,13 +23,12 @@ import (
 	"expvar"
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/config"
-	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
+	errs "github.com/rabbitstack/fibratus/pkg/errors"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/filter"
 	"github.com/rabbitstack/fibratus/pkg/handle"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
-	"github.com/rabbitstack/fibratus/pkg/ksource"
 	"github.com/rabbitstack/fibratus/pkg/ps"
+	"github.com/rabbitstack/fibratus/pkg/source"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	log "github.com/sirupsen/logrus"
@@ -55,20 +54,16 @@ const (
 )
 
 var (
-	// failedKevents counts the number of kevents that failed to process
-	failedKevents = expvar.NewMap("kstream.kevents.failures")
-	// keventsProcessed counts the number of total processed events
-	keventsProcessed = expvar.NewInt("kstream.kevents.processed")
-	// keventsDropped counts the number of overall dropped events
-	keventsDropped = expvar.NewInt("kstream.kevents.dropped")
-	// keventsUnknown counts the number of published events which types are not present in the internal catalog
-	keventsUnknown = expvar.NewInt("kstream.kevents.unknown")
-
-	// excludedKevents counts the number of excluded events
-	excludedKevents = expvar.NewInt("kstream.excluded.kevents")
-
+	// eventsFailed counts the number of events that failed to process
+	eventsFailed = expvar.NewMap("eventsource.events.failed")
+	// eventsProcessed counts the number of total processed events
+	eventsProcessed = expvar.NewInt("eventsource.events.processed")
+	// eventsUnknown counts the number of published events which types are not present in the internal catalog
+	eventsUnknown = expvar.NewInt("eventsource.events.unknown")
+	// eventsExcluded counts the number of excluded events
+	eventsExcluded = expvar.NewInt("eventsource.events.excluded")
 	// buffersRead amount of buffers fetched from the ETW session
-	buffersRead = expvar.NewInt("kstream.kbuffers.read")
+	buffersRead = expvar.NewInt("eventsource.buffers.read")
 )
 
 // EventSource is the core component responsible for
@@ -80,8 +75,8 @@ type EventSource struct {
 	consumers []*Consumer
 
 	errs      chan error
-	evts      chan *kevent.Kevent
-	sequencer *kevent.Sequencer
+	evts      chan *event.Event
+	sequencer *event.Sequencer
 	config    *config.Config
 	stop      chan struct{}
 
@@ -89,7 +84,7 @@ type EventSource struct {
 	hsnap handle.Snapshotter
 
 	filter    filter.Filter
-	listeners []kevent.Listener
+	listeners []event.Listener
 
 	isClosed bool
 }
@@ -100,19 +95,19 @@ func NewEventSource(
 	hsnap handle.Snapshotter,
 	config *config.Config,
 	compiler *config.RulesCompileResult,
-) ksource.EventSource {
+) source.EventSource {
 	evs := &EventSource{
 		r:         compiler,
 		traces:    make([]*Trace, 0),
 		consumers: make([]*Consumer, 0),
 		errs:      make(chan error, 1000),
-		evts:      make(chan *kevent.Kevent, 500),
-		sequencer: kevent.NewSequencer(),
+		evts:      make(chan *event.Event, 500),
+		sequencer: event.NewSequencer(),
 		config:    config,
 		stop:      make(chan struct{}),
 		psnap:     psnap,
 		hsnap:     hsnap,
-		listeners: make([]kevent.Listener, 0),
+		listeners: make([]event.Listener, 0),
 	}
 	return evs
 }
@@ -140,29 +135,29 @@ func (e *EventSource) Open(config *config.Config) error {
 		config.Kstream.EnableDNSEvents = config.Kstream.EnableDNSEvents && e.r.HasDNSEvents
 		config.Kstream.EnableAuditAPIEvents = config.Kstream.EnableAuditAPIEvents && e.r.HasAuditAPIEvents
 		config.Kstream.EnableThreadpoolEvents = config.Kstream.EnableThreadpoolEvents && e.r.HasThreadpoolEvents
-		for _, ktype := range ktypes.All() {
-			if ktype == ktypes.CreateProcess || ktype == ktypes.TerminateProcess ||
-				ktype == ktypes.LoadImage || ktype == ktypes.UnloadImage {
+		for _, typ := range event.All() {
+			if typ == event.CreateProcess || typ == event.TerminateProcess ||
+				typ == event.LoadImage || typ == event.UnloadImage {
 				// always allow fundamental events
 				continue
 			}
 
 			// allow events required for memory/file scanning
-			if ktype == ktypes.MapViewFile && config.Yara.Enabled && !config.Yara.SkipMmaps {
+			if typ == event.MapViewFile && config.Yara.Enabled && !config.Yara.SkipMmaps {
 				continue
 			}
-			if ktype == ktypes.VirtualAlloc && config.Yara.Enabled && !config.Yara.SkipAllocs {
+			if typ == event.VirtualAlloc && config.Yara.Enabled && !config.Yara.SkipAllocs {
 				continue
 			}
-			if ktype == ktypes.CreateFile && config.Yara.Enabled && !config.Yara.SkipFiles {
+			if typ == event.CreateFile && config.Yara.Enabled && !config.Yara.SkipFiles {
 				continue
 			}
-			if ktype == ktypes.RegSetValue && config.Yara.Enabled && !config.Yara.SkipRegistry {
+			if typ == event.RegSetValue && config.Yara.Enabled && !config.Yara.SkipRegistry {
 				continue
 			}
 
-			if !e.r.ContainsEvent(ktype) {
-				config.Kstream.SetDropMask(ktype)
+			if !e.r.ContainsEvent(typ) {
+				config.Kstream.SetDropMask(typ)
 			}
 		}
 	}
@@ -182,16 +177,16 @@ func (e *EventSource) Open(config *config.Config) error {
 	for _, trace := range e.traces {
 		err := trace.Start()
 		switch err {
-		case kerrors.ErrTraceAlreadyRunning:
+		case errs.ErrTraceAlreadyRunning:
 			log.Debugf("%s trace is already running. Trying to restart...", trace.Name)
 			if err := trace.Stop(); err != nil {
 				return err
 			}
 			time.Sleep(time.Millisecond * 100)
 			if err := trace.Start(); err != nil {
-				return multierror.Wrap(kerrors.ErrRestartTrace, err)
+				return multierror.Wrap(errs.ErrRestartTrace, err)
 			}
-		case kerrors.ErrTraceNoSysResources:
+		case errs.ErrTraceNoSysResources:
 			// get the number of maximum allowed loggers from registry
 			key, err := registry.OpenKey(registry.LOCAL_MACHINE, etwMaxLoggersPath, registry.QUERY_VALUE)
 			if err != nil {
@@ -238,7 +233,7 @@ func (e *EventSource) Open(config *config.Config) error {
 				return
 			case err := <-errch:
 				log.Infof("stopping [%s] trace processing", trace.Name)
-				if err != nil && !errors.Is(err, kerrors.ErrTraceCancelled) {
+				if err != nil && !errors.Is(err, errs.ErrTraceCancelled) {
 					e.errs <- fmt.Errorf("unable to process %s trace: %v", trace.Name, err)
 				}
 			}
@@ -293,7 +288,7 @@ func (e *EventSource) Errors() <-chan error {
 }
 
 // Events returns the buffered event channel.
-func (e *EventSource) Events() <-chan *kevent.Kevent {
+func (e *EventSource) Events() <-chan *event.Event {
 	return e.evts
 }
 
@@ -306,7 +301,7 @@ func (e *EventSource) SetFilter(f filter.Filter) {
 
 // RegisterEventListener registers a new event listener for each consumer queue.
 // The event is pushed to the output queue if at least one of the listeners allows.
-func (e *EventSource) RegisterEventListener(lis kevent.Listener) {
+func (e *EventSource) RegisterEventListener(lis event.Listener) {
 	e.listeners = append(e.listeners, lis)
 }
 

@@ -23,7 +23,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/olivere/elastic/v7"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"html/template"
 	"strings"
 	"time"
@@ -77,12 +77,12 @@ func (i index) putTemplate() error {
 
 // getName creates an index name by replacing specifiers to create time frame indices. If no time specifiers are
 // used this method returns a fixed index name.
-func (i index) getName(kevt *kevent.Kevent) string {
+func (i index) getName(evt *event.Event) string {
 	indexName := i.config.IndexName
 	if !strings.Contains(indexName, "%") {
 		return indexName
 	}
-	return i.replace(kevt.Timestamp)
+	return i.replace(evt.Timestamp)
 }
 
 func (i index) replace(timestamp time.Time) string {

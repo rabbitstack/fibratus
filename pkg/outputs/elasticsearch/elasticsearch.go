@@ -25,7 +25,7 @@ import (
 	"fmt"
 	"github.com/hashicorp/go-version"
 	"github.com/olivere/elastic/v7"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/outputs"
 	"github.com/rabbitstack/fibratus/pkg/util/tls"
 	log "github.com/sirupsen/logrus"
@@ -170,20 +170,20 @@ func (e *elasticsearch) Connect() error {
 	return nil
 }
 
-func (e *elasticsearch) Publish(batch *kevent.Batch) error {
-	for _, kevt := range batch.Events {
-		indexName := e.index.getName(kevt)
+func (e *elasticsearch) Publish(batch *event.Batch) error {
+	for _, evt := range batch.Events {
+		indexName := e.index.getName(evt)
 		// create the bulk index request for each event in the batch.
 		// We already have a valid JSON body, so just pass the raw
 		// JSON message as request document
-		e.bulkProcessor.Add(newBulkIndexRequest(indexName, kevt))
+		e.bulkProcessor.Add(newBulkIndexRequest(indexName, evt))
 		totalBulkedDocs.Add(1)
 	}
 	return nil
 }
 
-func newBulkIndexRequest(indexName string, kevt *kevent.Kevent) *elastic.BulkIndexRequest {
-	kjson := kevt.MarshalJSON()
+func newBulkIndexRequest(indexName string, evt *event.Event) *elastic.BulkIndexRequest {
+	kjson := evt.MarshalJSON()
 	return elastic.NewBulkIndexRequest().Index(indexName).Doc(json.RawMessage(kjson))
 }
 

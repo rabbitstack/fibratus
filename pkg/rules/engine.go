@@ -22,10 +22,9 @@ import (
 	"expvar"
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/filter"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/rules/action"
 	"github.com/rabbitstack/fibratus/pkg/util/hashers"
@@ -37,7 +36,7 @@ import (
 // RuleMatchFunc is rule match function definition. It accepts
 // the filter (rule) config and the group of events that fired
 // the rule
-type RuleMatchFunc func(f *config.FilterConfig, evts ...*kevent.Kevent)
+type RuleMatchFunc func(f *config.FilterConfig, evts ...*event.Event)
 
 var (
 	// sequenceGcInterval determines how often sequence GC kicks in
@@ -78,28 +77,28 @@ type ruleMatch struct {
 // hashCache caches the event type/category FNV hashes
 type hashCache struct {
 	mu             sync.RWMutex
-	types          map[ktypes.Ktype]uint32
-	cats           map[ktypes.Category]uint32
+	types          map[event.Type]uint32
+	cats           map[event.Category]uint32
 	lookupCategory bool
 }
 
 func newHashCache() *hashCache {
-	return &hashCache{types: make(map[ktypes.Ktype]uint32), cats: make(map[ktypes.Category]uint32)}
+	return &hashCache{types: make(map[event.Type]uint32), cats: make(map[event.Category]uint32)}
 }
 
-func (c *hashCache) typeHash(e *kevent.Kevent) uint32 {
+func (c *hashCache) typeHash(e *event.Event) uint32 {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.types[e.Type]
 }
 
-func (c *hashCache) categoryHash(e *kevent.Kevent) uint32 {
+func (c *hashCache) categoryHash(e *event.Event) uint32 {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.cats[e.Category]
 }
 
-func (c *hashCache) addTypeHash(e *kevent.Kevent) uint32 {
+func (c *hashCache) addTypeHash(e *event.Event) uint32 {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	h := e.Type.Hash()
@@ -107,7 +106,7 @@ func (c *hashCache) addTypeHash(e *kevent.Kevent) uint32 {
 	return h
 }
 
-func (c *hashCache) addCategoryHash(e *kevent.Kevent) uint32 {
+func (c *hashCache) addCategoryHash(e *event.Event) uint32 {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	h := e.Category.Hash()
@@ -127,7 +126,7 @@ type compiledFilters map[uint32][]*compiledFilter
 // particular event type or category. If no filters
 // are found, the event is not asserted against the
 // ruleset.
-func (filters compiledFilters) collect(hashCache *hashCache, e *kevent.Kevent) []*compiledFilter {
+func (filters compiledFilters) collect(hashCache *hashCache, e *event.Event) []*compiledFilter {
 	h := hashCache.typeHash(e)
 	if h == 0 {
 		h = hashCache.addTypeHash(e)
@@ -163,7 +162,7 @@ func (f *compiledFilter) isSequence() bool {
 	return f.ss != nil
 }
 
-func (f *compiledFilter) run(e *kevent.Kevent) bool {
+func (f *compiledFilter) run(e *event.Event) bool {
 	if f.ss != nil {
 		return f.ss.runSequence(e)
 	}
@@ -223,8 +222,8 @@ func (e *Engine) Compile() (*config.RulesCompileResult, error) {
 				"event type or event category condition! "+
 				"This rule is being discarded by "+
 				"the engine. Please consider narrowing the "+
-				"scope of the rule by including the `kevt.name` "+
-				"or `kevt.category` condition",
+				"scope of the rule by including the `evt.name` "+
+				"or `evt.category` condition",
 				c.Name)
 			continue
 		}
@@ -258,7 +257,7 @@ func (*Engine) CanEnqueue() bool { return true }
 // Filter is the internal lingo that designates a rule condition.
 // Filters can be simple direct-event matchers or sequence states that
 // track an ordered series of events over a short period of time.
-func (e *Engine) ProcessEvent(evt *kevent.Kevent) (bool, error) {
+func (e *Engine) ProcessEvent(evt *event.Event) (bool, error) {
 	if len(e.filters) == 0 {
 		return true, nil
 	}
@@ -342,11 +341,11 @@ func (e *Engine) processActions() error {
 	return nil
 }
 
-func (e *Engine) appendMatch(f *config.FilterConfig, evts ...*kevent.Kevent) {
+func (e *Engine) appendMatch(f *config.FilterConfig, evts ...*event.Event) {
 	for _, evt := range evts {
-		evt.AddMeta(kevent.RuleNameKey, f.Name)
+		evt.AddMeta(event.RuleNameKey, f.Name)
 		for k, v := range f.Labels {
-			evt.AddMeta(kevent.MetadataKey(k), v)
+			evt.AddMeta(event.MetadataKey(k), v)
 		}
 	}
 	ctx := &config.ActionContext{

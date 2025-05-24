@@ -38,7 +38,7 @@ type Config struct {
 // AddFlags registers persistent flags.
 func AddFlags(flags *pflag.FlagSet) {
 	flags.String(frmt, string(pretty), "Specifies the output format. Choose between pretty|json")
-	flags.String(paramKVDelimiter, "", "The delimiter symbol for the kparams key/value pairs")
+	flags.String(paramKVDelimiter, "", "The delimiter symbol for the params key/value pairs")
 	flags.String(tmpl, "", "Event formatting template")
 	flags.Bool(enabled, true, "Indicates if the console output is enabled")
 }

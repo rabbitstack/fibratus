@@ -21,12 +21,11 @@ package processors
 import (
 	"expvar"
 	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
@@ -56,14 +55,14 @@ type fsProcessor struct {
 	psnap ps.Snapshotter
 
 	// irps contains a mapping between the IRP (I/O request packet) and CreateFile events
-	irps map[uint64]*kevent.Kevent
+	irps map[uint64]*event.Event
 
 	devMapper       fs.DevMapper
 	devPathResolver fs.DevPathResolver
 	config          *config.Config
 
 	// buckets stores stack walk events per stack id
-	buckets map[uint64][]*kevent.Kevent
+	buckets map[uint64][]*event.Event
 	mu      sync.Mutex
 	purger  *time.Ticker
 
@@ -87,13 +86,13 @@ func newFsProcessor(
 ) Processor {
 	f := &fsProcessor{
 		files:           make(map[uint64]*FileInfo),
-		irps:            make(map[uint64]*kevent.Kevent),
+		irps:            make(map[uint64]*event.Event),
 		hsnap:           hsnap,
 		psnap:           psnap,
 		devMapper:       devMapper,
 		devPathResolver: devPathResolver,
 		config:          config,
-		buckets:         make(map[uint64][]*kevent.Kevent),
+		buckets:         make(map[uint64][]*event.Event),
 		purger:          time.NewTicker(time.Second * 5),
 		quit:            make(chan struct{}, 1),
 		lim:             rate.NewLimiter(30, 40), // allow 30 parse ops per second or bursts of 40 ops
@@ -104,8 +103,8 @@ func newFsProcessor(
 	return f
 }
 
-func (f *fsProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error) {
-	if e.Category == ktypes.File || e.IsStackWalk() {
+func (f *fsProcessor) ProcessEvent(e *event.Event) (*event.Event, bool, error) {
+	if e.Category == event.File || e.IsStackWalk() {
 		evt, err := f.processEvent(e)
 		return evt, false, err
 	}
@@ -119,14 +118,14 @@ func (f *fsProcessor) getFileInfo(name string, opts uint32) *FileInfo {
 	return &FileInfo{Name: name, Type: fs.GetFileType(name, opts)}
 }
 
-func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
+func (f *fsProcessor) processEvent(e *event.Event) (*event.Event, error) {
 	switch e.Type {
-	case ktypes.FileRundown:
+	case event.FileRundown:
 		// when the file rundown event comes in we store the file info
 		// in internal state in order to augment the rest of file events
 		// that lack the file path field
-		filepath := e.GetParamAsString(kparams.FilePath)
-		fileObject, err := e.Kparams.GetUint64(kparams.FileObject)
+		filepath := e.GetParamAsString(params.FilePath)
+		fileObject, err := e.Params.GetUint64(params.FileObject)
 		if err != nil {
 			return nil, err
 		}
@@ -134,35 +133,35 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 			totalRundownFiles.Add(1)
 			f.files[fileObject] = &FileInfo{Name: filepath, Type: fs.GetFileType(filepath, 0)}
 		}
-	case ktypes.MapFileRundown:
-		fileKey := e.Kparams.MustGetUint64(kparams.FileKey)
+	case event.MapFileRundown:
+		fileKey := e.Params.MustGetUint64(params.FileKey)
 		fileinfo := f.files[fileKey]
 
 		if fileinfo != nil {
 			totalMapRundownFiles.Add(1)
-			e.AppendParam(kparams.FilePath, kparams.Path, fileinfo.Name)
+			e.AppendParam(params.FilePath, params.Path, fileinfo.Name)
 		} else {
 			// if the view of section is backed by the data/image file
 			// try to get the mapped file name and append it to params
-			sec := e.Kparams.MustGetUint32(kparams.FileViewSectionType)
+			sec := e.Params.MustGetUint32(params.FileViewSectionType)
 			isMapped := sec != va.SectionPagefile && sec != va.SectionPhysical
 			if isMapped {
 				totalMapRundownFiles.Add(1)
-				addr := e.Kparams.MustGetUint64(kparams.FileViewBase) + (e.Kparams.MustGetUint64(kparams.FileOffset))
-				e.AppendParam(kparams.FilePath, kparams.Path, f.getMappedFile(e.PID, addr))
+				addr := e.Params.MustGetUint64(params.FileViewBase) + (e.Params.MustGetUint64(params.FileOffset))
+				e.AppendParam(params.FilePath, params.Path, f.getMappedFile(e.PID, addr))
 			}
 		}
 
 		return e, f.psnap.AddMmap(e)
-	case ktypes.CreateFile:
+	case event.CreateFile:
 		// we defer the processing of the CreateFile event until we get
 		// the matching FileOpEnd event. This event contains the operation
 		// that was done on behalf of the file, e.g. create or open.
-		irp := e.Kparams.MustGetUint64(kparams.FileIrpPtr)
+		irp := e.Params.MustGetUint64(params.FileIrpPtr)
 		e.WaitEnqueue = true
 		f.irps[irp] = e
-	case ktypes.StackWalk:
-		if !kevent.IsCurrentProcDropped(e.PID) {
+	case event.StackWalk:
+		if !event.IsCurrentProcDropped(e.PID) {
 			f.mu.Lock()
 			defer f.mu.Unlock()
 
@@ -170,18 +169,18 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 			id := e.StackID()
 			q, ok := f.buckets[id]
 			if !ok {
-				f.buckets[id] = []*kevent.Kevent{e}
+				f.buckets[id] = []*event.Event{e}
 			} else {
 				f.buckets[id] = append(q, e)
 			}
 		}
-	case ktypes.FileOpEnd:
+	case event.FileOpEnd:
 		// get the CreateFile pending event by IRP identifier
 		// and fetch the file create disposition value
 		var (
-			irp    = e.Kparams.MustGetUint64(kparams.FileIrpPtr)
-			dispo  = e.Kparams.MustGetUint64(kparams.FileExtraInfo)
-			status = e.Kparams.MustGetUint32(kparams.NTStatus)
+			irp    = e.Params.MustGetUint64(params.FileIrpPtr)
+			dispo  = e.Params.MustGetUint64(params.FileExtraInfo)
+			status = e.Params.MustGetUint32(params.NTStatus)
 		)
 
 		if dispo > windows.FILE_MAXIMUM_DISPOSITION {
@@ -196,28 +195,28 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 		// reset the wait status to allow passage of this event to
 		// the aggregator queue. Additionally, append params to it
 		ev.WaitEnqueue = false
-		fileObject := ev.Kparams.MustGetUint64(kparams.FileObject)
+		fileObject := ev.Params.MustGetUint64(params.FileObject)
 
 		// try to get extended file info. If the file object is already
 		// present in the map, we'll reuse the existing file information
 		fileinfo, ok := f.files[fileObject]
 		if !ok {
-			opts := ev.Kparams.MustGetUint32(kparams.FileCreateOptions)
+			opts := ev.Params.MustGetUint32(params.FileCreateOptions)
 			opts &= 0xFFFFFF
-			filepath := ev.GetParamAsString(kparams.FilePath)
+			filepath := ev.GetParamAsString(params.FilePath)
 			fileinfo = f.getFileInfo(filepath, opts)
 			f.files[fileObject] = fileinfo
 		}
 
 		if f.config.Kstream.EnableHandleKevents {
-			f.devPathResolver.AddPath(ev.GetParamAsString(kparams.FilePath))
+			f.devPathResolver.AddPath(ev.GetParamAsString(params.FilePath))
 		}
 
-		ev.AppendParam(kparams.NTStatus, kparams.Status, status)
+		ev.AppendParam(params.NTStatus, params.Status, status)
 		if fileinfo.Type != fs.Unknown {
-			ev.AppendEnum(kparams.FileType, uint32(fileinfo.Type), fs.FileTypes)
+			ev.AppendEnum(params.FileType, uint32(fileinfo.Type), fs.FileTypes)
 		}
-		ev.AppendEnum(kparams.FileOperation, uint32(dispo), fs.FileCreateDispositions)
+		ev.AppendEnum(params.FileOperation, uint32(dispo), fs.FileCreateDispositions)
 
 		// attach stack walk return addresses. CreateFile events
 		// represent an edge case in callstack enrichment. Since
@@ -236,10 +235,10 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 			id := ev.StackID()
 			q, ok := f.buckets[id]
 			if ok && len(q) > 0 {
-				var s *kevent.Kevent
+				var s *event.Event
 				s, f.buckets[id] = q[len(q)-1], q[:len(q)-1]
-				callstack := s.Kparams.MustGetSlice(kparams.Callstack)
-				ev.AppendParam(kparams.Callstack, kparams.Slice, callstack)
+				callstack := s.Params.MustGetSlice(params.Callstack)
+				ev.AppendParam(params.Callstack, params.Slice, callstack)
 			}
 		}
 
@@ -249,30 +248,30 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 				fsFileCharacteristicsRateLimits.Add(1)
 				return ev, nil
 			}
-			path := ev.GetParamAsString(kparams.FilePath)
+			path := ev.GetParamAsString(params.FilePath)
 			c, err := parseImageFileCharacteristics(path)
 			if err != nil {
 				return ev, nil
 			}
-			ev.AppendParam(kparams.FileIsDLL, kparams.Bool, c.isDLL)
-			ev.AppendParam(kparams.FileIsDriver, kparams.Bool, c.isDriver)
-			ev.AppendParam(kparams.FileIsExecutable, kparams.Bool, c.isExe)
-			ev.AppendParam(kparams.FileIsDotnet, kparams.Bool, c.isDotnet)
+			ev.AppendParam(params.FileIsDLL, params.Bool, c.isDLL)
+			ev.AppendParam(params.FileIsDriver, params.Bool, c.isDriver)
+			ev.AppendParam(params.FileIsExecutable, params.Bool, c.isExe)
+			ev.AppendParam(params.FileIsDotnet, params.Bool, c.isDotnet)
 		}
 
 		return ev, nil
-	case ktypes.ReleaseFile:
+	case event.ReleaseFile:
 		fileReleaseCount.Add(1)
 		// delete file metadata by file object address
-		fileObject := e.Kparams.MustGetUint64(kparams.FileObject)
+		fileObject := e.Params.MustGetUint64(params.FileObject)
 		delete(f.files, fileObject)
-	case ktypes.UnmapViewFile:
+	case event.UnmapViewFile:
 		ok, proc := f.psnap.Find(e.PID)
-		addr := e.Kparams.TryGetAddress(kparams.FileViewBase)
+		addr := e.Params.TryGetAddress(params.FileViewBase)
 		if ok {
 			mmap := proc.FindMmap(addr)
 			if mmap != nil {
-				e.AppendParam(kparams.FilePath, kparams.Path, mmap.File)
+				e.AppendParam(params.FilePath, params.Path, mmap.File)
 			}
 		}
 
@@ -281,10 +280,10 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 		return e, f.psnap.RemoveMmap(e.PID, addr)
 	default:
 		var fileObject uint64
-		fileKey := e.Kparams.MustGetUint64(kparams.FileKey)
+		fileKey := e.Params.MustGetUint64(params.FileKey)
 
 		if !e.IsMapViewFile() {
-			fileObject = e.Kparams.MustGetUint64(kparams.FileObject)
+			fileObject = e.Params.MustGetUint64(params.FileObject)
 		}
 
 		// attempt to get the file by file key. If there is no such file referenced
@@ -294,12 +293,12 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 
 		// try to resolve mapped file name if not found in internal state
 		if fileinfo == nil && e.IsMapViewFile() {
-			sec := e.Kparams.MustGetUint32(kparams.FileViewSectionType)
+			sec := e.Params.MustGetUint32(params.FileViewSectionType)
 			isMapped := sec != va.SectionPagefile && sec != va.SectionPhysical
 			if isMapped {
 				totalMapRundownFiles.Add(1)
-				addr := e.Kparams.MustGetUint64(kparams.FileViewBase) + (e.Kparams.MustGetUint64(kparams.FileOffset))
-				e.AppendParam(kparams.FilePath, kparams.Path, f.getMappedFile(e.PID, addr))
+				addr := e.Params.MustGetUint64(params.FileViewBase) + (e.Params.MustGetUint64(params.FileOffset))
+				e.AppendParam(params.FilePath, params.Path, f.getMappedFile(e.PID, addr))
 			}
 		}
 
@@ -313,16 +312,16 @@ func (f *fsProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 		}
 		if e.IsEnumDirectory() {
 			if fileinfo != nil {
-				e.AppendParam(kparams.FileDirectory, kparams.Path, fileinfo.Name)
+				e.AppendParam(params.FileDirectory, params.Path, fileinfo.Name)
 			}
 			return e, nil
 		}
 
 		if fileinfo != nil {
 			if fileinfo.Type != fs.Unknown {
-				e.AppendEnum(kparams.FileType, uint32(fileinfo.Type), fs.FileTypes)
+				e.AppendEnum(params.FileType, uint32(fileinfo.Type), fs.FileTypes)
 			}
-			e.AppendParam(kparams.FilePath, kparams.Path, fileinfo.Name)
+			e.AppendParam(params.FilePath, params.Path, fileinfo.Name)
 		}
 
 		if e.IsMapViewFile() {

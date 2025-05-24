@@ -23,7 +23,7 @@ package pe
 
 import (
 	"fmt"
-	kcapver "github.com/rabbitstack/fibratus/pkg/kcap/version"
+	capver "github.com/rabbitstack/fibratus/pkg/cap/version"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/bytes"
 	"github.com/rabbitstack/fibratus/pkg/util/convert"
@@ -124,7 +124,7 @@ func (pe *PE) Marshal() []byte {
 }
 
 // Unmarshal recovers the PE metadata from the byte stream.
-func (pe *PE) Unmarshal(b []byte, ver kcapver.Version) error {
+func (pe *PE) Unmarshal(b []byte, ver capver.Version) error {
 	if len(b) < 6 {
 		return fmt.Errorf("expected at least 6 bytes but got %d bytes", len(b))
 	}
@@ -241,7 +241,7 @@ func (pe *PE) Unmarshal(b []byte, ver kcapver.Version) error {
 
 	offset += roffset
 
-	if ver >= kcapver.PESecV2 {
+	if ver >= capver.PESecV2 {
 		pe.IsSigned = convert.Itob(b[20+offset])
 		pe.IsTrusted = convert.Itob(b[21+offset])
 
@@ -283,7 +283,7 @@ func (pe *PE) Unmarshal(b []byte, ver kcapver.Version) error {
 }
 
 // NewFromKcap restores the PE metadata from the byte stream.
-func NewFromKcap(b []byte, ver kcapver.Version) (*PE, error) {
+func NewFromKcap(b []byte, ver capver.Version) (*PE, error) {
 	pe := &PE{
 		Sections:         make([]Sec, 0),
 		Symbols:          make([]string, 0),

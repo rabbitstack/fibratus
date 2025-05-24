@@ -21,7 +21,7 @@ package amqp
 import (
 	"expvar"
 
-	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/outputs"
 )
 
@@ -66,7 +66,7 @@ func (q *rabbitmq) Close() error {
 	return q.client.close()
 }
 
-func (q *rabbitmq) Publish(batch *kevent.Batch) error {
+func (q *rabbitmq) Publish(batch *event.Batch) error {
 	body := batch.MarshalJSON()
 
 	err := q.client.publish(body)

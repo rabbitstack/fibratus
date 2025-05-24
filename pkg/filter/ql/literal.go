@@ -19,9 +19,8 @@
 package ql
 
 import (
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/util/hashers"
 	"golang.org/x/sys/windows"
 	"net"
@@ -282,12 +281,12 @@ type SequenceExpr struct {
 	Alias string
 
 	buckets map[uint32]bool
-	ktypes  []ktypes.Ktype
+	types   []event.Type
 }
 
 func (e *SequenceExpr) init() {
 	e.buckets = make(map[uint32]bool)
-	e.ktypes = make([]ktypes.Ktype, 0)
+	e.types = make([]event.Type, 0)
 	e.BoundFields = make([]*BoundFieldLiteral, 0)
 }
 
@@ -342,8 +341,8 @@ func (e *SequenceExpr) walk() {
 		if name == fields.KevtName || name == fields.KevtCategory {
 			for _, v := range values {
 				e.buckets[hashers.FnvUint32([]byte(v))] = true
-				if ktyp := ktypes.KeventNameToKtype(v); ktyp.Exists() {
-					e.ktypes = append(e.ktypes, ktyp)
+				if etype := event.NameToType(v); etype.Exists() {
+					e.types = append(e.types, etype)
 				}
 			}
 		}
@@ -354,8 +353,8 @@ func (e *SequenceExpr) walk() {
 // the event type filter fields defined in the expression. We permit the expression
 // to be evaluated when the incoming event type or category pertains to the one
 // defined in the field literal.
-func (e *SequenceExpr) IsEvaluable(kevt *kevent.Kevent) bool {
-	return e.buckets[kevt.Type.Hash()] || e.buckets[kevt.Category.Hash()]
+func (e *SequenceExpr) IsEvaluable(evt *event.Event) bool {
+	return e.buckets[evt.Type.Hash()] || e.buckets[evt.Category.Hash()]
 }
 
 // HasBoundFields determines if this sequence expression references any bound field.
@@ -384,11 +383,11 @@ func (s *Sequence) init() {
 	// is guaranteed
 	guids := make(map[windows.GUID]bool)
 	for _, expr := range s.Expressions {
-		for _, k := range expr.ktypes {
-			if k.CanArriveOutOfOrder() {
+		for _, etype := range expr.types {
+			if etype.CanArriveOutOfOrder() {
 				s.IsUnordered = true
 			}
-			guids[k.GUID()] = true
+			guids[etype.GUID()] = true
 		}
 	}
 

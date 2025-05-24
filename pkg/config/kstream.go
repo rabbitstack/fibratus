@@ -22,11 +22,11 @@
 package config
 
 import (
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"golang.org/x/sys/windows"
 	"runtime"
 	"time"
 
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/spf13/viper"
 )
@@ -63,17 +63,17 @@ var (
 
 // KstreamConfig stores different configuration options for fine-tuning kstream consumer/controller settings.
 type KstreamConfig struct {
-	// EnableThreadKevents indicates if thread kernel events are collected by the ETW provider.
+	// EnableThreadKevents indicates if thread events are collected by the ETW provider.
 	EnableThreadKevents bool `json:"enable-thread" yaml:"enable-thread"`
-	// EnableRegistryKevents indicates if registry kernel events are collected by the ETW provider.
+	// EnableRegistryKevents indicates if registry events are collected by the ETW provider.
 	EnableRegistryKevents bool `json:"enable-registry" yaml:"enable-registry"`
 	// EnableNetKevents determines whether network (TCP/UDP) events are collected by the ETW provider.
 	EnableNetKevents bool `json:"enable-net" yaml:"enable-net"`
-	// EnableFileIOKevents indicates if file I/O kernel events are collected by the ETW provider.
+	// EnableFileIOKevents indicates if file I/O events are collected by the ETW provider.
 	EnableFileIOKevents bool `json:"enable-fileio" yaml:"enable-fileio"`
 	// EnableVAMapKevents indicates if VA map/unmap events are collected by the ETW provider.
 	EnableVAMapKevents bool `json:"enable-vamap" yaml:"enable-vamap"`
-	// EnableImageKevents indicates if image kernel events are collected by the ETW provider.
+	// EnableImageKevents indicates if image events are collected by the ETW provider.
 	EnableImageKevents bool `json:"enable-image" yaml:"enable-image"`
 	// EnableHandleKevents indicates whether handle creation/disposal events are enabled.
 	EnableHandleKevents bool `json:"enable-handle" yaml:"enable-handle"`
@@ -102,7 +102,7 @@ type KstreamConfig struct {
 	// ExcludedImages are process image names that will be rejected if they generate a kernel event.
 	ExcludedImages []string `json:"blacklist.images" yaml:"blacklist.images"`
 
-	dropMasks ktypes.EventsetMasks
+	dropMasks event.EventsetMasks
 
 	excludedImages map[string]bool
 }
@@ -130,8 +130,8 @@ func (c *KstreamConfig) initFromViper(v *viper.Viper) {
 	c.excludedImages = make(map[string]bool)
 
 	for _, name := range c.ExcludedKevents {
-		if ktype := ktypes.KeventNameToKtype(name); ktype != ktypes.UnknownKtype {
-			c.dropMasks.Set(ktype)
+		if typ := event.NameToType(name); typ != event.UnknownType {
+			c.dropMasks.Set(typ)
 		}
 	}
 	for _, name := range c.ExcludedImages {
@@ -143,9 +143,9 @@ func (c *KstreamConfig) initFromViper(v *viper.Viper) {
 func (c *KstreamConfig) Init() {
 	c.excludedImages = make(map[string]bool)
 	for _, name := range c.ExcludedKevents {
-		for _, ktype := range ktypes.KeventNameToKtypes(name) {
-			if ktype != ktypes.UnknownKtype {
-				c.dropMasks.Set(ktype)
+		for _, typ := range event.NameToTypes(name) {
+			if typ != event.UnknownType {
+				c.dropMasks.Set(typ)
 			}
 		}
 	}
@@ -157,14 +157,14 @@ func (c *KstreamConfig) Init() {
 // SetDropMask inserts the event mask in the bitset to
 // instruct the given event type should be dropped from
 // the event stream.
-func (c *KstreamConfig) SetDropMask(ktype ktypes.Ktype) {
-	c.dropMasks.Set(ktype)
+func (c *KstreamConfig) SetDropMask(Type event.Type) {
+	c.dropMasks.Set(Type)
 }
 
 // TestDropMask checks if the specified event type has
 // the drop mask in the bitset.
-func (c *KstreamConfig) TestDropMask(ktype ktypes.Ktype) bool {
-	return c.dropMasks.Test(ktype.GUID(), ktype.HookID())
+func (c *KstreamConfig) TestDropMask(Type event.Type) bool {
+	return c.dropMasks.Test(Type.GUID(), Type.HookID())
 }
 
 // ExcludeKevent determines whether the supplied provider GUID

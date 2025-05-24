@@ -33,9 +33,9 @@ import (
 	"unsafe"
 
 	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -69,10 +69,10 @@ type SnapshotBuildCompleted func(total uint64, named uint64)
 type Snapshotter interface {
 	// Write updates the snapshotter state by storing a new entry for the inbound create handle event. It also notifies
 	// the registered callback that a new handle has been created.
-	Write(kevt *kevent.Kevent) error
+	Write(evt *event.Event) error
 	// Remove destroys the handle state for the specified handle object. The removal callback is triggered when an item
 	// is deleted from the store.
-	Remove(kevt *kevent.Kevent) error
+	Remove(evt *event.Event) error
 	// FindHandles returns a list of all known handles for the specified process identifier.
 	FindHandles(pid uint32) ([]htypes.Handle, error)
 	// FindByObject returns the handle for the given handle object reference.
@@ -127,7 +127,7 @@ func NewSnapshotter(config *config.Config, fn SnapshotBuildCompleted) Snapshotte
 	return s
 }
 
-// NewFromKcap builds the handle snapshotter from kcap state.
+// NewFromKcap builds the handle snapshotter from cap state.
 func NewFromKcap(handles []htypes.Handle) Snapshotter {
 	s := &snapshotter{
 		handlesByObject: make(map[uint64]htypes.Handle),
@@ -397,12 +397,12 @@ func (s *snapshotter) GetSnapshot() []htypes.Handle {
 	return handles
 }
 
-func (s *snapshotter) Write(e *kevent.Kevent) error {
+func (s *snapshotter) Write(e *event.Event) error {
 	if !e.IsCreateHandle() {
 		return fmt.Errorf("expected CreateHandle event but got %s", e.Type)
 	}
 	h := unwrapHandle(e)
-	obj, err := e.Kparams.GetUint64(kparams.HandleObject)
+	obj, err := e.Params.GetUint64(params.HandleObject)
 	if err != nil {
 		return err
 	}
@@ -412,11 +412,11 @@ func (s *snapshotter) Write(e *kevent.Kevent) error {
 	return nil
 }
 
-func (s *snapshotter) Remove(e *kevent.Kevent) error {
+func (s *snapshotter) Remove(e *event.Event) error {
 	if !e.IsCloseHandle() {
 		return fmt.Errorf("expected CloseHandle event but got %s", e.Type)
 	}
-	obj, err := e.Kparams.GetUint64(kparams.HandleObject)
+	obj, err := e.Params.GetUint64(params.HandleObject)
 	if err != nil {
 		return err
 	}
@@ -433,10 +433,10 @@ func (s *snapshotter) Close() error {
 	return nil
 }
 
-func unwrapHandle(e *kevent.Kevent) htypes.Handle {
+func unwrapHandle(e *event.Event) htypes.Handle {
 	h := htypes.Handle{}
-	h.Type = e.GetParamAsString(kparams.HandleObjectTypeID)
-	h.Object, _ = e.Kparams.GetUint64(kparams.HandleObject)
-	h.Name, _ = e.Kparams.GetString(kparams.HandleObjectName)
+	h.Type = e.GetParamAsString(params.HandleObjectTypeID)
+	h.Object, _ = e.Params.GetUint64(params.HandleObject)
+	h.Name, _ = e.Params.GetString(params.HandleObjectName)
 	return h
 }

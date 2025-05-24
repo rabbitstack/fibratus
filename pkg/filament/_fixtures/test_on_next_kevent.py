@@ -25,8 +25,8 @@ def on_init():
     columns(['Key', '#Seq'])
     sort_by('#Seq')
 
-def on_next_kevent(kevent):
-    kevents.append({'key_name': kevent['kparams']['key_name'], 'seq': kevent['seq'], 'dip': kevent['kparams']['dip']})
+def on_next_kevent(Event):
+    kevents.append({'key_name': Event['params']['key_name'], 'seq': Event['seq'], 'dip': Event['params']['dip']})
 
 def on_interval():
     for key in kevents:

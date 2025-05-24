@@ -19,9 +19,8 @@
 package processors
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"net"
@@ -31,47 +30,47 @@ import (
 func TestNetworkProcessor(t *testing.T) {
 	var tests = []struct {
 		name       string
-		e          *kevent.Kevent
-		assertions func(*kevent.Kevent, *testing.T)
+		e          *event.Event
+		assertions func(*event.Event, *testing.T)
 	}{
 		{
 			"send tcpv4",
-			&kevent.Kevent{
-				Type:     ktypes.SendTCPv4,
-				Category: ktypes.Net,
-				Kparams: kevent.Kparams{
-					kparams.NetDport: {Name: kparams.NetDport, Type: kparams.Uint16, Value: uint16(443)},
-					kparams.NetSport: {Name: kparams.NetSport, Type: kparams.Uint16, Value: uint16(43123)},
-					kparams.NetSIP:   {Name: kparams.NetSIP, Type: kparams.IPv4, Value: net.ParseIP("127.0.0.1")},
-					kparams.NetDIP:   {Name: kparams.NetDIP, Type: kparams.IPv4, Value: net.ParseIP("8.8.8.8")},
+			&event.Event{
+				Type:     event.SendTCPv4,
+				Category: event.Net,
+				Params: event.Params{
+					params.NetDport: {Name: params.NetDport, Type: params.Uint16, Value: uint16(443)},
+					params.NetSport: {Name: params.NetSport, Type: params.Uint16, Value: uint16(43123)},
+					params.NetSIP:   {Name: params.NetSIP, Type: params.IPv4, Value: net.ParseIP("127.0.0.1")},
+					params.NetDIP:   {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("8.8.8.8")},
 				},
 			},
-			func(e *kevent.Kevent, t *testing.T) {
+			func(e *event.Event, t *testing.T) {
 				assert.Equal(t, "Send", e.Type.String())
-				assert.Equal(t, "https", e.GetParamAsString(kparams.NetDportName))
-				assert.Equal(t, "TCP", e.GetParamAsString(kparams.NetL4Proto))
-				assert.Equal(t, "127.0.0.1", e.GetParamAsString(kparams.NetSIP))
-				assert.Equal(t, "8.8.8.8", e.GetParamAsString(kparams.NetDIP))
-				assert.Equal(t, "443", e.GetParamAsString(kparams.NetDport))
-				assert.Equal(t, "43123", e.GetParamAsString(kparams.NetSport))
+				assert.Equal(t, "https", e.GetParamAsString(params.NetDportName))
+				assert.Equal(t, "TCP", e.GetParamAsString(params.NetL4Proto))
+				assert.Equal(t, "127.0.0.1", e.GetParamAsString(params.NetSIP))
+				assert.Equal(t, "8.8.8.8", e.GetParamAsString(params.NetDIP))
+				assert.Equal(t, "443", e.GetParamAsString(params.NetDport))
+				assert.Equal(t, "43123", e.GetParamAsString(params.NetSport))
 			},
 		},
 		{
 			"recv udp6",
-			&kevent.Kevent{
-				Type:     ktypes.RecvUDPv6,
-				Category: ktypes.Net,
-				Kparams: kevent.Kparams{
-					kparams.NetDport: {Name: kparams.NetDport, Type: kparams.Uint16, Value: uint16(53)},
-					kparams.NetSport: {Name: kparams.NetSport, Type: kparams.Uint16, Value: uint16(43123)},
-					kparams.NetSIP:   {Name: kparams.NetSIP, Type: kparams.IPv4, Value: net.ParseIP("127.0.0.1")},
-					kparams.NetDIP:   {Name: kparams.NetDIP, Type: kparams.IPv4, Value: net.ParseIP("8.8.8.8")},
+			&event.Event{
+				Type:     event.RecvUDPv6,
+				Category: event.Net,
+				Params: event.Params{
+					params.NetDport: {Name: params.NetDport, Type: params.Uint16, Value: uint16(53)},
+					params.NetSport: {Name: params.NetSport, Type: params.Uint16, Value: uint16(43123)},
+					params.NetSIP:   {Name: params.NetSIP, Type: params.IPv4, Value: net.ParseIP("127.0.0.1")},
+					params.NetDIP:   {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("8.8.8.8")},
 				},
 			},
-			func(e *kevent.Kevent, t *testing.T) {
+			func(e *event.Event, t *testing.T) {
 				assert.Equal(t, "Recv", e.Type.String())
-				assert.Equal(t, "domain", e.GetParamAsString(kparams.NetDportName))
-				assert.Equal(t, "UDP", e.GetParamAsString(kparams.NetL4Proto))
+				assert.Equal(t, "domain", e.GetParamAsString(params.NetDportName))
+				assert.Equal(t, "UDP", e.GetParamAsString(params.NetL4Proto))
 			},
 		},
 	}

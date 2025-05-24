@@ -19,7 +19,7 @@
 package ps
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"github.com/stretchr/testify/mock"
@@ -31,14 +31,14 @@ type SnapshotterMock struct {
 }
 
 // Write method
-func (s *SnapshotterMock) Write(kevt *kevent.Kevent) error {
-	args := s.Called(kevt)
+func (s *SnapshotterMock) Write(evt *event.Event) error {
+	args := s.Called(evt)
 	return args.Error(0)
 }
 
 // Remove method
-func (s *SnapshotterMock) Remove(kevt *kevent.Kevent) error {
-	args := s.Called(kevt)
+func (s *SnapshotterMock) Remove(evt *event.Event) error {
+	args := s.Called(evt)
 	return args.Error(0)
 }
 
@@ -79,14 +79,14 @@ func (s *SnapshotterMock) GetSnapshot() []*pstypes.PS {
 }
 
 // AddThread method
-func (s *SnapshotterMock) AddThread(kevt *kevent.Kevent) error {
-	args := s.Called(kevt)
+func (s *SnapshotterMock) AddThread(evt *event.Event) error {
+	args := s.Called(evt)
 	return args.Error(0)
 }
 
 // AddModule method
-func (s *SnapshotterMock) AddModule(kevt *kevent.Kevent) error {
-	args := s.Called(kevt)
+func (s *SnapshotterMock) AddModule(evt *event.Event) error {
+	args := s.Called(evt)
 	return args.Error(0)
 }
 
@@ -102,16 +102,16 @@ func (s *SnapshotterMock) RemoveModule(pid uint32, addr va.Address) error {
 	return args.Error(0)
 }
 
-// WriteFromKcap method
-func (s *SnapshotterMock) WriteFromKcap(kevt *kevent.Kevent) error { return nil }
+// WriteFromCapture method
+func (s *SnapshotterMock) WriteFromCapture(evt *event.Event) error { return nil }
 
-// AddFileMapping method
-func (s *SnapshotterMock) AddMmap(kevt *kevent.Kevent) error {
-	args := s.Called(kevt)
+// AddMmap method
+func (s *SnapshotterMock) AddMmap(evt *event.Event) error {
+	args := s.Called(evt)
 	return args.Error(0)
 }
 
-// RemoveFileMapping method
+// RemoveMmap method
 func (s *SnapshotterMock) RemoveMmap(pid uint32, address va.Address) error {
 	args := s.Called(pid, address)
 	return args.Error(0)

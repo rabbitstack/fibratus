@@ -1,5 +1,5 @@
 name: src ip address is not a loopback address
 id: 2155539d-31bd-429e-81f9-c17ee1c01f93
 version: 1.0.0
-condition:  kevt.name = 'Recv' and net.sip != 127.0.0.1
+condition:  evt.name = 'Recv' and net.sip != 127.0.0.1
 min-engine-version: 1.5.0

@@ -21,10 +21,9 @@ package etw
 import (
 	"github.com/rabbitstack/fibratus/internal/etw/processors"
 	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/filter"
 	"github.com/rabbitstack/fibratus/pkg/handle"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 )
@@ -36,8 +35,8 @@ import (
 // with additional attributes. The event is sent to the queue where
 // all registered listeners are executed.
 type Consumer struct {
-	q          *kevent.Queue
-	sequencer  *kevent.Sequencer
+	q          *event.Queue
+	sequencer  *event.Sequencer
 	processors processors.Chain
 	psnap      ps.Snapshotter
 	config     *config.Config
@@ -50,11 +49,11 @@ func NewConsumer(
 	psnap ps.Snapshotter,
 	hsnap handle.Snapshotter,
 	config *config.Config,
-	sequencer *kevent.Sequencer,
-	evts chan *kevent.Kevent,
+	sequencer *event.Sequencer,
+	evts chan *event.Event,
 ) *Consumer {
 	return &Consumer{
-		q:          kevent.NewQueueWithChannel(evts, config.Kstream.StackEnrichment, config.ForwardMode || config.IsCaptureSet()),
+		q:          event.NewQueueWithChannel(evts, config.Kstream.StackEnrichment, config.ForwardMode || config.IsCaptureSet()),
 		sequencer:  sequencer,
 		processors: processors.NewChain(psnap, hsnap, config),
 		psnap:      psnap,
@@ -75,22 +74,22 @@ func (c *Consumer) ProcessEvent(ev *etw.EventRecord) error {
 	if c.isClosing {
 		return nil
 	}
-	if kevent.IsCurrentProcDropped(ev.Header.ProcessID) {
+	if event.IsCurrentProcDropped(ev.Header.ProcessID) {
 		return nil
 	}
 	if c.config.Kstream.ExcludeKevent(ev.Header.ProviderID, ev.HookID()) {
-		excludedKevents.Add(1)
+		eventsExcluded.Add(1)
 		return nil
 	}
 
-	ktype := ktypes.NewFromEventRecord(ev)
-	if !ktype.Exists() {
-		keventsUnknown.Add(1)
+	etype := event.NewFromEventRecord(ev)
+	if !etype.Exists() {
+		eventsUnknown.Add(1)
 		return nil
 	}
 
-	keventsProcessed.Add(1)
-	evt := kevent.New(c.sequencer.Get(), ktype, ev)
+	eventsProcessed.Add(1)
+	evt := event.New(c.sequencer.Get(), etype, ev)
 
 	// Dispatch each event to the processor chain.
 	// Processors may further augment the event with
@@ -131,7 +130,7 @@ func (c *Consumer) ProcessEvent(ev *etw.EventRecord) error {
 	// decide whether it should get dropped
 	if (evt.IsDropped(c.config.IsCaptureSet()) ||
 		c.config.Kstream.ExcludeImage(evt.PS)) && !evt.IsStackWalk() {
-		keventsDropped.Add(1)
+		eventsExcluded.Add(1)
 		return nil
 	}
 	if c.filter != nil && !evt.IsStackWalk() && !c.filter.Run(evt) {

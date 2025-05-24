@@ -22,8 +22,8 @@ import (
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"golang.org/x/sys/windows"
 
-	"github.com/rabbitstack/fibratus/pkg/kcap/section"
-	kcapver "github.com/rabbitstack/fibratus/pkg/kcap/version"
+	"github.com/rabbitstack/fibratus/pkg/cap/section"
+	kcapver "github.com/rabbitstack/fibratus/pkg/cap/version"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 
 	"github.com/stretchr/testify/assert"

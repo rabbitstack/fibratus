@@ -29,7 +29,7 @@ import (
 
 	"github.com/rabbitstack/fibratus/pkg/util/version"
 
-	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/outputs"
 )
 
@@ -79,7 +79,7 @@ func initHTTP(config outputs.Config) (outputs.OutputGroup, error) {
 func (h *_http) Connect() error { return nil }
 func (h *_http) Close() error   { return nil }
 
-func (h *_http) Publish(batch *kevent.Batch) error {
+func (h *_http) Publish(batch *event.Batch) error {
 	var buf []byte
 	switch h.config.Serializer {
 	case outputs.JSON:

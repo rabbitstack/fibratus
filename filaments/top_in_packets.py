@@ -25,15 +25,15 @@ __connections__ = collections.Counter()
 
 
 def on_init():
-    kfilter("kevt.name = 'Recv'")
+    set_filter("evt.name = 'Recv'")
     columns(["Source", "Count"])
     sort_by('Count')
     interval(1)
 
 
 @dotdictify
-def on_next_kevent(kevent):
-    src = ['%s:%d' % (kevent.kparams.sip, kevent.kparams.sport)]
+def on_next_event(event):
+    src = ['%s:%d' % (event.params.sip, event.params.sport)]
     __connections__.update(src)
 
 

@@ -30,7 +30,7 @@
     "init-snapshot": true
   },
 
-  "kevent": {
+  "Event": {
 
   },
 

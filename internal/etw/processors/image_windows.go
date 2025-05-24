@@ -20,8 +20,8 @@ package processors
 
 import (
 	"expvar"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"sync"
 	"time"
@@ -54,11 +54,11 @@ func newImageProcessor(psnap ps.Snapshotter) Processor {
 
 func (*imageProcessor) Name() ProcessorType { return Image }
 
-func (m *imageProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error) {
+func (m *imageProcessor) ProcessEvent(e *event.Event) (*event.Event, bool, error) {
 	if e.IsLoadImage() {
 		// is image characteristics data cached?
-		path := e.GetParamAsString(kparams.ImagePath)
-		key := path + e.GetParamAsString(kparams.ImageCheckSum)
+		path := e.GetParamAsString(params.ImagePath)
+		key := path + e.GetParamAsString(params.ImageCheckSum)
 
 		m.mu.Lock()
 		defer m.mu.Unlock()
@@ -78,15 +78,15 @@ func (m *imageProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, e
 		}
 
 		// append event parameters
-		e.AppendParam(kparams.FileIsDLL, kparams.Bool, c.isDLL)
-		e.AppendParam(kparams.FileIsDriver, kparams.Bool, c.isDriver)
-		e.AppendParam(kparams.FileIsExecutable, kparams.Bool, c.isExe)
-		e.AppendParam(kparams.FileIsDotnet, kparams.Bool, c.isDotnet)
+		e.AppendParam(params.FileIsDLL, params.Bool, c.isDLL)
+		e.AppendParam(params.FileIsDriver, params.Bool, c.isDriver)
+		e.AppendParam(params.FileIsExecutable, params.Bool, c.isExe)
+		e.AppendParam(params.FileIsDotnet, params.Bool, c.isDotnet)
 	}
 
 	if e.IsUnloadImage() {
-		pid := e.Kparams.MustGetPid()
-		addr := e.Kparams.TryGetAddress(kparams.ImageBase)
+		pid := e.Params.MustGetPid()
+		addr := e.Params.TryGetAddress(params.ImageBase)
 		if pid == 0 {
 			pid = e.PID
 		}

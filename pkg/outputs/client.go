@@ -19,12 +19,12 @@
 package outputs
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/event"
 )
 
 // Client represents the minimal interface all output implementors have to satisfy.
 type Client interface {
 	Close() error
-	Publish(*kevent.Batch) error
+	Publish(*event.Batch) error
 	Connect() error
 }

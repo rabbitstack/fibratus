@@ -4,8 +4,8 @@ version: 1.0.0
 condition: >
   sequence
   maxspan 100ms
-  |kevt.name = 'CreateProcess' and ps.name = 'cmd.exe'| by ps.exe
-  |kevt.name = 'CreateFile'
+  |evt.name = 'CreateProcess' and ps.name = 'cmd.exe'| by ps.exe
+  |evt.name = 'CreateFile'
       and
    file.path icontains 'temp'
   | by file.path

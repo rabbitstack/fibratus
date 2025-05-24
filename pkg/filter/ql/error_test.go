@@ -25,7 +25,7 @@ import (
 )
 
 func TestParseError(t *testing.T) {
-	expr := `kevt.name in ('RegCreateKey', 'RegDeleteKey', 'RegSetValue', 'RegDeleteValue')
+	expr := `evt.name in ('RegCreateKey', 'RegDeleteKey', 'RegSetValue', 'RegDeleteValue')
 	        and
 	     registry.key.name icontains
 			(
@@ -54,7 +54,7 @@ func TestParseError(t *testing.T) {
 	        (
 	          'user shell folders\\startup'
 	        )`
-	expected := `kevt.name in ('RegCreateKey', 'RegDeleteKey', 'RegSetValue', 'RegDeleteValue')
+	expected := `evt.name in ('RegCreateKey', 'RegDeleteKey', 'RegSetValue', 'RegDeleteValue')
 	        and
 	     registry.key.name icontains
 			(

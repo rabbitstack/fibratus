@@ -21,11 +21,10 @@ import (
 	"context"
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/symbolize"
@@ -58,7 +57,7 @@ type MockListener struct {
 
 func (l *MockListener) CanEnqueue() bool { return true }
 
-func (l *MockListener) ProcessEvent(e *kevent.Kevent) (bool, error) {
+func (l *MockListener) ProcessEvent(e *event.Event) (bool, error) {
 	l.gotEvent = true
 	return true, nil
 }
@@ -171,16 +170,16 @@ func TestEventSourceEnableFlagsDynamically(t *testing.T) {
 		HasThreadEvents:   false,
 		HasVAMapEvents:    true,
 		HasAuditAPIEvents: true,
-		UsedEvents: []ktypes.Ktype{
-			ktypes.CreateProcess,
-			ktypes.LoadImage,
-			ktypes.RegCreateKey,
-			ktypes.RegSetValue,
-			ktypes.CreateFile,
-			ktypes.RenameFile,
-			ktypes.MapViewFile,
-			ktypes.OpenProcess,
-			ktypes.ConnectTCPv4,
+		UsedEvents: []event.Type{
+			event.CreateProcess,
+			event.LoadImage,
+			event.RegCreateKey,
+			event.RegSetValue,
+			event.CreateFile,
+			event.RenameFile,
+			event.MapViewFile,
+			event.OpenProcess,
+			event.ConnectTCPv4,
 		},
 	}
 	cfg := &config.Config{
@@ -217,10 +216,10 @@ func TestEventSourceEnableFlagsDynamically(t *testing.T) {
 	// but VAMap is disabled in the config
 	require.True(t, flags&etw.VaMap == 0)
 
-	require.False(t, cfg.Kstream.TestDropMask(ktypes.UnloadImage))
-	require.True(t, cfg.Kstream.TestDropMask(ktypes.WriteFile))
-	require.True(t, cfg.Kstream.TestDropMask(ktypes.UnmapViewFile))
-	require.False(t, cfg.Kstream.TestDropMask(ktypes.OpenProcess))
+	require.False(t, cfg.Kstream.TestDropMask(event.UnloadImage))
+	require.True(t, cfg.Kstream.TestDropMask(event.WriteFile))
+	require.True(t, cfg.Kstream.TestDropMask(event.UnmapViewFile))
+	require.False(t, cfg.Kstream.TestDropMask(event.OpenProcess))
 }
 
 func TestEventSourceEnableFlagsDynamicallyWithYaraEnabled(t *testing.T) {
@@ -249,14 +248,14 @@ func TestEventSourceEnableFlagsDynamicallyWithYaraEnabled(t *testing.T) {
 		HasFileEvents:     false,
 		HasThreadEvents:   false,
 		HasAuditAPIEvents: true,
-		UsedEvents: []ktypes.Ktype{
-			ktypes.CreateProcess,
-			ktypes.LoadImage,
-			ktypes.RegCreateKey,
-			ktypes.RegSetValue,
-			ktypes.RenameFile,
-			ktypes.OpenProcess,
-			ktypes.ConnectTCPv4,
+		UsedEvents: []event.Type{
+			event.CreateProcess,
+			event.LoadImage,
+			event.RegCreateKey,
+			event.RegSetValue,
+			event.RenameFile,
+			event.OpenProcess,
+			event.ConnectTCPv4,
 		},
 	}
 	cfg := &config.Config{
@@ -293,9 +292,9 @@ func TestEventSourceEnableFlagsDynamicallyWithYaraEnabled(t *testing.T) {
 	// alloc scanning is enabled
 	require.True(t, flags&etw.VirtualAlloc != 0)
 
-	require.False(t, cfg.Kstream.TestDropMask(ktypes.CreateFile))
-	require.True(t, cfg.Kstream.TestDropMask(ktypes.MapViewFile))
-	require.False(t, cfg.Kstream.TestDropMask(ktypes.VirtualAlloc))
+	require.False(t, cfg.Kstream.TestDropMask(event.CreateFile))
+	require.True(t, cfg.Kstream.TestDropMask(event.MapViewFile))
+	require.False(t, cfg.Kstream.TestDropMask(event.VirtualAlloc))
 }
 
 func TestEventSourceRundownEvents(t *testing.T) {
@@ -325,7 +324,7 @@ func TestEventSourceRundownEvents(t *testing.T) {
 	}
 	cfg := &config.Config{
 		Kstream:  kstreamConfig,
-		KcapFile: "fake.kcap", // simulate capture to receive state/rundown events
+		KcapFile: "fake.cap", // simulate capture to receive state/rundown events
 		Filters:  &config.Filters{},
 	}
 
@@ -336,12 +335,12 @@ func TestEventSourceRundownEvents(t *testing.T) {
 	require.NoError(t, evs.Open(cfg))
 	defer evs.Close()
 
-	rundownsByType := map[ktypes.Ktype]bool{
-		ktypes.ProcessRundown: false,
-		ktypes.ThreadRundown:  false,
-		ktypes.ImageRundown:   false,
-		ktypes.FileRundown:    false,
-		ktypes.RegKCBRundown:  false,
+	rundownsByType := map[event.Type]bool{
+		event.ProcessRundown: false,
+		event.ThreadRundown:  false,
+		event.ImageRundown:   false,
+		event.FileRundown:    false,
+		event.RegKCBRundown:  false,
 	}
 	rundownsByHash := make(map[uint64]uint8)
 	timeout := time.After(time.Minute)
@@ -374,7 +373,7 @@ func TestEventSourceRundownEvents(t *testing.T) {
 }
 
 func TestEventSourceAllEvents(t *testing.T) {
-	kevent.DropCurrentProc = false
+	event.DropCurrentProc = false
 	var viewBase uintptr
 	var freeAddress uintptr
 	var dupHandleID windows.Handle
@@ -382,7 +381,7 @@ func TestEventSourceAllEvents(t *testing.T) {
 	var tests = []*struct {
 		name      string
 		gen       func() error
-		want      func(e *kevent.Kevent) bool
+		want      func(e *event.Event) bool
 		completed bool
 	}{
 		{
@@ -411,26 +410,26 @@ func TestEventSourceAllEvents(t *testing.T) {
 				defer windows.TerminateProcess(pi.Process, 0)
 				return nil
 			},
-			func(e *kevent.Kevent) bool {
+			func(e *event.Event) bool {
 				return e.IsCreateProcess() && e.CurrentPid() &&
-					strings.EqualFold(e.GetParamAsString(kparams.ProcessName), "notepad.exe")
+					strings.EqualFold(e.GetParamAsString(params.ProcessName), "notepad.exe")
 			},
 			false,
 		},
 		{
 			"terminate process",
 			nil,
-			func(e *kevent.Kevent) bool {
-				return e.IsTerminateProcess() && strings.EqualFold(e.GetParamAsString(kparams.ProcessName), "notepad.exe")
+			func(e *event.Event) bool {
+				return e.IsTerminateProcess() && strings.EqualFold(e.GetParamAsString(params.ProcessName), "notepad.exe")
 			},
 			false,
 		},
 		{
 			"load image",
 			nil,
-			func(e *kevent.Kevent) bool {
+			func(e *event.Event) bool {
 				img := filepath.Join(os.Getenv("windir"), "System32", "notepad.exe")
-				return e.IsLoadImage() && strings.EqualFold(img, e.GetParamAsString(kparams.ImagePath))
+				return e.IsLoadImage() && strings.EqualFold(img, e.GetParamAsString(params.ImagePath))
 			},
 			false,
 		},
@@ -444,9 +443,9 @@ func TestEventSourceAllEvents(t *testing.T) {
 				defer f.Close()
 				return nil
 			},
-			func(e *kevent.Kevent) bool {
-				return e.CurrentPid() && e.Type == ktypes.CreateFile &&
-					strings.HasPrefix(filepath.Base(e.GetParamAsString(kparams.FilePath)), "fibratus-test") &&
+			func(e *event.Event) bool {
+				return e.CurrentPid() && e.Type == event.CreateFile &&
+					strings.HasPrefix(filepath.Base(e.GetParamAsString(params.FilePath)), "fibratus-test") &&
 					!e.IsOpenDisposition()
 			},
 			false,
@@ -474,8 +473,8 @@ func TestEventSourceAllEvents(t *testing.T) {
 				}()
 				return nil
 			},
-			func(e *kevent.Kevent) bool {
-				return e.CurrentPid() && (e.Type == ktypes.ConnectTCPv4 || e.Type == ktypes.ConnectTCPv6)
+			func(e *event.Event) bool {
+				return e.CurrentPid() && (e.Type == event.ConnectTCPv4 || e.Type == event.ConnectTCPv6)
 			},
 			false,
 		},
@@ -527,11 +526,11 @@ func TestEventSourceAllEvents(t *testing.T) {
 				}
 				return nil
 			},
-			func(e *kevent.Kevent) bool {
-				return e.CurrentPid() && e.Type == ktypes.MapViewFile &&
-					e.GetParamAsString(kparams.MemProtect) == "EXECUTE_READWRITE|READONLY" &&
-					e.GetParamAsString(kparams.FileViewSectionType) == "IMAGE" &&
-					strings.Contains(e.GetParamAsString(kparams.FilePath), "_fixtures\\yara-test.dll")
+			func(e *event.Event) bool {
+				return e.CurrentPid() && e.Type == event.MapViewFile &&
+					e.GetParamAsString(params.MemProtect) == "EXECUTE_READWRITE|READONLY" &&
+					e.GetParamAsString(params.FileViewSectionType) == "IMAGE" &&
+					strings.Contains(e.GetParamAsString(params.FilePath), "_fixtures\\yara-test.dll")
 			},
 			false,
 		},
@@ -575,10 +574,10 @@ func TestEventSourceAllEvents(t *testing.T) {
 				}
 				return sys.NtUnmapViewOfSection(windows.CurrentProcess(), viewBase)
 			},
-			func(e *kevent.Kevent) bool {
-				return e.CurrentPid() && e.Type == ktypes.UnmapViewFile &&
-					e.GetParamAsString(kparams.MemProtect) == "READONLY" &&
-					e.Kparams.MustGetUint64(kparams.FileViewBase) == uint64(viewBase)
+			func(e *event.Event) bool {
+				return e.CurrentPid() && e.Type == event.UnmapViewFile &&
+					e.GetParamAsString(params.MemProtect) == "READONLY" &&
+					e.Params.MustGetUint64(params.FileViewBase) == uint64(viewBase)
 			},
 			false,
 		},
@@ -594,9 +593,9 @@ func TestEventSourceAllEvents(t *testing.T) {
 				}()
 				return nil
 			},
-			func(e *kevent.Kevent) bool {
-				return e.CurrentPid() && e.Type == ktypes.VirtualAlloc &&
-					e.GetParamAsString(kparams.MemAllocType) == "COMMIT|RESERVE" && e.GetParamAsString(kparams.MemProtectMask) == "RWX"
+			func(e *event.Event) bool {
+				return e.CurrentPid() && e.Type == event.VirtualAlloc &&
+					e.GetParamAsString(params.MemAllocType) == "COMMIT|RESERVE" && e.GetParamAsString(params.MemProtectMask) == "RWX"
 			},
 			false,
 		},
@@ -610,9 +609,9 @@ func TestEventSourceAllEvents(t *testing.T) {
 				}
 				return windows.VirtualFree(freeAddress, 1024, windows.MEM_DECOMMIT)
 			},
-			func(e *kevent.Kevent) bool {
-				return e.CurrentPid() && e.Type == ktypes.VirtualFree &&
-					e.GetParamAsString(kparams.MemAllocType) == "DECOMMIT" && e.Kparams.MustGetUint64(kparams.MemBaseAddress) == uint64(freeAddress)
+			func(e *event.Event) bool {
+				return e.CurrentPid() && e.Type == event.VirtualFree &&
+					e.GetParamAsString(params.MemAllocType) == "DECOMMIT" && e.Params.MustGetUint64(params.MemBaseAddress) == uint64(freeAddress)
 			},
 			false,
 		},
@@ -660,10 +659,10 @@ func TestEventSourceAllEvents(t *testing.T) {
 				defer windows.Close(dup)
 				return nil
 			},
-			func(e *kevent.Kevent) bool {
-				return e.CurrentPid() && e.Type == ktypes.DuplicateHandle &&
-					e.GetParamAsString(kparams.HandleObjectTypeID) == handle.Key &&
-					windows.Handle(e.Kparams.MustGetUint32(kparams.HandleSourceID)) == dupHandleID
+			func(e *event.Event) bool {
+				return e.CurrentPid() && e.Type == event.DuplicateHandle &&
+					e.GetParamAsString(params.HandleObjectTypeID) == handle.Key &&
+					windows.Handle(e.Params.MustGetUint32(params.HandleSourceID)) == dupHandleID
 			},
 			false,
 		},
@@ -673,11 +672,11 @@ func TestEventSourceAllEvents(t *testing.T) {
 				_, err := net.LookupHost("dns.google")
 				return err
 			},
-			func(e *kevent.Kevent) bool {
-				return e.CurrentPid() && e.Type == ktypes.QueryDNS && e.IsDNS() &&
-					e.Type.Subcategory() == ktypes.DNS &&
-					e.GetParamAsString(kparams.DNSName) == "dns.google" &&
-					e.GetParamAsString(kparams.DNSRR) == "A"
+			func(e *event.Event) bool {
+				return e.CurrentPid() && e.Type == event.QueryDNS && e.IsDNS() &&
+					e.Type.Subcategory() == event.DNS &&
+					e.GetParamAsString(params.DNSName) == "dns.google" &&
+					e.GetParamAsString(params.DNSRR) == "A"
 			},
 			false,
 		},
@@ -687,13 +686,13 @@ func TestEventSourceAllEvents(t *testing.T) {
 				_, err := net.LookupHost("dns.google")
 				return err
 			},
-			func(e *kevent.Kevent) bool {
-				return e.CurrentPid() && e.Type == ktypes.ReplyDNS && e.IsDNS() &&
-					e.Type.Subcategory() == ktypes.DNS &&
-					e.GetParamAsString(kparams.DNSName) == "dns.google" &&
-					e.GetParamAsString(kparams.DNSRR) == "AAAA" &&
-					e.GetParamAsString(kparams.DNSRcode) == "NOERROR" &&
-					e.GetParamAsString(kparams.DNSAnswers) != ""
+			func(e *event.Event) bool {
+				return e.CurrentPid() && e.Type == event.ReplyDNS && e.IsDNS() &&
+					e.Type.Subcategory() == event.DNS &&
+					e.GetParamAsString(params.DNSName) == "dns.google" &&
+					e.GetParamAsString(params.DNSRR) == "AAAA" &&
+					e.GetParamAsString(params.DNSRcode) == "NOERROR" &&
+					e.GetParamAsString(params.DNSAnswers) != ""
 			},
 			false,
 		},
@@ -702,8 +701,8 @@ func TestEventSourceAllEvents(t *testing.T) {
 			func() error {
 				return nil
 			},
-			func(e *kevent.Kevent) bool {
-				return e.CurrentPid() && e.Type == ktypes.SetThreadContext && e.GetParamAsString(kparams.NTStatus) == "Success"
+			func(e *event.Event) bool {
+				return e.CurrentPid() && e.Type == event.SetThreadContext && e.GetParamAsString(params.NTStatus) == "Success"
 			},
 			false,
 		},
@@ -806,21 +805,21 @@ type NoopPsSnapshotter struct{}
 
 var fakeProc = &pstypes.PS{PID: 111111, Name: "fake.exe"}
 
-func (s *NoopPsSnapshotter) Write(kevt *kevent.Kevent) error                    { return nil }
-func (s *NoopPsSnapshotter) Remove(kevt *kevent.Kevent) error                   { return nil }
+func (s *NoopPsSnapshotter) Write(evt *event.Event) error                       { return nil }
+func (s *NoopPsSnapshotter) Remove(evt *event.Event) error                      { return nil }
 func (s *NoopPsSnapshotter) Find(pid uint32) (bool, *pstypes.PS)                { return true, fakeProc }
 func (s *NoopPsSnapshotter) FindAndPut(pid uint32) *pstypes.PS                  { return fakeProc }
 func (s *NoopPsSnapshotter) Put(ps *pstypes.PS)                                 {}
 func (s *NoopPsSnapshotter) Size() uint32                                       { return 1 }
 func (s *NoopPsSnapshotter) Close() error                                       { return nil }
 func (s *NoopPsSnapshotter) GetSnapshot() []*pstypes.PS                         { return nil }
-func (s *NoopPsSnapshotter) AddThread(kevt *kevent.Kevent) error                { return nil }
-func (s *NoopPsSnapshotter) AddModule(kevt *kevent.Kevent) error                { return nil }
+func (s *NoopPsSnapshotter) AddThread(evt *event.Event) error                   { return nil }
+func (s *NoopPsSnapshotter) AddModule(evt *event.Event) error                   { return nil }
 func (s *NoopPsSnapshotter) FindModule(addr va.Address) (bool, *pstypes.Module) { return false, nil }
 func (s *NoopPsSnapshotter) RemoveThread(pid uint32, tid uint32) error          { return nil }
 func (s *NoopPsSnapshotter) RemoveModule(pid uint32, addr va.Address) error     { return nil }
-func (s *NoopPsSnapshotter) WriteFromKcap(kevt *kevent.Kevent) error            { return nil }
-func (s *NoopPsSnapshotter) AddMmap(kevt *kevent.Kevent) error                  { return nil }
+func (s *NoopPsSnapshotter) WriteFromKcap(evt *event.Event) error               { return nil }
+func (s *NoopPsSnapshotter) AddMmap(evt *event.Event) error                     { return nil }
 func (s *NoopPsSnapshotter) RemoveMmap(pid uint32, addr va.Address) error       { return nil }
 
 func TestCallstackEnrichment(t *testing.T) {
@@ -851,14 +850,14 @@ func TestCallstackEnrichment(t *testing.T) {
 }
 
 func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Snapshotter) {
-	kevent.DropCurrentProc = false
+	event.DropCurrentProc = false
 
 	var procHandle windows.Handle
 
 	var tests = []*struct {
 		name      string
 		gen       func() error
-		want      func(e *kevent.Kevent) bool
+		want      func(e *event.Event) bool
 		completed bool
 	}{
 		{
@@ -887,9 +886,9 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 				procHandle = pi.Process
 				return nil
 			},
-			func(e *kevent.Kevent) bool {
+			func(e *event.Event) bool {
 				if e.IsCreateProcess() && e.CurrentPid() &&
-					strings.EqualFold(e.GetParamAsString(kparams.ProcessName), "notepad.exe") {
+					strings.EqualFold(e.GetParamAsString(params.ProcessName), "notepad.exe") {
 					callstack := e.Callstack.String()
 					log.Infof("create process event %s: %s", e.String(), callstack)
 					return callstackContainsTestExe(callstack) &&
@@ -902,8 +901,8 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 		{
 			"load image callstack",
 			nil,
-			func(e *kevent.Kevent) bool {
-				if e.IsLoadImage() && filepath.Ext(e.GetParamAsString(kparams.FilePath)) == ".dll" {
+			func(e *event.Event) bool {
+				if e.IsLoadImage() && filepath.Ext(e.GetParamAsString(params.FilePath)) == ".dll" {
 					callstack := e.Callstack.String()
 					return strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\System32\\KERNELBASE.dll!LoadLibraryExW")) &&
 						strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\system32\\ntoskrnl.exe!NtMapViewOfSection"))
@@ -915,7 +914,7 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 		{
 			"create thread callstack",
 			nil,
-			func(e *kevent.Kevent) bool {
+			func(e *event.Event) bool {
 				if e.IsCreateThread() {
 					callstack := e.Callstack.String()
 					log.Infof("create thread event %s: %s", e.String(), callstack)
@@ -929,7 +928,7 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 		{
 			"terminate thread callstack",
 			nil,
-			func(e *kevent.Kevent) bool {
+			func(e *event.Event) bool {
 				if e.IsTerminateThread() {
 					callstack := e.Callstack.String()
 					log.Infof("terminate thread event %s: %s", e.String(), callstack)
@@ -954,8 +953,8 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 				defer registry.DeleteKey(registry.CURRENT_USER, path)
 				return nil
 			},
-			func(e *kevent.Kevent) bool {
-				if e.CurrentPid() && e.Type == ktypes.RegCreateKey && e.GetParamAsString(kparams.RegPath) == "HKEY_CURRENT_USER\\Volatile Environment\\CallstackTest" {
+			func(e *event.Event) bool {
+				if e.CurrentPid() && e.Type == event.RegCreateKey && e.GetParamAsString(params.RegPath) == "HKEY_CURRENT_USER\\Volatile Environment\\CallstackTest" {
 					callstack := e.Callstack.String()
 					log.Infof("create key event %s: %s", e.String(), callstack)
 					return callstackContainsTestExe(callstack) &&
@@ -970,8 +969,8 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 		{
 			"delete registry key callstack",
 			nil,
-			func(e *kevent.Kevent) bool {
-				if e.CurrentPid() && e.Type == ktypes.RegDeleteKey {
+			func(e *event.Event) bool {
+				if e.CurrentPid() && e.Type == event.RegDeleteKey {
 					callstack := e.Callstack.String()
 					log.Infof("delete key event %s: %s", e.String(), callstack)
 					return callstackContainsTestExe(callstack) &&
@@ -992,8 +991,8 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 				defer key.DeleteValue("FibratusCallstack")
 				return key.SetStringValue("FibratusCallstack", "Callstack")
 			},
-			func(e *kevent.Kevent) bool {
-				if e.CurrentPid() && e.Type == ktypes.RegSetValue && strings.HasSuffix(e.GetParamAsString(kparams.RegPath), "FibratusCallstack") {
+			func(e *event.Event) bool {
+				if e.CurrentPid() && e.Type == event.RegSetValue && strings.HasSuffix(e.GetParamAsString(params.RegPath), "FibratusCallstack") {
 					callstack := e.Callstack.String()
 					log.Infof("set value event %s: %s", e.String(), callstack)
 					return callstackContainsTestExe(callstack) &&
@@ -1008,8 +1007,8 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 		{
 			"delete registry value callstack",
 			nil,
-			func(e *kevent.Kevent) bool {
-				if e.CurrentPid() && e.Type == ktypes.RegDeleteValue {
+			func(e *event.Event) bool {
+				if e.CurrentPid() && e.Type == event.RegDeleteValue {
 					callstack := e.Callstack.String()
 					log.Infof("delete value event %s: %s", e.String(), callstack)
 					return callstackContainsTestExe(callstack) &&
@@ -1022,8 +1021,8 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 		{
 			"set thread context callstack",
 			nil,
-			func(e *kevent.Kevent) bool {
-				return e.Type == ktypes.SetThreadContext &&
+			func(e *event.Event) bool {
+				return e.Type == event.SetThreadContext &&
 					callstackContainsTestExe(e.Callstack.String()) &&
 					strings.Contains(strings.ToLower(e.Callstack.String()), strings.ToLower("\\WINDOWS\\System32\\KERNELBASE.dll!SetThreadContext"))
 			},
@@ -1039,9 +1038,9 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 				defer f.Close()
 				return nil
 			},
-			func(e *kevent.Kevent) bool {
-				if e.CurrentPid() && e.Type == ktypes.CreateFile &&
-					strings.HasPrefix(filepath.Base(e.GetParamAsString(kparams.FilePath)), "fibratus-callstack") &&
+			func(e *event.Event) bool {
+				if e.CurrentPid() && e.Type == event.CreateFile &&
+					strings.HasPrefix(filepath.Base(e.GetParamAsString(params.FilePath)), "fibratus-callstack") &&
 					!e.IsOpenDisposition() {
 					callstack := e.Callstack.String()
 					log.Infof("create file event %s: %s", e.String(), callstack)
@@ -1068,9 +1067,9 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 				defer windows.Close(h)
 				return nil
 			},
-			func(e *kevent.Kevent) bool {
-				if e.CurrentPid() && e.Type == ktypes.CreateFile &&
-					strings.HasPrefix(filepath.Base(e.GetParamAsString(kparams.FilePath)), "fibratus-file-transacted") &&
+			func(e *event.Event) bool {
+				if e.CurrentPid() && e.Type == event.CreateFile &&
+					strings.HasPrefix(filepath.Base(e.GetParamAsString(params.FilePath)), "fibratus-file-transacted") &&
 					!e.IsOpenDisposition() {
 					callstack := e.Callstack.String()
 					log.Infof("create transacted file event %s: %s", e.String(), callstack)
@@ -1090,9 +1089,9 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 				}
 				return nil
 			},
-			func(e *kevent.Kevent) bool {
-				if e.CurrentPid() && e.Type == ktypes.VirtualAlloc &&
-					e.GetParamAsString(kparams.MemAllocType) == "COMMIT|RESERVE" {
+			func(e *event.Event) bool {
+				if e.CurrentPid() && e.Type == event.VirtualAlloc &&
+					e.GetParamAsString(params.MemAllocType) == "COMMIT|RESERVE" {
 					callstack := e.Callstack.String()
 					log.Infof("virtual alloc event %s: %s", e.String(), callstack)
 					return callstackContainsTestExe(callstack) &&
@@ -1115,9 +1114,9 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 		//		to, _ := windows.UTF16PtrFromString(filepath.Join(os.TempDir(), "copied-file"))
 		//		return copyFile(from, to)
 		//	},
-		//	func(e *kevent.Kevent) bool {
-		//		if e.CurrentPid() && e.Type == ktypes.CreateFile &&
-		//			strings.HasPrefix(filepath.Base(e.GetParamAsString(kparams.FileName)), "copied-file") &&
+		//	func(e *event.Event) bool {
+		//		if e.CurrentPid() && e.Type == event.CreateFile &&
+		//			strings.HasPrefix(filepath.Base(e.GetParamAsString(params.FileName)), "copied-file") &&
 		//			!e.IsOpenDisposition() {
 		//			callstack := e.Callstack.String()
 		//			log.Infof("copy file event %s: %s", e.String(), callstack)
@@ -1138,9 +1137,9 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 				f.Close()
 				return os.Remove(f.Name())
 			},
-			func(e *kevent.Kevent) bool {
-				if e.CurrentPid() && e.Type == ktypes.DeleteFile &&
-					strings.HasPrefix(filepath.Base(e.GetParamAsString(kparams.FilePath)), "fibratus-delete") {
+			func(e *event.Event) bool {
+				if e.CurrentPid() && e.Type == event.DeleteFile &&
+					strings.HasPrefix(filepath.Base(e.GetParamAsString(params.FilePath)), "fibratus-delete") {
 					callstack := e.Callstack.String()
 					log.Infof("delete file event %s: %s", e.String(), callstack)
 					return callstackContainsTestExe(callstack) &&
@@ -1163,9 +1162,9 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 				}
 				return os.Remove(filepath.Join(os.TempDir(), "fibratus-ren"))
 			},
-			func(e *kevent.Kevent) bool {
-				if e.CurrentPid() && e.Type == ktypes.RenameFile &&
-					strings.HasPrefix(filepath.Base(e.GetParamAsString(kparams.FilePath)), "fibratus-rename") {
+			func(e *event.Event) bool {
+				if e.CurrentPid() && e.Type == event.RenameFile &&
+					strings.HasPrefix(filepath.Base(e.GetParamAsString(params.FilePath)), "fibratus-rename") {
 					callstack := e.Callstack.String()
 					log.Infof("rename file event %s: %s", e.String(), callstack)
 					return callstackContainsTestExe(callstack) &&
@@ -1181,8 +1180,8 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 				_, err := windows.OpenProcess(windows.PROCESS_VM_READ, false, uint32(os.Getpid()))
 				return err
 			},
-			func(e *kevent.Kevent) bool {
-				if e.CurrentPid() && e.Type == ktypes.OpenProcess {
+			func(e *event.Event) bool {
+				if e.CurrentPid() && e.Type == event.OpenProcess {
 					callstack := e.Callstack.String()
 					log.Infof("open process event %s: %s", e.String(), callstack)
 					return callstackContainsTestExe(callstack) &&
@@ -1198,8 +1197,8 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 				_, err := windows.OpenThread(windows.THREAD_IMPERSONATE, false, windows.GetCurrentThreadId())
 				return err
 			},
-			func(e *kevent.Kevent) bool {
-				if e.CurrentPid() && e.Type == ktypes.OpenThread {
+			func(e *event.Event) bool {
+				if e.CurrentPid() && e.Type == event.OpenThread {
 					callstack := e.Callstack.String()
 					log.Infof("open thread event %s: %s", e.String(), callstack)
 					return callstackContainsTestExe(callstack) &&

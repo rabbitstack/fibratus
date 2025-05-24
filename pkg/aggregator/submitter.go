@@ -19,12 +19,12 @@
 package aggregator
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/outputs"
 )
 
 // queue defines the type alias for the batch worker queue
-type queue chan *kevent.Batch
+type queue chan *event.Batch
 
 // submitter initializes a group of load balanced output producers.
 type submitter struct {

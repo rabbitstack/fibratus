@@ -21,11 +21,11 @@ package bootstrap
 import (
 	"github.com/rabbitstack/fibratus/internal/etw"
 	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/filter"
 	"github.com/rabbitstack/fibratus/pkg/handle"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/ksource"
 	"github.com/rabbitstack/fibratus/pkg/ps"
+	"github.com/rabbitstack/fibratus/pkg/source"
 )
 
 // EventSourceControl abstracts away the management of event sources.
@@ -37,7 +37,7 @@ import (
 // of telemetry than the ETW subsystem. In this scenario, the event source
 // control will bootstrap the instrumentation engine based on eBPF.
 type EventSourceControl struct {
-	evs ksource.EventSource
+	evs source.EventSource
 }
 
 func NewEventSourceControl(
@@ -61,7 +61,7 @@ func (s *EventSourceControl) Errors() <-chan error {
 	return s.evs.Errors()
 }
 
-func (s *EventSourceControl) Events() <-chan *kevent.Kevent {
+func (s *EventSourceControl) Events() <-chan *event.Event {
 	return s.evs.Events()
 }
 
@@ -69,6 +69,6 @@ func (s *EventSourceControl) SetFilter(f filter.Filter) {
 	s.evs.SetFilter(f)
 }
 
-func (s *EventSourceControl) RegisterEventListener(lis kevent.Listener) {
+func (s *EventSourceControl) RegisterEventListener(lis event.Listener) {
 	s.evs.RegisterEventListener(lis)
 }
