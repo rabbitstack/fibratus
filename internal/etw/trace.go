@@ -284,7 +284,7 @@ func (t *Trace) processEventCallback(ev *etw.EventRecord) uintptr {
 	}
 	if err := t.consumer.ProcessEvent(ev); err != nil {
 		t.errs <- err
-		failedKevents.Add(err.Error(), 1)
+		eventsFailed.Add(err.Error(), 1)
 	}
 	return callbackNext
 }

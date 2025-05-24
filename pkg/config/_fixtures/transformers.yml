@@ -19,11 +19,11 @@ transformers.tags:
 
 transformers.remove:
   enabled: true
-  kparams:
+  params:
     - key_handle
 
 transformers.rename:
   enabled: true
-  kparams:
+  params:
     - old: key_handle
       new: KeyHandle

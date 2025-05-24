@@ -84,7 +84,7 @@ jobs:
           ./make.bat mc
           ./make.bat
         env:
-          TAGS: kcap,filament,yara,yara_static
+          TAGS: cap,filament,yara,yara_static
       - uses: actions/upload-artifact@v4
         with:
           name: "fibratus-amd64.exe"
@@ -176,7 +176,7 @@ jobs:
            export PKG_CONFIG_PATH=$(pwd)/pkg-config
            ./make.bat test
         env:
-          TAGS: kcap,yara,yara_static
+          TAGS: cap,yara,yara_static
 
   lint:
     runs-on: windows-latest

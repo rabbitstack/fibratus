@@ -20,11 +20,11 @@ package trim
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"strings"
 )
 
-// trim transformer trims suffixes/prefixes from kpar values.
+// trim transformer trims suffixes/prefixes from par values.
 type trim struct {
 	c Config
 }
@@ -41,29 +41,29 @@ func initTrimTransformer(config transformers.Config) (transformers.Transformer, 
 	return &trim{c: cfg}, nil
 }
 
-func (r trim) Transform(kevt *kevent.Kevent) error {
-	for _, kpar := range kevt.Kparams {
+func (r trim) Transform(evt *event.Event) error {
+	for _, par := range evt.Params {
 		// trim prefixes
-		for _, par := range r.c.Prefixes {
-			if kpar.Name != par.Name {
+		for _, pre := range r.c.Prefixes {
+			if par.Name != pre.Name {
 				continue
 			}
-			_, ok := kpar.Value.(string)
+			_, ok := par.Value.(string)
 			if !ok {
 				continue
 			}
-			kpar.Value = strings.TrimPrefix(kevt.GetParamAsString(kpar.Name), par.Trim)
+			par.Value = strings.TrimPrefix(evt.GetParamAsString(par.Name), pre.Trim)
 		}
 		// trim suffixes
-		for _, par := range r.c.Suffixes {
-			if kpar.Name != par.Name {
+		for _, suf := range r.c.Suffixes {
+			if par.Name != suf.Name {
 				continue
 			}
-			_, ok := kpar.Value.(string)
+			_, ok := par.Value.(string)
 			if !ok {
 				continue
 			}
-			kpar.Value = strings.TrimSuffix(kevt.GetParamAsString(kpar.Name), par.Trim)
+			par.Value = strings.TrimSuffix(evt.GetParamAsString(par.Name), suf.Trim)
 		}
 	}
 	return nil

@@ -21,19 +21,19 @@ package processors
 import (
 	"expvar"
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 )
 
 // processorFailures counts the number of failures caused by event processors
-var processorFailures = expvar.NewInt("kevent.processor.failures")
+var processorFailures = expvar.NewInt("event.processor.failures")
 
 // Chain defines the event process chain has to satisfy.
 type Chain interface {
 	// ProcessEvent pushes the event into processor chain. Processors are applied sequentially, so we have to make
 	// sure that any processor providing additional context to the next processor is defined first in the chain. If
 	// one processor fails, the next processor in chain is invoked.
-	ProcessEvent(kevt *kevent.Kevent) (*kevent.Kevent, error)
+	ProcessEvent(evt *event.Event) (*event.Event, error)
 	// Close closes the processor chain and frees all allocated resources.
 	Close() error
 }
@@ -45,14 +45,14 @@ func (c *chain) addProcessor(processor Processor) {
 	c.processors = append(c.processors, processor)
 }
 
-func (c chain) ProcessEvent(kevt *kevent.Kevent) (*kevent.Kevent, error) {
+func (c chain) ProcessEvent(e *event.Event) (*event.Event, error) {
 	var errs = make([]error, 0)
-	var evt *kevent.Kevent
+	var evt *event.Event
 
 	for _, processor := range c.processors {
 		var err error
 		var next bool
-		evt, next, err = processor.ProcessEvent(kevt)
+		evt, next, err = processor.ProcessEvent(e)
 		if err != nil {
 			processorFailures.Add(1)
 			errs = append(errs, fmt.Errorf("%q processor failed with error: %v", processor.Name(), err))

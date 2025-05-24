@@ -22,8 +22,8 @@
 package handle
 
 import (
+	"github.com/rabbitstack/fibratus/pkg/event"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -33,14 +33,14 @@ type SnapshotterMock struct {
 }
 
 // Write method
-func (s *SnapshotterMock) Write(kevt *kevent.Kevent) error {
-	args := s.Called(kevt)
+func (s *SnapshotterMock) Write(evt *event.Event) error {
+	args := s.Called(evt)
 	return args.Error(0)
 }
 
 // Remove method
-func (s *SnapshotterMock) Remove(kevt *kevent.Kevent) error {
-	args := s.Called(kevt)
+func (s *SnapshotterMock) Remove(evt *event.Event) error {
+	args := s.Called(evt)
 	return args.Error(0)
 }
 

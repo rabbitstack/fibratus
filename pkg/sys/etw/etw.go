@@ -22,7 +22,7 @@
 package etw
 
 import (
-	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
+	"github.com/rabbitstack/fibratus/pkg/errors"
 	"golang.org/x/sys/windows"
 	"os"
 	"unsafe"
@@ -96,17 +96,17 @@ func StartTrace(name string, props EventTraceProperties) (TraceHandle, error) {
 	}
 	switch err.(windows.Errno) {
 	case windows.ERROR_ACCESS_DENIED:
-		return TraceHandle(0), kerrors.ErrTraceAccessDenied
+		return TraceHandle(0), errors.ErrTraceAccessDenied
 	case windows.ERROR_DISK_FULL:
-		return TraceHandle(0), kerrors.ErrTraceDiskFull
+		return TraceHandle(0), errors.ErrTraceDiskFull
 	case windows.ERROR_ALREADY_EXISTS:
-		return TraceHandle(0), kerrors.ErrTraceAlreadyRunning
+		return TraceHandle(0), errors.ErrTraceAlreadyRunning
 	case windows.ERROR_INVALID_PARAMETER:
-		return TraceHandle(0), kerrors.ErrTraceInvalidParameter
+		return TraceHandle(0), errors.ErrTraceInvalidParameter
 	case windows.ERROR_BAD_LENGTH:
-		return TraceHandle(0), kerrors.ErrTraceBadLength
+		return TraceHandle(0), errors.ErrTraceBadLength
 	case windows.ERROR_NO_SYSTEM_RESOURCES:
-		return TraceHandle(0), kerrors.ErrTraceNoSysResources
+		return TraceHandle(0), errors.ErrTraceNoSysResources
 	default:
 		return TraceHandle(0), os.NewSyscallError("StartTrace", err)
 	}
@@ -168,11 +168,11 @@ func ProcessTrace(handle TraceHandle) error {
 	}
 	switch err.(windows.Errno) {
 	case windows.ERROR_WMI_INSTANCE_NOT_FOUND:
-		return kerrors.ErrKsessionNotRunning
+		return errors.ErrSessionNotRunning
 	case windows.ERROR_NOACCESS:
-		return kerrors.ErrEventCallbackException
+		return errors.ErrEventCallbackException
 	case windows.ERROR_CANCELLED:
-		return kerrors.ErrTraceCancelled
+		return errors.ErrTraceCancelled
 	default:
 		return os.NewSyscallError("ProcessTrace", err)
 	}

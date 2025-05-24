@@ -20,9 +20,8 @@ package rename
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"net"
@@ -30,26 +29,26 @@ import (
 )
 
 func TestTransform(t *testing.T) {
-	kevt := &kevent.Kevent{
-		Type: ktypes.SendTCPv4,
+	evt := &event.Event{
+		Type: event.SendTCPv4,
 		Tid:  2484,
 		PID:  859,
-		Kparams: kevent.Kparams{
-			kparams.NetDport: {Name: kparams.NetDport, Type: kparams.Uint16, Value: uint16(443)},
-			kparams.NetSport: {Name: kparams.NetSport, Type: kparams.Uint16, Value: uint16(43123)},
-			kparams.NetSIP:   {Name: kparams.NetSIP, Type: kparams.IPv4, Value: net.ParseIP("127.0.0.1")},
-			kparams.NetDIP:   {Name: kparams.NetDIP, Type: kparams.IPv4, Value: net.ParseIP("216.58.201.174")},
+		Params: event.Params{
+			params.NetDport: {Name: params.NetDport, Type: params.Uint16, Value: uint16(443)},
+			params.NetSport: {Name: params.NetSport, Type: params.Uint16, Value: uint16(43123)},
+			params.NetSIP:   {Name: params.NetSIP, Type: params.IPv4, Value: net.ParseIP("127.0.0.1")},
+			params.NetDIP:   {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("216.58.201.174")},
 		},
-		Metadata: make(map[kevent.MetadataKey]any),
+		Metadata: make(map[event.MetadataKey]any),
 	}
 
-	transf, err := transformers.Load(transformers.Config{Type: transformers.Rename, Transformer: Config{Kparams: []Rename{{Old: "dport", New: "dstport"}, {Old: "sip", New: "srcip"}}}})
+	transf, err := transformers.Load(transformers.Config{Type: transformers.Rename, Transformer: Config{Params: []Rename{{Old: "dport", New: "dstport"}, {Old: "sip", New: "srcip"}}}})
 	require.NoError(t, err)
 
-	require.NoError(t, transf.Transform(kevt))
+	require.NoError(t, transf.Transform(evt))
 
-	assert.True(t, kevt.Kparams.Contains("dstport"))
-	assert.False(t, kevt.Kparams.Contains("dport"))
-	assert.True(t, kevt.Kparams.Contains("srcip"))
-	assert.False(t, kevt.Kparams.Contains("sip"))
+	assert.True(t, evt.Params.Contains("dstport"))
+	assert.False(t, evt.Params.Contains("dport"))
+	assert.True(t, evt.Params.Contains("srcip"))
+	assert.False(t, evt.Params.Contains("sip"))
 }

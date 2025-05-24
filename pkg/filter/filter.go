@@ -22,10 +22,10 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
-	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
+	errs "github.com/rabbitstack/fibratus/pkg/errors"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/filter/ql"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/util/bytes"
 	"github.com/rabbitstack/fibratus/pkg/util/hashers"
 	"net"
@@ -49,11 +49,11 @@ type Filter interface {
 	Compile() error
 	// Run runs a filter with a single expression. The return value decides
 	// if the incoming event has successfully matched the filter expression.
-	Run(evt *kevent.Kevent) bool
+	Run(evt *event.Event) bool
 	// RunSequence runs a filter with sequence expressions. Sequence rules depend
 	// on the state machine transitions and partial matches to decide whether the
 	// rule is fired.
-	RunSequence(evt *kevent.Kevent, seqID int, partials map[int][]*kevent.Kevent, rawMatch bool) bool
+	RunSequence(evt *event.Event, seqID int, partials map[int][]*event.Event, rawMatch bool) bool
 	// GetStringFields returns field names mapped to their string values.
 	GetStringFields() map[fields.Field][]string
 	// GetFields returns all fields used in the filter expression.
@@ -182,14 +182,14 @@ func (f *filter) Compile() error {
 	return f.checkBoundRefs()
 }
 
-func (f *filter) Run(e *kevent.Kevent) bool {
+func (f *filter) Run(e *event.Event) bool {
 	if f.expr == nil {
 		return false
 	}
 	return ql.Eval(f.expr, f.mapValuer(e), f.hasFunctions)
 }
 
-func (f *filter) RunSequence(e *kevent.Kevent, seqID int, partials map[int][]*kevent.Kevent, rawMatch bool) bool {
+func (f *filter) RunSequence(e *event.Event, seqID int, partials map[int][]*event.Event, rawMatch bool) bool {
 	if f.seq == nil {
 		return false
 	}
@@ -211,7 +211,7 @@ func (f *filter) RunSequence(e *kevent.Kevent, seqID int, partials map[int][]*ke
 		// if a sequence expression contains references to
 		// bound fields we map all partials to their sequence
 		// aliases
-		p := make(map[string][]*kevent.Kevent)
+		p := make(map[string][]*event.Event)
 		nslots := len(partials[seqID])
 		for i := 0; i < seqID; i++ {
 			alias := f.seq.Expressions[i].Alias
@@ -234,7 +234,7 @@ func (f *filter) RunSequence(e *kevent.Kevent, seqID int, partials map[int][]*ke
 		hash := make([]byte, 0)
 		for nslots > 0 {
 			nslots--
-			var evt *kevent.Kevent
+			var evt *event.Event
 			for _, field := range flds {
 				// get all events pertaining to the bounded event
 				evts := p[field.BoundVar]
@@ -252,7 +252,7 @@ func (f *filter) RunSequence(e *kevent.Kevent, seqID int, partials map[int][]*ke
 						continue
 					}
 					v, err := accessor.Get(field.Field, evt)
-					if err != nil && !kerrors.IsKparamNotFound(err) {
+					if err != nil && !errs.IsParamNotFound(err) {
 						accessorErrors.Add(err.Error(), 1)
 						continue
 					}
@@ -292,8 +292,8 @@ func (f *filter) RunSequence(e *kevent.Kevent, seqID int, partials map[int][]*ke
 			match = ql.Eval(expr.Expr, valuer, f.hasFunctions)
 			if match {
 				// compute sequence key hash to tie the events
-				evt.AddMeta(kevent.RuleSequenceLink, hashers.FnvUint64(hash))
-				e.AddMeta(kevent.RuleSequenceLink, hashers.FnvUint64(hash))
+				evt.AddMeta(event.RuleSequenceLink, hashers.FnvUint64(hash))
+				e.AddMeta(event.RuleSequenceLink, hashers.FnvUint64(hash))
 				break
 			}
 		}
@@ -323,7 +323,7 @@ func (f *filter) RunSequence(e *kevent.Kevent, seqID int, partials map[int][]*ke
 
 		if match && by != nil {
 			if v := valuer[by.Value]; v != nil {
-				e.AddMeta(kevent.RuleSequenceLink, v)
+				e.AddMeta(event.RuleSequenceLink, v)
 			}
 		}
 	}
@@ -349,7 +349,7 @@ func (f *filter) GetSequence() *ql.Sequence { return f.seq }
 // with values extracted from the event. Field modifiers may contain a leading ordinal
 // which refers to the event in particular sequence stage. Otherwise, the modifier is
 // a well-known field name prepended with the `%` symbol.
-func InterpolateFields(s string, evts []*kevent.Kevent) string {
+func InterpolateFields(s string, evts []*event.Event) string {
 	var fieldsReplRegexp = regexp.MustCompile(`%([1-9]?)\.?([a-z0-9A-Z\[\]._]+)`)
 	matches := fieldsReplRegexp.FindAllStringSubmatch(s, -1)
 	r := s
@@ -384,14 +384,14 @@ func InterpolateFields(s string, evts []*kevent.Kevent) string {
 			if i-1 > len(evts)-1 {
 				continue
 			}
-			kevt := evts[i-1]
+			evt := evts[i-1]
 			// extract field value from the event and replace in string
 			var val any
 			for _, accessor := range GetAccessors() {
 				name, arg := split(m[2])
 				f := Field{Value: m[2], Name: fields.Field(name), Arg: arg}
 				var err error
-				val, err = accessor.Get(f, kevt)
+				val, err = accessor.Get(f, evt)
 				if err != nil {
 					continue
 				}
@@ -415,7 +415,7 @@ func InterpolateFields(s string, evts []*kevent.Kevent) string {
 // accessors and extract the field values that are
 // supplied to the valuer. The valuer feeds the
 // expression with correct values.
-func (f *filter) mapValuer(evt *kevent.Kevent) map[string]interface{} {
+func (f *filter) mapValuer(evt *event.Event) map[string]interface{} {
 	valuer := make(map[string]interface{}, len(f.fields))
 	for _, field := range f.fields {
 		for _, accessor := range f.accessors {
@@ -423,7 +423,7 @@ func (f *filter) mapValuer(evt *kevent.Kevent) map[string]interface{} {
 				continue
 			}
 			v, err := accessor.Get(field, evt)
-			if err != nil && !kerrors.IsKparamNotFound(err) {
+			if err != nil && !errs.IsParamNotFound(err) {
 				accessorErrors.Add(err.Error(), 1)
 				continue
 			}

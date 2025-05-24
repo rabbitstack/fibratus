@@ -19,7 +19,7 @@
 package elasticsearch
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
@@ -30,21 +30,21 @@ func TestProduceIndexName(t *testing.T) {
 
 	ts, _ := time.Parse(time.RFC3339, "2011-05-03T15:04:05.323Z")
 
-	indexName := i.getName(&kevent.Kevent{Timestamp: ts})
+	indexName := i.getName(&event.Event{Timestamp: ts})
 	assert.Equal(t, "fibratus-2011-05", indexName)
 
 	i = index{config: Config{IndexName: "fibratus-%y-%d"}}
 
-	indexName = i.getName(&kevent.Kevent{Timestamp: ts})
+	indexName = i.getName(&event.Event{Timestamp: ts})
 	assert.Equal(t, "fibratus-11-03", indexName)
 
 	i = index{config: Config{IndexName: "fibratus-%d-%H"}}
 
-	indexName = i.getName(&kevent.Kevent{Timestamp: ts})
+	indexName = i.getName(&event.Event{Timestamp: ts})
 	assert.Equal(t, "fibratus-03-15", indexName)
 
 	i = index{config: Config{IndexName: "fibratus-events"}}
 
-	indexName = i.getName(&kevent.Kevent{Timestamp: ts})
+	indexName = i.getName(&event.Event{Timestamp: ts})
 	assert.Equal(t, "fibratus-events", indexName)
 }

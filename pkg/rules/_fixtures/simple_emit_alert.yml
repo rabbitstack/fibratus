@@ -1,7 +1,7 @@
 name: match https connections
 id: 50ffc2a8-0bde-45c4-9e20-46158250fa91
 version: 1.0.0
-condition: kevt.name = 'Recv' and net.dport = 443
+condition: evt.name = 'Recv' and net.dport = 443
 output: "%ps.name process received data on port %net.dport"
 severity: critical
 min-engine-version: 2.0.0

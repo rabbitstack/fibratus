@@ -55,7 +55,7 @@ func (h Handle) Offset() uint16 {
 	return offset
 }
 
-// Marshal dumps the state of the handle to byte slice that is suitable for serializing to kcap file.
+// Marshal dumps the state of the handle to byte slice that is suitable for serializing to cap file.
 func (h *Handle) Marshal() []byte {
 	b := make([]byte, 0)
 

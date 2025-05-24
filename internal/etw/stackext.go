@@ -20,7 +20,7 @@ package etw
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/config"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"golang.org/x/sys/windows"
 )
@@ -38,15 +38,15 @@ func NewStackExtensions(config config.KstreamConfig) *StackExtensions {
 }
 
 // AddStackTracing enables stack tracing for the specified event type.
-func (s *StackExtensions) AddStackTracing(ktype ktypes.Ktype) {
-	if !s.config.TestDropMask(ktype) {
-		s.ids = append(s.ids, etw.NewClassicEventID(ktype.GUID(), ktype.HookID()))
+func (s *StackExtensions) AddStackTracing(Type event.Type) {
+	if !s.config.TestDropMask(Type) {
+		s.ids = append(s.ids, etw.NewClassicEventID(Type.GUID(), Type.HookID()))
 	}
 }
 
 // AddStackTracingWith enables stack tracing for the specified provider GUID and event hook id.
 func (s *StackExtensions) AddStackTracingWith(guid windows.GUID, hookID uint16) {
-	if !s.config.TestDropMask(ktypes.FromParts(guid, hookID)) {
+	if !s.config.TestDropMask(event.TypeFromParts(guid, hookID)) {
 		s.ids = append(s.ids, etw.NewClassicEventID(guid, hookID))
 	}
 }
@@ -60,13 +60,13 @@ func (s *StackExtensions) EventIds() []etw.ClassicEventID { return s.ids }
 // creating/terminating a thread or loading an image into
 // process address space.
 func (s *StackExtensions) EnableProcessCallstack() {
-	s.AddStackTracing(ktypes.CreateProcess)
+	s.AddStackTracing(event.CreateProcess)
 	if s.config.EnableThreadKevents {
-		s.AddStackTracing(ktypes.CreateThread)
-		s.AddStackTracing(ktypes.TerminateThread)
+		s.AddStackTracing(event.CreateThread)
+		s.AddStackTracing(event.TerminateThread)
 	}
 	if s.config.EnableImageKevents {
-		s.AddStackTracingWith(ktypes.ProcessEventGUID, ktypes.LoadImage.HookID())
+		s.AddStackTracingWith(event.ProcessEventGUID, event.LoadImage.HookID())
 	}
 }
 
@@ -75,9 +75,9 @@ func (s *StackExtensions) EnableProcessCallstack() {
 // return addresses for file system activity.
 func (s *StackExtensions) EnableFileCallstack() {
 	if s.config.EnableFileIOKevents {
-		s.AddStackTracing(ktypes.CreateFile)
-		s.AddStackTracing(ktypes.DeleteFile)
-		s.AddStackTracing(ktypes.RenameFile)
+		s.AddStackTracing(event.CreateFile)
+		s.AddStackTracing(event.DeleteFile)
+		s.AddStackTracing(event.RenameFile)
 	}
 }
 
@@ -86,10 +86,10 @@ func (s *StackExtensions) EnableFileCallstack() {
 // return addresses for registry operations.
 func (s *StackExtensions) EnableRegistryCallstack() {
 	if s.config.EnableRegistryKevents {
-		s.AddStackTracing(ktypes.RegCreateKey)
-		s.AddStackTracing(ktypes.RegDeleteKey)
-		s.AddStackTracing(ktypes.RegSetValue)
-		s.AddStackTracing(ktypes.RegDeleteValue)
+		s.AddStackTracing(event.RegCreateKey)
+		s.AddStackTracing(event.RegDeleteKey)
+		s.AddStackTracing(event.RegSetValue)
+		s.AddStackTracing(event.RegDeleteValue)
 	}
 }
 
@@ -97,15 +97,15 @@ func (s *StackExtensions) EnableRegistryCallstack() {
 // events such as memory allocations.
 func (s *StackExtensions) EnableMemoryCallstack() {
 	if s.config.EnableMemKevents {
-		s.AddStackTracing(ktypes.VirtualAlloc)
+		s.AddStackTracing(event.VirtualAlloc)
 	}
 }
 
 // EnableThreadpoolCallstack enables stack tracing for thread pool events.
 func (s *StackExtensions) EnableThreadpoolCallstack() {
 	if s.config.EnableThreadpoolEvents {
-		s.AddStackTracing(ktypes.SubmitThreadpoolWork)
-		s.AddStackTracing(ktypes.SubmitThreadpoolCallback)
-		s.AddStackTracing(ktypes.SetThreadpoolTimer)
+		s.AddStackTracing(event.SubmitThreadpoolWork)
+		s.AddStackTracing(event.SubmitThreadpoolCallback)
+		s.AddStackTracing(event.SetThreadpoolTimer)
 	}
 }

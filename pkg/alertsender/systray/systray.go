@@ -25,7 +25,7 @@ import (
 	"github.com/Microsoft/go-winio"
 	"github.com/cenkalti/backoff/v4"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
@@ -198,7 +198,7 @@ func makeSender(config alertsender.Config) (alertsender.Sender, error) {
 
 func (s *systray) Send(alert alertsender.Alert) error {
 	// remove all events to avoid decoding errors on systray server end
-	alert.Events = make([]*kevent.Kevent, 0)
+	alert.Events = make([]*event.Event, 0)
 	return s.send(&Msg{Type: Balloon, Data: alert})
 }
 

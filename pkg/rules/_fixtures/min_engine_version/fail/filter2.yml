@@ -1,5 +1,5 @@
 name: accept events where source port = 44123
 id: 2f36f8e0-a5c2-498f-9563-eea306daa586
 version: 1.0.0
-condition: kevt.name = 'Recv' and net.sport = 44123
+condition: evt.name = 'Recv' and net.sport = 44123
 min-engine-version: 2.2.0

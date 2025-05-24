@@ -21,7 +21,7 @@ package alertsender
 import (
 	"bytes"
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/renderer/html"
@@ -95,7 +95,7 @@ type Alert struct {
 	// Severity determines the severity of this alert.
 	Severity Severity
 	// Events contains a list of events that trigger the alert.
-	Events []*kevent.Kevent
+	Events []*event.Event
 }
 
 // String returns the alert string representation. If verbose
@@ -146,6 +146,6 @@ func NewAlert(title, text string, tags []string, severity Severity) Alert {
 }
 
 // NewAlertWithEvents builds a new alert with associated events.
-func NewAlertWithEvents(title, text string, tags []string, severity Severity, evts []*kevent.Kevent) Alert {
+func NewAlertWithEvents(title, text string, tags []string, severity Severity, evts []*event.Event) Alert {
 	return Alert{Title: title, Text: text, Tags: tags, Severity: severity, Events: evts}
 }

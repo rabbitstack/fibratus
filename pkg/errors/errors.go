@@ -34,20 +34,20 @@ var (
 	}
 )
 
-// ErrKparamNotFound is the error is thrown when a parameter is not present in the list of parameters
-type ErrKparamNotFound struct {
+// ErrParamNotFound is the error is thrown when a parameter is not present in the list of parameters
+type ErrParamNotFound struct {
 	Name string
 }
 
 // Error returns the error message.
-func (e ErrKparamNotFound) Error() string {
+func (e ErrParamNotFound) Error() string {
 	return "couldn't find '" + e.Name + "' in event parameters"
 }
 
-// IsKparamNotFound returns true if the error is KparamNotFound.
-func IsKparamNotFound(err error) bool {
+// IsParamNotFound returns true if the error is ErrParamNotFound.
+func IsParamNotFound(err error) bool {
 	switch err.(type) {
-	case *ErrKparamNotFound:
+	case *ErrParamNotFound:
 		return true
 	default:
 		return false

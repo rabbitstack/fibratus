@@ -20,9 +20,9 @@ package types
 
 import (
 	"fmt"
+	"github.com/rabbitstack/fibratus/pkg/cap/section"
+	capver "github.com/rabbitstack/fibratus/pkg/cap/version"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
-	"github.com/rabbitstack/fibratus/pkg/kcap/section"
-	kcapver "github.com/rabbitstack/fibratus/pkg/kcap/version"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	"github.com/rabbitstack/fibratus/pkg/util/bytes"
 	"github.com/rabbitstack/fibratus/pkg/util/convert"
@@ -74,7 +74,7 @@ func (ps *PS) Marshal() []byte {
 	}
 
 	// write handles
-	sec := section.New(section.Handle, kcapver.HandleSecV1, uint32(len(ps.Handles)), 0)
+	sec := section.New(section.Handle, capver.HandleSecV1, uint32(len(ps.Handles)), 0)
 	b = append(b, sec[:]...)
 	for _, handle := range ps.Handles {
 		buf := handle.Marshal()
@@ -85,11 +85,11 @@ func (ps *PS) Marshal() []byte {
 	// write the PE metadata
 	if ps.PE != nil {
 		buf := ps.PE.Marshal()
-		sec := section.New(section.PE, kcapver.PESecV2, 0, uint32(len(buf)))
+		sec := section.New(section.PE, capver.PESecV2, 0, uint32(len(buf)))
 		b = append(b, sec[:]...)
 		b = append(b, buf...)
 	} else {
-		sec := section.New(section.PE, kcapver.PESecV2, 0, 0)
+		sec := section.New(section.PE, capver.PESecV2, 0, 0)
 		b = append(b, sec[:]...)
 	}
 
@@ -174,7 +174,7 @@ func (ps *PS) Unmarshal(b []byte, psec section.Section) error {
 	offset += uint32(aoffset)
 	idx := uint32(20)
 	// read session ID
-	if psec.Version() >= kcapver.ProcessSecV3 {
+	if psec.Version() >= capver.ProcessSecV3 {
 		// session identifier was changed from uint8 to uint32
 		ps.SessionID = bytes.ReadUint32(b[idx+offset:])
 		idx += 4
@@ -226,7 +226,7 @@ readpe:
 	sec = section.Read(b[idx+offset:])
 	idx += 10
 	if sec.Size() == 0 {
-		if psec.Version() >= kcapver.ProcessSecV2 {
+		if psec.Version() >= capver.ProcessSecV2 {
 			// read start time
 			l := uint32(bytes.ReadUint16(b[idx+offset:]))
 			idx += 2
@@ -243,7 +243,7 @@ readpe:
 			// read UUID
 			ps.uuid = bytes.ReadUint64(b[idx+offset:])
 		}
-		if psec.Version() >= kcapver.ProcessSecV3 {
+		if psec.Version() >= capver.ProcessSecV3 {
 			idx += 8
 			// read username
 			l := bytes.ReadUint16(b[idx+offset:])
@@ -259,7 +259,7 @@ readpe:
 			offset += uint32(l)
 			ps.Domain = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
 		}
-		if psec.Version() >= kcapver.ProcessSecV4 {
+		if psec.Version() >= capver.ProcessSecV4 {
 			// process flags
 			ps.IsWOW64 = convert.Itob(b[idx+offset])
 			idx++
@@ -278,7 +278,7 @@ readpe:
 	}
 
 	offset += sec.Size()
-	if psec.Version() >= kcapver.ProcessSecV2 {
+	if psec.Version() >= capver.ProcessSecV2 {
 		// read start time
 		l := uint32(bytes.ReadUint16(b[idx+offset:]))
 		idx += 2
@@ -290,7 +290,7 @@ readpe:
 		// read UUID
 		ps.uuid = bytes.ReadUint64(b[idx+offset:])
 	}
-	if psec.Version() >= kcapver.ProcessSecV3 {
+	if psec.Version() >= capver.ProcessSecV3 {
 		idx += 8
 		// read username
 		l := bytes.ReadUint16(b[idx+offset:])
@@ -306,7 +306,7 @@ readpe:
 		offset += uint32(l)
 		ps.Domain = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
 	}
-	if psec.Version() >= kcapver.ProcessSecV4 {
+	if psec.Version() >= capver.ProcessSecV4 {
 		// process flags
 		ps.IsWOW64 = convert.Itob(b[idx+offset])
 		idx++

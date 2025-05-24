@@ -20,9 +20,8 @@ package config
 
 import (
 	"errors"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	ytypes "github.com/rabbitstack/fibratus/pkg/yara/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -106,25 +105,25 @@ func TestShouldSkipFile(t *testing.T) {
 
 func TestAlertTitle(t *testing.T) {
 	var tests = []struct {
-		e *kevent.Kevent
+		e *event.Event
 		t string
 	}{
 		{
-			&kevent.Kevent{Type: ktypes.MapViewFile, Category: ktypes.File},
+			&event.Event{Type: event.MapViewFile, Category: event.File},
 			MemoryThreatAlertTitle,
 		},
 		{
-			&kevent.Kevent{Type: ktypes.MapViewFile, Category: ktypes.File,
-				Kparams: kevent.Kparams{kparams.FilePath: {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\System32\\wusa.exe"}},
+			&event.Event{Type: event.MapViewFile, Category: event.File,
+				Params: event.Params{params.FilePath: {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\System32\\wusa.exe"}},
 			},
 			FileThreatAlertTitle,
 		},
 		{
-			&kevent.Kevent{Type: ktypes.RegSetValue, Category: ktypes.Registry},
+			&event.Event{Type: event.RegSetValue, Category: event.Registry},
 			FileThreatAlertTitle,
 		},
 		{
-			&kevent.Kevent{Type: ktypes.LoadImage, Category: ktypes.Image},
+			&event.Event{Type: event.LoadImage, Category: event.Image},
 			MemoryThreatAlertTitle,
 		},
 	}
@@ -141,7 +140,7 @@ func TestAlertText(t *testing.T) {
 	var tests = []struct {
 		name string
 		c    Config
-		e    *kevent.Kevent
+		e    *event.Event
 		m    ytypes.MatchRule
 		text string
 		err  error
@@ -149,7 +148,7 @@ func TestAlertText(t *testing.T) {
 		{
 			"empty template and no threat_name meta",
 			Config{},
-			&kevent.Kevent{Type: ktypes.LoadImage, Category: ktypes.Image},
+			&event.Event{Type: event.LoadImage, Category: event.Image},
 			ytypes.MatchRule{Rule: "Badlands Trojan"},
 			"Threat detected Badlands Trojan",
 			nil,
@@ -157,7 +156,7 @@ func TestAlertText(t *testing.T) {
 		{
 			"empty template and threat_name meta",
 			Config{},
-			&kevent.Kevent{Type: ktypes.LoadImage, Category: ktypes.Image},
+			&event.Event{Type: event.LoadImage, Category: event.Image},
 			ytypes.MatchRule{Rule: "Badlands Trojan", Metas: []ytypes.Meta{{Identifier: "threat_name", Value: "Gravity Trojan"}}},
 			"Threat detected Gravity Trojan",
 			nil,
@@ -170,7 +169,7 @@ func TestAlertText(t *testing.T) {
 				Event name: {{ .Event.Name -}}
 				`,
 			},
-			&kevent.Kevent{Type: ktypes.LoadImage, Name: "LoadImage", Category: ktypes.Image},
+			&event.Event{Type: event.LoadImage, Name: "LoadImage", Category: event.Image},
 			ytypes.MatchRule{Rule: "Badlands Trojan", Metas: []ytypes.Meta{{Identifier: "threat_name", Value: "Gravity Trojan"}}},
 			`
 				Rule name: Badlands Trojan
@@ -185,7 +184,7 @@ func TestAlertText(t *testing.T) {
 				Event name: {{ .Evet.Name -}}
 				`,
 			},
-			&kevent.Kevent{Type: ktypes.LoadImage, Name: "LoadImage", Category: ktypes.Image},
+			&event.Event{Type: event.LoadImage, Name: "LoadImage", Category: event.Image},
 			ytypes.MatchRule{Rule: "Badlands Trojan", Metas: []ytypes.Meta{{Identifier: "threat_name", Value: "Gravity Trojan"}}},
 			"",
 			errors.New("yara alert template syntax error"),

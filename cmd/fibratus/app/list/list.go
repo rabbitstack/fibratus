@@ -24,8 +24,8 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/rabbitstack/fibratus/internal/bootstrap"
 	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/spf13/cobra"
 	"os"
 	"path/filepath"
@@ -34,7 +34,7 @@ import (
 
 var Command = &cobra.Command{
 	Use:   "list",
-	Short: "Show info about filaments, filter fields or kernel event types",
+	Short: "Show info about filaments, filter fields or event types",
 }
 
 var listFilamentsCmd = &cobra.Command{
@@ -50,10 +50,9 @@ var listFieldsCmd = &cobra.Command{
 }
 
 var listEventsCmd = &cobra.Command{
-	Use:     "kevents",
-	Aliases: []string{"events"},
-	Short:   "List supported kernel event types",
-	Run:     listEvents,
+	Use:   "events",
+	Short: "List supported event types",
+	Run:   listEvents,
 }
 
 var cfg = config.NewWithOpts(config.WithList())
@@ -131,8 +130,8 @@ func listEvents(cmd *cobra.Command, args []string) {
 	t.AppendHeader(table.Row{"Name", "Category", "Description"})
 	t.SetStyle(table.StyleLight)
 
-	for _, ktyp := range ktypes.GetKtypesMeta() {
-		t.AppendRow(table.Row{ktyp.Name, ktyp.Category, ktyp.Description})
+	for _, ev := range event.GetTypesMeta() {
+		t.AppendRow(table.Row{ev.Name, ev.Category, ev.Description})
 	}
 
 	t.Render()

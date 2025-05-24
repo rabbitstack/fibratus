@@ -25,15 +25,15 @@ __connections__ = collections.Counter()
 
 
 def on_init():
-    kfilter("kevt.name = 'Send'")
+    set_filter("evt.name = 'Send'")
     columns(["Destination", "Count"])
     sort_by('Count')
     interval(1)
 
 
 @dotdictify
-def on_next_kevent(kevent):
-    dst = ['%s:%d' % (kevent.kparams.dip, kevent.kparams.dport)]
+def on_next_event(event):
+    dst = ['%s:%d' % (event.params.dip, event.params.dport)]
     __connections__.update(dst)
 
 

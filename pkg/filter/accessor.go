@@ -20,9 +20,9 @@ package filter
 
 import (
 	"errors"
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
 	"reflect"
 )
 
@@ -36,7 +36,7 @@ var (
 // from the non-params constructs such as process' state or PE metadata.
 type Accessor interface {
 	// Get fetches the parameter value for the specified filter field.
-	Get(f Field, evt *kevent.Kevent) (kparams.Value, error)
+	Get(f Field, evt *event.Event) (params.Value, error)
 	// SetFields sets all fields declared in the expression.
 	SetFields(fields []Field)
 	// SetSegments sets all segments utilized in the function predicate expression.
@@ -45,94 +45,94 @@ type Accessor interface {
 	// given event. The condition is usually based on the event category,
 	// but it can also include different circumstances, like the presence
 	// of the process state or callstacks.
-	IsFieldAccessible(evt *kevent.Kevent) bool
+	IsFieldAccessible(evt *event.Event) bool
 }
 
-// kevtAccessor extracts generic event values.
-type kevtAccessor struct{}
+// evtAccessor extracts generic event values.
+type evtAccessor struct{}
 
-func (kevtAccessor) SetFields([]Field)                     {}
-func (kevtAccessor) SetSegments([]fields.Segment)          {}
-func (kevtAccessor) IsFieldAccessible(*kevent.Kevent) bool { return true }
+func (evtAccessor) SetFields([]Field)                   {}
+func (evtAccessor) SetSegments([]fields.Segment)        {}
+func (evtAccessor) IsFieldAccessible(*event.Event) bool { return true }
 
-func newKevtAccessor() Accessor {
-	return &kevtAccessor{}
+func newEventAccessor() Accessor {
+	return &evtAccessor{}
 }
 
 const timeFmt = "15:04:05"
 const dateFmt = "2006-01-02"
 
-func (k *kevtAccessor) Get(f Field, kevt *kevent.Kevent) (kparams.Value, error) {
+func (k *evtAccessor) Get(f Field, evt *event.Event) (params.Value, error) {
 	switch f.Name {
 	case fields.KevtSeq:
-		return kevt.Seq, nil
+		return evt.Seq, nil
 	case fields.KevtPID:
-		return kevt.PID, nil
+		return evt.PID, nil
 	case fields.KevtTID:
-		return kevt.Tid, nil
+		return evt.Tid, nil
 	case fields.KevtCPU:
-		return kevt.CPU, nil
+		return evt.CPU, nil
 	case fields.KevtName:
-		return kevt.Name, nil
+		return evt.Name, nil
 	case fields.KevtCategory:
-		return string(kevt.Category), nil
+		return string(evt.Category), nil
 	case fields.KevtDesc:
-		return kevt.Description, nil
+		return evt.Description, nil
 	case fields.KevtHost:
-		return kevt.Host, nil
+		return evt.Host, nil
 	case fields.KevtTime:
-		return kevt.Timestamp.Format(timeFmt), nil
+		return evt.Timestamp.Format(timeFmt), nil
 	case fields.KevtTimeHour:
-		return uint8(kevt.Timestamp.Hour()), nil
+		return uint8(evt.Timestamp.Hour()), nil
 	case fields.KevtTimeMin:
-		return uint8(kevt.Timestamp.Minute()), nil
+		return uint8(evt.Timestamp.Minute()), nil
 	case fields.KevtTimeSec:
-		return uint8(kevt.Timestamp.Second()), nil
+		return uint8(evt.Timestamp.Second()), nil
 	case fields.KevtTimeNs:
-		return kevt.Timestamp.UnixNano(), nil
+		return evt.Timestamp.UnixNano(), nil
 	case fields.KevtDate:
-		return kevt.Timestamp.Format(dateFmt), nil
+		return evt.Timestamp.Format(dateFmt), nil
 	case fields.KevtDateDay:
-		return uint8(kevt.Timestamp.Day()), nil
+		return uint8(evt.Timestamp.Day()), nil
 	case fields.KevtDateMonth:
-		return uint8(kevt.Timestamp.Month()), nil
+		return uint8(evt.Timestamp.Month()), nil
 	case fields.KevtDateTz:
-		tz, _ := kevt.Timestamp.Zone()
+		tz, _ := evt.Timestamp.Zone()
 		return tz, nil
 	case fields.KevtDateYear:
-		return uint32(kevt.Timestamp.Year()), nil
+		return uint32(evt.Timestamp.Year()), nil
 	case fields.KevtDateWeek:
-		_, week := kevt.Timestamp.ISOWeek()
+		_, week := evt.Timestamp.ISOWeek()
 		return uint8(week), nil
 	case fields.KevtDateWeekday:
-		return kevt.Timestamp.Weekday().String(), nil
+		return evt.Timestamp.Weekday().String(), nil
 	case fields.KevtNparams:
-		return uint64(kevt.Kparams.Len()), nil
+		return uint64(evt.Params.Len()), nil
 	case fields.KevtArg:
 		// lookup the parameter from the field argument
 		// and depending on the parameter type, return
 		// the respective value. The field format is
-		// expressed as kevt.arg[cmdline] where the string
+		// expressed as evt.arg[cmdline] where the string
 		// inside brackets represents the parameter name
 		name := f.Arg
-		par, err := kevt.Kparams.Get(name)
+		par, err := evt.Params.Get(name)
 		if err != nil {
 			return nil, err
 		}
 
 		switch par.Type {
-		case kparams.Uint8:
-			return kevt.Kparams.GetUint8(name)
-		case kparams.Uint16, kparams.Port:
-			return kevt.Kparams.GetUint16(name)
-		case kparams.Uint32, kparams.PID, kparams.TID:
-			return kevt.Kparams.GetUint32(name)
-		case kparams.Uint64:
-			return kevt.Kparams.GetUint64(name)
-		case kparams.Time:
-			return kevt.Kparams.GetTime(name)
+		case params.Uint8:
+			return evt.Params.GetUint8(name)
+		case params.Uint16, params.Port:
+			return evt.Params.GetUint16(name)
+		case params.Uint32, params.PID, params.TID:
+			return evt.Params.GetUint32(name)
+		case params.Uint64:
+			return evt.Params.GetUint64(name)
+		case params.Time:
+			return evt.Params.GetTime(name)
 		default:
-			return kevt.GetParamAsString(name), nil
+			return evt.GetParamAsString(name), nil
 		}
 	}
 
@@ -189,7 +189,7 @@ func (f *filter) narrowAccessors() {
 	}
 
 	if removeKevtAccessor {
-		f.removeAccessor(&kevtAccessor{})
+		f.removeAccessor(&evtAccessor{})
 	}
 	if removePsAccessor {
 		f.removeAccessor(&psAccessor{})

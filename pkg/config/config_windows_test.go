@@ -89,8 +89,8 @@ func TestNewFromYamlFile(t *testing.T) {
 		switch tr.Type {
 		case transformers.Rename:
 			rconfig := tr.Transformer.(rename.Config)
-			assert.Len(t, rconfig.Kparams, 2)
-			r1 := rconfig.Kparams[0]
+			assert.Len(t, rconfig.Params, 2)
+			r1 := rconfig.Params[0]
 			assert.Equal(t, "b", r1.New)
 		}
 	}

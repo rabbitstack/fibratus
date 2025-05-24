@@ -27,10 +27,10 @@ import (
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/filament/cpython"
 	"github.com/rabbitstack/fibratus/pkg/filter"
 	"github.com/rabbitstack/fibratus/pkg/handle"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"github.com/rabbitstack/fibratus/pkg/util/term"
@@ -55,7 +55,7 @@ const (
 	intervalFn      = "interval"
 	columnsFn       = "columns"
 	sortbyFn        = "sort_by"
-	kfilterFn       = "kfilter"
+	setFilterFn     = "set_filter"
 	addRowFn        = "add_row"
 	maxRowsFn       = "max_rows"
 	titleFn         = "title"
@@ -66,37 +66,37 @@ const (
 	findProcessesFn = "find_processes"
 	emitAlertFn     = "emit_alert"
 
-	onInitFn       = "on_init"
-	onStopFn       = "on_stop"
-	onNextKeventFn = "on_next_kevent"
-	onIntervalFn   = "on_interval"
-	doc            = "__doc__"
+	onInitFn      = "on_init"
+	onStopFn      = "on_stop"
+	onNextEventFn = "on_next_event"
+	onIntervalFn  = "on_interval"
+	doc           = "__doc__"
 )
 
 var (
-	keventErrors        = expvar.NewMap("filament.kevent.errors")
-	keventProcessErrors = expvar.NewInt("filament.kevent.process.errors")
+	keventErrors        = expvar.NewMap("filament.event.errors")
+	keventProcessErrors = expvar.NewInt("filament.event.process.errors")
 	kdictErrors         = expvar.NewInt("filament.kdict.errors")
-	batchFlushes        = expvar.NewInt("filament.kevent.batch.flushes")
+	batchFlushes        = expvar.NewInt("filament.event.batch.flushes")
 
 	errFilamentsDir = func(path string) error { return fmt.Errorf("%s does not exist or is not a directory", path) }
 
-	errNoDoc                    = errors.New("filament description is required")
-	errNoOnNextKevent           = errors.New("required on_next_kevent function is not defined")
-	errOnNextKeventNotCallable  = errors.New("on_next_kevent is not callable")
-	errOnNextKeventMismatchArgs = func(c uint32) error { return fmt.Errorf("expected 1 argument for on_next_kevent but found %d args", c) }
-	errEmptyName                = errors.New("filament name is empty")
+	errNoDoc                   = errors.New("filament description is required")
+	errNoOnNextEvent           = errors.New("required on_next_event function is not defined")
+	errOnNextEventNotCallable  = errors.New("on_next_event is not callable")
+	errOnNextEventMismatchArgs = func(c uint32) error { return fmt.Errorf("expected 1 argument for on_next_event but found %d args", c) }
+	errEmptyName               = errors.New("filament name is empty")
 
 	tableOutput io.Writer
 )
 
-type kbatch []*kevent.Kevent
+type kbatch []*event.Event
 
-func (k *kbatch) append(kevt *kevent.Kevent) {
+func (k *kbatch) append(evt *event.Event) {
 	if *k == nil {
-		*k = make([]*kevent.Kevent, 0)
+		*k = make([]*event.Event, 0)
 	}
-	*k = append(*k, kevt)
+	*k = append(*k, evt)
 }
 
 func (k *kbatch) reset()  { *k = nil }
@@ -205,26 +205,26 @@ func New(
 
 	// ensure required attributes are present before proceeding with
 	// further initialization. For instance, if the documentation
-	// string is not provided, on_next_kevent function is missing
+	// string is not provided, on_next_event function is missing
 	// or has a wrong signature we won't run the filament
 	doc, err := mod.GetAttrString(doc)
 	if err != nil || doc.IsNull() {
 		return nil, errNoDoc
 	}
 	defer doc.DecRef()
-	if !mod.HasAttr(onNextKeventFn) {
-		return nil, errNoOnNextKevent
+	if !mod.HasAttr(onNextEventFn) {
+		return nil, errNoOnNextEvent
 	}
-	onNextKevent, err := mod.GetAttrString(onNextKeventFn)
-	if err != nil || onNextKevent.IsNull() {
-		return nil, errNoOnNextKevent
+	onNextEvent, err := mod.GetAttrString(onNextEventFn)
+	if err != nil || onNextEvent.IsNull() {
+		return nil, errNoOnNextEvent
 	}
-	if !onNextKevent.IsCallable() {
-		return nil, errOnNextKeventNotCallable
+	if !onNextEvent.IsCallable() {
+		return nil, errOnNextEventNotCallable
 	}
-	argCount := onNextKevent.CallableArgCount()
+	argCount := onNextEvent.CallableArgCount()
 	if argCount != 1 {
-		return nil, errOnNextKeventMismatchArgs(argCount)
+		return nil, errOnNextEventMismatchArgs(argCount)
 	}
 
 	f := &filament{
@@ -237,7 +237,7 @@ func New(
 		fnerrs:       make(chan error, 100),
 		gil:          cpython.NewGIL(),
 		columns:      make([]string, 0),
-		onNextKevent: onNextKevent,
+		onNextKevent: onNextEvent,
 		interval:     time.Second,
 		initErrors:   make([]error, 0),
 		table:        newTable(),
@@ -272,7 +272,7 @@ func New(
 	if err != nil {
 		return nil, err
 	}
-	err = f.mod.RegisterFn(kfilterFn, f.kfilterFn, cpython.DefaultMethFlags)
+	err = f.mod.RegisterFn(setFilterFn, f.setFilterFn, cpython.DefaultMethFlags)
 	if err != nil {
 		return nil, err
 	}
@@ -368,7 +368,7 @@ func New(
 	return f, nil
 }
 
-func (f *filament) Run(kevents <-chan *kevent.Kevent, errs <-chan error) error {
+func (f *filament) Run(kevents <-chan *event.Event, errs <-chan error) error {
 	var batch kbatch
 	var flusher = time.NewTicker(time.Second)
 	for {
@@ -380,14 +380,14 @@ func (f *filament) Run(kevents <-chan *kevent.Kevent, errs <-chan error) error {
 		}
 
 		select {
-		case kevt := <-kevents:
-			batch.append(kevt)
+		case evt := <-kevents:
+			batch.append(evt)
 		case err := <-errs:
 			keventErrors.Add(err.Error(), 1)
 		case <-flusher.C:
 			batchFlushes.Add(1)
 			if batch.len() > 0 {
-				err := f.pushKevents(batch)
+				err := f.pushEvents(batch)
 				if err != nil {
 					log.Warnf("on_next_kevent failed: %v", err)
 					keventProcessErrors.Add(1)
@@ -403,21 +403,21 @@ func (f *filament) Run(kevents <-chan *kevent.Kevent, errs <-chan error) error {
 	}
 }
 
-func (f *filament) pushKevents(b kbatch) error {
+func (f *filament) pushEvents(b kbatch) error {
 	f.gil.Lock()
 	defer f.gil.Unlock()
-	for _, kevt := range b {
-		kdict, err := newKDict(kevt)
+	for _, evt := range b {
+		dict, err := newEventDict(evt)
 		if err != nil {
-			kdict.DecRef()
+			dict.DecRef()
 			kdictErrors.Add(1)
 			continue
 		}
-		r := f.onNextKevent.Call(kdict.Object())
+		r := f.onNextKevent.Call(dict.Object())
 		if r != nil {
 			r.DecRef()
 		}
-		kdict.DecRef()
+		dict.DecRef()
 		if err := cpython.FetchErr(); err != nil {
 			return err
 		}
@@ -472,7 +472,7 @@ func (f *filament) columnsFn(_, args cpython.PyArgs) cpython.PyRawObject {
 	return cpython.NewPyNone()
 }
 
-func (f *filament) kfilterFn(_, args cpython.PyArgs) cpython.PyRawObject {
+func (f *filament) setFilterFn(_, args cpython.PyArgs) cpython.PyRawObject {
 	f.fexpr = args.GetString(1)
 	return cpython.NewPyNone()
 }

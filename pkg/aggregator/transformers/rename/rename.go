@@ -20,10 +20,10 @@ package rename
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/event"
 )
 
-// rename as it name implies, it renames a sequence of kparams to their new names.
+// rename as it name implies, it renames a sequence of params to their new names.
 type rename struct {
 	c Config
 }
@@ -40,15 +40,15 @@ func initRenameTransformer(config transformers.Config) (transformers.Transformer
 	return &rename{c: cfg}, nil
 }
 
-func (r rename) Transform(kevt *kevent.Kevent) error {
-	for _, par := range r.c.Kparams {
-		kpar, ok := kevt.Kparams[par.Old]
+func (r rename) Transform(evt *event.Event) error {
+	for _, p := range r.c.Params {
+		par, ok := evt.Params[p.Old]
 		if !ok {
 			continue
 		}
-		kevt.Kparams.Remove(par.Old)
-		kpar.Name = par.New
-		kevt.Kparams[par.New] = kpar
+		evt.Params.Remove(p.Old)
+		par.Name = p.New
+		evt.Params[p.New] = par
 	}
 	return nil
 }

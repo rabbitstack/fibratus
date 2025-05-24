@@ -24,11 +24,11 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/aggregator"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	"github.com/rabbitstack/fibratus/pkg/api"
+	"github.com/rabbitstack/fibratus/pkg/cap"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/filament"
 	"github.com/rabbitstack/fibratus/pkg/filter"
 	"github.com/rabbitstack/fibratus/pkg/handle"
-	"github.com/rabbitstack/fibratus/pkg/kcap"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/rules"
 	"github.com/rabbitstack/fibratus/pkg/symbolize"
@@ -58,8 +58,8 @@ type App struct {
 	psnap      ps.Snapshotter
 	filament   filament.Filament
 	agg        *aggregator.BufferedAggregator
-	writer     kcap.Writer
-	reader     kcap.Reader
+	writer     cap.Writer
+	reader     cap.Reader
 	signals    chan struct{}
 }
 
@@ -120,7 +120,7 @@ func NewApp(cfg *config.Config, options ...Option) (*App, error) {
 		sigs = signals.Install()
 	}
 	if opts.isCaptureReplay {
-		reader, err := kcap.NewReader(cfg.KcapFile, cfg)
+		reader, err := cap.NewReader(cfg.KcapFile, cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -186,12 +186,12 @@ func (f *App) Run(args []string) error {
 	// build the filter from the CLI argument. If we got
 	// a valid expression the filter is attached to the
 	// event consumer
-	kfilter, err := filter.NewFromCLI(args, cfg)
+	fltr, err := filter.NewFromCLI(args, cfg)
 	if err != nil {
 		return err
 	}
-	if kfilter != nil {
-		f.evs.SetFilter(kfilter)
+	if fltr != nil {
+		f.evs.SetFilter(fltr)
 	}
 	// user can either instruct to bootstrap a filament or
 	// start a regular run. We'll set up the corresponding
@@ -277,18 +277,18 @@ func (f *App) WriteCapture(args []string) error {
 		return ErrAlreadyRunning
 	}
 
-	kfilter, err := filter.NewFromCLI(args, f.config)
+	fltr, err := filter.NewFromCLI(args, f.config)
 	if err != nil {
 		return err
 	}
-	if kfilter != nil {
-		f.evs.SetFilter(kfilter)
+	if fltr != nil {
+		f.evs.SetFilter(fltr)
 	}
 	err = f.evs.Open(f.config)
 	if err != nil {
 		return err
 	}
-	f.writer, err = kcap.NewWriter(f.config.KcapFile, f.psnap, f.hsnap)
+	f.writer, err = cap.NewWriter(f.config.KcapFile, f.psnap, f.hsnap)
 	if err != nil {
 		return err
 	}
@@ -306,7 +306,7 @@ func (f *App) ReadCapture(ctx context.Context, args []string) error {
 	if f.reader == nil {
 		panic("reader is nil")
 	}
-	kfilter, err := filter.NewFromCLIWithAllAccessors(args)
+	fltr, err := filter.NewFromCLIWithAllAccessors(args)
 	if err != nil {
 		return err
 	}
@@ -323,10 +323,10 @@ func (f *App) ReadCapture(ctx context.Context, args []string) error {
 		if f.filament.Filter() != nil {
 			// filament filter overrides CLI filter
 			f.reader.SetFilter(f.filament.Filter())
-		} else if kfilter != nil {
-			f.reader.SetFilter(kfilter)
+		} else if fltr != nil {
+			f.reader.SetFilter(fltr)
 		}
-		// returns the channel where events are read from the kcap
+		// returns the channel where events are read from the cap
 		evts, errs := f.reader.Read(ctx)
 		go func() {
 			defer f.filament.Close()
@@ -337,8 +337,8 @@ func (f *App) ReadCapture(ctx context.Context, args []string) error {
 			}
 		}()
 	} else {
-		if kfilter != nil {
-			f.reader.SetFilter(kfilter)
+		if fltr != nil {
+			f.reader.SetFilter(fltr)
 		}
 		// use the channels where events are read
 		// from the capture as aggregator source

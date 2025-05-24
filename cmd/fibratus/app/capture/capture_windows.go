@@ -29,7 +29,7 @@ import (
 
 var Command = &cobra.Command{
 	Use:   "capture [filter]",
-	Short: "Capture event stream to the kcap (capture) file",
+	Short: "Capture event stream to the cap (capture) file",
 	RunE:  capture,
 }
 

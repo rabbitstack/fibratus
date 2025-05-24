@@ -51,7 +51,7 @@ func TestLoadRulesFromPaths(t *testing.T) {
 	assert.Equal(t, "1.0.0", f1.Version)
 	assert.True(t, *f1.Enabled)
 	assert.Contains(t, f1.Tags, "TE")
-	assert.Equal(t, "kevt.category = 'net'", f1.Condition)
+	assert.Equal(t, "evt.category = 'net'", f1.Condition)
 	assert.Equal(t, "this rule matches all network signals", f1.Description)
 	assert.Equal(t, "low", f1.Severity)
 	assert.Equal(t, "`%ps.exe` attempted to reach out to `%net.sip` IP address\n", f1.Output)
@@ -73,7 +73,7 @@ func TestLoadRulesFromPaths(t *testing.T) {
 	f2 := filters.filters[1]
 	assert.False(t, f2.IsDisabled())
 	assert.Equal(t, "suspicious network ACTIVITY", f2.Name)
-	assert.Equal(t, "kevt.category = 'net' and ps.name in ('at.exe', 'java.exe')", f2.Condition)
+	assert.Equal(t, "evt.category = 'net' and ps.name in ('at.exe', 'java.exe')", f2.Condition)
 }
 
 func TestLoadRulesFromPathsWithTemplate(t *testing.T) {
@@ -135,7 +135,7 @@ func TestLoadGroupsFromURLs(t *testing.T) {
 	assert.Equal(t, "only network category", f1.Name)
 	assert.True(t, *f1.Enabled)
 	assert.Contains(t, f1.Tags, "TE")
-	assert.Equal(t, "kevt.category = 'net'", f1.Condition)
+	assert.Equal(t, "evt.category = 'net'", f1.Condition)
 	assert.Equal(t, "this rule matches all network signals", f1.Description)
 	assert.Equal(t, "low", f1.Severity)
 	assert.Equal(t, "`%ps.exe` attempted to reach out to `%net.sip` IP address\n", f1.Output)

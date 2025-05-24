@@ -22,7 +22,7 @@
 package pe
 
 import (
-	kcapver "github.com/rabbitstack/fibratus/pkg/kcap/version"
+	kcapver "github.com/rabbitstack/fibratus/pkg/cap/version"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

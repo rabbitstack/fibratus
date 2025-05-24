@@ -3,7 +3,7 @@ id: d6385b50-532a-4464-929a-044f21443dd3
 version: 1.0.0
 enabled: true
 description: this rule matches all network signals
-condition: kevt.category = 'net'
+condition: evt.category = 'net'
 severity: low
 output: >
   {{ upper "all network events" }}

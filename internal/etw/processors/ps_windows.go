@@ -19,9 +19,8 @@
 package processors
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
@@ -40,43 +39,43 @@ func newPsProcessor(psnap ps.Snapshotter, regionProber *va.RegionProber) Process
 	return &psProcessor{psnap: psnap, regionProber: regionProber}
 }
 
-func (p psProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error) {
+func (p psProcessor) ProcessEvent(e *event.Event) (*event.Event, bool, error) {
 	switch e.Type {
-	case ktypes.CreateProcess, ktypes.TerminateProcess, ktypes.ProcessRundown:
+	case event.CreateProcess, event.TerminateProcess, event.ProcessRundown:
 		evt, err := p.processEvent(e)
 		if evt.IsTerminateProcess() {
-			p.regionProber.Remove(evt.Kparams.MustGetPid())
+			p.regionProber.Remove(evt.Params.MustGetPid())
 			return evt, false, multierror.Wrap(err, p.psnap.Remove(evt))
 		}
 
 		return evt, false, multierror.Wrap(err, p.psnap.Write(evt))
-	case ktypes.CreateThread, ktypes.TerminateThread, ktypes.ThreadRundown:
-		pid, err := e.Kparams.GetPid()
+	case event.CreateThread, event.TerminateThread, event.ThreadRundown:
+		pid, err := e.Params.GetPid()
 		if err != nil {
 			return e, false, err
 		}
 		proc := p.psnap.FindAndPut(pid)
 		if proc != nil {
-			e.AppendParam(kparams.Exe, kparams.UnicodeString, proc.Exe)
+			e.AppendParam(params.Exe, params.UnicodeString, proc.Exe)
 		}
 		if !e.IsTerminateThread() {
 			return e, false, p.psnap.AddThread(e)
 		}
-		tid, err := e.Kparams.GetTid()
+		tid, err := e.Params.GetTid()
 		if err != nil {
 			return e, false, err
 		}
 
 		return e, false, p.psnap.RemoveThread(pid, tid)
-	case ktypes.OpenProcess, ktypes.OpenThread:
-		pid, err := e.Kparams.GetPid()
+	case event.OpenProcess, event.OpenThread:
+		pid, err := e.Params.GetPid()
 		if err != nil {
 			return e, false, err
 		}
 		proc := p.psnap.FindAndPut(pid)
 		if proc != nil {
-			e.AppendParam(kparams.Exe, kparams.Path, proc.Exe)
-			e.AppendParam(kparams.ProcessName, kparams.AnsiString, proc.Name)
+			e.AppendParam(params.Exe, params.Path, proc.Exe)
+			e.AppendParam(params.ProcessName, params.AnsiString, proc.Name)
 		}
 
 		return e, false, nil
@@ -86,34 +85,34 @@ func (p psProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error
 }
 
 //nolint:unparam
-func (p psProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
-	cmndline := cmdline.New(e.GetParamAsString(kparams.Cmdline)).
+func (p psProcessor) processEvent(e *event.Event) (*event.Event, error) {
+	cmndline := cmdline.New(e.GetParamAsString(params.Cmdline)).
 		// get rid of leading/trailing quotes in the executable path
 		CleanExe().
 		// expand all variations of the SystemRoot environment variable
 		ExpandSystemRoot().
 		// some system processes are reported without the path in the command line,
 		// but we can expand the path from the SystemRoot environment variable
-		CompleteSysProc(e.GetParamAsString(kparams.ProcessName))
+		CompleteSysProc(e.GetParamAsString(params.ProcessName))
 
 	// append executable path parameter
 	exe := cmndline.Exeline()
 	if exe == "" {
-		exe = e.GetParamAsString(kparams.ProcessName)
+		exe = e.GetParamAsString(params.ProcessName)
 	}
-	e.AppendParam(kparams.Exe, kparams.Path, exe)
+	e.AppendParam(params.Exe, params.Path, exe)
 
 	if e.IsTerminateProcess() {
 		return e, nil
 	}
 
 	// query process start time
-	pid := e.Kparams.MustGetPid()
+	pid := e.Params.MustGetPid()
 	started, err := getStartTime(pid, e)
 	if err != nil {
 		started = e.Timestamp
 	}
-	e.AppendParam(kparams.StartTime, kparams.Time, started)
+	e.AppendParam(params.StartTime, params.Time, started)
 
 	return e, nil
 }
@@ -121,7 +120,7 @@ func (p psProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
 func (psProcessor) Name() ProcessorType { return Ps }
 func (p psProcessor) Close()            {}
 
-func getStartTime(pid uint32, e *kevent.Kevent) (time.Time, error) {
+func getStartTime(pid uint32, e *event.Event) (time.Time, error) {
 	proc, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
 	if err != nil {
 		return e.Timestamp, err

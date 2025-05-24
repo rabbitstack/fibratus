@@ -21,20 +21,20 @@ package remove
 import "github.com/spf13/pflag"
 
 const (
-	kpars   = "transformers.remove.kparams"
+	pars    = "transformers.remove.params"
 	enabled = "transformers.remove.enabled"
 )
 
 // Config stores the configuration for the remove transformer.
 type Config struct {
-	// Kparams is the list of parameters that are dropped from the event.
-	Kparams []string `mapstructure:"kparams"`
+	// Params is the list of parameters that are dropped from the event.
+	Params []string `mapstructure:"params"`
 	// Enabled indicates whether this transformer is enabled
 	Enabled bool `mapstructure:"enabled"`
 }
 
 // AddFlags registers persistent flags.
 func AddFlags(flags *pflag.FlagSet) {
-	flags.StringSlice(kpars, []string{}, "A list of comma-separated parameters that will be removed from the event")
+	flags.StringSlice(pars, []string{}, "A list of comma-separated parameters that will be removed from the event")
 	flags.Bool(enabled, false, "Indicates if remove transformer is enabled")
 }

@@ -29,24 +29,23 @@ __procs__ = [
 
 
 def on_init():
-    kfilter("kevt.category = 'net' and ps.name in (%s)" % (', '.join([f'\'{ps}\'' for ps in __procs__])))
+    set_filter("evt.category = 'net' and ps.name in (%s)" % (', '.join([f'\'{ps}\'' for ps in __procs__])))
 
 
 @dotdictify
-def on_next_kevent(kevent):
-    print(kevent)
-    notify = True if kevent.pid in __pids__ else False
+def on_next_event(event):
+    notify = True if event.pid in __pids__ else False
     if not notify:
         emit_alert(
-            f'Anomalous network I/O detected to {kevent.kparams.dip}:{kevent.kparams.dport}',
-            text(kevent),
+            f'Anomalous network I/O detected to {event.params.dip}:{event.params.dport}',
+            text(Event),
             severity='critical',
             tags=['anomalous netio']
         )
-        __pids__.append(kevent.pid)
+        __pids__.append(event.pid)
 
 
-def text(kevent):
+def text(event):
     return """
         
         Source IP:        %s
@@ -63,11 +62,11 @@ def text(kevent):
         User: %s
 
         """ % (
-        kevent.kparams.sip,
-        kevent.kparams.sport,
-        kevent.kparams.dip,
-        kevent.kparams.dport,
-        kevent.kparams.dport_name,
-        kevent.exe,
-        kevent.comm,
-        kevent.cwd, kevent.sid)
+        event.params.sip,
+        event.params.sport,
+        event.params.dip,
+        event.params.dport,
+        event.params.dport_name,
+        event.exe,
+        event.comm,
+        event.cwd, event.sid)

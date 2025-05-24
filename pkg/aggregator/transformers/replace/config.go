@@ -26,17 +26,17 @@ const (
 
 // Config stores the configuration for the replace transformer
 type Config struct {
-	// Replacements describes a list of replacements that are applied on the kparam.
+	// Replacements describes a list of replacements that are applied on the Param.
 	Replacements []Replacement `mapstructure:"replacements"`
 	// Enabled indicates whether this transformer is enabled
 	Enabled bool `mapstructure:"enabled"`
 }
 
-// Replacement defines the string replacement config for a specific kparam.
+// Replacement defines the string replacement config for a specific Param.
 type Replacement struct {
-	Kpar string `mapstructure:"kparam"`
-	Old  string `mapstructure:"old"`
-	New  string `mapstructure:"new"`
+	Param string `mapstructure:"param"`
+	Old   string `mapstructure:"old"`
+	New   string `mapstructure:"new"`
 }
 
 // AddFlags registers persistent flags.

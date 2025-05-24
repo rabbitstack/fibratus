@@ -21,10 +21,9 @@ package rules
 import (
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/fs"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/sys"
@@ -107,7 +106,7 @@ func compileRules(t *testing.T, e *Engine) {
 	require.NotNil(t, rs)
 }
 
-func wrapProcessEvent(e *kevent.Kevent, fn func(*kevent.Kevent) (bool, error)) bool {
+func wrapProcessEvent(e *event.Event, fn func(*event.Event) (bool, error)) bool {
 	match, err := fn(e)
 	if err != nil {
 		panic(err)
@@ -117,19 +116,19 @@ func wrapProcessEvent(e *kevent.Kevent, fn func(*kevent.Kevent) (bool, error)) b
 
 func fireRules(t *testing.T, c *config.Config) bool {
 	e := NewEngine(new(ps.SnapshotterMock), c)
-	evt := &kevent.Kevent{
-		Type:     ktypes.RecvTCPv4,
+	evt := &event.Event{
+		Type:     event.RecvTCPv4,
 		Name:     "Recv",
 		Tid:      2484,
 		PID:      859,
-		Category: ktypes.Net,
-		Kparams: kevent.Kparams{
-			kparams.NetDport: {Name: kparams.NetDport, Type: kparams.Uint16, Value: uint16(443)},
-			kparams.NetSport: {Name: kparams.NetSport, Type: kparams.Uint16, Value: uint16(43123)},
-			kparams.NetSIP:   {Name: kparams.NetSIP, Type: kparams.IPv4, Value: net.ParseIP("127.0.0.1")},
-			kparams.NetDIP:   {Name: kparams.NetDIP, Type: kparams.IPv4, Value: net.ParseIP("216.58.201.174")},
+		Category: event.Net,
+		Params: event.Params{
+			params.NetDport: {Name: params.NetDport, Type: params.Uint16, Value: uint16(443)},
+			params.NetSport: {Name: params.NetSport, Type: params.Uint16, Value: uint16(43123)},
+			params.NetSIP:   {Name: params.NetSIP, Type: params.IPv4, Value: net.ParseIP("127.0.0.1")},
+			params.NetDIP:   {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("216.58.201.174")},
 		},
-		Metadata: make(map[kevent.MetadataKey]any),
+		Metadata: make(map[event.MetadataKey]any),
 	}
 	compileRules(t, e)
 	return wrapProcessEvent(evt, e.ProcessEvent)
@@ -146,14 +145,14 @@ func TestCompileIndexableFilters(t *testing.T) {
 	assert.Len(t, e.filters, 3)
 
 	var tests = []struct {
-		evt   *kevent.Kevent
+		evt   *event.Event
 		wants int
 	}{
-		{&kevent.Kevent{Type: ktypes.CreateProcess}, 2},
-		{&kevent.Kevent{Type: ktypes.RecvUDPv6}, 3},
-		{&kevent.Kevent{Type: ktypes.RecvTCPv4}, 3},
-		{&kevent.Kevent{Type: ktypes.RecvTCPv4, Category: ktypes.Net}, 4},
-		{&kevent.Kevent{Category: ktypes.Net}, 1},
+		{&event.Event{Type: event.CreateProcess}, 2},
+		{&event.Event{Type: event.RecvUDPv6}, 3},
+		{&event.Event{Type: event.RecvTCPv4}, 3},
+		{&event.Event{Type: event.RecvTCPv4, Category: event.Net}, 4},
+		{&event.Event{Category: event.Net}, 1},
 	}
 
 	for _, tt := range tests {
@@ -164,7 +163,7 @@ func TestCompileIndexableFilters(t *testing.T) {
 
 	assert.Len(t, e.hashCache.types, 4)
 
-	evt := &kevent.Kevent{Type: ktypes.RecvTCPv4}
+	evt := &event.Event{Type: event.RecvTCPv4}
 
 	h1, h2 := e.hashCache.typeHash(evt), e.hashCache.categoryHash(evt)
 	assert.Equal(t, uint32(0xfa4dab59), h1)
@@ -194,11 +193,11 @@ func TestRunSequenceRule(t *testing.T) {
 	e := NewEngine(new(ps.SnapshotterMock), newConfig("_fixtures/sequence_rule_complex.yml"))
 	compileRules(t, e)
 
-	e1 := &kevent.Kevent{
+	e1 := &event.Event{
 		Seq:       1,
-		Type:      ktypes.CreateProcess,
+		Type:      event.CreateProcess,
 		Timestamp: time.Now(),
-		Category:  ktypes.Process,
+		Category:  event.Process,
 		Name:      "CreateProcess",
 		Tid:       2484,
 		PID:       859,
@@ -206,38 +205,38 @@ func TestRunSequenceRule(t *testing.T) {
 			Name: "explorer.exe",
 			Exe:  "C:\\Windows\\system32\\explorer.exe",
 		},
-		Kparams: kevent.Kparams{
-			kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(2243)},
-			kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "firefox.exe"},
+		Params: event.Params{
+			params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: uint32(2243)},
+			params.ProcessName: {Name: params.ProcessName, Type: params.UnicodeString, Value: "firefox.exe"},
 		},
-		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
-	e2 := &kevent.Kevent{
+	e2 := &event.Event{
 		Seq:       2,
-		Type:      ktypes.CreateFile,
+		Type:      event.CreateFile,
 		Timestamp: time.Now().Add(time.Millisecond * 250),
 		Name:      "CreateFile",
 		Tid:       2484,
 		PID:       2243,
-		Category:  ktypes.File,
+		Category:  event.File,
 		PS: &types.PS{
 			Name:    "firefox.exe",
 			Exe:     "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
 			Cmdline: "C:\\Program Files\\Mozilla Firefox\\firefox.exe\" -contentproc --channel=\"10464.7.539748228\\1366525930\" -childID 6 -isF",
 		},
-		Kparams: kevent.Kparams{
-			kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
-			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: uint32(2), Enum: fs.FileCreateDispositions},
+		Params: event.Params{
+			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
+			params.FileOperation: {Name: params.FileOperation, Type: params.Enum, Value: uint32(2), Enum: fs.FileCreateDispositions},
 		},
-		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
-	e3 := &kevent.Kevent{
+	e3 := &event.Event{
 		Seq:       4,
-		Type:      ktypes.ConnectTCPv4,
+		Type:      event.ConnectTCPv4,
 		Timestamp: time.Now().Add(time.Second),
-		Category:  ktypes.Net,
+		Category:  event.Net,
 		Name:      "Connect",
 		Tid:       244,
 		PID:       2243,
@@ -246,10 +245,10 @@ func TestRunSequenceRule(t *testing.T) {
 			Exe:     "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
 			Cmdline: "C:\\Program Files\\Mozilla Firefox\\firefox.exe\" -contentproc --channel=\"10464.7.539748228\\1366525930\" -childID 6 -isF",
 		},
-		Kparams: kevent.Kparams{
-			kparams.NetDIP: {Name: kparams.NetDIP, Type: kparams.IPv4, Value: net.ParseIP("10.0.2.3")},
+		Params: event.Params{
+			params.NetDIP: {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("10.0.2.3")},
 		},
-		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
 	// register alert sender
@@ -284,11 +283,11 @@ func TestRunSequenceRuleWithPsUUIDLink(t *testing.T) {
 	e := NewEngine(new(ps.SnapshotterMock), newConfig("_fixtures/sequence_rule_ps_uuid.yml"))
 	compileRules(t, e)
 
-	e1 := &kevent.Kevent{
+	e1 := &event.Event{
 		Seq:       1,
-		Type:      ktypes.CreateProcess,
+		Type:      event.CreateProcess,
 		Timestamp: time.Now(),
-		Category:  ktypes.Process,
+		Category:  event.Process,
 		Name:      "CreateProcess",
 		Tid:       2484,
 		PID:       uint32(os.Getpid()),
@@ -297,32 +296,32 @@ func TestRunSequenceRuleWithPsUUIDLink(t *testing.T) {
 			Name: "explorer.exe",
 			Exe:  "C:\\Windows\\system32\\explorer.exe",
 		},
-		Kparams: kevent.Kparams{
-			kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(2243)},
-			kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "firefox.exe"},
+		Params: event.Params{
+			params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: uint32(2243)},
+			params.ProcessName: {Name: params.ProcessName, Type: params.UnicodeString, Value: "firefox.exe"},
 		},
-		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
-	e2 := &kevent.Kevent{
+	e2 := &event.Event{
 		Seq:       2,
-		Type:      ktypes.CreateFile,
+		Type:      event.CreateFile,
 		Timestamp: time.Now(),
 		Name:      "CreateFile",
 		Tid:       2484,
 		PID:       uint32(os.Getpid()),
-		Category:  ktypes.File,
+		Category:  event.File,
 		PS: &types.PS{
 			PID:     uint32(os.Getpid()),
 			Name:    "firefox.exe",
 			Exe:     "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
 			Cmdline: "C:\\Program Files\\Mozilla Firefox\\firefox.exe\" -contentproc --channel=\"10464.7.539748228\\1366525930\" -childID 6 -isF",
 		},
-		Kparams: kevent.Kparams{
-			kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
-			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: uint32(2), Enum: fs.FileCreateDispositions},
+		Params: event.Params{
+			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
+			params.FileOperation: {Name: params.FileOperation, Type: params.Enum, Value: uint32(2), Enum: fs.FileCreateDispositions},
 		},
-		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
 	require.False(t, wrapProcessEvent(e1, e.ProcessEvent))
@@ -336,7 +335,7 @@ func TestRunSimpleAndSequenceRules(t *testing.T) {
 	c := newConfig("_fixtures/simple_and_sequence_rules/*.yml")
 	c.Filters.MatchAll = true
 	e := NewEngine(new(ps.SnapshotterMock), c)
-	e.RegisterMatchFunc(func(f *config.FilterConfig, evts ...*kevent.Kevent) {
+	e.RegisterMatchFunc(func(f *config.FilterConfig, evts ...*event.Event) {
 		ids := make([]uint64, 0)
 		for _, evt := range evts {
 			ids = append(ids, evt.Seq)
@@ -346,12 +345,12 @@ func TestRunSimpleAndSequenceRules(t *testing.T) {
 
 	compileRules(t, e)
 
-	evts := []*kevent.Kevent{
+	evts := []*event.Event{
 		{
 			Seq:       1,
-			Type:      ktypes.CreateProcess,
+			Type:      event.CreateProcess,
 			Timestamp: time.Now(),
-			Category:  ktypes.Process,
+			Category:  event.Process,
 			Name:      "CreateProcess",
 			Tid:       2484,
 			PID:       2243,
@@ -359,35 +358,35 @@ func TestRunSimpleAndSequenceRules(t *testing.T) {
 				Name: "powershell.exe",
 				Exe:  "C:\\Windows\\system32\\powershell.exe",
 			},
-			Kparams: kevent.Kparams{
-				kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(2243)},
-				kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "firefox.exe"},
+			Params: event.Params{
+				params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: uint32(2243)},
+				params.ProcessName: {Name: params.ProcessName, Type: params.UnicodeString, Value: "firefox.exe"},
 			},
-			Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+			Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 		},
 		{
 			Seq:       2,
-			Type:      ktypes.CreateFile,
+			Type:      event.CreateFile,
 			Timestamp: time.Now().Add(time.Millisecond * 544),
 			Name:      "CreateFile",
 			Tid:       2484,
 			PID:       2243,
-			Category:  ktypes.File,
+			Category:  event.File,
 			PS: &types.PS{
 				Name: "cmd.exe",
 				Exe:  "C:\\Windows\\system32\\cmd.exe",
 			},
-			Kparams: kevent.Kparams{
-				kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
-				kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: uint32(2)},
+			Params: event.Params{
+				params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
+				params.FileOperation: {Name: params.FileOperation, Type: params.Enum, Value: uint32(2)},
 			},
-			Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+			Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 		},
 		{
 			Seq:       10,
-			Type:      ktypes.CreateProcess,
+			Type:      event.CreateProcess,
 			Timestamp: time.Now().Add(time.Second * 2),
-			Category:  ktypes.Process,
+			Category:  event.Process,
 			Name:      "CreateProcess",
 			Tid:       2484,
 			PID:       2243,
@@ -395,11 +394,11 @@ func TestRunSimpleAndSequenceRules(t *testing.T) {
 				Name: "cmd.exe",
 				Exe:  "C:\\Windows\\system32\\cmd.exe",
 			},
-			Kparams: kevent.Kparams{
-				kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(2243)},
-				kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "chrome.exe"},
+			Params: event.Params{
+				params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: uint32(2243)},
+				params.ProcessName: {Name: params.ProcessName, Type: params.UnicodeString, Value: "chrome.exe"},
 			},
-			Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+			Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 		},
 	}
 
@@ -431,22 +430,22 @@ func TestAlertAction(t *testing.T) {
 	e := NewEngine(new(ps.SnapshotterMock), newConfig("_fixtures/simple_emit_alert.yml"))
 	compileRules(t, e)
 
-	evt := &kevent.Kevent{
-		Type:     ktypes.RecvTCPv4,
+	evt := &event.Event{
+		Type:     event.RecvTCPv4,
 		Name:     "Recv",
 		Tid:      2484,
 		PID:      859,
-		Category: ktypes.Net,
+		Category: event.Net,
 		PS: &types.PS{
 			Name: "cmd.exe",
 		},
-		Kparams: kevent.Kparams{
-			kparams.NetDport: {Name: kparams.NetDport, Type: kparams.Uint16, Value: uint16(443)},
-			kparams.NetSport: {Name: kparams.NetSport, Type: kparams.Uint16, Value: uint16(43123)},
-			kparams.NetSIP:   {Name: kparams.NetSIP, Type: kparams.IPv4, Value: net.ParseIP("127.0.0.1")},
-			kparams.NetDIP:   {Name: kparams.NetDIP, Type: kparams.IPv4, Value: net.ParseIP("216.58.201.174")},
+		Params: event.Params{
+			params.NetDport: {Name: params.NetDport, Type: params.Uint16, Value: uint16(443)},
+			params.NetSport: {Name: params.NetSport, Type: params.Uint16, Value: uint16(43123)},
+			params.NetSIP:   {Name: params.NetSIP, Type: params.IPv4, Value: net.ParseIP("127.0.0.1")},
+			params.NetDIP:   {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("216.58.201.174")},
 		},
-		Metadata: make(map[kevent.MetadataKey]any),
+		Metadata: make(map[event.MetadataKey]any),
 	}
 
 	require.True(t, wrapProcessEvent(evt, e.ProcessEvent))
@@ -491,22 +490,22 @@ func TestKillAction(t *testing.T) {
 		time.Sleep(time.Millisecond * 100 * time.Duration(i))
 	}
 
-	evt := &kevent.Kevent{
-		Type:      ktypes.CreateProcess,
+	evt := &event.Event{
+		Type:      event.CreateProcess,
 		Timestamp: time.Now(),
 		Name:      "CreateProcess",
 		Tid:       2484,
 		PID:       859,
-		Category:  ktypes.Process,
+		Category:  event.Process,
 		PS: &types.PS{
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\svchost-temp.exe",
 		},
-		Kparams: kevent.Kparams{
-			kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: pi.ProcessId},
-			kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "calc.exe"},
+		Params: event.Params{
+			params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: pi.ProcessId},
+			params.ProcessName: {Name: params.ProcessName, Type: params.UnicodeString, Value: "calc.exe"},
 		},
-		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
 	require.True(t, sys.IsProcessRunning(pi.Process))
@@ -523,56 +522,56 @@ func BenchmarkRunRules(b *testing.B) {
 
 	b.ResetTimer()
 
-	evts := []*kevent.Kevent{
+	evts := []*event.Event{
 		{
-			Type:     ktypes.ConnectTCPv4,
+			Type:     event.ConnectTCPv4,
 			Name:     "Recv",
 			Tid:      2484,
 			PID:      859,
-			Category: ktypes.Net,
+			Category: event.Net,
 			PS: &types.PS{
 				Name: "cmd.exe",
 			},
-			Kparams: kevent.Kparams{
-				kparams.NetDport: {Name: kparams.NetDport, Type: kparams.Uint16, Value: uint16(443)},
-				kparams.NetSport: {Name: kparams.NetSport, Type: kparams.Uint16, Value: uint16(43123)},
-				kparams.NetSIP:   {Name: kparams.NetSIP, Type: kparams.IPv4, Value: net.ParseIP("127.0.0.1")},
-				kparams.NetDIP:   {Name: kparams.NetDIP, Type: kparams.IPv4, Value: net.ParseIP("216.58.201.174")},
+			Params: event.Params{
+				params.NetDport: {Name: params.NetDport, Type: params.Uint16, Value: uint16(443)},
+				params.NetSport: {Name: params.NetSport, Type: params.Uint16, Value: uint16(43123)},
+				params.NetSIP:   {Name: params.NetSIP, Type: params.IPv4, Value: net.ParseIP("127.0.0.1")},
+				params.NetDIP:   {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("216.58.201.174")},
 			},
-			Metadata: make(map[kevent.MetadataKey]any),
+			Metadata: make(map[event.MetadataKey]any),
 		},
 		{
-			Type:     ktypes.CreateProcess,
+			Type:     event.CreateProcess,
 			Name:     "CreateProcess",
-			Category: ktypes.Process,
+			Category: event.Process,
 			Tid:      2484,
 			PID:      859,
 			PS: &types.PS{
 				Name: "powershell.exe",
 			},
-			Kparams: kevent.Kparams{
-				kparams.ProcessID:       {Name: kparams.ProcessID, Type: kparams.PID, Value: 2323},
-				kparams.ProcessParentID: {Name: kparams.ProcessParentID, Type: kparams.PID, Value: uint32(8390)},
-				kparams.ProcessName:     {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "spotify.exe"},
-				kparams.Cmdline:         {Name: kparams.Cmdline, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`},
-				kparams.Exe:             {Name: kparams.Exe, Type: kparams.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe`},
-				kparams.UserSID:         {Name: kparams.UserSID, Type: kparams.UnicodeString, Value: `admin\SYSTEM`},
+			Params: event.Params{
+				params.ProcessID:       {Name: params.ProcessID, Type: params.PID, Value: 2323},
+				params.ProcessParentID: {Name: params.ProcessParentID, Type: params.PID, Value: uint32(8390)},
+				params.ProcessName:     {Name: params.ProcessName, Type: params.UnicodeString, Value: "spotify.exe"},
+				params.Cmdline:         {Name: params.Cmdline, Type: params.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe --type=crashpad-handler /prefetch:7 --max-uploads=5 --max-db-size=20 --max-db-age=5 --monitor-self-annotation=ptype=crashpad-handler "--metrics-dir=C:\Users\admin\AppData\Local\Spotify\User Data" --url=https://crashdump.spotify.com:443/ --annotation=platform=win32 --annotation=product=spotify --annotation=version=1.1.4.197 --initial-client-data=0x5a4,0x5a0,0x5a8,0x59c,0x5ac,0x6edcbf60,0x6edcbf70,0x6edcbf7c`},
+				params.Exe:             {Name: params.Exe, Type: params.UnicodeString, Value: `C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe`},
+				params.UserSID:         {Name: params.UserSID, Type: params.UnicodeString, Value: `admin\SYSTEM`},
 			},
-			Metadata: make(map[kevent.MetadataKey]any),
+			Metadata: make(map[event.MetadataKey]any),
 		},
 		{
-			Type:     ktypes.CreateHandle,
+			Type:     event.CreateHandle,
 			Name:     "CreateHandle",
-			Category: ktypes.Handle,
+			Category: event.Handle,
 			Tid:      2484,
 			PID:      859,
 			PS: &types.PS{
 				Name: "powershell.exe",
 			},
-			Kparams: kevent.Kparams{
-				kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.PID, Value: 2323},
+			Params: event.Params{
+				params.ProcessID: {Name: params.ProcessID, Type: params.PID, Value: 2323},
 			},
-			Metadata: make(map[kevent.MetadataKey]any),
+			Metadata: make(map[event.MetadataKey]any),
 		},
 	}
 

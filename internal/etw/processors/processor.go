@@ -19,8 +19,8 @@
 package processors
 
 import (
+	"github.com/rabbitstack/fibratus/pkg/event"
 	libntfs "github.com/rabbitstack/fibratus/pkg/fs/ntfs"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	"os"
 	"time"
@@ -52,7 +52,7 @@ const (
 type Processor interface {
 	// ProcessEvent receives an existing event possibly mutating its state.
 	// If it returns true, the next processor in the chain is evaluated.
-	ProcessEvent(*kevent.Kevent) (*kevent.Kevent, bool, error)
+	ProcessEvent(*event.Event) (*event.Event, bool, error)
 
 	// Name returns a human-readable name of this processor.
 	Name() ProcessorType

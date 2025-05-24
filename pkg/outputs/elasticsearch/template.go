@@ -46,7 +46,7 @@ const indexTemplate = `
 
 			"timestamp": { "type": "date" },
 
-			"kparams": { 
+			"params": { 
 				"type": "nested",
 			    "properties": {
 					"dip": { "type": "ip" },

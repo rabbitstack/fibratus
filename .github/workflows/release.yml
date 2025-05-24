@@ -85,7 +85,7 @@ jobs:
           ./make.bat mc
           ./make.bat
         env:
-          TAGS: kcap,filament,yara,yara_static
+          TAGS: cap,filament,yara,yara_static
       - name: Install Wix
         shell: bash
         run: |

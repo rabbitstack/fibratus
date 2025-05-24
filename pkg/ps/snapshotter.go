@@ -19,7 +19,7 @@
 package ps
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 )
@@ -31,23 +31,23 @@ type Snapshotter interface {
 	// Write appends a new process state to the snapshotter. It takes as an input the inbound event to fetch
 	// the basic data, but also enriches the process' state with extra metadata such as process' env variables, PE
 	// metadata for Windows binaries and so on.
-	Write(*kevent.Kevent) error
+	Write(*event.Event) error
 	// AddThread builds thread state from the event representation.
-	AddThread(*kevent.Kevent) error
+	AddThread(*event.Event) error
 	// AddModule builds module state from the event representation.
-	AddModule(*kevent.Kevent) error
+	AddModule(*event.Event) error
 	// RemoveThread removes the thread from the given process.
 	RemoveThread(pid uint32, tid uint32) error
 	// RemoveModule removes the module the given process.
 	RemoveModule(pid uint32, addr va.Address) error
 	// AddMmap adds a new memory mapping (data memory-mapped file, image, or pagefile) to this process state.
-	AddMmap(*kevent.Kevent) error
+	AddMmap(*event.Event) error
 	// RemoveMmap removes memory mapping at the given base address.
 	RemoveMmap(pid uint32, addr va.Address) error
-	// WriteFromKcap appends a new process state to the snapshotter from the captured kernel event.
-	WriteFromKcap(kevt *kevent.Kevent) error
+	// WriteFromCapture appends a new process state to the snapshotter from the captured event.
+	WriteFromCapture(evt *event.Event) error
 	// Remove deletes process's state from the snapshotter.
-	Remove(kevt *kevent.Kevent) error
+	Remove(evt *event.Event) error
 	// Find attempts to retrieve process' state for the specified process identifier. Returns true
 	// if the process was find in the state. Otherwise, returns false and constructs a fresh process
 	// state by querying the OS via API functions.

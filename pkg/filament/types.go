@@ -19,15 +19,15 @@
 package filament
 
 import (
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/filter"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
 )
 
 // Filament defines the set of operations all filaments have to satisfy. Filament represents a full-fledged
 // Python interpreter that runs the modules given by users.
 type Filament interface {
 	// Run consumes all events from the kernel event stream and dispatches them to the filament.
-	Run(<-chan *kevent.Kevent, <-chan error) error
+	Run(<-chan *event.Event, <-chan error) error
 	// Close shutdowns the filament by releasing all allocated resources.
 	Close() error
 	// Filter returns the filter compiled from filament.

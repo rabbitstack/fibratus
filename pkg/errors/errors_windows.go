@@ -23,7 +23,7 @@ import (
 )
 
 var (
-	// ErrTraceAccessDenied is returned when user doesn't have enough privileges to start kernel trace
+	// ErrTraceAccessDenied is returned when user doesn't have enough privileges to start the trace
 	ErrTraceAccessDenied = errors.New("not enough privileges to start the trace. Only users with administrative privileges or users in the Performance Log Users group can start kernel traces")
 	// ErrTraceInvalidParameter signals invalid values for trace session
 	ErrTraceInvalidParameter = errors.New("trace has invalid values")
@@ -35,14 +35,14 @@ var (
 	ErrTraceDiskFull = errors.New("not enough disk space for writing to log file")
 	// ErrInvalidTrace signals invalid trace handle
 	ErrInvalidTrace = errors.New("invalid trace handle")
-	// ErrRestartTrace signals an error that is thrown when currently running kernel trace cannot be restarted
+	// ErrRestartTrace signals an error that is thrown when currently running trace cannot be restarted
 	ErrRestartTrace = errors.New("couldn't restart an already running trace")
-	// ErrTraceAlreadyRunning identifies kernel trace already running errors
+	// ErrTraceAlreadyRunning identifies trace already running errors
 	ErrTraceAlreadyRunning = errors.New("trace is already running")
 	// ErrEventCallbackException signals that an exception has occurred in the event processing function
 	ErrEventCallbackException = errors.New("an exception occurred in the event callback function")
-	// ErrKsessionNotRunning is thrown when kernel session from which consumer is trying to collect events is not running
-	ErrKsessionNotRunning = errors.New("session from which you are trying to consume events in real time is not running")
-	// ErrTraceCancelled is thrown when in-progress kernel event trace is cancelled
+	// ErrSessionNotRunning is thrown when session from which consumer is trying to collect events is not running
+	ErrSessionNotRunning = errors.New("session from which you are trying to consume events in real time is not running")
+	// ErrTraceCancelled is thrown when in-progress event trace is cancelled
 	ErrTraceCancelled = errors.New("event trace has been cancelled")
 )

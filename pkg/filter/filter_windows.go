@@ -51,7 +51,7 @@ func New(expr string, config *config.Config, options ...Option) Filter {
 	}
 	accessors := []Accessor{
 		// general event parameters
-		newKevtAccessor(),
+		newEventAccessor(),
 		// process state and parameters
 		newPSAccessor(opts.psnap),
 		// PE metadata

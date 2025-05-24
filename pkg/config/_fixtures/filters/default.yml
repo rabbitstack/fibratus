@@ -3,7 +3,7 @@ id: 313933e7-8eb9-45d9-81af-0305fee70e29
 version: 1.0.0
 enabled: true
 description: this rule matches all network signals
-condition: kevt.category = 'net'
+condition: evt.category = 'net'
 severity: low
 output: >
   `%ps.exe` attempted to reach out to `%net.sip` IP address

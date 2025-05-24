@@ -20,9 +20,8 @@ package trim
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"testing"
@@ -30,36 +29,36 @@ import (
 )
 
 func TestTransform(t *testing.T) {
-	kevt := &kevent.Kevent{
-		Type:        ktypes.CreateFile,
+	evt := &event.Event{
+		Type:        event.CreateFile,
 		Tid:         2484,
 		PID:         859,
 		CPU:         1,
 		Seq:         2,
 		Name:        "CreateFile",
-		Category:    ktypes.File,
+		Category:    event.File,
 		Host:        "archrabbit",
 		Description: "Creates or opens a new file, directory, I/O device, pipe, console",
-		Kparams: kevent.Kparams{
-			kparams.FileObject:    {Name: kparams.FileObject, Type: kparams.Uint64, Value: uint64(12456738026482168384)},
-			kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
-			kparams.FileType:      {Name: kparams.FileType, Type: kparams.AnsiString, Value: "file"},
-			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.AnsiString, Value: "overwriteif"},
-			kparams.BasePrio:      {Name: kparams.BasePrio, Type: kparams.Int8, Value: int8(2)},
-			kparams.PagePrio:      {Name: kparams.PagePrio, Type: kparams.Uint8, Value: uint8(2)},
-			kparams.KstackLimit:   {Name: kparams.KstackLimit, Type: kparams.Address, Value: uint64(18884888488889)},
-			kparams.StartTime:     {Name: kparams.StartTime, Type: kparams.Time, Value: time.Now()},
-			kparams.ProcessID:     {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(1204)},
+		Params: event.Params{
+			params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
+			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
+			params.FileType:      {Name: params.FileType, Type: params.AnsiString, Value: "file"},
+			params.FileOperation: {Name: params.FileOperation, Type: params.AnsiString, Value: "overwriteif"},
+			params.BasePrio:      {Name: params.BasePrio, Type: params.Int8, Value: int8(2)},
+			params.PagePrio:      {Name: params.PagePrio, Type: params.Uint8, Value: uint8(2)},
+			params.KstackLimit:   {Name: params.KstackLimit, Type: params.Address, Value: uint64(18884888488889)},
+			params.StartTime:     {Name: params.StartTime, Type: params.Time, Value: time.Now()},
+			params.ProcessID:     {Name: params.ProcessID, Type: params.PID, Value: uint32(1204)},
 		},
-		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barz"},
+		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barz"},
 	}
 
 	transf, err := transformers.Load(transformers.Config{Type: transformers.Trim, Transformer: Config{Prefixes: []Trim{{Name: "file_path", Trim: "\\Device"}}, Suffixes: []Trim{{Name: "create_disposition", Trim: "if"}}}})
 	require.NoError(t, err)
 
-	require.NoError(t, transf.Transform(kevt))
-	filename, _ := kevt.Kparams.GetString(kparams.FilePath)
-	dispo, _ := kevt.Kparams.GetString(kparams.FileOperation)
+	require.NoError(t, transf.Transform(evt))
+	filename, _ := evt.Params.GetString(params.FilePath)
+	dispo, _ := evt.Params.GetString(params.FileOperation)
 
 	assert.Equal(t, "\\HarddiskVolume2\\Windows\\system32\\user32.dll", filename)
 	assert.Equal(t, "overwrite", dispo)

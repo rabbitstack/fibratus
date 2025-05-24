@@ -1,5 +1,5 @@
 name: Suspicious domains
 id: c4cd547f-d64a-4452-abe8-846410617c06
 version: 1.0.0
-condition: kevt.name = 'QueryDns' and dns.name = 'fishy.domain.dot'
+condition: evt.name = 'QueryDns' and dns.name = 'fishy.domain.dot'
 min-engine-version: 2.0.0

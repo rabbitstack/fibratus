@@ -1,5 +1,5 @@
 name: match https connections
 id: 5155539d-31bd-429e-81f9-c17ee1c01f93
 version: 1.0.0
-condition: kevt.name = 'Recv' and net.dport = 443
+condition: evt.name = 'Recv' and net.dport = 443
 min-engine-version: 2.0.0

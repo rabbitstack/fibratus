@@ -19,11 +19,10 @@
 package processors
 
 import (
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/handle"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
 	"strings"
@@ -50,28 +49,28 @@ func newHandleProcessor(
 	}
 }
 
-func (h *handleProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error) {
-	if e.Category == ktypes.Handle {
+func (h *handleProcessor) ProcessEvent(e *event.Event) (*event.Event, bool, error) {
+	if e.Category == event.Handle {
 		evt, err := h.processEvent(e)
 		return evt, false, err
 	}
 	return e, true, nil
 }
 
-func (h *handleProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
-	if e.Type == ktypes.DuplicateHandle {
+func (h *handleProcessor) processEvent(e *event.Event) (*event.Event, error) {
+	if e.Type == event.DuplicateHandle {
 		// enrich event with process parameters
-		pid := e.Kparams.MustGetPid()
+		pid := e.Params.MustGetPid()
 		proc := h.psnap.FindAndPut(pid)
 		if proc != nil {
-			e.AppendParam(kparams.Exe, kparams.Path, proc.Exe)
-			e.AppendParam(kparams.ProcessName, kparams.AnsiString, proc.Name)
+			e.AppendParam(params.Exe, params.Path, proc.Exe)
+			e.AppendParam(params.ProcessName, params.AnsiString, proc.Name)
 		}
 		return e, nil
 	}
 
-	name := e.GetParamAsString(kparams.HandleObjectName)
-	typ := e.GetParamAsString(kparams.HandleObjectTypeID)
+	name := e.GetParamAsString(params.HandleObjectName)
+	typ := e.GetParamAsString(params.HandleObjectTypeID)
 
 	if name != "" {
 		switch typ {
@@ -93,15 +92,15 @@ func (h *handleProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error)
 				driverPath = driverName
 			}
 			h.devPathResolver.RemovePath(driverName)
-			e.Kparams.Append(kparams.ImagePath, kparams.Path, driverPath)
+			e.Params.Append(params.ImagePath, params.Path, driverPath)
 		}
 		// assign the formatted handle name
-		if err := e.Kparams.SetValue(kparams.HandleObjectName, name); err != nil {
+		if err := e.Params.SetValue(params.HandleObjectName, name); err != nil {
 			return e, err
 		}
 	}
 
-	if e.Type == ktypes.CreateHandle {
+	if e.Type == event.CreateHandle {
 		return e, h.hsnap.Write(e)
 	}
 

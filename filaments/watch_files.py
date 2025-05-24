@@ -24,15 +24,15 @@ __files__ = []
 
 
 def on_init():
-    kfilter("kevt.name = 'CreateFile' and file.operation != 'OPEN'")
+    set_filter("evt.name = 'CreateFile' and file.operation != 'OPEN'")
     columns(["Process", "File"])
 
 
 @dotdictify
-def on_next_kevent(kevent):
-    file_name = kevent.kparams.file_name
+def on_next_event(event):
+    file_name = event.params.file_name
     if file_name:
-        __files__.append((kevent.exe, file_name, ))
+        __files__.append((event.exe, file_name, ))
         for f in __files__:
             add_row([f[0], f[1]])
         render_table()

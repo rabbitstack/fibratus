@@ -20,7 +20,7 @@ package etw
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/config"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -47,11 +47,11 @@ func TestStackExtensions(t *testing.T) {
 	exts.EnableMemoryCallstack()
 
 	assert.Len(t, exts.EventIds(), 7)
-	assert.Contains(t, exts.EventIds(), etw.ClassicEventID{GUID: ktypes.ProcessEventGUID, Type: uint8(ktypes.CreateProcess.HookID())})
-	assert.Contains(t, exts.EventIds(), etw.ClassicEventID{GUID: ktypes.ThreadEventGUID, Type: uint8(ktypes.CreateThread.HookID())})
-	assert.Contains(t, exts.EventIds(), etw.ClassicEventID{GUID: ktypes.ThreadEventGUID, Type: uint8(ktypes.TerminateThread.HookID())})
-	assert.Contains(t, exts.EventIds(), etw.ClassicEventID{GUID: ktypes.FileEventGUID, Type: uint8(ktypes.CreateFile.HookID())})
-	assert.Contains(t, exts.EventIds(), etw.ClassicEventID{GUID: ktypes.FileEventGUID, Type: uint8(ktypes.RenameFile.HookID())})
-	assert.Contains(t, exts.EventIds(), etw.ClassicEventID{GUID: ktypes.FileEventGUID, Type: uint8(ktypes.DeleteFile.HookID())})
-	assert.Contains(t, exts.EventIds(), etw.ClassicEventID{GUID: ktypes.MemEventGUID, Type: uint8(ktypes.VirtualAlloc.HookID())})
+	assert.Contains(t, exts.EventIds(), etw.ClassicEventID{GUID: event.ProcessEventGUID, Type: uint8(event.CreateProcess.HookID())})
+	assert.Contains(t, exts.EventIds(), etw.ClassicEventID{GUID: event.ThreadEventGUID, Type: uint8(event.CreateThread.HookID())})
+	assert.Contains(t, exts.EventIds(), etw.ClassicEventID{GUID: event.ThreadEventGUID, Type: uint8(event.TerminateThread.HookID())})
+	assert.Contains(t, exts.EventIds(), etw.ClassicEventID{GUID: event.FileEventGUID, Type: uint8(event.CreateFile.HookID())})
+	assert.Contains(t, exts.EventIds(), etw.ClassicEventID{GUID: event.FileEventGUID, Type: uint8(event.RenameFile.HookID())})
+	assert.Contains(t, exts.EventIds(), etw.ClassicEventID{GUID: event.FileEventGUID, Type: uint8(event.DeleteFile.HookID())})
+	assert.Contains(t, exts.EventIds(), etw.ClassicEventID{GUID: event.MemEventGUID, Type: uint8(event.VirtualAlloc.HookID())})
 }

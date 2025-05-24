@@ -30,10 +30,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/handle"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 )
 
 var (
@@ -75,26 +74,26 @@ func newRegistryProcessor(hsnap handle.Snapshotter) Processor {
 	}
 }
 
-func (r *registryProcessor) ProcessEvent(e *kevent.Kevent) (*kevent.Kevent, bool, error) {
-	if e.Category == ktypes.Registry {
+func (r *registryProcessor) ProcessEvent(e *event.Event) (*event.Event, bool, error) {
+	if e.Category == event.Registry {
 		evt, err := r.processEvent(e)
 		return evt, false, err
 	}
 	return e, true, nil
 }
 
-func (r *registryProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, error) {
+func (r *registryProcessor) processEvent(e *event.Event) (*event.Event, error) {
 	switch e.Type {
-	case ktypes.RegKCBRundown, ktypes.RegCreateKCB:
-		khandle := e.Kparams.MustGetUint64(kparams.RegKeyHandle)
-		r.keys[khandle] = e.Kparams.MustGetString(kparams.RegPath)
+	case event.RegKCBRundown, event.RegCreateKCB:
+		khandle := e.Params.MustGetUint64(params.RegKeyHandle)
+		r.keys[khandle] = e.Params.MustGetString(params.RegPath)
 		kcbCount.Add(1)
-	case ktypes.RegDeleteKCB:
-		khandle := e.Kparams.MustGetUint64(kparams.RegKeyHandle)
+	case event.RegDeleteKCB:
+		khandle := e.Params.MustGetUint64(params.RegKeyHandle)
 		delete(r.keys, khandle)
 		kcbCount.Add(-1)
 	default:
-		khandle := e.Kparams.MustGetUint64(kparams.RegKeyHandle)
+		khandle := e.Params.MustGetUint64(params.RegKeyHandle)
 		// we have to obey a straightforward algorithm to connect relative
 		// key names to their root keys. If key handle is equal to zero we
 		// have a full key name and don't have to go further resolving the
@@ -104,7 +103,7 @@ func (r *registryProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, erro
 		// last resort is to scan process' handles and check if any of the
 		// key handles contain the partial key name. In this case we assume
 		// the correct key is encountered.
-		keyName := e.Kparams.MustGetString(kparams.RegPath)
+		keyName := e.Params.MustGetString(params.RegPath)
 		if khandle != 0 {
 			if baseKey, ok := r.keys[khandle]; ok {
 				keyName = baseKey + "\\" + keyName
@@ -112,7 +111,7 @@ func (r *registryProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, erro
 				kcbMissCount.Add(1)
 				keyName = r.findMatchingKey(e.PID, keyName)
 			}
-			if err := e.Kparams.SetValue(kparams.RegPath, keyName); err != nil {
+			if err := e.Params.SetValue(params.RegPath, keyName); err != nil {
 				return e, err
 			}
 		}
@@ -137,18 +136,18 @@ func (r *registryProcessor) processEvent(e *kevent.Kevent) (*kevent.Kevent, erro
 				}
 				return e, ErrReadValue(rootkey.String(), keyName, err)
 			}
-			e.AppendEnum(kparams.RegValueType, typ, key.RegistryValueTypes)
+			e.AppendEnum(params.RegValueType, typ, key.RegistryValueTypes)
 			switch typ {
 			case registry.SZ, registry.EXPAND_SZ:
-				e.AppendParam(kparams.RegValue, kparams.UnicodeString, val)
+				e.AppendParam(params.RegValue, params.UnicodeString, val)
 			case registry.MULTI_SZ:
-				e.AppendParam(kparams.RegValue, kparams.Slice, val)
+				e.AppendParam(params.RegValue, params.Slice, val)
 			case registry.BINARY:
-				e.AppendParam(kparams.RegValue, kparams.Binary, val)
+				e.AppendParam(params.RegValue, params.Binary, val)
 			case registry.QWORD:
-				e.AppendParam(kparams.RegValue, kparams.Uint64, val)
+				e.AppendParam(params.RegValue, params.Uint64, val)
 			case registry.DWORD:
-				e.AppendParam(kparams.RegValue, kparams.Uint32, uint32(val.(uint64)))
+				e.AppendParam(params.RegValue, params.Uint32, uint32(val.(uint64)))
 			}
 		}
 	}

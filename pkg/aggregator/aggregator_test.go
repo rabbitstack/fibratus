@@ -19,9 +19,8 @@
 package aggregator
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/outputs"
 	"github.com/rabbitstack/fibratus/pkg/outputs/console"
 	"github.com/stretchr/testify/assert"
@@ -32,7 +31,7 @@ import (
 )
 
 func TestNewBufferedAggregator(t *testing.T) {
-	keventsc := make(chan *kevent.Kevent, 20)
+	keventsc := make(chan *event.Event, 20)
 	errsc := make(chan error, 1)
 	agg, err := NewBuffered(
 		keventsc,
@@ -46,36 +45,36 @@ func TestNewBufferedAggregator(t *testing.T) {
 	require.NotNil(t, agg)
 
 	for i := 0; i < 4; i++ {
-		kevt := &kevent.Kevent{
-			Type: ktypes.SendTCPv4,
+		evt := &event.Event{
+			Type: event.SendTCPv4,
 			Tid:  2484,
 			PID:  859,
-			Kparams: kevent.Kparams{
-				kparams.NetDport: {Name: kparams.NetDport, Type: kparams.Uint16, Value: uint16(443)},
-				kparams.NetSport: {Name: kparams.NetSport, Type: kparams.Uint16, Value: uint16(43123)},
-				kparams.NetSIP:   {Name: kparams.NetSIP, Type: kparams.IPv4, Value: net.ParseIP("127.0.0.1")},
-				kparams.NetDIP:   {Name: kparams.NetDIP, Type: kparams.IPv4, Value: net.ParseIP("216.58.201.174")},
+			Params: event.Params{
+				params.NetDport: {Name: params.NetDport, Type: params.Uint16, Value: uint16(443)},
+				params.NetSport: {Name: params.NetSport, Type: params.Uint16, Value: uint16(43123)},
+				params.NetSIP:   {Name: params.NetSIP, Type: params.IPv4, Value: net.ParseIP("127.0.0.1")},
+				params.NetDIP:   {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("216.58.201.174")},
 			},
 		}
-		keventsc <- kevt
+		keventsc <- evt
 	}
 	<-time.After(time.Millisecond * 275)
 	assert.Equal(t, int64(4), batchEvents.Value())
 
 	for i := 0; i < 2; i++ {
-		kevt := &kevent.Kevent{
-			Type: ktypes.SendTCPv4,
+		evt := &event.Event{
+			Type: event.SendTCPv4,
 			Tid:  2484,
 			PID:  859,
 			Seq:  uint64(i),
-			Kparams: kevent.Kparams{
-				kparams.NetDport: {Name: kparams.NetDport, Type: kparams.Uint16, Value: uint16(443)},
-				kparams.NetSport: {Name: kparams.NetSport, Type: kparams.Uint16, Value: uint16(43123)},
-				kparams.NetSIP:   {Name: kparams.NetSIP, Type: kparams.IPv4, Value: net.ParseIP("127.0.0.1")},
-				kparams.NetDIP:   {Name: kparams.NetDIP, Type: kparams.IPv4, Value: net.ParseIP("216.58.201.174")},
+			Params: event.Params{
+				params.NetDport: {Name: params.NetDport, Type: params.Uint16, Value: uint16(443)},
+				params.NetSport: {Name: params.NetSport, Type: params.Uint16, Value: uint16(43123)},
+				params.NetSIP:   {Name: params.NetSIP, Type: params.IPv4, Value: net.ParseIP("127.0.0.1")},
+				params.NetDIP:   {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("216.58.201.174")},
 			},
 		}
-		keventsc <- kevt
+		keventsc <- evt
 	}
 	<-time.After(time.Millisecond * 260)
 	assert.Equal(t, int64(6), batchEvents.Value())

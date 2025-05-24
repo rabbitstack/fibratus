@@ -64,9 +64,9 @@ func TestParser(t *testing.T) {
 		{expr: `ps.envs imatches 'C:\\Program Files'`},
 		{expr: `ps.pid[1] = 'svchost.exe'`, err: errors.New("ps.pid[1] = 'svchost.exe'\n╭──────^\n|\n|\n╰─────────────────── expected field without argument")},
 		{expr: `ps.envs[ProgramFiles = 'svchost.exe'`, err: errors.New("ps.envs[ProgramFiles = 'svchost.exe'\n╭───────────────────^\n|\n|\n╰─────────────────── expected ]")},
-		{expr: `kevt.arg = 'svchost.exe'`, err: errors.New("kevt.arg = 'svchost.exe'\n╭───────^\n|\n|\n╰─────────────────── expected field argument")},
-		{expr: `kevt.arg[name] = 'svchost.exe'`},
-		{expr: `kevt.arg[Name$] = 'svchost.exe'`, err: errors.New("kevt.arg[Name$] = 'svchost.exe'\n╭────────^\n|\n|\n╰─────────────────── expected a valid field argument matching the pattern [a-z0-9_]+")},
+		{expr: `evt.arg = 'svchost.exe'`, err: errors.New("evt.arg = 'svchost.exe'\n╭───────^\n|\n|\n╰─────────────────── expected field argument")},
+		{expr: `evt.arg[name] = 'svchost.exe'`},
+		{expr: `evt.arg[Name$] = 'svchost.exe'`, err: errors.New("evt.arg[Name$] = 'svchost.exe'\n╭────────^\n|\n|\n╰─────────────────── expected a valid field argument matching the pattern [a-z0-9_]+")},
 		{expr: `ps.ancestor[0] = 'svchost.exe'`},
 		{expr: `ps.ancestor[l0l] = 'svchost.exe'`, err: errors.New("ps.ancestor[l0l] = 'svchost.exe'\n╭───────────^\n|\n|\n╰─────────────────── expected a valid field argument matching the pattern [0-9]+")},
 	}
@@ -145,43 +145,43 @@ func TestExpandMacros(t *testing.T) {
 		err          error
 	}{
 		{
-			config.FiltersWithMacros(map[string]*config.Macro{"spawn_process": {Expr: "kevt.name = 'CreateProcess'"}}),
+			config.FiltersWithMacros(map[string]*config.Macro{"spawn_process": {Expr: "evt.name = 'CreateProcess'"}}),
 			"spawn_process and ps.name in ('cmd.exe', 'powershell.exe')",
-			"kevt.name = CreateProcess AND ps.name IN (cmd.exe, powershell.exe)",
+			"evt.name = CreateProcess AND ps.name IN (cmd.exe, powershell.exe)",
 			nil,
 		},
 		{
-			config.FiltersWithMacros(map[string]*config.Macro{"span_process": {Expr: "kevt.name = 'CreateProcess'"}}),
+			config.FiltersWithMacros(map[string]*config.Macro{"span_process": {Expr: "evt.name = 'CreateProcess'"}}),
 			"spawn_process and ps.name in ('cmd.exe', 'powershell.exe')",
 			"",
 			errors.New("expected field, string, number, bool, ip, function, pattern binding"),
 		},
 		{
-			config.FiltersWithMacros(map[string]*config.Macro{"spawn_process": {Expr: "kevt.name = 'CreateProcess'"}, "command_clients": {List: []string{"cmd.exe", "pwsh.exe"}}}),
+			config.FiltersWithMacros(map[string]*config.Macro{"spawn_process": {Expr: "evt.name = 'CreateProcess'"}, "command_clients": {List: []string{"cmd.exe", "pwsh.exe"}}}),
 			"spawn_process and ps.name in command_clients",
-			"kevt.name = CreateProcess AND ps.name IN (cmd.exe, pwsh.exe)",
+			"evt.name = CreateProcess AND ps.name IN (cmd.exe, pwsh.exe)",
 			nil,
 		},
 		{
-			config.FiltersWithMacros(map[string]*config.Macro{"spawn_process": {Expr: "kevt.nnname = 'CreateProcess'"}, "command_clients": {List: []string{"cmd.exe", "pwsh.exe"}}}),
+			config.FiltersWithMacros(map[string]*config.Macro{"spawn_process": {Expr: "evt.nnname = 'CreateProcess'"}, "command_clients": {List: []string{"cmd.exe", "pwsh.exe"}}}),
 			"spawn_process and ps.name in command_clients",
 			"",
 			errors.New("syntax error in \"spawn_process\" macro. expected field, string, number, bool, ip, function, pattern binding"),
 		},
 		{
 			config.FiltersWithMacros(map[string]*config.Macro{
-				"rename":    {Expr: "kevt.name = 'RenameFile'"},
-				"remove":    {Expr: "kevt.name = 'DeleteFile'"},
+				"rename":    {Expr: "evt.name = 'RenameFile'"},
+				"remove":    {Expr: "evt.name = 'DeleteFile'"},
 				"modify":    {Expr: "rename or remove"},
 				"wcm_files": {List: []string{"?:\\Users\\*\\AppData\\*\\Microsoft\\Credentials\\*"}}}),
 			"(modify) and file.name imatches wcm_files",
-			"(kevt.name = RenameFile OR kevt.name = DeleteFile) AND file.name IMATCHES (?:\\Users\\*\\AppData\\*\\Microsoft\\Credentials\\*)",
+			"(evt.name = RenameFile OR evt.name = DeleteFile) AND file.name IMATCHES (?:\\Users\\*\\AppData\\*\\Microsoft\\Credentials\\*)",
 			nil,
 		},
 		{
 			config.FiltersWithMacros(map[string]*config.Macro{
-				"rename": {Expr: "kevt.name = 'RenameFile'"},
-				"remove": {Expr: "kevt.name = 'DeleteFile'"},
+				"rename": {Expr: "evt.name = 'RenameFile'"},
+				"remove": {Expr: "evt.name = 'DeleteFile'"},
 				"modify": {Expr: "rename or remove"}}),
 			"entropy(file.name) > 0.22 and ren",
 			"",
@@ -189,22 +189,22 @@ func TestExpandMacros(t *testing.T) {
 		},
 		{
 			config.FiltersWithMacros(map[string]*config.Macro{
-				"rename": {Expr: "kevt.name = 'RenameFile'"},
-				"remove": {Expr: "kevt.name = 'DeleteFile'"},
+				"rename": {Expr: "evt.name = 'RenameFile'"},
+				"remove": {Expr: "evt.name = 'DeleteFile'"},
 				"modify": {Expr: "rename or remove"}}),
 			"entropy(file.name) > 0.22 and rename",
-			"entropy(file.name) > 2.2e-01 AND kevt.name = RenameFile",
+			"entropy(file.name) > 2.2e-01 AND evt.name = RenameFile",
 			nil,
 		},
 		{
 			config.FiltersWithMacros(map[string]*config.Macro{
-				"rename":    {Expr: "kevt.name = 'RenameFile'"},
-				"remove":    {Expr: "kevt.name = 'DeleteFile'"},
-				"create":    {Expr: "kevt.name = 'CreateFile' and file.operation = 'create'"},
+				"rename":    {Expr: "evt.name = 'RenameFile'"},
+				"remove":    {Expr: "evt.name = 'DeleteFile'"},
+				"create":    {Expr: "evt.name = 'CreateFile' and file.operation = 'create'"},
 				"modify":    {Expr: "rename or remove"},
 				"change_fs": {Expr: "modify or (create)"}}),
 			"change_fs",
-			"kevt.name = RenameFile OR kevt.name = DeleteFile OR (kevt.name = CreateFile AND file.operation = create)",
+			"evt.name = RenameFile OR evt.name = DeleteFile OR (evt.name = CreateFile AND file.operation = create)",
 			nil,
 		},
 	}
@@ -231,40 +231,40 @@ func TestParseSequence(t *testing.T) {
 		isConstrained bool
 	}{
 		{
-			`kevt.name = 'CreateProcess'|
-			 |kevt.name = 'CreateFile'|
+			`evt.name = 'CreateProcess'|
+			 |evt.name = 'CreateFile'|
 			`,
 			errors.New("expected |"),
 			time.Duration(0),
 			false,
 		},
 		{
-			`|kevt.name = 'CreateProcess'
-			 kevt.name = 'CreateFile'|
+			`|evt.name = 'CreateProcess'
+			 evt.name = 'CreateFile'|
 			`,
 			errors.New("expected operator, ')', ',', '|'"),
 			time.Duration(0),
 			false,
 		},
 		{
-			`|kevt.name = 'CreateProcess'|
-			 |kevt.name = 'CreateFile'
+			`|evt.name = 'CreateProcess'|
+			 |evt.name = 'CreateFile'
 			`,
 			errors.New("expected |"),
 			time.Duration(0),
 			false,
 		},
 		{
-			`|kevt.name = 'CreateProcess'|
-			 |kevt.name = 'CreateFile'|
+			`|evt.name = 'CreateProcess'|
+			 |evt.name = 'CreateFile'|
 			`,
 			nil,
 			time.Duration(0),
 			false,
 		},
 		{
-			`|kevt.name = 'CreateProcess'| by ps.exe
-			 |kevt.name = 'CreateFile'| by file.name
+			`|evt.name = 'CreateProcess'| by ps.exe
+			 |evt.name = 'CreateFile'| by file.name
 			`,
 			nil,
 			time.Duration(0),
@@ -273,8 +273,8 @@ func TestParseSequence(t *testing.T) {
 		{
 
 			`by ps.pid
-			 |kevt.name = 'CreateProcess'|
-			 |kevt.name = 'CreateFile'|
+			 |evt.name = 'CreateProcess'|
+			 |evt.name = 'CreateFile'|
 			`,
 			nil,
 			time.Duration(0),
@@ -283,8 +283,8 @@ func TestParseSequence(t *testing.T) {
 		{
 
 			`by ps.pid
-			 |kevt.name = 'CreateProcess'| by ps.pid
-			 |kevt.name = 'CreateFile'|
+			 |evt.name = 'CreateProcess'| by ps.pid
+			 |evt.name = 'CreateFile'|
 			`,
 			errors.New("all expressions require the 'by' statement"),
 			time.Duration(0),
@@ -292,8 +292,8 @@ func TestParseSequence(t *testing.T) {
 		},
 		{
 
-			`|kevt.name = 'CreateProcess'| by ps.pid
-			 |kevt.name = 'CreateFile'|
+			`|evt.name = 'CreateProcess'| by ps.pid
+			 |evt.name = 'CreateFile'|
 			`,
 			errors.New("all expressions require the 'by' statement"),
 			time.Duration(0),
@@ -302,8 +302,8 @@ func TestParseSequence(t *testing.T) {
 		{
 
 			`maxspan 20s
-			 |kevt.name = 'CreateProcess'| by ps.pid
-			 |kevt.name = 'CreateFile'| by ps.pid
+			 |evt.name = 'CreateProcess'| by ps.pid
+			 |evt.name = 'CreateFile'| by ps.pid
 			`,
 			nil,
 			time.Second * 20,
@@ -312,8 +312,8 @@ func TestParseSequence(t *testing.T) {
 		{
 
 			`maxspan 30s
-			 |kevt.name = 'CreateProcess'|
-			 |kevt.name = 'CreateFile'|
+			 |evt.name = 'CreateProcess'|
+			 |evt.name = 'CreateFile'|
 			`,
 			nil,
 			time.Second * 30,
@@ -322,8 +322,8 @@ func TestParseSequence(t *testing.T) {
 		{
 
 			`maxspan 30s
-			 |kevt.name = 'CreateProcess'| as e1
-			 |kevt.name = 'CreateFile' and $e1.ps.name = file.name |
+			 |evt.name = 'CreateProcess'| as e1
+			 |evt.name = 'CreateFile' and $e1.ps.name = file.name |
 			`,
 			nil,
 			time.Second * 30,
@@ -332,8 +332,8 @@ func TestParseSequence(t *testing.T) {
 		{
 
 			`maxspan 30s
-			 |kevt.name = 'CreateProcess'| as e1
-			 |kevt.name = 'CreateFile' and $e1.ps.ame = file.name |
+			 |evt.name = 'CreateProcess'| as e1
+			 |evt.name = 'CreateFile' and $e1.ps.ame = file.name |
 			`,
 			errors.New("expected field after bound ref"),
 			time.Second * 30,
@@ -342,8 +342,8 @@ func TestParseSequence(t *testing.T) {
 		{
 
 			`maxspan 40h
-			 |kevt.name = 'CreateProcess'| as e1
-			 |kevt.name = 'CreateFile' and $e1.ps.ame = file.name |
+			 |evt.name = 'CreateProcess'| as e1
+			 |evt.name = 'CreateFile' and $e1.ps.ame = file.name |
 			`,
 			errors.New("maximum span 40h0m0s cannot be greater than 4h"),
 			time.Hour * 40,
@@ -353,8 +353,8 @@ func TestParseSequence(t *testing.T) {
 
 			`by ps.uuid
 			 maxspan 2m
-			 |kevt.name = 'CreateProcess'| by ps.child.uuid
-			 |kevt.name = 'CreateFile'| by ps.uuid
+			 |evt.name = 'CreateProcess'| by ps.child.uuid
+			 |evt.name = 'CreateFile'| by ps.uuid
 			`,
 			errors.New("sequence mixes global and per-expression 'by' statements"),
 			time.Minute * 2,
@@ -388,51 +388,51 @@ func TestIsSequenceUnordered(t *testing.T) {
 		isUnordered bool
 	}{
 		{
-			`|kevt.name = 'CreateProcess'| by ps.uuid
-			 |kevt.name = 'OpenProcess'| by ps.uuid
+			`|evt.name = 'CreateProcess'| by ps.uuid
+			 |evt.name = 'OpenProcess'| by ps.uuid
 			`,
 			true,
 		},
 		{
-			`|kevt.name = 'CreateProcess'|
-			 |kevt.name = 'CreateFile'|
+			`|evt.name = 'CreateProcess'|
+			 |evt.name = 'CreateFile'|
 			`,
 			false,
 		},
 		{
-			`|kevt.name = 'CreateProcess'|
-			 |kevt.name = 'UnmapViewFile'|
- 			 |kevt.name = 'LoadImage'|
+			`|evt.name = 'CreateProcess'|
+			 |evt.name = 'UnmapViewFile'|
+ 			 |evt.name = 'LoadImage'|
 			`,
 			false,
 		},
 		{
-			`|kevt.name = 'CreateProcess'|
-			 |kevt.name = 'SetThreadContext'|
+			`|evt.name = 'CreateProcess'|
+			 |evt.name = 'SetThreadContext'|
 			`,
 			true,
 		},
 		{
-			`|kevt.name = 'OpenThread'| by ps.uuid
-			 |kevt.name = 'OpenProcess'| by ps.uuid
+			`|evt.name = 'OpenThread'| by ps.uuid
+			 |evt.name = 'OpenProcess'| by ps.uuid
 			`,
 			false,
 		},
 		{
-			`|kevt.name = 'OpenThread' or kevt.name = 'OpenProcess'| by ps.uuid
-			 |kevt.name = 'SetThreadContext'| by ps.uuid
+			`|evt.name = 'OpenThread' or evt.name = 'OpenProcess'| by ps.uuid
+			 |evt.name = 'SetThreadContext'| by ps.uuid
 			`,
 			false,
 		},
 		{
-			`|kevt.name = 'RegSetValue'| by ps.uuid
-			 |kevt.name = 'SetThreadContext'| by ps.uuid
+			`|evt.name = 'RegSetValue'| by ps.uuid
+			 |evt.name = 'SetThreadContext'| by ps.uuid
 			`,
 			true,
 		},
 		{
-			`|kevt.name = 'RegSetValue'| by ps.uuid
-			 |kevt.name = 'RegDeleteValue'| by ps.uuid
+			`|evt.name = 'RegSetValue'| by ps.uuid
+			 |evt.name = 'RegDeleteValue'| by ps.uuid
 			`,
 			false,
 		},

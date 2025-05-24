@@ -19,9 +19,8 @@
 package processors
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
@@ -41,20 +40,20 @@ func TestMemProcessor(t *testing.T) {
 	}()
 	var tests = []struct {
 		name       string
-		e          *kevent.Kevent
+		e          *event.Event
 		psnap      func() *ps.SnapshotterMock
-		assertions func(*kevent.Kevent, *testing.T, *ps.SnapshotterMock)
+		assertions func(*event.Event, *testing.T, *ps.SnapshotterMock)
 	}{
 		{
 			"virtual alloc",
-			&kevent.Kevent{
-				Type:     ktypes.VirtualAlloc,
-				Category: ktypes.Mem,
-				Kparams: kevent.Kparams{
-					kparams.MemRegionSize:  {Name: kparams.MemRegionSize, Type: kparams.Uint64, Value: uint64(1024)},
-					kparams.MemBaseAddress: {Name: kparams.MemBaseAddress, Type: kparams.Address, Value: uint64(base)},
-					kparams.MemAllocType:   {Name: kparams.MemAllocType, Type: kparams.Flags, Value: uint32(0x00001000 | 0x00002000), Flags: kevent.MemAllocationFlags},
-					kparams.ProcessID:      {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(os.Getpid())},
+			&event.Event{
+				Type:     event.VirtualAlloc,
+				Category: event.Mem,
+				Params: event.Params{
+					params.MemRegionSize:  {Name: params.MemRegionSize, Type: params.Uint64, Value: uint64(1024)},
+					params.MemBaseAddress: {Name: params.MemBaseAddress, Type: params.Address, Value: uint64(base)},
+					params.MemAllocType:   {Name: params.MemAllocType, Type: params.Flags, Value: uint32(0x00001000 | 0x00002000), Flags: event.MemAllocationFlags},
+					params.ProcessID:      {Name: params.ProcessID, Type: params.PID, Value: uint32(os.Getpid())},
 				},
 			},
 			func() *ps.SnapshotterMock {
@@ -62,25 +61,25 @@ func TestMemProcessor(t *testing.T) {
 				psnap.On("FindAndPut", mock.Anything).Return(&pstypes.PS{Name: "svchost.exe", Exe: "C:\\Windows\\System32\\svchost.exe"})
 				return psnap
 			},
-			func(e *kevent.Kevent, t *testing.T, psnap *ps.SnapshotterMock) {
+			func(e *event.Event, t *testing.T, psnap *ps.SnapshotterMock) {
 				psnap.AssertNumberOfCalls(t, "FindAndPut", 1)
-				assert.Equal(t, "PRIVATE", e.GetParamAsString(kparams.MemPageType))
-				assert.Equal(t, "EXECUTE_READWRITE", e.GetParamAsString(kparams.MemProtect))
-				assert.Equal(t, "RWX", e.GetParamAsString(kparams.MemProtectMask))
-				assert.Equal(t, "svchost.exe", e.GetParamAsString(kparams.ProcessName))
-				assert.Equal(t, "C:\\Windows\\System32\\svchost.exe", e.GetParamAsString(kparams.Exe))
+				assert.Equal(t, "PRIVATE", e.GetParamAsString(params.MemPageType))
+				assert.Equal(t, "EXECUTE_READWRITE", e.GetParamAsString(params.MemProtect))
+				assert.Equal(t, "RWX", e.GetParamAsString(params.MemProtectMask))
+				assert.Equal(t, "svchost.exe", e.GetParamAsString(params.ProcessName))
+				assert.Equal(t, "C:\\Windows\\System32\\svchost.exe", e.GetParamAsString(params.Exe))
 			},
 		},
 		{
 			"virtual free",
-			&kevent.Kevent{
-				Type:     ktypes.VirtualFree,
-				Category: ktypes.Mem,
-				Kparams: kevent.Kparams{
-					kparams.MemRegionSize:  {Name: kparams.MemRegionSize, Type: kparams.Uint64, Value: uint64(1024)},
-					kparams.MemBaseAddress: {Name: kparams.MemBaseAddress, Type: kparams.Address, Value: uint64(base)},
-					kparams.MemAllocType:   {Name: kparams.MemAllocType, Type: kparams.Flags, Value: uint32(0x00008000), Flags: kevent.MemAllocationFlags},
-					kparams.ProcessID:      {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(os.Getpid())},
+			&event.Event{
+				Type:     event.VirtualFree,
+				Category: event.Mem,
+				Params: event.Params{
+					params.MemRegionSize:  {Name: params.MemRegionSize, Type: params.Uint64, Value: uint64(1024)},
+					params.MemBaseAddress: {Name: params.MemBaseAddress, Type: params.Address, Value: uint64(base)},
+					params.MemAllocType:   {Name: params.MemAllocType, Type: params.Flags, Value: uint32(0x00008000), Flags: event.MemAllocationFlags},
+					params.ProcessID:      {Name: params.ProcessID, Type: params.PID, Value: uint32(os.Getpid())},
 				},
 			},
 			func() *ps.SnapshotterMock {
@@ -88,10 +87,10 @@ func TestMemProcessor(t *testing.T) {
 				psnap.On("FindAndPut", mock.Anything).Return(&pstypes.PS{Name: "svchost.exe", Exe: "C:\\Windows\\System32\\svchost.exe"})
 				return psnap
 			},
-			func(e *kevent.Kevent, t *testing.T, psnap *ps.SnapshotterMock) {
+			func(e *event.Event, t *testing.T, psnap *ps.SnapshotterMock) {
 				psnap.AssertNumberOfCalls(t, "FindAndPut", 1)
-				assert.Equal(t, "svchost.exe", e.GetParamAsString(kparams.ProcessName))
-				assert.Equal(t, "C:\\Windows\\System32\\svchost.exe", e.GetParamAsString(kparams.Exe))
+				assert.Equal(t, "svchost.exe", e.GetParamAsString(params.ProcessName))
+				assert.Equal(t, "C:\\Windows\\System32\\svchost.exe", e.GetParamAsString(params.Exe))
 			},
 		},
 	}

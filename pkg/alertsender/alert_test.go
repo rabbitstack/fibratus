@@ -19,9 +19,8 @@
 package alertsender
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/stretchr/testify/require"
 	"testing"
@@ -44,12 +43,12 @@ func TestAlertString(t *testing.T) {
 			"Credential discovery via VaultCmd.exe\n\nSuspicious vault enumeration via VaultCmd tool",
 		},
 		{
-			NewAlertWithEvents("Credential discovery via VaultCmd.exe", "Suspicious vault enumeration via VaultCmd tool", nil, Normal, []*kevent.Kevent{{
-				Type:     ktypes.CreateProcess,
-				Category: ktypes.Process,
-				Kparams: kevent.Kparams{
-					kparams.Cmdline:     {Name: kparams.Cmdline, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost-fake.exe -k RPCSS"},
-					kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.AnsiString, Value: "svchost-fake.exe"}},
+			NewAlertWithEvents("Credential discovery via VaultCmd.exe", "Suspicious vault enumeration via VaultCmd tool", nil, Normal, []*event.Event{{
+				Type:     event.CreateProcess,
+				Category: event.Process,
+				Params: event.Params{
+					params.Cmdline:     {Name: params.Cmdline, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\svchost-fake.exe -k RPCSS"},
+					params.ProcessName: {Name: params.ProcessName, Type: params.AnsiString, Value: "svchost-fake.exe"}},
 				Name: "CreateProcess",
 				PID:  1023,
 				PS: &pstypes.PS{
@@ -65,12 +64,12 @@ func TestAlertString(t *testing.T) {
 			"Credential discovery via VaultCmd.exe\n\nSuspicious vault enumeration via VaultCmd tool\n\nSeverity: low\n\nSystem event involved in this alert:\n\n\tEvent #1:\n\n\t\tSeq: 0\n\t\tPid: 1023\n\t\tTid: 0\n\t\tName: CreateProcess\n\t\tCategory: process\n\t\tHost: \n\t\tTimestamp: 0001-01-01 00:00:00 +0000 UTC\n\t\tParameters: cmdline➜ C:\\Windows\\system32\\svchost-fake.exe -k RPCSS, name➜ svchost-fake.exe\n    \n\t\tPid:  0\n\t\tPpid: 345\n\t\tName: svchost.exe\n\t\tCmdline: C:\\Windows\\System32\\svchost.exe\n\t\tExe:  \n\t\tCwd:  \n\t\tSID:  S-1-5-18\n\t\tUsername: SYSTEM\n\t\tDomain: NT AUTHORITY\n\t\tArgs: []\n\t\tSession ID: 0\n\t\tAncestors: \n\t\n",
 		},
 		{
-			NewAlertWithEvents("Credential discovery via VaultCmd.exe", "", nil, Normal, []*kevent.Kevent{{
-				Type:     ktypes.CreateProcess,
-				Category: ktypes.Process,
-				Kparams: kevent.Kparams{
-					kparams.Cmdline:     {Name: kparams.Cmdline, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost-fake.exe -k RPCSS"},
-					kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.AnsiString, Value: "svchost-fake.exe"}},
+			NewAlertWithEvents("Credential discovery via VaultCmd.exe", "", nil, Normal, []*event.Event{{
+				Type:     event.CreateProcess,
+				Category: event.Process,
+				Params: event.Params{
+					params.Cmdline:     {Name: params.Cmdline, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\svchost-fake.exe -k RPCSS"},
+					params.ProcessName: {Name: params.ProcessName, Type: params.AnsiString, Value: "svchost-fake.exe"}},
 				Name: "CreateProcess",
 				PID:  1023,
 				PS: &pstypes.PS{

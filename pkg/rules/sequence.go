@@ -23,11 +23,10 @@ import (
 	"expvar"
 	fsm "github.com/qmuntal/stateless"
 	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/filter"
 	"github.com/rabbitstack/fibratus/pkg/filter/ql"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/atomic"
 	log "github.com/sirupsen/logrus"
@@ -86,14 +85,14 @@ type sequenceState struct {
 	maxSpan time.Duration
 
 	// partials keeps the state of all matched events per expression
-	partials map[int][]*kevent.Kevent
+	partials map[int][]*event.Event
 	// mu guards the partials map
 	mu sync.RWMutex
 
 	// matches stores only the event that matched
 	// the upstream partials. These events will
 	// be propagated in the rule action context
-	matches map[int]*kevent.Kevent
+	matches map[int]*event.Event
 	// mmu guards the matches map
 	mmu sync.RWMutex
 
@@ -125,9 +124,9 @@ func newSequenceState(f filter.Filter, c *config.FilterConfig, psnap ps.Snapshot
 		seq:           f.GetSequence(),
 		name:          c.Name,
 		maxSpan:       f.GetSequence().MaxSpan,
-		partials:      make(map[int][]*kevent.Kevent),
+		partials:      make(map[int][]*event.Event),
 		states:        make(map[fsm.State]bool),
-		matches:       make(map[int]*kevent.Kevent),
+		matches:       make(map[int]*event.Event),
 		exprs:         make(map[int]string),
 		spanDeadlines: make(map[fsm.State]*time.Timer),
 		initialState:  sequenceInitialState,
@@ -142,10 +141,10 @@ func newSequenceState(f filter.Filter, c *config.FilterConfig, psnap ps.Snapshot
 	return ss
 }
 
-func (s *sequenceState) events() []*kevent.Kevent {
+func (s *sequenceState) events() []*event.Event {
 	s.mmu.RLock()
 	defer s.mmu.RUnlock()
-	events := make([]*kevent.Kevent, 0, len(s.matches))
+	events := make([]*event.Event, 0, len(s.matches))
 	for _, e := range s.matches {
 		events = append(events, e)
 	}
@@ -261,7 +260,7 @@ func (s *sequenceState) configureFSM() {
 		Permit(resetTransition, sequenceInitialState)
 }
 
-func (s *sequenceState) matchTransition(seqID int, e *kevent.Kevent) error {
+func (s *sequenceState) matchTransition(seqID int, e *event.Event) error {
 	s.smu.Lock()
 	defer s.smu.Unlock()
 	shouldFire := !s.states[seqID]
@@ -309,7 +308,7 @@ func (s *sequenceState) expr(state fsm.State) string {
 // addPartial appends the event that matched the expression at the
 // sequence index. If the event arrived out of order, then the isOOO
 // parameter is equal to false.
-func (s *sequenceState) addPartial(seqID int, e *kevent.Kevent, isOOO bool) {
+func (s *sequenceState) addPartial(seqID int, e *event.Event, isOOO bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if len(s.partials[seqID]) > maxOutstandingPartials {
@@ -331,7 +330,7 @@ func (s *sequenceState) addPartial(seqID int, e *kevent.Kevent, isOOO bool) {
 		}
 	}
 	if isOOO {
-		e.AddMeta(kevent.RuleSequenceOOOKey, true)
+		e.AddMeta(event.RuleSequenceOOOKey, true)
 	}
 	log.Debugf("adding partial to sequence [%s] slot [%d] for expression %q, ooo: %t: %s", s.name, seqID, s.expr(seqID), isOOO, e)
 	partialsPerSequence.Add(s.name, 1)
@@ -365,8 +364,8 @@ func (s *sequenceState) gc() {
 }
 
 func (s *sequenceState) clear() {
-	s.partials = make(map[int][]*kevent.Kevent)
-	s.matches = make(map[int]*kevent.Kevent)
+	s.partials = make(map[int][]*event.Event)
+	s.matches = make(map[int]*event.Event)
 	s.states = make(map[fsm.State]bool)
 	s.spanDeadlines = make(map[fsm.State]*time.Timer)
 	s.isPartialsBreached.Store(false)
@@ -430,7 +429,7 @@ func (s *sequenceState) scheduleMaxSpanDeadline(seqID fsm.State, maxSpan time.Du
 	s.spanDeadlines[seqID] = t
 }
 
-func (s *sequenceState) runSequence(e *kevent.Kevent) bool {
+func (s *sequenceState) runSequence(e *event.Event) bool {
 	for i, expr := range s.seq.Expressions {
 		// only try to evaluate the expression
 		// if upstream expressions have matched
@@ -481,7 +480,7 @@ func (s *sequenceState) runSequence(e *kevent.Kevent) bool {
 				s.mu.RLock()
 				for seqID := range s.partials {
 					for _, evt := range s.partials[seqID] {
-						if !evt.ContainsMeta(kevent.RuleSequenceOOOKey) {
+						if !evt.ContainsMeta(event.RuleSequenceOOOKey) {
 							continue
 						}
 						// try to initialize process state before evaluating the event
@@ -496,7 +495,7 @@ func (s *sequenceState) runSequence(e *kevent.Kevent) bool {
 								matchTransitionErrors.Add(1)
 								log.Warnf("out of order match transition failure: %v", err)
 							}
-							evt.RemoveMeta(kevent.RuleSequenceOOOKey)
+							evt.RemoveMeta(event.RuleSequenceOOOKey)
 						}
 					}
 				}
@@ -510,7 +509,7 @@ func (s *sequenceState) runSequence(e *kevent.Kevent) bool {
 		// collect all events involved in the rule match
 		isTerminal := s.isTerminalState()
 		if isTerminal {
-			setMatch := func(seqID int, e *kevent.Kevent) {
+			setMatch := func(seqID int, e *event.Event) {
 				s.mmu.Lock()
 				defer s.mmu.Unlock()
 				if s.matches[seqID] == nil {
@@ -537,26 +536,26 @@ func (s *sequenceState) runSequence(e *kevent.Kevent) bool {
 	return false
 }
 
-func (s *sequenceState) expire(e *kevent.Kevent) bool {
+func (s *sequenceState) expire(e *event.Event) bool {
 	if !e.IsTerminateProcess() {
 		return false
 	}
-	canExpire := func(lhs, rhs *kevent.Kevent, isFinalSlot bool) bool {
+	canExpire := func(lhs, rhs *event.Event, isFinalSlot bool) bool {
 		// if the TerminateProcess event arrives for the
 		// process spawned by CreateProcess, and it pertains
 		// to the final sequence slot, it is safe to expire
 		// the whole sequence
-		pid := rhs.Kparams.MustGetPid()
-		if lhs.Type == ktypes.CreateProcess && isFinalSlot {
-			return lhs.Kparams.MustGetPid() == pid
+		pid := rhs.Params.MustGetPid()
+		if lhs.Type == event.CreateProcess && isFinalSlot {
+			return lhs.Params.MustGetPid() == pid
 		}
-		if lhs.Type == ktypes.CreateThread {
+		if lhs.Type == event.CreateThread {
 			// if the pids differ, the thread
 			// is created in a remote process.
 			// Sequence can be expired only if
 			// the remote process terminates
-			if lhs.PID != lhs.Kparams.MustGetPid() {
-				return lhs.Kparams.MustGetPid() == pid
+			if lhs.PID != lhs.Params.MustGetPid() {
+				return lhs.Params.MustGetPid() == pid
 			}
 		}
 		return lhs.PID == pid
@@ -573,8 +572,8 @@ func (s *sequenceState) expire(e *kevent.Kevent) bool {
 			}
 			log.Debugf("removing event originated from %s (%d) "+
 				"in partials pertaining to sequence [%s] and slot [%d]",
-				e.Kparams.MustGetString(kparams.ProcessName),
-				e.Kparams.MustGetPid(),
+				e.Params.MustGetString(params.ProcessName),
+				e.Params.MustGetPid(),
 				s.name,
 				idx)
 			// remove partial event from the corresponding slot

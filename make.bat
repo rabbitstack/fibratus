@@ -29,7 +29,7 @@ set LDFLAGS="-s -w -X github.com/rabbitstack/fibratus/cmd/fibratus/app.version=%
 
 :: In case you want to avoid CGO overhead or don't need a specific feature, try tweaking the following compilation tags:
 ::
-:: kcap: enables capture support
+:: cap: enables capture support
 :: filament: enables running filaments and thus interacting with the CPython interpreter
 :: yara: enables YARA scanner via cgo bindings
 if NOT DEFINED TAGS (

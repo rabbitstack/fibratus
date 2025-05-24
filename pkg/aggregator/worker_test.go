@@ -19,7 +19,7 @@
 package aggregator
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
@@ -51,7 +51,7 @@ func (c *httpClient) Connect() error {
 
 func (c *httpClient) Close() error { return nil }
 
-func (c *httpClient) Publish(b *kevent.Batch) error {
+func (c *httpClient) Publish(b *event.Batch) error {
 	//nolint:noctx
 	res, err := http.Post(c.url+"/publish", "application/json", nil)
 	if err != nil {
@@ -68,9 +68,9 @@ func (c *httpClient) Publish(b *kevent.Batch) error {
 }
 
 func TestRunWorker(t *testing.T) {
-	q := make(chan *kevent.Batch, 2)
-	q <- &kevent.Batch{}
-	q <- &kevent.Batch{}
+	q := make(chan *event.Batch, 2)
+	q <- &event.Batch{}
+	q <- &event.Batch{}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/publish", func(w http.ResponseWriter, r *http.Request) {
@@ -91,9 +91,9 @@ func TestRunWorker(t *testing.T) {
 }
 
 func TestConnectClientBackoff(t *testing.T) {
-	q := make(chan *kevent.Batch, 2)
-	q <- &kevent.Batch{}
-	q <- &kevent.Batch{}
+	q := make(chan *event.Batch, 2)
+	q <- &event.Batch{}
+	q <- &event.Batch{}
 
 	fail := true
 

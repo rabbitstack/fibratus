@@ -27,9 +27,8 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	libntfs "github.com/rabbitstack/fibratus/pkg/fs/ntfs"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/signature"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
@@ -40,7 +39,7 @@ import (
 	"strings"
 
 	"github.com/hillu/go-yara/v4"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"github.com/rabbitstack/fibratus/pkg/yara/config"
@@ -172,39 +171,39 @@ func parseCompilerErrors(errors []yara.CompilerMessage) error {
 
 func (s scanner) CanEnqueue() bool { return false }
 
-func (s *scanner) ProcessEvent(evt *kevent.Kevent) (bool, error) {
+func (s *scanner) ProcessEvent(evt *event.Event) (bool, error) {
 	if evt.IsTerminateProcess() {
 		// cleanup
-		pid := evt.Kparams.MustGetPid()
+		pid := evt.Params.MustGetPid()
 		delete(s.rwxs, pid)
 		delete(s.mmaps, pid)
 	}
 	return s.Scan(evt)
 }
 
-func (s scanner) Scan(e *kevent.Kevent) (bool, error) {
+func (s scanner) Scan(e *event.Event) (bool, error) {
 	var matches yara.MatchRules
 	var isScanned bool
 	var err error
 
 	switch e.Type {
-	case ktypes.CreateProcess:
+	case event.CreateProcess:
 		// scan the created child process
-		pid := e.Kparams.MustGetPid()
-		log.Debugf("scanning child process. pid: %d, exe: %s", pid, e.GetParamAsString(kparams.Exe))
+		pid := e.Params.MustGetPid()
+		log.Debugf("scanning child process. pid: %d, exe: %s", pid, e.GetParamAsString(params.Exe))
 		matches, err = s.scan(pid)
 		procScans.Add(1)
 		isScanned = true
-	case ktypes.LoadImage:
+	case event.LoadImage:
 		// scan the process loading unsigned/untrusted module
 		// or loading the module from unbacked memory region
 		pid := e.PID
-		addr := e.Kparams.MustGetUint64(kparams.ImageBase)
-		typ := e.Kparams.MustGetUint32(kparams.ImageSignatureType)
+		addr := e.Params.MustGetUint64(params.ImageBase)
+		typ := e.Params.MustGetUint32(params.ImageSignatureType)
 		if typ != signature.None {
 			return false, nil
 		}
-		filename := e.GetParamAsString(kparams.ImagePath)
+		filename := e.GetParamAsString(params.ImagePath)
 		if s.config.ShouldSkipFile(filename) {
 			return false, nil
 		}
@@ -225,7 +224,7 @@ func (s scanner) Scan(e *kevent.Kevent) (bool, error) {
 			moduleScans.Add(1)
 			isScanned = true
 		}
-	case ktypes.CreateFile:
+	case event.CreateFile:
 		if s.config.SkipFiles {
 			return false, nil
 		}
@@ -233,15 +232,15 @@ func (s scanner) Scan(e *kevent.Kevent) (bool, error) {
 			return false, nil
 		}
 
-		filename := e.GetParamAsString(kparams.FilePath)
+		filename := e.GetParamAsString(params.FilePath)
 		if s.config.ShouldSkipFile(filename) || (e.PS != nil && s.config.ShouldSkipProcess(e.PS.Exe)) {
 			return false, nil
 		}
 
 		// scan dropped PE files
-		isDLL := strings.ToLower(filepath.Ext(filename)) == ".dll" || e.Kparams.TryGetBool(kparams.FileIsDLL)
-		isDriver := strings.ToLower(filepath.Ext(filename)) == ".sys" || e.Kparams.TryGetBool(kparams.FileIsDriver)
-		isExe := strings.ToLower(filepath.Ext(filename)) == ".exe" || e.Kparams.TryGetBool(kparams.FileIsExecutable)
+		isDLL := strings.ToLower(filepath.Ext(filename)) == ".dll" || e.Params.TryGetBool(params.FileIsDLL)
+		isDriver := strings.ToLower(filepath.Ext(filename)) == ".sys" || e.Params.TryGetBool(params.FileIsDriver)
+		isExe := strings.ToLower(filepath.Ext(filename)) == ".exe" || e.Params.TryGetBool(params.FileIsExecutable)
 
 		if isExe || isDLL || isDriver {
 			log.Debugf("scanning PE file %s. pid: %d", filename, e.PID)
@@ -271,16 +270,16 @@ func (s scanner) Scan(e *kevent.Kevent) (bool, error) {
 			streamScans.Add(1)
 			isScanned = true
 		}
-	case ktypes.VirtualAlloc:
+	case event.VirtualAlloc:
 		if s.config.SkipAllocs {
 			return false, nil
 		}
 		// scan process allocating RWX memory region
-		pid := e.Kparams.MustGetPid()
-		addr := e.Kparams.TryGetAddress(kparams.MemBaseAddress)
-		if e.PID != 4 && e.Kparams.TryGetUint32(kparams.MemProtect) == windows.PAGE_EXECUTE_READWRITE && !s.isRwxMatched(pid) {
-			log.Debugf("scanning RWX allocation. pid: %d, exe: %s, addr: %s", pid, e.GetParamAsString(kparams.Exe),
-				e.GetParamAsString(kparams.MemBaseAddress))
+		pid := e.Params.MustGetPid()
+		addr := e.Params.TryGetAddress(params.MemBaseAddress)
+		if e.PID != 4 && e.Params.TryGetUint32(params.MemProtect) == windows.PAGE_EXECUTE_READWRITE && !s.isRwxMatched(pid) {
+			log.Debugf("scanning RWX allocation. pid: %d, exe: %s, addr: %s", pid, e.GetParamAsString(params.Exe),
+				e.GetParamAsString(params.MemBaseAddress))
 			matches, err = s.scan(pid)
 			allocScans.Add(1)
 			isScanned = true
@@ -288,18 +287,18 @@ func (s scanner) Scan(e *kevent.Kevent) (bool, error) {
 				s.rwxs[pid] = addr
 			}
 		}
-	case ktypes.MapViewFile:
+	case event.MapViewFile:
 		if s.config.SkipMmaps {
 			return false, nil
 		}
 		// scan process mapping a suspicious RX/RWX section view
-		pid := e.Kparams.MustGetPid()
-		prot := e.Kparams.MustGetUint32(kparams.MemProtect)
-		size := e.Kparams.MustGetUint64(kparams.FileViewSize)
+		pid := e.Params.MustGetPid()
+		prot := e.Params.MustGetUint32(params.MemProtect)
+		size := e.Params.MustGetUint64(params.FileViewSize)
 		if e.PID != 4 && size >= 4096 && ((prot&sys.SectionRX) != 0 && (prot&sys.SectionRWX) != 0) && !s.isMmapMatched(pid) {
-			filename := e.GetParamAsString(kparams.FilePath)
+			filename := e.GetParamAsString(params.FilePath)
 			// skip mappings of signed images
-			addr := e.Kparams.MustGetUint64(kparams.FileViewBase)
+			addr := e.Params.MustGetUint64(params.FileViewBase)
 			sign := signature.GetSignatures().GetSignature(addr)
 			if sign != nil && sign.IsSigned() && sign.IsTrusted() {
 				return false, nil
@@ -309,13 +308,13 @@ func (s scanner) Scan(e *kevent.Kevent) (bool, error) {
 				if s.config.ShouldSkipFile(filename) {
 					return false, nil
 				}
-				log.Debugf("scanning %s section view mapping. filename: %s pid: %d, addr: %s", e.GetParamAsString(kparams.MemProtect),
-					filename, pid, e.GetParamAsString(kparams.FileViewBase))
+				log.Debugf("scanning %s section view mapping. filename: %s pid: %d, addr: %s", e.GetParamAsString(params.MemProtect),
+					filename, pid, e.GetParamAsString(params.FileViewBase))
 				matches, err = s.scan(filename)
 			} else {
 				// otherwise, scan the process
-				log.Debugf("scanning %s section view mapping. pid: %d, addr: %s", e.GetParamAsString(kparams.MemProtect), pid,
-					e.GetParamAsString(kparams.FileViewBase))
+				log.Debugf("scanning %s section view mapping. pid: %d, addr: %s", e.GetParamAsString(params.MemProtect), pid,
+					e.GetParamAsString(params.FileViewBase))
 				matches, err = s.scan(pid)
 			}
 			if len(matches) > 0 {
@@ -324,7 +323,7 @@ func (s scanner) Scan(e *kevent.Kevent) (bool, error) {
 			mmapScans.Add(1)
 			isScanned = true
 		}
-	case ktypes.RegSetValue:
+	case event.RegSetValue:
 		if s.config.SkipRegistry {
 			return false, nil
 		}
@@ -332,16 +331,16 @@ func (s scanner) Scan(e *kevent.Kevent) (bool, error) {
 			return false, nil
 		}
 		// scan registry binary values
-		if typ := e.Kparams.TryGetUint32(kparams.RegValueType); typ != registry.BINARY {
+		if typ := e.Params.TryGetUint32(params.RegValueType); typ != registry.BINARY {
 			return false, nil
 		}
-		v, err := e.Kparams.Get(kparams.RegValue)
+		v, err := e.Params.Get(params.RegValue)
 		if err != nil {
 			// value not attached to the event
 			return false, nil
 		}
 		if b, ok := v.Value.([]byte); ok && len(b) > 0 {
-			log.Debugf("scanning registry binary value %s. pid: %d", e.GetParamAsString(kparams.RegPath), e.PID)
+			log.Debugf("scanning registry binary value %s. pid: %d", e.GetParamAsString(params.RegPath), e.PID)
 			matches, err = s.scan(b)
 			registryScans.Add(1)
 			isScanned = true
@@ -389,7 +388,7 @@ func (s scanner) scan(target any) (yara.MatchRules, error) {
 	return matches, nil
 }
 
-func (s scanner) emit(matches yara.MatchRules, e *kevent.Kevent) error {
+func (s scanner) emit(matches yara.MatchRules, e *event.Event) error {
 	senders := alertsender.FindAll()
 	if len(senders) == 0 {
 		return fmt.Errorf("no alertsenders registered. Alert won't be sent")
@@ -418,7 +417,7 @@ func (s scanner) emit(matches yara.MatchRules, e *kevent.Kevent) error {
 		if err != nil {
 			return err
 		}
-		e.AddMeta(kevent.YaraMatchesKey, string(b))
+		e.AddMeta(event.YaraMatchesKey, string(b))
 
 		// render alert title and text
 		title := s.config.AlertTitle(e)
@@ -444,7 +443,7 @@ func (s scanner) emit(matches yara.MatchRules, e *kevent.Kevent) error {
 				id = uuid.New().String()
 			}
 			alert.ID = id
-			alert.Events = []*kevent.Kevent{e}
+			alert.Events = []*event.Event{e}
 			alert.Labels = m.Labels()
 			alert.Description = m.Description()
 

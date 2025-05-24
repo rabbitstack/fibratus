@@ -28,7 +28,7 @@ import (
 
 var Command = &cobra.Command{
 	Use:   "replay",
-	Short: "Replay event stream from the kcap (capture) file",
+	Short: "Replay event stream from the cap (capture) file",
 	RunE:  replay,
 }
 

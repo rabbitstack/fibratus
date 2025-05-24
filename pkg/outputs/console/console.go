@@ -21,7 +21,7 @@ package console
 import (
 	"bufio"
 	"expvar"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/outputs"
 	"os"
 )
@@ -36,12 +36,12 @@ const (
 	pretty format = "pretty"
 	json   format = "json"
 	// template represents the default template used in pretty rendering mode
-	template = "{{ .Seq }} {{ .Timestamp }} - {{ .CPU }} {{ .Process }} ({{ .Pid }}) - {{ .Type }} ({{ .Kparams }})"
+	template = "{{ .Seq }} {{ .Timestamp }} - {{ .CPU }} {{ .Process }} ({{ .Pid }}) - {{ .Type }} ({{ .Params }})"
 )
 
 type console struct {
 	writer    *bufio.Writer
-	formatter *kevent.Formatter
+	formatter *event.Formatter
 	format    format
 }
 
@@ -59,12 +59,12 @@ func initConsole(config outputs.Config) (outputs.OutputGroup, error) {
 	if tmpl == "" {
 		tmpl = template
 	}
-	formatter, err := kevent.NewFormatter(tmpl)
+	formatter, err := event.NewFormatter(tmpl)
 	if err != nil {
 		return outputs.Fail(err)
 	}
 	if cfg.ParamKVDelimiter != "" {
-		kevent.ParamKVDelimiter = cfg.ParamKVDelimiter
+		event.ParamKVDelimiter = cfg.ParamKVDelimiter
 	}
 
 	c := &console{
@@ -77,14 +77,14 @@ func initConsole(config outputs.Config) (outputs.OutputGroup, error) {
 
 func (c *console) Close() error   { return c.writer.Flush() }
 func (c *console) Connect() error { return nil }
-func (c *console) Publish(batch *kevent.Batch) error {
-	for _, kevt := range batch.Events {
+func (c *console) Publish(batch *event.Batch) error {
+	for _, evt := range batch.Events {
 		var buf []byte
 		switch c.format {
 		case json:
-			buf = kevt.MarshalJSON()
+			buf = evt.MarshalJSON()
 		case pretty:
-			buf = c.formatter.Format(kevt)
+			buf = c.formatter.Format(evt)
 		default:
 			return nil
 		}

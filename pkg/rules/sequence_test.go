@@ -20,11 +20,10 @@ package rules
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/filter"
 	"github.com/rabbitstack/fibratus/pkg/fs"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
-	"github.com/rabbitstack/fibratus/pkg/kevent/kparams"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	log "github.com/sirupsen/logrus"
@@ -44,9 +43,9 @@ func TestSequenceState(t *testing.T) {
 	f := filter.New(`
 	sequence
 	maxspan 100ms
-  	|kevt.name = 'CreateProcess' and ps.name = 'cmd.exe'| by ps.exe
-  	|kevt.name = 'CreateFile' and file.path icontains 'temp'| by file.path
-		|kevt.name = 'CreateProcess'| by ps.child.exe`,
+  	|evt.name = 'CreateProcess' and ps.name = 'cmd.exe'| by ps.exe
+  	|evt.name = 'CreateFile' and file.path icontains 'temp'| by file.path
+		|evt.name = 'CreateProcess'| by ps.child.exe`,
 		&config.Config{Kstream: config.KstreamConfig{}, Filters: &config.Filters{}})
 
 	require.NoError(t, f.Compile())
@@ -55,10 +54,10 @@ func TestSequenceState(t *testing.T) {
 
 	assert.Equal(t, 0, ss.currentState())
 	assert.True(t, ss.isInitialState())
-	assert.Equal(t, "kevt.name = CreateProcess AND ps.name = cmd.exe", ss.expr(ss.initialState))
+	assert.Equal(t, "evt.name = CreateProcess AND ps.name = cmd.exe", ss.expr(ss.initialState))
 
-	e1 := &kevent.Kevent{
-		Type: ktypes.CreateProcess,
+	e1 := &event.Event{
+		Type: event.CreateProcess,
 		Name: "CreateProcess",
 		Tid:  2484,
 		PID:  859,
@@ -66,9 +65,9 @@ func TestSequenceState(t *testing.T) {
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
 		},
-		Kparams: kevent.Kparams{
-			kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(4143)},
-			kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.AnsiString, Value: "powershell.exe"},
+		Params: event.Params{
+			params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: uint32(4143)},
+			params.ProcessName: {Name: params.ProcessName, Type: params.AnsiString, Value: "powershell.exe"},
 		},
 	}
 	require.True(t, ss.next(0))
@@ -80,10 +79,10 @@ func TestSequenceState(t *testing.T) {
 	require.False(t, ss.next(2))
 
 	assert.False(t, ss.isInitialState())
-	assert.Equal(t, "kevt.name = CreateFile AND file.path ICONTAINS temp", ss.expr(ss.currentState()))
+	assert.Equal(t, "evt.name = CreateFile AND file.path ICONTAINS temp", ss.expr(ss.currentState()))
 
-	e2 := &kevent.Kevent{
-		Type: ktypes.CreateFile,
+	e2 := &event.Event{
+		Type: event.CreateFile,
 		Name: "CreateFile",
 		Tid:  2484,
 		PID:  4143,
@@ -91,8 +90,8 @@ func TestSequenceState(t *testing.T) {
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
 		},
-		Kparams: kevent.Kparams{
-			kparams.FilePath: {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper"},
+		Params: event.Params{
+			params.FilePath: {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Temp\\dropper"},
 		},
 	}
 	// can't go to the next transitions as the expr hasn't matched
@@ -106,15 +105,15 @@ func TestSequenceState(t *testing.T) {
 	assert.Len(t, ss.partials[1], 1)
 
 	assert.Equal(t, 2, ss.currentState())
-	assert.Equal(t, "kevt.name = CreateProcess", ss.expr(ss.currentState()))
+	assert.Equal(t, "evt.name = CreateProcess", ss.expr(ss.currentState()))
 
-	e3 := &kevent.Kevent{
-		Type: ktypes.CreateProcess,
+	e3 := &event.Event{
+		Type: event.CreateProcess,
 		Name: "CreateProcess",
 		Tid:  2484,
 		PID:  4143,
-		Kparams: kevent.Kparams{
-			kparams.Exe: {Name: kparams.Exe, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
+		Params: event.Params{
+			params.Exe: {Name: params.Exe, Type: params.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
 		},
 	}
 	require.NoError(t, ss.matchTransition(2, e3))
@@ -130,10 +129,10 @@ func TestSequenceState(t *testing.T) {
 
 	// reset transition leads back to initial state
 	assert.Equal(t, 0, ss.currentState())
-	assert.Equal(t, "kevt.name = CreateProcess AND ps.name = cmd.exe", ss.expr(ss.currentState()))
+	assert.Equal(t, "evt.name = CreateProcess AND ps.name = cmd.exe", ss.expr(ss.currentState()))
 	// deadline exceeded
 	require.NoError(t, ss.matchTransition(0, e1))
-	assert.Equal(t, "kevt.name = CreateFile AND file.path ICONTAINS temp", ss.expr(ss.currentState()))
+	assert.Equal(t, "evt.name = CreateFile AND file.path ICONTAINS temp", ss.expr(ss.currentState()))
 	time.Sleep(time.Millisecond * 120)
 	// transition to initial state
 	assert.True(t, ss.isInitialState())
@@ -156,8 +155,8 @@ func TestSequenceState(t *testing.T) {
 	require.False(t, ss.inDeadline.Load())
 
 	// expire entire sequence
-	e4 := &kevent.Kevent{
-		Type: ktypes.TerminateProcess,
+	e4 := &event.Event{
+		Type: event.TerminateProcess,
 		Name: "TerminateProcess",
 		Tid:  2484,
 		PID:  859,
@@ -165,9 +164,9 @@ func TestSequenceState(t *testing.T) {
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
 		},
-		Kparams: kevent.Kparams{
-			kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(4143)},
-			kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.AnsiString, Value: "powershell.exe"},
+		Params: event.Params{
+			params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: uint32(4143)},
+			params.ProcessName: {Name: params.ProcessName, Type: params.AnsiString, Value: "powershell.exe"},
 		},
 	}
 	require.True(t, ss.expire(e4))
@@ -176,7 +175,7 @@ func TestSequenceState(t *testing.T) {
 	require.NoError(t, ss.matchTransition(0, e1))
 	require.False(t, ss.inExpired.Load())
 
-	assert.Equal(t, "kevt.name = CreateFile AND file.path ICONTAINS temp", ss.expr(ss.currentState()))
+	assert.Equal(t, "evt.name = CreateFile AND file.path ICONTAINS temp", ss.expr(ss.currentState()))
 }
 
 func TestSimpleSequence(t *testing.T) {
@@ -186,19 +185,19 @@ func TestSimpleSequence(t *testing.T) {
 	f := filter.New(`
 	sequence
 	maxspan 100ms
-  	|kevt.name = 'CreateProcess' and ps.name = 'cmd.exe'| by ps.exe
-  	|kevt.name = 'CreateFile' and file.path icontains 'temp'| by file.path
+  	|evt.name = 'CreateProcess' and ps.name = 'cmd.exe'| by ps.exe
+  	|evt.name = 'CreateFile' and file.path icontains 'temp'| by file.path
 	`, &config.Config{Kstream: config.KstreamConfig{EnableFileIOKevents: true}, Filters: &config.Filters{}})
 	require.NoError(t, f.Compile())
 
 	ss := newSequenceState(f, c, new(ps.SnapshotterMock))
 
 	var tests = []struct {
-		evts    []*kevent.Kevent
+		evts    []*event.Event
 		matches []bool
 	}{
-		{[]*kevent.Kevent{{
-			Type:      ktypes.CreateProcess,
+		{[]*event.Event{{
+			Type:      event.CreateProcess,
 			Name:      "CreateProcess",
 			Timestamp: time.Now(),
 			Tid:       2484,
@@ -207,26 +206,26 @@ func TestSimpleSequence(t *testing.T) {
 				Name: "cmd.exe",
 				Exe:  "C:\\Windows\\system32\\svchost-temp.exe",
 			},
-			Kparams: kevent.Kparams{
-				kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
+			Params: event.Params{
+				params.ProcessID: {Name: params.ProcessID, Type: params.Uint32, Value: uint32(4143)},
 			},
-			Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+			Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 		}, {
-			Type:      ktypes.CreateFile,
+			Type:      event.CreateFile,
 			Name:      "CreateFile",
 			Timestamp: time.Now(),
 			Tid:       2484,
 			PID:       859,
-			Category:  ktypes.File,
+			Category:  event.File,
 			PS: &pstypes.PS{
 				Name: "cmd.exe",
 			},
-			Kparams: kevent.Kparams{
-				kparams.FilePath: {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost-temp.exe"},
+			Params: event.Params{
+				params.FilePath: {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\svchost-temp.exe"},
 			},
-			Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"}}}, []bool{false, true}},
-		{[]*kevent.Kevent{{
-			Type:      ktypes.CreateProcess,
+			Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"}}}, []bool{false, true}},
+		{[]*event.Event{{
+			Type:      event.CreateProcess,
 			Name:      "CreateProcess",
 			Timestamp: time.Now(),
 			Tid:       2484,
@@ -235,24 +234,24 @@ func TestSimpleSequence(t *testing.T) {
 				Name: "cmd.exe",
 				Exe:  "C:\\Windows\\system32\\cmd.exe",
 			},
-			Kparams: kevent.Kparams{
-				kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
+			Params: event.Params{
+				params.ProcessID: {Name: params.ProcessID, Type: params.Uint32, Value: uint32(4143)},
 			},
-			Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+			Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 		}, {
-			Type:      ktypes.CreateFile,
+			Type:      event.CreateFile,
 			Name:      "CreateFile",
 			Timestamp: time.Now(),
 			Tid:       2484,
 			PID:       859,
-			Category:  ktypes.File,
+			Category:  event.File,
 			PS: &pstypes.PS{
 				Name: "cmd.exe",
 			},
-			Kparams: kevent.Kparams{
-				kparams.FilePath: {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost-temp.exe"},
+			Params: event.Params{
+				params.FilePath: {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\svchost-temp.exe"},
 			},
-			Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"}}}, []bool{false, false}},
+			Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"}}}, []bool{false, false}},
 	}
 
 	for i, tt := range tests {
@@ -272,8 +271,8 @@ func TestSimpleSequenceMultiplePartials(t *testing.T) {
 	sequence
   maxspan 200ms
   by ps.pid
-    |kevt.name = 'CreateProcess' and ps.name = 'cmd.exe'|
-    |kevt.name = 'CreateFile' and file.path icontains 'temp'|
+    |evt.name = 'CreateProcess' and ps.name = 'cmd.exe'|
+    |evt.name = 'CreateFile' and file.path icontains 'temp'|
 	`, &config.Config{Kstream: config.KstreamConfig{EnableFileIOKevents: true}, Filters: &config.Filters{}})
 	require.NoError(t, f.Compile())
 
@@ -281,8 +280,8 @@ func TestSimpleSequenceMultiplePartials(t *testing.T) {
 
 	// create random matches which don't satisfy the sequence link
 	for i, pid := range []uint32{2343, 1024, 11122, 3450, 12319} {
-		e1 := &kevent.Kevent{
-			Type:      ktypes.CreateProcess,
+		e1 := &event.Event{
+			Type:      event.CreateProcess,
 			Timestamp: time.Now().Add(time.Duration(i) * time.Millisecond),
 			Name:      "CreateProcess",
 			Tid:       2484,
@@ -291,26 +290,26 @@ func TestSimpleSequenceMultiplePartials(t *testing.T) {
 				Name: "cmd.exe",
 				Exe:  "C:\\Windows\\system32\\cmd.exe",
 			},
-			Kparams: kevent.Kparams{
-				kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: pid % 2},
+			Params: event.Params{
+				params.ProcessID: {Name: params.ProcessID, Type: params.Uint32, Value: pid % 2},
 			},
-			Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+			Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 		}
-		e2 := &kevent.Kevent{
-			Type:      ktypes.CreateFile,
+		e2 := &event.Event{
+			Type:      event.CreateFile,
 			Timestamp: time.Now().Add(time.Duration(i) * time.Millisecond * 2),
 			Name:      "CreateFile",
 			Tid:       2484,
 			PID:       pid * 2,
-			Category:  ktypes.File,
+			Category:  event.File,
 			PS: &pstypes.PS{
 				Name: "cmd.exe",
 				Exe:  "C:\\Windows\\system32\\cmd.exe",
 			},
-			Kparams: kevent.Kparams{
-				kparams.FilePath: {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost-temp.exe"},
+			Params: event.Params{
+				params.FilePath: {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\svchost-temp.exe"},
 			},
-			Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+			Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 		}
 		require.False(t, ss.runSequence(e1))
 		require.False(t, ss.runSequence(e2))
@@ -320,9 +319,9 @@ func TestSimpleSequenceMultiplePartials(t *testing.T) {
 	assert.Len(t, ss.partials[0], 5)
 	assert.Len(t, ss.partials[1], 0)
 
-	e1 := &kevent.Kevent{
+	e1 := &event.Event{
 		Seq:       20,
-		Type:      ktypes.CreateProcess,
+		Type:      event.CreateProcess,
 		Timestamp: time.Now().Add(time.Second),
 		Name:      "CreateProcess",
 		Tid:       2484,
@@ -334,27 +333,27 @@ func TestSimpleSequenceMultiplePartials(t *testing.T) {
 				Name: "WmiPrvSE.exe",
 			},
 		},
-		Kparams: kevent.Kparams{
-			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
+		Params: event.Params{
+			params.ProcessID: {Name: params.ProcessID, Type: params.Uint32, Value: uint32(4143)},
 		},
-		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
-	e2 := &kevent.Kevent{
-		Type:      ktypes.CreateFile,
+	e2 := &event.Event{
+		Type:      event.CreateFile,
 		Seq:       22,
 		Timestamp: time.Now().Add(time.Second * time.Duration(2)),
 		Name:      "CreateFile",
 		Tid:       2484,
 		PID:       859,
-		Category:  ktypes.File,
+		Category:  event.File,
 		PS: &pstypes.PS{
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
 		},
-		Kparams: kevent.Kparams{
-			kparams.FilePath: {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Temp\\file.tmp"},
+		Params: event.Params{
+			params.FilePath: {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Temp\\file.tmp"},
 		},
-		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
 	require.False(t, ss.runSequence(e1))
@@ -368,7 +367,7 @@ func TestSimpleSequenceMultiplePartials(t *testing.T) {
 	assert.Equal(t, uint32(859), ss.matches[0].PID)
 	assert.Equal(t, "WmiPrvSE.exe", ss.matches[0].PS.Parent.Name)
 	assert.Equal(t, uint32(859), ss.matches[1].PID)
-	assert.Equal(t, "C:\\Temp\\file.tmp", ss.matches[1].GetParamAsString(kparams.FilePath))
+	assert.Equal(t, "C:\\Temp\\file.tmp", ss.matches[1].GetParamAsString(params.FilePath))
 }
 
 func TestSimpleSequenceDeadline(t *testing.T) {
@@ -378,15 +377,15 @@ func TestSimpleSequenceDeadline(t *testing.T) {
 	f := filter.New(`
 	sequence
 	maxspan 100ms
-  	|kevt.name = 'CreateProcess' and ps.name = 'cmd.exe'| by ps.exe
-  	|kevt.name = 'CreateFile' and file.path icontains 'temp'| by file.path
+  	|evt.name = 'CreateProcess' and ps.name = 'cmd.exe'| by ps.exe
+  	|evt.name = 'CreateFile' and file.path icontains 'temp'| by file.path
 	`, &config.Config{Kstream: config.KstreamConfig{EnableFileIOKevents: true}, Filters: &config.Filters{}})
 	require.NoError(t, f.Compile())
 
 	ss := newSequenceState(f, c, new(ps.SnapshotterMock))
 
-	e1 := &kevent.Kevent{
-		Type:      ktypes.CreateProcess,
+	e1 := &event.Event{
+		Type:      event.CreateProcess,
 		Timestamp: time.Now(),
 		Name:      "CreateProcess",
 		Tid:       2484,
@@ -395,28 +394,28 @@ func TestSimpleSequenceDeadline(t *testing.T) {
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\svchost-temp.exe",
 		},
-		Kparams: kevent.Kparams{
-			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
+		Params: event.Params{
+			params.ProcessID: {Name: params.ProcessID, Type: params.Uint32, Value: uint32(4143)},
 		},
-		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 	require.False(t, ss.runSequence(e1))
 
-	e2 := &kevent.Kevent{
-		Type:      ktypes.CreateFile,
+	e2 := &event.Event{
+		Type:      event.CreateFile,
 		Timestamp: time.Now(),
 		Name:      "CreateFile",
 		Tid:       2484,
 		PID:       859,
-		Category:  ktypes.File,
+		Category:  event.File,
 		PS: &pstypes.PS{
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
 		},
-		Kparams: kevent.Kparams{
-			kparams.FilePath: {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost-temp.exe"},
+		Params: event.Params{
+			params.FilePath: {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\svchost-temp.exe"},
 		},
-		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 	time.Sleep(time.Millisecond * 110)
 	require.False(t, ss.runSequence(e2))
@@ -448,19 +447,19 @@ func TestComplexSequence(t *testing.T) {
 	f := filter.New(`
 	sequence
   maxspan 1h
-  	|kevt.name = 'CreateProcess' and ps.child.name in ('firefox.exe', 'chrome.exe', 'edge.exe')| by ps.child.pid
-		|kevt.name = 'CreateFile' and file.operation = 'CREATE' and file.extension = '.exe'| by ps.pid
-  	|kevt.name in ('Send', 'Connect')| by ps.pid
+  	|evt.name = 'CreateProcess' and ps.child.name in ('firefox.exe', 'chrome.exe', 'edge.exe')| by ps.child.pid
+		|evt.name = 'CreateFile' and file.operation = 'CREATE' and file.extension = '.exe'| by ps.pid
+  	|evt.name in ('Send', 'Connect')| by ps.pid
 	`, &config.Config{Kstream: config.KstreamConfig{EnableFileIOKevents: true}, Filters: &config.Filters{}})
 	require.NoError(t, f.Compile())
 
 	ss := newSequenceState(f, c, new(ps.SnapshotterMock))
 
-	e1 := &kevent.Kevent{
+	e1 := &event.Event{
 		Seq:       1,
-		Type:      ktypes.CreateProcess,
+		Type:      event.CreateProcess,
 		Timestamp: time.Now(),
-		Category:  ktypes.Process,
+		Category:  event.Process,
 		Name:      "CreateProcess",
 		Tid:       2484,
 		PID:       859,
@@ -468,43 +467,43 @@ func TestComplexSequence(t *testing.T) {
 			Name: "explorer.exe",
 			Exe:  "C:\\Windows\\system32\\explorer.exe",
 		},
-		Kparams: kevent.Kparams{
-			kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(2243)},
-			kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "firefox.exe"},
+		Params: event.Params{
+			params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: uint32(2243)},
+			params.ProcessName: {Name: params.ProcessName, Type: params.UnicodeString, Value: "firefox.exe"},
 		},
-		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 	require.False(t, ss.runSequence(e1))
 
-	e2 := &kevent.Kevent{
+	e2 := &event.Event{
 		Seq:       2,
-		Type:      ktypes.CreateFile,
+		Type:      event.CreateFile,
 		Timestamp: time.Now().Add(time.Millisecond * 250),
 		Name:      "CreateFile",
 		Tid:       2484,
 		PID:       2243,
-		Category:  ktypes.File,
+		Category:  event.File,
 		PS: &pstypes.PS{
 			Name:    "firefox.exe",
 			Exe:     "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
 			Cmdline: "C:\\Program Files\\Mozilla Firefox\\firefox.exe\" -contentproc --channel=\"10464.7.539748228\\1366525930\" -childID 6 -isF",
 		},
-		Kparams: kevent.Kparams{
-			kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
-			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.Enum, Value: uint32(2), Enum: fs.FileCreateDispositions},
+		Params: event.Params{
+			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
+			params.FileOperation: {Name: params.FileOperation, Type: params.Enum, Value: uint32(2), Enum: fs.FileCreateDispositions},
 		},
-		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 	require.False(t, ss.runSequence(e2))
 
 	assert.Len(t, ss.partials[0], 1)
 	assert.Len(t, ss.partials[1], 1)
 
-	e3 := &kevent.Kevent{
+	e3 := &event.Event{
 		Seq:       4,
-		Type:      ktypes.ConnectTCPv4,
+		Type:      event.ConnectTCPv4,
 		Timestamp: time.Now().Add(time.Second),
-		Category:  ktypes.Net,
+		Category:  event.Net,
 		Name:      "Connect",
 		Tid:       244,
 		PID:       2243,
@@ -513,10 +512,10 @@ func TestComplexSequence(t *testing.T) {
 			Exe:     "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
 			Cmdline: "C:\\Program Files\\Mozilla Firefox\\firefox.exe\" -contentproc --channel=\"10464.7.539748228\\1366525930\" -childID 6 -isF",
 		},
-		Kparams: kevent.Kparams{
-			kparams.NetDIP: {Name: kparams.NetDIP, Type: kparams.IPv4, Value: net.ParseIP("10.0.2.3")},
+		Params: event.Params{
+			params.NetDIP: {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("10.0.2.3")},
 		},
-		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
 	time.Sleep(time.Millisecond * 30)
@@ -542,36 +541,36 @@ func TestSequenceOOO(t *testing.T) {
 	f := filter.New(`
 	sequence
   maxspan 2m
-  	|kevt.name = 'OpenProcess' and kevt.arg[exe] imatches '?:\\Windows\\System32\\lsass.exe'| by ps.uuid
-		|kevt.name = 'CreateFile' and file.operation = 'CREATE' and file.extension = '.dmp'| by ps.uuid
+  	|evt.name = 'OpenProcess' and evt.arg[exe] imatches '?:\\Windows\\System32\\lsass.exe'| by ps.uuid
+		|evt.name = 'CreateFile' and file.operation = 'CREATE' and file.extension = '.dmp'| by ps.uuid
 	`, &config.Config{Kstream: config.KstreamConfig{EnableFileIOKevents: true}, Filters: &config.Filters{}})
 	require.NoError(t, f.Compile())
 
 	ss := newSequenceState(f, c, new(ps.SnapshotterMock))
 
-	e1 := &kevent.Kevent{
-		Type:      ktypes.CreateFile,
+	e1 := &event.Event{
+		Type:      event.CreateFile,
 		Timestamp: time.Now(),
 		Name:      "CreateFile",
 		Tid:       2484,
 		PID:       859,
-		Category:  ktypes.File,
+		Category:  event.File,
 		PS: &pstypes.PS{
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\rundll32.exe",
 		},
-		Kparams: kevent.Kparams{
-			kparams.FilePath:      {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\temp\\lsass.dmp"},
-			kparams.FileOperation: {Name: kparams.FileOperation, Type: kparams.UnicodeString, Value: "CREATE"},
+		Params: event.Params{
+			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\temp\\lsass.dmp"},
+			params.FileOperation: {Name: params.FileOperation, Type: params.UnicodeString, Value: "CREATE"},
 		},
-		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 	require.False(t, ss.runSequence(e1))
 	require.Len(t, ss.partials[1], 1)
-	assert.True(t, ss.partials[1][0].ContainsMeta(kevent.RuleSequenceOOOKey))
+	assert.True(t, ss.partials[1][0].ContainsMeta(event.RuleSequenceOOOKey))
 
-	e2 := &kevent.Kevent{
-		Type:      ktypes.OpenProcess,
+	e2 := &event.Event{
+		Type:      event.OpenProcess,
 		Timestamp: time.Now(),
 		Name:      "OpenProcess",
 		Tid:       2484,
@@ -580,17 +579,17 @@ func TestSequenceOOO(t *testing.T) {
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\rundll32.exe",
 		},
-		Kparams: kevent.Kparams{
-			kparams.Exe:           {Name: kparams.Exe, Type: kparams.UnicodeString, Value: "C:\\Windows\\System32\\lsass.exe"},
-			kparams.ProcessID:     {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(2243)},
-			kparams.DesiredAccess: {Name: kparams.DesiredAccess, Type: kparams.Flags, Value: uint32(0x1400), Flags: kevent.PsAccessRightFlags},
+		Params: event.Params{
+			params.Exe:           {Name: params.Exe, Type: params.UnicodeString, Value: "C:\\Windows\\System32\\lsass.exe"},
+			params.ProcessID:     {Name: params.ProcessID, Type: params.PID, Value: uint32(2243)},
+			params.DesiredAccess: {Name: params.DesiredAccess, Type: params.Flags, Value: uint32(0x1400), Flags: event.PsAccessRightFlags},
 		},
-		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
 	require.True(t, ss.runSequence(e2))
 	assert.Len(t, ss.partials[0], 1)
-	assert.False(t, ss.partials[1][0].ContainsMeta(kevent.RuleSequenceOOOKey))
+	assert.False(t, ss.partials[1][0].ContainsMeta(event.RuleSequenceOOOKey))
 }
 
 func TestSequenceGC(t *testing.T) {
@@ -602,15 +601,15 @@ func TestSequenceGC(t *testing.T) {
 	f := filter.New(`
 	sequence
   by ps.uuid
-  	|kevt.name = 'OpenProcess' and kevt.arg[exe] imatches '?:\\Windows\\System32\\lsass.exe'|
-		|kevt.name = 'CreateFile' and file.operation = 'CREATE' and file.extension = '.dmp'|
+  	|evt.name = 'OpenProcess' and evt.arg[exe] imatches '?:\\Windows\\System32\\lsass.exe'|
+		|evt.name = 'CreateFile' and file.operation = 'CREATE' and file.extension = '.dmp'|
 	`, &config.Config{Kstream: config.KstreamConfig{EnableFileIOKevents: true}, Filters: &config.Filters{}})
 	require.NoError(t, f.Compile())
 
 	ss := newSequenceState(f, c, new(ps.SnapshotterMock))
 
-	e := &kevent.Kevent{
-		Type:      ktypes.OpenProcess,
+	e := &event.Event{
+		Type:      event.OpenProcess,
 		Timestamp: time.Now(),
 		Name:      "OpenProcess",
 		Tid:       2484,
@@ -619,12 +618,12 @@ func TestSequenceGC(t *testing.T) {
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\rundll32.exe",
 		},
-		Kparams: kevent.Kparams{
-			kparams.Exe:           {Name: kparams.Exe, Type: kparams.UnicodeString, Value: "C:\\Windows\\System32\\lsass.exe"},
-			kparams.ProcessID:     {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(2243)},
-			kparams.DesiredAccess: {Name: kparams.DesiredAccess, Type: kparams.Flags, Value: uint32(0x1400), Flags: kevent.PsAccessRightFlags},
+		Params: event.Params{
+			params.Exe:           {Name: params.Exe, Type: params.UnicodeString, Value: "C:\\Windows\\System32\\lsass.exe"},
+			params.ProcessID:     {Name: params.ProcessID, Type: params.PID, Value: uint32(2243)},
+			params.DesiredAccess: {Name: params.DesiredAccess, Type: params.Flags, Value: uint32(0x1400), Flags: event.PsAccessRightFlags},
 		},
-		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
 	require.False(t, ss.runSequence(e))
@@ -643,19 +642,19 @@ func TestSequenceExpire(t *testing.T) {
 	var tests = []struct {
 		c     *config.FilterConfig
 		expr  string
-		evts  []*kevent.Kevent
+		evts  []*event.Event
 		wants bool
 	}{
 		{
 			&config.FilterConfig{Name: "LSASS memory dumping via legitimate or offensive tools"},
 			`sequence
   		 maxspan 2m
-  			|kevt.name = 'OpenProcess' and kevt.arg[exe] imatches '?:\\Windows\\System32\\lsass.exe'| by ps.uuid
-				|kevt.name = 'CreateFile' and file.operation = 'CREATE' and file.extension = '.dmp'| by ps.uuid
+  			|evt.name = 'OpenProcess' and evt.arg[exe] imatches '?:\\Windows\\System32\\lsass.exe'| by ps.uuid
+				|evt.name = 'CreateFile' and file.operation = 'CREATE' and file.extension = '.dmp'| by ps.uuid
 			`,
-			[]*kevent.Kevent{
+			[]*event.Event{
 				{
-					Type:      ktypes.OpenProcess,
+					Type:      event.OpenProcess,
 					Timestamp: time.Now(),
 					Name:      "OpenProcess",
 					Tid:       2484,
@@ -664,15 +663,15 @@ func TestSequenceExpire(t *testing.T) {
 						Name: "cmd.exe",
 						Exe:  "C:\\Windows\\system32\\rundll32.exe",
 					},
-					Kparams: kevent.Kparams{
-						kparams.Exe:           {Name: kparams.Exe, Type: kparams.UnicodeString, Value: "C:\\Windows\\System32\\lsass.exe"},
-						kparams.ProcessID:     {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(2243)},
-						kparams.DesiredAccess: {Name: kparams.DesiredAccess, Type: kparams.Flags, Value: uint32(0x1400), Flags: kevent.PsAccessRightFlags},
+					Params: event.Params{
+						params.Exe:           {Name: params.Exe, Type: params.UnicodeString, Value: "C:\\Windows\\System32\\lsass.exe"},
+						params.ProcessID:     {Name: params.ProcessID, Type: params.PID, Value: uint32(2243)},
+						params.DesiredAccess: {Name: params.DesiredAccess, Type: params.Flags, Value: uint32(0x1400), Flags: event.PsAccessRightFlags},
 					},
-					Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+					Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 				},
 				{
-					Type: ktypes.TerminateProcess,
+					Type: event.TerminateProcess,
 					Name: "TerminateProcess",
 					Tid:  2484,
 					PID:  859,
@@ -680,9 +679,9 @@ func TestSequenceExpire(t *testing.T) {
 						Name: "cmd.exe",
 						Exe:  "C:\\Windows\\system32\\svchost.exe",
 					},
-					Kparams: kevent.Kparams{
-						kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(4143)},
-						kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.AnsiString, Value: "powershell.exe"},
+					Params: event.Params{
+						params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: uint32(4143)},
+						params.ProcessName: {Name: params.ProcessName, Type: params.AnsiString, Value: "powershell.exe"},
 					},
 				},
 			},
@@ -692,15 +691,15 @@ func TestSequenceExpire(t *testing.T) {
 			&config.FilterConfig{Name: "System Binary Proxy Execution via Rundll32"},
 			`sequence
   		 maxspan 2m
-  			|kevt.name = 'CreateProcess' and ps.child.name = 'rundll32.exe'| by ps.child.pid
-				|kevt.name = 'CreateProcess' and ps.child.name = 'connhost.exe'| by ps.pid
+  			|evt.name = 'CreateProcess' and ps.child.name = 'rundll32.exe'| by ps.child.pid
+				|evt.name = 'CreateProcess' and ps.child.name = 'connhost.exe'| by ps.pid
 			`,
-			[]*kevent.Kevent{
+			[]*event.Event{
 				{
 					Seq:       1,
-					Type:      ktypes.CreateProcess,
+					Type:      event.CreateProcess,
 					Timestamp: time.Now(),
-					Category:  ktypes.Process,
+					Category:  event.Process,
 					Name:      "CreateProcess",
 					Tid:       2484,
 					PID:       859,
@@ -708,17 +707,17 @@ func TestSequenceExpire(t *testing.T) {
 						Name: "explorer.exe",
 						Exe:  "C:\\Windows\\system32\\explorer.exe",
 					},
-					Kparams: kevent.Kparams{
-						kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(2243)},
-						kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "rundll32.exe"},
+					Params: event.Params{
+						params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: uint32(2243)},
+						params.ProcessName: {Name: params.ProcessName, Type: params.UnicodeString, Value: "rundll32.exe"},
 					},
-					Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+					Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 				},
 				{
 					Seq:       2,
-					Type:      ktypes.CreateProcess,
+					Type:      event.CreateProcess,
 					Timestamp: time.Now(),
-					Category:  ktypes.Process,
+					Category:  event.Process,
 					Name:      "CreateProcess",
 					Tid:       2484,
 					PID:       2243,
@@ -726,14 +725,14 @@ func TestSequenceExpire(t *testing.T) {
 						Name: "explorer.exe",
 						Exe:  "C:\\Windows\\system32\\explorer.exe",
 					},
-					Kparams: kevent.Kparams{
-						kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(12243)},
-						kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.UnicodeString, Value: "connhost.exe"},
+					Params: event.Params{
+						params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: uint32(12243)},
+						params.ProcessName: {Name: params.ProcessName, Type: params.UnicodeString, Value: "connhost.exe"},
 					},
-					Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+					Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 				},
 				{
-					Type: ktypes.TerminateProcess,
+					Type: event.TerminateProcess,
 					Name: "TerminateProcess",
 					Tid:  2484,
 					PID:  859,
@@ -741,9 +740,9 @@ func TestSequenceExpire(t *testing.T) {
 						Name: "cmd.exe",
 						Exe:  "C:\\Windows\\system32\\svchost.exe",
 					},
-					Kparams: kevent.Kparams{
-						kparams.ProcessID:   {Name: kparams.ProcessID, Type: kparams.PID, Value: uint32(12243)},
-						kparams.ProcessName: {Name: kparams.ProcessName, Type: kparams.AnsiString, Value: "powershell.exe"},
+					Params: event.Params{
+						params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: uint32(12243)},
+						params.ProcessName: {Name: params.ProcessName, Type: params.AnsiString, Value: "powershell.exe"},
 					},
 				},
 			},
@@ -782,16 +781,16 @@ func TestSequenceBoundFields(t *testing.T) {
 	f := filter.New(`
 	sequence
   maxspan 200ms
-  	|kevt.name = 'CreateProcess' and ps.name = 'cmd.exe'| as e1
-  	|kevt.name = 'CreateFile' and file.path icontains 'temp' and $e1.ps.sid = ps.sid| as e2
-  	|kevt.name = 'Connect' and ps.sid != $e2.ps.sid and ps.sid = $e1.ps.sid|
+  	|evt.name = 'CreateProcess' and ps.name = 'cmd.exe'| as e1
+  	|evt.name = 'CreateFile' and file.path icontains 'temp' and $e1.ps.sid = ps.sid| as e2
+  	|evt.name = 'Connect' and ps.sid != $e2.ps.sid and ps.sid = $e1.ps.sid|
 	`, &config.Config{Kstream: config.KstreamConfig{EnableFileIOKevents: true}, Filters: &config.Filters{}})
 	require.NoError(t, f.Compile())
 
 	ss := newSequenceState(f, c, new(ps.SnapshotterMock))
 
-	e1 := &kevent.Kevent{
-		Type:      ktypes.CreateProcess,
+	e1 := &event.Event{
+		Type:      event.CreateProcess,
 		Timestamp: time.Now(),
 		Name:      "CreateProcess",
 		Tid:       2484,
@@ -801,14 +800,14 @@ func TestSequenceBoundFields(t *testing.T) {
 			Exe:  "C:\\Windows\\system32\\svchost-temp.exe",
 			SID:  "zinet",
 		},
-		Kparams: kevent.Kparams{
-			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
+		Params: event.Params{
+			params.ProcessID: {Name: params.ProcessID, Type: params.Uint32, Value: uint32(4143)},
 		},
-		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
-	e2 := &kevent.Kevent{
-		Type:      ktypes.CreateProcess,
+	e2 := &event.Event{
+		Type:      event.CreateProcess,
 		Timestamp: time.Now().Add(time.Millisecond * 20),
 		Name:      "CreateProcess",
 		Tid:       2484,
@@ -818,47 +817,47 @@ func TestSequenceBoundFields(t *testing.T) {
 			Exe:  "C:\\Windows\\system32\\svchost-temp.exe",
 			SID:  "nusret",
 		},
-		Kparams: kevent.Kparams{
-			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
+		Params: event.Params{
+			params.ProcessID: {Name: params.ProcessID, Type: params.Uint32, Value: uint32(4143)},
 		},
-		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
-	e3 := &kevent.Kevent{
-		Type:      ktypes.CreateFile,
+	e3 := &event.Event{
+		Type:      event.CreateFile,
 		Timestamp: time.Now().Add(time.Second),
 		Name:      "CreateFile",
 		Tid:       2484,
 		PID:       859,
-		Category:  ktypes.File,
+		Category:  event.File,
 		PS: &pstypes.PS{
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
 			SID:  "nusret",
 		},
-		Kparams: kevent.Kparams{
-			kparams.FilePath: {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\system32\\svchost-temp.exe"},
+		Params: event.Params{
+			params.FilePath: {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\svchost-temp.exe"},
 		},
-		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
-	e4 := &kevent.Kevent{
-		Type:      ktypes.ConnectTCPv4,
+	e4 := &event.Event{
+		Type:      event.ConnectTCPv4,
 		Timestamp: time.Now().Add(time.Second * 3),
 		Name:      "Connect",
 		Tid:       2484,
 		PID:       859,
-		Category:  ktypes.File,
+		Category:  event.File,
 		PS: &pstypes.PS{
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
 			SID:  "zinet",
 		},
-		Kparams: kevent.Kparams{
-			kparams.NetDport: {Name: kparams.NetDport, Type: kparams.Uint16, Value: uint16(80)},
-			kparams.NetDIP:   {Name: kparams.NetDIP, Type: kparams.IPv4, Value: net.ParseIP("172.1.2.3")},
+		Params: event.Params{
+			params.NetDport: {Name: params.NetDport, Type: params.Uint16, Value: uint16(80)},
+			params.NetDIP:   {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("172.1.2.3")},
 		},
-		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
 	require.False(t, ss.runSequence(e1))
@@ -876,8 +875,8 @@ func TestSequenceBoundFieldsWithFunctions(t *testing.T) {
 	f := filter.New(`
  	sequence
   maxspan 5m
-    |kevt.name = 'CreateFile' and file.path imatches '?:\\Windows\\System32\\*.dll'| as e1
-    |kevt.name = 'RegSetValue' and registry.path ~= 'HKEY_CURRENT_USER\\Volatile Environment\\Notification Packages' 
+    |evt.name = 'CreateFile' and file.path imatches '?:\\Windows\\System32\\*.dll'| as e1
+    |evt.name = 'RegSetValue' and registry.path ~= 'HKEY_CURRENT_USER\\Volatile Environment\\Notification Packages' 
 			and 
 		 get_reg_value(registry.path) iin (base($e1.file.path, false))|
 	`, &config.Config{Kstream: config.KstreamConfig{EnableFileIOKevents: true, EnableRegistryKevents: true}, Filters: &config.Filters{}})
@@ -885,36 +884,36 @@ func TestSequenceBoundFieldsWithFunctions(t *testing.T) {
 
 	ss := newSequenceState(f, c, new(ps.SnapshotterMock))
 
-	e1 := &kevent.Kevent{
-		Type:     ktypes.CreateFile,
+	e1 := &event.Event{
+		Type:     event.CreateFile,
 		Name:     "CreateFile",
-		Category: ktypes.File,
+		Category: event.File,
 		Tid:      2484,
 		PID:      859,
 		PS: &pstypes.PS{
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\cmd.exe",
 		},
-		Kparams: kevent.Kparams{
-			kparams.FilePath: {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Windows\\System32\\passwdflt.dll"},
+		Params: event.Params{
+			params.FilePath: {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\System32\\passwdflt.dll"},
 		},
-		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
-	e2 := &kevent.Kevent{
-		Type:     ktypes.RegSetValue,
+	e2 := &event.Event{
+		Type:     event.RegSetValue,
 		Name:     "RegSetValue",
-		Category: ktypes.Registry,
+		Category: event.Registry,
 		Tid:      2484,
 		PID:      859,
 		PS: &pstypes.PS{
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\cmd.exe",
 		},
-		Kparams: kevent.Kparams{
-			kparams.RegPath: {Name: kparams.RegPath, Type: kparams.UnicodeString, Value: "HKEY_CURRENT_USER\\Volatile Environment\\Notification Packages"},
+		Params: event.Params{
+			params.RegPath: {Name: params.RegPath, Type: params.UnicodeString, Value: "HKEY_CURRENT_USER\\Volatile Environment\\Notification Packages"},
 		},
-		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
 	key, err := registry.OpenKey(registry.CURRENT_USER, "Volatile Environment", registry.SET_VALUE)
@@ -938,15 +937,15 @@ func TestIsExpressionEvaluable(t *testing.T) {
 	f := filter.New(`
 	sequence
 	maxspan 100ms
-  	|kevt.name = 'CreateProcess' and ps.name = 'cmd.exe'| by ps.exe
-  	|kevt.name = 'CreateFile' and file.path icontains 'temp'| by file.path
+  	|evt.name = 'CreateProcess' and ps.name = 'cmd.exe'| by ps.exe
+  	|evt.name = 'CreateFile' and file.path icontains 'temp'| by file.path
 	`, &config.Config{Kstream: config.KstreamConfig{EnableFileIOKevents: true}, Filters: &config.Filters{}})
 	require.NoError(t, f.Compile())
 
 	ss := newSequenceState(f, c, new(ps.SnapshotterMock))
 
-	e1 := &kevent.Kevent{
-		Type: ktypes.CreateProcess,
+	e1 := &event.Event{
+		Type: event.CreateProcess,
 		Name: "CreateProcess",
 		Tid:  2484,
 		PID:  859,
@@ -954,14 +953,14 @@ func TestIsExpressionEvaluable(t *testing.T) {
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
 		},
-		Kparams: kevent.Kparams{
-			kparams.ProcessID: {Name: kparams.ProcessID, Type: kparams.Uint32, Value: uint32(4143)},
+		Params: event.Params{
+			params.ProcessID: {Name: params.ProcessID, Type: params.Uint32, Value: uint32(4143)},
 		},
-		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
-	e2 := &kevent.Kevent{
-		Type: ktypes.RenameFile,
+	e2 := &event.Event{
+		Type: event.RenameFile,
 		Name: "RenameFile",
 		Tid:  2484,
 		PID:  859,
@@ -969,10 +968,10 @@ func TestIsExpressionEvaluable(t *testing.T) {
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
 		},
-		Kparams: kevent.Kparams{
-			kparams.FilePath: {Name: kparams.FilePath, Type: kparams.UnicodeString, Value: "C:\\Temp\\dropper"},
+		Params: event.Params{
+			params.FilePath: {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Temp\\dropper"},
 		},
-		Metadata: map[kevent.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
 	assert.False(t, ss.filter.GetSequence().Expressions[0].IsEvaluable(e2))

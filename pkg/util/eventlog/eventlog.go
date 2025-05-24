@@ -20,7 +20,7 @@ package eventlog
 
 import (
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/kevent/ktypes"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"golang.org/x/sys/windows/registry"
 )
 
@@ -39,7 +39,7 @@ const (
 var ErrKeyExists = fmt.Errorf("%s\\%s already exists", keyName, Source)
 
 // categoryCount indicates the number of current event categories
-var categoryCount = uint32(len(ktypes.Categories()))
+var categoryCount = uint32(len(event.Categories()))
 
 // Level is the type definition for the eventlog log level
 type Level uint16

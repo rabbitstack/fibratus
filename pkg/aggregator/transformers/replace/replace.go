@@ -21,13 +21,13 @@ package replace
 import (
 	"expvar"
 	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers"
-	"github.com/rabbitstack/fibratus/pkg/kevent"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"strings"
 )
 
 var replaceCount = expvar.NewInt("transformers.replaced.params")
 
-// replace applies string substitutions in kpar values.
+// replace applies string substitutions in par values.
 type replace struct {
 	c Config
 }
@@ -44,17 +44,17 @@ func initReplaceTransformer(config transformers.Config) (transformers.Transforme
 	return &replace{c: cfg}, nil
 }
 
-func (r replace) Transform(kevt *kevent.Kevent) error {
+func (r replace) Transform(evt *event.Event) error {
 	for _, repl := range r.c.Replacements {
-		kpar := kevt.Kparams.Find(repl.Kpar)
-		if kpar == nil {
+		par := evt.Params.Find(repl.Param)
+		if par == nil {
 			continue
 		}
-		_, ok := kpar.Value.(string)
+		_, ok := par.Value.(string)
 		if !ok {
 			continue
 		}
-		kpar.Value = strings.ReplaceAll(kevt.GetParamAsString(kpar.Name), repl.Old, repl.New)
+		par.Value = strings.ReplaceAll(evt.GetParamAsString(par.Name), repl.Old, repl.New)
 		replaceCount.Add(1)
 	}
 	return nil

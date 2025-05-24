@@ -23,7 +23,7 @@ package filament
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/config"
-	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
+	errs "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 )
@@ -35,5 +35,5 @@ func New(
 	hsnap handle.Snapshotter,
 	config *config.Config,
 ) (Filament, error) {
-	return nil, kerrors.ErrFeatureUnsupported("filament")
+	return nil, errs.ErrFeatureUnsupported("filament")
 }
