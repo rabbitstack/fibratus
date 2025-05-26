@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"github.com/rabbitstack/fibratus/internal/bootstrap"
 	"github.com/rabbitstack/fibratus/pkg/config"
-	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
+	errs "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/util/rest"
 	"github.com/spf13/cobra"
 	"os"
@@ -49,7 +49,7 @@ func printConfig(cmd *cobra.Command, args []string) error {
 	}
 	body, err := rest.Get(rest.WithTransport(cfg.API.Transport), rest.WithURI("config"))
 	if err != nil {
-		return kerrors.ErrHTTPServerUnavailable(cfg.API.Transport, err)
+		return errs.ErrHTTPServerUnavailable(cfg.API.Transport, err)
 	}
 	_, err = fmt.Fprintln(os.Stdout, string(body))
 	if err != nil {

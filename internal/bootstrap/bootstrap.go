@@ -120,7 +120,7 @@ func NewApp(cfg *config.Config, options ...Option) (*App, error) {
 		sigs = signals.Install()
 	}
 	if opts.isCaptureReplay {
-		reader, err := cap.NewReader(cfg.KcapFile, cfg)
+		reader, err := cap.NewReader(cfg.CapFile, cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -230,7 +230,7 @@ func (f *App) Run(args []string) error {
 		}()
 	} else {
 		// register stack symbolizer
-		if cfg.Kstream.StackEnrichment {
+		if cfg.EventSource.StackEnrichment {
 			f.symbolizer = symbolize.NewSymbolizer(symbolize.NewDebugHelpResolver(cfg), f.psnap, cfg, false)
 			f.evs.RegisterEventListener(f.symbolizer)
 		}
@@ -288,7 +288,7 @@ func (f *App) WriteCapture(args []string) error {
 	if err != nil {
 		return err
 	}
-	f.writer, err = cap.NewWriter(f.config.KcapFile, f.psnap, f.hsnap)
+	f.writer, err = cap.NewWriter(f.config.CapFile, f.psnap, f.hsnap)
 	if err != nil {
 		return err
 	}

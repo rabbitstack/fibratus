@@ -50,22 +50,22 @@ func NewChain(
 
 	chain.addProcessor(newPsProcessor(psnap, vaRegionProber))
 
-	if config.Kstream.EnableFileIOKevents {
+	if config.EventSource.EnableFileIOEvents {
 		chain.addProcessor(newFsProcessor(hsnap, psnap, devMapper, devPathResolver, config))
 	}
-	if config.Kstream.EnableRegistryKevents {
+	if config.EventSource.EnableRegistryEvents {
 		chain.addProcessor(newRegistryProcessor(hsnap))
 	}
-	if config.Kstream.EnableImageKevents {
+	if config.EventSource.EnableImageEvents {
 		chain.addProcessor(newImageProcessor(psnap))
 	}
-	if config.Kstream.EnableNetKevents {
+	if config.EventSource.EnableNetEvents {
 		chain.addProcessor(newNetProcessor())
 	}
-	if config.Kstream.EnableHandleKevents {
+	if config.EventSource.EnableHandleEvents {
 		chain.addProcessor(newHandleProcessor(hsnap, psnap, devMapper, devPathResolver))
 	}
-	if config.Kstream.EnableMemKevents {
+	if config.EventSource.EnableMemEvents {
 		chain.addProcessor(newMemProcessor(psnap, vaRegionProber))
 	}
 

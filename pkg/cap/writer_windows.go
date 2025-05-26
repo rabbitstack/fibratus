@@ -41,7 +41,7 @@ import (
 )
 
 type stats struct {
-	kcapFile       string
+	capFile        string
 	evtsWritten    uint64
 	bytesWritten   uint64
 	handlesWritten uint64
@@ -67,7 +67,7 @@ func (s *stats) printStats() {
 	t.SetTitle("Capture Statistics")
 	t.SetStyle(table.StyleLight)
 
-	t.AppendRow(table.Row{"File", filepath.Base(s.kcapFile)})
+	t.AppendRow(table.Row{"File", filepath.Base(s.capFile)})
 	t.AppendSeparator()
 
 	t.AppendRow(table.Row{"Events written", atomic.LoadUint64(&s.evtsWritten)})
@@ -75,7 +75,7 @@ func (s *stats) printStats() {
 	t.AppendRow(table.Row{"Processes written", atomic.LoadUint64(&s.procsWritten)})
 	t.AppendRow(table.Row{"Handles written", atomic.LoadUint64(&s.handlesWritten)})
 
-	f, err := os.Stat(s.kcapFile)
+	f, err := os.Stat(s.capFile)
 	if err != nil {
 		t.Render()
 		return
@@ -142,7 +142,7 @@ func NewWriter(filename string, psnap ps.Snapshotter, hsnap handle.Snapshotter) 
 		psnap:   psnap,
 		hsnap:   hsnap,
 		stop:    make(chan struct{}),
-		stats:   &stats{kcapFile: filename},
+		stats:   &stats{capFile: filename},
 	}
 
 	if err := w.writeSnapshots(); err != nil {
@@ -220,7 +220,7 @@ func (w *writer) write(b []byte) error {
 	defer w.mu.Unlock()
 	l := len(b)
 	if l > maxKevtSize {
-		overflowKevents.Add(1)
+		overflowEvents.Add(1)
 		return fmt.Errorf("event size overflow by %d bytes", l-maxKevtSize)
 	}
 	if err := w.ws(section.Event, capver.EvtSecV2, 0, uint32(l)); err != nil {

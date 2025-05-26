@@ -95,11 +95,11 @@ func TestProduceEventDictWithIPAddresses(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, dict)
 
-	kpars := dict.Get(cpython.PyUnicodeFromString("params"))
-	kparamsDict := cpython.NewDictFromObject(kpars)
+	pars := dict.Get(cpython.PyUnicodeFromString("params"))
+	paramsDict := cpython.NewDictFromObject(pars)
 
-	assert.Equal(t, "216.58.201.174", kparamsDict.Get(cpython.PyUnicodeFromString("dip")).String())
-	assert.Equal(t, "2001:db8:85a3::8a2e:370:7334", kparamsDict.Get(cpython.PyUnicodeFromString("sip")).String())
+	assert.Equal(t, "216.58.201.174", paramsDict.Get(cpython.PyUnicodeFromString("dip")).String())
+	assert.Equal(t, "2001:db8:85a3::8a2e:370:7334", paramsDict.Get(cpython.PyUnicodeFromString("sip")).String())
 }
 
 func BenchmarkTestProduceEventDict(b *testing.B) {

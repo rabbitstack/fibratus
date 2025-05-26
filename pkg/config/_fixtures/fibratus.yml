@@ -2,10 +2,10 @@
 
 # =============================== Aggregator ==========================================
 
-# Aggregator is responsible for creating kernel event batches, applying transformers to each event
+# Aggregator is responsible for creating event batches, applying transformers to each event
 # present in the batch, and forwarding those batches to the output sinks.
 aggregator:
-  # Determines the flush period that triggers the flushing of the kernel event batches to output sinks.
+  # Determines the flush period that triggers the flushing of the event batches to output sinks.
   flush-period: 230ms
 
   # Represents the max time to wait before announcing failed flushing of enqueued events when fibratus
@@ -41,7 +41,7 @@ alertsenders:
     # Represents the port of the SMTP server.
     port: 587
 
-    # Specifies the user name when authenticating to the SMTP server.
+    # Specifies the username when authenticating to the SMTP server.
     user: bunny
 
     # Specifies the password when authenticating to the SMTP server.
@@ -116,12 +116,12 @@ handle:
 
 # =============================== Kcap =================================================
 
-kcap:
+cap:
   file: ""
 
 # =============================== Event ===============================================
 
-Event:
+event:
   serialize-threads: false
   serialize-images: false
   serialize-handles: false
@@ -129,7 +129,7 @@ Event:
 
 # =============================== Kstream ==============================================
 
-kstream:
+eventsource:
   max-buffers: 2
   min-buffers: 1
   flush-interval: 1s
@@ -209,7 +209,7 @@ transformers:
   replace:
     enabled: false
     replacements:
-      - Param: key_name
+      - param: key_name
         old: HKEY_CURRENT_USER
         new: HCU
   tags:
@@ -220,10 +220,10 @@ transformers:
   trim:
     enabled: false
     prefixes:
-      - Param: key_name
+      - param: key_name
         trim: CurrentControlSet
     suffixes:
-      - Param: file_name
+      - param: file_name
         trim: .exe
 
 # =============================== YARA =================================================

@@ -29,8 +29,8 @@ import (
 // removed from the cache.
 const backlogCacheSize = 800
 
-// keventsEnqueued counts the number of events that are pushed to the queue
-var keventsEnqueued = expvar.NewInt("kstream.kevents.enqueued")
+// eventsEnqueued counts the number of events that are pushed to the queue
+var eventsEnqueued = expvar.NewInt("eventsource.events.enqueued")
 
 // Listener is the minimal interface that all event listeners need to implement.
 type Listener interface {
@@ -163,7 +163,7 @@ func (q *Queue) push(e *Event) error {
 	}
 	if enqueue || len(q.listeners) == 0 {
 		q.q <- e
-		keventsEnqueued.Add(1)
+		eventsEnqueued.Add(1)
 	}
 	return nil
 }

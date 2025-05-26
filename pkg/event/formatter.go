@@ -64,8 +64,8 @@ var (
 	// tmplNormRegepx defines the regular expression for normalizing the template. This basically consists in removing
 	// the brackets and trailing/leading spaces from the field name.
 	tmplNormRegexp = regexp.MustCompile(`({{2}\s*([A-Za-z.]+)\s*}{2})`)
-	// tmplExpandKparamsRegexp determines whether Params. fields are expanded
-	tmplExpandKparamsRegexp = regexp.MustCompile(`{{\s*.Params.\S+}}`)
+	// tmplExpandParamsRegexp determines whether Params. fields are expanded
+	tmplExpandParamsRegexp = regexp.MustCompile(`{{\s*.Params.\S+}}`)
 )
 
 var fields = map[string]bool{
@@ -104,8 +104,8 @@ func hintFields() string {
 
 // Formatter deals with producing event's output that is dictated by the template.
 type Formatter struct {
-	t                *fasttemplate.Template
-	expandKparamsDot bool
+	t               *fasttemplate.Template
+	expandParamsDot bool
 }
 
 // NewFormatter builds a new instance of event's formatter.
@@ -142,8 +142,8 @@ func NewFormatter(template string) (*Formatter, error) {
 		return nil, fmt.Errorf("invalid template format %q: %v", norm, err)
 	}
 	return &Formatter{
-		t:                t,
-		expandKparamsDot: tmplExpandKparamsRegexp.MatchString(norm),
+		t:               t,
+		expandParamsDot: tmplExpandParamsRegexp.MatchString(norm),
 	}, nil
 }
 

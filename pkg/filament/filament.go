@@ -74,10 +74,10 @@ const (
 )
 
 var (
-	keventErrors        = expvar.NewMap("filament.event.errors")
-	keventProcessErrors = expvar.NewInt("filament.event.process.errors")
-	kdictErrors         = expvar.NewInt("filament.kdict.errors")
-	batchFlushes        = expvar.NewInt("filament.event.batch.flushes")
+	eventErrors        = expvar.NewMap("filament.event.errors")
+	eventProcessErrors = expvar.NewInt("filament.event.process.errors")
+	dictErrors         = expvar.NewInt("filament.dict.errors")
+	batchFlushes       = expvar.NewInt("filament.event.batch.flushes")
 
 	errFilamentsDir = func(path string) error { return fmt.Errorf("%s does not exist or is not a directory", path) }
 
@@ -90,17 +90,17 @@ var (
 	tableOutput io.Writer
 )
 
-type kbatch []*event.Event
+type batch []*event.Event
 
-func (k *kbatch) append(evt *event.Event) {
-	if *k == nil {
-		*k = make([]*event.Event, 0)
+func (b *batch) append(evt *event.Event) {
+	if *b == nil {
+		*b = make([]*event.Event, 0)
 	}
-	*k = append(*k, evt)
+	*b = append(*b, evt)
 }
 
-func (k *kbatch) reset()  { *k = nil }
-func (k kbatch) len() int { return len(k) }
+func (b *batch) reset()  { *b = nil }
+func (b batch) len() int { return len(b) }
 
 type filament struct {
 	name     string
@@ -123,8 +123,8 @@ type filament struct {
 
 	initErrors []error
 
-	onNextKevent *cpython.PyObject
-	onStop       *cpython.PyObject
+	onNextEvent *cpython.PyObject
+	onStop      *cpython.PyObject
 
 	table tab
 }
@@ -228,19 +228,19 @@ func New(
 	}
 
 	f := &filament{
-		name:         name,
-		mod:          mod,
-		config:       config,
-		psnap:        psnap,
-		hsnap:        hsnap,
-		close:        make(chan struct{}, 1),
-		fnerrs:       make(chan error, 100),
-		gil:          cpython.NewGIL(),
-		columns:      make([]string, 0),
-		onNextKevent: onNextEvent,
-		interval:     time.Second,
-		initErrors:   make([]error, 0),
-		table:        newTable(),
+		name:        name,
+		mod:         mod,
+		config:      config,
+		psnap:       psnap,
+		hsnap:       hsnap,
+		close:       make(chan struct{}, 1),
+		fnerrs:      make(chan error, 100),
+		gil:         cpython.NewGIL(),
+		columns:     make([]string, 0),
+		onNextEvent: onNextEvent,
+		interval:    time.Second,
+		initErrors:  make([]error, 0),
+		table:       newTable(),
 	}
 
 	if mod.HasAttr(onStopFn) {
@@ -368,8 +368,8 @@ func New(
 	return f, nil
 }
 
-func (f *filament) Run(kevents <-chan *event.Event, errs <-chan error) error {
-	var batch kbatch
+func (f *filament) Run(eventsc <-chan *event.Event, errs <-chan error) error {
+	var b batch
 	var flusher = time.NewTicker(time.Second)
 	for {
 		select {
@@ -380,19 +380,19 @@ func (f *filament) Run(kevents <-chan *event.Event, errs <-chan error) error {
 		}
 
 		select {
-		case evt := <-kevents:
-			batch.append(evt)
+		case evt := <-eventsc:
+			b.append(evt)
 		case err := <-errs:
-			keventErrors.Add(err.Error(), 1)
+			eventErrors.Add(err.Error(), 1)
 		case <-flusher.C:
 			batchFlushes.Add(1)
-			if batch.len() > 0 {
-				err := f.pushEvents(batch)
+			if b.len() > 0 {
+				err := f.pushEvents(b)
 				if err != nil {
-					log.Warnf("on_next_kevent failed: %v", err)
-					keventProcessErrors.Add(1)
+					log.Warnf("on_next_event failed: %v", err)
+					eventProcessErrors.Add(1)
 				}
-				batch.reset()
+				b.reset()
 			}
 		case err := <-f.fnerrs:
 			return err
@@ -403,17 +403,17 @@ func (f *filament) Run(kevents <-chan *event.Event, errs <-chan error) error {
 	}
 }
 
-func (f *filament) pushEvents(b kbatch) error {
+func (f *filament) pushEvents(b batch) error {
 	f.gil.Lock()
 	defer f.gil.Unlock()
 	for _, evt := range b {
 		dict, err := newEventDict(evt)
 		if err != nil {
 			dict.DecRef()
-			kdictErrors.Add(1)
+			dictErrors.Add(1)
 			continue
 		}
-		r := f.onNextKevent.Call(dict.Object())
+		r := f.onNextEvent.Call(dict.Object())
 		if r != nil {
 			r.DecRef()
 		}

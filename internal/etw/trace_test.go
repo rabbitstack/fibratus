@@ -28,12 +28,12 @@ import (
 
 func TestStartTrace(t *testing.T) {
 	cfg := &config.Config{
-		Kstream: config.KstreamConfig{
-			EnableThreadKevents: true,
-			EnableNetKevents:    true,
-			EnableFileIOKevents: true,
-			BufferSize:          1024,
-			FlushTimer:          time.Millisecond * 2300,
+		EventSource: config.EventSourceConfig{
+			EnableThreadEvents: true,
+			EnableNetEvents:    true,
+			EnableFileIOEvents: true,
+			BufferSize:         1024,
+			FlushTimer:         time.Millisecond * 2300,
 		},
 	}
 

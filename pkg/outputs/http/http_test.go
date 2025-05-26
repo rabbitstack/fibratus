@@ -54,12 +54,12 @@ func TestHttpPublish(t *testing.T) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		var kevents []*event.Event
-		if err := json.Unmarshal(body, &kevents); err != nil {
+		var events []*event.Event
+		if err := json.Unmarshal(body, &events); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		assert.Equal(t, 3, len(kevents))
+		assert.Equal(t, 3, len(events))
 		assert.Equal(t, "aaabbbaaa", r.Header.Get("API-Key"))
 		assert.Equal(t, "fibratus/", r.Header.Get("User-Agent"))
 		assert.Equal(t, "1.1", r.Header.Get("Version"))
@@ -114,12 +114,12 @@ func TestHttpGzipPublish(t *testing.T) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		var kevents []*event.Event
-		if err := json.Unmarshal(body, &kevents); err != nil {
+		var events []*event.Event
+		if err := json.Unmarshal(body, &events); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		assert.Equal(t, 3, len(kevents))
+		assert.Equal(t, 3, len(events))
 		w.WriteHeader(http.StatusOK)
 	})
 

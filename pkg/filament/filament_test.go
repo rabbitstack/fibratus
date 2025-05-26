@@ -53,18 +53,18 @@ func init() {
 	tableOutput = &buf
 }
 
-func TestOnNextKevent(t *testing.T) {
+func TestOnNextEvent(t *testing.T) {
 	// this test crashes in the CI. Reenable once
 	// we investigate why this happens
 	t.SkipNow()
-	filament, err := New("test_on_next_kevent", nil, nil, &config.Config{Filament: config.FilamentConfig{FlushPeriod: time.Millisecond * 250, Path: "_fixtures"}})
+	filament, err := New("test_on_next_event", nil, nil, &config.Config{Filament: config.FilamentConfig{FlushPeriod: time.Millisecond * 250, Path: "_fixtures"}})
 	require.NoError(t, err)
 	require.NotNil(t, filament)
 	time.AfterFunc(time.Millisecond*1050, func() {
 		filament.Close()
 	})
 
-	kevents := make(chan *event.Event, 100)
+	events := make(chan *event.Event, 100)
 	errs := make(chan error, 10)
 	for i := 1; i <= 100; i++ {
 		evt := &event.Event{
@@ -83,9 +83,9 @@ func TestOnNextKevent(t *testing.T) {
 				params.NetDIP:       {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("216.58.201.174")},
 			},
 		}
-		kevents <- evt
+		events <- evt
 	}
-	err = filament.Run(kevents, errs)
+	err = filament.Run(events, errs)
 	require.Nil(t, err)
 	sn := bufio.NewScanner(strings.NewReader(buf.String()))
 	const headerOffset = 4

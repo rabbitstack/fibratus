@@ -31,17 +31,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestKstreamConfig(t *testing.T) {
+func TestEventSourceConfig(t *testing.T) {
 	c := NewWithOpts(WithRun())
 
 	err := c.flags.Parse([]string{
-		"--kstream.enable-thread=false",
-		"--kstream.enable-registry=false",
-		"--kstream.enable-fileio=false",
-		"--kstream.enable-net=false",
-		"--kstream.enable-image=false",
-		"--kstream.blacklist.events=CloseFile,CloseHandle",
-		"--kstream.blacklist.images=System,svchost.exe",
+		"--eventsource.enable-thread=false",
+		"--eventsource.enable-registry=false",
+		"--eventsource.enable-fileio=false",
+		"--eventsource.enable-net=false",
+		"--eventsource.enable-image=false",
+		"--eventsource.blacklist.events=CloseFile,CloseHandle",
+		"--eventsource.blacklist.images=System,svchost.exe",
 	})
 	require.NoError(t, err)
 	require.NoError(t, c.viper.BindPFlags(c.flags))
@@ -49,15 +49,15 @@ func TestKstreamConfig(t *testing.T) {
 
 	require.NoError(t, c.Init())
 
-	assert.False(t, c.Kstream.EnableThreadKevents)
-	assert.False(t, c.Kstream.EnableNetKevents)
-	assert.False(t, c.Kstream.EnableRegistryKevents)
-	assert.False(t, c.Kstream.EnableImageKevents)
-	assert.False(t, c.Kstream.EnableFileIOKevents)
+	assert.False(t, c.EventSource.EnableThreadEvents)
+	assert.False(t, c.EventSource.EnableNetEvents)
+	assert.False(t, c.EventSource.EnableRegistryEvents)
+	assert.False(t, c.EventSource.EnableImageEvents)
+	assert.False(t, c.EventSource.EnableFileIOEvents)
 
-	assert.True(t, c.Kstream.ExcludeKevent(event.CloseHandle.GUID(), event.CloseHandle.HookID()))
-	assert.False(t, c.Kstream.ExcludeKevent(event.CreateProcess.GUID(), event.CreateProcess.HookID()))
+	assert.True(t, c.EventSource.ExcludeEvent(event.CloseHandle.GUID(), event.CloseHandle.HookID()))
+	assert.False(t, c.EventSource.ExcludeEvent(event.CreateProcess.GUID(), event.CreateProcess.HookID()))
 
-	assert.True(t, c.Kstream.ExcludeImage(&pstypes.PS{Name: "svchost.exe"}))
-	assert.False(t, c.Kstream.ExcludeImage(&pstypes.PS{Name: "explorer.exe"}))
+	assert.True(t, c.EventSource.ExcludeImage(&pstypes.PS{Name: "svchost.exe"}))
+	assert.False(t, c.EventSource.ExcludeImage(&pstypes.PS{Name: "explorer.exe"}))
 }

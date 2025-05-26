@@ -19,15 +19,15 @@
 package section
 
 import (
-	kcapver "github.com/rabbitstack/fibratus/pkg/cap/version"
+	capver "github.com/rabbitstack/fibratus/pkg/cap/version"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestSection(t *testing.T) {
-	s := New(Process, kcapver.ProcessSecV1, uint32(2456), uint32(30000))
+	s := New(Process, capver.ProcessSecV1, uint32(2456), uint32(30000))
 	assert.Equal(t, Process, s.Type())
-	assert.Equal(t, kcapver.ProcessSecV1, s.Version())
+	assert.Equal(t, capver.ProcessSecV1, s.Version())
 	assert.Equal(t, uint32(2456), s.Len())
 	assert.Equal(t, uint32(30000), s.Size())
 }

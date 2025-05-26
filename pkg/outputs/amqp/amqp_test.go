@@ -148,13 +148,13 @@ func consumeEvents(t *testing.T, amqpURI string, done chan struct{}) error {
 		return err
 	}
 	deliveries, err := channel.Consume(
-		queue.Name,         // name
-		"kevents-consumer", // consumerTag,
-		false,              // noAck
-		false,              // exclusive
-		false,              // noLocal
-		false,              // noWait
-		nil,                // arguments
+		queue.Name,        // name
+		"events-consumer", // consumerTag,
+		false,             // noAck
+		false,             // exclusive
+		false,             // noLocal
+		false,             // noWait
+		nil,               // arguments
 	)
 	require.NoError(t, err)
 
@@ -165,15 +165,15 @@ func consumeEvents(t *testing.T, amqpURI string, done chan struct{}) error {
 				done <- struct{}{}
 				t.Error("got empty AMQP message")
 			}
-			var kevents []*event.Event
-			err := json.Unmarshal(body, &kevents)
+			var events []*event.Event
+			err := json.Unmarshal(body, &events)
 			if err != nil {
 				done <- struct{}{}
 				t.Error(err)
 			}
-			if len(kevents) != 3 {
+			if len(events) != 3 {
 				done <- struct{}{}
-				t.Errorf("expected 3 events in body but got %d", len(kevents))
+				t.Errorf("expected 3 events in body but got %d", len(events))
 			}
 			err = d.Ack(false)
 			if err != nil {

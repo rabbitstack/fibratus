@@ -62,7 +62,7 @@ import (
 )
 
 const (
-	kcapFile                 = "cap.file"
+	capFile                  = "cap.file"
 	configFile               = "config-file"
 	debugPrivilege           = "debug-privilege"
 	initHandleSnapshot       = "handle.init-snapshot"
@@ -80,8 +80,8 @@ const (
 
 // Config stores configuration options for fine-tuning the behaviour of Fibratus.
 type Config struct {
-	// Kstream stores different configuration options for fine-tuning kstream consumer/controller settings.
-	Kstream KstreamConfig `json:"kstream" yaml:"kstream"`
+	// EventSource stores different configuration options for fine-tuning the event source.
+	EventSource EventSourceConfig `json:"eventsource" yaml:"eventsource"`
 	// Filament contains filament settings
 	Filament FilamentConfig `json:"filament" yaml:"filament"`
 	// PE contains the settings that influences the behaviour of the PE (Portable Executable) reader.
@@ -105,8 +105,8 @@ type Config struct {
 	// ForwardMode designates if event forwarding mode is engaged
 	ForwardMode bool `json:"forward" yaml:"forward"`
 
-	// KcapFile represents the name of the capture file.
-	KcapFile string
+	// CapFile represents the name of the capture file.
+	CapFile string
 
 	// API stores global HTTP API preferences
 	API APIConfig `json:"api" yaml:"api"`
@@ -201,16 +201,16 @@ func NewWithOpts(options ...Option) *Config {
 	flagSet := new(pflag.FlagSet)
 
 	c := &Config{
-		Kstream:    KstreamConfig{},
-		Filament:   FilamentConfig{},
-		API:        APIConfig{},
-		PE:         pe.Config{},
-		Log:        log.Config{},
-		Aggregator: aggregator.Config{},
-		Filters:    &Filters{},
-		viper:      v,
-		flags:      flagSet,
-		opts:       opts,
+		EventSource: EventSourceConfig{},
+		Filament:    FilamentConfig{},
+		API:         APIConfig{},
+		PE:          pe.Config{},
+		Log:         log.Config{},
+		Aggregator:  aggregator.Config{},
+		Filters:     &Filters{},
+		viper:       v,
+		flags:       flagSet,
+		opts:        opts,
 	}
 
 	if opts.run || opts.replay {
@@ -261,7 +261,7 @@ func (c *Config) MustViperize(cmd *cobra.Command) {
 		panic(err)
 	}
 	if c.opts.capture || c.opts.replay {
-		if err := cmd.MarkPersistentFlagRequired(kcapFile); err != nil {
+		if err := cmd.MarkPersistentFlagRequired(capFile); err != nil {
 			panic(err)
 		}
 	}
@@ -269,7 +269,7 @@ func (c *Config) MustViperize(cmd *cobra.Command) {
 
 // Init setups the configuration state from Viper.
 func (c *Config) Init() error {
-	c.Kstream.initFromViper(c.viper)
+	c.EventSource.initFromViper(c.viper)
 	c.Filament.initFromViper(c.viper)
 	c.API.initFromViper(c.viper)
 	c.PE.InitFromViper(c.viper)
@@ -284,7 +284,7 @@ func (c *Config) Init() error {
 	c.SymbolizeKernelAddresses = c.viper.GetBool(symbolizeKernelAddresses)
 	c.DebugPrivilege = c.viper.GetBool(debugPrivilege)
 	c.ForwardMode = c.viper.GetBool(forwardMode)
-	c.KcapFile = c.viper.GetString(kcapFile)
+	c.CapFile = c.viper.GetString(capFile)
 
 	event.SerializeThreads = c.viper.GetBool(serializeThreads)
 	event.SerializeImages = c.viper.GetBool(serializeImages)
@@ -308,7 +308,7 @@ func (c *Config) Init() error {
 
 // IsCaptureSet determines if the events are stored
 // in the capture file.
-func (c *Config) IsCaptureSet() bool { return c.KcapFile != "" }
+func (c *Config) IsCaptureSet() bool { return c.CapFile != "" }
 
 // TryLoadFile attempts to load the configuration file from specified path on the file system.
 func (c *Config) TryLoadFile(file string) error {
@@ -383,10 +383,10 @@ func (c *Config) addFlags() {
 		c.flags.Bool(matchAll, true, "Indicates if the match all strategy is enabled for the rule engine. If the match all strategy is enabled, a single event can trigger multiple rules")
 	}
 	if c.opts.capture {
-		c.flags.StringP(kcapFile, "o", "", "The path of the output cap file")
+		c.flags.StringP(capFile, "o", "", "The path of the output cap file")
 	}
 	if c.opts.replay {
-		c.flags.StringP(kcapFile, "k", "", "The path of the input cap file")
+		c.flags.StringP(capFile, "k", "", "The path of the input cap file")
 	}
 	if c.opts.run || c.opts.replay || c.opts.list || c.opts.validate {
 		c.flags.String(filamentPath, filepath.Join(os.Getenv("PROGRAMFILES"), "fibratus", "filaments"), "Denotes the directory where filaments are located")
@@ -402,14 +402,14 @@ func (c *Config) addFlags() {
 		c.flags.String(symbolPaths, "srv*c:\\\\SymCache*https://msdl.microsoft.com/download/symbols", "Designates the path or a series of paths separated by a semicolon that is used to search for symbols files")
 		c.flags.Bool(symbolizeKernelAddresses, false, "Determines if kernel stack addresses are symbolized")
 
-		c.flags.Bool(enableThreadKevents, true, "Determines whether thread kernel events are collected by Kernel Logger provider")
-		c.flags.Bool(enableRegistryKevents, true, "Determines whether registry kernel events are collected by Kernel Logger provider")
-		c.flags.Bool(enableNetKevents, true, "Determines whether network (TCP/UDP) kernel events are collected by Kernel Logger provider")
-		c.flags.Bool(enableFileIOKevents, true, "Determines whether disk I/O kernel events are collected by Kernel Logger provider")
-		c.flags.Bool(enableVAMapKevents, true, "Determines whether VA map/unmap events are collected by Kernel Logger provider")
-		c.flags.Bool(enableImageKevents, true, "Determines whether file I/O kernel events are collected by Kernel Logger provider")
-		c.flags.Bool(enableHandleKevents, false, "Determines whether object manager kernel events (handle creation/destruction) are collected by Kernel Logger provider")
-		c.flags.Bool(enableMemKevents, true, "Determines whether memory manager kernel events are collected by Kernel Logger provider")
+		c.flags.Bool(enableThreadEvents, true, "Determines whether thread events are collected by Kernel Logger provider")
+		c.flags.Bool(enableRegistryEvents, true, "Determines whether registry events are collected by Kernel Logger provider")
+		c.flags.Bool(enableNetEvents, true, "Determines whether network (TCP/UDP) events are collected by Kernel Logger provider")
+		c.flags.Bool(enableFileIOEvents, true, "Determines whether disk I/O events are collected by Kernel Logger provider")
+		c.flags.Bool(enableVAMapEvents, true, "Determines whether VA map/unmap events are collected by Kernel Logger provider")
+		c.flags.Bool(enableImageEvents, true, "Determines whether file I/O events are collected by Kernel Logger provider")
+		c.flags.Bool(enableHandleEvents, false, "Determines whether object manager events (handle creation/destruction) are collected by Kernel Logger provider")
+		c.flags.Bool(enableMemEvents, true, "Determines whether memory manager events are collected by Kernel Logger provider")
 		c.flags.Bool(enableAuditAPIEvents, true, "Determines whether kernel audit API calls events are published")
 		c.flags.Bool(enableDNSEvents, true, "Determines whether DNS client events are enabled")
 		c.flags.Bool(enableThreadpoolEvents, true, "Determines whether thread pool events are published")

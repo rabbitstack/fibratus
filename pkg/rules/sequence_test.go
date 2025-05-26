@@ -46,7 +46,7 @@ func TestSequenceState(t *testing.T) {
   	|evt.name = 'CreateProcess' and ps.name = 'cmd.exe'| by ps.exe
   	|evt.name = 'CreateFile' and file.path icontains 'temp'| by file.path
 		|evt.name = 'CreateProcess'| by ps.child.exe`,
-		&config.Config{Kstream: config.KstreamConfig{}, Filters: &config.Filters{}})
+		&config.Config{EventSource: config.EventSourceConfig{}, Filters: &config.Filters{}})
 
 	require.NoError(t, f.Compile())
 
@@ -187,7 +187,7 @@ func TestSimpleSequence(t *testing.T) {
 	maxspan 100ms
   	|evt.name = 'CreateProcess' and ps.name = 'cmd.exe'| by ps.exe
   	|evt.name = 'CreateFile' and file.path icontains 'temp'| by file.path
-	`, &config.Config{Kstream: config.KstreamConfig{EnableFileIOKevents: true}, Filters: &config.Filters{}})
+	`, &config.Config{EventSource: config.EventSourceConfig{EnableFileIOEvents: true}, Filters: &config.Filters{}})
 	require.NoError(t, f.Compile())
 
 	ss := newSequenceState(f, c, new(ps.SnapshotterMock))
@@ -273,7 +273,7 @@ func TestSimpleSequenceMultiplePartials(t *testing.T) {
   by ps.pid
     |evt.name = 'CreateProcess' and ps.name = 'cmd.exe'|
     |evt.name = 'CreateFile' and file.path icontains 'temp'|
-	`, &config.Config{Kstream: config.KstreamConfig{EnableFileIOKevents: true}, Filters: &config.Filters{}})
+	`, &config.Config{EventSource: config.EventSourceConfig{EnableFileIOEvents: true}, Filters: &config.Filters{}})
 	require.NoError(t, f.Compile())
 
 	ss := newSequenceState(f, c, new(ps.SnapshotterMock))
@@ -379,7 +379,7 @@ func TestSimpleSequenceDeadline(t *testing.T) {
 	maxspan 100ms
   	|evt.name = 'CreateProcess' and ps.name = 'cmd.exe'| by ps.exe
   	|evt.name = 'CreateFile' and file.path icontains 'temp'| by file.path
-	`, &config.Config{Kstream: config.KstreamConfig{EnableFileIOKevents: true}, Filters: &config.Filters{}})
+	`, &config.Config{EventSource: config.EventSourceConfig{EnableFileIOEvents: true}, Filters: &config.Filters{}})
 	require.NoError(t, f.Compile())
 
 	ss := newSequenceState(f, c, new(ps.SnapshotterMock))
@@ -450,7 +450,7 @@ func TestComplexSequence(t *testing.T) {
   	|evt.name = 'CreateProcess' and ps.child.name in ('firefox.exe', 'chrome.exe', 'edge.exe')| by ps.child.pid
 		|evt.name = 'CreateFile' and file.operation = 'CREATE' and file.extension = '.exe'| by ps.pid
   	|evt.name in ('Send', 'Connect')| by ps.pid
-	`, &config.Config{Kstream: config.KstreamConfig{EnableFileIOKevents: true}, Filters: &config.Filters{}})
+	`, &config.Config{EventSource: config.EventSourceConfig{EnableFileIOEvents: true}, Filters: &config.Filters{}})
 	require.NoError(t, f.Compile())
 
 	ss := newSequenceState(f, c, new(ps.SnapshotterMock))
@@ -543,7 +543,7 @@ func TestSequenceOOO(t *testing.T) {
   maxspan 2m
   	|evt.name = 'OpenProcess' and evt.arg[exe] imatches '?:\\Windows\\System32\\lsass.exe'| by ps.uuid
 		|evt.name = 'CreateFile' and file.operation = 'CREATE' and file.extension = '.dmp'| by ps.uuid
-	`, &config.Config{Kstream: config.KstreamConfig{EnableFileIOKevents: true}, Filters: &config.Filters{}})
+	`, &config.Config{EventSource: config.EventSourceConfig{EnableFileIOEvents: true}, Filters: &config.Filters{}})
 	require.NoError(t, f.Compile())
 
 	ss := newSequenceState(f, c, new(ps.SnapshotterMock))
@@ -603,7 +603,7 @@ func TestSequenceGC(t *testing.T) {
   by ps.uuid
   	|evt.name = 'OpenProcess' and evt.arg[exe] imatches '?:\\Windows\\System32\\lsass.exe'|
 		|evt.name = 'CreateFile' and file.operation = 'CREATE' and file.extension = '.dmp'|
-	`, &config.Config{Kstream: config.KstreamConfig{EnableFileIOKevents: true}, Filters: &config.Filters{}})
+	`, &config.Config{EventSource: config.EventSourceConfig{EnableFileIOEvents: true}, Filters: &config.Filters{}})
 	require.NoError(t, f.Compile())
 
 	ss := newSequenceState(f, c, new(ps.SnapshotterMock))
@@ -752,7 +752,7 @@ func TestSequenceExpire(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.expr, func(t *testing.T) {
-			f := filter.New(tt.expr, &config.Config{Kstream: config.KstreamConfig{EnableFileIOKevents: true}, Filters: &config.Filters{}})
+			f := filter.New(tt.expr, &config.Config{EventSource: config.EventSourceConfig{EnableFileIOEvents: true}, Filters: &config.Filters{}})
 			require.NoError(t, f.Compile())
 
 			ss := newSequenceState(f, tt.c, new(ps.SnapshotterMock))
@@ -784,7 +784,7 @@ func TestSequenceBoundFields(t *testing.T) {
   	|evt.name = 'CreateProcess' and ps.name = 'cmd.exe'| as e1
   	|evt.name = 'CreateFile' and file.path icontains 'temp' and $e1.ps.sid = ps.sid| as e2
   	|evt.name = 'Connect' and ps.sid != $e2.ps.sid and ps.sid = $e1.ps.sid|
-	`, &config.Config{Kstream: config.KstreamConfig{EnableFileIOKevents: true}, Filters: &config.Filters{}})
+	`, &config.Config{EventSource: config.EventSourceConfig{EnableFileIOEvents: true}, Filters: &config.Filters{}})
 	require.NoError(t, f.Compile())
 
 	ss := newSequenceState(f, c, new(ps.SnapshotterMock))
@@ -879,7 +879,7 @@ func TestSequenceBoundFieldsWithFunctions(t *testing.T) {
     |evt.name = 'RegSetValue' and registry.path ~= 'HKEY_CURRENT_USER\\Volatile Environment\\Notification Packages' 
 			and 
 		 get_reg_value(registry.path) iin (base($e1.file.path, false))|
-	`, &config.Config{Kstream: config.KstreamConfig{EnableFileIOKevents: true, EnableRegistryKevents: true}, Filters: &config.Filters{}})
+	`, &config.Config{EventSource: config.EventSourceConfig{EnableFileIOEvents: true, EnableRegistryEvents: true}, Filters: &config.Filters{}})
 	require.NoError(t, f.Compile())
 
 	ss := newSequenceState(f, c, new(ps.SnapshotterMock))
@@ -939,7 +939,7 @@ func TestIsExpressionEvaluable(t *testing.T) {
 	maxspan 100ms
   	|evt.name = 'CreateProcess' and ps.name = 'cmd.exe'| by ps.exe
   	|evt.name = 'CreateFile' and file.path icontains 'temp'| by file.path
-	`, &config.Config{Kstream: config.KstreamConfig{EnableFileIOKevents: true}, Filters: &config.Filters{}})
+	`, &config.Config{EventSource: config.EventSourceConfig{EnableFileIOEvents: true}, Filters: &config.Filters{}})
 	require.NoError(t, f.Compile())
 
 	ss := newSequenceState(f, c, new(ps.SnapshotterMock))

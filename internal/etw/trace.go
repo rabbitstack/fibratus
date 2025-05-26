@@ -21,7 +21,7 @@ package etw
 import (
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/config"
-	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
+	errs "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
@@ -33,7 +33,7 @@ import (
 // initEventTraceProps builds the trace properties descriptor which
 // influences the behaviour of event publishing to the trace session
 // buffers.
-func initEventTraceProps(c config.KstreamConfig) etw.EventTraceProperties {
+func initEventTraceProps(c config.EventSourceConfig) etw.EventTraceProperties {
 	bufferSize := c.BufferSize
 	if bufferSize > maxBufferSize {
 		bufferSize = maxBufferSize
@@ -122,7 +122,7 @@ type Trace struct {
 
 // NewTrace creates a new trace with specified name, provider GUID, and keywords.
 func NewTrace(name string, guid windows.GUID, keywords uint64, config *config.Config) *Trace {
-	t := &Trace{Name: name, GUID: guid, Keywords: keywords, stackExtensions: NewStackExtensions(config.Kstream), config: config}
+	t := &Trace{Name: name, GUID: guid, Keywords: keywords, stackExtensions: NewStackExtensions(config.EventSource), config: config}
 	t.enableCallstacks()
 	return t
 }
@@ -151,7 +151,7 @@ func (t *Trace) Start() error {
 	if len(t.Name) > maxLoggerNameSize {
 		return fmt.Errorf("trace name [%s] is too long", t.Name)
 	}
-	cfg := t.config.Kstream
+	cfg := t.config.EventSource
 	props := initEventTraceProps(cfg)
 	flags := t.enableFlagsDynamically(cfg)
 	if t.IsKernelTrace() {
@@ -171,7 +171,7 @@ func (t *Trace) Start() error {
 		return err
 	}
 	if !t.startHandle.IsValid() {
-		return kerrors.ErrInvalidTrace
+		return errs.ErrInvalidTrace
 	}
 
 	if t.IsKernelTrace() {
@@ -197,7 +197,7 @@ func (t *Trace) Start() error {
 		sysTraceFlags[0] = flags
 
 		// enable object manager tracking
-		if cfg.EnableHandleKevents {
+		if cfg.EnableHandleEvents {
 			sysTraceFlags[4] = etw.Handle
 		}
 		// enable stack enrichment
@@ -329,7 +329,7 @@ func (t *Trace) IsThreadpoolTrace() bool { return t.GUID == etw.ThreadpoolGUID }
 // machine. Note these flags are relevant to system logger traces
 // and initializing the EnableFlags field of the etw.EventTraceProperties
 // structure for non-system logger providers will result in an error.
-func (t *Trace) enableFlagsDynamically(config config.KstreamConfig) etw.EventTraceFlags {
+func (t *Trace) enableFlagsDynamically(config config.EventSourceConfig) etw.EventTraceFlags {
 	var flags etw.EventTraceFlags
 
 	if !t.IsKernelTrace() {
@@ -338,28 +338,28 @@ func (t *Trace) enableFlagsDynamically(config config.KstreamConfig) etw.EventTra
 
 	flags |= etw.Process
 
-	if config.EnableThreadKevents {
+	if config.EnableThreadEvents {
 		flags |= etw.Thread
 	}
-	if config.EnableImageKevents {
+	if config.EnableImageEvents {
 		flags |= etw.ImageLoad
 	}
-	if config.EnableNetKevents {
+	if config.EnableNetEvents {
 		flags |= etw.NetTCPIP
 	}
-	if config.EnableRegistryKevents {
+	if config.EnableRegistryEvents {
 		flags |= etw.Registry
 	}
-	if config.EnableFileIOKevents {
+	if config.EnableFileIOEvents {
 		flags |= etw.DiskFileIO | etw.FileIO | etw.FileIOInit
 	}
-	if config.EnableVAMapKevents {
+	if config.EnableVAMapEvents {
 		flags |= etw.VaMap
 	}
-	if config.EnableMemKevents {
+	if config.EnableMemEvents {
 		flags |= etw.VirtualAlloc
 	}
-	if config.EnableRegistryKevents {
+	if config.EnableRegistryEvents {
 		flags |= etw.Registry
 	}
 

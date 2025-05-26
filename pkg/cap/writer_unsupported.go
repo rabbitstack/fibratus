@@ -22,12 +22,12 @@
 package cap
 
 import (
-	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
+	errs "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 )
 
 // NewWriter returns unsupported writer.
 func NewWriter(filename string, psnap ps.Snapshotter, hsnap handle.Snapshotter) (Writer, error) {
-	return nil, kerrors.ErrFeatureUnsupported("cap")
+	return nil, errs.ErrFeatureUnsupported("cap")
 }

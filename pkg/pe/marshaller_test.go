@@ -22,7 +22,7 @@
 package pe
 
 import (
-	kcapver "github.com/rabbitstack/fibratus/pkg/cap/version"
+	capver "github.com/rabbitstack/fibratus/pkg/cap/version"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -64,7 +64,7 @@ func TestPEMarshal(t *testing.T) {
 	b := pe.Marshal()
 
 	newPE := &PE{VersionResources: make(map[string]string)}
-	err := newPE.Unmarshal(b, kcapver.PESecV2)
+	err := newPE.Unmarshal(b, capver.PESecV2)
 	require.NoError(t, err)
 
 	assert.Equal(t, uint16(7), newPE.NumberOfSections)

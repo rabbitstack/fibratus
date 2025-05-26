@@ -57,34 +57,34 @@ func New(expr string, config *config.Config, options ...Option) Filter {
 		// PE metadata
 		newPEAccessor(),
 	}
-	kconfig := config.Kstream
+
 	fconfig := config.Filters
 
-	if kconfig.EnableThreadKevents {
+	if config.EventSource.EnableThreadEvents {
 		accessors = append(accessors, newThreadAccessor())
 	}
-	if kconfig.EnableImageKevents {
+	if config.EventSource.EnableImageEvents {
 		accessors = append(accessors, newImageAccessor())
 	}
-	if kconfig.EnableFileIOKevents {
+	if config.EventSource.EnableFileIOEvents {
 		accessors = append(accessors, newFileAccessor())
 	}
-	if kconfig.EnableRegistryKevents {
+	if config.EventSource.EnableRegistryEvents {
 		accessors = append(accessors, newRegistryAccessor())
 	}
-	if kconfig.EnableNetKevents {
+	if config.EventSource.EnableNetEvents {
 		accessors = append(accessors, newNetworkAccessor())
 	}
-	if kconfig.EnableHandleKevents {
+	if config.EventSource.EnableHandleEvents {
 		accessors = append(accessors, newHandleAccessor())
 	}
-	if kconfig.EnableMemKevents {
+	if config.EventSource.EnableMemEvents {
 		accessors = append(accessors, newMemAccessor())
 	}
-	if kconfig.EnableDNSEvents {
+	if config.EventSource.EnableDNSEvents {
 		accessors = append(accessors, newDNSAccessor())
 	}
-	if kconfig.EnableThreadpoolEvents {
+	if config.EventSource.EnableThreadpoolEvents {
 		accessors = append(accessors, newThreadpoolAccessor())
 	}
 

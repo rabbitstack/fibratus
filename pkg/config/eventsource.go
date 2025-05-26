@@ -32,25 +32,25 @@ import (
 )
 
 const (
-	enableThreadKevents    = "kstream.enable-thread"
-	enableRegistryKevents  = "kstream.enable-registry"
-	enableNetKevents       = "kstream.enable-net"
-	enableFileIOKevents    = "kstream.enable-fileio"
-	enableVAMapKevents     = "kstream.enable-vamap"
-	enableImageKevents     = "kstream.enable-image"
-	enableHandleKevents    = "kstream.enable-handle"
-	enableMemKevents       = "kstream.enable-mem"
-	enableAuditAPIEvents   = "kstream.enable-audit-api"
-	enableDNSEvents        = "kstream.enable-dns"
-	enableThreadpoolEvents = "kstream.enable-threadpool"
-	stackEnrichment        = "kstream.stack-enrichment"
-	bufferSize             = "kstream.buffer-size"
-	minBuffers             = "kstream.min-buffers"
-	maxBuffers             = "kstream.max-buffers"
-	flushInterval          = "kstream.flush-interval"
+	enableThreadEvents     = "eventsource.enable-thread"
+	enableRegistryEvents   = "eventsource.enable-registry"
+	enableNetEvents        = "eventsource.enable-net"
+	enableFileIOEvents     = "eventsource.enable-fileio"
+	enableVAMapEvents      = "eventsource.enable-vamap"
+	enableImageEvents      = "eventsource.enable-image"
+	enableHandleEvents     = "eventsource.enable-handle"
+	enableMemEvents        = "eventsource.enable-mem"
+	enableAuditAPIEvents   = "eventsource.enable-audit-api"
+	enableDNSEvents        = "eventsource.enable-dns"
+	enableThreadpoolEvents = "eventsource.enable-threadpool"
+	stackEnrichment        = "eventsource.stack-enrichment"
+	bufferSize             = "eventsource.buffer-size"
+	minBuffers             = "eventsource.min-buffers"
+	maxBuffers             = "eventsource.max-buffers"
+	flushInterval          = "eventsource.flush-interval"
 
-	excludedEvents = "kstream.blacklist.events"
-	excludedImages = "kstream.blacklist.images"
+	excludedEvents = "eventsource.blacklist.events"
+	excludedImages = "eventsource.blacklist.images"
 
 	maxBufferSize = uint32(512)
 )
@@ -61,24 +61,24 @@ var (
 	defaultFlushInterval = time.Second
 )
 
-// KstreamConfig stores different configuration options for fine-tuning kstream consumer/controller settings.
-type KstreamConfig struct {
-	// EnableThreadKevents indicates if thread events are collected by the ETW provider.
-	EnableThreadKevents bool `json:"enable-thread" yaml:"enable-thread"`
-	// EnableRegistryKevents indicates if registry events are collected by the ETW provider.
-	EnableRegistryKevents bool `json:"enable-registry" yaml:"enable-registry"`
-	// EnableNetKevents determines whether network (TCP/UDP) events are collected by the ETW provider.
-	EnableNetKevents bool `json:"enable-net" yaml:"enable-net"`
-	// EnableFileIOKevents indicates if file I/O events are collected by the ETW provider.
-	EnableFileIOKevents bool `json:"enable-fileio" yaml:"enable-fileio"`
-	// EnableVAMapKevents indicates if VA map/unmap events are collected by the ETW provider.
-	EnableVAMapKevents bool `json:"enable-vamap" yaml:"enable-vamap"`
-	// EnableImageKevents indicates if image events are collected by the ETW provider.
-	EnableImageKevents bool `json:"enable-image" yaml:"enable-image"`
-	// EnableHandleKevents indicates whether handle creation/disposal events are enabled.
-	EnableHandleKevents bool `json:"enable-handle" yaml:"enable-handle"`
-	// EnableMemKevents indicates whether memory manager events are enabled.
-	EnableMemKevents bool `json:"enable-memory" yaml:"enable-memory"`
+// EventSourceConfig stores different configuration options for fine-tuning the event source.
+type EventSourceConfig struct {
+	// EnableThreadEvents indicates if thread events are collected by the ETW provider.
+	EnableThreadEvents bool `json:"enable-thread" yaml:"enable-thread"`
+	// EnableRegistryEvents indicates if registry events are collected by the ETW provider.
+	EnableRegistryEvents bool `json:"enable-registry" yaml:"enable-registry"`
+	// EnableNetEvents determines whether network (TCP/UDP) events are collected by the ETW provider.
+	EnableNetEvents bool `json:"enable-net" yaml:"enable-net"`
+	// EnableFileIOEvents indicates if file I/O events are collected by the ETW provider.
+	EnableFileIOEvents bool `json:"enable-fileio" yaml:"enable-fileio"`
+	// EnableVAMapEvents indicates if VA map/unmap events are collected by the ETW provider.
+	EnableVAMapEvents bool `json:"enable-vamap" yaml:"enable-vamap"`
+	// EnableImageEvents indicates if image events are collected by the ETW provider.
+	EnableImageEvents bool `json:"enable-image" yaml:"enable-image"`
+	// EnableHandleEvents indicates whether handle creation/disposal events are enabled.
+	EnableHandleEvents bool `json:"enable-handle" yaml:"enable-handle"`
+	// EnableMemEvents indicates whether memory manager events are enabled.
+	EnableMemEvents bool `json:"enable-memory" yaml:"enable-memory"`
 	// EnableAuditAPIEvents indicates if kernel audit API calls events are enabled
 	EnableAuditAPIEvents bool `json:"enable-audit-api" yaml:"enable-audit-api"`
 	// EnableDNSEvents indicates if DNS client events are enabled
@@ -97,8 +97,8 @@ type KstreamConfig struct {
 	MaxBuffers uint32 `json:"max-buffers" yaml:"max-buffers"`
 	// FlushTimer specifies how often the trace buffers are forcibly flushed.
 	FlushTimer time.Duration `json:"flush-interval" yaml:"flush-interval"`
-	// ExcludedKevents are kernel event names that will be dropped from the kernel event stream.
-	ExcludedKevents []string `json:"blacklist.events" yaml:"blacklist.events"`
+	// ExcludedEvents are kernel event names that will be dropped from the kernel event stream.
+	ExcludedEvents []string `json:"blacklist.events" yaml:"blacklist.events"`
 	// ExcludedImages are process image names that will be rejected if they generate a kernel event.
 	ExcludedImages []string `json:"blacklist.images" yaml:"blacklist.images"`
 
@@ -107,15 +107,15 @@ type KstreamConfig struct {
 	excludedImages map[string]bool
 }
 
-func (c *KstreamConfig) initFromViper(v *viper.Viper) {
-	c.EnableThreadKevents = v.GetBool(enableThreadKevents)
-	c.EnableRegistryKevents = v.GetBool(enableRegistryKevents)
-	c.EnableNetKevents = v.GetBool(enableNetKevents)
-	c.EnableFileIOKevents = v.GetBool(enableFileIOKevents)
-	c.EnableVAMapKevents = v.GetBool(enableVAMapKevents)
-	c.EnableImageKevents = v.GetBool(enableImageKevents)
-	c.EnableHandleKevents = v.GetBool(enableHandleKevents)
-	c.EnableMemKevents = v.GetBool(enableMemKevents)
+func (c *EventSourceConfig) initFromViper(v *viper.Viper) {
+	c.EnableThreadEvents = v.GetBool(enableThreadEvents)
+	c.EnableRegistryEvents = v.GetBool(enableRegistryEvents)
+	c.EnableNetEvents = v.GetBool(enableNetEvents)
+	c.EnableFileIOEvents = v.GetBool(enableFileIOEvents)
+	c.EnableVAMapEvents = v.GetBool(enableVAMapEvents)
+	c.EnableImageEvents = v.GetBool(enableImageEvents)
+	c.EnableHandleEvents = v.GetBool(enableHandleEvents)
+	c.EnableMemEvents = v.GetBool(enableMemEvents)
 	c.EnableAuditAPIEvents = v.GetBool(enableAuditAPIEvents)
 	c.EnableDNSEvents = v.GetBool(enableDNSEvents)
 	c.EnableThreadpoolEvents = v.GetBool(enableThreadpoolEvents)
@@ -124,12 +124,12 @@ func (c *KstreamConfig) initFromViper(v *viper.Viper) {
 	c.MinBuffers = uint32(v.GetInt(minBuffers))
 	c.MaxBuffers = uint32(v.GetInt(maxBuffers))
 	c.FlushTimer = v.GetDuration(flushInterval)
-	c.ExcludedKevents = v.GetStringSlice(excludedEvents)
+	c.ExcludedEvents = v.GetStringSlice(excludedEvents)
 	c.ExcludedImages = v.GetStringSlice(excludedImages)
 
 	c.excludedImages = make(map[string]bool)
 
-	for _, name := range c.ExcludedKevents {
+	for _, name := range c.ExcludedEvents {
 		if typ := event.NameToType(name); typ != event.UnknownType {
 			c.dropMasks.Set(typ)
 		}
@@ -140,9 +140,9 @@ func (c *KstreamConfig) initFromViper(v *viper.Viper) {
 }
 
 // Init is an exported method to allow initializing exclusion maps from external modules.
-func (c *KstreamConfig) Init() {
+func (c *EventSourceConfig) Init() {
 	c.excludedImages = make(map[string]bool)
-	for _, name := range c.ExcludedKevents {
+	for _, name := range c.ExcludedEvents {
 		for _, typ := range event.NameToTypes(name) {
 			if typ != event.UnknownType {
 				c.dropMasks.Set(typ)
@@ -157,26 +157,26 @@ func (c *KstreamConfig) Init() {
 // SetDropMask inserts the event mask in the bitset to
 // instruct the given event type should be dropped from
 // the event stream.
-func (c *KstreamConfig) SetDropMask(Type event.Type) {
+func (c *EventSourceConfig) SetDropMask(Type event.Type) {
 	c.dropMasks.Set(Type)
 }
 
 // TestDropMask checks if the specified event type has
 // the drop mask in the bitset.
-func (c *KstreamConfig) TestDropMask(Type event.Type) bool {
+func (c *EventSourceConfig) TestDropMask(Type event.Type) bool {
 	return c.dropMasks.Test(Type.GUID(), Type.HookID())
 }
 
-// ExcludeKevent determines whether the supplied provider GUID
+// ExcludeEvent determines whether the supplied provider GUID
 // and the hook identifier are in the bitset of excluded events.
-func (c *KstreamConfig) ExcludeKevent(guid windows.GUID, hookID uint16) bool {
+func (c *EventSourceConfig) ExcludeEvent(guid windows.GUID, hookID uint16) bool {
 	return c.dropMasks.Test(guid, hookID)
 }
 
 // ExcludeImage determines whether the process generating event is present in the
 // list of excluded images. If the hit occurs, the event associated with the process
 // is dropped.
-func (c *KstreamConfig) ExcludeImage(ps *pstypes.PS) bool {
+func (c *EventSourceConfig) ExcludeImage(ps *pstypes.PS) bool {
 	if len(c.excludedImages) == 0 {
 		return false
 	}

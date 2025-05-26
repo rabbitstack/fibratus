@@ -45,14 +45,14 @@ import (
 )
 
 var cfg = &config.Config{
-	Kstream: config.KstreamConfig{
-		EnableHandleKevents:    true,
-		EnableNetKevents:       true,
-		EnableRegistryKevents:  true,
-		EnableFileIOKevents:    true,
-		EnableImageKevents:     true,
-		EnableThreadKevents:    true,
-		EnableMemKevents:       true,
+	EventSource: config.EventSourceConfig{
+		EnableHandleEvents:     true,
+		EnableNetEvents:        true,
+		EnableRegistryEvents:   true,
+		EnableFileIOEvents:     true,
+		EnableImageEvents:      true,
+		EnableThreadEvents:     true,
+		EnableMemEvents:        true,
 		EnableDNSEvents:        true,
 		EnableThreadpoolEvents: true,
 	},
@@ -690,7 +690,7 @@ func TestFileInfoFilter(t *testing.T) {
 	}
 }
 
-func TestKeventFilter(t *testing.T) {
+func TestEventFilter(t *testing.T) {
 	evt := &event.Event{
 		Type:        event.CreateFile,
 		Tid:         2484,

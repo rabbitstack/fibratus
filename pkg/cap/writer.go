@@ -39,7 +39,7 @@ var (
 	handleWriteErrors = expvar.NewInt("cap.handle.write.errors")
 	evtWriteErrors    = expvar.NewInt("cap.evt.write.errors")
 	flusherErrors     = expvar.NewMap("cap.flusher.errors")
-	overflowKevents   = expvar.NewInt("cap.overflow.kevents")
+	overflowEvents    = expvar.NewInt("cap.overflow.events")
 	eventSourceErrors = expvar.NewInt("cap.eventsource.errors")
 )
 

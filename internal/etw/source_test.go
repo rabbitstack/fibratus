@@ -88,13 +88,13 @@ func TestEventSourceStartTraces(t *testing.T) {
 	}{
 		{"start kernel logger session",
 			&config.Config{
-				Kstream: config.KstreamConfig{
-					EnableThreadKevents: true,
-					EnableNetKevents:    true,
-					EnableFileIOKevents: true,
-					EnableVAMapKevents:  true,
-					BufferSize:          1024,
-					FlushTimer:          time.Millisecond * 2300,
+				EventSource: config.EventSourceConfig{
+					EnableThreadEvents: true,
+					EnableNetEvents:    true,
+					EnableFileIOEvents: true,
+					EnableVAMapEvents:  true,
+					BufferSize:         1024,
+					FlushTimer:         time.Millisecond * 2300,
 				},
 				Filters: &config.Filters{},
 			},
@@ -103,16 +103,16 @@ func TestEventSourceStartTraces(t *testing.T) {
 		},
 		{"start kernel logger and audit api sessions",
 			&config.Config{
-				Kstream: config.KstreamConfig{
-					EnableThreadKevents:   true,
-					EnableNetKevents:      true,
-					EnableFileIOKevents:   true,
-					EnableVAMapKevents:    true,
-					EnableHandleKevents:   true,
-					EnableRegistryKevents: true,
-					BufferSize:            1024,
-					FlushTimer:            time.Millisecond * 2300,
-					EnableAuditAPIEvents:  true,
+				EventSource: config.EventSourceConfig{
+					EnableThreadEvents:   true,
+					EnableNetEvents:      true,
+					EnableFileIOEvents:   true,
+					EnableVAMapEvents:    true,
+					EnableHandleEvents:   true,
+					EnableRegistryEvents: true,
+					BufferSize:           1024,
+					FlushTimer:           time.Millisecond * 2300,
+					EnableAuditAPIEvents: true,
 				},
 				Filters: &config.Filters{},
 			},
@@ -183,12 +183,12 @@ func TestEventSourceEnableFlagsDynamically(t *testing.T) {
 		},
 	}
 	cfg := &config.Config{
-		Kstream: config.KstreamConfig{
-			EnableThreadKevents:   true,
-			EnableRegistryKevents: true,
-			EnableImageKevents:    true,
-			EnableFileIOKevents:   true,
-			EnableAuditAPIEvents:  true,
+		EventSource: config.EventSourceConfig{
+			EnableThreadEvents:   true,
+			EnableRegistryEvents: true,
+			EnableImageEvents:    true,
+			EnableFileIOEvents:   true,
+			EnableAuditAPIEvents: true,
 		},
 		Filters: &config.Filters{},
 	}
@@ -197,7 +197,7 @@ func TestEventSourceEnableFlagsDynamically(t *testing.T) {
 	require.NoError(t, evs.Open(cfg))
 	defer evs.Close()
 
-	flags := evs.(*EventSource).traces[0].enableFlagsDynamically(cfg.Kstream)
+	flags := evs.(*EventSource).traces[0].enableFlagsDynamically(cfg.EventSource)
 
 	require.Len(t, evs.(*EventSource).traces, 2)
 
@@ -216,10 +216,10 @@ func TestEventSourceEnableFlagsDynamically(t *testing.T) {
 	// but VAMap is disabled in the config
 	require.True(t, flags&etw.VaMap == 0)
 
-	require.False(t, cfg.Kstream.TestDropMask(event.UnloadImage))
-	require.True(t, cfg.Kstream.TestDropMask(event.WriteFile))
-	require.True(t, cfg.Kstream.TestDropMask(event.UnmapViewFile))
-	require.False(t, cfg.Kstream.TestDropMask(event.OpenProcess))
+	require.False(t, cfg.EventSource.TestDropMask(event.UnloadImage))
+	require.True(t, cfg.EventSource.TestDropMask(event.WriteFile))
+	require.True(t, cfg.EventSource.TestDropMask(event.UnmapViewFile))
+	require.False(t, cfg.EventSource.TestDropMask(event.OpenProcess))
 }
 
 func TestEventSourceEnableFlagsDynamicallyWithYaraEnabled(t *testing.T) {
@@ -259,14 +259,14 @@ func TestEventSourceEnableFlagsDynamicallyWithYaraEnabled(t *testing.T) {
 		},
 	}
 	cfg := &config.Config{
-		Kstream: config.KstreamConfig{
-			EnableThreadKevents:   true,
-			EnableRegistryKevents: true,
-			EnableImageKevents:    true,
-			EnableFileIOKevents:   true,
-			EnableAuditAPIEvents:  true,
-			EnableVAMapKevents:    false,
-			EnableMemKevents:      true,
+		EventSource: config.EventSourceConfig{
+			EnableThreadEvents:   true,
+			EnableRegistryEvents: true,
+			EnableImageEvents:    true,
+			EnableFileIOEvents:   true,
+			EnableAuditAPIEvents: true,
+			EnableVAMapEvents:    false,
+			EnableMemEvents:      true,
 		},
 		Filters: &config.Filters{},
 		Yara: yara.Config{
@@ -281,7 +281,7 @@ func TestEventSourceEnableFlagsDynamicallyWithYaraEnabled(t *testing.T) {
 	require.NoError(t, evs.Open(cfg))
 	defer evs.Close()
 
-	flags := evs.(*EventSource).traces[0].enableFlagsDynamically(cfg.Kstream)
+	flags := evs.(*EventSource).traces[0].enableFlagsDynamically(cfg.EventSource)
 
 	// rules compile result doesn't have file events
 	// but Yara file scanning is enabled
@@ -292,9 +292,9 @@ func TestEventSourceEnableFlagsDynamicallyWithYaraEnabled(t *testing.T) {
 	// alloc scanning is enabled
 	require.True(t, flags&etw.VirtualAlloc != 0)
 
-	require.False(t, cfg.Kstream.TestDropMask(event.CreateFile))
-	require.True(t, cfg.Kstream.TestDropMask(event.MapViewFile))
-	require.False(t, cfg.Kstream.TestDropMask(event.VirtualAlloc))
+	require.False(t, cfg.EventSource.TestDropMask(event.CreateFile))
+	require.True(t, cfg.EventSource.TestDropMask(event.MapViewFile))
+	require.False(t, cfg.EventSource.TestDropMask(event.VirtualAlloc))
 }
 
 func TestEventSourceRundownEvents(t *testing.T) {
@@ -315,17 +315,17 @@ func TestEventSourceRundownEvents(t *testing.T) {
 	hsnap.On("FindByObject", mock.Anything).Return(htypes.Handle{}, false)
 	hsnap.On("FindHandles", mock.Anything).Return([]htypes.Handle{}, nil)
 
-	kstreamConfig := config.KstreamConfig{
-		EnableThreadKevents:   true,
-		EnableImageKevents:    true,
-		EnableFileIOKevents:   true,
-		EnableNetKevents:      true,
-		EnableRegistryKevents: true,
+	evsConfig := config.EventSourceConfig{
+		EnableThreadEvents:   true,
+		EnableImageEvents:    true,
+		EnableFileIOEvents:   true,
+		EnableNetEvents:      true,
+		EnableRegistryEvents: true,
 	}
 	cfg := &config.Config{
-		Kstream:  kstreamConfig,
-		KcapFile: "fake.cap", // simulate capture to receive state/rundown events
-		Filters:  &config.Filters{},
+		EventSource: evsConfig,
+		CapFile:     "fake.cap", // simulate capture to receive state/rundown events
+		Filters:     &config.Filters{},
 	}
 
 	evs := NewEventSource(psnap, hsnap, cfg, nil)
@@ -727,21 +727,21 @@ func TestEventSourceAllEvents(t *testing.T) {
 	hsnap.On("Write", mock.Anything).Return(nil)
 	hsnap.On("Remove", mock.Anything).Return(nil)
 
-	kstreamConfig := config.KstreamConfig{
-		EnableThreadKevents:   true,
-		EnableImageKevents:    true,
-		EnableFileIOKevents:   true,
-		EnableVAMapKevents:    true,
-		EnableNetKevents:      true,
-		EnableRegistryKevents: true,
-		EnableMemKevents:      true,
-		EnableHandleKevents:   true,
-		EnableDNSEvents:       true,
-		EnableAuditAPIEvents:  true,
-		StackEnrichment:       false,
+	evsConfig := config.EventSourceConfig{
+		EnableThreadEvents:   true,
+		EnableImageEvents:    true,
+		EnableFileIOEvents:   true,
+		EnableVAMapEvents:    true,
+		EnableNetEvents:      true,
+		EnableRegistryEvents: true,
+		EnableMemEvents:      true,
+		EnableHandleEvents:   true,
+		EnableDNSEvents:      true,
+		EnableAuditAPIEvents: true,
+		StackEnrichment:      false,
 	}
 
-	cfg := &config.Config{Kstream: kstreamConfig, Filters: &config.Filters{}}
+	cfg := &config.Config{EventSource: evsConfig, Filters: &config.Filters{}}
 	evs := NewEventSource(psnap, hsnap, cfg, nil)
 
 	l := &MockListener{}
@@ -818,7 +818,7 @@ func (s *NoopPsSnapshotter) AddModule(evt *event.Event) error                   
 func (s *NoopPsSnapshotter) FindModule(addr va.Address) (bool, *pstypes.Module) { return false, nil }
 func (s *NoopPsSnapshotter) RemoveThread(pid uint32, tid uint32) error          { return nil }
 func (s *NoopPsSnapshotter) RemoveModule(pid uint32, addr va.Address) error     { return nil }
-func (s *NoopPsSnapshotter) WriteFromKcap(evt *event.Event) error               { return nil }
+func (s *NoopPsSnapshotter) WriteFromCapture(evt *event.Event) error            { return nil }
 func (s *NoopPsSnapshotter) AddMmap(evt *event.Event) error                     { return nil }
 func (s *NoopPsSnapshotter) RemoveMmap(pid uint32, addr va.Address) error       { return nil }
 
@@ -1210,24 +1210,24 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 		},
 	}
 
-	kstreamConfig := config.KstreamConfig{
-		EnableThreadKevents:   true,
-		EnableImageKevents:    true,
-		EnableFileIOKevents:   true,
-		EnableRegistryKevents: true,
-		EnableMemKevents:      true,
-		EnableAuditAPIEvents:  true,
-		StackEnrichment:       true,
-		BufferSize:            1024,
-		MinBuffers:            uint32(runtime.NumCPU() * 2),
-		MaxBuffers:            uint32((runtime.NumCPU() * 2) + 20),
-		ExcludedImages:        []string{"System"},
-		ExcludedKevents:       []string{"WriteFile", "ReadFile", "RegOpenKey", "RegCloseKey", "CloseFile"},
-		FlushTimer:            1,
+	evsConfig := config.EventSourceConfig{
+		EnableThreadEvents:   true,
+		EnableImageEvents:    true,
+		EnableFileIOEvents:   true,
+		EnableRegistryEvents: true,
+		EnableMemEvents:      true,
+		EnableAuditAPIEvents: true,
+		StackEnrichment:      true,
+		BufferSize:           1024,
+		MinBuffers:           uint32(runtime.NumCPU() * 2),
+		MaxBuffers:           uint32((runtime.NumCPU() * 2) + 20),
+		ExcludedImages:       []string{"System"},
+		ExcludedEvents:       []string{"WriteFile", "ReadFile", "RegOpenKey", "RegCloseKey", "CloseFile"},
+		FlushTimer:           1,
 	}
 
 	cfg := &config.Config{
-		Kstream:                  kstreamConfig,
+		EventSource:              evsConfig,
 		Filters:                  &config.Filters{},
 		SymbolizeKernelAddresses: true,
 	}

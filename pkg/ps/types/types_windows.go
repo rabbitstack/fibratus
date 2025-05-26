@@ -401,8 +401,8 @@ func New(pid, ppid uint32, name, cmndline, exe string, sid *windows.SID, session
 	return ps
 }
 
-// NewFromKcap reconstructs the state of the process from the capture file.
-func NewFromKcap(buf []byte, sec section.Section) (*PS, error) {
+// NewFromCapture reconstructs the state of the process from the capture file.
+func NewFromCapture(buf []byte, sec section.Section) (*PS, error) {
 	ps := PS{
 		Args:    make([]string, 0),
 		Envs:    make(map[string]string),
