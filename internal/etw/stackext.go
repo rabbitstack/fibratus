@@ -29,11 +29,11 @@ import (
 // for particular event or event categories.
 type StackExtensions struct {
 	ids    []etw.ClassicEventID
-	config config.KstreamConfig
+	config config.EventSourceConfig
 }
 
 // NewStackExtensions creates an empty stack extensions.
-func NewStackExtensions(config config.KstreamConfig) *StackExtensions {
+func NewStackExtensions(config config.EventSourceConfig) *StackExtensions {
 	return &StackExtensions{ids: make([]etw.ClassicEventID, 0), config: config}
 }
 
@@ -61,11 +61,11 @@ func (s *StackExtensions) EventIds() []etw.ClassicEventID { return s.ids }
 // process address space.
 func (s *StackExtensions) EnableProcessCallstack() {
 	s.AddStackTracing(event.CreateProcess)
-	if s.config.EnableThreadKevents {
+	if s.config.EnableThreadEvents {
 		s.AddStackTracing(event.CreateThread)
 		s.AddStackTracing(event.TerminateThread)
 	}
-	if s.config.EnableImageKevents {
+	if s.config.EnableImageEvents {
 		s.AddStackTracingWith(event.ProcessEventGUID, event.LoadImage.HookID())
 	}
 }
@@ -74,7 +74,7 @@ func (s *StackExtensions) EnableProcessCallstack() {
 // with event types eligible for publishing call stack
 // return addresses for file system activity.
 func (s *StackExtensions) EnableFileCallstack() {
-	if s.config.EnableFileIOKevents {
+	if s.config.EnableFileIOEvents {
 		s.AddStackTracing(event.CreateFile)
 		s.AddStackTracing(event.DeleteFile)
 		s.AddStackTracing(event.RenameFile)
@@ -85,7 +85,7 @@ func (s *StackExtensions) EnableFileCallstack() {
 // with event types eligible for publishing call stack
 // return addresses for registry operations.
 func (s *StackExtensions) EnableRegistryCallstack() {
-	if s.config.EnableRegistryKevents {
+	if s.config.EnableRegistryEvents {
 		s.AddStackTracing(event.RegCreateKey)
 		s.AddStackTracing(event.RegDeleteKey)
 		s.AddStackTracing(event.RegSetValue)
@@ -96,7 +96,7 @@ func (s *StackExtensions) EnableRegistryCallstack() {
 // EnableMemoryCallstack enables stack tracing for the memory
 // events such as memory allocations.
 func (s *StackExtensions) EnableMemoryCallstack() {
-	if s.config.EnableMemKevents {
+	if s.config.EnableMemEvents {
 		s.AddStackTracing(event.VirtualAlloc)
 	}
 }

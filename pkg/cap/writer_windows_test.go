@@ -165,15 +165,15 @@ func TestWrite(t *testing.T) {
 func TestLiveCapture(t *testing.T) {
 	t.SkipNow()
 	cfg := &config.Config{
-		Kstream: config.KstreamConfig{
-			EnableFileIOKevents:   true,
-			EnableImageKevents:    true,
-			EnableRegistryKevents: true,
-			EnableNetKevents:      true,
-			EnableThreadKevents:   true,
-			EnableHandleKevents:   true,
+		EventSource: config.EventSourceConfig{
+			EnableFileIOEvents:   true,
+			EnableImageEvents:    true,
+			EnableRegistryEvents: true,
+			EnableNetEvents:      true,
+			EnableThreadEvents:   true,
+			EnableHandleEvents:   true,
 		},
-		KcapFile:           "../../test.cap",
+		CapFile:            "../../test.cap",
 		Filters:            &config.Filters{},
 		InitHandleSnapshot: true,
 	}
@@ -193,7 +193,7 @@ func TestLiveCapture(t *testing.T) {
 	}
 
 	// bootstrap cap writer with inbound event channel
-	writer, err := NewWriter(cfg.KcapFile, psnap, hsnap)
+	writer, err := NewWriter(cfg.CapFile, psnap, hsnap)
 	if err != nil {
 		t.Fatal(err)
 	}

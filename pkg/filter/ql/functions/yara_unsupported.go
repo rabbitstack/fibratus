@@ -23,7 +23,7 @@ package functions
 
 import (
 	"fmt"
-	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
+	errs "github.com/rabbitstack/fibratus/pkg/errors"
 )
 
 // Yara unsupported function
@@ -40,7 +40,7 @@ func (f Yara) Desc() FunctionDesc {
 			{Keyword: "vars", Types: []ArgType{Field, BoundField, Func, String}},
 		},
 		ArgsValidationFunc: func(args []string) error {
-			return fmt.Errorf("yara function is not supported. %w", kerrors.ErrFeatureUnsupported("yara"))
+			return fmt.Errorf("yara function is not supported. %w", errs.ErrFeatureUnsupported("yara"))
 		},
 	}
 	return desc

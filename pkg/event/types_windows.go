@@ -29,12 +29,12 @@ import (
 // Remember to increment if a new event source is introduced.
 const ProvidersCount = 12
 
-// EventSource is the type that designates the provenance of the event
-type EventSource uint8
+// Source is the type that designates the provenance of the event
+type Source uint8
 
 const (
 	// SystemLogger event is emitted by the system provider
-	SystemLogger EventSource = iota
+	SystemLogger Source = iota
 	// AuditAPICallsLogger event is emitted by Audit API calls provider
 	AuditAPICallsLogger
 	// DNSLogger event is emitted by DNS provider
@@ -576,7 +576,7 @@ func (t *Type) HookID() uint16 {
 }
 
 // Source designates the provenance of this event type.
-func (t Type) Source() EventSource {
+func (t Type) Source() Source {
 	switch t {
 	case OpenProcess, OpenThread, SetThreadContext, CreateSymbolicLinkObject:
 		return AuditAPICallsLogger

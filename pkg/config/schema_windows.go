@@ -177,7 +177,7 @@ var schema = `
 			},
 			"additionalProperties": false
 		},
-		"kstream": {
+		"eventsource": {
 			"type": "object",
 			"properties": {
 				"enable-thread":			{"type": "boolean"},
@@ -195,7 +195,7 @@ var schema = `
 				"min-buffers":				{"type": "integer", "minimum": 1, "maximum": {{ .MinBuffers }}},
 				"max-buffers":				{"type": "integer", "minimum": 2, "maximum": {{ .MaxBuffers }}},
 				"buffer-size":				{"type": "integer", "maximum": {{ .MaxBufferSize }}},
-                "flush-interval":	{"type": "string", "minLength": 2, "pattern": "[0-9]+s"},
+				"flush-interval":	{"type": "string", "minLength": 2, "pattern": "[0-9]+s"},
 				"blacklist":		{
 					"type": "object",
 					"properties":	{
@@ -380,7 +380,7 @@ var schema = `
 														{
 															"type": "object",
 															"properties": {
-																"Param": 	{"type": "string", "minLength": 1},
+																"param": 	{"type": "string", "minLength": 1},
 																"old": 		{"type": "string", "minLength": 1},
 																"new": 		{"type": "string"}
 															},
@@ -427,7 +427,7 @@ var schema = `
 														{
 															"type": "object",
 															"properties": {
-																"Param": 	{"type": "string", "minLength": 1},
+																"param": 	{"type": "string", "minLength": 1},
 																"trim": 	{"type": "string", "minLength": 1}
 															},
 															"additionalProperties": false
@@ -437,7 +437,7 @@ var schema = `
 														{
 															"type": "object",
 															"properties": {
-																"Param": 	{"type": "string", "minLength": 1},
+																"param": 	{"type": "string", "minLength": 1},
 																"trim": 	{"type": "string", "minLength": 1}
 															},
 															"additionalProperties": false

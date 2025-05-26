@@ -22,7 +22,7 @@ import (
 	"strconv"
 )
 
-// Format applies the template on the provided kernel event.
+// Format applies the template on the provided event.
 func (f *Formatter) Format(evt *Event) []byte {
 	if evt == nil {
 		return []byte{}
@@ -65,7 +65,7 @@ func (f *Formatter) Format(evt *Event) []byte {
 		values[cstack] = evt.Callstack.String()
 	}
 
-	if f.expandKparamsDot {
+	if f.expandParamsDot {
 		// expand all parameters into the map, so we can ask
 		// for specific parameter names in the template
 		for _, par := range evt.Params {

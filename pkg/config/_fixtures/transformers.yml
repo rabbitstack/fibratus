@@ -1,4 +1,4 @@
-kstream:
+eventsource:
   max-buffers: 10
   min-buffers: 8
   flush-interval: 1s

@@ -23,7 +23,7 @@ import (
 	"golang.org/x/sys/windows"
 
 	"github.com/rabbitstack/fibratus/pkg/cap/section"
-	kcapver "github.com/rabbitstack/fibratus/pkg/cap/version"
+	capver "github.com/rabbitstack/fibratus/pkg/cap/version"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 
 	"github.com/stretchr/testify/assert"
@@ -83,8 +83,8 @@ func TestPSMarshaler(t *testing.T) {
 	}
 
 	b := ps.Marshal()
-	sec := section.New(section.Process, kcapver.ProcessSecV4, 0, 0)
-	clone, err := NewFromKcap(b, sec)
+	sec := section.New(section.Process, capver.ProcessSecV4, 0, 0)
+	clone, err := NewFromCapture(b, sec)
 	require.NoError(t, err)
 
 	assert.Equal(t, uint32(2436), clone.PID)
@@ -177,8 +177,8 @@ func TestPSMarshalerWithPE(t *testing.T) {
 	}
 
 	b := ps.Marshal()
-	sec := section.New(section.Process, kcapver.ProcessSecV3, 0, 0)
-	clone, err := NewFromKcap(b, sec)
+	sec := section.New(section.Process, capver.ProcessSecV3, 0, 0)
+	clone, err := NewFromCapture(b, sec)
 	require.NoError(t, err)
 
 	assert.Equal(t, uint32(2436), clone.PID)

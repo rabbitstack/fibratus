@@ -30,15 +30,15 @@
     "init-snapshot": true
   },
 
-  "kevent": {
+  "event": {
 
   },
 
-  "kcap": {
+  "cap": {
 
   },
 
-  "kstream": {},
+  "eventsource": {},
   "logging": {},
 
   "output": {

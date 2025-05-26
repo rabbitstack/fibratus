@@ -29,7 +29,7 @@ def on_init():
     sort_by('#Ops')
 
 
-def on_next_kevent(Event):
+def on_next_event(event):
     pass
 
 

@@ -22,12 +22,12 @@
 package yara
 
 import (
-	kerrors "github.com/rabbitstack/fibratus/pkg/errors"
+	errs "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/yara/config"
 )
 
 // NewScanner returns unsupported scanner error.
 func NewScanner(psnap ps.Snapshotter, config config.Config) (Scanner, error) {
-	return nil, kerrors.ErrFeatureUnsupported("yara")
+	return nil, errs.ErrFeatureUnsupported("yara")
 }

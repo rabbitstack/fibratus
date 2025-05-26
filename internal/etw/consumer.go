@@ -53,7 +53,7 @@ func NewConsumer(
 	evts chan *event.Event,
 ) *Consumer {
 	return &Consumer{
-		q:          event.NewQueueWithChannel(evts, config.Kstream.StackEnrichment, config.ForwardMode || config.IsCaptureSet()),
+		q:          event.NewQueueWithChannel(evts, config.EventSource.StackEnrichment, config.ForwardMode || config.IsCaptureSet()),
 		sequencer:  sequencer,
 		processors: processors.NewChain(psnap, hsnap, config),
 		psnap:      psnap,
@@ -77,7 +77,7 @@ func (c *Consumer) ProcessEvent(ev *etw.EventRecord) error {
 	if event.IsCurrentProcDropped(ev.Header.ProcessID) {
 		return nil
 	}
-	if c.config.Kstream.ExcludeKevent(ev.Header.ProviderID, ev.HookID()) {
+	if c.config.EventSource.ExcludeEvent(ev.Header.ProviderID, ev.HookID()) {
 		eventsExcluded.Add(1)
 		return nil
 	}
@@ -129,7 +129,7 @@ func (c *Consumer) ProcessEvent(ev *etw.EventRecord) error {
 	// the filter is evaluated on the event to
 	// decide whether it should get dropped
 	if (evt.IsDropped(c.config.IsCaptureSet()) ||
-		c.config.Kstream.ExcludeImage(evt.PS)) && !evt.IsStackWalk() {
+		c.config.EventSource.ExcludeImage(evt.PS)) && !evt.IsStackWalk() {
 		eventsExcluded.Add(1)
 		return nil
 	}

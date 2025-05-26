@@ -81,16 +81,15 @@ func init() {
 }
 
 func newConfig(fromFiles ...string) *config.Config {
-	var kstreamConfig = config.KstreamConfig{
-		EnableHandleKevents:   true,
-		EnableNetKevents:      true,
-		EnableRegistryKevents: true,
-		EnableFileIOKevents:   true,
-		EnableImageKevents:    true,
-		EnableThreadKevents:   true,
-	}
 	c := &config.Config{
-		Kstream: kstreamConfig,
+		EventSource: config.EventSourceConfig{
+			EnableHandleEvents:   true,
+			EnableNetEvents:      true,
+			EnableRegistryEvents: true,
+			EnableFileIOEvents:   true,
+			EnableImageEvents:    true,
+			EnableThreadEvents:   true,
+		},
 		Filters: &config.Filters{
 			Rules: config.Rules{
 				FromPaths: fromFiles,

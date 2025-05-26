@@ -282,8 +282,8 @@ func (pe *PE) Unmarshal(b []byte, ver capver.Version) error {
 	return nil
 }
 
-// NewFromKcap restores the PE metadata from the byte stream.
-func NewFromKcap(b []byte, ver capver.Version) (*PE, error) {
+// NewFromCapture restores the PE metadata from the byte stream.
+func NewFromCapture(b []byte, ver capver.Version) (*PE, error) {
 	pe := &PE{
 		Sections:         make([]Sec, 0),
 		Symbols:          make([]string, 0),

@@ -52,13 +52,13 @@ extensions = [
 
 
 def on_init():
-    kfilter("evt.name = 'CreateFile' and ps.name = 'TeamViewer.exe' and file.operation = 'create' "
+    set_filter("evt.name = 'CreateFile' and ps.name = 'TeamViewer.exe' and file.operation = 'create' "
             "and file.extension in (%s)"
             % (', '.join([f'\'{ext}\'' for ext in extensions])))
 
 
 @dotdictify
-def on_next_kevent(event):
+def on_next_event(event):
     emit_alert(
         f'Remote File Copy via TeamViewer',
         f'TeamViewer downloaded an executable or script file {event.params.file_name} via transfer session',

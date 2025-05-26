@@ -212,7 +212,7 @@ func (ps *PS) Unmarshal(b []byte, psec section.Section) error {
 		// read handle length
 		l := uint32(bytes.ReadUint16(b[idx+offset+hoffset:]))
 		off := idx + 2 + hoffset + offset
-		handle, err := htypes.NewFromKcap(b[off : off+l])
+		handle, err := htypes.NewFromCapture(b[off : off+l])
 		if err != nil {
 			return err
 		}
@@ -272,7 +272,7 @@ readpe:
 	}
 
 	var err error
-	ps.PE, err = pe.NewFromKcap(b[idx+offset:], sec.Version())
+	ps.PE, err = pe.NewFromCapture(b[idx+offset:], sec.Version())
 	if err != nil {
 		return err
 	}

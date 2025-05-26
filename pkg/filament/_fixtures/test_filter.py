@@ -18,10 +18,10 @@
 Tests the filter expression.
 """
 
-kevents = []
+events = []
 
 def on_init():
-    kfilter('ps.name in (%s)' % ','.join(["'svchost.exe'", "'cmd.exe'", "'mimikatz.exe'"]))
+    set_filter('ps.name in (%s)' % ','.join(["'svchost.exe'", "'cmd.exe'", "'mimikatz.exe'"]))
 
-def on_next_kevent(Event):
+def on_next_event(event):
     pass

@@ -40,9 +40,9 @@ var (
 	// ErrReadSection is thrown when section read errors occur
 	ErrReadSection = func(s section.Type, err error) error { return fmt.Errorf("couldn't read %s section: %v", s, err) }
 
-	capReadKevents           = expvar.NewInt("cap.read.events")
+	capReadEvents            = expvar.NewInt("cap.read.events")
 	capReadBytes             = expvar.NewInt("cap.read.bytes")
-	capKeventUnmarshalErrors = expvar.NewInt("cap.event.unmarshal.errors")
+	capEventUnmarshalErrors  = expvar.NewInt("cap.event.unmarshal.errors")
 	capHandleUnmarshalErrors = expvar.NewInt("cap.reader.handle.unmarshal.errors")
 	capDroppedByFilter       = expvar.NewInt("cap.reader.dropped.by.filter")
 )

@@ -105,7 +105,7 @@ func TestMarshaller(t *testing.T) {
 	assert.Equal(t, "barzz", clone.Metadata["fooz"])
 }
 
-func TestKeventMarshalJSON(t *testing.T) {
+func TestEventMarshalJSON(t *testing.T) {
 	evt := &Event{
 		Type:        CreateFile,
 		Tid:         2484,
@@ -282,7 +282,7 @@ func TestUnmarshalHugeHandles(t *testing.T) {
 	require.NotNil(t, clone)
 }
 
-func TestKeventMarshalJSONMultiple(t *testing.T) {
+func TestEventMarshalJSONMultiple(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		seq := uint64(i + 1)
 		evt := &Event{
@@ -364,7 +364,7 @@ func TestKeventMarshalJSONMultiple(t *testing.T) {
 	}
 }
 
-func BenchmarkKeventMarshalJSON(b *testing.B) {
+func BenchmarkEventMarshalJSON(b *testing.B) {
 	evt := &Event{
 		Type:        CreateFile,
 		Tid:         2484,
@@ -448,7 +448,7 @@ func BenchmarkKeventMarshalJSON(b *testing.B) {
 	}
 }
 
-func BenchmarkKeventMarshalJSONStdlib(b *testing.B) {
+func BenchmarkEventMarshalJSONStdlib(b *testing.B) {
 	evt := &Event{
 		Type:        CreateFile,
 		Tid:         2484,

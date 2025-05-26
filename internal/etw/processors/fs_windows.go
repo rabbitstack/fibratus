@@ -208,7 +208,7 @@ func (f *fsProcessor) processEvent(e *event.Event) (*event.Event, error) {
 			f.files[fileObject] = fileinfo
 		}
 
-		if f.config.Kstream.EnableHandleKevents {
+		if f.config.EventSource.EnableHandleEvents {
 			f.devPathResolver.AddPath(ev.GetParamAsString(params.FilePath))
 		}
 
@@ -228,7 +228,7 @@ func (f *fsProcessor) processEvent(e *event.Event) (*event.Event, error) {
 		// the previous stack walk for CreateFile is popped from
 		// the queue and the callstack parameter attached to the
 		// event.
-		if f.config.Kstream.StackEnrichment {
+		if f.config.EventSource.StackEnrichment {
 			f.mu.Lock()
 			defer f.mu.Unlock()
 

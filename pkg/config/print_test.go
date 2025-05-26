@@ -25,7 +25,7 @@ import (
 
 func TestConfigPrint(t *testing.T) {
 	c := NewWithOpts(WithRun())
-	err := c.flags.Parse([]string{"--kstream.enable-thread=false", "--config-file=_fixtures/fibratus.yml"})
+	err := c.flags.Parse([]string{"--eventsource.enable-thread=false", "--config-file=_fixtures/fibratus.yml"})
 	require.NoError(t, c.viper.BindPFlags(c.flags))
 	require.NoError(t, err)
 	require.NoError(t, c.TryLoadFile(c.GetConfigFile()))

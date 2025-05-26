@@ -125,16 +125,16 @@ func (e *EventSource) Open(config *config.Config) error {
 	// disabled in the config, then thread events
 	// are not captured
 	if e.r != nil {
-		config.Kstream.EnableThreadKevents = config.Kstream.EnableThreadKevents && e.r.HasThreadEvents
-		config.Kstream.EnableImageKevents = config.Kstream.EnableImageKevents && e.r.HasImageEvents
-		config.Kstream.EnableNetKevents = config.Kstream.EnableNetKevents && e.r.HasNetworkEvents
-		config.Kstream.EnableRegistryKevents = config.Kstream.EnableRegistryKevents && (e.r.HasRegistryEvents || (config.Yara.Enabled && !config.Yara.SkipRegistry))
-		config.Kstream.EnableFileIOKevents = config.Kstream.EnableFileIOKevents && (e.r.HasFileEvents || (config.Yara.Enabled && !config.Yara.SkipFiles))
-		config.Kstream.EnableVAMapKevents = config.Kstream.EnableVAMapKevents && (e.r.HasVAMapEvents || (config.Yara.Enabled && !config.Yara.SkipMmaps))
-		config.Kstream.EnableMemKevents = config.Kstream.EnableMemKevents && (e.r.HasMemEvents || (config.Yara.Enabled && !config.Yara.SkipAllocs))
-		config.Kstream.EnableDNSEvents = config.Kstream.EnableDNSEvents && e.r.HasDNSEvents
-		config.Kstream.EnableAuditAPIEvents = config.Kstream.EnableAuditAPIEvents && e.r.HasAuditAPIEvents
-		config.Kstream.EnableThreadpoolEvents = config.Kstream.EnableThreadpoolEvents && e.r.HasThreadpoolEvents
+		config.EventSource.EnableThreadEvents = config.EventSource.EnableThreadEvents && e.r.HasThreadEvents
+		config.EventSource.EnableImageEvents = config.EventSource.EnableImageEvents && e.r.HasImageEvents
+		config.EventSource.EnableNetEvents = config.EventSource.EnableNetEvents && e.r.HasNetworkEvents
+		config.EventSource.EnableRegistryEvents = config.EventSource.EnableRegistryEvents && (e.r.HasRegistryEvents || (config.Yara.Enabled && !config.Yara.SkipRegistry))
+		config.EventSource.EnableFileIOEvents = config.EventSource.EnableFileIOEvents && (e.r.HasFileEvents || (config.Yara.Enabled && !config.Yara.SkipFiles))
+		config.EventSource.EnableVAMapEvents = config.EventSource.EnableVAMapEvents && (e.r.HasVAMapEvents || (config.Yara.Enabled && !config.Yara.SkipMmaps))
+		config.EventSource.EnableMemEvents = config.EventSource.EnableMemEvents && (e.r.HasMemEvents || (config.Yara.Enabled && !config.Yara.SkipAllocs))
+		config.EventSource.EnableDNSEvents = config.EventSource.EnableDNSEvents && e.r.HasDNSEvents
+		config.EventSource.EnableAuditAPIEvents = config.EventSource.EnableAuditAPIEvents && e.r.HasAuditAPIEvents
+		config.EventSource.EnableThreadpoolEvents = config.EventSource.EnableThreadpoolEvents && e.r.HasThreadpoolEvents
 		for _, typ := range event.All() {
 			if typ == event.CreateProcess || typ == event.TerminateProcess ||
 				typ == event.LoadImage || typ == event.UnloadImage {
@@ -157,20 +157,20 @@ func (e *EventSource) Open(config *config.Config) error {
 			}
 
 			if !e.r.ContainsEvent(typ) {
-				config.Kstream.SetDropMask(typ)
+				config.EventSource.SetDropMask(typ)
 			}
 		}
 	}
 
 	e.addTrace(etw.KernelLoggerSession, etw.KernelTraceControlGUID)
 
-	if config.Kstream.EnableDNSEvents {
+	if config.EventSource.EnableDNSEvents {
 		e.addTrace(etw.DNSClientSession, etw.DNSClientGUID)
 	}
-	if config.Kstream.EnableAuditAPIEvents {
+	if config.EventSource.EnableAuditAPIEvents {
 		e.addTrace(etw.KernelAuditAPICallsSession, etw.KernelAuditAPICallsGUID)
 	}
-	if config.Kstream.EnableThreadpoolEvents {
+	if config.EventSource.EnableThreadpoolEvents {
 		e.addTrace(etw.ThreadpoolSession, etw.ThreadpoolGUID)
 	}
 

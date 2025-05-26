@@ -31,10 +31,10 @@ import (
 )
 
 func TestNewBufferedAggregator(t *testing.T) {
-	keventsc := make(chan *event.Event, 20)
+	eventsc := make(chan *event.Event, 20)
 	errsc := make(chan error, 1)
 	agg, err := NewBuffered(
-		keventsc,
+		eventsc,
 		errsc,
 		Config{FlushPeriod: time.Millisecond * 200},
 		outputs.Config{Type: outputs.Console, Output: console.Config{Format: "pretty"}},
@@ -56,7 +56,7 @@ func TestNewBufferedAggregator(t *testing.T) {
 				params.NetDIP:   {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("216.58.201.174")},
 			},
 		}
-		keventsc <- evt
+		eventsc <- evt
 	}
 	<-time.After(time.Millisecond * 275)
 	assert.Equal(t, int64(4), batchEvents.Value())
@@ -74,7 +74,7 @@ func TestNewBufferedAggregator(t *testing.T) {
 				params.NetDIP:   {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("216.58.201.174")},
 			},
 		}
-		keventsc <- evt
+		eventsc <- evt
 	}
 	<-time.After(time.Millisecond * 260)
 	assert.Equal(t, int64(6), batchEvents.Value())

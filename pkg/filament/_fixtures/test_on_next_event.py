@@ -15,20 +15,20 @@
 # under the License.
 
 """
-Tests the on_next_kevent function.
+Tests the on_next_event function.
 """
 
-kevents = []
+events = []
 
 def on_init():
     interval(1)
     columns(['Key', '#Seq'])
     sort_by('#Seq')
 
-def on_next_kevent(Event):
-    kevents.append({'key_name': Event['params']['key_name'], 'seq': Event['seq'], 'dip': Event['params']['dip']})
+def on_next_event(event):
+    events.append({'key_name': event['params']['key_name'], 'seq': event['seq'], 'dip': event['params']['dip']})
 
 def on_interval():
-    for key in kevents:
+    for key in events:
         add_row([key['key_name'], key['seq']])
     render_table()

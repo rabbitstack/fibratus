@@ -410,7 +410,7 @@ func (e *Event) UnmarshalRaw(b []byte, ver capver.Version) error {
 	// read process state
 	sec := section.Read(b[inc(idx, 14)+offset:])
 	if sec.Size() != 0 {
-		ps, err := ptypes.NewFromKcap(b[inc(idx, 24)+offset:], sec)
+		ps, err := ptypes.NewFromCapture(b[inc(idx, 24)+offset:], sec)
 		if err != nil {
 			return err
 		}

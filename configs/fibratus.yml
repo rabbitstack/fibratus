@@ -2,10 +2,10 @@
 
 # =============================== Aggregator ==========================================
 
-# Aggregator is responsible for creating kernel event batches, applying transformers to each event
+# Aggregator is responsible for creating event batches, applying transformers to each event
 # present in the batch, and forwarding those batches to the output sinks.
 aggregator:
-  # Determines the flush period that triggers the flushing of the kernel event batches to output sinks
+  # Determines the flush period that triggers the flushing of the event batches to output sinks
   flush-period: 500ms
 
   # Represents the max time to wait before announcing failed flushing of enqueued events when fibratus
@@ -111,7 +111,7 @@ forward: false
 
 # =============================== Filament =============================================
 
-# Filaments are lightweight Python scriplets that are executed on top of the kernel event stream. You can easily
+# Filaments are lightweight Python scriplets that are executed on top of the event stream. You can easily
 # extend Fibratus with custom features that is encapsulated in filaments. This section controls the behaviour of
 # the filament engine.
 filament:
@@ -156,10 +156,10 @@ handle:
   # Indicates if process handles are collected during startup or when a new process is spawn.
   enumerate-handles: false
 
-# =============================== Kevent ===============================================
+# =============================== Event ===============================================
 
-# The following settings control the state of the kernel event.
-kevent:
+# The following settings control the state of the event.
+event:
   # Indicates if threads are serialized as part of the process state
   serialize-threads: false
 
@@ -175,19 +175,19 @@ kevent:
   # Indicates if environment variables are serialized as part of the process state
   serialize-envs: false
 
-# =============================== Kcap =================================================
+# =============================== Capture =================================================
 
-# Contains the settings that dictate the behaviour of the kernel event captures.
+# Contains the settings that dictate the behaviour of the captures.
 
-kcap:
-  # Specifies the name of the output kcap file. If not empty, capture files are always stored
+cap:
+  # Specifies the name of the output cap file. If not empty, capture files are always stored
   # to this file by overwriting any existing capture file
   file: ""
 
-# =============================== Kstream ==============================================
+# =============================== Event source ==============================================
 
-# Tweaks for controlling the behaviour of the kernel stream consumer.
-kstream:
+# Tweaks for controlling the behaviour of the event source.
+eventsource:
   # Determines the maximum number of buffers allocated for the event tracing session's buffer pool
   #max-buffers:
 
@@ -202,32 +202,32 @@ kstream:
   # less memory but it increases the rate at which buffers must be flushed)
   #buffer-size:
 
-  # Determines whether thread kernel events are collected by Kernel Logger provider
+  # Determines whether thread events are collected by Kernel Logger provider
   #enable-thread: true
 
-  # Determines whether registry kernel events are collected by Kernel Logger provider
+  # Determines whether registry events are collected by Kernel Logger provider
   #enable-registry: true
 
-  # Determines whether network kernel events are collected by Kernel Logger provider
+  # Determines whether network events are collected by Kernel Logger provider
   #enable-net: true
 
-  # Determines whether file kernel events are collected by Kernel Logger provider
+  # Determines whether file events are collected by Kernel Logger provider
   #enable-fileio: true
 
   # Determines whether VA map/unmap events are collected by Kernel Logger provider
   #enable-vamap: true
 
-  # Determines whether image kernel events are collected by Kernel Logger provider
+  # Determines whether image events are collected by Kernel Logger provider
   #enable-image: true
 
-  # Determines whether object manager kernel events (handle creation/destruction) are
+  # Determines whether object manager events (handle creation/destruction) are
   # collected by Kernel Logger provider
   #enable-handle: false
 
-  # Determines whether memory manager kernel events are collected by Kernel Logger provider
+  # Determines whether memory manager events are collected by Kernel Logger provider
   #enable-mem: true
 
-  # Determines whether kernel Audit API calls events are collected
+  # Determines whether Audit API calls events are collected
   #enable-audit-api: true
 
   # Determines whether DNS client events are collected
@@ -282,7 +282,7 @@ logging:
 
 # =============================== Output ================================================
 
-# Outputs transport the event flowing through kernel event stream to its final destination. Only one output
+# Outputs transport the event flowing through event stream to its final destination. Only one output
 # can be active at the time. The following section contains available outputs and their preferences.
 output:
   # Console output writes the event to standard output stream.
@@ -296,7 +296,7 @@ output:
 
     # Template that's feed into event formatter. The default event formatter template is:
     #
-    # {{ .Seq }} {{ .Timestamp }} - {{ .CPU }} {{ .Process }} ({{ .Pid }}) - {{ .Type }} ({{ .Kparams }})
+    # {{ .Seq }} {{ .Timestamp }} - {{ .CPU }} {{ .Process }} ({{ .Pid }}) - {{ .Type }} ({{ .Params }})
     #
     #template:
 
@@ -330,7 +330,7 @@ output:
     # Specifies the timeout for periodic health checks
     #healthcheck-timeout: 5s
 
-    # Identifies the user name for the basic HTTP authentication
+    # Identifies the username for the basic HTTP authentication
     #username:
 
     # Identifies the password for the basic HTTP authentication
@@ -349,7 +349,7 @@ output:
     # Specifies the name of the index template
     #template-name: fibratus
 
-    # Represents the target index for kernel events. It allows time specifiers to create indices per time frame.
+    # Represents the target index for events. It allows time specifiers to create indices per time frame.
     # For example, fibratus-%Y-%m generates the index name with current year and month time specifiers
     #index-name: fibratus
 
@@ -380,7 +380,7 @@ output:
     # Specifies the AMQP connection timeout
     #timeout: 5s
 
-    # Specifies target exchange name that receives inbound kernel events
+    # Specifies target exchange name that receives inbound events
     #exchange: fibratus
 
     # Represents  the AMQP exchange type. Available exchange type include common types are "direct", "fanout",
@@ -519,7 +519,7 @@ pe:
 
 # =============================== Transformers =========================================
 
-# Transformers are responsible for augmenting, parsing or enriching kernel events.
+# Transformers are responsible for augmenting, parsing or enriching events.
 transformers:
   # Remove transformer deletes provided event parameters.
   remove:
@@ -527,7 +527,7 @@ transformers:
     enabled: false
 
     # Represents the list of parameters that are removed from the event
-    #kparams:
+    #params:
     #  - irp
 
   # Rename transformer renames parameter from old to new name.
@@ -537,7 +537,7 @@ transformers:
 
     # Contains the list of old/new mappings. Old represents the original
     # parameter name, while new is the new parameter name
-    #kparams:
+    #params:
     #  - old:
     #    new:
 
@@ -549,7 +549,7 @@ transformers:
     # Contains the list of parameter replacements. For each target event parameter, the old represent the substring
     # that gets replaced by the new string.
     #replacements:
-    #  - kparam:
+    #  - param:
     #    old:
     #    new:
 
@@ -571,12 +571,12 @@ transformers:
 
     # Contains the list of parameters associated with the prefix that is trimmed from the parameter's value
     #prefixes:
-    #  - kparam:
+    #  - param:
     #    trim:
 
     # Contains the list of parameters associated with the suffix that is trimmed from the parameter's value
     #suffixes:
-    #  - kparam:
+    #  - param:
     #    trim:
 
 # =============================== YARA =================================================

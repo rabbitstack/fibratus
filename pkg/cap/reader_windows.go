@@ -136,7 +136,7 @@ func (r *reader) Read(ctx context.Context) (chan *event.Event, chan error) {
 			evt, err := event.NewFromCapture(buf, sec.Version())
 			if err != nil {
 				errsc <- fmt.Errorf("fail to unmarshal event: %v", err)
-				capKeventUnmarshalErrors.Add(1)
+				capEventUnmarshalErrors.Add(1)
 				continue
 			}
 			capReadBytes.Add(int64(len(buf)))
@@ -173,7 +173,7 @@ func (r *reader) read(evt *event.Event, eventsc chan *event.Event) {
 		return
 	}
 	eventsc <- evt
-	capReadKevents.Add(1)
+	capReadEvents.Add(1)
 }
 
 func (r *reader) updateSnapshotters(evt *event.Event) error {
@@ -247,11 +247,11 @@ func (r *reader) recoverHandleSnapshotter() (handle.Snapshotter, error) {
 		}
 
 		var err error
-		handles[i], err = htypes.NewFromKcap(b)
+		handles[i], err = htypes.NewFromCapture(b)
 		if err != nil {
 			capHandleUnmarshalErrors.Add(1)
 		}
 	}
-	r.hsnapshotter = handle.NewFromKcap(handles)
+	r.hsnapshotter = handle.NewFromCapture(handles)
 	return r.hsnapshotter, nil
 }

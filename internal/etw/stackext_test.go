@@ -29,16 +29,16 @@ import (
 
 func TestStackExtensions(t *testing.T) {
 	cfg := &config.Config{
-		Kstream: config.KstreamConfig{
-			EnableThreadKevents: true,
-			EnableNetKevents:    true,
-			EnableFileIOKevents: true,
-			EnableMemKevents:    true,
-			BufferSize:          1024,
-			FlushTimer:          time.Millisecond * 2300,
+		EventSource: config.EventSourceConfig{
+			EnableThreadEvents: true,
+			EnableNetEvents:    true,
+			EnableFileIOEvents: true,
+			EnableMemEvents:    true,
+			BufferSize:         1024,
+			FlushTimer:         time.Millisecond * 2300,
 		},
 	}
-	exts := NewStackExtensions(cfg.Kstream)
+	exts := NewStackExtensions(cfg.EventSource)
 	assert.Len(t, exts.EventIds(), 0)
 
 	exts.EnableProcessCallstack()
