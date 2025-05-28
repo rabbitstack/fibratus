@@ -64,9 +64,9 @@ func TestParser(t *testing.T) {
 		{expr: `ps.envs imatches 'C:\\Program Files'`},
 		{expr: `ps.pid[1] = 'svchost.exe'`, err: errors.New("ps.pid[1] = 'svchost.exe'\n╭──────^\n|\n|\n╰─────────────────── expected field without argument")},
 		{expr: `ps.envs[ProgramFiles = 'svchost.exe'`, err: errors.New("ps.envs[ProgramFiles = 'svchost.exe'\n╭───────────────────^\n|\n|\n╰─────────────────── expected ]")},
-		{expr: `evt.arg = 'svchost.exe'`, err: errors.New("evt.arg = 'svchost.exe'\n╭───────^\n|\n|\n╰─────────────────── expected field argument")},
+		{expr: `evt.arg = 'svchost.exe'`, err: errors.New("evt.arg = 'svchost.exe'\n╭──────^\n|\n|\n╰─────────────────── expected field argument")},
 		{expr: `evt.arg[name] = 'svchost.exe'`},
-		{expr: `evt.arg[Name$] = 'svchost.exe'`, err: errors.New("evt.arg[Name$] = 'svchost.exe'\n╭────────^\n|\n|\n╰─────────────────── expected a valid field argument matching the pattern [a-z0-9_]+")},
+		{expr: `evt.arg[Name$] = 'svchost.exe'`, err: errors.New("evt.arg[Name$] = 'svchost.exe'\n╭───────^\n|\n|\n╰─────────────────── expected a valid field argument matching the pattern [a-z0-9_]+")},
 		{expr: `ps.ancestor[0] = 'svchost.exe'`},
 		{expr: `ps.ancestor[l0l] = 'svchost.exe'`, err: errors.New("ps.ancestor[l0l] = 'svchost.exe'\n╭───────────^\n|\n|\n╰─────────────────── expected a valid field argument matching the pattern [0-9]+")},
 	}

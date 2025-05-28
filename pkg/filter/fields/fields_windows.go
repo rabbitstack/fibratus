@@ -300,52 +300,95 @@ const (
 	// PePsChildFileName represents the original file name of the child process executable provided at compile-time
 	PePsChildFileName Field = "pe.ps.child.file.name"
 
+	// EvtSeq is the event sequence number
+	EvtSeq Field = "evt.seq"
+	// EvtPID is the process identifier that generated the event
+	EvtPID Field = "evt.pid"
+	// EvtTID is the thread identifier that generated the event
+	EvtTID Field = "evt.tid"
+	// EvtCPU is the CPU core where the event was generated
+	EvtCPU Field = "evt.cpu"
+	// EvtDesc represents the event description
+	EvtDesc Field = "evt.desc"
+	// EvtHost represents the host where the event was produced
+	EvtHost Field = "evt.host"
+	// EvtTime is the event time
+	EvtTime Field = "evt.time"
+	// EvtTimeHour is the hour part of the event time
+	EvtTimeHour Field = "evt.time.h"
+	// EvtTimeMin is the minute part of the event time
+	EvtTimeMin Field = "evt.time.m"
+	// EvtTimeSec is the second part of the event time
+	EvtTimeSec Field = "evt.time.s"
+	// EvtTimeNs is the nanosecond part of the event time
+	EvtTimeNs Field = "evt.time.ns"
+	// EvtDate is the event date
+	EvtDate Field = "evt.date"
+	// EvtDateDay is the day of event date
+	EvtDateDay Field = "evt.date.d"
+	// EvtDateMonth is the month of event date
+	EvtDateMonth Field = "evt.date.m"
+	// EvtDateYear is the year of event date
+	EvtDateYear Field = "evt.date.y"
+	// EvtDateTz is the time zone of event timestamp
+	EvtDateTz Field = "evt.date.tz"
+	// EvtDateWeek is the event week number
+	EvtDateWeek Field = "evt.date.week"
+	// EvtDateWeekday is the event week day
+	EvtDateWeekday Field = "evt.date.weekday"
+	// EvtName is the event name
+	EvtName Field = "evt.name"
+	// EvtCategory is the event category
+	EvtCategory Field = "evt.category"
+	// EvtNparams is the number of event parameters
+	EvtNparams Field = "evt.nparams"
+	// EvtArg represents the field sequence for generic argument access
+	EvtArg Field = "evt.arg"
+
 	// KevtSeq is the event sequence number
-	KevtSeq Field = "evt.seq"
+	KevtSeq Field = "kevt.seq"
 	// KevtPID is the process identifier that generated the event
-	KevtPID Field = "evt.pid"
+	KevtPID Field = "kevt.pid"
 	// KevtTID is the thread identifier that generated the event
-	KevtTID Field = "evt.tid"
+	KevtTID Field = "kevt.tid"
 	// KevtCPU is the CPU core where the event was generated
-	KevtCPU Field = "evt.cpu"
+	KevtCPU Field = "kevt.cpu"
 	// KevtDesc represents the event description
-	KevtDesc Field = "evt.desc"
+	KevtDesc Field = "kevt.desc"
 	// KevtHost represents the host where the event was produced
-	KevtHost Field = "evt.host"
+	KevtHost Field = "kevt.host"
 	// KevtTime is the event time
-	KevtTime Field = "evt.time"
+	KevtTime Field = "kevt.time"
 	// KevtTimeHour is the hour part of the event time
-	KevtTimeHour Field = "evt.time.h"
+	KevtTimeHour Field = "kevt.time.h"
 	// KevtTimeMin is the minute part of the event time
-	KevtTimeMin Field = "evt.time.m"
+	KevtTimeMin Field = "kevt.time.m"
 	// KevtTimeSec is the second part of the event time
-	KevtTimeSec Field = "evt.time.s"
+	KevtTimeSec Field = "kevt.time.s"
 	// KevtTimeNs is the nanosecond part of the event time
-	KevtTimeNs Field = "evt.time.ns"
+	KevtTimeNs Field = "kevt.time.ns"
 	// KevtDate is the event date
-	KevtDate Field = "evt.date"
+	KevtDate Field = "kevt.date"
 	// KevtDateDay is the day of event date
-	KevtDateDay Field = "evt.date.d"
+	KevtDateDay Field = "kevt.date.d"
 	// KevtDateMonth is the month of event date
-	KevtDateMonth Field = "evt.date.m"
+	KevtDateMonth Field = "kevt.date.m"
 	// KevtDateYear is the year of event date
-	KevtDateYear Field = "evt.date.y"
+	KevtDateYear Field = "kevt.date.y"
 	// KevtDateTz is the time zone of event timestamp
-	KevtDateTz Field = "evt.date.tz"
+	KevtDateTz Field = "kevt.date.tz"
 	// KevtDateWeek is the event week number
-	KevtDateWeek Field = "evt.date.week"
+	KevtDateWeek Field = "kevt.date.week"
 	// KevtDateWeekday is the event week day
-	KevtDateWeekday Field = "evt.date.weekday"
+	KevtDateWeekday Field = "kevt.date.weekday"
 	// KevtName is the event name
-	KevtName Field = "evt.name"
+	KevtName Field = "kevt.name"
 	// KevtCategory is the event category
-	KevtCategory Field = "evt.category"
-	// KevtMeta is the event metadata
-	KevtMeta Field = "evt.meta"
+	KevtCategory Field = "kevt.category"
 	// KevtNparams is the number of event parameters
-	KevtNparams Field = "evt.nparams"
+	KevtNparams Field = "kevt.nparams"
 	// KevtArg represents the field sequence for generic argument access
-	KevtArg Field = "evt.arg"
+	KevtArg Field = "kevt.arg"
 
 	// HandleID represents the handle identifier within the process address space
 	HandleID Field = "handle.id"
@@ -734,28 +777,61 @@ func IsPseudoField(f Field) bool {
 func (f Field) IsPeSectionsPseudo() bool { return f == PeSections }
 
 var fields = map[Field]FieldInfo{
-	KevtSeq:         {KevtSeq, "event sequence number", params.Uint64, []string{"evt.seq > 666"}, nil, nil},
-	KevtPID:         {KevtPID, "process identifier generating the kernel event", params.Uint32, []string{"evt.pid = 6"}, nil, nil},
-	KevtTID:         {KevtTID, "thread identifier generating the kernel event", params.Uint32, []string{"evt.tid = 1024"}, nil, nil},
-	KevtCPU:         {KevtCPU, "logical processor core where the event was generated", params.Uint8, []string{"evt.cpu = 2"}, nil, nil},
-	KevtName:        {KevtName, "symbolical kernel event name", params.AnsiString, []string{"evt.name = 'CreateThread'"}, nil, nil},
-	KevtCategory:    {KevtCategory, "event category", params.AnsiString, []string{"evt.category = 'registry'"}, nil, nil},
-	KevtDesc:        {KevtDesc, "event description", params.AnsiString, []string{"evt.desc contains 'Creates a new process'"}, nil, nil},
-	KevtHost:        {KevtHost, "host name on which the event was produced", params.UnicodeString, []string{"evt.host contains 'kitty'"}, nil, nil},
-	KevtTime:        {KevtTime, "event timestamp as a time string", params.Time, []string{"evt.time = '17:05:32'"}, nil, nil},
-	KevtTimeHour:    {KevtTimeHour, "hour within the day on which the event occurred", params.Time, []string{"evt.time.h = 23"}, nil, nil},
-	KevtTimeMin:     {KevtTimeMin, "minute offset within the hour on which the event occurred", params.Time, []string{"evt.time.m = 54"}, nil, nil},
-	KevtTimeSec:     {KevtTimeSec, "second offset within the minute  on which the event occurred", params.Time, []string{"evt.time.s = 0"}, nil, nil},
-	KevtTimeNs:      {KevtTimeNs, "nanoseconds specified by event timestamp", params.Int64, []string{"evt.time.ns > 1591191629102337000"}, nil, nil},
-	KevtDate:        {KevtDate, "event timestamp as a date string", params.Time, []string{"evt.date = '2018-03-03'"}, nil, nil},
-	KevtDateDay:     {KevtDateDay, "day of the month on which the event occurred", params.Time, []string{"evt.date.d = 12"}, nil, nil},
-	KevtDateMonth:   {KevtDateMonth, "month of the year on which the event occurred", params.Time, []string{"evt.date.m = 11"}, nil, nil},
-	KevtDateYear:    {KevtDateYear, "year on which the event occurred", params.Uint32, []string{"evt.date.y = 2020"}, nil, nil},
-	KevtDateTz:      {KevtDateTz, "time zone associated with the event timestamp", params.AnsiString, []string{"evt.date.tz = 'UTC'"}, nil, nil},
-	KevtDateWeek:    {KevtDateWeek, "week number within the year on which the event occurred", params.Uint8, []string{"evt.date.week = 2"}, nil, nil},
-	KevtDateWeekday: {KevtDateWeekday, "week day on which the event occurred", params.AnsiString, []string{"evt.date.weekday = 'Monday'"}, nil, nil},
-	KevtNparams:     {KevtNparams, "number of parameters", params.Int8, []string{"evt.nparams > 2"}, nil, nil},
-	KevtArg: {KevtArg, "event parameter", params.Object, []string{"evt.arg[cmdline] istartswith 'C:\\Windows'"}, nil, &Argument{Optional: false, Pattern: "[a-z0-9_]+", ValidationFunc: func(s string) bool {
+	EvtSeq:         {EvtSeq, "event sequence number", params.Uint64, []string{"evt.seq > 666"}, nil, nil},
+	EvtPID:         {EvtPID, "process identifier generating the event", params.Uint32, []string{"evt.pid = 6"}, nil, nil},
+	EvtTID:         {EvtTID, "thread identifier generating the event", params.Uint32, []string{"evt.tid = 1024"}, nil, nil},
+	EvtCPU:         {EvtCPU, "logical processor core where the event was generated", params.Uint8, []string{"evt.cpu = 2"}, nil, nil},
+	EvtName:        {EvtName, "symbolical event name", params.AnsiString, []string{"evt.name = 'CreateThread'"}, nil, nil},
+	EvtCategory:    {EvtCategory, "event category", params.AnsiString, []string{"evt.category = 'registry'"}, nil, nil},
+	EvtDesc:        {EvtDesc, "event description", params.AnsiString, []string{"evt.desc contains 'Creates a new process'"}, nil, nil},
+	EvtHost:        {EvtHost, "host name on which the event was produced", params.UnicodeString, []string{"evt.host contains 'kitty'"}, nil, nil},
+	EvtTime:        {EvtTime, "event timestamp as a time string", params.Time, []string{"evt.time = '17:05:32'"}, nil, nil},
+	EvtTimeHour:    {EvtTimeHour, "hour within the day on which the event occurred", params.Time, []string{"evt.time.h = 23"}, nil, nil},
+	EvtTimeMin:     {EvtTimeMin, "minute offset within the hour on which the event occurred", params.Time, []string{"evt.time.m = 54"}, nil, nil},
+	EvtTimeSec:     {EvtTimeSec, "second offset within the minute  on which the event occurred", params.Time, []string{"evt.time.s = 0"}, nil, nil},
+	EvtTimeNs:      {EvtTimeNs, "nanoseconds specified by event timestamp", params.Int64, []string{"evt.time.ns > 1591191629102337000"}, nil, nil},
+	EvtDate:        {EvtDate, "event timestamp as a date string", params.Time, []string{"evt.date = '2018-03-03'"}, nil, nil},
+	EvtDateDay:     {EvtDateDay, "day of the month on which the event occurred", params.Time, []string{"evt.date.d = 12"}, nil, nil},
+	EvtDateMonth:   {EvtDateMonth, "month of the year on which the event occurred", params.Time, []string{"evt.date.m = 11"}, nil, nil},
+	EvtDateYear:    {EvtDateYear, "year on which the event occurred", params.Uint32, []string{"evt.date.y = 2020"}, nil, nil},
+	EvtDateTz:      {EvtDateTz, "time zone associated with the event timestamp", params.AnsiString, []string{"evt.date.tz = 'UTC'"}, nil, nil},
+	EvtDateWeek:    {EvtDateWeek, "week number within the year on which the event occurred", params.Uint8, []string{"evt.date.week = 2"}, nil, nil},
+	EvtDateWeekday: {EvtDateWeekday, "week day on which the event occurred", params.AnsiString, []string{"evt.date.weekday = 'Monday'"}, nil, nil},
+	EvtNparams:     {EvtNparams, "number of parameters", params.Int8, []string{"evt.nparams > 2"}, nil, nil},
+	EvtArg: {EvtArg, "event parameter", params.Object, []string{"evt.arg[cmdline] istartswith 'C:\\Windows'"}, nil, &Argument{Optional: false, Pattern: "[a-z0-9_]+", ValidationFunc: func(s string) bool {
+		for _, c := range s {
+			switch {
+			case unicode.IsLower(c):
+			case unicode.IsNumber(c):
+			case c == '_':
+			default:
+				return false
+			}
+		}
+		return true
+	}}},
+	KevtSeq:         {KevtSeq, "event sequence number", params.Uint64, []string{"kevt.seq > 666"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtSeq}}, nil},
+	KevtPID:         {KevtPID, "process identifier generating the event", params.Uint32, []string{"kevt.pid = 6"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtPID}}, nil},
+	KevtTID:         {KevtTID, "thread identifier generating the event", params.Uint32, []string{"kevt.tid = 1024"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtTID}}, nil},
+	KevtCPU:         {KevtCPU, "logical processor core where the event was generated", params.Uint8, []string{"kevt.cpu = 2"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtCPU}}, nil},
+	KevtName:        {KevtName, "symbolical event name", params.AnsiString, []string{"kevt.name = 'CreateThread'"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtName}}, nil},
+	KevtCategory:    {KevtCategory, "event category", params.AnsiString, []string{"kevt.category = 'registry'"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtCategory}}, nil},
+	KevtDesc:        {KevtDesc, "event description", params.AnsiString, []string{"kevt.desc contains 'Creates a new process'"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtDesc}}, nil},
+	KevtHost:        {KevtHost, "host name on which the event was produced", params.UnicodeString, []string{"kevt.host contains 'kitty'"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtHost}}, nil},
+	KevtTime:        {KevtTime, "event timestamp as a time string", params.Time, []string{"kevt.time = '17:05:32'"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtTime}}, nil},
+	KevtTimeHour:    {KevtTimeHour, "hour within the day on which the event occurred", params.Time, []string{"kevt.time.h = 23"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtTimeHour}}, nil},
+	KevtTimeMin:     {KevtTimeMin, "minute offset within the hour on which the event occurred", params.Time, []string{"kevt.time.m = 54"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtTimeMin}}, nil},
+	KevtTimeSec:     {KevtTimeSec, "second offset within the minute  on which the event occurred", params.Time, []string{"kevt.time.s = 0"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtTimeSec}}, nil},
+	KevtTimeNs:      {KevtTimeNs, "nanoseconds specified by event timestamp", params.Int64, []string{"kevt.time.ns > 1591191629102337000"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtTimeNs}}, nil},
+	KevtDate:        {KevtDate, "event timestamp as a date string", params.Time, []string{"kevt.date = '2018-03-03'"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtDate}}, nil},
+	KevtDateDay:     {KevtDateDay, "day of the month on which the event occurred", params.Time, []string{"kevt.date.d = 12"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtDateDay}}, nil},
+	KevtDateMonth:   {KevtDateMonth, "month of the year on which the event occurred", params.Time, []string{"kevt.date.m = 11"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtDateMonth}}, nil},
+	KevtDateYear:    {KevtDateYear, "year on which the event occurred", params.Uint32, []string{"kevt.date.y = 2020"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtDateYear}}, nil},
+	KevtDateTz:      {KevtDateTz, "time zone associated with the event timestamp", params.AnsiString, []string{"kevt.date.tz = 'UTC'"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtDateTz}}, nil},
+	KevtDateWeek:    {KevtDateWeek, "week number within the year on which the event occurred", params.Uint8, []string{"kevt.date.week = 2"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtDateWeek}}, nil},
+	KevtDateWeekday: {KevtDateWeekday, "week day on which the event occurred", params.AnsiString, []string{"kevt.date.weekday = 'Monday'"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtDateWeekday}}, nil},
+	KevtNparams:     {KevtNparams, "number of parameters", params.Int8, []string{"kevt.nparams > 2"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtNparams}}, nil},
+	KevtArg: {KevtArg, "event parameter", params.Object, []string{"kevt.arg[cmdline] istartswith 'C:\\Windows'"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtArg}}, &Argument{Optional: false, Pattern: "[a-z0-9_]+", ValidationFunc: func(s string) bool {
 		for _, c := range s {
 			switch {
 			case unicode.IsLower(c):

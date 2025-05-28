@@ -121,7 +121,7 @@ func (c *compiler) buildCompileResult(filters map[*config.FilterConfig]filter.Fi
 		rs.NumberRules++
 		for name, values := range f.GetStringFields() {
 			for _, v := range values {
-				if name == fields.KevtName || name == fields.KevtCategory {
+				if name == fields.EvtName || name == fields.EvtCategory {
 					types := event.NameToTypes(v)
 					for _, typ := range types {
 						switch typ.Category() {

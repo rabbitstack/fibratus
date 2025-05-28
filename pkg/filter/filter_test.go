@@ -104,7 +104,7 @@ func TestStringFields(t *testing.T) {
 	f := New(`ps.name = 'cmd.exe' and evt.name = 'CreateProcess' or evt.name in ('TerminateProcess', 'CreateFile')`, cfg)
 	require.NoError(t, f.Compile())
 	assert.Len(t, f.GetStringFields(), 2)
-	assert.Len(t, f.GetStringFields()[fields.KevtName], 3)
+	assert.Len(t, f.GetStringFields()[fields.EvtName], 3)
 	assert.Len(t, f.GetStringFields()[fields.PsName], 1)
 }
 
