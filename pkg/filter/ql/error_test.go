@@ -59,7 +59,7 @@ func TestParseError(t *testing.T) {
 	     registry.key.name icontains
 			(
 	          CurrentVersion\\Run',
-╭─────────────^
+╭──────────────^
 |
 |	          'Policies\\Explorer\\Run',
 |	          'Group Policy\\Scripts',

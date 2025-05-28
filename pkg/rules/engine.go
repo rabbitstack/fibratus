@@ -151,7 +151,7 @@ func newCompiledFilter(f filter.Filter, c *config.FilterConfig, ss *sequenceStat
 // conditions.
 func (f *compiledFilter) isScoped() bool {
 	for name := range f.filter.GetStringFields() {
-		if name == fields.KevtName || name == fields.KevtCategory {
+		if name == fields.EvtName || name == fields.EvtCategory {
 			return true
 		}
 	}
@@ -233,8 +233,8 @@ func (e *Engine) Compile() (*config.RulesCompileResult, error) {
 		// or event category hash
 		for name, values := range f.GetStringFields() {
 			for _, v := range values {
-				if name == fields.KevtName || name == fields.KevtCategory {
-					if name == fields.KevtCategory {
+				if name == fields.EvtName || name == fields.EvtCategory {
+					if name == fields.EvtCategory {
 						e.hashCache.lookupCategory = true
 					}
 					hash := hashers.FnvUint32([]byte(v))

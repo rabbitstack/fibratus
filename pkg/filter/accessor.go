@@ -64,51 +64,51 @@ const dateFmt = "2006-01-02"
 
 func (k *evtAccessor) Get(f Field, evt *event.Event) (params.Value, error) {
 	switch f.Name {
-	case fields.KevtSeq:
+	case fields.EvtSeq, fields.KevtSeq:
 		return evt.Seq, nil
-	case fields.KevtPID:
+	case fields.EvtPID, fields.KevtPID:
 		return evt.PID, nil
-	case fields.KevtTID:
+	case fields.EvtTID, fields.KevtTID:
 		return evt.Tid, nil
-	case fields.KevtCPU:
+	case fields.EvtCPU, fields.KevtCPU:
 		return evt.CPU, nil
-	case fields.KevtName:
+	case fields.EvtName, fields.KevtName:
 		return evt.Name, nil
-	case fields.KevtCategory:
+	case fields.EvtCategory, fields.KevtCategory:
 		return string(evt.Category), nil
-	case fields.KevtDesc:
+	case fields.EvtDesc, fields.KevtDesc:
 		return evt.Description, nil
-	case fields.KevtHost:
+	case fields.EvtHost, fields.KevtHost:
 		return evt.Host, nil
-	case fields.KevtTime:
+	case fields.EvtTime, fields.KevtTime:
 		return evt.Timestamp.Format(timeFmt), nil
-	case fields.KevtTimeHour:
+	case fields.EvtTimeHour, fields.KevtTimeHour:
 		return uint8(evt.Timestamp.Hour()), nil
-	case fields.KevtTimeMin:
+	case fields.EvtTimeMin, fields.KevtTimeMin:
 		return uint8(evt.Timestamp.Minute()), nil
-	case fields.KevtTimeSec:
+	case fields.EvtTimeSec, fields.KevtTimeSec:
 		return uint8(evt.Timestamp.Second()), nil
-	case fields.KevtTimeNs:
+	case fields.EvtTimeNs, fields.KevtTimeNs:
 		return evt.Timestamp.UnixNano(), nil
-	case fields.KevtDate:
+	case fields.EvtDate, fields.KevtDate:
 		return evt.Timestamp.Format(dateFmt), nil
-	case fields.KevtDateDay:
+	case fields.EvtDateDay, fields.KevtDateDay:
 		return uint8(evt.Timestamp.Day()), nil
-	case fields.KevtDateMonth:
+	case fields.EvtDateMonth, fields.KevtDateMonth:
 		return uint8(evt.Timestamp.Month()), nil
-	case fields.KevtDateTz:
+	case fields.EvtDateTz, fields.KevtDateTz:
 		tz, _ := evt.Timestamp.Zone()
 		return tz, nil
-	case fields.KevtDateYear:
+	case fields.EvtDateYear, fields.KevtDateYear:
 		return uint32(evt.Timestamp.Year()), nil
-	case fields.KevtDateWeek:
+	case fields.EvtDateWeek, fields.KevtDateWeek:
 		_, week := evt.Timestamp.ISOWeek()
 		return uint8(week), nil
-	case fields.KevtDateWeekday:
+	case fields.EvtDateWeekday, fields.KevtDateWeekday:
 		return evt.Timestamp.Weekday().String(), nil
-	case fields.KevtNparams:
+	case fields.EvtNparams, fields.KevtNparams:
 		return uint64(evt.Params.Len()), nil
-	case fields.KevtArg:
+	case fields.EvtArg, fields.KevtArg:
 		// lookup the parameter from the field argument
 		// and depending on the parameter type, return
 		// the respective value. The field format is

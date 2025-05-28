@@ -338,7 +338,7 @@ func (e *SequenceExpr) walk() {
 
 	// initialize event type/category buckets for every such field
 	for name, values := range stringFields {
-		if name == fields.KevtName || name == fields.KevtCategory {
+		if name == fields.EvtName || name == fields.EvtCategory {
 			for _, v := range values {
 				e.buckets[hashers.FnvUint32([]byte(v))] = true
 				if etype := event.NameToType(v); etype.Exists() {
