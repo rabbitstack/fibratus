@@ -20,6 +20,7 @@ package event
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/util/hashers"
+	"math"
 )
 
 // Category is the type alias for event categories
@@ -67,6 +68,41 @@ const (
 // Hash obtains the hash of the category string.
 func (c Category) Hash() uint32 {
 	return hashers.FnvUint32([]byte(c))
+}
+
+// MaxCategoryIndex designates the maximum allowed category index.
+const MaxCategoryIndex = math.MaxUint8
+
+// Index returns a numerical category index.
+func (c Category) Index() uint8 {
+	switch c {
+	case Registry:
+		return 1
+	case File:
+		return 2
+	case Net:
+		return 3
+	case Process:
+		return 4
+	case Thread:
+		return 5
+	case Image:
+		return 6
+	case Handle:
+		return 7
+	case Driver:
+		return 8
+	case Mem:
+		return 9
+	case Object:
+		return 10
+	case Threadpool:
+		return 11
+	case Other:
+		return 12
+	default:
+		return MaxCategoryIndex
+	}
 }
 
 // Categories returns all available categories.
