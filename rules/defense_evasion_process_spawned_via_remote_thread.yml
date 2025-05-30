@@ -1,6 +1,6 @@
 name: Process spawned via remote thread
 id: 9a2c7b40-4e5f-4edf-b02e-79cd33c9a137
-version: 1.0.2
+version: 1.0.3
 description: |
   Identifies the creation of a process with the parent call stack not
   revealing normal API functions for process creation. This may be a
@@ -22,4 +22,4 @@ condition: >
 action:
   - name: kill
 
-min-engine-version: 2.2.0
+min-engine-version: 3.0.0

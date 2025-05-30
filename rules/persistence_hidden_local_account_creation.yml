@@ -1,6 +1,6 @@
 name: Hidden local account creation
 id: bfa83754-3730-4c46-a0fd-cc71365f64df
-version: 1.0.1
+version: 1.0.2
 description: |
   Identifies the creation of a hidden local account. Adversaries can create hidden accounts by
   appending the dollar sign to the account name. This technique renders the account name hidden
@@ -25,4 +25,4 @@ condition: >
 
 severity: high
 
-min-engine-version: 2.4.0
+min-engine-version: 3.0.0

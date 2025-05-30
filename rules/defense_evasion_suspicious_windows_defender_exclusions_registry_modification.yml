@@ -1,6 +1,6 @@
 name: Suspicious Windows Defender exclusions registry modification
 id: 92fdbbea-e177-494e-8a6a-d8b055daf0e9
-version: 1.0.0
+version: 1.0.1
 description: |
   Identifies the modification of the Windows Defender process, path, or IP address registry key exclusions 
   by suspicious processes. Adversaries may alter the Windows Defender exclusions to bypass defenses.
@@ -45,4 +45,4 @@ output: >
   Windows Defender exclusion %registry.path added by suspicious process %ps.exe
 severity: high
 
-min-engine-version: 2.4.0
+min-engine-version: 3.0.0

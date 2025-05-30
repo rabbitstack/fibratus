@@ -1,6 +1,6 @@
 name: Potential thread execution hijacking
 id: 8b9f6d47-e9ba-4b3a-9da2-d7bf27e08ca9
-version: 1.0.1
+version: 1.0.2
 description: |
   Adversaries may inject malicious code into hijacked processes in order to evade process-based
   defenses as well as possibly elevate privileges. Thread Execution Hijacking is a method of
@@ -40,4 +40,4 @@ condition: >
 action:
   - name: kill
 
-min-engine-version: 2.0.0
+min-engine-version: 3.0.0

@@ -1,6 +1,6 @@
 name: AppDomain Manager injection via CLR search order hijacking
 id: 9319fafd-b7dc-4d85-b41a-54a8d4f1ab18
-version: 1.0.2
+version: 1.0.4
 description: |
   Adversaries may execute their own malicious payloads by hijacking how the .NET AppDomainManager loads assemblies. 
   The .NET framework uses the AppDomainManager class to create and manage one or more isolated runtime environments 
@@ -33,4 +33,4 @@ output: >
   Process %ps.exe loaded untrusted .NET assembly %image.path from suspicious location
 severity: high
 
-min-engine-version: 2.4.0
+min-engine-version: 3.0.0

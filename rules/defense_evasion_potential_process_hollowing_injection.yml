@@ -1,6 +1,6 @@
 name: Potential Process Hollowing
 id: 2a3fbae8-5e8c-4b71-b9da-56c3958c0d53
-version: 1.1.4
+version: 1.1.5
 description: |
   Adversaries may inject malicious code into suspended and hollowed processes in order to
   evade process-based defenses. Process hollowing is a method of executing arbitrary code
@@ -41,4 +41,4 @@ condition: >
 action:
   - name: kill
 
-min-engine-version: 2.0.0
+min-engine-version: 3.0.0

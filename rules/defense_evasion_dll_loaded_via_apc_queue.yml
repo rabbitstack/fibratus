@@ -1,6 +1,6 @@
 name: DLL loaded via APC queue
 id: e1ee3912-ad7c-4acb-80f4-84db87e54d5e
-version: 1.0.1
+version: 1.0.2
 description: |
   Identifies loading of a DLL with a callstack originating from the thread
   alertable state that led to the execution of an APC routine. This may be
@@ -30,4 +30,4 @@ condition: >
     and
   thread.callstack.symbols imatches ('KernelBase.dll!Sleep*')
 
-min-engine-version: 2.4.0
+min-engine-version: 3.0.0

@@ -1,6 +1,6 @@
 name: Clear Eventlog
 id: 692d3143-e1fb-4dab-8c9c-3109ff80ec85
-version: 1.0.2
+version: 1.0.3
 description: |
   Identifies attempts to clear Windows event log stores. Adversaries attempt to evade detection or 
   destroy forensic evidence on a system to cover their trails and slow down incident response.
@@ -19,11 +19,11 @@ condition: >
   sequence
   maxspan 1m
   by file.object
-    |set_file_information and kevt.pid != 4 and file.info_class = 'EOF' and file.info.eof_size > 50000 and file.path imatches '?:\\Windows\\System32\\winevt\\Logs\\*.evtx'|
+    |set_file_information and evt.pid != 4 and file.info_class = 'EOF' and file.info.eof_size > 50000 and file.path imatches '?:\\Windows\\System32\\winevt\\Logs\\*.evtx'|
     |set_file_information and file.info_class = 'Allocation' and file.info.allocation_size > 50000|
 
 output: >
   Windows Eventlog store %1.file.path was cleared
 severity: medium
 
-min-engine-version: 2.4.0
+min-engine-version: 3.0.0

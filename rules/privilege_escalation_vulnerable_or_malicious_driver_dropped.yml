@@ -1,6 +1,6 @@
 name: Vulnerable or malicious driver dropped
 id: d4742163-cf68-4ebd-b9a2-3ad17bbf63d5
-version: 1.0.1
+version: 1.0.2
 description: |
   Detects when adversaries drop a vulnerable/malicious driver
   onto a compromised system as a preparation for vulnerability
@@ -23,4 +23,4 @@ condition: >
 output: >
   Vulnerable or malicious %file.path driver dropped
 
-min-engine-version: 2.4.0
+min-engine-version: 3.0.0

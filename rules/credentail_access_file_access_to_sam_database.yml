@@ -1,6 +1,6 @@
 name: File access to SAM database
 id: e3dace20-4962-4381-884e-40dcdde66626
-version: 1.0.3
+version: 1.0.4
 description: |
   Identifies access to the Security Account Manager on-disk database.
 labels:
@@ -32,4 +32,4 @@ condition: >
       '?:\\Windows\\System32\\srtasks.exe'
     )
 
-min-engine-version: 2.4.0
+min-engine-version: 3.0.0

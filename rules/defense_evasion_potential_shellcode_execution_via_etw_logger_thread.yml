@@ -1,6 +1,6 @@
 name: Potential shellcode execution via ETW logger thread
 id: 3e915273-5ea0-4576-afc9-b018e2d53545
-version: 1.0.0
+version: 1.0.1
 description: |
   Adversaries may employ the undocumented EtwpCreateEtwThread function to execute shellcode 
   within the local process address space.
@@ -16,7 +16,7 @@ references:
   - https://github.com/Ne0nd0g/go-shellcode/tree/master?tab=readme-ov-file#EtwpCreateEtwThread
 
 condition: >
-  create_thread and kevt.pid != 4 and thread.callstack.symbols iin ('ntdll.dll!EtwpCreateEtwThread')
+  create_thread and evt.pid != 4 and thread.callstack.symbols iin ('ntdll.dll!EtwpCreateEtwThread')
     and
     not
   (ps.exe imatches
@@ -32,4 +32,4 @@ output: >
   Potential shellcode execution via EtwpCreateEtwThread API initiated by process %ps.exe
 severity: high
 
-min-engine-version: 2.2.0
+min-engine-version: 3.0.0

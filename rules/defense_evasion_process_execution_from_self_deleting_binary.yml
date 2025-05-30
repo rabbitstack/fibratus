@@ -1,6 +1,6 @@
 name: Process execution from a self-deleting binary
 id: 0f0da517-b22c-4d14-9adc-36baeb621cf7
-version: 1.0.4
+version: 1.0.3
 description: |
   Identifies the execution of the process from a self-deleting binary. The attackers can
   abuse undocumented API functions to create a process from a file-backed section. The file 
@@ -43,4 +43,4 @@ output: >
   Process %2.image.path spawned from self-deleting binary
 severity: high
 
-min-engine-version: 2.4.0
+min-engine-version: 3.0.0
