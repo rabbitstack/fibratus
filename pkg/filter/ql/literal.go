@@ -21,7 +21,6 @@ package ql
 import (
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
-	"github.com/rabbitstack/fibratus/pkg/util/hashers"
 	"golang.org/x/sys/windows"
 	"net"
 	"reflect"
@@ -280,12 +279,15 @@ type SequenceExpr struct {
 	// Alias represents the sequence expression alias.
 	Alias string
 
-	buckets map[uint32]bool
-	types   []event.Type
+	typeBuckets     map[event.Type]bool
+	categoryBuckets map[uint8]bool
+
+	types []event.Type
 }
 
 func (e *SequenceExpr) init() {
-	e.buckets = make(map[uint32]bool)
+	e.typeBuckets = make(map[event.Type]bool)
+	e.categoryBuckets = make(map[uint8]bool)
 	e.types = make([]event.Type, 0)
 	e.BoundFields = make([]*BoundFieldLiteral, 0)
 }
@@ -338,12 +340,15 @@ func (e *SequenceExpr) walk() {
 
 	// initialize event type/category buckets for every such field
 	for name, values := range stringFields {
-		if name == fields.EvtName || name == fields.EvtCategory {
-			for _, v := range values {
-				e.buckets[hashers.FnvUint32([]byte(v))] = true
-				if etype := event.NameToType(v); etype.Exists() {
-					e.types = append(e.types, etype)
+		for _, v := range values {
+			switch name {
+			case fields.EvtName:
+				for _, typ := range event.NameToTypes(v) {
+					e.typeBuckets[typ] = true
+					e.types = append(e.types, typ)
 				}
+			case fields.EvtCategory:
+				e.categoryBuckets[event.Category(v).Index()] = true
 			}
 		}
 	}
@@ -354,7 +359,7 @@ func (e *SequenceExpr) walk() {
 // to be evaluated when the incoming event type or category pertains to the one
 // defined in the field literal.
 func (e *SequenceExpr) IsEvaluable(evt *event.Event) bool {
-	return e.buckets[evt.Type.Hash()] || e.buckets[evt.Category.Hash()]
+	return e.typeBuckets[evt.Type] || e.categoryBuckets[evt.Category.Index()]
 }
 
 // HasBoundFields determines if this sequence expression references any bound field.

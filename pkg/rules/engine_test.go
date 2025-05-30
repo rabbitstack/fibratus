@@ -141,7 +141,8 @@ func TestCompileIndexableFilters(t *testing.T) {
 
 	compileRules(t, e)
 
-	assert.Len(t, e.filters, 3)
+	assert.Len(t, e.filters.types, 5)
+	assert.Len(t, e.filters.categories, 1)
 
 	var tests = []struct {
 		evt   *event.Event
@@ -156,17 +157,9 @@ func TestCompileIndexableFilters(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.evt.Type.String(), func(t *testing.T) {
-			assert.Len(t, e.filters.collect(e.hashCache, tt.evt), tt.wants)
+			assert.Len(t, e.filters.collect(tt.evt), tt.wants)
 		})
 	}
-
-	assert.Len(t, e.hashCache.types, 4)
-
-	evt := &event.Event{Type: event.RecvTCPv4}
-
-	h1, h2 := e.hashCache.typeHash(evt), e.hashCache.categoryHash(evt)
-	assert.Equal(t, uint32(0xfa4dab59), h1)
-	assert.Equal(t, uint32(0x811c9dc5), h2)
 }
 
 func TestRunSimpleRules(t *testing.T) {
