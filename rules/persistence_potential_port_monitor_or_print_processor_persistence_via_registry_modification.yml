@@ -1,6 +1,6 @@
 name: Potential port monitor or print processor persistence via registry modification
 id: de04ae6b-8141-41af-9baa-15630b5954cc
-version: 1.0.0
+version: 1.0.1
 description: |
   Identifies port monitor or print process registry modifications that would allow
   adversaries to run malicious DLLs during system boot.
@@ -30,4 +30,4 @@ output: >
   Port monitor or print processor DLL registered under registry key %registry.path by process %ps.exe
 severity: high
 
-min-engine-version: 2.4.0
+min-engine-version: 3.0.0

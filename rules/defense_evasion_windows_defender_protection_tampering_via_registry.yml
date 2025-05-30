@@ -1,6 +1,6 @@
 name: Windows Defender protection tampering via registry
 id: 47ad962b-be0f-44f8-9467-34109f41e5ff
-version: 1.0.0
+version: 1.0.1
 description: |
   Detects suspicious processes modifying Windows Defender configuration settings via registry 
   to disable protection features.
@@ -62,4 +62,4 @@ output: >
   Suspicious process %ps.exe tampered Windows Defender security settings in registry value %registry.path
 severity: high
 
-min-engine-version: 2.4.0
+min-engine-version: 3.0.0

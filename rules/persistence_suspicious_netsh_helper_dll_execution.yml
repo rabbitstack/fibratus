@@ -1,6 +1,6 @@
 name: Suspicious Netsh Helper DLL execution
 id: bd17781d-38ca-4b9a-a12a-f807a1eb45e0
-version: 1.0.0
+version: 1.0.1
 description: |
   Identifies the execution of a suspicious Netsh Helper DLL. Adversaries may establish persistence 
   by executing malicious content triggered by Netsh Helper DLLs. Netsh.exe is a command-line scripting 
@@ -32,4 +32,4 @@ output: >
   Suspicious Netsh Helper DLL %2.thread.start_address.module executed
 severity: high
 
-min-engine-version: 2.4.0
+min-engine-version: 3.0.0

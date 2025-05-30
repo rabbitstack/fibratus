@@ -1,6 +1,6 @@
 name: Suspicious print processor loaded
 id: 3e0f5ef7-8a0a-4604-b2bf-d09606f45483
-version: 1.0.0
+version: 1.0.1
 description: |
   Identifies when the print spooler service loads unsigned or untrusted DLL and the callstack pattern
   indicates the print processor is loaded. Adversaries may abuse print processors to run malicious DLLs 
@@ -29,4 +29,4 @@ output: >
   Print spooler service loaded suspicious print processor DLL %image.path
 severity: high
 
-min-engine-version: 2.4.0
+min-engine-version: 3.0.0

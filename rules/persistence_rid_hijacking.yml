@@ -1,6 +1,6 @@
 name: RID Hijacking
 id: 5c25666a-4a9f-4b7c-b02f-db0b5cdbde83
-version: 1.0.2
+version: 1.0.3
 description: |
   RID (Relative ID part of security identifier) hijacking allows an attacker with SYSTEM
   level privileges to covertly replace the RID of a low privileged account effectively making
@@ -23,4 +23,4 @@ condition: >
     and
   ps.exe not imatches '?:\\Windows\\System32\\lsass.exe'
 
-min-engine-version: 2.4.0
+min-engine-version: 3.0.0

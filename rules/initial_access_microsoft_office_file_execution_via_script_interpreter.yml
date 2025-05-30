@@ -1,6 +1,6 @@
 name: Microsoft Office file execution via script interpreter
 id: bf3ea547-1470-4bcc-9945-3b495d962c2c
-version: 1.0.0
+version: 1.0.1
 description: |
   Identifies the execution via Windows script interpreter of the executable file written 
   by the Microsoft Office process.
@@ -32,4 +32,4 @@ output: >
   Microsoft Office process %1.ps.exe wrote the file %1.file.path and subsequently executed it via script interpreter %2.ps.exe
 severity: high
 
-min-engine-version: 2.4.0
+min-engine-version: 3.0.0

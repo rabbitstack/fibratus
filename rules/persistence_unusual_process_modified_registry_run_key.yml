@@ -1,6 +1,6 @@
 name: Unusual process modified registry run key
 id: 921508a5-b627-4c02-a295-6c6863c0897b
-version: 1.0.4
+version: 1.0.5
 description: |
   Identifies an attempt by unusual Windows native processes to modify
   the run key and gain persistence on users logons or machine reboots.
@@ -44,4 +44,4 @@ condition: >
       '?:\\Windows\\System32\\CompatTelRunner.exe'
     )
 
-min-engine-version: 2.4.0
+min-engine-version: 3.0.0

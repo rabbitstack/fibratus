@@ -1,6 +1,6 @@
 name: Potential Process Doppelganging
 id: eb34cf6e-ccc3-4bce-bbcf-013720640a28
-version: 1.0.0
+version: 1.0.1
 description: |
   Adversaries may inject malicious code into process via process doppelganging
   in order to evade process-based defenses as well as possibly elevate privileges.
@@ -56,4 +56,4 @@ condition: >
 action:
   - name: kill
 
-min-engine-version: 2.2.0
+min-engine-version: 3.0.0

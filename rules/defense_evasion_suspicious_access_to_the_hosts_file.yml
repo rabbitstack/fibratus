@@ -1,6 +1,6 @@
 name: Suspicious access to the hosts file
 id: f7b2c9d3-99e7-41d5-bb4a-6ea1a5f7f9e2
-version: 1.0.2
+version: 1.0.3
 description: >
   Identifies suspicious process accessing the Windows hosts file for potential tampering.
   Adversaries can hijack the hosts files to block traffic to download/update servers or redirect the
@@ -36,4 +36,4 @@ output: >
   Suspicious process %1.ps.child.exe accessed the hosts file for potential tampering
 severity: medium
 
-min-engine-version: 2.2.0
+min-engine-version: 3.0.0

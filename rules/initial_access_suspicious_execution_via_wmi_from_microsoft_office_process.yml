@@ -1,6 +1,6 @@
 name: Suspicious execution via WMI from a Microsoft Office process
 id: cc3f0bbe-ec53-40a7-9eed-f0a8a3f7d7fa
-version: 1.0.0
+version: 1.0.1
 description: |
   Identifies a suspicious process execution via Windows Management Instrumentation (WMI)
   originated from the Microsoft Office process loading an unusual WMI DLL. This technique
@@ -91,4 +91,4 @@ output: >
   Suspicious process %2.ps.child.exe launched via WMI from Microsoft Office process %1.ps.cmdline
 severity: high
 
-min-engine-version: 2.2.0
+min-engine-version: 3.0.0

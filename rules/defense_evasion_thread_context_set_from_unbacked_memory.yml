@@ -1,6 +1,6 @@
 name: Thread context set from unbacked memory
 id: f8219274-ee68-416b-8489-4d2e635c7844
-version: 1.0.3
+version: 1.0.4
 description: |
   Identifies manipulation of the thread context from unbacked memory region. This may be
   indicative of process injection.
@@ -23,4 +23,4 @@ condition: >
       '?:\\Windows\\System32\\taskhostw.exe'
     )
 
-min-engine-version: 2.2.0
+min-engine-version: 3.0.0

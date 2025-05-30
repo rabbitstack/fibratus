@@ -1,6 +1,6 @@
 name: Suspicious object symbolic link creation
 id: f9306355-1f5f-4a06-9779-195aa681db80
-version: 1.0.2
+version: 1.0.3
 description: |
   Identifies the creation of the object symbolic link inside the object manager namespace
   by untrusted or unusual processes.
@@ -18,7 +18,7 @@ references:
   - https://www.elastic.co/kr/blog/detect-block-unknown-knowndlls-windows-acl-hardening-attacks-cache-poisoning-escalation
 
 condition: >
-  create_symbolic_link_object and kevt.pid != 4 
+  create_symbolic_link_object and evt.pid != 4 
     and 
   (pe.is_signed = false or pe.is_trusted = false or ps.exe not imatches
     (
@@ -32,10 +32,10 @@ condition: >
     )
   )
     and
-  kevt.arg[target] not imatches '\\Sessions\\*\\AppContainerNamedObjects\\*'
+  evt.arg[target] not imatches '\\Sessions\\*\\AppContainerNamedObjects\\*'
 
 output: >
-  Suspicious object symbolic link %kevt.arg[target] created by process %ps.exe
+  Suspicious object symbolic link %evt.arg[target] created by process %ps.exe
 severity: high
 
-min-engine-version: 2.4.0
+min-engine-version: 3.0.0

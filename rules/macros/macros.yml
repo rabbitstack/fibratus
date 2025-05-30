@@ -1,89 +1,89 @@
 - macro: spawn_process
-  expr: kevt.name = 'CreateProcess'
+  expr: evt.name = 'CreateProcess'
 
 - macro: create_thread
-  expr: kevt.name = 'CreateThread'
+  expr: evt.name = 'CreateThread'
 
 - macro: create_remote_thread
-  expr: create_thread and kevt.pid != 4 and kevt.pid != thread.pid
+  expr: create_thread and evt.pid != 4 and evt.pid != thread.pid
 
 - macro: open_process
-  expr: kevt.name = 'OpenProcess' and ps.access.status = 'Success'
+  expr: evt.name = 'OpenProcess' and ps.access.status = 'Success'
 
 - macro: open_thread
-  expr: kevt.name = 'OpenThread' and thread.access.status = 'Success'
+  expr: evt.name = 'OpenThread' and thread.access.status = 'Success'
 
 - macro: open_remote_thread
-  expr: open_thread and kevt.pid != 4 and kevt.pid != kevt.arg[pid]
+  expr: open_thread and evt.pid != 4 and evt.pid != evt.arg[pid]
 
 - macro: write_file
-  expr: kevt.name = 'WriteFile'
+  expr: evt.name = 'WriteFile'
 
 - macro: open_file
-  expr: kevt.name = 'CreateFile' and file.operation = 'OPEN' and file.status = 'Success'
+  expr: evt.name = 'CreateFile' and file.operation = 'OPEN' and file.status = 'Success'
 
 - macro: create_file
-  expr: kevt.name = 'CreateFile' and file.operation != 'OPEN' and file.status = 'Success'
+  expr: evt.name = 'CreateFile' and file.operation != 'OPEN' and file.status = 'Success'
 
 - macro: rename_file
-  expr: kevt.name = 'RenameFile'
+  expr: evt.name = 'RenameFile'
 
 - macro: read_file
-  expr: kevt.name = 'ReadFile'
+  expr: evt.name = 'ReadFile'
 
 - macro: delete_file
-  expr: kevt.name = 'DeleteFile'
+  expr: evt.name = 'DeleteFile'
 
 - macro: set_file_information
-  expr: kevt.name = 'SetFileInformation'
+  expr: evt.name = 'SetFileInformation'
 
 - macro: query_registry
-  expr: kevt.name in ('RegQueryKey', 'RegQueryValue') and registry.status = 'Success'
+  expr: evt.name in ('RegQueryKey', 'RegQueryValue') and registry.status = 'Success'
 
 - macro: open_registry
-  expr: kevt.name = 'RegOpenKey' and registry.status = 'Success'
+  expr: evt.name = 'RegOpenKey' and registry.status = 'Success'
 
 - macro: load_module
-  expr: kevt.name = 'LoadImage'
+  expr: evt.name = 'LoadImage'
 
 - macro: unload_module
-  expr: kevt.name = 'UnloadImage'
+  expr: evt.name = 'UnloadImage'
 
 - macro: set_value
-  expr: kevt.name = 'RegSetValue' and registry.status = 'Success'
+  expr: evt.name = 'RegSetValue' and registry.status = 'Success'
 
 - macro: create_key
-  expr: kevt.name = 'RegCreateKey' and registry.status = 'Success'
+  expr: evt.name = 'RegCreateKey' and registry.status = 'Success'
 
 - macro: modify_registry
   expr: ((set_value) or (create_key))
 
 - macro: send_socket
-  expr: kevt.name = 'Send'
+  expr: evt.name = 'Send'
 
 - macro: recv_socket
-  expr: kevt.name = 'Recv'
+  expr: evt.name = 'Recv'
 
 - macro: connect_socket
-  expr: kevt.name = 'Connect'
+  expr: evt.name = 'Connect'
 
 - macro: accept_socket
-  expr: kevt.name = 'Accept'
+  expr: evt.name = 'Accept'
 
 - macro: set_thread_context
-  expr: kevt.name = 'SetThreadContext' and kevt.arg[status] = 'Success'
+  expr: evt.name = 'SetThreadContext' and evt.arg[status] = 'Success'
 
 - macro: virtual_alloc
-  expr: kevt.name = 'VirtualAlloc'
+  expr: evt.name = 'VirtualAlloc'
 
 - macro: virtual_free
-  expr: kevt.name = 'VirtualFree'
+  expr: evt.name = 'VirtualFree'
 
 - macro: map_view_file
-  expr: kevt.name = 'MapViewFile'
+  expr: evt.name = 'MapViewFile'
 
 - macro: unmap_view_file
-  expr: kevt.name = 'UnmapViewFile'
+  expr: evt.name = 'UnmapViewFile'
 
 - macro: map_view_of_section
   expr: map_view_file and file.view.type in ('IMAGE', 'IMAGE_NO_EXECUTE', 'PAGEFILE')
@@ -92,19 +92,19 @@
   expr: unmap_view_file and file.view.type in ('IMAGE', 'IMAGE_NO_EXECUTE')
 
 - macro: duplicate_handle
-  expr: kevt.name = 'DuplicateHandle'
+  expr: evt.name = 'DuplicateHandle'
 
 - macro: create_handle
-  expr: kevt.name = 'CreateHandle'
+  expr: evt.name = 'CreateHandle'
 
 - macro: query_dns
-  expr: kevt.name = 'QueryDns'
+  expr: evt.name = 'QueryDns'
 
 - macro: reply_dns
-  expr: kevt.name = 'ReplyDns'
+  expr: evt.name = 'ReplyDns'
 
 - macro: create_symbolic_link_object
-  expr: kevt.name = 'CreateSymbolicLinkObject' and kevt.arg[status] = 'Success'
+  expr: evt.name = 'CreateSymbolicLinkObject' and evt.arg[status] = 'Success'
 
 - macro: inbound_network
   expr: >

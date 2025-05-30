@@ -1,6 +1,6 @@
 name: Vulnerable or malicious driver loaded
 id: e8005f1d-b4ec-45ee-a3ea-4247eac123db
-version: 1.0.1
+version: 1.0.2
 description: |
   Detects when adversaries load a vulnerable/malicious driver
   into the compromised system to exploit the vulnerability and
@@ -23,4 +23,4 @@ condition: >
 output: >
   Vulnerable or malicious %image.path driver loaded
 
-min-engine-version: 2.4.0
+min-engine-version: 3.0.0
