@@ -163,7 +163,6 @@ $ dotnet tool install --global wix --version 5.0.0
 Now use the `pkg` target from the `./make.bat` script to build the MSI package.
 
 ```
-$ $env:VERSION="0.0.0"
 $ ./make.bat pkg
 ```
 
