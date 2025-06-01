@@ -19,6 +19,7 @@
 package event
 
 import (
+	"github.com/bits-and-blooms/bitset"
 	"github.com/rabbitstack/fibratus/pkg/util/hashers"
 )
 
@@ -67,6 +68,56 @@ const (
 // Hash obtains the hash of the category string.
 func (c Category) Hash() uint32 {
 	return hashers.FnvUint32([]byte(c))
+}
+
+// CategoryMasks allows setting and checking the category bit mask.
+type CategoryMasks struct {
+	bs bitset.BitSet
+}
+
+// Set sets the category bit in the bit mask.
+func (m *CategoryMasks) Set(c Category) {
+	m.bs.Set(uint(c.Index()))
+}
+
+// Test checks if the given category bit is set.
+func (m *CategoryMasks) Test(c Category) bool {
+	return m.bs.Test(uint(c.Index()))
+}
+
+// MaxCategoryIndex designates the maximum category index.
+const MaxCategoryIndex = 13
+
+// Index returns a numerical category index.
+func (c Category) Index() uint8 {
+	switch c {
+	case Registry:
+		return 1
+	case File:
+		return 2
+	case Net:
+		return 3
+	case Process:
+		return 4
+	case Thread:
+		return 5
+	case Image:
+		return 6
+	case Handle:
+		return 7
+	case Driver:
+		return 8
+	case Mem:
+		return 9
+	case Object:
+		return 10
+	case Threadpool:
+		return 11
+	case Other:
+		return 12
+	default:
+		return MaxCategoryIndex
+	}
 }
 
 // Categories returns all available categories.

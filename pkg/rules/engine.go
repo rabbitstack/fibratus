@@ -27,7 +27,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/rules/action"
-	"github.com/rabbitstack/fibratus/pkg/util/hashers"
 	log "github.com/sirupsen/logrus"
 	"sync"
 	"time"
@@ -53,7 +52,7 @@ var (
 // the collection of compiled filters that are derived
 // from the loaded ruleset.
 type Engine struct {
-	filters compiledFilters
+	filters *filterset
 	config  *config.Config
 	psnap   ps.Snapshotter
 
@@ -65,53 +64,11 @@ type Engine struct {
 
 	compiler *compiler
 
-	hashCache *hashCache
-
 	matchFunc RuleMatchFunc
 }
 
 type ruleMatch struct {
 	ctx *config.ActionContext
-}
-
-// hashCache caches the event type/category FNV hashes
-type hashCache struct {
-	mu             sync.RWMutex
-	types          map[event.Type]uint32
-	cats           map[event.Category]uint32
-	lookupCategory bool
-}
-
-func newHashCache() *hashCache {
-	return &hashCache{types: make(map[event.Type]uint32), cats: make(map[event.Category]uint32)}
-}
-
-func (c *hashCache) typeHash(e *event.Event) uint32 {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.types[e.Type]
-}
-
-func (c *hashCache) categoryHash(e *event.Event) uint32 {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.cats[e.Category]
-}
-
-func (c *hashCache) addTypeHash(e *event.Event) uint32 {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	h := e.Type.Hash()
-	c.types[e.Type] = h
-	return h
-}
-
-func (c *hashCache) addCategoryHash(e *event.Event) uint32 {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	h := e.Category.Hash()
-	c.cats[e.Category] = h
-	return h
 }
 
 type compiledFilter struct {
@@ -120,27 +77,29 @@ type compiledFilter struct {
 	ss     *sequenceState
 }
 
-type compiledFilters map[uint32][]*compiledFilter
+// filterset contains compiled filters indexed by event type and category.
+type filterset struct {
+	types      map[event.Type][]*compiledFilter
+	categories map[uint8][]*compiledFilter
+}
 
-// collect collects all compiled filters for a
-// particular event type or category. If no filters
-// are found, the event is not asserted against the
-// ruleset.
-func (filters compiledFilters) collect(hashCache *hashCache, e *event.Event) []*compiledFilter {
-	h := hashCache.typeHash(e)
-	if h == 0 {
-		h = hashCache.addTypeHash(e)
+func newFilterset() *filterset {
+	fs := &filterset{
+		types:      make(map[event.Type][]*compiledFilter),
+		categories: make(map[uint8][]*compiledFilter),
 	}
+	return fs
+}
 
-	if !hashCache.lookupCategory {
-		return filters[h]
-	}
+func (f *filterset) empty() bool {
+	return len(f.types) == 0 && len(f.categories) == 0
+}
 
-	c := hashCache.categoryHash(e)
-	if c == 0 {
-		c = hashCache.addCategoryHash(e)
+func (f *filterset) collect(e *event.Event) []*compiledFilter {
+	if len(f.categories) == 0 {
+		return f.types[e.Type]
 	}
-	return append(filters[h], filters[c]...)
+	return append(f.types[e.Type], f.categories[e.Category.Index()]...)
 }
 
 func newCompiledFilter(f filter.Filter, c *config.FilterConfig, ss *sequenceState) *compiledFilter {
@@ -172,14 +131,13 @@ func (f *compiledFilter) run(e *event.Event) bool {
 // NewEngine builds a fresh rules engine instance.
 func NewEngine(psnap ps.Snapshotter, config *config.Config) *Engine {
 	e := &Engine{
-		filters:   make(map[uint32][]*compiledFilter),
+		filters:   newFilterset(),
 		matches:   make([]*ruleMatch, 0),
 		sequences: make([]*sequenceState, 0),
 		psnap:     psnap,
 		config:    config,
 		scavenger: time.NewTicker(sequenceGcInterval),
 		compiler:  newCompiler(psnap, config),
-		hashCache: newHashCache(),
 	}
 
 	go e.gcSequences()
@@ -217,6 +175,7 @@ func (e *Engine) Compile() (*config.RulesCompileResult, error) {
 			// for more convenient tracking
 			e.sequences = append(e.sequences, ss)
 		}
+
 		if !fltr.isScoped() {
 			log.Warnf("%q rule doesn't have "+
 				"event type or event category condition! "+
@@ -227,18 +186,21 @@ func (e *Engine) Compile() (*config.RulesCompileResult, error) {
 				c.Name)
 			continue
 		}
+
 		// traverse all event name or category fields and determine
 		// the event type from the filter field name expression.
-		// We end up with a map of rules indexed by event name
-		// or event category hash
+		// We end up with a map of rules indexed by event type
+		// or event category
 		for name, values := range f.GetStringFields() {
 			for _, v := range values {
-				if name == fields.EvtName || name == fields.EvtCategory {
-					if name == fields.EvtCategory {
-						e.hashCache.lookupCategory = true
+				switch name {
+				case fields.EvtName:
+					for _, typ := range event.NameToTypes(v) {
+						e.filters.types[typ] = append(e.filters.types[typ], fltr)
 					}
-					hash := hashers.FnvUint32([]byte(v))
-					e.filters[hash] = append(e.filters[hash], fltr)
+				case fields.EvtCategory:
+					category := event.Category(v)
+					e.filters.categories[category.Index()] = append(e.filters.categories[category.Index()], fltr)
 				}
 			}
 		}
@@ -258,10 +220,10 @@ func (*Engine) CanEnqueue() bool { return true }
 // Filters can be simple direct-event matchers or sequence states that
 // track an ordered series of events over a short period of time.
 func (e *Engine) ProcessEvent(evt *event.Event) (bool, error) {
-	if len(e.filters) == 0 {
+	if e.filters.empty() {
 		return true, nil
 	}
-	var matches bool
+
 	if evt.IsTerminateProcess() {
 		// expire all sequences if the
 		// process referenced in any
@@ -270,7 +232,10 @@ func (e *Engine) ProcessEvent(evt *event.Event) (bool, error) {
 			seq.expire(evt)
 		}
 	}
-	filters := e.filters.collect(e.hashCache, evt)
+
+	filters := e.filters.collect(evt)
+
+	var matches bool
 	for _, f := range filters {
 		match := f.run(evt)
 		if !match {
@@ -293,6 +258,7 @@ func (e *Engine) ProcessEvent(evt *event.Event) (bool, error) {
 			return true, nil
 		}
 	}
+
 	return matches, nil
 }
 
