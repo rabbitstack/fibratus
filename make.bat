@@ -22,6 +22,10 @@ set GOTEST=go test -timeout=10m -v -gcflags=all=-d=checkptr=0
 set GOFMT=gofmt -e -s -l -w
 set GOLINT=%GOBIN%\golangci-lint
 
+if NOT DEFINED VERSION (
+    set VERSION="0.0.0"
+)
+
 FOR /F "tokens=* USEBACKQ" %%F IN (`powershell -Command get-date -format "{dd-MM-yyyy.HH:mm:ss}"`) DO (
     SET BUILD_DATE=%%F
 )
