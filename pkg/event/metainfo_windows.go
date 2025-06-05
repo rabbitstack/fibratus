@@ -216,10 +216,40 @@ var indexedEvents = []Info{
 // All returns all event types.
 func All() []Type {
 	s := make([]Type, 0, len(types))
-	for _, Type := range types {
-		s = append(s, Type)
+	for _, typ := range types {
+		s = append(s, typ)
 	}
 	return s
+}
+
+// AllWithState returns all event types +
+// event types used for state management.
+func AllWithState() []Type {
+	s := All()
+
+	s = append(s, ProcessRundown)
+	s = append(s, ThreadRundown)
+	s = append(s, ImageRundown)
+	s = append(s, FileRundown)
+	s = append(s, RegKCBRundown)
+	s = append(s, RegCreateKCB)
+	s = append(s, RegDeleteKCB)
+	s = append(s, FileOpEnd)
+	s = append(s, ReleaseFile)
+	s = append(s, MapFileRundown)
+	s = append(s, StackWalk)
+
+	return s
+}
+
+// MaxTypeID returns the maximum event type (hook id) value.
+func MaxTypeID() uint16 {
+	types := AllWithState()
+	ids := make([]uint16, len(types))
+	for i, t := range types {
+		ids[i] = t.HookID()
+	}
+	return slices.Max(ids)
 }
 
 // TypeToEventInfo maps the event type to the structure storing detailed information about the event.
