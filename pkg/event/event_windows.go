@@ -47,13 +47,15 @@ var (
 
 // New constructs a fresh event instance with basic fields and parameters
 // from the raw ETW event record.
-func New(seq uint64, typ Type, evt *etw.EventRecord) *Event {
+func New(seq uint64, evt *etw.EventRecord) *Event {
 	var (
 		pid = evt.Header.ProcessID
 		tid = evt.Header.ThreadID
 		cpu = *(*uint8)(unsafe.Pointer(&evt.BufferContext.ProcessorIndex[0]))
 		ts  = filetime.ToEpoch(evt.Header.Timestamp)
+		typ = NewTypeFromEventRecord(evt)
 	)
+
 	e := &Event{
 		Seq:         seq,
 		PID:         pid,
@@ -68,8 +70,10 @@ func New(seq uint64, typ Type, evt *etw.EventRecord) *Event {
 		Metadata:    make(map[MetadataKey]any),
 		Host:        hostname.Get(),
 	}
+
 	e.produceParams(evt)
 	e.adjustPID()
+
 	return e
 }
 

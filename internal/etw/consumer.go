@@ -74,22 +74,21 @@ func (c *Consumer) ProcessEvent(ev *etw.EventRecord) error {
 	if c.isClosing {
 		return nil
 	}
+
+	if !c.config.EventSource.EventExists(ev.ID()) {
+		eventsUnknown.Add(1)
+		return nil
+	}
 	if event.IsCurrentProcDropped(ev.Header.ProcessID) {
 		return nil
 	}
-	if c.config.EventSource.ExcludeEvent(ev.Header.ProviderID, ev.HookID()) {
+	if c.config.EventSource.ExcludeEvent(ev.ID()) {
 		eventsExcluded.Add(1)
 		return nil
 	}
 
-	etype := event.NewFromEventRecord(ev)
-	if !etype.Exists() {
-		eventsUnknown.Add(1)
-		return nil
-	}
-
 	eventsProcessed.Add(1)
-	evt := event.New(c.sequencer.Get(), etype, ev)
+	evt := event.New(c.sequencer.Get(), ev)
 
 	// Dispatch each event to the processor chain.
 	// Processors may further augment the event with

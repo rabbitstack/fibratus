@@ -55,8 +55,8 @@ func TestEventSourceConfig(t *testing.T) {
 	assert.False(t, c.EventSource.EnableImageEvents)
 	assert.False(t, c.EventSource.EnableFileIOEvents)
 
-	assert.True(t, c.EventSource.ExcludeEvent(event.CloseHandle.GUID(), event.CloseHandle.HookID()))
-	assert.False(t, c.EventSource.ExcludeEvent(event.CreateProcess.GUID(), event.CreateProcess.HookID()))
+	assert.True(t, c.EventSource.ExcludeEvent(event.CloseHandle.ID()))
+	assert.False(t, c.EventSource.ExcludeEvent(event.CreateProcess.ID()))
 
 	assert.True(t, c.EventSource.ExcludeImage(&pstypes.PS{Name: "svchost.exe"}))
 	assert.False(t, c.EventSource.ExcludeImage(&pstypes.PS{Name: "explorer.exe"}))
