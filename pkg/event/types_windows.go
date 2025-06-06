@@ -35,12 +35,10 @@ type Source uint8
 const (
 	// SystemLogger event is emitted by the system provider
 	SystemLogger Source = iota
-	// AuditAPICallsLogger event is emitted by Audit API calls provider
-	AuditAPICallsLogger
-	// DNSLogger event is emitted by DNS provider
-	DNSLogger
-	// ThreadpoolLogger event is emitted by thread pool provider
-	ThreadpoolLogger
+	// SecurityTelemetryLogger event is emitted by the combination of multiple providers.
+	// Most notably, DNS, thread pool, and kernel audit API providers are in charge of
+	// publishing the events.
+	SecurityTelemetryLogger
 )
 
 // Type identifies an event type. It comprises the event GUID + hook ID to uniquely identify the event
@@ -578,25 +576,13 @@ func (t *Type) HookID() uint16 {
 // Source designates the provenance of this event type.
 func (t Type) Source() Source {
 	switch t {
-	case OpenProcess, OpenThread, SetThreadContext, CreateSymbolicLinkObject:
-		return AuditAPICallsLogger
-	case QueryDNS, ReplyDNS:
-		return DNSLogger
-	case SubmitThreadpoolWork, SubmitThreadpoolCallback, SetThreadpoolTimer:
-		return ThreadpoolLogger
+	case OpenProcess, OpenThread, SetThreadContext, CreateSymbolicLinkObject,
+		QueryDNS, ReplyDNS, SubmitThreadpoolWork, SubmitThreadpoolCallback,
+		SetThreadpoolTimer:
+		return SecurityTelemetryLogger
 	default:
 		return SystemLogger
 	}
-}
-
-// CanArriveOutOfOrder indicates if the event can be
-// emitted by the provider in out-of-order fashion, i.e.
-// its timestamp is perfectly aligned in relation to other
-// events, but it appears first on the consumer callback
-// before other events published before it.
-func (t Type) CanArriveOutOfOrder() bool {
-	return t.Category() == Threadpool || t.Subcategory() == DNS ||
-		t == OpenProcess || t == OpenThread || t == SetThreadContext || t == CreateSymbolicLinkObject
 }
 
 // TypeFromParts builds the event type from provider GUID and hook ID.
