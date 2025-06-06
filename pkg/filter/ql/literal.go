@@ -21,7 +21,6 @@ package ql
 import (
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
-	"golang.org/x/sys/windows"
 	"net"
 	"reflect"
 	"strconv"
@@ -379,24 +378,19 @@ func (s Sequence) IsConstrained() bool {
 }
 
 func (s *Sequence) init() {
-	// determine if the sequence references
-	// an event type that can arrive out-of-order.
-	// The edge case is for unordered events emitted
-	// by the same provider where the temporal order
-	// is guaranteed
-	guids := make(map[windows.GUID]bool)
+	// determine if the sequence references an event type
+	// that can arrive out-of-order. This happens if the
+	// expressions in the sequence reference event types
+	// from different event sources
+	sources := make(map[event.Source]bool)
+
 	for _, expr := range s.Expressions {
 		for _, etype := range expr.types {
-			if etype.CanArriveOutOfOrder() {
-				s.IsUnordered = true
-			}
-			guids[etype.GUID()] = true
+			sources[etype.Source()] = true
 		}
 	}
 
-	if s.IsUnordered && len(guids) == 1 {
-		s.IsUnordered = false
-	}
+	s.IsUnordered = len(sources) > 1
 }
 
 func (s Sequence) impairBy() bool {

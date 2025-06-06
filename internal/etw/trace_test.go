@@ -20,7 +20,6 @@ package etw
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/config"
-	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
@@ -37,7 +36,7 @@ func TestStartTrace(t *testing.T) {
 		},
 	}
 
-	trace := NewTrace(etw.KernelLoggerSession, etw.KernelTraceControlGUID, 0, cfg)
+	trace := NewKernelTrace(cfg)
 	require.NoError(t, trace.Start())
 	require.True(t, trace.IsStarted())
 	defer trace.Stop()

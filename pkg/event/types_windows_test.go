@@ -128,9 +128,3 @@ func TestGUIDAndHookIDFromEventType(t *testing.T) {
 		})
 	}
 }
-
-func TestCanArriveOutOfOrder(t *testing.T) {
-	assert.False(t, RegSetValue.CanArriveOutOfOrder())
-	assert.False(t, VirtualAlloc.CanArriveOutOfOrder())
-	assert.True(t, OpenProcess.CanArriveOutOfOrder())
-}

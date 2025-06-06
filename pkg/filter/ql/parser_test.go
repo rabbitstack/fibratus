@@ -436,6 +436,12 @@ func TestIsSequenceUnordered(t *testing.T) {
 			`,
 			false,
 		},
+		{
+			`|evt.name = 'OpenProcess'| by ps.uuid
+			 |evt.name = 'QueryDns'| by ps.uuid
+			`,
+			false,
+		},
 	}
 
 	for i, tt := range tests {

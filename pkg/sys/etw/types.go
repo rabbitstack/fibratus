@@ -54,17 +54,15 @@ const (
 const (
 	// EventHeaderExtTypeStackTrace64 indicates that the extended data contains the call stack if the event is captured on a 64-bit host
 	EventHeaderExtTypeStackTrace64 uint16 = 0x0006
+	// NoKeywords indicates that no keywords are supplied to the provider
+	NoKeywords = 0
 )
 
 const (
 	// KernelLoggerSession represents the default session name for NT kernel logger
 	KernelLoggerSession = "NT Kernel Logger"
-	// KernelAuditAPICallsSession represents the session name for the kernel audit API logger
-	KernelAuditAPICallsSession = "Kernel Audit API Calls Logger"
-	// DNSClientSession represents the session name for the DNS client logger
-	DNSClientSession = "DNS Client Logger"
-	// ThreadpoolSession represents the session name for the thread pool logger
-	ThreadpoolSession = "Threadpool Logger"
+	// SecurityTelemetrySession represents the session name for all security telemetry
+	SecurityTelemetrySession = "Security Telemetry Logger"
 
 	// WnodeTraceFlagGUID indicates that the structure contains event tracing information
 	WnodeTraceFlagGUID = 0x00020000

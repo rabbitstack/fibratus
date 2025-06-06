@@ -54,6 +54,9 @@ func (s *StackExtensions) AddStackTracingWith(guid windows.GUID, hookID uint16) 
 // EventIds returns all event types eligible for stack tracing.
 func (s *StackExtensions) EventIds() []etw.ClassicEventID { return s.ids }
 
+// Empty determines if this stack extensions has registered event identifiers.
+func (s *StackExtensions) Empty() bool { return len(s.ids) == 0 }
+
 // EnableProcessCallstack populates the stack identifiers
 // with event types eligible for emitting stack walk events
 // related to process telemetry, such as creating a process,
