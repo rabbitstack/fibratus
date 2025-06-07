@@ -80,7 +80,7 @@ func TestEventTypeComparison(t *testing.T) {
 }
 
 func TestNewEventTypeFromEventRecord(t *testing.T) {
-	assert.Equal(t, CreateProcess, NewFromEventRecord(&etw.EventRecord{
+	assert.Equal(t, CreateProcess, NewTypeFromEventRecord(&etw.EventRecord{
 		Header: etw.EventHeader{
 			ProviderID: windows.GUID{Data1: 0x3d6fa8d0, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}},
 			EventDescriptor: etw.EventDescriptor{
@@ -88,7 +88,7 @@ func TestNewEventTypeFromEventRecord(t *testing.T) {
 			},
 		},
 	}))
-	assert.Equal(t, OpenProcess, NewFromEventRecord(&etw.EventRecord{
+	assert.Equal(t, OpenProcess, NewTypeFromEventRecord(&etw.EventRecord{
 		Header: etw.EventHeader{
 			ProviderID: windows.GUID{Data1: 0xe02a841c, Data2: 0x75a3, Data3: 0x4fa7, Data4: [8]byte{0xaf, 0xc8, 0xae, 0x09, 0xcf, 0x9b, 0x7f, 0x23}},
 			EventDescriptor: etw.EventDescriptor{
@@ -101,6 +101,10 @@ func TestNewEventTypeFromEventRecord(t *testing.T) {
 func TestEventTypeExists(t *testing.T) {
 	require.True(t, AcceptTCPv4.Exists())
 	require.True(t, AcceptTCPv6.Exists())
+}
+
+func TestTypeID(t *testing.T) {
+	assert.Equal(t, uint(14439051552138264620), SetThreadpoolTimer.ID())
 }
 
 func TestGUIDAndHookIDFromEventType(t *testing.T) {
@@ -126,5 +130,21 @@ func TestGUIDAndHookIDFromEventType(t *testing.T) {
 			assert.Equal(t, tt.guid.String(), tt.Type.GUID().String())
 			assert.Equal(t, tt.opcode, tt.Type.HookID())
 		})
+	}
+}
+
+func TestIDEquality(t *testing.T) {
+	evt := etw.EventRecord{Header: etw.EventHeader{ProviderID: ThreadEventGUID, EventDescriptor: etw.EventDescriptor{Opcode: 1}}}
+	typ := CreateThread
+	require.Equal(t, typ.ID(), evt.ID())
+}
+
+func TestEventTypeIDCollision(t *testing.T) {
+	ids := make(map[uint]Type)
+	for _, typ := range AllWithState() {
+		if etype, ok := ids[typ.ID()]; ok {
+			t.Fatalf("id collision for %s event type. Mapped event type: %s", typ.String(), etype.String())
+		}
+		ids[typ.ID()] = typ
 	}
 }

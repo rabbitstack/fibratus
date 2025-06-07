@@ -25,10 +25,6 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// ProvidersCount designates the number of interesting providers.
-// Remember to increment if a new event source is introduced.
-const ProvidersCount = 12
-
 // Source is the type that designates the provenance of the event
 type Source uint8
 
@@ -223,8 +219,8 @@ var (
 	UnknownType = pack(windows.GUID{}, 0)
 )
 
-// NewFromEventRecord creates a new event type from ETW event record.
-func NewFromEventRecord(ev *etw.EventRecord) Type {
+// NewTypeFromEventRecord creates a new event type from ETW event record.
+func NewTypeFromEventRecord(ev *etw.EventRecord) Type {
 	return pack(ev.Header.ProviderID, ev.HookID())
 }
 
@@ -571,6 +567,20 @@ func (t *Type) GUID() windows.GUID {
 // HookID returns the event operation code (hook ID) from the raw event type.
 func (t *Type) HookID() uint16 {
 	return binary.BigEndian.Uint16(t[16:])
+}
+
+// ID is an unsigned integer that uniquely
+// identifies the event. Handy for bitmask
+// operations.
+func (t Type) ID() uint {
+	id := uint(t[0])<<56 |
+		uint(t[1])<<48 |
+		uint(t[2])<<40 |
+		uint(t[3])<<32 |
+		uint(t[4])<<24 |
+		uint(t[5])<<16 |
+		uint(t.HookID())
+	return id
 }
 
 // Source designates the provenance of this event type.
