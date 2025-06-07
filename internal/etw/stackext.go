@@ -38,9 +38,9 @@ func NewStackExtensions(config config.EventSourceConfig) *StackExtensions {
 }
 
 // AddStackTracing enables stack tracing for the specified event type.
-func (s *StackExtensions) AddStackTracing(Type event.Type) {
-	if !s.config.TestDropMask(Type) {
-		s.ids = append(s.ids, etw.NewClassicEventID(Type.GUID(), Type.HookID()))
+func (s *StackExtensions) AddStackTracing(typ event.Type) {
+	if !s.config.TestDropMask(typ) {
+		s.ids = append(s.ids, etw.NewClassicEventID(typ.GUID(), typ.HookID()))
 	}
 }
 
@@ -53,6 +53,9 @@ func (s *StackExtensions) AddStackTracingWith(guid windows.GUID, hookID uint16) 
 
 // EventIds returns all event types eligible for stack tracing.
 func (s *StackExtensions) EventIds() []etw.ClassicEventID { return s.ids }
+
+// Empty determines if this stack extensions has registered event identifiers.
+func (s *StackExtensions) Empty() bool { return len(s.ids) == 0 }
 
 // EnableProcessCallstack populates the stack identifiers
 // with event types eligible for emitting stack walk events

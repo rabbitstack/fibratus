@@ -72,16 +72,10 @@ func initEventTraceProps(c config.EventSourceConfig) etw.EventTraceProperties {
 	}
 }
 
-// Trace is the essential building block for controlling
-// trace sessions and configuring event consumers. Such
-// operations include starting, stopping, and flushing
-// trace sessions, and opening the trace for processing
-// and event consumption.
-type Trace struct {
-	// Name represents the unique tracing session name.
-	Name string
+// ProviderInfo describes ETW provider metadata.
+type ProviderInfo struct {
 	// GUID is the globally unique identifier for the
-	// ETW provider.
+	// ETW provider for which the session is started.
 	GUID windows.GUID
 	// Keywords is the bitmask of keywords that determine
 	// the categories of events for the provider to emit.
@@ -91,8 +85,39 @@ type Trace struct {
 	// for providers that are enabled via etw.EnableProvider
 	// API.
 	Keywords uint64
-
+	// EnableStacks indicates if callstacks are enabled for
+	// this provider.
+	EnableStacks bool
 	// stackExtensions manager stack tracing enablement.
+	// For each event present in the stack identifiers,
+	// the StackWalk event is published by the provider.
+	stackExtensions *StackExtensions
+}
+
+func (p *ProviderInfo) HasStackExtensions() bool {
+	return p.stackExtensions != nil && !p.stackExtensions.Empty()
+}
+
+// Trace is the essential building block for controlling
+// trace sessions and configuring event consumers. Such
+// operations include starting, stopping, and flushing
+// trace sessions, and opening the trace for processing
+// and event consumption. Trace can be configured to
+// operate a single ETW provider, or it can act as a
+// container for multiple provider sessions.
+type Trace struct {
+	// Name represents the unique tracing session name.
+	Name string
+	// GUID is the globally unique identifier for the
+	// ETW provider for which the session is started.
+	GUID windows.GUID
+
+	// Providers is the list of providers to be run inside
+	// the tracing session. For each provider, the GUID,
+	// keywords and other parameters can be specified.
+	Providers []ProviderInfo
+
+	// stackExtensions manages stack tracing enablement.
 	// For each event present in the stack identifiers,
 	// the StackWalk event is published by the provider.
 	stackExtensions *StackExtensions
@@ -120,11 +145,66 @@ type Trace struct {
 	errs chan error
 }
 
-// NewTrace creates a new trace with specified name, provider GUID, and keywords.
-func NewTrace(name string, guid windows.GUID, keywords uint64, config *config.Config) *Trace {
-	t := &Trace{Name: name, GUID: guid, Keywords: keywords, stackExtensions: NewStackExtensions(config.EventSource), config: config}
+type opts struct {
+	stackexts *StackExtensions
+	keywords  uint64
+}
+
+// Option represents the option for the trace.
+type Option func(o *opts)
+
+// WithStackExts sets the stack extensions.
+func WithStackExts(stackexts *StackExtensions) Option {
+	return func(o *opts) {
+		o.stackexts = stackexts
+	}
+}
+
+// WithKeywords sets the bitmask of keywords that determine
+// the categories of events for the provider to emit.
+func WithKeywords(keywords uint64) Option {
+	return func(o *opts) {
+		o.keywords = keywords
+	}
+}
+
+// NewKernelTrace creates a new NT Kernel Logger trace.
+func NewKernelTrace(config *config.Config) *Trace {
+	t := &Trace{Name: etw.KernelLoggerSession, GUID: etw.KernelTraceControlGUID, stackExtensions: NewStackExtensions(config.EventSource), config: config}
 	t.enableCallstacks()
 	return t
+}
+
+// NewTrace creates a new trace that can host various ETW provider sessions.
+// The providers to be run inside the session can be given in the last argument
+// or added by the AddProvider method.
+func NewTrace(name string, config *config.Config, providers ...ProviderInfo) *Trace {
+	t := &Trace{Name: name, config: config, Providers: make([]ProviderInfo, 0)}
+	t.Providers = providers
+	return t
+}
+
+// AddProvider adds a new provider to the multi trace session
+// with optional parameters that influence the provider.
+func (t *Trace) AddProvider(guid windows.GUID, enableStacks bool, options ...Option) {
+	var opts opts
+
+	for _, opt := range options {
+		opt(&opts)
+	}
+
+	t.Providers = append(t.Providers, ProviderInfo{GUID: guid, Keywords: opts.keywords, EnableStacks: enableStacks, stackExtensions: opts.stackexts})
+}
+
+// HasProviders determines if this trace contains providers.
+func (t *Trace) HasProviders() bool { return len(t.Providers) > 0 }
+
+// IsGUIDEmpty determines if the provider GUID is empty.
+func (t *Trace) IsGUIDEmpty() bool {
+	return t.GUID.Data1 == 0 &&
+		t.GUID.Data2 == 0 &&
+		t.GUID.Data3 == 0 &&
+		t.GUID.Data4 == [8]byte{}
 }
 
 func (t *Trace) enableCallstacks() {
@@ -137,10 +217,6 @@ func (t *Trace) enableCallstacks() {
 
 		t.stackExtensions.EnableMemoryCallstack()
 	}
-
-	if t.IsThreadpoolTrace() {
-		t.stackExtensions.EnableThreadpoolCallstack()
-	}
 }
 
 // Start registers and starts an event tracing session.
@@ -151,6 +227,11 @@ func (t *Trace) Start() error {
 	if len(t.Name) > maxLoggerNameSize {
 		return fmt.Errorf("trace name [%s] is too long", t.Name)
 	}
+
+	if !t.IsGUIDEmpty() && t.HasProviders() {
+		return fmt.Errorf("%s trace has the root GUID set but providers are not empty", t.Name)
+	}
+
 	cfg := t.config.EventSource
 	props := initEventTraceProps(cfg)
 	flags := t.enableFlagsDynamically(cfg)
@@ -212,21 +293,34 @@ func (t *Trace) Start() error {
 		return etw.SetTraceSystemFlags(handle, sysTraceFlags)
 	}
 
-	// if we're starting a trace for non-system logger, the call
-	// to etw.EnableTrace is needed to configure how an ETW provider
-	// publishes events to the trace session. For instance, if stack
-	// enrichment is enabled, it is necessary to instruct the provider
-	// to emit stack addresses in the extended data item section when
-	// writing events to the session buffers
-	if cfg.StackEnrichment && !t.IsThreadpoolTrace() {
-		return etw.EnableTraceWithOpts(t.GUID, t.startHandle, t.Keywords, etw.EnableTraceOpts{WithStacktrace: true})
-	} else if cfg.StackEnrichment && len(t.stackExtensions.EventIds()) > 0 {
-		if err := etw.EnableStackTracing(t.startHandle, t.stackExtensions.EventIds()); err != nil {
-			return fmt.Errorf("fail to enable system events callstack tracing: %v", err)
+	// For each provider in multi trace, the call to etw.EnableTrace is
+	// needed to configure how an ETW provider publishes events to the
+	// trace session.
+	// For instance, if stack enrichment is enabled, it is necessary to
+	// instruct the provider to emit stack addresses in the extended
+	// data item section when writing events to the session buffers
+	for _, provider := range t.Providers {
+		switch {
+		case provider.EnableStacks && provider.HasStackExtensions():
+			if err := etw.EnableStackTracing(t.startHandle, provider.stackExtensions.EventIds()); err != nil {
+				return fmt.Errorf("fail to enable provider callstack tracing: %v", err)
+			}
+			if err := etw.EnableTrace(provider.GUID, t.startHandle, provider.Keywords); err != nil {
+				return err
+			}
+		case provider.EnableStacks:
+			opts := etw.EnableTraceOpts{WithStacktrace: true}
+			if err := etw.EnableTraceWithOpts(provider.GUID, t.startHandle, provider.Keywords, opts); err != nil {
+				return err
+			}
+		default:
+			if err := etw.EnableTrace(provider.GUID, t.startHandle, provider.Keywords); err != nil {
+				return err
+			}
 		}
 	}
 
-	return etw.EnableTrace(t.GUID, t.startHandle, t.Keywords)
+	return nil
 }
 
 // IsStarted indicates if the trace is started successfully.
@@ -316,9 +410,6 @@ func (t *Trace) Close() error {
 
 // IsKernelTrace determines if this is the system logger trace.
 func (t *Trace) IsKernelTrace() bool { return t.GUID == etw.KernelTraceControlGUID }
-
-// IsThreadpoolTrace determines if this is the thread pool logger trace.
-func (t *Trace) IsThreadpoolTrace() bool { return t.GUID == etw.ThreadpoolGUID }
 
 // enableFlagsDynamically crafts the system logger event mask
 // depending on the compiled rules result or the config state.

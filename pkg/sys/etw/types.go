@@ -59,12 +59,8 @@ const (
 const (
 	// KernelLoggerSession represents the default session name for NT kernel logger
 	KernelLoggerSession = "NT Kernel Logger"
-	// KernelAuditAPICallsSession represents the session name for the kernel audit API logger
-	KernelAuditAPICallsSession = "Kernel Audit API Calls Logger"
-	// DNSClientSession represents the session name for the DNS client logger
-	DNSClientSession = "DNS Client Logger"
-	// ThreadpoolSession represents the session name for the thread pool logger
-	ThreadpoolSession = "Threadpool Logger"
+	// SecurityTelemetrySession represents the session name for all security telemetry
+	SecurityTelemetrySession = "Security Telemetry Logger"
 
 	// WnodeTraceFlagGUID indicates that the structure contains event tracing information
 	WnodeTraceFlagGUID = 0x00020000
