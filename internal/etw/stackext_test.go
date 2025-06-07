@@ -38,6 +38,9 @@ func TestStackExtensions(t *testing.T) {
 			FlushTimer:         time.Millisecond * 2300,
 		},
 	}
+
+	cfg.EventSource.Init()
+
 	exts := NewStackExtensions(cfg.EventSource)
 	assert.Len(t, exts.EventIds(), 0)
 

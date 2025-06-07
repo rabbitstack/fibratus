@@ -23,7 +23,7 @@ package config
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/event"
-	"golang.org/x/sys/windows"
+	"github.com/rabbitstack/fibratus/pkg/util/bitmask"
 	"runtime"
 	"time"
 
@@ -102,7 +102,8 @@ type EventSourceConfig struct {
 	// ExcludedImages are process image names that will be rejected if they generate a kernel event.
 	ExcludedImages []string `json:"blacklist.images" yaml:"blacklist.images"`
 
-	dropMasks event.EventsetMasks
+	dropMasks *bitmask.Bitmask
+	allMasks  *bitmask.Bitmask
 
 	excludedImages map[string]bool
 }
@@ -127,13 +128,21 @@ func (c *EventSourceConfig) initFromViper(v *viper.Viper) {
 	c.ExcludedEvents = v.GetStringSlice(excludedEvents)
 	c.ExcludedImages = v.GetStringSlice(excludedImages)
 
+	c.dropMasks = bitmask.New()
+	c.allMasks = bitmask.New()
+
 	c.excludedImages = make(map[string]bool)
 
 	for _, name := range c.ExcludedEvents {
 		if typ := event.NameToType(name); typ != event.UnknownType {
-			c.dropMasks.Set(typ)
+			c.dropMasks.Set(typ.ID())
 		}
 	}
+
+	for _, typ := range event.AllWithState() {
+		c.allMasks.Set(typ.ID())
+	}
+
 	for _, name := range c.ExcludedImages {
 		c.excludedImages[name] = true
 	}
@@ -142,35 +151,54 @@ func (c *EventSourceConfig) initFromViper(v *viper.Viper) {
 // Init is an exported method to allow initializing exclusion maps from external modules.
 func (c *EventSourceConfig) Init() {
 	c.excludedImages = make(map[string]bool)
+
+	if c.dropMasks == nil {
+		c.dropMasks = bitmask.New()
+	}
 	for _, name := range c.ExcludedEvents {
 		for _, typ := range event.NameToTypes(name) {
 			if typ != event.UnknownType {
-				c.dropMasks.Set(typ)
+				c.dropMasks.Set(typ.ID())
 			}
 		}
 	}
+
 	for _, name := range c.ExcludedImages {
 		c.excludedImages[name] = true
+	}
+
+	if c.allMasks == nil {
+		c.allMasks = bitmask.New()
+	}
+	for _, typ := range event.AllWithState() {
+		c.allMasks.Set(typ.ID())
 	}
 }
 
 // SetDropMask inserts the event mask in the bitset to
 // instruct the given event type should be dropped from
 // the event stream.
-func (c *EventSourceConfig) SetDropMask(Type event.Type) {
-	c.dropMasks.Set(Type)
+func (c *EventSourceConfig) SetDropMask(typ event.Type) {
+	c.dropMasks.Set(typ.ID())
 }
 
 // TestDropMask checks if the specified event type has
 // the drop mask in the bitset.
-func (c *EventSourceConfig) TestDropMask(Type event.Type) bool {
-	return c.dropMasks.Test(Type.GUID(), Type.HookID())
+func (c *EventSourceConfig) TestDropMask(typ event.Type) bool {
+	return c.dropMasks.IsSet(typ.ID())
 }
 
-// ExcludeEvent determines whether the supplied provider GUID
-// and the hook identifier are in the bitset of excluded events.
-func (c *EventSourceConfig) ExcludeEvent(guid windows.GUID, hookID uint16) bool {
-	return c.dropMasks.Test(guid, hookID)
+// ExcludeEvent determines whether the supplied short
+// event ID exists in the bitset of excluded events.
+func (c *EventSourceConfig) ExcludeEvent(id uint) bool {
+	return c.dropMasks.IsSet(id)
+}
+
+// EventExists determines if the provided event ID exists
+// in the internal event catalog by checking the event ID
+// bitmask.
+func (c *EventSourceConfig) EventExists(id uint) bool {
+	return c.allMasks.IsSet(id)
 }
 
 // ExcludeImage determines whether the process generating event is present in the
