@@ -101,7 +101,7 @@ func TestEventSourceStartTraces(t *testing.T) {
 			1,
 			[]etw.EventTraceFlags{0x6018203, 0},
 		},
-		{"start kernel logger and audit api sessions",
+		{"start kernel and security telemetry logger sessions",
 			&config.Config{
 				EventSource: config.EventSourceConfig{
 					EnableThreadEvents:   true,

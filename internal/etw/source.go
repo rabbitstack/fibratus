@@ -32,7 +32,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 	"time"
 )
@@ -162,16 +161,34 @@ func (e *EventSource) Open(config *config.Config) error {
 		}
 	}
 
-	e.addTrace(etw.KernelLoggerSession, etw.KernelTraceControlGUID)
+	// add the core NT Kernel Logger trace
+	e.addTrace(NewKernelTrace(config))
+
+	// security telemetry trace hosts remaining ETW providers
+	trace := NewTrace(etw.SecurityTelemetrySession, config)
 
 	if config.EventSource.EnableDNSEvents {
-		e.addTrace(etw.DNSClientSession, etw.DNSClientGUID)
+		trace.AddProvider(etw.DNSClientGUID, false)
 	}
+
 	if config.EventSource.EnableAuditAPIEvents {
-		e.addTrace(etw.KernelAuditAPICallsSession, etw.KernelAuditAPICallsGUID)
+		trace.AddProvider(etw.KernelAuditAPICallsGUID, config.EventSource.StackEnrichment)
 	}
+
 	if config.EventSource.EnableThreadpoolEvents {
-		e.addTrace(etw.ThreadpoolSession, etw.ThreadpoolGUID)
+		// thread pool provider must be configured with
+		// stack extensions to activate stack walks events
+		var stackexts *StackExtensions
+		if e.config.EventSource.StackEnrichment {
+			stackexts = NewStackExtensions(config.EventSource)
+			stackexts.EnableThreadpoolCallstack()
+		}
+		trace.AddProvider(etw.ThreadpoolGUID, config.EventSource.StackEnrichment, WithStackExts(stackexts))
+	}
+
+	if trace.HasProviders() {
+		// add security telemetry trace
+		e.addTrace(trace)
 	}
 
 	for _, trace := range e.traces {
@@ -305,6 +322,6 @@ func (e *EventSource) RegisterEventListener(lis event.Listener) {
 	e.listeners = append(e.listeners, lis)
 }
 
-func (e *EventSource) addTrace(name string, guid windows.GUID) {
-	e.traces = append(e.traces, NewTrace(name, guid, 0x0, e.config))
+func (e *EventSource) addTrace(trace *Trace) {
+	e.traces = append(e.traces, trace)
 }
