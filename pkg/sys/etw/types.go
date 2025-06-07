@@ -564,6 +564,24 @@ func (e *EventRecord) HookID() uint16 {
 	return e.Header.EventDescriptor.ID
 }
 
+// ID is an unsigned integer that uniquely
+// identifies the event. Handy for bitmask
+// operations.
+func (e *EventRecord) ID() uint {
+	d1 := e.Header.ProviderID.Data1
+	d2 := e.Header.ProviderID.Data2
+
+	id := uint(byte(d1>>24))<<56 |
+		uint(byte(d1>>16))<<48 |
+		uint(byte(d1>>8))<<40 |
+		uint(byte(d1))<<32 |
+		uint(byte(d2>>8))<<24 |
+		uint(byte(d2))<<16 |
+		uint(e.HookID())
+
+	return id
+}
+
 // ReadByte reads the byte from the buffer at the specified offset.
 func (e *EventRecord) ReadByte(offset uint16) byte {
 	if offset > e.BufferLen {

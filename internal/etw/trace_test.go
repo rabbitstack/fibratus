@@ -36,6 +36,8 @@ func TestStartTrace(t *testing.T) {
 		},
 	}
 
+	cfg.EventSource.Init()
+
 	trace := NewKernelTrace(cfg)
 	require.NoError(t, trace.Start())
 	require.True(t, trace.IsStarted())

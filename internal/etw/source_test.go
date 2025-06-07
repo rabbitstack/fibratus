@@ -123,6 +123,7 @@ func TestEventSourceStartTraces(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			tt.cfg.EventSource.Init()
 			evs := NewEventSource(psnap, hsnap, tt.cfg, nil)
 			require.NoError(t, evs.Open(tt.cfg))
 			defer evs.Close()
@@ -193,6 +194,7 @@ func TestEventSourceEnableFlagsDynamically(t *testing.T) {
 		Filters: &config.Filters{},
 	}
 
+	cfg.EventSource.Init()
 	evs := NewEventSource(psnap, hsnap, cfg, r)
 	require.NoError(t, evs.Open(cfg))
 	defer evs.Close()
@@ -277,6 +279,7 @@ func TestEventSourceEnableFlagsDynamicallyWithYaraEnabled(t *testing.T) {
 		},
 	}
 
+	cfg.EventSource.Init()
 	evs := NewEventSource(psnap, hsnap, cfg, r)
 	require.NoError(t, evs.Open(cfg))
 	defer evs.Close()
@@ -328,6 +331,7 @@ func TestEventSourceRundownEvents(t *testing.T) {
 		Filters:     &config.Filters{},
 	}
 
+	cfg.EventSource.Init()
 	evs := NewEventSource(psnap, hsnap, cfg, nil)
 
 	l := &MockListener{}
@@ -741,6 +745,7 @@ func TestEventSourceAllEvents(t *testing.T) {
 		StackEnrichment:      false,
 	}
 
+	evsConfig.Init()
 	cfg := &config.Config{EventSource: evsConfig, Filters: &config.Filters{}}
 	evs := NewEventSource(psnap, hsnap, cfg, nil)
 
@@ -1225,6 +1230,8 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 		ExcludedEvents:       []string{"WriteFile", "ReadFile", "RegOpenKey", "RegCloseKey", "CloseFile"},
 		FlushTimer:           1,
 	}
+
+	evsConfig.Init()
 
 	cfg := &config.Config{
 		EventSource:              evsConfig,
