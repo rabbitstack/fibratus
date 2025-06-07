@@ -278,10 +278,8 @@ type SequenceExpr struct {
 	// Alias represents the sequence expression alias.
 	Alias string
 
-	emasks event.EventsetMasks
-	cmasks event.CategoryMasks
-
-	types []event.Type
+	bitsets event.BitSets
+	types   []event.Type
 }
 
 func (e *SequenceExpr) init() {
@@ -335,28 +333,47 @@ func (e *SequenceExpr) walk() {
 
 	WalkFunc(e.Expr, walk)
 
+	uniqCats := make(map[event.Category]bool)
+
 	// initialize event type/category buckets for every such field
 	for name, values := range stringFields {
 		for _, v := range values {
 			switch name {
 			case fields.EvtName:
 				for _, typ := range event.NameToTypes(v) {
-					e.emasks.Set(typ)
+					if typ == event.UnknownType {
+						continue
+					}
 					e.types = append(e.types, typ)
+					uniqCats[event.TypeToEventInfo(typ).Category] = true
 				}
 			case fields.EvtCategory:
-				e.cmasks.Set(event.Category(v))
+				e.bitsets.SetCategoryBit(event.Category(v))
 			}
+		}
+	}
+
+	for _, t := range e.types {
+		switch len(uniqCats) {
+		case 0:
+			continue
+		case 1:
+			// happy path can use a single bitmask for all
+			// event types pertaining to the same category
+			e.bitsets.SetBit(event.TypeBitSet, t)
+		default:
+			// use map-backed bitmask for event identifiers
+			e.bitsets.SetBit(event.BitmaskBitSet, t)
 		}
 	}
 }
 
 // IsEvaluable determines if the expression should be evaluated by inspecting
 // the event type filter fields defined in the expression. We permit the expression
-// to be evaluated when the incoming event type or category pertains to the one
+// to be evaluated when the incoming event type, ID, or category pertains to the one
 // defined in the field literal.
 func (e *SequenceExpr) IsEvaluable(evt *event.Event) bool {
-	return e.emasks.Test(evt.Type.GUID(), evt.Type.HookID()) || e.cmasks.Test(evt.Category)
+	return e.bitsets.IsBitSet(evt)
 }
 
 // HasBoundFields determines if this sequence expression references any bound field.
