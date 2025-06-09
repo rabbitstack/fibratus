@@ -28,10 +28,10 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/filter"
 	"github.com/rabbitstack/fibratus/pkg/filter/ql"
 	"github.com/rabbitstack/fibratus/pkg/ps"
-	"github.com/rabbitstack/fibratus/pkg/util/atomic"
 	log "github.com/sirupsen/logrus"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -130,7 +130,6 @@ func newSequenceState(f filter.Filter, c *config.FilterConfig, psnap ps.Snapshot
 		exprs:         make(map[int]string),
 		spanDeadlines: make(map[fsm.State]*time.Timer),
 		initialState:  sequenceInitialState,
-		inDeadline:    atomic.MakeBool(false),
 		psnap:         psnap,
 	}
 
