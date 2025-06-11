@@ -53,6 +53,7 @@ var (
 	moduleCount               = expvar.NewInt("process.module.count")
 	mmapCount                 = expvar.NewInt("process.mmap.count")
 	pebReadErrors             = expvar.NewInt("process.peb.read.errors")
+	processEnrichments        = expvar.NewInt("process.enrichments")
 )
 
 type snapshotter struct {
@@ -146,6 +147,7 @@ func (s *snapshotter) Write(e *event.Event) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	processCount.Add(1)
+
 	pid, err := e.Params.GetPid()
 	if err != nil {
 		return err
@@ -154,8 +156,24 @@ func (s *snapshotter) Write(e *event.Event) error {
 	if err != nil {
 		return err
 	}
+
 	proc, err := s.newProcState(pid, ppid, e)
-	s.procs[pid] = proc
+	if ps := s.procs[pid]; ps == nil && (e.IsCreateProcessInternal() || e.IsProcessRundownInternal()) {
+		// only modify the state if there is no process derived from the NT kernel logger process events
+		s.procs[pid] = proc
+	} else if ps, ok := s.procs[pid]; ok && (e.IsCreateProcessInternal() || e.IsProcessRundownInternal()) {
+		// process state derived from the core kernel events exists - enrich it
+		ps.IntegrityLevel = proc.IntegrityLevel
+	} else if ps, ok := s.procs[pid]; ok && (e.IsCreateProcess() || e.IsProcessRundown()) {
+		// enrich the existing process state with the newly arrived NT kernel logger process events
+		processEnrichments.Add(1)
+		proc.IntegrityLevel = ps.IntegrityLevel
+		s.procs[pid] = proc
+	} else {
+		// in all other cases append process state
+		s.procs[pid] = proc
+	}
+
 	// adjust the process which is generating
 	// the event. For `CreateProcess` events
 	// the process context is scoped to the
@@ -165,9 +183,10 @@ func (s *snapshotter) Write(e *event.Event) error {
 	// snapshot state
 	if e.IsProcessRundown() {
 		e.PS = proc
-	} else {
+	} else if !e.IsProcessRundownInternal() {
 		e.PS = s.procs[e.PID]
 	}
+
 	return err
 }
 
@@ -317,6 +336,20 @@ func (s *snapshotter) Close() error {
 }
 
 func (s *snapshotter) newProcState(pid, ppid uint32, e *event.Event) (*pstypes.PS, error) {
+	if e.IsCreateProcessInternal() || e.IsProcessRundownInternal() {
+		proc := &pstypes.PS{
+			PID:            pid,
+			Ppid:           ppid,
+			IntegrityLevel: e.GetParamAsString(params.ProcessIntegrityLevel),
+			Threads:        make(map[uint32]pstypes.Thread),
+			Modules:        make([]pstypes.Module, 0),
+			Handles:        make([]htypes.Handle, 0),
+			Mmaps:          make([]pstypes.Mmap, 0),
+		}
+
+		return proc, nil
+	}
+
 	proc := pstypes.New(
 		pid,
 		ppid,

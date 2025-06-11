@@ -91,6 +91,9 @@ type PS struct {
 	// IsProtected denotes a protected process. The system restricts access to protected
 	// processes and the threads of protected processes.
 	IsProtected bool `json:"is_protected"`
+	// IntegrityLevel designates the process token integrity level. (e.g. High)
+	// Integrity level defines the trust between the process and a securable object.
+	IntegrityLevel string `json:"integrity_level"`
 }
 
 // UUID is meant to offer a more robust version of process ID that
@@ -150,6 +153,7 @@ func (ps *PS) String() string {
 		Exe:  %s
 		Cwd:  %s
 		SID:  %s
+		Integrity level: %s
 		Username: %s
 		Domain: %s
 		Args: %s
@@ -165,6 +169,7 @@ func (ps *PS) String() string {
 			ps.Exe,
 			ps.Cwd,
 			ps.SID,
+			ps.IntegrityLevel,
 			ps.Username,
 			ps.Domain,
 			ps.Args,
@@ -180,6 +185,7 @@ func (ps *PS) String() string {
 		Exe:  %s
 		Cwd:  %s
 		SID:  %s
+		Integrity level: %s
 		Username: %s
 		Domain: %s
 		Args: %s
@@ -193,6 +199,7 @@ func (ps *PS) String() string {
 		ps.Exe,
 		ps.Cwd,
 		ps.SID,
+		ps.IntegrityLevel,
 		ps.Username,
 		ps.Domain,
 		ps.Args,
@@ -246,6 +253,7 @@ func (ps *PS) StringShort() string {
 		Exe:  %s
 		Cwd:  %s
 		SID:  %s
+		Integrity level: %s
 		Username: %s
 		Domain: %s
 		Args: %s
@@ -259,6 +267,7 @@ func (ps *PS) StringShort() string {
 		ps.Exe,
 		ps.Cwd,
 		ps.SID,
+		ps.IntegrityLevel,
 		ps.Username,
 		ps.Domain,
 		ps.Args,

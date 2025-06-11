@@ -41,7 +41,7 @@ func newPsProcessor(psnap ps.Snapshotter, regionProber *va.RegionProber) Process
 
 func (p psProcessor) ProcessEvent(e *event.Event) (*event.Event, bool, error) {
 	switch e.Type {
-	case event.CreateProcess, event.TerminateProcess, event.ProcessRundown:
+	case event.CreateProcess, event.CreateProcessInternal, event.TerminateProcess, event.ProcessRundown, event.ProcessRundownInternal:
 		evt, err := p.processEvent(e)
 		if evt.IsTerminateProcess() {
 			p.regionProber.Remove(evt.Params.MustGetPid())
@@ -86,6 +86,10 @@ func (p psProcessor) ProcessEvent(e *event.Event) (*event.Event, bool, error) {
 
 //nolint:unparam
 func (p psProcessor) processEvent(e *event.Event) (*event.Event, error) {
+	if e.IsCreateProcessInternal() || e.IsProcessRundownInternal() {
+		return e, nil
+	}
+
 	cmndline := cmdline.New(e.GetParamAsString(params.Cmdline)).
 		// get rid of leading/trailing quotes in the executable path
 		CleanExe().

@@ -24,6 +24,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/rabbitstack/fibratus/pkg/util/ip"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
@@ -76,6 +77,26 @@ func (p Param) String() string {
 		sid, err := getSID(&p)
 		if err != nil {
 			return ""
+		}
+		if p.Name == params.ProcessIntegrityLevel {
+			switch sid.SubAuthority(uint32(sid.SubAuthorityCount() - 1)) {
+			case sys.UntrustedRid:
+				return "Untrusted"
+			case sys.LowRid:
+				return "Low"
+			case sys.MediumRid:
+				return "Medium"
+			case sys.MediumPlusRid:
+				return "Medium+"
+			case sys.HighRid:
+				return "High"
+			case sys.SystemRid:
+				return "System"
+			case sys.ProtectedProcessRid:
+				return "Protected"
+			default:
+				return "Unknown"
+			}
 		}
 		return sid.String()
 	case params.DOSPath:
@@ -180,7 +201,7 @@ func (pars Params) GetSID() (*windows.SID, error) {
 func getSID(param *Param) (*windows.SID, error) {
 	sid, ok := param.Value.([]byte)
 	if !ok {
-		return nil, fmt.Errorf("unable to type cast %q parameter to []byte value", params.UserSID)
+		return nil, fmt.Errorf("unable to type cast %q parameter to []byte value", param.Name)
 	}
 	b := uintptr(unsafe.Pointer(&sid[0]))
 	if param.Type == params.WbemSID {
@@ -207,9 +228,7 @@ func (pars Params) MustGetSID() *windows.SID {
 // schema changes in order to parse new fields.
 func (e *Event) produceParams(evt *etw.EventRecord) {
 	switch e.Type {
-	case ProcessRundown,
-		CreateProcess,
-		TerminateProcess:
+	case ProcessRundown, CreateProcess, TerminateProcess:
 		var (
 			kproc      uint64
 			pid, ppid  uint32
@@ -247,7 +266,7 @@ func (e *Event) produceParams(evt *etw.EventRecord) {
 		default:
 			offset = 24
 		}
-		sid, soffset = evt.ReadSID(offset)
+		sid, soffset = evt.ReadSID(offset, true)
 		name, noffset = evt.ReadAnsiString(soffset)
 		cmdline, _ = evt.ReadUTF16String(soffset + noffset)
 		e.AppendParam(params.ProcessObject, params.Address, kproc)
@@ -261,6 +280,27 @@ func (e *Event) produceParams(evt *etw.EventRecord) {
 		e.AppendParam(params.UserSID, params.WbemSID, sid)
 		e.AppendParam(params.ProcessName, params.AnsiString, name)
 		e.AppendParam(params.Cmdline, params.UnicodeString, cmdline)
+	case CreateProcessInternal, ProcessRundownInternal:
+		var (
+			pid       uint32
+			seqNumber uint64
+			ppid      uint32
+			//createTime windows.Filetime
+			integrityLevel []byte
+		)
+
+		pid = evt.ReadUint32(0)
+		seqNumber = evt.ReadUint64(4)
+		//createTime = windows.NsecToFiletime(int64(evt.ReadUint64(12)))
+		ppid = evt.ReadUint32(20)
+		var offset uint16
+		integrityLevel, offset = evt.ReadSID(24+8+4+4+4+4, false)
+
+		fmt.Println(evt.ReadUTF16String(offset))
+		e.AppendParam(params.ProcessID, params.PID, pid)
+		e.AppendParam("Seq number", params.Uint64, seqNumber)
+		e.AppendParam(params.ProcessParentID, params.PID, ppid)
+		e.AppendParam(params.ProcessIntegrityLevel, params.SID, integrityLevel)
 	case OpenProcess:
 		processID := evt.ReadUint32(0)
 		desiredAccess := evt.ReadUint32(4)
@@ -276,9 +316,7 @@ func (e *Event) produceParams(evt *etw.EventRecord) {
 			((desiredAccess & windows.PROCESS_CREATE_THREAD) != 0) || ((desiredAccess & windows.PROCESS_SET_INFORMATION) != 0) {
 			e.AppendParam(params.Callstack, params.Slice, evt.Callstack())
 		}
-	case CreateThread,
-		TerminateThread,
-		ThreadRundown:
+	case CreateThread, TerminateThread, ThreadRundown:
 		var (
 			pid            uint32
 			tid            uint32
@@ -369,9 +407,7 @@ func (e *Event) produceParams(evt *etw.EventRecord) {
 		e.AppendParam(params.HandleObjectTypeID, params.HandleType, typeID)
 		e.AppendParam(params.ProcessID, params.PID, sourcePID)
 		e.AppendParam(params.TargetProcessID, params.PID, targetPID)
-	case LoadImage,
-		UnloadImage,
-		ImageRundown:
+	case LoadImage, UnloadImage, ImageRundown:
 		var (
 			pid               uint32
 			checksum          uint32
@@ -512,9 +548,7 @@ func (e *Event) produceParams(evt *etw.EventRecord) {
 		e.AppendParam(params.FileObject, params.Address, fileObject)
 		e.AppendParam(params.FileKey, params.Address, fileKey)
 		e.AppendParam(params.ThreadID, params.TID, tid)
-	case DeleteFile,
-		RenameFile,
-		SetFileInformation:
+	case DeleteFile, RenameFile, SetFileInformation:
 		var (
 			irp        uint64
 			fileObject uint64

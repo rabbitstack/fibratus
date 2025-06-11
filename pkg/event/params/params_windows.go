@@ -58,6 +58,8 @@ const (
 	ExitStatus = "exit_status"
 	// StartTime field denotes the process start time.
 	StartTime = "start_time"
+	// ProcessIntegrityLevel field denotes the process integrity level.
+	ProcessIntegrityLevel = "integrity_level"
 
 	// DesiredAccess field denotes the access rights for different kernel objects such as processes or threads.
 	DesiredAccess = "desired_access"

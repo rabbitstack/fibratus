@@ -65,6 +65,8 @@ var (
 	DNSEventGUID = windows.GUID{Data1: 0x1c95126e, Data2: 0x7eea, Data3: 0x49a9, Data4: [8]byte{0xa3, 0xfe, 0xa3, 0x78, 0xb0, 0x3d, 0xdb, 0x4d}}
 	// ThreadpoolGUID represents the thread pool event GUID
 	ThreadpoolGUID = windows.GUID{Data1: 0xc861d0e2, Data2: 0xa2c1, Data3: 0x4d36, Data4: [8]byte{0x9f, 0x9c, 0x97, 0x0b, 0xab, 0x94, 0x3a, 0x12}}
+	// ProcessKernelEventGUID represents the Process Kernel event GUID
+	ProcessKernelEventGUID = windows.GUID{Data1: 0x22fb2cd6, Data2: 0x0e7b, Data3: 0x422b, Data4: [8]byte{0xa0, 0xc7, 0x2f, 0xad, 0x1f, 0xd0, 0xe7, 0x16}}
 )
 
 var (
@@ -76,6 +78,13 @@ var (
 	ProcessRundown = pack(ProcessEventGUID, 3)
 	// OpenProcess identifies the kernel events that are triggered when the process handle is acquired
 	OpenProcess = pack(AuditAPIEventGUID, 5)
+	// CreateProcessInternal identifies the process creation event emitted by the Microsoft Windows Kernel Process provider.
+	// The only purpose of this event is to enrich the process state with some extra attributes, and populates the snapshotter
+	// for events running in the Security Telemetry session that might miss process lookups because the core NT Kernel Provider
+	// hasn't still published the CreateProcess or ProcessRundown event
+	CreateProcessInternal = pack(ProcessKernelEventGUID, 1)
+	// ProcessRundownInternal same as above but for process rundown events originating from the Microsoft Windows Kernel Process provider.
+	ProcessRundownInternal = pack(ProcessKernelEventGUID, 15)
 
 	// CreateThread identifies thread creation kernel events
 	CreateThread = pack(ThreadEventGUID, 1)
@@ -228,11 +237,11 @@ func NewTypeFromEventRecord(ev *etw.EventRecord) Type {
 // if the event type is not recognized.
 func (t Type) String() string {
 	switch t {
-	case CreateProcess:
+	case CreateProcess, CreateProcessInternal:
 		return "CreateProcess"
 	case TerminateProcess:
 		return "TerminateProcess"
-	case ProcessRundown:
+	case ProcessRundown, ProcessRundownInternal:
 		return "ProcessRundown"
 	case OpenProcess:
 		return "OpenProcess"
@@ -346,7 +355,7 @@ func (t Type) String() string {
 // Category determines the category to which the event type pertains.
 func (t Type) Category() Category {
 	switch t {
-	case CreateProcess, TerminateProcess, OpenProcess, ProcessRundown:
+	case CreateProcess, CreateProcessInternal, TerminateProcess, OpenProcess, ProcessRundown, ProcessRundownInternal:
 		return Process
 	case CreateThread, TerminateThread, OpenThread, SetThreadContext, ThreadRundown, StackWalk:
 		return Thread
@@ -505,6 +514,8 @@ func (t Type) Exists() bool {
 func (t Type) OnlyState() bool {
 	switch t {
 	case ProcessRundown,
+		ProcessRundownInternal,
+		CreateProcessInternal,
 		ThreadRundown,
 		ImageRundown,
 		FileRundown,
@@ -585,10 +596,8 @@ func (t Type) ID() uint {
 
 // Source designates the provenance of this event type.
 func (t Type) Source() Source {
-	switch t {
-	case OpenProcess, OpenThread, SetThreadContext, CreateSymbolicLinkObject,
-		QueryDNS, ReplyDNS, SubmitThreadpoolWork, SubmitThreadpoolCallback,
-		SetThreadpoolTimer:
+	switch t.GUID() {
+	case AuditAPIEventGUID, DNSEventGUID, ThreadpoolGUID, ProcessKernelEventGUID:
 		return SecurityTelemetryLogger
 	default:
 		return SystemLogger

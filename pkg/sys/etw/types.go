@@ -44,12 +44,18 @@ var DNSClientGUID = windows.GUID{Data1: 0x1c95126e, Data2: 0x7eea, Data3: 0x49a9
 // ThreadpoolGUID represents the GUID for the thread pool provider
 var ThreadpoolGUID = windows.GUID{Data1: 0xc861d0e2, Data2: 0xa2c1, Data3: 0x4d36, Data4: [8]byte{0x9f, 0x9c, 0x97, 0x0b, 0xab, 0x94, 0x3a, 0x12}}
 
+// WindowsKernelProcessGUID represents the GUID for the Microsoft Windows Kernel Process provider
+var WindowsKernelProcessGUID = windows.GUID{Data1: 0x22fb2cd6, Data2: 0x0e7b, Data3: 0x422b, Data4: [8]byte{0xa0, 0xc7, 0x2f, 0xad, 0x1f, 0xd0, 0xe7, 0x16}}
+
 const (
 	// TraceStackTracingInfo controls call stack tracing for kernel events
 	TraceStackTracingInfo = uint8(3)
 	// TraceSystemTraceEnableFlagsInfo controls system logger event flags
 	TraceSystemTraceEnableFlagsInfo = uint8(4)
 )
+
+// ProcessKeywords enables process events for Microsoft Windows Kernel Process provider
+const ProcessKeywords = 0x10
 
 const (
 	// EventHeaderExtTypeStackTrace64 indicates that the extended data contains the call stack if the event is captured on a 64-bit host
@@ -684,7 +690,7 @@ func (e *EventRecord) ConsumeUTF16String(offset uint16) string {
 }
 
 // ReadSID reads the security identifier from the event buffer.
-func (e *EventRecord) ReadSID(offset uint16) ([]byte, uint16) {
+func (e *EventRecord) ReadSID(offset uint16, isWbemSid bool) ([]byte, uint16) {
 	// this is a Security Token which can be null and takes 4 bytes.
 	// Otherwise, it is an 8 byte structure (TOKEN_USER) followed by SID,
 	// which is variable size depending on the 2nd byte in the SID
@@ -692,7 +698,11 @@ func (e *EventRecord) ReadSID(offset uint16) ([]byte, uint16) {
 	if sid == 0 {
 		return nil, offset + 4
 	}
-	const tokenSize uint16 = 16
+
+	var tokenSize uint16
+	if isWbemSid {
+		tokenSize = 16 // TOKEN_USER size
+	}
 
 	authorities := e.ReadByte(offset + (tokenSize + 1))
 	end := offset + tokenSize + 8 + 4*uint16(authorities)
