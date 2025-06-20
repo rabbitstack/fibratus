@@ -91,6 +91,13 @@ type PS struct {
 	// IsProtected denotes a protected process. The system restricts access to protected
 	// processes and the threads of protected processes.
 	IsProtected bool `json:"is_protected"`
+	// TokenIntegrityLevel designates the process token integrity level. (e.g. High)
+	// Integrity level defines the trust between the process and a securable object.
+	TokenIntegrityLevel string `json:"token_integrity_level"`
+	// TokenElevationType designates the process token elevation type. (e.g. Limited)
+	TokenElevationType string `json:"token_elevation_type"`
+	// IsTokenElevated indicates if the process token is elevated.
+	IsTokenElevated bool `json:"is_token_elevated"`
 }
 
 // UUID is meant to offer a more robust version of process ID that
@@ -147,9 +154,10 @@ func (ps *PS) String() string {
 		Parent name: %s
 		Cmdline: %s
 		Parent cmdline: %s
-		Exe:  %s
-		Cwd:  %s
-		SID:  %s
+		Exe: %s
+		Cwd: %s
+		SID: %s
+		Integrity level: %s
 		Username: %s
 		Domain: %s
 		Args: %s
@@ -165,6 +173,7 @@ func (ps *PS) String() string {
 			ps.Exe,
 			ps.Cwd,
 			ps.SID,
+			ps.TokenIntegrityLevel,
 			ps.Username,
 			ps.Domain,
 			ps.Args,
@@ -177,9 +186,10 @@ func (ps *PS) String() string {
 		Ppid: %d
 		Name: %s
 		Cmdline: %s
-		Exe:  %s
-		Cwd:  %s
-		SID:  %s
+		Exe: %s
+		Cwd: %s
+		SID: %s
+		Integrity level: %s
 		Username: %s
 		Domain: %s
 		Args: %s
@@ -193,6 +203,7 @@ func (ps *PS) String() string {
 		ps.Exe,
 		ps.Cwd,
 		ps.SID,
+		ps.TokenIntegrityLevel,
 		ps.Username,
 		ps.Domain,
 		ps.Args,
@@ -213,9 +224,9 @@ func (ps *PS) StringShort() string {
 		Parent name: %s
 		Cmdline: %s
 		Parent cmdline: %s
-		Exe:  %s
-		Cwd:  %s
-		SID:  %s
+		Exe: %s
+		Cwd: %s
+		SID: %s
 		Username: %s
 		Domain: %s
 		Args: %s
@@ -243,9 +254,10 @@ func (ps *PS) StringShort() string {
 		Ppid: %d
 		Name: %s
 		Cmdline: %s
-		Exe:  %s
-		Cwd:  %s
-		SID:  %s
+		Exe: %s
+		Cwd: %s
+		SID: %s
+		Integrity level: %s
 		Username: %s
 		Domain: %s
 		Args: %s
@@ -259,6 +271,7 @@ func (ps *PS) StringShort() string {
 		ps.Exe,
 		ps.Cwd,
 		ps.SID,
+		ps.TokenIntegrityLevel,
 		ps.Username,
 		ps.Domain,
 		ps.Args,

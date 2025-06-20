@@ -53,6 +53,7 @@ var (
 	moduleCount               = expvar.NewInt("process.module.count")
 	mmapCount                 = expvar.NewInt("process.mmap.count")
 	pebReadErrors             = expvar.NewInt("process.peb.read.errors")
+	processEnrichments        = expvar.NewInt("process.enrichments")
 )
 
 type snapshotter struct {
@@ -146,6 +147,7 @@ func (s *snapshotter) Write(e *event.Event) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	processCount.Add(1)
+
 	pid, err := e.Params.GetPid()
 	if err != nil {
 		return err
@@ -154,8 +156,45 @@ func (s *snapshotter) Write(e *event.Event) error {
 	if err != nil {
 		return err
 	}
+
 	proc, err := s.newProcState(pid, ppid, e)
-	s.procs[pid] = proc
+	if ps := s.procs[pid]; ps == nil && (e.IsCreateProcessInternal() || e.IsProcessRundownInternal()) {
+		// only modify the state if there is no process derived from the NT kernel logger process events
+		s.procs[pid] = proc
+	} else if ps, ok := s.procs[pid]; ok && (e.IsCreateProcessInternal() || e.IsProcessRundownInternal()) {
+		// process state derived from the core kernel events exists - enrich it
+		ps.TokenIntegrityLevel = proc.TokenIntegrityLevel
+		ps.TokenElevationType = proc.TokenElevationType
+		ps.IsTokenElevated = proc.IsTokenElevated
+		if len(proc.Exe) > len(ps.Exe) {
+			// prefer full executable path
+			ps.Exe = proc.Exe
+		}
+		s.procs[pid] = ps
+	} else if ps, ok := s.procs[pid]; ok && (e.IsCreateProcess() || e.IsProcessRundown()) && ps.TokenIntegrityLevel != "" {
+		// enrich the existing process state with the newly arrived NT kernel logger process events
+		// but obtain the integrity level and executable path from the previous proc state
+		processEnrichments.Add(1)
+		proc.TokenIntegrityLevel = ps.TokenIntegrityLevel
+		proc.TokenElevationType = ps.TokenElevationType
+		proc.IsTokenElevated = ps.IsTokenElevated
+
+		if len(ps.Exe) > len(proc.Exe) {
+			// prefer full executable path
+			proc.Exe = ps.Exe
+			e.AppendParam(params.Exe, params.Path, ps.Exe)
+		}
+
+		e.AppendParam(params.ProcessIntegrityLevel, params.AnsiString, ps.TokenIntegrityLevel)
+		e.AppendParam(params.ProcessTokenElevationType, params.AnsiString, ps.TokenElevationType)
+		e.AppendParam(params.ProcessTokenIsElevated, params.Bool, ps.IsTokenElevated)
+
+		s.procs[pid] = proc
+	} else {
+		// in all other cases append the process state
+		s.procs[pid] = proc
+	}
+
 	// adjust the process which is generating
 	// the event. For `CreateProcess` events
 	// the process context is scoped to the
@@ -165,9 +204,10 @@ func (s *snapshotter) Write(e *event.Event) error {
 	// snapshot state
 	if e.IsProcessRundown() {
 		e.PS = proc
-	} else {
+	} else if !e.IsProcessRundownInternal() && !e.IsCreateProcessInternal() {
 		e.PS = s.procs[e.PID]
 	}
+
 	return err
 }
 
@@ -317,6 +357,23 @@ func (s *snapshotter) Close() error {
 }
 
 func (s *snapshotter) newProcState(pid, ppid uint32, e *event.Event) (*pstypes.PS, error) {
+	if e.IsCreateProcessInternal() || e.IsProcessRundownInternal() {
+		proc := &pstypes.PS{
+			PID:                 pid,
+			Ppid:                ppid,
+			Exe:                 e.GetParamAsString(params.Exe),
+			TokenIntegrityLevel: e.GetParamAsString(params.ProcessIntegrityLevel),
+			TokenElevationType:  e.GetParamAsString(params.ProcessTokenElevationType),
+			IsTokenElevated:     e.Params.TryGetBool(params.ProcessTokenIsElevated),
+			Threads:             make(map[uint32]pstypes.Thread),
+			Modules:             make([]pstypes.Module, 0),
+			Handles:             make([]htypes.Handle, 0),
+			Mmaps:               make([]pstypes.Mmap, 0),
+		}
+
+		return proc, nil
+	}
+
 	proc := pstypes.New(
 		pid,
 		ppid,
@@ -369,12 +426,38 @@ func (s *snapshotter) newProcState(pid, ppid uint32, e *event.Event) (*pstypes.P
 	access := uint32(windows.PROCESS_QUERY_INFORMATION | windows.PROCESS_VM_READ)
 	process, err := windows.OpenProcess(access, false, pid)
 	if err != nil {
-		return proc, nil
+		process, err = windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION, false, pid)
+		if err != nil {
+			return proc, nil
+		}
 	}
 	//nolint:errcheck
 	defer windows.CloseHandle(process)
 
-	// read PEB
+	// query token attributes if not enriched by internal event
+	if s.procs[pid] == nil {
+		var token windows.Token
+		err = windows.OpenProcessToken(process, windows.TOKEN_QUERY, &token)
+		if err != nil {
+			goto readPEB
+		}
+		defer token.Close()
+
+		// get process token integrity level
+		tokenMandatoryLabel, err := sys.GetProcessTokenInformation[windows.Tokenmandatorylabel](token, windows.TokenIntegrityLevel)
+		if err != nil {
+			goto readPEB
+		}
+
+		proc.TokenIntegrityLevel = sys.RidToString(tokenMandatoryLabel.Label.Sid)
+		proc.IsTokenElevated = token.IsElevated()
+
+		e.AppendParam(params.ProcessIntegrityLevel, params.AnsiString, proc.TokenIntegrityLevel)
+		e.AppendParam(params.ProcessTokenIsElevated, params.Bool, proc.IsTokenElevated)
+	}
+
+readPEB:
+	// read PEB (Process Environment Block)
 	peb, err := ReadPEB(process)
 	if err != nil {
 		pebReadErrors.Add(1)
@@ -525,37 +608,6 @@ func (s *snapshotter) Find(pid uint32) (bool, *pstypes.PS) {
 	}
 	proc.StartTime = time.Unix(0, ct.Nanoseconds())
 
-	// get process token attributes
-	var token windows.Token
-	err = windows.OpenProcessToken(process, windows.TOKEN_QUERY, &token)
-	if err != nil {
-		return false, proc
-	}
-	defer token.Close()
-	usr, err := token.GetTokenUser()
-	if err != nil {
-		return false, proc
-	}
-	proc.SID = usr.User.Sid.String()
-	proc.Username, proc.Domain, _, _ = usr.User.Sid.LookupAccount("")
-
-	// retrieve process handles
-	proc.Handles, err = s.hsnap.FindHandles(pid)
-	if err != nil {
-		return false, proc
-	}
-
-	// read PEB
-	peb, err := ReadPEB(process)
-	if err != nil {
-		pebReadErrors.Add(1)
-		return false, proc
-	}
-	proc.Envs = peb.GetEnvs()
-	proc.Cmdline = peb.GetCommandLine()
-	proc.SessionID = peb.GetSessionID()
-	proc.Cwd = peb.GetCurrentWorkingDirectory()
-
 	// get process creation attributes
 	var isWOW64 bool
 	if err := windows.IsWow64Process(process, &isWOW64); err == nil && isWOW64 {
@@ -567,6 +619,50 @@ func (s *snapshotter) Find(pid uint32) (bool, *pstypes.PS) {
 	if prot, err := sys.QueryInformationProcess[sys.PsProtection](process, sys.ProcessProtectionInformation); err == nil && prot != nil {
 		proc.IsProtected = prot.IsProtected()
 	}
+
+	// get process token attributes
+	var token windows.Token
+	var tokenUser *windows.Tokenuser
+	var tokenMandatoryLabel *windows.Tokenmandatorylabel
+
+	err = windows.OpenProcessToken(process, windows.TOKEN_QUERY, &token)
+	if err != nil {
+		goto readPEB
+	}
+	defer token.Close()
+	tokenUser, err = token.GetTokenUser()
+	if err != nil {
+		goto readPEB
+	}
+	proc.SID = tokenUser.User.Sid.String()
+	proc.Username, proc.Domain, _, _ = tokenUser.User.Sid.LookupAccount("")
+
+	// get process token integrity level
+	tokenMandatoryLabel, err = sys.GetProcessTokenInformation[windows.Tokenmandatorylabel](token, windows.TokenIntegrityLevel)
+	if err != nil {
+		goto readPEB
+	}
+
+	proc.TokenIntegrityLevel = sys.RidToString(tokenMandatoryLabel.Label.Sid)
+	proc.IsTokenElevated = token.IsElevated()
+
+	// retrieve process handles
+	proc.Handles, err = s.hsnap.FindHandles(pid)
+	if err != nil {
+		goto readPEB
+	}
+
+readPEB:
+	// read PEB (Process Environment Block)
+	peb, err := ReadPEB(process)
+	if err != nil {
+		pebReadErrors.Add(1)
+		return false, proc
+	}
+	proc.Envs = peb.GetEnvs()
+	proc.Cmdline = peb.GetCommandLine()
+	proc.SessionID = peb.GetSessionID()
+	proc.Cwd = peb.GetCurrentWorkingDirectory()
 
 	return false, proc
 }

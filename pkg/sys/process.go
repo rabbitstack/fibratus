@@ -173,3 +173,23 @@ func getModuleFileName(proc, mod windows.Handle) (string, error) {
 	}
 	return windows.UTF16ToString(buf), nil
 }
+
+// GetProcessTokenInformation returns the specified process token information.
+func GetProcessTokenInformation[C any](token windows.Token, class uint32) (*C, error) {
+	var n uint32
+	// get the buffer size to accommodate the desired token class structure
+	if err := windows.GetTokenInformation(token, class, nil, 0, &n); err != nil {
+		if err != windows.ERROR_INSUFFICIENT_BUFFER {
+			return nil, err
+		}
+	}
+
+	// allocate the buffer and obtain token information
+	b := make([]byte, n)
+	err := windows.GetTokenInformation(token, class, &b[0], n, &n)
+	if err != nil {
+		return nil, err
+	}
+
+	return (*C)(unsafe.Pointer(&b[0])), nil
+}
