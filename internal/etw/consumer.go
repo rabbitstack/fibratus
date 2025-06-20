@@ -79,7 +79,7 @@ func (c *Consumer) ProcessEvent(ev *etw.EventRecord) error {
 		eventsUnknown.Add(1)
 		return nil
 	}
-	if event.IsCurrentProcDropped(ev.Header.ProcessID) {
+	if event.IsCurrentProcDropped(ev.Header.ProcessID) && ev.Header.ProviderID != etw.WindowsKernelProcessGUID {
 		return nil
 	}
 	if c.config.EventSource.ExcludeEvent(ev.ID()) {

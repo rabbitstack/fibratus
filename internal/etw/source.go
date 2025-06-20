@@ -161,11 +161,14 @@ func (e *EventSource) Open(config *config.Config) error {
 		}
 	}
 
-	// add the core NT Kernel Logger trace
-	e.addTrace(NewKernelTrace(config))
-
-	// security telemetry trace hosts remaining ETW providers
+	// security telemetry trace hosts all ETW providers but NT Kernel Logger
 	trace := NewTrace(etw.SecurityTelemetrySession, config)
+
+	// Windows Kernel Process session permits enriching event state with
+	// additional attributes and guaranteeing that any event published by
+	// the security telemetry session doesn't miss its respective process
+	// from the snapshotter
+	trace.AddProvider(etw.WindowsKernelProcessGUID, false, WithKeywords(etw.ProcessKeyword), WithCaptureState())
 
 	if config.EventSource.EnableDNSEvents {
 		trace.AddProvider(etw.DNSClientGUID, false)
@@ -186,21 +189,21 @@ func (e *EventSource) Open(config *config.Config) error {
 		trace.AddProvider(etw.ThreadpoolGUID, config.EventSource.StackEnrichment, WithStackExts(stackexts))
 	}
 
-	if trace.HasProviders() {
-		// add security telemetry trace
-		e.addTrace(trace)
-	}
+	// add security telemetry trace
+	e.addTrace(trace)
+	// add the core NT Kernel Logger trace
+	e.addTrace(NewKernelTrace(config))
 
-	for _, trace := range e.traces {
-		err := trace.Start()
+	for _, t := range e.traces {
+		err := t.Start()
 		switch err {
 		case errs.ErrTraceAlreadyRunning:
-			log.Debugf("%s trace is already running. Trying to restart...", trace.Name)
-			if err := trace.Stop(); err != nil {
+			log.Debugf("%s trace is already running. Trying to restart...", t.Name)
+			if err := t.Stop(); err != nil {
 				return err
 			}
 			time.Sleep(time.Millisecond * 100)
-			if err := trace.Start(); err != nil {
+			if err := t.Start(); err != nil {
 				return multierror.Wrap(errs.ErrRestartTrace, err)
 			}
 		case errs.ErrTraceNoSysResources:
@@ -234,15 +237,22 @@ func (e *EventSource) Open(config *config.Config) error {
 		}
 		e.consumers = append(e.consumers, consumer)
 
-		err = trace.Open(consumer, e.errs)
+		// Open the trace and assign a consumer
+		err = t.Open(consumer, e.errs)
 		if err != nil {
-			return fmt.Errorf("unable to open %s trace: %v", trace.Name, err)
+			return fmt.Errorf("unable to open %s trace: %v", t.Name, err)
 		}
-		log.Infof("starting [%s] trace processing", trace.Name)
+		log.Infof("starting [%s] trace processing", t.Name)
+
+		// Instruct the provider to emit state information
+		err = t.CaptureState()
+		if err != nil {
+			log.Warn(err)
+		}
 
 		// Start event processing loop
 		errch := make(chan error)
-		go trace.Process(errch)
+		go t.Process(errch)
 
 		go func(trace *Trace) {
 			select {
@@ -254,7 +264,7 @@ func (e *EventSource) Open(config *config.Config) error {
 					e.errs <- fmt.Errorf("unable to process %s trace: %v", trace.Name, err)
 				}
 			}
-		}(trace)
+		}(t)
 	}
 
 	return nil

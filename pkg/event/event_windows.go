@@ -202,8 +202,8 @@ func (e *Event) IsSuccess() bool {
 // the tracing session to induce the arrival of rundown events
 // by calling into the `etw.SetTraceInformation` Windows API
 // function which causes duplicate rundown events.
-// For more pointers check `kstream/controller_windows.go`
-// and the `etw.SetTraceInformation` API function.
+// For more pointers check `internal/etw/trace.go` and the
+// `etw.SetTraceInformation` API function.
 func (e *Event) IsRundownProcessed() bool {
 	mu.Lock()
 	defer mu.Unlock()
@@ -216,26 +216,28 @@ func (e *Event) IsRundownProcessed() bool {
 	return false
 }
 
-func (e *Event) IsCreateFile() bool       { return e.Type == CreateFile }
-func (e *Event) IsCreateProcess() bool    { return e.Type == CreateProcess }
-func (e *Event) IsCreateThread() bool     { return e.Type == CreateThread }
-func (e *Event) IsCloseFile() bool        { return e.Type == CloseFile }
-func (e *Event) IsCreateHandle() bool     { return e.Type == CreateHandle }
-func (e *Event) IsCloseHandle() bool      { return e.Type == CloseHandle }
-func (e *Event) IsDeleteFile() bool       { return e.Type == DeleteFile }
-func (e *Event) IsEnumDirectory() bool    { return e.Type == EnumDirectory }
-func (e *Event) IsTerminateProcess() bool { return e.Type == TerminateProcess }
-func (e *Event) IsTerminateThread() bool  { return e.Type == TerminateThread }
-func (e *Event) IsUnloadImage() bool      { return e.Type == UnloadImage }
-func (e *Event) IsLoadImage() bool        { return e.Type == LoadImage }
-func (e *Event) IsImageRundown() bool     { return e.Type == ImageRundown }
-func (e *Event) IsFileOpEnd() bool        { return e.Type == FileOpEnd }
-func (e *Event) IsRegSetValue() bool      { return e.Type == RegSetValue }
-func (e *Event) IsProcessRundown() bool   { return e.Type == ProcessRundown }
-func (e *Event) IsVirtualAlloc() bool     { return e.Type == VirtualAlloc }
-func (e *Event) IsMapViewFile() bool      { return e.Type == MapViewFile }
-func (e *Event) IsUnmapViewFile() bool    { return e.Type == UnmapViewFile }
-func (e *Event) IsStackWalk() bool        { return e.Type == StackWalk }
+func (e *Event) IsCreateFile() bool             { return e.Type == CreateFile }
+func (e *Event) IsCreateProcess() bool          { return e.Type == CreateProcess }
+func (e *Event) IsCreateProcessInternal() bool  { return e.Type == CreateProcessInternal }
+func (e *Event) IsCreateThread() bool           { return e.Type == CreateThread }
+func (e *Event) IsCloseFile() bool              { return e.Type == CloseFile }
+func (e *Event) IsCreateHandle() bool           { return e.Type == CreateHandle }
+func (e *Event) IsCloseHandle() bool            { return e.Type == CloseHandle }
+func (e *Event) IsDeleteFile() bool             { return e.Type == DeleteFile }
+func (e *Event) IsEnumDirectory() bool          { return e.Type == EnumDirectory }
+func (e *Event) IsTerminateProcess() bool       { return e.Type == TerminateProcess }
+func (e *Event) IsTerminateThread() bool        { return e.Type == TerminateThread }
+func (e *Event) IsUnloadImage() bool            { return e.Type == UnloadImage }
+func (e *Event) IsLoadImage() bool              { return e.Type == LoadImage }
+func (e *Event) IsImageRundown() bool           { return e.Type == ImageRundown }
+func (e *Event) IsFileOpEnd() bool              { return e.Type == FileOpEnd }
+func (e *Event) IsRegSetValue() bool            { return e.Type == RegSetValue }
+func (e *Event) IsProcessRundown() bool         { return e.Type == ProcessRundown }
+func (e *Event) IsProcessRundownInternal() bool { return e.Type == ProcessRundownInternal }
+func (e *Event) IsVirtualAlloc() bool           { return e.Type == VirtualAlloc }
+func (e *Event) IsMapViewFile() bool            { return e.Type == MapViewFile }
+func (e *Event) IsUnmapViewFile() bool          { return e.Type == UnmapViewFile }
+func (e *Event) IsStackWalk() bool              { return e.Type == StackWalk }
 
 // InvalidPid indicates if the process generating the event is invalid.
 func (e *Event) InvalidPid() bool { return e.PID == sys.InvalidProcessID }

@@ -75,7 +75,7 @@ func TestReadBuffer(t *testing.T) {
 				assert.Equal(t, uint32(12520), ev.ReadUint32(8))
 				assert.Equal(t, uint32(5240), ev.ReadUint32(12))
 
-				rawSid, offset := ev.ReadSID(36)
+				rawSid, offset := ev.ReadSID(36, true)
 				b := uintptr(unsafe.Pointer(&rawSid[0]))
 				b += uintptr(8 * 2)
 

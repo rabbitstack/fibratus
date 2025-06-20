@@ -24,7 +24,9 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
+	"github.com/rabbitstack/fibratus/pkg/util/filetime"
 	"github.com/rabbitstack/fibratus/pkg/util/ip"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
 	"github.com/rabbitstack/fibratus/pkg/util/ntstatus"
@@ -76,6 +78,9 @@ func (p Param) String() string {
 		sid, err := getSID(&p)
 		if err != nil {
 			return ""
+		}
+		if p.Name == params.ProcessIntegrityLevel {
+			return sys.RidToString(sid)
 		}
 		return sid.String()
 	case params.DOSPath:
@@ -180,7 +185,10 @@ func (pars Params) GetSID() (*windows.SID, error) {
 func getSID(param *Param) (*windows.SID, error) {
 	sid, ok := param.Value.([]byte)
 	if !ok {
-		return nil, fmt.Errorf("unable to type cast %q parameter to []byte value", params.UserSID)
+		return nil, fmt.Errorf("unable to type cast %q parameter to []byte value", param.Name)
+	}
+	if sid == nil {
+		return nil, fmt.Errorf("sid linked to parameter %s is empty", param.Name)
 	}
 	b := uintptr(unsafe.Pointer(&sid[0]))
 	if param.Type == params.WbemSID {
@@ -207,9 +215,7 @@ func (pars Params) MustGetSID() *windows.SID {
 // schema changes in order to parse new fields.
 func (e *Event) produceParams(evt *etw.EventRecord) {
 	switch e.Type {
-	case ProcessRundown,
-		CreateProcess,
-		TerminateProcess:
+	case ProcessRundown, CreateProcess, TerminateProcess:
 		var (
 			kproc      uint64
 			pid, ppid  uint32
@@ -247,7 +253,7 @@ func (e *Event) produceParams(evt *etw.EventRecord) {
 		default:
 			offset = 24
 		}
-		sid, soffset = evt.ReadSID(offset)
+		sid, soffset = evt.ReadSID(offset, true)
 		name, noffset = evt.ReadAnsiString(soffset)
 		cmdline, _ = evt.ReadUTF16String(soffset + noffset)
 		e.AppendParam(params.ProcessObject, params.Address, kproc)
@@ -261,6 +267,50 @@ func (e *Event) produceParams(evt *etw.EventRecord) {
 		e.AppendParam(params.UserSID, params.WbemSID, sid)
 		e.AppendParam(params.ProcessName, params.AnsiString, name)
 		e.AppendParam(params.Cmdline, params.UnicodeString, cmdline)
+	case CreateProcessInternal, ProcessRundownInternal:
+		var (
+			pid                 uint32
+			createTime          windows.Filetime
+			ppid                uint32
+			sessionID           uint32
+			flags               uint32
+			tokenElevationType  uint32
+			tokenIsElevated     uint32
+			tokenMandatoryLabel []byte
+			exe                 string
+		)
+
+		pid = evt.ReadUint32(0)
+
+		if (e.IsCreateProcessInternal() && evt.Version() >= 3) || (e.IsProcessRundownInternal() && evt.Version() >= 1) {
+			createTime = windows.NsecToFiletime(int64(evt.ReadUint64(12))) // skip sequence number (8 bytes)
+
+			ppid = evt.ReadUint32(20)
+			sessionID = evt.ReadUint32(32) // skip parent sequence number (8 bytes)
+			flags = evt.ReadUint32(36)
+			tokenElevationType = evt.ReadUint32(40)
+			tokenIsElevated = evt.ReadUint32(44)
+
+			tokenMandatoryLabel, _ = evt.ReadSID(48, false) // integrity level SID size is 12 bytes
+
+			exe, _ = evt.ReadNTUnicodeString(60)
+		} else {
+			createTime = windows.NsecToFiletime(int64(evt.ReadUint64(8)))
+			ppid = evt.ReadUint32(16)
+			sessionID = evt.ReadUint32(20)
+			flags = evt.ReadUint32(24)
+			exe, _ = evt.ReadNTUnicodeString(28)
+		}
+
+		e.AppendParam(params.ProcessID, params.PID, pid)
+		e.AppendParam(params.StartTime, params.Time, filetime.ToEpoch(uint64(createTime.Nanoseconds())))
+		e.AppendParam(params.ProcessParentID, params.PID, ppid)
+		e.AppendParam(params.SessionID, params.Uint32, sessionID)
+		e.AppendParam(params.ProcessFlags, params.Flags, flags, WithFlags(PsCreationFlags))
+		e.AppendParam(params.ProcessTokenElevationType, params.Enum, tokenElevationType, WithEnum(PsTokenElevationTypes))
+		e.AppendParam(params.ProcessTokenIsElevated, params.Bool, tokenIsElevated > 0)
+		e.AppendParam(params.ProcessIntegrityLevel, params.SID, tokenMandatoryLabel)
+		e.AppendParam(params.Exe, params.DOSPath, exe)
 	case OpenProcess:
 		processID := evt.ReadUint32(0)
 		desiredAccess := evt.ReadUint32(4)
@@ -276,9 +326,7 @@ func (e *Event) produceParams(evt *etw.EventRecord) {
 			((desiredAccess & windows.PROCESS_CREATE_THREAD) != 0) || ((desiredAccess & windows.PROCESS_SET_INFORMATION) != 0) {
 			e.AppendParam(params.Callstack, params.Slice, evt.Callstack())
 		}
-	case CreateThread,
-		TerminateThread,
-		ThreadRundown:
+	case CreateThread, TerminateThread, ThreadRundown:
 		var (
 			pid            uint32
 			tid            uint32
@@ -369,9 +417,7 @@ func (e *Event) produceParams(evt *etw.EventRecord) {
 		e.AppendParam(params.HandleObjectTypeID, params.HandleType, typeID)
 		e.AppendParam(params.ProcessID, params.PID, sourcePID)
 		e.AppendParam(params.TargetProcessID, params.PID, targetPID)
-	case LoadImage,
-		UnloadImage,
-		ImageRundown:
+	case LoadImage, UnloadImage, ImageRundown:
 		var (
 			pid               uint32
 			checksum          uint32
@@ -512,9 +558,7 @@ func (e *Event) produceParams(evt *etw.EventRecord) {
 		e.AppendParam(params.FileObject, params.Address, fileObject)
 		e.AppendParam(params.FileKey, params.Address, fileKey)
 		e.AppendParam(params.ThreadID, params.TID, tid)
-	case DeleteFile,
-		RenameFile,
-		SetFileInformation:
+	case DeleteFile, RenameFile, SetFileInformation:
 		var (
 			irp        uint64
 			fileObject uint64
