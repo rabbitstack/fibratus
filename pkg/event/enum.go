@@ -114,3 +114,16 @@ var DNSResponseCodes = ParamEnum{
 	uint32(windows.ERROR_INVALID_PARAMETER):         "INVALID",
 	uint32(windows.DNS_INFO_NO_RECORDS):             "NXDOMAIN",
 }
+
+const (
+	TokenElevationTypeDefault uint32 = iota + 1
+	TokenElevationTypeFull
+	TokenElevationTypeLimited
+)
+
+// PsTokenElevationTypes describes process token elevation types
+var PsTokenElevationTypes = ParamEnum{
+	TokenElevationTypeDefault: "DEFAULT",
+	TokenElevationTypeFull:    "FULL",
+	TokenElevationTypeLimited: "LIMITED",
+}

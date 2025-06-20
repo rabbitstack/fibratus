@@ -185,6 +185,131 @@ func TestWrite(t *testing.T) {
 	}
 }
 
+func TestWriteInternalEventsEnrichment(t *testing.T) {
+	hsnap := new(handle.SnapshotterMock)
+	hsnap.On("FindHandles", mock.Anything).Return([]htypes.Handle{}, nil)
+
+	var tests = []struct {
+		name       string
+		evts       []*event.Event
+		psnap      Snapshotter
+		assertions func(t *testing.T, psnap Snapshotter)
+	}{
+		{"write internal event without previous state",
+			[]*event.Event{
+				{
+					Type: event.CreateProcessInternal,
+					Params: event.Params{
+						params.ProcessID:                 {Name: params.ProcessID, Type: params.PID, Value: uint32(1024)},
+						params.ProcessParentID:           {Name: params.ProcessParentID, Type: params.PID, Value: uint32(444)},
+						params.Exe:                       {Name: params.Exe, Type: params.UnicodeString, Value: `C:\Windows\System32\svchost.exe`},
+						params.ProcessIntegrityLevel:     {Name: params.ProcessIntegrityLevel, Type: params.AnsiString, Value: "HIGH"},
+						params.ProcessTokenIsElevated:    {Name: params.ProcessTokenIsElevated, Type: params.Bool, Value: true},
+						params.ProcessTokenElevationType: {Name: params.ProcessTokenElevationType, Type: params.AnsiString, Value: "FULL"},
+					},
+				},
+			},
+			NewSnapshotter(hsnap, &config.Config{}),
+			func(t *testing.T, psnap Snapshotter) {
+				ok, proc := psnap.Find(1024)
+				assert.True(t, ok)
+				assert.Equal(t, "HIGH", proc.TokenIntegrityLevel)
+				assert.Equal(t, "FULL", proc.TokenElevationType)
+				assert.Equal(t, true, proc.IsTokenElevated)
+				assert.Equal(t, `C:\Windows\System32\svchost.exe`, proc.Exe)
+			},
+		},
+		{"enrich existing system provider proc state with internal event",
+			[]*event.Event{
+				{
+					Type: event.CreateProcess,
+					Params: event.Params{
+						params.ProcessID:       {Name: params.ProcessID, Type: params.PID, Value: uint32(1024)},
+						params.ProcessParentID: {Name: params.ProcessParentID, Type: params.PID, Value: uint32(444)},
+						params.Exe:             {Name: params.Exe, Type: params.UnicodeString, Value: `svchost.exe`},
+						params.Cmdline:         {Name: params.Cmdline, Type: params.UnicodeString, Value: `svchost.exe -k LocalSystemNetworkRestricted -p -s NcbService`},
+						params.UserSID:         {Name: params.UserSID, Type: params.WbemSID, Value: []byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0}},
+						params.SessionID:       {Name: params.SessionID, Type: params.Uint32, Value: uint32(1)},
+						params.ProcessFlags:    {Name: params.ProcessFlags, Type: params.Flags, Value: uint32(0x00000010)},
+					},
+				},
+				{
+					Type: event.CreateProcessInternal,
+					Params: event.Params{
+						params.ProcessID:                 {Name: params.ProcessID, Type: params.PID, Value: uint32(1024)},
+						params.ProcessParentID:           {Name: params.ProcessParentID, Type: params.PID, Value: uint32(444)},
+						params.Exe:                       {Name: params.Exe, Type: params.UnicodeString, Value: `C:\Windows\System32\svchost.exe`},
+						params.ProcessIntegrityLevel:     {Name: params.ProcessIntegrityLevel, Type: params.AnsiString, Value: "HIGH"},
+						params.ProcessTokenIsElevated:    {Name: params.ProcessTokenIsElevated, Type: params.Bool, Value: true},
+						params.ProcessTokenElevationType: {Name: params.ProcessTokenElevationType, Type: params.AnsiString, Value: "FULL"},
+					},
+				},
+			},
+			NewSnapshotter(hsnap, &config.Config{}),
+			func(t *testing.T, psnap Snapshotter) {
+				ok, proc := psnap.Find(1024)
+				assert.True(t, ok)
+				assert.Equal(t, "HIGH", proc.TokenIntegrityLevel)
+				assert.Equal(t, "FULL", proc.TokenElevationType)
+				assert.Equal(t, true, proc.IsTokenElevated)
+				assert.Equal(t, `C:\Windows\System32\svchost.exe`, proc.Exe)
+				assert.Equal(t, "svchost.exe -k LocalSystemNetworkRestricted -p -s NcbService", proc.Cmdline)
+				assert.Equal(t, uint32(1), proc.SessionID)
+			},
+		},
+		{"enrich newly arrived system provider proc with previous internal event state",
+			[]*event.Event{
+				{
+					Type: event.CreateProcessInternal,
+					Params: event.Params{
+						params.ProcessID:                 {Name: params.ProcessID, Type: params.PID, Value: uint32(1024)},
+						params.ProcessParentID:           {Name: params.ProcessParentID, Type: params.PID, Value: uint32(444)},
+						params.Exe:                       {Name: params.Exe, Type: params.UnicodeString, Value: `C:\Windows\System32\svchost.exe`},
+						params.ProcessIntegrityLevel:     {Name: params.ProcessIntegrityLevel, Type: params.AnsiString, Value: "HIGH"},
+						params.ProcessTokenIsElevated:    {Name: params.ProcessTokenIsElevated, Type: params.Bool, Value: true},
+						params.ProcessTokenElevationType: {Name: params.ProcessTokenElevationType, Type: params.AnsiString, Value: "FULL"},
+					},
+				},
+				{
+					Type: event.CreateProcess,
+					Params: event.Params{
+						params.ProcessID:       {Name: params.ProcessID, Type: params.PID, Value: uint32(1024)},
+						params.ProcessParentID: {Name: params.ProcessParentID, Type: params.PID, Value: uint32(444)},
+						params.Exe:             {Name: params.Exe, Type: params.UnicodeString, Value: `svchost.exe`},
+						params.Cmdline:         {Name: params.Cmdline, Type: params.UnicodeString, Value: `svchost.exe -k LocalSystemNetworkRestricted -p -s NcbService`},
+						params.UserSID:         {Name: params.UserSID, Type: params.WbemSID, Value: []byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0}},
+						params.SessionID:       {Name: params.SessionID, Type: params.Uint32, Value: uint32(1)},
+						params.ProcessFlags:    {Name: params.ProcessFlags, Type: params.Flags, Value: uint32(0x00000010)},
+					},
+				},
+			},
+			NewSnapshotter(hsnap, &config.Config{}),
+			func(t *testing.T, psnap Snapshotter) {
+				ok, proc := psnap.Find(1024)
+				assert.True(t, ok)
+				assert.Equal(t, "HIGH", proc.TokenIntegrityLevel)
+				assert.Equal(t, "FULL", proc.TokenElevationType)
+				assert.Equal(t, true, proc.IsTokenElevated)
+				assert.Equal(t, `C:\Windows\System32\svchost.exe`, proc.Exe)
+				assert.Equal(t, "svchost.exe -k LocalSystemNetworkRestricted -p -s NcbService", proc.Cmdline)
+				assert.Equal(t, uint32(1), proc.SessionID)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, evt := range tt.evts {
+				require.NoError(t, tt.psnap.Write(evt))
+			}
+			if tt.assertions != nil {
+				tt.assertions(t, tt.psnap)
+			}
+			defer tt.psnap.Close()
+		})
+	}
+}
+
 func TestRemove(t *testing.T) {
 	hsnap := new(handle.SnapshotterMock)
 	hsnap.On("FindHandles", mock.Anything).Return([]htypes.Handle{}, nil)
@@ -615,6 +740,7 @@ func TestFindQueryOS(t *testing.T) {
 	assert.True(t, len(proc.Envs) > 0)
 	assert.Contains(t, proc.Cwd, "fibratus\\pkg\\ps")
 	assert.Equal(t, uint32(1), proc.SessionID)
+	assert.Equal(t, "HIGH", proc.TokenIntegrityLevel)
 
 	wts, err := sys.LookupActiveWTS()
 	require.NoError(t, err)
