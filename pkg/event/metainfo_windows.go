@@ -238,6 +238,8 @@ func AllWithState() []Type {
 	s = append(s, ReleaseFile)
 	s = append(s, MapFileRundown)
 	s = append(s, StackWalk)
+	s = append(s, CreateProcessInternal)
+	s = append(s, ProcessRundownInternal)
 
 	return s
 }

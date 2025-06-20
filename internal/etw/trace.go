@@ -56,6 +56,7 @@ func initEventTraceProps(c config.EventSourceConfig) etw.EventTraceProperties {
 	if flushTimer < time.Second {
 		flushTimer = time.Second
 	}
+
 	mode := uint32(etw.ProcessTraceModeRealtime)
 
 	return etw.EventTraceProperties{
@@ -88,6 +89,9 @@ type ProviderInfo struct {
 	// EnableStacks indicates if callstacks are enabled for
 	// this provider.
 	EnableStacks bool
+	// CaptureState requests that the provider log its state
+	// information, such as rundown events.
+	CaptureState bool
 	// stackExtensions manager stack tracing enablement.
 	// For each event present in the stack identifiers,
 	// the StackWalk event is published by the provider.
@@ -146,8 +150,9 @@ type Trace struct {
 }
 
 type opts struct {
-	stackexts *StackExtensions
-	keywords  uint64
+	stackexts    *StackExtensions
+	keywords     uint64
+	captureState bool
 }
 
 // Option represents the option for the trace.
@@ -165,6 +170,14 @@ func WithStackExts(stackexts *StackExtensions) Option {
 func WithKeywords(keywords uint64) Option {
 	return func(o *opts) {
 		o.keywords = keywords
+	}
+}
+
+// WithCaptureState indicates that the provider should
+// emit its state information.
+func WithCaptureState() Option {
+	return func(o *opts) {
+		o.captureState = true
 	}
 }
 
@@ -193,7 +206,10 @@ func (t *Trace) AddProvider(guid windows.GUID, enableStacks bool, options ...Opt
 		opt(&opts)
 	}
 
-	t.Providers = append(t.Providers, ProviderInfo{GUID: guid, Keywords: opts.keywords, EnableStacks: enableStacks, stackExtensions: opts.stackexts})
+	t.Providers = append(
+		t.Providers,
+		ProviderInfo{GUID: guid, Keywords: opts.keywords, EnableStacks: enableStacks, CaptureState: opts.captureState, stackExtensions: opts.stackexts},
+	)
 }
 
 // HasProviders determines if this trace contains providers.
@@ -235,6 +251,7 @@ func (t *Trace) Start() error {
 	cfg := t.config.EventSource
 	props := initEventTraceProps(cfg)
 	flags := t.enableFlagsDynamically(cfg)
+
 	if t.IsKernelTrace() {
 		props.EnableFlags = flags
 		props.Wnode.GUID = t.GUID
@@ -406,6 +423,20 @@ func (t *Trace) Process(ch chan error) {
 // after the respective session processing worker is started.
 func (t *Trace) Close() error {
 	return etw.CloseTrace(t.openHandle)
+}
+
+// CaptureState forces the provider to publish state
+// information such as rundown events.
+func (t *Trace) CaptureState() error {
+	for _, provider := range t.Providers {
+		if !provider.CaptureState {
+			continue
+		}
+		if err := etw.CaptureProviderState(provider.GUID, t.startHandle); err != nil {
+			return fmt.Errorf("unable to capture %s provider state: %v", provider.GUID, err)
+		}
+	}
+	return nil
 }
 
 // IsKernelTrace determines if this is the system logger trace.

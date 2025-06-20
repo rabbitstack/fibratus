@@ -98,7 +98,7 @@ func TestEventSourceStartTraces(t *testing.T) {
 				},
 				Filters: &config.Filters{},
 			},
-			1,
+			2,
 			[]etw.EventTraceFlags{0x6018203, 0},
 		},
 		{"start kernel and security telemetry logger sessions",
@@ -199,9 +199,9 @@ func TestEventSourceEnableFlagsDynamically(t *testing.T) {
 	require.NoError(t, evs.Open(cfg))
 	defer evs.Close()
 
-	flags := evs.(*EventSource).traces[0].enableFlagsDynamically(cfg.EventSource)
-
 	require.Len(t, evs.(*EventSource).traces, 2)
+
+	flags := evs.(*EventSource).traces[1].enableFlagsDynamically(cfg.EventSource)
 
 	require.True(t, flags&etw.FileIO != 0)
 	require.True(t, flags&etw.Process != 0)
@@ -284,7 +284,9 @@ func TestEventSourceEnableFlagsDynamicallyWithYaraEnabled(t *testing.T) {
 	require.NoError(t, evs.Open(cfg))
 	defer evs.Close()
 
-	flags := evs.(*EventSource).traces[0].enableFlagsDynamically(cfg.EventSource)
+	require.Len(t, evs.(*EventSource).traces, 2)
+
+	flags := evs.(*EventSource).traces[1].enableFlagsDynamically(cfg.EventSource)
 
 	// rules compile result doesn't have file events
 	// but Yara file scanning is enabled

@@ -209,11 +209,23 @@ const (
 	// ControlCodeEnableProvider updates the session configuration so
 	// that the session receives the requested events from the provider.
 	ControlCodeEnableProvider = 1
+	// ControlCodeCaptureState requests that the provider log its state
+	// information, such as rundown events
+	ControlCodeCaptureState = 2
 )
 
 // EnableTrace influences the behaviour of the specified event trace provider.
-func EnableTrace(guid windows.GUID, handle TraceHandle, keyword uint64) error {
-	err := enableTraceEx2(handle, &guid, ControlCodeEnableProvider, TraceLevelInformation, keyword, 0, 0, nil)
+func EnableTrace(guid windows.GUID, handle TraceHandle, keywords uint64) error {
+	err := enableTraceEx2(handle, &guid, ControlCodeEnableProvider, TraceLevelInformation, keywords, 0, 0, nil)
+	if err != nil {
+		return os.NewSyscallError("EnableTraceEx2", err)
+	}
+	return nil
+}
+
+// CaptureProviderState requests that the provider log its state information.
+func CaptureProviderState(guid windows.GUID, handle TraceHandle) error {
+	err := enableTraceEx2(handle, &guid, ControlCodeCaptureState, 0, 0, 0, 0, nil)
 	if err != nil {
 		return os.NewSyscallError("EnableTraceEx2", err)
 	}
@@ -228,7 +240,7 @@ type EnableTraceOpts struct {
 
 // EnableTraceWithOpts influences the behaviour of the specified event trace provider
 // by providing extra options to configure how events are writing to the session buffer.
-func EnableTraceWithOpts(guid windows.GUID, handle TraceHandle, keyword uint64, opts EnableTraceOpts) error {
+func EnableTraceWithOpts(guid windows.GUID, handle TraceHandle, keywords uint64, opts EnableTraceOpts) error {
 	params := &EnableTraceParameters{
 		Version:  EnableTraceParametersVersion,
 		SourceID: guid,
@@ -236,7 +248,7 @@ func EnableTraceWithOpts(guid windows.GUID, handle TraceHandle, keyword uint64, 
 	if opts.WithStacktrace {
 		params.EnableProperty = EventEnablePropertyStacktrace
 	}
-	err := enableTraceEx2(handle, &guid, ControlCodeEnableProvider, TraceLevelInformation, keyword, 0, 0, params)
+	err := enableTraceEx2(handle, &guid, ControlCodeEnableProvider, TraceLevelInformation, keywords, 0, 0, params)
 	if err != nil {
 		return os.NewSyscallError("EnableTraceEx2", err)
 	}
