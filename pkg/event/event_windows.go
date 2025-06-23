@@ -229,6 +229,7 @@ func (e *Event) IsTerminateProcess() bool       { return e.Type == TerminateProc
 func (e *Event) IsTerminateThread() bool        { return e.Type == TerminateThread }
 func (e *Event) IsUnloadImage() bool            { return e.Type == UnloadImage }
 func (e *Event) IsLoadImage() bool              { return e.Type == LoadImage }
+func (e *Event) IsLoadImageInternal() bool      { return e.Type == LoadImageInternal }
 func (e *Event) IsImageRundown() bool           { return e.Type == ImageRundown }
 func (e *Event) IsFileOpEnd() bool              { return e.Type == FileOpEnd }
 func (e *Event) IsRegSetValue() bool            { return e.Type == RegSetValue }

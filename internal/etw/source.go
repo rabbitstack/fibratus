@@ -168,7 +168,7 @@ func (e *EventSource) Open(config *config.Config) error {
 	// additional attributes and guaranteeing that any event published by
 	// the security telemetry session doesn't miss its respective process
 	// from the snapshotter
-	trace.AddProvider(etw.WindowsKernelProcessGUID, false, WithKeywords(etw.ProcessKeyword), WithCaptureState())
+	trace.AddProvider(etw.WindowsKernelProcessGUID, false, WithKeywords(etw.ProcessKeyword|etw.ImageKeyword), WithCaptureState())
 
 	if config.EventSource.EnableDNSEvents {
 		trace.AddProvider(etw.DNSClientGUID, false)

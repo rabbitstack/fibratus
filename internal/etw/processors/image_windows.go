@@ -55,6 +55,11 @@ func newImageProcessor(psnap ps.Snapshotter) Processor {
 func (*imageProcessor) Name() ProcessorType { return Image }
 
 func (m *imageProcessor) ProcessEvent(e *event.Event) (*event.Event, bool, error) {
+	if e.IsLoadImageInternal() {
+		// state management
+		return e, false, m.psnap.AddModule(e)
+	}
+
 	if e.IsLoadImage() {
 		// is image characteristics data cached?
 		path := e.GetParamAsString(params.ImagePath)
