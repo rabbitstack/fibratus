@@ -156,6 +156,8 @@ var (
 	ImageRundown = pack(ImageEventGUID, 3)
 	// LoadImage represents load image kernel events that are triggered when a DLL or executable file  is loaded
 	LoadImage = pack(ImageEventGUID, 10)
+	// LoadImageInternal same as for process internal event originating from the Microsoft Windows Kernel Process provider.
+	LoadImageInternal = pack(ProcessKernelEventGUID, 5)
 
 	// AcceptTCPv4 represents the TCPv4 kernel events for accepting connection requests from the socket queue.
 	AcceptTCPv4 = pack(NetworkTCPEventGUID, 15)
@@ -309,7 +311,7 @@ func (t Type) String() string {
 		return "RegCreateKCB"
 	case RegSetValue:
 		return "RegSetValue"
-	case LoadImage:
+	case LoadImage, LoadImageInternal:
 		return "LoadImage"
 	case UnloadImage:
 		return "UnloadImage"
@@ -359,7 +361,7 @@ func (t Type) Category() Category {
 		return Process
 	case CreateThread, TerminateThread, OpenThread, SetThreadContext, ThreadRundown, StackWalk:
 		return Thread
-	case LoadImage, UnloadImage, ImageRundown:
+	case LoadImage, UnloadImage, ImageRundown, LoadImageInternal:
 		return Image
 	case CreateFile, ReadFile, WriteFile, EnumDirectory, DeleteFile, RenameFile, CloseFile, SetFileInformation,
 		FileRundown, FileOpEnd, ReleaseFile, MapViewFile, UnmapViewFile, MapFileRundown:
@@ -518,6 +520,7 @@ func (t Type) OnlyState() bool {
 		CreateProcessInternal,
 		ThreadRundown,
 		ImageRundown,
+		LoadImageInternal,
 		FileRundown,
 		RegKCBRundown,
 		FileOpEnd,

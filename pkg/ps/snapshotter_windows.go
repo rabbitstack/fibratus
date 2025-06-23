@@ -246,7 +246,6 @@ func (s *snapshotter) AddModule(e *event.Event) error {
 	if err != nil {
 		return err
 	}
-	moduleCount.Add(1)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -265,6 +264,14 @@ func (s *snapshotter) AddModule(e *event.Event) error {
 	module.Name = e.GetParamAsString(params.ImagePath)
 	module.BaseAddress = e.Params.TryGetAddress(params.ImageBase)
 	module.DefaultBaseAddress = e.Params.TryGetAddress(params.ImageDefaultBase)
+
+	if e.IsLoadImageInternal() {
+		proc.AddModule(module)
+		return nil
+	}
+
+	moduleCount.Add(1)
+
 	module.SignatureLevel, _ = e.Params.GetUint32(params.ImageSignatureLevel)
 	module.SignatureType, _ = e.Params.GetUint32(params.ImageSignatureType)
 

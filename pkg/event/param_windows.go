@@ -459,6 +459,29 @@ func (e *Event) produceParams(evt *etw.EventRecord) {
 		e.AppendParam(params.ImagePath, params.DOSPath, filename)
 		e.AppendParam(params.ImageSignatureLevel, params.Enum, uint32(sigLevel), WithEnum(signature.Levels))
 		e.AppendParam(params.ImageSignatureType, params.Enum, uint32(sigType), WithEnum(signature.Types))
+	case LoadImageInternal:
+		var (
+			pid         uint32
+			checksum    uint32
+			defaultBase uint64
+			imageBase   uint64
+			imageSize   uint64
+			filename    string
+		)
+
+		imageBase = evt.ReadUint64(0)
+		imageSize = evt.ReadUint64(8)
+		pid = evt.ReadUint32(16)
+		checksum = evt.ReadUint32(20)
+		defaultBase = evt.ReadUint64(28) // skip timestamp (4 bytes)
+		filename = evt.ConsumeUTF16String(36)
+
+		e.AppendParam(params.ProcessID, params.PID, pid)
+		e.AppendParam(params.ImageCheckSum, params.Uint32, checksum)
+		e.AppendParam(params.ImageDefaultBase, params.Address, defaultBase)
+		e.AppendParam(params.ImageBase, params.Address, imageBase)
+		e.AppendParam(params.ImageSize, params.Uint64, imageSize)
+		e.AppendParam(params.ImagePath, params.DOSPath, filename)
 	case RegOpenKey, RegCloseKey,
 		RegCreateKCB, RegDeleteKCB,
 		RegKCBRundown, RegCreateKey,

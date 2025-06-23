@@ -57,6 +57,9 @@ const (
 // ProcessKeyword enables process events for Microsoft Windows Kernel Process provider
 const ProcessKeyword = 0x10
 
+// ImageKeyword enables images events for Microsoft Windows Kernel Process provider
+const ImageKeyword = 0x40
+
 const (
 	// EventHeaderExtTypeStackTrace64 indicates that the extended data contains the call stack if the event is captured on a 64-bit host
 	EventHeaderExtTypeStackTrace64 uint16 = 0x0006
