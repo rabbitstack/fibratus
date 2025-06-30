@@ -310,6 +310,9 @@ func (c *Config) Init() error {
 // in the capture file.
 func (c *Config) IsCaptureSet() bool { return c.CapFile != "" }
 
+// IsFilamentSet indicates if the filament is supplied.
+func (c *Config) IsFilamentSet() bool { return c.Filament.Name != "" }
+
 // TryLoadFile attempts to load the configuration file from specified path on the file system.
 func (c *Config) TryLoadFile(file string) error {
 	c.viper.SetConfigFile(file)
