@@ -89,6 +89,15 @@ func (b *BitSets) IsBitSet(evt *Event) bool {
 		(b.cats != nil && b.cats.Test(uint(evt.Category.Index())))
 }
 
-func (b *BitSets) IsBitmaskInitialized() bool  { return b.bitmask != nil }
-func (b *BitSets) IsTypesInitialized() bool    { return b.types != nil }
-func (b *BitSets) IsCategoryInitialized() bool { return b.cats != nil }
+// IsInitialized checks if the given bitset type is initialized.
+func (b *BitSets) IsInitialized(bs BitSetType) bool {
+	switch bs {
+	case BitmaskBitSet:
+		return b.bitmask != nil
+	case TypeBitSet:
+		return b.types != nil
+	case CategoryBitSet:
+		return b.cats != nil
+	}
+	return false
+}
