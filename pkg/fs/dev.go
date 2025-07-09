@@ -23,6 +23,7 @@ package fs
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/sys"
+	"os"
 	"strings"
 )
 
@@ -36,7 +37,8 @@ type DevMapper interface {
 }
 
 type mapper struct {
-	cache map[string]string
+	cache   map[string]string
+	sysroot string
 }
 
 // NewDevMapper creates a new instance of the DOS device replacer.
@@ -44,6 +46,7 @@ func NewDevMapper() DevMapper {
 	m := &mapper{
 		cache: make(map[string]string),
 	}
+
 	// loop through logical drives and query the DOS device name
 	for _, drive := range sys.GetLogicalDrives() {
 		device, err := sys.QueryDosDevice(drive)
@@ -52,6 +55,13 @@ func NewDevMapper() DevMapper {
 		}
 		m.cache[device] = drive
 	}
+
+	// resolve the SystemRoot environment variable
+	m.sysroot = os.Getenv("SystemRoot")
+	if m.sysroot == "" {
+		m.sysroot = os.Getenv("SYSTEMROOT")
+	}
+
 	return m
 }
 
@@ -59,23 +69,35 @@ func (m *mapper) Convert(filename string) string {
 	if filename == "" || len(filename) < deviceOffset {
 		return filename
 	}
-	i := strings.Index(filename[deviceOffset:], "\\")
-	if i < 0 {
+
+	// find the backslash index
+	n := strings.Index(filename[deviceOffset:], "\\")
+	if n < 0 {
 		if f, ok := m.cache[filename]; ok {
 			return f
 		}
 		return filename
 	}
-	dev := filename[:i+deviceOffset]
-	// convert Windows Sandbox path to native path
-	if dev == vmsmbDevice {
-		n := strings.Index(filename, "os")
-		if n > 0 {
-			return "C:" + filename[n+2:]
-		}
-	}
+
+	dev := filename[:n+deviceOffset]
 	if drive, ok := m.cache[dev]; ok {
+		// the mapping for the DOS device exists
 		return strings.Replace(filename, dev, drive, 1)
 	}
+
+	switch {
+	case dev == vmsmbDevice:
+		// convert Windows Sandbox path to native path
+		if n := strings.Index(filename, "os"); n > 0 {
+			return "C:" + filename[n+2:]
+		}
+	case strings.HasPrefix(filename, "\\SystemRoot"):
+		// normalize paths starting with SystemRoot
+		return strings.Replace(filename, "\\SystemRoot", m.sysroot, 1)
+	case strings.HasPrefix(filename, "\\SYSTEMROOT"):
+		// normalize paths starting with SYSTEMROOT
+		return strings.Replace(filename, "\\SYSTEMROOT", m.sysroot, 1)
+	}
+
 	return filename
 }
