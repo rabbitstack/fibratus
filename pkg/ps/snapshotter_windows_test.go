@@ -295,6 +295,29 @@ func TestWriteInternalEventsEnrichment(t *testing.T) {
 				assert.Equal(t, uint32(1), proc.SessionID)
 			},
 		},
+		{"consult process token integrity level from OS",
+			[]*event.Event{
+				{
+					Type: event.CreateProcess,
+					Params: event.Params{
+						params.ProcessID:       {Name: params.ProcessID, Type: params.PID, Value: uint32(os.Getpid())},
+						params.ProcessParentID: {Name: params.ProcessParentID, Type: params.PID, Value: uint32(444)},
+						params.Exe:             {Name: params.Exe, Type: params.UnicodeString, Value: `svchost.exe`},
+						params.Cmdline:         {Name: params.Cmdline, Type: params.UnicodeString, Value: `svchost.exe -k LocalSystemNetworkRestricted -p -s NcbService`},
+						params.UserSID:         {Name: params.UserSID, Type: params.WbemSID, Value: []byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0}},
+						params.SessionID:       {Name: params.SessionID, Type: params.Uint32, Value: uint32(1)},
+						params.ProcessFlags:    {Name: params.ProcessFlags, Type: params.Flags, Value: uint32(0x00000010)},
+					},
+				},
+			},
+			NewSnapshotter(hsnap, &config.Config{}),
+			func(t *testing.T, psnap Snapshotter) {
+				ok, proc := psnap.Find(uint32(os.Getpid()))
+				assert.True(t, ok)
+				assert.Equal(t, "HIGH", proc.TokenIntegrityLevel)
+				assert.Equal(t, true, proc.IsTokenElevated)
+			},
+		},
 	}
 
 	for _, tt := range tests {

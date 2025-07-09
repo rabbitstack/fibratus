@@ -628,9 +628,11 @@ func (s *snapshotter) Find(pid uint32) (bool, *pstypes.PS) {
 	}
 
 	// get process token attributes
-	var token windows.Token
-	var tokenUser *windows.Tokenuser
-	var tokenMandatoryLabel *windows.Tokenmandatorylabel
+	var (
+		token               windows.Token
+		tokenUser           *windows.Tokenuser
+		tokenMandatoryLabel *windows.Tokenmandatorylabel
+	)
 
 	err = windows.OpenProcessToken(process, windows.TOKEN_QUERY, &token)
 	if err != nil {
