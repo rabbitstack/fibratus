@@ -57,23 +57,40 @@ var drives = []string{
 	"Z"}
 
 func TestConvertDosDevice(t *testing.T) {
-	mapper := NewDevMapper()
+	m := NewDevMapper()
 	files := make([]string, 0, len(drives))
+
 	for _, drive := range drives {
 		files = append(files, fmt.Sprintf("%s:\\Windows\\system32\\kernel32.dll", drive))
 	}
+
 	var filename string
 	for i := 0; i < len(drives); i++ {
-		filename = mapper.Convert(fmt.Sprintf("\\Device\\HarddiskVolume%d\\Windows\\system32\\kernel32.dll", i))
+		filename = m.Convert(fmt.Sprintf("\\Device\\HarddiskVolume%d\\Windows\\system32\\kernel32.dll", i))
 		if !strings.HasPrefix(filename, "\\Device") {
 			break
 		}
 	}
 	assert.Contains(t, files, filename)
-}
 
-func TestConvertVmsmbDevice(t *testing.T) {
-	mapper := NewDevMapper()
-	path := "\\Device\\vmsmb\\VSMB-{dcc079ae-60ba-4d07-847c-3493609c0870}\\os\\Windows\\System32\\ntdll.dll"
-	assert.Equal(t, "C:\\Windows\\System32\\ntdll.dll", mapper.Convert(path))
+	m.(*mapper).cache["\\Device\\HarddiskVolume1"] = "C:"
+	m.(*mapper).sysroot = "C:\\Windows"
+
+	var tests = []struct {
+		inputFilename    string
+		expectedFilename string
+	}{
+		{"\\Device\\HarddiskVolume1\\Windows\\system32\\kernel32.dll", "C:\\Windows\\system32\\kernel32.dll"},
+		{"\\Device\\HarddiskVolume5\\Windows\\system32\\kernel32.dll", "\\Device\\HarddiskVolume5\\Windows\\system32\\kernel32.dll"},
+		{"\\Device\\vmsmb\\VSMB-{dcc079ae-60ba-4d07-847c-3493609c0870}\\os\\Windows\\System32\\ntdll.dll", "C:\\Windows\\System32\\ntdll.dll"},
+		{"\\SystemRoot\\system32\\drivers\\wd\\WdNisDrv.sys", "C:\\Windows\\system32\\drivers\\wd\\WdNisDrv.sys"},
+		{"\\SYSTEMROOT\\system32\\drivers\\wd\\WdNisDrv.sys", "C:\\Windows\\system32\\drivers\\wd\\WdNisDrv.sys"},
+		{"\\Device\\Mup", "\\Device\\Mup"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.inputFilename, func(t *testing.T) {
+			assert.Equal(t, tt.expectedFilename, m.Convert(tt.inputFilename))
+		})
+	}
 }
