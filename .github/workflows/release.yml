@@ -6,7 +6,7 @@ on:
       - 'v*'
 
 env:
-  GO_VERSION: 1.23.x
+  GO_VERSION: 1.24.x
   WIX_VERSION: 5.0.0
   PYTHON_VERSION: 3.7.9
 
