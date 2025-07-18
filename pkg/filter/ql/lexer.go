@@ -326,15 +326,16 @@ func (s *scanner) scanString() (tok token, pos int, lit string) {
 	s.r.unread()
 	_, pos = s.r.curr()
 
-	var err error
-	lit, err = ScanString(s.r)
-	if err == errBadString {
+	lit, err := ScanString(s.r)
+	switch err {
+	case errBadString:
 		return Badstr, pos, lit
-	} else if err == errBadEscape {
+	case errBadEscape:
 		_, pos = s.r.curr()
 		return Badstr, pos, lit
+	default:
+		return Str, pos, lit
 	}
-	return Str, pos, lit
 }
 
 var errBadString = errors.New("bad string")
@@ -358,15 +359,16 @@ func ScanString(r io.RuneScanner) (string, error) {
 			// If the next character is an escape then write the escaped char.
 			// If it's not a valid escape then return an error.
 			ch1, _, _ := r.ReadRune()
-			if ch1 == 'n' {
+			switch ch1 {
+			case 'n':
 				_, _ = buf.WriteRune('\n')
-			} else if ch1 == '\\' {
+			case '\\':
 				_, _ = buf.WriteRune('\\')
-			} else if ch1 == '"' {
+			case '"':
 				_, _ = buf.WriteRune('"')
-			} else if ch1 == '\'' {
+			case '\'':
 				_, _ = buf.WriteRune('\'')
-			} else {
+			default:
 				return string(ch0) + string(ch1), errBadEscape
 			}
 		} else {

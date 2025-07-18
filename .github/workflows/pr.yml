@@ -8,7 +8,7 @@ on:
       - "docs/**"
 
 env:
-  GO_VERSION: 1.23.x
+  GO_VERSION: 1.24.x
   WIX_VERSION: 5.0.0
   PYTHON_VERSION: 3.7.9
 
@@ -210,7 +210,7 @@ jobs:
         run: |
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin $GOLANGCI_LINT_VER
         env:
-          GOLANGCI_LINT_VER: v1.61.0
+          GOLANGCI_LINT_VER: v2.2.2
       - name: Lint
         shell: bash
         run: |

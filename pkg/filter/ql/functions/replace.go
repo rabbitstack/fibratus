@@ -36,7 +36,7 @@ func (f Replace) Call(args []interface{}) (interface{}, bool) {
 	if len(args) == 3 {
 		o := parseString(1, args)
 		n := parseString(2, args)
-		return strings.Replace(s, o, n, -1), true
+		return strings.ReplaceAll(s, o, n), true
 	}
 	// apply multiple replacements
 	repl := s
@@ -49,7 +49,7 @@ func (f Replace) Call(args []interface{}) (interface{}, bool) {
 		if !ok {
 			break
 		}
-		repl = strings.Replace(repl, o, n, -1)
+		repl = strings.ReplaceAll(repl, o, n)
 	}
 	return repl, true
 }
