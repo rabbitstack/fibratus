@@ -188,7 +188,7 @@ func Format(key string) (Key, string) {
 				if strings.HasSuffix(sid, "_Classes") {
 					return CurrentUser, "Software\\Classes\\" + path[n+1:]
 				}
-				return CurrentUser, strings.Replace(path[n+1:], "_Classes", "Software\\Classes", -1)
+				return CurrentUser, strings.Replace(path[n+1:], "_Classes", "Software\\Classes", 1)
 			case sid == loggedSID:
 				if len(path) == len(loggedSID) {
 					return CurrentUser, ""

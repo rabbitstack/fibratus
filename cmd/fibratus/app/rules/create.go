@@ -87,9 +87,9 @@ func createRule(name string) error {
 		return err
 	}
 
-	n := fmt.Sprintf("%s.yml", strings.Replace(strings.ToLower(name), " ", "_", -1))
+	n := fmt.Sprintf("%s.yml", strings.ReplaceAll(strings.ToLower(name), " ", "_"))
 	if tacticID != "" {
-		n = strings.Replace(strings.ToLower(tactics[tacticID]), " ", "_", -1) + "_" + n
+		n = strings.ReplaceAll(strings.ToLower(tactics[tacticID]), " ", "_") + "_" + n
 	}
 	f, err := os.Create(n)
 	if err != nil {

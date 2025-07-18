@@ -77,7 +77,7 @@ func (s *eventlog) Send(alert alertsender.Alert) error {
 		// assume alert ID has the UUID format
 		// where we build the short version by
 		// taking the first 12 characters
-		id := strings.Replace(alert.ID, "-", "", -1)
+		id := strings.ReplaceAll(alert.ID, "-", "")
 		h := crc32.ChecksumIEEE([]byte(id[:minIDChars]))
 		// take the lower 16 bits of the CRC32 hash
 		code = uint16(h & 0xFFFF)
@@ -86,7 +86,7 @@ func (s *eventlog) Send(alert alertsender.Alert) error {
 	msg := alert.String(s.config.Verbose)
 	// trim null characters to avoid
 	// UTF16PtrFromString complaints
-	msg = strings.Replace(msg, "\x00", "", -1)
+	msg = strings.ReplaceAll(msg, "\x00", "")
 
 	m, err := windows.UTF16PtrFromString(msg)
 	if err != nil {

@@ -74,7 +74,7 @@ func EnumDevices() []Driver {
 			continue
 		}
 		dev := syscall.UTF16ToString(filename)
-		drv.Filename = strings.Replace(dev, "\\SystemRoot", os.Getenv("SYSTEMROOT"), -1)
+		drv.Filename = strings.Replace(dev, "\\SystemRoot", os.Getenv("SYSTEMROOT"), 1)
 		drivers[i] = drv
 	}
 	return drivers
