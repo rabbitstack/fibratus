@@ -124,6 +124,7 @@ func (js *jsonStream) writeMore() *jsonStream {
 }
 
 func (js *jsonStream) shouldWriteMore(i, l int) bool {
+	//nolint:staticcheck
 	return !(i == l-1)
 }
 
@@ -295,9 +296,10 @@ func writeStringSlowPath(stream *jsonStream, i int, s string, valLen int) {
 
 func writeFirstBuf(space []byte, v uint32) []byte {
 	start := v >> 24
-	if start == 0 {
+	switch start {
+	case 0:
 		space = append(space, byte(v>>16), byte(v>>8))
-	} else if start == 1 {
+	case 1:
 		space = append(space, byte(v>>8))
 	}
 	space = append(space, byte(v))

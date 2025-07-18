@@ -706,9 +706,9 @@ func (pars Params) String() string {
 		case SnakeCase:
 			sb.WriteString(par.Name + ParamKVDelimiter + par.String())
 		case DotCase:
-			sb.WriteString(strings.Replace(par.Name, "_", ".", -1) + ParamKVDelimiter + par.String())
+			sb.WriteString(strings.ReplaceAll(par.Name, "_", ".") + ParamKVDelimiter + par.String())
 		case PascalCase:
-			sb.WriteString(strings.Replace(caser.String(strings.Replace(par.Name, "_", " ", -1)), " ", "", -1) + ParamKVDelimiter + par.String())
+			sb.WriteString(strings.ReplaceAll(caser.String(strings.ReplaceAll(par.Name, "_", " ")), " ", "") + ParamKVDelimiter + par.String())
 		case CamelCase:
 		}
 		if i != len(pars)-1 {
