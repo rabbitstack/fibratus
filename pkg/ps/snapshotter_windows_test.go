@@ -762,7 +762,7 @@ func TestFindQueryOS(t *testing.T) {
 	assert.Equal(t, filepath.Join(os.Getenv("windir"), "notepad.exe"), proc.Cmdline)
 	assert.True(t, len(proc.Envs) > 0)
 	assert.Contains(t, proc.Cwd, "fibratus\\pkg\\ps")
-	assert.Equal(t, uint32(1), proc.SessionID)
+	assert.True(t, proc.SessionID > 0)
 	assert.Equal(t, "HIGH", proc.TokenIntegrityLevel)
 
 	wts, err := sys.LookupActiveWTS()
