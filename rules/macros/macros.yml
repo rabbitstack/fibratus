@@ -135,7 +135,7 @@
     watching for driver objects being created.
 
 - macro: unload_driver
-  expr: unload_image and (image.name iendswith '.sys' or image.is_driver)
+  expr: unload_module and (image.name iendswith '.sys' or image.is_driver)
 
 - macro: load_unsigned_module
   expr: >
