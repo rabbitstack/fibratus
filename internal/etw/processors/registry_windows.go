@@ -27,6 +27,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -41,10 +42,19 @@ var (
 		return fmt.Errorf("unable to read value %s : %v", filepath.Join(key, subkey), err)
 	}
 
+	// valueTTL specifies the maximum allowed period for RegSetValueInternal events
+	// to remain in the queue
+	valueTTL = time.Minute * 2
+	// valuePurgerInterval specifies the purge interval for stale values
+	valuePurgerInterval = time.Minute
+
 	// kcbCount counts the total KCBs found during the duration of the kernel session
 	kcbCount      = expvar.NewInt("registry.kcb.count")
 	kcbMissCount  = expvar.NewInt("registry.kcb.misses")
 	keyHandleHits = expvar.NewInt("registry.key.handle.hits")
+
+	readValueOps     = expvar.NewInt("registry.read.value.ops")
+	capturedDataHits = expvar.NewInt("registry.data.hits")
 
 	handleThrottleCount uint32
 )
@@ -57,6 +67,13 @@ type registryProcessor struct {
 	// keys stores the mapping between the KCB (Key Control Block) and the key name.
 	keys  map[uint64]string
 	hsnap handle.Snapshotter
+
+	values map[uint32][]*event.Event
+	mu     sync.Mutex
+
+	purger *time.Ticker
+
+	quit chan struct{}
 }
 
 func newRegistryProcessor(hsnap handle.Snapshotter) Processor {
@@ -68,10 +85,18 @@ func newRegistryProcessor(hsnap handle.Snapshotter) Processor {
 			atomic.StoreUint32(&handleThrottleCount, 0)
 		}
 	}()
-	return &registryProcessor{
-		keys:  make(map[uint64]string),
-		hsnap: hsnap,
+
+	r := &registryProcessor{
+		keys:   make(map[uint64]string),
+		hsnap:  hsnap,
+		values: make(map[uint32][]*event.Event),
+		purger: time.NewTicker(valuePurgerInterval),
+		quit:   make(chan struct{}, 1),
 	}
+
+	go r.housekeep()
+
+	return r
 }
 
 func (r *registryProcessor) ProcessEvent(e *event.Event) (*event.Event, bool, error) {
@@ -93,6 +118,12 @@ func (r *registryProcessor) processEvent(e *event.Event) (*event.Event, error) {
 		delete(r.keys, khandle)
 		kcbCount.Add(-1)
 	default:
+		if e.IsRegSetValueInternal() {
+			// store the event in temporary queue
+			r.pushSetValue(e)
+			return e, nil
+		}
+
 		khandle := e.Params.MustGetUint64(params.RegKeyHandle)
 		// we have to obey a straightforward algorithm to connect relative
 		// key names to their root keys. If key handle is equal to zero we
@@ -116,7 +147,32 @@ func (r *registryProcessor) processEvent(e *event.Event) (*event.Event, error) {
 			}
 		}
 
-		// get the type/value of the registry key and append to parameters
+		if e.IsRegSetValue() {
+			// previously stored RegSetValueInternal event
+			// is popped from the queue. RegSetValue can
+			// be enriched with registry value type/data
+			v := r.popSetValue(e)
+			if v == nil {
+				// try to read captured data from userspace
+				goto readValue
+			}
+
+			capturedDataHits.Add(1)
+
+			// enrich the event with value data/type parameters
+			typ, err := v.Params.GetUint32(params.RegValueType)
+			if err == nil {
+				e.AppendEnum(params.RegValueType, typ, key.RegistryValueTypes)
+			}
+			data, err := v.Params.Get(params.RegData)
+			if err == nil {
+				e.AppendParam(params.RegData, data.Type, data.Value)
+			}
+
+			return e, nil
+		}
+
+	readValue:
 		if !e.IsRegSetValue() || !e.IsSuccess() {
 			return e, nil
 		}
@@ -126,36 +182,42 @@ func (r *registryProcessor) processEvent(e *event.Event) (*event.Event, error) {
 			return e, nil
 		}
 
+		// get the type/value of the registry key and append to parameters
 		rootkey, subkey := key.Format(keyName)
-		if rootkey != key.Invalid {
-			typ, val, err := rootkey.ReadValue(subkey)
-			if err != nil {
-				errno, ok := err.(windows.Errno)
-				if ok && (errno.Is(os.ErrNotExist) || err == windows.ERROR_ACCESS_DENIED) {
-					return e, nil
-				}
-				return e, ErrReadValue(rootkey.String(), keyName, err)
+		if rootkey == key.Invalid {
+			return e, nil
+		}
+
+		readValueOps.Add(1)
+		typ, val, err := rootkey.ReadValue(subkey)
+		if err != nil {
+			errno, ok := err.(windows.Errno)
+			if ok && (errno.Is(os.ErrNotExist) || err == windows.ERROR_ACCESS_DENIED) {
+				return e, nil
 			}
-			e.AppendEnum(params.RegValueType, typ, key.RegistryValueTypes)
-			switch typ {
-			case registry.SZ, registry.EXPAND_SZ:
-				e.AppendParam(params.RegValue, params.UnicodeString, val)
-			case registry.MULTI_SZ:
-				e.AppendParam(params.RegValue, params.Slice, val)
-			case registry.BINARY:
-				e.AppendParam(params.RegValue, params.Binary, val)
-			case registry.QWORD:
-				e.AppendParam(params.RegValue, params.Uint64, val)
-			case registry.DWORD:
-				e.AppendParam(params.RegValue, params.Uint32, uint32(val.(uint64)))
-			}
+			return e, ErrReadValue(rootkey.String(), keyName, err)
+		}
+		e.AppendEnum(params.RegValueType, typ, key.RegistryValueTypes)
+
+		switch typ {
+		case registry.SZ, registry.EXPAND_SZ:
+			e.AppendParam(params.RegData, params.UnicodeString, val)
+		case registry.MULTI_SZ:
+			e.AppendParam(params.RegData, params.Slice, val)
+		case registry.BINARY:
+			e.AppendParam(params.RegData, params.Binary, val)
+		case registry.QWORD:
+			e.AppendParam(params.RegData, params.Uint64, val)
+		case registry.DWORD:
+			e.AppendParam(params.RegData, params.Uint32, uint32(val.(uint64)))
 		}
 	}
+
 	return e, nil
 }
 
-func (registryProcessor) Name() ProcessorType { return Registry }
-func (registryProcessor) Close()              {}
+func (*registryProcessor) Name() ProcessorType { return Registry }
+func (r *registryProcessor) Close()            { r.quit <- struct{}{} }
 
 func (r *registryProcessor) findMatchingKey(pid uint32, relativeKeyName string) string {
 	// we want to prevent too frequent queries on the process' handles
@@ -166,10 +228,12 @@ func (r *registryProcessor) findMatchingKey(pid uint32, relativeKeyName string) 
 	if atomic.LoadUint32(&handleThrottleCount) > maxHandleQueries {
 		return relativeKeyName
 	}
+
 	handles, err := r.hsnap.FindHandles(pid)
 	if err != nil {
 		return relativeKeyName
 	}
+
 	for _, h := range handles {
 		if h.Type != handle.Key {
 			continue
@@ -179,5 +243,71 @@ func (r *registryProcessor) findMatchingKey(pid uint32, relativeKeyName string) 
 			return h.Name
 		}
 	}
+
 	return relativeKeyName
+}
+
+// pushSetValue stores the internal RegSetValue event
+// into per process identifier queue.
+func (r *registryProcessor) pushSetValue(e *event.Event) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	vals, ok := r.values[e.PID]
+	if !ok {
+		r.values[e.PID] = []*event.Event{e}
+	} else {
+		r.values[e.PID] = append(vals, e)
+	}
+}
+
+// popSetValue traverses the internal RegSetValue queue
+// and pops the event if the suffixes match.
+func (r *registryProcessor) popSetValue(e *event.Event) *event.Event {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	vals, ok := r.values[e.PID]
+	if !ok {
+		return nil
+	}
+
+	var v *event.Event
+	for i := len(vals) - 1; i >= 0; i-- {
+		val := vals[i]
+		if strings.HasSuffix(e.GetParamAsString(params.RegPath), val.GetParamAsString(params.RegPath)) {
+			v = val
+			r.values[e.PID] = append(vals[:i], vals[i+1:]...)
+			break
+		}
+	}
+
+	return v
+}
+
+func (r *registryProcessor) valuesSize(pid uint32) int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.values[pid])
+}
+
+func (r *registryProcessor) housekeep() {
+	for {
+		select {
+		case <-r.purger.C:
+			r.mu.Lock()
+			for pid, vals := range r.values {
+				for i, val := range vals {
+					if time.Since(val.Timestamp) < valueTTL {
+						continue
+					}
+					r.values[pid] = append(vals[:i], vals[i+1:]...)
+				}
+				if len(vals) == 0 {
+					delete(r.values, pid)
+				}
+			}
+			r.mu.Unlock()
+		case <-r.quit:
+			return
+		}
+	}
 }

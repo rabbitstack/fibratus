@@ -23,10 +23,17 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
+	"github.com/rabbitstack/fibratus/pkg/util/key"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"testing"
+	"time"
 )
+
+func init() {
+	valueTTL = time.Millisecond * 150
+	valuePurgerInterval = time.Millisecond * 300
+}
 
 func TestRegistryProcessor(t *testing.T) {
 	var tests = []struct {
@@ -161,7 +168,53 @@ func TestRegistryProcessor(t *testing.T) {
 			func(e *event.Event, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
 				assert.Equal(t, `HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Windows\Directory`, e.GetParamAsString(params.RegPath))
 				assert.Equal(t, `REG_EXPAND_SZ`, e.GetParamAsString(params.RegValueType))
-				assert.Equal(t, `%SystemRoot%`, e.GetParamAsString(params.RegValue))
+				assert.Equal(t, `%SystemRoot%`, e.GetParamAsString(params.RegData))
+			},
+		},
+		{
+			"process registry set value from internal event",
+			&event.Event{
+				Type:     event.RegSetValue,
+				Category: event.Registry,
+				PID:      23234,
+				Params: event.Params{
+					params.RegPath:      {Name: params.RegPath, Type: params.Key, Value: `\REGISTRY\MACHINE\SYSTEM\CurrentControlSet\Control\Windows\Directory`},
+					params.RegKeyHandle: {Name: params.RegKeyHandle, Type: params.Uint64, Value: uint64(0)},
+				},
+			},
+			func(p Processor) {
+				p.(*registryProcessor).values[23234] = []*event.Event{
+					{
+						Type:      event.RegSetValueInternal,
+						Timestamp: time.Now(),
+						Params: event.Params{
+							params.RegPath:      {Name: params.RegPath, Type: params.Key, Value: `\SessionId`},
+							params.RegData:      {Name: params.RegData, Type: params.UnicodeString, Value: "{ABD9EA10-87F6-11EB-9ED5-645D86501328}"},
+							params.RegValueType: {Name: params.RegValueType, Type: params.Enum, Value: uint32(1), Enum: key.RegistryValueTypes},
+							params.RegKeyHandle: {Name: params.RegKeyHandle, Type: params.Uint64, Value: uint64(0)}},
+					},
+					{
+						Type:      event.RegSetValueInternal,
+						Timestamp: time.Now(),
+						Params: event.Params{
+							params.RegPath:      {Name: params.RegPath, Type: params.Key, Value: `\Directory`},
+							params.RegData:      {Name: params.RegData, Type: params.UnicodeString, Value: "%SYSTEMROOT%"},
+							params.RegValueType: {Name: params.RegValueType, Type: params.Enum, Value: uint32(2), Enum: key.RegistryValueTypes},
+							params.RegKeyHandle: {Name: params.RegKeyHandle, Type: params.Uint64, Value: uint64(0)}},
+					},
+				}
+			},
+			func() *handle.SnapshotterMock {
+				hsnap := new(handle.SnapshotterMock)
+				return hsnap
+			},
+			func(e *event.Event, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
+				assert.Equal(t, `HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Windows\Directory`, e.GetParamAsString(params.RegPath))
+				assert.Equal(t, `REG_EXPAND_SZ`, e.GetParamAsString(params.RegValueType))
+				assert.Equal(t, `%SYSTEMROOT%`, e.GetParamAsString(params.RegData))
+				assert.Equal(t, p.(*registryProcessor).valuesSize(23234), 1)
+				time.Sleep(time.Millisecond * 500)
+				assert.Equal(t, p.(*registryProcessor).valuesSize(23234), 0)
 			},
 		},
 	}

@@ -47,6 +47,9 @@ var ThreadpoolGUID = windows.GUID{Data1: 0xc861d0e2, Data2: 0xa2c1, Data3: 0x4d3
 // WindowsKernelProcessGUID represents the GUID for the Microsoft Windows Kernel Process provider
 var WindowsKernelProcessGUID = windows.GUID{Data1: 0x22fb2cd6, Data2: 0x0e7b, Data3: 0x422b, Data4: [8]byte{0xa0, 0xc7, 0x2f, 0xad, 0x1f, 0xd0, 0xe7, 0x16}}
 
+// WindowsKernelRegistryGUID represents the GUID for the Microsoft Windows Kernel Registry provider
+var WindowsKernelRegistryGUID = windows.GUID{Data1: 0x70eb4f03, Data2: 0xc1de, Data3: 0x4f73, Data4: [8]byte{0xa0, 0x51, 0x33, 0xd1, 0x3d, 0x54, 0x13, 0xbd}}
+
 const (
 	// TraceStackTracingInfo controls call stack tracing for kernel events
 	TraceStackTracingInfo = uint8(3)
@@ -59,6 +62,9 @@ const ProcessKeyword = 0x10
 
 // ImageKeyword enables images events for Microsoft Windows Kernel Process provider
 const ImageKeyword = 0x40
+
+// SetValueKeyword enables registry key value set events for Microsoft Windows Kernel Registry provider
+const SetValueKeyword = 0x100
 
 const (
 	// EventHeaderExtTypeStackTrace64 indicates that the extended data contains the call stack if the event is captured on a 64-bit host

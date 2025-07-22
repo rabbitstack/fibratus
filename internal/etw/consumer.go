@@ -23,7 +23,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/filter"
-	"github.com/rabbitstack/fibratus/pkg/handle"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 )
@@ -47,15 +46,15 @@ type Consumer struct {
 // NewConsumer builds a new event consumer.
 func NewConsumer(
 	psnap ps.Snapshotter,
-	hsnap handle.Snapshotter,
 	config *config.Config,
 	sequencer *event.Sequencer,
 	evts chan *event.Event,
+	processors processors.Chain,
 ) *Consumer {
 	return &Consumer{
 		q:          event.NewQueueWithChannel(evts, config.EventSource.StackEnrichment, config.ForwardMode || config.IsCaptureSet()),
 		sequencer:  sequencer,
-		processors: processors.NewChain(psnap, hsnap, config),
+		processors: processors,
 		psnap:      psnap,
 		config:     config,
 	}
