@@ -22,6 +22,7 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
+	"github.com/rabbitstack/fibratus/internal/etw/processors"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	errs "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/event"
@@ -34,6 +35,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows/registry"
 	"time"
+	"unsafe"
 )
 
 const (
@@ -69,9 +71,10 @@ var (
 // starting ETW tracing sessions and setting up event
 // consumers.
 type EventSource struct {
-	r         *config.RulesCompileResult
-	traces    []*Trace
-	consumers []*Consumer
+	r          *config.RulesCompileResult
+	traces     []*Trace
+	consumers  []*Consumer
+	processors processors.Chain
 
 	errs      chan error
 	evts      chan *event.Event
@@ -96,17 +99,18 @@ func NewEventSource(
 	compiler *config.RulesCompileResult,
 ) source.EventSource {
 	evs := &EventSource{
-		r:         compiler,
-		traces:    make([]*Trace, 0),
-		consumers: make([]*Consumer, 0),
-		errs:      make(chan error, 1000),
-		evts:      make(chan *event.Event, 500),
-		sequencer: event.NewSequencer(),
-		config:    config,
-		stop:      make(chan struct{}),
-		psnap:     psnap,
-		hsnap:     hsnap,
-		listeners: make([]event.Listener, 0),
+		r:          compiler,
+		traces:     make([]*Trace, 0),
+		consumers:  make([]*Consumer, 0),
+		processors: processors.NewChain(psnap, hsnap, config),
+		errs:       make(chan error, 1000),
+		evts:       make(chan *event.Event, 500),
+		sequencer:  event.NewSequencer(),
+		config:     config,
+		stop:       make(chan struct{}),
+		psnap:      psnap,
+		hsnap:      hsnap,
+		listeners:  make([]event.Listener, 0),
 	}
 	return evs
 }
@@ -170,6 +174,20 @@ func (e *EventSource) Open(config *config.Config) error {
 	// from the snapshotter
 	trace.AddProvider(etw.WindowsKernelProcessGUID, false, WithKeywords(etw.ProcessKeyword|etw.ImageKeyword), WithCaptureState())
 
+	// in a similar vein, Windows Kernel Registry provider publishes
+	// the RegSetValue event with the full captured data for the
+	// modified value. This data is used to attach various parameters
+	// to the RegSetValue event published by the NT Kernel Logger
+	if config.EventSource.EnableRegistryEvents {
+		// undocumented ETW feature to enable captured data in RegSetValue events
+		val := 0x2
+		eventFilterDescriptor := etw.EventFilterDescriptor{
+			Ptr:  uintptr(unsafe.Pointer(&val)),
+			Size: 4,
+		}
+		trace.AddProvider(etw.WindowsKernelRegistryGUID, false, WithKeywords(etw.SetValueKeyword), WithEventFilterDescriptors(eventFilterDescriptor))
+	}
+
 	if config.EventSource.EnableDNSEvents {
 		trace.AddProvider(etw.DNSClientGUID, false)
 	}
@@ -228,7 +246,13 @@ func (e *EventSource) Open(config *config.Config) error {
 		}
 
 		// Init consumer and open the trace for processing
-		consumer := NewConsumer(e.psnap, e.hsnap, config, e.sequencer, e.evts)
+		consumer := NewConsumer(
+			e.psnap,
+			config,
+			e.sequencer,
+			e.evts,
+			e.processors,
+		)
 		consumer.SetFilter(e.filter)
 
 		// Attach event listeners
@@ -245,9 +269,8 @@ func (e *EventSource) Open(config *config.Config) error {
 		log.Infof("starting [%s] trace processing", t.Name)
 
 		// Instruct the provider to emit state information
-		err = t.CaptureState()
-		if err != nil {
-			log.Warn(err)
+		if err := t.CaptureState(); err != nil {
+			log.Warnf("unable to capture trace %s state: %v", t.Name, err)
 		}
 
 		// Start event processing loop
