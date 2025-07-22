@@ -241,6 +241,7 @@ func AllWithState() []Type {
 	s = append(s, CreateProcessInternal)
 	s = append(s, ProcessRundownInternal)
 	s = append(s, LoadImageInternal)
+	s = append(s, RegSetValueInternal)
 
 	return s
 }
