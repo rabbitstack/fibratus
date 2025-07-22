@@ -940,9 +940,14 @@ func (r *registryAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 	case fields.RegistryKeyHandle:
 		return e.GetParamAsString(params.RegKeyHandle), nil
 	case fields.RegistryValue:
-		return e.Params.GetRaw(params.RegValue)
+		if e.IsRegSetValue() {
+			return filepath.Base(filepath.Base(e.GetParamAsString(params.RegPath))), nil
+		}
+		return nil, nil
 	case fields.RegistryValueType:
 		return e.Params.GetString(params.RegValueType)
+	case fields.RegistryData:
+		return e.GetParamAsString(params.RegData), nil
 	case fields.RegistryStatus:
 		return e.GetParamAsString(params.NTStatus), nil
 	}
