@@ -67,6 +67,8 @@ var (
 	ThreadpoolGUID = windows.GUID{Data1: 0xc861d0e2, Data2: 0xa2c1, Data3: 0x4d36, Data4: [8]byte{0x9f, 0x9c, 0x97, 0x0b, 0xab, 0x94, 0x3a, 0x12}}
 	// ProcessKernelEventGUID represents the Process Kernel event GUID
 	ProcessKernelEventGUID = windows.GUID{Data1: 0x22fb2cd6, Data2: 0x0e7b, Data3: 0x422b, Data4: [8]byte{0xa0, 0xc7, 0x2f, 0xad, 0x1f, 0xd0, 0xe7, 0x16}}
+	// RegistryKernelEventGUID represents the Registry Kernel event GUID
+	RegistryKernelEventGUID = windows.GUID{Data1: 0x70eb4f03, Data2: 0xc1de, Data3: 0x4f73, Data4: [8]byte{0xa0, 0x51, 0x33, 0xd1, 0x3d, 0x54, 0x13, 0xbd}}
 )
 
 var (
@@ -149,6 +151,10 @@ var (
 	RegDeleteKCB = pack(RegistryEventGUID, 23)
 	// RegKCBRundown enumerates the registry keys open at the start of the kernel session.
 	RegKCBRundown = pack(RegistryEventGUID, 25)
+	// RegSetValueInternal is the internal event that is used to
+	// enrich the corresponding public RegSetValue event with
+	// extra attributes
+	RegSetValueInternal = pack(RegistryKernelEventGUID, 36)
 
 	// UnloadImage represents unload image kernel events
 	UnloadImage = pack(ImageEventGUID, 2)
@@ -309,7 +315,7 @@ func (t Type) String() string {
 		return "RegQueryValue"
 	case RegCreateKCB:
 		return "RegCreateKCB"
-	case RegSetValue:
+	case RegSetValue, RegSetValueInternal:
 		return "RegSetValue"
 	case LoadImage, LoadImageInternal:
 		return "LoadImage"
@@ -367,7 +373,7 @@ func (t Type) Category() Category {
 		FileRundown, FileOpEnd, ReleaseFile, MapViewFile, UnmapViewFile, MapFileRundown:
 		return File
 	case RegCreateKey, RegDeleteKey, RegOpenKey, RegCloseKey, RegQueryKey, RegQueryValue, RegSetValue, RegDeleteValue,
-		RegKCBRundown, RegDeleteKCB, RegCreateKCB:
+		RegKCBRundown, RegDeleteKCB, RegCreateKCB, RegSetValueInternal:
 		return Registry
 	case AcceptTCPv4, AcceptTCPv6,
 		ConnectTCPv4, ConnectTCPv6,
@@ -527,7 +533,8 @@ func (t Type) OnlyState() bool {
 		ReleaseFile,
 		MapFileRundown,
 		RegCreateKCB,
-		RegDeleteKCB:
+		RegDeleteKCB,
+		RegSetValueInternal:
 		return true
 	default:
 		return false
@@ -600,7 +607,7 @@ func (t Type) ID() uint {
 // Source designates the provenance of this event type.
 func (t Type) Source() Source {
 	switch t.GUID() {
-	case AuditAPIEventGUID, DNSEventGUID, ThreadpoolGUID, ProcessKernelEventGUID:
+	case AuditAPIEventGUID, DNSEventGUID, ThreadpoolGUID, ProcessKernelEventGUID, RegistryKernelEventGUID:
 		return SecurityTelemetryLogger
 	default:
 		return SystemLogger
