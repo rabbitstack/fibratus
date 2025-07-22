@@ -933,7 +933,7 @@ func TestScan(t *testing.T) {
 					PID:      565,
 					Params: event.Params{
 						params.RegValueType: {Name: params.RegValueType, Type: params.Uint32, Value: uint32(registry.BINARY)},
-						params.RegValue:     {Name: params.RegValue, Type: params.Binary, Value: data},
+						params.RegData:      {Name: params.RegValue, Type: params.Binary, Value: data},
 						params.RegPath:      {Name: params.RegPath, Type: params.UnicodeString, Value: `HKEY_LOCAL_MACHINE\CurrentControlSet\Control\DeviceGuard\Mal`},
 					},
 					Metadata: make(map[event.MetadataKey]any),
