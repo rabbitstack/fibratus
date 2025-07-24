@@ -863,7 +863,7 @@ func TestRegistryFilter(t *testing.T) {
 		Category: event.Registry,
 		Params: event.Params{
 			params.RegPath:      {Name: params.RegPath, Type: params.UnicodeString, Value: `HKEY_LOCAL_MACHINE\SYSTEM\Setup\Pid`},
-			params.RegValue:     {Name: params.RegValue, Type: params.Uint32, Value: uint32(10234)},
+			params.RegData:      {Name: params.RegData, Type: params.Uint32, Value: uint32(10234)},
 			params.RegValueType: {Name: params.RegValueType, Type: params.AnsiString, Value: "DWORD"},
 			params.NTStatus:     {Name: params.NTStatus, Type: params.AnsiString, Value: "success"},
 			params.RegKeyHandle: {Name: params.RegKeyHandle, Type: params.Address, Value: uint64(18446666033449935464)},
@@ -878,8 +878,9 @@ func TestRegistryFilter(t *testing.T) {
 		{`registry.status startswith ('key not', 'succ')`, true},
 		{`registry.path = 'HKEY_LOCAL_MACHINE\\SYSTEM\\Setup\\Pid'`, true},
 		{`registry.key.name icontains ('Setup', 'setup')`, true},
-		{`registry.value = 10234`, true},
+		{`registry.value = 'Pid'`, true},
 		{`registry.value.type in ('DWORD', 'QWORD')`, true},
+		{`registry.data = '10234'`, true},
 		{`MD5(registry.path) = 'eab870b2a516206575d2ffa2b98d8af5'`, true},
 	}
 

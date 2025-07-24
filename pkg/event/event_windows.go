@@ -233,6 +233,7 @@ func (e *Event) IsLoadImageInternal() bool      { return e.Type == LoadImageInte
 func (e *Event) IsImageRundown() bool           { return e.Type == ImageRundown }
 func (e *Event) IsFileOpEnd() bool              { return e.Type == FileOpEnd }
 func (e *Event) IsRegSetValue() bool            { return e.Type == RegSetValue }
+func (e *Event) IsRegSetValueInternal() bool    { return e.Type == RegSetValueInternal }
 func (e *Event) IsProcessRundown() bool         { return e.Type == ProcessRundown }
 func (e *Event) IsProcessRundownInternal() bool { return e.Type == ProcessRundownInternal }
 func (e *Event) IsVirtualAlloc() bool           { return e.Type == VirtualAlloc }

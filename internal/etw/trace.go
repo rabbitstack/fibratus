@@ -95,11 +95,16 @@ type ProviderInfo struct {
 	// stackExtensions manager stack tracing enablement.
 	// For each event present in the stack identifiers,
 	// the StackWalk event is published by the provider.
-	stackExtensions *StackExtensions
+	stackExtensions        *StackExtensions
+	eventFilterDescriptors []etw.EventFilterDescriptor
 }
 
 func (p *ProviderInfo) HasStackExtensions() bool {
 	return p.stackExtensions != nil && !p.stackExtensions.Empty()
+}
+
+func (p *ProviderInfo) HasEventFilterDescriptors() bool {
+	return len(p.eventFilterDescriptors) > 0
 }
 
 // Trace is the essential building block for controlling
@@ -150,9 +155,10 @@ type Trace struct {
 }
 
 type opts struct {
-	stackexts    *StackExtensions
-	keywords     uint64
-	captureState bool
+	stackexts              *StackExtensions
+	keywords               uint64
+	captureState           bool
+	eventFilterDescriptors []etw.EventFilterDescriptor
 }
 
 // Option represents the option for the trace.
@@ -178,6 +184,14 @@ func WithKeywords(keywords uint64) Option {
 func WithCaptureState() Option {
 	return func(o *opts) {
 		o.captureState = true
+	}
+}
+
+// WithEventFilterDescriptors assigns filters to be passed
+// to the provider's enable callback function.
+func WithEventFilterDescriptors(descriptors ...etw.EventFilterDescriptor) Option {
+	return func(o *opts) {
+		o.eventFilterDescriptors = descriptors
 	}
 }
 
@@ -208,7 +222,7 @@ func (t *Trace) AddProvider(guid windows.GUID, enableStacks bool, options ...Opt
 
 	t.Providers = append(
 		t.Providers,
-		ProviderInfo{GUID: guid, Keywords: opts.keywords, EnableStacks: enableStacks, CaptureState: opts.captureState, stackExtensions: opts.stackexts},
+		ProviderInfo{GUID: guid, Keywords: opts.keywords, EnableStacks: enableStacks, CaptureState: opts.captureState, stackExtensions: opts.stackexts, eventFilterDescriptors: opts.eventFilterDescriptors},
 	)
 }
 
@@ -325,8 +339,11 @@ func (t *Trace) Start() error {
 			if err := etw.EnableTrace(provider.GUID, t.startHandle, provider.Keywords); err != nil {
 				return err
 			}
-		case provider.EnableStacks:
-			opts := etw.EnableTraceOpts{WithStacktrace: true}
+		case provider.EnableStacks || provider.HasEventFilterDescriptors():
+			opts := etw.EnableTraceOpts{
+				WithStacktrace:         provider.EnableStacks,
+				EventFilterDescriptors: provider.eventFilterDescriptors,
+			}
 			if err := etw.EnableTraceWithOpts(provider.GUID, t.startHandle, provider.Keywords, opts); err != nil {
 				return err
 			}

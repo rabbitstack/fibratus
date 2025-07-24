@@ -479,10 +479,12 @@ const (
 	RegistryKeyName Field = "registry.key.name"
 	// RegistryKeyHandle represents the registry KCB address
 	RegistryKeyHandle Field = "registry.key.handle"
-	// RegistryValue represents the registry value
+	// RegistryValue represents the registry value name field
 	RegistryValue Field = "registry.value"
-	// RegistryValueType represents the registry value type
+	// RegistryValueType represents the registry value type field
 	RegistryValueType Field = "registry.value.type"
+	// RegistryData represents the captured registry data field
+	RegistryData Field = "registry.data"
 	// RegistryStatus represent the registry operation status
 	RegistryStatus Field = "registry.status"
 
@@ -1000,8 +1002,9 @@ var fields = map[Field]FieldInfo{
 	RegistryPath:      {RegistryPath, "fully qualified registry path", params.UnicodeString, []string{"registry.path = 'HKEY_LOCAL_MACHINE\\SYSTEM'"}, nil, nil},
 	RegistryKeyName:   {RegistryKeyName, "registry key name", params.UnicodeString, []string{"registry.key.name = 'CurrentControlSet'"}, nil, nil},
 	RegistryKeyHandle: {RegistryKeyHandle, "registry key object address", params.Address, []string{"registry.key.handle = 'FFFFB905D60C2268'"}, nil, nil},
-	RegistryValue:     {RegistryValue, "registry value content", params.UnicodeString, []string{"registry.value = '%SystemRoot%\\system32'"}, nil, nil},
+	RegistryValue:     {RegistryValue, "registry value name", params.UnicodeString, []string{"registry.value = 'Epoch'"}, nil, nil},
 	RegistryValueType: {RegistryValueType, "type of registry value", params.UnicodeString, []string{"registry.value.type = 'REG_SZ'"}, nil, nil},
+	RegistryData:      {RegistryData, "registry value captured data", params.Object, []string{"registry.data = '%SystemRoot%'"}, nil, nil},
 	RegistryStatus:    {RegistryStatus, "status of registry operation", params.UnicodeString, []string{"registry.status != 'success'"}, nil, nil},
 
 	NetDIP:        {NetDIP, "destination IP address", params.IP, []string{"net.dip = 172.17.0.3"}, nil, nil},

@@ -84,7 +84,7 @@ func TestReadBuffer(t *testing.T) {
 
 				name, noffset := ev.ReadAnsiString(offset)
 				assert.Equal(t, "cmd.exe", name)
-				cmdline, _ := ev.ReadUTF16String(noffset + offset)
+				cmdline, _ := ev.ReadUTF16String(noffset)
 				assert.Equal(t, "C:\\WINDOWS\\system32\\cmd.exe /c dir /-C /W \"\\\\?\\c:\\Users\\nedo\\AppData\\Roaming\\RabbitMQ\\db\\rabbit@archrabbit-mnesia\"", cmdline)
 			},
 		},

@@ -19,6 +19,7 @@
 package event
 
 import (
+	"encoding/binary"
 	"expvar"
 	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
@@ -33,7 +34,9 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/signature"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/registry"
 	"net"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -255,7 +258,7 @@ func (e *Event) produceParams(evt *etw.EventRecord) {
 		}
 		sid, soffset = evt.ReadSID(offset, true)
 		name, noffset = evt.ReadAnsiString(soffset)
-		cmdline, _ = evt.ReadUTF16String(soffset + noffset)
+		cmdline, _ = evt.ReadUTF16String(noffset)
 		e.AppendParam(params.ProcessObject, params.Address, kproc)
 		e.AppendParam(params.ProcessID, params.PID, pid)
 		e.AppendParam(params.ProcessParentID, params.PID, ppid)
@@ -508,6 +511,34 @@ func (e *Event) produceParams(evt *etw.EventRecord) {
 		e.AppendParam(params.RegKeyHandle, params.Address, keyHandle)
 		e.AppendParam(params.RegPath, params.Key, keyName)
 		e.AppendParam(params.NTStatus, params.Status, status)
+	case RegSetValueInternal:
+		keyObject := evt.ReadUint64(0)
+		status := evt.ReadUint32(8)
+		valueType := evt.ReadUint32(12)
+		keyName, koffset := evt.ReadUTF16String(20) // skip data size param (4 bytes)
+		valueName, voffset := evt.ReadUTF16String(koffset)
+		capturedSize := evt.ReadUint16(voffset)
+		capturedData := evt.ReadBytes(2+voffset, capturedSize)
+
+		e.AppendParam(params.RegKeyHandle, params.Address, keyObject)
+		e.AppendParam(params.NTStatus, params.Status, status)
+		e.AppendParam(params.RegPath, params.Key, filepath.Join(keyName, valueName))
+		e.AppendEnum(params.RegValueType, valueType, key.RegistryValueTypes)
+
+		if len(capturedData) > 0 {
+			switch valueType {
+			case registry.SZ, registry.MULTI_SZ, registry.EXPAND_SZ:
+				e.AppendParam(params.RegData, params.UnicodeString, string(capturedData))
+			case registry.BINARY:
+				e.AppendParam(params.RegData, params.Binary, capturedData)
+			case registry.DWORD:
+				e.AppendParam(params.RegData, params.Uint32, binary.LittleEndian.Uint32(capturedData))
+			case registry.DWORD_BIG_ENDIAN:
+				e.AppendParam(params.RegData, params.Uint32, binary.BigEndian.Uint32(capturedData))
+			case registry.QWORD:
+				e.AppendParam(params.RegData, params.Uint64, binary.LittleEndian.Uint64(capturedData))
+			}
+		}
 	case CreateFile:
 		var (
 			irp            uint64

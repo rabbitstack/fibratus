@@ -334,7 +334,7 @@ func (s scanner) Scan(e *event.Event) (bool, error) {
 		if typ := e.Params.TryGetUint32(params.RegValueType); typ != registry.BINARY {
 			return false, nil
 		}
-		v, err := e.Params.Get(params.RegValue)
+		v, err := e.Params.Get(params.RegData)
 		if err != nil {
 			// value not attached to the event
 			return false, nil

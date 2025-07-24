@@ -47,6 +47,9 @@ var ThreadpoolGUID = windows.GUID{Data1: 0xc861d0e2, Data2: 0xa2c1, Data3: 0x4d3
 // WindowsKernelProcessGUID represents the GUID for the Microsoft Windows Kernel Process provider
 var WindowsKernelProcessGUID = windows.GUID{Data1: 0x22fb2cd6, Data2: 0x0e7b, Data3: 0x422b, Data4: [8]byte{0xa0, 0xc7, 0x2f, 0xad, 0x1f, 0xd0, 0xe7, 0x16}}
 
+// WindowsKernelRegistryGUID represents the GUID for the Microsoft Windows Kernel Registry provider
+var WindowsKernelRegistryGUID = windows.GUID{Data1: 0x70eb4f03, Data2: 0xc1de, Data3: 0x4f73, Data4: [8]byte{0xa0, 0x51, 0x33, 0xd1, 0x3d, 0x54, 0x13, 0xbd}}
+
 const (
 	// TraceStackTracingInfo controls call stack tracing for kernel events
 	TraceStackTracingInfo = uint8(3)
@@ -59,6 +62,9 @@ const ProcessKeyword = 0x10
 
 // ImageKeyword enables images events for Microsoft Windows Kernel Process provider
 const ImageKeyword = 0x40
+
+// SetValueKeyword enables registry key value set events for Microsoft Windows Kernel Registry provider
+const SetValueKeyword = 0x100
 
 const (
 	// EventHeaderExtTypeStackTrace64 indicates that the extended data contains the call stack if the event is captured on a 64-bit host
@@ -555,6 +561,14 @@ type ClassicEventID struct {
 	_    [7]uint8 // reserved
 }
 
+// EventFilterDescriptor defines the filter data that
+// a session passes to the provider's enable callback.
+type EventFilterDescriptor struct {
+	Ptr  uintptr
+	Size uint32
+	Type uint32
+}
+
 // NewClassicEventID creates a new instance of classic event identifier.
 func NewClassicEventID(guid windows.GUID, typ uint16) ClassicEventID {
 	return ClassicEventID{GUID: guid, Type: uint8(typ)}
@@ -604,7 +618,7 @@ func (e *EventRecord) ReadBytes(offset uint16, count uint16) []byte {
 	if offset > e.BufferLen {
 		return nil
 	}
-	return (*[1<<30 - 1]byte)(unsafe.Pointer(e.Buffer + uintptr(offset) + uintptr(count)))[:count:count]
+	return (*[1<<30 - 1]byte)(unsafe.Pointer(e.Buffer + uintptr(offset)))[:count:count]
 }
 
 // ReadUint16 reads the uint16 value from the buffer at the specified offset.
@@ -637,6 +651,7 @@ func (e *EventRecord) ReadAnsiString(offset uint16) (string, uint16) {
 	if offset > e.BufferLen {
 		return "", 0
 	}
+
 	b := make([]byte, e.BufferLen)
 	var i uint16
 	for i < e.BufferLen {
@@ -647,49 +662,52 @@ func (e *EventRecord) ReadAnsiString(offset uint16) (string, uint16) {
 		b[i] = c
 		i++
 	}
-	if int(i) > len(b) {
-		return string(b[:len(b)-1]), uint16(len(b))
+
+	if i == 0 {
+		return "", offset + 1
 	}
-	return string(b[:i]), i + 1
+
+	if int(i) > len(b) {
+		return string(b[:len(b)-1]), uint16(len(b)) + offset
+	}
+
+	return string(b[:i]), i + 1 + offset
 }
 
 // ReadUTF16String reads the UTF-16 string from the buffer at the specified offset.
-// Returns the UTF-8 string and the number of bytes read from the string.
+// Returns the UTF-8 string and the number of bytes read from the string + the offset.
 func (e *EventRecord) ReadUTF16String(offset uint16) (string, uint16) {
 	if offset > e.BufferLen {
 		return "", 0
 	}
 
+	// we're reading the leading string. First, calculate
+	// the length of the null-terminated UTF16 string
+	i := offset
 	var length uint16
-
-	if offset > 0 {
-		length = e.BufferLen - offset
-	} else {
-		// we're reading the leading string. First, calculate
-		// the length of the null-terminated UTF16 string
-		var i uint16
-		for i < e.BufferLen {
-			c := *(*uint16)(unsafe.Pointer(e.Buffer + uintptr(i)))
-			if c == 0 {
-				break // null terminator
-			}
-			length += 2
-			i += 2
+	for i < e.BufferLen {
+		c := *(*uint16)(unsafe.Pointer(e.Buffer + uintptr(i)))
+		if c == 0 {
+			break // null terminator
 		}
+		length += 2
+		i += 2
 	}
 
-	s := (*[1<<30 - 1]uint16)(unsafe.Pointer(e.Buffer + uintptr(offset)))[:length:length]
-	if offset > 0 {
-		return utf16.Decode(s[:len(s)/2-1-2]), uint16(len(s) + 2)
+	if length == 0 {
+		return "", offset + 2 // null terminator size
 	}
 
-	return utf16.Decode(s[:len(s)/2]), uint16(len(s) + 2)
+	b := (*[1<<30 - 1]uint16)(unsafe.Pointer(e.Buffer + uintptr(offset)))[:length:length]
+	s := b[:len(b)/2]
+
+	return utf16.Decode(s), uint16((len(s)+1)*2) + offset
 }
 
 // ReadNTUnicodeString reads the native Unicode string at the given offset.
 func (e *EventRecord) ReadNTUnicodeString(offset uint16) (string, uint16) {
 	if offset > e.BufferLen {
-		return "", offset
+		return "", 0
 	}
 
 	i := offset
@@ -704,7 +722,7 @@ func (e *EventRecord) ReadNTUnicodeString(offset uint16) (string, uint16) {
 	}
 
 	if length == 0 {
-		return "", offset
+		return "", offset + 2 // null terminator size
 	}
 
 	b := (*[1<<30 - 1]byte)(unsafe.Pointer(e.Buffer + uintptr(offset)))[:length:length]
@@ -715,7 +733,7 @@ func (e *EventRecord) ReadNTUnicodeString(offset uint16) (string, uint16) {
 		Buffer:        (*uint16)(unsafe.Pointer(&b[0])),
 	}
 
-	return s.String(), offset + s.Length
+	return s.String(), s.Length + offset
 }
 
 // ConsumeUTF16String reads the byte slice with UTF16-encoded string

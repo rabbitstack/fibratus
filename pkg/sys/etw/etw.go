@@ -236,6 +236,9 @@ func CaptureProviderState(guid windows.GUID, handle TraceHandle) error {
 type EnableTraceOpts struct {
 	// WithStacktrace indicates call stack trace is added to the extended data of events.
 	WithStacktrace bool
+	// EventFilterDescriptors defines the filter data that a session passes to the provider's
+	// enable callback function.
+	EventFilterDescriptors []EventFilterDescriptor
 }
 
 // EnableTraceWithOpts influences the behaviour of the specified event trace provider
@@ -245,9 +248,16 @@ func EnableTraceWithOpts(guid windows.GUID, handle TraceHandle, keywords uint64,
 		Version:  EnableTraceParametersVersion,
 		SourceID: guid,
 	}
+
 	if opts.WithStacktrace {
 		params.EnableProperty = EventEnablePropertyStacktrace
 	}
+
+	if len(opts.EventFilterDescriptors) > 0 {
+		params.EnableFilterDesc = uintptr(unsafe.Pointer(&opts.EventFilterDescriptors[0]))
+		params.FilterDescCount = uint32(len(opts.EventFilterDescriptors))
+	}
+
 	err := enableTraceEx2(handle, &guid, ControlCodeEnableProvider, TraceLevelInformation, keywords, 0, 0, params)
 	if err != nil {
 		return os.NewSyscallError("EnableTraceEx2", err)
