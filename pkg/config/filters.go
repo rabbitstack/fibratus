@@ -55,6 +55,7 @@ type FilterConfig struct {
 	Notes            string            `json:"notes" yaml:"notes"`
 	MinEngineVersion string            `json:"min-engine-version" yaml:"min-engine-version"`
 	Enabled          *bool             `json:"enabled" yaml:"enabled"`
+	Authors          []string          `json:"authors" yaml:"authors"`
 }
 
 // FilterAction wraps all possible filter actions.

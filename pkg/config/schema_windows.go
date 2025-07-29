@@ -524,6 +524,7 @@ var rulesSchema = `
 		},
 		"tags":						{"type": "array", "items": [{"type": "string", "minLength": 1}]},
 		"references":			{"type": "array", "items": [{"type": "string", "minLength": 1}]},
+		"authors":				{"type": "array", "items": [{"type": "string", "minLength": 1}]},
 		"action": 				{
 			"type": "array",
 			"items": {
