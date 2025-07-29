@@ -58,6 +58,7 @@ func TestLoadRulesFromPaths(t *testing.T) {
 	assert.NotNil(t, f1.Action)
 	assert.Contains(t, f1.References, "ref2")
 	assert.NotEmpty(t, f1.Notes)
+	assert.Len(t, f1.Authors, 2)
 
 	acts, err := f1.DecodeActions()
 	require.NoError(t, err)
