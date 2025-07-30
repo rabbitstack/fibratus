@@ -338,12 +338,12 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("couldn't read the config file: %v", err)
 	}
 	// validate config file content
-	valid, errs := validate(interpolateSchema(), out)
+	valid, errs := validate(configSchema, out)
 	if !valid || len(errs) > 0 {
 		return fmt.Errorf("invalid config: %v", multierror.Wrap(errs...))
 	}
 	// now validate the Viper config flags
-	valid, errs = validate(interpolateSchema(), c.viper.AllSettings())
+	valid, errs = validate(configSchema, c.viper.AllSettings())
 	if !valid || len(errs) > 0 {
 		return fmt.Errorf("invalid config: %v", multierror.Wrap(errs...))
 	}

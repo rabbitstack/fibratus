@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "macro": {
+        "type": "string",
+        "minLength": 2,
+        "pattern": "^[A-Za-z0-9_-]+$"
+      },
+      "description": {
+        "type": "string"
+      },
+      "expr": {
+        "type": "string",
+        "minLength": 5
+      },
+      "list": {
+        "type": "array",
+        "items": [
+          {
+            "type": "string",
+            "minLength": 1
+          }
+        ]
+      }
+    },
+    "required": [
+      "macro"
+    ],
+    "oneOf": [
+      {
+        "required": [
+          "expr"
+        ]
+      },
+      {
+        "required": [
+          "list"
+        ]
+      }
+    ],
+    "additionalProperties": false
+  },
+  "additionalProperties": false
+}
