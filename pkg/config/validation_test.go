@@ -82,7 +82,7 @@ func TestValidate(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		valid, errs := validate(interpolateSchema(), m)
+		valid, errs := validate(configSchema, m)
 		if valid != tt.valid {
 			t.Errorf("%d. valid mismatch: text=%q exp=%#v got=%#v errs=%#v", i, tt.text, tt.valid, valid, errs)
 		} else if len(errs) != tt.errs {
