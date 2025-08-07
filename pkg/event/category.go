@@ -122,3 +122,13 @@ func Categories() []string {
 		string(Threadpool),
 	}
 }
+
+// IsCategoryKnown indicates if the category is known given its name.
+func IsCategoryKnown(name string) bool {
+	for _, category := range Categories() {
+		if category == name {
+			return true
+		}
+	}
+	return false
+}

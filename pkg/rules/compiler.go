@@ -44,6 +44,12 @@ var (
 	ErrMalformedMinEngineVer = func(rule, v string, err error) error {
 		return fmt.Errorf("rule %q has a malformed minimum engine version: %s: %v", rule, v, err)
 	}
+	ErrUnknownEventName = func(rule, name string) error {
+		return fmt.Errorf("rule %s references an invalid event name %q in the evt.name field", rule, name)
+	}
+	ErrUnknownCategoryName = func(rule, name string) error {
+		return fmt.Errorf("rule %s references an invalid event category %q in the evt.category field", rule, name)
+	}
 )
 
 type compiler struct {
@@ -89,6 +95,7 @@ func (c *compiler) compile() (map[*config.FilterConfig]filter.Filter, *config.Ru
 				return nil, nil, ErrIncompatibleFilter(f.Name, f.MinEngineVersion)
 			}
 		}
+
 		// output warning for deprecated fields
 		for _, field := range fltr.GetFields() {
 			deprecated, d := fields.IsDeprecated(field.Name)
@@ -97,7 +104,23 @@ func (c *compiler) compile() (map[*config.FilterConfig]filter.Filter, *config.Ru
 					"was deprecated starting from version %s. "+
 					"Please consider migrating to %s field(s) "+
 					"because [%s] will be removed in future versions.",
-					f.Name, field, d.Since, d.Fields, field)
+					f.Name, field.Name, d.Since, d.Fields, field.Name)
+			}
+		}
+
+		// validate the value of the event/category fields
+		for field, values := range fltr.GetStringFields() {
+			for _, v := range values {
+				switch field {
+				case fields.EvtName, fields.KevtName:
+					if !event.IsKnown(v) {
+						return nil, nil, ErrUnknownEventName(f.Name, v)
+					}
+				case fields.EvtCategory, fields.KevtCategory:
+					if !event.IsCategoryKnown(v) {
+						return nil, nil, ErrUnknownCategoryName(f.Name, v)
+					}
+				}
 			}
 		}
 
