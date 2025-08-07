@@ -314,6 +314,16 @@ outer:
 	return typs
 }
 
+// IsKnown indicates if the event type is known given the event name.
+func IsKnown(name string) bool {
+	for _, evt := range GetTypesMeta() {
+		if evt.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
 // GetTypesMetaIndexed returns indexed event types metadata
 // that is guaranteed to always return the same event indices.
 func GetTypesMetaIndexed() []Info { return indexedEvents }

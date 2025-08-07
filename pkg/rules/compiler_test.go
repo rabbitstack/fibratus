@@ -70,3 +70,29 @@ func TestCompileMinEngineVersion(t *testing.T) {
 		})
 	}
 }
+
+func TestCompileEventCategoryFieldNames(t *testing.T) {
+	var tests = []struct {
+		rules string
+		err   error
+	}{
+		{"_fixtures/field_values/correct_event_name_field.yml", nil},
+		{"_fixtures/field_values/incorrect_event_name_field.yml", ErrUnknownEventName("match https connections", "RecvTcp4")},
+		{"_fixtures/field_values/incorrect_event_name_in_operator.yml", ErrUnknownEventName("match https connections", "CreateProc")},
+		{"_fixtures/field_values/correct_category_name_field.yml", nil},
+		{"_fixtures/field_values/incorrect_category_name_field.yml", ErrUnknownCategoryName("match https connections", "network")},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.rules, func(t *testing.T) {
+			c := newCompiler(new(ps.SnapshotterMock), newConfig(tt.rules))
+			_, _, err := c.compile()
+			if err != nil && tt.err != nil {
+				require.Error(t, err)
+			}
+			if err != nil {
+				require.EqualError(t, err, tt.err.Error())
+			}
+		})
+	}
+}
