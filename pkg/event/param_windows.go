@@ -82,7 +82,7 @@ func (p Param) String() string {
 		if err != nil {
 			return ""
 		}
-		if p.Name == params.ProcessIntegrityLevel {
+		if p.Name == params.ProcessTokenIntegrityLevel {
 			return sys.RidToString(sid)
 		}
 		return sid.String()
@@ -312,7 +312,7 @@ func (e *Event) produceParams(evt *etw.EventRecord) {
 		e.AppendParam(params.ProcessFlags, params.Flags, flags, WithFlags(PsCreationFlags))
 		e.AppendParam(params.ProcessTokenElevationType, params.Enum, tokenElevationType, WithEnum(PsTokenElevationTypes))
 		e.AppendParam(params.ProcessTokenIsElevated, params.Bool, tokenIsElevated > 0)
-		e.AppendParam(params.ProcessIntegrityLevel, params.SID, tokenMandatoryLabel)
+		e.AppendParam(params.ProcessTokenIntegrityLevel, params.SID, tokenMandatoryLabel)
 		e.AppendParam(params.Exe, params.DOSPath, exe)
 	case OpenProcess:
 		processID := evt.ReadUint32(0)
