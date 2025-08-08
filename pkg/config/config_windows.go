@@ -21,6 +21,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/rabbitstack/fibratus/internal/evasion"
 	"golang.org/x/sys/windows"
 	"time"
 
@@ -124,6 +125,8 @@ type Config struct {
 
 	// Filters contains filter/rule definitions
 	Filters *Filters `json:"filters" yaml:"filters"`
+
+	Evasions evasion.Config
 
 	flags *pflag.FlagSet
 	viper *viper.Viper

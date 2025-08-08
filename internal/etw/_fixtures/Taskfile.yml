@@ -1,0 +1,14 @@
+version: '3'
+
+vars:
+  SYSWHISPERS3_REPO: https://github.com/klezVirus/SysWhispers3.git
+
+tasks:
+  direct-syscall:
+    desc: Builds the binary to perform direct syscalls via Syswhispers generated stubs
+    dir: direct-syscall
+    cmds:
+      - git clone {{ .SYSWHISPERS3_REPO }}
+      - python SysWhispers3/syswhispers.py -a x64 -c msvc -p common -o syscalls
+      - nmake -f Makefile.msvc
+    silent: true

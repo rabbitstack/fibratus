@@ -56,6 +56,12 @@ func TestCallstack(t *testing.T) {
 	assert.Equal(t, "fffff8015690b644", kframe.Addr.String())
 	assert.Equal(t, "ObDeleteCapturedInsertInfo", kframe.Symbol)
 	assert.Equal(t, "C:\\WINDOWS\\system32\\ntoskrnl.exe", kframe.Module)
+
+	finalUserspaceFrame := callstack.FinalUserspaceFrame()
+	require.NotNil(t, finalUserspaceFrame)
+	assert.Equal(t, "7ffb5c1d0396", finalUserspaceFrame.Addr.String())
+	assert.Equal(t, "CreateProcessW", finalUserspaceFrame.Symbol)
+	assert.Equal(t, "C:\\WINDOWS\\System32\\KERNELBASE.dll", finalUserspaceFrame.Module)
 }
 
 func TestCallstackFinalUserFrame(t *testing.T) {

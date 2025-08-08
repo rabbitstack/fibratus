@@ -365,10 +365,12 @@ func (s *snapshotter) Close() error {
 
 func (s *snapshotter) newProcState(pid, ppid uint32, e *event.Event) (*pstypes.PS, error) {
 	if e.IsCreateProcessInternal() || e.IsProcessRundownInternal() {
+		exe := e.GetParamAsString(params.Exe)
 		proc := &pstypes.PS{
 			PID:                 pid,
 			Ppid:                ppid,
-			Exe:                 e.GetParamAsString(params.Exe),
+			Exe:                 exe,
+			Name:                filepath.Base(exe),
 			TokenIntegrityLevel: e.GetParamAsString(params.ProcessIntegrityLevel),
 			TokenElevationType:  e.GetParamAsString(params.ProcessTokenElevationType),
 			IsTokenElevated:     e.Params.TryGetBool(params.ProcessTokenIsElevated),
