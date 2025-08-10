@@ -369,6 +369,7 @@ func (s *snapshotter) newProcState(pid, ppid uint32, e *event.Event) (*pstypes.P
 			PID:                 pid,
 			Ppid:                ppid,
 			Exe:                 e.GetParamAsString(params.Exe),
+			Name:                filepath.Base(e.GetParamAsString(params.Exe)),
 			TokenIntegrityLevel: e.GetParamAsString(params.ProcessIntegrityLevel),
 			TokenElevationType:  e.GetParamAsString(params.ProcessTokenElevationType),
 			IsTokenElevated:     e.Params.TryGetBool(params.ProcessTokenIsElevated),
