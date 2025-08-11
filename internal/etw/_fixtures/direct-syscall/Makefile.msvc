@@ -1,0 +1,7 @@
+OPTIONS = -Zp8 -c -nologo -Gy -Os -O1 -GR- -EHa -Oi -GS-
+LIBS = libvcruntime.lib libcmt.lib ucrt.lib kernel32.lib
+
+main:
+  ML64 /c syscalls-asm.x64.asm /link /NODEFAULTLIB /RELEASE /MACHINE:X64
+  cl.exe $(OPTIONS) syscalls.c main.c
+  link.exe /OUT:direct-syscall.exe -nologo $(LIBS) /MACHINE:X64 -subsystem:console -nodefaultlib syscalls-asm.x64.obj syscalls.obj main.obj

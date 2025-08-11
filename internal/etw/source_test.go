@@ -20,6 +20,7 @@ package etw
 import (
 	"context"
 	"fmt"
+	"github.com/rabbitstack/fibratus/internal/evasion"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
@@ -41,6 +42,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -1290,6 +1292,127 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 				}
 			}
 			t.Fatal("FAIL: TestCallstackEnrichment")
+		}
+	}
+}
+
+func containsEvasion(e *event.Event, evasion string) bool {
+	m := e.GetMeta(event.EvasionsKey)
+	evas, ok := m.([]string)
+	if !ok {
+		return false
+	}
+	for _, eva := range evas {
+		if eva == evasion {
+			return true
+		}
+	}
+	return false
+}
+
+func TestEvasionScanner(t *testing.T) {
+	var tests = []*struct {
+		name      string
+		gen       func() error
+		want      func(e *event.Event) bool
+		completed bool
+	}{
+		{
+			"direct syscall",
+			func() error {
+				cmd := exec.Command("_fixtures/direct-syscall/direct-syscall.exe")
+				return cmd.Run()
+			},
+			func(e *event.Event) bool {
+				if strings.Contains(strings.ToLower(e.Callstack.String()), strings.ToLower("direct-syscall.exe")) && e.Type == event.SetThreadContext {
+					log.Info(e, e.Callstack)
+					return containsEvasion(e, "direct_syscall")
+				}
+				return false
+			},
+			false,
+		},
+	}
+
+	evsConfig := config.EventSourceConfig{
+		EnableThreadEvents:   true,
+		EnableImageEvents:    true,
+		EnableFileIOEvents:   false,
+		EnableVAMapEvents:    true,
+		EnableNetEvents:      true,
+		EnableRegistryEvents: false,
+		EnableMemEvents:      false,
+		EnableHandleEvents:   false,
+		EnableDNSEvents:      false,
+		EnableAuditAPIEvents: true,
+		StackEnrichment:      true,
+	}
+	evsConfig.Init()
+
+	hsnap := new(handle.SnapshotterMock)
+	hsnap.On("FindByObject", mock.Anything).Return(htypes.Handle{}, false)
+	hsnap.On("FindHandles", mock.Anything).Return([]htypes.Handle{}, nil)
+	hsnap.On("Write", mock.Anything).Return(nil)
+	hsnap.On("Remove", mock.Anything).Return(nil)
+
+	cfg := &config.Config{EventSource: evsConfig, Filters: &config.Filters{}}
+
+	psnap := ps.NewSnapshotter(hsnap, cfg)
+
+	evs := NewEventSource(psnap, hsnap, cfg, nil)
+
+	l := &MockListener{}
+	evs.RegisterEventListener(l)
+
+	symbolizer := symbolize.NewSymbolizer(symbolize.NewDebugHelpResolver(cfg), psnap, cfg, true)
+	defer symbolizer.Close()
+	evs.RegisterEventListener(symbolizer)
+
+	scanner := evasion.NewScanner(evasion.Config{Enabled: true, EnableDirectSyscall: true})
+	evs.RegisterEventListener(scanner)
+
+	require.NoError(t, evs.Open(cfg))
+	defer evs.Close()
+
+	time.Sleep(time.Second * 2)
+
+	for _, tt := range tests {
+		gen := tt.gen
+		if gen != nil {
+			log.Infof("executing [%s] evasion test generator", tt.name)
+			require.NoError(t, gen(), tt.name)
+		}
+	}
+
+	ntests := len(tests)
+	timeout := time.After(time.Duration(ntests) * time.Minute)
+
+	for {
+		select {
+		case e := <-evs.Events():
+			for _, tt := range tests {
+				if tt.completed {
+					continue
+				}
+				pred := tt.want
+				if pred(e) {
+					t.Logf("PASS: %s", tt.name)
+					tt.completed = true
+					ntests--
+				}
+				if ntests == 0 {
+					return
+				}
+			}
+		case err := <-evs.Errors():
+			t.Fatalf("FAIL: %v", err)
+		case <-timeout:
+			for _, tt := range tests {
+				if !tt.completed {
+					t.Logf("FAIL: %s", tt.name)
+				}
+			}
+			t.Fatal("FAIL: TestEvasionScanner")
 		}
 	}
 }

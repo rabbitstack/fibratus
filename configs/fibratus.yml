@@ -156,6 +156,21 @@ handle:
   # Indicates if process handles are collected during startup or when a new process is spawn.
   enumerate-handles: false
 
+# =============================== Evasion ====================================================
+
+# Tweaks for controlling evasion scanner behaviours. Evasion behaviours can represent strong
+# IoC (Indicators of Compromise) such as direct syscall or require a combination of fine-tune
+# exceptions to reduce the alert fatigue.
+evasion:
+  # Indicates if evasion detections are enabled global-wise. If disabled, evasion scanner will
+  # not try to classify ad-hoc evasion techniques.
+  enabled: true
+
+  # Indicates if direct syscall evasion detection is enabled. A direct syscall bypasses Windows
+  # API functions and calls the underlying system call directly using the syscall instruction,
+  # skipping the NTDLL stub that normally performs the transition to kernel mode.
+  #enable-direct-syscall: true
+
 # =============================== Event ===============================================
 
 # The following settings control the state of the event.

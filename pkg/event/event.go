@@ -48,6 +48,8 @@ const (
 	// RuleSequenceOOOKey the presence of this metadata key indicates the
 	// event in the partials list arrived out of order and requires reevaluation
 	RuleSequenceOOOKey MetadataKey = "rule.seq.ooo"
+	// EvasionsKey represents the evasion behaviours detected on the event
+	EvasionsKey MetadataKey = "evasions"
 )
 
 func (key MetadataKey) String() string { return string(key) }
@@ -243,6 +245,17 @@ func (e *Event) AddMeta(k MetadataKey, v any) {
 	e.Metadata[k] = v
 }
 
+// AddSliceMetaOrAppend puts the provided string into the slice if the key
+// doesn't exist or appends the string to the slice.
+func (e *Event) AddSliceMetaOrAppend(k MetadataKey, s string) {
+	if e.ContainsMeta(k) {
+		v := append(e.GetMeta(k).([]string), s)
+		e.AddMeta(k, v)
+	} else {
+		e.AddMeta(k, []string{s})
+	}
+}
+
 // RemoveMeta removes the event metadata index by given key.
 func (e *Event) RemoveMeta(k MetadataKey) {
 	e.mmux.Lock()
@@ -260,6 +273,13 @@ func (e *Event) GetMetaAsString(k MetadataKey) string {
 		}
 	}
 	return ""
+}
+
+// GetMeta returns the metadata for the given key.
+func (e *Event) GetMeta(k MetadataKey) any {
+	e.mmux.RLock()
+	defer e.mmux.RUnlock()
+	return e.Metadata[k]
 }
 
 // ContainsMeta returns true if the metadata contains the specified key.

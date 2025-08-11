@@ -21,6 +21,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/rabbitstack/fibratus/internal/evasion"
 	"golang.org/x/sys/windows"
 	"time"
 
@@ -124,6 +125,9 @@ type Config struct {
 
 	// Filters contains filter/rule definitions
 	Filters *Filters `json:"filters" yaml:"filters"`
+
+	// Evasion controls the detection of evasion behaviours.
+	Evasion evasion.Config `json:"evasion" yaml:"evasion"`
 
 	flags *pflag.FlagSet
 	viper *viper.Viper
@@ -236,6 +240,10 @@ func NewWithOpts(options ...Option) *Config {
 		pe.AddFlags(flagSet)
 	}
 
+	if opts.run {
+		evasion.AddFlags(flagSet)
+	}
+
 	c.addFlags()
 
 	return c
@@ -303,12 +311,20 @@ func (c *Config) Init() error {
 			return err
 		}
 	}
+
+	if c.opts.run {
+		c.Evasion.InitFromViper(c.viper)
+	}
+
 	return nil
 }
 
 // IsCaptureSet determines if the events are stored
 // in the capture file.
 func (c *Config) IsCaptureSet() bool { return c.CapFile != "" }
+
+// IsFilamentSet indicates if the filament is supplied.
+func (c *Config) IsFilamentSet() bool { return c.Filament.Name != "" }
 
 // TryLoadFile attempts to load the configuration file from specified path on the file system.
 func (c *Config) TryLoadFile(file string) error {

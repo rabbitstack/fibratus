@@ -292,6 +292,18 @@
       },
       "additionalProperties": false
     },
+    "evasion": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "enable-direct-syscall": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
     "event": {
       "type": "object",
       "properties": {

@@ -196,6 +196,24 @@ func (s *Callstack) FinalUserFrame() *Frame {
 	return nil
 }
 
+// FinalUserspaceFrame returns the final userspace frame. This
+// frame is typically backed by the ntdll module.
+func (s *Callstack) FinalUserspaceFrame() *Frame {
+	if s.IsEmpty() {
+		return nil
+	}
+
+	for n := s.Depth() - 1; n > 0; n-- {
+		f := (*s)[n]
+		if f.Addr.InSystemRange() {
+			continue
+		}
+		return &f
+	}
+
+	return nil
+}
+
 // FinalKernelFrame returns the final kernel space frame.
 func (s *Callstack) FinalKernelFrame() *Frame {
 	if s.IsEmpty() {

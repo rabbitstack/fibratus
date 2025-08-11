@@ -21,6 +21,7 @@ package bootstrap
 import (
 	"context"
 	"errors"
+	"github.com/rabbitstack/fibratus/internal/evasion"
 	"github.com/rabbitstack/fibratus/pkg/aggregator"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	"github.com/rabbitstack/fibratus/pkg/api"
@@ -138,7 +139,7 @@ func NewApp(cfg *config.Config, options ...Option) (*App, error) {
 	var engine *rules.Engine
 	var rs *config.RulesCompileResult
 
-	if cfg.Filters.Rules.Enabled && !cfg.ForwardMode && !cfg.IsCaptureSet() {
+	if cfg.Filters.Rules.Enabled && !cfg.ForwardMode && !cfg.IsCaptureSet() && !cfg.IsFilamentSet() {
 		engine = rules.NewEngine(psnap, cfg)
 		var err error
 		rs, err = engine.Compile()
@@ -203,9 +204,8 @@ func (f *App) Run(args []string) error {
 	// In case of a regular run, we additionally set up the aggregator.
 	// The aggregator will grab the events from the queue, assemble them
 	// into batches and hand over to output sinks.
-	filamentName := cfg.Filament.Name
-	if filamentName != "" {
-		f.filament, err = filament.New(filamentName, f.psnap, f.hsnap, cfg)
+	if cfg.IsFilamentSet() {
+		f.filament, err = filament.New(cfg.Filament.Name, f.psnap, f.hsnap, cfg)
 		if err != nil {
 			return err
 		}
@@ -233,6 +233,10 @@ func (f *App) Run(args []string) error {
 		if cfg.EventSource.StackEnrichment {
 			f.symbolizer = symbolize.NewSymbolizer(symbolize.NewDebugHelpResolver(cfg), f.psnap, cfg, false)
 			f.evs.RegisterEventListener(f.symbolizer)
+		}
+		// register evasion scanner
+		if cfg.Evasion.Enabled {
+			f.evs.RegisterEventListener(evasion.NewScanner(cfg.Evasion))
 		}
 		// register rule engine
 		if f.engine != nil {
@@ -314,9 +318,9 @@ func (f *App) ReadCapture(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	filamentName := f.config.Filament.Name
-	if filamentName != "" {
-		f.filament, err = filament.New(filamentName, f.psnap, f.hsnap, f.config)
+
+	if f.config.IsFilamentSet() {
+		f.filament, err = filament.New(f.config.Filament.Name, f.psnap, f.hsnap, f.config)
 		if err != nil {
 			return err
 		}
@@ -355,6 +359,7 @@ func (f *App) ReadCapture(ctx context.Context, args []string) error {
 			return err
 		}
 	}
+
 	return api.StartServer(f.config)
 }
 
