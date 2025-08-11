@@ -1,0 +1,20 @@
+version: '3'
+
+vars:
+  SYSWHISPERS3_REPO: https://github.com/klezVirus/SysWhispers3.git
+  VISUAL_STUDIO_EDITION: Enterprise
+  VISUAL_STUDIO_VERSION: 2022
+
+tasks:
+  direct-syscall:
+    desc: Builds the binary to perform direct syscalls via Syswhispers generated stubs
+    dir: direct-syscall
+    cmds:
+      - git clone {{ .SYSWHISPERS3_REPO }}
+      - python SysWhispers3/syswhispers.py -a x64 -c msvc -p common -o syscalls
+      - cmd.exe /c 'C:\"Program Files"\"Microsoft Visual Studio"\{{ .VISUAL_STUDIO_VERSION }}\{{ .VISUAL_STUDIO_EDITION }}\VC\Auxiliary\Build\vcvars64.bat && nmake -f Makefile.msvc'
+    silent: true
+
+  all:
+    deps:
+      - direct-syscall

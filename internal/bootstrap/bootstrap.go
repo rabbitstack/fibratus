@@ -21,6 +21,7 @@ package bootstrap
 import (
 	"context"
 	"errors"
+	"github.com/rabbitstack/fibratus/internal/evasion"
 	"github.com/rabbitstack/fibratus/pkg/aggregator"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	"github.com/rabbitstack/fibratus/pkg/api"
@@ -232,6 +233,10 @@ func (f *App) Run(args []string) error {
 		if cfg.EventSource.StackEnrichment {
 			f.symbolizer = symbolize.NewSymbolizer(symbolize.NewDebugHelpResolver(cfg), f.psnap, cfg, false)
 			f.evs.RegisterEventListener(f.symbolizer)
+		}
+		// register evasion scanner
+		if cfg.Evasion.Enabled {
+			f.evs.RegisterEventListener(evasion.NewScanner(cfg.Evasion))
 		}
 		// register rule engine
 		if f.engine != nil {

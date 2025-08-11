@@ -151,6 +151,10 @@ jobs:
         run: |
           cd yara
           make install
+      - name: Setup test fixtures
+        run: |
+          choco install -y go-task
+          task --taskfile internal/etw/_fixtures/Taskfile.yml all
       - name: Test
         shell: bash
         run: |

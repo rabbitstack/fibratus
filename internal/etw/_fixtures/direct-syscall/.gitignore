@@ -1,0 +1,6 @@
+SysWhishpers3
+*.obj
+*.asm
+*.exe
+syscalls.c
+syscalls.h
