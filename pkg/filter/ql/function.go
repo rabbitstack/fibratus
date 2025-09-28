@@ -487,6 +487,12 @@ func (f *Foreach) procMapValuer(segments []*BoundSegmentLiteral, proc *pstypes.P
 			valuer[key] = proc.Username
 		case fields.DomainSegment:
 			valuer[key] = proc.Domain
+		case fields.TokenIntegrityLevelSegment:
+			valuer[key] = proc.TokenIntegrityLevel
+		case fields.TokenIsElevatedSegment:
+			valuer[key] = proc.IsTokenElevated
+		case fields.TokenElevationTypeSegment:
+			valuer[key] = proc.TokenElevationType
 		}
 	}
 	return valuer

@@ -165,6 +165,24 @@ const (
 	PsChildIsPackagedField Field = "ps.child.is_packaged"
 	// PsChildIsProtectedField represents the field that indicates if the process is to be run as a protected process
 	PsChildIsProtectedField Field = "ps.child.is_protected"
+	// PsTokenIntegrityLevel represents the field that indicates the current process integrity level
+	PsTokenIntegrityLevel = "ps.token.integrity_level"
+	// PsTokenIsElevated  represents the field that indicates if the current process token is elevated
+	PsTokenIsElevated = "ps.token.is_elevated"
+	// PsTokenElevationType represents the field that indicates if the current process token elevation type
+	PsTokenElevationType = "ps.token.elevation_type"
+	// PsChildTokenIntegrityLevel represents the field that indicates the created/child process integrity level
+	PsChildTokenIntegrityLevel = "ps.child.token.integrity_level"
+	// PsChildTokenIsElevated  represents the field that indicates if the created/child process token is elevated
+	PsChildTokenIsElevated = "ps.child.token.is_elevated"
+	// PsChildTokenElevationType represents the field that indicates if the created/child process token elevation type
+	PsChildTokenElevationType = "ps.child.token.elevation_type"
+	// PsParentTokenIntegrityLevel represents the field that indicates the parent process integrity level
+	PsParentTokenIntegrityLevel = "ps.parent.token.integrity_level"
+	// PsParentTokenIsElevated  represents the field that indicates if the parent process token is elevated
+	PsParentTokenIsElevated = "ps.parent.token.is_elevated"
+	// PsTokenElevationType represents the field that indicates if the parent process token elevation type
+	PsParentTokenElevationType = "ps.parent.token.elevation_type"
 
 	// ThreadBasePrio is the base thread priority
 	ThreadBasePrio Field = "thread.prio"
@@ -643,15 +661,18 @@ const (
 	EntropySegment  Segment = "entropy"
 	MD5Segment      Segment = "md5"
 
-	PIDSegment       Segment = "pid"
-	CmdlineSegment   Segment = "cmdline"
-	ExeSegment       Segment = "exe"
-	ArgsSegment      Segment = "args"
-	CwdSegment       Segment = "cwd"
-	SIDSegment       Segment = "sid"
-	SessionIDSegment Segment = "sessionid"
-	UsernameSegment  Segment = "username"
-	DomainSegment    Segment = "domain"
+	PIDSegment                 Segment = "pid"
+	CmdlineSegment             Segment = "cmdline"
+	ExeSegment                 Segment = "exe"
+	ArgsSegment                Segment = "args"
+	CwdSegment                 Segment = "cwd"
+	SIDSegment                 Segment = "sid"
+	SessionIDSegment           Segment = "sessionid"
+	UsernameSegment            Segment = "username"
+	DomainSegment              Segment = "domain"
+	TokenIntegrityLevelSegment Segment = "token.integrity_level"
+	TokenIsElevatedSegment     Segment = "token.is_elevated"
+	TokenElevationTypeSegment  Segment = "token.elevation_type"
 
 	TidSegment              Segment = "tid"
 	StartAddressSegment     Segment = "start_address"
@@ -692,6 +713,9 @@ var segments = map[Segment]bool{
 	SessionIDSegment:                  true,
 	UsernameSegment:                   true,
 	DomainSegment:                     true,
+	TokenIntegrityLevelSegment:        true,
+	TokenIsElevatedSegment:            true,
+	TokenElevationTypeSegment:         true,
 	TidSegment:                        true,
 	StartAddressSegment:               true,
 	UserStackBaseSegment:              true,
@@ -713,7 +737,7 @@ var segments = map[Segment]bool{
 }
 
 var allowedSegments = map[Field][]Segment{
-	PsAncestors:     {NameSegment, PIDSegment, CmdlineSegment, ExeSegment, ArgsSegment, CwdSegment, SIDSegment, SessionIDSegment, UsernameSegment, DomainSegment},
+	PsAncestors:     {NameSegment, PIDSegment, CmdlineSegment, ExeSegment, ArgsSegment, CwdSegment, SIDSegment, SessionIDSegment, UsernameSegment, DomainSegment, TokenIntegrityLevelSegment, TokenIsElevatedSegment, TokenElevationTypeSegment},
 	PsThreads:       {TidSegment, StartAddressSegment, UserStackBaseSegment, UserStackLimitSegment, KernelStackBaseSegment, KernelStackLimitSegment},
 	PsModules:       {PathSegment, NameSegment, AddressSegment, SizeSegment, ChecksumSegment},
 	PsMmaps:         {AddressSegment, TypeSegment, AddressSegment, SizeSegment, ProtectionSegment, PathSegment},
@@ -846,73 +870,82 @@ var fields = map[Field]FieldInfo{
 		return true
 	}}},
 
-	PsPid:                    {PsPid, "process identifier", params.PID, []string{"ps.pid = 1024"}, nil, nil},
-	PsPpid:                   {PsPpid, "parent process identifier", params.PID, []string{"ps.ppid = 45"}, nil, nil},
-	PsName:                   {PsName, "process image name including the file extension", params.UnicodeString, []string{"ps.name contains 'firefox'"}, nil, nil},
-	PsComm:                   {PsComm, "process command line", params.UnicodeString, []string{"ps.comm contains 'java'"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsCmdline}}, nil},
-	PsCmdline:                {PsCmdline, "process command line", params.UnicodeString, []string{"ps.cmdline contains 'java'"}, nil, nil},
-	PsExe:                    {PsExe, "full name of the process' executable", params.UnicodeString, []string{"ps.exe = 'C:\\Windows\\system32\\cmd.exe'"}, nil, nil},
-	PsArgs:                   {PsArgs, "process command line arguments", params.Slice, []string{"ps.args in ('/cdir', '/-C')"}, nil, nil},
-	PsCwd:                    {PsCwd, "process current working directory", params.UnicodeString, []string{"ps.cwd = 'C:\\Users\\Default'"}, nil, nil},
-	PsSID:                    {PsSID, "security identifier under which this process is run", params.UnicodeString, []string{"ps.sid contains 'SYSTEM'"}, nil, nil},
-	PsSessionID:              {PsSessionID, "unique identifier for the current session", params.Int16, []string{"ps.sessionid = 1"}, nil, nil},
-	PsDomain:                 {PsDomain, "process domain", params.UnicodeString, []string{"ps.domain contains 'SERVICE'"}, nil, nil},
-	PsUsername:               {PsUsername, "process username", params.UnicodeString, []string{"ps.username contains 'system'"}, nil, nil},
-	PsEnvs:                   {PsEnvs, "process environment variables", params.Slice, []string{"ps.envs in ('SystemRoot:C:\\WINDOWS')", "ps.envs[windir] = 'C:\\WINDOWS'"}, nil, &Argument{Optional: true, ValidationFunc: func(arg string) bool { return true }}},
-	PsHandleNames:            {PsHandleNames, "allocated process handle names", params.Slice, []string{"ps.handles in ('\\BaseNamedObjects\\__ComCatalogCache__')"}, nil, nil},
-	PsHandleTypes:            {PsHandleTypes, "allocated process handle types", params.Slice, []string{"ps.handle.types in ('Key', 'Mutant', 'Section')"}, nil, nil},
-	PsDTB:                    {PsDTB, "process directory table base address", params.Address, []string{"ps.dtb = '7ffe0000'"}, nil, nil},
-	PsModuleNames:            {PsModuleNames, "modules loaded by the process", params.Slice, []string{"ps.modules in ('crypt32.dll', 'xul.dll')"}, nil, nil},
-	PsParentName:             {PsParentName, "parent process image name including the file extension", params.UnicodeString, []string{"ps.parent.name contains 'cmd.exe'"}, nil, nil},
-	PsParentPid:              {PsParentPid, "parent process id", params.Uint32, []string{"ps.parent.pid = 4"}, nil, nil},
-	PsParentComm:             {PsParentComm, "parent process command line", params.UnicodeString, []string{"ps.parent.comm contains 'java'"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsParentCmdline}}, nil},
-	PsParentCmdline:          {PsParentCmdline, "parent process command line", params.UnicodeString, []string{"ps.parent.cmdline contains 'java'"}, nil, nil},
-	PsParentExe:              {PsParentExe, "full name of the parent process' executable", params.UnicodeString, []string{"ps.parent.exe = 'C:\\Windows\\system32\\explorer.exe'"}, nil, nil},
-	PsParentArgs:             {PsParentArgs, "parent process command line arguments", params.Slice, []string{"ps.parent.args in ('/cdir', '/-C')"}, nil, nil},
-	PsParentCwd:              {PsParentCwd, "parent process current working directory", params.UnicodeString, []string{"ps.parent.cwd = 'C:\\Temp'"}, nil, nil},
-	PsParentSID:              {PsParentSID, "security identifier under which the parent process is run", params.UnicodeString, []string{"ps.parent.sid contains 'SYSTEM'"}, nil, nil},
-	PsParentDomain:           {PsParentDomain, "parent process domain", params.UnicodeString, []string{"ps.parent.domain contains 'SERVICE'"}, nil, nil},
-	PsParentUsername:         {PsParentUsername, "parent process username", params.UnicodeString, []string{"ps.parent.username contains 'system'"}, nil, nil},
-	PsParentSessionID:        {PsParentSessionID, "unique identifier for the current session of parent process", params.Int16, []string{"ps.parent.sessionid = 1"}, nil, nil},
-	PsParentEnvs:             {PsParentEnvs, "parent process environment variables", params.Slice, []string{"ps.parent.envs in ('MOZ_CRASHREPORTER_DATA_DIRECTORY')"}, nil, nil},
-	PsParentHandles:          {PsParentHandles, "allocated parent process handle names", params.Slice, []string{"ps.parent.handles in ('\\BaseNamedObjects\\__ComCatalogCache__')"}, nil, nil},
-	PsParentHandleTypes:      {PsParentHandleTypes, "allocated parent process handle types", params.Slice, []string{"ps.parent.handle.types in ('File', 'SymbolicLink')"}, nil, nil},
-	PsParentDTB:              {PsParentDTB, "parent process directory table base address", params.Address, []string{"ps.parent.dtb = '7ffe0000'"}, nil, nil},
-	PsAccessMask:             {PsAccessMask, "process desired access rights", params.AnsiString, []string{"ps.access.mask = '0x1400'"}, nil, nil},
-	PsAccessMaskNames:        {PsAccessMaskNames, "process desired access rights as a string list", params.Slice, []string{"ps.access.mask.names in ('SUSPEND_RESUME')"}, nil, nil},
-	PsAccessStatus:           {PsAccessStatus, "process access status", params.UnicodeString, []string{"ps.access.status = 'access is denied.'"}, nil, nil},
-	PsSiblingPid:             {PsSiblingPid, "created or terminated process identifier", params.PID, []string{"ps.sibling.pid = 320"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsChildPid}}, nil},
-	PsChildPid:               {PsChildPid, "created or terminated process identifier", params.PID, []string{"ps.child.pid = 320"}, nil, nil},
-	PsSiblingName:            {PsSiblingName, "created or terminated process name", params.UnicodeString, []string{"ps.sibling.name = 'notepad.exe'"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsChildName}}, nil},
-	PsChildName:              {PsChildName, "created or terminated process name", params.UnicodeString, []string{"ps.child.name = 'notepad.exe'"}, nil, nil},
-	PsSiblingComm:            {PsSiblingComm, "created or terminated process command line", params.UnicodeString, []string{"ps.sibling.comm contains '\\k \\v'"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsChildCmdline}}, nil},
-	PsChildCmdline:           {PsChildCmdline, "created or terminated process command line", params.UnicodeString, []string{"ps.child.cmdline contains '\\k \\v'"}, nil, nil},
-	PsSiblingArgs:            {PsSiblingArgs, "created process command line arguments", params.Slice, []string{"ps.sibling.args in ('/cdir', '/-C')"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsChildArgs}}, nil},
-	PsChildArgs:              {PsChildArgs, "created process command line arguments", params.Slice, []string{"ps.child.args in ('/cdir', '/-C')"}, nil, nil},
-	PsSiblingExe:             {PsSiblingExe, "created, terminated, or opened process id", params.UnicodeString, []string{"ps.sibling.exe contains '\\Windows\\cmd.exe'"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsChildExe}}, nil},
-	PsChildExe:               {PsChildExe, "created, terminated, or opened process id", params.UnicodeString, []string{"ps.child.exe contains '\\Windows\\cmd.exe'"}, nil, nil},
-	PsSiblingSID:             {PsSiblingSID, "created or terminated process security identifier", params.UnicodeString, []string{"ps.sibling.sid contains 'SERVICE'"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsChildSID}}, nil},
-	PsChildSID:               {PsChildSID, "created or terminated process security identifier", params.UnicodeString, []string{"ps.child.sid contains 'SERVICE'"}, nil, nil},
-	PsSiblingSessionID:       {PsSiblingSessionID, "created or terminated process session identifier", params.Int16, []string{"ps.sibling.sessionid == 1"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsChildSessionID}}, nil},
-	PsChildSessionID:         {PsChildSessionID, "created or terminated process session identifier", params.Int16, []string{"ps.child.sessionid == 1"}, nil, nil},
-	PsSiblingDomain:          {PsSiblingDomain, "created or terminated process domain", params.UnicodeString, []string{"ps.sibling.domain contains 'SERVICE'"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsChildDomain}}, nil},
-	PsChildDomain:            {PsChildDomain, "created or terminated process domain", params.UnicodeString, []string{"ps.child.domain contains 'SERVICE'"}, nil, nil},
-	PsSiblingUsername:        {PsSiblingUsername, "created or terminated process username", params.UnicodeString, []string{"ps.sibling.username contains 'system'"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsChildUsername}}, nil},
-	PsChildUsername:          {PsChildUsername, "created or terminated process username", params.UnicodeString, []string{"ps.child.username contains 'system'"}, nil, nil},
-	PsUUID:                   {PsUUID, "unique process identifier", params.Uint64, []string{"ps.uuid > 6000054355"}, nil, nil},
-	PsParentUUID:             {PsParentUUID, "unique parent process identifier", params.Uint64, []string{"ps.parent.uuid > 6000054355"}, nil, nil},
-	PsChildUUID:              {PsChildUUID, "unique child process identifier", params.Uint64, []string{"ps.child.uuid > 6000054355"}, nil, nil},
-	PsChildPeFilename:        {PsChildPeFilename, "original file name of the child process executable supplied at compile-time", params.UnicodeString, []string{"ps.child.pe.file.name = 'NOTEPAD.EXE'"}, nil, nil},
-	PsChildIsWOW64Field:      {PsChildIsWOW64Field, "indicates if the 32-bit child process is created in 64-bit Windows system", params.Bool, []string{"ps.child.is_wow64"}, nil, nil},
-	PsChildIsPackagedField:   {PsChildIsPackagedField, "indicates if the child process is packaged with the MSIX technology", params.Bool, []string{"ps.child.is_packaged"}, nil, nil},
-	PsChildIsProtectedField:  {PsChildIsProtectedField, "indicates if the child process is a protected process", params.Bool, []string{"ps.child.is_protected"}, nil, nil},
-	PsIsWOW64Field:           {PsIsWOW64Field, "indicates if the process generating the event is a 32-bit process created in 64-bit Windows system", params.Bool, []string{"ps.is_wow64"}, nil, nil},
-	PsIsPackagedField:        {PsIsPackagedField, "indicates if the process generating the event is packaged with the MSIX technology", params.Bool, []string{"ps.is_packaged"}, nil, nil},
-	PsIsProtectedField:       {PsIsProtectedField, "indicates if the process generating the event is a protected process", params.Bool, []string{"ps.is_protected"}, nil, nil},
-	PsParentIsWOW64Field:     {PsParentIsWOW64Field, "indicates if the parent process generating the event is a 32-bit process created in 64-bit Windows system", params.Bool, []string{"ps.parent.is_wow64"}, nil, nil},
-	PsParentIsPackagedField:  {PsParentIsPackagedField, "indicates if the parent process generating the event is packaged with the MSIX technology", params.Bool, []string{"ps.parent.is_packaged"}, nil, nil},
-	PsParentIsProtectedField: {PsParentIsProtectedField, "indicates if the the parent process generating the event is a protected process", params.Bool, []string{"ps.parent.is_protected"}, nil, nil},
-	PsAncestor:               {PsAncestor, "the process ancestor name", params.UnicodeString, []string{"ps.ancestor[1] = 'svchost.exe'", "ps.ancestor in ('winword.exe')"}, nil, &Argument{Optional: true, Pattern: "[0-9]+", ValidationFunc: isNumber}},
+	PsPid:                       {PsPid, "process identifier", params.PID, []string{"ps.pid = 1024"}, nil, nil},
+	PsPpid:                      {PsPpid, "parent process identifier", params.PID, []string{"ps.ppid = 45"}, nil, nil},
+	PsName:                      {PsName, "process image name including the file extension", params.UnicodeString, []string{"ps.name contains 'firefox'"}, nil, nil},
+	PsComm:                      {PsComm, "process command line", params.UnicodeString, []string{"ps.comm contains 'java'"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsCmdline}}, nil},
+	PsCmdline:                   {PsCmdline, "process command line", params.UnicodeString, []string{"ps.cmdline contains 'java'"}, nil, nil},
+	PsExe:                       {PsExe, "full name of the process' executable", params.UnicodeString, []string{"ps.exe = 'C:\\Windows\\system32\\cmd.exe'"}, nil, nil},
+	PsArgs:                      {PsArgs, "process command line arguments", params.Slice, []string{"ps.args in ('/cdir', '/-C')"}, nil, nil},
+	PsCwd:                       {PsCwd, "process current working directory", params.UnicodeString, []string{"ps.cwd = 'C:\\Users\\Default'"}, nil, nil},
+	PsSID:                       {PsSID, "security identifier under which this process is run", params.UnicodeString, []string{"ps.sid contains 'SYSTEM'"}, nil, nil},
+	PsSessionID:                 {PsSessionID, "unique identifier for the current session", params.Int16, []string{"ps.sessionid = 1"}, nil, nil},
+	PsDomain:                    {PsDomain, "process domain", params.UnicodeString, []string{"ps.domain contains 'SERVICE'"}, nil, nil},
+	PsUsername:                  {PsUsername, "process username", params.UnicodeString, []string{"ps.username contains 'system'"}, nil, nil},
+	PsEnvs:                      {PsEnvs, "process environment variables", params.Slice, []string{"ps.envs in ('SystemRoot:C:\\WINDOWS')", "ps.envs[windir] = 'C:\\WINDOWS'"}, nil, &Argument{Optional: true, ValidationFunc: func(arg string) bool { return true }}},
+	PsHandleNames:               {PsHandleNames, "allocated process handle names", params.Slice, []string{"ps.handles in ('\\BaseNamedObjects\\__ComCatalogCache__')"}, nil, nil},
+	PsHandleTypes:               {PsHandleTypes, "allocated process handle types", params.Slice, []string{"ps.handle.types in ('Key', 'Mutant', 'Section')"}, nil, nil},
+	PsDTB:                       {PsDTB, "process directory table base address", params.Address, []string{"ps.dtb = '7ffe0000'"}, nil, nil},
+	PsModuleNames:               {PsModuleNames, "modules loaded by the process", params.Slice, []string{"ps.modules in ('crypt32.dll', 'xul.dll')"}, nil, nil},
+	PsParentName:                {PsParentName, "parent process image name including the file extension", params.UnicodeString, []string{"ps.parent.name contains 'cmd.exe'"}, nil, nil},
+	PsParentPid:                 {PsParentPid, "parent process id", params.Uint32, []string{"ps.parent.pid = 4"}, nil, nil},
+	PsParentComm:                {PsParentComm, "parent process command line", params.UnicodeString, []string{"ps.parent.comm contains 'java'"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsParentCmdline}}, nil},
+	PsParentCmdline:             {PsParentCmdline, "parent process command line", params.UnicodeString, []string{"ps.parent.cmdline contains 'java'"}, nil, nil},
+	PsParentExe:                 {PsParentExe, "full name of the parent process' executable", params.UnicodeString, []string{"ps.parent.exe = 'C:\\Windows\\system32\\explorer.exe'"}, nil, nil},
+	PsParentArgs:                {PsParentArgs, "parent process command line arguments", params.Slice, []string{"ps.parent.args in ('/cdir', '/-C')"}, nil, nil},
+	PsParentCwd:                 {PsParentCwd, "parent process current working directory", params.UnicodeString, []string{"ps.parent.cwd = 'C:\\Temp'"}, nil, nil},
+	PsParentSID:                 {PsParentSID, "security identifier under which the parent process is run", params.UnicodeString, []string{"ps.parent.sid contains 'SYSTEM'"}, nil, nil},
+	PsParentDomain:              {PsParentDomain, "parent process domain", params.UnicodeString, []string{"ps.parent.domain contains 'SERVICE'"}, nil, nil},
+	PsParentUsername:            {PsParentUsername, "parent process username", params.UnicodeString, []string{"ps.parent.username contains 'system'"}, nil, nil},
+	PsParentSessionID:           {PsParentSessionID, "unique identifier for the current session of parent process", params.Int16, []string{"ps.parent.sessionid = 1"}, nil, nil},
+	PsParentEnvs:                {PsParentEnvs, "parent process environment variables", params.Slice, []string{"ps.parent.envs in ('MOZ_CRASHREPORTER_DATA_DIRECTORY')"}, nil, nil},
+	PsParentHandles:             {PsParentHandles, "allocated parent process handle names", params.Slice, []string{"ps.parent.handles in ('\\BaseNamedObjects\\__ComCatalogCache__')"}, nil, nil},
+	PsParentHandleTypes:         {PsParentHandleTypes, "allocated parent process handle types", params.Slice, []string{"ps.parent.handle.types in ('File', 'SymbolicLink')"}, nil, nil},
+	PsParentDTB:                 {PsParentDTB, "parent process directory table base address", params.Address, []string{"ps.parent.dtb = '7ffe0000'"}, nil, nil},
+	PsAccessMask:                {PsAccessMask, "process desired access rights", params.AnsiString, []string{"ps.access.mask = '0x1400'"}, nil, nil},
+	PsAccessMaskNames:           {PsAccessMaskNames, "process desired access rights as a string list", params.Slice, []string{"ps.access.mask.names in ('SUSPEND_RESUME')"}, nil, nil},
+	PsAccessStatus:              {PsAccessStatus, "process access status", params.UnicodeString, []string{"ps.access.status = 'access is denied.'"}, nil, nil},
+	PsSiblingPid:                {PsSiblingPid, "created or terminated process identifier", params.PID, []string{"ps.sibling.pid = 320"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsChildPid}}, nil},
+	PsChildPid:                  {PsChildPid, "created or terminated process identifier", params.PID, []string{"ps.child.pid = 320"}, nil, nil},
+	PsSiblingName:               {PsSiblingName, "created or terminated process name", params.UnicodeString, []string{"ps.sibling.name = 'notepad.exe'"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsChildName}}, nil},
+	PsChildName:                 {PsChildName, "created or terminated process name", params.UnicodeString, []string{"ps.child.name = 'notepad.exe'"}, nil, nil},
+	PsSiblingComm:               {PsSiblingComm, "created or terminated process command line", params.UnicodeString, []string{"ps.sibling.comm contains '\\k \\v'"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsChildCmdline}}, nil},
+	PsChildCmdline:              {PsChildCmdline, "created or terminated process command line", params.UnicodeString, []string{"ps.child.cmdline contains '\\k \\v'"}, nil, nil},
+	PsSiblingArgs:               {PsSiblingArgs, "created process command line arguments", params.Slice, []string{"ps.sibling.args in ('/cdir', '/-C')"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsChildArgs}}, nil},
+	PsChildArgs:                 {PsChildArgs, "created process command line arguments", params.Slice, []string{"ps.child.args in ('/cdir', '/-C')"}, nil, nil},
+	PsSiblingExe:                {PsSiblingExe, "created, terminated, or opened process id", params.UnicodeString, []string{"ps.sibling.exe contains '\\Windows\\cmd.exe'"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsChildExe}}, nil},
+	PsChildExe:                  {PsChildExe, "created, terminated, or opened process id", params.UnicodeString, []string{"ps.child.exe contains '\\Windows\\cmd.exe'"}, nil, nil},
+	PsSiblingSID:                {PsSiblingSID, "created or terminated process security identifier", params.UnicodeString, []string{"ps.sibling.sid contains 'SERVICE'"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsChildSID}}, nil},
+	PsChildSID:                  {PsChildSID, "created or terminated process security identifier", params.UnicodeString, []string{"ps.child.sid contains 'SERVICE'"}, nil, nil},
+	PsSiblingSessionID:          {PsSiblingSessionID, "created or terminated process session identifier", params.Int16, []string{"ps.sibling.sessionid == 1"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsChildSessionID}}, nil},
+	PsChildSessionID:            {PsChildSessionID, "created or terminated process session identifier", params.Int16, []string{"ps.child.sessionid == 1"}, nil, nil},
+	PsSiblingDomain:             {PsSiblingDomain, "created or terminated process domain", params.UnicodeString, []string{"ps.sibling.domain contains 'SERVICE'"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsChildDomain}}, nil},
+	PsChildDomain:               {PsChildDomain, "created or terminated process domain", params.UnicodeString, []string{"ps.child.domain contains 'SERVICE'"}, nil, nil},
+	PsSiblingUsername:           {PsSiblingUsername, "created or terminated process username", params.UnicodeString, []string{"ps.sibling.username contains 'system'"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsChildUsername}}, nil},
+	PsChildUsername:             {PsChildUsername, "created or terminated process username", params.UnicodeString, []string{"ps.child.username contains 'system'"}, nil, nil},
+	PsUUID:                      {PsUUID, "unique process identifier", params.Uint64, []string{"ps.uuid > 6000054355"}, nil, nil},
+	PsParentUUID:                {PsParentUUID, "unique parent process identifier", params.Uint64, []string{"ps.parent.uuid > 6000054355"}, nil, nil},
+	PsChildUUID:                 {PsChildUUID, "unique child process identifier", params.Uint64, []string{"ps.child.uuid > 6000054355"}, nil, nil},
+	PsChildPeFilename:           {PsChildPeFilename, "original file name of the child process executable supplied at compile-time", params.UnicodeString, []string{"ps.child.pe.file.name = 'NOTEPAD.EXE'"}, nil, nil},
+	PsChildIsWOW64Field:         {PsChildIsWOW64Field, "indicates if the 32-bit child process is created in 64-bit Windows system", params.Bool, []string{"ps.child.is_wow64"}, nil, nil},
+	PsChildIsPackagedField:      {PsChildIsPackagedField, "indicates if the child process is packaged with the MSIX technology", params.Bool, []string{"ps.child.is_packaged"}, nil, nil},
+	PsChildIsProtectedField:     {PsChildIsProtectedField, "indicates if the child process is a protected process", params.Bool, []string{"ps.child.is_protected"}, nil, nil},
+	PsIsWOW64Field:              {PsIsWOW64Field, "indicates if the process generating the event is a 32-bit process created in 64-bit Windows system", params.Bool, []string{"ps.is_wow64"}, nil, nil},
+	PsIsPackagedField:           {PsIsPackagedField, "indicates if the process generating the event is packaged with the MSIX technology", params.Bool, []string{"ps.is_packaged"}, nil, nil},
+	PsIsProtectedField:          {PsIsProtectedField, "indicates if the process generating the event is a protected process", params.Bool, []string{"ps.is_protected"}, nil, nil},
+	PsParentIsWOW64Field:        {PsParentIsWOW64Field, "indicates if the parent process generating the event is a 32-bit process created in 64-bit Windows system", params.Bool, []string{"ps.parent.is_wow64"}, nil, nil},
+	PsParentIsPackagedField:     {PsParentIsPackagedField, "indicates if the parent process generating the event is packaged with the MSIX technology", params.Bool, []string{"ps.parent.is_packaged"}, nil, nil},
+	PsParentIsProtectedField:    {PsParentIsProtectedField, "indicates if the the parent process generating the event is a protected process", params.Bool, []string{"ps.parent.is_protected"}, nil, nil},
+	PsAncestor:                  {PsAncestor, "the process ancestor name", params.UnicodeString, []string{"ps.ancestor[1] = 'svchost.exe'", "ps.ancestor in ('winword.exe')"}, nil, &Argument{Optional: true, Pattern: "[0-9]+", ValidationFunc: isNumber}},
+	PsTokenIntegrityLevel:       {PsTokenIntegrityLevel, "process token integrity level", params.UnicodeString, []string{"ps.token.integrity_level = 'SYSTEM'"}, nil, nil},
+	PsTokenIsElevated:           {PsTokenIsElevated, "indicates if the process token is elevated", params.Bool, []string{"ps.token.is_elevated = true"}, nil, nil},
+	PsTokenElevationType:        {PsTokenElevationType, "process token elevation type", params.AnsiString, []string{"ps.token.elevation_type = 'LIMITED'"}, nil, nil},
+	PsChildTokenIntegrityLevel:  {PsChildTokenIntegrityLevel, "child process token integrity level", params.UnicodeString, []string{"ps.child.token.integrity_level = 'SYSTEM'"}, nil, nil},
+	PsChildTokenIsElevated:      {PsChildTokenIsElevated, "indicates if the child process token is elevated", params.Bool, []string{"ps.child.token.is_elevated = true"}, nil, nil},
+	PsChildTokenElevationType:   {PsChildTokenElevationType, "child process token elevation type", params.AnsiString, []string{"ps.child.token.elevation_type = 'LIMITED'"}, nil, nil},
+	PsParentTokenIntegrityLevel: {PsParentTokenIntegrityLevel, "parent process token integrity level", params.UnicodeString, []string{"ps.parent.token.integrity_level = 'HIGH'"}, nil, nil},
+	PsParentTokenIsElevated:     {PsParentTokenIsElevated, "indicates if the parent process token is elevated", params.Bool, []string{"ps.parent.token.is_elevated = true"}, nil, nil},
+	PsParentTokenElevationType:  {PsParentTokenElevationType, "parent process token elevation type", params.AnsiString, []string{"ps.parent.token.elevation_type = 'LIMITED'"}, nil, nil},
 
 	ThreadBasePrio:                                     {ThreadBasePrio, "scheduler priority of the thread", params.Int8, []string{"thread.prio = 5"}, nil, nil},
 	ThreadIOPrio:                                       {ThreadIOPrio, "I/O priority hint for scheduling I/O operations", params.Int8, []string{"thread.io.prio = 4"}, nil, nil},

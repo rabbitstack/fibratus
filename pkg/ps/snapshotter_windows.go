@@ -185,7 +185,7 @@ func (s *snapshotter) Write(e *event.Event) error {
 			e.AppendParam(params.Exe, params.Path, ps.Exe)
 		}
 
-		e.AppendParam(params.ProcessIntegrityLevel, params.AnsiString, ps.TokenIntegrityLevel)
+		e.AppendParam(params.ProcessTokenIntegrityLevel, params.AnsiString, ps.TokenIntegrityLevel)
 		e.AppendParam(params.ProcessTokenElevationType, params.AnsiString, ps.TokenElevationType)
 		e.AppendParam(params.ProcessTokenIsElevated, params.Bool, ps.IsTokenElevated)
 
@@ -370,7 +370,7 @@ func (s *snapshotter) newProcState(pid, ppid uint32, e *event.Event) (*pstypes.P
 			Ppid:                ppid,
 			Exe:                 e.GetParamAsString(params.Exe),
 			Name:                filepath.Base(e.GetParamAsString(params.Exe)),
-			TokenIntegrityLevel: e.GetParamAsString(params.ProcessIntegrityLevel),
+			TokenIntegrityLevel: e.GetParamAsString(params.ProcessTokenIntegrityLevel),
 			TokenElevationType:  e.GetParamAsString(params.ProcessTokenElevationType),
 			IsTokenElevated:     e.Params.TryGetBool(params.ProcessTokenIsElevated),
 			Threads:             make(map[uint32]pstypes.Thread),
@@ -460,7 +460,7 @@ func (s *snapshotter) newProcState(pid, ppid uint32, e *event.Event) (*pstypes.P
 		proc.TokenIntegrityLevel = sys.RidToString(tokenMandatoryLabel.Label.Sid)
 		proc.IsTokenElevated = token.IsElevated()
 
-		e.AppendParam(params.ProcessIntegrityLevel, params.AnsiString, proc.TokenIntegrityLevel)
+		e.AppendParam(params.ProcessTokenIntegrityLevel, params.AnsiString, proc.TokenIntegrityLevel)
 		e.AppendParam(params.ProcessTokenIsElevated, params.Bool, proc.IsTokenElevated)
 	}
 
