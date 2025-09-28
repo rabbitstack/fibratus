@@ -430,11 +430,64 @@ func (ps *psAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 			return nil, ErrPsNil
 		}
 		return ps.IsProtected, nil
+	case fields.PsChildTokenIntegrityLevel:
+		if e.Category != event.Process {
+			return nil, nil
+		}
+		return e.GetParamAsString(params.ProcessTokenIntegrityLevel), nil
+	case fields.PsChildTokenIsElevated:
+		if e.Category != event.Process {
+			return nil, nil
+		}
+		return e.Params.GetBool(params.ProcessTokenIsElevated)
+	case fields.PsChildTokenElevationType:
+		if e.Category != event.Process {
+			return nil, nil
+		}
+		return e.GetParamAsString(params.ProcessTokenElevationType), nil
+	case fields.PsTokenIntegrityLevel:
+		ps := e.PS
+		if ps == nil {
+			return nil, ErrPsNil
+		}
+		return ps.TokenIntegrityLevel, nil
+	case fields.PsTokenElevationType:
+		ps := e.PS
+		if ps == nil {
+			return nil, ErrPsNil
+		}
+		return ps.TokenElevationType, nil
+	case fields.PsTokenIsElevated:
+		ps := e.PS
+		if ps == nil {
+			return nil, ErrPsNil
+		}
+		return ps.IsTokenElevated, nil
+	case fields.PsParentTokenIntegrityLevel:
+		ps := getParentPs(e)
+		if ps == nil {
+			return nil, ErrPsNil
+		}
+		return ps.TokenIntegrityLevel, nil
+	case fields.PsParentTokenElevationType:
+		ps := getParentPs(e)
+		if ps == nil {
+			return nil, ErrPsNil
+		}
+		return ps.TokenElevationType, nil
+	case fields.PsParentTokenIsElevated:
+		ps := getParentPs(e)
+		if ps == nil {
+			return nil, ErrPsNil
+		}
+		return ps.IsTokenElevated, nil
 	case fields.PsAncestors:
 		if e.PS != nil {
 			ancestors := make([]*pstypes.PS, 0)
 			walk := func(proc *pstypes.PS) {
-				ancestors = append(ancestors, proc)
+				if proc != nil {
+					ancestors = append(ancestors, proc)
+				}
 			}
 			pstypes.Walk(walk, e.PS)
 
@@ -474,7 +527,9 @@ func (ps *psAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 
 			ancestors := make([]string, 0)
 			walk := func(proc *pstypes.PS) {
-				ancestors = append(ancestors, proc.Name)
+				if proc != nil {
+					ancestors = append(ancestors, proc.Name)
+				}
 			}
 			pstypes.Walk(walk, e.PS)
 

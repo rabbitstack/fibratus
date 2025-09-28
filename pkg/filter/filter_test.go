@@ -109,21 +109,6 @@ func TestStringFields(t *testing.T) {
 }
 
 func TestProcFilter(t *testing.T) {
-	pars := event.Params{
-		params.Cmdline:         {Name: params.Cmdline, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\svchost-fake.exe -k RPCSS"},
-		params.ProcessName:     {Name: params.ProcessName, Type: params.AnsiString, Value: "svchost-fake.exe"},
-		params.ProcessID:       {Name: params.ProcessID, Type: params.PID, Value: uint32(1234)},
-		params.ProcessParentID: {Name: params.ProcessParentID, Type: params.PID, Value: uint32(345)},
-		params.UserSID:         {Name: params.UserSID, Type: params.WbemSID, Value: []byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0}},
-		params.Username:        {Name: params.Username, Type: params.UnicodeString, Value: "loki"},
-		params.Domain:          {Name: params.Domain, Type: params.UnicodeString, Value: "TITAN"},
-		params.ProcessFlags:    {Name: params.ProcessFlags, Type: params.Flags, Value: uint32(0x000000E)},
-	}
-
-	pars1 := event.Params{
-		params.DesiredAccess: {Name: params.DesiredAccess, Type: params.Flags, Value: uint32(0x1400), Flags: event.PsAccessRightFlags},
-	}
-
 	ps1 := &pstypes.PS{
 		Name:     "wininit.exe",
 		Username: "SYSTEM",
@@ -138,17 +123,32 @@ func TestProcFilter(t *testing.T) {
 				Name: "System",
 			},
 		},
-		IsWOW64:     false,
-		IsProtected: true,
-		IsPackaged:  false,
+		IsWOW64:             false,
+		IsProtected:         true,
+		IsPackaged:          false,
+		TokenIntegrityLevel: "SYSTEM",
+		IsTokenElevated:     false,
+		TokenElevationType:  "DEFAULT",
 	}
 
 	evt := &event.Event{
 		Type:     event.CreateProcess,
 		Category: event.Process,
-		Params:   pars,
-		Name:     "CreateProcess",
-		PID:      1023,
+		Params: event.Params{
+			params.Cmdline:                    {Name: params.Cmdline, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\svchost-fake.exe -k RPCSS"},
+			params.ProcessName:                {Name: params.ProcessName, Type: params.AnsiString, Value: "svchost-fake.exe"},
+			params.ProcessID:                  {Name: params.ProcessID, Type: params.PID, Value: uint32(1234)},
+			params.ProcessParentID:            {Name: params.ProcessParentID, Type: params.PID, Value: uint32(345)},
+			params.UserSID:                    {Name: params.UserSID, Type: params.WbemSID, Value: []byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0}},
+			params.Username:                   {Name: params.Username, Type: params.UnicodeString, Value: "loki"},
+			params.Domain:                     {Name: params.Domain, Type: params.UnicodeString, Value: "TITAN"},
+			params.ProcessFlags:               {Name: params.ProcessFlags, Type: params.Flags, Value: uint32(0x000000E)},
+			params.ProcessTokenIntegrityLevel: {Name: params.ProcessTokenIntegrityLevel, Type: params.AnsiString, Value: "SYSTEM"},
+			params.ProcessTokenIsElevated:     {Name: params.ProcessTokenIsElevated, Type: params.Bool, Value: true},
+			params.ProcessTokenElevationType:  {Name: params.ProcessTokenElevationType, Type: params.AnsiString, Value: "FULL"},
+		},
+		Name: "CreateProcess",
+		PID:  1023,
 		PS: &pstypes.PS{
 			Name:     "svchost.exe",
 			Cmdline:  "C:\\Windows\\System32\\svchost.exe",
@@ -171,9 +171,12 @@ func TestProcFilter(t *testing.T) {
 				{Size: 34545, BaseAddress: va.Address(144229524944769), Protection: 4653056, File: "C:\\Windows\\System32\\ucrtbase.dll", Type: "IMAGE"}, //EXECUTE_READWRITE|READONLY
 				{Size: 4096, BaseAddress: va.Address(145229445447666), Protection: 12845056, Type: "PAGEFILE"},                                           // READWRITE 12845056
 			},
-			IsProtected: false,
-			IsPackaged:  true,
-			IsWOW64:     false,
+			IsProtected:         false,
+			IsPackaged:          true,
+			IsWOW64:             false,
+			TokenIntegrityLevel: "SYSTEM",
+			IsTokenElevated:     false,
+			TokenElevationType:  "DEFAULT",
 		},
 	}
 	evt.Timestamp, _ = time.Parse(time.RFC3339, "2011-05-03T15:04:05.323Z")
@@ -181,9 +184,11 @@ func TestProcFilter(t *testing.T) {
 	evt1 := &event.Event{
 		Type:     event.OpenProcess,
 		Category: event.Process,
-		Params:   pars1,
-		Name:     "OpenProcess",
-		PID:      1023,
+		Params: event.Params{
+			params.DesiredAccess: {Name: params.DesiredAccess, Type: params.Flags, Value: uint32(0x1400), Flags: event.PsAccessRightFlags},
+		},
+		Name: "OpenProcess",
+		PID:  1023,
 		PS: &pstypes.PS{
 			Name:   "svchost.exe",
 			Parent: ps1,
@@ -240,6 +245,16 @@ func TestProcFilter(t *testing.T) {
 		{`ps.parent.is_wow64`, false},
 		{`ps.parent.is_packaged`, false},
 		{`ps.parent.is_protected`, true},
+		{`ps.token.integrity_level = 'SYSTEM'`, true},
+		{`ps.token.is_elevated = false`, true},
+		{`ps.token.elevation_type = 'DEFAULT'`, true},
+		{`ps.child.token.integrity_level = 'SYSTEM'`, true},
+		{`ps.child.token.is_elevated = true`, true},
+		{`ps.child.token.elevation_type = 'FULL'`, true},
+		{`ps.parent.token.integrity_level = 'SYSTEM'`, true},
+		{`ps.parent.token.is_elevated = false`, true},
+		{`ps.parent.token.elevation_type = 'DEFAULT'`, true},
+
 		{`evt.name = 'CreateProcess' and ps.name contains 'svchost'`, true},
 
 		{`ps.modules IN ('kernel32.dll')`, true},
@@ -262,6 +277,7 @@ func TestProcFilter(t *testing.T) {
 		{`foreach(ps._ancestors, $proc, $proc.username = 'SYSTEM')`, true},
 		{`foreach(ps._ancestors, $proc, $proc.domain = 'NT AUTHORITY')`, true},
 		{`foreach(ps._ancestors, $proc, $proc.username = upper('system'))`, true},
+		{`foreach(ps._ancestors, $proc, $proc.token.integrity_level = 'SYSTEM' and $proc.token.is_elevated = false and $proc.token.elevation_type = 'DEFAULT')`, true},
 
 		{`ps.args intersects ('-k', 'DcomLaunch')`, true},
 		{`ps.args intersects ('-w', 'DcomLaunch')`, false},

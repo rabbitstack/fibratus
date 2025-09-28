@@ -58,8 +58,8 @@ const (
 	ExitStatus = "exit_status"
 	// StartTime field denotes the process start time.
 	StartTime = "start_time"
-	// ProcessIntegrityLevel field denotes the process integrity level.
-	ProcessIntegrityLevel = "integrity_level"
+	// ProcessTokenIntegrityLevel field denotes the process integrity level.
+	ProcessTokenIntegrityLevel = "token_integrity_level"
 	// ProcessTokenElevationType field designates the process token elevation type.
 	ProcessTokenElevationType = "token_elevation_type"
 	// ProcessTokenIsElevated field designates if the process token is elevated.
