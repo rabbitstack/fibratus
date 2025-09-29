@@ -201,6 +201,16 @@ func TestProcFilter(t *testing.T) {
 		},
 	}
 
+	evt2 := &event.Event{
+		Type:     event.OpenProcess,
+		Category: event.Process,
+		Params: event.Params{
+			params.DesiredAccess: {Name: params.DesiredAccess, Type: params.Flags, Value: uint32(0x1400), Flags: event.PsAccessRightFlags},
+		},
+		Name: "OpenProcess",
+		PID:  1023,
+	}
+
 	var tests = []struct {
 		filter  string
 		matches bool
@@ -336,6 +346,26 @@ func TestProcFilter(t *testing.T) {
 			t.Fatal(err)
 		}
 		matches := f.Run(evt1)
+		if matches != tt.matches {
+			t.Errorf("%d. %q ps filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
+		}
+	}
+
+	var tests2 = []struct {
+		filter  string
+		matches bool
+	}{
+
+		{`ps.exe = ''`, true},
+	}
+
+	for i, tt := range tests2 {
+		f := New(tt.filter, cfg)
+		err := f.Compile()
+		if err != nil {
+			t.Fatal(err)
+		}
+		matches := f.Run(evt2)
 		if matches != tt.matches {
 			t.Errorf("%d. %q ps filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
