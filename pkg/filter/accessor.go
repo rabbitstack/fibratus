@@ -23,7 +23,9 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
+	"net"
 	"reflect"
+	"time"
 )
 
 var (
@@ -62,7 +64,7 @@ func newEventAccessor() Accessor {
 const timeFmt = "15:04:05"
 const dateFmt = "2006-01-02"
 
-func (k *evtAccessor) Get(f Field, evt *event.Event) (params.Value, error) {
+func (*evtAccessor) Get(f Field, evt *event.Event) (params.Value, error) {
 	switch f.Name {
 	case fields.EvtSeq, fields.KevtSeq:
 		return evt.Seq, nil
@@ -236,5 +238,32 @@ func (f *filter) removeAccessor(removed Accessor) {
 		if reflect.TypeOf(accessor) == reflect.TypeOf(removed) {
 			f.accessors = append(f.accessors[:i], f.accessors[i+1:]...)
 		}
+	}
+}
+
+// defaultAccessorValue provides the default value for the field.
+// This value is typically assigned when the accessor returns an
+// error or nil value, but the map valuer must contain the resolved
+// field name in case of filters using the not operator.
+func defaultAccessorValue(field Field) any {
+	switch field.Name.Type() {
+	case params.Uint8, params.Int64, params.Int8, params.Int32, params.Int16,
+		params.Uint16, params.Port, params.Uint32, params.Uint64, params.PID,
+		params.TID, params.Flags, params.Flags64:
+		return 0
+	case params.Float, params.Double:
+		return 0.0
+	case params.Time:
+		return time.Now()
+	case params.Bool:
+		return false
+	case params.IP, params.IPv4, params.IPv6:
+		return net.IP{}
+	case params.Binary:
+		return []byte{}
+	case params.Slice:
+		return []string{}
+	default:
+		return ""
 	}
 }

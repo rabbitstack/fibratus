@@ -423,14 +423,15 @@ func (f *filter) mapValuer(evt *event.Event) map[string]interface{} {
 				continue
 			}
 			v, err := accessor.Get(field, evt)
-			if err != nil && !errs.IsParamNotFound(err) {
-				accessorErrors.Add(err.Error(), 1)
+			if v == nil || err != nil {
+				valuer[field.Value] = defaultAccessorValue(field)
+				if err != nil && !errs.IsParamNotFound(err) {
+					accessorErrors.Add(err.Error(), 1)
+				}
 				continue
 			}
-			if v != nil {
-				valuer[field.Value] = v
-				break
-			}
+			valuer[field.Value] = v
+			break
 		}
 	}
 	return valuer
