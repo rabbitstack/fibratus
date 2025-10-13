@@ -19,12 +19,13 @@
 package pe
 
 import (
-	"github.com/stretchr/testify/require"
-	"golang.org/x/sys/windows"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
+	"golang.org/x/sys/windows"
 )
 
 func TestParseFile(t *testing.T) {
@@ -106,7 +107,7 @@ func TestParseMem(t *testing.T) {
 		executable       string
 		expectedSections int
 	}{
-		{filepath.Join(os.Getenv("windir"), "notepad.exe"), 7},
+		{filepath.Join(os.Getenv("windir"), "regedit.exe"), 8},
 	}
 
 	for _, tt := range tests {

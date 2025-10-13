@@ -20,6 +20,18 @@ package etw
 import (
 	"context"
 	"fmt"
+	"net"
+	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"syscall"
+	"testing"
+	"time"
+	"unsafe"
+
 	"github.com/rabbitstack/fibratus/internal/evasion"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
@@ -39,17 +51,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
-	"net"
-	"net/http"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"runtime"
-	"strings"
-	"syscall"
-	"testing"
-	"time"
-	"unsafe"
 )
 
 // MockListener receives the event and does nothing but indicating the event was processed.
@@ -626,30 +627,8 @@ func TestEventSourceAllEvents(t *testing.T) {
 		{
 			"duplicate handle",
 			func() error {
-				var si windows.StartupInfo
-				var pi windows.ProcessInformation
-				argv, err := windows.UTF16PtrFromString(filepath.Join(os.Getenv("windir"), "notepad.exe"))
-				if err != nil {
-					return err
-				}
-				err = windows.CreateProcess(
-					nil,
-					argv,
-					nil,
-					nil,
-					true,
-					0,
-					nil,
-					nil,
-					&si,
-					&pi)
-				if err != nil {
-					return err
-				}
-				time.Sleep(time.Second)
-				defer windows.TerminateProcess(pi.Process, 0)
 				hs := handle.NewSnapshotter(&config.Config{EnumerateHandles: true}, nil)
-				handles, err := hs.FindHandles(pi.ProcessId)
+				handles, err := hs.FindHandles(uint32(os.Getppid()))
 				if err != nil {
 					return err
 				}
@@ -660,7 +639,7 @@ func TestEventSourceAllEvents(t *testing.T) {
 					}
 				}
 				assert.False(t, dupHandleID == 0)
-				dup, err := handle.Duplicate(dupHandleID, pi.ProcessId, windows.KEY_READ)
+				dup, err := handle.Duplicate(dupHandleID, uint32(os.Getppid()), 0)
 				if err != nil {
 					return err
 				}
