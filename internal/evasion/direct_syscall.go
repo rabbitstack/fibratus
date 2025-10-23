@@ -19,9 +19,10 @@
 package evasion
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/event"
 	"path/filepath"
 	"strings"
+
+	"github.com/rabbitstack/fibratus/pkg/event"
 )
 
 // directSyscall direct syscall evasion refers to a technique where
@@ -54,11 +55,16 @@ func (d *directSyscall) Eval(e *event.Event) (bool, error) {
 
 	mod := filepath.Base(strings.ToLower(frame.Module))
 
-	// check if the last userspace frame is originated
+	// check if the last user space frame is originated
 	// from the allowed modules such as the native NTDLL
 	// module. If that's not the case, the process is
-	// invoking a direct syscall
-	return mod != "ntdll.dll" && mod != "win32.dll" && mod != "win32u.dll" && mod != "wow64win.dll" && mod != "wow64cpu.dll", nil
+	// likely invoking a direct syscall
+	switch mod {
+	case "ntdll.dll", "win32.dll", "win32u.dll", "wow64win.dll", "wow64cpu.dll":
+		return false, nil
+	default:
+		return true, nil
+	}
 }
 
-func (d *directSyscall) Type() Type { return DirectSyscall }
+func (*directSyscall) Type() Type { return DirectSyscall }
