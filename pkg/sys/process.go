@@ -19,9 +19,10 @@
 package sys
 
 import (
+	"unsafe"
+
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
-	"unsafe"
 )
 
 const (
@@ -30,6 +31,11 @@ const (
 	// ProcessStatusStillActive represents the status of the running process
 	ProcessStatusStillActive uint32 = 259
 )
+
+// ModuleHandleFromAddress is the flag of the GetModuleHandleEx
+// function parameter that indicates the module handle is obtained
+// from the address
+const ModuleHandleFromAddress = 0x00000004
 
 // ProcessProtectionInformation is the information class that returns a
 // value indicating the type of protected process and the protected process
