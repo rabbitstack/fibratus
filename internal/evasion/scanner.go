@@ -19,9 +19,13 @@
 package evasion
 
 import (
+	"expvar"
+
 	"github.com/rabbitstack/fibratus/pkg/event"
 	log "github.com/sirupsen/logrus"
 )
+
+var evasionsCount expvar.Map
 
 // Scanner is responsible for evaluating evasion detectors
 // and decorating the event with the reported behaviours.
@@ -42,6 +46,9 @@ func NewScanner(config Config) *Scanner {
 	if config.EnableDirectSyscall {
 		s.registerEvasion(NewDirectSyscall())
 	}
+	if config.EnableIndirectSyscall {
+		s.registerEvasion(NewIndirectSyscall())
+	}
 
 	return s
 }
@@ -57,15 +64,16 @@ func (s *Scanner) ProcessEvent(e *event.Event) (bool, error) {
 	var enq bool
 
 	// run registered evasion detectors
-	for _, eva := range s.evasions {
-		matches, err := eva.Eval(e)
+	for _, evasion := range s.evasions {
+		matches, err := evasion.Eval(e)
 		if err != nil {
 			return false, err
 		}
 		if matches {
 			enq = true
-			e.AddSliceMetaOrAppend(event.EvasionsKey, eva.Type().String())
-			log.Infof("detected evasion %q on event [%s] and callstack [%s]", eva.Type(), e, e.Callstack)
+			e.AddSliceMetaOrAppend(event.EvasionsKey, evasion.Type().String())
+			evasionsCount.Add(evasion.Type().String(), 1)
+			log.Debugf("detected evasion %q on event [%s] and callstack [%s]", evasion.Type(), e, e.Callstack)
 		}
 	}
 
@@ -74,6 +82,6 @@ func (s *Scanner) ProcessEvent(e *event.Event) (bool, error) {
 
 func (s *Scanner) CanEnqueue() bool { return false }
 
-func (s *Scanner) registerEvasion(eva Evasion) {
-	s.evasions = append(s.evasions, eva)
+func (s *Scanner) registerEvasion(evasion Evasion) {
+	s.evasions = append(s.evasions, evasion)
 }

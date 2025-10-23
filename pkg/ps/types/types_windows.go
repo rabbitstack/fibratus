@@ -346,6 +346,9 @@ func (m Module) String() string {
 // IsExecutable determines if the loaded module is an executable.
 func (m Module) IsExecutable() bool { return strings.ToLower(filepath.Ext(m.Name)) == ".exe" }
 
+// IsNTDLL determines if the module is the native ntdll module.
+func (m Module) IsNTDLL() bool { return strings.EqualFold(filepath.Base(m.Name), "ntdll.dll") }
+
 // Mmap stores information related to the memory mapping.
 type Mmap struct {
 	// BaseAddress represents the address where the view of section is mapped.

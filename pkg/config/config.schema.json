@@ -300,6 +300,9 @@
         },
         "enable-direct-syscall": {
           "type": "boolean"
+        },
+        "enable-indirect-syscall": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false

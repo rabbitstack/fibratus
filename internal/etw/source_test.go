@@ -26,6 +26,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"syscall"
 	"testing"
@@ -1281,12 +1282,7 @@ func containsEvasion(e *event.Event, evasion string) bool {
 	if !ok {
 		return false
 	}
-	for _, eva := range evas {
-		if eva == evasion {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(evas, evasion)
 }
 
 func TestEvasionScanner(t *testing.T) {
@@ -1306,6 +1302,21 @@ func TestEvasionScanner(t *testing.T) {
 				if strings.Contains(strings.ToLower(e.Callstack.String()), strings.ToLower("direct-syscall.exe")) && e.Type == event.SetThreadContext {
 					log.Info(e, e.Callstack)
 					return containsEvasion(e, "direct_syscall")
+				}
+				return false
+			},
+			false,
+		},
+		{
+			"indirect syscall",
+			func() error {
+				cmd := exec.Command("_fixtures/indirect-syscall/indirect-syscall.exe")
+				return cmd.Run()
+			},
+			func(e *event.Event) bool {
+				if strings.Contains(strings.ToLower(e.Callstack.String()), strings.ToLower("indirect-syscall.exe")) && e.Type == event.SetThreadContext {
+					log.Info(e, e.Callstack)
+					return containsEvasion(e, "indirect_syscall")
 				}
 				return false
 			},
@@ -1347,7 +1358,12 @@ func TestEvasionScanner(t *testing.T) {
 	defer symbolizer.Close()
 	evs.RegisterEventListener(symbolizer)
 
-	scanner := evasion.NewScanner(evasion.Config{Enabled: true, EnableDirectSyscall: true})
+	scanner := evasion.NewScanner(
+		evasion.Config{
+			Enabled:               true,
+			EnableDirectSyscall:   true,
+			EnableIndirectSyscall: true,
+		})
 	evs.RegisterEventListener(scanner)
 
 	require.NoError(t, evs.Open(cfg))

@@ -171,6 +171,11 @@ evasion:
   # skipping the NTDLL stub that normally performs the transition to kernel mode.
   #enable-direct-syscall: true
 
+  # Indicates if indirect syscall evasion detection is enabled. Indirect syscall evasion refers
+  # to executing the syscall instruction by diverting the execution flow into a legitimate, clean
+  # ntdll stub that performs the syscall on process behalf.
+  #enable-indirect-syscall: true
+
 # =============================== Event ===============================================
 
 # The following settings control the state of the event.
