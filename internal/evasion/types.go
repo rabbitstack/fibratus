@@ -26,6 +26,8 @@ type Type uint8
 const (
 	// DirectSyscall represents the direct syscall evasion.
 	DirectSyscall Type = iota
+	// IndirectSyscall represents the indirect syscall evasion.
+	IndirectSyscall
 )
 
 // String returns the evasion human-friendly name.
@@ -33,6 +35,8 @@ func (t Type) String() string {
 	switch t {
 	case DirectSyscall:
 		return "direct_syscall"
+	case IndirectSyscall:
+		return "indirect_syscall"
 	default:
 		return "unknown"
 	}
@@ -42,7 +46,7 @@ func (t Type) String() string {
 type Evasion interface {
 	// Eval executes the evasion logic. The evasion detector usually accesses
 	// the callstack from the given event to determine if any evasions are
-	// performed on behalf of the process. If the evasion is classified, this
+	// performed on behalf of the process. If the evasion is recognized, this
 	// method return true, or false otherwise.
 	Eval(*event.Event) (bool, error)
 	// Type returns the type of the evasion technique.

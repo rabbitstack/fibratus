@@ -15,6 +15,16 @@ tasks:
       - cmd.exe /c 'C:\"Program Files"\"Microsoft Visual Studio"\{{ .VISUAL_STUDIO_VERSION }}\{{ .VISUAL_STUDIO_EDITION }}\VC\Auxiliary\Build\vcvars64.bat && nmake -f Makefile.msvc'
     silent: true
 
+  indirect-syscall:
+    desc: Builds the binary to perform indirect syscalls via Syswhispers generated stubs
+    dir: indirect-syscall
+    cmds:
+      - git clone {{ .SYSWHISPERS3_REPO }}
+      - python SysWhispers3/syswhispers.py -a x64 -c msvc -p common -m jumper_randomized -o syscalls
+      - cmd.exe /c 'C:\"Program Files"\"Microsoft Visual Studio"\{{ .VISUAL_STUDIO_VERSION }}\{{ .VISUAL_STUDIO_EDITION }}\VC\Auxiliary\Build\vcvars64.bat && nmake -f Makefile.msvc'
+    silent: true
+
   all:
     deps:
       - direct-syscall
+      - indirect-syscall

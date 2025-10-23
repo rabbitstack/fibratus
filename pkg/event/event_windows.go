@@ -234,12 +234,15 @@ func (e *Event) IsImageRundown() bool           { return e.Type == ImageRundown 
 func (e *Event) IsFileOpEnd() bool              { return e.Type == FileOpEnd }
 func (e *Event) IsRegSetValue() bool            { return e.Type == RegSetValue }
 func (e *Event) IsRegSetValueInternal() bool    { return e.Type == RegSetValueInternal }
+func (e *Event) IsRegCreateKey() bool           { return e.Type == RegCreateKey }
 func (e *Event) IsProcessRundown() bool         { return e.Type == ProcessRundown }
 func (e *Event) IsProcessRundownInternal() bool { return e.Type == ProcessRundownInternal }
 func (e *Event) IsVirtualAlloc() bool           { return e.Type == VirtualAlloc }
 func (e *Event) IsMapViewFile() bool            { return e.Type == MapViewFile }
 func (e *Event) IsUnmapViewFile() bool          { return e.Type == UnmapViewFile }
 func (e *Event) IsStackWalk() bool              { return e.Type == StackWalk }
+func (e *Event) IsOpenThread() bool             { return e.Type == OpenThread }
+func (e *Event) IsOpenProcess() bool            { return e.Type == OpenProcess }
 
 // InvalidPid indicates if the process generating the event is invalid.
 func (e *Event) InvalidPid() bool { return e.PID == sys.InvalidProcessID }

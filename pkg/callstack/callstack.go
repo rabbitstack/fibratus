@@ -19,13 +19,14 @@
 package callstack
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/util/va"
-	"golang.org/x/arch/x86/x86asm"
-	"golang.org/x/sys/windows"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/rabbitstack/fibratus/pkg/util/va"
+	"golang.org/x/arch/x86/x86asm"
+	"golang.org/x/sys/windows"
 )
 
 // unbacked represents the identifier for unbacked regions in stack frames
@@ -60,6 +61,7 @@ func (f *Frame) AllocationSize(proc windows.Handle) uint64 {
 	}
 
 	r := va.VirtualQuery(proc, f.Addr.Uint64())
+
 	if r == nil || (r.State != windows.MEM_COMMIT || r.Protect == windows.PAGE_NOACCESS || r.Type != va.MemImage) {
 		return 0
 	}
@@ -305,6 +307,16 @@ func (s Callstack) String() string {
 func (s Callstack) ContainsUnbacked() bool {
 	for _, frame := range s {
 		if !frame.Addr.InSystemRange() && frame.IsUnbacked() {
+			return true
+		}
+	}
+	return false
+}
+
+// ContainsSymbol checks if the supplied symbol name is present in the callstack.
+func (s Callstack) ContainsSymbol(sym string) bool {
+	for _, frame := range s {
+		if frame.Symbol == sym {
 			return true
 		}
 	}

@@ -24,8 +24,9 @@ import (
 )
 
 const (
-	enabled             = "evasion.enabled"
-	enableDirectSyscall = "evasion.enable-direct-syscall"
+	enabled               = "evasion.enabled"
+	enableDirectSyscall   = "evasion.enable-direct-syscall"
+	enableIndirectSyscall = "evasion.enable-indirect-syscall"
 )
 
 // Config contains the settings that influence the behaviour of the evasion scanner.
@@ -34,16 +35,20 @@ type Config struct {
 	Enabled bool `json:"enabled" yaml:"enabled"`
 	// EnableDirectSyscall indicates if direct syscall evasion detection is enabled.
 	EnableDirectSyscall bool `json:"enable-direct-syscall" yaml:"enable-direct-syscall"`
+	// EnableIndirectSyscall indicates if indirect syscall evasion detection is enabled.
+	EnableIndirectSyscall bool `json:"enable-indirect-syscall" yaml:"enable-indirect-syscall"`
 }
 
 // InitFromViper initializes evasion config from Viper.
 func (c *Config) InitFromViper(v *viper.Viper) {
 	c.Enabled = v.GetBool(enabled)
 	c.EnableDirectSyscall = v.GetBool(enableDirectSyscall)
+	c.EnableIndirectSyscall = v.GetBool(enableIndirectSyscall)
 }
 
 // AddFlags adds evasion config flags to the set.
 func AddFlags(flags *pflag.FlagSet) {
 	flags.Bool(enabled, true, "Indicates if evasion detections are enabled global-wise")
 	flags.Bool(enableDirectSyscall, true, "Indicates if direct syscall evasion detection is enabled")
+	flags.Bool(enableIndirectSyscall, true, "Indicates if indirect syscall evasion detection is enabled")
 }
