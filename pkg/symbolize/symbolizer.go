@@ -21,6 +21,12 @@ package symbolize
 import (
 	"expvar"
 	"fmt"
+	"path/filepath"
+	"slices"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/callstack"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
@@ -34,11 +40,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
-	"path/filepath"
-	"slices"
-	"strings"
-	"sync"
-	"time"
 )
 
 // ErrSymInitialize is thrown if the process symbol handler fails to initialize
@@ -108,8 +109,9 @@ type module struct {
 }
 
 type syminfo struct {
-	module string
-	symbol string
+	module        string
+	symbol        string
+	moduleAddress va.Address // base module address
 }
 
 func (m *module) keepalive() {
@@ -453,7 +455,7 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *event.Event) callstack.Fra
 	if sym, ok := s.symbols[e.PID]; ok {
 		if symbol, ok := sym[addr]; ok {
 			symCacheHits.Add(1)
-			frame.Module, frame.Symbol = symbol.module, symbol.symbol
+			frame.Module, frame.Symbol, frame.ModuleAddress = symbol.module, symbol.symbol, symbol.moduleAddress
 			return frame
 		}
 	}
@@ -571,11 +573,11 @@ func (s *Symbolizer) cacheSymbol(pid uint32, addr va.Address, frame *callstack.F
 	if sym, ok := s.symbols[pid]; ok {
 		if _, ok := sym[addr]; !ok {
 			symCachedSymbols.Add(1)
-			s.symbols[pid][addr] = syminfo{module: frame.Module, symbol: frame.Symbol}
+			s.symbols[pid][addr] = syminfo{module: frame.Module, symbol: frame.Symbol, moduleAddress: frame.ModuleAddress}
 		}
 	} else {
 		symCachedSymbols.Add(1)
-		s.symbols[pid] = map[va.Address]syminfo{addr: {module: frame.Module, symbol: frame.Symbol}}
+		s.symbols[pid] = map[va.Address]syminfo{addr: {module: frame.Module, symbol: frame.Symbol, moduleAddress: frame.ModuleAddress}}
 	}
 }
 
