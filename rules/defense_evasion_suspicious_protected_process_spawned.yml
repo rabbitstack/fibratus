@@ -1,0 +1,43 @@
+name: Suspicious protected process spawned
+id: a778295a-02f1-42d9-9c20-78346a7bc2c6
+version: 1.0.0
+description: |
+  Identifies when a non-SYSTEM process spawns a protected child process. This indicates an 
+  unusual behavior that is often associated with attempts to tamper with or freeze endpoint 
+  protection components.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1562
+  technique.name: Impair Defenses
+  technique.ref: https://attack.mitre.org/techniques/T1562/
+  subtechnique.id: T1562.001
+  subtechnique.name: Disable or Modify Tools
+  subtechnique.ref: https://attack.mitre.org/techniques/T1562/001
+references:
+  - https://github.com/TwoSevenOneT/EDR-Freeze
+
+condition: >
+  spawn_process and ps.child.is_protected = true and ps.token.integrity_level != 'SYSTEM'
+    and
+  pe.cert.issuer not imatches
+    (
+      '*Microsoft Windows*',
+      '*Microsoft Corporation*',
+      '*CrowdStrike, Inc*',
+      '*Sentinel Labs, Inc*',
+      '*SentinelOne Inc*',
+      '*Sophos Ltd*',
+      '*Symantec Corporation*',
+      '*Palo Alto Networks*',
+      '*Trend Micro, Inc*'
+    )
+action:
+  - name: kill
+
+output: >
+  Suspicious protected process %ps.child.exe spawned by non-system process %ps.exe
+severity: high
+
+min-engine-version: 3.0.0
