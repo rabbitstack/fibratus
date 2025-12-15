@@ -19,12 +19,14 @@
 package config
 
 import (
-	"github.com/mitchellh/mapstructure"
 	"net"
 	"reflect"
+
+	"github.com/mitchellh/mapstructure"
 )
 
-func decode(input, output interface{}) error {
+// Decode decodes the config to the specific type from the raw interface.
+func Decode(input, output any) error {
 	var decoderConfig = &mapstructure.DecoderConfig{
 		Metadata:         nil,
 		Result:           output,

@@ -22,6 +22,9 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
+	"time"
+	"unsafe"
+
 	"github.com/rabbitstack/fibratus/internal/etw/processors"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	errs "github.com/rabbitstack/fibratus/pkg/errors"
@@ -29,13 +32,12 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/filter"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	"github.com/rabbitstack/fibratus/pkg/ps"
+	"github.com/rabbitstack/fibratus/pkg/ruleset"
 	"github.com/rabbitstack/fibratus/pkg/source"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows/registry"
-	"time"
-	"unsafe"
 )
 
 const (
@@ -71,7 +73,7 @@ var (
 // starting ETW tracing sessions and setting up event
 // consumers.
 type EventSource struct {
-	r          *config.RulesCompileResult
+	rcr        *ruleset.CompileResult
 	traces     []*Trace
 	consumers  []*Consumer
 	processors processors.Chain
@@ -96,10 +98,10 @@ func NewEventSource(
 	psnap ps.Snapshotter,
 	hsnap handle.Snapshotter,
 	config *config.Config,
-	compiler *config.RulesCompileResult,
+	rcr *ruleset.CompileResult,
 ) source.EventSource {
 	evs := &EventSource{
-		r:          compiler,
+		rcr:        rcr,
 		traces:     make([]*Trace, 0),
 		consumers:  make([]*Consumer, 0),
 		processors: processors.NewChain(psnap, hsnap, config),
@@ -127,17 +129,17 @@ func (e *EventSource) Open(config *config.Config) error {
 	// used by the rules, but thread events are
 	// disabled in the config, then thread events
 	// are not captured
-	if e.r != nil {
-		config.EventSource.EnableThreadEvents = config.EventSource.EnableThreadEvents && e.r.HasThreadEvents
-		config.EventSource.EnableImageEvents = config.EventSource.EnableImageEvents && e.r.HasImageEvents
-		config.EventSource.EnableNetEvents = config.EventSource.EnableNetEvents && e.r.HasNetworkEvents
-		config.EventSource.EnableRegistryEvents = config.EventSource.EnableRegistryEvents && (e.r.HasRegistryEvents || (config.Yara.Enabled && !config.Yara.SkipRegistry))
-		config.EventSource.EnableFileIOEvents = config.EventSource.EnableFileIOEvents && (e.r.HasFileEvents || (config.Yara.Enabled && !config.Yara.SkipFiles))
-		config.EventSource.EnableVAMapEvents = config.EventSource.EnableVAMapEvents && (e.r.HasVAMapEvents || (config.Yara.Enabled && !config.Yara.SkipMmaps))
-		config.EventSource.EnableMemEvents = config.EventSource.EnableMemEvents && (e.r.HasMemEvents || (config.Yara.Enabled && !config.Yara.SkipAllocs))
-		config.EventSource.EnableDNSEvents = config.EventSource.EnableDNSEvents && e.r.HasDNSEvents
-		config.EventSource.EnableAuditAPIEvents = config.EventSource.EnableAuditAPIEvents && e.r.HasAuditAPIEvents
-		config.EventSource.EnableThreadpoolEvents = config.EventSource.EnableThreadpoolEvents && e.r.HasThreadpoolEvents
+	if e.rcr != nil {
+		config.EventSource.EnableThreadEvents = config.EventSource.EnableThreadEvents && e.rcr.HasThreadEvents
+		config.EventSource.EnableImageEvents = config.EventSource.EnableImageEvents && e.rcr.HasImageEvents
+		config.EventSource.EnableNetEvents = config.EventSource.EnableNetEvents && e.rcr.HasNetworkEvents
+		config.EventSource.EnableRegistryEvents = config.EventSource.EnableRegistryEvents && (e.rcr.HasRegistryEvents || (config.Yara.Enabled && !config.Yara.SkipRegistry))
+		config.EventSource.EnableFileIOEvents = config.EventSource.EnableFileIOEvents && (e.rcr.HasFileEvents || (config.Yara.Enabled && !config.Yara.SkipFiles))
+		config.EventSource.EnableVAMapEvents = config.EventSource.EnableVAMapEvents && (e.rcr.HasVAMapEvents || (config.Yara.Enabled && !config.Yara.SkipMmaps))
+		config.EventSource.EnableMemEvents = config.EventSource.EnableMemEvents && (e.rcr.HasMemEvents || (config.Yara.Enabled && !config.Yara.SkipAllocs))
+		config.EventSource.EnableDNSEvents = config.EventSource.EnableDNSEvents && e.rcr.HasDNSEvents
+		config.EventSource.EnableAuditAPIEvents = config.EventSource.EnableAuditAPIEvents && e.rcr.HasAuditAPIEvents
+		config.EventSource.EnableThreadpoolEvents = config.EventSource.EnableThreadpoolEvents && e.rcr.HasThreadpoolEvents
 		for _, typ := range event.All() {
 			if typ == event.CreateProcess || typ == event.TerminateProcess ||
 				typ == event.LoadImage || typ == event.UnloadImage {
@@ -159,7 +161,7 @@ func (e *EventSource) Open(config *config.Config) error {
 				continue
 			}
 
-			if !e.r.ContainsEvent(typ) {
+			if !e.rcr.ContainsEvent(typ) {
 				config.EventSource.SetDropMask(typ)
 			}
 		}

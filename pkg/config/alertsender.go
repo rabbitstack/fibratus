@@ -21,12 +21,13 @@ package config
 import (
 	"errors"
 	"fmt"
+	"reflect"
+
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	"github.com/rabbitstack/fibratus/pkg/alertsender/eventlog"
 	"github.com/rabbitstack/fibratus/pkg/alertsender/mail"
 	"github.com/rabbitstack/fibratus/pkg/alertsender/slack"
 	"github.com/rabbitstack/fibratus/pkg/alertsender/systray"
-	"reflect"
 )
 
 var errNoAlertsendersSection = errors.New("no alertsenders section in config")
@@ -56,7 +57,7 @@ func (c *Config) tryLoadAlertSenders() error {
 		switch typ {
 		case "mail":
 			var mailConfig mail.Config
-			if err := decode(config, &mailConfig); err != nil {
+			if err := Decode(config, &mailConfig); err != nil {
 				return errAlertsenderConfig(typ, err)
 			}
 			if !mailConfig.Enabled {
@@ -69,7 +70,7 @@ func (c *Config) tryLoadAlertSenders() error {
 			configs = append(configs, config)
 		case "slack":
 			var slackConfig slack.Config
-			if err := decode(config, &slackConfig); err != nil {
+			if err := Decode(config, &slackConfig); err != nil {
 				return errAlertsenderConfig(typ, err)
 			}
 			if !slackConfig.Enabled {
@@ -82,7 +83,7 @@ func (c *Config) tryLoadAlertSenders() error {
 			configs = append(configs, config)
 		case "systray":
 			var systrayConfig systray.Config
-			if err := decode(config, &systrayConfig); err != nil {
+			if err := Decode(config, &systrayConfig); err != nil {
 				return errAlertsenderConfig(typ, err)
 			}
 			if !systrayConfig.Enabled {
@@ -96,7 +97,7 @@ func (c *Config) tryLoadAlertSenders() error {
 
 		case "eventlog":
 			var eventlogConfig eventlog.Config
-			if err := decode(config, &eventlogConfig); err != nil {
+			if err := Decode(config, &eventlogConfig); err != nil {
 				return errAlertsenderConfig(typ, err)
 			}
 			if !eventlogConfig.Enabled {

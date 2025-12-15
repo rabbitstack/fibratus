@@ -25,6 +25,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/filter"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	"github.com/rabbitstack/fibratus/pkg/ps"
+	"github.com/rabbitstack/fibratus/pkg/ruleset"
 	"github.com/rabbitstack/fibratus/pkg/source"
 )
 
@@ -44,9 +45,9 @@ func NewEventSourceControl(
 	psnap ps.Snapshotter,
 	hsnap handle.Snapshotter,
 	config *config.Config,
-	compiler *config.RulesCompileResult,
+	rcr *ruleset.CompileResult,
 ) *EventSourceControl {
-	return &EventSourceControl{evs: etw.NewEventSource(psnap, hsnap, config, compiler)}
+	return &EventSourceControl{evs: etw.NewEventSource(psnap, hsnap, config, rcr)}
 }
 
 func (s *EventSourceControl) Open(config *config.Config) error {

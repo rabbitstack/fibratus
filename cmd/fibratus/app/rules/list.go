@@ -19,23 +19,31 @@
 package rules
 
 import (
+	"context"
 	"fmt"
+	"os"
+	"strings"
+
 	"github.com/enescakir/emoji"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/rabbitstack/fibratus/internal/bootstrap"
-	"os"
-	"strings"
+	"github.com/rabbitstack/fibratus/pkg/rules"
 )
 
 func listRules() error {
 	if err := bootstrap.InitConfigAndLogger(cfg); err != nil {
 		return err
 	}
-	if err := cfg.Filters.LoadFilters(); err != nil {
+	loader := rules.NewLoader()
+	rs, err := loader.Load(
+		context.Background(),
+		rules.WithRulePaths(cfg.Filters.Rules.FromPaths...),
+		rules.WithMacroPaths(cfg.Filters.Macros.FromPaths...),
+	)
+	if err != nil {
 		return fmt.Errorf("%v %v", emoji.DisappointedFace, err)
 	}
-	filters := cfg.GetFilters()
-	if len(filters) == 0 {
+	if rs.IsEmpty() {
 		return fmt.Errorf("%v no rules found in %s", emoji.DisappointedFace, strings.Join(cfg.Filters.Rules.FromPaths, ","))
 	}
 
@@ -52,9 +60,9 @@ func listRules() error {
 		})
 		tactics := make(map[string]int)
 		techniques := make(map[string]int)
-		for _, f := range filters {
-			tactics[f.Labels["tactic.name"]]++
-			techniques[f.Labels["technique.name"]]++
+		for _, rule := range rs.Rules {
+			tactics[rule.Labels["tactic.name"]]++
+			techniques[rule.Labels["technique.name"]]++
 		}
 		tot := 0
 		for tac, n := range tactics {
@@ -85,16 +93,16 @@ func listRules() error {
 		tactics := make(map[string]int)
 		techniques := make(map[string]int)
 
-		for _, f := range filters {
-			tac := f.Labels["tactic.name"]
-			tec := f.Labels["technique.name"]
+		for _, rule := range rs.Rules {
+			tac := rule.Labels["tactic.name"]
+			tec := rule.Labels["technique.name"]
 			if _, ok := tactics[tac]; !ok {
 				tactics[tac] = 1
 			}
 			if _, ok := tactics[tec]; !ok {
 				techniques[tec] = 1
 			}
-			t.AppendRow(table.Row{n + 1, f.Name, tec, tac})
+			t.AppendRow(table.Row{n + 1, rule.Name, tec, tac})
 			n++
 		}
 

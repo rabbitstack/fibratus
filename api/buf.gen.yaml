@@ -1,0 +1,15 @@
+version: v2
+managed:
+  enabled: true
+  override:
+    - file_option: go_package_prefix
+      value: github.com/fibratus/api/proto
+plugins:
+  - remote: buf.build/protocolbuffers/go
+    out: protobuf
+    opt: paths=source_relative
+  - remote: buf.build/grpc/go
+    out: protobuf
+    opt: paths=source_relative
+inputs:
+  - directory: proto

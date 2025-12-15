@@ -1,0 +1,154 @@
+time=2025-11-06T16:52:11+01:00 level=info msg=new endpoint connected for rule streaming source=grpc/rule.go:75
+time=2025-11-06T16:52:11+01:00 level=info msg=endpoint disconnected from rule streaming source=grpc/rule.go:82
+time=2025-11-06T16:53:27+01:00 level=info msg=new endpoint connected for rule streaming source=grpc/rule.go:75
+time=2025-11-06T16:54:46+01:00 level=info msg=endpoint disconnected from rule streaming source=grpc/rule.go:82
+time=2025-11-06T16:55:28+01:00 level=info msg=new endpoint connected for rule streaming source=grpc/rule.go:75
+time=2025-11-06T16:55:28+01:00 level=info msg=endpoint disconnected from rule streaming source=grpc/rule.go:82
+time=2025-11-06T16:56:19+01:00 level=info msg=new endpoint connected for rule streaming source=grpc/rule.go:75
+time=2025-11-06T16:56:19+01:00 level=info msg=endpoint disconnected from rule streaming source=grpc/rule.go:82
+time=2025-11-06T16:56:32+01:00 level=info msg=new endpoint connected for rule streaming source=grpc/rule.go:75
+time=2025-11-06T16:58:01+01:00 level=info msg=endpoint disconnected from rule streaming source=grpc/rule.go:82
+time=2025-11-06T16:59:48+01:00 level=info msg=new endpoint connected for rule streaming source=grpc/rule.go:77
+time=2025-11-06T16:59:55+01:00 level=info msg=sending ruleset message source=grpc/rule.go:139
+time=2025-11-06T17:00:05+01:00 level=info msg=sending ruleset message source=grpc/rule.go:139
+time=2025-11-06T17:00:15+01:00 level=info msg=sending ruleset message source=grpc/rule.go:139
+time=2025-11-06T17:00:25+01:00 level=info msg=sending ruleset message source=grpc/rule.go:139
+time=2025-11-06T17:00:35+01:00 level=info msg=sending ruleset message source=grpc/rule.go:139
+time=2025-11-06T17:00:45+01:00 level=info msg=sending ruleset message source=grpc/rule.go:139
+time=2025-11-06T17:00:55+01:00 level=info msg=sending ruleset message source=grpc/rule.go:139
+time=2025-11-06T17:01:05+01:00 level=info msg=sending ruleset message source=grpc/rule.go:139
+time=2025-11-06T17:01:15+01:00 level=info msg=sending ruleset message source=grpc/rule.go:139
+time=2025-11-06T17:01:25+01:00 level=info msg=sending ruleset message source=grpc/rule.go:139
+time=2025-11-06T17:01:35+01:00 level=info msg=sending ruleset message source=grpc/rule.go:139
+time=2025-11-06T17:01:45+01:00 level=info msg=sending ruleset message source=grpc/rule.go:139
+time=2025-11-06T17:01:55+01:00 level=info msg=sending ruleset message source=grpc/rule.go:139
+time=2025-11-06T17:02:05+01:00 level=info msg=sending ruleset message source=grpc/rule.go:139
+time=2025-11-06T17:02:15+01:00 level=info msg=sending ruleset message source=grpc/rule.go:139
+time=2025-11-06T17:02:25+01:00 level=info msg=sending ruleset message source=grpc/rule.go:139
+time=2025-11-06T17:02:35+01:00 level=info msg=sending ruleset message source=grpc/rule.go:139
+time=2025-11-06T17:02:45+01:00 level=info msg=sending ruleset message source=grpc/rule.go:139
+time=2025-11-06T17:02:47+01:00 level=info msg=endpoint disconnected from rule streaming source=grpc/rule.go:84
+time=2025-11-06T17:03:07+01:00 level=info msg=new endpoint connected for rule streaming source=grpc/rule.go:77
+time=2025-11-06T17:03:15+01:00 level=info msg=sending ruleset message source=grpc/rule.go:139
+time=2025-11-06T17:03:25+01:00 level=info msg=sending ruleset message source=grpc/rule.go:139
+time=2025-11-06T17:03:35+01:00 level=info msg=sending ruleset message source=grpc/rule.go:139
+time=2025-11-06T17:03:45+01:00 level=info msg=sending ruleset message source=grpc/rule.go:139
+time=2025-11-06T17:03:55+01:00 level=info msg=sending ruleset message source=grpc/rule.go:139
+time=2025-11-06T17:04:05+01:00 level=info msg=sending ruleset message source=grpc/rule.go:139
+time=2025-11-06T17:04:15+01:00 level=info msg=sending ruleset message source=grpc/rule.go:139
+time=2025-11-06T17:04:25+01:00 level=info msg=sending ruleset message source=grpc/rule.go:139
+time=2025-11-06T17:04:25+01:00 level=info msg=endpoint disconnected from rule streaming source=grpc/rule.go:84
+time=2025-11-06T17:13:47+01:00 level=info msg=new endpoint connected for rule streaming source=grpc/rule.go:77
+time=2025-11-06T17:13:51+01:00 level=info msg=sending ruleset message source=grpc/rule.go:139
+time=2025-11-06T17:14:01+01:00 level=info msg=sending ruleset message source=grpc/rule.go:139
+time=2025-11-06T17:14:11+01:00 level=info msg=sending ruleset message source=grpc/rule.go:139
+time=2025-11-06T17:14:21+01:00 level=info msg=sending ruleset message source=grpc/rule.go:139
+time=2025-11-06T17:14:29+01:00 level=info msg=endpoint disconnected from rule streaming source=grpc/rule.go:84
+time=2025-11-06T17:14:58+01:00 level=info msg=new endpoint connected for rule streaming source=grpc/rule.go:77
+time=2025-11-06T17:15:01+01:00 level=info msg=sending ruleset message source=grpc/rule.go:139
+time=2025-11-06T17:15:11+01:00 level=info msg=sending ruleset message source=grpc/rule.go:139
+time=2025-11-06T17:15:15+01:00 level=info msg=endpoint disconnected from rule streaming source=grpc/rule.go:84
+time=2025-11-06T22:46:21+01:00 level=info msg=new endpoint connected for rule streaming source=grpc/rule.go:59
+time=2025-11-06T22:47:14+01:00 level=info msg=endpoint disconnected from rule streaming source=grpc/rule.go:66
+time=2025-11-06T23:06:23+01:00 level=info msg=new endpoint connected for rule streaming source=grpc/rule.go:59
+time=2025-11-06T23:07:47+01:00 level=info msg=endpoint disconnected from rule streaming source=grpc/rule.go:66
+time=2025-11-06T23:12:37+01:00 level=info msg=new endpoint connected for rule streaming source=grpc/rule.go:59
+time=2025-11-06T23:14:52+01:00 level=info msg=endpoint disconnected from rule streaming source=grpc/rule.go:66
+time=2025-11-06T23:15:24+01:00 level=info msg=new endpoint connected for rule streaming source=grpc/rule.go:59
+time=2025-11-06T23:16:29+01:00 level=info msg=endpoint disconnected from rule streaming source=grpc/rule.go:66
+time=2025-11-06T23:16:50+01:00 level=info msg=new endpoint connected for rule streaming source=grpc/rule.go:59
+time=2025-11-06T23:17:17+01:00 level=info msg=endpoint disconnected from rule streaming source=grpc/rule.go:66
+time=2025-11-06T23:24:25+01:00 level=info msg=new endpoint connected for rule streaming source=grpc/rule.go:59
+time=2025-11-06T23:24:31+01:00 level=info msg=endpoint disconnected from rule streaming source=grpc/rule.go:66
+time=2025-11-06T23:25:33+01:00 level=info msg=new endpoint connected for rule streaming source=grpc/rule.go:59
+time=2025-11-06T23:25:38+01:00 level=info msg=endpoint disconnected from rule streaming source=grpc/rule.go:66
+time=2025-11-06T23:36:30+01:00 level=info msg=new endpoint connected for rule streaming source=grpc/rule.go:59
+time=2025-11-06T23:36:36+01:00 level=info msg=endpoint disconnected from rule streaming source=grpc/rule.go:66
+time=2025-11-06T23:37:43+01:00 level=info msg=new endpoint connected for rule streaming source=grpc/rule.go:59
+time=2025-11-06T23:37:50+01:00 level=info msg=endpoint disconnected from rule streaming source=grpc/rule.go:66
+time=2025-11-06T23:39:14+01:00 level=info msg=new endpoint connected for rule streaming source=grpc/rule.go:59
+time=2025-11-06T23:39:15+01:00 level=info msg=endpoint disconnected from rule streaming source=grpc/rule.go:66
+time=2025-12-15T18:25:40+01:00 level=info msg=new endpoint connected for rule streaming source=grpc/rule.go:56
+time=2025-12-15T18:25:40+01:00 level=info msg=loading macros from file C:\Fibratus\fibratus\rules\macros\macros.yml source=rules/loader.go:180
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\credentail_access_file_access_to_sam_database.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\credential_access_credential_access_from_backups_via_rundll32.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\credential_access_credential_discovery_via_vaultcmd.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\credential_access_lsass_access_from_unsigned_executable.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\credential_access_lsass_handle_leak_via_seclogon.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\credential_access_lsass_memory_dump_preparation_via_silent_process_exit.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\credential_access_lsass_memory_dump_via_minidumpwritedump.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\credential_access_lsass_memory_dump_via_wer.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\credential_access_lsass_memory_dumping.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\credential_access_lsass_process_clone_creation_via_reflection.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\credential_access_potential_sam_hive_dumping.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\credential_access_remote_thread_creation_into_lsass.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\credential_access_suspicious_access_to_active_directory_domain_database.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\credential_access_suspicious_access_to_unattended_panther_files.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\credential_access_suspicious_access_to_windows_dpapi_master_keys.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\credential_access_suspicious_access_to_windows_manager_files.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\credential_access_suspicious_access_to_windows_vault_files.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\credential_access_suspicious_security_package_loaded_by_lsass.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\credential_access_suspicious_vault_client_dll_load.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\credential_access_unusual_access_to_ssh_keys.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\credential_access_unusual_access_to_web_browser_credential_stores.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\credential_access_unusual_access_to_windows_credential_history.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\defense_evasion_appdomain_manager_injection_via_clr_search_order_hijacking.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\defense_evasion_clear_eventlog.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\defense_evasion_dll_loaded_via_apc_queue.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\defense_evasion_dll_loaded_via_callback_function.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\defense_evasion_dll_loaded_via_ldrpkernel32_overwrite.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\defense_evasion_dll_sideloading_via_copied_binary.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\defense_evasion_dll_sideloading_via_microsoft_office_dropped_file.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\defense_evasion_dotnet_assembly_loaded_by_unmanaged_process.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\defense_evasion_hidden_registry_key_creation.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\defense_evasion_image_load_via_ntfs_transaction.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\defense_evasion_potential_injection_via_dotnet_debugging.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\defense_evasion_potential_process_creation_via_shellcode.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\defense_evasion_potential_process_doppelganging_injection.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\defense_evasion_potential_process_hollowing_injection.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\defense_evasion_potential_process_injection_via_tainted_memory_section.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\defense_evasion_potential_shellcode_execution_via_etw_logger_thread.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\defense_evasion_potential_thread_execution_hijacking.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\defense_evasion_process_execution_from_self_deleting_binary.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\defense_evasion_process_spawned_via_remote_thread.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\defense_evasion_regsvr32_scriptlet_execution.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\defense_evasion_suspicious_access_to_the_hosts_file.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\defense_evasion_suspicious_dll_loaded_via_memory_section_mapping.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\defense_evasion_suspicious_html_application_script_execution.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\defense_evasion_suspicious_object_symbolic_link_creation.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\defense_evasion_suspicious_windows_defender_exclusions_registry_modification.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\defense_evasion_suspicious_xsl_script_execution.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\defense_evasion_system_binary_proxy_execution_via_rundll32.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\defense_evasion_thread_context_set_from_unbacked_memory.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\defense_evasion_unsigned_dll_injection_via_remote_thread.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\defense_evasion_windows_defender_driver_unloading.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\defense_evasion_windows_defender_protection_tampering_via_registry.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\initial_access_executable_file_creation_from_macro_enabled_microsoft_office_document.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\initial_access_execution_via_microsoft_office_process.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\initial_access_macro_execution_via_script_interpreter.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\initial_access_microsoft_office_file_execution_via_script_interpreter.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\initial_access_microsoft_office_file_execution_via_wmi.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\initial_access_potential_clickfix_infection_chain_via_run_window.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\initial_access_process_spawned_from_macro_enabled_microsoft_office_document.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\initial_access_suspicious_dll_loaded_by_microsoft_office_process.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\initial_access_suspicious_execution_via_wmi_from_microsoft_office_process.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\initial_access_suspicious_microsoft_office_embedded_object.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\persistence_executable_file_dropped_by_unsigned_service_dll.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\persistence_hidden_local_account_creation.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\persistence_network_connection_via_startup_folder_executable_or_script.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\persistence_potential_port_monitor_or_print_processor_persistence_via_registry_modification.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\persistence_rid_hijacking.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\persistence_script_interpreter_or_untrusted_process_persistence.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\persistence_suspicious_microsoft_office_addin_loaded.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\persistence_suspicious_microsoft_office_template.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\persistence_suspicious_netsh_helper_dll_execution.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\persistence_suspicious_persistence_via_registry_modification.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\persistence_suspicious_port_monitor_loaded.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\persistence_suspicious_print_processor_loaded.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\persistence_suspicious_startup_shell_folder_modification.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\persistence_unusual_file_written_in_startup_folder.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\persistence_unusual_process_modified_registry_run_key.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\privilege_escalation_potential_privilege_escalation_via_phantom_dll_hijacking.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\privilege_escalation_vulnerable_or_malicious_driver_dropped.yml source=rules/loader.go:191
+time=2025-12-15T18:25:40+01:00 level=info msg=loading rule from C:\Fibratus\fibratus\rules\privilege_escalation_vulnerable_or_malicious_driver_loaded.yml source=rules/loader.go:191
+time=2025-12-15T18:25:51+01:00 level=info msg=endpoint disconnected from rule streaming source=grpc/rule.go:63

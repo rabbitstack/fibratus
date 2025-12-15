@@ -21,17 +21,21 @@ package bootstrap
 import (
 	"context"
 	"errors"
+	"os"
+
 	"github.com/rabbitstack/fibratus/internal/evasion"
 	"github.com/rabbitstack/fibratus/pkg/aggregator"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	"github.com/rabbitstack/fibratus/pkg/api"
 	"github.com/rabbitstack/fibratus/pkg/cap"
+	"github.com/rabbitstack/fibratus/pkg/client"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/filament"
 	"github.com/rabbitstack/fibratus/pkg/filter"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/rules"
+	"github.com/rabbitstack/fibratus/pkg/ruleset"
 	"github.com/rabbitstack/fibratus/pkg/symbolize"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
@@ -40,7 +44,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/yara"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
-	"os"
 )
 
 // ErrAlreadyRunning signals a Fibratus process is already running in the system
@@ -55,6 +58,7 @@ type App struct {
 	evs        *EventSourceControl
 	symbolizer *symbolize.Symbolizer
 	engine     *rules.Engine
+	loader     *rules.Loader
 	hsnap      handle.Snapshotter
 	psnap      ps.Snapshotter
 	filament   filament.Filament
@@ -62,6 +66,11 @@ type App struct {
 	writer     cap.Writer
 	reader     cap.Reader
 	signals    chan struct{}
+	// client is responsible for communication with the server
+	client client.Client
+
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 // Option enables changing the behaviour of the bootstrap application.
@@ -136,29 +145,8 @@ func NewApp(cfg *config.Config, options ...Option) (*App, error) {
 	hsnap := handle.NewSnapshotter(cfg, opts.handleSnapshotFn)
 	psnap := ps.NewSnapshotter(hsnap, cfg)
 
-	var engine *rules.Engine
-	var rs *config.RulesCompileResult
-
-	if cfg.Filters.Rules.Enabled && !cfg.ForwardMode && !cfg.IsCaptureSet() && !cfg.IsFilamentSet() {
-		engine = rules.NewEngine(psnap, cfg)
-		var err error
-		rs, err = engine.Compile()
-		if err != nil {
-			return nil, err
-		}
-		if rs != nil {
-			log.Infof("rules compile summary: %s", rs)
-		}
-	} else {
-		log.Info("rule engine is disabled")
-	}
-
-	evs := NewEventSourceControl(psnap, hsnap, cfg, rs)
-
 	app := &App{
 		config:  cfg,
-		evs:     evs,
-		engine:  engine,
 		hsnap:   hsnap,
 		psnap:   psnap,
 		signals: sigs,
@@ -172,10 +160,10 @@ func NewApp(cfg *config.Config, options ...Option) (*App, error) {
 // spin up a filament or set up the aggregator to start forwarding events
 // to the rule engine and output sinks.
 func (f *App) Run(args []string) error {
-	if f.evs == nil {
-		panic("event source is nil")
-	}
 	cfg := f.config
+	f.ctx, f.cancel = context.WithCancel(context.Background())
+	signals.SetCancelFunc(f.cancel)
+	defer f.cancel()
 
 	if !f.isSingleInstance() {
 		return ErrAlreadyRunning
@@ -183,6 +171,56 @@ func (f *App) Run(args []string) error {
 
 	log.Infof("bootstrapping with pid %d. Version: %s", os.Getpid(), version.Get())
 	log.Infof("configuration options: %s", cfg.Print())
+
+	if cfg.Server.Enabled && !f.config.IsCaptureSet() && !f.config.IsFilamentSet() {
+		// try to establish the connection to the server
+		var err error
+		log.Infof("connecting to the server...")
+		f.client, err = client.New()
+		if err != nil {
+			return err
+		}
+	}
+
+	var rcr *ruleset.CompileResult
+
+	if f.isEngineEnabled() {
+		var opts []rules.LoaderOption
+
+		if cfg.Server.Enabled {
+			opts = append(opts, rules.WithRemoteStore())
+		} else {
+			opts = append(
+				opts,
+				rules.WithRulePaths(cfg.Filters.Rules.FromPaths...),
+				rules.WithMacroPaths(cfg.Filters.Macros.FromPaths...),
+			)
+		}
+
+		// configure the loader to load local or remote rules
+		if f.client != nil {
+			f.loader = rules.NewLoaderWithClient(f.client)
+		} else {
+			f.loader = rules.NewLoader()
+		}
+		rs, err := f.loader.Load(f.ctx, opts...)
+		if err != nil {
+			return err
+		}
+		// build the rule engine and compile rules
+		f.engine = rules.NewEngine(f.psnap, cfg)
+		rcr, err = f.engine.Compile(rs)
+		if err != nil {
+			return err
+		}
+		if rcr != nil {
+			log.Infof("rules compile summary: %s", rcr)
+		}
+		// register rule engine subscriber
+		f.loader.RegisterSubscriber(f.engine)
+	}
+
+	f.evs = NewEventSourceControl(f.psnap, f.hsnap, cfg, rcr)
 
 	// build the filter from the CLI argument. If we got
 	// a valid expression the filter is attached to the
@@ -250,6 +288,7 @@ func (f *App) Run(args []string) error {
 			}
 			f.evs.RegisterEventListener(scanner)
 		}
+
 		err = f.evs.Open(cfg)
 		if err != nil {
 			return multierror.Wrap(err, f.evs.Close())
@@ -273,9 +312,7 @@ func (f *App) Run(args []string) error {
 
 // WriteCapture writes the event stream to the capture file.
 func (f *App) WriteCapture(args []string) error {
-	if f.evs == nil {
-		panic("event source is nil")
-	}
+	f.evs = NewEventSourceControl(f.psnap, f.hsnap, f.config, nil)
 
 	if !f.isSingleInstance() {
 		return ErrAlreadyRunning
@@ -427,6 +464,11 @@ func (f *App) stop() {
 	if f.signals != nil {
 		f.signals <- struct{}{}
 	}
+}
+
+// isEngineEnabled determines if the rule engine is enabled.
+func (f *App) isEngineEnabled() bool {
+	return f.config.Filters.Rules.Enabled && !f.config.ForwardMode && !f.config.IsCaptureSet() && !f.config.IsFilamentSet()
 }
 
 // isSingleInstance checks if there is a single instance

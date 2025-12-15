@@ -78,7 +78,7 @@ func (c *Config) tryLoadOutput() error {
 		switch outputs.TypeFromString(typ) {
 		case outputs.Console:
 			var consoleConfig console.Config
-			if err := decode(config, &consoleConfig); err != nil {
+			if err := Decode(config, &consoleConfig); err != nil {
 				return errOutputConfig(typ, err)
 			}
 			if !consoleConfig.Enabled {
@@ -88,7 +88,7 @@ func (c *Config) tryLoadOutput() error {
 
 		case outputs.AMQP:
 			var amqpConfig amqp.Config
-			if err := decode(config, &amqpConfig); err != nil {
+			if err := Decode(config, &amqpConfig); err != nil {
 				return errOutputConfig(typ, err)
 			}
 			if !amqpConfig.Enabled {
@@ -98,7 +98,7 @@ func (c *Config) tryLoadOutput() error {
 
 		case outputs.Elasticsearch:
 			var esConfig elasticsearch.Config
-			if err := decode(config, &esConfig); err != nil {
+			if err := Decode(config, &esConfig); err != nil {
 				return errOutputConfig(typ, err)
 			}
 			if !esConfig.Enabled {
@@ -108,7 +108,7 @@ func (c *Config) tryLoadOutput() error {
 
 		case outputs.HTTP:
 			var httpConfig http.Config
-			if err := decode(config, &httpConfig); err != nil {
+			if err := Decode(config, &httpConfig); err != nil {
 				return errOutputConfig(typ, err)
 			}
 			if !httpConfig.Enabled {
@@ -118,7 +118,7 @@ func (c *Config) tryLoadOutput() error {
 
 		case outputs.Eventlog:
 			var eventlogConfig eventlog.Config
-			if err := decode(config, &eventlogConfig); err != nil {
+			if err := Decode(config, &eventlogConfig); err != nil {
 				return errOutputConfig(typ, err)
 			}
 			if !eventlogConfig.Enabled {

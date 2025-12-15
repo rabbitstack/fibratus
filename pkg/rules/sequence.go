@@ -21,18 +21,19 @@ package rules
 import (
 	"context"
 	"expvar"
+	"sort"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	fsm "github.com/qmuntal/stateless"
-	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/filter"
 	"github.com/rabbitstack/fibratus/pkg/filter/ql"
 	"github.com/rabbitstack/fibratus/pkg/ps"
+	"github.com/rabbitstack/fibratus/pkg/ruleset"
 	log "github.com/sirupsen/logrus"
-	"sort"
-	"sync"
-	"sync/atomic"
-	"time"
 )
 
 const (
@@ -118,11 +119,11 @@ type sequenceState struct {
 	psnap ps.Snapshotter
 }
 
-func newSequenceState(f filter.Filter, c *config.FilterConfig, psnap ps.Snapshotter) *sequenceState {
+func newSequenceState(f filter.Filter, r *ruleset.Rule, psnap ps.Snapshotter) *sequenceState {
 	ss := &sequenceState{
 		filter:        f,
 		seq:           f.GetSequence(),
-		name:          c.Name,
+		name:          r.Name,
 		maxSpan:       f.GetSequence().MaxSpan,
 		partials:      make(map[int][]*event.Event),
 		states:        make(map[fsm.State]bool),

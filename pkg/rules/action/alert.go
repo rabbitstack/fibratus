@@ -20,15 +20,16 @@ package action
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
-	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/ruleset"
 	"github.com/rabbitstack/fibratus/pkg/util/markdown"
 	log "github.com/sirupsen/logrus"
-	"strings"
 )
 
 // Alert sends the rule alert via all configured alert senders.
-func Alert(ctx *config.ActionContext, title string, text string, severity string, tags []string) error {
+func Alert(ctx *ruleset.ActionContext, title string, text string, severity string, tags []string) error {
 	var b strings.Builder
 	for _, evt := range ctx.Events {
 		b.WriteString(evt.String())
@@ -49,10 +50,10 @@ func Alert(ctx *config.ActionContext, title string, text string, severity string
 			alertsender.ParseSeverityFromString(severity),
 		)
 
-		alert.ID = ctx.Filter.ID
+		alert.ID = ctx.Rule.ID
 		alert.Events = ctx.Events
-		alert.Labels = ctx.Filter.Labels
-		alert.Description = ctx.Filter.Description
+		alert.Labels = ctx.Rule.Labels
+		alert.Description = ctx.Rule.Description
 
 		// strip markdown if not supported by the sender
 		if !sender.SupportsMarkdown() {

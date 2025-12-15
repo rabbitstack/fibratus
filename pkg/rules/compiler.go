@@ -21,12 +21,14 @@ package rules
 import (
 	"expvar"
 	"fmt"
+
 	semver "github.com/hashicorp/go-version"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/filter"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/ps"
+	"github.com/rabbitstack/fibratus/pkg/ruleset"
 	"github.com/rabbitstack/fibratus/pkg/util/version"
 	log "github.com/sirupsen/logrus"
 )
@@ -61,38 +63,35 @@ func newCompiler(psnap ps.Snapshotter, config *config.Config) *compiler {
 	return &compiler{psnap: psnap, config: config}
 }
 
-func (c *compiler) compile() (map[*config.FilterConfig]filter.Filter, *config.RulesCompileResult, error) {
-	if err := c.config.Filters.LoadMacros(); err != nil {
-		return nil, nil, err
-	}
-	if err := c.config.Filters.LoadFilters(); err != nil {
-		return nil, nil, err
-	}
+func (c *compiler) compile(rs *ruleset.RuleSet) (map[*ruleset.Rule]filter.Filter, *ruleset.CompileResult, error) {
+	filtersCount.Set(0)
+	filters := make(map[*ruleset.Rule]filter.Filter)
 
-	filters := make(map[*config.FilterConfig]filter.Filter)
-
-	for _, f := range c.config.GetFilters() {
-		if f.IsDisabled() {
-			log.Warnf("[%s] rule is disabled", f.Name)
+	for _, r := range rs.Rules {
+		if !r.IsBehaviour() {
+			continue
+		}
+		if r.IsDisabled() {
+			log.Warnf("[%s] rule is disabled", r.Name)
 			continue
 		}
 
 		filtersCount.Add(1)
 
 		// compile the filter
-		fltr := filter.New(f.Condition, c.config, filter.WithPSnapshotter(c.psnap))
+		fltr := filter.New(r.Condition, c.config, rs, filter.WithPSnapshotter(c.psnap))
 		err := fltr.Compile()
 		if err != nil {
-			return nil, nil, ErrInvalidFilter(f.Name, err)
+			return nil, nil, ErrInvalidFilter(r.Name, err)
 		}
 		// check version requirements
 		if !version.IsDev() {
-			minEngineVer, err := semver.NewSemver(f.MinEngineVersion)
+			minEngineVer, err := semver.NewSemver(r.MinEngineVersion)
 			if err != nil {
-				return nil, nil, ErrMalformedMinEngineVer(f.Name, f.MinEngineVersion, err)
+				return nil, nil, ErrMalformedMinEngineVer(r.Name, r.MinEngineVersion, err)
 			}
 			if minEngineVer.GreaterThan(version.Sem()) {
-				return nil, nil, ErrIncompatibleFilter(f.Name, f.MinEngineVersion)
+				return nil, nil, ErrIncompatibleFilter(r.Name, r.MinEngineVersion)
 			}
 		}
 
@@ -104,7 +103,7 @@ func (c *compiler) compile() (map[*config.FilterConfig]filter.Filter, *config.Ru
 					"was deprecated starting from version %s. "+
 					"Please consider migrating to %s field(s) "+
 					"because [%s] will be removed in future versions.",
-					f.Name, field.Name, d.Since, d.Fields, field.Name)
+					r.Name, field.Name, d.Since, d.Fields, field.Name)
 			}
 		}
 
@@ -114,17 +113,17 @@ func (c *compiler) compile() (map[*config.FilterConfig]filter.Filter, *config.Ru
 				switch field {
 				case fields.EvtName, fields.KevtName:
 					if !event.IsKnown(v) {
-						return nil, nil, ErrUnknownEventName(f.Name, v)
+						return nil, nil, ErrUnknownEventName(r.Name, v)
 					}
 				case fields.EvtCategory, fields.KevtCategory:
 					if !event.IsCategoryKnown(v) {
-						return nil, nil, ErrUnknownCategoryName(f.Name, v)
+						return nil, nil, ErrUnknownCategoryName(r.Name, v)
 					}
 				}
 			}
 		}
 
-		filters[f] = fltr
+		filters[r] = fltr
 	}
 
 	if len(filters) == 0 {
@@ -134,8 +133,8 @@ func (c *compiler) compile() (map[*config.FilterConfig]filter.Filter, *config.Ru
 	return filters, c.buildCompileResult(filters), nil
 }
 
-func (c *compiler) buildCompileResult(filters map[*config.FilterConfig]filter.Filter) *config.RulesCompileResult {
-	rs := &config.RulesCompileResult{}
+func (c *compiler) buildCompileResult(filters map[*ruleset.Rule]filter.Filter) *ruleset.CompileResult {
+	rs := &ruleset.CompileResult{}
 
 	m := make(map[event.Type]bool)
 	events := make([]event.Type, 0)

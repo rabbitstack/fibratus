@@ -23,19 +23,20 @@ package ql
 import (
 	"errors"
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/config"
-	"github.com/rabbitstack/fibratus/pkg/filter/fields"
-	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"net"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/rabbitstack/fibratus/pkg/filter/fields"
+	"github.com/rabbitstack/fibratus/pkg/ruleset"
+	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 )
 
 // Parser builds the binary expression tree from the filter string.
 type Parser struct {
 	s    *bufScanner
-	c    *config.Filters
+	rs   *ruleset.RuleSet
 	expr string
 }
 
@@ -44,9 +45,9 @@ func NewParser(expr string) *Parser {
 	return &Parser{s: newBufScanner(strings.NewReader(expr)), expr: expr}
 }
 
-// NewParserWithConfig builds a new parser instance with filters config.
-func NewParserWithConfig(expr string, config *config.Filters) *Parser {
-	return &Parser{s: newBufScanner(strings.NewReader(expr)), expr: expr, c: config}
+// NewParserWithRuleSet builds a new parser instance with ruleset.
+func NewParserWithRuleSet(expr string, rs *ruleset.RuleSet) *Parser {
+	return &Parser{s: newBufScanner(strings.NewReader(expr)), expr: expr, rs: rs}
 }
 
 // ParseSequence parses the collection of binary expressions with possible join
@@ -194,7 +195,7 @@ func (p *Parser) ParseExpr() (Expr, error) {
 			// expect LPAREN after in
 			tok, pos, lit := p.scanIgnoreWhitespace()
 			p.unscan()
-			if tok != Lparen && (p.c != nil && !p.c.IsMacroList(lit)) {
+			if tok != Lparen && (p.rs != nil && !p.rs.IsMacroList(lit)) {
 				return nil, newParseError(tokstr(op, lit), []string{"'('"}, pos, p.expr)
 			}
 		}
@@ -304,11 +305,11 @@ func (p *Parser) parseUnaryExpr() (Expr, error) {
 		p.unscan()
 
 		// expand macros
-		if p.c != nil {
-			macro := p.c.GetMacro(lit)
+		if p.rs != nil {
+			macro := p.rs.GetMacro(lit)
 			if macro != nil {
 				if macro.Expr != "" {
-					p := NewParserWithConfig(macro.Expr, p.c)
+					p := NewParserWithRuleSet(macro.Expr, p.rs)
 					expr, err := p.ParseExpr()
 					if err != nil {
 						return nil, multierror.WrapWithSeparator("\n", fmt.Errorf("syntax error in %q macro", lit), err)

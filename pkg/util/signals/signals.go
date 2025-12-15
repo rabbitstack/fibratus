@@ -19,11 +19,14 @@
 package signals
 
 import (
-	log "github.com/sirupsen/logrus"
-	"golang.org/x/sys/windows"
 	"os"
 	"os/signal"
+
+	log "github.com/sirupsen/logrus"
+	"golang.org/x/sys/windows"
 )
+
+var f func()
 
 // Install setups the signal handler. Returns a blocking
 // channel which receives an input after Interrupt or Term
@@ -37,8 +40,17 @@ func Install() chan struct{} {
 	go func() {
 		sig := <-sigCh
 		log.Infof("got signal %q, shutting down...", sig)
+		if f != nil {
+			f()
+		}
 		stopCh <- struct{}{}
 	}()
 
 	return stopCh
+}
+
+// SetCancelFunc assigns a function to be invoked
+// when the signal is broadcast.
+func SetCancelFunc(fn func()) {
+	f = fn
 }

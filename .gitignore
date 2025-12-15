@@ -7,9 +7,12 @@ cmd/systray/fibratus-systray.syso
 pkg/outputs/eventlog/mc/*
 !pkg/outputs/eventlog/mc/gen.go
 
+api/protobuf/*
+
 build/msi/fibratus-*
 build/msi/*.wixpdb
 build/msi/*.msi
 
 .idea
+.zed
 filaments/__pycache__

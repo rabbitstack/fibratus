@@ -21,27 +21,29 @@ package rules
 import (
 	"expvar"
 	"fmt"
+	"sync"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/filter"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/rules/action"
+	"github.com/rabbitstack/fibratus/pkg/ruleset"
 	log "github.com/sirupsen/logrus"
-	"sync"
-	"time"
 )
 
 // RuleMatchFunc is rule match function definition. It accepts
 // the filter (rule) config and the group of events that fired
 // the rule
-type RuleMatchFunc func(f *config.FilterConfig, evts ...*event.Event)
+type RuleMatchFunc func(*ruleset.Rule, ...*event.Event)
 
 var (
 	// sequenceGcInterval determines how often sequence GC kicks in
 	sequenceGcInterval = time.Minute
 
-	filterMatches = expvar.NewMap("filter.matches")
+	ruleMatches = expvar.NewMap("rule.matches")
 
 	ErrRuleAction = func(rule string, err error) error {
 		return fmt.Errorf("fail to execute action for %q rule: %v", rule, err)
@@ -52,6 +54,7 @@ var (
 // the collection of compiled filters that are derived
 // from the loaded ruleset.
 type Engine struct {
+	sync.RWMutex
 	filters *filterset
 	config  *config.Config
 	psnap   ps.Snapshotter
@@ -68,12 +71,12 @@ type Engine struct {
 }
 
 type ruleMatch struct {
-	ctx *config.ActionContext
+	ctx *ruleset.ActionContext
 }
 
 type compiledFilter struct {
 	filter filter.Filter
-	config *config.FilterConfig
+	rule   *ruleset.Rule
 	ss     *sequenceState
 }
 
@@ -102,8 +105,13 @@ func (f *filterset) collect(e *event.Event) []*compiledFilter {
 	return append(f.types[e.Type], f.categories[e.Category.Index()]...)
 }
 
-func newCompiledFilter(f filter.Filter, c *config.FilterConfig, ss *sequenceState) *compiledFilter {
-	return &compiledFilter{filter: f, config: c, ss: ss}
+func (f *filterset) clear() {
+	f.types = make(map[event.Type][]*compiledFilter)
+	f.categories = make(map[uint8][]*compiledFilter)
+}
+
+func newCompiledFilter(f filter.Filter, r *ruleset.Rule, ss *sequenceState) *compiledFilter {
+	return &compiledFilter{filter: f, rule: r, ss: ss}
 }
 
 // isScoped determines if this filter is scoped, i.e. it has the event name or category
@@ -129,15 +137,15 @@ func (f *compiledFilter) run(e *event.Event) bool {
 }
 
 // NewEngine builds a fresh rules engine instance.
-func NewEngine(psnap ps.Snapshotter, config *config.Config) *Engine {
+func NewEngine(psnap ps.Snapshotter, c *config.Config) *Engine {
 	e := &Engine{
 		filters:   newFilterset(),
 		matches:   make([]*ruleMatch, 0),
 		sequences: make([]*sequenceState, 0),
 		psnap:     psnap,
-		config:    config,
+		config:    c,
 		scavenger: time.NewTicker(sequenceGcInterval),
-		compiler:  newCompiler(psnap, config),
+		compiler:  newCompiler(psnap, c),
 	}
 
 	go e.gcSequences()
@@ -154,22 +162,25 @@ func (e *Engine) gcSequences() {
 	}
 }
 
-// Compile loads macros/rules and builds an indexable filter set.
+// Compile builds an indexable filter set from the given ruleset.
 // For every rule in the ruleset the condition is compiled and
 // converted into a filter. The filter is indexed by either the
 // event name or event category.
-func (e *Engine) Compile() (*config.RulesCompileResult, error) {
-	filters, rs, err := e.compiler.compile()
+func (e *Engine) Compile(rs *ruleset.RuleSet) (*ruleset.CompileResult, error) {
+	filters, rcr, err := e.compiler.compile(rs)
 	if err != nil {
 		return nil, err
 	}
 
-	for c, f := range filters {
+	e.Lock()
+	defer e.Unlock()
+	e.filters.clear()
+	for r, f := range filters {
 		var ss *sequenceState
 		if f.IsSequence() {
-			ss = newSequenceState(f, c, e.psnap)
+			ss = newSequenceState(f, r, e.psnap)
 		}
-		fltr := newCompiledFilter(f, c, ss)
+		fltr := newCompiledFilter(f, r, ss)
 		if ss != nil {
 			// store the sequences in engine
 			// for more convenient tracking
@@ -183,7 +194,7 @@ func (e *Engine) Compile() (*config.RulesCompileResult, error) {
 				"the engine. Please consider narrowing the "+
 				"scope of the rule by including the `evt.name` "+
 				"or `evt.category` condition",
-				c.Name)
+				r.Name)
 			continue
 		}
 
@@ -206,7 +217,7 @@ func (e *Engine) Compile() (*config.RulesCompileResult, error) {
 		}
 	}
 
-	return rs, nil
+	return rcr, nil
 }
 
 func (e *Engine) RegisterMatchFunc(fn RuleMatchFunc) {
@@ -220,10 +231,6 @@ func (*Engine) CanEnqueue() bool { return true }
 // Filters can be simple direct-event matchers or sequence states that
 // track an ordered series of events over a short period of time.
 func (e *Engine) ProcessEvent(evt *event.Event) (bool, error) {
-	if e.filters.empty() {
-		return true, nil
-	}
-
 	if evt.IsTerminateProcess() {
 		// expire all sequences if the
 		// process referenced in any
@@ -233,7 +240,9 @@ func (e *Engine) ProcessEvent(evt *event.Event) (bool, error) {
 		}
 	}
 
+	e.RLock()
 	filters := e.filters.collect(evt)
+	e.RUnlock()
 
 	var matches bool
 	for _, f := range filters {
@@ -242,10 +251,10 @@ func (e *Engine) ProcessEvent(evt *event.Event) (bool, error) {
 			continue
 		}
 		if f.isSequence() {
-			e.appendMatch(f.config, f.ss.events()...)
+			e.appendMatch(f.rule, f.ss.events()...)
 			f.ss.clearLocked()
 		} else {
-			e.appendMatch(f.config, evt)
+			e.appendMatch(f.rule, evt)
 		}
 		err := e.processActions()
 		if err != nil {
@@ -275,30 +284,30 @@ func (e *Engine) processActions() error {
 	e.mmu.Lock()
 	defer e.mmu.Unlock()
 	for _, m := range e.matches {
-		f, evts := m.ctx.Filter, m.ctx.Events
-		filterMatches.Add(f.Name, 1)
-		log.Debugf("[%s] rule matched", f.Name)
-		err := action.Alert(m.ctx, f.Name, filter.InterpolateFields(f.Output, evts), f.Severity, f.Tags)
+		rule, evts := m.ctx.Rule, m.ctx.Events
+		ruleMatches.Add(rule.Name, 1)
+		log.Debugf("[%s] rule matched", rule.Name)
+		err := action.Alert(m.ctx, rule.Name, filter.InterpolateFields(rule.Output, evts), rule.Severity, rule.Tags)
 		if err != nil {
-			return ErrRuleAction(f.Name, err)
+			return ErrRuleAction(rule.Name, err)
 		}
 
-		actions, err := f.DecodeActions()
+		actions, err := rule.DecodeActions()
 		if err != nil {
 			return err
 		}
 
 		for _, act := range actions {
 			switch t := act.(type) {
-			case config.KillAction:
-				log.Infof("executing kill action: pids=%v rule=%s", m.ctx.UniquePids(), f.Name)
+			case ruleset.KillAction:
+				log.Infof("executing kill action: pids=%v rule=%s", m.ctx.UniquePids(), rule.Name)
 				if err := action.Kill(m.ctx.UniquePids()); err != nil {
-					return ErrRuleAction(f.Name, err)
+					return ErrRuleAction(rule.Name, err)
 				}
-			case config.IsolateAction:
-				log.Infof("executing isolate action: rule=%s", f.Name)
+			case ruleset.IsolateAction:
+				log.Infof("executing isolate action: rule=%s", rule.Name)
 				if err := action.Isolate(t.Whitelist); err != nil {
-					return ErrRuleAction(f.Name, err)
+					return ErrRuleAction(rule.Name, err)
 				}
 			}
 		}
@@ -307,22 +316,22 @@ func (e *Engine) processActions() error {
 	return nil
 }
 
-func (e *Engine) appendMatch(f *config.FilterConfig, evts ...*event.Event) {
+func (e *Engine) appendMatch(rule *ruleset.Rule, evts ...*event.Event) {
 	for _, evt := range evts {
-		evt.AddMeta(event.RuleNameKey, f.Name)
-		for k, v := range f.Labels {
+		evt.AddMeta(event.RuleNameKey, rule.Name)
+		for k, v := range rule.Labels {
 			evt.AddMeta(event.MetadataKey(k), v)
 		}
 	}
-	ctx := &config.ActionContext{
+	ctx := &ruleset.ActionContext{
 		Events: evts,
-		Filter: f,
+		Rule:   rule,
 	}
 	e.mmu.Lock()
 	defer e.mmu.Unlock()
 	e.matches = append(e.matches, &ruleMatch{ctx: ctx})
 	if e.matchFunc != nil {
-		e.matchFunc(f, evts...)
+		e.matchFunc(rule, evts...)
 	}
 }
 

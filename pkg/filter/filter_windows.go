@@ -20,11 +20,13 @@ package filter
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/filter/ql"
 	"github.com/rabbitstack/fibratus/pkg/ps"
-	"strings"
+	"github.com/rabbitstack/fibratus/pkg/ruleset"
 )
 
 type opts struct {
@@ -44,7 +46,7 @@ func WithPSnapshotter(psnap ps.Snapshotter) Option {
 // New creates a new filter with the specified filter expression. The consumers must ensure
 // the expression is correctly parsed before executing the filter. This is achieved by calling the
 // `Compile` method after constructing the filter.
-func New(expr string, config *config.Config, options ...Option) Filter {
+func New(expr string, config *config.Config, rs *ruleset.RuleSet, options ...Option) Filter {
 	var opts opts
 	for _, opt := range options {
 		opt(&opts)
@@ -57,8 +59,6 @@ func New(expr string, config *config.Config, options ...Option) Filter {
 		// PE metadata
 		newPEAccessor(),
 	}
-
-	fconfig := config.Filters
 
 	if config.EventSource.EnableThreadEvents {
 		accessors = append(accessors, newThreadAccessor())
@@ -89,8 +89,8 @@ func New(expr string, config *config.Config, options ...Option) Filter {
 	}
 
 	var parser *ql.Parser
-	if fconfig.HasMacros() {
-		parser = ql.NewParserWithConfig(expr, fconfig)
+	if rs != nil && rs.HasMacros() {
+		parser = ql.NewParserWithRuleSet(expr, rs)
 	} else {
 		parser = ql.NewParser(expr)
 	}
@@ -112,7 +112,7 @@ func NewFromCLI(args []string, config *config.Config) (Filter, error) {
 	if expr == "" {
 		return nil, nil
 	}
-	filter := New(expr, config)
+	filter := New(expr, config, nil)
 	if err := filter.Compile(); err != nil {
 		return nil, fmt.Errorf("bad filter:\n%v", err)
 	}

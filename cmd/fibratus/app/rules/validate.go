@@ -19,14 +19,15 @@
 package rules
 
 import (
+	"context"
 	"fmt"
+	"strings"
+
 	"github.com/enescakir/emoji"
 	"github.com/rabbitstack/fibratus/internal/bootstrap"
 	"github.com/rabbitstack/fibratus/pkg/filter"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/rules"
-	"path/filepath"
-	"strings"
 )
 
 type warning struct {
@@ -46,50 +47,25 @@ func validateRules() error {
 		return err
 	}
 
-	isValidExt := func(path string) bool {
-		return filepath.Ext(path) == ".yml" || filepath.Ext(path) == ".yaml"
-	}
-	// load macros and rules
-	for _, m := range cfg.Filters.Macros.FromPaths {
-		paths, err := filepath.Glob(m)
-		if err != nil {
-			return err
-		}
-		for _, path := range paths {
-			if !isValidExt(path) {
-				continue
-			}
-			emo("%v Loading macros from %s\n", emoji.Hook, path)
-		}
-	}
-	if err := cfg.Filters.LoadMacros(); err != nil {
-		return fmt.Errorf("%v %v", emoji.DisappointedFace, err)
-	}
+	loader := rules.NewLoader()
+	rs, err := loader.Load(
+		context.Background(),
+		rules.WithRulePaths(cfg.Filters.Rules.FromPaths...),
+		rules.WithMacroPaths(cfg.Filters.Macros.FromPaths...),
+	)
 
-	for _, r := range cfg.Filters.Rules.FromPaths {
-		paths, err := filepath.Glob(r)
-		if err != nil {
-			return err
-		}
-		for _, path := range paths {
-			if !isValidExt(path) {
-				continue
-			}
-			emo("%v Loading rule %s\n", emoji.Package, path)
-		}
-	}
-	if err := cfg.Filters.LoadFilters(); err != nil {
+	if err != nil {
 		return fmt.Errorf("%v %v", emoji.DisappointedFace, err)
 	}
-	if len(cfg.GetFilters()) == 0 {
+	if rs.IsEmpty() {
 		return fmt.Errorf("%v no rules found in %s", emoji.DisappointedFace, strings.Join(cfg.Filters.Rules.FromPaths, ","))
 	}
 
 	warnings := make([]warning, 0)
 
 	// validate rules
-	for _, rule := range cfg.GetFilters() {
-		f := filter.New(rule.Condition, cfg)
+	for _, rule := range rs.Rules {
+		f := filter.New(rule.Condition, cfg, rs)
 		err := f.Compile()
 		if err != nil {
 			return fmt.Errorf("%v %v", emoji.DisappointedFace, rules.ErrInvalidFilter(rule.Name, err))

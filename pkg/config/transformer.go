@@ -20,13 +20,14 @@ package config
 
 import (
 	"fmt"
+	"reflect"
+
 	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers"
 	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers/remove"
 	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers/rename"
 	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers/replace"
 	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers/tags"
 	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers/trim"
-	"reflect"
 )
 
 var errTransformerConfig = func(t string, err error) error { return fmt.Errorf("%s transformer invalid config: %v", t, err) }
@@ -47,7 +48,7 @@ func (c *Config) tryLoadTransformers() error {
 		switch typ {
 		case "remove":
 			var removeConfig remove.Config
-			if err := decode(config, &removeConfig); err != nil {
+			if err := Decode(config, &removeConfig); err != nil {
 				return errTransformerConfig(typ, err)
 			}
 			if !removeConfig.Enabled {
@@ -61,7 +62,7 @@ func (c *Config) tryLoadTransformers() error {
 
 		case "rename":
 			var renameConfig rename.Config
-			if err := decode(config, &renameConfig); err != nil {
+			if err := Decode(config, &renameConfig); err != nil {
 				return errTransformerConfig(typ, err)
 			}
 			if !renameConfig.Enabled {
@@ -75,7 +76,7 @@ func (c *Config) tryLoadTransformers() error {
 
 		case "replace":
 			var replaceConfig replace.Config
-			if err := decode(config, &replaceConfig); err != nil {
+			if err := Decode(config, &replaceConfig); err != nil {
 				return errTransformerConfig(typ, err)
 			}
 			if !replaceConfig.Enabled {
@@ -89,7 +90,7 @@ func (c *Config) tryLoadTransformers() error {
 
 		case "trim":
 			var trimConfig trim.Config
-			if err := decode(config, &trimConfig); err != nil {
+			if err := Decode(config, &trimConfig); err != nil {
 				return errTransformerConfig(typ, err)
 			}
 			if !trimConfig.Enabled {
@@ -103,7 +104,7 @@ func (c *Config) tryLoadTransformers() error {
 
 		case "tags":
 			var tagsConfig tags.Config
-			if err := decode(config, &tagsConfig); err != nil {
+			if err := Decode(config, &tagsConfig); err != nil {
 				return errTransformerConfig(typ, err)
 			}
 			if !tagsConfig.Enabled {

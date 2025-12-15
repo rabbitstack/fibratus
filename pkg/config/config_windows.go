@@ -21,9 +21,10 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"time"
+
 	"github.com/rabbitstack/fibratus/internal/evasion"
 	"golang.org/x/sys/windows"
-	"time"
 
 	"github.com/rabbitstack/fibratus/pkg/outputs/eventlog"
 
@@ -123,11 +124,15 @@ type Config struct {
 	// Alertsenders stores alert sender configurations
 	Alertsenders []alertsender.Config
 
-	// Filters contains filter/rule definitions
-	Filters *Filters `json:"filters" yaml:"filters"`
+	// Filters contains filter/rule properties such as
+	// file paths or knobs for controlling the rule engine
+	Filters *FiltersConfig `json:"filters" yaml:"filters"`
 
-	// Evasion controls the detection of evasion behaviours.
+	// Evasion controls the detection of evasion behaviours
 	Evasion evasion.Config `json:"evasion" yaml:"evasion"`
+
+	// ServerConfig describes Fibratus server configuration
+	Server ServerConfig `json:"server" yaml:"server"`
 
 	flags *pflag.FlagSet
 	viper *viper.Viper
@@ -211,7 +216,8 @@ func NewWithOpts(options ...Option) *Config {
 		PE:          pe.Config{},
 		Log:         log.Config{},
 		Aggregator:  aggregator.Config{},
-		Filters:     &Filters{},
+		Filters:     &FiltersConfig{},
+		Server:      ServerConfig{Enabled: true},
 		viper:       v,
 		flags:       flagSet,
 		opts:        opts,
@@ -252,14 +258,6 @@ func NewWithOpts(options ...Option) *Config {
 // GetConfigFile gets the path of the configuration file from Viper value.
 func (c Config) GetConfigFile() string {
 	return c.viper.GetString(configFile)
-}
-
-// GetFilters returns all rule filters loaded into the engine.
-func (c Config) GetFilters() []*FilterConfig {
-	if c.Filters == nil {
-		return nil
-	}
-	return c.Filters.filters
 }
 
 // MustViperize adds the flag set to the Cobra command and binds them within the Viper flags.
@@ -395,7 +393,6 @@ func (c *Config) addFlags() {
 		c.flags.Bool(rulesEnabled, true, "Indicates if the rule engine is enabled and rules loaded")
 		c.flags.StringSlice(rulesFromPaths, []string{filepath.Join(dir, "*")}, "Comma-separated list of rules files")
 		c.flags.StringSlice(macrosFromPaths, []string{filepath.Join(dir, "Macros", "*")}, "Comma-separated list of macro files")
-		c.flags.StringSlice(rulesFromURLs, []string{}, "Comma-separated list of rules URL resources")
 		c.flags.Bool(matchAll, true, "Indicates if the match all strategy is enabled for the rule engine. If the match all strategy is enabled, a single event can trigger multiple rules")
 	}
 	if c.opts.capture {

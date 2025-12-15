@@ -15,6 +15,7 @@ set PYTHON_VER=3.7.9
 set PYTHON_URL=https://www.python.org/ftp/python/%PYTHON_VER%/python-%PYTHON_VER%-embed-amd64.zip
 
 set WIX_VERSION=5.0.0
+set BUF_VERSION=1.59.0
 
 set GOBIN=%USERPROFILE%\go\bin
 
@@ -56,6 +57,7 @@ if "%~1"=="install" goto install
 if "%~1"=="deps" goto deps
 if "%~1"=="rsrc" goto rsrc
 if "%~1"=="mc" goto mc
+if "%~1"=="install-buf" goto install-buf
 
 :build
 :: set PKG_CONFIG_PATH=pkg-config
@@ -209,6 +211,10 @@ echo Installing Fibratus...
 start /b /wait msiexec /i fibratus-0.0.0-amd64.msi /qn /l*! install.log
 timeout 2 > NUL
 type install.log
+goto :EOF
+
+:install-buf
+go install github.com/bufbuild/buf/cmd/buf@v%BUF_VERSION% || goto :fail
 goto :EOF
 
 :fail
