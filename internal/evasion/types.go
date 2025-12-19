@@ -21,11 +21,11 @@ package evasion
 import "github.com/rabbitstack/fibratus/pkg/event"
 
 // Type is the alias for the evasion technique type.
-type Type uint8
+type Type uint32
 
 const (
 	// DirectSyscall represents the direct syscall evasion.
-	DirectSyscall Type = iota
+	DirectSyscall Type = 1 << iota
 	// IndirectSyscall represents the indirect syscall evasion.
 	IndirectSyscall
 )
@@ -47,8 +47,10 @@ type Evasion interface {
 	// Eval executes the evasion logic. The evasion detector usually accesses
 	// the callstack from the given event to determine if any evasions are
 	// performed on behalf of the process. If the evasion is recognized, this
-	// method return true, or false otherwise.
+	// method returns true, or false otherwise.
 	Eval(*event.Event) (bool, error)
 	// Type returns the type of the evasion technique.
 	Type() Type
+	// SetMask sets the type in the event evasions bitmask.
+	SetMask(*event.Event)
 }

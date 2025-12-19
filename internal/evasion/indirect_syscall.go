@@ -160,3 +160,7 @@ func (i *indirectSyscall) Eval(e *event.Event) (bool, error) {
 }
 
 func (*indirectSyscall) Type() Type { return IndirectSyscall }
+
+func (*indirectSyscall) SetMask(e *event.Event) {
+	e.Evasions |= uint32(IndirectSyscall)
+}
