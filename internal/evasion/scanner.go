@@ -35,19 +35,21 @@ var evasionsCount expvar.Map
 // that yields the evasion techniques, such as direct syscall.
 type Scanner struct {
 	evasions []Evasion
+	config   Config
 }
 
 // NewScanner instantiates the new evasion scanner.
 func NewScanner(config Config) *Scanner {
 	s := &Scanner{
 		evasions: make([]Evasion, 0),
+		config:   config,
 	}
 
 	if config.EnableDirectSyscall {
-		s.registerEvasion(NewDirectSyscall())
+		s.addEvasion(NewDirectSyscall())
 	}
 	if config.EnableIndirectSyscall {
-		s.registerEvasion(NewIndirectSyscall())
+		s.addEvasion(NewIndirectSyscall())
 	}
 
 	return s
@@ -71,8 +73,9 @@ func (s *Scanner) ProcessEvent(e *event.Event) (bool, error) {
 		}
 		if matches {
 			enq = true
-			e.AddSliceMetaOrAppend(event.EvasionsKey, evasion.Type().String())
+			evasion.SetMask(e)
 			evasionsCount.Add(evasion.Type().String(), 1)
+			e.AddOrAppendMetaSlice(event.EvasionsKey, evasion.Type().String())
 			log.Debugf("detected evasion %q on event [%s] and callstack [%s]", evasion.Type(), e, e.Callstack)
 		}
 	}
@@ -82,6 +85,8 @@ func (s *Scanner) ProcessEvent(e *event.Event) (bool, error) {
 
 func (s *Scanner) CanEnqueue() bool { return false }
 
-func (s *Scanner) registerEvasion(evasion Evasion) {
-	s.evasions = append(s.evasions, evasion)
+func (s *Scanner) addEvasion(evasion Evasion) {
+	if s.config.Enabled {
+		s.evasions = append(s.evasions, evasion)
+	}
 }

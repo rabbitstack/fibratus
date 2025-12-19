@@ -362,6 +362,12 @@ const (
 	EvtNparams Field = "evt.nparams"
 	// EvtArg represents the field sequence for generic argument access
 	EvtArg Field = "evt.arg"
+	// EvtIsDirectSyscall represents the field that designates if this event is
+	// performing a direct syscall.
+	EvtIsDirectSyscall Field = "evt.is_direct_syscall"
+	// EvtIsIndirectSyscall represents the field that designates if this event is
+	// performing an indirect syscall.
+	EvtIsIndirectSyscall Field = "evt.is_indirect_syscall"
 
 	// KevtSeq is the event sequence number
 	KevtSeq Field = "kevt.seq"
@@ -839,6 +845,9 @@ var fields = map[Field]FieldInfo{
 		}
 		return true
 	}}},
+	EvtIsDirectSyscall:   {EvtIsDirectSyscall, "indicates if the event is performing a direct syscall", params.Bool, []string{"evt.is_direct_syscall = true"}, nil, nil},
+	EvtIsIndirectSyscall: {EvtIsIndirectSyscall, "indicates if the event is performing an indirect syscall", params.Bool, []string{"evt.is_indirect_syscall = true"}, nil, nil},
+
 	KevtSeq:         {KevtSeq, "event sequence number", params.Uint64, []string{"kevt.seq > 666"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtSeq}}, nil},
 	KevtPID:         {KevtPID, "process identifier generating the event", params.Uint32, []string{"kevt.pid = 6"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtPID}}, nil},
 	KevtTID:         {KevtTID, "thread identifier generating the event", params.Uint32, []string{"kevt.tid = 1024"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtTID}}, nil},

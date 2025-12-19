@@ -19,14 +19,15 @@
 package evasion
 
 import (
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/callstack"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/stretchr/testify/require"
-	"strings"
-	"testing"
-	"time"
 )
 
 func TestScannerProcessEvent(t *testing.T) {
@@ -66,6 +67,7 @@ func TestScannerProcessEvent(t *testing.T) {
 			require.NoError(t, err)
 			require.True(t, matches && len(tt.expectedEvasions) > 0)
 			if len(tt.expectedEvasions) > 0 {
+				require.True(t, tt.evt.Evasions&uint32(DirectSyscall) != 0)
 				require.True(t, tt.evt.ContainsMeta(event.EvasionsKey))
 				require.Equal(t, tt.expectedEvasions, tt.evt.GetMeta(event.EvasionsKey).([]string))
 			}

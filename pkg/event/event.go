@@ -20,13 +20,14 @@ package event
 
 import (
 	"fmt"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/callstack"
 	capver "github.com/rabbitstack/fibratus/pkg/cap/version"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
-	"strings"
-	"sync"
-	"time"
 )
 
 // TimestampFormat is the Go valid format for the event timestamp
@@ -73,6 +74,8 @@ type Event struct {
 	PID uint32 `json:"pid"`
 	// Tid is the thread identifier of the thread that generated the event.
 	Tid uint32 `json:"tid"`
+	// Evasions is the bitmask that stores detected evasion types on this event.
+	Evasions uint32 `json:"-"`
 	// Type is the internal representation of the event. This field should be ignored by serializers.
 	Type Type `json:"-"`
 	// CPU designates the processor logical core where the event was originated.
@@ -245,9 +248,9 @@ func (e *Event) AddMeta(k MetadataKey, v any) {
 	e.Metadata[k] = v
 }
 
-// AddSliceMetaOrAppend puts the provided string into the slice if the key
+// AddOrAppendMetaSlice puts the provided string into the slice if the key
 // doesn't exist or appends the string to the slice.
-func (e *Event) AddSliceMetaOrAppend(k MetadataKey, s string) {
+func (e *Event) AddOrAppendMetaSlice(k MetadataKey, s string) {
 	if e.ContainsMeta(k) {
 		v := append(e.GetMeta(k).([]string), s)
 		e.AddMeta(k, v)

@@ -20,12 +20,14 @@ package filter
 
 import (
 	"errors"
-	"github.com/rabbitstack/fibratus/pkg/event"
-	"github.com/rabbitstack/fibratus/pkg/event/params"
-	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"net"
 	"reflect"
 	"time"
+
+	"github.com/rabbitstack/fibratus/internal/evasion"
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
+	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 )
 
 var (
@@ -136,6 +138,10 @@ func (*evtAccessor) Get(f Field, evt *event.Event) (params.Value, error) {
 		default:
 			return evt.GetParamAsString(name), nil
 		}
+	case fields.EvtIsDirectSyscall:
+		return evt.Evasions&uint32(evasion.DirectSyscall) != 0, nil
+	case fields.EvtIsIndirectSyscall:
+		return evt.Evasions&uint32(evasion.IndirectSyscall) != 0, nil
 	}
 
 	return nil, nil

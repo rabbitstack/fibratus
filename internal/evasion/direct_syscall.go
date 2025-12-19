@@ -68,3 +68,7 @@ func (d *directSyscall) Eval(e *event.Event) (bool, error) {
 }
 
 func (*directSyscall) Type() Type { return DirectSyscall }
+
+func (*directSyscall) SetMask(e *event.Event) {
+	e.Evasions |= uint32(DirectSyscall)
+}

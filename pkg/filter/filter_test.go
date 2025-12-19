@@ -19,7 +19,15 @@
 package filter
 
 import (
+	"net"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+	"unsafe"
+
 	"github.com/rabbitstack/fibratus/internal/etw/processors"
+	"github.com/rabbitstack/fibratus/internal/evasion"
 	"github.com/rabbitstack/fibratus/pkg/callstack"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
@@ -36,12 +44,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
-	"net"
-	"os"
-	"path/filepath"
-	"testing"
-	"time"
-	"unsafe"
 )
 
 var cfg = &config.Config{
@@ -747,6 +749,7 @@ func TestEventFilter(t *testing.T) {
 		Category:    event.File,
 		Host:        "archrabbit",
 		Description: "Creates or opens a new file, directory, I/O device, pipe, console",
+		Evasions:    uint32(evasion.IndirectSyscall),
 		Params: event.Params{
 			params.ProcessID:     {Name: params.ProcessID, Type: params.PID, Value: uint32(3434)},
 			params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
@@ -775,6 +778,8 @@ func TestEventFilter(t *testing.T) {
 		{`evt.arg[file_path] = '\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll'`, true},
 		{`evt.arg[type] = 'file'`, true},
 		{`evt.arg[pid] = 3434`, true},
+		{`evt.is_direct_syscall = false`, true},
+		{`evt.is_indirect_syscall`, true},
 
 		{`evt.desc contains 'Creates or opens a new file'`, true},
 
