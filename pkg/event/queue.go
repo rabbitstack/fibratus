@@ -20,14 +20,7 @@ package event
 
 import (
 	"expvar"
-	"github.com/golang/groupcache/lru"
-	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 )
-
-// backlogCacheSize specifies the max size of the backlog cache.
-// When the backlog cache size is reached, the oldest entries are
-// removed from the cache.
-const backlogCacheSize = 800
 
 // eventsEnqueued counts the number of events that are pushed to the queue
 var eventsEnqueued = expvar.NewInt("eventsource.events.enqueued")
@@ -52,7 +45,6 @@ type Listener interface {
 type Queue struct {
 	q               chan *Event
 	listeners       []Listener
-	backlog         *backlog
 	decorator       *StackwalkDecorator
 	stackEnrichment bool
 	enqueueAlways   bool
@@ -63,7 +55,6 @@ func NewQueue(size int, stackEnrichment bool, enqueueAlways bool) *Queue {
 	q := &Queue{
 		q:               make(chan *Event, size),
 		listeners:       make([]Listener, 0),
-		backlog:         newBacklog(backlogCacheSize),
 		stackEnrichment: stackEnrichment,
 		enqueueAlways:   enqueueAlways,
 	}
@@ -76,7 +67,6 @@ func NewQueueWithChannel(ch chan *Event, stackEnrichment bool, enqueueAlways boo
 	q := &Queue{
 		q:               ch,
 		listeners:       make([]Listener, 0),
-		backlog:         newBacklog(backlogCacheSize),
 		stackEnrichment: stackEnrichment,
 		enqueueAlways:   enqueueAlways,
 	}
@@ -128,14 +118,6 @@ func (q *Queue) Push(e *Event) error {
 			e = q.decorator.Pop(e)
 		}
 	}
-	if isEventDelayed(e) {
-		q.backlog.put(e)
-		return nil
-	}
-	evt := q.backlog.pop(e)
-	if evt != nil {
-		return multierror.Wrap(q.push(evt), q.push(e))
-	}
 	// drop stack walk events
 	if e.IsStackWalk() {
 		return nil
@@ -167,43 +149,3 @@ func (q *Queue) push(e *Event) error {
 	}
 	return nil
 }
-
-func isEventDelayed(e *Event) bool {
-	return e.IsCreateHandle()
-}
-
-type backlog struct {
-	cache *lru.Cache
-}
-
-func newBacklog(size int) *backlog {
-	return &backlog{cache: lru.New(size)}
-}
-
-func (b *backlog) put(evt *Event) {
-	if b.cache.Len() > backlogCacheSize {
-		b.cache.RemoveOldest()
-	}
-	key := evt.BacklogKey()
-	if key != 0 {
-		b.cache.Add(key, evt)
-	}
-}
-
-func (b *backlog) pop(evt *Event) *Event {
-	key := evt.BacklogKey()
-	if key == 0 {
-		return nil
-	}
-	ev, ok := b.cache.Get(key)
-	if !ok {
-		return nil
-	}
-	b.cache.Remove(key)
-	e := ev.(*Event)
-	e.CopyState(evt)
-	return e
-}
-
-func (b *backlog) size() int   { return b.cache.Len() }
-func (b *backlog) empty() bool { return b.size() == 0 }

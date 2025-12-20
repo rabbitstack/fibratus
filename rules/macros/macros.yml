@@ -126,8 +126,6 @@
 - macro: load_driver
   expr: >
     (load_module and (image.name iendswith '.sys' or image.is_driver))
-      or
-    (create_handle and handle.type = 'Driver')
   description: |
     Detects the loading of the kernel driver. Image load events are published when
     executable images, DLLs, or driver PE objects are loaded. On the contrary, we can
