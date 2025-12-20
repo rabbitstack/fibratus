@@ -19,6 +19,12 @@
 package ps
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
@@ -31,11 +37,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
-	"os"
-	"path/filepath"
-	"strings"
-	"testing"
-	"time"
 )
 
 func TestWrite(t *testing.T) {
@@ -227,6 +228,7 @@ func TestWriteInternalEventsEnrichment(t *testing.T) {
 						params.ProcessID:       {Name: params.ProcessID, Type: params.PID, Value: uint32(1024)},
 						params.ProcessParentID: {Name: params.ProcessParentID, Type: params.PID, Value: uint32(444)},
 						params.Exe:             {Name: params.Exe, Type: params.UnicodeString, Value: `svchost.exe`},
+						params.ProcessName:     {Name: params.ProcessName, Type: params.UnicodeString, Value: `svchost.exe`},
 						params.Cmdline:         {Name: params.Cmdline, Type: params.UnicodeString, Value: `svchost.exe -k LocalSystemNetworkRestricted -p -s NcbService`},
 						params.UserSID:         {Name: params.UserSID, Type: params.WbemSID, Value: []byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0}},
 						params.SessionID:       {Name: params.SessionID, Type: params.Uint32, Value: uint32(1)},
@@ -265,6 +267,7 @@ func TestWriteInternalEventsEnrichment(t *testing.T) {
 						params.ProcessID:                  {Name: params.ProcessID, Type: params.PID, Value: uint32(1024)},
 						params.ProcessParentID:            {Name: params.ProcessParentID, Type: params.PID, Value: uint32(444)},
 						params.Exe:                        {Name: params.Exe, Type: params.UnicodeString, Value: `C:\Windows\System32\svchost.exe`},
+						params.ProcessName:                {Name: params.ProcessName, Type: params.UnicodeString, Value: `svchost.exe`},
 						params.ProcessTokenIntegrityLevel: {Name: params.ProcessTokenIntegrityLevel, Type: params.AnsiString, Value: "HIGH"},
 						params.ProcessTokenIsElevated:     {Name: params.ProcessTokenIsElevated, Type: params.Bool, Value: true},
 						params.ProcessTokenElevationType:  {Name: params.ProcessTokenElevationType, Type: params.AnsiString, Value: "FULL"},
@@ -275,6 +278,7 @@ func TestWriteInternalEventsEnrichment(t *testing.T) {
 					Params: event.Params{
 						params.ProcessID:       {Name: params.ProcessID, Type: params.PID, Value: uint32(1024)},
 						params.ProcessParentID: {Name: params.ProcessParentID, Type: params.PID, Value: uint32(444)},
+						params.ProcessName:     {Name: params.ProcessName, Type: params.UnicodeString, Value: `svchost.exe`},
 						params.Exe:             {Name: params.Exe, Type: params.UnicodeString, Value: `svchost.exe`},
 						params.Cmdline:         {Name: params.Cmdline, Type: params.UnicodeString, Value: `svchost.exe -k LocalSystemNetworkRestricted -p -s NcbService`},
 						params.UserSID:         {Name: params.UserSID, Type: params.WbemSID, Value: []byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0}},
@@ -303,6 +307,7 @@ func TestWriteInternalEventsEnrichment(t *testing.T) {
 						params.ProcessID:       {Name: params.ProcessID, Type: params.PID, Value: uint32(os.Getpid())},
 						params.ProcessParentID: {Name: params.ProcessParentID, Type: params.PID, Value: uint32(444)},
 						params.Exe:             {Name: params.Exe, Type: params.UnicodeString, Value: `svchost.exe`},
+						params.ProcessName:     {Name: params.ProcessName, Type: params.UnicodeString, Value: `svchost.exe`},
 						params.Cmdline:         {Name: params.Cmdline, Type: params.UnicodeString, Value: `svchost.exe -k LocalSystemNetworkRestricted -p -s NcbService`},
 						params.UserSID:         {Name: params.UserSID, Type: params.WbemSID, Value: []byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0}},
 						params.SessionID:       {Name: params.SessionID, Type: params.Uint32, Value: uint32(1)},
