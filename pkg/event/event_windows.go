@@ -152,18 +152,6 @@ func (e *Event) IsDropped(capture bool) bool {
 // current process is dropped.
 func IsCurrentProcDropped(pid uint32) bool { return DropCurrentProc && pid == currentPid }
 
-// DelayKey returns the value that is used to
-// store and reference delayed events in the event
-// backlog state. The delayed event is indexed by
-// the sequence identifier.
-func (e *Event) DelayKey() uint64 {
-	switch e.Type {
-	case CreateHandle, CloseHandle:
-		return e.Params.MustGetUint64(params.HandleObject)
-	}
-	return 0
-}
-
 // IsNetworkTCP determines whether the event pertains to network TCP events.
 func (e *Event) IsNetworkTCP() bool {
 	return e.Category == Net && !e.IsNetworkUDP()
@@ -417,26 +405,6 @@ func (e *Event) PartialKey() uint64 {
 		return hashers.FnvUint64(b)
 	}
 	return 0
-}
-
-// BacklogKey represents the key used to index the events in the backlog store.
-func (e *Event) BacklogKey() uint64 {
-	switch e.Type {
-	case CreateHandle, CloseHandle:
-		return e.Params.MustGetUint64(params.HandleObject)
-	}
-	return 0
-}
-
-// CopyState adds parameters, tags, or process state from the provided event.
-func (e *Event) CopyState(evt *Event) {
-	switch evt.Type {
-	case CloseHandle:
-		if evt.Params.Contains(params.ImagePath) {
-			e.Params.Append(params.ImagePath, params.UnicodeString, evt.GetParamAsString(params.ImagePath))
-		}
-		_ = e.Params.SetValue(params.HandleObjectName, evt.GetParamAsString(params.HandleObjectName))
-	}
 }
 
 // Summary returns a brief summary of this event. Various important substrings

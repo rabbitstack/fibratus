@@ -20,14 +20,13 @@ package event
 
 import (
 	"errors"
+	"testing"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	"reflect"
-	"testing"
-	"time"
 )
 
 // AddParamListener receives the event and appends a parameter to it
@@ -189,50 +188,4 @@ func TestQueuePush(t *testing.T) {
 			assert.True(t, len(q.Events()) > 0 == tt.isEnqueued)
 		})
 	}
-}
-
-func TestPushBacklog(t *testing.T) {
-	e := &Event{
-		Type:     CreateHandle,
-		Tid:      2484,
-		PID:      859,
-		Category: Handle,
-		Params: Params{
-			params.HandleID:           {Name: params.HandleID, Type: params.Uint32, Value: uint32(21)},
-			params.HandleObjectTypeID: {Name: params.HandleObjectTypeID, Type: params.AnsiString, Value: "Key"},
-			params.HandleObject:       {Name: params.HandleObject, Type: params.Uint64, Value: uint64(18446692422059208560)},
-			params.HandleObjectName:   {Name: params.HandleObjectName, Type: params.UnicodeString, Value: ""},
-		},
-		Metadata: make(Metadata),
-	}
-
-	q := NewQueue(100, false, true)
-	q.RegisterListener(&DummyListener{})
-
-	require.NoError(t, q.Push(e))
-	require.Len(t, q.Events(), 0)
-	require.False(t, q.backlog.empty())
-
-	e1 := &Event{
-		Type:     CloseHandle,
-		Tid:      2484,
-		PID:      859,
-		Category: Handle,
-		Params: Params{
-			params.HandleID:           {Name: params.HandleID, Type: params.Uint32, Value: uint32(21)},
-			params.HandleObjectTypeID: {Name: params.HandleObjectTypeID, Type: params.AnsiString, Value: "Key"},
-			params.HandleObject:       {Name: params.HandleObject, Type: params.Uint64, Value: uint64(18446692422059208560)},
-			params.HandleObjectName:   {Name: params.HandleObjectName, Type: params.UnicodeString, Value: `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\Tcpip\Parameters\Interfaces\{b677c565-6ca5-45d3-b618-736b4e09b036}`},
-		},
-		Metadata: make(Metadata),
-	}
-
-	require.NoError(t, q.Push(e1))
-	require.True(t, q.backlog.empty())
-
-	ev := <-q.Events()
-	require.NotNil(t, ev)
-	assert.Equal(t, `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\Tcpip\Parameters\Interfaces\{b677c565-6ca5-45d3-b618-736b4e09b036}`, ev.GetParamAsString(params.HandleObjectName))
-
-	require.True(t, reflect.DeepEqual(e1, <-q.Events()))
 }
