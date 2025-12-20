@@ -21,20 +21,22 @@ package types
 import (
 	"encoding/binary"
 	"fmt"
+	"path/filepath"
+	"strings"
+	"sync"
+
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
-	"path/filepath"
-	"strings"
-	"sync"
 
 	"github.com/rabbitstack/fibratus/pkg/cap/section"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 
-	"github.com/rabbitstack/fibratus/pkg/util/bootid"
 	"time"
+
+	"github.com/rabbitstack/fibratus/pkg/util/bootid"
 )
 
 // PS encapsulates process' state such as allocated resources and other metadata.
@@ -123,6 +125,14 @@ func (ps *PS) UUID() uint64 {
 		}
 	}
 	return ps.uuid
+}
+
+// AssignUUID assigns the UUID from the given
+// process if the UUID has been initialized.
+func (ps *PS) AssignUUID(proc *PS) {
+	if proc.uuid != 0 {
+		ps.uuid = proc.uuid
+	}
 }
 
 // ProcessSequenceNumber contains the unique process sequence number.

@@ -20,14 +20,15 @@ package ps
 
 import (
 	"expvar"
-	"github.com/rabbitstack/fibratus/pkg/sys"
-	"github.com/rabbitstack/fibratus/pkg/util/va"
-	"golang.org/x/sys/windows"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/rabbitstack/fibratus/pkg/sys"
+	"github.com/rabbitstack/fibratus/pkg/util/va"
+	"golang.org/x/sys/windows"
 
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
@@ -184,6 +185,11 @@ func (s *snapshotter) Write(e *event.Event) error {
 			proc.Exe = ps.Exe
 			e.AppendParam(params.Exe, params.Path, ps.Exe)
 		}
+
+		// if the process UUID has been initialized when
+		// the internal event arrived, reassign it to the
+		// current process state
+		proc.AssignUUID(ps)
 
 		e.AppendParam(params.ProcessTokenIntegrityLevel, params.AnsiString, ps.TokenIntegrityLevel)
 		e.AppendParam(params.ProcessTokenElevationType, params.AnsiString, ps.TokenElevationType)
