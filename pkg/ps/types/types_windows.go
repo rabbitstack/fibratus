@@ -21,20 +21,22 @@ package types
 import (
 	"encoding/binary"
 	"fmt"
+	"path/filepath"
+	"strings"
+	"sync"
+
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
-	"path/filepath"
-	"strings"
-	"sync"
 
 	"github.com/rabbitstack/fibratus/pkg/cap/section"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 
-	"github.com/rabbitstack/fibratus/pkg/util/bootid"
 	"time"
+
+	"github.com/rabbitstack/fibratus/pkg/util/bootid"
 )
 
 // PS encapsulates process' state such as allocated resources and other metadata.
@@ -98,6 +100,9 @@ type PS struct {
 	TokenElevationType string `json:"token_elevation_type"`
 	// IsTokenElevated indicates if the process token is elevated.
 	IsTokenElevated bool `json:"is_token_elevated"`
+	// IsCreatedFromSystemLogger is the metadata attribute that indicates if the
+	// process state is created from the event published by the NT kernel logger.
+	IsCreatedFromSystemLogger bool `json:"-"`
 }
 
 // UUID is meant to offer a more robust version of process ID that
