@@ -186,6 +186,11 @@ func (s *snapshotter) Write(e *event.Event) error {
 			e.AppendParam(params.Exe, params.Path, ps.Exe)
 		}
 
+		// if the process UUID has been initialized when
+		// the internal event arrived, reassign it to the
+		// current process state
+		proc.AssignUUID(ps)
+
 		e.AppendParam(params.ProcessTokenIntegrityLevel, params.AnsiString, ps.TokenIntegrityLevel)
 		e.AppendParam(params.ProcessTokenElevationType, params.AnsiString, ps.TokenElevationType)
 		e.AppendParam(params.ProcessTokenIsElevated, params.Bool, ps.IsTokenElevated)
