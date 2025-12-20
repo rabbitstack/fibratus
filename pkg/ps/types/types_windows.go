@@ -100,6 +100,9 @@ type PS struct {
 	TokenElevationType string `json:"token_elevation_type"`
 	// IsTokenElevated indicates if the process token is elevated.
 	IsTokenElevated bool `json:"is_token_elevated"`
+	// IsCreatedFromSystemLogger is the metadata attribute that indicates if the
+	// process state is created from the event published by the NT kernel logger.
+	IsCreatedFromSystemLogger bool `json:"-"`
 }
 
 // UUID is meant to offer a more robust version of process ID that

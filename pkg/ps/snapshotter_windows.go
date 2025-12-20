@@ -162,17 +162,17 @@ func (s *snapshotter) Write(e *event.Event) error {
 	if ps := s.procs[pid]; ps == nil && (e.IsCreateProcessInternal() || e.IsProcessRundownInternal()) {
 		// only modify the state if there is no process derived from the NT kernel logger process events
 		s.procs[pid] = proc
-	} else if ps, ok := s.procs[pid]; ok && (e.IsCreateProcessInternal() || e.IsProcessRundownInternal()) {
+	} else if ps, ok := s.procs[pid]; ok && (e.IsCreateProcessInternal() || e.IsProcessRundownInternal()) && ps.IsCreatedFromSystemLogger {
 		// process state derived from the core kernel events exists - enrich it
 		ps.TokenIntegrityLevel = proc.TokenIntegrityLevel
 		ps.TokenElevationType = proc.TokenElevationType
 		ps.IsTokenElevated = proc.IsTokenElevated
-		if len(proc.Exe) > len(ps.Exe) {
+		if strings.EqualFold(ps.Name, filepath.Base(proc.Exe)) && len(proc.Exe) > len(ps.Exe) {
 			// prefer full executable path
 			ps.Exe = proc.Exe
 		}
 		s.procs[pid] = ps
-	} else if ps, ok := s.procs[pid]; ok && (e.IsCreateProcess() || e.IsProcessRundown()) && ps.TokenIntegrityLevel != "" {
+	} else if ps, ok := s.procs[pid]; ok && (e.IsCreateProcess() || e.IsProcessRundown()) && !ps.IsCreatedFromSystemLogger {
 		// enrich the existing process state with the newly arrived NT kernel logger process events
 		// but obtain the integrity level and executable path from the previous proc state
 		processEnrichments.Add(1)
@@ -180,7 +180,7 @@ func (s *snapshotter) Write(e *event.Event) error {
 		proc.TokenElevationType = ps.TokenElevationType
 		proc.IsTokenElevated = ps.IsTokenElevated
 
-		if len(ps.Exe) > len(proc.Exe) {
+		if strings.EqualFold(proc.Name, filepath.Base(ps.Exe)) && len(ps.Exe) > len(proc.Exe) {
 			// prefer full executable path
 			proc.Exe = ps.Exe
 			e.AppendParam(params.Exe, params.Path, ps.Exe)
@@ -393,6 +393,7 @@ func (s *snapshotter) newProcState(pid, ppid uint32, e *event.Event) (*pstypes.P
 	proc.IsWOW64 = (e.Params.MustGetUint32(params.ProcessFlags) & event.PsWOW64) != 0
 	proc.IsPackaged = (e.Params.MustGetUint32(params.ProcessFlags) & event.PsPackaged) != 0
 	proc.IsProtected = (e.Params.MustGetUint32(params.ProcessFlags) & event.PsProtected) != 0
+	proc.IsCreatedFromSystemLogger = true
 
 	if !s.capture {
 		if proc.Username != "" {
