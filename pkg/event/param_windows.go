@@ -22,6 +22,13 @@ import (
 	"encoding/binary"
 	"expvar"
 	"fmt"
+	"net"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+	"unsafe"
+
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
@@ -35,12 +42,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
-	"net"
-	"path/filepath"
-	"strconv"
-	"strings"
-	"time"
-	"unsafe"
 )
 
 // unknownKeysCount counts the number of times the registry key failed to convert from native format
@@ -520,6 +521,11 @@ func (e *Event) produceParams(evt *etw.EventRecord) {
 		capturedSize := evt.ReadUint16(voffset)
 		capturedData := evt.ReadBytes(2+voffset, capturedSize)
 
+		// copy the buffer as it points to invalid
+		// memory when the callback function returns
+		b := make([]byte, capturedSize)
+		copy(b, capturedData)
+
 		e.AppendParam(params.RegKeyHandle, params.Address, keyObject)
 		e.AppendParam(params.NTStatus, params.Status, status)
 		e.AppendParam(params.RegPath, params.Key, filepath.Join(keyName, valueName))
@@ -530,13 +536,13 @@ func (e *Event) produceParams(evt *etw.EventRecord) {
 			case registry.SZ, registry.MULTI_SZ, registry.EXPAND_SZ:
 				e.AppendParam(params.RegData, params.UnicodeString, string(capturedData))
 			case registry.BINARY:
-				e.AppendParam(params.RegData, params.Binary, capturedData)
+				e.AppendParam(params.RegData, params.Binary, b)
 			case registry.DWORD:
-				e.AppendParam(params.RegData, params.Uint32, binary.LittleEndian.Uint32(capturedData))
+				e.AppendParam(params.RegData, params.Uint32, binary.LittleEndian.Uint32(b))
 			case registry.DWORD_BIG_ENDIAN:
-				e.AppendParam(params.RegData, params.Uint32, binary.BigEndian.Uint32(capturedData))
+				e.AppendParam(params.RegData, params.Uint32, binary.BigEndian.Uint32(b))
 			case registry.QWORD:
-				e.AppendParam(params.RegData, params.Uint64, binary.LittleEndian.Uint64(capturedData))
+				e.AppendParam(params.RegData, params.Uint64, binary.LittleEndian.Uint64(b))
 			}
 		}
 	case CreateFile:
