@@ -22,6 +22,7 @@
 package utf16
 
 import (
+	"encoding/binary"
 	"unicode/utf8"
 )
 
@@ -57,4 +58,17 @@ func Decode(p []uint16) string {
 		s = utf8.AppendRune(s, r)
 	}
 	return string(s)
+}
+
+// BytesToString converts the UTF16-encoded byte buffer to string.
+func BytesToString(b []byte, o binary.ByteOrder) string {
+	utf := make([]uint16, 0, len(b)/2)
+	for i := 0; i+1 < len(b); i += 2 {
+		u := o.Uint16(b[i:])
+		if u == 0 {
+			break // stop at null terminator
+		}
+		utf = append(utf, u)
+	}
+	return Decode(utf)
 }

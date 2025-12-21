@@ -29,6 +29,8 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/rabbitstack/fibratus/pkg/util/utf16"
+
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
@@ -531,10 +533,10 @@ func (e *Event) produceParams(evt *etw.EventRecord) {
 		e.AppendParam(params.RegPath, params.Key, filepath.Join(keyName, valueName))
 		e.AppendEnum(params.RegValueType, valueType, key.RegistryValueTypes)
 
-		if len(capturedData) > 0 {
+		if len(b) > 0 {
 			switch valueType {
 			case registry.SZ, registry.MULTI_SZ, registry.EXPAND_SZ:
-				e.AppendParam(params.RegData, params.UnicodeString, string(capturedData))
+				e.AppendParam(params.RegData, params.UnicodeString, utf16.BytesToString(b, binary.LittleEndian))
 			case registry.BINARY:
 				e.AppendParam(params.RegData, params.Binary, b)
 			case registry.DWORD:
