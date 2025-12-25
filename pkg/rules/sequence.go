@@ -21,6 +21,11 @@ package rules
 import (
 	"context"
 	"expvar"
+	"sort"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	fsm "github.com/qmuntal/stateless"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
@@ -29,10 +34,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/filter/ql"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	log "github.com/sirupsen/logrus"
-	"sort"
-	"sync"
-	"sync/atomic"
-	"time"
 )
 
 const (
@@ -520,7 +521,7 @@ func (s *sequenceState) runSequence(e *event.Event) bool {
 			for seqID := 0; seqID < len(s.partials); seqID++ {
 				for _, outer := range s.partials[seqID] {
 					for _, inner := range s.partials[seqID+1] {
-						if filter.CompareSeqLink(outer.SequenceLink(), inner.SequenceLink()) {
+						if filter.CompareSeqLinks(outer.SequenceLinks(), inner.SequenceLinks()) {
 							setMatch(seqID, outer)
 							setMatch(seqID+1, inner)
 						}

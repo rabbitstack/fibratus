@@ -22,16 +22,17 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
+	"net"
+	"regexp"
+	"strconv"
+	"strings"
+
 	errs "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/filter/ql"
 	"github.com/rabbitstack/fibratus/pkg/util/bytes"
 	"github.com/rabbitstack/fibratus/pkg/util/hashers"
-	"net"
-	"regexp"
-	"strconv"
-	"strings"
 )
 
 var (
@@ -292,8 +293,8 @@ func (f *filter) RunSequence(e *event.Event, seqID int, partials map[int][]*even
 			match = ql.Eval(expr.Expr, valuer, f.hasFunctions)
 			if match {
 				// compute sequence key hash to tie the events
-				evt.AddMeta(event.RuleSequenceLink, hashers.FnvUint64(hash))
-				e.AddMeta(event.RuleSequenceLink, hashers.FnvUint64(hash))
+				evt.AddSequenceLink(hashers.FnvUint64(hash))
+				e.AddSequenceLink(hashers.FnvUint64(hash))
 				break
 			}
 		}
@@ -310,7 +311,7 @@ func (f *filter) RunSequence(e *event.Event, seqID int, partials map[int][]*even
 		outer:
 			for i := 0; i < seqID; i++ {
 				for _, p := range partials[i] {
-					if CompareSeqLink(joinID, p.SequenceLink()) {
+					if CompareSeqLink(joinID, p.SequenceLinks()) {
 						joins[i] = true
 						continue outer
 					}
@@ -323,7 +324,7 @@ func (f *filter) RunSequence(e *event.Event, seqID int, partials map[int][]*even
 
 		if match && by != nil {
 			if v := valuer[by.Value]; v != nil {
-				e.AddMeta(event.RuleSequenceLink, v)
+				e.AddSequenceLink(v)
 			}
 		}
 	}
@@ -511,57 +512,89 @@ func (f *filter) checkBoundRefs() error {
 	return nil
 }
 
-// CompareSeqLink returns true if both values
-// representing the sequence joins are equal.
-func CompareSeqLink(s1, s2 any) bool {
-	if s1 == nil || s2 == nil {
+// CompareSeqLink returns true if any value
+// in the sequence link slice equals to the
+// given LHS value.
+func CompareSeqLink(lhs any, rhs []any) bool {
+	if lhs == nil || rhs == nil {
 		return false
 	}
-	switch v := s1.(type) {
+	for _, v := range rhs {
+		if compareSeqLink(lhs, v) {
+			return true
+		}
+	}
+	return false
+}
+
+// CompareSeqLinks returns true any LHS sequence
+// link values equal to the RHS sequence link values.
+func CompareSeqLinks(lhs []any, rhs []any) bool {
+	if lhs == nil || rhs == nil {
+		return false
+	}
+	for _, v1 := range lhs {
+		for _, v2 := range rhs {
+			if compareSeqLink(v1, v2) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func compareSeqLink(lhs any, rhs any) bool {
+	if lhs == nil || rhs == nil {
+		return false
+	}
+
+	switch v := lhs.(type) {
 	case string:
-		s, ok := s2.(string)
+		s, ok := rhs.(string)
 		if !ok {
 			return false
 		}
 		return strings.EqualFold(v, s)
 	case uint8:
-		n, ok := s2.(uint8)
+		n, ok := rhs.(uint8)
 		if !ok {
 			return false
 		}
 		return v == n
 	case uint16:
-		n, ok := s2.(uint16)
+		n, ok := rhs.(uint16)
 		if !ok {
 			return false
 		}
 		return v == n
 	case uint32:
-		n, ok := s2.(uint32)
+		n, ok := rhs.(uint32)
 		if !ok {
 			return false
 		}
 		return v == n
 	case uint64:
-		n, ok := s2.(uint64)
+		n, ok := rhs.(uint64)
 		if !ok {
 			return false
 		}
-		return v == n
+		if v == n {
+			return true
+		}
 	case int:
-		n, ok := s2.(int)
+		n, ok := rhs.(int)
 		if !ok {
 			return false
 		}
 		return v == n
 	case uint:
-		n, ok := s2.(uint)
+		n, ok := rhs.(uint)
 		if !ok {
 			return false
 		}
 		return v == n
 	case net.IP:
-		ip, ok := s2.(net.IP)
+		ip, ok := rhs.(net.IP)
 		if !ok {
 			return false
 		}
