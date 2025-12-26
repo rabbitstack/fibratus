@@ -247,6 +247,13 @@ func (f *filter) removeAccessor(removed Accessor) {
 	}
 }
 
+var (
+	zeroTime  time.Time
+	zeroSlice []string
+	zeroIP    net.IP
+	zeroByte  []byte
+)
+
 // defaultAccessorValue provides the default value for the field.
 // This value is typically assigned when the accessor returns an
 // error or nil value, but the map valuer must contain the resolved
@@ -260,15 +267,15 @@ func defaultAccessorValue(field Field) any {
 	case params.Float, params.Double:
 		return 0.0
 	case params.Time:
-		return time.Now()
+		return zeroTime
 	case params.Bool:
 		return false
 	case params.IP, params.IPv4, params.IPv6:
-		return net.IP{}
+		return zeroIP
 	case params.Binary:
-		return []byte{}
+		return zeroByte
 	case params.Slice:
-		return []string{}
+		return zeroSlice
 	default:
 		return ""
 	}
