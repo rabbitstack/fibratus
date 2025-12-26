@@ -1,6 +1,6 @@
 name: DLL loaded via a callback function
 id: c7f46d0a-10b2-421a-b33c-f4df79599f2e
-version: 1.0.2
+version: 1.0.3
 description: |
   Identifies module proxying as a method to conceal suspicious callstacks. Adversaries use module proxying
   the hide the origin of the LoadLibrary call from the callstack by loading the library from the callback
@@ -20,19 +20,18 @@ condition: >
   sequence
   maxspan 2m
    |spawn_process| by ps.child.uuid
-   |load_dll and image.name iin 
-      (
-        'winhttp.dll', 'clr.dll', 'bcrypt.dll', 'bcryptprimitives.dll',
-        'wininet.dll', 'taskschd.dll', 'dnsapi.dll', 'coreclr.dll', 'ws2_32.dll',
-        'wmiutils.dll', 'vaultcli.dll', 'System.Management.Automation.dll', 'psapi.dll',
-        'mstscax.dll', 'dsquery.dll', 'mstask.dll', 'bitsproxy.dll'
-      )
-    and thread.callstack.summary 
-      imatches 
-      (
-        'ntdll.dll|kernelbase.dll|ntdll.dll|kernel32.dll|ntdll.dll', 
-        'ntdll.dll|wow64.dll|wow64cpu.dll|wow64.dll|ntdll.dll|kernelbase.dll|ntdll.dll|kernel32.dll|ntdll.dll'
-      )
+   |load_dll and image.name iin
+                (
+                  'winhttp.dll', 'clr.dll', 'bcrypt.dll', 'bcryptprimitives.dll',
+                  'wininet.dll', 'taskschd.dll', 'dnsapi.dll', 'coreclr.dll', 'ws2_32.dll',
+                  'wmiutils.dll', 'vaultcli.dll', 'System.Management.Automation.dll', 'psapi.dll',
+                  'mstscax.dll', 'dsquery.dll', 'mstask.dll', 'bitsproxy.dll'
+                ) and 
+    thread.callstack.summary imatches
+                (
+                  'ntdll.dll|kernelbase.dll|ntdll.dll|kernel32.dll|ntdll.dll',
+                  'ntdll.dll|wow64.dll|wow64cpu.dll|wow64.dll|ntdll.dll|kernelbase.dll|ntdll.dll|kernel32.dll|ntdll.dll'
+                )
    | by ps.uuid
 
 output: >

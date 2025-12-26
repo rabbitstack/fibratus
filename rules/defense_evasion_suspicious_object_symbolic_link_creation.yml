@@ -1,6 +1,6 @@
 name: Suspicious object symbolic link creation
 id: f9306355-1f5f-4a06-9779-195aa681db80
-version: 1.0.3
+version: 1.0.4
 description: |
   Identifies the creation of the object symbolic link inside the object manager namespace
   by untrusted or unusual processes.
@@ -18,20 +18,19 @@ references:
   - https://www.elastic.co/kr/blog/detect-block-unknown-knowndlls-windows-acl-hardening-attacks-cache-poisoning-escalation
 
 condition: >
-  create_symbolic_link_object and evt.pid != 4 
-    and 
-  (pe.is_signed = false or pe.is_trusted = false or ps.exe not imatches
-    (
-      '?:\\ProgramData\\Microsoft\\Windows Defender\\*\\MsMpEng.exe',
-      '?:\\WINDOWS\\system32\\svchost.exe',
-      '?:\\Program Files\\*',
-      '?:\\Program Files (x86)\\*',
-      '?:\\Windows\\System32\\vmwp.exe',
-      '?:\\Windows\\System32\\spoolsv.exe',
-      '?:\\Windows\\System32\\csrss.exe'
-    )
-  )
-    and
+  create_symbolic_link_object and evt.pid != 4 and
+  (pe.is_signed = false or pe.is_trusted = false or
+   ps.exe not imatches
+              (
+                '?:\\ProgramData\\Microsoft\\Windows Defender\\*\\MsMpEng.exe',
+                '?:\\WINDOWS\\system32\\svchost.exe',
+                '?:\\Program Files\\*',
+                '?:\\Program Files (x86)\\*',
+                '?:\\Windows\\System32\\vmwp.exe',
+                '?:\\Windows\\System32\\spoolsv.exe',
+                '?:\\Windows\\System32\\csrss.exe'
+              )
+  ) and
   evt.arg[target] not imatches '\\Sessions\\*\\AppContainerNamedObjects\\*'
 
 output: >

@@ -1,6 +1,6 @@
 name: Executable file dropped by an unsigned service DLL
 id: 3e29da58-0fc4-44c0-91c0-0dfc6af87e9d
-version: 1.0.1
+version: 1.0.2
 description: |
   Identifies the loading of an unsigned DLL by svchost process followed by creating an
   executable file. Adversaries may rely on Windows Services to repeatedly execute malicious 
@@ -23,11 +23,10 @@ condition: >
   sequence
   maxspan 3m
     |load_unsigned_dll and ps.exe imatches ('?:\\Windows\\System32\\svchost.exe', '?:\\Windows\\SysWOW64\\svchost.exe')| as e1
-    |create_file and evt.pid != 4 and ps.exe imatches ('?:\\Windows\\System32\\svchost.exe', '?:\\Windows\\SysWOW64\\svchost.exe')
-      and
-     (file.extension iin ('.exe', '.dll', '.com', '.js', '.vbs', '.cmd', '.bat', '.vbe') or file.is_exec or file.is_dll or file.is_driver)
-      and
-     thread.callstack.symbols iin (concat($e1.image.name, '!ServiceMain'))
+    |create_file and
+     evt.pid != 4 and ps.exe imatches ('?:\\Windows\\System32\\svchost.exe', '?:\\Windows\\SysWOW64\\svchost.exe') and
+     (file.extension iin ('.exe', '.dll', '.com', '.js', '.vbs', '.cmd', '.bat', '.vbe') or file.is_exec or file.is_dll or file.is_driver) and
+      thread.callstack.symbols iin (concat($e1.image.name, '!ServiceMain'))
     |
 
 output: >

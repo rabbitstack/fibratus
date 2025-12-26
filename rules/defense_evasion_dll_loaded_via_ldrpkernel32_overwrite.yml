@@ -1,6 +1,6 @@
 name: DLL loaded via LdrpKernel32 overwrite
 id: 56739eda-210f-4a30-a114-d55ca60976df
-version: 1.0.2
+version: 1.0.3
 description: |
   Detects attempts to bypass the standard NTDLL bootstrap process by loading a malicious DLL early through hijacking. 
   The malicious DLL, containing attacker-controlled code, is loaded in place of the legitimate kernel32 DLL.
@@ -18,17 +18,15 @@ references:
   - https://www.elastic.co/security-labs/peeling-back-the-curtain-with-call-stacks
 
 condition: >
-  (load_unsigned_or_untrusted_dll) and thread.callstack.symbols imatches ('*!BaseThreadInitThunk*')
-    and
-  image.path not imatches '?:\\Windows\\assembly\\NativeImages_*\\System.Numerics.ni.dll'
-    and
-    not
-  foreach(thread._callstack, $frame, 
-          $frame.symbol imatches ('?:\\Windows\\System32\\kernel32.dll!BaseThreadInitThunk*',
-                                  '?:\\Windows\\SysWOW64\\kernel32.dll!BaseThreadInitThunk*',
-                                  '?:\\Windows\\WinSxS\\*\\kernel32.dll!BaseThreadInitThunk*',
-                                  '?:\\Windows\\WinSxS\\Temp\\PendingDeletes\\*!BaseThreadInitThunk*',
-                                  '\\Device\\*\\Windows\\*\\kernel32.dll!BaseThreadInitThunk*'))
+  (load_unsigned_or_untrusted_dll) and
+  thread.callstack.symbols imatches ('*!BaseThreadInitThunk*') and
+  image.path not imatches '?:\\Windows\\assembly\\NativeImages_*\\System.Numerics.ni.dll' and
+  not foreach(thread._callstack, $frame,
+              $frame.symbol imatches ('?:\\Windows\\System32\\kernel32.dll!BaseThreadInitThunk*',
+                                      '?:\\Windows\\SysWOW64\\kernel32.dll!BaseThreadInitThunk*',
+                                      '?:\\Windows\\WinSxS\\*\\kernel32.dll!BaseThreadInitThunk*',
+                                      '?:\\Windows\\WinSxS\\Temp\\PendingDeletes\\*!BaseThreadInitThunk*',
+                                      '\\Device\\*\\Windows\\*\\kernel32.dll!BaseThreadInitThunk*'))
 action:
   - name: kill
 

@@ -1,6 +1,6 @@
 name: Unusual file written in Startup folder
 id: c5ffe15c-d94f-416b-bec7-c47f89843267
-version: 1.0.3
+version: 1.0.4
 description: |
   Identifies suspicious files written to the startup folder that would
   allow adversaries to maintain persistence on the endpoint.
@@ -16,23 +16,16 @@ labels:
   subtechnique.ref: https://attack.mitre.org/techniques/T1547/001/
 
 condition: >
-  create_file
-    and
-  (
-    file.extension in ('.vbs', '.js', '.jar', '.exe', '.dll', '.com', '.ps1', '.hta', '.cmd', '.vbe')
-      or
-    (file.is_exec or file.is_dll)
-  )
-    and
-  file.path imatches startup_locations
-    and
+  create_file and
+  (file.extension in ('.vbs', '.js', '.jar', '.exe', '.dll', '.com', '.ps1', '.hta', '.cmd', '.vbe') or (file.is_exec or file.is_dll)) and
+  file.path imatches startup_locations and
   ps.exe not imatches
-    (
-      '?:\\Windows\\System32\\wuauclt.exe',
-      '?:\\Windows\\System32\\msiexec.exe',
-      '?:\\Windows\\SysWOW64\\msiexec.exe',
-      '?:\\Windows\\System32\\svchost.exe',
-      '?:\\ProgramData\\Microsoft\\Windows Defender\\Platform\\*.exe'
-    )
+            (
+              '?:\\Windows\\System32\\wuauclt.exe',
+              '?:\\Windows\\System32\\msiexec.exe',
+              '?:\\Windows\\SysWOW64\\msiexec.exe',
+              '?:\\Windows\\System32\\svchost.exe',
+              '?:\\ProgramData\\Microsoft\\Windows Defender\\Platform\\*.exe'
+            )
 
 min-engine-version: 3.0.0

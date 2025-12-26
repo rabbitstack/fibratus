@@ -1,6 +1,6 @@
 name: Potential process creation via shellcode
 id: 7a918532-12d1-4aa2-8c46-8769c67cac07
-version: 1.0.1
+version: 1.0.2
 description: |
   Identifies the creation of a process with stack frames originating from floating memory area while 
   invoking commonly used Windows API functions like WinExec. This behavior is a typical indicator of 
@@ -16,8 +16,8 @@ references:
   - https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-winexec
 
 condition: >
-  spawn_process and thread.callstack.is_unbacked = true and thread.callstack.summary imatches '*kernel32.dll|unbacked*'
-    and
+  spawn_process and
+  thread.callstack.is_unbacked = true and thread.callstack.summary imatches '*kernel32.dll|unbacked*' and
   thread.callstack.symbols imatches ('kernel32.dll!WinExec*')
 
 output: >

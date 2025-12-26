@@ -1,6 +1,6 @@
 name: Process spawned from macro-enabled Microsoft Office document
 id: 47521206-e19d-4608-9dbc-dc3a1df99db5
-version: 1.0.3
+version: 1.0.4
 description: |
   Identifies the execution of the child process spawned by Microsoft
   Office parent process where the call stack contains the Visual Basic
@@ -18,27 +18,25 @@ labels:
   subtechnique.ref: https://attack.mitre.org/techniques/T1566/001/
 
 condition: >
-  spawn_process and ps.name iin msoffice_binaries
-    and
+  spawn_process and
+  ps.name iin msoffice_binaries and
   (
-    thread.callstack.modules imatches ('*vbe?.dll')
-      or
+    thread.callstack.modules imatches ('*vbe?.dll') or
     thread.callstack.symbols imatches
-      (
-        '*!xlAutoOpen*',
-        '*!wlAutoOpen*',
-        '*!wdAutoOpen*',
-        'kernel32.dll!WinExec*',
-        'shell32.dll!ShellExecute*'
-      )
-  )
-    and
+                            (
+                              '*!xlAutoOpen*',
+                              '*!wlAutoOpen*',
+                              '*!wdAutoOpen*',
+                              'kernel32.dll!WinExec*',
+                              'shell32.dll!ShellExecute*'
+                            )
+  ) and
   ps.child.exe not imatches
-    (
-      '?:\\Windows\\explorer.exe',
-      '?:\\Windows\\hh.exe',
-      '?:\\Windows\\System32\\spool\\drivers\\*',
-      '?:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
-    )
+                  (
+                    '?:\\Windows\\explorer.exe',
+                    '?:\\Windows\\hh.exe',
+                    '?:\\Windows\\System32\\spool\\drivers\\*',
+                    '?:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
+                  )
 
 min-engine-version: 3.0.0

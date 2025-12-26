@@ -1,6 +1,6 @@
 name: Potential port monitor or print processor persistence via registry modification
 id: de04ae6b-8141-41af-9baa-15630b5954cc
-version: 1.0.1
+version: 1.0.2
 description: |
   Identifies port monitor or print process registry modifications that would allow
   adversaries to run malicious DLLs during system boot.
@@ -18,13 +18,13 @@ references:
   - https://www.ired.team/offensive-security/persistence/t1013-addmonitor
 
 condition: >
-  (modify_registry) and ps.sid != 'S-1-5-18'
-    and
+  (modify_registry) and
+  ps.sid != 'S-1-5-18' and
   registry.path imatches
-    (
-      'HKEY_LOCAL_MACHINE\\SYSTEM\\*ControlSet*\\Control\\Print\\Monitors\\*',
-      'HKEY_LOCAL_MACHINE\\SYSTEM\\*ControlSet*\\Control\\Print\\Environments\\Windows*\\Print Processors\\*'
-    )
+                (
+                  'HKEY_LOCAL_MACHINE\\SYSTEM\\*ControlSet*\\Control\\Print\\Monitors\\*',
+                  'HKEY_LOCAL_MACHINE\\SYSTEM\\*ControlSet*\\Control\\Print\\Environments\\Windows*\\Print Processors\\*'
+                )
 
 output: >
   Port monitor or print processor DLL registered under registry key %registry.path by process %ps.exe

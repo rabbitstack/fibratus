@@ -1,6 +1,6 @@
 name: Potential ClickFix infection chain via Run window
 id: ffe1fc54-2893-4760-ab50-51a83bd71d13
-version: 1.0.2
+version: 1.0.3
 description: |
   Identifies the execution of the process via the Run command dialog box followed by spawning of the potential 
   infostealer process. 
@@ -21,23 +21,22 @@ references:
 condition: >
   sequence
   maxspan 2m
-    |spawn_process and ps.name ~= 'explorer.exe' and length(ps.child.args) >= 2
-      and
-     (thread.callstack.summary imatches 
-       (
-        'ntdll.dll|KernelBase.dll|kernel32.dll|windows.storage.dll|shell32.dll|user32.dll|shell32.dll|explorer.exe|SHCore.dll|*',
-        'ntdll.dll|KernelBase.dll|kernel32.dll|windows.storage.dll|shell32.dll|windows.storage.dll|shell32.dll|user32.dll|shell32.dll|explorer.exe|SHCore.dll|*'
-       )
-       or
+    |spawn_process and
+     ps.name ~= 'explorer.exe' and length(ps.child.args) >= 2 and
+     (thread.callstack.summary imatches
+                              (
+                                'ntdll.dll|KernelBase.dll|kernel32.dll|windows.storage.dll|shell32.dll|user32.dll|shell32.dll|explorer.exe|SHCore.dll|*',
+                                'ntdll.dll|KernelBase.dll|kernel32.dll|windows.storage.dll|shell32.dll|windows.storage.dll|shell32.dll|user32.dll|shell32.dll|explorer.exe|SHCore.dll|*'
+                              ) or
       (thread.callstack.summary imatches '*shell32.dll|explorer.exe|*' and thread.callstack.symbols imatches ('*shell32.dll!GetFileNameFromBrowse*'))
      )
     | by ps.child.uuid
-    |spawn_process and ps.child.exe not imatches 
-      (
-        '?:\\Program Files\\*.exe',
-        '?:\\Program Files (x86)\\*.exe',
-        '?:\\Windows\\System32\\*.exe'
-      )
+    |spawn_process and ps.child.exe not imatches
+                              (
+                                '?:\\Program Files\\*.exe',
+                                '?:\\Program Files (x86)\\*.exe',
+                                '?:\\Windows\\System32\\*.exe'
+                              )
     | by ps.uuid
 action:
   - name: kill

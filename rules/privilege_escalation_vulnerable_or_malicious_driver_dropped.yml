@@ -1,6 +1,6 @@
 name: Vulnerable or malicious driver dropped
 id: d4742163-cf68-4ebd-b9a2-3ad17bbf63d5
-version: 1.0.2
+version: 1.0.3
 description: |
   Detects when adversaries drop a vulnerable/malicious driver
   onto a compromised system as a preparation for vulnerability
@@ -16,9 +16,7 @@ references:
   - https://www.loldrivers.io/
 
 condition: >
-  create_file and file.is_driver
-    and
-  (file.is_driver_vulnerable or file.is_driver_malicious)
+  create_file and file.is_driver and (file.is_driver_vulnerable or file.is_driver_malicious)
 
 output: >
   Vulnerable or malicious %file.path driver dropped

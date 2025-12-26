@@ -1,6 +1,6 @@
 name: Unusual process modified registry run key
 id: 921508a5-b627-4c02-a295-6c6863c0897b
-version: 1.0.5
+version: 1.0.6
 description: |
   Identifies an attempt by unusual Windows native processes to modify
   the run key and gain persistence on users logons or machine reboots.
@@ -16,32 +16,31 @@ labels:
   subtechnique.ref: https://attack.mitre.org/techniques/T1547/001/
 
 condition: >
-  modify_registry and ps.exe imatches '?:\\Windows\\*'
-    and
-  registry.path imatches registry_run_keys
-    and
+  modify_registry and
+  ps.exe imatches '?:\\Windows\\*' and
+  registry.path imatches registry_run_keys and
   ps.exe not imatches
-    (
-      '?:\\Windows\\System32\\svchost.exe',
-      '?:\\Windows\\SysWOW64\\msiexec.exe',
-      '?:\\Windows\\System32\\msiexec.exe',
-      '?:\\Windows\\System32\\drvinst.exe',
-      '?:\\Windows\\System32\\WinSAT.exe',
-      '?:\\Windows\\System32\\reg.exe',
-      '?:\\Windows\\regedit.exe',
-      '?:\\Windows\\SysWOW64\\reg.exe',
-      '?:\\Windows\\System32\\csrss.exe',
-      '?:\\Windows\\SysWOW64\\DriverStore\\*.exe',
-      '?:\\Windows\\System32\\DriverStore\\*.exe',
-      '?:\\Windows\\Installer\\*.exe',
-      '?:\\Windows\\explorer.exe',
-      '?:\\Windows\\IMECache\\*.exe',
-      '?:\\Windows\\System32\\sihost.exe',
-      '?:\\Windows\\SysWOW64\\prevhost.exe',
-      '?:\\Windows\\System32\\conhost.exe',
-      '?:\\Windows\\System32\\taskhostw.exe',
-      '?:\\Windows\\System32\\backgroundTaskHost.exe',
-      '?:\\Windows\\System32\\CompatTelRunner.exe'
-    )
+            (
+              '?:\\Windows\\System32\\svchost.exe',
+              '?:\\Windows\\SysWOW64\\msiexec.exe',
+              '?:\\Windows\\System32\\msiexec.exe',
+              '?:\\Windows\\System32\\drvinst.exe',
+              '?:\\Windows\\System32\\WinSAT.exe',
+              '?:\\Windows\\System32\\reg.exe',
+              '?:\\Windows\\regedit.exe',
+              '?:\\Windows\\SysWOW64\\reg.exe',
+              '?:\\Windows\\System32\\csrss.exe',
+              '?:\\Windows\\SysWOW64\\DriverStore\\*.exe',
+              '?:\\Windows\\System32\\DriverStore\\*.exe',
+              '?:\\Windows\\Installer\\*.exe',
+              '?:\\Windows\\explorer.exe',
+              '?:\\Windows\\IMECache\\*.exe',
+              '?:\\Windows\\System32\\sihost.exe',
+              '?:\\Windows\\SysWOW64\\prevhost.exe',
+              '?:\\Windows\\System32\\conhost.exe',
+              '?:\\Windows\\System32\\taskhostw.exe',
+              '?:\\Windows\\System32\\backgroundTaskHost.exe',
+              '?:\\Windows\\System32\\CompatTelRunner.exe'
+            )
 
 min-engine-version: 3.0.0

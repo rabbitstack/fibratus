@@ -1,6 +1,6 @@
 name: Windows Defender protection tampering via registry
 id: 47ad962b-be0f-44f8-9467-34109f41e5ff
-version: 1.0.1
+version: 1.0.2
 description: |
   Detects suspicious processes modifying Windows Defender configuration settings via registry 
   to disable protection features.
@@ -18,43 +18,40 @@ references:
   - https://symantec-enterprise-blogs.security.com/blogs/threat-intelligence/ransomware-hive-conti-avoslocker
 
 condition: >
-  set_value 
-    and 
-  ((base(registry.path) iin 
-    (
-      'DisableAntiSpyware',
-      'DisableAntiVirus',
-      'DisableBehaviorMonitoring',
-      'DisableBlockAtFirstSeen',
-      'DisableEnhancedNotifications',
-      'DisableIntrusionPreventionSystem',
-      'DisableIOAVProtection',
-      'DisableOnAccessProtection',
-      'DisableRealtimeMonitoring',
-      'DisableScanOnRealtimeEnable',
-      'DisableScriptScanning',
-      'DisableArchiveScanning',
-      'DisableRawWriteNotification'
-    ) and registry.value = 1)
-      or
+  set_value and
+  ((base(registry.path) iin
+                        (
+                          'DisableAntiSpyware',
+                          'DisableAntiVirus',
+                          'DisableBehaviorMonitoring',
+                          'DisableBlockAtFirstSeen',
+                          'DisableEnhancedNotifications',
+                          'DisableIntrusionPreventionSystem',
+                          'DisableIOAVProtection',
+                          'DisableOnAccessProtection',
+                          'DisableRealtimeMonitoring',
+                          'DisableScanOnRealtimeEnable',
+                          'DisableScriptScanning',
+                          'DisableArchiveScanning',
+                          'DisableRawWriteNotification'
+                        ) and registry.data = '1') or
     (registry.path imatches
-      (
-        '*\\Windows Defender\\Spynet\\SpyNetReporting',
-        '*\\Windows Defender\\Spynet\\SubmitSamplesConsent',
-        '*\\DisallowExploitProtectionOverride',
-        '*\\Windows Defender\\Features\\TamperProtection',
-        '*\\Windows Defender\\MpEngine\\MpEnablePus'
-      ) and registry.value = 0
+                        (
+                          '*\\Windows Defender\\Spynet\\SpyNetReporting',
+                          '*\\Windows Defender\\Spynet\\SubmitSamplesConsent',
+                          '*\\DisallowExploitProtectionOverride',
+                          '*\\Windows Defender\\Features\\TamperProtection',
+                          '*\\Windows Defender\\MpEngine\\MpEnablePus'
+                        ) and registry.data = '0'
     )
-  )
-    and
+  ) and
   ps.exe not imatches
-    (
-      '?:\\Program Files\\Symantec\\Symantec Endpoint Protection\\sepWscSvc64.exe',
-      '?:\\ProgramData\\Microsoft\\Windows Defender\\Platform\\*\\ConfigSecurityPolicy.exe',
-      '?:\\ProgramData\\Microsoft\\Windows Defender\\Platform\\*\\MsMpEng.exe',
-      '?:\\ProgramData\\Microsoft\\Windows Defender\\*\\NisSrv.exe'
-    )
+            (
+              '?:\\Program Files\\Symantec\\Symantec Endpoint Protection\\sepWscSvc64.exe',
+              '?:\\ProgramData\\Microsoft\\Windows Defender\\Platform\\*\\ConfigSecurityPolicy.exe',
+              '?:\\ProgramData\\Microsoft\\Windows Defender\\Platform\\*\\MsMpEng.exe',
+              '?:\\ProgramData\\Microsoft\\Windows Defender\\*\\NisSrv.exe'
+            )
 action:
   - name: kill
 

@@ -108,16 +108,14 @@
 
 - macro: inbound_network
   expr: >
-    (recv_socket or accept_socket)
-        and
+    (recv_socket or accept_socket) and
     ((net.sip != 0.0.0.0 or net.dip != 0.0.0.0) and (net.sip not in ('0:0:0:0:0:0:0:1', '::1') or net.dip not in ('0:0:0:0:0:0:0:1', '::1')) and not (cidr_contains(net.sip, '127.0.0.0/8') or cidr_contains(net.dip, '127.0.0.0/8')))
   description: |
     Detects inbound network traffic excluding source/destination loopback addresses/address spaces.
 
 - macro: outbound_network
   expr: >
-    (send_socket or connect_socket)
-        and
+    (send_socket or connect_socket) and
     (net.dip != 0.0.0.0 and net.dip not in ('0:0:0:0:0:0:0:1', '::1') and not cidr_contains(net.dip, '127.0.0.0/8', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16'))
   description: |
     Detects outbound network traffic excluding unspecified destination IP addresses,
@@ -125,8 +123,7 @@
 
 - macro: load_driver
   expr: >
-    (load_module and (image.name iendswith '.sys' or image.is_driver))
-      or
+    (load_module and (image.name iendswith '.sys' or image.is_driver)) or
     (create_handle and handle.type = 'Driver')
   description: |
     Detects the loading of the kernel driver. Image load events are published when
@@ -161,16 +158,14 @@
 
 - macro: load_untrusted_executable
   expr: >
-    load_executable
-      and
+    load_executable and
     (image.signature.level = 'UNCHECKED' or image.signature.level = 'UNSIGNED')
   description:
     Detects when untrusted executable is loaded into process address space.
 
 - macro: load_untrusted_dll
   expr: >
-    load_dll
-      and
+    load_dll and
     (image.signature.level = 'UNCHECKED' or image.signature.level = 'UNSIGNED')
   description:
     Detects when untrusted DLL is loaded into process address space.
@@ -191,8 +186,7 @@
 
 - macro: load_untrusted_module
   expr: >
-    load_module
-      and
+    load_module and
     (image.signature.level = 'UNCHECKED' or image.signature.level = 'UNSIGNED')
   description: |
     Detects when untrusted executable or DLL is loaded into process address space.
@@ -212,16 +206,14 @@
 
 - macro: write_minidump_file
   expr: >
-    create_file
-      and
+    create_file and
     (
       file.extension iin
-      (
-        '.dmp',
-        '.mdmp',
-        '.dump'
-      )
-        or
+                    (
+                      '.dmp',
+                      '.mdmp',
+                      '.dump'
+                    ) or
       is_minidump(file.path)
     )
   description: |

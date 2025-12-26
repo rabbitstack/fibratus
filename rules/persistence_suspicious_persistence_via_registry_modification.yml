@@ -1,6 +1,6 @@
 name: Suspicious persistence via registry modification
 id: 1f496a17-4f0c-491a-823b-7a70adb9919c
-version: 1.0.3
+version: 1.0.4
 description: |
   Adversaries may abuse the registry to achieve persistence
   by modifying the keys that are unlikely modified by legitimate
@@ -17,16 +17,12 @@ labels:
   subtechnique.ref: https://attack.mitre.org/techniques/T1547/001/
 
 condition: >
-  modify_registry
-    and
+  modify_registry and
   (
-    (ps.name in script_interpreters or ps.name in ('reg.exe', 'rundll32.exe', 'regsvr32.exe'))
-      or
-     ps.exe imatches '?:\\Users\\Public\\*'
-      or
+    (ps.name in script_interpreters or ps.name in ('reg.exe', 'rundll32.exe', 'regsvr32.exe')) or
+     ps.exe imatches '?:\\Users\\Public\\*' or
      pe.is_signed = false or pe.is_trusted = false
-  )
-    and
+  ) and
   registry.path imatches registry_persistence_keys
 
 min-engine-version: 3.0.0
