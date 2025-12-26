@@ -26,6 +26,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 
 	errs "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/event"
@@ -199,6 +200,7 @@ func (f *filter) RunSequence(e *event.Event, seqID int, partials map[int][]*even
 		return false
 	}
 	valuer := f.mapValuer(e)
+	defer valuerPool.Put(valuer)
 	expr := f.seq.Expressions[seqID]
 
 	if rawMatch {
@@ -412,12 +414,18 @@ func InterpolateFields(s string, evts []*event.Event) string {
 	return r
 }
 
+var valuerPool = sync.Pool{
+	New: func() any {
+		return make(map[string]any)
+	},
+}
+
 // mapValuer for each field present in the AST, we run the
 // accessors and extract the field values that are
 // supplied to the valuer. The valuer feeds the
 // expression with correct values.
-func (f *filter) mapValuer(evt *event.Event) map[string]interface{} {
-	valuer := make(map[string]interface{}, len(f.fields))
+func (f *filter) mapValuer(evt *event.Event) map[string]any {
+	valuer := valuerPool.Get().(map[string]any)
 	for _, field := range f.fields {
 		for _, accessor := range f.accessors {
 			if !accessor.IsFieldAccessible(evt) {
