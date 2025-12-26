@@ -153,7 +153,7 @@ func (*evtAccessor) Get(f Field, evt *event.Event) (params.Value, error) {
 // referenced in the bound field.
 func (f *filter) narrowAccessors() {
 	var (
-		removeKevtAccessor       = true
+		removeEvtAccessor        = true
 		removePsAccessor         = true
 		removeThreadAccessor     = true
 		removeImageAccessor      = true
@@ -169,8 +169,8 @@ func (f *filter) narrowAccessors() {
 
 	for _, field := range f.fields {
 		switch {
-		case field.Name.IsKevtField():
-			removeKevtAccessor = false
+		case field.Name.IsKevtField(), field.Name.IsEvtField():
+			removeEvtAccessor = false
 		case field.Name.IsPsField():
 			removePsAccessor = false
 		case field.Name.IsThreadField():
@@ -196,7 +196,7 @@ func (f *filter) narrowAccessors() {
 		}
 	}
 
-	if removeKevtAccessor {
+	if removeEvtAccessor {
 		f.removeAccessor(&evtAccessor{})
 	}
 	if removePsAccessor {
