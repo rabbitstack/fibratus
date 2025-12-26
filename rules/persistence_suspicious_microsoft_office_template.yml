@@ -1,6 +1,6 @@
 name: Suspicious Microsoft Office template
 id: c4be3b30-9d23-4a33-b974-fb12e17487a2
-version: 1.0.3
+version: 1.0.4
 description: |
   Detects when attackers drop macro-enabled files in specific
   folders to trigger their execution every time the victim user
@@ -19,24 +19,21 @@ references:
   - https://cyberint.com/blog/research/office-templates-and-globaldotname-a-stealthy-office-persistence-technique/
 
 condition: >
-  create_file
-    and
+  create_file and
   file.path imatches
-    (
-      '?:\\Users\\*\\AppData\\Roaming\\Microsoft\\Word\\Startup\\*',
-      '?:\\Users\\*\\AppData\\Roaming\\Microsoft\\Templates\\*.dotm',
-      '?:\\Users\\*\\AppData\\Roaming\\Microsoft\\Excel\\XLSTART\\*',
-      '?:\\Users\\*\\AppData\\Roaming\\Microsoft\\AddIns\\*',
-      '?:\\Users\\*\\AppData\\Roaming\\Microsoft\\Outlook\\*.otm'
-    )
-    and
-  ps.name not iin msoffice_binaries
-    and
+            (
+              '?:\\Users\\*\\AppData\\Roaming\\Microsoft\\Word\\Startup\\*',
+              '?:\\Users\\*\\AppData\\Roaming\\Microsoft\\Templates\\*.dotm',
+              '?:\\Users\\*\\AppData\\Roaming\\Microsoft\\Excel\\XLSTART\\*',
+              '?:\\Users\\*\\AppData\\Roaming\\Microsoft\\AddIns\\*',
+              '?:\\Users\\*\\AppData\\Roaming\\Microsoft\\Outlook\\*.otm'
+            ) and
+  ps.name not iin msoffice_binaries and
   ps.exe not imatches
-    (
-      '?:\\Program Files\\*.exe',
-      '?:\\Program Files (x86)\\*.exe'
-    )
+            (
+              '?:\\Program Files\\*.exe',
+              '?:\\Program Files (x86)\\*.exe'
+            )
 
 output: >
   Office template %file.path created by suspicious process %ps.exe

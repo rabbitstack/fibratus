@@ -1,6 +1,6 @@
 name: Suspicious XSL script execution
 id: 65136b30-14ae-46dd-b8e5-9dfa99690d74
-version: 1.0.2
+version: 1.0.3
 description: |
   Identifies a suspicious execution of XSL script via Windows Management Instrumentation command line tool or XSL
   transformation utility. Adversaries may bypass application control and obscure the execution of code by embedding 
@@ -19,23 +19,22 @@ references:
 condition: >
   sequence
   maxspan 3m
-    |spawn_process and (((ps.child.name ~= 'wmic.exe' or ps.child.pe.file.name ~= 'wmic.exe') and ps.child.cmdline imatches
-      ('* format*:*', '*/format*:*', '*-format*:*')
-        and
-      ps.child.cmdline not imatches
-        (
-          '*format:list*',
-          '*format:htable*',
-          '*format:hform*',
-          '*format:table*',
-          '*format:mof*',
-          '*format:value*',
-          '*format:rawxml*',
-          '*format:xml*',
-          '*format:csv*'
-        )
-      )
-        or
+    |spawn_process and
+     (((ps.child.name ~= 'wmic.exe' or ps.child.pe.file.name ~= 'wmic.exe') and
+     ps.child.cmdline imatches ('* format*:*', '*/format*:*', '*-format*:*') and
+     ps.child.cmdline not imatches
+                          (
+                            '*format:list*',
+                            '*format:htable*',
+                            '*format:hform*',
+                            '*format:table*',
+                            '*format:mof*',
+                            '*format:value*',
+                            '*format:rawxml*',
+                            '*format:xml*',
+                            '*format:csv*'
+                          )
+      ) or
       ps.child.name ~= 'msxsl.exe' or ps.child.pe.file.name ~= 'msxsl.exe'
      )
     | by ps.child.uuid

@@ -1,6 +1,6 @@
 name: Script interpreter host or untrusted process persistence
 id: cc41ee3a-6e44-4903-85a4-0147ec6a7eea
-version: 1.1.1
+version: 1.1.2
 description: |
   Identifies the script interpreter or untrusted process writing to commonly 
   abused run keys or the Startup folder locations.
@@ -16,33 +16,26 @@ labels:
   subtechnique.ref: https://attack.mitre.org/techniques/T1547/001/
 
 condition: >
-  (((modify_registry) or (create_file)) and evt.pid != 4)
-    and
-  (ps.name in script_interpreters or ps.parent.name in script_interpreters or pe.is_trusted = false)
-    and
-  (registry.path imatches registry_run_keys or file.path imatches startup_locations)
-    and
-    not
-  (
-    ps.exe imatches
-      (
-        '?:\\Windows\\explorer.exe',
-        '?:\\Windows\\System32\\services.exe',
-        '?:\\Windows\\System32\\svchost.exe',
-        '?:\\Windows\\System32\\msiexec.exe',
-        '?:\\Program Files*\\Google\\Chrome\\Application\\chrome.exe',
-        '?:\\Program Files*\\Mozilla Firefox\\firefox.exe',
-        '?:\\Program Files*\\Opera\\*\\opera.exe',
-        '?:\\Program Files*\\Microsoft\\Edge\\Application\\msedge.exe',
-        '?:\\Program Files\\Microsoft\\Edge\\Application\\*\\msedge.exe',
-        '?:\\Program Files (x86)\\Microsoft\\Edge\\Application\\*\\msedge.exe',
-        '?:\\Users\\*\\AppData\\Local\\Microsoft\\OneDrive\\OneDrive.exe',
-        '?:\\Program Files\\Google\\Drive File Stream\\*\\GoogleDriveFS.exe',
-        '?:\\Users\\*\\AppData\\Local\\Dropbox\\Dropbox.exe'
-      )
-      or
-    (pe.is_signed = true and pe.cert.subject imatches '*Microsoft*')
-  )
+  (((modify_registry) or (create_file)) and evt.pid != 4) and
+  (ps.name in script_interpreters or ps.parent.name in script_interpreters or pe.is_trusted = false) and
+  (registry.path imatches registry_run_keys or file.path imatches startup_locations) and
+  not (ps.exe imatches
+              (
+                '?:\\Windows\\explorer.exe',
+                '?:\\Windows\\System32\\services.exe',
+                '?:\\Windows\\System32\\svchost.exe',
+                '?:\\Windows\\System32\\msiexec.exe',
+                '?:\\Program Files*\\Google\\Chrome\\Application\\chrome.exe',
+                '?:\\Program Files*\\Mozilla Firefox\\firefox.exe',
+                '?:\\Program Files*\\Opera\\*\\opera.exe',
+                '?:\\Program Files*\\Microsoft\\Edge\\Application\\msedge.exe',
+                '?:\\Program Files\\Microsoft\\Edge\\Application\\*\\msedge.exe',
+                '?:\\Program Files (x86)\\Microsoft\\Edge\\Application\\*\\msedge.exe',
+                '?:\\Users\\*\\AppData\\Local\\Microsoft\\OneDrive\\OneDrive.exe',
+                '?:\\Program Files\\Google\\Drive File Stream\\*\\GoogleDriveFS.exe',
+                '?:\\Users\\*\\AppData\\Local\\Dropbox\\Dropbox.exe'
+              ) or
+       (pe.is_signed = true and pe.cert.subject imatches '*Microsoft*'))
 action:
   - name: kill
 

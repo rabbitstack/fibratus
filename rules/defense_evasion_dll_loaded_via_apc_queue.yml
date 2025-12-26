@@ -1,6 +1,6 @@
 name: DLL loaded via APC queue
 id: e1ee3912-ad7c-4acb-80f4-84db87e54d5e
-version: 1.0.2
+version: 1.0.3
 description: |
   Identifies loading of a DLL with a callstack originating from the thread
   alertable state that led to the execution of an APC routine. This may be
@@ -16,18 +16,15 @@ references:
   - https://github.com/Idov31/Cronos
 
 condition: >
-  load_dll and image.name iin 
-    (
-      'winhttp.dll', 'clr.dll', 'bcrypt.dll', 'bcryptprimitives.dll',
-      'wininet.dll', 'taskschd.dll', 'dnsapi.dll', 'coreclr.dll', 'ws2_32.dll',
-      'wmiutils.dll', 'vaultcli.dll', 'System.Management.Automation.dll', 'psapi.dll',
-      'mstscax.dll', 'dsquery.dll', 'mstask.dll', 'bitsproxy.dll'
-    )
-    and 
-  thread.callstack.symbols imatches ('ntdll.dll!KiUserApcDispatcher')
-    and
-  thread.callstack.symbols imatches ('ntdll.dll!ZwDelayExecution')
-    and
+  load_dll and image.name iin
+              (
+                'winhttp.dll', 'clr.dll', 'bcrypt.dll', 'bcryptprimitives.dll',
+                'wininet.dll', 'taskschd.dll', 'dnsapi.dll', 'coreclr.dll', 'ws2_32.dll',
+                'wmiutils.dll', 'vaultcli.dll', 'System.Management.Automation.dll', 'psapi.dll',
+                'mstscax.dll', 'dsquery.dll', 'mstask.dll', 'bitsproxy.dll'
+              ) and
+  thread.callstack.symbols imatches ('ntdll.dll!KiUserApcDispatcher') and
+  thread.callstack.symbols imatches ('ntdll.dll!ZwDelayExecution') and
   thread.callstack.symbols imatches ('KernelBase.dll!Sleep*')
 
 min-engine-version: 3.0.0

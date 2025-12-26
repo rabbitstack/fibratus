@@ -1,6 +1,6 @@
 name: .NET assembly loaded by unmanaged process
 id: 34be8bd1-1143-4fa8-bed4-ae2566b1394a
-version: 1.0.7
+version: 1.0.8
 description: |
   Identifies the loading of the .NET assembly by an unmanaged process. Adversaries can load the CLR runtime
   inside unmanaged process and execute the assembly via the ICLRRuntimeHost::ExecuteInDefaultAppDomain method.
@@ -16,26 +16,24 @@ references:
   - https://www.ired.team/offensive-security/code-injection-process-injection/injecting-and-executing-.net-assemblies-to-unmanaged-process
 
 condition: >
-  (load_unsigned_or_untrusted_module) and ps.exe != '' and pe.is_dotnet = false
-    and
-  (image.is_dotnet or thread.callstack.modules imatches ('*clr.dll'))
-    and
+  (load_unsigned_or_untrusted_module) and
+  ps.exe != '' and pe.is_dotnet = false and
+  (image.is_dotnet or thread.callstack.modules imatches ('*clr.dll')) and
   image.path not imatches
-    (
-      '?:\\Windows\\assembly\\*\\*.ni.dll',
-      '?:\\Program Files\\WindowsPowerShell\\Modules\\*\\*.dll',
-      '?:\\Windows\\Microsoft.NET\\assembly\\*\\*.dll'
-    )
-    and
+                (
+                  '?:\\Windows\\assembly\\*\\*.ni.dll',
+                  '?:\\Program Files\\WindowsPowerShell\\Modules\\*\\*.dll',
+                  '?:\\Windows\\Microsoft.NET\\assembly\\*\\*.dll'
+                ) and
   ps.exe not imatches
-    (
-      '?:\\Program Files\\WindowsApps\\*\\CrossDeviceService.exe',
-      '?:\\Program Files\\WindowsApps\\*\\WidgetService.exe',
-      '?:\\Program Files\\WindowsApps\\*\\PhoneExperienceHost.exe',
-      '?:\\Program Files\\WindowsApps\\*\\WindowsSandboxServer.exe',
-      '?:\\Program Files\\Conexant\\SAII\\SmartAudio.exe',
-      '?:\\Windows\\Microsoft.NET\\Framework*\\mscorsvw.exe'
-    )
+                (
+                  '?:\\Program Files\\WindowsApps\\*\\CrossDeviceService.exe',
+                  '?:\\Program Files\\WindowsApps\\*\\WidgetService.exe',
+                  '?:\\Program Files\\WindowsApps\\*\\PhoneExperienceHost.exe',
+                  '?:\\Program Files\\WindowsApps\\*\\WindowsSandboxServer.exe',
+                  '?:\\Program Files\\Conexant\\SAII\\SmartAudio.exe',
+                  '?:\\Windows\\Microsoft.NET\\Framework*\\mscorsvw.exe'
+                )
 
 output: >
   .NET assembly %image.path loaded by unmanaged process %ps.exe

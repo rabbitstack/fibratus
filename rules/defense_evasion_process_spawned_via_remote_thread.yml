@@ -1,6 +1,6 @@
 name: Process spawned via remote thread
 id: 9a2c7b40-4e5f-4edf-b02e-79cd33c9a137
-version: 1.0.3
+version: 1.0.4
 description: |
   Identifies the creation of a process with the parent call stack not
   revealing normal API functions for process creation. This may be a
@@ -14,10 +14,8 @@ labels:
   technique.ref: https://attack.mitre.org/techniques/T1055/
 
 condition: >
-  spawn_process
-    and
-  thread.callstack.symbols imatches ('ntdll.dll!ZwCreateThreadEx*', 'ntdll.dll!NtCreateThreadEx*', 'ntdll.dll!RtlCreateUserThread')
-    and
+  spawn_process and
+  thread.callstack.symbols imatches ('ntdll.dll!ZwCreateThreadEx*', 'ntdll.dll!NtCreateThreadEx*', 'ntdll.dll!RtlCreateUserThread') and
   thread.callstack.symbols not imatches ('*CreateProcess*', '*CreateUserProcess*')
 action:
   - name: kill

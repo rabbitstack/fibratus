@@ -1,6 +1,6 @@
 name: System Binary Proxy Execution via Rundll32
 id: 43d76718-cc46-485e-8f47-996eb7a9f83b
-version: 1.0.2
+version: 1.0.3
 description: |
   Detects the execution of rundll32.exe process with suspicious command line
   followed by the creation of a possibly malicious child process.
@@ -24,41 +24,38 @@ references:
 condition: >
   sequence
   maxspan 1m
-    |spawn_process
-      and
-     (ps.child.name ~= 'rundll32.exe' or ps.child.pe.file.name ~= 'rundll32.exe')
-      and
-     (
-      ps.child.cmdline imatches
-        (
-          '*javascript:*',
-          '*vbscript:*',
-          '*shell32.dll*ShellExec_RunDLL*',
-          '*shell32*WaitForExplorerRestart*',
-          '*-sta*',
-          '*ActiveXObject*',
-          '*WScript.Shell*',
-          '*RunHTMLApplication*',
-          '*advpack*#12*',
-          '*advpack*RegisterOCX*',
-          '*advpack*LaunchINFSection*',
-          '*url.dll*FileProtocolHandler*file://*',
-          '*url.dll*FileProtocolHandler*.exe*',
-          '*zipfldr*RouteTheCall*',
-          '*pcwutl*LaunchApplication*',
-          '*pcwutl*#1*',
-          '*desk*InstallScreenSaver*',
-          '*PointFunctionCall*'
-        )
-        or
-      regex(ps.child.cmdline, '(?i)[A-Z]:\\\\.+:.+$')
-     )
+    |spawn_process and
+     (ps.child.name ~= 'rundll32.exe' or ps.child.pe.file.name ~= 'rundll32.exe') and
+      (
+        ps.child.cmdline imatches
+                        (
+                          '*javascript:*',
+                          '*vbscript:*',
+                          '*shell32.dll*ShellExec_RunDLL*',
+                          '*shell32*WaitForExplorerRestart*',
+                          '*-sta*',
+                          '*ActiveXObject*',
+                          '*WScript.Shell*',
+                          '*RunHTMLApplication*',
+                          '*advpack*#12*',
+                          '*advpack*RegisterOCX*',
+                          '*advpack*LaunchINFSection*',
+                          '*url.dll*FileProtocolHandler*file://*',
+                          '*url.dll*FileProtocolHandler*.exe*',
+                          '*zipfldr*RouteTheCall*',
+                          '*pcwutl*LaunchApplication*',
+                          '*pcwutl*#1*',
+                          '*desk*InstallScreenSaver*',
+                          '*PointFunctionCall*'
+                        ) or
+        regex(ps.child.cmdline, '(?i)[A-Z]:\\\\.+:.+$')
+      )
     | by ps.child.uuid
     |spawn_process and ps.child.exe not imatches
-      (
-        '?:\\Program Files\\*.exe',
-        '?:\\Program Files (x86)\\*.exe'
-      )
+                        (
+                          '?:\\Program Files\\*.exe',
+                          '?:\\Program Files (x86)\\*.exe'
+                        )
     | by ps.uuid
 action:
   - name: kill

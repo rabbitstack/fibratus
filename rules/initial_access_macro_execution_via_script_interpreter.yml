@@ -1,6 +1,6 @@
 name: Macro execution via script interpreter
 id: 845404de-df6f-472f-bd74-72148a7f5166
-version: 1.0.4
+version: 1.0.5
 description: |
   Identifies the execution of the Windows scripting interpreter spawning
   a Microsoft Office process to execute suspicious Visual Basic macro.
@@ -19,12 +19,9 @@ condition: >
   sequence
   maxspan 5m
     |spawn_process and ps.name iin script_interpreters and ps.child.name iin msoffice_binaries| by ps.child.uuid
-    |ps.name iin msoffice_binaries and thread.callstack.modules imatches '*vbe?.dll'
-      and
-     (spawn_process or (create_remote_thread) or (modify_registry) or (create_file)
-        or
-      (load_module and image.path not imatches ('?:\\Program Files\\*', '?:\\Program Files (x86)\\*'))
-     )
+    |ps.name iin msoffice_binaries and thread.callstack.modules imatches '*vbe?.dll' and
+     (spawn_process or (create_remote_thread) or (modify_registry) or (create_file) or
+     (load_module and image.path not imatches ('?:\\Program Files\\*', '?:\\Program Files (x86)\\*')))
     | by ps.uuid
 
 min-engine-version: 3.0.0

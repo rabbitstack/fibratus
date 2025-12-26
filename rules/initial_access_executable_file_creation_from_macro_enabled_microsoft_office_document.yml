@@ -1,6 +1,6 @@
 name: Executable file creation from a macro-enabled Microsoft Office document
 id: fffcce75-2427-406e-9597-1f49b0c9ad5b
-version: 1.0.2
+version: 1.0.3
 description: |
   Identifies the Microsoft Office process writing an executable file type and
   the call stack reveals the file creation was originated from the Microsoft
@@ -18,16 +18,14 @@ labels:
   subtechnique.ref: https://attack.mitre.org/techniques/T1566/001/
 
 condition: >
-  create_file and ps.name in msoffice_binaries
-    and
-  thread.callstack.modules imatches 'vbe?.dll'
-    and
+  create_file and
+  ps.name in msoffice_binaries and
+  thread.callstack.modules imatches 'vbe?.dll' and
   (
     file.extension iin ('.vbs', '.js', '.jar', '.exe', '.dll', '.com',
                         '.ps1', '.hta', '.cmd', '.vbe', '.rar.', '.zip',
                         '.iso', '.img', '.wsh', '.bat', '.cpl', '.7z'
-                        )
-      or
+                        ) or
     (file.is_exec or file.is_dll)
   )
 

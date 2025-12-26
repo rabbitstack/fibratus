@@ -1,6 +1,6 @@
 name: Hidden registry key creation
 id: 65deda38-9b1d-42a0-9f40-a68903e81b49
-version: 1.1.5
+version: 1.1.6
 description: |
   Identifies the creation of a hidden registry key. Adversaries can utilize the
   native NtSetValueKey API to create a hidden registry key and conceal payloads
@@ -16,28 +16,25 @@ references:
   - https://github.com/outflanknl/SharpHide
 
 condition: >
-  set_value and evt.pid != 4 and registry.path endswith '\\' 
-    and
-  thread.callstack.symbols imatches ('ntdll.dll!NtSetValueKey', 'ntdll.dll!ZwSetValueKey')
-    and
-  thread.callstack.symbols not imatches ('KernelBase.dll!RegSetValue*', 'KernelBase.dll!RegLoadAppKey*', 'KernelBase.dll!GetFileAttributes*')
-    and
+  set_value and
+  evt.pid != 4 and registry.path endswith '\\' and
+  thread.callstack.symbols imatches ('ntdll.dll!NtSetValueKey', 'ntdll.dll!ZwSetValueKey') and
+  thread.callstack.symbols not imatches ('KernelBase.dll!RegSetValue*', 'KernelBase.dll!RegLoadAppKey*', 'KernelBase.dll!GetFileAttributes*') and
   ps.exe not imatches
-    (
-      '?:\\Program Files (x86)\\Microsoft\\EdgeUpdate\\MicrosoftEdgeUpdate.exe',
-      '?:\\Program Files\\Microsoft\\EdgeUpdate\\MicrosoftEdgeUpdate.exe',
-      '?:\\Windows\\System32\\sppsvc.exe',
-      '?:\\Windows\\System32\\compattelrunner.exe',
-      '?:\\Windows\\explorer.exe',
-      '?:\\Windows\\System32\\lsass.exe',
-      '?:\\Windows\\System32\\svchost.exe'
-    )
-    and
+            (
+              '?:\\Program Files (x86)\\Microsoft\\EdgeUpdate\\MicrosoftEdgeUpdate.exe',
+              '?:\\Program Files\\Microsoft\\EdgeUpdate\\MicrosoftEdgeUpdate.exe',
+              '?:\\Windows\\System32\\sppsvc.exe',
+              '?:\\Windows\\System32\\compattelrunner.exe',
+              '?:\\Windows\\explorer.exe',
+              '?:\\Windows\\System32\\lsass.exe',
+              '?:\\Windows\\System32\\svchost.exe'
+            ) and
   ps.parent.exe not imatches
-    (
-      '?:\\WINDOWS\\uus\\*\\wuaucltcore.exe',
-      '?:\\WINDOWS\\System32\\svchost.exe'
-    )
+            (
+              '?:\\WINDOWS\\uus\\*\\wuaucltcore.exe',
+              '?:\\WINDOWS\\System32\\svchost.exe'
+            )
 
 output: >
   Hidden registry key %registry.path created by process %ps.exe

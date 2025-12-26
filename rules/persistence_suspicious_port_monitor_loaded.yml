@@ -1,6 +1,6 @@
 name: Suspicious port monitor loaded
 id: d6ab6bfa-1a97-46cb-a69a-7a6c98a699f1
-version: 1.0.2
+version: 1.0.3
 description: |
   Identifies the loading of an unsigned DLL by the print spool service. Adversaries may use port
   monitors to run an adversary supplied DLL during system boot for persistence or privilege escalation.
@@ -18,8 +18,8 @@ references:
   - https://www.ired.team/offensive-security/persistence/t1013-addmonitor
 
 condition: >
-  (load_unsigned_or_untrusted_dll) and ps.name ~= 'spoolsv.exe'
-    and
+  (load_unsigned_or_untrusted_dll) and
+  ps.name ~= 'spoolsv.exe' and
   thread.callstack.symbols imatches ('localspl.dll!SplAddMonitor*', 'spoolsv.exe!PrvAddMonitor*')
 
 min-engine-version: 3.0.0

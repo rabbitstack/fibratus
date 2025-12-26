@@ -1,6 +1,6 @@
 name: Regsvr32 scriptlet execution
 id: 128f5254-67c9-43ac-b901-18b3731b1d0b
-version: 1.0.2
+version: 1.0.3
 description: |
   Identifies the execution of a scriptlet file by regsvr32.exe process. regsvr32.exe
   allows attackers to run arbitrary scripts to proxy execution of malicious code.
@@ -16,55 +16,46 @@ labels:
   subtechnique.ref: https://attack.mitre.org/techniques/T1218/010/
 
 condition: >
-  spawn_process
-    and
-  (ps.child.name ~= 'regsvr32.exe' or ps.child.pe.file.name ~= 'regsvr32.exe')
-    and
-  (
-    (ps.child.cmdline imatches '*scrobj*'
-      and
-     ps.child.cmdline imatches
-      (
-        '*/i:*',
-        '*-i:*',
-        '*.sct*'
-      )
-    )
-      or
-    (ps.child.cmdline imatches '* /u*'
-      and
-     ps.child.cmdline imatches
-      (
-        '* -i:*http*',
-        '* /i:*http*',
-        '* -i:*ftp*',
-        '* /i:*ftp*',
-        '* -i:C:\\*',
-        '* /i:\"C:\\*',
-        '* /i:C:\\*',
-        '* -i:\"C:\\*'
-      )
-    )
-      or
-    (ps.child.cmdline imatches
-      (
-        '* /i:*',
-        '* -i:*'
-      )
-      and
-      not
-     ps.child.cmdline imatches
-      (
-        '* /n*',
-        '* -n*'
-      )
-    )
-  )
-    and
-  ps.child.exe not imatches
+  spawn_process and
+  (ps.child.name ~= 'regsvr32.exe' or ps.child.pe.file.name ~= 'regsvr32.exe') and
     (
-      '?:\\Program Files\\*.exe',
-      '?:\\Program Files (x86)\\*.exe'
-    )
+      (ps.child.cmdline imatches '*scrobj*' and
+       ps.child.cmdline imatches
+                        (
+                          '*/i:*',
+                          '*-i:*',
+                          '*.sct*'
+                        )
+      ) or
+      (ps.child.cmdline imatches '* /u*' and
+       ps.child.cmdline imatches
+                        (
+                          '* -i:*http*',
+                          '* /i:*http*',
+                          '* -i:*ftp*',
+                          '* /i:*ftp*',
+                          '* -i:C:\\*',
+                          '* /i:\"C:\\*',
+                          '* /i:C:\\*',
+                          '* -i:\"C:\\*'
+                        )
+      ) or
+      (ps.child.cmdline imatches
+                        (
+                          '* /i:*',
+                          '* -i:*'
+                        ) and
+      ps.child.cmdline not imatches
+                        (
+                          '* /n*',
+                          '* -n*'
+                        )
+      )
+    ) and
+  ps.child.exe not imatches
+                  (
+                    '?:\\Program Files\\*.exe',
+                    '?:\\Program Files (x86)\\*.exe'
+                  )
 
 min-engine-version: 3.0.0
