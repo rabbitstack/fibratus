@@ -563,7 +563,8 @@ func (f Field) String() string { return string(f) }
 func (f Field) Type() params.Type { return fields[f].Type }
 
 func (f Field) IsPsField() bool         { return strings.HasPrefix(string(f), "ps.") }
-func (f Field) IsKevtField() bool       { return strings.HasPrefix(string(f), "evt.") }
+func (f Field) IsKevtField() bool       { return strings.HasPrefix(string(f), "kevt.") }
+func (f Field) IsEvtField() bool        { return strings.HasPrefix(string(f), "evt.") }
 func (f Field) IsThreadField() bool     { return strings.HasPrefix(string(f), "thread.") }
 func (f Field) IsImageField() bool      { return strings.HasPrefix(string(f), "image.") }
 func (f Field) IsFileField() bool       { return strings.HasPrefix(string(f), "file.") }

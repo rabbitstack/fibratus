@@ -19,11 +19,14 @@
 package filter
 
 import (
+	"net"
 	"path/filepath"
+	"strings"
 
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
+	"github.com/rabbitstack/fibratus/pkg/util/bytes"
 	"github.com/rabbitstack/fibratus/pkg/util/loldrivers"
 	"github.com/rabbitstack/fibratus/pkg/util/signature"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
@@ -112,4 +115,127 @@ func framePID(e *event.Event) uint32 {
 		return e.Callstack.FrameAt(0).PID
 	}
 	return e.PID
+}
+
+// CompareSeqLink returns true if any value
+// in the sequence link slice equals to the
+// given LHS value.
+func CompareSeqLink(lhs any, rhs []any) bool {
+	if lhs == nil || rhs == nil {
+		return false
+	}
+	for _, v := range rhs {
+		if compareSeqLink(lhs, v) {
+			return true
+		}
+	}
+	return false
+}
+
+// CompareSeqLinks returns true any LHS sequence
+// link values equal to the RHS sequence link values.
+func CompareSeqLinks(lhs []any, rhs []any) bool {
+	if lhs == nil || rhs == nil {
+		return false
+	}
+	for _, v1 := range lhs {
+		for _, v2 := range rhs {
+			if compareSeqLink(v1, v2) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func compareSeqLink(lhs any, rhs any) bool {
+	if lhs == nil || rhs == nil {
+		return false
+	}
+
+	switch v := lhs.(type) {
+	case string:
+		s, ok := rhs.(string)
+		if !ok {
+			return false
+		}
+		return strings.EqualFold(v, s)
+	case uint8:
+		n, ok := rhs.(uint8)
+		if !ok {
+			return false
+		}
+		return v == n
+	case uint16:
+		n, ok := rhs.(uint16)
+		if !ok {
+			return false
+		}
+		return v == n
+	case uint32:
+		n, ok := rhs.(uint32)
+		if !ok {
+			return false
+		}
+		return v == n
+	case uint64:
+		n, ok := rhs.(uint64)
+		if !ok {
+			return false
+		}
+		if v == n {
+			return true
+		}
+	case int:
+		n, ok := rhs.(int)
+		if !ok {
+			return false
+		}
+		return v == n
+	case uint:
+		n, ok := rhs.(uint)
+		if !ok {
+			return false
+		}
+		return v == n
+	case net.IP:
+		ip, ok := rhs.(net.IP)
+		if !ok {
+			return false
+		}
+		return v.Equal(ip)
+	}
+	return false
+}
+
+// appendHash appends the value's hashable bytes to buf.
+func appendHash(buf []byte, v any) []byte {
+	switch val := v.(type) {
+	case uint8:
+		return append(buf, val)
+	case uint16:
+		return append(buf, bytes.WriteUint16(val)...)
+	case uint32:
+		return append(buf, bytes.WriteUint32(val)...)
+	case uint64:
+		return append(buf, bytes.WriteUint64(val)...)
+	case int8:
+		return append(buf, byte(val))
+	case int16:
+		return append(buf, bytes.WriteUint16(uint16(val))...)
+	case int32:
+		return append(buf, bytes.WriteUint32(uint32(val))...)
+	case int64:
+		return append(buf, bytes.WriteUint64(uint64(val))...)
+	case int:
+		return append(buf, bytes.WriteUint64(uint64(val))...)
+	case uint:
+		return append(buf, bytes.WriteUint64(uint64(val))...)
+	case string:
+		return append(buf, val...)
+	case net.IP:
+		return append(buf, val...)
+	default:
+		return buf
+	}
 }
