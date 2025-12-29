@@ -450,6 +450,8 @@ const (
 	FileName Field = "file.name"
 	// FilePath represents the file full path (e.g. C:\Windows\System32\cmd.exe)
 	FilePath Field = "file.path"
+	// FilePathStem represents the full file path without extension (e.g. C:\Windows\System32\cmd)
+	FilePathStem Field = "file.path.stem"
 	// FileExtension represents the file extension (e.g. .exe or .dll)
 	FileExtension Field = "file.extension"
 	// FileOperation represents the file operation (e.g. create)
@@ -522,6 +524,8 @@ const (
 	ImageDefaultAddress Field = "image.default.address"
 	// ImagePath is the module full path
 	ImagePath Field = "image.path"
+	// ImagePathStem represents the full module path without extension
+	ImagePathStem Field = "image.path.stem"
 	// ImageName is the module name
 	ImageName Field = "image.name"
 	// ImagePID is the pid of the process where the image was loaded
@@ -997,6 +1001,7 @@ var fields = map[Field]FieldInfo{
 	ThreadCallstackFinalUserModuleSignatureCertSubject: {ThreadCallstackFinalUserModuleSignatureCertSubject, "final user space stack frame module signature certificate subject", params.UnicodeString, []string{"thread.callstack.final_user_module.signature.cert.subject imatches '*Microsoft Windows*'"}, nil, nil},
 
 	ImagePath:               {ImagePath, "full image path", params.UnicodeString, []string{"image.patj = 'C:\\Windows\\System32\\advapi32.dll'"}, nil, nil},
+	ImagePathStem:           {ImagePathStem, "full image path without extension", params.UnicodeString, []string{"image.path.stem = 'C:\\Windows\\System32\\advapi32'"}, nil, nil},
 	ImageName:               {ImageName, "image name", params.UnicodeString, []string{"image.name = 'advapi32.dll'"}, nil, nil},
 	ImageBase:               {ImageBase, "the base address of process in which the image is loaded", params.Address, []string{"image.base.address = 'a65d800000'"}, nil, nil},
 	ImageChecksum:           {ImageChecksum, "image checksum", params.Uint32, []string{"image.checksum = 746424"}, nil, nil},
@@ -1019,6 +1024,7 @@ var fields = map[Field]FieldInfo{
 
 	FileObject:                      {FileObject, "file object address", params.Uint64, []string{"file.object = 18446738026482168384"}, nil, nil},
 	FilePath:                        {FilePath, "full file path", params.UnicodeString, []string{"file.path = 'C:\\Windows\\System32'"}, nil, nil},
+	FilePathStem:                    {FilePathStem, "full file path without extension", params.UnicodeString, []string{"file.path.stem = 'C:\\Windows\\System32\\cmd'"}, nil, nil},
 	FileName:                        {FileName, "full file name", params.UnicodeString, []string{"file.name contains 'mimikatz'"}, nil, nil},
 	FileOperation:                   {FileOperation, "file operation", params.AnsiString, []string{"file.operation = 'open'"}, nil, nil},
 	FileShareMask:                   {FileShareMask, "file share mask", params.AnsiString, []string{"file.share.mask = 'rw-'"}, nil, nil},
