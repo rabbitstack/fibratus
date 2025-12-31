@@ -19,6 +19,12 @@
 package ps
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
@@ -31,11 +37,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
-	"os"
-	"path/filepath"
-	"strings"
-	"testing"
-	"time"
 )
 
 func TestWrite(t *testing.T) {
@@ -175,11 +176,7 @@ func TestWrite(t *testing.T) {
 			assert.True(t, (ps.Parent != nil) == (proc.Parent != nil))
 			if found, _ := psnap.Find(evt.PID); found {
 				assert.NotNil(t, evt.PS)
-				if evt.IsProcessRundown() {
-					assert.Equal(t, ps.PID, evt.PS.PID)
-				} else {
-					assert.Equal(t, ps.Ppid, evt.PS.PID)
-				}
+				assert.Equal(t, ps.PID, evt.PS.PID)
 			}
 		})
 	}
