@@ -20,14 +20,15 @@ package ps
 
 import (
 	"expvar"
-	"github.com/rabbitstack/fibratus/pkg/sys"
-	"github.com/rabbitstack/fibratus/pkg/util/va"
-	"golang.org/x/sys/windows"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/rabbitstack/fibratus/pkg/sys"
+	"github.com/rabbitstack/fibratus/pkg/util/va"
+	"golang.org/x/sys/windows"
 
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
@@ -195,18 +196,8 @@ func (s *snapshotter) Write(e *event.Event) error {
 		s.procs[pid] = proc
 	}
 
-	// adjust the process which is generating
-	// the event. For `CreateProcess` events
-	// the process context is scoped to the
-	// parent/creator process. Otherwise, it
-	// is a regular rundown event that doesn't
-	// require consulting the process in the
-	// snapshot state
-	if e.IsProcessRundown() {
-		e.PS = proc
-	} else if !e.IsProcessRundownInternal() && !e.IsCreateProcessInternal() {
-		e.PS = s.procs[e.PID]
-	}
+	// assign process state to the event
+	e.PS = proc
 
 	return err
 }
