@@ -1,6 +1,6 @@
 name: Microsoft Office file execution via script interpreter
 id: bf3ea547-1470-4bcc-9945-3b495d962c2c
-version: 1.0.2
+version: 1.0.3
 description: |
   Identifies the execution via Windows script interpreter of the executable file written 
   by the Microsoft Office process.
@@ -22,13 +22,13 @@ condition: >
      ps.name iin msoffice_binaries and (file.extension iin ('.exe', '.com', '.scr', '.pif', '.bat') or file.is_exec = true)
     | by file.path
     |spawn_process and
-     ps.name iin script_interpreters and
-     ps.child.exe not imatches
+     ps.parent.name iin script_interpreters and
+     ps.exe not imatches
                       (
                         '?:\\Program Files\\*.exe',
                         '?:\\Program Files (x86)\\*.exe'
                       )
-    | by ps.child.exe
+    | by ps.exe
 action:
   - name: kill
 

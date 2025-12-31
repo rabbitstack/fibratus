@@ -1,6 +1,6 @@
 name: Potential injection via .NET debugging
 id: 193ebf2f-e365-4f57-a639-275b7cdf0319
-version: 1.0.4
+version: 1.0.5
 description: |
   Identifies creation of a process on behalf of the CLR debugging facility which may
   be indicative of code injection. The CLR interface utilizes the OpenVirtualProcess
@@ -18,16 +18,16 @@ references:
 
 condition: >
   spawn_process and
-  ps.exe != '' and thread.callstack.symbols imatches ('mscordbi.dll!OpenVirtualProcess') and
-  ps.child.exe not imatches
-                  (
-                    '?:\\Visual Studio\\Common?\\IDE\\devenv.exe',
-                    '?:\\Program Files\\Microsoft Visual Studio\\*.exe',
-                    '?:\\Program Files (x86)\\Microsoft Visual Studio\\*.exe',
-                    '?:\\Program Files\\IIS Express\\iisexpress.exe',
-                    '?:\\Program Files (x86)\\IIS Express\\iisexpress.exe'
-                  ) and 
-  ps.exe not imatches '?:\\Program Files (x86)\\Microsoft Visual Studio\\*.exe'
+  ps.parent.exe != '' and thread.callstack.symbols imatches ('mscordbi.dll!OpenVirtualProcess') and
+  ps.exe not imatches
+            (
+              '?:\\Visual Studio\\Common?\\IDE\\devenv.exe',
+              '?:\\Program Files\\Microsoft Visual Studio\\*.exe',
+              '?:\\Program Files (x86)\\Microsoft Visual Studio\\*.exe',
+              '?:\\Program Files\\IIS Express\\iisexpress.exe',
+              '?:\\Program Files (x86)\\IIS Express\\iisexpress.exe'
+            ) and 
+  ps.parent.exe not imatches '?:\\Program Files (x86)\\Microsoft Visual Studio\\*.exe'
 
 output: >
   Process %ps.exe attached the .NET debugger to process %ps.child.exe for potential code injection
