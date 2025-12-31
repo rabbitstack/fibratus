@@ -1,6 +1,6 @@
 name: Microsoft Office file execution via WMI
 id: 50f6efa2-4d7b-4fb7-b1a9-65c3a24d9152
-version: 1.0.2
+version: 1.0.3
 description: |
   Identifies the execution via Windows Management Instrumentation (WMI) of the binary file written 
   by the Microsoft Office process. Attackers can exploit WMI to silently execute malicious code.
@@ -23,7 +23,7 @@ condition: >
     |create_file and
      ps.name iin msoffice_binaries and (file.extension iin ('.exe', '.com') or file.is_exec = true)
     | by file.path
-    |spawn_process and ps.name ~= 'wmiprvse.exe'| by ps.child.exe
+    |spawn_process and ps.parent.name ~= 'wmiprvse.exe'| by ps.exe
 action:
   - name: kill
 

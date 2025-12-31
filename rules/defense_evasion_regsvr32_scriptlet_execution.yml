@@ -1,6 +1,6 @@
 name: Regsvr32 scriptlet execution
 id: 128f5254-67c9-43ac-b901-18b3731b1d0b
-version: 1.0.3
+version: 1.0.4
 description: |
   Identifies the execution of a scriptlet file by regsvr32.exe process. regsvr32.exe
   allows attackers to run arbitrary scripts to proxy execution of malicious code.
@@ -17,42 +17,42 @@ labels:
 
 condition: >
   spawn_process and
-  (ps.child.name ~= 'regsvr32.exe' or ps.child.pe.file.name ~= 'regsvr32.exe') and
+  (ps.name ~= 'regsvr32.exe' or pe.file.name ~= 'regsvr32.exe') and
     (
-      (ps.child.cmdline imatches '*scrobj*' and
-       ps.child.cmdline imatches
-                        (
-                          '*/i:*',
-                          '*-i:*',
-                          '*.sct*'
-                        )
+      (ps.cmdline imatches '*scrobj*' and
+       ps.cmdline imatches
+                  (
+                    '*/i:*',
+                    '*-i:*',
+                    '*.sct*'
+                  )
       ) or
-      (ps.child.cmdline imatches '* /u*' and
-       ps.child.cmdline imatches
-                        (
-                          '* -i:*http*',
-                          '* /i:*http*',
-                          '* -i:*ftp*',
-                          '* /i:*ftp*',
-                          '* -i:C:\\*',
-                          '* /i:\"C:\\*',
-                          '* /i:C:\\*',
-                          '* -i:\"C:\\*'
-                        )
+      (ps.cmdline imatches '* /u*' and
+       ps.cmdline imatches
+                  (
+                    '* -i:*http*',
+                    '* /i:*http*',
+                    '* -i:*ftp*',
+                    '* /i:*ftp*',
+                    '* -i:C:\\*',
+                    '* /i:\"C:\\*',
+                    '* /i:C:\\*',
+                    '* -i:\"C:\\*'
+                  )
       ) or
-      (ps.child.cmdline imatches
-                        (
-                          '* /i:*',
-                          '* -i:*'
-                        ) and
-      ps.child.cmdline not imatches
-                        (
-                          '* /n*',
-                          '* -n*'
-                        )
+      (ps.cmdline imatches
+                  (
+                    '* /i:*',
+                    '* -i:*'
+                  ) and
+      ps.cmdline not imatches
+                  (
+                    '* /n*',
+                    '* -n*'
+                  )
       )
     ) and
-  ps.child.exe not imatches
+  ps.exe not imatches
                   (
                     '?:\\Program Files\\*.exe',
                     '?:\\Program Files (x86)\\*.exe'

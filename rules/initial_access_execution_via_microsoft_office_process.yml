@@ -1,6 +1,6 @@
 name: Execution via Microsoft Office process
 id: a10ebe66-1b55-4005-a374-840f1e2933a3
-version: 1.0.2
+version: 1.0.3
 description:
   Identifies the execution of the file dropped by Microsoft Office process.
 labels:
@@ -18,6 +18,6 @@ condition: >
   sequence
   maxspan 1h
     |create_file and (file.extension iin executable_extensions or file.is_exec) and ps.name iin msoffice_binaries| by file.path
-    |spawn_process and ps.name iin msoffice_binaries| by ps.child.exe
+    |spawn_process and ps.parent.name iin msoffice_binaries| by ps.exe
 
 min-engine-version: 3.0.0

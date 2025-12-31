@@ -1,6 +1,6 @@
 name: Suspicious HTML Application script execution
 id: 4ec64ac2-851d-41b4-b7d2-910c21de334d
-version: 1.0.3
+version: 1.0.5
 description: |  
   Identifies the execution of scripts via Microsoft HTML Application Host interpreter. Adversaries 
   can proxy the execution of arbitrary script code through a trusted, signed utility to evade defenses.
@@ -20,38 +20,36 @@ references:
 
 condition: >
   spawn_process and
-  (ps.child.name ~= 'mshta.exe' or ps.child.pe.file.name ~= 'mshta.exe') and
-  ps.child.cmdline imatches
-                  (
-                    '*WScript.Shell*',
-                    '*mshtml*RunHTMLApplication*',
-                    '*http*',
-                    '*https*',
-                    '*hXXps',
-                    '*ftp*',
-                    '*.run*',
-                    '*window.close*',
-                    '*mshta*',
-                    '*mshtml*',
-                    '*).Exec()*',
-                    '*script*eval(*',
-                    '*script*GetObject*',
-                    '*vbscript*',
-                    '*\\Users\\*\\Downloads\\*.hta*',
-                    '*.rtf*',
-                    '*.bat*',
-                    '*.dll*',
-                    '*.zip*',
-                    '*.jpg*',
-                    '*.png*',
-                    '*.lnk*',
-                    '*.doc*',
-                    '*.xls*'
-                  ) and
-  ps.exe not imatches
-                  (
-                    '?:\\Program Files (x86)\\Microsoft Office\\Office*\\MSACCESS.EXE'
-                  )
+  (ps.name ~= 'mshta.exe' or pe.file.name ~= 'mshta.exe') and
+  ps.cmdline imatches
+            (
+              '*WScript.Shell*',
+              '*mshtml*RunHTMLApplication*',
+              '*http*',
+              '*https*',
+              '*hXXps',
+              '*ftp*',
+              '*.run*',
+              '*window.close*',
+              '*mshta*',
+              '*mshtml*',
+              '*).Exec()*',
+              '*script*eval(*',
+              '*script*GetObject*',
+              '*vbscript*',
+              '*\\Users\\*\\Downloads\\*.hta*',
+              '*.rtf*',
+              '*.bat*',
+              '*.dll*',
+              '*.zip*',
+              '*.jpg*',
+              '*.png*',
+              '*.lnk*',
+              '*.doc*',
+              '*.xls*'
+            ) and
+  ps.parent.exe not imatches '?:\\Program Files (x86)\\Microsoft Office\\Office*\\MSACCESS.EXE'
+
 action:
   - name: kill
 

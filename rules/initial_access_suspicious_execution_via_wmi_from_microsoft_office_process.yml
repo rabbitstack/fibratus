@@ -1,6 +1,6 @@
 name: Suspicious execution via WMI from a Microsoft Office process
 id: cc3f0bbe-ec53-40a7-9eed-f0a8a3f7d7fa
-version: 1.0.2
+version: 1.0.3
 description: |
   Identifies a suspicious process execution via Windows Management Instrumentation (WMI)
   originated from the Microsoft Office process loading an unusual WMI DLL. This technique
@@ -23,66 +23,67 @@ references:
 condition: >
   sequence
   maxspan 1m
+  by ps.sid
     |load_dll and
      image.name iin ('wmiclnt.dll', 'wbemcomn.dll', 'wmiprov.dll', 'wbemprox.dll', 'wmutils.dll', 'fastprox.dll', 'WMINet_Utils.dll')  and
      (ps.name iin msoffice_binaries or thread.callstack.modules imatches ('*vbe?.dll'))
-    | by ps.sid
+    |
     |spawn_process and
-     ps.name iin ('wmiprvse.exe', 'wmiapsrv.exe') and (ps.child.exe imatches ('?:\\Users\\*.exe', '?:\\ProgramData\\*.exe') or
-     ps.child.name iin 
-                    (
-                      'rundll32.exe',
-                      'regsvr32.exe',
-                      'hh.exe',
-                      'cmd.exe',
-                      'pwsh.exe',
-                      'powershell.exe',
-                      'mshta.exe',
-                      'certutil.exe',
-                      'bitsadmin.exe',
-                      'cscript.exe',
-                      'wscript.exe',
-                      'jsc.exe',
-                      'vssadmin.exe',
-                      'curl.exe',
-                      'wget.exe',
-                      'sc.exe',
-                      'reg.exe',
-                      'schtasks.exe',
-                      'msxsl.exe',
-                      'msbuild.exe',
-                      'regasm.exe',
-                      'regsvcs.exe',
-                      'wmic.exe',
-                      'msiexec.exe'
-                    ) or
-    ps.child.pe.file.name iin 
-                    (
-                      'rundll32.exe',
-                      'regsvr32.exe',
-                      'hh.exe',
-                      'cmd.exe',
-                      'pwsh.exe',
-                      'powershell.exe',
-                      'mshta.exe',
-                      'certutil.exe',
-                      'bitsadmin.exe',
-                      'cscript.exe',
-                      'wscript.exe',
-                      'jsc.exe',
-                      'vssadmin.exe',
-                      'curl.exe',
-                      'wget.exe',
-                      'sc.exe',
-                      'reg.exe',
-                      'schtasks.exe',
-                      'msxsl.exe',
-                      'msbuild.exe',
-                      'regasm.exe',
-                      'regsvcs.exe',
-                      'wmic.exe',
-                      'msiexec.exe'
-                    ))| by ps.child.sid
+     ps.parent.name iin ('wmiprvse.exe', 'wmiapsrv.exe') and (ps.exe imatches ('?:\\Users\\*.exe', '?:\\ProgramData\\*.exe') or
+     ps.name iin 
+             (
+               'rundll32.exe',
+               'regsvr32.exe',
+               'hh.exe',
+               'cmd.exe',
+               'pwsh.exe',
+               'powershell.exe',
+               'mshta.exe',
+               'certutil.exe',
+               'bitsadmin.exe',
+               'cscript.exe',
+               'wscript.exe',
+               'jsc.exe',
+               'vssadmin.exe',
+               'curl.exe',
+               'wget.exe',
+               'sc.exe',
+               'reg.exe',
+               'schtasks.exe',
+               'msxsl.exe',
+               'msbuild.exe',
+               'regasm.exe',
+               'regsvcs.exe',
+               'wmic.exe',
+               'msiexec.exe'
+             ) or
+    pe.file.name iin 
+            (
+              'rundll32.exe',
+              'regsvr32.exe',
+              'hh.exe',
+              'cmd.exe',
+              'pwsh.exe',
+              'powershell.exe',
+              'mshta.exe',
+              'certutil.exe',
+              'bitsadmin.exe',
+              'cscript.exe',
+              'wscript.exe',
+              'jsc.exe',
+              'vssadmin.exe',
+              'curl.exe',
+              'wget.exe',
+              'sc.exe',
+              'reg.exe',
+              'schtasks.exe',
+              'msxsl.exe',
+              'msbuild.exe',
+              'regasm.exe',
+              'regsvcs.exe',
+              'wmic.exe',
+              'msiexec.exe'
+            ))|
 
 output: >
   Suspicious process %2.ps.child.exe launched via WMI from Microsoft Office process %1.ps.cmdline

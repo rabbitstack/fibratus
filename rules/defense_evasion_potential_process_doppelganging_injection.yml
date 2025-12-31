@@ -1,6 +1,6 @@
 name: Potential Process Doppelganging
 id: eb34cf6e-ccc3-4bce-bbcf-013720640a28
-version: 1.0.1
+version: 1.0.2
 description: |
   Adversaries may inject malicious code into process via process doppelganging
   in order to evade process-based defenses as well as possibly elevate privileges.
@@ -50,9 +50,8 @@ references:
 condition: >
   sequence
   maxspan 2m
-  by ps.uuid
-    |create_file and thread.callstack.symbols imatches ('kernel32.dll!CreateFileTransacted*', 'ntdll.dll!RtlSetCurrentTransaction')|
-    |spawn_process|
+    |create_file and thread.callstack.symbols imatches ('kernel32.dll!CreateFileTransacted*', 'ntdll.dll!RtlSetCurrentTransaction')| by ps.uuid
+    |spawn_process| by ps.parent.uuid
 action:
   - name: kill
 

@@ -1,6 +1,6 @@
 name: DLL loaded via a callback function
 id: c7f46d0a-10b2-421a-b33c-f4df79599f2e
-version: 1.0.3
+version: 1.0.5
 description: |
   Identifies module proxying as a method to conceal suspicious callstacks. Adversaries use module proxying
   the hide the origin of the LoadLibrary call from the callstack by loading the library from the callback
@@ -19,7 +19,8 @@ tags:
 condition: >
   sequence
   maxspan 2m
-   |spawn_process| by ps.child.uuid
+  by ps.uuid
+   |spawn_process|
    |load_dll and image.name iin
                 (
                   'winhttp.dll', 'clr.dll', 'bcrypt.dll', 'bcryptprimitives.dll',
@@ -32,7 +33,7 @@ condition: >
                   'ntdll.dll|kernelbase.dll|ntdll.dll|kernel32.dll|ntdll.dll',
                   'ntdll.dll|wow64.dll|wow64cpu.dll|wow64.dll|ntdll.dll|kernelbase.dll|ntdll.dll|kernel32.dll|ntdll.dll'
                 )
-   | by ps.uuid
+   |
 
 output: >
   %2.image.path loaded from callback function by process %ps.exe
