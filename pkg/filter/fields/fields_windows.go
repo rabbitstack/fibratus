@@ -113,70 +113,16 @@ const (
 	PsParentIsPackagedField Field = "ps.parent.is_packaged"
 	// PsParentIsProtectedField represents the field that indicates if the process is to be run as a protected process
 	PsParentIsProtectedField Field = "ps.parent.is_protected"
-
-	// PsSiblingPid represents the sibling process identifier field. Deprecated
-	PsSiblingPid Field = "ps.sibling.pid"
-	// PsSiblingName represents the sibling process name field. Deprecated
-	PsSiblingName Field = "ps.sibling.name"
-	// PsSiblingComm represents the sibling process command line field. Deprecated
-	PsSiblingComm Field = "ps.sibling.comm"
-	// PsSiblingExe represents the sibling process complete executable path field. Deprecated
-	PsSiblingExe Field = "ps.sibling.exe"
-	// PsSiblingArgs represents the sibling process command line arguments path field. Deprecated
-	PsSiblingArgs Field = "ps.sibling.args"
-	// PsSiblingSID represents the sibling process security identifier field. Deprecated
-	PsSiblingSID Field = "ps.sibling.sid"
-	// PsSiblingSessionID represents the sibling process session id field. Deprecated
-	PsSiblingSessionID Field = "ps.sibling.sessionid"
-	// PsSiblingDomain represents the sibling process domain field. Deprecated
-	PsSiblingDomain Field = "ps.sibling.domain"
-	// PsSiblingUsername represents the sibling process username field. Deprecated
-	PsSiblingUsername Field = "ps.sibling.username"
 	// PsUUID represents the unique process identifier
 	PsUUID Field = "ps.uuid"
 	// PsParentUUID represents the unique parent process identifier
 	PsParentUUID Field = "ps.parent.uuid"
-	// PsChildUUID represents the unique child process identifier
-	PsChildUUID Field = "ps.child.uuid"
-
-	// PsChildPid represents the child process identifier field
-	PsChildPid Field = "ps.child.pid"
-	// PsChildName represents the child process name field
-	PsChildName Field = "ps.child.name"
-	// PsChildCmdline represents the child process command line field
-	PsChildCmdline Field = "ps.child.cmdline"
-	// PsChildExe represents the child process complete executable path field
-	PsChildExe Field = "ps.child.exe"
-	// PsChildArgs represents the child process command line arguments path field
-	PsChildArgs Field = "ps.child.args"
-	// PsChildSID represents the child process security identifier field
-	PsChildSID Field = "ps.child.sid"
-	// PsChildSessionID represents the child process session id field
-	PsChildSessionID Field = "ps.child.sessionid"
-	// PsChildDomain represents the child process domain field
-	PsChildDomain Field = "ps.child.domain"
-	// PsChildUsername represents the child process username field
-	PsChildUsername Field = "ps.child.username"
-	// PsChildPeFilename represents the original file name of the child process executable provided at compile-time
-	PsChildPeFilename Field = "ps.child.pe.file.name"
-	// PsChildIsWOW64Field  represents the field that indicates if the 32-bit process is created in 64-bit Windows system
-	PsChildIsWOW64Field Field = "ps.child.is_wow64"
-	// PsChildIsPackagedField represents the field that indicates if a process is packaged with the MSIX technology
-	PsChildIsPackagedField Field = "ps.child.is_packaged"
-	// PsChildIsProtectedField represents the field that indicates if the process is to be run as a protected process
-	PsChildIsProtectedField Field = "ps.child.is_protected"
 	// PsTokenIntegrityLevel represents the field that indicates the current process integrity level
 	PsTokenIntegrityLevel = "ps.token.integrity_level"
 	// PsTokenIsElevated  represents the field that indicates if the current process token is elevated
 	PsTokenIsElevated = "ps.token.is_elevated"
 	// PsTokenElevationType represents the field that indicates if the current process token elevation type
 	PsTokenElevationType = "ps.token.elevation_type"
-	// PsChildTokenIntegrityLevel represents the field that indicates the created/child process integrity level
-	PsChildTokenIntegrityLevel = "ps.child.token.integrity_level"
-	// PsChildTokenIsElevated  represents the field that indicates if the created/child process token is elevated
-	PsChildTokenIsElevated = "ps.child.token.is_elevated"
-	// PsChildTokenElevationType represents the field that indicates if the created/child process token elevation type
-	PsChildTokenElevationType = "ps.child.token.elevation_type"
 	// PsParentTokenIntegrityLevel represents the field that indicates the parent process integrity level
 	PsParentTokenIntegrityLevel = "ps.parent.token.integrity_level"
 	// PsParentTokenIsElevated  represents the field that indicates if the parent process token is elevated
@@ -315,8 +261,6 @@ const (
 	PeCertBefore Field = "pe.cert.before"
 	// PeIsModified is the field that indicates whether disk and in-memory PE headers differ
 	PeIsModified Field = "pe.is_modified"
-	// PePsChildFileName represents the original file name of the child process executable provided at compile-time
-	PePsChildFileName Field = "pe.ps.child.file.name"
 
 	// EvtSeq is the event sequence number
 	EvtSeq Field = "evt.seq"
@@ -626,7 +570,7 @@ func (f Field) IsFileField() bool       { return strings.HasPrefix(string(f), "f
 func (f Field) IsRegistryField() bool   { return strings.HasPrefix(string(f), "registry.") }
 func (f Field) IsNetworkField() bool    { return strings.HasPrefix(string(f), "net.") }
 func (f Field) IsHandleField() bool     { return strings.HasPrefix(string(f), "handle.") }
-func (f Field) IsPeField() bool         { return strings.HasPrefix(string(f), "pe.") || f == PsChildPeFilename }
+func (f Field) IsPeField() bool         { return strings.HasPrefix(string(f), "pe.") }
 func (f Field) IsMemField() bool        { return strings.HasPrefix(string(f), "mem.") }
 func (f Field) IsDNSField() bool        { return strings.HasPrefix(string(f), "dns.") }
 func (f Field) IsThreadpoolField() bool { return strings.HasPrefix(string(f), "threadpool.") }
@@ -634,7 +578,7 @@ func (f Field) IsThreadpoolField() bool { return strings.HasPrefix(string(f), "t
 func (f Field) IsPeSection() bool { return f == PeNumSections }
 func (f Field) IsPeSymbol() bool  { return f == PeSymbols || f == PeNumSymbols || f == PeImports }
 func (f Field) IsPeVersionResource() bool {
-	return f == PeCompany || f == PeCopyright || f == PeDescription || f == PeFileName || f == PeFileVersion || f == PeProduct || f == PeProductVersion || f == PePsChildFileName || f == PsChildPeFilename
+	return f == PeCompany || f == PeCopyright || f == PeDescription || f == PeFileName || f == PeFileVersion || f == PeProduct || f == PeProductVersion
 }
 func (f Field) IsPeVersionResources() bool { return f == PeResources }
 func (f Field) IsPeImphash() bool          { return f == PeImphash }
@@ -917,31 +861,8 @@ var fields = map[Field]FieldInfo{
 	PsAccessMask:                {PsAccessMask, "process desired access rights", params.AnsiString, []string{"ps.access.mask = '0x1400'"}, nil, nil},
 	PsAccessMaskNames:           {PsAccessMaskNames, "process desired access rights as a string list", params.Slice, []string{"ps.access.mask.names in ('SUSPEND_RESUME')"}, nil, nil},
 	PsAccessStatus:              {PsAccessStatus, "process access status", params.UnicodeString, []string{"ps.access.status = 'access is denied.'"}, nil, nil},
-	PsSiblingPid:                {PsSiblingPid, "created or terminated process identifier", params.PID, []string{"ps.sibling.pid = 320"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsChildPid}}, nil},
-	PsChildPid:                  {PsChildPid, "created or terminated process identifier", params.PID, []string{"ps.child.pid = 320"}, nil, nil},
-	PsSiblingName:               {PsSiblingName, "created or terminated process name", params.UnicodeString, []string{"ps.sibling.name = 'notepad.exe'"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsChildName}}, nil},
-	PsChildName:                 {PsChildName, "created or terminated process name", params.UnicodeString, []string{"ps.child.name = 'notepad.exe'"}, nil, nil},
-	PsSiblingComm:               {PsSiblingComm, "created or terminated process command line", params.UnicodeString, []string{"ps.sibling.comm contains '\\k \\v'"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsChildCmdline}}, nil},
-	PsChildCmdline:              {PsChildCmdline, "created or terminated process command line", params.UnicodeString, []string{"ps.child.cmdline contains '\\k \\v'"}, nil, nil},
-	PsSiblingArgs:               {PsSiblingArgs, "created process command line arguments", params.Slice, []string{"ps.sibling.args in ('/cdir', '/-C')"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsChildArgs}}, nil},
-	PsChildArgs:                 {PsChildArgs, "created process command line arguments", params.Slice, []string{"ps.child.args in ('/cdir', '/-C')"}, nil, nil},
-	PsSiblingExe:                {PsSiblingExe, "created, terminated, or opened process id", params.UnicodeString, []string{"ps.sibling.exe contains '\\Windows\\cmd.exe'"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsChildExe}}, nil},
-	PsChildExe:                  {PsChildExe, "created, terminated, or opened process id", params.UnicodeString, []string{"ps.child.exe contains '\\Windows\\cmd.exe'"}, nil, nil},
-	PsSiblingSID:                {PsSiblingSID, "created or terminated process security identifier", params.UnicodeString, []string{"ps.sibling.sid contains 'SERVICE'"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsChildSID}}, nil},
-	PsChildSID:                  {PsChildSID, "created or terminated process security identifier", params.UnicodeString, []string{"ps.child.sid contains 'SERVICE'"}, nil, nil},
-	PsSiblingSessionID:          {PsSiblingSessionID, "created or terminated process session identifier", params.Int16, []string{"ps.sibling.sessionid == 1"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsChildSessionID}}, nil},
-	PsChildSessionID:            {PsChildSessionID, "created or terminated process session identifier", params.Int16, []string{"ps.child.sessionid == 1"}, nil, nil},
-	PsSiblingDomain:             {PsSiblingDomain, "created or terminated process domain", params.UnicodeString, []string{"ps.sibling.domain contains 'SERVICE'"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsChildDomain}}, nil},
-	PsChildDomain:               {PsChildDomain, "created or terminated process domain", params.UnicodeString, []string{"ps.child.domain contains 'SERVICE'"}, nil, nil},
-	PsSiblingUsername:           {PsSiblingUsername, "created or terminated process username", params.UnicodeString, []string{"ps.sibling.username contains 'system'"}, &Deprecation{Since: "1.10.0", Fields: []Field{PsChildUsername}}, nil},
-	PsChildUsername:             {PsChildUsername, "created or terminated process username", params.UnicodeString, []string{"ps.child.username contains 'system'"}, nil, nil},
 	PsUUID:                      {PsUUID, "unique process identifier", params.Uint64, []string{"ps.uuid > 6000054355"}, nil, nil},
 	PsParentUUID:                {PsParentUUID, "unique parent process identifier", params.Uint64, []string{"ps.parent.uuid > 6000054355"}, nil, nil},
-	PsChildUUID:                 {PsChildUUID, "unique child process identifier", params.Uint64, []string{"ps.child.uuid > 6000054355"}, nil, nil},
-	PsChildPeFilename:           {PsChildPeFilename, "original file name of the child process executable supplied at compile-time", params.UnicodeString, []string{"ps.child.pe.file.name = 'NOTEPAD.EXE'"}, nil, nil},
-	PsChildIsWOW64Field:         {PsChildIsWOW64Field, "indicates if the 32-bit child process is created in 64-bit Windows system", params.Bool, []string{"ps.child.is_wow64"}, nil, nil},
-	PsChildIsPackagedField:      {PsChildIsPackagedField, "indicates if the child process is packaged with the MSIX technology", params.Bool, []string{"ps.child.is_packaged"}, nil, nil},
-	PsChildIsProtectedField:     {PsChildIsProtectedField, "indicates if the child process is a protected process", params.Bool, []string{"ps.child.is_protected"}, nil, nil},
 	PsIsWOW64Field:              {PsIsWOW64Field, "indicates if the process generating the event is a 32-bit process created in 64-bit Windows system", params.Bool, []string{"ps.is_wow64"}, nil, nil},
 	PsIsPackagedField:           {PsIsPackagedField, "indicates if the process generating the event is packaged with the MSIX technology", params.Bool, []string{"ps.is_packaged"}, nil, nil},
 	PsIsProtectedField:          {PsIsProtectedField, "indicates if the process generating the event is a protected process", params.Bool, []string{"ps.is_protected"}, nil, nil},
@@ -952,9 +873,6 @@ var fields = map[Field]FieldInfo{
 	PsTokenIntegrityLevel:       {PsTokenIntegrityLevel, "process token integrity level", params.UnicodeString, []string{"ps.token.integrity_level = 'SYSTEM'"}, nil, nil},
 	PsTokenIsElevated:           {PsTokenIsElevated, "indicates if the process token is elevated", params.Bool, []string{"ps.token.is_elevated = true"}, nil, nil},
 	PsTokenElevationType:        {PsTokenElevationType, "process token elevation type", params.AnsiString, []string{"ps.token.elevation_type = 'LIMITED'"}, nil, nil},
-	PsChildTokenIntegrityLevel:  {PsChildTokenIntegrityLevel, "child process token integrity level", params.UnicodeString, []string{"ps.child.token.integrity_level = 'SYSTEM'"}, nil, nil},
-	PsChildTokenIsElevated:      {PsChildTokenIsElevated, "indicates if the child process token is elevated", params.Bool, []string{"ps.child.token.is_elevated = true"}, nil, nil},
-	PsChildTokenElevationType:   {PsChildTokenElevationType, "child process token elevation type", params.AnsiString, []string{"ps.child.token.elevation_type = 'LIMITED'"}, nil, nil},
 	PsParentTokenIntegrityLevel: {PsParentTokenIntegrityLevel, "parent process token integrity level", params.UnicodeString, []string{"ps.parent.token.integrity_level = 'HIGH'"}, nil, nil},
 	PsParentTokenIsElevated:     {PsParentTokenIsElevated, "indicates if the parent process token is elevated", params.Bool, []string{"ps.parent.token.is_elevated = true"}, nil, nil},
 	PsParentTokenElevationType:  {PsParentTokenElevationType, "parent process token elevation type", params.AnsiString, []string{"ps.parent.token.elevation_type = 'LIMITED'"}, nil, nil},
@@ -1089,28 +1007,27 @@ var fields = map[Field]FieldInfo{
 		return true
 	}}},
 
-	PeCompany:         {PeCompany, "internal company name of the file provided at compile-time", params.UnicodeString, []string{"pe.company = 'Microsoft Corporation'"}, nil, nil},
-	PeCopyright:       {PeCopyright, "copyright notice for the file emitted at compile-time", params.UnicodeString, []string{"pe.copyright = '© Microsoft Corporation'"}, nil, nil},
-	PeDescription:     {PeDescription, "internal description of the file provided at compile-time", params.UnicodeString, []string{"pe.description = 'Notepad'"}, nil, nil},
-	PeFileName:        {PeFileName, "original file name supplied at compile-time", params.UnicodeString, []string{"pe.file.name = 'NOTEPAD.EXE'"}, nil, nil},
-	PeFileVersion:     {PeFileVersion, "file version supplied at compile-time", params.UnicodeString, []string{"pe.file.version = '10.0.18362.693 (WinBuild.160101.0800)'"}, nil, nil},
-	PeProduct:         {PeProduct, "internal product name of the file provided at compile-time", params.UnicodeString, []string{"pe.product = 'Microsoft® Windows® Operating System'"}, nil, nil},
-	PeProductVersion:  {PeProductVersion, "internal product version of the file provided at compile-time", params.UnicodeString, []string{"pe.product.version = '10.0.18362.693'"}, nil, nil},
-	PeIsDLL:           {PeIsDLL, "indicates if the loaded image or created file is a DLL", params.Bool, []string{"pe.is_dll'"}, &Deprecation{Since: "2.0.0", Fields: []Field{FileIsDLL, ImageIsDLL}}, nil},
-	PeIsDriver:        {PeIsDriver, "indicates if the loaded image or created file is a driver", params.Bool, []string{"pe.is_driver'"}, &Deprecation{Since: "2.0.0", Fields: []Field{FileIsDriver, ImageIsDriver}}, nil},
-	PeIsExecutable:    {PeIsExecutable, "indicates if the loaded image or created file is an executable", params.Bool, []string{"pe.is_exec'"}, &Deprecation{Since: "2.0.0", Fields: []Field{FileIsExecutable, ImageIsExecutable}}, nil},
-	PeImphash:         {PeImphash, "import hash", params.AnsiString, []string{"pe.impash = '5d3861c5c547f8a34e471ba273a732b2'"}, nil, nil},
-	PeIsDotnet:        {PeIsDotnet, "indicates if PE contains CLR data", params.Bool, []string{"pe.is_dotnet"}, nil, nil},
-	PeAnomalies:       {PeAnomalies, "contains PE anomalies detected during parsing", params.Slice, []string{"pe.anomalies in ('number of sections is 0')"}, nil, nil},
-	PeIsSigned:        {PeIsSigned, "indicates if the PE has embedded or catalog signature", params.Bool, []string{"pe.is_signed"}, nil, nil},
-	PeIsTrusted:       {PeIsTrusted, "indicates if the PE certificate chain is trusted", params.Bool, []string{"pe.is_trusted"}, nil, nil},
-	PeCertSerial:      {PeCertSerial, "PE certificate serial number", params.UnicodeString, []string{"pe.cert.serial = '330000023241fb59996dcc4dff000000000232'"}, nil, nil},
-	PeCertSubject:     {PeCertSubject, "PE certificate subject", params.UnicodeString, []string{"pe.cert.subject contains 'Washington, Redmond, Microsoft Corporation'"}, nil, nil},
-	PeCertIssuer:      {PeCertIssuer, "PE certificate CA", params.UnicodeString, []string{"pe.cert.issuer contains 'Washington, Redmond, Microsoft Corporation'"}, nil, nil},
-	PeCertAfter:       {PeCertAfter, "PE certificate expiration date", params.Time, []string{"pe.cert.after contains '2024-02-01 00:05:42 +0000 UTC'"}, nil, nil},
-	PeCertBefore:      {PeCertBefore, "PE certificate enrollment date", params.Time, []string{"pe.cert.before contains '2024-02-01 00:05:42 +0000 UTC'"}, nil, nil},
-	PeIsModified:      {PeIsModified, "indicates if disk and in-memory PE headers differ", params.Bool, []string{"pe.is_modified"}, nil, nil},
-	PePsChildFileName: {PePsChildFileName, "original file name of the child process executable supplied at compile-time", params.UnicodeString, []string{"pe.ps.child.file.name = 'NOTEPAD.EXE'"}, &Deprecation{Since: "2.3.0", Fields: []Field{PsChildPeFilename}}, nil},
+	PeCompany:        {PeCompany, "internal company name of the file provided at compile-time", params.UnicodeString, []string{"pe.company = 'Microsoft Corporation'"}, nil, nil},
+	PeCopyright:      {PeCopyright, "copyright notice for the file emitted at compile-time", params.UnicodeString, []string{"pe.copyright = '© Microsoft Corporation'"}, nil, nil},
+	PeDescription:    {PeDescription, "internal description of the file provided at compile-time", params.UnicodeString, []string{"pe.description = 'Notepad'"}, nil, nil},
+	PeFileName:       {PeFileName, "original file name supplied at compile-time", params.UnicodeString, []string{"pe.file.name = 'NOTEPAD.EXE'"}, nil, nil},
+	PeFileVersion:    {PeFileVersion, "file version supplied at compile-time", params.UnicodeString, []string{"pe.file.version = '10.0.18362.693 (WinBuild.160101.0800)'"}, nil, nil},
+	PeProduct:        {PeProduct, "internal product name of the file provided at compile-time", params.UnicodeString, []string{"pe.product = 'Microsoft® Windows® Operating System'"}, nil, nil},
+	PeProductVersion: {PeProductVersion, "internal product version of the file provided at compile-time", params.UnicodeString, []string{"pe.product.version = '10.0.18362.693'"}, nil, nil},
+	PeIsDLL:          {PeIsDLL, "indicates if the loaded image or created file is a DLL", params.Bool, []string{"pe.is_dll'"}, &Deprecation{Since: "2.0.0", Fields: []Field{FileIsDLL, ImageIsDLL}}, nil},
+	PeIsDriver:       {PeIsDriver, "indicates if the loaded image or created file is a driver", params.Bool, []string{"pe.is_driver'"}, &Deprecation{Since: "2.0.0", Fields: []Field{FileIsDriver, ImageIsDriver}}, nil},
+	PeIsExecutable:   {PeIsExecutable, "indicates if the loaded image or created file is an executable", params.Bool, []string{"pe.is_exec'"}, &Deprecation{Since: "2.0.0", Fields: []Field{FileIsExecutable, ImageIsExecutable}}, nil},
+	PeImphash:        {PeImphash, "import hash", params.AnsiString, []string{"pe.impash = '5d3861c5c547f8a34e471ba273a732b2'"}, nil, nil},
+	PeIsDotnet:       {PeIsDotnet, "indicates if PE contains CLR data", params.Bool, []string{"pe.is_dotnet"}, nil, nil},
+	PeAnomalies:      {PeAnomalies, "contains PE anomalies detected during parsing", params.Slice, []string{"pe.anomalies in ('number of sections is 0')"}, nil, nil},
+	PeIsSigned:       {PeIsSigned, "indicates if the PE has embedded or catalog signature", params.Bool, []string{"pe.is_signed"}, nil, nil},
+	PeIsTrusted:      {PeIsTrusted, "indicates if the PE certificate chain is trusted", params.Bool, []string{"pe.is_trusted"}, nil, nil},
+	PeCertSerial:     {PeCertSerial, "PE certificate serial number", params.UnicodeString, []string{"pe.cert.serial = '330000023241fb59996dcc4dff000000000232'"}, nil, nil},
+	PeCertSubject:    {PeCertSubject, "PE certificate subject", params.UnicodeString, []string{"pe.cert.subject contains 'Washington, Redmond, Microsoft Corporation'"}, nil, nil},
+	PeCertIssuer:     {PeCertIssuer, "PE certificate CA", params.UnicodeString, []string{"pe.cert.issuer contains 'Washington, Redmond, Microsoft Corporation'"}, nil, nil},
+	PeCertAfter:      {PeCertAfter, "PE certificate expiration date", params.Time, []string{"pe.cert.after contains '2024-02-01 00:05:42 +0000 UTC'"}, nil, nil},
+	PeCertBefore:     {PeCertBefore, "PE certificate enrollment date", params.Time, []string{"pe.cert.before contains '2024-02-01 00:05:42 +0000 UTC'"}, nil, nil},
+	PeIsModified:     {PeIsModified, "indicates if disk and in-memory PE headers differ", params.Bool, []string{"pe.is_modified"}, nil, nil},
 
 	MemBaseAddress:    {MemBaseAddress, "region base address", params.Address, []string{"mem.address = '211d13f2000'"}, nil, nil},
 	MemRegionSize:     {MemRegionSize, "region size", params.Uint64, []string{"mem.size > 438272"}, nil, nil},

@@ -21,6 +21,11 @@ package event
 import (
 	"encoding/binary"
 	"fmt"
+	"os"
+	"strings"
+	"sync"
+	"unsafe"
+
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
@@ -29,10 +34,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/hostname"
 	"github.com/rabbitstack/fibratus/pkg/util/ntstatus"
 	"golang.org/x/sys/windows"
-	"os"
-	"strings"
-	"sync"
-	"unsafe"
 )
 
 var (
@@ -111,9 +112,9 @@ func (e *Event) adjustPID() {
 	case Process:
 		// process start events may be logged in the context of the parent or child process.
 		// As a result, the ProcessId member of EVENT_TRACE_HEADER may not correspond to the
-		// process being created, so we set the event pid to be the one of the parent process
+		// process being created, so we extract the process id from the event parameters
 		if e.IsCreateProcess() {
-			e.PID, _ = e.Params.GetPpid()
+			e.PID, _ = e.Params.GetPid()
 		}
 	case Net:
 		if !e.IsDNS() {

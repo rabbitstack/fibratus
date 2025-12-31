@@ -19,6 +19,11 @@
 package rules
 
 import (
+	"net"
+	"os"
+	"testing"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
@@ -31,10 +36,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
-	"net"
-	"os"
-	"testing"
-	"time"
 )
 
 type mockNoopSender struct{}
@@ -192,10 +193,10 @@ func TestRunSequenceRule(t *testing.T) {
 		Category:  event.Process,
 		Name:      "CreateProcess",
 		Tid:       2484,
-		PID:       859,
+		PID:       2243,
 		PS: &types.PS{
-			Name: "explorer.exe",
-			Exe:  "C:\\Windows\\system32\\explorer.exe",
+			Name: "firefox.exe",
+			Exe:  "C:\\Program Files\\Firefox\\firefox.exe",
 		},
 		Params: event.Params{
 			params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: uint32(2243)},
@@ -281,15 +282,15 @@ func TestRunSequenceRuleWithPsUUIDLink(t *testing.T) {
 		Timestamp: time.Now(),
 		Category:  event.Process,
 		Name:      "CreateProcess",
-		Tid:       2484,
+		Tid:       2243,
 		PID:       uint32(os.Getpid()),
 		PS: &types.PS{
 			PID:  uint32(os.Getpid()),
-			Name: "explorer.exe",
-			Exe:  "C:\\Windows\\system32\\explorer.exe",
+			Name: "firefox.exe",
+			Exe:  "C:\\Program Files\\Firefox\\firefox.exe",
 		},
 		Params: event.Params{
-			params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: uint32(2243)},
+			params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: uint32(os.Getpid())},
 			params.ProcessName: {Name: params.ProcessName, Type: params.UnicodeString, Value: "firefox.exe"},
 		},
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
@@ -352,7 +353,7 @@ func TestRunSimpleAndSequenceRules(t *testing.T) {
 			},
 			Params: event.Params{
 				params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: uint32(2243)},
-				params.ProcessName: {Name: params.ProcessName, Type: params.UnicodeString, Value: "firefox.exe"},
+				params.ProcessName: {Name: params.ProcessName, Type: params.UnicodeString, Value: "powershell.exe"},
 			},
 			Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 		},
@@ -383,8 +384,12 @@ func TestRunSimpleAndSequenceRules(t *testing.T) {
 			Tid:       2484,
 			PID:       2243,
 			PS: &types.PS{
-				Name: "cmd.exe",
-				Exe:  "C:\\Windows\\system32\\cmd.exe",
+				Name: "chrome.exe",
+				Exe:  "C:\\Program Files\\Chrome\\chrome.exe",
+				Parent: &types.PS{
+					Name: "cmd.exe",
+					Exe:  "C:\\Windows\\system32\\cmd.exe",
+				},
 			},
 			Params: event.Params{
 				params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: uint32(2243)},
@@ -404,7 +409,7 @@ func TestRunSimpleAndSequenceRules(t *testing.T) {
 		rule     string
 		eventIDs []uint64
 	}{
-		{"Process spawned by powershell", []uint64{1}},
+		{"Powershell process spawned", []uint64{1}},
 		{"Powershell created a temp file", []uint64{1, 2}},
 		{"Spawn Chrome browser", []uint64{10}},
 		{"Command shell spawned Chrome browser", []uint64{1, 10}},
@@ -487,11 +492,11 @@ func TestKillAction(t *testing.T) {
 		Timestamp: time.Now(),
 		Name:      "CreateProcess",
 		Tid:       2484,
-		PID:       859,
+		PID:       pi.ProcessId,
 		Category:  event.Process,
 		PS: &types.PS{
-			Name: "cmd.exe",
-			Exe:  "C:\\Windows\\system32\\svchost-temp.exe",
+			Name: "calc.exe",
+			Exe:  "C:\\Windows\\system32\\calc.exe",
 		},
 		Params: event.Params{
 			params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: pi.ProcessId},

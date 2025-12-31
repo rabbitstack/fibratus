@@ -1,4 +1,4 @@
-name: Process spawned by powershell
+name: Powershell process spawned
 id: 4155539d-31bd-429e-81f9-c17ee1c01f93
 version: 1.0.0
 condition: >

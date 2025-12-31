@@ -19,6 +19,11 @@
 package rules
 
 import (
+	"net"
+	"strconv"
+	"testing"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
@@ -30,10 +35,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows/registry"
-	"net"
-	"strconv"
-	"testing"
-	"time"
 )
 
 func TestSequenceState(t *testing.T) {
@@ -45,7 +46,7 @@ func TestSequenceState(t *testing.T) {
 	maxspan 100ms
   	|evt.name = 'CreateProcess' and ps.name = 'cmd.exe'| by ps.exe
   	|evt.name = 'CreateFile' and file.path icontains 'temp'| by file.path
-		|evt.name = 'CreateProcess'| by ps.child.exe`,
+		|evt.name = 'CreateProcess'| by ps.exe`,
 		&config.Config{EventSource: config.EventSourceConfig{}, Filters: &config.Filters{}})
 
 	require.NoError(t, f.Compile())
@@ -285,13 +286,13 @@ func TestSimpleSequenceMultiplePartials(t *testing.T) {
 			Timestamp: time.Now().Add(time.Duration(i) * time.Millisecond),
 			Name:      "CreateProcess",
 			Tid:       2484,
-			PID:       pid,
+			PID:       pid % 2,
 			PS: &pstypes.PS{
 				Name: "cmd.exe",
 				Exe:  "C:\\Windows\\system32\\cmd.exe",
 			},
 			Params: event.Params{
-				params.ProcessID: {Name: params.ProcessID, Type: params.Uint32, Value: pid % 2},
+				params.ProcessID: {Name: params.ProcessID, Type: params.PID, Value: pid % 2},
 			},
 			Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 		}
@@ -329,12 +330,13 @@ func TestSimpleSequenceMultiplePartials(t *testing.T) {
 		PS: &pstypes.PS{
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\System32\\cmd.exe",
+			PID:  859,
 			Parent: &pstypes.PS{
 				Name: "WmiPrvSE.exe",
 			},
 		},
 		Params: event.Params{
-			params.ProcessID: {Name: params.ProcessID, Type: params.Uint32, Value: uint32(4143)},
+			params.ProcessID: {Name: params.ProcessID, Type: params.PID, Value: uint32(859)},
 		},
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
@@ -348,7 +350,8 @@ func TestSimpleSequenceMultiplePartials(t *testing.T) {
 		Category:  event.File,
 		PS: &pstypes.PS{
 			Name: "cmd.exe",
-			Exe:  "C:\\Windows\\system32\\svchost.exe",
+			Exe:  "C:\\Windows\\system32\\cmd.exe",
+			PID:  859,
 		},
 		Params: event.Params{
 			params.FilePath: {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Temp\\file.tmp"},
@@ -357,7 +360,7 @@ func TestSimpleSequenceMultiplePartials(t *testing.T) {
 	}
 
 	require.False(t, ss.runSequence(e1))
-	// expression matched the partial that satisfy the sequence link
+	// expression matched the partial that satisfies the sequence link
 	assert.Len(t, ss.partials[0], 6)
 	assert.Len(t, ss.partials[1], 0)
 	require.True(t, ss.runSequence(e2))
@@ -447,7 +450,7 @@ func TestComplexSequence(t *testing.T) {
 	f := filter.New(`
 	sequence
   maxspan 1h
-  	|evt.name = 'CreateProcess' and ps.child.name in ('firefox.exe', 'chrome.exe', 'edge.exe')| by ps.child.pid
+  	|evt.name = 'CreateProcess' and ps.name in ('firefox.exe', 'chrome.exe', 'edge.exe')| by ps.pid
 		|evt.name = 'CreateFile' and file.operation = 'CREATE' and file.extension = '.exe'| by ps.pid
   	|evt.name in ('Send', 'Connect')| by ps.pid
 	`, &config.Config{EventSource: config.EventSourceConfig{EnableFileIOEvents: true}, Filters: &config.Filters{}})
@@ -462,10 +465,10 @@ func TestComplexSequence(t *testing.T) {
 		Category:  event.Process,
 		Name:      "CreateProcess",
 		Tid:       2484,
-		PID:       859,
+		PID:       2243,
 		PS: &pstypes.PS{
-			Name: "explorer.exe",
-			Exe:  "C:\\Windows\\system32\\explorer.exe",
+			Name: "firefox.exe",
+			Exe:  "C:\\Program Files\\Firefox\\firefox.exe",
 		},
 		Params: event.Params{
 			params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: uint32(2243)},
@@ -691,8 +694,8 @@ func TestSequenceExpire(t *testing.T) {
 			&config.FilterConfig{Name: "System Binary Proxy Execution via Rundll32"},
 			`sequence
   		 maxspan 2m
-  			|evt.name = 'CreateProcess' and ps.child.name = 'rundll32.exe'| by ps.child.pid
-				|evt.name = 'CreateProcess' and ps.child.name = 'connhost.exe'| by ps.pid
+  			|evt.name = 'CreateProcess' and ps.name = 'rundll32.exe'| by ps.pid
+				|evt.name = 'CreateProcess' and ps.name = 'connhost.exe'| by ps.parent.pid
 			`,
 			[]*event.Event{
 				{
@@ -702,10 +705,10 @@ func TestSequenceExpire(t *testing.T) {
 					Category:  event.Process,
 					Name:      "CreateProcess",
 					Tid:       2484,
-					PID:       859,
+					PID:       2243,
 					PS: &pstypes.PS{
-						Name: "explorer.exe",
-						Exe:  "C:\\Windows\\system32\\explorer.exe",
+						Name: "rundll32.exe",
+						Exe:  "C:\\Windows\\system32\\rundll32.exe",
 					},
 					Params: event.Params{
 						params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: uint32(2243)},
@@ -720,10 +723,14 @@ func TestSequenceExpire(t *testing.T) {
 					Category:  event.Process,
 					Name:      "CreateProcess",
 					Tid:       2484,
-					PID:       2243,
+					PID:       12243,
 					PS: &pstypes.PS{
-						Name: "explorer.exe",
-						Exe:  "C:\\Windows\\system32\\explorer.exe",
+						Name: "connhost.exe",
+						Exe:  "C:\\Windows\\system32\\connhost.exe",
+						Parent: &pstypes.PS{
+							Name: "rundll32.exe",
+							PID:  2243,
+						},
 					},
 					Params: event.Params{
 						params.ProcessID:   {Name: params.ProcessID, Type: params.PID, Value: uint32(12243)},

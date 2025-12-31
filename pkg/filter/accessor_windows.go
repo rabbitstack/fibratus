@@ -21,16 +21,16 @@ package filter
 import (
 	"errors"
 	"expvar"
-	"github.com/rabbitstack/fibratus/pkg/fs"
-	"github.com/rabbitstack/fibratus/pkg/network"
-	psnap "github.com/rabbitstack/fibratus/pkg/ps"
-	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
-	"github.com/rabbitstack/fibratus/pkg/util/signature"
 	"net"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/rabbitstack/fibratus/pkg/fs"
+	"github.com/rabbitstack/fibratus/pkg/network"
+	psnap "github.com/rabbitstack/fibratus/pkg/ps"
+	"github.com/rabbitstack/fibratus/pkg/util/signature"
 
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
@@ -91,14 +91,7 @@ func newPSAccessor(psnap psnap.Snapshotter) Accessor { return &psAccessor{psnap:
 func (ps *psAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 	switch f.Name {
 	case fields.PsPid:
-		// identifier of the process that is generating the event
 		return e.PID, nil
-	case fields.PsSiblingPid, fields.PsChildPid:
-		if e.Category != event.Process {
-			return nil, nil
-		}
-		// the id of a created child process. `e.PID` is the parent process id
-		return e.Params.GetPid()
 	case fields.PsPpid:
 		ps := e.PS
 		if ps == nil {
@@ -111,48 +104,24 @@ func (ps *psAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 			return nil, ErrPsNil
 		}
 		return ps.Name, nil
-	case fields.PsSiblingName, fields.PsChildName:
-		if e.Category != event.Process {
-			return nil, nil
-		}
-		return e.Params.GetString(params.ProcessName)
 	case fields.PsComm, fields.PsCmdline:
 		ps := e.PS
 		if ps == nil {
 			return nil, ErrPsNil
 		}
 		return ps.Cmdline, nil
-	case fields.PsSiblingComm, fields.PsChildCmdline:
-		if e.Category != event.Process {
-			return nil, nil
-		}
-		return e.Params.GetString(params.Cmdline)
 	case fields.PsExe:
 		ps := e.PS
 		if ps == nil {
 			return nil, ErrPsNil
 		}
 		return ps.Exe, nil
-	case fields.PsSiblingExe, fields.PsChildExe:
-		if e.Category != event.Process {
-			return nil, nil
-		}
-		return e.Params.GetString(params.Exe)
 	case fields.PsArgs:
 		ps := e.PS
 		if ps == nil {
 			return nil, ErrPsNil
 		}
 		return ps.Args, nil
-	case fields.PsSiblingArgs, fields.PsChildArgs:
-		if e.Category != event.Process {
-			return nil, nil
-		}
-		cmndline, err := e.Params.GetString(params.Cmdline)
-		if err != nil {
-			return nil, err
-		}
-		return cmdline.Split(cmndline), nil
 	case fields.PsCwd:
 		ps := e.PS
 		if ps == nil {
@@ -165,40 +134,6 @@ func (ps *psAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 			return nil, ErrPsNil
 		}
 		return ps.SID, nil
-	case fields.PsSiblingSID, fields.PsChildSID:
-		if e.Category != event.Process {
-			return nil, nil
-		}
-		sid, err := e.Params.GetSID()
-		if err != nil {
-			return nil, err
-		}
-		return sid.String(), nil
-	case fields.PsSiblingDomain, fields.PsChildDomain:
-		if e.Category != event.Process {
-			return nil, nil
-		}
-		return e.Params.GetString(params.Domain)
-	case fields.PsSiblingUsername, fields.PsChildUsername:
-		if e.Category != event.Process {
-			return nil, nil
-		}
-		return e.Params.GetString(params.Username)
-	case fields.PsChildIsWOW64Field:
-		if e.Category != event.Process {
-			return nil, nil
-		}
-		return (e.Params.MustGetUint32(params.ProcessFlags) & event.PsWOW64) != 0, nil
-	case fields.PsChildIsPackagedField:
-		if e.Category != event.Process {
-			return nil, nil
-		}
-		return (e.Params.MustGetUint32(params.ProcessFlags) & event.PsPackaged) != 0, nil
-	case fields.PsChildIsProtectedField:
-		if e.Category != event.Process {
-			return nil, nil
-		}
-		return (e.Params.MustGetUint32(params.ProcessFlags) & event.PsProtected) != 0, nil
 	case fields.PsIsWOW64Field:
 		ps := e.PS
 		if ps == nil {
@@ -250,11 +185,6 @@ func (ps *psAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 			return nil, nil
 		}
 		return e.GetParamAsString(params.NTStatus), nil
-	case fields.PsSiblingSessionID, fields.PsChildSessionID:
-		if e.Category != event.Process {
-			return nil, nil
-		}
-		return e.Params.GetUint32(params.SessionID)
 	case fields.PsModuleNames:
 		ps := e.PS
 		if ps == nil {
@@ -277,25 +207,6 @@ func (ps *psAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 			return nil, ErrPsNil
 		}
 		return ps.UUID(), nil
-	case fields.PsChildUUID:
-		if e.Category != event.Process {
-			return nil, nil
-		}
-
-		pid, err := e.Params.GetPid()
-		if err != nil {
-			return nil, err
-		}
-		if ps.psnap == nil {
-			return nil, nil
-		}
-
-		proc := ps.psnap.FindAndPut(pid)
-		if proc == nil {
-			return nil, ErrPsNil
-		}
-
-		return proc.UUID(), nil
 	case fields.PsHandleNames:
 		ps := e.PS
 		if ps == nil {
@@ -430,21 +341,6 @@ func (ps *psAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 			return nil, ErrPsNil
 		}
 		return ps.IsProtected, nil
-	case fields.PsChildTokenIntegrityLevel:
-		if e.Category != event.Process {
-			return nil, nil
-		}
-		return e.GetParamAsString(params.ProcessTokenIntegrityLevel), nil
-	case fields.PsChildTokenIsElevated:
-		if e.Category != event.Process {
-			return nil, nil
-		}
-		return e.Params.GetBool(params.ProcessTokenIsElevated)
-	case fields.PsChildTokenElevationType:
-		if e.Category != event.Process {
-			return nil, nil
-		}
-		return e.GetParamAsString(params.ProcessTokenElevationType), nil
 	case fields.PsTokenIntegrityLevel:
 		ps := e.PS
 		if ps == nil {
@@ -1171,18 +1067,9 @@ func (pa *peAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 	// PE enrichment is likely disabled. Load PE data lazily
 	// by only requesting parsing of the PE directories that
 	// are relevant to the fields present in the expression.
-	// If the field references a child process executable
-	// original file name as part of the CreateProcess event,
-	// then the parser obtains the PE metadata for the executable
-	// path parameter
-	if (e.PS != nil && e.PS.Exe != "" && p == nil) || f.Name == fields.PePsChildFileName || f.Name == fields.PsChildPeFilename {
+	if e.PS != nil && e.PS.Exe != "" && p == nil {
 		var err error
-		var exe string
-		if (f.Name == fields.PePsChildFileName || f.Name == fields.PsChildPeFilename) && e.IsCreateProcess() {
-			exe = e.GetParamAsString(params.Exe)
-		} else {
-			exe = e.PS.Exe
-		}
+		exe := e.PS.Exe
 		p, err = pe.ParseFile(exe, pa.parserOpts()...)
 		if err != nil {
 			return nil, err
@@ -1228,9 +1115,7 @@ func (pa *peAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 		p.VerifySignature()
 	}
 
-	if f.Name != fields.PePsChildFileName {
-		e.PS.PE = p
-	}
+	e.PS.PE = p
 
 	switch f.Name {
 	case fields.PeEntrypoint:
@@ -1294,7 +1179,7 @@ func (pa *peAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 		return p.VersionResources[pe.LegalCopyright], nil
 	case fields.PeDescription:
 		return p.VersionResources[pe.FileDescription], nil
-	case fields.PeFileName, fields.PePsChildFileName, fields.PsChildPeFilename:
+	case fields.PeFileName:
 		return p.VersionResources[pe.OriginalFilename], nil
 	case fields.PeFileVersion:
 		return p.VersionResources[pe.FileVersion], nil
