@@ -111,8 +111,9 @@ func TestStringFields(t *testing.T) {
 }
 
 func TestProcFilter(t *testing.T) {
-	ps1 := &pstypes.PS{
-		Name:     "wininit.exe",
+	parent := &pstypes.PS{
+		Name:     "svchost.exe",
+		Cmdline:  "C:\\Windows\\system32\\svchost.exe -k RPCSS",
 		Username: "SYSTEM",
 		Domain:   "NT AUTHORITY",
 		SID:      "S-1-5-18",
@@ -122,7 +123,7 @@ func TestProcFilter(t *testing.T) {
 			SID:  "S-1-5-8",
 			PID:  2034,
 			Parent: &pstypes.PS{
-				Name: "System",
+				Name: "csrss.exe",
 			},
 		},
 		IsWOW64:             false,
@@ -137,24 +138,25 @@ func TestProcFilter(t *testing.T) {
 		Type:     event.CreateProcess,
 		Category: event.Process,
 		Params: event.Params{
-			params.Cmdline:                    {Name: params.Cmdline, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\svchost-fake.exe -k RPCSS"},
-			params.ProcessName:                {Name: params.ProcessName, Type: params.AnsiString, Value: "svchost-fake.exe"},
+			params.Cmdline:                    {Name: params.Cmdline, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\svchost.exe -k DcomLaunch -p -s LSM"},
+			params.ProcessName:                {Name: params.ProcessName, Type: params.AnsiString, Value: "svchost.exe"},
 			params.ProcessID:                  {Name: params.ProcessID, Type: params.PID, Value: uint32(1234)},
 			params.ProcessParentID:            {Name: params.ProcessParentID, Type: params.PID, Value: uint32(345)},
 			params.UserSID:                    {Name: params.UserSID, Type: params.WbemSID, Value: []byte{224, 8, 226, 31, 15, 167, 255, 255, 0, 0, 0, 0, 15, 167, 255, 255, 1, 1, 0, 0, 0, 0, 0, 5, 18, 0, 0, 0}},
-			params.Username:                   {Name: params.Username, Type: params.UnicodeString, Value: "loki"},
-			params.Domain:                     {Name: params.Domain, Type: params.UnicodeString, Value: "TITAN"},
+			params.Username:                   {Name: params.Username, Type: params.UnicodeString, Value: "SYSTEM"},
+			params.Domain:                     {Name: params.Domain, Type: params.UnicodeString, Value: "NT AUTHORITY"},
 			params.ProcessFlags:               {Name: params.ProcessFlags, Type: params.Flags, Value: uint32(0x000000E)},
 			params.ProcessTokenIntegrityLevel: {Name: params.ProcessTokenIntegrityLevel, Type: params.AnsiString, Value: "SYSTEM"},
 			params.ProcessTokenIsElevated:     {Name: params.ProcessTokenIsElevated, Type: params.Bool, Value: true},
-			params.ProcessTokenElevationType:  {Name: params.ProcessTokenElevationType, Type: params.AnsiString, Value: "FULL"},
+			params.ProcessTokenElevationType:  {Name: params.ProcessTokenElevationType, Type: params.AnsiString, Value: "DEFAULT"},
 		},
 		Name: "CreateProcess",
-		PID:  1023,
+		PID:  1234,
 		PS: &pstypes.PS{
 			Name:     "svchost.exe",
-			Cmdline:  "C:\\Windows\\System32\\svchost.exe",
-			Parent:   ps1,
+			Cmdline:  "C:\\Windows\\System32\\svchost.exe -k DcomLaunch -p -s LSM",
+			Parent:   parent,
+			PID:      1234,
 			Ppid:     345,
 			Username: "SYSTEM",
 			Domain:   "NT AUTHORITY",
@@ -177,7 +179,7 @@ func TestProcFilter(t *testing.T) {
 			IsPackaged:          true,
 			IsWOW64:             false,
 			TokenIntegrityLevel: "SYSTEM",
-			IsTokenElevated:     false,
+			IsTokenElevated:     true,
 			TokenElevationType:  "DEFAULT",
 		},
 	}
@@ -193,7 +195,7 @@ func TestProcFilter(t *testing.T) {
 		PID:  1023,
 		PS: &pstypes.PS{
 			Name:   "svchost.exe",
-			Parent: ps1,
+			Parent: parent,
 			Ppid:   345,
 			Envs:   map[string]string{"ALLUSERSPROFILE": "C:\\ProgramData", "OS": "Windows_NT", "ProgramFiles(x86)": "C:\\Program Files (x86)"},
 			Modules: []pstypes.Module{
@@ -220,25 +222,18 @@ func TestProcFilter(t *testing.T) {
 
 		{`ps.name = 'svchost.exe'`, true},
 		{`ps.name = 'svchot.exe'`, false},
-		{`ps.name = 'mimikatz.exe' or ps.name contains 'svc'`, true},
+		{`ps.name = 'csrss.exe' or ps.name contains 'svc'`, true},
 		{`ps.name ~= 'SVCHOST.exe'`, true},
-		{`ps.cmdline = 'C:\\Windows\\System32\\svchost.exe'`, true},
-		{`ps.child.cmdline = 'C:\\Windows\\system32\\svchost-fake.exe -k RPCSS'`, true},
+		{`ps.parent.cmdline = 'C:\\Windows\\system32\\svchost.exe -k RPCSS'`, true},
+		{`ps.cmdline = 'C:\\Windows\\System32\\svchost.exe -k DcomLaunch -p -s LSM'`, true},
 		{`ps.username = 'SYSTEM'`, true},
 		{`ps.domain = 'NT AUTHORITY'`, true},
 		{`ps.sid = 'S-1-5-18'`, true},
-		{`ps.pid = 1023`, true},
-		{`ps.child.sid = 'S-1-5-18'`, true},
-		{`ps.sibling.pid = 1234`, true},
-		{`ps.child.pid = 1234`, true},
-		{`ps.child.uuid > 0`, true},
+		{`ps.pid = 1234`, true},
+		{`ps.parent.sid = 'S-1-5-18'`, true},
+		{`ps.uuid > 0`, true},
+		{`ps.parent.name = 'svchost.exe'`, true},
 		{`ps.parent.pid = 5042`, true},
-		{`ps.sibling.name = 'svchost-fake.exe'`, true},
-		{`ps.child.name = 'svchost-fake.exe'`, true},
-		{`ps.sibling.username = 'loki'`, true},
-		{`ps.child.username = 'loki'`, true},
-		{`ps.sibling.domain = 'TITAN'`, true},
-		{`ps.child.domain = 'TITAN'`, true},
 		{`ps.parent.username = 'SYSTEM'`, true},
 		{`ps.parent.domain = 'NT AUTHORITY'`, true},
 		{`ps.envs[ALLUSERSPROFILE] = 'C:\\ProgramData'`, true},
@@ -248,9 +243,6 @@ func TestProcFilter(t *testing.T) {
 		{`ps.envs in ('ALLUSERSPROFILE:C:\\ProgramData')`, true},
 		{`foreach(ps.envs, $env, substr($env, 0, indexof($env, ':')) = 'OS')`, true},
 
-		{`ps.child.is_wow64`, true},
-		{`ps.child.is_packaged`, true},
-		{`ps.child.is_protected`, true},
 		{`ps.is_wow64`, false},
 		{`ps.is_packaged`, true},
 		{`ps.is_protected`, false},
@@ -258,11 +250,10 @@ func TestProcFilter(t *testing.T) {
 		{`ps.parent.is_packaged`, false},
 		{`ps.parent.is_protected`, true},
 		{`ps.token.integrity_level = 'SYSTEM'`, true},
-		{`ps.token.is_elevated = false`, true},
+		{`ps.token.is_elevated = true`, true},
 		{`ps.token.elevation_type = 'DEFAULT'`, true},
-		{`ps.child.token.integrity_level = 'SYSTEM'`, true},
-		{`ps.child.token.is_elevated = true`, true},
-		{`ps.child.token.elevation_type = 'FULL'`, true},
+		{`ps.token.integrity_level = 'SYSTEM'`, true},
+		{`ps.token.is_elevated = true`, true},
 		{`ps.parent.token.integrity_level = 'SYSTEM'`, true},
 		{`ps.parent.token.is_elevated = false`, true},
 		{`ps.parent.token.elevation_type = 'DEFAULT'`, true},
@@ -271,17 +262,17 @@ func TestProcFilter(t *testing.T) {
 
 		{`ps.modules IN ('kernel32.dll')`, true},
 		{`evt.name = 'CreateProcess' and evt.pid != ps.ppid`, true},
-		{`ps.parent.name = 'wininit.exe'`, true},
+		{`ps.parent.name = 'svchost.exe'`, true},
 
-		{`ps.ancestor[0] = 'svchost.exe'`, false},
-		{`ps.ancestor[0] = 'wininit.exe'`, true},
+		{`ps.ancestor[0] = 'svchost.exe'`, true},
+		{`ps.ancestor[0] = 'csrss.exe'`, false},
 		{`ps.ancestor[1] = 'services.exe'`, true},
-		{`ps.ancestor[2] = 'System'`, true},
+		{`ps.ancestor[2] = 'csrss.exe'`, true},
 		{`ps.ancestor[3] = ''`, true},
-		{`ps.ancestor intersects ('wininit.exe', 'services.exe', 'System')`, true},
+		{`ps.ancestor intersects ('csrss.exe', 'services.exe', 'svchost.exe')`, true},
 
-		{`foreach(ps._ancestors, $proc, $proc.name in ('wininit.exe', 'services.exe', 'System'))`, true},
-		{`foreach(ps._ancestors, $proc, $proc.name in ('wininit.exe', 'services.exe', 'System') and ps.is_packaged, ps.is_packaged)`, true},
+		{`foreach(ps._ancestors, $proc, $proc.name in ('csrss.exe', 'services.exe', 'System'))`, true},
+		{`foreach(ps._ancestors, $proc, $proc.name in ('csrss.exe', 'services.exe', 'System') and ps.is_packaged, ps.is_packaged)`, true},
 		{`foreach(ps._ancestors, $proc, $proc.name not in ('svchost.exe', 'WmiPrvSE.exe'))`, true},
 		{`foreach(ps._ancestors, $proc, $proc.sid = 'S-1-5-8'))`, true},
 		{`foreach(ps._ancestors, $proc, $proc.name endswith 'ices.exe'))`, true},
@@ -318,7 +309,7 @@ func TestProcFilter(t *testing.T) {
 	}
 
 	psnap := new(ps.SnapshotterMock)
-	psnap.On("FindAndPut", uint32(1234)).Return(ps1)
+	psnap.On("FindAndPut", uint32(1234)).Return(parent)
 
 	for i, tt := range tests {
 		f := New(tt.filter, cfg, WithPSnapshotter(psnap))

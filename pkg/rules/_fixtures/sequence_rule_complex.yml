@@ -4,11 +4,10 @@ version: 1.0.0
 condition: >
   sequence
   maxspan 1h
-  |evt.name = 'CreateProcess' and ps.sibling.name
+  |evt.name = 'CreateProcess' and ps.name
       in
   ('firefox.exe', 'chrome.exe', 'edge.exe')
-  | by ps.sibling.pid
-
+  | by ps.pid
   |evt.name = 'CreateFile' and file.operation = 'CREATE'
       and
   file.extension = '.exe'

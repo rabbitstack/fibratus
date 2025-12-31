@@ -19,8 +19,9 @@
 package fields
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestIsField(t *testing.T) {
@@ -44,7 +45,7 @@ func TestIsField(t *testing.T) {
 }
 
 func TestIsDeprecated(t *testing.T) {
-	deprecated, d := IsDeprecated(PsSiblingPid)
+	deprecated, d := IsDeprecated(KevtArg)
 	assert.True(t, deprecated)
 	assert.NotNil(t, d)
 }

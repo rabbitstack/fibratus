@@ -5,12 +5,12 @@ condition: >
   sequence
   maxspan 1h
   by ps.uuid
-  |evt.name = 'CreateProcess' and ps.child.name
-      in
-  ('firefox.exe', 'chrome.exe', 'edge.exe')
-  |
-  |evt.name = 'CreateFile' and file.operation = 'CREATE'
-      and
-  file.extension = '.exe'
-  |
+    |evt.name = 'CreateProcess' and ps.name
+        in
+    ('firefox.exe', 'chrome.exe', 'edge.exe')
+    |
+    |evt.name = 'CreateFile' and file.operation = 'CREATE'
+        and
+    file.extension = '.exe'
+    |
 min-engine-version: 2.0.0
