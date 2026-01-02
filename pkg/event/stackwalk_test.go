@@ -19,12 +19,14 @@
 package event
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/event/params"
-	"github.com/rabbitstack/fibratus/pkg/fs"
-	"github.com/rabbitstack/fibratus/pkg/util/va"
-	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
+
+	"github.com/rabbitstack/fibratus/pkg/event/params"
+	"github.com/rabbitstack/fibratus/pkg/fs"
+	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
+	"github.com/rabbitstack/fibratus/pkg/util/va"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestStackwalkDecorator(t *testing.T) {
@@ -88,6 +90,77 @@ func TestStackwalkDecorator(t *testing.T) {
 	assert.Equal(t, CreateFile, evt.Type)
 	assert.True(t, evt.Params.Contains(params.Callstack))
 	assert.Equal(t, "C:\\Windows\\system32\\user32.dll", evt.GetParamAsString(params.FilePath))
+}
+
+func TestStackwalkDecoratorSurrogateProcess(t *testing.T) {
+	q := NewQueue(50, false, true)
+	cd := NewStackwalkDecorator(q)
+
+	e := &Event{
+		Type:      CreateProcess,
+		Tid:       2484,
+		PID:       859,
+		CPU:       1,
+		Seq:       2,
+		Name:      "CreateProcess",
+		Timestamp: time.Now(),
+		Category:  Process,
+		Params: Params{
+			params.ProcessID:           {Name: params.ProcessID, Type: params.PID, Value: uint32(859)},
+			params.ProcessParentID:     {Name: params.ProcessParentID, Type: params.PID, Value: uint32(4523)},
+			params.ProcessRealParentID: {Name: params.ProcessRealParentID, Type: params.PID, Value: uint32(8846)},
+		},
+	}
+
+	e1 := &Event{
+		Type:      CreateThread,
+		Tid:       2484,
+		PID:       1411,
+		CPU:       1,
+		Seq:       3,
+		Name:      "CreateThread",
+		Timestamp: time.Now(),
+		Category:  Thread,
+		PS: &pstypes.PS{
+			Name:    "svchost.exe",
+			Exe:     `C:\WINDOWS\system32\svchost.exe`,
+			Cmdline: `C:\WINDOWS\system32\svchost.exe -k netsvcs -p -s seclogon`,
+		},
+		Params: Params{
+			params.ProcessID: {Name: params.ProcessID, Type: params.PID, Value: uint32(859)},
+		},
+	}
+
+	cd.Push(e)
+
+	assert.Len(t, cd.buckets[e.StackID()], 1)
+	assert.Len(t, cd.buckets[e1.StackID()], 0)
+	assert.Len(t, cd.procs, 1)
+
+	cd.Push(e1)
+	assert.Len(t, cd.buckets[e1.StackID()], 1)
+
+	sw := &Event{
+		Type:      StackWalk,
+		Tid:       2484,
+		PID:       1411,
+		CPU:       1,
+		Seq:       4,
+		Name:      "StackWalk",
+		Timestamp: time.Now(),
+		Params: Params{
+			params.Callstack: {Name: params.Callstack, Type: params.Slice, Value: []va.Address{0x7ffb5eb70dc4, 0x7ffb5c191deb, 0x7ffb3138592e}},
+		},
+	}
+
+	thread := cd.Pop(sw)
+	proc := <-q.Events()
+	assert.Equal(t, CreateProcess, proc.Type)
+	assert.Equal(t, CreateThread, thread.Type)
+	assert.Len(t, cd.buckets[e.StackID()], 0)
+	assert.Len(t, cd.buckets[e1.StackID()], 0)
+	assert.True(t, proc.Params.Contains(params.Callstack))
+	assert.True(t, thread.Params.Contains(params.Callstack))
 }
 
 func init() {

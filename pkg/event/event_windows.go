@@ -284,6 +284,17 @@ func (e *Event) StackPID() uint32 {
 	return e.PID
 }
 
+// IsCreateRemoteThread indicates if the remote thread creation occurred.
+func (e *Event) IsCreateRemoteThread() bool {
+	return e.Type == CreateThread && e.PID != e.Params.MustGetPid()
+}
+
+// IsSurrogateProcess indicates if the process creation event parent id
+// differs from the real process parent identifier.
+func (e *Event) IsSurrogateProcess() bool {
+	return e.IsCreateProcess() && e.Params.MustGetUint32(params.ProcessParentID) != e.Params.MustGetUint32(params.ProcessRealParentID)
+}
+
 // RundownKey calculates the rundown event hash. The hash is
 // used to determine if the rundown event was already processed.
 func (e *Event) RundownKey() uint64 {

@@ -28,6 +28,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
+	"github.com/rabbitstack/fibratus/pkg/util/wildcard"
 	"golang.org/x/sys/windows"
 
 	"github.com/rabbitstack/fibratus/pkg/cap/section"
@@ -302,6 +303,21 @@ func (ps *PS) Ancestors() []string {
 	}
 	Walk(walk, ps)
 	return ancestors
+}
+
+// IsSeclogonSvc returns true if this is the Secondary Logon Service process.
+func (ps *PS) IsSeclogonSvc() bool {
+	return ps.IsSvchost() && strings.HasSuffix(ps.Cmdline, "-s seclogon")
+}
+
+// IsAppinfoSvc returns true if this is the AppInfo Service process.
+func (ps *PS) IsAppinfoSvc() bool {
+	return ps.IsSvchost() && strings.HasSuffix(ps.Cmdline, "-s Appinfo")
+}
+
+// IsSvchost returns true if this is the Service Host process.
+func (ps *PS) IsSvchost() bool {
+	return wildcard.Match(`?:\windows\system32\svchost.exe`, strings.ToLower(ps.Exe))
 }
 
 // Thread stores metadata about a thread that's executing in process's address space.
