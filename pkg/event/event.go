@@ -55,7 +55,7 @@ const (
 
 func (key MetadataKey) String() string { return string(key) }
 
-// String turns kernel event's metadata into string.
+// String turns event's metadata into string.
 func (md Metadata) String() string {
 	var sb strings.Builder
 	for k, v := range md {
@@ -66,21 +66,31 @@ func (md Metadata) String() string {
 
 // Event encapsulates event's state and provides a set of methods for
 // accessing and manipulating event parameters, process state, and other
-// metadata.
+// metadata. The fields in this structure are organized for cache-optimal
+// layout.
 type Event struct {
-	// Seq is monotonically incremented kernel event sequence.
+	// Seq is monotonically incremented event sequence.
 	Seq uint64 `json:"seq"`
+	// Timestamp represents the temporal occurrence of the event.
+	Timestamp time.Time `json:"timestamp"`
 	// PID is the identifier of the process that generated the event.
 	PID uint32 `json:"pid"`
 	// Tid is the thread identifier of the thread that generated the event.
 	Tid uint32 `json:"tid"`
 	// Evasions is the bitmask that stores detected evasion types on this event.
 	Evasions uint32 `json:"-"`
-	// Type is the internal representation of the event. This field should be ignored by serializers.
+	// Type is the internal representation of the event. This field should be
+	// ignored by serializers.
 	Type Type `json:"-"`
 	// CPU designates the processor logical core where the event was originated.
 	CPU uint8 `json:"cpu"`
-	// Name is the human friendly name of the kernel event.
+	// WaitEnqueue indicates if this event should temporarily defer pushing to
+	// the consumer output queue. This is usually required in event processors
+	// to propagate certain events stored in processor's state when the related
+	// event arrives.
+	WaitEnqueue bool `json:"waitenqueue"`
+
+	// Name is the human friendly name of the event.
 	Name string `json:"name"`
 	// Category designates the category to which this event pertains.
 	Category Category `json:"category"`
@@ -88,23 +98,17 @@ type Event struct {
 	Description string `json:"description"`
 	// Host is the machine name that reported the generated event.
 	Host string `json:"host"`
-	// Timestamp represents the temporal occurrence of the event.
-	Timestamp time.Time `json:"timestamp"`
 	// Params stores the collection of event parameters.
 	Params Params `json:"-"`
 	// Metadata represents any tags that are meaningful to this event.
 	Metadata Metadata `json:"metadata"`
-	// mmux guards the metadata map
-	mmux sync.RWMutex
 	// PS represents process' metadata and its allocated resources such as handles, DLLs, etc.
 	PS *pstypes.PS `json:"ps,omitempty"`
 	// Callstack represents the call stack for the thread that generated the event.
 	Callstack callstack.Callstack `json:"callstack"`
-	// WaitEnqueue indicates if this event should temporarily defer pushing to
-	// the consumer output queue. This is usually required in event processors
-	// to propagate certain events stored in processor's state when the related
-	// event arrives.
-	WaitEnqueue bool `json:"waitenqueue"`
+
+	// mmux guards the metadata map
+	mmux sync.RWMutex
 }
 
 // String returns event's string representation.
