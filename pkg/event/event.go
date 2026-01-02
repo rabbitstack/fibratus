@@ -249,6 +249,9 @@ func NewFromCapture(buf []byte, ver capver.Version) (*Event, error) {
 func (e *Event) AddMeta(k MetadataKey, v any) {
 	e.mmux.Lock()
 	defer e.mmux.Unlock()
+	if e.Metadata == nil {
+		e.Metadata = make(map[MetadataKey]any)
+	}
 	e.Metadata[k] = v
 }
 
@@ -267,13 +270,18 @@ func (e *Event) AddOrAppendMetaSlice(k MetadataKey, s string) {
 func (e *Event) RemoveMeta(k MetadataKey) {
 	e.mmux.Lock()
 	defer e.mmux.Unlock()
-	delete(e.Metadata, k)
+	if e.Metadata != nil {
+		delete(e.Metadata, k)
+	}
 }
 
 // GetMetaAsString returns the metadata as a string value.
 func (e *Event) GetMetaAsString(k MetadataKey) string {
 	e.mmux.RLock()
 	defer e.mmux.RUnlock()
+	if e.Metadata == nil {
+		return ""
+	}
 	if v, ok := e.Metadata[k]; ok {
 		if s, ok := v.(string); ok {
 			return s
@@ -286,6 +294,9 @@ func (e *Event) GetMetaAsString(k MetadataKey) string {
 func (e *Event) GetMeta(k MetadataKey) any {
 	e.mmux.RLock()
 	defer e.mmux.RUnlock()
+	if e.Metadata == nil {
+		return ""
+	}
 	return e.Metadata[k]
 }
 
@@ -293,6 +304,9 @@ func (e *Event) GetMeta(k MetadataKey) any {
 func (e *Event) ContainsMeta(k MetadataKey) bool {
 	e.mmux.RLock()
 	defer e.mmux.RUnlock()
+	if e.Metadata == nil {
+		return false
+	}
 	return e.Metadata[k] != nil
 }
 
