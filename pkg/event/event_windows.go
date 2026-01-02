@@ -267,8 +267,24 @@ func (e *Event) IsOpenDisposition() bool {
 	return e.IsCreateFile() && e.Params.MustGetUint32(params.FileOperation) == windows.FILE_OPEN
 }
 
-// StackID returns the integer that is used to identify the callstack present in the StackWalk event.
-func (e *Event) StackID() uint64 { return uint64(e.PID + e.Tid) }
+// StackID returns the integer that is used to stich the callstack present in the StackWalk event.
+func (e *Event) StackID() uint64 {
+	if e.IsCreateProcess() {
+		return uint64(e.Params.MustGetPpid() + e.Tid)
+	}
+	return uint64(e.PID + e.Tid)
+}
+
+// StackPID returns the process id as seen the creator
+// from the callstack execution perspective. For example,
+// the pid associated with CreateProcess events is the
+// parent, not the process being created.
+func (e *Event) StackPID() uint32 {
+	if e.IsCreateProcess() {
+		return e.Params.MustGetPpid()
+	}
+	return e.PID
+}
 
 // RundownKey calculates the rundown event hash. The hash is
 // used to determine if the rundown event was already processed.

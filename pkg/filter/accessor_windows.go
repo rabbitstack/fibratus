@@ -563,13 +563,13 @@ func (t *threadAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 
 		return e.Callstack.Symbols(), nil
 	case fields.ThreadCallstackAllocationSizes:
-		return e.Callstack.AllocationSizes(e.PID), nil
+		return e.Callstack.AllocationSizes(framePID(e)), nil
 	case fields.ThreadCallstackProtections:
-		return e.Callstack.Protections(e.PID), nil
+		return e.Callstack.Protections(framePID(e)), nil
 	case fields.ThreadCallstackCallsiteLeadingAssembly:
-		return e.Callstack.CallsiteInsns(e.PID, true), nil
+		return e.Callstack.CallsiteInsns(framePID(e), true), nil
 	case fields.ThreadCallstackCallsiteTrailingAssembly:
-		return e.Callstack.CallsiteInsns(e.PID, false), nil
+		return e.Callstack.CallsiteInsns(framePID(e), false), nil
 	case fields.ThreadCallstackIsUnbacked:
 		return e.Callstack.ContainsUnbacked(), nil
 	case fields.ThreadCallstack:
