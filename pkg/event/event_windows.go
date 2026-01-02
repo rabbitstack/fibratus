@@ -58,18 +58,16 @@ func New(seq uint64, evt *etw.EventRecord) *Event {
 	)
 
 	e := &Event{
-		Seq:         seq,
-		PID:         pid,
-		Tid:         tid,
-		CPU:         cpu,
-		Type:        typ,
-		Category:    typ.Category(),
-		Name:        typ.String(),
-		Params:      make(map[string]*Param),
-		Description: typ.Description(),
-		Timestamp:   ts,
-		Metadata:    make(map[MetadataKey]any),
-		Host:        hostname.Get(),
+		Seq:       seq,
+		PID:       pid,
+		Tid:       tid,
+		CPU:       cpu,
+		Type:      typ,
+		Category:  typ.Category(),
+		Name:      typ.String(),
+		Params:    make(map[string]*Param),
+		Timestamp: ts,
+		Host:      hostname.Get(),
 	}
 
 	e.produceParams(evt)
