@@ -21,20 +21,23 @@ package types
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/sys"
-	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
-	"github.com/rabbitstack/fibratus/pkg/util/va"
-	"golang.org/x/sys/windows"
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/rabbitstack/fibratus/pkg/sys"
+	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
+	"github.com/rabbitstack/fibratus/pkg/util/va"
+	"github.com/rabbitstack/fibratus/pkg/util/wildcard"
+	"golang.org/x/sys/windows"
 
 	"github.com/rabbitstack/fibratus/pkg/cap/section"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 
-	"github.com/rabbitstack/fibratus/pkg/util/bootid"
 	"time"
+
+	"github.com/rabbitstack/fibratus/pkg/util/bootid"
 )
 
 // PS encapsulates process' state such as allocated resources and other metadata.
@@ -289,6 +292,21 @@ func (ps *PS) Ancestors() []string {
 	}
 	Walk(walk, ps)
 	return ancestors
+}
+
+// IsSeclogonSvc returns true if this is the Secondary Logon Service process.
+func (ps *PS) IsSeclogonSvc() bool {
+	return ps.IsSvchost() && strings.HasSuffix(ps.Cmdline, "-s seclogon")
+}
+
+// IsAppinfoSvc returns true if this is the AppInfo Service process.
+func (ps *PS) IsAppinfoSvc() bool {
+	return ps.IsSvchost() && strings.HasSuffix(ps.Cmdline, "-s Appinfo")
+}
+
+// IsSvchost returns true if this is the Service Host process.
+func (ps *PS) IsSvchost() bool {
+	return wildcard.Match(`?:\windows\system32\svchost.exe`, strings.ToLower(ps.Exe))
 }
 
 // Thread stores metadata about a thread that's executing in process's address space.

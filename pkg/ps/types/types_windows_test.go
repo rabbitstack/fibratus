@@ -19,13 +19,14 @@
 package types
 
 import (
+	"os"
+	"testing"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/util/bootid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
-	"os"
-	"testing"
-	"time"
 )
 
 func TestVisit(t *testing.T) {
@@ -96,4 +97,36 @@ func TestUUID(t *testing.T) {
 	}
 	tsUUID := (bootid.Read() << 30) + uint64(os.Getpid()) | uint64(now.UnixNano())
 	assert.True(t, ps2.UUID() > 0 && ps2.UUID() != tsUUID)
+}
+
+func TestIsSeclogonSvc(t *testing.T) {
+	var tests = []struct {
+		ps *PS
+		ok bool
+	}{
+		{&PS{Name: "svchost.exe", Exe: `C:\WINDOWS\system32\svchost.exe`, Cmdline: `C:\WINDOWS\system32\svchost.exe -k netsvcs -p -s Appinfo`}, false},
+		{&PS{Name: "svchost.exe", Exe: `C:\WINDOWS\system32\svchost.exe`, Cmdline: `C:\WINDOWS\system32\svchost.exe -k netsvcs -p -s seclogon`}, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.ps.Cmdline, func(t *testing.T) {
+			assert.Equal(t, tt.ok, tt.ps.IsSeclogonSvc())
+		})
+	}
+}
+
+func TestIsAppinfoSvc(t *testing.T) {
+	var tests = []struct {
+		ps *PS
+		ok bool
+	}{
+		{&PS{Name: "svchost.exe", Exe: `C:\WINDOWS\system32\svchost.exe`, Cmdline: `C:\WINDOWS\system32\svchost.exe -k netsvcs -p -s Appinfo`}, true},
+		{&PS{Name: "svchost.exe", Exe: `C:\WINDOWS\system32\svchost.exe`, Cmdline: `C:\WINDOWS\System32\svchost.exe -k LocalServiceNoNetwork -p -s DPS`}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.ps.Cmdline, func(t *testing.T) {
+			assert.Equal(t, tt.ok, tt.ps.IsAppinfoSvc())
+		})
+	}
 }

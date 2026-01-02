@@ -21,6 +21,11 @@ package event
 import (
 	"encoding/binary"
 	"fmt"
+	"os"
+	"strings"
+	"sync"
+	"unsafe"
+
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
@@ -29,10 +34,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/hostname"
 	"github.com/rabbitstack/fibratus/pkg/util/ntstatus"
 	"golang.org/x/sys/windows"
-	"os"
-	"strings"
-	"sync"
-	"unsafe"
 )
 
 var (
@@ -264,6 +265,17 @@ func (e *Event) IsCreateDisposition() bool {
 // IsOpenDisposition determines if the file disposition leads to opening a file object.
 func (e *Event) IsOpenDisposition() bool {
 	return e.IsCreateFile() && e.Params.MustGetUint32(params.FileOperation) == windows.FILE_OPEN
+}
+
+// IsCreateRemoteThread indicates if the remote thread creation occurred.
+func (e *Event) IsCreateRemoteThread() bool {
+	return e.Type == CreateThread && e.PID != e.Params.MustGetPid()
+}
+
+// IsSurrogateProcess indicates if the process creation event parent id
+// differs from the real process parent identifier.
+func (e *Event) IsSurrogateProcess() bool {
+	return e.IsCreateProcess() && e.Params.MustGetUint32(params.ProcessParentID) != e.Params.MustGetUint32(params.ProcessRealParentID)
 }
 
 // StackID returns the integer that is used to identify the callstack present in the StackWalk event.
