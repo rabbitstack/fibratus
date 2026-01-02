@@ -1,6 +1,6 @@
 name: Potential ClickFix infection chain via Run window
 id: ffe1fc54-2893-4760-ab50-51a83bd71d13
-version: 1.0.4
+version: 1.0.5
 description: |
   Identifies the execution of the process via the Run command dialog box followed by spawning of the potential 
   infostealer process. 
@@ -42,7 +42,7 @@ action:
   - name: kill
 
 output: >
-  Potential infostealer process %2.ps.child.exe executed via the Run command window by %1.ps.child.cmdline
+  Potential infostealer process %2.ps.exe executed via the Run command window by %1.ps.cmdline
 severity: high
 
 min-engine-version: 3.0.0
