@@ -19,13 +19,14 @@
 package filter
 
 import (
+	"path/filepath"
+
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/util/loldrivers"
 	"github.com/rabbitstack/fibratus/pkg/util/signature"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
-	"path/filepath"
 )
 
 // isLOLDriver interacts with the loldrivers client to determine
@@ -103,4 +104,12 @@ func getSignature(addr va.Address, filename string, parseCert bool) *signature.S
 	signature.GetSignatures().PutSignature(addr.Uint64(), sign)
 
 	return sign
+}
+
+// framePID returns the pid associated with the stack frame.
+func framePID(e *event.Event) uint32 {
+	if !e.Callstack.IsEmpty() && e.Callstack.FrameAt(0).PID != 0 {
+		return e.Callstack.FrameAt(0).PID
+	}
+	return e.PID
 }

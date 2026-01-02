@@ -19,6 +19,12 @@
 package symbolize
 
 import (
+	"math/rand"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
@@ -33,11 +39,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
-	"math/rand"
-	"os"
-	"path/filepath"
-	"testing"
-	"time"
 )
 
 // MockResolver for unit testing
@@ -282,7 +283,7 @@ func TestProcessCallstack(t *testing.T) {
 	e := &event.Event{
 		Type:      event.CreateProcess,
 		Tid:       2484,
-		PID:       uint32(os.Getpid()),
+		PID:       2232,
 		CPU:       1,
 		Seq:       2,
 		Name:      "CreatedProcess",
@@ -290,7 +291,8 @@ func TestProcessCallstack(t *testing.T) {
 		Category:  event.Process,
 		Host:      "archrabbit",
 		Params: event.Params{
-			params.Callstack: {Name: params.Callstack, Type: params.Slice, Value: []va.Address{0x7ffb5c1d0396, 0x7ffb5d8e61f4, 0x7ffb3138592e, 0x7ffb313853b2, 0x2638e59e0a5}},
+			params.ProcessParentID: {Name: params.ProcessParentID, Type: params.PID, Value: (uint32(os.Getpid()))},
+			params.Callstack:       {Name: params.Callstack, Type: params.Slice, Value: []va.Address{0x7ffb5c1d0396, 0x7ffb5d8e61f4, 0x7ffb3138592e, 0x7ffb313853b2, 0x2638e59e0a5}},
 		},
 		PS: proc,
 	}
@@ -454,7 +456,7 @@ func TestProcessCallstackProcsTTL(t *testing.T) {
 		e := &event.Event{
 			Type:      event.CreateProcess,
 			Tid:       2484,
-			PID:       uint32(os.Getpid()),
+			PID:       1232,
 			CPU:       1,
 			Seq:       2,
 			Name:      "CreatedProcess",
@@ -462,7 +464,8 @@ func TestProcessCallstackProcsTTL(t *testing.T) {
 			Category:  event.Process,
 			Host:      "archrabbit",
 			Params: event.Params{
-				params.Callstack: {Name: params.Callstack, Type: params.Slice, Value: []va.Address{0x7ffb5c1d0396, 0x7ffb5d8e61f4, 0x7ffb3138592e, 0x7ffb313853b2, 0x2638e59e0a5}},
+				params.ProcessParentID: {Name: params.ProcessParentID, Type: params.PID, Value: (uint32(os.Getpid()))},
+				params.Callstack:       {Name: params.Callstack, Type: params.Slice, Value: []va.Address{0x7ffb5c1d0396, 0x7ffb5d8e61f4, 0x7ffb3138592e, 0x7ffb313853b2, 0x2638e59e0a5}},
 			},
 		}
 		_, _ = s.ProcessEvent(e)

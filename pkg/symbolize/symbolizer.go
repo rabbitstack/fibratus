@@ -398,9 +398,10 @@ func (s *Symbolizer) processCallstack(e *event.Event) error {
 		return nil
 	}
 
-	proc, ok := s.procs[e.PID]
+	pid := e.StackPID()
+	proc, ok := s.procs[pid]
 	if !ok {
-		handle, err := windows.OpenProcess(windows.SYNCHRONIZE|windows.PROCESS_QUERY_INFORMATION, false, e.PID)
+		handle, err := windows.OpenProcess(windows.SYNCHRONIZE|windows.PROCESS_QUERY_INFORMATION, false, pid)
 		if err != nil {
 			s.pushFrames(addrs, e)
 			return err
@@ -410,10 +411,10 @@ func (s *Symbolizer) processCallstack(e *event.Event) error {
 		err = s.r.Initialize(handle, opts)
 		if err != nil {
 			s.pushFrames(addrs, e)
-			return ErrSymInitialize(e.PID)
+			return ErrSymInitialize(pid)
 		}
-		proc = &process{e.PID, handle, time.Now(), 1}
-		s.procs[e.PID] = proc
+		proc = &process{pid, handle, time.Now(), 1}
+		s.procs[pid] = proc
 	}
 
 	s.pushFrames(addrs, e)
@@ -442,7 +443,8 @@ func (s *Symbolizer) pushFrames(addrs []va.Address, e *event.Event) {
 // symbol or module are not resolved, then we
 // fall back to Debug API.
 func (s *Symbolizer) produceFrame(addr va.Address, e *event.Event) callstack.Frame {
-	frame := callstack.Frame{PID: e.PID, Addr: addr}
+	pid := e.StackPID()
+	frame := callstack.Frame{PID: pid, Addr: addr}
 	if addr.InSystemRange() {
 		if s.config.SymbolizeKernelAddresses {
 			frame.Module = s.r.GetModuleName(windows.CurrentProcess(), addr)
@@ -452,7 +454,7 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *event.Event) callstack.Fra
 	}
 
 	// did we hit this address previously?
-	if sym, ok := s.symbols[e.PID]; ok {
+	if sym, ok := s.symbols[pid]; ok {
 		if symbol, ok := sym[addr]; ok {
 			symCacheHits.Add(1)
 			frame.Module, frame.Symbol, frame.ModuleAddress = symbol.module, symbol.symbol, symbol.moduleAddress
@@ -468,7 +470,7 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *event.Event) callstack.Fra
 		}
 		if mod == nil {
 			// our last resort is to enumerate process modules
-			modules := sys.EnumProcessModules(e.PID)
+			modules := sys.EnumProcessModules(pid)
 			for _, m := range modules {
 				b := va.Address(m.BaseOfDll)
 				size := uint64(m.SizeOfImage)
@@ -526,7 +528,7 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *event.Event) callstack.Fra
 		}
 		if frame.Module != "" && frame.Symbol != "" {
 			// store resolved symbol information in cache
-			s.cacheSymbol(e.PID, addr, &frame)
+			s.cacheSymbol(pid, addr, &frame)
 			return frame
 		}
 	}
@@ -534,9 +536,9 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *event.Event) callstack.Fra
 	debugHelpFallbacks.Add(1)
 
 	// fallback to Debug Help API
-	proc, ok := s.procs[e.PID]
+	proc, ok := s.procs[pid]
 	if !ok {
-		handle, err := windows.OpenProcess(windows.SYNCHRONIZE|windows.PROCESS_QUERY_INFORMATION, false, e.PID)
+		handle, err := windows.OpenProcess(windows.SYNCHRONIZE|windows.PROCESS_QUERY_INFORMATION, false, pid)
 		if err != nil {
 			return frame
 		}
@@ -546,8 +548,8 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *event.Event) callstack.Fra
 		if err != nil {
 			return frame
 		}
-		proc = &process{e.PID, handle, time.Now(), 1}
-		s.procs[e.PID] = proc
+		proc = &process{pid, handle, time.Now(), 1}
+		s.procs[pid] = proc
 	}
 
 	proc.keepalive()
@@ -564,7 +566,7 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *event.Event) callstack.Fra
 	}
 
 	// store resolved symbol information in cache
-	s.cacheSymbol(e.PID, addr, &frame)
+	s.cacheSymbol(pid, addr, &frame)
 
 	return frame
 }
