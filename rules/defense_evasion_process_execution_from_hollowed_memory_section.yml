@@ -1,6 +1,6 @@
-name: Potential Process Hollowing
+name: Process execution from hollowed memory section
 id: 2a3fbae8-5e8c-4b71-b9da-56c3958c0d53
-version: 1.1.7
+version: 2.0.0
 description: |
   Adversaries may inject malicious code into suspended and hollowed processes in order to
   evade process-based defenses. Process hollowing is a method of executing arbitrary code
@@ -29,21 +29,26 @@ references:
 condition: >
   sequence
   maxspan 2m
-  by ps.uuid
     |spawn_process and
      ps.parent.sid not in ('S-1-5-18', 'S-1-5-19', 'S-1-5-20') and
      ps.parent.exe not imatches
                 (
                   '?:\\Program Files\\*.exe',
-                  '?:\\Program Files (x86)\\*.exe',
-                  '?:\\Users\\*\\AppData\\Local\\Programs\\Common\\OneDriveCloud\\taskhostw.exe'
+                  '?:\\Program Files (x86)\\*.exe'
                 )
-    |
+    | as e1
     |unmap_view_of_section and
-     file.view.size > 20000 and file.view.protection != 'READONLY' and (length(file.name) = 0 or not ext(file.name) = '.dll')
+     ps.uuid = $e1.ps.uuid and
+     file.view.size > 20000 and file.view.protection != 'READONLY'
+    | as e2
+    |load_executable and
+     ps.uuid = $e2.ps.uuid and image.base.address = $e2.file.view.base
     |
-    |load_executable|
 action:
   - name: kill
+
+output: >
+  Process %3.ps.exe executed from hollowed memory section
+severity: high
 
 min-engine-version: 3.0.0
