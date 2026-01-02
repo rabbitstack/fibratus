@@ -1,6 +1,6 @@
 name: Potential process creation via shellcode
 id: 7a918532-12d1-4aa2-8c46-8769c67cac07
-version: 1.0.2
+version: 1.0.3
 description: |
   Identifies the creation of a process with stack frames originating from floating memory area while 
   invoking commonly used Windows API functions like WinExec. This behavior is a typical indicator of 
@@ -21,7 +21,7 @@ condition: >
   thread.callstack.symbols imatches ('kernel32.dll!WinExec*')
 
 output: >
-  Process %ps.child.exe created via potential shellcode injection by process %ps.exe
+  Process %ps.exe created via potential shellcode injection by process %ps.parent.exe
 severity: high
 
 min-engine-version: 3.0.0

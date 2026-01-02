@@ -1,6 +1,6 @@
 name: Potential injection via .NET debugging
 id: 193ebf2f-e365-4f57-a639-275b7cdf0319
-version: 1.0.5
+version: 1.0.6
 description: |
   Identifies creation of a process on behalf of the CLR debugging facility which may
   be indicative of code injection. The CLR interface utilizes the OpenVirtualProcess
@@ -30,7 +30,7 @@ condition: >
   ps.parent.exe not imatches '?:\\Program Files (x86)\\Microsoft Visual Studio\\*.exe'
 
 output: >
-  Process %ps.exe attached the .NET debugger to process %ps.child.exe for potential code injection
+  Process %ps.parent.exe attached the .NET debugger to process %ps.exe for potential code injection
 severity: high
 
 min-engine-version: 3.0.0

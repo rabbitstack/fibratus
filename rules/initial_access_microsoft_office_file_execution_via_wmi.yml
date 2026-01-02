@@ -1,6 +1,6 @@
 name: Microsoft Office file execution via WMI
 id: 50f6efa2-4d7b-4fb7-b1a9-65c3a24d9152
-version: 1.0.3
+version: 1.0.4
 description: |
   Identifies the execution via Windows Management Instrumentation (WMI) of the binary file written 
   by the Microsoft Office process. Attackers can exploit WMI to silently execute malicious code.
