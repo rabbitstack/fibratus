@@ -20,12 +20,13 @@ package ql
 
 import (
 	"errors"
+	"testing"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
-	"time"
 )
 
 func TestParser(t *testing.T) {
@@ -353,7 +354,7 @@ func TestParseSequence(t *testing.T) {
 
 			`by ps.uuid
 			 maxspan 2m
-			 |evt.name = 'CreateProcess'| by ps.child.uuid
+			 |evt.name = 'CreateProcess'| by ps.uuid
 			 |evt.name = 'CreateFile'| by ps.uuid
 			`,
 			errors.New("sequence mixes global and per-expression 'by' statements"),
