@@ -1,0 +1,40 @@
+name: Suspicious protected process execution
+id: a778295a-02f1-42d9-9c20-78346a7bc2c6
+version: 1.0.0
+description: |
+  Identifies unprivileged process spawning a child with protected integrity level. This 
+  indicates an unusual behavior that is often associated with attempts to tamper with or 
+  freeze endpoint protection components.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1562
+  technique.name: Impair Defenses
+  technique.ref: https://attack.mitre.org/techniques/T1562/
+  subtechnique.id: T1562.001
+  subtechnique.name: Disable or Modify Tools
+  subtechnique.ref: https://attack.mitre.org/techniques/T1562/001
+references:
+  - https://github.com/TwoSevenOneT/EDR-Freeze
+
+condition: >
+  sequence
+  maxspan 1m30s
+    |spawn_process and
+     ps.token.integrity_level != 'SYSTEM' and
+     ps.exe not imatches
+                (
+                  '?:\\Program Files\\*',
+                  '?:\\Program Files(x86)\\*'
+                )
+    | by ps.uuid
+    |spawn_process and ps.is_protected| by ps.parent.uuid
+action:
+  - name: kill
+
+output: >
+  Suspicious protected process %2.ps.exe spawned by process %2.ps.parent.exe
+severity: high
+
+min-engine-version: 3.0.0
