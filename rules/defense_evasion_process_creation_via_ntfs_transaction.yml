@@ -1,0 +1,39 @@
+name: Process creation via NTFS transaction
+id: eb34cf6e-ccc3-4bce-bbcf-013720640a28
+version: 2.0.0
+description: |
+  Adversaries may inject malicious code into process by abusing NTFS transactions
+  to avoid writing the final executable image to disk. Attackers exploit TxF API
+  and low-level process creation internals to evade traditional file-based detection.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1055
+  technique.name: Process Injection
+  technique.ref: https://attack.mitre.org/techniques/T1055/
+  subtechnique.id: T1055.013
+  subtechnique.name: Process Doppelganging
+  subtechnique.ref: https://attack.mitre.org/techniques/T1055/013/
+references:
+  - https://www.ired.team/offensive-security/code-injection-process-injection/process-doppelganging
+  - https://www.malwarebytes.com/blog/news/2018/08/process-doppelganging-meets-process-hollowing_osiris
+
+condition: >
+  sequence
+  maxspan 2m
+    |create_file and
+     evt.pid != 4 and thread.callstack.symbols imatches
+                    (
+                      'kernel32.dll!CreateFileTransacted*',
+                      'ntdll.dll!RtlSetCurrentTransaction'
+                    )
+    | by file.name
+    |spawn_process and
+     ps.name != base(ps.exe) and
+     thread.callstack.symbols not imatches ('ntdll.dll!*CreateUserProcess')
+    | by ps.name
+action:
+  - name: kill
+
+min-engine-version: 3.0.0
