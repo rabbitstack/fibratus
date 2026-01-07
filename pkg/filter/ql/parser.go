@@ -23,13 +23,14 @@ package ql
 import (
 	"errors"
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/config"
-	"github.com/rabbitstack/fibratus/pkg/filter/fields"
-	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"net"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/filter/fields"
+	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 )
 
 // Parser builds the binary expression tree from the filter string.
@@ -71,7 +72,7 @@ func (p *Parser) ParseSequence() (*Sequence, error) {
 		p.unscan()
 	}
 
-	// parse optional global join
+	// parse optional global link
 	tok, _, _ = p.scanIgnoreWhitespace()
 	if tok == By {
 		tok, pos, lit := p.scanIgnoreWhitespace()
@@ -79,10 +80,33 @@ func (p *Parser) ParseSequence() (*Sequence, error) {
 			return nil, newParseError(tokstr(tok, lit), []string{"field"}, pos, p.expr)
 		}
 		var err error
-		seq.By, err = p.parseField(lit)
+		field, err := p.parseField(lit)
 		if err != nil {
 			return nil, err
 		}
+
+		seqLink := &SequenceLink{Fields: []*FieldLiteral{field}}
+
+		// handle multiple join fields separated by comma
+		for {
+			if tok, _, _ := p.scanIgnoreWhitespace(); tok != Comma {
+				p.unscan()
+				break
+			}
+
+			tok, pos, lit := p.scanIgnoreWhitespace()
+			if !fields.IsField(lit) {
+				return nil, newParseError(tokstr(tok, lit), []string{"field"}, pos, p.expr)
+			}
+			field, err := p.parseField(lit)
+			if err != nil {
+				return nil, err
+			}
+
+			seqLink.Fields = append(seqLink.Fields, field)
+		}
+
+		seq.By = seqLink
 	} else {
 		p.unscan()
 	}
@@ -127,7 +151,7 @@ func (p *Parser) ParseSequence() (*Sequence, error) {
 
 		var seqexpr SequenceExpr
 
-		// parse sequence BY or AS constraints
+		// parse sequence BY or AS constraints (links)
 		tok, _, _ = p.scanIgnoreWhitespace()
 		switch tok {
 		case By:
@@ -139,7 +163,28 @@ func (p *Parser) ParseSequence() (*Sequence, error) {
 			if err != nil {
 				return nil, err
 			}
-			seqexpr = SequenceExpr{Expr: expr, By: field}
+
+			seqLink := &SequenceLink{Fields: []*FieldLiteral{field}}
+
+			// handle multiple join fields separated by comma
+			for {
+				if tok, _, _ := p.scanIgnoreWhitespace(); tok != Comma {
+					p.unscan()
+					break
+				}
+
+				tok, pos, lit := p.scanIgnoreWhitespace()
+				if !fields.IsField(lit) {
+					return nil, newParseError(tokstr(tok, lit), []string{"field"}, pos, p.expr)
+				}
+				field, err := p.parseField(lit)
+				if err != nil {
+					return nil, err
+				}
+
+				seqLink.Fields = append(seqLink.Fields, field)
+			}
+			seqexpr = SequenceExpr{Expr: expr, By: seqLink}
 		case As:
 			tok, pos, lit := p.scanIgnoreWhitespace()
 			if tok != Ident {
