@@ -19,13 +19,14 @@
 package ql
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/event"
-	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"net"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 
 	"github.com/rabbitstack/fibratus/pkg/filter/ql/functions"
 )
@@ -271,11 +272,11 @@ func (f *Function) validate() error {
 // SequenceExpr represents a single binary expression within the sequence.
 type SequenceExpr struct {
 	Expr Expr
-	// By contains the field literal if the sequence expression is constrained.
-	By *FieldLiteral
+	// By contains the expression link if the sequence is constrained.
+	By *SequenceLink
 	// BoundFields is a group of bound fields referenced in the sequence expression.
 	BoundFields []*BoundFieldLiteral
-	// Alias represents the sequence expression alias.
+	// Alias represents the sequence expression alias when bound fields are used.
 	Alias string
 
 	bitsets event.BitSets
@@ -381,10 +382,31 @@ func (e *SequenceExpr) HasBoundFields() bool {
 	return len(e.BoundFields) > 0
 }
 
+// SequenceLink represents a single or
+// a collection of fields that are used to
+// build the sequence join link.
+type SequenceLink struct {
+	Fields []*FieldLiteral
+}
+
+// IsCompound indicates if the sequence expression
+// uses multiple fields for the join link.
+func (l *SequenceLink) IsCompound() bool {
+	return len(l.Fields) > 1
+}
+
+// First returns the first field if the link is not compound.
+func (l *SequenceLink) First() string {
+	if len(l.Fields) == 1 {
+		return l.Fields[0].Value
+	}
+	return ""
+}
+
 // Sequence is a collection of two or more sequence expressions.
 type Sequence struct {
 	MaxSpan     time.Duration
-	By          *FieldLiteral
+	By          *SequenceLink
 	Expressions []SequenceExpr
 	IsUnordered bool
 }

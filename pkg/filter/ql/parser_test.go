@@ -20,6 +20,8 @@ package ql
 
 import (
 	"errors"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -272,6 +274,31 @@ func TestParseSequence(t *testing.T) {
 			true,
 		},
 		{
+			`|evt.name = 'CreateProcess'| by ps.exe, ps.uuid
+			 |evt.name = 'CreateFile'| by file.name, ps.uuid
+			`,
+			nil,
+			time.Duration(0),
+			true,
+		},
+		{
+			`by ps.exe, ps.uuid
+			 |evt.name = 'CreateProcess'|
+			 |evt.name = 'CreateFile'|
+			`,
+			nil,
+			time.Duration(0),
+			true,
+		},
+		{
+			`|evt.name = 'CreateProcess'| by ps.exe, 
+			 |evt.name = 'CreateFile'| by file.name, ps.uuid
+			`,
+			errors.New("expected field"),
+			time.Duration(0),
+			true,
+		},
+		{
 
 			`by ps.pid
 			 |evt.name = 'CreateProcess'|
@@ -336,7 +363,7 @@ func TestParseSequence(t *testing.T) {
 			 |evt.name = 'CreateProcess'| as e1
 			 |evt.name = 'CreateFile' and $e1.ps.ame = file.name |
 			`,
-			errors.New("expected field after bound ref"),
+			errors.New("expected field/segment after bound ref"),
 			time.Second * 30,
 			false,
 		},
@@ -352,8 +379,8 @@ func TestParseSequence(t *testing.T) {
 		},
 		{
 
-			`by ps.uuid
-			 maxspan 2m
+			`maxspan 2m
+			 by ps.uuid
 			 |evt.name = 'CreateProcess'| by ps.uuid
 			 |evt.name = 'CreateFile'| by ps.uuid
 			`,
@@ -370,6 +397,10 @@ func TestParseSequence(t *testing.T) {
 			t.Errorf("%d. exp=%s expected error=\n%v", i, tt.expr, tt.err)
 		} else if err != nil && tt.err == nil {
 			t.Errorf("%d. exp=%s got error=\n%v", i, tt.expr, err)
+		}
+
+		if err != nil && tt.err != nil {
+			assert.True(t, strings.Contains(err.Error(), tt.err.Error()), fmt.Sprintf("error '%v' should contain '%v'", err, tt.err))
 		}
 
 		if seq != nil {
