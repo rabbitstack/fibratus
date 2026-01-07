@@ -32,7 +32,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/filter/ql"
-	"github.com/rabbitstack/fibratus/pkg/util/hashers"
 )
 
 var (
@@ -207,12 +206,17 @@ func (f *filter) Compile() error {
 		ql.WalkFunc(f.expr, walk)
 	} else {
 		if f.seq.By != nil {
-			f.addField(f.seq.By)
+			for _, fld := range f.seq.By.Fields {
+				f.addField(fld)
+			}
 		}
 		for _, expr := range f.seq.Expressions {
 			ql.WalkFunc(expr.Expr, walk)
-			if expr.By != nil {
-				f.addField(expr.By)
+			if expr.By == nil {
+				continue
+			}
+			for _, fld := range expr.By.Fields {
+				f.addField(fld)
 			}
 		}
 	}
@@ -302,21 +306,65 @@ func (f *filter) evalBoundSequence(
 		// evaluate the expression with the current valuer state
 		if ql.Eval(expr.Expr, valuer, f.hasFunctions) {
 			// compute sequence key hash to stich events
-			hash := make([]byte, 0)
+			values := make([]any, 0)
 			for _, fld := range flds {
 				if !strings.HasPrefix(fld.BoundVar, "$") {
 					continue
 				}
-				hash = appendHash(hash, valuer[fld.Value])
+				values = append(values, valuer[fld.Value])
 			}
-			fnv := hashers.FnvUint64(hash)
-			e.AddSequenceLink(fnv)
-			evt.AddSequenceLink(fnv)
+			hash := hashFields(values)
+			e.AddSequenceLink(hash)
+			evt.AddSequenceLink(hash)
 			return true
 		}
 	}
 
 	return false
+}
+
+// evalSequence evaluates the sequence with one, multiple or
+// no join links. The sequence link is first consulted for the
+// global sequence definition, and if it is not defined then
+// the expression sequence link is used.
+func (f *filter) evalSequence(
+	e *event.Event,
+	seqID int,
+	expr *ql.SequenceExpr,
+	partials map[int][]*event.Event,
+	valuer ql.MapValuer,
+) bool {
+	// top-level sequence link is defined
+	by := f.seq.By
+	if by == nil {
+		// otherwise, use the expression link
+		by = expr.By
+	}
+
+	var match bool
+	if seqID >= 1 && by != nil {
+		linkID := makeSequenceLinkID(valuer, by)
+		// traverse upstream partials for join equality
+		joins := make([]bool, seqID)
+	outer:
+		for i := range seqID {
+			for _, p := range partials[i] {
+				if CompareSeqLink(linkID, p.SequenceLinks()) {
+					joins[i] = true
+					continue outer
+				}
+			}
+		}
+		match = joinsEqual(joins) && ql.Eval(expr.Expr, valuer, f.hasFunctions)
+	} else {
+		match = ql.Eval(expr.Expr, valuer, f.hasFunctions)
+	}
+
+	if match && by != nil {
+		e.AddSequenceLink(makeSequenceLinkID(valuer, by))
+	}
+
+	return match
 }
 
 func (f *filter) RunSequence(e *event.Event, seqID int, partials map[int][]*event.Event, rawMatch bool) bool {
@@ -343,45 +391,10 @@ func (f *filter) RunSequence(e *event.Event, seqID int, partials map[int][]*even
 		match = f.evalBoundSequence(e, seqID, &expr, partials, valuer)
 	} else {
 		// evaluate constrained/unconstrained sequences
-		by := f.seq.By
-		if by == nil {
-			by = expr.By
-		}
-
-		if seqID >= 1 && by != nil {
-			// traverse upstream partials for join equality
-			joins := make([]bool, seqID)
-			joinID := valuer[by.Value]
-		outer:
-			for i := range seqID {
-				for _, p := range partials[i] {
-					if CompareSeqLink(joinID, p.SequenceLinks()) {
-						joins[i] = true
-						continue outer
-					}
-				}
-			}
-			match = joinsEqual(joins) && ql.Eval(expr.Expr, valuer, f.hasFunctions)
-		} else {
-			match = ql.Eval(expr.Expr, valuer, f.hasFunctions)
-		}
-
-		if match && by != nil {
-			if v := valuer[by.Value]; v != nil {
-				e.AddSequenceLink(v)
-			}
-		}
+		match = f.evalSequence(e, seqID, &expr, partials, valuer)
 	}
+
 	return match
-}
-
-func joinsEqual(joins []bool) bool {
-	for _, j := range joins {
-		if !j {
-			return false
-		}
-	}
-	return true
 }
 
 func (f *filter) GetStringFields() map[fields.Field][]string { return f.stringFields }
@@ -563,4 +576,15 @@ func (f *filter) checkBoundRefs() error {
 	}
 
 	return nil
+}
+
+func makeSequenceLinkID(valuer ql.MapValuer, link *ql.SequenceLink) any {
+	if !link.IsCompound() {
+		return valuer[link.First()]
+	}
+	values := make([]any, 0, len(link.Fields))
+	for _, fld := range link.Fields {
+		values = append(values, valuer[fld.Value])
+	}
+	return hashFields(values)
 }

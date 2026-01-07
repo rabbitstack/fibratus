@@ -19,6 +19,7 @@
 package filter
 
 import (
+	"encoding/hex"
 	"net"
 	"path/filepath"
 	"strings"
@@ -208,34 +209,45 @@ func compareSeqLink(lhs any, rhs any) bool {
 	return false
 }
 
-// appendHash appends the value's hashable bytes to buf.
-func appendHash(buf []byte, v any) []byte {
-	switch val := v.(type) {
-	case uint8:
-		return append(buf, val)
-	case uint16:
-		return append(buf, bytes.WriteUint16(val)...)
-	case uint32:
-		return append(buf, bytes.WriteUint32(val)...)
-	case uint64:
-		return append(buf, bytes.WriteUint64(val)...)
-	case int8:
-		return append(buf, byte(val))
-	case int16:
-		return append(buf, bytes.WriteUint16(uint16(val))...)
-	case int32:
-		return append(buf, bytes.WriteUint32(uint32(val))...)
-	case int64:
-		return append(buf, bytes.WriteUint64(uint64(val))...)
-	case int:
-		return append(buf, bytes.WriteUint64(uint64(val))...)
-	case uint:
-		return append(buf, bytes.WriteUint64(uint64(val))...)
-	case string:
-		return append(buf, val...)
-	case net.IP:
-		return append(buf, val...)
-	default:
-		return buf
+// hashFields computes the hash of all field values.
+func hashFields(values []any) string {
+	buf := make([]byte, 0)
+	for _, v := range values {
+		switch val := v.(type) {
+		case uint8:
+			buf = append(buf, val)
+		case uint16:
+			buf = append(buf, bytes.WriteUint16(val)...)
+		case uint32:
+			buf = append(buf, bytes.WriteUint32(val)...)
+		case uint64:
+			buf = append(buf, bytes.WriteUint64(val)...)
+		case int8:
+			buf = append(buf, byte(val))
+		case int16:
+			buf = append(buf, bytes.WriteUint16(uint16(val))...)
+		case int32:
+			buf = append(buf, bytes.WriteUint32(uint32(val))...)
+		case int64:
+			buf = append(buf, bytes.WriteUint64(uint64(val))...)
+		case int:
+			buf = append(buf, bytes.WriteUint64(uint64(val))...)
+		case uint:
+			buf = append(buf, bytes.WriteUint64(uint64(val))...)
+		case string:
+			buf = append(buf, val...)
+		case net.IP:
+			buf = append(buf, val...)
+		}
 	}
+	return hex.EncodeToString(buf)
+}
+
+func joinsEqual(joins []bool) bool {
+	for _, j := range joins {
+		if !j {
+			return false
+		}
+	}
+	return true
 }

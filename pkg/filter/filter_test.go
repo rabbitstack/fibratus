@@ -19,6 +19,7 @@
 package filter
 
 import (
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -33,6 +34,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
+	"github.com/rabbitstack/fibratus/pkg/filter/ql"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	"github.com/rabbitstack/fibratus/pkg/ps"
@@ -108,6 +110,45 @@ func TestStringFields(t *testing.T) {
 	assert.Len(t, f.GetStringFields(), 2)
 	assert.Len(t, f.GetStringFields()[fields.EvtName], 3)
 	assert.Len(t, f.GetStringFields()[fields.PsName], 1)
+}
+
+func TestMakeSequenceLinkID(t *testing.T) {
+	var tests = []struct {
+		valuer  ql.MapValuer
+		seqLink *ql.SequenceLink
+		id      any
+	}{
+		{ql.MapValuer{
+			"ps.uuid": uint64(123232454234232132),
+			"ps.exe":  "C:\\Windows\\System32\\cmd.exe"},
+			&ql.SequenceLink{Fields: []*ql.FieldLiteral{{Value: "ps.exe"}, {Value: "ps.uuid"}}},
+			"433a5c57696e646f77735c53797374656d33325c636d642e65786544556ea343cfb501",
+		},
+		{ql.MapValuer{
+			"ps.uuid":        uint64(123232454234232132),
+			"module.address": uint64(0xfff32343)},
+			&ql.SequenceLink{Fields: []*ql.FieldLiteral{{Value: "ps.uuid"}, {Value: "module.address"}}},
+			"44556ea343cfb5014323f3ff00000000",
+		},
+		{ql.MapValuer{
+			"ps.uuid": uint64(123232454234232132),
+			"ps.exe":  "C:\\Windows\\System32\\cmd.exe"},
+			&ql.SequenceLink{Fields: []*ql.FieldLiteral{{Value: "ps.exe"}}},
+			"C:\\Windows\\System32\\cmd.exe",
+		},
+		{ql.MapValuer{
+			"ps.uuid": uint64(123232454234232132),
+			"ps.exe":  "C:\\Windows\\System32\\cmd.exe"},
+			&ql.SequenceLink{Fields: []*ql.FieldLiteral{{Value: "ps.uuid"}}},
+			uint64(123232454234232132),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("%v", tt.valuer), func(t *testing.T) {
+			assert.Equal(t, tt.id, makeSequenceLinkID(tt.valuer, tt.seqLink))
+		})
+	}
 }
 
 func TestProcFilter(t *testing.T) {
