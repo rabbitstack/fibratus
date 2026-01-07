@@ -1,18 +1,10 @@
 name: Process execution from hollowed memory section
 id: 2a3fbae8-5e8c-4b71-b9da-56c3958c0d53
-version: 2.0.0
+version: 2.1.0
 description: |
   Adversaries may inject malicious code into suspended and hollowed processes in order to
   evade process-based defenses. Process hollowing is a method of executing arbitrary code
   in the address space of a separate live process.
-
-  Process hollowing is commonly performed by creating a process in a suspended state then
-  unmapping/hollowing its memory, which can then be replaced with malicious code. A victim
-  process can be created with native Windows API calls such as CreateProcess, which includes
-  a flag to suspend the processes primary thread. At this point the process can be unmapped
-  using APIs calls such as ZwUnmapViewOfSection or NtUnmapViewOfSection before being written
-  to, realigned to the injected code, and resumed via VirtualAllocEx, WriteProcessMemory,
-  SetThreadContext, then ResumeThread/ResumeProcess respectively.
 labels:
   tactic.id: TA0005
   tactic.name: Defense Evasion
@@ -28,27 +20,28 @@ references:
 
 condition: >
   sequence
-  maxspan 2m
-    |spawn_process and
-     ps.parent.sid not in ('S-1-5-18', 'S-1-5-19', 'S-1-5-20') and
-     ps.parent.exe not imatches
-                (
-                  '?:\\Program Files\\*.exe',
-                  '?:\\Program Files (x86)\\*.exe'
-                )
-    | as e1
+  maxspan 40s
     |unmap_view_of_section and
-     ps.uuid = $e1.ps.uuid and
-     file.view.size > 20000 and file.view.protection != 'READONLY'
-    | as e2
+     evt.pid != 4 and ps.sid not in ('S-1-5-18', 'S-1-5-19', 'S-1-5-20') and
+     file.view.size > 20000 and file.view.protection != 'READONLY' and
+     (file.name = '' or file.extension != '.dll') and
+     ps.parent.exe not imatches
+                    (
+                      '?:\\Windows\\System32\\dwm.exe',
+                      '?:\\Windows\\System32\\svchost.exe',
+                      '?:\\Windows\\System32\\services.exe',
+                      '?:\\Windows\\Microsoft.NET\\Framework*\\ngen.exe',
+                      '?:\\Windows\\Microsoft.NET\\Framework*\\mscorsvw.exe'
+                    )
+    | by ps.uuid, file.view.base
     |load_executable and
-     ps.uuid = $e2.ps.uuid and image.base.address = $e2.file.view.base
-    |
+     image.path not imatches '?:\\Windows\\SoftwareDistribution\\Download\\*\\Package_for_RollupFix*\\*.exe'
+    | by ps.uuid, image.base.address
 action:
   - name: kill
 
 output: >
-  Process %3.ps.exe executed from hollowed memory section
+  Process %2.ps.exe executed from hollowed memory section
 severity: high
 
 min-engine-version: 3.0.0
