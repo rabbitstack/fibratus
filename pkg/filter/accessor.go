@@ -171,6 +171,8 @@ func (f *filter) narrowAccessors() {
 		switch {
 		case field.Name.IsKevtField(), field.Name.IsEvtField():
 			removeEvtAccessor = false
+		case field.Name.IsPeField():
+			removePEAccessor = false
 		case field.Name.IsPsField():
 			removePsAccessor = false
 		case field.Name.IsThreadField():
@@ -185,8 +187,6 @@ func (f *filter) narrowAccessors() {
 			removeNetworkAccessor = false
 		case field.Name.IsHandleField():
 			removeHandleAccessor = false
-		case field.Name.IsPeField():
-			removePEAccessor = false
 		case field.Name.IsMemField():
 			removeMemAccessor = false
 		case field.Name.IsDNSField():

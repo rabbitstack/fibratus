@@ -19,13 +19,14 @@
 package filter
 
 import (
+	"reflect"
+	"testing"
+
 	"github.com/rabbitstack/fibratus/pkg/callstack"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	ptypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"reflect"
-	"testing"
 )
 
 func TestNarrowAccessors(t *testing.T) {
@@ -42,7 +43,7 @@ func TestNarrowAccessors(t *testing.T) {
 			1,
 		},
 		{
-			New(`handle.type = 'Section' and pe.nsections > 1 and evt.name = 'CreateHandle'`, cfg),
+			New(`handle.type = 'Section' and ps.pe.nsections > 1 and evt.name = 'CreateHandle'`, cfg),
 			3,
 		},
 		{
