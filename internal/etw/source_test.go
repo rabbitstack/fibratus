@@ -421,7 +421,7 @@ func TestEventSourceAllEvents(t *testing.T) {
 				return nil
 			},
 			func(e *event.Event) bool {
-				return e.IsCreateProcess() && e.CurrentPid() &&
+				return e.IsCreateProcess() && e.Params.MustGetUint32(params.ProcessParentID) == uint32(os.Getpid()) &&
 					strings.EqualFold(e.GetParamAsString(params.ProcessName), "notepad.exe")
 			},
 			false,
@@ -876,7 +876,7 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 				return nil
 			},
 			func(e *event.Event) bool {
-				if e.IsCreateProcess() && e.CurrentPid() &&
+				if e.IsCreateProcess() && e.Params.MustGetUint32(params.ProcessParentID) == uint32(os.Getpid()) &&
 					strings.EqualFold(e.GetParamAsString(params.ProcessName), "notepad.exe") {
 					callstack := e.Callstack.String()
 					log.Infof("create process event %s: %s", e.String(), callstack)
