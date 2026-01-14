@@ -1,6 +1,6 @@
 name: System Binary Proxy Execution via Rundll32
 id: 43d76718-cc46-485e-8f47-996eb7a9f83b
-version: 1.0.4
+version: 1.0.5
 description: |
   Detects the execution of rundll32.exe process with suspicious command line
   followed by the creation of a possibly malicious child process.
@@ -25,7 +25,7 @@ condition: >
   sequence
   maxspan 1m
     |spawn_process and
-     (ps.name ~= 'rundll32.exe' or pe.file.name ~= 'rundll32.exe') and
+     (ps.name ~= 'rundll32.exe' or ps.pe.file.name ~= 'rundll32.exe') and
       (
         ps.cmdline imatches
                   (

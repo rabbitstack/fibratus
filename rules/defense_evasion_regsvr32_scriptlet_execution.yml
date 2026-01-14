@@ -1,6 +1,6 @@
 name: Regsvr32 scriptlet execution
 id: 128f5254-67c9-43ac-b901-18b3731b1d0b
-version: 1.0.4
+version: 1.0.5
 description: |
   Identifies the execution of a scriptlet file by regsvr32.exe process. regsvr32.exe
   allows attackers to run arbitrary scripts to proxy execution of malicious code.
@@ -17,7 +17,7 @@ labels:
 
 condition: >
   spawn_process and
-  (ps.name ~= 'regsvr32.exe' or pe.file.name ~= 'regsvr32.exe') and
+  (ps.name ~= 'regsvr32.exe' or ps.pe.file.name ~= 'regsvr32.exe') and
     (
       (ps.cmdline imatches '*scrobj*' and
        ps.cmdline imatches
