@@ -1,6 +1,6 @@
 name: Suspicious execution via WMI from a Microsoft Office process
 id: cc3f0bbe-ec53-40a7-9eed-f0a8a3f7d7fa
-version: 1.0.4
+version: 1.0.5
 description: |
   Identifies a suspicious process execution via Windows Management Instrumentation (WMI)
   originated from the Microsoft Office process loading an unusual WMI DLL. This technique
@@ -57,7 +57,7 @@ condition: >
                'wmic.exe',
                'msiexec.exe'
              ) or
-    pe.file.name iin 
+    ps.pe.file.name iin
             (
               'rundll32.exe',
               'regsvr32.exe',
