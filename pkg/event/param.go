@@ -20,17 +20,18 @@ package event
 
 import (
 	"fmt"
+	"net"
+	"reflect"
+	"sort"
+	"strings"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/network"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
-	"net"
-	"reflect"
-	"sort"
-	"strings"
-	"time"
 
 	"github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
@@ -97,6 +98,12 @@ type Param struct {
 	Flags ParamFlags `json:"flags"`
 	// Enum represents parameter enumeration
 	Enum ParamEnum `json:"enum"`
+}
+
+// IsNumber determines if the parameter stores the integer value type.
+func (p Param) IsNumber() bool {
+	return p.Type == params.Int8 || p.Type == params.Int16 || p.Type == params.Int32 || p.Type == params.Int64 ||
+		p.Type == params.Uint8 || p.Type == params.Uint16 || p.Type == params.Uint32 || p.Type == params.Uint64
 }
 
 // CaptureType returns the event type saved inside the capture file.
