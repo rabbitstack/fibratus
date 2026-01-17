@@ -19,13 +19,15 @@
 package eventlog
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/crc32"
+	"strings"
+
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	evlog "github.com/rabbitstack/fibratus/pkg/util/eventlog"
 	"golang.org/x/sys/windows"
-	"hash/crc32"
-	"strings"
 )
 
 const minIDChars = 12
@@ -83,7 +85,19 @@ func (s *eventlog) Send(alert alertsender.Alert) error {
 		code = uint16(h & 0xFFFF)
 	}
 
-	msg := alert.String(s.config.Verbose)
+	// build the eventlog event
+	var msg string
+	switch s.config.Format {
+	case prettyFormat:
+		msg = alert.String(s.config.Verbose)
+	case jsonFormat:
+		b, err := json.MarshalIndent(alert, "", "  ")
+		if err != nil {
+			return err
+		}
+		msg = string(b)
+	}
+
 	// trim null characters to avoid
 	// UTF16PtrFromString complaints
 	msg = strings.ReplaceAll(msg, "\x00", "")
