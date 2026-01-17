@@ -19,11 +19,13 @@
 package alertsender
 
 import (
+	"encoding/json"
+	"testing"
+
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestAlertString(t *testing.T) {
@@ -93,4 +95,34 @@ func TestAlertString(t *testing.T) {
 			require.Equal(t, tt.wantString, tt.alert.String(tt.verbose))
 		})
 	}
+}
+
+func TestAlertJSON(t *testing.T) {
+	alert := NewAlertWithEvents("Credential discovery via VaultCmd.exe", "Suspicious vault enumeration via VaultCmd tool", nil, Normal, []*event.Event{{
+		Type:     event.CreateProcess,
+		Category: event.Process,
+		Params: event.Params{
+			params.Cmdline:     {Name: params.Cmdline, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\svchost-fake.exe -k RPCSS"},
+			params.ProcessName: {Name: params.ProcessName, Type: params.AnsiString, Value: "svchost-fake.exe"}},
+		Name: "CreateProcess",
+		PID:  1023,
+		PS: &pstypes.PS{
+			Name:                "svchost.exe",
+			Cmdline:             "C:\\Windows\\System32\\svchost.exe",
+			Ppid:                345,
+			Username:            "SYSTEM",
+			Domain:              "NT AUTHORITY",
+			SID:                 "S-1-5-18",
+			TokenIntegrityLevel: "HIGH",
+		},
+	}})
+
+	alert.ID = "64af2e2e-2309-4079-9c0f-985f1dd930f5"
+
+	b, err := json.MarshalIndent(alert, "", "  ")
+	require.NoError(t, err)
+
+	expectedJSON := "{\n  \"id\": \"64af2e2e-2309-4079-9c0f-985f1dd930f5\",\n  \"title\": \"Credential discovery via VaultCmd.exe\",\n  \"severity\": \"low\",\n  \"text\": \"Suspicious vault enumeration via VaultCmd tool\",\n  \"description\": \"\",\n  \"events\": [\n    {\n      \"name\": \"CreateProcess\",\n      \"category\": \"process\",\n      \"timestamp\": \"0001-01-01T00:00:00Z\",\n      \"params\": {\n        \"cmdline\": \"C:\\\\Windows\\\\system32\\\\svchost-fake.exe -k RPCSS\",\n        \"name\": \"svchost-fake.exe\"\n      },\n      \"proc\": {\n        \"pid\": 0,\n        \"tid\": 0,\n        \"ppid\": 345,\n        \"name\": \"svchost.exe\",\n        \"exe\": \"\",\n        \"cmdline\": \"C:\\\\Windows\\\\System32\\\\svchost.exe\",\n        \"sid\": \"S-1-5-18\",\n        \"username\": \"SYSTEM\",\n        \"domain\": \"NT AUTHORITY\",\n        \"session_id\": 0,\n        \"integrity_level\": \"HIGH\",\n        \"is_wow64\": false,\n        \"is_packaged\": false,\n        \"is_protected\": false,\n        \"ancestors\": []\n      }\n    }\n  ]\n}"
+
+	require.Equal(t, expectedJSON, string(b))
 }
