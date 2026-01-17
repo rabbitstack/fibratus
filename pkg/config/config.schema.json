@@ -155,6 +155,10 @@
                 },
                 "verbose": {
                   "type": "boolean"
+                },
+                "format": {
+                  "type": "string",
+                  "enum": ["pretty", "json"]
                 }
               },
               "additionalProperties": false

@@ -20,15 +20,16 @@ package systray
 
 import (
 	"encoding/json"
+	"io"
+	"net"
+	"sync"
+	"testing"
+
 	"github.com/Microsoft/go-winio"
 	"github.com/mitchellh/mapstructure"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"io"
-	"net"
-	"sync"
-	"testing"
 )
 
 func handleMessage(t *testing.T, conn net.Conn, wg *sync.WaitGroup, msgs chan Msg) {
@@ -107,6 +108,7 @@ func decodeMsg(output any, data any) error {
 		DecodeHook: mapstructure.ComposeDecodeHookFunc(
 			mapstructure.StringToTimeDurationHookFunc(),
 			mapstructure.StringToSliceHookFunc(","),
+			alertsender.StringToSeverityDecodeHook(),
 		),
 	}
 	decoder, err := mapstructure.NewDecoder(decoderConfig)
