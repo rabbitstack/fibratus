@@ -86,6 +86,9 @@ alertsenders:
     # in the log message.
     verbose: true
 
+     # Specifies the eventlog record format for the alert. Can be pretty|json
+    format: pretty
+
 # =============================== API ==================================================
 
 # Settings that influence the behaviour of the HTTP server that exposes a number of endpoints such as

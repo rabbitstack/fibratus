@@ -21,11 +21,14 @@ package alertsender
 import (
 	"bytes"
 	"fmt"
+	"reflect"
+	"strings"
+
+	"github.com/mitchellh/mapstructure"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/renderer/html"
-	"strings"
 )
 
 // Severity is the type alias for alert's severity level.
@@ -55,6 +58,26 @@ func (s Severity) String() string {
 		return "critical"
 	default:
 		return "unknown"
+	}
+}
+
+// StringToSeverityDecodeHook converts severity string to integer.
+func StringToSeverityDecodeHook() mapstructure.DecodeHookFuncType {
+	return func(
+		from reflect.Type,
+		to reflect.Type,
+		data any,
+	) (any, error) {
+
+		if from.Kind() != reflect.String {
+			return data, nil
+		}
+
+		if to != reflect.TypeOf(Severity(0)) {
+			return data, nil
+		}
+
+		return ParseSeverityFromString(data.(string)), nil
 	}
 }
 

@@ -25,6 +25,10 @@ import (
 const (
 	enabled = "alertsenders.eventlog.enabled"
 	verbose = "alertsenders.eventlog.verbose"
+	format  = "alertsenders.eventlog.format"
+
+	prettyFormat = "pretty"
+	jsonFormat   = "json"
 )
 
 // Config defines the configuration for the eventlog sender.
@@ -35,10 +39,14 @@ type Config struct {
 	// event context, including parameters and the process
 	// state are included in the log message.
 	Verbose bool `mapstructure:"verbose"`
+	// Format specifies the eventlog record format for the alert.
+	// Can be pretty or json.
+	Format string `mapstructure:"format"`
 }
 
 // AddFlags registers persistent flags.
 func AddFlags(flags *pflag.FlagSet) {
 	flags.Bool(enabled, true, "Indicates if eventlog alert sender is enabled")
 	flags.Bool(verbose, true, "Enables/disables the verbose mode. In verbose mode, the full event context, including all parameters and the process information are included in the log message")
+	flags.String(format, "pretty", "Specifies the eventlog record format for the alert. Can be pretty|json")
 }

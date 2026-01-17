@@ -22,6 +22,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net"
+	"os"
+	"path/filepath"
+	"unsafe"
+
 	"github.com/Microsoft/go-winio"
 	"github.com/mitchellh/mapstructure"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
@@ -31,11 +37,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/signals"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
-	"io"
-	"net"
-	"os"
-	"path/filepath"
-	"unsafe"
 )
 
 const systrayPipe = `\\.\pipe\fibratus-systray`
@@ -65,6 +66,7 @@ func (m Msg) decode(output any) error {
 		DecodeHook: mapstructure.ComposeDecodeHookFunc(
 			mapstructure.StringToTimeDurationHookFunc(),
 			mapstructure.StringToSliceHookFunc(","),
+			alertsender.StringToSeverityDecodeHook(),
 		),
 	}
 	decoder, err := mapstructure.NewDecoder(decoderConfig)
