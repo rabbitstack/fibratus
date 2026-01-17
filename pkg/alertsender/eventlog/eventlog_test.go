@@ -19,6 +19,9 @@
 package eventlog
 
 import (
+	"testing"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
@@ -28,12 +31,10 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
-	"testing"
-	"time"
 )
 
 func TestEventlogSender(t *testing.T) {
-	s, err := alertsender.Load(alertsender.Config{Type: alertsender.Eventlog, Sender: Config{Verbose: true, Enabled: true}})
+	s, err := alertsender.Load(alertsender.Config{Type: alertsender.Eventlog, Sender: Config{Verbose: true, Enabled: true, Format: prettyFormat}})
 	require.NoError(t, err)
 	require.NotNil(t, s)
 
