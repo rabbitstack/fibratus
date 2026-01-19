@@ -673,6 +673,13 @@ func (l *fileAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 	switch f.Name {
 	case fields.FilePath:
 		return e.GetParamAsString(params.FilePath), nil
+	case fields.FilePathStem:
+		path := e.GetParamAsString(params.FilePath)
+		n := strings.LastIndexByte(path, '.')
+		if n == -1 {
+			return path, nil
+		}
+		return path[:n], nil
 	case fields.FileName:
 		return filepath.Base(e.GetParamAsString(params.FilePath)), nil
 	case fields.FileExtension:
@@ -821,6 +828,13 @@ func (i *imageAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 	switch f.Name {
 	case fields.ImagePath:
 		return e.GetParamAsString(params.ImagePath), nil
+	case fields.ImagePathStem:
+		path := e.GetParamAsString(params.ImagePath)
+		n := strings.LastIndexByte(path, '.')
+		if n == -1 {
+			return path, nil
+		}
+		return path[:n], nil
 	case fields.ImageName:
 		return filepath.Base(e.GetParamAsString(params.ImagePath)), nil
 	case fields.ImageDefaultAddress:
