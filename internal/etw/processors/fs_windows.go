@@ -20,6 +20,9 @@ package processors
 
 import (
 	"expvar"
+	"sync"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
@@ -31,8 +34,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
 	"golang.org/x/time/rate"
-	"sync"
-	"time"
 )
 
 var (
@@ -371,11 +372,13 @@ func (f *fsProcessor) purge() {
 
 			// evict unmatched stack traces
 			for id, q := range f.buckets {
-				for i, evt := range q {
-					if time.Since(evt.Timestamp) > time.Second*30 {
-						f.buckets[id] = append(q[:i], q[i+1:]...)
+				s := q[:0]
+				for _, evt := range q {
+					if time.Since(evt.Timestamp) <= time.Second*30 {
+						s = append(s, evt)
 					}
 				}
+				f.buckets[id] = s
 			}
 
 			f.mu.Unlock()
