@@ -160,8 +160,9 @@ func (s *StackwalkDecorator) Pop(e *Event) *Event {
 				if !proc.IsCreateProcess() && proc.Params.MustGetPid() != pid {
 					continue
 				}
-				s.buckets[ev.StackID()] = append(qu[:i], qu[i+1:]...)
+				qu = append(qu[:i], qu[i+1:]...)
 			}
+			s.buckets[ev.StackID()] = qu
 		}
 	}
 
@@ -209,16 +210,18 @@ func (s *StackwalkDecorator) flush() []error {
 	errs := make([]error, 0)
 
 	for id, q := range s.buckets {
-		for i, evt := range q {
+		n := q[:0]
+		for _, evt := range q {
 			if time.Since(evt.Timestamp) < maxQueueTTLPeriod {
+				n = append(n, evt)
 				continue
 			}
+
 			stackwalkFlushes.Add(1)
 			err := s.q.push(evt)
 			if err != nil {
 				errs = append(errs, err)
 			}
-			s.buckets[id] = append(q[:i], q[i+1:]...)
 			if stackwalkEnqueued.Value() > 0 {
 				stackwalkEnqueued.Add(-1)
 			}
@@ -227,6 +230,7 @@ func (s *StackwalkDecorator) flush() []error {
 			}
 			stackwalkFlushesEvents.Add(evt.Name, 1)
 		}
+		s.buckets[id] = n
 	}
 
 	return errs
