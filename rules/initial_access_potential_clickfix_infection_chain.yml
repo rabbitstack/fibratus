@@ -1,10 +1,10 @@
-name: Potential ClickFix infection chain via Run window
+name: Potential ClickFix infection chain
 id: ffe1fc54-2893-4760-ab50-51a83bd71d13
-version: 1.0.5
+version: 2.0.0
 description: |
-  Identifies the execution of the process via the Run command dialog box followed by spawning of the potential 
-  infostealer process. 
-  This could be indicative of the ClickFix deceptive tactic used by attackers to lure victims into executing 
+  Identifies the execution of the process via the Run command dialog box, Windows Console shortuct, or Explorer address bar
+  followed by spawning of the potential infostealer process.
+  This could be indicative of the ClickFix deceptive tactic used by attackers to lure victims into executing
   malicious commands under the guise of meeting pages or CAPTCHAs.
 labels:
   tactic.id: TA0001
@@ -23,10 +23,12 @@ condition: >
   maxspan 2m
     |spawn_process and
      ps.parent.name ~= 'explorer.exe' and length(ps.args) >= 2 and
+     ps.name iin ('cmd.exe', 'powershell.exe', 'pwsh.exe', 'wget.exe', 'curl.exe', 'msiexec.exe', 'mshta.exe', 'wscript.exe', 'cscript.exe', 'msbuild.exe') and
      (thread.callstack.summary imatches
                               (
                                 'ntdll.dll|KernelBase.dll|kernel32.dll|windows.storage.dll|shell32.dll|user32.dll|shell32.dll|explorer.exe|SHCore.dll|*',
-                                'ntdll.dll|KernelBase.dll|kernel32.dll|windows.storage.dll|shell32.dll|windows.storage.dll|shell32.dll|user32.dll|shell32.dll|explorer.exe|SHCore.dll|*'
+                                'ntdll.dll|KernelBase.dll|kernel32.dll|windows.storage.dll|shell32.dll|windows.storage.dll|shell32.dll|user32.dll|shell32.dll|explorer.exe|SHCore.dll|*',
+                                'ntdll.dll|KernelBase.dll|kernel32.dll|windows.storage.dll|shell32.dll|windows.storage.dll|SHCore.dll|*'
                               ) or
       (thread.callstack.summary imatches '*shell32.dll|explorer.exe|*' and thread.callstack.symbols imatches ('*shell32.dll!GetFileNameFromBrowse*'))
      )
@@ -42,7 +44,7 @@ action:
   - name: kill
 
 output: >
-  Potential infostealer process %2.ps.exe executed via the Run command window by %1.ps.cmdline
+  Potential infostealer process %2.ps.exe delivered via ClickFix infection chain
 severity: high
 
 min-engine-version: 3.0.0
