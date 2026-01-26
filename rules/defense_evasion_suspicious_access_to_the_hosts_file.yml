@@ -1,6 +1,6 @@
 name: Suspicious access to the hosts file
 id: f7b2c9d3-99e7-41d5-bb4a-6ea1a5f7f9e2
-version: 1.0.6
+version: 1.0.7
 description: >
   Identifies suspicious process accessing the Windows hosts file for potential tampering.
   Adversaries can hijack the hosts files to block traffic to download/update servers or redirect the
@@ -26,7 +26,9 @@ condition: >
                                           '?:\\Windows\\System32\\MicrosoftEdgeUpdate.exe',
                                           '?:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
                                           '?:\\Program Files\\Mozilla Firefox\\firefox.exe',
-                                          '?:\\Program Files (x86)\\Mozilla Firefox\\firefox.exe'
+                                          '?:\\Program Files (x86)\\Mozilla Firefox\\firefox.exe',
+                                          '?:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\*\\msedgewebview2.exe',
+                                          '?:\\Windows\\Explorer.exe'
                                         )
     |
     |open_file and file.path imatches '?:\\Windows\\System32\\drivers\\etc\\hosts'|
