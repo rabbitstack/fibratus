@@ -1,0 +1,38 @@
+name: Potential mandatory profile registry persistence
+id: e9c9fa57-5088-4d40-8a5e-2aa70ec6e189
+version: 1.0.0
+description: |
+  Identifies suspicious creation of the NTUSER.MAN file within user profile
+  directories, a lesser-known persistence technique that abuses mandatory
+  user profiles. By planting a crafted NTUSER.MAN, an attacker can force
+  Windows to load attacker-controlled registry settings at every logon,
+  achieving durable boot or logon persistence.
+labels:
+  tactic.id: TA0003
+  tactic.name: Persistence
+  tactic.ref: https://attack.mitre.org/tactics/TA0003/
+  technique.name: Boot or Logon Autostart Execution
+  technique.ref: https://attack.mitre.org/techniques/T1547/
+  subtechnique.id: T1547.001
+  subtechnique.name: Registry Run Keys / Startup Folder
+  subtechnique.ref: https://attack.mitre.org/techniques/T1547/001/
+references:
+  - https://deceptiq.com/blog/ntuser-man-registry-persistence
+  - https://github.com/MHaggis/notes/tree/master/utilities/MandatoryProfilePersistence
+
+condition: >
+  create_file and
+  evt.pid != 4 and ps.token.integrity_level != 'SYSTEM' and
+  file.path imatches '?:\\Users\\*\\NTUSER.MAN' and
+  ps.exe not imatches
+            (
+              '?:\\Windows\\System32\\userinit.exe',
+              '?:\\Windows\\System32\\winlogon.exe'
+            ) and
+  not (ps.exe imatches '?:\\Windows\\System32\\svchost.exe' and ps.cmdline matches '*-k UserProfileService -p -s ProfSvc')
+action:
+  - name: kill
+
+severity: high
+
+min-engine-version: 3.0.0
