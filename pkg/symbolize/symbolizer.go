@@ -53,8 +53,6 @@ var (
 
 	// symCleanups counts the number of symbol cleanups
 	symCleanups = expvar.NewInt("symbolizer.symbol.cleanups")
-	// modCleanups counts the number of module cleanups
-	modCleanups = expvar.NewInt("symbolizer.module.cleanups")
 
 	// symCacheHits counts the number of cache hits in the symbols cache
 	symCacheHits = expvar.NewInt("symbolizer.cache.hits")
@@ -85,10 +83,6 @@ var parsePeFile = func(name string, option ...pe.Option) (*pe.PE, error) {
 // its handle and symbol resources are disposed
 var procTTL = 15 * time.Second
 
-// modTTL maximum time for the module to remain in
-// the state until all its exports are removed
-var modTTL = 8 * time.Minute
-
 type process struct {
 	pid      uint32
 	handle   windows.Handle
@@ -102,20 +96,9 @@ func (p *process) keepalive() {
 }
 
 type module struct {
-	exports                    map[uint32]string
-	accessed                   time.Time
+	exports                    *ModuleExports
 	minExportRVA, maxExportRVA uint32
 	hasExports                 bool
-}
-
-type syminfo struct {
-	module        string
-	symbol        string
-	moduleAddress va.Address // base module address
-}
-
-func (m *module) keepalive() {
-	m.accessed = time.Now()
 }
 
 func (m *module) isUnexported(rva va.Address) bool {
@@ -125,13 +108,19 @@ func (m *module) isUnexported(rva va.Address) bool {
 	return rva.Uint64() < uint64(m.minExportRVA) || rva.Uint64() > uint64(m.maxExportRVA)
 }
 
+type syminfo struct {
+	module        string
+	symbol        string
+	moduleAddress va.Address // base module address
+}
+
 // Symbolizer is responsible for converting raw addresses
 // into symbol names and modules with the assistance of the
-// symbol resolver.
+// export directory or symbol resolver.
 type Symbolizer struct {
 	config *config.Config
 	procs  map[uint32]*process
-	mods   map[va.Address]*module
+	mods   map[uint32]map[va.Address]*module
 	mu     sync.Mutex
 
 	// symbols stores the mapping of stack
@@ -142,6 +131,9 @@ type Symbolizer struct {
 	// it is populated by each export directory symbol
 	// resolution
 	symbols map[uint32]map[va.Address]syminfo
+
+	// exps stores resolved export directories
+	exps *ExportsDirectoryCache
 
 	r     Resolver
 	psnap ps.Snapshotter
@@ -161,12 +153,13 @@ func NewSymbolizer(r Resolver, psnap ps.Snapshotter, config *config.Config, enqu
 	sym := &Symbolizer{
 		config:  config,
 		procs:   make(map[uint32]*process),
-		mods:    make(map[va.Address]*module),
+		mods:    make(map[uint32]map[va.Address]*module),
 		symbols: make(map[uint32]map[va.Address]syminfo),
 		cleaner: time.NewTicker(time.Second * 2),
 		purger:  time.NewTicker(time.Minute * 5),
 		quit:    make(chan struct{}, 1),
 		enqueue: enqueue,
+		exps:    NewExportsDirectoryCache(psnap),
 		r:       r,
 		psnap:   psnap,
 	}
@@ -184,6 +177,7 @@ func NewSymbolizer(r Resolver, psnap ps.Snapshotter, config *config.Config, enqu
 	}
 
 	go sym.housekeep()
+	go sym.exps.purge()
 
 	return sym
 }
@@ -194,6 +188,7 @@ func (s *Symbolizer) Close() {
 	s.cleaner.Stop()
 	s.purger.Stop()
 	s.quit <- struct{}{}
+	s.exps.quit <- struct{}{}
 	s.cleanAllSyms()
 	if s.config.SymbolizeKernelAddresses {
 		for _, dev := range sys.EnumDevices() {
@@ -208,11 +203,11 @@ func (s *Symbolizer) ProcessEvent(e *event.Event) (bool, error) {
 		pid := e.Params.MustGetPid()
 		s.mu.Lock()
 		defer s.mu.Unlock()
-		if _, ok := s.symbols[pid]; !ok {
-			return true, nil
-		}
-		symCachedSymbols.Add(-int64(len(s.symbols[pid])))
+		delete(s.mods, pid)
 		delete(s.symbols, pid)
+		// remove exports for this process
+		s.exps.RemoveExports(e.GetParamAsString(params.Exe))
+		symCachedSymbols.Add(-int64(len(s.symbols[pid])))
 		proc, ok := s.procs[pid]
 		if !ok {
 			return true, nil
@@ -240,9 +235,7 @@ func (s *Symbolizer) ProcessEvent(e *event.Event) (bool, error) {
 			}
 		}
 
-		// remove module if it has been unmapped from
-		// all process VAS. If the new module is loaded
-		// populate its export directory entries
+		// remove module if it has been unmapped from the process VAS
 		err := s.syncModules(e)
 		if err != nil {
 			log.Error(err)
@@ -263,48 +256,35 @@ func (s *Symbolizer) ProcessEvent(e *event.Event) (bool, error) {
 }
 
 // syncModules reconciles the state of loaded modules.
-// When the module is unloaded from all processes in
-// the snapshost state, its exports map is pruned. If
-// the new module is loaded and not already present in
-// the map, we parse its export directory and insert
+// When the module is unloaded from the process address
+// space, its information is pruned from the cache.
+// If the new module is loaded and not already present in
+// the map, we get its export directory and insert
 // into the map.
 func (s *Symbolizer) syncModules(e *event.Event) error {
-	filename := e.GetParamAsString(params.ImagePath)
-	addr := e.Params.TryGetAddress(params.ImageBase)
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	base := e.Params.TryGetAddress(params.ImageBase)
+	size := e.Params.TryGetUint64(params.ImageSize)
 
 	if e.IsUnloadImage() {
-		ok, _ := s.psnap.FindModule(addr)
-		if !ok {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if _, ok := s.mods[e.PID][base]; ok {
 			symModulesCount.Add(-1)
-			delete(s.mods, addr)
+			delete(s.mods[e.PID], base)
+			// prune symbol entry from the cache if
+			// the symbol address falls within the
+			// unmapped module
+			syms, ok := s.symbols[e.PID]
+			if !ok {
+				return nil
+			}
+			for addr := range syms {
+				if addr >= base && addr <= base.Inc(size) {
+					delete(s.symbols[e.PID], base)
+				}
+			}
 		}
-		// remove executable images
-		if strings.EqualFold(filepath.Ext(filename), ".exe") {
-			delete(s.mods, addr)
-		}
-		return nil
 	}
-
-	if s.mods[addr] != nil {
-		return nil
-	}
-	px, err := parsePeFile(filename, pe.WithSections(), pe.WithExports())
-	if err != nil {
-		return fmt.Errorf("unable to parse PE exports for module [%s]: %v", filename, err)
-	}
-
-	symModulesCount.Add(1)
-
-	m := &module{exports: px.Exports, accessed: time.Now(), hasExports: true}
-	exportRVAs := convert.MapKeysToSlice(m.exports)
-	if len(exportRVAs) > 0 {
-		m.minExportRVA, m.maxExportRVA = slices.Min(exportRVAs), slices.Max(exportRVAs)
-	} else {
-		m.hasExports = false
-	}
-	s.mods[addr] = m
 
 	return nil
 }
@@ -485,31 +465,34 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *event.Event) callstack.Fra
 				}
 			}
 		}
+
 		if mod != nil {
 			frame.Module = mod.Name
 			frame.ModuleAddress = mod.BaseAddress
-			m, ok := s.mods[mod.BaseAddress]
+			m, ok := s.mods[pid][mod.BaseAddress]
 			peOK := true
 			if !ok {
-				// parse export directory to resolve symbols
-				m = &module{exports: make(map[uint32]string), accessed: time.Now(), hasExports: true}
-				px, err := parsePeFile(mod.Name, pe.WithSections(), pe.WithExports())
-				if err != nil {
-					peOK = false
-					m.hasExports = false
-				} else {
-					m.exports = px.Exports
-					m.hasExports = len(m.exports) > 0
-					exportRVAs := convert.MapKeysToSlice(m.exports)
+				var exports *ModuleExports
+				exports, peOK = s.exps.Exports(mod.Name)
+				m = &module{
+					hasExports: true,
+					exports:    &ModuleExports{exps: make(map[uint32]string)},
+				}
+				if exports != nil {
+					m.exports = exports
+					m.hasExports = len(m.exports.exps) > 0
+					exportRVAs := convert.MapKeysToSlice(m.exports.exps)
 					if m.hasExports {
 						m.minExportRVA, m.maxExportRVA = slices.Min(exportRVAs), slices.Max(exportRVAs)
 					}
+				} else {
+					m.hasExports = false
 				}
 				symModulesCount.Add(1)
-				s.mods[mod.BaseAddress] = m
+				s.cacheModule(e.PID, mod.BaseAddress, m)
 			}
 			rva := addr.Dec(mod.BaseAddress.Uint64())
-			frame.Symbol = symbolFromRVA(rva, m.exports)
+			frame.Symbol = m.exports.SymbolFromRVA(rva)
 			// permit unknown symbols for executable modules
 			if frame.Symbol == "" && strings.EqualFold(filepath.Ext(mod.Name), ".exe") {
 				frame.Symbol = "?"
@@ -523,9 +506,8 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *event.Event) callstack.Fra
 			if frame.Symbol == "" && (m.isUnexported(rva) || (!m.hasExports && peOK)) {
 				frame.Symbol = "?"
 			}
-			// keep to module alive from purger
-			m.keepalive()
 		}
+
 		if frame.Module != "" && frame.Symbol != "" {
 			// store resolved symbol information in cache
 			s.cacheSymbol(pid, addr, &frame)
@@ -571,33 +553,6 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *event.Event) callstack.Fra
 	return frame
 }
 
-func (s *Symbolizer) cacheSymbol(pid uint32, addr va.Address, frame *callstack.Frame) {
-	if sym, ok := s.symbols[pid]; ok {
-		if _, ok := sym[addr]; !ok {
-			symCachedSymbols.Add(1)
-			s.symbols[pid][addr] = syminfo{module: frame.Module, symbol: frame.Symbol, moduleAddress: frame.ModuleAddress}
-		}
-	} else {
-		symCachedSymbols.Add(1)
-		s.symbols[pid] = map[va.Address]syminfo{addr: {module: frame.Module, symbol: frame.Symbol, moduleAddress: frame.ModuleAddress}}
-	}
-}
-
-// resolveSymbolFromExportDirectory parses the module PE
-// export directory  and attempts to locate the closest
-// symbol before the relative virtual callstack address.
-func (s *Symbolizer) resolveSymbolFromExportDirectory(addr va.Address, mod *pstypes.Module) string {
-	if mod == nil {
-		return ""
-	}
-	px, err := parsePeFile(mod.Name, pe.WithSections(), pe.WithExports())
-	if err != nil {
-		return ""
-	}
-	rva := addr.Dec(mod.BaseAddress.Uint64())
-	return symbolFromRVA(rva, px.Exports)
-}
-
 // symbolizeAddress resolves the given address to a symbol. If the symbol
 // for this address was resolved previously, we fetch it from the cache.
 // On the contrary, the symbol is first consulted in the export directory.
@@ -610,9 +565,15 @@ func (s *Symbolizer) symbolizeAddress(pid uint32, addr va.Address, mod *pstypes.
 	symbol, ok := s.symbols[pid][addr]
 	if !ok && mod != nil {
 		// resolve symbol from the export directory
-		symbol.symbol = s.resolveSymbolFromExportDirectory(addr, mod)
+		exports, ok := s.exps.Exports(mod.Name)
+		if !ok {
+			goto fallback
+		}
+		rva := addr.Dec(mod.BaseAddress.Uint64())
+		symbol.symbol = exports.SymbolFromRVA(rva)
 	}
 
+fallback:
 	// try to get the symbol via Debug Help API
 	if symbol.symbol == "" {
 		proc, ok := s.procs[pid]
@@ -658,37 +619,31 @@ func (s *Symbolizer) symbolizeAddress(pid uint32, addr va.Address, mod *pstypes.
 	return symbol.symbol
 }
 
-// symbolFromRVA finds the closest export address before RVA.
-func symbolFromRVA(rva va.Address, exports map[uint32]string) string {
-	var exp uint32
-	for f := range exports {
-		if uint64(f) <= rva.Uint64() {
-			if exp < f {
-				exp = f
-			}
+func (s *Symbolizer) cacheModule(pid uint32, addr va.Address, m *module) {
+	if mod, ok := s.mods[pid]; ok {
+		if _, ok := mod[addr]; !ok {
+			s.mods[pid][addr] = m
 		}
+	} else {
+		s.mods[pid] = map[va.Address]*module{addr: m}
 	}
-	if exp != 0 {
-		sym, ok := exports[exp]
-		if ok && sym == "" {
-			return "?"
+}
+
+func (s *Symbolizer) cacheSymbol(pid uint32, addr va.Address, frame *callstack.Frame) {
+	if sym, ok := s.symbols[pid]; ok {
+		if _, ok := sym[addr]; !ok {
+			symCachedSymbols.Add(1)
+			s.symbols[pid][addr] = syminfo{module: frame.Module, symbol: frame.Symbol, moduleAddress: frame.ModuleAddress}
 		}
-		return sym
+	} else {
+		symCachedSymbols.Add(1)
+		s.symbols[pid] = map[va.Address]syminfo{addr: {module: frame.Module, symbol: frame.Symbol, moduleAddress: frame.ModuleAddress}}
 	}
-	return ""
 }
 
 func (s *Symbolizer) cleanSym() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	for addr, m := range s.mods {
-		if time.Since(m.accessed) > modTTL {
-			modCleanups.Add(1)
-			symModulesCount.Add(-1)
-			log.Debugf("removing module exports for addr [%s]", addr)
-			delete(s.mods, addr)
-		}
-	}
 	for _, proc := range s.procs {
 		if time.Since(proc.accessed) > procTTL {
 			symCleanups.Add(1)

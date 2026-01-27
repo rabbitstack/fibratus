@@ -55,6 +55,8 @@ type Snapshotter interface {
 	// FindModule traverses loaded modules of all processes in the snapshot and
 	// if there is module with the specified base address, it returns its metadata.
 	FindModule(addr va.Address) (bool, *pstypes.Module)
+	// FindAllModules finds all unique modules across the snapshotter state.
+	FindAllModules() map[string]pstypes.Module
 	// FindAndPut attempts to retrieve process' state for the specified process identifier.
 	// If the process is found, the snapshotter state is updated with the new process.
 	FindAndPut(pid uint32) *pstypes.PS
