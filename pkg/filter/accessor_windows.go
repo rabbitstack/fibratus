@@ -1074,6 +1074,7 @@ func (pa *peAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 		if err != nil {
 			return nil, err
 		}
+		e.PS.PE = p
 	}
 
 	// here we determine if the PE was tampered. This check
@@ -1115,54 +1116,52 @@ func (pa *peAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 		p.VerifySignature()
 	}
 
-	e.PS.PE = p
-
 	switch f.Name {
-	case fields.PeEntrypoint:
+	case fields.PeEntrypoint, fields.PsPeEntrypoint:
 		return p.EntryPoint, nil
-	case fields.PeBaseAddress:
+	case fields.PeBaseAddress, fields.PsPeBaseAddress:
 		return p.ImageBase, nil
-	case fields.PeNumSections:
+	case fields.PeNumSections, fields.PsPeNumSections:
 		return p.NumberOfSections, nil
-	case fields.PeNumSymbols:
+	case fields.PeNumSymbols, fields.PsPeNumSymbols:
 		return p.NumberOfSymbols, nil
-	case fields.PeSymbols:
+	case fields.PeSymbols, fields.PsPeSymbols:
 		return p.Symbols, nil
-	case fields.PeImports:
+	case fields.PeImports, fields.PsPeImports:
 		return p.Imports, nil
-	case fields.PeImphash:
+	case fields.PeImphash, fields.PsPeImphash:
 		return p.Imphash, nil
-	case fields.PeIsDotnet:
+	case fields.PeIsDotnet, fields.PsPeIsDotnet:
 		return p.IsDotnet, nil
-	case fields.PeAnomalies:
+	case fields.PeAnomalies, fields.PsPeAnomalies:
 		return p.Anomalies, nil
-	case fields.PeIsSigned:
+	case fields.PeIsSigned, fields.PsSignatureExists:
 		return p.IsSigned, nil
-	case fields.PeIsTrusted:
+	case fields.PeIsTrusted, fields.PsSignatureTrusted:
 		return p.IsTrusted, nil
 	case fields.PeIsModified:
 		return p.IsModified, nil
-	case fields.PeCertIssuer:
+	case fields.PeCertIssuer, fields.PsSignatureIssuer:
 		if p.Cert == nil {
 			return nil, ErrPeNilCertificate
 		}
 		return p.Cert.Issuer, nil
-	case fields.PeCertSubject:
+	case fields.PeCertSubject, fields.PsSignatureSubject:
 		if p.Cert == nil {
 			return nil, ErrPeNilCertificate
 		}
 		return p.Cert.Subject, nil
-	case fields.PeCertSerial:
+	case fields.PeCertSerial, fields.PsSignatureSerial:
 		if p.Cert == nil {
 			return nil, ErrPeNilCertificate
 		}
 		return p.Cert.SerialNumber, nil
-	case fields.PeCertAfter:
+	case fields.PeCertAfter, fields.PsSignatureAfter:
 		if p.Cert == nil {
 			return nil, ErrPeNilCertificate
 		}
 		return p.Cert.NotAfter, nil
-	case fields.PeCertBefore:
+	case fields.PeCertBefore, fields.PsSignatureBefore:
 		if p.Cert == nil {
 			return nil, ErrPeNilCertificate
 		}
@@ -1173,23 +1172,23 @@ func (pa *peAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 		return e.Params.GetBool(params.FileIsDriver)
 	case fields.PeIsExecutable:
 		return e.Params.GetBool(params.FileIsExecutable)
-	case fields.PeCompany:
+	case fields.PeCompany, fields.PsPeCompany:
 		return p.VersionResources[pe.Company], nil
-	case fields.PeCopyright:
+	case fields.PeCopyright, fields.PsPeCopyright:
 		return p.VersionResources[pe.LegalCopyright], nil
-	case fields.PeDescription:
+	case fields.PeDescription, fields.PsPeDescription:
 		return p.VersionResources[pe.FileDescription], nil
-	case fields.PeFileName:
+	case fields.PeFileName, fields.PsPeFileName:
 		return p.VersionResources[pe.OriginalFilename], nil
-	case fields.PeFileVersion:
+	case fields.PeFileVersion, fields.PsPeFileVersion:
 		return p.VersionResources[pe.FileVersion], nil
-	case fields.PeProduct:
+	case fields.PeProduct, fields.PsPeProduct:
 		return p.VersionResources[pe.ProductName], nil
-	case fields.PeProductVersion:
+	case fields.PeProductVersion, fields.PsPeProductVersion:
 		return p.VersionResources[pe.ProductVersion], nil
-	case fields.PeSections:
+	case fields.PeSections, fields.PsPeSections:
 		return p.Sections, nil
-	case fields.PeResources:
+	case fields.PeResources, fields.PsPeResources:
 		// return a single version resource indicated by the arg.
 		// For example, pe.resources[FileDescription] returns the
 		// original file description present in the resource directory
