@@ -1,6 +1,6 @@
 name: Suspicious object symbolic link creation
 id: f9306355-1f5f-4a06-9779-195aa681db80
-version: 1.0.4
+version: 1.0.5
 description: |
   Identifies the creation of the object symbolic link inside the object manager namespace
   by untrusted or unusual processes.
@@ -19,7 +19,7 @@ references:
 
 condition: >
   create_symbolic_link_object and evt.pid != 4 and
-  (pe.is_signed = false or pe.is_trusted = false or
+  (ps.signature.exists = false or ps.signature.trusted = false or
    ps.exe not imatches
               (
                 '?:\\ProgramData\\Microsoft\\Windows Defender\\*\\MsMpEng.exe',

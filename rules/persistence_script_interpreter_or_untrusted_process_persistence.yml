@@ -1,6 +1,6 @@
 name: Script interpreter host or untrusted process persistence
 id: cc41ee3a-6e44-4903-85a4-0147ec6a7eea
-version: 1.1.2
+version: 1.1.3
 description: |
   Identifies the script interpreter or untrusted process writing to commonly 
   abused run keys or the Startup folder locations.
@@ -17,7 +17,7 @@ labels:
 
 condition: >
   (((modify_registry) or (create_file)) and evt.pid != 4) and
-  (ps.name in script_interpreters or ps.parent.name in script_interpreters or pe.is_trusted = false) and
+  (ps.name in script_interpreters or ps.parent.name in script_interpreters or ps.signature.trusted = false) and
   (registry.path imatches registry_run_keys or file.path imatches startup_locations) and
   not (ps.exe imatches
               (
@@ -35,7 +35,7 @@ condition: >
                 '?:\\Program Files\\Google\\Drive File Stream\\*\\GoogleDriveFS.exe',
                 '?:\\Users\\*\\AppData\\Local\\Dropbox\\Dropbox.exe'
               ) or
-       (pe.is_signed = true and pe.cert.subject imatches '*Microsoft*'))
+       (ps.signature.exists = true and ps.signature.subject imatches '*Microsoft*'))
 action:
   - name: kill
 
