@@ -59,7 +59,7 @@ func GetAccessors() []Accessor {
 		newDNSAccessor(),
 		newFileAccessor(),
 		newEventAccessor(),
-		newImageAccessor(),
+		newModuleAccessor(),
 		newThreadAccessor(),
 		newHandleAccessor(),
 		newNetworkAccessor(),
@@ -616,7 +616,7 @@ func (t *threadAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 			return frame.Symbol, nil
 		}
 		return nil, nil
-	case fields.ThreadCallstackFinalUserModuleSignatureIsSigned, fields.ThreadCallstackFinalUserModuleSignatureIsTrusted:
+	case fields.ThreadCallstackFinalUserModuleSignatureExists, fields.ThreadCallstackFinalUserModuleSignatureTrusted:
 		frame := e.Callstack.FinalUserFrame()
 		if frame == nil || (frame != nil && frame.ModuleAddress.IsZero()) {
 			return nil, nil
@@ -627,12 +627,12 @@ func (t *threadAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 			return nil, nil
 		}
 
-		if f.Name == fields.ThreadCallstackFinalUserModuleSignatureIsSigned {
+		if f.Name == fields.ThreadCallstackFinalUserModuleSignatureExists {
 			return sign.IsSigned(), nil
 		}
 
 		return sign.IsTrusted(), nil
-	case fields.ThreadCallstackFinalUserModuleSignatureCertIssuer, fields.ThreadCallstackFinalUserModuleSignatureCertSubject:
+	case fields.ThreadCallstackFinalUserModuleSignatureIssuer, fields.ThreadCallstackFinalUserModuleSignatureSubject:
 		frame := e.Callstack.FinalUserFrame()
 		if frame == nil || (frame != nil && frame.ModuleAddress.IsZero()) {
 			return nil, nil
@@ -643,7 +643,7 @@ func (t *threadAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 			return nil, nil
 		}
 
-		if sign.HasCertificate() && f.Name == fields.ThreadCallstackFinalUserModuleSignatureCertIssuer {
+		if sign.HasCertificate() && f.Name == fields.ThreadCallstackFinalUserModuleSignatureIssuer {
 			return sign.Cert.Issuer, nil
 		}
 
@@ -737,24 +737,24 @@ func (l *fileAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 	return nil, nil
 }
 
-// imageAccessor extracts image (DLL, executable, driver) event values.
-type imageAccessor struct{}
+// moduleAccessor extracts module (DLL, executable, driver) event values.
+type moduleAccessor struct{}
 
-func (imageAccessor) SetFields(fields []Field) {
+func (moduleAccessor) SetFields(fields []Field) {
 	initLOLDriversClient(fields)
 }
-func (imageAccessor) SetSegments([]fields.Segment) {}
+func (moduleAccessor) SetSegments([]fields.Segment) {}
 
-func (imageAccessor) IsFieldAccessible(e *event.Event) bool {
+func (moduleAccessor) IsFieldAccessible(e *event.Event) bool {
 	return e.Category == event.Image
 }
 
-func newImageAccessor() Accessor {
-	return &imageAccessor{}
+func newModuleAccessor() Accessor {
+	return &moduleAccessor{}
 }
 
-func (i *imageAccessor) Get(f Field, e *event.Event) (params.Value, error) {
-	if e.IsLoadImage() && (f.Name == fields.ImageSignatureType || f.Name == fields.ImageSignatureLevel || f.Name.IsImageCert()) {
+func (*moduleAccessor) Get(f Field, e *event.Event) (params.Value, error) {
+	if e.IsLoadImage() && (f.Name.IsModuleSignature() || f.Name == fields.ImageSignatureType || f.Name == fields.ImageSignatureLevel || f.Name.IsImageCert()) {
 		filename := e.GetParamAsString(params.ImagePath)
 		addr := e.Params.MustGetUint64(params.ImageBase)
 		typ := e.Params.MustGetUint32(params.ImageSignatureType)
@@ -771,7 +771,7 @@ func (i *imageAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 					Filename: filename,
 				}
 			}
-			if f.Name.IsImageCert() {
+			if f.Name.IsImageCert() || f.Name.IsModuleCert() {
 				err := sign.ParseCertificate()
 				if err != nil {
 					certErrors.Add(1)
@@ -795,7 +795,7 @@ func (i *imageAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 				if sign.IsSigned() {
 					sign.Verify()
 				}
-				if f.Name.IsImageCert() {
+				if f.Name.IsImageCert() || f.Name.IsModuleCert() {
 					err := sign.ParseCertificate()
 					if err != nil {
 						certErrors.Add(1)
@@ -816,49 +816,56 @@ func (i *imageAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 			e.AppendParam(params.ImageCertNotAfter, params.Time, sign.Cert.NotAfter)
 			e.AppendParam(params.ImageCertNotBefore, params.Time, sign.Cert.NotBefore)
 		}
+
+		switch f.Name {
+		case fields.ModuleSignatureExists, fields.DllSignatureExists:
+			return sign != nil && sign.IsSigned(), nil
+		case fields.ModuleSignatureTrusted, fields.DllSignatureTrusted:
+			return sign != nil && sign.IsTrusted(), nil
+		}
 	}
 
 	switch f.Name {
-	case fields.ImagePath:
+	case fields.ImagePath, fields.ModulePath, fields.DllPath:
 		return e.GetParamAsString(params.ImagePath), nil
-	case fields.ImageName:
+	case fields.ImageName, fields.ModuleName, fields.DllName:
 		return filepath.Base(e.GetParamAsString(params.ImagePath)), nil
-	case fields.ImageDefaultAddress:
+	case fields.ImageDefaultAddress, fields.ModuleDefaultAddress:
 		return e.GetParamAsString(params.ImageDefaultBase), nil
-	case fields.ImageBase:
+	case fields.ImageBase, fields.ModuleBase, fields.DllBase:
 		return e.GetParamAsString(params.ImageBase), nil
-	case fields.ImageSize:
+	case fields.ImageSize, fields.ModuleSize, fields.DllSize:
 		return e.Params.GetUint64(params.ImageSize)
-	case fields.ImageChecksum:
+	case fields.ImageChecksum, fields.ModuleChecksum:
 		return e.Params.GetUint32(params.ImageCheckSum)
-	case fields.ImagePID:
+	case fields.ImagePID, fields.ModulePID, fields.DllPID:
 		return e.Params.GetPid()
-	case fields.ImageSignatureType:
+	case fields.ImageSignatureType, fields.ModuleSignatureType, fields.DllSignatureType:
 		return e.GetParamAsString(params.ImageSignatureType), nil
-	case fields.ImageSignatureLevel:
+	case fields.ImageSignatureLevel, fields.ModuleSignatureLevel, fields.DllSignatureLevel:
 		return e.GetParamAsString(params.ImageSignatureLevel), nil
-	case fields.ImageCertSubject:
+	case fields.ImageCertSubject, fields.ModuleSignatureSubject, fields.DllSignatureSubject:
 		return e.GetParamAsString(params.ImageCertSubject), nil
-	case fields.ImageCertIssuer:
+	case fields.ImageCertIssuer, fields.ModuleSignatureIssuer, fields.DllSignatureIssuer:
 		return e.GetParamAsString(params.ImageCertIssuer), nil
-	case fields.ImageCertSerial:
+	case fields.ImageCertSerial, fields.ModuleSignatureSerial, fields.DllSignatureSerial:
 		return e.GetParamAsString(params.ImageCertSerial), nil
-	case fields.ImageCertBefore:
+	case fields.ImageCertBefore, fields.ModuleSignatureBefore, fields.DllSignatureBefore:
 		return e.Params.GetTime(params.ImageCertNotBefore)
-	case fields.ImageCertAfter:
+	case fields.ImageCertAfter, fields.ModuleSignatureAfter, fields.DllSignatureAfter:
 		return e.Params.GetTime(params.ImageCertNotAfter)
-	case fields.ImageIsDriverVulnerable, fields.ImageIsDriverMalicious:
+	case fields.ImageIsDriverVulnerable, fields.ImageIsDriverMalicious, fields.ModuleIsDriverVulnerable, fields.ModuleIsDriverMalicious:
 		if e.IsLoadImage() {
 			return isLOLDriver(f.Name, e)
 		}
 		return false, nil
-	case fields.ImageIsDLL:
+	case fields.ImageIsDLL, fields.ModuleIsDLL:
 		return e.Params.GetBool(params.FileIsDLL)
-	case fields.ImageIsDriver:
+	case fields.ImageIsDriver, fields.ModuleIsDriver:
 		return e.Params.GetBool(params.FileIsDriver)
-	case fields.ImageIsExecutable:
+	case fields.ImageIsExecutable, fields.ModuleIsExecutable:
 		return e.Params.GetBool(params.FileIsExecutable)
-	case fields.ImageIsDotnet:
+	case fields.ImageIsDotnet, fields.ModuleIsDotnet, fields.DllIsDotnet:
 		return e.Params.GetBool(params.FileIsDotnet)
 	}
 

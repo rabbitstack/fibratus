@@ -502,10 +502,10 @@ func TestThreadFilter(t *testing.T) {
 		{`thread.callstack.final_kernel_module.name = 'FLTMGR.SYS'`, true},
 		{`thread.callstack.final_kernel_module.path = 'C:\\WINDOWS\\System32\\drivers\\FLTMGR.SYS'`, true},
 		{`thread.callstack.final_kernel_symbol.name = 'FltGetStreamContext'`, true},
-		{`thread.callstack.final_user_module.signature.is_signed = true`, true},
-		{`thread.callstack.final_user_module.signature.is_trusted = true`, true},
-		{`thread.callstack.final_user_module.signature.cert.issuer imatches '*Microsoft Corporation*'`, true},
-		{`thread.callstack.final_user_module.signature.cert.subject imatches '*Microsoft Windows*'`, true},
+		{`thread.callstack.final_user_module.signature.exists = true`, true},
+		{`thread.callstack.final_user_module.signature.trusted = true`, true},
+		{`thread.callstack.final_user_module.signature.issuer imatches '*Microsoft Corporation*'`, true},
+		{`thread.callstack.final_user_module.signature.subject imatches '*Microsoft Windows*'`, true},
 
 		{`foreach(thread._callstack, $frame, $frame.address = '2638e59e0a5' or $frame.address = '7ffb5c1d0396')`, true},
 		{`foreach(thread._callstack, $frame, $frame.address = 'fffff8072ebc1f6f' or $frame.address = 'fffff8072eb8961b')`, true},
@@ -520,9 +520,9 @@ func TestThreadFilter(t *testing.T) {
 		{`foreach(thread._callstack, $frame, $frame.allocation_size = 0)`, true},
 		{`foreach(thread._callstack, $frame, $frame.protection = 'RWX')`, true},
 		{`foreach(thread._callstack, $frame, $frame.callsite_trailing_assembly matches '*mov r10, rcx|mov eax, 0x*|syscall*' and $frame.module = 'unbacked')`, true},
-		{`foreach(thread._callstack, $frame, $frame.module.signature.is_signed and $frame.module.signature.is_trusted)`, true},
-		{`foreach(thread._callstack, $frame, $frame.module.signature.cert.issuer imatches '*Microsoft Corporation*')`, true},
-		{`foreach(thread._callstack, $frame, $frame.module.signature.cert.subject imatches '*Microsoft Windows*')`, true},
+		{`foreach(thread._callstack, $frame, $frame.module.signature.exists and $frame.module.signature.trusted)`, true},
+		{`foreach(thread._callstack, $frame, $frame.module.signature.issuer imatches '*Microsoft Corporation*')`, true},
+		{`foreach(thread._callstack, $frame, $frame.module.signature.subject imatches '*Microsoft Windows*')`, true},
 	}
 
 	for i, tt := range tests {
@@ -980,7 +980,7 @@ func TestRegistryFilter(t *testing.T) {
 	}
 }
 
-func TestImageFilter(t *testing.T) {
+func TestModuleFilter(t *testing.T) {
 	e1 := &event.Event{
 		Type:     event.LoadImage,
 		Category: event.Image,
@@ -1000,16 +1000,29 @@ func TestImageFilter(t *testing.T) {
 		matches bool
 	}{
 
-		{`image.signature.type = 'EMBEDDED'`, true},
-		{`image.signature.level = 'AUTHENTICODE'`, true},
-		{`image.pid = 1023`, true},
-		{`image.path endswith 'System32\\kernel32.dll'`, true},
-		{`image.name = 'kernel32.dll'`, true},
-		{`image.checksum = 2323432`, true},
-		{`image.base.address = '7ffb313833a3'`, true},
-		{`image.cert.issuer icontains 'Microsoft Windows'`, true},
-		{`image.cert.subject icontains 'Microsoft Corporation'`, true},
-		{`image.is_dotnet`, false},
+		{`module.signature.type = 'EMBEDDED'`, true},
+		{`module.signature.level = 'AUTHENTICODE'`, true},
+		{`module.signature.exists`, true},
+		{`module.signature.trusted`, true},
+		{`module.pid = 1023`, true},
+		{`module.path endswith 'System32\\kernel32.dll'`, true},
+		{`module.name = 'kernel32.dll'`, true},
+		{`module.checksum = 2323432`, true},
+		{`module.base = '7ffb313833a3'`, true},
+		{`module.signature.issuer icontains 'Microsoft Windows'`, true},
+		{`module.signature.subject icontains 'Microsoft Corporation'`, true},
+		{`module.pe.is_dotnet`, false},
+		{`dll.signature.type = 'EMBEDDED'`, true},
+		{`dll.signature.level = 'AUTHENTICODE'`, true},
+		{`dll.signature.exists`, true},
+		{`dll.signature.trusted`, true},
+		{`dll.pid = 1023`, true},
+		{`dll.path endswith 'System32\\kernel32.dll'`, true},
+		{`dll.name = 'kernel32.dll'`, true},
+		{`dll.base = '7ffb313833a3'`, true},
+		{`dll.signature.issuer icontains 'Microsoft Windows'`, true},
+		{`dll.signature.subject icontains 'Microsoft Corporation'`, true},
+		{`dll.pe.is_dotnet`, false},
 	}
 
 	for i, tt := range tests {
@@ -1051,14 +1064,25 @@ func TestImageFilter(t *testing.T) {
 		matches bool
 	}{
 
-		{`image.signature.type = 'EMBEDDED'`, true},
-		{`image.signature.level = 'AUTHENTICODE'`, true},
-		{`image.pid = 1023`, true},
-		{`image.name endswith 'kernel32.dll'`, true},
-		{`image.checksum = 2323432`, true},
-		{`image.base.address = '7ccb313833a3'`, true},
-		{`image.cert.issuer icontains 'Microsoft Windows'`, true},
-		{`image.cert.subject icontains 'Microsoft Corporation'`, true},
+		{`module.signature.type = 'EMBEDDED'`, true},
+		{`module.signature.level = 'AUTHENTICODE'`, true},
+		{`module.signature.exists`, true},
+		{`module.signature.trusted`, true},
+		{`module.pid = 1023`, true},
+		{`module.name endswith 'kernel32.dll'`, true},
+		{`module.checksum = 2323432`, true},
+		{`module.base = '7ccb313833a3'`, true},
+		{`module.signature.issuer icontains 'Microsoft Windows'`, true},
+		{`module.signature.subject icontains 'Microsoft Corporation'`, true},
+		{`dll.signature.type = 'EMBEDDED'`, true},
+		{`dll.signature.level = 'AUTHENTICODE'`, true},
+		{`dll.signature.exists`, true},
+		{`dll.signature.trusted`, true},
+		{`dll.pid = 1023`, true},
+		{`dll.name endswith 'kernel32.dll'`, true},
+		{`dll.base = '7ccb313833a3'`, true},
+		{`dll.signature.issuer icontains 'Microsoft Windows'`, true},
+		{`dll.signature.subject icontains 'Microsoft Corporation'`, true},
 	}
 
 	for i, tt := range tests1 {
@@ -1094,9 +1118,12 @@ func TestImageFilter(t *testing.T) {
 		matches bool
 	}{
 
-		{`image.pid = 1023`, true},
-		{`image.name endswith 'mscorlib.dll'`, true},
-		{`image.is_dotnet`, true},
+		{`module.pid = 1023`, true},
+		{`module.name endswith 'mscorlib.dll'`, true},
+		{`module.pe.is_dotnet`, true},
+		{`dll.pid = 1023`, true},
+		{`dll.name endswith 'mscorlib.dll'`, true},
+		{`dll.pe.is_dotnet`, true},
 	}
 
 	for i, tt := range tests2 {

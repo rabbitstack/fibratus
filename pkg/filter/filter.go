@@ -100,7 +100,7 @@ func (b *BoundField) Accessor(f *filter) Accessor {
 	case b.Field.Name.IsThreadField():
 		b.accessor = newThreadAccessor()
 	case b.Field.Name.IsImageField():
-		b.accessor = newImageAccessor()
+		b.accessor = newModuleAccessor()
 	case b.Field.Name.IsFileField():
 		b.accessor = newFileAccessor()
 	case b.Field.Name.IsRegistryField():

@@ -20,11 +20,12 @@ package filter
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/filter/ql"
 	"github.com/rabbitstack/fibratus/pkg/ps"
-	"strings"
 )
 
 type opts struct {
@@ -64,7 +65,7 @@ func New(expr string, config *config.Config, options ...Option) Filter {
 		accessors = append(accessors, newThreadAccessor())
 	}
 	if config.EventSource.EnableImageEvents {
-		accessors = append(accessors, newImageAccessor())
+		accessors = append(accessors, newModuleAccessor())
 	}
 	if config.EventSource.EnableFileIOEvents {
 		accessors = append(accessors, newFileAccessor())

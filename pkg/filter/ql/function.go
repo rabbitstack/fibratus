@@ -20,17 +20,18 @@ package ql
 
 import (
 	"fmt"
+	"maps"
+	"path/filepath"
+	"regexp"
+	"sort"
+	"strings"
+
 	"github.com/rabbitstack/fibratus/pkg/callstack"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/util/signature"
 	"golang.org/x/sys/windows"
-	"maps"
-	"path/filepath"
-	"regexp"
-	"sort"
-	"strings"
 
 	"github.com/rabbitstack/fibratus/pkg/filter/ql/functions"
 )
@@ -566,8 +567,8 @@ func (f *Foreach) callstackMapValuer(segments []*BoundSegmentLiteral, frame call
 			valuer[key] = frame.CallsiteAssembly(proc, false)
 		case fields.CallsiteLeadingAssemblySegment:
 			valuer[key] = frame.CallsiteAssembly(proc, true)
-		case fields.ModuleSignatureIsSignedSegment, fields.ModuleSignatureIsTrustedSegment,
-			fields.ModuleSignatureCertIssuerSegment, fields.ModuleSignatureCertSubjectSegment:
+		case fields.ModuleSignatureExistsSegment, fields.ModuleSignatureTrustedSegment,
+			fields.ModuleSignatureIssuerSegment, fields.ModuleSignatureSubjectSegment:
 
 			if frame.ModuleAddress.IsZero() {
 				continue
@@ -588,7 +589,7 @@ func (f *Foreach) callstackMapValuer(segments []*BoundSegmentLiteral, frame call
 					sign.Verify()
 				}
 
-				if segment == fields.ModuleSignatureCertIssuerSegment || segment == fields.ModuleSignatureCertSubjectSegment {
+				if segment == fields.ModuleSignatureIssuerSegment || segment == fields.ModuleSignatureSubjectSegment {
 					if err := sign.ParseCertificate(); err != nil {
 						continue
 					}
@@ -598,18 +599,18 @@ func (f *Foreach) callstackMapValuer(segments []*BoundSegmentLiteral, frame call
 			}
 
 			switch segment {
-			case fields.ModuleSignatureIsSignedSegment:
+			case fields.ModuleSignatureExistsSegment:
 				valuer[key] = sign.IsSigned()
-			case fields.ModuleSignatureIsTrustedSegment:
+			case fields.ModuleSignatureTrustedSegment:
 				valuer[key] = sign.IsTrusted()
-			case fields.ModuleSignatureCertIssuerSegment:
+			case fields.ModuleSignatureIssuerSegment:
 				if err := sign.ParseCertificate(); err != nil {
 					continue
 				}
 				if sign.HasCertificate() {
 					valuer[key] = sign.Cert.Issuer
 				}
-			case fields.ModuleSignatureCertSubjectSegment:
+			case fields.ModuleSignatureSubjectSegment:
 				if err := sign.ParseCertificate(); err != nil {
 					continue
 				}
