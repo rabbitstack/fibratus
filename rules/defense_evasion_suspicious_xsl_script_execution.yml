@@ -1,6 +1,6 @@
 name: Suspicious XSL script execution
 id: 65136b30-14ae-46dd-b8e5-9dfa99690d74
-version: 1.0.5
+version: 1.0.6
 description: |
   Identifies a suspicious execution of XSL script via Windows Management Instrumentation command line tool or XSL
   transformation utility. Adversaries may bypass application control and obscure the execution of code by embedding 
@@ -21,7 +21,7 @@ condition: >
   maxspan 3m
   by ps.uuid
     |spawn_process and
-     (((ps.name ~= 'wmic.exe' or pe.file.name ~= 'wmic.exe') and
+     (((ps.name ~= 'wmic.exe' or ps.pe.file.name ~= 'wmic.exe') and
      ps.cmdline imatches ('* format*:*', '*/format*:*', '*-format*:*') and
      ps.cmdline not imatches
                     (
@@ -36,7 +36,7 @@ condition: >
                       '*format:csv*'
                     )
       ) or
-      ps.name ~= 'msxsl.exe' or pe.file.name ~= 'msxsl.exe'
+      ps.name ~= 'msxsl.exe' or ps.pe.file.name ~= 'msxsl.exe'
      )
     |
     |load_dll and image.name iin ('scrobj.dll', 'vbscript.dll', 'jscript.dll', 'jscript9.dll')|
