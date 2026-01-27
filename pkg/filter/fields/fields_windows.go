@@ -247,14 +247,14 @@ const (
 	ThreadCallstackFinalKernelModulePath Field = "thread.callstack.final_kernel_module.path"
 	// ThreadCallstackFinalKernelSymbolName represents the final kernel space stack frame symbol name
 	ThreadCallstackFinalKernelSymbolName Field = "thread.callstack.final_kernel_symbol.name"
-	// ThreadCallstackFinalUserModuleSignatureIsSigned represents the signature status of the final user space stack frame module
-	ThreadCallstackFinalUserModuleSignatureIsSigned Field = "thread.callstack.final_user_module.signature.is_signed"
-	// ThreadCallstackFinalUserModuleSignatureIsTrusted represents the trust status of the final user space stack frame module signature
-	ThreadCallstackFinalUserModuleSignatureIsTrusted Field = "thread.callstack.final_user_module.signature.is_trusted"
-	// ThreadCallstackFinalUserModuleSignatureCertIssuer represents the final user space stack frame module certificate issuer
-	ThreadCallstackFinalUserModuleSignatureCertIssuer Field = "thread.callstack.final_user_module.signature.cert.issuer"
-	// ThreadCallstackFinalUserModuleSignatureCertSubject represents the final user space stack frame module certificate subject
-	ThreadCallstackFinalUserModuleSignatureCertSubject Field = "thread.callstack.final_user_module.signature.cert.subject"
+	// ThreadCallstackFinalUserModuleSignatureExists represents the signature status of the final user space stack frame module
+	ThreadCallstackFinalUserModuleSignatureExists Field = "thread.callstack.final_user_module.signature.exists"
+	// ThreadCallstackFinalUserModuleSignatureTrusted represents the trust status of the final user space stack frame module signature
+	ThreadCallstackFinalUserModuleSignatureTrusted Field = "thread.callstack.final_user_module.signature.trusted"
+	// ThreadCallstackFinalUserModuleSignatureIssuer represents the final user space stack frame module certificate issuer
+	ThreadCallstackFinalUserModuleSignatureIssuer Field = "thread.callstack.final_user_module.signature.issuer"
+	// ThreadCallstackFinalUserModuleSignatureSubject represents the final user space stack frame module certificate subject
+	ThreadCallstackFinalUserModuleSignatureSubject Field = "thread.callstack.final_user_module.signature.subject"
 
 	// PeNumSections represents the number of sections
 	PeNumSections Field = "pe.nsections"
@@ -551,6 +551,84 @@ const (
 	// ImageIsDotnet indicates if the loaded image is a .NET assembly
 	ImageIsDotnet Field = "image.is_dotnet"
 
+	// DllBase is the DLL base address
+	DllBase Field = "dll.base"
+	// DllSize is the DLL virtual mapped space size
+	DllSize Field = "dll.size"
+	// DllPath is the DLL full path
+	DllPath Field = "dll.path"
+	// DllName is the DLL name
+	DllName Field = "dll.name"
+	// DllPID is the pid of the process where the DLL was loaded
+	DllPID Field = "dll.pid"
+	// DllSignatureType represents the DLL signature type
+	DllSignatureType Field = "dll.signature.type"
+	// DllSignatureLevel represents the DLL signature level
+	DllSignatureLevel Field = "dll.signature.level"
+	// DllSignatureExists is the field that determines if the DLL signature exists
+	DllSignatureExists Field = "dll.signature.exists"
+	// DllSignatureTrusted is the filed that determines if the DLL signature is trusted
+	DllSignatureTrusted Field = "dll.signature.trusted"
+	// DllSignatureSubject is the field that indicates the subject of the certificate is the entity its public key is associated with.
+	DllSignatureSubject = "dll.signature.subject"
+	// DllSignatureIssuer is the field that represents the certificate authority (CA).
+	DllSignatureIssuer = "dll.signature.issuer"
+	// DllSignatureSerial is the field that represents the serial number MUST be a positive integer assigned
+	// by the CA to each certificate.
+	DllSignatureSerial = "dll.signature.serial"
+	// DllSignatureBefore is the field that specifies the certificate won't be valid before this timestamp.
+	DllSignatureBefore = "dll.signature.before"
+	// DllSignatureAfter is the field that specifies the certificate won't be valid after this timestamp.
+	DllSignatureAfter = "dll.signature.after"
+	// DllIsDotnet indicates if the DLL is a .NET assembly.
+	DllIsDotnet Field = "dll.pe.is_dotnet"
+
+	// ModuleBase is the module base address
+	ModuleBase Field = "module.base"
+	// ModuleSize is the module size
+	ModuleSize Field = "module.size"
+	// ModuleChecksum represents the module checksum hash
+	ModuleChecksum Field = "module.checksum"
+	// ModuleDefaultAddress represents the module address
+	ModuleDefaultAddress Field = "module.default_address"
+	// ModulePath is the module full path
+	ModulePath Field = "module.path"
+	// ModuleName is the module name
+	ModuleName Field = "module.name"
+	// ModulePID is the pid of the process where the module was loaded
+	ModulePID Field = "module.pid"
+	// ModuleSignatureType represents the module signature type
+	ModuleSignatureType Field = "module.signature.type"
+	// ModuleSignatureLevel represents the module signature level
+	ModuleSignatureLevel Field = "module.signature.level"
+	// ModuleSignatureExists is the field that determines if the module signature exists
+	ModuleSignatureExists Field = "module.signature.exists"
+	// ModuleSignatureTrusted is the filed that determines if the module signature is trusted
+	ModuleSignatureTrusted Field = "module.signature.trusted"
+	// ModuleSignatureSubject is the field that indicates the subject of the certificate is the entity its public key is associated with.
+	ModuleSignatureSubject = "module.signature.subject"
+	// ModuleSignatureIssuer is the field that represents the certificate authority (CA).
+	ModuleSignatureIssuer = "module.signature.issuer"
+	// ModuleSignatureSerial is the field that represents the serial number MUST be a positive integer assigned
+	// by the CA to each certificate.
+	ModuleSignatureSerial = "module.signature.serial"
+	// ModuleSignatureBefore is the field that specifies the certificate won't be valid before this timestamp.
+	ModuleSignatureBefore = "module.signature.before"
+	// ModuleSignatureAfter is the field that specifies the certificate won't be valid after this timestamp.
+	ModuleSignatureAfter = "module.signature.after"
+	// ModuleIsDriverVulnerable represents the field that denotes whether loaded driver is vulnerable
+	ModuleIsDriverVulnerable Field = "module.is_driver_vulnerable"
+	// ModuleIsDriverMalicious represents the field that denotes whether the loaded driver is malicious
+	ModuleIsDriverMalicious Field = "module.is_driver_malicious"
+	// ModuleIsDLL indicates if the loaded module is a DLL
+	ModuleIsDLL Field = "module.is_dll"
+	// ModuleIsDriver indicates if the loaded module is a driver
+	ModuleIsDriver Field = "module.is_driver"
+	// ModuleIsExecutable indicates if the loaded module is an executable
+	ModuleIsExecutable Field = "module.is_exec"
+	// ModuleIsDotnet indicates if the loaded module is a .NET assembly
+	ModuleIsDotnet Field = "module.pe.is_dotnet"
+
 	// MemBaseAddress identifies the field that denotes the allocation base address
 	MemBaseAddress Field = "mem.address"
 	// MemRegionSize Field identifies the field that represents the allocated region size
@@ -627,6 +705,9 @@ func (f Field) IsHandleField() bool   { return strings.HasPrefix(string(f), "han
 func (f Field) IsPeField() bool {
 	return strings.HasPrefix(string(f), "pe.") || strings.HasPrefix(string(f), "ps.pe.") || strings.HasPrefix(string(f), "ps.signature.")
 }
+func (f Field) IsModuleField() bool {
+	return strings.HasPrefix(string(f), "module.") || strings.HasPrefix(string(f), "dll.")
+}
 func (f Field) IsMemField() bool        { return strings.HasPrefix(string(f), "mem.") }
 func (f Field) IsDNSField() bool        { return strings.HasPrefix(string(f), "dns.") }
 func (f Field) IsThreadpoolField() bool { return strings.HasPrefix(string(f), "threadpool.") }
@@ -653,6 +734,13 @@ func (f Field) IsPeCert() bool {
 	return strings.HasPrefix(string(f), "pe.cert.") || f == PsSignatureIssuer || f == PsSignatureSubject || f == PsSignatureSerial || f == PsSignatureAfter || f == PsSignatureBefore
 }
 func (f Field) IsImageCert() bool { return strings.HasPrefix(string(f), "image.cert.") }
+func (f Field) IsModuleCert() bool {
+	return f == ModuleSignatureSubject || f == ModuleSignatureIssuer || f == ModuleSignatureSerial || f == ModuleSignatureAfter || f == ModuleSignatureBefore ||
+		f == DllSignatureSubject || f == DllSignatureIssuer || f == DllSignatureSerial || f == DllSignatureAfter || f == DllSignatureBefore
+}
+func (f Field) IsModuleSignature() bool {
+	return strings.HasPrefix(string(f), "module.signature.") || strings.HasPrefix(string(f), "dll.signature.")
+}
 
 func (f Field) IsPeModified() bool { return f == PeIsModified || f == PsPeIsModified }
 
@@ -703,51 +791,51 @@ const (
 	CallsiteLeadingAssemblySegment  Segment = "callsite_leading_assembly"
 	CallsiteTrailingAssemblySegment Segment = "callsite_trailing_assembly"
 
-	ModuleSignatureIsSignedSegment    Segment = "module.signature.is_signed"
-	ModuleSignatureIsTrustedSegment   Segment = "module.signature.is_trusted"
-	ModuleSignatureCertIssuerSegment  Segment = "module.signature.cert.issuer"
-	ModuleSignatureCertSubjectSegment Segment = "module.signature.cert.subject"
+	ModuleSignatureExistsSegment  Segment = "module.signature.exists"
+	ModuleSignatureTrustedSegment Segment = "module.signature.trusted"
+	ModuleSignatureIssuerSegment  Segment = "module.signature.issuer"
+	ModuleSignatureSubjectSegment Segment = "module.signature.subject"
 )
 
 var segments = map[Segment]bool{
-	NameSegment:                       true,
-	PathSegment:                       true,
-	TypeSegment:                       true,
-	EntropySegment:                    true,
-	SizeSegment:                       true,
-	MD5Segment:                        true,
-	AddressSegment:                    true,
-	ChecksumSegment:                   true,
-	PIDSegment:                        true,
-	CmdlineSegment:                    true,
-	ExeSegment:                        true,
-	ArgsSegment:                       true,
-	CwdSegment:                        true,
-	SIDSegment:                        true,
-	SessionIDSegment:                  true,
-	UsernameSegment:                   true,
-	DomainSegment:                     true,
-	TokenIntegrityLevelSegment:        true,
-	TokenIsElevatedSegment:            true,
-	TokenElevationTypeSegment:         true,
-	TidSegment:                        true,
-	StartAddressSegment:               true,
-	UserStackBaseSegment:              true,
-	UserStackLimitSegment:             true,
-	KernelStackBaseSegment:            true,
-	KernelStackLimitSegment:           true,
-	OffsetSegment:                     true,
-	SymbolSegment:                     true,
-	ModuleSegment:                     true,
-	AllocationSizeSegment:             true,
-	ProtectionSegment:                 true,
-	IsUnbackedSegment:                 true,
-	CallsiteLeadingAssemblySegment:    true,
-	CallsiteTrailingAssemblySegment:   true,
-	ModuleSignatureIsSignedSegment:    true,
-	ModuleSignatureIsTrustedSegment:   true,
-	ModuleSignatureCertIssuerSegment:  true,
-	ModuleSignatureCertSubjectSegment: true,
+	NameSegment:                     true,
+	PathSegment:                     true,
+	TypeSegment:                     true,
+	EntropySegment:                  true,
+	SizeSegment:                     true,
+	MD5Segment:                      true,
+	AddressSegment:                  true,
+	ChecksumSegment:                 true,
+	PIDSegment:                      true,
+	CmdlineSegment:                  true,
+	ExeSegment:                      true,
+	ArgsSegment:                     true,
+	CwdSegment:                      true,
+	SIDSegment:                      true,
+	SessionIDSegment:                true,
+	UsernameSegment:                 true,
+	DomainSegment:                   true,
+	TokenIntegrityLevelSegment:      true,
+	TokenIsElevatedSegment:          true,
+	TokenElevationTypeSegment:       true,
+	TidSegment:                      true,
+	StartAddressSegment:             true,
+	UserStackBaseSegment:            true,
+	UserStackLimitSegment:           true,
+	KernelStackBaseSegment:          true,
+	KernelStackLimitSegment:         true,
+	OffsetSegment:                   true,
+	SymbolSegment:                   true,
+	ModuleSegment:                   true,
+	AllocationSizeSegment:           true,
+	ProtectionSegment:               true,
+	IsUnbackedSegment:               true,
+	CallsiteLeadingAssemblySegment:  true,
+	CallsiteTrailingAssemblySegment: true,
+	ModuleSignatureExistsSegment:    true,
+	ModuleSignatureTrustedSegment:   true,
+	ModuleSignatureIssuerSegment:    true,
+	ModuleSignatureSubjectSegment:   true,
 }
 
 var allowedSegments = map[Field][]Segment{
@@ -757,7 +845,7 @@ var allowedSegments = map[Field][]Segment{
 	PsMmaps:         {AddressSegment, TypeSegment, SizeSegment, ProtectionSegment, PathSegment},
 	PeSections:      {NameSegment, SizeSegment, EntropySegment, MD5Segment},
 	PsPeSections:    {NameSegment, SizeSegment, EntropySegment, MD5Segment},
-	ThreadCallstack: {AddressSegment, OffsetSegment, SymbolSegment, ModuleSegment, AllocationSizeSegment, ProtectionSegment, IsUnbackedSegment, CallsiteLeadingAssemblySegment, CallsiteTrailingAssemblySegment, ModuleSignatureIsSignedSegment, ModuleSignatureIsTrustedSegment, ModuleSignatureCertIssuerSegment, ModuleSignatureCertSubjectSegment},
+	ThreadCallstack: {AddressSegment, OffsetSegment, SymbolSegment, ModuleSegment, AllocationSizeSegment, ProtectionSegment, IsUnbackedSegment, CallsiteLeadingAssemblySegment, CallsiteTrailingAssemblySegment, ModuleSignatureExistsSegment, ModuleSignatureTrustedSegment, ModuleSignatureIssuerSegment, ModuleSignatureSubjectSegment},
 }
 
 func (s Segment) IsEntropy() bool { return s == EntropySegment }
@@ -978,63 +1066,100 @@ var fields = map[Field]FieldInfo{
 	PsPeAnomalies:      {PsPeAnomalies, "contains PE anomalies detected during parsing", params.Slice, []string{"ps.pe.anomalies in ('number of sections is 0')"}, nil, nil},
 	PsPeIsModified:     {PsPeIsModified, "indicates if disk and in-memory PE headers differ", params.Bool, []string{"ps.pe.is_modified"}, nil, nil},
 
-	ThreadBasePrio:                                     {ThreadBasePrio, "scheduler priority of the thread", params.Int8, []string{"thread.prio = 5"}, nil, nil},
-	ThreadIOPrio:                                       {ThreadIOPrio, "I/O priority hint for scheduling I/O operations", params.Int8, []string{"thread.io.prio = 4"}, nil, nil},
-	ThreadPagePrio:                                     {ThreadPagePrio, "memory page priority hint for memory pages accessed by the thread", params.Int8, []string{"thread.page.prio = 12"}, nil, nil},
-	ThreadKstackBase:                                   {ThreadKstackBase, "base address of the thread's kernel space stack", params.Address, []string{"thread.kstack.base = 'a65d800000'"}, nil, nil},
-	ThreadKstackLimit:                                  {ThreadKstackLimit, "limit of the thread's kernel space stack", params.Address, []string{"thread.kstack.limit = 'a85d800000'"}, nil, nil},
-	ThreadUstackBase:                                   {ThreadUstackBase, "base address of the thread's user space stack", params.Address, []string{"thread.ustack.base = '7ffe0000'"}, nil, nil},
-	ThreadUstackLimit:                                  {ThreadUstackLimit, "limit of the thread's user space stack", params.Address, []string{"thread.ustack.limit = '8ffe0000'"}, nil, nil},
-	ThreadEntrypoint:                                   {ThreadEntrypoint, "starting address of the function to be executed by the thread", params.Address, []string{"thread.entrypoint = '7efe0000'"}, &Deprecation{Since: "2.3.0", Fields: []Field{ThreadStartAddress}}, nil},
-	ThreadStartAddress:                                 {ThreadStartAddress, "thread start address", params.Address, []string{"thread.start_address = '7efe0000'"}, nil, nil},
-	ThreadStartAddressSymbol:                           {ThreadStartAddressSymbol, "thread start address symbol", params.UnicodeString, []string{"thread.start_address.symbol = 'LoadImage'"}, nil, nil},
-	ThreadStartAddressModule:                           {ThreadStartAddressModule, "thread start address module", params.UnicodeString, []string{"thread.start_address.module endswith 'kernel32.dll'"}, nil, nil},
-	ThreadPID:                                          {ThreadPID, "the process identifier where the thread is created", params.Uint32, []string{"evt.pid != thread.pid"}, nil, nil},
-	ThreadTEB:                                          {ThreadTEB, "the base address of the thread environment block", params.Address, []string{"thread.teb_address = '8f30893000'"}, nil, nil},
-	ThreadAccessMask:                                   {ThreadAccessMask, "thread desired access rights", params.AnsiString, []string{"thread.access.mask = '0x1fffff'"}, nil, nil},
-	ThreadAccessMaskNames:                              {ThreadAccessMaskNames, "thread desired access rights as a string list", params.Slice, []string{"thread.access.mask.names in ('IMPERSONATE')"}, nil, nil},
-	ThreadAccessStatus:                                 {ThreadAccessStatus, "thread access status", params.UnicodeString, []string{"thread.access.status = 'success'"}, nil, nil},
-	ThreadCallstackSummary:                             {ThreadCallstackSummary, "callstack summary", params.UnicodeString, []string{"thread.callstack.summary contains 'ntdll.dll|KERNELBASE.dll'"}, nil, nil},
-	ThreadCallstackDetail:                              {ThreadCallstackDetail, "detailed information of each stack frame", params.UnicodeString, []string{"thread.callstack.detail contains 'KERNELBASE.dll!CreateProcessW'"}, nil, nil},
-	ThreadCallstackModules:                             {ThreadCallstackModules, "list of modules comprising the callstack", params.Slice, []string{"thread.callstack.modules in ('C:\\WINDOWS\\System32\\KERNELBASE.dll')", "base(thread.callstack.modules[7]) = 'ntdll.dll'"}, nil, &Argument{Optional: true, Pattern: "[0-9]+", ValidationFunc: isNumber}},
-	ThreadCallstackSymbols:                             {ThreadCallstackSymbols, "list of symbols comprising the callstack", params.Slice, []string{"thread.callstack.symbols in ('ntdll.dll!NtCreateProcess')", "thread.callstack.symbols[3] = 'ntdll!NtCreateProcess'"}, nil, &Argument{Optional: true, Pattern: "[0-9]+", ValidationFunc: isNumber}},
-	ThreadCallstackAllocationSizes:                     {ThreadCallstackAllocationSizes, "allocation sizes of private pages", params.Slice, []string{"thread.callstack.allocation_sizes > 10000"}, nil, nil},
-	ThreadCallstackProtections:                         {ThreadCallstackProtections, "page protections masks of each frame", params.Slice, []string{"thread.callstack.protections in ('RWX', 'WX')"}, nil, nil},
-	ThreadCallstackCallsiteLeadingAssembly:             {ThreadCallstackCallsiteLeadingAssembly, "callsite leading assembly instructions", params.Slice, []string{"thread.callstack.callsite_leading_assembly in ('mov r10,rcx', 'syscall')"}, nil, nil},
-	ThreadCallstackCallsiteTrailingAssembly:            {ThreadCallstackCallsiteTrailingAssembly, "callsite trailing assembly instructions", params.Slice, []string{"thread.callstack.callsite_trailing_assembly in ('add esp, 0xab')"}, nil, nil},
-	ThreadCallstackIsUnbacked:                          {ThreadCallstackIsUnbacked, "indicates if the callstack contains unbacked regions", params.Bool, []string{"thread.callstack.is_unbacked"}, nil, nil},
-	ThreadCallstackAddresses:                           {ThreadCallstackAddresses, "list of all stack return addresses", params.Slice, []string{"thread.callstack.addresses in ('7ffb5c1d0396')"}, nil, nil},
-	ThreadCallstackFinalUserModuleName:                 {ThreadCallstackFinalUserModuleName, "final user space stack frame module name", params.UnicodeString, []string{"thread.callstack.final_user_module.name != 'ntdll.dll'"}, nil, nil},
-	ThreadCallstackFinalUserModulePath:                 {ThreadCallstackFinalUserModulePath, "final user space stack frame module path", params.UnicodeString, []string{"thread.callstack.final_user_module.path imatches '?:\\Windows\\System32\\ntdll.dll'"}, nil, nil},
-	ThreadCallstackFinalUserSymbolName:                 {ThreadCallstackFinalUserSymbolName, "final user space stack symbol name", params.UnicodeString, []string{"thread.callstack.final_user_symbol.name imatches 'CreateProcess*'"}, nil, nil},
-	ThreadCallstackFinalKernelModuleName:               {ThreadCallstackFinalKernelModuleName, "final kernel space stack frame module name", params.UnicodeString, []string{"thread.callstack.final_kernel_module.name = 'FLTMGR.SYS'"}, nil, nil},
-	ThreadCallstackFinalKernelModulePath:               {ThreadCallstackFinalKernelModulePath, "final kernel space stack frame module path", params.UnicodeString, []string{"thread.callstack.final_kernel_module.path imatches '?:\\WINDOWS\\System32\\drivers\\FLTMGR.SYS'"}, nil, nil},
-	ThreadCallstackFinalKernelSymbolName:               {ThreadCallstackFinalKernelSymbolName, "final kernel space stack symbol name", params.UnicodeString, []string{"thread.callstack.final_kernel_symbol.name = 'FltGetStreamContext'"}, nil, nil},
-	ThreadCallstackFinalUserModuleSignatureIsSigned:    {ThreadCallstackFinalUserModuleSignatureIsSigned, "signature status of the final user space stack frame module", params.Bool, []string{"thread.callstack.final_user_module.signature.is_signed = true"}, nil, nil},
-	ThreadCallstackFinalUserModuleSignatureIsTrusted:   {ThreadCallstackFinalUserModuleSignatureIsTrusted, "signature trust status of the final user space stack frame module", params.Bool, []string{"thread.callstack.final_user_module.signature.is_trusted = true"}, nil, nil},
-	ThreadCallstackFinalUserModuleSignatureCertIssuer:  {ThreadCallstackFinalUserModuleSignatureCertIssuer, "final user space stack frame module signature certificate issuer", params.UnicodeString, []string{"thread.callstack.final_user_module.signature.cert.issuer imatches '*Microsoft Corporation*'"}, nil, nil},
-	ThreadCallstackFinalUserModuleSignatureCertSubject: {ThreadCallstackFinalUserModuleSignatureCertSubject, "final user space stack frame module signature certificate subject", params.UnicodeString, []string{"thread.callstack.final_user_module.signature.cert.subject imatches '*Microsoft Windows*'"}, nil, nil},
+	ThreadBasePrio:                                 {ThreadBasePrio, "scheduler priority of the thread", params.Int8, []string{"thread.prio = 5"}, nil, nil},
+	ThreadIOPrio:                                   {ThreadIOPrio, "I/O priority hint for scheduling I/O operations", params.Int8, []string{"thread.io.prio = 4"}, nil, nil},
+	ThreadPagePrio:                                 {ThreadPagePrio, "memory page priority hint for memory pages accessed by the thread", params.Int8, []string{"thread.page.prio = 12"}, nil, nil},
+	ThreadKstackBase:                               {ThreadKstackBase, "base address of the thread's kernel space stack", params.Address, []string{"thread.kstack.base = 'a65d800000'"}, nil, nil},
+	ThreadKstackLimit:                              {ThreadKstackLimit, "limit of the thread's kernel space stack", params.Address, []string{"thread.kstack.limit = 'a85d800000'"}, nil, nil},
+	ThreadUstackBase:                               {ThreadUstackBase, "base address of the thread's user space stack", params.Address, []string{"thread.ustack.base = '7ffe0000'"}, nil, nil},
+	ThreadUstackLimit:                              {ThreadUstackLimit, "limit of the thread's user space stack", params.Address, []string{"thread.ustack.limit = '8ffe0000'"}, nil, nil},
+	ThreadEntrypoint:                               {ThreadEntrypoint, "starting address of the function to be executed by the thread", params.Address, []string{"thread.entrypoint = '7efe0000'"}, &Deprecation{Since: "2.3.0", Fields: []Field{ThreadStartAddress}}, nil},
+	ThreadStartAddress:                             {ThreadStartAddress, "thread start address", params.Address, []string{"thread.start_address = '7efe0000'"}, nil, nil},
+	ThreadStartAddressSymbol:                       {ThreadStartAddressSymbol, "thread start address symbol", params.UnicodeString, []string{"thread.start_address.symbol = 'LoadImage'"}, nil, nil},
+	ThreadStartAddressModule:                       {ThreadStartAddressModule, "thread start address module", params.UnicodeString, []string{"thread.start_address.module endswith 'kernel32.dll'"}, nil, nil},
+	ThreadPID:                                      {ThreadPID, "the process identifier where the thread is created", params.Uint32, []string{"evt.pid != thread.pid"}, nil, nil},
+	ThreadTEB:                                      {ThreadTEB, "the base address of the thread environment block", params.Address, []string{"thread.teb_address = '8f30893000'"}, nil, nil},
+	ThreadAccessMask:                               {ThreadAccessMask, "thread desired access rights", params.AnsiString, []string{"thread.access.mask = '0x1fffff'"}, nil, nil},
+	ThreadAccessMaskNames:                          {ThreadAccessMaskNames, "thread desired access rights as a string list", params.Slice, []string{"thread.access.mask.names in ('IMPERSONATE')"}, nil, nil},
+	ThreadAccessStatus:                             {ThreadAccessStatus, "thread access status", params.UnicodeString, []string{"thread.access.status = 'success'"}, nil, nil},
+	ThreadCallstackSummary:                         {ThreadCallstackSummary, "callstack summary", params.UnicodeString, []string{"thread.callstack.summary contains 'ntdll.dll|KERNELBASE.dll'"}, nil, nil},
+	ThreadCallstackDetail:                          {ThreadCallstackDetail, "detailed information of each stack frame", params.UnicodeString, []string{"thread.callstack.detail contains 'KERNELBASE.dll!CreateProcessW'"}, nil, nil},
+	ThreadCallstackModules:                         {ThreadCallstackModules, "list of modules comprising the callstack", params.Slice, []string{"thread.callstack.modules in ('C:\\WINDOWS\\System32\\KERNELBASE.dll')", "base(thread.callstack.modules[7]) = 'ntdll.dll'"}, nil, &Argument{Optional: true, Pattern: "[0-9]+", ValidationFunc: isNumber}},
+	ThreadCallstackSymbols:                         {ThreadCallstackSymbols, "list of symbols comprising the callstack", params.Slice, []string{"thread.callstack.symbols in ('ntdll.dll!NtCreateProcess')", "thread.callstack.symbols[3] = 'ntdll!NtCreateProcess'"}, nil, &Argument{Optional: true, Pattern: "[0-9]+", ValidationFunc: isNumber}},
+	ThreadCallstackAllocationSizes:                 {ThreadCallstackAllocationSizes, "allocation sizes of private pages", params.Slice, []string{"thread.callstack.allocation_sizes > 10000"}, nil, nil},
+	ThreadCallstackProtections:                     {ThreadCallstackProtections, "page protections masks of each frame", params.Slice, []string{"thread.callstack.protections in ('RWX', 'WX')"}, nil, nil},
+	ThreadCallstackCallsiteLeadingAssembly:         {ThreadCallstackCallsiteLeadingAssembly, "callsite leading assembly instructions", params.Slice, []string{"thread.callstack.callsite_leading_assembly in ('mov r10,rcx', 'syscall')"}, nil, nil},
+	ThreadCallstackCallsiteTrailingAssembly:        {ThreadCallstackCallsiteTrailingAssembly, "callsite trailing assembly instructions", params.Slice, []string{"thread.callstack.callsite_trailing_assembly in ('add esp, 0xab')"}, nil, nil},
+	ThreadCallstackIsUnbacked:                      {ThreadCallstackIsUnbacked, "indicates if the callstack contains unbacked regions", params.Bool, []string{"thread.callstack.is_unbacked"}, nil, nil},
+	ThreadCallstackAddresses:                       {ThreadCallstackAddresses, "list of all stack return addresses", params.Slice, []string{"thread.callstack.addresses in ('7ffb5c1d0396')"}, nil, nil},
+	ThreadCallstackFinalUserModuleName:             {ThreadCallstackFinalUserModuleName, "final user space stack frame module name", params.UnicodeString, []string{"thread.callstack.final_user_module.name != 'ntdll.dll'"}, nil, nil},
+	ThreadCallstackFinalUserModulePath:             {ThreadCallstackFinalUserModulePath, "final user space stack frame module path", params.UnicodeString, []string{"thread.callstack.final_user_module.path imatches '?:\\Windows\\System32\\ntdll.dll'"}, nil, nil},
+	ThreadCallstackFinalUserSymbolName:             {ThreadCallstackFinalUserSymbolName, "final user space stack symbol name", params.UnicodeString, []string{"thread.callstack.final_user_symbol.name imatches 'CreateProcess*'"}, nil, nil},
+	ThreadCallstackFinalKernelModuleName:           {ThreadCallstackFinalKernelModuleName, "final kernel space stack frame module name", params.UnicodeString, []string{"thread.callstack.final_kernel_module.name = 'FLTMGR.SYS'"}, nil, nil},
+	ThreadCallstackFinalKernelModulePath:           {ThreadCallstackFinalKernelModulePath, "final kernel space stack frame module path", params.UnicodeString, []string{"thread.callstack.final_kernel_module.path imatches '?:\\WINDOWS\\System32\\drivers\\FLTMGR.SYS'"}, nil, nil},
+	ThreadCallstackFinalKernelSymbolName:           {ThreadCallstackFinalKernelSymbolName, "final kernel space stack symbol name", params.UnicodeString, []string{"thread.callstack.final_kernel_symbol.name = 'FltGetStreamContext'"}, nil, nil},
+	ThreadCallstackFinalUserModuleSignatureExists:  {ThreadCallstackFinalUserModuleSignatureExists, "signature status of the final user space stack frame module", params.Bool, []string{"thread.callstack.final_user_module.signature.exists = true"}, nil, nil},
+	ThreadCallstackFinalUserModuleSignatureTrusted: {ThreadCallstackFinalUserModuleSignatureTrusted, "signature trust status of the final user space stack frame module", params.Bool, []string{"thread.callstack.final_user_module.signature.trusted = true"}, nil, nil},
+	ThreadCallstackFinalUserModuleSignatureIssuer:  {ThreadCallstackFinalUserModuleSignatureIssuer, "final user space stack frame module signature certificate issuer", params.UnicodeString, []string{"thread.callstack.final_user_module.signature.issuer imatches '*Microsoft Corporation*'"}, nil, nil},
+	ThreadCallstackFinalUserModuleSignatureSubject: {ThreadCallstackFinalUserModuleSignatureSubject, "final user space stack frame module signature certificate subject", params.UnicodeString, []string{"thread.callstack.final_user_module.signature.subject imatches '*Microsoft Windows*'"}, nil, nil},
 
-	ImagePath:               {ImagePath, "full image path", params.UnicodeString, []string{"image.patj = 'C:\\Windows\\System32\\advapi32.dll'"}, nil, nil},
-	ImageName:               {ImageName, "image name", params.UnicodeString, []string{"image.name = 'advapi32.dll'"}, nil, nil},
-	ImageBase:               {ImageBase, "the base address of process in which the image is loaded", params.Address, []string{"image.base.address = 'a65d800000'"}, nil, nil},
-	ImageChecksum:           {ImageChecksum, "image checksum", params.Uint32, []string{"image.checksum = 746424"}, nil, nil},
-	ImageSize:               {ImageSize, "image size", params.Uint32, []string{"image.size > 1024"}, nil, nil},
-	ImageDefaultAddress:     {ImageDefaultAddress, "default image address", params.Address, []string{"image.default.address = '7efe0000'"}, nil, nil},
-	ImagePID:                {ImagePID, "target process identifier", params.Uint32, []string{"image.pid = 80"}, nil, nil},
-	ImageSignatureType:      {ImageSignatureType, "image signature type", params.AnsiString, []string{"image.signature.type != 'NONE'"}, nil, nil},
-	ImageSignatureLevel:     {ImageSignatureLevel, "image signature level", params.AnsiString, []string{"image.signature.level = 'AUTHENTICODE'"}, nil, nil},
-	ImageCertSerial:         {ImageCertSerial, "image certificate serial number", params.UnicodeString, []string{"image.cert.serial = '330000023241fb59996dcc4dff000000000232'"}, nil, nil},
-	ImageCertSubject:        {ImageCertSubject, "image certificate subject", params.UnicodeString, []string{"image.cert.subject contains 'Washington, Redmond, Microsoft Corporation'"}, nil, nil},
-	ImageCertIssuer:         {ImageCertIssuer, "image certificate CA", params.UnicodeString, []string{"image.cert.issuer contains 'Washington, Redmond, Microsoft Corporation'"}, nil, nil},
-	ImageCertAfter:          {ImageCertAfter, "image certificate expiration date", params.Time, []string{"image.cert.after contains '2024-02-01 00:05:42 +0000 UTC'"}, nil, nil},
-	ImageCertBefore:         {ImageCertBefore, "image certificate enrollment date", params.Time, []string{"image.cert.before contains '2024-02-01 00:05:42 +0000 UTC'"}, nil, nil},
-	ImageIsDriverMalicious:  {ImageIsDriverMalicious, "indicates if the loaded driver is malicious", params.Bool, []string{"image.is_driver_malicious"}, nil, nil},
-	ImageIsDriverVulnerable: {ImageIsDriverVulnerable, "indicates if the loaded driver is vulnerable", params.Bool, []string{"image.is_driver_vulnerable"}, nil, nil},
-	ImageIsDLL:              {ImageIsDLL, "indicates if the loaded image is a DLL", params.Bool, []string{"image.is_dll'"}, nil, nil},
-	ImageIsDriver:           {ImageIsDriver, "indicates if the loaded image is a driver", params.Bool, []string{"image.is_driver'"}, nil, nil},
-	ImageIsExecutable:       {ImageIsExecutable, "indicates if the loaded image is an executable", params.Bool, []string{"image.is_exec'"}, nil, nil},
-	ImageIsDotnet:           {ImageIsDotnet, "indicates if the loaded image is a .NET assembly", params.Bool, []string{"image.is_dotnet'"}, nil, nil},
+	ImagePath:                {ImagePath, "full image path", params.UnicodeString, []string{"image.path = 'C:\\Windows\\System32\\advapi32.dll'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModulePath}}, nil},
+	ImageName:                {ImageName, "image name", params.UnicodeString, []string{"image.name = 'advapi32.dll'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleName}}, nil},
+	ImageBase:                {ImageBase, "the base address of process in which the image is loaded", params.Address, []string{"image.base.address = 'a65d800000'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleBase}}, nil},
+	ImageChecksum:            {ImageChecksum, "image checksum", params.Uint32, []string{"image.checksum = 746424"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleChecksum}}, nil},
+	ImageSize:                {ImageSize, "image size", params.Uint32, []string{"image.size > 1024"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleSize}}, nil},
+	ImageDefaultAddress:      {ImageDefaultAddress, "default image address", params.Address, []string{"image.default.address = '7efe0000'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleDefaultAddress}}, nil},
+	ImagePID:                 {ImagePID, "target process identifier", params.Uint32, []string{"image.pid = 80"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModulePID}}, nil},
+	ImageSignatureType:       {ImageSignatureType, "image signature type", params.AnsiString, []string{"image.signature.type != 'NONE'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleSignatureType}}, nil},
+	ImageSignatureLevel:      {ImageSignatureLevel, "image signature level", params.AnsiString, []string{"image.signature.level = 'AUTHENTICODE'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleSignatureLevel}}, nil},
+	ImageCertSerial:          {ImageCertSerial, "image certificate serial number", params.UnicodeString, []string{"image.cert.serial = '330000023241fb59996dcc4dff000000000232'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleSignatureSerial}}, nil},
+	ImageCertSubject:         {ImageCertSubject, "image certificate subject", params.UnicodeString, []string{"image.cert.subject contains 'Washington, Redmond, Microsoft Corporation'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleSignatureSubject}}, nil},
+	ImageCertIssuer:          {ImageCertIssuer, "image certificate CA", params.UnicodeString, []string{"image.cert.issuer contains 'Washington, Redmond, Microsoft Corporation'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleSignatureIssuer}}, nil},
+	ImageCertAfter:           {ImageCertAfter, "image certificate expiration date", params.Time, []string{"image.cert.after contains '2024-02-01 00:05:42 +0000 UTC'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleSignatureAfter}}, nil},
+	ImageCertBefore:          {ImageCertBefore, "image certificate enrollment date", params.Time, []string{"image.cert.before contains '2024-02-01 00:05:42 +0000 UTC'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleSignatureBefore}}, nil},
+	ImageIsDriverMalicious:   {ImageIsDriverMalicious, "indicates if the loaded driver is malicious", params.Bool, []string{"image.is_driver_malicious"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleIsDriverMalicious}}, nil},
+	ImageIsDriverVulnerable:  {ImageIsDriverVulnerable, "indicates if the loaded driver is vulnerable", params.Bool, []string{"image.is_driver_vulnerable"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleIsDriverVulnerable}}, nil},
+	ImageIsDLL:               {ImageIsDLL, "indicates if the loaded image is a DLL", params.Bool, []string{"image.is_dll'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleIsDLL}}, nil},
+	ImageIsDriver:            {ImageIsDriver, "indicates if the loaded image is a driver", params.Bool, []string{"image.is_driver'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleIsDriver}}, nil},
+	ImageIsExecutable:        {ImageIsExecutable, "indicates if the loaded image is an executable", params.Bool, []string{"image.is_exec'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleIsExecutable}}, nil},
+	ImageIsDotnet:            {ImageIsDotnet, "indicates if the loaded image is a .NET assembly", params.Bool, []string{"image.is_dotnet'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleIsDotnet}}, nil},
+	ModulePath:               {ModulePath, "full module path", params.UnicodeString, []string{"module.path = 'C:\\Windows\\System32\\advapi32.dll'"}, nil, nil},
+	ModuleName:               {ModuleName, "module name", params.UnicodeString, []string{"module.name = 'advapi32.dll'"}, nil, nil},
+	ModuleBase:               {ModuleBase, "the base address of process in which the module is loaded", params.Address, []string{"module.base.address = 'a65d800000'"}, nil, nil},
+	ModuleChecksum:           {ModuleChecksum, "module checksum", params.Uint32, []string{"module.checksum = 746424"}, nil, nil},
+	ModuleSize:               {ModuleSize, "module size", params.Uint32, []string{"module.size > 1024"}, nil, nil},
+	ModuleDefaultAddress:     {ModuleDefaultAddress, "default module address", params.Address, []string{"module.default_address = '7efe0000'"}, nil, nil},
+	ModulePID:                {ModulePID, "target process identifier", params.Uint32, []string{"module.pid = 80"}, nil, nil},
+	ModuleSignatureType:      {ModuleSignatureType, "module signature type", params.AnsiString, []string{"module.signature.type != 'NONE'"}, nil, nil},
+	ModuleSignatureLevel:     {ModuleSignatureLevel, "module signature level", params.AnsiString, []string{"module.signature.level = 'AUTHENTICODE'"}, nil, nil},
+	ModuleSignatureExists:    {ModuleSignatureExists, "indicates if the module is signed", params.Bool, []string{"module.signature.exists = true"}, nil, nil},
+	ModuleSignatureTrusted:   {ModuleSignatureTrusted, "indicates if the module signature is trusted", params.Bool, []string{"module.signature.trusted = false"}, nil, nil},
+	ModuleSignatureSerial:    {ModuleSignatureSerial, "module certificate serial number", params.UnicodeString, []string{"module.signature.serial = '330000023241fb59996dcc4dff000000000232'"}, nil, nil},
+	ModuleSignatureSubject:   {ModuleSignatureSubject, "module certificate subject", params.UnicodeString, []string{"module.signature.subject contains 'Washington, Redmond, Microsoft Corporation'"}, nil, nil},
+	ModuleSignatureIssuer:    {ModuleSignatureIssuer, "module certificate CA", params.UnicodeString, []string{"module.signature.issuer contains 'Washington, Redmond, Microsoft Corporation'"}, nil, nil},
+	ModuleSignatureAfter:     {ModuleSignatureAfter, "module certificate expiration date", params.Time, []string{"module.signature.after contains '2024-02-01 00:05:42 +0000 UTC'"}, nil, nil},
+	ModuleSignatureBefore:    {ModuleSignatureBefore, "module certificate enrollment date", params.Time, []string{"module.signature.before contains '2024-02-01 00:05:42 +0000 UTC'"}, nil, nil},
+	ModuleIsDriverMalicious:  {ModuleIsDriverMalicious, "indicates if the loaded driver is malicious", params.Bool, []string{"module.is_driver_malicious"}, nil, nil},
+	ModuleIsDriverVulnerable: {ModuleIsDriverVulnerable, "indicates if the loaded driver is vulnerable", params.Bool, []string{"module.is_driver_vulnerable"}, nil, nil},
+	ModuleIsDLL:              {ModuleIsDLL, "indicates if the loaded module is a DLL", params.Bool, []string{"module.is_dll'"}, nil, nil},
+	ModuleIsDriver:           {ModuleIsDriver, "indicates if the loaded module is a driver", params.Bool, []string{"module.is_driver'"}, nil, nil},
+	ModuleIsExecutable:       {ModuleIsExecutable, "indicates if the loaded module is an executable", params.Bool, []string{"module.is_exec'"}, nil, nil},
+	ModuleIsDotnet:           {ModuleIsDotnet, "indicates if the loaded module is a .NET assembly", params.Bool, []string{"module.pe.is_dotnet'"}, nil, nil},
+	DllPath:                  {DllPath, "full dll path", params.UnicodeString, []string{"dll.path = 'C:\\Windows\\System32\\advapi32.dll'"}, nil, nil},
+	DllName:                  {DllName, "module name", params.UnicodeString, []string{"dll.name = 'advapi32.dll'"}, nil, nil},
+	DllBase:                  {DllBase, "the base address of process in which the DLL is loaded", params.Address, []string{"dll.base = 'a65d800000'"}, nil, nil},
+	DllSize:                  {DllSize, "dll virtual mapped size", params.Uint32, []string{"dll.size > 1024"}, nil, nil},
+	DllPID:                   {DllPID, "target process identifier", params.Uint32, []string{"dll.pid = 80"}, nil, nil},
+	DllSignatureType:         {DllSignatureType, "dll signature type", params.AnsiString, []string{"dll.signature.type != 'NONE'"}, nil, nil},
+	DllSignatureLevel:        {DllSignatureLevel, "dll signature level", params.AnsiString, []string{"dll.signature.level = 'AUTHENTICODE'"}, nil, nil},
+	DllSignatureExists:       {DllSignatureExists, "indicates if the dll is signed", params.Bool, []string{"dll.signature.exists = true"}, nil, nil},
+	DllSignatureTrusted:      {DllSignatureTrusted, "indicates if the dll signature is trusted", params.Bool, []string{"dll.signature.trusted = false"}, nil, nil},
+	DllSignatureSerial:       {DllSignatureSerial, "dll certificate serial number", params.UnicodeString, []string{"dll.signature.serial = '330000023241fb59996dcc4dff000000000232'"}, nil, nil},
+	DllSignatureSubject:      {DllSignatureSubject, "dll certificate subject", params.UnicodeString, []string{"dll.signature.subject contains 'Washington, Redmond, Microsoft Corporation'"}, nil, nil},
+	DllSignatureIssuer:       {DllSignatureIssuer, "dll certificate CA", params.UnicodeString, []string{"dll.signature.issuer contains 'Washington, Redmond, Microsoft Corporation'"}, nil, nil},
+	DllSignatureAfter:        {DllSignatureAfter, "moddllule certificate expiration date", params.Time, []string{"dll.signature.after contains '2024-02-01 00:05:42 +0000 UTC'"}, nil, nil},
+	DllSignatureBefore:       {DllSignatureBefore, "dll certificate enrollment date", params.Time, []string{"dll.signature.before contains '2024-02-01 00:05:42 +0000 UTC'"}, nil, nil},
+	DllIsDotnet:              {DllIsDotnet, "indicates if the loaded dll is a .NET assembly", params.Bool, []string{"dll.pe.is_dotnet'"}, nil, nil},
 
 	FileObject:                      {FileObject, "file object address", params.Uint64, []string{"file.object = 18446738026482168384"}, nil, nil},
 	FilePath:                        {FilePath, "full file path", params.UnicodeString, []string{"file.path = 'C:\\Windows\\System32'"}, nil, nil},

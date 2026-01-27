@@ -137,7 +137,7 @@ func TestIsFieldAccessible(t *testing.T) {
 			true,
 		},
 		{
-			newImageAccessor(),
+			newModuleAccessor(),
 			&event.Event{Type: event.LoadImage, Category: event.Image},
 			true,
 		},

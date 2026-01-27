@@ -156,7 +156,7 @@ func (f *filter) narrowAccessors() {
 		removeEvtAccessor        = true
 		removePsAccessor         = true
 		removeThreadAccessor     = true
-		removeImageAccessor      = true
+		removeModuleAccessor     = true
 		removeFileAccessor       = true
 		removeRegistryAccessor   = true
 		removeNetworkAccessor    = true
@@ -169,7 +169,7 @@ func (f *filter) narrowAccessors() {
 
 	for _, field := range f.fields {
 		switch {
-		case field.Name.IsKevtField(), field.Name.IsEvtField():
+		case field.Name.IsEvtField() || field.Name.IsKevtField():
 			removeEvtAccessor = false
 		case field.Name.IsPeField():
 			removePEAccessor = false
@@ -177,8 +177,8 @@ func (f *filter) narrowAccessors() {
 			removePsAccessor = false
 		case field.Name.IsThreadField():
 			removeThreadAccessor = false
-		case field.Name.IsImageField():
-			removeImageAccessor = false
+		case field.Name.IsImageField() || field.Name.IsModuleField():
+			removeModuleAccessor = false
 		case field.Name.IsFileField():
 			removeFileAccessor = false
 		case field.Name.IsRegistryField():
@@ -205,8 +205,8 @@ func (f *filter) narrowAccessors() {
 	if removeThreadAccessor {
 		f.removeAccessor(&threadAccessor{})
 	}
-	if removeImageAccessor {
-		f.removeAccessor(&imageAccessor{})
+	if removeModuleAccessor {
+		f.removeAccessor(&moduleAccessor{})
 	}
 	if removeFileAccessor {
 		f.removeAccessor(&fileAccessor{})
