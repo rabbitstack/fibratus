@@ -129,6 +129,59 @@ const (
 	PsParentTokenIsElevated = "ps.parent.token.is_elevated"
 	// PsTokenElevationType represents the field that indicates if the parent process token elevation type
 	PsParentTokenElevationType = "ps.parent.token.elevation_type"
+	// PsSignatureExists is the field which indicates if the binary is signed, either by embedded or catalog signature
+	PsSignatureExists Field = "ps.signature.exists"
+	// PsSignatureTrusted is the field which indicates if the binary signature is trusted
+	PsSignatureTrusted Field = "ps.signature.trusted"
+	// PsSignatureIssuer is the field which indicates the certificate issuer
+	PsSignatureIssuer Field = "ps.signature.issuer"
+	// PsSignatureSubject is the field which indicates the certificate subject
+	PsSignatureSubject Field = "ps.signature.subject"
+	// PsSignatureSerial is the field which indicates the certificate serial
+	PsSignatureSerial Field = "ps.signature.serial"
+	// PsSignatureAfter is the field which indicates the timestamp after certificate is no longer valid
+	PsSignatureAfter Field = "ps.signature.after"
+	// PsSignatureBefore is the field which indicates the timestamp of the certificate enrollment date
+	PsSignatureBefore Field = "ps.signature.before"
+
+	// PsPeNumSections represents the number of sections
+	PsPeNumSections Field = "ps.pe.nsections"
+	// PsPeNumSymbols represents the number of exported symbols
+	PsPeNumSymbols Field = "ps.pe.nsymbols"
+	// PsPeSymbols represents imported symbols
+	PsPeSymbols Field = "ps.pe.symbols"
+	// PeImports represents imported libraries (e.g. kernel32.dll)
+	PsPeImports Field = "ps.pe.imports"
+	// PeTimestamp is the PE build timestamp
+	PsPeTimestamp Field = "ps.pe.timestamp"
+	// PeBaseAddress represents the base address when the binary is loaded
+	PsPeBaseAddress Field = "ps.pe.address.base"
+	// PeEntrypoint is the address of the entrypoint function
+	PsPeEntrypoint Field = "ps.pe.address.entrypoint"
+	// PeResources represents PE resources
+	PsPeResources Field = "ps.pe.resources"
+	// PeCompany represents the company name resource
+	PsPeCompany Field = "ps.pe.company"
+	// PeDescription represents the internal description of the file
+	PsPeDescription Field = "ps.pe.description"
+	// PeFileVersion represents the internal file version
+	PsPeFileVersion Field = "ps.pe.file.version"
+	// PeFileName represents the original file name provided at compile-time.
+	PsPeFileName Field = "ps.pe.file.name"
+	// PeCopyright represents the copyright notice emitted at compile-time
+	PsPeCopyright Field = "ps.pe.copyright"
+	// PeProduct represents the product name provided at compile-time
+	PsPeProduct Field = "ps.pe.product"
+	// PeProductVersion represents the internal product version provided at compile-time
+	PsPeProductVersion Field = "ps.pe.product.version"
+	// PeAnomalies represents the field that contains PE anomalies detected during parsing
+	PsPeAnomalies Field = "ps.pe.anomalies"
+	// PsPeImphash is the field that yields the PE import hash
+	PsPeImphash Field = "ps.pe.imphash"
+	// PsPeIsDotnet is the field which indicates if the binary contains the .NET assembly
+	PsPeIsDotnet Field = "ps.pe.is_dotnet"
+	// PsPeIsModified is the field that indicates whether disk and in-memory PE headers differ
+	PsPeIsModified Field = "ps.pe.is_modified"
 
 	// ThreadBasePrio is the base thread priority
 	ThreadBasePrio Field = "thread.prio"
@@ -562,39 +615,46 @@ func (f Field) String() string { return string(f) }
 // Type returns the data type that this field contains.
 func (f Field) Type() params.Type { return fields[f].Type }
 
-func (f Field) IsPsField() bool         { return strings.HasPrefix(string(f), "ps.") }
-func (f Field) IsKevtField() bool       { return strings.HasPrefix(string(f), "kevt.") }
-func (f Field) IsEvtField() bool        { return strings.HasPrefix(string(f), "evt.") }
-func (f Field) IsThreadField() bool     { return strings.HasPrefix(string(f), "thread.") }
-func (f Field) IsImageField() bool      { return strings.HasPrefix(string(f), "image.") }
-func (f Field) IsFileField() bool       { return strings.HasPrefix(string(f), "file.") }
-func (f Field) IsRegistryField() bool   { return strings.HasPrefix(string(f), "registry.") }
-func (f Field) IsNetworkField() bool    { return strings.HasPrefix(string(f), "net.") }
-func (f Field) IsHandleField() bool     { return strings.HasPrefix(string(f), "handle.") }
-func (f Field) IsPeField() bool         { return strings.HasPrefix(string(f), "pe.") }
+func (f Field) IsPsField() bool       { return strings.HasPrefix(string(f), "ps.") }
+func (f Field) IsKevtField() bool     { return strings.HasPrefix(string(f), "kevt.") }
+func (f Field) IsEvtField() bool      { return strings.HasPrefix(string(f), "evt.") }
+func (f Field) IsThreadField() bool   { return strings.HasPrefix(string(f), "thread.") }
+func (f Field) IsImageField() bool    { return strings.HasPrefix(string(f), "image.") }
+func (f Field) IsFileField() bool     { return strings.HasPrefix(string(f), "file.") }
+func (f Field) IsRegistryField() bool { return strings.HasPrefix(string(f), "registry.") }
+func (f Field) IsNetworkField() bool  { return strings.HasPrefix(string(f), "net.") }
+func (f Field) IsHandleField() bool   { return strings.HasPrefix(string(f), "handle.") }
+func (f Field) IsPeField() bool {
+	return strings.HasPrefix(string(f), "pe.") || strings.HasPrefix(string(f), "ps.pe.") || strings.HasPrefix(string(f), "ps.signature.")
+}
 func (f Field) IsMemField() bool        { return strings.HasPrefix(string(f), "mem.") }
 func (f Field) IsDNSField() bool        { return strings.HasPrefix(string(f), "dns.") }
 func (f Field) IsThreadpoolField() bool { return strings.HasPrefix(string(f), "threadpool.") }
 
-func (f Field) IsPeSection() bool { return f == PeNumSections }
-func (f Field) IsPeSymbol() bool  { return f == PeSymbols || f == PeNumSymbols || f == PeImports }
+func (f Field) IsPeSection() bool { return f == PeNumSections || f == PsPeNumSections }
+func (f Field) IsPeSymbol() bool {
+	return f == PeSymbols || f == PeNumSymbols || f == PeImports || f == PsPeSymbols || f == PsPeNumSymbols || f == PsPeImports
+}
 func (f Field) IsPeVersionResource() bool {
-	return f == PeCompany || f == PeCopyright || f == PeDescription || f == PeFileName || f == PeFileVersion || f == PeProduct || f == PeProductVersion
+	return f == PeCompany || f == PeCopyright || f == PeDescription || f == PeFileName || f == PeFileVersion || f == PeProduct || f == PeProductVersion ||
+		f == PsPeCompany || f == PsPeCopyright || f == PsPeDescription || f == PsPeFileName || f == PsPeFileVersion || f == PsPeProduct || f == PsPeProductVersion
 }
-func (f Field) IsPeVersionResources() bool { return f == PeResources }
-func (f Field) IsPeImphash() bool          { return f == PeImphash }
-func (f Field) IsPeDotnet() bool           { return f == PeIsDotnet }
-func (f Field) IsPeAnomalies() bool        { return f == PeAnomalies }
+func (f Field) IsPeVersionResources() bool { return f == PeResources || f == PsPeResources }
+func (f Field) IsPeImphash() bool          { return f == PeImphash || f == PsPeImphash }
+func (f Field) IsPeDotnet() bool           { return f == PeIsDotnet || f == PsPeIsDotnet }
+func (f Field) IsPeAnomalies() bool        { return f == PeAnomalies || f == PsPeAnomalies }
 func (f Field) IsPeSignature() bool {
-	return f == PeIsTrusted || f == PeIsSigned || f == PeCertIssuer || f == PeCertSerial || f == PeCertSubject || f == PeCertBefore || f == PeCertAfter
+	return f == PeIsTrusted || f == PeIsSigned || f == PeCertIssuer || f == PeCertSerial || f == PeCertSubject || f == PeCertBefore || f == PeCertAfter || strings.HasPrefix(string(f), "ps.signature.")
 }
-func (f Field) IsPeIsTrusted() bool { return f == PeIsTrusted }
-func (f Field) IsPeIsSigned() bool  { return f == PeIsSigned }
+func (f Field) IsPeIsTrusted() bool { return f == PeIsTrusted || f == PsSignatureTrusted }
+func (f Field) IsPeIsSigned() bool  { return f == PeIsSigned || f == PsSignatureExists }
 
-func (f Field) IsPeCert() bool    { return strings.HasPrefix(string(f), "pe.cert.") }
+func (f Field) IsPeCert() bool {
+	return strings.HasPrefix(string(f), "pe.cert.") || f == PsSignatureIssuer || f == PsSignatureSubject || f == PsSignatureSerial || f == PsSignatureAfter || f == PsSignatureBefore
+}
 func (f Field) IsImageCert() bool { return strings.HasPrefix(string(f), "image.cert.") }
 
-func (f Field) IsPeModified() bool { return f == PeIsModified }
+func (f Field) IsPeModified() bool { return f == PeIsModified || f == PsPeIsModified }
 
 // Segment represents the type alias for the segment. Segment
 // denotes the property anchored to the bound field reference.
@@ -694,8 +754,9 @@ var allowedSegments = map[Field][]Segment{
 	PsAncestors:     {NameSegment, PIDSegment, CmdlineSegment, ExeSegment, ArgsSegment, CwdSegment, SIDSegment, SessionIDSegment, UsernameSegment, DomainSegment, TokenIntegrityLevelSegment, TokenIsElevatedSegment, TokenElevationTypeSegment},
 	PsThreads:       {TidSegment, StartAddressSegment, UserStackBaseSegment, UserStackLimitSegment, KernelStackBaseSegment, KernelStackLimitSegment},
 	PsModules:       {PathSegment, NameSegment, AddressSegment, SizeSegment, ChecksumSegment},
-	PsMmaps:         {AddressSegment, TypeSegment, AddressSegment, SizeSegment, ProtectionSegment, PathSegment},
+	PsMmaps:         {AddressSegment, TypeSegment, SizeSegment, ProtectionSegment, PathSegment},
 	PeSections:      {NameSegment, SizeSegment, EntropySegment, MD5Segment},
+	PsPeSections:    {NameSegment, SizeSegment, EntropySegment, MD5Segment},
 	ThreadCallstack: {AddressSegment, OffsetSegment, SymbolSegment, ModuleSegment, AllocationSizeSegment, ProtectionSegment, IsUnbackedSegment, CallsiteLeadingAssemblySegment, CallsiteTrailingAssemblySegment, ModuleSignatureIsSignedSegment, ModuleSignatureIsTrustedSegment, ModuleSignatureCertIssuerSegment, ModuleSignatureCertSubjectSegment},
 }
 
@@ -746,15 +807,16 @@ var (
 	PsThreads       Field = "ps._threads"
 	PsMmaps         Field = "ps._mmaps"
 	PsAncestors     Field = "ps._ancestors"
+	PsPeSections    Field = "ps.pe._sections"
 	ThreadCallstack Field = "thread._callstack"
 	PeSections      Field = "pe._sections"
 )
 
 func IsPseudoField(f Field) bool {
-	return f == PsAncestors || f == PsModules || f == PsThreads || f == PsMmaps || f == ThreadCallstack || f == PeSections
+	return f == PsAncestors || f == PsModules || f == PsThreads || f == PsMmaps || f == ThreadCallstack || f == PeSections || f == PsPeSections
 }
 
-func (f Field) IsPeSectionsPseudo() bool { return f == PeSections }
+func (f Field) IsPeSectionsPseudo() bool { return f == PeSections || f == PsPeSections }
 
 var fields = map[Field]FieldInfo{
 	EvtSeq:         {EvtSeq, "event sequence number", params.Uint64, []string{"evt.seq > 666"}, nil, nil},
@@ -877,6 +939,44 @@ var fields = map[Field]FieldInfo{
 	PsParentTokenIntegrityLevel: {PsParentTokenIntegrityLevel, "parent process token integrity level", params.UnicodeString, []string{"ps.parent.token.integrity_level = 'HIGH'"}, nil, nil},
 	PsParentTokenIsElevated:     {PsParentTokenIsElevated, "indicates if the parent process token is elevated", params.Bool, []string{"ps.parent.token.is_elevated = true"}, nil, nil},
 	PsParentTokenElevationType:  {PsParentTokenElevationType, "parent process token elevation type", params.AnsiString, []string{"ps.parent.token.elevation_type = 'LIMITED'"}, nil, nil},
+	PsSignatureExists:           {PsSignatureExists, "indicates if the process executable has a valid signature", params.Bool, []string{"ps.signature.exists"}, nil, nil},
+	PsSignatureTrusted:          {PsSignatureTrusted, "indicates if the process executable signature certificate chain is trusted", params.Bool, []string{"ps.signature.trusted"}, nil, nil},
+	PsSignatureSerial:           {PsSignatureSerial, "represents signature serial number", params.UnicodeString, []string{"ps.signature.serial = '330000023241fb59996dcc4dff000000000232'"}, nil, nil},
+	PsSignatureSubject:          {PsSignatureSubject, "represents signature subject", params.UnicodeString, []string{"ps.signature.subject contains 'Washington, Redmond, Microsoft Corporation'"}, nil, nil},
+	PsSignatureIssuer:           {PsSignatureIssuer, "represents signature CA", params.UnicodeString, []string{"ps.signature.issuer contains 'Washington, Redmond, Microsoft Corporation'"}, nil, nil},
+	PsSignatureAfter:            {PsSignatureAfter, "represents certificate expiration date", params.Time, []string{"ps.signature.after contains '2024-02-01 00:05:42 +0000 UTC'"}, nil, nil},
+	PsSignatureBefore:           {PsSignatureBefore, "represents certificate enrollment date", params.Time, []string{"ps.signature.before contains '2024-02-01 00:05:42 +0000 UTC'"}, nil, nil},
+
+	PsPeNumSections: {PsPeNumSections, "number of PE sections", params.Uint16, []string{"ps.pe.nsections < 5"}, nil, nil},
+	PsPeNumSymbols:  {PsPeNumSymbols, "number of entries in the symbol table", params.Uint32, []string{"ps.pe.nsymbols > 230"}, nil, nil},
+	PsPeBaseAddress: {PsPeBaseAddress, "executable base address", params.Address, []string{"ps.pe.address.base = '140000000'"}, nil, nil},
+	PsPeEntrypoint:  {PsPeEntrypoint, "address of the entrypoint function", params.Address, []string{"ps.pe.address.entrypoint = '20110'"}, nil, nil},
+	PsPeSymbols:     {PsPeSymbols, "imported symbols", params.Slice, []string{"ps.pe.symbols in ('GetTextFaceW', 'GetProcessHeap')"}, nil, nil},
+	PsPeImports:     {PsPeImports, "imported dynamic linked libraries", params.Slice, []string{"ps.pe.imports in ('msvcrt.dll', 'GDI32.dll'"}, nil, nil},
+	PsPeResources: {PsPeResources, "version resources", params.Map, []string{"ps.pe.resources[FileDescription] = 'Notepad'"}, nil, &Argument{Optional: true, Pattern: "[a-zA-Z0-9_]+", ValidationFunc: func(s string) bool {
+		for _, c := range s {
+			switch {
+			case unicode.IsLower(c):
+			case unicode.IsUpper(c):
+			case unicode.IsNumber(c):
+			case c == '_':
+			default:
+				return false
+			}
+		}
+		return true
+	}}},
+	PsPeCompany:        {PsPeCompany, "internal company name of the file provided at compile-time", params.UnicodeString, []string{"ps.pe.company = 'Microsoft Corporation'"}, nil, nil},
+	PsPeCopyright:      {PsPeCopyright, "copyright notice for the file emitted at compile-time", params.UnicodeString, []string{"ps.pe.copyright = '© Microsoft Corporation'"}, nil, nil},
+	PsPeDescription:    {PsPeDescription, "internal description of the file provided at compile-time", params.UnicodeString, []string{"ps.pe.description = 'Notepad'"}, nil, nil},
+	PsPeFileName:       {PsPeFileName, "original file name supplied at compile-time", params.UnicodeString, []string{"ps.pe.file.name = 'NOTEPAD.EXE'"}, nil, nil},
+	PsPeFileVersion:    {PsPeFileVersion, "file version supplied at compile-time", params.UnicodeString, []string{"ps.pe.file.version = '10.0.18362.693 (WinBuild.160101.0800)'"}, nil, nil},
+	PsPeProduct:        {PsPeProduct, "internal product name of the file provided at compile-time", params.UnicodeString, []string{"ps.pe.product = 'Microsoft® Windows® Operating System'"}, nil, nil},
+	PsPeProductVersion: {PsPeProductVersion, "internal product version of the file provided at compile-time", params.UnicodeString, []string{"ps.pe.product.version = '10.0.18362.693'"}, nil, nil},
+	PsPeImphash:        {PsPeImphash, "import hash", params.AnsiString, []string{"pe.impash = '5d3861c5c547f8a34e471ba273a732b2'"}, nil, nil},
+	PsPeIsDotnet:       {PsPeIsDotnet, "indicates if PE contains CLR data", params.Bool, []string{"ps.pe.is_dotnet"}, nil, nil},
+	PsPeAnomalies:      {PsPeAnomalies, "contains PE anomalies detected during parsing", params.Slice, []string{"ps.pe.anomalies in ('number of sections is 0')"}, nil, nil},
+	PsPeIsModified:     {PsPeIsModified, "indicates if disk and in-memory PE headers differ", params.Bool, []string{"ps.pe.is_modified"}, nil, nil},
 
 	ThreadBasePrio:                                     {ThreadBasePrio, "scheduler priority of the thread", params.Int8, []string{"thread.prio = 5"}, nil, nil},
 	ThreadIOPrio:                                       {ThreadIOPrio, "I/O priority hint for scheduling I/O operations", params.Int8, []string{"thread.io.prio = 4"}, nil, nil},
@@ -987,14 +1087,14 @@ var fields = map[Field]FieldInfo{
 	HandleName:   {HandleName, "handle name", params.UnicodeString, []string{"handle.name = '\\Device\\NamedPipe\\chrome.12644.28.105826381'"}, nil, nil},
 	HandleType:   {HandleType, "handle type", params.AnsiString, []string{"handle.type = 'Mutant'"}, nil, nil},
 
-	PeNumSections: {PeNumSections, "number of sections", params.Uint16, []string{"pe.nsections < 5"}, nil, nil},
-	PeNumSymbols:  {PeNumSymbols, "number of entries in the symbol table", params.Uint32, []string{"pe.nsymbols > 230"}, nil, nil},
-	PeBaseAddress: {PeBaseAddress, "image base address", params.Address, []string{"pe.address.base = '140000000'"}, nil, nil},
-	PeEntrypoint:  {PeEntrypoint, "address of the entrypoint function", params.Address, []string{"pe.address.entrypoint = '20110'"}, nil, nil},
-	PeSymbols:     {PeSymbols, "imported symbols", params.Slice, []string{"pe.symbols in ('GetTextFaceW', 'GetProcessHeap')"}, nil, nil},
-	PeImports:     {PeImports, "imported dynamic linked libraries", params.Slice, []string{"pe.imports in ('msvcrt.dll', 'GDI32.dll'"}, nil, nil},
+	PeNumSections: {PeNumSections, "number of sections", params.Uint16, []string{"pe.nsections < 5"}, &Deprecation{Since: "3.0.0", Fields: []Field{PsPeNumSections}}, nil},
+	PeNumSymbols:  {PeNumSymbols, "number of entries in the symbol table", params.Uint32, []string{"pe.nsymbols > 230"}, &Deprecation{Since: "3.0.0", Fields: []Field{PsPeNumSymbols}}, nil},
+	PeBaseAddress: {PeBaseAddress, "image base address", params.Address, []string{"pe.address.base = '140000000'"}, &Deprecation{Since: "3.0.0", Fields: []Field{PsPeBaseAddress}}, nil},
+	PeEntrypoint:  {PeEntrypoint, "address of the entrypoint function", params.Address, []string{"pe.address.entrypoint = '20110'"}, &Deprecation{Since: "3.0.0", Fields: []Field{PsPeEntrypoint}}, nil},
+	PeSymbols:     {PeSymbols, "imported symbols", params.Slice, []string{"pe.symbols in ('GetTextFaceW', 'GetProcessHeap')"}, &Deprecation{Since: "3.0.0", Fields: []Field{PsPeSymbols}}, nil},
+	PeImports:     {PeImports, "imported dynamic linked libraries", params.Slice, []string{"pe.imports in ('msvcrt.dll', 'GDI32.dll'"}, &Deprecation{Since: "3.0.0", Fields: []Field{PsPeImports}}, nil},
 
-	PeResources: {PeResources, "version resources", params.Map, []string{"pe.resources[FileDescription] = 'Notepad'"}, nil, &Argument{Optional: true, Pattern: "[a-zA-Z0-9_]+", ValidationFunc: func(s string) bool {
+	PeResources: {PeResources, "version resources", params.Map, []string{"pe.resources[FileDescription] = 'Notepad'"}, &Deprecation{Since: "3.0.0", Fields: []Field{PsPeResources}}, &Argument{Optional: true, Pattern: "[a-zA-Z0-9_]+", ValidationFunc: func(s string) bool {
 		for _, c := range s {
 			switch {
 			case unicode.IsLower(c):
@@ -1008,27 +1108,27 @@ var fields = map[Field]FieldInfo{
 		return true
 	}}},
 
-	PeCompany:        {PeCompany, "internal company name of the file provided at compile-time", params.UnicodeString, []string{"pe.company = 'Microsoft Corporation'"}, nil, nil},
-	PeCopyright:      {PeCopyright, "copyright notice for the file emitted at compile-time", params.UnicodeString, []string{"pe.copyright = '© Microsoft Corporation'"}, nil, nil},
-	PeDescription:    {PeDescription, "internal description of the file provided at compile-time", params.UnicodeString, []string{"pe.description = 'Notepad'"}, nil, nil},
-	PeFileName:       {PeFileName, "original file name supplied at compile-time", params.UnicodeString, []string{"pe.file.name = 'NOTEPAD.EXE'"}, nil, nil},
-	PeFileVersion:    {PeFileVersion, "file version supplied at compile-time", params.UnicodeString, []string{"pe.file.version = '10.0.18362.693 (WinBuild.160101.0800)'"}, nil, nil},
-	PeProduct:        {PeProduct, "internal product name of the file provided at compile-time", params.UnicodeString, []string{"pe.product = 'Microsoft® Windows® Operating System'"}, nil, nil},
-	PeProductVersion: {PeProductVersion, "internal product version of the file provided at compile-time", params.UnicodeString, []string{"pe.product.version = '10.0.18362.693'"}, nil, nil},
+	PeCompany:        {PeCompany, "internal company name of the file provided at compile-time", params.UnicodeString, []string{"pe.company = 'Microsoft Corporation'"}, &Deprecation{Since: "3.0.0", Fields: []Field{PsPeCompany}}, nil},
+	PeCopyright:      {PeCopyright, "copyright notice for the file emitted at compile-time", params.UnicodeString, []string{"pe.copyright = '© Microsoft Corporation'"}, &Deprecation{Since: "3.0.0", Fields: []Field{PsPeCopyright}}, nil},
+	PeDescription:    {PeDescription, "internal description of the file provided at compile-time", params.UnicodeString, []string{"pe.description = 'Notepad'"}, &Deprecation{Since: "3.0.0", Fields: []Field{PsPeDescription}}, nil},
+	PeFileName:       {PeFileName, "original file name supplied at compile-time", params.UnicodeString, []string{"pe.file.name = 'NOTEPAD.EXE'"}, &Deprecation{Since: "3.0.0", Fields: []Field{PsPeFileName}}, nil},
+	PeFileVersion:    {PeFileVersion, "file version supplied at compile-time", params.UnicodeString, []string{"pe.file.version = '10.0.18362.693 (WinBuild.160101.0800)'"}, &Deprecation{Since: "3.0.0", Fields: []Field{PsPeFileVersion}}, nil},
+	PeProduct:        {PeProduct, "internal product name of the file provided at compile-time", params.UnicodeString, []string{"pe.product = 'Microsoft® Windows® Operating System'"}, &Deprecation{Since: "3.0.0", Fields: []Field{PsPeProduct}}, nil},
+	PeProductVersion: {PeProductVersion, "internal product version of the file provided at compile-time", params.UnicodeString, []string{"pe.product.version = '10.0.18362.693'"}, &Deprecation{Since: "3.0.0", Fields: []Field{PsPeProductVersion}}, nil},
 	PeIsDLL:          {PeIsDLL, "indicates if the loaded image or created file is a DLL", params.Bool, []string{"pe.is_dll'"}, &Deprecation{Since: "2.0.0", Fields: []Field{FileIsDLL, ImageIsDLL}}, nil},
 	PeIsDriver:       {PeIsDriver, "indicates if the loaded image or created file is a driver", params.Bool, []string{"pe.is_driver'"}, &Deprecation{Since: "2.0.0", Fields: []Field{FileIsDriver, ImageIsDriver}}, nil},
 	PeIsExecutable:   {PeIsExecutable, "indicates if the loaded image or created file is an executable", params.Bool, []string{"pe.is_exec'"}, &Deprecation{Since: "2.0.0", Fields: []Field{FileIsExecutable, ImageIsExecutable}}, nil},
-	PeImphash:        {PeImphash, "import hash", params.AnsiString, []string{"pe.impash = '5d3861c5c547f8a34e471ba273a732b2'"}, nil, nil},
-	PeIsDotnet:       {PeIsDotnet, "indicates if PE contains CLR data", params.Bool, []string{"pe.is_dotnet"}, nil, nil},
-	PeAnomalies:      {PeAnomalies, "contains PE anomalies detected during parsing", params.Slice, []string{"pe.anomalies in ('number of sections is 0')"}, nil, nil},
-	PeIsSigned:       {PeIsSigned, "indicates if the PE has embedded or catalog signature", params.Bool, []string{"pe.is_signed"}, nil, nil},
-	PeIsTrusted:      {PeIsTrusted, "indicates if the PE certificate chain is trusted", params.Bool, []string{"pe.is_trusted"}, nil, nil},
-	PeCertSerial:     {PeCertSerial, "PE certificate serial number", params.UnicodeString, []string{"pe.cert.serial = '330000023241fb59996dcc4dff000000000232'"}, nil, nil},
-	PeCertSubject:    {PeCertSubject, "PE certificate subject", params.UnicodeString, []string{"pe.cert.subject contains 'Washington, Redmond, Microsoft Corporation'"}, nil, nil},
-	PeCertIssuer:     {PeCertIssuer, "PE certificate CA", params.UnicodeString, []string{"pe.cert.issuer contains 'Washington, Redmond, Microsoft Corporation'"}, nil, nil},
-	PeCertAfter:      {PeCertAfter, "PE certificate expiration date", params.Time, []string{"pe.cert.after contains '2024-02-01 00:05:42 +0000 UTC'"}, nil, nil},
-	PeCertBefore:     {PeCertBefore, "PE certificate enrollment date", params.Time, []string{"pe.cert.before contains '2024-02-01 00:05:42 +0000 UTC'"}, nil, nil},
-	PeIsModified:     {PeIsModified, "indicates if disk and in-memory PE headers differ", params.Bool, []string{"pe.is_modified"}, nil, nil},
+	PeImphash:        {PeImphash, "import hash", params.AnsiString, []string{"pe.impash = '5d3861c5c547f8a34e471ba273a732b2'"}, &Deprecation{Since: "3.0.0", Fields: []Field{PsPeImphash}}, nil},
+	PeIsDotnet:       {PeIsDotnet, "indicates if PE contains CLR data", params.Bool, []string{"pe.is_dotnet"}, &Deprecation{Since: "3.0.0", Fields: []Field{PsPeIsDotnet}}, nil},
+	PeAnomalies:      {PeAnomalies, "contains PE anomalies detected during parsing", params.Slice, []string{"pe.anomalies in ('number of sections is 0')"}, &Deprecation{Since: "3.0.0", Fields: []Field{PsPeAnomalies}}, nil},
+	PeIsSigned:       {PeIsSigned, "indicates if the PE has embedded or catalog signature", params.Bool, []string{"pe.is_signed"}, &Deprecation{Since: "3.0.0", Fields: []Field{PsSignatureExists}}, nil},
+	PeIsTrusted:      {PeIsTrusted, "indicates if the PE certificate chain is trusted", params.Bool, []string{"pe.is_trusted"}, &Deprecation{Since: "3.0.0", Fields: []Field{PsSignatureTrusted}}, nil},
+	PeCertSerial:     {PeCertSerial, "PE certificate serial number", params.UnicodeString, []string{"pe.cert.serial = '330000023241fb59996dcc4dff000000000232'"}, &Deprecation{Since: "3.0.0", Fields: []Field{PsSignatureSerial}}, nil},
+	PeCertSubject:    {PeCertSubject, "PE certificate subject", params.UnicodeString, []string{"pe.cert.subject contains 'Washington, Redmond, Microsoft Corporation'"}, &Deprecation{Since: "3.0.0", Fields: []Field{PsSignatureSubject}}, nil},
+	PeCertIssuer:     {PeCertIssuer, "PE certificate CA", params.UnicodeString, []string{"pe.cert.issuer contains 'Washington, Redmond, Microsoft Corporation'"}, &Deprecation{Since: "3.0.0", Fields: []Field{PsSignatureIssuer}}, nil},
+	PeCertAfter:      {PeCertAfter, "PE certificate expiration date", params.Time, []string{"pe.cert.after contains '2024-02-01 00:05:42 +0000 UTC'"}, &Deprecation{Since: "3.0.0", Fields: []Field{PsSignatureAfter}}, nil},
+	PeCertBefore:     {PeCertBefore, "PE certificate enrollment date", params.Time, []string{"pe.cert.before contains '2024-02-01 00:05:42 +0000 UTC'"}, &Deprecation{Since: "3.0.0", Fields: []Field{PsSignatureBefore}}, nil},
+	PeIsModified:     {PeIsModified, "indicates if disk and in-memory PE headers differ", params.Bool, []string{"pe.is_modified"}, &Deprecation{Since: "3.0.0", Fields: []Field{PsPeIsModified}}, nil},
 
 	MemBaseAddress:    {MemBaseAddress, "region base address", params.Address, []string{"mem.address = '211d13f2000'"}, nil, nil},
 	MemRegionSize:     {MemRegionSize, "region size", params.Uint64, []string{"mem.size > 438272"}, nil, nil},

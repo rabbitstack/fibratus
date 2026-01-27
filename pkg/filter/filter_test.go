@@ -1137,18 +1137,18 @@ func TestPEFilter(t *testing.T) {
 		matches bool
 	}{
 
-		{`foreach(pe._sections, $section, $section.entropy = 6.368381)`, true},
-		{`foreach(pe._sections, $section, $section.entropy > 4.45)`, true},
-		{`foreach(pe._sections, $section, $section.name = '.rdata' and $section.entropy < 9.45)`, true},
-		{`foreach(pe._sections, $section, $section.size = 132608)`, true},
-		{`foreach(pe._sections, $section, $section.md5 = 'ffa5c960b421ca9887e54966588e97e8')`, true},
-		{`pe.symbols IN ('GetTextFaceW', 'GetProcessHeap')`, true},
-		{`pe.resources[FileDesc] = 'Notepad'`, true},
-		{`pe.resources[CompanyName] = 'Microsoft Corporation'`, true},
-		{`pe.resources in ('FileDescription:Notepad')`, true},
-		{`pe.nsymbols = 10 AND pe.nsections = 2`, true},
-		{`pe.nsections > 1`, true},
-		{`pe.address.base = '140000000' AND pe.address.entrypoint = '20110'`, true},
+		{`foreach(ps.pe._sections, $section, $section.entropy = 6.368381)`, true},
+		{`foreach(ps.pe._sections, $section, $section.entropy > 4.45)`, true},
+		{`foreach(ps.pe._sections, $section, $section.name = '.rdata' and $section.entropy < 9.45)`, true},
+		{`foreach(ps.pe._sections, $section, $section.size = 132608)`, true},
+		{`foreach(ps.pe._sections, $section, $section.md5 = 'ffa5c960b421ca9887e54966588e97e8')`, true},
+		{`ps.pe.symbols IN ('GetTextFaceW', 'GetProcessHeap')`, true},
+		{`ps.pe.resources[FileDesc] = 'Notepad'`, true},
+		{`ps.pe.resources[CompanyName] = 'Microsoft Corporation'`, true},
+		{`ps.pe.resources in ('FileDescription:Notepad')`, true},
+		{`ps.pe.nsymbols = 10 AND ps.pe.nsections = 2`, true},
+		{`ps.pe.nsections > 1`, true},
+		{`ps.pe.address.base = '140000000' AND ps.pe.address.entrypoint = '20110'`, true},
 	}
 
 	for i, tt := range tests {
@@ -1181,21 +1181,21 @@ func TestLazyPEFilter(t *testing.T) {
 		filter  string
 		matches bool
 	}{
-		{`foreach(pe._sections, $s, $s.entropy > 1.23)`, true},
-		{`pe.symbols IN ('GetTextFaceW', 'GetProcessHeap')`, true},
+		{`foreach(ps.pe._sections, $s, $s.entropy > 1.23)`, true},
+		{`ps.pe.symbols IN ('GetTextFaceW', 'GetProcessHeap')`, true},
 		{`pe.is_dll`, true},
-		{`length(pe.imphash) > 0`, true},
-		{`pe.is_dotnet`, false},
-		{`pe.resources[FileDesc] icontains 'Notepad'`, true},
-		{`pe.file.name ~= 'NOTEPAD.EXE'`, true},
-		{`pe.nsymbols > 10 AND pe.nsections > 2`, true},
-		{`pe.nsections > 1`, true},
-		{`length(pe.anomalies) = 0`, true},
-		{`pe.is_signed`, true},
-		{`pe.is_trusted`, true},
-		{`pe.cert.subject icontains 'microsoft'`, true},
-		{`pe.cert.issuer icontains 'microsoft'`, true},
-		{`length(pe.cert.serial) > 0`, true},
+		{`length(ps.pe.imphash) > 0`, true},
+		{`ps.pe.is_dotnet`, false},
+		{`ps.pe.resources[FileDesc] icontains 'Notepad'`, true},
+		{`ps.pe.file.name ~= 'NOTEPAD.EXE'`, true},
+		{`ps.pe.nsymbols > 10 AND pe.nsections > 2`, true},
+		{`ps.pe.nsections > 1`, true},
+		{`length(ps.pe.anomalies) = 0`, true},
+		{`ps.signature.exists`, true},
+		{`ps.signature.trusted`, true},
+		{`ps.signature.subject icontains 'microsoft'`, true},
+		{`ps.signature.issuer icontains 'microsoft'`, true},
+		{`length(ps.signature.serial) > 0`, true},
 	}
 
 	for i, tt := range tests {
