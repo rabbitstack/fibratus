@@ -320,6 +320,21 @@ func (s *snapshotter) FindModule(addr va.Address) (bool, *pstypes.Module) {
 	return false, nil
 }
 
+func (s *snapshotter) FindAllModules() map[string]pstypes.Module {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	mods := make(map[string]pstypes.Module)
+	for _, proc := range s.procs {
+		for _, mod := range proc.Modules {
+			if _, ok := mods[mod.Name]; ok {
+				continue
+			}
+			mods[mod.Name] = mod
+		}
+	}
+	return mods
+}
+
 func (s *snapshotter) AddMmap(e *event.Event) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

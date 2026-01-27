@@ -21,7 +21,6 @@ package symbolize
 import (
 	"math/rand"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -192,53 +191,33 @@ func TestProcessCallstackPeExports(t *testing.T) {
 	assert.True(t, e.Callstack.ContainsUnbacked())
 
 	// check internal state
-	assert.Len(t, s.mods, 3)
+	assert.Len(t, s.mods, 1)
+	assert.Len(t, s.mods[e.PID], 3)
 
 	// should have populated the symbols cache
 	assert.Len(t, s.symbols, 1)
 	assert.Equal(t, syminfo{module: "unbacked", symbol: "?"}, s.symbols[e.PID][0x2638e59e0a5])
 
-	// image load event should add module exports
-	// and when the image is unloaded and there are
-	// no processes with the image section mapped
-	// inside their VAS, we can remove the module
-	e2 := &event.Event{
-		Type:      event.LoadImage,
-		Tid:       2484,
-		PID:       uint32(12328),
-		CPU:       1,
-		Seq:       2,
-		Name:      "LoadImage",
-		Timestamp: time.Now(),
-		Category:  event.Image,
-		Params: event.Params{
-			params.ImageBase: {Name: params.ImageBase, Type: params.Address, Value: uint64(0x12345f)},
-			params.FilePath:  {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\System32\\bcrypt32.dll"},
-		},
-		PS: proc,
-	}
-	_, err = s.ProcessEvent(e2)
-	require.NoError(t, err)
-	assert.Len(t, s.mods, 4)
-
 	e3 := &event.Event{
 		Type:      event.UnloadImage,
 		Tid:       2484,
-		PID:       uint32(12328),
+		PID:       uint32(os.Getpid()),
 		CPU:       1,
 		Seq:       2,
 		Name:      "UnloadImage",
 		Timestamp: time.Now(),
 		Category:  event.Image,
 		Params: event.Params{
-			params.ImageBase: {Name: params.ImageBase, Type: params.Address, Value: uint64(0x12345f)},
-			params.FilePath:  {Name: params.FilePath, Type: params.UnicodeString, Value: filepath.Join(os.Getenv("SystemRoot"), "System32", "bcrypt32.dll")},
+			params.ImageBase: {Name: params.ImageBase, Type: params.Address, Value: uint64(0x7ffb5d8e11c4)},
+			params.FilePath:  {Name: params.FilePath, Type: params.UnicodeString, Value: `C:\Windows\System32\user32.dll`},
 		},
 		PS: proc,
 	}
+
+	// dll is unloaded, the number of modules should decrement
 	_, err = s.ProcessEvent(e3)
 	require.NoError(t, err)
-	assert.Len(t, s.mods, 3)
+	assert.Len(t, s.mods[e.PID], 2)
 }
 
 func TestProcessCallstack(t *testing.T) {
@@ -480,68 +459,4 @@ func TestProcessCallstackProcsTTL(t *testing.T) {
 	// evicted
 	r.AssertNumberOfCalls(t, "Cleanup", 1)
 	assert.Equal(t, 0, s.procsSize())
-}
-
-func TestSymbolFromRVA(t *testing.T) {
-	var tests = []struct {
-		rva            va.Address
-		exports        map[uint32]string
-		expectedSymbol string
-	}{
-		{va.Address(317949), map[uint32]string{
-			9824:   "SHCreateScopeItemFromShellItem",
-			23248:  "SHCreateScopeItemFromIDList",
-			165392: "DllGetClassObject",
-			186368: "SHCreateSearchIDListFromAutoList",
-			238048: "DllCanUnloadNow",
-			240112: "IsShellItemInSearchIndex",
-			240304: "IsMSSearchEnabled",
-			272336: "SHSaveBinaryAutoListToStream",
-			310672: "DllMain",
-			317920: "",
-			320864: "",
-			434000: "SHCreateAutoList",
-			434016: "SHCreateAutoListWithID",
-			555040: "CreateDefaultProviderResolver",
-			571136: "GetGatherAdmin",
-			572592: "SEARCH_RemoteLocationsCscStateCache_IsRemoteLocationInCsc"},
-			"?",
-		},
-		{va.Address(434011), map[uint32]string{
-			9824:   "SHCreateScopeItemFromShellItem",
-			23248:  "SHCreateScopeItemFromIDList",
-			165392: "DllGetClassObject",
-			186368: "SHCreateSearchIDListFromAutoList",
-			238048: "DllCanUnloadNow",
-			240112: "IsShellItemInSearchIndex",
-			240304: "IsMSSearchEnabled",
-			272336: "SHSaveBinaryAutoListToStream",
-			310672: "DllMain",
-			317920: "",
-			320864: "",
-			434000: "SHCreateAutoList",
-			434016: "SHCreateAutoListWithID",
-			555040: "CreateDefaultProviderResolver",
-			571136: "GetGatherAdmin",
-			572592: "SEARCH_RemoteLocationsCscStateCache_IsRemoteLocationInCsc"},
-			"SHCreateAutoList",
-		},
-		{va.Address(4532), map[uint32]string{
-			9824:   "SHCreateScopeItemFromShellItem",
-			23248:  "SHCreateScopeItemFromIDList",
-			165392: "DllGetClassObject",
-			186368: "SHCreateSearchIDListFromAutoList",
-			238048: "DllCanUnloadNow",
-			240112: "IsShellItemInSearchIndex",
-			240304: "IsMSSearchEnabled",
-			572592: "SEARCH_RemoteLocationsCscStateCache_IsRemoteLocationInCsc"},
-			"",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.expectedSymbol, func(t *testing.T) {
-			assert.Equal(t, tt.expectedSymbol, symbolFromRVA(tt.rva, tt.exports))
-		})
-	}
 }

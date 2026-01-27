@@ -805,6 +805,7 @@ func (s *NoopPsSnapshotter) GetSnapshot() []*pstypes.PS                         
 func (s *NoopPsSnapshotter) AddThread(evt *event.Event) error                   { return nil }
 func (s *NoopPsSnapshotter) AddModule(evt *event.Event) error                   { return nil }
 func (s *NoopPsSnapshotter) FindModule(addr va.Address) (bool, *pstypes.Module) { return false, nil }
+func (s *NoopPsSnapshotter) FindAllModules() map[string]pstypes.Module          { return nil }
 func (s *NoopPsSnapshotter) RemoveThread(pid uint32, tid uint32) error          { return nil }
 func (s *NoopPsSnapshotter) RemoveModule(pid uint32, addr va.Address) error     { return nil }
 func (s *NoopPsSnapshotter) WriteFromCapture(evt *event.Event) error            { return nil }
