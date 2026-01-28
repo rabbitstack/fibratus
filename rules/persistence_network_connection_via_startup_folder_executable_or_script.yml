@@ -1,6 +1,6 @@
 name: Network connection via startup folder executable or script
 id: 09b7278d-42e3-4792-9f00-dee38baecfad
-version: 1.0.4
+version: 1.0.5
 description: |
   Identifies the execution of unsigned binary or script from the
   Startup folder followed by network inbound or outbound connection.
@@ -19,7 +19,7 @@ condition: >
   sequence
   maxspan 5m
   by ps.uuid
-    |(load_untrusted_executable and image.path imatches startup_locations) or
+    |(load_untrusted_executable and module.path imatches startup_locations) or
      (load_executable and ps.name in script_interpreters and ps.cmdline imatches startup_locations)
     |
     |((inbound_network) or (outbound_network)) and ps.cmdline imatches startup_locations|
