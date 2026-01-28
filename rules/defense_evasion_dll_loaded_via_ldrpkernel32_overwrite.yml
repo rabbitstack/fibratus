@@ -1,6 +1,6 @@
 name: DLL loaded via LdrpKernel32 overwrite
 id: 56739eda-210f-4a30-a114-d55ca60976df
-version: 1.0.3
+version: 1.0.4
 description: |
   Detects attempts to bypass the standard NTDLL bootstrap process by loading a malicious DLL early through hijacking. 
   The malicious DLL, containing attacker-controlled code, is loaded in place of the legitimate kernel32 DLL.
@@ -20,7 +20,7 @@ references:
 condition: >
   (load_unsigned_or_untrusted_dll) and
   thread.callstack.symbols imatches ('*!BaseThreadInitThunk*') and
-  image.path not imatches '?:\\Windows\\assembly\\NativeImages_*\\System.Numerics.ni.dll' and
+  dll.path not imatches '?:\\Windows\\assembly\\NativeImages_*\\System.Numerics.ni.dll' and
   not foreach(thread._callstack, $frame,
               $frame.symbol imatches ('?:\\Windows\\System32\\kernel32.dll!BaseThreadInitThunk*',
                                       '?:\\Windows\\SysWOW64\\kernel32.dll!BaseThreadInitThunk*',
@@ -31,7 +31,7 @@ action:
   - name: kill
 
 output: >
-  DLL %image.path loaded via LdrpKernel32 overwrite evasion by process %ps.exe
+  DLL %dll.path loaded via LdrpKernel32 overwrite evasion by process %ps.exe
 severity: high
 
 min-engine-version: 3.0.0

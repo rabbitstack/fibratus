@@ -1,6 +1,6 @@
 name: Suspicious Netsh Helper DLL execution
 id: bd17781d-38ca-4b9a-a12a-f807a1eb45e0
-version: 1.0.4
+version: 1.0.5
 description: |
   Identifies the execution of a suspicious Netsh Helper DLL. Adversaries may establish persistence 
   by executing malicious content triggered by Netsh Helper DLLs. Netsh.exe is a command-line scripting 
@@ -28,7 +28,7 @@ condition: >
      (ps.name ~= 'netsh.exe' or ps.pe.file.name ~= 'netsh.exe')
     |
     |create_thread and
-     foreach(thread._callstack, $frame, $frame.symbol imatches '*!InitHelperDll' and ($frame.module.signature.is_signed = false or $frame.module.signature.is_trusted = false))
+     foreach(thread._callstack, $frame, $frame.symbol imatches '*!InitHelperDll' and ($frame.module.signature.exists = false or $frame.module.signature.trusted = false))
     |
 
 output: >

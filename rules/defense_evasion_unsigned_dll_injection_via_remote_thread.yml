@@ -1,6 +1,6 @@
 name: Unsigned DLL injection via remote thread
 id: 21bdd944-3bda-464b-9a72-58fd37ba9163
-version: 1.1.4
+version: 1.1.5
 description: |
   Identifies unsigned DLL injection via remote thread creation.
   Adversaries may inject dynamic-link libraries (DLLs) into processes in order to evade process-based defenses
@@ -33,7 +33,7 @@ condition: >
           (ps.cmdline imatches '"?:\\Windows\\Microsoft.NET\\Framework\\*\\ngen.exe" ExecuteQueuedItems /LegacyServiceBehavior'))
     | by thread.pid
     |(load_unsigned_or_untrusted_dll) and
-     image.path not imatches
+     dll.path not imatches
                     (
                       '?:\\Program Files\\Git\\mingw64\\bin\\*.dll',
                       '?:\\Windows\\assembly\\*\\*.ni.dll',

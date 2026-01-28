@@ -1,6 +1,6 @@
 name: Suspicious Microsoft Office add-in loaded
 id: fe4daff8-d8aa-48d3-bf09-a9d868375a3c
-version: 1.0.2
+version: 1.0.3
 description: |
   Identifies attempts to load unsigned executables from known Microsoft Office 
   add-ins directories, which adversaries may exploit to maintain persistence.
@@ -17,7 +17,7 @@ references:
 condition: >
   (load_unsigned_or_untrusted_module) and
   ps.name iin ('excel.exe', 'winword.exe', 'outlook.exe', 'powerpnt.exe') and
-  image.path imatches
+  module.path imatches
             (
               '?:\\Users\\*\\AppData\\Roaming\\Microsoft\\AddIns\\*',
               '?:\\Users\\*\\AppData\\Roaming\\Microsoft\\Excel\\XLSTART\\*',
@@ -26,7 +26,7 @@ condition: >
             )
 
 output:
-  Microsoft Office process %ps.name loaded a suspicious add-in %image.path
+  Microsoft Office process %ps.name loaded a suspicious add-in %module.path
 severity: high
 
 min-engine-version: 3.0.0

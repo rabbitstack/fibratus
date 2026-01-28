@@ -1,6 +1,6 @@
 name: Process execution from a self-deleting binary
 id: 0f0da517-b22c-4d14-9adc-36baeb621cf7
-version: 1.0.4
+version: 1.0.5
 description: |
   Identifies the execution of the process from a self-deleting binary. The attackers can
   abuse undocumented API functions to create a process from a file-backed section. The file 
@@ -36,10 +36,10 @@ condition: >
                   '?:\\Windows\\uus\\packages\\preview\\*'
                 )
     | by file.name
-    |load_module and ext(image.path) != '.dll'| by image.name
+    |load_module and ext(module.path) != '.dll'| by module.name
 
 output: >
-  Process %2.image.path spawned from self-deleting binary
+  Process %2.module.path spawned from self-deleting binary
 severity: high
 
 min-engine-version: 3.0.0
