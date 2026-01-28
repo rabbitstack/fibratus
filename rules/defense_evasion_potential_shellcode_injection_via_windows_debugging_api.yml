@@ -1,0 +1,39 @@
+name: Potential shellcode injection via Windows Debugging API
+id: 0100c5ce-3cdf-4701-8253-6c33bb48eabf
+version: 1.0.0
+description: |
+  Identifies shellcode injection using the Windows Debugging API and shared memory section.
+  Attackers avoid writing and reading remote memory directly, instead employ context manipulation
+  to force the target process to load and execute the payload itself via shared file mapping.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1055
+  technique.name: Process Injection
+  technique.ref: https://attack.mitre.org/techniques/T1055/
+references:
+  - https://github.com/dis0rder0x00/DbgNexum
+
+condition: >
+  sequence
+  maxspan 1m
+    |create_remote_thread and
+     thread.callstack.symbols imatches ('ntdll.dll!DbgUiDebugActiveProcess', 'ntdll.dll!DbgUiIssueRemoteBreakin', 'KernelBase.dll!DebugActiveProcess') and
+     ps.exe not imatches
+                (
+                  '?:\\Program Files\\*.exe',
+                  '?:\\Program Files(x86)\\*.exe',
+                  '?:\\Windows\\System32\\wermgr.exe',
+                  '?:\\Windows\\System32\\WerFault.exe'
+                )
+    | by thread.pid
+    |map_view_of_section and
+     file.view.protection = 'READONLY|EXECUTE' and file.view.size >= 4096
+    | by ps.pid
+action:
+  - name: kill
+
+severity: high
+
+min-engine-version: 3.0.0
