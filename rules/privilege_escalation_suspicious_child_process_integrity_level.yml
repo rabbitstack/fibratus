@@ -1,0 +1,44 @@
+name: Suspicious child process integrity level
+id: b958e949-a16a-4d66-b008-15f4e8382a6e
+version: 1.0.0
+description: |
+  Identifies the execution of the parent process running with low/medium integrity 
+  level that spawns a child process with the system integrity level. Because normal 
+  user-mode applications at lower integrity levels rarely legitimately create new 
+  processes running with SYSTEM privileges, this pattern is a strong indicator of 
+  privilege escalation or token manipulation where an attacker abuses a privileged 
+  token to execute code.
+labels:
+  tactic.id: TA0004
+  tactic.name: Privilege Escalation
+  tactic.ref: https://attack.mitre.org/tactics/TA0004/
+  technique.id: T1134
+  technique.name: Access Token Manipulation
+  technique.ref: https://attack.mitre.org/techniques/T1134/
+  subtechnique.id: T1134.002
+  subtechnique.name: Create Process with Token 
+  subtechnique.ref: https://attack.mitre.org/techniques/T1134/002/
+
+condition: >
+  sequence
+  maxspan 8m
+    |spawn_process and ps.token.integrity_level in ('LOW', 'MEDIUM')| by ps.uuid
+    |spawn_process and
+     ps.sid = 'S-1-5-18' and
+     ps.token.integrity_level = 'SYSTEM' and
+     ps.exe not imatches
+                (
+                  '?:\\Windows\\System32\\wermgr.exe',
+                  '?:\\Windows\\System32\\WerFault.exe',
+                  '?:\\Windows\\SysWOW64\\WerFault.exe',
+                  '?:\\Windows\\System32\\WerFaultSecure.exe'
+                )
+    | by ps.parent.uuid
+action:
+  - name: kill
+
+output: >
+  Suspicious process %1.ps.exe spawned the process %2.ps.exe with System integrity level
+severity: critical
+
+min-engine-version: 3.0.0
