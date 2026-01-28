@@ -1,0 +1,32 @@
+name: Thread context manipulation from exception handler
+id: 9e52cd07-b07a-4f2b-b326-cad8524401c8
+version: 1.0.0
+description: |
+  Identifies attempts to manipulate thread context from inside the exception handler.
+  Attackers can hijack execution as part of stealthy process injection or patchless
+  AMSI bypass techniques.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1055
+  technique.name: Process Injection
+  technique.ref: https://attack.mitre.org/techniques/T1055/
+references:
+  - https://www.crowdstrike.com/en-us/blog/crowdstrike-investigates-threat-of-patchless-amsi-bypass-attacks/
+
+condition: >
+  ((set_thread_context) or (set_thread_context_failed)) and
+  thread.callstack.symbols imatches ('ntdll.dll!KiUserExceptionDispatcher') and
+  ps.exe not imatches
+            (
+              '?:\\Windows\\System32\\wermgr.exe',
+              '?:\\Windows\\System32\\WerFault.exe',
+              '?:\\Windows\\System32\\taskhostw.exe',
+              '?:\\ProgramData\\Microsoft\\Windows Defender\\*\\MsMpEng.exe',
+              '?:\\ProgramData\\Microsoft\\Windows Defender\\*\\NisSrv.exe'
+            )
+
+severity: high
+
+min-engine-version: 3.0.0
