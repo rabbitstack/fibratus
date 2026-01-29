@@ -1,0 +1,38 @@
+name: Embedded executable file run via shortcut
+id: a0e3db54-41e5-4ece-bcd4-4b45eae868cb
+version: 1.0.0
+description: |
+  Identifies execution of an embedded executable extracted from a shortcut
+  (.lnk) file via script or command interpreters, a technique commonly used
+  to deliver and launch payloads through malicious links.
+labels:
+  tactic.id: TA0002
+  tactic.name: Execution
+  tactic.ref: https://attack.mitre.org/tactics/TA0002/
+  technique.id: T1204
+  technique.name: User Execution
+  technique.ref: https://attack.mitre.org/techniques/T1204/
+  subtechnique.id: T1204.002
+  subtechnique.name: Malicious File
+  subtechnique.ref: https://attack.mitre.org/techniques/T1204/002/
+references:
+  - https://github.com/d4rkiZ/EmbedExeLnk-
+
+condition: >
+  sequence
+  maxspan 5m
+  by ps.uuid
+    |open_file and
+     ps.name iin ('powershell.exe', 'pwsh.exe', 'cmd.exe') and
+     file.path imatches '?:\\*.lnk'
+    |
+    |create_file and
+     (file.extension iin ('.exe', '.bat', '.com',
+                          '.scr', '.pif', '.dll') or file.is_exec or file.is_dll)|
+    |spawn_process and ps.name iin ('powershell.exe', 'pwsh.exe', 'cmd.exe', 'rundll32.exe', 'msbuild.exe', 'certutil.exe', 'certreq.exe', 'msiexec.exe')|
+action:
+  - name: kill
+
+severity: high
+
+min-engine-version: 3.0.0
