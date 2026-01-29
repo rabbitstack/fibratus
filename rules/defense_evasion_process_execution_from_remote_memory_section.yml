@@ -1,0 +1,41 @@
+name: Process execution from remote memory section
+id: 6e4cc918-a30e-4167-ba26-6356d6384f30
+version: 1.0.0
+description: |
+  Detects execution of a process image originating from a memory section
+  mapped without a backing file, a strong indicator of advanced process
+  injection techniques such as ghostly hollowing. In this pattern, a malicious
+  image is mapped directly into memory, loaded into a remote process, and
+  subsequently executed without ever being written to disk.
+  This allows attackers to evade file-based detection and forensic recovery.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1055
+  technique.name: Process Injection
+  technique.ref: https://attack.mitre.org/techniques/T1055/
+references:
+  - https://captain-woof.medium.com/ghostly-hollowing-probably-the-most-bizarre-windows-process-injection-technique-i-know-bf833c96663a
+
+condition: >
+  sequence
+  maxspan 1m
+    |map_view_file and
+     ps.sid != 'S-1-5-18' and
+     file.view.size > 50000 and file.path = '' and file.view.type = 'IMAGE'
+    | as e1
+    |load_module and
+     evt.pid != module.pid and
+     module.base = $e1.file.view.base and
+     (thread.callstack.summary = '' or thread.callstack.summary imatches '*ntoskrnl.exe!NtMapViewOfSection*')
+    | as e2
+    |load_executable and thread.callstack.summary imatches concat('*', base($e2.image.path), '*')|
+action:
+  - name: kill
+
+output: >
+  Process %3.ps.exe executed from a remotely mapped memory section with no backing file
+severity: high
+
+min-engine-version: 3.0.0
