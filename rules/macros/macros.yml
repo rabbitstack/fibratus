@@ -73,6 +73,9 @@
 - macro: set_thread_context
   expr: evt.name = 'SetThreadContext' and evt.arg[status] = 'Success'
 
+- macro: set_thread_context_failed
+  expr: evt.name = 'SetThreadContext' and evt.arg[status] != 'Success'
+
 - macro: virtual_alloc
   expr: evt.name = 'VirtualAlloc'
 
