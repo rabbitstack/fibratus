@@ -1,0 +1,38 @@
+name: Potential NTDLL unhooking via file mapping
+id: b000955d-90df-44eb-8e32-8269d395f0ef
+version: 1.0.0
+description: |
+  Identifies processes that map a fresh image view of NTDLL.dll
+  from disk, a behavior commonly associated with user-mode API
+  unhooking. Malware often remaps the original NTDLL image to
+  restore pristine code sections and bypass user-mode security
+  hooks placed by EDRs or AMSI.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1055
+  technique.name: Process Injection
+  technique.ref: https://attack.mitre.org/techniques/T1055/
+references:
+  - https://github.com/hwbp/NTDLL-Unhook
+
+condition: >
+  map_view_file and
+  file.view.type = 'IMAGE' and evt.pid not in (0, 4) and
+  file.path imatches
+            (
+              '?:\\Windows\\System32\\ntdll.dll',
+              '?:\\Windows\\SysWOW64\\ntdll.dll'
+            ) and
+  ps.exe not imatches
+            (
+              '?:\\Windows\\System32\\WerFault.exe',
+              '?:\\Windows\\SysWOW64\\WerFault.exe',
+              '?:\\Windows\\System32\\wermgr.exe',
+              '?:\\Windows\\SysWOW64\\wermgr.exe'
+            )
+
+severity: high
+
+min-engine-version: 3.0.0
