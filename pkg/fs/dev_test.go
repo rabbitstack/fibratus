@@ -23,9 +23,10 @@ package fs
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 var drives = []string{
@@ -74,6 +75,7 @@ func TestConvertDosDevice(t *testing.T) {
 	assert.Contains(t, files, filename)
 
 	m.(*mapper).cache["\\Device\\HarddiskVolume1"] = "C:"
+	m.(*mapper).cache["\\Device\\HarddiskVolume5"] = "\\Device\\HarddiskVolume5"
 	m.(*mapper).sysroot = "C:\\Windows"
 
 	var tests = []struct {
