@@ -74,6 +74,8 @@ const (
 	YaraFn
 	// ForeachFn represents the FOREACH function
 	ForeachFn
+	// CountFn reprsents the COUNT function
+	CountFn
 )
 
 // ArgType is the type alias for the argument value type.
@@ -228,6 +230,8 @@ func (f Fn) String() string {
 		return "YARA"
 	case ForeachFn:
 		return "FOREACH"
+	case CountFn:
+		return "COUNT"
 	default:
 		return "UNDEFINED"
 	}

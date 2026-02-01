@@ -60,7 +60,7 @@ func TestParser(t *testing.T) {
 		{expr: "ps.none = 'cmd.exe'", err: errors.New("ps.none = 'cmd.exe'\n╭^\n|\n|\n╰─────────────────── expected field, bound field, string, number, bool, ip, function")},
 
 		{expr: "ps.name = 'cmd.exe' AND ps.name IN ('exe') ps.name", err: errors.New("ps.name = 'cmd.exe' AND ps.name IN ('exe') ps.name\n╭──────────────────────────────────────────^\n|\n|\n╰─────────────────── expected operator, ')', ',', '|'")},
-		{expr: "ip_cidr(net.dip) = '24'", err: errors.New("ip_cidr function is undefined. Did you mean one of BASE|CIDR_CONTAINS|CONCAT|DIR|ENTROPY|EXT|FOREACH|GET_REG_VALUE|GLOB|INDEXOF|IS_ABS|IS_MINIDUMP|LENGTH|LOWER|LTRIM|MD5|REGEX|REPLACE|RTRIM|SPLIT|SUBSTR|UNDEFINED|UPPER|VOLUME|YARA?")},
+		{expr: "ip_cidr(net.dip) = '24'", err: errors.New("ip_cidr function is undefined. Did you mean one of BASE|CIDR_CONTAINS|CONCAT|COUNT|DIR|ENTROPY|EXT|FOREACH|GET_REG_VALUE|GLOB|INDEXOF|IS_ABS|IS_MINIDUMP|LENGTH|LOWER|LTRIM|MD5|REGEX|REPLACE|RTRIM|SPLIT|SUBSTR|UNDEFINED|UPPER|VOLUME|YARA?")},
 
 		{expr: "ps.name = 'cmd.exe' and not cidr_contains(net.sip, '172.14.0.0')"},
 		{expr: `ps.envs[ProgramFiles] = 'C:\\Program Files'`},

@@ -81,6 +81,7 @@ var funcs = map[string]FunctionDef{
 	functions.GetRegValueFn.String():  &functions.GetRegValue{},
 	functions.YaraFn.String():         &functions.Yara{},
 	functions.ForeachFn.String():      &Foreach{},
+	functions.CountFn.String():        &functions.Count{},
 }
 
 // FunctionDef is the interface that all function definitions have to satisfy.

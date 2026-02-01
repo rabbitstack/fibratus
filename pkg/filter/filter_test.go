@@ -304,6 +304,7 @@ func TestProcFilter(t *testing.T) {
 		{`ps.modules IN ('kernel32.dll')`, true},
 		{`evt.name = 'CreateProcess' and evt.pid != ps.ppid`, true},
 		{`ps.parent.name = 'svchost.exe'`, true},
+		{`count(ps.modules, '*.dll') >= 2`, true},
 
 		{`ps.ancestor[0] = 'svchost.exe'`, true},
 		{`ps.ancestor[0] = 'csrss.exe'`, false},
@@ -311,6 +312,7 @@ func TestProcFilter(t *testing.T) {
 		{`ps.ancestor[2] = 'csrss.exe'`, true},
 		{`ps.ancestor[3] = ''`, true},
 		{`ps.ancestor intersects ('csrss.exe', 'services.exe', 'svchost.exe')`, true},
+		{`count(ps.ancestor, '*.exe') = 3`, true},
 
 		{`foreach(ps._ancestors, $proc, $proc.name in ('csrss.exe', 'services.exe', 'System'))`, true},
 		{`foreach(ps._ancestors, $proc, $proc.name in ('csrss.exe', 'services.exe', 'System') and ps.is_packaged, ps.is_packaged)`, true},
