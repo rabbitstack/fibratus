@@ -192,7 +192,7 @@ func (ps *psAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 		}
 		mods := make([]string, 0, len(ps.Modules))
 		for _, m := range ps.Modules {
-			mods = append(mods, filepath.Base(m.Name))
+			mods = append(mods, m.Name)
 		}
 		return mods, nil
 	case fields.PsUUID:

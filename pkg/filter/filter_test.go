@@ -301,7 +301,7 @@ func TestProcFilter(t *testing.T) {
 
 		{`evt.name = 'CreateProcess' and ps.name contains 'svchost'`, true},
 
-		{`ps.modules IN ('kernel32.dll')`, true},
+		{`ps.modules IN ('C:\\Windows\\System32\\kernel32.dll')`, true},
 		{`evt.name = 'CreateProcess' and evt.pid != ps.ppid`, true},
 		{`ps.parent.name = 'svchost.exe'`, true},
 
@@ -328,7 +328,7 @@ func TestProcFilter(t *testing.T) {
 		{`ps.args iintersects ('-K', 'DComLaunch')`, true},
 		{`ps.args iintersects ('-W', 'DcomLaunch')`, false},
 
-		{`foreach(ps.modules, $mod, $mod imatches 'us?r32.dll')`, true},
+		{`foreach(ps.modules, $mod, $mod imatches '?:\\*\\us?r32.dll')`, true},
 		{`foreach(ps._modules, $mod, $mod.path imatches '?:\\Windows\\System32\\us?r32.dll')`, true},
 		{`foreach(ps._modules, $mod, $mod.name imatches 'USER32.*')`, true},
 		{`foreach(ps._modules, $mod, $mod.name imatches 'USER32.*' and $mod.size >= 212354)`, true},
