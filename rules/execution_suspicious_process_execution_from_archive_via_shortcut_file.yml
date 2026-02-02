@@ -1,0 +1,52 @@
+name: Suspicious process execution from archive via shortcut file
+id: 74062a54-b886-4b90-bf33-24f2c1732f2c
+version: 1.0.0
+description: |
+  Detects suspicious process execution triggered by a shortcut (.lnk) file
+  extracted from an archive. Adversaries can employ in user-execution attacks
+  where malicious payloads are hidden inside archives and launched via decoy
+  shortcut files to evade detection.
+labels:
+  tactic.id: TA0002
+  tactic.name: Execution
+  tactic.ref: https://attack.mitre.org/tactics/TA0002/
+  technique.id: T1204
+  technique.name: User Execution
+  technique.ref: https://attack.mitre.org/techniques/T1204/
+  subtechnique.id: T1204.002
+  subtechnique.name: Malicious File
+  subtechnique.ref: https://attack.mitre.org/techniques/T1204/002/
+references:
+  - https://www.crowdstrike.com/en-us/blog/self-extracting-archives-decoy-files-and-their-hidden-payloads/
+
+condition: >
+  sequence
+  maxspan 1m30s
+  by ps.uuid
+    |create_file and
+     ((ps.name ~= 'explorer.exe' and thread.callstack.summary imatches '*|zipfldr.dll|*') or
+      ps.name iin ('WinRAR.exe', '7z.exe', '7zFM.exe')) and
+     file.path imatches '?:\\Users\\*\\AppData\\Local\\Temp\\*\\*.lnk'
+    |
+    |spawn_process and
+     ps.name iin
+              (
+                'cmd.exe',
+                'powershell.exe',
+                'pwsh.exe',
+                'mshta.exe',
+                'wscript.exe',
+                'rundll32.exe',
+                'regsvr32.exe',
+                'wmic.exe'
+              ) and
+     thread.callstack.summary imatches 'ntdll.dll|KernelBase.dll|kernel32.dll|windows.storage.dll|shell32.dll|windows.storage.dll|shell32.dll|*'
+    |
+action:
+  - name: kill
+
+output: >
+  Execution of suspicious process %2.ps.exe from shortcut file %1.file.path
+severity: high
+
+min-engine-version: 3.0.0
