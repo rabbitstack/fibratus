@@ -1,0 +1,46 @@
+name: Suspicious child spawned via reflected process
+id: 0c71dd48-d238-41bb-9c7e-9ba804e888de
+version: 1.0.0
+description: |
+  Identifies the creation of a child via the clone process by employing the
+  RtlCreateProcessReflection or RtlCloneUserProcess API.
+  This behaviour represents a potential Dirty Vanity process injection.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1055
+  technique.name: Process Injection
+  technique.ref: https://attack.mitre.org/techniques/T1055/
+references:
+  - https://unprotect.it/technique/dirty-vanity/
+  - https://github.com/deepinstinct/Dirty-Vanity
+  - https://www.deepinstinct.com/blog/dirty-vanity-a-new-approach-to-code-injection-edr-bypass
+
+condition: >
+  sequence
+  maxspan 5m
+    |spawn_process and
+     thread.callstack.symbols imatches ('ntdll.dll!RtlCreateProcessReflection', 'ntdll.dll!RtlCloneUserProcess') and
+     not
+      (
+        (ps.exe imatches ('?:\\Windows\\System32\\WerFault.exe', '?:\\Windows\\SysWOW64\\WerFault.exe') and thread.callstack.summary imatches '*faultrep.dll|wersvc.dll*') or
+        (ps.exe imatches ('?:\\Windows\\System32\\WerFault.exe', '?:\\Windows\\SysWOW64\\WerFault.exe') and thread.callstack.summary imatches '*faultrep.dll*') or
+        (ps.exe imatches '?:\\Windows\\System32\\conhost.exe' and thread.callstack.symbols imatches ('ntdll.dll!*DeviceIoControlFile*'))
+      )
+    | by ps.uuid
+    |spawn_process and
+     ps.exe not imatches
+                (
+                  '?:\\Windows\\System32\\WerFault.exe',
+                  '?:\\Windows\\SysWOW64\\WerFault.exe'
+                )
+    | by ps.parent.uuid
+action:
+  - name: kill
+
+output: >
+  Suspicious child process %2.ps.exe spawned via clone process %ps.exe
+severity: high
+
+min-engine-version: 3.0.0
