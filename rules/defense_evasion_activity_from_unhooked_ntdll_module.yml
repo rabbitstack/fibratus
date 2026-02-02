@@ -1,0 +1,58 @@
+name: Activity from unhooked NTDLL module
+id: 24f48f6c-9d97-498d-badc-65e179d19599
+version: 1.0.0
+description: |
+  Detects suspicious activity originating from an unhooked or manually mapped copy of NTDLL loaded
+  into a process. This behavior is commonly associated with defense evasion frameworks that bypass
+  user-mode API hooks implemented by security products.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1055
+  technique.name: Process Injection
+  technique.ref: https://attack.mitre.org/techniques/T1055/
+references:
+  - https://unprotect.it/technique/dll-unhooking/
+  - https://github.com/SaadAhla/ntdlll-unhooking-collection
+
+condition: >
+  sequence
+  maxspan 2m
+  by ps.uuid
+    |load_dll and
+     dll.name ~= 'ntdll.dll' and foreach(thread._callstack, $frame,
+                                         $frame.symbol imatches
+                                                (
+                                                  '?:\\Windows\\Sys*\\KernelBase.dll!MapViewOfFile*',
+                                                  '?:\\Windows\\Sys*\\ntdll.dll!*MapViewOfSection*'
+                                                )) and
+      thread.callstack.modules not imatches
+                                   (
+                                      '?:\\Program Files*\\AVG\\Antivirus\\aswhook.dll',
+                                      '?:\\Program Files\\ESET\\ESET Security\\ebehmoni.dll',
+                                      '?:\\Program Files\\ESET\\ESET Endpoint Antivirus\\ebehmoni.dll',
+                                      '?:\\Windows\\System32\\sxwmon64.dll',
+                                      '?:\\ProgramData\\Symantec\\Symantec Endpoint Protection\\*\\sysfer.dll'
+                                   ) and
+      count(ps.modules, '?:\\*ntdll.dll') >= 2 and
+      not foreach(thread._callstack, $frame, $frame.module imatches ('?:\\Windows\\Sys*\\ntdll.dll') and $frame.allocation_size > 0)
+    |
+    |((spawn_process) or
+      (load_module) or
+      (create_file) or
+      (set_thread_context) or
+      (create_remote_thread) or
+      (open_process) or
+      (open_thread) or
+      (set_value) or
+      (rename_file) or
+      (delete_file)) and
+     foreach(thread._callstack, $frame, $frame.module imatches '?:\\Windows\\Sys*\\ntdll.dll' and $frame.allocation_size > 4000)
+    |
+action:
+  - name: kill
+
+severity: high
+
+min-engine-version: 3.0.0
