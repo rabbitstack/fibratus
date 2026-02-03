@@ -1,0 +1,113 @@
+name: Process spawned from unusual directory
+id: eb51aad3-f2ce-4f5a-b8f1-4cfb8d0d141e
+version: 1.0.0
+description: |
+  Detects executions of common utilities or build tools when those binaries
+  are launched from suspicious default Windows directories. Attackers often
+  place well-known system binaries beside malicious payloads or abuse proxy
+  binaries from unexpected paths to evade defenses.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1218
+  technique.name: System Binary Proxy Execution
+  technique.ref: https://attack.mitre.org/techniques/T1218/
+
+condition: >
+  spawn_process and
+  ps.name iin
+          (
+            'rundll32.exe',
+            'regsvr32.exe',
+            'certutil.exe',
+            'mshta.exe',
+            'wmic.exe',
+            'cmstp.exe',
+            'cscript.exe',
+            'wscript.exe',
+            'msxsl.exe',
+            'RegAsm.exe',
+            'msbuild.exe',
+            'installutil.exe',
+            'csc.exe',
+            'hh.exe',
+            'jsc.exe',
+            'vbc.exe'
+          ) and
+  ps.exe imatches
+          (
+            '?:\\Windows\\Tasks\\*',
+            '?:\\Windows\\System32\\Tasks\\*',
+            '?:\\PerfLogs\\*',
+            '?:\\$Recycle.Bin\\*',
+            '?:\\ProgramData\\*',
+            '?:\\Users\\Public\\*',
+            '?:\\Users\\*\\AppData\\Roaming\\*',
+            '?:\\Users\\*\\Documents\\*',
+            '?:\\Users\\*\\Pictures\\*',
+            '?:\\Users\\*\\Music\\*',
+            '?:\\Users\\*\\Videos\\*',
+            '?:\\Windows\\AppReadiness\\*',
+            '?:\\Windows\\Prefetch\\*',
+            '?:\\Windows\\Fonts\\*',
+            '?:\\Windows\\INF\\*',
+            '?:\\Windows\\tracing\\*',
+            '?:\\Windows\\Help\\*',
+            '?:\\Windows\\csc\\*',
+            '?:\\Windows\\Web\\*',
+            '?:\\Windows\\Servicing\\*',
+            '?:\\Windows\\Boot\\*',
+            '?:\\Windows\\Resources\\*',
+            '?:\\Windows\\Provisioning\\*',
+            '?:\\Windows\\PrintDialog\\*',
+            '?:\\Windows\\SchCache\\*',
+            '?:\\Windows\\Cursors\\*',
+            '?:\\Windows\\debug\\*',
+            '?:\\Windows\\Containers\\*',
+            '?:\\Windows\\ShellComponents\\*',
+            '?:\\Windows\\ShellExperiences\\*',
+            '?:\\Windows\\Setup\\*',
+            '?:\\Windows\\Migration\\*',
+            '?:\\Windows\\PLA\\*',
+            '?:\\Windows\\Vss\\*',
+            '?:\\Windows\\WaaS\\*',
+            '?:\\Windows\\ImmersiveControlPanel\\*',
+            '?:\\Windows\\PolicyDefinitions\\*',
+            '?:\\Windows\\Globalization\\*',
+            '?:\\Windows\\appcompat\\*',
+            '?:\\Windows\\apppatch\\*',
+            '?:\\Windows\\addins\\*',
+            '?:\\Windows\\SystemTemp\\*',
+            '?:\\Windows\\WinSxS\\*',
+            '?:\\Windows\\TextInput\\*',
+            '?:\\Windows\\TAPI\\*',
+            '?:\\Windows\\Prefetch\\*',
+            '?:\\Intel\\*',
+            '?:\\AMD\\Temp\\*',
+            '?:\\Windows\\hp\\*',
+            '?:\\Windows\\RemotePackages\\*',
+            '?:\\Windows\\ServiceProfiles\\*',
+            '?:\\Windows\\dot3svc\\*',
+            '?:\\Windows\\CbsTemp\\*',
+            '?:\\Windows\\LiveKernelReports\\*',
+            '?:\\Windows\\SoftwareDistribution\\*',
+            '?:\\Windows\\ServiceState\\*',
+            '?:\\Windows\\SKB\\*',
+            '?:\\Users\\*\\AppData\\Local\\Microsoft\\Windows\\INetCache\\IE\\*'
+          ) and
+    not
+      (
+        (ps.name = 'rundll32.exe' and ps.parent.name = 'svchost.exe' and ps.parent.args iin ('LocalServiceNoNetworkFirewall')) or
+        (ps.name = 'regsvr32.exe' and ps.args imatches ('?:\\Windows\\servicing\\LCU\\Package_for_RollupFix~*')) or
+        (ps.parent.exe imatches '?:\\Windows\\system32\\CompatTelRunner.exe' and ps.parent.args imatches ('*-m:appraiser.dll')) or
+        (ps.exe imatches ('?:\\Program Files\\*\\msbuild.exe', '?:\\Program Files (x86)\\*\\msbuild.exe'))
+      )
+action:
+  - name: kill
+
+output: >
+  Process %ps.name spawned from suspicious directory %ps.exe
+severity: medium
+
+min-engine-version: 3.0.0
