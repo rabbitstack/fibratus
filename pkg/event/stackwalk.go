@@ -210,7 +210,7 @@ func (s *StackwalkDecorator) flush() []error {
 	errs := make([]error, 0)
 
 	for id, q := range s.buckets {
-		n := q[:0]
+		n := make([]*Event, 0, len(q))
 		for _, evt := range q {
 			if time.Since(evt.Timestamp) < maxQueueTTLPeriod {
 				n = append(n, evt)
@@ -230,7 +230,11 @@ func (s *StackwalkDecorator) flush() []error {
 			}
 			stackwalkFlushesEvents.Add(evt.Name, 1)
 		}
-		s.buckets[id] = n
+		if len(n) == 0 {
+			delete(s.buckets, id)
+		} else {
+			s.buckets[id] = n
+		}
 	}
 
 	return errs

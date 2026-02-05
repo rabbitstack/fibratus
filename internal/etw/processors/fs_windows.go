@@ -372,13 +372,17 @@ func (f *fsProcessor) purge() {
 
 			// evict unmatched stack traces
 			for id, q := range f.buckets {
-				s := q[:0]
+				s := make([]*event.Event, 0, len(q))
 				for _, evt := range q {
 					if time.Since(evt.Timestamp) <= time.Second*30 {
 						s = append(s, evt)
 					}
 				}
-				f.buckets[id] = s
+				if len(s) == 0 {
+					delete(f.buckets, id)
+				} else {
+					f.buckets[id] = s
+				}
 			}
 
 			f.mu.Unlock()
