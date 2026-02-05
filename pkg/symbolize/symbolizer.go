@@ -442,11 +442,24 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *event.Event) callstack.Fra
 		}
 	}
 
-	if e.PS != nil {
-		mod := e.PS.FindModuleByVa(addr)
+	ps := e.PS
+
+	// for process creation events initiated by
+	// brokered processes, obtain the real parent
+	// process state
+	if e.IsSurrogateProcess() {
+		var ok bool
+		ok, ps = s.psnap.Find(e.Params.MustGetUint32(params.ProcessRealParentID))
+		if !ok {
+			ps = e.PS
+		}
+	}
+
+	if ps != nil {
+		mod := ps.FindModuleByVa(addr)
 		// perform lookup against parent modules
-		if mod == nil && e.PS.Parent != nil {
-			mod = e.PS.Parent.FindModuleByVa(addr)
+		if mod == nil && ps.Parent != nil {
+			mod = ps.Parent.FindModuleByVa(addr)
 		}
 		if mod == nil {
 			// our last resort is to enumerate process modules
