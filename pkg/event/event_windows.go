@@ -267,6 +267,9 @@ func (e *Event) StackID() uint64 {
 // parent, not the process being created.
 func (e *Event) StackPID() uint32 {
 	if e.IsCreateProcess() {
+		if e.IsSurrogateProcess() {
+			return e.Params.MustGetUint32(params.ProcessRealParentID)
+		}
 		return e.Params.MustGetPpid()
 	}
 	return e.PID
