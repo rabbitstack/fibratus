@@ -106,6 +106,10 @@
 - macro: create_symbolic_link_object
   expr: evt.name = 'CreateSymbolicLinkObject' and evt.arg[status] = 'Success'
 
+- macro: direct_syscall
+  expr: evt.is_direct_syscall
+  description: Indicates if the event has been triggered via direct syscall.
+
 - macro: inbound_network
   expr: >
     (recv_socket or accept_socket) and

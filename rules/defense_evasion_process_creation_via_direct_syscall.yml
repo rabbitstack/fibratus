@@ -1,0 +1,29 @@
+name: Process creation via direct syscall
+id: 79627d37-0796-4fe9-afc2-06b9b41563e3
+version: 1.0.0
+description: |
+  Identifies process creation initiated via direct system call, a technique
+  commonly used by malware to bypass user-mode API hooks and evade security
+  monitoring.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1055
+  technique.name: Process Injection
+  technique.ref: https://attack.mitre.org/techniques/T1055/
+references:
+  - https://github.com/jthuraisamy/SysWhispers
+  - https://github.com/klezVirus/SysWhispers3
+
+condition: >
+  spawn_process and
+  direct_syscall and
+  (thread.callstack.summary not imatches 'unbacked|embeddedbrowserwebview.dll|unbacked' and
+   thread.callstack.modules not imatches ('?:\\Program Files*\\Microsoft\\EdgeWebView\\*\\EmbeddedBrowserWebView.dll')))
+action:
+  - name: kill
+
+severity: high
+
+min-engine-version: 3.0.0
