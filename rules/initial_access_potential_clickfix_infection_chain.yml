@@ -1,6 +1,6 @@
 name: Potential ClickFix infection chain
 id: ffe1fc54-2893-4760-ab50-51a83bd71d13
-version: 2.0.0
+version: 2.0.1
 description: |
   Identifies the execution of the process via the Run command dialog box, Windows Console shortuct, or Explorer address bar
   followed by spawning of the potential infostealer process.
@@ -36,8 +36,7 @@ condition: >
     |spawn_process and ps.exe not imatches
                               (
                                 '?:\\Program Files\\*.exe',
-                                '?:\\Program Files (x86)\\*.exe',
-                                '?:\\Windows\\System32\\*.exe'
+                                '?:\\Program Files (x86)\\*.exe'
                               )
     | by ps.parent.uuid
 action:
