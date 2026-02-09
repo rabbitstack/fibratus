@@ -1,0 +1,54 @@
+name: Suspicious virtual path redirection
+id: 71a7ba01-a7a9-428a-8704-72b200f9b43c
+version: 1.0.0
+description: |
+  Detects attempts to create files in user-writable or system-temporary locations
+  where the thread call stack shows use of APIs commonly involved in virtual-path
+  redirection / bind filter registration.
+  Attackers sometimes abuse virtual-path redirection, filter drivers, or cloud-sync
+  registration to place malicious payloads in locations that are later resolved or
+  served via trusted paths to evade detection or gain persistence.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1562
+  technique.name: Impair Defenses
+  technique.ref: https://attack.mitre.org/techniques/T1562/
+  subtechnique.id: T1562.001
+  subtechnique.name: Disable or Modify Tools
+  subtechnique.ref: https://attack.mitre.org/techniques/T1562/001
+references:
+  - https://github.com/TwoSevenOneT/EDR-Redir
+  - https://www.zerosalarium.com/2025/10/DR-Redir-Break-EDR-Via-BindLink-Cloud-Filter.html
+
+condition: >
+  create_file and
+  evt.pid != 4 and thread.callstack.symbols imatches ('ntdll.dll!*DeviceIoControlFile') and
+  thread.callstack.symbols imatches ('bindfltapi.dll!BfSetupFilter', 'cldapi.dll!CfRegisterSyncRoot') and
+  file.path imatches
+            (
+              '?:\\Users\\*\\AppData\\Local\\Temp\\*',
+              '?:\\Users\\*\\AppData\\Local\\VirtualStore\\*',
+              '?:\\Users\\*\\AppData\\Roaming\\*',
+              '?:\\Users\\Public\\*',
+              '?:\\Users\\*\\Pictures\\*',
+              '?:\\Users\\*\\Music\\*',
+              '?:\\ProgramData\\*',
+              '?:\\Windows\\Tasks\\*',
+              '?:\\Windows\\System32\\Tasks\\*',
+              '?:\\Windows\\Temp\\*',
+              '?:\\Windows\\tracing\\*',
+              '?:\\Temp\\*',
+              '?:\\Tmp\\*',
+              '?:\\PerfLogs\\*',
+              '?:\\$Recycle.Bin\\*',
+              '?:\\Intel\\*',
+              '?:\\AMD\\Temp\\*'
+            )
+
+output: >
+  Suspicious virtual path redirection mapped to %file.path by process %ps.exe
+severity: high
+
+min-engine-version: 3.0.0
