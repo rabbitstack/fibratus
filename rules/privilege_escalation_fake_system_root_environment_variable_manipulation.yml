@@ -1,0 +1,35 @@
+name: Fake system root environment variable manipulation
+id: 15613558-14cc-4d00-b13e-392df61e29c4
+version: 1.0.0
+description: |
+  Identifies attempts to manipulate user-scoped Windows directory registry values
+  to point to non-standard locations, a technique commonly abused to fake the system
+  root directory and enable privilege escalation.
+labels:
+  tactic.id: TA0004
+  tactic.name: Privilege Escalation
+  tactic.ref: https://attack.mitre.org/tactics/TA0004/
+  technique.id: T1068
+  technique.name: Exploitation for Privilege Escalation
+  technique.ref: https://attack.mitre.org/techniques/T1068/
+references:
+  - https://github.com/hfiref0x/UACME
+
+condition: >
+  set_value and
+  ps.sid != 'S-1-5-18' and
+  registry.path imatches
+                (
+                  'HKEY_CURRENT_USER\\*\\windir',
+                  'HKEY_CURRENT_USER\\*\\systemroot'
+                ) and
+  registry.data not imatches
+                (
+                  '?:\\windows',
+                  '?SystemRoot?'
+                ) and
+   registry.path not imatches 'HKEY_CURRENT_USER\\*\\SOFTWARE\\*'
+
+severity: high
+
+min-engine-version: 3.0.0
