@@ -1,0 +1,46 @@
+name: Suspicious activity from a reflected process
+id: 2c5d3663-3e76-4cba-bd72-178757112f2c
+version: 1.0.0
+description: |
+  Detects the execution of a process clone via RtlCreateProcessReflection
+  followed by network activity or loading of common networking DLLs.
+  This behaviour may indicate that an attacker is abusing process reflection
+  for shellcode injection.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1055
+  technique.name: Process Injection
+  technique.ref: https://attack.mitre.org/techniques/T1055/
+references:
+  - https://unprotect.it/technique/dirty-vanity/
+  - https://github.com/Whitecat18/Rust-for-Malware-Development/tree/main/Dirty_Vanity
+  - https://www.deepinstinct.com/blog/dirty-vanity-a-new-approach-to-code-injection-edr-bypass
+
+condition: >
+  sequence
+  maxspan 2m
+  by ps.uuid
+    |spawn_process and
+     thread.callstack.symbols imatches ('ntdll.dll!RtlCreateProcessReflection*', 'ntdll.dll!RtlCloneUserProcess*')
+    |
+    |(outbound_network) or
+     (load_dll and dll.name iin
+                            (
+                              'dnsapi.dll',
+                              'ws2_32.dll',
+                              'winhttp.dll',
+                              'bitsproxy.dll',
+                              'wininet.dll',
+                              'mswsock.dll',
+                              'iphlpapi.dll',
+                              'httpapi.dll'
+                             ))
+    |
+action:
+  - name: kill
+
+severity: high
+
+min-engine-version: 3.0.0
