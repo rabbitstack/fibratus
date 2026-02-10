@@ -447,6 +447,8 @@ const (
 	FileName Field = "file.name"
 	// FilePath represents the file full path (e.g. C:\Windows\System32\cmd.exe)
 	FilePath Field = "file.path"
+	// FilePathStem represents the full file path without extension (e.g. C:\Windows\System32\cmd)
+	FilePathStem Field = "file.path.stem"
 	// FileExtension represents the file extension (e.g. .exe or .dll)
 	FileExtension Field = "file.extension"
 	// FileOperation represents the file operation (e.g. create)
@@ -557,6 +559,8 @@ const (
 	DllSize Field = "dll.size"
 	// DllPath is the DLL full path
 	DllPath Field = "dll.path"
+	// DllPath is the DLL path stem field
+	DllPathStem Field = "dll.path.stem"
 	// DllName is the DLL name
 	DllName Field = "dll.name"
 	// DllPID is the pid of the process where the DLL was loaded
@@ -593,6 +597,8 @@ const (
 	ModuleDefaultAddress Field = "module.default_address"
 	// ModulePath is the module full path
 	ModulePath Field = "module.path"
+	// ModulePathStem is the module path stem field
+	ModulePathStem Field = "module.path.stem"
 	// ModuleName is the module name
 	ModuleName Field = "module.name"
 	// ModulePID is the pid of the process where the module was loaded
@@ -1124,6 +1130,7 @@ var fields = map[Field]FieldInfo{
 	ImageIsExecutable:        {ImageIsExecutable, "indicates if the loaded image is an executable", params.Bool, []string{"image.is_exec'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleIsExecutable}}, nil},
 	ImageIsDotnet:            {ImageIsDotnet, "indicates if the loaded image is a .NET assembly", params.Bool, []string{"image.is_dotnet'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleIsDotnet}}, nil},
 	ModulePath:               {ModulePath, "full module path", params.UnicodeString, []string{"module.path = 'C:\\Windows\\System32\\advapi32.dll'"}, nil, nil},
+	ModulePathStem:           {ModulePathStem, "module path stem", params.UnicodeString, []string{"module.path.stem = 'C:\\Windows\\System32\\advapi32'"}, nil, nil},
 	ModuleName:               {ModuleName, "module name", params.UnicodeString, []string{"module.name = 'advapi32.dll'"}, nil, nil},
 	ModuleBase:               {ModuleBase, "the base address of process in which the module is loaded", params.Address, []string{"module.base.address = 'a65d800000'"}, nil, nil},
 	ModuleChecksum:           {ModuleChecksum, "module checksum", params.Uint32, []string{"module.checksum = 746424"}, nil, nil},
@@ -1146,6 +1153,7 @@ var fields = map[Field]FieldInfo{
 	ModuleIsExecutable:       {ModuleIsExecutable, "indicates if the loaded module is an executable", params.Bool, []string{"module.is_exec'"}, nil, nil},
 	ModuleIsDotnet:           {ModuleIsDotnet, "indicates if the loaded module is a .NET assembly", params.Bool, []string{"module.pe.is_dotnet'"}, nil, nil},
 	DllPath:                  {DllPath, "full dll path", params.UnicodeString, []string{"dll.path = 'C:\\Windows\\System32\\advapi32.dll'"}, nil, nil},
+	DllPathStem:              {DllPathStem, "dll path stem", params.UnicodeString, []string{"dll.path.stem = 'C:\\Windows\\System32\\advapi32'"}, nil, nil},
 	DllName:                  {DllName, "module name", params.UnicodeString, []string{"dll.name = 'advapi32.dll'"}, nil, nil},
 	DllBase:                  {DllBase, "the base address of process in which the DLL is loaded", params.Address, []string{"dll.base = 'a65d800000'"}, nil, nil},
 	DllSize:                  {DllSize, "dll virtual mapped size", params.Uint32, []string{"dll.size > 1024"}, nil, nil},
@@ -1163,6 +1171,7 @@ var fields = map[Field]FieldInfo{
 
 	FileObject:                      {FileObject, "file object address", params.Uint64, []string{"file.object = 18446738026482168384"}, nil, nil},
 	FilePath:                        {FilePath, "full file path", params.UnicodeString, []string{"file.path = 'C:\\Windows\\System32'"}, nil, nil},
+	FilePathStem:                    {FilePathStem, "full file path without extension", params.UnicodeString, []string{"file.path.stem = 'C:\\Windows\\System32\\cmd'"}, nil, nil},
 	FileName:                        {FileName, "full file name", params.UnicodeString, []string{"file.name contains 'mimikatz'"}, nil, nil},
 	FileOperation:                   {FileOperation, "file operation", params.AnsiString, []string{"file.operation = 'open'"}, nil, nil},
 	FileShareMask:                   {FileShareMask, "file share mask", params.AnsiString, []string{"file.share.mask = 'rw-'"}, nil, nil},
