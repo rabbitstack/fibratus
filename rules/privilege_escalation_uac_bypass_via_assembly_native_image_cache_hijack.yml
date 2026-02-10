@@ -1,0 +1,43 @@
+name: UAC bypass via assembly Native Image Cache hijack
+id: d10685d9-675c-4888-a246-85758e4c4515
+version: 1.0.0
+description: |
+  Detects attempts to bypass User Account Control (UAC) by hijacking the
+  .NET Native Image Cache (NativeImages) through unauthorized assembly
+  creation followed by execution of a high-integrity process.
+labels:
+  tactic.id: TA0004
+  tactic.name: Privilege Escalation
+  tactic.ref: https://attack.mitre.org/tactics/TA0004/
+  technique.id: T1548
+  technique.name: Abuse Elevation Control Mechanism
+  technique.ref: https://attack.mitre.org/techniques/T1548/
+  subtechnique.id: T1548.002
+  subtechnique.name: Bypass User Account Control
+  subtechnique.ref: https://attack.mitre.org/techniques/T1548/002/
+references:
+  - https://github.com/hfiref0x/UACME
+
+condition: >
+  sequence
+  maxspan 1m
+    |create_file and
+     evt.pid != 4 and ps.sid != 'S-1-5-18' and
+     file.path imatches '?:\\WINDOWS\\assembly\\NativeImages_*\\*.dll' and
+     ps.exe not imatches
+                (
+                  '?:\\Windows\\Microsoft.NET\\Framework\\*\\ngen.exe',
+                  '?:\\Windows\\Microsoft.NET\\Framework64\\*\\ngen.exe',
+                  '?:\\Windows\\Microsoft.NET\\Framework\\*\\mscorsvw.exe',
+                  '?:\\Windows\\Microsoft.NET\\Framework64\\*\\mscorsvw.exe',
+                  '?:\\Windows\\servicing\\TrustedInstaller.exe'
+                )
+    | as e1
+    |spawn_process and
+     ps.token.integrity_level = 'HIGH' and
+     thread.callstack.summary imatches concat('ntdll.dll|KernelBase.dll|*', $e1.file.name, '|*')
+    |
+
+severity: high
+
+min-engine-version: 3.0.0
