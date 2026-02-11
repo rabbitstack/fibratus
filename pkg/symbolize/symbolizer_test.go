@@ -270,8 +270,9 @@ func TestProcessCallstack(t *testing.T) {
 		Category:  event.Process,
 		Host:      "archrabbit",
 		Params: event.Params{
-			params.ProcessParentID: {Name: params.ProcessParentID, Type: params.PID, Value: (uint32(os.Getpid()))},
-			params.Callstack:       {Name: params.Callstack, Type: params.Slice, Value: []va.Address{0x7ffb5c1d0396, 0x7ffb5d8e61f4, 0x7ffb3138592e, 0x7ffb313853b2, 0x2638e59e0a5}},
+			params.ProcessParentID:     {Name: params.ProcessParentID, Type: params.PID, Value: (uint32(os.Getpid()))},
+			params.ProcessRealParentID: {Name: params.ProcessRealParentID, Type: params.PID, Value: (uint32(os.Getpid()))},
+			params.Callstack:           {Name: params.Callstack, Type: params.Slice, Value: []va.Address{0x7ffb5c1d0396, 0x7ffb5d8e61f4, 0x7ffb3138592e, 0x7ffb313853b2, 0x2638e59e0a5}},
 		},
 		PS: proc,
 	}
@@ -443,8 +444,9 @@ func TestProcessCallstackProcsTTL(t *testing.T) {
 			Category:  event.Process,
 			Host:      "archrabbit",
 			Params: event.Params{
-				params.ProcessParentID: {Name: params.ProcessParentID, Type: params.PID, Value: (uint32(os.Getpid()))},
-				params.Callstack:       {Name: params.Callstack, Type: params.Slice, Value: []va.Address{0x7ffb5c1d0396, 0x7ffb5d8e61f4, 0x7ffb3138592e, 0x7ffb313853b2, 0x2638e59e0a5}},
+				params.ProcessParentID:     {Name: params.ProcessParentID, Type: params.PID, Value: (uint32(os.Getpid()))},
+				params.ProcessRealParentID: {Name: params.ProcessRealParentID, Type: params.PID, Value: (uint32(os.Getpid()))},
+				params.Callstack:           {Name: params.Callstack, Type: params.Slice, Value: []va.Address{0x7ffb5c1d0396, 0x7ffb5d8e61f4, 0x7ffb3138592e, 0x7ffb313853b2, 0x2638e59e0a5}},
 			},
 		}
 		_, _ = s.ProcessEvent(e)
