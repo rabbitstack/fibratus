@@ -37,6 +37,9 @@
 - macro: set_file_information
   expr: evt.name = 'SetFileInformation'
 
+- macro: move_file
+  expr: evt.name = 'CreateFile' and thread.callstack.symbols imatches ('KernelBase.dll!MoveFile*')
+
 - macro: query_registry
   expr: evt.name in ('RegQueryKey', 'RegQueryValue') and registry.status = 'Success'
 
