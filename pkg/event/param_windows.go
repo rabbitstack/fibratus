@@ -540,11 +540,40 @@ func (e *Event) produceParams(evt *etw.EventRecord) {
 			case registry.BINARY:
 				e.AppendParam(params.RegData, params.Binary, b)
 			case registry.DWORD:
-				e.AppendParam(params.RegData, params.Uint32, binary.LittleEndian.Uint32(b))
+				var v uint32
+				switch len(b) {
+				case 4:
+					v = binary.LittleEndian.Uint32(b)
+				case 2:
+					v = uint32(binary.LittleEndian.Uint16(b))
+				case 1:
+					v = uint32(b[0])
+				}
+				e.AppendParam(params.RegData, params.Uint32, v)
 			case registry.DWORD_BIG_ENDIAN:
-				e.AppendParam(params.RegData, params.Uint32, binary.BigEndian.Uint32(b))
+				var v uint32
+				switch len(b) {
+				case 4:
+					v = binary.BigEndian.Uint32(b)
+				case 2:
+					v = uint32(binary.BigEndian.Uint16(b))
+				case 1:
+					v = uint32(b[0])
+				}
+				e.AppendParam(params.RegData, params.Uint32, v)
 			case registry.QWORD:
-				e.AppendParam(params.RegData, params.Uint64, binary.LittleEndian.Uint64(b))
+				var v uint64
+				switch len(b) {
+				case 8:
+					v = binary.LittleEndian.Uint64(b)
+				case 4:
+					v = uint64(binary.LittleEndian.Uint32(b))
+				case 2:
+					v = uint64(binary.LittleEndian.Uint16(b))
+				case 1:
+					v = uint64(b[0])
+				}
+				e.AppendParam(params.RegData, params.Uint64, v)
 			}
 		}
 	case CreateFile:
