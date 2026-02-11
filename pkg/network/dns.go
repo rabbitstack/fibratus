@@ -19,6 +19,7 @@
 package network
 
 import (
+	"context"
 	"errors"
 	"expvar"
 	"net"
@@ -119,7 +120,9 @@ func (r *ReverseDNS) Add(addr Address) ([]string, error) {
 
 	now := time.Now()
 	exp := now.Add(r.ttl).UnixNano()
-	names, err := net.LookupAddr(addr.ToIPString())
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+	names, err := net.DefaultResolver.LookupAddr(ctx, addr.ToIPString())
 	if err != nil {
 		r.blacklist[addr]++
 		failedDNSLookups.Add(addr.ToIPString(), 1)

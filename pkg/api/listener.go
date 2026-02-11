@@ -24,9 +24,10 @@ package api
 import (
 	"context"
 	"fmt"
-	"github.com/Microsoft/go-winio"
 	"net"
 	"strings"
+
+	"github.com/Microsoft/go-winio"
 )
 
 // MakePipeListener produces a new listener for receiving requests over a named pipe.
@@ -41,6 +42,7 @@ func MakePipeListener(pipePath, descriptor string) (net.Listener, error) {
 
 // makeTCPListener produces a new listener for receiving requests over TCP.
 func makeTCPListener(addr string) (net.Listener, error) {
+	//nolint:noctx
 	return net.Listen("tcp", addr)
 }
 
