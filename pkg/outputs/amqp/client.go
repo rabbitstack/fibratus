@@ -21,12 +21,13 @@ package amqp
 import (
 	"expvar"
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/util/tls"
-	log "github.com/sirupsen/logrus"
-	"github.com/streadway/amqp"
 	"net"
 	"sync"
 	"time"
+
+	"github.com/rabbitstack/fibratus/pkg/util/tls"
+	log "github.com/sirupsen/logrus"
+	"github.com/streadway/amqp"
 )
 
 var (
@@ -55,6 +56,7 @@ func (c *client) connect(healthcheck bool) error {
 	amqpConfig := amqp.Config{
 		Vhost: c.config.Vhost,
 		Dial: func(network, addr string) (net.Conn, error) {
+			//nolint:noctx
 			return net.DialTimeout(network, addr, c.config.Timeout)
 		},
 		SASL: c.config.auth(),
