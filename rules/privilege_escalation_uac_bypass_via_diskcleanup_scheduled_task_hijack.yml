@@ -1,0 +1,42 @@
+name: UAC bypass via DiskCleanup scheduled task hijack
+id: 683b0f04-15ab-4b89-8c4d-ee2077937c4e
+version: 1.0.0
+description: |
+  Detects attempts to bypass User Account Control (UAC) by abusing the built-in
+  Windows Disk Cleanup scheduled task as a privilege escalation vector.
+  Adversaries commonly abuse trusted, auto-elevated Windows components to evade
+  UAC prompts and silently obtain high-integrity execution without requiring explicit
+  user consent.
+labels:
+  tactic.id: TA0004
+  tactic.name: Privilege Escalation
+  tactic.ref: https://attack.mitre.org/tactics/TA0004/
+  technique.id: T1548
+  technique.name: Abuse Elevation Control Mechanism
+  technique.ref: https://attack.mitre.org/techniques/T1548/
+  subtechnique.id: T1548.002
+  subtechnique.name: Bypass User Account Control
+  subtechnique.ref: https://attack.mitre.org/techniques/T1548/002/
+references:
+  - https://github.com/hfiref0x/UACME
+  - https://enigma0x3.net/2016/07/22/bypassing-uac-on-windows-10-using-disk-cleanup/
+
+condition: >
+  spawn_process and
+  ps.token.integrity_level = 'HIGH' and
+  ps.cmdline imatches '*cleanmgr.exe*' and
+  thread.callstack.summary imatches 'ntdll.dll|KernelBase.dll|kernel32.dll|ubpm.dll|*' and
+  ps.exe not imatches
+            (
+              '?:\\Windows\\System32\\cleanmgr.exe',
+              '?:\\Windows\\SysWOW64\\cleanmgr.exe',
+              '?:\\Windows\\System32\\taskhostw.exe',
+              '?:\\Windows\\System32\\taskhost.exe',
+              '?:\\Windows\\SysWOW64\\taskhost.exe'
+            )
+action:
+ - name: kill
+
+severity: high
+
+min-engine-version: 3.0.0
