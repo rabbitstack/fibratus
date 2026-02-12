@@ -505,8 +505,9 @@ func (s *sequenceState) runSequence(e *event.Event) bool {
 
 		// if both the terminal state is reached and the partials
 		// in the sequence state could be joined by the specified
-		// field(s), the rule has matched successfully, and we can
-		// collect all events involved in the rule match
+		// field(s) or the sequence is unconstrained, the rule has
+		// matched successfully, and we can collect all events involved
+		// in the rule match
 		isTerminal := s.isTerminalState()
 		if isTerminal {
 			setMatch := func(seqID int, e *event.Event) {
@@ -521,7 +522,11 @@ func (s *sequenceState) runSequence(e *event.Event) bool {
 			for seqID := 0; seqID < len(s.partials); seqID++ {
 				for _, outer := range s.partials[seqID] {
 					for _, inner := range s.partials[seqID+1] {
-						if filter.CompareSeqLinks(outer.SequenceLinks(), inner.SequenceLinks()) {
+						switch {
+						case filter.CompareSeqLinks(outer.SequenceLinks(), inner.SequenceLinks()):
+							setMatch(seqID, outer)
+							setMatch(seqID+1, inner)
+						case !s.seq.IsConstrained() && !outer.ContainsMeta(event.RuleSequenceLinks) && !inner.ContainsMeta(event.RuleSequenceLinks):
 							setMatch(seqID, outer)
 							setMatch(seqID+1, inner)
 						}

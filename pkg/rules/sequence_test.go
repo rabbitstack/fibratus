@@ -373,6 +373,93 @@ func TestSimpleSequenceMultiplePartials(t *testing.T) {
 	assert.Equal(t, "C:\\Temp\\file.tmp", ss.matches[1].GetParamAsString(params.FilePath))
 }
 
+func TestUnconstrainedSequenceMatches(t *testing.T) {
+	log.SetLevel(log.DebugLevel)
+
+	c := &config.FilterConfig{Name: "Command shell created a temp file"}
+	f := filter.New(`
+	sequence
+  maxspan 200ms
+    |evt.name = 'CreateProcess' and ps.name = 'cmd.exe'|
+    |evt.name = 'CreateFile' and file.path icontains 'temp'|
+	`, &config.Config{EventSource: config.EventSourceConfig{EnableFileIOEvents: true}, Filters: &config.Filters{}})
+	require.NoError(t, f.Compile())
+
+	ss := newSequenceState(f, c, new(ps.SnapshotterMock))
+
+	e1 := &event.Event{
+		Seq:       20,
+		Type:      event.CreateProcess,
+		Timestamp: time.Now().Add(time.Second),
+		Name:      "CreateProcess",
+		Tid:       2484,
+		PID:       859,
+		PS: &pstypes.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\System32\\cmd.exe",
+			PID:  859,
+			Parent: &pstypes.PS{
+				Name: "WmiPrvSE.exe",
+			},
+		},
+		Params: event.Params{
+			params.ProcessID: {Name: params.ProcessID, Type: params.PID, Value: uint32(859)},
+		},
+		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+	}
+	e2 := &event.Event{
+		Seq:       21,
+		Type:      event.CreateProcess,
+		Timestamp: time.Now().Add(time.Second),
+		Name:      "CreateProcess",
+		Tid:       2484,
+		PID:       1859,
+		PS: &pstypes.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\System32\\cmd.exe",
+			PID:  1859,
+			Parent: &pstypes.PS{
+				Name: "svchost.exe",
+			},
+		},
+		Params: event.Params{
+			params.ProcessID: {Name: params.ProcessID, Type: params.PID, Value: uint32(859)},
+		},
+		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+	}
+	e3 := &event.Event{
+		Type:      event.CreateFile,
+		Seq:       25,
+		Timestamp: time.Now().Add(time.Second * time.Duration(2)),
+		Name:      "CreateFile",
+		Tid:       2484,
+		PID:       3859,
+		Category:  event.File,
+		PS: &pstypes.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\cmd.exe",
+			PID:  3859,
+		},
+		Params: event.Params{
+			params.FilePath: {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Temp\\file.tmp"},
+		},
+		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
+	}
+
+	require.False(t, ss.runSequence(e1))
+	require.False(t, ss.runSequence(e2))
+	assert.Len(t, ss.partials[0], 2)
+	assert.Len(t, ss.partials[1], 0)
+	require.True(t, ss.runSequence(e3))
+	assert.Len(t, ss.partials[1], 1)
+
+	require.Len(t, ss.matches, 2)
+	assert.Equal(t, uint32(859), ss.matches[0].PID)
+	assert.Equal(t, "WmiPrvSE.exe", ss.matches[0].PS.Parent.Name)
+	assert.Equal(t, uint32(3859), ss.matches[1].PID)
+	assert.Equal(t, "C:\\Temp\\file.tmp", ss.matches[1].GetParamAsString(params.FilePath))
+}
+
 func TestSimpleSequenceDeadline(t *testing.T) {
 	log.SetLevel(log.DebugLevel)
 
