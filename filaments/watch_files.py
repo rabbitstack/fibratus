@@ -30,9 +30,9 @@ def on_init():
 
 @dotdictify
 def on_next_event(event):
-    file_name = event.params.file_name
-    if file_name:
-        __files__.append((event.exe, file_name, ))
+    file_path = event.params.file_path
+    if file_path:
+        __files__.append((event.exe, file_path, ))
         for f in __files__:
             add_row([f[0], f[1]])
         render_table()
