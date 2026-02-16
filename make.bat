@@ -116,6 +116,7 @@ echo Copying artifacts...
 :: Copy artifacts
 copy /y ".\cmd\fibratus\fibratus.exe" "%RELEASE_DIR%\Bin"
 copy /y ".\cmd\systray\fibratus-systray.exe" "%RELEASE_DIR%\Bin"
+copy /y ".\cmd\fibratus\fibratus.ico" "%RELEASE_DIR%\Bin"
 copy /y ".\configs\fibratus.yml" "%RELEASE_DIR%\Config\fibratus.yml"
 copy /y ".\pkg\outputs\eventlog\mc\fibratus.dll" "%RELEASE_DIR%\fibratus.dll"
 
@@ -175,6 +176,7 @@ echo Copying artifacts...
 :: Copy artifacts
 copy /y ".\cmd\fibratus\fibratus.exe" "%RELEASE_DIR%\Bin"
 copy /y ".\cmd\systray\fibratus-systray.exe" "%RELEASE_DIR%\Bin"
+copy /y ".\cmd\fibratus\fibratus.ico" "%RELEASE_DIR%\Bin"
 copy /y ".\configs\fibratus.yml" "%RELEASE_DIR%\Config\fibratus.yml"
 copy /y ".\pkg\outputs\eventlog\mc\fibratus.dll" "%RELEASE_DIR%\fibratus.dll"
 
