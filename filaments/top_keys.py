@@ -34,7 +34,7 @@ def on_init():
 
 @dotdictify
 def on_next_event(event):
-    key = event.params.key_name
+    key = event.params.key_path
     if key:
         __keys__.update((key, ))
 
