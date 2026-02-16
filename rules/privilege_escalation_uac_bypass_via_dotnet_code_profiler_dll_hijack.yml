@@ -1,0 +1,44 @@
+name: UAC bypass via .NET Code Profiler DLL Hijack
+id: 554f1b0d-c317-4cf0-aaac-d29d6e046b0c
+version: 1.0.0
+description: |
+  Identifies potential User Account Control (UAC) bypass activity leveraging
+  the .NET Code Profiler mechanism to achieve elevated code execution through
+  DLL hijacking. Attackers may attempt to load arbitrary profiler libraries
+  into high-integrity processes.
+labels:
+  tactic.id: TA0004
+  tactic.name: Privilege Escalation
+  tactic.ref: https://attack.mitre.org/tactics/TA0004/
+  technique.id: T1548
+  technique.name: Abuse Elevation Control Mechanism
+  technique.ref: https://attack.mitre.org/techniques/T1548/
+  subtechnique.id: T1548.002
+  subtechnique.name: Bypass User Account Control
+  subtechnique.ref: https://attack.mitre.org/techniques/T1548/002/
+references:
+  - https://github.com/hfiref0x/UACME
+  - https://github.com/djhohnstein/.NET-Profiler-DLL-Hijack
+
+condition: >
+  sequence
+  maxspan 2m
+    |set_value and
+     registry.data imatches '?:\\*.dll' and
+     registry.path ~= 'HKEY_CURRENT_USER\\Environment\\COR_PROFILER_PATH'
+    | as e1
+    |spawn_process and
+     ps.token.integrity_level = 'HIGH' and
+     thread.callstack.summary imatches concat('ntdll.dll|KernelBase.dll|advapi32.dll|', base($e1.registry.data), '|*') and
+     ps.exe not imatches
+                (
+                  '?:\\Windows\\System32\\WerFault.exe',
+                  '?:\\Windows\\SysWOW64\\WerFault.exe'
+                )
+    |
+action:
+  - name: kill
+
+severity: high
+
+min-engine-version: 3.0.0
