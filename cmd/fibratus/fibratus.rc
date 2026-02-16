@@ -25,7 +25,7 @@ BEGIN
             VALUE "FileDescription", "Adversary tradecraft detection, protection, and hunting"
             VALUE "FileVersion", FILE_VERSION_STRING
             VALUE "InternalName", "fibratus"
-            VALUE "LegalCopyright", "Copyright (C) 2019-2024"
+            VALUE "LegalCopyright", "Copyright (C) 2019-2026"
             VALUE "OriginalFilename", "fibratus.exe"
             VALUE "ProductName", "Fibratus"
             VALUE "ProductVersion", FILE_VERSION_STRING
