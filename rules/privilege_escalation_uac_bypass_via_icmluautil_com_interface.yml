@@ -1,0 +1,44 @@
+name: UAC bypass via ICMLuaUtil COM interface
+id: e6acb300-4c0b-4463-a48c-f6abc55cb079
+version: 1.0.0
+description: |
+  Identifies potential User Account Control (UAC) bypass activity through abuse
+  of the ICMLuaUtil Component Object Model (COM) interface. ICMLuaUtil is an
+  internal Windows COM interface associated with system configuration and
+  elevation-related operations. Because it is registered as an auto-elevated COM
+  object, adversaries can be weaponize it in a manner that results in elevated
+  execution without triggering a standard UAC consent prompt.
+labels:
+  tactic.id: TA0004
+  tactic.name: Privilege Escalation
+  tactic.ref: https://attack.mitre.org/tactics/TA0004/
+  technique.id: T1548
+  technique.name: Abuse Elevation Control Mechanism
+  technique.ref: https://attack.mitre.org/techniques/T1548/
+  subtechnique.id: T1548.002
+  subtechnique.name: Bypass User Account Control
+  subtechnique.ref: https://attack.mitre.org/techniques/T1548/002/
+references:
+  - https://github.com/hfiref0x/UACME
+  - https://gist.github.com/gavz/afa005dd63044c6974c56fb33fd66475
+  - https://www.linkedin.com/posts/m-hassoub_eventsimplename-threathunting-uacbypass-activity-7418649556999118848-Cuvd
+
+condition: >
+  spawn_process and
+  ps.parent.name ~= 'dllhost.exe' and ps.token.integrity_level = 'HIGH' and
+  ps.parent.cmdline imatches
+            (
+              '*D2E7041B-2927-42FB-8E9F-7CE93B6DC937*',
+              '*3E5FC7F9-9A51-4367-9063-A120244FBEC7*'
+            ) and
+  ps.exe not imatches
+            (
+              '?:\\Windows\\System32\\WerFault.exe',
+              '?:\\Windows\\SysWOW64\\WerFault.exe'
+            )
+action:
+  - name: kill
+
+severity: high
+
+min-engine-version: 3.0.0
