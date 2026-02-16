@@ -1,6 +1,6 @@
 name: Network connection via startup folder executable or script
 id: 09b7278d-42e3-4792-9f00-dee38baecfad
-version: 1.0.5
+version: 1.1.0
 description: |
   Identifies the execution of unsigned binary or script from the
   Startup folder followed by network inbound or outbound connection.
@@ -22,6 +22,10 @@ condition: >
     |(load_untrusted_executable and module.path imatches startup_locations) or
      (load_executable and ps.name in script_interpreters and ps.cmdline imatches startup_locations)
     |
-    |((inbound_network) or (outbound_network)) and ps.cmdline imatches startup_locations|
+    |connect_socket and
+     ps.cmdline imatches startup_locations and
+     net.dip != 0.0.0.0 and net.dip not in ('0:0:0:0:0:0:0:1', '::1') and
+     not cidr_contains(net.dip, '127.0.0.0/8', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16')
+    |
 
 min-engine-version: 3.0.0
