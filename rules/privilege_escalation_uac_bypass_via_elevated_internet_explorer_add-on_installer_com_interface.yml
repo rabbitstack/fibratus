@@ -1,0 +1,31 @@
+name: UAC bypass via elevated Internet Explorer add-on installer COM interface
+id: 340b09e5-6149-4655-998c-1c2fe0041576
+version: 1.0.0
+description: |
+  Identifies potential User Account Control (UAC) bypass activity involving the
+  elevated Internet Explorer add-on installation mechanism exposed through a
+  COM interface. Adversaries can take advantage of scenarios in which legacy
+  Internet Explorer components are abused to execute code with high integrity
+  outside of standard user consent flows.
+labels:
+  tactic.id: TA0004
+  tactic.name: Privilege Escalation
+  tactic.ref: https://attack.mitre.org/tactics/TA0004/
+  technique.id: T1548
+  technique.name: Abuse Elevation Control Mechanism
+  technique.ref: https://attack.mitre.org/techniques/T1548/
+  subtechnique.id: T1548.002
+  subtechnique.name: Bypass User Account Control
+  subtechnique.ref: https://attack.mitre.org/techniques/T1548/002/
+references:
+  - https://github.com/hfiref0x/UACME
+
+condition: >
+  spawn_process and
+  ps.token.integrity_level = 'HIGH' and
+  ps.exe imatches '?:\\*\\AppData\\*\\Temp\\IDC*.tmp\\*.exe' and
+  thread.callstack.summary imatches 'ntdll.dll|KernelBase.dll|kernel32.dll|IEAdvpack.dll|ieinstal.exe|rpcrt?.dll|*'
+
+severity: high
+
+min-engine-version: 3.0.0
