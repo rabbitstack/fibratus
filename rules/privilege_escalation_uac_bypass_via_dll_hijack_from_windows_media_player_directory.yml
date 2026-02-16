@@ -1,0 +1,37 @@
+name: UAC bypass via DLL hijack from Windows Media player directory
+id: a76ea056-a143-454a-8a7e-bffe22604b51
+version: 1.0.0
+description: |
+  Identifies potential User Account Control (UAC) bypass activity through DLL hijacking
+  involving components loaded from the Windows Media Player installation directory.
+  Adversaries may leverage trusted Windows Media Player binaries or their associated
+  dynamic-link libraries to execute arbitrary code with elevated context.
+labels:
+  tactic.id: TA0004
+  tactic.name: Privilege Escalation
+  tactic.ref: https://attack.mitre.org/tactics/TA0004/
+  technique.id: T1548
+  technique.name: Abuse Elevation Control Mechanism
+  technique.ref: https://attack.mitre.org/techniques/T1548/
+  subtechnique.id: T1548.002
+  subtechnique.name: Bypass User Account Control
+  subtechnique.ref: https://attack.mitre.org/techniques/T1548/002/
+
+condition: >
+  spawn_process and
+  ps.token.integrity_level = 'HIGH' and
+  ps.exe not imatches
+            (
+              '?:\\Windows\\System32\\svchost.exe',
+              '?:\\Program Files\\Windows Media Player\\wmplayer.exe',
+              '?:\\Program Files (x86)\\Windows Media Player\\wmplayer.exe'
+            ) and
+  thread.callstack.modules imatches
+            (
+              '?:\\Program Files\\Windows Media Player\\*.dll',
+              '?:\\Program Files (x86)\\Windows Media Player\\*.dll'
+            )
+
+severity: high
+
+min-engine-version: 3.0.0
