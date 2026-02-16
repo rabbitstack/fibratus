@@ -1,6 +1,8 @@
 #include "version.h"
 #define RT_MANIFEST 24
 
+IDI_APP_ICON ICON "fibratus.ico"
+
 #define VS_VERSION_INFO 1
 VS_VERSION_INFO VERSIONINFO
  FILEVERSION RC_FILE_VERSION
