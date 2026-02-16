@@ -49,7 +49,8 @@ const (
 )
 
 var (
-	className = windows.StringToUTF16Ptr("fibratus")
+	className  = windows.StringToUTF16Ptr("fibratus")
+	alertTitle = "Malicious Activity Detected"
 )
 
 // Msg represents the data exchanged between systray client/server.
@@ -221,13 +222,7 @@ func (s *Systray) handleMessage(m Msg) error {
 			logrus.Errorf("unable to decode alert: %v", err)
 			return err
 		}
-		text := alert.Text
-		// the balloon notification fails
-		// to show up if the text is empty
-		if text == "" {
-			text = " "
-		}
-		return s.systrayIcon.ShowBalloonNotification(alert.Title, text, s.config.Sound, s.config.QuietMode)
+		return s.systrayIcon.ShowBalloonNotification(alertTitle, alert.Title, s.config.Sound, s.config.QuietMode)
 	}
 	return nil
 }
