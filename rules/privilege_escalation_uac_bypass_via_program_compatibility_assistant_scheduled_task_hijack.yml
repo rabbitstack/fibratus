@@ -1,0 +1,31 @@
+name: UAC bypass via Program Compatibility Assistant scheduled task hijack
+id: 73de8712-f3a7-483e-b15f-6cc29c415511
+version: 1.0.0
+description: |
+  Detects attempts to bypass User Account Control (UAC) by abusing the
+  Program Compatibility Assistant (PCA) scheduled task to achieve unauthorized
+  privilege escalation. Adversaries can leverage a trusted Windows component and
+  its associated task execution context to spawn elevated processes without triggering
+  standard UAC consent prompts.
+labels:
+  tactic.id: TA0004
+  tactic.name: Privilege Escalation
+  tactic.ref: https://attack.mitre.org/tactics/TA0004/
+  technique.id: T1548
+  technique.name: Abuse Elevation Control Mechanism
+  technique.ref: https://attack.mitre.org/techniques/T1548/
+  subtechnique.id: T1548.002
+  subtechnique.name: Bypass User Account Control
+  subtechnique.ref: https://attack.mitre.org/techniques/T1548/002/
+references:
+  - https://github.com/hfiref0x/UACME
+
+condition: >
+  spawn_process and
+  ps.parent.name ~= 'taskhostw.exe' and ps.token.integrity_level = 'HIGH' and
+  thread.callstack.summary imatches 'ntdll.dll|KernelBase.dll|kernel32.dll|pcadm.dll|ntdll.dll|KernelBase.dll|wdi.dll|*' and
+  not foreach(thread._callstack, $frame, $frame.module imatches '?:\\Windows\\System32\\pcadm.dll')
+
+severity: high
+
+min-engine-version: 3.0.0
