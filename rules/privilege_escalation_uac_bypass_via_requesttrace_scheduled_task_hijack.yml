@@ -1,0 +1,33 @@
+name: UAC bypass via RequestTrace scheduled task hijack
+id: ba86dd4c-e4a9-4b67-94d5-fdea513f1f1a
+version: 1.0.0
+description: |
+  Identifies attempts to bypass User Account Control (UAC) by abusing
+  the RequestTrace scheduled task, a lesser-known but powerful auto-elevated
+  Windows mechanism that can be repurposed by attackers to gain administrative-level
+  execution without user consent.
+  RequestTrace scheduled task can be started by pressing SHIFT+CTRL+WIN+T opening a
+  stealthy attack vector for adversaries.
+labels:
+  tactic.id: TA0004
+  tactic.name: Privilege Escalation
+  tactic.ref: https://attack.mitre.org/tactics/TA0004/
+  technique.id: T1548
+  technique.name: Abuse Elevation Control Mechanism
+  technique.ref: https://attack.mitre.org/techniques/T1548/
+  subtechnique.id: T1548.002
+  subtechnique.name: Bypass User Account Control
+  subtechnique.ref: https://attack.mitre.org/techniques/T1548/002/
+references:
+  - https://github.com/hfiref0x/UACME
+  - https://github.com/R41N3RZUF477/RequestTrace_UAC_Bypass
+
+condition: >
+  spawn_process and
+  ps.parent.name ~= 'taskhostw.exe' and ps.token.integrity_level = 'HIGH' and
+  thread.callstack.summary imatches 'ntdll.dll|KernelBase.dll|*PerformanceTraceHandler.dll*' and
+  not foreach(thread._callstack, $frame, $frame.module imatches '?:\\Windows\\System32\\PerformanceTraceHandler.dll')
+
+severity: high
+
+min-engine-version: 3.0.0
