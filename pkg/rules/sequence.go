@@ -116,6 +116,10 @@ type sequenceState struct {
 	// smu guards the states map
 	smu sync.RWMutex
 
+	// lastMatch is the timestamp of the last matched event.
+	// The purpose is to enforce temporal monotonicity
+	lastMatch time.Time
+
 	psnap ps.Snapshotter
 }
 
@@ -370,6 +374,7 @@ func (s *sequenceState) clear() {
 	s.spanDeadlines = make(map[fsm.State]*time.Timer)
 	s.isPartialsBreached.Store(false)
 	partialsPerSequence.Delete(s.name)
+	s.lastMatch = time.Time{}
 }
 
 func (s *sequenceState) clearLocked() {
@@ -391,15 +396,17 @@ func (s *sequenceState) next(seqID int) bool {
 	if seqID == 0 {
 		return true
 	}
+
 	var next bool
 	s.smu.RLock()
 	defer s.smu.RUnlock()
-	for n := 0; n < seqID; n++ {
+	for n := range seqID {
 		next = s.states[n]
 		if !next {
 			break
 		}
 	}
+
 	return next && !s.inDeadline.Load() && !s.inExpired.Load()
 }
 
@@ -454,53 +461,59 @@ func (s *sequenceState) runSequence(e *event.Event) bool {
 			continue
 		}
 
-		// prevent running the filter if the expression
-		// can't be matched against the current event
-		if !expr.IsEvaluable(e) {
+		s.mu.RLock()
+		matches := expr.IsEvaluable(e) && s.filter.RunSequence(e, i, s.partials, false)
+		s.mu.RUnlock()
+
+		if !matches {
 			continue
 		}
 
-		s.mu.RLock()
-		matches := s.filter.RunSequence(e, i, s.partials, false)
-		s.mu.RUnlock()
+		// enforce temporal monotonicity check for ordered sequences
+		if !s.seq.IsUnordered && !s.lastMatch.IsZero() && !e.Timestamp.After(s.lastMatch) {
+			// this event is older than or equal to the previous matched slot
+			continue
+		}
 
 		// append the partial and transition state machine
-		if matches {
-			s.addPartial(i, e, false)
-			err := s.matchTransition(i, e)
-			if err != nil {
-				matchTransitionErrors.Add(1)
-				log.Warnf("match transition failure: %v", err)
-			}
-			// now try to match all pending out-of-order
-			// events from downstream sequence slots if
-			// the previous match hasn't reached terminal
-			// state
-			if s.seq.IsUnordered && s.currentState() != sequenceTerminalState {
-				s.mu.RLock()
-				for seqID := range s.partials {
-					for _, evt := range s.partials[seqID] {
-						if !evt.ContainsMeta(event.RuleSequenceOOOKey) {
-							continue
-						}
-						// try to initialize process state before evaluating the event
-						if evt.PS == nil {
-							_, evt.PS = s.psnap.Find(evt.PID)
-						}
-						matches = s.filter.RunSequence(evt, seqID, s.partials, false)
-						// transition the state machine
-						if matches {
-							err := s.matchTransition(seqID, evt)
-							if err != nil {
-								matchTransitionErrors.Add(1)
-								log.Warnf("out of order match transition failure: %v", err)
-							}
-							evt.RemoveMeta(event.RuleSequenceOOOKey)
-						}
+		s.addPartial(i, e, false)
+		err := s.matchTransition(i, e)
+		if err != nil {
+			matchTransitionErrors.Add(1)
+			log.Warnf("match transition failure: %v", err)
+		}
+		if !s.seq.IsUnordered {
+			s.lastMatch = e.Timestamp
+		}
+		// now try to match all pending out-of-order
+		// events from downstream sequence slots if
+		// the previous match hasn't reached terminal
+		// state
+		if s.seq.IsUnordered && s.currentState() != sequenceTerminalState {
+			s.mu.RLock()
+			for seqID := range s.partials {
+				for _, evt := range s.partials[seqID] {
+					if !evt.ContainsMeta(event.RuleSequenceOOOKey) {
+						continue
 					}
+					// try to initialize process state before evaluating the event
+					if evt.PS == nil {
+						_, evt.PS = s.psnap.Find(evt.PID)
+					}
+					matches = s.filter.RunSequence(evt, seqID, s.partials, false)
+					if !matches {
+						continue
+					}
+					// transition the state machine
+					err := s.matchTransition(seqID, evt)
+					if err != nil {
+						matchTransitionErrors.Add(1)
+						log.Warnf("out of order match transition failure: %v", err)
+					}
+					evt.RemoveMeta(event.RuleSequenceOOOKey)
 				}
-				s.mu.RUnlock()
 			}
+			s.mu.RUnlock()
 		}
 
 		// if both the terminal state is reached and the partials

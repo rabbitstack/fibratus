@@ -299,7 +299,7 @@ func TestRunSequenceRuleWithPsUUIDLink(t *testing.T) {
 	e2 := &event.Event{
 		Seq:       2,
 		Type:      event.CreateFile,
-		Timestamp: time.Now(),
+		Timestamp: time.Now().Add(time.Second),
 		Name:      "CreateFile",
 		Tid:       2484,
 		PID:       uint32(os.Getpid()),

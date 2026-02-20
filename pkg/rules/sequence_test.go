@@ -58,10 +58,11 @@ func TestSequenceState(t *testing.T) {
 	assert.Equal(t, "evt.name = CreateProcess AND ps.name = cmd.exe", ss.expr(ss.initialState))
 
 	e1 := &event.Event{
-		Type: event.CreateProcess,
-		Name: "CreateProcess",
-		Tid:  2484,
-		PID:  859,
+		Type:      event.CreateProcess,
+		Name:      "CreateProcess",
+		Tid:       2484,
+		PID:       859,
+		Timestamp: time.Now(),
 		PS: &pstypes.PS{
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
@@ -71,6 +72,22 @@ func TestSequenceState(t *testing.T) {
 			params.ProcessName: {Name: params.ProcessName, Type: params.AnsiString, Value: "powershell.exe"},
 		},
 	}
+
+	e2 := &event.Event{
+		Type:      event.CreateFile,
+		Name:      "CreateFile",
+		Tid:       2484,
+		PID:       4143,
+		Timestamp: time.Now().Add(time.Second * 5),
+		PS: &pstypes.PS{
+			Name: "cmd.exe",
+			Exe:  "C:\\Windows\\system32\\svchost.exe",
+		},
+		Params: event.Params{
+			params.FilePath: {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Temp\\dropper"},
+		},
+	}
+
 	require.True(t, ss.next(0))
 	require.False(t, ss.next(1))
 	require.NoError(t, ss.matchTransition(0, e1))
@@ -82,19 +99,17 @@ func TestSequenceState(t *testing.T) {
 	assert.False(t, ss.isInitialState())
 	assert.Equal(t, "evt.name = CreateFile AND file.path ICONTAINS temp", ss.expr(ss.currentState()))
 
-	e2 := &event.Event{
-		Type: event.CreateFile,
-		Name: "CreateFile",
-		Tid:  2484,
-		PID:  4143,
-		PS: &pstypes.PS{
-			Name: "cmd.exe",
-			Exe:  "C:\\Windows\\system32\\svchost.exe",
-		},
+	e3 := &event.Event{
+		Type:      event.CreateProcess,
+		Name:      "CreateProcess",
+		Timestamp: time.Now().Add(time.Second * 10),
+		Tid:       2484,
+		PID:       4143,
 		Params: event.Params{
-			params.FilePath: {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Temp\\dropper"},
+			params.Exe: {Name: params.Exe, Type: params.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
 		},
 	}
+
 	// can't go to the next transitions as the expr hasn't matched
 	require.False(t, ss.next(2))
 	require.NoError(t, ss.matchTransition(1, e2))
@@ -108,15 +123,6 @@ func TestSequenceState(t *testing.T) {
 	assert.Equal(t, 2, ss.currentState())
 	assert.Equal(t, "evt.name = CreateProcess", ss.expr(ss.currentState()))
 
-	e3 := &event.Event{
-		Type: event.CreateProcess,
-		Name: "CreateProcess",
-		Tid:  2484,
-		PID:  4143,
-		Params: event.Params{
-			params.Exe: {Name: params.Exe, Type: params.UnicodeString, Value: "C:\\Temp\\dropper.exe"},
-		},
-	}
 	require.NoError(t, ss.matchTransition(2, e3))
 	ss.addPartial(2, e3, false)
 
@@ -214,7 +220,7 @@ func TestSimpleSequence(t *testing.T) {
 		}, {
 			Type:      event.CreateFile,
 			Name:      "CreateFile",
-			Timestamp: time.Now(),
+			Timestamp: time.Now().Add(time.Second),
 			Tid:       2484,
 			PID:       859,
 			Category:  event.File,
@@ -242,7 +248,7 @@ func TestSimpleSequence(t *testing.T) {
 		}, {
 			Type:      event.CreateFile,
 			Name:      "CreateFile",
-			Timestamp: time.Now(),
+			Timestamp: time.Now().Add(time.Second),
 			Tid:       2484,
 			PID:       859,
 			Category:  event.File,
@@ -410,7 +416,7 @@ func TestUnconstrainedSequenceMatches(t *testing.T) {
 	e2 := &event.Event{
 		Seq:       21,
 		Type:      event.CreateProcess,
-		Timestamp: time.Now().Add(time.Second),
+		Timestamp: time.Now().Add(time.Second * 2),
 		Name:      "CreateProcess",
 		Tid:       2484,
 		PID:       1859,
@@ -430,7 +436,7 @@ func TestUnconstrainedSequenceMatches(t *testing.T) {
 	e3 := &event.Event{
 		Type:      event.CreateFile,
 		Seq:       25,
-		Timestamp: time.Now().Add(time.Second * time.Duration(2)),
+		Timestamp: time.Now().Add(time.Second * 3),
 		Name:      "CreateFile",
 		Tid:       2484,
 		PID:       3859,
@@ -493,7 +499,7 @@ func TestSimpleSequenceDeadline(t *testing.T) {
 
 	e2 := &event.Event{
 		Type:      event.CreateFile,
-		Timestamp: time.Now(),
+		Timestamp: time.Now().Add(time.Millisecond * 200),
 		Name:      "CreateFile",
 		Tid:       2484,
 		PID:       859,
@@ -563,7 +569,7 @@ func TestSequenceMultiLinks(t *testing.T) {
 
 	e2 := &event.Event{
 		Type:      event.CreateFile,
-		Timestamp: time.Now(),
+		Timestamp: time.Now().Add(time.Second),
 		Name:      "CreateFile",
 		Tid:       2484,
 		PID:       859,
@@ -856,7 +862,7 @@ func TestSequenceExpire(t *testing.T) {
 				{
 					Seq:       2,
 					Type:      event.CreateProcess,
-					Timestamp: time.Now(),
+					Timestamp: time.Now().Add(time.Second),
 					Category:  event.Process,
 					Name:      "CreateProcess",
 					Tid:       2484,
@@ -1029,11 +1035,12 @@ func TestSequenceBoundFieldsWithFunctions(t *testing.T) {
 	ss := newSequenceState(f, c, new(ps.SnapshotterMock))
 
 	e1 := &event.Event{
-		Type:     event.CreateFile,
-		Name:     "CreateFile",
-		Category: event.File,
-		Tid:      2484,
-		PID:      859,
+		Type:      event.CreateFile,
+		Name:      "CreateFile",
+		Category:  event.File,
+		Timestamp: time.Now(),
+		Tid:       2484,
+		PID:       859,
 		PS: &pstypes.PS{
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\cmd.exe",
@@ -1045,11 +1052,12 @@ func TestSequenceBoundFieldsWithFunctions(t *testing.T) {
 	}
 
 	e2 := &event.Event{
-		Type:     event.RegSetValue,
-		Name:     "RegSetValue",
-		Category: event.Registry,
-		Tid:      2484,
-		PID:      859,
+		Type:      event.RegSetValue,
+		Name:      "RegSetValue",
+		Category:  event.Registry,
+		Timestamp: time.Now().Add(time.Millisecond * 5),
+		Tid:       2484,
+		PID:       859,
 		PS: &pstypes.PS{
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\cmd.exe",
