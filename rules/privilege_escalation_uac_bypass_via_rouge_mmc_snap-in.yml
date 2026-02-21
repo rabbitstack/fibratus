@@ -1,0 +1,40 @@
+name: UAC bypass via rouge MMC snap-in
+id: abc02312-2f30-4f26-91ed-194b80492c03
+version: 1.0.0
+description: |
+  Detects attempts to bypass User Account Control (UAC) by executing
+  a malicious Microsoft Management Console (MMC) snap-in. Abuse of MMC
+  snap-ins for UAC bypass is typically observed in post-exploitation
+  scenarios where an adversary already has code execution in a user
+  context and is attempting to escalate privileges to administrator.
+labels:
+  tactic.id: TA0004
+  tactic.name: Privilege Escalation
+  tactic.ref: https://attack.mitre.org/tactics/TA0004/
+  technique.id: T1548
+  technique.name: Abuse Elevation Control Mechanism
+  technique.ref: https://attack.mitre.org/techniques/T1548/
+  subtechnique.id: T1548.002
+  subtechnique.name: Bypass User Account Control
+  subtechnique.ref: https://attack.mitre.org/techniques/T1548/002/
+references:
+  - https://github.com/hfiref0x/UACME
+  - https://medium.com/@Idabian/uac-snap-abusing-mmc-help-topics-to-bypass-uac-6f346e54dfae
+
+condition: >
+ sequence
+ maxspan 1m
+  |create_file and evt.pid != 4 and ps.sid != 'S-1-5-18' and file.extension ~= '.msc'|
+  |spawn_process and ps.name ~= 'mmc.exe' and ps.cmdline imatches '*.msc *.msc*'|
+  |spawn_process and
+   ps.parent.name ~= 'mmc.exe' and ps.token.integrity_level = 'HIGH' and
+   ps.exe not imatches
+            (
+              '?:\\Windows\\System32\\WerFault.exe',
+              '?:\\Windows\\SysWOW64\\WerFault.exe'
+            )
+  |
+
+severity: high
+
+min-engine-version: 3.0.0
