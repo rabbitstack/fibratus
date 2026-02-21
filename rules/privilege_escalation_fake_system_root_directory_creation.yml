@@ -1,0 +1,30 @@
+name: Fake system root directory creation
+id: c70c41e2-fd43-466d-9cb6-20b259380960
+version: 1.0.0
+description: |
+  Detects attempts to create a fake or malformed Windows system root
+  directory by a unprivileged process, which may indicate exploitation
+  of path confusion vulnerabilities for privilege escalation.
+labels:
+  tactic.id: TA0004
+  tactic.name: Privilege Escalation
+  tactic.ref: https://attack.mitre.org/tactics/TA0004/
+  technique.id: T1068
+  technique.name: Exploitation for Privilege Escalation
+  technique.ref: https://attack.mitre.org/techniques/T1068/
+references:
+  - https://github.com/hfiref0x/UACME
+
+condition: >
+   create_file and
+   ps.sid != 'S-1-5-18' and file.path imatches
+                                      (
+                                        '?:\\Windows ',
+                                        '?:\\ Windows*'
+                                      )
+action:
+  - name: kill
+
+severity: high
+
+min-engine-version: 3.0.0
