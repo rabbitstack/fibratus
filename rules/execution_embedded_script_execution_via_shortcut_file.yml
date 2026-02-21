@@ -1,0 +1,61 @@
+name: Embedded script execution via shortcut file
+id: 2d94a68b-03fe-4ece-9a99-f4de8ff7261d
+version: 1.0.0
+description: |
+  Detects execution of embedded scripts delivered via Windows shortcut (.lnk) files.
+  Adversaries can exploit the attack chain where a shortcut file is accessed by a
+  scripting or command interpreter, followed by the creation of a payload in
+  user-writable locations and the subsequent execution of a script.
+labels:
+  tactic.id: TA0002
+  tactic.name: Execution
+  tactic.ref: https://attack.mitre.org/tactics/TA0002/
+  technique.id: T1204
+  technique.name: User Execution
+  technique.ref: https://attack.mitre.org/techniques/T1204/
+  subtechnique.id: T1204.002
+  subtechnique.name: Malicious File
+  subtechnique.ref: https://attack.mitre.org/techniques/T1204/002/
+references:
+  - https://unit42.paloaltonetworks.com/lnk-malware/
+  - https://github.com/knight0x07/Lnk2Vbs/blob/main/lnk2vbs.py
+
+condition: >
+  sequence
+  maxspan 1m
+  by ps.sessionid
+    |open_file and
+     ps.name iin ('cmd.exe', 'findstr.exe', 'find.exe', 'powershell.exe', 'pwsh.exe') and
+     file.path imatches '?:\\*.lnk'
+    |
+    |create_file and
+     ps.name iin ('cmd.exe', 'powershell.exe', 'pwsh.exe') and
+     file.path imatches
+              (
+                '?:\\Users\\*\\AppData\\Local\\*',
+                '?:\\Users\\*\\AppData\\LocalLow\\*',
+                '?:\\Users\\*\\AppData\\Roaming\\*',
+                '?:\\Users\\Public\\*'
+              )
+    |
+    |spawn_process and
+     ps.name iin
+              (
+                'wscript.exe',
+                'mshta.exe',
+                'powershell.exe',
+                'pwsh.exe',
+                'cmd.exe',
+                'connhost.exe',
+                'rundll32.exe',
+                'forfiles.exe',
+                'wmic.exe',
+                'msbuild.exe'
+              )
+    |
+action:
+  - name: kill
+
+severity: high
+
+min-engine-version: 3.0.0
