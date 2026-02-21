@@ -1,0 +1,73 @@
+name: Process execution from compressed file via Explorer
+id: e4f373a0-1fe3-42a5-bca6-b465e930713f
+version: 1.0.0
+description: |
+  Detects child processes commonly used for code execution that are spawned
+  from compressed files when initiated from Windows Explorer. Adversaries can
+  leverage archives to deliver malicious executables and scripts for execution.
+labels:
+  tactic.id: TA0002
+  tactic.name: Execution
+  tactic.ref: https://attack.mitre.org/tactics/TA0002/
+  technique.id: T1204
+  technique.name: User Execution 
+  technique.ref: https://attack.mitre.org/techniques/T1204/
+  subtechnique.id: T1204.002
+  subtechnique.name: Malicious File
+  subtechnique.ref: https://attack.mitre.org/techniques/T1204/002/
+
+condition: >
+  spawn_process and (ps.parent.name ~= 'explorer.exe' or ps.ancestor iin ('explorer.exe')) and
+  thread.callstack.summary imatches
+                          (
+                            '*zipfldr.dll*',
+                            'ntdll.dll|KernelBase.dll|kernel32.dll|windows.storage.dll|7z*.exe|*',
+                            'ntdll.dll|KernelBase.dll|kernel32.dll|windows.storage.dll|WinRar.exe|*'
+                          ) and
+  (ps.name iin
+          (
+            'rundll32.exe',
+            'regsvr32.exe',
+            'wscript.exe',
+            'cscript.exe',
+            'certutil.exe',
+            'cmstp.exe',
+            'mshta.exe',
+            'msxsl.exe',
+            'RegAsm.exe',
+            'installutil.exe',
+            'powershell.exe',
+            'cmd.exe',
+            'msbuild.exe',
+            'AppLaunch.exe',
+            'AddInUtil.exe',
+            'AddInProcess.exe'
+          ) or
+   ps.pe.file.name iin
+          (
+            'rundll32.exe',
+            'regsvr32.exe',
+            'wscript.exe',
+            'cscript.exe',
+            'certutil.exe',
+            'cmstp.exe',
+            'mshta.exe',
+            'msxsl.exe',
+            'RegAsm.exe',
+            'installutil.exe',
+            'powershell.exe',
+            'cmd.exe',
+            'msbuild.exe',
+            'AppLaunch.exe',
+            'AddInUtil.exe',
+            'AddInProcess.exe'
+          )
+  )
+action:
+  - name: kill
+
+output: >
+  Suspicious process %ps.exe executed from compressed file via Windows Explorer
+severity: high
+
+min-engine-version: 3.0.0
