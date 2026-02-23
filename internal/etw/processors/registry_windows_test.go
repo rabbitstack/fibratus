@@ -19,6 +19,9 @@
 package processors
 
 import (
+	"testing"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/handle"
@@ -26,8 +29,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/key"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
-	"time"
 )
 
 func init() {
@@ -183,8 +184,8 @@ func TestRegistryProcessor(t *testing.T) {
 				},
 			},
 			func(p Processor) {
-				p.(*registryProcessor).values[23234] = []*event.Event{
-					{
+				p.(*registryProcessor).values[23234] = map[string]*event.Event{
+					"SessionId": {
 						Type:      event.RegSetValueInternal,
 						Timestamp: time.Now(),
 						Params: event.Params{
@@ -193,7 +194,7 @@ func TestRegistryProcessor(t *testing.T) {
 							params.RegValueType: {Name: params.RegValueType, Type: params.Enum, Value: uint32(1), Enum: key.RegistryValueTypes},
 							params.RegKeyHandle: {Name: params.RegKeyHandle, Type: params.Uint64, Value: uint64(0)}},
 					},
-					{
+					"Directory": {
 						Type:      event.RegSetValueInternal,
 						Timestamp: time.Now(),
 						Params: event.Params{
