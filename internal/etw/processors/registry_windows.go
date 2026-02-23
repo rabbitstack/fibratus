@@ -21,15 +21,16 @@ package processors
 import (
 	"expvar"
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/util/key"
-	"golang.org/x/sys/windows"
-	"golang.org/x/sys/windows/registry"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/rabbitstack/fibratus/pkg/util/key"
+	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/registry"
 
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
@@ -68,7 +69,8 @@ type registryProcessor struct {
 	keys  map[uint64]string
 	hsnap handle.Snapshotter
 
-	values map[uint32][]*event.Event
+	// values keeps temporarily RegSetValue internal events by pid and base registry path.
+	values map[uint32]map[string]*event.Event
 	mu     sync.Mutex
 
 	purger *time.Ticker
@@ -89,7 +91,7 @@ func newRegistryProcessor(hsnap handle.Snapshotter) Processor {
 	r := &registryProcessor{
 		keys:   make(map[uint64]string),
 		hsnap:  hsnap,
-		values: make(map[uint32][]*event.Event),
+		values: make(map[uint32]map[string]*event.Event),
 		purger: time.NewTicker(valuePurgerInterval),
 		quit:   make(chan struct{}, 1),
 	}
@@ -252,35 +254,22 @@ func (r *registryProcessor) findMatchingKey(pid uint32, relativeKeyName string) 
 func (r *registryProcessor) pushSetValue(e *event.Event) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	vals, ok := r.values[e.PID]
-	if !ok {
-		r.values[e.PID] = []*event.Event{e}
-	} else {
-		r.values[e.PID] = append(vals, e)
-	}
+	r.values[e.PID] = map[string]*event.Event{filepath.Base(e.GetParamAsString(params.RegPath)): e}
 }
 
 // popSetValue traverses the internal RegSetValue queue
-// and pops the event if the suffixes match.
+// and pops the event if the base paths match.
 func (r *registryProcessor) popSetValue(e *event.Event) *event.Event {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	vals, ok := r.values[e.PID]
+	key := filepath.Base(e.GetParamAsString(params.RegPath))
+	evt, ok := r.values[e.PID][key]
 	if !ok {
 		return nil
 	}
+	delete(r.values[e.PID], key)
 
-	var v *event.Event
-	for i := len(vals) - 1; i >= 0; i-- {
-		val := vals[i]
-		if strings.HasSuffix(e.GetParamAsString(params.RegPath), val.GetParamAsString(params.RegPath)) {
-			v = val
-			r.values[e.PID] = append(vals[:i], vals[i+1:]...)
-			break
-		}
-	}
-
-	return v
+	return evt
 }
 
 func (r *registryProcessor) valuesSize(pid uint32) int {
@@ -294,14 +283,13 @@ func (r *registryProcessor) housekeep() {
 		select {
 		case <-r.purger.C:
 			r.mu.Lock()
-			for pid, vals := range r.values {
-				for i, val := range vals {
-					if time.Since(val.Timestamp) < valueTTL {
-						continue
+			for pid, bucket := range r.values {
+				for key, ev := range bucket {
+					if time.Since(ev.Timestamp) > valueTTL {
+						delete(bucket, key)
 					}
-					r.values[pid] = append(vals[:i], vals[i+1:]...)
 				}
-				if len(vals) == 0 {
+				if len(bucket) == 0 {
 					delete(r.values, pid)
 				}
 			}
