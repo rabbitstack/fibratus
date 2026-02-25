@@ -1,0 +1,51 @@
+name: UAC bypass via NTFS junction DLL hijacking
+id: 9cdfa658-e8d5-4391-a4d8-0b53f8158782
+version: 1.0.0
+description: |
+  Detects potential User Account Control (UAC) bypass activity leveraging
+  NTFS junctions in combination with DLL hijacking to achieve elevated code
+  execution. Attackers can manipulate filesystem redirection features to
+  coerce trusted Windows components into loading malicious libraries.
+labels:
+  tactic.id: TA0004
+  tactic.name: Privilege Escalation
+  tactic.ref: https://attack.mitre.org/tactics/TA0004/
+  technique.id: T1548
+  technique.name: Abuse Elevation Control Mechanism
+  technique.ref: https://attack.mitre.org/techniques/T1548/
+  subtechnique.id: T1548.002
+  subtechnique.name: Bypass User Account Control
+  subtechnique.ref: https://attack.mitre.org/techniques/T1548/002/
+references:
+  - https://github.com/hfiref0x/UACME
+
+condition: >
+  sequence
+  maxspan 2m
+    |((create_file) or (create_file_supersede)) and
+     ps.name iin ('wusa.exe', 'dllhost.exe') and
+     thread.callstack.symbols imatches ('cabinet.dll!FDICopy') and
+     file.path imatches
+              (
+                '?:\\Windows\\System32\\*.dll',
+                '?:\\Windows\\SysWoW64\\*.dll',
+                '?:\\Windows\\System32\\*.exe.local\\*.dll',
+                '?:\\Windows\\SysWoW64\\*.exe.local\\*.dll'
+              )
+    |
+    |spawn_process and
+     ps.token.integrity_level = 'HIGH' and
+     ps.exe not imatches
+                (
+                  '?:\\Windows\\System32\\WerFault.exe',
+                  '?:\\Windows\\SysWOW64\\WerFault.exe',
+                  '?:\\Windows\\System32\\wermgr.exe',
+                  '?:\\Windows\\SysWOW64\\wermgr.exe',
+                  '?:\\Windows\\System32\\conhost.exe',
+                  '?:\\Windows\\SysWOW64\\conhost.exe'
+                )
+    |
+
+severity: high
+
+min-engine-version: 3.0.0
