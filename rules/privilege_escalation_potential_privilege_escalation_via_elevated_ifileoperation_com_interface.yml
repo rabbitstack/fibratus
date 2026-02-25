@@ -1,0 +1,52 @@
+name: Potential privilege escalation via elevated IFileOperation COM interface
+id: e2e09014-78ad-4a73-9178-ba33c74f7839
+version: 1.0.0
+description: |
+  Identifies potential privilege escalation attempts through abuse of the elevated
+  IFileOperation COM interface to bypass User Account Control (UAC) and gain unauthorized
+  administrative privileges. Adversaries leverage trusted Windows components and auto-elevated
+  COM objects to perform file operations in protected system locations.
+labels:
+  tactic.id: TA0004
+  tactic.name: Privilege Escalation
+  tactic.ref: https://attack.mitre.org/tactics/TA0004/
+  technique.id: T1548
+  technique.name: Abuse Elevation Control Mechanism
+  technique.ref: https://attack.mitre.org/techniques/T1548/
+  subtechnique.id: T1548.002
+  subtechnique.name: Bypass User Account Control
+  subtechnique.ref: https://attack.mitre.org/techniques/T1548/002/
+references:
+  - https://github.com/hfiref0x/UACME
+  - https://fuzzysecurity.com/tutorials/27.html
+  - https://github.com/3gstudent/Use-COM-objects-to-bypass-UAC/blob/master/IFileOperation.cpp
+
+condition: >
+  sequence
+  maxspan 2m
+    |ps.name ~= 'dllhost.exe' and
+     ((create_file) or (move_file)) and ps.sid imatches ('S-1-5-21-*') and
+     (file.is_dll or file.extension iin ('.dll', '.dl~')) and
+     file.path imatches
+              (
+                '?:\\Windows\\System32\\*',
+                '?:\\Windows\\SysWoW64\\*',
+                '?:\\Program Files\\*',
+                '?:\\Program Files (x86)\\*'
+              )
+    | by file.path.stem
+    |load_dll and
+     ps.exe imatches
+              (
+                '?:\\Windows\\System32\\*',
+                '?:\\Windows\\SysWoW64\\*',
+                '?:\\Program Files\\*',
+                '?:\\Program Files (x86)\\*'
+              )
+    | by dll.path.stem
+action:
+  - name: kill
+
+severity: high
+
+min-engine-version: 3.0.0
