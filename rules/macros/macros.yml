@@ -206,7 +206,7 @@
 - macro: web_browser_binaries
   list: [
     chrome.exe, firefox.exe, msedge.exe, iexplore.exe, opera.exe,
-    brave.exe, microsoftedge.exe, chromium.exe, safari.exe
+    brave.exe, microsoftedge.exe, chromium.exe, safari.exe, vivaldi.exe
     ]
 
 - macro: web_browser_cred_stores
