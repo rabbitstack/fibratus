@@ -1,0 +1,41 @@
+name: UAC bypass via Control Panel applet execution hijack
+id: daddbf61-c391-4875-988a-a385b38c397d
+version: 1.0.0
+description: |
+  Identifies attempts to bypass User Account Control (UAC) by abusing trusted Control Panel
+  execution paths to achieve unauthorized privilege escalation.
+  Attackers leverage the implicit trust and auto-elevation behavior of Control Panel components
+  to execute arbitrary code with elevated privileges. By manipulating how Control Panel applets
+  or associated shell handlers are resolved, adversaries can cause privileged system processes to
+  launch attacker-controlled payloads without triggering a UAC prompt.
+labels:
+  tactic.id: TA0004
+  tactic.name: Privilege Escalation
+  tactic.ref: https://attack.mitre.org/tactics/TA0004/
+  technique.id: T1548
+  technique.name: Abuse Elevation Control Mechanism
+  technique.ref: https://attack.mitre.org/techniques/T1548/
+  subtechnique.id: T1548.002
+  subtechnique.name: Bypass User Account Control
+  subtechnique.ref: https://attack.mitre.org/techniques/T1548/002/
+references:
+  - https://github.com/hfiref0x/UACME
+
+condition: >
+  sequence
+  maxspan 1m
+    |set_value and
+     registry.path imatches
+                  (
+                    'HKEY_CURRENT_USER\\Environment\\Path',
+                    'HKEY_USERS\\S-1-5-21*_Classes\\Folder\\Shell\\Open\\Command*'
+                  )
+    |
+    |spawn_process and
+     ps.token.integrity_level = 'HIGH' and
+     ((ps.parent.name ~= 'control.exe' and length(ps.args) >= 2) or thread.callstack.symbols imatches ('shell32.dll!Control_RunDLL*'))
+    |
+
+severity: high
+
+min-engine-version: 3.0.0
