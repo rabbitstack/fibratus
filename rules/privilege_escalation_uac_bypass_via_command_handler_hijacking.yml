@@ -1,0 +1,46 @@
+name: UAC bypass via command handler hijacking
+id: 77bf73f2-d610-4212-a481-adcb6124cc3e
+version: 1.0.0
+description: |
+  Detects attempts to bypass User Account Control (UAC) by hijacking command
+  handler registry keys associated with auto-elevated system components.
+  Attackers abuse this technique to redirect execution flow and spawn elevated
+  processes without user consent.
+labels:
+  tactic.id: TA0004
+  tactic.name: Privilege Escalation
+  tactic.ref: https://attack.mitre.org/tactics/TA0004/
+  technique.id: T1548
+  technique.name: Abuse Elevation Control Mechanism
+  technique.ref: https://attack.mitre.org/techniques/T1548/
+  subtechnique.id: T1548.002
+  subtechnique.name: Bypass User Account Control
+  subtechnique.ref: https://attack.mitre.org/techniques/T1548/002/
+references:
+  - https://github.com/hfiref0x/UACME
+
+condition: >
+  sequence
+  maxspan 1m
+    |set_value and
+     registry.path imatches
+                   (
+                      'HKEY_USERS\\S-1-5-21-*_CLASSES\\MS-SETTINGS\\SHELL\\OPEN\\COMMAND\\*',
+                      'HKEY_USERS\\S-1-5-21-*_CLASSES\\LAUNCHER.SYSTEMSETTINGS\\SHELL\\OPEN\\COMMAND\\*',
+                      'HKEY_USERS\\S-1-5-21-*_CLASSES\\MS-SETTINGS\\CURVER\\*',
+                      'HKEY_USERS\\S-1-5-21-*_CLASSES\\MS-SETTINGS\\URL Protocol',
+                      'HKEY_USERS\\S-1-5-21-*_CLASSES\\MS-WINDOWS-STORE\\URL Protocol'
+                   )
+    |
+    |spawn_process and
+     ps.token.integrity_level = 'HIGH' and
+     ps.exe not imatches
+                  (
+                     '?:\\Windows\\System32\\WerFault.exe',
+                     '?:\\Windows\\SysWOW64\\WerFault.exe'
+                  )
+    |
+
+severity: high
+
+min-engine-version: 3.0.0
