@@ -1,0 +1,53 @@
+name: Process creation from a stomped module
+id: f85d1e80-49ec-4bbe-9bf5-7e2a3a8a7319
+version: 1.0.0
+description: |
+  Identifies the creation of the process from the parent where the call stack
+  exhibits suspicious memory properties. The pattern is typical of stomped module
+  techniques such as DLL-hollowing or other forms of in-memory code injection where
+  an attacker overwrites or maps shellcode into legitimate system modules to hide
+  malicious payloads.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1055
+  technique.name: Process Injection
+  technique.ref: https://attack.mitre.org/techniques/T1055/
+references:
+  - https://www.forrest-orr.net/post/malicious-memory-artifacts-part-i-dll-hollowing
+
+condition: >
+  spawn_process and
+  foreach(thread._callstack, $frame, $frame.module imatches ('?:\\Windows\\System32\\*.dll', '?:\\Windows\\SysWOW64\\*.dll') and $frame.allocation_size >= 10000) and
+  not foreach(thread._callstack, $frame, $frame.module imatches
+                                (
+                                  '?:\\Program Files\\*.dll',
+                                  '?:\\Program Files (x86)\\*.dll',
+                                  '?:\\Windows\\System32\\umppc*.dll'
+                                ) or
+                                (
+                                  $frame.allocation_size >= 10000 and $frame.module imatches
+                                     (
+                                       '?:\\Windows\\System32\\ntdll.dll',
+                                       '?:\\Windows\\System32\\rpcrt4.dll',
+                                       '?:\\Windows\\SysWOW64\\rpcrt4.dll',
+                                       '?:\\Windows\\System32\\KernelBase.dll',
+                                       '?:\\Windows\\SysWOW64\\KernelBase.dll',
+                                       '?:\\Windows\\System32\\combase.dll',
+                                       '?:\\Windows\\SysWOW64\\combase.dll',
+                                       '?:\\Windows\\System32\\user32.dll',
+                                       '?:\\Windows\\SysWOW64\\user32.dll',
+                                       '?:\\Windows\\System32\\ws2_32.dll',
+                                       '?:\\Windows\\SysWOW64\\ws2_32.dll',
+                                       '?:\\Windows\\System32\\spool\\drivers\\*',
+                                       '?:\\Windows\\assembly\\NativeImages_*',
+                                       '?:\\Windows\\System32\\DriverStore\\FileRepository\\*'
+                                     )
+                                  ))
+action:
+  - name: kill
+
+severity: high
+
+min-engine-version: 3.0.0
