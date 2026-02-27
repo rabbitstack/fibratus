@@ -35,6 +35,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/log"
 	"github.com/rabbitstack/fibratus/pkg/util/signals"
+	yconfig "github.com/rabbitstack/fibratus/pkg/yara/config"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
 )
@@ -49,8 +50,8 @@ const (
 )
 
 var (
-	className  = windows.StringToUTF16Ptr("fibratus")
-	alertTitle = "Malicious Activity Detected"
+	className           = windows.StringToUTF16Ptr("fibratus")
+	defaultSystrayTitle = "Malicious Activity Detected"
 )
 
 // Msg represents the data exchanged between systray client/server.
@@ -75,6 +76,24 @@ func (m Msg) decode(output any) error {
 		return err
 	}
 	return decoder.Decode(m.Data)
+}
+
+func systrayTitle(alert alertsender.Alert) string {
+	switch alert.Title {
+	case yconfig.MemoryThreatAlertTitle, yconfig.FileThreatAlertTitle:
+		return alert.Title
+	default:
+		return defaultSystrayTitle
+	}
+}
+
+func systrayText(alert alertsender.Alert) string {
+	switch alert.Title {
+	case yconfig.MemoryThreatAlertTitle, yconfig.FileThreatAlertTitle:
+		return alert.Text
+	default:
+		return alert.Title
+	}
 }
 
 type Systray struct {
@@ -222,7 +241,7 @@ func (s *Systray) handleMessage(m Msg) error {
 			logrus.Errorf("unable to decode alert: %v", err)
 			return err
 		}
-		return s.systrayIcon.ShowBalloonNotification(alertTitle, alert.Title, s.config.Sound, s.config.QuietMode)
+		return s.systrayIcon.ShowBalloonNotification(systrayTitle(alert), systrayText(alert), s.config.Sound, s.config.QuietMode)
 	}
 	return nil
 }
