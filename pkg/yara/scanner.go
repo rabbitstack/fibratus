@@ -25,18 +25,19 @@ import (
 	"encoding/json"
 	"expvar"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
-	libntfs "github.com/rabbitstack/fibratus/pkg/fs/ntfs"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/signature"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
-	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/hillu/go-yara/v4"
 	"github.com/rabbitstack/fibratus/pkg/event"
@@ -257,9 +258,7 @@ func (s scanner) Scan(e *event.Event) (bool, error) {
 			return false, nil
 		}
 		// read ADS data
-		ntfs := libntfs.NewFS()
-		data, n, err := ntfs.Read(filename, 0, 1024*1024)
-		defer ntfs.Close()
+		data, err := sys.ReadFile(filename, 1024*1024, time.Second)
 		if err != nil {
 			return false, nil
 		}

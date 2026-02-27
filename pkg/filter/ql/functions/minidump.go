@@ -20,8 +20,9 @@ package functions
 
 import (
 	"encoding/binary"
-	"io"
-	"os"
+	"time"
+
+	"github.com/rabbitstack/fibratus/pkg/sys"
 )
 
 // The 4-byte magic number at the start of a minidump file
@@ -36,18 +37,11 @@ func (f IsMinidump) Call(args []interface{}) (interface{}, bool) {
 	}
 	path := parseString(0, args)
 
-	file, err := os.Open(path)
-	if err != nil {
-		return false, true
+	b, err := sys.ReadFile(path, 4, time.Second)
+	if err != nil || len(b) < 4 {
+		return nil, false
 	}
-	defer file.Close()
-
-	var header [4]byte
-	_, err = io.ReadFull(file, header[:])
-	if err != nil {
-		return false, true
-	}
-	isMinidumpSignature := binary.LittleEndian.Uint32(header[:]) == minidumpSignature
+	isMinidumpSignature := binary.LittleEndian.Uint32(b[:]) == minidumpSignature
 	return isMinidumpSignature, true
 }
 
