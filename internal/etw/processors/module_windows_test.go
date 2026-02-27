@@ -19,6 +19,10 @@
 package processors
 
 import (
+	"os"
+	"path/filepath"
+	"testing"
+
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/ps"
@@ -27,12 +31,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"os"
-	"path/filepath"
-	"testing"
 )
 
-func TestImageProcessor(t *testing.T) {
+func TestModuleProcessor(t *testing.T) {
 	var tests = []struct {
 		name       string
 		e          *event.Event
@@ -84,11 +85,6 @@ func TestImageProcessor(t *testing.T) {
 			},
 			func(e *event.Event, t *testing.T, psnap *ps.SnapshotterMock) {
 				psnap.AssertNumberOfCalls(t, "AddModule", 1)
-				// should be enriched with image characteristics params
-				assert.True(t, e.Params.MustGetBool(params.FileIsDLL))
-				assert.True(t, e.Params.MustGetBool(params.FileIsDotnet))
-				assert.False(t, e.Params.MustGetBool(params.FileIsExecutable))
-				assert.False(t, e.Params.MustGetBool(params.FileIsDriver))
 			},
 		},
 		{
@@ -119,7 +115,7 @@ func TestImageProcessor(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			psnap := tt.psnap()
-			p := newImageProcessor(psnap)
+			p := newModuleProcessor(psnap)
 			var err error
 			tt.e, _, err = p.ProcessEvent(tt.e)
 			require.NoError(t, err)

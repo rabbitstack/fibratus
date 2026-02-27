@@ -57,7 +57,7 @@ func NewChain(
 		chain.addProcessor(newRegistryProcessor(hsnap))
 	}
 	if config.EventSource.EnableImageEvents {
-		chain.addProcessor(newImageProcessor(psnap))
+		chain.addProcessor(newModuleProcessor(psnap))
 	}
 	if config.EventSource.EnableNetEvents {
 		chain.addProcessor(newNetProcessor())

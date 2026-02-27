@@ -20,10 +20,6 @@ package processors
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/event"
-	libntfs "github.com/rabbitstack/fibratus/pkg/fs/ntfs"
-	"github.com/rabbitstack/fibratus/pkg/pe"
-	"os"
-	"time"
 )
 
 // ProcessorType is an alias for the event processor type
@@ -81,64 +77,4 @@ func (typ ProcessorType) String() string {
 	default:
 		return "unknown"
 	}
-}
-
-type imageFileCharacteristics struct {
-	isExe    bool
-	isDLL    bool
-	isDriver bool
-	isDotnet bool
-	accessed time.Time
-}
-
-func (c *imageFileCharacteristics) keepalive() {
-	c.accessed = time.Now()
-}
-
-// parseImageFileCharacteristics parses the PE structure for the file path
-// residing in the given event parameters. The preferred method for reading
-// the PE metadata is by directly accessing the file.
-// If this operation fails, the file data is read form the raw device and
-// the blob is passed to the PE parser.
-// The given event is decorated with various parameters extracted from PE
-// data. Most notably, parameters that indicate whether the file is a DLL,
-// executable image, or a Windows driver.
-func parseImageFileCharacteristics(path string) (*imageFileCharacteristics, error) {
-	var pefile *pe.PE
-
-	f, err := os.Open(path)
-	if err != nil {
-		// read file data blob from raw device
-		// if the regular file access fails
-		ntfs := libntfs.NewFS()
-		data, n, err := ntfs.Read(path, 0, int64(os.Getpagesize()))
-		defer ntfs.Close()
-		if err != nil {
-			return nil, err
-		}
-		if n > 0 {
-			data = data[:n]
-		}
-		// parse PE file from byte slice
-		pefile, err = pe.ParseBytes(data, pe.WithSections(), pe.WithSymbols(), pe.WithCLR())
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		defer f.Close()
-		// parse PE file from on-disk file
-		pefile, err = pe.ParseFile(path, pe.WithSections(), pe.WithSymbols(), pe.WithCLR())
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	c := &imageFileCharacteristics{
-		isExe:    pefile.IsExecutable,
-		isDLL:    pefile.IsDLL,
-		isDriver: pefile.IsDriver,
-		isDotnet: pefile.IsDotnet,
-	}
-
-	return c, nil
 }
