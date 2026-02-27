@@ -1,6 +1,6 @@
 name: Suspicious DLL loaded by Microsoft Office process
 id: 5868518c-2a83-4b26-ad4b-f14f0b85e744
-version: 1.0.4
+version: 1.0.5
 description:
   Identifies loading of recently dropped DLL by Microsoft Office process.
 labels:
@@ -18,7 +18,8 @@ condition: >
   sequence
   maxspan 1h
     |create_file and
-     (file.extension iin module_extensions or file.is_dll) and ps.name iin msoffice_binaries and
+     ps.name iin msoffice_binaries and
+     (file.extension iin module_extensions or file.is_dll) and
      file.path not imatches '?:\\Program Files\\Microsoft Office\\Root\\Office*\\*.dll'
     | by file.name
     |load_module and ps.name iin msoffice_binaries| by module.name

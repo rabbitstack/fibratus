@@ -1,6 +1,6 @@
 name: DLL Side-Loading via a copied binary
 id: 80798e2c-6c37-472b-936c-1d2d6b95ff3c
-version: 1.0.6
+version: 1.0.7
 description: |
   Identifies when a binary is copied to a directory and shortly followed
   by the loading of an unsigned DLL from the same directory. Adversaries may
@@ -21,8 +21,9 @@ condition: >
   sequence
   maxspan 8m
     |create_file and
-     file.is_exec and ps.sid not in ('S-1-5-18', 'S-1-5-19', 'S-1-5-20') and
-     thread.callstack.symbols imatches ('*CopyFile*', '*MoveFile*')
+     ps.sid not in ('S-1-5-18', 'S-1-5-19', 'S-1-5-20') and
+     thread.callstack.symbols imatches ('*CopyFile*', '*MoveFile*') and
+     (file.extension ~= '.exe' or file.is_exec)
     | by file.path
     |(load_dll) and
      dir(image.path) ~= dir(ps.exe) and

@@ -25,6 +25,9 @@
 - macro: create_file
   expr: evt.name = 'CreateFile' and file.operation != 'OPEN' and file.status = 'Success'
 
+- macro: create_new_file
+  expr: evt.name = 'CreateFile' and file.operation = 'CREATE' and file.status = 'Success'
+
 - macro: rename_file
   expr: evt.name = 'RenameFile'
 

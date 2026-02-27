@@ -1,6 +1,6 @@
 name: Suspicious Microsoft Office template
 id: c4be3b30-9d23-4a33-b974-fb12e17487a2
-version: 1.0.4
+version: 1.0.5
 description: |
   Detects when attackers drop macro-enabled files in specific
   folders to trigger their execution every time the victim user
@@ -20,6 +20,7 @@ references:
 
 condition: >
   create_file and
+  ps.name not iin msoffice_binaries and
   file.path imatches
             (
               '?:\\Users\\*\\AppData\\Roaming\\Microsoft\\Word\\Startup\\*',
@@ -28,7 +29,6 @@ condition: >
               '?:\\Users\\*\\AppData\\Roaming\\Microsoft\\AddIns\\*',
               '?:\\Users\\*\\AppData\\Roaming\\Microsoft\\Outlook\\*.otm'
             ) and
-  ps.name not iin msoffice_binaries and
   ps.exe not imatches
             (
               '?:\\Program Files\\*.exe',

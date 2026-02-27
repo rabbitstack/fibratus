@@ -1,6 +1,6 @@
 name: DLL Side-Loading via Microsoft Office dropped file
 id: d808175d-c4f8-459d-b17f-ca9a88890c04
-version: 1.0.4
+version: 1.0.5
 description: |
   Identifies Microsoft Office process creating a DLL or other variant of an executable object which
   is later loaded by a trusted binary. Adversaries may exploit this behavior by delivering malicious 
@@ -20,8 +20,8 @@ condition: >
   sequence
   maxspan 6m
     |create_file and
-     (file.extension iin ('.dll', '.cpl', '.ocx') or file.is_dll) and
-     ps.name iin msoffice_binaries
+     ps.name iin msoffice_binaries and
+     (file.extension iin ('.dll', '.cpl', '.ocx') or file.is_dll)
     | by file.path
     |(load_unsigned_or_untrusted_dll) and
      ps.name not iin msoffice_binaries and ps.signature.trusted = true and
