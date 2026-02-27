@@ -19,6 +19,10 @@
 package sys
 
 import (
+	"fmt"
+	"syscall"
+	"time"
+
 	"golang.org/x/sys/windows"
 )
 
@@ -101,4 +105,82 @@ func GetMappedFile(process windows.Handle, addr uintptr) string {
 		return windows.UTF16ToString(n)
 	}
 	return ""
+}
+
+// WaitTimeout indicates the time-out interval
+// elapsed, and the object's state is nonsignaled.
+const WaitTimeout = 0x00000102
+
+// ReadFile reads the file asynchronously with the specified number
+// of bytes to read and the timeout after which the I/O operation
+// is cancelled.
+func ReadFile(path string, size int, timeout time.Duration) ([]byte, error) {
+	pathUTF16, err := syscall.UTF16PtrFromString(path)
+	if err != nil {
+		return nil, err
+	}
+
+	// open file asynchronously
+	handle, err := windows.CreateFile(
+		pathUTF16,
+		windows.GENERIC_READ,
+		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE,
+		nil,
+		windows.OPEN_EXISTING,
+		windows.FILE_FLAG_OVERLAPPED,
+		0,
+	)
+	if err != nil {
+		return nil, err
+	}
+	//nolint:errcheck
+	defer windows.CloseHandle(handle)
+
+	event, err := windows.CreateEvent(nil, 1, 0, nil)
+	if err != nil {
+		return nil, err
+	}
+	//nolint:errcheck
+	defer windows.CloseHandle(event)
+
+	var overlapped windows.Overlapped
+	overlapped.HEvent = event
+
+	buf := make([]byte, size) // chunk size
+	var n uint32
+
+	err = windows.ReadFile(handle, buf, &n, &overlapped)
+	if err != nil && err != windows.ERROR_IO_PENDING {
+		return nil, err
+	}
+	// synchronous completion
+	if err == nil && int(n) <= size {
+		return buf[:n], nil
+	}
+
+	// wait for I/O operation to complete
+	wait, err := windows.WaitForSingleObject(event, uint32(timeout.Milliseconds()))
+	switch wait {
+	case windows.WAIT_FAILED:
+		return nil, err
+	case WaitTimeout:
+		// cancel the I/O
+		_ = windows.CancelIoEx(handle, &overlapped)
+
+		// must wait until cancellation completes
+		_, _ = windows.WaitForSingleObject(event, 1000)
+		err = windows.GetOverlappedResult(handle, &overlapped, &n, false)
+		if err == windows.ERROR_OPERATION_ABORTED {
+			return nil, fmt.Errorf("timeout reading file %s", path)
+		}
+		return nil, err
+	}
+
+	// get the result
+	err = windows.GetOverlappedResult(handle, &overlapped, &n, false)
+	if err != nil {
+		return nil, err
+	}
+
+	return buf[:n], nil
 }

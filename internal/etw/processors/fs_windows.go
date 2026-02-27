@@ -44,8 +44,6 @@ var (
 	fileObjectMisses     = expvar.NewInt("fs.file.objects.misses")
 	fileObjectHandleHits = expvar.NewInt("fs.file.object.handle.hits")
 	fileReleaseCount     = expvar.NewInt("fs.file.releases")
-
-	fsFileCharacteristicsRateLimits = expvar.NewInt("fs.file.characteristics.rate.limits")
 )
 
 type fsProcessor struct {
@@ -241,23 +239,6 @@ func (f *fsProcessor) processEvent(e *event.Event) (*event.Event, error) {
 				callstack := s.Params.MustGetSlice(params.Callstack)
 				ev.AppendParam(params.Callstack, params.Slice, callstack)
 			}
-		}
-
-		// parse PE data for created files and append parameters
-		if ev.IsCreateDisposition() && ev.IsSuccess() {
-			if !f.lim.Allow() {
-				fsFileCharacteristicsRateLimits.Add(1)
-				return ev, nil
-			}
-			path := ev.GetParamAsString(params.FilePath)
-			c, err := parseImageFileCharacteristics(path)
-			if err != nil {
-				return ev, nil
-			}
-			ev.AppendParam(params.FileIsDLL, params.Bool, c.isDLL)
-			ev.AppendParam(params.FileIsDriver, params.Bool, c.isDriver)
-			ev.AppendParam(params.FileIsExecutable, params.Bool, c.isExe)
-			ev.AppendParam(params.FileIsDotnet, params.Bool, c.isDotnet)
 		}
 
 		return ev, nil

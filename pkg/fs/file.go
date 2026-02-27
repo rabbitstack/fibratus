@@ -23,12 +23,16 @@ package fs
 
 import (
 	"expvar"
-	"github.com/rabbitstack/fibratus/pkg/sys"
-	"golang.org/x/sys/windows"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"unsafe"
+
+	"github.com/rabbitstack/fibratus/pkg/pe"
+	"github.com/rabbitstack/fibratus/pkg/sys"
+	"github.com/rabbitstack/fibratus/pkg/util/wildcard"
+	"golang.org/x/sys/windows"
 )
 
 const (
@@ -47,6 +51,70 @@ const (
 
 	devConsole = 0x00000050
 )
+
+// FileInfo represents file metadata.
+type FileInfo struct {
+	IsExecutable bool
+	IsDLL        bool
+	IsDriver     bool
+	IsDotnet     bool
+}
+
+var skippedPatterns = []string{
+	`?:\$WinREAgent\Scratch\*`,
+	`?:\WINDOWS\WinSxS\*`,
+	`?:\Windows\WinSxS\*`,
+	`?:\WINDOWS\CbsTemp\*`,
+	`?:\Windows\CbsTemp\*`,
+	`?:\WINDOWS\SoftwareDistribution\*`,
+	`?:\Windows\SoftwareDistribution\*`,
+}
+
+// ErrSkippedFile signals the file processing is skipped.
+var ErrSkippedFile = func(path string) error { return fmt.Errorf("skipped file: %s", path) }
+
+var parserOpts = []pe.Option{
+	pe.WithSections(),
+	pe.WithSymbols(),
+	pe.WithCLR(),
+}
+
+// GetFileInfo returns file metadata for the given path.
+// The file metadata consists of information extracted
+// from the Portable Executable headers.
+func GetFileInfo(path string) (*FileInfo, error) {
+	for _, pat := range skippedPatterns {
+		if wildcard.Match(pat, path) {
+			return nil, ErrSkippedFile(path)
+		}
+	}
+
+	ext := filepath.Ext(path)
+	switch strings.ToLower(ext) {
+	case ".exe":
+		return &FileInfo{IsExecutable: true}, nil
+	case ".sys":
+		return &FileInfo{IsDriver: true}, nil
+	case ".dll":
+		pefile, err := pe.ParseFile(path, parserOpts...)
+		if err != nil {
+			return &FileInfo{IsDLL: true}, nil
+		}
+		return &FileInfo{IsDLL: true, IsDotnet: pefile.IsDotnet}, nil
+	}
+
+	pefile, err := pe.ParseFile(path, parserOpts...)
+	if err != nil {
+		return nil, err
+	}
+
+	return &FileInfo{
+		IsExecutable: pefile.IsExecutable,
+		IsDLL:        pefile.IsDLL,
+		IsDriver:     pefile.IsDriver,
+		IsDotnet:     pefile.IsDotnet,
+	}, nil
+}
 
 // queryVolumeCalls represents the number of times the query volume function was called
 var queryVolumeCalls = expvar.NewInt("file.query.volume.info.calls")

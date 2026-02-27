@@ -19,6 +19,10 @@
 package processors
 
 import (
+	"os"
+	"reflect"
+	"testing"
+
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
@@ -31,9 +35,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"os"
-	"reflect"
-	"testing"
 )
 
 func TestFsProcessor(t *testing.T) {
@@ -166,10 +167,6 @@ func TestFsProcessor(t *testing.T) {
 				assert.Equal(t, "Success", e.GetParamAsString(params.NTStatus))
 				assert.Equal(t, "File", e.GetParamAsString(params.FileType))
 				assert.Equal(t, "CREATE", e.GetParamAsString(params.FileOperation))
-				assert.True(t, e.Params.MustGetBool(params.FileIsExecutable))
-				assert.False(t, e.Params.MustGetBool(params.FileIsDotnet))
-				assert.False(t, e.Params.MustGetBool(params.FileIsDLL))
-				assert.False(t, e.Params.MustGetBool(params.FileIsDriver))
 			},
 		},
 		{
@@ -193,33 +190,6 @@ func TestFsProcessor(t *testing.T) {
 			func(e *event.Event, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
 				fsProcessor := p.(*fsProcessor)
 				assert.Empty(t, fsProcessor.files)
-			},
-		},
-		{
-			"parse created file characteristics",
-			&event.Event{
-				Type:     event.CreateFile,
-				Category: event.File,
-				Params: event.Params{
-					params.FileObject:        {Name: params.FileObject, Type: params.Uint64, Value: uint64(18446738026482168384)},
-					params.ThreadID:          {Name: params.ThreadID, Type: params.Uint32, Value: uint32(1484)},
-					params.FileCreateOptions: {Name: params.FileCreateOptions, Type: params.Uint32, Value: uint32(1223456)},
-					params.FilePath:          {Name: params.FilePath, Type: params.UnicodeString, Value: exe},
-					params.FileShareMask:     {Name: params.FileShareMask, Type: params.Uint32, Value: uint32(5)},
-					params.FileIrpPtr:        {Name: params.FileIrpPtr, Type: params.Uint64, Value: uint64(1234543123112321)},
-					params.FileOperation:     {Name: params.FileOperation, Type: params.Uint64, Value: uint64(2)},
-				},
-			},
-			nil,
-			func() *handle.SnapshotterMock {
-				hsnap := new(handle.SnapshotterMock)
-				return hsnap
-			},
-			func(e *event.Event, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
-				fsProcessor := p.(*fsProcessor)
-				assert.True(t, e.WaitEnqueue)
-				assert.Contains(t, fsProcessor.irps, uint64(1234543123112321))
-				assert.True(t, reflect.DeepEqual(e, fsProcessor.irps[1234543123112321]))
 			},
 		},
 		{

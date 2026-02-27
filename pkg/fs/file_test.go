@@ -22,8 +22,10 @@
 package fs
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetFileType(t *testing.T) {
@@ -52,6 +54,53 @@ func TestGetFileType(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.filename, func(t *testing.T) {
 			assert.Equal(t, tt.wants, GetFileType(tt.filename, tt.opts))
+		})
+	}
+}
+
+func TestGetFileInfo(t *testing.T) {
+	var tests = []struct {
+		path     string
+		fileinfo *FileInfo
+		err      error
+	}{
+		{
+			`C:\System32\cmd.exe`,
+			&FileInfo{IsExecutable: true},
+			nil,
+		},
+		{
+			`C:\System32\kernel32.dll`,
+			&FileInfo{IsDLL: true},
+			nil,
+		},
+		{
+			`C:\Temp\afs.sys`,
+			&FileInfo{IsDriver: true},
+			nil,
+		},
+		{
+			`../pe/_fixtures/054299e09cea38df2b84e6b29348b418.bin`,
+			&FileInfo{IsDriver: true},
+			nil,
+		},
+		{
+			`C:\WINDOWS\SoftwareDistribution\Temp\combase.dll`,
+			nil,
+			ErrSkippedFile(`C:\WINDOWS\SoftwareDistribution\Temp\combase.dll`),
+		},
+		{
+			`../pe/_fixtures/mscorlib.dll`,
+			&FileInfo{IsDLL: true, IsDotnet: true},
+			nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			fileinfo, err := GetFileInfo(tt.path)
+			require.Equal(t, tt.err, err)
+			assert.Equal(t, tt.fileinfo, fileinfo)
 		})
 	}
 }
