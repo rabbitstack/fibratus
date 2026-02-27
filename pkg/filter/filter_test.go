@@ -1016,6 +1016,7 @@ func TestModuleFilter(t *testing.T) {
 		{`module.signature.subject icontains 'Microsoft Corporation'`, true},
 		{`module.pe.is_dotnet`, false},
 		{`module.path.stem endswith 'System32\\kernel32'`, true},
+		{`module.is_dll`, true},
 		{`dll.path.stem endswith 'System32\\kernel32'`, true},
 		{`dll.signature.type = 'EMBEDDED'`, true},
 		{`dll.signature.level = 'AUTHENTICODE'`, true},
