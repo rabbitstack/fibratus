@@ -24,6 +24,11 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/format"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
@@ -31,10 +36,6 @@ import (
 	peparserlog "github.com/saferwall/pe/log"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
-	"os"
-	"path/filepath"
-	"strings"
-	"time"
 )
 
 var (
@@ -49,6 +50,7 @@ var (
 	directoryParseErrors        = expvar.NewInt("pe.directory.parse.errors")
 	versionResourcesParseErrors = expvar.NewInt("pe.version.resources.parse.errors")
 	imphashErrors               = expvar.NewInt("pe.imphash.errors")
+	parserWarnings              = expvar.NewMap("pe.parser.warnings")
 )
 
 type opts struct {
@@ -237,7 +239,7 @@ func (l Logger) Log(level peparserlog.Level, keyvals ...interface{}) error {
 	case peparserlog.LevelInfo:
 		log.Info(keyvals[1:]...)
 	case peparserlog.LevelWarn:
-		log.Warn(keyvals[1:]...)
+		parserWarnings.Add(fmt.Sprintf("%s", keyvals[1:]), 1)
 	case peparserlog.LevelError, peparserlog.LevelFatal:
 		log.Error(keyvals[1:]...)
 	default:
