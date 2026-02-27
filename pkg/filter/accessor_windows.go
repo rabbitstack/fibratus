@@ -716,12 +716,11 @@ func (l *fileAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 			return isLOLDriver(f.Name, e)
 		}
 		return false, nil
-	case fields.FileIsDLL:
-		return e.Params.GetBool(params.FileIsDLL)
-	case fields.FileIsDriver:
-		return e.Params.GetBool(params.FileIsDriver)
-	case fields.FileIsExecutable:
-		return e.Params.GetBool(params.FileIsExecutable)
+	case fields.FileIsDLL, fields.FileIsDriver, fields.FileIsExecutable:
+		if e.IsCreateDisposition() && e.IsSuccess() {
+			return getFileInfo(f.Name, e)
+		}
+		return false, nil
 	case fields.FilePID:
 		return e.Params.GetPid()
 	case fields.FileKey:
@@ -873,14 +872,13 @@ func (*moduleAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 			return isLOLDriver(f.Name, e)
 		}
 		return false, nil
-	case fields.ImageIsDLL, fields.ModuleIsDLL:
-		return e.Params.GetBool(params.FileIsDLL)
-	case fields.ImageIsDriver, fields.ModuleIsDriver:
-		return e.Params.GetBool(params.FileIsDriver)
-	case fields.ImageIsExecutable, fields.ModuleIsExecutable:
-		return e.Params.GetBool(params.FileIsExecutable)
-	case fields.ImageIsDotnet, fields.ModuleIsDotnet, fields.DllIsDotnet:
-		return e.Params.GetBool(params.FileIsDotnet)
+	case fields.ImageIsDLL, fields.ModuleIsDLL, fields.ImageIsDriver,
+		fields.ModuleIsDriver, fields.ImageIsExecutable, fields.ModuleIsExecutable,
+		fields.ImageIsDotnet, fields.ModuleIsDotnet, fields.DllIsDotnet:
+		if e.IsLoadImage() {
+			return getFileInfo(f.Name, e)
+		}
+		return false, nil
 	}
 
 	return nil, nil
