@@ -1,0 +1,43 @@
+name: UAC bypass via CDSSync scheduled task hijack
+id: 7de08df3-c2ab-4632-ab26-37e617815edb
+version: 1.0.0
+description: |
+  Identifies attempts to bypass User Account Control (UAC) by hijacking the CDSSync
+  scheduled task through a malicious npmproxy.dll. Such behavior is indicative of a
+  UAC bypass technique where attackers abuse auto-elevated scheduled tasks to execute
+  code with elevated privileges.
+labels:
+  tactic.id: TA0004
+  tactic.name: Privilege Escalation
+  tactic.ref: https://attack.mitre.org/tactics/TA0004/
+  technique.id: T1548
+  technique.name: Abuse Elevation Control Mechanism
+  technique.ref: https://attack.mitre.org/techniques/T1548/
+  subtechnique.id: T1548.002
+  subtechnique.name: Bypass User Account Control
+  subtechnique.ref: https://attack.mitre.org/techniques/T1548/002/
+references:
+  - https://www.elastic.co/de/security-labs/exploring-windows-uac-bypasses-techniques-and-detection-strategies
+
+condition: >
+  sequence
+  maxspan 1m
+    |create_file and
+     file.path imatches '?:\\*\\System32\\npmproxy.dll' and
+     file.path not imatches
+                (
+                  '?:\\Windows\\System32\\npmproxy.dll',
+                  '?:\\Windows\\SysWOW64\\npmproxy.dll'
+                )
+    | as e1
+    |spawn_process and
+     ps.name ~= 'taskhostw.exe' and ps.token.integrity_level = 'HIGH' and
+     thread.callstack.summary imatches concat('ntdll.dll|KernelBase.dll|kernel32.dll|npmproxy.dll|*', base($e1.file.path), '|*') and
+     ps.exe not imatches '?:\\Windows\\System32\\WinSAT.exe'
+    |
+action:
+  - name: kill
+
+severity: high
+
+min-engine-version: 3.0.0
