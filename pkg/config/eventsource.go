@@ -22,10 +22,11 @@
 package config
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/event"
-	"github.com/rabbitstack/fibratus/pkg/util/bitmask"
 	"runtime"
 	"time"
+
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/util/bitmask"
 
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/spf13/viper"
@@ -57,7 +58,7 @@ const (
 
 var (
 	defaultMinBuffers    = uint32(runtime.NumCPU() * 2)
-	defaultMaxBuffers    = defaultMinBuffers + 20
+	defaultMaxBuffers    = uint32(runtime.NumCPU() * 8)
 	defaultFlushInterval = time.Second
 )
 
