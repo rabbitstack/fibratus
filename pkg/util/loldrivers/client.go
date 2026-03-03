@@ -27,16 +27,17 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	libntfs "github.com/rabbitstack/fibratus/pkg/fs/ntfs"
-	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
-	log "github.com/sirupsen/logrus"
 	"hash"
 	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/rabbitstack/fibratus/pkg/sys"
+	log "github.com/sirupsen/logrus"
 )
 
 // apiURL represents the default loldrivers API endpoint
@@ -141,6 +142,8 @@ func initClient(options ...Option) *Client {
 	return c
 }
 
+const maxDriverSize = 1_000_000 * 100
+
 // MatchHash receives the full path of the driver file and tries to read
 // the blob data from the raw device. If it succeeds, then one of the SHA1/SHA256
 // hashes are computed for the read data and the calculated hash is evaluated
@@ -148,14 +151,25 @@ func initClient(options ...Option) *Client {
 // hash calculation fail, then the driver sample name is asserted against the
 // dataset to determine if the driver is either malicious or vulnerable.
 func (c *Client) MatchHash(path string) (bool, Driver) {
-	ntfs := libntfs.NewFS()
-	defer ntfs.Close()
-	data, _, err := ntfs.ReadFull(cmdline.ExpandSystemRoot(path))
+	f, err := os.Open(path)
+	if err != nil {
+		return c.matchPath(path)
+	}
+	defer f.Close()
+	stat, err := f.Stat()
+	if err != nil {
+		return c.matchPath(path)
+	}
+	if stat.Size() > maxDriverSize {
+		return c.matchPath(path)
+	}
+
+	b, err := sys.ReadFile(path, int(stat.Size()), 1)
 	if err != nil {
 		return c.matchPath(path)
 	}
 
-	r := bytes.NewReader(data)
+	r := bytes.NewReader(b)
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
