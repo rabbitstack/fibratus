@@ -1,6 +1,6 @@
 name: Activity from unhooked NTDLL module
 id: 24f48f6c-9d97-498d-badc-65e179d19599
-version: 1.0.0
+version: 1.1.0
 description: |
   Detects suspicious activity originating from an unhooked or manually mapped copy of NTDLL loaded
   into a process. This behavior is commonly associated with defense evasion frameworks that bypass
@@ -21,6 +21,7 @@ condition: >
   maxspan 2m
   by ps.uuid
     |load_dll and
+     ps.token.integrity_level != 'SYSTEM' and
      dll.name ~= 'ntdll.dll' and foreach(thread._callstack, $frame,
                                          $frame.symbol imatches
                                                 (
@@ -35,6 +36,22 @@ condition: >
                                       '?:\\Windows\\System32\\sxwmon64.dll',
                                       '?:\\ProgramData\\Symantec\\Symantec Endpoint Protection\\*\\sysfer.dll'
                                    ) and
+      ps.exe not imatches
+                 (
+                    '?:\\Windows\\Microsoft.NET\\Framework\\*\\ngen.exe',
+                    '?:\\Windows\\Microsoft.NET\\Framework64\\*\\ngen.exe',
+                    '?:\\Windows\\Microsoft.NET\\Framework\\*\\mscorsvw.exe',
+                    '?:\\Windows\\Microsoft.NET\\Framework64\\*\\mscorsvw.exe',
+                    '?:\\Windows\\servicing\\TrustedInstaller.exe',
+                    '?:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe',
+                    '?:\\Program Files\\Microsoft Visual Studio\\Installer\\vswhere.exe',
+                    '?:\\Program Files (x86)\\Microsoft\\EdgeUpdate\\MicrosoftEdgeUpdate.exe',
+                    '?:\\Program Files\\Microsoft\\EdgeUpdate\\MicrosoftEdgeUpdate.exe',
+                    '?:\\Program Files\\Adobe\\Acrobat DC\\Acrobat\\RDCNotificationClient\\FullTrustNotifier.exe',
+                    '?:\\Program Files (x86)\\Adobe\\Acrobat DC\\Acrobat\\RDCNotificationClient\\FullTrustNotifier.exe',
+                    '?:\\Program Files (x86)\\Common Files\\Adobe\\ARM\\*\\AdobeARM.exe',
+                    '?:\\Program Files\\Common Files\\Adobe\\ARM\\*\\AdobeARM.exe'
+                 ) and
       count(ps.modules, '?:\\*ntdll.dll') >= 2 and
       not foreach(thread._callstack, $frame, $frame.module imatches ('?:\\Windows\\Sys*\\ntdll.dll') and $frame.allocation_size > 0)
     |
@@ -43,8 +60,6 @@ condition: >
       (create_file) or
       (set_thread_context) or
       (create_remote_thread) or
-      (open_process) or
-      (open_thread) or
       (set_value) or
       (rename_file) or
       (delete_file)) and
