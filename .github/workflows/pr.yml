@@ -6,6 +6,10 @@ on:
       - master
     paths-ignore:
       - "docs/**"
+      
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 env:
   GO_VERSION: 1.26.x
