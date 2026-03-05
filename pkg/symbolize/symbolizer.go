@@ -535,12 +535,16 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *event.Event) callstack.Fra
 	if !ok {
 		handle, err := windows.OpenProcess(windows.SYNCHRONIZE|windows.PROCESS_QUERY_INFORMATION, false, pid)
 		if err != nil {
+			// symbol handler initalization fails, cache
+			// the symbol for future lookups
+			s.cacheSymbolUnbacked(pid, addr, &frame)
 			return frame
 		}
 		// initialize symbol handler
 		opts := uint32(sys.SymUndname | sys.SymCaseInsensitive | sys.SymAutoPublics | sys.SymOmapFindNearest | sys.SymDeferredLoads)
 		err = s.r.Initialize(handle, opts)
 		if err != nil {
+			s.cacheSymbolUnbacked(pid, addr, &frame)
 			return frame
 		}
 		proc = &process{pid, handle, time.Now(), 1}
@@ -652,6 +656,13 @@ func (s *Symbolizer) cacheSymbol(pid uint32, addr va.Address, frame *callstack.F
 		symCachedSymbols.Add(1)
 		s.symbols[pid] = map[va.Address]syminfo{addr: {module: frame.Module, symbol: frame.Symbol, moduleAddress: frame.ModuleAddress}}
 	}
+}
+
+func (s *Symbolizer) cacheSymbolUnbacked(pid uint32, addr va.Address, frame *callstack.Frame) {
+	if frame.Module == "?" {
+		frame.Module = "unbacked"
+	}
+	s.cacheSymbol(pid, addr, frame)
 }
 
 func (s *Symbolizer) cleanSym() {
