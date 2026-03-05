@@ -262,8 +262,7 @@ func (s scanner) Scan(e *event.Event) (bool, error) {
 		if err != nil {
 			return false, nil
 		}
-		if n > 0 {
-			data = data[:n]
+		if len(data) > 0 {
 			log.Debugf("scanning ADS %s. pid: %d", filename, e.PID)
 			matches, err = s.scan(data)
 			streamScans.Add(1)
