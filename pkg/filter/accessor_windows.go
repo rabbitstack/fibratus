@@ -1078,6 +1078,11 @@ func newPEAccessor() Accessor {
 }
 
 func (pa *peAccessor) Get(f Field, e *event.Event) (params.Value, error) {
+	// ignore System process
+	if e.PID == psnap.SystemPID {
+		return nil, nil
+	}
+
 	var p *pe.PE
 	if e.PS != nil && e.PS.PE != nil {
 		p = e.PS.PE
