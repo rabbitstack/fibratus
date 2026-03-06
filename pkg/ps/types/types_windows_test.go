@@ -20,10 +20,13 @@ package types
 
 import (
 	"os"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/bootid"
+	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
@@ -127,6 +130,170 @@ func TestIsAppinfoSvc(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.ps.Cmdline, func(t *testing.T) {
 			assert.Equal(t, tt.ok, tt.ps.IsAppinfoSvc())
+		})
+	}
+}
+
+func TestFindModuleByVa(t *testing.T) {
+	base := va.Address(0x1000)
+
+	tests := []struct {
+		name            string
+		initialModules  []Module
+		liveModules     []sys.ProcessModule
+		addr            va.Address
+		expectNil       bool
+		expectName      string
+		expectCachedAdd bool
+	}{
+		{
+			name: "hit lower bound inclusive",
+			initialModules: []Module{
+				{
+					Name:        "C:\\Windows\\System32\\ntdll.dll",
+					BaseAddress: base,
+					Size:        0x200,
+				},
+			},
+			addr:       base,
+			expectName: "C:\\Windows\\System32\\ntdll.dll",
+		},
+		{
+			name: "hit upper bound exclusive",
+			initialModules: []Module{
+				{
+					Name:        "C:\\Windows\\System32\\ntdll.dll",
+					BaseAddress: base,
+					Size:        0x200,
+				},
+			},
+			addr:      base.Inc(0x200),
+			expectNil: true,
+		},
+		{
+			name: "address inside range",
+			initialModules: []Module{
+				{
+					Name:        "C:\\Windows\\System32\\ntdll.dll",
+					BaseAddress: base,
+					Size:        0x200,
+				},
+				{
+					Name:        "C:\\Windows\\System32\\kernel32.dll",
+					BaseAddress: base.Inc(10),
+					Size:        0x100,
+				},
+			},
+			addr:       base.Inc(0x100),
+			expectName: "C:\\Windows\\System32\\ntdll.dll",
+		},
+		{
+			name: "miss cached but hit live modules",
+			liveModules: []sys.ProcessModule{
+				{
+					ModuleInfo: windows.ModuleInfo{
+						BaseOfDll:   0x2000,
+						SizeOfImage: 0x300,
+					},
+					Name: "C:\\Windows\\System32\\ntdll.dll",
+				},
+			},
+			addr:            va.Address(0x2100),
+			expectName:      "C:\\Windows\\System32\\ntdll.dll",
+			expectCachedAdd: true,
+		},
+		{
+			name: "miss both cached and live",
+			initialModules: []Module{
+				{
+					Name:        "C:\\Windows\\System32\\ntdll.dll",
+					BaseAddress: base,
+					Size:        0x200,
+				},
+			},
+			liveModules: []sys.ProcessModule{
+				{
+					ModuleInfo: windows.ModuleInfo{
+						BaseOfDll:   0x3000,
+						SizeOfImage: 0x100,
+					},
+					Name: "C:\\Windows\\System32\\ntdll.dll",
+				},
+			},
+			addr:      va.Address(0x9999),
+			expectNil: true,
+		},
+		{
+			name: "multiple modules choose correct one",
+			initialModules: []Module{
+				{
+					Name:        "C:\\Windows\\System32\\ntdll.dll",
+					BaseAddress: va.Address(0x1000),
+					Size:        0x100,
+				},
+				{
+					Name:        "C:\\Windows\\System32\\kernel32.dll",
+					BaseAddress: va.Address(0x2000),
+					Size:        0x200,
+				},
+			},
+			addr:       va.Address(0x2100),
+			expectName: "C:\\Windows\\System32\\kernel32.dll",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ps := &PS{
+				PID:     1234,
+				Modules: append([]Module{}, tt.initialModules...),
+			}
+
+			ps.onceMods = sync.Once{}
+
+			queryLiveModules = func(_ uint32) []sys.ProcessModule {
+				var mods []sys.ProcessModule
+				for _, m := range tt.liveModules {
+					mods = append(mods, sys.ProcessModule{
+						ModuleInfo: windows.ModuleInfo{
+							BaseOfDll:   m.BaseOfDll,
+							SizeOfImage: m.SizeOfImage,
+						},
+						Name: m.Name,
+					})
+				}
+				return mods
+			}
+
+			mod := ps.FindModuleByVa(tt.addr)
+
+			if tt.expectNil {
+				if mod != nil {
+					t.Fatalf("expected nil, got %+v", mod)
+				}
+				return
+			}
+
+			if mod == nil {
+				t.Fatalf("expected module %s, got nil", tt.expectName)
+			}
+
+			if mod.Name != tt.expectName {
+				t.Fatalf("expected module %s, got %s", tt.expectName, mod.Name)
+			}
+
+			if tt.expectCachedAdd {
+				found := false
+				for _, m := range ps.Modules {
+					if m.Name == tt.expectName {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Fatalf("expected module to be cached")
+				}
+			}
 		})
 	}
 }

@@ -63,9 +63,6 @@ var (
 	// symModulesCount counts the number of loaded module exports
 	symModulesCount = expvar.NewInt("symbolizer.modules.count")
 
-	// symEnumModulesHits counts the number of hits from enumerated modules
-	symEnumModulesHits = expvar.NewInt("symbolizer.enum.modules.hits")
-
 	// debugHelpFallbacks counts how many times we Debug Help API was called
 	// to resolve symbol information since we fail to do this from process
 	// modules and PE export directory data
@@ -460,23 +457,6 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *event.Event) callstack.Fra
 		// perform lookup against parent modules
 		if mod == nil && ps.Parent != nil {
 			mod = ps.Parent.FindModuleByVa(addr)
-		}
-		if mod == nil {
-			// our last resort is to enumerate process modules
-			modules := sys.EnumProcessModules(pid)
-			for _, m := range modules {
-				b := va.Address(m.BaseOfDll)
-				size := uint64(m.SizeOfImage)
-				if addr >= b && addr <= b.Inc(size) {
-					mod = &pstypes.Module{
-						Name:        m.Name,
-						BaseAddress: b,
-						Size:        size,
-					}
-					symEnumModulesHits.Add(1)
-					break
-				}
-			}
 		}
 
 		if mod != nil {
