@@ -104,6 +104,10 @@ type PS struct {
 	// IsCreatedFromSystemLogger is the metadata attribute that indicates if the
 	// process state is created from the event published by the NT kernel logger.
 	IsCreatedFromSystemLogger bool `json:"-"`
+
+	// modules are process modules obtained by direct invocation to the API call.
+	modules  []sys.ProcessModule
+	onceMods sync.Once
 }
 
 // UUID is meant to offer a more robust version of process ID that
@@ -497,11 +501,15 @@ func (ps *PS) AddModule(mod Module) {
 	if m != nil {
 		return
 	}
+	ps.Lock()
+	defer ps.Unlock()
 	ps.Modules = append(ps.Modules, mod)
 }
 
 // RemoveModule removes a specified module from this process state.
 func (ps *PS) RemoveModule(addr va.Address) {
+	ps.Lock()
+	defer ps.Unlock()
 	for i, mod := range ps.Modules {
 		if mod.BaseAddress == addr {
 			ps.Modules = append(ps.Modules[:i], ps.Modules[i+1:]...)
@@ -512,6 +520,8 @@ func (ps *PS) RemoveModule(addr va.Address) {
 
 // FindModule finds the module by name.
 func (ps *PS) FindModule(path string) *Module {
+	ps.RLock()
+	defer ps.RUnlock()
 	for _, mod := range ps.Modules {
 		if filepath.Base(mod.Name) == filepath.Base(path) {
 			return &mod
@@ -522,6 +532,8 @@ func (ps *PS) FindModule(path string) *Module {
 
 // FindModuleByAddr finds the module by its base address.
 func (ps *PS) FindModuleByAddr(addr va.Address) *Module {
+	ps.RLock()
+	defer ps.RUnlock()
 	for _, mod := range ps.Modules {
 		if mod.BaseAddress == addr {
 			return &mod
@@ -530,11 +542,57 @@ func (ps *PS) FindModuleByAddr(addr va.Address) *Module {
 	return nil
 }
 
+var queryLiveModules = func(pid uint32) []sys.ProcessModule {
+	return sys.EnumProcessModules(pid)
+}
+
 // FindModuleByVa finds the module name by
 // probing the range of the given virtual address.
 func (ps *PS) FindModuleByVa(addr va.Address) *Module {
+	mod := ps.findModuleByVa(addr)
+	if mod != nil {
+		return mod
+	}
+
+	ps.onceMods.Do(func() {
+		// query live process modules
+		ps.modules = queryLiveModules(ps.PID)
+	})
+
+	// try to find the module within the VA space
+	// and if found, add it to process modules for
+	// future lookups
+	for _, m := range ps.modules {
+		b := va.Address(m.BaseOfDll)
+		size := uint64(m.SizeOfImage)
+
+		if addr < b || addr >= b.Inc(size) {
+			continue
+		}
+
+		mod := Module{
+			Name:               m.Name,
+			BaseAddress:        b,
+			Size:               size,
+			DefaultBaseAddress: b,
+		}
+
+		ps.Lock()
+		ps.Modules = append(ps.Modules, mod)
+		ps.Unlock()
+
+		return &mod
+	}
+
+	return nil
+}
+
+func (ps *PS) findModuleByVa(addr va.Address) *Module {
+	ps.RLock()
+	defer ps.RUnlock()
 	for _, mod := range ps.Modules {
-		if addr >= mod.BaseAddress && addr <= mod.BaseAddress.Inc(mod.Size) {
+		end := mod.BaseAddress.Inc(mod.Size)
+		if addr >= mod.BaseAddress && addr < end {
 			return &mod
 		}
 	}
