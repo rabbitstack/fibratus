@@ -35,6 +35,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/signature"
+	"github.com/rabbitstack/fibratus/pkg/util/terminator"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
@@ -355,6 +356,12 @@ func (s scanner) Scan(e *event.Event) (bool, error) {
 
 	totalScans.Add(1)
 	ruleMatches.Add(int64(len(matches)))
+
+	if s.config.PreventionMode {
+		if err := terminator.Kill(e.PID); err != nil {
+			log.Warnf("unable to terminate threat (pid: %d) for YARA match(es): %v", e.PID, matches)
+		}
+	}
 
 	return len(matches) > 0, s.emit(matches, e)
 }

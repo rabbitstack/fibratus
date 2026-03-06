@@ -651,3 +651,6 @@ yara:
   # Contains the list of the comma-separated process image paths that shouldn't be scanned. Wildcard matching is possible.
   #excluded-procs:
   #  - System
+
+  # If the prevention mode is enabled the detected threat is automatically terminated.
+  #prevention-mode: true

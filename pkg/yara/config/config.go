@@ -21,6 +21,10 @@ package config
 import (
 	"bytes"
 	"fmt"
+	"strings"
+	"text/template"
+	"time"
+
 	"github.com/mitchellh/mapstructure"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
@@ -28,9 +32,6 @@ import (
 	ytypes "github.com/rabbitstack/fibratus/pkg/yara/types"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"strings"
-	"text/template"
-	"time"
 )
 
 const (
@@ -44,6 +45,7 @@ const (
 	skipRegistry      = "yara.skip-registry"
 	excludedProcesses = "yara.excluded-procs"
 	excludedFiles     = "yara.excluded-files"
+	preventionMode    = "yara.prevention-mode"
 )
 
 const (
@@ -97,6 +99,8 @@ type Config struct {
 	// ExcludedProcesses contains the list of the comma-separated file paths that shouldn't be scanned.
 	// Wildcard matching is possible.
 	ExcludedFiles []string `json:"yara.excluded-files" yaml:"yara.excluded-files"`
+	// PreventionMode if the prevention mode is enabled the detected threat is automatically terminated.
+	PreventionMode bool `json:"yara.prevention-mode" yaml:"yara.prevention-mode"`
 }
 
 // InitFromViper initializes Yara config from Viper.
@@ -111,6 +115,7 @@ func (c *Config) InitFromViper(v *viper.Viper) {
 	c.SkipRegistry = v.GetBool(skipRegistry)
 	c.ExcludedFiles = v.GetStringSlice(excludedFiles)
 	c.ExcludedProcesses = v.GetStringSlice(excludedProcesses)
+	c.PreventionMode = v.GetBool(preventionMode)
 
 	all := v.AllSettings()
 	if _, ok := all["yara"]; !ok {
@@ -137,6 +142,7 @@ func AddFlags(flags *pflag.FlagSet) {
 	flags.Bool(skipRegistry, false, "Indicates whether registry value scanning is disabled")
 	flags.StringSlice(excludedFiles, []string{}, "Contains the list of the comma-separated file paths that shouldn't be scanned. Wildcard matching is possible")
 	flags.StringSlice(excludedProcesses, []string{}, "Contains the list of the comma-separated process image paths that shouldn't be scanned. Wildcard matching is possible")
+	flags.Bool(preventionMode, true, "If the prevention mode is enabled the detected threat is automatically terminated")
 }
 
 // ShouldSkipProcess determines whether the specified full process image path is rejected by the scanner.

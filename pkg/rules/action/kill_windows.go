@@ -19,40 +19,18 @@
 package action
 
 import (
-	"fmt"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
-	"golang.org/x/sys/windows"
-	"os"
-	"syscall"
+	"github.com/rabbitstack/fibratus/pkg/util/terminator"
 )
 
 // Kill terminates all processes with specified pids.
 func Kill(pids []uint32) error {
 	errs := make([]error, 0)
 	for _, pid := range pids {
-		err := terminate(pid)
+		err := terminator.Kill(pid)
 		if err != nil {
 			errs = append(errs, err)
 		}
 	}
 	return multierror.Wrap(errs...)
-}
-
-func terminate(pid uint32) error {
-	proc, err := windows.OpenProcess(syscall.PROCESS_TERMINATE, false, pid)
-	if err != nil {
-		errno, ok := err.(windows.Errno)
-		if ok && (errno.Is(os.ErrNotExist) || err == windows.ERROR_INVALID_PARAMETER) {
-			return nil
-		}
-		return fmt.Errorf("couldn't open pid %d for termination: %v", pid, err)
-	}
-	defer func() {
-		_ = windows.CloseHandle(proc)
-	}()
-	err = windows.TerminateProcess(proc, uint32(1))
-	if err != nil {
-		return fmt.Errorf("failed to kill pid %d: %v", pid, err)
-	}
-	return nil
 }

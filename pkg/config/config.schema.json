@@ -1121,6 +1121,9 @@
         "skip-registry": {
           "type": "boolean"
         },
+        "prevention-mode": {
+          "type": "boolean"
+        },
         "scan-timeout": {
           "type": "string",
           "minLength": 2,
