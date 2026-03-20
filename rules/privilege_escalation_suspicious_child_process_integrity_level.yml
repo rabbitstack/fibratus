@@ -1,6 +1,6 @@
 name: Suspicious child process integrity level
 id: b958e949-a16a-4d66-b008-15f4e8382a6e
-version: 1.0.0
+version: 1.0.1
 description: |
   Identifies the execution of the parent process running with low/medium integrity 
   level that spawns a child process with the system integrity level. Because normal 
@@ -22,7 +22,14 @@ labels:
 condition: >
   sequence
   maxspan 8m
-    |spawn_process and ps.token.integrity_level in ('LOW', 'MEDIUM')| by ps.uuid
+    |spawn_process and
+     ps.token.integrity_level in ('LOW', 'MEDIUM') and
+     ps.exe not imatches
+                (
+                  '?:\\Program Files\\Google\\GoogleUpdater\\*\\updater.exe',
+                  '?:\\Program Files (x86)\\Google\\GoogleUpdater\\*\\updater.exe'
+                )
+    | by ps.uuid
     |spawn_process and
      ps.sid = 'S-1-5-18' and
      ps.token.integrity_level = 'SYSTEM' and
@@ -31,7 +38,9 @@ condition: >
                   '?:\\Windows\\System32\\wermgr.exe',
                   '?:\\Windows\\System32\\WerFault.exe',
                   '?:\\Windows\\SysWOW64\\WerFault.exe',
-                  '?:\\Windows\\System32\\WerFaultSecure.exe'
+                  '?:\\Windows\\System32\\WerFaultSecure.exe',
+                  '?:\\Program Files\\Google\\GoogleUpdater\\*\\updater.exe',
+                  '?:\\Program Files (x86)\\Google\\GoogleUpdater\\*\\updater.exe'
                 )
     | by ps.parent.uuid
 action:

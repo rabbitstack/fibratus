@@ -1,6 +1,6 @@
 name: Embedded script execution via shortcut file
 id: 2d94a68b-03fe-4ece-9a99-f4de8ff7261d
-version: 1.0.0
+version: 1.0.1
 description: |
   Detects execution of embedded scripts delivered via Windows shortcut (.lnk) files.
   Adversaries can exploit the attack chain where a shortcut file is accessed by a
@@ -36,7 +36,8 @@ condition: >
                 '?:\\Users\\*\\AppData\\LocalLow\\*',
                 '?:\\Users\\*\\AppData\\Roaming\\*',
                 '?:\\Users\\Public\\*'
-              )
+              ) and
+     file.extension iin ('.exe', '.bat', '.com', '.scr', '.pif', '.dll', '.js', '.vbs', '.vbe', '.jse', '.wsf', '.wsh', '.hta', '.ps1', '.psm1', '.msi', '.msc', '.jar')
     |
     |spawn_process and
      ps.name iin
@@ -48,9 +49,16 @@ condition: >
                 'cmd.exe',
                 'connhost.exe',
                 'rundll32.exe',
+                'regsvr32.exe',
                 'forfiles.exe',
                 'wmic.exe',
-                'msbuild.exe'
+                'msbuild.exe',
+                'java.exe',
+                'javaw.exe',
+                'mmc.exe',
+                'cscript.exe',
+                'installutil.exe',
+                'scriptrunner.exe'
               )
     |
 action:

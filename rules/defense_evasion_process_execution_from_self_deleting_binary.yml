@@ -1,6 +1,6 @@
 name: Process execution from a self-deleting binary
 id: 0f0da517-b22c-4d14-9adc-36baeb621cf7
-version: 1.0.5
+version: 1.0.6
 description: |
   Identifies the execution of the process from a self-deleting binary. The attackers can
   abuse undocumented API functions to create a process from a file-backed section. The file 
@@ -28,12 +28,18 @@ condition: >
                   '?:\\WINDOWS\\uus\\packages\\preview\\*\\wuaucltcore.exe',
                   '?:\\WINDOWS\\uus\\packages\\preview\\*\\MoUsoCoreWorker.exe',
                   '?:\\WINDOWS\\System32\\svchost.exe',
-                  '?:\\WINDOWS\\winsxs\\*\\TiWorker.exe'
+                  '?:\\WINDOWS\\winsxs\\*\\TiWorker.exe',
+                  '?:\\Windows\\UUS\\*\\wuaucltcore.exe'
                 ) and
+     ps.parent.exe not imatches '?:\\WINDOWS\\uus\\*\\wuaucltcore.exe' and
      file.path not imatches
                 (
-                  '?:\\Windows\\SoftwareDistribution\\Download\\*',
-                  '?:\\Windows\\uus\\packages\\preview\\*'
+                  '?:\\Windows\\SoftwareDistribution\\Download\\*.exe',
+                  '?:\\Windows\\uus\\packages\\preview\\*.exe',
+                  '?:\\$WinREAgent\\Scratch\\*.exe',
+                  '?:\\WINDOWS\\WinSxS\\*.exe',
+                  '?:\\WINDOWS\\CbsTemp\\*.exe',
+                  '?:\\WINDOWS\\SoftwareDistribution\\*.exe'
                 )
     | by file.name
     |load_module and ext(module.path) != '.dll'| by module.name

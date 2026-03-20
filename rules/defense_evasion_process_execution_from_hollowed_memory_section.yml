@@ -1,6 +1,6 @@
 name: Process execution from hollowed memory section
 id: 2a3fbae8-5e8c-4b71-b9da-56c3958c0d53
-version: 2.1.1
+version: 2.1.2
 description: |
   Adversaries may inject malicious code into suspended and hollowed processes in order to
   evade process-based defenses. Process hollowing is a method of executing arbitrary code
@@ -35,7 +35,8 @@ condition: >
                     )
     | by ps.uuid, file.view.base
     |load_executable and
-     module.path not imatches '?:\\Windows\\SoftwareDistribution\\Download\\*\\Package_for_RollupFix*\\*.exe'
+     module.path not imatches '?:\\Windows\\SoftwareDistribution\\Download\\*\\Package_for_RollupFix*\\*.exe' and
+     (ps.exe not imatches '?:\\Windows\\System32\\conhost.exe' and ps.cmdline not imatches '*0xffffffff -ForceV1' and ps.parent.exe not imatches '?:\\Windows\\System32\\WindowsPowerShell\\*\\powershell.exe')
     | by ps.uuid, module.base
 action:
   - name: kill
