@@ -1,6 +1,6 @@
 name: DLL loaded via LdrpKernel32 overwrite
 id: 56739eda-210f-4a30-a114-d55ca60976df
-version: 1.0.4
+version: 1.0.5
 description: |
   Detects attempts to bypass the standard NTDLL bootstrap process by loading a malicious DLL early through hijacking. 
   The malicious DLL, containing attacker-controlled code, is loaded in place of the legitimate kernel32 DLL.
@@ -8,6 +8,7 @@ labels:
   tactic.id: TA0005
   tactic.name: Defense Evasion
   tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1574
   technique.name: Hijack Execution Flow
   technique.ref: https://attack.mitre.org/techniques/T1574/
   subtechnique.id: T1574.001

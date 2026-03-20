@@ -1,6 +1,6 @@
 name: Potential port monitor or print processor persistence via registry modification
 id: de04ae6b-8141-41af-9baa-15630b5954cc
-version: 1.0.2
+version: 1.0.3
 description: |
   Identifies port monitor or print process registry modifications that would allow
   adversaries to run malicious DLLs during system boot.
@@ -8,6 +8,7 @@ labels:
   tactic.id: TA0003
   tactic.name: Persistence
   tactic.ref: https://attack.mitre.org/tactics/TA0003/
+  technique.id: T1547
   technique.name: Boot or Logon Autostart Execution
   technique.ref: https://attack.mitre.org/techniques/T1547/
   subtechnique.id: T1547.010
