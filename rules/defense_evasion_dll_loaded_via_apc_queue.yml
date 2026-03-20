@@ -1,6 +1,6 @@
 name: DLL loaded via APC queue
 id: e1ee3912-ad7c-4acb-80f4-84db87e54d5e
-version: 1.0.4
+version: 1.0.5
 description: |
   Identifies loading of a DLL with a callstack originating from the thread
   alertable state that led to the execution of an APC routine. This may be
@@ -9,9 +9,9 @@ labels:
   tactic.id: TA0005
   tactic.name: Defense Evasion
   tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1055
   technique.name: Process Injection
   technique.ref: https://attack.mitre.org/techniques/T1055/
-  subtechnique.id: T1055.003
 references:
   - https://github.com/Idov31/Cronos
 

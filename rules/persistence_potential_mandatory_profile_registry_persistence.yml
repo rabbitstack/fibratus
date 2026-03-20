@@ -1,6 +1,6 @@
 name: Potential mandatory profile registry persistence
 id: e9c9fa57-5088-4d40-8a5e-2aa70ec6e189
-version: 1.0.0
+version: 1.0.1
 description: |
   Identifies suspicious creation of the NTUSER.MAN file within user profile
   directories, a lesser-known persistence technique that abuses mandatory
@@ -11,6 +11,7 @@ labels:
   tactic.id: TA0003
   tactic.name: Persistence
   tactic.ref: https://attack.mitre.org/tactics/TA0003/
+  technique.id: T1547
   technique.name: Boot or Logon Autostart Execution
   technique.ref: https://attack.mitre.org/techniques/T1547/
   subtechnique.id: T1547.001
