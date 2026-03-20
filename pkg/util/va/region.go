@@ -20,12 +20,13 @@ package va
 
 import (
 	"expvar"
-	"github.com/rabbitstack/fibratus/pkg/sys"
-	"golang.org/x/sys/windows"
-	"golang.org/x/time/rate"
 	"strconv"
 	"sync"
 	"unsafe"
+
+	"github.com/rabbitstack/fibratus/pkg/sys"
+	"golang.org/x/sys/windows"
+	"golang.org/x/time/rate"
 )
 
 const (
@@ -181,19 +182,6 @@ func VirtualQuery(process windows.Handle, addr uint64) *RegionInfo {
 		proc:     process,
 		State:    mem.State,
 	}
-}
-
-// QueryWorkingSet retrieves extended information about
-// the pages at specific virtual addresses in the address
-// space of the specified process.
-func QueryWorkingSet(process windows.Handle, addr uint64) *sys.MemoryWorkingSetExBlock {
-	var ws sys.MemoryWorkingSetExInformation
-	ws.VirtualAddress = uintptr(addr)
-	err := sys.QueryWorkingSet(process, &ws, uint32(unsafe.Sizeof(sys.MemoryWorkingSetExInformation{})))
-	if err != nil {
-		return nil
-	}
-	return &ws.VirtualAttributes
 }
 
 // Remove removes the process handle from cache and closes it.

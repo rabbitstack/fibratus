@@ -19,13 +19,14 @@
 package va
 
 import (
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"golang.org/x/sys/windows"
 	"os"
 	"testing"
 	"time"
 	"unsafe"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"golang.org/x/sys/windows"
 )
 
 func TestRegionProber(t *testing.T) {
@@ -123,19 +124,6 @@ func TestReadArea(t *testing.T) {
 	zeroArea := ReadArea(windows.CurrentProcess(), base, 4096, 0x100, false)
 	require.Len(t, zeroArea, 4096)
 	require.True(t, Zeroed(zeroArea))
-}
-
-func TestQueryWorkingSet(t *testing.T) {
-	addr, err := getModuleBaseAddress(uint32(os.Getpid()))
-	require.NoError(t, err)
-
-	b := QueryWorkingSet(windows.CurrentProcess(), uint64(addr))
-	require.NotNil(t, b)
-
-	require.True(t, b.Valid())
-	require.False(t, b.Bad())
-	require.True(t, b.SharedOriginal())
-	require.True(t, (b.Win32Protection()&windows.PAGE_READONLY) != 0)
 }
 
 func getModuleBaseAddress(pid uint32) (uintptr, error) {

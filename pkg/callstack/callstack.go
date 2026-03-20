@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/arch/x86/x86asm"
 	"golang.org/x/sys/windows"
@@ -66,23 +67,34 @@ func (f *Frame) AllocationSize(proc windows.Handle) uint64 {
 		return 0
 	}
 
+	pageCount := r.Size / pageSize
+	m := make([]sys.MemoryWorkingSetExInformation, pageCount)
+	for n := range pageCount {
+		addr := f.Addr.Inc(n * pageSize)
+		m[n].VirtualAddress = addr.Uintptr()
+	}
+
+	ws := va.QueryWorkingSet(proc, m)
+	if ws == nil {
+		return 0
+	}
+
 	var size uint64
 
 	// traverse all pages in the region
-	for n := uint64(0); n < r.Size; n += pageSize {
-		addr := f.Addr.Inc(n)
-		ws := va.QueryWorkingSet(proc, addr.Uint64())
-		if ws == nil || !ws.Valid() {
+	for _, r := range ws {
+		attr := r.VirtualAttributes
+		if !attr.Valid() {
 			continue
 		}
 
 		// use SharedOriginal after RS3/1709
 		if buildNumber >= 16299 {
-			if !ws.SharedOriginal() {
+			if !attr.SharedOriginal() {
 				size += pageSize
 			}
 		} else {
-			if !ws.Shared() {
+			if !attr.Shared() {
 				size += pageSize
 			}
 		}
