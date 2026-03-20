@@ -1,6 +1,6 @@
 name: Windows Defender driver unloading
 id: c9b93fbc-8845-4f39-a74b-26862615432c
-version: 1.0.1
+version: 1.0.2
 description: |
   Detects the unloading of Windows Defender kernel-mode drivers, such as WdFilter.sys or WdBoot.sys,
   which may indicate an attempt to impair or disable antivirus protections. 
@@ -19,7 +19,8 @@ labels:
   subtechnique.ref: https://attack.mitre.org/techniques/T1562/001
 
 condition: >
-  unload_driver and module.path imatches ('?:\\Windows\\System32\\drivers\\wd\\*.sys', '?:\\Windows\\System32\\drivers\\Wd*.sys')
+  unload_driver and
+  evt.pid != 4 and module.path imatches ('?:\\Windows\\System32\\drivers\\wd\\*.sys', '?:\\Windows\\System32\\drivers\\Wd*.sys')
 
 output: >
   Windows Defender driver %module.path unloaded by process %ps.exe

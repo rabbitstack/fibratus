@@ -1,6 +1,6 @@
 name: Potential NTDLL unhooking via file mapping
 id: b000955d-90df-44eb-8e32-8269d395f0ef
-version: 1.0.0
+version: 1.0.1
 description: |
   Identifies processes that map a fresh image view of NTDLL.dll
   from disk, a behavior commonly associated with user-mode API
@@ -30,7 +30,8 @@ condition: >
               '?:\\Windows\\System32\\WerFault.exe',
               '?:\\Windows\\SysWOW64\\WerFault.exe',
               '?:\\Windows\\System32\\wermgr.exe',
-              '?:\\Windows\\SysWOW64\\wermgr.exe'
+              '?:\\Windows\\SysWOW64\\wermgr.exe',
+              '?:\\Windows\\System32\\taskhostw.exe'
             )
 
 severity: high
