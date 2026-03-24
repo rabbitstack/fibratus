@@ -20,7 +20,9 @@ package event
 
 import (
 	"encoding/binary"
+
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
+	"github.com/rabbitstack/fibratus/pkg/util/colorizer"
 	"github.com/rabbitstack/fibratus/pkg/util/hashers"
 	"golang.org/x/sys/windows"
 )
@@ -634,4 +636,120 @@ func pack(g windows.GUID, id uint16) Type {
 		g.Data4[7],
 		byte(id >> 8), byte(id),
 	}
+}
+
+// color return the colorized event type to render by the color formatter.
+func (t Type) color() string {
+	switch t {
+	case CreateFile, ReadFile, CloseFile, SetFileInformation, MapViewFile, UnmapViewFile:
+		return colorizer.SpanBold(colorizer.Cyan, t.String())
+
+	case RenameFile:
+		return colorizer.SpanBold(colorizer.Amber, t.String())
+
+	case WriteFile:
+		return colorizer.SpanBold(colorizer.Teal, t.String())
+
+	case DeleteFile:
+		return colorizer.SpanBold(colorizer.Red, t.String())
+
+	case RegOpenKey, RegCreateKey, RegQueryValue, RegQueryKey:
+		return colorizer.SpanBold(colorizer.Yellow, t.String())
+
+	case RegDeleteKey, RegDeleteValue:
+		return colorizer.SpanBold(colorizer.Red, t.String())
+
+	case RegSetValue:
+		return colorizer.SpanBold(colorizer.Amber, t.String())
+
+	case CreateProcess, OpenProcess:
+		return colorizer.SpanBold(colorizer.Green, t.String())
+
+	case TerminateProcess:
+		return colorizer.SpanBold(colorizer.Red, t.String())
+
+	case CreateThread, OpenThread:
+		return colorizer.SpanBold(colorizer.Green, t.String())
+
+	case TerminateThread:
+		return colorizer.SpanBold(colorizer.Red, t.String())
+
+	case SetThreadContext:
+		return colorizer.SpanBold(colorizer.Amber, t.String())
+
+	case LoadImage, UnloadImage:
+		return colorizer.SpanBold(colorizer.Magenta, t.String())
+
+	case SendTCPv4, SendTCPv6, SendUDPv4, SendUDPv6,
+		RecvTCPv4, RecvTCPv6, RecvUDPv4, RecvUDPv6:
+		return colorizer.SpanBold(colorizer.Blue, t.String())
+
+	case ConnectTCPv4, ConnectTCPv6:
+		return colorizer.SpanBold(colorizer.Teal, t.String())
+
+	case DisconnectTCPv4, DisconnectTCPv6:
+		return colorizer.SpanBold(colorizer.Blue, t.String())
+
+	case AcceptTCPv4, AcceptTCPv6:
+		return colorizer.SpanBold(colorizer.Teal, t.String())
+
+	case QueryDNS, ReplyDNS:
+		return colorizer.SpanBold(colorizer.Indigo, t.String())
+
+	case CreateHandle, CloseHandle:
+		return colorizer.SpanBold(colorizer.Gray, t.String())
+	case DuplicateHandle:
+		return colorizer.SpanBold(colorizer.Amber, t.String())
+
+	case VirtualAlloc, VirtualFree:
+		return colorizer.SpanBold(colorizer.Magenta, t.String())
+
+	case CreateSymbolicLinkObject:
+		return colorizer.SpanBold(colorizer.Lavender, t.String())
+
+	case SubmitThreadpoolCallback, SubmitThreadpoolWork, SetThreadpoolTimer:
+		return colorizer.SpanBold(colorizer.Lavender, t.String())
+
+	default:
+		return colorizer.SpanBold(colorizer.White, t.String())
+	}
+}
+
+// arrow renders the prefix arrow according to event severity.
+// Events are grouped by destructive, mutate, read, and housekeeping
+// severities. Destructive severity covers events that irreversibly
+// alter system state: process termination, file deletion, registry
+// key deletion, code injection.
+//
+// Mutate covers write/create operations: file writes, registry value
+// sets, process creation, thread context changes.
+//
+// Read covers read/query/open operations that consume but do not
+// alter state. Finally, houskeeping covers close/cleanup
+// events that are expected noise in a healthy system.
+func (t Type) arrow() string {
+	var clr uint8
+	switch t {
+	case TerminateProcess, TerminateThread, DeleteFile, RegDeleteKey,
+		RegDeleteValue, UnloadImage, VirtualFree, UnmapViewFile:
+		clr = colorizer.Red
+
+	case CreateProcess, CreateFile, WriteFile, RenameFile, SetFileInformation,
+		RegCreateKey, RegSetValue, CreateThread, SetThreadContext, VirtualAlloc, MapViewFile,
+		DuplicateHandle, ConnectTCPv4, ConnectTCPv6, AcceptTCPv4, AcceptTCPv6,
+		SendTCPv4, SendTCPv6, SendUDPv4, SendUDPv6:
+		clr = colorizer.Amber
+
+	case ReadFile, EnumDirectory, LoadImage, RegOpenKey, RegQueryKey, RegQueryValue, OpenProcess,
+		OpenThread, CreateHandle, RecvTCPv4, RecvTCPv6, RecvUDPv4, RecvUDPv6:
+		clr = colorizer.Teal
+
+	case QueryDNS, ReplyDNS:
+		clr = colorizer.Indigo
+
+	default:
+		clr = colorizer.Gray
+	}
+
+	return colorizer.SpanBold(clr, "› ")
 }
