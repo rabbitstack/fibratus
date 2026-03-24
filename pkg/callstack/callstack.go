@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2022 by Nedim Sabic Sabic
+ * Copyright 2021-present by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -30,6 +30,15 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+// FrameProvenance designates the frame provenance
+type FrameProvenance uint8
+
+const (
+	Kernel FrameProvenance = iota
+	System
+	User
+)
+
 // unbacked represents the identifier for unbacked regions in stack frames
 const unbacked = "unbacked"
 
@@ -46,6 +55,20 @@ type Frame struct {
 	Symbol        string     // symbol name
 	Module        string     // module name
 	ModuleAddress va.Address // module base address
+}
+
+// Provenance resolves the frame provenance.
+func (f Frame) Provenance() FrameProvenance {
+	if f.Addr.InSystemRange() {
+		return Kernel
+	}
+
+	mod := filepath.Base(strings.ToLower(f.Module))
+	if mod == "ntdll.dll" || mod == "kernel32.dll" || mod == "kernelbase.dll" {
+		return System
+	}
+
+	return User
 }
 
 // IsUnbacked returns true if this frame is originated

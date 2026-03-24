@@ -498,6 +498,9 @@
                 "enabled": {
                   "type": "boolean"
                 },
+                "colorize": {
+                  "type": "boolean"
+                },
                 "format": {
                   "type": "string",
                   "enum": [

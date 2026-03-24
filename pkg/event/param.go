@@ -28,7 +28,9 @@ import (
 
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/network"
+	"github.com/rabbitstack/fibratus/pkg/util/colorizer"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
+	"github.com/rabbitstack/fibratus/pkg/util/ntstatus"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -740,4 +742,81 @@ func (pars Params) findParam(name string) (*Param, error) {
 		return nil, &errors.ErrParamNotFound{Name: name}
 	}
 	return pars[name], nil
+}
+
+// Colorize renders the full parameter list for the {{.Params}} tag.
+// Each entry is formatted as: key <separator> value, with the key in
+// amber, the seperator dim, and the value semantically coloured.
+func (pars Params) Colorize() string {
+	if len(pars) == 0 {
+		return ""
+	}
+
+	// sort parameters by name
+	s := make([]*Param, 0, len(pars))
+	for _, par := range pars {
+		s = append(s, par)
+	}
+	sort.Slice(s, func(i, j int) bool { return s[i].Name < s[j].Name })
+
+	var b strings.Builder
+	b.Grow(len(pars) * 40)
+
+	for i, p := range s {
+		if i > 0 {
+			b.WriteString(colorizer.SpanDim(", "))
+		}
+		b.WriteString(colorizer.Span(colorizer.Amber, p.Name))
+		b.WriteString(colorizer.SpanDim(ParamKVDelimiter))
+		b.WriteString(p.color())
+	}
+
+	return b.String()
+}
+
+// color applies a semantic colour to a single parameter value based
+// on its type and for string types its content.
+func (p *Param) color() string {
+	switch p.Type {
+	case params.Address:
+		return colorizer.SpanDim(colorizer.Span(colorizer.Gray, "0x"+p.String()))
+
+	case params.Status:
+		v := p.String()
+
+		if v == ntstatus.Success {
+			return colorizer.Span(colorizer.Green, v)
+		}
+		return colorizer.Span(colorizer.Red, v)
+
+	case params.Int8, params.Int16, params.Int32, params.Int64,
+		params.Uint8, params.Uint16, params.Uint32, params.Uint64,
+		params.Float, params.Double:
+		return colorizer.Span(colorizer.Yellow, p.String())
+
+	case params.Bool:
+		b, ok := p.Value.(bool)
+		if !ok {
+			return colorizer.Span(colorizer.Coral, p.String())
+		}
+		if b {
+			return colorizer.Span(colorizer.Green, p.String())
+		}
+		return colorizer.Span(colorizer.Coral, p.String())
+
+	case params.UnicodeString, params.AnsiString, params.SID:
+		return colorizer.Span(colorizer.White, p.String())
+
+	case params.IPv4, params.IPv6:
+		return colorizer.Span(colorizer.Blue, p.String())
+
+	case params.Port:
+		return colorizer.Span(colorizer.Cyan, p.String())
+
+	case params.PID, params.TID:
+		return colorizer.Span(colorizer.Green, p.String())
+
+	default:
+		return colorizer.Span(colorizer.White, p.String())
+	}
 }

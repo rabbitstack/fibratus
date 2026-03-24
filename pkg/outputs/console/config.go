@@ -25,6 +25,7 @@ const (
 	tmpl             = "output.console.template"
 	paramKVDelimiter = "output.console.kv-delimiter"
 	enabled          = "output.console.enabled"
+	colorize         = "output.console.colorize"
 )
 
 // Config contains the tweaks that influence the behaviour of the console output.
@@ -33,6 +34,7 @@ type Config struct {
 	Template         string `mapstructure:"template"`
 	ParamKVDelimiter string `mapstructure:"kv-delimiter"`
 	Enabled          bool   `mapstructure:"enabled"`
+	Colorize         bool   `mapstructure:"colorize"`
 }
 
 // AddFlags registers persistent flags.
@@ -41,4 +43,5 @@ func AddFlags(flags *pflag.FlagSet) {
 	flags.String(paramKVDelimiter, "", "The delimiter symbol for the params key/value pairs")
 	flags.String(tmpl, "", "Event formatting template")
 	flags.Bool(enabled, true, "Indicates if the console output is enabled")
+	flags.Bool(colorize, true, "Indicates if the console output is colorized")
 }

@@ -21,9 +21,10 @@ package console
 import (
 	"bufio"
 	"expvar"
+	"os"
+
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/outputs"
-	"os"
 )
 
 var (
@@ -40,9 +41,10 @@ const (
 )
 
 type console struct {
-	writer    *bufio.Writer
-	formatter *event.Formatter
-	format    format
+	writer         *bufio.Writer
+	formatter      *event.Formatter
+	colorFormatter *event.ColorFormatter
+	format         format
 }
 
 func init() {
@@ -59,10 +61,12 @@ func initConsole(config outputs.Config) (outputs.OutputGroup, error) {
 	if tmpl == "" {
 		tmpl = template
 	}
+
 	formatter, err := event.NewFormatter(tmpl)
 	if err != nil {
 		return outputs.Fail(err)
 	}
+
 	if cfg.ParamKVDelimiter != "" {
 		event.ParamKVDelimiter = cfg.ParamKVDelimiter
 	}
@@ -72,6 +76,11 @@ func initConsole(config outputs.Config) (outputs.OutputGroup, error) {
 		formatter: formatter,
 		format:    format(cfg.Format),
 	}
+
+	if cfg.Colorize {
+		c.colorFormatter = event.NewColorFormatter(formatter)
+	}
+
 	return outputs.Success(c), nil
 }
 
@@ -84,7 +93,11 @@ func (c *console) Publish(batch *event.Batch) error {
 		case json:
 			buf = evt.MarshalJSON()
 		case pretty:
-			buf = c.formatter.Format(evt)
+			if c.colorFormatter != nil {
+				buf = c.colorFormatter.Format(evt)
+			} else {
+				buf = c.formatter.Format(evt)
+			}
 		default:
 			return nil
 		}

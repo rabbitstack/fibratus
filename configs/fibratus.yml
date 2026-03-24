@@ -313,6 +313,9 @@ output:
     # Indicates whether the console output is active
     enabled: true
 
+    # Indicates if the console output is colorized
+    colorize: true
+
     # Specifies the console output format. The "pretty" format dictates that formatting is accomplished
     # by replacing the specifiers in the template. The "json" format outputs the event as a raw JSON string
     format: pretty
