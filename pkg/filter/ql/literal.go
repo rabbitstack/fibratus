@@ -98,7 +98,16 @@ func (s StringLiteral) String() string {
 	return s.Value
 }
 
-func (f FieldLiteral) String() string {
+func (f *FieldLiteral) String() string {
+	if f.Arg != "" {
+		var b strings.Builder
+		b.Grow(len(f.Value) + len(f.Arg) + 2)
+		b.WriteString(f.Value)
+		b.WriteByte('[')
+		b.WriteString(f.Arg)
+		b.WriteByte(']')
+		return b.String()
+	}
 	return f.Value
 }
 
