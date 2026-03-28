@@ -71,6 +71,19 @@ type Field struct {
 	Arg   string
 }
 
+func (f *Field) String() string {
+	if f.Arg != "" {
+		var b strings.Builder
+		b.Grow(len(f.Value) + len(f.Arg) + 2)
+		b.WriteString(f.Value)
+		b.WriteByte('[')
+		b.WriteString(f.Arg)
+		b.WriteByte(']')
+		return b.String()
+	}
+	return f.Value
+}
+
 // BoundField contains the field meta attributes in addition to bound field specific fields.
 type BoundField struct {
 	Field    Field
@@ -489,15 +502,15 @@ func (f *filter) mapValuer(evt *event.Event) map[string]any {
 			v, err := accessor.Get(field, evt)
 			if v == nil || err != nil {
 				if v == nil {
-					valuer[field.Value] = defaultAccessorValue(field)
+					valuer[field.String()] = defaultAccessorValue(field)
 				}
 				if err != nil && !errs.IsParamNotFound(err) {
-					valuer[field.Value] = defaultAccessorValue(field)
+					valuer[field.String()] = defaultAccessorValue(field)
 					accessorErrors.Add(err.Error(), 1)
 				}
 				continue
 			}
-			valuer[field.Value] = v
+			valuer[field.String()] = v
 			break
 		}
 	}
@@ -507,7 +520,7 @@ func (f *filter) mapValuer(evt *event.Event) map[string]any {
 // addField appends a new field to the filter fields list.
 func (f *filter) addField(field *ql.FieldLiteral) {
 	for _, f := range f.fields {
-		if f.Value == field.Value {
+		if f.String() == field.String() {
 			return
 		}
 	}

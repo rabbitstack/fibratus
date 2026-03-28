@@ -21,12 +21,13 @@
 package ql
 
 import (
-	fuzzysearch "github.com/lithammer/fuzzysearch/fuzzy"
-	"github.com/rabbitstack/fibratus/pkg/util/sets"
-	"github.com/rabbitstack/fibratus/pkg/util/wildcard"
 	"net"
 	"strconv"
 	"strings"
+
+	fuzzysearch "github.com/lithammer/fuzzysearch/fuzzy"
+	"github.com/rabbitstack/fibratus/pkg/util/sets"
+	"github.com/rabbitstack/fibratus/pkg/util/wildcard"
 )
 
 // Eval evaluates expr against a map that contains the field values.
@@ -198,7 +199,7 @@ func (v *ValuerEval) Eval(expr Expr) interface{} {
 	case *BoolLiteral:
 		return expr.Value
 	case *FieldLiteral:
-		val, ok := v.Valuer.Value(expr.Value)
+		val, ok := v.Valuer.Value(expr.String())
 		if !ok {
 			return nil
 		}
