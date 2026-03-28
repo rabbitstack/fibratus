@@ -6,7 +6,7 @@ The `eventlog` alert sender sends alerts to the [Windows Eventlog](https://semat
   <img src="alerts/senders/images/eventlog.gif" style="border-radius: 4px; backdrop-filter: blur(15px) saturate(3); filter: drop-shadow(0 0 0.75rem rgba(30, 30, 30, 0.4));" />
 </p>
 
-### Configuration {docsify-ignore}
+### Configuration 
 
 The `eventlog` alert sender configuration is located in the `alertsenders.eventlog` section.
 

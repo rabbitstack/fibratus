@@ -8,7 +8,7 @@ To replay the `kcap` file, you launch the following command.
 $ fibratus replay -k events
 ```
 
-### Filtering {docsify-ignore}
+### Filtering 
 
 To drill down into capture by filtering out valuable events, you can provide a filter.
 
@@ -16,7 +16,7 @@ To drill down into capture by filtering out valuable events, you can provide a f
 $ fibratus replay file.name contains 'Temp' -k fs-events
 ```
 
-### Filaments {docsify-ignore}
+### Filaments 
 
 Another compelling use case stems from running a filament on top of events living in the capture. To run a filament you supply the filament name via the `-f` or `--filament.name` option.
 

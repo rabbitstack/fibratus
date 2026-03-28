@@ -31,7 +31,7 @@ The transformer produces the following parameters:
 }
 ```
 
-### Configuration {docsify-ignore}
+### Configuration 
 
 The `replace` transformer configuration is located in the `transformers.replace` section.
 

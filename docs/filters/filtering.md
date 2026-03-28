@@ -1,6 +1,6 @@
 # Filtering
 
-### Anatomy of a filter {docsify-ignore}
+### Anatomy of a filter 
 
 At its simplest form, a filter is composed of the LHS (Left Hand Side) and RHS (Right Hand Side) expressions connected with an [operator](/filters/operators) that can pertain to binary, logical, or string operators. The LHS expression is usually a [field](/filters/fields) [path](/filters/paths), even though the use of fields is possible in Right Hand Side expressions as well.
 
@@ -18,7 +18,7 @@ The RHS expressions can be strings, numbers, IP addresses, boolean values, and f
 - Numbers: `ps.pid = 4`
 - Fields: `kevt.pid != ps.pid`
 
-### Running filters {docsify-ignore}
+### Running filters 
 
 As previously mentioned, filters can be engaged in various stages of event collection and processing. The filter expression is given  to `run`, `capture`, and `replay` commands in form of the command line argument.
 
@@ -45,7 +45,7 @@ $ fibratus replay kevt.name = 'RegSetValue' -k events
 
 Lastly, filtering is possible during filament execution. If the filter is set in both, the `run` command and through the `kfilter` function, the latter takes precedence. Filtering in filaments is thoroughly explained in [filaments](/filaments/introduction).
 
-### Escaping characters {docsify-ignore}
+### Escaping characters 
 
 As you might have noticed, string values are enclosed in single quotes `''`. If the string contains characters that would result in an illegal identifier, you'll have to escape the offending characters accordingly. For example, path delimiters (backslashes) or quotes need to be escaped:
 
@@ -56,7 +56,7 @@ $ fibratus run --forward file.name contains '\"hosts\"'
 
 Filter expressions can accept escape sequences, such as newline characters (`\n`).
 
-### Invalid filters {docsify-ignore}
+### Invalid filters 
 
 If a syntax error is present in the filter, a hint is given indicating the erroneous position in the expression.  
 

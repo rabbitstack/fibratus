@@ -4,7 +4,7 @@ Sections are the fundamental building block of the PE data. They contain the con
 
 Fibratus obtains the number of sections, and for each section encountered in the PE data, its name and size is fetched. For example, the code section is called `.text` and the data section is called `.data`. Sometimes the malware specimens tamper the PE structure and alter sections. You can hunt for a non-standard number of sections in the executable or detect extraneous sections by checking the data surfaced by Fibratus.
 
-### Reading extended section data {docsify-ignore}
+### Reading extended section data 
 
 For a full-blown section parsing, you can enable the `read-sections` option. This instructs the PE parser to read the underlying section bytes for the purpose of computing the `md5` hash of each section. It is possible to write filter expressions that involve evaluating the section attributes.
 

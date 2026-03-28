@@ -33,7 +33,7 @@ The transformer produces the following parameters:
 }
 ```
 
-### Configuration {docsify-ignore}
+### Configuration 
 
 The `trim` transformer configuration is located in the `transformers.trim` section.
 

@@ -2,7 +2,7 @@
 
 Console is the default output. It renders the inbound event flow onto the console. The console output tends to reduce the number of I/O syscalls by buffering the incoming event lines.
 
-### Configuration {docsify-ignore}
+### Configuration 
 
 The console output configuration is located in the `outputs.console` section.
 
@@ -30,7 +30,7 @@ Defines the template that's used in the event formatter. For more details, see t
 
 **default**: `{{ .Seq }} {{ .Timestamp }} - {{ .CPU }} {{ .Process }} ({{ .Pid }}) - {{ .Type }} ({{ .Kparams }})`
 
-### Templates {docsify-ignore}
+### Templates 
 
 The template consists of a collection of named placeholders that event formatter replaces with desired values. The syntax of the template resembles the Go [template](https://golang.org/pkg/text/template/) engine constructs, excepts the event formatter lacks advanced templating features such as loops , functions or `if` statements.
 

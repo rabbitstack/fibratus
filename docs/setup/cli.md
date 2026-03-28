@@ -1,4 +1,4 @@
-## CLI {docsify-ignore}
+## CLI 
 
 Invoking the `fibratus` binary without any parameters reveals available CLI commands. You can obtain help information for each available command by appending the `--help` or `-h` option after the command name. Let's briefly describe available commands.
 
@@ -6,10 +6,7 @@ Invoking the `fibratus` binary without any parameters reveals available CLI comm
 
 The main command for bootstrapping Fibratus (either in rule engine or event forwarder mode) or running a filament. It accepts an optional filter expression. Examples:
 
-- collect all events
-  ```
-  $ fibratus run --forward
-  ```
+- collect all events $ fibratus run --forward
 
 - run the `watch_files` filament
   ```

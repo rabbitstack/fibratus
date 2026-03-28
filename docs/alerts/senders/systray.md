@@ -2,7 +2,7 @@
 
 The `systray` alert sender sends alerts to the systray notification area. 
 
-### Configuration {docsify-ignore}
+### Configuration 
 
 The `systray` alert sender configuration is located in the `alertsenders.systray` section.
 

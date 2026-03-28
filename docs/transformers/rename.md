@@ -39,7 +39,7 @@ The event will contain the following parameters:
 }
 ```
 
-### Configuration {docsify-ignore}
+### Configuration 
 
 The `rename` transformer configuration is located in the `transformers.rename` section.
 

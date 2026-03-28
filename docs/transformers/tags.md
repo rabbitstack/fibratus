@@ -2,7 +2,7 @@
 
 The `tags` transformer appends custom tags to event's metadata field.
 
-### Configuration {docsify-ignore}
+### Configuration 
 
 The `tags` transformer configuration is located in the `transformers.tags` section.
 

@@ -2,7 +2,7 @@
 
 For the YARA scanner to operate correctly, the rules have to be compiled and loaded into the engine. This is accomplished by providing file system paths with YARA rule definitions in the `rule.paths` configuration keys. The directories are scanned recursively for any `.yar` file. Alternatively, it is possible to provide the rules as inline strings directly in the Fibratus configuration file.
 
-### Configuration {docsify-ignore}
+### Configuration 
 
 YARA scanner related options are located in the `yara` section of the configuration file.
 

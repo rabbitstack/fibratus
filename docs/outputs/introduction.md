@@ -2,7 +2,7 @@
 
 Fibratus delivers a diverse array of output sinks to route the events. When captures are not enough, you may opt for forwarding the event stream to remote destinations such as RabbitMQ brokers or Elasticsearch clusters. Outputs expose a rich set of configuration knobs that enable to fine-tune the behaviour of the event flow transmission.
 
-### Event serialization tweaking {docsify-ignore}
+### Event serialization tweaking 
 
 JSON is the default serialization format for events. Since the event state contains a vast of attributes, you can specify which fields are serialized through configuration properties located in the `kevent` section.
 

@@ -7,7 +7,7 @@ In Fibratus filter expression language the fields can evaluate to one of the fol
 - **IP address** field types represent IPv4 addresses (`172.14.4.4`)
 - **bool** represents the `true` or `false` boolean values
 
-## Filter fields {docsify-ignore}
+## Filter fields 
 
 The following tables summarize available field names that can be used in filter expressions.
 

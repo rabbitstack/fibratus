@@ -38,7 +38,7 @@ Thread events are comprised of the following parameters:
 
 - `status` contains the result of operation. (e.g. `Success`)
 
-## Thread pool events {docsify-ignore}
+## Thread pool events 
 
 A thread pool is a collection of worker threads that efficiently execute asynchronous callbacks on behalf of the application. The thread pool is primarily used to reduce the number of application threads and provide management of the worker threads.
 

@@ -1,13 +1,13 @@
 # Installation
 
-### System requirements {docsify-ignore}
+### System requirements
 
-- **Windows 10** and higher or **Windows Server 2016** or higher
+- **Windows 10** and higher or **Windows Server 2016** and higher
 - 40 MB of free disk space
 - 1 (V)CPU
 - 90 MB of available physical memory
 
-### Permission requirements {docsify-ignore}
+### Permission requirements
 
 Fibratus requires **administrator** or **SYSTEM** privileges to capture system events from the ETW subsystem. During execution, Fibratus performs the following operations on your system:
 
@@ -16,20 +16,14 @@ Fibratus requires **administrator** or **SYSTEM** privileges to capture system e
 - writes logs to disk. The default logs directory location is `%PROGRAMFILES%\Fibratus\Logs`
 - grants the `SeDebugPrivilege` to its process token. However, you can disable granting this privilege by setting the `debug-privilege` option to `false`
 - transports event messages over the wire if the eligible output sink is active
-- inspects process image [PE](/pe/introduction.md) metadata. Again, you can disable this feature through [config](/pe/introduction) file
 - executes [YARA](/yara/introduction.md) rules on freshly created process images or other image files when the [YARA scanner](/yara/introduction) is enabled
 - spins up an embedded Python interpreter to run [filaments](/filaments/introduction)
-- accesses raw disk devices to read file data
 
 
-### Installation  {docsify-ignore}
+### Installation
 
 The easiest way to get started with Fibratus is by downloading the Windows installer. Head over to the [releases](https://github.com/rabbitstack/fibratus/releases) and pick your download. Latest releases are recommended as they ship with new features, bug fixes and tend to improve the performance.
 Windows installers are automatically built by the CI platform each time new Fibratus release is published.
-
-<p align="center">
-  <a href="https://github.com/rabbitstack/fibratus/releases"><img src="setup/images/fibratus-msi.png"/ width="700px" height="600px"></a>
-</p>
 
 There are two flavors of Windows MSI installers:
 
@@ -45,11 +39,11 @@ Fibratus service is running
 
 If you're able to see the output like in the snippet above, congratulations! You have successfully installed Fibratus. Jump to [quick start](/setup/quick-start).
 
-### Uninstall {docsify-ignore}
+### Uninstall
 
 To remove Fibratus from your system, head to the **Control Panel > Programs and Features** and start the uninstall process. The uninstaller will make sure to stop/remove the Windows Service and get rid of all installation data.
 
-## Building from source {docsify-ignore}
+## Building from source
 
 To build Fibratus directly from source code you have to satisfy the following requirements:
 
@@ -58,7 +52,7 @@ To build Fibratus directly from source code you have to satisfy the following re
 - Python headers (optional)
 - [libyara](https://github.com/VirusTotal/yara/tree/master/libyara) (optional)
 
-### Installing dependencies {docsify-ignore}
+### Installing dependencies
 
 !> You can skip this step if you're not interested in building features that interop with the C code.
 
@@ -77,12 +71,12 @@ To build Fibratus directly from source code you have to satisfy the following re
       - `./configure --host=x86_64-w64-mingw32`
       - `make install`
 
-### Building the executable {docsify-ignore}
+### Building the executable
 
 The **optional dependencies are only needed** if you'll be building features that interop with the C code. The Go compiler is instructed to ignore all features that trigger the [cgo](https://golang.org/cmd/cgo/), but you can control which features are built into Fibratus through the following build flags:
 
 - `filament`: compiles Fibratus with filaments support
-- `kcap`: compiles Fibratus with support for capturing/replaying kcap files
+- `cap`: compiles Fibratus with support for capturing/replaying capture files
 - `yara`: builds Fibratus with support for [Yara](https://virustotal.github.io/yara/) pattern matching
 
 To build the Fibratus binary without filament, kcap nor yara features, run the following command from the `cmd` shell and within the`fibratus` directory:

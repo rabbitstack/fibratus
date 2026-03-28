@@ -12,7 +12,7 @@ The `Details` tab shows extended event data including event parameters, process,
   <img src="outputs/images/eventlog-details.png"/>
 </p>
 
-### Configuration {docsify-ignore}
+### Configuration 
 
 The Eventlog output configuration is located in the `outputs.eventlog` section.
 

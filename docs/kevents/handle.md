@@ -27,7 +27,7 @@ This event is fired when the process duplicates an object handle. The following 
 - `type_id` designates the duplicated handle type. (e.g. `DxgkCompositionObject`)
 - `pid`, `exe`, `name` represent the source process identifier, process executable path, and the process image name respectively.
 
-### Handle state {docsify-ignore}
+### Handle state 
 
 During bootstrap, Fibratus builds a snapshot of currently allocated handles. Similarly, when a new process is created Fibratus fetches its handles and attaches them to the process state. However, to optimize memory utilization, the initial handle snapshot and process handle table initialization are disabled by default. You can enable both features by modifying the `--handle.init-snapshot=true` and `--handle.enumerate-handles` config flags respectively or changing the corresponding key in the configuration file.
 

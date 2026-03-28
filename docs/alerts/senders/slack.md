@@ -2,7 +2,7 @@
 
 The `slack` alert sender forwards alerts to Slack workspaces. You'll have to [activate](https://slack.com/intl/en-es/help/articles/115005265063-Incoming-webhooks-for-Slack) incoming webhooks and associate the webhook to your Slack workspace to be able to emit the alerts.
 
-### Configuration {docsify-ignore}
+### Configuration 
 
 The `slack` alert sender configuration is located in the `alertsenders.slack` section.
 

@@ -12,7 +12,7 @@ $ fibratus capture -o events
 
 To stop capturing events, hit the `Ctrl-C` key combination. A short summary is displayed indicating the number of captured events, processes, handles, the size of the `kcap` file and so on.
 
-### Filtering {docsify-ignore}
+### Filtering 
 
 As already explained in [filtering](/filters/filtering), for a fine-grained control over which events are stored in the capture, you can provide a filter expression.
 

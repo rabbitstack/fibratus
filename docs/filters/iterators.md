@@ -20,7 +20,7 @@ foreach(ps._modules, $mod, $mod.path imatches '?:\\Windows\\System32\\us?r32.dll
 foreach(ps._ancestors, $proc, $proc.name = 'services.exe' and ps.is_protected, ps.is_protected)
 ```
 
-## Process iterators {docsify-ignore}
+## Process iterators 
 
 The `ps.ancestor` returns all ancestor names of the process generating the event. Alternatively, the filter field can accept an argument. In case of the `ps.ancestor` field, the argument indicates the ancestor level. Given the process tree below and assuming the current process generating the event is `cmd.exe`, the field with an optional level argument yields the values as follows:
 
@@ -67,7 +67,7 @@ foreach(ps._ancestors, $proc, $proc.sid imatches `S-1-5*` and $proc.name = 'svch
 ```
 
 
-### Modules {docsify-ignore}
+### Modules 
 
 The `ps._modules` pseudo field returns the process modules iterable. Available module segments are:
 
@@ -88,7 +88,7 @@ Examples
 foreach(ps._modules, $mod, $mod.size >= 212354 and $mod.name imatches '*winhttp.dll')
 ```
 
-### Threads {docsify-ignore}
+### Threads 
 
 The `ps._threads` pseudo field yields all of the process running threads. Available thread segments are:
 
@@ -102,7 +102,7 @@ The `ps._threads` pseudo field yields all of the process running threads. Availa
 |`kernel_stack_base`  | The base address of the thread kernel stack |
 |`kernel_stack_limit`  | he address denoting the thread kernel stack limit |
 
-### Memory mappings {docsify-ignore}
+### Memory mappings 
 
 Process memory mappings (also known as sections) can be accessed via the `ps._mmaps` pseudo field. Available memory mappings segments are:
 
@@ -114,7 +114,7 @@ Process memory mappings (also known as sections) can be accessed via the `ps._mm
 |`protection` | Protection attributes of the mapped memory section |
 |`path`  | If the memory mapping is backed by a physical file, indicates the path of the file |
 
-### Environment variables {docsify-ignore}
+### Environment variables 
 
 You can access process environment variables by providing the name of the environment variable. Alternatively, you can provide the prefix.
 
@@ -134,11 +134,11 @@ It is also possible to retrieve all environment variables as a list of colon sep
 foreach(ps.envs, $env, substr($env, 0, indexof($env, ':')) = 'OS')
 ```
 
-## Portable Executable iterators {docsify-ignore}
+## Portable Executable iterators 
 
 [Portable Executable](/pe/introduction) introspection allows for utilizing the PE metadata in filters. See other [fields](filters/fields?id=pe) that can be used to narrow down events by PE data.
 
-### Sections {docsify-ignore}
+### Sections 
 
 The `pe._sections` pseudo field yields all of the executable image PE sections. Available section segments are:
 
@@ -149,7 +149,7 @@ The `pe._sections` pseudo field yields all of the executable image PE sections. 
 |`entropy` | Section entropy |
 |`md5` | Section MD5 hash |
 
-### Resources {docsify-ignore}
+### Resources 
 
 PE [resources](/pe/resources) can be accessed by the resource name. Alternatively, it is possible to obtain all the resources as a list separated by the colon delimiter:
 
@@ -158,7 +158,7 @@ pe.resources iin ('FileDescription:Notepad')
 ```
 
 
-## Callstack {docsify-ignore}
+## Callstack 
 
 [Stack enrichment](/kevents/anatomy?id=callstack) attaches call frames that can be accessed by the `thread._callstack` pseudo field. Available callstsack segments are:
 

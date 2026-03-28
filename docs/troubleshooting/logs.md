@@ -2,7 +2,7 @@
 
 Fibratus logs various diagnostics and error messages to log files residing in the `%PROGRAM FILES%\Fibratus\Logs` directory. Logs serve as an invaluable resource for debugging or chasing down issues in Fibratus.
 
-### Configuration {docsify-ignore}
+### Configuration 
 
 It's possible to influence the behavior of how log file are written. The configuration options are stored in the `logging` section of the `yml` file.
 

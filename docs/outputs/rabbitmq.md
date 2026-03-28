@@ -2,7 +2,7 @@
 
 The RabbitMQ output sends events to the [RabbitMQ](https://www.rabbitmq.com/) message broker. Various events are buffered and sent as part of a single AMQP message.
 
-### Configuration {docsify-ignore}
+### Configuration 
 
 The RabbitMQ output configuration is located in the `outputs.amqp` section.
 

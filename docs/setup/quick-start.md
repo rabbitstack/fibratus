@@ -12,7 +12,7 @@ $ VaultCmd.exe /listcreds:"Windows Credentials" /all
 
 To learn more about detection rules, head to [rules](/filters/rules).
 
-### Event forwarding {docsify-ignore}
+### Event forwarding 
 
 To start forwarding events to [output](/outputs/introduction) sinks, run Fibratus from the command line in event forwarding mode:
 

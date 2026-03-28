@@ -32,7 +32,7 @@ Process events are fired up as a stimulus to the process' life-cycle changes. Wh
 - `pid` is the identifier of the local process that was opened.
 - `status` contains the result of the process object open operation. (e.g. `Success`)
 
-### Process state  {docsify-ignore}
+### Process state  
 
 Fibratus keeps a snapshot of all running processes including their state such as basic process attributes, allocated file handles, dynamically-linked libraries, PE (Portable Executable) metadata and other resources. The snapshot is updated dynamically as processes get spawn or die. Each time a kernel event is triggered, its process' state is fetched from the snapshot and attached to the event. This state machine semantically enriches each individual event with the aim on providing a powerful context for [filtering](/filters/introduction.md) and [scripting](/filaments/introduction.md).
 

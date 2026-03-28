@@ -35,7 +35,7 @@ The event will contain the following parameters:
 }
 ```
 
-### Configuration {docsify-ignore}
+### Configuration 
 
 The `remove` transformer configuration is located in the `transformers.remove` section.
 

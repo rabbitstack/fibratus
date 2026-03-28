@@ -2,7 +2,7 @@
 
 The Elasticsearch output ships kernel events to the `_bulk` [API endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html). Events are batched and flushed when the interval specified by `flush-period` elapses.
 
-### Configuration {docsify-ignore}
+### Configuration 
 
 The Elasticsearch output configuration is located in the `outputs.elasticsearch` section.
 
