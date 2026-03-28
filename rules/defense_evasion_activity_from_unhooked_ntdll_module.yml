@@ -1,6 +1,6 @@
 name: Activity from unhooked NTDLL module
 id: 24f48f6c-9d97-498d-badc-65e179d19599
-version: 1.1.0
+version: 1.1.1
 description: |
   Detects suspicious activity originating from an unhooked or manually mapped copy of NTDLL loaded
   into a process. This behavior is commonly associated with defense evasion frameworks that bypass
@@ -58,7 +58,6 @@ condition: >
     |((spawn_process) or
       (load_module) or
       (create_file) or
-      (set_thread_context) or
       (create_remote_thread) or
       (set_value) or
       (rename_file) or
