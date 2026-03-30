@@ -1,6 +1,6 @@
 name: .NET assembly loaded by unmanaged process
 id: 34be8bd1-1143-4fa8-bed4-ae2566b1394a
-version: 1.0.11
+version: 1.2.0
 description: |
   Identifies the loading of the .NET assembly by an unmanaged process. Adversaries can load the CLR runtime
   inside unmanaged process and execute the assembly via the ICLRRuntimeHost::ExecuteInDefaultAppDomain method.
@@ -16,31 +16,47 @@ references:
   - https://www.ired.team/offensive-security/code-injection-process-injection/injecting-and-executing-.net-assemblies-to-unmanaged-process
 
 condition: >
-  (load_unsigned_or_untrusted_module) and
-  dll.path not imatches
+  sequence
+  maxspan 1m
+  by ps.uuid
+    |spawn_process and
+     ps.token.integrity_level != 'SYSTEM' and
+     ps.exe not imatches
                 (
-                  '?:\\Windows\\assembly\\*\\*.ni.dll',
-                  '?:\\Program Files\\WindowsPowerShell\\Modules\\*\\*.dll',
-                  '?:\\Windows\\Microsoft.NET\\assembly\\*\\*.dll',
-                  '?:\\$WinREAgent\\Scratch\\*',
-                  '?:\\Windows\\WinSxS\\*',
-                  '?:\\Windows\\CbsTemp\\*',
-                  '?:\\Windows\\SoftwareDistribution\\*'
-                ) and
-  ps.exe != '' and ps.pe.is_dotnet = false and
-  (dll.pe.is_dotnet or thread.callstack.modules imatches ('*clr.dll')) and
-  ps.exe not imatches
-                (
+                  '?:\\Windows\\system32\\DllHost.exe',
+                  '?:\\Windows\\System32\\WindowsPowerShell\\*\\powershell.exe',
                   '?:\\Program Files\\WindowsApps\\*\\CrossDeviceService.exe',
                   '?:\\Program Files\\WindowsApps\\*\\WidgetService.exe',
                   '?:\\Program Files\\WindowsApps\\*\\PhoneExperienceHost.exe',
                   '?:\\Program Files\\WindowsApps\\*\\WindowsSandboxServer.exe',
                   '?:\\Program Files\\Conexant\\SAII\\SmartAudio.exe',
-                  '?:\\Windows\\Microsoft.NET\\Framework*\\mscorsvw.exe'
+                  '?:\\Program Files\\WindowsApps\\Microsoft.WinDbg_*\\*.exe',
+                  '?:\\Windows\\Microsoft.NET\\Framework\\*\\ngen.exe',
+                  '?:\\Windows\\Microsoft.NET\\Framework64\\*\\ngen.exe',
+                  '?:\\Windows\\Microsoft.NET\\Framework\\*\\mscorsvw.exe',
+                  '?:\\Windows\\Microsoft.NET\\Framework64\\*\\mscorsvw.exe',
+                  '?:\\Program Files\\WindowsApps\\Microsoft.WindowsStore_*\\WinStore.DesktopExtension\\StoreDesktopExtension.exe'
                 )
+    |
+    |(load_unsigned_or_untrusted_module) and
+     dll.path not imatches
+                (
+                  '?:\\Windows\\System32\\*.dll',
+                  '?:\\Windows\\assembly\\*\\*.ni.dll',
+                  '?:\\Program Files\\WindowsPowerShell\\Modules\\*\\*.dll',
+                  '?:\\Windows\\Microsoft.NET\\assembly\\*\\*.dll',
+                  '?:\\$WinREAgent\\Scratch\\*.dll',
+                  '?:\\Windows\\WinSxS\\*.dll',
+                  '?:\\Windows\\CbsTemp\\*.dll',
+                  '?:\\Windows\\SoftwareDistribution\\*.dll',
+                  '?:\\Program Files\\WindowsApps\\Microsoft.WindowsStore_*\\*.dll'
+                ) and
+     ps.exe != '' and ps.pe.is_dotnet = false and
+     (dll.pe.is_dotnet or thread.callstack.modules imatches ('*clr.dll'))
+    |
 
 output: >
-  .NET assembly %dll.path loaded by unmanaged process %ps.exe
+  .NET assembly %2.dll.path loaded by unmanaged process %2.ps.exe
 severity: high
 
 min-engine-version: 3.0.0

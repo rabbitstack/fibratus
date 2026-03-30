@@ -1,11 +1,11 @@
 name: Potential ClickFix infection chain
 id: ffe1fc54-2893-4760-ab50-51a83bd71d13
-version: 2.0.1
+version: 2.0.2
 description: |
-  Identifies the execution of the process via the Run command dialog box, Windows Console shortuct, or Explorer address bar
-  followed by spawning of the potential infostealer process.
-  This could be indicative of the ClickFix deceptive tactic used by attackers to lure victims into executing
-  malicious commands under the guise of meeting pages or CAPTCHAs.
+  Identifies the execution of the process via the Run command dialog box, Windows Console shortuct,
+  or Explorer address bar followed by spawning of the potential infostealer process.
+  This could be indicative of the ClickFix deceptive tactic used by attackers to lure victims into
+  executing malicious commands under the guise of meeting pages or CAPTCHAs.
 labels:
   tactic.id: TA0001
   tactic.name: Initial Access
