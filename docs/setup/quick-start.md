@@ -1,18 +1,37 @@
 # Quick start
 
-By default, Fibratus operates in rule engine mode. It loads the rule set from the `%PROGRAM FILES%\Fibratus\Rules` directory and sends security alerts to [Eventlog](/alerts/senders/eventlog) or other configurable [sinks](/alerts/senders). Optionally, it takes response actions when the rule is fired, such as killing the process. To see Fibratus in action, we can trigger a rule by performing the following actions:
+##### By default, Fibratus operates in rule engine mode. It loads the rule set from the `%PROGRAM FILES%\Fibratus\Rules` directory and sends security alerts to [Eventlog](/alerts/senders/eventlog) or other configurable [senders](/alerts/senders). It takes response actions when the rule fires, such as killing the process. To see Fibratus in action, we can trigger a rule by executing a native Windows binary.
 
-- spin up a command line prompt
-- list credentials from the vault by using the `VaultCmd` tool
-```
+<Stepper>
+
+<Step title="Enumerate Windows Credential stores">
+
+Spin up a command line prompt and run the `VaultCmd.exe` command. This command lists the credentials stored in the Credential Manager.
+
+<Terminal>
 $ VaultCmd.exe /listcreds:"Windows Credentials" /all
-```
+</Terminal>
 
-- `Credential discovery via VaultCmd tool` rule should trigger displaying the alert in the Eventlog `Application` channel.
+</Step>
 
-To learn more about detection rules, head to [rules](/filters/rules).
+<Step title="Open Event Viewer">
 
-### Event forwarding 
+Hit `⊞ Win` + `R` key combination to bring the Run dialog. Type `evtwvr.msc` to open the Event Viewer snap-in.
+
+
+</Step>
+
+<Step title="Explore the alert">
+
+Navigate to the Eventlog `Application` channel. `Credential Manager access via known tools` rule should trigger displaying the alert in the Eventlog
+
+</Step>
+
+</Stepper>
+
+To learn more about detection rules, head to [rules](/rulelang/rules).
+
+## Event forwarding 
 
 To start forwarding events to [output](/outputs/introduction) sinks, run Fibratus from the command line in event forwarding mode:
 
@@ -56,4 +75,4 @@ A different [rendering template](/outputs/console?id=templates) can be used to c
 
 The console output is the default events output, even though you can route the event flow to [Elasticsearch](https://www.elastic.co/elasticsearch/) or [RabbitMQ](https://www.rabbitmq.com/) sinks, just to name a few. [Learn](/outputs/introduction) more about output sinks.
 
-To stop Fibratus, hit the `Ctr-C` key combination.
+To stop Fibratus, hit the `Ctr` + `C` key combination.
