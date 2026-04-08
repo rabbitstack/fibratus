@@ -22,3 +22,27 @@ Releases, decommits, or releases and decommits a region of pages within the virt
 - `base_address` is the base address of the region of pages to be freed.
 - `region_size` represents the size of the region of memory to be freed, in bytes.
 - `pid`, `exe`, `name` represent process identifier, process executable path, and the image name of the process for which the pages are freed.
+
+#### MapViewFile
+
+Maps a view of a file mapping into the process address space. These events contain the following parameters:
+
+- `file_key` is the address of the file object for which the mapping is performed.
+- `offset` represents the file offset where the view is to begin.
+- `pid` is the process identifier where the file mapping is performed.
+- `protection` specifies the page protection of the file mapping object. Can be the compatible combination of the following values: `READONLY`, `EXECUTE`, `EXECUTE_READ`, `READWRITE`, `WRITECOPY`, `NOCACHE`, `EXECUTE_WRITECOPY` and `EXECUTE_READWRITE`. 
+- `section_type` describes the type of the mapped section. It can be `DATA`, `IMAGE`, `IMAGE_NO_EXECUTE`, `PAGEFILE` or `PHYSICAL`. 
+- `view_base` is the base memory address in the process address space where mapping begins.
+- `view_size` represents the number of bytes of a file mapping to map to a view.
+
+#### UnmapViewFile
+
+Unmaps a mapped view of a file from the process's virtual address space.
+
+- `file_key` is the address of the file object for which the unmapping is performed.
+- `offset` represents the file offset where the view to unmap begins.
+- `pid` is the process identifier where the file unmapping is performed.
+- `protection` specifies the page protection of the file mapping object that is being unmapped. Can be the compatible combination of the following values: `READONLY`, `EXECUTE`, `EXECUTE_READ`, `READWRITE`, `WRITECOPY`, `NOCACHE`, `EXECUTE_WRITECOPY` and `EXECUTE_READWRITE`. 
+- `section_type` describes the type of the unmapped section. It can be `DATA`, `IMAGE`, `IMAGE_NO_EXECUTE`, `PAGEFILE` or `PHYSICAL`. 
+- `view_base` is the base memory address in the process address space where unmapping begins.
+- `view_size` represents the number of bytes of a file mapping to unmap.

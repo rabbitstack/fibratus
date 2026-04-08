@@ -135,13 +135,13 @@ $ make install
 
 ### Building the executable
 
-The **optional dependencies are needed only** if you'll be building features that interop with the C code. By default, the Go compiler is instructed to ignore all features that trigger the [cgo](https://golang.org/cmd/cgo/), but you can control which features are built into Fibratus through the following build flags:
+The **optional dependencies are needed only** if you'll be building features that interop with the C code. By default, the Go compiler is instructed to ignore all features that trigger [cgo](https://golang.org/cmd/cgo/), but you can control which features are built into Fibratus through the following build flags:
 
-- `filament` compiles Fibratus with filaments support
+- `filament` compiles Fibratus with [filaments](/filaments/introduction) support
 - `cap` compiles Fibratus with support for capturing/replaying capture files
-- `yara` builds Fibratus with [Yara](https://virustotal.github.io/yara/) scanner
+- `yara` builds Fibratus with [Yara](https://virustotal.github.io/yara/) memory scanning capabilities
 
-To build the Fibratus binary without filament, cap and yara features, run the following command from `Powershell` and within the `fibratus` directory:
+To build the Fibratus binary without `filament`, `cap` and `yara` features, run the following command from `Powershell` terminal and within the `fibratus` directory:
 
 <Terminal>
 $ ./make
@@ -155,4 +155,4 @@ $ $env:TAGS="filament"
 $ ./make
 </Terminal>
 
-In either case, the resulting binary is placed in the `cmd\fibratus` directory.
+The resulting `fibratus.exe` binary is placed in the `cmd\fibratus` directory.

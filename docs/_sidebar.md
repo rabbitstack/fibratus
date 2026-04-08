@@ -58,20 +58,14 @@
     * [Symbols](/pe/symbols.md)
     * [Resources](/pe/resources.md)
 * ---
-* Captures
-  * [Immortalizing The Event Flux](captures/introduction.md)
-  * [Capturing](captures/capturing.md)
-  * [Replaying](captures/replaying.md)
+* [Captures](captures.md)
 * Filaments
   * [Python Meets Kernel Events](filaments/introduction.md)
   * [Executing](filaments/executing.md)
   * [Internals](filaments/internals.md)
   * [Writing Filaments](filaments/writing.md)
   * [Alerting](alerts/filaments.md)
-* YARA
-  * [Pattern Matching Swiss Knife](/yara/introduction.md)
-  * [Scanning Processes](/yara/scanning.md)
-  * [Alerts](/yara/alerts.md)
+* [YARA](yara.md)
 * ---
 * Troubleshooting
   * [Logs](troubleshooting/logs.md)

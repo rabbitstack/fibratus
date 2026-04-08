@@ -1,3 +1,19 @@
+# Pattern Matching Swiss Knife
+
+[YARA](https://virustotal.github.io/yara/) is a prominent tool for binary pattern matching that aims to streamline and accelerate the classification of malware specimens. Fibratus interacts with the `libyara` through C bindings. The `libyara` dependency is statically linked, so no further software needs to be installed.
+
+**Fibratus/YARA** tandem aims to detect in-memory threats and malicious **PE** files by reacting on various signals including:
+
+- new process creation
+- loading of an unsigned/untrusted executable/DLL or when the executable/DLL is loaded from the unbacked memory region
+- creation of executable, DLL, or driver PE files
+- creation of [ADS](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fscc/e2b19412-a925-4360-b009-86e3b8a020c8) (Alternate Data Streams)
+- RWX memory allocations
+- mapping of a suspicious view of section
+- writing a binary registry value
+
+The YARA scanner is not enabled by default, but you can do that by modifying the `yara.enabled` key in the configuration file.
+
 # Scanning Processes
 
 For the YARA scanner to operate correctly, the rules have to be compiled and loaded into the engine. This is accomplished by providing file system paths with YARA rule definitions in the `rule.paths` configuration keys. The directories are scanned recursively for any `.yar` file. Alternatively, it is possible to provide the rules as inline strings directly in the Fibratus configuration file.
@@ -84,3 +100,43 @@ excluded-files:
 #### excluded-procs
 
 Contains the list of the comma-separated process image paths that shouldn't be scanned. Wildcard matching is possible.
+
+# Alerts
+
+Alerts on rule matches are automatically sent via all active alert senders.
+
+##  Event metadata 
+
+When the event triggers a specific YARA rule, its metadata is automatically decorated with the rule matches. 
+The `yara.matches` tag contains the JSON array payload where each object represents the YARA rule match. For example:
+
+```json
+[
+  {
+    "rule": "AnglerEKredirector ",
+    "namespace": "EK",
+    "tags": null,
+    "metas": [
+      {
+        "identifier": "description",
+        "value": "Angler Exploit Kit Redirector"
+      }
+    ],
+    "strings": "..."
+  },
+  {
+    "rule": "angler_flash_uncompressed ",
+    "namespace": "EK",
+    "tags": [
+      "exploitkit"
+    ],
+    "metas": [
+      {
+        "identifier": "description",
+        "value": "Angler Exploit Kit Detection"
+      }
+    ],
+    "strings": "..."
+  }
+]
+```

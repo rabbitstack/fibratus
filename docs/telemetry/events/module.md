@@ -12,3 +12,6 @@
 | `base_address` | Base address of the process in which the image is loaded/unloaded. |
 | `default_address` | Represents the module base address. |
 | `pid` | Specifies the process identifier where the module is loaded/unloaded. |
+| `signature_type` | Describes the type of the digital signature. Can be `NONE`, `EMBEDDED`, `CACHED`, `CATALOG_CACHED`, `CATALOG_UNCACHED`, `CATALOG_HINT`, `PACKAGE_CATALOG` and `FILE_VERIFIED`. This parameter is a best-effort hint. The kernel doesn't always verify signatures on module load and can report false negatives for the signature type.  |
+| `signature_level` | Describes the signature level. This parameter is a best-effort hint. The kernel doesn't always verify signatures on module load and can report false negatives for the signature level. |
+
