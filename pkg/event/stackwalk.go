@@ -201,13 +201,13 @@ func (s *StackwalkDecorator) doFlush() {
 // TTL period.
 func (s *StackwalkDecorator) flush() []error {
 	s.mux.Lock()
-	defer s.mux.Unlock()
 
 	if len(s.buckets) == 0 {
+		s.mux.Unlock()
 		return nil
 	}
 
-	errs := make([]error, 0)
+	expired := make([]*Event, 0)
 
 	for id, q := range s.buckets {
 		n := make([]*Event, 0, len(q))
@@ -216,25 +216,34 @@ func (s *StackwalkDecorator) flush() []error {
 				n = append(n, evt)
 				continue
 			}
-
-			stackwalkFlushes.Add(1)
-			err := s.q.push(evt)
-			if err != nil {
-				errs = append(errs, err)
-			}
-			if stackwalkEnqueued.Value() > 0 {
-				stackwalkEnqueued.Add(-1)
-			}
-			if evt.PS != nil {
-				stackwalkFlushesProcs.Add(evt.PS.Name, 1)
-			}
-			stackwalkFlushesEvents.Add(evt.Name, 1)
+			expired = append(expired, evt)
 		}
 		if len(n) == 0 {
 			delete(s.buckets, id)
 		} else {
 			s.buckets[id] = n
 		}
+	}
+
+	s.mux.Unlock()
+	errs := make([]error, 0)
+
+	// push expired events without holding the mutex.
+	// This allows incoming Push()/Pop() calls to proceed
+	// while the channel send may block briefly
+	for _, evt := range expired {
+		stackwalkFlushes.Add(1)
+		err := s.q.push(evt)
+		if err != nil {
+			errs = append(errs, err)
+		}
+		if stackwalkEnqueued.Value() > 0 {
+			stackwalkEnqueued.Add(-1)
+		}
+		if evt.PS != nil {
+			stackwalkFlushesProcs.Add(evt.PS.Name, 1)
+		}
+		stackwalkFlushesEvents.Add(evt.Name, 1)
 	}
 
 	return errs
