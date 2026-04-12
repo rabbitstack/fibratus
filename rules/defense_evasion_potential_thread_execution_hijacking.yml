@@ -1,6 +1,6 @@
 name: Potential thread execution hijacking
 id: 8b9f6d47-e9ba-4b3a-9da2-d7bf27e08ca9
-version: 1.0.3
+version: 1.0.4
 description: |
   Adversaries may inject malicious code into hijacked processes in order to evade process-based
   defenses as well as possibly elevate privileges. Thread Execution Hijacking is a method of
@@ -35,10 +35,20 @@ condition: >
      ps.exe not imatches
                 (
                   '?:\\Program Files\\*',
-                  '?:\\Program Files (x86)\\*'
+                  '?:\\Program Files (x86)\\*',
+                  '?:\\WINDOWS\\system32\\csrss.exe'
                 )
     |
-    |set_thread_context|
+    |set_thread_context and
+     ps.exe not imatches
+                (
+                  '?:\\ProgramData\\Microsoft\\Windows Defender\\*\\MsMpEng.exe',
+                  '?:\\Program Files\\Windows Kits\\*\\Debuggers\\*',
+                  '?:\\Program Files (x86)\\Windows Kits\\*\\Debuggers\\*',
+                  '?:\\Program Files\\Microsoft Visual Studio\\*\\Common7\\IDE\\*',
+                  '?:\\Program Files (x86)\\Microsoft Visual Studio\\*\\Common7\\IDE\\*'
+                )
+    |
 action:
   - name: kill
 
