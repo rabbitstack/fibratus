@@ -23,6 +23,7 @@ package filament
 
 import (
 	"errors"
+
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/filament/cpython"
@@ -34,7 +35,7 @@ var (
 	ppid       = cpython.PyUnicodeFromString("ppid")
 	cwd        = cpython.PyUnicodeFromString("cwd")
 	exec       = cpython.PyUnicodeFromString("exe")
-	comm       = cpython.PyUnicodeFromString("comm")
+	cmdline    = cpython.PyUnicodeFromString("cmdline")
 	sid        = cpython.PyUnicodeFromString("sid")
 	tid        = cpython.PyUnicodeFromString("tid")
 	cpu        = cpython.PyUnicodeFromString("cpu")
@@ -73,7 +74,7 @@ func newEventDict(evt *event.Event) (*cpython.Dict, error) {
 		dict.Insert(ppid, cpython.NewPyObjectFromValue(ps.Ppid))
 		dict.Insert(cwd, cpython.NewPyObjectFromValue(ps.Cwd))
 		dict.Insert(exec, cpython.NewPyObjectFromValue(ps.Name))
-		dict.Insert(comm, cpython.NewPyObjectFromValue(ps.Cmdline))
+		dict.Insert(cmdline, cpython.NewPyObjectFromValue(ps.Cmdline))
 		dict.Insert(sid, cpython.NewPyObjectFromValue(ps.SID))
 	}
 
