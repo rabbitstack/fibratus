@@ -21,13 +21,14 @@ package event
 import (
 	"expvar"
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/util/convert"
-	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"math"
 	"net"
 	"sort"
 	"time"
 	"unsafe"
+
+	"github.com/rabbitstack/fibratus/pkg/util/convert"
+	"github.com/rabbitstack/fibratus/pkg/util/va"
 
 	"github.com/rabbitstack/fibratus/pkg/cap/section"
 	capver "github.com/rabbitstack/fibratus/pkg/cap/version"
@@ -42,8 +43,8 @@ var (
 	SerializeHandles bool
 	// SerializeThreads indicates if threads are serialized as part of the process state
 	SerializeThreads bool
-	// SerializeImages indicates if images are serialized as part of the process state
-	SerializeImages bool
+	// SerializeModules indicates if modules are serialized as part of the process state
+	SerializeModules bool
 	// SerializePE indicates if PE metadata are serialized as part of the process state
 	SerializePE bool
 	// SerializeEnvs indicates if the environment variables are serialized as part of the process state
@@ -423,7 +424,7 @@ func (e *Event) UnmarshalRaw(b []byte, ver capver.Version) error {
 var js = newJSONStream()
 
 func writePsResources() bool {
-	return SerializeHandles || SerializeThreads || SerializeImages || SerializePE
+	return SerializeHandles || SerializeThreads || SerializeModules || SerializePE
 }
 
 // MarshalJSON produces a JSON payload for this event.
@@ -622,12 +623,12 @@ func (e *Event) MarshalJSON() []byte {
 			ps.RUnlock()
 			// end threads
 			js.writeArrayEnd()
-			if SerializeImages || SerializeHandles {
+			if SerializeModules || SerializeHandles {
 				js.writeMore()
 			}
 		}
 
-		if SerializeImages {
+		if SerializeModules {
 			// start modules
 			js.writeObjectField("modules")
 			js.writeArrayStart()

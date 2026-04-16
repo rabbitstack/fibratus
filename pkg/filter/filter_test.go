@@ -54,7 +54,7 @@ var cfg = &config.Config{
 		EnableNetEvents:        true,
 		EnableRegistryEvents:   true,
 		EnableFileIOEvents:     true,
-		EnableImageEvents:      true,
+		EnableModuleEvents:     true,
 		EnableThreadEvents:     true,
 		EnableMemEvents:        true,
 		EnableDNSEvents:        true,
@@ -421,7 +421,7 @@ func TestThreadFilter(t *testing.T) {
 		params.PagePrio:           {Name: params.PagePrio, Type: params.Uint8, Value: uint8(5)},
 		params.UstackBase:         {Name: params.UstackBase, Type: params.Address, Value: uint64(86376448)},
 		params.UstackLimit:        {Name: params.UstackLimit, Type: params.Address, Value: uint64(86372352)},
-		params.StartAddressSymbol: {Name: params.StartAddressSymbol, Type: params.UnicodeString, Value: "LoadImage"},
+		params.StartAddressSymbol: {Name: params.StartAddressSymbol, Type: params.UnicodeString, Value: "LoadModule"},
 		params.StartAddressModule: {Name: params.StartAddressModule, Type: params.UnicodeString, Value: "C:\\Windows\\System32\\kernel32.dll"},
 	}
 	evt := &event.Event{
@@ -481,7 +481,7 @@ func TestThreadFilter(t *testing.T) {
 		{`thread.kstack.limit = 'ffffc307810cf000'`, true},
 		{`thread.start_address = '7ffe2557ff80'`, true},
 		{`thread.teb_address = '8f30893000'`, true},
-		{`thread.start_address.symbol = 'LoadImage'`, true},
+		{`thread.start_address.symbol = 'LoadModule'`, true},
 		{`thread.start_address.module = 'C:\\Windows\\System32\\kernel32.dll'`, true},
 		{`thread.callstack.summary = 'KERNELBASE.dll|KERNEL32.DLL|java.dll|unbacked'`, true},
 		{`thread.callstack.detail icontains 'C:\\WINDOWS\\System32\\KERNELBASE.dll!CreateProcessW+0x66'`, true},
@@ -985,16 +985,16 @@ func TestRegistryFilter(t *testing.T) {
 
 func TestModuleFilter(t *testing.T) {
 	e1 := &event.Event{
-		Type:     event.LoadImage,
-		Category: event.Image,
+		Type:     event.LoadModule,
+		Category: event.Module,
 		Params: event.Params{
-			params.ImagePath:           {Name: params.ImagePath, Type: params.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll")},
-			params.ProcessID:           {Name: params.ProcessID, Type: params.PID, Value: uint32(1023)},
-			params.ImageCheckSum:       {Name: params.ImageCheckSum, Type: params.Uint32, Value: uint32(2323432)},
-			params.ImageBase:           {Name: params.ImageBase, Type: params.Address, Value: uint64(0x7ffb313833a3)},
-			params.ImageSignatureType:  {Name: params.ImageSignatureType, Type: params.Enum, Value: uint32(1), Enum: signature.Types},
-			params.ImageSignatureLevel: {Name: params.ImageSignatureLevel, Type: params.Enum, Value: uint32(4), Enum: signature.Levels},
-			params.FileIsDotnet:        {Name: params.FileIsDotnet, Type: params.Bool, Value: false},
+			params.ModulePath:           {Name: params.ModulePath, Type: params.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll")},
+			params.ProcessID:            {Name: params.ProcessID, Type: params.PID, Value: uint32(1023)},
+			params.ModuleCheckSum:       {Name: params.ModuleCheckSum, Type: params.Uint32, Value: uint32(2323432)},
+			params.ModuleBase:           {Name: params.ModuleBase, Type: params.Address, Value: uint64(0x7ffb313833a3)},
+			params.ModuleSignatureType:  {Name: params.ModuleSignatureType, Type: params.Enum, Value: uint32(1), Enum: signature.Types},
+			params.ModuleSignatureLevel: {Name: params.ModuleSignatureLevel, Type: params.Enum, Value: uint32(4), Enum: signature.Levels},
+			params.FileIsDotnet:         {Name: params.FileIsDotnet, Type: params.Bool, Value: false},
 		},
 	}
 
@@ -1039,7 +1039,7 @@ func TestModuleFilter(t *testing.T) {
 		}
 		matches := f.Run(e1)
 		if matches != tt.matches {
-			t.Errorf("%d. %q image filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
+			t.Errorf("%d. %q module filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
 	}
 
@@ -1052,16 +1052,16 @@ func TestModuleFilter(t *testing.T) {
 
 	// now exercise unsigned/unchecked signature
 	e2 := &event.Event{
-		Type:     event.LoadImage,
-		Category: event.Image,
+		Type:     event.LoadModule,
+		Category: event.Module,
 		Params: event.Params{
-			params.ImagePath:           {Name: params.ImagePath, Type: params.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll")},
-			params.ProcessID:           {Name: params.ProcessID, Type: params.PID, Value: uint32(1023)},
-			params.ImageCheckSum:       {Name: params.ImageCheckSum, Type: params.Uint32, Value: uint32(2323432)},
-			params.ImageBase:           {Name: params.ImageBase, Type: params.Address, Value: uint64(0x7ccb313833a3)},
-			params.ImageSignatureType:  {Name: params.ImageSignatureType, Type: params.Enum, Value: uint32(0), Enum: signature.Types},
-			params.ImageSignatureLevel: {Name: params.ImageSignatureLevel, Type: params.Enum, Value: uint32(0), Enum: signature.Levels},
-			params.FileIsDotnet:        {Name: params.FileIsDotnet, Type: params.Bool, Value: false},
+			params.ModulePath:           {Name: params.ModulePath, Type: params.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll")},
+			params.ProcessID:            {Name: params.ProcessID, Type: params.PID, Value: uint32(1023)},
+			params.ModuleCheckSum:       {Name: params.ModuleCheckSum, Type: params.Uint32, Value: uint32(2323432)},
+			params.ModuleBase:           {Name: params.ModuleBase, Type: params.Address, Value: uint64(0x7ccb313833a3)},
+			params.ModuleSignatureType:  {Name: params.ModuleSignatureType, Type: params.Enum, Value: uint32(0), Enum: signature.Types},
+			params.ModuleSignatureLevel: {Name: params.ModuleSignatureLevel, Type: params.Enum, Value: uint32(0), Enum: signature.Levels},
+			params.FileIsDotnet:         {Name: params.FileIsDotnet, Type: params.Bool, Value: false},
 		},
 	}
 
@@ -1099,23 +1099,23 @@ func TestModuleFilter(t *testing.T) {
 		}
 		matches := f.Run(e2)
 		if matches != tt.matches {
-			t.Errorf("%d. %q image filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
+			t.Errorf("%d. %q  filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
 	}
 
 	assert.NotNil(t, signature.GetSignatures().GetSignature(0x7ccb313833a3))
 
 	e3 := &event.Event{
-		Type:     event.LoadImage,
-		Category: event.Image,
+		Type:     event.LoadModule,
+		Category: event.Module,
 		Params: event.Params{
-			params.ImagePath:           {Name: params.ImagePath, Type: params.UnicodeString, Value: "C:\\Windows\\System32\\mscorlib.dll"},
-			params.ProcessID:           {Name: params.ProcessID, Type: params.PID, Value: uint32(1023)},
-			params.ImageCheckSum:       {Name: params.ImageCheckSum, Type: params.Uint32, Value: uint32(2323432)},
-			params.ImageBase:           {Name: params.ImageBase, Type: params.Address, Value: uint64(0xfff313833a3)},
-			params.ImageSignatureType:  {Name: params.ImageSignatureType, Type: params.Enum, Value: uint32(0), Enum: signature.Types},
-			params.ImageSignatureLevel: {Name: params.ImageSignatureLevel, Type: params.Enum, Value: uint32(0), Enum: signature.Levels},
-			params.FileIsDotnet:        {Name: params.FileIsDotnet, Type: params.Bool, Value: true},
+			params.ModulePath:           {Name: params.ModulePath, Type: params.UnicodeString, Value: "C:\\Windows\\System32\\mscorlib.dll"},
+			params.ProcessID:            {Name: params.ProcessID, Type: params.PID, Value: uint32(1023)},
+			params.ModuleCheckSum:       {Name: params.ModuleCheckSum, Type: params.Uint32, Value: uint32(2323432)},
+			params.ModuleBase:           {Name: params.ModuleBase, Type: params.Address, Value: uint64(0xfff313833a3)},
+			params.ModuleSignatureType:  {Name: params.ModuleSignatureType, Type: params.Enum, Value: uint32(0), Enum: signature.Types},
+			params.ModuleSignatureLevel: {Name: params.ModuleSignatureLevel, Type: params.Enum, Value: uint32(0), Enum: signature.Levels},
+			params.FileIsDotnet:         {Name: params.FileIsDotnet, Type: params.Bool, Value: true},
 		},
 	}
 
@@ -1140,7 +1140,7 @@ func TestModuleFilter(t *testing.T) {
 		}
 		matches := f.Run(e3)
 		if matches != tt.matches {
-			t.Errorf("%d. %q image filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
+			t.Errorf("%d. %q module filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
 	}
 }
@@ -1199,7 +1199,7 @@ func TestPEFilter(t *testing.T) {
 
 func TestLazyPEFilter(t *testing.T) {
 	evt := &event.Event{
-		Type: event.LoadImage,
+		Type: event.LoadModule,
 		PS: &pstypes.PS{
 			PID: 2312,
 			Exe: filepath.Join(os.Getenv("windir"), "notepad.exe"),

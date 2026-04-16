@@ -64,7 +64,7 @@ func New(expr string, config *config.Config, options ...Option) Filter {
 	if config.EventSource.EnableThreadEvents {
 		accessors = append(accessors, newThreadAccessor())
 	}
-	if config.EventSource.EnableImageEvents {
+	if config.EventSource.EnableModuleEvents {
 		accessors = append(accessors, newModuleAccessor())
 	}
 	if config.EventSource.EnableFileIOEvents {

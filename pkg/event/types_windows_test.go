@@ -19,11 +19,12 @@
 package event
 
 import (
+	"testing"
+
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
-	"testing"
 )
 
 func TestEventTypePackAllBytes(t *testing.T) {
@@ -114,7 +115,7 @@ func TestGUIDAndHookIDFromEventType(t *testing.T) {
 		guid   windows.GUID
 	}{
 		{
-			LoadImage,
+			LoadModule,
 			10,
 			windows.GUID{Data1: 0x2cb15d1d, Data2: 0x5fc1, Data3: 0x11d2, Data4: [8]byte{0xab, 0xe1, 0x0, 0xa0, 0xc9, 0x11, 0xf5, 0x18}},
 		},

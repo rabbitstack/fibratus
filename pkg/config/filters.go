@@ -21,13 +21,6 @@ package config
 import (
 	"bytes"
 	"fmt"
-	"github.com/Masterminds/sprig/v3"
-	"github.com/rabbitstack/fibratus/pkg/event"
-	"github.com/rabbitstack/fibratus/pkg/util/convert"
-	"github.com/rabbitstack/fibratus/pkg/util/multierror"
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
-	"gopkg.in/yaml.v3"
 	"io"
 	"net"
 	"net/http"
@@ -37,6 +30,14 @@ import (
 	"slices"
 	"strings"
 	"text/template"
+
+	"github.com/Masterminds/sprig/v3"
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/util/convert"
+	"github.com/rabbitstack/fibratus/pkg/util/multierror"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 )
 
 // FilterConfig is the descriptor of a single filter.
@@ -189,7 +190,7 @@ func (ctx *ActionContext) UniquePids() []uint32 {
 type RulesCompileResult struct {
 	HasProcEvents       bool
 	HasThreadEvents     bool
-	HasImageEvents      bool
+	HasModuleEvents     bool
 	HasFileEvents       bool
 	HasNetworkEvents    bool
 	HasRegistryEvents   bool
@@ -226,7 +227,7 @@ func (r RulesCompileResult) String() string {
 	return fmt.Sprintf(`
 		HasProcEvents: %t
 		HasThreadEvents: %t
-		HasImageEvents: %t
+		HasModuleEvents: %t
 		HasFileEvents: %t
 		HasRegistryEvents: %t
 		HasNetworkEvents: %t
@@ -239,7 +240,7 @@ func (r RulesCompileResult) String() string {
 		Events: %s`,
 		r.HasProcEvents,
 		r.HasThreadEvents,
-		r.HasImageEvents,
+		r.HasModuleEvents,
 		r.HasFileEvents,
 		r.HasRegistryEvents,
 		r.HasNetworkEvents,

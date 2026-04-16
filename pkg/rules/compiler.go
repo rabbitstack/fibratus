@@ -21,6 +21,7 @@ package rules
 import (
 	"expvar"
 	"fmt"
+
 	semver "github.com/hashicorp/go-version"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
@@ -152,8 +153,8 @@ func (c *compiler) buildCompileResult(filters map[*config.FilterConfig]filter.Fi
 							rs.HasProcEvents = true
 						case event.Thread:
 							rs.HasThreadEvents = true
-						case event.Image:
-							rs.HasImageEvents = true
+						case event.Module:
+							rs.HasModuleEvents = true
 						case event.File:
 							rs.HasFileEvents = true
 						case event.Net:

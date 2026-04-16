@@ -317,7 +317,7 @@
         "serialize-threads": {
           "type": "boolean"
         },
-        "serialize-images": {
+        "serialize-modules": {
           "type": "boolean"
         },
         "serialize-handles": {
@@ -338,7 +338,7 @@
         "enable-thread": {
           "type": "boolean"
         },
-        "enable-image": {
+        "enable-module": {
           "type": "boolean"
         },
         "enable-registry": {
@@ -400,8 +400,8 @@
                   "OpenProcess",
                   "OpenThread",
                   "SetThreadContext",
-                  "LoadImage",
-                  "UnloadImage",
+                  "LoadModule",
+                  "UnloadModule",
                   "CreateFile",
                   "CloseFile",
                   "ReadFile",

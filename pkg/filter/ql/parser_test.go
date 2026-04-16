@@ -434,7 +434,7 @@ func TestIsSequenceUnordered(t *testing.T) {
 		{
 			`|evt.name = 'CreateProcess'|
 			 |evt.name = 'UnmapViewFile'|
- 			 |evt.name = 'LoadImage'|
+ 			 |evt.name = 'LoadModule'|
 			`,
 			false,
 		},

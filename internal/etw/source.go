@@ -22,6 +22,9 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
+	"time"
+	"unsafe"
+
 	"github.com/rabbitstack/fibratus/internal/etw/processors"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	errs "github.com/rabbitstack/fibratus/pkg/errors"
@@ -34,8 +37,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows/registry"
-	"time"
-	"unsafe"
 )
 
 const (
@@ -129,7 +130,7 @@ func (e *EventSource) Open(config *config.Config) error {
 	// are not captured
 	if e.r != nil {
 		config.EventSource.EnableThreadEvents = config.EventSource.EnableThreadEvents && e.r.HasThreadEvents
-		config.EventSource.EnableImageEvents = config.EventSource.EnableImageEvents && e.r.HasImageEvents
+		config.EventSource.EnableModuleEvents = config.EventSource.EnableModuleEvents && e.r.HasModuleEvents
 		config.EventSource.EnableNetEvents = config.EventSource.EnableNetEvents && e.r.HasNetworkEvents
 		config.EventSource.EnableRegistryEvents = config.EventSource.EnableRegistryEvents && (e.r.HasRegistryEvents || (config.Yara.Enabled && !config.Yara.SkipRegistry))
 		config.EventSource.EnableFileIOEvents = config.EventSource.EnableFileIOEvents && (e.r.HasFileEvents || (config.Yara.Enabled && !config.Yara.SkipFiles))
@@ -140,7 +141,7 @@ func (e *EventSource) Open(config *config.Config) error {
 		config.EventSource.EnableThreadpoolEvents = config.EventSource.EnableThreadpoolEvents && e.r.HasThreadpoolEvents
 		for _, typ := range event.All() {
 			if typ == event.CreateProcess || typ == event.TerminateProcess ||
-				typ == event.LoadImage || typ == event.UnloadImage {
+				typ == event.LoadModule || typ == event.UnloadModule {
 				// always allow fundamental events
 				continue
 			}

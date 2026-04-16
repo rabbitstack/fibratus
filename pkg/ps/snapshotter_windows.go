@@ -138,7 +138,7 @@ func (s *snapshotter) WriteFromCapture(e *event.Event) error {
 		s.procs[pid] = proc
 	case event.CreateThread, event.ThreadRundown:
 		return s.AddThread(e)
-	case event.LoadImage, event.ImageRundown:
+	case event.LoadModule, event.ModuleRundown:
 		return s.AddModule(e)
 	}
 	return nil
@@ -245,7 +245,7 @@ func (s *snapshotter) AddModule(e *event.Event) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if pid == 0 && e.IsImageRundown() {
+	if pid == 0 && e.IsModuleRundown() {
 		// assume system process if pid is zero
 		pid = SystemPID
 	}
@@ -255,26 +255,26 @@ func (s *snapshotter) AddModule(e *event.Event) error {
 	}
 
 	module := pstypes.Module{}
-	module.Size, _ = e.Params.GetUint64(params.ImageSize)
-	module.Checksum, _ = e.Params.GetUint32(params.ImageCheckSum)
-	module.Name = e.GetParamAsString(params.ImagePath)
-	module.BaseAddress = e.Params.TryGetAddress(params.ImageBase)
-	module.DefaultBaseAddress = e.Params.TryGetAddress(params.ImageDefaultBase)
+	module.Size, _ = e.Params.GetUint64(params.ModuleSize)
+	module.Checksum, _ = e.Params.GetUint32(params.ModuleCheckSum)
+	module.Name = e.GetParamAsString(params.ModulePath)
+	module.BaseAddress = e.Params.TryGetAddress(params.ModuleBase)
+	module.DefaultBaseAddress = e.Params.TryGetAddress(params.ModuleDefaultBase)
 
-	if e.IsLoadImageInternal() {
+	if e.IsLoadModuleInternal() {
 		proc.AddModule(module)
 		return nil
 	}
 
 	moduleCount.Add(1)
 
-	module.SignatureLevel, _ = e.Params.GetUint32(params.ImageSignatureLevel)
-	module.SignatureType, _ = e.Params.GetUint32(params.ImageSignatureType)
+	module.SignatureLevel, _ = e.Params.GetUint32(params.ModuleSignatureLevel)
+	module.SignatureType, _ = e.Params.GetUint32(params.ModuleSignatureType)
 
 	if strings.EqualFold(proc.Name, filepath.Base(module.Name)) && len(proc.Exe) < len(module.Name) {
 		// if the module is loaded for the process executable, and
 		// we don't have the full executable path, override with
-		// the one from the image path
+		// the one from the Module path
 		proc.Exe = module.Name
 	}
 
@@ -590,7 +590,7 @@ func (s *snapshotter) Find(pid uint32) (bool, *pstypes.PS) {
 		// through `PROCESS_VM_READ` or `PROCESS_QUERY_INFORMATION` flags.
 		// Try to acquire the process handle again but with restricted access
 		// rights to be able to obtain other attributes such as the full process's
-		// image executable path or process times
+		// Module executable path or process times
 		process, err = windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
 		if err != nil {
 			return false, nil

@@ -88,7 +88,7 @@ func newConfig(fromFiles ...string) *config.Config {
 			EnableNetEvents:      true,
 			EnableRegistryEvents: true,
 			EnableFileIOEvents:   true,
-			EnableImageEvents:    true,
+			EnableModuleEvents:   true,
 			EnableThreadEvents:   true,
 		},
 		Filters: &config.Filters{

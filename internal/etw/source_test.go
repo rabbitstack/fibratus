@@ -168,7 +168,7 @@ func TestEventSourceEnableFlagsDynamically(t *testing.T) {
 
 	r := &config.RulesCompileResult{
 		HasProcEvents:     true,
-		HasImageEvents:    true,
+		HasModuleEvents:   true,
 		HasRegistryEvents: true,
 		HasNetworkEvents:  true,
 		HasFileEvents:     true,
@@ -177,7 +177,7 @@ func TestEventSourceEnableFlagsDynamically(t *testing.T) {
 		HasAuditAPIEvents: true,
 		UsedEvents: []event.Type{
 			event.CreateProcess,
-			event.LoadImage,
+			event.LoadModule,
 			event.RegCreateKey,
 			event.RegSetValue,
 			event.CreateFile,
@@ -191,7 +191,7 @@ func TestEventSourceEnableFlagsDynamically(t *testing.T) {
 		EventSource: config.EventSourceConfig{
 			EnableThreadEvents:   true,
 			EnableRegistryEvents: true,
-			EnableImageEvents:    true,
+			EnableModuleEvents:   true,
 			EnableFileIOEvents:   true,
 			EnableAuditAPIEvents: true,
 		},
@@ -212,7 +212,7 @@ func TestEventSourceEnableFlagsDynamically(t *testing.T) {
 	// rules compile result doesn't have the thread event
 	// and thread events are enabled in the config
 	require.True(t, flags&etw.Thread == 0)
-	require.True(t, flags&etw.ImageLoad != 0)
+	require.True(t, flags&etw.Module != 0)
 	require.True(t, flags&etw.Registry != 0)
 	// rules compile result has the network event
 	// but network I/O is disabled in the config
@@ -222,7 +222,7 @@ func TestEventSourceEnableFlagsDynamically(t *testing.T) {
 	// but VAMap is disabled in the config
 	require.True(t, flags&etw.VaMap == 0)
 
-	require.False(t, cfg.EventSource.TestDropMask(event.UnloadImage))
+	require.False(t, cfg.EventSource.TestDropMask(event.UnloadModule))
 	require.True(t, cfg.EventSource.TestDropMask(event.WriteFile))
 	require.True(t, cfg.EventSource.TestDropMask(event.UnmapViewFile))
 	require.False(t, cfg.EventSource.TestDropMask(event.OpenProcess))
@@ -248,7 +248,7 @@ func TestEventSourceEnableFlagsDynamicallyWithYaraEnabled(t *testing.T) {
 
 	r := &config.RulesCompileResult{
 		HasProcEvents:     true,
-		HasImageEvents:    true,
+		HasModuleEvents:   true,
 		HasRegistryEvents: true,
 		HasNetworkEvents:  true,
 		HasFileEvents:     false,
@@ -256,7 +256,7 @@ func TestEventSourceEnableFlagsDynamicallyWithYaraEnabled(t *testing.T) {
 		HasAuditAPIEvents: true,
 		UsedEvents: []event.Type{
 			event.CreateProcess,
-			event.LoadImage,
+			event.LoadModule,
 			event.RegCreateKey,
 			event.RegSetValue,
 			event.RenameFile,
@@ -268,7 +268,7 @@ func TestEventSourceEnableFlagsDynamicallyWithYaraEnabled(t *testing.T) {
 		EventSource: config.EventSourceConfig{
 			EnableThreadEvents:   true,
 			EnableRegistryEvents: true,
-			EnableImageEvents:    true,
+			EnableModuleEvents:   true,
 			EnableFileIOEvents:   true,
 			EnableAuditAPIEvents: true,
 			EnableVAMapEvents:    false,
@@ -326,7 +326,7 @@ func TestEventSourceRundownEvents(t *testing.T) {
 
 	evsConfig := config.EventSourceConfig{
 		EnableThreadEvents:   true,
-		EnableImageEvents:    true,
+		EnableModuleEvents:   true,
 		EnableFileIOEvents:   true,
 		EnableNetEvents:      true,
 		EnableRegistryEvents: true,
@@ -348,7 +348,7 @@ func TestEventSourceRundownEvents(t *testing.T) {
 	rundownsByType := map[event.Type]bool{
 		event.ProcessRundown: false,
 		event.ThreadRundown:  false,
-		event.ImageRundown:   false,
+		event.ModuleRundown:  false,
 		event.FileRundown:    false,
 		event.RegKCBRundown:  false,
 	}
@@ -435,11 +435,11 @@ func TestEventSourceAllEvents(t *testing.T) {
 			false,
 		},
 		{
-			"load image",
+			"load module",
 			nil,
 			func(e *event.Event) bool {
 				img := filepath.Join(os.Getenv("windir"), "System32", "notepad.exe")
-				return e.IsLoadImage() && strings.EqualFold(img, e.GetParamAsString(params.ImagePath))
+				return e.IsLoadModule() && strings.EqualFold(img, e.GetParamAsString(params.ModulePath))
 			},
 			false,
 		},
@@ -491,7 +491,7 @@ func TestEventSourceAllEvents(t *testing.T) {
 		{
 			"map view section",
 			func() error {
-				const SecImage = 0x01000000
+				const SecModule = 0x01000000
 				const SectionRead = 0x4
 
 				var sec windows.Handle
@@ -514,7 +514,7 @@ func TestEventSourceAllEvents(t *testing.T) {
 					0,
 					uintptr(unsafe.Pointer(&size)),
 					windows.PAGE_READONLY,
-					SecImage,
+					SecModule,
 					windows.Handle(f.Fd()),
 				); err != nil {
 					return fmt.Errorf("NtCreateSection: %v", err)
@@ -539,7 +539,7 @@ func TestEventSourceAllEvents(t *testing.T) {
 			func(e *event.Event) bool {
 				return e.CurrentPid() && e.Type == event.MapViewFile &&
 					e.GetParamAsString(params.MemProtect) == "EXECUTE_READWRITE|READONLY" &&
-					e.GetParamAsString(params.FileViewSectionType) == "IMAGE" &&
+					e.GetParamAsString(params.FileViewSectionType) == "Module" &&
 					strings.Contains(e.GetParamAsString(params.FilePath), "_fixtures\\yara-test.dll")
 			},
 			false,
@@ -717,7 +717,7 @@ func TestEventSourceAllEvents(t *testing.T) {
 
 	evsConfig := config.EventSourceConfig{
 		EnableThreadEvents:   true,
-		EnableImageEvents:    true,
+		EnableModuleEvents:   true,
 		EnableFileIOEvents:   true,
 		EnableVAMapEvents:    true,
 		EnableNetEvents:      true,
@@ -889,10 +889,10 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 			false,
 		},
 		{
-			"load image callstack",
+			"load Module callstack",
 			nil,
 			func(e *event.Event) bool {
-				if e.IsLoadImage() && filepath.Ext(e.GetParamAsString(params.FilePath)) == ".dll" {
+				if e.IsLoadModule() && filepath.Ext(e.GetParamAsString(params.FilePath)) == ".dll" {
 					callstack := e.Callstack.String()
 					return strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\System32\\KERNELBASE.dll!LoadLibraryExW")) &&
 						strings.Contains(strings.ToLower(callstack), strings.ToLower("\\WINDOWS\\system32\\ntoskrnl.exe!NtMapViewOfSection"))
@@ -1202,7 +1202,7 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 
 	evsConfig := config.EventSourceConfig{
 		EnableThreadEvents:   true,
-		EnableImageEvents:    true,
+		EnableModuleEvents:   true,
 		EnableFileIOEvents:   true,
 		EnableRegistryEvents: true,
 		EnableMemEvents:      true,
@@ -1327,7 +1327,7 @@ func TestEvasionScanner(t *testing.T) {
 
 	evsConfig := config.EventSourceConfig{
 		EnableThreadEvents:   true,
-		EnableImageEvents:    true,
+		EnableModuleEvents:   true,
 		EnableFileIOEvents:   false,
 		EnableVAMapEvents:    true,
 		EnableNetEvents:      true,

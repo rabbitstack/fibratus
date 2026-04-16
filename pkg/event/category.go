@@ -39,8 +39,8 @@ const (
 	Process Category = "process"
 	// Thread is the category for thread events
 	Thread Category = "thread"
-	// Image is the category for image events
-	Image Category = "image"
+	// Module is the category for module (dll, exe, sys) events
+	Module Category = "module"
 	// Handle is the category for handle events
 	Handle Category = "handle"
 	// Driver is the category for driver events
@@ -85,7 +85,7 @@ func (c Category) Index() uint8 {
 		return 4
 	case Thread:
 		return 5
-	case Image:
+	case Module:
 		return 6
 	case Handle:
 		return 7
@@ -112,7 +112,7 @@ func Categories() []string {
 		string(Net),
 		string(Process),
 		string(Thread),
-		string(Image),
+		string(Module),
 		string(Handle),
 		string(Mem),
 		string(Driver),

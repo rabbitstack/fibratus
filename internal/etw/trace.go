@@ -20,14 +20,15 @@ package etw
 
 import (
 	"fmt"
+	"runtime"
+	"time"
+	"unsafe"
+
 	"github.com/rabbitstack/fibratus/pkg/config"
 	errs "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
-	"runtime"
-	"time"
-	"unsafe"
 )
 
 // initEventTraceProps builds the trace properties descriptor which
@@ -480,8 +481,8 @@ func (t *Trace) enableFlagsDynamically(config config.EventSourceConfig) etw.Even
 	if config.EnableThreadEvents {
 		flags |= etw.Thread
 	}
-	if config.EnableImageEvents {
-		flags |= etw.ImageLoad
+	if config.EnableModuleEvents {
+		flags |= etw.Module
 	}
 	if config.EnableNetEvents {
 		flags |= etw.NetTCPIP

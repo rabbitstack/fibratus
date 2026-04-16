@@ -53,10 +53,10 @@
   expr: evt.name = 'RegOpenKey' and registry.status = 'Success'
 
 - macro: load_module
-  expr: evt.name = 'LoadImage'
+  expr: evt.name = 'LoadModule'
 
 - macro: unload_module
-  expr: evt.name = 'UnloadImage'
+  expr: evt.name = 'UnloadModule'
 
 - macro: set_value
   expr: evt.name = 'RegSetValue' and registry.status = 'Success'
