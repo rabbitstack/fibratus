@@ -22,6 +22,11 @@
 package yara
 
 import (
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
@@ -32,10 +37,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows/registry"
-	"os"
-	"path/filepath"
-	"testing"
-	"time"
 
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
@@ -281,15 +282,15 @@ func TestScan(t *testing.T) {
 				psnap.On("Find", pid).Return(true, proc)
 
 				e := &event.Event{
-					Type: event.LoadImage,
-					Name: "LoadImage",
+					Type: event.LoadModule,
+					Name: "LoadModule",
 					Tid:  2484,
 					PID:  pid,
 					Params: event.Params{
-						params.FilePath:           {Name: params.FilePath, Type: params.UnicodeString, Value: "tests.exe"},
-						params.ImageBase:          {Name: params.ImageBase, Type: params.Uint64, Value: uint64(0x74888fd99)},
-						params.ImageSignatureType: {Name: params.ImageSignatureType, Type: params.Uint32, Value: signature.None},
-						params.ProcessID:          {Name: params.ProcessID, Type: params.PID, Value: pid},
+						params.FilePath:            {Name: params.FilePath, Type: params.UnicodeString, Value: "tests.exe"},
+						params.ModuleBase:          {Name: params.ModuleBase, Type: params.Uint64, Value: uint64(0x74888fd99)},
+						params.ModuleSignatureType: {Name: params.ModuleSignatureType, Type: params.Uint32, Value: signature.None},
+						params.ProcessID:           {Name: params.ProcessID, Type: params.PID, Value: pid},
 					},
 					Metadata: make(map[event.MetadataKey]any),
 					PS:       proc,
@@ -855,7 +856,7 @@ func TestScan(t *testing.T) {
 			false,
 		},
 		{
-			"scan rwx image file mmap",
+			"scan rwx Module file mmap",
 			func() (*event.Event, error) {
 				proc := &pstypes.PS{
 					Name:      "tests.exe",
@@ -992,7 +993,7 @@ func TestScan(t *testing.T) {
 				assert.Contains(t, e.Metadata, event.YaraMatchesKey)
 			}
 
-			if e.IsCreateProcess() || e.IsLoadImage() || e.IsVirtualAlloc() || e.IsMapViewFile() {
+			if e.IsCreateProcess() || e.IsLoadModule() || e.IsVirtualAlloc() || e.IsMapViewFile() {
 				// cleanup
 				proc, err := windows.OpenProcess(windows.PROCESS_TERMINATE, false, e.Params.MustGetPid())
 				if err == nil {

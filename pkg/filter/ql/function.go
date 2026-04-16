@@ -303,6 +303,8 @@ func (f *Foreach) Desc() functions.FunctionDesc {
 				"$pe":         true,
 				"$file":       true,
 				"$image":      true,
+				"$module":     true,
+				"$dll":        true,
 				"$thread":     true,
 				"$threadpool": true,
 				"$registry":   true,

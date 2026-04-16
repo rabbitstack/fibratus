@@ -1081,7 +1081,7 @@ var fields = map[Field]FieldInfo{
 	ThreadUstackLimit:                              {ThreadUstackLimit, "limit of the thread's user space stack", params.Address, []string{"thread.ustack.limit = '8ffe0000'"}, nil, nil},
 	ThreadEntrypoint:                               {ThreadEntrypoint, "starting address of the function to be executed by the thread", params.Address, []string{"thread.entrypoint = '7efe0000'"}, &Deprecation{Since: "2.3.0", Fields: []Field{ThreadStartAddress}}, nil},
 	ThreadStartAddress:                             {ThreadStartAddress, "thread start address", params.Address, []string{"thread.start_address = '7efe0000'"}, nil, nil},
-	ThreadStartAddressSymbol:                       {ThreadStartAddressSymbol, "thread start address symbol", params.UnicodeString, []string{"thread.start_address.symbol = 'LoadImage'"}, nil, nil},
+	ThreadStartAddressSymbol:                       {ThreadStartAddressSymbol, "thread start address symbol", params.UnicodeString, []string{"thread.start_address.symbol = 'LoadModule'"}, nil, nil},
 	ThreadStartAddressModule:                       {ThreadStartAddressModule, "thread start address module", params.UnicodeString, []string{"thread.start_address.module endswith 'kernel32.dll'"}, nil, nil},
 	ThreadPID:                                      {ThreadPID, "the process identifier where the thread is created", params.Uint32, []string{"evt.pid != thread.pid"}, nil, nil},
 	ThreadTEB:                                      {ThreadTEB, "the base address of the thread environment block", params.Address, []string{"thread.teb_address = '8f30893000'"}, nil, nil},

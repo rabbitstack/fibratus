@@ -423,7 +423,7 @@ func (e *Event) produceParams(evt *etw.EventRecord) {
 		e.AppendParam(params.HandleObjectTypeID, params.HandleType, typeID)
 		e.AppendParam(params.ProcessID, params.PID, sourcePID)
 		e.AppendParam(params.TargetProcessID, params.PID, targetPID)
-	case LoadImage, UnloadImage, ImageRundown:
+	case LoadModule, UnloadModule, ModuleRundown:
 		var (
 			pid               uint32
 			checksum          uint32
@@ -458,14 +458,14 @@ func (e *Event) produceParams(evt *etw.EventRecord) {
 		}
 		filename = evt.ConsumeUTF16String(offset)
 		e.AppendParam(params.ProcessID, params.PID, pid)
-		e.AppendParam(params.ImageCheckSum, params.Uint32, checksum)
-		e.AppendParam(params.ImageDefaultBase, params.Address, defaultBase)
-		e.AppendParam(params.ImageBase, params.Address, imageBase)
-		e.AppendParam(params.ImageSize, params.Uint64, imageSize)
-		e.AppendParam(params.ImagePath, params.DOSPath, filename)
-		e.AppendParam(params.ImageSignatureLevel, params.Enum, uint32(sigLevel), WithEnum(signature.Levels))
-		e.AppendParam(params.ImageSignatureType, params.Enum, uint32(sigType), WithEnum(signature.Types))
-	case LoadImageInternal:
+		e.AppendParam(params.ModuleCheckSum, params.Uint32, checksum)
+		e.AppendParam(params.ModuleDefaultBase, params.Address, defaultBase)
+		e.AppendParam(params.ModuleBase, params.Address, imageBase)
+		e.AppendParam(params.ModuleSize, params.Uint64, imageSize)
+		e.AppendParam(params.ModulePath, params.DOSPath, filename)
+		e.AppendParam(params.ModuleSignatureLevel, params.Enum, uint32(sigLevel), WithEnum(signature.Levels))
+		e.AppendParam(params.ModuleSignatureType, params.Enum, uint32(sigType), WithEnum(signature.Types))
+	case LoadModuleInternal:
 		var (
 			pid         uint32
 			checksum    uint32
@@ -483,11 +483,11 @@ func (e *Event) produceParams(evt *etw.EventRecord) {
 		filename = evt.ConsumeUTF16String(36)
 
 		e.AppendParam(params.ProcessID, params.PID, pid)
-		e.AppendParam(params.ImageCheckSum, params.Uint32, checksum)
-		e.AppendParam(params.ImageDefaultBase, params.Address, defaultBase)
-		e.AppendParam(params.ImageBase, params.Address, imageBase)
-		e.AppendParam(params.ImageSize, params.Uint64, imageSize)
-		e.AppendParam(params.ImagePath, params.DOSPath, filename)
+		e.AppendParam(params.ModuleCheckSum, params.Uint32, checksum)
+		e.AppendParam(params.ModuleDefaultBase, params.Address, defaultBase)
+		e.AppendParam(params.ModuleBase, params.Address, imageBase)
+		e.AppendParam(params.ModuleSize, params.Uint64, imageSize)
+		e.AppendParam(params.ModulePath, params.DOSPath, filename)
 	case RegOpenKey, RegCloseKey,
 		RegCreateKCB, RegDeleteKCB,
 		RegKCBRundown, RegCreateKey,

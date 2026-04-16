@@ -19,12 +19,13 @@
 package rules
 
 import (
+	"testing"
+
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/version"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestCompile(t *testing.T) {
@@ -34,13 +35,13 @@ func TestCompile(t *testing.T) {
 	require.NotNil(t, rs)
 	require.Len(t, filters, 6)
 
-	assert.True(t, rs.HasImageEvents)
+	assert.True(t, rs.HasModuleEvents)
 	assert.True(t, rs.HasProcEvents)
 	assert.False(t, rs.HasMemEvents)
 	assert.False(t, rs.HasAuditAPIEvents)
 	assert.True(t, rs.HasDNSEvents)
 	assert.Contains(t, rs.UsedEvents, event.CreateProcess)
-	assert.Contains(t, rs.UsedEvents, event.LoadImage)
+	assert.Contains(t, rs.UsedEvents, event.LoadModule)
 	assert.Contains(t, rs.UsedEvents, event.QueryDNS)
 	assert.Contains(t, rs.UsedEvents, event.ConnectTCPv4)
 	assert.Contains(t, rs.UsedEvents, event.ConnectTCPv6)
