@@ -10,13 +10,13 @@ Some examples of the `foreach` usage:
 
 - Traverses process modules and return true if the module path matches the pattern
 
-```
+```python
 foreach(ps._modules, $mod, $mod.path imatches '?:\\Windows\\System32\\us?r32.dll')
 ```
 
 - For each process ancestor, check if the ancestor is `services.exe` and the current process is protected. In this example, the `ps.is_protected` field is captured before its usage in the predicate
 
-```
+```python
 foreach(ps._ancestors, $proc, $proc.name = 'services.exe' and ps.is_protected, ps.is_protected)
 ```
 
@@ -24,7 +24,7 @@ foreach(ps._ancestors, $proc, $proc.name = 'services.exe' and ps.is_protected, p
 
 The `ps.ancestor` returns all ancestor names of the process generating the event. Alternatively, the filter field can accept an argument. In case of the `ps.ancestor` field, the argument indicates the ancestor level. Given the process tree below and assuming the current process generating the event is `cmd.exe`, the field with an optional level argument yields the values as follows:
 
-```
+```python
 ├───wininit.exe
 │   └───services.exe
 │       └───svchost.exe
@@ -39,7 +39,7 @@ The `ps.ancestor` returns all ancestor names of the process generating the event
 
 If the argument is omitted, the slice with all ancestor names is returned. The `ps.ancestor` field can only yield a single process attribute - process name. To build complex conditions involving different process attribute, we can use the `foreach` construct. The bound variable associated with the `ps._ancestors` pseudo field can have the any of the segments:
 
-| Segment Name  | Description |
+| SEGMENT  | DESCRIPTION |
 | :---        |    :----    |
 |`pid` | Process identifier |
 |`name` | Process name |
@@ -52,17 +52,17 @@ If the argument is omitted, the slice with all ancestor names is returned. The `
 |`username` | User name associated with the process security context |
 |`domain`  | Domain associated with the process security context |
 
-Examples
+Examples:
 
 - Check if the ancestor has one of the particular process identifiers and the pid belongs to the `services.exe` process
 
-```
+```python
 foreach(ps._ancestors, $proc, $proc.pid in (2034, 343) and $proc.name = 'services.exe')
 ```
 
 - Check if the ancestor starts with the specific security identifier and the pid belongs to the `svchost.exe` process
 
-```
+```python
 foreach(ps._ancestors, $proc, $proc.sid imatches `S-1-5*` and $proc.name = 'svchost.exe')
 ```
 
@@ -72,7 +72,7 @@ foreach(ps._ancestors, $proc, $proc.sid imatches `S-1-5*` and $proc.name = 'svch
 The `ps._modules` pseudo field returns the process modules iterable. Available module segments are:
 
 
-| Segment Name  | Description |
+| SEGMENT  | DESCRIPTION |
 | :---        |    :----    |
 |`address` | Base address of the process in which the module is loaded|
 |`checksum` | Module checksum |
@@ -80,11 +80,11 @@ The `ps._modules` pseudo field returns the process modules iterable. Available m
 |`name` | Module name |
 |`path`  | Full module path |
 
-Examples
+Examples:
 
 - Check the virtual memory space size of the specific module
 
-```
+```python
 foreach(ps._modules, $mod, $mod.size >= 212354 and $mod.name imatches '*winhttp.dll')
 ```
 
@@ -93,7 +93,7 @@ foreach(ps._modules, $mod, $mod.size >= 212354 and $mod.name imatches '*winhttp.
 The `ps._threads` pseudo field yields all of the process running threads. Available thread segments are:
 
 
-| Segment Name  | Description |
+| SEGMENT  | DESCRIPTION |
 | :---        |    :----    |
 |`tid` | Thread identifier |
 |`start_address` | The address of the function executed by the thread |
@@ -106,7 +106,7 @@ The `ps._threads` pseudo field yields all of the process running threads. Availa
 
 Process memory mappings (also known as sections) can be accessed via the `ps._mmaps` pseudo field. Available memory mappings segments are:
 
-| Segment Name  | Description |
+| SEGMENT  | DESCRIPTION |
 | :---        |    :----    |
 |`address` | Address where the section is mapped within the process address space |
 |`type` | The type of the memory mapping. For example, `DATA`. |
@@ -118,67 +118,50 @@ Process memory mappings (also known as sections) can be accessed via the `ps._mm
 
 You can access process environment variables by providing the name of the environment variable. Alternatively, you can provide the prefix.
 
-```
+```python
 ps.envs['MOZ_CRASHREPORTER'] = 'C:\\Program Files\\Firefox'
 ```
 
 Or, supplying the prefix
 
-```
+```python
 ps.envs['MOZ_CRASH'] = 'C:\\Program Files\\Firefox'
 ```
 
 It is also possible to retrieve all environment variables as a list of colon separated key/value pairs. Example using the `foreach` idiom:
 
-```
+```python
 foreach(ps.envs, $env, substr($env, 0, indexof($env, ':')) = 'OS')
 ```
 
-## Portable Executable iterators 
+## PE iterators
 
-[Portable Executable](/pe/introduction) introspection allows for utilizing the PE metadata in filters. See other [fields](filters/fields?id=pe) that can be used to narrow down events by PE data.
-[Portable Executable](https://en.wikipedia.org/wiki/Portable_Executable) (PE) is the Windows file format that describes the layout of the executable code. PE is frequently subject to weaponization ranging from reverse shell payload injections to several obfuscation techniques used by malware creators.
+[Portable Executable](https://en.wikipedia.org/wiki/Portable_Executable) (PE) is the Windows file format that describes the layout of the executable code. PE is frequently subject to weaponization ranging from reverse shell payload injections to several obfuscation techniques. Fibratus introspects the PE metadata and populates filter fields that can be used in detection rules.
 
-Fibratus natively supports the scanning of the PE format data that, for example, underpins the [PE filters](/filters/fields?id=pe). To enable the PE introspection, it is necessary to edit the `pe.enabled` key in the configuration file or provide the `--pe.enabled=true` command line flag.
+### Sections
 
-### Sections 
-
-# Sections
-
-Sections are the fundamental building block of the PE data. They contain the content of the file, including the executable code, data, resources and other executable artifacts.
-
-Fibratus obtains the number of sections, and for each section encountered in the PE data, its name and size is fetched. For example, the code section is called `.text` and the data section is called `.data`. Sometimes the malware specimens tamper the PE structure and alter sections. You can hunt for a non-standard number of sections in the executable or detect extraneous sections by checking the data surfaced by Fibratus.
-
-### Reading extended section data 
-
-For a full-blown section parsing, you can enable the `read-sections` option. This instructs the PE parser to read the underlying section bytes for the purpose of computing the `md5` hash of each section. It is possible to write filter expressions that involve evaluating the section attributes.
-
-For example, to match against specific `.text` section `md5` hash, you would write the `pe.sections[.text].md5 = '0464997eb36c70083164c666d53c6af3'` filter.
-
-# Symbols
-
- Symbols or functions referred to by the binary that are expected to be satisfied by other libraries at dynamic load time are located in the Import Address Table (IAT). Fibratus parses this table and extracts all symbols names as well as the dynamic libraries referenced by the binary. Symbol names can be `URLDownloadToFileA` or `WriteFile`.
-
- To activate symbol parsing it is necessary to enable the `read-symbols` option.
-
- From the filtering perspective,  you can write `pe.symbols in ('GetTextFaceW', 'GetProcessHeap')` or `pe.imports in ('msvcrt.dll', 'GDI32.dll')` to filter events where the originating process contains the provided symbols or imports in its binary PE data.
+Sections are the fundamental building blocks of PE data. They contain the contents of the file, including executable code, data, resources, and other runtime artifacts.
 
 The `pe._sections` pseudo field yields all of the executable image PE sections. Available section segments are:
 
-| Segment Name  | Description |
+| SEGMENT | DESCRIPTION |
 | :---        |    :----    |
 |`name` | Section name. For example, `.debug$` |
 |`size` | Section size in bytes |
 |`entropy` | Section entropy |
 |`md5` | Section MD5 hash |
 
-### Resources 
+### Resources
 
-PE [resources](/pe/resources) can be accessed by the resource name. Alternatively, it is possible to obtain all the resources as a list separated by the colon delimiter:
+PE resources can be accessed by the resource name. Alternatively, it is possible to obtain all the resources as a list separated by the colon delimiter:
 
-Fibratus reads version resources from the PE resource directory. The resource contains information about the exeucutable as its version number, its intended operating system, and its original filename. An example of version resources read by Fibratus:
-
+```python
+pe.resources iin ('FileDescription:Notepad')
 ```
+
+Fibratus reads version resources from the PE resource directory. The resource contains information about the exeucutable as its version number, its intended operating system, and its original filename. An example of version resources:
+
+```python
 CompanyName: Microsoft Corporation
 FileDescription: Notepad
 FileVersion: 10.0.18362.693 (WinBuild.160101.0800)
@@ -189,20 +172,11 @@ ProductName: Microsoft® Windows® Operating System
 ProductVersion: 10.0.18362.693
 ```
 
-You can use any of these resource entries in filter expressions. For example, the `pe.resources[FileDescription] = 'Notepad'` filter matches any event where the `FileDescription` resource is equal to `Notepad`.
+## Callstack iterators
 
-To enable resource parsing, it is necessary to set the `read-resources` option to `true`.
+[Stack enrichment](../telemetry/callstacks.md) attaches call frames that can be accessed by the `thread._callstack` pseudo field. Available callstsack segments are:
 
-```
-pe.resources iin ('FileDescription:Notepad')
-```
-
-
-## Callstack 
-
-[Stack enrichment](/kevents/anatomy?id=callstack) attaches call frames that can be accessed by the `thread._callstack` pseudo field. Available callstsack segments are:
-
-| Segment Name  | Description |
+| SEGMENT  | DESCRIPTION |
 | :---        |    :----    |
 |`address` | Symbol address |
 |`offset` | Symbol offset |
@@ -222,12 +196,12 @@ Examples:
 
 - Determine if the frame protection is RWX (Read-Write-Execute)
 
-```
+```python
 foreach(thread._callstack, $frame, $frame.protection = 'RWX')
 ```
 
 - Determine if the frame trailing assembly contain the `syscall` instruction and the frame resides in the floating memory region
 
-```
+```python
 foreach(thread._callstack, $frame, $frame.callsite_trailing_assembly matches '*mov r10, rcx|mov eax, 0x*|syscall*' and $frame.module = 'unbacked')
 ```

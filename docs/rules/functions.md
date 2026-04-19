@@ -4,226 +4,77 @@
 
 Functions can be used anywhere a value is expected inside comparisons, logical expressions, or even as inputs to other functions.
 
-## Basic usage
-
 A function call follows this general form:
 
-```text
+```python
 function_name(arg1, arg2, ...)
 ```
 
-For example:
+For example, this expression removes the `C:` prefix from `file.path` and converts the resulting string to lowercase.
 
-```text
-lower(ltrim(file.name, 'C:'))
+```python
+lower(ltrim(file.path, 'C:'))
 ```
 
-This expression:
+Functions can be nested arbitrarily, allowing to build complex transformations step by step. In this example, the execution proceeds from the innermost function outward. `replace` normalizes path separators. Next,`trim` removes leading/trailing whitespace, and finally, `lower` ensures case-insensitive comparasion. This makes it easy to normalize data before applying detection logic.
 
-1. Removes the `C:` prefix from `file.name`
-2. Converts the resulting string to lowercase
-
----
-
-## Function composition (nesting)
-
-Functions can be **nested arbitrarily**, allowing you to build complex transformations step by step.
-
-```text
+```python
 lower(trim(replace(file.path, '\\', '/')))
 ```
 
-Execution proceeds from the **innermost function outward**:
+Some functions return collections (lists) instead of single values. These are especially useful when combined with operators like `in`, `iin`, `contains`, or `intersects`. In this example, `get_reg_value` may return multiple strings, for example from a `MULTI_SZ` registry value. The `iin` operator checks whether any element matches the provided list.
 
-1. `replace` normalizes path separators
-2. `trim` removes leading/trailing whitespace
-3. `lower` ensures case-insensitive comparison
-
-This makes it easy to normalize data before applying detection logic.
-
----
-
-## Working with collections
-
-Some functions return **collections (lists)** instead of single values. These are especially useful when combined with operators like:
-
-* `in`
-* `iin` (case-insensitive membership)
-* `contains`
-* `intersects`
-
-### Example
-
-```text
-get_reg_value(registry.key.name) iin ('mimikatz.dll', 'evil.dll')
+```python
+get_reg_value(registry.path) iin ('mimikatz.dll', 'evil.dll')
 ```
 
-Here:
+?> Each function expects arguments of specific types. Passing an incompatible results in rule compilation error.
 
-* `get_reg_value` may return multiple strings (e.g., from a `MULTI_SZ` registry value)
-* The `iin` operator checks whether **any element** matches the provided list
-
----
-
-## Functions in sequence rules
-
-Functions become particularly powerful when combined with **aliases and bound fields** in sequence rules.
-
-```yaml
-|create_file
-  and
- file.name imatches '?:\\Windows\\System32\\*.dll'
-| as e1
-|modify_registry
-  and
- get_reg_value(registry.key.name) iin (base($e1.file.name, false))
-```
-
-In this example:
-
-* `base($e1.file.name, false)` extracts the filename from a previously captured event
-* The result is compared against dynamically retrieved registry values
-
-This allows expressing **cross-event relationships** that would otherwise be impossible.
-
----
-
-## Case sensitivity
-
-Function names are **case-insensitive**, so the following are equivalent:
-
-```text
-lower(file.name)
-LOWER(file.name)
-LoWeR(file.name)
-```
-
-However, **function arguments remain case-sensitive** unless explicitly handled (e.g., via `lower`, `upper`, or `iin`).
-
----
-
-## Type expectations and coercion
-
-Each function expects arguments of specific types:
-
-* Passing an incompatible type may result in:
-
-  * Evaluation failure
-  * Implicit conversion (when supported)
-
-### Example
-
-```text
-length(file.name) > 10
-```
-
-* `length` expects a string and returns an integer
-
-When in doubt, explicitly normalize types using helper functions.
-
----
-
-## Practical patterns
-
-### Normalization before comparison
-
-```text
-lower(file.name) endswith '.exe'
-```
-
-Avoids missing matches due to casing differences.
-
----
-
-### Extract and compare
-
-```text
-base(file.path, false) in suspicious_filenames
-```
-
-Focuses detection on the filename rather than the full path.
-
----
-
-### Dynamic lookups
-
-```text
-get_reg_value(registry.key.name) contains 'powershell'
-```
-
-Allows inspecting live system state instead of relying only on event fields.
-
----
-
-### Combining multiple transformations
-
-```text
-lower(base(ltrim(file.path, 'C:'), false)) in bad_binaries
-```
-
-Builds a robust comparison pipeline resilient to path and casing variations.
-
-
-
-
-Functions expand the scope of the filtering language by bringing a plethora of capabilities. The function can return a primitive value, including integers, strings, and booleans. Function calls can be nested where the result of one function is used as an input in another function. For example, `lower(ltrim(file.name, 'C:'))`, removes the `C` drive letter from the file path and converts it to a lower case string.
-
-Additionally, some functions may return a collection of values. Function names are case insensitive.
 
 ## Network functions
 
 ### `cidr_contains`
 
-Determines if the specified IP is contained within the block referenced by the given CIDR mask. The first argument represents the IP address and the subsequent   arguments are IP masks in CIDR notation.
-
-```
-cidr_contains(ip: <string>, cidrs: <string>...) :: <boolean>
-```
+Determines if the specified IP is contained within the block referenced by the given CIDR masks.
 
 ##### Arguments
 
-> `ip` IPv4|IPv6 IP address in v4/v6 notation
+| ARGUMENT  | TYPE | DESCRIPTION | REQUIRED? |
+| :---        |    :----   |  :---- | :----  |
+| `ip` | ip | IP address in v4/v6 notation. | yes |
+| `cidrs` | array | List of IP masks in CIDR notation. | yes |
 
-> `cidrs` list List of CIDR masks
+##### Return
 
-`return` a boolean value indicating whether the IP pertains to the CIDR block
+> `return` Boolean Indicates whether the IP pertains to the CIDR block
 
-- **Specification**
-    ```
-    cidr_contains(ip: <string>, cidrs: <string>...) :: <boolean>
-    ```
-    - `ip`: The IP address in v4/v6 notation
-    - `cidrs`: The list of CIDR masks
-    - `return` a boolean value indicating whether the IP pertains to the CIDR block
+##### Usage
 
-- **Examples**
-
-    Assuming `net.sip` contains the `192.168.1.20` IP address
-
-    ```
-    cidr_contains(net.sip, '192.168.1.1/24', '172.17.1.1/8') = true
-    ```
+```
+cidr_contains(net.sip, '192.168.1.1/24', '172.17.1.1/8') = true
+```
 
 ## Hash functions
 
-### md5
+### `md5`
 
-`md5` computes the MD5 hash of the given value.
+Computes the MD5 hash of the given value.
 
-- **Specification**
-    ```
-    md5(data: <string|[]byte>) :: <string>
-    ```
-    - `data`: The string or the byte array for which to calculate the hash
-    - `return` a string representing the md5 hash
+##### Arguments
 
-- **Examples**
+| ARGUMENT  | TYPE | DESCRIPTION | REQUIRED? |
+| :---        |    :----   |  :---- | :----  |
+| `data` | string or byte | String or byte array for which the MD5 hash is calculated. | yes |
 
-    Assuming `registry.key.name` contains the `HKEY_LOCAL_MACHINE\SYSTEM\Setup\Pid` key.
+##### Return
 
-    ```
-    md5(registry.key.name) = 'eab870b2a516206575d2ffa2b98d8af5'
-    ```
+> `return` String MD5 hash in string format
+
+##### Usage
+
+```
+md5(registry.path) = 'eab870b2a516206575d2ffa2b98d8af5'
+```
 
 ## String functions
 

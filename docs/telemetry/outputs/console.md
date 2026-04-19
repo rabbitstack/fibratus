@@ -23,6 +23,10 @@ Specifies the separator rendered between the event parameter's key and its value
 
 Defines the template used in the event formatter. For more details, see the next section.
 
+### `colorize`
+
+Indicates if the console output is colorized.
+
 ## Templates
 
 The template consists of a collection of named placeholders that event formatter replaces with desired values. The syntax of the template resembles the Go [template](https://golang.org/pkg/text/template/) engine constructs, excepts the event formatter lacks advanced templating features such as loops, functions or `if` statements.
@@ -55,8 +59,6 @@ The following field modifiers are supported:
 
 The default template is defined as:
 
-```
+```python
 {{ .Seq }} {{ .Timestamp }} - {{ .CPU }} {{ .Process }} ({{ .Pid }}) - {{ .Type }} ({{ .Params }})
 ```
-
-

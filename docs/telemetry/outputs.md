@@ -1,6 +1,6 @@
 # Outputs
 
-##### Fibratus provides a wide range of output sinks for transmitting telemetry events. While local captures are often sufficient for inspection and analysis, the event stream can also be forwarded to external systems such as message brokers or search and analytics platforms, for example, RabbitMQ or Elasticsearch, enabling centralized processing, storage, and observability at scale.
+##### Fibratus provides a wide range of output sinks for transmitting telemetry events. While local [captures](../../captures.md) are often sufficient for inspection and analysis, the event stream can also be forwarded to external systems such as message brokers or search and analytics platforms, for example, RabbitMQ or Elasticsearch, enabling centralized processing, storage, and observability at scale.
 
 Each output exposes a comprehensive set of configuration options, allowing you to fine-tune how events are transmitted and integrated with downstream systems.
 

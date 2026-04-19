@@ -1,6 +1,6 @@
 <p align="center" >
-  <a href="https://www.fibratus.io" >
-    <img src="logo.png" alt="Fibratus">
+  <a href="https://fibratus.io" >
+    <img src="logo.svg" alt="Fibratus">
   </a>
 </p>
 
@@ -9,63 +9,32 @@
 <p align="center">
   Adversary tradecraft detection, protection, and hunting
   <br>
-  <a href="https://www.fibratus.io/#/setup/installation"><strong>Get Started »</strong></a>
+  <a href="https://fibratus.io/docs/setup/installation"><strong>Get Started »</strong></a>
   <br>
   <br>
   <strong>
-    <a href="https://www.fibratus.io">Docs</a>
+    <a href="https://fibratus.io/docs">Docs</a>
     &nbsp;&nbsp;&bull;&nbsp;&nbsp;
-    <a href="https://github.com/rabbitstack/fibratus/tree/master/rules">Rules</a>
+    <a href="https://fibratus.io/rules">Rules</a>
     &nbsp;&nbsp;&bull;&nbsp;&nbsp;
     <a href="https://github.com/rabbitstack/fibratus/tree/master/filaments">Filaments</a>
     &nbsp;&nbsp;&bull;&nbsp;&nbsp;
-    <a href="https://github.com/rabbitstack/fibratus/releases">Download</a>
+    <a href="https://fibratus.io/downloads">Download</a>
     &nbsp;&nbsp;&bull;&nbsp;&nbsp;
     <a href="https://github.com/rabbitstack/fibratus/discussions">Discussions</a>
   </strong>
 </p>
 
 Fibratus detects, protects, and eradicates advanced adversary tradecraft by scrutinizing
-and asserting a wide spectrum of system events against a behavior-driven [rule engine](https://www.fibratus.io/#/filters/rules) and [YARA](https://www.fibratus.io/#/yara/introduction) memory scanner.
+and asserting a wide spectrum of [system events](https://fibratus.io/docs/telemetry/events) against a behavior-driven [rule engine](https://fibratus.io/docs/rules) and [YARA](https://fibratus.io/docs/yara) memory scanner.
 
-Events can also be shipped to a wide array of [output sinks](https://www.fibratus.io/#/outputs/introduction) or dumped to [capture](https://www.fibratus.io/#/captures/introduction) files for local inspection and forensics analysis. You can use [filaments](https://www.fibratus.io/#/filaments/introduction) to extend Fibratus with your own arsenal of tools and so leverage the power of the Python ecosystem. 
+Events can also be shipped to a wide array of [output sinks](https://fibratus.io/docs/telemetry/outputs) or dumped to [capture](https://fibratus.io/docs/captures) files for local inspection and forensics analysis. You can use [filaments](https://fibratus.io/docs/filaments) to extend Fibratus with your own arsenal of tools and so leverage the power of the Python ecosystem. 
 
 In a nutshell, the Fibratus mantra is defined by the pillars of **realtime behavior detection**, **memory scanning**, and **forensics** capabilities.
 
+### Installation and Quick start
 
-### Installation
-
-- Download the latest [MSI package](https://github.com/rabbitstack/fibratus/releases) and follow the [UI](https://www.fibratus.io/#/setup/installation) wizard or
-alternatively install via `msiexec` in silent mode
-
-```
-$ msiexec /i fibratus-2.4.0-amd64.msi /qn
-```
-
-### Quick start
-
----
-
-- spin up a command line prompt
-- list credentials from the vault by using the `VaultCmd` tool
-
-```
-$ VaultCmd.exe /listcreds:"Windows Credentials" /all
-```
-
-`Credential discovery via VaultCmd tool` rule should trigger and emit the alert to the [Eventlog](https://www.fibratus.io/#/alerts/senders/eventlog). Check the short demo [here](https://www.fibratus.io/alerts/senders/images/eventlog.gif).
-
-### Documentation
-
-To fully exploit and learn about Fibratus capabilities, read the [docs](https://www.fibratus.io).
-
-### Rules
-
-Detection rules live in the [`rules`](/rules) directory of this repository. The CLI provides a set of
-commands to explore the rule catalog, validate the rules, or [create a new rule](https://github.com/rabbitstack/fibratus/tree/master/rules#structure) from the template.
-
-To describe all rules in the catalog, use the `fibratus rules list` command. It is possible to pass the
-`-s` flag to show rules summary by MITRE tactics and techniques.
+For installation and [quick start](https://www.fibratus.io/docs/setup/quick-start) instructions, go [here](https://www.fibratus.io/docs/setup/installation).
 
 ### Contributing
 

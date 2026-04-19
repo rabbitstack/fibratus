@@ -15,26 +15,26 @@ filters:
 
 ### Expressions
 
-**Expression** macros encapsulate rule conditions. A macro declaration requires a unique macro name, the expression, and an optional description.
+Expression macros encapsulate rule conditions. A macro declaration requires a unique macro name, the expression, and an optional description.
 
-```yaml
+```python
 - macro: spawn_process
   expr: evt.name = 'CreateProcess'
   description: Identifies the execution of a new process
 ```
 
-Where macro expressions really shine is when combined with other macros to forge recursive macros. For example, the `spawn_msoffice_process` is composed of `spawn_process` expression macro and the `msoffice_binaries` list macro.
+Macros can be combined with other macros to forge recursive macros. For example, the `spawn_msoffice_process` is composed of `spawn_process` expression macro and the `msoffice_binaries` list macro.
 
-```yaml
+```python
 - macro: spawn_msoffice_process
   expr: spawn_process and ps.sibling.exe iin msoffice_binaries
   description: Identifies the execution of the MS Office process
 ```
 ### Lists
 
-- **list** macros declare a sequence of items such as file system paths, process names, or registry keys. List macros help to make the rules succinct and clean. An example of a macro list containing Microsoft Office process image names. Various operators, such as `in`, `matches`, or `startswith` can accept list macros as RHS (Right Hand Side) expressions.
+List macros define a sequence of values such as file system paths, process names, or registry keys. They help keep rules concise, readable, and easier to maintain. For example, a list macro can contain Microsoft Office process executable names. Operators such as `in`, `matches`, or `startswith` can accept list macros as right-hand side (RHS) expressions in rule conditions.
 
-```yaml
+```python
 - macro: msoffice_binaries
   list: [EXCEL.EXE, WINWORD.EXE, MSACCESS.EXE, POWERPNT.EXE]
 ```

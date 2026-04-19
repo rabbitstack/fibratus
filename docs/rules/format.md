@@ -125,31 +125,20 @@ condition: >
 
 #### Key Concepts
 
-* **Event predicates** are expressions like `open_file` that match specific event types
-* **Field accessors** populate fields such as `file.path` or `ps.exe` from event attributes or process context
-* **Operators**  include `and`, `or`, `not` logical composition operators or `imatches` operator for case-insensitive pattern matching with wildcards
+* **Event predicates** are expressions like `open_file` that match specific event types. To be more precise, `open_file` is a [macro](macros.md) that expands into `evt.name = 'OpenProcess'` event condition
+* **Field accessors** populate [fields](fields.md) such as `file.path` or `ps.exe` from event attributes or process context
+* **Operators**  include `and`, `or`, `not` logical composition [operators](operators.md) or `imatches` operator for case-insensitive pattern matching with wildcards
 * **Grouping** allows combining multiple expressions with parentheses
 
 ## Output and Severity
 
 ### `output`
 
-Defines the alert message emitted when the rule matches. Supports field interpolation using `%field.name`.
-
-Example:
-
-```yaml
-Detected an attempt by `%ps.name` process to access `%file.name`
-```
+Defines the alert message emitted when the rule matches. Supports field interpolation using `%field.name`, for example, `Detected an attempt by %ps.name process to access %file.path`
 
 ### `severity`
 
-Indicates the importance of the detection. Common levels include:
-
-* `low`
-* `medium`
-* `high`
-* `critical`
+Indicates the importance of the security alert. Common levels include `low`, `medium`, `high`, and `critical`
 
 ## Response Actions
 
@@ -157,12 +146,7 @@ Indicates the importance of the detection. Common levels include:
 
 Specifies automated responses triggered when the rule matches.
 
-Example:
-
-```yaml
-action:
-  - name: kill
-```
+For more details, see [actions](actions/alerts.md).
 
 ## Engine Compatibility
 

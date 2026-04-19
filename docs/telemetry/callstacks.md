@@ -6,7 +6,7 @@ By resolving raw instruction pointers into human-readable such as module paths, 
 
 A typical callstack summary is depicted in the screenshot below, delineating kernel, system, and user frames provenance.
 
-!> For the [console](outputs/console.md) output to render callstack frames, the template shall define the `{{ .Callstack }}` segment. Segments can be customized by overriding the default [rendering template](../outputs/console.md#templates).
+!> For the [console](outputs/console.md) output to render callstack frames, the template shall define the `{{ .Callstack }}` segment. Segments can be customized by overriding the default [rendering template](outputs/console?id=templates).
 
 ![Callstacks](images/callstacks.png "Callstacks")
 
