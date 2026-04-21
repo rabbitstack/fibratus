@@ -20,12 +20,13 @@ package config
 
 import (
 	"errors"
+	"testing"
+
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	ytypes "github.com/rabbitstack/fibratus/pkg/yara/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestShouldSkipProcess(t *testing.T) {
@@ -123,7 +124,7 @@ func TestAlertTitle(t *testing.T) {
 			FileThreatAlertTitle,
 		},
 		{
-			&event.Event{Type: event.LoadImage, Category: event.Image},
+			&event.Event{Type: event.LoadModule, Category: event.Module},
 			MemoryThreatAlertTitle,
 		},
 	}
@@ -148,7 +149,7 @@ func TestAlertText(t *testing.T) {
 		{
 			"empty template and no threat_name meta",
 			Config{},
-			&event.Event{Type: event.LoadImage, Category: event.Image},
+			&event.Event{Type: event.LoadModule, Category: event.Module},
 			ytypes.MatchRule{Rule: "Badlands Trojan"},
 			"Threat detected Badlands Trojan",
 			nil,
@@ -156,7 +157,7 @@ func TestAlertText(t *testing.T) {
 		{
 			"empty template and threat_name meta",
 			Config{},
-			&event.Event{Type: event.LoadImage, Category: event.Image},
+			&event.Event{Type: event.LoadModule, Category: event.Module},
 			ytypes.MatchRule{Rule: "Badlands Trojan", Metas: []ytypes.Meta{{Identifier: "threat_name", Value: "Gravity Trojan"}}},
 			"Threat detected Gravity Trojan",
 			nil,
@@ -169,11 +170,11 @@ func TestAlertText(t *testing.T) {
 				Event name: {{ .Event.Name -}}
 				`,
 			},
-			&event.Event{Type: event.LoadImage, Name: "LoadImage", Category: event.Image},
+			&event.Event{Type: event.LoadModule, Name: "LoadModule", Category: event.Module},
 			ytypes.MatchRule{Rule: "Badlands Trojan", Metas: []ytypes.Meta{{Identifier: "threat_name", Value: "Gravity Trojan"}}},
 			`
 				Rule name: Badlands Trojan
-				Event name: LoadImage`,
+				Event name: LoadModule`,
 			nil,
 		},
 		{
@@ -184,7 +185,7 @@ func TestAlertText(t *testing.T) {
 				Event name: {{ .Evet.Name -}}
 				`,
 			},
-			&event.Event{Type: event.LoadImage, Name: "LoadImage", Category: event.Image},
+			&event.Event{Type: event.LoadModule, Name: "LoadModule", Category: event.Module},
 			ytypes.MatchRule{Rule: "Badlands Trojan", Metas: []ytypes.Meta{{Identifier: "threat_name", Value: "Gravity Trojan"}}},
 			"",
 			errors.New("yara alert template syntax error"),

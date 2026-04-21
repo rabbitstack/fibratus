@@ -32,8 +32,8 @@ const (
 	Fs
 	// Registry represents the registry event processor.
 	Registry
-	// Image represents the image event processor.
-	Image
+	// Module represents the module event processor.
+	Module
 	// Net represents the network event processor.
 	Net
 	// Handle represents the handle event processor.
@@ -66,8 +66,8 @@ func (typ ProcessorType) String() string {
 		return "file"
 	case Registry:
 		return "registry"
-	case Image:
-		return "image"
+	case Module:
+		return "module"
 	case Net:
 		return "net"
 	case Handle:

@@ -60,7 +60,7 @@ func (s *StackExtensions) Empty() bool { return len(s.ids) == 0 }
 // EnableProcessCallstack populates the stack identifiers
 // with event types eligible for emitting stack walk events
 // related to process telemetry, such as creating a process,
-// creating/terminating a thread or loading an image into
+// creating/terminating a thread or module loading into
 // process address space.
 func (s *StackExtensions) EnableProcessCallstack() {
 	s.AddStackTracing(event.CreateProcess)
@@ -68,8 +68,8 @@ func (s *StackExtensions) EnableProcessCallstack() {
 		s.AddStackTracing(event.CreateThread)
 		s.AddStackTracing(event.TerminateThread)
 	}
-	if s.config.EnableImageEvents {
-		s.AddStackTracingWith(event.ProcessEventGUID, event.LoadImage.HookID())
+	if s.config.EnableModuleEvents {
+		s.AddStackTracingWith(event.ProcessEventGUID, event.LoadModule.HookID())
 	}
 }
 

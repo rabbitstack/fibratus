@@ -24,6 +24,11 @@ package cap
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"sync"
+
 	"github.com/rabbitstack/fibratus/pkg/cap/section"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
@@ -35,10 +40,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/bytes"
 	log "github.com/sirupsen/logrus"
 	zstd "github.com/valyala/gozstd"
-	"io"
-	"os"
-	"path/filepath"
-	"sync"
 )
 
 type reader struct {
@@ -188,16 +189,16 @@ func (r *reader) updateSnapshotters(evt *event.Event) error {
 		if err := r.psnapshotter.RemoveThread(pid, tid); err != nil {
 			return err
 		}
-	case event.UnloadImage:
+	case event.UnloadModule:
 		pid := evt.Params.MustGetPid()
-		addr := evt.Params.TryGetAddress(params.ImageBase)
+		addr := evt.Params.TryGetAddress(params.ModuleBase)
 		if err := r.psnapshotter.RemoveModule(pid, addr); err != nil {
 			return err
 		}
 	case event.CreateProcess,
 		event.ProcessRundown,
-		event.LoadImage,
-		event.ImageRundown,
+		event.LoadModule,
+		event.ModuleRundown,
 		event.CreateThread,
 		event.ThreadRundown:
 		if err := r.psnapshotter.WriteFromCapture(evt); err != nil {

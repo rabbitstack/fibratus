@@ -22,6 +22,9 @@
 package cap
 
 import (
+	"testing"
+	"time"
+
 	"github.com/rabbitstack/fibratus/internal/etw"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
@@ -33,8 +36,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
-	"testing"
-	"time"
 )
 
 func TestWrite(t *testing.T) {
@@ -167,7 +168,7 @@ func TestLiveCapture(t *testing.T) {
 	cfg := &config.Config{
 		EventSource: config.EventSourceConfig{
 			EnableFileIOEvents:   true,
-			EnableImageEvents:    true,
+			EnableModuleEvents:   true,
 			EnableRegistryEvents: true,
 			EnableNetEvents:      true,
 			EnableThreadEvents:   true,

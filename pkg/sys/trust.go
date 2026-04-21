@@ -21,12 +21,6 @@ package sys
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/util/bytes"
-	"github.com/rabbitstack/fibratus/pkg/util/format"
-	"github.com/rabbitstack/fibratus/pkg/util/multierror"
-	log "github.com/sirupsen/logrus"
-	"go.mozilla.org/pkcs7"
-	"golang.org/x/sys/windows"
 	"io"
 	"os"
 	"reflect"
@@ -34,6 +28,13 @@ import (
 	"sync"
 	"time"
 	"unsafe"
+
+	"github.com/rabbitstack/fibratus/pkg/util/bytes"
+	"github.com/rabbitstack/fibratus/pkg/util/format"
+	"github.com/rabbitstack/fibratus/pkg/util/multierror"
+	log "github.com/sirupsen/logrus"
+	"go.mozilla.org/pkcs7"
+	"golang.org/x/sys/windows"
 )
 
 const (
@@ -218,7 +219,7 @@ func IsWintrustFound() bool {
 			log.Warn("unable to find wintrust.dll library. This will lead to " +
 				"PE objects signature verification to be skipped possibly " +
 				"causing false positive samples in detection rules relying on " +
-				"image signature filter fields")
+				"module signature filter fields")
 		}
 	})
 	return isWintrustDLLFound

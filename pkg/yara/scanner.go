@@ -195,16 +195,16 @@ func (s scanner) Scan(e *event.Event) (bool, error) {
 		matches, err = s.scan(pid)
 		procScans.Add(1)
 		isScanned = true
-	case event.LoadImage:
+	case event.LoadModule:
 		// scan the process loading unsigned/untrusted module
 		// or loading the module from unbacked memory region
 		pid := e.PID
-		addr := e.Params.MustGetUint64(params.ImageBase)
-		typ := e.Params.MustGetUint32(params.ImageSignatureType)
+		addr := e.Params.MustGetUint64(params.ModuleBase)
+		typ := e.Params.MustGetUint32(params.ModuleSignatureType)
 		if typ != signature.None {
 			return false, nil
 		}
-		filename := e.GetParamAsString(params.ImagePath)
+		filename := e.GetParamAsString(params.ModulePath)
 		if s.config.ShouldSkipFile(filename) {
 			return false, nil
 		}
@@ -295,13 +295,13 @@ func (s scanner) Scan(e *event.Event) (bool, error) {
 		size := e.Params.MustGetUint64(params.FileViewSize)
 		if e.PID != 4 && size >= 4096 && ((prot&sys.SectionRX) != 0 && (prot&sys.SectionRWX) != 0) && !s.isMmapMatched(pid) {
 			filename := e.GetParamAsString(params.FilePath)
-			// skip mappings of signed images
+			// skip mappings of signed Modules
 			addr := e.Params.MustGetUint64(params.FileViewBase)
 			sign := signature.GetSignatures().GetSignature(addr)
 			if sign != nil && sign.IsSigned() && sign.IsTrusted() {
 				return false, nil
 			}
-			// data/image file was mapped?
+			// data/Module file was mapped?
 			if filename != "" {
 				if s.config.ShouldSkipFile(filename) {
 					return false, nil

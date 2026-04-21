@@ -19,13 +19,14 @@
 package processors
 
 import (
+	"strings"
+
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
-	"strings"
 )
 
 type handleProcessor struct {
@@ -92,7 +93,7 @@ func (h *handleProcessor) processEvent(e *event.Event) (*event.Event, error) {
 				driverPath = driverName
 			}
 			h.devPathResolver.RemovePath(driverName)
-			e.Params.Append(params.ImagePath, params.Path, driverPath)
+			e.Params.Append(params.ModulePath, params.Path, driverPath)
 		}
 		// assign the formatted handle name
 		if err := e.Params.SetValue(params.HandleObjectName, name); err != nil {
