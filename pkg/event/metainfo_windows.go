@@ -75,8 +75,8 @@ var events = map[Type]Info{
 	ReconnectTCPv6:           {"Reconnect", Net, "Reconnects to the socket"},
 	RetransmitTCPv4:          {"Retransmit", Net, "Retransmits unacknowledged TCP segments"},
 	RetransmitTCPv6:          {"Retransmit", Net, "Retransmits unacknowledged TCP segments"},
-	LoadImage:                {"LoadImage", Image, "Loads the module into the address space of the calling process"},
-	UnloadImage:              {"UnloadImage", Image, "Unloads the module from the address space of the calling process"},
+	LoadModule:               {"LoadModule", Module, "Loads the module into the address space of the calling process"},
+	UnloadModule:             {"UnloadModule", Module, "Unloads the module from the address space of the calling process"},
 	CreateHandle:             {"CreateHandle", Handle, "Creates a new handle"},
 	CloseHandle:              {"CloseHandle", Handle, "Closes the handle"},
 	DuplicateHandle:          {"DuplicateHandle", Handle, "Duplicates the handle"},
@@ -100,8 +100,8 @@ var types = map[string]Type{
 	"TerminateThread":          TerminateThread,
 	"OpenThread":               OpenThread,
 	"SetThreadContext":         SetThreadContext,
-	"LoadImage":                LoadImage,
-	"UnloadImage":              UnloadImage,
+	"LoadModule":               LoadModule,
+	"UnloadModule":             UnloadModule,
 	"CreateFile":               CreateFile,
 	"CloseFile":                CloseFile,
 	"ReadFile":                 ReadFile,
@@ -163,8 +163,8 @@ var indexedEvents = []Info{
 	events[TerminateThread],
 	events[OpenThread],
 	events[SetThreadContext],
-	events[LoadImage],
-	events[UnloadImage],
+	events[LoadModule],
+	events[UnloadModule],
 	events[CreateFile],
 	events[CloseFile],
 	events[ReadFile],
@@ -229,7 +229,7 @@ func AllWithState() []Type {
 
 	s = append(s, ProcessRundown)
 	s = append(s, ThreadRundown)
-	s = append(s, ImageRundown)
+	s = append(s, ModuleRundown)
 	s = append(s, FileRundown)
 	s = append(s, RegKCBRundown)
 	s = append(s, RegCreateKCB)
@@ -240,7 +240,7 @@ func AllWithState() []Type {
 	s = append(s, StackWalk)
 	s = append(s, CreateProcessInternal)
 	s = append(s, ProcessRundownInternal)
-	s = append(s, LoadImageInternal)
+	s = append(s, LoadModuleInternal)
 	s = append(s, RegSetValueInternal)
 
 	return s

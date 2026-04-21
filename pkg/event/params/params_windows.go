@@ -44,7 +44,7 @@ const (
 	Username = "username"
 	// Domain field represents the domain under which the event was generated.
 	Domain = "domain"
-	// ProcessName field denotes the process image name.
+	// ProcessName field denotes the process Module name.
 	ProcessName = "name"
 	// Exe field denotes the full path of the executable.
 	Exe = "exe"
@@ -152,31 +152,31 @@ const (
 	// RegData identifies the parameter that stores the captured registry data
 	RegData = "data"
 
-	// ImageBase identifies the parameter name for the base address of the process in which the image is loaded.
-	ImageBase = "base_address"
-	// ImageSize represents the parameter name for the size of the image in bytes.
-	ImageSize = "image_size"
-	// ImageCheckSum is the parameter name for image checksum.
-	ImageCheckSum = "checksum"
-	// ImageDefaultBase is the parameter name that represents image's base address.
-	ImageDefaultBase = "default_address"
-	// ImagePath is the parameter name that denotes the file path and extension of the DLL/executable image.
-	ImagePath = "file_path"
-	// ImageSignatureLevel is the parameter denoting the loaded module signature level.
-	ImageSignatureLevel = "signature_level"
-	// ImageSignatureType is the parameter denoting the loaded module signature type.
-	ImageSignatureType = "signature_type"
-	// ImageCertSubject is the parameter that indicates the subject of the certificate is the entity its public key is associated with.
-	ImageCertSubject = "cert_subject"
-	// ImageCertIssuer is the parameter that represents the certificate authority (CA).
-	ImageCertIssuer = "cert_issuer"
-	// ImageCertSerial is the parameter that represents the serial number MUST be a positive integer assigned
+	// ModuleBase identifies the parameter name for the base address of the process in which the Mmdule is loaded.
+	ModuleBase = "base_address"
+	// ModuleSize represents the parameter name for the size of the module in bytes.
+	ModuleSize = "module_size"
+	// ModuleCheckSum is the parameter name for module checksum.
+	ModuleCheckSum = "checksum"
+	// ModuleDefaultBase is the parameter name that represents module's base address.
+	ModuleDefaultBase = "default_address"
+	// ModulePath is the parameter name that denotes the file path and extension of the DLL/executable Module.
+	ModulePath = "file_path"
+	// ModuleSignatureLevel is the parameter denoting the loaded module signature level.
+	ModuleSignatureLevel = "signature_level"
+	// ModuleSignatureType is the parameter denoting the loaded module signature type.
+	ModuleSignatureType = "signature_type"
+	// ModuleCertSubject is the parameter that indicates the subject of the certificate is the entity its public key is associated with.
+	ModuleCertSubject = "cert_subject"
+	// ModuleCertIssuer is the parameter that represents the certificate authority (CA).
+	ModuleCertIssuer = "cert_issuer"
+	// ModuleCertSerial is the parameter that represents the serial number MUST be a positive integer assigned
 	// by the CA to each certificate.
-	ImageCertSerial = "cert_serial"
-	// ImageCertNotBefore  is the parameter that specifies the certificate won't be valid before this timestamp.
-	ImageCertNotBefore = "cert_not_before"
-	// ImageCertNotAfter is the parameter that specifies the certificate won't be valid after this timestamp.
-	ImageCertNotAfter = "cert_not_after"
+	ModuleCertSerial = "cert_serial"
+	// ModuleCertNotBefore  is the parameter that specifies the certificate won't be valid before this timestamp.
+	ModuleCertNotBefore = "cert_not_before"
+	// ModuleCertNotAfter is the parameter that specifies the certificate won't be valid after this timestamp.
+	ModuleCertNotAfter = "cert_not_after"
 
 	// NetSize identifies the parameter name that represents the packet size.
 	NetSize = "size"

@@ -34,24 +34,24 @@ func newModuleProcessor(psnap ps.Snapshotter) Processor {
 	return m
 }
 
-func (*moduleProcessor) Name() ProcessorType { return Image }
+func (*moduleProcessor) Name() ProcessorType { return Module }
 
 func (m *moduleProcessor) ProcessEvent(e *event.Event) (*event.Event, bool, error) {
-	if e.IsLoadImageInternal() {
+	if e.IsLoadModuleInternal() {
 		// state management
 		return e, false, m.psnap.AddModule(e)
 	}
 
-	if e.IsUnloadImage() {
+	if e.IsUnloadModule() {
 		pid := e.Params.MustGetPid()
-		addr := e.Params.TryGetAddress(params.ImageBase)
+		addr := e.Params.TryGetAddress(params.ModuleBase)
 		if pid == 0 {
 			pid = e.PID
 		}
 		return e, false, m.psnap.RemoveModule(pid, addr)
 	}
 
-	if e.IsLoadImage() || e.IsImageRundown() {
+	if e.IsLoadModule() || e.IsModuleRundown() {
 		return e, false, m.psnap.AddModule(e)
 	}
 

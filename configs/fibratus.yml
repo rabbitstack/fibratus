@@ -187,7 +187,7 @@ event:
   serialize-threads: false
 
   # Indicates if modules such as Dynamic Linked Libraries are serialized as part of the process state
-  serialize-images: false
+  serialize-modules: false
 
   # Indicates if handles are serialized as part of the process state
   serialize-handles: false
@@ -240,8 +240,8 @@ eventsource:
   # Determines whether VA map/unmap events are collected by Kernel Logger provider
   #enable-vamap: true
 
-  # Determines whether image events are collected by Kernel Logger provider
-  #enable-image: true
+  # Determines whether module events are collected by Kernel Logger provider
+  #enable-module: true
 
   # Determines whether object manager events (handle creation/destruction) are
   # collected by Kernel Logger provider

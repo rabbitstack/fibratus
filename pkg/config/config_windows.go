@@ -21,9 +21,10 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"time"
+
 	"github.com/rabbitstack/fibratus/internal/evasion"
 	"golang.org/x/sys/windows"
-	"time"
 
 	"github.com/rabbitstack/fibratus/pkg/outputs/eventlog"
 
@@ -73,7 +74,7 @@ const (
 	forwardMode              = "forward"
 
 	serializeThreads = "event.serialize-threads"
-	serializeImages  = "event.serialize-images"
+	serializeModules = "event.serialize-modules"
 	serializeHandles = "event.serialize-handles"
 	serializePE      = "event.serialize-pe"
 	serializeEnvs    = "event.serialize-envs"
@@ -295,7 +296,7 @@ func (c *Config) Init() error {
 	c.CapFile = c.viper.GetString(capFile)
 
 	event.SerializeThreads = c.viper.GetBool(serializeThreads)
-	event.SerializeImages = c.viper.GetBool(serializeImages)
+	event.SerializeModules = c.viper.GetBool(serializeModules)
 	event.SerializeHandles = c.viper.GetBool(serializeHandles)
 	event.SerializePE = c.viper.GetBool(serializePE)
 	event.SerializeEnvs = c.viper.GetBool(serializeEnvs)
@@ -423,7 +424,7 @@ func (c *Config) addFlags() {
 		c.flags.Bool(enableNetEvents, true, "Determines whether network (TCP/UDP) events are collected by Kernel Logger provider")
 		c.flags.Bool(enableFileIOEvents, true, "Determines whether disk I/O events are collected by Kernel Logger provider")
 		c.flags.Bool(enableVAMapEvents, true, "Determines whether VA map/unmap events are collected by Kernel Logger provider")
-		c.flags.Bool(enableImageEvents, true, "Determines whether file I/O events are collected by Kernel Logger provider")
+		c.flags.Bool(enableModuleEvents, true, "Determines whether module events are collected by Kernel Logger provider")
 		c.flags.Bool(enableHandleEvents, false, "Determines whether object manager events (handle creation/destruction) are collected by Kernel Logger provider")
 		c.flags.Bool(enableMemEvents, true, "Determines whether memory manager events are collected by Kernel Logger provider")
 		c.flags.Bool(enableAuditAPIEvents, true, "Determines whether kernel audit API calls events are published")
@@ -438,7 +439,7 @@ func (c *Config) addFlags() {
 		c.flags.StringSlice(excludedImages, []string{}, "A list of image names that will be dropped from the event stream. Image names are case sensitive")
 
 		c.flags.Bool(serializeThreads, false, "Indicates if threads are serialized as part of the process state")
-		c.flags.Bool(serializeImages, false, "Indicates if images are serialized as part of the process state")
+		c.flags.Bool(serializeModules, false, "Indicates if modules are serialized as part of the process state")
 		c.flags.Bool(serializeHandles, false, "Indicates if handles are serialized as part of the process state")
 		c.flags.Bool(serializePE, false, "Indicates if the PE metadata are serialized as part of the process state")
 		c.flags.Bool(serializeEnvs, true, "Indicates if environment variables are serialized as part of the process state")

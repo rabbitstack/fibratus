@@ -19,8 +19,9 @@
 package event
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/util/bitmask"
 	"testing"
+
+	"github.com/rabbitstack/fibratus/pkg/util/bitmask"
 
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/stretchr/testify/assert"
@@ -36,14 +37,14 @@ func TestBitmask(t *testing.T) {
 		{CreateThread, true},
 		{CreateFile, false},
 		{WriteFile, false},
-		{LoadImage, false},
+		{LoadModule, false},
 		{MapFileRundown, true},
 		{ProcessRundown, true},
 	}
 
 	b := bitmask.New()
 	for _, typ := range AllWithState() {
-		if typ == WriteFile || typ == LoadImage || typ == CreateFile {
+		if typ == WriteFile || typ == LoadModule || typ == CreateFile {
 			continue
 		}
 		b.Set(typ.ID())
@@ -66,7 +67,7 @@ func TestBitSets(t *testing.T) {
 		{&Event{Type: CreateThread, Category: Thread}, true},
 		{&Event{Type: CreateFile}, false},
 		{&Event{Type: WriteFile}, false},
-		{&Event{Type: LoadImage}, false},
+		{&Event{Type: LoadModule}, false},
 		{&Event{Type: MapFileRundown}, true},
 		{&Event{Type: ProcessRundown}, true},
 	}

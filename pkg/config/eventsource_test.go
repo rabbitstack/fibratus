@@ -22,8 +22,9 @@
 package config
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/event"
 	"testing"
+
+	"github.com/rabbitstack/fibratus/pkg/event"
 
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 
@@ -39,7 +40,7 @@ func TestEventSourceConfig(t *testing.T) {
 		"--eventsource.enable-registry=false",
 		"--eventsource.enable-fileio=false",
 		"--eventsource.enable-net=false",
-		"--eventsource.enable-image=false",
+		"--eventsource.enable-module=false",
 		"--eventsource.blacklist.events=CloseFile,CloseHandle",
 		"--eventsource.blacklist.images=System,svchost.exe",
 	})
@@ -52,7 +53,7 @@ func TestEventSourceConfig(t *testing.T) {
 	assert.False(t, c.EventSource.EnableThreadEvents)
 	assert.False(t, c.EventSource.EnableNetEvents)
 	assert.False(t, c.EventSource.EnableRegistryEvents)
-	assert.False(t, c.EventSource.EnableImageEvents)
+	assert.False(t, c.EventSource.EnableModuleEvents)
 	assert.False(t, c.EventSource.EnableFileIOEvents)
 
 	assert.True(t, c.EventSource.ExcludeEvent(event.CloseHandle.ID()))

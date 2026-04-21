@@ -41,16 +41,16 @@ func TestModuleProcessor(t *testing.T) {
 		assertions func(*event.Event, *testing.T, *ps.SnapshotterMock)
 	}{
 		{
-			"load new image",
+			"load new module",
 			&event.Event{
-				Type: event.LoadImage,
+				Type: event.LoadModule,
 				Params: event.Params{
-					params.ImagePath:           {Name: params.ImagePath, Type: params.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll")},
-					params.ProcessID:           {Name: params.ProcessID, Type: params.PID, Value: uint32(1023)},
-					params.ImageCheckSum:       {Name: params.ImageCheckSum, Type: params.Uint32, Value: uint32(2323432)},
-					params.ImageBase:           {Name: params.ImageBase, Type: params.Address, Value: uint64(0x7ffb313833a3)},
-					params.ImageSignatureType:  {Name: params.ImageSignatureType, Type: params.Enum, Value: uint32(1), Enum: signature.Types},
-					params.ImageSignatureLevel: {Name: params.ImageSignatureLevel, Type: params.Enum, Value: uint32(4), Enum: signature.Levels},
+					params.ModulePath:           {Name: params.ModulePath, Type: params.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll")},
+					params.ProcessID:            {Name: params.ProcessID, Type: params.PID, Value: uint32(1023)},
+					params.ModuleCheckSum:       {Name: params.ModuleCheckSum, Type: params.Uint32, Value: uint32(2323432)},
+					params.ModuleBase:           {Name: params.ModuleBase, Type: params.Address, Value: uint64(0x7ffb313833a3)},
+					params.ModuleSignatureType:  {Name: params.ModuleSignatureType, Type: params.Enum, Value: uint32(1), Enum: signature.Types},
+					params.ModuleSignatureLevel: {Name: params.ModuleSignatureLevel, Type: params.Enum, Value: uint32(4), Enum: signature.Levels},
 				},
 			},
 			func() *ps.SnapshotterMock {
@@ -61,21 +61,21 @@ func TestModuleProcessor(t *testing.T) {
 			func(e *event.Event, t *testing.T, psnap *ps.SnapshotterMock) {
 				psnap.AssertNumberOfCalls(t, "AddModule", 1)
 				// should get the signature verified
-				assert.Equal(t, "EMBEDDED", e.GetParamAsString(params.ImageSignatureType))
-				assert.Equal(t, "AUTHENTICODE", e.GetParamAsString(params.ImageSignatureLevel))
+				assert.Equal(t, "EMBEDDED", e.GetParamAsString(params.ModuleSignatureType))
+				assert.Equal(t, "AUTHENTICODE", e.GetParamAsString(params.ModuleSignatureLevel))
 			},
 		},
 		{
-			"parse image characteristics",
+			"parse module characteristics",
 			&event.Event{
-				Type: event.LoadImage,
+				Type: event.LoadModule,
 				Params: event.Params{
-					params.ImagePath:           {Name: params.ImagePath, Type: params.UnicodeString, Value: "../_fixtures/mscorlib.dll"},
-					params.ProcessID:           {Name: params.ProcessID, Type: params.PID, Value: uint32(1023)},
-					params.ImageCheckSum:       {Name: params.ImageCheckSum, Type: params.Uint32, Value: uint32(2323432)},
-					params.ImageBase:           {Name: params.ImageBase, Type: params.Address, Value: uint64(0x7ffb313833a3)},
-					params.ImageSignatureType:  {Name: params.ImageSignatureType, Type: params.Enum, Value: uint32(1), Enum: signature.Types},
-					params.ImageSignatureLevel: {Name: params.ImageSignatureLevel, Type: params.Enum, Value: uint32(4), Enum: signature.Levels},
+					params.ModulePath:           {Name: params.ModulePath, Type: params.UnicodeString, Value: "../_fixtures/mscorlib.dll"},
+					params.ProcessID:            {Name: params.ProcessID, Type: params.PID, Value: uint32(1023)},
+					params.ModuleCheckSum:       {Name: params.ModuleCheckSum, Type: params.Uint32, Value: uint32(2323432)},
+					params.ModuleBase:           {Name: params.ModuleBase, Type: params.Address, Value: uint64(0x7ffb313833a3)},
+					params.ModuleSignatureType:  {Name: params.ModuleSignatureType, Type: params.Enum, Value: uint32(1), Enum: signature.Types},
+					params.ModuleSignatureLevel: {Name: params.ModuleSignatureLevel, Type: params.Enum, Value: uint32(4), Enum: signature.Levels},
 				},
 			},
 			func() *ps.SnapshotterMock {
@@ -88,16 +88,16 @@ func TestModuleProcessor(t *testing.T) {
 			},
 		},
 		{
-			"unload image",
+			"unload module",
 			&event.Event{
-				Type: event.UnloadImage,
+				Type: event.UnloadModule,
 				Params: event.Params{
-					params.ImagePath:           {Name: params.ImagePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\kernel32.dll"},
-					params.ProcessName:         {Name: params.ProcessName, Type: params.AnsiString, Value: "csrss.exe"},
-					params.ProcessID:           {Name: params.ProcessID, Type: params.PID, Value: uint32(676)},
-					params.ImageBase:           {Name: params.ImageBase, Type: params.Address, Value: uint64(0xfffb313833a3)},
-					params.ImageSignatureType:  {Name: params.ImageSignatureType, Type: params.Enum, Value: uint32(0), Enum: signature.Types},
-					params.ImageSignatureLevel: {Name: params.ImageSignatureLevel, Type: params.Enum, Value: uint32(0), Enum: signature.Levels},
+					params.ModulePath:           {Name: params.ModulePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\kernel32.dll"},
+					params.ProcessName:          {Name: params.ProcessName, Type: params.AnsiString, Value: "csrss.exe"},
+					params.ProcessID:            {Name: params.ProcessID, Type: params.PID, Value: uint32(676)},
+					params.ModuleBase:           {Name: params.ModuleBase, Type: params.Address, Value: uint64(0xfffb313833a3)},
+					params.ModuleSignatureType:  {Name: params.ModuleSignatureType, Type: params.Enum, Value: uint32(0), Enum: signature.Types},
+					params.ModuleSignatureLevel: {Name: params.ModuleSignatureLevel, Type: params.Enum, Value: uint32(0), Enum: signature.Levels},
 				},
 			},
 			func() *ps.SnapshotterMock {

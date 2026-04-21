@@ -22,11 +22,12 @@
 package etw
 
 import (
+	"strings"
+	"unsafe"
+
 	"github.com/rabbitstack/fibratus/pkg/util/utf16"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
-	"strings"
-	"unsafe"
 )
 
 // EventTraceFlags is the type alias for kernel trace events
@@ -108,8 +109,8 @@ const (
 	FileIO EventTraceFlags = 0x02000000
 	// FileIOInit flag enables file start/end events.
 	FileIOInit EventTraceFlags = 0x04000000
-	// ImageLoad flag enables image events.
-	ImageLoad EventTraceFlags = 0x00000004
+	// Module flag enables module events.
+	Module EventTraceFlags = 0x00000004
 	// Handle flag enables handle events.
 	Handle EventTraceFlags = 0x80000040
 	// IRQ flag enables IRQ events.
@@ -150,8 +151,8 @@ func (f EventTraceFlags) String() string {
 	if f&FileIO == FileIO {
 		flags = append(flags, "FileIO")
 	}
-	if f&ImageLoad == ImageLoad {
-		flags = append(flags, "DLL")
+	if f&Module == Module {
+		flags = append(flags, "Module")
 	}
 	if f&Handle == Handle {
 		flags = append(flags, "Handle")

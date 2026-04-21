@@ -752,7 +752,7 @@ func (moduleAccessor) SetFields(fields []Field) {
 func (moduleAccessor) SetSegments([]fields.Segment) {}
 
 func (moduleAccessor) IsFieldAccessible(e *event.Event) bool {
-	return e.Category == event.Image
+	return e.Category == event.Module
 }
 
 func newModuleAccessor() Accessor {
@@ -760,11 +760,11 @@ func newModuleAccessor() Accessor {
 }
 
 func (*moduleAccessor) Get(f Field, e *event.Event) (params.Value, error) {
-	if e.IsLoadImage() && (f.Name.IsModuleSignature() || f.Name == fields.ImageSignatureType || f.Name == fields.ImageSignatureLevel || f.Name.IsImageCert()) {
-		filename := e.GetParamAsString(params.ImagePath)
-		addr := e.Params.MustGetUint64(params.ImageBase)
-		typ := e.Params.MustGetUint32(params.ImageSignatureType)
-		level := e.Params.MustGetUint32(params.ImageSignatureLevel)
+	if e.IsLoadModule() && (f.Name.IsModuleSignature() || f.Name == fields.ImageSignatureType || f.Name == fields.ImageSignatureLevel || f.Name.IsImageCert()) {
+		filename := e.GetParamAsString(params.ModulePath)
+		addr := e.Params.MustGetUint64(params.ModuleBase)
+		typ := e.Params.MustGetUint32(params.ModuleSignatureType)
+		level := e.Params.MustGetUint32(params.ModuleSignatureLevel)
 
 		sign := signature.GetSignatures().GetSignature(addr)
 
@@ -810,17 +810,17 @@ func (*moduleAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 				signature.GetSignatures().PutSignature(addr, sign)
 			}
 			// reset signature type/level parameters
-			_ = e.Params.SetValue(params.ImageSignatureType, sign.Type)
-			_ = e.Params.SetValue(params.ImageSignatureLevel, sign.Level)
+			_ = e.Params.SetValue(params.ModuleSignatureType, sign.Type)
+			_ = e.Params.SetValue(params.ModuleSignatureLevel, sign.Level)
 		}
 
 		// append certificate parameters
 		if sign.HasCertificate() {
-			e.AppendParam(params.ImageCertIssuer, params.UnicodeString, sign.Cert.Issuer)
-			e.AppendParam(params.ImageCertSubject, params.UnicodeString, sign.Cert.Subject)
-			e.AppendParam(params.ImageCertSerial, params.UnicodeString, sign.Cert.SerialNumber)
-			e.AppendParam(params.ImageCertNotAfter, params.Time, sign.Cert.NotAfter)
-			e.AppendParam(params.ImageCertNotBefore, params.Time, sign.Cert.NotBefore)
+			e.AppendParam(params.ModuleCertIssuer, params.UnicodeString, sign.Cert.Issuer)
+			e.AppendParam(params.ModuleCertSubject, params.UnicodeString, sign.Cert.Subject)
+			e.AppendParam(params.ModuleCertSerial, params.UnicodeString, sign.Cert.SerialNumber)
+			e.AppendParam(params.ModuleCertNotAfter, params.Time, sign.Cert.NotAfter)
+			e.AppendParam(params.ModuleCertNotBefore, params.Time, sign.Cert.NotBefore)
 		}
 
 		switch f.Name {
@@ -833,49 +833,49 @@ func (*moduleAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 
 	switch f.Name {
 	case fields.ImagePath, fields.ModulePath, fields.DllPath:
-		return e.GetParamAsString(params.ImagePath), nil
+		return e.GetParamAsString(params.ModulePath), nil
 	case fields.ModulePathStem, fields.DllPathStem:
-		path := e.GetParamAsString(params.ImagePath)
+		path := e.GetParamAsString(params.ModulePath)
 		n := strings.LastIndexByte(path, '.')
 		if n == -1 {
 			return path, nil
 		}
 		return path[:n], nil
 	case fields.ImageName, fields.ModuleName, fields.DllName:
-		return filepath.Base(e.GetParamAsString(params.ImagePath)), nil
+		return filepath.Base(e.GetParamAsString(params.ModulePath)), nil
 	case fields.ImageDefaultAddress, fields.ModuleDefaultAddress:
-		return e.GetParamAsString(params.ImageDefaultBase), nil
+		return e.GetParamAsString(params.ModuleDefaultBase), nil
 	case fields.ImageBase, fields.ModuleBase, fields.DllBase:
-		return e.GetParamAsString(params.ImageBase), nil
+		return e.GetParamAsString(params.ModuleBase), nil
 	case fields.ImageSize, fields.ModuleSize, fields.DllSize:
-		return e.Params.GetUint64(params.ImageSize)
+		return e.Params.GetUint64(params.ModuleSize)
 	case fields.ImageChecksum, fields.ModuleChecksum:
-		return e.Params.GetUint32(params.ImageCheckSum)
+		return e.Params.GetUint32(params.ModuleCheckSum)
 	case fields.ImagePID, fields.ModulePID, fields.DllPID:
 		return e.Params.GetPid()
 	case fields.ImageSignatureType, fields.ModuleSignatureType, fields.DllSignatureType:
-		return e.GetParamAsString(params.ImageSignatureType), nil
+		return e.GetParamAsString(params.ModuleSignatureType), nil
 	case fields.ImageSignatureLevel, fields.ModuleSignatureLevel, fields.DllSignatureLevel:
-		return e.GetParamAsString(params.ImageSignatureLevel), nil
+		return e.GetParamAsString(params.ModuleSignatureLevel), nil
 	case fields.ImageCertSubject, fields.ModuleSignatureSubject, fields.DllSignatureSubject:
-		return e.GetParamAsString(params.ImageCertSubject), nil
+		return e.GetParamAsString(params.ModuleCertSubject), nil
 	case fields.ImageCertIssuer, fields.ModuleSignatureIssuer, fields.DllSignatureIssuer:
-		return e.GetParamAsString(params.ImageCertIssuer), nil
+		return e.GetParamAsString(params.ModuleCertIssuer), nil
 	case fields.ImageCertSerial, fields.ModuleSignatureSerial, fields.DllSignatureSerial:
-		return e.GetParamAsString(params.ImageCertSerial), nil
+		return e.GetParamAsString(params.ModuleCertSerial), nil
 	case fields.ImageCertBefore, fields.ModuleSignatureBefore, fields.DllSignatureBefore:
-		return e.Params.GetTime(params.ImageCertNotBefore)
+		return e.Params.GetTime(params.ModuleCertNotBefore)
 	case fields.ImageCertAfter, fields.ModuleSignatureAfter, fields.DllSignatureAfter:
-		return e.Params.GetTime(params.ImageCertNotAfter)
+		return e.Params.GetTime(params.ModuleCertNotAfter)
 	case fields.ImageIsDriverVulnerable, fields.ImageIsDriverMalicious, fields.ModuleIsDriverVulnerable, fields.ModuleIsDriverMalicious:
-		if e.IsLoadImage() {
+		if e.IsLoadModule() {
 			return isLOLDriver(f.Name, e)
 		}
 		return false, nil
 	case fields.ImageIsDLL, fields.ModuleIsDLL, fields.ImageIsDriver,
 		fields.ModuleIsDriver, fields.ImageIsExecutable, fields.ModuleIsExecutable,
 		fields.ImageIsDotnet, fields.ModuleIsDotnet, fields.DllIsDotnet:
-		if e.IsLoadImage() {
+		if e.IsLoadModule() {
 			return getFileInfo(f.Name, e)
 		}
 		return false, nil
@@ -1025,7 +1025,7 @@ func (pa *peAccessor) SetSegments(segments []fields.Segment) {
 }
 
 func (peAccessor) IsFieldAccessible(e *event.Event) bool {
-	return e.PS != nil || e.IsLoadImage()
+	return e.PS != nil || e.IsLoadModule()
 }
 
 // parserOpts traverses all fields/segments declared in the expression and
@@ -1106,15 +1106,15 @@ func (pa *peAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 	// PE for loaded executables followed by fetching the PE
 	// from process' memory at the base address of the loaded
 	// executable image
-	if e.IsLoadImage() && f.Name.IsPeModified() {
-		filename := e.GetParamAsString(params.ImagePath)
+	if e.IsLoadModule() && f.Name.IsPeModified() {
+		filename := e.GetParamAsString(params.ModulePath)
 		isExecutable := filepath.Ext(filename) == ".exe" || e.Params.TryGetBool(params.FileIsExecutable)
 		if !isExecutable {
 			return nil, nil
 		}
 
 		pid := e.Params.MustGetPid()
-		addr := e.Params.MustGetUint64(params.ImageBase)
+		addr := e.Params.MustGetUint64(params.ModuleBase)
 
 		file, err := pe.ParseFile(filename, pa.parserOpts()...)
 		if err != nil {

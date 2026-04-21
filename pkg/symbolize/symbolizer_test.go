@@ -199,17 +199,17 @@ func TestProcessCallstackPeExports(t *testing.T) {
 	assert.Equal(t, syminfo{module: "unbacked", symbol: "?"}, s.symbols[e.PID][0x2638e59e0a5])
 
 	e3 := &event.Event{
-		Type:      event.UnloadImage,
+		Type:      event.UnloadModule,
 		Tid:       2484,
 		PID:       uint32(os.Getpid()),
 		CPU:       1,
 		Seq:       2,
-		Name:      "UnloadImage",
+		Name:      "UnloadModule",
 		Timestamp: time.Now(),
-		Category:  event.Image,
+		Category:  event.Module,
 		Params: event.Params{
-			params.ImageBase: {Name: params.ImageBase, Type: params.Address, Value: uint64(0x7ffb5d8e11c4)},
-			params.FilePath:  {Name: params.FilePath, Type: params.UnicodeString, Value: `C:\Windows\System32\user32.dll`},
+			params.ModuleBase: {Name: params.ModuleBase, Type: params.Address, Value: uint64(0x7ffb5d8e11c4)},
+			params.FilePath:   {Name: params.FilePath, Type: params.UnicodeString, Value: `C:\Windows\System32\user32.dll`},
 		},
 		PS: proc,
 	}

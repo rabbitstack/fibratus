@@ -20,12 +20,13 @@ package event
 
 import (
 	"encoding/json"
-	capver "github.com/rabbitstack/fibratus/pkg/cap/version"
-	"github.com/rabbitstack/fibratus/pkg/util/va"
-	"golang.org/x/sys/windows"
 	"os"
 	"testing"
 	"time"
+
+	capver "github.com/rabbitstack/fibratus/pkg/cap/version"
+	"github.com/rabbitstack/fibratus/pkg/util/va"
+	"golang.org/x/sys/windows"
 
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
@@ -37,7 +38,7 @@ import (
 
 func init() {
 	SerializeThreads = true
-	SerializeImages = true
+	SerializeModules = true
 	SerializeHandles = true
 	SerializePE = true
 	SerializeEnvs = true

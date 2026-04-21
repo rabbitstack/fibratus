@@ -47,8 +47,8 @@ var (
 	ProcessEventGUID = windows.GUID{Data1: 0x3d6fa8d0, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}
 	// ThreadEventGUID represents thread provider event GUID
 	ThreadEventGUID = windows.GUID{Data1: 0x3d6fa8d1, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}
-	// ImageEventGUID represents image provider event GUID
-	ImageEventGUID = windows.GUID{Data1: 0x2cb15d1d, Data2: 0x5fc1, Data3: 0x11d2, Data4: [8]byte{0xab, 0xe1, 0x0, 0xa0, 0xc9, 0x11, 0xf5, 0x18}}
+	// ModuleEventGUID represents module provider event GUID
+	ModuleEventGUID = windows.GUID{Data1: 0x2cb15d1d, Data2: 0x5fc1, Data3: 0x11d2, Data4: [8]byte{0xab, 0xe1, 0x0, 0xa0, 0xc9, 0x11, 0xf5, 0x18}}
 	// FileEventGUID represents file provider event GUID
 	FileEventGUID = windows.GUID{Data1: 0x90cbdc39, Data2: 0x4a3e, Data3: 0x11d1, Data4: [8]byte{0x84, 0xf4, 0x0, 0x0, 0xf8, 0x04, 0x64, 0xe3}}
 	// RegistryEventGUID represents registry provider event GUID
@@ -158,14 +158,14 @@ var (
 	// extra attributes
 	RegSetValueInternal = pack(RegistryKernelEventGUID, 36)
 
-	// UnloadImage represents unload image kernel events
-	UnloadImage = pack(ImageEventGUID, 2)
-	// ImageRundown represents kernel events that is triggered to enumerate all loaded images
-	ImageRundown = pack(ImageEventGUID, 3)
-	// LoadImage represents load image kernel events that are triggered when a DLL or executable file  is loaded
-	LoadImage = pack(ImageEventGUID, 10)
-	// LoadImageInternal same as for process internal event originating from the Microsoft Windows Kernel Process provider.
-	LoadImageInternal = pack(ProcessKernelEventGUID, 5)
+	// UnloadModule represents unload module kernel events
+	UnloadModule = pack(ModuleEventGUID, 2)
+	// ModuleRundown represents kernel events that is triggered to enumerate all loaded modules
+	ModuleRundown = pack(ModuleEventGUID, 3)
+	// LoadModule represents module load kernel events that are triggered when a DLL or executable file is loaded
+	LoadModule = pack(ModuleEventGUID, 10)
+	// LoadModuleInternal same as for process internal event originating from the Microsoft Windows Kernel Process provider
+	LoadModuleInternal = pack(ProcessKernelEventGUID, 5)
 
 	// AcceptTCPv4 represents the TCPv4 kernel events for accepting connection requests from the socket queue.
 	AcceptTCPv4 = pack(NetworkTCPEventGUID, 15)
@@ -319,12 +319,12 @@ func (t Type) String() string {
 		return "RegCreateKCB"
 	case RegSetValue, RegSetValueInternal:
 		return "RegSetValue"
-	case LoadImage, LoadImageInternal:
-		return "LoadImage"
-	case UnloadImage:
-		return "UnloadImage"
-	case ImageRundown:
-		return "ImageRundown"
+	case LoadModule, LoadModuleInternal:
+		return "LoadModule"
+	case UnloadModule:
+		return "UnloadModule"
+	case ModuleRundown:
+		return "ModuleRundown"
 	case AcceptTCPv4, AcceptTCPv6:
 		return "Accept"
 	case SendTCPv4, SendTCPv6, SendUDPv4, SendUDPv6:
@@ -369,8 +369,8 @@ func (t Type) Category() Category {
 		return Process
 	case CreateThread, TerminateThread, OpenThread, SetThreadContext, ThreadRundown, StackWalk:
 		return Thread
-	case LoadImage, UnloadImage, ImageRundown, LoadImageInternal:
-		return Image
+	case LoadModule, UnloadModule, ModuleRundown, LoadModuleInternal:
+		return Module
 	case CreateFile, ReadFile, WriteFile, EnumDirectory, DeleteFile, RenameFile, CloseFile, SetFileInformation,
 		FileRundown, FileOpEnd, ReleaseFile, MapViewFile, UnmapViewFile, MapFileRundown:
 		return File
@@ -476,9 +476,9 @@ func (t Type) Description() string {
 		return "Sends data over the wire"
 	case RecvTCPv4, RecvUDPv4, RecvTCPv6, RecvUDPv6:
 		return "Receives data from the socket"
-	case LoadImage:
+	case LoadModule:
 		return "Loads the module into the address space of the calling process"
-	case UnloadImage:
+	case UnloadModule:
 		return "Unloads the module from the address space of the calling process"
 	case CreateHandle:
 		return "Creates a new handle"
@@ -527,8 +527,8 @@ func (t Type) OnlyState() bool {
 		ProcessRundownInternal,
 		CreateProcessInternal,
 		ThreadRundown,
-		ImageRundown,
-		LoadImageInternal,
+		ModuleRundown,
+		LoadModuleInternal,
 		FileRundown,
 		RegKCBRundown,
 		FileOpEnd,
@@ -549,7 +549,7 @@ func (t Type) CanEnrichStack() bool {
 	case CreateProcess,
 		CreateThread,
 		TerminateThread,
-		LoadImage,
+		LoadModule,
 		RegCreateKey,
 		RegDeleteKey,
 		RegSetValue,
@@ -677,7 +677,7 @@ func (t Type) color() string {
 	case SetThreadContext:
 		return colorizer.SpanBold(colorizer.Amber, t.String())
 
-	case LoadImage, UnloadImage:
+	case LoadModule, UnloadModule:
 		return colorizer.SpanBold(colorizer.Magenta, t.String())
 
 	case SendTCPv4, SendTCPv6, SendUDPv4, SendUDPv6,
@@ -731,7 +731,7 @@ func (t Type) arrow() string {
 	var clr uint8
 	switch t {
 	case TerminateProcess, TerminateThread, DeleteFile, RegDeleteKey,
-		RegDeleteValue, UnloadImage, VirtualFree, UnmapViewFile:
+		RegDeleteValue, UnloadModule, VirtualFree, UnmapViewFile:
 		clr = colorizer.Red
 
 	case CreateProcess, CreateFile, WriteFile, RenameFile, SetFileInformation,
@@ -740,7 +740,7 @@ func (t Type) arrow() string {
 		SendTCPv4, SendTCPv6, SendUDPv4, SendUDPv6:
 		clr = colorizer.Amber
 
-	case ReadFile, EnumDirectory, LoadImage, RegOpenKey, RegQueryKey, RegQueryValue, OpenProcess,
+	case ReadFile, EnumDirectory, LoadModule, RegOpenKey, RegQueryKey, RegQueryValue, OpenProcess,
 		OpenThread, CreateHandle, RecvTCPv4, RecvTCPv6, RecvUDPv4, RecvUDPv6:
 		clr = colorizer.Teal
 

@@ -78,7 +78,7 @@ func New(seq uint64, evt *etw.EventRecord) *Event {
 
 func (e *Event) adjustPID() {
 	switch e.Category {
-	case Image:
+	case Module:
 		// sometimes the pid present in event header is invalid
 		// but, we can get the valid one from the event parameters
 		if e.InvalidPid() {
@@ -169,7 +169,7 @@ func (e *Event) IsDNS() bool {
 
 // IsRundown determines if this is a rundown events.
 func (e *Event) IsRundown() bool {
-	return e.Type == ProcessRundown || e.Type == ThreadRundown || e.Type == ImageRundown ||
+	return e.Type == ProcessRundown || e.Type == ThreadRundown || e.Type == ModuleRundown ||
 		e.Type == FileRundown || e.Type == RegKCBRundown
 }
 
@@ -214,10 +214,10 @@ func (e *Event) IsDeleteFile() bool             { return e.Type == DeleteFile }
 func (e *Event) IsEnumDirectory() bool          { return e.Type == EnumDirectory }
 func (e *Event) IsTerminateProcess() bool       { return e.Type == TerminateProcess }
 func (e *Event) IsTerminateThread() bool        { return e.Type == TerminateThread }
-func (e *Event) IsUnloadImage() bool            { return e.Type == UnloadImage }
-func (e *Event) IsLoadImage() bool              { return e.Type == LoadImage }
-func (e *Event) IsLoadImageInternal() bool      { return e.Type == LoadImageInternal }
-func (e *Event) IsImageRundown() bool           { return e.Type == ImageRundown }
+func (e *Event) IsUnloadModule() bool           { return e.Type == UnloadModule }
+func (e *Event) IsLoadModule() bool             { return e.Type == LoadModule }
+func (e *Event) IsLoadModuleInternal() bool     { return e.Type == LoadModuleInternal }
+func (e *Event) IsModuleRundown() bool          { return e.Type == ModuleRundown }
 func (e *Event) IsFileOpEnd() bool              { return e.Type == FileOpEnd }
 func (e *Event) IsRegSetValue() bool            { return e.Type == RegSetValue }
 func (e *Event) IsRegSetValueInternal() bool    { return e.Type == RegSetValueInternal }
@@ -306,9 +306,9 @@ func (e *Event) RundownKey() uint64 {
 		binary.LittleEndian.PutUint32(b, tid)
 
 		return hashers.FnvUint64(b)
-	case ImageRundown:
+	case ModuleRundown:
 		pid, _ := e.Params.GetPid()
-		mod, _ := e.Params.GetString(params.ImagePath)
+		mod, _ := e.Params.GetString(params.ModulePath)
 		b := make([]byte, 4+len(mod))
 
 		binary.LittleEndian.PutUint32(b, pid)
@@ -453,10 +453,10 @@ func (e *Event) Summary() string {
 		exe, _ := e.Params.GetString(params.Exe)
 		return printSummary(e, fmt.Sprintf("opened <code>%s</code> process' thread object with <code>%s</code> access right(s)",
 			exe, access))
-	case LoadImage:
+	case LoadModule:
 		filename := e.GetParamAsString(params.FilePath)
 		return printSummary(e, fmt.Sprintf("loaded </code>%s</code> module", filename))
-	case UnloadImage:
+	case UnloadModule:
 		filename := e.GetParamAsString(params.FilePath)
 		return printSummary(e, fmt.Sprintf("unloaded </code>%s</code> module", filename))
 	case CreateFile:

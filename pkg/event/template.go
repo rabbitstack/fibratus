@@ -60,7 +60,7 @@ Threads:
 			{{- end }}
 			{{- end }}
 {{ end }}
-{{ if .SerializeImages }}
+{{ if .SerializeModules }}
 Modules:
 			{{- with .Evt.PS.Modules }}
 			{{- range . }}
@@ -79,7 +79,7 @@ Handles:
 
 {{ if and (.SerializePE) (.Evt.PS.PE) }}
 Entrypoint:  		{{ .Evt.PS.PE.EntryPoint }}
-Image base: 		{{ .Evt.PS.PE.ImageBase }}
+Module base: 		{{ .Evt.PS.PE.ImageBase }}
 Build date:  		{{ .Evt.PS.PE.LinkTime }}
 
 Number of symbols: 	{{ .Evt.PS.PE.NumberOfSymbols }}
@@ -141,14 +141,14 @@ func renderTemplate(evt *Event, tmpl *template.Template) ([]byte, error) {
 		Evt              *Event
 		SerializeHandles bool
 		SerializeThreads bool
-		SerializeImages  bool
+		SerializeModules bool
 		SerializeEnvs    bool
 		SerializePE      bool
 	}{
 		evt,
 		SerializeHandles,
 		SerializeThreads,
-		SerializeImages,
+		SerializeModules,
 		SerializeEnvs,
 		SerializePE,
 	}

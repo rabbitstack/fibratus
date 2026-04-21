@@ -43,7 +43,7 @@ func isLOLDriver(f fields.Field, e *event.Event) (params.Value, error) {
 	if e.Category == event.File {
 		filename = e.GetParamAsString(params.FilePath)
 	} else {
-		filename = e.GetParamAsString(params.ImagePath)
+		filename = e.GetParamAsString(params.ModulePath)
 	}
 
 	isDriver := filepath.Ext(filename) == ".sys" || e.Params.TryGetBool(params.FileIsDriver)

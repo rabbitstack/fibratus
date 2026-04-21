@@ -538,20 +538,20 @@ func TestAddModule(t *testing.T) {
 	}{
 		{"add module to existing process",
 			&event.Event{
-				Type: event.LoadImage,
+				Type: event.LoadModule,
 				Params: event.Params{
-					params.ProcessID: {Name: params.ProcessID, Type: params.PID, Value: uint32(os.Getpid())},
-					params.ImagePath: {Name: params.ImagePath, Type: params.UnicodeString, Value: "C:\\Users\\admin\\AppData\\Roaming\\Spotify\\Spotify.exe"},
+					params.ProcessID:  {Name: params.ProcessID, Type: params.PID, Value: uint32(os.Getpid())},
+					params.ModulePath: {Name: params.ModulePath, Type: params.UnicodeString, Value: "C:\\Users\\admin\\AppData\\Roaming\\Spotify\\Spotify.exe"},
 				},
 			},
 			true,
 		},
 		{"add module to absent process",
 			&event.Event{
-				Type: event.LoadImage,
+				Type: event.LoadModule,
 				Params: event.Params{
-					params.ProcessID: {Name: params.ProcessID, Type: params.PID, Value: uint32(os.Getpid() + 1)},
-					params.ImagePath: {Name: params.ImagePath, Type: params.UnicodeString, Value: "C:\\Windows\\System32\\notepad.exe"},
+					params.ProcessID:  {Name: params.ProcessID, Type: params.PID, Value: uint32(os.Getpid() + 1)},
+					params.ModulePath: {Name: params.ModulePath, Type: params.UnicodeString, Value: "C:\\Windows\\System32\\notepad.exe"},
 				},
 			},
 			false,
@@ -567,7 +567,7 @@ func TestAddModule(t *testing.T) {
 			ok, proc := psnap.Find(evt.Params.MustGetPid())
 			require.Equal(t, exists, ok)
 			if ok {
-				require.NotNil(t, proc.FindModule(evt.GetParamAsString(params.ImagePath)))
+				require.NotNil(t, proc.FindModule(evt.GetParamAsString(params.ModulePath)))
 				assert.Equal(t, "C:\\Users\\admin\\AppData\\Roaming\\Spotify\\Spotify.exe", proc.Exe)
 			}
 		})
@@ -597,11 +597,11 @@ func TestRemoveModule(t *testing.T) {
 	require.NoError(t, psnap.Write(pevt))
 
 	mevt := &event.Event{
-		Type: event.LoadImage,
+		Type: event.LoadModule,
 		Params: event.Params{
-			params.ProcessID: {Name: params.ProcessID, Type: params.PID, Value: uint32(os.Getpid())},
-			params.ImagePath: {Name: params.ImagePath, Type: params.UnicodeString, Value: "C:\\Windows\\System32\\notepad.exe"},
-			params.ImageBase: {Name: params.ImageBase, Type: params.Address, Value: uint64(0xffff7656)},
+			params.ProcessID:  {Name: params.ProcessID, Type: params.PID, Value: uint32(os.Getpid())},
+			params.ModulePath: {Name: params.ModulePath, Type: params.UnicodeString, Value: "C:\\Windows\\System32\\notepad.exe"},
+			params.ModuleBase: {Name: params.ModuleBase, Type: params.Address, Value: uint64(0xffff7656)},
 		},
 	}
 
@@ -643,28 +643,28 @@ func TestOverrideProcExecutable(t *testing.T) {
 	}{
 		{`Spotify.exe`,
 			&event.Event{
-				Type: event.LoadImage,
+				Type: event.LoadModule,
 				Params: event.Params{
-					params.ProcessID: {Name: params.ProcessID, Type: params.PID, Value: uint32(os.Getpid())},
-					params.ImagePath: {Name: params.ImagePath, Type: params.UnicodeString, Value: "C:\\Windows\\assembly\\NativeImages_v4.0.30319_32\\Microsoft.Dee252aac#\\707569faabe821b47fa4f59ecd9eb6ea\\Microsoft.Developer.IdentityService.ni.exe"},
+					params.ProcessID:  {Name: params.ProcessID, Type: params.PID, Value: uint32(os.Getpid())},
+					params.ModulePath: {Name: params.ModulePath, Type: params.UnicodeString, Value: "C:\\Windows\\assembly\\NativeModules_v4.0.30319_32\\Microsoft.Dee252aac#\\707569faabe821b47fa4f59ecd9eb6ea\\Microsoft.Developer.IdentityService.ni.exe"},
 				},
 			},
 		},
 		{`Spotify.exe`,
 			&event.Event{
-				Type: event.LoadImage,
+				Type: event.LoadModule,
 				Params: event.Params{
-					params.ProcessID: {Name: params.ProcessID, Type: params.PID, Value: uint32(os.Getpid())},
-					params.ImagePath: {Name: params.ImagePath, Type: params.UnicodeString, Value: "C:\\Windows\\System32\\notepad.exe"},
+					params.ProcessID:  {Name: params.ProcessID, Type: params.PID, Value: uint32(os.Getpid())},
+					params.ModulePath: {Name: params.ModulePath, Type: params.UnicodeString, Value: "C:\\Windows\\System32\\notepad.exe"},
 				},
 			},
 		},
 		{`C:\Users\admin\AppData\Roaming\Spotify\Spotify.exe`,
 			&event.Event{
-				Type: event.LoadImage,
+				Type: event.LoadModule,
 				Params: event.Params{
-					params.ProcessID: {Name: params.ProcessID, Type: params.PID, Value: uint32(os.Getpid())},
-					params.ImagePath: {Name: params.ImagePath, Type: params.UnicodeString, Value: "C:\\Users\\admin\\AppData\\Roaming\\Spotify\\Spotify.exe"},
+					params.ProcessID:  {Name: params.ProcessID, Type: params.PID, Value: uint32(os.Getpid())},
+					params.ModulePath: {Name: params.ModulePath, Type: params.UnicodeString, Value: "C:\\Users\\admin\\AppData\\Roaming\\Spotify\\Spotify.exe"},
 				},
 			},
 		},
