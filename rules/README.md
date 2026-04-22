@@ -6,7 +6,7 @@
   </a>
 </p>
 
-This directory contains a catalog of detection rules modeled around the prominent [MITRE ATT&CK](https://attack.mitre.org/) framework. The goal is to provide a direct mapping of tactics, techniques, and sub-techniques for each rule. The following sections introduce the general structure, design guidelines, and best practices to keep in mind when creating new rules.
+This directory contains a catalog of detection rules mapped to [MITRE ATT&CK](https://attack.mitre.org/) framework. The goal is to provide a direct mapping of tactics, techniques, and sub-techniques for each rule. The following sections introduce the general structure, design guidelines, and best practices to keep in mind when creating new rules.
 
 ## Structure
 
@@ -28,7 +28,7 @@ required attributes such as rule identifier, name, and the minimum engine versio
 
 ### Read the docs
 
-This should be your starting point. Before trying to write new rules, explore the [docs](https://www.fibratus.io/#/filters/introduction) to learn about [filter expressions](https://www.fibratus.io/#/filters/filtering) fundamentals, [operators](https://www.fibratus.io/#/filters/operators), [functions](https://www.fibratus.io/#/filters/functions), [filter fields](https://www.fibratus.io/#/filters/fields) reference, and [rule engine](https://www.fibratus.io/#/filters/rules) specifics. 
+This should be your starting point. Before trying to write new rules, explore the [docs](https://www.fibratus.io/docs/rules) to learn about [operators](https://www.fibratus.io/docs/rules/operators), [functions](https://www.fibratus.io/docs/rules/functions), [filter fields](https://www.fibratus.io/docs//rules/fields) reference.
 
 ### Stick to naming nomenclature
 
@@ -55,4 +55,4 @@ Fibratus comes with a [macros](https://www.fibratus.io/#/filters/rules?id=macros
 
 ### Formatting styles
 
-Pay attention to rule condition/action formatting style. If the rule consists of multiple or large expressions, it is desirable to split each spanning expression on a new line and properly indent the `and`, `or`, or `not` operators. By default, we use 1 space tab for indenting operators and rule actions. This notably improves readability and prevents formatting inconsistencies.
+Pay attention to rule condition/action formatting style. If the rule consists of multiple or large expressions, it is desirable to split each spanning expression on a new line. This notably improves readability and prevents formatting inconsistencies.
