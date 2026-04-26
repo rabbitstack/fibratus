@@ -648,6 +648,8 @@ func TestFileFilter(t *testing.T) {
 		{`file.extension not contains '.exe' and file.extension not contains '.com' and file.extension not in ('.vba', '.exe')`, true},
 		{`file.extension not in ('.exe', '.com')`, true},
 		{`file.extension not in ('.exe', '.dll')`, false},
+		{`file.extension = '.dll' and not (file.extension contains '.com') and file.operation = 'open'`, true},
+		{`file.path not imatches 'C:\\Windows\\system32\\*.exe' and file.path not imatches '?:\\Windows\\System32\\svchost.exe'`, true},
 		{`file.path matches 'C:\\*\\user32.dll'`, true},
 		{`file.path not matches 'C:\\*.exe'`, true},
 		{`file.path imatches 'C:\\*\\USER32.dll'`, true},
