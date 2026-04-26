@@ -33,7 +33,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
-	"golang.org/x/time/rate"
 )
 
 var (
@@ -66,8 +65,6 @@ type fsProcessor struct {
 	purger  *time.Ticker
 
 	quit chan struct{}
-	// lim throttles the parsing of image characteristics
-	lim *rate.Limiter
 }
 
 // FileInfo stores file information obtained from event state.
@@ -94,7 +91,6 @@ func newFsProcessor(
 		buckets:         make(map[uint64][]*event.Event),
 		purger:          time.NewTicker(time.Second * 5),
 		quit:            make(chan struct{}, 1),
-		lim:             rate.NewLimiter(30, 40), // allow 30 parse ops per second or bursts of 40 ops
 	}
 
 	go f.purge()
