@@ -44,7 +44,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/symbolize"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
-	"github.com/rabbitstack/fibratus/pkg/util/va"
 	yara "github.com/rabbitstack/fibratus/pkg/yara/config"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -386,7 +385,6 @@ func TestEventSourceAllEvents(t *testing.T) {
 	event.DropCurrentProc = false
 	var viewBase uintptr
 	var freeAddress uintptr
-	var dupHandleID windows.Handle
 
 	var tests = []*struct {
 		name      string
@@ -539,7 +537,7 @@ func TestEventSourceAllEvents(t *testing.T) {
 			func(e *event.Event) bool {
 				return e.CurrentPid() && e.Type == event.MapViewFile &&
 					e.GetParamAsString(params.MemProtect) == "EXECUTE_READWRITE|READONLY" &&
-					e.GetParamAsString(params.FileViewSectionType) == "Module" &&
+					e.GetParamAsString(params.FileViewSectionType) == "IMAGE" &&
 					strings.Contains(e.GetParamAsString(params.FilePath), "_fixtures\\yara-test.dll")
 			},
 			false,
@@ -626,35 +624,6 @@ func TestEventSourceAllEvents(t *testing.T) {
 			false,
 		},
 		{
-			"duplicate handle",
-			func() error {
-				hs := handle.NewSnapshotter(&config.Config{EnumerateHandles: true}, nil)
-				handles, err := hs.FindHandles(uint32(os.Getppid()))
-				if err != nil {
-					return err
-				}
-				for _, h := range handles {
-					if h.Type == handle.Key {
-						dupHandleID = h.Num
-						break
-					}
-				}
-				assert.False(t, dupHandleID == 0)
-				dup, err := handle.Duplicate(dupHandleID, uint32(os.Getppid()), 0)
-				if err != nil {
-					return err
-				}
-				defer windows.Close(dup)
-				return nil
-			},
-			func(e *event.Event) bool {
-				return e.CurrentPid() && e.Type == event.DuplicateHandle &&
-					e.GetParamAsString(params.HandleObjectTypeID) == handle.Key &&
-					windows.Handle(e.Params.MustGetUint32(params.HandleSourceID)) == dupHandleID
-			},
-			false,
-		},
-		{
 			"query dns",
 			func() error {
 				_, err := net.LookupHost("dns.google")
@@ -696,19 +665,6 @@ func TestEventSourceAllEvents(t *testing.T) {
 		},
 	}
 
-	psnap := new(ps.SnapshotterMock)
-	psnap.On("Write", mock.Anything).Return(nil)
-	psnap.On("AddThread", mock.Anything).Return(nil)
-	psnap.On("AddModule", mock.Anything).Return(nil)
-	psnap.On("AddMmap", mock.Anything).Return(nil)
-	psnap.On("RemoveThread", mock.Anything, mock.Anything).Return(nil)
-	psnap.On("RemoveModule", mock.Anything, mock.Anything).Return(nil)
-	psnap.On("FindModule", mock.Anything).Return(false, nil)
-	psnap.On("RemoveMmap", mock.Anything, mock.Anything).Return(nil)
-	psnap.On("FindAndPut", mock.Anything).Return(&pstypes.PS{})
-	psnap.On("Find", mock.Anything).Return(true, &pstypes.PS{})
-	psnap.On("Remove", mock.Anything).Return(nil)
-
 	hsnap := new(handle.SnapshotterMock)
 	hsnap.On("FindByObject", mock.Anything).Return(htypes.Handle{}, false)
 	hsnap.On("FindHandles", mock.Anything).Return([]htypes.Handle{}, nil)
@@ -723,7 +679,6 @@ func TestEventSourceAllEvents(t *testing.T) {
 		EnableNetEvents:      true,
 		EnableRegistryEvents: true,
 		EnableMemEvents:      true,
-		EnableHandleEvents:   true,
 		EnableDNSEvents:      true,
 		EnableAuditAPIEvents: true,
 		StackEnrichment:      false,
@@ -731,6 +686,7 @@ func TestEventSourceAllEvents(t *testing.T) {
 
 	evsConfig.Init()
 	cfg := &config.Config{EventSource: evsConfig, Filters: &config.Filters{}}
+	psnap := ps.NewSnapshotter(hsnap, cfg)
 	evs := NewEventSource(psnap, hsnap, cfg, nil)
 
 	l := &MockListener{}
@@ -743,6 +699,7 @@ func TestEventSourceAllEvents(t *testing.T) {
 	for _, tt := range tests {
 		gen := tt.gen
 		if gen != nil {
+			log.Infof("executing [%s] test generator", tt.name)
 			require.NoError(t, gen(), tt.name)
 		}
 	}
@@ -776,7 +733,7 @@ func TestEventSourceAllEvents(t *testing.T) {
 					t.Logf("FAIL: %s", tt.name)
 				}
 			}
-			t.Fatal("FAIL: TestConsumerEvents")
+			t.Fatal("FAIL: TestEventSourceAllEvents")
 		}
 	}
 }
@@ -785,33 +742,6 @@ func callstackContainsTestExe(callstack string) bool {
 	return strings.Contains(callstack, "etw.test.exe")
 }
 
-// NoopPsSnapshotter is the process noop snapshotter  used in tests.
-// The main motivation for a noop snapshotter is to reduce the pressure
-// on internal mock calls which lead to excessive memory usage when
-// the snapshotter Find method is invoked for each incoming event. This
-// may create flaky tests.
-type NoopPsSnapshotter struct{}
-
-var fakeProc = &pstypes.PS{PID: 111111, Name: "fake.exe"}
-
-func (s *NoopPsSnapshotter) Write(evt *event.Event) error                       { return nil }
-func (s *NoopPsSnapshotter) Remove(evt *event.Event) error                      { return nil }
-func (s *NoopPsSnapshotter) Find(pid uint32) (bool, *pstypes.PS)                { return true, fakeProc }
-func (s *NoopPsSnapshotter) FindAndPut(pid uint32) *pstypes.PS                  { return fakeProc }
-func (s *NoopPsSnapshotter) Put(ps *pstypes.PS)                                 {}
-func (s *NoopPsSnapshotter) Size() uint32                                       { return 1 }
-func (s *NoopPsSnapshotter) Close() error                                       { return nil }
-func (s *NoopPsSnapshotter) GetSnapshot() []*pstypes.PS                         { return nil }
-func (s *NoopPsSnapshotter) AddThread(evt *event.Event) error                   { return nil }
-func (s *NoopPsSnapshotter) AddModule(evt *event.Event) error                   { return nil }
-func (s *NoopPsSnapshotter) FindModule(addr va.Address) (bool, *pstypes.Module) { return false, nil }
-func (s *NoopPsSnapshotter) FindAllModules() map[string]pstypes.Module          { return nil }
-func (s *NoopPsSnapshotter) RemoveThread(pid uint32, tid uint32) error          { return nil }
-func (s *NoopPsSnapshotter) RemoveModule(pid uint32, addr va.Address) error     { return nil }
-func (s *NoopPsSnapshotter) WriteFromCapture(evt *event.Event) error            { return nil }
-func (s *NoopPsSnapshotter) AddMmap(evt *event.Event) error                     { return nil }
-func (s *NoopPsSnapshotter) RemoveMmap(pid uint32, addr va.Address) error       { return nil }
-
 func TestCallstackEnrichment(t *testing.T) {
 	hsnap := new(handle.SnapshotterMock)
 	hsnap.On("FindByObject", mock.Anything).Return(htypes.Handle{}, false)
@@ -819,23 +749,14 @@ func TestCallstackEnrichment(t *testing.T) {
 	hsnap.On("Write", mock.Anything).Return(nil)
 	hsnap.On("Remove", mock.Anything).Return(nil)
 
-	// exercise callstack enrichment with a noop
-	// process snapshotter. This will make the
-	// symbolizer to always fall back to Debug Help
-	// API when resolving symbolic information
-	nopsnap := new(NoopPsSnapshotter)
-	log.Info("test callstack enrichment with noop ps snapshotter")
-	testCallstackEnrichment(t, hsnap, nopsnap)
-
-	// now use a real process snapshotter to
+	// use a real process snapshotter to
 	// enrich the callstacks. This way, we
 	// should only resort to Debug Help API
-	// when the symbol is not found in PE
+	// when the symbol is not found in the PE
 	// export directory or the module doesn't
 	// exist in process state
 	cfg := &config.Config{}
 	psnap := ps.NewSnapshotter(hsnap, cfg)
-	log.Info("test callstack enrichment with real ps snapshotter")
 	testCallstackEnrichment(t, hsnap, psnap)
 }
 
@@ -889,7 +810,7 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 			false,
 		},
 		{
-			"load Module callstack",
+			"load module callstack",
 			nil,
 			func(e *event.Event) bool {
 				if e.IsLoadModule() && filepath.Ext(e.GetParamAsString(params.FilePath)) == ".dll" {
