@@ -244,43 +244,31 @@ func (p *Parser) ParseExpr() (Expr, error) {
 			}
 		}
 
-		var rhs Expr
-		switch op {
-		case Not:
-			// the first variant of the negation operator.
-			// The operator that is negated appears immediately
-			// after the `not` operator, e.g. ps.name not in ('cmd.exe')
+		if op == Not {
+			// handle infix negation
 			op1, pos, lit := p.scanIgnoreWhitespace()
 			if !op1.isOperator() {
-				return nil, newParseError(tokstr(op, lit), []string{"operator"}, pos, p.expr)
+				return nil, newParseError(tokstr(op1, lit), []string{"operator"}, pos, p.expr)
 			}
-			// parse the next expression after operator
-			rhs1, err := p.parseUnaryExpr()
+			rhs, err := p.parseUnaryExpr()
 			if err != nil {
 				return nil, err
 			}
-			rhs = &BinaryExpr{RHS: rhs1, Op: op1}
-		default:
-			op1, _, _ := p.scanIgnoreWhitespace()
-			// if the negation appears after the operator
-			// try to parse an entire binary expr and wrap
-			// it inside the `not` expression. This is the
-			// second variant of the negating expressions, e.g.
-			// ps.name = 'cmd.exe' and not (ps.name in ('powershell.exe'))
-			if op1 == Not {
-				binaryExpr, err := p.ParseExpr()
-				if err != nil {
-					return nil, err
+
+			for node := root; ; {
+				r, ok := node.RHS.(*BinaryExpr)
+				if !ok || r.Op.precedence() >= op1.precedence() {
+					node.RHS = &NotExpr{Expr: &BinaryExpr{LHS: node.RHS, RHS: rhs, Op: op1}}
+					break
 				}
-				rhs = &NotExpr{binaryExpr}
-			} else {
-				p.unscan()
-				// otherwise, parse the next expression
-				rhs, err = p.parseUnaryExpr()
-				if err != nil {
-					return nil, err
-				}
+				node = r
 			}
+			continue
+		}
+
+		rhs, err := p.parseUnaryExpr()
+		if err != nil {
+			return nil, err
 		}
 
 		// find the right spot in the tree to add the new expression by
@@ -290,13 +278,7 @@ func (p *Parser) ParseExpr() (Expr, error) {
 		for node := root; ; {
 			r, ok := node.RHS.(*BinaryExpr)
 			if !ok || r.Op.precedence() >= op.precedence() {
-				if op == Not {
-					r := rhs.(*BinaryExpr)
-					r.LHS = node.RHS
-					node.RHS = &NotExpr{Expr: r}
-					break
-				}
-				// Add the new expression here and break.
+				// add the new expression here and break
 				node.RHS = &BinaryExpr{LHS: node.RHS, RHS: rhs, Op: op}
 				break
 			}
@@ -331,6 +313,21 @@ func (p *Parser) parseUnaryExpr() (Expr, error) {
 		}
 
 		return &ListLiteral{Values: tagKeys}, nil
+	}
+
+	// handle unary negation
+	p.unscan()
+	if tok, pos, lit := p.scanIgnoreWhitespace(); tok == Not {
+		expr, err := p.parseUnaryExpr()
+		if err != nil {
+			return nil, err
+		}
+
+		if f, ok := expr.(*FieldLiteral); ok && !fields.IsBoolean(f.Field) {
+			return nil, newParseError(tokstr(tok, lit), []string{"boolean field"}, pos, p.expr)
+		}
+
+		return &NotExpr{Expr: expr}, nil
 	}
 
 	p.unscan()
