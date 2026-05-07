@@ -77,7 +77,7 @@ func (s Callstack) Colorize() string {
 
 		// frames in kernel range with no resolved symbol are unresolved so
 		// we can collapse them into a counter
-		if f.Addr.InSystemRange() && (f.Symbol == "" || f.Symbol == "?") {
+		if f.Addr.InSystemRange() && ((f.Symbol == "" || f.Symbol == "?") && f.Module == "") {
 			unresolved++
 			continue
 		}
