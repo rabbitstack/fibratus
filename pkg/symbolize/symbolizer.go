@@ -132,6 +132,11 @@ type Symbolizer struct {
 	// exps stores resolved export directories
 	exps *ExportsDirectoryCache
 
+	// drivers stores loaded kernel drivers and
+	// allows resolution of kernel addresses to
+	// kernel drivers
+	drivers *driverStore
+
 	r     Resolver
 	psnap ps.Snapshotter
 
@@ -157,6 +162,7 @@ func NewSymbolizer(r Resolver, psnap ps.Snapshotter, config *config.Config, enqu
 		quit:    make(chan struct{}, 1),
 		enqueue: enqueue,
 		exps:    NewExportsDirectoryCache(psnap),
+		drivers: initDriverStore(),
 		r:       r,
 		psnap:   psnap,
 	}
@@ -169,7 +175,7 @@ func NewSymbolizer(r Resolver, psnap ps.Snapshotter, config *config.Config, enqu
 		}
 		devs := sys.EnumDevices()
 		for _, dev := range devs {
-			_ = r.LoadModule(windows.CurrentProcess(), dev.Filename, va.Address(dev.Addr))
+			_ = r.LoadModule(windows.CurrentProcess(), dev.Path, va.Address(dev.Base))
 		}
 	}
 
@@ -189,7 +195,7 @@ func (s *Symbolizer) Close() {
 	s.cleanAllSyms()
 	if s.config.SymbolizeKernelAddresses {
 		for _, dev := range sys.EnumDevices() {
-			s.r.UnloadModule(windows.CurrentProcess(), va.Address(dev.Addr))
+			s.r.UnloadModule(windows.CurrentProcess(), va.Address(dev.Base))
 		}
 	}
 }
@@ -216,19 +222,28 @@ func (s *Symbolizer) ProcessEvent(e *event.Event) (bool, error) {
 	}
 
 	if e.IsLoadModule() || e.IsUnloadModule() {
-		filename := e.GetParamAsString(params.ModulePath)
+		path := e.GetParamAsString(params.ModulePath)
+		size := e.Params.TryGetUint64(params.ModuleSize)
 		addr := e.Params.TryGetAddress(params.ModuleBase)
 		// if the kernel driver is loaded or unloaded,
-		// load/unload symbol handlers respectively
-		if (strings.ToLower(filepath.Ext(filename)) == ".sys" ||
-			e.Params.TryGetBool(params.FileIsDriver)) && s.config.SymbolizeKernelAddresses {
+		// load/unload symbol handlers respectively or
+		// update the driver store
+		if strings.ToLower(filepath.Ext(path)) == ".sys" || e.Params.TryGetBool(params.FileIsDriver) {
 			if e.IsLoadModule() {
-				err := s.r.LoadModule(windows.CurrentProcess(), filename, addr)
-				if err != nil {
-					log.Errorf("unable to load symbol table for %s module: %v", filename, err)
+				if s.config.SymbolizeKernelAddresses {
+					err := s.r.LoadModule(windows.CurrentProcess(), path, addr)
+					if err != nil {
+						log.Errorf("unable to load symbol table for %s module: %v", path, err)
+					}
+				} else {
+					s.drivers.addDriver(addr, size, path)
 				}
 			} else {
-				s.r.UnloadModule(windows.CurrentProcess(), addr)
+				if s.config.SymbolizeKernelAddresses {
+					s.r.UnloadModule(windows.CurrentProcess(), addr)
+				} else {
+					s.drivers.removeDriver(addr, size)
+				}
 			}
 		}
 
@@ -424,8 +439,14 @@ func (s *Symbolizer) produceFrame(addr va.Address, e *event.Event) callstack.Fra
 	frame := callstack.Frame{PID: pid, Addr: addr}
 	if addr.InSystemRange() {
 		if s.config.SymbolizeKernelAddresses {
+			// full kernel address symbolization
 			frame.Module = s.r.GetModuleName(windows.CurrentProcess(), addr)
 			frame.Symbol, frame.Offset = s.r.GetSymbolNameAndOffset(windows.CurrentProcess(), addr)
+		} else {
+			// module-only symbolization
+			if dev := s.drivers.resolve(addr); dev != nil {
+				frame.Module = dev.Path
+			}
 		}
 		return frame
 	}
