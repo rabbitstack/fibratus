@@ -306,7 +306,7 @@ func TestFsProcessor(t *testing.T) {
 					{File: "C:\\Windows\\System32\\kernel32.dll", BaseAddress: va.Address(0xffff23433), Size: 3098},
 				},
 			})
-			p := newFsProcessor(hsnap, psnap, fs.NewDevMapper(), fs.NewDevPathResolver(), &config.Config{})
+			p := newFsProcessor(hsnap, psnap, fs.NewDevMapper(), &config.Config{})
 			if tt.setupProcessor != nil {
 				tt.setupProcessor(p)
 			}

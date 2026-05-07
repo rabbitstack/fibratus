@@ -56,9 +56,8 @@ type fsProcessor struct {
 	// irps contains a mapping between the IRP (I/O request packet) and CreateFile events
 	irps map[uint64]*event.Event
 
-	devMapper       fs.DevMapper
-	devPathResolver fs.DevPathResolver
-	config          *config.Config
+	devMapper fs.DevMapper
+	config    *config.Config
 
 	// buckets stores stack walk events per stack id
 	buckets map[uint64][]*event.Event
@@ -80,21 +79,19 @@ func newFsProcessor(
 	hsnap handle.Snapshotter,
 	psnap ps.Snapshotter,
 	devMapper fs.DevMapper,
-	devPathResolver fs.DevPathResolver,
 	config *config.Config,
 ) Processor {
 	f := &fsProcessor{
-		files:           make(map[uint64]*FileInfo),
-		irps:            make(map[uint64]*event.Event),
-		hsnap:           hsnap,
-		psnap:           psnap,
-		devMapper:       devMapper,
-		devPathResolver: devPathResolver,
-		config:          config,
-		buckets:         make(map[uint64][]*event.Event),
-		purger:          time.NewTicker(time.Second * 5),
-		quit:            make(chan struct{}, 1),
-		lim:             rate.NewLimiter(30, 40), // allow 30 parse ops per second or bursts of 40 ops
+		files:     make(map[uint64]*FileInfo),
+		irps:      make(map[uint64]*event.Event),
+		hsnap:     hsnap,
+		psnap:     psnap,
+		devMapper: devMapper,
+		config:    config,
+		buckets:   make(map[uint64][]*event.Event),
+		purger:    time.NewTicker(time.Second * 5),
+		quit:      make(chan struct{}, 1),
+		lim:       rate.NewLimiter(30, 40), // allow 30 parse ops per second or bursts of 40 ops
 	}
 
 	go f.purge()
@@ -205,10 +202,6 @@ func (f *fsProcessor) processEvent(e *event.Event) (*event.Event, error) {
 			filepath := ev.GetParamAsString(params.FilePath)
 			fileinfo = f.getFileInfo(filepath, opts)
 			f.files[fileObject] = fileinfo
-		}
-
-		if f.config.EventSource.EnableHandleEvents {
-			f.devPathResolver.AddPath(ev.GetParamAsString(params.FilePath))
 		}
 
 		ev.AppendParam(params.NTStatus, params.Status, status)
