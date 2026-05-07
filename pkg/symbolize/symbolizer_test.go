@@ -304,6 +304,104 @@ func TestProcessCallstack(t *testing.T) {
 	assert.Equal(t, 0, s.procsSize())
 }
 
+func TestKernelCallstackSymbolizationFromDriverStore(t *testing.T) {
+	r := new(MockResolver)
+	c := &config.Config{
+		SymbolizeKernelAddresses: false,
+	}
+	psnap := new(ps.SnapshotterMock)
+
+	s := NewSymbolizer(r, psnap, c, false)
+	require.NotNil(t, s)
+
+	// Inject real-ish kernel driver ranges directly into the symbolizer's driver store.
+	// These mimic what EnumDevices/NtQuerySystemInformation would return at runtime.
+	//
+	//   ntoskrnl.exe  0xFFFFF80000000000 – 0xFFFFF80000800000  (8 MB)
+	//   hal.dll       0xFFFFF80000800000 – 0xFFFFF80000900000  (1 MB)
+	//   fltMgr.sys    0xFFFFF80001000000 – 0xFFFFF80001080000  (512 KB)
+	//   ksecdd.sys    0xFFFFF80001200000 – 0xFFFFF80001240000  (256 KB)
+	s.drivers.addDriver(0xFFFFF80000000000, 0x800000, `\SystemRoot\system32\ntoskrnl.exe`)
+	s.drivers.addDriver(0xFFFFF80000800000, 0x100000, `\SystemRoot\system32\hal.dll`)
+	s.drivers.addDriver(0xFFFFF80001000000, 0x080000, `\SystemRoot\system32\drivers\fltMgr.sys`)
+	s.drivers.addDriver(0xFFFFF80001200000, 0x040000, `\SystemRoot\system32\drivers\ksecdd.sys`)
+
+	proc := &pstypes.PS{
+		Name:      "notepad.exe",
+		PID:       23234,
+		Ppid:      2434,
+		Exe:       `C:\Windows\notepad.exe`,
+		Cmdline:   `C:\Windows\notepad.exe`,
+		SID:       "S-1-1-18",
+		Cwd:       `C:\Windows\`,
+		SessionID: 1,
+		Threads: map[uint32]pstypes.Thread{
+			3453: {
+				Tid:          3453,
+				StartAddress: va.Address(140729524944768),
+				IOPrio:       2,
+				PagePrio:     5,
+				KstackBase:   va.Address(18446677035730165760),
+				KstackLimit:  va.Address(18446677035730137088),
+				UstackLimit:  va.Address(86376448),
+				UstackBase:   va.Address(86372352),
+			},
+		},
+		Envs: map[string]string{"ProgramData": "C:\\ProgramData", "COMPUTRENAME": "archrabbit"},
+	}
+
+	// callstack mixes kernel addresses (0xFFFFF800...) with a user-space tail.
+	// Each kernel address falls inside one of the driver ranges injected above
+	e := &event.Event{
+		Type:      event.CreateProcess,
+		Tid:       2484,
+		PID:       2232,
+		CPU:       1,
+		Seq:       2,
+		Name:      "CreatedProcess",
+		Timestamp: time.Now(),
+		Category:  event.Process,
+		Host:      "archrabbit",
+		Params: event.Params{
+			params.ProcessParentID:     {Name: params.ProcessParentID, Type: params.PID, Value: uint32(os.Getpid())},
+			params.ProcessRealParentID: {Name: params.ProcessRealParentID, Type: params.PID, Value: uint32(os.Getpid())},
+			params.Callstack: {
+				Name: params.Callstack,
+				Type: params.Slice,
+				Value: []va.Address{
+					0xFFFFF80000100000, // ntoskrnl.exe
+					0xFFFFF80000810000, // hal.dll
+					0xFFFFF80001010000, // fltMgr.sys
+					0xFFFFF80001210000, // ksecdd.sys
+				},
+			},
+		},
+		PS: proc,
+	}
+
+	_, err := s.ProcessEvent(e)
+	require.NoError(t, err)
+
+	// each frame must carry the driver path derived from the driver store,
+	// not a user-space module name, paired with the symbol the mock returned.
+	assert.Equal(t,
+		`0xfffff80000100000 \SystemRoot\system32\ntoskrnl.exe!?`+
+			`|0xfffff80000810000 \SystemRoot\system32\hal.dll!?`+
+			`|0xfffff80001010000 \SystemRoot\system32\drivers\fltMgr.sys!?`+
+			`|0xfffff80001210000 \SystemRoot\system32\drivers\ksecdd.sys!?`,
+		e.Callstack.String(),
+	)
+
+	// verify each frame individually for clearer failure messages
+	frames := e.Callstack
+	require.Len(t, frames, 4)
+
+	assert.Equal(t, `\SystemRoot\system32\ntoskrnl.exe`, frames[3].Module)
+	assert.Equal(t, `\SystemRoot\system32\hal.dll`, frames[2].Module)
+	assert.Equal(t, `\SystemRoot\system32\drivers\fltMgr.sys`, frames[1].Module)
+	assert.Equal(t, `\SystemRoot\system32\drivers\ksecdd.sys`, frames[0].Module)
+}
+
 func TestSymbolizeEventParamAddress(t *testing.T) {
 	r := new(MockResolver)
 	c := &config.Config{}
