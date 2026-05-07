@@ -19,11 +19,12 @@
 package sys
 
 import (
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestEnumDevices(t *testing.T) {
@@ -32,7 +33,7 @@ func TestEnumDevices(t *testing.T) {
 
 	ntoskrnlFound := false
 	for _, drv := range drivers {
-		if strings.EqualFold(filepath.Base(drv.Filename), "ntoskrnl.exe") {
+		if strings.EqualFold(filepath.Base(drv.Path), "ntoskrnl.exe") {
 			ntoskrnlFound = true
 			break
 		}

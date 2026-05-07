@@ -22,60 +22,86 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"syscall"
 	"unsafe"
+
+	"golang.org/x/sys/windows"
 )
 
-// DevSize specifies the initial size used to allocate the driver base addresses
-const DevSize = 1024
+// devSize specifies the initial size used to allocate the drivers info buffer
+const devSize uint32 = 1024 * 256
 
 // Driver contains device driver metadata for each driver found in
 // the system.
 type Driver struct {
-	Filename string
-	Addr     uintptr
+	Path string
+	Base uintptr
+	Size uint32
+}
+
+// RTL_PROCESS_MODULE_INFORMATION mirrors the C struct
+type RTL_PROCESS_MODULE_INFORMATION struct {
+	Section          uintptr
+	MappedBase       uintptr
+	ImageBase        uintptr
+	ImageSize        uint32
+	Flags            uint32
+	LoadOrderIndex   uint16
+	InitOrderIndex   uint16
+	LoadCount        uint16
+	OffsetToFileName uint16
+	FullPathName     [256]byte
+}
+
+// RTL_PROCESS_MODULES is the header returned by NtQuerySystemInformation
+type RTL_PROCESS_MODULES struct {
+	NumberOfModules uint32
+	Modules         [1]RTL_PROCESS_MODULE_INFORMATION // variable-length, treated as start of array
 }
 
 // String returns the driver string representation.
 func (d Driver) String() string {
-	return fmt.Sprintf("File: %s", d.Filename)
+	return fmt.Sprintf("Path: %s, Base: %x", d.Path, d.Base)
 }
 
 // EnumDevices returns metadata about device drivers encountered in the
 // system. If device driver enumeration fails, an empty slice with device
 // information is returned.
 func EnumDevices() []Driver {
-	needed := uint32(0)
-	addrs := make([]uintptr, DevSize)
-	err := EnumDeviceDrivers(uintptr(unsafe.Pointer(&addrs[0])), DevSize, &needed)
-	if err != nil {
-		return nil
-	}
-	// base image size greater than initial allocation
-	if needed > uint32(len(addrs)) {
-		addrs = make([]uintptr, needed)
-		err := EnumDeviceDrivers(uintptr(unsafe.Pointer(&addrs[0])), needed, &needed)
+	var length uint32
+	buf := make([]byte, devSize) // 256 KB initial guess
+
+	for {
+		err := windows.NtQuerySystemInformation(windows.SystemModuleInformation, unsafe.Pointer(&buf[0]), uint32(len(buf)), &length)
+		if err == windows.STATUS_INFO_LENGTH_MISMATCH || err == windows.STATUS_BUFFER_TOO_SMALL || err == windows.STATUS_BUFFER_OVERFLOW {
+			buf = make([]byte, length)
+			continue
+		}
 		if err != nil {
 			return nil
 		}
-	}
-	// resize to get the number of drivers
-	if needed/8 < uint32(len(addrs)) {
-		addrs = addrs[:needed/8]
-	}
-	drivers := make([]Driver, len(addrs))
-	for i, addr := range addrs {
-		drv := Driver{
-			Addr: addr,
+
+		// parse the buffer with driver information
+		header := (*RTL_PROCESS_MODULES)(unsafe.Pointer(&buf[0]))
+		count := header.NumberOfModules
+
+		offset := unsafe.Offsetof(header.Modules)
+		size := unsafe.Sizeof(RTL_PROCESS_MODULE_INFORMATION{})
+
+		devs := make([]Driver, 0, count)
+
+		for i := range count {
+			m := (*RTL_PROCESS_MODULE_INFORMATION)(unsafe.Pointer(&buf[offset+uintptr(i)*size]))
+			path := windows.ByteSliceToString(m.FullPathName[:])
+			// normalize driver path
+			path = strings.Replace(path, "\\SystemRoot", os.Getenv("SYSTEMROOT"), 1)
+			dev := Driver{
+				Base: m.ImageBase,
+				Size: m.ImageSize,
+				Path: path,
+			}
+			devs = append(devs, dev)
 		}
-		filename := make([]uint16, syscall.MAX_PATH)
-		n := GetDeviceDriverFileName(addr, &filename[0], syscall.MAX_PATH)
-		if n == 0 {
-			continue
-		}
-		dev := syscall.UTF16ToString(filename)
-		drv.Filename = strings.Replace(dev, "\\SystemRoot", os.Getenv("SYSTEMROOT"), 1)
-		drivers[i] = drv
+
+		return devs
 	}
-	return drivers
 }
