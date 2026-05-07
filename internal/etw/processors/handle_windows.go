@@ -19,8 +19,6 @@
 package processors
 
 import (
-	"strings"
-
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/fs"
@@ -30,23 +28,20 @@ import (
 )
 
 type handleProcessor struct {
-	hsnap           handle.Snapshotter
-	psnap           ps.Snapshotter
-	devMapper       fs.DevMapper
-	devPathResolver fs.DevPathResolver
+	hsnap     handle.Snapshotter
+	psnap     ps.Snapshotter
+	devMapper fs.DevMapper
 }
 
 func newHandleProcessor(
 	hsnap handle.Snapshotter,
 	psnap ps.Snapshotter,
 	devMapper fs.DevMapper,
-	devPathResolver fs.DevPathResolver,
 ) Processor {
 	return &handleProcessor{
-		hsnap:           hsnap,
-		psnap:           psnap,
-		devMapper:       devMapper,
-		devPathResolver: devPathResolver,
+		hsnap:     hsnap,
+		psnap:     psnap,
+		devMapper: devMapper,
 	}
 }
 
@@ -86,14 +81,6 @@ func (h *handleProcessor) processEvent(e *event.Event) (*event.Event, error) {
 			}
 		case handle.File:
 			name = h.devMapper.Convert(name)
-		case handle.Driver:
-			driverName := strings.TrimPrefix(name, "\\Driver\\") + ".sys"
-			driverPath := h.devPathResolver.GetPath(driverName)
-			if driverPath == "" {
-				driverPath = driverName
-			}
-			h.devPathResolver.RemovePath(driverName)
-			e.Params.Append(params.ModulePath, params.Path, driverPath)
 		}
 		// assign the formatted handle name
 		if err := e.Params.SetValue(params.HandleObjectName, name); err != nil {

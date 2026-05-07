@@ -43,15 +43,14 @@ func NewChain(
 			psnapshotter: psnap,
 			processors:   make([]Processor, 0),
 		}
-		devMapper       = fs.NewDevMapper()
-		devPathResolver = fs.NewDevPathResolver()
-		vaRegionProber  = va.NewRegionProber()
+		devMapper      = fs.NewDevMapper()
+		vaRegionProber = va.NewRegionProber()
 	)
 
 	chain.addProcessor(newPsProcessor(psnap, vaRegionProber))
 
 	if config.EventSource.EnableFileIOEvents {
-		chain.addProcessor(newFsProcessor(hsnap, psnap, devMapper, devPathResolver, config))
+		chain.addProcessor(newFsProcessor(hsnap, psnap, devMapper, config))
 	}
 	if config.EventSource.EnableRegistryEvents {
 		chain.addProcessor(newRegistryProcessor(hsnap))
@@ -63,7 +62,7 @@ func NewChain(
 		chain.addProcessor(newNetProcessor())
 	}
 	if config.EventSource.EnableHandleEvents {
-		chain.addProcessor(newHandleProcessor(hsnap, psnap, devMapper, devPathResolver))
+		chain.addProcessor(newHandleProcessor(hsnap, psnap, devMapper))
 	}
 	if config.EventSource.EnableMemEvents {
 		chain.addProcessor(newMemProcessor(psnap, vaRegionProber))
