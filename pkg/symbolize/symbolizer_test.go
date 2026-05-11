@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rabbitstack/fibratus/pkg/callstack"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
@@ -187,7 +188,7 @@ func TestProcessCallstackPeExports(t *testing.T) {
 	assert.Equal(t, "user32.dll!LoadKeyboardLayoutW", e.Callstack.Symbols()[3])
 	assert.Equal(t, "kernel32.dll!?", e.Callstack.Symbols()[4]) // unexported symbol
 
-	assert.Equal(t, "kernel32.dll|user32.dll|ntdll.dll|unbacked", e.Callstack.Summary())
+	assert.Equal(t, "kernel32.dll|user32.dll|ntdll.dll|unbacked", e.Callstack.Summary(callstack.UserSummary))
 	assert.True(t, e.Callstack.ContainsUnbacked())
 
 	// check internal state
