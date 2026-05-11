@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rabbitstack/fibratus/pkg/callstack"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/network"
 	psnap "github.com/rabbitstack/fibratus/pkg/ps"
@@ -527,7 +528,9 @@ func (t *threadAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 		}
 		return e.GetParamAsString(params.NTStatus), nil
 	case fields.ThreadCallstackSummary:
-		return e.Callstack.Summary(), nil
+		return e.Callstack.Summary(callstack.UserSummary), nil
+	case fields.ThreadCallstackKernelSummary:
+		return e.Callstack.Summary(callstack.KernelSummary), nil
 	case fields.ThreadCallstackDetail:
 		return e.Callstack.String(), nil
 	case fields.ThreadCallstackModules:

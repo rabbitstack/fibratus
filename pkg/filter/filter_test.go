@@ -460,7 +460,7 @@ func TestThreadFilter(t *testing.T) {
 	}
 	require.NoError(t, windows.WriteProcessMemory(windows.CurrentProcess(), base, &insns[0], uintptr(len(insns)), nil))
 
-	evt.Callstack.Init(8)
+	evt.Callstack.Init(9)
 	evt.Callstack.PushFrame(callstack.Frame{PID: evt.PID, Addr: 0x2638e59e0a5, Offset: 0, Symbol: "?", Module: "unbacked"})
 	evt.Callstack.PushFrame(callstack.Frame{PID: evt.PID, Addr: va.Address(base), Offset: 0, Symbol: "?", Module: "unbacked"})
 	evt.Callstack.PushFrame(callstack.Frame{PID: evt.PID, Addr: 0x7ffb313853b2, Offset: 0x10a, Symbol: "Java_java_lang_ProcessImpl_create", Module: "C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll"})
@@ -469,6 +469,7 @@ func TestThreadFilter(t *testing.T) {
 	evt.Callstack.PushFrame(callstack.Frame{PID: evt.PID, Addr: 0x7ffb5c1d0396, Offset: 0x66, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"})
 	evt.Callstack.PushFrame(callstack.Frame{PID: evt.PID, Addr: 0xfffff8072ebc1f6f, Offset: 0x4ef, Symbol: "FltRequestFileInfoOnCreateCompletion", Module: "C:\\WINDOWS\\System32\\drivers\\FLTMGR.SYS"})
 	evt.Callstack.PushFrame(callstack.Frame{PID: evt.PID, Addr: 0xfffff8072eb8961b, Offset: 0x20cb, Symbol: "FltGetStreamContext", Module: "C:\\WINDOWS\\System32\\drivers\\FLTMGR.SYS"})
+	evt.Callstack.PushFrame(callstack.Frame{PID: evt.PID, Addr: 0xfffff8172eb8961b, Offset: 0x20cb, Symbol: "IofCallDriver", Module: "C:\\WINDOWS\\system32\\ntoskrnl.exe"})
 
 	var tests = []struct {
 		filter  string
@@ -484,14 +485,15 @@ func TestThreadFilter(t *testing.T) {
 		{`thread.start_address.symbol = 'LoadModule'`, true},
 		{`thread.start_address.module = 'C:\\Windows\\System32\\kernel32.dll'`, true},
 		{`thread.callstack.summary = 'KERNELBASE.dll|KERNEL32.DLL|java.dll|unbacked'`, true},
+		{`thread.callstack.kernel_summary = 'ntoskrnl.exe|FLTMGR.SYS'`, true},
 		{`thread.callstack.detail icontains 'C:\\WINDOWS\\System32\\KERNELBASE.dll!CreateProcessW+0x66'`, true},
 		{`thread.callstack.modules in ('C:\\WINDOWS\\System32\\KERNELBASE.dll', 'C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll')`, true},
 		{`thread.callstack.modules[5] = 'C:\\WINDOWS\\System32\\KERNELBASE.dll'`, true},
 		{`thread.callstack.modules[7] = 'C:\\WINDOWS\\System32\\drivers\\FLTMGR.SYS'`, true},
-		{`thread.callstack.modules[8] = ''`, true},
+		{`thread.callstack.modules[10] = ''`, true},
 		{`thread.callstack.symbols imatches ('KERNELBASE.dll!CreateProcess*', 'Java_java_lang_ProcessImpl_create')`, true},
 		{`thread.callstack.symbols[2] = 'Java_java_lang_ProcessImpl_create'`, true},
-		{`thread.callstack.symbols[8] = ''`, true},
+		{`thread.callstack.symbols[10] = ''`, true},
 		{`thread.callstack.protections in ('RWX')`, true},
 		{`thread.callstack.allocation_sizes > 0`, false},
 		{`length(thread.callstack.callsite_leading_assembly) > 0`, true},
@@ -501,9 +503,9 @@ func TestThreadFilter(t *testing.T) {
 		{`thread.callstack.final_user_module.name = 'java.dll'`, true},
 		{`thread.callstack.final_user_module.path = 'C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll'`, true},
 		{`thread.callstack.final_user_symbol.name = 'Java_java_lang_ProcessImpl_waitForTimeoutInterruptibly'`, true},
-		{`thread.callstack.final_kernel_module.name = 'FLTMGR.SYS'`, true},
-		{`thread.callstack.final_kernel_module.path = 'C:\\WINDOWS\\System32\\drivers\\FLTMGR.SYS'`, true},
-		{`thread.callstack.final_kernel_symbol.name = 'FltGetStreamContext'`, true},
+		{`thread.callstack.final_kernel_module.name = 'ntoskrnl.exe'`, true},
+		{`thread.callstack.final_kernel_module.path = 'C:\\WINDOWS\\system32\\ntoskrnl.exe'`, true},
+		{`thread.callstack.final_kernel_symbol.name = 'IofCallDriver'`, true},
 		{`thread.callstack.final_user_module.signature.exists = true`, true},
 		{`thread.callstack.final_user_module.signature.trusted = true`, true},
 		{`thread.callstack.final_user_module.signature.issuer imatches '*Microsoft Corporation*'`, true},

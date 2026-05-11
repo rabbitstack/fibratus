@@ -39,6 +39,14 @@ const (
 	User
 )
 
+// SummaryMode defines the callstack summary mode
+type SummaryMode uint8
+
+const (
+	UserSummary SummaryMode = iota
+	KernelSummary
+)
+
 // unbacked represents the identifier for unbacked regions in stack frames
 const unbacked = "unbacked"
 
@@ -260,15 +268,23 @@ func (s *Callstack) FinalKernelFrame() *Frame {
 }
 
 // Summary returns a sequence of non-repeated module names.
-func (s Callstack) Summary() string {
+func (s Callstack) Summary(mode SummaryMode) string {
 	var b strings.Builder
+	b.Grow(len(s) * 16) // preallocate the buffer
+
 	var prev string
-	var removeSep bool
 
 	for i := range s {
 		frame := s[len(s)-i-1]
-		if frame.Addr.InSystemRange() {
-			continue
+		switch mode {
+		case UserSummary:
+			if frame.Addr.InSystemRange() {
+				continue
+			}
+		case KernelSummary:
+			if !frame.Addr.InSystemRange() {
+				return b.String()
+			}
 		}
 
 		var n string
@@ -279,23 +295,15 @@ func (s Callstack) Summary() string {
 		}
 
 		if n == prev {
-			if i == len(s)-1 {
-				// last module equals to the previous
-				// which renders redundant separator
-				removeSep = true
-			}
 			continue
 		}
 
-		b.WriteString(n)
-		if i != len(s)-1 {
+		if b.Len() > 0 {
 			b.WriteRune('|')
 		}
-		prev = n
-	}
+		b.WriteString(n)
 
-	if removeSep {
-		return strings.TrimSuffix(b.String(), "|")
+		prev = n
 	}
 
 	return b.String()

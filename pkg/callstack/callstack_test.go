@@ -19,9 +19,10 @@
 package callstack
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestCallstack(t *testing.T) {
@@ -43,7 +44,8 @@ func TestCallstack(t *testing.T) {
 	assert.True(t, callstack.ContainsUnbacked())
 	assert.Equal(t, 9, callstack.Depth())
 	assert.Equal(t, "0xfffff8015690b644 C:\\WINDOWS\\system32\\ntoskrnl.exe!ObDeleteCapturedInsertInfo+0x45b4|0xfffff801568e9c33 C:\\WINDOWS\\system32\\ntoskrnl.exe!LpcRequestPort+0x2ef3|0xfffff8015662a605 C:\\WINDOWS\\system32\\ntoskrnl.exe!setjmpex+0x9125|0x7ffb5c1d0396 C:\\WINDOWS\\System32\\KERNELBASE.dll!CreateProcessW+0x66|0x7ffb5d8e61f4 C:\\WINDOWS\\System32\\KERNEL32.DLL!CreateProcessW+0x54|0x7ffb5c1d0396 C:\\WINDOWS\\System32\\KERNELBASE.dll!CreateProcessW+0x61|0x7ffb3138592e C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll!Java_java_lang_ProcessImpl_waitForTimeoutInterruptibly+0x3a2|0x7ffb313853b2 C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll!Java_java_lang_ProcessImpl_create+0x10a|0x2638e59e0a5 unbacked!?", callstack.String())
-	assert.Equal(t, "KERNELBASE.dll|KERNEL32.DLL|KERNELBASE.dll|java.dll|unbacked", callstack.Summary())
+	assert.Equal(t, "KERNELBASE.dll|KERNEL32.DLL|KERNELBASE.dll|java.dll|unbacked", callstack.Summary(UserSummary))
+	assert.Equal(t, "ntoskrnl.exe", callstack.Summary(KernelSummary))
 
 	uframe := callstack.FinalUserFrame()
 	require.NotNil(t, uframe)
@@ -118,6 +120,55 @@ func TestCallstackFinalUserFrame(t *testing.T) {
 			require.NotNil(t, f)
 			assert.Equal(t, tt.expectedMod, f.Module)
 			assert.Equal(t, tt.expectedSym, f.Symbol)
+		})
+	}
+}
+
+func TestCallstackSummary(t *testing.T) {
+	var tests = []struct {
+		callstack             Callstack
+		expectedUserSummary   string
+		expectedKernelSummary string
+	}{
+		{callstack: callstackFromFrames(
+			Frame{Addr: 0xf259de, Module: unbacked, Symbol: "?"},
+			Frame{Addr: 0x7ffe4fda6e3b, Module: "C:\\Windows\\System32\\KernelBase.dll", Symbol: "SetThreadContext"},
+			Frame{Addr: 0x7ffe52942b24, Module: "C:\\Windows\\System32\\ntdll.dll", Symbol: "ZwSetContextThread"},
+			Frame{Addr: 0xfffff807e228c555, Module: "C:\\WINDOWS\\system32\\ntoskrnl.exe", Symbol: "setjmpex"},
+			Frame{Addr: 0xfffff807e264805c, Module: "C:\\WINDOWS\\system32\\ntoskrnl.exe", Symbol: "ObOpenObjectByPointerWithTag"}),
+			expectedUserSummary:   "ntdll.dll|KernelBase.dll|unbacked",
+			expectedKernelSummary: "ntoskrnl.exe",
+		},
+		{callstack: callstackFromFrames(
+			Frame{Addr: 0x7ffff0f3bf6c, Module: "C:\\Windows\\System32\\ntdll.dll", Symbol: "RtlUserThreadStart"},
+			Frame{Addr: 0x7ffff03ee8d7, Module: "C:\\Windows\\System32\\ntdll.dll", Symbol: "BaseThreadInitThunk"},
+			Frame{Addr: 0x7ffff0ee5f13, Module: "C:\\Windows\\System32\\ntdll.dll", Symbol: "TpCallbackMayRunLong"},
+			Frame{Addr: 0x7ffff0c78788, Module: "C:\\Windows\\System32\\rpcrt4.dll", Symbol: "RpcGetBufferWithObject"},
+			Frame{Addr: 0x7ffff0c797e3, Module: "C:\\Windows\\System32\\rpcrt4.dll", Symbol: "RpcImpersonateClient"},
+			Frame{Addr: 0x7fffee58d16a, Module: "C:\\Windows\\System32\\KernelBase.dll", Symbol: "CreateProcessInternalW"},
+			Frame{Addr: 0x7ffff0fe1204, Module: "C:\\Windows\\System32\\ntdll.dll", Symbol: "ZwCreateUserProcess"}),
+			expectedUserSummary:   "ntdll.dll|KernelBase.dll|rpcrt4.dll|ntdll.dll",
+			expectedKernelSummary: "",
+		},
+		{callstack: callstackFromFrames(
+			Frame{Addr: 0x7fffa7e3bf6c, Module: "C:\\Windows\\System32\\ntdll.dll", Symbol: "RtlUserThreadStart"},
+			Frame{Addr: 0x7fffa60de8d7, Module: "C:\\Windows\\System32\\ntdll.dll", Symbol: "BaseThreadInitThunk"},
+			Frame{Addr: 0x7ff6163cfc68, Module: "C:\\Program Files\\Mozilla Firefox\\firefox.exe", Symbol: "TargetCreateThread"},
+			Frame{Addr: 0x7fffee58d16a, Module: "C:\\Windows\\System32\\ntdll.dll", Symbol: "ZwMapViewOfSection"},
+			Frame{Addr: 0xfffff8028deeed1d, Module: "C:\\WINDOWS\\system32\\ntoskrnl.exe", Symbol: "NtMapViewOfSection"},
+			Frame{Addr: 0xfffff8328deeed1d, Module: "C:\\WINDOWS\\system32\\drivers\\FLTMGR.SYS", Symbol: "FltCreateFileEx2"},
+			Frame{Addr: 0xfffff8528deeed1d, Module: "C:\\WINDOWS\\system32\\drirvers\\FLTMGR.SYS", Symbol: "FltCreateFileEx"},
+			Frame{Addr: 0xfffff8628deeed1d, Module: "C:\\WINDOWS\\system32\\ntoskrnl.exe", Symbol: "IofCallDriver"},
+			Frame{Addr: 0xfffff8728deeed1d, Module: "C:\\WINDOWS\\system32\\drivers\\fileinfo.sys", Symbol: "?"}),
+			expectedUserSummary:   "ntdll.dll|firefox.exe|ntdll.dll",
+			expectedKernelSummary: "fileinfo.sys|ntoskrnl.exe|FLTMGR.SYS|ntoskrnl.exe",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.expectedUserSummary+"!"+tt.expectedKernelSummary, func(t *testing.T) {
+			assert.Equal(t, tt.expectedUserSummary, tt.callstack.Summary(UserSummary))
+			assert.Equal(t, tt.expectedKernelSummary, tt.callstack.Summary(KernelSummary))
 		})
 	}
 }

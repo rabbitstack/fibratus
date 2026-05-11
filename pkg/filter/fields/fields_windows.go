@@ -213,6 +213,8 @@ const (
 	ThreadAccessStatus Field = "thread.access.status"
 	// ThreadCallstackSummary represents the thread callstack summary field
 	ThreadCallstackSummary Field = "thread.callstack.summary"
+	// ThreadCallstackKernelSummary represents the kernel thread callstack summary field
+	ThreadCallstackKernelSummary Field = "thread.callstack.kernel_summary"
 	// ThreadCallstackDetail represents the thread callstack detail field
 	ThreadCallstackDetail Field = "thread.callstack.detail"
 	// ThreadCallstackModules represents the callstack modules field
@@ -1089,6 +1091,7 @@ var fields = map[Field]FieldInfo{
 	ThreadAccessMaskNames:                          {ThreadAccessMaskNames, "thread desired access rights as a string list", params.Slice, []string{"thread.access.mask.names in ('IMPERSONATE')"}, nil, nil},
 	ThreadAccessStatus:                             {ThreadAccessStatus, "thread access status", params.UnicodeString, []string{"thread.access.status = 'success'"}, nil, nil},
 	ThreadCallstackSummary:                         {ThreadCallstackSummary, "callstack summary", params.UnicodeString, []string{"thread.callstack.summary contains 'ntdll.dll|KERNELBASE.dll'"}, nil, nil},
+	ThreadCallstackKernelSummary:                   {ThreadCallstackKernelSummary, "kernel thread callstack summary", params.UnicodeString, []string{"thread.callstack.kernel_summary contains 'fileinfo.sys|ntoskrnl.exe|FLTMGR.SYS|ntoskrnl.exe'"}, nil, nil},
 	ThreadCallstackDetail:                          {ThreadCallstackDetail, "detailed information of each stack frame", params.UnicodeString, []string{"thread.callstack.detail contains 'KERNELBASE.dll!CreateProcessW'"}, nil, nil},
 	ThreadCallstackModules:                         {ThreadCallstackModules, "list of modules comprising the callstack", params.Slice, []string{"thread.callstack.modules in ('C:\\WINDOWS\\System32\\KERNELBASE.dll')", "base(thread.callstack.modules[7]) = 'ntdll.dll'"}, nil, &Argument{Optional: true, Pattern: "[0-9]+", ValidationFunc: isNumber}},
 	ThreadCallstackSymbols:                         {ThreadCallstackSymbols, "list of symbols comprising the callstack", params.Slice, []string{"thread.callstack.symbols in ('ntdll.dll!NtCreateProcess')", "thread.callstack.symbols[3] = 'ntdll!NtCreateProcess'"}, nil, &Argument{Optional: true, Pattern: "[0-9]+", ValidationFunc: isNumber}},
