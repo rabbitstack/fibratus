@@ -497,7 +497,9 @@ func (ps *PS) RemoveHandle(handle windows.Handle) {
 
 // AddModule adds a new module to this process state.
 func (ps *PS) AddModule(mod Module) {
+	ps.RLock()
 	m := ps.FindModuleByAddr(mod.BaseAddress)
+	ps.RUnlock()
 	if m != nil {
 		return
 	}
@@ -522,9 +524,9 @@ func (ps *PS) RemoveModule(addr va.Address) {
 func (ps *PS) FindModule(path string) *Module {
 	ps.RLock()
 	defer ps.RUnlock()
-	for _, mod := range ps.Modules {
-		if filepath.Base(mod.Name) == filepath.Base(path) {
-			return &mod
+	for i := range ps.Modules {
+		if filepath.Base(ps.Modules[i].Name) == filepath.Base(path) {
+			return &ps.Modules[i]
 		}
 	}
 	return nil
@@ -532,11 +534,9 @@ func (ps *PS) FindModule(path string) *Module {
 
 // FindModuleByAddr finds the module by its base address.
 func (ps *PS) FindModuleByAddr(addr va.Address) *Module {
-	ps.RLock()
-	defer ps.RUnlock()
-	for _, mod := range ps.Modules {
-		if mod.BaseAddress == addr {
-			return &mod
+	for i := range ps.Modules {
+		if ps.Modules[i].BaseAddress == addr {
+			return &ps.Modules[i]
 		}
 	}
 	return nil
@@ -549,7 +549,9 @@ var queryLiveModules = func(pid uint32) []sys.ProcessModule {
 // FindModuleByVa finds the module name by
 // probing the range of the given virtual address.
 func (ps *PS) FindModuleByVa(addr va.Address) *Module {
+	ps.RLock()
 	mod := ps.findModuleByVa(addr)
+	ps.RUnlock()
 	if mod != nil {
 		return mod
 	}
@@ -569,8 +571,7 @@ func (ps *PS) FindModuleByVa(addr va.Address) *Module {
 		if addr < b || addr >= b.Inc(size) {
 			continue
 		}
-
-		mod := Module{
+		mod := &Module{
 			Name:               m.Name,
 			BaseAddress:        b,
 			Size:               size,
@@ -578,22 +579,21 @@ func (ps *PS) FindModuleByVa(addr va.Address) *Module {
 		}
 
 		ps.Lock()
-		ps.Modules = append(ps.Modules, mod)
+		ps.Modules = append(ps.Modules, *mod)
 		ps.Unlock()
 
-		return &mod
+		return mod
 	}
 
 	return nil
 }
 
 func (ps *PS) findModuleByVa(addr va.Address) *Module {
-	ps.RLock()
-	defer ps.RUnlock()
-	for _, mod := range ps.Modules {
-		end := mod.BaseAddress.Inc(mod.Size)
-		if addr >= mod.BaseAddress && addr < end {
-			return &mod
+	for i := range ps.Modules {
+		end := ps.Modules[i].BaseAddress.Inc(ps.Modules[i].Size)
+		if addr >= ps.Modules[i].BaseAddress && addr < end {
+			mod := &ps.Modules[i]
+			return mod
 		}
 	}
 	return nil
