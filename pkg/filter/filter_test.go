@@ -360,7 +360,7 @@ func TestProcFilter(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		matches := f.Run(evt)
+		matches := f.Eval(evt)
 		if matches != tt.matches {
 			t.Errorf("%d. %q ps filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
@@ -381,7 +381,7 @@ func TestProcFilter(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		matches := f.Run(evt1)
+		matches := f.Eval(evt1)
 		if matches != tt.matches {
 			t.Errorf("%d. %q ps filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
@@ -401,7 +401,7 @@ func TestProcFilter(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		matches := f.Run(evt2)
+		matches := f.Eval(evt2)
 		if matches != tt.matches {
 			t.Errorf("%d. %q ps filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
@@ -533,7 +533,7 @@ func TestThreadFilter(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		matches := f.Run(evt)
+		matches := f.Eval(evt)
 		if matches != tt.matches {
 			t.Errorf("%d. %q thread filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
@@ -605,7 +605,7 @@ func TestThreadFilter(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		matches := f.Run(evt)
+		matches := f.Eval(evt)
 		if matches != tt.matches {
 			t.Errorf("%d. %q thread filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
@@ -686,7 +686,7 @@ func TestFileFilter(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		matches := f.Run(evt)
+		matches := f.Eval(evt)
 		if matches != tt.matches {
 			t.Errorf("%d. %q file filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
@@ -772,7 +772,7 @@ func TestFileInfoFilter(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			assert.Equal(t, tt.matches, f.Run(tt.e))
+			assert.Equal(t, tt.matches, f.Eval(tt.e))
 		})
 	}
 }
@@ -848,7 +848,7 @@ func TestEventFilter(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		matches := f.Run(evt)
+		matches := f.Eval(evt)
 		if matches != tt.matches {
 			t.Errorf("%d. %q evt filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
@@ -901,7 +901,7 @@ func TestNetFilter(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		matches := f.Run(evt)
+		matches := f.Eval(evt)
 		if matches != tt.matches {
 			t.Errorf("%d. %q net filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
@@ -938,7 +938,7 @@ func TestNetFilter(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		matches := f.Run(evt1)
+		matches := f.Eval(evt1)
 		if matches != tt.matches {
 			t.Errorf("%d. %q net filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
@@ -980,7 +980,7 @@ func TestRegistryFilter(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		matches := f.Run(evt)
+		matches := f.Eval(evt)
 		if matches != tt.matches {
 			t.Errorf("%d. %q registry filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
@@ -1041,7 +1041,7 @@ func TestModuleFilter(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		matches := f.Run(e1)
+		matches := f.Eval(e1)
 		if matches != tt.matches {
 			t.Errorf("%d. %q module filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
@@ -1101,7 +1101,7 @@ func TestModuleFilter(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		matches := f.Run(e2)
+		matches := f.Eval(e2)
 		if matches != tt.matches {
 			t.Errorf("%d. %q  filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
@@ -1142,7 +1142,7 @@ func TestModuleFilter(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		matches := f.Run(e3)
+		matches := f.Eval(e3)
 		if matches != tt.matches {
 			t.Errorf("%d. %q module filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
@@ -1194,7 +1194,7 @@ func TestPEFilter(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		matches := f.Run(evt)
+		matches := f.Eval(evt)
 		if matches != tt.matches {
 			t.Errorf("%d. %q pe filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
@@ -1242,7 +1242,7 @@ func TestLazyPEFilter(t *testing.T) {
 			t.Fatal(err)
 		}
 		require.Nil(t, evt.PS.PE)
-		matches := f.Run(evt)
+		matches := f.Eval(evt)
 		if matches != tt.matches {
 			t.Errorf("%d. %q pe lazy filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
@@ -1293,7 +1293,7 @@ func TestMemFilter(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		matches := f.Run(evt)
+		matches := f.Eval(evt)
 		if matches != tt.matches {
 			t.Errorf("%d. %q mem filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
@@ -1336,7 +1336,7 @@ func TestDNSFilter(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		matches := f.Run(evt)
+		matches := f.Eval(evt)
 		if matches != tt.matches {
 			t.Errorf("%d. %q dns filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
@@ -1401,7 +1401,7 @@ func TestThreadpoolFilter(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		matches := f.Run(e)
+		matches := f.Eval(e)
 		if matches != tt.matches {
 			t.Errorf("%d. %q threadpool filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
@@ -1562,7 +1562,7 @@ func BenchmarkFilterRun(b *testing.B) {
 	}
 
 	for i := 0; i < b.N; i++ {
-		f.Run(evt)
+		f.Eval(evt)
 	}
 }
 

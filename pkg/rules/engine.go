@@ -21,6 +21,9 @@ package rules
 import (
 	"expvar"
 	"fmt"
+	"sync"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/filter"
@@ -28,8 +31,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/rules/action"
 	log "github.com/sirupsen/logrus"
-	"sync"
-	"time"
 )
 
 // RuleMatchFunc is rule match function definition. It accepts
@@ -121,11 +122,11 @@ func (f *compiledFilter) isSequence() bool {
 	return f.ss != nil
 }
 
-func (f *compiledFilter) run(e *event.Event) bool {
+func (f *compiledFilter) eval(e *event.Event, valuer *filter.ValuerCache) bool {
 	if f.ss != nil {
-		return f.ss.runSequence(e)
+		return f.ss.evalSequence(e, valuer)
 	}
-	return f.filter.Run(e)
+	return f.filter.EvalWithValuer(e, valuer)
 }
 
 // NewEngine builds a fresh rules engine instance.
@@ -235,9 +236,14 @@ func (e *Engine) ProcessEvent(evt *event.Event) (bool, error) {
 
 	filters := e.filters.collect(evt)
 
+	// acquire valuer cache
+	valuer := filter.AcquireValuerCache()
+	defer valuer.Release()
+
+	// assert event against compiled ruleset
 	var matches bool
 	for _, f := range filters {
-		match := f.run(evt)
+		match := f.eval(evt, valuer)
 		if !match {
 			continue
 		}
@@ -274,6 +280,7 @@ func (e *Engine) processActions() error {
 	defer e.clearMatches()
 	e.mmu.Lock()
 	defer e.mmu.Unlock()
+
 	for _, m := range e.matches {
 		f, evts := m.ctx.Filter, m.ctx.Events
 		filterMatches.Add(f.Name, 1)

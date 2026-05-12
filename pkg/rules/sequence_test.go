@@ -37,6 +37,13 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
+func runSequence(ss *sequenceState, e *event.Event) bool {
+	valuer := filter.AcquireValuerCache()
+	defer valuer.Release()
+	matches := ss.evalSequence(e, valuer)
+	return matches
+}
+
 func TestSequenceState(t *testing.T) {
 	log.SetLevel(log.DebugLevel)
 
@@ -264,7 +271,7 @@ func TestSimpleSequence(t *testing.T) {
 	for i, tt := range tests {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			for idx, e := range tt.evts {
-				assert.Equal(t, tt.matches[idx], ss.runSequence(e))
+				assert.Equal(t, tt.matches[idx], runSequence(ss, e))
 			}
 		})
 	}
@@ -318,8 +325,8 @@ func TestSimpleSequenceMultiplePartials(t *testing.T) {
 			},
 			Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 		}
-		require.False(t, ss.runSequence(e1))
-		require.False(t, ss.runSequence(e2))
+		require.False(t, runSequence(ss, e1))
+		require.False(t, runSequence(ss, e2))
 	}
 
 	// expression matched multiple partials
@@ -365,11 +372,11 @@ func TestSimpleSequenceMultiplePartials(t *testing.T) {
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
-	require.False(t, ss.runSequence(e1))
+	require.False(t, runSequence(ss, e1))
 	// expression matched the partial that satisfies the sequence link
 	assert.Len(t, ss.partials[0], 6)
 	assert.Len(t, ss.partials[1], 0)
-	require.True(t, ss.runSequence(e2))
+	require.True(t, runSequence(ss, e2))
 	assert.Len(t, ss.partials[1], 1)
 
 	require.Len(t, ss.matches, 2)
@@ -452,11 +459,11 @@ func TestUnconstrainedSequenceMatches(t *testing.T) {
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
-	require.False(t, ss.runSequence(e1))
-	require.False(t, ss.runSequence(e2))
+	require.False(t, runSequence(ss, e1))
+	require.False(t, runSequence(ss, e2))
 	assert.Len(t, ss.partials[0], 2)
 	assert.Len(t, ss.partials[1], 0)
-	require.True(t, ss.runSequence(e3))
+	require.True(t, runSequence(ss, e3))
 	assert.Len(t, ss.partials[1], 1)
 
 	require.Len(t, ss.matches, 2)
@@ -495,7 +502,8 @@ func TestSimpleSequenceDeadline(t *testing.T) {
 		},
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
-	require.False(t, ss.runSequence(e1))
+
+	require.False(t, runSequence(ss, e1))
 
 	e2 := &event.Event{
 		Type:      event.CreateFile,
@@ -513,8 +521,9 @@ func TestSimpleSequenceDeadline(t *testing.T) {
 		},
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
+
 	time.Sleep(time.Millisecond * 110)
-	require.False(t, ss.runSequence(e2))
+	require.False(t, runSequence(ss, e2))
 
 	require.Equal(t, sequenceInitialState, ss.currentState())
 	assert.Len(t, ss.partials, 0)
@@ -523,17 +532,17 @@ func TestSimpleSequenceDeadline(t *testing.T) {
 	// to the initial state, which means we should
 	// be able to match the sequence if we reinsert
 	// the events
-	require.False(t, ss.runSequence(e1))
-	require.True(t, ss.runSequence(e2))
+	require.False(t, runSequence(ss, e1))
+	require.True(t, runSequence(ss, e2))
 
 	ss.clearLocked()
 	require.Equal(t, sequenceInitialState, ss.currentState())
 	assert.Len(t, ss.partials, 0)
 
 	// assert the events again with the delay less than max span
-	require.False(t, ss.runSequence(e1))
+	require.False(t, runSequence(ss, e1))
 	time.Sleep(time.Millisecond * 85)
-	require.True(t, ss.runSequence(e2))
+	require.True(t, runSequence(ss, e2))
 }
 
 func TestSequenceMultiLinks(t *testing.T) {
@@ -565,7 +574,8 @@ func TestSequenceMultiLinks(t *testing.T) {
 		},
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
-	require.False(t, ss.runSequence(e1))
+
+	require.False(t, runSequence(ss, e1))
 
 	e2 := &event.Event{
 		Type:      event.CreateFile,
@@ -583,7 +593,8 @@ func TestSequenceMultiLinks(t *testing.T) {
 		},
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
-	require.True(t, ss.runSequence(e2))
+
+	require.True(t, runSequence(ss, e2))
 }
 
 func TestComplexSequence(t *testing.T) {
@@ -592,10 +603,10 @@ func TestComplexSequence(t *testing.T) {
 	c := &config.FilterConfig{Name: "Phishing dropper outbound communication"}
 	f := filter.New(`
 	sequence
-  maxspan 1h
-  	|evt.name = 'CreateProcess' and ps.name in ('firefox.exe', 'chrome.exe', 'edge.exe')| by ps.pid
-		|evt.name = 'CreateFile' and file.operation = 'CREATE' and file.extension = '.exe'| by ps.pid
-  	|evt.name in ('Send', 'Connect')| by ps.pid
+	maxspan 1h
+	|evt.name = 'CreateProcess' and ps.name in ('firefox.exe', 'chrome.exe', 'edge.exe')| by ps.pid
+	|evt.name = 'CreateFile' and file.operation = 'CREATE' and file.extension = '.exe'| by ps.pid
+	|evt.name in ('Send', 'Connect')| by ps.pid
 	`, &config.Config{EventSource: config.EventSourceConfig{EnableFileIOEvents: true}, Filters: &config.Filters{}})
 	require.NoError(t, f.Compile())
 
@@ -619,7 +630,8 @@ func TestComplexSequence(t *testing.T) {
 		},
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
-	require.False(t, ss.runSequence(e1))
+
+	require.False(t, runSequence(ss, e1))
 
 	e2 := &event.Event{
 		Seq:       2,
@@ -640,7 +652,8 @@ func TestComplexSequence(t *testing.T) {
 		},
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
-	require.False(t, ss.runSequence(e2))
+
+	require.False(t, runSequence(ss, e2))
 
 	assert.Len(t, ss.partials[0], 1)
 	assert.Len(t, ss.partials[1], 1)
@@ -665,7 +678,7 @@ func TestComplexSequence(t *testing.T) {
 	}
 
 	time.Sleep(time.Millisecond * 30)
-	require.True(t, ss.runSequence(e3))
+	require.True(t, runSequence(ss, e3))
 
 	time.Sleep(time.Millisecond * 50)
 
@@ -674,10 +687,10 @@ func TestComplexSequence(t *testing.T) {
 	// FSM should transition from terminal to initial state
 	require.Equal(t, sequenceInitialState, ss.currentState())
 
-	require.False(t, ss.runSequence(e1))
-	require.False(t, ss.runSequence(e2))
+	require.False(t, runSequence(ss, e1))
+	require.False(t, runSequence(ss, e2))
 	time.Sleep(time.Millisecond * 15)
-	require.True(t, ss.runSequence(e3))
+	require.True(t, runSequence(ss, e3))
 }
 
 func TestSequenceOOO(t *testing.T) {
@@ -686,9 +699,9 @@ func TestSequenceOOO(t *testing.T) {
 	c := &config.FilterConfig{Name: "LSASS memory dumping via legitimate or offensive tools"}
 	f := filter.New(`
 	sequence
-  maxspan 2m
-  	|evt.name = 'OpenProcess' and evt.arg[exe] imatches '?:\\Windows\\System32\\lsass.exe'| by ps.uuid
-		|evt.name = 'CreateFile' and file.operation = 'CREATE' and file.extension = '.dmp'| by ps.uuid
+	maxspan 2m
+	|evt.name = 'OpenProcess' and evt.arg[exe] imatches '?:\\Windows\\System32\\lsass.exe'| by ps.uuid
+	|evt.name = 'CreateFile' and file.operation = 'CREATE' and file.extension = '.dmp'| by ps.uuid
 	`, &config.Config{EventSource: config.EventSourceConfig{EnableFileIOEvents: true}, Filters: &config.Filters{}})
 	require.NoError(t, f.Compile())
 
@@ -711,7 +724,8 @@ func TestSequenceOOO(t *testing.T) {
 		},
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
-	require.False(t, ss.runSequence(e1))
+
+	require.False(t, runSequence(ss, e1))
 	require.Len(t, ss.partials[1], 1)
 	assert.True(t, ss.partials[1][0].ContainsMeta(event.RuleSequenceOOOKey))
 
@@ -733,7 +747,7 @@ func TestSequenceOOO(t *testing.T) {
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
-	require.True(t, ss.runSequence(e2))
+	require.True(t, runSequence(ss, e2))
 	assert.Len(t, ss.partials[0], 1)
 	assert.False(t, ss.partials[1][0].ContainsMeta(event.RuleSequenceOOOKey))
 }
@@ -746,9 +760,9 @@ func TestSequenceGC(t *testing.T) {
 	c := &config.FilterConfig{Name: "LSASS memory dumping via legitimate or offensive tools"}
 	f := filter.New(`
 	sequence
-  by ps.uuid
-  	|evt.name = 'OpenProcess' and evt.arg[exe] imatches '?:\\Windows\\System32\\lsass.exe'|
-		|evt.name = 'CreateFile' and file.operation = 'CREATE' and file.extension = '.dmp'|
+	by ps.uuid
+	|evt.name = 'OpenProcess' and evt.arg[exe] imatches '?:\\Windows\\System32\\lsass.exe'|
+	|evt.name = 'CreateFile' and file.operation = 'CREATE' and file.extension = '.dmp'|
 	`, &config.Config{EventSource: config.EventSourceConfig{EnableFileIOEvents: true}, Filters: &config.Filters{}})
 	require.NoError(t, f.Compile())
 
@@ -772,7 +786,7 @@ func TestSequenceGC(t *testing.T) {
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
-	require.False(t, ss.runSequence(e))
+	require.False(t, runSequence(ss, e))
 	assert.Len(t, ss.partials[0], 1)
 
 	time.Sleep(time.Second)
@@ -910,13 +924,13 @@ func TestSequenceExpire(t *testing.T) {
 				if evt.IsTerminateProcess() {
 					ss.expire(evt)
 				} else {
-					ss.runSequence(evt)
+					runSequence(ss, evt)
 				}
 			}
 
 			require.Equal(t, tt.wants, ss.inExpired.Load())
 			require.Len(t, ss.partials, 0)
-			ss.runSequence(tt.evts[0])
+			runSequence(ss, tt.evts[0])
 			require.False(t, ss.inExpired.Load())
 		})
 	}
@@ -1010,10 +1024,10 @@ func TestSequenceBoundFields(t *testing.T) {
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
 
-	require.False(t, ss.runSequence(e1))
-	require.False(t, ss.runSequence(e2))
-	require.False(t, ss.runSequence(e3))
-	require.True(t, ss.runSequence(e4))
+	require.False(t, runSequence(ss, e1))
+	require.False(t, runSequence(ss, e2))
+	require.False(t, runSequence(ss, e3))
+	require.True(t, runSequence(ss, e4))
 }
 
 func TestSequenceBoundFieldsWithFunctions(t *testing.T) {
@@ -1078,8 +1092,8 @@ func TestSequenceBoundFieldsWithFunctions(t *testing.T) {
 
 	require.NoError(t, key.SetStringsValue("Notification Packages", []string{"secli", "passwdflt"}))
 
-	require.False(t, ss.runSequence(e1))
-	require.True(t, ss.runSequence(e2))
+	require.False(t, runSequence(ss, e1))
+	require.True(t, runSequence(ss, e2))
 }
 
 func TestIsExpressionEvaluable(t *testing.T) {
