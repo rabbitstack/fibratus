@@ -169,7 +169,7 @@ func (r *reader) read(evt *event.Event, eventsc chan *event.Event) {
 	if evt.Type.OnlyState() {
 		return
 	}
-	if r.filter != nil && !r.filter.Run(evt) {
+	if r.filter != nil && !r.filter.Eval(evt) {
 		capDroppedByFilter.Add(1)
 		return
 	}

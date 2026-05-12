@@ -436,7 +436,7 @@ func (s *sequenceState) scheduleMaxSpanDeadline(seqID fsm.State, maxSpan time.Du
 	s.spanDeadlines[seqID] = t
 }
 
-func (s *sequenceState) runSequence(e *event.Event) bool {
+func (s *sequenceState) evalSequence(e *event.Event, v *filter.ValuerCache) bool {
 	for i, expr := range s.seq.Expressions {
 		// only try to evaluate the expression
 		// if upstream expressions have matched
@@ -453,7 +453,7 @@ func (s *sequenceState) runSequence(e *event.Event) bool {
 			// against the current event, mark it as
 			// out-of-order and store in partials list
 			s.mu.RLock()
-			ok := expr.IsEvaluable(e) && s.filter.RunSequence(e, i, s.partials, true)
+			ok := expr.IsEvaluable(e) && s.filter.EvalSequence(e, v, i, s.partials, true)
 			s.mu.RUnlock()
 			if ok {
 				s.addPartial(i, e, true)
@@ -462,9 +462,8 @@ func (s *sequenceState) runSequence(e *event.Event) bool {
 		}
 
 		s.mu.RLock()
-		matches := expr.IsEvaluable(e) && s.filter.RunSequence(e, i, s.partials, false)
+		matches := expr.IsEvaluable(e) && s.filter.EvalSequence(e, v, i, s.partials, false)
 		s.mu.RUnlock()
-
 		if !matches {
 			continue
 		}
@@ -500,10 +499,14 @@ func (s *sequenceState) runSequence(e *event.Event) bool {
 					if evt.PS == nil {
 						_, evt.PS = s.psnap.Find(evt.PID)
 					}
-					matches = s.filter.RunSequence(evt, seqID, s.partials, false)
+
+					v := filter.AcquireValuerCache()
+					defer v.Release()
+					matches = s.filter.EvalSequence(evt, v, seqID, s.partials, false)
 					if !matches {
 						continue
 					}
+
 					// transition the state machine
 					err := s.matchTransition(seqID, evt)
 					if err != nil {

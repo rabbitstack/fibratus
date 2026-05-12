@@ -26,7 +26,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 
 	errs "github.com/rabbitstack/fibratus/pkg/errors"
 	"github.com/rabbitstack/fibratus/pkg/event"
@@ -47,13 +46,21 @@ var (
 type Filter interface {
 	// Compile compiles the filter by parsing the sequence/expression.
 	Compile() error
-	// Run runs a filter with a single expression. The return value decides
-	// if the incoming event has successfully matched the filter expression.
-	Run(evt *event.Event) bool
-	// RunSequence runs a filter with sequence expressions. Sequence rules depend
-	// on the state machine transitions and partial matches to decide whether the
-	// rule is fired.
-	RunSequence(evt *event.Event, seqID int, partials map[int][]*event.Event, rawMatch bool) bool
+	// Eval evaluates the event against filter expression. Returns true if the filter
+	// has matched against the event, or false othwerise. Creates the valuer cache within
+	// the lifetime of the method call.
+	Eval(evt *event.Event) bool
+	// EvalWithValuer evaluates the event against filter. Returns true if the filter
+	// has matched against the event, or false othwerise.
+	// The valuer cache is acquired before the evaluation stage and provides a fast
+	// access to extracted field values.
+	EvalWithValuer(evt *event.Event, valuer *ValuerCache) bool
+	// EvalSequence evalutes the event against sequence expresions. Sequence rules
+	// depend on the state machine transitions and partial matches to decide whether
+	// the rule is fired.
+	// The valuer cache is acquired before the evaluation stage and provides a fast
+	// access to extracted field values.
+	EvalSequence(evt *event.Event, valuer *ValuerCache, seqID int, partials map[int][]*event.Event, rawMatch bool) bool
 	// GetStringFields returns field names mapped to their string values.
 	GetStringFields() map[fields.Field][]string
 	// GetFields returns all fields used in the filter expression.
@@ -243,11 +250,17 @@ func (f *filter) Compile() error {
 	return f.checkBoundRefs()
 }
 
-func (f *filter) Run(e *event.Event) bool {
+func (f *filter) Eval(e *event.Event) bool {
+	valuer := AcquireValuerCache()
+	defer valuer.Release()
+	return f.EvalWithValuer(e, valuer)
+}
+
+func (f *filter) EvalWithValuer(e *event.Event, cache *ValuerCache) bool {
 	if f.expr == nil {
 		return false
 	}
-	return ql.Eval(f.expr, f.mapValuer(e), f.hasFunctions)
+	return ql.Eval(f.expr, f.mapValuer(e, cache), f.hasFunctions)
 }
 
 // evalBoundSequence evaluates the sequence with bound fields
@@ -380,7 +393,7 @@ func (f *filter) evalSequence(
 	return match
 }
 
-func (f *filter) RunSequence(e *event.Event, seqID int, partials map[int][]*event.Event, rawMatch bool) bool {
+func (f *filter) EvalSequence(e *event.Event, valuerCache *ValuerCache, seqID int, partials map[int][]*event.Event, rawMatch bool) bool {
 	if f.seq == nil {
 		return false
 	}
@@ -388,8 +401,7 @@ func (f *filter) RunSequence(e *event.Event, seqID int, partials map[int][]*even
 	if seqID > nseqs-1 {
 		return false
 	}
-	valuer := f.mapValuer(e)
-	defer valuerPool.Put(valuer)
+	valuer := f.mapValuer(e, valuerCache)
 	expr := f.seq.Expressions[seqID]
 
 	if rawMatch {
@@ -482,39 +494,38 @@ func InterpolateFields(s string, evts []*event.Event) string {
 	return r
 }
 
-var valuerPool = sync.Pool{
-	New: func() any {
-		return make(map[string]any)
-	},
+// mapValuer for each field present in the AST, we run the
+// accessors and extract the field values that are supplied
+// to the valuer. The valuer feeds the expression with correct
+// values. If the field value is present in the valuer cache then
+// we directly populate the valuer for the field.
+func (f *filter) mapValuer(evt *event.Event, valuerCache *ValuerCache) map[string]any {
+	for _, field := range f.fields {
+		valuerCache.populateValuer(field, func() any {
+			return f.extractField(field, evt)
+		})
+	}
+	return valuerCache.valuer
 }
 
-// mapValuer for each field present in the AST, we run the
-// accessors and extract the field values that are
-// supplied to the valuer. The valuer feeds the
-// expression with correct values.
-func (f *filter) mapValuer(evt *event.Event) map[string]any {
-	valuer := valuerPool.Get().(map[string]any)
-	for _, field := range f.fields {
-		for _, accessor := range f.accessors {
-			if !accessor.IsFieldAccessible(evt) {
-				continue
+// extractField extracts the field value from the accessor.
+func (f *filter) extractField(field Field, evt *event.Event) any {
+	for _, accessor := range f.accessors {
+		if !accessor.IsFieldAccessible(evt) {
+			continue
+		}
+		v, err := accessor.Get(field, evt)
+		if err != nil {
+			if !errs.IsParamNotFound(err) {
+				accessorErrors.Add(err.Error(), 1)
 			}
-			v, err := accessor.Get(field, evt)
-			if v == nil || err != nil {
-				if v == nil {
-					valuer[field.String()] = defaultAccessorValue(field)
-				}
-				if err != nil && !errs.IsParamNotFound(err) {
-					valuer[field.String()] = defaultAccessorValue(field)
-					accessorErrors.Add(err.Error(), 1)
-				}
-				continue
-			}
-			valuer[field.String()] = v
-			break
+			return defaultAccessorValue(field)
+		}
+		if v != nil {
+			return v
 		}
 	}
-	return valuer
+	return defaultAccessorValue(field)
 }
 
 // addField appends a new field to the filter fields list.

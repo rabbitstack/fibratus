@@ -131,9 +131,11 @@ func (c *Consumer) ProcessEvent(ev *etw.EventRecord) error {
 		eventsExcluded.Add(1)
 		return nil
 	}
-	if c.filter != nil && !evt.IsStackWalk() && !c.filter.Run(evt) {
+
+	if c.filter != nil && !evt.IsStackWalk() && !c.filter.Eval(evt) {
 		return nil
 	}
+
 	// Increment sequence
 	if !evt.IsState() {
 		c.sequencer.Increment()

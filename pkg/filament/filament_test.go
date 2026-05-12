@@ -24,15 +24,16 @@ package filament
 import (
 	"bufio"
 	"bytes"
+	"net"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"net"
-	"strings"
-	"testing"
-	"time"
 )
 
 func init() {
@@ -117,5 +118,5 @@ func TestFilamentFilter(t *testing.T) {
 		Name:   "CreateProcess",
 	}
 
-	require.True(t, filament.Filter().Run(evt))
+	require.True(t, filament.Filter().Eval(evt))
 }
