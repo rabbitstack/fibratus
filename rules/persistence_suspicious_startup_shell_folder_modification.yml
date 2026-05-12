@@ -1,6 +1,6 @@
 name: Suspicious Startup shell folder modification
 id: 7a4082f6-f7e3-49bd-9514-dbc8dd4e68ad
-version: 1.0.4
+version: 1.0.5
 description: |
   Detects when adversaries attempt to modify the default Startup
   folder path to to circumvent runtime rules that hunt for file
@@ -19,7 +19,7 @@ labels:
 condition: >
   modify_registry and
   registry.path imatches startup_shell_folder_registry_keys and
-  not (registry.data imatches startup_locations or
-       registry.data imatches ('%ProgramData%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup'))
+  registry.data not imatches startup_locations and
+  registry.data not imatches ('%ProgramData%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup')
 
 min-engine-version: 3.0.0

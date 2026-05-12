@@ -1,6 +1,6 @@
 name: Potential shellcode execution via ETW logger thread
 id: 3e915273-5ea0-4576-afc9-b018e2d53545
-version: 1.0.2
+version: 1.0.3
 description: |
   Adversaries may employ the undocumented EtwpCreateEtwThread function to execute shellcode 
   within the local process address space.
@@ -22,8 +22,8 @@ condition: >
               (
                 '?:\\WINDOWS\\System32\\ProvTool.exe',
                 '?:\\Windows\\System32\\LogonUI.exe'
-              ) or
-       thread.callstack.symbols imatches ('ntdll.dll!EtwProcessPrivateLoggerRequest', 'sechost.dll!ControlTrace*'))
+              )) and
+  not (thread.callstack.symbols imatches ('ntdll.dll!EtwProcessPrivateLoggerRequest', 'sechost.dll!ControlTrace*'))
 
 output: >
   Potential shellcode execution via EtwpCreateEtwThread API initiated by process %ps.exe
