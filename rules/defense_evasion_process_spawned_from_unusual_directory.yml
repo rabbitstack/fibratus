@@ -1,6 +1,6 @@
 name: Process spawned from unusual directory
 id: eb51aad3-f2ce-4f5a-b8f1-4cfb8d0d141e
-version: 1.0.0
+version: 1.0.1
 description: |
   Detects executions of common utilities or build tools when those binaries
   are launched from suspicious default Windows directories. Attackers often
@@ -96,13 +96,10 @@ condition: >
             '?:\\Windows\\SKB\\*',
             '?:\\Users\\*\\AppData\\Local\\Microsoft\\Windows\\INetCache\\IE\\*'
           ) and
-    not
-      (
-        (ps.name = 'rundll32.exe' and ps.parent.name = 'svchost.exe' and ps.parent.args iin ('LocalServiceNoNetworkFirewall')) or
-        (ps.name = 'regsvr32.exe' and ps.args imatches ('?:\\Windows\\servicing\\LCU\\Package_for_RollupFix~*')) or
-        (ps.parent.exe imatches '?:\\Windows\\system32\\CompatTelRunner.exe' and ps.parent.args imatches ('*-m:appraiser.dll')) or
-        (ps.exe imatches ('?:\\Program Files\\*\\msbuild.exe', '?:\\Program Files (x86)\\*\\msbuild.exe'))
-      )
+    not (ps.name = 'rundll32.exe' and ps.parent.name = 'svchost.exe' and ps.parent.args iin ('LocalServiceNoNetworkFirewall')) and
+    not (ps.name = 'regsvr32.exe' and ps.args imatches ('?:\\Windows\\servicing\\LCU\\Package_for_RollupFix~*')) and
+    not (ps.parent.exe imatches '?:\\Windows\\system32\\CompatTelRunner.exe' and ps.parent.args imatches ('*-m:appraiser.dll')) and
+    not (ps.exe imatches ('?:\\Program Files\\*\\msbuild.exe', '?:\\Program Files (x86)\\*\\msbuild.exe'))
 action:
   - name: kill
 

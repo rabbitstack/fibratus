@@ -1,6 +1,6 @@
 name: Thread context set from unbacked memory
 id: f8219274-ee68-416b-8489-4d2e635c7844
-version: 1.0.6
+version: 1.0.7
 description: |
   Identifies manipulation of the thread context from unbacked memory region. This may be
   indicative of process injection.
@@ -22,6 +22,6 @@ condition: >
               '?:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
               '?:\\Windows\\System32\\taskhostw.exe'
             ) and
-  (ps.exe not imatches '?:\\Program Files\\Go\\bin\\go.exe' and ps.cmdline not imatches 'go mod tidy -modfile=*.mod')
+  not (ps.exe imatches '?:\\Program Files\\Go\\bin\\go.exe' and ps.cmdline imatches 'go mod tidy -modfile=*.mod')
 
 min-engine-version: 3.0.0
