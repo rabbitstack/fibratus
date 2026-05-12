@@ -406,6 +406,16 @@ func (pars Params) GetUint16(name string) (uint16, error) {
 	return v, nil
 }
 
+// MustGetUint8 returns  the underlying uint8 value parameter. It panics if
+// an error occurs while trying to get the parameter.
+func (pars Params) MustGetUint8(name string) uint8 {
+	v, err := pars.GetUint8(name)
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
+
 // MustGetUint16 returns  the underlying uint16 value parameter. It panics if
 // an error occurs while trying to get the parameter.
 func (pars Params) MustGetUint16(name string) uint16 {

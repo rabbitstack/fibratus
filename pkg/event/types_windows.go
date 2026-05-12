@@ -31,7 +31,7 @@ import (
 type Source uint8
 
 const (
-	// SystemLogger event is emitted by the system provider
+	// SystemLogger event is emitted by the system provider.
 	SystemLogger Source = iota
 	// SecurityTelemetryLogger event is emitted by the combination of multiple providers.
 	// Most notably, DNS, thread pool, and kernel audit API providers are in charge of
@@ -65,174 +65,257 @@ var (
 	AuditAPIEventGUID = windows.GUID{Data1: 0xe02a841c, Data2: 0x75a3, Data3: 0x4fa7, Data4: [8]byte{0xaf, 0xc8, 0xae, 0x09, 0xcf, 0x9b, 0x7f, 0x23}}
 	// DNSEventGUID represents DNS provider event GUID
 	DNSEventGUID = windows.GUID{Data1: 0x1c95126e, Data2: 0x7eea, Data3: 0x49a9, Data4: [8]byte{0xa3, 0xfe, 0xa3, 0x78, 0xb0, 0x3d, 0xdb, 0x4d}}
-	// ThreadpoolGUID represents the thread pool event GUID
-	ThreadpoolGUID = windows.GUID{Data1: 0xc861d0e2, Data2: 0xa2c1, Data3: 0x4d36, Data4: [8]byte{0x9f, 0x9c, 0x97, 0x0b, 0xab, 0x94, 0x3a, 0x12}}
+	// ThreadpoolEventGUID represents the thread pool event GUID
+	ThreadpoolEventGUID = windows.GUID{Data1: 0xc861d0e2, Data2: 0xa2c1, Data3: 0x4d36, Data4: [8]byte{0x9f, 0x9c, 0x97, 0x0b, 0xab, 0x94, 0x3a, 0x12}}
 	// ProcessKernelEventGUID represents the Process Kernel event GUID
 	ProcessKernelEventGUID = windows.GUID{Data1: 0x22fb2cd6, Data2: 0x0e7b, Data3: 0x422b, Data4: [8]byte{0xa0, 0xc7, 0x2f, 0xad, 0x1f, 0xd0, 0xe7, 0x16}}
 	// RegistryKernelEventGUID represents the Registry Kernel event GUID
 	RegistryKernelEventGUID = windows.GUID{Data1: 0x70eb4f03, Data2: 0xc1de, Data3: 0x4f73, Data4: [8]byte{0xa0, 0x51, 0x33, 0xd1, 0x3d, 0x54, 0x13, 0xbd}}
+	// StackWalkEventGUID represents the StackWalk event GUID
+	StackWalkEventGUID = windows.GUID{Data1: 0xdef2fe46, Data2: 0x7bd6, Data3: 0x4b80, Data4: [8]byte{0xbd, 0x94, 0xf5, 0x7f, 0xe2, 0x0d, 0x0c, 0xe3}}
+)
+
+const (
+	CreateProcessID          uint8  = 1
+	CreateProcessInternalID  uint16 = 1
+	TerminateProcessID       uint8  = 2
+	ProcessRundownID         uint8  = 3
+	OpenProcessID            uint16 = 5
+	ProcessRundownInternalID uint16 = 15
+
+	CreateThreadID     uint8  = 1
+	TerminateThreadID  uint8  = 2
+	ThreadRundownID    uint8  = 3
+	SetThreadContextID uint16 = 4
+	OpenThreadID       uint16 = 6
+
+	UnloadModuleID       uint8  = 2
+	ModuleRundownID      uint8  = 3
+	LoadModuleInternalID uint16 = 5
+	LoadModuleID         uint8  = 10
+
+	FileRundownID        uint8 = 36
+	MapViewFileID        uint8 = 37
+	UnmapViewFileID      uint8 = 38
+	MapFileRundownID     uint8 = 39
+	CreateFileID         uint8 = 64
+	ReleaseFileID        uint8 = 65
+	CloseFileID          uint8 = 66
+	ReadFileID           uint8 = 67
+	WriteFileID          uint8 = 68
+	SetFileInformationID uint8 = 69
+	DeleteFileID         uint8 = 70
+	RenameFileID         uint8 = 71
+	EnumDirectoryID      uint8 = 72
+	FileOpEndID          uint8 = 76
+
+	RegCreateKeyID        uint8  = 10
+	RegOpenKeyID          uint8  = 11
+	RegDeleteKeyID        uint8  = 12
+	RegQueryKeyID         uint8  = 13
+	RegSetValueID         uint8  = 14
+	RegDeleteValueID      uint8  = 15
+	RegQueryValueID       uint8  = 16
+	RegCreateKCBID        uint8  = 22
+	RegDeleteKCBID        uint8  = 23
+	RegKCBRundownID       uint8  = 25
+	RegCloseKeyID         uint8  = 27
+	RegSetValueInternalID uint16 = 36
+
+	AcceptTCPv4ID     uint8 = 15
+	AcceptTCPv6ID     uint8 = 31
+	SendV4ID          uint8 = 10
+	SendV6ID          uint8 = 26
+	RecvV4ID          uint8 = 11
+	RecvV6ID          uint8 = 27
+	ConnectTCPv4ID    uint8 = 12
+	ConnectTCPv6ID    uint8 = 28
+	DisconnectTCPv4ID uint8 = 13
+	DisconnectTCPv6ID uint8 = 29
+	ReconnectTCPv4ID  uint8 = 16
+	ReconnectTCPv6ID  uint8 = 32
+	RetransmitTCPv4ID uint8 = 14
+	RetransmitTCPv6ID uint8 = 30
+
+	VirtualAllocID uint8 = 98
+	VirtualFreeID  uint8 = 99
+
+	CreateHandleID    uint8 = 32
+	CloseHandleID     uint8 = 33
+	DuplicateHandleID uint8 = 34
+
+	QueryDNSID uint16 = 3006
+	ReplyDNSID uint16 = 3008
+
+	CreateSymbolicLinkObjectID uint16 = 3
+
+	StackWalkID uint8 = 32
+
+	SubmitThreadpoolWorkID     uint8 = 32
+	SubmitThreadpoolCallbackID uint8 = 34
+	SetThreadpoolTimerID       uint8 = 44
 )
 
 var (
 	// CreateProcess identifies process creation kernel events
-	CreateProcess = pack(ProcessEventGUID, 1)
+	CreateProcess = pack(ProcessEventGUID, uint16(CreateProcessID))
 	// TerminateProcess identifies process termination kernel events
-	TerminateProcess = pack(ProcessEventGUID, 2)
+	TerminateProcess = pack(ProcessEventGUID, uint16(TerminateProcessID))
 	// ProcessRundown represents the start data collection process event that enumerates processes that are currently running at the time the kernel session starts
-	ProcessRundown = pack(ProcessEventGUID, 3)
+	ProcessRundown = pack(ProcessEventGUID, uint16(ProcessRundownID))
 	// OpenProcess identifies the kernel events that are triggered when the process handle is acquired
-	OpenProcess = pack(AuditAPIEventGUID, 5)
+	OpenProcess = pack(AuditAPIEventGUID, OpenProcessID)
 	// CreateProcessInternal identifies the process creation event emitted by the Microsoft Windows Kernel Process provider.
 	// The only purpose of this event is to enrich the process state with some extra attributes, and populates the snapshotter
 	// for events running in the Security Telemetry session that might miss process lookups because the core NT Kernel Provider
 	// hasn't still published the CreateProcess or ProcessRundown event
-	CreateProcessInternal = pack(ProcessKernelEventGUID, 1)
+	CreateProcessInternal = pack(ProcessKernelEventGUID, CreateProcessInternalID)
 	// ProcessRundownInternal same as above but for process rundown events originating from the Microsoft Windows Kernel Process provider.
-	ProcessRundownInternal = pack(ProcessKernelEventGUID, 15)
+	ProcessRundownInternal = pack(ProcessKernelEventGUID, ProcessRundownInternalID)
 
 	// CreateThread identifies thread creation kernel events
-	CreateThread = pack(ThreadEventGUID, 1)
+	CreateThread = pack(ThreadEventGUID, uint16(CreateThreadID))
 	// TerminateThread identifies thread termination kernel events
-	TerminateThread = pack(ThreadEventGUID, 2)
+	TerminateThread = pack(ThreadEventGUID, uint16(TerminateThreadID))
 	// ThreadRundown represents the start data collection thread event that enumerates threads that are currently running at the time the kernel session starts
-	ThreadRundown = pack(ThreadEventGUID, 3)
+	ThreadRundown = pack(ThreadEventGUID, uint16(ThreadRundownID))
 	// OpenThread identifies the kernel events that are triggered when the process acquires a thread handle
-	OpenThread = pack(AuditAPIEventGUID, 6)
+	OpenThread = pack(AuditAPIEventGUID, OpenThreadID)
 	// SetThreadContext identifies the kernel event that is fired when the thread context is changed
-	SetThreadContext = pack(AuditAPIEventGUID, 4)
+	SetThreadContext = pack(AuditAPIEventGUID, SetThreadContextID)
 
 	// MapViewFile represents events that map a view of a file mapping into the address space of a calling process
-	MapViewFile = pack(FileEventGUID, 37)
+	MapViewFile = pack(FileEventGUID, uint16(MapViewFileID))
 	// UnmapViewFile represents events that unmap a view of a file mapping from the address space of a calling process
-	UnmapViewFile = pack(FileEventGUID, 38)
+	UnmapViewFile = pack(FileEventGUID, uint16(UnmapViewFileID))
 	// MapFileRundown represents the event that is emitted at the start of the tracing session to enumerate I/O mapped files
-	MapFileRundown = pack(FileEventGUID, 39)
+	MapFileRundown = pack(FileEventGUID, uint16(MapFileRundownID))
 
 	// FileRundown events are generated by kernel rundown logger to enumerate all open files on the start of the kernel session
-	FileRundown = pack(FileEventGUID, 36)
+	FileRundown = pack(FileEventGUID, uint16(FileRundownID))
 	// CreateFile represents events that create/open a file or I/O device
-	CreateFile = pack(FileEventGUID, 64)
+	CreateFile = pack(FileEventGUID, uint16(CreateFileID))
 	// ReleaseFile represents events that occur when the last file handle is disposed
-	ReleaseFile = pack(FileEventGUID, 65)
+	ReleaseFile = pack(FileEventGUID, uint16(ReleaseFileID))
 	// CloseFile represents events that dispose existing kernel file objects
-	CloseFile = pack(FileEventGUID, 66)
+	CloseFile = pack(FileEventGUID, uint16(CloseFileID))
 	// ReadFile represents events that read data from the file or I/O device
-	ReadFile = pack(FileEventGUID, 67)
+	ReadFile = pack(FileEventGUID, uint16(ReadFileID))
 	// WriteFile represents events that write data to the file or I/O device
-	WriteFile = pack(FileEventGUID, 68)
+	WriteFile = pack(FileEventGUID, uint16(WriteFileID))
 	// SetFileInformation represents events that set file information
-	SetFileInformation = pack(FileEventGUID, 69)
+	SetFileInformation = pack(FileEventGUID, uint16(SetFileInformationID))
 	// DeleteFile identifies file deletion events
-	DeleteFile = pack(FileEventGUID, 70)
+	DeleteFile = pack(FileEventGUID, uint16(DeleteFileID))
 	// RenameFile identifies events that are responsible for renaming files
-	RenameFile = pack(FileEventGUID, 71)
+	RenameFile = pack(FileEventGUID, uint16(RenameFileID))
 	// EnumDirectory identifies enumerate directory and directory notification events
-	EnumDirectory = pack(FileEventGUID, 72)
+	EnumDirectory = pack(FileEventGUID, uint16(EnumDirectoryID))
 	// FileOpEnd signals the finalization of the file operation
-	FileOpEnd = pack(FileEventGUID, 76)
+	FileOpEnd = pack(FileEventGUID, uint16(FileOpEndID))
 
 	// RegCreateKey represents registry key creation kernel events
-	RegCreateKey = pack(RegistryEventGUID, 10)
+	RegCreateKey = pack(RegistryEventGUID, uint16(RegCreateKeyID))
 	// RegOpenKey represents registry open key kernel events
-	RegOpenKey = pack(RegistryEventGUID, 11)
+	RegOpenKey = pack(RegistryEventGUID, uint16(RegOpenKeyID))
 	// RegCloseKey represents registry close key kernel event.
-	RegCloseKey = pack(RegistryEventGUID, 27)
+	RegCloseKey = pack(RegistryEventGUID, uint16(RegCloseKeyID))
 	// RegDeleteKey represents registry key deletion kernel events
-	RegDeleteKey = pack(RegistryEventGUID, 12)
+	RegDeleteKey = pack(RegistryEventGUID, uint16(RegDeleteKeyID))
 	// RegQueryKey represents registry query key kernel events
-	RegQueryKey = pack(RegistryEventGUID, 13)
+	RegQueryKey = pack(RegistryEventGUID, uint16(RegQueryKeyID))
 	// RegSetValue represents registry set value kernel events
-	RegSetValue = pack(RegistryEventGUID, 14)
+	RegSetValue = pack(RegistryEventGUID, uint16(RegSetValueID))
 	// RegDeleteValue are kernel events for registry value removals
-	RegDeleteValue = pack(RegistryEventGUID, 15)
+	RegDeleteValue = pack(RegistryEventGUID, uint16(RegDeleteValueID))
 	// RegQueryValue are kernel events for registry value queries
-	RegQueryValue = pack(RegistryEventGUID, 16)
+	RegQueryValue = pack(RegistryEventGUID, uint16(RegQueryValueID))
 	// RegCreateKCB represents kernel events for KCB (Key Control Block) creation requests
-	RegCreateKCB = pack(RegistryEventGUID, 22)
+	RegCreateKCB = pack(RegistryEventGUID, uint16(RegCreateKCBID))
 	// RegDeleteKCB represents kernel events for KCB(Key Control Block) closures
-	RegDeleteKCB = pack(RegistryEventGUID, 23)
+	RegDeleteKCB = pack(RegistryEventGUID, uint16(RegDeleteKCBID))
 	// RegKCBRundown enumerates the registry keys open at the start of the kernel session.
-	RegKCBRundown = pack(RegistryEventGUID, 25)
+	RegKCBRundown = pack(RegistryEventGUID, uint16(RegKCBRundownID))
 	// RegSetValueInternal is the internal event that is used to
 	// enrich the corresponding public RegSetValue event with
 	// extra attributes
-	RegSetValueInternal = pack(RegistryKernelEventGUID, 36)
+	RegSetValueInternal = pack(RegistryKernelEventGUID, RegSetValueInternalID)
 
 	// UnloadModule represents unload module kernel events
-	UnloadModule = pack(ModuleEventGUID, 2)
+	UnloadModule = pack(ModuleEventGUID, uint16(UnloadModuleID))
 	// ModuleRundown represents kernel events that is triggered to enumerate all loaded modules
-	ModuleRundown = pack(ModuleEventGUID, 3)
+	ModuleRundown = pack(ModuleEventGUID, uint16(ModuleRundownID))
 	// LoadModule represents module load kernel events that are triggered when a DLL or executable file is loaded
-	LoadModule = pack(ModuleEventGUID, 10)
+	LoadModule = pack(ModuleEventGUID, uint16(LoadModuleID))
 	// LoadModuleInternal same as for process internal event originating from the Microsoft Windows Kernel Process provider
-	LoadModuleInternal = pack(ProcessKernelEventGUID, 5)
+	LoadModuleInternal = pack(ProcessKernelEventGUID, LoadModuleInternalID)
 
 	// AcceptTCPv4 represents the TCPv4 kernel events for accepting connection requests from the socket queue.
-	AcceptTCPv4 = pack(NetworkTCPEventGUID, 15)
+	AcceptTCPv4 = pack(NetworkTCPEventGUID, uint16(AcceptTCPv4ID))
 	// AcceptTCPv6 represents the TCPv6 kernel events for accepting connection requests from the socket queue.
-	AcceptTCPv6 = pack(NetworkTCPEventGUID, 31)
+	AcceptTCPv6 = pack(NetworkTCPEventGUID, uint16(AcceptTCPv6ID))
 	// SendTCPv4 represents the TCPv4 kernel events for sending data to the connected socket.
-	SendTCPv4 = pack(NetworkTCPEventGUID, 10)
+	SendTCPv4 = pack(NetworkTCPEventGUID, uint16(SendV4ID))
 	// SendTCPv6 represents the TCPv6 kernel events for sending data to the connected socket.
-	SendTCPv6 = pack(NetworkTCPEventGUID, 26)
+	SendTCPv6 = pack(NetworkTCPEventGUID, uint16(SendV6ID))
 	// SendUDPv4 represents the UDPv4 kernel events for sending datagrams to connectionless sockets.
-	SendUDPv4 = pack(NetworkUDPEventGUID, 10)
+	SendUDPv4 = pack(NetworkUDPEventGUID, uint16(SendV4ID))
 	// SendUDPv6 represents the UDPv6 kernel events for sending datagrams to connectionless sockets.
-	SendUDPv6 = pack(NetworkUDPEventGUID, 26)
+	SendUDPv6 = pack(NetworkUDPEventGUID, uint16(SendV6ID))
 	// RecvTCPv4 represents the TCP IPv4 network receive event.
-	RecvTCPv4 = pack(NetworkTCPEventGUID, 11)
+	RecvTCPv4 = pack(NetworkTCPEventGUID, uint16(RecvV4ID))
 	// RecvTCPv6 represents the TCP IPv6 network receive event.
-	RecvTCPv6 = pack(NetworkTCPEventGUID, 27)
+	RecvTCPv6 = pack(NetworkTCPEventGUID, uint16(RecvV6ID))
 	// RecvUDPv4 represents the UDP IPv4 network receive event.
-	RecvUDPv4 = pack(NetworkUDPEventGUID, 11)
+	RecvUDPv4 = pack(NetworkUDPEventGUID, uint16(RecvV4ID))
 	// RecvUDPv6 represents the UDP IPv6 network receive event.
-	RecvUDPv6 = pack(NetworkUDPEventGUID, 27)
+	RecvUDPv6 = pack(NetworkUDPEventGUID, uint16(RecvV6ID))
 	// ConnectTCPv4 represents the TCP IPv4 network connect event.
-	ConnectTCPv4 = pack(NetworkTCPEventGUID, 12)
+	ConnectTCPv4 = pack(NetworkTCPEventGUID, uint16(ConnectTCPv4ID))
 	// ConnectTCPv6 represents the TCP IPv6 network connect event.
-	ConnectTCPv6 = pack(NetworkTCPEventGUID, 28)
+	ConnectTCPv6 = pack(NetworkTCPEventGUID, uint16(ConnectTCPv6ID))
 	// DisconnectTCPv4 is the TCP IPv4 network disconnect event.
-	DisconnectTCPv4 = pack(NetworkTCPEventGUID, 13)
+	DisconnectTCPv4 = pack(NetworkTCPEventGUID, uint16(DisconnectTCPv4ID))
 	// DisconnectTCPv6 is the TCP IPv6 network disconnect event.
-	DisconnectTCPv6 = pack(NetworkTCPEventGUID, 29)
+	DisconnectTCPv6 = pack(NetworkTCPEventGUID, uint16(DisconnectTCPv6ID))
 	// ReconnectTCPv4 is the TCP IPv4 network reconnect event.
-	ReconnectTCPv4 = pack(NetworkTCPEventGUID, 16)
+	ReconnectTCPv4 = pack(NetworkTCPEventGUID, uint16(ReconnectTCPv4ID))
 	// ReconnectTCPv6 is the TCP IPv6 network reconnect event.
-	ReconnectTCPv6 = pack(NetworkTCPEventGUID, 32)
+	ReconnectTCPv6 = pack(NetworkTCPEventGUID, uint16(ReconnectTCPv6ID))
 	// RetransmitTCPv4 is the TCP IPv4 network retransmit event.
-	RetransmitTCPv4 = pack(NetworkTCPEventGUID, 14)
+	RetransmitTCPv4 = pack(NetworkTCPEventGUID, uint16(RetransmitTCPv4ID))
 	// RetransmitTCPv6 is the TCP IPv6 network retransmit event.
-	RetransmitTCPv6 = pack(NetworkTCPEventGUID, 30)
+	RetransmitTCPv6 = pack(NetworkTCPEventGUID, uint16(RetransmitTCPv6ID))
 
 	// CreateHandle represents handle creation event
-	CreateHandle = pack(HandleEventGUID, 32)
+	CreateHandle = pack(HandleEventGUID, uint16(CreateHandleID))
 	// CloseHandle represents handle closure event
-	CloseHandle = pack(HandleEventGUID, 33)
+	CloseHandle = pack(HandleEventGUID, uint16(CloseHandleID))
 	// DuplicateHandle represents handle duplication event
-	DuplicateHandle = pack(HandleEventGUID, 34)
+	DuplicateHandle = pack(HandleEventGUID, uint16(DuplicateHandleID))
 
 	// VirtualAlloc represents virtual memory allocation event
-	VirtualAlloc = pack(MemEventGUID, 98)
+	VirtualAlloc = pack(MemEventGUID, uint16(VirtualAllocID))
 	// VirtualFree represents virtual memory release event
-	VirtualFree = pack(MemEventGUID, 99)
+	VirtualFree = pack(MemEventGUID, uint16(VirtualFreeID))
 
 	// QueryDNS represents DNS query events
-	QueryDNS = pack(DNSEventGUID, 3006)
+	QueryDNS = pack(DNSEventGUID, QueryDNSID)
 	// ReplyDNS represents the DNS response events
-	ReplyDNS = pack(DNSEventGUID, 3008)
+	ReplyDNS = pack(DNSEventGUID, ReplyDNSID)
 
 	// StackWalk represents stack walk event with the collection of return addresses
-	StackWalk = pack(windows.GUID{Data1: 0xdef2fe46, Data2: 0x7bd6, Data3: 0x4b80, Data4: [8]byte{0xbd, 0x94, 0xf5, 0x7f, 0xe2, 0x0d, 0x0c, 0xe3}}, 32)
+	StackWalk = pack(StackWalkEventGUID, uint16(StackWalkID))
 
 	// CreateSymbolicLinkObject represents the event emitted by the object manager when the new symbolic link is created within the object manager directory
-	CreateSymbolicLinkObject = pack(AuditAPIEventGUID, 3)
+	CreateSymbolicLinkObject = pack(AuditAPIEventGUID, CreateSymbolicLinkObjectID)
 
 	// SubmitThreadpoolWork represents the event that enqueues the work item to the thread pool
-	SubmitThreadpoolWork = pack(ThreadpoolGUID, 32)
+	SubmitThreadpoolWork = pack(ThreadpoolEventGUID, uint16(SubmitThreadpoolWorkID))
 	//SubmitThreadpoolCallback represents the event that submits the thread pool callback for execution within the work item
-	SubmitThreadpoolCallback = pack(ThreadpoolGUID, 34)
+	SubmitThreadpoolCallback = pack(ThreadpoolEventGUID, uint16(SubmitThreadpoolCallbackID))
 	// SetThreadpoolTimer represents the event that sets the thread pool timer object
-	SetThreadpoolTimer = pack(ThreadpoolGUID, 44)
+	SetThreadpoolTimer = pack(ThreadpoolEventGUID, uint16(SetThreadpoolTimerID))
 
 	// UnknownType designates unknown event type
 	UnknownType = pack(windows.GUID{}, 0)
@@ -609,7 +692,7 @@ func (t Type) ID() uint {
 // Source designates the provenance of this event type.
 func (t Type) Source() Source {
 	switch t.GUID() {
-	case AuditAPIEventGUID, DNSEventGUID, ThreadpoolGUID, ProcessKernelEventGUID, RegistryKernelEventGUID:
+	case AuditAPIEventGUID, DNSEventGUID, ThreadpoolEventGUID, ProcessKernelEventGUID, RegistryKernelEventGUID:
 		return SecurityTelemetryLogger
 	default:
 		return SystemLogger
