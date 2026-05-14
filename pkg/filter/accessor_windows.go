@@ -691,7 +691,7 @@ func (l *fileAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 		return e.Params.GetUint64(params.FileOffset)
 	case fields.FileIOSize:
 		return e.Params.GetUint32(params.FileIoSize)
-	case fields.FileShareMask:
+	case fields.FileShareMode, fields.FileShareMask:
 		return e.GetParamAsString(params.FileShareMask), nil
 	case fields.FileOperation:
 		return e.GetParamAsString(params.FileOperation), nil
