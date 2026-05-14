@@ -958,7 +958,7 @@ func TestRegistryFilter(t *testing.T) {
 			params.RegData:      {Name: params.RegData, Type: params.Uint32, Value: uint32(10234)},
 			params.RegValueType: {Name: params.RegValueType, Type: params.AnsiString, Value: "DWORD"},
 			params.NTStatus:     {Name: params.NTStatus, Type: params.AnsiString, Value: "success"},
-			params.RegKeyHandle: {Name: params.RegKeyHandle, Type: params.Address, Value: uint64(18446666033449935464)},
+			params.RegKCB:       {Name: params.RegKCB, Type: params.Address, Value: uint64(18446666033449935464)},
 		},
 	}
 

@@ -50,8 +50,8 @@ func TestRegistryProcessor(t *testing.T) {
 				Type:     event.RegKCBRundown,
 				Category: event.Registry,
 				Params: event.Params{
-					params.RegPath:      {Name: params.RegPath, Type: params.UnicodeString, Value: `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\bthserv\Parameters`},
-					params.RegKeyHandle: {Name: params.RegKeyHandle, Type: params.Uint64, Value: uint64(18446666033549154696)},
+					params.RegPath: {Name: params.RegPath, Type: params.UnicodeString, Value: `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\bthserv\Parameters`},
+					params.RegKCB:  {Name: params.RegKCB, Type: params.Uint64, Value: uint64(18446666033549154696)},
 				},
 			},
 			nil,
@@ -71,8 +71,8 @@ func TestRegistryProcessor(t *testing.T) {
 				Type:     event.RegDeleteKCB,
 				Category: event.Registry,
 				Params: event.Params{
-					params.RegPath:      {Name: params.RegPath, Type: params.UnicodeString, Value: `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\bthserv\Parameters`},
-					params.RegKeyHandle: {Name: params.RegKeyHandle, Type: params.Uint64, Value: uint64(18446666033549154696)},
+					params.RegPath: {Name: params.RegPath, Type: params.UnicodeString, Value: `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\bthserv\Parameters`},
+					params.RegKCB:  {Name: params.RegKCB, Type: params.Uint64, Value: uint64(18446666033549154696)},
 				},
 			},
 			func(p Processor) {
@@ -93,8 +93,8 @@ func TestRegistryProcessor(t *testing.T) {
 				Type:     event.RegOpenKey,
 				Category: event.Registry,
 				Params: event.Params{
-					params.RegPath:      {Name: params.RegPath, Type: params.Key, Value: `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\bthserv\Parameters`},
-					params.RegKeyHandle: {Name: params.RegKeyHandle, Type: params.Uint64, Value: uint64(0)},
+					params.RegPath: {Name: params.RegPath, Type: params.Key, Value: `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\bthserv\Parameters`},
+					params.RegKCB:  {Name: params.RegKCB, Type: params.Uint64, Value: uint64(0)},
 				},
 			},
 			nil,
@@ -112,8 +112,8 @@ func TestRegistryProcessor(t *testing.T) {
 				Type:     event.RegOpenKey,
 				Category: event.Registry,
 				Params: event.Params{
-					params.RegPath:      {Name: params.RegPath, Type: params.Key, Value: `Pid`},
-					params.RegKeyHandle: {Name: params.RegKeyHandle, Type: params.Uint64, Value: uint64(18446666033549154696)},
+					params.RegPath: {Name: params.RegPath, Type: params.Key, Value: `Pid`},
+					params.RegKCB:  {Name: params.RegKCB, Type: params.Uint64, Value: uint64(18446666033549154696)},
 				},
 			},
 			func(p Processor) {
@@ -134,8 +134,8 @@ func TestRegistryProcessor(t *testing.T) {
 				Category: event.Registry,
 				PID:      23234,
 				Params: event.Params{
-					params.RegPath:      {Name: params.RegPath, Type: params.Key, Value: `Pid`},
-					params.RegKeyHandle: {Name: params.RegKeyHandle, Type: params.Uint64, Value: uint64(18446666033549154696)},
+					params.RegPath: {Name: params.RegPath, Type: params.Key, Value: `Pid`},
+					params.RegKCB:  {Name: params.RegKCB, Type: params.Uint64, Value: uint64(18446666033549154696)},
 				},
 			},
 			nil,
@@ -157,8 +157,8 @@ func TestRegistryProcessor(t *testing.T) {
 				Category: event.Registry,
 				PID:      23234,
 				Params: event.Params{
-					params.RegPath:      {Name: params.RegPath, Type: params.Key, Value: `\REGISTRY\MACHINE\SYSTEM\CurrentControlSet\Control\Windows\Directory`},
-					params.RegKeyHandle: {Name: params.RegKeyHandle, Type: params.Uint64, Value: uint64(0)},
+					params.RegPath: {Name: params.RegPath, Type: params.Key, Value: `\REGISTRY\MACHINE\SYSTEM\CurrentControlSet\Control\Windows\Directory`},
+					params.RegKCB:  {Name: params.RegKCB, Type: params.Uint64, Value: uint64(0)},
 				},
 			},
 			nil,
@@ -179,8 +179,8 @@ func TestRegistryProcessor(t *testing.T) {
 				Category: event.Registry,
 				PID:      23234,
 				Params: event.Params{
-					params.RegPath:      {Name: params.RegPath, Type: params.Key, Value: `\REGISTRY\MACHINE\SYSTEM\CurrentControlSet\Control\Windows\Directory`},
-					params.RegKeyHandle: {Name: params.RegKeyHandle, Type: params.Uint64, Value: uint64(0)},
+					params.RegPath: {Name: params.RegPath, Type: params.Key, Value: `\REGISTRY\MACHINE\SYSTEM\CurrentControlSet\Control\Windows\Directory`},
+					params.RegKCB:  {Name: params.RegKCB, Type: params.Uint64, Value: uint64(0)},
 				},
 			},
 			func(p Processor) {
@@ -192,7 +192,7 @@ func TestRegistryProcessor(t *testing.T) {
 							params.RegPath:      {Name: params.RegPath, Type: params.Key, Value: `\SessionId`},
 							params.RegData:      {Name: params.RegData, Type: params.UnicodeString, Value: "{ABD9EA10-87F6-11EB-9ED5-645D86501328}"},
 							params.RegValueType: {Name: params.RegValueType, Type: params.Enum, Value: uint32(1), Enum: key.RegistryValueTypes},
-							params.RegKeyHandle: {Name: params.RegKeyHandle, Type: params.Uint64, Value: uint64(0)}},
+							params.RegKCB:       {Name: params.RegKCB, Type: params.Uint64, Value: uint64(0)}},
 					},
 					"Directory": {
 						Type:      event.RegSetValueInternal,
@@ -201,7 +201,7 @@ func TestRegistryProcessor(t *testing.T) {
 							params.RegPath:      {Name: params.RegPath, Type: params.Key, Value: `\Directory`},
 							params.RegData:      {Name: params.RegData, Type: params.UnicodeString, Value: "%SYSTEMROOT%"},
 							params.RegValueType: {Name: params.RegValueType, Type: params.Enum, Value: uint32(2), Enum: key.RegistryValueTypes},
-							params.RegKeyHandle: {Name: params.RegKeyHandle, Type: params.Uint64, Value: uint64(0)}},
+							params.RegKCB:       {Name: params.RegKCB, Type: params.Uint64, Value: uint64(0)}},
 					},
 				}
 			},
