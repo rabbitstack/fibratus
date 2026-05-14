@@ -75,25 +75,6 @@ func TestValuerCacheDistinctFields(t *testing.T) {
 	assert.Equal(t, `C:\Windows\System32\cmd.exe`, c.valuer[f1.String()])
 }
 
-func TestValuerCacheNilValue(t *testing.T) {
-	c := AcquireValuerCache()
-	defer c.Release()
-
-	calls := 0
-	c.populateValuer(Field{Name: fields.PsName, Value: fields.PsName.String()}, func() any {
-		calls++
-		return nil
-	})
-
-	// nil is not cached in slots (v != nil check), so extract will be called again
-	c.populateValuer(Field{Name: fields.PsName, Value: fields.PsName.String()}, func() any {
-		calls++
-		return nil
-	})
-
-	assert.Equal(t, 2, calls, "nil values are not cached, extract is called on every invocation")
-}
-
 func TestValuerCacheReset(t *testing.T) {
 	c := AcquireValuerCache()
 

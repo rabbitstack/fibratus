@@ -21,20 +21,18 @@ package filter
 import (
 	"sync"
 
-	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/filter/ql"
 )
 
 // ValuerCache caches extracted field values for a single event's lifetime.
 type ValuerCache struct {
-	slots  [fields.MaxFieldID]any
 	valuer ql.MapValuer
 }
 
 var valuerCachePool = sync.Pool{
 	New: func() any {
 		return &ValuerCache{
-			valuer: make(ql.MapValuer, 8), // pre-allocate buckets
+			valuer: make(ql.MapValuer),
 		}
 	},
 }
@@ -44,30 +42,13 @@ func AcquireValuerCache() *ValuerCache {
 }
 
 func (c *ValuerCache) Release() {
-	c.slots = [fields.MaxFieldID]any{}
 	clear(c.valuer)
 	valuerCachePool.Put(c)
 }
 
 func (c *ValuerCache) populateValuer(f Field, extract func() any) {
-	id := f.Name.ID()
-	if id == -1 {
-		// if the field doesn't allow fast id lookup
-		// extract the value and cache inside valuer
-		n := f.String()
-		if _, ok := c.valuer[n]; !ok {
-			c.valuer[n] = extract()
-		}
-		return
+	n := f.String()
+	if _, ok := c.valuer[n]; !ok {
+		c.valuer[n] = extract()
 	}
-
-	// field value is already cached, skip
-	v := c.slots[id]
-	if v != nil {
-		return
-	}
-
-	// extract the value and cache
-	v = extract()
-	c.slots[id], c.valuer[f.String()] = v, v
 }
