@@ -19,12 +19,13 @@
 package replace
 
 import (
+	"testing"
+
 	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestTransform(t *testing.T) {
@@ -33,8 +34,8 @@ func TestTransform(t *testing.T) {
 		Tid:  2484,
 		PID:  859,
 		Params: event.Params{
-			params.RegPath:      {Name: params.RegPath, Type: params.UnicodeString, Value: `HKEY_LOCAL_MACHINE\SYSTEM\Setup\Pid`},
-			params.RegKeyHandle: {Name: params.RegKeyHandle, Type: params.Address, Value: uint64(18446666033449935464)},
+			params.RegPath: {Name: params.RegPath, Type: params.UnicodeString, Value: `HKEY_LOCAL_MACHINE\SYSTEM\Setup\Pid`},
+			params.RegKCB:  {Name: params.RegKCB, Type: params.Address, Value: uint64(18446666033449935464)},
 		},
 	}
 
