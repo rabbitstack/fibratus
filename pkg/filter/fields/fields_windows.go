@@ -457,6 +457,8 @@ const (
 	FileOperation Field = "file.operation"
 	// FileShareMask represents the file share mask
 	FileShareMask Field = "file.share.mask"
+	// FileShareMode represents the file share mode field
+	FileShareMode Field = "file.share_mode"
 	// FileIOSize represents the number of read/written bytes
 	FileIOSize Field = "file.io.size"
 	// FileOffset represents the read/write offset
@@ -1177,7 +1179,8 @@ var fields = map[Field]FieldInfo{
 	FilePathStem:                    {FilePathStem, "full file path without extension", params.UnicodeString, []string{"file.path.stem = 'C:\\Windows\\System32\\cmd'"}, nil, nil},
 	FileName:                        {FileName, "full file name", params.UnicodeString, []string{"file.name contains 'mimikatz'"}, nil, nil},
 	FileOperation:                   {FileOperation, "file operation", params.AnsiString, []string{"file.operation = 'open'"}, nil, nil},
-	FileShareMask:                   {FileShareMask, "file share mask", params.AnsiString, []string{"file.share.mask = 'rw-'"}, nil, nil},
+	FileShareMask:                   {FileShareMask, "file share mask", params.AnsiString, []string{"file.share.mask = 'READ'"}, &Deprecation{Since: "3.1.0", Fields: []Field{FileShareMode}}, nil},
+	FileShareMode:                   {FileShareMask, "file share mode", params.AnsiString, []string{"file.share_mode = 'DENY'"}, nil, nil},
 	FileIOSize:                      {FileIOSize, "file I/O size", params.Uint32, []string{"file.io.size > 512"}, nil, nil},
 	FileOffset:                      {FileOffset, "file offset", params.Uint64, []string{"file.offset = 1024"}, nil, nil},
 	FileType:                        {FileType, "file type", params.AnsiString, []string{"file.type = 'directory'"}, nil, nil},

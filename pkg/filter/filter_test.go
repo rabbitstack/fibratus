@@ -630,6 +630,7 @@ func TestFileFilter(t *testing.T) {
 			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
 			params.FileType:      {Name: params.FileType, Type: params.AnsiString, Value: "file"},
 			params.FileOperation: {Name: params.FileOperation, Type: params.AnsiString, Value: "open"},
+			params.FileShareMask: {Name: params.FileShareMask, Type: params.Flags, Value: uint32(1), Flags: event.FileShareModeFlags},
 		},
 		Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 	}
@@ -641,7 +642,7 @@ func TestFileFilter(t *testing.T) {
 
 		{`file.name = 'user32.dll'`, true},
 		{`file.path = 'C:\\Windows\\system32\\user32.dll'`, true},
-		{`file.extension  = '.dll'`, true},
+		{`file.extension = '.dll'`, true},
 		{`file.extension not contains '.exe'`, true},
 		{`file.extension contains '.exe' or (file.extension contains '.dll' and file.name endswith 'user32.dll')`, true},
 		{`file.extension = '.dll' or (file.extension contains '.exe' and file.name endswith 'kernel32.dll')`, true},
@@ -670,6 +671,7 @@ func TestFileFilter(t *testing.T) {
 		{`file.path fuzzy ('C:\\Windows\\system32\\kernel', 'C:\\Windows\\system32\\ser3ll')`, true},
 		{`file.path ifuzzynorm 'C:\\WINDOWS\\sÝS\\32dll'`, true},
 		{`file.path.stem = 'C:\\Windows\\system32\\user32'`, true},
+		{`file.share_mode = 'READ'`, true},
 		{`base(file.path) = 'user32.dll'`, true},
 		{`ext(base(file.path)) = '.dll'`, true},
 		{`base(file.path, false) = 'user32'`, true},

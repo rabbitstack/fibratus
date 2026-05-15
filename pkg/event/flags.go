@@ -19,9 +19,10 @@
 package event
 
 import (
+	"strings"
+
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"golang.org/x/sys/windows"
-	"strings"
 )
 
 // ParamFlag defines the mapping between the flag value and its symbolical name.
@@ -178,6 +179,7 @@ var FileCreateOptionsFlags = []ParamFlag{
 
 // FileShareModeFlags describes file share mask flags
 var FileShareModeFlags = []ParamFlag{
+	{"DENY", 0},
 	{"READ", windows.FILE_SHARE_READ},
 	{"WRITE", windows.FILE_SHARE_WRITE},
 	{"DELETE", windows.FILE_SHARE_DELETE},
