@@ -1,6 +1,6 @@
 name: Fake system root environment variable manipulation
 id: 15613558-14cc-4d00-b13e-392df61e29c4
-version: 1.0.0
+version: 1.0.1
 description: |
   Identifies attempts to manipulate user-scoped Windows directory registry values
   to point to non-standard locations, a technique commonly abused to fake the system
@@ -20,6 +20,8 @@ condition: >
   ps.sid != 'S-1-5-18' and
   registry.path imatches
                 (
+                  'HKEY_USERS\\*\\windir',
+                  'HKEY_USERS\\*\\systemroot',
                   'HKEY_CURRENT_USER\\*\\windir',
                   'HKEY_CURRENT_USER\\*\\systemroot'
                 ) and
@@ -29,7 +31,10 @@ condition: >
                   '?SystemRoot?'
                 ) and
    registry.path not imatches 'HKEY_CURRENT_USER\\*\\SOFTWARE\\*'
-
+action:
+  - name: kill
+  
 severity: high
+
 
 min-engine-version: 3.0.0
