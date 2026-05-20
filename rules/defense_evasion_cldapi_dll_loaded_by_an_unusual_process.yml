@@ -1,0 +1,66 @@
+name: CldApi DLL loaded by an unusual process
+id: 450aee38-e8cf-47bc-8315-d16b13d740cb
+version: 1.0.0
+description: |
+  Detects the loading of cldapi.dll (Cloud Filter API) by processes other than
+  those legitimately associated with Windows Cloud Files infrastructure and OneDrive
+  sync functionality. Adversaries may abuse the Cloud Filter API to hijack execution
+  flow and evade defenses, for example by exploiting BindLink or redirector mechanisms
+  to sideload malicious code into trusted processes or redirect file system operations.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1574
+  technique.name: Hijack Execution Flow
+  technique.ref: https://attack.mitre.org/techniques/T1574/
+references:
+  - https://github.com/Nightmare-Eclipse/MiniPlasma
+  - https://www.zerosalarium.com/2025/10/DR-Redir-Break-EDR-Via-BindLink-Cloud-Filter.html
+
+condition: >
+  load_dll and
+  dll.name ~= 'cldapi.dll' and
+  ps.exe not imatches
+            (
+              '?:\\Windows\\System32\\RuntimeBroker.exe',
+              '?:\\Windows\\System32\\SearchProtocolHost.exe',
+              '?:\\Windows\\System32\\svchost.exe',
+              '?:\\Windows\\System32\\sihost.exe',
+              '?:\\Windows\\System32\\explorer.exe',
+              '?:\\Windows\\System32\\ShellHost.exe',
+              '?:\\Windows\\System32\\FileSyncConfig.exe',
+              '?:\\Windows\\System32\\WorkFolders.exe',
+              '?:\\Windows\\System32\\OneDriveSetup.exe',
+              '?:\\Windows\\SysWOW64\\OneDriveSetup.exe',
+              '?:\\Windows\\SystemApps\\Microsoft.Windows.Search_*\\SearchApp.exe',
+              '?:\\Program Files\\Microsoft OneDrive\\*\\OneDrive.exe',
+              '?:\\Program Files\\Microsoft OneDrive\\*\\FileCoAuth.exe',
+              '?:\\Program Files\\Microsoft OneDrive\\*\\OneDriveUpdaterService.exe',
+              '?:\\Program Files\\Microsoft OneDrive\\*\\OneDriveStandaloneUpdater.exe',
+              '?:\\Program Files (x86)\\Microsoft OneDrive\\*\\OneDrive.exe',
+              '?:\\Program Files (x86)\\Microsoft OneDrive\\*\\FileCoAuth.exe',
+              '?:\\Users\\*\\AppData\\Local\\Microsoft\\OneDrive\\*\\OneDrive.exe',
+              '?:\\Users\\*\\AppData\\Local\\Microsoft\\OneDrive\\*\\FileCoAuth.exe',
+              '?:\\Users\\*\\AppData\\Local\\Microsoft\\OneDrive\\OneDrive.exe',
+              '?:\\Users\\*\\AppData\\Local\\Microsoft\\OneDrive\\*\\OneDriveStandaloneUpdater.exe',
+              '?:\\Program Files\\Microsoft Office\\root\\Office*\\MSOSYNC.EXE',
+              '?:\\Program Files (x86)\\Microsoft Office\\root\\Office*\\MSOSYNC.EXE',
+              '?:\\Program Files\\SharePoint Migration Tool\\*\\microsoft.sharepoint.migration.tool.exe',
+              '?:\\Program Files\\Microsoft SharePoint\\*\\groove.exe',
+              '?:\\Program Files (x86)\\Microsoft SharePoint\\*\\groove.exe',
+              '?:\\Program Files\\Google\\Drive File Stream\\*\\GoogleDriveFS.exe',
+              '?:\\Program Files\\Google\\DriveFS\\*\\GoogleDriveFS.exe',
+              '?:\\Program Files\\Citrix\\ShareFile\\ShareFileSync.exe',
+              '?:\\Program Files\\Nextcloud\\nextcloud.exe',
+              '?:\\Program Files (x86)\\Dropbox\\Client\\Dropbox.exe',
+              '?:\\Program Files\\Dropbox\\Client\\Dropbox.exe',
+              '?:\\Program Files\\Adobe\\Adobe Creative Cloud\\ACC\\Creative Cloud.exe',
+              '?:\\Program Files\\Autodesk\\Desktop App\\AdAppMgrSvc.exe'
+            )
+action:
+  - name: kill
+
+severity: high
+
+min-engine-version: 3.0.0
