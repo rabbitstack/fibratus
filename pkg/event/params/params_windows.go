@@ -143,6 +143,8 @@ const (
 
 	// RegKeyHandle identifies the parameter name for the registry key handle.
 	RegKeyHandle = "key_handle"
+	// RegKCB identifies the parameter name for the registry key control block.
+	RegKCB = "kcb"
 	// RegPath represents the parameter name for the fully qualified key path.
 	RegPath = "key_path"
 	// RegValue identifies the parameter name that contains the value

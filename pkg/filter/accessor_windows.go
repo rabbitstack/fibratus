@@ -910,8 +910,8 @@ func (r *registryAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 		} else {
 			return filepath.Base(e.GetParamAsString(params.RegPath)), nil
 		}
-	case fields.RegistryKeyHandle:
-		return e.GetParamAsString(params.RegKeyHandle), nil
+	case fields.RegistryKCB:
+		return e.GetParamAsString(params.RegKCB), nil
 	case fields.RegistryValue:
 		if e.IsRegSetValue() {
 			return filepath.Base(filepath.Base(e.GetParamAsString(params.RegPath))), nil
