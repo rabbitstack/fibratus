@@ -39,7 +39,7 @@ func TestDecodeRegistry(t *testing.T) {
 				assert.Len(t, e.Params, 3)
 				assert.Equal(t, "StartTime", e.Params.MustGetString(params.RegPath))
 				assert.Equal(t, uint32(0), e.Params.MustGetUint32(params.NTStatus))
-				assert.Equal(t, uint64(0xffffde0e05e45330), e.Params.MustGetUint64(params.RegKeyHandle))
+				assert.Equal(t, uint64(0xffffde0e05e45330), e.Params.MustGetUint64(params.RegKCB))
 			},
 			buf: []byte{
 				116, 104, 52, 53, 29, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -53,7 +53,7 @@ func TestDecodeRegistry(t *testing.T) {
 				assert.Len(t, e.Params, 3)
 				assert.Equal(t, `Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\Capabilities`, e.Params.MustGetString(params.RegPath))
 				assert.Equal(t, uint32(0), e.Params.MustGetUint32(params.NTStatus))
-				assert.Equal(t, uint64(0xffffb58b742ff990), e.Params.MustGetUint64(params.RegKeyHandle))
+				assert.Equal(t, uint64(0xffffb58b742ff990), e.Params.MustGetUint64(params.RegKCB))
 			},
 			buf: []byte{
 				248, 104, 16, 11, 5, 0, 0, 0,

@@ -112,12 +112,12 @@ func (r *registryProcessor) ProcessEvent(e *event.Event) (*event.Event, bool, er
 func (r *registryProcessor) processEvent(e *event.Event) (*event.Event, error) {
 	switch e.Type {
 	case event.RegKCBRundown, event.RegCreateKCB:
-		khandle := e.Params.MustGetUint64(params.RegKeyHandle)
-		r.keys[khandle] = e.Params.MustGetString(params.RegPath)
+		kcb := e.Params.MustGetUint64(params.RegKCB)
+		r.keys[kcb] = e.Params.MustGetString(params.RegPath)
 		kcbCount.Add(1)
 	case event.RegDeleteKCB:
-		khandle := e.Params.MustGetUint64(params.RegKeyHandle)
-		delete(r.keys, khandle)
+		kcb := e.Params.MustGetUint64(params.RegKCB)
+		delete(r.keys, kcb)
 		kcbCount.Add(-1)
 	default:
 		if e.IsRegSetValueInternal() {
@@ -126,9 +126,9 @@ func (r *registryProcessor) processEvent(e *event.Event) (*event.Event, error) {
 			return e, nil
 		}
 
-		khandle := e.Params.MustGetUint64(params.RegKeyHandle)
+		kcb := e.Params.MustGetUint64(params.RegKCB)
 		// we have to obey a straightforward algorithm to connect relative
-		// key names to their root keys. If key handle is equal to zero we
+		// key names to their root keys. If the KCB is equal to zero we
 		// have a full key name and don't have to go further resolving the
 		// missing part. Otherwise, we have to lookup existing KCBs to try
 		// finding the matching base key name and concatenate to its relative
@@ -136,15 +136,15 @@ func (r *registryProcessor) processEvent(e *event.Event) (*event.Event, error) {
 		// last resort is to scan process' handles and check if any of the
 		// key handles contain the partial key name. In this case we assume
 		// the correct key is encountered.
-		keyName := e.Params.MustGetString(params.RegPath)
-		if khandle != 0 {
-			if baseKey, ok := r.keys[khandle]; ok {
-				keyName = baseKey + "\\" + keyName
+		path := e.Params.MustGetString(params.RegPath)
+		if kcb != 0 {
+			if baseKey, ok := r.keys[kcb]; ok {
+				path = baseKey + "\\" + path
 			} else {
 				kcbMissCount.Add(1)
-				keyName = r.findMatchingKey(e.PID, keyName)
+				path = r.findMatchingKey(e.PID, path)
 			}
-			if err := e.Params.SetValue(params.RegPath, keyName); err != nil {
+			if err := e.Params.SetValue(params.RegPath, path); err != nil {
 				return e, err
 			}
 		}
@@ -180,12 +180,12 @@ func (r *registryProcessor) processEvent(e *event.Event) (*event.Event, error) {
 		}
 
 		// values within hidden keys cannot be read
-		if strings.HasSuffix(keyName, "\\") {
+		if strings.HasSuffix(path, "\\") {
 			return e, nil
 		}
 
 		// get the type/value of the registry key and append to parameters
-		rootkey, subkey := key.Format(keyName)
+		rootkey, subkey := key.Format(path)
 		if rootkey == key.Invalid {
 			return e, nil
 		}
@@ -197,7 +197,7 @@ func (r *registryProcessor) processEvent(e *event.Event) (*event.Event, error) {
 			if ok && (errno.Is(os.ErrNotExist) || err == windows.ERROR_ACCESS_DENIED) {
 				return e, nil
 			}
-			return e, ErrReadValue(rootkey.String(), keyName, err)
+			return e, ErrReadValue(rootkey.String(), path, err)
 		}
 		e.AppendEnum(params.RegValueType, typ, key.RegistryValueTypes)
 

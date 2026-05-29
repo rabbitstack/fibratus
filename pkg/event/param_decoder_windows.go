@@ -55,7 +55,7 @@ func (d *ParamDecoder) DecodeRegistry(r *etw.EventRecord, e *Event) {
 	// skip InitialTime (uint64)
 	e.AppendParam(params.NTStatus, params.Status, r.ReadUint32(8))
 	// skip Index/InfoClass (uint32)
-	e.AppendParam(params.RegKeyHandle, params.Address, r.ReadUint64(16))
+	e.AppendParam(params.RegKCB, params.Address, r.ReadUint64(16))
 	e.AppendParam(params.RegPath, params.Key, r.ConsumeUTF16String(24))
 }
 
