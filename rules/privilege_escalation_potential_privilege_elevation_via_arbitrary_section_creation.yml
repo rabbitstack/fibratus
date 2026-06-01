@@ -1,0 +1,46 @@
+name: Potential privilege elevation via arbitrary section creation
+id: a232b3e4-17ac-4b0c-bcd3-43816b92d15d
+version: 1.0.0
+description: |
+  Identifies potential privilege escalation attempts where a non-SYSTEM process creates
+  symbolic links targeting object manager namespaces specific to memory section objects
+  followed by the creation of a SYSTEM process. This behavior may indicate exploitation
+  of arbitrary object directory or section creation vulnerabilities that abuse symbolic
+  link redirection to manipulate privileged operations and gain elevated execution.
+labels:
+  tactic.id: TA0004
+  tactic.name: Privilege Escalation
+  tactic.ref: https://attack.mitre.org/tactics/TA0004/
+  technique.id: T1068
+  technique.name: Exploitation for Privilege Escalation
+  technique.ref: https://attack.mitre.org/techniques/T1068/
+references:
+  - https://www.threatlocker.com/blog/what-yellowkey-and-greenplasma-zero-day-exploits-reveal-about-trusting-native-windows-security
+  - https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createsymboliclinka
+
+condition: >
+  sequence
+  maxspan 1m
+    |create_symbolic_link_object and
+     evt.pid != 4 and ps.token.integrity_level not in ('HIGH', 'SYSTEM') and
+     evt.arg[source] imatches
+                     (
+                       '\\Sessions\\*\\BaseNamedObjects\\*',
+                       '\\BaseNamedObjects\\*',
+                       '\\KnownDlls\\*',
+                       '\\KnownDlls32\\*',
+                       '\\Device\\*'
+                     )
+    |
+    |spawn_process and
+     ps.token.integrity_level = 'SYSTEM' and
+     ps.parent.exe not imatches
+                     (
+                       '?:\\Windows\\System32\\wininit.exe',
+                       '?:\\Windows\\System32\\services.exe'
+                     )
+    |
+
+severity: high
+
+min-engine-version: 3.0.0
