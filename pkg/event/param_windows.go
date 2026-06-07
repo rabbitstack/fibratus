@@ -63,8 +63,6 @@ func NewParam(name string, typ params.Type, value params.Value, options ...Param
 	return &Param{Name: name, Type: typ, Value: v, Flags: opts.flags, Enum: opts.enum}
 }
 
-var devMapper = fs.NewDevMapper()
-
 // String returns the string representation of the parameter value.
 func (p Param) String() string {
 	if p.Value == nil {
@@ -83,7 +81,7 @@ func (p Param) String() string {
 		}
 		return sid.String()
 	case params.DOSPath:
-		return devMapper.Convert(p.Value.(string))
+		return fs.GetDevMapper().Convert(p.Value.(string))
 	case params.Key:
 		rootKey, keyName := key.Format(p.Value.(string))
 		if keyName != "" && rootKey != key.Invalid {
