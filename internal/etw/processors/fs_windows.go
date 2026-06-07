@@ -52,11 +52,7 @@ type fsProcessor struct {
 	hsnap handle.Snapshotter
 	psnap ps.Snapshotter
 
-	// irps contains a mapping between the IRP (I/O request packet) and CreateFile events
-	irps map[uint64]*event.Event
-
-	devMapper fs.DevMapper
-	config    *config.Config
+	config *config.Config
 
 	// buckets stores stack walk events per stack id
 	buckets map[uint64][]*event.Event
@@ -75,19 +71,16 @@ type FileInfo struct {
 func newFsProcessor(
 	hsnap handle.Snapshotter,
 	psnap ps.Snapshotter,
-	devMapper fs.DevMapper,
 	config *config.Config,
 ) Processor {
 	f := &fsProcessor{
-		files:     make(map[uint64]*FileInfo),
-		irps:      make(map[uint64]*event.Event),
-		hsnap:     hsnap,
-		psnap:     psnap,
-		devMapper: devMapper,
-		config:    config,
-		buckets:   make(map[uint64][]*event.Event),
-		purger:    time.NewTicker(time.Second * 5),
-		quit:      make(chan struct{}, 1),
+		files:   make(map[uint64]*FileInfo),
+		hsnap:   hsnap,
+		psnap:   psnap,
+		config:  config,
+		buckets: make(map[uint64][]*event.Event),
+		purger:  time.NewTicker(time.Second * 5),
+		quit:    make(chan struct{}, 1),
 	}
 
 	go f.purge()
@@ -145,13 +138,6 @@ func (f *fsProcessor) processEvent(e *event.Event) (*event.Event, error) {
 		}
 
 		return e, f.psnap.AddMmap(e)
-	case event.CreateFile:
-		// we defer the processing of the CreateFile event until we get
-		// the matching FileOpEnd event. This event contains the operation
-		// that was done on behalf of the file, e.g. create or open.
-		irp := e.Params.MustGetUint64(params.FileIrpPtr)
-		e.WaitEnqueue = true
-		f.irps[irp] = e
 	case event.StackWalk:
 		if !event.IsCurrentProcDropped(e.PID) {
 			f.mu.Lock()
@@ -166,45 +152,23 @@ func (f *fsProcessor) processEvent(e *event.Event) (*event.Event, error) {
 				f.buckets[id] = append(q, e)
 			}
 		}
-	case event.FileOpEnd:
-		// get the CreateFile pending event by IRP identifier
-		// and fetch the file create disposition value
-		var (
-			irp    = e.Params.MustGetUint64(params.FileIrpPtr)
-			dispo  = e.Params.MustGetUint64(params.FileExtraInfo)
-			status = e.Params.MustGetUint32(params.NTStatus)
-		)
-
-		if dispo > windows.FILE_MAXIMUM_DISPOSITION {
-			return e, nil
-		}
-		ev, ok := f.irps[irp]
-		if !ok {
-			return e, nil
-		}
-		delete(f.irps, irp)
-
-		// reset the wait status to allow passage of this event to
-		// the aggregator queue. Additionally, append params to it
-		ev.WaitEnqueue = false
-		fileObject := ev.Params.MustGetUint64(params.FileObject)
+	case event.CreateFile:
+		fileObject := e.Params.MustGetUint64(params.FileObject)
 
 		// try to get extended file info. If the file object is already
 		// present in the map, we'll reuse the existing file information
 		fileinfo, ok := f.files[fileObject]
 		if !ok {
-			opts := ev.Params.MustGetUint32(params.FileCreateOptions)
+			opts := e.Params.MustGetUint32(params.FileCreateOptions)
 			opts &= 0xFFFFFF
-			filepath := ev.GetParamAsString(params.FilePath)
+			filepath := e.GetParamAsString(params.FilePath)
 			fileinfo = f.getFileInfo(filepath, opts)
 			f.files[fileObject] = fileinfo
 		}
 
-		ev.AppendParam(params.NTStatus, params.Status, status)
 		if fileinfo.Type != fs.Unknown {
-			ev.AppendEnum(params.FileType, uint32(fileinfo.Type), fs.FileTypes)
+			e.AppendEnum(params.FileType, uint32(fileinfo.Type), fs.FileTypes)
 		}
-		ev.AppendEnum(params.FileOperation, uint32(dispo), fs.FileCreateDispositions)
 
 		// attach stack walk return addresses. CreateFile events
 		// represent an edge case in callstack enrichment. Since
@@ -220,17 +184,17 @@ func (f *fsProcessor) processEvent(e *event.Event) (*event.Event, error) {
 			f.mu.Lock()
 			defer f.mu.Unlock()
 
-			id := ev.StackID()
+			id := e.StackID()
 			q, ok := f.buckets[id]
 			if ok && len(q) > 0 {
 				var s *event.Event
 				s, f.buckets[id] = q[len(q)-1], q[:len(q)-1]
 				callstack := s.Params.MustGetSlice(params.Callstack)
-				ev.AppendParam(params.Callstack, params.Slice, callstack)
+				e.AppendParam(params.Callstack, params.Slice, callstack)
 			}
 		}
 
-		return ev, nil
+		return e, nil
 	case event.ReleaseFile:
 		fileReleaseCount.Add(1)
 		// delete file metadata by file object address
@@ -303,6 +267,16 @@ func (f *fsProcessor) processEvent(e *event.Event) (*event.Event, error) {
 	return e, nil
 }
 
+func (f *fsProcessor) dequeueStackwalk(stackID uint64) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	q, ok := f.buckets[stackID]
+	if ok && len(q) > 0 {
+		f.buckets[stackID] = q[:len(q)-1]
+	}
+}
+
 func (f *fsProcessor) findFile(fileKey, fileObject uint64) *FileInfo {
 	fileinfo, ok := f.files[fileKey]
 	if ok {
@@ -331,7 +305,7 @@ func (f *fsProcessor) getMappedFile(pid uint32, addr uint64) string {
 		return ""
 	}
 	defer windows.Close(process)
-	return f.devMapper.Convert(sys.GetMappedFile(process, uintptr(addr)))
+	return fs.GetDevMapper().Convert(sys.GetMappedFile(process, uintptr(addr)))
 }
 
 func (f *fsProcessor) purge() {

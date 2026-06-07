@@ -19,8 +19,6 @@
 package processors
 
 import (
-	"os"
-	"reflect"
 	"testing"
 
 	"github.com/rabbitstack/fibratus/pkg/config"
@@ -38,9 +36,6 @@ import (
 )
 
 func TestFsProcessor(t *testing.T) {
-	exe, err := os.Executable()
-	require.NoError(t, err)
-
 	var tests = []struct {
 		name           string
 		e              *event.Event
@@ -99,74 +94,6 @@ func TestFsProcessor(t *testing.T) {
 
 				psnap := fsProcessor.psnap.(*ps.SnapshotterMock)
 				psnap.AssertNumberOfCalls(t, "AddMmap", 1)
-			},
-		},
-		{
-			"wait enqueue for create file events",
-			&event.Event{
-				Type:     event.CreateFile,
-				Category: event.File,
-				Params: event.Params{
-					params.FileObject:        {Name: params.FileObject, Type: params.Uint64, Value: uint64(18446738026482168384)},
-					params.ThreadID:          {Name: params.ThreadID, Type: params.Uint32, Value: uint32(1484)},
-					params.FileCreateOptions: {Name: params.FileCreateOptions, Type: params.Uint32, Value: uint32(1223456)},
-					params.FilePath:          {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\kernel32.dll"},
-					params.FileShareMask:     {Name: params.FileShareMask, Type: params.Uint32, Value: uint32(5)},
-					params.FileIrpPtr:        {Name: params.FileIrpPtr, Type: params.Uint64, Value: uint64(1234543123112321)},
-				},
-			},
-			nil,
-			func() *handle.SnapshotterMock {
-				hsnap := new(handle.SnapshotterMock)
-				return hsnap
-			},
-			func(e *event.Event, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
-				fsProcessor := p.(*fsProcessor)
-				assert.True(t, e.WaitEnqueue)
-				assert.Contains(t, fsProcessor.irps, uint64(1234543123112321))
-				assert.True(t, reflect.DeepEqual(e, fsProcessor.irps[1234543123112321]))
-			},
-		},
-		{
-			"get IRP completion for create file event",
-			&event.Event{
-				Type:     event.FileOpEnd,
-				Category: event.File,
-				Params: event.Params{
-					params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(18446738026482168384)},
-					params.FileExtraInfo: {Name: params.FileExtraInfo, Type: params.Uint64, Value: uint64(2)},
-					params.FileIrpPtr:    {Name: params.FileIrpPtr, Type: params.Uint64, Value: uint64(1334543123112321)},
-					params.NTStatus:      {Name: params.NTStatus, Type: params.Status, Value: uint32(0)},
-				},
-			},
-			func(p Processor) {
-				fsProcessor := p.(*fsProcessor)
-				fsProcessor.irps[1334543123112321] = &event.Event{
-					Type:     event.CreateFile,
-					Category: event.File,
-					Params: event.Params{
-						params.FileObject:        {Name: params.FileObject, Type: params.Uint64, Value: uint64(12446738026482168384)},
-						params.FileCreateOptions: {Name: params.FileCreateOptions, Type: params.Uint32, Value: uint32(18874368)},
-						params.FilePath:          {Name: params.FilePath, Type: params.UnicodeString, Value: exe},
-						params.FileShareMask:     {Name: params.FileShareMask, Type: params.Uint32, Value: uint32(5)},
-						params.FileIrpPtr:        {Name: params.FileIrpPtr, Type: params.Uint64, Value: uint64(1334543123112321)},
-					},
-				}
-			},
-			func() *handle.SnapshotterMock {
-				hsnap := new(handle.SnapshotterMock)
-				return hsnap
-			},
-			func(e *event.Event, t *testing.T, hsnap *handle.SnapshotterMock, p Processor) {
-				fsProcessor := p.(*fsProcessor)
-				assert.Equal(t, event.CreateFile, e.Type)
-				assert.NotContains(t, fsProcessor.irps, uint64(1334543123112321))
-				assert.False(t, e.WaitEnqueue)
-				assert.Contains(t, fsProcessor.files, uint64(12446738026482168384))
-				assert.Equal(t, exe, fsProcessor.files[12446738026482168384].Name)
-				assert.Equal(t, "Success", e.GetParamAsString(params.NTStatus))
-				assert.Equal(t, "File", e.GetParamAsString(params.FileType))
-				assert.Equal(t, "CREATE", e.GetParamAsString(params.FileOperation))
 			},
 		},
 		{
@@ -306,7 +233,7 @@ func TestFsProcessor(t *testing.T) {
 					{File: "C:\\Windows\\System32\\kernel32.dll", BaseAddress: va.Address(0xffff23433), Size: 3098},
 				},
 			})
-			p := newFsProcessor(hsnap, psnap, fs.NewDevMapper(), &config.Config{})
+			p := newFsProcessor(hsnap, psnap, &config.Config{})
 			if tt.setupProcessor != nil {
 				tt.setupProcessor(p)
 			}
