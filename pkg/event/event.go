@@ -84,11 +84,7 @@ type Event struct {
 	Type Type `json:"-"`
 	// CPU designates the processor logical core where the event was originated.
 	CPU uint8 `json:"cpu"`
-	// WaitEnqueue indicates if this event should temporarily defer pushing to
-	// the consumer output queue. This is usually required in event processors
-	// to propagate certain events stored in processor's state when the related
-	// event arrives.
-	WaitEnqueue bool `json:"waitenqueue"`
+	_   uint8 // padding
 
 	// Name is the human friendly name of the event.
 	Name string `json:"name"`
