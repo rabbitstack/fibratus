@@ -20,37 +20,37 @@ package processors
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/config"
-	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 )
 
-type chain struct {
+type Chain struct {
 	processors   []Processor
 	psnapshotter ps.Snapshotter
+	fsProcessor  Processor
 }
 
 // NewChain constructs the processor chain. It arranges all the processors
-// according to enabled kernel event categories.
+// according to enabled event categories.
 func NewChain(
 	psnap ps.Snapshotter,
 	hsnap handle.Snapshotter,
 	config *config.Config,
-) Chain {
+) *Chain {
 	var (
-		chain = &chain{
+		chain = &Chain{
 			psnapshotter: psnap,
 			processors:   make([]Processor, 0),
 		}
-		devMapper      = fs.NewDevMapper()
 		vaRegionProber = va.NewRegionProber()
 	)
 
 	chain.addProcessor(newPsProcessor(psnap, vaRegionProber))
 
 	if config.EventSource.EnableFileIOEvents {
-		chain.addProcessor(newFsProcessor(hsnap, psnap, devMapper, config))
+		chain.fsProcessor = newFsProcessor(hsnap, psnap, config)
+		chain.addProcessor(chain.fsProcessor)
 	}
 	if config.EventSource.EnableRegistryEvents {
 		chain.addProcessor(newRegistryProcessor(hsnap))
@@ -62,7 +62,7 @@ func NewChain(
 		chain.addProcessor(newNetProcessor())
 	}
 	if config.EventSource.EnableHandleEvents {
-		chain.addProcessor(newHandleProcessor(hsnap, psnap, devMapper))
+		chain.addProcessor(newHandleProcessor(hsnap, psnap))
 	}
 	if config.EventSource.EnableMemEvents {
 		chain.addProcessor(newMemProcessor(psnap, vaRegionProber))

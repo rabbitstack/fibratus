@@ -21,6 +21,7 @@ package processors
 import (
 	"expvar"
 	"fmt"
+
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 )
@@ -28,24 +29,14 @@ import (
 // processorFailures counts the number of failures caused by event processors
 var processorFailures = expvar.NewInt("event.processor.failures")
 
-// Chain defines the event process chain has to satisfy.
-type Chain interface {
-	// ProcessEvent pushes the event into processor chain. Processors are applied sequentially, so we have to make
-	// sure that any processor providing additional context to the next processor is defined first in the chain. If
-	// one processor fails, the next processor in chain is invoked.
-	ProcessEvent(evt *event.Event) (*event.Event, error)
-	// Close closes the processor chain and frees all allocated resources.
-	Close() error
-}
-
-func (c *chain) addProcessor(processor Processor) {
+func (c *Chain) addProcessor(processor Processor) {
 	if processor == nil {
 		return
 	}
 	c.processors = append(c.processors, processor)
 }
 
-func (c chain) ProcessEvent(e *event.Event) (*event.Event, error) {
+func (c *Chain) ProcessEvent(e *event.Event) (*event.Event, error) {
 	var errs = make([]error, 0)
 	var evt *event.Event
 
@@ -69,8 +60,14 @@ func (c chain) ProcessEvent(e *event.Event) (*event.Event, error) {
 	return evt, nil
 }
 
+func (c *Chain) DequeueStackwalk(stackID uint64) {
+	if c.fsProcessor != nil {
+		c.fsProcessor.(*fsProcessor).dequeueStackwalk(stackID)
+	}
+}
+
 // Close closes the processor chain and frees all allocated resources.
-func (c chain) Close() error {
+func (c *Chain) Close() error {
 	for _, processor := range c.processors {
 		processor.Close()
 	}
