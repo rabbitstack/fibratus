@@ -69,6 +69,8 @@ type Filter interface {
 	GetSequence() *ql.Sequence
 	// IsSequence determines if this filter is a sequence.
 	IsSequence() bool
+	// Expr returns the raw AST expression.
+	Expr() ql.Expr
 }
 
 // Field contains field meta attributes all accessors need to extract the value.
@@ -261,6 +263,10 @@ func (f *filter) EvalWithValuer(e *event.Event, cache *ValuerCache) bool {
 		return false
 	}
 	return ql.Eval(f.expr, f.mapValuer(e, cache), f.hasFunctions)
+}
+
+func (f *filter) Expr() ql.Expr {
+	return f.expr
 }
 
 // evalBoundSequence evaluates the sequence with bound fields

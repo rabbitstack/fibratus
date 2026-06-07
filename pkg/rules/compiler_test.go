@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/filter/ql"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/version"
 	"github.com/stretchr/testify/assert"
@@ -95,5 +96,225 @@ func TestCompileEventCategoryFieldNames(t *testing.T) {
 				require.EqualError(t, err, tt.err.Error())
 			}
 		})
+	}
+}
+
+func TestVisitApproverPredicatesRegistryEvents(t *testing.T) {
+	tests := []struct {
+		name string
+		expr string
+		want bool
+	}{
+		{
+			name: "RegSetValue does not match",
+			expr: "evt.name = 'RegSetValue'",
+			want: false,
+		},
+		{
+			name: "RegOpenKey matches",
+			expr: "evt.name = 'RegOpenKey'",
+			want: true,
+		},
+		{
+			name: "CreateProcess does not match",
+			expr: "evt.name = 'CreateProcess'",
+			want: false,
+		},
+		{
+			name: "RegOpenKey event nested in AND matches",
+			expr: `evt.name = 'RegOpenKey' and registry.path imatches ('HKEY_LOCAL_MACHINE\\SYSTEM\\*')`,
+			want: true,
+		},
+		{
+			name: "Registry event nested in paren matches",
+			expr: "(evt.name = 'RegOpenKey')",
+			want: true,
+		},
+	}
+
+	c := newCompiler(new(ps.SnapshotterMock), newConfig("_fixtures/default/*.yml"))
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := ql.NewParser(tt.expr)
+			n, err := p.ParseExpr()
+			require.NoError(t, err)
+			got := c.referencesApproverEvents(n)
+			if got != tt.want {
+				t.Errorf("registry approver predicates: %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestVisitApproverPredicatesCreateFile(t *testing.T) {
+	tests := []struct {
+		name string
+		expr string
+		want bool
+	}{
+		{
+			name: "CreateFile with OPEN operation matches",
+			expr: "evt.name = 'CreateFile' and file.operation = 'OPEN'",
+			want: true,
+		},
+		{
+			name: "CreateFile without file.operation does not match",
+			expr: "evt.name = 'CreateFile'",
+			want: false,
+		},
+		{
+			name: "CreateFile with non-OPEN operation does not match",
+			expr: "evt.name = 'CreateFile' and file.operation = 'CREATE'",
+			want: false,
+		},
+		{
+			name: "file.operation OPEN without CreateFile does not match",
+			expr: "file.operation = 'OPEN'",
+			want: false,
+		},
+		{
+			name: "CreateFile and OPEN in separate OR branches does not match",
+			expr: "evt.name = 'CreateFile' or file.operation = 'OPEN'",
+			want: false,
+		},
+		{
+			name: "CreateFile with OPEN nested in paren matches",
+			expr: "evt.name = 'CreateFile' and (file.operation = 'OPEN')",
+			want: true,
+		},
+		{
+			name: "CreateFile with OPEN and extra conditions matches",
+			expr: "evt.name = 'CreateFile' and file.operation = 'OPEN' and file.path imatches '?:\\\\Windows\\\\*'",
+			want: true,
+		},
+	}
+
+	c := newCompiler(new(ps.SnapshotterMock), newConfig("_fixtures/default/*.yml"))
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := ql.NewParser(tt.expr)
+			n, err := p.ParseExpr()
+			require.NoError(t, err)
+			got := c.referencesApproverEvents(n)
+			if got != tt.want {
+				t.Errorf("file approver predicates: %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestAccumulatedApproverPredicates(t *testing.T) {
+	tests := []struct {
+		name            string
+		expr            string
+		wantKeys        map[string][]string
+		wantPaths       map[string][]string
+		wantExtensions  map[string][]string
+		wantExecutables map[string][]string
+		wantBases       map[string][]string
+	}{
+		{
+			name: "extracts registry key path with imatches",
+			expr: "evt.name = 'RegOpenKey' and registry.path imatches 'HKEY_LOCAL_MACHINE\\\\SYSTEM\\\\*'",
+			wantKeys: map[string][]string{
+				"IMATCHES": {`HKEY_LOCAL_MACHINE\SYSTEM\*`},
+			},
+		},
+		{
+			name: "extracts file path with imatches",
+			expr: "evt.name = 'CreateFile' and file.operation = 'OPEN' and file.path imatches 'C:\\\\Windows\\\\*'",
+			wantPaths: map[string][]string{
+				"IMATCHES": {`C:\Windows\*`},
+			},
+		},
+		{
+			name: "negated registry path is not extracted",
+			expr: "evt.name = 'RegSetValue' and registry.path not imatches 'HKEY_LOCAL_MACHINE\\\\SOFTWARE\\\\*'",
+		},
+		{
+			name: "extracts file extension",
+			expr: "evt.name = 'CreateFile' and file.operation = 'OPEN' and file.extension = '.exe'",
+			wantExtensions: map[string][]string{
+				"=": {".exe"},
+			},
+		},
+		{
+			name: "extracts file base name",
+			expr: "evt.name = 'CreateFile' and file.operation = 'OPEN' and file.name icontains 'svchost'",
+			wantBases: map[string][]string{
+				"ICONTAINS": {"svchost"},
+			},
+		},
+		{
+			name: "extracts process executable",
+			expr: "evt.name = 'OpenProcess' and evt.arg[exe] icontains 'lsass'",
+			wantExecutables: map[string][]string{
+				"ICONTAINS": {"lsass"},
+			},
+		},
+	}
+
+	c := newCompiler(new(ps.SnapshotterMock), newConfig(""))
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := ql.NewParser(tt.expr)
+			n, err := p.ParseExpr()
+			require.NoError(t, err)
+
+			c.visitApproverPredicates(n)
+
+			if tt.wantKeys != nil {
+				assertMapEqual(t, "Keys", c.approvers.Keys, tt.wantKeys)
+			}
+
+			if tt.wantPaths != nil {
+				assertMapEqual(t, "Paths", c.approvers.Paths, tt.wantPaths)
+			}
+
+			if tt.wantExtensions != nil {
+				assertMapEqual(t, "Extensions", c.approvers.Extensions, tt.wantExtensions)
+			}
+
+			if tt.wantBases != nil {
+				assertMapEqual(t, "Bases", c.approvers.Bases, tt.wantBases)
+			}
+
+			if tt.wantExecutables != nil {
+				assertMapEqual(t, "Executables", c.approvers.Executables, tt.wantExecutables)
+			}
+		})
+	}
+
+	assert.Len(t, c.approvers.Paths, 1)
+	assert.Len(t, c.approvers.Keys, 1)
+	assert.Len(t, c.approvers.Extensions, 1)
+	assert.Len(t, c.approvers.Bases, 1)
+	assert.Len(t, c.approvers.Executables, 1)
+}
+
+func assertMapEqual(t *testing.T, name string, got, want map[string][]string) {
+	t.Helper()
+	if len(got) != len(want) {
+		t.Errorf("%s: got %d keys, want %d keys. got=%v want=%v", name, len(got), len(want), got, want)
+		return
+	}
+	for k, wantVals := range want {
+		gotVals, ok := got[k]
+		if !ok {
+			t.Errorf("%s: missing key %q", name, k)
+			continue
+		}
+		if len(gotVals) != len(wantVals) {
+			t.Errorf("%s[%q]: got %v, want %v", name, k, gotVals, wantVals)
+			continue
+		}
+		for i, v := range wantVals {
+			if gotVals[i] != v {
+				t.Errorf("%s[%q][%d]: got %q, want %q", name, k, i, gotVals[i], v)
+			}
+		}
 	}
 }

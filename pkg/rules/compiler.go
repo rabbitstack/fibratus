@@ -21,12 +21,16 @@ package rules
 import (
 	"expvar"
 	"fmt"
+	"slices"
+	"strings"
 
 	semver "github.com/hashicorp/go-version"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/filter"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
+	"github.com/rabbitstack/fibratus/pkg/filter/ql"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/version"
 	log "github.com/sirupsen/logrus"
@@ -54,12 +58,19 @@ var (
 )
 
 type compiler struct {
-	psnap  ps.Snapshotter
-	config *config.Config
+	psnap     ps.Snapshotter
+	config    *config.Config
+	approvers config.Approvers
 }
 
-func newCompiler(psnap ps.Snapshotter, config *config.Config) *compiler {
-	return &compiler{psnap: psnap, config: config}
+func newCompiler(psnap ps.Snapshotter, cfg *config.Config) *compiler {
+	return &compiler{psnap: psnap, config: cfg, approvers: config.Approvers{
+		Keys:        make(map[string][]string),
+		Paths:       make(map[string][]string),
+		Extensions:  make(map[string][]string),
+		Bases:       make(map[string][]string),
+		Executables: make(map[string][]string),
+	}}
 }
 
 func (c *compiler) compile() (map[*config.FilterConfig]filter.Filter, *config.RulesCompileResult, error) {
@@ -125,6 +136,17 @@ func (c *compiler) compile() (map[*config.FilterConfig]filter.Filter, *config.Ru
 			}
 		}
 
+		// visit filter or sequence expressions
+		// to extract approver predicates
+		expr := fltr.Expr()
+		if expr != nil {
+			c.visitApproverPredicates(expr)
+		} else {
+			for _, expr := range fltr.GetSequence().Expressions {
+				c.visitApproverPredicates(expr.Expr)
+			}
+		}
+
 		filters[f] = fltr
 	}
 
@@ -132,7 +154,176 @@ func (c *compiler) compile() (map[*config.FilterConfig]filter.Filter, *config.Ru
 		return filters, nil, nil
 	}
 
-	return filters, c.buildCompileResult(filters), nil
+	r := c.buildCompileResult(filters)
+	if r != nil {
+		r.Approvers = c.approvers
+	}
+
+	return filters, r, nil
+}
+
+func (c *compiler) visitApproverPredicates(node ql.Node) {
+	walk := func(n ql.Node) {
+		expr, ok := n.(*ql.BinaryExpr)
+		if !ok {
+			return
+		}
+
+		// skip expressions wrapped in NOT
+		if c.isNegated(node, n) {
+			return
+		}
+
+		lhs, ok := expr.LHS.(*ql.FieldLiteral)
+		if !ok {
+			return
+		}
+
+		// only extract if the rule targets interested event types
+		if !c.referencesApproverEvents(node) {
+			return
+		}
+
+		// extract the string value(s) from RHS
+		values, ok := rhsToStrings(expr.RHS)
+		if !ok {
+			return
+		}
+
+		op := expr.Op.String()
+
+		switch lhs.Field {
+		case fields.RegistryPath:
+			for _, v := range values {
+				c.approvers.AppendKey(op, v)
+			}
+		case fields.FilePath:
+			for _, v := range values {
+				c.approvers.AppendPath(op, v)
+			}
+		case fields.FileExtension:
+			for _, v := range values {
+				c.approvers.AppendExtension(op, v)
+			}
+		case fields.FileName:
+			for _, v := range values {
+				c.approvers.AppendBase(op, v)
+			}
+		case fields.EvtArg:
+			if lhs.Arg == params.Exe {
+				for _, v := range values {
+					c.approvers.AppendExecutable(op, v)
+				}
+			}
+		}
+	}
+	ql.WalkFunc(node, walk)
+}
+
+// referencesTargetEvents checks whether the rule AST contains
+// an event type filter for high-volume events we want to approve.
+func (c *compiler) referencesApproverEvents(root ql.Node) bool {
+	var found bool
+	ql.WalkFunc(root, func(n ql.Node) {
+		expr, ok := n.(*ql.BinaryExpr)
+		if !ok {
+			return
+		}
+
+		// direct event match. We also include SetFileInformation
+		// to approve any paths referenced in the condition
+		if c.containsEventTypes(expr, event.RegOpenKey, event.OpenThread, event.OpenProcess, event.SetFileInformation) {
+			found = true
+			return
+		}
+
+		// for file events require open file operation
+		if expr.Op == ql.And {
+			if c.containsEventTypes(expr, event.CreateFile) && c.containsFieldMatch(expr, fields.FileOperation, ql.Eq, "OPEN") {
+				found = true
+			}
+		}
+	})
+	return found
+}
+
+func (c *compiler) containsEventTypes(root ql.Node, types ...event.Type) bool {
+	var contains bool
+	ql.WalkFunc(root, func(n ql.Node) {
+		expr, ok := n.(*ql.BinaryExpr)
+		if !ok {
+			return
+		}
+		lhs, ok := expr.LHS.(*ql.FieldLiteral)
+		if !ok || lhs.Field != fields.EvtName {
+			return
+		}
+
+		vals, ok := rhsToStrings(expr.RHS)
+		if !ok {
+			return
+		}
+
+		evts := make([]event.Type, 0, len(vals))
+		for _, v := range vals {
+			evts = append(evts, event.NameToType(v))
+		}
+
+		for _, typ := range types {
+			if slices.Contains(evts, typ) {
+				contains = true
+				return
+			}
+		}
+	})
+	return contains
+}
+
+func (c *compiler) containsFieldMatch(root ql.Node, field fields.Field, op ql.Token, val string) bool {
+	var contains bool
+	ql.WalkFunc(root, func(n ql.Node) {
+		expr, ok := n.(*ql.BinaryExpr)
+		if !ok {
+			return
+		}
+
+		lhs, ok := expr.LHS.(*ql.FieldLiteral)
+		if !ok || lhs.Field != field {
+			return
+		}
+
+		if expr.Op != op {
+			return
+		}
+
+		values, ok := rhsToStrings(expr.RHS)
+		if !ok {
+			return
+		}
+		for _, v := range values {
+			if strings.EqualFold(v, val) {
+				contains = true
+				return
+			}
+		}
+	})
+	return contains
+}
+
+// isNegated walks up the AST to check if the given node
+// is a direct child of a NOT unary expression.
+func (c *compiler) isNegated(root ql.Node, node ql.Node) bool {
+	negated := false
+	ql.WalkFunc(root, func(n ql.Node) {
+		unary, ok := n.(*ql.NotExpr)
+		if !ok {
+			return
+		}
+		if unary.Expr == node {
+			negated = true
+		}
+	})
+	return negated
 }
 
 func (c *compiler) buildCompileResult(filters map[*config.FilterConfig]filter.Filter) *config.RulesCompileResult {
@@ -194,4 +385,14 @@ func (c *compiler) buildCompileResult(filters map[*config.FilterConfig]filter.Fi
 	rs.UsedEvents = events
 
 	return rs
+}
+
+func rhsToStrings(n ql.Node) ([]string, bool) {
+	switch v := n.(type) {
+	case *ql.StringLiteral:
+		return []string{v.Value}, true
+	case *ql.ListLiteral:
+		return v.Values, true
+	}
+	return []string{}, false
 }

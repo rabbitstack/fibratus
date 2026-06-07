@@ -202,11 +202,59 @@ type RulesCompileResult struct {
 	HasThreadpoolEvents bool
 	UsedEvents          []event.Type
 	NumberRules         int
+	Approvers           Approvers
 }
 
-func (r RulesCompileResult) ContainsEvent(Type event.Type) bool {
-	for _, ktyp := range r.UsedEvents {
-		if ktyp == Type {
+type Approvers struct {
+	Keys        map[string][]string
+	Paths       map[string][]string
+	Extensions  map[string][]string
+	Bases       map[string][]string
+	Executables map[string][]string
+}
+
+func (p *Approvers) AppendKey(op, path string) {
+	if slices.Contains(p.Keys[op], path) {
+		return
+	}
+	p.Keys[op] = append(p.Keys[op], path)
+}
+
+func (p *Approvers) AppendPath(op, path string) {
+	if slices.Contains(p.Paths[op], path) {
+		return
+	}
+	p.Paths[op] = append(p.Paths[op], path)
+}
+
+func (p *Approvers) AppendExtension(op, ext string) {
+	if slices.Contains(p.Extensions[op], ext) {
+		return
+	}
+	p.Extensions[op] = append(p.Extensions[op], ext)
+}
+
+func (p *Approvers) AppendBase(op, base string) {
+	if slices.Contains(p.Bases[op], base) {
+		return
+	}
+	p.Bases[op] = append(p.Bases[op], base)
+}
+
+func (p *Approvers) AppendExecutable(op, exe string) {
+	if slices.Contains(p.Executables[op], exe) {
+		return
+	}
+	p.Executables[op] = append(p.Executables[op], exe)
+}
+
+func (p Approvers) String() string {
+	return fmt.Sprintf("Keys: %v, Paths: %v, Extensions: %v, Bases: %v, Executables: %v", p.Keys, p.Paths, p.Extensions, p.Bases, p.Executables)
+}
+
+func (r RulesCompileResult) ContainsEvent(e event.Type) bool {
+	for _, typ := range r.UsedEvents {
+		if typ == e {
 			return true
 		}
 	}
@@ -237,7 +285,8 @@ func (r RulesCompileResult) String() string {
 		HasAuditAPIEvents: %t
 		HasDNSEvents: %t
 		HasThreadpoolEvents: %t
-		Events: %s`,
+		Events: %s
+		Approvers: %s`,
 		r.HasProcEvents,
 		r.HasThreadEvents,
 		r.HasModuleEvents,
@@ -251,6 +300,7 @@ func (r RulesCompileResult) String() string {
 		r.HasDNSEvents,
 		r.HasThreadpoolEvents,
 		strings.Join(events, ", "),
+		r.Approvers,
 	)
 }
 

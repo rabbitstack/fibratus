@@ -26,7 +26,7 @@ import (
 func TestScanner(t *testing.T) {
 	var tests = []struct {
 		s   string
-		tok token
+		tok Token
 		lit string
 		pos int
 	}{

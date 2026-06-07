@@ -43,7 +43,7 @@ func newScanner(r io.Reader) *scanner {
 // scan returns the next token and position from the underlying reader.
 // Also returns the literal text read for strings, numbers, and duration tokens
 // since these token types can have different literal representations.
-func (s *scanner) scan() (tok token, pos int, lit string) {
+func (s *scanner) scan() (tok Token, pos int, lit string) {
 	// Read next code point.
 	ch0, pos := s.r.read()
 
@@ -124,7 +124,7 @@ func (s *scanner) scan() (tok token, pos int, lit string) {
 }
 
 // scanWhitespace consumes the current rune and all contiguous whitespace.
-func (s *scanner) scanWhitespace() (tok token, pos int, lit string) {
+func (s *scanner) scanWhitespace() (tok Token, pos int, lit string) {
 	// Create a buffer and read the current character into it.
 	var buf bytes.Buffer
 	ch, pos := s.r.curr()
@@ -147,7 +147,7 @@ func (s *scanner) scanWhitespace() (tok token, pos int, lit string) {
 	return WS, pos, buf.String()
 }
 
-func (s *scanner) scanIdent() (tok token, pos int, lit string) {
+func (s *scanner) scanIdent() (tok Token, pos int, lit string) {
 	// Save the starting position of the identifier.
 	_, pos = s.r.read()
 	s.r.unread()
@@ -180,7 +180,7 @@ func (s *scanner) scanIdent() (tok token, pos int, lit string) {
 }
 
 // scanNumber consumes anything that looks like the start of a number.
-func (s *scanner) scanNumber() (tok token, pos int, lit string) {
+func (s *scanner) scanNumber() (tok Token, pos int, lit string) {
 	var buf bytes.Buffer
 
 	// Check if the initial rune is a ".".
@@ -322,7 +322,7 @@ func scanBareIdent(r io.RuneScanner) string {
 
 // scanString consumes a contiguous string of non-quote characters.
 // Quote characters can be consumed if they're first escaped with a backslash.
-func (s *scanner) scanString() (tok token, pos int, lit string) {
+func (s *scanner) scanString() (tok Token, pos int, lit string) {
 	s.r.unread()
 	_, pos = s.r.curr()
 
@@ -384,7 +384,7 @@ type bufScanner struct {
 	i   int // buffer index
 	n   int // buffer size
 	buf [3]struct {
-		tok token
+		tok Token
 		pos int
 		lit string
 	}
@@ -396,12 +396,12 @@ func newBufScanner(r io.Reader) *bufScanner {
 }
 
 // scan reads the next token from the scanner.
-func (s *bufScanner) scan() (tok token, pos int, lit string) {
+func (s *bufScanner) scan() (tok Token, pos int, lit string) {
 	return s.scanFunc(s.s.scan)
 }
 
 // scanFunc uses the provided function to scan the next token.
-func (s *bufScanner) scanFunc(scan func() (token, int, string)) (tok token, pos int, lit string) {
+func (s *bufScanner) scanFunc(scan func() (Token, int, string)) (tok Token, pos int, lit string) {
 	// If we have unread tokens then read them off the buffer first.
 	if s.n > 0 {
 		s.n--
@@ -420,7 +420,7 @@ func (s *bufScanner) scanFunc(scan func() (token, int, string)) (tok token, pos 
 func (s *bufScanner) unscan() { s.n++ }
 
 // curr returns the last read token.
-func (s *bufScanner) curr() (tok token, pos int, lit string) {
+func (s *bufScanner) curr() (tok Token, pos int, lit string) {
 	buf := &s.buf[(s.i-s.n+len(s.buf))%len(s.buf)]
 	return buf.tok, buf.pos, buf.lit
 }
