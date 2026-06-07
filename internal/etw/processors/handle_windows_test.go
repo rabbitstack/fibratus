@@ -23,7 +23,6 @@ import (
 
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
-	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/stretchr/testify/assert"
@@ -93,7 +92,7 @@ func TestHandleProcessor(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			hsnap := tt.hsnap()
 			psnap := new(ps.SnapshotterMock)
-			p := newHandleProcessor(hsnap, psnap, fs.NewDevMapper())
+			p := newHandleProcessor(hsnap, psnap)
 			var err error
 			tt.e, _, err = p.ProcessEvent(tt.e)
 			require.NoError(t, err)

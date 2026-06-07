@@ -28,20 +28,17 @@ import (
 )
 
 type handleProcessor struct {
-	hsnap     handle.Snapshotter
-	psnap     ps.Snapshotter
-	devMapper fs.DevMapper
+	hsnap handle.Snapshotter
+	psnap ps.Snapshotter
 }
 
 func newHandleProcessor(
 	hsnap handle.Snapshotter,
 	psnap ps.Snapshotter,
-	devMapper fs.DevMapper,
 ) Processor {
 	return &handleProcessor{
-		hsnap:     hsnap,
-		psnap:     psnap,
-		devMapper: devMapper,
+		hsnap: hsnap,
+		psnap: psnap,
 	}
 }
 
@@ -80,7 +77,7 @@ func (h *handleProcessor) processEvent(e *event.Event) (*event.Event, error) {
 				name += "\\" + keyName
 			}
 		case handle.File:
-			name = h.devMapper.Convert(name)
+			name = fs.GetDevMapper().Convert(name)
 		}
 		// assign the formatted handle name
 		if err := e.Params.SetValue(params.HandleObjectName, name); err != nil {
