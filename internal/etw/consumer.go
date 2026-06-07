@@ -19,6 +19,7 @@
 package etw
 
 import (
+	"github.com/rabbitstack/fibratus/internal/etw/approvers"
 	"github.com/rabbitstack/fibratus/internal/etw/processors"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
@@ -36,7 +37,8 @@ import (
 type Consumer struct {
 	q          *event.Queue
 	sequencer  *event.Sequencer
-	processors processors.Chain
+	processors *processors.Chain
+	approvers  approvers.Approvers
 	psnap      ps.Snapshotter
 	config     *config.Config
 	filter     filter.Filter
@@ -49,7 +51,8 @@ func NewConsumer(
 	config *config.Config,
 	sequencer *event.Sequencer,
 	evts chan *event.Event,
-	processors processors.Chain,
+	processors *processors.Chain,
+	r *config.RulesCompileResult,
 ) *Consumer {
 	return &Consumer{
 		q:          event.NewQueueWithChannel(evts, config.EventSource.StackEnrichment, config.ForwardMode || config.IsCaptureSet()),
@@ -57,6 +60,7 @@ func NewConsumer(
 		processors: processors,
 		psnap:      psnap,
 		config:     config,
+		approvers:  approvers.New(psnap, r, processors),
 	}
 }
 
@@ -69,25 +73,32 @@ func (c *Consumer) Close() error {
 	return c.processors.Close()
 }
 
-func (c *Consumer) ProcessEvent(ev *etw.EventRecord) error {
+func (c *Consumer) ProcessEvent(r *etw.EventRecord) error {
 	if c.isClosing {
 		return nil
 	}
 
-	if !c.config.EventSource.EventExists(ev.ID()) {
+	if !c.config.EventSource.EventExists(r.ID()) {
 		eventsUnknown.Add(1)
 		return nil
 	}
-	if event.IsCurrentProcDropped(ev.Header.ProcessID) && ev.Header.ProviderID != etw.WindowsKernelProcessGUID {
+	if event.IsCurrentProcDropped(r.Header.ProcessID) && r.Header.ProviderID != etw.WindowsKernelProcessGUID {
 		return nil
 	}
-	if c.config.EventSource.ExcludeEvent(ev.ID()) {
+
+	rec, approved := c.approvers.Approve(r)
+	if !approved {
+		return nil
+	}
+	defer c.approvers.Cleanup(rec)
+
+	if c.config.EventSource.ExcludeEvent(rec.ID()) {
 		eventsExcluded.Add(1)
 		return nil
 	}
 
 	eventsProcessed.Add(1)
-	evt := event.New(c.sequencer.Get(), ev)
+	evt := event.New(c.sequencer.Get(), rec)
 
 	// Dispatch each event to the processor chain.
 	// Processors may further augment the event with
@@ -99,9 +110,6 @@ func (c *Consumer) ProcessEvent(ev *etw.EventRecord) error {
 	evt, err = c.processors.ProcessEvent(evt)
 	if err != nil {
 		return err
-	}
-	if evt.WaitEnqueue {
-		return nil
 	}
 	ok, proc := c.psnap.Find(evt.PID)
 	if !ok {
