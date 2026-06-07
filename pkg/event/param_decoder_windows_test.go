@@ -147,13 +147,15 @@ func TestDecodeFile(t *testing.T) {
 		{
 			name: "CreateFile", opcode: CreateFileID,
 			assertions: func(t *testing.T, e *Event) {
-				assert.Len(t, e.Params, 7)
+				assert.Len(t, e.Params, 9)
 				assert.Equal(t, uint64(0xffffd78d965e07c8), e.Params.MustGetUint64(params.FileIrpPtr))
 				assert.Equal(t, uint64(0xffffd78d920b6650), e.Params.MustGetUint64(params.FileObject))
 				assert.Equal(t, `\Device\HarddiskVolume3\WINDOWS\AppCompat\Programs\Amcache.hve`, e.Params.MustGetString(params.FilePath))
 				assert.Equal(t, "NORMAL", e.GetParamAsString(params.FileAttributes))
 				assert.Equal(t, "SEQUENTIAL_ONLY|SYNCHRONOUS_IO_NONALERT|NO_COMPRESSION", e.GetParamAsString(params.FileCreateOptions))
 				assert.Equal(t, uint32(6536), e.Params.MustGetTid())
+				assert.Equal(t, "SUPERSEDE", e.GetParamAsString(params.FileOperation))
+				assert.Equal(t, "Success", e.GetParamAsString(params.NTStatus))
 			},
 			buf: []byte{
 				200, 7, 94, 150, 141, 215, 255, 255,
