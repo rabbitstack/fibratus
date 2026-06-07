@@ -24,14 +24,13 @@ package handle
 import (
 	"errors"
 	"fmt"
+
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
 	"golang.org/x/sys/windows"
 )
-
-var devMapper = fs.NewDevMapper()
 
 // Duplicate duplicates the handle in the caller process's address space.
 func Duplicate(handle windows.Handle, pid uint32, access uint32) (windows.Handle, error) {
@@ -91,7 +90,7 @@ func QueryName(handle windows.Handle, typ string, withTimeout bool) (string, hty
 		if err != nil {
 			return "", nil, err
 		}
-		name = devMapper.Convert(name)
+		name = fs.GetDevMapper().Convert(name)
 		fileInfo := &htypes.FileInfo{IsDirectory: sys.PathIsDirectory(name)}
 		return name, fileInfo, nil
 	case ALPCPort:
