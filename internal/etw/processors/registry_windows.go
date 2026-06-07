@@ -139,7 +139,7 @@ func (r *registryProcessor) processEvent(e *event.Event) (*event.Event, error) {
 		path := e.Params.MustGetString(params.RegPath)
 		if kcb != 0 {
 			if baseKey, ok := r.keys[kcb]; ok {
-				path = baseKey + "\\" + path
+				path = key.ConcatPaths(baseKey, path)
 			} else {
 				kcbMissCount.Add(1)
 				path = r.findMatchingKey(e.PID, path)
