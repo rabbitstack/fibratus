@@ -22,28 +22,39 @@
 package fs
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/sys"
 	"os"
 	"strings"
+	"sync"
+
+	"github.com/rabbitstack/fibratus/pkg/sys"
 )
 
 const deviceOffset = 8
 const vmsmbDevice = `\Device\vmsmb`
 
-// DevMapper is the minimal interface for the device converters.
-type DevMapper interface {
-	// Convert receives the fully qualified file path and replaces the DOS device name with a drive letter.
-	Convert(filename string) string
+var (
+	devMapper     *DevMapper
+	onceDevMapper sync.Once
+)
+
+// GetDevMapper builds and returns the singleton dev mapper instance.
+func GetDevMapper() *DevMapper {
+	onceDevMapper.Do(func() {
+		devMapper = newDevMapper()
+	})
+	return devMapper
 }
 
-type mapper struct {
+// DevMapper converts the fully qualified file path and
+// replaces the DOS device name with a drive letter.
+type DevMapper struct {
 	cache   map[string]string
 	sysroot string
 }
 
-// NewDevMapper creates a new instance of the DOS device replacer.
-func NewDevMapper() DevMapper {
-	m := &mapper{
+// newDevMapper creates a new instance of the DOS device replacer.
+func newDevMapper() *DevMapper {
+	m := &DevMapper{
 		cache: make(map[string]string),
 	}
 
@@ -65,39 +76,39 @@ func NewDevMapper() DevMapper {
 	return m
 }
 
-func (m *mapper) Convert(filename string) string {
-	if filename == "" || len(filename) < deviceOffset {
-		return filename
+func (m *DevMapper) Convert(path string) string {
+	if path == "" || len(path) < deviceOffset {
+		return path
 	}
 
 	// find the backslash index
-	n := strings.Index(filename[deviceOffset:], "\\")
+	n := strings.Index(path[deviceOffset:], "\\")
 	if n < 0 {
-		if f, ok := m.cache[filename]; ok {
+		if f, ok := m.cache[path]; ok {
 			return f
 		}
-		return filename
+		return path
 	}
 
-	dev := filename[:n+deviceOffset]
+	dev := path[:n+deviceOffset]
 	if drive, ok := m.cache[dev]; ok {
 		// the mapping for the DOS device exists
-		return strings.Replace(filename, dev, drive, 1)
+		return strings.Replace(path, dev, drive, 1)
 	}
 
 	switch {
 	case dev == vmsmbDevice:
 		// convert Windows Sandbox path to native path
-		if n := strings.Index(filename, "os"); n > 0 {
-			return "C:" + filename[n+2:]
+		if n := strings.Index(path, "os"); n > 0 {
+			return "C:" + path[n+2:]
 		}
-	case strings.HasPrefix(filename, "\\SystemRoot"):
+	case strings.HasPrefix(path, "\\SystemRoot"):
 		// normalize paths starting with SystemRoot
-		return strings.Replace(filename, "\\SystemRoot", m.sysroot, 1)
-	case strings.HasPrefix(filename, "\\SYSTEMROOT"):
+		return strings.Replace(path, "\\SystemRoot", m.sysroot, 1)
+	case strings.HasPrefix(path, "\\SYSTEMROOT"):
 		// normalize paths starting with SYSTEMROOT
-		return strings.Replace(filename, "\\SYSTEMROOT", m.sysroot, 1)
+		return strings.Replace(path, "\\SYSTEMROOT", m.sysroot, 1)
 	}
 
-	return filename
+	return path
 }
