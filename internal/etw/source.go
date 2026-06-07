@@ -75,7 +75,7 @@ type EventSource struct {
 	r          *config.RulesCompileResult
 	traces     []*Trace
 	consumers  []*Consumer
-	processors processors.Chain
+	processors *processors.Chain
 
 	errs      chan error
 	evts      chan *event.Event
@@ -253,6 +253,7 @@ func (e *EventSource) Open(config *config.Config) error {
 			e.sequencer,
 			e.evts,
 			e.processors,
+			e.r,
 		)
 		consumer.SetFilter(e.filter)
 
