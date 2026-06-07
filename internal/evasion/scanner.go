@@ -56,13 +56,6 @@ func NewScanner(config Config) *Scanner {
 }
 
 func (s *Scanner) ProcessEvent(e *event.Event) (bool, error) {
-	// filter out CreateFile events with the open disposition
-	// as they tend to be noisy and could impact performance
-	// when hitting evasion detectors
-	if e.IsOpenDisposition() {
-		return true, nil
-	}
-
 	var enq bool
 
 	// run registered evasion detectors
