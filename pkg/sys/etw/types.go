@@ -570,6 +570,72 @@ type EventFilterDescriptor struct {
 	Type uint32
 }
 
+const (
+	// ExtTypeDisposition represents a custom extended item type for the file disposition.
+	ExtTypeDisposition = 0x8000
+	// ExtTypeStatus represents a custom extended item type for the file system status.
+	ExtTypeStatus = 0x8001
+)
+
+// FileExtendedDataItems stores file extended data items.
+type FileExtendedDataItems struct {
+	status      uint32
+	disposition uint32
+	items       []EventHeaderExtendedDataItem
+}
+
+// AppendEventHeaderFileExtendedDataItems appends custom file extendeed data items to the event record.
+func AppendEventHeaderFileExtendedDataItems(r *EventRecord, disposition uint64, status uint32) *FileExtendedDataItems {
+	f := &FileExtendedDataItems{
+		disposition: uint32(disposition),
+		status:      status,
+		items:       make([]EventHeaderExtendedDataItem, 2),
+	}
+
+	f.items[0] = EventHeaderExtendedDataItem{
+		ExtType:  ExtTypeDisposition,
+		DataSize: 4,
+		DataPtr:  uint64(uintptr(unsafe.Pointer(&f.disposition))),
+	}
+	f.items[1] = EventHeaderExtendedDataItem{
+		ExtType:  ExtTypeStatus,
+		DataSize: 4,
+		DataPtr:  uint64(uintptr(unsafe.Pointer(&f.status))),
+	}
+
+	r.ExtendedDataCount = uint16(len(f.items))
+	r.ExtendedData = &f.items[0]
+
+	return f
+}
+
+// ReadEventHeaderFileExtendedDataItems reads the custom file extended data items from the event record.
+func (r *EventRecord) ReadEventHeaderFileExtendedDataItems() (uint32, uint32) {
+	if r.ExtendedData == nil {
+		return 0, 0
+	}
+
+	items := unsafe.Slice(r.ExtendedData, r.ExtendedDataCount)
+
+	var disposition uint32
+	var status uint32
+
+	for _, item := range items {
+		switch item.ExtType {
+		case ExtTypeDisposition:
+			if item.DataSize == 4 && item.DataPtr != 0 {
+				disposition = *(*uint32)(unsafe.Pointer(uintptr(item.DataPtr)))
+			}
+		case ExtTypeStatus:
+			if item.DataSize == 4 && item.DataPtr != 0 {
+				status = *(*uint32)(unsafe.Pointer(uintptr(item.DataPtr)))
+			}
+		}
+	}
+
+	return disposition, status
+}
+
 // NewClassicEventID creates a new instance of classic event identifier.
 func NewClassicEventID(guid windows.GUID, typ uint16) ClassicEventID {
 	return ClassicEventID{GUID: guid, Type: uint8(typ)}
@@ -604,6 +670,17 @@ func (e *EventRecord) ID() uint {
 		uint(e.HookID())
 
 	return id
+}
+
+// Copy makes a copy of this event record and returns the
+// copy itself and the event buffer. The buffer must outlive
+// the event record instance.
+func (r *EventRecord) Copy() (*EventRecord, []byte) {
+	c := *r
+	buf := make([]byte, r.BufferLen)
+	copy(buf, unsafe.Slice((*byte)(unsafe.Pointer(r.Buffer)), r.BufferLen))
+	c.Buffer = uintptr(unsafe.Pointer(&buf[0]))
+	return &c, buf
 }
 
 // ReadByte reads the byte from the buffer at the specified offset.
