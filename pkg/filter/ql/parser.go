@@ -650,10 +650,10 @@ func parseDuration(s string) (time.Duration, error) {
 }
 
 // scan returns the next token from the underlying scanner.
-func (p *Parser) scan() (tok token, pos int, lit string) { return p.s.scan() }
+func (p *Parser) scan() (tok Token, pos int, lit string) { return p.s.scan() }
 
 // scanIgnoreWhitespace scans the next non-whitespace.
-func (p *Parser) scanIgnoreWhitespace() (tok token, pos int, lit string) {
+func (p *Parser) scanIgnoreWhitespace() (tok Token, pos int, lit string) {
 	for {
 		tok, pos, lit = p.scan()
 		if tok == WS {

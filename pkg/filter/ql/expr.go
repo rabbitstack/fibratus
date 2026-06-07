@@ -49,7 +49,7 @@ func (e *ParenExpr) String() string {
 
 // BinaryExpr represents an operation between two expressions.
 type BinaryExpr struct {
-	Op  token
+	Op  Token
 	LHS Expr
 	RHS Expr
 }
