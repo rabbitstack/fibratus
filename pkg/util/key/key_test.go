@@ -22,11 +22,12 @@
 package key
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
-	"testing"
 )
 
 func init() {
@@ -179,6 +180,36 @@ func TestReadValue(t *testing.T) {
 			_, val, err := tt.key.ReadValue(tt.subkey)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, val)
+		})
+	}
+}
+
+func TestConcatPaths(t *testing.T) {
+	var tests = []struct {
+		root     string
+		subkey   string
+		expected string
+	}{
+		{
+			root:     "HKEY_LOCAL_MACHINE",
+			subkey:   `Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\Capabilities`,
+			expected: `HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\Capabilities`,
+		},
+		{
+			root:     "",
+			subkey:   `Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\Capabilities`,
+			expected: `Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\Capabilities`,
+		},
+		{
+			root:     "HKEY_LOCAL_MACHINE",
+			subkey:   "",
+			expected: "HKEY_LOCAL_MACHINE\\",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.root+tt.subkey, func(t *testing.T) {
+			assert.Equal(t, tt.expected, ConcatPaths(tt.root, tt.subkey))
 		})
 	}
 }
