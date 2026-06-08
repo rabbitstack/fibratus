@@ -22,11 +22,12 @@
 package key
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/sys"
-	"golang.org/x/sys/windows/registry"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/rabbitstack/fibratus/pkg/sys"
+	"golang.org/x/sys/windows/registry"
 )
 
 var (
@@ -200,6 +201,18 @@ func Format(key string) (Key, string) {
 		}
 	}
 	return Invalid, key
+}
+
+// ConcatPaths concatenates root and subkey registry paths.
+func ConcatPaths(root, path string) string {
+	var b strings.Builder
+	b.Grow(len(root) + len(path) + 1)
+	if root != "" {
+		b.WriteString(root)
+		b.WriteByte('\\')
+	}
+	b.WriteString(path)
+	return b.String()
 }
 
 func subkey(key string, prefix string) string {
