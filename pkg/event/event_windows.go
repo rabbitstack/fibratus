@@ -76,6 +76,14 @@ func New(seq uint64, r *etw.EventRecord) *Event {
 	return e
 }
 
+// RawTimestamp returns the raw event record system timestamp.
+func (e *Event) RawTimestamp() uint64 {
+	nsec := e.Timestamp.UnixNano()
+	nsec /= 100
+	nsec += 116444736000000000
+	return uint64(nsec)
+}
+
 func (e *Event) adjustPID() {
 	switch e.Category {
 	case Module:
@@ -251,14 +259,6 @@ func (e *Event) IsCreateDisposition() bool {
 // IsOpenDisposition determines if the file disposition leads to opening a file object.
 func (e *Event) IsOpenDisposition() bool {
 	return e.IsCreateFile() && e.Params.MustGetUint32(params.FileOperation) == windows.FILE_OPEN
-}
-
-// StackID returns the integer that is used to stich the callstack present in the StackWalk event.
-func (e *Event) StackID() uint64 {
-	if e.IsCreateProcess() {
-		return uint64(e.Params.MustGetPpid() + e.Tid)
-	}
-	return uint64(e.PID + e.Tid)
 }
 
 // StackPID returns the process id as seen the creator

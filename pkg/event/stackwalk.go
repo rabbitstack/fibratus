@@ -29,11 +29,11 @@ import (
 )
 
 // maxQueueTTLPeriod specifies the maximum period
-// for the events to reside in the queue.
-var maxQueueTTLPeriod = time.Second * 10
+// for the events to reside in the bucket queue
+var maxQueueTTLPeriod = time.Millisecond * 500
 
-// flusherInterval specifies the interval for the queue flushing.
-var flusherInterval = time.Second * 5
+// flusherInterval specifies the interval for the queue flushing
+var flusherInterval = time.Millisecond * 250
 
 // stackwalkFlushes computes overall flushes for unmatched stackwalk events
 var stackwalkFlushes = expvar.NewInt("stackwalk.flushes")
@@ -44,19 +44,23 @@ var stackwalkFlushesProcs = expvar.NewMap("stackwalk.flushes.procs")
 // stackwalkFlushesEvents computes overall flushes for unmatched stackwalks per event type
 var stackwalkFlushesEvents = expvar.NewMap("stackwalk.flushes.events")
 
-// stackwalkEnqueued counts the number of enqueued events in individual buckets
-var stackwalkEnqueued = expvar.NewInt("stackwalk.enqueued")
+// stackwalkUnordered counts the unordered stackwalk matches
+var stackwalkUnorderedMatches = expvar.NewInt("stackwalk.unordered.matches")
 
-// stackwalkBuckets counts the number of overall stackwalk buckets per stack id
-var stackwalkBuckets = expvar.NewInt("stackwalk.buckets")
+// stackwalkUnorderedEnqueued counts enqueued unordered stackwalk matches
+var stackwalkUnorderedEnqueued = expvar.NewInt("stackwalk.unordered.enqueued")
 
-// StackwalkDecorator maintains a FIFO queue where events
-// eligible for stack enrichment are queued. Upon arrival
+// stackwalkSurrogateProcessHits counts the number of hits where the callstack is attributed from
+// the surrogate thread creation event
+var stackwalkSurrogateProcessHits = expvar.NewInt("stackwalk.surrogate.process.hits")
+
+// StackwalkDecorator maintains a per-timestamp buckets where
+// events eligible for stack enrichment are queued. Upon arrival
 // of the respective stack walk event, the acting event is
-// popped from the queue and enriched with return addresses
+// popped from the bucket and enriched with return addresses
 // which are later subject to symbolization.
 type StackwalkDecorator struct {
-	buckets map[uint64][]*Event
+	buckets map[uint64]*Event
 	q       *Queue
 	mux     sync.Mutex
 
@@ -72,7 +76,7 @@ type StackwalkDecorator struct {
 func NewStackwalkDecorator(q *Queue) *StackwalkDecorator {
 	s := &StackwalkDecorator{
 		q:       q,
-		buckets: make(map[uint64][]*Event),
+		buckets: make(map[uint64]*Event),
 		procs:   make(map[uint32]*Event),
 		flusher: time.NewTicker(flusherInterval),
 		quit:    make(chan struct{}, 1),
@@ -95,17 +99,19 @@ func (s *StackwalkDecorator) Push(e *Event) {
 		s.procs[e.Params.MustGetPid()] = e
 	}
 
-	// append the event to the bucket indexed by stack id
-	id := e.StackID()
-	q, ok := s.buckets[id]
-	if !ok {
-		s.buckets[id] = []*Event{e}
-	} else {
-		s.buckets[id] = append(q, e)
-	}
+	id := e.RawTimestamp()
 
-	stackwalkBuckets.Set(int64(len(s.buckets)))
-	stackwalkEnqueued.Add(int64(len(s.buckets[id])))
+	// check if we have the previous stack walk event
+	if evt, ok := s.buckets[id]; ok && evt.IsStackWalk() {
+		stackwalkUnorderedMatches.Add(1)
+		callstack := evt.Params.MustGetSlice(params.Callstack)
+		e.AppendParam(params.Callstack, params.Slice, callstack)
+		delete(s.buckets, id)
+		_ = s.q.push(e)
+	} else {
+		// store the event to the bucket indexed by stack id
+		s.buckets[id] = e
+	}
 }
 
 // Pop receives the stack walk event and pops the oldest
@@ -116,21 +122,17 @@ func (s *StackwalkDecorator) Pop(e *Event) *Event {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 
-	id := e.StackID()
-	q, ok := s.buckets[id]
+	id := e.Params.MustGetUint64(params.CallstackTimestamp)
+	evt, ok := s.buckets[id]
 	if !ok {
+		// enqueue if the stack walk arrived out of order
+		if e.Params.MustGetPid() != currentPid {
+			s.buckets[id] = e
+			stackwalkUnorderedEnqueued.Add(1)
+		}
 		return e
 	}
-
-	var evt *Event
-	if len(q) > 0 {
-		evt, s.buckets[id] = q[0], q[1:]
-		stackwalkEnqueued.Add(-int64(len(s.buckets[id])))
-	}
-
-	if evt == nil {
-		return e
-	}
+	delete(s.buckets, id)
 
 	if evt.IsSurrogateProcess() && s.procs[evt.Params.MustGetPid()] != nil {
 		delete(s.procs, evt.Params.MustGetPid())
@@ -152,17 +154,8 @@ func (s *StackwalkDecorator) Pop(e *Event) *Event {
 			ev.AppendParam(params.Callstack, params.Slice, callstack)
 			_ = s.q.push(ev)
 			delete(s.procs, pid)
-			// find the most recent CreateProcess event and
-			// remove it from buckets as we have the callstack
-			qu := s.buckets[ev.StackID()]
-			for i := len(qu) - 1; i >= 0; i-- {
-				proc := qu[i]
-				if !proc.IsCreateProcess() && proc.Params.MustGetPid() != pid {
-					continue
-				}
-				qu = append(qu[:i], qu[i+1:]...)
-			}
-			s.buckets[ev.StackID()] = qu
+			delete(s.buckets, ev.RawTimestamp())
+			stackwalkSurrogateProcessHits.Add(1)
 		}
 	}
 
@@ -172,14 +165,6 @@ func (s *StackwalkDecorator) Pop(e *Event) *Event {
 // Stop shutdowns the stack walk decorator flusher.
 func (s *StackwalkDecorator) Stop() {
 	s.quit <- struct{}{}
-}
-
-// RemoveBucket removes the bucket and all enqueued events.
-func (s *StackwalkDecorator) RemoveBucket(id uint64) {
-	s.mux.Lock()
-	defer s.mux.Unlock()
-	delete(s.buckets, id)
-	stackwalkBuckets.Set(int64(len(s.buckets)))
 }
 
 func (s *StackwalkDecorator) doFlush() {
@@ -209,20 +194,12 @@ func (s *StackwalkDecorator) flush() []error {
 
 	expired := make([]*Event, 0)
 
-	for id, q := range s.buckets {
-		n := make([]*Event, 0, len(q))
-		for _, evt := range q {
-			if time.Since(evt.Timestamp) < maxQueueTTLPeriod {
-				n = append(n, evt)
-				continue
-			}
-			expired = append(expired, evt)
+	for id, evt := range s.buckets {
+		if time.Since(evt.Timestamp) < maxQueueTTLPeriod {
+			continue
 		}
-		if len(n) == 0 {
-			delete(s.buckets, id)
-		} else {
-			s.buckets[id] = n
-		}
+		expired = append(expired, evt)
+		delete(s.buckets, id)
 	}
 
 	s.mux.Unlock()
@@ -232,13 +209,14 @@ func (s *StackwalkDecorator) flush() []error {
 	// This allows incoming Push()/Pop() calls to proceed
 	// while the channel send may block briefly
 	for _, evt := range expired {
+		if evt.IsStackWalk() {
+			continue
+		}
 		stackwalkFlushes.Add(1)
+
 		err := s.q.push(evt)
 		if err != nil {
 			errs = append(errs, err)
-		}
-		if stackwalkEnqueued.Value() > 0 {
-			stackwalkEnqueued.Add(-1)
 		}
 		if evt.PS != nil {
 			stackwalkFlushesProcs.Add(evt.PS.Name, 1)
