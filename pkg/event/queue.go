@@ -130,6 +130,7 @@ func (q *Queue) push(e *Event) error {
 	if q.enqueueAlways {
 		enqueue = true
 	}
+
 	for _, listener := range q.listeners {
 		enq, err := listener.ProcessEvent(e)
 		if err != nil {
@@ -139,13 +140,11 @@ func (q *Queue) push(e *Event) error {
 			enqueue = true
 		}
 	}
-	if q.stackEnrichment && e.IsTerminateThread() {
-		id := uint64(e.Params.MustGetPid() + e.Params.MustGetTid())
-		q.decorator.RemoveBucket(id)
-	}
+
 	if enqueue || len(q.listeners) == 0 {
 		q.q <- e
 		eventsEnqueued.Add(1)
 	}
+
 	return nil
 }

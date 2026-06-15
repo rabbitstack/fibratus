@@ -32,6 +32,8 @@ const (
 	ThreadID = "tid"
 	// Callstack field represents the thread callstack.
 	Callstack = "callstack"
+	// CallstackTimestamp field identifvies the callstack timestamp parameter.
+	CallstackTimestamp = "callstack_timestamp"
 	// ProcessParentID field represents the parent process identifier.
 	ProcessParentID = "ppid"
 	// ProcessRealParentID field presents the real parent process identifier.
