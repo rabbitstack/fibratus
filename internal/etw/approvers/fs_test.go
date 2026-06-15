@@ -35,6 +35,7 @@ func createFileRecord(t *testing.T, buf []byte) *etw.EventRecord {
 	b := make([]byte, len(buf))
 	copy(b, buf)
 	r := &etw.EventRecord{}
+	r.Header.Timestamp = 250273540393 // matches StackWalk timestamp parameter
 	r.Header.ProviderID = event.FileEventGUID
 	r.Header.EventDescriptor.Opcode = event.CreateFileID
 	r.BufferLen = uint16(len(b))
@@ -52,6 +53,19 @@ func fileOpEndRecord(t *testing.T, buf []byte) *etw.EventRecord {
 	r := &etw.EventRecord{}
 	r.Header.ProviderID = event.FileEventGUID
 	r.Header.EventDescriptor.Opcode = event.FileOpEndID
+	r.BufferLen = uint16(len(b))
+	r.Buffer = uintptr(unsafe.Pointer(&b[0]))
+	t.Cleanup(func() { _ = b })
+	return r
+}
+
+func stackwalkRecord(t *testing.T, buf []byte) *etw.EventRecord {
+	t.Helper()
+	b := make([]byte, len(buf))
+	copy(b, buf)
+	r := &etw.EventRecord{}
+	r.Header.ProviderID = event.StackWalkEventGUID
+	r.Header.EventDescriptor.Opcode = event.StackWalkID
 	r.BufferLen = uint16(len(b))
 	r.Buffer = uintptr(unsafe.Pointer(&b[0]))
 	t.Cleanup(func() { _ = b })
@@ -92,6 +106,33 @@ var (
 		248, 240, 61, 151, 141, 215, 255, 255, // Irp
 		0, 0, 0, 0, 40, 0, 0, 0, // ExtraInformation
 		0, 0, 0, 0, // Status
+	}
+
+	stackwalkBuf = []byte{
+		41, 41, 119, 69, 58, 0, 0, 0,
+		12, 15, 0, 0,
+		160, 29, 0, 0,
+
+		148, 12, 254, 189, 5, 248, 255, 255,
+		175, 137, 229, 189, 5, 248, 255, 255,
+		134, 47, 242, 189, 5, 248, 255, 255,
+		36, 109, 255, 80, 5, 248, 255, 255,
+		175, 186, 130, 79, 5, 248, 255, 255,
+		160, 177, 130, 79, 5, 248, 255, 255,
+		224, 104, 137, 79, 5, 248, 255, 255,
+		59, 149, 250, 189, 5, 248, 255, 255,
+		179, 148, 250, 189, 5, 248, 255, 255,
+		59, 168, 73, 190, 5, 248, 255, 255,
+		218, 136, 73, 190, 5, 248, 255, 255,
+		227, 101, 73, 190, 5, 248, 255, 255,
+		196, 202, 73, 190, 5, 248, 255, 255,
+		85, 217, 43, 190, 5, 248, 255, 255,
+
+		20, 69, 114, 9, 253, 127, 0, 0,
+		31, 51, 25, 6, 253, 127, 0, 0,
+		105, 96, 138, 36, 246, 127, 0, 0,
+		109, 37, 146, 36, 246, 127, 0, 0,
+		227, 37, 146, 36, 246, 127, 0, 0,
 	}
 )
 

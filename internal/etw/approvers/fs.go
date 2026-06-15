@@ -26,12 +26,15 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/event"
 	devmapper "github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
+	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
 )
 
 var (
 	fsApproverApprovals  = expvar.NewInt("approver.fs.approvals")
 	fsApproverRejections = expvar.NewInt("approver.fs.rejections")
+
+	fsApproverCallstackMisses = expvar.NewInt("approver.fs.callstack.misses")
 )
 
 // irp acts as a scratch area for the pending IRP request
@@ -39,9 +42,10 @@ var (
 // The memory buffer backing the event record must outlive
 // event processors scope.
 type irp struct {
-	rec   *etw.EventRecord
-	buf   []byte                     // keeps the data buffer alive
-	items *etw.FileExtendedDataItems // keeps the extended data items alive
+	rec       *etw.EventRecord
+	buf       []byte                     // keeps the data buffer alive
+	items     *etw.FileExtendedDataItems // keeps the extended data items alive
+	callstack []va.Address               // CreateFile stack return addresses
 }
 
 // fs is the file system approver that accepts or discards
@@ -80,7 +84,8 @@ func newFSApprover(r *config.RulesCompileResult, processors *processors.Chain) A
 }
 
 func (f *fs) Approve(r *etw.EventRecord) (*etw.EventRecord, bool) {
-	if r.Header.ProviderID != event.FileEventGUID {
+	isStackwalk := r.Header.ProviderID == event.StackWalkEventGUID && r.Header.EventDescriptor.Opcode == event.StackWalkID
+	if r.Header.ProviderID != event.FileEventGUID && !isStackwalk {
 		return r, true
 	}
 
@@ -89,6 +94,21 @@ func (f *fs) Approve(r *etw.EventRecord) (*etw.EventRecord, bool) {
 		rec, buf := r.Copy()
 		f.irps[r.ReadUint64(0)] = irp{rec: rec, buf: buf}
 		return r, false
+	}
+
+	// decorate the pending CreateFile with the return addresses
+	// obtained from the StackWalk event by correlating the timestamp
+	if isStackwalk {
+		ts := r.ReadUint64(0)
+		for i, rec := range f.irps {
+			if rec.rec.Header.Timestamp == ts {
+				irp := f.irps[i]
+				irp.callstack = r.ReadCallstack(16)
+				f.irps[i] = irp
+				return r, false
+			}
+		}
+		return r, true
 	}
 
 	if r.Header.EventDescriptor.Opcode == event.FileOpEndID {
@@ -108,13 +128,17 @@ func (f *fs) Approve(r *etw.EventRecord) (*etw.EventRecord, bool) {
 			return r, false
 		}
 
+		if irp.callstack == nil {
+			fsApproverCallstackMisses.Add(1)
+		}
+
 		rec := irp.rec
 		status := r.ReadUint32(16)
 		// if the I/O status is different than file open
 		// or the rules compilation result is not present
 		// we'll allow events flow downstream processors
 		if f.r == nil || disposition != windows.FILE_OPEN {
-			irp.items = etw.AppendEventHeaderFileExtendedDataItems(rec, disposition, status)
+			irp.items = etw.AppendEventHeaderFileExtendedDataItems(rec, disposition, status, irp.callstack)
 			f.irps[i] = irp
 			return rec, true
 		}
@@ -134,15 +158,11 @@ func (f *fs) Approve(r *etw.EventRecord) (*etw.EventRecord, bool) {
 			// CreateFile operation
 			delete(f.irps, i)
 			fsApproverRejections.Add(1)
-			stackID := uint64(rec.Header.ProcessID + rec.Header.ThreadID)
-			if f.processors != nil {
-				f.processors.DequeueStackwalk(stackID)
-			}
 			return rec, false
 		}
 
 		fsApproverApprovals.Add(1)
-		irp.items = etw.AppendEventHeaderFileExtendedDataItems(rec, disposition, status)
+		irp.items = etw.AppendEventHeaderFileExtendedDataItems(rec, disposition, status, irp.callstack)
 		f.irps[i] = irp
 		return rec, true
 	}

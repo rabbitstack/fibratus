@@ -20,8 +20,6 @@ package processors
 
 import (
 	"expvar"
-	"sync"
-	"time"
 
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
@@ -53,13 +51,6 @@ type fsProcessor struct {
 	psnap ps.Snapshotter
 
 	config *config.Config
-
-	// buckets stores stack walk events per stack id
-	buckets map[uint64][]*event.Event
-	mu      sync.Mutex
-	purger  *time.Ticker
-
-	quit chan struct{}
 }
 
 // FileInfo stores file information obtained from event state.
@@ -73,23 +64,16 @@ func newFsProcessor(
 	psnap ps.Snapshotter,
 	config *config.Config,
 ) Processor {
-	f := &fsProcessor{
-		files:   make(map[uint64]*FileInfo),
-		hsnap:   hsnap,
-		psnap:   psnap,
-		config:  config,
-		buckets: make(map[uint64][]*event.Event),
-		purger:  time.NewTicker(time.Second * 5),
-		quit:    make(chan struct{}, 1),
+	return &fsProcessor{
+		files:  make(map[uint64]*FileInfo),
+		hsnap:  hsnap,
+		psnap:  psnap,
+		config: config,
 	}
-
-	go f.purge()
-
-	return f
 }
 
 func (f *fsProcessor) ProcessEvent(e *event.Event) (*event.Event, bool, error) {
-	if e.Category == event.File || e.IsStackWalk() {
+	if e.Category == event.File {
 		evt, err := f.processEvent(e)
 		return evt, false, err
 	}
@@ -97,7 +81,7 @@ func (f *fsProcessor) ProcessEvent(e *event.Event) (*event.Event, bool, error) {
 }
 
 func (*fsProcessor) Name() ProcessorType { return Fs }
-func (f *fsProcessor) Close()            { f.quit <- struct{}{} }
+func (f *fsProcessor) Close()            {}
 
 func (f *fsProcessor) getFileInfo(name string, opts uint32) *FileInfo {
 	return &FileInfo{Name: name, Type: fs.GetFileType(name, opts)}
@@ -138,20 +122,6 @@ func (f *fsProcessor) processEvent(e *event.Event) (*event.Event, error) {
 		}
 
 		return e, f.psnap.AddMmap(e)
-	case event.StackWalk:
-		if !event.IsCurrentProcDropped(e.PID) {
-			f.mu.Lock()
-			defer f.mu.Unlock()
-
-			// append the event to the bucket indexed by stack id
-			id := e.StackID()
-			q, ok := f.buckets[id]
-			if !ok {
-				f.buckets[id] = []*event.Event{e}
-			} else {
-				f.buckets[id] = append(q, e)
-			}
-		}
 	case event.CreateFile:
 		fileObject := e.Params.MustGetUint64(params.FileObject)
 
@@ -168,30 +138,6 @@ func (f *fsProcessor) processEvent(e *event.Event) (*event.Event, error) {
 
 		if fileinfo.Type != fs.Unknown {
 			e.AppendEnum(params.FileType, uint32(fileinfo.Type), fs.FileTypes)
-		}
-
-		// attach stack walk return addresses. CreateFile events
-		// represent an edge case in callstack enrichment. Since
-		// the events are delayed until the respective FileOpEnd
-		// event arrives, we enable stack tracing for CreateFile
-		// events. When the CreateFile event is generated, we store
-		// it in pending IRP map. Subsequently, the stack walk event
-		// is put inside the queue. After FileOpEnd event arrives,
-		// the previous stack walk for CreateFile is popped from
-		// the queue and the callstack parameter attached to the
-		// event.
-		if f.config.EventSource.StackEnrichment {
-			f.mu.Lock()
-			defer f.mu.Unlock()
-
-			id := e.StackID()
-			q, ok := f.buckets[id]
-			if ok && len(q) > 0 {
-				var s *event.Event
-				s, f.buckets[id] = q[len(q)-1], q[:len(q)-1]
-				callstack := s.Params.MustGetSlice(params.Callstack)
-				e.AppendParam(params.Callstack, params.Slice, callstack)
-			}
 		}
 
 		return e, nil
@@ -267,16 +213,6 @@ func (f *fsProcessor) processEvent(e *event.Event) (*event.Event, error) {
 	return e, nil
 }
 
-func (f *fsProcessor) dequeueStackwalk(stackID uint64) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	q, ok := f.buckets[stackID]
-	if ok && len(q) > 0 {
-		f.buckets[stackID] = q[:len(q)-1]
-	}
-}
-
 func (f *fsProcessor) findFile(fileKey, fileObject uint64) *FileInfo {
 	fileinfo, ok := f.files[fileKey]
 	if ok {
@@ -306,32 +242,4 @@ func (f *fsProcessor) getMappedFile(pid uint32, addr uint64) string {
 	}
 	defer windows.Close(process)
 	return fs.GetDevMapper().Convert(sys.GetMappedFile(process, uintptr(addr)))
-}
-
-func (f *fsProcessor) purge() {
-	for {
-		select {
-		case <-f.purger.C:
-			f.mu.Lock()
-
-			// evict unmatched stack traces
-			for id, q := range f.buckets {
-				s := make([]*event.Event, 0, len(q))
-				for _, evt := range q {
-					if time.Since(evt.Timestamp) <= time.Second*30 {
-						s = append(s, evt)
-					}
-				}
-				if len(s) == 0 {
-					delete(f.buckets, id)
-				} else {
-					f.buckets[id] = s
-				}
-			}
-
-			f.mu.Unlock()
-		case <-f.quit:
-			return
-		}
-	}
 }

@@ -29,6 +29,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
 )
 
@@ -142,12 +143,18 @@ func TestApproversFileEventWithRulesApproved(t *testing.T) {
 	p.Approve(cr)
 	assert.Equal(t, 1, len(p.fs.irps))
 
+	sw := stackwalkRecord(t, stackwalkBuf)
+	rec, approved := p.Approve(sw)
+	require.Equal(t, event.StackWalkEventGUID, rec.Header.ProviderID)
+	require.False(t, approved)
+
 	foe := buildMatchingFileOpEnd(t, createBuf, uint64(windows.FILE_OPEN))
-	rec, approved := p.Approve(foe)
+	rec, approved = p.Approve(foe)
 	assert.True(t, approved, "Pending CreateFile should be approved")
 	assert.Equal(t, event.CreateFileID, rec.Header.EventDescriptor.Opcode,
 		"should return stored CreateFile record")
 	assert.NotNil(t, rec.ExtendedData, "extended data should be attached")
+	assert.NotNil(t, rec.ReadEventHeaderFileExtendedDataItemsCallstack(), "file callstack should be attached")
 }
 
 func TestApproversFileEventWithRulesRejected(t *testing.T) {

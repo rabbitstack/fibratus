@@ -30,7 +30,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/key"
 	"github.com/rabbitstack/fibratus/pkg/util/signature"
 	"github.com/rabbitstack/fibratus/pkg/util/utf16"
-	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 )
@@ -169,10 +168,11 @@ func (d *ParamDecoder) DecodeFile(r *etw.EventRecord, e *Event) {
 		e.AppendParam(params.FileShareMask, params.Flags, r.ReadUint32(28), WithFlags(FileShareModeFlags))
 		e.AppendParam(params.FilePath, params.DOSPath, r.ConsumeUTF16String(32))
 
-		// read create disposition/status from extended data items
+		// read create disposition, status, and callstack from extended data items
 		disposition, status := r.ReadEventHeaderFileExtendedDataItems()
 		e.AppendParam(params.NTStatus, params.Status, status)
 		e.AppendEnum(params.FileOperation, disposition, fs.FileCreateDispositions)
+		e.AppendParam(params.Callstack, params.Slice, r.ReadEventHeaderFileExtendedDataItemsCallstack())
 	case FileOpEndID:
 		// typedef struct _PERFINFO_FILE_OPERATION_END {
 		//     ULONG_PTR Irp;
@@ -537,22 +537,10 @@ func (d *ParamDecoder) DecodeStackwalk(r *etw.EventRecord, e *Event) {
 	//         ULONG       ThreadId;
 	//         PVOID       Addresses[1]; // Address of captured Stack address
 	// } STACK_WALK_EVENT_DATA, *PSTACK_WALK_EVENT_DATA;
-
-	// Skip TimeStamp (uint64)
+	e.AppendParam(params.CallstackTimestamp, params.Uint64, r.ReadUint64(0))
 	e.AppendParam(params.ProcessID, params.PID, r.ReadUint32(8))
 	e.AppendParam(params.ThreadID, params.TID, r.ReadUint32(12))
-
-	var n uint16
-	var offset uint16 = 16
-
-	frames := (r.BufferLen - offset) / 8
-	callstack := make([]va.Address, frames)
-	for n < frames {
-		callstack[n] = va.Address(r.ReadUint64(offset))
-		offset += 8
-		n++
-	}
-	e.AppendParam(params.Callstack, params.Slice, callstack)
+	e.AppendParam(params.Callstack, params.Slice, r.ReadCallstack(16))
 }
 
 // DecodeMemory decodes memory event payloads.
