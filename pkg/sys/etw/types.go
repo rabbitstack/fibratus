@@ -575,21 +575,25 @@ const (
 	ExtTypeDisposition = 0x8000
 	// ExtTypeStatus represents a custom extended item type for the file system status.
 	ExtTypeStatus = 0x8001
+	// ExtTypeCallstack represents a customer extended item type for the file system event callstack.
+	ExtTypeCallstack = 0x8002
 )
 
 // FileExtendedDataItems stores file extended data items.
 type FileExtendedDataItems struct {
 	status      uint32
 	disposition uint32
+	callstack   []va.Address
 	items       []EventHeaderExtendedDataItem
 }
 
 // AppendEventHeaderFileExtendedDataItems appends custom file extendeed data items to the event record.
-func AppendEventHeaderFileExtendedDataItems(r *EventRecord, disposition uint64, status uint32) *FileExtendedDataItems {
+func AppendEventHeaderFileExtendedDataItems(r *EventRecord, disposition uint64, status uint32, callstack []va.Address) *FileExtendedDataItems {
 	f := &FileExtendedDataItems{
 		disposition: uint32(disposition),
 		status:      status,
-		items:       make([]EventHeaderExtendedDataItem, 2),
+		callstack:   callstack,
+		items:       make([]EventHeaderExtendedDataItem, 3),
 	}
 
 	f.items[0] = EventHeaderExtendedDataItem{
@@ -601,6 +605,15 @@ func AppendEventHeaderFileExtendedDataItems(r *EventRecord, disposition uint64, 
 		ExtType:  ExtTypeStatus,
 		DataSize: 4,
 		DataPtr:  uint64(uintptr(unsafe.Pointer(&f.status))),
+	}
+	if len(f.callstack) > 0 {
+		f.items[2] = EventHeaderExtendedDataItem{
+			ExtType:  ExtTypeCallstack,
+			DataSize: uint16(len(f.callstack) * 8),
+			DataPtr: uint64(
+				uintptr(unsafe.Pointer(&f.callstack[0])),
+			),
+		}
 	}
 
 	r.ExtendedDataCount = uint16(len(f.items))
@@ -634,6 +647,26 @@ func (r *EventRecord) ReadEventHeaderFileExtendedDataItems() (uint32, uint32) {
 	}
 
 	return disposition, status
+}
+
+// ReadEventHeaderFileExtendedDataItems reads the callstack from the custom file extended data items.
+func (r *EventRecord) ReadEventHeaderFileExtendedDataItemsCallstack() []va.Address {
+	if r.ExtendedData == nil {
+		return nil
+	}
+
+	items := unsafe.Slice(r.ExtendedData, r.ExtendedDataCount)
+	for _, item := range items {
+		if item.ExtType != ExtTypeCallstack {
+			continue
+		}
+
+		n := int(item.DataSize) / 8
+
+		return unsafe.Slice((*va.Address)(unsafe.Pointer(uintptr(item.DataPtr))), n)
+	}
+
+	return nil
 }
 
 // NewClassicEventID creates a new instance of classic event identifier.
@@ -848,6 +881,22 @@ func (e *EventRecord) ReadSID(offset uint16, isWbemSid bool) ([]byte, uint16) {
 		i++
 	}
 	return b, end
+}
+
+// ReadCallstack reads callstack return addresses at the given offset.
+func (e *EventRecord) ReadCallstack(offset uint16) []va.Address {
+	var n uint16
+	m := offset
+
+	frames := (e.BufferLen - offset) / 8
+	callstack := make([]va.Address, frames)
+	for n < frames {
+		callstack[n] = va.Address(e.ReadUint64(m))
+		m += 8
+		n++
+	}
+
+	return callstack
 }
 
 // EventExtendedItemStackTrace64 defines a call stack on a 64-bit machine.

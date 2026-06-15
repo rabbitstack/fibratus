@@ -60,12 +60,6 @@ func (c *Chain) ProcessEvent(e *event.Event) (*event.Event, error) {
 	return evt, nil
 }
 
-func (c *Chain) DequeueStackwalk(stackID uint64) {
-	if c.fsProcessor != nil {
-		c.fsProcessor.(*fsProcessor).dequeueStackwalk(stackID)
-	}
-}
-
 // Close closes the processor chain and frees all allocated resources.
 func (c *Chain) Close() error {
 	for _, processor := range c.processors {

@@ -147,7 +147,7 @@ func TestDecodeFile(t *testing.T) {
 		{
 			name: "CreateFile", opcode: CreateFileID,
 			assertions: func(t *testing.T, e *Event) {
-				assert.Len(t, e.Params, 9)
+				assert.Len(t, e.Params, 10)
 				assert.Equal(t, uint64(0xffffd78d965e07c8), e.Params.MustGetUint64(params.FileIrpPtr))
 				assert.Equal(t, uint64(0xffffd78d920b6650), e.Params.MustGetUint64(params.FileObject))
 				assert.Equal(t, `\Device\HarddiskVolume3\WINDOWS\AppCompat\Programs\Amcache.hve`, e.Params.MustGetString(params.FilePath))
@@ -156,6 +156,7 @@ func TestDecodeFile(t *testing.T) {
 				assert.Equal(t, uint32(6536), e.Params.MustGetTid())
 				assert.Equal(t, "SUPERSEDE", e.GetParamAsString(params.FileOperation))
 				assert.Equal(t, "Success", e.GetParamAsString(params.NTStatus))
+				assert.Contains(t, e.Params, params.Callstack)
 			},
 			buf: []byte{
 				200, 7, 94, 150, 141, 215, 255, 255,
@@ -798,7 +799,8 @@ func TestDecodeStackWalk(t *testing.T) {
 	e := &Event{Params: make(Params)}
 	paramDecoder.DecodeStackwalk(r, e)
 
-	assert.Len(t, e.Params, 3)
+	assert.Len(t, e.Params, 4)
+	assert.Equal(t, uint64(250273540393), e.Params.MustGetUint64(params.CallstackTimestamp))
 	assert.Equal(t, uint32(3852), e.Params.MustGetPid())
 	assert.Equal(t, uint32(7584), e.Params.MustGetTid())
 	assert.Equal(t, []va.Address{0xfffff805bdfe0c94, 0xfffff805bde589af, 0xfffff805bdf22f86, 0xfffff80550ff6d24, 0xfffff8054f82baaf, 0xfffff8054f82b1a0, 0xfffff8054f8968e0, 0xfffff805bdfa953b, 0xfffff805bdfa94b3, 0xfffff805be49a83b, 0xfffff805be4988da, 0xfffff805be4965e3, 0xfffff805be49cac4, 0xfffff805be2bd955, 0x7ffd09724514, 0x7ffd0619331f, 0x7ff6248a6069, 0x7ff62492256d, 0x7ff6249225e3}, e.Params.MustGetSlice(params.Callstack))
