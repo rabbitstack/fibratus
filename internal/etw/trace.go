@@ -64,7 +64,7 @@ func initEventTraceProps(c config.EventSourceConfig) etw.EventTraceProperties {
 		Wnode: etw.WnodeHeader{
 			BufferSize:    uint32(unsafe.Sizeof(etw.EventTraceProperties{})) + maxTracePropsSize,
 			Flags:         etw.WnodeTraceFlagGUID,
-			ClientContext: 1, // QPC clock resolution
+			ClientContext: 2, // System time: The system time provides a time stamp that tracks changes to the system’s clock
 		},
 		BufferSize:     bufferSize,
 		LogFileMode:    mode,
