@@ -565,7 +565,7 @@ func TestDecodeModule(t *testing.T) {
 	e := &Event{Params: make(Params)}
 	paramDecoder.DecodeModule(r, e)
 
-	assert.Len(t, e.Params, 8)
+	assert.Len(t, e.Params, 9)
 	assert.Equal(t, uint64(0x7ffd09200000), e.Params.MustGetUint64(params.ModuleBase))
 	assert.Equal(t, uint32(48733), e.Params.MustGetUint32(params.ModuleCheckSum))
 	assert.Equal(t, uint64(0x7ffd09200000), e.Params.MustGetUint64(params.ModuleDefaultBase))
