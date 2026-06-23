@@ -369,6 +369,8 @@ type Module struct {
 	SignatureLevel uint32
 	// SignatureType designates the image signature type (e.g. EMBEDDED)
 	SignatureType uint32
+	// TimedateStamp that is produced by the linker.
+	TimedateStamp uint32
 }
 
 // String returns the string representation of the module.
