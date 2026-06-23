@@ -257,6 +257,7 @@ func (s *snapshotter) AddModule(e *event.Event) error {
 	module := pstypes.Module{}
 	module.Size, _ = e.Params.GetUint64(params.ModuleSize)
 	module.Checksum, _ = e.Params.GetUint32(params.ModuleCheckSum)
+	module.TimedateStamp, _ = e.Params.GetUint32(params.ModuleTimeDateStamp)
 	module.Name = e.GetParamAsString(params.ModulePath)
 	module.BaseAddress = e.Params.TryGetAddress(params.ModuleBase)
 	module.DefaultBaseAddress = e.Params.TryGetAddress(params.ModuleDefaultBase)
