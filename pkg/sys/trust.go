@@ -70,6 +70,53 @@ const (
 	WtdSaferFlag = 0x100
 )
 
+const (
+	trustSignatureOk          = 0
+	trustErrNoSignature       = 0x800b0100
+	trustErrExplicitDistrust  = 0x800B0111
+	trustErrSystem            = 0x80096001
+	trustErrBadDigest         = 0x80096010
+	trustErrSubjectNotTrusted = 0x800B0003
+	trustErrTimestamp         = 0x80096005
+	trustMalformedSignature   = 0x80096011
+	cryptErrSecuritySettings  = 0x80092026
+	certErrExpired            = 0x800B0101
+)
+
+// SignatureStatus defines the signature status
+type SignatureStatus uint8
+
+const (
+	SignatureNotTrusted SignatureStatus = iota
+	SignatureTrusted
+	SignatureExpired
+	SignatureBadDigest
+	SignatureBadTimestamp
+	SignatureMalformed
+	SignatureEndpointError
+)
+
+func (s SignatureStatus) String() string {
+	switch s {
+	case SignatureNotTrusted:
+		return "NotTrusted"
+	case SignatureTrusted:
+		return "Trusted"
+	case SignatureExpired:
+		return "Expired"
+	case SignatureBadDigest:
+		return "BadDigest"
+	case SignatureBadTimestamp:
+		return "BadTimestamp"
+	case SignatureMalformed:
+		return "Malformed"
+	case SignatureEndpointError:
+		return "EndpointError"
+	default:
+		return fmt.Sprintf("%d", uint8(s))
+	}
+}
+
 // WintrustActionGenericVerifyV2 is the action that indicates the file or object should be verified by using the Authenticode policy provider.
 var WintrustActionGenericVerifyV2 = windows.GUID{Data1: 0xaac56b, Data2: 0xcd44, Data3: 0x11d0, Data4: [8]byte{0x8c, 0xc2, 0x0, 0xc0, 0x4f, 0xc2, 0x95, 0xee}}
 
@@ -104,24 +151,42 @@ func NewWintrustData(choice uint32) *WintrustData {
 	}
 }
 
+func (t *WintrustData) verifyTrust() (SignatureStatus, error) {
+	status, err := WinVerifyTrust(windows.InvalidHandle, &WintrustActionGenericVerifyV2, t)
+	switch status {
+	case trustSignatureOk:
+		return SignatureTrusted, nil
+	case trustErrNoSignature, trustErrExplicitDistrust, trustErrSubjectNotTrusted, cryptErrSecuritySettings:
+		return SignatureNotTrusted, err
+	case trustErrSystem:
+		return SignatureEndpointError, err
+	case trustErrBadDigest:
+		return SignatureBadDigest, err
+	case trustErrTimestamp:
+		return SignatureBadTimestamp, err
+	case trustMalformedSignature:
+		return SignatureMalformed, err
+	case certErrExpired:
+		return SignatureExpired, err
+	default:
+		return SignatureNotTrusted, err
+	}
+}
+
 // VerifyFile verifies the provided file trust. The trust provider
 // should perform the verification action without the user's assistance.
 // This is achieved by providing INVALID_HANDLE_VALUE as a first parameter
 // in the WinVerifyTrust call.
-func (t *WintrustData) VerifyFile(filename string) bool {
+func (t *WintrustData) VerifyFile(filename string) (SignatureStatus, error) {
 	fileinfo := &WintrustFileInfo{
 		Size:     uint32(unsafe.Sizeof(WintrustFileInfo{})),
 		FilePath: windows.StringToUTF16Ptr(filename),
 	}
 	t.Union = uintptr(unsafe.Pointer(fileinfo))
-	status, err := WinVerifyTrust(windows.InvalidHandle, &WintrustActionGenericVerifyV2, t)
-	if status != 0 || err != nil {
-		return false
-	}
-	return true
+	return t.verifyTrust()
 }
 
-// VerifyCatalog verifies the provided catalog file.
+// VerifyCatalog verifies the trust of the file signed by catalog-based certificate.
 func (t *WintrustData) VerifyCatalog(
 	fd uintptr,
 	filename string,
@@ -129,7 +194,7 @@ func (t *WintrustData) VerifyCatalog(
 	catalog CatalogInfo,
 	hash []byte,
 	hasSize uint32,
-) bool {
+) (SignatureStatus, error) {
 	// tag is a hexadecimal representation of the hash of the file
 	tag := windows.StringToUTF16Ptr(format.BytesToHex(hash[:hasSize]))
 	catinfo := &WintrustCatalogInfo{
@@ -143,11 +208,7 @@ func (t *WintrustData) VerifyCatalog(
 		CatalogAdmin:    catalogAdmin,
 	}
 	t.Union = uintptr(unsafe.Pointer(catinfo))
-	status, err := WinVerifyTrust(windows.InvalidHandle, &WintrustActionGenericVerifyV2, t)
-	if status != 0 || err != nil {
-		return false
-	}
-	return true
+	return t.verifyTrust()
 }
 
 // Close disposes state data by specifying the corresponding action
@@ -279,11 +340,7 @@ func (c *Cat) Open(filename string) error {
 		c.size, 0, nil,
 	)
 	c.catalogInfo.Size = uint32(unsafe.Sizeof(c.catalogInfo))
-	err = CryptCatalogInfoFromContext(c.catalog, &c.catalogInfo, 0)
-	if err != nil {
-		return err
-	}
-	return nil
+	return CryptCatalogInfoFromContext(c.catalog, &c.catalogInfo, 0)
 }
 
 // IsCatalogSigned determines if the file is catalog-signed.
@@ -292,7 +349,7 @@ func (c *Cat) IsCatalogSigned() bool {
 }
 
 // Verify verifies the signature of the given file against the catalog.
-func (c *Cat) Verify(filename string) bool {
+func (c *Cat) Verify(filename string) (SignatureStatus, error) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 	trust := NewWintrustData(WtdChoiceCatalog)
