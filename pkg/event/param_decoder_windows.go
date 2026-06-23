@@ -358,7 +358,7 @@ func (d *ParamDecoder) DecodeModule(r *etw.EventRecord, e *Event) {
 	e.AppendParam(params.ModuleSize, params.Uint64, r.ReadUint64(8))
 	e.AppendParam(params.ProcessID, params.PID, r.ReadUint32(16))
 	e.AppendParam(params.ModuleCheckSum, params.Uint32, r.ReadUint32(20))
-	// skip TimeDateStamp (uint32)
+	e.AppendParam(params.ModuleTimeDateStamp, params.Uint32, r.ReadUint32(24))
 	e.AppendParam(params.ModuleSignatureLevel, params.Enum, uint32(r.ReadByte(28)), WithEnum(signature.Levels))
 	e.AppendParam(params.ModuleSignatureType, params.Enum, uint32(r.ReadByte(29)), WithEnum(signature.Types))
 	// skip Reserved0 (uint8)

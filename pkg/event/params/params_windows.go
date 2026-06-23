@@ -162,6 +162,8 @@ const (
 	ModuleSize = "module_size"
 	// ModuleCheckSum is the parameter name for module checksum.
 	ModuleCheckSum = "checksum"
+	// ModuleTimeDateStamp is the parametter name for module timedate stamp.
+	ModuleTimeDateStamp = "timedate_stamp"
 	// ModuleDefaultBase is the parameter name that represents module's base address.
 	ModuleDefaultBase = "default_address"
 	// ModulePath is the parameter name that denotes the file path and extension of the DLL/executable Module.
