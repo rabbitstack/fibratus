@@ -1,0 +1,71 @@
+name: Suspicious virtual path redirection via bind filter
+id: 71a7ba01-a7a9-428a-8704-72b200f9b43c
+version: 2.0.0
+description: |
+  Detects attempts to open files or directories under security software parent paths
+  where the calling thread's stack shows active use of the Bind Filter API
+  (BfSetupFilter) or Cloud Filter API (CfRegisterSyncRoot) routed through a kernel
+  DeviceIoControlFile call. This combination is the precise behavioural fingerprint
+  of EDR redirection attacks, which enumerate and mirror subdirectories under parent
+  directories such as Program Files or ProgramData to construct bind link loops that
+  blind security products without disrupting other software.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1562
+  technique.name: Impair Defenses
+  technique.ref: https://attack.mitre.org/techniques/T1562/
+  subtechnique.id: T1562.001
+  subtechnique.name: Disable or Modify Tools
+  subtechnique.ref: https://attack.mitre.org/techniques/T1562/001
+references:
+  - https://github.com/TwoSevenOneT/EDR-Redir
+  - https://www.zerosalarium.com/2025/10/DR-Redir-Break-EDR-Via-BindLink-Cloud-Filter.html
+
+condition: >
+  open_file and
+  evt.pid != 4 and thread.callstack.symbols imatches ('ntdll.dll!*DeviceIoControlFile') and
+  thread.callstack.symbols imatches ('bindfltapi.dll!BfSetupFilter', 'cldapi.dll!CfRegisterSyncRoot') and
+  file.path imatches
+          (
+            '?:\\Temp\\*',
+            '?:\\Program Files\\*',
+            '?:\\Windows',
+            '?:\\Windows\\System32',
+            '?:\\Windows\\SysWOW64',
+            '?:\\Program Files (x86)\\*',
+            '?:\\ProgramData\\Microsoft\\*'
+          ) and
+  ps.exe not imatches
+            (
+              '?:\\Windows\\System32\\RuntimeBroker.exe',
+              '?:\\Windows\\System32\\SearchProtocolHost.exe',
+              '?:\\Windows\\System32\\svchost.exe',
+              '?:\\Windows\\System32\\sihost.exe',
+              '?:\\Windows\\System32\\explorer.exe',
+              '?:\\Windows\\System32\\ShellHost.exe',
+              '?:\\Windows\\System32\\FileSyncConfig.exe',
+              '?:\\Windows\\System32\\svchost.exe',
+              '?:\\Windows\\System32\\wsl.exe',
+              '?:\\Windows\\System32\\wslhost.exe',
+              '?:\\Windows\\System32\\wslservice.exe',
+              '?:\\Windows\\System32\\vmcompute.exe',
+              '?:\\Windows\\System32\\vmwp.exe',
+              '?:\\Windows\\System32\\CExecSvc.exe',
+              '?:\\Windows\\System32\\WindowsSandboxClient.exe',
+              '?:\\Windows\\System32\\WindowsSandboxRemoteSession.exe',
+              '?:\\Windows\\System32\\ContainerManager.exe',
+              '?:\\Windows\\System32\\HvHost.exe',
+              '?:\\Windows\\System32\\msixmgr.exe',
+              '?:\\Program Files\\Microsoft OneDrive\\*\\OneDrive.exe',
+              '?:\\Program Files\\Microsoft OneDrive\\*\\FileCoAuth.exe'
+            )
+action:
+  - name: kill
+
+output: >
+  Suspicious virtual path redirection targeting %file.path by process %ps.exe
+severity: high
+
+min-engine-version: 3.0.0
