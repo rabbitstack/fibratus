@@ -23,6 +23,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 	"unsafe"
@@ -436,14 +437,14 @@ func TestThreadFilter(t *testing.T) {
 			Modules: []pstypes.Module{
 				{Name: "C:\\Windows\\System32\\kernel32.dll", Size: 2312354, Checksum: 23123343, BaseAddress: va.Address(0x7ffb5c1d0396), DefaultBaseAddress: va.Address(0x7ffb5c1d0396)},
 				{Name: "C:\\Windows\\System32\\user32.dll", Size: 32212354, Checksum: 33123343, BaseAddress: va.Address(0x7ffb313953b2), DefaultBaseAddress: va.Address(0x7ffb313953b2)},
-				{Name: "C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll", Size: 32212354, Checksum: 33123343, BaseAddress: va.Address(0x7ffb3138592e), DefaultBaseAddress: va.Address(0x7ffb3138592e)},
+				{Name: "C:\\Windows\\System32\\rpcrt4.dll", Size: 32212354, Checksum: 33123343, BaseAddress: va.Address(0x7ffb3138592e), DefaultBaseAddress: va.Address(0x7ffb3138592e)},
 			},
 		},
 	}
 
 	// append the module signature
-	cert := &sys.Cert{Subject: "US, Washington, Redmond, Microsoft Corporation, Microsoft Windows", Issuer: "US, Washington, Redmond, Microsoft Corporation, Microsoft Windows Production PCA 2011"}
-	signature.GetSignatures().PutSignature(0x7ffb3138592e, &signature.Signature{Filename: "C:\\Program Files\\JetBrains\\GoLand 2021.2.3\\jbr\\bin\\java.dll", Level: 4, Type: 1, Cert: cert})
+	key := signature.MakeKey("C:\\Windows\\System32\\kernel32.dll", 32212354, 33123343, 0)
+	signature.GetSignatures().PutSignature(key, signature.TypeFileVerified, signature.LevelWindows)
 
 	// simulate unbacked RWX frame
 	base, err := windows.VirtualAlloc(0, 1024, windows.MEM_COMMIT|windows.MEM_RESERVE, windows.PAGE_EXECUTE_READWRITE)
@@ -1000,6 +1001,8 @@ func TestModuleFilter(t *testing.T) {
 			params.ProcessID:            {Name: params.ProcessID, Type: params.PID, Value: uint32(1023)},
 			params.ModuleCheckSum:       {Name: params.ModuleCheckSum, Type: params.Uint32, Value: uint32(2323432)},
 			params.ModuleBase:           {Name: params.ModuleBase, Type: params.Address, Value: uint64(0x7ffb313833a3)},
+			params.ModuleSize:           {Name: params.ModuleSize, Type: params.Uint64, Value: uint64(0x72342)},
+			params.ModuleTimeDateStamp:  {Name: params.ModuleTimeDateStamp, Type: params.Uint32, Value: uint32(12322567)},
 			params.ModuleSignatureType:  {Name: params.ModuleSignatureType, Type: params.Enum, Value: uint32(1), Enum: signature.Types},
 			params.ModuleSignatureLevel: {Name: params.ModuleSignatureLevel, Type: params.Enum, Value: uint32(4), Enum: signature.Levels},
 			params.FileIsDotnet:         {Name: params.FileIsDotnet, Type: params.Bool, Value: false},
@@ -1052,11 +1055,13 @@ func TestModuleFilter(t *testing.T) {
 	}
 
 	// check signatures expectations
-	sig := signature.GetSignatures().GetSignature(0x7ffb313833a3)
+	key := signature.MakeKey(filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll"), 0x72342, 2323432, 12322567)
+	sig := signature.GetSignatures().GetSignature(key)
 	assert.NotNil(t, sig)
-	assert.Equal(t, filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll"), sig.Filename)
-	assert.Equal(t, signature.Embedded, sig.Type)
-	assert.Equal(t, signature.AuthenticodeLevel, sig.Level)
+	assert.Equal(t, strings.ToLower(filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll")), sig.Path)
+	assert.True(t, sig.Exists())
+	assert.True(t, sig.IsTrusted())
+	assert.Equal(t, signature.TypeEmbedded, sig.Type())
 
 	// now exercise unsigned/unchecked signature
 	e2 := &event.Event{
@@ -1078,8 +1083,8 @@ func TestModuleFilter(t *testing.T) {
 		matches bool
 	}{
 
-		{`module.signature.type = 'EMBEDDED'`, true},
-		{`module.signature.level = 'AUTHENTICODE'`, true},
+		{`module.signature.type = 'NONE'`, true},
+		{`module.signature.level = 'UNCHECKED'`, true},
 		{`module.signature.exists`, true},
 		{`module.signature.trusted`, true},
 		{`module.pid = 1023`, true},
@@ -1088,8 +1093,7 @@ func TestModuleFilter(t *testing.T) {
 		{`module.base = '7ccb313833a3'`, true},
 		{`module.signature.issuer icontains 'Microsoft Windows'`, true},
 		{`module.signature.subject icontains 'Microsoft Corporation'`, true},
-		{`dll.signature.type = 'EMBEDDED'`, true},
-		{`dll.signature.level = 'AUTHENTICODE'`, true},
+		{`dll.signature.type = 'NONE'`, true},
 		{`dll.signature.exists`, true},
 		{`dll.signature.trusted`, true},
 		{`dll.pid = 1023`, true},
@@ -1111,7 +1115,8 @@ func TestModuleFilter(t *testing.T) {
 		}
 	}
 
-	assert.NotNil(t, signature.GetSignatures().GetSignature(0x7ccb313833a3))
+	key = signature.MakeKey(filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll"), 0, 2323432, 0)
+	assert.NotNil(t, signature.GetSignatures().GetSignature(key))
 
 	e3 := &event.Event{
 		Type:     event.LoadModule,
@@ -1156,6 +1161,7 @@ func TestModuleFilter(t *testing.T) {
 func TestPEFilter(t *testing.T) {
 	evt := &event.Event{
 		PS: &pstypes.PS{
+			Exe: filepath.Join(filepath.Join(os.Getenv("windir"), "System32", "notepad.exe")),
 			PE: &pe.PE{
 				NumberOfSections: 2,
 				NumberOfSymbols:  10,
@@ -1190,6 +1196,11 @@ func TestPEFilter(t *testing.T) {
 		{`ps.pe.nsymbols = 10 AND ps.pe.nsections = 2`, true},
 		{`ps.pe.nsections > 1`, true},
 		{`ps.pe.address.base = '140000000' AND ps.pe.address.entrypoint = '20110'`, true},
+		{`ps.signature.exists`, true},
+		{`ps.signature.trusted`, true},
+		{`ps.signature.subject icontains 'microsoft'`, true},
+		{`ps.signature.issuer icontains 'microsoft'`, true},
+		{`length(ps.signature.serial) > 0`, true},
 	}
 
 	for i, tt := range tests {
@@ -1232,11 +1243,6 @@ func TestLazyPEFilter(t *testing.T) {
 		{`ps.pe.nsymbols > 10 AND pe.nsections > 2`, true},
 		{`ps.pe.nsections > 1`, true},
 		{`length(ps.pe.anomalies) = 0`, true},
-		{`ps.signature.exists`, true},
-		{`ps.signature.trusted`, true},
-		{`ps.signature.subject icontains 'microsoft'`, true},
-		{`ps.signature.issuer icontains 'microsoft'`, true},
-		{`length(ps.signature.serial) > 0`, true},
 	}
 
 	for i, tt := range tests {

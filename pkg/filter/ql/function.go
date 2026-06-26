@@ -573,52 +573,23 @@ func (f *Foreach) callstackMapValuer(segments []*BoundSegmentLiteral, frame call
 		case fields.ModuleSignatureExistsSegment, fields.ModuleSignatureTrustedSegment,
 			fields.ModuleSignatureIssuerSegment, fields.ModuleSignatureSubjectSegment:
 
-			if frame.ModuleAddress.IsZero() {
+			sign := signature.GetSignatures().DoRequest(signature.MakeKey(frame.Module, 0, 0, 0))
+			if sign == nil {
 				continue
 			}
 
-			segment := seg.Segment
-			sign := signature.GetSignatures().GetSignature(frame.ModuleAddress.Uint64())
-			if sign == nil && frame.Module != "" {
-				// register signature if not present in the cache
-				var err error
-				sign = &signature.Signature{Filename: frame.Module}
-				sign.Type, sign.Level, err = sign.Check()
-				if err != nil {
-					continue
-				}
-
-				if sign.IsSigned() {
-					sign.Verify()
-				}
-
-				if segment == fields.ModuleSignatureIssuerSegment || segment == fields.ModuleSignatureSubjectSegment {
-					if err := sign.ParseCertificate(); err != nil {
-						continue
-					}
-				}
-
-				signature.GetSignatures().PutSignature(frame.ModuleAddress.Uint64(), sign)
-			}
-
-			switch segment {
+			switch seg.Segment {
 			case fields.ModuleSignatureExistsSegment:
-				valuer[key] = sign.IsSigned()
+				valuer[key] = sign.Exists()
 			case fields.ModuleSignatureTrustedSegment:
 				valuer[key] = sign.IsTrusted()
 			case fields.ModuleSignatureIssuerSegment:
-				if err := sign.ParseCertificate(); err != nil {
-					continue
-				}
 				if sign.HasCertificate() {
-					valuer[key] = sign.Cert.Issuer
+					valuer[key] = sign.Cert().Issuer
 				}
 			case fields.ModuleSignatureSubjectSegment:
-				if err := sign.ParseCertificate(); err != nil {
-					continue
-				}
 				if sign.HasCertificate() {
-					valuer[key] = sign.Cert.Subject
+					valuer[key] = sign.Cert().Subject
 				}
 			}
 		}

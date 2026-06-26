@@ -22,16 +22,19 @@
 package pe
 
 import (
+	"testing"
+	"time"
+
 	capver "github.com/rabbitstack/fibratus/pkg/cap/version"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
-	"time"
 )
 
 func TestPEMarshal(t *testing.T) {
 	now := time.Now()
+
+	isSigned, isTrusted := true, true
 
 	pe := &PE{
 		NumberOfSections: 7,
@@ -46,8 +49,8 @@ func TestPEMarshal(t *testing.T) {
 		Symbols:          []string{"SelectObject", "GetTextFaceW", "EnumFontsW", "TextOutW", "GetProcessHeap"},
 		Imports:          []string{"GDI32.dll", "USER32.dll", "msvcrt.dll", "api-ms-win-core-libraryloader-l1-2-0.dl"},
 		VersionResources: map[string]string{"CompanyName": "Microsoft Corporation", "FileDescription": "Notepad", "FileVersion": "10.0.18362.693"},
-		IsSigned:         true,
-		IsTrusted:        true,
+		isSigned:         &isSigned,
+		isTrusted:        &isTrusted,
 		Cert: &sys.Cert{
 			Issuer:       "Washington, Redmond, Microsoft Corporation",
 			Subject:      "Washington, Redmond, Microsoft Corporation",
@@ -99,8 +102,8 @@ func TestPEMarshal(t *testing.T) {
 	assert.Equal(t, "Microsoft Corporation", newPE.VersionResources["CompanyName"])
 	assert.Equal(t, "Notepad", newPE.VersionResources["FileDescription"])
 
-	assert.True(t, newPE.IsSigned)
-	assert.True(t, newPE.IsTrusted)
+	assert.True(t, newPE.IsSigned())
+	assert.True(t, newPE.IsTrusted())
 
 	assert.NotNil(t, newPE.Cert)
 	assert.False(t, newPE.Cert.NotBefore.IsZero())

@@ -354,6 +354,16 @@ func (e *Event) GetFlagsAsSlice(name string) []string {
 	return strings.Split(e.GetParamAsString(name), "|")
 }
 
+// GetParamAsUint64 returns the uint64 value of the given parameter.
+func (e *Event) GetParamAsUint64(name string) uint64 {
+	return e.Params.TryGetUint64(name)
+}
+
+// GetParamAsUint32 returns the uint32 value of the given parameter.
+func (e *Event) GetParamAsUint32(name string) uint32 {
+	return e.Params.TryGetUint32(name)
+}
+
 // SequenceLink returns the sequence link values from event metadata.
 func (e *Event) SequenceLinks() []any {
 	e.mmux.RLock()

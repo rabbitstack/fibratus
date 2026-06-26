@@ -20,7 +20,6 @@ package filter
 
 import (
 	"errors"
-	"expvar"
 	"net"
 	"path/filepath"
 	"strconv"
@@ -31,6 +30,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/network"
 	psnap "github.com/rabbitstack/fibratus/pkg/ps"
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/signature"
 
 	"github.com/rabbitstack/fibratus/pkg/event"
@@ -44,12 +44,6 @@ var (
 	// ErrPENil indicates the PE (Portable Executable) data is nil
 	ErrPENil = errors.New("pe state is nil")
 )
-
-// signatureErrors counts signature check/verification errors
-var signatureErrors = expvar.NewInt("image.signature.errors")
-
-// certErrors counts certificate parse errors
-var certErrors = expvar.NewInt("image.certificate.errors")
 
 // GetAccessors initializes and returns all available accessors.
 func GetAccessors() []Accessor {
@@ -625,33 +619,53 @@ func (t *threadAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 			return nil, nil
 		}
 
-		sign := getSignature(frame.ModuleAddress, frame.Module, false)
+		ps := e.PS
+		if ps == nil {
+			return nil, ErrPsNil
+		}
+		mod := ps.FindModuleByVa(frame.Addr)
+		if mod == nil {
+			return nil, nil
+		}
+
+		sign := requestSignature(mod.Name, mod.Size, mod.Checksum, mod.TimedateStamp)
 		if sign == nil {
 			return nil, nil
 		}
 
 		if f.Name == fields.ThreadCallstackFinalUserModuleSignatureExists {
-			return sign.IsSigned(), nil
+			return sign.Exists(), nil
+		}
+		if f.Name == fields.ThreadCallstackFinalUserModuleSignatureTrusted {
+			return sign.IsTrusted(), nil
 		}
 
-		return sign.IsTrusted(), nil
 	case fields.ThreadCallstackFinalUserModuleSignatureIssuer, fields.ThreadCallstackFinalUserModuleSignatureSubject:
 		frame := e.Callstack.FinalUserFrame()
 		if frame == nil || (frame != nil && frame.ModuleAddress.IsZero()) {
 			return nil, nil
 		}
 
-		sign := getSignature(frame.ModuleAddress, frame.Module, true)
+		ps := e.PS
+		if ps == nil {
+			return nil, ErrPsNil
+		}
+		mod := ps.FindModuleByVa(frame.Addr)
+		if mod == nil {
+			return nil, nil
+		}
+
+		sign := requestSignature(mod.Name, mod.Size, mod.Checksum, mod.TimedateStamp)
 		if sign == nil {
 			return nil, nil
 		}
 
 		if sign.HasCertificate() && f.Name == fields.ThreadCallstackFinalUserModuleSignatureIssuer {
-			return sign.Cert.Issuer, nil
+			return sign.Cert().Issuer, nil
 		}
 
 		if sign.HasCertificate() {
-			return sign.Cert.Subject, nil
+			return sign.Cert().Subject, nil
 		}
 	}
 
@@ -762,73 +776,22 @@ func newModuleAccessor() Accessor {
 	return &moduleAccessor{}
 }
 
-func (*moduleAccessor) Get(f Field, e *event.Event) (params.Value, error) {
+func (m *moduleAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 	if e.IsLoadModule() && (f.Name.IsModuleSignature() || f.Name == fields.ImageSignatureType || f.Name == fields.ImageSignatureLevel || f.Name.IsImageCert()) {
-		filename := e.GetParamAsString(params.ModulePath)
-		addr := e.Params.MustGetUint64(params.ModuleBase)
-		typ := e.Params.MustGetUint32(params.ModuleSignatureType)
-		level := e.Params.MustGetUint32(params.ModuleSignatureLevel)
+		sign := signature.GetSignatures().DoRequest(e.SignatureKey())
 
-		sign := signature.GetSignatures().GetSignature(addr)
-
-		// signature already checked
-		if typ != signature.None {
-			if sign == nil {
-				sign = &signature.Signature{
-					Type:     typ,
-					Level:    level,
-					Filename: filename,
-				}
-			}
-			if f.Name.IsImageCert() || f.Name.IsModuleCert() {
-				err := sign.ParseCertificate()
-				if err != nil {
-					certErrors.Add(1)
-				}
-			}
-			signature.GetSignatures().PutSignature(addr, sign)
-		} else {
-			// image signature parameters exhibit unreliable behaviour. Allegedly,
-			// signature verification is not performed in certain circumstances
-			// which leads to the core system DLL or binaries to be reported with
-			// signature unchecked level.
-			// To mitigate this situation, we have to manually check/verify the
-			// signature for all unchecked signature levels.
-			if sign == nil {
-				var err error
-				sign = &signature.Signature{Filename: filename}
-				sign.Type, sign.Level, err = sign.Check()
-				if err != nil {
-					signatureErrors.Add(1)
-				}
-				if sign.IsSigned() {
-					sign.Verify()
-				}
-				if f.Name.IsImageCert() || f.Name.IsModuleCert() {
-					err := sign.ParseCertificate()
-					if err != nil {
-						certErrors.Add(1)
-					}
-				}
-				signature.GetSignatures().PutSignature(addr, sign)
-			}
-			// reset signature type/level parameters
-			_ = e.Params.SetValue(params.ModuleSignatureType, sign.Type)
-			_ = e.Params.SetValue(params.ModuleSignatureLevel, sign.Level)
-		}
-
-		// append certificate parameters
-		if sign.HasCertificate() {
-			e.AppendParam(params.ModuleCertIssuer, params.UnicodeString, sign.Cert.Issuer)
-			e.AppendParam(params.ModuleCertSubject, params.UnicodeString, sign.Cert.Subject)
-			e.AppendParam(params.ModuleCertSerial, params.UnicodeString, sign.Cert.SerialNumber)
-			e.AppendParam(params.ModuleCertNotAfter, params.Time, sign.Cert.NotAfter)
-			e.AppendParam(params.ModuleCertNotBefore, params.Time, sign.Cert.NotBefore)
+		if sign != nil && sign.HasCertificate() {
+			cert := sign.Cert()
+			e.AppendParam(params.ModuleCertIssuer, params.UnicodeString, cert.Issuer)
+			e.AppendParam(params.ModuleCertSubject, params.UnicodeString, cert.Subject)
+			e.AppendParam(params.ModuleCertSerial, params.UnicodeString, cert.SerialNumber)
+			e.AppendParam(params.ModuleCertNotAfter, params.Time, cert.NotAfter)
+			e.AppendParam(params.ModuleCertNotBefore, params.Time, cert.NotBefore)
 		}
 
 		switch f.Name {
 		case fields.ModuleSignatureExists, fields.DllSignatureExists:
-			return sign != nil && sign.IsSigned(), nil
+			return sign != nil && sign.Exists(), nil
 		case fields.ModuleSignatureTrusted, fields.DllSignatureTrusted:
 			return sign != nil && sign.IsTrusted(), nil
 		}
@@ -1059,9 +1022,6 @@ func (pa *peAccessor) parserOpts() []pe.Option {
 		if f.Name.IsPeAnomalies() {
 			opts = append(opts, pe.WithSections(), pe.WithSymbols())
 		}
-		if f.Name.IsPeSignature() {
-			opts = append(opts, pe.WithSecurity())
-		}
 	}
 
 	for _, s := range pa.segments {
@@ -1071,6 +1031,12 @@ func (pa *peAccessor) parserOpts() []pe.Option {
 	}
 
 	return opts
+}
+
+func (pa *peAccessor) verifySignature(sig *signature.Signature) pe.SignatureCallback {
+	return func() (bool, bool, *sys.Cert) {
+		return sig.Exists(), sig.IsTrusted(), sig.Cert()
+	}
 }
 
 // ErrPeNilCertificate indicates the PE certificate is not available
@@ -1138,9 +1104,12 @@ func (pa *peAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 		return nil, ErrPENil
 	}
 
-	// verify signature
-	if f.Name.IsPeSignature() {
-		p.VerifySignature()
+	if !p.IsSignatureVerified() && f.Name.IsPeSignature() {
+		sign := signature.GetSignatures().DoRequest(e.SignatureKey())
+		if sign == nil {
+			return nil, signature.ErrNilSignature
+		}
+		p.VerifySignature(pa.verifySignature(sign))
 	}
 
 	switch f.Name {
@@ -1163,9 +1132,9 @@ func (pa *peAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 	case fields.PeAnomalies, fields.PsPeAnomalies:
 		return p.Anomalies, nil
 	case fields.PeIsSigned, fields.PsSignatureExists:
-		return p.IsSigned, nil
+		return p.IsSigned(), nil
 	case fields.PeIsTrusted, fields.PsSignatureTrusted:
-		return p.IsTrusted, nil
+		return p.IsTrusted(), nil
 	case fields.PeIsModified:
 		return p.IsModified, nil
 	case fields.PeCertIssuer, fields.PsSignatureIssuer:

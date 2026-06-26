@@ -32,7 +32,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/bytes"
 	"github.com/rabbitstack/fibratus/pkg/util/loldrivers"
 	"github.com/rabbitstack/fibratus/pkg/util/signature"
-	"github.com/rabbitstack/fibratus/pkg/util/va"
 )
 
 // isLOLDriver interacts with the loldrivers client to determine
@@ -121,42 +120,10 @@ func getFileInfo(f fields.Field, e *event.Event) (params.Value, error) {
 	return nil, fmt.Errorf("unexpected field: %s", f)
 }
 
-// getSignature tries to find the module signature mapped to the given address.
-// If the signature is not found in the cache, then a fresh signature instance
-// is created and verified.
-func getSignature(addr va.Address, filename string, parseCert bool) *signature.Signature {
-	sign := signature.GetSignatures().GetSignature(addr.Uint64())
-	if sign != nil {
-		if parseCert {
-			err := sign.ParseCertificate()
-			if err != nil {
-				certErrors.Add(1)
-			}
-		}
-		return sign
-	}
-
-	var err error
-	sign = &signature.Signature{Filename: filename}
-	sign.Type, sign.Level, err = sign.Check()
-	if err != nil {
-		signatureErrors.Add(1)
-	}
-
-	if sign.IsSigned() {
-		sign.Verify()
-	}
-
-	if parseCert {
-		err = sign.ParseCertificate()
-		if err != nil {
-			certErrors.Add(1)
-		}
-	}
-
-	signature.GetSignatures().PutSignature(addr.Uint64(), sign)
-
-	return sign
+// requestSignature submits the request for the signature check.
+func requestSignature(path string, size uint64, checksum, timedatestamp uint32) *signature.Signature {
+	key := signature.MakeKey(path, size, checksum, timedatestamp)
+	return signature.GetSignatures().DoRequest(key)
 }
 
 // framePID returns the pid associated with the stack frame.
