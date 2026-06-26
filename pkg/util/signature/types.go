@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2022 by Nedim Sabic Sabic
+ * Copyright 2021-present by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -20,106 +20,297 @@ package signature
 
 import (
 	"errors"
-	"github.com/rabbitstack/fibratus/pkg/sys"
+	"fmt"
 	"runtime"
+	"sync/atomic"
 	"time"
+
+	"github.com/rabbitstack/fibratus/pkg/pe"
+	"github.com/rabbitstack/fibratus/pkg/sys"
 )
+
+// Type defines the signature verification type.
+type Type uint32
 
 const (
-	// UncheckedLevel specifies signature unchecked level
-	UncheckedLevel uint32 = 0
-	// UnsignedLevel specifies signature unsigned level
-	UnsignedLevel uint32 = 1
-	// AuthenticodeLevel determines the object is Authenticode signed
-	AuthenticodeLevel uint32 = 4
-
-	// None indicates non-existent signature
-	None uint32 = 0
-	// Embedded indicates the signature is baked into the PE object
-	Embedded uint32 = 1
-	// Catalog indicates the executable or DLL signature is stored in the catalog
-	Catalog uint32 = 3
+	TypeNone            Type = 0 // unsigned or verification hasn't been attempted
+	TypeEmbedded        Type = 1 // embedded signature
+	TypeCached          Type = 2 // cached signature; presence of a CI EA means the file was previously verified
+	TypeCatalogCached   Type = 3 // cached catalog verified via Catalog Database or searching catalog directly
+	TypeCatalogUncached Type = 4 // uncached catalog verified via Catalog Database or searching catalog directly
+	TypeCatalogHint     Type = 5 // successfully verified using an EA that informs CI that catalog to try first
+	TypePackageCatalog  Type = 6 // AppX / MSIX package catalog verified
+	TypeFileVerified    Type = 7 // the file was verified
 )
 
-// ErrNotSigned represents the error which is raised when the image lacks the signature
-var ErrNotSigned = errors.New("image is not signed")
+func (t Type) String() string {
+	switch t {
+	case TypeNone:
+		return "None"
+	case TypeEmbedded:
+		return "Embedded"
+	case TypeCached:
+		return "Cached"
+	case TypeCatalogCached:
+		return "CatalogCached"
+	case TypeCatalogUncached:
+		return "CatalogUncached"
+	case TypeCatalogHint:
+		return "CatalogHint"
+	case TypePackageCatalog:
+		return "PackageCatalog"
+	case TypeFileVerified:
+		return "FileVerified"
+	default:
+		return fmt.Sprintf("%d", uint32(t))
+	}
+}
 
-// ErrWintrustUnavailable represents the error which is raised when wintrust platfrom is not available
+// Level defines the image signing level.
+type Level uint32
+
+const (
+	LevelUnchecked      Level = 0 // signing level hasn't yet been checked
+	LevelUnsigned       Level = 1 // file is unsigned or has no signature that passes the active policies
+	LevelEnterprise     Level = 2 // trusted by Windows Defender Application Control policy
+	LevelDeveloper      Level = 3 // developer signed code
+	LevelAuthenticode   Level = 4 // Authenticode signed
+	LevelStorePPL       Level = 5 // Microsoft Store signed app PPL (Protected Process Light)
+	LevelStore          Level = 6 // Microsoft Store-signed
+	LevelAntimalware    Level = 7 // signed by an Antimalware vendor whose product is using AMPPL
+	LevelMicrosoft      Level = 8 // Microsoft signed
+	LevelCustom4        Level = 9
+	LevelCustom5        Level = 10
+	LevelDynamicCodeGen Level = 11 // only used for signing of the .NET NGEN compiler
+	LevelWindows        Level = 12 // Windows signed
+	LevelCustom7        Level = 13
+	LevelWindowsTCB     Level = 14 // Windows Trusted Computing Base signed
+	LevelCustom6        Level = 15
+)
+
+var Types = map[uint32]string{
+	uint32(TypeNone):            "NONE",
+	uint32(TypeEmbedded):        "EMBEDDED",
+	uint32(TypeCached):          "CACHED",
+	uint32(TypeCatalogCached):   "CATALOG_CACHED",
+	uint32(TypeCatalogUncached): "CATALOG_UNCACHED",
+	uint32(TypeCatalogHint):     "CATALOG_HINT",
+	uint32(TypePackageCatalog):  "PACKAGE_CATALOG",
+	uint32(TypeFileVerified):    "FILE_VERIFIED",
+}
+
+var Levels = map[uint32]string{
+	uint32(LevelUnchecked):      "UNCHECKED",
+	uint32(LevelUnsigned):       "UNSIGNED",
+	uint32(LevelEnterprise):     "ENTERPRISE",
+	uint32(LevelDeveloper):      "DEVELOPER",
+	uint32(LevelAuthenticode):   "AUTHENTICODE",
+	uint32(LevelStorePPL):       "STORE_PPL",
+	uint32(LevelStore):          "STORE",
+	uint32(LevelAntimalware):    "ANTIMALWARE",
+	uint32(LevelMicrosoft):      "MICROSOFT",
+	uint32(LevelCustom4):        "CUSTOM_4",
+	uint32(LevelCustom5):        "CUSTOM_5",
+	uint32(LevelDynamicCodeGen): "DYNAMIC_CODEGEN",
+	uint32(LevelWindows):        "WINDOWS",
+	uint32(LevelCustom7):        "CUSTOM_7",
+	uint32(LevelWindowsTCB):     "WINDOWS_TCB",
+	uint32(LevelCustom6):        "CUSTOM_6",
+}
+
+// ErrNoSignature represents the error which is raised when the executable image lacks the signature
+var ErrNoSignature = errors.New("image is not signed")
+
+// ErrNilSignature represents the error that is signaled when the operation is attempted on a nil signature
+var ErrNilSignature = errors.New("the signature is not initialized")
+
+// ErrWintrustUnavailable represents the error which is raised when wintrust platform is not available
 var ErrWintrustUnavailable = errors.New("wintrust is not available")
 
-// Types enum defines signature types which verified the image.
-var Types = map[uint32]string{
-	0: "NONE",             // unsigned or verification hasn't been attempted
-	1: "EMBEDDED",         // embedded signature
-	2: "CACHED",           // cached signature; presence of a CI EA means the file was previously verified
-	3: "CATALOG_CACHED",   // cached catalog verified via Catalog Database or searching catalog directly
-	4: "CATALOG_UNCACHED", // uncached catalog verified via Catalog Database or searching catalog directly
-	5: "CATALOG_HINT",     // successfully verified using an EA that informs CI that catalog to try first
-	6: "PACKAGE_CATALOG",  // AppX / MSIX package catalog verified
-	7: "FILE_VERIFIED",    // the file was verified
-}
-
-// Levels enum defines all possible image signature levels at which the code was verified.
-var Levels = map[uint32]string{
-	0:  "UNCHECKED",    // signing level hasn't yet been checked
-	1:  "UNSIGNED",     // file is unsigned or has no signature that passes the active policies
-	2:  "ENTERPRISE",   // trusted by Windows Defender Application Control policy
-	3:  "DEVELOPER",    // developer signed code
-	4:  "AUTHENTICODE", // Authenticode signed
-	5:  "STORE_PPL",    // Microsoft Store signed app PPL (Protected Process Light)
-	6:  "STORE",        // Microsoft Store-signed
-	7:  "ANTIMALWARE",  // signed by an Antimalware vendor whose product is using AMPPL
-	8:  "MICROSOFT",    // Microsoft signed
-	9:  "CUSTOM_4",
-	10: "CUSTOM_5",
-	11: "DYNAMIC_CODEGEN", // only used for signing of the .NET NGEN compiler
-	12: "WINDOWS",         // Windows signed
-	13: "CUSTOM_7",
-	14: "WINDOWS_TCB", // Windows Trusted Computing Base signed
-	15: "CUSTOM_6",
-}
-
-// Signature represents the signature status.
+// Signature represents the signature state.
 type Signature struct {
-	// Type specifies the signature type. If the image is not signed, the
-	// type is equal to None.
-	Type uint32
-	// Level specifies the signature level at which the code was signed.
-	Level uint32
-	// Cert represents certificate information for the particular signature.
-	Cert *sys.Cert
-	// Filename represents the name of the executable image/DLL/driver
-	Filename string
-	// accessed the timestamp of the signature access by field extractor
-	accessed time.Time
+	// Path represents the name of the executable/DLL.
+	Path string
+
+	// typ indicates the signature type.
+	typ atomic.Uint32
+
+	// exists indicates if the signature exists in the PE security directory
+	// or a system-wide catalog.
+	exists atomic.Bool
+
+	// status represents the signature trust status.
+	status atomic.Uint32
+
+	// cert represents certificate information for the particular signature.
+	cert atomic.Pointer[sys.Cert]
+
+	// accessed the timestamp of the signature access by field extractor.
+	accessed atomic.Int64
+}
+
+func (s *Signature) String() string {
+	var cert string
+	if s.HasCertificate() {
+		c := s.Cert()
+		cert = c.Issuer + " | " + c.Subject
+	}
+
+	var accessed string
+	if ts := s.accessed.Load(); ts != 0 {
+		accessed = time.Unix(0, ts).Format(time.RFC3339Nano)
+	}
+
+	return fmt.Sprintf(
+		"Exists: %t, Type: %s, Status: %s, Path: %s, Cert: %s, Accessed: %s}",
+		s.Exists(),
+		s.Type(),
+		s.Status(),
+		s.Path,
+		cert,
+		accessed,
+	)
+}
+
+// IsTrusted returns true if Code Integrity successfully validates the file's trust chain.
+func IsTrusted(sigType Type, sigLevel Level) bool {
+	return (sigType == TypeEmbedded &&
+		(sigLevel == LevelWindows || sigLevel == LevelWindowsTCB)) ||
+		(sigType == TypeFileVerified && sigLevel == LevelWindows)
+}
+
+// newSignature returns a signature initialized with file name and signature type.
+// If the signature type is known upfront, then we can skip the signature
+// check phase to save system resources.
+func newSignature(path string, sigType Type, sigLevel Level) *Signature {
+	s := &Signature{
+		Path: path,
+	}
+	s.setType(sigType)
+	s.setStatus(sys.SignatureNotTrusted)
+
+	s.exists.Store(false)
+
+	if IsTrusted(sigType, sigLevel) {
+		s.setExists()
+		s.setStatus(sys.SignatureTrusted)
+	}
+
+	return s
+}
+
+// newUncheckedSignature creates a new signature with none type and unchecked signature level.
+// This is the default constructor for any non-trusted signature verification.
+func newUncheckedSignature(path string) *Signature {
+	return newSignature(path, TypeNone, LevelUnchecked)
 }
 
 func (s *Signature) keepalive() {
-	s.accessed = time.Now()
+	s.accessed.Store(time.Now().UnixNano())
 }
 
-func (s *Signature) IsSigned() bool       { return s.Type != None }
-func (s *Signature) IsTrusted() bool      { return s.Level != UncheckedLevel && s.Level != UnsignedLevel }
-func (s *Signature) HasCertificate() bool { return s.Cert != nil }
+func (s *Signature) lastAccessed() time.Time {
+	return time.Unix(0, s.accessed.Load())
+}
 
-// VerifyEmbedded performs a trust verification action on the PE file
+func (s *Signature) Status() sys.SignatureStatus {
+	return sys.SignatureStatus(s.status.Load())
+}
+
+func (s *Signature) Type() Type {
+	return Type(s.typ.Load())
+}
+
+func (s *Signature) Exists() bool {
+	return s.exists.Load()
+}
+
+func (s *Signature) setStatus(v sys.SignatureStatus) {
+	s.status.Store(uint32(v))
+}
+
+func (s *Signature) setType(t Type) {
+	s.typ.Store(uint32(t))
+}
+
+func (s *Signature) setExists() {
+	s.exists.Store(true)
+}
+
+func (s *Signature) IsTrusted() bool {
+	return s.Status() == sys.SignatureTrusted
+}
+
+// Cert returns the certificate, or nil if not yet parsed.
+func (s *Signature) Cert() *sys.Cert {
+	return s.cert.Load()
+}
+
+// setCert uses a aingle atomic store to initialize a valid pointer
+// cert pointer exactly once. Any reader seeing non-nil is guaranteed
+// to see the fully initialised Cert struct.
+func (s *Signature) setCert(cert *sys.Cert) {
+	s.cert.CompareAndSwap(nil, cert)
+}
+
+// HasCertificate returns true if this signature holds a certificate.
+func (s *Signature) HasCertificate() bool {
+	return s.cert.Load() != nil
+}
+
+// verifyFile performs a trust verification action on the PE file
 // by passing the inquiry to a trust provider that supports the action
 // identifier.
-func (s *Signature) VerifyEmbedded() bool {
+func (s *Signature) verifyFile() error {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 	trust := sys.NewWintrustData(sys.WtdChoiceFile)
 	defer trust.Close()
-	return trust.VerifyFile(s.Filename)
+	status, err := trust.VerifyFile(s.Path)
+	s.setStatus(status)
+	return err
 }
 
-// VerifyCatalog verifies the catalog-based file signature.
-func (s *Signature) VerifyCatalog() bool {
+// verifyCatalog verifies the catalog-based file signature.
+func (s *Signature) verifyCatalog(catalog sys.Cat) error {
+	status, err := catalog.Verify(s.Path)
+	s.setStatus(status)
+	return err
+}
+
+// parseCertificate parses the certificate data for catalog-based
+// or PE signatures if the parameter is set to false.
+func (s *Signature) parseCertificate(onlyCatalog bool) (*sys.Cert, error) {
+	if s == nil {
+		return nil, ErrNilSignature
+	}
+
+	// the certificate already exists
+	if s.HasCertificate() {
+		return s.Cert(), nil
+	}
+	if !s.Exists() {
+		return nil, ErrNoSignature
+	}
+
+	if !onlyCatalog {
+		// parse PE certificate
+		f, err := pe.ParseFile(s.Path, pe.WithSecurity())
+		if err != nil {
+			goto cat
+		}
+		return f.Cert, nil
+	}
+
+cat:
+	if !sys.IsWintrustFound() {
+		return nil, ErrWintrustUnavailable
+	}
+	// parse catalog certificate
 	catalog := sys.NewCatalog()
-	err := catalog.Open(s.Filename)
-	if err != nil {
-		return false
+	if err := catalog.Open(s.Path); err != nil {
+		return nil, err
 	}
 	defer catalog.Close()
-	return catalog.Verify(s.Filename)
+	return catalog.ParseCertificate()
 }

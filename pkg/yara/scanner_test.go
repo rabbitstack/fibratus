@@ -281,15 +281,22 @@ func TestScan(t *testing.T) {
 				}
 				psnap.On("Find", pid).Return(true, proc)
 
+				exe, err := os.Executable()
+				require.NoError(t, err)
+
+				key := signature.MakeKey(exe, 0, 2323432, 0)
+				signature.GetSignatures().PutSignature(key, 0, 0)
+
 				e := &event.Event{
 					Type: event.LoadModule,
 					Name: "LoadModule",
 					Tid:  2484,
 					PID:  pid,
 					Params: event.Params{
-						params.FilePath:            {Name: params.FilePath, Type: params.UnicodeString, Value: "tests.exe"},
+						params.FilePath:            {Name: params.FilePath, Type: params.UnicodeString, Value: exe},
 						params.ModuleBase:          {Name: params.ModuleBase, Type: params.Uint64, Value: uint64(0x74888fd99)},
-						params.ModuleSignatureType: {Name: params.ModuleSignatureType, Type: params.Uint32, Value: signature.None},
+						params.ModuleCheckSum:      {Name: params.ModuleCheckSum, Type: params.Uint32, Value: uint32(2323432)},
+						params.ModuleSignatureType: {Name: params.ModuleSignatureType, Type: params.Uint32, Value: signature.TypeNone},
 						params.ProcessID:           {Name: params.ProcessID, Type: params.PID, Value: pid},
 					},
 					Metadata: make(map[event.MetadataKey]any),
@@ -754,57 +761,6 @@ func TestScan(t *testing.T) {
 				Tags:  []string{"T1"},
 			},
 			true,
-		},
-		{
-			"scan rx pagefile mmap address for signed module",
-			func() (*event.Event, error) {
-				proc := &pstypes.PS{
-					Name:      "tests.exe",
-					PID:       1123,
-					Ppid:      uint32(os.Getppid()),
-					Exe:       `C:\ProgramData\tests.exe`,
-					Cmdline:   `C:\ProgramData\tests.exe`,
-					SID:       "S-1-1-18",
-					Cwd:       `C:\ProgramData\`,
-					SessionID: 1,
-				}
-				psnap.On("Find", 1123).Return(true, proc)
-
-				signature.GetSignatures().PutSignature(uint64(0x7f3e1000), &signature.Signature{Level: signature.AuthenticodeLevel, Type: signature.Catalog})
-
-				e := &event.Event{
-					Type:     event.MapViewFile,
-					Name:     "MapViewFile",
-					Category: event.File,
-					Tid:      2484,
-					PID:      565,
-					Params: event.Params{
-						params.ProcessID:    {Name: params.ProcessID, Type: params.PID, Value: uint32(1123)},
-						params.FileViewBase: {Name: params.FileViewBase, Type: params.Address, Value: uint64(0x7f3e1000)},
-						params.FileViewSize: {Name: params.FileViewSize, Type: params.Uint64, Value: uint64(12333)},
-						params.MemProtect:   {Name: params.MemProtect, Type: params.Flags, Value: uint32(sys.SectionRX), Flags: event.ViewProtectionFlags},
-					},
-					Metadata: make(map[event.MetadataKey]any),
-					PS:       proc,
-				}
-				return e, nil
-			},
-			func() (Scanner, error) {
-				return NewScanner(psnap, config.Config{
-					Enabled:     true,
-					ScanTimeout: time.Minute,
-					Rule: config.Rule{
-						Paths: []config.RulePath{
-							{
-								Namespace: "default",
-								Path:      "_fixtures/rules",
-							},
-						},
-					},
-				})
-			},
-			alertsender.Alert{},
-			false,
 		},
 		{
 			"scan rx pagefile readonly mmap",

@@ -22,6 +22,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/ps"
+	"github.com/rabbitstack/fibratus/pkg/util/signature"
 )
 
 type moduleProcessor struct {
@@ -38,7 +39,6 @@ func (*moduleProcessor) Name() ProcessorType { return Module }
 
 func (m *moduleProcessor) ProcessEvent(e *event.Event) (*event.Event, bool, error) {
 	if e.IsLoadModuleInternal() {
-		// state management
 		return e, false, m.psnap.AddModule(e)
 	}
 
@@ -52,6 +52,23 @@ func (m *moduleProcessor) ProcessEvent(e *event.Event) (*event.Event, bool, erro
 	}
 
 	if e.IsLoadModule() || e.IsModuleRundown() {
+		typ := signature.Type(e.Params.MustGetUint32(params.ModuleSignatureType))
+		lvl := signature.Level(e.Params.MustGetUint32(params.ModuleSignatureLevel))
+		// Code Integrity successfully validated the file's trust chain.
+		// The signature level WINDOWS and WINDOWS_TCB describes the trust
+		// level assigned after verification.
+		// A file can reach the WINDOWS signing level through either an embedded PE
+		// Authenticode signature or a catalog signature where the file hash lives
+		// in a trusted .cat file.
+		// Trusted signatures are automatically pushed to the store. On the contrary,
+		// signature verification is delegated to the async workers
+		key := e.SignatureKey()
+		if signature.IsTrusted(typ, lvl) {
+			signature.GetSignatures().PutSignature(key, typ, lvl)
+		} else {
+			signature.GetSignatures().DoRequestAsync(key)
+		}
+
 		return e, false, m.psnap.AddModule(e)
 	}
 

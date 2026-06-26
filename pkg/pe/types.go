@@ -23,11 +23,10 @@ package pe
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	peparser "github.com/saferwall/pe"
-	"runtime"
-	"sync"
-	"time"
 )
 
 const (
@@ -68,10 +67,16 @@ type PE struct {
 	NumberOfSymbols uint32 `json:"nsymbols"`
 	// ImageBase designates the base address of the process' image.
 	ImageBase string `json:"image_base"`
+	// ImageBase designates the size of the process' image.
+	ImageSize uint32 `json:"image_size"`
+	// ImageBase designates the process' image checksum.
+	ImageChecksum uint32 `json:"image_checksum"`
 	// Entrypoint is the address of the entry point function.
 	EntryPoint string `json:"entry_point"`
 	// LinkTime represents the time that the image was created by the linker.
 	LinkTime time.Time `json:"link_time"`
+	// TimedateStamp represents the timedate stamp of the process' image.
+	TimedateStamp uint32 `json:"timedate_stamp"`
 	// Sections contains all distinct sections and their metadata.
 	Sections []Sec `json:"sections"`
 	// Symbols contains the list of imported symbols.
@@ -80,10 +85,6 @@ type PE struct {
 	Imports []string `json:"imports"`
 	// VersionResources holds the version resources
 	VersionResources map[string]string `json:"resources"`
-	// IsSigned determines if the PE contains a digital signature.
-	IsSigned bool `json:"is_signed"`
-	// IsTrusted determines if the PE certificate chain is trusted.
-	IsTrusted bool `json:"is_trusted"`
 	// Cert contains certificate information.
 	Cert *sys.Cert `json:"cert"`
 	// IsDriver indicates if the PE contains driver code.
@@ -105,42 +106,18 @@ type PE struct {
 	// Exports contains exported function names indexed by RVA
 	Exports map[uint32]string `json:"exports"`
 
+	// isSigned determines if the PE contains a digital signature.
+	isSigned *bool
+	// isTrusted determines if the PE certificate chain is trusted.
+	isTrusted *bool
+
 	dosHeader      peparser.ImageDOSHeader
 	ntHeader       peparser.ImageNtHeader
 	sectionHeaders []peparser.ImageSectionHeader
-
-	filename string
-	once     sync.Once
 }
 
-// VerifySignature checks if the embedded or catalog PE signature is trusted.
-func (pe *PE) VerifySignature() {
-	pe.once.Do(func() {
-		if sys.IsWintrustFound() {
-			runtime.LockOSThread()
-			trust := sys.NewWintrustData(sys.WtdChoiceFile)
-			defer trust.Close()
-			defer runtime.UnlockOSThread()
-			pe.IsTrusted = trust.VerifyFile(pe.filename)
-			// maybe the PE is catalog signed?
-			if !pe.IsSigned {
-				catalog := sys.NewCatalog()
-				err := catalog.Open(pe.filename)
-				defer catalog.Close()
-				if err != nil {
-					return
-				}
-				pe.IsSigned = catalog.IsCatalogSigned()
-				if pe.IsSigned {
-					pe.IsTrusted = catalog.Verify(pe.filename)
-				}
-				if pe.IsSigned && pe.IsTrusted {
-					pe.Cert, _ = catalog.ParseCertificate()
-				}
-			}
-		}
-	})
-}
+func (pe *PE) IsSigned() bool  { return pe.isSigned != nil && *pe.isSigned }
+func (pe *PE) IsTrusted() bool { return pe.isTrusted != nil && *pe.isTrusted }
 
 // String returns the string representation of the PE metadata.
 func (pe *PE) String() string {
@@ -165,6 +142,18 @@ func (pe *PE) String() string {
 		pe.Imports,
 		pe.VersionResources,
 	)
+}
+
+// SignatureCallback returns the signature status, trust level and the certificate.
+type SignatureCallback func() (bool, bool, *sys.Cert)
+
+// IsSignatureVerified indicates if the PE signature was verified.
+func (pe *PE) IsSignatureVerified() bool { return pe.isSigned != nil && pe.isTrusted != nil }
+
+// VerifySignature invokes the provided closure to verify he PE signature.
+func (pe *PE) VerifySignature(cb SignatureCallback) {
+	exists, signed, cert := cb()
+	pe.isSigned, pe.isTrusted, pe.Cert = &exists, &signed, cert
 }
 
 // Section returns the section with specified name.

@@ -33,6 +33,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/hashers"
 	"github.com/rabbitstack/fibratus/pkg/util/hostname"
 	"github.com/rabbitstack/fibratus/pkg/util/ntstatus"
+	"github.com/rabbitstack/fibratus/pkg/util/signature"
 	"golang.org/x/sys/windows"
 )
 
@@ -219,6 +220,7 @@ func (e *Event) IsCloseFile() bool              { return e.Type == CloseFile }
 func (e *Event) IsCreateHandle() bool           { return e.Type == CreateHandle }
 func (e *Event) IsCloseHandle() bool            { return e.Type == CloseHandle }
 func (e *Event) IsDeleteFile() bool             { return e.Type == DeleteFile }
+func (e *Event) IsRenameFile() bool             { return e.Type == RenameFile }
 func (e *Event) IsEnumDirectory() bool          { return e.Type == EnumDirectory }
 func (e *Event) IsTerminateProcess() bool       { return e.Type == TerminateProcess }
 func (e *Event) IsTerminateThread() bool        { return e.Type == TerminateThread }
@@ -284,6 +286,20 @@ func (e *Event) IsCreateRemoteThread() bool {
 // differs from the real process parent identifier.
 func (e *Event) IsSurrogateProcess() bool {
 	return e.IsCreateProcess() && e.Params.MustGetUint32(params.ProcessParentID) != e.Params.MustGetUint32(params.ProcessRealParentID)
+}
+
+// SignatureKey derives the key into signature store.
+func (e *Event) SignatureKey() signature.Key {
+	if e.IsLoadModule() || e.IsModuleRundown() {
+		return signature.MakeKey(e.GetParamAsString(params.ModulePath), e.GetParamAsUint64(params.ModuleSize), e.GetParamAsUint32(params.ModuleCheckSum), e.GetParamAsUint32(params.ModuleTimeDateStamp))
+	}
+
+	if e.PS != nil && e.PS.PE != nil {
+		pe := e.PS.PE
+		return signature.MakeKey(e.PS.Exe, uint64(pe.ImageSize), pe.ImageChecksum, pe.TimedateStamp)
+	}
+
+	return signature.Key{}
 }
 
 // RundownKey calculates the rundown event hash. The hash is

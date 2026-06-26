@@ -29,6 +29,7 @@ import (
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/sys"
+	"github.com/rabbitstack/fibratus/pkg/util/signature"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
 )
@@ -140,6 +141,12 @@ func (f *fsProcessor) processEvent(e *event.Event) (*event.Event, error) {
 			e.AppendEnum(params.FileType, uint32(fileinfo.Type), fs.FileTypes)
 		}
 
+		// invalidate signature cache
+		dispo := e.Params.MustGetUint32(params.FileOperation)
+		if dispo == windows.FILE_OVERWRITE || dispo == windows.FILE_OVERWRITE_IF {
+			signature.GetSignatures().RemoveSignature(e.GetParamAsString(params.FilePath))
+		}
+
 		return e, nil
 	case event.ReleaseFile:
 		fileReleaseCount.Add(1)
@@ -190,6 +197,14 @@ func (f *fsProcessor) processEvent(e *event.Event) (*event.Event, error) {
 
 		if e.IsDeleteFile() {
 			delete(f.files, fileObject)
+			if fileinfo != nil {
+				signature.GetSignatures().RemoveSignature(fileinfo.Name)
+			}
+		}
+		if e.IsRenameFile() {
+			if fileinfo != nil {
+				signature.GetSignatures().RemoveSignature(fileinfo.Name)
+			}
 		}
 		if e.IsEnumDirectory() {
 			if fileinfo != nil {

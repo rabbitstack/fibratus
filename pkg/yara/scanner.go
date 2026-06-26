@@ -199,27 +199,13 @@ func (s scanner) Scan(e *event.Event) (bool, error) {
 		// scan the process loading unsigned/untrusted module
 		// or loading the module from unbacked memory region
 		pid := e.PID
-		addr := e.Params.MustGetUint64(params.ModuleBase)
-		typ := e.Params.MustGetUint32(params.ModuleSignatureType)
-		if typ != signature.None {
-			return false, nil
-		}
 		filename := e.GetParamAsString(params.ModulePath)
 		if s.config.ShouldSkipFile(filename) {
 			return false, nil
 		}
-
 		// get module signature
-		sign := signature.GetSignatures().GetSignature(addr)
-		if sign == nil {
-			sign = &signature.Signature{Filename: filename}
-			sign.Type, sign.Level, err = sign.Check()
-			if sign.IsSigned() {
-				sign.Verify()
-			}
-		}
-
-		if !sign.IsSigned() || !sign.IsTrusted() || (!e.Callstack.IsEmpty() && e.Callstack.ContainsUnbacked()) {
+		sign := signature.GetSignatures().GetSignature(e.SignatureKey())
+		if (sign != nil && (!sign.Exists() || !sign.IsTrusted())) || (!e.Callstack.IsEmpty() && e.Callstack.ContainsUnbacked()) {
 			log.Debugf("scanning suspicious module loading. pid: %d, module: %s", pid, filename)
 			matches, err = s.scan(pid)
 			moduleScans.Add(1)
@@ -295,13 +281,8 @@ func (s scanner) Scan(e *event.Event) (bool, error) {
 		size := e.Params.MustGetUint64(params.FileViewSize)
 		if e.PID != 4 && size >= 4096 && ((prot&sys.SectionRX) != 0 && (prot&sys.SectionRWX) != 0) && !s.isMmapMatched(pid) {
 			filename := e.GetParamAsString(params.FilePath)
-			// skip mappings of signed Modules
 			addr := e.Params.MustGetUint64(params.FileViewBase)
-			sign := signature.GetSignatures().GetSignature(addr)
-			if sign != nil && sign.IsSigned() && sign.IsTrusted() {
-				return false, nil
-			}
-			// data/Module file was mapped?
+			// data/module file was mapped?
 			if filename != "" {
 				if s.config.ShouldSkipFile(filename) {
 					return false, nil

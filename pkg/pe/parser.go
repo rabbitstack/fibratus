@@ -285,13 +285,13 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 	p := &PE{
 		NumberOfSections: pe.NtHeader.FileHeader.NumberOfSections,
 		LinkTime:         linkTime,
+		TimedateStamp:    timestamp,
 		Symbols:          make([]string, 0),
 		Imports:          make([]string, 0),
 		Sections:         make([]Sec, 0),
 		Exports:          make(map[uint32]string, 0),
 		VersionResources: make(map[string]string),
 		Is64:             pe.Is64,
-		filename:         path,
 		dosHeader:        pe.DOSHeader,
 		ntHeader:         pe.NtHeader,
 		sectionHeaders:   make([]peparser.ImageSectionHeader, 0),
@@ -301,11 +301,15 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 	case true:
 		oh64 := pe.NtHeader.OptionalHeader.(peparser.ImageOptionalHeader64)
 		p.ImageBase = format.UintToHex(oh64.ImageBase)
+		p.ImageSize = oh64.SizeOfImage
+		p.ImageChecksum = oh64.CheckSum
 		p.EntryPoint = format.UintToHex(uint64(oh64.AddressOfEntryPoint))
 	case false:
 		oh32 := pe.NtHeader.OptionalHeader.(peparser.ImageOptionalHeader32)
 		p.ImageBase = format.UintToHex(uint64(oh32.ImageBase))
 		p.EntryPoint = format.UintToHex(uint64(oh32.AddressOfEntryPoint))
+		p.ImageSize = oh32.SizeOfImage
+		p.ImageChecksum = oh32.CheckSum
 	}
 
 	// parse section header
@@ -374,7 +378,7 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 
 	// parse certificate info
 	if opts.parseSecurity {
-		p.IsSigned = pe.IsSigned
+		p.isSigned = &pe.IsSigned
 		if pe.HasCertificate && len(pe.Certificates.Certificates) > 0 {
 			cert := pe.Certificates.Certificates[0]
 			p.Cert = &sys.Cert{

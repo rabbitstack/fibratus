@@ -21,6 +21,8 @@ package bootstrap
 import (
 	"context"
 	"errors"
+	"os"
+
 	"github.com/rabbitstack/fibratus/internal/evasion"
 	"github.com/rabbitstack/fibratus/pkg/aggregator"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
@@ -36,11 +38,11 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"github.com/rabbitstack/fibratus/pkg/util/signals"
+	"github.com/rabbitstack/fibratus/pkg/util/signature"
 	"github.com/rabbitstack/fibratus/pkg/util/version"
 	"github.com/rabbitstack/fibratus/pkg/yara"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
-	"os"
 )
 
 // ErrAlreadyRunning signals a Fibratus process is already running in the system
@@ -420,6 +422,9 @@ func (f *App) Shutdown() error {
 	if err := alertsender.ShutdownAll(); err != nil {
 		errs = append(errs, err)
 	}
+
+	signature.GetSignatures().Close()
+
 	return multierror.Wrap(errs...)
 }
 

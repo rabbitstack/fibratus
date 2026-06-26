@@ -23,13 +23,14 @@ package pe
 
 import (
 	"fmt"
+	"math"
+	"time"
+	"unsafe"
+
 	capver "github.com/rabbitstack/fibratus/pkg/cap/version"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/bytes"
 	"github.com/rabbitstack/fibratus/pkg/util/convert"
-	"math"
-	"time"
-	"unsafe"
 )
 
 // Marshal dumps the PE metadata to binary stream.
@@ -93,8 +94,8 @@ func (pe *PE) Marshal() []byte {
 	}
 
 	// signature and cert data
-	b = append(b, convert.Btoi(pe.IsSigned))
-	b = append(b, convert.Btoi(pe.IsTrusted))
+	b = append(b, convert.Btoi(pe.IsSigned()))
+	b = append(b, convert.Btoi(pe.IsTrusted()))
 	if pe.Cert != nil {
 		crt := pe.Cert.Marshal()
 		b = append(b, bytes.WriteUint32(uint32(len(crt)))...)
@@ -242,8 +243,9 @@ func (pe *PE) Unmarshal(b []byte, ver capver.Version) error {
 	offset += roffset
 
 	if ver >= capver.PESecV2 {
-		pe.IsSigned = convert.Itob(b[20+offset])
-		pe.IsTrusted = convert.Itob(b[21+offset])
+		isSigned, isTrusted := convert.Itob(b[20+offset]), convert.Itob(b[21+offset])
+		pe.isSigned = &isSigned
+		pe.isTrusted = &isTrusted
 
 		certSize := bytes.ReadUint32(b[22+offset:])
 		if certSize > 0 {
