@@ -1,0 +1,43 @@
+name: Suspicious registry symbolic link creation
+id: 56e14e7a-69a2-4195-aca4-4d7975e01e54
+version: 1.0.0
+description: |
+  Detects the creation of registry symbolic links, a technique that
+  allows attackers to redirect registry key lookups to arbitrary
+  locations within the registry hive.
+  Adversaries abuse this mechanism to manipulate the registry
+  namespace and influence how privileged processes or system
+  services resolve registry paths, potentially enabling privilege
+  escalation without exploiting a traditional code vulnerability.
+labels:
+  tactic.id: TA0004
+  tactic.name: Privilege Escalation
+  tactic.ref: https://attack.mitre.org/tactics/TA0004/
+  technique.id: T1068
+  technique.name: Exploitation for Privilege Escalation
+  technique.ref: https://attack.mitre.org/techniques/T1068/
+references:
+  - https://github.com/usdAG/SharpLink
+  - https://securelist.com/tr/mini-plasma-vulner/120099/
+
+condition: >
+  ((create_key) or (set_value)) and
+  registry.value ~= 'SymbolicLinkValue' and ps.sid imatches ('S-1-5-21*', 'S-1-12-*') and
+  ps.exe not imatches
+            (
+              '?:\\Windows\\servicing\\TrustedInstaller.exe',
+              '?:\\Windows\\System32\\wuauclt.exe',
+              '?:\\Windows\\UUS\\*\\wuaucltcore.exe',
+              '?:\\Windows\\WinSxS\\*\\TiWorker.exe',
+              '?:\\Windows\\System32\\MoUsoCoreWorker.exe',
+              '?:\\Windows\\System32\\svchost.exe',
+              '?:\\Program Files\\*.exe',
+              '?:\\Program Files (x86)\\*.exe',
+              '?:\\Windows\\System32\\DismHost.exe',
+              '?:\\$WINDOWS.~BT\\Work\\*\\DismHost.exe'
+            ) and
+  not (ps.signature.trusted = true and ps.signature.subject matches 'Microsoft*')
+
+severity: high
+
+min-engine-version: 3.0.0
