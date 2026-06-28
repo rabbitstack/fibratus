@@ -1,6 +1,6 @@
 name: Potential process injection via tainted memory section
 id: 8e4182f3-02e7-4e95-afc3-93d18c9a9c09
-version: 1.0.5
+version: 1.0.6
 description: |
   Identifies potential process injection when the adversary creates and maps a memory
   section with RW protection rights followed by mapping of the same memory section in
@@ -16,6 +16,7 @@ labels:
   technique.name: Process Injection
   technique.ref: https://attack.mitre.org/techniques/T1055/
 references:
+  - https://github.com/MazX0p/LACUNA-Chain
   - https://www.elastic.co/security-labs/dissecting-remcos-rat-part-four
   - https://www.ired.team/offensive-security/code-injection-process-injection/ntcreatesection-+-ntmapviewofsection-code-injection
 
@@ -36,17 +37,11 @@ condition: >
                   '?:\\WINDOWS\\System32\\svchost.exe',
                   '?:\\WINDOWS\\System32\\lsass.exe',
                   '?:\\WINDOWS\\System32\\SecurityHealthService.exe',
-                  '?:\\WINDOWS\\System32\\services.exe'
+                  '?:\\WINDOWS\\System32\\services.exe',
+                  '?:\\WINDOWS\\System32\\RuntimeBroker.exe'
                 )
     | as e1
-    |map_view_of_section and
-     file.view.protection = 'READONLY|EXECUTE' and file.key = $e1.file.key and evt.pid != $e1.evt.pid and
-     ps.exe not imatches
-                (
-                  '?:\\Program Files\\Mozilla Firefox\\firefox.exe',
-                  '?:\\Program Files (x86)\\Mozilla Firefox\\firefox.exe'
-                )
-    |
+    |map_view_of_section and file.view.protection = 'READONLY|EXECUTE' and file.key = $e1.file.key and evt.pid != $e1.evt.pid|
 action:
   - name: kill
 
