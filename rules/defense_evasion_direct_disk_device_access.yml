@@ -1,0 +1,59 @@
+name: Direct disk device access
+id: b77914b8-9e91-46ab-8f52-342a2848c59e
+version: 1.0.0
+description: |
+  Detects direct access to raw disk devices or volumes by user-mode processes,
+  bypassing the Windows filesystem layer. Attackers abuse raw disk handles to
+  read partition structures, extract volume data, or wipe MBR/VBR without
+  triggering standard file-level auditing, making it a common primitive in
+  data destruction malware, ransomware, pre-encryption volume enumeration,
+  and stealthy credential harvesting tools that read NTFS structures directly.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1006
+  technique.name: Direct Volume Access
+  technique.ref: https://attack.mitre.org/techniques/T1006/
+references:
+  - https://github.com/nmht3t/RawHive
+  - https://www.fortinet.com/blog/threat-research/the-increasing-wiper-malware-threat
+  - https://www.crowdstrike.com/en-us/blog/petrwrap-ransomware-technical-analysis-triple-threat-file-encryption-mft-encryption-credential-theft/
+
+condition: >
+  open_file and
+  evt.pid != 4 and file.path imatches
+            (
+              '?:',
+              '\\Device\\Harddisk*\\DR*',
+              '\\Device\\Harddisk*\\Partition*',
+              '\\Device\\HarddiskVolume*',
+              '\\Device\\Scsi\\*',
+              '\\??\\GLOBALROOT\\Device\\HarddiskVolume*'
+            ) and
+  ps.exe not imatches
+            (
+              '?:\\Windows\\System32\\svchost.exe',
+              '?:\\Windows\\System32\\services.exe',
+              '?:\\Windows\\System32\\defrag.exe',
+              '?:\\Windows\\System32\\chkdsk.exe',
+              '?:\\Windows\\System32\\diskpart.exe',
+              '?:\\Windows\\System32\\diskmgmt.msc',
+              '?:\\Windows\\System32\\dfrg.msc',
+              '?:\\Windows\\System32\\wbadmin.exe',
+              '?:\\Windows\\System32\\fsutil.exe',
+              '?:\\Program Files\\VMware\\VMware Workstation\\vmware.exe',
+              '?:\\Program Files (x86)\\VMware\\VMware Workstation\\vmware.exe',
+              '?:\\Program Files\\Oracle\\VirtualBox\\VBoxSVC.exe',
+              '?:\\Program Files\\Oracle\\VirtualBox\\VirtualBoxVM.exe',
+              '?:\\Windows\\System32\\vmms.exe',
+              '?:\\Windows\\System32\\vmwp.exe',
+              '?:\\Program Files\\Windows Defender\\MsMpEng.exe',
+              '?:\\Program Files\\Windows Defender\\NisSrv.exe',
+              '?:\\ProgramData\\Microsoft\\Windows Defender\\Platform\\*\\MsMpEng.exe',
+              '?:\\ProgramData\\Microsoft\\Windows Defender\\Platform\\*\\NisSrv.exe'
+            )
+
+severity: high
+
+min-engine-version: 3.0.0
