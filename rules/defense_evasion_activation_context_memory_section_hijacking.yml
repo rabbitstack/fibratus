@@ -1,0 +1,41 @@
+name: Activation Context memory section hijacking
+id: 3d56281e-9608-4a70-b7b7-7651ccd3752b
+version: 1.0.0
+description: |
+  Detects abuses of a legitimate Windows feature present in most processes
+  called Activation Contexts with the objective of loading an arbitrary DLL
+  into signed executables.
+  Adversaries can unmap the legitimate read-only memory section view backing
+  the process Activation Context, then map a new pagefile-backed section at
+  the exact same base address containing a malicious Activation Context.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1055
+  technique.name: Process Injection
+  technique.ref: https://attack.mitre.org/techniques/T1055/
+references:
+  - https://github.com/r3xmax/PhantomCtx
+  - https://learn.microsoft.com/en-us/windows/win32/sbscs/activation-contexts
+
+condition: >
+  sequence
+  maxspan 40s
+  by ps.uuid, file.view.base
+    |unmap_view_file and
+     file.view.type = 'PAGEFILE' and file.view.protection = 'READONLY' and
+     (file.view.size = 12288 or (file.view.size = 4096 and
+      not (ps.parent.exe imatches '?:\\Windows\\System32\\svchost.exe' and ps.exe imatches '?:\\Windows\\System32\\taskhostw.exe') and
+      not (ps.parent.exe imatches '?:\\Windows\\explorer.exe' and ps.exe imatches '?:\\Program Files\\WindowsApps\\*.exe') and
+      not (ps.parent.exe imatches '?:\\Windows\\System32\\winlogon.exe' and ps.exe imatches '?:\\Windows\\System32\\dwm.exe') and
+      not (ps.parent.exe imatches '?:\\Windows\\System32\\winlogon.exe' and ps.exe imatches '?:\\Windows\\System32\\csrss.exe') and
+      not (ps.parent.exe imatches '?:\\Windows\\System32\\svchost.exe' and ps.exe imatches '?:\\Program Files\\Microsoft Office\\*\\ActionsServer\\ActionsServer.exe') and
+      not (ps.parent.exe imatches '?:\\Program Files\\Mozilla Firefox\\firefox.exe' and ps.exe imatches '?:\\Program Files\\Mozilla Firefox\\firefox.exe' and ps.cmdline imatches concat('*-contentproc -parentBuildID* -parentPid ', ps.ppid)))
+     )
+    |
+    |map_view_file and file.view.size = 12288 and file.view.type = 'PAGEFILE' and file.view.protection = 'READWRITE'|
+
+severity: high
+
+min-engine-version: 3.0.0
