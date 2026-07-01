@@ -1,0 +1,91 @@
+name: Untrusted DLL loaded from unusual directory
+id: 57372a7a-7f7a-4202-80a7-12888589414a
+version: 1.0.0
+description: |
+  Identifies trusted, digitally signed executables loading unsigned or untrusted
+  Dynamic Link Libraries (DLLs) from user-writable or otherwise uncommon filesystem
+  locations.
+  Adversaries frequently abuse these directories to stage malicious libraries that
+  are subsequently loaded by legitimate applications, allowing arbitrary code to
+  execute within the context of a trusted process while reducing the likelihood of
+  detection.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1574
+  technique.name: Hijack Execution Flow
+  technique.ref: https://attack.mitre.org/techniques/T1574/
+references:
+  - https://www.crowdstrike.com/en-us/blog/4-ways-adversaries-hijack-dlls/
+  - https://www.ibm.com/think/x-force/windows-features-dll-sideloading
+
+condition: >
+  load_dll and
+  ps.exe != '' and dir(dll.path) ~= dir(ps.exe) and
+  ps.signature.trusted = true and (dll.signature.exists = false or dll.signature.trusted = false) and
+  dll.path imatches
+          (
+            '?:\\Windows\\Tasks\\*',
+            '?:\\Windows\\System32\\Tasks\\*',
+            '?:\\PerfLogs\\*',
+            '?:\\$Recycle.Bin\\*',
+            '?:\\ProgramData\\*',
+            '?:\\Users\\Public\\*',
+            '?:\\Users\\*\\AppData\\Roaming\\*',
+            '?:\\Users\\*\\Documents\\*',
+            '?:\\Users\\*\\Pictures\\*',
+            '?:\\Users\\*\\Music\\*',
+            '?:\\Users\\*\\Videos\\*',
+            '?:\\Windows\\AppReadiness\\*',
+            '?:\\Windows\\Prefetch\\*',
+            '?:\\Windows\\Fonts\\*',
+            '?:\\Windows\\INF\\*',
+            '?:\\Windows\\tracing\\*',
+            '?:\\Windows\\Help\\*',
+            '?:\\Windows\\csc\\*',
+            '?:\\Windows\\Web\\*',
+            '?:\\Windows\\Servicing\\*',
+            '?:\\Windows\\Boot\\*',
+            '?:\\Windows\\Resources\\*',
+            '?:\\Windows\\Provisioning\\*',
+            '?:\\Windows\\PrintDialog\\*',
+            '?:\\Windows\\SchCache\\*',
+            '?:\\Windows\\Cursors\\*',
+            '?:\\Windows\\debug\\*',
+            '?:\\Windows\\Containers\\*',
+            '?:\\Windows\\ShellComponents\\*',
+            '?:\\Windows\\ShellExperiences\\*',
+            '?:\\Windows\\Setup\\*',
+            '?:\\Windows\\Migration\\*',
+            '?:\\Windows\\PLA\\*',
+            '?:\\Windows\\Vss\\*',
+            '?:\\Windows\\WaaS\\*',
+            '?:\\Windows\\ImmersiveControlPanel\\*',
+            '?:\\Windows\\PolicyDefinitions\\*',
+            '?:\\Windows\\Globalization\\*',
+            '?:\\Windows\\appcompat\\*',
+            '?:\\Windows\\apppatch\\*',
+            '?:\\Windows\\addins\\*',
+            '?:\\Windows\\SystemTemp\\*',
+            '?:\\Windows\\WinSxS\\*',
+            '?:\\Windows\\TextInput\\*',
+            '?:\\Windows\\TAPI\\*',
+            '?:\\Windows\\Prefetch\\*',
+            '?:\\Intel\\*',
+            '?:\\AMD\\Temp\\*',
+            '?:\\Windows\\hp\\*',
+            '?:\\Windows\\RemotePackages\\*',
+            '?:\\Windows\\ServiceProfiles\\*',
+            '?:\\Windows\\dot3svc\\*',
+            '?:\\Windows\\CbsTemp\\*',
+            '?:\\Windows\\LiveKernelReports\\*',
+            '?:\\Windows\\SoftwareDistribution\\*',
+            '?:\\Windows\\ServiceState\\*',
+            '?:\\Windows\\SKB\\*',
+            '?:\\Users\\*\\AppData\\Local\\Microsoft\\Windows\\INetCache\\IE\\*'
+          )
+
+severity: high
+
+min-engine-version: 3.0.0
