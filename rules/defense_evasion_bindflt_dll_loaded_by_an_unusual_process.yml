@@ -1,0 +1,54 @@
+name: BindFlt DLL loaded by an unusual process
+id: fa439e69-2a73-49f9-8385-0e7f801f67db
+version: 1.0.0
+description: |
+  Detects the loading of bindfltapi.dll, bindflt.dll, or bindlink.dll DLL family that
+  represents user-mode API surface of the Windows Bind Filter driver (bindflt.sys)
+  by processes outside the known legitimate consumer set. The Bind Filter driver allows
+  administrator-level callers to create transparent, application-invisible redirections
+  from a virtual file system path to an arbitrary local or remote backing path.
+  While legitimately used by WSL2, Windows Containers, Windows Sandbox, Hyper-V, and
+  MSIX packaging, this capability has been weaponised in multiple public tools to perform
+  EDR and AV evasion.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1574
+  technique.name: Hijack Execution Flow
+  technique.ref: https://attack.mitre.org/techniques/T1574/
+references:
+  - https://github.com/Nukem9/BindFltAPI
+  - https://github.com/TwoSevenOneT/EDR-Redir
+  - https://ipurple.team/2025/12/01/bind-link-edr-tampering/
+  - https://www.zerosalarium.com/2025/10/DR-Redir-Break-EDR-Via-BindLink-Cloud-Filter.html
+
+condition: >
+  load_dll and
+  dll.name iin ('bindfltapi.dll', 'bindflt.dll', 'bindlink.dll') and
+  ps.exe not imatches
+            (
+              '?:\\Windows\\System32\\svchost.exe',
+              '?:\\Windows\\System32\\wsl.exe',
+              '?:\\Windows\\System32\\wslhost.exe',
+              '?:\\Windows\\System32\\wslservice.exe',
+              '?:\\Windows\\System32\\vmcompute.exe',
+              '?:\\Windows\\System32\\vmwp.exe',
+              '?:\\Windows\\System32\\CExecSvc.exe',
+              '?:\\Windows\\System32\\WindowsSandboxClient.exe',
+              '?:\\Windows\\System32\\WindowsSandboxRemoteSession.exe',
+              '?:\\Windows\\System32\\ContainerManager.exe',
+              '?:\\Windows\\System32\\HvHost.exe',
+              '?:\\Windows\\System32\\msixmgr.exe',
+              '?:\\Program Files\\Docker\\Docker\\resources\\com.docker.backend.exe',
+              '?:\\Program Files\\Docker\\Docker\\Docker Desktop.exe',
+              '?:\\Users\\*\\AppData\\Local\\Docker\\Desktop\\Docker Desktop.exe'
+            ) and
+  not (ps.sid = 'S-1-5-18' and ps.exe imatches ('?:\\Windows\\System32\\*.exe', '?:\\Windows\\SysWOW64\\*.exe') and
+       ps.signature.subject imatches ('*Microsoft Windows*', '*Microsoft Corporation*') and ps.signature.trusted = true)
+action:
+  - name: kill
+  
+severity: high
+
+min-engine-version: 3.0.0
