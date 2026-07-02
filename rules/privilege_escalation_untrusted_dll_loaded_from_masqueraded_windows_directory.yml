@@ -1,0 +1,58 @@
+name: Untrusted DLL loaded from masqueraded Windows directory
+id: a3899290-dc2e-405b-a6ea-cb1eb40c4769
+version: 1.0.0
+description: |
+  Identifies trusted process executables loading unsigned or untrusted
+  Dynamic Link Libraries (DLLs) from filesystem paths that masquerade as
+  legitimate Windows system directories.
+  Attackers frequently create lookalike directory structures to disguise
+  malicious payloads as legitimate operating system components.
+labels:
+  tactic.id: TA0004
+  tactic.name: Privilege Escalation
+  tactic.ref: https://attack.mitre.org/tactics/TA0004/
+  technique.id: T1574
+  technique.name: Hijack Execution Flow
+  technique.ref: https://attack.mitre.org/techniques/T1574/
+references:
+  - https://github.com/r3xmax/PhantomCtx
+  - https://www.crowdstrike.com/en-us/blog/4-ways-adversaries-hijack-dlls/
+
+condition: >
+  load_dll and
+  ps.exe imatches ('?:\\Windows\\System32\\*.exe', '?:\\Windows\\SysWOW64\\*.exe', '?:\\Program Files*') and
+  (dll.signature.exists = false or dll.signature.trusted = false) and
+  dll.path imatches
+          (
+            '?:\\*\\Windows\\System32\\*',
+            '?:\\*\\Windows\\SysWOW64\\*',
+            '?:\\*\\Windows\\WinSxS\\*',
+            '?:\\*\\Windows\\assembly\\*',
+            '?:\\*\\Windows\\Microsoft.NET\\*',
+            '*:\\Windows \\System32\\*',
+            '*:\\Windows \\SysWOW64\\*',
+            '*:\\ Windows*\\System32\\*',
+            '*:\\ Windows*\\SysWOW64\\*',
+            '*:\\Windows*\\assembly\\*',
+            '*:\\Windows*\\WinSxS\\*',
+            '*:\\ Windows*\\WinSxS\\*',
+            '*:\\ Windows*\\assembly\\*'
+          ) and
+  dll.path not imatches
+          (
+            '?:\\Windows\\System32\\*',
+            '?:\\Windows\\SysWOW64\\*',
+            '?:\\Windows\\WinSxS\\*',
+            '?:\\Windows\\assembly\\*',
+            '?:\\Windows\\Microsoft.NET\\*',
+            '?:\\$WINDOWS.~BT\\*\\Windows\\System32\\migration\\*.dll',
+            '?:\\$WINDOWS.~BT\\*\\Windows\\SysWOW64\\migration\\*.dll',
+            '?:\\Windows.old\\WINDOWS\\System32\\DriverStore\\*.dll',
+            '?:\\$WinREAgent\\Scratch\\Mount\\Windows\\*.dll',
+            '?:\\ProgramData\\docker\\windowsfilter\\*\\Files\\Windows\\System32\\*.dll',
+            '?:\\ProgramData\\docker\\windowsfilter\\*\\Files\\Windows\\SysWOW64\\*.dll'
+          )
+
+severity: high
+
+min-engine-version: 3.0.0
