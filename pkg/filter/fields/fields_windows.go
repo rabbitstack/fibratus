@@ -477,10 +477,6 @@ const (
 	FileViewType Field = "file.view.type"
 	// FileViewProtection represents the protection attributes of the section view
 	FileViewProtection Field = "file.view.protection"
-	// FileIsDriverVulnerable represents the field that denotes whether the created file is a vulnerable driver
-	FileIsDriverVulnerable Field = "file.is_driver_vulnerable"
-	// FileIsDriverMalicious represents the field that denotes whether the created file is a malicious driver
-	FileIsDriverMalicious Field = "file.is_driver_malicious"
 	// FileIsDLL indicates if the created file is a DLL
 	FileIsDLL Field = "file.is_dll"
 	// FileIsDriver indicates if the created file is a driver
@@ -544,10 +540,6 @@ const (
 	ImageCertBefore = "image.cert.before"
 	// ImageCertAfter is the field that specifies the certificate won't be valid after this timestamp.
 	ImageCertAfter = "image.cert.after"
-	// ImageIsDriverVulnerable represents the field that denotes whether loaded driver is vulnerable
-	ImageIsDriverVulnerable Field = "image.is_driver_vulnerable"
-	// ImageIsDriverMalicious represents the field that denotes whether the loaded driver is malicious
-	ImageIsDriverMalicious Field = "image.is_driver_malicious"
 	// ImageIsDLL indicates if the loaded image is a DLL
 	ImageIsDLL Field = "image.is_dll"
 	// ImageIsDriver indicates if the loaded image is a driver
@@ -626,10 +618,6 @@ const (
 	ModuleSignatureBefore = "module.signature.before"
 	// ModuleSignatureAfter is the field that specifies the certificate won't be valid after this timestamp.
 	ModuleSignatureAfter = "module.signature.after"
-	// ModuleIsDriverVulnerable represents the field that denotes whether loaded driver is vulnerable
-	ModuleIsDriverVulnerable Field = "module.is_driver_vulnerable"
-	// ModuleIsDriverMalicious represents the field that denotes whether the loaded driver is malicious
-	ModuleIsDriverMalicious Field = "module.is_driver_malicious"
 	// ModuleIsDLL indicates if the loaded module is a DLL
 	ModuleIsDLL Field = "module.is_dll"
 	// ModuleIsDriver indicates if the loaded module is a driver
@@ -1114,65 +1102,61 @@ var fields = map[Field]FieldInfo{
 	ThreadCallstackFinalUserModuleSignatureIssuer:  {ThreadCallstackFinalUserModuleSignatureIssuer, "final user space stack frame module signature certificate issuer", params.UnicodeString, []string{"thread.callstack.final_user_module.signature.issuer imatches '*Microsoft Corporation*'"}, nil, nil},
 	ThreadCallstackFinalUserModuleSignatureSubject: {ThreadCallstackFinalUserModuleSignatureSubject, "final user space stack frame module signature certificate subject", params.UnicodeString, []string{"thread.callstack.final_user_module.signature.subject imatches '*Microsoft Windows*'"}, nil, nil},
 
-	ImagePath:                {ImagePath, "full image path", params.UnicodeString, []string{"image.path = 'C:\\Windows\\System32\\advapi32.dll'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModulePath}}, nil},
-	ImageName:                {ImageName, "image name", params.UnicodeString, []string{"image.name = 'advapi32.dll'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleName}}, nil},
-	ImageBase:                {ImageBase, "the base address of process in which the image is loaded", params.Address, []string{"image.base.address = 'a65d800000'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleBase}}, nil},
-	ImageChecksum:            {ImageChecksum, "image checksum", params.Uint32, []string{"image.checksum = 746424"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleChecksum}}, nil},
-	ImageSize:                {ImageSize, "image size", params.Uint32, []string{"image.size > 1024"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleSize}}, nil},
-	ImageDefaultAddress:      {ImageDefaultAddress, "default image address", params.Address, []string{"image.default.address = '7efe0000'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleDefaultAddress}}, nil},
-	ImagePID:                 {ImagePID, "target process identifier", params.Uint32, []string{"image.pid = 80"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModulePID}}, nil},
-	ImageSignatureType:       {ImageSignatureType, "image signature type", params.AnsiString, []string{"image.signature.type != 'NONE'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleSignatureType}}, nil},
-	ImageSignatureLevel:      {ImageSignatureLevel, "image signature level", params.AnsiString, []string{"image.signature.level = 'AUTHENTICODE'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleSignatureLevel}}, nil},
-	ImageCertSerial:          {ImageCertSerial, "image certificate serial number", params.UnicodeString, []string{"image.cert.serial = '330000023241fb59996dcc4dff000000000232'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleSignatureSerial}}, nil},
-	ImageCertSubject:         {ImageCertSubject, "image certificate subject", params.UnicodeString, []string{"image.cert.subject contains 'Washington, Redmond, Microsoft Corporation'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleSignatureSubject}}, nil},
-	ImageCertIssuer:          {ImageCertIssuer, "image certificate CA", params.UnicodeString, []string{"image.cert.issuer contains 'Washington, Redmond, Microsoft Corporation'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleSignatureIssuer}}, nil},
-	ImageCertAfter:           {ImageCertAfter, "image certificate expiration date", params.Time, []string{"image.cert.after contains '2024-02-01 00:05:42 +0000 UTC'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleSignatureAfter}}, nil},
-	ImageCertBefore:          {ImageCertBefore, "image certificate enrollment date", params.Time, []string{"image.cert.before contains '2024-02-01 00:05:42 +0000 UTC'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleSignatureBefore}}, nil},
-	ImageIsDriverMalicious:   {ImageIsDriverMalicious, "indicates if the loaded driver is malicious", params.Bool, []string{"image.is_driver_malicious"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleIsDriverMalicious}}, nil},
-	ImageIsDriverVulnerable:  {ImageIsDriverVulnerable, "indicates if the loaded driver is vulnerable", params.Bool, []string{"image.is_driver_vulnerable"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleIsDriverVulnerable}}, nil},
-	ImageIsDLL:               {ImageIsDLL, "indicates if the loaded image is a DLL", params.Bool, []string{"image.is_dll'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleIsDLL}}, nil},
-	ImageIsDriver:            {ImageIsDriver, "indicates if the loaded image is a driver", params.Bool, []string{"image.is_driver'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleIsDriver}}, nil},
-	ImageIsExecutable:        {ImageIsExecutable, "indicates if the loaded image is an executable", params.Bool, []string{"image.is_exec'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleIsExecutable}}, nil},
-	ImageIsDotnet:            {ImageIsDotnet, "indicates if the loaded image is a .NET assembly", params.Bool, []string{"image.is_dotnet'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleIsDotnet}}, nil},
-	ModulePath:               {ModulePath, "full module path", params.UnicodeString, []string{"module.path = 'C:\\Windows\\System32\\advapi32.dll'"}, nil, nil},
-	ModulePathStem:           {ModulePathStem, "module path stem", params.UnicodeString, []string{"module.path.stem = 'C:\\Windows\\System32\\advapi32'"}, nil, nil},
-	ModuleName:               {ModuleName, "module name", params.UnicodeString, []string{"module.name = 'advapi32.dll'"}, nil, nil},
-	ModuleBase:               {ModuleBase, "the base address of process in which the module is loaded", params.Address, []string{"module.base.address = 'a65d800000'"}, nil, nil},
-	ModuleChecksum:           {ModuleChecksum, "module checksum", params.Uint32, []string{"module.checksum = 746424"}, nil, nil},
-	ModuleSize:               {ModuleSize, "module size", params.Uint32, []string{"module.size > 1024"}, nil, nil},
-	ModuleDefaultAddress:     {ModuleDefaultAddress, "default module address", params.Address, []string{"module.default_address = '7efe0000'"}, nil, nil},
-	ModulePID:                {ModulePID, "target process identifier", params.Uint32, []string{"module.pid = 80"}, nil, nil},
-	ModuleSignatureType:      {ModuleSignatureType, "module signature type", params.AnsiString, []string{"module.signature.type != 'NONE'"}, nil, nil},
-	ModuleSignatureLevel:     {ModuleSignatureLevel, "module signature level", params.AnsiString, []string{"module.signature.level = 'AUTHENTICODE'"}, nil, nil},
-	ModuleSignatureExists:    {ModuleSignatureExists, "indicates if the module is signed", params.Bool, []string{"module.signature.exists = true"}, nil, nil},
-	ModuleSignatureTrusted:   {ModuleSignatureTrusted, "indicates if the module signature is trusted", params.Bool, []string{"module.signature.trusted = false"}, nil, nil},
-	ModuleSignatureSerial:    {ModuleSignatureSerial, "module certificate serial number", params.UnicodeString, []string{"module.signature.serial = '330000023241fb59996dcc4dff000000000232'"}, nil, nil},
-	ModuleSignatureSubject:   {ModuleSignatureSubject, "module certificate subject", params.UnicodeString, []string{"module.signature.subject contains 'Washington, Redmond, Microsoft Corporation'"}, nil, nil},
-	ModuleSignatureIssuer:    {ModuleSignatureIssuer, "module certificate CA", params.UnicodeString, []string{"module.signature.issuer contains 'Washington, Redmond, Microsoft Corporation'"}, nil, nil},
-	ModuleSignatureAfter:     {ModuleSignatureAfter, "module certificate expiration date", params.Time, []string{"module.signature.after contains '2024-02-01 00:05:42 +0000 UTC'"}, nil, nil},
-	ModuleSignatureBefore:    {ModuleSignatureBefore, "module certificate enrollment date", params.Time, []string{"module.signature.before contains '2024-02-01 00:05:42 +0000 UTC'"}, nil, nil},
-	ModuleIsDriverMalicious:  {ModuleIsDriverMalicious, "indicates if the loaded driver is malicious", params.Bool, []string{"module.is_driver_malicious"}, nil, nil},
-	ModuleIsDriverVulnerable: {ModuleIsDriverVulnerable, "indicates if the loaded driver is vulnerable", params.Bool, []string{"module.is_driver_vulnerable"}, nil, nil},
-	ModuleIsDLL:              {ModuleIsDLL, "indicates if the loaded module is a DLL", params.Bool, []string{"module.is_dll'"}, nil, nil},
-	ModuleIsDriver:           {ModuleIsDriver, "indicates if the loaded module is a driver", params.Bool, []string{"module.is_driver'"}, nil, nil},
-	ModuleIsExecutable:       {ModuleIsExecutable, "indicates if the loaded module is an executable", params.Bool, []string{"module.is_exec'"}, nil, nil},
-	ModuleIsDotnet:           {ModuleIsDotnet, "indicates if the loaded module is a .NET assembly", params.Bool, []string{"module.pe.is_dotnet'"}, nil, nil},
-	DllPath:                  {DllPath, "full dll path", params.UnicodeString, []string{"dll.path = 'C:\\Windows\\System32\\advapi32.dll'"}, nil, nil},
-	DllPathStem:              {DllPathStem, "dll path stem", params.UnicodeString, []string{"dll.path.stem = 'C:\\Windows\\System32\\advapi32'"}, nil, nil},
-	DllName:                  {DllName, "module name", params.UnicodeString, []string{"dll.name = 'advapi32.dll'"}, nil, nil},
-	DllBase:                  {DllBase, "the base address of process in which the DLL is loaded", params.Address, []string{"dll.base = 'a65d800000'"}, nil, nil},
-	DllSize:                  {DllSize, "dll virtual mapped size", params.Uint32, []string{"dll.size > 1024"}, nil, nil},
-	DllPID:                   {DllPID, "target process identifier", params.Uint32, []string{"dll.pid = 80"}, nil, nil},
-	DllSignatureType:         {DllSignatureType, "dll signature type", params.AnsiString, []string{"dll.signature.type != 'NONE'"}, nil, nil},
-	DllSignatureLevel:        {DllSignatureLevel, "dll signature level", params.AnsiString, []string{"dll.signature.level = 'AUTHENTICODE'"}, nil, nil},
-	DllSignatureExists:       {DllSignatureExists, "indicates if the dll is signed", params.Bool, []string{"dll.signature.exists = true"}, nil, nil},
-	DllSignatureTrusted:      {DllSignatureTrusted, "indicates if the dll signature is trusted", params.Bool, []string{"dll.signature.trusted = false"}, nil, nil},
-	DllSignatureSerial:       {DllSignatureSerial, "dll certificate serial number", params.UnicodeString, []string{"dll.signature.serial = '330000023241fb59996dcc4dff000000000232'"}, nil, nil},
-	DllSignatureSubject:      {DllSignatureSubject, "dll certificate subject", params.UnicodeString, []string{"dll.signature.subject contains 'Washington, Redmond, Microsoft Corporation'"}, nil, nil},
-	DllSignatureIssuer:       {DllSignatureIssuer, "dll certificate CA", params.UnicodeString, []string{"dll.signature.issuer contains 'Washington, Redmond, Microsoft Corporation'"}, nil, nil},
-	DllSignatureAfter:        {DllSignatureAfter, "moddllule certificate expiration date", params.Time, []string{"dll.signature.after contains '2024-02-01 00:05:42 +0000 UTC'"}, nil, nil},
-	DllSignatureBefore:       {DllSignatureBefore, "dll certificate enrollment date", params.Time, []string{"dll.signature.before contains '2024-02-01 00:05:42 +0000 UTC'"}, nil, nil},
-	DllIsDotnet:              {DllIsDotnet, "indicates if the loaded dll is a .NET assembly", params.Bool, []string{"dll.pe.is_dotnet'"}, nil, nil},
+	ImagePath:              {ImagePath, "full image path", params.UnicodeString, []string{"image.path = 'C:\\Windows\\System32\\advapi32.dll'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModulePath}}, nil},
+	ImageName:              {ImageName, "image name", params.UnicodeString, []string{"image.name = 'advapi32.dll'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleName}}, nil},
+	ImageBase:              {ImageBase, "the base address of process in which the image is loaded", params.Address, []string{"image.base.address = 'a65d800000'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleBase}}, nil},
+	ImageChecksum:          {ImageChecksum, "image checksum", params.Uint32, []string{"image.checksum = 746424"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleChecksum}}, nil},
+	ImageSize:              {ImageSize, "image size", params.Uint32, []string{"image.size > 1024"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleSize}}, nil},
+	ImageDefaultAddress:    {ImageDefaultAddress, "default image address", params.Address, []string{"image.default.address = '7efe0000'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleDefaultAddress}}, nil},
+	ImagePID:               {ImagePID, "target process identifier", params.Uint32, []string{"image.pid = 80"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModulePID}}, nil},
+	ImageSignatureType:     {ImageSignatureType, "image signature type", params.AnsiString, []string{"image.signature.type != 'NONE'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleSignatureType}}, nil},
+	ImageSignatureLevel:    {ImageSignatureLevel, "image signature level", params.AnsiString, []string{"image.signature.level = 'AUTHENTICODE'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleSignatureLevel}}, nil},
+	ImageCertSerial:        {ImageCertSerial, "image certificate serial number", params.UnicodeString, []string{"image.cert.serial = '330000023241fb59996dcc4dff000000000232'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleSignatureSerial}}, nil},
+	ImageCertSubject:       {ImageCertSubject, "image certificate subject", params.UnicodeString, []string{"image.cert.subject contains 'Washington, Redmond, Microsoft Corporation'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleSignatureSubject}}, nil},
+	ImageCertIssuer:        {ImageCertIssuer, "image certificate CA", params.UnicodeString, []string{"image.cert.issuer contains 'Washington, Redmond, Microsoft Corporation'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleSignatureIssuer}}, nil},
+	ImageCertAfter:         {ImageCertAfter, "image certificate expiration date", params.Time, []string{"image.cert.after contains '2024-02-01 00:05:42 +0000 UTC'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleSignatureAfter}}, nil},
+	ImageCertBefore:        {ImageCertBefore, "image certificate enrollment date", params.Time, []string{"image.cert.before contains '2024-02-01 00:05:42 +0000 UTC'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleSignatureBefore}}, nil},
+	ImageIsDLL:             {ImageIsDLL, "indicates if the loaded image is a DLL", params.Bool, []string{"image.is_dll'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleIsDLL}}, nil},
+	ImageIsDriver:          {ImageIsDriver, "indicates if the loaded image is a driver", params.Bool, []string{"image.is_driver'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleIsDriver}}, nil},
+	ImageIsExecutable:      {ImageIsExecutable, "indicates if the loaded image is an executable", params.Bool, []string{"image.is_exec'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleIsExecutable}}, nil},
+	ImageIsDotnet:          {ImageIsDotnet, "indicates if the loaded image is a .NET assembly", params.Bool, []string{"image.is_dotnet'"}, &Deprecation{Since: "3.0.0", Fields: []Field{ModuleIsDotnet}}, nil},
+	ModulePath:             {ModulePath, "full module path", params.UnicodeString, []string{"module.path = 'C:\\Windows\\System32\\advapi32.dll'"}, nil, nil},
+	ModulePathStem:         {ModulePathStem, "module path stem", params.UnicodeString, []string{"module.path.stem = 'C:\\Windows\\System32\\advapi32'"}, nil, nil},
+	ModuleName:             {ModuleName, "module name", params.UnicodeString, []string{"module.name = 'advapi32.dll'"}, nil, nil},
+	ModuleBase:             {ModuleBase, "the base address of process in which the module is loaded", params.Address, []string{"module.base.address = 'a65d800000'"}, nil, nil},
+	ModuleChecksum:         {ModuleChecksum, "module checksum", params.Uint32, []string{"module.checksum = 746424"}, nil, nil},
+	ModuleSize:             {ModuleSize, "module size", params.Uint32, []string{"module.size > 1024"}, nil, nil},
+	ModuleDefaultAddress:   {ModuleDefaultAddress, "default module address", params.Address, []string{"module.default_address = '7efe0000'"}, nil, nil},
+	ModulePID:              {ModulePID, "target process identifier", params.Uint32, []string{"module.pid = 80"}, nil, nil},
+	ModuleSignatureType:    {ModuleSignatureType, "module signature type", params.AnsiString, []string{"module.signature.type != 'NONE'"}, nil, nil},
+	ModuleSignatureLevel:   {ModuleSignatureLevel, "module signature level", params.AnsiString, []string{"module.signature.level = 'AUTHENTICODE'"}, nil, nil},
+	ModuleSignatureExists:  {ModuleSignatureExists, "indicates if the module is signed", params.Bool, []string{"module.signature.exists = true"}, nil, nil},
+	ModuleSignatureTrusted: {ModuleSignatureTrusted, "indicates if the module signature is trusted", params.Bool, []string{"module.signature.trusted = false"}, nil, nil},
+	ModuleSignatureSerial:  {ModuleSignatureSerial, "module certificate serial number", params.UnicodeString, []string{"module.signature.serial = '330000023241fb59996dcc4dff000000000232'"}, nil, nil},
+	ModuleSignatureSubject: {ModuleSignatureSubject, "module certificate subject", params.UnicodeString, []string{"module.signature.subject contains 'Washington, Redmond, Microsoft Corporation'"}, nil, nil},
+	ModuleSignatureIssuer:  {ModuleSignatureIssuer, "module certificate CA", params.UnicodeString, []string{"module.signature.issuer contains 'Washington, Redmond, Microsoft Corporation'"}, nil, nil},
+	ModuleSignatureAfter:   {ModuleSignatureAfter, "module certificate expiration date", params.Time, []string{"module.signature.after contains '2024-02-01 00:05:42 +0000 UTC'"}, nil, nil},
+	ModuleSignatureBefore:  {ModuleSignatureBefore, "module certificate enrollment date", params.Time, []string{"module.signature.before contains '2024-02-01 00:05:42 +0000 UTC'"}, nil, nil},
+	ModuleIsDLL:            {ModuleIsDLL, "indicates if the loaded module is a DLL", params.Bool, []string{"module.is_dll'"}, nil, nil},
+	ModuleIsDriver:         {ModuleIsDriver, "indicates if the loaded module is a driver", params.Bool, []string{"module.is_driver'"}, nil, nil},
+	ModuleIsExecutable:     {ModuleIsExecutable, "indicates if the loaded module is an executable", params.Bool, []string{"module.is_exec'"}, nil, nil},
+	ModuleIsDotnet:         {ModuleIsDotnet, "indicates if the loaded module is a .NET assembly", params.Bool, []string{"module.pe.is_dotnet'"}, nil, nil},
+	DllPath:                {DllPath, "full dll path", params.UnicodeString, []string{"dll.path = 'C:\\Windows\\System32\\advapi32.dll'"}, nil, nil},
+	DllPathStem:            {DllPathStem, "dll path stem", params.UnicodeString, []string{"dll.path.stem = 'C:\\Windows\\System32\\advapi32'"}, nil, nil},
+	DllName:                {DllName, "module name", params.UnicodeString, []string{"dll.name = 'advapi32.dll'"}, nil, nil},
+	DllBase:                {DllBase, "the base address of process in which the DLL is loaded", params.Address, []string{"dll.base = 'a65d800000'"}, nil, nil},
+	DllSize:                {DllSize, "dll virtual mapped size", params.Uint32, []string{"dll.size > 1024"}, nil, nil},
+	DllPID:                 {DllPID, "target process identifier", params.Uint32, []string{"dll.pid = 80"}, nil, nil},
+	DllSignatureType:       {DllSignatureType, "dll signature type", params.AnsiString, []string{"dll.signature.type != 'NONE'"}, nil, nil},
+	DllSignatureLevel:      {DllSignatureLevel, "dll signature level", params.AnsiString, []string{"dll.signature.level = 'AUTHENTICODE'"}, nil, nil},
+	DllSignatureExists:     {DllSignatureExists, "indicates if the dll is signed", params.Bool, []string{"dll.signature.exists = true"}, nil, nil},
+	DllSignatureTrusted:    {DllSignatureTrusted, "indicates if the dll signature is trusted", params.Bool, []string{"dll.signature.trusted = false"}, nil, nil},
+	DllSignatureSerial:     {DllSignatureSerial, "dll certificate serial number", params.UnicodeString, []string{"dll.signature.serial = '330000023241fb59996dcc4dff000000000232'"}, nil, nil},
+	DllSignatureSubject:    {DllSignatureSubject, "dll certificate subject", params.UnicodeString, []string{"dll.signature.subject contains 'Washington, Redmond, Microsoft Corporation'"}, nil, nil},
+	DllSignatureIssuer:     {DllSignatureIssuer, "dll certificate CA", params.UnicodeString, []string{"dll.signature.issuer contains 'Washington, Redmond, Microsoft Corporation'"}, nil, nil},
+	DllSignatureAfter:      {DllSignatureAfter, "moddllule certificate expiration date", params.Time, []string{"dll.signature.after contains '2024-02-01 00:05:42 +0000 UTC'"}, nil, nil},
+	DllSignatureBefore:     {DllSignatureBefore, "dll certificate enrollment date", params.Time, []string{"dll.signature.before contains '2024-02-01 00:05:42 +0000 UTC'"}, nil, nil},
+	DllIsDotnet:            {DllIsDotnet, "indicates if the loaded dll is a .NET assembly", params.Bool, []string{"dll.pe.is_dotnet'"}, nil, nil},
 
 	FileObject:                      {FileObject, "file object address", params.Uint64, []string{"file.object = 18446738026482168384"}, nil, nil},
 	FilePath:                        {FilePath, "full file path", params.UnicodeString, []string{"file.path = 'C:\\Windows\\System32'"}, nil, nil},
@@ -1191,8 +1175,6 @@ var fields = map[Field]FieldInfo{
 	FileViewSize:                    {FileViewSize, "size of the mapped view", params.Uint64, []string{"file.view.size > 1024"}, nil, nil},
 	FileViewType:                    {FileViewType, "type of the mapped view section", params.Enum, []string{"file.view.type = 'IMAGE'"}, nil, nil},
 	FileViewProtection:              {FileViewProtection, "protection rights of the section view", params.AnsiString, []string{"file.view.protection = 'READONLY'"}, nil, nil},
-	FileIsDriverMalicious:           {FileIsDriverMalicious, "indicates if the dropped driver is malicious", params.Bool, []string{"file.is_driver_malicious"}, nil, nil},
-	FileIsDriverVulnerable:          {FileIsDriverVulnerable, "indicates if the dropped driver is vulnerable", params.Bool, []string{"file.is_driver_vulnerable"}, nil, nil},
 	FileIsDLL:                       {FileIsDLL, "indicates if the created file is a DLL", params.Bool, []string{"file.is_dll'"}, nil, nil},
 	FileIsDriver:                    {FileIsDriver, "indicates if the created file is a driver", params.Bool, []string{"file.is_driver'"}, nil, nil},
 	FileIsExecutable:                {FileIsExecutable, "indicates if the created file is an executable", params.Bool, []string{"file.is_exec'"}, nil, nil},

@@ -675,9 +675,7 @@ func (t *threadAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 // fileAccessor extracts file specific values.
 type fileAccessor struct{}
 
-func (fileAccessor) SetFields(fields []Field) {
-	initLOLDriversClient(fields)
-}
+func (fileAccessor) SetFields(fields []Field)     {}
 func (fileAccessor) SetSegments([]fields.Segment) {}
 
 func (fileAccessor) IsFieldAccessible(e *event.Event) bool { return e.Category == event.File }
@@ -728,11 +726,6 @@ func (l *fileAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 		return e.GetParamAsString(params.FileViewSectionType), nil
 	case fields.FileViewProtection:
 		return e.GetParamAsString(params.MemProtect), nil
-	case fields.FileIsDriverVulnerable, fields.FileIsDriverMalicious:
-		if e.IsCreateDisposition() && e.IsSuccess() {
-			return isLOLDriver(f.Name, e)
-		}
-		return false, nil
 	case fields.FileIsDLL, fields.FileIsDriver, fields.FileIsExecutable:
 		if e.IsCreateDisposition() && e.IsSuccess() {
 			return getFileInfo(f.Name, e)
@@ -763,9 +756,7 @@ func (l *fileAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 // moduleAccessor extracts module (DLL, executable, driver) event values.
 type moduleAccessor struct{}
 
-func (moduleAccessor) SetFields(fields []Field) {
-	initLOLDriversClient(fields)
-}
+func (moduleAccessor) SetFields(fields []Field)     {}
 func (moduleAccessor) SetSegments([]fields.Segment) {}
 
 func (moduleAccessor) IsFieldAccessible(e *event.Event) bool {
@@ -833,11 +824,6 @@ func (m *moduleAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 		return e.Params.GetTime(params.ModuleCertNotBefore)
 	case fields.ImageCertAfter, fields.ModuleSignatureAfter, fields.DllSignatureAfter:
 		return e.Params.GetTime(params.ModuleCertNotAfter)
-	case fields.ImageIsDriverVulnerable, fields.ImageIsDriverMalicious, fields.ModuleIsDriverVulnerable, fields.ModuleIsDriverMalicious:
-		if e.IsLoadModule() {
-			return isLOLDriver(f.Name, e)
-		}
-		return false, nil
 	case fields.ImageIsDLL, fields.ModuleIsDLL, fields.ImageIsDriver,
 		fields.ModuleIsDriver, fields.ImageIsExecutable, fields.ModuleIsExecutable,
 		fields.ImageIsDotnet, fields.ModuleIsDotnet, fields.DllIsDotnet:
