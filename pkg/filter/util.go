@@ -22,7 +22,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net"
-	"path/filepath"
 	"strings"
 
 	"github.com/rabbitstack/fibratus/pkg/event"
@@ -30,48 +29,8 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/util/bytes"
-	"github.com/rabbitstack/fibratus/pkg/util/loldrivers"
 	"github.com/rabbitstack/fibratus/pkg/util/signature"
 )
-
-// isLOLDriver interacts with the loldrivers client to determine
-// whether the loaded/dropped driver is malicious or vulnerable.
-func isLOLDriver(f fields.Field, e *event.Event) (params.Value, error) {
-	var filename string
-
-	if e.Category == event.File {
-		filename = e.GetParamAsString(params.FilePath)
-	} else {
-		filename = e.GetParamAsString(params.ModulePath)
-	}
-
-	isDriver := filepath.Ext(filename) == ".sys" || e.Params.TryGetBool(params.FileIsDriver)
-	if !isDriver {
-		return nil, nil
-	}
-	ok, driver := loldrivers.GetClient().MatchHash(filename)
-	if !ok {
-		return nil, nil
-	}
-	if (f == fields.FileIsDriverVulnerable || f == fields.ImageIsDriverVulnerable) && driver.IsVulnerable {
-		return true, nil
-	}
-	if (f == fields.FileIsDriverMalicious || f == fields.ImageIsDriverMalicious) && driver.IsMalicious {
-		return true, nil
-	}
-	return false, nil
-}
-
-// initLOLDriversClient initializes the loldrivers client if the filter expression
-// contains any of the relevant fields.
-func initLOLDriversClient(flds []Field) {
-	for _, f := range flds {
-		if f.Name == fields.FileIsDriverVulnerable || f.Name == fields.FileIsDriverMalicious ||
-			f.Name == fields.ImageIsDriverVulnerable || f.Name == fields.ImageIsDriverMalicious {
-			loldrivers.InitClient(loldrivers.WithAsyncDownload())
-		}
-	}
-}
 
 // getFileInfo obtains the file information for created files and loaded modules.
 // Appends the file data to the event parameters, so subsequent field extractions
