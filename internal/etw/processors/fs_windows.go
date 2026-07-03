@@ -28,9 +28,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/ps"
-	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/signature"
-	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
 )
 
@@ -110,16 +108,6 @@ func (f *fsProcessor) processEvent(e *event.Event) (*event.Event, error) {
 		if fileinfo != nil {
 			totalMapRundownFiles.Add(1)
 			e.AppendParam(params.FilePath, params.Path, fileinfo.Name)
-		} else {
-			// if the view of section is backed by the data/image file
-			// try to get the mapped file name and append it to params
-			sec := e.Params.MustGetUint32(params.FileViewSectionType)
-			isMapped := sec != va.SectionPagefile && sec != va.SectionPhysical
-			if isMapped {
-				totalMapRundownFiles.Add(1)
-				addr := e.Params.MustGetUint64(params.FileViewBase) + (e.Params.MustGetUint64(params.FileOffset))
-				e.AppendParam(params.FilePath, params.Path, f.getMappedFile(e.PID, addr))
-			}
 		}
 
 		return e, f.psnap.AddMmap(e)
@@ -179,17 +167,6 @@ func (f *fsProcessor) processEvent(e *event.Event) (*event.Event, error) {
 		// references fails, we search in the file handles for such file
 		fileinfo := f.findFile(fileKey, fileObject)
 
-		// try to resolve mapped file name if not found in internal state
-		if fileinfo == nil && e.IsMapViewFile() {
-			sec := e.Params.MustGetUint32(params.FileViewSectionType)
-			isMapped := sec != va.SectionPagefile && sec != va.SectionPhysical
-			if isMapped {
-				totalMapRundownFiles.Add(1)
-				addr := e.Params.MustGetUint64(params.FileViewBase) + (e.Params.MustGetUint64(params.FileOffset))
-				e.AppendParam(params.FilePath, params.Path, f.getMappedFile(e.PID, addr))
-			}
-		}
-
 		// ignore object misses that are produced by CloseFile
 		if fileinfo == nil && !e.IsCloseFile() {
 			fileObjectMisses.Add(1)
@@ -248,13 +225,4 @@ func (f *fsProcessor) findFile(fileKey, fileObject uint64) *FileInfo {
 		return &FileInfo{Name: file.Name, Type: fs.GetFileType(file.Name, 0)}
 	}
 	return nil
-}
-
-func (f *fsProcessor) getMappedFile(pid uint32, addr uint64) string {
-	process, err := windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION, false, pid)
-	if err != nil {
-		return ""
-	}
-	defer windows.Close(process)
-	return fs.GetDevMapper().Convert(sys.GetMappedFile(process, uintptr(addr)))
 }
