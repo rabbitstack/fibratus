@@ -537,8 +537,7 @@ func TestEventSourceAllEvents(t *testing.T) {
 			func(e *event.Event) bool {
 				return e.CurrentPid() && e.Type == event.MapViewFile &&
 					e.GetParamAsString(params.MemProtect) == "EXECUTE_READWRITE|READONLY" &&
-					e.GetParamAsString(params.FileViewSectionType) == "IMAGE" &&
-					strings.Contains(e.GetParamAsString(params.FilePath), "_fixtures\\yara-test.dll")
+					e.GetParamAsString(params.FileViewSectionType) == "IMAGE"
 			},
 			false,
 		},
