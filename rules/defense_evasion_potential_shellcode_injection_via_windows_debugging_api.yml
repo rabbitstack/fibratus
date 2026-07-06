@@ -1,6 +1,6 @@
 name: Potential shellcode injection via Windows Debugging API
 id: 0100c5ce-3cdf-4701-8253-6c33bb48eabf
-version: 1.0.0
+version: 1.0.1
 description: |
   Identifies shellcode injection using the Windows Debugging API and shared memory section.
   Attackers avoid writing and reading remote memory directly, instead employ context manipulation
@@ -28,9 +28,7 @@ condition: >
                   '?:\\Windows\\System32\\WerFault.exe'
                 )
     | by thread.pid
-    |map_view_of_section and
-     file.view.protection = 'READONLY|EXECUTE' and file.view.size >= 4096
-    | by ps.pid
+    |map_view_of_section and file.view.protection = 'READONLY|EXECUTE' and file.view.size >= 4096| by ps.pid
 action:
   - name: kill
 
