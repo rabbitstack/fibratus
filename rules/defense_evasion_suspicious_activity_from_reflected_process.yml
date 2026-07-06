@@ -1,6 +1,6 @@
 name: Suspicious activity from a reflected process
 id: 2c5d3663-3e76-4cba-bd72-178757112f2c
-version: 1.0.0
+version: 1.0.1
 description: |
   Detects the execution of a process clone via RtlCreateProcessReflection
   followed by network activity or loading of common networking DLLs.
@@ -22,9 +22,7 @@ condition: >
   sequence
   maxspan 2m
   by ps.uuid
-    |spawn_process and
-     thread.callstack.symbols imatches ('ntdll.dll!RtlCreateProcessReflection*', 'ntdll.dll!RtlCloneUserProcess*')
-    |
+    |spawn_process and thread.callstack.symbols imatches ('ntdll.dll!RtlCreateProcessReflection*', 'ntdll.dll!RtlCloneUserProcess*')|
     |(connect_socket and
       net.dip != 0.0.0.0 and net.dip not in ('0:0:0:0:0:0:0:1', '::1') and
       not cidr_contains(net.dip, '127.0.0.0/8', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16')) or

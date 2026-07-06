@@ -1,6 +1,6 @@
 name: Process creation via NTFS transaction
 id: eb34cf6e-ccc3-4bce-bbcf-013720640a28
-version: 2.0.0
+version: 2.0.1
 description: |
   Adversaries may inject malicious code into process by abusing NTFS transactions
   to avoid writing the final executable image to disk. Attackers exploit TxF API
@@ -22,13 +22,7 @@ references:
 condition: >
   sequence
   maxspan 2m
-    |create_file and
-     evt.pid != 4 and thread.callstack.symbols imatches
-                    (
-                      'kernel32.dll!CreateFileTransacted*',
-                      'ntdll.dll!RtlSetCurrentTransaction'
-                    )
-    | by file.name
+    |create_file and evt.pid != 4 and thread.callstack.symbols imatches ('kernel32.dll!CreateFileTransacted*', 'ntdll.dll!RtlSetCurrentTransaction')| by file.name
     |spawn_process and
      ps.name != base(ps.exe) and
      thread.callstack.symbols not imatches ('ntdll.dll!*CreateUserProcess')
