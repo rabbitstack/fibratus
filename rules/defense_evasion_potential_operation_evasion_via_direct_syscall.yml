@@ -1,0 +1,47 @@
+name: Potential operation evasion via direct syscall
+id: 4d91ae23-ba4f-44a1-9952-a7e634d39ceb
+version: 1.0.0
+description: |
+  Identifies processes invoking system operations via direct syscalls.
+  Adversaries and offensive tooling use this technique to evade user-mode
+  API hooks placed by EDR/AV products, since hooks typically instrument
+  the ntdll.dll wrapper functions rather than the kernel syscall dispatch
+  itself.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1055
+  technique.name: Process Injection
+  technique.ref: https://attack.mitre.org/techniques/T1055/
+references:
+  - https://redops.at/en/blog/direct-syscalls-vs-indirect-syscalls
+  - https://www.paloaltonetworks.com/blog/security-operations/a-deep-dive-into-malicious-direct-syscall-detection/
+
+condition: >
+  (
+    (spawn_process and
+     ps.name != '' and ps.parent.name != '' and
+     (thread.callstack.summary istartswith ps.parent.name or
+     (ltrim(substr(thread.callstack.summary, indexof(thread.callstack.summary, '|')), '|') istartswith ps.parent.name and
+      not (ps.parent.exe imatches '?:\\Windows\\System32\\services.exe') and
+      not (thread.callstack.summary imatches 'ntdll.dll|wow64.dll|wow64cpu.dll*')))
+    ) or
+    (((create_file) or (rename_file) or (delete_file) or (set_value) or (create_key) or (load_module) or (create_thread) or (set_thread_context) or (create_symbolic_link_object)) and
+     evt.pid != 4 and ps.name != '' and thread.callstack.summary istartswith ps.name
+    )
+  ) and
+  not ((ps.exe imatches '?:\\Windows\\System32\\smss.exe' or ps.parent.exe imatches '?:\\Windows\\System32\\smss.exe') and thread.callstack.summary imatches 'ntdll.dll|smsss.exe|*') and
+  not (ps.exe imatches '?:\\Windows\\System32\\WerFault.exe' and thread.callstack.summary imatches 'ntdll.dll|kernelbase.dll|faultrep.dll|wersvc.dll|ntdll.dll|kernel32.dll|ntdll.dll') and
+  not (ps.exe imatches '?:\\Windows\\System32\\WUDFCompanionHost.exe' and ps.parent.exe imatches '?:\\Windows\\System32\\services.exe') and
+  not (spawn_process and ps.exe imatches '?:\\Windows\\System32\\WUDFCompanionHost.exe' and thread.callstack.summary imatches 'ntdll.dll|vmwp.exe|ntdll.dll*') and
+  not (load_module and module.signature.trusted = true and module.signature.subject imatches 'Microsoft*') and
+  ps.exe not imatches
+            (
+              '?:\\Program Files\\Oracle\\VirtualBox\\VirtualBoxVM.exe',
+              '?:\\Program Files (x86)\\Oracle\\VirtualBox\\VirtualBoxVM.exe'
+            )
+
+severity: high
+
+min-engine-version: 3.0.0
