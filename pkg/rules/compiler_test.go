@@ -219,14 +219,14 @@ func TestAccumulatedApproverPredicates(t *testing.T) {
 			name: "extracts registry key path with imatches",
 			expr: "evt.name = 'RegOpenKey' and registry.path imatches 'HKEY_LOCAL_MACHINE\\\\SYSTEM\\\\*'",
 			wantKeys: map[string][]string{
-				"IMATCHES": {`HKEY_LOCAL_MACHINE\SYSTEM\*`},
+				"IMATCHES": {`hkey_local_machine\system\*`},
 			},
 		},
 		{
 			name: "extracts file path with imatches",
 			expr: "evt.name = 'CreateFile' and file.operation = 'OPEN' and file.path imatches 'C:\\\\Windows\\\\*'",
 			wantPaths: map[string][]string{
-				"IMATCHES": {`C:\Windows\*`},
+				"IMATCHES": {`c:\windows\*`},
 			},
 		},
 		{

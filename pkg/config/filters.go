@@ -214,38 +214,43 @@ type Approvers struct {
 }
 
 func (p *Approvers) AppendKey(op, path string) {
-	if slices.Contains(p.Keys[op], path) {
+	n := strings.ToLower(path)
+	if slices.Contains(p.Keys[op], n) {
 		return
 	}
-	p.Keys[op] = append(p.Keys[op], path)
+	p.Keys[op] = append(p.Keys[op], n)
 }
 
 func (p *Approvers) AppendPath(op, path string) {
-	if slices.Contains(p.Paths[op], path) {
+	n := strings.ToLower(path)
+	if slices.Contains(p.Paths[op], n) {
 		return
 	}
-	p.Paths[op] = append(p.Paths[op], path)
+	p.Paths[op] = append(p.Paths[op], n)
 }
 
 func (p *Approvers) AppendExtension(op, ext string) {
-	if slices.Contains(p.Extensions[op], ext) {
+	n := strings.ToLower(ext)
+	if slices.Contains(p.Extensions[op], n) {
 		return
 	}
-	p.Extensions[op] = append(p.Extensions[op], ext)
+	p.Extensions[op] = append(p.Extensions[op], n)
 }
 
 func (p *Approvers) AppendBase(op, base string) {
-	if slices.Contains(p.Bases[op], base) {
+	n := strings.ToLower(base)
+	if slices.Contains(p.Bases[op], n) {
 		return
 	}
-	p.Bases[op] = append(p.Bases[op], base)
+	p.Bases[op] = append(p.Bases[op], n)
 }
 
 func (p *Approvers) AppendExecutable(op, exe string) {
-	if slices.Contains(p.Executables[op], exe) {
+	n := strings.ToLower(exe)
+	if slices.Contains(p.Executables[op], n) {
 		return
 	}
-	p.Executables[op] = append(p.Executables[op], exe)
+	p.Executables[op] = append(p.Executables[op], n)
 }
 
 func (p Approvers) String() string {

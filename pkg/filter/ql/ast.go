@@ -30,6 +30,18 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/wildcard"
 )
 
+// loweredWildcards contains a mapping between original and lower-case wildcard patterns
+var loweredWildcards = map[string]string{}
+
+func toLowerWildcard(p string) string {
+	if s, ok := loweredWildcards[p]; ok {
+		return s
+	}
+	s := strings.ToLower(p)
+	loweredWildcards[p] = s
+	return s
+}
+
 // Eval evaluates expr against a map that contains the field values.
 func Eval(expr Expr, m map[string]interface{}, useFuncValuer bool) bool {
 	var eval ValuerEval
@@ -964,10 +976,10 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			v := strings.ToLower(lhs)
 			switch rhs := rhs.(type) {
 			case string:
-				return wildcard.Match(strings.ToLower(rhs), v)
+				return wildcard.Match(toLowerWildcard(rhs), v)
 			case []string:
 				for _, pat := range rhs {
-					if wildcard.Match(strings.ToLower(pat), v) {
+					if wildcard.Match(toLowerWildcard(pat), v) {
 						return true
 					}
 				}
@@ -1232,7 +1244,7 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			}
 			for _, pat := range rhs {
 				for _, val := range lhs {
-					if wildcard.Match(strings.ToLower(pat), strings.ToLower(val)) {
+					if wildcard.Match(toLowerWildcard(pat), strings.ToLower(val)) {
 						return true
 					}
 				}

@@ -208,7 +208,7 @@ func TestRegistryApproverRegOpenKeyApproved(t *testing.T) {
 	rules := &config.RulesCompileResult{
 		Approvers: config.Approvers{
 			Keys: map[string][]string{
-				"IMATCHES": {`HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\*`},
+				"IMATCHES": {`hkey_local_machine\software\microsoft\windows\currentversion\capabilityaccessmanager\*`},
 			},
 		},
 	}
@@ -250,7 +250,7 @@ func TestRegistryApproverRegOpenKeyKCBPathPrepended(t *testing.T) {
 	rules := &config.RulesCompileResult{
 		Approvers: config.Approvers{
 			Keys: map[string][]string{
-				"IMATCHES": {`HKEY_LOCAL_MACHINE\SYSTEM\*`},
+				"IMATCHES": {`hkey_local_machine\system\*`},
 			},
 		},
 	}
@@ -273,7 +273,7 @@ func TestRegistryApproverRegOpenKeyZeroKCBUsesPathDirectly(t *testing.T) {
 	rules := &config.RulesCompileResult{
 		Approvers: config.Approvers{
 			Keys: map[string][]string{
-				"IMATCHES": {`HKEY_LOCAL_MACHINE\SOFTWARE\*`},
+				"IMATCHES": {`hkey_local_machine\software\*`},
 			},
 		},
 	}
