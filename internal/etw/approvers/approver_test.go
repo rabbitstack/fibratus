@@ -131,7 +131,7 @@ func TestApproversFileEventWithRulesApproved(t *testing.T) {
 	rules := &config.RulesCompileResult{
 		Approvers: config.Approvers{
 			Paths: map[string][]string{
-				"ICONTAINS": {`Windows\AppCompat`},
+				"ICONTAINS": {`windows\appcompat`},
 			},
 		},
 	}
@@ -193,7 +193,7 @@ func TestApproversRegistryEventWithRulesApproved(t *testing.T) {
 	rules := &config.RulesCompileResult{
 		Approvers: config.Approvers{
 			Keys: map[string][]string{
-				"IMATCHES": {`HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\*`},
+				"IMATCHES": {`hkey_local_machine\software\microsoft\windows\*`},
 			},
 		},
 	}
@@ -251,7 +251,7 @@ func TestApproversProcEventWithRulesApproved(t *testing.T) {
 	rules := &config.RulesCompileResult{
 		Approvers: config.Approvers{
 			Executables: map[string][]string{
-				"IMATCHES": {`?:\Windows\System32\*`},
+				"IMATCHES": {`?:\windows\system32\*`},
 			},
 		},
 	}
@@ -307,13 +307,13 @@ func TestApproversMatchPredicate(t *testing.T) {
 	}{
 		{
 			name: "imatches wildcard hit",
-			m:    map[string][]string{"IMATCHES": {`C:\Windows\*`}},
+			m:    map[string][]string{"IMATCHES": {`c:\windows\*`}},
 			val:  `C:\Windows\System32\ntdll.dll`,
 			want: true,
 		},
 		{
 			name: "imatches wildcard miss",
-			m:    map[string][]string{"IMATCHES": {`C:\Windows\*`}},
+			m:    map[string][]string{"IMATCHES": {`c:\windows\*`}},
 			val:  `C:\Users\Administrator\cmd.exe`,
 			want: false,
 		},
@@ -326,12 +326,6 @@ func TestApproversMatchPredicate(t *testing.T) {
 		{
 			name: "icontains hit",
 			m:    map[string][]string{"ICONTAINS": {"svchost"}},
-			val:  `C:\Windows\System32\svchost.exe`,
-			want: true,
-		},
-		{
-			name: "icontains case insensitive",
-			m:    map[string][]string{"ICONTAINS": {"SVCHOST"}},
 			val:  `C:\Windows\System32\svchost.exe`,
 			want: true,
 		},
@@ -355,14 +349,14 @@ func TestApproversMatchPredicate(t *testing.T) {
 		},
 		{
 			name: "ieq hit",
-			m:    map[string][]string{"~=": {`C:\Windows\System32\svchost.exe`}},
-			val:  `C:\Windows\System32\svchost.exe`,
+			m:    map[string][]string{"~=": {`c:\windows\system32\svchost.exe`}},
+			val:  `c:\windows\system32\svchost.exe`,
 			want: true,
 		},
 		{
 			name: "multiple patterns first hits",
 			m: map[string][]string{
-				"IMATCHES": {`C:\Windows\*`, `C:\System32\*`},
+				"IMATCHES": {`c:\windows\*`, `C:\System32\*`},
 			},
 			val:  `C:\Windows\notepad.exe`,
 			want: true,

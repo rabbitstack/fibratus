@@ -145,7 +145,7 @@ func TestProcApproverOpenProcessExeApproved(t *testing.T) {
 	rules := &config.RulesCompileResult{
 		Approvers: config.Approvers{
 			Executables: map[string][]string{
-				"IMATCHES": {`C:\Windows\System32\*`},
+				"IMATCHES": {`c:\windows\system32\*`},
 			},
 		},
 	}
@@ -208,7 +208,7 @@ func TestProcApproverOpenThreadSameProcessExeApproved(t *testing.T) {
 	rules := &config.RulesCompileResult{
 		Approvers: config.Approvers{
 			Executables: map[string][]string{
-				"IMATCHES": {`C:\Windows\*`},
+				"IMATCHES": {`c:\windows\*`},
 			},
 		},
 	}

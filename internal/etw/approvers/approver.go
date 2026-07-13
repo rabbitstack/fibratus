@@ -123,37 +123,21 @@ func (*approver) matchPredicate(m map[string][]string, v string) bool {
 		for _, pattern := range patterns {
 			switch op {
 			case ql.IMatches.String():
-				if wildcard.Match(strings.ToLower(pattern), s) {
-					return true
-				}
-			case ql.Matches.String():
-				if wildcard.Match(pattern, v) {
+				if wildcard.Match(pattern, s) {
 					return true
 				}
 			case ql.IContains.String():
-				if strings.Contains(s, strings.ToLower(pattern)) {
-					return true
-				}
-			case ql.Contains.String():
-				if strings.Contains(v, pattern) {
-					return true
-				}
-			case ql.IEq.String(), ql.IIn.String():
-				if s == strings.ToLower(pattern) {
+				if strings.Contains(s, pattern) {
 					return true
 				}
 			case ql.Eq.String(), ql.In.String():
-				if v == pattern {
-					return true
-				}
+				return v == pattern
+			case ql.IEq.String(), ql.IIn.String():
+				return s == pattern
 			case ql.IStartswith.String():
 				return strings.HasPrefix(s, pattern)
-			case ql.Startswith.String():
-				return strings.HasPrefix(v, pattern)
 			case ql.IEndswith.String():
 				return strings.HasSuffix(s, pattern)
-			case ql.Endswith.String():
-				return strings.HasSuffix(v, pattern)
 			}
 		}
 	}

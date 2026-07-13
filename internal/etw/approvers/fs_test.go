@@ -259,7 +259,7 @@ func TestFSApproverFileOpEndPathApproverApproved(t *testing.T) {
 	rules := &config.RulesCompileResult{
 		Approvers: config.Approvers{
 			Paths: map[string][]string{
-				"ICONTAINS": {`Windows\AppCompat`},
+				"ICONTAINS": {`windows\appcompat`},
 			},
 		},
 	}
