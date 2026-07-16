@@ -21,6 +21,9 @@ package config
 import (
 	"bytes"
 	"fmt"
+	"text/template"
+	"time"
+
 	"github.com/mitchellh/mapstructure"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
@@ -28,9 +31,6 @@ import (
 	ytypes "github.com/rabbitstack/fibratus/pkg/yara/types"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"strings"
-	"text/template"
-	"time"
 )
 
 const (
@@ -143,7 +143,7 @@ func AddFlags(flags *pflag.FlagSet) {
 // Wildcard matching is possible.
 func (c Config) ShouldSkipProcess(proc string) bool {
 	for _, p := range c.ExcludedProcesses {
-		if wildcard.Match(strings.ToLower(p), strings.ToLower(proc)) {
+		if wildcard.Match(p, proc, false) {
 			return true
 		}
 	}
@@ -153,7 +153,7 @@ func (c Config) ShouldSkipProcess(proc string) bool {
 // ShouldSkipFile determines whether the specified full file path is rejected by the scanner.
 func (c Config) ShouldSkipFile(file string) bool {
 	for _, f := range c.ExcludedFiles {
-		if wildcard.Match(strings.ToLower(f), strings.ToLower(file)) {
+		if wildcard.Match(f, file, false) {
 			return true
 		}
 	}
