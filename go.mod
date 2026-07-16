@@ -11,6 +11,7 @@ require (
 	github.com/enescakir/emoji v1.0.0
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e
 	github.com/hashicorp/go-version v1.2.1
+	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/hillu/go-yara/v4 v4.2.4
 	github.com/jedib0t/go-pretty/v6 v6.2.1
 	github.com/lithammer/fuzzysearch v1.1.2
@@ -33,6 +34,7 @@ require (
 	github.com/valyala/gozstd v1.11.0
 	github.com/xeipuuv/gojsonschema v1.2.0
 	github.com/yuin/goldmark v1.5.2
+	github.com/zeebo/xxh3 v1.1.0
 	go.mozilla.org/pkcs7 v0.0.0-20210826202110-33d05740a352
 	golang.org/x/arch v0.6.0
 	golang.org/x/sys v0.31.0
@@ -41,11 +43,12 @@ require (
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v3 v3.0.1
-	www.velocidex.com/golang/go-ntfs v0.2.1-0.20240818145200-04736de821dc
 )
 
 require (
 	github.com/BurntSushi/toml v0.4.1 // indirect
+	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
+	github.com/kr/pretty v0.3.1 // indirect
 	github.com/rivo/uniseg v0.4.2 // indirect
 	github.com/rogpeppe/go-internal v1.11.0 // indirect
 	github.com/secDre4mer/pkcs7 v0.0.0-20240322103146-665324a4461d // indirect
@@ -54,6 +57,7 @@ require (
 	golang.org/x/mod v0.17.0 // indirect
 	golang.org/x/sync v0.21.0 // indirect
 	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
+	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	honnef.co/go/tools v0.3.2 // indirect
 )
 
