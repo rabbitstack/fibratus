@@ -20,24 +20,27 @@ import (
 
 func TestMatch(t *testing.T) {
 	var tests = []struct {
-		p     string
-		s     string
-		match bool
+		p             string
+		s             string
+		caseSensitive bool
+		match         bool
 	}{
-		{"C:\\*\\lsass?.dmp", "C:\\Windows\\System32\\lsass2.dmp", true},
-		{"?:\\*\\lsass?.dmp", "C:\\Windows\\System32\\lsass2.dmp", true},
-		{"?:\\*\\lsass?.dmp", "C:\\Windows\\System32\\cmd.exe", false},
-		{"C:\\*\\ActionList.x?l", "C:\\Windows\\Setup\\LatentAcquisition\\ActionList.xml", true},
-		{"C:\\ProgramData\\*.dll", "C:\\ProgramData\\Directory\\OneMoreDirectory\\mal.dll", true},
-		{"HKEY_USERS\\*\\Environment\\windir", "HKEY_USERS\\S-1-5-21-2271034452-2606270099-984871569-1001\\Environment\\windir", true},
-		{"C:\\Windows\\SoftwareDistribution\\*", "C:\\Windows\\SoftwareDistribution\\SLS\\7971F918-A847-4430-9279-4A52D1EFE18D\\sls.rar", true},
-		{"HKEY_USERS\\S-1-5-21-*_CLASSES\\MS-SETTINGS\\CURVER", "HKEY_USERS\\S-1-5-21-2271034452-1207270099-244871569-1021_CLASSES\\MS-SETTINGS\\CURVER", true},
-		{"ntdll.dll|KernelBase.dll|advapi32.dll|*", "ntdll.dll|KernelBase.dll|advapi32.dll|pe386.dll|com.dll|clr.dll|mmc.exe", true},
+		{"C:\\*\\lsass?.dmp", "C:\\Windows\\System32\\lsass2.dmp", true, true},
+		{"C:\\*\\LSASS?.dmp", "C:\\Windows\\System32\\lsass2.dmp", true, false},
+		{"?:\\*\\lsass?.dmp", "C:\\Windows\\System32\\lsass2.dmp", true, true},
+		{"?:\\*\\lsass?.dmp", "C:\\Windows\\System32\\cmd.exe", true, false},
+		{"C:\\*\\ActionList.x?l", "C:\\Windows\\Setup\\LatentAcquisition\\ActionList.xml", true, true},
+		{"C:\\*\\ActionList.x?l", "C:\\Windows\\Setup\\LatentAcquisition\\actionList.xml", true, false},
+		{"C:\\ProgramData\\*.dll", "C:\\ProgramData\\Directory\\OneMoreDirectory\\mal.dll", true, true},
+		{"HKEY_USERS\\*\\Environment\\windir", "HKEY_USERS\\S-1-5-21-2271034452-2606270099-984871569-1001\\Environment\\windir", true, true},
+		{"C:\\Windows\\SoftwareDistribution\\*", "C:\\Windows\\SoftwareDistribution\\SLS\\7971F918-A847-4430-9279-4A52D1EFE18D\\sls.rar", true, true},
+		{"HKEY_USERS\\S-1-5-21-*_CLASSES\\MS-SETTINGS\\CURVER", "HKEY_USERS\\S-1-5-21-2271034452-1207270099-244871569-1021_CLASSES\\MS-SETTINGS\\CURVER", true, true},
+		{"ntdll.dll|KernelBase.dll|advapi32.dll|*", "ntdll.dll|KernelBase.dll|advapi32.dll|pe386.dll|com.dll|clr.dll|mmc.exe", true, true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.p, func(t *testing.T) {
-			assert.Equal(t, tt.match, Match(tt.p, tt.s))
+			assert.Equal(t, tt.match, Match(tt.p, tt.s, tt.caseSensitive))
 		})
 	}
 }

@@ -84,7 +84,7 @@ var parserOpts = []pe.Option{
 // from the Portable Executable headers.
 func GetFileInfo(path string) (*FileInfo, error) {
 	for _, pat := range skippedPatterns {
-		if wildcard.Match(pat, path) {
+		if wildcard.Match(pat, path, false) {
 			return nil, ErrSkippedFile(path)
 		}
 	}

@@ -321,7 +321,7 @@ func (ps *PS) IsAppinfoSvc() bool {
 
 // IsSvchost returns true if this is the Service Host process.
 func (ps *PS) IsSvchost() bool {
-	return wildcard.Match(`?:\windows\system32\svchost.exe`, strings.ToLower(ps.Exe))
+	return wildcard.Match(`?:\windows\system32\svchost.exe`, ps.Exe, false)
 }
 
 // Thread stores metadata about a thread that's executing in process's address space.

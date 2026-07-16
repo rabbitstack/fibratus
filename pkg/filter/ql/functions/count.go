@@ -50,11 +50,11 @@ func (f Count) Call(args []interface{}) (any, bool) {
 		for _, ss := range substrings {
 			switch caseInsensitive {
 			case true:
-				if wildcard.Match(strings.ToLower(pattern), strings.ToLower(ss)) {
+				if wildcard.Match(pattern, ss, false) {
 					count++
 				}
 			case false:
-				if wildcard.Match(pattern, ss) {
+				if wildcard.Match(pattern, ss, true) {
 					count++
 				}
 			}
@@ -63,11 +63,11 @@ func (f Count) Call(args []interface{}) (any, bool) {
 		for _, i := range s {
 			switch caseInsensitive {
 			case true:
-				if wildcard.Match(strings.ToLower(pattern), strings.ToLower(i)) {
+				if wildcard.Match(pattern, i, false) {
 					count++
 				}
 			case false:
-				if wildcard.Match(pattern, i) {
+				if wildcard.Match(pattern, i, true) {
 					count++
 				}
 			}
