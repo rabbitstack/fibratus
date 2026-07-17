@@ -584,17 +584,13 @@ type FileExtendedDataItems struct {
 	status      uint32
 	disposition uint32
 	callstack   []va.Address
-	items       []EventHeaderExtendedDataItem
+	items       [3]EventHeaderExtendedDataItem
 }
 
 // AppendEventHeaderFileExtendedDataItems appends custom file extendeed data items to the event record.
 func AppendEventHeaderFileExtendedDataItems(r *EventRecord, disposition uint64, status uint32, callstack []va.Address) *FileExtendedDataItems {
-	f := &FileExtendedDataItems{
-		disposition: uint32(disposition),
-		status:      status,
-		callstack:   callstack,
-		items:       make([]EventHeaderExtendedDataItem, 3),
-	}
+	f := getFileExtendedDataItems()
+	f.disposition, f.status, f.callstack = uint32(disposition), status, callstack
 
 	f.items[0] = EventHeaderExtendedDataItem{
 		ExtType:  ExtTypeDisposition,
@@ -614,6 +610,8 @@ func AppendEventHeaderFileExtendedDataItems(r *EventRecord, disposition uint64, 
 				uintptr(unsafe.Pointer(&f.callstack[0])),
 			),
 		}
+	} else {
+		f.items[2] = EventHeaderExtendedDataItem{} // clear stale entry from a prior pooled use
 	}
 
 	r.ExtendedDataCount = uint16(len(f.items))
@@ -705,15 +703,19 @@ func (e *EventRecord) ID() uint {
 	return id
 }
 
-// Copy makes a copy of this event record and returns the
+// Clone makes a copy of this event record and returns the
 // copy itself and the event buffer. The buffer must outlive
-// the event record instance.
-func (r *EventRecord) Copy() (*EventRecord, []byte) {
-	c := *r
-	buf := make([]byte, r.BufferLen)
+// the event record instance. Both are drawn from pools.
+// Release with ReleaseRecord once fully done with the copy.
+func (r *EventRecord) Clone() (*EventRecord, []byte) {
+	c := getEventRecord()
+	*c = *r
+
+	buf := getBuf(int(r.BufferLen))
 	copy(buf, unsafe.Slice((*byte)(unsafe.Pointer(r.Buffer)), r.BufferLen))
 	c.Buffer = uintptr(unsafe.Pointer(&buf[0]))
-	return &c, buf
+
+	return c, buf
 }
 
 // ReadByte reads the byte from the buffer at the specified offset.
@@ -857,6 +859,14 @@ func (e *EventRecord) ConsumeUTF16String(offset uint16) string {
 	return utf16.Decode(s[:len(s)/2-1])
 }
 
+// ConsumeRawUTF16String reads the byte slice for the UTF16-encoded string.
+func (e *EventRecord) ConsumeRawUTF16String(offset uint16) []uint16 {
+	if offset > e.BufferLen {
+		return nil
+	}
+	return (*[1<<30 - 1]uint16)(unsafe.Pointer(e.Buffer + uintptr(offset)))[: e.BufferLen-offset : e.BufferLen-offset]
+}
+
 // ReadSID reads the security identifier from the event buffer.
 func (e *EventRecord) ReadSID(offset uint16, isWbemSid bool) ([]byte, uint16) {
 	// this is a Security Token which can be null and takes 4 bytes.
@@ -885,18 +895,28 @@ func (e *EventRecord) ReadSID(offset uint16, isWbemSid bool) ([]byte, uint16) {
 
 // ReadCallstack reads callstack return addresses at the given offset.
 func (e *EventRecord) ReadCallstack(offset uint16) []va.Address {
+	return e.ReadCallstackInto(offset, nil)
+}
+
+// ReadCallstackInto reads callstack return addresses at the given offset,
+// appending into v. If v has sufficient capacity, no allocation occurs.
+func (e *EventRecord) ReadCallstackInto(offset uint16, v va.Callstack) []va.Address {
 	var n uint16
 	m := offset
-
 	frames := (e.BufferLen - offset) / 8
-	callstack := make([]va.Address, frames)
+
+	if v != nil {
+		v = v[:0]
+	} else {
+		v = make([]va.Address, 0, frames)
+	}
+
 	for n < frames {
-		callstack[n] = va.Address(e.ReadUint64(m))
+		v = append(v, va.Address(e.ReadUint64(m)))
 		m += 8
 		n++
 	}
-
-	return callstack
+	return v
 }
 
 // EventExtendedItemStackTrace64 defines a call stack on a 64-bit machine.

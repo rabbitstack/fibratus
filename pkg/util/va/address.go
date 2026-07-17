@@ -18,10 +18,25 @@
 
 package va
 
-import "strconv"
+import (
+	"strconv"
+	"sync"
+)
 
 // Address represents the memory address
 type Address uint64
+
+// Callstack is the type alias for callstack return addresses
+type Callstack []Address
+
+const callstackDepthHint = 60
+
+var callstackPool = sync.Pool{
+	New: func() any {
+		c := make(Callstack, 0, callstackDepthHint)
+		return &c
+	},
+}
 
 // Hex returns the hexadecimal representation of the memory address.
 func (a Address) String() string   { return strconv.FormatUint(uint64(a), 16) }
@@ -44,3 +59,15 @@ func (a Address) Dec(offset uint64) Address {
 // InSystemRange determines if this address is in the system address space range.
 // The kernel preferentially uses these two ranges to load DLLs at shared addresses.
 func (a Address) InSystemRange() bool { return a >= 0xfffff80000000000 && a < 0xffffffffffffffff }
+
+func GetCallstack() Callstack {
+	return (*callstackPool.Get().(*Callstack))[:0]
+}
+
+func (c Callstack) ReleasePool() {
+	if cap(c) > callstackDepthHint*4 {
+		return // drop outlier-sized buffers rather than pooling them permanently
+	}
+	c = c[:0]
+	callstackPool.Put(&c)
+}
