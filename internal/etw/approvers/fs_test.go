@@ -157,7 +157,7 @@ func buildMatchingFileOpEnd(t *testing.T, createBuf []byte, disposition uint64) 
 }
 
 func newTestFSApprover(r *config.RulesCompileResult) *fs {
-	return newFSApprover(r, nil).(*fs)
+	return newFSApprover(r).(*fs)
 }
 
 func TestFSApproverNonFileEvent(t *testing.T) {

@@ -60,7 +60,7 @@ func NewConsumer(
 		processors: processors,
 		psnap:      psnap,
 		config:     config,
-		approvers:  approvers.New(psnap, r, processors),
+		approvers:  approvers.New(psnap, r),
 	}
 }
 

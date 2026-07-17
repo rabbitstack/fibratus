@@ -22,7 +22,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/rabbitstack/fibratus/internal/etw/processors"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/filter/ql"
 	"github.com/rabbitstack/fibratus/pkg/ps"
@@ -46,12 +45,12 @@ type Approvers struct {
 }
 
 // New creates a new approvers set.
-func New(psnap ps.Snapshotter, r *config.RulesCompileResult, processors *processors.Chain) Approvers {
+func New(psnap ps.Snapshotter, r *config.RulesCompileResult) Approvers {
 	p := Approvers{
 		approvers: make([]Approver, 0),
 	}
 
-	p.fs = newFSApprover(r, processors).(*fs)
+	p.fs = newFSApprover(r).(*fs)
 
 	p.approvers = append(p.approvers, p.fs)
 	if r != nil {
@@ -118,26 +117,25 @@ func (p *approver) approveExecutable(exe string) bool {
 }
 
 func (*approver) matchPredicate(m map[string][]string, v string) bool {
-	s := strings.ToLower(v)
 	for op, patterns := range m {
 		for _, pattern := range patterns {
 			switch op {
 			case ql.IMatches.String():
-				if wildcard.Match(pattern, s) {
+				if wildcard.Match(pattern, v, false) {
 					return true
 				}
 			case ql.IContains.String():
-				if strings.Contains(s, pattern) {
+				if strings.Contains(strings.ToLower(v), pattern) {
 					return true
 				}
 			case ql.Eq.String(), ql.In.String():
 				return v == pattern
 			case ql.IEq.String(), ql.IIn.String():
-				return s == pattern
+				return strings.EqualFold(v, pattern)
 			case ql.IStartswith.String():
-				return strings.HasPrefix(s, pattern)
+				return strings.HasPrefix(strings.ToLower(v), pattern)
 			case ql.IEndswith.String():
-				return strings.HasSuffix(s, pattern)
+				return strings.HasSuffix(strings.ToLower(v), pattern)
 			}
 		}
 	}

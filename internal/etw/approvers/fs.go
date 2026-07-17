@@ -20,13 +20,17 @@ package approvers
 
 import (
 	"expvar"
+	"time"
+	"unsafe"
 
-	"github.com/rabbitstack/fibratus/internal/etw/processors"
+	"github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	devmapper "github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
+	"github.com/rabbitstack/fibratus/pkg/util/utf16"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
+	"github.com/zeebo/xxh3"
 	"golang.org/x/sys/windows"
 )
 
@@ -40,12 +44,31 @@ var (
 // irp acts as a scratch area for the pending IRP request
 // that is used as a signal to promote the file operation.
 // The memory buffer backing the event record must outlive
-// event processors scope.
+// event processors scope, along with the extended data items
+// and the event callstack.
 type irp struct {
-	rec       *etw.EventRecord
-	buf       []byte                     // keeps the data buffer alive
+	rec       *etw.EventRecord           // keeps the original even record
 	items     *etw.FileExtendedDataItems // keeps the extended data items alive
-	callstack []va.Address               // CreateFile stack return addresses
+	buf       []byte                     // keeps the data buffer alive
+	callstack va.Callstack               // CreateFile stack return addresses
+}
+
+func (p *irp) storeExtendedDataItems(disposition uint64, status uint32) {
+	p.items = etw.AppendEventHeaderFileExtendedDataItems(p.rec, disposition, status, p.callstack)
+}
+
+func (p *irp) storeCallstack(r *etw.EventRecord) {
+	p.callstack = r.ReadCallstackInto(16, va.GetCallstack())
+}
+
+func (p *irp) releasePools() {
+	p.rec.ReleasePool()
+	if p.items != nil {
+		p.items.ReleasePool()
+	}
+	if p.callstack != nil {
+		p.callstack.ReleasePool()
+	}
 }
 
 // fs is the file system approver that accepts or discards
@@ -56,18 +79,24 @@ type fs struct {
 
 	irps map[uint64]irp
 
-	processors *processors.Chain
-	approvers  []func(string) bool
+	approvers []func(string) bool
+
+	pathLRUCache *expirable.LRU[uint64, string] // interned file paths
 }
 
-func newFSApprover(r *config.RulesCompileResult, processors *processors.Chain) Approver {
+func hashFilePath(u []uint16) uint64 {
+	b := unsafe.Slice((*byte)(unsafe.Pointer(unsafe.SliceData(u))), len(u))
+	return xxh3.Hash(b)
+}
+
+func newFSApprover(r *config.RulesCompileResult) Approver {
 	fs := &fs{
 		approver: approver{
 			r: r,
 		},
-		approvers:  make([]func(string) bool, 0),
-		processors: processors,
-		irps:       make(map[uint64]irp),
+		approvers:    make([]func(string) bool, 0),
+		irps:         make(map[uint64]irp, 120),
+		pathLRUCache: expirable.NewLRU[uint64, string](2500, nil, time.Minute*5),
 	}
 
 	if r != nil && len(r.Approvers.Paths) > 0 {
@@ -89,24 +118,26 @@ func (f *fs) Approve(r *etw.EventRecord) (*etw.EventRecord, bool) {
 		return r, true
 	}
 
-	// enqueue in flight CreateFile event
+	// clone and enqueue in flight CreateFile event
 	if r.Header.EventDescriptor.Opcode == event.CreateFileID {
-		rec, buf := r.Copy()
-		f.irps[r.ReadUint64(0)] = irp{rec: rec, buf: buf}
+		i := r.ReadUint64(0)
+		rec, buf := r.Clone()
+		f.irps[i] = irp{rec: rec, buf: buf}
 		return r, false
 	}
 
-	// decorate the pending CreateFile with the return addresses
-	// obtained from the StackWalk event by correlating the timestamp
+	// associate the callstack return addresses to the CreateFile event
+	// obtained from the StackWalk event by event timestamp correlation
 	if isStackwalk {
 		ts := r.ReadUint64(0)
 		for i, rec := range f.irps {
-			if rec.rec.Header.Timestamp == ts {
-				irp := f.irps[i]
-				irp.callstack = r.ReadCallstack(16)
-				f.irps[i] = irp
-				return r, false
+			if rec.rec.Header.Timestamp != ts {
+				continue
 			}
+			irp := f.irps[i]
+			irp.storeCallstack(r)
+			f.irps[i] = irp
+			return r, false
 		}
 		return r, true
 	}
@@ -138,33 +169,34 @@ func (f *fs) Approve(r *etw.EventRecord) (*etw.EventRecord, bool) {
 		// or the rules compilation result is not present
 		// we'll allow events flow downstream processors
 		if f.r == nil || disposition != windows.FILE_OPEN {
-			irp.items = etw.AppendEventHeaderFileExtendedDataItems(rec, disposition, status, irp.callstack)
+			irp.storeExtendedDataItems(disposition, status)
 			f.irps[i] = irp
 			return rec, true
 		}
 
-		// evaluate against available approvers
-		var approved bool
-		path := devmapper.GetDevMapper().Convert(rec.ConsumeUTF16String(32))
-		for _, approver := range f.approvers {
-			if approver(path) {
-				approved = true
-				break
-			}
-		}
-		if !approved {
-			// the event is rejected by approvers. Make sure to
-			// evict the enqueded StackWalk event produced by the
-			// CreateFile operation
-			delete(f.irps, i)
-			fsApproverRejections.Add(1)
-			return rec, false
+		s := rec.ConsumeRawUTF16String(32)
+		h := hashFilePath(s)
+		path, ok := f.pathLRUCache.Get(h)
+		if !ok {
+			n := utf16.Decode(s[:len(s)/2-1])
+			path = devmapper.GetDevMapper().Convert(n)
+			f.pathLRUCache.Add(h, path)
 		}
 
-		fsApproverApprovals.Add(1)
-		irp.items = etw.AppendEventHeaderFileExtendedDataItems(rec, disposition, status, irp.callstack)
-		f.irps[i] = irp
-		return rec, true
+		// evaluate against available approvers
+		for _, approver := range f.approvers {
+			if approver(path) {
+				fsApproverApprovals.Add(1)
+				irp.storeExtendedDataItems(disposition, status)
+				f.irps[i] = irp
+				return rec, true
+			}
+		}
+		// the event is rejected by approvers
+		irp.releasePools()
+		delete(f.irps, i)
+		fsApproverRejections.Add(1)
+		return rec, false
 	}
 
 	return r, true
@@ -173,6 +205,9 @@ func (f *fs) Approve(r *etw.EventRecord) (*etw.EventRecord, bool) {
 func (f *fs) cleanup(r *etw.EventRecord) {
 	if r.Header.ProviderID == event.FileEventGUID && r.Header.EventDescriptor.Opcode == event.CreateFileID {
 		i := r.ReadUint64(0)
-		delete(f.irps, i)
+		if irp, ok := f.irps[i]; ok {
+			irp.releasePools()
+			delete(f.irps, i)
+		}
 	}
 }

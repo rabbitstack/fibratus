@@ -65,7 +65,7 @@ func TestApproversChainPassesEnrichedRecord(t *testing.T) {
 		},
 	}
 
-	p := New(psnap, rules, nil)
+	p := New(psnap, rules)
 
 	r := &etw.EventRecord{}
 	r.Header.ProviderID = etw.WindowsKernelProcessGUID
@@ -95,7 +95,7 @@ func TestApproversFirstApproverRejectsShortCircuits(t *testing.T) {
 
 func TestApproversCleanupDelegatesToFS(t *testing.T) {
 	psnap := &ps.SnapshotterMock{}
-	p := New(psnap, nil, nil)
+	p := New(psnap, nil)
 
 	// enqueue a CreateFile
 	cr := createFileRecord(t, createBuf)
@@ -110,7 +110,7 @@ func TestApproversCleanupDelegatesToFS(t *testing.T) {
 
 func TestApproversFileEventFullFlow(t *testing.T) {
 	psnap := &ps.SnapshotterMock{}
-	p := New(psnap, nil, nil)
+	p := New(psnap, nil)
 
 	// CreateFile is suppressed and stored
 	cr := createFileRecord(t, createBuf)
@@ -137,7 +137,7 @@ func TestApproversFileEventWithRulesApproved(t *testing.T) {
 	}
 
 	psnap := &ps.SnapshotterMock{}
-	p := New(psnap, rules, nil)
+	p := New(psnap, rules)
 
 	cr := createFileRecord(t, createBuf)
 	p.Approve(cr)
@@ -167,7 +167,7 @@ func TestApproversFileEventWithRulesRejected(t *testing.T) {
 	}
 
 	psnap := &ps.SnapshotterMock{}
-	p := New(psnap, rules, nil)
+	p := New(psnap, rules)
 
 	cr := createFileRecord(t, createBuf)
 	p.Approve(cr)
@@ -181,7 +181,7 @@ func TestApproversFileEventWithRulesRejected(t *testing.T) {
 func TestApproversRegistryEventNoRulesApprovesAll(t *testing.T) {
 	psnap := &ps.SnapshotterMock{}
 
-	p := New(psnap, nil, nil)
+	p := New(psnap, nil)
 	r := makeRecord(event.RegistryEventGUID, event.RegOpenKeyID, 0, regOpenKeyBuf)
 
 	_, approved := p.Approve(r)
@@ -198,7 +198,7 @@ func TestApproversRegistryEventWithRulesApproved(t *testing.T) {
 		},
 	}
 
-	p := New(psnap, rules, nil)
+	p := New(psnap, rules)
 
 	k := makeRecord(event.RegistryEventGUID, event.RegCreateKCBID, 0, regCreateKCBBuf)
 	r := makeRecord(event.RegistryEventGUID, event.RegOpenKeyID, 0, regOpenKeyBuf)
@@ -221,7 +221,7 @@ func TestApproversRegistryEventWithRulesRejected(t *testing.T) {
 		},
 	}
 
-	p := New(psnap, rules, nil)
+	p := New(psnap, rules)
 
 	k := makeRecord(event.RegistryEventGUID, event.RegCreateKCBID, 0, regCreateKCBBuf)
 	r := makeRecord(event.RegistryEventGUID, event.RegOpenKeyID, 0, regOpenKeyBuf)
@@ -234,7 +234,7 @@ func TestApproversRegistryEventWithRulesRejected(t *testing.T) {
 
 func TestApproversProcEventNoRulesApprovesAll(t *testing.T) {
 	psnap := &ps.SnapshotterMock{}
-	p := New(psnap, nil, nil)
+	p := New(psnap, nil)
 
 	buf := make([]byte, 4)
 	*(*uint32)(unsafe.Pointer(&buf[0])) = uint32(1234)
@@ -256,7 +256,7 @@ func TestApproversProcEventWithRulesApproved(t *testing.T) {
 		},
 	}
 
-	p := New(psnap, rules, nil)
+	p := New(psnap, rules)
 
 	const pid = uint32(1234)
 	psnap.On("Find", pid).Return(true, &pstypes.PS{
@@ -281,7 +281,7 @@ func TestApproversProcEventWithRulesRejected(t *testing.T) {
 			},
 		},
 	}
-	p := New(psnap, rules, nil)
+	p := New(psnap, rules)
 
 	const pid = uint32(5678)
 	psnap.On("Find", pid).Return(true, &pstypes.PS{
