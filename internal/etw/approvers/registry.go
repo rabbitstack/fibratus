@@ -20,7 +20,14 @@ package approvers
 
 import (
 	"expvar"
+	"time"
+	"unsafe"
 
+	"github.com/zeebo/xxh3"
+
+	"github.com/rabbitstack/fibratus/pkg/util/utf16"
+
+	"github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
@@ -37,6 +44,8 @@ var (
 type registry struct {
 	approver
 	kcbs map[uint64]string
+
+	pathLRUCache *expirable.LRU[uint64, string] // interned KCB paths
 }
 
 func newRegistryApprover(r *config.RulesCompileResult) Approver {
@@ -44,8 +53,22 @@ func newRegistryApprover(r *config.RulesCompileResult) Approver {
 		approver: approver{
 			r: r,
 		},
-		kcbs: make(map[uint64]string),
+		kcbs:         make(map[uint64]string, 5000),
+		pathLRUCache: expirable.NewLRU[uint64, string](1000, nil, time.Minute*5),
 	}
+}
+
+func hashKeyPath(r string, u []uint16) uint64 {
+	var h xxh3.Hasher
+
+	b := unsafe.Slice((*byte)(unsafe.Pointer(unsafe.SliceData(u))), len(u))
+	_, _ = h.Write(b)
+	if r != "" {
+		k := unsafe.Slice(unsafe.StringData(r), len(r))
+		_, _ = h.Write(k)
+	}
+
+	return h.Sum64()
 }
 
 func (r *registry) Approve(rec *etw.EventRecord) (*etw.EventRecord, bool) {
@@ -58,11 +81,16 @@ func (r *registry) Approve(rec *etw.EventRecord) (*etw.EventRecord, bool) {
 	// keep the state of allocated key control blocks
 	// to be able to derive the full registry path
 	if id == event.RegKCBRundownID || id == event.RegCreateKCBID {
-		r.kcbs[rec.ReadUint64(16)] = rec.ConsumeUTF16String(24)
+		kcb := rec.ReadUint64(16)
+		path := rec.ConsumeUTF16String(24)
+		r.kcbs[kcb] = path
 		return rec, true
 	}
+	// remove kcb mapping
 	if id == event.RegDeleteKCBID {
-		delete(r.kcbs, rec.ReadUint64(16))
+		kcb := rec.ReadUint64(16)
+		r.pathLRUCache.Purge()
+		delete(r.kcbs, kcb)
 		return rec, true
 	}
 
@@ -71,24 +99,31 @@ func (r *registry) Approve(rec *etw.EventRecord) (*etw.EventRecord, bool) {
 		return rec, true
 	}
 
-	// lookup KCB map to check if the event
-	// KCB object address references a key
-	// we can use to reconstruct the full
-	// registry path
+	// calculate the hash and check against LRU cache
 	kcb := rec.ReadUint64(16)
-	path := rec.ConsumeUTF16String(24)
-	if kcb != 0 {
-		path = key.ConcatPaths(r.kcbs[kcb], path)
-	}
-
-	rootkey, subkey := key.Format(path)
-	if rootkey != key.Invalid {
-		root := rootkey.String()
-		if subkey != "" {
-			path = key.ConcatPaths(root, subkey)
-		} else {
-			path = root
+	s := rec.ConsumeRawUTF16String(24)
+	h := hashKeyPath(r.kcbs[kcb], s)
+	path, ok := r.pathLRUCache.Get(h)
+	if !ok {
+		// lookup KCB map to check if the event
+		// KCB object address references a key
+		// we can use to reconstruct the full
+		// registry path
+		path = utf16.Decode(s[:len(s)/2-1])
+		if kcb != 0 {
+			path = key.ConcatPaths(r.kcbs[kcb], path)
 		}
+
+		rootkey, subkey := key.Format(path)
+		if rootkey != key.Invalid {
+			root := rootkey.String()
+			if subkey != "" {
+				path = key.ConcatPaths(root, subkey)
+			} else {
+				path = root
+			}
+		}
+		r.pathLRUCache.Add(h, path)
 	}
 
 	if r.approveKey(path) {
