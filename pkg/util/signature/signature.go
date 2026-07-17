@@ -318,6 +318,11 @@ func (s *Signatures) getOrCheck(key Key) *Signature {
 }
 
 func (s *Signatures) runWorker() {
+	// pin this goroutine to its OS thread for the lifetime of the worker.
+	// WinVerifyTrust has COM STA thread affinity and all calls must happen
+	// on a thread where CoInitializeEx has been called.
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
 	for {
 		select {
 		case req := <-s.requests:
