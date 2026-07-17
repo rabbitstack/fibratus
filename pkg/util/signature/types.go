@@ -21,7 +21,6 @@ package signature
 import (
 	"errors"
 	"fmt"
-	"runtime"
 	"sync/atomic"
 	"time"
 
@@ -262,8 +261,6 @@ func (s *Signature) HasCertificate() bool {
 // by passing the inquiry to a trust provider that supports the action
 // identifier.
 func (s *Signature) verifyFile() error {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
 	trust := sys.NewWintrustData(sys.WtdChoiceFile)
 	defer trust.Close()
 	status, err := trust.VerifyFile(s.Path)

@@ -24,7 +24,6 @@ import (
 	"io"
 	"os"
 	"reflect"
-	"runtime"
 	"sync"
 	"time"
 	"unsafe"
@@ -310,8 +309,6 @@ func NewCatalog() Cat {
 // Open opens the catalog and acquires the hash for the given file. If the
 // file is catalog-signed, a valid catalog handle is stored internally.
 func (c *Cat) Open(filename string) error {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
 	// acquire handle to a catalog administrator context
 	err := CryptCatalogAdminAcquireContext(&c.admin, nil, nil, 0, 0)
 	if err != nil {
@@ -350,8 +347,6 @@ func (c *Cat) IsCatalogSigned() bool {
 
 // Verify verifies the signature of the given file against the catalog.
 func (c *Cat) Verify(filename string) (SignatureStatus, error) {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
 	trust := NewWintrustData(WtdChoiceCatalog)
 	defer trust.Close()
 	if c.file == nil {
@@ -428,8 +423,6 @@ func (c *Cat) ParseCertificate() (*Cert, error) {
 }
 
 func (c *Cat) Close() error {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
 	if c.admin != 0 {
 		defer CryptCatalogAdminReleaseContext(c.admin, 0)
 	}
