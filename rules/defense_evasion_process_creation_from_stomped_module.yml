@@ -1,6 +1,6 @@
 name: Process creation from a stomped module
 id: f85d1e80-49ec-4bbe-9bf5-7e2a3a8a7319
-version: 1.0.1
+version: 1.1.0
 description: |
   Identifies the creation of the process from the parent where the call stack
   exhibits suspicious memory properties. The pattern is typical of stomped module
@@ -24,8 +24,9 @@ condition: >
                                         '?:\\Program Files\\*.exe',
                                         '?:\\Program Files(x86)\\*.exe'
                                       ) and
-  foreach(thread._callstack, $frame, $frame.module imatches ('?:\\Windows\\System32\\*.dll', '?:\\Windows\\SysWOW64\\*.dll') and $frame.allocation_size >= 10000) and
-  not foreach(thread._callstack, $frame, $frame.module imatches
+  foreach(thread._callstack, $frame,
+                          $frame.module imatches ('?:\\Windows\\System32\\*.dll', '?:\\Windows\\SysWOW64\\*.dll') and
+                          $frame.module not imatches
                                 (
                                   '?:\\Program Files\\*.dll',
                                   '?:\\Program Files (x86)\\*.dll',
@@ -44,7 +45,8 @@ condition: >
                                   '?:\\Windows\\System32\\spool\\drivers\\*',
                                   '?:\\Windows\\assembly\\NativeImages_*',
                                   '?:\\Windows\\System32\\DriverStore\\FileRepository\\*'
-                                ))
+                                ) and
+                          $frame.allocation_size >= 10000)
 action:
   - name: kill
 
