@@ -256,3 +256,25 @@ func TestAddRemoveRoundTrip(t *testing.T) {
 		t.Error("driver must be gone after round-trip removal")
 	}
 }
+
+func TestAddNewDriverSameBase(t *testing.T) {
+	ds := makeStore(realDrivers())
+
+	const base va.Address = 0xFFFFF80010000000
+	const size uint64 = 0x50000
+
+	ds.addDriver(base, size, `\Driver\fileinfo.sys`)
+	if len(ds.devs) != 3 {
+		t.Error("must be 3 drivers in the store")
+	}
+
+	ds.addDriver(base, size, `\Driver\FLTMGR.SYS.sys`)
+	if len(ds.devs) != 3 {
+		t.Error("must be 3 drivers in the store")
+	}
+
+	drv := ds.resolve(base)
+	if drv.Path != `\Driver\FLTMGR.SYS.sys` {
+		t.Error("unexpected driver resolved")
+	}
+}

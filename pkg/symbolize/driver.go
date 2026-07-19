@@ -47,9 +47,31 @@ func (d *driverStore) resolve(addr va.Address) *sys.Driver {
 	// driver already cached?
 	d.mux.RLock()
 	dev, isCached := d.drivers[addr]
-	d.mux.RUnlock()
+	var (
+		base va.Address
+		size uint64
+	)
 	if isCached {
-		return dev
+		base = va.Address(dev.Base)
+		size = uint64(dev.Size)
+	}
+	d.mux.RUnlock()
+
+	if isCached {
+		if addr >= base && addr < base.Inc(size) {
+			// entry is still valid
+			return dev
+		}
+		// evict the stale cache entry so that subsequent calls for
+		// the same address do not keep hitting the validation path
+		d.mux.Lock()
+		// recheck under write lock in case if another goroutine may
+		// have already evicted or refreshed the entry while we were
+		// upgrading the lock
+		if current, still := d.drivers[addr]; still && current == dev {
+			delete(d.drivers, addr)
+		}
+		d.mux.Unlock()
 	}
 
 	d.mux.Lock()
@@ -67,15 +89,12 @@ func (d *driverStore) resolve(addr va.Address) *sys.Driver {
 }
 
 func (d *driverStore) addDriver(base va.Address, size uint64, path string) {
-	d.mux.Lock()
-	defer d.mux.Unlock()
-
 	dev := sys.Driver{
 		Path: path,
 		Base: base.Uintptr(),
 		Size: uint32(size),
 	}
-	d.devs = append(d.devs, dev)
+	d.addDev(dev)
 }
 
 func (d *driverStore) removeDriver(base va.Address, size uint64) {
@@ -93,5 +112,40 @@ func (d *driverStore) removeDriver(base va.Address, size uint64) {
 		if addr >= base && addr < base.Inc(size) {
 			delete(d.drivers, addr)
 		}
+	}
+}
+
+func (d *driverStore) addDev(drv sys.Driver) {
+	d.mux.Lock()
+	defer d.mux.Unlock()
+
+	var (
+		exists = false
+		base   = va.Address(drv.Base)
+		size   = uint64(drv.Size)
+	)
+
+	for i, dev := range d.devs {
+		switch {
+		case dev.Base == drv.Base && dev.Path != drv.Path:
+			// different driver has reloaded at the same base address.
+			// Evict all cached addresses that still point at the old
+			// driver so that resolve() cannot return a stale pointer
+			// for the new occupant.
+			for addr := range d.drivers {
+				if addr >= base && addr < base.Inc(size) {
+					delete(d.drivers, addr)
+				}
+			}
+			d.devs = append(d.devs[:i], d.devs[i+1:]...)
+		case dev.Base == drv.Base && dev.Path == drv.Path:
+			// driver exists at identical base address and
+			// device path. Nothing to do
+			exists = true
+		}
+	}
+
+	if !exists {
+		d.devs = append(d.devs, drv)
 	}
 }
