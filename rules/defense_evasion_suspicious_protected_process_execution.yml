@@ -1,6 +1,6 @@
 name: Suspicious protected process execution
 id: a778295a-02f1-42d9-9c20-78346a7bc2c6
-version: 1.0.0
+version: 1.1.0
 description: |
   Identifies unprivileged process spawning a child with protected integrity level. This 
   indicates an unusual behavior that is often associated with attempts to tamper with or 
@@ -22,11 +22,13 @@ condition: >
   sequence
   maxspan 1m30s
     |spawn_process and
-     ps.token.integrity_level != 'SYSTEM' and
+     ps.is_protected = false and
+     (ps.sid != 'S-1-5-18' or ps.token.integrity_level != 'SYSTEM') and
      ps.exe not imatches
                 (
                   '?:\\Program Files\\*',
-                  '?:\\Program Files(x86)\\*'
+                  '?:\\Program Files(x86)\\*',
+                  '?:\\WINDOWS\\System32\\smss.exe'
                 )
     | by ps.uuid
     |spawn_process and ps.is_protected| by ps.parent.uuid
