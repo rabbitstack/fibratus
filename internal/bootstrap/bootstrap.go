@@ -31,6 +31,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/filament"
 	"github.com/rabbitstack/fibratus/pkg/filter"
+	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/handle"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/rules"
@@ -424,6 +425,7 @@ func (f *App) Shutdown() error {
 	}
 
 	signature.GetSignatures().Close()
+	fs.GetMetadataStore().Close()
 
 	return multierror.Wrap(errs...)
 }

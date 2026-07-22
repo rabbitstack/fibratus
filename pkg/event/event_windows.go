@@ -258,6 +258,12 @@ func (e *Event) IsCreateDisposition() bool {
 	return e.IsCreateFile() && e.Params.MustGetUint32(params.FileOperation) == windows.FILE_CREATE
 }
 
+// IsOverwriteDisposition determines if the file disposition leads to file overwriting.
+func (e *Event) IsOverwriteDisposition() bool {
+	o := e.Params.MustGetUint32(params.FileOperation)
+	return e.IsCreateFile() && (o == windows.FILE_OVERWRITE || o == windows.FILE_OVERWRITE_IF)
+}
+
 // IsOpenDisposition determines if the file disposition leads to opening a file object.
 func (e *Event) IsOpenDisposition() bool {
 	return e.IsCreateFile() && e.Params.MustGetUint32(params.FileOperation) == windows.FILE_OPEN

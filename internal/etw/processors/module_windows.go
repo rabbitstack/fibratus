@@ -21,6 +21,7 @@ package processors
 import (
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
+	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/signature"
 )
@@ -68,6 +69,9 @@ func (m *moduleProcessor) ProcessEvent(e *event.Event) (*event.Event, bool, erro
 		} else {
 			signature.GetSignatures().DoRequestAsync(key)
 		}
+
+		// request module file metadata by queueing async work
+		fs.GetMetadataStore().DoRequestAsync(e.GetParamAsString(params.ModulePath))
 
 		return e, false, m.psnap.AddModule(e)
 	}
