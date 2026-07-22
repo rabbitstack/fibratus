@@ -402,7 +402,7 @@ func parse(path string, data []byte, options ...Option) (*PE, error) {
 	p.IsDLL = pe.IsDLL()
 	p.IsDriver = p.isDriver()
 	p.IsExecutable = pe.IsEXE()
-	p.IsDotnet = pe.HasCLR
+	p.IsDotnet = pe.HasCLR || p.hasManagedImport()
 	p.Anomalies = pe.Anomalies
 
 	return p, nil
@@ -456,5 +456,37 @@ func (pe *PE) isDriver() bool {
 			}
 		}
 	}
+	return false
+}
+
+const (
+	mscoreeDLL = "mscoree.dll"
+	corExeMain = "_CorExeMain"
+	corDllMain = "_CorDllMain"
+)
+
+// hasManagedImport walks the import descriptor table looking for
+// mscoree.dll with the classic unmanaged entry point thunk. This is
+// the import that every IJW/Framework-hosted managed PE must carry
+// because the OS loader needs a native entry point to bootstrap the
+// CLR, even when the COR20 directory has been stripped or relocated
+// by a protector.
+func (pe *PE) hasManagedImport() bool {
+	hasMscoree := false
+	for _, imp := range pe.Imports {
+		if strings.EqualFold(imp, mscoreeDLL) {
+			hasMscoree = true
+			break
+		}
+	}
+	if !hasMscoree {
+		return false
+	}
+	for _, fn := range pe.Symbols {
+		if fn == corExeMain || fn == corDllMain {
+			return true
+		}
+	}
+
 	return false
 }
