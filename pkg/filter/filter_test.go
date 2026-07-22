@@ -993,6 +993,8 @@ func TestRegistryFilter(t *testing.T) {
 }
 
 func TestModuleFilter(t *testing.T) {
+	fs.GetMetadataStore().AddFile(filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll"), &fs.FileInfo{IsDLL: true})
+
 	e1 := &event.Event{
 		Type:     event.LoadModule,
 		Category: event.Module,
@@ -1122,7 +1124,7 @@ func TestModuleFilter(t *testing.T) {
 		Type:     event.LoadModule,
 		Category: event.Module,
 		Params: event.Params{
-			params.ModulePath:           {Name: params.ModulePath, Type: params.UnicodeString, Value: "C:\\Windows\\System32\\mscorlib.dll"},
+			params.ModulePath:           {Name: params.ModulePath, Type: params.UnicodeString, Value: "..\\pe\\_fixtures\\mscorlib.dll"},
 			params.ProcessID:            {Name: params.ProcessID, Type: params.PID, Value: uint32(1023)},
 			params.ModuleCheckSum:       {Name: params.ModuleCheckSum, Type: params.Uint32, Value: uint32(2323432)},
 			params.ModuleBase:           {Name: params.ModuleBase, Type: params.Address, Value: uint64(0xfff313833a3)},

@@ -29,7 +29,6 @@ import (
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/util/signature"
-	"golang.org/x/sys/windows"
 )
 
 var (
@@ -129,10 +128,14 @@ func (f *fsProcessor) processEvent(e *event.Event) (*event.Event, error) {
 			e.AppendEnum(params.FileType, uint32(fileinfo.Type), fs.FileTypes)
 		}
 
-		// invalidate signature cache
-		dispo := e.Params.MustGetUint32(params.FileOperation)
-		if dispo == windows.FILE_OVERWRITE || dispo == windows.FILE_OVERWRITE_IF {
+		// invalidate signature cache / file metadata
+		if e.IsOverwriteDisposition() {
+			fs.GetMetadataStore().RemoveFile(e.GetParamAsString(params.FilePath))
 			signature.GetSignatures().RemoveSignature(e.GetParamAsString(params.FilePath))
+		}
+		// start async file metadata resolution
+		if e.IsCreateDisposition() && e.IsSuccess() {
+			fs.GetMetadataStore().DoRequestAsync(e.GetParamAsString(params.FilePath))
 		}
 
 		return e, nil
@@ -175,11 +178,13 @@ func (f *fsProcessor) processEvent(e *event.Event) (*event.Event, error) {
 		if e.IsDeleteFile() {
 			delete(f.files, fileObject)
 			if fileinfo != nil {
+				fs.GetMetadataStore().RemoveFile(fileinfo.Name)
 				signature.GetSignatures().RemoveSignature(fileinfo.Name)
 			}
 		}
 		if e.IsRenameFile() {
 			if fileinfo != nil {
+				fs.GetMetadataStore().RemoveFile(fileinfo.Name)
 				signature.GetSignatures().RemoveSignature(fileinfo.Name)
 			}
 		}

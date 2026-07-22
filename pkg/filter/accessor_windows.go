@@ -628,7 +628,7 @@ func (t *threadAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 			return nil, nil
 		}
 
-		sign := requestSignature(mod.Name, mod.Size, mod.Checksum, mod.TimedateStamp)
+		sign := signature.GetSignatures().DoRequest(signature.MakeKey(mod.Name, mod.Size, mod.Checksum, mod.TimedateStamp))
 		if sign == nil {
 			return nil, nil
 		}
@@ -655,7 +655,7 @@ func (t *threadAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 			return nil, nil
 		}
 
-		sign := requestSignature(mod.Name, mod.Size, mod.Checksum, mod.TimedateStamp)
+		sign := signature.GetSignatures().DoRequest(signature.MakeKey(mod.Name, mod.Size, mod.Checksum, mod.TimedateStamp))
 		if sign == nil {
 			return nil, nil
 		}
@@ -727,8 +727,20 @@ func (l *fileAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 	case fields.FileViewProtection:
 		return e.GetParamAsString(params.MemProtect), nil
 	case fields.FileIsDLL, fields.FileIsDriver, fields.FileIsExecutable:
+		var file *fs.FileInfo
 		if e.IsCreateDisposition() && e.IsSuccess() {
-			return getFileInfo(f.Name, e)
+			file = fs.GetMetadataStore().DoRequest(e.GetParamAsString(params.FilePath))
+		}
+		if file == nil {
+			return false, nil
+		}
+		switch f.Name {
+		case fields.FileIsDLL:
+			return file.IsDLL, nil
+		case fields.FileIsDriver:
+			return file.IsDriver, nil
+		case fields.FileIsExecutable:
+			return file.IsExecutable, nil
 		}
 		return false, nil
 	case fields.FilePID:
@@ -827,9 +839,25 @@ func (m *moduleAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 	case fields.ImageIsDLL, fields.ModuleIsDLL, fields.ImageIsDriver,
 		fields.ModuleIsDriver, fields.ImageIsExecutable, fields.ModuleIsExecutable,
 		fields.ImageIsDotnet, fields.ModuleIsDotnet, fields.DllIsDotnet:
+		var file *fs.FileInfo
 		if e.IsLoadModule() {
-			return getFileInfo(f.Name, e)
+			file = fs.GetMetadataStore().DoRequest(e.GetParamAsString(params.ModulePath))
 		}
+		if file == nil {
+			return false, nil
+		}
+
+		switch f.Name {
+		case fields.ImageIsDLL, fields.ModuleIsDLL:
+			return file.IsDLL, nil
+		case fields.ModuleIsDriver, fields.ImageIsDriver:
+			return file.IsDriver, nil
+		case fields.ImageIsExecutable, fields.ModuleIsExecutable:
+			return file.IsExecutable, nil
+		case fields.ImageIsDotnet, fields.ModuleIsDotnet, fields.DllIsDotnet:
+			return file.IsDotnet, nil
+		}
+
 		return false, nil
 	}
 

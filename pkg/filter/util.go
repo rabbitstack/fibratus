@@ -20,70 +20,12 @@ package filter
 
 import (
 	"encoding/hex"
-	"fmt"
 	"net"
 	"strings"
 
 	"github.com/rabbitstack/fibratus/pkg/event"
-	"github.com/rabbitstack/fibratus/pkg/event/params"
-	"github.com/rabbitstack/fibratus/pkg/filter/fields"
-	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/util/bytes"
-	"github.com/rabbitstack/fibratus/pkg/util/signature"
 )
-
-// getFileInfo obtains the file information for created files and loaded modules.
-// Appends the file data to the event parameters, so subsequent field extractions
-// will already have the needed info.
-func getFileInfo(f fields.Field, e *event.Event) (params.Value, error) {
-	switch f {
-	case fields.FileIsDLL, fields.ImageIsDLL, fields.ModuleIsDLL:
-		if e.Params.Contains(params.FileIsDLL) {
-			return e.Params.GetBool(params.FileIsDLL)
-		}
-	case fields.FileIsDriver, fields.ModuleIsDriver, fields.ImageIsDriver:
-		if e.Params.Contains(params.FileIsDriver) {
-			return e.Params.GetBool(params.FileIsDriver)
-		}
-	case fields.FileIsExecutable, fields.ImageIsExecutable, fields.ModuleIsExecutable:
-		if e.Params.Contains(params.FileIsExecutable) {
-			return e.Params.GetBool(params.FileIsExecutable)
-		}
-	case fields.ImageIsDotnet, fields.ModuleIsDotnet, fields.DllIsDotnet:
-		if e.Params.Contains(params.FileIsDotnet) {
-			return e.Params.GetBool(params.FileIsDotnet)
-		}
-	}
-
-	fileinfo, err := fs.GetFileInfo(e.GetParamAsString(params.FilePath))
-	if err != nil {
-		return nil, err
-	}
-
-	e.AppendParam(params.FileIsDLL, params.Bool, fileinfo.IsDLL)
-	e.AppendParam(params.FileIsDriver, params.Bool, fileinfo.IsDriver)
-	e.AppendParam(params.FileIsExecutable, params.Bool, fileinfo.IsExecutable)
-	e.AppendParam(params.FileIsDotnet, params.Bool, fileinfo.IsDotnet)
-
-	switch f {
-	case fields.FileIsDLL, fields.ImageIsDLL, fields.ModuleIsDLL:
-		return fileinfo.IsDLL, nil
-	case fields.FileIsDriver, fields.ModuleIsDriver, fields.ImageIsDriver:
-		return fileinfo.IsDriver, nil
-	case fields.FileIsExecutable, fields.ImageIsExecutable, fields.ModuleIsExecutable:
-		return fileinfo.IsExecutable, nil
-	case fields.ImageIsDotnet, fields.ModuleIsDotnet, fields.DllIsDotnet:
-		return fileinfo.IsDotnet, nil
-	}
-
-	return nil, fmt.Errorf("unexpected field: %s", f)
-}
-
-// requestSignature submits the request for the signature check.
-func requestSignature(path string, size uint64, checksum, timedatestamp uint32) *signature.Signature {
-	key := signature.MakeKey(path, size, checksum, timedatestamp)
-	return signature.GetSignatures().DoRequest(key)
-}
 
 // framePID returns the pid associated with the stack frame.
 func framePID(e *event.Event) uint32 {

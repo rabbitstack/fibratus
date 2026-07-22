@@ -28,7 +28,6 @@ import (
 type Chain struct {
 	processors   []Processor
 	psnapshotter ps.Snapshotter
-	fsProcessor  Processor
 }
 
 // NewChain constructs the processor chain. It arranges all the processors
@@ -49,8 +48,7 @@ func NewChain(
 	chain.addProcessor(newPsProcessor(psnap, vaRegionProber))
 
 	if config.EventSource.EnableFileIOEvents {
-		chain.fsProcessor = newFsProcessor(hsnap, psnap, config)
-		chain.addProcessor(chain.fsProcessor)
+		chain.addProcessor(newFsProcessor(hsnap, psnap, config))
 	}
 	if config.EventSource.EnableRegistryEvents {
 		chain.addProcessor(newRegistryProcessor(hsnap))
