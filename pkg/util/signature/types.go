@@ -186,6 +186,7 @@ func newSignature(path string, sigType Type, sigLevel Level) *Signature {
 	s := &Signature{
 		Path: path,
 	}
+	s.keepalive()
 	s.setType(sigType)
 	s.setStatus(sys.SignatureNotTrusted)
 
