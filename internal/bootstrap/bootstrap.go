@@ -142,6 +142,9 @@ func NewApp(cfg *config.Config, options ...Option) (*App, error) {
 	var engine *rules.Engine
 	var rs *config.RulesCompileResult
 
+	signature.InitStore()
+	fs.InitMetadataStore()
+
 	if cfg.Filters.Rules.Enabled && !cfg.ForwardMode && !cfg.IsCaptureSet() && !cfg.IsFilamentSet() {
 		engine = rules.NewEngine(psnap, cfg)
 		var err error

@@ -140,6 +140,13 @@ func GetSignatures() *Signatures {
 	return sigs
 }
 
+// InitStore eagerly initializes the signature store and its worker pool.
+func InitStore() {
+	once.Do(func() {
+		sigs = newSignatures()
+	})
+}
+
 func newSignatures() *Signatures {
 	sigs = &Signatures{
 		signatures: make(map[Key]*Signature, 512),
