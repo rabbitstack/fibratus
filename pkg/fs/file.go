@@ -155,6 +155,12 @@ func GetMetadataStore() *FileMetadataStore {
 	return metadataStore
 }
 
+func InitMetadataStore() {
+	onceMetadataStore.Do(func() {
+		metadataStore = newFileMetadataStore()
+	})
+}
+
 // FileMetadataStore contains metainfo of PE files derived
 // from file creation or DLL loading. Metadata store is
 // invalidated on various signals such as file overwriting
