@@ -24,6 +24,7 @@ import (
 	"io"
 	"os"
 	"reflect"
+	"runtime"
 	"sync"
 	"time"
 	"unsafe"
@@ -182,7 +183,11 @@ func (t *WintrustData) VerifyFile(filename string) (SignatureStatus, error) {
 		FilePath: windows.StringToUTF16Ptr(filename),
 	}
 	t.Union = uintptr(unsafe.Pointer(fileinfo))
-	return t.verifyTrust()
+
+	status, err := t.verifyTrust()
+	runtime.KeepAlive(fileinfo)
+
+	return status, err
 }
 
 // VerifyCatalog verifies the trust of the file signed by catalog-based certificate.
@@ -192,22 +197,40 @@ func (t *WintrustData) VerifyCatalog(
 	catalogAdmin windows.Handle,
 	catalog CatalogInfo,
 	hash []byte,
-	hasSize uint32,
+	hashSize uint32,
 ) (SignatureStatus, error) {
-	// tag is a hexadecimal representation of the hash of the file
-	tag := windows.StringToUTF16Ptr(format.BytesToHex(hash[:hasSize]))
+	// convert strings to UTF-16 and hold explicit Go references.
+	// Converting directly to uintptr in the struct literal would
+	// allow the GC to collect these before WinVerifyTrust reads them
+	s := format.BytesToHex(hash[:hashSize])
+	tag := windows.StringToUTF16Ptr(s)
+	path := windows.StringToUTF16Ptr(filename)
+
 	catinfo := &WintrustCatalogInfo{
 		Size:            uint32(unsafe.Sizeof(WintrustCatalogInfo{})),
 		CatalogFilePath: uintptr(unsafe.Pointer(&catalog.Name[0])),
-		MemberFilePath:  uintptr(unsafe.Pointer(windows.StringToUTF16Ptr(filename))),
+		MemberFilePath:  uintptr(unsafe.Pointer(path)),
 		MemberFile:      windows.Handle(fd),
 		MemberTag:       uintptr(unsafe.Pointer(tag)),
 		FileHash:        uintptr(unsafe.Pointer(&hash[0])),
-		FileHashSize:    hasSize,
+		FileHashSize:    hashSize,
 		CatalogAdmin:    catalogAdmin,
 	}
 	t.Union = uintptr(unsafe.Pointer(catinfo))
-	return t.verifyTrust()
+
+	status, err := t.verifyTrust()
+
+	// KeepAlive pins every object whose address was passed into
+	// WinVerifyTrust via a uintptr field. Without these, the GC
+	// is permitted to collect them as soon as their last Go-visible
+	// use is seenm which may be before verifyTrust returns
+	runtime.KeepAlive(tag)
+	runtime.KeepAlive(path)
+	runtime.KeepAlive(hash)
+	runtime.KeepAlive(catalog)
+	runtime.KeepAlive(catinfo)
+
+	return status, err
 }
 
 // Close disposes state data by specifying the corresponding action
@@ -264,8 +287,9 @@ type CatalogInfo struct {
 
 // CatalogFile returns the full path to the catalog file.
 func (c CatalogInfo) CatalogFile() string {
-	p := (*[unsafe.Sizeof(c.Name) / 2]uint16)(unsafe.Pointer(&c.Name[0]))
-	return windows.UTF16ToString(p[:])
+	n := len(c.Name) / 2
+	p := unsafe.Slice((*uint16)(unsafe.Pointer(&c.Name[0])), n)
+	return windows.UTF16ToString(p)
 }
 
 var isWintrustDLLFound bool
@@ -299,11 +323,11 @@ type Cat struct {
 	size uint32
 }
 
-const hashSize uint32 = 100
+const initialHashBufSize uint32 = 32 // SHA-1 is 20, SHA-256 is 32; start at 32
 
 // NewCatalog creates an instance of the catalog with default hash size.
 func NewCatalog() Cat {
-	return Cat{size: hashSize, hash: make([]byte, hashSize)}
+	return Cat{size: initialHashBufSize, hash: make([]byte, initialHashBufSize)}
 }
 
 // Open opens the catalog and acquires the hash for the given file. If the
@@ -325,9 +349,22 @@ func (c *Cat) Open(filename string) error {
 		&c.size,
 		uintptr(unsafe.Pointer(&c.hash[0])), 0,
 	)
+	if err == windows.ERROR_INSUFFICIENT_BUFFER {
+		// reallocate with the new buffer size,
+		// rewind the file position and retry
+		c.hash = make([]byte, c.size)
+		_, _ = c.file.Seek(0, io.SeekStart)
+		err = CryptCatalogAdminCalcHashFromFileHandle(
+			c.admin,
+			c.file.Fd(),
+			&c.size,
+			uintptr(unsafe.Pointer(&c.hash[0])), 0)
+	}
+
 	if err != nil {
 		return err
 	}
+
 	// enumerate catalogs that contain the calculated hash.
 	// If no catalogs are found, we can deduce the file is
 	// not catalog signed
