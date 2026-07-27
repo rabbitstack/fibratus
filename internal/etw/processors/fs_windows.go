@@ -135,7 +135,7 @@ func (f *fsProcessor) processEvent(e *event.Event) (*event.Event, error) {
 		}
 		// start async file metadata resolution
 		if e.IsCreateDisposition() && e.IsSuccess() {
-			fs.GetMetadataStore().DoRequestAsync(e.GetParamAsString(params.FilePath))
+			fs.GetMetadataStore().DoRequestAsync(e.GetParamAsString(params.FilePath), false)
 		}
 
 		return e, nil
