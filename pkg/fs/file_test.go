@@ -399,7 +399,7 @@ func TestDoRequestAsyncPopulatesCacheEventually(t *testing.T) {
 	s := newTestStore()
 	defer s.Close()
 
-	s.DoRequestAsync(path)
+	s.DoRequestAsync(path, false)
 
 	deadline := time.Now().Add(2 * time.Second)
 	var f *FileInfo
@@ -425,7 +425,7 @@ func TestDoRequestAsyncIsNoopWhenAlreadyCached(t *testing.T) {
 	s.addDLL(path)
 	original := s.get(path)
 
-	s.DoRequestAsync(`C:\Windows\System32\kernel32.dll`)
+	s.DoRequestAsync(`C:\Windows\System32\kernel32.dll`, false)
 	time.Sleep(50 * time.Millisecond)
 
 	if got := s.get(path); got != original {

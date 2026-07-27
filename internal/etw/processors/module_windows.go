@@ -71,7 +71,7 @@ func (m *moduleProcessor) ProcessEvent(e *event.Event) (*event.Event, bool, erro
 		}
 
 		// request module file metadata by queueing async work
-		fs.GetMetadataStore().DoRequestAsync(e.GetParamAsString(params.ModulePath))
+		fs.GetMetadataStore().DoRequestAsync(e.GetParamAsString(params.ModulePath), e.IsModuleRundown())
 
 		return e, false, m.psnap.AddModule(e)
 	}

@@ -38,6 +38,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/wildcard"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
+	"golang.org/x/time/rate"
 )
 
 const (
@@ -145,6 +146,7 @@ func (f *FileInfo) lastAccessed() time.Time {
 type Request struct {
 	Path     string
 	Response chan *FileInfo
+	IsSeed   bool // request originated from the initial rundown
 }
 
 func GetMetadataStore() *FileMetadataStore {
@@ -179,6 +181,8 @@ type FileMetadataStore struct {
 
 	purger *time.Ticker
 
+	limiter *rate.Limiter
+
 	windowsUpdateWildcards windowsUpdateWildcards
 	wellKnownDLLs          moduleWildcards
 	wellKnownExecutables   moduleWildcards
@@ -190,6 +194,7 @@ func newFileMetadataStore() *FileMetadataStore {
 		requests: make(chan Request, metadataStoreQueueSize),
 		stop:     make(chan struct{}),
 		purger:   time.NewTicker(time.Minute),
+		limiter:  rate.NewLimiter(100, 120), // 100 ops/sec, burst 120
 		windowsUpdateWildcards: []string{
 			`?:\$winreagent\scratch\*`,
 			`?:\windows\winsxs\*`,
@@ -324,18 +329,19 @@ func (s *FileMetadataStore) DoRequest(path string) *FileInfo {
 	}
 
 	ch := make(chan *FileInfo, 1)
+	r := Request{Path: p, Response: ch}
 	select {
-	case s.requests <- Request{Path: p, Response: ch}:
+	case s.requests <- r:
 	default:
 		// queue full: fall back to inline check rather than
 		// dropping a decision that has a security consequence.
-		return s.getOrParse(p)
+		return s.getOrParse(r)
 	}
-	r := <-ch
-	return r
+	f := <-ch
+	return f
 }
 
-func (s *FileMetadataStore) DoRequestAsync(path string) {
+func (s *FileMetadataStore) DoRequestAsync(path string, isSeed bool) {
 	p := s.normalizePath(path)
 	if s.contains(p) {
 		return
@@ -355,7 +361,7 @@ func (s *FileMetadataStore) DoRequestAsync(path string) {
 	}
 
 	select {
-	case s.requests <- Request{Path: p}:
+	case s.requests <- Request{Path: p, IsSeed: isSeed}:
 	default:
 		// queue is full
 		fsMetadataAsyncRequestDrops.Add(1)
@@ -440,7 +446,7 @@ func (s *FileMetadataStore) gc() {
 }
 
 func (s *FileMetadataStore) processRequest(r Request) {
-	f := s.getOrParse(r.Path)
+	f := s.getOrParse(r)
 	if r.Response != nil {
 		r.Response <- f
 	}
@@ -471,13 +477,14 @@ func (s *FileMetadataStore) get(path string) *FileInfo {
 	return f
 }
 
-func (s *FileMetadataStore) getOrParse(path string) *FileInfo {
+func (s *FileMetadataStore) getOrParse(r Request) *FileInfo {
+	path := r.Path
 	if f := s.get(path); f != nil {
 		return f
 	}
 
 	v, err := s.group.Do(path, func() (any, error) {
-		pe, err := s.parsePE(path)
+		pe, err := s.parsePE(path, r.IsSeed)
 		if err != nil {
 			return nil, err
 		}
@@ -499,7 +506,11 @@ func (s *FileMetadataStore) getOrParse(path string) *FileInfo {
 	return f
 }
 
-func (s *FileMetadataStore) parsePE(path string) (*pe.PE, error) {
+func (s *FileMetadataStore) parsePE(path string, isSeed bool) (*pe.PE, error) {
+	if !isSeed && !s.limiter.Allow() {
+		return nil, fmt.Errorf("path %s rate-limited for PE parsing", path)
+	}
+
 	const size = 8 * 1024 * 1024 // 8MB
 	data, err := sys.ReadFile(path, size, time.Millisecond*500)
 	if err != nil {
