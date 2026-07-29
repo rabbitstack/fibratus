@@ -1,6 +1,6 @@
 name: Potential process injection via tainted memory section
 id: 8e4182f3-02e7-4e95-afc3-93d18c9a9c09
-version: 1.0.6
+version: 1.0.8
 description: |
   Identifies potential process injection when the adversary creates and maps a memory
   section with RW protection rights followed by mapping of the same memory section in
@@ -38,8 +38,15 @@ condition: >
                   '?:\\WINDOWS\\System32\\lsass.exe',
                   '?:\\WINDOWS\\System32\\SecurityHealthService.exe',
                   '?:\\WINDOWS\\System32\\services.exe',
-                  '?:\\WINDOWS\\System32\\RuntimeBroker.exe'
-                )
+                  '?:\\WINDOWS\\System32\\RuntimeBroker.exe',
+                  '?:\\WINDOWS\\System32\\sihost.exe',
+                  '?:\\WINDOWS\\System32\\smartscreen.exe',
+                  '?:\\WINDOWS\\System32\\taskhostw.exe',
+                  '?:\\WINDOWS\\System32\\wbem\\wmiprvse.exe',
+                  '?:\\WINDOWS\\System32\\backgroundTaskHost.exe',
+                  '?:\\Windows\\ImmersiveControlPanel\\SystemSettings.exe'
+                ) and
+     not (ps.parent.exe imatches '?:\\WINDOWS\\Explorer.exe' and ps.signature.exists = true and ps.signature.trusted = true)
     | as e1
     |map_view_of_section and file.view.protection = 'READONLY|EXECUTE' and file.key = $e1.file.key and evt.pid != $e1.evt.pid|
 action:
