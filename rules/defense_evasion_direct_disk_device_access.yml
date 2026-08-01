@@ -1,6 +1,6 @@
 name: Direct disk device access
 id: b77914b8-9e91-46ab-8f52-342a2848c59e
-version: 1.0.0
+version: 1.0.1
 description: |
   Detects direct access to raw disk devices or volumes by user-mode processes,
   bypassing the Windows filesystem layer. Attackers abuse raw disk handles to
@@ -33,7 +33,10 @@ condition: >
             ) and
   ps.exe not imatches
             (
+              '?:\\Windows\\explorer.exe',
               '?:\\Windows\\System32\\svchost.exe',
+              '?:\\Windows\\System32\\lsass.exe',
+              '?:\\Windows\\System32\\devicesensus.exe',
               '?:\\Windows\\System32\\services.exe',
               '?:\\Windows\\System32\\defrag.exe',
               '?:\\Windows\\System32\\chkdsk.exe',
@@ -42,6 +45,14 @@ condition: >
               '?:\\Windows\\System32\\dfrg.msc',
               '?:\\Windows\\System32\\wbadmin.exe',
               '?:\\Windows\\System32\\fsutil.exe',
+              '?:\\Windows\\System32\\MRT.exe',
+              '?:\\Windows\\System32\\srtasks.exe',
+              '?:\\Windows\\System32\\taskhostw.exe',
+              '?:\\Windows\\System32\\wbem\\wmiprvse.exe',
+              '?:\\Windows\\System32\\SearchIndexer.exe',
+              '?:\\Windows\\uus\\*\\MoUsoCoreWorker.exe',
+              '?:\\Windows\\winsxs\\amd64_microsoft-windows-servicingstack_*\\TiWorker.exe',
+              '?:\\Windows\\System32\\SecurityHealthService.exe',
               '?:\\Program Files\\VMware\\VMware Workstation\\vmware.exe',
               '?:\\Program Files (x86)\\VMware\\VMware Workstation\\vmware.exe',
               '?:\\Program Files\\Oracle\\VirtualBox\\VBoxSVC.exe',
@@ -51,9 +62,15 @@ condition: >
               '?:\\Program Files\\Windows Defender\\MsMpEng.exe',
               '?:\\Program Files\\Windows Defender\\NisSrv.exe',
               '?:\\ProgramData\\Microsoft\\Windows Defender\\Platform\\*\\MsMpEng.exe',
-              '?:\\ProgramData\\Microsoft\\Windows Defender\\Platform\\*\\NisSrv.exe'
-            )
+              '?:\\ProgramData\\Microsoft\\Windows Defender\\Platform\\*\\NisSrv.exe',
+              '?:\\WINDOWS\\SystemApps\\MicrosoftWindows.Client.CBS_*\\SearchHost.exe',
+              '?:\\WINDOWS\\SystemApps\\Microsoft.Windows.StartMenuExperienceHost_*\\StartMenuExperienceHost.exe'
+            ) and
+  not (ps.exe imatches '?:\\WINDOWS\\system32\\vssvc.exe' and ps.parent.exe imatches '?:\\Windows\\System32\\services.exe') and
+  not (file.path imatches '\\Device\\HarddiskVolume*\\EFI\\OEM\\Boot' and ps.token.integrity_level = 'SYSTEM') and
+  not (thread.callstack.kernel_summary imatches '*|CI.dll|ntoskrnl.exe|clipsp.sys|*' and ps.signature.trusted = true) and
+  not (thread.callstack.symbols imatches ('sechost.dll!TraceSetInformation') and ps.signature.trusted = true and ps.signature.subject imatches '*Microsoft Corporation*')
 
 severity: high
 
-min-engine-version: 3.0.0
+min-engine-version: 3.1.0
