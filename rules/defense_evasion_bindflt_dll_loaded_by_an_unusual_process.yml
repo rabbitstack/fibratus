@@ -1,6 +1,6 @@
 name: BindFlt DLL loaded by an unusual process
 id: fa439e69-2a73-49f9-8385-0e7f801f67db
-version: 1.0.0
+version: 1.0.1
 description: |
   Detects the loading of bindfltapi.dll, bindflt.dll, or bindlink.dll DLL family that
   represents user-mode API surface of the Windows Bind Filter driver (bindflt.sys)
@@ -45,7 +45,8 @@ condition: >
               '?:\\Users\\*\\AppData\\Local\\Docker\\Desktop\\Docker Desktop.exe'
             ) and
   not (ps.sid = 'S-1-5-18' and ps.exe imatches ('?:\\Windows\\System32\\*.exe', '?:\\Windows\\SysWOW64\\*.exe') and
-       ps.signature.subject imatches ('*Microsoft Windows*', '*Microsoft Corporation*') and ps.signature.trusted = true)
+       ps.signature.subject imatches ('*Microsoft Windows*', '*Microsoft Corporation*') and ps.signature.trusted = true) and
+  not (ps.exe imatches '?:\\Windows\\winsxs\\*\\TiWorker.exe' and ps.parent.exe imatches '?:\\Windows\\System32\\svchost.exe')
 action:
   - name: kill
   
