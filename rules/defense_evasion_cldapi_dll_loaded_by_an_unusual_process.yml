@@ -1,6 +1,6 @@
 name: CldApi DLL loaded by an unusual process
 id: 450aee38-e8cf-47bc-8315-d16b13d740cb
-version: 1.0.0
+version: 1.0.1
 description: |
   Detects the loading of cldapi.dll (Cloud Filter API) by processes other than
   those legitimately associated with Windows Cloud Files infrastructure and OneDrive
@@ -27,13 +27,15 @@ condition: >
               '?:\\Windows\\System32\\SearchProtocolHost.exe',
               '?:\\Windows\\System32\\svchost.exe',
               '?:\\Windows\\System32\\sihost.exe',
-              '?:\\Windows\\System32\\explorer.exe',
+              '?:\\Windows\\explorer.exe',
               '?:\\Windows\\System32\\ShellHost.exe',
               '?:\\Windows\\System32\\FileSyncConfig.exe',
               '?:\\Windows\\System32\\WorkFolders.exe',
               '?:\\Windows\\System32\\OneDriveSetup.exe',
               '?:\\Windows\\SysWOW64\\OneDriveSetup.exe',
               '?:\\Windows\\SystemApps\\Microsoft.Windows.Search_*\\SearchApp.exe',
+              '?:\\Program Files\\Microsoft OneDrive\\OneDrive.exe',
+              '?:\\Program Files\\Microsoft OneDrive\\FileCoAuth.exe',
               '?:\\Program Files\\Microsoft OneDrive\\*\\OneDrive.exe',
               '?:\\Program Files\\Microsoft OneDrive\\*\\FileCoAuth.exe',
               '?:\\Program Files\\Microsoft OneDrive\\*\\OneDriveUpdaterService.exe',
@@ -56,7 +58,10 @@ condition: >
               '?:\\Program Files (x86)\\Dropbox\\Client\\Dropbox.exe',
               '?:\\Program Files\\Dropbox\\Client\\Dropbox.exe',
               '?:\\Program Files\\Adobe\\Adobe Creative Cloud\\ACC\\Creative Cloud.exe',
-              '?:\\Program Files\\Autodesk\\Desktop App\\AdAppMgrSvc.exe'
+              '?:\\Program Files\\Autodesk\\Desktop App\\AdAppMgrSvc.exe',
+              '?:\\Program Files\\Microsoft\\EdgeWebView\\Application\\*\\msedgewebview2.exe',
+              '?:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\*\\msedgewebview2.exe',
+              '?:\\WINDOWS\\SystemApps\\Microsoft.Windows.StartMenuExperienceHost_*\\StartMenuExperienceHost.exe'
             )
 action:
   - name: kill
