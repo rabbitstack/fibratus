@@ -1,6 +1,6 @@
 name: Activation Context memory section hijacking
 id: 3d56281e-9608-4a70-b7b7-7651ccd3752b
-version: 1.0.0
+version: 1.0.1
 description: |
   Detects abuses of a legitimate Windows feature present in most processes
   called Activation Contexts with the objective of loading an arbitrary DLL
@@ -26,12 +26,16 @@ condition: >
     |unmap_view_file and
      file.view.type = 'PAGEFILE' and file.view.protection = 'READONLY' and
      (file.view.size = 12288 or (file.view.size = 4096 and
+      not (ps.exe imatches '?:\\Windows\\explorer.exe') and
+      not (ps.parent.exe imatches '?:\\Windows\\System32\\services.exe' and ps.exe imatches '?:\\Windows\\System32\\svchost.exe') and
       not (ps.parent.exe imatches '?:\\Windows\\System32\\svchost.exe' and ps.exe imatches '?:\\Windows\\System32\\taskhostw.exe') and
       not (ps.parent.exe imatches '?:\\Windows\\explorer.exe' and ps.exe imatches '?:\\Program Files\\WindowsApps\\*.exe') and
       not (ps.parent.exe imatches '?:\\Windows\\System32\\winlogon.exe' and ps.exe imatches '?:\\Windows\\System32\\dwm.exe') and
       not (ps.parent.exe imatches '?:\\Windows\\System32\\winlogon.exe' and ps.exe imatches '?:\\Windows\\System32\\csrss.exe') and
       not (ps.parent.exe imatches '?:\\Windows\\System32\\svchost.exe' and ps.exe imatches '?:\\Program Files\\Microsoft Office\\*\\ActionsServer\\ActionsServer.exe') and
-      not (ps.parent.exe imatches '?:\\Program Files\\Mozilla Firefox\\firefox.exe' and ps.exe imatches '?:\\Program Files\\Mozilla Firefox\\firefox.exe' and ps.cmdline imatches concat('*-contentproc -parentBuildID* -parentPid ', ps.ppid)))
+      not (ps.parent.exe imatches '?:\\Windows\\System32\\svchost.exe' and ps.exe imatches 'C:\\WINDOWS\\SystemApps\\ShellExperienceHost_*\\ShellExperienceHost.exe') and
+      not (ps.parent.exe imatches '?:\\Program Files\\Mozilla Firefox\\firefox.exe' and ps.exe imatches '?:\\Program Files\\Mozilla Firefox\\firefox.exe' and ps.cmdline imatches concat('*-contentproc -parentBuildID* -parentPid ', ps.ppid))) and
+      not (ps.name iin ('procexp.exe', 'procexp64.exe') and ps.signature.trusted = true and ps.signature.subject imatches '*Microsoft Corporation*')
      )
     |
     |map_view_file and file.view.size = 12288 and file.view.type = 'PAGEFILE' and file.view.protection = 'READWRITE'|
