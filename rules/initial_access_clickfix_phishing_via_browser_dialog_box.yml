@@ -1,6 +1,6 @@
 name: Clickfix phishing via browser dialog box
 id: 5fc4bf43-fbb6-4a78-a2cc-1fe9138bd3c2
-version: 1.0.0
+version: 1.0.1
 description: |
   Identifies a ClickFix-style social-engineering phishing attempt and its FileFix evolution
   where a web page coerces a user into interacting with a trusted File Explorer address bar so
@@ -23,6 +23,7 @@ references:
 
 condition: >
   spawn_process and ps.parent.name iin web_browser_binaries and
+  (ps.parent.args iintersects ('--service-sandbox-type=none', '--message-loop-type-ui') or ps.parent.args iintersects ('-contentproc', 'utility')) and
   (ps.name iin script_interpreters or ps.name iin ('msiexec.exe', 'rundll32.exe', 'curl.exe', 'wget.exe', 'certutil.exe', 'certreq.exe', 'msbuild.exe') or
    ps.exe imatches '?:\\Users\\*\\Downloads\\*') and
   thread.callstack.summary imatches 'ntdll.dll|*|windows.storage.dll|shell32.dll|windows.storage.dll|SHCore.dll|*'
