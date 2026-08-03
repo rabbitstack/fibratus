@@ -1,6 +1,6 @@
 name: Hidden registry key creation
 id: 65deda38-9b1d-42a0-9f40-a68903e81b49
-version: 1.1.7
+version: 1.1.8
 description: |
   Identifies the creation of a hidden registry key. Adversaries can utilize the
   native NtSetValueKey API to create a hidden registry key and conceal payloads
@@ -31,13 +31,15 @@ condition: >
               '?:\\Windows\\System32\\svchost.exe',
               '?:\\Windows\\WinSxS\\*\\TiWorker.exe',
               '?:\\Windows\\UUS\\*\\wuaucltcore.exe',
-              '?:\\$WinREAgent\\Scratch\\*\\DismHost.exe'
+              '?:\\$WinREAgent\\Scratch\\*\\DismHost.exe',
+              '?:\\Windows\\WinSxS\\amd64_microsoft-windows-servicingstack_*\\containerworker.exe'
             ) and
   ps.parent.exe not imatches
             (
               '?:\\WINDOWS\\uus\\*\\wuaucltcore.exe',
               '?:\\WINDOWS\\System32\\svchost.exe'
-            )
+            ) and
+  not (ps.exe imatches '?:\\Windows\\*' and thread.callstack.summary imatches ('ntdll.dll|wcp.dll|CbsCore.dll|turbostsack.dll|*', 'ntdll.dll|drvstore.dll|drupdate.dll|CbsCore.dll|turbostsack.dll|*'))
 
 output: >
   Hidden registry key %registry.path created by process %ps.exe
