@@ -103,7 +103,9 @@ func ProbePrerequisites() (*PrerequisiteReport, error) {
 		report.RingbufHelper = true
 	}
 
-	// Task iterators attach as Tracing + AttachTraceIter against a kernel BTF target.
+	// iter/task attach still needs a loaded program; ProbePrerequisites only checks
+	// the necessary Tracing + runtime BTF preconditions. AttachIter in the spike
+	// (and later loader) is the conclusive probe.
 	if report.TracingOK && report.BTFOK {
 		report.IterOK = true
 	} else {

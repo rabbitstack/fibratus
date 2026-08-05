@@ -79,6 +79,7 @@ func Run(duration time.Duration) (*Result, error) {
 	defer execObjs.Close()
 
 	// Inject the canonical shared maps from the first collection into the second.
+	// The first collection owns those maps; only close the iterator program here.
 	var iterObjs prociterObjects
 	if err := iterSpec.LoadAndAssign(&iterObjs, &ebpf.CollectionOptions{
 		MapReplacements: map[string]*ebpf.Map{
@@ -88,7 +89,11 @@ func Run(duration time.Duration) (*Result, error) {
 	}); err != nil {
 		return nil, fmt.Errorf("loading prociter with map replacements: %w", err)
 	}
-	defer iterObjs.Close()
+	defer func() {
+		if iterObjs.DumpTask != nil {
+			_ = iterObjs.DumpTask.Close()
+		}
+	}()
 
 	rd, err := ringbuf.NewReader(execObjs.Events)
 	if err != nil {
@@ -112,7 +117,7 @@ func Run(duration time.Duration) (*Result, error) {
 				select {
 				case <-stop:
 					return
-				default:
+				case <-time.After(10 * time.Millisecond):
 					continue
 				}
 			}

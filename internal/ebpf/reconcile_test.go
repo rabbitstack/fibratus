@@ -68,6 +68,23 @@ func TestStartupReconcilerRaceSafeBaseline(t *testing.T) {
 	}
 }
 
+func TestStartupReconcilerIgnoresLateSnapshots(t *testing.T) {
+	r := NewStartupReconciler(8)
+	key := ProcessKey{PID: 7, StartBootTime: 9}
+	r.UpsertSnapshot(ProcessRecord{Key: key, Comm: "snap"})
+	r.FinishBaseline()
+	r.EnqueueHot(HotEvent{Key: key, Kind: 1, Comm: "live", ExePath: "/bin/live"})
+	r.UpsertSnapshot(ProcessRecord{Key: key, Comm: "stale-snap", ExePath: "/bin/stale"})
+
+	got, ok := r.Get(key)
+	if !ok {
+		t.Fatal("missing process after late snapshot")
+	}
+	if got.Comm != "live" || got.ExePath != "/bin/live" {
+		t.Fatalf("late snapshot overwrote live state: %+v", got)
+	}
+}
+
 func TestStartupReconcilerPendingBackpressure(t *testing.T) {
 	r := NewStartupReconciler(2)
 	key := ProcessKey{PID: 1, StartBootTime: 1}
