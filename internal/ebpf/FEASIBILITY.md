@@ -9,7 +9,7 @@ Hard requirements (no graceful degradation):
 - Linux kernel >= 5.9 (BPF task iterators)
 - Usable runtime kernel BTF at `/sys/kernel/btf/vmlinux`
 - Ring buffer maps and helpers
-- Tracing programs with `iter/task` attach support
+- Tracing programs plus runtime kernel BTF (required for `iter/task`; attach is verified when the spike/loader calls `AttachIter`)
 - Capabilities: `CAP_BPF`, `CAP_PERFMON`, and `CAP_SYS_PTRACE` for best-effort `/proc` enrichment
 
 Explicit non-fallbacks:
