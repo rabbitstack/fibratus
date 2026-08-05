@@ -105,9 +105,14 @@ func (r *StartupReconciler) EnqueueHot(ev HotEvent) bool {
 }
 
 // UpsertSnapshot installs an iterator baseline record keyed by ProcessKey.
+// After FinishBaseline, late snapshot records are ignored so they cannot
+// overwrite live hot-path state.
 func (r *StartupReconciler) UpsertSnapshot(rec ProcessRecord) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.live {
+		return
+	}
 	rec.FromSnap = true
 	existing, ok := r.procs[rec.Key]
 	if !ok {
