@@ -1,6 +1,6 @@
 name: Embedded script execution via shortcut file
 id: 2d94a68b-03fe-4ece-9a99-f4de8ff7261d
-version: 1.0.1
+version: 1.0.2
 description: |
   Detects execution of embedded scripts delivered via Windows shortcut (.lnk) files.
   Adversaries can exploit the attack chain where a shortcut file is accessed by a
@@ -26,7 +26,8 @@ condition: >
   by ps.sessionid
     |open_file and
      ps.name iin ('cmd.exe', 'findstr.exe', 'find.exe', 'powershell.exe', 'pwsh.exe') and
-     file.path imatches '?:\\*.lnk'
+     file.path imatches '?:\\*.lnk' and
+     file.path not imatches '?:\\Users\\*\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Powershell\\Windows PowerShell.lnk'
     |
     |create_file and
      ps.name iin ('cmd.exe', 'powershell.exe', 'pwsh.exe') and
