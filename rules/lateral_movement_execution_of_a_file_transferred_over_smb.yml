@@ -1,0 +1,115 @@
+name: Execution of a file transferred over SMB
+id: 04021379-a498-4ad0-ab46-62b2ed891e51
+version: 1.0.0
+description: |
+  Identifies the execution of the binary file that was transferred over SMB.
+  This pattern is characteristic of lateral movement via admin shares (C$,
+  ADMIN$) followed by remote service creation or remote command execution,
+  as used by PsExec-style tools, Impacket's psexec/smbexec/atexec, and
+  commodity ransomware/backdoor deployment via SMB.
+labels:
+  tactic.id: TA0008
+  tactic.name: Lateral Movement
+  tactic.ref: https://attack.mitre.org/tactics/TA0008/
+  technique.id: T1021
+  technique.name: Remote Services
+  technique.ref: https://attack.mitre.org/techniques/T1021/
+  subtechnique.id: T1021.002
+  subtechnique.name: SMB/Windows Admin Shares
+  subtechnique.ref: https://attack.mitre.org/techniques/T1021/002/
+references:
+  - https://www.elastic.co/security-labs/hunting-for-lateral-movement-using-event-query-language
+
+condition: >
+  sequence
+  maxspan 8m
+    |create_file and evt.pid = 4 and thread.callstack.kernel_summary imatches ('*|srv2.sys|*', '*|srvnet.sys|*')| by file.path
+    |spawn_process and
+     ps.ancestor imatches
+                 (
+                   'PAExec*.exe',
+                   'cmd.exe',
+                   'psexesvc*.exe',
+                   'wmiprvse.exe',
+                   'wsmprovhost.exe',
+                   'powershell.exe',
+                   'pwsh.exe',
+                   'KaseyaEndpoint.exe',
+                   'RemComSvc*.exe'
+                 ) and
+     not (ps.signature.subject imatches
+                 (
+                   '*NinjaOne, LLC',
+                   '*Trellix',
+                   '*Check Point Software Technologies Ltd.',
+                   '*RAPIDFIRE TOOLS INC.',
+                   '*IBM Corporation',
+                   '*PDQ.COM CORPORATION',
+                   '*Veeam Software Group GmbH',
+                   '*Veeam Software AG',
+                   '*LANDesk Software, Inc.',
+                   '*Cynet Security LTD',
+                   '*CyberArk Software Ltd.',
+                   '*Barracuda Networks, Inc.',
+                   '*AVG Technologies Canada, Inc.',
+                   '*ConnectWise, Inc.',
+                   '*Ivanti, Inc.',
+                   '*FUJITSU LIMITED',
+                   '*Kaspersky Lab JSC',
+                   '*Netalytics Security Inc',
+                   '*Elasticsearch, Inc.',
+                   '*Netwrix Corporation',
+                   '*Power Admin LLC',
+                   '*Veritas Technologies LLC',
+                   '*Bitdefender SRL',
+                   '*Kaseya Corporation',
+                   '*Insecure.Com LLC',
+                   '*ZOHO Corporation Private Limited',
+                   '*VMware, Inc.',
+                   '*ServiceNow, Inc.',
+                   '*N-ABLE TECHNOLOGIES LTD',
+                   '*CISCO SYSTEMS, INC.',
+                   '*TeamViewer Germany GmbH',
+                   '*SysAid Technologies LTD',
+                   '*Sophos Ltd',
+                   '*Ericsson',
+                   '*Quest Software Inc.',
+                   '*Commvault Systems, Inc.',
+                   '*Red Gate Software Ltd',
+                   '*Cocobolo Software, LLC',
+                   '*Tenable Network Security Inc.',
+                   '*CS.NIWC-ATLANTIC.001',
+                   '*Lansweeper',
+                   '*Lenovo',
+                   '*Acronis International GmbH',
+                   '*Cisco WebEx LLC',
+                   '*Oracle America, Inc.',
+                   '*Chocolatey Software, Inc.',
+                   '*Micro Focus Group Limited',
+                   '*Solarwinds Worldwide, LLC',
+                   '*Cyberark Software Ltd.',
+                   '*AO Kaspersky Lab',
+                   '*Symantec Corporation',
+                   '*Hornetsecurity GmbH',
+                   '*KASEYA US LLC',
+                   '*ForeScout Technologies, Inc',
+                   '*Kaseya Holdings Inc',
+                   '*ConnectSecure LLC',
+                   '*Red Gate Software Limited',
+                   '*Dell Inc.',
+                   '*WatchGuard Technologies, Inc.',
+                   '*Qualys, Inc.'
+                 ) and ps.signature.exists = true and ps.signature.trusted = true) and
+     not (ps.exe imatches ('?:\\Windows\\CCM\\*', '?:\\Program Files\\Microsoft Configuration Manager\\*')) and
+     not (ps.parent.name = 'powershell.exe' and ps.exe imatches ('?:\\Program Files (x86)\\*', '?:\\Program Files\\')) and
+     not (ps.pe.file.name imatches
+                 (
+                    'MOMAgentInstaller.exe', 'dotnet-hosting-*-win.exe', 'dpmac.exe',
+                    'PushClient.exe', 'migrate.exe', 'Ms.Dsp.Do.Inc.Installer.exe',
+                    'OpenHandleCollector.exe', 'VC_redist*.exe'
+                 ) and ps.signature.subject imatches '*Microsoft Corporation*' and ps.signature.trusted = true)
+    | by ps.exe
+
+severity: high
+
+min-engine-version: 3.1.0
