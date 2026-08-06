@@ -1,0 +1,33 @@
+name: DLL loading of a file transferred over SMB
+id: e8747023-1cec-4549-b4ac-d272f10bef90
+version: 1.0.0
+description: |
+  Identifies the loading of an unsigned or untrusted DLL shortly after it has
+  been dropped to disk via an SMB file transfer. This behavior is indicative
+  of lateral movement techniques where an attacker transfers a malicious library
+  over an administrative SMB share and immediately executes it on the remote host.
+labels:
+  tactic.id: TA0008
+  tactic.name: Lateral Movement
+  tactic.ref: https://attack.mitre.org/tactics/TA0008/
+  technique.id: T1021
+  technique.name: Remote Services
+  technique.ref: https://attack.mitre.org/techniques/T1021/
+  subtechnique.id: T1021.002
+  subtechnique.name: SMB/Windows Admin Shares
+  subtechnique.ref: https://attack.mitre.org/techniques/T1021/002/
+references:
+  - https://www.elastic.co/security-labs/hunting-for-lateral-movement-using-event-query-language
+
+condition: >
+  sequence
+  maxspan 8m
+    |create_file and evt.pid = 4 and thread.callstack.kernel_summary imatches ('*|srv2.sys|*', '*|srvnet.sys|*')| by file.path
+    |load_dll and
+     ps.name iin ('rundll32.exe', 'regsvr32.exe', 'svchost.exe', 'lsass.exe') and dll.signature.trusted = false and
+     not (dll.path imatches '?:\\Windows\\VeeamVssSupport\\VeeamVssHook.dll' and ps.exe imatches '?:\\Windows\\System32\\svchost.exe')
+    | by dll.path
+
+severity: high
+
+min-engine-version: 3.1.0
