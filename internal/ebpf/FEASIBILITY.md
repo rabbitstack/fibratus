@@ -24,7 +24,7 @@ Explicit non-fallbacks:
 
 | Tool | Pin / note |
 | --- | --- |
-| `github.com/cilium/ebpf` | v0.20.0 |
+| `github.com/cilium/ebpf` | v0.20.0 (direct `go.mod` require; run `GOOS=linux go mod tidy` so Darwin tidy cannot drop it) |
 | `bpf2go` | version-matched to cilium/ebpf v0.20.0 |
 | clang/LLVM | Spike objects regenerated with Debian clang 19.1.7 (`golang:1.26` image) |
 | bpftool | Optional for inspecting BTF; not required for ordinary builds |
