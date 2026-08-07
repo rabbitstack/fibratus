@@ -34,7 +34,7 @@ import (
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/ringbuf"
 	"github.com/cilium/ebpf/rlimit"
-	fibebpf "github.com/rabbitstack/fibratus/internal/ebpf"
+	libebpf "github.com/rabbitstack/fibratus/internal/ebpf"
 )
 
 const (
@@ -44,7 +44,7 @@ const (
 
 // Result summarizes a successful spike run.
 type Result struct {
-	Prerequisites *fibebpf.PrerequisiteReport
+	Prerequisites *libebpf.PrerequisiteReport
 	Snapshots     int
 	ExecEvents    int
 	Reconciled    int
@@ -54,7 +54,7 @@ type Result struct {
 // Run proves CO-RE load, shared-map replacement, race-safe startup, and
 // best-effort /proc enrichment on a real Linux kernel.
 func Run(duration time.Duration) (*Result, error) {
-	report, err := fibebpf.ProbePrerequisites()
+	report, err := libebpf.ProbePrerequisites()
 	if err != nil {
 		return &Result{Prerequisites: report}, fmt.Errorf("prerequisites: %w", err)
 	}
@@ -101,7 +101,7 @@ func Run(duration time.Duration) (*Result, error) {
 	}
 	defer rd.Close()
 
-	reconciler := fibebpf.NewStartupReconciler(4096)
+	reconciler := libebpf.NewStartupReconciler(4096)
 	stop := make(chan struct{})
 	done := make(chan struct{})
 	var execCount, snapCount atomic.Uint64
@@ -125,7 +125,7 @@ func Run(duration time.Duration) (*Result, error) {
 			if err != nil {
 				continue
 			}
-			key := fibebpf.ProcessKey{PID: ev.Tgid, StartBootTime: ev.StartBoottime}
+			key := libebpf.ProcessKey{PID: ev.Tgid, StartBootTime: ev.StartBoottime}
 			comm := cString(ev.Comm[:])
 			filename := cString(ev.Filename[:])
 			switch ev.Kind {
@@ -135,7 +135,7 @@ func Run(duration time.Duration) (*Result, error) {
 					reconciler.AccountEnrichmentMiss()
 				}
 				snapCount.Add(1)
-				reconciler.UpsertSnapshot(fibebpf.ProcessRecord{
+				reconciler.UpsertSnapshot(libebpf.ProcessRecord{
 					Key:      key,
 					Comm:     comm,
 					Filename: filename,
@@ -146,7 +146,7 @@ func Run(duration time.Duration) (*Result, error) {
 				// Short-lived execs often exit before /proc enrichment; that is expected.
 				exe, cmdline, _ := enrichFromProc(ev.Tgid)
 				execCount.Add(1)
-				_ = reconciler.EnqueueHot(fibebpf.HotEvent{
+				_ = reconciler.EnqueueHot(libebpf.HotEvent{
 					Key:       key,
 					Kind:      ev.Kind,
 					Timestamp: ev.TimestampNs,

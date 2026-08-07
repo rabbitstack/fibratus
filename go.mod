@@ -7,6 +7,7 @@ require (
 	github.com/bits-and-blooms/bitset v1.13.0
 	github.com/briandowns/spinner v1.12.0
 	github.com/cenkalti/backoff/v4 v4.3.0
+	github.com/cilium/ebpf v0.20.0
 	github.com/dustin/go-humanize v1.0.0
 	github.com/enescakir/emoji v1.0.0
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e
@@ -48,9 +49,7 @@ require (
 require (
 	github.com/BurntSushi/toml v0.4.1 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
-	github.com/kr/pretty v0.3.1 // indirect
 	github.com/rivo/uniseg v0.4.2 // indirect
-	github.com/rogpeppe/go-internal v1.12.0 // indirect
 	github.com/secDre4mer/pkcs7 v0.0.0-20240322103146-665324a4461d // indirect
 	go4.org/netipx v0.0.0-20220725152314-7e7bdc8411bf // indirect
 	golang.org/x/exp/typeparams v0.0.0-20220218215828-6cf2b201936e // indirect
