@@ -19,8 +19,19 @@ Fibratus requires **administrator** or **SYSTEM** privileges to capture system e
 - executes [YARA](../yara.md) rules on freshly created process images or other image files when the [YARA scanner](../yara.md) is enabled
 - spins up an embedded Python interpreter to run [filaments](../filaments.md)
 
+### One-liner Installation
 
-### Installation
+Install or upgrade Fibratus with a single PowerShell command.
+
+<Terminal>
+$ irm https://install.fibratus.io | iex
+
+</Terminal>
+
+
+The installer automatically downloads the latest [MSI](https://learn.microsoft.com/en-us/windows/win32/msi/installation-package) package, verifies its integrity using a checksum, and validates the package digital signature before proceeding. If either verification fails, the installation is aborted to prevent an untrusted or corrupted package from being installed. Once installation completes successfully, the Fibratus Windows service is started automatically which is immediately armed in protection mode to detect and neutralize threats.
+
+### Manual Installation
 
 <Stepper>
 

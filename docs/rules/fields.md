@@ -174,6 +174,7 @@ The following tables summarize available field names that can be employed in det
 | Field Name  | Description | Example     |
 | :---        |    :----   |   :--- |
 | `thread.callstack.summary` | Callstack summary showing involved modules | `thread.callstack.summary contains 'ntdll.dll\|KERNELBASE.dll'` |
+| `thread.callstack.kernel_summary` | Kernel callstack summary showing involved kernel devices | `thread.callstack.kernel_summary contains '*\|srvnet.sys\|*'` |
 | `thread.callstack.detail` | Detailed information of each stack frame | `thread.callstack.detail contains 'KERNELBASE.dll!CreateProcessW'` |
 | `thread.callstack.modules` | List of modules comprising the callstack | `thread.callstack.modules in ('C:\WINDOWS\System32\KERNELBASE.dll')` |
 | `thread.callstack.symbols` | List of symbols comprising the callstack | `thread.callstack.symbols in ('ntdll.dll!NtCreateProcess')` |
@@ -189,8 +190,8 @@ The following tables summarize available field names that can be employed in det
 | `thread.callstack.final_kernel_module.name` | The final kernel module name | `thread.callstack.final_kernel_module.name = 'FLTMGR.SYS'` |
 | `thread.callstack.final_kernel_module.path` | The final kernel module path | `thread.callstack.final_kernel_module.path imatches '?:\\WINDOWS\\System32\\drivers\\FLTMGR.SYS'` |
 | `thread.callstack.final_kernel_symbol.name` | The final kernel symbol name | `thread.callstack.final_kernel_symbol.name = 'FltGetStreamContext'` |
-| `thread.callstack.final_user_module.signature.is_signed` | Indicates if the final user module is signed | `thread.callstack.final_user_module.signature.is_signed = true` |
-| `thread.callstack.final_user_module.signature.is_trusted` | Indicates if the final user module signature is trusted | `thread.callstack.final_user_module.signature.is_trusted = true` |
+| `thread.callstack.final_user_module.signature.exists` | Indicates if the final user module is signed | `thread.callstack.final_user_module.signature.exists = true` |
+| `thread.callstack.final_user_module.signature.trusted` | Indicates if the final user module signature is trusted | `thread.callstack.final_user_module.signature.trusted = true` |
 | `thread.callstack.final_user_module.signature.cert.issuer` | The final user module signature certificate issuer | `thread.callstack.final_user_module.signature.cert.issuer imatches '*Microsoft Corporation*'` |
 | `thread.callstack.final_user_module.signature.cert.subject` |  The final user module signature certificate subject | `thread.callstack.final_user_module.signature.cert.subject imatches '*Microsoft Windows*'` |
 
@@ -214,8 +215,6 @@ The following tables summarize available field names that can be employed in det
 | `module.signature.issuer` | Module certificate CA | `module.signature.issuer contains 'US, Washington, Redmond, Microsoft Windows Production PCA 2011`   |
 | `imodule.signature.after` | Module certificate expiration date | `module.signature.after contains '2024-02-01 00:05:42 +0000 UTC'`   |
 | `module.signature.before` | Module certificate enrollment date | `module.signature.before contains '2024-02-01 00:05:42 +0000 UTC'`   |
-| `image.is_driver_malicious` | Indicates if the loaded driver is malicious | `module.is_driver_malicious`  |
-| `image.is_driver_vulnerable` | Indicates if the loaded driver is vulnerable | `module.is_driver_vulnerable` |
 | `module.is_dll` | Indicates if the loaded module is a DLL | `module.is_dll` |
 | `module.is_driver` | Indicates if the loaded module is a driver | `module.is_driver` |
 | `module.is_exec` | Indicates if the loaded module is an executable | `module.is_exec` |
@@ -246,7 +245,7 @@ The following tables summarize available field names that can be employed in det
 | `file.path.stem` | File path without extension | `file.path.stem = 'C:\\Windows\\Sytem32\\regedit'`   |
 | `file.name` | File name | `file.name = 'regedit.exe'`   |
 | `file.operation` | Operation performed on the file or I/O device | `file.operation = 'OPEN'`   |
-| `file.share.mask` | File share mask | `file.share.mask = 'READ'`   |
+| `file.share_mode` | File share mode | `file.share_mode = 'READ'`   |
 | `file.io.size` | I/O read/write size | `file.io.size > 512`   |
 | `file.offset` | Read/write position in the file | `file.offset = 1024`   |
 | `file.type` | File type. Possible values are `File`, `Directory`, `Pipe`, `Console`, `Mailslot`, `Other`, `Unknown` | `file.type = 'Directory'`   |
@@ -257,8 +256,6 @@ The following tables summarize available field names that can be employed in det
 | `file.view.size` | Size of the mapped/unmapped section view | `file.view.size > 1024`   |
 | `file.view.type` | Type of the mapped/unmapped section view | `file.view.type = 'IMAGE'`   |
 | `file.view.protection` | Protection rights of the section view | `file.view.protection = 'READONLY'` |
-| `file.is_driver_malicious` | Indicates if the dropped driver is malicious | `file.is_driver_malicious`  |
-| `file.is_driver_vulnerable` | Indicates if the dropped driver is vulnerable | `file.is_driver_vulnerable` |
 | `file.is_dll` | Indicates if the created file is a DLL | `file.is_dll` |
 | `file.is_driver` | Indicates if the created file is a driver | `file.is_driver` |
 | `file.is_exec` | Indicates if the created file is an executable | `file.is_exec` |
