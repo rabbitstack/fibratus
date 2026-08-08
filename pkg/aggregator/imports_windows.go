@@ -18,19 +18,10 @@
  * limitations under the License.
  */
 
-package config
+package aggregator
 
 import (
-	"github.com/stretchr/testify/require"
-	"testing"
+	// initialize Windows-only outputs and alert senders
+	_ "github.com/rabbitstack/fibratus/pkg/alertsender/systray"
+	_ "github.com/rabbitstack/fibratus/pkg/outputs/eventlog"
 )
-
-func TestConfigPrint(t *testing.T) {
-	c := NewWithOpts(WithRun())
-	err := c.flags.Parse([]string{"--eventsource.enable-thread=false", "--config-file=_fixtures/fibratus.yml"})
-	require.NoError(t, c.viper.BindPFlags(c.flags))
-	require.NoError(t, err)
-	require.NoError(t, c.TryLoadFile(c.GetConfigFile()))
-	opts := c.Print()
-	require.NotEmpty(t, opts)
-}

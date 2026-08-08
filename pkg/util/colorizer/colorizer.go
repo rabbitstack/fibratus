@@ -22,8 +22,6 @@ import (
 	"os"
 	"runtime"
 	"strings"
-
-	"golang.org/x/sys/windows"
 )
 
 // escape sequences
@@ -121,21 +119,4 @@ func IsAnsiEnabled() bool {
 		return enableWindowsVT()
 	}
 	return true
-}
-
-// enableWindowsVT activates ENABLE_VIRTUAL_TERMINAL_PROCESSING on the Windows
-// console handle so that ANSI escape sequences are interpreted rather than
-// printed verbatim. Returns false on pre-Windows 10 hosts where this flag
-// is unavailable.
-func enableWindowsVT() bool {
-	handle := windows.Handle(os.Stdout.Fd())
-	var mode uint32
-	if err := windows.GetConsoleMode(handle, &mode); err != nil {
-		return false
-	}
-	const vtFlag = 0x0004 // ENABLE_VIRTUAL_TERMINAL_PROCESSING
-	if mode&vtFlag != 0 {
-		return true
-	}
-	return windows.SetConsoleMode(handle, mode|vtFlag) == nil
 }
