@@ -29,6 +29,13 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 )
 
+// PE is a placeholder for PE metadata on Linux builds.
+// Linux process images are ELF; this field exists so shared
+// formatters/templates compile without Windows PE types.
+type PE struct{}
+
+func (p *PE) String() string { return "" }
+
 type PS struct {
 	sync.RWMutex
 	PID           uint32            `json:"pid"`
@@ -42,12 +49,22 @@ type PS struct {
 	StartBootTime uint64            `json:"start_boot_time"`
 	UID           uint32            `json:"uid"`
 	GID           uint32            `json:"gid"`
-	Username      string            `json:"username"`
-	Envs          map[string]string `json:"envs"`
-	Parent        *PS               `json:"parent"`
-	Threads       map[uint32]Thread `json:"-"`
-	Mmaps         []Mmap            `json:"mmaps"`
-	Modules       []Module          `json:"modules"`
+	Username            string            `json:"username"`
+	Domain              string            `json:"domain"`
+	SID                 string            `json:"sid"`
+	SessionID           uint32            `json:"session_id"`
+	TokenIntegrityLevel string            `json:"token_integrity_level"`
+	TokenElevationType  string            `json:"token_elevation_type"`
+	IsTokenElevated     bool              `json:"is_token_elevated"`
+	IsWOW64             bool              `json:"is_wow_64"`
+	IsPackaged          bool              `json:"is_packaged"`
+	IsProtected         bool              `json:"is_protected"`
+	Envs                map[string]string `json:"envs"`
+	Parent              *PS               `json:"parent"`
+	Threads             map[uint32]Thread `json:"-"`
+	Mmaps               []Mmap            `json:"mmaps"`
+	Modules             []Module          `json:"modules"`
+	PE                  *PE               `json:"-"`
 }
 
 func (ps *PS) String() string {
@@ -67,14 +84,20 @@ func (ps *PS) Ancestors() []string {
 }
 
 type Thread struct {
-	Tid uint32
-	Pid uint32
+	Tid          uint32
+	Pid          uint32
+	StartAddress va.Address
+	UstackBase   va.Address
+	UstackLimit  va.Address
+	KstackBase   va.Address
+	KstackLimit  va.Address
 }
 
 type Module struct {
 	Name        string
 	BaseAddress va.Address
 	Size        uint64
+	Checksum    uint32
 }
 
 type Mmap struct {
