@@ -1,7 +1,7 @@
 //go:build linux
 
 /*
- * Copyright 2026 by Nedim Sabic Sabic
+ * Copyright 2026 by Mostafa Moradian
  * https://www.fibratus.io
  * All Rights Reserved.
  *
