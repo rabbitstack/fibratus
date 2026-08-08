@@ -1,4 +1,4 @@
-Copyright 2019-2024 by Nedim Sabic Sabic and contributors
+Copyright 2019-2026 by Nedim Sabic Sabic and contributors
 https://www.fibratus.io
 
 All Rights Reserved.

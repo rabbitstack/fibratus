@@ -8,7 +8,7 @@ Creates a new registry key or opens the key if it already exists. Deletes a subk
 
 | PARAMETER  | DESCRIPTION |
 | :---        |    :----   |
-| `key_handle` | Represents the address of the [KCB](https://learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/-regkcb) (Key Control Block) structure in kernel space. |
+| `kcb` | Represents the address of the [KCB](https://learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/-regkcb) (Key Control Block) structure in kernel space. |
 | `key_path` | Full registry path involved in the operation, for example, `HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control` |
 | `status` | System status code of the registry operation, for example, `More data is available` |
 
@@ -18,7 +18,7 @@ Creates a new registry key or opens the key if it already exists. Deletes a subk
 
 | PARAMETER  | DESCRIPTION |
 | :---        |    :----   |
-| `key_handle` | Represents the address of the [KCB](https://learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/-regkcb) (Key Control Block) structure in kernel space. |
+| `kcb` | Represents the address of the [KCB](https://learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/-regkcb) (Key Control Block) structure in kernel space. |
 | `key_path` | Full path of the registry value, for example, `HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\System\GpSvcDebugLevel` |
 | `status` | System status code of the registry operation, for example, `The system cannot find the file specified` |
 
@@ -29,7 +29,7 @@ Creates a new registry key or opens the key if it already exists. Deletes a subk
 
 | PARAMETER  | DESCRIPTION |
 | :---        |    :----   |
-| `key_handle` | Represents the address of the [KCB](https://learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/-regkcb) (Key Control Block) structure in kernel space. |
+| `kcb` | Represents the address of the [KCB](https://learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/-regkcb) (Key Control Block) structure in kernel space. |
 | `key_path` | Full path of the registry value, for example, `HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\System\GpSvcDebugLevel` |
 | `status` | System status code of the registry operation, for example, `Success` |
 | `data` | Value data being stored. |
@@ -41,7 +41,7 @@ Creates a new registry key or opens the key if it already exists. Deletes a subk
 
 | PARAMETER  | DESCRIPTION |
 | :---        |    :----   |
-| `key_handle` | Represents the address of the [KCB](https://learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/-regkcb) (Key Control Block) structure in kernel space. |
+| `kcb` | Represents the address of the [KCB](https://learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/-regkcb) (Key Control Block) structure in kernel space. |
 | `key_path` | Full path of the registry value, for example, `HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\System\GpSvcDebugLevel` |
 | `status` | System status code of the registry operation, for example, `Success` |
 | `value_type` | Registry value type. Possible values include `REG_DWORD`, `REG_QWORD`, `REG_SZ`, `REG_EXPAND_SZ`, `REG_MULTI_SZ`, `REG_BINARY`, `UNKNOWN` |
