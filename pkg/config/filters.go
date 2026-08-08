@@ -1,3 +1,5 @@
+//go:build windows
+
 /*
  * Copyright 2020-2021 by Nedim Sabic Sabic
  * https://www.fibratus.io
