@@ -1,6 +1,6 @@
 name: Potential operation evasion via direct syscall
 id: 4d91ae23-ba4f-44a1-9952-a7e634d39ceb
-version: 1.0.0
+version: 1.0.1
 description: |
   Identifies processes invoking system operations via direct syscalls.
   Adversaries and offensive tooling use this technique to evade user-mode
@@ -31,7 +31,7 @@ condition: >
      evt.pid != 4 and ps.name != '' and thread.callstack.summary istartswith ps.name
     )
   ) and
-  not ((ps.exe imatches '?:\\Windows\\System32\\smss.exe' or ps.parent.exe imatches '?:\\Windows\\System32\\smss.exe') and thread.callstack.summary imatches 'ntdll.dll|smsss.exe|*') and
+  not ((ps.exe imatches '?:\\Windows\\System32\\smss.exe' or ps.parent.exe imatches '?:\\Windows\\System32\\smss.exe') and thread.callstack.summary imatches 'ntdll.dll|smss.exe|*') and
   not (ps.exe imatches '?:\\Windows\\System32\\WerFault.exe' and thread.callstack.summary imatches 'ntdll.dll|kernelbase.dll|faultrep.dll|wersvc.dll|ntdll.dll|kernel32.dll|ntdll.dll') and
   not (ps.exe imatches '?:\\Windows\\System32\\WUDFCompanionHost.exe' and ps.parent.exe imatches '?:\\Windows\\System32\\services.exe') and
   not (spawn_process and ps.exe imatches '?:\\Windows\\System32\\WUDFCompanionHost.exe' and thread.callstack.summary imatches 'ntdll.dll|vmwp.exe|ntdll.dll*') and
