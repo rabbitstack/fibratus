@@ -120,10 +120,10 @@ type sequenceState struct {
 	// The purpose is to enforce temporal monotonicity
 	lastMatch time.Time
 
-	psnap ps.Snapshotter
+	psnap ps.Resolver
 }
 
-func newSequenceState(f filter.Filter, c *config.FilterConfig, psnap ps.Snapshotter) *sequenceState {
+func newSequenceState(f filter.Filter, c *config.FilterConfig, psnap ps.Resolver) *sequenceState {
 	ss := &sequenceState{
 		filter:        f,
 		seq:           f.GetSequence(),

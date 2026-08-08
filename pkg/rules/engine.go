@@ -55,7 +55,7 @@ var (
 type Engine struct {
 	filters *filterset
 	config  *config.Config
-	psnap   ps.Snapshotter
+	psnap   ps.Resolver
 
 	matches   []*ruleMatch
 	mmu       sync.Mutex // guards the rule matches slice
@@ -130,7 +130,7 @@ func (f *compiledFilter) eval(e *event.Event, valuer *filter.ValuerCache) bool {
 }
 
 // NewEngine builds a fresh rules engine instance.
-func NewEngine(psnap ps.Snapshotter, config *config.Config) *Engine {
+func NewEngine(psnap ps.Resolver, config *config.Config) *Engine {
 	e := &Engine{
 		filters:   newFilterset(),
 		matches:   make([]*ruleMatch, 0),
