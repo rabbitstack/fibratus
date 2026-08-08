@@ -1,4 +1,4 @@
-//go:build linux && eventsource
+//go:build linux
 
 /*
  * Copyright 2026 by Nedim Sabic Sabic
