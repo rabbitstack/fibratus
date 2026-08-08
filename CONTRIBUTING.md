@@ -5,8 +5,7 @@ We greatly appreciate you have considered contributing to Fibratus! Please, read
 ## Introduction
 
 1. **You're familiar with [Github](https://github.com), git, and the pull request workflow**
-2. **Make sure you've read Fibratus [docs](https://www.fibratus.io)**
-3. If you got an idea about some feature that's not currently in the backlog, please create the [feature request](https://github.com/rabbitstack/fibratus/issues/new) first. The feature request should precisely describe the scope, requirements, and the motivation for the intended changeset
+2. If you got an idea about some feature that's not currently in the backlog, please create the [feature request](https://github.com/rabbitstack/fibratus/issues/new) first. The feature request should precisely describe the scope, requirements, and the motivation for the intended changeset
 
 ## Your First Contribution
 
@@ -99,7 +98,7 @@ To build Fibratus directly from source code you have to satisfy the following de
 By default, when building Fibratus, the Go compiler is instructed to ignore all features that trigger the [cgo](https://golang.org/cmd/cgo/), but you can control which features are enabled through the following build flags:
 
 - `filament`: compiles Fibratus with filaments support
-- `kcap`: compiles Fibratus with support for capturing/replaying kcap files
+- `cap`: compiles Fibratus with support for capturing/replaying cap files
 - `yara`: builds Fibratus with support for [Yara](https://virustotal.github.io/yara/) pattern matching
 
 To produce the Fibratus binary with the filaments support, you would run the following commands from the Powershell terminal:
@@ -112,7 +111,7 @@ $ ./make
 To create the full-fledged Fibratus binary, activate all build flags:
 
 ```
-$ $env:TAGS="filament,kcap,yara"
+$ $env:TAGS="filament,cap,yara"
 $ ./make
 ```
 

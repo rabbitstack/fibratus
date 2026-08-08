@@ -2,6 +2,21 @@
 
 ##### Fibratus rules define how behavioral patterns are detected from system telemetry. They allow expressing conditions over events and optionally trigger [response actions](rules/actions.md). Inspired by declarative detection formats like [Sigma](https://sigmahq.io/), Fibratus rules are designed to be readable, expressive, and tightly integrated with the event model.
 
+## Built-in Rules and Sigma Compatibility
+
+Fibratus ships with a curated set of high-quality [rules](https://fibratus.io/rules) for detecting sophisticated and stealthy attack behaviors out of the box. These rules cover advanced patterns such as suspicious memory activity, code injection, memory-resident malware, privilege escalation and other techniques that may evade traditional file-based detection.
+
+Fibratus also supports converting [Sigma](https://sigmahq.io/) rules to Fibratus-compatible rules through the [RSigma](https://rsigma.io/) Fibratus [backend](https://rsigma.io/reference/backends/fibratus/). This allows existing Sigma rule collections to be adapted for use with Fibratus.
+
+To convert a directory of Sigma rules to Fibratus rules, use:
+
+<Terminal>
+$ rsigma backend convert source-dir -t fibratus -p fibratus_windows -o target-dir
+
+</Terminal>
+
+Where `source-dir` contains the source Sigma rules and `target-dir` is the directory where the converted Fibratus rules are written.
+
 ## Rule Structure
 
 A rule is defined in `YAML` format and consists of **metadata**, a detection **condition**, and optional response **actions**.

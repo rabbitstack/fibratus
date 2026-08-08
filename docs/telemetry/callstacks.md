@@ -39,4 +39,4 @@ Stack enrichment is applied to the following event types:
 - `SubmitThreadpoolCallback`
 - `SetThreadpoolTimer`
 
-Stack enrichment is enabled by default, but can be controlled via `--eventsource.stack-enrichment` configuration flag. To enable stack enrichment for kernel space return addresses, the `symbolize-kernel-addresses` config option needs to be set to `true`
+Stack enrichment is enabled by default, but can be controlled via `--eventsource.stack-enrichment` configuration flag. To enable stack enrichment for kernel space symbols mapped to return addresses, the `symbolize-kernel-addresses` config option needs to be set to `true`. If not specified, only the kernel module paths are resolved in the callstacks.
