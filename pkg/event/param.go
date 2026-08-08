@@ -26,10 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rabbitstack/fibratus/pkg/fs"
-	"github.com/rabbitstack/fibratus/pkg/network"
 	"github.com/rabbitstack/fibratus/pkg/util/colorizer"
-	"github.com/rabbitstack/fibratus/pkg/util/key"
 	"github.com/rabbitstack/fibratus/pkg/util/ntstatus"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/text/cases"
@@ -124,53 +121,6 @@ func (p Param) CaptureType() params.Type {
 
 // Params is the type that represents the sequence of event parameters
 type Params map[string]*Param
-
-// NewParamFromCapture builds a parameter instance from the restored capture state.
-func NewParamFromCapture(name string, typ params.Type, value params.Value, etype Type) *Param {
-	var enum ParamEnum
-	var flags ParamFlags
-	switch name {
-	case params.FileOperation:
-		enum = fs.FileCreateDispositions
-	case params.FileCreateOptions:
-		flags = FileCreateOptionsFlags
-	case params.FileAttributes:
-		flags = FileAttributeFlags
-	case params.FileShareMask:
-		flags = FileShareModeFlags
-	case params.FileInfoClass:
-		enum = fs.FileInfoClasses
-	case params.FileType:
-		enum = fs.FileTypes
-	case params.NetL4Proto:
-		enum = network.ProtoNames
-	case params.RegValueType:
-		enum = key.RegistryValueTypes
-	case params.MemAllocType:
-		flags = MemAllocationFlags
-	case params.FileViewSectionType:
-		enum = ViewSectionTypes
-	case params.DNSOpts:
-		flags = DNSOptsFlags
-	case params.DNSRR:
-		enum = DNSRecordTypes
-	case params.DNSRcode:
-		enum = DNSResponseCodes
-	case params.DesiredAccess:
-		if etype == OpenProcess {
-			flags = PsAccessRightFlags
-		} else {
-			flags = ThreadAccessRightFlags
-		}
-	case params.MemProtect:
-		if etype == VirtualAlloc || etype == VirtualFree {
-			flags = MemProtectionFlags
-		} else {
-			flags = ViewProtectionFlags
-		}
-	}
-	return &Param{Name: name, Type: typ, Value: value, Enum: enum, Flags: flags}
-}
 
 // Append adds a new parameter with the specified name, type and value.
 func (pars Params) Append(name string, typ params.Type, value params.Value, opts ...ParamOption) Params {
