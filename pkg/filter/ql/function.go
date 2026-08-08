@@ -30,8 +30,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
-	"github.com/rabbitstack/fibratus/pkg/util/signature"
-	"golang.org/x/sys/windows"
 
 	"github.com/rabbitstack/fibratus/pkg/filter/ql/functions"
 )
@@ -246,40 +244,10 @@ func (f *Foreach) Call(args []interface{}) (interface{}, bool) {
 			}
 		}
 	case callstack.Callstack:
-		var pid uint32
-		var proc windows.Handle
-		var err error
-
-		if !elems.IsEmpty() {
-			pid = elems.FrameAt(0).PID
+		if ok, matched := f.foreachCallstack(elems, segments, e, useCallValuer, valuer); ok {
+			return matched, true
 		}
-
-		// open process handle with required access mask
-		var desiredAccess uint32
-	loop:
-		for _, seg := range segments {
-			switch seg.Segment {
-			case fields.CallsiteLeadingAssemblySegment, fields.CallsiteTrailingAssemblySegment:
-				// break on broader access rights
-				desiredAccess = windows.PROCESS_QUERY_INFORMATION | windows.PROCESS_VM_READ
-				break loop
-			case fields.AllocationSizeSegment, fields.ProtectionSegment:
-				desiredAccess = windows.PROCESS_QUERY_INFORMATION
-			}
-		}
-		if desiredAccess != 0 {
-			proc, err = windows.OpenProcess(desiredAccess, false, pid)
-			if err != nil {
-				return false, false
-			}
-			defer windows.Close(proc)
-		}
-
-		for _, frame := range elems {
-			if f.evalExpr(e, useCallValuer, f.callstackMapValuer(segments, frame, proc), valuer) {
-				return true, true
-			}
-		}
+		return false, false
 	}
 
 	return false, false
@@ -541,57 +509,6 @@ func (f *Foreach) mmapMapValuer(segments []*BoundSegmentLiteral, mmap pstypes.Mm
 			valuer[key] = mmap.Type
 		case fields.PathSegment:
 			valuer[key] = mmap.File
-		}
-	}
-	return valuer
-}
-
-// callstackMapValuer returns map valuer with thread stack frame data.
-func (f *Foreach) callstackMapValuer(segments []*BoundSegmentLiteral, frame callstack.Frame, proc windows.Handle) MapValuer {
-	var valuer = MapValuer{}
-	for _, seg := range segments {
-		key := seg.Value
-		switch seg.Segment {
-		case fields.AddressSegment:
-			valuer[key] = frame.Addr.String()
-		case fields.OffsetSegment:
-			valuer[key] = frame.Offset
-		case fields.IsUnbackedSegment:
-			valuer[key] = frame.IsUnbacked()
-		case fields.ModuleSegment:
-			valuer[key] = frame.Module
-		case fields.SymbolSegment:
-			valuer[key] = frame.Module + "!" + frame.Symbol
-		case fields.AllocationSizeSegment:
-			valuer[key] = frame.AllocationSize(proc)
-		case fields.ProtectionSegment:
-			valuer[key] = frame.Protection(proc)
-		case fields.CallsiteTrailingAssemblySegment:
-			valuer[key] = frame.CallsiteAssembly(proc, false)
-		case fields.CallsiteLeadingAssemblySegment:
-			valuer[key] = frame.CallsiteAssembly(proc, true)
-		case fields.ModuleSignatureExistsSegment, fields.ModuleSignatureTrustedSegment,
-			fields.ModuleSignatureIssuerSegment, fields.ModuleSignatureSubjectSegment:
-
-			sign := signature.GetSignatures().DoRequest(signature.MakeKey(frame.Module, 0, 0, 0))
-			if sign == nil {
-				continue
-			}
-
-			switch seg.Segment {
-			case fields.ModuleSignatureExistsSegment:
-				valuer[key] = sign.Exists()
-			case fields.ModuleSignatureTrustedSegment:
-				valuer[key] = sign.IsTrusted()
-			case fields.ModuleSignatureIssuerSegment:
-				if sign.HasCertificate() {
-					valuer[key] = sign.Cert().Issuer
-				}
-			case fields.ModuleSignatureSubjectSegment:
-				if sign.HasCertificate() {
-					valuer[key] = sign.Cert().Subject
-				}
-			}
 		}
 	}
 	return valuer
