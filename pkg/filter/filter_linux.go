@@ -1,5 +1,7 @@
+//go:build linux
+
 /*
- * Copyright 2020-2021 by Nedim Sabic Sabic
+ * Copyright 2026 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -42,52 +44,18 @@ func WithPSnapshotter(psnap ps.Resolver) Option {
 	}
 }
 
-// New creates a new filter with the specified filter expression. The consumers must ensure
-// the expression is correctly parsed before executing the filter. This is achieved by calling the
-// `Compile` method after constructing the filter.
+// New creates a new filter with the specified filter expression.
 func New(expr string, config *config.Config, options ...Option) Filter {
 	var opts opts
 	for _, opt := range options {
 		opt(&opts)
 	}
 	accessors := []Accessor{
-		// general event parameters
 		newEventAccessor(),
-		// process state and parameters
 		newPSAccessor(opts.psnap),
-		// PE metadata
-		newPEAccessor(),
 	}
 
 	fconfig := config.Filters
-
-	if config.EventSource.EnableThreadEvents {
-		accessors = append(accessors, newThreadAccessor())
-	}
-	if config.EventSource.EnableModuleEvents {
-		accessors = append(accessors, newModuleAccessor())
-	}
-	if config.EventSource.EnableFileIOEvents {
-		accessors = append(accessors, newFileAccessor())
-	}
-	if config.EventSource.EnableRegistryEvents {
-		accessors = append(accessors, newRegistryAccessor())
-	}
-	if config.EventSource.EnableNetEvents {
-		accessors = append(accessors, newNetworkAccessor())
-	}
-	if config.EventSource.EnableHandleEvents {
-		accessors = append(accessors, newHandleAccessor())
-	}
-	if config.EventSource.EnableMemEvents {
-		accessors = append(accessors, newMemAccessor())
-	}
-	if config.EventSource.EnableDNSEvents {
-		accessors = append(accessors, newDNSAccessor())
-	}
-	if config.EventSource.EnableThreadpoolEvents {
-		accessors = append(accessors, newThreadpoolAccessor())
-	}
 
 	var parser *ql.Parser
 	if fconfig.HasMacros() {
