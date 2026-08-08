@@ -1,7 +1,7 @@
-//go:build windows
+//go:build !windows
 
 /*
- * Copyright 2019-2020 by Nedim Sabic Sabic
+ * Copyright 2026 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -18,19 +18,6 @@
  * limitations under the License.
  */
 
-package config
+package colorizer
 
-import (
-	"github.com/stretchr/testify/require"
-	"testing"
-)
-
-func TestConfigPrint(t *testing.T) {
-	c := NewWithOpts(WithRun())
-	err := c.flags.Parse([]string{"--eventsource.enable-thread=false", "--config-file=_fixtures/fibratus.yml"})
-	require.NoError(t, c.viper.BindPFlags(c.flags))
-	require.NoError(t, err)
-	require.NoError(t, c.TryLoadFile(c.GetConfigFile()))
-	opts := c.Print()
-	require.NotEmpty(t, opts)
-}
+func enableWindowsVT() bool { return false }

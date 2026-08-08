@@ -1,7 +1,7 @@
 //go:build windows
 
 /*
- * Copyright 2021-2022 by Nedim Sabic Sabic
+ * Copyright 2021-present by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -18,37 +18,27 @@
  * limitations under the License.
  */
 
-package eventlog
+package colorizer
 
 import (
-	"fmt"
-	"github.com/stretchr/testify/assert"
+	"os"
+
 	"golang.org/x/sys/windows"
-	"testing"
 )
 
-func TestEventID(t *testing.T) {
-	var tests = []struct {
-		eid      uint32
-		expected uint32
-	}{
-		{
-			EventID(windows.EVENTLOG_INFORMATION_TYPE, 3191),
-			0x20000c77,
-		},
-		{
-			EventID(windows.EVENTLOG_WARNING_TYPE, 3191),
-			0x40000c77,
-		},
-		{
-			EventID(windows.EVENTLOG_ERROR_TYPE, 3191),
-			0x60000c77,
-		},
+// enableWindowsVT activates ENABLE_VIRTUAL_TERMINAL_PROCESSING on the Windows
+// console handle so that ANSI escape sequences are interpreted rather than
+// printed verbatim. Returns false on pre-Windows 10 hosts where this flag
+// is unavailable.
+func enableWindowsVT() bool {
+	handle := windows.Handle(os.Stdout.Fd())
+	var mode uint32
+	if err := windows.GetConsoleMode(handle, &mode); err != nil {
+		return false
 	}
-
-	for _, tt := range tests {
-		t.Run(fmt.Sprintf("%d", tt.expected), func(t *testing.T) {
-			assert.Equal(t, tt.expected, tt.eid)
-		})
+	const vtFlag = 0x0004 // ENABLE_VIRTUAL_TERMINAL_PROCESSING
+	if mode&vtFlag != 0 {
+		return true
 	}
+	return windows.SetConsoleMode(handle, mode|vtFlag) == nil
 }

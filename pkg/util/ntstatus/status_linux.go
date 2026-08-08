@@ -1,4 +1,4 @@
-//go:build linux && !eventsource
+//go:build linux
 
 /*
  * Copyright 2026 by Nedim Sabic Sabic
@@ -18,24 +18,18 @@
  * limitations under the License.
  */
 
-package config
+package ntstatus
 
-import (
-	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
-)
+import "fmt"
 
-type EventSourceConfig struct {
-	EnableProcessEvents bool
-	EnableFileIOEvents  bool
-	EnableNetEvents     bool
-	EnableMemEvents     bool
-}
+// Success determines the success system message
+const Success = "Success"
 
-func (c *EventSourceConfig) AddFlags(flags *pflag.FlagSet) {
-	flags.Bool("eventsource.enable-process", true, "Determines whether process events are collected")
-}
-
-func (c *EventSourceConfig) initFromViper(v *viper.Viper) {
-	c.EnableProcessEvents = v.GetBool("eventsource.enable-process")
+// FormatMessage resolves a status code to a human-readable message.
+// On Linux this returns a hex representation for non-zero codes.
+func FormatMessage(status uint32) string {
+	if status == 0 {
+		return Success
+	}
+	return fmt.Sprintf("0x%x", status)
 }
