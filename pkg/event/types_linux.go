@@ -42,6 +42,19 @@ const (
 	Exit
 	ProcessRundown
 	Clone
+
+	// Windows-only event types stubbed so shared consumers (rules compiler)
+	// compile on Linux. These are never emitted by the Linux event source.
+	RegOpenKey
+	OpenThread
+	OpenProcess
+	SetFileInformation
+	CreateFile
+	MapViewFile
+	UnmapViewFile
+	SetThreadContext
+	CreateSymbolicLinkObject
+	CreateThread
 )
 
 func (t Type) String() string {
