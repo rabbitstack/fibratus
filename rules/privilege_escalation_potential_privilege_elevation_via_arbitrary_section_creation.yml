@@ -1,6 +1,6 @@
 name: Potential privilege elevation via arbitrary section creation
 id: a232b3e4-17ac-4b0c-bcd3-43816b92d15d
-version: 1.0.0
+version: 1.0.1
 description: |
   Identifies potential privilege escalation attempts where a non-SYSTEM process creates
   symbolic links targeting object manager namespaces specific to memory section objects
@@ -30,7 +30,9 @@ condition: >
                        '\\KnownDlls\\*',
                        '\\KnownDlls32\\*',
                        '\\Device\\*'
-                     )
+                     ) and
+     not (evt.arg[target] imatches '\\Device\\lwm\\NetworkInterface\\*') and
+     not (thread.callstack.kernel_summary imatches '*|ndis.sys|*|vmswitch.sys|vmsproxy.sys|*')
     |
     |spawn_process and
      ps.token.integrity_level = 'SYSTEM' and
@@ -43,4 +45,4 @@ condition: >
 
 severity: high
 
-min-engine-version: 3.0.0
+min-engine-version: 3.1.0
