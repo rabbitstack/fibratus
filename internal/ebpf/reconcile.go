@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 Fibratus contributors
+ * Copyright 2026 by Mostafa Moradian
  * https://www.fibratus.io
  * All Rights Reserved.
  *
