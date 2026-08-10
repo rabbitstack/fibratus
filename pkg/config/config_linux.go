@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	"github.com/rabbitstack/fibratus/pkg/util/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -34,13 +35,14 @@ import (
 const configFile = "config-file"
 
 type Config struct {
-	EventSource EventSourceConfig `json:"eventsource" yaml:"eventsource"`
-	Filament    FilamentConfig    `json:"filament" yaml:"filament"`
-	API         APIConfig         `json:"api" yaml:"api"`
-	Log         log.Config        `json:"logging" yaml:"logging"`
-	Filters     *Filters          `json:"filters" yaml:"filters"`
-	ForwardMode bool              `json:"forward" yaml:"forward"`
-	CapFile     string            `json:"cap.file" yaml:"cap.file"`
+	EventSource  EventSourceConfig    `json:"eventsource" yaml:"eventsource"`
+	Filament     FilamentConfig       `json:"filament" yaml:"filament"`
+	API          APIConfig            `json:"api" yaml:"api"`
+	Log          log.Config           `json:"logging" yaml:"logging"`
+	Filters      *Filters             `json:"filters" yaml:"filters"`
+	ForwardMode  bool                 `json:"forward" yaml:"forward"`
+	CapFile      string               `json:"cap.file" yaml:"cap.file"`
+	Alertsenders []alertsender.Config `json:"-" yaml:"-"`
 
 	flags *pflag.FlagSet
 	viper *viper.Viper
@@ -104,6 +106,9 @@ func (c *Config) Init() error {
 	c.Filters.initFromViper(c.viper)
 	c.ForwardMode = c.viper.GetBool("forward")
 	c.CapFile = c.viper.GetString("cap.file")
+	if err := c.tryLoadAlertSenders(); err != nil && err != errNoAlertsendersSection {
+		return err
+	}
 	return nil
 }
 
