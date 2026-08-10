@@ -1,5 +1,3 @@
-//go:build windows
-
 /*
  * Copyright 2019-2020 by Nedim Sabic Sabic
  * https://www.fibratus.io
@@ -22,13 +20,14 @@ package config
 
 import (
 	"fmt"
+	"reflect"
+
 	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers"
 	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers/remove"
 	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers/rename"
 	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers/replace"
 	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers/tags"
 	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers/trim"
-	"reflect"
 )
 
 var errTransformerConfig = func(t string, err error) error { return fmt.Errorf("%s transformer invalid config: %v", t, err) }

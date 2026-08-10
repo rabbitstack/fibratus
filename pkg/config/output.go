@@ -1,5 +1,3 @@
-//go:build windows
-
 /*
  * Copyright 2019-2020 by Nedim Sabic Sabic
  * https://www.fibratus.io
@@ -33,7 +31,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/outputs/http"
 	"github.com/rabbitstack/fibratus/pkg/outputs/null"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/sys/windows/svc"
 )
 
 var errNoOutputSection = errors.New("no output section in config")
@@ -112,18 +109,19 @@ func (c *Config) tryLoadOutput() error {
 				continue
 			}
 			c.Output.Type, c.Output.Output = outputs.HTTP, httpConfig
+<<<<<<< HEAD
+=======
+
+		default:
+			if err := c.loadPlatformOutput(outputs.TypeFromString(typ), typ, config); err != nil {
+				return err
+			}
+>>>>>>> ce1f8af (refactor(config): share platform-neutral configuration)
 		}
 	}
 
-	// if it is not an interactive session but the console output is enabled
-	// we default to null output and warn about that
-	if isWindowsService() && c.Output.Output != nil {
-		if c.Output.Type == outputs.Console {
-			log.Warn("running in non-interactive session with console output. " +
-				"Please configure a different output type. Defaulting to null output")
-			c.Output.Type, c.Output.Output = outputs.Null, &null.Config{}
-			return nil
-		}
+	if c.adjustPlatformOutput() {
+		return nil
 	}
 
 	// default to null output
@@ -144,13 +142,4 @@ func findActiveOutputs(outputs map[string]interface{}) []string {
 		}
 	}
 	return outputTypes
-}
-
-// isWindowsService returns true if the process is running inside Windows Service.
-func isWindowsService() bool {
-	isWinService, err := svc.IsWindowsService()
-	if err != nil {
-		return false
-	}
-	return isWinService
 }

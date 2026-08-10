@@ -35,7 +35,9 @@ func TestInitSnapshot(t *testing.T) {
 		ch <- true
 		t.Fatal("snapshot callback was not triggered")
 	})
-	snap := NewSnapshotter(&config.Config{InitHandleSnapshot: true}, func(total, known uint64) {
+	cfg := &config.Config{}
+	cfg.InitHandleSnapshot = true
+	snap := NewSnapshotter(cfg, func(total, known uint64) {
 		ch <- true
 	})
 	require.NotNil(t, snap)
@@ -43,7 +45,10 @@ func TestInitSnapshot(t *testing.T) {
 }
 
 func TestFindHandles(t *testing.T) {
-	snap := NewSnapshotter(&config.Config{InitHandleSnapshot: true, EnumerateHandles: true}, nil)
+	cfg := &config.Config{}
+	cfg.InitHandleSnapshot = true
+	cfg.EnumerateHandles = true
+	snap := NewSnapshotter(cfg, nil)
 	handles, err := snap.FindHandles(uint32(os.Getppid()))
 	require.NoError(t, err)
 	require.NotEmpty(t, handles)

@@ -22,8 +22,6 @@ package config
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/event"
-	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
-	"github.com/rabbitstack/fibratus/pkg/util/bitmask"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
@@ -38,16 +36,14 @@ const (
 )
 
 type EventSourceConfig struct {
+	eventSourceConfig
+
+	ExcludedEvents      []string `json:"blacklist.events" yaml:"blacklist.events"`
+	ExcludedImages      []string `json:"blacklist.images" yaml:"blacklist.images"`
 	EnableProcessEvents bool     `json:"enable-process" yaml:"enable-process"`
 	EnableFileIOEvents  bool     `json:"enable-file" yaml:"enable-file"`
 	EnableNetEvents     bool     `json:"enable-net" yaml:"enable-net"`
 	EnableMemEvents     bool     `json:"enable-mem" yaml:"enable-mem"`
-	ExcludedEvents      []string `json:"blacklist.events" yaml:"blacklist.events"`
-	ExcludedImages      []string `json:"blacklist.images" yaml:"blacklist.images"`
-
-	dropMasks      *bitmask.Bitmask
-	allMasks       *bitmask.Bitmask
-	excludedImages map[string]bool
 }
 
 func (c *EventSourceConfig) AddFlags(flags *pflag.FlagSet) {
@@ -69,33 +65,4 @@ func (c *EventSourceConfig) initFromViper(v *viper.Viper) {
 	c.Init()
 }
 
-func (c *EventSourceConfig) Init() {
-	c.dropMasks = bitmask.New()
-	c.allMasks = bitmask.New()
-	c.excludedImages = make(map[string]bool)
-	for _, name := range c.ExcludedEvents {
-		for _, typ := range event.NameToTypes(name) {
-			c.dropMasks.Set(typ.ID())
-		}
-	}
-	for _, typ := range event.AllWithState() {
-		c.allMasks.Set(typ.ID())
-	}
-	for _, name := range c.ExcludedImages {
-		c.excludedImages[name] = true
-	}
-}
-
-func (c *EventSourceConfig) SetDropMask(typ event.Type) { c.dropMasks.Set(typ.ID()) }
-func (c *EventSourceConfig) TestDropMask(typ event.Type) bool {
-	return c.dropMasks != nil && c.dropMasks.IsSet(typ.ID())
-}
-func (c *EventSourceConfig) ExcludeEvent(id uint) bool {
-	return c.dropMasks != nil && c.dropMasks.IsSet(id)
-}
-func (c *EventSourceConfig) EventExists(id uint) bool {
-	return c.allMasks != nil && c.allMasks.IsSet(id)
-}
-func (c *EventSourceConfig) ExcludeImage(ps *pstypes.PS) bool {
-	return ps != nil && c.excludedImages[ps.Name]
-}
+func platformEventTypes() []event.Type { return event.All() }

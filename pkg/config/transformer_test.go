@@ -1,5 +1,3 @@
-//go:build windows
-
 /*
  * Copyright 2019-2020 by Nedim Sabic Sabic
  * https://www.fibratus.io
@@ -21,8 +19,9 @@
 package config
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestTransformers(t *testing.T) {
