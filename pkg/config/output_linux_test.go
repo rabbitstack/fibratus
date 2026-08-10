@@ -1,5 +1,7 @@
+//go:build linux
+
 /*
- * Copyright 2019-2020 by Nedim Sabic Sabic
+ * Copyright 2026 by Mostafa Moradian
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -21,15 +23,16 @@ package config
 import (
 	"testing"
 
+	"github.com/rabbitstack/fibratus/pkg/outputs/null"
 	"github.com/stretchr/testify/require"
 )
 
-func TestConfigPrint(t *testing.T) {
+func TestEventlogOutputDefaultsToNull(t *testing.T) {
 	c := NewWithOpts(WithRun())
-	err := c.flags.Parse([]string{"--filters.match-all=false", "--config-file=_fixtures/fibratus.yml"})
+	require.NoError(t, c.flags.Parse([]string{"--config-file=_fixtures/eventlog-output.yml"}))
 	require.NoError(t, c.viper.BindPFlags(c.flags))
-	require.NoError(t, err)
 	require.NoError(t, c.TryLoadFile(c.GetConfigFile()))
-	opts := c.Print()
-	require.NotEmpty(t, opts)
+	require.NoError(t, c.Init())
+
+	require.IsType(t, &null.Config{}, c.Output.Output)
 }
