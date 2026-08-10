@@ -567,10 +567,10 @@ func (s *sequenceState) expire(e *event.Event) bool {
 		// to the final sequence slot, it is safe to expire
 		// the whole sequence
 		pid := event.PID(rhs.Params.MustGetPid())
-		if lhs.Type == event.CreateProcess && isFinalSlot {
+		if lhs.IsCreateProcess() && isFinalSlot {
 			return event.PID(lhs.Params.MustGetPid()) == pid
 		}
-		if lhs.Type == event.CreateThread {
+		if lhs.IsCreateThread() {
 			// if the pids differ, the thread
 			// is created in a remote process.
 			// Sequence can be expired only if

@@ -220,33 +220,6 @@ func (c *compiler) visitApproverPredicates(node ql.Node) {
 	ql.WalkFunc(node, walk)
 }
 
-// referencesTargetEvents checks whether the rule AST contains
-// an event type filter for high-volume events we want to approve.
-func (c *compiler) referencesApproverEvents(root ql.Node) bool {
-	var found bool
-	ql.WalkFunc(root, func(n ql.Node) {
-		expr, ok := n.(*ql.BinaryExpr)
-		if !ok {
-			return
-		}
-
-		// direct event match. We also include SetFileInformation
-		// to approve any paths referenced in the condition
-		if c.containsEventTypes(expr, event.RegOpenKey, event.OpenThread, event.OpenProcess, event.SetFileInformation) {
-			found = true
-			return
-		}
-
-		// for file events require open file operation
-		if expr.Op == ql.And {
-			if c.containsEventTypes(expr, event.CreateFile) && c.containsFieldMatch(expr, fields.FileOperation, ql.Eq, "OPEN") {
-				found = true
-			}
-		}
-	})
-	return found
-}
-
 func (c *compiler) containsEventTypes(root ql.Node, types ...event.Type) bool {
 	var contains bool
 	ql.WalkFunc(root, func(n ql.Node) {
@@ -362,13 +335,7 @@ func (c *compiler) buildCompileResult(filters map[*config.FilterConfig]filter.Fi
 						if typ.Subcategory() == event.DNS {
 							rs.HasDNSEvents = true
 						}
-						if typ == event.MapViewFile || typ == event.UnmapViewFile {
-							rs.HasVAMapEvents = true
-						}
-						if typ == event.OpenProcess || typ == event.OpenThread || typ == event.SetThreadContext ||
-							typ == event.CreateSymbolicLinkObject {
-							rs.HasAuditAPIEvents = true
-						}
+						updatePlatformCompileResult(rs, typ)
 
 						if m[typ] {
 							continue

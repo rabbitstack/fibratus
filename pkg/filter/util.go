@@ -23,17 +23,8 @@ import (
 	"net"
 	"strings"
 
-	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/util/bytes"
 )
-
-// framePID returns the pid associated with the stack frame.
-func framePID(e *event.Event) event.PID {
-	if !e.Callstack.IsEmpty() && e.Callstack.FrameAt(0).PID != 0 {
-		return event.PID(e.Callstack.FrameAt(0).PID)
-	}
-	return e.PID
-}
 
 // CompareSeqLink returns true if any value
 // in the sequence link slice equals to the

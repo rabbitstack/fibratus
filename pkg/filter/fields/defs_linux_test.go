@@ -18,16 +18,25 @@
  * limitations under the License.
  */
 
-package action
+package fields
 
 import (
-	"fmt"
+	"testing"
 
-	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
+	"github.com/stretchr/testify/require"
 )
 
-// Kill terminates all processes with specified pids.
-// The signal-based Linux implementation lands with the detection work.
-func Kill(pids []event.PID) error {
-	return fmt.Errorf("kill action is not implemented on Linux yet (pids=%v)", pids)
+func TestLinuxFields(t *testing.T) {
+	require.True(t, IsField(string(EvtName)))
+	require.True(t, IsField(string(PsName)))
+	require.True(t, IsField(string(PsParentExe)))
+	require.Equal(t, params.String, EvtName.Type())
+	require.Equal(t, params.String, PsName.Type())
+	require.Equal(t, params.Uint64, EvtPID.Type())
+	require.Equal(t, params.Uint64, EvtTID.Type())
+	require.Equal(t, params.Uint64, PsPid.Type())
+	require.False(t, IsField(string(PsComm)))
+	require.False(t, IsField(string(RegistryPath)))
+	require.False(t, IsField(string(PeEntrypoint)))
 }

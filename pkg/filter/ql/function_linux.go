@@ -25,7 +25,37 @@ import (
 
 	"github.com/rabbitstack/fibratus/pkg/callstack"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
+	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 )
+
+func (f *Foreach) foreachPlatform(elems interface{}, segments []*BoundSegmentLiteral, e interface{}, useCallValuer bool, valuer MapValuer) (bool, bool) {
+	threads, ok := elems.(map[uint64]pstypes.Thread)
+	if !ok {
+		return false, false
+	}
+	for _, thread := range threads {
+		if f.evalExpr(e, useCallValuer, f.threadMapValuer(segments, thread), valuer) {
+			return true, true
+		}
+	}
+	return false, false
+}
+
+func addPlatformProcessValues(_ []*BoundSegmentLiteral, _ *pstypes.PS, _ MapValuer) {}
+
+// threadMapValuer returns the map valuer with Linux thread information.
+func (f *Foreach) threadMapValuer(segments []*BoundSegmentLiteral, thread pstypes.Thread) MapValuer {
+	valuer := MapValuer{}
+	for _, seg := range segments {
+		switch seg.Segment {
+		case fields.TidSegment:
+			valuer[seg.Value] = thread.Tid
+		case fields.PIDSegment:
+			valuer[seg.Value] = thread.Pid
+		}
+	}
+	return valuer
+}
 
 func (f *Foreach) foreachCallstack(elems callstack.Callstack, segments []*BoundSegmentLiteral, e interface{}, useCallValuer bool, valuer MapValuer) (bool, bool) {
 	for _, frame := range elems {
