@@ -34,12 +34,3 @@ const (
 	ProcessSecV3
 	ProcessSecV4
 )
-
-const (
-	HandleSecV1 Version = iota + 1
-)
-
-const (
-	PESecV1 Version = iota + 1
-	PESecV2
-)
