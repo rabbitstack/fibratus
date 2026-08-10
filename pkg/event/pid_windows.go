@@ -22,3 +22,6 @@ package event
 
 // PID is the process identifier type on Windows.
 type PID = uint32
+
+// TID is the thread identifier type on Windows.
+type TID = uint32

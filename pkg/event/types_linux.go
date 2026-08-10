@@ -25,54 +25,66 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/hashers"
 )
 
+// Source identifies a Linux event source.
 type Source uint8
 
 const (
-	SystemLogger Source = iota
-	SecurityTelemetryLogger
+	// RawSyscallTracepoint identifies events from the raw_syscalls tracepoint.
+	RawSyscallTracepoint Source = iota
 )
 
+// Type identifies a Linux event type.
 type Type uint16
 
 const (
 	UnknownType Type = iota
-	CreateProcess
 	Execve
-	TerminateProcess
 	Exit
-	ProcessRundown
 	Clone
-
-	// Windows-only event types stubbed so shared consumers (rules compiler)
-	// compile on Linux. These are never emitted by the Linux event source.
-	RegOpenKey
-	OpenThread
-	OpenProcess
-	SetFileInformation
-	CreateFile
-	MapViewFile
-	UnmapViewFile
-	SetThreadContext
-	CreateSymbolicLinkObject
-	CreateThread
 )
 
+// String returns the event type name.
 func (t Type) String() string {
-	return TypeToEventInfo(t).Name
+	switch t {
+	case Execve:
+		return "execve"
+	case Exit:
+		return "exit"
+	case Clone:
+		return "clone"
+	default:
+		return ""
+	}
 }
 
+// Category returns the event type category.
 func (t Type) Category() Category {
-	return TypeToEventInfo(t).Category
+	switch t {
+	case Execve, Exit, Clone:
+		return Process
+	default:
+		return Unknown
+	}
 }
 
-func (t Type) Subcategory() Subcategory {
-	return None
-}
+// Subcategory returns the event type subcategory.
+func (t Type) Subcategory() Subcategory { return None }
 
+// Description returns a brief description of the event type.
 func (t Type) Description() string {
-	return TypeToEventInfo(t).Description
+	switch t {
+	case Execve:
+		return "Executes a program"
+	case Exit:
+		return "Exit all threads in a process"
+	case Clone:
+		return "Creates a child process or a thread"
+	default:
+		return ""
+	}
 }
 
+// Hash calculates the hash of the event type name.
 func (t Type) Hash() uint32 {
 	if t == UnknownType {
 		return 0
@@ -80,18 +92,17 @@ func (t Type) Hash() uint32 {
 	return hashers.FnvUint32([]byte(t.String()))
 }
 
+// Exists reports whether the event type is known.
 func (t Type) Exists() bool {
-	return t != UnknownType && t.String() != "N/A"
+	switch t {
+	case Execve, Exit, Clone:
+		return true
+	default:
+		return false
+	}
 }
 
-func (t Type) OnlyState() bool {
-	return t == ProcessRundown
-}
-
-func (t Type) CanEnrichStack() bool {
-	return false
-}
-
+// UnmarshalYAML converts an event name to its type.
 func (t *Type) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	var name string
 	if err := unmarshal(&name); err != nil {
@@ -101,13 +112,11 @@ func (t *Type) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-func (t Type) ID() uint {
-	return uint(t)
-}
+// ID returns the stable numeric event identifier.
+func (t Type) ID() uint { return uint(t) }
 
-func (t Type) Source() Source {
-	return SystemLogger
-}
+// Source returns the event source.
+func (t Type) Source() Source { return RawSyscallTracepoint }
 
 func (t Type) color() string {
 	return colorizer.SpanBold(colorizer.White, t.String())

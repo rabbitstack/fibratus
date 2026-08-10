@@ -1,5 +1,7 @@
+//go:build linux
+
 /*
- * Copyright 2021-2022 by Nedim Sabic Sabic
+ * Copyright 2026 by Mostafa Moradian
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -18,28 +20,4 @@
 
 package event
 
-import "testing"
-
-func TestParamFlags(t *testing.T) {
-	flags := ParamFlags{
-		{Name: "ALL", Value: 0x3},
-		{Name: "READ", Value: 0x1},
-		{Name: "WRITE", Value: 0x2},
-	}
-	tests := []struct {
-		flag     uint64
-		expected string
-	}{
-		{0x3, "ALL"},
-		{0x1, "READ"},
-		{0x2, "WRITE"},
-		{0, ""},
-	}
-
-	for i, tt := range tests {
-		s := flags.String(tt.flag)
-		if s != tt.expected {
-			t.Errorf("%d. %q flag mismatch: exp=%s got=%s", i, tt.expected, tt.expected, s)
-		}
-	}
-}
+func typeBitIndex(typ Type) uint { return typ.ID() }

@@ -18,28 +18,31 @@
 
 package event
 
-import "testing"
+type queuePlatform struct {
+	decorator *StackwalkDecorator
+}
 
-func TestParamFlags(t *testing.T) {
-	flags := ParamFlags{
-		{Name: "ALL", Value: 0x3},
-		{Name: "READ", Value: 0x1},
-		{Name: "WRITE", Value: 0x2},
-	}
-	tests := []struct {
-		flag     uint64
-		expected string
-	}{
-		{0x3, "ALL"},
-		{0x1, "READ"},
-		{0x2, "WRITE"},
-		{0, ""},
-	}
+func (q *Queue) initPlatform() {
+	q.decorator = NewStackwalkDecorator(q)
+}
 
-	for i, tt := range tests {
-		s := flags.String(tt.flag)
-		if s != tt.expected {
-			t.Errorf("%d. %q flag mismatch: exp=%s got=%s", i, tt.expected, tt.expected, s)
+func (q *Queue) closePlatform() {
+	q.decorator.Stop()
+}
+
+func (q *Queue) pushPlatform(e *Event) (bool, error) {
+	if q.stackEnrichment {
+		if e.Type.CanEnrichStack() {
+			q.decorator.Push(e)
+			return true, nil
+		}
+		if e.IsStackWalk() {
+			q.decorator.Pop(e)
+			return true, nil
 		}
 	}
+	if e.IsStackWalk() {
+		return true, nil
+	}
+	return false, nil
 }

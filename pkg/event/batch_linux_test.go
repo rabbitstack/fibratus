@@ -20,10 +20,18 @@
 
 package event
 
-import "github.com/rabbitstack/fibratus/pkg/event/params"
+import (
+	"encoding/json"
+	"testing"
 
-// NewParamFromCapture builds a parameter instance from the restored capture state.
-// Captures are not wired on Linux yet, so enrichment is deferred.
-func NewParamFromCapture(name string, typ params.Type, value params.Value, _ Type) *Param {
-	return &Param{Name: name, Type: typ, Value: value}
+	"github.com/stretchr/testify/require"
+)
+
+func TestLinuxBatchMarshalJSON(t *testing.T) {
+	batch := NewBatch(&Event{PID: 42, Type: Execve}, &Event{PID: 43, Type: Exit})
+	require.EqualValues(t, 2, batch.Len())
+
+	var events []map[string]interface{}
+	require.NoError(t, json.Unmarshal(batch.MarshalJSON(), &events))
+	require.Len(t, events, 2)
 }

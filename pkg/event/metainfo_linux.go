@@ -22,42 +22,29 @@ package event
 
 import "slices"
 
-type Info struct {
-	Name        string
-	Category    Category
-	Description string
-}
-
 var events = map[Type]Info{
-	CreateProcess:    {Name: "CreateProcess", Category: Process, Description: "Creates a new process"},
-	Execve:           {Name: "Execve", Category: Process, Description: "Executes a program"},
-	TerminateProcess: {Name: "TerminateProcess", Category: Process, Description: "Terminates a process"},
-	Exit:             {Name: "Exit", Category: Process, Description: "Exits a process"},
-	ProcessRundown:   {Name: "ProcessRundown", Category: Process, Description: "Reports an existing process"},
-	Clone:            {Name: "Clone", Category: Process, Description: "Clones a process or thread"},
+	Execve: {Name: "execve", Category: Process, Description: "Executes a program"},
+	Exit:   {Name: "exit", Category: Process, Description: "Exit all threads in a process"},
+	Clone:  {Name: "clone", Category: Process, Description: "Creates a child process or a thread"},
 }
 
 var types = map[string]Type{
-	"CreateProcess":    CreateProcess,
-	"Execve":           Execve,
-	"TerminateProcess": TerminateProcess,
-	"Exit":             Exit,
-	"ProcessRundown":   ProcessRundown,
-	"Clone":            Clone,
+	"execve": Execve,
+	"exit":   Exit,
+	"clone":  Clone,
 }
 
+// All returns all Linux event types.
 func All() []Type {
-	return []Type{CreateProcess, Execve, TerminateProcess, Exit, Clone}
+	return []Type{Execve, Exit, Clone}
 }
 
-func AllWithState() []Type {
-	return append(All(), ProcessRundown)
-}
-
+// MaxTypeID returns the largest Linux event type identifier.
 func MaxTypeID() uint16 {
-	return uint16(slices.Max(AllWithState()))
+	return uint16(slices.Max(All()))
 }
 
+// TypeToEventInfo returns metadata for an event type.
 func TypeToEventInfo(typ Type) Info {
 	if info, ok := events[typ]; ok {
 		return info
@@ -65,6 +52,7 @@ func TypeToEventInfo(typ Type) Info {
 	return Info{Name: "N/A", Category: Unknown}
 }
 
+// NameToType converts an event name to its type.
 func NameToType(name string) Type {
 	if typ, ok := types[name]; ok {
 		return typ
@@ -72,37 +60,7 @@ func NameToType(name string) Type {
 	return UnknownType
 }
 
+// NameToTypes converts an event name to its possible internal types.
 func NameToTypes(name string) []Type {
 	return []Type{NameToType(name)}
-}
-
-func GetTypesMeta() []Info {
-	infos := make([]Info, 0, len(events))
-	for _, info := range events {
-		infos = append(infos, info)
-	}
-	slices.SortFunc(infos, func(a, b Info) int {
-		if a.Category == b.Category {
-			if a.Name < b.Name {
-				return -1
-			}
-			if a.Name > b.Name {
-				return 1
-			}
-			return 0
-		}
-		if a.Category < b.Category {
-			return -1
-		}
-		return 1
-	})
-	return infos
-}
-
-func GetTypesMetaIndexed() []Info {
-	return GetTypesMeta()
-}
-
-func IsKnown(name string) bool {
-	return NameToType(name) != UnknownType
 }

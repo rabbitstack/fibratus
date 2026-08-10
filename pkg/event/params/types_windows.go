@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2022 by Nedim Sabic Sabic
+ * Copyright 2021-present by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -16,30 +16,29 @@
  * limitations under the License.
  */
 
-package event
+package params
 
-import "testing"
+const (
+	UnicodeString Type = 1
+	AnsiString    Type = 2
+	GUID          Type = 15
+	Pointer       Type = 16
+	SID           Type = 17
+	WbemSID       Type = 20
+	DOSPath       Type = 30
+	Key           Type = 33
+	HandleType    Type = 37
+)
 
-func TestParamFlags(t *testing.T) {
-	flags := ParamFlags{
-		{Name: "ALL", Value: 0x3},
-		{Name: "READ", Value: 0x1},
-		{Name: "WRITE", Value: 0x2},
-	}
-	tests := []struct {
-		flag     uint64
-		expected string
-	}{
-		{0x3, "ALL"},
-		{0x1, "READ"},
-		{0x2, "WRITE"},
-		{0, ""},
-	}
-
-	for i, tt := range tests {
-		s := flags.String(tt.flag)
-		if s != tt.expected {
-			t.Errorf("%d. %q flag mismatch: exp=%s got=%s", i, tt.expected, tt.expected, s)
-		}
+func platformTypeString(t Type) string {
+	switch t {
+	case UnicodeString:
+		return "unicode"
+	case AnsiString:
+		return "ansi"
+	case SID, WbemSID:
+		return "sid"
+	default:
+		return ""
 	}
 }

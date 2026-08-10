@@ -20,15 +20,31 @@
 
 package event
 
-var (
-	// SerializeHandles indicates if handles are serialized as part of the process state
-	SerializeHandles bool
-	// SerializeThreads indicates if threads are serialized as part of the process state
-	SerializeThreads bool
-	// SerializeModules indicates if modules are serialized as part of the process state
-	SerializeModules bool
-	// SerializePE indicates if PE metadata are serialized as part of the process state
-	SerializePE bool
-	// SerializeEnvs indicates if the environment variables are serialized as part of the process state
-	SerializeEnvs bool
+import (
+	"encoding/json"
+	"fmt"
+
+	capver "github.com/rabbitstack/fibratus/pkg/cap/version"
 )
+
+// SerializeEnvs indicates if environment variables are serialized with process state.
+var SerializeEnvs bool
+
+func serializationOptions() serializationConfig {
+	return serializationConfig{envs: SerializeEnvs}
+}
+
+// MarshalJSON serializes the event to JSON.
+func (e *Event) MarshalJSON() []byte {
+	type plainEvent Event
+	b, err := json.Marshal((*plainEvent)(e))
+	if err != nil {
+		return []byte("{}")
+	}
+	return b
+}
+
+// UnmarshalRaw recovers an event from a capture buffer.
+func (e *Event) UnmarshalRaw(_ []byte, _ capver.Version) error {
+	return fmt.Errorf("event capture unmarshalling is not implemented on Linux")
+}
