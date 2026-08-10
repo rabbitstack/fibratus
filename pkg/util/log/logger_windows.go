@@ -1,5 +1,3 @@
-//go:build windows
-
 /*
  * Copyright 2019-2020 by Nedim Sabic Sabic
  * https://www.fibratus.io
@@ -24,15 +22,16 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/log/rotate"
 	fs "github.com/rifflock/lfshook"
 	"github.com/saferwall/pe/log"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
-	"io"
-	"os"
-	"path/filepath"
 )
 
 var (

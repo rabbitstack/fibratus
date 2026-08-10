@@ -166,115 +166,47 @@ func (a *Alert) MDToHTML() error {
 	return nil
 }
 
+type alertJSON struct {
+	ID          string            `json:"id"`
+	Title       string            `json:"title"`
+	Severity    string            `json:"severity"`
+	Text        string            `json:"text,omitempty"`
+	Description string            `json:"description"`
+	Labels      map[string]string `json:"labels,omitempty"`
+	Events      []alertJSONEvent  `json:"events"`
+}
+
+type alertJSONEvent struct {
+	Name      string         `json:"name"`
+	Category  string         `json:"category"`
+	Timestamp time.Time      `json:"timestamp"`
+	Params    map[string]any `json:"params"`
+	Callstack []string       `json:"callstack,omitempty"`
+	Proc      *alertProcess  `json:"proc,omitempty"`
+}
+
 // MarshalJSON encodes the alert to JSON format.
 func (a Alert) MarshalJSON() ([]byte, error) {
-	var msg = &struct {
-		ID          string            `json:"id"`
-		Title       string            `json:"title"`
-		Severity    string            `json:"severity"`
-		Text        string            `json:"text,omitempty"`
-		Description string            `json:"description"`
-		Labels      map[string]string `json:"labels,omitempty"`
-		Events      []struct {
-			Name      string         `json:"name"`
-			Category  string         `json:"category"`
-			Timestamp time.Time      `json:"timestamp"`
-			Params    map[string]any `json:"params"`
-			Callstack []string       `json:"callstack,omitempty"`
-			Proc      *struct {
-				PID            event.PID `json:"pid"`
-				TID            uint32    `json:"tid"`
-				PPID           event.PID `json:"ppid"`
-				Name           string   `json:"name"`
-				Exe            string   `json:"exe"`
-				Cmdline        string   `json:"cmdline,omitempty"`
-				Pname          string   `json:"parent_name,omitempty"`
-				Pcmdline       string   `json:"parent_cmdline,omitempty"`
-				Cwd            string   `json:"cwd,omitempty"`
-				SID            string   `json:"sid"`
-				Username       string   `json:"username"`
-				Domain         string   `json:"domain"`
-				SessionID      uint32   `json:"session_id"`
-				IntegrityLevel string   `json:"integrity_level"`
-				IsWOW64        bool     `json:"is_wow64"`
-				IsPackaged     bool     `json:"is_packaged"`
-				IsProtected    bool     `json:"is_protected"`
-				Ancestors      []string `json:"ancestors"`
-			} `json:"proc,omitempty"`
-		} `json:"events"`
-	}{
+	msg := alertJSON{
 		ID:          a.ID,
 		Title:       a.Title,
 		Severity:    a.Severity.String(),
 		Text:        a.Text,
 		Description: a.Description,
 		Labels:      a.Labels,
+		Events:      make([]alertJSONEvent, 0, len(a.Events)),
 	}
 
-	events := make([]struct {
-		Name      string         `json:"name"`
-		Category  string         `json:"category"`
-		Timestamp time.Time      `json:"timestamp"`
-		Params    map[string]any `json:"params"`
-		Callstack []string       `json:"callstack,omitempty"`
-		Proc      *struct {
-			PID            event.PID `json:"pid"`
-			TID            uint32    `json:"tid"`
-			PPID           event.PID `json:"ppid"`
-			Name           string   `json:"name"`
-			Exe            string   `json:"exe"`
-			Cmdline        string   `json:"cmdline,omitempty"`
-			Pname          string   `json:"parent_name,omitempty"`
-			Pcmdline       string   `json:"parent_cmdline,omitempty"`
-			Cwd            string   `json:"cwd,omitempty"`
-			SID            string   `json:"sid"`
-			Username       string   `json:"username"`
-			Domain         string   `json:"domain"`
-			SessionID      uint32   `json:"session_id"`
-			IntegrityLevel string   `json:"integrity_level"`
-			IsWOW64        bool     `json:"is_wow64"`
-			IsPackaged     bool     `json:"is_packaged"`
-			IsProtected    bool     `json:"is_protected"`
-			Ancestors      []string `json:"ancestors"`
-		} `json:"proc,omitempty"`
-	}, 0, len(a.Events))
-
 	for _, e := range a.Events {
-		var evt = struct {
-			Name      string         `json:"name"`
-			Category  string         `json:"category"`
-			Timestamp time.Time      `json:"timestamp"`
-			Params    map[string]any `json:"params"`
-			Callstack []string       `json:"callstack,omitempty"`
-			Proc      *struct {
-				PID            event.PID `json:"pid"`
-				TID            uint32    `json:"tid"`
-				PPID           event.PID `json:"ppid"`
-				Name           string   `json:"name"`
-				Exe            string   `json:"exe"`
-				Cmdline        string   `json:"cmdline,omitempty"`
-				Pname          string   `json:"parent_name,omitempty"`
-				Pcmdline       string   `json:"parent_cmdline,omitempty"`
-				Cwd            string   `json:"cwd,omitempty"`
-				SID            string   `json:"sid"`
-				Username       string   `json:"username"`
-				Domain         string   `json:"domain"`
-				SessionID      uint32   `json:"session_id"`
-				IntegrityLevel string   `json:"integrity_level"`
-				IsWOW64        bool     `json:"is_wow64"`
-				IsPackaged     bool     `json:"is_packaged"`
-				IsProtected    bool     `json:"is_protected"`
-				Ancestors      []string `json:"ancestors"`
-			} `json:"proc,omitempty"`
-		}{
+		evt := alertJSONEvent{
 			Name:      e.Name,
 			Category:  string(e.Category),
 			Timestamp: e.Timestamp,
 			Params:    make(map[string]any),
-			Callstack: make([]string, 0, len(e.Callstack)),
+			Callstack: alertCallstack(e),
+			Proc:      newAlertProcess(e),
 		}
 
-		// populate event parameters
 		for _, param := range e.Params {
 			if param.Type == params.Bool || param.Type == params.PID ||
 				param.Type == params.TID || param.Type == params.Port || param.IsNumber() {
@@ -284,60 +216,8 @@ func (a Alert) MarshalJSON() ([]byte, error) {
 			}
 		}
 
-		// populate callstack
-		for i := range e.Callstack {
-			frame := e.Callstack[len(e.Callstack)-i-1]
-			evt.Callstack = append(evt.Callstack, fmt.Sprintf("%v %s!%s", frame.Addr, frame.Module, frame.Symbol))
-		}
-
-		ps := e.PS
-		if ps != nil {
-			evt.Proc = &struct {
-				PID            event.PID `json:"pid"`
-				TID            uint32    `json:"tid"`
-				PPID           event.PID `json:"ppid"`
-				Name           string   `json:"name"`
-				Exe            string   `json:"exe"`
-				Cmdline        string   `json:"cmdline,omitempty"`
-				Pname          string   `json:"parent_name,omitempty"`
-				Pcmdline       string   `json:"parent_cmdline,omitempty"`
-				Cwd            string   `json:"cwd,omitempty"`
-				SID            string   `json:"sid"`
-				Username       string   `json:"username"`
-				Domain         string   `json:"domain"`
-				SessionID      uint32   `json:"session_id"`
-				IntegrityLevel string   `json:"integrity_level"`
-				IsWOW64        bool     `json:"is_wow64"`
-				IsPackaged     bool     `json:"is_packaged"`
-				IsProtected    bool     `json:"is_protected"`
-				Ancestors      []string `json:"ancestors"`
-			}{
-				PID:            ps.PID,
-				TID:            e.Tid,
-				PPID:           ps.Ppid,
-				Name:           ps.Name,
-				Exe:            ps.Exe,
-				Cmdline:        ps.Cmdline,
-				Cwd:            ps.Cwd,
-				SID:            ps.SID,
-				Username:       ps.Username,
-				Domain:         ps.Domain,
-				SessionID:      ps.SessionID,
-				IntegrityLevel: ps.TokenIntegrityLevel,
-				IsWOW64:        ps.IsWOW64,
-				IsPackaged:     ps.IsPackaged,
-				IsProtected:    ps.IsProtected,
-				Ancestors:      ps.Ancestors(),
-			}
-			if ps.Parent != nil {
-				evt.Proc.Pname = ps.Parent.Name
-				evt.Proc.Pcmdline = ps.Parent.Cmdline
-			}
-		}
-
-		events = append(events, evt)
+		msg.Events = append(msg.Events, evt)
 	}
-	msg.Events = events
 
 	return json.Marshal(msg)
 }

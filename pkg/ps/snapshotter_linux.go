@@ -36,12 +36,11 @@ type Snapshotter interface {
 	Remove(*event.Event) error
 	// Find attempts to retrieve process state for the specified process identifier.
 	Find(pid uint64) (bool, *pstypes.PS)
-	// FindAndPut attempts to retrieve process state and updates the snapshot when found.
+	// FindAndPut retrieves process state. Procfs fallback enrichment will be added
+	// when Linux capture is wired.
 	FindAndPut(pid uint64) *pstypes.PS
 	// Put inserts the process state into the snapshotter.
 	Put(*pstypes.PS)
-	// UpsertSnapshot inserts or replaces process state.
-	UpsertSnapshot(*pstypes.PS)
 	// Size returns the total number of process state items.
 	Size() uint32
 	// Close closes the process snapshotter and disposes allocated resources.
@@ -49,7 +48,7 @@ type Snapshotter interface {
 	// AddThread builds thread state from the event representation.
 	AddThread(*event.Event) error
 	// RemoveThread removes the thread from the given process.
-	RemoveThread(pid uint64, tid uint32) error
+	RemoveThread(pid uint64, tid uint64) error
 	// AddMmap adds a memory mapping to the process state.
 	AddMmap(*event.Event) error
 	// RemoveMmap removes a memory mapping at the given base address.
@@ -88,10 +87,6 @@ func (s *snapshotter) Put(ps *pstypes.PS) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.procs[ps.PID] = ps
-}
-
-func (s *snapshotter) UpsertSnapshot(ps *pstypes.PS) {
-	s.Put(ps)
 }
 
 func (s *snapshotter) Write(evt *event.Event) error {
@@ -138,7 +133,7 @@ func (s *snapshotter) AddThread(evt *event.Event) error {
 	return nil
 }
 
-func (s *snapshotter) RemoveThread(pid uint64, tid uint32) error {
+func (s *snapshotter) RemoveThread(pid uint64, tid uint64) error {
 	ok, ps := s.Find(pid)
 	if !ok || ps == nil {
 		return nil
