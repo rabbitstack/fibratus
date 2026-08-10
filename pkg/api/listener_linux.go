@@ -18,8 +18,17 @@
  * limitations under the License.
  */
 
-package config
+package api
 
-import "github.com/spf13/cobra"
+import (
+	"context"
+	"fmt"
+	"net"
+)
 
-var Command = &cobra.Command{Use: "config", Short: "Show runtime config"}
+// DialPipe is unavailable on Linux. The HTTP API uses TCP transports instead.
+func DialPipe(pipePath string) func(context.Context, string, string) (net.Conn, error) {
+	return func(context.Context, string, string) (net.Conn, error) {
+		return nil, fmt.Errorf("named pipe transport %q is not supported on linux", pipePath)
+	}
+}
