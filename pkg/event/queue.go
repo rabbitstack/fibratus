@@ -43,9 +43,10 @@ type Listener interface {
 // Queue is the channel-backed data structure for
 // pushing captured events and invoking listeners.
 type Queue struct {
+	queuePlatform
+
 	q               chan *Event
 	listeners       []Listener
-	decorator       *StackwalkDecorator
 	stackEnrichment bool
 	enqueueAlways   bool
 }
@@ -58,7 +59,7 @@ func NewQueue(size int, stackEnrichment bool, enqueueAlways bool) *Queue {
 		stackEnrichment: stackEnrichment,
 		enqueueAlways:   enqueueAlways,
 	}
-	q.decorator = NewStackwalkDecorator(q)
+	q.initPlatform()
 	return q
 }
 
@@ -70,7 +71,7 @@ func NewQueueWithChannel(ch chan *Event, stackEnrichment bool, enqueueAlways boo
 		stackEnrichment: stackEnrichment,
 		enqueueAlways:   enqueueAlways,
 	}
-	q.decorator = NewStackwalkDecorator(q)
+	q.initPlatform()
 	return q
 }
 
@@ -84,7 +85,7 @@ func (q *Queue) RegisterListener(listener Listener) {
 func (q *Queue) Events() <-chan *Event { return q.q }
 
 // Close closes the queue disposing allocated resources.
-func (q *Queue) Close() { q.decorator.Stop() }
+func (q *Queue) Close() { q.closePlatform() }
 
 // Push pushes a new event to the channel. Prior to
 // sending the event to the channel, all registered
@@ -107,20 +108,8 @@ func (q *Queue) Close() { q.decorator.Stop() }
 // enriched with callstack parameter and forwarded to the
 // event queue.
 func (q *Queue) Push(e *Event) error {
-	if q.stackEnrichment {
-		// store pending event for callstack enrichment
-		if e.Type.CanEnrichStack() {
-			q.decorator.Push(e)
-			return nil
-		}
-		// decorate events with callstack return addresses
-		if e.IsStackWalk() {
-			e = q.decorator.Pop(e)
-		}
-	}
-	// drop stack walk events
-	if e.IsStackWalk() {
-		return nil
+	if handled, err := q.pushPlatform(e); handled || err != nil {
+		return err
 	}
 	return q.push(e)
 }

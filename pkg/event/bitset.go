@@ -56,7 +56,7 @@ func (b *BitSets) SetBit(bs BitSetType, typ Type) {
 		if b.types == nil {
 			b.types = bitset.New(uint(MaxTypeID() + 1))
 		}
-		b.types.Set(uint(typ.HookID()))
+		b.types.Set(typeBitIndex(typ))
 
 	case CategoryBitSet:
 		if b.cats == nil {
@@ -82,7 +82,7 @@ func (b *BitSets) SetCategoryBit(c Category) {
 // Otherwise, event id bitset and last category bitset
 // are tested for respective bits.
 func (b *BitSets) IsBitSet(evt *Event) bool {
-	if b.types != nil && b.types.Test(uint(evt.Type.HookID())) {
+	if b.types != nil && b.types.Test(typeBitIndex(evt.Type)) {
 		return true
 	}
 	return (b.bitmask != nil && b.bitmask.IsSet(evt.Type.ID())) ||

@@ -157,6 +157,49 @@ func NewFormatter(template string) (*Formatter, error) {
 	}, nil
 }
 
+// Format applies the template to the provided event.
+func (f *Formatter) Format(evt *Event) []byte {
+	if evt == nil {
+		return []byte{}
+	}
+	values := map[string]interface{}{
+		ts:         evt.Timestamp.String(),
+		pid:        strconv.FormatUint(uint64(evt.PID), 10),
+		tid:        strconv.FormatUint(uint64(evt.Tid), 10),
+		seq:        strconv.FormatUint(evt.Seq, 10),
+		cpu:        strconv.FormatUint(uint64(evt.CPU), 10),
+		typ:        evt.Name,
+		cat:        evt.Category,
+		desc:       evt.Description,
+		host:       evt.Host,
+		meta:       evt.Metadata.String(),
+		parameters: evt.Params.String(),
+	}
+
+	if ps := evt.PS; ps != nil {
+		values[proc] = ps.Name
+		values[ppid] = strconv.FormatUint(uint64(ps.Ppid), 10)
+		values[cwd] = ps.Cwd
+		values[exe] = ps.Exe
+		values[cmd] = ps.Cmdline
+		if ps.Parent != nil {
+			values[pproc] = ps.Parent.Name
+			values[pexe] = ps.Parent.Exe
+			values[pcmd] = ps.Parent.Cmdline
+		}
+		addPlatformProcessFormatValues(ps, values)
+	}
+	addPlatformFormatValues(evt, values)
+
+	if f.expandParamsDot {
+		for _, par := range evt.Params {
+			values[".Params."+caser.String(par.Name)] = par.String()
+		}
+	}
+
+	return f.t.ExecuteString(values)
+}
+
 // ColorFormatter wraps a Formatter and re-renders each template tag with
 // ANSI colour codes before it is substituted into the output string.
 //
@@ -205,6 +248,9 @@ func (f *ColorFormatter) Format(e *Event) []byte {
 
 // colourTag maps a bare tag name to its coloured string representation.
 func (f *ColorFormatter) colourTag(tag string, e *Event) string {
+	if value, ok := colourPlatformProcessTag(tag, e); ok {
+		return value
+	}
 	switch tag {
 	case seq:
 		// sequence number is ok to render as dim gray
@@ -273,13 +319,6 @@ func (f *ColorFormatter) colourTag(tag string, e *Event) string {
 		}
 		return colorizer.Span(colorizer.White, ps.Cwd)
 
-	case sid:
-		ps := e.PS
-		if ps == nil {
-			return colorizer.Span(colorizer.Gray, "N/A")
-		}
-		return colorizer.Span(colorizer.Gray, ps.SID)
-
 	case pproc:
 		ps := e.PS
 		if ps == nil || ps.Parent == nil {
@@ -296,15 +335,8 @@ func (f *ColorFormatter) colourTag(tag string, e *Event) string {
 	case parameters:
 		return e.Params.Colorize()
 
-	case pe:
-		ps := e.PS
-		if ps == nil || ps.PE == nil {
-			return colorizer.Span(colorizer.Gray, "N/A")
-		}
-		return colorizer.Span(colorizer.Magenta, ps.PE.String())
-
 	case cstack:
-		return fmt.Sprintf("\n%s", e.Callstack.Colorize())
+		return colourPlatformTag(tag, e)
 	}
 
 	return ""

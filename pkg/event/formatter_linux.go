@@ -20,54 +20,12 @@
 
 package event
 
-import "strconv"
+import pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 
-// Format applies the template on the provided event.
-func (f *Formatter) Format(evt *Event) []byte {
-	if evt == nil {
-		return []byte{}
-	}
-	values := map[string]interface{}{
-		ts:         evt.Timestamp.String(),
-		pid:        strconv.FormatUint(uint64(evt.PID), 10),
-		tid:        strconv.FormatUint(uint64(evt.Tid), 10),
-		seq:        strconv.FormatUint(evt.Seq, 10),
-		cpu:        strconv.FormatUint(uint64(evt.CPU), 10),
-		typ:        evt.Name,
-		cat:        evt.Category,
-		desc:       evt.Description,
-		host:       evt.Host,
-		meta:       evt.Metadata.String(),
-		parameters: evt.Params.String(),
-	}
+func addPlatformFormatValues(_ *Event, _ map[string]interface{}) {}
 
-	ps := evt.PS
-	if ps != nil {
-		values[proc] = ps.Name
-		values[ppid] = strconv.FormatUint(uint64(ps.Ppid), 10)
-		values[cwd] = ps.Cwd
-		values[exe] = ps.Exe
-		values[cmd] = ps.Cmdline
-		values[sid] = ps.SID
-		parent := ps.Parent
-		if parent != nil {
-			values[pproc] = parent.Name
-			values[pexe] = parent.Exe
-			values[pcmd] = parent.Cmdline
-		}
-		if ps.PE != nil {
-			values[pe] = ps.PE.String()
-		}
-	}
-	if !evt.Callstack.IsEmpty() {
-		values[cstack] = evt.Callstack.String()
-	}
+func addPlatformProcessFormatValues(_ *pstypes.PS, _ map[string]interface{}) {}
 
-	if f.expandParamsDot {
-		for _, par := range evt.Params {
-			values[".Params."+caser.String(par.Name)] = par.String()
-		}
-	}
+func colourPlatformTag(_ string, _ *Event) string { return "" }
 
-	return f.t.ExecuteString(values)
-}
+func colourPlatformProcessTag(_ string, _ *Event) (string, bool) { return "", false }
