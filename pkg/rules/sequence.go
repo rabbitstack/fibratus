@@ -120,10 +120,10 @@ type sequenceState struct {
 	// The purpose is to enforce temporal monotonicity
 	lastMatch time.Time
 
-	psnap ps.Resolver
+	psnap ps.Snapshotter
 }
 
-func newSequenceState(f filter.Filter, c *config.FilterConfig, psnap ps.Resolver) *sequenceState {
+func newSequenceState(f filter.Filter, c *config.FilterConfig, psnap ps.Snapshotter) *sequenceState {
 	ss := &sequenceState{
 		filter:        f,
 		seq:           f.GetSequence(),
@@ -566,17 +566,17 @@ func (s *sequenceState) expire(e *event.Event) bool {
 		// process spawned by CreateProcess, and it pertains
 		// to the final sequence slot, it is safe to expire
 		// the whole sequence
-		pid := rhs.Params.MustGetPid()
+		pid := event.PID(rhs.Params.MustGetPid())
 		if lhs.Type == event.CreateProcess && isFinalSlot {
-			return lhs.Params.MustGetPid() == pid
+			return event.PID(lhs.Params.MustGetPid()) == pid
 		}
 		if lhs.Type == event.CreateThread {
 			// if the pids differ, the thread
 			// is created in a remote process.
 			// Sequence can be expired only if
 			// the remote process terminates
-			if lhs.PID != lhs.Params.MustGetPid() {
-				return lhs.Params.MustGetPid() == pid
+			if lhs.PID != event.PID(lhs.Params.MustGetPid()) {
+				return event.PID(lhs.Params.MustGetPid()) == pid
 			}
 		}
 		return lhs.PID == pid

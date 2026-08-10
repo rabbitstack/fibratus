@@ -28,9 +28,9 @@ import (
 )
 
 // framePID returns the pid associated with the stack frame.
-func framePID(e *event.Event) uint32 {
+func framePID(e *event.Event) event.PID {
 	if !e.Callstack.IsEmpty() && e.Callstack.FrameAt(0).PID != 0 {
-		return e.Callstack.FrameAt(0).PID
+		return event.PID(e.Callstack.FrameAt(0).PID)
 	}
 	return e.PID
 }

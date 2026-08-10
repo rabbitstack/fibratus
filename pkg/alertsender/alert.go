@@ -182,9 +182,9 @@ func (a Alert) MarshalJSON() ([]byte, error) {
 			Params    map[string]any `json:"params"`
 			Callstack []string       `json:"callstack,omitempty"`
 			Proc      *struct {
-				PID            uint32   `json:"pid"`
-				TID            uint32   `json:"tid"`
-				PPID           uint32   `json:"ppid"`
+				PID            event.PID `json:"pid"`
+				TID            uint32    `json:"tid"`
+				PPID           event.PID `json:"ppid"`
 				Name           string   `json:"name"`
 				Exe            string   `json:"exe"`
 				Cmdline        string   `json:"cmdline,omitempty"`
@@ -218,9 +218,9 @@ func (a Alert) MarshalJSON() ([]byte, error) {
 		Params    map[string]any `json:"params"`
 		Callstack []string       `json:"callstack,omitempty"`
 		Proc      *struct {
-			PID            uint32   `json:"pid"`
-			TID            uint32   `json:"tid"`
-			PPID           uint32   `json:"ppid"`
+			PID            event.PID `json:"pid"`
+			TID            uint32    `json:"tid"`
+			PPID           event.PID `json:"ppid"`
 			Name           string   `json:"name"`
 			Exe            string   `json:"exe"`
 			Cmdline        string   `json:"cmdline,omitempty"`
@@ -247,9 +247,9 @@ func (a Alert) MarshalJSON() ([]byte, error) {
 			Params    map[string]any `json:"params"`
 			Callstack []string       `json:"callstack,omitempty"`
 			Proc      *struct {
-				PID            uint32   `json:"pid"`
-				TID            uint32   `json:"tid"`
-				PPID           uint32   `json:"ppid"`
+				PID            event.PID `json:"pid"`
+				TID            uint32    `json:"tid"`
+				PPID           event.PID `json:"ppid"`
 				Name           string   `json:"name"`
 				Exe            string   `json:"exe"`
 				Cmdline        string   `json:"cmdline,omitempty"`
@@ -287,15 +287,15 @@ func (a Alert) MarshalJSON() ([]byte, error) {
 		// populate callstack
 		for i := range e.Callstack {
 			frame := e.Callstack[len(e.Callstack)-i-1]
-			evt.Callstack = append(evt.Callstack, fmt.Sprintf("%s %s!%s", frame.Addr, frame.Module, frame.Symbol))
+			evt.Callstack = append(evt.Callstack, fmt.Sprintf("%v %s!%s", frame.Addr, frame.Module, frame.Symbol))
 		}
 
 		ps := e.PS
 		if ps != nil {
 			evt.Proc = &struct {
-				PID            uint32   `json:"pid"`
-				TID            uint32   `json:"tid"`
-				PPID           uint32   `json:"ppid"`
+				PID            event.PID `json:"pid"`
+				TID            uint32    `json:"tid"`
+				PPID           event.PID `json:"ppid"`
 				Name           string   `json:"name"`
 				Exe            string   `json:"exe"`
 				Cmdline        string   `json:"cmdline,omitempty"`

@@ -58,12 +58,12 @@ var (
 )
 
 type compiler struct {
-	psnap     ps.Resolver
+	psnap     ps.Snapshotter
 	config    *config.Config
 	approvers config.Approvers
 }
 
-func newCompiler(psnap ps.Resolver, cfg *config.Config) *compiler {
+func newCompiler(psnap ps.Snapshotter, cfg *config.Config) *compiler {
 	return &compiler{psnap: psnap, config: cfg, approvers: config.Approvers{
 		Keys:        make(map[string][]string),
 		Paths:       make(map[string][]string),

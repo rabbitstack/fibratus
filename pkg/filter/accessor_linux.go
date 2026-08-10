@@ -36,7 +36,7 @@ func GetAccessors() []Accessor {
 }
 
 type psAccessor struct {
-	psnap ps.Resolver
+	psnap ps.Snapshotter
 }
 
 func (psAccessor) SetFields([]Field)            {}
@@ -45,7 +45,7 @@ func (psAccessor) IsFieldAccessible(e *event.Event) bool {
 	return e.PS != nil || e.Category == event.Process
 }
 
-func newPSAccessor(psnap ps.Resolver) Accessor { return &psAccessor{psnap: psnap} }
+func newPSAccessor(psnap ps.Snapshotter) Accessor { return &psAccessor{psnap: psnap} }
 
 func (a *psAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 	switch f.Name {
