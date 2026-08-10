@@ -21,60 +21,73 @@
 package types
 
 import (
+	"encoding/binary"
 	"fmt"
-	"strings"
+	"hash/fnv"
 	"sync"
 	"time"
 
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 )
 
-// PE is a placeholder for PE metadata on Linux builds.
-// Linux process images are ELF; this field exists so shared
-// formatters/templates compile without Windows PE types.
-type PE struct{}
-
-func (p *PE) String() string { return "" }
-
+// PS encapsulates Linux process state and its allocated resources.
 type PS struct {
 	sync.RWMutex
-	PID           uint64            `json:"pid"`
-	Ppid          uint64            `json:"ppid"`
-	Name          string            `json:"name"`
-	Cmdline       string            `json:"comm"`
-	Exe           string            `json:"exe"`
-	Cwd           string            `json:"cwd"`
-	Args          []string          `json:"args"`
-	StartTime     time.Time         `json:"started"`
-	StartBootTime uint64            `json:"start_boot_time"`
-	UID           uint32            `json:"uid"`
-	GID           uint32            `json:"gid"`
-	Username            string            `json:"username"`
-	Domain              string            `json:"domain"`
-	SID                 string            `json:"sid"`
-	SessionID           uint32            `json:"session_id"`
-	TokenIntegrityLevel string            `json:"token_integrity_level"`
-	TokenElevationType  string            `json:"token_elevation_type"`
-	IsTokenElevated     bool              `json:"is_token_elevated"`
-	IsWOW64             bool              `json:"is_wow_64"`
-	IsPackaged          bool              `json:"is_packaged"`
-	IsProtected         bool              `json:"is_protected"`
-	Envs                map[string]string `json:"envs"`
-	Parent              *PS               `json:"parent"`
-	Threads             map[uint32]Thread `json:"-"`
-	Mmaps               []Mmap            `json:"mmaps"`
-	Modules             []Module          `json:"modules"`
-	PE                  *PE               `json:"-"`
+	// PID is the thread group identifier. It is also the thread identifier of the main thread.
+	PID uint64 `json:"pid"`
+	// Ppid is the thread group identifier of the parent process.
+	Ppid uint64 `json:"ppid"`
+	// Name is the process name.
+	Name string `json:"name"`
+	// Cmdline is the full process command line.
+	Cmdline string `json:"comm"`
+	// Exe is the full path to the process executable.
+	Exe string `json:"exe"`
+	// Cwd is the current working directory of the process.
+	Cwd string `json:"cwd"`
+	// Args contains the process command-line arguments.
+	Args []string `json:"args"`
+	// StartTime is the wall-clock time when the process started.
+	StartTime time.Time `json:"started"`
+	// StartBootTime is the process start time measured from system boot.
+	StartBootTime uint64 `json:"start_boot_time"`
+	// UID is the real user identifier of the process.
+	UID uint32 `json:"uid"`
+	// GID is the real group identifier of the process.
+	GID uint32 `json:"gid"`
+	// Username is the name associated with UID.
+	Username string `json:"username"`
+	// Envs contains process environment variables indexed by name.
+	Envs map[string]string `json:"envs"`
+	// Parent references the parent process state when it is available.
+	Parent *PS `json:"parent"`
+	// Threads contains the threads that belong to this process.
+	Threads map[uint64]Thread `json:"-"`
+	// Mmaps contains the process memory mappings, including shared objects.
+	Mmaps []Mmap `json:"mmaps"`
 }
 
+// UUID returns a stable identifier for this process instance.
+func (ps *PS) UUID() uint64 {
+	var key [16]byte
+	binary.LittleEndian.PutUint64(key[:8], ps.PID)
+	binary.LittleEndian.PutUint64(key[8:], ps.StartBootTime)
+	h := fnv.New64a()
+	_, _ = h.Write(key[:])
+	return h.Sum64()
+}
+
+// String returns a string representation of the process state.
 func (ps *PS) String() string {
 	return fmt.Sprintf("Pid: %d\nPpid: %d\nName: %s\nCmdline: %s\nExe: %s", ps.PID, ps.Ppid, ps.Name, ps.Cmdline, ps.Exe)
 }
 
+// StringShort returns a compact string representation of the process state.
 func (ps *PS) StringShort() string {
 	return ps.String()
 }
 
+// Ancestors returns process ancestors as image name and process identifier pairs.
 func (ps *PS) Ancestors() []string {
 	var ancestors []string
 	Walk(func(parent *PS) {
@@ -83,50 +96,56 @@ func (ps *PS) Ancestors() []string {
 	return ancestors
 }
 
+// Thread stores identifiers for a Linux thread.
 type Thread struct {
-	Tid          uint32
-	Pid          uint64
-	StartAddress va.Address
-	UstackBase   va.Address
-	UstackLimit  va.Address
-	KstackBase   va.Address
-	KstackLimit  va.Address
+	// Tid is the thread identifier.
+	Tid uint64
+	// Pid is the thread group identifier to which the thread belongs.
+	Pid uint64
 }
 
-type Module struct {
-	Name        string
-	BaseAddress va.Address
-	Size        uint64
-	Checksum    uint32
-}
-
+// Mmap stores information about a process memory mapping.
 type Mmap struct {
+	// BaseAddress is the starting virtual address of the mapping.
 	BaseAddress va.Address
-	Size        uint64
-	Protection  uint32
-	Type        string
-	File        string
+	// Size is the mapping size in bytes.
+	Size uint64
+	// Protection is the mapping protection bitmask.
+	Protection uint32
+	// Type describes the mapping type.
+	Type string
+	// File is the path backing the mapping, if any.
+	File string
 }
 
+// ProtectMask returns the mapping protection in mask notation.
 func (m *Mmap) ProtectMask() string {
 	return ""
 }
 
+// AddThread adds a thread to the process state.
 func (ps *PS) AddThread(thread Thread) {
+	ps.Lock()
+	defer ps.Unlock()
 	if ps.Threads == nil {
-		ps.Threads = make(map[uint32]Thread)
+		ps.Threads = make(map[uint64]Thread)
 	}
 	ps.Threads[thread.Tid] = thread
 }
 
-func (ps *PS) RemoveThread(tid uint32) {
+// RemoveThread removes a thread from the process state.
+func (ps *PS) RemoveThread(tid uint64) {
+	ps.Lock()
+	defer ps.Unlock()
 	delete(ps.Threads, tid)
 }
 
+// AddMmap adds a memory mapping to the process state.
 func (ps *PS) AddMmap(mmap Mmap) {
 	ps.Mmaps = append(ps.Mmaps, mmap)
 }
 
+// RemoveMmap removes the memory mapping at the specified address.
 func (ps *PS) RemoveMmap(addr va.Address) {
 	for i, mmap := range ps.Mmaps {
 		if mmap.BaseAddress == addr {
@@ -136,6 +155,7 @@ func (ps *PS) RemoveMmap(addr va.Address) {
 	}
 }
 
+// FindMmap returns the memory mapping at the specified address.
 func (ps *PS) FindMmap(addr va.Address) *Mmap {
 	for i := range ps.Mmaps {
 		if ps.Mmaps[i].BaseAddress == addr {
@@ -143,8 +163,4 @@ func (ps *PS) FindMmap(addr va.Address) *Mmap {
 		}
 	}
 	return nil
-}
-
-func (ps *PS) IsSvchost() bool {
-	return strings.EqualFold(ps.Name, "svchost.exe")
 }

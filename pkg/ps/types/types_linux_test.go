@@ -18,19 +18,18 @@
  * limitations under the License.
  */
 
-package pe
+package types
 
-import "fmt"
+import (
+	"testing"
 
-// Sec contains section attributes. On Linux this is only used so
-// shared filter foreach helpers can compile against pe.Sec.
-type Sec struct {
-	Name    string
-	Size    uint32
-	Entropy float64
-	Md5     string
-}
+	"github.com/stretchr/testify/require"
+)
 
-func (s Sec) String() string {
-	return fmt.Sprintf("Name: %s, Size: %d, Entropy: %f, Md5: %s", s.Name, s.Size, s.Entropy, s.Md5)
+func TestPSUUID(t *testing.T) {
+	process := &PS{PID: 42, StartBootTime: 100}
+	reusedPID := &PS{PID: 42, StartBootTime: 200}
+
+	require.Equal(t, process.UUID(), process.UUID())
+	require.NotEqual(t, process.UUID(), reusedPID.UUID())
 }

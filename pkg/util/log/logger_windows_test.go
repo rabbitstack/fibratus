@@ -1,7 +1,5 @@
-//go:build linux
-
 /*
- * Copyright 2026 by Mostafa Moradian
+ * Copyright 2019-2020 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -18,18 +16,24 @@
  * limitations under the License.
  */
 
-package ntstatus
+package log
 
-import "fmt"
+import (
+	"os"
+	"testing"
 
-// Success determines the success system message
-const Success = "Success"
+	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/require"
+)
 
-// FormatMessage resolves a status code to a human-readable message.
-// On Linux this returns a hex representation for non-zero codes.
-func FormatMessage(status uint32) string {
-	if status == 0 {
-		return Success
-	}
-	return fmt.Sprintf("0x%x", status)
+func TestInitFromConfig(t *testing.T) {
+	require.Error(t, InitFromConfig(Config{}, "fibratus.log"))
+	require.NoError(t, InitFromConfig(Config{Path: "_fixtures", Level: "info", Formatter: "text"}, "fibratus.log"))
+
+	os.Remove("_fixtures\\fibratus.log")
+
+	logrus.Info("fibratus initialized")
+
+	_, err := os.Stat("_fixtures\\fibratus.log")
+	require.NoError(t, err)
 }
