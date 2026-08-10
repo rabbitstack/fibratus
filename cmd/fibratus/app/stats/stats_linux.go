@@ -20,6 +20,5 @@
 
 package stats
 
-import "github.com/spf13/cobra"
-
-var Command = &cobra.Command{Use: "stats", Short: "Show runtime statistics"}
+// Stats stores runtime statistics that are retrieved from the expvar endpoint.
+type Stats struct{}
