@@ -76,7 +76,7 @@ type Event struct {
 	// PID is the identifier of the process that generated the event.
 	PID PID `json:"pid"`
 	// Tid is the thread identifier of the thread that generated the event.
-	Tid uint32 `json:"tid"`
+	Tid TID `json:"tid"`
 	// Evasions is the bitmask that stores detected evasion types on this event.
 	Evasions uint32 `json:"-"`
 	// Type is the internal representation of the event. This field should be
@@ -101,8 +101,7 @@ type Event struct {
 	// PS represents process' metadata and its allocated resources such as handles, DLLs, etc.
 	PS *pstypes.PS `json:"ps,omitempty"`
 	// Callstack represents the call stack for the thread that generated the event.
-	Callstack callstack.Callstack `json:"callstack"`
-
+	Callstack callstack.Callstack `json:"callstack,omitempty"`
 	// mmux guards the metadata map
 	mmux sync.RWMutex
 }

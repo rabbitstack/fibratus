@@ -19,19 +19,8 @@
 package event
 
 import (
-	"cmp"
 	"slices"
 )
-
-// Info describes the event meta info such as human-readable name, category and description.
-type Info struct {
-	// Name is the human-readable representation of the event (e.g. CreateProcess, DeleteFile).
-	Name string
-	// Category designates the category to which event pertains. (e.g. process, net)
-	Category Category
-	// Description is the short explanation that describes the purpose of the event.
-	Description string
-}
 
 var events = map[Type]Info{
 	CreateProcess:            {"CreateProcess", Process, "Creates a new process and its primary thread"},
@@ -294,34 +283,6 @@ func NameToTypes(name string) []Type {
 	default:
 		return []Type{NameToType(name)}
 	}
-}
-
-// GetTypesMeta returns event types metadata.
-func GetTypesMeta() []Info {
-	typs := make([]Info, 0)
-outer:
-	for _, ev := range events {
-		for _, typ := range typs {
-			if typ.Name == ev.Name {
-				continue outer
-			}
-		}
-		typs = append(typs, ev)
-	}
-	slices.SortFunc(typs, func(a, b Info) int {
-		return cmp.Or(cmp.Compare(a.Category, b.Category), cmp.Compare(a.Name, b.Name))
-	})
-	return typs
-}
-
-// IsKnown indicates if the event type is known given the event name.
-func IsKnown(name string) bool {
-	for _, evt := range GetTypesMeta() {
-		if evt.Name == name {
-			return true
-		}
-	}
-	return false
 }
 
 // GetTypesMetaIndexed returns indexed event types metadata

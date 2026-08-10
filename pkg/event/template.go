@@ -137,6 +137,7 @@ func (e *Event) RenderCustomTemplate(tmpl *template.Template) ([]byte, error) {
 
 func renderTemplate(evt *Event, tmpl *template.Template) ([]byte, error) {
 	var writer bytes.Buffer
+	opts := serializationOptions()
 	data := struct {
 		Evt              *Event
 		SerializeHandles bool
@@ -146,11 +147,11 @@ func renderTemplate(evt *Event, tmpl *template.Template) ([]byte, error) {
 		SerializePE      bool
 	}{
 		evt,
-		SerializeHandles,
-		SerializeThreads,
-		SerializeModules,
-		SerializeEnvs,
-		SerializePE,
+		opts.handles,
+		opts.threads,
+		opts.modules,
+		opts.envs,
+		opts.pe,
 	}
 	err := tmpl.Execute(&writer, data)
 	if err != nil {

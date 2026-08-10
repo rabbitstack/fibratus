@@ -19,122 +19,54 @@
 package params
 
 const (
-	// NTStatus is the parameter that identifies the NTSTATUS value.
-	NTStatus = "status"
-
 	// ProcessID represents the process identifier.
 	ProcessID = "pid"
 	// TargetProcessID represents the target process identifier.
 	TargetProcessID = "target_pid"
-	// ProcessObject field represents the address of the process object in the kernel.
-	ProcessObject = "kproc"
 	// ThreadID field represents the thread identifier.
 	ThreadID = "tid"
-	// Callstack field represents the thread callstack.
-	Callstack = "callstack"
-	// CallstackTimestamp field identifvies the callstack timestamp parameter.
-	CallstackTimestamp = "callstack_timestamp"
 	// ProcessParentID field represents the parent process identifier.
 	ProcessParentID = "ppid"
-	// ProcessRealParentID field presents the real parent process identifier.
-	ProcessRealParentID = "real_ppid"
 	// SessionID fields represents the session identifier.
 	SessionID = "session_id"
-	// UserSID field is the security identifier associated to the process token under which it is run.
-	UserSID = "sid"
 	// Username field represents the username under which the event was generated.
 	Username = "username"
-	// Domain field represents the domain under which the event was generated.
-	Domain = "domain"
 	// ProcessName field denotes the process Module name.
 	ProcessName = "name"
 	// Exe field denotes the full path of the executable.
 	Exe = "exe"
 	// Cmdline field represents the process command line.
 	Cmdline = "cmdline"
-	// DTB field denotes the address of the process directory table.
-	DTB = "directory_table_base"
 	// ProcessFlags field denotes the process creation flags
 	ProcessFlags = "flags"
 	// ExitStatus is the field that represents the process exit status.
 	ExitStatus = "exit_status"
 	// StartTime field denotes the process start time.
 	StartTime = "start_time"
-	// ProcessTokenIntegrityLevel field denotes the process integrity level.
-	ProcessTokenIntegrityLevel = "token_integrity_level"
-	// ProcessTokenElevationType field designates the process token elevation type.
-	ProcessTokenElevationType = "token_elevation_type"
-	// ProcessTokenIsElevated field designates if the process token is elevated.
-	ProcessTokenIsElevated = "token_is_elevated"
-
-	// DesiredAccess field denotes the access rights for different kernel objects such as processes or threads.
-	DesiredAccess = "desired_access"
-
-	// BasePrio field is the thread base priority assigned by the scheduler.
-	BasePrio = "base_prio"
-	// IOPrio represents the filed that indicates the thread I/O priority.
-	IOPrio = "io_prio"
-	// PagePrio field denotes page priority.
-	PagePrio = "page_prio"
-	// KstackBase field is the start address of the kernel space stack.
-	KstackBase = "kstack"
-	// KstackLimit field is the end address of the kernel space stack.
-	KstackLimit = "kstack_limit"
-	// UstackBase field is the start address of the user space stack.
-	UstackBase = "ustack"
-	// UstackLimit field is the end address of the user space stack.
-	UstackLimit = "ustack_limit"
-	// StartAddress field is the thread start address.
-	StartAddress = "start_address"
-	// StartAddressSymbol field is the symbol associated with the thread start address.
-	StartAddressSymbol = "start_address_symbol"
-	// StartAddressModule field is the module where the thread start address is mapped.
-	StartAddressModule = "start_address_module"
-	// TEB field is the address of the Thread Environment Block (TEB)
-	TEB = "teb"
-
 	// FileObject determines the field name for the file object pointer.
 	FileObject = "file_object"
 	// FilePath represents the field that designates the absolute path of the file.
 	FilePath = "file_path"
-	// FileCreateOptions is the field that represents the values passed in the CreateDispositions parameter to the NtCreateFile function.
-	FileCreateOptions = "create_options"
-	// FileOperation is the field that represents the values passed in the CreateOptions parameter to the NtCreateFile function.
-	FileOperation = "create_disposition"
 	// FileCreated represents the name for the file creation field.
 	FileCreated = "created"
 	// FileAccessed represents the name for the file access field.
 	FileAccessed = "accessed"
 	// FileModified represents the name for the file modification field.
 	FileModified = "modified"
-	// FileShareMask represents the field name for the share access mask.
-	FileShareMask = "share_mask"
 	// FileType represents the field name that indicates the file type.
 	FileType = "type"
-	// FileAttributes is the field that represents file attribute values.
-	FileAttributes = "attributes"
 	// FileIoSize is the filed that represents the number of bytes in file read/write operations.
 	FileIoSize = "io_size"
 	// FileOffset represents the file for the file offset in read/write operations.
 	FileOffset = "offset"
-	// FileInfoClass represents the file information class.
-	FileInfoClass = "class"
 	// FileKey represents the directory key identifier in EnumDirectory events.
 	FileKey = "file_key"
 	// FileDirectory represents the field for the directory name in EnumDirectory events.
 	FileDirectory = "directory"
-	// FileIrpPtr represents the I/O request packet id.
-	FileIrpPtr = "irp"
 	// FileExtraInfo is the parameter that represents extra information returned by the file system for the operation. For example for a read request, the actual number of bytes that were read.
 	FileExtraInfo = "extra_info"
-	// FileIsDLL is the parameter that indicates if the file is a DLL
-	FileIsDLL = "is_dll"
-	// FileIsDriver is the parameter that indicates if the file is a driver
-	FileIsDriver = "is_driver"
 	// FileIsExecutable is the parameter that indicates if the file is an executable
 	FileIsExecutable = "is_exec"
-	// FileIsDotnet is the parameter that indicates if the file is a .NET assembly
-	FileIsDotnet = "is_dotnet"
 
 	// FileViewBase is the parameter that represents the base address of the mapped section.
 	FileViewBase = "view_base"
@@ -143,47 +75,12 @@ const (
 	// FileViewSectionType is the parameter that represents the mapped section type.
 	FileViewSectionType = "section_type"
 
-	// RegKeyHandle identifies the parameter name for the registry key handle.
-	RegKeyHandle = "key_handle"
-	// RegKCB identifies the parameter name for the registry key control block.
-	RegKCB = "kcb"
-	// RegPath represents the parameter name for the fully qualified key path.
-	RegPath = "key_path"
-	// RegValue identifies the parameter name that contains the value
-	RegValue = "value"
-	// RegValueType identifies the parameter that represents registry value type e.g (DWORD, BINARY)
-	RegValueType = "value_type"
-	// RegData identifies the parameter that stores the captured registry data
-	RegData = "data"
-
 	// ModuleBase identifies the parameter name for the base address of the process in which the Mmdule is loaded.
 	ModuleBase = "base_address"
 	// ModuleSize represents the parameter name for the size of the module in bytes.
 	ModuleSize = "module_size"
-	// ModuleCheckSum is the parameter name for module checksum.
-	ModuleCheckSum = "checksum"
-	// ModuleTimeDateStamp is the parametter name for module timedate stamp.
-	ModuleTimeDateStamp = "timedate_stamp"
-	// ModuleDefaultBase is the parameter name that represents module's base address.
-	ModuleDefaultBase = "default_address"
 	// ModulePath is the parameter name that denotes the file path and extension of the DLL/executable Module.
 	ModulePath = "file_path"
-	// ModuleSignatureLevel is the parameter denoting the loaded module signature level.
-	ModuleSignatureLevel = "signature_level"
-	// ModuleSignatureType is the parameter denoting the loaded module signature type.
-	ModuleSignatureType = "signature_type"
-	// ModuleCertSubject is the parameter that indicates the subject of the certificate is the entity its public key is associated with.
-	ModuleCertSubject = "cert_subject"
-	// ModuleCertIssuer is the parameter that represents the certificate authority (CA).
-	ModuleCertIssuer = "cert_issuer"
-	// ModuleCertSerial is the parameter that represents the serial number MUST be a positive integer assigned
-	// by the CA to each certificate.
-	ModuleCertSerial = "cert_serial"
-	// ModuleCertNotBefore  is the parameter that specifies the certificate won't be valid before this timestamp.
-	ModuleCertNotBefore = "cert_not_before"
-	// ModuleCertNotAfter is the parameter that specifies the certificate won't be valid after this timestamp.
-	ModuleCertNotAfter = "cert_not_after"
-
 	// NetSize identifies the parameter name that represents the packet size.
 	NetSize = "size"
 	// NetDIP is the parameter name that denotes the destination IP address.
@@ -238,17 +135,6 @@ const (
 	// DNSAnswers is the field that represents DNS response answers
 	DNSAnswers = "answers"
 
-	// HandleID identifies the parameter that specifies the handle identifier.
-	HandleID = "handle_id"
-	// HandleSourceID identifies the parameter that specifies the source handle identifier.
-	HandleSourceID = "handle_source_id"
-	// HandleObject identifies the parameter that represents the kernel object to which handle is associated.
-	HandleObject = "handle_object"
-	// HandleObjectName identifies the parameter that represents the kernel object name.
-	HandleObjectName = "handle_name"
-	// HandleObjectTypeID identifies the parameter that represents the kernel object type identifier.
-	HandleObjectTypeID = "type_id"
-
 	// MemBaseAddress identifies the parameter that denotes the allocation base address.
 	MemBaseAddress = "base_address"
 	// MemRegionSize identifies the parameter that represents the allocated region size.
@@ -266,37 +152,4 @@ const (
 	LinkSource = "source"
 	// LinkTarget identifies the parameter that represents the target symbolic link object or other kernel object
 	LinkTarget = "target"
-
-	// ThreadpoolPoolID represents the thread pool identifier.
-	ThreadpoolPoolID = "pool_id"
-	// ThreadpoolTaskID represents the thread pool task identifier.
-	ThreadpoolTaskID = "task_id"
-	// ThreadpoolCallback represents the address of the callback function.
-	ThreadpoolCallback = "callback"
-	// ThreadpoolCallbackSymbol represents the callback symbol.
-	ThreadpoolCallbackSymbol = "callback_symbol"
-	// ThreadpoolCallbackModule represents the module containing the callback symbol.
-	ThreadpoolCallbackModule = "callback_module"
-	// ThreadpoolContext represents the address of the callback context.
-	ThreadpoolContext = "context"
-	// ThreadpoolContextRip represents the value of instruction pointer contained in the callback context.
-	ThreadpoolContextRip = "context_rip"
-	// ThreadpoolContextRipSymbol represents the symbol name associated with the instruction pointer in callback context.
-	ThreadpoolContextRipSymbol = "context_rip_symbol"
-	// ThreadpoolContextRipModule represents the module name associated with the instruction pointer in callback context.
-	ThreadpoolContextRipModule = "context_rip_module"
-	// ThreadpoolSubprocessTag represents the service identifier associated with the thread pool.
-	ThreadpoolSubprocessTag = "subprocess_tag"
-	// ThreadpoolTimerDuetime represents the timer due time.
-	ThreadpoolTimerDuetime = "duetime"
-	// ThreadpoolTimerSubqueue represents the memory address of the timer subqueue.
-	ThreadpoolTimerSubqueue = "subqueue"
-	// ThreadpoolTimer represents the memory address of the timer object.
-	ThreadpoolTimer = "timer"
-	// ThreadpoolTimerPeriod represents the period of the timer
-	ThreadpoolTimerPeriod = "period"
-	// ThreadpoolTimerWindow represents the timer tolerate period.
-	ThreadpoolTimerWindow = "window"
-	// ThreadpoolTimerAbsolute indicates if the timer is absolute or relative.
-	ThreadpoolTimerAbsolute = "absolute"
 )
