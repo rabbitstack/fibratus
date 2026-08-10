@@ -29,8 +29,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestLinuxSnapshotterFindPut(t *testing.T) {
-	s := NewLinuxSnapshotter()
+func TestSnapshotterFindPut(t *testing.T) {
+	s := NewSnapshotter()
 	ps := &pstypes.PS{PID: 100, Name: "bash", StartBootTime: 1234}
 	s.Put(ps)
 

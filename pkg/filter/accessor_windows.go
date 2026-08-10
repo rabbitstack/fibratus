@@ -72,7 +72,7 @@ func getParentPs(e *event.Event) *pstypes.PS {
 
 // psAccessor extracts process's state or event specific values.
 type psAccessor struct {
-	psnap psnap.Resolver
+	psnap psnap.Snapshotter
 }
 
 func (psAccessor) SetFields([]Field)            {}
@@ -81,7 +81,7 @@ func (psAccessor) IsFieldAccessible(e *event.Event) bool {
 	return e.PS != nil || e.Category == event.Process
 }
 
-func newPSAccessor(psnap psnap.Resolver) Accessor { return &psAccessor{psnap: psnap} }
+func newPSAccessor(psnap psnap.Snapshotter) Accessor { return &psAccessor{psnap: psnap} }
 
 func (ps *psAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 	switch f.Name {

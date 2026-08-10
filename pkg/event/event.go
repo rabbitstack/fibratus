@@ -74,7 +74,7 @@ type Event struct {
 	// Timestamp represents the temporal occurrence of the event.
 	Timestamp time.Time `json:"timestamp"`
 	// PID is the identifier of the process that generated the event.
-	PID uint32 `json:"pid"`
+	PID PID `json:"pid"`
 	// Tid is the thread identifier of the thread that generated the event.
 	Tid uint32 `json:"tid"`
 	// Evasions is the bitmask that stores detected evasion types on this event.
