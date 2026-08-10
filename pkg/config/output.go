@@ -1,5 +1,3 @@
-//go:build windows
-
 /*
  * Copyright 2019-2020 by Nedim Sabic Sabic
  * https://www.fibratus.io
@@ -26,8 +24,6 @@ import (
 	"reflect"
 	"strconv"
 
-	"github.com/rabbitstack/fibratus/pkg/outputs/eventlog"
-
 	"github.com/rabbitstack/fibratus/pkg/outputs"
 	"github.com/rabbitstack/fibratus/pkg/outputs/amqp"
 	"github.com/rabbitstack/fibratus/pkg/outputs/console"
@@ -35,7 +31,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/outputs/http"
 	"github.com/rabbitstack/fibratus/pkg/outputs/null"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/sys/windows/svc"
 )
 
 var errNoOutputSection = errors.New("no output section in config")
@@ -118,27 +113,15 @@ func (c *Config) tryLoadOutput() error {
 			}
 			c.Output.Type, c.Output.Output = outputs.HTTP, httpConfig
 
-		case outputs.Eventlog:
-			var eventlogConfig eventlog.Config
-			if err := decode(config, &eventlogConfig); err != nil {
-				return errOutputConfig(typ, err)
+		default:
+			if err := c.loadPlatformOutput(outputs.TypeFromString(typ), typ, config); err != nil {
+				return err
 			}
-			if !eventlogConfig.Enabled {
-				continue
-			}
-			c.Output.Type, c.Output.Output = outputs.Eventlog, eventlogConfig
 		}
 	}
 
-	// if it is not an interactive session but the console output is enabled
-	// we default to null output and warn about that
-	if isWindowsService() && c.Output.Output != nil {
-		if c.Output.Type == outputs.Console {
-			log.Warn("running in non-interactive session with console output. " +
-				"Please configure a different output type. Defaulting to null output")
-			c.Output.Type, c.Output.Output = outputs.Null, &null.Config{}
-			return nil
-		}
+	if c.adjustPlatformOutput() {
+		return nil
 	}
 
 	// default to null output
@@ -159,13 +142,4 @@ func findActiveOutputs(outputs map[string]interface{}) []string {
 		}
 	}
 	return outputTypes
-}
-
-// isWindowsService returns true if the process is running inside Windows Service.
-func isWindowsService() bool {
-	isWinService, err := svc.IsWindowsService()
-	if err != nil {
-		return false
-	}
-	return isWinService
 }

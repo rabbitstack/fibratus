@@ -1,3 +1,5 @@
+//go:build windows
+
 /*
  * Copyright 2019-2020 by Nedim Sabic Sabic
  * https://www.fibratus.io
@@ -21,15 +23,19 @@ package config
 import (
 	"testing"
 
+	"github.com/rabbitstack/fibratus/pkg/outputs/eventlog"
 	"github.com/stretchr/testify/require"
 )
 
-func TestConfigPrint(t *testing.T) {
+func TestEventlogOutput(t *testing.T) {
 	c := NewWithOpts(WithRun())
-	err := c.flags.Parse([]string{"--filters.match-all=false", "--config-file=_fixtures/fibratus.yml"})
+	require.NoError(t, c.flags.Parse([]string{"--config-file=_fixtures/eventlog-output.yml"}))
 	require.NoError(t, c.viper.BindPFlags(c.flags))
-	require.NoError(t, err)
 	require.NoError(t, c.TryLoadFile(c.GetConfigFile()))
-	opts := c.Print()
-	require.NotEmpty(t, opts)
+	require.NoError(t, c.Init())
+
+	require.IsType(t, eventlog.Config{}, c.Output.Output)
+	eventlogConfig := c.Output.Output.(eventlog.Config)
+	require.True(t, eventlogConfig.Enabled)
+	require.Equal(t, "INFO", eventlogConfig.Level)
 }

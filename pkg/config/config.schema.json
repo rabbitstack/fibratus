@@ -335,6 +335,12 @@
     "eventsource": {
       "type": "object",
       "properties": {
+        "enable-process": {
+          "type": "boolean"
+        },
+        "enable-file": {
+          "type": "boolean"
+        },
         "enable-thread": {
           "type": "boolean"
         },
@@ -395,6 +401,9 @@
               "items": {
                 "type": "string",
                 "enum": [
+                  "execve",
+                  "exit",
+                  "clone",
                   "CreateThread",
                   "TerminateThread",
                   "OpenProcess",
