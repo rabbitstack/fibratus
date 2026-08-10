@@ -176,7 +176,7 @@ func (ctx *ActionContext) UniquePids() []uint32 {
 		if e.IsCreateProcess() {
 			pids[e.Params.MustGetPid()] = struct{}{}
 		} else {
-			pids[e.PID] = struct{}{}
+			pids[uint32(e.PID)] = struct{}{}
 		}
 	}
 	return convert.MapKeysToSlice(pids)

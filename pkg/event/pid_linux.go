@@ -1,3 +1,5 @@
+//go:build linux
+
 /*
  * Copyright 2026 by Mostafa Moradian
  * https://www.fibratus.io
@@ -16,10 +18,7 @@
  * limitations under the License.
  */
 
-package ps
+package event
 
-import pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
-
-type Resolver interface {
-	Find(pid uint32) (bool, *pstypes.PS)
-}
+// PID is the process identifier type on Linux (kernel PIDs are 64-bit).
+type PID = uint64

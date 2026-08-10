@@ -1,4 +1,4 @@
-//go:build linux
+//go:build windows
 
 /*
  * Copyright 2026 by Mostafa Moradian
@@ -18,19 +18,7 @@
  * limitations under the License.
  */
 
-package rules
+package event
 
-import (
-	"testing"
-
-	"github.com/rabbitstack/fibratus/pkg/config"
-	"github.com/rabbitstack/fibratus/pkg/ps"
-	"github.com/stretchr/testify/require"
-)
-
-func TestNewEngineAcceptsSnapshotter(t *testing.T) {
-	cfg := &config.Config{Filters: &config.Filters{}}
-	e := NewEngine(ps.NewSnapshotter(), cfg)
-	require.NotNil(t, e)
-	require.NotNil(t, e.compiler)
-}
+// PID is the process identifier type on Windows.
+type PID = uint32
