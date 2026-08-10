@@ -22,3 +22,6 @@ package event
 
 // PID is the process identifier type on Linux (kernel PIDs are 64-bit).
 type PID = uint64
+
+// TID is the thread identifier type on Linux (kernel thread IDs are 64-bit).
+type TID = uint64

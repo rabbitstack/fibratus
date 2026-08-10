@@ -24,6 +24,14 @@ import (
 	"unicode/utf8"
 )
 
+type serializationConfig struct {
+	handles bool
+	threads bool
+	modules bool
+	envs    bool
+	pe      bool
+}
+
 type jsonStream struct {
 	buf []byte
 }

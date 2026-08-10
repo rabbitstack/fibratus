@@ -18,23 +18,13 @@
  * limitations under the License.
  */
 
-package event
+package params
 
-import "strings"
-
-type ParamFlag struct {
-	Name  string
-	Value uint64
-}
-
-type ParamFlags []ParamFlag
-
-func (flags ParamFlags) String(value uint64) string {
-	var names []string
-	for _, flag := range flags {
-		if value&flag.Value == flag.Value {
-			names = append(names, flag.Name)
-		}
-	}
-	return strings.Join(names, "|")
-}
+const (
+	// CloneFlags is the bitmask supplied to clone(2).
+	CloneFlags = "clone_flags"
+	// UID is the effective Linux user identifier.
+	UID = "uid"
+	// GID is the effective Linux group identifier.
+	GID = "gid"
+)

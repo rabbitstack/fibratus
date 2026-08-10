@@ -18,96 +18,47 @@
 
 package params
 
-// Type defines event parameter type
+// Type defines an event parameter type.
 type Type uint16
 
 const (
-	// Null is a null parameter type
-	Null Type = iota
-	// UnicodeString a string of 16-bit characters. By default, assumed to have been encoded using UTF-16LE
-	UnicodeString
-	// AnsiString a string of 8-bit characters
-	AnsiString
-	// Int8 a signed 8-bit integer
-	Int8
-	// Uint8 an unsigned 8-bit integer
-	Uint8
-	// Int16 a signed 16-bit integer
-	Int16
-	// Uint16 an unsigned 16-bit integer
-	Uint16
-	// Int32 a signed 32-bit integer
-	Int32
-	// Uint32 an unsigned 32-bit integer
-	Uint32
-	// Int64 a signed 64-bit integer
-	Int64
-	// Uint64 an unsigned 64-bit integer
-	Uint64
-	// Float an IEEE 4-byte floating-point number
-	Float
-	// Double an IEEE 8-byte floating-point number
-	Double
-	// Bool a 32-bit value where 0 is false and 1 is true
-	Bool
-	// Binary is a binary data of variable size. The size must be specified in the data definition as a constant or a reference to another (integer) data item.For an IP V6 address, the data should be an IN6_ADDR structure.
-	// For a socket address, the data should be a SOCKADDR_STORAGE structure. The AF_INET, AF_INET6, and AF_LINK address families are supported
-	Binary
-	// GUID is a GUID structure. On output, the GUID is rendered in the registry string form, {xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx}
-	GUID
-	// Pointer an unsigned 32-bit or 64-bit pointer value. The size depends on the architecture of the computer logging the event
-	Pointer
-	// SID a security identifier (SID) structure that uniquely identifies a user or group
-	SID
-	// PID is the process identifier
-	PID
-	// TID is the thread identifier
-	TID
-	// WbemSID is the Web-Based Enterprise Management security identifier.
-	WbemSID
-	// Port represents the endpoint port number
-	Port
-	// IP is the IP address
-	IP
-	// IPv4 is the IPv4 address
-	IPv4
-	// IPv6 is the IPv6 address
-	IPv6
-	// Time represents the timestamp
-	Time
-	// Slice represents a collection of items
-	Slice
-	// Enum represents an enumeration
-	Enum
-	// Map represents a map
-	Map
-	// Object is the generic object type
-	Object
-	// DOSPath represents the file system path in DOS device notation
-	DOSPath
-	// Path represents the file system path with normalized drive letter notation
-	Path
-	// Status represents the system error code message
-	Status
-	// Key represents the registry key
-	Key
-	// Flags represents a bitmask of flags
-	Flags
-	// Flags64 represents an extended (64 bits) bitmask of flags
-	Flags64
-	// Address is the memory address reference
-	Address
-	// HandleType represents the handle type such as Mutex or File
-	HandleType
+	Null    Type = 0
+	Int8    Type = 3
+	Uint8   Type = 4
+	Int16   Type = 5
+	Uint16  Type = 6
+	Int32   Type = 7
+	Uint32  Type = 8
+	Int64   Type = 9
+	Uint64  Type = 10
+	Float   Type = 11
+	Double  Type = 12
+	Bool    Type = 13
+	Binary  Type = 14
+	PID     Type = 18
+	TID     Type = 19
+	Port    Type = 21
+	IP      Type = 22
+	IPv4    Type = 23
+	IPv6    Type = 24
+	Time    Type = 25
+	Slice   Type = 26
+	Enum    Type = 27
+	Map     Type = 28
+	Object  Type = 29
+	Path    Type = 31
+	Status  Type = 32
+	Flags   Type = 34
+	Flags64 Type = 35
+	Address Type = 36
 )
 
-// String return the type string representation.
+// String returns the type name.
 func (t Type) String() string {
+	if name := platformTypeString(t); name != "" {
+		return name
+	}
 	switch t {
-	case UnicodeString:
-		return "unicode"
-	case AnsiString:
-		return "ansi"
 	case Int8:
 		return "int8"
 	case Uint8:
@@ -124,8 +75,6 @@ func (t Type) String() string {
 		return "int64"
 	case Uint64:
 		return "uint64"
-	case SID, WbemSID:
-		return "sid"
 	case TID:
 		return "tid"
 	case PID:

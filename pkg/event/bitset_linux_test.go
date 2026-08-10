@@ -19,3 +19,16 @@
  */
 
 package event
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
+
+func TestLinuxBitSets(t *testing.T) {
+	bitsets := &BitSets{}
+	bitsets.SetBit(TypeBitSet, Execve)
+	assert.True(t, bitsets.IsBitSet(&Event{Type: Execve}))
+	assert.False(t, bitsets.IsBitSet(&Event{Type: Exit}))
+}

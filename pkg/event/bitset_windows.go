@@ -1,5 +1,3 @@
-//go:build linux
-
 /*
  * Copyright 2026 by Mostafa Moradian
  * https://www.fibratus.io
@@ -20,17 +18,4 @@
 
 package event
 
-// StackwalkDecorator is a no-op on Linux. Callstack enrichment
-// via StackWalk events is a Windows ETW concept.
-type StackwalkDecorator struct{}
-
-// NewStackwalkDecorator constructs a no-op stackwalk decorator.
-func NewStackwalkDecorator(_ *Queue) *StackwalkDecorator {
-	return &StackwalkDecorator{}
-}
-
-func (s *StackwalkDecorator) Push(_ *Event) {}
-
-func (s *StackwalkDecorator) Pop(e *Event) *Event { return e }
-
-func (s *StackwalkDecorator) Stop() {}
+func typeBitIndex(typ Type) uint { return uint(typ.HookID()) }
