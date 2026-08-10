@@ -274,12 +274,12 @@ func TestEventSourceEnableFlagsDynamicallyWithYaraEnabled(t *testing.T) {
 			EnableMemEvents:      true,
 		},
 		Filters: &config.Filters{},
-		Yara: yara.Config{
-			Enabled:    true,
-			SkipFiles:  false,
-			SkipMmaps:  true,
-			SkipAllocs: false,
-		},
+	}
+	cfg.Yara = yara.Config{
+		Enabled:    true,
+		SkipFiles:  false,
+		SkipMmaps:  true,
+		SkipAllocs: false,
 	}
 
 	cfg.EventSource.Init()
@@ -1139,10 +1139,10 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 	evsConfig.Init()
 
 	cfg := &config.Config{
-		EventSource:              evsConfig,
-		Filters:                  &config.Filters{},
-		SymbolizeKernelAddresses: true,
+		EventSource: evsConfig,
+		Filters:     &config.Filters{},
 	}
+	cfg.SymbolizeKernelAddresses = true
 
 	evs := NewEventSource(psnap, hsnap, cfg, nil)
 	symbolizer := symbolize.NewSymbolizer(symbolize.NewDebugHelpResolver(cfg), psnap, cfg, true)

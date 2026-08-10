@@ -82,7 +82,8 @@ func (r *MockResolver) Cleanup(proc windows.Handle) {
 
 func TestLoadKernelModuleSymbolTables(t *testing.T) {
 	r := new(MockResolver)
-	c := &config.Config{SymbolizeKernelAddresses: true}
+	c := &config.Config{}
+	c.SymbolizeKernelAddresses = true
 
 	psnap := new(ps.SnapshotterMock)
 
@@ -307,9 +308,8 @@ func TestProcessCallstack(t *testing.T) {
 
 func TestKernelCallstackSymbolizationFromDriverStore(t *testing.T) {
 	r := new(MockResolver)
-	c := &config.Config{
-		SymbolizeKernelAddresses: false,
-	}
+	c := &config.Config{}
+	c.SymbolizeKernelAddresses = false
 	psnap := new(ps.SnapshotterMock)
 
 	s := NewSymbolizer(r, psnap, c, false)

@@ -1,5 +1,3 @@
-//go:build windows
-
 /*
  * Copyright 2019-2020 by Nedim Sabic Sabic
  * https://www.fibratus.io
@@ -23,8 +21,6 @@ package config
 import (
 	"testing"
 	"time"
-
-	"github.com/rabbitstack/fibratus/pkg/outputs/eventlog"
 
 	"github.com/rabbitstack/fibratus/pkg/outputs/amqp"
 	"github.com/rabbitstack/fibratus/pkg/outputs/http"
@@ -80,22 +76,4 @@ func TestHTTPOutput(t *testing.T) {
 	assert.Equal(t, "basic", httpConfig.Password)
 	assert.Len(t, httpConfig.Headers, 2)
 	assert.Equal(t, "kkvvkk", httpConfig.Headers["api-key"])
-}
-
-func TestEventlogOutput(t *testing.T) {
-	c := NewWithOpts(WithRun())
-
-	err := c.flags.Parse([]string{"--config-file=_fixtures/eventlog-output.yml"})
-	require.NoError(t, c.viper.BindPFlags(c.flags))
-	require.NoError(t, err)
-	require.NoError(t, c.TryLoadFile(c.GetConfigFile()))
-
-	require.NoError(t, c.Init())
-
-	require.NotNil(t, c.Output)
-	require.IsType(t, eventlog.Config{}, c.Output.Output)
-
-	eventlogConfig := c.Output.Output.(eventlog.Config)
-	assert.True(t, eventlogConfig.Enabled)
-	assert.Equal(t, "INFO", eventlogConfig.Level)
 }
