@@ -38,8 +38,8 @@ func (p *PE) String() string { return "" }
 
 type PS struct {
 	sync.RWMutex
-	PID           uint32            `json:"pid"`
-	Ppid          uint32            `json:"ppid"`
+	PID           uint64            `json:"pid"`
+	Ppid          uint64            `json:"ppid"`
 	Name          string            `json:"name"`
 	Cmdline       string            `json:"comm"`
 	Exe           string            `json:"exe"`
@@ -85,7 +85,7 @@ func (ps *PS) Ancestors() []string {
 
 type Thread struct {
 	Tid          uint32
-	Pid          uint32
+	Pid          uint64
 	StartAddress va.Address
 	UstackBase   va.Address
 	UstackLimit  va.Address

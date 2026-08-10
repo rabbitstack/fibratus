@@ -31,14 +31,14 @@ import (
 )
 
 type opts struct {
-	psnap ps.Resolver
+	psnap ps.Snapshotter
 }
 
 // Option defines the option supplied to the filter
 type Option func(o *opts)
 
-// WithPSnapshotter passes a process resolver reference to the filter.
-func WithPSnapshotter(psnap ps.Resolver) Option {
+// WithPSnapshotter passes a process snapshotter reference to the filter.
+func WithPSnapshotter(psnap ps.Snapshotter) Option {
 	return func(o *opts) {
 		o.psnap = psnap
 	}

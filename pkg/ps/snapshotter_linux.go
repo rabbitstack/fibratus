@@ -28,39 +28,60 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 )
 
-// LinuxSnapshotter stores Linux process state for enrichment and rule evaluation.
-type LinuxSnapshotter interface {
-	Resolver
+// Snapshotter stores Linux process state for enrichment and rule evaluation.
+type Snapshotter interface {
+	// Write appends or updates process state from an inbound event.
 	Write(*event.Event) error
+	// Remove deletes process state for the event process identifier.
 	Remove(*event.Event) error
-	UpsertSnapshot(*pstypes.PS)
+	// Find attempts to retrieve process state for the specified process identifier.
+	Find(pid uint64) (bool, *pstypes.PS)
+	// FindAndPut attempts to retrieve process state and updates the snapshot when found.
+	FindAndPut(pid uint64) *pstypes.PS
+	// Put inserts the process state into the snapshotter.
 	Put(*pstypes.PS)
+	// UpsertSnapshot inserts or replaces process state.
+	UpsertSnapshot(*pstypes.PS)
+	// Size returns the total number of process state items.
 	Size() uint32
+	// Close closes the process snapshotter and disposes allocated resources.
 	Close() error
+	// AddThread builds thread state from the event representation.
 	AddThread(*event.Event) error
-	RemoveThread(pid uint32, tid uint32) error
+	// RemoveThread removes the thread from the given process.
+	RemoveThread(pid uint64, tid uint32) error
+	// AddMmap adds a memory mapping to the process state.
 	AddMmap(*event.Event) error
-	RemoveMmap(pid uint32, addr va.Address) error
+	// RemoveMmap removes a memory mapping at the given base address.
+	RemoveMmap(pid uint64, addr va.Address) error
 }
 
-type linuxSnapshotter struct {
+type snapshotter struct {
 	mu    sync.RWMutex
-	procs map[uint32]*pstypes.PS
+	procs map[uint64]*pstypes.PS
 }
 
-// NewLinuxSnapshotter builds an in-memory Linux process snapshotter.
-func NewLinuxSnapshotter() LinuxSnapshotter {
-	return &linuxSnapshotter{procs: make(map[uint32]*pstypes.PS)}
+// NewSnapshotter builds an in-memory Linux process snapshotter.
+func NewSnapshotter() Snapshotter {
+	return &snapshotter{procs: make(map[uint64]*pstypes.PS)}
 }
 
-func (s *linuxSnapshotter) Find(pid uint32) (bool, *pstypes.PS) {
+func (s *snapshotter) Find(pid uint64) (bool, *pstypes.PS) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	ps, ok := s.procs[pid]
 	return ok, ps
 }
 
-func (s *linuxSnapshotter) Put(ps *pstypes.PS) {
+func (s *snapshotter) FindAndPut(pid uint64) *pstypes.PS {
+	ok, ps := s.Find(pid)
+	if !ok {
+		return nil
+	}
+	return ps
+}
+
+func (s *snapshotter) Put(ps *pstypes.PS) {
 	if ps == nil {
 		return
 	}
@@ -69,11 +90,11 @@ func (s *linuxSnapshotter) Put(ps *pstypes.PS) {
 	s.procs[ps.PID] = ps
 }
 
-func (s *linuxSnapshotter) UpsertSnapshot(ps *pstypes.PS) {
+func (s *snapshotter) UpsertSnapshot(ps *pstypes.PS) {
 	s.Put(ps)
 }
 
-func (s *linuxSnapshotter) Write(evt *event.Event) error {
+func (s *snapshotter) Write(evt *event.Event) error {
 	if evt == nil || evt.PS == nil {
 		return nil
 	}
@@ -81,7 +102,7 @@ func (s *linuxSnapshotter) Write(evt *event.Event) error {
 	return nil
 }
 
-func (s *linuxSnapshotter) Remove(evt *event.Event) error {
+func (s *snapshotter) Remove(evt *event.Event) error {
 	if evt == nil {
 		return nil
 	}
@@ -91,20 +112,20 @@ func (s *linuxSnapshotter) Remove(evt *event.Event) error {
 	return nil
 }
 
-func (s *linuxSnapshotter) Size() uint32 {
+func (s *snapshotter) Size() uint32 {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return uint32(len(s.procs))
 }
 
-func (s *linuxSnapshotter) Close() error {
+func (s *snapshotter) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.procs = make(map[uint32]*pstypes.PS)
+	s.procs = make(map[uint64]*pstypes.PS)
 	return nil
 }
 
-func (s *linuxSnapshotter) AddThread(evt *event.Event) error {
+func (s *snapshotter) AddThread(evt *event.Event) error {
 	if evt == nil || evt.PS == nil {
 		return nil
 	}
@@ -117,7 +138,7 @@ func (s *linuxSnapshotter) AddThread(evt *event.Event) error {
 	return nil
 }
 
-func (s *linuxSnapshotter) RemoveThread(pid uint32, tid uint32) error {
+func (s *snapshotter) RemoveThread(pid uint64, tid uint32) error {
 	ok, ps := s.Find(pid)
 	if !ok || ps == nil {
 		return nil
@@ -126,7 +147,7 @@ func (s *linuxSnapshotter) RemoveThread(pid uint32, tid uint32) error {
 	return nil
 }
 
-func (s *linuxSnapshotter) AddMmap(evt *event.Event) error {
+func (s *snapshotter) AddMmap(evt *event.Event) error {
 	if evt == nil || evt.PS == nil {
 		return nil
 	}
@@ -141,7 +162,7 @@ func (s *linuxSnapshotter) AddMmap(evt *event.Event) error {
 	return nil
 }
 
-func (s *linuxSnapshotter) RemoveMmap(pid uint32, addr va.Address) error {
+func (s *snapshotter) RemoveMmap(pid uint64, addr va.Address) error {
 	ok, ps := s.Find(pid)
 	if !ok || ps == nil {
 		return nil
