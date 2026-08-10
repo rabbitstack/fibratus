@@ -18,12 +18,11 @@
  * limitations under the License.
  */
 
-package functions
+package filter
 
-type GetRegValue struct{}
+import "github.com/rabbitstack/fibratus/pkg/event"
 
-func (GetRegValue) Call([]interface{}) (interface{}, bool) { return nil, false }
-func (GetRegValue) Desc() FunctionDesc {
-	return FunctionDesc{Name: GetRegValueFn}
+// framePID returns the process identifier associated with the event.
+func framePID(e *event.Event) event.PID {
+	return e.PID
 }
-func (GetRegValue) Name() Fn { return GetRegValueFn }

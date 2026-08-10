@@ -1261,3 +1261,74 @@ func (*dnsAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 
 	return nil, nil
 }
+
+func (f *filter) pruneUnusedAccessors() {
+	var (
+		removeEvtAccessor      = true
+		removePsAccessor       = true
+		removeThreadAccessor   = true
+		removeModuleAccessor   = true
+		removeFileAccessor     = true
+		removeRegistryAccessor = true
+		removeNetworkAccessor  = true
+		removePEAccessor       = true
+		removeMemAccessor      = true
+		removeDNSAccessor      = true
+	)
+
+	for _, field := range f.fields {
+		switch {
+		case field.Name.IsEvtField() || field.Name.IsKevtField():
+			removeEvtAccessor = false
+		case field.Name.IsPeField():
+			removePEAccessor = false
+		case field.Name.IsPsField():
+			removePsAccessor = false
+		case field.Name.IsThreadField():
+			removeThreadAccessor = false
+		case field.Name.IsImageField() || field.Name.IsModuleField():
+			removeModuleAccessor = false
+		case field.Name.IsFileField():
+			removeFileAccessor = false
+		case field.Name.IsRegistryField():
+			removeRegistryAccessor = false
+		case field.Name.IsNetworkField():
+			removeNetworkAccessor = false
+		case field.Name.IsMemField():
+			removeMemAccessor = false
+		case field.Name.IsDNSField():
+			removeDNSAccessor = false
+		}
+	}
+
+	if removeEvtAccessor {
+		f.removeAccessor(&evtAccessor{})
+	}
+	if removePsAccessor {
+		f.removeAccessor(&psAccessor{})
+	}
+	if removeThreadAccessor {
+		f.removeAccessor(&threadAccessor{})
+	}
+	if removeModuleAccessor {
+		f.removeAccessor(&moduleAccessor{})
+	}
+	if removeFileAccessor {
+		f.removeAccessor(&fileAccessor{})
+	}
+	if removeRegistryAccessor {
+		f.removeAccessor(&registryAccessor{})
+	}
+	if removeNetworkAccessor {
+		f.removeAccessor(&networkAccessor{})
+	}
+	if removePEAccessor {
+		f.removeAccessor(&peAccessor{})
+	}
+	if removeMemAccessor {
+		f.removeAccessor(&memAccessor{})
+	}
+	if removeDNSAccessor {
+		f.removeAccessor(&dnsAccessor{})
+	}
+}

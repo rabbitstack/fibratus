@@ -71,6 +71,17 @@ func TestNarrowAccessors(t *testing.T) {
 	assert.Len(t, pea.fields, 2)
 }
 
+func eventWithCallstack(typ event.Type, category event.Category) *event.Event {
+	e := &event.Event{Type: typ}
+	e.Callstack = []callstack.Frame{{
+		Addr:   0x7ffb5c1d0396,
+		Offset: 0x61,
+		Symbol: "CreateProcessW",
+		Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll",
+	}}
+	return e
+}
+
 func TestIsFieldAccessible(t *testing.T) {
 	var tests = []struct {
 		a            Accessor
@@ -104,22 +115,22 @@ func TestIsFieldAccessible(t *testing.T) {
 		},
 		{
 			newThreadAccessor(),
-			&event.Event{Type: event.CreateProcess, Callstack: []callstack.Frame{{Addr: 0x7ffb5c1d0396, Offset: 0x61, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"}}},
+			eventWithCallstack(event.CreateProcess, event.Process),
 			true,
 		},
 		{
 			newThreadAccessor(),
-			&event.Event{Type: event.RegSetValue, Callstack: []callstack.Frame{{Addr: 0x7ffb5c1d0396, Offset: 0x61, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"}}},
+			eventWithCallstack(event.RegSetValue, event.Registry),
 			true,
 		},
 		{
 			newRegistryAccessor(),
-			&event.Event{Type: event.RegSetValue, Callstack: []callstack.Frame{{Addr: 0x7ffb5c1d0396, Offset: 0x61, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"}}},
+			eventWithCallstack(event.RegSetValue, event.Registry),
 			true,
 		},
 		{
 			newNetworkAccessor(),
-			&event.Event{Type: event.RegSetValue, Callstack: []callstack.Frame{{Addr: 0x7ffb5c1d0396, Offset: 0x61, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"}}},
+			eventWithCallstack(event.RegSetValue, event.Registry),
 			false,
 		},
 		{
