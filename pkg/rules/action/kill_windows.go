@@ -20,14 +20,16 @@ package action
 
 import (
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/util/multierror"
-	"golang.org/x/sys/windows"
 	"os"
 	"syscall"
+
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/util/multierror"
+	"golang.org/x/sys/windows"
 )
 
 // Kill terminates all processes with specified pids.
-func Kill(pids []uint32) error {
+func Kill(pids []event.PID) error {
 	errs := make([]error, 0)
 	for _, pid := range pids {
 		err := terminate(pid)

@@ -22,11 +22,124 @@
 package ql
 
 import (
+	"path/filepath"
+
 	"github.com/rabbitstack/fibratus/pkg/callstack"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
+	"github.com/rabbitstack/fibratus/pkg/filter/ql/functions"
+	"github.com/rabbitstack/fibratus/pkg/pe"
+	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/util/signature"
 	"golang.org/x/sys/windows"
 )
+
+func init() {
+	funcs[functions.IsMinidumpFn.String()] = &functions.IsMinidump{}
+	funcs[functions.GetRegValueFn.String()] = &functions.GetRegValue{}
+}
+
+func (f *Foreach) foreachPlatform(elems interface{}, segments []*BoundSegmentLiteral, e interface{}, useCallValuer bool, valuer MapValuer) (bool, bool) {
+	switch elems := elems.(type) {
+	case []pstypes.Module:
+		for _, mod := range elems {
+			if f.evalExpr(e, useCallValuer, f.moduleMapValuer(segments, mod), valuer) {
+				return true, true
+			}
+		}
+	case map[uint32]pstypes.Thread:
+		for _, thread := range elems {
+			if f.evalExpr(e, useCallValuer, f.threadMapValuer(segments, thread), valuer) {
+				return true, true
+			}
+		}
+	case []pe.Sec:
+		for _, sec := range elems {
+			if f.evalExpr(e, useCallValuer, f.sectionMapValuer(segments, sec), valuer) {
+				return true, true
+			}
+		}
+	}
+	return false, false
+}
+
+func addPlatformProcessValues(segments []*BoundSegmentLiteral, proc *pstypes.PS, valuer MapValuer) {
+	for _, seg := range segments {
+		switch seg.Segment {
+		case fields.SIDSegment:
+			valuer[seg.Value] = proc.SID
+		case fields.SessionIDSegment:
+			valuer[seg.Value] = proc.SessionID
+		case fields.DomainSegment:
+			valuer[seg.Value] = proc.Domain
+		case fields.TokenIntegrityLevelSegment:
+			valuer[seg.Value] = proc.TokenIntegrityLevel
+		case fields.TokenIsElevatedSegment:
+			valuer[seg.Value] = proc.IsTokenElevated
+		case fields.TokenElevationTypeSegment:
+			valuer[seg.Value] = proc.TokenElevationType
+		}
+	}
+}
+
+// moduleMapValuer returns the map valuer with process module attributes.
+func (f *Foreach) moduleMapValuer(segments []*BoundSegmentLiteral, mod pstypes.Module) MapValuer {
+	valuer := MapValuer{}
+	for _, seg := range segments {
+		switch seg.Segment {
+		case fields.PathSegment:
+			valuer[seg.Value] = mod.Name
+		case fields.NameSegment:
+			valuer[seg.Value] = filepath.Base(mod.Name)
+		case fields.AddressSegment:
+			valuer[seg.Value] = mod.BaseAddress.String()
+		case fields.SizeSegment:
+			valuer[seg.Value] = mod.Size
+		case fields.ChecksumSegment:
+			valuer[seg.Value] = mod.Checksum
+		}
+	}
+	return valuer
+}
+
+// threadMapValuer returns the map valuer with thread information.
+func (f *Foreach) threadMapValuer(segments []*BoundSegmentLiteral, thread pstypes.Thread) MapValuer {
+	valuer := MapValuer{}
+	for _, seg := range segments {
+		switch seg.Segment {
+		case fields.TidSegment:
+			valuer[seg.Value] = thread.Tid
+		case fields.StartAddressSegment:
+			valuer[seg.Value] = thread.StartAddress.String()
+		case fields.UserStackBaseSegment:
+			valuer[seg.Value] = thread.UstackBase.String()
+		case fields.UserStackLimitSegment:
+			valuer[seg.Value] = thread.UstackLimit.String()
+		case fields.KernelStackBaseSegment:
+			valuer[seg.Value] = thread.KstackBase.String()
+		case fields.KernelStackLimitSegment:
+			valuer[seg.Value] = thread.KstackLimit.String()
+		}
+	}
+	return valuer
+}
+
+// sectionMapValuer returns map valuer with PE section data.
+func (f *Foreach) sectionMapValuer(segments []*BoundSegmentLiteral, section pe.Sec) MapValuer {
+	valuer := MapValuer{}
+	for _, seg := range segments {
+		switch seg.Segment {
+		case fields.NameSegment:
+			valuer[seg.Value] = section.Name
+		case fields.SizeSegment:
+			valuer[seg.Value] = section.Size
+		case fields.EntropySegment:
+			valuer[seg.Value] = section.Entropy
+		case fields.MD5Segment:
+			valuer[seg.Value] = section.Md5
+		}
+	}
+	return valuer
+}
 
 // foreachCallstack evaluates the predicate against callstack frames.
 // The first return value indicates whether callstack handling applied;

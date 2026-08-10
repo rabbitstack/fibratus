@@ -61,7 +61,7 @@ func (a *psAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 			return nil, ErrPsNil
 		}
 		return e.PS.Name, nil
-	case fields.PsComm, fields.PsCmdline:
+	case fields.PsCmdline:
 		if e.PS == nil {
 			return nil, ErrPsNil
 		}
@@ -113,5 +113,26 @@ func (a *psAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 		return e.PS.Parent.Exe, nil
 	default:
 		return nil, nil
+	}
+}
+
+func (f *filter) pruneUnusedAccessors() {
+	removeEvtAccessor := true
+	removePsAccessor := true
+
+	for _, field := range f.fields {
+		switch {
+		case field.Name.IsEvtField() || field.Name.IsKevtField():
+			removeEvtAccessor = false
+		case field.Name.IsPsField():
+			removePsAccessor = false
+		}
+	}
+
+	if removeEvtAccessor {
+		f.removeAccessor(&evtAccessor{})
+	}
+	if removePsAccessor {
+		f.removeAccessor(&psAccessor{})
 	}
 }

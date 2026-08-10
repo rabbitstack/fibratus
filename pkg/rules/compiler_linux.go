@@ -18,22 +18,16 @@
  * limitations under the License.
  */
 
-package functions
+package rules
 
-// IsMinidump determines if the specified file contains the minidump signature.
-type IsMinidump struct{}
+import (
+	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/filter/ql"
+)
 
-func (f IsMinidump) Call(args []interface{}) (interface{}, bool) {
-	return false, len(args) >= 1
+func (*compiler) referencesApproverEvents(ql.Node) bool {
+	return false
 }
 
-func (f IsMinidump) Desc() FunctionDesc {
-	return FunctionDesc{
-		Name: IsMinidumpFn,
-		Args: []FunctionArgDesc{
-			{Keyword: "file", Types: []ArgType{Field, BoundField, BoundSegment, BareBoundVariable, Func, String}, Required: true},
-		},
-	}
-}
-
-func (f IsMinidump) Name() Fn { return IsMinidumpFn }
+func updatePlatformCompileResult(*config.RulesCompileResult, event.Type) {}

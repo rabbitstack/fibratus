@@ -170,13 +170,13 @@ type ActionContext struct {
 // UniquePids returns a set of process identifiers
 // from each matched event to be used in actions
 // such as the process kill action.
-func (ctx *ActionContext) UniquePids() []uint32 {
-	pids := make(map[uint32]struct{})
+func (ctx *ActionContext) UniquePids() []event.PID {
+	pids := make(map[event.PID]struct{})
 	for _, e := range ctx.Events {
 		if e.IsCreateProcess() {
 			pids[e.Params.MustGetPid()] = struct{}{}
 		} else {
-			pids[uint32(e.PID)] = struct{}{}
+			pids[e.PID] = struct{}{}
 		}
 	}
 	return convert.MapKeysToSlice(pids)
