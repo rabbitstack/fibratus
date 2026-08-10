@@ -64,7 +64,10 @@ var cfg = &config.Config{
 		EnableThreadpoolEvents: true,
 	},
 	Filters: &config.Filters{},
-	PE:      pe.Config{Enabled: true},
+}
+
+func init() {
+	cfg.PE = pe.Config{Enabled: true}
 }
 
 func TestFilterCompile(t *testing.T) {

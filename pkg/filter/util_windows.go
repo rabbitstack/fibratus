@@ -1,6 +1,7 @@
-//go:build linux
+//go:build windows
 
 /*
+ * Copyright 2021-present by Nedim Sabic Sabic
  * Copyright 2026 by Mostafa Moradian
  * https://www.fibratus.io
  * All Rights Reserved.
@@ -20,23 +21,12 @@
 
 package filter
 
-func (f *filter) pruneUnusedAccessors() {
-	removeEvtAccessor := true
-	removePsAccessor := true
+import "github.com/rabbitstack/fibratus/pkg/event"
 
-	for _, field := range f.fields {
-		switch {
-		case field.Name.IsEvtField() || field.Name.IsKevtField():
-			removeEvtAccessor = false
-		case field.Name.IsPsField():
-			removePsAccessor = false
-		}
+// framePID returns the process identifier associated with the stack frame.
+func framePID(e *event.Event) event.PID {
+	if !e.Callstack.IsEmpty() && e.Callstack.FrameAt(0).PID != 0 {
+		return event.PID(e.Callstack.FrameAt(0).PID)
 	}
-
-	if removeEvtAccessor {
-		f.removeAccessor(&evtAccessor{})
-	}
-	if removePsAccessor {
-		f.removeAccessor(&psAccessor{})
-	}
+	return e.PID
 }
