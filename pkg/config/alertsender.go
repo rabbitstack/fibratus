@@ -1,7 +1,6 @@
-//go:build windows
-
 /*
  * Copyright 2019-2020 by Nedim Sabic Sabic
+ * Copyright 2026 by Mostafa Moradian
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -23,12 +22,11 @@ package config
 import (
 	"errors"
 	"fmt"
+	"reflect"
+
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
-	"github.com/rabbitstack/fibratus/pkg/alertsender/eventlog"
 	"github.com/rabbitstack/fibratus/pkg/alertsender/mail"
 	"github.com/rabbitstack/fibratus/pkg/alertsender/slack"
-	"github.com/rabbitstack/fibratus/pkg/alertsender/systray"
-	"reflect"
 )
 
 var errNoAlertsendersSection = errors.New("no alertsenders section in config")
@@ -64,11 +62,10 @@ func (c *Config) tryLoadAlertSenders() error {
 			if !mailConfig.Enabled {
 				continue
 			}
-			config := alertsender.Config{
+			configs = append(configs, alertsender.Config{
 				Type:   alertsender.Mail,
 				Sender: mailConfig,
-			}
-			configs = append(configs, config)
+			})
 		case "slack":
 			var slackConfig slack.Config
 			if err := decode(config, &slackConfig); err != nil {
@@ -77,38 +74,14 @@ func (c *Config) tryLoadAlertSenders() error {
 			if !slackConfig.Enabled {
 				continue
 			}
-			config := alertsender.Config{
+			configs = append(configs, alertsender.Config{
 				Type:   alertsender.Slack,
 				Sender: slackConfig,
+			})
+		default:
+			if err := c.loadPlatformAlertSender(typ, config, &configs); err != nil {
+				return err
 			}
-			configs = append(configs, config)
-		case "systray":
-			var systrayConfig systray.Config
-			if err := decode(config, &systrayConfig); err != nil {
-				return errAlertsenderConfig(typ, err)
-			}
-			if !systrayConfig.Enabled {
-				continue
-			}
-			config := alertsender.Config{
-				Type:   alertsender.Systray,
-				Sender: systrayConfig,
-			}
-			configs = append(configs, config)
-
-		case "eventlog":
-			var eventlogConfig eventlog.Config
-			if err := decode(config, &eventlogConfig); err != nil {
-				return errAlertsenderConfig(typ, err)
-			}
-			if !eventlogConfig.Enabled {
-				continue
-			}
-			config := alertsender.Config{
-				Type:   alertsender.Eventlog,
-				Sender: eventlogConfig,
-			}
-			configs = append(configs, config)
 		}
 	}
 
