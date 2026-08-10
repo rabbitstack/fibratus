@@ -1,3 +1,5 @@
+//go:build linux
+
 /*
  * Copyright 2026 by Mostafa Moradian
  * https://www.fibratus.io
@@ -16,10 +18,6 @@
  * limitations under the License.
  */
 
-package ps
+package colorizer
 
-// ProcessKey uniquely identifies a process instance across PID reuse.
-type ProcessKey struct {
-	PID           uint32
-	StartBootTime uint64
-}
+func enableWindowsVT() bool { return false }
