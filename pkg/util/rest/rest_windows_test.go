@@ -1,3 +1,5 @@
+//go:build windows
+
 /*
  * Copyright 2019-2020 by Nedim Sabic Sabic
  * https://www.fibratus.io
@@ -19,36 +21,37 @@
 package rest
 
 import (
-	"fmt"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
-	"strings"
+	"os/user"
 	"testing"
+
+	"github.com/rabbitstack/fibratus/pkg/api"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestGet(t *testing.T) {
+func TestGetPipe(t *testing.T) {
+	usr, err := user.Current()
+	require.NoError(t, err)
+	descriptor := "D:P(A;;GA;;;" + usr.Uid + ")"
+	listener, err := api.MakePipeListener(`npipe:///fibratus`, descriptor)
+	require.NoError(t, err)
+
 	mux := http.NewServeMux()
-	mux.HandleFunc("/config", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/config", func(w http.ResponseWriter, _ *http.Request) {
 		if _, err := w.Write([]byte("test")); err != nil {
 			t.Fatal(err)
 		}
 	})
 
-	srv := httptest.NewServer(mux)
+	srv := httptest.NewUnstartedServer(mux)
+	srv.Listener = listener
+	srv.Start()
 	defer srv.Close()
 
-	resp, err := Get(WithURI("config"), WithTransport(fmt.Sprintf("localhost:%s", port(srv.URL))))
+	resp, err := Get(WithURI("config"), WithTransport(`npipe:///fibratus`))
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	assert.Equal(t, "test", string(resp))
-}
-
-func port(s string) string {
-	i := strings.LastIndex(s, ":")
-	if i == 0 {
-		return ""
-	}
-	return s[i+1:]
 }
