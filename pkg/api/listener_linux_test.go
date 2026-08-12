@@ -23,13 +23,28 @@ package api
 import (
 	"context"
 	"net"
-	"strings"
+	"path/filepath"
+	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
-// DialLocalTransport creates a dialer for the Linux UNIX domain socket transport.
-func DialLocalTransport(path string) func(context.Context, string, string) (net.Conn, error) {
-	path = strings.TrimPrefix(path, "unix://")
-	return func(ctx context.Context, _, _ string) (net.Conn, error) {
-		return (&net.Dialer{}).DialContext(ctx, "unix", path)
-	}
+func TestDialLocalTransport(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "fibratus.sock")
+	listener, err := net.Listen("unix", path)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, listener.Close()) })
+
+	accepted := make(chan net.Conn, 1)
+	go func() {
+		conn, err := listener.Accept()
+		if err == nil {
+			accepted <- conn
+		}
+	}()
+
+	conn, err := DialLocalTransport("unix://"+path)(context.Background(), "", "")
+	require.NoError(t, err)
+	require.NoError(t, conn.Close())
+	require.NoError(t, (<-accepted).Close())
 }

@@ -46,8 +46,8 @@ func makeTCPListener(addr string) (net.Listener, error) {
 	return net.Listen("tcp", addr)
 }
 
-// DialPipe creates a dialer to be used with the http.Client to connect to a named pipe.
-func DialPipe(pipePath string) func(context.Context, string, string) (net.Conn, error) {
+// DialLocalTransport creates a dialer for the Windows named pipe transport.
+func DialLocalTransport(pipePath string) func(context.Context, string, string) (net.Conn, error) {
 	npipe := transformPipePath(pipePath)
 	return func(ctx context.Context, _, _ string) (net.Conn, error) {
 		return winio.DialPipeContext(ctx, npipe)
