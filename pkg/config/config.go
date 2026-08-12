@@ -60,17 +60,28 @@ const (
 type Config struct {
 	platformConfig
 
-	EventSource  EventSourceConfig `json:"eventsource" yaml:"eventsource"`
-	Filament     FilamentConfig    `json:"filament" yaml:"filament"`
-	API          APIConfig         `json:"api" yaml:"api"`
-	Output       outputs.Config
-	Aggregator   aggregator.Config `json:"aggregator" yaml:"aggregator"`
-	Log          log.Config        `json:"logging" yaml:"logging"`
+	// EventSource stores options for fine-tuning the event source.
+	EventSource EventSourceConfig `json:"eventsource" yaml:"eventsource"`
+	// Filament contains filament settings.
+	Filament FilamentConfig `json:"filament" yaml:"filament"`
+	// API stores global HTTP API preferences.
+	API APIConfig `json:"api" yaml:"api"`
+	// Output stores the currently active output configuration.
+	Output outputs.Config
+	// Aggregator stores event aggregator configuration.
+	Aggregator aggregator.Config `json:"aggregator" yaml:"aggregator"`
+	// Log contains logging configuration.
+	Log log.Config `json:"logging" yaml:"logging"`
+	// Transformers stores transformer configurations.
 	Transformers []transformers.Config
+	// Alertsenders stores alert sender configurations.
 	Alertsenders []alertsender.Config
-	Filters      *Filters `json:"filters" yaml:"filters"`
-	ForwardMode  bool     `json:"forward" yaml:"forward"`
-	CapFile      string
+	// Filters contains filter and rule definitions.
+	Filters *Filters `json:"filters" yaml:"filters"`
+	// ForwardMode designates whether event forwarding mode is engaged.
+	ForwardMode bool `json:"forward" yaml:"forward"`
+	// CapFile is the path to the capture file.
+	CapFile string
 
 	flags *pflag.FlagSet
 	viper *viper.Viper
@@ -90,11 +101,22 @@ type Options struct {
 // Option configures the command-specific configuration surface.
 type Option func(*Options)
 
-func WithCapture() Option  { return func(o *Options) { o.capture = true } }
-func WithReplay() Option   { return func(o *Options) { o.replay = true } }
-func WithRun() Option      { return func(o *Options) { o.run = true } }
-func WithList() Option     { return func(o *Options) { o.list = true } }
-func WithStats() Option    { return func(o *Options) { o.stats = true } }
+// WithCapture determines whether the capture command is executed.
+func WithCapture() Option { return func(o *Options) { o.capture = true } }
+
+// WithReplay determines whether the replay command is executed.
+func WithReplay() Option { return func(o *Options) { o.replay = true } }
+
+// WithRun determines whether the run command is executed.
+func WithRun() Option { return func(o *Options) { o.run = true } }
+
+// WithList determines whether the list command is executed.
+func WithList() Option { return func(o *Options) { o.list = true } }
+
+// WithStats determines whether the stats command is executed.
+func WithStats() Option { return func(o *Options) { o.stats = true } }
+
+// WithValidate determines whether the validate command is executed.
 func WithValidate() Option { return func(o *Options) { o.validate = true } }
 
 // NewWithOpts builds a new configuration store from files, environment variables, and flags.
