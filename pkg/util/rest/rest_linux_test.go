@@ -1,5 +1,7 @@
+//go:build linux
+
 /*
- * Copyright 2019-2020 by Nedim Sabic Sabic
+ * Copyright 2026 by Mostafa Moradian
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -19,36 +21,35 @@
 package rest
 
 import (
-	"fmt"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"net"
 	"net/http"
 	"net/http/httptest"
-	"strings"
+	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestGet(t *testing.T) {
+func TestGetUnixSocket(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "fibratus.sock")
+	listener, err := net.Listen("unix", path)
+	require.NoError(t, err)
+
 	mux := http.NewServeMux()
-	mux.HandleFunc("/config", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/config", func(w http.ResponseWriter, _ *http.Request) {
 		if _, err := w.Write([]byte("test")); err != nil {
 			t.Fatal(err)
 		}
 	})
 
-	srv := httptest.NewServer(mux)
+	srv := httptest.NewUnstartedServer(mux)
+	srv.Listener = listener
+	srv.Start()
 	defer srv.Close()
 
-	resp, err := Get(WithURI("config"), WithTransport(fmt.Sprintf("localhost:%s", port(srv.URL))))
+	resp, err := Get(WithURI("config"), WithTransport("unix://"+path))
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	assert.Equal(t, "test", string(resp))
-}
-
-func port(s string) string {
-	i := strings.LastIndex(s, ":")
-	if i == 0 {
-		return ""
-	}
-	return s[i+1:]
 }

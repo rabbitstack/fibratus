@@ -46,9 +46,9 @@ type Option func(o *opts)
 func WithTransport(addr string) Option {
 	return func(o *opts) {
 		o.addr = addr
-		if strings.HasPrefix(addr, `npipe:///`) {
+		if strings.HasPrefix(addr, `npipe:///`) || strings.HasPrefix(addr, `unix://`) {
 			transport = &http.Transport{
-				DialContext: api.DialPipe(addr),
+				DialContext: api.DialLocalTransport(addr),
 			}
 		} else {
 			transport = &http.Transport{
@@ -104,6 +104,9 @@ func request(method string, options ...Option) ([]byte, error) {
 
 	scheme := "http://"
 	addr := strings.TrimPrefix(opts.addr, `npipe:///`)
+	if strings.HasPrefix(addr, "unix://") {
+		addr = "localhost"
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
