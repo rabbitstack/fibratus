@@ -28,8 +28,6 @@ func platformAnsiString() params.Type { return params.String }
 var fields = platformFields(map[Field]FieldInfo{
 	EvtPID:      {EvtPID, "process identifier generating the event", params.Uint64, []string{"evt.pid = 6"}, nil, nil},
 	EvtTID:      {EvtTID, "thread identifier generating the event", params.Uint64, []string{"evt.tid = 1024"}, nil, nil},
-	KevtPID:     {KevtPID, "process identifier generating the event", params.Uint64, []string{"kevt.pid = 6"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtPID}}, nil},
-	KevtTID:     {KevtTID, "thread identifier generating the event", params.Uint64, []string{"kevt.tid = 1024"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtTID}}, nil},
 	PsPid:       {PsPid, "process identifier", params.Uint64, []string{"ps.pid = 1024"}, nil, nil},
 	PsPpid:      {PsPpid, "parent process identifier", params.Uint64, []string{"ps.ppid = 45"}, nil, nil},
 	PsParentPid: {PsParentPid, "parent process id", params.Uint64, []string{"ps.parent.pid = 4"}, nil, nil},

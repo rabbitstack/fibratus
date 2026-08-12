@@ -36,6 +36,8 @@ func TestLinuxFields(t *testing.T) {
 	require.Equal(t, params.Uint64, EvtPID.Type())
 	require.Equal(t, params.Uint64, EvtTID.Type())
 	require.Equal(t, params.Uint64, PsPid.Type())
+	require.False(t, IsField(string(KevtPID)))
+	require.False(t, IsField(string(KevtTID)))
 	require.False(t, IsField(string(PsComm)))
 	require.False(t, IsField(string(RegistryPath)))
 	require.False(t, IsField(string(PeEntrypoint)))
