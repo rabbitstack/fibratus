@@ -22,10 +22,6 @@ package config
 
 import "github.com/rabbitstack/fibratus/pkg/alertsender"
 
-func (c *Config) loadPlatformAlertSender(typ string, config interface{}, configs *[]alertsender.Config) error {
-	// Platform-specific Linux alert senders can be loaded here.
-	_ = typ
-	_ = config
-	_ = configs
+func (c *Config) loadPlatformAlertSender(_ string, _ interface{}, _ *[]alertsender.Config) error {
 	return nil
 }

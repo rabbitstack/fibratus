@@ -22,34 +22,63 @@ package params
 type Type uint16
 
 const (
-	Null    Type = 0
-	Int8    Type = 3
-	Uint8   Type = 4
-	Int16   Type = 5
-	Uint16  Type = 6
-	Int32   Type = 7
-	Uint32  Type = 8
-	Int64   Type = 9
-	Uint64  Type = 10
-	Float   Type = 11
-	Double  Type = 12
-	Bool    Type = 13
-	Binary  Type = 14
-	PID     Type = 18
-	TID     Type = 19
-	Port    Type = 21
-	IP      Type = 22
-	IPv4    Type = 23
-	IPv6    Type = 24
-	Time    Type = 25
-	Slice   Type = 26
-	Enum    Type = 27
-	Map     Type = 28
-	Object  Type = 29
-	Path    Type = 31
-	Status  Type = 32
-	Flags   Type = 34
+	// Null is a null parameter type.
+	Null Type = 0
+	// Int8 is a signed 8-bit integer.
+	Int8 Type = 3
+	// Uint8 is an unsigned 8-bit integer.
+	Uint8 Type = 4
+	// Int16 is a signed 16-bit integer.
+	Int16 Type = 5
+	// Uint16 is an unsigned 16-bit integer.
+	Uint16 Type = 6
+	// Int32 is a signed 32-bit integer.
+	Int32 Type = 7
+	// Uint32 is an unsigned 32-bit integer.
+	Uint32 Type = 8
+	// Int64 is a signed 64-bit integer.
+	Int64 Type = 9
+	// Uint64 is an unsigned 64-bit integer.
+	Uint64 Type = 10
+	// Float is an IEEE 4-byte floating-point number.
+	Float Type = 11
+	// Double is an IEEE 8-byte floating-point number.
+	Double Type = 12
+	// Bool is a boolean value.
+	Bool Type = 13
+	// Binary is variable-sized binary data.
+	Binary Type = 14
+	// PID is a process identifier.
+	PID Type = 18
+	// TID is a thread identifier.
+	TID Type = 19
+	// Port is an endpoint port number.
+	Port Type = 21
+	// IP is an IP address.
+	IP Type = 22
+	// IPv4 is an IPv4 address.
+	IPv4 Type = 23
+	// IPv6 is an IPv6 address.
+	IPv6 Type = 24
+	// Time is a timestamp.
+	Time Type = 25
+	// Slice is a collection of items.
+	Slice Type = 26
+	// Enum is an enumeration.
+	Enum Type = 27
+	// Map is a map of values.
+	Map Type = 28
+	// Object is a generic object.
+	Object Type = 29
+	// Path is a normalized filesystem path.
+	Path Type = 31
+	// Status is a system error code.
+	Status Type = 32
+	// Flags is a bitmask.
+	Flags Type = 34
+	// Flags64 is a 64-bit bitmask.
 	Flags64 Type = 35
+	// Address is a memory address.
 	Address Type = 36
 )
 

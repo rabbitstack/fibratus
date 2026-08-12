@@ -33,14 +33,14 @@ import (
 func TestEventSourceConfigLinux(t *testing.T) {
 	c := NewWithOpts(WithRun())
 	require.NoError(t, c.flags.Parse([]string{
-		"--eventsource.enable-process=false",
+		"--eventsource.enable-fileio=false",
 		"--eventsource.blacklist.events=execve",
 		"--eventsource.blacklist.images=systemd",
 	}))
 	require.NoError(t, c.viper.BindPFlags(c.flags))
 	require.NoError(t, c.Init())
 
-	require.False(t, c.EventSource.EnableProcessEvents)
+	require.False(t, c.EventSource.EnableFileIOEvents)
 	require.True(t, c.EventSource.ExcludeEvent(event.Execve.ID()))
 	require.True(t, c.EventSource.ExcludeImage(&pstypes.PS{Name: "systemd"}))
 	for _, typ := range event.All() {
@@ -51,8 +51,7 @@ func TestEventSourceConfigLinux(t *testing.T) {
 func TestValidateLinuxEventSource(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "fibratus.yml")
 	require.NoError(t, os.WriteFile(file, []byte(`eventsource:
-  enable-process: true
-  enable-file: true
+  enable-fileio: true
   blacklist:
     events:
       - execve

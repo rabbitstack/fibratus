@@ -19,15 +19,24 @@
 package params
 
 const (
+	// UnicodeString is a UTF-16LE string.
 	UnicodeString Type = 1
-	AnsiString    Type = 2
-	GUID          Type = 15
-	Pointer       Type = 16
-	SID           Type = 17
-	WbemSID       Type = 20
-	DOSPath       Type = 30
-	Key           Type = 33
-	HandleType    Type = 37
+	// AnsiString is an 8-bit character string.
+	AnsiString Type = 2
+	// GUID is a globally unique identifier.
+	GUID Type = 15
+	// Pointer is an architecture-sized pointer value.
+	Pointer Type = 16
+	// SID is a Windows security identifier.
+	SID Type = 17
+	// WbemSID is a Web-Based Enterprise Management security identifier.
+	WbemSID Type = 20
+	// DOSPath is a filesystem path in DOS device notation.
+	DOSPath Type = 30
+	// Key is a registry key.
+	Key Type = 33
+	// HandleType is a Windows handle type.
+	HandleType Type = 37
 )
 
 func platformTypeString(t Type) string {
