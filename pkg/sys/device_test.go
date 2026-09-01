@@ -19,6 +19,7 @@
 package sys
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -33,9 +34,10 @@ func TestEnumDevices(t *testing.T) {
 
 	ntoskrnlFound := false
 	for _, drv := range drivers {
+		fmt.Println(drv)
 		if strings.EqualFold(filepath.Base(drv.Path), "ntoskrnl.exe") {
 			ntoskrnlFound = true
-			break
+			//break
 		}
 	}
 	assert.True(t, ntoskrnlFound)

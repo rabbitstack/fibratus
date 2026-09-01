@@ -22,6 +22,7 @@
 package etw
 
 import (
+	"fmt"
 	"strings"
 	"unsafe"
 
@@ -50,6 +51,8 @@ var WindowsKernelProcessGUID = windows.GUID{Data1: 0x22fb2cd6, Data2: 0x0e7b, Da
 
 // WindowsKernelRegistryGUID represents the GUID for the Microsoft Windows Kernel Registry provider
 var WindowsKernelRegistryGUID = windows.GUID{Data1: 0x70eb4f03, Data2: 0xc1de, Data3: 0x4f73, Data4: [8]byte{0xa0, 0x51, 0x33, 0xd1, 0x3d, 0x54, 0x13, 0xbd}}
+
+var AttackSurfaceMonitorGUID = windows.GUID{Data1: 0xc4e507b1, Data2: 0x7224, Data3: 0x4737, Data4: [8]byte{0xbd, 0xe0, 0xce, 0xd9, 0x28, 0x4e, 0x70, 0x73}}
 
 const (
 	// TraceStackTracingInfo controls call stack tracing for kernel events
@@ -677,8 +680,28 @@ func (e *EventRecord) Version() uint8 {
 	return e.Header.EventDescriptor.Version
 }
 
+const (
+	AstIoctlCalled   = "Ast.IoctlCalled"
+	AstDeviceCreated = "Ast.DeviceCreated"
+)
+
 // HookID returns either the opcode or the event ID.
 func (e *EventRecord) HookID() uint16 {
+	if e.Header.ProviderID == AttackSurfaceMonitorGUID {
+		name, err := e.EventName()
+		if err != nil {
+			return 0
+		}
+		fmt.Println(name)
+		switch name {
+		case AstDeviceCreated:
+			return 1
+		case AstIoctlCalled:
+			return 3
+		}
+		panic(name)
+		return 0
+	}
 	if e.Header.EventDescriptor.Opcode > 0 {
 		return uint16(e.Header.EventDescriptor.Opcode)
 	}
@@ -849,6 +872,28 @@ func (e *EventRecord) ReadNTUnicodeString(offset uint16) (string, uint16) {
 	return s.String(), s.Length + offset
 }
 
+// ReadCountedString reads a COUNTEDSTRING from the buffer at the specified
+// offset. A counted string is prefixed by a UINT16 that gives the byte
+// length of the UTF-16LE data that follows.
+func (e *EventRecord) ReadCountedString(offset uint16) (string, uint16) {
+	if offset+2 > e.BufferLen {
+		return "", 0
+	}
+
+	length := *(*uint16)(unsafe.Pointer(e.Buffer + uintptr(offset)))
+	if length == 0 {
+		return "", offset + 2
+	}
+
+	if offset+2+length > e.BufferLen {
+		return "", offset + 2
+	}
+
+	b := (*[1<<30 - 1]uint16)(unsafe.Pointer(e.Buffer + uintptr(offset+2)))[: length/2 : length/2]
+
+	return utf16.Decode(b), offset + 2 + length
+}
+
 // ConsumeUTF16String reads the byte slice with UTF16-encoded string
 // when the UTF16 string is located at the end of the buffer.
 func (e *EventRecord) ConsumeUTF16String(offset uint16) string {
@@ -917,6 +962,10 @@ func (e *EventRecord) ReadCallstackInto(offset uint16, v va.Callstack) []va.Addr
 		n++
 	}
 	return v
+}
+
+func (e *EventRecord) EventName() (string, error) {
+	return GetEventTaskName(e)
 }
 
 // EventExtendedItemStackTrace64 defines a call stack on a 64-bit machine.

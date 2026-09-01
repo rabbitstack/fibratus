@@ -45,6 +45,7 @@ const (
 	Handle Category = "handle"
 	// Driver is the category for driver events
 	Driver Category = "driver"
+	Device Category = "device"
 	// Mem is the category for memory events
 	Mem Category = "mem"
 	// Object the category for object manager events
@@ -70,7 +71,7 @@ func (c Category) Hash() uint32 {
 }
 
 // MaxCategoryIndex designates the maximum category index.
-const MaxCategoryIndex = 13
+const MaxCategoryIndex = 14
 
 // Index returns a numerical category index.
 func (c Category) Index() uint8 {
@@ -99,6 +100,8 @@ func (c Category) Index() uint8 {
 		return 11
 	case Other:
 		return 12
+	case Device:
+		return 13
 	default:
 		return MaxCategoryIndex
 	}
@@ -120,6 +123,7 @@ func Categories() []string {
 		string(Unknown),
 		string(Object),
 		string(Threadpool),
+		string(Device),
 	}
 }
 

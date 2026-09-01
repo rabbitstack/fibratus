@@ -22,10 +22,11 @@
 package etw
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/errors"
-	"golang.org/x/sys/windows"
 	"os"
 	"unsafe"
+
+	"github.com/rabbitstack/fibratus/pkg/errors"
+	"golang.org/x/sys/windows"
 )
 
 //go:generate go run golang.org/x/sys/windows/mkwinsyscall -output zsyscall_windows.go etw.go
@@ -38,6 +39,7 @@ import (
 //sys traceSetInformation(handle TraceHandle, infoClass uint8, info uintptr, length uint32) (err error) [failretval!=0] = advapi32.TraceSetInformation
 //sys traceQueryInformation(handle TraceHandle, infoClass uint8, info uintptr, length uint32, size *uint32) (err error) [failretval!=0] = advapi32.TraceQueryInformation
 //sys enableTraceEx2(handle TraceHandle, providerID *windows.GUID, controlCode uint32, level uint8, matchAnyKeyword uint64, matchAllKeyword uint64, timeout uint32, enableParameters *EnableTraceParameters) (err error) [failretval!=0] = advapi32.EnableTraceEx2
+//sys tdhGetEventInformation(event *EventRecord, contextCount uint32, ctx uintptr, buf *byte, size *uint32) (status syscall.Errno) = tdh.TdhGetEventInformation
 
 // EnableTraceParametersVersion determines the version of the EnableTraceParameters structure.
 const EnableTraceParametersVersion = 2
@@ -216,7 +218,7 @@ const (
 
 // EnableTrace influences the behaviour of the specified event trace provider.
 func EnableTrace(guid windows.GUID, handle TraceHandle, keywords uint64) error {
-	err := enableTraceEx2(handle, &guid, ControlCodeEnableProvider, TraceLevelInformation, keywords, 0, 0, nil)
+	err := enableTraceEx2(handle, &guid, ControlCodeEnableProvider, 5, keywords, 0, 0, nil)
 	if err != nil {
 		return os.NewSyscallError("EnableTraceEx2", err)
 	}
@@ -258,7 +260,7 @@ func EnableTraceWithOpts(guid windows.GUID, handle TraceHandle, keywords uint64,
 		params.FilterDescCount = uint32(len(opts.EventFilterDescriptors))
 	}
 
-	err := enableTraceEx2(handle, &guid, ControlCodeEnableProvider, TraceLevelInformation, keywords, 0, 0, params)
+	err := enableTraceEx2(handle, &guid, ControlCodeEnableProvider, 5, keywords, 0, 0, params)
 	if err != nil {
 		return os.NewSyscallError("EnableTraceEx2", err)
 	}

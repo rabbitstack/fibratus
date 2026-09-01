@@ -610,6 +610,25 @@ func (d *ParamDecoder) DecodeDNS(r *etw.EventRecord, e *Event) {
 	}
 }
 
+// DecodeDeviceIo
+func (d *ParamDecoder) DecodeDeviceIo(r *etw.EventRecord, e *Event) {
+	switch r.HookID() {
+	case CreateIoDeviceID:
+		deviceName, offset := r.ReadCountedString(8)
+		e.AppendParam("device_name", params.AnsiString, deviceName)
+		e.AppendParam("device_type", params.Uint32, r.ReadUint32(offset))
+		e.AppendParam("device_characteristics", params.Uint32, r.ReadUint32(offset+4))
+		e.AppendParam("device_object", params.Address, r.ReadUint64(offset+8))
+		e.AppendParam(params.Callstack, params.Slice, r.Callstack())
+	case DeviceIoControlID:
+		e.AppendParam("device_object", params.Address, r.ReadUint64(8))
+		e.AppendParam("ioctl_code", params.Uint32, r.ReadUint32(16))
+		e.AppendParam("hash", params.Uint64, r.ReadUint64(20))
+		e.AppendParam("len", params.Uint32, r.ReadUint32(28))
+		e.AppendParam(params.Callstack, params.Slice, r.Callstack())
+	}
+}
+
 // sanitizeDNSAnswers removes the "type" string from DNS answers.
 func sanitizeDNSAnswers(answers string) string {
 	return strings.ReplaceAll(answers, "type: 5 ", "")

@@ -175,6 +175,8 @@ func (e *EventSource) Open(config *config.Config) error {
 	// from the snapshotter
 	trace.AddProvider(etw.WindowsKernelProcessGUID, false, WithKeywords(etw.ProcessKeyword|etw.ImageKeyword), WithCaptureState())
 
+	trace.AddProvider(etw.AttackSurfaceMonitorGUID, true)
+
 	// in a similar vein, Windows Kernel Registry provider publishes
 	// the RegSetValue event with the full captured data for the
 	// modified value. This data is used to attach various parameters
@@ -211,6 +213,7 @@ func (e *EventSource) Open(config *config.Config) error {
 	// add security telemetry trace
 	e.addTrace(trace)
 	// add the core NT Kernel Logger trace
+	//e.addTrace(NewAttackSurfaceKernelTrace(config))
 	e.addTrace(NewKernelTrace(config))
 
 	for _, t := range e.traces {

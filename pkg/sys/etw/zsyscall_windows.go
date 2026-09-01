@@ -39,19 +39,21 @@ func errnoErr(e syscall.Errno) error {
 
 var (
 	modadvapi32 = windows.NewLazySystemDLL("advapi32.dll")
+	modtdh      = windows.NewLazySystemDLL("tdh.dll")
 
-	procCloseTrace            = modadvapi32.NewProc("CloseTrace")
-	procControlTraceW         = modadvapi32.NewProc("ControlTraceW")
-	procEnableTraceEx2        = modadvapi32.NewProc("EnableTraceEx2")
-	procOpenTraceW            = modadvapi32.NewProc("OpenTraceW")
-	procProcessTrace          = modadvapi32.NewProc("ProcessTrace")
-	procStartTraceW           = modadvapi32.NewProc("StartTraceW")
-	procTraceQueryInformation = modadvapi32.NewProc("TraceQueryInformation")
-	procTraceSetInformation   = modadvapi32.NewProc("TraceSetInformation")
+	procCloseTrace             = modadvapi32.NewProc("CloseTrace")
+	procControlTraceW          = modadvapi32.NewProc("ControlTraceW")
+	procEnableTraceEx2         = modadvapi32.NewProc("EnableTraceEx2")
+	procOpenTraceW             = modadvapi32.NewProc("OpenTraceW")
+	procProcessTrace           = modadvapi32.NewProc("ProcessTrace")
+	procStartTraceW            = modadvapi32.NewProc("StartTraceW")
+	procTraceQueryInformation  = modadvapi32.NewProc("TraceQueryInformation")
+	procTraceSetInformation    = modadvapi32.NewProc("TraceSetInformation")
+	procTdhGetEventInformation = modtdh.NewProc("TdhGetEventInformation")
 )
 
 func closeTrace(handle TraceHandle) (err error) {
-	r1, _, e1 := syscall.Syscall(procCloseTrace.Addr(), 1, uintptr(handle), 0, 0)
+	r1, _, e1 := syscall.SyscallN(procCloseTrace.Addr(), uintptr(handle))
 	if r1 == 0 {
 		err = errnoErr(e1)
 	}
@@ -68,7 +70,7 @@ func controlTrace(handle TraceHandle, name string, props *EventTraceProperties, 
 }
 
 func _controlTrace(handle TraceHandle, name *uint16, props *EventTraceProperties, operation TraceOperation) (err error) {
-	r1, _, e1 := syscall.Syscall6(procControlTraceW.Addr(), 4, uintptr(handle), uintptr(unsafe.Pointer(name)), uintptr(unsafe.Pointer(props)), uintptr(operation), 0, 0)
+	r1, _, e1 := syscall.SyscallN(procControlTraceW.Addr(), uintptr(handle), uintptr(unsafe.Pointer(name)), uintptr(unsafe.Pointer(props)), uintptr(operation))
 	if r1 != 0 {
 		err = errnoErr(e1)
 	}
@@ -76,7 +78,7 @@ func _controlTrace(handle TraceHandle, name *uint16, props *EventTraceProperties
 }
 
 func enableTraceEx2(handle TraceHandle, providerID *windows.GUID, controlCode uint32, level uint8, matchAnyKeyword uint64, matchAllKeyword uint64, timeout uint32, enableParameters *EnableTraceParameters) (err error) {
-	r1, _, e1 := syscall.Syscall9(procEnableTraceEx2.Addr(), 8, uintptr(handle), uintptr(unsafe.Pointer(providerID)), uintptr(controlCode), uintptr(level), uintptr(matchAnyKeyword), uintptr(matchAllKeyword), uintptr(timeout), uintptr(unsafe.Pointer(enableParameters)), 0)
+	r1, _, e1 := syscall.SyscallN(procEnableTraceEx2.Addr(), uintptr(handle), uintptr(unsafe.Pointer(providerID)), uintptr(controlCode), uintptr(level), uintptr(matchAnyKeyword), uintptr(matchAllKeyword), uintptr(timeout), uintptr(unsafe.Pointer(enableParameters)))
 	if r1 != 0 {
 		err = errnoErr(e1)
 	}
@@ -84,13 +86,13 @@ func enableTraceEx2(handle TraceHandle, providerID *windows.GUID, controlCode ui
 }
 
 func openTrace(logfile *EventTraceLogfile) (handle TraceHandle) {
-	r0, _, _ := syscall.Syscall(procOpenTraceW.Addr(), 1, uintptr(unsafe.Pointer(logfile)), 0, 0)
+	r0, _, _ := syscall.SyscallN(procOpenTraceW.Addr(), uintptr(unsafe.Pointer(logfile)))
 	handle = TraceHandle(r0)
 	return
 }
 
 func processTrace(handle *TraceHandle, count uint32, start *windows.Filetime, end *windows.Filetime) (err error) {
-	r1, _, e1 := syscall.Syscall6(procProcessTrace.Addr(), 4, uintptr(unsafe.Pointer(handle)), uintptr(count), uintptr(unsafe.Pointer(start)), uintptr(unsafe.Pointer(end)), 0, 0)
+	r1, _, e1 := syscall.SyscallN(procProcessTrace.Addr(), uintptr(unsafe.Pointer(handle)), uintptr(count), uintptr(unsafe.Pointer(start)), uintptr(unsafe.Pointer(end)))
 	if r1 != 0 {
 		err = errnoErr(e1)
 	}
@@ -107,7 +109,7 @@ func startTrace(handle *TraceHandle, name string, props *EventTraceProperties) (
 }
 
 func _startTrace(handle *TraceHandle, name *uint16, props *EventTraceProperties) (err error) {
-	r1, _, e1 := syscall.Syscall(procStartTraceW.Addr(), 3, uintptr(unsafe.Pointer(handle)), uintptr(unsafe.Pointer(name)), uintptr(unsafe.Pointer(props)))
+	r1, _, e1 := syscall.SyscallN(procStartTraceW.Addr(), uintptr(unsafe.Pointer(handle)), uintptr(unsafe.Pointer(name)), uintptr(unsafe.Pointer(props)))
 	if r1 != 0 {
 		err = errnoErr(e1)
 	}
@@ -115,7 +117,7 @@ func _startTrace(handle *TraceHandle, name *uint16, props *EventTraceProperties)
 }
 
 func traceQueryInformation(handle TraceHandle, infoClass uint8, info uintptr, length uint32, size *uint32) (err error) {
-	r1, _, e1 := syscall.Syscall6(procTraceQueryInformation.Addr(), 5, uintptr(handle), uintptr(infoClass), uintptr(info), uintptr(length), uintptr(unsafe.Pointer(size)), 0)
+	r1, _, e1 := syscall.SyscallN(procTraceQueryInformation.Addr(), uintptr(handle), uintptr(infoClass), uintptr(info), uintptr(length), uintptr(unsafe.Pointer(size)))
 	if r1 != 0 {
 		err = errnoErr(e1)
 	}
@@ -123,9 +125,15 @@ func traceQueryInformation(handle TraceHandle, infoClass uint8, info uintptr, le
 }
 
 func traceSetInformation(handle TraceHandle, infoClass uint8, info uintptr, length uint32) (err error) {
-	r1, _, e1 := syscall.Syscall6(procTraceSetInformation.Addr(), 4, uintptr(handle), uintptr(infoClass), uintptr(info), uintptr(length), 0, 0)
+	r1, _, e1 := syscall.SyscallN(procTraceSetInformation.Addr(), uintptr(handle), uintptr(infoClass), uintptr(info), uintptr(length))
 	if r1 != 0 {
 		err = errnoErr(e1)
 	}
+	return
+}
+
+func tdhGetEventInformation(event *EventRecord, contextCount uint32, ctx uintptr, buf *byte, size *uint32) (status syscall.Errno) {
+	r0, _, _ := syscall.SyscallN(procTdhGetEventInformation.Addr(), uintptr(unsafe.Pointer(event)), uintptr(contextCount), uintptr(ctx), uintptr(unsafe.Pointer(buf)), uintptr(unsafe.Pointer(size)))
+	status = syscall.Errno(r0)
 	return
 }

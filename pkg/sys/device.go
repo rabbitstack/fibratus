@@ -38,6 +38,8 @@ type Driver struct {
 	Size uint32
 }
 
+type DeviceInventory struct{}
+
 // RTL_PROCESS_MODULE_INFORMATION mirrors the C struct
 type RTL_PROCESS_MODULE_INFORMATION struct {
 	Section          uintptr

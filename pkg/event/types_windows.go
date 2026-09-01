@@ -73,6 +73,8 @@ var (
 	RegistryKernelEventGUID = windows.GUID{Data1: 0x70eb4f03, Data2: 0xc1de, Data3: 0x4f73, Data4: [8]byte{0xa0, 0x51, 0x33, 0xd1, 0x3d, 0x54, 0x13, 0xbd}}
 	// StackWalkEventGUID represents the StackWalk event GUID
 	StackWalkEventGUID = windows.GUID{Data1: 0xdef2fe46, Data2: 0x7bd6, Data3: 0x4b80, Data4: [8]byte{0xbd, 0x94, 0xf5, 0x7f, 0xe2, 0x0d, 0x0c, 0xe3}}
+
+	AttackSurfaceEventGUID = windows.GUID{Data1: 0xc4e507b1, Data2: 0x7224, Data3: 0x4737, Data4: [8]byte{0xbd, 0xe0, 0xce, 0xd9, 0x28, 0x4e, 0x70, 0x73}}
 )
 
 const (
@@ -154,6 +156,9 @@ const (
 	SubmitThreadpoolWorkID     uint8 = 32
 	SubmitThreadpoolCallbackID uint8 = 34
 	SetThreadpoolTimerID       uint8 = 44
+
+	CreateIoDeviceID  uint16 = 1
+	DeviceIoControlID uint16 = 3
 )
 
 var (
@@ -317,6 +322,10 @@ var (
 	// SetThreadpoolTimer represents the event that sets the thread pool timer object
 	SetThreadpoolTimer = pack(ThreadpoolEventGUID, uint16(SetThreadpoolTimerID))
 
+	CreateIoDevice = pack(AttackSurfaceEventGUID, CreateIoDeviceID)
+
+	DeviceIoControl = pack(AttackSurfaceEventGUID, DeviceIoControlID)
+
 	// UnknownType designates unknown event type
 	UnknownType = pack(windows.GUID{}, 0)
 )
@@ -440,6 +449,10 @@ func (t Type) String() string {
 		return "SubmitThreadpoolCallback"
 	case SetThreadpoolTimer:
 		return "SetThreadpoolTimer"
+	case CreateIoDevice:
+		return "CreateIoDevice"
+	case DeviceIoControl:
+		return "DeviceIoControl"
 	default:
 		return ""
 	}
@@ -477,6 +490,8 @@ func (t Type) Category() Category {
 		return Object
 	case SubmitThreadpoolWork, SubmitThreadpoolCallback, SetThreadpoolTimer:
 		return Threadpool
+	case CreateIoDevice, DeviceIoControl:
+		return Device
 	default:
 		return Unknown
 	}

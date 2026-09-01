@@ -256,5 +256,7 @@ func (e *Event) decodeParams(r *etw.EventRecord) {
 		case LoadModuleInternalID:
 			paramDecoder.DecodeModuleInternal(r, e)
 		}
+	case AttackSurfaceEventGUID:
+		paramDecoder.DecodeDeviceIo(r, e)
 	}
 }
