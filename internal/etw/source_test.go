@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"slices"
 	"strings"
@@ -134,8 +135,8 @@ func TestEventSourceStartTraces(t *testing.T) {
 
 			for _, trace := range evs.(*EventSource).traces {
 				require.True(t, trace.Handle().IsValid())
-				require.NoError(t, etw.ControlTrace(0, trace.Name, trace.GUID, etw.Query))
-				if tt.wantFlags != nil && trace.IsKernelTrace() {
+				require.True(t, trace.IsRunning())
+				if tt.wantFlags != nil && reflect.TypeOf(trace) == reflect.TypeOf((*KernelTrace)(nil)) {
 					flags, err := etw.GetTraceSystemFlags(trace.Handle())
 					require.NoError(t, err)
 					// check enabled system event flags
@@ -204,7 +205,7 @@ func TestEventSourceEnableFlagsDynamically(t *testing.T) {
 
 	require.Len(t, evs.(*EventSource).traces, 2)
 
-	flags := evs.(*EventSource).traces[1].enableFlagsDynamically(cfg.EventSource)
+	flags := enableFlagsDynamically(cfg.EventSource)
 
 	require.True(t, flags&etw.FileIO != 0)
 	require.True(t, flags&etw.Process != 0)
@@ -289,7 +290,7 @@ func TestEventSourceEnableFlagsDynamicallyWithYaraEnabled(t *testing.T) {
 
 	require.Len(t, evs.(*EventSource).traces, 2)
 
-	flags := evs.(*EventSource).traces[1].enableFlagsDynamically(cfg.EventSource)
+	flags := enableFlagsDynamically(cfg.EventSource)
 
 	// rules compile result doesn't have file events
 	// but Yara file scanning is enabled

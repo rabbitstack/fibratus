@@ -73,7 +73,7 @@ var (
 // consumers.
 type EventSource struct {
 	r          *config.RulesCompileResult
-	traces     []*Trace
+	traces     []Trace
 	consumers  []*Consumer
 	processors *processors.Chain
 
@@ -101,7 +101,7 @@ func NewEventSource(
 ) source.EventSource {
 	evs := &EventSource{
 		r:          compiler,
-		traces:     make([]*Trace, 0),
+		traces:     make([]Trace, 0),
 		consumers:  make([]*Consumer, 0),
 		processors: processors.NewChain(psnap, hsnap, config),
 		errs:       make(chan error, 1000),
@@ -167,7 +167,7 @@ func (e *EventSource) Open(config *config.Config) error {
 	}
 
 	// security telemetry trace hosts all ETW providers but NT Kernel Logger
-	trace := NewTrace(etw.SecurityTelemetrySession, config)
+	trace := NewUserTrace(etw.SecurityTelemetrySession, config)
 
 	// Windows Kernel Process session permits enriching event state with
 	// additional attributes and guaranteeing that any event published by
@@ -217,7 +217,7 @@ func (e *EventSource) Open(config *config.Config) error {
 		err := t.Start()
 		switch err {
 		case errs.ErrTraceAlreadyRunning:
-			log.Debugf("%s trace is already running. Trying to restart...", t.Name)
+			log.Debugf("%s trace is already running. Trying to restart...", t.Name())
 			if err := t.Stop(); err != nil {
 				return err
 			}
@@ -266,27 +266,27 @@ func (e *EventSource) Open(config *config.Config) error {
 		// Open the trace and assign a consumer
 		err = t.Open(consumer, e.errs)
 		if err != nil {
-			return fmt.Errorf("unable to open %s trace: %v", t.Name, err)
+			return fmt.Errorf("unable to open %s trace: %v", t.Name(), err)
 		}
-		log.Infof("starting [%s] trace processing", t.Name)
+		log.Infof("starting [%s] trace processing", t.Name())
 
 		// Instruct the provider to emit state information
 		if err := t.CaptureState(); err != nil {
-			log.Warnf("unable to capture trace %s state: %v", t.Name, err)
+			log.Warnf("unable to capture trace %s state: %v", t.Name(), err)
 		}
 
 		// Start event processing loop
 		errch := make(chan error)
 		go t.Process(errch)
 
-		go func(trace *Trace) {
+		go func(trace Trace) {
 			select {
 			case <-e.stop:
 				return
 			case err := <-errch:
-				log.Infof("stopping [%s] trace processing", trace.Name)
+				log.Infof("stopping [%s] trace processing", trace.Name())
 				if err != nil && !errors.Is(err, errs.ErrTraceCancelled) {
-					e.errs <- fmt.Errorf("unable to process %s trace: %v", trace.Name, err)
+					e.errs <- fmt.Errorf("unable to process %s trace: %v", trace.Name(), err)
 				}
 			}
 		}(t)
@@ -315,15 +315,15 @@ func (e *EventSource) Close() error {
 			continue
 		}
 		if err := trace.Flush(); err != nil {
-			log.Warnf("couldn't flush trace session for [%s]: %v", trace.Name, err)
+			log.Warnf("couldn't flush trace session for [%s]: %v", trace.Name(), err)
 		}
 		time.Sleep(time.Millisecond * 150)
 		if err := trace.Close(); err != nil {
-			log.Warnf("couldn't close trace session for [%s]: %v", trace.Name, err)
+			log.Warnf("couldn't close trace session for [%s]: %v", trace.Name(), err)
 		}
 		time.Sleep(time.Millisecond * 250)
 		if err := trace.Stop(); err != nil {
-			log.Warnf("couldn't stop trace session for [%s]: %v", trace.Name, err)
+			log.Warnf("couldn't stop trace session for [%s]: %v", trace.Name(), err)
 		}
 	}
 
@@ -357,6 +357,6 @@ func (e *EventSource) RegisterEventListener(lis event.Listener) {
 	e.listeners = append(e.listeners, lis)
 }
 
-func (e *EventSource) addTrace(trace *Trace) {
+func (e *EventSource) addTrace(trace Trace) {
 	e.traces = append(e.traces, trace)
 }
