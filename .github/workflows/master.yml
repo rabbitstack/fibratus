@@ -80,8 +80,8 @@ jobs:
           export PKG_CONFIG_PATH=$(pwd)/pkg-config
           export COMMIT=$(echo $GITHUB_SHA | cut -c1-8)
           export VERSION=0.0.0
-          ./make.bat rsrc
           ./make.bat mc
+          ./make.bat rsrc
           ./make.bat
         env:
           TAGS: cap,filament,yara,yara_static

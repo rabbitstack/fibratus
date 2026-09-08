@@ -81,8 +81,8 @@ jobs:
           export PKG_CONFIG_PATH=$(pwd)/pkg-config
           export COMMIT=$(echo $GITHUB_SHA | cut -c1-8)
           export VERSION=${{ steps.get_version.outputs.VERSION }}
-          ./make.bat rsrc
           ./make.bat mc
+          ./make.bat rsrc
           ./make.bat
         env:
           TAGS: cap,filament,yara,yara_static
@@ -137,8 +137,8 @@ jobs:
           export PATH=/c/msys64/mingw64/bin:$PATH
           export COMMIT=$(echo $GITHUB_SHA | cut -c1-8)
           export VERSION=${{ steps.get_version.outputs.VERSION }}
-          ./make.bat rsrc
           ./make.bat mc
+          ./make.bat rsrc
           ./make.bat
       - name: Install Wix
         shell: bash

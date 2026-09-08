@@ -139,62 +139,6 @@ var types = map[string]Type{
 	"CreateSymbolicLinkObject": CreateSymbolicLinkObject,
 }
 
-// indexedEvents keeps the slice of event infos. When the
-// new event type is added, MAKE SURE TO ADD the event info
-// at the END of the slice. This way the event index is guaranteed
-// to remain static which is important for eventlog message identifiers.
-var indexedEvents = []Info{
-	events[CreateProcess],
-	events[TerminateProcess],
-	events[OpenProcess],
-	events[CreateThread],
-	events[TerminateThread],
-	events[OpenThread],
-	events[SetThreadContext],
-	events[LoadModule],
-	events[UnloadModule],
-	events[CreateFile],
-	events[CloseFile],
-	events[ReadFile],
-	events[WriteFile],
-	events[SetFileInformation],
-	events[DeleteFile],
-	events[RenameFile],
-	events[EnumDirectory],
-	events[RegCreateKey],
-	events[RegOpenKey],
-	events[RegSetValue],
-	events[RegQueryValue],
-	events[RegQueryKey],
-	events[RegDeleteKey],
-	events[RegDeleteValue],
-	events[AcceptTCPv4],
-	events[AcceptTCPv6],
-	events[SendTCPv4],
-	events[SendTCPv6],
-	events[SendUDPv4],
-	events[SendUDPv6],
-	events[RecvTCPv4],
-	events[RecvTCPv6],
-	events[RecvUDPv4],
-	events[RecvUDPv6],
-	events[ConnectTCPv4],
-	events[ConnectTCPv6],
-	events[ReconnectTCPv4],
-	events[ReconnectTCPv6],
-	events[DisconnectTCPv4],
-	events[DisconnectTCPv6],
-	events[RetransmitTCPv4],
-	events[RetransmitTCPv6],
-	events[VirtualAlloc],
-	events[VirtualFree],
-	events[MapViewFile],
-	events[UnmapViewFile],
-	events[QueryDNS],
-	events[ReplyDNS],
-	events[CreateSymbolicLinkObject],
-}
-
 // All returns all event types.
 func All() []Type {
 	s := make([]Type, 0, len(types))
@@ -305,7 +249,3 @@ func IsKnown(name string) bool {
 	}
 	return false
 }
-
-// GetTypesMetaIndexed returns indexed event types metadata
-// that is guaranteed to always return the same event indices.
-func GetTypesMetaIndexed() []Info { return indexedEvents }

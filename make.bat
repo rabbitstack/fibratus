@@ -1,4 +1,4 @@
-:: Copyright 2019-2020 by Nedim Sabic Sabic
+:: Copyright 2019-2026 by Nedim Sabic Sabic
 :: https://www.fibratus.io
 :: All Rights Reserved.
 ::
@@ -93,11 +93,8 @@ goto :EOF
 
 :mc
 :: Generate eventlog message compiler input file
-go generate github.com/rabbitstack/fibratus/pkg/outputs/eventlog
-windmc -c -r pkg/outputs/eventlog/mc pkg/outputs/eventlog/mc/fibratus.mc
-windres -O coff -r -fo pkg/outputs/eventlog/mc/fibratus.res pkg/outputs/eventlog/mc/fibratus.rc
-:: Link the resulting resource object
-gcc pkg/outputs/eventlog/mc/fibratus.res -o pkg/outputs/eventlog/mc/fibratus.dll -s -shared "-Wl,--subsystem,windows"
+go generate github.com/rabbitstack/fibratus/pkg/util/eventlog
+windmc -c -r pkg/util/eventlog/mc pkg/util/eventlog/mc/fibratus.mc
 if errorlevel 1 goto fail
 goto :EOF
 
@@ -118,7 +115,6 @@ copy /y ".\cmd\fibratus\fibratus.exe" "%RELEASE_DIR%\Bin"
 copy /y ".\cmd\systray\fibratus-systray.exe" "%RELEASE_DIR%\Bin"
 copy /y ".\cmd\fibratus\fibratus.ico" "%RELEASE_DIR%\Bin"
 copy /y ".\configs\fibratus.yml" "%RELEASE_DIR%\Config\fibratus.yml"
-copy /y ".\pkg\outputs\eventlog\mc\fibratus.dll" "%RELEASE_DIR%\fibratus.dll"
 
 robocopy ".\filaments" "%RELEASE_DIR%\Filaments" /E /S /XF *.md /XD __pycache__ .idea
 robocopy ".\rules" "%RELEASE_DIR%\Rules" /E /S /XF *.md *.png
@@ -178,7 +174,6 @@ copy /y ".\cmd\fibratus\fibratus.exe" "%RELEASE_DIR%\Bin"
 copy /y ".\cmd\systray\fibratus-systray.exe" "%RELEASE_DIR%\Bin"
 copy /y ".\cmd\fibratus\fibratus.ico" "%RELEASE_DIR%\Bin"
 copy /y ".\configs\fibratus.yml" "%RELEASE_DIR%\Config\fibratus.yml"
-copy /y ".\pkg\outputs\eventlog\mc\fibratus.dll" "%RELEASE_DIR%\fibratus.dll"
 
 robocopy ".\rules" "%RELEASE_DIR%\Rules" /E /S /XF *.md *.png
 
