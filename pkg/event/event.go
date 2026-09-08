@@ -44,11 +44,6 @@ const (
 	YaraMatchesKey MetadataKey = "yara.matches"
 	// RuleNameKey identifies the rule that was triggered by the event
 	RuleNameKey MetadataKey = "rule.name"
-	// RuleSequenceLink represents the join link values in sequence rules
-	RuleSequenceLinks MetadataKey = "rule.seq.links"
-	// RuleSequenceOOOKey the presence of this metadata key indicates the
-	// event in the partials list arrived out of order and requires reevaluation
-	RuleSequenceOOOKey MetadataKey = "rule.seq.ooo"
 	// EvasionsKey represents the evasion behaviours detected on the event
 	EvasionsKey MetadataKey = "evasions"
 )
@@ -306,20 +301,6 @@ func (e *Event) ContainsMeta(k MetadataKey) bool {
 	return e.Metadata[k] != nil
 }
 
-// AddSequenceLink adds a new sequence link to the set.
-func (e *Event) AddSequenceLink(link any) {
-	if e.ContainsMeta(RuleSequenceLinks) {
-		links, ok := e.GetMeta(RuleSequenceLinks).(map[any]struct{})
-		if !ok {
-			return
-		}
-		links[link] = struct{}{}
-		e.AddMeta(RuleSequenceLinks, links)
-	} else {
-		e.AddMeta(RuleSequenceLinks, map[any]struct{}{link: {}})
-	}
-}
-
 // AppendParam adds a new parameter to this event.
 func (e *Event) AppendParam(name string, typ params.Type, value params.Value, opts ...ParamOption) {
 	e.Params.Append(name, typ, value, opts...)
@@ -362,19 +343,4 @@ func (e *Event) GetParamAsUint64(name string) uint64 {
 // GetParamAsUint32 returns the uint32 value of the given parameter.
 func (e *Event) GetParamAsUint32(name string) uint32 {
 	return e.Params.TryGetUint32(name)
-}
-
-// SequenceLink returns the sequence link values from event metadata.
-func (e *Event) SequenceLinks() []any {
-	e.mmux.RLock()
-	defer e.mmux.RUnlock()
-	links, ok := e.Metadata[RuleSequenceLinks].(map[any]struct{})
-	if !ok {
-		return nil
-	}
-	s := make([]any, 0, len(links))
-	for v := range links {
-		s = append(s, v)
-	}
-	return s
 }

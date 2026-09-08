@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ql
+package parser
 
 import (
 	"errors"
@@ -25,8 +25,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rabbitstack/fibratus/pkg/compiler/ast"
+	"github.com/rabbitstack/fibratus/pkg/compiler/fields"
 	"github.com/rabbitstack/fibratus/pkg/config"
-	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -94,33 +95,33 @@ func TestParser(t *testing.T) {
 func TestParseUnaryExpr(t *testing.T) {
 	var tests = []struct {
 		expr       string
-		ee         Expr
+		ee         ast.Expr
 		err        string
-		assertions func(t *testing.T, e Expr)
+		assertions func(t *testing.T, e ast.Expr)
 	}{
-		{"ps.name", &FieldLiteral{}, "", nil},
-		{"ps.name[", &FieldLiteral{}, "expected ident, integer", nil},
-		{"ps.name[svchost.exe]", &FieldLiteral{}, "expected field without argument", nil},
-		{"ps.ancestor[1]", &FieldLiteral{}, "", func(t *testing.T, e Expr) {
-			f := e.(*FieldLiteral)
+		{"ps.name", &ast.FieldLiteral{}, "", nil},
+		{"ps.name[", &ast.FieldLiteral{}, "expected ident, integer", nil},
+		{"ps.name[svchost.exe]", &ast.FieldLiteral{}, "expected field without argument", nil},
+		{"ps.ancestor[1]", &ast.FieldLiteral{}, "", func(t *testing.T, e ast.Expr) {
+			f := e.(*ast.FieldLiteral)
 			assert.Equal(t, "1", f.Arg)
 		}},
-		{"$entry", &BareBoundVariableLiteral{}, "", nil},
-		{"$entry.entropy", &BoundSegmentLiteral{}, "", func(t *testing.T, e Expr) {
-			s := e.(*BoundSegmentLiteral)
+		{"$entry", &ast.BareBoundVariableLiteral{}, "", nil},
+		{"$entry.entropy", &ast.BoundSegmentLiteral{}, "", func(t *testing.T, e ast.Expr) {
+			s := e.(*ast.BoundSegmentLiteral)
 			assert.Equal(t, fields.EntropySegment, s.Segment)
 			assert.Equal(t, "$entry.entropy", s.Value)
 		}},
-		{"$entry.file.path", &BoundFieldLiteral{}, "", func(t *testing.T, e Expr) {
-			f := e.(*BoundFieldLiteral)
+		{"$entry.file.path", &ast.BoundFieldLiteral{}, "", func(t *testing.T, e ast.Expr) {
+			f := e.(*ast.BoundFieldLiteral)
 			assert.Equal(t, fields.FilePath, f.Field.Field)
 			assert.Equal(t, "$entry.file.path", f.Value)
 		}},
 		{"$entry.foo", nil, "expected field/segment after bound ref", nil},
-		{"('a', 'b', 'c')", &ListLiteral{}, "", nil},
+		{"('a', 'b', 'c')", &ast.ListLiteral{}, "", nil},
 		{"('a', 'b', 'c'", nil, "expected ')'", nil},
-		{"base(file.path)", &Function{}, "", nil},
-		{"base(file.path,", &Function{}, "expected field, bound field, string, number, bool, ip, function", nil},
+		{"base(file.path)", &ast.Function{}, "", nil},
+		{"base(file.path,", &ast.Function{}, "expected field, bound field, string, number, bool, ip, function", nil},
 	}
 
 	for _, tt := range tests {
@@ -141,6 +142,52 @@ func TestParseUnaryExpr(t *testing.T) {
 				tt.assertions(t, expr)
 			}
 		})
+	}
+}
+
+func TestParseFunction(t *testing.T) {
+	var tests = []struct {
+		expr string
+		err  error
+	}{
+		{expr: "cidr_contains(net.dip)", err: errors.New("CIDR_CONTAINS function requires 2 argument(s) but 1 argument(s) given")},
+		{expr: "cidr_contains(net.dip, 12)", err: errors.New("argument #2 (cidr) in function CIDR_CONTAINS should be one of: string")},
+		{expr: "cidr_contains(net.dip, '172.17.12.4/24')"},
+		{expr: "cidr_contains($e1.net.dip, '172.17.12.4/24')"},
+		{expr: "md('172.17.12.4')", err: errors.New("md function is undefined")},
+		{expr: "concat('hello ', 'world')"},
+		{expr: "concat('hello')", err: errors.New("CONCAT function requires 2 argument(s) but 1 argument(s) given")},
+		{expr: "ltrim('hello world', 'hello ')"},
+		{expr: "replace('hello world', 'hello', 'hell', 'world')", err: errors.New("old/new replacements mismatch")},
+		{expr: "replace('hello world', 'hello', 'hell', 'world', 'war', 'hello')", err: errors.New("old/new replacements mismatch")},
+		{expr: "replace('hello world', 'hello', 'hell', 'world', 'war', 'hello', 'warld', 'old', 'new', 'one')", err: errors.New("old/new replacements mismatch")},
+		{expr: "indexof('hello', 'h', 'frst')", err: errors.New("frst is not a valid index search order")},
+		{expr: "base('C:\\\\Windows\\\\cmd.exe', false)"},
+		{expr: "foreach(ps.modules, $n, $n = 'user32.dll')"},
+		{expr: "foreach(ps._ancestors, $proc, $proc.name = 'svchost.exe')"},
+		{expr: "foreach(ps._ancestors, $proc, $process.name = 'svchost.exe')", err: errors.New(`undeclared bound variable $process in predicate "$process.name = svchost.exe"`)},
+		{expr: "foreach(ps._ancestors, $proc, $proc.pid = 4 or $process.name = 'svchost.exe')", err: errors.New(`undeclared bound variable $process in predicate "$proc.pid = 4 OR $process.name = svchost.exe"`)},
+		{expr: "foreach(ps._ancestors, $ps, $ps.name = 'svchost.exe')", err: errors.New(`"$ps" is a reserved bound variable name`)},
+		{expr: "foreach(pe._sections, $sec, $sec.protection = 'RWX')", err: errors.New(`unrecognized property "protection" accessing bound variable $sec. Allowed properties [name, size, entropy, md5]`)},
+		{expr: "foreach(ps.modules, $n, $n.name = 'user32.dll')", err: errors.New(`unrecognized property "name" accessing bound variable $n. Allowed properties []`)},
+		{expr: "foreach(ps._ancestors, $proc, ($proc.name = 'svchost.exe' and $proc.sessionid > 0) or $proc.sid = 'S-1-5-8')"},
+		{expr: "foreach(ps._ancestors, $proc, $proc.name = 'svchost.exe' and ps.cwd imatches '?:\\\\Windows\\\\System32\\\\*', ps.cwd)"},
+		{expr: "foreach(ps._ancestors, $proc, $proc.name = 'svchost.exe', ps.cwd)", err: errors.New(`one of captured field(s) (ps.cwd) not used in predicate "$proc.name = svchost.exe"`)},
+		{expr: "foreach(ps._ancestors, $proc, $proc.name = 'svchost.exe' and ps.cwd != ' ')", err: errors.New(`field ps.cwd used in predicate "$proc.name = svchost.exe AND ps.cwd !=  " but not captured`)},
+		{expr: "foreach(ps._ancestors, $proc, $proc.name = 'svchost.exe' and ps.cwd = '.' and ps.sid = 'S-1-5-18', ps.cwd, ps.sid)"},
+		{expr: "foreach(ps._ancestors, $proc, $proc.name = 'svchost.exe' and ps.cwd = '.' and ps.sid = 'S-1-5-18', ps.cwd)", err: errors.New(`field ps.sid used in predicate "$proc.name = svchost.exe AND ps.cwd = . AND ps.sid = S-1-5-18" but not captured`)},
+	}
+
+	for i, tt := range tests {
+		p := NewParser(tt.expr)
+		_, err := p.ParseExpr()
+		if err == nil && tt.err != nil {
+			t.Errorf("%d. exp=%s expected error=%v", i, tt.expr, tt.err)
+		} else if err != nil && tt.err != nil {
+			assert.True(t, strings.Contains(err.Error(), tt.err.Error()), fmt.Sprintf("exp=%v got=%v", tt.err, err))
+		} else if err != nil && tt.err == nil {
+			t.Errorf("%d. exp=%s got error=%v", i, tt.expr, err)
+		}
 	}
 }
 
@@ -396,7 +443,7 @@ func TestParseSequence(t *testing.T) {
 
 	for i, tt := range tests {
 		p := NewParser(tt.expr)
-		seq, err := p.ParseSequence()
+		expr, err := p.parseSequenceExpr()
 		if err == nil && tt.err != nil {
 			t.Errorf("%d. exp=%s expected error=\n%v", i, tt.expr, tt.err)
 		} else if err != nil && tt.err == nil {
@@ -407,86 +454,15 @@ func TestParseSequence(t *testing.T) {
 			assert.True(t, strings.Contains(err.Error(), tt.err.Error()), fmt.Sprintf("error '%v' should contain '%v'", err, tt.err))
 		}
 
-		if seq != nil {
+		seq, ok := expr.(*ast.SequenceExpr)
+
+		if ok {
 			if seq.MaxSpan != tt.maxSpan {
 				t.Errorf("%d. exp=%s maxspan=%s got maxspan=%v", i, tt.expr, tt.maxSpan, seq.MaxSpan)
 			}
 			if seq.IsConstrained() != tt.isConstrained {
 				t.Errorf("%d. exp=%s isConstrained=%t got isConstrained=%t", i, tt.expr, tt.isConstrained, seq.IsConstrained())
 			}
-		}
-	}
-}
-
-func TestIsSequenceUnordered(t *testing.T) {
-	var tests = []struct {
-		expr        string
-		isUnordered bool
-	}{
-		{
-			`|evt.name = 'CreateProcess'| by ps.uuid
-			 |evt.name = 'OpenProcess'| by ps.uuid
-			`,
-			true,
-		},
-		{
-			`|evt.name = 'CreateProcess'|
-			 |evt.name = 'CreateFile'|
-			`,
-			false,
-		},
-		{
-			`|evt.name = 'CreateProcess'|
-			 |evt.name = 'UnmapViewFile'|
- 			 |evt.name = 'LoadModule'|
-			`,
-			false,
-		},
-		{
-			`|evt.name = 'CreateProcess'|
-			 |evt.name = 'SetThreadContext'|
-			`,
-			true,
-		},
-		{
-			`|evt.name = 'OpenThread'| by ps.uuid
-			 |evt.name = 'OpenProcess'| by ps.uuid
-			`,
-			false,
-		},
-		{
-			`|evt.name = 'OpenThread' or evt.name = 'OpenProcess'| by ps.uuid
-			 |evt.name = 'SetThreadContext'| by ps.uuid
-			`,
-			false,
-		},
-		{
-			`|evt.name = 'RegSetValue'| by ps.uuid
-			 |evt.name = 'SetThreadContext'| by ps.uuid
-			`,
-			true,
-		},
-		{
-			`|evt.name = 'RegSetValue'| by ps.uuid
-			 |evt.name = 'RegDeleteValue'| by ps.uuid
-			`,
-			false,
-		},
-		{
-			`|evt.name = 'OpenProcess'| by ps.uuid
-			 |evt.name = 'QueryDns'| by ps.uuid
-			`,
-			false,
-		},
-	}
-
-	for i, tt := range tests {
-		p := NewParser(tt.expr)
-		seq, err := p.ParseSequence()
-		require.NoError(t, err)
-
-		if seq.IsUnordered != tt.isUnordered {
-			t.Errorf("%d. exp=%s isUnordered=%t got isUnordered=%t", i, tt.expr, tt.isUnordered, seq.IsUnordered)
 		}
 	}
 }

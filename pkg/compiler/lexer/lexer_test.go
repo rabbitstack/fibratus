@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ql
+package lexer
 
 import (
 	"strings"

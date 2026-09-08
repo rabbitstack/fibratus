@@ -114,6 +114,9 @@ const (
 	Unknown
 )
 
+// funcs represents the function registry
+var funcs = make(map[Fn]FunctionDef)
+
 // String returns the argument type as a string value.
 func (typ ArgType) String() string {
 	switch typ {
@@ -141,6 +144,16 @@ func (typ ArgType) String() string {
 		return "bareboundvar"
 	}
 	return "unknown"
+}
+
+// FunctionDef is the interface that all function definitions have to satisfy.
+type FunctionDef interface {
+	// Call is the main function method that contains the implementation logic.
+	Call(args []interface{}) (interface{}, bool)
+	// Desc returns the function descriptor.
+	Desc() FunctionDesc
+	// Name returns the function name.
+	Name() Fn
 }
 
 // FunctionDesc contains the function signature that
@@ -235,6 +248,18 @@ func (f Fn) String() string {
 	default:
 		return "UNDEFINED"
 	}
+}
+
+func Register(name Fn, fn FunctionDef) {
+	if _, exists := funcs[name]; exists {
+		panic("function already registered: " + name.String())
+	}
+	funcs[name] = fn
+}
+
+func Get(name Fn) (FunctionDef, bool) {
+	fn, ok := funcs[name]
+	return fn, ok
 }
 
 // parseString yields a string value from the specific position in the args slice.

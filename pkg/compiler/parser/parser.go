@@ -18,7 +18,7 @@
  *  Copyright (c) 2013-2016 Errplane Inc.
  */
 
-package ql
+package parser
 
 import (
 	"errors"
@@ -28,38 +28,56 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rabbitstack/fibratus/pkg/compiler/ast"
+	"github.com/rabbitstack/fibratus/pkg/compiler/fields"
+	"github.com/rabbitstack/fibratus/pkg/compiler/lexer"
 	"github.com/rabbitstack/fibratus/pkg/config"
-	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 )
 
-// Parser builds the binary expression tree from the filter string.
+// Parser builds AST expressions from the condition string.
 type Parser struct {
-	s    *bufScanner
+	s    *lexer.Scanner
 	c    *config.Filters
 	expr string
 }
 
+func Parse(expr string) (ast.Expr, error) {
+	return NewParser(expr).ParseExpr()
+}
+
 // NewParser builds a new parser instance from the expression string.
 func NewParser(expr string) *Parser {
-	return &Parser{s: newBufScanner(strings.NewReader(expr)), expr: expr}
+	return &Parser{s: lexer.NewScanner(strings.NewReader(expr)), expr: expr}
 }
 
 // NewParserWithConfig builds a new parser instance with filters config.
 func NewParserWithConfig(expr string, config *config.Filters) *Parser {
-	return &Parser{s: newBufScanner(strings.NewReader(expr)), expr: expr, c: config}
+	return &Parser{s: lexer.NewScanner(strings.NewReader(expr)), expr: expr, c: config}
 }
 
-// ParseSequence parses the collection of binary expressions with possible join
+func (p *Parser) ParseExpr() (ast.Expr, error) {
+	tok, _, _ := p.scanIgnoreWhitespace()
+	switch tok {
+	case lexer.Seq:
+		return p.parseSequenceExpr()
+	default:
+		p.unscan()
+		return p.parseBinaryExpr()
+	}
+}
+
+// parseSequenceExpr parses the collection of sequence steps with possible join
 // statements and time frame constraints. This method assumes the SEQUENCE token
 // has already been consumed.
-func (p *Parser) ParseSequence() (*Sequence, error) {
-	seq := &Sequence{}
-	var exprs []SequenceExpr
+func (p *Parser) parseSequenceExpr() (ast.Expr, error) {
+	var steps []ast.SequenceStep
+
+	seq := &ast.SequenceExpr{}
 
 	// parse optional max span
 	tok, _, _ := p.scanIgnoreWhitespace()
-	if tok == MaxSpan {
+	if tok == lexer.MaxSpan {
 		var err error
 		seq.MaxSpan, err = p.parseDuration()
 		if err != nil {
@@ -74,10 +92,10 @@ func (p *Parser) ParseSequence() (*Sequence, error) {
 
 	// parse optional global link
 	tok, _, _ = p.scanIgnoreWhitespace()
-	if tok == By {
+	if tok == lexer.By {
 		tok, pos, lit := p.scanIgnoreWhitespace()
 		if !fields.IsField(lit) {
-			return nil, newParseError(tokstr(tok, lit), []string{"field"}, pos, p.expr)
+			return nil, newParseError(lexer.Tokstr(tok, lit), []string{"field"}, pos, p.expr)
 		}
 		var err error
 		field, err := p.parseField(lit)
@@ -85,18 +103,18 @@ func (p *Parser) ParseSequence() (*Sequence, error) {
 			return nil, err
 		}
 
-		seqLink := &SequenceLink{Fields: []*FieldLiteral{field}}
+		seqLink := &ast.SequenceLink{Fields: []*ast.FieldLiteral{field}}
 
 		// handle multiple join fields separated by comma
 		for {
-			if tok, _, _ := p.scanIgnoreWhitespace(); tok != Comma {
+			if tok, _, _ := p.scanIgnoreWhitespace(); tok != lexer.Comma {
 				p.unscan()
 				break
 			}
 
 			tok, pos, lit := p.scanIgnoreWhitespace()
 			if !fields.IsField(lit) {
-				return nil, newParseError(tokstr(tok, lit), []string{"field"}, pos, p.expr)
+				return nil, newParseError(lexer.Tokstr(tok, lit), []string{"field"}, pos, p.expr)
 			}
 			field, err := p.parseField(lit)
 			if err != nil {
@@ -111,71 +129,70 @@ func (p *Parser) ParseSequence() (*Sequence, error) {
 		p.unscan()
 	}
 
-	// parse sequence expressions
+	// parse sequence steps
 	for {
-		if tok, _, _ := p.scanIgnoreWhitespace(); tok == EOF {
-			if len(exprs) < 1 {
-				return nil, fmt.Errorf("%s: sequences require at least two expressions", p.expr)
+		if tok, _, _ := p.scanIgnoreWhitespace(); tok == lexer.EOF {
+			if len(steps) < 1 {
+				return nil, fmt.Errorf("%s: sequences require at least two steps", p.expr)
 			}
 
-			const maxExpressions = 5
-			if len(exprs) > maxExpressions {
-				return nil, fmt.Errorf("%s: maximum number of expressions reached", p.expr)
+			const maxSteps = 5
+			if len(steps) > maxSteps {
+				return nil, fmt.Errorf("%s: maximum number of steps reached", p.expr)
 			}
-			seq.Expressions = exprs
-			if seq.impairBy() {
-				return nil, fmt.Errorf("%s: all expressions require the 'by' statement", p.expr)
+			seq.Steps = steps
+
+			if seq.HasImpairBy() {
+				return nil, fmt.Errorf("%s: all steps require the 'by' statement", p.expr)
 			}
-			if seq.incompatibleConstraints() {
+			if seq.HasIncompatibleConstraints() {
 				return nil, fmt.Errorf("%s: sequence mixes global and per-expression 'by' statements", p.expr)
 			}
-
-			seq.init()
 
 			return seq, nil
 		}
 		p.unscan()
 
 		tok, posStart, lit := p.scanIgnoreWhitespace()
-		if tok != Pipe {
-			return nil, newParseError(tokstr(tok, lit), []string{"|"}, posStart, p.expr)
+		if tok != lexer.Pipe {
+			return nil, newParseError(lexer.Tokstr(tok, lit), []string{"|"}, posStart, p.expr)
 		}
-		expr, err := p.ParseExpr()
+		expr, err := p.parseBinaryExpr()
 		if err != nil {
 			return nil, err
 		}
 		tok, posEnd, lit := p.scanIgnoreWhitespace()
-		if tok != Pipe {
-			return nil, newParseError(tokstr(tok, lit), []string{"|"}, posEnd, p.expr)
+		if tok != lexer.Pipe {
+			return nil, newParseError(lexer.Tokstr(tok, lit), []string{"|"}, posEnd, p.expr)
 		}
 
-		var seqexpr SequenceExpr
+		var step ast.SequenceStep
 
 		// parse sequence BY or AS constraints (links)
 		tok, _, _ = p.scanIgnoreWhitespace()
 		switch tok {
-		case By:
+		case lexer.By:
 			tok, pos, lit := p.scanIgnoreWhitespace()
 			if !fields.IsField(lit) {
-				return nil, newParseError(tokstr(tok, lit), []string{"field"}, pos, p.expr)
+				return nil, newParseError(lexer.Tokstr(tok, lit), []string{"field"}, pos, p.expr)
 			}
 			field, err := p.parseField(lit)
 			if err != nil {
 				return nil, err
 			}
 
-			seqLink := &SequenceLink{Fields: []*FieldLiteral{field}}
+			seqLink := &ast.SequenceLink{Fields: []*ast.FieldLiteral{field}}
 
 			// handle multiple join fields separated by comma
 			for {
-				if tok, _, _ := p.scanIgnoreWhitespace(); tok != Comma {
+				if tok, _, _ := p.scanIgnoreWhitespace(); tok != lexer.Comma {
 					p.unscan()
 					break
 				}
 
 				tok, pos, lit := p.scanIgnoreWhitespace()
 				if !fields.IsField(lit) {
-					return nil, newParseError(tokstr(tok, lit), []string{"field"}, pos, p.expr)
+					return nil, newParseError(lexer.Tokstr(tok, lit), []string{"field"}, pos, p.expr)
 				}
 				field, err := p.parseField(lit)
 				if err != nil {
@@ -184,38 +201,26 @@ func (p *Parser) ParseSequence() (*Sequence, error) {
 
 				seqLink.Fields = append(seqLink.Fields, field)
 			}
-			seqexpr = SequenceExpr{Expr: expr, By: seqLink}
-		case As:
+			step = ast.SequenceStep{Expr: expr, By: seqLink}
+		case lexer.As:
 			tok, pos, lit := p.scanIgnoreWhitespace()
-			if tok != Ident {
-				return nil, newParseError(tokstr(tok, lit), []string{"identifier"}, pos, p.expr)
+			if tok != lexer.BoundVar {
+				return nil, newParseError(lexer.Tokstr(tok, lit), []string{"bound var"}, pos, p.expr)
 			}
-			seqexpr = SequenceExpr{Expr: expr, Alias: lit}
+			step = ast.SequenceStep{Expr: expr, BoundVar: lit}
 		default:
-			seqexpr = SequenceExpr{Expr: expr}
+			step = ast.SequenceStep{Expr: expr}
 			p.unscan()
 		}
 
-		seqexpr.init()
-		seqexpr.walk()
-		exprs = append(exprs, seqexpr)
+		steps = append(steps, step)
 	}
 }
 
-// IsSequence checks whether the expression given to the parser is a sequence.
-func (p *Parser) IsSequence() bool {
-	tok, _, _ := p.scanIgnoreWhitespace()
-	if tok == Seq {
-		return true
-	}
-	p.unscan()
-	return false
-}
-
-// ParseExpr parses an expression by building the binary expression tree.
-func (p *Parser) ParseExpr() (Expr, error) {
+// parseBinaryExpr parses the binary expression by building the expression tree.
+func (p *Parser) parseBinaryExpr() (ast.Expr, error) {
 	var err error
-	root := &BinaryExpr{}
+	root := &ast.BinaryExpr{}
 	// parse a non-binary expression type to start. This variable will always be
 	// the root of the expression tree.
 	root.RHS, err = p.parseUnaryExpr()
@@ -227,28 +232,28 @@ func (p *Parser) ParseExpr() (Expr, error) {
 	for {
 		// if the next token is NOT an operator then return the expression.
 		op, pos, lit := p.scanIgnoreWhitespace()
-		if !op.isOperator() {
+		if !op.IsOperator() {
 			p.unscan()
-			if op != EOF && op != Rparen && op != Comma && op != Pipe {
-				return nil, newParseError(tokstr(op, lit), []string{"operator", "')'", "','", "'|'"}, pos, p.expr)
+			if op != lexer.EOF && op != lexer.Rparen && op != lexer.Comma && op != lexer.Pipe {
+				return nil, newParseError(lexer.Tokstr(op, lit), []string{"operator", "')'", "','", "'|'"}, pos, p.expr)
 			}
 			return root.RHS, nil
 		}
 
-		if op == In || op == IIn {
+		if op == lexer.In || op == lexer.IIn {
 			// expect LPAREN after in
 			tok, pos, lit := p.scanIgnoreWhitespace()
 			p.unscan()
-			if tok != Lparen && (p.c != nil && !p.c.IsMacroList(lit)) {
-				return nil, newParseError(tokstr(op, lit), []string{"'('"}, pos, p.expr)
+			if tok != lexer.Lparen && (p.c != nil && !p.c.IsMacroList(lit)) {
+				return nil, newParseError(lexer.Tokstr(op, lit), []string{"'('"}, pos, p.expr)
 			}
 		}
 
-		if op == Not {
+		if op == lexer.Not {
 			// handle infix negation
 			op1, pos, lit := p.scanIgnoreWhitespace()
-			if !op1.isOperator() {
-				return nil, newParseError(tokstr(op1, lit), []string{"operator"}, pos, p.expr)
+			if !op1.IsOperator() {
+				return nil, newParseError(lexer.Tokstr(op1, lit), []string{"operator"}, pos, p.expr)
 			}
 			rhs, err := p.parseUnaryExpr()
 			if err != nil {
@@ -256,9 +261,9 @@ func (p *Parser) ParseExpr() (Expr, error) {
 			}
 
 			for node := root; ; {
-				r, ok := node.RHS.(*BinaryExpr)
-				if !ok || r.Op.precedence() >= op1.precedence() {
-					node.RHS = &NotExpr{Expr: &BinaryExpr{LHS: node.RHS, RHS: rhs, Op: op1}}
+				r, ok := node.RHS.(*ast.BinaryExpr)
+				if !ok || r.Op.Precedence() >= op1.Precedence() {
+					node.RHS = &ast.NotExpr{Expr: &ast.BinaryExpr{LHS: node.RHS, RHS: rhs, Op: op1}}
 					break
 				}
 				node = r
@@ -276,10 +281,10 @@ func (p *Parser) ParseExpr() (Expr, error) {
 		// BinaryExpr or a BinaryExpr whose RHS has an operator with
 		// precedence >= the operator being added.
 		for node := root; ; {
-			r, ok := node.RHS.(*BinaryExpr)
-			if !ok || r.Op.precedence() >= op.precedence() {
+			r, ok := node.RHS.(*ast.BinaryExpr)
+			if !ok || r.Op.Precedence() >= op.Precedence() {
 				// add the new expression here and break
-				node.RHS = &BinaryExpr{LHS: node.RHS, RHS: rhs, Op: op}
+				node.RHS = &ast.BinaryExpr{LHS: node.RHS, RHS: rhs, Op: op}
 				break
 			}
 			node = r
@@ -288,9 +293,9 @@ func (p *Parser) ParseExpr() (Expr, error) {
 }
 
 // parseUnaryExpr parses an non-binary expression.
-func (p *Parser) parseUnaryExpr() (Expr, error) {
+func (p *Parser) parseUnaryExpr() (ast.Expr, error) {
 	// If the first token is a LPAREN then parse it as its own grouped expression.
-	if tok, _, _ := p.scanIgnoreWhitespace(); tok == Lparen {
+	if tok, _, _ := p.scanIgnoreWhitespace(); tok == lexer.Lparen {
 		// parse a comma-separated list if this looks like a list
 		tagKeys, err := p.parseList()
 		if err != nil {
@@ -301,45 +306,45 @@ func (p *Parser) parseUnaryExpr() (Expr, error) {
 				return nil, err
 			}
 			// Expect an RPAREN at the end.
-			if tok, pos, lit := p.scanIgnoreWhitespace(); tok != Rparen {
-				return nil, newParseError(tokstr(tok, lit), []string{"')'"}, pos, p.expr)
+			if tok, pos, lit := p.scanIgnoreWhitespace(); tok != lexer.Rparen {
+				return nil, newParseError(lexer.Tokstr(tok, lit), []string{"')'"}, pos, p.expr)
 			}
-			return &ParenExpr{Expr: expr}, nil
+			return &ast.ParenExpr{Expr: expr}, nil
 		}
 
 		// Expect an RPAREN at the end of list
-		if tok, pos, lit := p.scanIgnoreWhitespace(); tok != Rparen {
-			return nil, newParseError(tokstr(tok, lit), []string{"')'"}, pos, p.expr)
+		if tok, pos, lit := p.scanIgnoreWhitespace(); tok != lexer.Rparen {
+			return nil, newParseError(lexer.Tokstr(tok, lit), []string{"')'"}, pos, p.expr)
 		}
 
-		return &ListLiteral{Values: tagKeys}, nil
+		return &ast.ListLiteral{Values: tagKeys}, nil
 	}
 
 	// handle unary negation
 	p.unscan()
-	if tok, pos, lit := p.scanIgnoreWhitespace(); tok == Not {
+	if tok, pos, lit := p.scanIgnoreWhitespace(); tok == lexer.Not {
 		expr, err := p.parseUnaryExpr()
 		if err != nil {
 			return nil, err
 		}
 
-		if f, ok := expr.(*FieldLiteral); ok && !fields.IsBoolean(f.Field) {
-			return nil, newParseError(tokstr(tok, lit), []string{"boolean field", "("}, pos, p.expr)
+		if f, ok := expr.(*ast.FieldLiteral); ok && !fields.IsBoolean(f.Field) {
+			return nil, newParseError(lexer.Tokstr(tok, lit), []string{"boolean field", "("}, pos, p.expr)
 		}
 
-		return &NotExpr{Expr: expr}, nil
+		return &ast.NotExpr{Expr: expr}, nil
 	}
 
 	p.unscan()
 
 	tok, pos, lit := p.scanIgnoreWhitespace()
 	switch tok {
-	case Ident:
+	case lexer.Ident:
 		if fields.IsField(lit) {
 			return p.parseField(lit)
 		}
 
-		if tok0, _, _ := p.scan(); tok0 == Lparen {
+		if tok0, _, _ := p.scan(); tok0 == lexer.Lparen {
 			return p.parseFunction(lit)
 		}
 		// unscan lparen token
@@ -357,25 +362,25 @@ func (p *Parser) parseUnaryExpr() (Expr, error) {
 					}
 					return expr, nil
 				}
-				return &ListLiteral{Values: macro.List}, nil
+				return &ast.ListLiteral{Values: macro.List}, nil
 			}
 			// unscan ident
 			p.unscan()
 		}
-	case IP:
-		return &IPLiteral{Value: net.ParseIP(lit)}, nil
-	case Str:
-		return &StringLiteral{Value: lit}, nil
-	case BoundVar:
+	case lexer.IP:
+		return &ast.IPLiteral{Value: net.ParseIP(lit)}, nil
+	case lexer.Str:
+		return &ast.StringLiteral{Value: lit}, nil
+	case lexer.BoundVar:
 		n := strings.Index(lit, ".")
 		if n == -1 {
-			return &BareBoundVariableLiteral{Value: lit}, nil
+			return &ast.BareBoundVariableLiteral{Value: lit}, nil
 		}
 
 		// for recognized segment return bound segment literal
 		s := lit[n+1:]
 		if fields.IsSegment(s) {
-			return &BoundSegmentLiteral{Value: lit, BoundVar: BareBoundVariableLiteral{lit[1:n]}, Segment: fields.Segment(s)}, nil
+			return &ast.BoundSegmentLiteral{Value: lit, BoundVar: ast.BareBoundVariableLiteral{Value: lit[1:n]}, Segment: fields.Segment(s)}, nil
 		}
 
 		// parse field literal for recognized field
@@ -384,80 +389,80 @@ func (p *Parser) parseUnaryExpr() (Expr, error) {
 			if err != nil {
 				return nil, err
 			}
-			return &BoundFieldLiteral{Value: lit, BoundVar: BareBoundVariableLiteral{lit[1:n]}, Field: field}, nil
+			return &ast.BoundFieldLiteral{Value: lit, BoundVar: ast.BareBoundVariableLiteral{Value: lit[1:n]}, Field: field}, nil
 		}
 
-		return nil, newParseError(tokstr(tok, lit), []string{"field/segment after bound ref"}, pos+n, p.expr)
-	case True, False:
-		return &BoolLiteral{Value: tok == True}, nil
-	case Integer:
+		return nil, newParseError(lexer.Tokstr(tok, lit), []string{"field/segment after bound ref"}, pos+n, p.expr)
+	case lexer.True, lexer.False:
+		return &ast.BoolLiteral{Value: tok == lexer.True}, nil
+	case lexer.Integer:
 		v, err := strconv.ParseInt(lit, 10, 64)
 		if err != nil {
 			// The literal may be too large to fit into an int64. If it is, use an unsigned integer.
 			// The check for negative numbers is handled somewhere else so this should always be a positive number.
 			if v, err := strconv.ParseUint(lit, 10, 64); err == nil {
-				return &UnsignedLiteral{Value: v}, nil
+				return &ast.UnsignedLiteral{Value: v}, nil
 			}
 			return nil, &ParseError{Message: "unable to parse integer", Pos: pos}
 		}
-		return &IntegerLiteral{Value: v}, nil
-	case Decimal:
+		return &ast.IntegerLiteral{Value: v}, nil
+	case lexer.Decimal:
 		v, err := strconv.ParseFloat(lit, 64)
 		if err != nil {
 			return nil, &ParseError{Message: "unable to parse decimal", Pos: pos}
 		}
-		return &DecimalLiteral{Value: v}, nil
+		return &ast.DecimalLiteral{Value: v}, nil
 	}
 
 	expectations := []string{"field", "bound field", "string", "number", "bool", "ip", "function"}
-	if tok == BadIP {
+	if tok == lexer.BadIP {
 		expectations = []string{"a valid IP address"}
 	}
-	if tok == Badesc || tok == Badstr {
+	if tok == lexer.Badesc || tok == lexer.Badstr {
 		expectations = []string{"a valid string but bad string or escape found"}
 	}
 
-	return nil, newParseError(tokstr(tok, lit), expectations, pos, p.expr)
+	return nil, newParseError(lexer.Tokstr(tok, lit), expectations, pos, p.expr)
 }
 
 // parseField parses the field and its argument. This method
 // assumes the field name has been consumed.
-func (p *Parser) parseField(name string) (*FieldLiteral, error) {
+func (p *Parser) parseField(name string) (*ast.FieldLiteral, error) {
 	argument := fields.ArgumentOf(name)
 
 	// parse field argument
 	tok, pos, lit := p.scan()
-	if tok == LBracket {
+	if tok == lexer.LBracket {
 		arg, pos, lit := p.scan()
-		if arg != Ident && arg != Integer {
-			return nil, newParseError(tokstr(arg, lit), []string{"ident", "integer"}, pos, p.expr)
+		if arg != lexer.Ident && arg != lexer.Integer {
+			return nil, newParseError(lexer.Tokstr(arg, lit), []string{"ident", "integer"}, pos, p.expr)
 		}
 
 		// field argument given, but the field doesn't require one
 		if argument == nil {
-			return nil, newParseError(tokstr(tok, lit), []string{"field without argument"}, pos, p.expr)
+			return nil, newParseError(lexer.Tokstr(tok, lit), []string{"field without argument"}, pos, p.expr)
 		}
 
 		// validate argument
 		if argument != nil && !argument.Validate(lit) {
 			exp := fmt.Sprintf("a valid field argument matching the pattern %s", argument.Pattern)
-			return nil, newParseError(tokstr(arg, lit), []string{exp}, pos, p.expr)
+			return nil, newParseError(lexer.Tokstr(arg, lit), []string{exp}, pos, p.expr)
 		}
 
-		if tok, pos, lit := p.scan(); tok != RBracket {
-			return nil, newParseError(tokstr(tok, lit), []string{"]"}, pos, p.expr)
+		if tok, pos, lit := p.scan(); tok != lexer.RBracket {
+			return nil, newParseError(lexer.Tokstr(tok, lit), []string{"]"}, pos, p.expr)
 		}
 
-		return &FieldLiteral{Value: name, Field: fields.Field(name), Arg: lit}, nil
+		return &ast.FieldLiteral{Value: name, Field: fields.Field(name), Arg: lit}, nil
 	} else {
 		// unscan lbracket
 		p.unscan()
 		// field argument not given, but it is required
 		if argument != nil && !argument.Optional {
-			return nil, newParseError(tokstr(tok, lit), []string{"field argument"}, pos, p.expr)
+			return nil, newParseError(lexer.Tokstr(tok, lit), []string{"field argument"}, pos, p.expr)
 		}
 
-		return &FieldLiteral{Value: name, Field: fields.Field(name)}, nil
+		return &ast.FieldLiteral{Value: name, Field: fields.Field(name)}, nil
 	}
 }
 
@@ -465,21 +470,21 @@ func (p *Parser) parseField(name string) (*FieldLiteral, error) {
 // LPAREN token has been consumed.
 func (p *Parser) parseList() ([]string, error) {
 	tok, pos, lit := p.scanIgnoreWhitespace()
-	if tok != Str && tok != IP && tok != Integer {
-		return []string{}, newParseError(tokstr(tok, lit), []string{"identifier"}, pos, p.expr)
+	if tok != lexer.Str && tok != lexer.IP && tok != lexer.Integer {
+		return []string{}, newParseError(lexer.Tokstr(tok, lit), []string{"identifier"}, pos, p.expr)
 	}
 	idents := []string{lit}
 
 	// parse remaining identifiers
 	for {
-		if tok, _, _ := p.scanIgnoreWhitespace(); tok != Comma {
+		if tok, _, _ := p.scanIgnoreWhitespace(); tok != lexer.Comma {
 			p.unscan()
 			return idents, nil
 		}
 
 		tok, pos, lit := p.scanIgnoreWhitespace()
-		if tok != Str && tok != IP && tok != Integer {
-			return []string{}, newParseError(tokstr(tok, lit), []string{"identifier"}, pos, p.expr)
+		if tok != lexer.Str && tok != lexer.IP && tok != lexer.Integer {
+			return []string{}, newParseError(lexer.Tokstr(tok, lit), []string{"identifier"}, pos, p.expr)
 		}
 
 		idents = append(idents, lit)
@@ -488,15 +493,15 @@ func (p *Parser) parseList() ([]string, error) {
 
 // parseFunction parses a function call. This method assumes
 // the function name and LPAREN have been consumed.
-func (p *Parser) parseFunction(name string) (*Function, error) {
+func (p *Parser) parseFunction(name string) (*ast.Function, error) {
 	name = strings.ToLower(name)
-	args := make([]Expr, 0)
+	args := make([]ast.Expr, 0)
 
 	// If there's a right paren then just return immediately.
 	// This is the case for functions without arguments
-	if tok, _, _ := p.scan(); tok == Rparen {
-		fn := &Function{Name: name}
-		if err := fn.validate(); err != nil {
+	if tok, _, _ := p.scan(); tok == lexer.Rparen {
+		fn := &ast.Function{Name: name}
+		if err := fn.Validate(); err != nil {
 			return nil, err
 		}
 		return fn, nil
@@ -512,7 +517,7 @@ func (p *Parser) parseFunction(name string) (*Function, error) {
 	// Parse additional function arguments if there is a comma.
 	for {
 		// If there's not a comma, stop parsing arguments.
-		if tok, _, _ := p.scanIgnoreWhitespace(); tok != Comma {
+		if tok, _, _ := p.scanIgnoreWhitespace(); tok != lexer.Comma {
 			p.unscan()
 			break
 		}
@@ -526,13 +531,13 @@ func (p *Parser) parseFunction(name string) (*Function, error) {
 	}
 
 	// There should be a right parentheses at the end.
-	if tok, pos, lit := p.scan(); tok != Rparen {
-		return nil, newParseError(tokstr(tok, lit), []string{")"}, pos, p.expr)
+	if tok, pos, lit := p.scan(); tok != lexer.Rparen {
+		return nil, newParseError(lexer.Tokstr(tok, lit), []string{")"}, pos, p.expr)
 	}
 
-	fn := &Function{Name: name, Args: args}
+	fn := &ast.Function{Name: name, Args: args}
 
-	if err := fn.validate(); err != nil {
+	if err := fn.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -542,8 +547,8 @@ func (p *Parser) parseFunction(name string) (*Function, error) {
 // parseDuration parses a string and returns a duration literal.
 func (p *Parser) parseDuration() (time.Duration, error) {
 	tok, pos, lit := p.scanIgnoreWhitespace()
-	if tok != Duration {
-		return 0, newParseError(tokstr(tok, lit), []string{"duration"}, pos, p.expr)
+	if tok != lexer.Duration {
+		return 0, newParseError(lexer.Tokstr(tok, lit), []string{"duration"}, pos, p.expr)
 	}
 
 	d, err := parseDuration(lit)
@@ -585,7 +590,7 @@ func parseDuration(s string) (time.Duration, error) {
 	for i < len(a) {
 		// Find the number portion.
 		start := i
-		for ; i < len(a) && isDigit(a[i]); i++ {
+		for ; i < len(a) && lexer.IsDigit(a[i]); i++ {
 			// Scan for the digits.
 		}
 
@@ -650,13 +655,13 @@ func parseDuration(s string) (time.Duration, error) {
 }
 
 // scan returns the next token from the underlying scanner.
-func (p *Parser) scan() (tok Token, pos int, lit string) { return p.s.scan() }
+func (p *Parser) scan() (tok lexer.Token, pos int, lit string) { return p.s.Scan() }
 
 // scanIgnoreWhitespace scans the next non-whitespace.
-func (p *Parser) scanIgnoreWhitespace() (tok Token, pos int, lit string) {
+func (p *Parser) scanIgnoreWhitespace() (tok lexer.Token, pos int, lit string) {
 	for {
 		tok, pos, lit = p.scan()
-		if tok == WS {
+		if tok == lexer.WS {
 			continue
 		}
 		return
@@ -664,4 +669,4 @@ func (p *Parser) scanIgnoreWhitespace() (tok Token, pos int, lit string) {
 }
 
 // unscan pushes the previously read token back onto the buffer.
-func (p *Parser) unscan() { p.s.unscan() }
+func (p *Parser) unscan() { p.s.Unscan() }

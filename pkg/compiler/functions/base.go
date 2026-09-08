@@ -71,3 +71,7 @@ func (f Base) trimExt(base string, args []interface{}) string {
 	}
 	return base
 }
+
+func init() {
+	Register(BaseFn, &Base{})
+}

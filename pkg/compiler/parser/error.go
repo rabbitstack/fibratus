@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ql
+package parser
 
 import (
 	"fmt"

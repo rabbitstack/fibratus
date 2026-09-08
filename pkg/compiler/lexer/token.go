@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ql
+package lexer
 
 import (
 	"strings"
@@ -160,8 +160,8 @@ var tokens = [...]string{
 	As:      "AS",
 }
 
-// isOperator determines whether the current token is an operator.
-func (tok Token) isOperator() bool { return tok > opBeg && tok < opEnd }
+// IsOperator determines whether the current token is an operator.
+func (tok Token) IsOperator() bool { return tok > opBeg && tok < opEnd }
 
 // String returns the string representation of the token.
 func (tok Token) String() string {
@@ -171,8 +171,8 @@ func (tok Token) String() string {
 	return ""
 }
 
-// precedence returns the operator precedence of the binary operator token.
-func (tok Token) precedence() int {
+// Precedence returns the operator precedence of the binary operator token.
+func (tok Token) Precedence() int {
 	switch tok {
 	case Or:
 		return 1
@@ -189,7 +189,7 @@ func (tok Token) precedence() int {
 	return 0
 }
 
-func tokstr(tok Token, lit string) string {
+func Tokstr(tok Token, lit string) string {
 	if lit != "" {
 		return lit
 	}
@@ -197,7 +197,7 @@ func tokstr(tok Token, lit string) string {
 }
 
 // lookup returns the token associated with a given string.
-func lookup(id string) (Token, string) {
+func Lookup(id string) (Token, string) {
 	if tok, ok := keywords[strings.ToLower(id)]; ok {
 		return tok, ""
 	}

@@ -16,19 +16,17 @@
  * limitations under the License.
  */
 
-package ql
+package ast
 
 import (
 	"net"
 	"reflect"
 	"strconv"
 	"strings"
-	"time"
 
-	"github.com/rabbitstack/fibratus/pkg/event"
-	"github.com/rabbitstack/fibratus/pkg/filter/fields"
+	"github.com/rabbitstack/fibratus/pkg/compiler/fields"
 
-	"github.com/rabbitstack/fibratus/pkg/filter/ql/functions"
+	"github.com/rabbitstack/fibratus/pkg/compiler/functions"
 )
 
 // StringLiteral represents a string literal.
@@ -223,7 +221,7 @@ func (f *Function) IsFieldArg(i int) bool {
 // catalog. It also validates the function signature to
 // make sure required arguments are supplied. Finally, it
 // checks the type of each argument with the expected one.
-func (f *Function) validate() error {
+func (f *Function) Validate() error {
 	fn, ok := funcs[strings.ToUpper(f.Name)]
 	if !ok {
 		return ErrUndefinedFunction(f.Name)
@@ -278,117 +276,13 @@ func (f *Function) validate() error {
 	return nil
 }
 
-// SequenceExpr represents a single binary expression within the sequence.
-type SequenceExpr struct {
+// SequenceStep represents a single expression within the sequence.
+type SequenceStep struct {
+	// Expr is the expression that belongs to the sequence step.
 	Expr Expr
-	// By contains the expression link if the sequence is constrained.
-	By *SequenceLink
-	// BoundFields is a group of bound fields referenced in the sequence expression.
-	BoundFields []*BoundFieldLiteral
-	// Alias represents the sequence expression alias when bound fields are used.
-	Alias string
-
-	bitsets event.BitSets
-	types   []event.Type
-}
-
-func (e *SequenceExpr) init() {
-	e.types = make([]event.Type, 0)
-	e.BoundFields = make([]*BoundFieldLiteral, 0)
-}
-
-func (e *SequenceExpr) walk() {
-	stringFields := make(map[fields.Field][]string)
-	walk := func(n Node) {
-		if expr, ok := n.(*BinaryExpr); ok {
-			switch lhs := expr.LHS.(type) {
-			case *BoundFieldLiteral:
-				e.BoundFields = append(e.BoundFields, lhs)
-			case *FieldLiteral:
-				field := fields.Field(lhs.Value)
-				switch v := expr.RHS.(type) {
-				case *StringLiteral:
-					stringFields[field] = append(stringFields[field], v.Value)
-				case *ListLiteral:
-					stringFields[field] = append(stringFields[field], v.Values...)
-				}
-			}
-
-			switch rhs := expr.RHS.(type) {
-			case *BoundFieldLiteral:
-				e.BoundFields = append(e.BoundFields, rhs)
-			case *FieldLiteral:
-				field := fields.Field(rhs.Value)
-				switch v := expr.LHS.(type) {
-				case *StringLiteral:
-					stringFields[field] = append(stringFields[field], v.Value)
-				case *ListLiteral:
-					stringFields[field] = append(stringFields[field], v.Values...)
-				}
-			}
-		}
-
-		if expr, ok := n.(*Function); ok {
-			for _, arg := range expr.Args {
-				switch v := arg.(type) {
-				case *FieldLiteral:
-					field := fields.Field(v.Value)
-					stringFields[field] = append(stringFields[field], v.Value)
-				case *BoundFieldLiteral:
-					e.BoundFields = append(e.BoundFields, v)
-				}
-			}
-		}
-	}
-
-	WalkFunc(e.Expr, walk)
-
-	uniqCats := make(map[event.Category]bool)
-
-	// initialize event type/category buckets for every such field
-	for name, values := range stringFields {
-		for _, v := range values {
-			switch name {
-			case fields.EvtName:
-				for _, typ := range event.NameToTypes(v) {
-					if typ == event.UnknownType {
-						continue
-					}
-					e.types = append(e.types, typ)
-					uniqCats[event.TypeToEventInfo(typ).Category] = true
-				}
-			case fields.EvtCategory:
-				e.bitsets.SetCategoryBit(event.Category(v))
-			}
-		}
-	}
-
-	for _, t := range e.types {
-		switch len(uniqCats) {
-		case 0:
-			continue
-		case 1:
-			// happy path can use a single bitmask for all
-			// event types pertaining to the same category
-			e.bitsets.SetBit(event.TypeBitSet, t)
-		default:
-			// use map-backed bitmask for event identifiers
-			e.bitsets.SetBit(event.BitmaskBitSet, t)
-		}
-	}
-}
-
-// IsEvaluable determines if the expression should be evaluated by inspecting
-// the event type filter fields defined in the expression. We permit the expression
-// to be evaluated when the incoming event type, ID, or category pertains to the one
-// defined in the field literal.
-func (e *SequenceExpr) IsEvaluable(evt *event.Event) bool {
-	return e.bitsets.IsBitSet(evt)
-}
-
-// HasBoundFields determines if this sequence expression references any bound field.
-func (e *SequenceExpr) HasBoundFields() bool {
-	return len(e.BoundFields) > 0
+	// By contains the sequence step link if the sequence is constrained.
+	By       *SequenceLink
+	BoundVar string
 }
 
 // SequenceLink represents a single or
@@ -412,54 +306,32 @@ func (l *SequenceLink) First() string {
 	return ""
 }
 
-// Sequence is a collection of two or more sequence expressions.
-type Sequence struct {
-	MaxSpan     time.Duration
-	By          *SequenceLink
-	Expressions []SequenceExpr
-	IsUnordered bool
-}
-
 // IsConstrained determines if the sequence has the global or per-expression `BY` statement.
-func (s Sequence) IsConstrained() bool {
-	return s.By != nil || s.Expressions[0].By != nil
+func (s SequenceExpr) IsConstrained() bool {
+	return s.By != nil || (len(s.Steps) > 0 && s.Steps[0].By != nil)
 }
 
-func (s *Sequence) init() {
-	// determine if the sequence references an event type
-	// that can arrive out-of-order. This happens if the
-	// expressions in the sequence reference event types
-	// from different event sources
-	sources := make(map[event.Source]bool)
-
-	for _, expr := range s.Expressions {
-		for _, etype := range expr.types {
-			sources[etype.Source()] = true
-		}
-	}
-
-	s.IsUnordered = len(sources) > 1
-}
-
-func (s Sequence) impairBy() bool {
-	b := make(map[bool]int, len(s.Expressions))
-	for _, expr := range s.Expressions {
-		b[expr.By != nil]++
-	}
-	if s.By != nil && (b[true] == len(s.Expressions) || b[false] == len(s.Expressions)) {
-		return false
-	}
-	return b[true] > 0 && b[false] > 0
-}
-
-// incompatibleConstraints checks if the sequence has
-// both global and per-expression `BY` statements and
-// returns true if such condition is satisfied.
-func (s Sequence) incompatibleConstraints() bool {
-	for _, expr := range s.Expressions {
-		if expr.By != nil && s.By != nil {
+// HasIncompatibleConstraints checks if the sequence has
+// both global and per-expression `BY` statements mixed
+// and returns true if such condition is satisfied.
+func (s SequenceExpr) HasIncompatibleConstraints() bool {
+	for _, step := range s.Steps {
+		if step.By != nil && s.By != nil {
 			return true
 		}
 	}
 	return false
+}
+
+// HasImpairBy returns true if the sequence has impair
+// count of BY statements.
+func (s SequenceExpr) HasImpairBy() bool {
+	b := make(map[bool]int, len(s.Steps))
+	for _, step := range s.Steps {
+		b[step.By != nil]++
+	}
+	if s.By != nil && (b[true] == len(s.Steps) || b[false] == len(s.Steps)) {
+		return false
+	}
+	return b[true] > 0 && b[false] > 0
 }

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ql
+package ast
 
 // Visitor can be called by Walk to traverse an AST hierarchy.
 // The Visit() function is called once per node.

@@ -18,27 +18,39 @@
  *  Copyright (c) 2013-2016 Errplane Inc.
  */
 
-package ql
+package ast
 
 import (
+	"fmt"
 	"net"
 	"strconv"
 	"strings"
 
 	fuzzysearch "github.com/lithammer/fuzzysearch/fuzzy"
+	"github.com/rabbitstack/fibratus/pkg/compiler/lexer"
 	"github.com/rabbitstack/fibratus/pkg/util/sets"
 	"github.com/rabbitstack/fibratus/pkg/util/wildcard"
 )
 
-// Eval evaluates expr against a map that contains the field values.
-func Eval(expr Expr, m map[string]interface{}, useFuncValuer bool) bool {
+// EvalOptions contains the context passed to the AST evaluation.
+type EvalOptions struct {
+	// MultiValuer indicates if multiple valuers are needed for the
+	// evaluation process.
+	MultiValuer bool
+	// StepIndex indicates the step position inside the sequence expression.
+	// Only applies to sequence-based rules.
+	StepIndex int
+}
+
+// Eval evaluates expr against a valuer that contains extracted field values.
+func Eval(expr Expr, m map[string]interface{}, opts EvalOptions) bool {
 	var eval ValuerEval
-	if useFuncValuer {
+	if opts.MultiValuer {
 		eval = ValuerEval{Valuer: MultiValuer(MapValuer(m), FunctionValuer{m})}
 	} else {
 		eval = ValuerEval{Valuer: MapValuer(m)}
 	}
-	v, ok := eval.Eval(expr).(bool)
+	v, ok := eval.Eval(expr, opts).(bool)
 	if !ok {
 		return false
 	}
@@ -106,18 +118,25 @@ type ValuerEval struct {
 }
 
 // Eval evaluates an expression and returns a value.
-func (v *ValuerEval) Eval(expr Expr) interface{} {
+func (v *ValuerEval) Eval(expr Expr, opts EvalOptions) interface{} {
 	if expr == nil {
 		return nil
 	}
 
 	switch expr := expr.(type) {
 	case *BinaryExpr:
-		return v.evalBinaryExpr(expr)
+		return v.evalBinaryExpr(expr, opts)
+	case *SequenceExpr:
+		stepIndex := opts.StepIndex
+		if stepIndex > len(expr.Steps)-1 {
+			return nil
+		}
+		fmt.Println(expr.Steps[stepIndex].Expr)
+		return v.Eval(expr.Steps[stepIndex].Expr, opts)
 	case *NotExpr:
 		switch exp := expr.Expr.(type) {
 		case *BinaryExpr:
-			v := v.evalBinaryExpr(exp)
+			v := v.evalBinaryExpr(exp, opts)
 			if v == nil {
 				return nil
 			}
@@ -148,14 +167,14 @@ func (v *ValuerEval) Eval(expr Expr) interface{} {
 									// a map with the key equal to the field name and
 									// the value is the result of the map valuer access
 									// in the outer context.
-									args[i] = MapValuer{field.String(): v.Eval(field)}
+									args[i] = MapValuer{field.String(): v.Eval(field, opts)}
 								} else {
 									// otherwise, this is the slice (iterable) argument
-									args[i] = v.Eval(exp.Args[i])
+									args[i] = v.Eval(exp.Args[i], opts)
 								}
 							}
 						} else {
-							args[i] = v.Eval(exp.Args[i])
+							args[i] = v.Eval(exp.Args[i], opts)
 						}
 					}
 				}
@@ -171,7 +190,7 @@ func (v *ValuerEval) Eval(expr Expr) interface{} {
 			}
 			return nil
 		case *ParenExpr:
-			v := v.Eval(exp.Expr)
+			v := v.Eval(exp.Expr, opts)
 			if v == nil {
 				return nil
 			}
@@ -191,7 +210,7 @@ func (v *ValuerEval) Eval(expr Expr) interface{} {
 	case *DecimalLiteral:
 		return expr.Value
 	case *ParenExpr:
-		return v.Eval(expr.Expr)
+		return v.Eval(expr.Expr, opts)
 	case *StringLiteral:
 		return expr.Value
 	case *ListLiteral:
@@ -246,14 +265,14 @@ func (v *ValuerEval) Eval(expr Expr) interface{} {
 								// a map with the key equal to the field name and
 								// the value is the result of the map valuer access
 								// in the outer context.
-								args[i] = MapValuer{field.String(): v.Eval(field)}
+								args[i] = MapValuer{field.String(): v.Eval(field, opts)}
 							} else {
 								// otherwise, this is the slice (iterable) argument
-								args[i] = v.Eval(expr.Args[i])
+								args[i] = v.Eval(expr.Args[i], opts)
 							}
 						}
 					} else {
-						args[i] = v.Eval(expr.Args[i])
+						args[i] = v.Eval(expr.Args[i], opts)
 					}
 				}
 			}
@@ -267,20 +286,20 @@ func (v *ValuerEval) Eval(expr Expr) interface{} {
 	}
 }
 
-func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
-	lhs := v.Eval(expr.LHS)
+func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr, opts EvalOptions) interface{} {
+	lhs := v.Eval(expr.LHS, opts)
 	// lazy evaluation for the AND/OR operators
-	if lhs != nil && expr.Op == And {
+	if lhs != nil && expr.Op == lexer.And {
 		if val, ok := lhs.(bool); ok && !val {
 			return false
 		}
 	}
-	if lhs != nil && expr.Op == Or {
+	if lhs != nil && expr.Op == lexer.Or {
 		if val, ok := lhs.(bool); ok && val {
 			return true
 		}
 	}
-	rhs := v.Eval(expr.RHS)
+	rhs := v.Eval(expr.RHS, opts)
 	if lhs == nil && rhs != nil {
 		// when the LHS is nil and the RHS is a boolean, implicitly cast the
 		// nil to false.
@@ -298,13 +317,13 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 	case bool:
 		rhs, ok := rhs.(bool)
 		switch expr.Op {
-		case And:
+		case lexer.And:
 			return ok && (lhs && rhs)
-		case Or:
+		case lexer.Or:
 			return ok && (lhs || rhs)
-		case Eq:
+		case lexer.Eq:
 			return ok && (lhs == rhs)
-		case Neq:
+		case lexer.Neq:
 			return ok && (lhs != rhs)
 		}
 	case int:
@@ -312,56 +331,56 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 		case float64:
 			lhs := float64(lhs)
 			switch expr.Op {
-			case Eq:
+			case lexer.Eq:
 				return lhs == rhs
-			case Neq:
+			case lexer.Neq:
 				return lhs != rhs
-			case Lt:
+			case lexer.Lt:
 				return lhs < rhs
-			case Lte:
+			case lexer.Lte:
 				return lhs <= rhs
-			case Gt:
+			case lexer.Gt:
 				return lhs > rhs
-			case Gte:
+			case lexer.Gte:
 				return lhs >= rhs
 			}
 		case int64:
 			switch expr.Op {
-			case Eq:
+			case lexer.Eq:
 				return int64(lhs) == rhs
-			case Neq:
+			case lexer.Neq:
 				return int64(lhs) != rhs
-			case Lt:
+			case lexer.Lt:
 				return int64(lhs) < rhs
-			case Lte:
+			case lexer.Lte:
 				return int64(lhs) <= rhs
-			case Gt:
+			case lexer.Gt:
 				return int64(lhs) > rhs
-			case Gte:
+			case lexer.Gte:
 				return int64(lhs) >= rhs
 			}
 		case uint64:
 			switch expr.Op {
-			case Eq:
+			case lexer.Eq:
 				return uint64(lhs) == rhs
-			case Neq:
+			case lexer.Neq:
 				return uint64(lhs) != rhs
-			case Lt:
+			case lexer.Lt:
 				if lhs < 0 {
 					return true
 				}
 				return uint64(lhs) < rhs
-			case Lte:
+			case lexer.Lte:
 				if lhs < 0 {
 					return true
 				}
 				return uint64(lhs) <= rhs
-			case Gt:
+			case lexer.Gt:
 				if lhs < 0 {
 					return false
 				}
 				return uint64(lhs) > rhs
-			case Gte:
+			case lexer.Gte:
 				if lhs < 0 {
 					return false
 				}
@@ -369,7 +388,7 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			}
 		case []uint16:
 			switch expr.Op {
-			case In:
+			case lexer.In:
 				for _, i := range rhs {
 					if int(i) == lhs {
 						return true
@@ -383,47 +402,47 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 		case float64:
 			lhs := float64(lhs)
 			switch expr.Op {
-			case Eq:
+			case lexer.Eq:
 				return lhs == rhs
-			case Neq:
+			case lexer.Neq:
 				return lhs != rhs
-			case Lt:
+			case lexer.Lt:
 				return lhs < rhs
-			case Lte:
+			case lexer.Lte:
 				return lhs <= rhs
-			case Gt:
+			case lexer.Gt:
 				return lhs > rhs
-			case Gte:
+			case lexer.Gte:
 				return lhs >= rhs
 			}
 		case int64:
 			switch expr.Op {
-			case Eq:
+			case lexer.Eq:
 				return int64(lhs) == rhs
-			case Neq:
+			case lexer.Neq:
 				return int64(lhs) != rhs
-			case Lt:
+			case lexer.Lt:
 				return int64(lhs) < rhs
-			case Lte:
+			case lexer.Lte:
 				return int64(lhs) <= rhs
-			case Gt:
+			case lexer.Gt:
 				return int64(lhs) > rhs
-			case Gte:
+			case lexer.Gte:
 				return int64(lhs) >= rhs
 			}
 		case uint64:
 			switch expr.Op {
-			case Eq:
+			case lexer.Eq:
 				return uint64(lhs) == rhs
-			case Neq:
+			case lexer.Neq:
 				return uint64(lhs) != rhs
-			case Lt:
+			case lexer.Lt:
 				return uint64(lhs) < rhs
-			case Lte:
+			case lexer.Lte:
 				return uint64(lhs) <= rhs
-			case Gt:
+			case lexer.Gt:
 				return uint64(lhs) > rhs
-			case Gte:
+			case lexer.Gte:
 				return uint64(lhs) >= rhs
 			}
 		}
@@ -441,17 +460,17 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 
 		rhs := rhsf
 		switch expr.Op {
-		case Eq:
+		case lexer.Eq:
 			return ok && (lhs == rhs)
-		case Neq:
+		case lexer.Neq:
 			return ok && (lhs != rhs)
-		case Lt:
+		case lexer.Lt:
 			return ok && (lhs < rhs)
-		case Lte:
+		case lexer.Lte:
 			return ok && (lhs <= rhs)
-		case Gt:
+		case lexer.Gt:
 			return ok && (lhs > rhs)
-		case Gte:
+		case lexer.Gte:
 			return ok && (lhs >= rhs)
 		}
 	case int64:
@@ -460,56 +479,56 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 		case float64:
 			lhs := float64(lhs)
 			switch expr.Op {
-			case Eq:
+			case lexer.Eq:
 				return lhs == rhs
-			case Neq:
+			case lexer.Neq:
 				return lhs != rhs
-			case Lt:
+			case lexer.Lt:
 				return lhs < rhs
-			case Lte:
+			case lexer.Lte:
 				return lhs <= rhs
-			case Gt:
+			case lexer.Gt:
 				return lhs > rhs
-			case Gte:
+			case lexer.Gte:
 				return lhs >= rhs
 			}
 		case int64:
 			switch expr.Op {
-			case Eq:
+			case lexer.Eq:
 				return lhs == rhs
-			case Neq:
+			case lexer.Neq:
 				return lhs != rhs
-			case Lt:
+			case lexer.Lt:
 				return lhs < rhs
-			case Lte:
+			case lexer.Lte:
 				return lhs <= rhs
-			case Gt:
+			case lexer.Gt:
 				return lhs > rhs
-			case Gte:
+			case lexer.Gte:
 				return lhs >= rhs
 			}
 		case uint64:
 			switch expr.Op {
-			case Eq:
+			case lexer.Eq:
 				return uint64(lhs) == rhs
-			case Neq:
+			case lexer.Neq:
 				return uint64(lhs) != rhs
-			case Lt:
+			case lexer.Lt:
 				if lhs < 0 {
 					return true
 				}
 				return uint64(lhs) < rhs
-			case Lte:
+			case lexer.Lte:
 				if lhs < 0 {
 					return true
 				}
 				return uint64(lhs) <= rhs
-			case Gt:
+			case lexer.Gt:
 				if lhs < 0 {
 					return false
 				}
 				return uint64(lhs) > rhs
-			case Gte:
+			case lexer.Gte:
 				if lhs < 0 {
 					return false
 				}
@@ -522,41 +541,41 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 		case float64:
 			lhs := float64(lhs)
 			switch expr.Op {
-			case Eq:
+			case lexer.Eq:
 				return lhs == rhs
-			case Neq:
+			case lexer.Neq:
 				return lhs != rhs
-			case Lt:
+			case lexer.Lt:
 				return lhs < rhs
-			case Lte:
+			case lexer.Lte:
 				return lhs <= rhs
-			case Gt:
+			case lexer.Gt:
 				return lhs > rhs
-			case Gte:
+			case lexer.Gte:
 				return lhs >= rhs
 			}
 		case int64:
 			switch expr.Op {
-			case Eq:
+			case lexer.Eq:
 				return lhs == uint64(rhs)
-			case Neq:
+			case lexer.Neq:
 				return lhs != uint64(rhs)
-			case Lt:
+			case lexer.Lt:
 				if rhs < 0 {
 					return false
 				}
 				return lhs < uint64(rhs)
-			case Lte:
+			case lexer.Lte:
 				if rhs < 0 {
 					return false
 				}
 				return lhs <= uint64(rhs)
-			case Gt:
+			case lexer.Gt:
 				if rhs < 0 {
 					return true
 				}
 				return lhs > uint64(rhs)
-			case Gte:
+			case lexer.Gte:
 				if rhs < 0 {
 					return true
 				}
@@ -564,17 +583,17 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			}
 		case uint64:
 			switch expr.Op {
-			case Eq:
+			case lexer.Eq:
 				return lhs == rhs
-			case Neq:
+			case lexer.Neq:
 				return lhs != rhs
-			case Lt:
+			case lexer.Lt:
 				return lhs < rhs
-			case Lte:
+			case lexer.Lte:
 				return lhs <= rhs
-			case Gt:
+			case lexer.Gt:
 				return lhs > rhs
-			case Gte:
+			case lexer.Gte:
 				return lhs >= rhs
 			}
 		}
@@ -582,14 +601,14 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 		switch rhs := rhs.(type) {
 		case uint64:
 			switch expr.Op {
-			case Gt:
+			case lexer.Gt:
 				for _, i := range lhs {
 					if i > rhs {
 						return true
 					}
 				}
 				return false
-			case Gte:
+			case lexer.Gte:
 				for _, i := range lhs {
 					if i >= rhs {
 						return true
@@ -599,14 +618,14 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			}
 		case int64:
 			switch expr.Op {
-			case Gt:
+			case lexer.Gt:
 				for _, i := range lhs {
 					if i > uint64(rhs) {
 						return true
 					}
 				}
 				return false
-			case Gte:
+			case lexer.Gte:
 				for _, i := range lhs {
 					if i >= uint64(rhs) {
 						return true
@@ -620,41 +639,41 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 		case float64:
 			lhs := float64(lhs)
 			switch expr.Op {
-			case Eq:
+			case lexer.Eq:
 				return lhs == rhs
-			case Neq:
+			case lexer.Neq:
 				return lhs != rhs
-			case Lt:
+			case lexer.Lt:
 				return lhs < rhs
-			case Lte:
+			case lexer.Lte:
 				return lhs <= rhs
-			case Gt:
+			case lexer.Gt:
 				return lhs > rhs
-			case Gte:
+			case lexer.Gte:
 				return lhs >= rhs
 			}
 		case int32:
 			switch expr.Op {
-			case Eq:
+			case lexer.Eq:
 				return lhs == uint32(rhs)
-			case Neq:
+			case lexer.Neq:
 				return lhs != uint32(rhs)
-			case Lt:
+			case lexer.Lt:
 				if rhs < 0 {
 					return false
 				}
 				return lhs < uint32(rhs)
-			case Lte:
+			case lexer.Lte:
 				if rhs < 0 {
 					return false
 				}
 				return lhs <= uint32(rhs)
-			case Gt:
+			case lexer.Gt:
 				if rhs < 0 {
 					return true
 				}
 				return lhs > uint32(rhs)
-			case Gte:
+			case lexer.Gte:
 				if rhs < 0 {
 					return true
 				}
@@ -662,26 +681,26 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			}
 		case int64:
 			switch expr.Op {
-			case Eq:
+			case lexer.Eq:
 				return lhs == uint32(rhs)
-			case Neq:
+			case lexer.Neq:
 				return lhs != uint32(rhs)
-			case Lt:
+			case lexer.Lt:
 				if rhs < 0 {
 					return false
 				}
 				return lhs < uint32(rhs)
-			case Lte:
+			case lexer.Lte:
 				if rhs < 0 {
 					return false
 				}
 				return lhs <= uint32(rhs)
-			case Gt:
+			case lexer.Gt:
 				if rhs < 0 {
 					return true
 				}
 				return lhs > uint32(rhs)
-			case Gte:
+			case lexer.Gte:
 				if rhs < 0 {
 					return true
 				}
@@ -689,22 +708,22 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			}
 		case uint32:
 			switch expr.Op {
-			case Eq:
+			case lexer.Eq:
 				return lhs == rhs
-			case Neq:
+			case lexer.Neq:
 				return lhs != rhs
-			case Lt:
+			case lexer.Lt:
 				return lhs < rhs
-			case Lte:
+			case lexer.Lte:
 				return lhs <= rhs
-			case Gt:
+			case lexer.Gt:
 				return lhs > rhs
-			case Gte:
+			case lexer.Gte:
 				return lhs >= rhs
 			}
 		case []string:
 			switch expr.Op {
-			case In:
+			case lexer.In:
 				for _, s := range rhs {
 					n, err := strconv.ParseUint(s, 10, 32)
 					if err != nil {
@@ -722,41 +741,41 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 		case float64:
 			lhs := float64(lhs)
 			switch expr.Op {
-			case Eq:
+			case lexer.Eq:
 				return lhs == rhs
-			case Neq:
+			case lexer.Neq:
 				return lhs != rhs
-			case Lt:
+			case lexer.Lt:
 				return lhs < rhs
-			case Lte:
+			case lexer.Lte:
 				return lhs <= rhs
-			case Gt:
+			case lexer.Gt:
 				return lhs > rhs
-			case Gte:
+			case lexer.Gte:
 				return lhs >= rhs
 			}
 		case int32:
 			switch expr.Op {
-			case Eq:
+			case lexer.Eq:
 				return lhs == uint16(rhs)
-			case Neq:
+			case lexer.Neq:
 				return lhs != uint16(rhs)
-			case Lt:
+			case lexer.Lt:
 				if rhs < 0 {
 					return false
 				}
 				return lhs < uint16(rhs)
-			case Lte:
+			case lexer.Lte:
 				if rhs < 0 {
 					return false
 				}
 				return lhs <= uint16(rhs)
-			case Gt:
+			case lexer.Gt:
 				if rhs < 0 {
 					return true
 				}
 				return lhs > uint16(rhs)
-			case Gte:
+			case lexer.Gte:
 				if rhs < 0 {
 					return true
 				}
@@ -764,26 +783,26 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			}
 		case int64:
 			switch expr.Op {
-			case Eq:
+			case lexer.Eq:
 				return lhs == uint16(rhs)
-			case Neq:
+			case lexer.Neq:
 				return lhs != uint16(rhs)
-			case Lt:
+			case lexer.Lt:
 				if rhs < 0 {
 					return false
 				}
 				return lhs < uint16(rhs)
-			case Lte:
+			case lexer.Lte:
 				if rhs < 0 {
 					return false
 				}
 				return lhs <= uint16(rhs)
-			case Gt:
+			case lexer.Gt:
 				if rhs < 0 {
 					return true
 				}
 				return lhs > uint16(rhs)
-			case Gte:
+			case lexer.Gte:
 				if rhs < 0 {
 					return true
 				}
@@ -791,22 +810,22 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			}
 		case uint16:
 			switch expr.Op {
-			case Eq:
+			case lexer.Eq:
 				return lhs == rhs
-			case Neq:
+			case lexer.Neq:
 				return lhs != rhs
-			case Lt:
+			case lexer.Lt:
 				return lhs < rhs
-			case Lte:
+			case lexer.Lte:
 				return lhs <= rhs
-			case Gt:
+			case lexer.Gt:
 				return lhs > rhs
-			case Gte:
+			case lexer.Gte:
 				return lhs >= rhs
 			}
 		case []string:
 			switch expr.Op {
-			case In:
+			case lexer.In:
 				for _, s := range rhs {
 					n, err := strconv.Atoi(s)
 					if err != nil {
@@ -821,25 +840,25 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 		}
 	case string:
 		switch expr.Op {
-		case Eq:
+		case lexer.Eq:
 			rhs, ok := rhs.(string)
 			if !ok {
 				return false
 			}
 			return lhs == rhs
-		case IEq:
+		case lexer.IEq:
 			rhs, ok := rhs.(string)
 			if !ok {
 				return false
 			}
 			return strings.EqualFold(lhs, rhs)
-		case Neq:
+		case lexer.Neq:
 			rhs, ok := rhs.(string)
 			if !ok {
 				return false
 			}
 			return lhs != rhs
-		case Contains:
+		case lexer.Contains:
 			switch rhs := rhs.(type) {
 			case string:
 				return strings.Contains(lhs, rhs)
@@ -853,7 +872,7 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			default:
 				return false
 			}
-		case IContains:
+		case lexer.IContains:
 			v := strings.ToLower(lhs)
 			switch rhs := rhs.(type) {
 			case string:
@@ -868,7 +887,7 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			default:
 				return false
 			}
-		case In:
+		case lexer.In:
 			rhs, ok := rhs.([]string)
 			if !ok {
 				return false
@@ -879,7 +898,7 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 				}
 			}
 			return false
-		case IIn:
+		case lexer.IIn:
 			rhs, ok := rhs.([]string)
 			if !ok {
 				return false
@@ -890,7 +909,7 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 				}
 			}
 			return false
-		case Startswith:
+		case lexer.Startswith:
 			switch rhs := rhs.(type) {
 			case string:
 				return strings.HasPrefix(lhs, rhs)
@@ -904,7 +923,7 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			default:
 				return false
 			}
-		case IStartswith:
+		case lexer.IStartswith:
 			switch rhs := rhs.(type) {
 			case string:
 				return strings.HasPrefix(strings.ToLower(lhs), strings.ToLower(rhs))
@@ -918,7 +937,7 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			default:
 				return false
 			}
-		case Endswith:
+		case lexer.Endswith:
 			switch rhs := rhs.(type) {
 			case string:
 				return strings.HasSuffix(lhs, rhs)
@@ -932,7 +951,7 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			default:
 				return false
 			}
-		case IEndswith:
+		case lexer.IEndswith:
 			switch rhs := rhs.(type) {
 			case string:
 				return strings.HasSuffix(strings.ToLower(lhs), strings.ToLower(rhs))
@@ -946,7 +965,7 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			default:
 				return false
 			}
-		case Matches:
+		case lexer.Matches:
 			switch rhs := rhs.(type) {
 			case string:
 				return wildcard.Match(rhs, lhs, true)
@@ -960,7 +979,7 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			default:
 				return false
 			}
-		case IMatches:
+		case lexer.IMatches:
 			switch rhs := rhs.(type) {
 			case string:
 				return wildcard.Match(rhs, lhs, false)
@@ -974,7 +993,7 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			default:
 				return false
 			}
-		case Fuzzy:
+		case lexer.Fuzzy:
 			switch rhs := rhs.(type) {
 			case string:
 				return fuzzysearch.Match(rhs, lhs)
@@ -988,7 +1007,7 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			default:
 				return false
 			}
-		case IFuzzy:
+		case lexer.IFuzzy:
 			switch rhs := rhs.(type) {
 			case string:
 				return fuzzysearch.MatchFold(rhs, lhs)
@@ -1002,7 +1021,7 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			default:
 				return false
 			}
-		case Fuzzynorm:
+		case lexer.Fuzzynorm:
 			switch rhs := rhs.(type) {
 			case string:
 				return fuzzysearch.MatchNormalized(rhs, lhs)
@@ -1016,7 +1035,7 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 			default:
 				return false
 			}
-		case IFuzzynorm:
+		case lexer.IFuzzynorm:
 			switch rhs := rhs.(type) {
 			case string:
 				return fuzzysearch.MatchNormalizedFold(rhs, lhs)
@@ -1033,19 +1052,19 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 		}
 	case net.IP:
 		switch expr.Op {
-		case Eq:
+		case lexer.Eq:
 			rhs, ok := rhs.(net.IP)
 			if !ok {
 				return false
 			}
 			return lhs.Equal(rhs)
-		case Neq:
+		case lexer.Neq:
 			rhs, ok := rhs.(net.IP)
 			if !ok {
 				return false
 			}
 			return !lhs.Equal(rhs)
-		case In:
+		case lexer.In:
 			ips, ok := rhs.([]net.IP)
 			if !ok {
 				// keep backward compatibility with string lists
@@ -1066,13 +1085,13 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 				}
 			}
 			return false
-		case Startswith:
+		case lexer.Startswith:
 			rhs, ok := rhs.(string)
 			if !ok {
 				return false
 			}
 			return strings.HasPrefix(lhs.String(), rhs)
-		case Endswith:
+		case lexer.Endswith:
 			rhs, ok := rhs.(string)
 			if !ok {
 				return false
@@ -1081,7 +1100,7 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 		}
 	case []string:
 		switch expr.Op {
-		case Contains:
+		case lexer.Contains:
 			s, ok := rhs.(string)
 			if !ok {
 				rhs, ok := rhs.([]string)
@@ -1103,7 +1122,7 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 				}
 			}
 			return false
-		case IContains:
+		case lexer.IContains:
 			rhs, ok := rhs.([]string)
 			if !ok {
 				return false
@@ -1116,7 +1135,7 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 				}
 			}
 			return false
-		case In:
+		case lexer.In:
 			s, ok := rhs.(string)
 			if !ok {
 				rhs, ok := rhs.([]string)
@@ -1138,7 +1157,7 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 				}
 			}
 			return false
-		case IIn:
+		case lexer.IIn:
 			s, ok := rhs.(string)
 			if !ok {
 				rhs, ok := rhs.([]string)
@@ -1159,7 +1178,7 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 				}
 			}
 			return false
-		case Startswith:
+		case lexer.Startswith:
 			rhs, ok := rhs.([]string)
 			if !ok {
 				return false
@@ -1172,7 +1191,7 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 				}
 			}
 			return false
-		case IStartswith:
+		case lexer.IStartswith:
 			rhs, ok := rhs.([]string)
 			if !ok {
 				return false
@@ -1185,7 +1204,7 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 				}
 			}
 			return false
-		case Endswith:
+		case lexer.Endswith:
 			rhs, ok := rhs.([]string)
 			if !ok {
 				return false
@@ -1198,7 +1217,7 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 				}
 			}
 			return false
-		case IEndswith:
+		case lexer.IEndswith:
 			rhs, ok := rhs.([]string)
 			if !ok {
 				return false
@@ -1211,7 +1230,7 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 				}
 			}
 			return false
-		case Matches:
+		case lexer.Matches:
 			rhs, ok := rhs.([]string)
 			if !ok {
 				return false
@@ -1224,7 +1243,7 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 				}
 			}
 			return false
-		case IMatches:
+		case lexer.IMatches:
 			rhs, ok := rhs.([]string)
 			if !ok {
 				return false
@@ -1237,13 +1256,13 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 				}
 			}
 			return false
-		case Intersects:
+		case lexer.Intersects:
 			rhs, ok := rhs.([]string)
 			if !ok {
 				return false
 			}
 			return len(sets.IntersectionStrings(lhs, rhs, false)) == len(rhs)
-		case IIntersects:
+		case lexer.IIntersects:
 			rhs, ok := rhs.([]string)
 			if !ok {
 				return false
@@ -1255,7 +1274,7 @@ func (v *ValuerEval) evalBinaryExpr(expr *BinaryExpr) interface{} {
 	// the types were not comparable. If our operation was an equality operation,
 	// return false instead of true.
 	switch expr.Op {
-	case Eq, IEq, Neq, Lt, Lte, Gt, Gte:
+	case lexer.Eq, lexer.IEq, lexer.Neq, lexer.Lt, lexer.Lte, lexer.Gt, lexer.Gte:
 		return false
 	}
 	return nil

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ql
+package ast
 
 import (
 	"fmt"
@@ -27,13 +27,13 @@ import (
 	"strings"
 
 	"github.com/rabbitstack/fibratus/pkg/callstack"
-	"github.com/rabbitstack/fibratus/pkg/filter/fields"
+	"github.com/rabbitstack/fibratus/pkg/compiler/fields"
 	"github.com/rabbitstack/fibratus/pkg/pe"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/util/signature"
 	"golang.org/x/sys/windows"
 
-	"github.com/rabbitstack/fibratus/pkg/filter/ql/functions"
+	"github.com/rabbitstack/fibratus/pkg/compiler/functions"
 )
 
 var (
@@ -423,13 +423,13 @@ func (f *Foreach) evalExpr(e any, useCallValuer bool, valuers ...Valuer) bool {
 
 	switch expr := e.(type) {
 	case *BinaryExpr:
-		v, ok := valuer.Eval(expr).(bool)
+		v, ok := valuer.Eval(expr, EvalOptions{}).(bool)
 		if !ok {
 			return false
 		}
 		return v
 	case *NotExpr:
-		v, ok := valuer.Eval(expr).(bool)
+		v, ok := valuer.Eval(expr, EvalOptions{}).(bool)
 		if !ok {
 			return false
 		}

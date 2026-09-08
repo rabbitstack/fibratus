@@ -82,3 +82,7 @@ func (f CIDRContains) Desc() FunctionDesc {
 }
 
 func (f CIDRContains) Name() Fn { return CIDRContainsFn }
+
+func init() {
+	Register(CIDRContainsFn, &CIDRContains{})
+}

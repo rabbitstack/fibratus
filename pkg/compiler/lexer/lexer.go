@@ -18,7 +18,7 @@
  *  Copyright (c) 2013-2016 Errplane Inc.
  */
 
-package ql
+package lexer
 
 import (
 	"bufio"
@@ -55,7 +55,7 @@ func (s *scanner) scan() (tok Token, pos int, lit string) {
 	} else if isLetter(ch0) || ch0 == '_' {
 		s.r.unread()
 		return s.scanIdent()
-	} else if isDigit(ch0) {
+	} else if IsDigit(ch0) {
 		return s.scanNumber()
 	}
 
@@ -71,7 +71,7 @@ func (s *scanner) scan() (tok Token, pos int, lit string) {
 	case '.':
 		ch1, _ := s.r.read()
 		s.r.unread()
-		if isDigit(ch1) {
+		if IsDigit(ch1) {
 			return s.scanNumber()
 		}
 		return Dot, pos, ""
@@ -172,7 +172,7 @@ func (s *scanner) scanIdent() (tok Token, pos int, lit string) {
 	}
 	lit = buf.String()
 
-	if tok, lit = lookup(lit); tok != Ident {
+	if tok, lit = Lookup(lit); tok != Ident {
 		return tok, pos, lit
 	}
 
@@ -189,7 +189,7 @@ func (s *scanner) scanNumber() (tok Token, pos int, lit string) {
 		// Peek and see if the next rune is a digit.
 		ch1, _ := s.r.read()
 		s.r.unread()
-		if !isDigit(ch1) {
+		if !IsDigit(ch1) {
 			return Illegal, pos, "."
 		}
 		// Unread the full stop so we can read it later.
@@ -205,7 +205,7 @@ func (s *scanner) scanNumber() (tok Token, pos int, lit string) {
 	isDecimal := false
 	if ch0, _ := s.r.read(); ch0 == '.' {
 		isDecimal = true
-		if ch1, _ := s.r.read(); isDigit(ch1) {
+		if ch1, _ := s.r.read(); IsDigit(ch1) {
 			_, _ = buf.WriteRune(ch0)
 			_, _ = buf.WriteRune(ch1)
 			_, _ = buf.WriteString(s.scanDigits())
@@ -271,7 +271,7 @@ func (s *scanner) scanNumber() (tok Token, pos int, lit string) {
 
 			// Continue reading digits and letters as part of this token.
 			for {
-				if ch0, _ := s.r.read(); isLetter(ch0) || ch0 == 'µ' || isDigit(ch0) {
+				if ch0, _ := s.r.read(); isLetter(ch0) || ch0 == 'µ' || IsDigit(ch0) {
 					_, _ = buf.WriteRune(ch0)
 				} else {
 					s.r.unread()
@@ -292,7 +292,7 @@ func (s *scanner) scanDigits() string {
 	var buf bytes.Buffer
 	for {
 		ch, _ := s.r.read()
-		if !isDigit(ch) {
+		if !IsDigit(ch) {
 			s.r.unread()
 			break
 		}
@@ -377,9 +377,9 @@ func ScanString(r io.RuneScanner) (string, error) {
 	}
 }
 
-// bufScanner represents a wrapper for scanner to add a buffer.
+// Scanner represents a wrapper for scanner to add a buffer.
 // It provides a fixed-length circular buffer that can be unread.
-type bufScanner struct {
+type Scanner struct {
 	s   *scanner
 	i   int // buffer index
 	n   int // buffer size
@@ -390,18 +390,18 @@ type bufScanner struct {
 	}
 }
 
-// newBufScanner returns a new buffered scanner for a reader.
-func newBufScanner(r io.Reader) *bufScanner {
-	return &bufScanner{s: newScanner(r)}
+// NewScanner returns a new buffered scanner for a reader.
+func NewScanner(r io.Reader) *Scanner {
+	return &Scanner{s: newScanner(r)}
 }
 
-// scan reads the next token from the scanner.
-func (s *bufScanner) scan() (tok Token, pos int, lit string) {
-	return s.scanFunc(s.s.scan)
+// Scan reads the next token from the scanner.
+func (s *Scanner) Scan() (tok Token, pos int, lit string) {
+	return s.ScanFunc(s.s.scan)
 }
 
-// scanFunc uses the provided function to scan the next token.
-func (s *bufScanner) scanFunc(scan func() (Token, int, string)) (tok Token, pos int, lit string) {
+// ScanFunc uses the provided function to scan the next token.
+func (s *Scanner) ScanFunc(scan func() (Token, int, string)) (tok Token, pos int, lit string) {
 	// If we have unread tokens then read them off the buffer first.
 	if s.n > 0 {
 		s.n--
@@ -416,11 +416,11 @@ func (s *bufScanner) scanFunc(scan func() (Token, int, string)) (tok Token, pos 
 	return s.curr()
 }
 
-// unscan pushes the previously token back onto the buffer.
-func (s *bufScanner) unscan() { s.n++ }
+// Unscan pushes the previously token back onto the buffer.
+func (s *Scanner) Unscan() { s.n++ }
 
 // curr returns the last read token.
-func (s *bufScanner) curr() (tok Token, pos int, lit string) {
+func (s *Scanner) curr() (tok Token, pos int, lit string) {
 	buf := &s.buf[(s.i-s.n+len(s.buf))%len(s.buf)]
 	return buf.tok, buf.pos, buf.lit
 }
@@ -516,10 +516,10 @@ func isLetter(ch rune) bool {
 	return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')
 }
 
-// isDigit returns true if the rune is a digit.
-func isDigit(ch rune) bool { return ch >= '0' && ch <= '9' }
+// IsDigit returns true if the rune is a digit.
+func IsDigit(ch rune) bool { return ch >= '0' && ch <= '9' }
 
 // isIdentChar returns true if the rune can be used in an unquoted identifier. $ rune is for special PE section names (e.g. .debug$ | .tls$)
 func isIdentChar(ch rune) bool {
-	return isLetter(ch) || isDigit(ch) || ch == '_' || ch == '.' || ch == '$'
+	return isLetter(ch) || IsDigit(ch) || ch == '_' || ch == '.' || ch == '$'
 }

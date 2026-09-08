@@ -16,10 +16,13 @@
  * limitations under the License.
  */
 
-package ql
+package ast
 
 import (
 	"strings"
+	"time"
+
+	"github.com/rabbitstack/fibratus/pkg/compiler/lexer"
 )
 
 // Node represents a node in the abstract syntax tree.
@@ -49,7 +52,7 @@ func (e *ParenExpr) String() string {
 
 // BinaryExpr represents an operation between two expressions.
 type BinaryExpr struct {
-	Op  Token
+	Op  lexer.Token
 	LHS Expr
 	RHS Expr
 }
@@ -85,4 +88,18 @@ func (e *NotExpr) String() string {
 	b.WriteString("NOT ")
 	b.WriteString(e.Expr.String())
 	return b.String()
+}
+
+type MacroExpr struct {
+}
+
+// SequenceExpr is a collection of two or more sequence steps.
+type SequenceExpr struct {
+	By      *SequenceLink
+	MaxSpan time.Duration
+	Steps   []SequenceStep
+}
+
+func (e *SequenceExpr) String() string {
+	return "SEQUENCE"
 }

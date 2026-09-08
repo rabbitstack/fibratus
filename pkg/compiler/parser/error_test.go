@@ -16,12 +16,13 @@
  * limitations under the License.
  */
 
-package ql
+package parser
 
 import (
-	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestParseError(t *testing.T) {
