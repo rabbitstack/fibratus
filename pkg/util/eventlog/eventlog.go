@@ -16,11 +16,13 @@
  * limitations under the License.
  */
 
+//go:generate go run github.com/rabbitstack/fibratus/pkg/util/eventlog/mc
+
 package eventlog
 
 import (
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/event"
+
 	"golang.org/x/sys/windows/registry"
 )
 
@@ -29,17 +31,14 @@ const (
 	Source = "Fibratus"
 	// Levels designates the supported eventlog levels
 	Levels = uint32(Info | Warn | Erro)
-	// msgFile specifies the location of the eventlog message DLL
-	msgFile = "%ProgramFiles%\\Fibratus\\fibratus.dll"
+	// msgFile specifies the location of the eventlog message table. Embedded inside the binary
+	msgFile = "%ProgramFiles%\\Fibratus\\Bin\\fibratus.exe"
 	// keyName represents the registry key under which the eventlog source is registered
 	keyName = `SYSTEM\CurrentControlSet\Services\EventLog\Application`
 )
 
 // ErrKeyExists signals that the registry key already exists
 var ErrKeyExists = fmt.Errorf("%s\\%s already exists", keyName, Source)
-
-// categoryCount indicates the number of current event categories
-var categoryCount = uint32(len(event.Categories()))
 
 // Level is the type definition for the eventlog log level
 type Level uint16
@@ -55,11 +54,11 @@ const (
 
 // Install modifies PC registry to allow logging with an event source src.
 // It adds all required keys and values to the event log registry key.
-// Install uses msgFile as the event message file. If useExpandKey is true,
-// the event message file is installed as REG_EXPAND_SZ value,
-// otherwise as REG_SZ. Use bitwise of Errr, Warn, and Info to specify events
-// supported by the new event source.
-func Install(eventsSupported uint32) error {
+// Install uses the running executable as the event message file, since
+// the message table resource is now embedded directly in fibratus.exe.
+// Use bitwise of Errr, Warn, and Info to specify levels supported by the
+// new event source.
+func Install(levels uint32) error {
 	key, err := registry.OpenKey(registry.LOCAL_MACHINE, keyName, registry.CREATE_SUB_KEY)
 	if err != nil {
 		return err
@@ -87,11 +86,11 @@ func Install(eventsSupported uint32) error {
 	if err != nil {
 		return err
 	}
-	err = sk.SetDWordValue("TypesSupported", eventsSupported)
+	err = sk.SetDWordValue("TypesSupported", levels)
 	if err != nil {
 		return err
 	}
-	err = sk.SetDWordValue("CategoryCount", categoryCount)
+	err = sk.SetDWordValue("CategoryCount", 1)
 	if err != nil {
 		return err
 	}

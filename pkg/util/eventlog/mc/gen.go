@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-2022 by Nedim Sabic Sabic
+ * Copyright 2021-2026 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -21,31 +21,22 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"github.com/Masterminds/sprig/v3"
-	"github.com/rabbitstack/fibratus/pkg/event"
 	"io"
 	"log"
 	"math"
 	"os"
 	"text/template"
+
+	"github.com/Masterminds/sprig/v3"
 )
 
-// Source contains the required data for producing the input for the message compiler.
-type Source struct {
-	Categories []string
-	Events     []event.Info
-	MaxEvents  uint16
-}
-
-func (s *Source) Generate(w io.Writer) error {
+// generate produces the message table embedded directly inside the binary.
+func generate(w io.Writer) error {
 	funcmap := sprig.TxtFuncMap()
-	funcmap["length"] = func(evts []event.Info) int {
-		return len(evts)
-	}
-	funcmap["N"] = func(start, end int) (stream chan int) {
+	funcmap["N"] = func() (stream chan int) {
 		stream = make(chan int)
 		go func() {
-			for i := start; i <= end; i++ {
+			for i := 2; i <= math.MaxUint16; i++ {
 				stream <- i
 			}
 			close(stream)
@@ -53,7 +44,7 @@ func (s *Source) Generate(w io.Writer) error {
 		return
 	}
 	t := template.Must(template.New("main").Funcs(funcmap).Parse(srcTemplate))
-	err := t.Execute(w, s)
+	err := t.Execute(w, nil)
 	if err != nil {
 		return fmt.Errorf("failed to execute template: %v", err)
 	}
@@ -63,15 +54,10 @@ func (s *Source) Generate(w io.Writer) error {
 func main() {
 	var buf bytes.Buffer
 
-	src := &Source{
-		Categories: event.Categories(),
-		Events:     event.GetTypesMetaIndexed(),
-		MaxEvents:  math.MaxUint16,
-	}
-
-	if err := src.Generate(&buf); err != nil {
+	if err := generate(&buf); err != nil {
 		log.Fatal(err)
 	}
+
 	if err := os.WriteFile("mc/fibratus.mc", buf.Bytes(), 0644); err != nil {
 		log.Fatal(err)
 	}
@@ -83,33 +69,13 @@ MessageIdTypedef=DWORD
 
 LanguageNames=(English=0x409:MSG00409)
 
-;//************** Event categories ************
-{{- range $i, $cat := .Categories }}
-MessageId={{ add1 $i }}
-SymbolicName={{title $cat}}
+MessageId=1
+SymbolicName=Security
 Language=English
-{{ title $cat }}
-.
-{{- end }}
 
-{{ $catOffset := 25 }}
-
-;//*********** Event types **************
-{{- range $i, $e := .Events }}
-MessageId={{ add $i $catOffset }}
-SymbolicName={{ $e.Name }}
-Language=English
-{{ $e.Description }}
-.
-{{- end }}
-
-{{ $n := length .Events }}
-{{ $n = add $n $catOffset | int }}
-{{ $e := sub .MaxEvents $n | int }}
-
-{{- range $i, $_ := N $n $e }}
-MessageId={{ add $i $n }}
-SymbolicName=Reserved{{ add $i $n }}
+{{- range $i, $_ := N }}
+MessageId={{ $i }}
+SymbolicName=Reserved{{ $i }}
 Language=English
 %1
 .

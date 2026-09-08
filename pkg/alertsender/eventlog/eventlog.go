@@ -31,6 +31,7 @@ import (
 )
 
 const minIDChars = 12
+const categoryID = 1
 
 type eventlog struct {
 	log    windows.Handle
@@ -107,7 +108,7 @@ func (s *eventlog) Send(alert alertsender.Alert) error {
 		return fmt.Errorf("could not convert eventlog message to UTF16: %v: %s", err, msg)
 	}
 
-	return windows.ReportEvent(s.log, windows.EVENTLOG_INFORMATION_TYPE, 0,
+	return windows.ReportEvent(s.log, windows.EVENTLOG_INFORMATION_TYPE, categoryID,
 		evlog.EventID(windows.EVENTLOG_INFORMATION_TYPE, code),
 		uintptr(0),
 		1, 0, &m, nil)

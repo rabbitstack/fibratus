@@ -47,8 +47,6 @@ const (
 	Elasticsearch
 	// HTTP denotes the HTTP output.
 	HTTP
-	// Eventlog denotes the eventlog output.
-	Eventlog
 	// Null is the null output.
 	Null
 	// Unknown is an undefined output type.
@@ -66,8 +64,6 @@ func (t Type) String() string {
 		return "elasticsearch"
 	case HTTP:
 		return "http"
-	case Eventlog:
-		return "eventlog"
 	case Null:
 		return "null"
 	default:
@@ -86,8 +82,6 @@ func TypeFromString(s string) Type {
 		return Elasticsearch
 	case "http":
 		return HTTP
-	case "eventlog":
-		return Eventlog
 	case "null":
 		return Null
 	default:
