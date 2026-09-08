@@ -19,6 +19,8 @@
 package event
 
 import (
+	"slices"
+
 	"github.com/rabbitstack/fibratus/pkg/util/hashers"
 )
 
@@ -124,11 +126,4 @@ func Categories() []string {
 }
 
 // IsCategoryKnown indicates if the category is known given its name.
-func IsCategoryKnown(name string) bool {
-	for _, category := range Categories() {
-		if category == name {
-			return true
-		}
-	}
-	return false
-}
+func IsCategoryKnown(name string) bool { return slices.Contains(Categories(), name) }

@@ -1,4 +1,5 @@
 #include "version.h"
+#define RT_MESSAGETABLE 11
 #define RT_MANIFEST 24
 
 IDI_APP_ICON ICON "fibratus.ico"
@@ -38,3 +39,5 @@ BEGIN
 END
 
 1 RT_MANIFEST "fibratus.exe.manifest"
+
+1 RT_MESSAGETABLE "../../pkg/util/eventlog/mc/MSG00409.bin"
