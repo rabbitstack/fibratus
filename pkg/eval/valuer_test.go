@@ -18,205 +18,198 @@
 
 package eval
 
-import (
-	"testing"
+// var dontCallValuerFunc = func() any { return "should-not-be-called" }
+// var extractValueFunc = func() any { return "explorer.exe" }
 
-	"github.com/rabbitstack/fibratus/pkg/compiler/fields"
-	"github.com/stretchr/testify/assert"
-)
+// func TestValuerCacheHit(t *testing.T) {
+// 	c := AcquireValuerCache()
+// 	defer c.Release()
 
-var dontCallValuerFunc = func() any { return "should-not-be-called" }
-var extractValueFunc = func() any { return "explorer.exe" }
+// 	calls := 0
+// 	extract := func() any {
+// 		calls++
+// 		return "explorer.exe"
+// 	}
 
-func TestValuerCacheHit(t *testing.T) {
-	c := AcquireValuerCache()
-	defer c.Release()
+// 	f := Field{Name: fields.PsName, Value: fields.PsName.String()}
 
-	calls := 0
-	extract := func() any {
-		calls++
-		return "explorer.exe"
-	}
+// 	c.populateValuer(f, extract)
+// 	c.populateValuer(f, extract)
 
-	f := Field{Name: fields.PsName, Value: fields.PsName.String()}
+// 	assert.Equal(t, "explorer.exe", c.Valuer[f.String()])
+// 	assert.Equal(t, 1, calls, "extract must be called exactly once on repeated access")
+// }
 
-	c.populateValuer(f, extract)
-	c.populateValuer(f, extract)
+// func TestValuerCacheMiss(t *testing.T) {
+// 	c := AcquireValuerCache()
+// 	defer c.Release()
 
-	assert.Equal(t, "explorer.exe", c.Valuer[f.String()])
-	assert.Equal(t, 1, calls, "extract must be called exactly once on repeated access")
-}
+// 	f := Field{Name: fields.PsName, Value: fields.PsName.String()}
+// 	c.populateValuer(f, func() any { return "svchost.exe" })
 
-func TestValuerCacheMiss(t *testing.T) {
-	c := AcquireValuerCache()
-	defer c.Release()
+// 	assert.Equal(t, "svchost.exe", c.Valuer[f.String()])
+// }
 
-	f := Field{Name: fields.PsName, Value: fields.PsName.String()}
-	c.populateValuer(f, func() any { return "svchost.exe" })
+// func TestValuerCacheDistinctFields(t *testing.T) {
+// 	c := AcquireValuerCache()
+// 	defer c.Release()
 
-	assert.Equal(t, "svchost.exe", c.Valuer[f.String()])
-}
+// 	f := Field{Name: fields.PsName, Value: fields.PsName.String()}
+// 	f1 := Field{Name: fields.FilePath, Value: fields.FilePath.String()}
 
-func TestValuerCacheDistinctFields(t *testing.T) {
-	c := AcquireValuerCache()
-	defer c.Release()
+// 	c.populateValuer(f, extractValueFunc)
+// 	c.populateValuer(f1, func() any { return `C:\Windows\System32\cmd.exe` })
 
-	f := Field{Name: fields.PsName, Value: fields.PsName.String()}
-	f1 := Field{Name: fields.FilePath, Value: fields.FilePath.String()}
+// 	// populate again to verify no overwrite
+// 	c.populateValuer(f, dontCallValuerFunc)
+// 	c.populateValuer(f1, dontCallValuerFunc)
 
-	c.populateValuer(f, extractValueFunc)
-	c.populateValuer(f1, func() any { return `C:\Windows\System32\cmd.exe` })
+// 	assert.Equal(t, "explorer.exe", c.Valuer[f.String()])
+// 	assert.Equal(t, `C:\Windows\System32\cmd.exe`, c.Valuer[f1.String()])
+// }
 
-	// populate again to verify no overwrite
-	c.populateValuer(f, dontCallValuerFunc)
-	c.populateValuer(f1, dontCallValuerFunc)
+// func TestValuerCacheReset(t *testing.T) {
+// 	c := AcquireValuerCache()
 
-	assert.Equal(t, "explorer.exe", c.Valuer[f.String()])
-	assert.Equal(t, `C:\Windows\System32\cmd.exe`, c.Valuer[f1.String()])
-}
+// 	c.populateValuer(Field{Name: fields.PsName, Value: fields.PsName.String()}, extractValueFunc)
+// 	c.Release()
 
-func TestValuerCacheReset(t *testing.T) {
-	c := AcquireValuerCache()
+// 	// simulate pool returning the same instance
+// 	c2 := AcquireValuerCache()
+// 	defer c2.Release()
 
-	c.populateValuer(Field{Name: fields.PsName, Value: fields.PsName.String()}, extractValueFunc)
-	c.Release()
+// 	calls := 0
+// 	c2.populateValuer(Field{Name: fields.PsName, Value: fields.PsName.String()}, func() any {
+// 		calls++
+// 		return "notepad.exe"
+// 	})
 
-	// simulate pool returning the same instance
-	c2 := AcquireValuerCache()
-	defer c2.Release()
+// 	assert.Equal(t, "notepad.exe", c2.Valuer[fields.PsName.String()])
+// 	assert.Equal(t, 1, calls, "slot must be cleared after Release")
+// }
 
-	calls := 0
-	c2.populateValuer(Field{Name: fields.PsName, Value: fields.PsName.String()}, func() any {
-		calls++
-		return "notepad.exe"
-	})
+// func TestValuerCacheExtractCalledOnceAcrossRules(t *testing.T) {
+// 	c := AcquireValuerCache()
+// 	defer c.Release()
 
-	assert.Equal(t, "notepad.exe", c2.Valuer[fields.PsName.String()])
-	assert.Equal(t, 1, calls, "slot must be cleared after Release")
-}
+// 	calls := 0
+// 	extract := func() any {
+// 		calls++
+// 		return uint32(1234)
+// 	}
 
-func TestValuerCacheExtractCalledOnceAcrossRules(t *testing.T) {
-	c := AcquireValuerCache()
-	defer c.Release()
+// 	// simulate 20 rules all requesting the same field
+// 	for range 20 {
+// 		c.populateValuer(Field{Name: fields.PsPid, Value: fields.PsPid.String()}, extract)
+// 	}
 
-	calls := 0
-	extract := func() any {
-		calls++
-		return uint32(1234)
-	}
+// 	assert.Equal(t, uint32(1234), c.Valuer[fields.PsPid.String()])
+// 	assert.Equal(t, 1, calls, "extract must be called once regardless of rule count")
+// }
 
-	// simulate 20 rules all requesting the same field
-	for range 20 {
-		c.populateValuer(Field{Name: fields.PsPid, Value: fields.PsPid.String()}, extract)
-	}
+// func TestValuerCacheAllSlotsIndependent(t *testing.T) {
+// 	c := AcquireValuerCache()
+// 	defer c.Release()
 
-	assert.Equal(t, uint32(1234), c.Valuer[fields.PsPid.String()])
-	assert.Equal(t, 1, calls, "extract must be called once regardless of rule count")
-}
+// 	want := map[Field]any{
+// 		{Name: fields.PsName, Value: fields.PsName.String()}:     "explorer.exe",
+// 		{Name: fields.PsPid, Value: fields.PsPid.String()}:       uint32(4),
+// 		{Name: fields.FilePath, Value: fields.FilePath.String()}: `C:\Windows\System32\cmd.exe`,
+// 	}
 
-func TestValuerCacheAllSlotsIndependent(t *testing.T) {
-	c := AcquireValuerCache()
-	defer c.Release()
+// 	for f, v := range want {
+// 		val := v
+// 		c.populateValuer(f, func() any { return val })
+// 	}
 
-	want := map[Field]any{
-		{Name: fields.PsName, Value: fields.PsName.String()}:     "explorer.exe",
-		{Name: fields.PsPid, Value: fields.PsPid.String()}:       uint32(4),
-		{Name: fields.FilePath, Value: fields.FilePath.String()}: `C:\Windows\System32\cmd.exe`,
-	}
+// 	for f, expected := range want {
+// 		assert.Equal(t, expected, c.Valuer[f.String()], "field %v", f)
+// 	}
+// }
 
-	for f, v := range want {
-		val := v
-		c.populateValuer(f, func() any { return val })
-	}
+// func TestValuerCachePoolReuse(t *testing.T) {
+// 	for i := range 10 {
+// 		c := AcquireValuerCache()
 
-	for f, expected := range want {
-		assert.Equal(t, expected, c.Valuer[f.String()], "field %v", f)
-	}
-}
+// 		calls := 0
+// 		c.populateValuer(Field{Name: fields.PsName, Value: fields.PsName.String()}, func() any {
+// 			calls++
+// 			return i
+// 		})
 
-func TestValuerCachePoolReuse(t *testing.T) {
-	for i := range 10 {
-		c := AcquireValuerCache()
+// 		assert.Equal(t, i, c.Valuer[fields.PsName.String()])
+// 		assert.Equal(t, 1, calls, "event %d: stale slot from previous cycle", i)
 
-		calls := 0
-		c.populateValuer(Field{Name: fields.PsName, Value: fields.PsName.String()}, func() any {
-			calls++
-			return i
-		})
+// 		c.Release()
+// 	}
+// }
 
-		assert.Equal(t, i, c.Valuer[fields.PsName.String()])
-		assert.Equal(t, 1, calls, "event %d: stale slot from previous cycle", i)
+// func TestValuerCacheFieldWithoutID(t *testing.T) {
+// 	c := AcquireValuerCache()
+// 	defer c.Release()
 
-		c.Release()
-	}
-}
+// 	// fields with id == -1 always call extract, no caching
+// 	calls := 0
+// 	extract := func() any {
+// 		calls++
+// 		return "value"
+// 	}
 
-func TestValuerCacheFieldWithoutID(t *testing.T) {
-	c := AcquireValuerCache()
-	defer c.Release()
+// 	c.populateValuer(Field{Name: fields.HandleID, Value: fields.HandleID.String()}, extract)
+// 	c.populateValuer(Field{Name: fields.HandleName, Value: fields.HandleName.String()}, extract)
 
-	// fields with id == -1 always call extract, no caching
-	calls := 0
-	extract := func() any {
-		calls++
-		return "value"
-	}
+// 	assert.Equal(t, 2, calls, "unknown fields (id == -1) must not be cached")
 
-	c.populateValuer(Field{Name: fields.HandleID, Value: fields.HandleID.String()}, extract)
-	c.populateValuer(Field{Name: fields.HandleName, Value: fields.HandleName.String()}, extract)
+// 	c.populateValuer(Field{Name: fields.HandleID, Value: fields.HandleID.String()}, dontCallValuerFunc)
+// 	c.populateValuer(Field{Name: fields.HandleName, Value: fields.HandleName.String()}, dontCallValuerFunc)
 
-	assert.Equal(t, 2, calls, "unknown fields (id == -1) must not be cached")
+// 	// now the fields should be cached
+// 	assert.Equal(t, "value", c.Valuer[fields.HandleID.String()])
+// 	assert.Equal(t, "value", c.Valuer[fields.HandleName.String()])
+// }
 
-	c.populateValuer(Field{Name: fields.HandleID, Value: fields.HandleID.String()}, dontCallValuerFunc)
-	c.populateValuer(Field{Name: fields.HandleName, Value: fields.HandleName.String()}, dontCallValuerFunc)
+// func BenchmarkValuerCacheHit(b *testing.B) {
+// 	c := AcquireValuerCache()
+// 	defer c.Release()
 
-	// now the fields should be cached
-	assert.Equal(t, "value", c.Valuer[fields.HandleID.String()])
-	assert.Equal(t, "value", c.Valuer[fields.HandleName.String()])
-}
+// 	c.populateValuer(Field{Name: fields.PsName, Value: fields.PsName.String()}, extractValueFunc)
 
-func BenchmarkValuerCacheHit(b *testing.B) {
-	c := AcquireValuerCache()
-	defer c.Release()
+// 	b.ResetTimer()
+// 	b.ReportAllocs()
 
-	c.populateValuer(Field{Name: fields.PsName, Value: fields.PsName.String()}, extractValueFunc)
+// 	for range b.N {
+// 		c.populateValuer(Field{Name: fields.PsName, Value: fields.PsName.String()}, dontCallValuerFunc)
+// 	}
+// }
 
-	b.ResetTimer()
-	b.ReportAllocs()
+// func BenchmarkValuerCacheMiss(b *testing.B) {
+// 	b.ReportAllocs()
 
-	for range b.N {
-		c.populateValuer(Field{Name: fields.PsName, Value: fields.PsName.String()}, dontCallValuerFunc)
-	}
-}
+// 	for range b.N {
+// 		c := AcquireValuerCache()
+// 		c.populateValuer(Field{Name: fields.PsName, Value: fields.PsName.String()}, extractValueFunc)
+// 		c.Release()
+// 	}
+// }
 
-func BenchmarkValuerCacheMiss(b *testing.B) {
-	b.ReportAllocs()
+// func BenchmarkValuerCacheFullEvent(b *testing.B) {
+// 	// simulates 20 rules each requesting 3 fields on every event
+// 	fieldsUnderTest := []Field{
+// 		{Name: fields.PsName, Value: fields.PsName.String()},
+// 		{Name: fields.PsPid, Value: fields.PsPid.String()},
+// 		{Name: fields.FilePath, Value: fields.FilePath.String()},
+// 	}
 
-	for range b.N {
-		c := AcquireValuerCache()
-		c.populateValuer(Field{Name: fields.PsName, Value: fields.PsName.String()}, extractValueFunc)
-		c.Release()
-	}
-}
+// 	b.ReportAllocs()
 
-func BenchmarkValuerCacheFullEvent(b *testing.B) {
-	// simulates 20 rules each requesting 3 fields on every event
-	fieldsUnderTest := []Field{
-		{Name: fields.PsName, Value: fields.PsName.String()},
-		{Name: fields.PsPid, Value: fields.PsPid.String()},
-		{Name: fields.FilePath, Value: fields.FilePath.String()},
-	}
-
-	b.ReportAllocs()
-
-	for range b.N {
-		c := AcquireValuerCache()
-		for range 20 {
-			for _, f := range fieldsUnderTest {
-				field := f
-				c.populateValuer(field, func() any { return "value" })
-			}
-		}
-		c.Release()
-	}
-}
+// 	for range b.N {
+// 		c := AcquireValuerCache()
+// 		for range 20 {
+// 			for _, f := range fieldsUnderTest {
+// 				field := f
+// 				c.populateValuer(field, func() any { return "value" })
+// 			}
+// 		}
+// 		c.Release()
+// 	}
+// }

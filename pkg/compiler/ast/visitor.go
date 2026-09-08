@@ -44,6 +44,10 @@ func Walk(v Visitor, node Node) {
 		}
 	case *ParenExpr:
 		Walk(v, n.Expr)
+	case *SequenceExpr:
+		for _, step := range n.Steps {
+			Walk(v, step.Expr)
+		}
 	}
 }
 

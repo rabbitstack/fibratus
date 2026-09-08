@@ -68,7 +68,6 @@ type SequenceEvaluator struct {
 
 	evaluator *eval.Evaluator
 
-	depth  int
 	events []*event.Event
 }
 
@@ -76,7 +75,6 @@ func MakeSequenceEvaluator(evaluator *eval.Evaluator) RuleEvaluator {
 	depth := evaluator.GetDepth()
 
 	seq := &SequenceEvaluator{
-		depth:     depth,
 		evaluator: evaluator,
 		steps:     make([]SequenceStepFunc, depth),
 		lookups:   make([]map[any]*SequenceChain, depth),
@@ -94,7 +92,7 @@ func MakeSequenceEvaluator(evaluator *eval.Evaluator) RuleEvaluator {
 		step := &expr.Steps[pos]
 
 		evaluate := func(event *event.Event, valuer *eval.ValuerCache) bool {
-			return seq.evaluator.EvalExpr(step.Expr, event, valuer)
+			return seq.evaluate(step.Expr, event, valuer)
 		}
 		link := func(valuer *eval.ValuerCache) any {
 			by := seq.evaluator.GetLink(pos)
@@ -167,6 +165,33 @@ func MakeSequenceEvaluator(evaluator *eval.Evaluator) RuleEvaluator {
 	return seq
 }
 
+func (s *SequenceEvaluator) Evaluate(event *event.Event, valuer *eval.ValuerCache) ([]*event.Event, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.expire(event) {
+
+	}
+
+	for i := 0; i < len(s.steps); i++ {
+		s.steps[i](event, valuer)
+	}
+
+	if s.events != nil {
+		evts := s.events
+		s.events = nil // reset for next match
+		return evts, true
+	}
+
+	return nil, false
+}
+
+func (s *SequenceEvaluator) evaluate(expr ast.Expr, event *event.Event, valuer *eval.ValuerCache) bool {
+	// if !r.rule.eval.IsEvaluable(event) {
+	// 	return false
+	// }
+	return s.evaluator.EvalExpr(expr, event, valuer)
+}
+
 // expire expires sequence chains when a TerminateProcess event arrives
 // for a process involved in the chain.
 //
@@ -235,33 +260,6 @@ func (s *SequenceEvaluator) expire(evt *event.Event) bool {
 		}
 	}
 	return false
-}
-
-func (s *SequenceEvaluator) evaluate(event *event.Event, valuer *eval.ValuerCache, stepIndex int) bool {
-	// if !r.rule.eval.IsEvaluable(event) {
-	// 	return false
-	// }
-	return false
-}
-
-func (s *SequenceEvaluator) Evaluate(event *event.Event, valuer *eval.ValuerCache) ([]*event.Event, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.expire(event) {
-
-	}
-
-	for i := 0; i < len(s.steps); i++ {
-		s.steps[i](event, valuer)
-	}
-
-	if s.events != nil {
-		evts := s.events
-		s.events = nil // reset for next match
-		return evts, true
-	}
-
-	return nil, false
 }
 
 // func (e *SequenceStep) init() {

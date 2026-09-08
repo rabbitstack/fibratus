@@ -47,7 +47,7 @@ func (c *ValuerCache) Release() {
 	valuerCachePool.Put(c)
 }
 
-func (c *ValuerCache) populateValuer(f Field, event *event.Event) {
+func (c *ValuerCache) Put(event *event.Event, f Field) {
 	n := f.String()
 	if _, ok := c.Valuer[n]; !ok {
 		c.Valuer[n] = f.Extract(event)

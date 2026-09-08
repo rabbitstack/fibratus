@@ -1,5 +1,5 @@
 /*
- * Copyright 2021-present by Nedim Sabic Sabic
+ * Copyright 2021-2026 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -32,7 +32,7 @@ type Evaluator struct {
 
 	expr ast.Expr
 
-	fields   sets.Set[Field]
+	fields   Fields
 	segments sets.Set[Segment]
 
 	accessors []Accessor
@@ -49,7 +49,7 @@ func NewEvaluator(id string, expression string) (*Evaluator, error) {
 	evaluator := &Evaluator{
 		ID:        id,
 		expr:      expr,
-		fields:    sets.New[Field](),
+		fields:    Fields{Set: sets.New[Field]()},
 		segments:  sets.New[Segment](),
 		accessors: make([]Accessor, 0),
 	}
@@ -58,12 +58,11 @@ func NewEvaluator(id string, expression string) (*Evaluator, error) {
 	case *ast.BinaryExpr:
 		ast.WalkFunc(expr, evaluator.walkFn)
 	case *ast.SequenceExpr:
+		ast.WalkFunc(expr, evaluator.walkFn)
 		if expr.By != nil {
 			evaluator.addField(expr.By.Fields...)
 		}
-
 		for _, step := range expr.Steps {
-			ast.WalkFunc(step.Expr, evaluator.walkFn)
 			if step.By != nil {
 				evaluator.addField(step.By.Fields...)
 			}
@@ -74,16 +73,15 @@ func NewEvaluator(id string, expression string) (*Evaluator, error) {
 }
 
 func (e *Evaluator) Eval(evt *event.Event, valuer *ValuerCache) bool {
-	for field := range e.fields {
-		valuer.populateValuer(field, evt)
-	}
-	return ast.Eval(e.expr, valuer.Valuer, e.opts)
+	return e.eval(e.expr, evt, valuer)
 }
 
 func (e *Evaluator) EvalExpr(expr ast.Expr, evt *event.Event, valuer *ValuerCache) bool {
-	for field := range e.fields {
-		valuer.populateValuer(field, evt)
-	}
+	return e.eval(expr, evt, valuer)
+}
+
+func (e *Evaluator) eval(expr ast.Expr, evt *event.Event, valuer *ValuerCache) bool {
+	e.fields.ExtractToValuer(evt, valuer)
 	return ast.Eval(expr, valuer.Valuer, e.opts)
 }
 

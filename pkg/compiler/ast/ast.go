@@ -21,7 +21,6 @@
 package ast
 
 import (
-	"fmt"
 	"net"
 	"strconv"
 	"strings"
@@ -37,9 +36,6 @@ type EvalOptions struct {
 	// MultiValuer indicates if multiple valuers are needed for the
 	// evaluation process.
 	MultiValuer bool
-	// StepIndex indicates the step position inside the sequence expression.
-	// Only applies to sequence-based rules.
-	StepIndex int
 }
 
 // Eval evaluates expr against a valuer that contains extracted field values.
@@ -126,13 +122,6 @@ func (v *ValuerEval) Eval(expr Expr, opts EvalOptions) interface{} {
 	switch expr := expr.(type) {
 	case *BinaryExpr:
 		return v.evalBinaryExpr(expr, opts)
-	case *SequenceExpr:
-		stepIndex := opts.StepIndex
-		if stepIndex > len(expr.Steps)-1 {
-			return nil
-		}
-		fmt.Println(expr.Steps[stepIndex].Expr)
-		return v.Eval(expr.Steps[stepIndex].Expr, opts)
 	case *NotExpr:
 		switch exp := expr.Expr.(type) {
 		case *BinaryExpr:

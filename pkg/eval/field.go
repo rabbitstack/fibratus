@@ -26,6 +26,7 @@ import (
 
 	"github.com/rabbitstack/fibratus/pkg/compiler/fields"
 	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/util/sets"
 )
 
 // Field contains field meta attributes all accessors need to extract the value.
@@ -34,6 +35,16 @@ type Field struct {
 	Value    string
 	Arg      string
 	BoundVar string
+}
+
+type Fields struct {
+	sets.Set[Field]
+}
+
+func (fields Fields) ExtractToValuer(event *event.Event, valuer *ValuerCache) {
+	for field := range fields.Set {
+		valuer.Put(event, field)
+	}
 }
 
 func (f *Field) String() string {

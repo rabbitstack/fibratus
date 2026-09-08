@@ -48,6 +48,12 @@ func makeEvent(name string, at time.Time, kv map[string]string) *event.Event {
 	}
 }
 
+func evaluateRule(rule *Rule, event *event.Event) ([]*event.Event, bool) {
+	valuer := eval.AcquireValuerCache()
+	defer valuer.Release()
+	return rule.Evaluate(event, valuer)
+}
+
 func TestUnconstrainedSequenceTwoStepsMatches(t *testing.T) {
 	ruleDef := policy.RuleDef{
 		Condition: `
@@ -61,11 +67,8 @@ func TestUnconstrainedSequenceTwoStepsMatches(t *testing.T) {
 	rule, err := NewRule(ruleDef)
 	require.NoError(t, err)
 
-	valuer := eval.AcquireValuerCache()
-	defer valuer.Release()
-
-	matches, ok := rule.Evaluate(makeEvent("CreateProcess", ts(0), nil), valuer)
-	matches, ok = rule.Evaluate(makeEvent("CreateFile", ts(10*time.Millisecond), nil), valuer)
+	matches, ok := evaluateRule(rule, makeEvent("CreateProcess", ts(0), nil))
+	matches, ok = evaluateRule(rule, makeEvent("CreateFile", ts(10*time.Millisecond), nil))
 
 	assert.True(t, ok)
 	require.Len(t, matches, 2)
