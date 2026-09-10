@@ -43,16 +43,12 @@ func TestNarrowAccessors(t *testing.T) {
 			1,
 		},
 		{
-			New(`handle.type = 'Section' and ps.pe.nsections > 1 and evt.name = 'CreateHandle'`, cfg),
-			3,
-		},
-		{
 			New(`sequence |evt.name = 'CreateProcess'| as e1 |evt.name = 'CreateFile' and file.name = $e1.ps.exe |`, cfg),
 			3,
 		},
 		{
-			New(`base(file.name) = 'kernel32.dll'`, cfg),
-			1,
+			New(`base(file.name) = 'kernel32.dll' and ps.pe.nsections > 1`, cfg),
+			2,
 		},
 	}
 
@@ -72,7 +68,7 @@ func TestNarrowAccessors(t *testing.T) {
 	}
 	// check if fields are set in the accessor
 	require.NotNil(t, pea)
-	assert.Len(t, pea.fields, 3)
+	assert.Len(t, pea.fields, 2)
 }
 
 func TestIsFieldAccessible(t *testing.T) {

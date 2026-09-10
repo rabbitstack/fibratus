@@ -172,7 +172,6 @@ func TestLiveCapture(t *testing.T) {
 			EnableRegistryEvents: true,
 			EnableNetEvents:      true,
 			EnableThreadEvents:   true,
-			EnableHandleEvents:   true,
 		},
 		CapFile:            "../../test.cap",
 		Filters:            &config.Filters{},

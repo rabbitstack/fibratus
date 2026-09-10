@@ -350,9 +350,6 @@
         "enable-vamap": {
           "type": "boolean"
         },
-        "enable-handle": {
-          "type": "boolean"
-        },
         "enable-net": {
           "type": "boolean"
         },
@@ -427,9 +424,6 @@
                   "Disconnect",
                   "Reconnect",
                   "Retransmit",
-                  "CreateHandle",
-                  "CloseHandle",
-                  "DuplicateHandle",
                   "QueryDns",
                   "ReplyDns",
                   "VirtualAlloc",

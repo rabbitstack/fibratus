@@ -204,14 +204,6 @@ func (r *reader) updateSnapshotters(evt *event.Event) error {
 		if err := r.psnapshotter.WriteFromCapture(evt); err != nil {
 			return err
 		}
-	case event.CreateHandle:
-		if err := r.hsnapshotter.Write(evt); err != nil {
-			return err
-		}
-	case event.CloseHandle:
-		if err := r.hsnapshotter.Remove(evt); err != nil {
-			return err
-		}
 	}
 	if evt.PS == nil {
 		_, evt.PS = r.psnapshotter.Find(evt.PID)

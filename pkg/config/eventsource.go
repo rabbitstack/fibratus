@@ -39,7 +39,6 @@ const (
 	enableFileIOEvents     = "eventsource.enable-fileio"
 	enableVAMapEvents      = "eventsource.enable-vamap"
 	enableModuleEvents     = "eventsource.enable-module"
-	enableHandleEvents     = "eventsource.enable-handle"
 	enableMemEvents        = "eventsource.enable-mem"
 	enableAuditAPIEvents   = "eventsource.enable-audit-api"
 	enableDNSEvents        = "eventsource.enable-dns"
@@ -76,8 +75,6 @@ type EventSourceConfig struct {
 	EnableVAMapEvents bool `json:"enable-vamap" yaml:"enable-vamap"`
 	// EnableModuleEvents indicates if module events are collected by the ETW provider.
 	EnableModuleEvents bool `json:"enable-image" yaml:"enable-module"`
-	// EnableHandleEvents indicates whether handle creation/disposal events are enabled.
-	EnableHandleEvents bool `json:"enable-handle" yaml:"enable-handle"`
 	// EnableMemEvents indicates whether memory manager events are enabled.
 	EnableMemEvents bool `json:"enable-memory" yaml:"enable-memory"`
 	// EnableAuditAPIEvents indicates if kernel audit API calls events are enabled
@@ -116,7 +113,6 @@ func (c *EventSourceConfig) initFromViper(v *viper.Viper) {
 	c.EnableFileIOEvents = v.GetBool(enableFileIOEvents)
 	c.EnableVAMapEvents = v.GetBool(enableVAMapEvents)
 	c.EnableModuleEvents = v.GetBool(enableModuleEvents)
-	c.EnableHandleEvents = v.GetBool(enableHandleEvents)
 	c.EnableMemEvents = v.GetBool(enableMemEvents)
 	c.EnableAuditAPIEvents = v.GetBool(enableAuditAPIEvents)
 	c.EnableDNSEvents = v.GetBool(enableDNSEvents)

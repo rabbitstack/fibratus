@@ -160,7 +160,6 @@ func (f *filter) narrowAccessors() {
 		removeFileAccessor       = true
 		removeRegistryAccessor   = true
 		removeNetworkAccessor    = true
-		removeHandleAccessor     = true
 		removePEAccessor         = true
 		removeMemAccessor        = true
 		removeDNSAccessor        = true
@@ -185,8 +184,6 @@ func (f *filter) narrowAccessors() {
 			removeRegistryAccessor = false
 		case field.Name.IsNetworkField():
 			removeNetworkAccessor = false
-		case field.Name.IsHandleField():
-			removeHandleAccessor = false
 		case field.Name.IsMemField():
 			removeMemAccessor = false
 		case field.Name.IsDNSField():
@@ -216,9 +213,6 @@ func (f *filter) narrowAccessors() {
 	}
 	if removeNetworkAccessor {
 		f.removeAccessor(&networkAccessor{})
-	}
-	if removeHandleAccessor {
-		f.removeAccessor(&handleAccessor{})
 	}
 	if removePEAccessor {
 		f.removeAccessor(&peAccessor{})

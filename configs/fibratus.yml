@@ -243,10 +243,6 @@ eventsource:
   # Determines whether module events are collected by Kernel Logger provider
   #enable-module: true
 
-  # Determines whether object manager events (handle creation/destruction) are
-  # collected by Kernel Logger provider
-  #enable-handle: false
-
   # Determines whether memory manager events are collected by Kernel Logger provider
   #enable-mem: true
 

@@ -413,15 +413,6 @@ const (
 	// KevtArg represents the field sequence for generic argument access
 	KevtArg Field = "kevt.arg"
 
-	// HandleID represents the handle identifier within the process address space
-	HandleID Field = "handle.id"
-	// HandleObject represents the handle object address
-	HandleObject Field = "handle.object"
-	// HandleName represents the handle name
-	HandleName Field = "handle.name"
-	// HandleType represents the handle type (e.g. file)
-	HandleType Field = "handle.type"
-
 	// NetDIP represents network destination IP address
 	NetDIP Field = "net.dip"
 	// NetSIP represents the source IP address
@@ -699,7 +690,6 @@ func (f Field) IsImageField() bool    { return strings.HasPrefix(string(f), "ima
 func (f Field) IsFileField() bool     { return strings.HasPrefix(string(f), "file.") }
 func (f Field) IsRegistryField() bool { return strings.HasPrefix(string(f), "registry.") }
 func (f Field) IsNetworkField() bool  { return strings.HasPrefix(string(f), "net.") }
-func (f Field) IsHandleField() bool   { return strings.HasPrefix(string(f), "handle.") }
 func (f Field) IsPeField() bool {
 	return strings.HasPrefix(string(f), "pe.") || strings.HasPrefix(string(f), "ps.pe.") || strings.HasPrefix(string(f), "ps.signature.")
 }
@@ -1203,11 +1193,6 @@ var fields = map[Field]FieldInfo{
 	NetPacketSize: {NetPacketSize, "packet size", params.Uint32, []string{"net.size > 512"}, nil, nil},
 	NetSIPNames:   {NetSIPNames, "source IP names", params.Slice, []string{"net.sip.names in ('github.com.')"}, nil, nil},
 	NetDIPNames:   {NetDIPNames, "destination IP names", params.Slice, []string{"net.dip.names in ('github.com.')"}, nil, nil},
-
-	HandleID:     {HandleID, "handle identifier", params.Uint16, []string{"handle.id = 24"}, nil, nil},
-	HandleObject: {HandleObject, "handle object address", params.Address, []string{"handle.object = 'FFFFB905DBF61988'"}, nil, nil},
-	HandleName:   {HandleName, "handle name", params.UnicodeString, []string{"handle.name = '\\Device\\NamedPipe\\chrome.12644.28.105826381'"}, nil, nil},
-	HandleType:   {HandleType, "handle type", params.AnsiString, []string{"handle.type = 'Mutant'"}, nil, nil},
 
 	PeNumSections: {PeNumSections, "number of sections", params.Uint16, []string{"pe.nsections < 5"}, &Deprecation{Since: "3.0.0", Fields: []Field{PsPeNumSections}}, nil},
 	PeNumSymbols:  {PeNumSymbols, "number of entries in the symbol table", params.Uint32, []string{"pe.nsymbols > 230"}, &Deprecation{Since: "3.0.0", Fields: []Field{PsPeNumSymbols}}, nil},

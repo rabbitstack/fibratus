@@ -127,11 +127,6 @@ func (e *Event) adjustPID() {
 		if !e.IsDNS() {
 			e.PID, _ = e.Params.GetPid()
 		}
-	case Handle:
-		if e.Type == DuplicateHandle {
-			e.PID, _ = e.Params.GetUint32(params.TargetProcessID)
-			e.Params.Remove(params.TargetProcessID)
-		}
 	case Thread:
 		if e.Type == StackWalk {
 			e.PID, _ = e.Params.GetPid()
@@ -217,8 +212,6 @@ func (e *Event) IsCreateProcess() bool          { return e.Type == CreateProcess
 func (e *Event) IsCreateProcessInternal() bool  { return e.Type == CreateProcessInternal }
 func (e *Event) IsCreateThread() bool           { return e.Type == CreateThread }
 func (e *Event) IsCloseFile() bool              { return e.Type == CloseFile }
-func (e *Event) IsCreateHandle() bool           { return e.Type == CreateHandle }
-func (e *Event) IsCloseHandle() bool            { return e.Type == CloseHandle }
 func (e *Event) IsDeleteFile() bool             { return e.Type == DeleteFile }
 func (e *Event) IsRenameFile() bool             { return e.Type == RenameFile }
 func (e *Event) IsEnumDirectory() bool          { return e.Type == EnumDirectory }
@@ -429,10 +422,6 @@ func (e *Event) PartialKey() uint64 {
 		return hashers.FnvUint64(b)
 	case VirtualAlloc, VirtualFree:
 		return e.Params.MustGetUint64(params.MemBaseAddress) + uint64(e.PID)
-	case DuplicateHandle:
-		pid := e.Params.MustGetUint32(params.ProcessID)
-		object := e.Params.MustGetUint64(params.HandleObject)
-		return object + uint64(pid+e.PID)
 	case QueryDNS, ReplyDNS:
 		n, _ := e.Params.GetString(params.DNSName)
 		b := make([]byte, 4+len(n))
@@ -554,16 +543,6 @@ func (e *Event) Summary() string {
 		size, _ := e.Params.GetUint32(params.NetSize)
 		return printSummary(e, fmt.Sprintf("received <code>%d</code> bytes from <code>%v</code> and <code>%d</code> port",
 			size, ip, port))
-	case CreateHandle:
-		handleType := e.GetParamAsString(params.HandleObjectTypeID)
-		handleName := e.GetParamAsString(params.HandleObjectName)
-		return printSummary(e, fmt.Sprintf("created <code>%s</code> handle of <code>%s</code> type",
-			handleName, handleType))
-	case CloseHandle:
-		handleType := e.GetParamAsString(params.HandleObjectTypeID)
-		handleName := e.GetParamAsString(params.HandleObjectName)
-		return printSummary(e, fmt.Sprintf("closed <code>%s</code> handle of <code>%s</code> type",
-			handleName, handleType))
 	case VirtualAlloc:
 		addr := e.GetParamAsString(params.MemBaseAddress)
 		return printSummary(e, fmt.Sprintf("allocated memory at <code>%s</code> address", addr))
@@ -576,9 +555,6 @@ func (e *Event) Summary() string {
 	case UnmapViewFile:
 		sec := e.GetParamAsString(params.FileViewSectionType)
 		return printSummary(e, fmt.Sprintf("unmapped view of <code>%s</code> section", sec))
-	case DuplicateHandle:
-		handleType := e.GetParamAsString(params.HandleObjectTypeID)
-		return printSummary(e, fmt.Sprintf("duplicated <code>%s</code> handle", handleType))
 	case QueryDNS:
 		dnsName := e.GetParamAsString(params.DNSName)
 		return printSummary(e, fmt.Sprintf("sent <code>%s</code> DNS query", dnsName))

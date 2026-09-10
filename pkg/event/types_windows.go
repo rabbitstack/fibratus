@@ -57,8 +57,6 @@ var (
 	NetworkTCPEventGUID = windows.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}
 	// NetworkUDPEventGUID represents network UDP provider event GUID
 	NetworkUDPEventGUID = windows.GUID{Data1: 0xbf3a50c5, Data2: 0xa9c9, Data3: 0x4988, Data4: [8]byte{0xa0, 0x05, 0x2d, 0xf0, 0xb7, 0xc8, 0x0f, 0x80}}
-	// HandleEventGUID represents handle provider event GUID
-	HandleEventGUID = windows.GUID{Data1: 0x89497f50, Data2: 0xeffe, Data3: 0x4440, Data4: [8]byte{0x8c, 0xf2, 0xce, 0x6b, 0x1c, 0xdc, 0xac, 0xa7}}
 	// MemEventGUID represents memory provider event GUID
 	MemEventGUID = windows.GUID{Data1: 0x3d6fa8d3, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x00, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}
 	// AuditAPIEventGUID represents audit API calls event GUID
@@ -139,10 +137,6 @@ const (
 
 	VirtualAllocID uint8 = 98
 	VirtualFreeID  uint8 = 99
-
-	CreateHandleID    uint8 = 32
-	CloseHandleID     uint8 = 33
-	DuplicateHandleID uint8 = 34
 
 	QueryDNSID uint16 = 3006
 	ReplyDNSID uint16 = 3008
@@ -287,13 +281,6 @@ var (
 	// RetransmitTCPv6 is the TCP IPv6 network retransmit event.
 	RetransmitTCPv6 = pack(NetworkTCPEventGUID, uint16(RetransmitTCPv6ID))
 
-	// CreateHandle represents handle creation event
-	CreateHandle = pack(HandleEventGUID, uint16(CreateHandleID))
-	// CloseHandle represents handle closure event
-	CloseHandle = pack(HandleEventGUID, uint16(CloseHandleID))
-	// DuplicateHandle represents handle duplication event
-	DuplicateHandle = pack(HandleEventGUID, uint16(DuplicateHandleID))
-
 	// VirtualAlloc represents virtual memory allocation event
 	VirtualAlloc = pack(MemEventGUID, uint16(VirtualAllocID))
 	// VirtualFree represents virtual memory release event
@@ -376,12 +363,6 @@ func (t Type) String() string {
 		return "UnmapViewFile"
 	case MapFileRundown:
 		return "MapFileRundown"
-	case CreateHandle:
-		return "CreateHandle"
-	case CloseHandle:
-		return "CloseHandle"
-	case DuplicateHandle:
-		return "DuplicateHandle"
 	case RegKCBRundown:
 		return "RegKCBRundown"
 	case RegOpenKey:
@@ -469,8 +450,6 @@ func (t Type) Category() Category {
 		RecvTCPv4, RecvTCPv6, RecvUDPv4, RecvUDPv6,
 		QueryDNS, ReplyDNS:
 		return Net
-	case CreateHandle, CloseHandle, DuplicateHandle:
-		return Handle
 	case VirtualAlloc, VirtualFree:
 		return Mem
 	case CreateSymbolicLinkObject:
@@ -563,12 +542,6 @@ func (t Type) Description() string {
 		return "Loads the module into the address space of the calling process"
 	case UnloadModule:
 		return "Unloads the module from the address space of the calling process"
-	case CreateHandle:
-		return "Creates a new handle"
-	case CloseHandle:
-		return "Closes the handle"
-	case DuplicateHandle:
-		return "Duplicates the handle"
 	case VirtualAlloc:
 		return "Reserves, commits, or changes the state of a region of memory within the process virtual address space"
 	case VirtualFree:
@@ -726,73 +699,47 @@ func (t Type) color() string {
 	switch t {
 	case CreateFile, ReadFile, CloseFile, SetFileInformation, MapViewFile, UnmapViewFile:
 		return colorizer.SpanBold(colorizer.Cyan, t.String())
-
 	case RenameFile:
 		return colorizer.SpanBold(colorizer.Amber, t.String())
-
 	case WriteFile:
 		return colorizer.SpanBold(colorizer.Teal, t.String())
-
 	case DeleteFile:
 		return colorizer.SpanBold(colorizer.Red, t.String())
-
 	case RegOpenKey, RegCreateKey, RegQueryValue, RegQueryKey:
 		return colorizer.SpanBold(colorizer.Yellow, t.String())
-
 	case RegDeleteKey, RegDeleteValue:
 		return colorizer.SpanBold(colorizer.Red, t.String())
-
 	case RegSetValue:
 		return colorizer.SpanBold(colorizer.Amber, t.String())
-
 	case CreateProcess, OpenProcess:
 		return colorizer.SpanBold(colorizer.Green, t.String())
-
 	case TerminateProcess:
 		return colorizer.SpanBold(colorizer.Red, t.String())
-
 	case CreateThread, OpenThread:
 		return colorizer.SpanBold(colorizer.Green, t.String())
-
 	case TerminateThread:
 		return colorizer.SpanBold(colorizer.Red, t.String())
-
 	case SetThreadContext:
 		return colorizer.SpanBold(colorizer.Amber, t.String())
-
 	case LoadModule, UnloadModule:
 		return colorizer.SpanBold(colorizer.Magenta, t.String())
-
 	case SendTCPv4, SendTCPv6, SendUDPv4, SendUDPv6,
 		RecvTCPv4, RecvTCPv6, RecvUDPv4, RecvUDPv6:
 		return colorizer.SpanBold(colorizer.Blue, t.String())
-
 	case ConnectTCPv4, ConnectTCPv6:
 		return colorizer.SpanBold(colorizer.Teal, t.String())
-
 	case DisconnectTCPv4, DisconnectTCPv6:
 		return colorizer.SpanBold(colorizer.Blue, t.String())
-
 	case AcceptTCPv4, AcceptTCPv6:
 		return colorizer.SpanBold(colorizer.Teal, t.String())
-
 	case QueryDNS, ReplyDNS:
 		return colorizer.SpanBold(colorizer.Indigo, t.String())
-
-	case CreateHandle, CloseHandle:
-		return colorizer.SpanBold(colorizer.Gray, t.String())
-	case DuplicateHandle:
-		return colorizer.SpanBold(colorizer.Amber, t.String())
-
 	case VirtualAlloc, VirtualFree:
 		return colorizer.SpanBold(colorizer.Magenta, t.String())
-
 	case CreateSymbolicLinkObject:
 		return colorizer.SpanBold(colorizer.Lavender, t.String())
-
 	case SubmitThreadpoolCallback, SubmitThreadpoolWork, SetThreadpoolTimer:
 		return colorizer.SpanBold(colorizer.Lavender, t.String())
-
 	default:
 		return colorizer.SpanBold(colorizer.White, t.String())
 	}
@@ -816,20 +763,16 @@ func (t Type) arrow() string {
 	case TerminateProcess, TerminateThread, DeleteFile, RegDeleteKey,
 		RegDeleteValue, UnloadModule, VirtualFree, UnmapViewFile:
 		clr = colorizer.Red
-
 	case CreateProcess, CreateFile, WriteFile, RenameFile, SetFileInformation,
 		RegCreateKey, RegSetValue, CreateThread, SetThreadContext, VirtualAlloc, MapViewFile,
-		DuplicateHandle, ConnectTCPv4, ConnectTCPv6, AcceptTCPv4, AcceptTCPv6,
+		ConnectTCPv4, ConnectTCPv6, AcceptTCPv4, AcceptTCPv6,
 		SendTCPv4, SendTCPv6, SendUDPv4, SendUDPv6:
 		clr = colorizer.Amber
-
 	case ReadFile, EnumDirectory, LoadModule, RegOpenKey, RegQueryKey, RegQueryValue, OpenProcess,
-		OpenThread, CreateHandle, RecvTCPv4, RecvTCPv6, RecvUDPv4, RecvUDPv6:
+		OpenThread, RecvTCPv4, RecvTCPv6, RecvUDPv4, RecvUDPv6:
 		clr = colorizer.Teal
-
 	case QueryDNS, ReplyDNS:
 		clr = colorizer.Indigo
-
 	default:
 		clr = colorizer.Gray
 	}

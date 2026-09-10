@@ -56,7 +56,6 @@ func GetAccessors() []Accessor {
 		newEventAccessor(),
 		newModuleAccessor(),
 		newThreadAccessor(),
-		newHandleAccessor(),
 		newNetworkAccessor(),
 		newRegistryAccessor(),
 		newThreadpoolAccessor(),
@@ -963,32 +962,6 @@ func (n *networkAccessor) resolveNamesForIP(ip net.IP) ([]string, error) {
 		return nil, err
 	}
 	return names, nil
-}
-
-// handleAccessor extracts handle event values.
-type handleAccessor struct{}
-
-func (handleAccessor) SetFields([]Field)            {}
-func (handleAccessor) SetSegments([]fields.Segment) {}
-func (handleAccessor) IsFieldAccessible(e *event.Event) bool {
-	return e.Category == event.Handle
-}
-
-func newHandleAccessor() Accessor { return &handleAccessor{} }
-
-func (h *handleAccessor) Get(f Field, e *event.Event) (params.Value, error) {
-	switch f.Name {
-	case fields.HandleID:
-		return e.Params.GetUint32(params.HandleID)
-	case fields.HandleType:
-		return e.GetParamAsString(params.HandleObjectTypeID), nil
-	case fields.HandleName:
-		return e.Params.GetString(params.HandleObjectName)
-	case fields.HandleObject:
-		return e.Params.GetUint64(params.HandleObject)
-	}
-
-	return nil, nil
 }
 
 // peAccessor extracts PE specific values.

@@ -310,7 +310,6 @@ func (f *Foreach) Desc() functions.FunctionDesc {
 				"$registry":   true,
 				"$net":        true,
 				"$mem":        true,
-				"$handle":     true,
 				"$dns":        true,
 				"$evt":        true,
 			}

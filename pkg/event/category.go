@@ -41,8 +41,6 @@ const (
 	Thread Category = "thread"
 	// Module is the category for module (dll, exe, sys) events
 	Module Category = "module"
-	// Handle is the category for handle events
-	Handle Category = "handle"
 	// Driver is the category for driver events
 	Driver Category = "driver"
 	// Mem is the category for memory events
@@ -70,7 +68,7 @@ func (c Category) Hash() uint32 {
 }
 
 // MaxCategoryIndex designates the maximum category index.
-const MaxCategoryIndex = 13
+const MaxCategoryIndex = 12
 
 // Index returns a numerical category index.
 func (c Category) Index() uint8 {
@@ -87,8 +85,6 @@ func (c Category) Index() uint8 {
 		return 5
 	case Module:
 		return 6
-	case Handle:
-		return 7
 	case Driver:
 		return 8
 	case Mem:
@@ -113,7 +109,6 @@ func Categories() []string {
 		string(Process),
 		string(Thread),
 		string(Module),
-		string(Handle),
 		string(Mem),
 		string(Driver),
 		string(Other),

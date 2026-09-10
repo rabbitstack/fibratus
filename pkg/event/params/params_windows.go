@@ -238,17 +238,6 @@ const (
 	// DNSAnswers is the field that represents DNS response answers
 	DNSAnswers = "answers"
 
-	// HandleID identifies the parameter that specifies the handle identifier.
-	HandleID = "handle_id"
-	// HandleSourceID identifies the parameter that specifies the source handle identifier.
-	HandleSourceID = "handle_source_id"
-	// HandleObject identifies the parameter that represents the kernel object to which handle is associated.
-	HandleObject = "handle_object"
-	// HandleObjectName identifies the parameter that represents the kernel object name.
-	HandleObjectName = "handle_name"
-	// HandleObjectTypeID identifies the parameter that represents the kernel object type identifier.
-	HandleObjectTypeID = "type_id"
-
 	// MemBaseAddress identifies the parameter that denotes the allocation base address.
 	MemBaseAddress = "base_address"
 	// MemRegionSize identifies the parameter that represents the allocated region size.

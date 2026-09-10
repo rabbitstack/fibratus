@@ -485,39 +485,6 @@ func (d *ParamDecoder) DecodeThreadpool(r *etw.EventRecord, e *Event) {
 	}
 }
 
-// DecodeHandle decodes events for handle creation/disposition events.
-func (d *ParamDecoder) DecodeHandle(r *etw.EventRecord, e *Event) {
-	switch r.Header.EventDescriptor.Opcode {
-	case CreateHandleID, CloseHandleID:
-		// typedef struct _ETW_CREATE_HANDLE_EVENT {
-		//     PVOID Object;
-		//     ULONG Handle;
-		//     USHORT ObjectType;
-		// } ETW_CREATE_HANDLE_EVENT, *PETW_CREATE_HANDLE_EVENT;
-		e.AppendParam(params.HandleObject, params.Address, r.ReadUint64(0))
-		e.AppendParam(params.HandleID, params.Uint32, r.ReadUint32(8))
-		e.AppendParam(params.HandleObjectTypeID, params.HandleType, r.ReadUint16(12))
-		if r.BufferLen >= 16 {
-			e.AppendParam(params.HandleObjectName, params.UnicodeString, r.ConsumeUTF16String(14))
-		}
-	case DuplicateHandleID:
-		// typedef struct _ETW_DUPLICATE_HANDLE_EVENT {
-		//     PVOID Object;
-		//     ULONG SourceHandle;
-		//     ULONG TargetHandle;
-		//     ULONG TargetProcessId;
-		//     USHORT ObjectType;
-		//     ULONG SourceProcessId;
-		// } ETW_DUPLICATE_HANDLE_EVENT, *PETW_DUPLICATE_HANDLE_EVENT;
-		e.AppendParam(params.HandleObject, params.Address, r.ReadUint64(0))
-		e.AppendParam(params.HandleSourceID, params.Uint32, r.ReadUint32(8))
-		e.AppendParam(params.HandleID, params.Uint32, r.ReadUint32(12))
-		e.AppendParam(params.TargetProcessID, params.PID, r.ReadUint32(16))
-		e.AppendParam(params.HandleObjectTypeID, params.HandleType, r.ReadUint16(20))
-		e.AppendParam(params.ProcessID, params.PID, r.ReadUint32(22))
-	}
-}
-
 // DecodeCreateSymbolicLinkObject decodes the payload for the CreateSymbolicLinkObject event.
 func (d *ParamDecoder) DecodeCreateSymbolicLinkObject(r *etw.EventRecord, e *Event) {
 	source, offset := r.ReadUTF16String(0)

@@ -194,7 +194,6 @@ type RulesCompileResult struct {
 	HasFileEvents       bool
 	HasNetworkEvents    bool
 	HasRegistryEvents   bool
-	HasHandleEvents     bool
 	HasMemEvents        bool
 	HasVAMapEvents      bool
 	HasDNSEvents        bool
@@ -284,7 +283,6 @@ func (r RulesCompileResult) String() string {
 		HasFileEvents: %t
 		HasRegistryEvents: %t
 		HasNetworkEvents: %t
-		HasHandleEvents: %t
 		HasMemEvents: %t
 		HasVAMapEvents: %t
 		HasAuditAPIEvents: %t
@@ -298,7 +296,6 @@ func (r RulesCompileResult) String() string {
 		r.HasFileEvents,
 		r.HasRegistryEvents,
 		r.HasNetworkEvents,
-		r.HasHandleEvents,
 		r.HasMemEvents,
 		r.HasVAMapEvents,
 		r.HasAuditAPIEvents,

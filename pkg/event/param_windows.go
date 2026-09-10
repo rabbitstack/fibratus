@@ -245,8 +245,6 @@ func (e *Event) decodeParams(r *etw.EventRecord) {
 		paramDecoder.DecodeThread(r, e)
 	case ThreadpoolEventGUID:
 		paramDecoder.DecodeThreadpool(r, e)
-	case HandleEventGUID:
-		paramDecoder.DecodeHandle(r, e)
 	case RegistryKernelEventGUID:
 		paramDecoder.DecodeRegSetValueInternal(r, e)
 	case ProcessKernelEventGUID:
