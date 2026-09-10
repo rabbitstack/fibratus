@@ -136,8 +136,6 @@ eventsource:
   blacklist:
     events:
       - CreateThread
-      - CreateHandle
-      - CloseHandle
     images:
       - System
 

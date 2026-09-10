@@ -20,9 +20,10 @@ package stats
 
 import (
 	"encoding/json"
-	"github.com/rabbitstack/fibratus/internal/bootstrap"
 	"os"
 	"reflect"
+
+	"github.com/rabbitstack/fibratus/internal/bootstrap"
 
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/rabbitstack/fibratus/pkg/config"
@@ -59,7 +60,6 @@ type Stats struct {
 	FsFileObjectMisses                  int            `json:"fs.file.object.misses"`
 	FsFileReleases                      int            `json:"fs.file.releases"`
 	FsTotalRundownFiles                 int            `json:"fs.total.rundown.files"`
-	HandleDeferredEvictions             int            `json:"handle.deferred.evictions"`
 	HandleNameQueryFailures             map[string]int `json:"handle.name.query.failures"`
 	HandleSnapshotCount                 int            `json:"handle.snapshot.count"`
 	HandleSnapshotBytes                 int            `json:"handle.snapshot.bytes"`

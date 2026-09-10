@@ -129,8 +129,6 @@ func (b *BoundField) Accessor(f *filter) Accessor {
 		b.accessor = newRegistryAccessor()
 	case b.Field.Name.IsNetworkField():
 		b.accessor = newNetworkAccessor()
-	case b.Field.Name.IsHandleField():
-		b.accessor = newHandleAccessor()
 	case b.Field.Name.IsPeField():
 		b.accessor = newPEAccessor()
 	case b.Field.Name.IsMemField():

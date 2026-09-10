@@ -425,7 +425,6 @@ func (c *Config) addFlags() {
 		c.flags.Bool(enableFileIOEvents, true, "Determines whether disk I/O events are collected by Kernel Logger provider")
 		c.flags.Bool(enableVAMapEvents, true, "Determines whether VA map/unmap events are collected by Kernel Logger provider")
 		c.flags.Bool(enableModuleEvents, true, "Determines whether module events are collected by Kernel Logger provider")
-		c.flags.Bool(enableHandleEvents, false, "Determines whether object manager events (handle creation/destruction) are collected by Kernel Logger provider")
 		c.flags.Bool(enableMemEvents, true, "Determines whether memory manager events are collected by Kernel Logger provider")
 		c.flags.Bool(enableAuditAPIEvents, true, "Determines whether kernel audit API calls events are published")
 		c.flags.Bool(enableDNSEvents, true, "Determines whether DNS client events are enabled")

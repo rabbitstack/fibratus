@@ -348,28 +348,15 @@ func (t *KernelTrace) Start() error {
 
 	handle := t.controlHandle
 
-	// poorly documented ETW feature that allows for enabling an extended set of
-	// kernel event tracing flags. According to the MSDN documentation, aside from
-	// invoking `EventTraceProperties` function to enable object manager tracking
-	// the `EventTraceProperties` structure's `EnableFlags` member needs to be set
-	// to PERF_OB_HANDLE (0x80000040). This actually results in an erroneous trace start.
-	// The documentation neither specifies how the function should be called, group mask
-	// array with its 4th element set to 0x80000040.
-	sysTraceFlags := make([]etw.EventTraceFlags, 8)
 	// when we call `TraceSetInformation` with event empty group mask reserved for the
 	// flags that are bitvectored into `EventTraceProperties` structure's `EnableFlags` field,
 	// it will trigger the arrival of rundown events including open file objects and
 	// registry keys that are very valuable for us to construct the initial snapshot of
 	// these system resources and let us build the state machine
+	sysTraceFlags := make([]etw.EventTraceFlags, 8)
 	if err := etw.SetTraceSystemFlags(handle, sysTraceFlags); err != nil {
 		log.Warnf("unable to set empty system flags: %v", err)
 		return nil
-	}
-	sysTraceFlags[0] = flags
-
-	// enable object manager tracking
-	if t.config.EventSource.EnableHandleEvents {
-		sysTraceFlags[4] = etw.Handle
 	}
 	// enable stack enrichment
 	if t.config.EventSource.StackEnrichment {
@@ -377,9 +364,8 @@ func (t *KernelTrace) Start() error {
 			return fmt.Errorf("fail to enable kernel callstack tracing: %v", err)
 		}
 	}
-	// call again to enable all kernel events. Just to recap. The first call to
-	// `TraceSetInformation` with empty group masks activates rundown events,
-	// while this second call enables the rest of the kernel events specified in flags.
+	// call again to enable all kernel events
+	sysTraceFlags[0] = flags
 	return etw.SetTraceSystemFlags(handle, sysTraceFlags)
 }
 

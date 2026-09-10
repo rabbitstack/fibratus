@@ -22,7 +22,6 @@
 package handle
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/event"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	"github.com/stretchr/testify/mock"
 )
@@ -30,18 +29,6 @@ import (
 // SnapshotterMock is the mock handle snapshotter used in tests.
 type SnapshotterMock struct {
 	mock.Mock
-}
-
-// Write method
-func (s *SnapshotterMock) Write(evt *event.Event) error {
-	args := s.Called(evt)
-	return args.Error(0)
-}
-
-// Remove method
-func (s *SnapshotterMock) Remove(evt *event.Event) error {
-	args := s.Called(evt)
-	return args.Error(0)
 }
 
 // FindHandles method

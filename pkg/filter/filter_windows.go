@@ -76,9 +76,6 @@ func New(expr string, config *config.Config, options ...Option) Filter {
 	if config.EventSource.EnableNetEvents {
 		accessors = append(accessors, newNetworkAccessor())
 	}
-	if config.EventSource.EnableHandleEvents {
-		accessors = append(accessors, newHandleAccessor())
-	}
 	if config.EventSource.EnableMemEvents {
 		accessors = append(accessors, newMemAccessor())
 	}

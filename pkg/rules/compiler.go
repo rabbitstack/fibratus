@@ -354,8 +354,6 @@ func (c *compiler) buildCompileResult(filters map[*config.FilterConfig]filter.Fi
 							rs.HasRegistryEvents = true
 						case event.Mem:
 							rs.HasMemEvents = true
-						case event.Handle:
-							rs.HasHandleEvents = true
 						case event.Threadpool:
 							rs.HasThreadpoolEvents = true
 						}

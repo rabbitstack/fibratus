@@ -84,7 +84,6 @@ func init() {
 func newConfig(fromFiles ...string) *config.Config {
 	c := &config.Config{
 		EventSource: config.EventSourceConfig{
-			EnableHandleEvents:   true,
 			EnableNetEvents:      true,
 			EnableRegistryEvents: true,
 			EnableFileIOEvents:   true,
@@ -557,9 +556,9 @@ func BenchmarkRunRules(b *testing.B) {
 			Metadata: make(map[event.MetadataKey]any),
 		},
 		{
-			Type:     event.CreateHandle,
-			Name:     "CreateHandle",
-			Category: event.Handle,
+			Type:     event.CreateFile,
+			Name:     "CreateFile",
+			Category: event.File,
 			Tid:      2484,
 			PID:      859,
 			PS: &types.PS{

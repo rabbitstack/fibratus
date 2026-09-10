@@ -162,17 +162,17 @@ func TestValuerCacheFieldWithoutID(t *testing.T) {
 		return "value"
 	}
 
-	c.populateValuer(Field{Name: fields.HandleID, Value: fields.HandleID.String()}, extract)
-	c.populateValuer(Field{Name: fields.HandleName, Value: fields.HandleName.String()}, extract)
+	c.populateValuer(Field{Name: fields.PsUUID, Value: fields.PsUUID.String()}, extract)
+	c.populateValuer(Field{Name: fields.PsName, Value: fields.PsName.String()}, extract)
 
 	assert.Equal(t, 2, calls, "unknown fields (id == -1) must not be cached")
 
-	c.populateValuer(Field{Name: fields.HandleID, Value: fields.HandleID.String()}, dontCallValuerFunc)
-	c.populateValuer(Field{Name: fields.HandleName, Value: fields.HandleName.String()}, dontCallValuerFunc)
+	c.populateValuer(Field{Name: fields.PsUUID, Value: fields.PsUUID.String()}, dontCallValuerFunc)
+	c.populateValuer(Field{Name: fields.PsName, Value: fields.PsName.String()}, dontCallValuerFunc)
 
 	// now the fields should be cached
-	assert.Equal(t, "value", c.valuer[fields.HandleID.String()])
-	assert.Equal(t, "value", c.valuer[fields.HandleName.String()])
+	assert.Equal(t, "value", c.valuer[fields.PsUUID.String()])
+	assert.Equal(t, "value", c.valuer[fields.PsName.String()])
 }
 
 func BenchmarkValuerCacheHit(b *testing.B) {

@@ -103,12 +103,6 @@
 - macro: unmap_view_of_section
   expr: unmap_view_file and file.view.type in ('IMAGE', 'IMAGE_NO_EXECUTE')
 
-- macro: duplicate_handle
-  expr: evt.name = 'DuplicateHandle'
-
-- macro: create_handle
-  expr: evt.name = 'CreateHandle'
-
 - macro: query_dns
   expr: evt.name = 'QueryDns'
 

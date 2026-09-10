@@ -112,7 +112,6 @@ func TestEventSourceStartTraces(t *testing.T) {
 					EnableNetEvents:      true,
 					EnableFileIOEvents:   true,
 					EnableVAMapEvents:    true,
-					EnableHandleEvents:   true,
 					EnableRegistryEvents: true,
 					BufferSize:           1024,
 					FlushTimer:           time.Millisecond * 2300,
@@ -141,7 +140,6 @@ func TestEventSourceStartTraces(t *testing.T) {
 					require.NoError(t, err)
 					// check enabled system event flags
 					require.Equal(t, tt.wantFlags[0], flags[0])
-					require.Equal(t, tt.wantFlags[1], flags[4])
 				}
 			}
 		})
@@ -1254,7 +1252,6 @@ func TestEvasionScanner(t *testing.T) {
 		EnableNetEvents:      true,
 		EnableRegistryEvents: false,
 		EnableMemEvents:      false,
-		EnableHandleEvents:   false,
 		EnableDNSEvents:      false,
 		EnableAuditAPIEvents: true,
 		StackEnrichment:      true,

@@ -51,7 +51,6 @@ import (
 
 var cfg = &config.Config{
 	EventSource: config.EventSourceConfig{
-		EnableHandleEvents:     true,
 		EnableNetEvents:        true,
 		EnableRegistryEvents:   true,
 		EnableFileIOEvents:     true,

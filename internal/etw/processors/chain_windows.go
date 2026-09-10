@@ -59,9 +59,6 @@ func NewChain(
 	if config.EventSource.EnableNetEvents {
 		chain.addProcessor(newNetProcessor())
 	}
-	if config.EventSource.EnableHandleEvents {
-		chain.addProcessor(newHandleProcessor(hsnap, psnap))
-	}
 	if config.EventSource.EnableMemEvents {
 		chain.addProcessor(newMemProcessor(psnap, vaRegionProber))
 	}

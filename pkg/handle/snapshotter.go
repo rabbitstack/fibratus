@@ -24,17 +24,16 @@ package handle
 import (
 	"expvar"
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/sys"
-	"golang.org/x/sys/windows"
 	"os"
 	"strconv"
 	"sync"
 	"time"
 	"unsafe"
 
+	"github.com/rabbitstack/fibratus/pkg/sys"
+	"golang.org/x/sys/windows"
+
 	"github.com/rabbitstack/fibratus/pkg/config"
-	"github.com/rabbitstack/fibratus/pkg/event"
-	"github.com/rabbitstack/fibratus/pkg/event/params"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	log "github.com/sirupsen/logrus"
 )
@@ -63,16 +62,10 @@ type DestroyCallback func(pid uint32, rawHandle windows.Handle)
 // SnapshotBuildCompleted is the function type for snapshot completed signal
 type SnapshotBuildCompleted func(total uint64, named uint64)
 
-// Snapshotter keeps the system-wide snapshot of allocated handles always when handle kernel events are enabled or
-// supported on the target system. It also provides facilities for obtaining a list of handles pertaining to the specific
+// Snapshotter keeps the system-wide snapshot of allocated handles. It also
+// provides facilities for obtaining a list of handles pertaining to the specific
 // process.
 type Snapshotter interface {
-	// Write updates the snapshotter state by storing a new entry for the inbound create handle event. It also notifies
-	// the registered callback that a new handle has been created.
-	Write(evt *event.Event) error
-	// Remove destroys the handle state for the specified handle object. The removal callback is triggered when an item
-	// is deleted from the store.
-	Remove(evt *event.Event) error
 	// FindHandles returns a list of all known handles for the specified process identifier.
 	FindHandles(pid uint32) ([]htypes.Handle, error)
 	// FindByObject returns the handle for the given handle object reference.
@@ -397,46 +390,9 @@ func (s *snapshotter) GetSnapshot() []htypes.Handle {
 	return handles
 }
 
-func (s *snapshotter) Write(e *event.Event) error {
-	if !e.IsCreateHandle() {
-		return fmt.Errorf("expected CreateHandle event but got %s", e.Type)
-	}
-	h := unwrapHandle(e)
-	obj, err := e.Params.GetUint64(params.HandleObject)
-	if err != nil {
-		return err
-	}
-	s.mu.Lock()
-	s.handlesByObject[obj] = h
-	s.mu.Unlock()
-	return nil
-}
-
-func (s *snapshotter) Remove(e *event.Event) error {
-	if !e.IsCloseHandle() {
-		return fmt.Errorf("expected CloseHandle event but got %s", e.Type)
-	}
-	obj, err := e.Params.GetUint64(params.HandleObject)
-	if err != nil {
-		return err
-	}
-	s.mu.Lock()
-	delete(s.handlesByObject, obj)
-	s.mu.Unlock()
-	return nil
-}
-
 func (s *snapshotter) Close() error {
 	if s.housekeepTick != nil {
 		s.housekeepTick.Stop()
 	}
 	return nil
-}
-
-func unwrapHandle(e *event.Event) htypes.Handle {
-	h := htypes.Handle{}
-	h.Type = e.GetParamAsString(params.HandleObjectTypeID)
-	h.Object, _ = e.Params.GetUint64(params.HandleObject)
-	h.Name, _ = e.Params.GetString(params.HandleObjectName)
-	return h
 }
