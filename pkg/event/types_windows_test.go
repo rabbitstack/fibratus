@@ -104,10 +104,6 @@ func TestEventTypeExists(t *testing.T) {
 	require.True(t, AcceptTCPv6.Exists())
 }
 
-func TestTypeID(t *testing.T) {
-	assert.Equal(t, uint(14439051552138264620), SetThreadpoolTimer.ID())
-}
-
 func TestGUIDAndHookIDFromEventType(t *testing.T) {
 	var tests = []struct {
 		Type   Type

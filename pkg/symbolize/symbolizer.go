@@ -36,7 +36,6 @@ import (
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/util/convert"
-	"github.com/rabbitstack/fibratus/pkg/util/threadcontext"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
@@ -319,9 +318,6 @@ func (s *Symbolizer) processCallstack(e *event.Event) error {
 		case event.CreateThread:
 			pid = e.Params.MustGetPid()
 			addr = e.Params.TryGetAddress(params.StartAddress)
-		case event.SubmitThreadpoolWork, event.SubmitThreadpoolCallback:
-			pid = e.PID
-			addr = e.Params.TryGetAddress(params.ThreadpoolCallback)
 		}
 
 		// symbolize thread start or thread pool callback address
@@ -338,31 +334,6 @@ func (s *Symbolizer) processCallstack(e *event.Event) error {
 				switch e.Type {
 				case event.CreateThread:
 					e.Params.Append(params.StartAddressSymbol, params.UnicodeString, symbol)
-				case event.SubmitThreadpoolWork, event.SubmitThreadpoolCallback:
-					e.Params.Append(params.ThreadpoolCallbackSymbol, params.UnicodeString, symbol)
-
-					ctx := e.Params.TryGetAddress(params.ThreadpoolContext)
-
-					// if the callback resolves to one of the functions
-					// that receive the CONTEXT structure as a parameter
-					// try to read the thread context and resolve the
-					// function address stored in the instruction pointer
-					if ctx != 0 && threadcontext.IsParamOfFunc(symbol) {
-						rip := threadcontext.Rip(pid, ctx)
-						if rip != 0 {
-							e.Params.Append(params.ThreadpoolContextRip, params.Address, rip.Uint64())
-
-							m := e.PS.FindModuleByVa(rip)
-							if m != nil {
-								e.Params.Append(params.ThreadpoolContextRipModule, params.UnicodeString, m.Name)
-							}
-
-							sym := s.symbolizeAddress(pid, rip, m)
-							if sym != "" && sym != "?" {
-								e.Params.Append(params.ThreadpoolContextRipSymbol, params.UnicodeString, sym)
-							}
-						}
-					}
 				}
 			}
 
@@ -370,8 +341,6 @@ func (s *Symbolizer) processCallstack(e *event.Event) error {
 				switch e.Type {
 				case event.CreateThread:
 					e.Params.Append(params.StartAddressModule, params.UnicodeString, mod.Name)
-				case event.SubmitThreadpoolWork, event.SubmitThreadpoolCallback:
-					e.Params.Append(params.ThreadpoolCallbackModule, params.UnicodeString, mod.Name)
 				}
 			}
 		}

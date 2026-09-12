@@ -188,20 +188,19 @@ func (ctx *ActionContext) UniquePids() []uint32 {
 // enabling/disabling event providers/types
 // dynamically.
 type RulesCompileResult struct {
-	HasProcEvents       bool
-	HasThreadEvents     bool
-	HasModuleEvents     bool
-	HasFileEvents       bool
-	HasNetworkEvents    bool
-	HasRegistryEvents   bool
-	HasMemEvents        bool
-	HasVAMapEvents      bool
-	HasDNSEvents        bool
-	HasAuditAPIEvents   bool
-	HasThreadpoolEvents bool
-	UsedEvents          []event.Type
-	NumberRules         int
-	Approvers           Approvers
+	HasProcEvents     bool
+	HasThreadEvents   bool
+	HasModuleEvents   bool
+	HasFileEvents     bool
+	HasNetworkEvents  bool
+	HasRegistryEvents bool
+	HasMemEvents      bool
+	HasVAMapEvents    bool
+	HasDNSEvents      bool
+	HasAuditAPIEvents bool
+	UsedEvents        []event.Type
+	NumberRules       int
+	Approvers         Approvers
 }
 
 type Approvers struct {
@@ -287,7 +286,6 @@ func (r RulesCompileResult) String() string {
 		HasVAMapEvents: %t
 		HasAuditAPIEvents: %t
 		HasDNSEvents: %t
-		HasThreadpoolEvents: %t
 		Events: %s
 		Approvers: %s`,
 		r.HasProcEvents,
@@ -300,7 +298,6 @@ func (r RulesCompileResult) String() string {
 		r.HasVAMapEvents,
 		r.HasAuditAPIEvents,
 		r.HasDNSEvents,
-		r.HasThreadpoolEvents,
 		strings.Join(events, ", "),
 		r.Approvers,
 	)

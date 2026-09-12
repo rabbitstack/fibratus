@@ -482,30 +482,6 @@ func TestSymbolizeEventParamAddress(t *testing.T) {
 
 	assert.Equal(t, "CreateProcessW", e.GetParamAsString(params.StartAddressSymbol))
 	assert.Equal(t, "C:\\Windows\\System32\\ntdll.dll", e.GetParamAsString(params.StartAddressModule))
-
-	e1 := &event.Event{
-		Type:      event.SubmitThreadpoolCallback,
-		Tid:       2484,
-		PID:       uint32(os.Getpid()),
-		CPU:       1,
-		Seq:       2,
-		Name:      "SubmitThreadpoolCallback",
-		Timestamp: time.Now(),
-		Category:  event.Threadpool,
-		Host:      "archrabbit",
-		Params: event.Params{
-			params.Callstack:          {Name: params.Callstack, Type: params.Slice, Value: []va.Address{0x7ffb5c1d0396}},
-			params.ThreadpoolCallback: {Name: params.ThreadpoolCallback, Type: params.Address, Value: uint64(0x7ffb3138592e)},
-			params.ThreadpoolContext:  {Name: params.ThreadpoolContext, Type: params.Address, Value: uint64(0)},
-		},
-		PS: proc,
-	}
-
-	_, err = s.ProcessEvent(e1)
-	require.NoError(t, err)
-
-	assert.Equal(t, "CreateProcessW", e1.GetParamAsString(params.ThreadpoolCallbackSymbol))
-	assert.Equal(t, "C:\\Windows\\System32\\ntdll.dll", e1.GetParamAsString(params.ThreadpoolCallbackModule))
 }
 
 func init() {

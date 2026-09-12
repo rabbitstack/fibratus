@@ -153,17 +153,16 @@ func (*evtAccessor) Get(f Field, evt *event.Event) (params.Value, error) {
 // referenced in the bound field.
 func (f *filter) narrowAccessors() {
 	var (
-		removeEvtAccessor        = true
-		removePsAccessor         = true
-		removeThreadAccessor     = true
-		removeModuleAccessor     = true
-		removeFileAccessor       = true
-		removeRegistryAccessor   = true
-		removeNetworkAccessor    = true
-		removePEAccessor         = true
-		removeMemAccessor        = true
-		removeDNSAccessor        = true
-		removeThreadpoolAccessor = true
+		removeEvtAccessor      = true
+		removePsAccessor       = true
+		removeThreadAccessor   = true
+		removeModuleAccessor   = true
+		removeFileAccessor     = true
+		removeRegistryAccessor = true
+		removeNetworkAccessor  = true
+		removePEAccessor       = true
+		removeMemAccessor      = true
+		removeDNSAccessor      = true
 	)
 
 	for _, field := range f.fields {
@@ -188,8 +187,6 @@ func (f *filter) narrowAccessors() {
 			removeMemAccessor = false
 		case field.Name.IsDNSField():
 			removeDNSAccessor = false
-		case field.Name.IsThreadpoolField():
-			removeThreadpoolAccessor = false
 		}
 	}
 
@@ -222,9 +219,6 @@ func (f *filter) narrowAccessors() {
 	}
 	if removeDNSAccessor {
 		f.removeAccessor(&dnsAccessor{})
-	}
-	if removeThreadpoolAccessor {
-		f.removeAccessor(&threadpoolAccessor{})
 	}
 
 	for _, accessor := range f.accessors {

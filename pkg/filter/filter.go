@@ -135,8 +135,6 @@ func (b *BoundField) Accessor(f *filter) Accessor {
 		b.accessor = newMemAccessor()
 	case b.Field.Name.IsDNSField():
 		b.accessor = newDNSAccessor()
-	case b.Field.Name.IsThreadpoolField():
-		b.accessor = newThreadAccessor()
 	}
 	return b.accessor
 }

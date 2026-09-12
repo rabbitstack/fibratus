@@ -84,9 +84,6 @@ var events = map[Type]Info{
 	QueryDNS:                 {"QueryDns", Net, "Sends a DNS query to the name server"},
 	ReplyDNS:                 {"ReplyDNS", Net, "Receives the response from the DNS server"},
 	CreateSymbolicLinkObject: {"CreateSymbolicLinkObject", Object, "Creates the symbolic link within the object manager directory"},
-	SubmitThreadpoolWork:     {"SubmitThreadpoolWork", Threadpool, "Enqueues the work item to the thread pool"},
-	SubmitThreadpoolCallback: {"SubmitThreadpoolCallback", Threadpool, "Submits the thread pool callback for execution within the work item"},
-	SetThreadpoolTimer:       {"SetThreadpoolTimer", Threadpool, "Sets the thread pool timer object"},
 }
 
 var types = map[string]Type{
@@ -140,9 +137,6 @@ var types = map[string]Type{
 	"QueryDns":                 QueryDNS,
 	"ReplyDns":                 ReplyDNS,
 	"CreateSymbolicLinkObject": CreateSymbolicLinkObject,
-	"SubmitThreadpoolWork":     SubmitThreadpoolWork,
-	"SubmitThreadpoolCallback": SubmitThreadpoolCallback,
-	"SetThreadpoolTimer":       SetThreadpoolTimer,
 }
 
 // indexedEvents keeps the slice of event infos. When the
@@ -199,9 +193,6 @@ var indexedEvents = []Info{
 	events[QueryDNS],
 	events[ReplyDNS],
 	events[CreateSymbolicLinkObject],
-	events[SubmitThreadpoolWork],
-	events[SubmitThreadpoolCallback],
-	events[SetThreadpoolTimer],
 }
 
 // All returns all event types.

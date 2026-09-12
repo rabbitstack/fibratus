@@ -51,14 +51,13 @@ import (
 
 var cfg = &config.Config{
 	EventSource: config.EventSourceConfig{
-		EnableNetEvents:        true,
-		EnableRegistryEvents:   true,
-		EnableFileIOEvents:     true,
-		EnableModuleEvents:     true,
-		EnableThreadEvents:     true,
-		EnableMemEvents:        true,
-		EnableDNSEvents:        true,
-		EnableThreadpoolEvents: true,
+		EnableNetEvents:      true,
+		EnableRegistryEvents: true,
+		EnableFileIOEvents:   true,
+		EnableModuleEvents:   true,
+		EnableThreadEvents:   true,
+		EnableMemEvents:      true,
+		EnableDNSEvents:      true,
 	},
 	Filters: &config.Filters{},
 	PE:      pe.Config{Enabled: true},
@@ -1350,71 +1349,6 @@ func TestDNSFilter(t *testing.T) {
 		matches := f.Eval(evt)
 		if matches != tt.matches {
 			t.Errorf("%d. %q dns filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
-		}
-	}
-}
-
-func TestThreadpoolFilter(t *testing.T) {
-	e := &event.Event{
-		Type:      event.SubmitThreadpoolCallback,
-		Tid:       2484,
-		PID:       1023,
-		CPU:       1,
-		Seq:       2,
-		Name:      "SubmitThreadpoolCallback",
-		Timestamp: time.Now(),
-		Category:  event.Threadpool,
-		Params: event.Params{
-			params.ThreadpoolPoolID:           {Name: params.ThreadpoolPoolID, Type: params.Address, Value: uint64(0x20f5fc02440)},
-			params.ThreadpoolTaskID:           {Name: params.ThreadpoolTaskID, Type: params.Address, Value: uint64(0x20f7ecd21f8)},
-			params.ThreadpoolCallback:         {Name: params.ThreadpoolCallback, Type: params.Address, Value: uint64(0x7ffb3138592e)},
-			params.ThreadpoolContext:          {Name: params.ThreadpoolContext, Type: params.Address, Value: uint64(0x14d0d16fed8)},
-			params.ThreadpoolContextRip:       {Name: params.ThreadpoolContextRip, Type: params.Address, Value: uint64(0x143c9b07bd0)},
-			params.ThreadpoolSubprocessTag:    {Name: params.ThreadpoolSubprocessTag, Type: params.Address, Value: uint64(0x10d)},
-			params.ThreadpoolContextRipSymbol: {Name: params.ThreadpoolContextRipSymbol, Type: params.UnicodeString, Value: "VirtualProtect"},
-			params.ThreadpoolContextRipModule: {Name: params.ThreadpoolContextRipModule, Type: params.UnicodeString, Value: "C:\\Windows\\System32\\kernelbase.dll"},
-			params.ThreadpoolCallbackSymbol:   {Name: params.ThreadpoolCallbackSymbol, Type: params.UnicodeString, Value: "RtlDestroyQueryDebugBuffer"},
-			params.ThreadpoolCallbackModule:   {Name: params.ThreadpoolCallbackModule, Type: params.UnicodeString, Value: "C:\\Windows\\System32\\ntdll.dll"},
-			params.ThreadpoolTimerSubqueue:    {Name: params.ThreadpoolTimerSubqueue, Type: params.Address, Value: uint64(0x1db401703e8)},
-			params.ThreadpoolTimerDuetime:     {Name: params.ThreadpoolTimerDuetime, Type: params.Uint64, Value: uint64(18446744073699551616)},
-			params.ThreadpoolTimer:            {Name: params.ThreadpoolTimer, Type: params.Address, Value: uint64(0x3e8)},
-			params.ThreadpoolTimerPeriod:      {Name: params.ThreadpoolTimerPeriod, Type: params.Uint32, Value: uint32(100)},
-			params.ThreadpoolTimerWindow:      {Name: params.ThreadpoolTimerWindow, Type: params.Uint32, Value: uint32(50)},
-			params.ThreadpoolTimerAbsolute:    {Name: params.ThreadpoolTimerAbsolute, Type: params.Bool, Value: true},
-		},
-	}
-
-	var tests = []struct {
-		filter  string
-		matches bool
-	}{
-
-		{`threadpool.id = '20f5fc02440'`, true},
-		{`threadpool.task.id = '20f7ecd21f8'`, true},
-		{`threadpool.callback.address = '7ffb3138592e'`, true},
-		{`threadpool.callback.symbol = 'RtlDestroyQueryDebugBuffer'`, true},
-		{`threadpool.callback.module = 'C:\\Windows\\System32\\ntdll.dll'`, true},
-		{`threadpool.callback.context = '14d0d16fed8'`, true},
-		{`threadpool.callback.context.rip = '143c9b07bd0'`, true},
-		{`threadpool.callback.context.rip.symbol = 'VirtualProtect'`, true},
-		{`threadpool.callback.context.rip.module = 'C:\\Windows\\System32\\kernelbase.dll'`, true},
-		{`threadpool.timer.address = '3e8'`, true},
-		{`threadpool.timer.subqueue = '1db401703e8'`, true},
-		{`threadpool.timer.duetime = 18446744073699551616`, true},
-		{`threadpool.timer.period = 100`, true},
-		{`threadpool.timer.window = 50`, true},
-		{`threadpool.timer.is_absolute = true`, true},
-	}
-
-	for i, tt := range tests {
-		f := New(tt.filter, cfg)
-		err := f.Compile()
-		if err != nil {
-			t.Fatal(err)
-		}
-		matches := f.Eval(e)
-		if matches != tt.matches {
-			t.Errorf("%d. %q threadpool filter mismatch: exp=%t got=%t", i, tt.filter, tt.matches, matches)
 		}
 	}
 }

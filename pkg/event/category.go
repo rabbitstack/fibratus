@@ -47,8 +47,6 @@ const (
 	Mem Category = "mem"
 	// Object the category for object manager events
 	Object Category = "object"
-	// Threadpool is the category for thread pool events
-	Threadpool Category = "threadpool"
 	// Other is the category for uncategorized events
 	Other Category = "other"
 	// Unknown is the category for events that couldn't match any of the previous categories
@@ -68,7 +66,7 @@ func (c Category) Hash() uint32 {
 }
 
 // MaxCategoryIndex designates the maximum category index.
-const MaxCategoryIndex = 12
+const MaxCategoryIndex = 11
 
 // Index returns a numerical category index.
 func (c Category) Index() uint8 {
@@ -86,15 +84,13 @@ func (c Category) Index() uint8 {
 	case Module:
 		return 6
 	case Driver:
-		return 8
+		return 7
 	case Mem:
-		return 9
+		return 8
 	case Object:
-		return 10
-	case Threadpool:
-		return 11
+		return 9
 	case Other:
-		return 12
+		return 10
 	default:
 		return MaxCategoryIndex
 	}
@@ -114,7 +110,6 @@ func Categories() []string {
 		string(Other),
 		string(Unknown),
 		string(Object),
-		string(Threadpool),
 	}
 }
 

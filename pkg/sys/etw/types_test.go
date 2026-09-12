@@ -19,10 +19,11 @@
 package etw
 
 import (
-	"github.com/stretchr/testify/assert"
-	"golang.org/x/sys/windows"
 	"testing"
 	"unsafe"
+
+	"github.com/stretchr/testify/assert"
+	"golang.org/x/sys/windows"
 )
 
 func TestReadBuffer(t *testing.T) {
@@ -97,9 +98,4 @@ func TestReadBuffer(t *testing.T) {
 		}
 		tt.assertions(t, ev)
 	}
-}
-
-func TestID(t *testing.T) {
-	ev := &EventRecord{Header: EventHeader{ProviderID: ThreadpoolGUID, EventDescriptor: EventDescriptor{ID: 44}}}
-	assert.Equal(t, uint(14439051552138264620), ev.ID())
 }
