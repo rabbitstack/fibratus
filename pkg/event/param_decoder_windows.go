@@ -451,40 +451,6 @@ func (d *ParamDecoder) DecodeSetThreadContext(r *etw.EventRecord, e *Event) {
 	e.AppendParam(params.Callstack, params.Slice, r.Callstack())
 }
 
-// DecodeThreadpool decodes payloads for thread pool events.
-func (d *ParamDecoder) DecodeThreadpool(r *etw.EventRecord, e *Event) {
-	switch r.Header.EventDescriptor.Opcode {
-	case SubmitThreadpoolWorkID, SubmitThreadpoolCallbackID:
-		// typedef struct _ETW_TP_EVENT_CALLBACK_ENQUEUE {
-		//     PVOID PoolId;                   // Pool Identifier
-		//     PVOID TaskId;                   // Task Identifier
-		//     PVOID Callback;                 // Callback Function
-		//     PVOID Context;                  // Callback Context
-		//     PVOID SubProcessTag;            // Sub-components in a process
-		// } ETW_TP_EVENT_CALLBACK_ENQUEUE, *PETW_TP_EVENT_CALLBACK_ENQUEUE
-		e.AppendParam(params.ThreadpoolPoolID, params.Address, r.ReadUint64(0))
-		e.AppendParam(params.ThreadpoolTaskID, params.Address, r.ReadUint64(8))
-		e.AppendParam(params.ThreadpoolCallback, params.Address, r.ReadUint64(16))
-		e.AppendParam(params.ThreadpoolContext, params.Address, r.ReadUint64(24))
-		e.AppendParam(params.ThreadpoolSubprocessTag, params.Address, r.ReadUint64(32))
-	case SetThreadpoolTimerID:
-		// typedef struct _ETW_TP_EVENT_TIMER_SET {
-		//     LONG64 DueTime;                 // Due time
-		//     PVOID SubQueue;                 // Sub Queue to be inserted
-		//     PVOID Timer;                    // Timer to be set
-		//     ULONG Period;                   // period of the timer
-		//     ULONG WindowLength;             // Tolerate period
-		//     ULONG Absolute;                 // An absolute timer or relative timer
-		// } ETW_TP_EVENT_TIMER_SET, *PETW_TP_EVENT_TIMER_SET;
-		e.AppendParam(params.ThreadpoolTimerDuetime, params.Uint64, r.ReadUint64(0))
-		e.AppendParam(params.ThreadpoolTimerSubqueue, params.Address, r.ReadUint64(8))
-		e.AppendParam(params.ThreadpoolTimer, params.Address, r.ReadUint64(16))
-		e.AppendParam(params.ThreadpoolTimerPeriod, params.Uint32, r.ReadUint32(24))
-		e.AppendParam(params.ThreadpoolTimerWindow, params.Uint32, r.ReadUint32(28))
-		e.AppendParam(params.ThreadpoolTimerAbsolute, params.Bool, r.ReadUint32(32) > 0)
-	}
-}
-
 // DecodeCreateSymbolicLinkObject decodes the payload for the CreateSymbolicLinkObject event.
 func (d *ParamDecoder) DecodeCreateSymbolicLinkObject(r *etw.EventRecord, e *Event) {
 	source, offset := r.ReadUTF16String(0)

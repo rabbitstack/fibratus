@@ -362,9 +362,6 @@
         "enable-dns": {
           "type": "boolean"
         },
-        "enable-threadpool": {
-          "type": "boolean"
-        },
         "stack-enrichment": {
           "type": "boolean"
         },
@@ -428,10 +425,7 @@
                   "ReplyDns",
                   "VirtualAlloc",
                   "VirtualFree",
-                  "CreateSymbolicLinkObject",
-                  "SubmitThreadpoolWork",
-                  "SubmitThreadpoolCallback",
-                  "SetThreadpoolTimer"
+                  "CreateSymbolicLinkObject"
                 ]
               }
             },

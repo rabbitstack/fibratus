@@ -33,21 +33,20 @@ import (
 )
 
 const (
-	enableThreadEvents     = "eventsource.enable-thread"
-	enableRegistryEvents   = "eventsource.enable-registry"
-	enableNetEvents        = "eventsource.enable-net"
-	enableFileIOEvents     = "eventsource.enable-fileio"
-	enableVAMapEvents      = "eventsource.enable-vamap"
-	enableModuleEvents     = "eventsource.enable-module"
-	enableMemEvents        = "eventsource.enable-mem"
-	enableAuditAPIEvents   = "eventsource.enable-audit-api"
-	enableDNSEvents        = "eventsource.enable-dns"
-	enableThreadpoolEvents = "eventsource.enable-threadpool"
-	stackEnrichment        = "eventsource.stack-enrichment"
-	bufferSize             = "eventsource.buffer-size"
-	minBuffers             = "eventsource.min-buffers"
-	maxBuffers             = "eventsource.max-buffers"
-	flushInterval          = "eventsource.flush-interval"
+	enableThreadEvents   = "eventsource.enable-thread"
+	enableRegistryEvents = "eventsource.enable-registry"
+	enableNetEvents      = "eventsource.enable-net"
+	enableFileIOEvents   = "eventsource.enable-fileio"
+	enableVAMapEvents    = "eventsource.enable-vamap"
+	enableModuleEvents   = "eventsource.enable-module"
+	enableMemEvents      = "eventsource.enable-mem"
+	enableAuditAPIEvents = "eventsource.enable-audit-api"
+	enableDNSEvents      = "eventsource.enable-dns"
+	stackEnrichment      = "eventsource.stack-enrichment"
+	bufferSize           = "eventsource.buffer-size"
+	minBuffers           = "eventsource.min-buffers"
+	maxBuffers           = "eventsource.max-buffers"
+	flushInterval        = "eventsource.flush-interval"
 
 	excludedEvents = "eventsource.blacklist.events"
 	excludedImages = "eventsource.blacklist.images"
@@ -81,8 +80,6 @@ type EventSourceConfig struct {
 	EnableAuditAPIEvents bool `json:"enable-audit-api" yaml:"enable-audit-api"`
 	// EnableDNSEvents indicates if DNS client events are enabled
 	EnableDNSEvents bool `json:"enable-dns" yaml:"enable-dns"`
-	// EnableThreadpoolEvents indicates if thread pool events are enabled
-	EnableThreadpoolEvents bool `json:"enable-threadpool" yaml:"enable-threadpool"`
 	// StackEnrichment indicates if stack enrichment is enabled for eligible events.
 	StackEnrichment bool `json:"stack-enrichment" yaml:"stack-enrichment"`
 	// BufferSize represents the amount of memory allocated for each event tracing session buffer, in kilobytes.
@@ -116,7 +113,6 @@ func (c *EventSourceConfig) initFromViper(v *viper.Viper) {
 	c.EnableMemEvents = v.GetBool(enableMemEvents)
 	c.EnableAuditAPIEvents = v.GetBool(enableAuditAPIEvents)
 	c.EnableDNSEvents = v.GetBool(enableDNSEvents)
-	c.EnableThreadpoolEvents = v.GetBool(enableThreadpoolEvents)
 	c.StackEnrichment = v.GetBool(stackEnrichment)
 	c.BufferSize = uint32(v.GetInt(bufferSize))
 	c.MinBuffers = uint32(v.GetInt(minBuffers))

@@ -58,7 +58,6 @@ func GetAccessors() []Accessor {
 		newThreadAccessor(),
 		newNetworkAccessor(),
 		newRegistryAccessor(),
-		newThreadpoolAccessor(),
 	}
 }
 
@@ -1256,58 +1255,6 @@ func (*dnsAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 		return e.GetFlagsAsSlice(params.DNSOpts), nil
 	case fields.DNSAnswers:
 		return e.Params.GetSlice(params.DNSAnswers)
-	}
-
-	return nil, nil
-}
-
-// threadpoolAccessor extracts values from thread pool events
-type threadpoolAccessor struct{}
-
-func (threadpoolAccessor) SetFields([]Field)            {}
-func (threadpoolAccessor) SetSegments([]fields.Segment) {}
-func (threadpoolAccessor) IsFieldAccessible(e *event.Event) bool {
-	return e.Category == event.Threadpool
-}
-
-func newThreadpoolAccessor() Accessor {
-	return &threadpoolAccessor{}
-}
-
-func (*threadpoolAccessor) Get(f Field, e *event.Event) (params.Value, error) {
-	switch f.Name {
-	case fields.ThreadpoolPoolID:
-		return e.GetParamAsString(params.ThreadpoolPoolID), nil
-	case fields.ThreadpoolTaskID:
-		return e.GetParamAsString(params.ThreadpoolTaskID), nil
-	case fields.ThreadpoolCallbackAddress:
-		return e.GetParamAsString(params.ThreadpoolCallback), nil
-	case fields.ThreadpoolCallbackSymbol:
-		return e.GetParamAsString(params.ThreadpoolCallbackSymbol), nil
-	case fields.ThreadpoolCallbackModule:
-		return e.GetParamAsString(params.ThreadpoolCallbackModule), nil
-	case fields.ThreadpoolCallbackContext:
-		return e.GetParamAsString(params.ThreadpoolContext), nil
-	case fields.ThreadpoolCallbackContextRip:
-		return e.GetParamAsString(params.ThreadpoolContextRip), nil
-	case fields.ThreadpoolCallbackContextRipSymbol:
-		return e.GetParamAsString(params.ThreadpoolContextRipSymbol), nil
-	case fields.ThreadpoolCallbackContextRipModule:
-		return e.GetParamAsString(params.ThreadpoolContextRipModule), nil
-	case fields.ThreadpoolSubprocessTag:
-		return e.GetParamAsString(params.ThreadpoolSubprocessTag), nil
-	case fields.ThreadpoolTimer:
-		return e.GetParamAsString(params.ThreadpoolTimer), nil
-	case fields.ThreadpoolTimerSubqueue:
-		return e.GetParamAsString(params.ThreadpoolTimerSubqueue), nil
-	case fields.ThreadpoolTimerDuetime:
-		return e.Params.GetUint64(params.ThreadpoolTimerDuetime)
-	case fields.ThreadpoolTimerPeriod:
-		return e.Params.GetUint32(params.ThreadpoolTimerPeriod)
-	case fields.ThreadpoolTimerWindow:
-		return e.Params.GetUint32(params.ThreadpoolTimerWindow)
-	case fields.ThreadpoolTimerAbsolute:
-		return e.Params.GetBool(params.ThreadpoolTimerAbsolute)
 	}
 
 	return nil, nil

@@ -50,16 +50,8 @@ type ProviderInfo struct {
 	// CaptureState requests that the provider log its state
 	// information, such as rundown events.
 	CaptureState bool
-	// stackExtensions manager stack tracing enablement.
-	// For each event present in the stack identifiers,
-	// the StackWalk event is published by the provider.
-	stackExtensions *StackExtensions
 	//eventFilterDescriptors stores the provider-specific filters.
 	eventFilterDescriptors []etw.EventFilterDescriptor
-}
-
-func (p *ProviderInfo) HasStackExtensions() bool {
-	return p.stackExtensions != nil && !p.stackExtensions.Empty()
 }
 
 func (p *ProviderInfo) HasEventFilterDescriptors() bool {
@@ -137,11 +129,6 @@ type trace struct {
 
 	// name represents the unique tracing session name.
 	name string
-
-	// stackExtensions manages stack tracing enablement.
-	// For each event present in the stack identifiers,
-	// the StackWalk event is published by the provider.
-	stackExtensions *StackExtensions
 
 	// controlHandle is the session handle returned by the
 	// etw.StartTrace function. This handle is
@@ -228,6 +215,10 @@ func (t *trace) Close() error {
 // events from the global NT Kernel Logger session.
 type KernelTrace struct {
 	trace
+	// stackExtensions manages stack tracing enablement.
+	// For each event present in the stack identifiers,
+	// the StackWalk event is published by the provider.
+	stackExtensions *StackExtensions
 }
 
 // UserTrace is responsible for starting a private tracing
@@ -242,7 +233,6 @@ type UserTrace struct {
 	Providers []ProviderInfo
 }
 type opts struct {
-	stackexts              *StackExtensions
 	keywords               uint64
 	captureState           bool
 	eventFilterDescriptors []etw.EventFilterDescriptor
@@ -250,13 +240,6 @@ type opts struct {
 
 // Option represents the option for the trace.
 type Option func(o *opts)
-
-// WithStackExts sets the stack extensions.
-func WithStackExts(stackexts *StackExtensions) Option {
-	return func(o *opts) {
-		o.stackexts = stackexts
-	}
-}
 
 // WithKeywords sets the bitmask of keywords that determine
 // the categories of events for the provider to emit.
@@ -284,7 +267,7 @@ func WithEventFilterDescriptors(descriptors ...etw.EventFilterDescriptor) Option
 
 // NewKernelTrace creates a new NT Kernel Logger trace.
 func NewKernelTrace(config *config.Config) *KernelTrace {
-	t := &KernelTrace{trace: trace{guid: etw.KernelTraceControlGUID, name: etw.KernelLoggerSession, stackExtensions: NewStackExtensions(config.EventSource), config: config}}
+	t := &KernelTrace{trace: trace{guid: etw.KernelTraceControlGUID, name: etw.KernelLoggerSession, config: config}, stackExtensions: NewStackExtensions(config.EventSource)}
 
 	t.stackExtensions.EnableProcessCallstack()
 	t.stackExtensions.EnableRegistryCallstack()
@@ -314,7 +297,7 @@ func (t *UserTrace) AddProvider(guid windows.GUID, enableStacks bool, options ..
 
 	t.Providers = append(
 		t.Providers,
-		ProviderInfo{GUID: guid, Keywords: opts.keywords, EnableStacks: enableStacks, CaptureState: opts.captureState, stackExtensions: opts.stackexts, eventFilterDescriptors: opts.eventFilterDescriptors},
+		ProviderInfo{GUID: guid, Keywords: opts.keywords, EnableStacks: enableStacks, CaptureState: opts.captureState, eventFilterDescriptors: opts.eventFilterDescriptors},
 	)
 }
 
@@ -400,13 +383,6 @@ func (t *UserTrace) Start() error {
 	// data item section when writing events to the session buffers
 	for _, provider := range t.Providers {
 		switch {
-		case provider.EnableStacks && provider.HasStackExtensions():
-			if err := etw.EnableStackTracing(t.controlHandle, provider.stackExtensions.EventIds()); err != nil {
-				return fmt.Errorf("fail to enable provider callstack tracing: %v", err)
-			}
-			if err := etw.EnableTrace(provider.GUID, t.controlHandle, provider.Keywords); err != nil {
-				return err
-			}
 		case provider.EnableStacks || provider.HasEventFilterDescriptors():
 			opts := etw.EnableTraceOpts{
 				WithStacktrace:         provider.EnableStacks,

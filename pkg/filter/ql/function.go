@@ -299,19 +299,18 @@ func (f *Foreach) Desc() functions.FunctionDesc {
 			e := args[2] // expression
 
 			var reserved = map[string]bool{ // reserved bound variable names
-				"$ps":         true,
-				"$pe":         true,
-				"$file":       true,
-				"$image":      true,
-				"$module":     true,
-				"$dll":        true,
-				"$thread":     true,
-				"$threadpool": true,
-				"$registry":   true,
-				"$net":        true,
-				"$mem":        true,
-				"$dns":        true,
-				"$evt":        true,
+				"$ps":       true,
+				"$pe":       true,
+				"$file":     true,
+				"$image":    true,
+				"$module":   true,
+				"$dll":      true,
+				"$thread":   true,
+				"$registry": true,
+				"$net":      true,
+				"$mem":      true,
+				"$dns":      true,
+				"$evt":      true,
 			}
 
 			if reserved[v] {

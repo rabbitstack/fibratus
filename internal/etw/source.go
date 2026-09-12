@@ -138,7 +138,6 @@ func (e *EventSource) Open(config *config.Config) error {
 		config.EventSource.EnableMemEvents = config.EventSource.EnableMemEvents && (e.r.HasMemEvents || (config.Yara.Enabled && !config.Yara.SkipAllocs))
 		config.EventSource.EnableDNSEvents = config.EventSource.EnableDNSEvents && e.r.HasDNSEvents
 		config.EventSource.EnableAuditAPIEvents = config.EventSource.EnableAuditAPIEvents && e.r.HasAuditAPIEvents
-		config.EventSource.EnableThreadpoolEvents = config.EventSource.EnableThreadpoolEvents && e.r.HasThreadpoolEvents
 		for _, typ := range event.All() {
 			if typ == event.CreateProcess || typ == event.TerminateProcess ||
 				typ == event.LoadModule || typ == event.UnloadModule {
@@ -195,17 +194,6 @@ func (e *EventSource) Open(config *config.Config) error {
 
 	if config.EventSource.EnableAuditAPIEvents {
 		trace.AddProvider(etw.KernelAuditAPICallsGUID, config.EventSource.StackEnrichment)
-	}
-
-	if config.EventSource.EnableThreadpoolEvents {
-		// thread pool provider must be configured with
-		// stack extensions to activate stack walks events
-		var stackexts *StackExtensions
-		if e.config.EventSource.StackEnrichment {
-			stackexts = NewStackExtensions(config.EventSource)
-			stackexts.EnableThreadpoolCallstack()
-		}
-		trace.AddProvider(etw.ThreadpoolGUID, config.EventSource.StackEnrichment, WithStackExts(stackexts))
 	}
 
 	// add security telemetry trace

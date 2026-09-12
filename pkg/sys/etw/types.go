@@ -42,9 +42,6 @@ var KernelAuditAPICallsGUID = windows.GUID{Data1: 0xe02a841c, Data2: 0x75a3, Dat
 // DNSClientGUID represents the GUID for the Windows DNS Client provider
 var DNSClientGUID = windows.GUID{Data1: 0x1c95126e, Data2: 0x7eea, Data3: 0x49a9, Data4: [8]byte{0xa3, 0xfe, 0xa3, 0x78, 0xb0, 0x3d, 0xdb, 0x4d}}
 
-// ThreadpoolGUID represents the GUID for the thread pool provider
-var ThreadpoolGUID = windows.GUID{Data1: 0xc861d0e2, Data2: 0xa2c1, Data3: 0x4d36, Data4: [8]byte{0x9f, 0x9c, 0x97, 0x0b, 0xab, 0x94, 0x3a, 0x12}}
-
 // WindowsKernelProcessGUID represents the GUID for the Microsoft Windows Kernel Process provider
 var WindowsKernelProcessGUID = windows.GUID{Data1: 0x22fb2cd6, Data2: 0x0e7b, Data3: 0x422b, Data4: [8]byte{0xa0, 0xc7, 0x2f, 0xad, 0x1f, 0xd0, 0xe7, 0x16}}
 

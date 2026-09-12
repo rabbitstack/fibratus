@@ -63,8 +63,6 @@ var (
 	AuditAPIEventGUID = windows.GUID{Data1: 0xe02a841c, Data2: 0x75a3, Data3: 0x4fa7, Data4: [8]byte{0xaf, 0xc8, 0xae, 0x09, 0xcf, 0x9b, 0x7f, 0x23}}
 	// DNSEventGUID represents DNS provider event GUID
 	DNSEventGUID = windows.GUID{Data1: 0x1c95126e, Data2: 0x7eea, Data3: 0x49a9, Data4: [8]byte{0xa3, 0xfe, 0xa3, 0x78, 0xb0, 0x3d, 0xdb, 0x4d}}
-	// ThreadpoolEventGUID represents the thread pool event GUID
-	ThreadpoolEventGUID = windows.GUID{Data1: 0xc861d0e2, Data2: 0xa2c1, Data3: 0x4d36, Data4: [8]byte{0x9f, 0x9c, 0x97, 0x0b, 0xab, 0x94, 0x3a, 0x12}}
 	// ProcessKernelEventGUID represents the Process Kernel event GUID
 	ProcessKernelEventGUID = windows.GUID{Data1: 0x22fb2cd6, Data2: 0x0e7b, Data3: 0x422b, Data4: [8]byte{0xa0, 0xc7, 0x2f, 0xad, 0x1f, 0xd0, 0xe7, 0x16}}
 	// RegistryKernelEventGUID represents the Registry Kernel event GUID
@@ -144,10 +142,6 @@ const (
 	CreateSymbolicLinkObjectID uint16 = 3
 
 	StackWalkID uint8 = 32
-
-	SubmitThreadpoolWorkID     uint8 = 32
-	SubmitThreadpoolCallbackID uint8 = 34
-	SetThreadpoolTimerID       uint8 = 44
 )
 
 var (
@@ -297,13 +291,6 @@ var (
 	// CreateSymbolicLinkObject represents the event emitted by the object manager when the new symbolic link is created within the object manager directory
 	CreateSymbolicLinkObject = pack(AuditAPIEventGUID, CreateSymbolicLinkObjectID)
 
-	// SubmitThreadpoolWork represents the event that enqueues the work item to the thread pool
-	SubmitThreadpoolWork = pack(ThreadpoolEventGUID, uint16(SubmitThreadpoolWorkID))
-	//SubmitThreadpoolCallback represents the event that submits the thread pool callback for execution within the work item
-	SubmitThreadpoolCallback = pack(ThreadpoolEventGUID, uint16(SubmitThreadpoolCallbackID))
-	// SetThreadpoolTimer represents the event that sets the thread pool timer object
-	SetThreadpoolTimer = pack(ThreadpoolEventGUID, uint16(SetThreadpoolTimerID))
-
 	// UnknownType designates unknown event type
 	UnknownType = pack(windows.GUID{}, 0)
 )
@@ -415,12 +402,6 @@ func (t Type) String() string {
 		return "StackWalk"
 	case CreateSymbolicLinkObject:
 		return "CreateSymbolicLinkObject"
-	case SubmitThreadpoolWork:
-		return "SubmitThreadpoolWork"
-	case SubmitThreadpoolCallback:
-		return "SubmitThreadpoolCallback"
-	case SetThreadpoolTimer:
-		return "SetThreadpoolTimer"
 	default:
 		return ""
 	}
@@ -454,8 +435,6 @@ func (t Type) Category() Category {
 		return Mem
 	case CreateSymbolicLinkObject:
 		return Object
-	case SubmitThreadpoolWork, SubmitThreadpoolCallback, SetThreadpoolTimer:
-		return Threadpool
 	default:
 		return Unknown
 	}
@@ -552,12 +531,6 @@ func (t Type) Description() string {
 		return "Receives the response from the DNS server"
 	case CreateSymbolicLinkObject:
 		return "Creates the symbolic link within the object manager directory"
-	case SubmitThreadpoolWork:
-		return "Enqueues the work item to the thread pool"
-	case SubmitThreadpoolCallback:
-		return "Submits the thread pool callback for execution within the work item"
-	case SetThreadpoolTimer:
-		return "Sets the thread pool timer object"
 	default:
 		return ""
 	}
@@ -612,10 +585,7 @@ func (t Type) CanEnrichStack() bool {
 		RegDeleteValue,
 		DeleteFile,
 		RenameFile,
-		VirtualAlloc,
-		SubmitThreadpoolWork,
-		SubmitThreadpoolCallback,
-		SetThreadpoolTimer:
+		VirtualAlloc:
 		return true
 	default:
 		return false
@@ -665,7 +635,7 @@ func (t Type) ID() uint {
 // Source designates the provenance of this event type.
 func (t Type) Source() Source {
 	switch t.GUID() {
-	case AuditAPIEventGUID, DNSEventGUID, ThreadpoolEventGUID, ProcessKernelEventGUID, RegistryKernelEventGUID:
+	case AuditAPIEventGUID, DNSEventGUID, ProcessKernelEventGUID, RegistryKernelEventGUID:
 		return SecurityTelemetryLogger
 	default:
 		return SystemLogger
@@ -737,8 +707,6 @@ func (t Type) color() string {
 	case VirtualAlloc, VirtualFree:
 		return colorizer.SpanBold(colorizer.Magenta, t.String())
 	case CreateSymbolicLinkObject:
-		return colorizer.SpanBold(colorizer.Lavender, t.String())
-	case SubmitThreadpoolCallback, SubmitThreadpoolWork, SetThreadpoolTimer:
 		return colorizer.SpanBold(colorizer.Lavender, t.String())
 	default:
 		return colorizer.SpanBold(colorizer.White, t.String())

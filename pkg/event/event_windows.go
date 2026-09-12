@@ -565,12 +565,6 @@ func (e *Event) Summary() string {
 		src := e.GetParamAsString(params.LinkSource)
 		target := e.GetParamAsString(params.LinkTarget)
 		return printSummary(e, fmt.Sprintf("created symbolic link from %s to %s", src, target))
-	case SubmitThreadpoolWork:
-		return printSummary(e, "enqueued the work item to the thread pool")
-	case SubmitThreadpoolCallback:
-		return printSummary(e, "Submitted the thread pool callback for execution within the work item")
-	case SetThreadpoolTimer:
-		return printSummary(e, "set thread pool timer object")
 	}
 	return ""
 }

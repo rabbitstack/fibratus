@@ -103,12 +103,3 @@ func (s *StackExtensions) EnableMemoryCallstack() {
 		s.AddStackTracing(event.VirtualAlloc)
 	}
 }
-
-// EnableThreadpoolCallstack enables stack tracing for thread pool events.
-func (s *StackExtensions) EnableThreadpoolCallstack() {
-	if s.config.EnableThreadpoolEvents {
-		s.AddStackTracing(event.SubmitThreadpoolWork)
-		s.AddStackTracing(event.SubmitThreadpoolCallback)
-		s.AddStackTracing(event.SetThreadpoolTimer)
-	}
-}
