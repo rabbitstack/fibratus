@@ -17,6 +17,11 @@ jobs:
   ebpf:
     runs-on: ubuntu-latest
     steps:
+      - name: Validate PR title
+        if: github.event_name == 'pull_request'
+        uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Go
