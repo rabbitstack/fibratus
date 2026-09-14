@@ -32,6 +32,7 @@ import (
 type SequenceStepFunc func(*event.Event, *eval.ValuerCache) bool
 
 type SequenceStep struct {
+	fn SequenceStepFunc
 }
 
 // SequenceChain carries the accumulated events for one in-progress
