@@ -48,7 +48,8 @@ func TestDecodeRawEvent(t *testing.T) {
 }
 
 func TestRawEventToEventGolden(t *testing.T) {
-	evt := sampleExecve().toEvent(7)
+	evt := sampleExecve().toEvent()
+	evt.Seq = 7
 	got := goldenEvent(evt)
 	path := filepath.Join("testdata", "execve.json")
 	if os.Getenv("UPDATE_GOLDEN") == "1" {
@@ -62,12 +63,12 @@ func TestRawEventToEventGolden(t *testing.T) {
 
 func TestCloneThreadSemantics(t *testing.T) {
 	raw := sampleClone(0x00010000)
-	evt := raw.toEvent(1)
+	evt := raw.toEvent()
 	assert.True(t, evt.IsCreateThread())
 	assert.False(t, evt.IsCreateProcess())
 
 	raw = sampleClone(0)
-	evt = raw.toEvent(2)
+	evt = raw.toEvent()
 	assert.True(t, evt.IsCreateProcess())
 	assert.False(t, evt.IsCreateThread())
 }
@@ -143,7 +144,7 @@ func prettyJSON(t *testing.T, v any) []byte {
 }
 
 func TestSucceededHelper(t *testing.T) {
-	evt := sampleExecve().toEvent(1)
+	evt := sampleExecve().toEvent()
 	assert.True(t, succeeded(evt))
 	evt.Params.Append(params.Retval, params.Int64, int64(-2))
 	assert.False(t, succeeded(evt))

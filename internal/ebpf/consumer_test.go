@@ -33,7 +33,7 @@ import (
 
 func TestApplyProcessStateExecveAndPIDReuse(t *testing.T) {
 	snap := ps.NewSnapshotter()
-	first := sampleExecve().toEvent(1)
+	first := sampleExecve().toEvent()
 	applyProcessState(snap, first)
 	ok, got := snap.Find(4242)
 	require.True(t, ok)
@@ -41,7 +41,7 @@ func TestApplyProcessStateExecveAndPIDReuse(t *testing.T) {
 	assert.Equal(t, uint64(123456789), got.StartBootTime)
 	assert.Equal(t, got.UUID(), first.PS.UUID())
 
-	reuse := sampleExecve().toEvent(2)
+	reuse := sampleExecve().toEvent()
 	reuse.Params.Append(params.StartBootTime, params.Uint64, uint64(999))
 	reuse.Params.Append(params.Exe, params.Path, "/bin/sh")
 	reuse.Params.Append(params.ProcessName, params.String, "sh")
@@ -55,7 +55,7 @@ func TestApplyProcessStateExecveAndPIDReuse(t *testing.T) {
 
 func TestApplyProcessStateExitRemoves(t *testing.T) {
 	snap := ps.NewSnapshotter()
-	evt := sampleExecve().toEvent(1)
+	evt := sampleExecve().toEvent()
 	applyProcessState(snap, evt)
 	exit := &event.Event{
 		Type:   event.Exit,
