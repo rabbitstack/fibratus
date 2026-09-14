@@ -124,6 +124,7 @@ struct cgroup_namespace {
 struct task_struct {
 	int pid;
 	int tgid;
+	int exit_code;
 	struct task_struct *real_parent;
 	struct task_struct *group_leader;
 	const struct cred *real_cred;

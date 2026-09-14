@@ -62,8 +62,7 @@ type exitSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type exitProgramSpecs struct {
-	HandleSysExitExit      *ebpf.ProgramSpec `ebpf:"handle_sys_exit_exit"`
-	HandleSysExitExitGroup *ebpf.ProgramSpec `ebpf:"handle_sys_exit_exit_group"`
+	HandleSchedProcessExit *ebpf.ProgramSpec `ebpf:"handle_sched_process_exit"`
 }
 
 // exitMapSpecs contains maps before they are loaded into the kernel.
@@ -124,14 +123,12 @@ type exitVariables struct {
 //
 // It can be passed to loadExitObjects or ebpf.CollectionSpec.LoadAndAssign.
 type exitPrograms struct {
-	HandleSysExitExit      *ebpf.Program `ebpf:"handle_sys_exit_exit"`
-	HandleSysExitExitGroup *ebpf.Program `ebpf:"handle_sys_exit_exit_group"`
+	HandleSchedProcessExit *ebpf.Program `ebpf:"handle_sched_process_exit"`
 }
 
 func (p *exitPrograms) Close() error {
 	return _ExitClose(
-		p.HandleSysExitExit,
-		p.HandleSysExitExitGroup,
+		p.HandleSchedProcessExit,
 	)
 }
 
