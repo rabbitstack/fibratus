@@ -1,3 +1,5 @@
+//go:build linux
+
 /*
  * Copyright 2026 by Mostafa Moradian
  * https://www.fibratus.io
@@ -16,8 +18,16 @@
  * limitations under the License.
  */
 
-// Package ebpf hosts the Linux eBPF instrumentation backend. The process
-// event source loads CO-RE programs, captures execve/exit/clone, and
-// reconciles live events against an iter/task baseline. The spike
-// subdirectory remains as a feasibility prototype.
 package ebpf
+
+import (
+	"fmt"
+	"runtime"
+)
+
+func checkRuntimeSupport() (*PrerequisiteReport, error) {
+	if runtime.GOARCH != "amd64" {
+		return nil, fmt.Errorf("linux eBPF capture requires amd64, got %s", runtime.GOARCH)
+	}
+	return ProbePrerequisites()
+}

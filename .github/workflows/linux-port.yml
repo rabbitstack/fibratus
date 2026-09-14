@@ -1,0 +1,39 @@
+name: linux-port
+
+on:
+  pull_request:
+    branches:
+      - linux-port
+  workflow_dispatch:
+
+concurrency:
+  group: linux-port-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: 1.26.x
+
+jobs:
+  ebpf:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Install clang
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang llvm
+          clang --version
+      - name: Check generation drift
+        run: |
+          chmod +x internal/ebpf/generate.sh
+          ./internal/ebpf/generate.sh
+          git diff --exit-code -- internal/ebpf
+      - name: Unit tests
+        run: go test ./internal/ebpf ./internal/bootstrap ./pkg/event ./pkg/ps ./pkg/api ./pkg/util/signals
+      - name: Privileged process source
+        run: sudo -E env "PATH=$PATH" go test -tags ebpf_integration -count=1 ./internal/ebpf
