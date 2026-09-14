@@ -68,7 +68,9 @@ type EventSource struct {
 
 // NewEventSource constructs the Linux eBPF event source.
 func NewEventSource(psnap ps.Snapshotter, cfg *config.Config, _ *config.RulesCompileResult) source.EventSource {
-	evts := make(chan *event.Event, 500)
+	// Startup replay pushes queued events before the aggregator starts
+	// consuming, so the channel must be able to absorb a full pending queue.
+	evts := make(chan *event.Event, defaultPendingCap)
 	return &EventSource{
 		psnap:      psnap,
 		config:     cfg,
@@ -210,8 +212,7 @@ func (e *EventSource) handleRecord(raw []byte) {
 		return
 	}
 
-	e.sequencer.Increment()
-	evt := rec.toEvent(e.sequencer.Get())
+	evt := rec.toEvent()
 	if rec.Kind == eventKindExecve || rec.Kind == eventKindClone {
 		enrichEvent(evt)
 	}
@@ -249,20 +250,31 @@ func (e *EventSource) enqueuePending(evt *event.Event) bool {
 	return true
 }
 
+// finishBaseline replays queued hot events in ring-buffer order and then
+// switches to live dispatch. New records keep landing in the pending queue
+// while a replay round runs, so loop until the queue drains before flipping
+// live. This guarantees replayed and live events preserve global ring-buffer
+// order.
 func (e *EventSource) finishBaseline() {
-	e.pendingMu.Lock()
-	pending := e.pending
-	e.pending = nil
-	e.live.Store(true)
-	e.pendingMu.Unlock()
-
-	for _, evt := range pending {
-		e.dispatch(evt)
-		replayApplied.Add(1)
+	for {
+		e.pendingMu.Lock()
+		pending := e.pending
+		e.pending = nil
+		if len(pending) == 0 {
+			e.live.Store(true)
+			e.pendingMu.Unlock()
+			return
+		}
+		e.pendingMu.Unlock()
+		for _, evt := range pending {
+			e.dispatch(evt)
+			replayApplied.Add(1)
+		}
 	}
 }
 
 func (e *EventSource) dispatch(evt *event.Event) {
+	evt.Seq = e.sequencer.Get()
 	applyProcessState(e.psnap, evt)
 	eventsProcessed.Add(1)
 
@@ -283,6 +295,7 @@ func (e *EventSource) dispatch(evt *event.Event) {
 	if e.filter != nil && !e.filter.Eval(evt) {
 		return
 	}
+	e.sequencer.Increment()
 	if err := e.q.Push(evt); err != nil {
 		select {
 		case e.errs <- err:
