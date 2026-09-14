@@ -44,8 +44,8 @@ static __always_inline int handle_exec_exit(long ret, u32 syscall_id)
 		e->ppid = BPF_CORE_READ(parent, tgid);
 	cred = BPF_CORE_READ(task, real_cred);
 	if (cred) {
-		e->uid = BPF_CORE_READ(cred, uid.val);
-		e->gid = BPF_CORE_READ(cred, gid.val);
+		e->uid = BPF_CORE_READ(cred, euid.val);
+		e->gid = BPF_CORE_READ(cred, egid.val);
 	}
 
 	val = bpf_map_lookup_elem(&scratch, &key);

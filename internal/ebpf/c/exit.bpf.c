@@ -6,17 +6,25 @@
 
 char LICENSE[] SEC("license") = "Dual MIT/GPL";
 
-static __always_inline int handle_exit(long ret, u32 syscall_id)
+/* Process exits are captured from sched_process_exit rather than the
+ * syscalls/sys_exit_{exit,exit_group} tracepoints: those syscalls never
+ * return, so their exit tracepoints never fire. The scheduler hook also
+ * covers processes terminated by signals, which never enter exit_group.
+ */
+SEC("tp_btf/sched_process_exit")
+int BPF_PROG(handle_sched_process_exit, struct task_struct *task)
 {
 	struct fibratus_event *e;
-	struct task_struct *task;
 	struct task_struct *parent;
 	const struct cred *cred;
-	u64 id;
 
-	id = bpf_get_current_pid_tgid();
-	/* Only emit process exits from the thread-group leader. */
-	if ((u32)id != (id >> 32))
+	if (!task)
+		return 0;
+
+	/* Only emit process exits from the thread-group leader; thread
+	 * exits are not process exits.
+	 */
+	if (task->pid != task->tgid)
 		return 0;
 
 	e = reserve_event();
@@ -25,33 +33,24 @@ static __always_inline int handle_exit(long ret, u32 syscall_id)
 
 	e->kind = EVT_KIND_EXIT;
 	e->type = EVT_TYPE_EXIT;
-	e->syscall_id = syscall_id;
-	e->retval = ret;
-	fill_current_ids(e);
+	/* Raw wait status: (code << 8) | termination signal. */
+	e->retval = task->exit_code;
+	e->pid = task->tgid;
+	e->tid = task->pid;
+	e->tgid = task->tgid;
+	e->start_boottime = task->start_boottime;
+	__builtin_memcpy(&e->comm, task->comm, sizeof(e->comm));
 
-	task = (struct task_struct *)bpf_get_current_task();
-	e->start_boottime = BPF_CORE_READ(task, start_boottime);
-	parent = BPF_CORE_READ(task, real_parent);
+	parent = task->real_parent;
 	if (parent)
-		e->ppid = BPF_CORE_READ(parent, tgid);
-	cred = BPF_CORE_READ(task, real_cred);
+		e->ppid = parent->tgid;
+
+	cred = task->real_cred;
 	if (cred) {
-		e->uid = BPF_CORE_READ(cred, uid.val);
-		e->gid = BPF_CORE_READ(cred, gid.val);
+		e->uid = cred->euid.val;
+		e->gid = cred->egid.val;
 	}
 
 	bpf_ringbuf_submit(e, 0);
 	return 0;
-}
-
-SEC("tp/syscalls/sys_exit_exit_group")
-int handle_sys_exit_exit_group(struct trace_event_raw_sys_exit *ctx)
-{
-	return handle_exit(ctx->ret, (u32)ctx->id);
-}
-
-SEC("tp/syscalls/sys_exit_exit")
-int handle_sys_exit_exit(struct trace_event_raw_sys_exit *ctx)
-{
-	return handle_exit(ctx->ret, (u32)ctx->id);
 }

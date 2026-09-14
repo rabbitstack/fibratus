@@ -120,54 +120,66 @@ func (l *loader) dropCount() uint64 {
 	return drop
 }
 
+// syscallsGroup is the tracefs group hosting raw syscall tracepoints.
+const syscallsGroup = "syscalls"
+
 func (l *loader) attachHotPath() error {
 	type tp struct {
-		group    string
 		name     string
 		prog     *ebpf.Program
 		optional bool
 	}
 	tracepoints := []tp{
-		{"syscalls", "sys_enter_execve", l.exec.HandleSysEnterExecve, false},
-		{"syscalls", "sys_exit_execve", l.exec.HandleSysExitExecve, false},
-		{"syscalls", "sys_enter_execveat", l.exec.HandleSysEnterExecveat, false},
-		{"syscalls", "sys_exit_execveat", l.exec.HandleSysExitExecveat, false},
-		{"syscalls", "sys_exit_exit_group", l.exit.HandleSysExitExitGroup, false},
-		{"syscalls", "sys_exit_exit", l.exit.HandleSysExitExit, false},
-		{"syscalls", "sys_enter_clone", l.clone.HandleSysEnterClone, false},
-		{"syscalls", "sys_exit_clone", l.clone.HandleSysExitClone, false},
-		{"syscalls", "sys_enter_clone3", l.clone.HandleSysEnterClone3, false},
-		{"syscalls", "sys_exit_clone3", l.clone.HandleSysExitClone3, false},
+		{"sys_enter_execve", l.exec.HandleSysEnterExecve, false},
+		{"sys_exit_execve", l.exec.HandleSysExitExecve, false},
+		{"sys_enter_execveat", l.exec.HandleSysEnterExecveat, false},
+		{"sys_exit_execveat", l.exec.HandleSysExitExecveat, false},
+		{"sys_enter_clone", l.clone.HandleSysEnterClone, false},
+		{"sys_exit_clone", l.clone.HandleSysExitClone, false},
+		{"sys_enter_clone3", l.clone.HandleSysEnterClone3, false},
+		{"sys_exit_clone3", l.clone.HandleSysExitClone3, false},
 		// fork/vfork are legacy wrappers. libc uses clone/clone3, and some
 		// kernels refuse a perf link on these syscall tracepoints.
-		{"syscalls", "sys_enter_fork", l.clone.HandleSysEnterFork, true},
-		{"syscalls", "sys_exit_fork", l.clone.HandleSysExitFork, true},
-		{"syscalls", "sys_enter_vfork", l.clone.HandleSysEnterVfork, true},
-		{"syscalls", "sys_exit_vfork", l.clone.HandleSysExitVfork, true},
+		{"sys_enter_fork", l.clone.HandleSysEnterFork, true},
+		{"sys_exit_fork", l.clone.HandleSysExitFork, true},
+		{"sys_enter_vfork", l.clone.HandleSysEnterVfork, true},
+		{"sys_exit_vfork", l.clone.HandleSysExitVfork, true},
 	}
 	for _, t := range tracepoints {
 		if t.prog == nil {
-			return fmt.Errorf("missing program for %s/%s", t.group, t.name)
+			return fmt.Errorf("missing program for %s/%s", syscallsGroup, t.name)
 		}
-		lnk, err := link.Tracepoint(t.group, t.name, t.prog, nil)
+		lnk, err := link.Tracepoint(syscallsGroup, t.name, t.prog, nil)
 		if err != nil {
 			if t.optional && isAttachUnavailable(err) {
-				log.Warnf("skipping optional %s/%s: %v", t.group, t.name, err)
+				log.Warnf("skipping optional %s/%s: %v", syscallsGroup, t.name, err)
 				continue
 			}
-			return fmt.Errorf("attaching %s/%s: %w", t.group, t.name, err)
+			return fmt.Errorf("attaching %s/%s: %w", syscallsGroup, t.name, err)
 		}
 		l.links = append(l.links, lnk)
 	}
 
-	if l.clone.HandleSchedProcessFork == nil {
-		return fmt.Errorf("missing sched_process_fork program")
+	// Successful clones and process exits are captured from scheduler
+	// tracepoints. Clone syscall exit tracepoints fire in the parent, and
+	// exit/exit_group never return, so their exit tracepoints never fire.
+	tracing := []struct {
+		name string
+		prog *ebpf.Program
+	}{
+		{"sched_process_fork", l.clone.HandleSchedProcessFork},
+		{"sched_process_exit", l.exit.HandleSchedProcessExit},
 	}
-	fork, err := link.AttachTracing(link.TracingOptions{Program: l.clone.HandleSchedProcessFork})
-	if err != nil {
-		return fmt.Errorf("attaching sched_process_fork: %w", err)
+	for _, t := range tracing {
+		if t.prog == nil {
+			return fmt.Errorf("missing %s program", t.name)
+		}
+		lnk, err := link.AttachTracing(link.TracingOptions{Program: t.prog})
+		if err != nil {
+			return fmt.Errorf("attaching %s: %w", t.name, err)
+		}
+		l.links = append(l.links, lnk)
 	}
-	l.links = append(l.links, fork)
 	return nil
 }
 
