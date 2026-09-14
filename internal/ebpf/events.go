@@ -32,29 +32,27 @@ import (
 )
 
 const (
-	eventKindSnapshot = 0
-	eventKindExecve   = 1
-	eventKindExit     = 2
-	eventKindClone    = 3
+	// snapshotType marks iter/task baseline records. It maps to
+	// event.UnknownType, so snapshots can never leak as live events.
+	snapshotType = 0
 
 	commLen     = 16
 	filenameLen = 256
 )
 
-// rawEvent mirrors struct fibratus_event in c/common/events.h.
+// rawEvent mirrors struct syscall_event in c/common/events.h.
 type rawEvent struct {
-	Kind          uint32
-	Type          uint32
-	PID           uint32
-	TID           uint32
-	TGID          uint32
-	PPID          uint32
-	UID           uint32
-	GID           uint32
-	SyscallID     uint32
-	Pad           uint32
-	Retval        int64
-	CloneFlags    uint64
+	Type      uint32
+	PID       uint32
+	TID       uint32
+	TGID      uint32
+	PPID      uint32
+	UID       uint32
+	GID       uint32
+	SyscallID uint32
+	Retval    int64
+	// Flags is interpreted per event type; clone stores the raw clone flags.
+	Flags         uint64
 	StartBootTime uint64
 	TimestampNs   uint64
 	Comm          [commLen]byte
@@ -131,7 +129,7 @@ func (r rawEvent) toEvent() *event.Event {
 	case event.Exit:
 		evt.Params.Append(params.ExitStatus, params.Int64, r.Retval)
 	case event.Clone:
-		evt.Params.Append(params.CloneFlags, params.Uint64, r.CloneFlags)
+		evt.Params.Append(params.CloneFlags, params.Uint64, r.Flags)
 	}
 	return evt
 }

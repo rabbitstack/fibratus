@@ -22,7 +22,7 @@ static __always_inline int handle_exec_exit(long ret, u32 syscall_id)
 {
 	u64 key = bpf_get_current_pid_tgid();
 	struct scratch_value *val;
-	struct fibratus_event *e;
+	struct syscall_event *e;
 	struct task_struct *task;
 	struct task_struct *parent;
 	const struct cred *cred;
@@ -31,7 +31,6 @@ static __always_inline int handle_exec_exit(long ret, u32 syscall_id)
 	if (!e)
 		return 0;
 
-	e->kind = EVT_KIND_EXECVE;
 	e->type = EVT_TYPE_EXECVE;
 	e->syscall_id = syscall_id;
 	e->retval = ret;
