@@ -55,7 +55,7 @@ func evaluateRule(rule *Rule, event *event.Event) ([]*event.Event, bool) {
 }
 
 func TestUnconstrainedSequenceTwoStepsMatches(t *testing.T) {
-	ruleDef := policy.RuleDef{
+	ruleDef := &policy.RuleDef{
 		Condition: `
 		sequence
 		  maxspan 1s
@@ -72,4 +72,65 @@ func TestUnconstrainedSequenceTwoStepsMatches(t *testing.T) {
 
 	assert.True(t, ok)
 	require.Len(t, matches, 2)
+}
+
+func TestUnconstrainedSequenceTwoStagesWrongOrder(t *testing.T) {
+	ruleDef := &policy.RuleDef{
+		Condition: `
+		sequence
+		  maxspan 1s
+		  |evt.name = 'CreateProcess'|
+		  |evt.name = 'CreateFile'|
+	`,
+	}
+
+	rule, err := NewRule(ruleDef)
+	require.NoError(t, err)
+
+	matches, ok := evaluateRule(rule, makeEvent("CreateFile", ts(0), nil))
+	matches, ok = evaluateRule(rule, makeEvent("CreateProcess", ts(10*time.Millisecond), nil))
+
+	assert.False(t, ok)
+	require.Empty(t, matches)
+}
+
+func TestUnconstrainedSequenceTwoStagesNoSecondStageMatch(t *testing.T) {
+	ruleDef := &policy.RuleDef{
+		Condition: `
+		sequence
+		  maxspan 1s
+		  |evt.name = 'CreateProcess'|
+		  |evt.name = 'CreateFile'|
+	`,
+	}
+
+	rule, err := NewRule(ruleDef)
+	require.NoError(t, err)
+
+	matches, ok := evaluateRule(rule, makeEvent("CreateProcess", ts(0), nil))
+
+	assert.False(t, ok)
+	require.Empty(t, matches)
+}
+
+func TestUnconstrainedSequenceThreeStagesMatches(t *testing.T) {
+	ruleDef := &policy.RuleDef{
+		Condition: `
+		sequence
+		  maxspan 1s
+		  |evt.name = 'CreateProcess'|
+		  |evt.name = 'CreateFile'|
+		  |evt.name = 'Connect'|
+	`,
+	}
+
+	rule, err := NewRule(ruleDef)
+	require.NoError(t, err)
+
+	matches, ok := evaluateRule(rule, makeEvent("CreateProcess", ts(0), nil))
+	matches, ok = evaluateRule(rule, makeEvent("CreateFile", ts(10*time.Millisecond), nil))
+	matches, ok = evaluateRule(rule, makeEvent("Connect", ts(20*time.Millisecond), nil))
+
+	assert.True(t, ok)
+	require.Len(t, matches, 3)
 }

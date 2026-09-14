@@ -103,3 +103,7 @@ type SequenceExpr struct {
 func (e *SequenceExpr) String() string {
 	return "SEQUENCE"
 }
+
+func (e *SequenceExpr) Depth() int {
+	return len(e.Steps)
+}

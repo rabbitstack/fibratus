@@ -72,7 +72,8 @@ type SequenceEvaluator struct {
 }
 
 func MakeSequenceEvaluator(evaluator *eval.Evaluator) RuleEvaluator {
-	depth := evaluator.GetDepth()
+	expr := evaluator.GetExpr().(*ast.SequenceExpr)
+	depth := expr.Depth()
 
 	seq := &SequenceEvaluator{
 		evaluator: evaluator,
@@ -84,8 +85,6 @@ func MakeSequenceEvaluator(evaluator *eval.Evaluator) RuleEvaluator {
 		seq.lookups[i] = make(map[any]*SequenceChain)
 	}
 
-	expr := evaluator.GetExpr().(*ast.SequenceExpr)
-
 	// compile in reverse so one event can't advance multiple stages in one pass
 	for pos := depth - 1; pos >= 0; pos-- {
 		pos := pos // capture
@@ -95,7 +94,13 @@ func MakeSequenceEvaluator(evaluator *eval.Evaluator) RuleEvaluator {
 			return seq.evaluate(step.Expr, event, valuer)
 		}
 		link := func(valuer *eval.ValuerCache) any {
-			by := seq.evaluator.GetLink(pos)
+			var by *ast.SequenceLink
+			if expr.By != nil {
+				by = expr.By
+			}
+			if by == nil {
+				by = step.By
+			}
 			if by == nil {
 				return struct{}{} // unconstrained means all events share one bucket
 			}

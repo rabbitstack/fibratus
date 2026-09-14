@@ -19,12 +19,9 @@
 package eval
 
 import (
-	"time"
-
 	"github.com/rabbitstack/fibratus/pkg/compiler/ast"
 	"github.com/rabbitstack/fibratus/pkg/compiler/parser"
 	"github.com/rabbitstack/fibratus/pkg/event"
-	"github.com/rabbitstack/fibratus/pkg/util/sets"
 )
 
 type Evaluator struct {
@@ -33,9 +30,7 @@ type Evaluator struct {
 	expr ast.Expr
 
 	fields   Fields
-	segments sets.Set[Segment]
-
-	accessors []Accessor
+	segments Segments
 
 	opts ast.EvalOptions
 }
@@ -47,11 +42,9 @@ func NewEvaluator(id string, expression string) (*Evaluator, error) {
 	}
 
 	evaluator := &Evaluator{
-		ID:        id,
-		expr:      expr,
-		fields:    Fields{Set: sets.New[Field]()},
-		segments:  sets.New[Segment](),
-		accessors: make([]Accessor, 0),
+		ID:     id,
+		expr:   expr,
+		fields: NewFields(),
 	}
 
 	switch expr := expr.(type) {
@@ -95,7 +88,7 @@ func (e *Evaluator) GetExpr() ast.Expr {
 }
 
 func (e *Evaluator) GetFields() []Field {
-	return e.fields.Values()
+	return e.fields.fields
 }
 
 func (e *Evaluator) GetEventTypes() ([]*event.Type, error) {
@@ -104,35 +97,6 @@ func (e *Evaluator) GetEventTypes() ([]*event.Type, error) {
 
 	})
 	return eventTypes, nil
-}
-
-func (e *Evaluator) GetDepth() int {
-	expr, ok := e.expr.(*ast.SequenceExpr)
-	if !ok {
-		return 0
-	}
-	return len(expr.Steps)
-}
-
-func (e *Evaluator) GetMaxSpan() time.Duration {
-	expr, ok := e.expr.(*ast.SequenceExpr)
-	if !ok {
-		return 0
-	}
-	return expr.MaxSpan
-}
-
-// GetLink returns the join link for sequence expressions. If
-// the expression is not a sequence, this method returns nil.
-func (e *Evaluator) GetLink(stepIndex int) *ast.SequenceLink {
-	expr, ok := e.expr.(*ast.SequenceExpr)
-	if !ok {
-		return nil
-	}
-	if expr.By != nil {
-		return expr.By
-	}
-	return expr.Steps[stepIndex].By
 }
 
 func (e *Evaluator) addField(fields ...*ast.FieldLiteral) {

@@ -26,7 +26,6 @@ import (
 
 	"github.com/rabbitstack/fibratus/pkg/compiler/fields"
 	"github.com/rabbitstack/fibratus/pkg/event"
-	"github.com/rabbitstack/fibratus/pkg/util/sets"
 )
 
 // Field contains field meta attributes all accessors need to extract the value.
@@ -38,11 +37,16 @@ type Field struct {
 }
 
 type Fields struct {
-	sets.Set[Field]
+	fields    []Field
+	accessors []Accessor
 }
 
-func (fields Fields) ExtractToValuer(event *event.Event, valuer *ValuerCache) {
-	for field := range fields.Set {
+func NewFields() Fields {
+
+}
+
+func (f Fields) ExtractToValuer(event *event.Event, valuer *ValuerCache) {
+	for _, field := range f.fields {
 		valuer.Put(event, field)
 	}
 }
@@ -81,6 +85,8 @@ func (f *Field) Extract(event *event.Event) any {
 
 type Segment struct {
 }
+
+type Segments []Segment
 
 // InterpolateFields replaces all occurrences of field modifiers in the given string
 // with values extracted from the event. Field modifiers may contain a leading ordinal

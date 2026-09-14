@@ -28,11 +28,6 @@ type RuleEvaluator interface {
 	Evaluate(evt *event.Event, valuer *eval.ValuerCache) ([]*event.Event, bool)
 }
 
-type Rule struct {
-	evaluator     *eval.Evaluator
-	ruleEvaluator RuleEvaluator
-}
-
 type DirectEvaluator struct {
 	evaluator *eval.Evaluator
 }
@@ -48,11 +43,17 @@ func (e *DirectEvaluator) Evaluate(evt *event.Event, valuer *eval.ValuerCache) (
 	return nil, false
 }
 
+type Rule struct {
+	*policy.RuleDef
+	evaluator     *eval.Evaluator
+	ruleEvaluator RuleEvaluator
+}
+
 func (r *Rule) Evaluate(event *event.Event, valuer *eval.ValuerCache) ([]*event.Event, bool) {
 	return r.ruleEvaluator.Evaluate(event, valuer)
 }
 
-func NewRule(ruleDef policy.RuleDef) (*Rule, error) {
+func NewRule(ruleDef *policy.RuleDef) (*Rule, error) {
 	evaluator, err := eval.NewEvaluator(string(ruleDef.ID), ruleDef.Condition)
 	if err != nil {
 		return nil, err
@@ -66,6 +67,7 @@ func NewRule(ruleDef policy.RuleDef) (*Rule, error) {
 	}
 
 	return &Rule{
+		RuleDef:       ruleDef,
 		evaluator:     evaluator,
 		ruleEvaluator: ruleEvaluator,
 	}, nil
