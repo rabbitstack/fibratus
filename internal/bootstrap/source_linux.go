@@ -22,7 +22,7 @@
 package bootstrap
 
 import (
-	"github.com/rabbitstack/fibratus/internal/ebpf"
+	libebpf "github.com/rabbitstack/fibratus/internal/ebpf"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/filter"
@@ -40,7 +40,7 @@ func NewEventSourceControl(
 	cfg *config.Config,
 	compiler *config.RulesCompileResult,
 ) *EventSourceControl {
-	return &EventSourceControl{evs: ebpf.NewEventSource(psnap, cfg, compiler)}
+	return &EventSourceControl{evs: libebpf.NewEventSource(psnap, cfg, compiler)}
 }
 
 func (s *EventSourceControl) Open(cfg *config.Config) error {
