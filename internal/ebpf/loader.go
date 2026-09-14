@@ -123,7 +123,12 @@ func (l *loader) dropCount() uint64 {
 // syscallsGroup is the tracefs group hosting raw syscall tracepoints.
 const syscallsGroup = "syscalls"
 
-func (l *loader) attachHotPath() error {
+// attachPrograms attaches the live-capture programs: raw syscall tracepoints
+// plus the scheduler tp_btf hooks. These feed the ring buffer continuously,
+// in contrast to the one-shot iter/task snapshot program started by
+// runTaskIterator. The caller starts the ring buffer reader first so no
+// events are lost between attachment and consumption.
+func (l *loader) attachPrograms() error {
 	type tp struct {
 		name     string
 		prog     *ebpf.Program

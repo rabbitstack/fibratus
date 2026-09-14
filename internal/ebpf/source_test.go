@@ -54,8 +54,7 @@ func TestStartupReplayAndLateSnapshot(t *testing.T) {
 	assert.False(t, ok)
 
 	snap := hot
-	snap.Kind = eventKindSnapshot
-	snap.Type = 0
+	snap.Type = snapshotType
 	snap.Comm = [16]byte{}
 	copy(snap.Comm[:], "snap-a")
 	es.handleSnapshot(snap)
@@ -100,7 +99,7 @@ func TestPIDReuseKeepsDistinctUUIDs(t *testing.T) {
 	copy(first.Comm[:], "one")
 	es.handleRecord(encodeRaw(t, first))
 
-	exit := rawEvent{Kind: eventKindExit, Type: uint32(event.Exit), PID: 8, TGID: 8, StartBootTime: 1}
+	exit := rawEvent{Type: uint32(event.Exit), PID: 8, TGID: 8, StartBootTime: 1}
 	es.handleRecord(encodeRaw(t, exit))
 
 	second := first

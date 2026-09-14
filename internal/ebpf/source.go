@@ -118,7 +118,7 @@ func (e *EventSource) Open(cfg *config.Config) error {
 
 	go e.consume()
 
-	if err := ldr.attachHotPath(); err != nil {
+	if err := ldr.attachPrograms(); err != nil {
 		e.Close()
 		return err
 	}
@@ -198,7 +198,7 @@ func (e *EventSource) handleRecord(raw []byte) {
 		parseErrors.Add(1)
 		return
 	}
-	if rec.Kind == eventKindSnapshot {
+	if rec.Type == snapshotType {
 		e.handleSnapshot(rec)
 		return
 	}
@@ -213,7 +213,7 @@ func (e *EventSource) handleRecord(raw []byte) {
 	}
 
 	evt := rec.toEvent()
-	if rec.Kind == eventKindExecve || rec.Kind == eventKindClone {
+	if typ == event.Execve || typ == event.Clone {
 		enrichEvent(evt)
 	}
 

@@ -14,7 +14,7 @@ char LICENSE[] SEC("license") = "Dual MIT/GPL";
 SEC("tp_btf/sched_process_exit")
 int BPF_PROG(handle_sched_process_exit, struct task_struct *task)
 {
-	struct fibratus_event *e;
+	struct syscall_event *e;
 	struct task_struct *parent;
 	const struct cred *cred;
 
@@ -31,7 +31,6 @@ int BPF_PROG(handle_sched_process_exit, struct task_struct *task)
 	if (!e)
 		return 0;
 
-	e->kind = EVT_KIND_EXIT;
 	e->type = EVT_TYPE_EXIT;
 	/* Raw wait status: (code << 8) | termination signal. */
 	e->retval = task->exit_code;

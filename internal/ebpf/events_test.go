@@ -39,7 +39,6 @@ func TestDecodeRawEvent(t *testing.T) {
 	buf := encodeRaw(t, raw)
 	got, err := decodeRawEvent(buf)
 	require.NoError(t, err)
-	assert.Equal(t, raw.Kind, got.Kind)
 	assert.Equal(t, raw.Type, got.Type)
 	assert.Equal(t, raw.PID, got.PID)
 	assert.Equal(t, raw.StartBootTime, got.StartBootTime)
@@ -75,7 +74,6 @@ func TestCloneThreadSemantics(t *testing.T) {
 
 func sampleExecve() rawEvent {
 	var ev rawEvent
-	ev.Kind = eventKindExecve
 	ev.Type = uint32(event.Execve)
 	ev.PID = 4242
 	ev.TID = 4242
@@ -94,14 +92,13 @@ func sampleExecve() rawEvent {
 
 func sampleClone(flags uint64) rawEvent {
 	var ev rawEvent
-	ev.Kind = eventKindClone
 	ev.Type = uint32(event.Clone)
 	ev.PID = 99
 	ev.TID = 100
 	ev.TGID = 99
 	ev.PPID = 1
 	ev.Retval = 99
-	ev.CloneFlags = flags
+	ev.Flags = flags
 	ev.StartBootTime = 55
 	copy(ev.Comm[:], "worker")
 	return ev

@@ -20,7 +20,7 @@ int dump_task(struct bpf_iter__task *ctx)
 	struct task_struct *task;
 	struct task_struct *parent;
 	const struct cred *cred;
-	struct fibratus_event *e;
+	struct syscall_event *e;
 	pid_t pid;
 	pid_t tgid;
 
@@ -37,8 +37,7 @@ int dump_task(struct bpf_iter__task *ctx)
 	if (!e)
 		return 0;
 
-	e->kind = EVT_KIND_SNAPSHOT;
-	e->type = EVT_TYPE_UNKNOWN;
+	e->type = EVT_TYPE_SNAPSHOT;
 	e->pid = tgid;
 	e->tid = pid;
 	e->tgid = tgid;
