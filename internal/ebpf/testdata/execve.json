@@ -1,0 +1,19 @@
+{
+  "name": "execve",
+  "pid": 4242,
+  "tid": 4242,
+  "seq": 7,
+  "params": {
+    "cmdline": "/bin/bash",
+    "exe": "/bin/bash",
+    "gid": "1000",
+    "name": "bash",
+    "pid": "4242",
+    "ppid": "1",
+    "retval": "0",
+    "start_boot_time": "123456789",
+    "syscall_id": "59",
+    "tid": "4242",
+    "uid": "1000"
+  }
+}
