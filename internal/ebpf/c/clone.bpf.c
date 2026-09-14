@@ -21,7 +21,7 @@ static __always_inline int handle_clone_exit(long ret, u32 syscall_id)
 {
 	u64 key = bpf_get_current_pid_tgid();
 	struct scratch_value *val;
-	struct fibratus_event *e;
+	struct syscall_event *e;
 	struct task_struct *task;
 	struct task_struct *parent;
 	const struct cred *cred;
@@ -36,7 +36,6 @@ static __always_inline int handle_clone_exit(long ret, u32 syscall_id)
 	if (!e)
 		return 0;
 
-	e->kind = EVT_KIND_CLONE;
 	e->type = EVT_TYPE_CLONE;
 	e->syscall_id = syscall_id;
 	e->retval = ret;
@@ -55,7 +54,7 @@ static __always_inline int handle_clone_exit(long ret, u32 syscall_id)
 
 	val = bpf_map_lookup_elem(&scratch, &key);
 	if (val) {
-		e->clone_flags = val->arg0;
+		e->flags = val->arg0;
 		if (!e->syscall_id)
 			e->syscall_id = (u32)val->arg1;
 	}
@@ -119,7 +118,7 @@ int handle_sys_exit_vfork(struct trace_event_raw_sys_exit *ctx)
 SEC("tp_btf/sched_process_fork")
 int BPF_PROG(handle_sched_process_fork, struct task_struct *parent, struct task_struct *child)
 {
-	struct fibratus_event *e;
+	struct syscall_event *e;
 	struct scratch_value *val;
 	const struct cred *cred;
 	struct task_struct *real_parent;
@@ -132,7 +131,6 @@ int BPF_PROG(handle_sched_process_fork, struct task_struct *parent, struct task_
 	if (!e)
 		return 0;
 
-	e->kind = EVT_KIND_CLONE;
 	e->type = EVT_TYPE_CLONE;
 	e->retval = child->tgid;
 	e->pid = child->tgid;
@@ -156,7 +154,7 @@ int BPF_PROG(handle_sched_process_fork, struct task_struct *parent, struct task_
 	key = ((u64)parent->tgid << 32) | (u32)parent->pid;
 	val = bpf_map_lookup_elem(&scratch, &key);
 	if (val) {
-		e->clone_flags = val->arg0;
+		e->flags = val->arg0;
 		e->syscall_id = (u32)val->arg1;
 		bpf_map_delete_elem(&scratch, &key);
 	}

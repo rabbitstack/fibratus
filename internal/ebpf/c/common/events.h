@@ -29,21 +29,16 @@ struct trace_event_raw_sys_exit {
 	long ret;
 };
 
-enum fibratus_event_kind {
-	EVT_KIND_SNAPSHOT = 0,
-	EVT_KIND_EXECVE = 1,
-	EVT_KIND_EXIT = 2,
-	EVT_KIND_CLONE = 3,
-};
-
-/* Stable semantic type IDs. Keep in sync with pkg/event.Type on Linux. */
-#define EVT_TYPE_UNKNOWN 0
+/* Stable semantic type IDs. Keep in sync with pkg/event.Type on Linux.
+ * Zero is reserved for iter/task baseline snapshot records, which feed
+ * the process state and are never dispatched as events.
+ */
+#define EVT_TYPE_SNAPSHOT 0
 #define EVT_TYPE_EXECVE 1
 #define EVT_TYPE_EXIT 2
 #define EVT_TYPE_CLONE 3
 
-struct fibratus_event {
-	u32 kind;
+struct syscall_event {
 	u32 type;
 	u32 pid;
 	u32 tid;
@@ -52,9 +47,9 @@ struct fibratus_event {
 	u32 uid;
 	u32 gid;
 	u32 syscall_id;
-	u32 pad;
 	s64 retval;
-	u64 clone_flags;
+	/* Interpreted per event type; clone stores the raw clone flags. */
+	u64 flags;
 	u64 start_boottime;
 	u64 timestamp_ns;
 	u8 comm[TASK_COMM_LEN];
@@ -97,9 +92,9 @@ static __always_inline void account_drop(void)
 	__sync_fetch_and_add(count, 1);
 }
 
-static __always_inline struct fibratus_event *reserve_event(void)
+static __always_inline struct syscall_event *reserve_event(void)
 {
-	struct fibratus_event *e;
+	struct syscall_event *e;
 
 	e = bpf_ringbuf_reserve(&events, sizeof(*e), 0);
 	if (!e) {
@@ -111,7 +106,7 @@ static __always_inline struct fibratus_event *reserve_event(void)
 	return e;
 }
 
-static __always_inline void fill_current_ids(struct fibratus_event *e)
+static __always_inline void fill_current_ids(struct syscall_event *e)
 {
 	u64 id = bpf_get_current_pid_tgid();
 	u64 uidgid = bpf_get_current_uid_gid();
