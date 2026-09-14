@@ -22,10 +22,11 @@
 package bootstrap
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"net"
 	"os"
-	"syscall"
 
 	"github.com/rabbitstack/fibratus/pkg/aggregator"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
@@ -38,10 +39,12 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/signals"
 	"github.com/rabbitstack/fibratus/pkg/util/version"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/sys/unix"
 )
 
-const instanceLockPath = "/tmp/fibratus.lock"
+// instanceSocket is an abstract UNIX domain socket name. Binding it acts as
+// a kernel-wide mutex that is released automatically when the process
+// terminates, so no filesystem cleanup is required.
+const instanceSocket = "@fibratus"
 
 // ErrAlreadyRunning signals a Fibratus process is already running.
 var ErrAlreadyRunning = errors.New("an instance of Fibratus process is already running in the system")
@@ -50,13 +53,13 @@ var ErrAlreadyRunning = errors.New("an instance of Fibratus process is already r
 // for event acquisition, rule engine initialization,
 // and event routing to the output sinks.
 type App struct {
-	config  *config.Config
-	evs     *EventSourceControl
-	engine  *rules.Engine
-	psnap   ps.Snapshotter
-	agg     *aggregator.BufferedAggregator
-	signals chan struct{}
-	lock    *os.File
+	config   *config.Config
+	evs      *EventSourceControl
+	engine   *rules.Engine
+	psnap    ps.Snapshotter
+	agg      *aggregator.BufferedAggregator
+	signals  chan struct{}
+	instance net.Listener
 }
 
 // Option enables changing the behaviour of the bootstrap application.
@@ -71,11 +74,6 @@ func WithSignals() Option {
 	return func(o *opts) {
 		o.installSignals = true
 	}
-}
-
-// WithDebugPrivilege is a no-op on Linux.
-func WithDebugPrivilege() Option {
-	return func(*opts) {}
 }
 
 // NewApp constructs a new bootstrap application with the specified configuration
@@ -131,14 +129,9 @@ func (f *App) Run(args []string) error {
 		return fmt.Errorf("filaments are not supported on Linux")
 	}
 
-	lock, err := acquireInstanceLock()
-	if err != nil {
-		if errors.Is(err, syscall.EWOULDBLOCK) || errors.Is(err, syscall.EAGAIN) {
-			return ErrAlreadyRunning
-		}
-		return fmt.Errorf("acquiring instance lock: %w", err)
+	if !f.isSingleInstance() {
+		return ErrAlreadyRunning
 	}
-	f.lock = lock
 
 	log.Infof("bootstrapping with pid %d. Version: %s", os.Getpid(), version.Get())
 	log.Infof("configuration options: %s", cfg.Print())
@@ -203,22 +196,20 @@ func (f *App) Shutdown() error {
 	if err := alertsender.ShutdownAll(); err != nil {
 		errs = append(errs, err)
 	}
-	if f.lock != nil {
-		_ = unix.Flock(int(f.lock.Fd()), unix.LOCK_UN)
-		_ = f.lock.Close()
-		_ = os.Remove(instanceLockPath)
+	if f.instance != nil {
+		_ = f.instance.Close()
 	}
 	return multierror.Wrap(errs...)
 }
 
-func acquireInstanceLock() (*os.File, error) {
-	f, err := os.OpenFile(instanceLockPath, os.O_CREATE|os.O_RDWR, 0o600)
+// isSingleInstance checks if there is already an instance of Fibratus
+// running in the system.
+func (f *App) isSingleInstance() bool {
+	var lc net.ListenConfig
+	l, err := lc.Listen(context.Background(), "unix", instanceSocket)
 	if err != nil {
-		return nil, err
+		return false
 	}
-	if err := unix.Flock(int(f.Fd()), unix.LOCK_EX|unix.LOCK_NB); err != nil {
-		_ = f.Close()
-		return nil, err
-	}
-	return f, nil
+	f.instance = l
+	return true
 }
