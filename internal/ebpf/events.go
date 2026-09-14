@@ -92,11 +92,13 @@ func (r rawEvent) processID() uint64 {
 	return uint64(r.TGID)
 }
 
-func (r rawEvent) toEvent(seq uint64) *event.Event {
+// toEvent converts the raw eBPF record into an event. The sequence number is
+// assigned at dispatch time, mirroring the Windows consumer which increments
+// the sequencer only for events that pass exclusion and filtering.
+func (r rawEvent) toEvent() *event.Event {
 	typ := r.eventType()
 	info := event.TypeToEventInfo(typ)
 	evt := &event.Event{
-		Seq:         seq,
 		PID:         r.processID(),
 		Tid:         uint64(r.TID),
 		Type:        typ,
