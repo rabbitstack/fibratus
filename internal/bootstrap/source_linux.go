@@ -22,15 +22,25 @@
 package bootstrap
 
 import (
+	"github.com/rabbitstack/fibratus/internal/ebpf"
 	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/filter"
+	"github.com/rabbitstack/fibratus/pkg/ps"
+	"github.com/rabbitstack/fibratus/pkg/source"
 )
 
+// EventSourceControl abstracts away the management of event sources.
 type EventSourceControl struct {
-	evs *stubEventSource
+	evs source.EventSource
 }
 
-func NewEventSourceControl(*config.Config) *EventSourceControl {
-	return &EventSourceControl{evs: &stubEventSource{}}
+func NewEventSourceControl(
+	psnap ps.Snapshotter,
+	cfg *config.Config,
+	compiler *config.RulesCompileResult,
+) *EventSourceControl {
+	return &EventSourceControl{evs: ebpf.NewEventSource(psnap, cfg, compiler)}
 }
 
 func (s *EventSourceControl) Open(cfg *config.Config) error {
@@ -41,10 +51,18 @@ func (s *EventSourceControl) Close() error {
 	return s.evs.Close()
 }
 
-type stubEventSource struct{}
-
-func (*stubEventSource) Open(*config.Config) error {
-	return nil
+func (s *EventSourceControl) Errors() <-chan error {
+	return s.evs.Errors()
 }
 
-func (*stubEventSource) Close() error { return nil }
+func (s *EventSourceControl) Events() <-chan *event.Event {
+	return s.evs.Events()
+}
+
+func (s *EventSourceControl) SetFilter(f filter.Filter) {
+	s.evs.SetFilter(f)
+}
+
+func (s *EventSourceControl) RegisterEventListener(lis event.Listener) {
+	s.evs.RegisterEventListener(lis)
+}
