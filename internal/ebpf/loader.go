@@ -21,14 +21,18 @@
 package ebpf
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"os"
+	"strings"
 	"sync"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/rlimit"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sys/unix"
 )
 
 type loader struct {
@@ -118,25 +122,28 @@ func (l *loader) dropCount() uint64 {
 
 func (l *loader) attachHotPath() error {
 	type tp struct {
-		group string
-		name  string
-		prog  *ebpf.Program
+		group    string
+		name     string
+		prog     *ebpf.Program
+		optional bool
 	}
 	tracepoints := []tp{
-		{"syscalls", "sys_enter_execve", l.exec.HandleSysEnterExecve},
-		{"syscalls", "sys_exit_execve", l.exec.HandleSysExitExecve},
-		{"syscalls", "sys_enter_execveat", l.exec.HandleSysEnterExecveat},
-		{"syscalls", "sys_exit_execveat", l.exec.HandleSysExitExecveat},
-		{"syscalls", "sys_exit_exit_group", l.exit.HandleSysExitExitGroup},
-		{"syscalls", "sys_exit_exit", l.exit.HandleSysExitExit},
-		{"syscalls", "sys_enter_clone", l.clone.HandleSysEnterClone},
-		{"syscalls", "sys_exit_clone", l.clone.HandleSysExitClone},
-		{"syscalls", "sys_enter_clone3", l.clone.HandleSysEnterClone3},
-		{"syscalls", "sys_exit_clone3", l.clone.HandleSysExitClone3},
-		{"syscalls", "sys_enter_fork", l.clone.HandleSysEnterFork},
-		{"syscalls", "sys_exit_fork", l.clone.HandleSysExitFork},
-		{"syscalls", "sys_enter_vfork", l.clone.HandleSysEnterVfork},
-		{"syscalls", "sys_exit_vfork", l.clone.HandleSysExitVfork},
+		{"syscalls", "sys_enter_execve", l.exec.HandleSysEnterExecve, false},
+		{"syscalls", "sys_exit_execve", l.exec.HandleSysExitExecve, false},
+		{"syscalls", "sys_enter_execveat", l.exec.HandleSysEnterExecveat, false},
+		{"syscalls", "sys_exit_execveat", l.exec.HandleSysExitExecveat, false},
+		{"syscalls", "sys_exit_exit_group", l.exit.HandleSysExitExitGroup, false},
+		{"syscalls", "sys_exit_exit", l.exit.HandleSysExitExit, false},
+		{"syscalls", "sys_enter_clone", l.clone.HandleSysEnterClone, false},
+		{"syscalls", "sys_exit_clone", l.clone.HandleSysExitClone, false},
+		{"syscalls", "sys_enter_clone3", l.clone.HandleSysEnterClone3, false},
+		{"syscalls", "sys_exit_clone3", l.clone.HandleSysExitClone3, false},
+		// fork/vfork are legacy wrappers. libc uses clone/clone3, and some
+		// kernels refuse a perf link on these syscall tracepoints.
+		{"syscalls", "sys_enter_fork", l.clone.HandleSysEnterFork, true},
+		{"syscalls", "sys_exit_fork", l.clone.HandleSysExitFork, true},
+		{"syscalls", "sys_enter_vfork", l.clone.HandleSysEnterVfork, true},
+		{"syscalls", "sys_exit_vfork", l.clone.HandleSysExitVfork, true},
 	}
 	for _, t := range tracepoints {
 		if t.prog == nil {
@@ -144,6 +151,10 @@ func (l *loader) attachHotPath() error {
 		}
 		lnk, err := link.Tracepoint(t.group, t.name, t.prog, nil)
 		if err != nil {
+			if t.optional && isAttachUnavailable(err) {
+				log.Warnf("skipping optional %s/%s: %v", t.group, t.name, err)
+				continue
+			}
 			return fmt.Errorf("attaching %s/%s: %w", t.group, t.name, err)
 		}
 		l.links = append(l.links, lnk)
@@ -158,6 +169,17 @@ func (l *loader) attachHotPath() error {
 	}
 	l.links = append(l.links, fork)
 	return nil
+}
+
+func isAttachUnavailable(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, unix.EPERM) || errors.Is(err, unix.ENOENT) || errors.Is(err, os.ErrPermission) || errors.Is(err, os.ErrNotExist) {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "permission denied") || strings.Contains(msg, "no such file")
 }
 
 func (l *loader) runTaskIterator() error {
