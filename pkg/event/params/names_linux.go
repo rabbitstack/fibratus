@@ -27,4 +27,10 @@ const (
 	UID = "uid"
 	// GID is the effective Linux group identifier.
 	GID = "gid"
+	// SyscallID is the raw architecture-specific syscall number.
+	SyscallID = "syscall_id"
+	// Retval is the syscall return value.
+	Retval = "retval"
+	// StartBootTime is the process start time measured from system boot, in nanoseconds.
+	StartBootTime = "start_boot_time"
 )

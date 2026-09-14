@@ -1,3 +1,5 @@
+//go:build linux
+
 /*
  * Copyright 2026 by Mostafa Moradian
  * https://www.fibratus.io
@@ -16,8 +18,9 @@
  * limitations under the License.
  */
 
-// Package ebpf hosts the Linux eBPF instrumentation backend. The process
-// event source loads CO-RE programs, captures execve/exit/clone, and
-// reconciles live events against an iter/task baseline. The spike
-// subdirectory remains as a feasibility prototype.
 package ebpf
+
+// Regenerate with ./generate.sh (preferred) or go generate -tags linux.
+// bpf2go version is pinned to github.com/cilium/ebpf v0.20.0.
+//
+//go:generate ./generate.sh

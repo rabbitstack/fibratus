@@ -1,3 +1,5 @@
+//go:build linux
+
 /*
  * Copyright 2026 by Mostafa Moradian
  * https://www.fibratus.io
@@ -16,8 +18,30 @@
  * limitations under the License.
  */
 
-// Package ebpf hosts the Linux eBPF instrumentation backend. The process
-// event source loads CO-RE programs, captures execve/exit/clone, and
-// reconciles live events against an iter/task baseline. The spike
-// subdirectory remains as a feasibility prototype.
-package ebpf
+package signals
+
+import (
+	"os"
+	"os/signal"
+	"syscall"
+
+	log "github.com/sirupsen/logrus"
+)
+
+// Install setups the signal handler. Returns a blocking
+// channel which receives an input after Interrupt or Term
+// signals are triggered.
+func Install() chan struct{} {
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+
+	stopCh := make(chan struct{})
+
+	go func() {
+		sig := <-sigCh
+		log.Infof("got signal %q, shutting down...", sig)
+		stopCh <- struct{}{}
+	}()
+
+	return stopCh
+}
