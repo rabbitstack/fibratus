@@ -49,8 +49,8 @@ static __always_inline int handle_clone_exit(long ret, u32 syscall_id)
 		e->ppid = BPF_CORE_READ(parent, tgid);
 	cred = BPF_CORE_READ(task, real_cred);
 	if (cred) {
-		e->uid = BPF_CORE_READ(cred, uid.val);
-		e->gid = BPF_CORE_READ(cred, gid.val);
+		e->uid = BPF_CORE_READ(cred, euid.val);
+		e->gid = BPF_CORE_READ(cred, egid.val);
 	}
 
 	val = bpf_map_lookup_elem(&scratch, &key);
@@ -149,8 +149,8 @@ int BPF_PROG(handle_sched_process_fork, struct task_struct *parent, struct task_
 
 	cred = child->real_cred;
 	if (cred) {
-		e->uid = cred->uid.val;
-		e->gid = cred->gid.val;
+		e->uid = cred->euid.val;
+		e->gid = cred->egid.val;
 	}
 
 	key = ((u64)parent->tgid << 32) | (u32)parent->pid;

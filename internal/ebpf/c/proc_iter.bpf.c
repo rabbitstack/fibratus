@@ -51,8 +51,8 @@ int dump_task(struct bpf_iter__task *ctx)
 
 	cred = task->real_cred;
 	if (cred) {
-		e->uid = cred->uid.val;
-		e->gid = cred->gid.val;
+		e->uid = cred->euid.val;
+		e->gid = cred->egid.val;
 	}
 
 	bpf_ringbuf_submit(e, 0);
