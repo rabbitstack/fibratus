@@ -12,12 +12,12 @@ static __always_inline void read_sockaddr(struct scratch_value *val, const void 
 {
 	u64 len = addrlen;
 
-	if (len > sizeof(val->filename2)) {
-		len = sizeof(val->filename2);
-		val->truncated |= TRUNC_FILENAME2;
+	if (len > sizeof(val->aux)) {
+		len = sizeof(val->aux);
+		val->truncated |= TRUNC_AUX;
 	}
 	if (addr && len)
-		bpf_probe_read_user(val->filename2, len, addr);
+		bpf_probe_read_user(val->aux, len, addr);
 }
 
 SEC("tp/syscalls/sys_enter_connect")

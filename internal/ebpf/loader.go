@@ -258,18 +258,6 @@ func (l *loader) attachPrograms(cfg *config.EventSourceConfig) error {
 		{"sys_exit_fork", l.clone.HandleSysExitFork, true},
 		{"sys_enter_vfork", l.clone.HandleSysEnterVfork, true},
 		{"sys_exit_vfork", l.clone.HandleSysExitVfork, true},
-		{"sys_enter_kill", l.ctl.HandleSysEnterKill, false},
-		{"sys_exit_kill", l.ctl.HandleSysExitKill, false},
-		// tkill is an obsolescent predecessor of tgkill; treat it like the
-		// other legacy syscall tracepoints.
-		{"sys_enter_tkill", l.ctl.HandleSysEnterTkill, true},
-		{"sys_exit_tkill", l.ctl.HandleSysExitTkill, true},
-		{"sys_enter_tgkill", l.ctl.HandleSysEnterTgkill, false},
-		{"sys_exit_tgkill", l.ctl.HandleSysExitTgkill, false},
-		{"sys_enter_ptrace", l.ctl.HandleSysEnterPtrace, false},
-		{"sys_exit_ptrace", l.ctl.HandleSysExitPtrace, false},
-		{"sys_enter_prctl", l.ctl.HandleSysEnterPrctl, false},
-		{"sys_exit_prctl", l.ctl.HandleSysExitPrctl, false},
 	}
 	if cfg == nil || cfg.EnableFileIOEvents {
 		// Legacy variants (open, unlink, rename) follow the fork/vfork
@@ -331,12 +319,14 @@ func (l *loader) attachPrograms(cfg *config.EventSourceConfig) error {
 	// Successful clones and process exits are captured from scheduler
 	// tracepoints. Clone syscall exit tracepoints fire in the parent, and
 	// exit/exit_group never return, so their exit tracepoints never fire.
+	// kill/ptrace/prctl read arguments from pt_regs at tp_btf/sys_exit.
 	tracing := []struct {
 		name string
 		prog *ebpf.Program
 	}{
 		{"sched_process_fork", l.clone.HandleSchedProcessFork},
 		{"sched_process_exit", l.exit.HandleSchedProcessExit},
+		{"sys_exit", l.ctl.HandleSysExit},
 	}
 	for _, t := range tracing {
 		if t.prog == nil {
