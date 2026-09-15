@@ -115,8 +115,8 @@ static __always_inline int handle_rename_enter(s64 olddirfd, const char *oldpath
 	val->arg1 = (u64)newdirfd;
 	val->flags = flags;
 	val->truncated |= read_user_str(val->filename, sizeof(val->filename), oldpath);
-	if (read_user_str(val->filename2, sizeof(val->filename2), newpath))
-		val->truncated |= TRUNC_FILENAME2;
+	if (read_user_str(val->aux, sizeof(val->aux), newpath))
+		val->truncated |= TRUNC_AUX;
 	store_scratch(val);
 	return 0;
 }

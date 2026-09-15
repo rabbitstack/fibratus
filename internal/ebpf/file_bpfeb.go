@@ -23,7 +23,7 @@ type fileScratchValue struct {
 	Truncated uint32
 	Pad       uint32
 	Filename  [256]uint8
-	Filename2 [256]uint8
+	Aux       [256]uint8
 }
 
 // loadFile returns the embedded CollectionSpec for file.

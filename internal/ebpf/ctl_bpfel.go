@@ -23,7 +23,7 @@ type ctlScratchValue struct {
 	Truncated uint32
 	Pad       uint32
 	Filename  [256]uint8
-	Filename2 [256]uint8
+	Aux       [256]uint8
 }
 
 // loadCtl returns the embedded CollectionSpec for ctl.
@@ -68,16 +68,7 @@ type ctlSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type ctlProgramSpecs struct {
-	HandleSysEnterKill   *ebpf.ProgramSpec `ebpf:"handle_sys_enter_kill"`
-	HandleSysEnterPrctl  *ebpf.ProgramSpec `ebpf:"handle_sys_enter_prctl"`
-	HandleSysEnterPtrace *ebpf.ProgramSpec `ebpf:"handle_sys_enter_ptrace"`
-	HandleSysEnterTgkill *ebpf.ProgramSpec `ebpf:"handle_sys_enter_tgkill"`
-	HandleSysEnterTkill  *ebpf.ProgramSpec `ebpf:"handle_sys_enter_tkill"`
-	HandleSysExitKill    *ebpf.ProgramSpec `ebpf:"handle_sys_exit_kill"`
-	HandleSysExitPrctl   *ebpf.ProgramSpec `ebpf:"handle_sys_exit_prctl"`
-	HandleSysExitPtrace  *ebpf.ProgramSpec `ebpf:"handle_sys_exit_ptrace"`
-	HandleSysExitTgkill  *ebpf.ProgramSpec `ebpf:"handle_sys_exit_tgkill"`
-	HandleSysExitTkill   *ebpf.ProgramSpec `ebpf:"handle_sys_exit_tkill"`
+	HandleSysExit *ebpf.ProgramSpec `ebpf:"handle_sys_exit"`
 }
 
 // ctlMapSpecs contains maps before they are loaded into the kernel.
@@ -144,30 +135,12 @@ type ctlVariables struct {
 //
 // It can be passed to loadCtlObjects or ebpf.CollectionSpec.LoadAndAssign.
 type ctlPrograms struct {
-	HandleSysEnterKill   *ebpf.Program `ebpf:"handle_sys_enter_kill"`
-	HandleSysEnterPrctl  *ebpf.Program `ebpf:"handle_sys_enter_prctl"`
-	HandleSysEnterPtrace *ebpf.Program `ebpf:"handle_sys_enter_ptrace"`
-	HandleSysEnterTgkill *ebpf.Program `ebpf:"handle_sys_enter_tgkill"`
-	HandleSysEnterTkill  *ebpf.Program `ebpf:"handle_sys_enter_tkill"`
-	HandleSysExitKill    *ebpf.Program `ebpf:"handle_sys_exit_kill"`
-	HandleSysExitPrctl   *ebpf.Program `ebpf:"handle_sys_exit_prctl"`
-	HandleSysExitPtrace  *ebpf.Program `ebpf:"handle_sys_exit_ptrace"`
-	HandleSysExitTgkill  *ebpf.Program `ebpf:"handle_sys_exit_tgkill"`
-	HandleSysExitTkill   *ebpf.Program `ebpf:"handle_sys_exit_tkill"`
+	HandleSysExit *ebpf.Program `ebpf:"handle_sys_exit"`
 }
 
 func (p *ctlPrograms) Close() error {
 	return _CtlClose(
-		p.HandleSysEnterKill,
-		p.HandleSysEnterPrctl,
-		p.HandleSysEnterPtrace,
-		p.HandleSysEnterTgkill,
-		p.HandleSysEnterTkill,
-		p.HandleSysExitKill,
-		p.HandleSysExitPrctl,
-		p.HandleSysExitPtrace,
-		p.HandleSysExitTgkill,
-		p.HandleSysExitTkill,
+		p.HandleSysExit,
 	)
 }
 

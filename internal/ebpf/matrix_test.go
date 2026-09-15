@@ -55,9 +55,9 @@ func syscallMatrix() []matrixRow {
 		{"mmap", event.Mmap, []string{"mmap"}, hookSyscallIO, []string{params.MemBaseAddress, params.MemRegionSize, params.MemProtect, params.MmapFlags, params.Retval}},
 		{"process_vm_readv", event.ProcessVMRead, []string{"process_vm_readv"}, "tp/syscalls enter/exit; first remote iovec only", []string{params.TargetProcessID, params.MemBaseAddress, params.Retval}},
 		{"process_vm_writev", event.ProcessVMWrite, []string{"process_vm_writev"}, "tp/syscalls enter/exit; first remote iovec only", []string{params.TargetProcessID, params.MemBaseAddress, params.Retval}},
-		{"kill", event.Kill, []string{"kill", "tkill", "tgkill"}, hookSyscallIO, []string{params.TargetProcessID, params.Signal, params.Retval}},
-		{"ptrace", event.Ptrace, []string{"ptrace"}, hookSyscallIO, []string{params.PtraceRequest, params.TargetProcessID, params.Retval}},
-		{"prctl", event.Prctl, []string{"prctl"}, hookSyscallIO, []string{params.PrctlOption, params.Retval}},
+		{"kill", event.Kill, []string{"kill", "tkill", "tgkill"}, "tp_btf/sys_exit", []string{params.TargetProcessID, params.Signal, params.Retval}},
+		{"ptrace", event.Ptrace, []string{"ptrace"}, "tp_btf/sys_exit", []string{params.PtraceRequest, params.TargetProcessID, params.Retval}},
+		{"prctl", event.Prctl, []string{"prctl"}, "tp_btf/sys_exit", []string{params.PrctlOption, params.Retval}},
 	}
 }
 
@@ -69,16 +69,16 @@ func TestSyscallEventMatrix(t *testing.T) {
 		assert.NotEmpty(t, row.syscalls)
 		assert.NotEmpty(t, row.hook)
 		seen[row.typ] = true
-		raw := rawEvent{Type: uint32(row.typ), Retval: 0, Filename: [256]byte{'/'}, Filename2: [256]byte{'/'}}
+		raw := rawEvent{Type: uint32(row.typ), Retval: 0, Filename: [256]byte{'/'}, Aux: [256]byte{'/'}}
 		if row.typ == event.Connect || row.typ == event.Accept {
-			raw.Filename2[0] = byte(unix.AF_INET)
-			raw.Filename2[1] = 0
-			raw.Filename2[2] = 0
-			raw.Filename2[3] = 80
-			raw.Filename2[4] = 127
-			raw.Filename2[5] = 0
-			raw.Filename2[6] = 0
-			raw.Filename2[7] = 1
+			raw.Aux[0] = byte(unix.AF_INET)
+			raw.Aux[1] = 0
+			raw.Aux[2] = 0
+			raw.Aux[3] = 80
+			raw.Aux[4] = 127
+			raw.Aux[5] = 0
+			raw.Aux[6] = 0
+			raw.Aux[7] = 1
 		}
 		evt := raw.toEvent()
 		require.Equal(t, row.typ, evt.Type, row.name)
@@ -122,7 +122,7 @@ func TestMmapUpdatesProcessState(t *testing.T) {
 	ps := &pstypes.PS{PID: 9, Name: "target", StartBootTime: 1, Threads: map[uint64]pstypes.Thread{}}
 	snap.Put(ps)
 
-	raw := rawEvent{Type: uint32(event.Mmap), PID: 9, TGID: 9, Retval: 0x1000, Arg0: 4096, Arg1: 8192, Arg2: 3, Flags: 0x20}
+	raw := rawEvent{Type: uint32(event.Mmap), PID: 9, TGID: 9, Retval: 0x1000, Arg0: 4096, Arg1: 8192, Arg2: 3, Arg3: 3, Flags: 0}
 	evt := raw.toEvent()
 	applyProcessState(snap, evt)
 	ok, got := snap.Find(9)
@@ -130,7 +130,20 @@ func TestMmapUpdatesProcessState(t *testing.T) {
 	require.Len(t, got.Mmaps, 1)
 	assert.Equal(t, uint64(0x1000), uint64(got.Mmaps[0].BaseAddress))
 	assert.Equal(t, uint64(8192), got.Mmaps[0].Size)
-	assert.Equal(t, "anonymous", got.Mmaps[0].Type)
+	assert.Equal(t, "file", got.Mmaps[0].Type)
+}
+
+func TestAnonymousMmapSkipped(t *testing.T) {
+	snap := ps.NewSnapshotter()
+	ps := &pstypes.PS{PID: 9, Name: "target", StartBootTime: 1, Threads: map[uint64]pstypes.Thread{}}
+	snap.Put(ps)
+
+	raw := rawEvent{Type: uint32(event.Mmap), PID: 9, TGID: 9, Retval: 0x1000, Arg1: 8192, Arg2: 3, Arg3: ^uint64(0), Flags: 0x20}
+	evt := raw.toEvent()
+	applyProcessState(snap, evt)
+	ok, got := snap.Find(9)
+	require.True(t, ok)
+	assert.Empty(t, got.Mmaps)
 }
 
 func TestFailedSyscallKeepsProcessState(t *testing.T) {

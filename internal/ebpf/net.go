@@ -38,7 +38,7 @@ func appendSockParams(evt *event.Event, r rawEvent) {
 		evt.Params.Append(params.SockFlags, params.Uint64, r.Flags)
 	}
 
-	family, ip, port, unixPath := parseSockaddr(r.Filename2[:])
+	family, ip, port, unixPath := parseSockaddr(r.Aux[:])
 	evt.Params.Append(params.SockFamily, params.Uint16, family)
 	if unixPath != "" {
 		evt.Params.Append(params.SockPath, params.Path, unixPath)
