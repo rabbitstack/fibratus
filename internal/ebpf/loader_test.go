@@ -26,9 +26,31 @@ import (
 	"os"
 	"testing"
 
+	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/sys/unix"
 )
+
+func TestEnabledTypes(t *testing.T) {
+	all := enabledTypes(nil)
+	assert.True(t, all[event.Execve])
+	assert.True(t, all[event.Openat])
+	assert.True(t, all[event.Connect])
+	assert.True(t, all[event.Mmap])
+
+	off := enabledTypes(&config.EventSourceConfig{})
+	assert.True(t, off[event.Execve])
+	assert.True(t, off[event.Kill])
+	assert.False(t, off[event.Openat])
+	assert.False(t, off[event.Connect])
+	assert.False(t, off[event.Mmap])
+
+	on := enabledTypes(&config.EventSourceConfig{EnableFileIOEvents: true, EnableNetEvents: true, EnableMemEvents: true})
+	assert.True(t, on[event.Openat])
+	assert.True(t, on[event.Accept])
+	assert.True(t, on[event.ProcessVMRead])
+}
 
 func TestIsAttachUnavailable(t *testing.T) {
 	assert.False(t, isAttachUnavailable(nil))

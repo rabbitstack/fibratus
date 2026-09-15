@@ -26,6 +26,8 @@ int BPF_PROG(handle_sched_process_exit, struct task_struct *task)
 	 */
 	if (task->pid != task->tgid)
 		return 0;
+	if (!type_enabled(EVT_TYPE_EXIT))
+		return 0;
 
 	e = reserve_event();
 	if (!e)

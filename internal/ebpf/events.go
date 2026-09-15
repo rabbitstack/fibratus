@@ -42,21 +42,27 @@ const (
 
 // rawEvent mirrors struct syscall_event in c/common/events.h.
 type rawEvent struct {
-	Type      uint32
-	PID       uint32
-	TID       uint32
-	TGID      uint32
-	PPID      uint32
-	UID       uint32
-	GID       uint32
-	SyscallID uint32
-	Retval    int64
-	// Flags is interpreted per event type; clone stores the raw clone flags.
+	Type          uint32
+	PID           uint32
+	TID           uint32
+	TGID          uint32
+	PPID          uint32
+	UID           uint32
+	GID           uint32
+	SyscallID     uint32
+	Retval        int64
 	Flags         uint64
+	Arg0          uint64
+	Arg1          uint64
+	Arg2          uint64
+	Arg3          uint64
 	StartBootTime uint64
 	TimestampNs   uint64
+	Truncated     uint32
+	Pad           uint32
 	Comm          [commLen]byte
 	Filename      [filenameLen]byte
+	Filename2     [filenameLen]byte
 }
 
 func decodeRawEvent(raw []byte) (rawEvent, error) {
@@ -67,8 +73,9 @@ func decodeRawEvent(raw []byte) (rawEvent, error) {
 	return ev, nil
 }
 
-func (r rawEvent) comm() string     { return cString(r.Comm[:]) }
-func (r rawEvent) filename() string { return cString(r.Filename[:]) }
+func (r rawEvent) comm() string      { return cString(r.Comm[:]) }
+func (r rawEvent) filename() string  { return cString(r.Filename[:]) }
+func (r rawEvent) filename2() string { return cString(r.Filename2[:]) }
 
 func (r rawEvent) eventType() event.Type {
 	switch r.Type {
