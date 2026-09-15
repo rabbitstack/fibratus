@@ -16,8 +16,9 @@
  * limitations under the License.
  */
 
-// Package ebpf hosts the Linux eBPF instrumentation backend. The process
-// event source loads CO-RE programs, captures execve/exit/clone, and
-// reconciles live events against an iter/task baseline. The spike
-// subdirectory remains as a feasibility prototype.
+// Package ebpf hosts the Linux eBPF instrumentation backend. The event
+// source loads CO-RE programs, captures process, file, network, memory,
+// and process-control syscalls, and reconciles live events against an
+// iter/task baseline. The spike subdirectory remains as a feasibility
+// prototype.
 package ebpf

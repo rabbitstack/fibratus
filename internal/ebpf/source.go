@@ -123,7 +123,7 @@ func (e *EventSource) Open(cfg *config.Config) error {
 
 	go e.consume()
 
-	if err := ldr.attachPrograms(); err != nil {
+	if err := ldr.attachPrograms(&e.config.EventSource); err != nil {
 		e.Close()
 		return err
 	}

@@ -78,16 +78,11 @@ func (r rawEvent) filename() string  { return cString(r.Filename[:]) }
 func (r rawEvent) filename2() string { return cString(r.Filename2[:]) }
 
 func (r rawEvent) eventType() event.Type {
-	switch r.Type {
-	case uint32(event.Execve):
-		return event.Execve
-	case uint32(event.Exit):
-		return event.Exit
-	case uint32(event.Clone):
-		return event.Clone
-	default:
-		return event.UnknownType
+	typ := event.Type(r.Type)
+	if typ.Exists() {
+		return typ
 	}
+	return event.UnknownType
 }
 
 func (r rawEvent) processID() uint64 {
@@ -137,6 +132,55 @@ func (r rawEvent) toEvent() *event.Event {
 		evt.Params.Append(params.ExitStatus, params.Int64, r.Retval)
 	case event.Clone:
 		evt.Params.Append(params.CloneFlags, params.Uint64, r.Flags)
+	case event.Openat:
+		evt.Params.Append(params.DirFD, params.Int64, int64(r.Arg0))
+		evt.Params.Append(params.FilePath, params.Path, r.filename())
+		evt.Params.Append(params.FileFlags, params.Uint64, r.Flags)
+		evt.Params.Append(params.FileMode, params.Uint64, r.Arg1)
+		if r.Retval >= 0 {
+			evt.Params.Append(params.FD, params.Int64, r.Retval)
+		}
+	case event.Unlink:
+		evt.Params.Append(params.DirFD, params.Int64, int64(r.Arg0))
+		evt.Params.Append(params.FilePath, params.Path, r.filename())
+		evt.Params.Append(params.FileFlags, params.Uint64, r.Flags)
+	case event.Rename:
+		evt.Params.Append(params.DirFD, params.Int64, int64(r.Arg0))
+		evt.Params.Append(params.NewDirFD, params.Int64, int64(r.Arg1))
+		evt.Params.Append(params.FilePath, params.Path, r.filename())
+		evt.Params.Append(params.FileNewPath, params.Path, r.filename2())
+		evt.Params.Append(params.FileFlags, params.Uint64, r.Flags)
+	case event.Connect, event.Accept:
+		appendSockParams(evt, r)
+	case event.Mmap:
+		addr := uint64(0)
+		if r.Retval >= 0 {
+			addr = uint64(r.Retval)
+		}
+		evt.Params.Append(params.MemBaseAddress, params.Address, addr)
+		evt.Params.Append(params.MemRegionSize, params.Uint64, r.Arg1)
+		evt.Params.Append(params.MemProtect, params.Uint32, uint32(r.Arg2))
+		evt.Params.Append(params.MmapFlags, params.Uint64, r.Flags)
+		evt.Params.Append(params.FD, params.Int64, int64(r.Arg3))
+		evt.Params.Append(params.MmapOffset, params.Uint64, r.Arg0)
+	case event.ProcessVMRead, event.ProcessVMWrite:
+		evt.Params.Append(params.TargetProcessID, params.PID, uint64(uint32(r.Arg0)))
+		evt.Params.Append(params.MemBaseAddress, params.Address, r.Arg2)
+		evt.Params.Append(params.MemRegionSize, params.Uint64, r.Arg3)
+		evt.Params.Append(params.MmapFlags, params.Uint64, r.Flags)
+	case event.Kill:
+		evt.Params.Append(params.TargetProcessID, params.PID, uint64(uint32(r.Arg0)))
+		evt.Params.Append(params.Signal, params.Int32, int32(r.Arg1))
+	case event.Ptrace:
+		evt.Params.Append(params.PtraceRequest, params.Int64, int64(r.Arg0))
+		evt.Params.Append(params.TargetProcessID, params.PID, uint64(uint32(r.Arg1)))
+		evt.Params.Append(params.PtraceAddr, params.Address, r.Arg2)
+		evt.Params.Append(params.PtraceData, params.Uint64, r.Arg3)
+	case event.Prctl:
+		evt.Params.Append(params.PrctlOption, params.Int64, int64(r.Arg0))
+	}
+	if r.Truncated != 0 {
+		evt.Params.Append(params.Truncated, params.Uint32, r.Truncated)
 	}
 	return evt
 }
