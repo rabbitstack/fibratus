@@ -73,6 +73,16 @@ enum bpf_map_type {
 #define TASK_COMM_LEN 16
 #endif
 
+/* x86-64 field names from kernel BTF. CO-RE relocates by name. */
+struct pt_regs {
+	unsigned long r10;
+	unsigned long r8;
+	unsigned long dx;
+	unsigned long si;
+	unsigned long di;
+	unsigned long orig_ax;
+} __attribute__((preserve_access_index));
+
 struct seq_file;
 
 struct bpf_iter_meta {

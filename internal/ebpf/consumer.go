@@ -67,12 +67,14 @@ func applyProcessState(psnap ps.Snapshotter, evt *event.Event) {
 		ok, existing := psnap.Find(evt.PID)
 		if ok && existing != nil {
 			evt.PS = existing
-			existing.AddMmap(pstypes.Mmap{
-				BaseAddress: va.Address(evt.GetParamAsUint64(params.MemBaseAddress)),
-				Size:        evt.GetParamAsUint64(params.MemRegionSize),
-				Protection:  evt.GetParamAsUint32(params.MemProtect),
-				Type:        mmapKind(evt.GetParamAsUint64(params.MmapFlags)),
-			})
+			if retainMmap(evt) {
+				existing.AddMmap(pstypes.Mmap{
+					BaseAddress: va.Address(evt.GetParamAsUint64(params.MemBaseAddress)),
+					Size:        evt.GetParamAsUint64(params.MemRegionSize),
+					Protection:  evt.GetParamAsUint32(params.MemProtect),
+					Type:        mmapKind(evt.GetParamAsUint64(params.MmapFlags)),
+				})
+			}
 		}
 	case evt.Type == event.Exit:
 		ok, existing := psnap.Find(evt.PID)
@@ -188,6 +190,21 @@ func mmapKind(flags uint64) string {
 		return "anonymous"
 	}
 	return "file"
+}
+
+// retainMmap reports whether the mapping should be stored on process state.
+// Anonymous mappings are frequent (heap, stacks, JIT) and we do not yet
+// hook munmap, so keeping them would grow without bound. File-backed
+// mappings are the useful set (shared objects, mapped files).
+func retainMmap(evt *event.Event) bool {
+	if mmapKind(evt.GetParamAsUint64(params.MmapFlags)) != "file" {
+		return false
+	}
+	fd, err := evt.Params.GetInt64(params.FD)
+	if err != nil {
+		return false
+	}
+	return fd >= 0
 }
 
 func enrichEvent(evt *event.Event) {

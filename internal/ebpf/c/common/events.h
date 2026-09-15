@@ -13,8 +13,9 @@
 #define EVT_FILENAME_LEN 256
 #define EVT_TYPE_MAX 32
 
-#define TRUNC_FILENAME  (1u << 0)
-#define TRUNC_FILENAME2 (1u << 1)
+/* Set when a userspace copy was longer than the destination and was cut off. */
+#define TRUNC_FILENAME (1u << 0) /* filename[]: exec path, open/unlink/rename source */
+#define TRUNC_AUX      (1u << 1) /* aux[]: rename destination or sockaddr bytes */
 
 /* UAPI openat2 argument; not a CO-RE kernel type. */
 struct open_how {
@@ -73,6 +74,7 @@ struct syscall_event {
 	s64 retval;
 	/* Interpreted per event type: clone flags, open flags, mmap flags, accept flags. */
 	u64 flags;
+	/* Generic argument slots, interpreted per event type. */
 	u64 arg0;
 	u64 arg1;
 	u64 arg2;
@@ -80,10 +82,10 @@ struct syscall_event {
 	u64 start_boottime;
 	u64 timestamp_ns;
 	u32 truncated;
-	u32 pad;
+	u32 pad; /* keeps comm[] 8-byte aligned; no semantic value */
 	u8 comm[TASK_COMM_LEN];
-	u8 filename[EVT_FILENAME_LEN];
-	u8 filename2[EVT_FILENAME_LEN];
+	u8 filename[EVT_FILENAME_LEN]; /* exec path, open/unlink/rename source */
+	u8 aux[EVT_FILENAME_LEN];      /* rename destination or sockaddr bytes */
 };
 
 struct scratch_value {
@@ -95,7 +97,7 @@ struct scratch_value {
 	u32 truncated;
 	u32 pad;
 	u8 filename[EVT_FILENAME_LEN];
-	u8 filename2[EVT_FILENAME_LEN];
+	u8 aux[EVT_FILENAME_LEN];
 };
 
 struct {
@@ -227,7 +229,7 @@ static __always_inline void copy_scratch(struct syscall_event *e, struct scratch
 		e->flags = val->flags;
 	e->truncated = val->truncated;
 	__builtin_memcpy(&e->filename, val->filename, sizeof(e->filename));
-	__builtin_memcpy(&e->filename2, val->filename2, sizeof(e->filename2));
+	__builtin_memcpy(&e->aux, val->aux, sizeof(e->aux));
 }
 
 static __always_inline struct scratch_value *borrow_scratch(void)
@@ -274,6 +276,62 @@ static __always_inline int submit_from_scratch(u32 type, long ret, u32 syscall_i
 	if (val)
 		copy_scratch(e, val);
 	bpf_map_delete_elem(&scratch, &key);
+	bpf_ringbuf_submit(e, 0);
+	return 0;
+}
+
+/* x86-64 syscall ABI. arg3 is r10, not rcx. */
+static __always_inline u64 syscall_nr(struct pt_regs *regs)
+{
+	return BPF_CORE_READ(regs, orig_ax);
+}
+
+static __always_inline u64 syscall_arg0(struct pt_regs *regs)
+{
+	return BPF_CORE_READ(regs, di);
+}
+
+static __always_inline u64 syscall_arg1(struct pt_regs *regs)
+{
+	return BPF_CORE_READ(regs, si);
+}
+
+static __always_inline u64 syscall_arg2(struct pt_regs *regs)
+{
+	return BPF_CORE_READ(regs, dx);
+}
+
+static __always_inline u64 syscall_arg3(struct pt_regs *regs)
+{
+	return BPF_CORE_READ(regs, r10);
+}
+
+static __always_inline u64 syscall_arg4(struct pt_regs *regs)
+{
+	return BPF_CORE_READ(regs, r8);
+}
+
+static __always_inline int submit_args(u32 type, long ret, u32 syscall_id,
+				       u64 arg0, u64 arg1, u64 arg2, u64 arg3, u64 flags)
+{
+	struct syscall_event *e;
+
+	if (!type_enabled(type))
+		return 0;
+
+	e = reserve_event();
+	if (!e)
+		return 0;
+
+	e->type = type;
+	e->syscall_id = syscall_id;
+	e->retval = ret;
+	e->arg0 = arg0;
+	e->arg1 = arg1;
+	e->arg2 = arg2;
+	e->arg3 = arg3;
+	e->flags = flags;
+	fill_current_task(e);
 	bpf_ringbuf_submit(e, 0);
 	return 0;
 }

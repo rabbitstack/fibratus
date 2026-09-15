@@ -5,102 +5,44 @@
 
 char LICENSE[] SEC("license") = "Dual MIT/GPL";
 
-static __always_inline int handle_kill_enter(u64 pid, u64 sig)
-{
-	struct scratch_value *val;
+/* x86-64 syscall numbers. Register-only syscalls are captured at
+ * tp_btf/sys_exit, which supplies pt_regs (args + retval) so there is
+ * no enter probe or scratch slot. The per-syscall sys_exit tracepoint
+ * only carries id and ret.
+ */
+#define NR_PTRACE 101
+#define NR_KILL   62
+#define NR_TKILL  200
+#define NR_TGKILL 234
+#define NR_PRCTL  157
 
-	if (!type_enabled(EVT_TYPE_KILL))
+SEC("tp_btf/sys_exit")
+int BPF_PROG(handle_sys_exit, struct pt_regs *regs, long ret)
+{
+	u64 id;
+
+	if (!regs)
 		return 0;
-	val = borrow_scratch();
-	if (!val)
+	id = syscall_nr(regs);
+	switch (id) {
+	case NR_KILL:
+	case NR_TKILL:
+		return submit_args(EVT_TYPE_KILL, ret, (u32)id,
+				   syscall_arg0(regs), syscall_arg1(regs), 0, 0, 0);
+	case NR_TGKILL:
+		/* pid, tid, sig: emit the thread-group id and the signal. */
+		return submit_args(EVT_TYPE_KILL, ret, (u32)id,
+				   syscall_arg0(regs), syscall_arg2(regs), 0, 0, 0);
+	case NR_PTRACE:
+		return submit_args(EVT_TYPE_PTRACE, ret, (u32)id,
+				   syscall_arg0(regs), syscall_arg1(regs),
+				   syscall_arg2(regs), syscall_arg3(regs), 0);
+	case NR_PRCTL:
+		return submit_args(EVT_TYPE_PRCTL, ret, (u32)id,
+				   syscall_arg0(regs), syscall_arg1(regs),
+				   syscall_arg2(regs), syscall_arg3(regs),
+				   syscall_arg4(regs));
+	default:
 		return 0;
-	val->arg0 = pid;
-	val->arg1 = sig;
-	store_scratch(val);
-	return 0;
-}
-
-SEC("tp/syscalls/sys_enter_kill")
-int handle_sys_enter_kill(struct trace_event_raw_sys_enter *ctx)
-{
-	return handle_kill_enter(ctx->args[0], ctx->args[1]);
-}
-
-SEC("tp/syscalls/sys_exit_kill")
-int handle_sys_exit_kill(struct trace_event_raw_sys_exit *ctx)
-{
-	return submit_from_scratch(EVT_TYPE_KILL, ctx->ret, (u32)ctx->id);
-}
-
-SEC("tp/syscalls/sys_enter_tkill")
-int handle_sys_enter_tkill(struct trace_event_raw_sys_enter *ctx)
-{
-	return handle_kill_enter(ctx->args[0], ctx->args[1]);
-}
-
-SEC("tp/syscalls/sys_exit_tkill")
-int handle_sys_exit_tkill(struct trace_event_raw_sys_exit *ctx)
-{
-	return submit_from_scratch(EVT_TYPE_KILL, ctx->ret, (u32)ctx->id);
-}
-
-SEC("tp/syscalls/sys_enter_tgkill")
-int handle_sys_enter_tgkill(struct trace_event_raw_sys_enter *ctx)
-{
-	return handle_kill_enter(ctx->args[0], ctx->args[2]);
-}
-
-SEC("tp/syscalls/sys_exit_tgkill")
-int handle_sys_exit_tgkill(struct trace_event_raw_sys_exit *ctx)
-{
-	return submit_from_scratch(EVT_TYPE_KILL, ctx->ret, (u32)ctx->id);
-}
-
-SEC("tp/syscalls/sys_enter_ptrace")
-int handle_sys_enter_ptrace(struct trace_event_raw_sys_enter *ctx)
-{
-	struct scratch_value *val;
-
-	if (!type_enabled(EVT_TYPE_PTRACE))
-		return 0;
-	val = borrow_scratch();
-	if (!val)
-		return 0;
-	val->arg0 = ctx->args[0]; /* request */
-	val->arg1 = ctx->args[1]; /* pid */
-	val->arg2 = ctx->args[2]; /* addr */
-	val->arg3 = ctx->args[3]; /* data */
-	store_scratch(val);
-	return 0;
-}
-
-SEC("tp/syscalls/sys_exit_ptrace")
-int handle_sys_exit_ptrace(struct trace_event_raw_sys_exit *ctx)
-{
-	return submit_from_scratch(EVT_TYPE_PTRACE, ctx->ret, (u32)ctx->id);
-}
-
-SEC("tp/syscalls/sys_enter_prctl")
-int handle_sys_enter_prctl(struct trace_event_raw_sys_enter *ctx)
-{
-	struct scratch_value *val;
-
-	if (!type_enabled(EVT_TYPE_PRCTL))
-		return 0;
-	val = borrow_scratch();
-	if (!val)
-		return 0;
-	val->arg0 = ctx->args[0];
-	val->arg1 = ctx->args[1];
-	val->arg2 = ctx->args[2];
-	val->arg3 = ctx->args[3];
-	val->flags = ctx->args[4];
-	store_scratch(val);
-	return 0;
-}
-
-SEC("tp/syscalls/sys_exit_prctl")
-int handle_sys_exit_prctl(struct trace_event_raw_sys_exit *ctx)
-{
-	return submit_from_scratch(EVT_TYPE_PRCTL, ctx->ret, (u32)ctx->id);
+	}
 }

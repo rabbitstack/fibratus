@@ -62,7 +62,7 @@ type rawEvent struct {
 	Pad           uint32
 	Comm          [commLen]byte
 	Filename      [filenameLen]byte
-	Filename2     [filenameLen]byte
+	Aux           [filenameLen]byte
 }
 
 func decodeRawEvent(raw []byte) (rawEvent, error) {
@@ -73,9 +73,9 @@ func decodeRawEvent(raw []byte) (rawEvent, error) {
 	return ev, nil
 }
 
-func (r rawEvent) comm() string      { return cString(r.Comm[:]) }
-func (r rawEvent) filename() string  { return cString(r.Filename[:]) }
-func (r rawEvent) filename2() string { return cString(r.Filename2[:]) }
+func (r rawEvent) comm() string     { return cString(r.Comm[:]) }
+func (r rawEvent) filename() string { return cString(r.Filename[:]) }
+func (r rawEvent) aux() string      { return cString(r.Aux[:]) }
 
 func (r rawEvent) eventType() event.Type {
 	typ := event.Type(r.Type)
@@ -148,7 +148,7 @@ func (r rawEvent) toEvent() *event.Event {
 		evt.Params.Append(params.DirFD, params.Int64, int64(r.Arg0))
 		evt.Params.Append(params.NewDirFD, params.Int64, int64(r.Arg1))
 		evt.Params.Append(params.FilePath, params.Path, r.filename())
-		evt.Params.Append(params.FileNewPath, params.Path, r.filename2())
+		evt.Params.Append(params.FileNewPath, params.Path, r.aux())
 		evt.Params.Append(params.FileFlags, params.Uint64, r.Flags)
 	case event.Connect, event.Accept:
 		appendSockParams(evt, r)
