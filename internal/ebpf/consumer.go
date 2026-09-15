@@ -27,6 +27,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
+	"github.com/rabbitstack/fibratus/pkg/util/va"
 )
 
 var (
@@ -61,6 +62,17 @@ func applyProcessState(psnap ps.Snapshotter, evt *event.Event) {
 		if ok && existing != nil {
 			evt.PS = existing
 			_ = psnap.AddThread(evt)
+		}
+	case evt.Type == event.Mmap && succeeded(evt):
+		ok, existing := psnap.Find(evt.PID)
+		if ok && existing != nil {
+			evt.PS = existing
+			existing.AddMmap(pstypes.Mmap{
+				BaseAddress: va.Address(evt.GetParamAsUint64(params.MemBaseAddress)),
+				Size:        evt.GetParamAsUint64(params.MemRegionSize),
+				Protection:  evt.GetParamAsUint32(params.MemProtect),
+				Type:        mmapKind(evt.GetParamAsUint64(params.MmapFlags)),
+			})
 		}
 	case evt.Type == event.Exit:
 		ok, existing := psnap.Find(evt.PID)
@@ -167,6 +179,15 @@ func succeeded(evt *event.Event) bool {
 		return true
 	}
 	return ret >= 0
+}
+
+const mapAnonymous = 0x20
+
+func mmapKind(flags uint64) string {
+	if flags&mapAnonymous != 0 {
+		return "anonymous"
+	}
+	return "file"
 }
 
 func enrichEvent(evt *event.Event) {
