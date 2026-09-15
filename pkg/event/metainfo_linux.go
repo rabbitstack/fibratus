@@ -23,20 +23,48 @@ package event
 import "slices"
 
 var events = map[Type]Info{
-	Execve: {Name: "execve", Category: Process, Description: "Executes a program"},
-	Exit:   {Name: "exit", Category: Process, Description: "Exit all threads in a process"},
-	Clone:  {Name: "clone", Category: Process, Description: "Creates a child process or a thread"},
+	Execve:         {Name: "execve", Category: Process, Description: "Executes a program"},
+	Exit:           {Name: "exit", Category: Process, Description: "Exit all threads in a process"},
+	Clone:          {Name: "clone", Category: Process, Description: "Creates a child process or a thread"},
+	Openat:         {Name: "openat", Category: File, Description: "Opens or creates a file"},
+	Unlink:         {Name: "unlink", Category: File, Description: "Removes a directory entry"},
+	Rename:         {Name: "rename", Category: File, Description: "Renames a file"},
+	Connect:        {Name: "connect", Category: Net, Description: "Initiates a socket connection"},
+	Accept:         {Name: "accept", Category: Net, Description: "Accepts a socket connection"},
+	Mmap:           {Name: "mmap", Category: Mem, Description: "Maps files or devices into memory"},
+	ProcessVMRead:  {Name: "process_vm_readv", Category: Mem, Description: "Reads memory from another process"},
+	ProcessVMWrite: {Name: "process_vm_writev", Category: Mem, Description: "Writes memory into another process"},
+	Kill:           {Name: "kill", Category: Process, Description: "Sends a signal to a process"},
+	Ptrace:         {Name: "ptrace", Category: Process, Description: "Traces or controls another process"},
+	Prctl:          {Name: "prctl", Category: Process, Description: "Performs a process-control operation"},
 }
 
 var types = map[string]Type{
-	"execve": Execve,
-	"exit":   Exit,
-	"clone":  Clone,
+	"execve":            Execve,
+	"exit":              Exit,
+	"clone":             Clone,
+	"openat":            Openat,
+	"unlink":            Unlink,
+	"rename":            Rename,
+	"connect":           Connect,
+	"accept":            Accept,
+	"mmap":              Mmap,
+	"process_vm_readv":  ProcessVMRead,
+	"process_vm_writev": ProcessVMWrite,
+	"kill":              Kill,
+	"ptrace":            Ptrace,
+	"prctl":             Prctl,
 }
 
 // All returns all Linux event types.
 func All() []Type {
-	return []Type{Execve, Exit, Clone}
+	return []Type{
+		Execve, Exit, Clone,
+		Openat, Unlink, Rename,
+		Connect, Accept,
+		Mmap, ProcessVMRead, ProcessVMWrite,
+		Kill, Ptrace, Prctl,
+	}
 }
 
 // MaxTypeID returns the largest Linux event type identifier.

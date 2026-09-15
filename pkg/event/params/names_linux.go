@@ -33,4 +33,36 @@ const (
 	Retval = "retval"
 	// StartBootTime is the process start time measured from system boot, in nanoseconds.
 	StartBootTime = "start_boot_time"
+	// DirFD is a directory file descriptor, including AT_FDCWD.
+	DirFD = "dirfd"
+	// NewDirFD is the destination directory file descriptor for renameat.
+	NewDirFD = "new_dirfd"
+	// FileNewPath is the destination path of a rename.
+	FileNewPath = "file_new_path"
+	// FileFlags is the raw openat, unlinkat, or renameat2 flags bitmask.
+	FileFlags = "file_flags"
+	// FileMode is the file creation mode supplied to openat.
+	FileMode = "file_mode"
+	// FD is a file descriptor.
+	FD = "fd"
+	// SockFamily is the socket address family (AF_INET, AF_INET6, AF_UNIX).
+	SockFamily = "sock_family"
+	// SockPath is the filesystem path of an AF_UNIX socket.
+	SockPath = "sock_path"
+	// MmapFlags is the raw mmap flags bitmask.
+	MmapFlags = "mmap_flags"
+	// MmapOffset is the file offset of a memory mapping.
+	MmapOffset = "mmap_offset"
+	// Signal is a POSIX signal number.
+	Signal = "signal"
+	// PtraceRequest is the ptrace request code.
+	PtraceRequest = "ptrace_request"
+	// PtraceAddr is the ptrace address argument.
+	PtraceAddr = "ptrace_addr"
+	// PtraceData is the ptrace data argument.
+	PtraceData = "ptrace_data"
+	// PrctlOption is the prctl option code.
+	PrctlOption = "prctl_option"
+	// Truncated is a bitmask of truncated variable-length fields.
+	Truncated = "truncated"
 )
