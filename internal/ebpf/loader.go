@@ -42,6 +42,10 @@ type loader struct {
 	exit     *exitObjects
 	clone    *cloneObjects
 	iter     *prociterObjects
+	file     *fileObjects
+	net      *netObjects
+	mem      *memObjects
+	ctl      *ctlObjects
 	links    []link.Link
 	iterLink *link.Iter
 	once     sync.Once
@@ -67,6 +71,22 @@ func loadCollections() (*loader, error) {
 	iterSpec, err := loadProciter()
 	if err != nil {
 		return nil, fmt.Errorf("loading prociter collection spec: %w", err)
+	}
+	fileSpec, err := loadFile()
+	if err != nil {
+		return nil, fmt.Errorf("loading file collection spec: %w", err)
+	}
+	netSpec, err := loadNet()
+	if err != nil {
+		return nil, fmt.Errorf("loading net collection spec: %w", err)
+	}
+	memSpec, err := loadMem()
+	if err != nil {
+		return nil, fmt.Errorf("loading mem collection spec: %w", err)
+	}
+	ctlSpec, err := loadCtl()
+	if err != nil {
+		return nil, fmt.Errorf("loading ctl collection spec: %w", err)
 	}
 
 	var execObjs execveObjects
@@ -104,11 +124,57 @@ func loadCollections() (*loader, error) {
 		return nil, fmt.Errorf("loading prociter objects: %w", err)
 	}
 
+	var fileObjs fileObjects
+	if err := fileSpec.LoadAndAssign(&fileObjs, opts); err != nil {
+		_ = iterObjs.Close()
+		_ = cloneObjs.Close()
+		_ = exitObjs.Close()
+		_ = execObjs.Close()
+		return nil, fmt.Errorf("loading file objects: %w", err)
+	}
+
+	var netObjs netObjects
+	if err := netSpec.LoadAndAssign(&netObjs, opts); err != nil {
+		_ = fileObjs.Close()
+		_ = iterObjs.Close()
+		_ = cloneObjs.Close()
+		_ = exitObjs.Close()
+		_ = execObjs.Close()
+		return nil, fmt.Errorf("loading net objects: %w", err)
+	}
+
+	var memObjs memObjects
+	if err := memSpec.LoadAndAssign(&memObjs, opts); err != nil {
+		_ = netObjs.Close()
+		_ = fileObjs.Close()
+		_ = iterObjs.Close()
+		_ = cloneObjs.Close()
+		_ = exitObjs.Close()
+		_ = execObjs.Close()
+		return nil, fmt.Errorf("loading mem objects: %w", err)
+	}
+
+	var ctlObjs ctlObjects
+	if err := ctlSpec.LoadAndAssign(&ctlObjs, opts); err != nil {
+		_ = memObjs.Close()
+		_ = netObjs.Close()
+		_ = fileObjs.Close()
+		_ = iterObjs.Close()
+		_ = cloneObjs.Close()
+		_ = exitObjs.Close()
+		_ = execObjs.Close()
+		return nil, fmt.Errorf("loading ctl objects: %w", err)
+	}
+
 	return &loader{
 		exec:  &execObjs,
 		exit:  &exitObjs,
 		clone: &cloneObjs,
 		iter:  &iterObjs,
+		file:  &fileObjs,
+		net:   &netObjs,
+		mem:   &memObjs,
+		ctl:   &ctlObjs,
 	}, nil
 }
 
@@ -171,7 +237,7 @@ const syscallsGroup = "syscalls"
 // in contrast to the one-shot iter/task snapshot program started by
 // runTaskIterator. The caller starts the ring buffer reader first so no
 // events are lost between attachment and consumption.
-func (l *loader) attachPrograms() error {
+func (l *loader) attachPrograms(cfg *config.EventSourceConfig) error {
 	type tp struct {
 		name     string
 		prog     *ebpf.Program
@@ -192,6 +258,60 @@ func (l *loader) attachPrograms() error {
 		{"sys_exit_fork", l.clone.HandleSysExitFork, true},
 		{"sys_enter_vfork", l.clone.HandleSysEnterVfork, true},
 		{"sys_exit_vfork", l.clone.HandleSysExitVfork, true},
+		{"sys_enter_kill", l.ctl.HandleSysEnterKill, false},
+		{"sys_exit_kill", l.ctl.HandleSysExitKill, false},
+		// tkill is an obsolescent predecessor of tgkill; treat it like the
+		// other legacy syscall tracepoints.
+		{"sys_enter_tkill", l.ctl.HandleSysEnterTkill, true},
+		{"sys_exit_tkill", l.ctl.HandleSysExitTkill, true},
+		{"sys_enter_tgkill", l.ctl.HandleSysEnterTgkill, false},
+		{"sys_exit_tgkill", l.ctl.HandleSysExitTgkill, false},
+		{"sys_enter_ptrace", l.ctl.HandleSysEnterPtrace, false},
+		{"sys_exit_ptrace", l.ctl.HandleSysExitPtrace, false},
+		{"sys_enter_prctl", l.ctl.HandleSysEnterPrctl, false},
+		{"sys_exit_prctl", l.ctl.HandleSysExitPrctl, false},
+	}
+	if cfg == nil || cfg.EnableFileIOEvents {
+		// Legacy variants (open, unlink, rename) follow the fork/vfork
+		// precedent: some kernels refuse perf links on them.
+		tracepoints = append(tracepoints,
+			tp{"sys_enter_open", l.file.HandleSysEnterOpen, true},
+			tp{"sys_exit_open", l.file.HandleSysExitOpen, true},
+			tp{"sys_enter_openat", l.file.HandleSysEnterOpenat, false},
+			tp{"sys_exit_openat", l.file.HandleSysExitOpenat, false},
+			tp{"sys_enter_openat2", l.file.HandleSysEnterOpenat2, false},
+			tp{"sys_exit_openat2", l.file.HandleSysExitOpenat2, false},
+			tp{"sys_enter_unlink", l.file.HandleSysEnterUnlink, true},
+			tp{"sys_exit_unlink", l.file.HandleSysExitUnlink, true},
+			tp{"sys_enter_unlinkat", l.file.HandleSysEnterUnlinkat, false},
+			tp{"sys_exit_unlinkat", l.file.HandleSysExitUnlinkat, false},
+			tp{"sys_enter_rename", l.file.HandleSysEnterRename, true},
+			tp{"sys_exit_rename", l.file.HandleSysExitRename, true},
+			tp{"sys_enter_renameat", l.file.HandleSysEnterRenameat, false},
+			tp{"sys_exit_renameat", l.file.HandleSysExitRenameat, false},
+			tp{"sys_enter_renameat2", l.file.HandleSysEnterRenameat2, false},
+			tp{"sys_exit_renameat2", l.file.HandleSysExitRenameat2, false},
+		)
+	}
+	if cfg == nil || cfg.EnableNetEvents {
+		tracepoints = append(tracepoints,
+			tp{"sys_enter_connect", l.net.HandleSysEnterConnect, false},
+			tp{"sys_exit_connect", l.net.HandleSysExitConnect, false},
+			tp{"sys_enter_accept", l.net.HandleSysEnterAccept, false},
+			tp{"sys_exit_accept", l.net.HandleSysExitAccept, false},
+			tp{"sys_enter_accept4", l.net.HandleSysEnterAccept4, false},
+			tp{"sys_exit_accept4", l.net.HandleSysExitAccept4, false},
+		)
+	}
+	if cfg == nil || cfg.EnableMemEvents {
+		tracepoints = append(tracepoints,
+			tp{"sys_enter_mmap", l.mem.HandleSysEnterMmap, false},
+			tp{"sys_exit_mmap", l.mem.HandleSysExitMmap, false},
+			tp{"sys_enter_process_vm_readv", l.mem.HandleSysEnterProcessVmReadv, false},
+			tp{"sys_exit_process_vm_readv", l.mem.HandleSysExitProcessVmReadv, false},
+			tp{"sys_enter_process_vm_writev", l.mem.HandleSysEnterProcessVmWritev, false},
+			tp{"sys_exit_process_vm_writev", l.mem.HandleSysExitProcessVmWritev, false},
+		)
 	}
 	for _, t := range tracepoints {
 		if t.prog == nil {
@@ -276,6 +396,26 @@ func (l *loader) Close() error {
 		}
 		// Replacement collections share maps owned by execve. Close only their
 		// programs so the canonical maps are released once.
+		if l.ctl != nil {
+			if e := l.ctl.ctlPrograms.Close(); e != nil {
+				err = e
+			}
+		}
+		if l.mem != nil {
+			if e := l.mem.memPrograms.Close(); e != nil {
+				err = e
+			}
+		}
+		if l.net != nil {
+			if e := l.net.netPrograms.Close(); e != nil {
+				err = e
+			}
+		}
+		if l.file != nil {
+			if e := l.file.filePrograms.Close(); e != nil {
+				err = e
+			}
+		}
 		if l.iter != nil {
 			if e := l.iter.prociterPrograms.Close(); e != nil {
 				err = e
