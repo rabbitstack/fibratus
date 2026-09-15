@@ -31,6 +31,8 @@ import (
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/rlimit"
+	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
@@ -73,9 +75,11 @@ func loadCollections() (*loader, error) {
 	}
 
 	replacements := map[string]*ebpf.Map{
-		eventsMapName:    execObjs.Events,
-		dropCountMapName: execObjs.DropCount,
-		scratchMapName:   execObjs.Scratch,
+		eventsMapName:      execObjs.Events,
+		dropCountMapName:   execObjs.DropCount,
+		scratchMapName:     execObjs.Scratch,
+		scratchHeapMapName: execObjs.ScratchHeap,
+		enabledMapName:     execObjs.Enabled,
 	}
 	opts := &ebpf.CollectionOptions{MapReplacements: replacements}
 
@@ -118,6 +122,45 @@ func (l *loader) dropCount() uint64 {
 	}
 	_ = l.exec.DropCount.Lookup(&key, &drop)
 	return drop
+}
+
+func (l *loader) setEnabledTypes(cfg *config.EventSourceConfig) error {
+	if l.exec == nil || l.exec.Enabled == nil {
+		return fmt.Errorf("missing enabled map")
+	}
+	for typ, on := range enabledTypes(cfg) {
+		key := uint32(typ)
+		var val uint8
+		if on {
+			val = 1
+		}
+		if err := l.exec.Enabled.Put(&key, &val); err != nil {
+			return fmt.Errorf("enabling %s: %w", typ, err)
+		}
+	}
+	return nil
+}
+
+func enabledTypes(cfg *config.EventSourceConfig) map[event.Type]bool {
+	file := cfg == nil || cfg.EnableFileIOEvents
+	netev := cfg == nil || cfg.EnableNetEvents
+	mem := cfg == nil || cfg.EnableMemEvents
+	return map[event.Type]bool{
+		event.Execve:         true,
+		event.Exit:           true,
+		event.Clone:          true,
+		event.Kill:           true,
+		event.Ptrace:         true,
+		event.Prctl:          true,
+		event.Openat:         file,
+		event.Unlink:         file,
+		event.Rename:         file,
+		event.Connect:        netev,
+		event.Accept:         netev,
+		event.Mmap:           mem,
+		event.ProcessVMRead:  mem,
+		event.ProcessVMWrite: mem,
+	}
 }
 
 // syscallsGroup is the tracefs group hosting raw syscall tracepoints.

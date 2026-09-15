@@ -21,7 +21,9 @@
 package ebpf
 
 const (
-	eventsMapName    = "events"
-	dropCountMapName = "drop_count"
-	scratchMapName   = "scratch"
+	eventsMapName      = "events"
+	dropCountMapName   = "drop_count"
+	scratchMapName     = "scratch"
+	scratchHeapMapName = "scratch_heap"
+	enabledMapName     = "enabled"
 )

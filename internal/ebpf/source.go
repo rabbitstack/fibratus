@@ -109,6 +109,11 @@ func (e *EventSource) Open(cfg *config.Config) error {
 	}
 	e.loader = ldr
 
+	if err := ldr.setEnabledTypes(&e.config.EventSource); err != nil {
+		_ = ldr.Close()
+		return err
+	}
+
 	rd, err := newRingReader(ldr.eventsMap())
 	if err != nil {
 		_ = ldr.Close()
