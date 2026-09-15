@@ -1,19 +1,20 @@
 //go:build ignore
 
 #include "common/events.h"
-#include "bpf_core_read.h"
 #include "bpf_tracing.h"
 
 char LICENSE[] SEC("license") = "Dual MIT/GPL";
 
 static __always_inline int handle_clone_enter(u64 flags, u32 syscall_id)
 {
-	u64 key = bpf_get_current_pid_tgid();
-	struct scratch_value val = {};
+	struct scratch_value *val;
 
-	val.arg0 = flags;
-	val.arg1 = syscall_id;
-	bpf_map_update_elem(&scratch, &key, &val, BPF_ANY);
+	val = borrow_scratch();
+	if (!val)
+		return 0;
+	val->flags = flags;
+	val->arg1 = syscall_id;
+	store_scratch(val);
 	return 0;
 }
 
@@ -22,9 +23,6 @@ static __always_inline int handle_clone_exit(long ret, u32 syscall_id)
 	u64 key = bpf_get_current_pid_tgid();
 	struct scratch_value *val;
 	struct syscall_event *e;
-	struct task_struct *task;
-	struct task_struct *parent;
-	const struct cred *cred;
 
 	/* Successful clones are emitted from sched_process_fork with child identity.
 	 * Leave scratch in place so the fork handler can recover clone flags.
@@ -32,29 +30,25 @@ static __always_inline int handle_clone_exit(long ret, u32 syscall_id)
 	if (ret >= 0)
 		return 0;
 
-	e = reserve_event();
-	if (!e)
+	if (!type_enabled(EVT_TYPE_CLONE)) {
+		bpf_map_delete_elem(&scratch, &key);
 		return 0;
+	}
+
+	e = reserve_event();
+	if (!e) {
+		bpf_map_delete_elem(&scratch, &key);
+		return 0;
+	}
 
 	e->type = EVT_TYPE_CLONE;
 	e->syscall_id = syscall_id;
 	e->retval = ret;
-	fill_current_ids(e);
-
-	task = (struct task_struct *)bpf_get_current_task();
-	e->start_boottime = BPF_CORE_READ(task, start_boottime);
-	parent = BPF_CORE_READ(task, real_parent);
-	if (parent)
-		e->ppid = BPF_CORE_READ(parent, tgid);
-	cred = BPF_CORE_READ(task, real_cred);
-	if (cred) {
-		e->uid = BPF_CORE_READ(cred, euid.val);
-		e->gid = BPF_CORE_READ(cred, egid.val);
-	}
+	fill_current_task(e);
 
 	val = bpf_map_lookup_elem(&scratch, &key);
 	if (val) {
-		e->flags = val->arg0;
+		copy_scratch(e, val);
 		if (!e->syscall_id)
 			e->syscall_id = (u32)val->arg1;
 	}
@@ -126,6 +120,8 @@ int BPF_PROG(handle_sched_process_fork, struct task_struct *parent, struct task_
 
 	if (!child || !parent)
 		return 0;
+	if (!type_enabled(EVT_TYPE_CLONE))
+		return 0;
 
 	e = reserve_event();
 	if (!e)
@@ -154,7 +150,7 @@ int BPF_PROG(handle_sched_process_fork, struct task_struct *parent, struct task_
 	key = ((u64)parent->tgid << 32) | (u32)parent->pid;
 	val = bpf_map_lookup_elem(&scratch, &key);
 	if (val) {
-		e->flags = val->arg0;
+		copy_scratch(e, val);
 		e->syscall_id = (u32)val->arg1;
 		bpf_map_delete_elem(&scratch, &key);
 	}
