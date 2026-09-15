@@ -32,6 +32,9 @@ import (
 
 func testConfig() *config.Config {
 	cfg := &config.Config{ForwardMode: true}
+	cfg.EventSource.EnableFileIOEvents = true
+	cfg.EventSource.EnableNetEvents = true
+	cfg.EventSource.EnableMemEvents = true
 	cfg.EventSource.Init()
 	return cfg
 }

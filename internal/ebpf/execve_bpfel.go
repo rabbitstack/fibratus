@@ -14,10 +14,16 @@ import (
 )
 
 type execveScratchValue struct {
-	_        structs.HostLayout
-	Arg0     uint64
-	Arg1     uint64
-	Filename [256]uint8
+	_         structs.HostLayout
+	Arg0      uint64
+	Arg1      uint64
+	Arg2      uint64
+	Arg3      uint64
+	Flags     uint64
+	Truncated uint32
+	Pad       uint32
+	Filename  [256]uint8
+	Filename2 [256]uint8
 }
 
 // loadExecve returns the embedded CollectionSpec for execve.
@@ -72,9 +78,11 @@ type execveProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type execveMapSpecs struct {
-	DropCount *ebpf.MapSpec `ebpf:"drop_count"`
-	Events    *ebpf.MapSpec `ebpf:"events"`
-	Scratch   *ebpf.MapSpec `ebpf:"scratch"`
+	DropCount   *ebpf.MapSpec `ebpf:"drop_count"`
+	Enabled     *ebpf.MapSpec `ebpf:"enabled"`
+	Events      *ebpf.MapSpec `ebpf:"events"`
+	Scratch     *ebpf.MapSpec `ebpf:"scratch"`
+	ScratchHeap *ebpf.MapSpec `ebpf:"scratch_heap"`
 }
 
 // execveVariableSpecs contains global variables before they are loaded into the kernel.
@@ -103,16 +111,20 @@ func (o *execveObjects) Close() error {
 //
 // It can be passed to loadExecveObjects or ebpf.CollectionSpec.LoadAndAssign.
 type execveMaps struct {
-	DropCount *ebpf.Map `ebpf:"drop_count"`
-	Events    *ebpf.Map `ebpf:"events"`
-	Scratch   *ebpf.Map `ebpf:"scratch"`
+	DropCount   *ebpf.Map `ebpf:"drop_count"`
+	Enabled     *ebpf.Map `ebpf:"enabled"`
+	Events      *ebpf.Map `ebpf:"events"`
+	Scratch     *ebpf.Map `ebpf:"scratch"`
+	ScratchHeap *ebpf.Map `ebpf:"scratch_heap"`
 }
 
 func (m *execveMaps) Close() error {
 	return _ExecveClose(
 		m.DropCount,
+		m.Enabled,
 		m.Events,
 		m.Scratch,
+		m.ScratchHeap,
 	)
 }
 
