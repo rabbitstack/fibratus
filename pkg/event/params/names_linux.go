@@ -45,8 +45,12 @@ const (
 	FileMode = "file_mode"
 	// FD is a file descriptor.
 	FD = "fd"
+	// NewFD is the connected file descriptor returned by accept.
+	NewFD = "new_fd"
 	// SockFamily is the socket address family (AF_INET, AF_INET6, AF_UNIX).
 	SockFamily = "sock_family"
+	// SockFlags is the flags bitmask supplied to accept4.
+	SockFlags = "sock_flags"
 	// SockPath is the filesystem path of an AF_UNIX socket.
 	SockPath = "sock_path"
 	// MmapFlags is the raw mmap flags bitmask.

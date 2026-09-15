@@ -248,3 +248,32 @@ static __always_inline int store_scratch(struct scratch_value *val)
 
 	return bpf_map_update_elem(&scratch, &key, val, BPF_ANY);
 }
+
+static __always_inline int submit_from_scratch(u32 type, long ret, u32 syscall_id)
+{
+	u64 key = bpf_get_current_pid_tgid();
+	struct scratch_value *val;
+	struct syscall_event *e;
+
+	if (!type_enabled(type)) {
+		bpf_map_delete_elem(&scratch, &key);
+		return 0;
+	}
+
+	e = reserve_event();
+	if (!e) {
+		bpf_map_delete_elem(&scratch, &key);
+		return 0;
+	}
+
+	e->type = type;
+	e->syscall_id = syscall_id;
+	e->retval = ret;
+	fill_current_task(e);
+	val = bpf_map_lookup_elem(&scratch, &key);
+	if (val)
+		copy_scratch(e, val);
+	bpf_map_delete_elem(&scratch, &key);
+	bpf_ringbuf_submit(e, 0);
+	return 0;
+}

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Regenerate bpf2go bindings for the Linux eBPF process source.
+# Regenerate bpf2go bindings for the Linux eBPF syscall telemetry source.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -32,5 +32,9 @@ generate execve ./c/execve.bpf.c
 generate exit ./c/exit.bpf.c
 generate clone ./c/clone.bpf.c
 generate prociter ./c/proc_iter.bpf.c
+generate file ./c/file.bpf.c
+generate net ./c/net.bpf.c
+generate mem ./c/mem.bpf.c
+generate ctl ./c/ctl.bpf.c
 
 echo "generated eBPF bindings"
