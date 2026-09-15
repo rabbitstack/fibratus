@@ -22,6 +22,8 @@ package ebpf
 
 import (
 	"os"
+	"os/exec"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -80,4 +82,46 @@ func execLookPath() string {
 		}
 	}
 	return "/bin/sh"
+}
+
+func TestLiveSyscallTelemetry(t *testing.T) {
+	cfg := testConfig()
+	es := NewEventSource(ps.NewSnapshotter(), cfg, nil).(*EventSource)
+	if err := es.Open(cfg); err != nil {
+		t.Fatalf("opening process source: %v", err)
+	}
+	t.Cleanup(func() { _ = es.Close() })
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "x")
+	script := "echo hi > \"$1\" && mv \"$1\" \"$1.new\" && rm -f \"$1.new\" && kill -0 $$"
+	cmd := exec.Command("/bin/sh", "-c", script, "sh", path)
+	require.NoError(t, cmd.Run())
+
+	deadline := time.Now().Add(5 * time.Second)
+	saw := map[event.Type]bool{}
+	for time.Now().Before(deadline) && (!saw[event.Openat] || !saw[event.Rename] || !saw[event.Unlink] || !saw[event.Kill]) {
+		select {
+		case evt := <-es.Events():
+			switch evt.Type {
+			case event.Openat, event.Rename, event.Unlink, event.Kill, event.Mmap:
+				saw[evt.Type] = true
+			}
+		case err := <-es.Errors():
+			t.Fatalf("event source error: %v", err)
+		case <-time.After(50 * time.Millisecond):
+		}
+	}
+	if !saw[event.Openat] {
+		t.Fatal("did not observe openat")
+	}
+	if !saw[event.Rename] {
+		t.Fatal("did not observe rename")
+	}
+	if !saw[event.Unlink] {
+		t.Fatal("did not observe unlink")
+	}
+	if !saw[event.Kill] {
+		t.Fatal("did not observe kill")
+	}
 }
