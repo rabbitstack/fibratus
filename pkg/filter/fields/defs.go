@@ -117,6 +117,20 @@ const (
 	PsUUID Field = "ps.uuid"
 	// PsParentUUID represents the unique parent process identifier
 	PsParentUUID Field = "ps.parent.uuid"
+	// PsUID represents the real user identifier of the process
+	PsUID Field = "ps.uid"
+	// PsGID represents the real group identifier of the process
+	PsGID Field = "ps.gid"
+	// PsSignal represents the POSIX signal number
+	PsSignal Field = "ps.signal"
+	// PsTargetPID represents the target process identifier of kill, ptrace, or process_vm operations
+	PsTargetPID Field = "ps.target.pid"
+	// PsPtraceRequest represents the ptrace request code
+	PsPtraceRequest Field = "ps.ptrace.request"
+	// PsPrctlOption represents the prctl option code
+	PsPrctlOption Field = "ps.prctl.option"
+	// PsCloneFlags represents the clone flags bitmask
+	PsCloneFlags Field = "ps.clone.flags"
 	// PsTokenIntegrityLevel represents the field that indicates the current process integrity level
 	PsTokenIntegrityLevel = "ps.token.integrity_level"
 	// PsTokenIsElevated  represents the field that indicates if the current process token is elevated
@@ -203,6 +217,8 @@ const (
 	ThreadStartAddress Field = "thread.start_address"
 	// ThreadPID is the process identifier where the thread is created
 	ThreadPID Field = "thread.pid"
+	// ThreadTID is the thread identifier
+	ThreadTID Field = "thread.tid"
 	// ThreadTEB is the thread environment block base address
 	ThreadTEB Field = "thread.teb_address"
 	// ThreadAccessMask represents the thread access rights field
@@ -361,6 +377,12 @@ const (
 	EvtNparams Field = "evt.nparams"
 	// EvtArg represents the field sequence for generic argument access
 	EvtArg Field = "evt.arg"
+	// EvtRetval represents the syscall return value
+	EvtRetval Field = "evt.retval"
+	// EvtSyscall represents the raw architecture-specific syscall number
+	EvtSyscall Field = "evt.syscall"
+	// EvtTruncated indicates whether variable-length event fields were truncated
+	EvtTruncated Field = "evt.truncated"
 	// EvtIsDirectSyscall represents the field that designates if this event is
 	// performing a direct syscall.
 	EvtIsDirectSyscall Field = "evt.is_direct_syscall"
@@ -442,6 +464,12 @@ const (
 	NetSIPNames Field = "net.sip.names"
 	// NetDIPNames represents the destination IP names
 	NetDIPNames Field = "net.dip.names"
+	// NetFamily represents the socket address family
+	NetFamily Field = "net.family"
+	// NetPath represents the filesystem path of an AF_UNIX socket
+	NetPath Field = "net.path"
+	// NetFD represents the socket file descriptor
+	NetFD Field = "net.fd"
 
 	// FileObject represents the address of the file object
 	FileObject Field = "file.object"
@@ -453,6 +481,18 @@ const (
 	FilePathStem Field = "file.path.stem"
 	// FileExtension represents the file extension (e.g. .exe or .dll)
 	FileExtension Field = "file.extension"
+	// FileNewPath represents the destination path of a rename
+	FileNewPath Field = "file.new_path"
+	// FileDirFD represents a directory file descriptor, including AT_FDCWD
+	FileDirFD Field = "file.dirfd"
+	// FileFD represents a file descriptor
+	FileFD Field = "file.fd"
+	// FileFlags represents the raw openat, unlinkat, or renameat flags bitmask
+	FileFlags Field = "file.flags"
+	// FileMode represents the file creation mode supplied to openat
+	FileMode Field = "file.mode"
+	// FileTruncated indicates whether the file path was truncated
+	FileTruncated Field = "file.truncated"
 	// FileOperation represents the file operation (e.g. create)
 	FileOperation Field = "file.operation"
 	// FileShareMask represents the file share mask
@@ -639,6 +679,14 @@ const (
 	MemProtection Field = "mem.protection"
 	// MemProtectionMask identifies the field that represents the memory protection in mask notation
 	MemProtectionMask Field = "mem.protection.mask"
+	// MemFlags represents the mmap flags bitmask
+	MemFlags Field = "mem.flags"
+	// MemFD represents the file descriptor backing a mapping
+	MemFD Field = "mem.fd"
+	// MemOffset represents the file offset of a memory mapping
+	MemOffset Field = "mem.offset"
+	// MemTargetPID represents the target process identifier of a process_vm operation
+	MemTargetPID Field = "mem.target.pid"
 
 	// DNSName identifies the field that represents the DNS name
 	DNSName Field = "dns.name"
@@ -925,37 +973,6 @@ var commonFields = map[Field]FieldInfo{
 	EvtDateWeekday: {EvtDateWeekday, "week day on which the event occurred", platformAnsiString(), []string{"evt.date.weekday = 'Monday'"}, nil, nil},
 	EvtNparams:     {EvtNparams, "number of parameters", params.Int8, []string{"evt.nparams > 2"}, nil, nil},
 	EvtArg: {EvtArg, "event parameter", params.Object, []string{"evt.arg[cmdline] istartswith 'C:\\Windows'"}, nil, &Argument{Optional: false, Pattern: "[a-z0-9_]+", ValidationFunc: func(s string) bool {
-		for _, c := range s {
-			switch {
-			case unicode.IsLower(c):
-			case unicode.IsNumber(c):
-			case c == '_':
-			default:
-				return false
-			}
-		}
-		return true
-	}}},
-	KevtSeq:         {KevtSeq, "event sequence number", params.Uint64, []string{"kevt.seq > 666"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtSeq}}, nil},
-	KevtCPU:         {KevtCPU, "logical processor core where the event was generated", params.Uint8, []string{"kevt.cpu = 2"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtCPU}}, nil},
-	KevtName:        {KevtName, "symbolical event name", platformAnsiString(), []string{"kevt.name = 'CreateThread'"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtName}}, nil},
-	KevtCategory:    {KevtCategory, "event category", platformAnsiString(), []string{"kevt.category = 'registry'"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtCategory}}, nil},
-	KevtDesc:        {KevtDesc, "event description", platformAnsiString(), []string{"kevt.desc contains 'Creates a new process'"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtDesc}}, nil},
-	KevtHost:        {KevtHost, "host name on which the event was produced", platformString(), []string{"kevt.host contains 'kitty'"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtHost}}, nil},
-	KevtTime:        {KevtTime, "event timestamp as a time string", params.Time, []string{"kevt.time = '17:05:32'"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtTime}}, nil},
-	KevtTimeHour:    {KevtTimeHour, "hour within the day on which the event occurred", params.Time, []string{"kevt.time.h = 23"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtTimeHour}}, nil},
-	KevtTimeMin:     {KevtTimeMin, "minute offset within the hour on which the event occurred", params.Time, []string{"kevt.time.m = 54"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtTimeMin}}, nil},
-	KevtTimeSec:     {KevtTimeSec, "second offset within the minute  on which the event occurred", params.Time, []string{"kevt.time.s = 0"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtTimeSec}}, nil},
-	KevtTimeNs:      {KevtTimeNs, "nanoseconds specified by event timestamp", params.Int64, []string{"kevt.time.ns > 1591191629102337000"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtTimeNs}}, nil},
-	KevtDate:        {KevtDate, "event timestamp as a date string", params.Time, []string{"kevt.date = '2018-03-03'"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtDate}}, nil},
-	KevtDateDay:     {KevtDateDay, "day of the month on which the event occurred", params.Time, []string{"kevt.date.d = 12"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtDateDay}}, nil},
-	KevtDateMonth:   {KevtDateMonth, "month of the year on which the event occurred", params.Time, []string{"kevt.date.m = 11"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtDateMonth}}, nil},
-	KevtDateYear:    {KevtDateYear, "year on which the event occurred", params.Uint32, []string{"kevt.date.y = 2020"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtDateYear}}, nil},
-	KevtDateTz:      {KevtDateTz, "time zone associated with the event timestamp", platformAnsiString(), []string{"kevt.date.tz = 'UTC'"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtDateTz}}, nil},
-	KevtDateWeek:    {KevtDateWeek, "week number within the year on which the event occurred", params.Uint8, []string{"kevt.date.week = 2"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtDateWeek}}, nil},
-	KevtDateWeekday: {KevtDateWeekday, "week day on which the event occurred", platformAnsiString(), []string{"kevt.date.weekday = 'Monday'"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtDateWeekday}}, nil},
-	KevtNparams:     {KevtNparams, "number of parameters", params.Int8, []string{"kevt.nparams > 2"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtNparams}}, nil},
-	KevtArg: {KevtArg, "event parameter", params.Object, []string{"kevt.arg[cmdline] istartswith 'C:\\Windows'"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtArg}}, &Argument{Optional: false, Pattern: "[a-z0-9_]+", ValidationFunc: func(s string) bool {
 		for _, c := range s {
 			switch {
 			case unicode.IsLower(c):
