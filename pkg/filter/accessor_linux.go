@@ -49,10 +49,8 @@ func platformEvtValue(f Field, evt *event.Event) (params.Value, error) {
 	switch f.Name {
 	case fields.EvtRetval:
 		return evt.Params.GetInt64(params.Retval)
-	case fields.EvtSyscall:
+	case fields.EvtSyscallID:
 		return evt.Params.GetUint32(params.SyscallID)
-	case fields.EvtTruncated:
-		return evt.Params.TryGetUint32(params.Truncated) != 0, nil
 	default:
 		return nil, nil
 	}
@@ -245,7 +243,7 @@ func (*fileAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 		return filepath.Base(e.GetParamAsString(params.FilePath)), nil
 	case fields.FileExtension:
 		return filepath.Ext(e.GetParamAsString(params.FilePath)), nil
-	case fields.FileNewPath:
+	case fields.FilePathTarget:
 		return e.GetParamAsString(params.FileNewPath), nil
 	case fields.FileDirFD:
 		return e.Params.GetInt64(params.DirFD)
@@ -255,10 +253,6 @@ func (*fileAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 		return e.Params.GetUint64(params.FileFlags)
 	case fields.FileMode:
 		return e.Params.GetUint64(params.FileMode)
-	case fields.FileTruncated:
-		// for file events both truncation bits designate a clipped
-		// path: the source path or the rename destination
-		return e.Params.TryGetUint32(params.Truncated) != 0, nil
 	default:
 		return nil, nil
 	}
@@ -283,7 +277,7 @@ func (*networkAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 		return e.Params.GetUint16(params.NetSport)
 	case fields.NetFamily:
 		return e.Params.GetUint16(params.SockFamily)
-	case fields.NetPath:
+	case fields.NetUnixPath:
 		return e.GetParamAsString(params.SockPath), nil
 	case fields.NetFD:
 		return e.Params.GetInt64(params.FD)
@@ -307,11 +301,11 @@ func (*memAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 		return e.Params.GetUint64(params.MemRegionSize)
 	case fields.MemProtection:
 		return e.Params.GetUint32(params.MemProtect)
-	case fields.MemFlags:
+	case fields.MemMmapFlags:
 		return e.Params.GetUint64(params.MmapFlags)
-	case fields.MemFD:
+	case fields.MemMmapFD:
 		return e.Params.GetInt64(params.FD)
-	case fields.MemOffset:
+	case fields.MemMmapOffset:
 		return e.Params.GetUint64(params.MmapOffset)
 	case fields.MemTargetPID:
 		return e.Params.GetUint64(params.TargetProcessID)
