@@ -30,10 +30,41 @@ func platformString() params.Type     { return params.UnicodeString }
 func platformAnsiString() params.Type { return params.AnsiString }
 
 var fields = platformFields(map[Field]FieldInfo{
-	EvtPID:                      {EvtPID, "process identifier generating the event", params.Uint32, []string{"evt.pid = 6"}, nil, nil},
-	EvtTID:                      {EvtTID, "thread identifier generating the event", params.Uint32, []string{"evt.tid = 1024"}, nil, nil},
-	KevtPID:                     {KevtPID, "process identifier generating the event", params.Uint32, []string{"kevt.pid = 6"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtPID}}, nil},
-	KevtTID:                     {KevtTID, "thread identifier generating the event", params.Uint32, []string{"kevt.tid = 1024"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtTID}}, nil},
+	EvtPID:          {EvtPID, "process identifier generating the event", params.Uint32, []string{"evt.pid = 6"}, nil, nil},
+	EvtTID:          {EvtTID, "thread identifier generating the event", params.Uint32, []string{"evt.tid = 1024"}, nil, nil},
+	KevtPID:         {KevtPID, "process identifier generating the event", params.Uint32, []string{"kevt.pid = 6"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtPID}}, nil},
+	KevtTID:         {KevtTID, "thread identifier generating the event", params.Uint32, []string{"kevt.tid = 1024"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtTID}}, nil},
+	KevtSeq:         {KevtSeq, "event sequence number", params.Uint64, []string{"kevt.seq > 666"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtSeq}}, nil},
+	KevtCPU:         {KevtCPU, "logical processor core where the event was generated", params.Uint8, []string{"kevt.cpu = 2"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtCPU}}, nil},
+	KevtName:        {KevtName, "symbolical event name", platformAnsiString(), []string{"kevt.name = 'CreateThread'"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtName}}, nil},
+	KevtCategory:    {KevtCategory, "event category", platformAnsiString(), []string{"kevt.category = 'registry'"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtCategory}}, nil},
+	KevtDesc:        {KevtDesc, "event description", platformAnsiString(), []string{"kevt.desc contains 'Creates a new process'"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtDesc}}, nil},
+	KevtHost:        {KevtHost, "host name on which the event was produced", platformString(), []string{"kevt.host contains 'kitty'"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtHost}}, nil},
+	KevtTime:        {KevtTime, "event timestamp as a time string", params.Time, []string{"kevt.time = '17:05:32'"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtTime}}, nil},
+	KevtTimeHour:    {KevtTimeHour, "hour within the day on which the event occurred", params.Time, []string{"kevt.time.h = 23"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtTimeHour}}, nil},
+	KevtTimeMin:     {KevtTimeMin, "minute offset within the hour on which the event occurred", params.Time, []string{"kevt.time.m = 54"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtTimeMin}}, nil},
+	KevtTimeSec:     {KevtTimeSec, "second offset within the minute  on which the event occurred", params.Time, []string{"kevt.time.s = 0"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtTimeSec}}, nil},
+	KevtTimeNs:      {KevtTimeNs, "nanoseconds specified by event timestamp", params.Int64, []string{"kevt.time.ns > 1591191629102337000"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtTimeNs}}, nil},
+	KevtDate:        {KevtDate, "event timestamp as a date string", params.Time, []string{"kevt.date = '2018-03-03'"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtDate}}, nil},
+	KevtDateDay:     {KevtDateDay, "day of the month on which the event occurred", params.Time, []string{"kevt.date.d = 12"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtDateDay}}, nil},
+	KevtDateMonth:   {KevtDateMonth, "month of the year on which the event occurred", params.Time, []string{"kevt.date.m = 11"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtDateMonth}}, nil},
+	KevtDateYear:    {KevtDateYear, "year on which the event occurred", params.Uint32, []string{"kevt.date.y = 2020"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtDateYear}}, nil},
+	KevtDateTz:      {KevtDateTz, "time zone associated with the event timestamp", platformAnsiString(), []string{"kevt.date.tz = 'UTC'"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtDateTz}}, nil},
+	KevtDateWeek:    {KevtDateWeek, "week number within the year on which the event occurred", params.Uint8, []string{"kevt.date.week = 2"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtDateWeek}}, nil},
+	KevtDateWeekday: {KevtDateWeekday, "week day on which the event occurred", platformAnsiString(), []string{"kevt.date.weekday = 'Monday'"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtDateWeekday}}, nil},
+	KevtNparams:     {KevtNparams, "number of parameters", params.Int8, []string{"kevt.nparams > 2"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtNparams}}, nil},
+	KevtArg: {KevtArg, "event parameter", params.Object, []string{"kevt.arg[cmdline] istartswith 'C:\\Windows'"}, &Deprecation{Since: "3.0.0", Fields: []Field{EvtArg}}, &Argument{Optional: false, Pattern: "[a-z0-9_]+", ValidationFunc: func(s string) bool {
+		for _, c := range s {
+			switch {
+			case unicode.IsLower(c):
+			case unicode.IsNumber(c):
+			case c == '_':
+			default:
+				return false
+			}
+		}
+		return true
+	}}},
 	PsPid:                       {PsPid, "process identifier", params.PID, []string{"ps.pid = 1024"}, nil, nil},
 	PsPpid:                      {PsPpid, "parent process identifier", params.PID, []string{"ps.ppid = 45"}, nil, nil},
 	PsParentPid:                 {PsParentPid, "parent process id", params.Uint32, []string{"ps.parent.pid = 4"}, nil, nil},
