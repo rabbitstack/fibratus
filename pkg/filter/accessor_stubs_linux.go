@@ -7,6 +7,7 @@
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
+ *
  * You may obtain a copy of the License at
  *
  *  http://www.apache.org/licenses/LICENSE-2.0
@@ -34,13 +35,9 @@ func (noopAccessor) SetFields([]Field)                             {}
 func (noopAccessor) SetSegments([]fields.Segment)                  {}
 func (noopAccessor) IsFieldAccessible(*event.Event) bool           { return false }
 
-func newThreadAccessor() Accessor     { return noopAccessor{} }
 func newModuleAccessor() Accessor     { return noopAccessor{} }
-func newFileAccessor() Accessor       { return noopAccessor{} }
 func newRegistryAccessor() Accessor   { return noopAccessor{} }
-func newNetworkAccessor() Accessor    { return noopAccessor{} }
 func newHandleAccessor() Accessor     { return noopAccessor{} }
 func newPEAccessor() Accessor         { return noopAccessor{} }
-func newMemAccessor() Accessor        { return noopAccessor{} }
 func newDNSAccessor() Accessor        { return noopAccessor{} }
 func newThreadpoolAccessor() Accessor { return noopAccessor{} }

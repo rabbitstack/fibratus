@@ -70,6 +70,9 @@ func getParentPs(e *event.Event) *pstypes.PS {
 	return e.PS.Parent
 }
 
+// platformEvtValue resolves evt fields available only on other platforms.
+func platformEvtValue(Field, *event.Event) (params.Value, error) { return nil, nil }
+
 // psAccessor extracts process's state or event specific values.
 type psAccessor struct {
 	psnap psnap.Snapshotter
