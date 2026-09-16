@@ -31,6 +31,7 @@ import (
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/rlimit"
+	"github.com/rabbitstack/fibratus/internal/ebpf/bpf"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	log "github.com/sirupsen/logrus"
@@ -38,14 +39,14 @@ import (
 )
 
 type loader struct {
-	exec     *execveObjects
-	exit     *exitObjects
-	clone    *cloneObjects
-	iter     *prociterObjects
-	file     *fileObjects
-	net      *netObjects
-	mem      *memObjects
-	ctl      *ctlObjects
+	exec     *bpf.ExecveObjects
+	exit     *bpf.ExitObjects
+	clone    *bpf.CloneObjects
+	iter     *bpf.ProciterObjects
+	file     *bpf.FileObjects
+	net      *bpf.NetObjects
+	mem      *bpf.MemObjects
+	ctl      *bpf.CtlObjects
 	links    []link.Link
 	iterLink *link.Iter
 	once     sync.Once
@@ -56,40 +57,40 @@ func loadCollections() (*loader, error) {
 		return nil, fmt.Errorf("removing memlock: %w", err)
 	}
 
-	execSpec, err := loadExecve()
+	execSpec, err := bpf.LoadExecve()
 	if err != nil {
 		return nil, fmt.Errorf("loading execve collection spec: %w", err)
 	}
-	exitSpec, err := loadExit()
+	exitSpec, err := bpf.LoadExit()
 	if err != nil {
 		return nil, fmt.Errorf("loading exit collection spec: %w", err)
 	}
-	cloneSpec, err := loadClone()
+	cloneSpec, err := bpf.LoadClone()
 	if err != nil {
 		return nil, fmt.Errorf("loading clone collection spec: %w", err)
 	}
-	iterSpec, err := loadProciter()
+	iterSpec, err := bpf.LoadProciter()
 	if err != nil {
 		return nil, fmt.Errorf("loading prociter collection spec: %w", err)
 	}
-	fileSpec, err := loadFile()
+	fileSpec, err := bpf.LoadFile()
 	if err != nil {
 		return nil, fmt.Errorf("loading file collection spec: %w", err)
 	}
-	netSpec, err := loadNet()
+	netSpec, err := bpf.LoadNet()
 	if err != nil {
 		return nil, fmt.Errorf("loading net collection spec: %w", err)
 	}
-	memSpec, err := loadMem()
+	memSpec, err := bpf.LoadMem()
 	if err != nil {
 		return nil, fmt.Errorf("loading mem collection spec: %w", err)
 	}
-	ctlSpec, err := loadCtl()
+	ctlSpec, err := bpf.LoadCtl()
 	if err != nil {
 		return nil, fmt.Errorf("loading ctl collection spec: %w", err)
 	}
 
-	var execObjs execveObjects
+	var execObjs bpf.ExecveObjects
 	if err := execSpec.LoadAndAssign(&execObjs, nil); err != nil {
 		return nil, fmt.Errorf("loading execve objects: %w", err)
 	}
@@ -103,20 +104,20 @@ func loadCollections() (*loader, error) {
 	}
 	opts := &ebpf.CollectionOptions{MapReplacements: replacements}
 
-	var exitObjs exitObjects
+	var exitObjs bpf.ExitObjects
 	if err := exitSpec.LoadAndAssign(&exitObjs, opts); err != nil {
 		_ = execObjs.Close()
 		return nil, fmt.Errorf("loading exit objects: %w", err)
 	}
 
-	var cloneObjs cloneObjects
+	var cloneObjs bpf.CloneObjects
 	if err := cloneSpec.LoadAndAssign(&cloneObjs, opts); err != nil {
 		_ = exitObjs.Close()
 		_ = execObjs.Close()
 		return nil, fmt.Errorf("loading clone objects: %w", err)
 	}
 
-	var iterObjs prociterObjects
+	var iterObjs bpf.ProciterObjects
 	if err := iterSpec.LoadAndAssign(&iterObjs, opts); err != nil {
 		_ = cloneObjs.Close()
 		_ = exitObjs.Close()
@@ -124,7 +125,7 @@ func loadCollections() (*loader, error) {
 		return nil, fmt.Errorf("loading prociter objects: %w", err)
 	}
 
-	var fileObjs fileObjects
+	var fileObjs bpf.FileObjects
 	if err := fileSpec.LoadAndAssign(&fileObjs, opts); err != nil {
 		_ = iterObjs.Close()
 		_ = cloneObjs.Close()
@@ -133,7 +134,7 @@ func loadCollections() (*loader, error) {
 		return nil, fmt.Errorf("loading file objects: %w", err)
 	}
 
-	var netObjs netObjects
+	var netObjs bpf.NetObjects
 	if err := netSpec.LoadAndAssign(&netObjs, opts); err != nil {
 		_ = fileObjs.Close()
 		_ = iterObjs.Close()
@@ -143,7 +144,7 @@ func loadCollections() (*loader, error) {
 		return nil, fmt.Errorf("loading net objects: %w", err)
 	}
 
-	var memObjs memObjects
+	var memObjs bpf.MemObjects
 	if err := memSpec.LoadAndAssign(&memObjs, opts); err != nil {
 		_ = netObjs.Close()
 		_ = fileObjs.Close()
@@ -154,7 +155,7 @@ func loadCollections() (*loader, error) {
 		return nil, fmt.Errorf("loading mem objects: %w", err)
 	}
 
-	var ctlObjs ctlObjects
+	var ctlObjs bpf.CtlObjects
 	if err := ctlSpec.LoadAndAssign(&ctlObjs, opts); err != nil {
 		_ = memObjs.Close()
 		_ = netObjs.Close()
@@ -387,37 +388,37 @@ func (l *loader) Close() error {
 		// Replacement collections share maps owned by execve. Close only their
 		// programs so the canonical maps are released once.
 		if l.ctl != nil {
-			if e := l.ctl.ctlPrograms.Close(); e != nil {
+			if e := l.ctl.CtlPrograms.Close(); e != nil {
 				err = e
 			}
 		}
 		if l.mem != nil {
-			if e := l.mem.memPrograms.Close(); e != nil {
+			if e := l.mem.MemPrograms.Close(); e != nil {
 				err = e
 			}
 		}
 		if l.net != nil {
-			if e := l.net.netPrograms.Close(); e != nil {
+			if e := l.net.NetPrograms.Close(); e != nil {
 				err = e
 			}
 		}
 		if l.file != nil {
-			if e := l.file.filePrograms.Close(); e != nil {
+			if e := l.file.FilePrograms.Close(); e != nil {
 				err = e
 			}
 		}
 		if l.iter != nil {
-			if e := l.iter.prociterPrograms.Close(); e != nil {
+			if e := l.iter.ProciterPrograms.Close(); e != nil {
 				err = e
 			}
 		}
 		if l.exit != nil {
-			if e := l.exit.exitPrograms.Close(); e != nil {
+			if e := l.exit.ExitPrograms.Close(); e != nil {
 				err = e
 			}
 		}
 		if l.clone != nil {
-			if e := l.clone.clonePrograms.Close(); e != nil {
+			if e := l.clone.ClonePrograms.Close(); e != nil {
 				err = e
 			}
 		}
