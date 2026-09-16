@@ -144,7 +144,7 @@ func (*evtAccessor) Get(f Field, evt *event.Event) (params.Value, error) {
 		return evt.Evasions&uint32(evasion.IndirectSyscall) != 0, nil
 	}
 
-	return nil, nil
+	return platformEvtValue(f, evt)
 }
 
 // narrowAccessors dynamically disables filter accessors by walking

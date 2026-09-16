@@ -53,6 +53,17 @@ func New(expr string, config *config.Config, options ...Option) Filter {
 	accessors := []Accessor{
 		newEventAccessor(),
 		newPSAccessor(opts.psnap),
+		newThreadAccessor(),
+	}
+
+	if config.EventSource.EnableFileIOEvents {
+		accessors = append(accessors, newFileAccessor())
+	}
+	if config.EventSource.EnableNetEvents {
+		accessors = append(accessors, newNetworkAccessor())
+	}
+	if config.EventSource.EnableMemEvents {
+		accessors = append(accessors, newMemAccessor())
 	}
 
 	fconfig := config.Filters
