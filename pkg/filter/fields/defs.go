@@ -130,7 +130,7 @@ const (
 	// PsPrctlOption represents the prctl option code
 	PsPrctlOption Field = "ps.prctl.option"
 	// PsCloneFlags represents the clone flags bitmask
-	PsCloneFlags Field = "ps.clone.flags"
+	PsCloneFlags Field = "ps.clone_flags"
 	// PsTokenIntegrityLevel represents the field that indicates the current process integrity level
 	PsTokenIntegrityLevel = "ps.token.integrity_level"
 	// PsTokenIsElevated  represents the field that indicates if the current process token is elevated
@@ -379,10 +379,8 @@ const (
 	EvtArg Field = "evt.arg"
 	// EvtRetval represents the syscall return value
 	EvtRetval Field = "evt.retval"
-	// EvtSyscall represents the raw architecture-specific syscall number
-	EvtSyscall Field = "evt.syscall"
-	// EvtTruncated indicates whether variable-length event fields were truncated
-	EvtTruncated Field = "evt.truncated"
+	// EvtSyscallID represents the raw architecture-specific syscall number
+	EvtSyscallID Field = "evt.syscall_id"
 	// EvtIsDirectSyscall represents the field that designates if this event is
 	// performing a direct syscall.
 	EvtIsDirectSyscall Field = "evt.is_direct_syscall"
@@ -466,8 +464,8 @@ const (
 	NetDIPNames Field = "net.dip.names"
 	// NetFamily represents the socket address family
 	NetFamily Field = "net.family"
-	// NetPath represents the filesystem path of an AF_UNIX socket
-	NetPath Field = "net.path"
+	// NetUnixPath represents the filesystem path of an AF_UNIX socket
+	NetUnixPath Field = "net.unix_path"
 	// NetFD represents the socket file descriptor
 	NetFD Field = "net.fd"
 
@@ -481,8 +479,8 @@ const (
 	FilePathStem Field = "file.path.stem"
 	// FileExtension represents the file extension (e.g. .exe or .dll)
 	FileExtension Field = "file.extension"
-	// FileNewPath represents the destination path of a rename
-	FileNewPath Field = "file.new_path"
+	// FilePathTarget represents the destination path of a rename or similar source/target file operation
+	FilePathTarget Field = "file.path.target"
 	// FileDirFD represents a directory file descriptor, including AT_FDCWD
 	FileDirFD Field = "file.dirfd"
 	// FileFD represents a file descriptor
@@ -491,8 +489,6 @@ const (
 	FileFlags Field = "file.flags"
 	// FileMode represents the file creation mode supplied to openat
 	FileMode Field = "file.mode"
-	// FileTruncated indicates whether the file path was truncated
-	FileTruncated Field = "file.truncated"
 	// FileOperation represents the file operation (e.g. create)
 	FileOperation Field = "file.operation"
 	// FileShareMask represents the file share mask
@@ -679,12 +675,12 @@ const (
 	MemProtection Field = "mem.protection"
 	// MemProtectionMask identifies the field that represents the memory protection in mask notation
 	MemProtectionMask Field = "mem.protection.mask"
-	// MemFlags represents the mmap flags bitmask
-	MemFlags Field = "mem.flags"
-	// MemFD represents the file descriptor backing a mapping
-	MemFD Field = "mem.fd"
-	// MemOffset represents the file offset of a memory mapping
-	MemOffset Field = "mem.offset"
+	// MemMmapFlags represents the mmap flags bitmask
+	MemMmapFlags Field = "mem.mmap.flags"
+	// MemMmapFD represents the file descriptor backing a mapping
+	MemMmapFD Field = "mem.mmap.fd"
+	// MemMmapOffset represents the file offset of a memory mapping
+	MemMmapOffset Field = "mem.mmap.offset"
 	// MemTargetPID represents the target process identifier of a process_vm operation
 	MemTargetPID Field = "mem.target.pid"
 
