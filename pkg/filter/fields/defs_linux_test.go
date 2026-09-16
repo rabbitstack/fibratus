@@ -66,7 +66,7 @@ func TestLinuxExcludesWindowsOnlyFields(t *testing.T) {
 	}
 }
 
-func TestLinuxKeVtNotDeprecatedBecauseAbsent(t *testing.T) {
+func TestKevtDeprecationAbsentOnLinux(t *testing.T) {
 	deprecated, d := IsDeprecated(KevtArg)
 	require.False(t, deprecated)
 	require.Nil(t, d)
