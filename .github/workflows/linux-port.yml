@@ -35,9 +35,8 @@ jobs:
           clang --version
       - name: Check generation drift
         run: |
-          chmod +x internal/ebpf/generate.sh
-          ./internal/ebpf/generate.sh
-          git diff --exit-code -- internal/ebpf
+          make ebpf
+          git diff --exit-code -- internal/ebpf/bpf
       - name: Unit tests
         run: go test ./internal/ebpf ./internal/bootstrap ./pkg/event ./pkg/ps ./pkg/api ./pkg/util/signals
       - name: Privileged process source
