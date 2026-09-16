@@ -111,6 +111,15 @@ func TestWindowsOnlyFieldsUnavailable(t *testing.T) {
 		`handle.name = 'mutant'`,
 		`dns.name = 'example.org'`,
 		`evt.is_direct_syscall = true`,
+		`evt.truncated = true`,
+		`file.truncated = true`,
+		`file.new_path = '/tmp/x'`,
+		`net.path = '/tmp/app.sock'`,
+		`ps.clone.flags = 0`,
+		`evt.syscall = 59`,
+		`mem.flags = 1`,
+		`mem.fd = 3`,
+		`mem.offset = 0`,
 	}
 	for _, expr := range exprs {
 		f := New(expr, cfg)
@@ -259,14 +268,14 @@ func TestProcFilter(t *testing.T) {
 		{execve, `evt.tid = 4242`, true},
 		{execve, `evt.cpu = 2`, true},
 		{execve, `evt.retval = 0`, true},
-		{execve, `evt.syscall = 59`, true},
+		{execve, `evt.syscall_id = 59`, true},
 		{execve, `evt.arg[exe] = '/bin/bash'`, true},
 		{kill, `ps.signal = 9`, true},
 		{kill, `ps.target.pid = 99`, true},
 		{ptrace, `ps.ptrace.request = 16`, true},
 		{ptrace, `ps.target.pid = 99`, true},
 		{prctl, `ps.prctl.option = 15`, true},
-		{clone, `ps.clone.flags = 0`, true},
+		{clone, `ps.clone_flags = 0`, true},
 	}
 	for i, tt := range tests {
 		got := evalFilter(t, tt.filter, tt.evt)
@@ -323,7 +332,7 @@ func TestFileFilter(t *testing.T) {
 		{openat, `file.flags = 0`, true},
 		{openat, `file.mode = 420`, true},
 		{openat, `evt.retval = 3`, true},
-		{rename, `file.new_path = '/tmp/new'`, true},
+		{rename, `file.path.target = '/tmp/new'`, true},
 		{rename, `file.path = '/tmp/old'`, true},
 		{unlink, `file.extension = '.log'`, true},
 		{unlink, `file.name = 'gone.log'`, true},
@@ -379,7 +388,7 @@ func TestNetFilter(t *testing.T) {
 	require.True(t, evalFilter(t, `net.fd = 5`, connect))
 	require.True(t, evalFilter(t, `net.sip = 127.0.0.1`, accept))
 	require.True(t, evalFilter(t, `net.sport = 80`, accept))
-	require.True(t, evalFilter(t, `net.path = '/tmp/app.sock'`, unixc))
+	require.True(t, evalFilter(t, `net.unix_path = '/tmp/app.sock'`, unixc))
 	require.True(t, evalFilter(t, `net.family = 1`, unixc))
 }
 
@@ -423,9 +432,9 @@ func TestMemFilter(t *testing.T) {
 	require.True(t, evalFilter(t, `mem.address = 8192`, mmap))
 	require.True(t, evalFilter(t, `mem.size = 8192`, mmap))
 	require.True(t, evalFilter(t, `mem.protection = 3`, mmap))
-	require.True(t, evalFilter(t, `mem.flags = 1`, mmap))
-	require.True(t, evalFilter(t, `mem.fd = 3`, mmap))
-	require.True(t, evalFilter(t, `mem.offset = 0`, mmap))
+	require.True(t, evalFilter(t, `mem.mmap.flags = 1`, mmap))
+	require.True(t, evalFilter(t, `mem.mmap.fd = 3`, mmap))
+	require.True(t, evalFilter(t, `mem.mmap.offset = 0`, mmap))
 	require.True(t, evalFilter(t, `mem.target.pid = 99`, vmread))
 	require.True(t, evalFilter(t, `mem.target.pid = 77`, vmwrite))
 }
@@ -474,12 +483,10 @@ func TestDefaultAndMissingValues(t *testing.T) {
 	}
 
 	require.True(t, evalFilter(t, `evt.retval = 0`, empty))
-	require.True(t, evalFilter(t, `evt.truncated = false`, empty))
 	require.True(t, evalFilter(t, `ps.signal = 0`, empty))
 	require.True(t, evalFilter(t, `file.path = ''`, fileEvt))
 	require.True(t, evalFilter(t, `not (file.path = '/tmp/x')`, fileEvt))
 	require.True(t, evalFilter(t, `file.fd = 0`, fileEvt))
-	require.True(t, evalFilter(t, `file.truncated = false`, fileEvt))
 	require.True(t, evalFilter(t, `mem.size = 0`, &event.Event{Type: event.Mmap, Category: event.Mem, Name: "mmap", Params: event.Params{}}))
 }
 
@@ -509,16 +516,14 @@ func TestTruncatedFields(t *testing.T) {
 		Category: event.File,
 		Name:     "openat",
 		Params: event.Params{
-			params.FilePath: {Name: params.FilePath, Type: params.Path, Value: "/tmp/full"},
+			params.FilePath:  {Name: params.FilePath, Type: params.Path, Value: "/tmp/full"},
+			params.Truncated: {Name: params.Truncated, Type: params.Uint32, Value: uint32(0)},
 		},
 	}
 
-	require.True(t, evalFilter(t, `file.truncated = true`, filenameTrunc))
-	require.True(t, evalFilter(t, `evt.truncated = true`, filenameTrunc))
-	require.True(t, evalFilter(t, `file.truncated = true`, auxTrunc))
-	require.True(t, evalFilter(t, `evt.truncated = true`, auxTrunc))
-	require.True(t, evalFilter(t, `file.truncated = false`, notTrunc))
-	require.True(t, evalFilter(t, `evt.truncated = false`, notTrunc))
+	require.True(t, evalFilter(t, `evt.arg[truncated] = 1`, filenameTrunc))
+	require.True(t, evalFilter(t, `evt.arg[truncated] = 2`, auxTrunc))
+	require.True(t, evalFilter(t, `evt.arg[truncated] = 0`, notTrunc))
 }
 
 func TestEveryLinuxEventType(t *testing.T) {
@@ -529,10 +534,10 @@ func TestEveryLinuxEventType(t *testing.T) {
 	}{
 		{&event.Event{Type: event.Execve, Category: event.Process, Name: "execve", PS: ps, Params: event.Params{params.Retval: {Name: params.Retval, Type: params.Int64, Value: int64(0)}}}, `evt.name = 'execve' and ps.name = 'bash'`},
 		{&event.Event{Type: event.Exit, Category: event.Process, Name: "exit", PS: ps, Params: event.Params{params.Retval: {Name: params.Retval, Type: params.Int64, Value: int64(0)}}}, `evt.name = 'exit' and evt.retval = 0`},
-		{&event.Event{Type: event.Clone, Category: event.Process, Name: "clone", PS: ps, Params: event.Params{params.CloneFlags: {Name: params.CloneFlags, Type: params.Uint64, Value: uint64(0)}}}, `evt.name = 'clone' and ps.clone.flags = 0`},
+		{&event.Event{Type: event.Clone, Category: event.Process, Name: "clone", PS: ps, Params: event.Params{params.CloneFlags: {Name: params.CloneFlags, Type: params.Uint64, Value: uint64(0)}}}, `evt.name = 'clone' and ps.clone_flags = 0`},
 		{&event.Event{Type: event.Openat, Category: event.File, Name: "openat", PS: ps, Params: event.Params{params.FilePath: {Name: params.FilePath, Type: params.Path, Value: "/tmp/x"}}}, `file.path = '/tmp/x'`},
 		{&event.Event{Type: event.Unlink, Category: event.File, Name: "unlink", PS: ps, Params: event.Params{params.FilePath: {Name: params.FilePath, Type: params.Path, Value: "/tmp/x"}}}, `file.name = 'x'`},
-		{&event.Event{Type: event.Rename, Category: event.File, Name: "rename", PS: ps, Params: event.Params{params.FileNewPath: {Name: params.FileNewPath, Type: params.Path, Value: "/tmp/y"}}}, `file.new_path = '/tmp/y'`},
+		{&event.Event{Type: event.Rename, Category: event.File, Name: "rename", PS: ps, Params: event.Params{params.FileNewPath: {Name: params.FileNewPath, Type: params.Path, Value: "/tmp/y"}}}, `file.path.target = '/tmp/y'`},
 		{&event.Event{Type: event.Connect, Category: event.Net, Name: "connect", PS: ps, Params: event.Params{params.NetDport: {Name: params.NetDport, Type: params.Port, Value: uint16(443)}}}, `net.dport = 443`},
 		{&event.Event{Type: event.Accept, Category: event.Net, Name: "accept", PS: ps, Params: event.Params{params.NetSport: {Name: params.NetSport, Type: params.Port, Value: uint16(80)}}}, `net.sport = 80`},
 		{&event.Event{Type: event.Mmap, Category: event.Mem, Name: "mmap", PS: ps, Params: event.Params{params.MemRegionSize: {Name: params.MemRegionSize, Type: params.Uint64, Value: uint64(4096)}}}, `mem.size = 4096`},
@@ -576,6 +581,6 @@ func TestFieldCatalogTypes(t *testing.T) {
 	require.Equal(t, params.Uint64, fields.PsUUID.Type())
 	require.Equal(t, params.Uint32, fields.PsUID.Type())
 	require.Equal(t, params.Int64, fields.PsSignal.Type())
-	require.Equal(t, params.Bool, fields.FileTruncated.Type())
-	require.Equal(t, params.Bool, fields.EvtTruncated.Type())
+	require.Equal(t, params.Uint32, fields.EvtSyscallID.Type())
+	require.Equal(t, params.String, fields.FilePathTarget.Type())
 }
