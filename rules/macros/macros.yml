@@ -91,17 +91,11 @@
 - macro: virtual_free
   expr: evt.name = 'VirtualFree'
 
-- macro: map_view_file
-  expr: evt.name = 'MapViewFile'
-
-- macro: unmap_view_file
-  expr: evt.name = 'UnmapViewFile'
-
 - macro: map_view_of_section
-  expr: map_view_file and file.view.type in ('IMAGE', 'IMAGE_NO_EXECUTE', 'PAGEFILE')
+  expr: evt.name = 'MapViewOfSection'
 
 - macro: unmap_view_of_section
-  expr: unmap_view_file and file.view.type in ('IMAGE', 'IMAGE_NO_EXECUTE')
+  expr: evt.name = 'UnmapViewOfSection'
 
 - macro: query_dns
   expr: evt.name = 'QueryDns'
