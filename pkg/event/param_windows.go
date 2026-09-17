@@ -213,14 +213,14 @@ var paramDecoder = &ParamDecoder{}
 // version number which helps us determine when the event
 // schema changes in order to parse new fields.
 func (e *Event) decodeParams(r *etw.EventRecord) {
-	switch r.Header.ProviderID {
-	case RegistryEventGUID:
+	switch r.Header.ProviderID.Data1 {
+	case RegistryEventGUID.Data1:
 		paramDecoder.DecodeRegistry(r, e)
-	case FileEventGUID:
+	case FileEventGUID.Data1:
 		paramDecoder.DecodeFile(r, e)
-	case StackWalkEventGUID:
+	case StackWalkEventGUID.Data1:
 		paramDecoder.DecodeStackwalk(r, e)
-	case AuditAPIEventGUID:
+	case AuditAPIEventGUID.Data1:
 		switch r.Header.EventDescriptor.ID {
 		case OpenProcessID:
 			paramDecoder.DecodeOpenProcess(r, e)
@@ -231,21 +231,21 @@ func (e *Event) decodeParams(r *etw.EventRecord) {
 		case CreateSymbolicLinkObjectID:
 			paramDecoder.DecodeCreateSymbolicLinkObject(r, e)
 		}
-	case MemEventGUID:
+	case MemoryEventGUID.Data1:
 		paramDecoder.DecodeMemory(r, e)
-	case NetworkTCPEventGUID, NetworkUDPEventGUID:
+	case NetworkTCPEventGUID.Data1, NetworkUDPEventGUID.Data1:
 		paramDecoder.DecodeNetwork(r, e)
-	case DNSEventGUID:
+	case DNSEventGUID.Data1:
 		paramDecoder.DecodeDNS(r, e)
-	case ProcessEventGUID:
+	case ProcessEventGUID.Data1:
 		paramDecoder.DecodeProcess(r, e)
-	case ModuleEventGUID:
+	case ModuleEventGUID.Data1:
 		paramDecoder.DecodeModule(r, e)
-	case ThreadEventGUID:
+	case ThreadEventGUID.Data1:
 		paramDecoder.DecodeThread(r, e)
-	case RegistryKernelEventGUID:
+	case RegistryKernelEventGUID.Data1:
 		paramDecoder.DecodeRegSetValueInternal(r, e)
-	case ProcessKernelEventGUID:
+	case ProcessKernelEventGUID.Data1:
 		switch r.Header.EventDescriptor.ID {
 		case CreateProcessInternalID, ProcessRundownInternalID:
 			paramDecoder.DecodeProcessInternal(r, e)

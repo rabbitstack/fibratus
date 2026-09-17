@@ -19,28 +19,31 @@
 package event
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestEventNameToType(t *testing.T) {
-	typ := NameToType("CreateProcess")
+	typ, ok := ParseType("CreateProcess")
 
 	assert.Equal(t, CreateProcess, typ)
+	assert.True(t, ok)
 
-	typ = NameToType("CreateRemoteThread")
-	assert.Equal(t, UnknownType, typ)
+	typ, ok = ParseType("CreateRemoteThread")
+	assert.Equal(t, Unknown, typ)
+	assert.False(t, ok)
 }
 
 func TestEventToEventInfo(t *testing.T) {
-	info := TypeToEventInfo(CreateProcess)
+	info := GetTypeInfo(CreateProcess)
 
 	assert.Equal(t, "CreateProcess", info.Name)
 	assert.Equal(t, Process, info.Category)
 	assert.Equal(t, "Creates a new process and its primary thread", info.Description)
 
-	info = TypeToEventInfo(UnknownType)
-	assert.Equal(t, "N/A", info.Name)
-	assert.Equal(t, Unknown, info.Category)
+	info = GetTypeInfo(Unknown)
+	assert.Equal(t, "", info.Name)
+	assert.Equal(t, Category(0), info.Category)
 	assert.Empty(t, info.Description)
 }

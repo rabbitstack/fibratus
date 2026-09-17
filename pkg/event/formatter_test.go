@@ -23,9 +23,10 @@ import (
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/stretchr/testify/assert"
 
+	"testing"
+
 	kpars "github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestTemplateUnknownField(t *testing.T) {
@@ -57,7 +58,7 @@ func TestFormat(t *testing.T) {
 	params := Params{
 		kpars.ProcessID: {Name: kpars.ProcessID, Type: kpars.PID, Value: uint32(876)},
 	}
-	s := f.Format(&Event{CPU: uint8(4), Name: "CreateProcess", Seq: uint64(1999), Params: params, Metadata: map[MetadataKey]any{"key1": "value1"}})
+	s := f.Format(&Event{CPU: uint8(4), Seq: uint64(1999), Params: params, Metadata: map[MetadataKey]any{"key1": "value1"}})
 	assert.Equal(t, "1999 4 -  (CreateProcess) -- pid: 876 (pid➜ 876) key1: value1", string(s))
 }
 
@@ -70,7 +71,6 @@ func TestFormatPS(t *testing.T) {
 	}
 	s := f.Format(&Event{
 		CPU:    uint8(4),
-		Name:   "CreateProcess",
 		Seq:    uint64(1999),
 		Params: params,
 		PS: &pstypes.PS{

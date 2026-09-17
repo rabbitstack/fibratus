@@ -78,8 +78,8 @@ func (c *Consumer) ProcessEvent(r *etw.EventRecord) error {
 		return nil
 	}
 
-	if !c.config.EventSource.EventExists(r.ID()) {
-		eventsUnknown.Add(1)
+	etype := event.NewTypeFromEventRecord(r)
+	if etype == event.Unknown {
 		return nil
 	}
 	if event.IsCurrentProcDropped(r.Header.ProcessID) && r.Header.ProviderID != etw.WindowsKernelProcessGUID {
@@ -92,13 +92,13 @@ func (c *Consumer) ProcessEvent(r *etw.EventRecord) error {
 	}
 	defer c.approvers.Cleanup(rec)
 
-	if c.config.EventSource.ExcludeEvent(rec.ID()) {
+	if c.config.EventSource.ExcludeEvent(etype) {
 		eventsExcluded.Add(1)
 		return nil
 	}
 
 	eventsProcessed.Add(1)
-	evt := event.New(c.sequencer.Get(), rec)
+	evt := event.New(c.sequencer.Get(), rec, etype)
 
 	// Dispatch each event to the processor chain.
 	// Processors may further augment the event with

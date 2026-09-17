@@ -60,8 +60,6 @@ var (
 	eventsFailed = expvar.NewMap("eventsource.events.failed")
 	// eventsProcessed counts the number of total processed events
 	eventsProcessed = expvar.NewInt("eventsource.events.processed")
-	// eventsUnknown counts the number of published events which types are not present in the internal catalog
-	eventsUnknown = expvar.NewInt("eventsource.events.unknown")
 	// eventsExcluded counts the number of excluded events
 	eventsExcluded = expvar.NewInt("eventsource.events.excluded")
 	// buffersRead amount of buffers fetched from the ETW session
@@ -138,7 +136,11 @@ func (e *EventSource) Open(config *config.Config) error {
 		config.EventSource.EnableMemEvents = config.EventSource.EnableMemEvents && (e.r.HasMemEvents || (config.Yara.Enabled && !config.Yara.SkipAllocs))
 		config.EventSource.EnableDNSEvents = config.EventSource.EnableDNSEvents && e.r.HasDNSEvents
 		config.EventSource.EnableAuditAPIEvents = config.EventSource.EnableAuditAPIEvents && e.r.HasAuditAPIEvents
-		for _, typ := range event.All() {
+
+		for _, typ := range event.AllTypes() {
+			if typ.OnlyState() || typ.StateSnapshot() {
+				continue
+			}
 			if typ == event.CreateProcess || typ == event.TerminateProcess ||
 				typ == event.LoadModule || typ == event.UnloadModule {
 				// always allow fundamental events
@@ -146,7 +148,7 @@ func (e *EventSource) Open(config *config.Config) error {
 			}
 
 			// allow events required for memory/file scanning
-			if typ == event.MapViewFile && config.Yara.Enabled && !config.Yara.SkipMmaps {
+			if typ == event.MapViewOfSection && config.Yara.Enabled && !config.Yara.SkipMmaps {
 				continue
 			}
 			if typ == event.VirtualAlloc && config.Yara.Enabled && !config.Yara.SkipAllocs {
@@ -179,13 +181,10 @@ func (e *EventSource) Open(config *config.Config) error {
 	// modified value. This data is used to attach various parameters
 	// to the RegSetValue event published by the NT Kernel Logger
 	if config.EventSource.EnableRegistryEvents {
-		// undocumented ETW feature to enable captured data in RegSetValue events
-		val := 0x2
-		eventFilterDescriptor := etw.EventFilterDescriptor{
-			Ptr:  uintptr(unsafe.Pointer(&val)),
+		trace.AddProvider(etw.WindowsKernelRegistryGUID, false, WithKeywords(etw.SetValueKeyword), WithEventFilterDescriptors(etw.EventFilterDescriptor{
+			Ptr:  uintptr(unsafe.Pointer(&etw.CaptureRegistryValue)),
 			Size: 4,
-		}
-		trace.AddProvider(etw.WindowsKernelRegistryGUID, false, WithKeywords(etw.SetValueKeyword), WithEventFilterDescriptors(eventFilterDescriptor))
+		}))
 	}
 
 	if config.EventSource.EnableDNSEvents {

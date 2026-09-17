@@ -102,7 +102,7 @@ func newRegistryProcessor(hsnap handle.Snapshotter) Processor {
 }
 
 func (r *registryProcessor) ProcessEvent(e *event.Event) (*event.Event, bool, error) {
-	if e.Category == event.Registry {
+	if e.Category() == event.Registry {
 		evt, err := r.processEvent(e)
 		return evt, false, err
 	}

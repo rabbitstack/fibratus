@@ -19,12 +19,13 @@
 package etw
 
 import (
+	"testing"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/stretchr/testify/assert"
-	"testing"
-	"time"
 )
 
 func TestStackExtensions(t *testing.T) {
@@ -50,11 +51,11 @@ func TestStackExtensions(t *testing.T) {
 	exts.EnableMemoryCallstack()
 
 	assert.Len(t, exts.EventIds(), 7)
-	assert.Contains(t, exts.EventIds(), etw.ClassicEventID{GUID: event.ProcessEventGUID, Type: uint8(event.CreateProcess.HookID())})
-	assert.Contains(t, exts.EventIds(), etw.ClassicEventID{GUID: event.ThreadEventGUID, Type: uint8(event.CreateThread.HookID())})
-	assert.Contains(t, exts.EventIds(), etw.ClassicEventID{GUID: event.ThreadEventGUID, Type: uint8(event.TerminateThread.HookID())})
-	assert.Contains(t, exts.EventIds(), etw.ClassicEventID{GUID: event.FileEventGUID, Type: uint8(event.CreateFile.HookID())})
-	assert.Contains(t, exts.EventIds(), etw.ClassicEventID{GUID: event.FileEventGUID, Type: uint8(event.RenameFile.HookID())})
-	assert.Contains(t, exts.EventIds(), etw.ClassicEventID{GUID: event.FileEventGUID, Type: uint8(event.DeleteFile.HookID())})
-	assert.Contains(t, exts.EventIds(), etw.ClassicEventID{GUID: event.MemEventGUID, Type: uint8(event.VirtualAlloc.HookID())})
+	assert.Contains(t, exts.EventIds(), etw.ClassicEventID{GUID: event.ProcessEventGUID, Type: event.CreateProcessID})
+	assert.Contains(t, exts.EventIds(), etw.ClassicEventID{GUID: event.ThreadEventGUID, Type: event.CreateThreadID})
+	assert.Contains(t, exts.EventIds(), etw.ClassicEventID{GUID: event.ThreadEventGUID, Type: event.TerminateThreadID})
+	assert.Contains(t, exts.EventIds(), etw.ClassicEventID{GUID: event.FileEventGUID, Type: event.CreateFileID})
+	assert.Contains(t, exts.EventIds(), etw.ClassicEventID{GUID: event.FileEventGUID, Type: event.RenameFileID})
+	assert.Contains(t, exts.EventIds(), etw.ClassicEventID{GUID: event.FileEventGUID, Type: event.DeleteFileID})
+	assert.Contains(t, exts.EventIds(), etw.ClassicEventID{GUID: event.MemoryEventGUID, Type: event.VirtualAllocID})
 }

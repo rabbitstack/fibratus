@@ -19,6 +19,9 @@
 package processors
 
 import (
+	"os"
+	"testing"
+
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/ps"
@@ -28,8 +31,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
-	"os"
-	"testing"
 )
 
 func TestMemProcessor(t *testing.T) {
@@ -47,8 +48,7 @@ func TestMemProcessor(t *testing.T) {
 		{
 			"virtual alloc",
 			&event.Event{
-				Type:     event.VirtualAlloc,
-				Category: event.Mem,
+				Type: event.VirtualAlloc,
 				Params: event.Params{
 					params.MemRegionSize:  {Name: params.MemRegionSize, Type: params.Uint64, Value: uint64(1024)},
 					params.MemBaseAddress: {Name: params.MemBaseAddress, Type: params.Address, Value: uint64(base)},
@@ -73,8 +73,7 @@ func TestMemProcessor(t *testing.T) {
 		{
 			"virtual free",
 			&event.Event{
-				Type:     event.VirtualFree,
-				Category: event.Mem,
+				Type: event.VirtualFree,
 				Params: event.Params{
 					params.MemRegionSize:  {Name: params.MemRegionSize, Type: params.Uint64, Value: uint64(1024)},
 					params.MemBaseAddress: {Name: params.MemBaseAddress, Type: params.Address, Value: uint64(base)},

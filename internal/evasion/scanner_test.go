@@ -41,9 +41,7 @@ func TestScannerProcessEvent(t *testing.T) {
 			PID:       859,
 			CPU:       1,
 			Seq:       2,
-			Name:      "CreateFile",
 			Timestamp: time.Now(),
-			Category:  event.File,
 			Metadata:  event.Metadata{},
 			Params: event.Params{
 				params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},

@@ -21,15 +21,16 @@ package list
 import (
 	"bufio"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/rabbitstack/fibratus/internal/bootstrap"
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 	"github.com/spf13/cobra"
-	"os"
-	"path/filepath"
-	"strings"
 )
 
 var Command = &cobra.Command{
@@ -130,7 +131,7 @@ func listEvents(cmd *cobra.Command, args []string) {
 	t.AppendHeader(table.Row{"Name", "Category", "Description"})
 	t.SetStyle(table.StyleLight)
 
-	for _, ev := range event.GetTypesMeta() {
+	for _, ev := range event.GetTypesInfo() {
 		t.AppendRow(table.Row{ev.Name, ev.Category, ev.Description})
 	}
 

@@ -71,7 +71,7 @@ func newFsProcessor(
 }
 
 func (f *fsProcessor) ProcessEvent(e *event.Event) (*event.Event, bool, error) {
-	if e.Category == event.File {
+	if e.Category() == event.File {
 		evt, err := f.processEvent(e)
 		return evt, false, err
 	}
@@ -100,7 +100,7 @@ func (f *fsProcessor) processEvent(e *event.Event) (*event.Event, error) {
 			totalRundownFiles.Add(1)
 			f.files[fileObject] = &FileInfo{Name: filepath, Type: fs.GetFileType(filepath, 0)}
 		}
-	case event.MapFileRundown:
+	case event.MapViewOfSection:
 		fileKey := e.Params.MustGetUint64(params.FileKey)
 		fileinfo := f.files[fileKey]
 
@@ -144,7 +144,7 @@ func (f *fsProcessor) processEvent(e *event.Event) (*event.Event, error) {
 		// delete file metadata by file object address
 		fileObject := e.Params.MustGetUint64(params.FileObject)
 		delete(f.files, fileObject)
-	case event.UnmapViewFile:
+	case event.UnmapViewOfSection:
 		ok, proc := f.psnap.Find(e.PID)
 		addr := e.Params.TryGetAddress(params.FileViewBase)
 		if ok {
@@ -161,7 +161,7 @@ func (f *fsProcessor) processEvent(e *event.Event) (*event.Event, error) {
 		var fileObject uint64
 		fileKey := e.Params.MustGetUint64(params.FileKey)
 
-		if !e.IsMapViewFile() {
+		if !e.IsMapViewOfSection() {
 			fileObject = e.Params.MustGetUint64(params.FileObject)
 		}
 
@@ -202,7 +202,7 @@ func (f *fsProcessor) processEvent(e *event.Event) (*event.Event, error) {
 			e.AppendParam(params.FilePath, params.Path, fileinfo.Name)
 		}
 
-		if e.IsMapViewFile() {
+		if e.IsMapViewOfSection() {
 			return e, f.psnap.AddMmap(e)
 		}
 	}

@@ -66,7 +66,6 @@ func TestSequenceState(t *testing.T) {
 
 	e1 := &event.Event{
 		Type:      event.CreateProcess,
-		Name:      "CreateProcess",
 		Tid:       2484,
 		PID:       859,
 		Timestamp: time.Now(),
@@ -82,7 +81,6 @@ func TestSequenceState(t *testing.T) {
 
 	e2 := &event.Event{
 		Type:      event.CreateFile,
-		Name:      "CreateFile",
 		Tid:       2484,
 		PID:       4143,
 		Timestamp: time.Now().Add(time.Second * 5),
@@ -108,7 +106,6 @@ func TestSequenceState(t *testing.T) {
 
 	e3 := &event.Event{
 		Type:      event.CreateProcess,
-		Name:      "CreateProcess",
 		Timestamp: time.Now().Add(time.Second * 10),
 		Tid:       2484,
 		PID:       4143,
@@ -171,7 +168,6 @@ func TestSequenceState(t *testing.T) {
 	// expire entire sequence
 	e4 := &event.Event{
 		Type: event.TerminateProcess,
-		Name: "TerminateProcess",
 		Tid:  2484,
 		PID:  859,
 		PS: &pstypes.PS{
@@ -212,7 +208,6 @@ func TestSimpleSequence(t *testing.T) {
 	}{
 		{[]*event.Event{{
 			Type:      event.CreateProcess,
-			Name:      "CreateProcess",
 			Timestamp: time.Now(),
 			Tid:       2484,
 			PID:       859,
@@ -226,11 +221,9 @@ func TestSimpleSequence(t *testing.T) {
 			Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 		}, {
 			Type:      event.CreateFile,
-			Name:      "CreateFile",
 			Timestamp: time.Now().Add(time.Second),
 			Tid:       2484,
 			PID:       859,
-			Category:  event.File,
 			PS: &pstypes.PS{
 				Name: "cmd.exe",
 			},
@@ -240,7 +233,6 @@ func TestSimpleSequence(t *testing.T) {
 			Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"}}}, []bool{false, true}},
 		{[]*event.Event{{
 			Type:      event.CreateProcess,
-			Name:      "CreateProcess",
 			Timestamp: time.Now(),
 			Tid:       2484,
 			PID:       859,
@@ -254,11 +246,9 @@ func TestSimpleSequence(t *testing.T) {
 			Metadata: map[event.MetadataKey]any{"foo": "bar", "fooz": "barzz"},
 		}, {
 			Type:      event.CreateFile,
-			Name:      "CreateFile",
 			Timestamp: time.Now().Add(time.Second),
 			Tid:       2484,
 			PID:       859,
-			Category:  event.File,
 			PS: &pstypes.PS{
 				Name: "cmd.exe",
 			},
@@ -297,7 +287,6 @@ func TestSimpleSequenceMultiplePartials(t *testing.T) {
 		e1 := &event.Event{
 			Type:      event.CreateProcess,
 			Timestamp: time.Now().Add(time.Duration(i) * time.Millisecond),
-			Name:      "CreateProcess",
 			Tid:       2484,
 			PID:       pid % 2,
 			PS: &pstypes.PS{
@@ -312,10 +301,8 @@ func TestSimpleSequenceMultiplePartials(t *testing.T) {
 		e2 := &event.Event{
 			Type:      event.CreateFile,
 			Timestamp: time.Now().Add(time.Duration(i) * time.Millisecond * 2),
-			Name:      "CreateFile",
 			Tid:       2484,
 			PID:       pid * 2,
-			Category:  event.File,
 			PS: &pstypes.PS{
 				Name: "cmd.exe",
 				Exe:  "C:\\Windows\\system32\\cmd.exe",
@@ -337,7 +324,6 @@ func TestSimpleSequenceMultiplePartials(t *testing.T) {
 		Seq:       20,
 		Type:      event.CreateProcess,
 		Timestamp: time.Now().Add(time.Second),
-		Name:      "CreateProcess",
 		Tid:       2484,
 		PID:       859,
 		PS: &pstypes.PS{
@@ -357,10 +343,8 @@ func TestSimpleSequenceMultiplePartials(t *testing.T) {
 		Type:      event.CreateFile,
 		Seq:       22,
 		Timestamp: time.Now().Add(time.Second * time.Duration(2)),
-		Name:      "CreateFile",
 		Tid:       2484,
 		PID:       859,
-		Category:  event.File,
 		PS: &pstypes.PS{
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\cmd.exe",
@@ -404,7 +388,6 @@ func TestUnconstrainedSequenceMatches(t *testing.T) {
 		Seq:       20,
 		Type:      event.CreateProcess,
 		Timestamp: time.Now().Add(time.Second),
-		Name:      "CreateProcess",
 		Tid:       2484,
 		PID:       859,
 		PS: &pstypes.PS{
@@ -424,7 +407,6 @@ func TestUnconstrainedSequenceMatches(t *testing.T) {
 		Seq:       21,
 		Type:      event.CreateProcess,
 		Timestamp: time.Now().Add(time.Second * 2),
-		Name:      "CreateProcess",
 		Tid:       2484,
 		PID:       1859,
 		PS: &pstypes.PS{
@@ -444,10 +426,8 @@ func TestUnconstrainedSequenceMatches(t *testing.T) {
 		Type:      event.CreateFile,
 		Seq:       25,
 		Timestamp: time.Now().Add(time.Second * 3),
-		Name:      "CreateFile",
 		Tid:       2484,
 		PID:       3859,
-		Category:  event.File,
 		PS: &pstypes.PS{
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\cmd.exe",
@@ -490,7 +470,6 @@ func TestSimpleSequenceDeadline(t *testing.T) {
 	e1 := &event.Event{
 		Type:      event.CreateProcess,
 		Timestamp: time.Now(),
-		Name:      "CreateProcess",
 		Tid:       2484,
 		PID:       859,
 		PS: &pstypes.PS{
@@ -508,10 +487,8 @@ func TestSimpleSequenceDeadline(t *testing.T) {
 	e2 := &event.Event{
 		Type:      event.CreateFile,
 		Timestamp: time.Now().Add(time.Millisecond * 200),
-		Name:      "CreateFile",
 		Tid:       2484,
 		PID:       859,
-		Category:  event.File,
 		PS: &pstypes.PS{
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
@@ -562,7 +539,6 @@ func TestSequenceMultiLinks(t *testing.T) {
 	e1 := &event.Event{
 		Type:      event.CreateProcess,
 		Timestamp: time.Now(),
-		Name:      "CreateProcess",
 		Tid:       2484,
 		PID:       859,
 		PS: &pstypes.PS{
@@ -580,10 +556,8 @@ func TestSequenceMultiLinks(t *testing.T) {
 	e2 := &event.Event{
 		Type:      event.CreateFile,
 		Timestamp: time.Now().Add(time.Second),
-		Name:      "CreateFile",
 		Tid:       2484,
 		PID:       859,
-		Category:  event.File,
 		PS: &pstypes.PS{
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
@@ -616,8 +590,6 @@ func TestComplexSequence(t *testing.T) {
 		Seq:       1,
 		Type:      event.CreateProcess,
 		Timestamp: time.Now(),
-		Category:  event.Process,
-		Name:      "CreateProcess",
 		Tid:       2484,
 		PID:       2243,
 		PS: &pstypes.PS{
@@ -637,10 +609,8 @@ func TestComplexSequence(t *testing.T) {
 		Seq:       2,
 		Type:      event.CreateFile,
 		Timestamp: time.Now().Add(time.Millisecond * 250),
-		Name:      "CreateFile",
 		Tid:       2484,
 		PID:       2243,
-		Category:  event.File,
 		PS: &pstypes.PS{
 			Name:    "firefox.exe",
 			Exe:     "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
@@ -660,10 +630,8 @@ func TestComplexSequence(t *testing.T) {
 
 	e3 := &event.Event{
 		Seq:       4,
-		Type:      event.ConnectTCPv4,
+		Type:      event.Connect,
 		Timestamp: time.Now().Add(time.Second),
-		Category:  event.Net,
-		Name:      "Connect",
 		Tid:       244,
 		PID:       2243,
 		PS: &pstypes.PS{
@@ -710,10 +678,8 @@ func TestSequenceOOO(t *testing.T) {
 	e1 := &event.Event{
 		Type:      event.CreateFile,
 		Timestamp: time.Now(),
-		Name:      "CreateFile",
 		Tid:       2484,
 		PID:       859,
-		Category:  event.File,
 		PS: &pstypes.PS{
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\rundll32.exe",
@@ -732,7 +698,6 @@ func TestSequenceOOO(t *testing.T) {
 	e2 := &event.Event{
 		Type:      event.OpenProcess,
 		Timestamp: time.Now(),
-		Name:      "OpenProcess",
 		Tid:       2484,
 		PID:       859,
 		PS: &pstypes.PS{
@@ -771,7 +736,6 @@ func TestSequenceGC(t *testing.T) {
 	e := &event.Event{
 		Type:      event.OpenProcess,
 		Timestamp: time.Now(),
-		Name:      "OpenProcess",
 		Tid:       2484,
 		PID:       859,
 		PS: &pstypes.PS{
@@ -816,7 +780,6 @@ func TestSequenceExpire(t *testing.T) {
 				{
 					Type:      event.OpenProcess,
 					Timestamp: time.Now(),
-					Name:      "OpenProcess",
 					Tid:       2484,
 					PID:       4143,
 					PS: &pstypes.PS{
@@ -832,7 +795,6 @@ func TestSequenceExpire(t *testing.T) {
 				},
 				{
 					Type: event.TerminateProcess,
-					Name: "TerminateProcess",
 					Tid:  2484,
 					PID:  859,
 					PS: &pstypes.PS{
@@ -859,8 +821,6 @@ func TestSequenceExpire(t *testing.T) {
 					Seq:       1,
 					Type:      event.CreateProcess,
 					Timestamp: time.Now(),
-					Category:  event.Process,
-					Name:      "CreateProcess",
 					Tid:       2484,
 					PID:       2243,
 					PS: &pstypes.PS{
@@ -877,8 +837,6 @@ func TestSequenceExpire(t *testing.T) {
 					Seq:       2,
 					Type:      event.CreateProcess,
 					Timestamp: time.Now().Add(time.Second),
-					Category:  event.Process,
-					Name:      "CreateProcess",
 					Tid:       2484,
 					PID:       12243,
 					PS: &pstypes.PS{
@@ -897,7 +855,6 @@ func TestSequenceExpire(t *testing.T) {
 				},
 				{
 					Type: event.TerminateProcess,
-					Name: "TerminateProcess",
 					Tid:  2484,
 					PID:  859,
 					PS: &pstypes.PS{
@@ -956,7 +913,6 @@ func TestSequenceBoundFields(t *testing.T) {
 	e1 := &event.Event{
 		Type:      event.CreateProcess,
 		Timestamp: time.Now(),
-		Name:      "CreateProcess",
 		Tid:       2484,
 		PID:       859,
 		PS: &pstypes.PS{
@@ -973,7 +929,6 @@ func TestSequenceBoundFields(t *testing.T) {
 	e2 := &event.Event{
 		Type:      event.CreateProcess,
 		Timestamp: time.Now().Add(time.Millisecond * 20),
-		Name:      "CreateProcess",
 		Tid:       2484,
 		PID:       859,
 		PS: &pstypes.PS{
@@ -990,10 +945,8 @@ func TestSequenceBoundFields(t *testing.T) {
 	e3 := &event.Event{
 		Type:      event.CreateFile,
 		Timestamp: time.Now().Add(time.Second),
-		Name:      "CreateFile",
 		Tid:       2484,
 		PID:       859,
-		Category:  event.File,
 		PS: &pstypes.PS{
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
@@ -1006,12 +959,10 @@ func TestSequenceBoundFields(t *testing.T) {
 	}
 
 	e4 := &event.Event{
-		Type:      event.ConnectTCPv4,
+		Type:      event.Connect,
 		Timestamp: time.Now().Add(time.Second * 3),
-		Name:      "Connect",
 		Tid:       2484,
 		PID:       859,
-		Category:  event.File,
 		PS: &pstypes.PS{
 			Name: "cmd.exe",
 			Exe:  "C:\\Windows\\system32\\svchost.exe",
@@ -1050,8 +1001,6 @@ func TestSequenceBoundFieldsWithFunctions(t *testing.T) {
 
 	e1 := &event.Event{
 		Type:      event.CreateFile,
-		Name:      "CreateFile",
-		Category:  event.File,
 		Timestamp: time.Now(),
 		Tid:       2484,
 		PID:       859,
@@ -1067,8 +1016,6 @@ func TestSequenceBoundFieldsWithFunctions(t *testing.T) {
 
 	e2 := &event.Event{
 		Type:      event.RegSetValue,
-		Name:      "RegSetValue",
-		Category:  event.Registry,
 		Timestamp: time.Now().Add(time.Millisecond * 5),
 		Tid:       2484,
 		PID:       859,
@@ -1112,7 +1059,6 @@ func TestIsExpressionEvaluable(t *testing.T) {
 
 	e1 := &event.Event{
 		Type: event.CreateProcess,
-		Name: "CreateProcess",
 		Tid:  2484,
 		PID:  859,
 		PS: &pstypes.PS{
@@ -1127,7 +1073,6 @@ func TestIsExpressionEvaluable(t *testing.T) {
 
 	e2 := &event.Event{
 		Type: event.RenameFile,
-		Name: "RenameFile",
 		Tid:  2484,
 		PID:  859,
 		PS: &pstypes.PS{

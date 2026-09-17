@@ -48,7 +48,7 @@ func (m memProcessor) Close() {
 }
 
 func (m memProcessor) ProcessEvent(e *event.Event) (*event.Event, bool, error) {
-	if e.Category == event.Mem {
+	if e.Category() == event.Memory {
 		pid := e.Params.MustGetPid()
 		if e.IsVirtualAlloc() {
 			// retrieve info about the range of pages and enrich the event

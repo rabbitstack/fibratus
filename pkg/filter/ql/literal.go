@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bits-and-blooms/bitset"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
 
@@ -288,8 +289,10 @@ type SequenceExpr struct {
 	// Alias represents the sequence expression alias when bound fields are used.
 	Alias string
 
-	bitsets event.BitSets
-	types   []event.Type
+	categoryMask bitset.BitSet
+	eventMask    bitset.BitSet
+
+	types []event.Type
 }
 
 func (e *SequenceExpr) init() {
@@ -343,37 +346,24 @@ func (e *SequenceExpr) walk() {
 
 	WalkFunc(e.Expr, walk)
 
-	uniqCats := make(map[event.Category]bool)
-
 	// initialize event type/category buckets for every such field
 	for name, values := range stringFields {
 		for _, v := range values {
 			switch name {
 			case fields.EvtName:
-				for _, typ := range event.NameToTypes(v) {
-					if typ == event.UnknownType {
-						continue
-					}
-					e.types = append(e.types, typ)
-					uniqCats[event.TypeToEventInfo(typ).Category] = true
+				typ, ok := event.ParseType(v)
+				if !ok {
+					continue
 				}
+				e.types = append(e.types, typ)
+				e.eventMask.Set(typ.Uint())
 			case fields.EvtCategory:
-				e.bitsets.SetCategoryBit(event.Category(v))
+				category, ok := event.ParseCategory(v)
+				if !ok {
+					continue
+				}
+				e.categoryMask.Set(category.Uint())
 			}
-		}
-	}
-
-	for _, t := range e.types {
-		switch len(uniqCats) {
-		case 0:
-			continue
-		case 1:
-			// happy path can use a single bitmask for all
-			// event types pertaining to the same category
-			e.bitsets.SetBit(event.TypeBitSet, t)
-		default:
-			// use map-backed bitmask for event identifiers
-			e.bitsets.SetBit(event.BitmaskBitSet, t)
 		}
 	}
 }
@@ -383,7 +373,7 @@ func (e *SequenceExpr) walk() {
 // to be evaluated when the incoming event type, ID, or category pertains to the one
 // defined in the field literal.
 func (e *SequenceExpr) IsEvaluable(evt *event.Event) bool {
-	return e.bitsets.IsBitSet(evt)
+	return e.eventMask.Test(evt.Type.Uint()) || e.categoryMask.Test(evt.Category().Uint())
 }
 
 // HasBoundFields determines if this sequence expression references any bound field.
@@ -434,7 +424,7 @@ func (s *Sequence) init() {
 
 	for _, expr := range s.Expressions {
 		for _, etype := range expr.types {
-			sources[etype.Source()] = true
+			sources[event.GetTypeInfo(etype).Source] = true
 		}
 	}
 

@@ -64,21 +64,11 @@ func (e *Event) MarshalRaw() []byte {
 	b = append(b, bytes.WriteUint32(e.Tid)...)
 
 	// write type and CPU
-	b = append(b, e.Type[:]...)
+	b = append(b, bytes.WriteUint16(uint16(e.Type))...)
 	b = append(b, e.CPU)
 
 	// for the string fields we have to write the length prior to
 	// the string buffer itself, so we can decode the string correctly
-	//
-	// write event name
-	b = append(b, bytes.WriteUint16(uint16(len(e.Name)))...)
-	b = append(b, e.Name...)
-	// write category
-	b = append(b, bytes.WriteUint16(uint16(len(e.Category)))...)
-	b = append(b, e.Category...)
-	// write description
-	b = append(b, bytes.WriteUint16(uint16(len(e.Description)))...)
-	b = append(b, e.Description...)
 	// write host name
 	b = append(b, bytes.WriteUint16(uint16(len(e.Host)))...)
 	b = append(b, e.Host...)
@@ -201,8 +191,6 @@ func (e *Event) UnmarshalRaw(b []byte, ver capver.Version) error {
 	e.PID = bytes.ReadUint32(b[8:])
 	e.Tid = bytes.ReadUint32(b[12:])
 
-	// read type and CPU
-	var typ Type
 	// set start index depending
 	// on event section version
 	var idx uint32
@@ -211,41 +199,25 @@ func (e *Event) UnmarshalRaw(b []byte, ver capver.Version) error {
 		idx = 33
 	case capver.EvtSecV2:
 		idx = 34
+	case capver.EvtSecV3:
+		idx = 18
 	}
-	copy(typ[:], b[16:idx])
-	e.Type = typ
+
+	e.Type = Type(bytes.ReadUint16(b[16:idx]))
 	e.CPU = b[idx : idx+1][0]
 
 	idx++ // increment index
 	var offset uint32
 
-	// read event name
+	// read host name
 	l := bytes.ReadUint16(b[inc(idx, 0):])
 	buf := b[inc(idx, 2):]
 	offset = uint32(l)
-	e.Name = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
-
-	// read category
-	l = bytes.ReadUint16(b[inc(idx, 2)+offset:])
-	buf = b[inc(idx, 4)+offset:]
-	offset += uint32(l)
-	e.Category = Category(string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l]))
-
-	// read description
-	l = bytes.ReadUint16(b[inc(idx, 4)+offset:])
-	buf = b[inc(idx, 6)+offset:]
-	offset += uint32(l)
-	e.Description = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
-
-	// read host name
-	l = bytes.ReadUint16(b[inc(idx, 6)+offset:])
-	buf = b[inc(idx, 8)+offset:]
-	offset += uint32(l)
 	e.Host = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
 
 	// read timestamp
-	l = bytes.ReadUint16(b[inc(idx, 8)+offset:])
-	buf = b[inc(idx, 10)+offset:]
+	l = bytes.ReadUint16(b[inc(idx, 2)+offset:])
+	buf = b[inc(idx, 4)+offset:]
 	offset += uint32(l)
 	if len(buf) > 0 {
 		var err error
@@ -256,87 +228,87 @@ func (e *Event) UnmarshalRaw(b []byte, ver capver.Version) error {
 	}
 
 	// read parameters
-	nparams := bytes.ReadUint16(b[inc(idx, 10)+offset:])
+	nparams := bytes.ReadUint16(b[inc(idx, 4)+offset:])
 	// accumulates the offset of all parameter name and value lengths
 	var poffset uint32
 
 	for i := 0; i < int(nparams); i++ {
-		// read Param type
-		typ := bytes.ReadUint16(b[inc(idx, 12)+offset+poffset:])
-		// read Param name
-		kparamNameLength := uint32(bytes.ReadUint16(b[inc(idx, 14)+offset+poffset:]))
-		buf = b[inc(idx, 16)+offset+poffset:]
-		kparamName := string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:kparamNameLength:kparamNameLength])
+		// read param type
+		typ := bytes.ReadUint16(b[inc(idx, 6)+offset+poffset:])
+		// read param name
+		paramNameLength := uint32(bytes.ReadUint16(b[inc(idx, 8)+offset+poffset:]))
+		buf = b[inc(idx, 10)+offset+poffset:]
+		kparamName := string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:paramNameLength:paramNameLength])
 
-		pi := inc(idx, 16) // parameter index
+		pi := inc(idx, 10) // parameter index
 
 		var val params.Value
 		switch params.Type(typ) {
 		case params.AnsiString, params.UnicodeString, params.Path:
 			// read string parameter
-			l := bytes.ReadUint16(b[pi+offset+kparamNameLength+poffset:])
-			buf = b[inc(idx, 18)+offset+kparamNameLength+poffset:]
+			l := bytes.ReadUint16(b[pi+offset+paramNameLength+poffset:])
+			buf = b[inc(idx, 12)+offset+paramNameLength+poffset:]
 			if len(buf) > 0 {
 				val = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l])
 			}
 			// increment parameter offset by string by type length + name length bytes + length of
 			// the string parameter + string parameter size
-			poffset += kparamNameLength + 6 + uint32(l)
+			poffset += paramNameLength + 6 + uint32(l)
 		case params.Uint64, params.Address, params.Flags64:
-			val = bytes.ReadUint64(b[pi+offset+kparamNameLength+poffset:])
+			val = bytes.ReadUint64(b[pi+offset+paramNameLength+poffset:])
 			// increment parameter offset by type length + name length sizes + size of uint64
-			poffset += kparamNameLength + 4 + 8
+			poffset += paramNameLength + 4 + 8
 		case params.Int64:
-			val = int64(bytes.ReadUint64(b[pi+offset+kparamNameLength+poffset:]))
+			val = int64(bytes.ReadUint64(b[pi+offset+paramNameLength+poffset:]))
 			// increment parameter offset by type length + name length sizes + size of int64
-			poffset += kparamNameLength + 4 + 8
+			poffset += paramNameLength + 4 + 8
 		case params.Double:
-			val = float64(bytes.ReadUint64(b[pi+offset+kparamNameLength+poffset:]))
-			poffset += kparamNameLength + 4 + 8
+			val = float64(bytes.ReadUint64(b[pi+offset+paramNameLength+poffset:]))
+			poffset += paramNameLength + 4 + 8
 		case params.Float:
-			val = float32(bytes.ReadUint32(b[pi+offset+kparamNameLength+poffset:]))
-			poffset += kparamNameLength + 4 + 4
+			val = float32(bytes.ReadUint32(b[pi+offset+paramNameLength+poffset:]))
+			poffset += paramNameLength + 4 + 4
 		case params.IPv4:
-			val = ip.ToIPv4(bytes.ReadUint32(b[pi+offset+kparamNameLength+poffset:]))
+			val = ip.ToIPv4(bytes.ReadUint32(b[pi+offset+paramNameLength+poffset:]))
 			// // increment by IPv4 length
-			poffset += kparamNameLength + 4 + 4
+			poffset += paramNameLength + 4 + 4
 		case params.IPv6:
-			val = ip.ToIPv6(b[pi+offset+kparamNameLength+poffset : pi+offset+kparamNameLength+poffset+16])
+			val = ip.ToIPv6(b[pi+offset+paramNameLength+poffset : pi+offset+paramNameLength+poffset+16])
 			// increment by IPv6 length
-			poffset += kparamNameLength + 4 + 16
+			poffset += paramNameLength + 4 + 16
 		case params.PID, params.TID:
-			val = bytes.ReadUint32(b[pi+offset+kparamNameLength+poffset:])
-			poffset += kparamNameLength + 4 + 4
+			val = bytes.ReadUint32(b[pi+offset+paramNameLength+poffset:])
+			poffset += paramNameLength + 4 + 4
 		case params.Int32:
-			val = int32(bytes.ReadUint32(b[pi+offset+kparamNameLength+poffset:]))
-			poffset += kparamNameLength + 4 + 4
+			val = int32(bytes.ReadUint32(b[pi+offset+paramNameLength+poffset:]))
+			poffset += paramNameLength + 4 + 4
 		case params.Uint32, params.Enum, params.Flags, params.Status:
-			val = bytes.ReadUint32(b[pi+offset+kparamNameLength+poffset:])
-			poffset += kparamNameLength + 4 + 4
+			val = bytes.ReadUint32(b[pi+offset+paramNameLength+poffset:])
+			poffset += paramNameLength + 4 + 4
 		case params.Uint16, params.Port:
-			val = bytes.ReadUint16(b[pi+offset+kparamNameLength+poffset:])
-			poffset += kparamNameLength + 4 + 2
+			val = bytes.ReadUint16(b[pi+offset+paramNameLength+poffset:])
+			poffset += paramNameLength + 4 + 2
 		case params.Int16:
-			val = int16(bytes.ReadUint16(b[pi+offset+kparamNameLength+poffset:]))
-			poffset += kparamNameLength + 4 + 2
+			val = int16(bytes.ReadUint16(b[pi+offset+paramNameLength+poffset:]))
+			poffset += paramNameLength + 4 + 2
 		case params.Uint8:
-			val = b[pi+offset+kparamNameLength+poffset : pi+offset+kparamNameLength+poffset+1][0]
-			poffset += kparamNameLength + 4 + 1
+			val = b[pi+offset+paramNameLength+poffset : pi+offset+paramNameLength+poffset+1][0]
+			poffset += paramNameLength + 4 + 1
 		case params.Int8:
-			val = int8(b[pi+offset+kparamNameLength+poffset : pi+offset+kparamNameLength+poffset+1][0])
-			poffset += kparamNameLength + 4 + 1
+			val = int8(b[pi+offset+paramNameLength+poffset : pi+offset+paramNameLength+poffset+1][0])
+			poffset += paramNameLength + 4 + 1
 		case params.Bool:
-			v := b[pi+offset+kparamNameLength+poffset : pi+offset+kparamNameLength+poffset+1][0]
+			v := b[pi+offset+paramNameLength+poffset : pi+offset+paramNameLength+poffset+1][0]
 			if v == 1 {
 				val = true
 			} else {
 				val = false
 			}
-			poffset += kparamNameLength + 4 + 1
+			poffset += paramNameLength + 4 + 1
 		case params.Time:
 			// read ts length
-			l := bytes.ReadUint16(b[pi+offset+kparamNameLength+poffset:])
-			buf = b[inc(idx, 18)+offset+kparamNameLength+poffset:]
+			l := bytes.ReadUint16(b[pi+offset+paramNameLength+poffset:])
+			buf = b[inc(idx, 12)+offset+paramNameLength+poffset:]
 			if len(buf) > 0 {
 				var err error
 				val, err = time.Parse(time.RFC3339Nano, string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:l:l]))
@@ -344,19 +316,19 @@ func (e *Event) UnmarshalRaw(b []byte, ver capver.Version) error {
 					unmarshalTimestampErrors.Add(1)
 				}
 			}
-			poffset += kparamNameLength + 6 + uint32(l)
+			poffset += paramNameLength + 6 + uint32(l)
 		case params.Slice:
 			// read slice element type
-			typ := b[pi+offset+kparamNameLength+poffset]
+			typ := b[pi+offset+paramNameLength+poffset]
 			// read slice size
-			l := bytes.ReadUint16(b[inc(idx, 17)+offset+kparamNameLength+poffset:])
+			l := bytes.ReadUint16(b[inc(idx, 11)+offset+paramNameLength+poffset:])
 			var off uint32
 			switch typ {
 			case 's':
 				s := make([]string, l)
 				for i := 0; i < int(l); i++ {
-					size := bytes.ReadUint16(b[inc(idx, 19)+offset+kparamNameLength+poffset+off:])
-					buf := b[inc(idx, 22)+offset+kparamNameLength+poffset+off:]
+					size := bytes.ReadUint16(b[inc(idx, 13)+offset+paramNameLength+poffset+off:])
+					buf := b[inc(idx, 15)+offset+paramNameLength+poffset+off:]
 					s[i] = string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:size:size])
 					off += 2 + uint32(size)
 				}
@@ -364,19 +336,19 @@ func (e *Event) UnmarshalRaw(b []byte, ver capver.Version) error {
 			case '8':
 				v := make([]uint64, l)
 				for i := 0; i < int(l); i++ {
-					bytes.ReadUint64(b[inc(idx, 22)+offset+kparamNameLength+poffset+off:])
+					bytes.ReadUint64(b[inc(idx, 16)+offset+paramNameLength+poffset+off:])
 					off += 8
 				}
 				val = v
 			}
-			poffset += kparamNameLength + 4 + 1 + 2 + off
+			poffset += paramNameLength + 4 + 1 + 2 + off
 		case params.Binary, params.SID, params.WbemSID:
-			l := bytes.ReadUint32(b[pi+offset+kparamNameLength+poffset:])
-			buf = b[inc(idx, 18)+offset+kparamNameLength+poffset:]
+			l := bytes.ReadUint32(b[pi+offset+paramNameLength+poffset:])
+			buf = b[inc(idx, 12)+offset+paramNameLength+poffset:]
 			if len(buf) > 0 {
 				val = buf[:l]
 			}
-			poffset += kparamNameLength + 8 + l
+			poffset += paramNameLength + 8 + l
 		}
 
 		if val != nil {
@@ -387,16 +359,16 @@ func (e *Event) UnmarshalRaw(b []byte, ver capver.Version) error {
 	offset += poffset
 
 	// read metadata tags
-	ntags := bytes.ReadUint16(b[inc(idx, 12)+offset:])
+	ntags := bytes.ReadUint16(b[inc(idx, 6)+offset:])
 	var moffset uint32
 	for i := 0; i < int(ntags); i++ {
 		// read key
-		klen := uint32(bytes.ReadUint16(b[inc(idx, 14)+offset+moffset:]))
-		buf = b[inc(idx, 16)+offset+moffset:]
+		klen := uint32(bytes.ReadUint16(b[inc(idx, 8)+offset+moffset:]))
+		buf = b[inc(idx, 10)+offset+moffset:]
 		key := string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:klen:klen])
 		// read value
-		vlen := uint32(bytes.ReadUint16(b[inc(idx, 16)+offset+klen+moffset:]))
-		buf = b[inc(idx, 18)+offset+klen+moffset:]
+		vlen := uint32(bytes.ReadUint16(b[inc(idx, 10)+offset+klen+moffset:]))
+		buf = b[inc(idx, 12)+offset+klen+moffset:]
 		value := string((*[1<<30 - 1]byte)(unsafe.Pointer(&buf[0]))[:vlen:vlen])
 		// increment the offset by the length of the key + length value + size of uint16 * 2
 		// that corresponds to bytes storing the lengths of keys/values
@@ -409,9 +381,9 @@ func (e *Event) UnmarshalRaw(b []byte, ver capver.Version) error {
 	offset += moffset
 
 	// read process state
-	sec := section.Read(b[inc(idx, 14)+offset:])
+	sec := section.Read(b[inc(idx, 8)+offset:])
 	if sec.Size() != 0 {
-		ps, err := ptypes.NewFromCapture(b[inc(idx, 24)+offset:], sec)
+		ps, err := ptypes.NewFromCapture(b[inc(idx, 18)+offset:], sec)
 		if err != nil {
 			return err
 		}
@@ -441,9 +413,9 @@ func (e *Event) MarshalJSON() []byte {
 	js.writeObjectField("tid").writeUint32(e.Tid).writeMore()
 	js.writeObjectField("cpu").writeUint8(e.CPU).writeMore()
 
-	js.writeObjectField("name").writeString(e.Name).writeMore()
-	js.writeObjectField("category").writeString(string(e.Category)).writeMore()
-	js.writeObjectField("description").writeString(e.Description).writeMore()
+	js.writeObjectField("name").writeString(e.Name()).writeMore()
+	js.writeObjectField("category").writeString(e.Category().String()).writeMore()
+	js.writeObjectField("description").writeString(e.Description()).writeMore()
 	js.writeObjectField("host").writeString(e.Host).writeMore()
 
 	timestamp := make([]byte, 0)

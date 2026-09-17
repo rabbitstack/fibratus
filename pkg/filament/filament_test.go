@@ -72,10 +72,8 @@ func TestOnNextEvent(t *testing.T) {
 			Type:      event.RegCreateKey,
 			Tid:       2484,
 			PID:       859,
-			Name:      "RegCreateKey",
 			Host:      "archrabbit",
 			CPU:       uint8(i / 2),
-			Category:  event.Registry,
 			Seq:       uint64(i),
 			Timestamp: time.Now(),
 			Params: event.Params{
@@ -105,7 +103,7 @@ func TestFilamentFilter(t *testing.T) {
 	require.NotNil(t, filament)
 	defer filament.Close()
 	require.NotNil(t, filament.Filter())
-	kpars := event.Params{
+	pars := event.Params{
 		params.Cmdline:         {Name: params.Cmdline, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\svchost.exe -k RPCSS"},
 		params.ProcessName:     {Name: params.ProcessName, Type: params.AnsiString, Value: "svchost.exe"},
 		params.ProcessID:       {Name: params.ProcessID, Type: params.Uint32, Value: uint32(1234)},
@@ -114,8 +112,7 @@ func TestFilamentFilter(t *testing.T) {
 
 	evt := &event.Event{
 		Type:   event.CreateProcess,
-		Params: kpars,
-		Name:   "CreateProcess",
+		Params: pars,
 	}
 
 	require.True(t, filament.Filter().Eval(evt))
