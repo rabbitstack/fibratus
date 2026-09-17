@@ -1,6 +1,6 @@
 name: Activation Context memory section hijacking
 id: 3d56281e-9608-4a70-b7b7-7651ccd3752b
-version: 1.0.1
+version: 1.0.2
 description: |
   Detects abuses of a legitimate Windows feature present in most processes
   called Activation Contexts with the objective of loading an arbitrary DLL
@@ -23,7 +23,7 @@ condition: >
   sequence
   maxspan 40s
   by ps.uuid, file.view.base
-    |unmap_view_file and
+    |unmap_view_of_section and
      file.view.type = 'PAGEFILE' and file.view.protection = 'READONLY' and
      (file.view.size = 12288 or (file.view.size = 4096 and
       not (ps.exe imatches '?:\\Windows\\explorer.exe') and
@@ -38,8 +38,8 @@ condition: >
       not (ps.name iin ('procexp.exe', 'procexp64.exe') and ps.signature.trusted = true and ps.signature.subject imatches '*Microsoft Corporation*')
      )
     |
-    |map_view_file and file.view.size = 12288 and file.view.type = 'PAGEFILE' and file.view.protection = 'READWRITE'|
+    |map_view_of_section and file.view.size = 12288 and file.view.type = 'PAGEFILE' and file.view.protection = 'READWRITE'|
 
 severity: high
 
-min-engine-version: 3.0.0
+min-engine-version: 3.2.0

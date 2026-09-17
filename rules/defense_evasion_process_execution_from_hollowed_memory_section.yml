@@ -1,6 +1,6 @@
 name: Process execution from hollowed memory section
 id: 2a3fbae8-5e8c-4b71-b9da-56c3958c0d53
-version: 2.1.4
+version: 2.1.5
 description: |
   Adversaries may inject malicious code into suspended and hollowed processes in order to
   evade process-based defenses. Process hollowing is a method of executing arbitrary code
@@ -23,7 +23,7 @@ condition: >
   maxspan 40s
     |unmap_view_of_section and
      evt.pid != 4 and ps.sid not in ('S-1-5-18', 'S-1-5-19', 'S-1-5-20') and
-     file.view.size > 20000 and file.view.protection != 'READONLY' and
+     file.view.type in ('IMAGE', 'IMAGE_NO_EXECUTE') and file.view.size > 20000 and file.view.protection != 'READONLY' and
      (file.name = '' or file.extension != '.dll') and
      ps.parent.exe not imatches
                     (
@@ -47,4 +47,4 @@ output: >
   Process %2.ps.exe executed from hollowed memory section
 severity: high
 
-min-engine-version: 3.0.0
+min-engine-version: 3.2.0
