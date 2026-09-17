@@ -180,9 +180,9 @@ func TestEventSourceEnableFlagsDynamically(t *testing.T) {
 			event.RegSetValue,
 			event.CreateFile,
 			event.RenameFile,
-			event.MapViewFile,
+			event.MapViewOfSection,
 			event.OpenProcess,
-			event.ConnectTCPv4,
+			event.Connect,
 		},
 	}
 	cfg := &config.Config{
@@ -222,7 +222,7 @@ func TestEventSourceEnableFlagsDynamically(t *testing.T) {
 
 	require.False(t, cfg.EventSource.TestDropMask(event.UnloadModule))
 	require.True(t, cfg.EventSource.TestDropMask(event.WriteFile))
-	require.True(t, cfg.EventSource.TestDropMask(event.UnmapViewFile))
+	require.True(t, cfg.EventSource.TestDropMask(event.UnmapViewOfSection))
 	require.False(t, cfg.EventSource.TestDropMask(event.OpenProcess))
 }
 
@@ -259,7 +259,7 @@ func TestEventSourceEnableFlagsDynamicallyWithYaraEnabled(t *testing.T) {
 			event.RegSetValue,
 			event.RenameFile,
 			event.OpenProcess,
-			event.ConnectTCPv4,
+			event.Connect,
 		},
 	}
 	cfg := &config.Config{
@@ -300,7 +300,7 @@ func TestEventSourceEnableFlagsDynamicallyWithYaraEnabled(t *testing.T) {
 	require.True(t, flags&etw.VirtualAlloc != 0)
 
 	require.False(t, cfg.EventSource.TestDropMask(event.CreateFile))
-	require.True(t, cfg.EventSource.TestDropMask(event.MapViewFile))
+	require.True(t, cfg.EventSource.TestDropMask(event.MapViewOfSection))
 	require.False(t, cfg.EventSource.TestDropMask(event.VirtualAlloc))
 }
 
@@ -481,7 +481,7 @@ func TestEventSourceAllEvents(t *testing.T) {
 				return nil
 			},
 			func(e *event.Event) bool {
-				return e.CurrentPid() && (e.Type == event.ConnectTCPv4 || e.Type == event.ConnectTCPv6)
+				return e.CurrentPid() && e.Type == event.Connect
 			},
 			false,
 		},
@@ -534,7 +534,7 @@ func TestEventSourceAllEvents(t *testing.T) {
 				return nil
 			},
 			func(e *event.Event) bool {
-				return e.CurrentPid() && e.Type == event.MapViewFile &&
+				return e.CurrentPid() && e.Type == event.MapViewOfSection &&
 					e.GetParamAsString(params.MemProtect) == "EXECUTE_READWRITE|READONLY" &&
 					e.GetParamAsString(params.FileViewSectionType) == "IMAGE"
 			},
@@ -581,7 +581,7 @@ func TestEventSourceAllEvents(t *testing.T) {
 				return sys.NtUnmapViewOfSection(windows.CurrentProcess(), viewBase)
 			},
 			func(e *event.Event) bool {
-				return e.CurrentPid() && e.Type == event.UnmapViewFile &&
+				return e.CurrentPid() && e.Type == event.UnmapViewOfSection &&
 					e.GetParamAsString(params.MemProtect) == "READONLY" &&
 					e.Params.MustGetUint64(params.FileViewBase) == uint64(viewBase)
 			},
@@ -629,7 +629,7 @@ func TestEventSourceAllEvents(t *testing.T) {
 			},
 			func(e *event.Event) bool {
 				return e.CurrentPid() && e.Type == event.QueryDNS && e.IsDNS() &&
-					e.Type.Subcategory() == event.DNS &&
+					e.Subcategory() == event.DNS &&
 					e.GetParamAsString(params.DNSName) == "dns.google" &&
 					e.GetParamAsString(params.DNSRR) == "A"
 			},
@@ -643,7 +643,7 @@ func TestEventSourceAllEvents(t *testing.T) {
 			},
 			func(e *event.Event) bool {
 				return e.CurrentPid() && e.Type == event.ReplyDNS && e.IsDNS() &&
-					e.Type.Subcategory() == event.DNS &&
+					e.Subcategory() == event.DNS &&
 					e.GetParamAsString(params.DNSName) == "dns.google" &&
 					e.GetParamAsString(params.DNSRR) == "AAAA" &&
 					e.GetParamAsString(params.DNSRcode) == "NOERROR" &&

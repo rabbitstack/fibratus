@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 by Nedim Sabic Sabic
+ * Copyright 2019-2026 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -86,12 +86,6 @@ type Event struct {
 	CPU uint8 `json:"cpu"`
 	_   uint8 // padding
 
-	// Name is the human friendly name of the event.
-	Name string `json:"name"`
-	// Category designates the category to which this event pertains.
-	Category Category `json:"category"`
-	// Description is the short explanation that describes the purpose of the event.
-	Description string `json:"description"`
 	// Host is the machine name that reported the generated event.
 	Host string `json:"host"`
 	// Params stores the collection of event parameters.
@@ -105,6 +99,26 @@ type Event struct {
 
 	// mmux guards the metadata map
 	mmux sync.RWMutex
+}
+
+// Name returns the human friendly event name.
+func (e *Event) Name() string {
+	return e.Type.String()
+}
+
+// Category designates the category to which this event pertains.
+func (e *Event) Category() Category {
+	return table[e.Type].Category
+}
+
+// Subcategory designates the subcategory to which this event pertains.
+func (e *Event) Subcategory() Subcategory {
+	return table[e.Type].Subcategory
+}
+
+// Description is the short explanation that describes the purpose of the event.
+func (e *Event) Description() string {
+	return table[e.Type].Description
 }
 
 // String returns event's string representation.
@@ -132,9 +146,9 @@ func (e *Event) String() string {
 			e.Tid,
 			e.Type,
 			e.CPU,
-			e.Name,
-			e.Category,
-			e.Description,
+			e.Name(),
+			e.Category(),
+			e.Description(),
 			e.Host,
 			e.Timestamp,
 			e.Params,
@@ -161,9 +175,9 @@ func (e *Event) String() string {
 		e.Tid,
 		e.Type,
 		e.CPU,
-		e.Name,
-		e.Category,
-		e.Description,
+		e.Name(),
+		e.Category(),
+		e.Description(),
 		e.Host,
 		e.Timestamp,
 		e.Params,
@@ -191,8 +205,8 @@ func (e *Event) StringShort() string {
 			e.Seq,
 			e.PID,
 			e.Tid,
-			e.Name,
-			e.Category,
+			e.Name(),
+			e.Category(),
 			e.Host,
 			e.Timestamp,
 			e.Params,
@@ -212,8 +226,8 @@ func (e *Event) StringShort() string {
 		e.Seq,
 		e.PID,
 		e.Tid,
-		e.Name,
-		e.Category,
+		e.Name(),
+		e.Category(),
 		e.Host,
 		e.Timestamp,
 		e.Params,

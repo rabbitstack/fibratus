@@ -79,67 +79,67 @@ func TestIsFieldAccessible(t *testing.T) {
 	}{
 		{
 			newEventAccessor(),
-			&event.Event{Type: event.QueryDNS, Category: event.Net},
+			&event.Event{Type: event.QueryDNS},
 			true,
 		},
 		{
 			newPSAccessor(nil),
-			&event.Event{Type: event.CreateProcess, Category: event.Process},
+			&event.Event{Type: event.CreateProcess},
 			true,
 		},
 		{
 			newPSAccessor(nil),
-			&event.Event{PS: &ptypes.PS{}, Type: event.CreateFile, Category: event.File},
+			&event.Event{PS: &ptypes.PS{}, Type: event.CreateFile},
 			true,
 		},
 		{
 			newPSAccessor(nil),
-			&event.Event{Type: event.SetThreadContext, Category: event.Thread},
+			&event.Event{Type: event.SetThreadContext},
 			false,
 		},
 		{
 			newThreadAccessor(),
-			&event.Event{Type: event.SetThreadContext, Category: event.Thread},
+			&event.Event{Type: event.SetThreadContext},
 			true,
 		},
 		{
 			newThreadAccessor(),
-			&event.Event{Type: event.CreateProcess, Category: event.Process, Callstack: []callstack.Frame{{Addr: 0x7ffb5c1d0396, Offset: 0x61, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"}}},
+			&event.Event{Type: event.CreateProcess, Callstack: []callstack.Frame{{Addr: 0x7ffb5c1d0396, Offset: 0x61, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"}}},
 			true,
 		},
 		{
 			newThreadAccessor(),
-			&event.Event{Type: event.RegSetValue, Category: event.Registry, Callstack: []callstack.Frame{{Addr: 0x7ffb5c1d0396, Offset: 0x61, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"}}},
+			&event.Event{Type: event.RegSetValue, Callstack: []callstack.Frame{{Addr: 0x7ffb5c1d0396, Offset: 0x61, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"}}},
 			true,
 		},
 		{
 			newRegistryAccessor(),
-			&event.Event{Type: event.RegSetValue, Category: event.Registry, Callstack: []callstack.Frame{{Addr: 0x7ffb5c1d0396, Offset: 0x61, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"}}},
+			&event.Event{Type: event.RegSetValue, Callstack: []callstack.Frame{{Addr: 0x7ffb5c1d0396, Offset: 0x61, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"}}},
 			true,
 		},
 		{
 			newNetworkAccessor(),
-			&event.Event{Type: event.RegSetValue, Category: event.Registry, Callstack: []callstack.Frame{{Addr: 0x7ffb5c1d0396, Offset: 0x61, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"}}},
+			&event.Event{Type: event.RegSetValue, Callstack: []callstack.Frame{{Addr: 0x7ffb5c1d0396, Offset: 0x61, Symbol: "CreateProcessW", Module: "C:\\WINDOWS\\System32\\KERNELBASE.dll"}}},
 			false,
 		},
 		{
 			newNetworkAccessor(),
-			&event.Event{Type: event.ConnectTCPv6, Category: event.Net},
+			&event.Event{Type: event.Connect},
 			true,
 		},
 		{
 			newDNSAccessor(),
-			&event.Event{Type: event.ReplyDNS, Category: event.Net},
+			&event.Event{Type: event.ReplyDNS},
 			true,
 		},
 		{
 			newModuleAccessor(),
-			&event.Event{Type: event.LoadModule, Category: event.Module},
+			&event.Event{Type: event.LoadModule},
 			true,
 		},
 		{
 			newMemAccessor(),
-			&event.Event{Type: event.VirtualAlloc, Category: event.Mem},
+			&event.Event{Type: event.VirtualAlloc},
 			true,
 		},
 	}

@@ -81,13 +81,13 @@ type compiledFilter struct {
 // filterset contains compiled filters indexed by event type and category.
 type filterset struct {
 	types      map[event.Type][]*compiledFilter
-	categories map[uint8][]*compiledFilter
+	categories map[event.Category][]*compiledFilter
 }
 
 func newFilterset() *filterset {
 	fs := &filterset{
 		types:      make(map[event.Type][]*compiledFilter),
-		categories: make(map[uint8][]*compiledFilter),
+		categories: make(map[event.Category][]*compiledFilter),
 	}
 	return fs
 }
@@ -100,7 +100,7 @@ func (f *filterset) collect(e *event.Event) []*compiledFilter {
 	if len(f.categories) == 0 {
 		return f.types[e.Type]
 	}
-	return append(f.types[e.Type], f.categories[e.Category.Index()]...)
+	return append(f.types[e.Type], f.categories[e.Category()]...)
 }
 
 func newCompiledFilter(f filter.Filter, c *config.FilterConfig, ss *sequenceState) *compiledFilter {
@@ -196,12 +196,17 @@ func (e *Engine) Compile() (*config.RulesCompileResult, error) {
 			for _, v := range values {
 				switch name {
 				case fields.EvtName:
-					for _, typ := range event.NameToTypes(v) {
-						e.filters.types[typ] = append(e.filters.types[typ], fltr)
+					typ, ok := event.ParseType(v)
+					if !ok {
+						continue
 					}
+					e.filters.types[typ] = append(e.filters.types[typ], fltr)
 				case fields.EvtCategory:
-					category := event.Category(v)
-					e.filters.categories[category.Index()] = append(e.filters.categories[category.Index()], fltr)
+					category, ok := event.ParseCategory(v)
+					if !ok {
+						continue
+					}
+					e.filters.categories[category] = append(e.filters.categories[category], fltr)
 				}
 			}
 		}

@@ -49,16 +49,13 @@ func TestMarshaller(t *testing.T) {
 	require.NoError(t, err)
 
 	evt := &Event{
-		Type:        CreateFile,
-		Tid:         2484,
-		PID:         859,
-		CPU:         1,
-		Seq:         2,
-		Name:        "CreateFile",
-		Timestamp:   now,
-		Category:    File,
-		Host:        "archrabbit",
-		Description: "Creates or opens a new file, directory, I/O device, pipe, console",
+		Type:      CreateFile,
+		Tid:       2484,
+		PID:       859,
+		CPU:       1,
+		Seq:       2,
+		Timestamp: now,
+		Host:      "archrabbit",
 		Params: Params{
 			params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
 			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
@@ -77,7 +74,7 @@ func TestMarshaller(t *testing.T) {
 	b := evt.MarshalRaw()
 	require.NotEmpty(t, b)
 
-	clone, err := NewFromCapture(b, capver.EvtSecV2)
+	clone, err := NewFromCapture(b, capver.EvtSecV3)
 	require.NoError(t, err)
 
 	assert.Equal(t, uint64(2), clone.Seq)
@@ -85,9 +82,9 @@ func TestMarshaller(t *testing.T) {
 	assert.Equal(t, uint32(2484), clone.Tid)
 	assert.Equal(t, CreateFile, clone.Type)
 	assert.Equal(t, uint8(1), clone.CPU)
-	assert.Equal(t, "CreateFile", clone.Name)
-	assert.Equal(t, File, clone.Category)
-	assert.Equal(t, "Creates or opens a new file, directory, I/O device, pipe, console", clone.Description)
+	assert.Equal(t, "CreateFile", clone.Name())
+	assert.Equal(t, File, clone.Category())
+	assert.Equal(t, "Creates or opens a new file, directory, I/O device, pipe, console", clone.Description())
 	assert.Equal(t, "archrabbit", clone.Host)
 	assert.Equal(t, now, clone.Timestamp)
 
@@ -108,16 +105,13 @@ func TestMarshaller(t *testing.T) {
 
 func TestEventMarshalJSON(t *testing.T) {
 	evt := &Event{
-		Type:        CreateFile,
-		Tid:         2484,
-		PID:         859,
-		CPU:         1,
-		Seq:         2,
-		Name:        "CreateFile",
-		Timestamp:   time.Now(),
-		Category:    File,
-		Host:        "archrabbit",
-		Description: "Creates or opens a new file, directory, I/O device, pipe, console",
+		Type:      CreateFile,
+		Tid:       2484,
+		PID:       859,
+		CPU:       1,
+		Seq:       2,
+		Timestamp: time.Now(),
+		Host:      "archrabbit",
 		Params: Params{
 			params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
 			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
@@ -225,16 +219,13 @@ func TestUnmarshalHugeHandles(t *testing.T) {
 	require.NoError(t, err)
 
 	evt := &Event{
-		Type:        CreateProcess,
-		Tid:         2484,
-		PID:         859,
-		CPU:         1,
-		Seq:         2,
-		Name:        "CreateProcess",
-		Timestamp:   time.Now(),
-		Category:    File,
-		Host:        "archrabbit",
-		Description: "Creates a new process",
+		Type:      CreateProcess,
+		Tid:       2484,
+		PID:       859,
+		CPU:       1,
+		Seq:       2,
+		Timestamp: time.Now(),
+		Host:      "archrabbit",
 		Params: Params{
 			params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
 			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
@@ -278,7 +269,7 @@ func TestUnmarshalHugeHandles(t *testing.T) {
 	}
 
 	s := evt.MarshalRaw()
-	clone, err := NewFromCapture(s, capver.EvtSecV2)
+	clone, err := NewFromCapture(s, capver.EvtSecV3)
 	require.NoError(t, err)
 	require.NotNil(t, clone)
 }
@@ -287,16 +278,13 @@ func TestEventMarshalJSONMultiple(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		seq := uint64(i + 1)
 		evt := &Event{
-			Type:        CreateFile,
-			Tid:         2484,
-			PID:         859,
-			CPU:         1,
-			Seq:         seq,
-			Name:        "CreateFile",
-			Timestamp:   time.Now(),
-			Category:    File,
-			Host:        "archrabbit",
-			Description: "Creates or opens a new file, directory, I/O device, pipe, console",
+			Type:      CreateFile,
+			Tid:       2484,
+			PID:       859,
+			CPU:       1,
+			Seq:       seq,
+			Timestamp: time.Now(),
+			Host:      "archrabbit",
 			Params: Params{
 				params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
 				params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
@@ -367,16 +355,13 @@ func TestEventMarshalJSONMultiple(t *testing.T) {
 
 func BenchmarkEventMarshalJSON(b *testing.B) {
 	evt := &Event{
-		Type:        CreateFile,
-		Tid:         2484,
-		PID:         859,
-		CPU:         1,
-		Seq:         2,
-		Name:        "CreateFile",
-		Timestamp:   time.Now(),
-		Category:    File,
-		Host:        "archrabbit",
-		Description: "Creates or opens a new file, directory, I/O device, pipe, console",
+		Type:      CreateFile,
+		Tid:       2484,
+		PID:       859,
+		CPU:       1,
+		Seq:       2,
+		Timestamp: time.Now(),
+		Host:      "archrabbit",
 		Params: Params{
 			params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
 			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
@@ -451,16 +436,13 @@ func BenchmarkEventMarshalJSON(b *testing.B) {
 
 func BenchmarkEventMarshalJSONStdlib(b *testing.B) {
 	evt := &Event{
-		Type:        CreateFile,
-		Tid:         2484,
-		PID:         859,
-		CPU:         1,
-		Seq:         2,
-		Name:        "CreateFile",
-		Timestamp:   time.Now(),
-		Category:    File,
-		Host:        "archrabbit",
-		Description: "Creates or opens a new file, directory, I/O device, pipe, console",
+		Type:      CreateFile,
+		Tid:       2484,
+		PID:       859,
+		CPU:       1,
+		Seq:       2,
+		Timestamp: time.Now(),
+		Host:      "archrabbit",
 		Params: Params{
 			params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
 			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
@@ -537,16 +519,13 @@ func BenchmarkEventMarshalJSONStdlib(b *testing.B) {
 
 func BenchmarkMarshal(b *testing.B) {
 	evt := &Event{
-		Type:        CreateFile,
-		Tid:         2484,
-		PID:         859,
-		CPU:         1,
-		Seq:         2,
-		Name:        "CreateFile",
-		Timestamp:   time.Now(),
-		Category:    File,
-		Host:        "archrabbit",
-		Description: "Creates or opens a new file, directory, I/O device, pipe, console",
+		Type:      CreateFile,
+		Tid:       2484,
+		PID:       859,
+		CPU:       1,
+		Seq:       2,
+		Timestamp: time.Now(),
+		Host:      "archrabbit",
 		Params: Params{
 			params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
 			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
@@ -565,16 +544,13 @@ func BenchmarkMarshal(b *testing.B) {
 
 func BenchmarkUnmarshal(b *testing.B) {
 	evt := &Event{
-		Type:        CreateFile,
-		Tid:         2484,
-		PID:         859,
-		CPU:         1,
-		Seq:         2,
-		Name:        "CreateFile",
-		Timestamp:   time.Now(),
-		Category:    File,
-		Host:        "archrabbit",
-		Description: "Creates or opens a new file, directory, I/O device, pipe, console",
+		Type:      CreateFile,
+		Tid:       2484,
+		PID:       859,
+		CPU:       1,
+		Seq:       2,
+		Timestamp: time.Now(),
+		Host:      "archrabbit",
 		Params: Params{
 			params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
 			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
@@ -586,11 +562,11 @@ func BenchmarkUnmarshal(b *testing.B) {
 	buf := evt.MarshalRaw()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		ke, err := NewFromCapture(buf, capver.EvtSecV2)
+		evt, err := NewFromCapture(buf, capver.EvtSecV3)
 		if err != nil {
 			b.Fatal(err)
 		}
-		if ke.Name == "" {
+		if evt.Name() == "" {
 			b.Fatal("invalid unmarshal byte slice")
 		}
 	}

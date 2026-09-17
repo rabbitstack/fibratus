@@ -21,10 +21,11 @@ package amqp
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/util/va"
-	"golang.org/x/sys/windows"
 	"testing"
 	"time"
+
+	"github.com/rabbitstack/fibratus/pkg/util/va"
+	"golang.org/x/sys/windows"
 
 	"github.com/phayes/freeport"
 	"github.com/rabbitstack/fibratus/pkg/event"
@@ -194,16 +195,13 @@ func amqpURL(port int) string {
 //nolint:unused
 func getBatch() *event.Batch {
 	evt := &event.Event{
-		Type:        event.CreateFile,
-		Tid:         2484,
-		PID:         859,
-		CPU:         1,
-		Seq:         2,
-		Name:        "CreateFile",
-		Timestamp:   time.Now(),
-		Category:    event.File,
-		Host:        "archrabbit",
-		Description: "Creates or opens a new file, directory, I/O device, pipe, console",
+		Type:      event.CreateFile,
+		Tid:       2484,
+		PID:       859,
+		CPU:       1,
+		Seq:       2,
+		Timestamp: time.Now(),
+		Host:      "archrabbit",
 		Params: event.Params{
 			params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
 			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
@@ -262,16 +260,13 @@ func getBatch() *event.Batch {
 	}
 
 	evt1 := &event.Event{
-		Type:        event.CreateFile,
-		Tid:         2484,
-		PID:         459,
-		CPU:         1,
-		Seq:         2,
-		Name:        "CreateFile",
-		Timestamp:   time.Now(),
-		Category:    event.File,
-		Host:        "archrabbit",
-		Description: "Creates or opens a new file, directory, I/O device, pipe, console",
+		Type:      event.CreateFile,
+		Tid:       2484,
+		PID:       459,
+		CPU:       1,
+		Seq:       2,
+		Timestamp: time.Now(),
+		Host:      "archrabbit",
 		Params: event.Params{
 			params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
 			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},
@@ -330,16 +325,13 @@ func getBatch() *event.Batch {
 	}
 
 	evt2 := &event.Event{
-		Type:        event.CreateFile,
-		Tid:         2484,
-		PID:         829,
-		CPU:         1,
-		Seq:         2,
-		Name:        "CreateFile",
-		Timestamp:   time.Now(),
-		Category:    event.File,
-		Host:        "archrabbit",
-		Description: "Creates or opens a new file, directory, I/O device, pipe, console",
+		Type:      event.CreateFile,
+		Tid:       2484,
+		PID:       829,
+		CPU:       1,
+		Seq:       2,
+		Timestamp: time.Now(),
+		Host:      "archrabbit",
 		Params: event.Params{
 			params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
 			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},

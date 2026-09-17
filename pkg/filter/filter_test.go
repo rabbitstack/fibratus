@@ -175,8 +175,7 @@ func TestProcFilter(t *testing.T) {
 	}
 
 	evt := &event.Event{
-		Type:     event.CreateProcess,
-		Category: event.Process,
+		Type: event.CreateProcess,
 		Params: event.Params{
 			params.Cmdline:                    {Name: params.Cmdline, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\svchost.exe -k DcomLaunch -p -s LSM"},
 			params.ProcessName:                {Name: params.ProcessName, Type: params.AnsiString, Value: "svchost.exe"},
@@ -190,8 +189,7 @@ func TestProcFilter(t *testing.T) {
 			params.ProcessTokenIsElevated:     {Name: params.ProcessTokenIsElevated, Type: params.Bool, Value: true},
 			params.ProcessTokenElevationType:  {Name: params.ProcessTokenElevationType, Type: params.AnsiString, Value: "DEFAULT"},
 		},
-		Name: "CreateProcess",
-		PID:  1234,
+		PID: 1234,
 		PS: &pstypes.PS{
 			Name:     "svchost.exe",
 			Cmdline:  "C:\\Windows\\System32\\svchost.exe -k DcomLaunch -p -s LSM",
@@ -226,13 +224,11 @@ func TestProcFilter(t *testing.T) {
 	evt.Timestamp, _ = time.Parse(time.RFC3339, "2011-05-03T15:04:05.323Z")
 
 	evt1 := &event.Event{
-		Type:     event.OpenProcess,
-		Category: event.Process,
+		Type: event.OpenProcess,
 		Params: event.Params{
 			params.DesiredAccess: {Name: params.DesiredAccess, Type: params.Flags, Value: uint32(0x1400), Flags: event.PsAccessRightFlags},
 		},
-		Name: "OpenProcess",
-		PID:  1023,
+		PID: 1023,
 		PS: &pstypes.PS{
 			Name:   "svchost.exe",
 			Parent: parent,
@@ -246,13 +242,11 @@ func TestProcFilter(t *testing.T) {
 	}
 
 	evt2 := &event.Event{
-		Type:     event.OpenProcess,
-		Category: event.Process,
+		Type: event.OpenProcess,
 		Params: event.Params{
 			params.DesiredAccess: {Name: params.DesiredAccess, Type: params.Flags, Value: uint32(0x1400), Flags: event.PsAccessRightFlags},
 		},
-		Name: "OpenProcess",
-		PID:  1023,
+		PID: 1023,
 	}
 
 	var tests = []struct {
@@ -424,11 +418,9 @@ func TestThreadFilter(t *testing.T) {
 		params.StartAddressModule: {Name: params.StartAddressModule, Type: params.UnicodeString, Value: "C:\\Windows\\System32\\kernel32.dll"},
 	}
 	evt := &event.Event{
-		Type:     event.CreateThread,
-		Params:   pars,
-		Name:     "CreateThread",
-		PID:      windows.GetCurrentProcessId(),
-		Category: event.Thread,
+		Type:   event.CreateThread,
+		Params: pars,
+		PID:    windows.GetCurrentProcessId(),
 		PS: &pstypes.PS{
 			Name: "svchost.exe",
 			Envs: map[string]string{"ALLUSERSPROFILE": "C:\\ProgramData", "OS": "Windows_NT", "ProgramFiles(x86)": "C:\\Program Files (x86)"},
@@ -615,15 +607,12 @@ func TestThreadFilter(t *testing.T) {
 
 func TestFileFilter(t *testing.T) {
 	evt := &event.Event{
-		Type:        event.CreateFile,
-		Tid:         2484,
-		PID:         859,
-		CPU:         1,
-		Seq:         2,
-		Name:        "CreateFile",
-		Category:    event.File,
-		Host:        "archrabbit",
-		Description: "Creates or opens a new file, directory, I/O device, pipe, console",
+		Type: event.CreateFile,
+		Tid:  2484,
+		PID:  859,
+		CPU:  1,
+		Seq:  2,
+		Host: "archrabbit",
 		Params: event.Params{
 			params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
 			params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
@@ -705,9 +694,7 @@ func TestFileInfoFilter(t *testing.T) {
 		{
 			`file.info_class = 'Allocation'`,
 			&event.Event{
-				Category: event.File,
-				Type:     event.SetFileInformation,
-				Name:     "SetFileInformation",
+				Type: event.SetFileInformation,
 				Params: event.Params{
 					params.FileInfoClass: {Name: params.FileInfoClass, Type: params.Enum, Value: fs.AllocationClass, Enum: fs.FileInfoClasses},
 				},
@@ -717,9 +704,7 @@ func TestFileInfoFilter(t *testing.T) {
 		{
 			`file.info.allocation_size = 64500`,
 			&event.Event{
-				Category: event.File,
-				Type:     event.SetFileInformation,
-				Name:     "SetFileInformation",
+				Type: event.SetFileInformation,
 				Params: event.Params{
 					params.FileInfoClass: {Name: params.FileInfoClass, Type: params.Enum, Value: fs.AllocationClass, Enum: fs.FileInfoClasses},
 					params.FileExtraInfo: {Name: params.FileExtraInfo, Type: params.Uint64, Value: uint64(64500)},
@@ -730,9 +715,7 @@ func TestFileInfoFilter(t *testing.T) {
 		{
 			`file.info.eof_size = 64500`,
 			&event.Event{
-				Category: event.File,
-				Type:     event.SetFileInformation,
-				Name:     "SetFileInformation",
+				Type: event.SetFileInformation,
 				Params: event.Params{
 					params.FileInfoClass: {Name: params.FileInfoClass, Type: params.Enum, Value: fs.EOFClass, Enum: fs.FileInfoClasses},
 					params.FileExtraInfo: {Name: params.FileExtraInfo, Type: params.Uint64, Value: uint64(64500)},
@@ -743,9 +726,7 @@ func TestFileInfoFilter(t *testing.T) {
 		{
 			`file.info.eof_size = 64500`,
 			&event.Event{
-				Category: event.File,
-				Type:     event.SetFileInformation,
-				Name:     "SetFileInformation",
+				Type: event.SetFileInformation,
 				Params: event.Params{
 					params.FileInfoClass: {Name: params.FileInfoClass, Type: params.Enum, Value: fs.DispositionClass, Enum: fs.FileInfoClasses},
 					params.FileExtraInfo: {Name: params.FileExtraInfo, Type: params.Uint64, Value: uint64(1)},
@@ -756,9 +737,7 @@ func TestFileInfoFilter(t *testing.T) {
 		{
 			`file.info.is_disposition_delete_file = true`,
 			&event.Event{
-				Category: event.File,
-				Type:     event.DeleteFile,
-				Name:     "DeleteFile",
+				Type: event.DeleteFile,
 				Params: event.Params{
 					params.FileInfoClass: {Name: params.FileInfoClass, Type: params.Enum, Value: fs.DispositionClass, Enum: fs.FileInfoClasses},
 					params.FileExtraInfo: {Name: params.FileExtraInfo, Type: params.Uint64, Value: uint64(1)},
@@ -782,16 +761,13 @@ func TestFileInfoFilter(t *testing.T) {
 
 func TestEventFilter(t *testing.T) {
 	evt := &event.Event{
-		Type:        event.CreateFile,
-		Tid:         2484,
-		PID:         859,
-		CPU:         1,
-		Seq:         2,
-		Name:        "CreateFile",
-		Category:    event.File,
-		Host:        "archrabbit",
-		Description: "Creates or opens a new file, directory, I/O device, pipe, console",
-		Evasions:    uint32(evasion.IndirectSyscall),
+		Type:     event.CreateFile,
+		Tid:      2484,
+		PID:      859,
+		CPU:      1,
+		Seq:      2,
+		Host:     "archrabbit",
+		Evasions: uint32(evasion.IndirectSyscall),
 		Params: event.Params{
 			params.ProcessID:     {Name: params.ProcessID, Type: params.PID, Value: uint32(3434)},
 			params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
@@ -860,13 +836,12 @@ func TestEventFilter(t *testing.T) {
 
 func TestNetFilter(t *testing.T) {
 	evt := &event.Event{
-		Type: event.SendTCPv4,
+		Type: event.Accept,
 		Tid:  2484,
 		PID:  859,
 		PS: &pstypes.PS{
 			Name: "cmd.exe",
 		},
-		Category: event.Net,
 		Params: event.Params{
 			params.NetDport: {Name: params.NetDport, Type: params.Uint16, Value: uint16(443)},
 			params.NetSport: {Name: params.NetSport, Type: params.Uint16, Value: uint16(43123)},
@@ -911,13 +886,12 @@ func TestNetFilter(t *testing.T) {
 	}
 
 	evt1 := &event.Event{
-		Type: event.SendTCPv4,
+		Type: event.Send,
 		Tid:  2484,
 		PID:  859,
 		PS: &pstypes.PS{
 			Name: "cmd.exe",
 		},
-		Category: event.Net,
 		Params: event.Params{
 			params.NetDport: {Name: params.NetDport, Type: params.Uint16, Value: uint16(53)},
 			params.NetSport: {Name: params.NetSport, Type: params.Uint16, Value: uint16(43123)},
@@ -950,10 +924,9 @@ func TestNetFilter(t *testing.T) {
 
 func TestRegistryFilter(t *testing.T) {
 	evt := &event.Event{
-		Type:     event.RegSetValue,
-		Tid:      2484,
-		PID:      859,
-		Category: event.Registry,
+		Type: event.RegSetValue,
+		Tid:  2484,
+		PID:  859,
 		Params: event.Params{
 			params.RegPath:      {Name: params.RegPath, Type: params.UnicodeString, Value: `HKEY_LOCAL_MACHINE\SYSTEM\Setup\Pid`},
 			params.RegData:      {Name: params.RegData, Type: params.Uint32, Value: uint32(10234)},
@@ -994,8 +967,7 @@ func TestModuleFilter(t *testing.T) {
 	fs.GetMetadataStore().AddFile(filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll"), &fs.FileInfo{IsDLL: true})
 
 	e1 := &event.Event{
-		Type:     event.LoadModule,
-		Category: event.Module,
+		Type: event.LoadModule,
 		Params: event.Params{
 			params.ModulePath:           {Name: params.ModulePath, Type: params.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll")},
 			params.ProcessID:            {Name: params.ProcessID, Type: params.PID, Value: uint32(1023)},
@@ -1065,8 +1037,7 @@ func TestModuleFilter(t *testing.T) {
 
 	// now exercise unsigned/unchecked signature
 	e2 := &event.Event{
-		Type:     event.LoadModule,
-		Category: event.Module,
+		Type: event.LoadModule,
 		Params: event.Params{
 			params.ModulePath:           {Name: params.ModulePath, Type: params.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "kernel32.dll")},
 			params.ProcessID:            {Name: params.ProcessID, Type: params.PID, Value: uint32(1023)},
@@ -1119,8 +1090,7 @@ func TestModuleFilter(t *testing.T) {
 	assert.NotNil(t, signature.GetSignatures().GetSignature(key))
 
 	e3 := &event.Event{
-		Type:     event.LoadModule,
-		Category: event.Module,
+		Type: event.LoadModule,
 		Params: event.Params{
 			params.ModulePath:           {Name: params.ModulePath, Type: params.UnicodeString, Value: "..\\pe\\_fixtures\\mscorlib.dll"},
 			params.ProcessID:            {Name: params.ProcessID, Type: params.PID, Value: uint32(1023)},
@@ -1273,10 +1243,8 @@ func TestMemFilter(t *testing.T) {
 	}
 
 	evt := &event.Event{
-		Type:     event.VirtualAlloc,
-		Params:   pars,
-		Name:     "VirtualAlloc",
-		Category: event.Mem,
+		Type:   event.VirtualAlloc,
+		Params: pars,
 		PS: &pstypes.PS{
 			Name: "svchost.exe",
 			Envs: map[string]string{"ALLUSERSPROFILE": "C:\\ProgramData", "OS": "Windows_NT", "ProgramFiles(x86)": "C:\\Program Files (x86)"},
@@ -1318,7 +1286,6 @@ func TestDNSFilter(t *testing.T) {
 		PS: &pstypes.PS{
 			Name: "cmd.exe",
 		},
-		Category: event.Net,
 		Params: event.Params{
 			params.DNSName:    {Name: params.DNSName, Type: params.UnicodeString, Value: "r3.o.lencr.org"},
 			params.DNSRR:      {Name: params.DNSRR, Type: params.Enum, Value: uint32(0x0001), Enum: event.DNSRecordTypes},
@@ -1364,10 +1331,8 @@ func TestInterpolateFields(t *testing.T) {
 			interpolated: "Credential discovery via VaultCmd.exe (VaultCmd.exe /listcreds:Windows Credentials /all) and user LOCAL\\tor",
 			evts: []*event.Event{
 				{
-					Type:     event.CreateProcess,
-					Category: event.Process,
-					Name:     "CreateProcess",
-					PID:      1023,
+					Type: event.CreateProcess,
+					PID:  1023,
 					PS: &pstypes.PS{
 						Name: "VaultCmd.exe",
 						Ppid: 345,
@@ -1384,10 +1349,8 @@ func TestInterpolateFields(t *testing.T) {
 			interpolated: "Credential discovery via N/A and pid 1023",
 			evts: []*event.Event{
 				{
-					Type:     event.CreateProcess,
-					Category: event.Process,
-					Name:     "CreateProcess",
-					PID:      1023,
+					Type: event.CreateProcess,
+					PID:  1023,
 				},
 			},
 		},
@@ -1396,10 +1359,8 @@ func TestInterpolateFields(t *testing.T) {
 			interpolated: "Suspicious thread start module C:\\Windows\\System32\\vault.dll",
 			evts: []*event.Event{
 				{
-					Type:     event.CreateThread,
-					Category: event.Thread,
-					Name:     "CreateThread",
-					PID:      1023,
+					Type: event.CreateThread,
+					PID:  1023,
 					Params: event.Params{
 						params.StartAddressModule: {Name: params.StartAddressModule, Type: params.UnicodeString, Value: "C:\\Windows\\System32\\vault.dll"},
 					},
@@ -1416,10 +1377,8 @@ and subsequently write the <code>C:\Users
 eo\Temp\lsass.dump</code> dump file to the disk device`,
 			evts: []*event.Event{
 				{
-					Type:     event.OpenProcess,
-					Category: event.Process,
-					Name:     "OpenProcess",
-					PID:      1023,
+					Type: event.OpenProcess,
+					PID:  1023,
 					PS: &pstypes.PS{
 						Name: "taskmgr.exe",
 						Ppid: 345,
@@ -1427,10 +1386,8 @@ eo\Temp\lsass.dump</code> dump file to the disk device`,
 					},
 				},
 				{
-					Type:     event.WriteFile,
-					Category: event.File,
-					Name:     "WriteFile",
-					PID:      1023,
+					Type: event.WriteFile,
+					PID:  1023,
 					Params: event.Params{
 						params.FilePath: {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Users\neo\\Temp\\lsass.dump"},
 					},
@@ -1452,10 +1409,8 @@ and subsequently write the <code>C:\Users
 eo\Temp\lsass.dump</code> dump file to the disk device`,
 			evts: []*event.Event{
 				{
-					Type:     event.OpenProcess,
-					Category: event.Process,
-					Name:     "OpenProcess",
-					PID:      1023,
+					Type: event.OpenProcess,
+					PID:  1023,
 					PS: &pstypes.PS{
 						Name: "taskmgr.exe",
 						Ppid: 345,
@@ -1463,10 +1418,8 @@ eo\Temp\lsass.dump</code> dump file to the disk device`,
 					},
 				},
 				{
-					Type:     event.WriteFile,
-					Category: event.File,
-					Name:     "WriteFile",
-					PID:      1023,
+					Type: event.WriteFile,
+					PID:  1023,
 					Params: event.Params{
 						params.FilePath: {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Users\neo\\Temp\\lsass.dump"},
 					},
@@ -1503,7 +1456,6 @@ func BenchmarkFilterRun(b *testing.B) {
 	evt := &event.Event{
 		Type:   event.CreateProcess,
 		Params: pars,
-		Name:   "CreateProcess",
 	}
 
 	for i := 0; i < b.N; i++ {

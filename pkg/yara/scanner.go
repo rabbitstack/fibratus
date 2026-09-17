@@ -271,7 +271,7 @@ func (s scanner) Scan(e *event.Event) (bool, error) {
 				s.rwxs[pid] = addr
 			}
 		}
-	case event.MapViewFile:
+	case event.MapViewOfSection:
 		if s.config.SkipMmaps {
 			return false, nil
 		}

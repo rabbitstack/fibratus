@@ -19,64 +19,28 @@
 package ql
 
 import (
+	"testing"
+
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestSequenceExprIsEvaluable(t *testing.T) {
 	var tests = []struct {
-		expr       string
-		evt        *event.Event
-		isEval     bool
-		assertions func(t *testing.T, sexpr *SequenceExpr)
+		expr   string
+		evt    *event.Event
+		isEval bool
 	}{
-		{"evt.name = 'CreateProcess'", &event.Event{Type: event.CreateProcess, Category: event.Process}, true,
-			func(t *testing.T, sexpr *SequenceExpr) {
-				assert.True(t, sexpr.bitsets.IsInitialized(event.TypeBitSet))
-				assert.False(t, sexpr.bitsets.IsInitialized(event.BitmaskBitSet))
-				assert.False(t, sexpr.bitsets.IsInitialized(event.CategoryBitSet))
-			},
-		},
-		{"evt.name = 'CreateProcess'", &event.Event{Type: event.TerminateProcess, Category: event.Process}, false, nil},
-		{"evt.name = 'CreateProcess' or evt.name = 'TerminateThread'", &event.Event{Type: event.TerminateProcess, Category: event.Process}, false, nil},
-		{"evt.name = 'CreateProcess' or evt.category = 'object'", &event.Event{Type: event.TerminateProcess, Category: event.Process}, false, nil},
-		{"evt.name = 'CreateProcess' or evt.name = 'OpenProcess'", &event.Event{Type: event.OpenProcess, Category: event.Process}, true,
-			func(t *testing.T, sexpr *SequenceExpr) {
-				assert.True(t, sexpr.bitsets.IsInitialized(event.TypeBitSet))
-				assert.False(t, sexpr.bitsets.IsInitialized(event.BitmaskBitSet))
-				assert.False(t, sexpr.bitsets.IsInitialized(event.CategoryBitSet))
-			},
-		},
-		{"evt.name = 'CreateProcess' or evt.name = 'CreateThread'", &event.Event{Type: event.CreateThread, Category: event.Thread}, true,
-			func(t *testing.T, sexpr *SequenceExpr) {
-				assert.False(t, sexpr.bitsets.IsInitialized(event.TypeBitSet))
-				assert.True(t, sexpr.bitsets.IsInitialized(event.BitmaskBitSet))
-				assert.False(t, sexpr.bitsets.IsInitialized(event.CategoryBitSet))
-			},
-		},
-		{"evt.name = 'CreateProcess' or evt.category = 'registry'", &event.Event{Type: event.RegSetValue, Category: event.Registry}, true,
-			func(t *testing.T, sexpr *SequenceExpr) {
-				assert.True(t, sexpr.bitsets.IsInitialized(event.TypeBitSet))
-				assert.False(t, sexpr.bitsets.IsInitialized(event.BitmaskBitSet))
-				assert.True(t, sexpr.bitsets.IsInitialized(event.CategoryBitSet))
-			},
-		},
-		{"evt.name = 'CreateProcess' or evt.name = 'OpenProcess' or evt.category = 'registry'", &event.Event{Type: event.OpenProcess, Category: event.Process}, true,
-			func(t *testing.T, sexpr *SequenceExpr) {
-				assert.True(t, sexpr.bitsets.IsInitialized(event.TypeBitSet))
-				assert.False(t, sexpr.bitsets.IsInitialized(event.BitmaskBitSet))
-				assert.True(t, sexpr.bitsets.IsInitialized(event.CategoryBitSet))
-			},
-		},
-		{"evt.name = 'CreateProcess' or evt.name = 'SetThreadContext' or evt.category = 'registry'", &event.Event{Type: event.CreateProcess, Category: event.Process}, true,
-			func(t *testing.T, sexpr *SequenceExpr) {
-				assert.False(t, sexpr.bitsets.IsInitialized(event.TypeBitSet))
-				assert.True(t, sexpr.bitsets.IsInitialized(event.BitmaskBitSet))
-				assert.True(t, sexpr.bitsets.IsInitialized(event.CategoryBitSet))
-			},
-		},
+		{"evt.name = 'CreateProcess'", &event.Event{Type: event.CreateProcess}, true},
+		{"evt.name = 'CreateProcess'", &event.Event{Type: event.TerminateProcess}, false},
+		{"evt.name = 'CreateProcess' or evt.name = 'TerminateThread'", &event.Event{Type: event.TerminateProcess}, false},
+		{"evt.name = 'CreateProcess' or evt.category = 'object'", &event.Event{Type: event.TerminateProcess}, false},
+		{"evt.name = 'CreateProcess' or evt.name = 'OpenProcess'", &event.Event{Type: event.OpenProcess}, true},
+		{"evt.name = 'CreateProcess' or evt.name = 'CreateThread'", &event.Event{Type: event.CreateThread}, true},
+		{"evt.name = 'CreateProcess' or evt.category = 'registry'", &event.Event{Type: event.RegSetValue}, true},
+		{"evt.name = 'CreateProcess' or evt.name = 'OpenProcess' or evt.category = 'registry'", &event.Event{Type: event.OpenProcess}, true},
+		{"evt.name = 'CreateProcess' or evt.name = 'SetThreadContext' or evt.category = 'registry'", &event.Event{Type: event.CreateProcess}, true},
 	}
 
 	for _, tt := range tests {
@@ -90,9 +54,6 @@ func TestSequenceExprIsEvaluable(t *testing.T) {
 			sexpr.walk()
 
 			assert.Equal(t, tt.isEval, sexpr.IsEvaluable(tt.evt))
-			if tt.assertions != nil {
-				tt.assertions(t, sexpr)
-			}
 		})
 	}
 }

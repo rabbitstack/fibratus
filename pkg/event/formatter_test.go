@@ -19,13 +19,14 @@
 package event
 
 import (
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/stretchr/testify/assert"
 
-	kpars "github.com/rabbitstack/fibratus/pkg/event/params"
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestTemplateUnknownField(t *testing.T) {
@@ -54,10 +55,10 @@ func TestFormat(t *testing.T) {
 	template := "{{ .Seq }} {{.CPU}} -  ({{.Type}}) -- pid: {{ .Params.Pid }} ({{.Params}}) {{ .Meta }}"
 	f, err := NewFormatter(template)
 	require.NoError(t, err)
-	params := Params{
-		kpars.ProcessID: {Name: kpars.ProcessID, Type: kpars.PID, Value: uint32(876)},
+	pars := Params{
+		params.ProcessID: {Name: params.ProcessID, Type: params.PID, Value: uint32(876)},
 	}
-	s := f.Format(&Event{CPU: uint8(4), Name: "CreateProcess", Seq: uint64(1999), Params: params, Metadata: map[MetadataKey]any{"key1": "value1"}})
+	s := f.Format(&Event{CPU: uint8(4), Type: CreateProcess, Seq: uint64(1999), Params: pars, Metadata: map[MetadataKey]any{"key1": "value1"}})
 	assert.Equal(t, "1999 4 -  (CreateProcess) -- pid: 876 (pid➜ 876) key1: value1", string(s))
 }
 
@@ -65,14 +66,13 @@ func TestFormatPS(t *testing.T) {
 	template := "{{ .Seq }} {{ .Process }} ({{ .Cwd }}) {{ .Ppid }} ({{ .Sid }})"
 	f, err := NewFormatter(template)
 	require.NoError(t, err)
-	params := Params{
-		kpars.ProcessID: {Name: kpars.ProcessID, Type: kpars.PID, Value: uint32(876)},
+	pars := Params{
+		params.ProcessID: {Name: params.ProcessID, Type: params.PID, Value: uint32(876)},
 	}
 	s := f.Format(&Event{
 		CPU:    uint8(4),
-		Name:   "CreateProcess",
 		Seq:    uint64(1999),
-		Params: params,
+		Params: pars,
 		PS: &pstypes.PS{
 			Name: "cmd.exe",
 			Cwd:  "C:/Windows/System32",
@@ -92,47 +92,86 @@ func TestNormalizeTemplate(t *testing.T) {
 }
 
 func TestIsTemplateBalanced(t *testing.T) {
-	ok, pos := isTemplateBalanced("{{ .Seq }} {{.CPU}}")
-	require.True(t, ok)
-	assert.Equal(t, -1, pos)
+	tests := []struct {
+		name    string
+		input   string
+		wantOK  bool
+		wantPos int
+	}{
+		{
+			name:    "balanced templates",
+			input:   "{{ .Seq }} {{.CPU}}",
+			wantOK:  true,
+			wantPos: -1,
+		},
+		{
+			name:    "balanced templates with other delimiters",
+			input:   "{{ .Seq }} ({{.CPU}}) [] {{.Type}}",
+			wantOK:  true,
+			wantPos: -1,
+		},
+		{
+			name:    "single opening brace",
+			input:   "{{ .Seq }} {.CPU}} {{.Type}}",
+			wantOK:  false,
+			wantPos: 2,
+		},
+		{
+			name:    "single template",
+			input:   "{.Seq}",
+			wantOK:  false,
+			wantPos: 1,
+		},
+		{
+			name:    "unmatched closing braces",
+			input:   "{{ .Seq }} .CPU }}",
+			wantOK:  false,
+			wantPos: 2,
+		},
+		{
+			name:    "triple opening brace",
+			input:   "{{{ .Seq }} {{.CPU}} {{} {{ .Params }} { .Params.pid}}",
+			wantOK:  false,
+			wantPos: 1,
+		},
+		{
+			name:    "empty template",
+			input:   "{{ .Seq }} {{.CPU}} {{} {{ .Params }} { .Params.pid}}",
+			wantOK:  false,
+			wantPos: 3,
+		},
+		{
+			name:    "empty template with other delimiters",
+			input:   "({{ .Seq }}) {{.CPU}} {{}} {{ .Params }} { .Params.pid}}",
+			wantOK:  false,
+			wantPos: 5,
+		},
+		{
+			name:    "malformed closing delimiter",
+			input:   "{{ .Seq } {{.CPU}} {.Type}}",
+			wantOK:  false,
+			wantPos: 1,
+		},
+		{
+			name:    "unmatched closing brace",
+			input:   "{{ .Seq }} {{.CPU}} {.Type}}",
+			wantOK:  false,
+			wantPos: 3,
+		},
+		{
+			name:    "malformed template in complex input",
+			input:   "{{ .Seq }} {{.CPU}} -  ({{.Type}}) -- pid: {{]} {{ .Params.Pid }} ({{.Params}}) {{ .Meta }}",
+			wantOK:  false,
+			wantPos: 4,
+		},
+	}
 
-	ok, pos = isTemplateBalanced("{{ .Seq }} ({{.CPU}}) [] {{.Type}}")
-	require.True(t, ok)
-	assert.Equal(t, -1, pos)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ok, pos := isTemplateBalanced(tt.input)
 
-	ok, pos = isTemplateBalanced("{{ .Seq }} {.CPU}} {{.Type}}")
-	require.False(t, ok)
-	assert.Equal(t, 2, pos)
-
-	ok, pos = isTemplateBalanced("{.Seq}")
-	require.False(t, ok)
-	assert.Equal(t, 1, pos)
-
-	ok, pos = isTemplateBalanced("{{ .Seq }} .CPU }}")
-	require.False(t, ok)
-	assert.Equal(t, 2, pos)
-
-	ok, pos = isTemplateBalanced("{{{ .Seq }} {{.CPU}} {{} {{ .Params }} { .Params.pid}}")
-	require.False(t, ok)
-	assert.Equal(t, 1, pos)
-
-	ok, pos = isTemplateBalanced("{{ .Seq }} {{.CPU}} {{} {{ .Params }} { .Params.pid}}")
-	require.False(t, ok)
-	assert.Equal(t, 3, pos)
-
-	ok, pos = isTemplateBalanced("({{ .Seq }}) {{.CPU}} {{}} {{ .Params }} { .Params.pid}}")
-	require.False(t, ok)
-	assert.Equal(t, 5, pos)
-
-	ok, pos = isTemplateBalanced("{{ .Seq } {{.CPU}} {.Type}}")
-	require.False(t, ok)
-	assert.Equal(t, 1, pos)
-
-	ok, pos = isTemplateBalanced("{{ .Seq }} {{.CPU}} {.Type}}")
-	require.False(t, ok)
-	assert.Equal(t, 3, pos)
-
-	ok, pos = isTemplateBalanced("{{ .Seq }} {{.CPU}} -  ({{.Type}}) -- pid: {{]} {{ .Params.Pid }} ({{.Params}}) {{ .Meta }}")
-	require.False(t, ok)
-	assert.Equal(t, 4, pos)
+			require.Equal(t, tt.wantOK, ok)
+			assert.Equal(t, tt.wantPos, pos)
+		})
+	}
 }

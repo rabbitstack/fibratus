@@ -19,13 +19,14 @@
 package evasion
 
 import (
+	"testing"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/callstack"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/stretchr/testify/require"
-	"testing"
-	"time"
 )
 
 func TestDirectSyscall(t *testing.T) {
@@ -39,9 +40,7 @@ func TestDirectSyscall(t *testing.T) {
 			PID:       859,
 			CPU:       1,
 			Seq:       2,
-			Name:      "CreateFile",
 			Timestamp: time.Now(),
-			Category:  event.File,
 			Params: event.Params{
 				params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
 				params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
@@ -60,9 +59,7 @@ func TestDirectSyscall(t *testing.T) {
 			PID:       859,
 			CPU:       1,
 			Seq:       2,
-			Name:      "CreateFile",
 			Timestamp: time.Now(),
-			Category:  event.File,
 			Params: event.Params{
 				params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
 				params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
@@ -82,9 +79,7 @@ func TestDirectSyscall(t *testing.T) {
 			PID:       859,
 			CPU:       1,
 			Seq:       2,
-			Name:      "CreateFile",
 			Timestamp: time.Now(),
-			Category:  event.File,
 			Params: event.Params{
 				params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
 				params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
@@ -104,9 +99,7 @@ func TestDirectSyscall(t *testing.T) {
 			PID:       859,
 			CPU:       1,
 			Seq:       2,
-			Name:      "CreateFile",
 			Timestamp: time.Now(),
-			Category:  event.File,
 			Params: event.Params{
 				params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
 				params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
@@ -123,7 +116,7 @@ func TestDirectSyscall(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.evt.Name, func(t *testing.T) {
+		t.Run(tt.evt.Name(), func(t *testing.T) {
 			eva := NewDirectSyscall()
 			matches, err := eva.Eval(tt.evt)
 			require.NoError(t, err)

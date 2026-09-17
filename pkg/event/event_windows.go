@@ -27,6 +27,7 @@ import (
 	"unsafe"
 
 	"github.com/rabbitstack/fibratus/pkg/event/params"
+	"github.com/rabbitstack/fibratus/pkg/network"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/rabbitstack/fibratus/pkg/util/filetime"
@@ -49,13 +50,12 @@ var (
 
 // New constructs a fresh event instance with basic fields and parameters
 // from the raw ETW event record.
-func New(seq uint64, r *etw.EventRecord) *Event {
+func New(seq uint64, r *etw.EventRecord, typ Type) *Event {
 	var (
 		pid = r.Header.ProcessID
 		tid = r.Header.ThreadID
 		cpu = *(*uint8)(unsafe.Pointer(&r.BufferContext.ProcessorIndex[0]))
 		ts  = filetime.ToEpoch(r.Header.Timestamp)
-		typ = NewTypeFromEventRecord(r)
 	)
 
 	e := &Event{
@@ -64,8 +64,6 @@ func New(seq uint64, r *etw.EventRecord) *Event {
 		Tid:       tid,
 		CPU:       cpu,
 		Type:      typ,
-		Category:  typ.Category(),
-		Name:      typ.String(),
 		Params:    make(map[string]*Param),
 		Timestamp: ts,
 		Host:      hostname.Get(),
@@ -86,7 +84,7 @@ func (e *Event) RawTimestamp() uint64 {
 }
 
 func (e *Event) adjustPID() {
-	switch e.Category {
+	switch e.Category() {
 	case Module:
 		// sometimes the pid present in event header is invalid
 		// but, we can get the valid one from the event parameters
@@ -94,16 +92,7 @@ func (e *Event) adjustPID() {
 			e.PID, _ = e.Params.GetPid()
 		}
 	case File:
-		if !e.IsMapViewFile() && !e.IsUnmapViewFile() {
-			// take thread id from the event parameters
-			e.Tid, _ = e.Params.GetTid()
-		}
-		switch {
-		case e.InvalidPid() && e.Type == MapFileRundown:
-			// a valid pid for map rundown events
-			// is located in the event parameters
-			e.PID = e.Params.MustGetPid()
-		case e.InvalidPid():
+		if e.InvalidPid() {
 			// on some Windows versions the value of
 			// the PID is invalid in the event header
 			access := uint32(windows.THREAD_QUERY_LIMITED_INFORMATION)
@@ -123,7 +112,7 @@ func (e *Event) adjustPID() {
 		if e.IsCreateProcess() {
 			e.PID, _ = e.Params.GetPid()
 		}
-	case Net:
+	case Network:
 		if !e.IsDNS() {
 			e.PID, _ = e.Params.GetPid()
 		}
@@ -131,6 +120,12 @@ func (e *Event) adjustPID() {
 		if e.Type == StackWalk {
 			e.PID, _ = e.Params.GetPid()
 			e.Tid, _ = e.Params.GetTid()
+		}
+	case Memory:
+		if e.Type == MapViewSectionRundown {
+			// a valid pid for map rundown events
+			// is located in the event parameters
+			e.PID = e.Params.MustGetPid()
 		}
 	}
 }
@@ -158,23 +153,17 @@ func IsCurrentProcDropped(pid uint32) bool { return DropCurrentProc && pid == cu
 
 // IsNetworkTCP determines whether the event pertains to network TCP events.
 func (e *Event) IsNetworkTCP() bool {
-	return e.Category == Net && !e.IsNetworkUDP()
-}
-
-// IsNetworkUDP determines whether the event pertains to network UDP events.
-func (e *Event) IsNetworkUDP() bool {
-	return e.Type == RecvUDPv4 || e.Type == RecvUDPv6 || e.Type == SendUDPv4 || e.Type == SendUDPv6
+	return e.Category() == Network && network.L4Proto(e.Params.MustGetUint32(params.NetL4Proto)) == network.TCP
 }
 
 // IsDNS determines whether the event is a DNS question/answer.
 func (e *Event) IsDNS() bool {
-	return e.Type.Subcategory() == DNS
+	return e.Subcategory() == DNS
 }
 
 // IsRundown determines if this is a rundown events.
 func (e *Event) IsRundown() bool {
-	return e.Type == ProcessRundown || e.Type == ThreadRundown || e.Type == ModuleRundown ||
-		e.Type == FileRundown || e.Type == RegKCBRundown
+	return e.Type.StateSnapshot()
 }
 
 // IsSuccess checks if the event contains the status parameter
@@ -228,8 +217,8 @@ func (e *Event) IsRegCreateKey() bool           { return e.Type == RegCreateKey 
 func (e *Event) IsProcessRundown() bool         { return e.Type == ProcessRundown }
 func (e *Event) IsProcessRundownInternal() bool { return e.Type == ProcessRundownInternal }
 func (e *Event) IsVirtualAlloc() bool           { return e.Type == VirtualAlloc }
-func (e *Event) IsMapViewFile() bool            { return e.Type == MapViewFile }
-func (e *Event) IsUnmapViewFile() bool          { return e.Type == UnmapViewFile }
+func (e *Event) IsMapViewOfSection() bool       { return e.Type == MapViewOfSection }
+func (e *Event) IsUnmapViewOfSection() bool     { return e.Type == UnmapViewOfSection }
 func (e *Event) IsStackWalk() bool              { return e.Type == StackWalk }
 func (e *Event) IsOpenThread() bool             { return e.Type == OpenThread }
 func (e *Event) IsOpenProcess() bool            { return e.Type == OpenProcess }
@@ -336,7 +325,7 @@ func (e *Event) RundownKey() uint64 {
 		binary.LittleEndian.PutUint64(b, fileObject)
 
 		return hashers.FnvUint64(b)
-	case MapFileRundown:
+	case MapViewSectionRundown:
 		b := make([]byte, 12)
 		fileKey, _ := e.Params.GetUint64(params.FileKey)
 		binary.LittleEndian.PutUint32(b, e.PID)
@@ -362,7 +351,7 @@ func (e *Event) PartialKey() uint64 {
 	switch e.Type {
 	case WriteFile, ReadFile:
 		return e.Params.MustGetUint64(params.FileObject) + uint64(e.PID)
-	case MapViewFile, UnmapViewFile:
+	case MapViewOfSection, UnmapViewOfSection:
 		return e.Params.MustGetUint64(params.FileViewBase) + uint64(e.PID)
 	case CreateFile:
 		file, _ := e.Params.GetString(params.FilePath)
@@ -378,38 +367,34 @@ func (e *Event) PartialKey() uint64 {
 		tid := e.Params.MustGetUint32(params.ThreadID)
 		access := e.Params.MustGetUint32(params.DesiredAccess)
 		return uint64(tid + access + e.PID)
-	case AcceptTCPv4, RecvTCPv4, RecvUDPv4:
-		b := make([]byte, 10)
+	case Accept, Recv:
+		var b []byte
 		ip, _ := e.Params.GetIP(params.NetSIP)
+		if ip.To4() != nil {
+			b = make([]byte, 10)
+			binary.LittleEndian.PutUint32(b, binary.BigEndian.Uint32(ip.To4()))
+		} else {
+			b = make([]byte, 22)
+			binary.LittleEndian.PutUint64(b, binary.BigEndian.Uint64(ip.To16()[0:8]))
+			binary.LittleEndian.PutUint64(b, binary.BigEndian.Uint64(ip.To16()[8:16]))
+		}
 		port, _ := e.Params.GetUint16(params.NetSport)
 		binary.LittleEndian.PutUint32(b, e.PID)
-		binary.LittleEndian.PutUint32(b, binary.BigEndian.Uint32(ip.To4()))
 		binary.LittleEndian.PutUint16(b, port)
 		return hashers.FnvUint64(b)
-	case AcceptTCPv6, RecvTCPv6, RecvUDPv6:
-		b := make([]byte, 22)
-		ip, _ := e.Params.GetIP(params.NetSIP)
-		port, _ := e.Params.GetUint16(params.NetSport)
-		binary.LittleEndian.PutUint32(b, e.PID)
-		binary.LittleEndian.PutUint64(b, binary.BigEndian.Uint64(ip.To16()[0:8]))
-		binary.LittleEndian.PutUint64(b, binary.BigEndian.Uint64(ip.To16()[8:16]))
-		binary.LittleEndian.PutUint16(b, port)
-		return hashers.FnvUint64(b)
-	case ConnectTCPv4, SendTCPv4, SendUDPv4:
-		b := make([]byte, 10)
+	case Connect, Send:
+		var b []byte
 		ip, _ := e.Params.GetIP(params.NetDIP)
+		if ip.To4() != nil {
+			b = make([]byte, 10)
+			binary.LittleEndian.PutUint32(b, binary.BigEndian.Uint32(ip.To4()))
+		} else {
+			b = make([]byte, 22)
+			binary.LittleEndian.PutUint64(b, binary.BigEndian.Uint64(ip.To16()[0:8]))
+			binary.LittleEndian.PutUint64(b, binary.BigEndian.Uint64(ip.To16()[8:16]))
+		}
 		port, _ := e.Params.GetUint16(params.NetDport)
 		binary.LittleEndian.PutUint32(b, e.PID)
-		binary.LittleEndian.PutUint32(b, binary.BigEndian.Uint32(ip.To4()))
-		binary.LittleEndian.PutUint16(b, port)
-		return hashers.FnvUint64(b)
-	case ConnectTCPv6, SendTCPv6, SendUDPv6:
-		b := make([]byte, 22)
-		ip, _ := e.Params.GetIP(params.NetDIP)
-		port, _ := e.Params.GetUint16(params.NetDport)
-		binary.LittleEndian.PutUint32(b, e.PID)
-		binary.LittleEndian.PutUint64(b, binary.BigEndian.Uint64(ip.To16()[0:8]))
-		binary.LittleEndian.PutUint64(b, binary.BigEndian.Uint64(ip.To16()[8:16]))
 		binary.LittleEndian.PutUint16(b, port)
 		return hashers.FnvUint64(b)
 	case RegOpenKey, RegQueryKey, RegQueryValue,
@@ -523,21 +508,21 @@ func (e *Event) Summary() string {
 	case RegQueryValue:
 		key := e.GetParamAsString(params.RegPath)
 		return printSummary(e, fmt.Sprintf("queried <code>%s</code> value", key))
-	case AcceptTCPv4, AcceptTCPv6:
+	case Accept:
 		ip, _ := e.Params.GetIP(params.NetSIP)
 		port, _ := e.Params.GetUint16(params.NetSport)
 		return printSummary(e, fmt.Sprintf("accepted connection from <code>%v</code> and <code>%d</code> port", ip, port))
-	case ConnectTCPv4, ConnectTCPv6:
+	case Connect:
 		ip, _ := e.Params.GetIP(params.NetDIP)
 		port, _ := e.Params.GetUint16(params.NetDport)
 		return printSummary(e, fmt.Sprintf("connected to <code>%v</code> and <code>%d</code> port", ip, port))
-	case SendTCPv4, SendTCPv6, SendUDPv4, SendUDPv6:
+	case Send:
 		ip, _ := e.Params.GetIP(params.NetDIP)
 		port, _ := e.Params.GetUint16(params.NetDport)
 		size, _ := e.Params.GetUint32(params.NetSize)
 		return printSummary(e, fmt.Sprintf("sent <code>%d</code> bytes to <code>%v</code> and <code>%d</code> port",
 			size, ip, port))
-	case RecvTCPv4, RecvTCPv6, RecvUDPv4, RecvUDPv6:
+	case Recv:
 		ip, _ := e.Params.GetIP(params.NetSIP)
 		port, _ := e.Params.GetUint16(params.NetSport)
 		size, _ := e.Params.GetUint32(params.NetSize)
@@ -549,10 +534,10 @@ func (e *Event) Summary() string {
 	case VirtualFree:
 		addr := e.GetParamAsString(params.MemBaseAddress)
 		return printSummary(e, fmt.Sprintf("released memory at <code>%s</code> address", addr))
-	case MapViewFile:
+	case MapViewOfSection:
 		sec := e.GetParamAsString(params.FileViewSectionType)
 		return printSummary(e, fmt.Sprintf("mapped view of <code>%s</code> section", sec))
-	case UnmapViewFile:
+	case UnmapViewOfSection:
 		sec := e.GetParamAsString(params.FileViewSectionType)
 		return printSummary(e, fmt.Sprintf("unmapped view of <code>%s</code> section", sec))
 	case QueryDNS:

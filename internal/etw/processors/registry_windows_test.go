@@ -47,8 +47,7 @@ func TestRegistryProcessor(t *testing.T) {
 		{
 			"process KCB rundown",
 			&event.Event{
-				Type:     event.RegKCBRundown,
-				Category: event.Registry,
+				Type: event.RegKCBRundown,
 				Params: event.Params{
 					params.RegPath: {Name: params.RegPath, Type: params.UnicodeString, Value: `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\bthserv\Parameters`},
 					params.RegKCB:  {Name: params.RegKCB, Type: params.Uint64, Value: uint64(18446666033549154696)},
@@ -68,8 +67,7 @@ func TestRegistryProcessor(t *testing.T) {
 		{
 			"process delete KCB",
 			&event.Event{
-				Type:     event.RegDeleteKCB,
-				Category: event.Registry,
+				Type: event.RegDeleteKCB,
 				Params: event.Params{
 					params.RegPath: {Name: params.RegPath, Type: params.UnicodeString, Value: `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\bthserv\Parameters`},
 					params.RegKCB:  {Name: params.RegKCB, Type: params.Uint64, Value: uint64(18446666033549154696)},
@@ -90,8 +88,7 @@ func TestRegistryProcessor(t *testing.T) {
 		{
 			"full key name",
 			&event.Event{
-				Type:     event.RegOpenKey,
-				Category: event.Registry,
+				Type: event.RegOpenKey,
 				Params: event.Params{
 					params.RegPath: {Name: params.RegPath, Type: params.Key, Value: `\REGISTRY\MACHINE\SYSTEM\ControlSet001\Services\bthserv\Parameters`},
 					params.RegKCB:  {Name: params.RegKCB, Type: params.Uint64, Value: uint64(0)},
@@ -109,8 +106,7 @@ func TestRegistryProcessor(t *testing.T) {
 		{
 			"incomplete key name",
 			&event.Event{
-				Type:     event.RegOpenKey,
-				Category: event.Registry,
+				Type: event.RegOpenKey,
 				Params: event.Params{
 					params.RegPath: {Name: params.RegPath, Type: params.Key, Value: `Pid`},
 					params.RegKCB:  {Name: params.RegKCB, Type: params.Uint64, Value: uint64(18446666033549154696)},
@@ -130,9 +126,8 @@ func TestRegistryProcessor(t *testing.T) {
 		{
 			"incomplete key name consult handle snapshotter",
 			&event.Event{
-				Type:     event.RegOpenKey,
-				Category: event.Registry,
-				PID:      23234,
+				Type: event.RegOpenKey,
+				PID:  23234,
 				Params: event.Params{
 					params.RegPath: {Name: params.RegPath, Type: params.Key, Value: `Pid`},
 					params.RegKCB:  {Name: params.RegKCB, Type: params.Uint64, Value: uint64(18446666033549154696)},
@@ -153,9 +148,8 @@ func TestRegistryProcessor(t *testing.T) {
 		{
 			"process registry set value",
 			&event.Event{
-				Type:     event.RegSetValue,
-				Category: event.Registry,
-				PID:      23234,
+				Type: event.RegSetValue,
+				PID:  23234,
 				Params: event.Params{
 					params.RegPath: {Name: params.RegPath, Type: params.Key, Value: `\REGISTRY\MACHINE\SYSTEM\CurrentControlSet\Control\Windows\Directory`},
 					params.RegKCB:  {Name: params.RegKCB, Type: params.Uint64, Value: uint64(0)},
@@ -175,9 +169,8 @@ func TestRegistryProcessor(t *testing.T) {
 		{
 			"process registry set value from internal event",
 			&event.Event{
-				Type:     event.RegSetValue,
-				Category: event.Registry,
-				PID:      23234,
+				Type: event.RegSetValue,
+				PID:  23234,
 				Params: event.Params{
 					params.RegPath: {Name: params.RegPath, Type: params.Key, Value: `\REGISTRY\MACHINE\SYSTEM\CurrentControlSet\Control\Windows\Directory`},
 					params.RegKCB:  {Name: params.RegKCB, Type: params.Uint64, Value: uint64(0)},

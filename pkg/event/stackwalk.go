@@ -221,7 +221,7 @@ func (s *StackwalkDecorator) flush() []error {
 		if evt.PS != nil {
 			stackwalkFlushesProcs.Add(evt.PS.Name, 1)
 		}
-		stackwalkFlushesEvents.Add(evt.Name, 1)
+		stackwalkFlushesEvents.Add(evt.Name(), 1)
 	}
 
 	return errs

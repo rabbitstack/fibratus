@@ -125,7 +125,7 @@ func (c *compiler) compile() (map[*config.FilterConfig]filter.Filter, *config.Ru
 			for _, v := range values {
 				switch field {
 				case fields.EvtName, fields.KevtName:
-					if !event.IsKnown(v) {
+					if !event.IsTypeKnown(v) {
 						return nil, nil, ErrUnknownEventName(f.Name, v)
 					}
 				case fields.EvtCategory, fields.KevtCategory:
@@ -266,7 +266,11 @@ func (c *compiler) containsEventTypes(root ql.Node, types ...event.Type) bool {
 
 		evts := make([]event.Type, 0, len(vals))
 		for _, v := range vals {
-			evts = append(evts, event.NameToType(v))
+			typ, ok := event.ParseType(v)
+			if !ok {
+				continue
+			}
+			evts = append(evts, typ)
 		}
 
 		for _, typ := range types {
@@ -337,42 +341,46 @@ func (c *compiler) buildCompileResult(filters map[*config.FilterConfig]filter.Fi
 		for name, values := range f.GetStringFields() {
 			for _, v := range values {
 				if name == fields.EvtName || name == fields.EvtCategory {
-					types := event.NameToTypes(v)
-					for _, typ := range types {
-						switch typ.Category() {
-						case event.Process:
-							rs.HasProcEvents = true
-						case event.Thread:
-							rs.HasThreadEvents = true
-						case event.Module:
-							rs.HasModuleEvents = true
-						case event.File:
-							rs.HasFileEvents = true
-						case event.Net:
-							rs.HasNetworkEvents = true
-						case event.Registry:
-							rs.HasRegistryEvents = true
-						case event.Mem:
-							rs.HasMemEvents = true
-						}
-						if typ.Subcategory() == event.DNS {
-							rs.HasDNSEvents = true
-						}
-						if typ == event.MapViewFile || typ == event.UnmapViewFile {
-							rs.HasVAMapEvents = true
-						}
-						if typ == event.OpenProcess || typ == event.OpenThread || typ == event.SetThreadContext ||
-							typ == event.CreateSymbolicLinkObject {
-							rs.HasAuditAPIEvents = true
-						}
-
-						if m[typ] {
-							continue
-						}
-
-						events = append(events, typ)
-						m[typ] = true
+					typ, ok := event.ParseType(v)
+					if !ok {
+						continue
 					}
+
+					info := event.GetTypeInfo(typ)
+
+					switch info.Category {
+					case event.Process:
+						rs.HasProcEvents = true
+					case event.Thread:
+						rs.HasThreadEvents = true
+					case event.Module:
+						rs.HasModuleEvents = true
+					case event.File:
+						rs.HasFileEvents = true
+					case event.Network:
+						rs.HasNetworkEvents = true
+					case event.Registry:
+						rs.HasRegistryEvents = true
+					case event.Memory:
+						rs.HasMemEvents = true
+					}
+					if info.Subcategory == event.DNS {
+						rs.HasDNSEvents = true
+					}
+					if typ == event.MapViewOfSection || typ == event.UnmapViewOfSection {
+						rs.HasVAMapEvents = true
+					}
+					if typ == event.OpenProcess || typ == event.OpenThread || typ == event.SetThreadContext ||
+						typ == event.CreateSymbolicLinkObject {
+						rs.HasAuditAPIEvents = true
+					}
+
+					if m[typ] {
+						continue
+					}
+
+					events = append(events, typ)
+					m[typ] = true
 				}
 			}
 		}

@@ -19,11 +19,8 @@
 package event
 
 import (
-	"encoding/binary"
-
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/rabbitstack/fibratus/pkg/util/colorizer"
-	"github.com/rabbitstack/fibratus/pkg/util/hashers"
 	"golang.org/x/sys/windows"
 )
 
@@ -34,13 +31,13 @@ const (
 	// SystemLogger event is emitted by the system provider.
 	SystemLogger Source = iota
 	// SecurityTelemetryLogger event is emitted by the combination of multiple providers.
-	// Most notably, DNS, thread pool, and kernel audit API providers are in charge of
-	// publishing the events.
+	// Most notably, DNS, and kernel audit API providers are in charge of publishing the
+	// events.
 	SecurityTelemetryLogger
 )
 
-// Type identifies an event type. It comprises the event GUID + hook ID to uniquely identify the event
-type Type [18]byte
+// Type identifies an event type.
+type Type uint16
 
 var (
 	// ProcessEventGUID represents process provider event GUID
@@ -57,8 +54,8 @@ var (
 	NetworkTCPEventGUID = windows.GUID{Data1: 0x9a280ac0, Data2: 0xc8e0, Data3: 0x11d1, Data4: [8]byte{0x84, 0xe2, 0x0, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}}
 	// NetworkUDPEventGUID represents network UDP provider event GUID
 	NetworkUDPEventGUID = windows.GUID{Data1: 0xbf3a50c5, Data2: 0xa9c9, Data3: 0x4988, Data4: [8]byte{0xa0, 0x05, 0x2d, 0xf0, 0xb7, 0xc8, 0x0f, 0x80}}
-	// MemEventGUID represents memory provider event GUID
-	MemEventGUID = windows.GUID{Data1: 0x3d6fa8d3, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x00, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}
+	// MemoryEventGUID represents memory provider event GUID
+	MemoryEventGUID = windows.GUID{Data1: 0x3d6fa8d3, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x00, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}
 	// AuditAPIEventGUID represents audit API calls event GUID
 	AuditAPIEventGUID = windows.GUID{Data1: 0xe02a841c, Data2: 0x75a3, Data3: 0x4fa7, Data4: [8]byte{0xaf, 0xc8, 0xae, 0x09, 0xcf, 0x9b, 0x7f, 0x23}}
 	// DNSEventGUID represents DNS provider event GUID
@@ -69,6 +66,65 @@ var (
 	RegistryKernelEventGUID = windows.GUID{Data1: 0x70eb4f03, Data2: 0xc1de, Data3: 0x4f73, Data4: [8]byte{0xa0, 0x51, 0x33, 0xd1, 0x3d, 0x54, 0x13, 0xbd}}
 	// StackWalkEventGUID represents the StackWalk event GUID
 	StackWalkEventGUID = windows.GUID{Data1: 0xdef2fe46, Data2: 0x7bd6, Data3: 0x4b80, Data4: [8]byte{0xbd, 0x94, 0xf5, 0x7f, 0xe2, 0x0d, 0x0c, 0xe3}}
+)
+
+const (
+	Unknown Type = iota
+	CreateProcess
+	TerminateProcess
+	ProcessRundown
+	OpenProcess
+	CreateProcessInternal  // only purpose of this event is to enrich the process state with some extra attributes
+	ProcessRundownInternal // populates the snapshotter for events running in the Security Telemetry session
+	CreateThread
+	TerminateThread
+	ThreadRundown
+	OpenThread
+	SetThreadContext
+	StackWalk
+	UnloadModule
+	LoadModule
+	ModuleRundown
+	LoadModuleInternal // only purpose is to populate the module state for events running in the Security Telemetry session
+	RegCreateKey
+	RegOpenKey
+	RegDeleteKey
+	RegQueryKey
+	RegSetValue
+	RegSetValueInternal // internal event that is used to enrich the corresponding public RegSetValue event with captured data
+	RegDeleteValue
+	RegQueryValue
+	RegCloseKey
+	RegCreateKCB
+	RegDeleteKCB
+	RegKCBRundown
+	CreateFile
+	ReleaseFile
+	CloseFile
+	ReadFile
+	WriteFile
+	SetFileInformation
+	DeleteFile
+	RenameFile
+	EnumDirectory
+	FileRundown
+	FileOpEnd
+	Accept
+	Send
+	Recv
+	Connect
+	Disconnect
+	Reconnect
+	Retransmit
+	QueryDNS
+	ReplyDNS
+	MapViewOfSection
+	UnmapViewOfSection
+	MapViewSectionRundown
+	VirtualAlloc
+	VirtualFree
+	CreateSymbolicLinkObject
+	MaxEvent // sentinel
 )
 
 const (
@@ -90,20 +146,20 @@ const (
 	LoadModuleInternalID uint16 = 5
 	LoadModuleID         uint8  = 10
 
-	FileRundownID        uint8 = 36
-	MapViewFileID        uint8 = 37
-	UnmapViewFileID      uint8 = 38
-	MapFileRundownID     uint8 = 39
-	CreateFileID         uint8 = 64
-	ReleaseFileID        uint8 = 65
-	CloseFileID          uint8 = 66
-	ReadFileID           uint8 = 67
-	WriteFileID          uint8 = 68
-	SetFileInformationID uint8 = 69
-	DeleteFileID         uint8 = 70
-	RenameFileID         uint8 = 71
-	EnumDirectoryID      uint8 = 72
-	FileOpEndID          uint8 = 76
+	FileRundownID           uint8 = 36
+	MapViewOfSectionID      uint8 = 37
+	UnmapViewOfSectionID    uint8 = 38
+	MapViewSectionRundownID uint8 = 39
+	CreateFileID            uint8 = 64
+	ReleaseFileID           uint8 = 65
+	CloseFileID             uint8 = 66
+	ReadFileID              uint8 = 67
+	WriteFileID             uint8 = 68
+	SetFileInformationID    uint8 = 69
+	DeleteFileID            uint8 = 70
+	RenameFileID            uint8 = 71
+	EnumDirectoryID         uint8 = 72
+	FileOpEndID             uint8 = 76
 
 	RegCreateKeyID        uint8  = 10
 	RegOpenKeyID          uint8  = 11
@@ -144,530 +200,214 @@ const (
 	StackWalkID uint8 = 32
 )
 
-var (
-	// CreateProcess identifies process creation kernel events
-	CreateProcess = pack(ProcessEventGUID, uint16(CreateProcessID))
-	// TerminateProcess identifies process termination kernel events
-	TerminateProcess = pack(ProcessEventGUID, uint16(TerminateProcessID))
-	// ProcessRundown represents the start data collection process event that enumerates processes that are currently running at the time the kernel session starts
-	ProcessRundown = pack(ProcessEventGUID, uint16(ProcessRundownID))
-	// OpenProcess identifies the kernel events that are triggered when the process handle is acquired
-	OpenProcess = pack(AuditAPIEventGUID, OpenProcessID)
-	// CreateProcessInternal identifies the process creation event emitted by the Microsoft Windows Kernel Process provider.
-	// The only purpose of this event is to enrich the process state with some extra attributes, and populates the snapshotter
-	// for events running in the Security Telemetry session that might miss process lookups because the core NT Kernel Provider
-	// hasn't still published the CreateProcess or ProcessRundown event
-	CreateProcessInternal = pack(ProcessKernelEventGUID, CreateProcessInternalID)
-	// ProcessRundownInternal same as above but for process rundown events originating from the Microsoft Windows Kernel Process provider.
-	ProcessRundownInternal = pack(ProcessKernelEventGUID, ProcessRundownInternalID)
-
-	// CreateThread identifies thread creation kernel events
-	CreateThread = pack(ThreadEventGUID, uint16(CreateThreadID))
-	// TerminateThread identifies thread termination kernel events
-	TerminateThread = pack(ThreadEventGUID, uint16(TerminateThreadID))
-	// ThreadRundown represents the start data collection thread event that enumerates threads that are currently running at the time the kernel session starts
-	ThreadRundown = pack(ThreadEventGUID, uint16(ThreadRundownID))
-	// OpenThread identifies the kernel events that are triggered when the process acquires a thread handle
-	OpenThread = pack(AuditAPIEventGUID, OpenThreadID)
-	// SetThreadContext identifies the kernel event that is fired when the thread context is changed
-	SetThreadContext = pack(AuditAPIEventGUID, SetThreadContextID)
-
-	// MapViewFile represents events that map a view of a file mapping into the address space of a calling process
-	MapViewFile = pack(FileEventGUID, uint16(MapViewFileID))
-	// UnmapViewFile represents events that unmap a view of a file mapping from the address space of a calling process
-	UnmapViewFile = pack(FileEventGUID, uint16(UnmapViewFileID))
-	// MapFileRundown represents the event that is emitted at the start of the tracing session to enumerate I/O mapped files
-	MapFileRundown = pack(FileEventGUID, uint16(MapFileRundownID))
-
-	// FileRundown events are generated by kernel rundown logger to enumerate all open files on the start of the kernel session
-	FileRundown = pack(FileEventGUID, uint16(FileRundownID))
-	// CreateFile represents events that create/open a file or I/O device
-	CreateFile = pack(FileEventGUID, uint16(CreateFileID))
-	// ReleaseFile represents events that occur when the last file handle is disposed
-	ReleaseFile = pack(FileEventGUID, uint16(ReleaseFileID))
-	// CloseFile represents events that dispose existing kernel file objects
-	CloseFile = pack(FileEventGUID, uint16(CloseFileID))
-	// ReadFile represents events that read data from the file or I/O device
-	ReadFile = pack(FileEventGUID, uint16(ReadFileID))
-	// WriteFile represents events that write data to the file or I/O device
-	WriteFile = pack(FileEventGUID, uint16(WriteFileID))
-	// SetFileInformation represents events that set file information
-	SetFileInformation = pack(FileEventGUID, uint16(SetFileInformationID))
-	// DeleteFile identifies file deletion events
-	DeleteFile = pack(FileEventGUID, uint16(DeleteFileID))
-	// RenameFile identifies events that are responsible for renaming files
-	RenameFile = pack(FileEventGUID, uint16(RenameFileID))
-	// EnumDirectory identifies enumerate directory and directory notification events
-	EnumDirectory = pack(FileEventGUID, uint16(EnumDirectoryID))
-	// FileOpEnd signals the finalization of the file operation
-	FileOpEnd = pack(FileEventGUID, uint16(FileOpEndID))
-
-	// RegCreateKey represents registry key creation kernel events
-	RegCreateKey = pack(RegistryEventGUID, uint16(RegCreateKeyID))
-	// RegOpenKey represents registry open key kernel events
-	RegOpenKey = pack(RegistryEventGUID, uint16(RegOpenKeyID))
-	// RegCloseKey represents registry close key kernel event.
-	RegCloseKey = pack(RegistryEventGUID, uint16(RegCloseKeyID))
-	// RegDeleteKey represents registry key deletion kernel events
-	RegDeleteKey = pack(RegistryEventGUID, uint16(RegDeleteKeyID))
-	// RegQueryKey represents registry query key kernel events
-	RegQueryKey = pack(RegistryEventGUID, uint16(RegQueryKeyID))
-	// RegSetValue represents registry set value kernel events
-	RegSetValue = pack(RegistryEventGUID, uint16(RegSetValueID))
-	// RegDeleteValue are kernel events for registry value removals
-	RegDeleteValue = pack(RegistryEventGUID, uint16(RegDeleteValueID))
-	// RegQueryValue are kernel events for registry value queries
-	RegQueryValue = pack(RegistryEventGUID, uint16(RegQueryValueID))
-	// RegCreateKCB represents kernel events for KCB (Key Control Block) creation requests
-	RegCreateKCB = pack(RegistryEventGUID, uint16(RegCreateKCBID))
-	// RegDeleteKCB represents kernel events for KCB(Key Control Block) closures
-	RegDeleteKCB = pack(RegistryEventGUID, uint16(RegDeleteKCBID))
-	// RegKCBRundown enumerates the registry keys open at the start of the kernel session.
-	RegKCBRundown = pack(RegistryEventGUID, uint16(RegKCBRundownID))
-	// RegSetValueInternal is the internal event that is used to
-	// enrich the corresponding public RegSetValue event with
-	// extra attributes
-	RegSetValueInternal = pack(RegistryKernelEventGUID, RegSetValueInternalID)
-
-	// UnloadModule represents unload module kernel events
-	UnloadModule = pack(ModuleEventGUID, uint16(UnloadModuleID))
-	// ModuleRundown represents kernel events that is triggered to enumerate all loaded modules
-	ModuleRundown = pack(ModuleEventGUID, uint16(ModuleRundownID))
-	// LoadModule represents module load kernel events that are triggered when a DLL or executable file is loaded
-	LoadModule = pack(ModuleEventGUID, uint16(LoadModuleID))
-	// LoadModuleInternal same as for process internal event originating from the Microsoft Windows Kernel Process provider
-	LoadModuleInternal = pack(ProcessKernelEventGUID, LoadModuleInternalID)
-
-	// AcceptTCPv4 represents the TCPv4 kernel events for accepting connection requests from the socket queue.
-	AcceptTCPv4 = pack(NetworkTCPEventGUID, uint16(AcceptTCPv4ID))
-	// AcceptTCPv6 represents the TCPv6 kernel events for accepting connection requests from the socket queue.
-	AcceptTCPv6 = pack(NetworkTCPEventGUID, uint16(AcceptTCPv6ID))
-	// SendTCPv4 represents the TCPv4 kernel events for sending data to the connected socket.
-	SendTCPv4 = pack(NetworkTCPEventGUID, uint16(SendV4ID))
-	// SendTCPv6 represents the TCPv6 kernel events for sending data to the connected socket.
-	SendTCPv6 = pack(NetworkTCPEventGUID, uint16(SendV6ID))
-	// SendUDPv4 represents the UDPv4 kernel events for sending datagrams to connectionless sockets.
-	SendUDPv4 = pack(NetworkUDPEventGUID, uint16(SendV4ID))
-	// SendUDPv6 represents the UDPv6 kernel events for sending datagrams to connectionless sockets.
-	SendUDPv6 = pack(NetworkUDPEventGUID, uint16(SendV6ID))
-	// RecvTCPv4 represents the TCP IPv4 network receive event.
-	RecvTCPv4 = pack(NetworkTCPEventGUID, uint16(RecvV4ID))
-	// RecvTCPv6 represents the TCP IPv6 network receive event.
-	RecvTCPv6 = pack(NetworkTCPEventGUID, uint16(RecvV6ID))
-	// RecvUDPv4 represents the UDP IPv4 network receive event.
-	RecvUDPv4 = pack(NetworkUDPEventGUID, uint16(RecvV4ID))
-	// RecvUDPv6 represents the UDP IPv6 network receive event.
-	RecvUDPv6 = pack(NetworkUDPEventGUID, uint16(RecvV6ID))
-	// ConnectTCPv4 represents the TCP IPv4 network connect event.
-	ConnectTCPv4 = pack(NetworkTCPEventGUID, uint16(ConnectTCPv4ID))
-	// ConnectTCPv6 represents the TCP IPv6 network connect event.
-	ConnectTCPv6 = pack(NetworkTCPEventGUID, uint16(ConnectTCPv6ID))
-	// DisconnectTCPv4 is the TCP IPv4 network disconnect event.
-	DisconnectTCPv4 = pack(NetworkTCPEventGUID, uint16(DisconnectTCPv4ID))
-	// DisconnectTCPv6 is the TCP IPv6 network disconnect event.
-	DisconnectTCPv6 = pack(NetworkTCPEventGUID, uint16(DisconnectTCPv6ID))
-	// ReconnectTCPv4 is the TCP IPv4 network reconnect event.
-	ReconnectTCPv4 = pack(NetworkTCPEventGUID, uint16(ReconnectTCPv4ID))
-	// ReconnectTCPv6 is the TCP IPv6 network reconnect event.
-	ReconnectTCPv6 = pack(NetworkTCPEventGUID, uint16(ReconnectTCPv6ID))
-	// RetransmitTCPv4 is the TCP IPv4 network retransmit event.
-	RetransmitTCPv4 = pack(NetworkTCPEventGUID, uint16(RetransmitTCPv4ID))
-	// RetransmitTCPv6 is the TCP IPv6 network retransmit event.
-	RetransmitTCPv6 = pack(NetworkTCPEventGUID, uint16(RetransmitTCPv6ID))
-
-	// VirtualAlloc represents virtual memory allocation event
-	VirtualAlloc = pack(MemEventGUID, uint16(VirtualAllocID))
-	// VirtualFree represents virtual memory release event
-	VirtualFree = pack(MemEventGUID, uint16(VirtualFreeID))
-
-	// QueryDNS represents DNS query events
-	QueryDNS = pack(DNSEventGUID, QueryDNSID)
-	// ReplyDNS represents the DNS response events
-	ReplyDNS = pack(DNSEventGUID, ReplyDNSID)
-
-	// StackWalk represents stack walk event with the collection of return addresses
-	StackWalk = pack(StackWalkEventGUID, uint16(StackWalkID))
-
-	// CreateSymbolicLinkObject represents the event emitted by the object manager when the new symbolic link is created within the object manager directory
-	CreateSymbolicLinkObject = pack(AuditAPIEventGUID, CreateSymbolicLinkObjectID)
-
-	// UnknownType designates unknown event type
-	UnknownType = pack(windows.GUID{}, 0)
-)
-
-// NewTypeFromEventRecord creates a new event type from ETW event record.
-func NewTypeFromEventRecord(ev *etw.EventRecord) Type {
-	return pack(ev.Header.ProviderID, ev.HookID())
-}
-
-// String returns the string representation of the event type. Returns an empty string
-// if the event type is not recognized.
-func (t Type) String() string {
-	switch t {
-	case CreateProcess, CreateProcessInternal:
-		return "CreateProcess"
-	case TerminateProcess:
-		return "TerminateProcess"
-	case ProcessRundown, ProcessRundownInternal:
-		return "ProcessRundown"
-	case OpenProcess:
-		return "OpenProcess"
-	case CreateThread:
-		return "CreateThread"
-	case TerminateThread:
-		return "TerminateThread"
-	case ThreadRundown:
-		return "ThreadRundown"
-	case OpenThread:
-		return "OpenThread"
-	case SetThreadContext:
-		return "SetThreadContext"
-	case CreateFile:
-		return "CreateFile"
-	case CloseFile:
-		return "CloseFile"
-	case ReleaseFile:
-		return "ReleaseFile"
-	case ReadFile:
-		return "ReadFile"
-	case WriteFile:
-		return "WriteFile"
-	case SetFileInformation:
-		return "SetFileInformation"
-	case DeleteFile:
-		return "DeleteFile"
-	case RenameFile:
-		return "RenameFile"
-	case EnumDirectory:
-		return "EnumDirectory"
-	case FileOpEnd:
-		return "FileOpEnd"
-	case FileRundown:
-		return "FileRundown"
-	case MapViewFile:
-		return "MapViewFile"
-	case UnmapViewFile:
-		return "UnmapViewFile"
-	case MapFileRundown:
-		return "MapFileRundown"
-	case RegKCBRundown:
-		return "RegKCBRundown"
-	case RegOpenKey:
-		return "RegOpenKey"
-	case RegCloseKey:
-		return "RegCloseKey"
-	case RegCreateKey:
-		return "RegCreateKey"
-	case RegDeleteKey:
-		return "RegDeleteKey"
-	case RegDeleteValue:
-		return "RegDeleteValue"
-	case RegQueryKey:
-		return "RegQueryKey"
-	case RegQueryValue:
-		return "RegQueryValue"
-	case RegCreateKCB:
-		return "RegCreateKCB"
-	case RegSetValue, RegSetValueInternal:
-		return "RegSetValue"
-	case LoadModule, LoadModuleInternal:
-		return "LoadModule"
-	case UnloadModule:
-		return "UnloadModule"
-	case ModuleRundown:
-		return "ModuleRundown"
-	case AcceptTCPv4, AcceptTCPv6:
-		return "Accept"
-	case SendTCPv4, SendTCPv6, SendUDPv4, SendUDPv6:
-		return "Send"
-	case RecvTCPv4, RecvTCPv6, RecvUDPv4, RecvUDPv6:
-		return "Recv"
-	case ConnectTCPv4, ConnectTCPv6:
-		return "Connect"
-	case ReconnectTCPv4, ReconnectTCPv6:
-		return "Reconnect"
-	case DisconnectTCPv4, DisconnectTCPv6:
-		return "Disconnect"
-	case RetransmitTCPv4, RetransmitTCPv6:
-		return "Retransmit"
-	case VirtualAlloc:
-		return "VirtualAlloc"
-	case VirtualFree:
-		return "VirtualFree"
-	case QueryDNS:
-		return "QueryDns"
-	case ReplyDNS:
-		return "ReplyDns"
-	case StackWalk:
-		return "StackWalk"
-	case CreateSymbolicLinkObject:
-		return "CreateSymbolicLinkObject"
-	default:
-		return ""
+// NewTypeFromEventRecord derives the event type from the Data1 member of the provider GUID
+// and the opcode/event ID integer.
+// Go only jump-tables switches over integer types and only when case values are reasonably
+// dense. A switch over provider ID which is GUID struct compiles to a sequential chain of
+// struct-equality compares instead of a jump table.
+// So we split the GUID into a fast-reject key and switch on that instead. The first member of
+// the GUID (Data1) is a dense uint32 integer and is certainly unique across all providers.
+func NewTypeFromEventRecord(r *etw.EventRecord) Type {
+	switch r.Header.ProviderID.Data1 {
+	case RegistryEventGUID.Data1:
+		switch r.Header.EventDescriptor.Opcode {
+		case RegCreateKeyID:
+			return RegCreateKey
+		case RegOpenKeyID:
+			return RegOpenKey
+		case RegDeleteKeyID:
+			return RegDeleteKey
+		case RegQueryKeyID:
+			return RegQueryKey
+		case RegSetValueID:
+			return RegSetValue
+		case RegDeleteValueID:
+			return RegDeleteValue
+		case RegQueryValueID:
+			return RegQueryValue
+		case RegCreateKCBID:
+			return RegCreateKCB
+		case RegDeleteKCBID:
+			return RegDeleteKCB
+		case RegKCBRundownID:
+			return RegKCBRundown
+		case RegCloseKeyID:
+			return RegCloseKey
+		}
+	case FileEventGUID.Data1:
+		switch r.Header.EventDescriptor.Opcode {
+		case FileRundownID:
+			return FileRundown
+		case MapViewOfSectionID:
+			return MapViewOfSection
+		case UnmapViewOfSectionID:
+			return UnmapViewOfSection
+		case MapViewSectionRundownID:
+			return MapViewSectionRundown
+		case CreateFileID:
+			return CreateFile
+		case ReleaseFileID:
+			return ReleaseFile
+		case CloseFileID:
+			return CloseFile
+		case ReadFileID:
+			return ReadFile
+		case WriteFileID:
+			return WriteFile
+		case SetFileInformationID:
+			return SetFileInformation
+		case DeleteFileID:
+			return DeleteFile
+		case RenameFileID:
+			return RenameFile
+		case EnumDirectoryID:
+			return EnumDirectory
+		case FileOpEndID:
+			return FileOpEnd
+		}
+	case AuditAPIEventGUID.Data1:
+		switch r.Header.EventDescriptor.ID {
+		case OpenProcessID:
+			return OpenProcess
+		case OpenThreadID:
+			return OpenThread
+		case SetThreadContextID:
+			return SetThreadContext
+		case CreateSymbolicLinkObjectID:
+			return CreateSymbolicLinkObject
+		}
+	case StackWalkEventGUID.Data1:
+		return StackWalk
+	case MemoryEventGUID.Data1:
+		switch r.Header.EventDescriptor.Opcode {
+		case VirtualAllocID:
+			return VirtualAlloc
+		case VirtualFreeID:
+			return VirtualFree
+		}
+	case NetworkTCPEventGUID.Data1:
+		switch r.Header.EventDescriptor.Opcode {
+		case AcceptTCPv4ID, AcceptTCPv6ID:
+			return Accept
+		case SendV4ID, SendV6ID:
+			return Send
+		case RecvV4ID, RecvV6ID:
+			return Recv
+		case ConnectTCPv4ID, ConnectTCPv6ID:
+			return Connect
+		case DisconnectTCPv4ID, DisconnectTCPv6ID:
+			return Disconnect
+		case ReconnectTCPv4ID, ReconnectTCPv6ID:
+			return Reconnect
+		case RetransmitTCPv4ID, RetransmitTCPv6ID:
+			return Retransmit
+		}
+	case NetworkUDPEventGUID.Data1:
+		switch r.Header.EventDescriptor.Opcode {
+		case SendV4ID, SendV6ID:
+			return Send
+		case RecvV4ID, RecvV6ID:
+			return Recv
+		}
+	case DNSEventGUID.Data1:
+		switch r.Header.EventDescriptor.ID {
+		case QueryDNSID:
+			return QueryDNS
+		case ReplyDNSID:
+			return ReplyDNS
+		}
+	case ProcessEventGUID.Data1:
+		switch r.Header.EventDescriptor.Opcode {
+		case CreateProcessID:
+			return CreateProcess
+		case TerminateProcessID:
+			return TerminateProcess
+		case ProcessRundownID:
+			return ProcessRundown
+		}
+	case ProcessKernelEventGUID.Data1:
+		switch r.Header.EventDescriptor.ID {
+		case CreateProcessInternalID:
+			return CreateProcessInternal
+		case ProcessRundownInternalID:
+			return ProcessRundownInternal
+		case LoadModuleInternalID:
+			return LoadModuleInternal
+		}
+	case ModuleEventGUID.Data1:
+		switch r.Header.EventDescriptor.Opcode {
+		case UnloadModuleID:
+			return UnloadModule
+		case ModuleRundownID:
+			return ModuleRundown
+		case LoadModuleID:
+			return LoadModule
+		}
+	case ThreadEventGUID.Data1:
+		switch r.Header.EventDescriptor.Opcode {
+		case CreateThreadID:
+			return CreateThread
+		case TerminateThreadID:
+			return TerminateThread
+		case ThreadRundownID:
+			return ThreadRundown
+		}
 	}
+	return Unknown
 }
 
-// Category determines the category to which the event type pertains.
-func (t Type) Category() Category {
-	switch t {
-	case CreateProcess, CreateProcessInternal, TerminateProcess, OpenProcess, ProcessRundown, ProcessRundownInternal:
-		return Process
-	case CreateThread, TerminateThread, OpenThread, SetThreadContext, ThreadRundown, StackWalk:
-		return Thread
-	case LoadModule, UnloadModule, ModuleRundown, LoadModuleInternal:
-		return Module
-	case CreateFile, ReadFile, WriteFile, EnumDirectory, DeleteFile, RenameFile, CloseFile, SetFileInformation,
-		FileRundown, FileOpEnd, ReleaseFile, MapViewFile, UnmapViewFile, MapFileRundown:
-		return File
-	case RegCreateKey, RegDeleteKey, RegOpenKey, RegCloseKey, RegQueryKey, RegQueryValue, RegSetValue, RegDeleteValue,
-		RegKCBRundown, RegDeleteKCB, RegCreateKCB, RegSetValueInternal:
-		return Registry
-	case AcceptTCPv4, AcceptTCPv6,
-		ConnectTCPv4, ConnectTCPv6,
-		ReconnectTCPv4, ReconnectTCPv6,
-		RetransmitTCPv4, RetransmitTCPv6,
-		DisconnectTCPv4, DisconnectTCPv6,
-		SendTCPv4, SendTCPv6, SendUDPv4, SendUDPv6,
-		RecvTCPv4, RecvTCPv6, RecvUDPv4, RecvUDPv6,
-		QueryDNS, ReplyDNS:
-		return Net
-	case VirtualAlloc, VirtualFree:
-		return Mem
-	case CreateSymbolicLinkObject:
-		return Object
-	default:
-		return Unknown
-	}
-}
+// String returns the event type string representation.
+func (t Type) String() string { return table[t].Name }
 
-// Subcategory determines the event subcategory, if any.
-func (t Type) Subcategory() Subcategory {
-	switch t {
-	case QueryDNS, ReplyDNS:
-		return DNS
-	default:
-		return None
-	}
-}
-
-// Description returns a brief description of the event type.
-func (t Type) Description() string {
-	switch t {
-	case CreateProcess:
-		return "Creates a new process and its primary thread"
-	case TerminateProcess:
-		return "Terminates the process and all of its threads"
-	case OpenProcess:
-		return "Opens the process handle"
-	case CreateThread:
-		return "Creates a thread to execute within the virtual address space of the calling process"
-	case TerminateThread:
-		return "Terminates a thread within the process"
-	case OpenThread:
-		return "Opens the thread handle"
-	case SetThreadContext:
-		return "Sets the thread context"
-	case ReadFile:
-		return "Reads data from the file or I/O device"
-	case WriteFile:
-		return "Writes data to the file or I/O device"
-	case CreateFile:
-		return "Creates or opens a file or I/O device"
-	case CloseFile:
-		return "Closes the file handle"
-	case DeleteFile:
-		return "Removes the file from the file system"
-	case RenameFile:
-		return "Changes the file name"
-	case SetFileInformation:
-		return "Sets the file meta information"
-	case EnumDirectory:
-		return "Enumerates a directory or dispatches a directory change notification to registered listeners"
-	case MapViewFile:
-		return "Maps a view of a file mapping into the address space of a calling process"
-	case UnmapViewFile:
-		return "Unmaps a mapped view of a file from the calling process's address space"
-	case RegCreateKey:
-		return "Creates a registry key or opens it if the key already exists"
-	case RegOpenKey:
-		return "Opens the registry key"
-	case RegCloseKey:
-		return "Closes the registry key"
-	case RegSetValue:
-		return "Sets the data for the value of a registry key"
-	case RegQueryValue:
-		return "Reads the data for the value of a registry key"
-	case RegQueryKey:
-		return "Enumerates subkeys of the parent key"
-	case RegDeleteKey:
-		return "Removes the registry key"
-	case RegDeleteValue:
-		return "Removes the registry value"
-	case AcceptTCPv4, AcceptTCPv6:
-		return "Accepts the connection request from the socket queue"
-	case ConnectTCPv4, ConnectTCPv6:
-		return "Connects establishes a connection to the socket"
-	case DisconnectTCPv4, DisconnectTCPv6:
-		return "Terminates data reception on the socket"
-	case ReconnectTCPv4, ReconnectTCPv6:
-		return "Reconnects to the socket"
-	case RetransmitTCPv4, RetransmitTCPv6:
-		return "Retransmits unacknowledged TCP segments"
-	case SendTCPv4, SendUDPv4, SendTCPv6, SendUDPv6:
-		return "Sends data over the wire"
-	case RecvTCPv4, RecvUDPv4, RecvTCPv6, RecvUDPv6:
-		return "Receives data from the socket"
-	case LoadModule:
-		return "Loads the module into the address space of the calling process"
-	case UnloadModule:
-		return "Unloads the module from the address space of the calling process"
-	case VirtualAlloc:
-		return "Reserves, commits, or changes the state of a region of memory within the process virtual address space"
-	case VirtualFree:
-		return "Releases or decommits a region of memory within the process virtual address space"
-	case QueryDNS:
-		return "Sends a DNS query to the name server"
-	case ReplyDNS:
-		return "Receives the response from the DNS server"
-	case CreateSymbolicLinkObject:
-		return "Creates the symbolic link within the object manager directory"
-	default:
-		return ""
-	}
-}
-
-// Hash calculates the hash number of the event type.
-func (t Type) Hash() uint32 {
-	if t == UnknownType {
-		return 0
-	}
-	return hashers.FnvUint32([]byte(t.String()))
-}
-
-// Exists determines whether particular event type exists.
-func (t Type) Exists() bool {
-	return t.String() != ""
-}
+// Uint coerces the type to pointer-sized unsigned integer.
+func (t Type) Uint() uint { return uint(t) }
 
 // OnlyState determines whether the event type is solely used for state management.
-func (t Type) OnlyState() bool {
+func (t Type) OnlyState() bool { return table[t].Flags&OnlyState != 0 }
+
+// IsRundown indicates if this type represents a rundown event that seeds the state.
+func (t Type) StateSnapshot() bool { return table[t].Flags&StateSnapshot != 0 }
+
+// WaitStack determines if the event waits for call stack return addresses.
+func (t Type) WaitStack() bool { return table[t].Flags&WaitStack != 0 }
+
+// EventID produces a native ETW classic event identifier to
+// indicate which event types are enabled for stack walk tracing.
+func (t Type) EventID() etw.ClassicEventID {
 	switch t {
-	case ProcessRundown,
-		ProcessRundownInternal,
-		CreateProcessInternal,
-		ThreadRundown,
-		ModuleRundown,
-		LoadModuleInternal,
-		FileRundown,
-		RegKCBRundown,
-		FileOpEnd,
-		ReleaseFile,
-		MapFileRundown,
-		RegCreateKCB,
-		RegDeleteKCB,
-		RegSetValueInternal:
-		return true
+	case CreateProcess:
+		return etw.ClassicEventID{GUID: ProcessEventGUID, Type: CreateProcessID}
+	case CreateThread:
+		return etw.ClassicEventID{GUID: ThreadEventGUID, Type: CreateThreadID}
+	case TerminateThread:
+		return etw.ClassicEventID{GUID: ThreadEventGUID, Type: TerminateThreadID}
+	case LoadModule:
+		return etw.ClassicEventID{GUID: ProcessEventGUID, Type: LoadModuleID}
+	case CreateFile:
+		return etw.ClassicEventID{GUID: FileEventGUID, Type: CreateFileID}
+	case DeleteFile:
+		return etw.ClassicEventID{GUID: FileEventGUID, Type: DeleteFileID}
+	case RenameFile:
+		return etw.ClassicEventID{GUID: FileEventGUID, Type: RenameFileID}
+	case RegCreateKey:
+		return etw.ClassicEventID{GUID: RegistryEventGUID, Type: RegCreateKeyID}
+	case RegDeleteKey:
+		return etw.ClassicEventID{GUID: RegistryEventGUID, Type: RegDeleteKeyID}
+	case RegSetValue:
+		return etw.ClassicEventID{GUID: RegistryEventGUID, Type: RegSetValueID}
+	case RegDeleteValue:
+		return etw.ClassicEventID{GUID: RegistryEventGUID, Type: RegDeleteValueID}
+	case VirtualAlloc:
+		return etw.ClassicEventID{GUID: MemoryEventGUID, Type: VirtualAllocID}
 	default:
-		return false
-	}
-}
-
-// CanEnrichStack determines if the event can be enriched with a callstack.
-func (t Type) CanEnrichStack() bool {
-	switch t {
-	case CreateProcess,
-		CreateThread,
-		TerminateThread,
-		LoadModule,
-		RegCreateKey,
-		RegDeleteKey,
-		RegSetValue,
-		RegDeleteValue,
-		DeleteFile,
-		RenameFile,
-		VirtualAlloc:
-		return true
-	default:
-		return false
-	}
-}
-
-// UnmarshalYAML converts the Type name to Type array type.
-func (t *Type) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	var typ string
-	err := unmarshal(&typ)
-	if err != nil {
-		return err
-	}
-	*t = NameToType(typ)
-	return nil
-}
-
-// GUID returns the event GUID from the raw event type.
-func (t *Type) GUID() windows.GUID {
-	return windows.GUID{
-		Data1: binary.BigEndian.Uint32(t[0:4]),
-		Data2: binary.BigEndian.Uint16(t[4:6]),
-		Data3: binary.BigEndian.Uint16(t[6:8]),
-		Data4: [8]byte{t[8], t[9], t[10], t[11], t[12], t[13], t[14], t[15]},
-	}
-}
-
-// HookID returns the event operation code (hook ID) from the raw event type.
-func (t *Type) HookID() uint16 {
-	return binary.BigEndian.Uint16(t[16:])
-}
-
-// ID is an unsigned integer that uniquely
-// identifies the event. Handy for bitmask
-// operations.
-func (t Type) ID() uint {
-	id := uint(t[0])<<56 |
-		uint(t[1])<<48 |
-		uint(t[2])<<40 |
-		uint(t[3])<<32 |
-		uint(t[4])<<24 |
-		uint(t[5])<<16 |
-		uint(t.HookID())
-	return id
-}
-
-// Source designates the provenance of this event type.
-func (t Type) Source() Source {
-	switch t.GUID() {
-	case AuditAPIEventGUID, DNSEventGUID, ProcessKernelEventGUID, RegistryKernelEventGUID:
-		return SecurityTelemetryLogger
-	default:
-		return SystemLogger
-	}
-}
-
-// TypeFromParts builds the event type from provider GUID and hook ID.
-func TypeFromParts(g windows.GUID, id uint16) Type { return pack(g, id) }
-
-// pack merges event provider GUID and the hook ID into `Type` array.
-// The type provides a convenient way for comparing event types.
-func pack(g windows.GUID, id uint16) Type {
-	return [18]byte{
-		byte(g.Data1 >> 24), byte(g.Data1 >> 16), byte(g.Data1 >> 8), byte(g.Data1),
-		byte(g.Data2 >> 8), byte(g.Data2),
-		byte(g.Data3 >> 8), byte(g.Data3),
-		g.Data4[0],
-		g.Data4[1],
-		g.Data4[2],
-		g.Data4[3],
-		g.Data4[4],
-		g.Data4[5],
-		g.Data4[6],
-		g.Data4[7],
-		byte(id >> 8), byte(id),
+		return etw.ClassicEventID{}
 	}
 }
 
 // color return the colorized event type to render by the color formatter.
 func (t Type) color() string {
 	switch t {
-	case CreateFile, ReadFile, CloseFile, SetFileInformation, MapViewFile, UnmapViewFile:
+	case CreateFile, ReadFile, CloseFile, SetFileInformation:
 		return colorizer.SpanBold(colorizer.Cyan, t.String())
 	case RenameFile:
 		return colorizer.SpanBold(colorizer.Amber, t.String())
@@ -693,18 +433,17 @@ func (t Type) color() string {
 		return colorizer.SpanBold(colorizer.Amber, t.String())
 	case LoadModule, UnloadModule:
 		return colorizer.SpanBold(colorizer.Magenta, t.String())
-	case SendTCPv4, SendTCPv6, SendUDPv4, SendUDPv6,
-		RecvTCPv4, RecvTCPv6, RecvUDPv4, RecvUDPv6:
+	case Send, Recv:
 		return colorizer.SpanBold(colorizer.Blue, t.String())
-	case ConnectTCPv4, ConnectTCPv6:
+	case Connect:
 		return colorizer.SpanBold(colorizer.Teal, t.String())
-	case DisconnectTCPv4, DisconnectTCPv6:
+	case Disconnect:
 		return colorizer.SpanBold(colorizer.Blue, t.String())
-	case AcceptTCPv4, AcceptTCPv6:
+	case Accept:
 		return colorizer.SpanBold(colorizer.Teal, t.String())
 	case QueryDNS, ReplyDNS:
 		return colorizer.SpanBold(colorizer.Indigo, t.String())
-	case VirtualAlloc, VirtualFree:
+	case VirtualAlloc, VirtualFree, MapViewOfSection, UnmapViewOfSection:
 		return colorizer.SpanBold(colorizer.Magenta, t.String())
 	case CreateSymbolicLinkObject:
 		return colorizer.SpanBold(colorizer.Lavender, t.String())
@@ -729,21 +468,19 @@ func (t Type) arrow() string {
 	var clr uint8
 	switch t {
 	case TerminateProcess, TerminateThread, DeleteFile, RegDeleteKey,
-		RegDeleteValue, UnloadModule, VirtualFree, UnmapViewFile:
+		RegDeleteValue, UnloadModule, VirtualFree, UnmapViewOfSection:
 		clr = colorizer.Red
 	case CreateProcess, CreateFile, WriteFile, RenameFile, SetFileInformation,
-		RegCreateKey, RegSetValue, CreateThread, SetThreadContext, VirtualAlloc, MapViewFile,
-		ConnectTCPv4, ConnectTCPv6, AcceptTCPv4, AcceptTCPv6,
-		SendTCPv4, SendTCPv6, SendUDPv4, SendUDPv6:
+		RegCreateKey, RegSetValue, CreateThread, SetThreadContext, VirtualAlloc,
+		MapViewOfSection, Connect, Accept, Send:
 		clr = colorizer.Amber
-	case ReadFile, EnumDirectory, LoadModule, RegOpenKey, RegQueryKey, RegQueryValue, OpenProcess,
-		OpenThread, RecvTCPv4, RecvTCPv6, RecvUDPv4, RecvUDPv6:
+	case ReadFile, EnumDirectory, LoadModule, RegOpenKey, RegQueryKey, RegQueryValue,
+		OpenProcess, OpenThread, Recv:
 		clr = colorizer.Teal
 	case QueryDNS, ReplyDNS:
 		clr = colorizer.Indigo
 	default:
 		clr = colorizer.Gray
 	}
-
 	return colorizer.SpanBold(clr, "› ")
 }
