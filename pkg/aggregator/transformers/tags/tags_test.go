@@ -32,7 +32,7 @@ import (
 
 func TestTransform(t *testing.T) {
 	evt := &event.Event{
-		Type: event.SendTCPv4,
+		Type: event.Send,
 		Tid:  2484,
 		PID:  859,
 		Params: event.Params{

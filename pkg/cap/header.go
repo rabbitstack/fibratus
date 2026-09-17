@@ -34,7 +34,7 @@ const magic = 0x6669627261747573
 
 // major represents the major digit of the cap file format. Incrementing the major digit makes older cap readers not
 // capable to replay the capture file
-const major = uint8(2)
+const major = uint8(3)
 
 // minor represents the minor digit of the cap file format
 const minor = uint8(0)

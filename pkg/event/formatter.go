@@ -209,13 +209,10 @@ func (f *ColorFormatter) colourTag(tag string, e *Event) string {
 	case seq:
 		// sequence number is ok to render as dim gray
 		return colorizer.SpanDim(colorizer.Span(colorizer.Gray, strconv.FormatUint(e.Seq, 10)))
-
 	case ts:
 		return f.colourTimestamp(e)
-
 	case cpu:
 		return colorizer.Span(colorizer.Yellow, strconv.FormatUint(uint64(e.CPU), 10))
-
 	case proc:
 		// render process name with bold green as it is the most important
 		// identity anchor on the line. Analysts scan for it first.
@@ -224,85 +221,70 @@ func (f *ColorFormatter) colourTag(tag string, e *Event) string {
 			return colorizer.Span(colorizer.Gray, "N/A")
 		}
 		return colorizer.SpanBold(colorizer.Green, ps.Name)
-
 	case pid:
 		return colorizer.Span(colorizer.Green, strconv.FormatUint(uint64(e.PID), 10))
-
 	case ppid:
 		ps := e.PS
 		if ps == nil {
 			return colorizer.Span(colorizer.Gray, "N/A")
 		}
 		return colorizer.Span(colorizer.Green, strconv.FormatUint(uint64(ps.Ppid), 10))
-
 	case tid:
 		return colorizer.Span(colorizer.Green, strconv.FormatUint(uint64(e.Tid), 10))
-
 	case exe:
 		ps := e.PS
 		if ps == nil {
 			return colorizer.Span(colorizer.Gray, "N/A")
 		}
 		return colorizer.Span(colorizer.White, ps.Exe)
-
 	case pexe:
 		ps := e.PS
 		if ps == nil || ps.Parent == nil {
 			return colorizer.Span(colorizer.Gray, "N/A")
 		}
 		return colorizer.Span(colorizer.White, ps.Parent.Exe)
-
 	case cmd:
 		ps := e.PS
 		if ps == nil {
 			return colorizer.Span(colorizer.Gray, "N/A")
 		}
 		return colorizer.Span(colorizer.White, ps.Cmdline)
-
 	case pcmd:
 		ps := e.PS
 		if ps == nil || ps.Parent == nil {
 			return colorizer.Span(colorizer.Gray, "N/A")
 		}
 		return colorizer.Span(colorizer.White, ps.Parent.Cmdline)
-
 	case cwd:
 		ps := e.PS
 		if ps == nil {
 			return colorizer.Span(colorizer.Gray, "N/A")
 		}
 		return colorizer.Span(colorizer.White, ps.Cwd)
-
 	case sid:
 		ps := e.PS
 		if ps == nil {
 			return colorizer.Span(colorizer.Gray, "N/A")
 		}
 		return colorizer.Span(colorizer.Gray, ps.SID)
-
 	case pproc:
 		ps := e.PS
 		if ps == nil || ps.Parent == nil {
 			return colorizer.Span(colorizer.Gray, "N/A")
 		}
 		return colorizer.Span(colorizer.Green, ps.Parent.Name)
-
 	case typ:
 		return e.Type.color()
-
 	case cat:
-		return colorizer.Span(colorizer.Magenta, string(e.Category))
-
+		return colorizer.Span(colorizer.Magenta, e.Category().String())
 	case parameters:
 		return e.Params.Colorize()
-
 	case pe:
 		ps := e.PS
 		if ps == nil || ps.PE == nil {
 			return colorizer.Span(colorizer.Gray, "N/A")
 		}
 		return colorizer.Span(colorizer.Magenta, ps.PE.String())
-
 	case cstack:
 		return fmt.Sprintf("\n%s", e.Callstack.Colorize())
 	}

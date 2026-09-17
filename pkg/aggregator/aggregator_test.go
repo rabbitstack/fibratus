@@ -19,15 +19,16 @@
 package aggregator
 
 import (
+	"net"
+	"testing"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/outputs"
 	"github.com/rabbitstack/fibratus/pkg/outputs/console"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"net"
-	"testing"
-	"time"
 )
 
 func TestNewBufferedAggregator(t *testing.T) {
@@ -46,7 +47,7 @@ func TestNewBufferedAggregator(t *testing.T) {
 
 	for i := 0; i < 4; i++ {
 		evt := &event.Event{
-			Type: event.SendTCPv4,
+			Type: event.Send,
 			Tid:  2484,
 			PID:  859,
 			Params: event.Params{
@@ -63,7 +64,7 @@ func TestNewBufferedAggregator(t *testing.T) {
 
 	for i := 0; i < 2; i++ {
 		evt := &event.Event{
-			Type: event.SendTCPv4,
+			Type: event.Send,
 			Tid:  2484,
 			PID:  859,
 			Seq:  uint64(i),

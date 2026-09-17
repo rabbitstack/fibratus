@@ -21,7 +21,6 @@ package processors
 import (
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
-	"github.com/rabbitstack/fibratus/pkg/network"
 	"github.com/rabbitstack/fibratus/pkg/util/ports"
 )
 
@@ -38,14 +37,7 @@ func (netProcessor) Name() ProcessorType { return Net }
 func (n netProcessor) Close() {}
 
 func (n *netProcessor) ProcessEvent(e *event.Event) (*event.Event, bool, error) {
-	if e.Category == event.Net {
-		if e.IsNetworkTCP() && !e.IsDNS() {
-			e.AppendEnum(params.NetL4Proto, uint32(network.TCP), network.ProtoNames)
-		}
-		if e.IsNetworkUDP() && !e.IsDNS() {
-			e.AppendEnum(params.NetL4Proto, uint32(network.UDP), network.ProtoNames)
-		}
-
+	if e.Category() == event.Network {
 		if e.IsDNS() {
 			return e, false, nil
 		}

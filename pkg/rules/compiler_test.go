@@ -44,8 +44,7 @@ func TestCompile(t *testing.T) {
 	assert.Contains(t, rs.UsedEvents, event.CreateProcess)
 	assert.Contains(t, rs.UsedEvents, event.LoadModule)
 	assert.Contains(t, rs.UsedEvents, event.QueryDNS)
-	assert.Contains(t, rs.UsedEvents, event.ConnectTCPv4)
-	assert.Contains(t, rs.UsedEvents, event.ConnectTCPv6)
+	assert.Contains(t, rs.UsedEvents, event.Connect)
 }
 
 func TestCompileMinEngineVersion(t *testing.T) {
@@ -82,7 +81,7 @@ func TestCompileEventCategoryFieldNames(t *testing.T) {
 		{"_fixtures/field_values/incorrect_event_name_field.yml", ErrUnknownEventName("match https connections", "RecvTcp4")},
 		{"_fixtures/field_values/incorrect_event_name_in_operator.yml", ErrUnknownEventName("match https connections", "CreateProc")},
 		{"_fixtures/field_values/correct_category_name_field.yml", nil},
-		{"_fixtures/field_values/incorrect_category_name_field.yml", ErrUnknownCategoryName("match https connections", "network")},
+		{"_fixtures/field_values/incorrect_category_name_field.yml", ErrUnknownCategoryName("match https connections", "pipe")},
 	}
 
 	for _, tt := range tests {

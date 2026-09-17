@@ -25,6 +25,7 @@ import (
 
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/fs"
+	"github.com/rabbitstack/fibratus/pkg/network"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/rabbitstack/fibratus/pkg/util/filetime"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
@@ -149,8 +150,8 @@ func (d *ParamDecoder) DecodeRegSetValueInternal(r *etw.EventRecord, e *Event) {
 // DecodeFile decodes file I/O operations such as file creation, access,
 // or file metadata manipulation.
 func (d *ParamDecoder) DecodeFile(r *etw.EventRecord, e *Event) {
-	switch r.Header.EventDescriptor.Opcode {
-	case CreateFileID:
+	switch e.Type {
+	case CreateFile:
 		// typedef struct _PERFINFO_FILE_CREATE {
 		//     LONG_PTR Irp;
 		//     ULONG_PTR FileObject;
@@ -173,7 +174,7 @@ func (d *ParamDecoder) DecodeFile(r *etw.EventRecord, e *Event) {
 		e.AppendParam(params.NTStatus, params.Status, status)
 		e.AppendEnum(params.FileOperation, disposition, fs.FileCreateDispositions)
 		e.AppendParam(params.Callstack, params.Slice, r.ReadEventHeaderFileExtendedDataItemsCallstack())
-	case FileOpEndID:
+	case FileOpEnd:
 		// typedef struct _PERFINFO_FILE_OPERATION_END {
 		//     ULONG_PTR Irp;
 		//     ULONG_PTR ExtraInformation;
@@ -182,7 +183,7 @@ func (d *ParamDecoder) DecodeFile(r *etw.EventRecord, e *Event) {
 		e.AppendParam(params.FileIrpPtr, params.Address, r.ReadUint64(0))
 		e.AppendParam(params.FileExtraInfo, params.Address, r.ReadUint64(8))
 		e.AppendParam(params.NTStatus, params.Status, r.ReadUint32(16))
-	case MapViewFileID, UnmapViewFileID, MapFileRundownID:
+	case MapViewOfSection, UnmapViewOfSection, MapViewSectionRundown:
 		e.AppendParam(params.FileViewBase, params.Address, r.ReadUint64(0))
 		e.AppendParam(params.FileKey, params.Address, r.ReadUint64(8))
 		e.AppendParam(params.MemProtect, params.Flags, uint32(r.ReadUint64(16)>>32), WithFlags(ViewProtectionFlags))
@@ -190,7 +191,7 @@ func (d *ParamDecoder) DecodeFile(r *etw.EventRecord, e *Event) {
 		e.AppendParam(params.FileViewSize, params.Uint64, r.ReadUint64(24))
 		e.AppendParam(params.FileOffset, params.Uint64, r.ReadUint64(32))
 		e.AppendParam(params.ProcessID, params.PID, r.ReadUint32(40))
-	case SetFileInformationID, DeleteFileID, RenameFileID:
+	case SetFileInformation, DeleteFile, RenameFile:
 		// DeleteFile, RenameFile, and SetFileInformation share the same layout
 		// typedef struct _PERFINFO_FILE_INFORMATION {
 		//     ULONG_PTR Irp;
@@ -206,7 +207,7 @@ func (d *ParamDecoder) DecodeFile(r *etw.EventRecord, e *Event) {
 		e.AppendParam(params.FileExtraInfo, params.Uint64, r.ReadUint64(24))
 		e.AppendParam(params.ThreadID, params.TID, r.ReadUint32(32))
 		e.AppendParam(params.FileInfoClass, params.Enum, r.ReadUint32(36), WithEnum(fs.FileInfoClasses))
-	case ReleaseFileID, CloseFileID:
+	case ReleaseFile, CloseFile:
 		// typedef struct _PERFINFO_FILE_SIMPLE_OPERATION {
 		//     ULONG_PTR Irp;
 		//     ULONG_PTR FileObject;
@@ -217,7 +218,7 @@ func (d *ParamDecoder) DecodeFile(r *etw.EventRecord, e *Event) {
 		e.AppendParam(params.FileObject, params.Address, r.ReadUint64(8))
 		e.AppendParam(params.FileKey, params.Address, r.ReadUint64(16))
 		e.AppendParam(params.ThreadID, params.TID, r.ReadUint32(24))
-	case ReadFileID, WriteFileID:
+	case ReadFile, WriteFile:
 		// typedef struct _PERFINFO_FILE_READ_WRITE {
 		//     ULONGLONG Offset;
 		//     ULONG_PTR Irp;
@@ -234,7 +235,7 @@ func (d *ParamDecoder) DecodeFile(r *etw.EventRecord, e *Event) {
 		e.AppendParam(params.FileKey, params.Address, r.ReadUint64(24))
 		e.AppendParam(params.ThreadID, params.TID, r.ReadUint32(32))
 		e.AppendParam(params.FileIoSize, params.Uint32, r.ReadUint32(34))
-	case EnumDirectoryID:
+	case EnumDirectory:
 		// typedef struct _PERFINFO_FILE_DIRENUM {
 		//     ULONG_PTR Irp;
 		//     ULONG_PTR FileObject;
@@ -253,7 +254,7 @@ func (d *ParamDecoder) DecodeFile(r *etw.EventRecord, e *Event) {
 		e.AppendParam(params.FileInfoClass, params.Enum, r.ReadUint32(32), WithEnum(fs.FileInfoClasses))
 		// skip FileIndex (uint32)
 		e.AppendParam(params.FilePath, params.UnicodeString, r.ConsumeUTF16String(40))
-	case FileRundownID:
+	case FileRundown:
 		e.AppendParam(params.FileObject, params.Address, r.ReadUint64(0))
 		e.AppendParam(params.FilePath, params.DOSPath, r.ConsumeUTF16String(8))
 	}
@@ -526,6 +527,12 @@ func (d *ParamDecoder) DecodeNetwork(r *etw.EventRecord, e *Event) {
 		e.AppendParam(params.NetSIP, params.IPv4, r.ReadUint32(12))
 		e.AppendParam(params.NetDport, params.Port, r.ReadUint16(16))
 		e.AppendParam(params.NetSport, params.Port, r.ReadUint16(18))
+	}
+
+	if r.Header.ProviderID == NetworkTCPEventGUID {
+		e.AppendEnum(params.NetL4Proto, uint32(network.TCP), network.ProtoNames)
+	} else {
+		e.AppendEnum(params.NetL4Proto, uint32(network.UDP), network.ProtoNames)
 	}
 }
 

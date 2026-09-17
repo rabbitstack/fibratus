@@ -19,12 +19,14 @@
 package processors
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/event"
-	"github.com/rabbitstack/fibratus/pkg/event/params"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"net"
 	"testing"
+
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
+	"github.com/rabbitstack/fibratus/pkg/network"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNetworkProcessor(t *testing.T) {
@@ -36,13 +38,13 @@ func TestNetworkProcessor(t *testing.T) {
 		{
 			"send tcpv4",
 			&event.Event{
-				Type:     event.SendTCPv4,
-				Category: event.Net,
+				Type: event.Send,
 				Params: event.Params{
-					params.NetDport: {Name: params.NetDport, Type: params.Uint16, Value: uint16(443)},
-					params.NetSport: {Name: params.NetSport, Type: params.Uint16, Value: uint16(43123)},
-					params.NetSIP:   {Name: params.NetSIP, Type: params.IPv4, Value: net.ParseIP("127.0.0.1")},
-					params.NetDIP:   {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("8.8.8.8")},
+					params.NetDport:   {Name: params.NetDport, Type: params.Uint16, Value: uint16(443)},
+					params.NetSport:   {Name: params.NetSport, Type: params.Uint16, Value: uint16(43123)},
+					params.NetSIP:     {Name: params.NetSIP, Type: params.IPv4, Value: net.ParseIP("127.0.0.1")},
+					params.NetDIP:     {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("8.8.8.8")},
+					params.NetL4Proto: {Name: params.NetL4Proto, Type: params.Enum, Value: uint32(network.TCP), Enum: network.ProtoNames},
 				},
 			},
 			func(e *event.Event, t *testing.T) {
@@ -58,13 +60,13 @@ func TestNetworkProcessor(t *testing.T) {
 		{
 			"recv udp6",
 			&event.Event{
-				Type:     event.RecvUDPv6,
-				Category: event.Net,
+				Type: event.Recv,
 				Params: event.Params{
-					params.NetDport: {Name: params.NetDport, Type: params.Uint16, Value: uint16(53)},
-					params.NetSport: {Name: params.NetSport, Type: params.Uint16, Value: uint16(43123)},
-					params.NetSIP:   {Name: params.NetSIP, Type: params.IPv4, Value: net.ParseIP("127.0.0.1")},
-					params.NetDIP:   {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("8.8.8.8")},
+					params.NetDport:   {Name: params.NetDport, Type: params.Uint16, Value: uint16(53)},
+					params.NetSport:   {Name: params.NetSport, Type: params.Uint16, Value: uint16(43123)},
+					params.NetSIP:     {Name: params.NetSIP, Type: params.IPv4, Value: net.ParseIP("127.0.0.1")},
+					params.NetDIP:     {Name: params.NetDIP, Type: params.IPv4, Value: net.ParseIP("8.8.8.8")},
+					params.NetL4Proto: {Name: params.NetL4Proto, Type: params.Enum, Value: uint32(network.UDP), Enum: network.ProtoNames},
 				},
 			},
 			func(e *event.Event, t *testing.T) {

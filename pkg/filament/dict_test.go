@@ -22,14 +22,15 @@
 package filament
 
 import (
+	"net"
+	"testing"
+	"time"
+
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/filament/cpython"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"net"
-	"testing"
-	"time"
 )
 
 func TestProduceEventDict(t *testing.T) {
@@ -41,16 +42,15 @@ func TestProduceEventDict(t *testing.T) {
 	defer cpython.Finalize()
 	now := time.Now()
 	evt := &event.Event{
-		Seq:         uint64(12456738026482168384),
-		Tid:         2484,
-		PID:         859,
-		CPU:         1,
-		Name:        "CreateFile",
-		Timestamp:   now,
-		Category:    event.File,
-		Host:        "archrabbit",
-		Description: "Creates or opens a new file, directory, I/O device, pipe, console",
+		Seq:       uint64(12456738026482168384),
+		Tid:       2484,
+		PID:       859,
+		CPU:       1,
+		Type:      event.CreateFile,
+		Timestamp: now,
+		Host:      "archrabbit",
 	}
+
 	dict, err := newEventDict(evt)
 	require.NoError(t, err)
 	require.NotNil(t, dict)
@@ -80,7 +80,7 @@ func TestProduceEventDictWithIPAddresses(t *testing.T) {
 	defer cpython.Finalize()
 
 	evt := &event.Event{
-		Name: "Send",
+		Type: event.Send,
 		Tid:  2484,
 		PID:  859,
 		Params: event.Params{
@@ -112,15 +112,13 @@ func BenchmarkTestProduceEventDict(b *testing.B) {
 	defer cpython.Finalize()
 
 	evt := &event.Event{
-		Seq:         uint64(12456738026482168384),
-		Tid:         2484,
-		PID:         859,
-		CPU:         1,
-		Name:        "CreateFile",
-		Timestamp:   time.Now(),
-		Category:    event.File,
-		Host:        "archrabbit",
-		Description: "Creates or opens a new file, directory, I/O device, pipe, console",
+		Seq:       uint64(12456738026482168384),
+		Tid:       2484,
+		PID:       859,
+		CPU:       1,
+		Type:      event.CreateFile,
+		Timestamp: time.Now(),
+		Host:      "archrabbit",
 	}
 
 	for i := 0; i < b.N; i++ {

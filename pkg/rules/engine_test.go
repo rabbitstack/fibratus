@@ -116,11 +116,9 @@ func wrapProcessEvent(e *event.Event, fn func(*event.Event) (bool, error)) bool 
 func fireRules(t *testing.T, c *config.Config) bool {
 	e := NewEngine(new(ps.SnapshotterMock), c)
 	evt := &event.Event{
-		Type:     event.RecvTCPv4,
-		Name:     "Recv",
-		Tid:      2484,
-		PID:      859,
-		Category: event.Net,
+		Type: event.Recv,
+		Tid:  2484,
+		PID:  859,
 		Params: event.Params{
 			params.NetDport: {Name: params.NetDport, Type: params.Uint16, Value: uint16(443)},
 			params.NetSport: {Name: params.NetSport, Type: params.Uint16, Value: uint16(43123)},
@@ -141,7 +139,7 @@ func TestCompileIndexableFilters(t *testing.T) {
 
 	compileRules(t, e)
 
-	assert.Len(t, e.filters.types, 5)
+	assert.Len(t, e.filters.types, 2)
 	assert.Len(t, e.filters.categories, 1)
 
 	var tests = []struct {
@@ -149,10 +147,7 @@ func TestCompileIndexableFilters(t *testing.T) {
 		wants int
 	}{
 		{&event.Event{Type: event.CreateProcess}, 2},
-		{&event.Event{Type: event.RecvUDPv6}, 3},
-		{&event.Event{Type: event.RecvTCPv4}, 3},
-		{&event.Event{Type: event.RecvTCPv4, Category: event.Net}, 4},
-		{&event.Event{Category: event.Net}, 1},
+		{&event.Event{Type: event.Recv}, 4},
 	}
 
 	for _, tt := range tests {
@@ -189,8 +184,6 @@ func TestRunSequenceRule(t *testing.T) {
 		Seq:       1,
 		Type:      event.CreateProcess,
 		Timestamp: time.Now(),
-		Category:  event.Process,
-		Name:      "CreateProcess",
 		Tid:       2484,
 		PID:       2243,
 		PS: &types.PS{
@@ -208,10 +201,8 @@ func TestRunSequenceRule(t *testing.T) {
 		Seq:       2,
 		Type:      event.CreateFile,
 		Timestamp: time.Now().Add(time.Millisecond * 250),
-		Name:      "CreateFile",
 		Tid:       2484,
 		PID:       2243,
-		Category:  event.File,
 		PS: &types.PS{
 			Name:    "firefox.exe",
 			Exe:     "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
@@ -226,10 +217,8 @@ func TestRunSequenceRule(t *testing.T) {
 
 	e3 := &event.Event{
 		Seq:       4,
-		Type:      event.ConnectTCPv4,
+		Type:      event.Connect,
 		Timestamp: time.Now().Add(time.Second),
-		Category:  event.Net,
-		Name:      "Connect",
 		Tid:       244,
 		PID:       2243,
 		PS: &types.PS{
@@ -279,8 +268,6 @@ func TestRunSequenceRuleWithPsUUIDLink(t *testing.T) {
 		Seq:       1,
 		Type:      event.CreateProcess,
 		Timestamp: time.Now(),
-		Category:  event.Process,
-		Name:      "CreateProcess",
 		Tid:       2243,
 		PID:       uint32(os.Getpid()),
 		PS: &types.PS{
@@ -299,10 +286,8 @@ func TestRunSequenceRuleWithPsUUIDLink(t *testing.T) {
 		Seq:       2,
 		Type:      event.CreateFile,
 		Timestamp: time.Now().Add(time.Second),
-		Name:      "CreateFile",
 		Tid:       2484,
 		PID:       uint32(os.Getpid()),
-		Category:  event.File,
 		PS: &types.PS{
 			PID:     uint32(os.Getpid()),
 			Name:    "firefox.exe",
@@ -342,8 +327,6 @@ func TestRunSimpleAndSequenceRules(t *testing.T) {
 			Seq:       1,
 			Type:      event.CreateProcess,
 			Timestamp: time.Now(),
-			Category:  event.Process,
-			Name:      "CreateProcess",
 			Tid:       2484,
 			PID:       2243,
 			PS: &types.PS{
@@ -360,10 +343,8 @@ func TestRunSimpleAndSequenceRules(t *testing.T) {
 			Seq:       2,
 			Type:      event.CreateFile,
 			Timestamp: time.Now().Add(time.Millisecond * 544),
-			Name:      "CreateFile",
 			Tid:       2484,
 			PID:       2243,
-			Category:  event.File,
 			PS: &types.PS{
 				Name: "cmd.exe",
 				Exe:  "C:\\Windows\\system32\\cmd.exe",
@@ -378,8 +359,6 @@ func TestRunSimpleAndSequenceRules(t *testing.T) {
 			Seq:       10,
 			Type:      event.CreateProcess,
 			Timestamp: time.Now().Add(time.Second * 2),
-			Category:  event.Process,
-			Name:      "CreateProcess",
 			Tid:       2484,
 			PID:       2243,
 			PS: &types.PS{
@@ -427,11 +406,9 @@ func TestAlertAction(t *testing.T) {
 	compileRules(t, e)
 
 	evt := &event.Event{
-		Type:     event.RecvTCPv4,
-		Name:     "Recv",
-		Tid:      2484,
-		PID:      859,
-		Category: event.Net,
+		Type: event.Recv,
+		Tid:  2484,
+		PID:  859,
 		PS: &types.PS{
 			Name: "cmd.exe",
 		},
@@ -489,10 +466,8 @@ func TestKillAction(t *testing.T) {
 	evt := &event.Event{
 		Type:      event.CreateProcess,
 		Timestamp: time.Now(),
-		Name:      "CreateProcess",
 		Tid:       2484,
 		PID:       pi.ProcessId,
-		Category:  event.Process,
 		PS: &types.PS{
 			Name: "calc.exe",
 			Exe:  "C:\\Windows\\system32\\calc.exe",
@@ -520,11 +495,9 @@ func BenchmarkRunRules(b *testing.B) {
 
 	evts := []*event.Event{
 		{
-			Type:     event.ConnectTCPv4,
-			Name:     "Recv",
-			Tid:      2484,
-			PID:      859,
-			Category: event.Net,
+			Type: event.Connect,
+			Tid:  2484,
+			PID:  859,
 			PS: &types.PS{
 				Name: "cmd.exe",
 			},
@@ -537,11 +510,9 @@ func BenchmarkRunRules(b *testing.B) {
 			Metadata: make(map[event.MetadataKey]any),
 		},
 		{
-			Type:     event.CreateProcess,
-			Name:     "CreateProcess",
-			Category: event.Process,
-			Tid:      2484,
-			PID:      859,
+			Type: event.CreateProcess,
+			Tid:  2484,
+			PID:  859,
 			PS: &types.PS{
 				Name: "powershell.exe",
 			},
@@ -556,11 +527,9 @@ func BenchmarkRunRules(b *testing.B) {
 			Metadata: make(map[event.MetadataKey]any),
 		},
 		{
-			Type:     event.CreateFile,
-			Name:     "CreateFile",
-			Category: event.File,
-			Tid:      2484,
-			PID:      859,
+			Type: event.CreateFile,
+			Tid:  2484,
+			PID:  859,
 			PS: &types.PS{
 				Name: "powershell.exe",
 			},

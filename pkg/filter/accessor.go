@@ -77,11 +77,11 @@ func (*evtAccessor) Get(f Field, evt *event.Event) (params.Value, error) {
 	case fields.EvtCPU, fields.KevtCPU:
 		return evt.CPU, nil
 	case fields.EvtName, fields.KevtName:
-		return evt.Name, nil
+		return evt.Name(), nil
 	case fields.EvtCategory, fields.KevtCategory:
-		return string(evt.Category), nil
+		return evt.Category().String(), nil
 	case fields.EvtDesc, fields.KevtDesc:
-		return evt.Description, nil
+		return evt.Description(), nil
 	case fields.EvtHost, fields.KevtHost:
 		return evt.Host, nil
 	case fields.EvtTime, fields.KevtTime:

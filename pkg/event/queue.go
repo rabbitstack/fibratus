@@ -109,7 +109,7 @@ func (q *Queue) Close() { q.decorator.Stop() }
 func (q *Queue) Push(e *Event) error {
 	if q.stackEnrichment {
 		// store pending event for callstack enrichment
-		if e.Type.CanEnrichStack() {
+		if e.Type.WaitStack() {
 			q.decorator.Push(e)
 			return nil
 		}

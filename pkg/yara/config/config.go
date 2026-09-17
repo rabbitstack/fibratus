@@ -164,7 +164,7 @@ func (c Config) ShouldSkipFile(file string) bool {
 // whether the process scan took place or a file/registry
 // key was scanned.
 func (c Config) AlertTitle(e *event.Event) string {
-	if (e.Category == event.File && e.GetParamAsString(params.FilePath) != "") || e.Category == event.Registry {
+	if (e.Category() == event.File && e.GetParamAsString(params.FilePath) != "") || e.Category() == event.Registry {
 		return FileThreatAlertTitle
 	}
 	return MemoryThreatAlertTitle

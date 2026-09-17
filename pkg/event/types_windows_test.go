@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 by Nedim Sabic Sabic
+ * Copyright 2019-2026 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -22,126 +22,442 @@ import (
 	"testing"
 
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
 )
 
-func TestEventTypePackAllBytes(t *testing.T) {
-	assert.Equal(t, byte(0x3d), CreateProcess[0])
-	assert.Equal(t, byte(0x6f), CreateProcess[1])
-	assert.Equal(t, byte(0xa8), CreateProcess[2])
-	assert.Equal(t, byte(0xd0), CreateProcess[3])
-
-	assert.Equal(t, byte(0xfe), CreateProcess[4])
-	assert.Equal(t, byte(0x05), CreateProcess[5])
-
-	assert.Equal(t, byte(0x11), CreateProcess[6])
-	assert.Equal(t, byte(0xd0), CreateProcess[7])
-
-	assert.Equal(t, byte(0x9d), CreateProcess[8])
-	assert.Equal(t, byte(0xda), CreateProcess[9])
-	assert.Equal(t, byte(0x0), CreateProcess[10])
-	assert.Equal(t, byte(0xc0), CreateProcess[11])
-	assert.Equal(t, byte(0x4f), CreateProcess[12])
-	assert.Equal(t, byte(0xd7), CreateProcess[13])
-	assert.Equal(t, byte(0xba), CreateProcess[14])
-	assert.Equal(t, byte(0x7c), CreateProcess[15])
-	assert.Equal(t, byte(0x0), CreateProcess[16])
-	assert.Equal(t, byte(0x1), CreateProcess[17])
-
-	assert.Equal(t, byte(0x0b), QueryDNS[16])
-	assert.Equal(t, byte(0xbe), QueryDNS[17])
-}
-
-func TestEventTypeComparison(t *testing.T) {
-	var tests = []struct {
-		name  string
-		ktyp  Type
-		wants Type
+func TestNewTypeFromEventRecord(t *testing.T) {
+	tests := []struct {
+		name     string
+		provider windows.GUID
+		id       uint16
+		opcode   uint8
+		want     Type
 	}{
+		// Registry
 		{
-			"equals CreateProcess",
-			pack(windows.GUID{Data1: 0x3d6fa8d0, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}, 1),
-			CreateProcess,
+			name:     "Registry/CreateKey",
+			provider: RegistryEventGUID,
+			opcode:   RegCreateKeyID,
+			want:     RegCreateKey,
 		},
 		{
-			"equals TerminateProcess",
-			pack(windows.GUID{Data1: 0x3d6fa8d0, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}}, 2),
-			TerminateProcess,
+			name:     "Registry/OpenKey",
+			provider: RegistryEventGUID,
+			opcode:   RegOpenKeyID,
+			want:     RegOpenKey,
+		},
+		{
+			name:     "Registry/DeleteKey",
+			provider: RegistryEventGUID,
+			opcode:   RegDeleteKeyID,
+			want:     RegDeleteKey,
+		},
+		{
+			name:     "Registry/QueryKey",
+			provider: RegistryEventGUID,
+			opcode:   RegQueryKeyID,
+			want:     RegQueryKey,
+		},
+		{
+			name:     "Registry/SetValue",
+			provider: RegistryEventGUID,
+			opcode:   RegSetValueID,
+			want:     RegSetValue,
+		},
+		{
+			name:     "Registry/DeleteValue",
+			provider: RegistryEventGUID,
+			opcode:   RegDeleteValueID,
+			want:     RegDeleteValue,
+		},
+		{
+			name:     "Registry/QueryValue",
+			provider: RegistryEventGUID,
+			opcode:   RegQueryValueID,
+			want:     RegQueryValue,
+		},
+		{
+			name:     "Registry/CreateKCB",
+			provider: RegistryEventGUID,
+			opcode:   RegCreateKCBID,
+			want:     RegCreateKCB,
+		},
+		{
+			name:     "Registry/DeleteKCB",
+			provider: RegistryEventGUID,
+			opcode:   RegDeleteKCBID,
+			want:     RegDeleteKCB,
+		},
+		{
+			name:     "Registry/KCBRundown",
+			provider: RegistryEventGUID,
+			opcode:   RegKCBRundownID,
+			want:     RegKCBRundown,
+		},
+		{
+			name:     "Registry/CloseKey",
+			provider: RegistryEventGUID,
+			opcode:   RegCloseKeyID,
+			want:     RegCloseKey,
+		},
+
+		// File
+		{
+			name:     "File/FileRundown",
+			provider: FileEventGUID,
+			opcode:   FileRundownID,
+			want:     FileRundown,
+		},
+		{
+			name:     "File/MapViewOfSection",
+			provider: FileEventGUID,
+			opcode:   MapViewOfSectionID,
+			want:     MapViewOfSection,
+		},
+		{
+			name:     "File/UnmapViewOfSection",
+			provider: FileEventGUID,
+			opcode:   UnmapViewOfSectionID,
+			want:     UnmapViewOfSection,
+		},
+		{
+			name:     "File/MapViewSectionRundown",
+			provider: FileEventGUID,
+			opcode:   MapViewSectionRundownID,
+			want:     MapViewSectionRundown,
+		},
+		{
+			name:     "File/CreateFile",
+			provider: FileEventGUID,
+			opcode:   CreateFileID,
+			want:     CreateFile,
+		},
+		{
+			name:     "File/ReleaseFile",
+			provider: FileEventGUID,
+			opcode:   ReleaseFileID,
+			want:     ReleaseFile,
+		},
+		{
+			name:     "File/CloseFile",
+			provider: FileEventGUID,
+			opcode:   CloseFileID,
+			want:     CloseFile,
+		},
+		{
+			name:     "File/ReadFile",
+			provider: FileEventGUID,
+			opcode:   ReadFileID,
+			want:     ReadFile,
+		},
+		{
+			name:     "File/WriteFile",
+			provider: FileEventGUID,
+			opcode:   WriteFileID,
+			want:     WriteFile,
+		},
+		{
+			name:     "File/SetFileInformation",
+			provider: FileEventGUID,
+			opcode:   SetFileInformationID,
+			want:     SetFileInformation,
+		},
+		{
+			name:     "File/DeleteFile",
+			provider: FileEventGUID,
+			opcode:   DeleteFileID,
+			want:     DeleteFile,
+		},
+		{
+			name:     "File/RenameFile",
+			provider: FileEventGUID,
+			opcode:   RenameFileID,
+			want:     RenameFile,
+		},
+		{
+			name:     "File/EnumDirectory",
+			provider: FileEventGUID,
+			opcode:   EnumDirectoryID,
+			want:     EnumDirectory,
+		},
+		{
+			name:     "File/FileOpEnd",
+			provider: FileEventGUID,
+			opcode:   FileOpEndID,
+			want:     FileOpEnd,
+		},
+
+		// Audit API -- these use EventDescriptor.ID, not Opcode.
+		{
+			name:     "AuditAPI/OpenProcess",
+			provider: AuditAPIEventGUID,
+			id:       OpenProcessID,
+			want:     OpenProcess,
+		},
+		{
+			name:     "AuditAPI/OpenThread",
+			provider: AuditAPIEventGUID,
+			id:       OpenThreadID,
+			want:     OpenThread,
+		},
+		{
+			name:     "AuditAPI/SetThreadContext",
+			provider: AuditAPIEventGUID,
+			id:       SetThreadContextID,
+			want:     SetThreadContext,
+		},
+		{
+			name:     "AuditAPI/CreateSymbolicLinkObject",
+			provider: AuditAPIEventGUID,
+			id:       CreateSymbolicLinkObjectID,
+			want:     CreateSymbolicLinkObject,
+		},
+
+		// Stack walk
+		{
+			name:     "StackWalk",
+			provider: StackWalkEventGUID,
+			want:     StackWalk,
+		},
+
+		// Memory
+		{
+			name:     "Memory/VirtualAlloc",
+			provider: MemoryEventGUID,
+			opcode:   VirtualAllocID,
+			want:     VirtualAlloc,
+		},
+		{
+			name:     "Memory/VirtualFree",
+			provider: MemoryEventGUID,
+			opcode:   VirtualFreeID,
+			want:     VirtualFree,
+		},
+
+		// TCP
+		{
+			name:     "TCP/AcceptIPv4",
+			provider: NetworkTCPEventGUID,
+			opcode:   AcceptTCPv4ID,
+			want:     Accept,
+		},
+		{
+			name:     "TCP/AcceptIPv6",
+			provider: NetworkTCPEventGUID,
+			opcode:   AcceptTCPv6ID,
+			want:     Accept,
+		},
+		{
+			name:     "TCP/SendIPv4",
+			provider: NetworkTCPEventGUID,
+			opcode:   SendV4ID,
+			want:     Send,
+		},
+		{
+			name:     "TCP/SendIPv6",
+			provider: NetworkTCPEventGUID,
+			opcode:   SendV6ID,
+			want:     Send,
+		},
+		{
+			name:     "TCP/RecvIPv4",
+			provider: NetworkTCPEventGUID,
+			opcode:   RecvV4ID,
+			want:     Recv,
+		},
+		{
+			name:     "TCP/RecvIPv6",
+			provider: NetworkTCPEventGUID,
+			opcode:   RecvV6ID,
+			want:     Recv,
+		},
+		{
+			name:     "TCP/ConnectIPv4",
+			provider: NetworkTCPEventGUID,
+			opcode:   ConnectTCPv4ID,
+			want:     Connect,
+		},
+		{
+			name:     "TCP/ConnectIPv6",
+			provider: NetworkTCPEventGUID,
+			opcode:   ConnectTCPv6ID,
+			want:     Connect,
+		},
+		{
+			name:     "TCP/DisconnectIPv4",
+			provider: NetworkTCPEventGUID,
+			opcode:   DisconnectTCPv4ID,
+			want:     Disconnect,
+		},
+		{
+			name:     "TCP/DisconnectIPv6",
+			provider: NetworkTCPEventGUID,
+			opcode:   DisconnectTCPv6ID,
+			want:     Disconnect,
+		},
+		{
+			name:     "TCP/ReconnectIPv4",
+			provider: NetworkTCPEventGUID,
+			opcode:   ReconnectTCPv4ID,
+			want:     Reconnect,
+		},
+		{
+			name:     "TCP/ReconnectIPv6",
+			provider: NetworkTCPEventGUID,
+			opcode:   ReconnectTCPv6ID,
+			want:     Reconnect,
+		},
+		{
+			name:     "TCP/RetransmitIPv4",
+			provider: NetworkTCPEventGUID,
+			opcode:   RetransmitTCPv4ID,
+			want:     Retransmit,
+		},
+		{
+			name:     "TCP/RetransmitIPv6",
+			provider: NetworkTCPEventGUID,
+			opcode:   RetransmitTCPv6ID,
+			want:     Retransmit,
+		},
+
+		// UDP
+		{
+			name:     "UDP/SendIPv4",
+			provider: NetworkUDPEventGUID,
+			opcode:   SendV4ID,
+			want:     Send,
+		},
+		{
+			name:     "UDP/SendIPv6",
+			provider: NetworkUDPEventGUID,
+			opcode:   SendV6ID,
+			want:     Send,
+		},
+		{
+			name:     "UDP/RecvIPv4",
+			provider: NetworkUDPEventGUID,
+			opcode:   RecvV4ID,
+			want:     Recv,
+		},
+		{
+			name:     "UDP/RecvIPv6",
+			provider: NetworkUDPEventGUID,
+			opcode:   RecvV6ID,
+			want:     Recv,
+		},
+
+		// DNS -- uses EventDescriptor.ID.
+		{
+			name:     "DNS/Query",
+			provider: DNSEventGUID,
+			id:       QueryDNSID,
+			want:     QueryDNS,
+		},
+		{
+			name:     "DNS/Reply",
+			provider: DNSEventGUID,
+			id:       ReplyDNSID,
+			want:     ReplyDNS,
+		},
+
+		// Process
+		{
+			name:     "Process/CreateProcess",
+			provider: ProcessEventGUID,
+			opcode:   CreateProcessID,
+			want:     CreateProcess,
+		},
+		{
+			name:     "Process/TerminateProcess",
+			provider: ProcessEventGUID,
+			opcode:   TerminateProcessID,
+			want:     TerminateProcess,
+		},
+		{
+			name:     "Process/ProcessRundown",
+			provider: ProcessEventGUID,
+			opcode:   ProcessRundownID,
+			want:     ProcessRundown,
+		},
+
+		// Process kernel -- uses EventDescriptor.ID.
+		{
+			name:     "ProcessKernel/CreateProcessInternal",
+			provider: ProcessKernelEventGUID,
+			id:       CreateProcessInternalID,
+			want:     CreateProcessInternal,
+		},
+		{
+			name:     "ProcessKernel/ProcessRundownInternal",
+			provider: ProcessKernelEventGUID,
+			id:       ProcessRundownInternalID,
+			want:     ProcessRundownInternal,
+		},
+		{
+			name:     "ProcessKernel/LoadModuleInternal",
+			provider: ProcessKernelEventGUID,
+			id:       LoadModuleInternalID,
+			want:     LoadModuleInternal,
+		},
+
+		// Module
+		{
+			name:     "Module/UnloadModule",
+			provider: ModuleEventGUID,
+			opcode:   UnloadModuleID,
+			want:     UnloadModule,
+		},
+		{
+			name:     "Module/ModuleRundown",
+			provider: ModuleEventGUID,
+			opcode:   ModuleRundownID,
+			want:     ModuleRundown,
+		},
+		{
+			name:     "Module/LoadModule",
+			provider: ModuleEventGUID,
+			opcode:   LoadModuleID,
+			want:     LoadModule,
+		},
+
+		// Thread
+		{
+			name:     "Thread/CreateThread",
+			provider: ThreadEventGUID,
+			opcode:   CreateThreadID,
+			want:     CreateThread,
+		},
+		{
+			name:     "Thread/TerminateThread",
+			provider: ThreadEventGUID,
+			opcode:   TerminateThreadID,
+			want:     TerminateThread,
+		},
+		{
+			name:     "Thread/ThreadRundown",
+			provider: ThreadEventGUID,
+			opcode:   ThreadRundownID,
+			want:     ThreadRundown,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			lhs, rhs := tt.ktyp, tt.wants
-			assert.Equal(t, lhs, rhs)
+			r := &etw.EventRecord{
+				Header: etw.EventHeader{
+					ProviderID: tt.provider,
+					EventDescriptor: etw.EventDescriptor{
+						ID:     tt.id,
+						Opcode: tt.opcode,
+					},
+				},
+			}
+
+			got := NewTypeFromEventRecord(r)
+
+			if got != tt.want {
+				t.Fatalf("NewTypeFromEventRecord() = %v, want %v", got, tt.want)
+			}
 		})
-	}
-}
-
-func TestNewEventTypeFromEventRecord(t *testing.T) {
-	assert.Equal(t, CreateProcess, NewTypeFromEventRecord(&etw.EventRecord{
-		Header: etw.EventHeader{
-			ProviderID: windows.GUID{Data1: 0x3d6fa8d0, Data2: 0xfe05, Data3: 0x11d0, Data4: [8]byte{0x9d, 0xda, 0x0, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}},
-			EventDescriptor: etw.EventDescriptor{
-				Opcode: 1,
-			},
-		},
-	}))
-	assert.Equal(t, OpenProcess, NewTypeFromEventRecord(&etw.EventRecord{
-		Header: etw.EventHeader{
-			ProviderID: windows.GUID{Data1: 0xe02a841c, Data2: 0x75a3, Data3: 0x4fa7, Data4: [8]byte{0xaf, 0xc8, 0xae, 0x09, 0xcf, 0x9b, 0x7f, 0x23}},
-			EventDescriptor: etw.EventDescriptor{
-				ID: 5,
-			},
-		},
-	}))
-}
-
-func TestEventTypeExists(t *testing.T) {
-	require.True(t, AcceptTCPv4.Exists())
-	require.True(t, AcceptTCPv6.Exists())
-}
-
-func TestGUIDAndHookIDFromEventType(t *testing.T) {
-	var tests = []struct {
-		Type   Type
-		opcode uint16
-		guid   windows.GUID
-	}{
-		{
-			LoadModule,
-			10,
-			windows.GUID{Data1: 0x2cb15d1d, Data2: 0x5fc1, Data3: 0x11d2, Data4: [8]byte{0xab, 0xe1, 0x0, 0xa0, 0xc9, 0x11, 0xf5, 0x18}},
-		},
-		{
-			WriteFile,
-			68,
-			windows.GUID{Data1: 0x90cbdc39, Data2: 0x4a3e, Data3: 0x11d1, Data4: [8]byte{0x84, 0xf4, 0x0, 0x0, 0xf8, 0x04, 0x64, 0xe3}},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.Type.String(), func(t *testing.T) {
-			assert.Equal(t, tt.guid.String(), tt.Type.GUID().String())
-			assert.Equal(t, tt.opcode, tt.Type.HookID())
-		})
-	}
-}
-
-func TestIDEquality(t *testing.T) {
-	evt := etw.EventRecord{Header: etw.EventHeader{ProviderID: ThreadEventGUID, EventDescriptor: etw.EventDescriptor{Opcode: 1}}}
-	typ := CreateThread
-	require.Equal(t, typ.ID(), evt.ID())
-}
-
-func TestEventTypeIDCollision(t *testing.T) {
-	ids := make(map[uint]Type)
-	for _, typ := range AllWithState() {
-		if etype, ok := ids[typ.ID()]; ok {
-			t.Fatalf("id collision for %s event type. Mapped event type: %s", typ.String(), etype.String())
-		}
-		ids[typ.ID()] = typ
 	}
 }

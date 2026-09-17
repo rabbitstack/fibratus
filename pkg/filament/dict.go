@@ -62,9 +62,9 @@ func newEventDict(evt *event.Event) (*cpython.Dict, error) {
 	dict.Insert(pid, cpython.NewPyObjectFromValue(evt.PID))
 	dict.Insert(tid, cpython.NewPyObjectFromValue(evt.Tid))
 	dict.Insert(cpu, cpython.NewPyObjectFromValue(evt.CPU))
-	dict.Insert(name, cpython.NewPyObjectFromValue(evt.Name))
-	dict.Insert(cat, cpython.NewPyObjectFromValue(string(evt.Category)))
-	dict.Insert(desc, cpython.NewPyObjectFromValue(evt.Description))
+	dict.Insert(name, cpython.NewPyObjectFromValue(evt.Name()))
+	dict.Insert(cat, cpython.NewPyObjectFromValue(evt.Category().String()))
+	dict.Insert(desc, cpython.NewPyObjectFromValue(evt.Description()))
 	dict.Insert(host, cpython.NewPyObjectFromValue(evt.Host))
 	dict.Insert(ts, cpython.NewPyObjectFromValue(evt.Timestamp))
 
