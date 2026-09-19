@@ -359,9 +359,6 @@ func NewTypeFromEventRecord(r *etw.EventRecord) Type {
 // String returns the event type string representation.
 func (t Type) String() string { return table[t].Name }
 
-// Uint coerces the type to pointer-sized unsigned integer.
-func (t Type) Uint() uint { return uint(t) }
-
 // OnlyState determines whether the event type is solely used for state management.
 func (t Type) OnlyState() bool { return table[t].Flags&OnlyState != 0 }
 

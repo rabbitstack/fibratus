@@ -43,20 +43,16 @@ const (
 	Object
 	// Other is the category for uncategorized events
 	Other
-	MaxCategory
+	MaxCategory // sentinel
 )
 
 const (
 	// DNS designates the DNS (Domain Name Service) event subcategory
-	DNS Subcategory = iota + 1
-	MaxSubcategory
+	DNS            Subcategory = iota + 1
+	MaxSubcategory             // sentinel
 )
 
-// Uint coerces the category type to pointer-sized unsigned integer.
-func (c Category) Uint() uint {
-	return uint(c)
-}
-
+// String returns the category string representation.
 func (c Category) String() string {
 	switch c {
 	case Registry:
