@@ -110,21 +110,21 @@ func TestAlertTitle(t *testing.T) {
 		t string
 	}{
 		{
-			&event.Event{Type: event.MapViewFile, Category: event.File},
+			&event.Event{Type: event.CreateFile},
 			MemoryThreatAlertTitle,
 		},
 		{
-			&event.Event{Type: event.MapViewFile, Category: event.File,
+			&event.Event{Type: event.CreateFile,
 				Params: event.Params{params.FilePath: {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\System32\\wusa.exe"}},
 			},
 			FileThreatAlertTitle,
 		},
 		{
-			&event.Event{Type: event.RegSetValue, Category: event.Registry},
+			&event.Event{Type: event.RegSetValue},
 			FileThreatAlertTitle,
 		},
 		{
-			&event.Event{Type: event.LoadModule, Category: event.Module},
+			&event.Event{Type: event.LoadModule},
 			MemoryThreatAlertTitle,
 		},
 	}
@@ -149,7 +149,7 @@ func TestAlertText(t *testing.T) {
 		{
 			"empty template and no threat_name meta",
 			Config{},
-			&event.Event{Type: event.LoadModule, Category: event.Module},
+			&event.Event{Type: event.LoadModule},
 			ytypes.MatchRule{Rule: "Badlands Trojan"},
 			"Threat detected Badlands Trojan",
 			nil,
@@ -157,7 +157,7 @@ func TestAlertText(t *testing.T) {
 		{
 			"empty template and threat_name meta",
 			Config{},
-			&event.Event{Type: event.LoadModule, Category: event.Module},
+			&event.Event{Type: event.LoadModule},
 			ytypes.MatchRule{Rule: "Badlands Trojan", Metas: []ytypes.Meta{{Identifier: "threat_name", Value: "Gravity Trojan"}}},
 			"Threat detected Gravity Trojan",
 			nil,
@@ -170,7 +170,7 @@ func TestAlertText(t *testing.T) {
 				Event name: {{ .Event.Name -}}
 				`,
 			},
-			&event.Event{Type: event.LoadModule, Name: "LoadModule", Category: event.Module},
+			&event.Event{Type: event.LoadModule},
 			ytypes.MatchRule{Rule: "Badlands Trojan", Metas: []ytypes.Meta{{Identifier: "threat_name", Value: "Gravity Trojan"}}},
 			`
 				Rule name: Badlands Trojan
@@ -185,7 +185,7 @@ func TestAlertText(t *testing.T) {
 				Event name: {{ .Evet.Name -}}
 				`,
 			},
-			&event.Event{Type: event.LoadModule, Name: "LoadModule", Category: event.Module},
+			&event.Event{Type: event.LoadModule},
 			ytypes.MatchRule{Rule: "Badlands Trojan", Metas: []ytypes.Meta{{Identifier: "threat_name", Value: "Gravity Trojan"}}},
 			"",
 			errors.New("yara alert template syntax error"),

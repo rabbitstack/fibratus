@@ -26,6 +26,8 @@ const (
 	EvtSecV1 Version = iota + 1
 	// EvtSecV2 is the v2 of the event section
 	EvtSecV2
+	// EvtSecV3 is the v3 of the event section
+	EvtSecV3
 )
 
 const (

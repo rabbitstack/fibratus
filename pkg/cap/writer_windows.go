@@ -48,7 +48,7 @@ type stats struct {
 	procsWritten   uint64
 }
 
-func (s *stats) incKevts(evt *event.Event) {
+func (s *stats) incEvts(evt *event.Event) {
 	if !evt.Type.OnlyState() {
 		atomic.AddUint64(&s.evtsWritten, 1)
 	}
@@ -201,7 +201,7 @@ func (w *writer) Write(evtsc <-chan *event.Event, errs <-chan error) chan error 
 					continue
 				}
 				// update stats
-				w.stats.incKevts(evt)
+				w.stats.incEvts(evt)
 				w.stats.incBytes(uint64(l))
 				w.stats.incProcs(evt)
 			case err := <-errs:
@@ -223,7 +223,7 @@ func (w *writer) write(b []byte) error {
 		overflowEvents.Add(1)
 		return fmt.Errorf("event size overflow by %d bytes", l-maxKevtSize)
 	}
-	if err := w.ws(section.Event, capver.EvtSecV2, 0, uint32(l)); err != nil {
+	if err := w.ws(section.Event, capver.EvtSecV3, 0, uint32(l)); err != nil {
 		evtWriteErrors.Add(1)
 		return err
 	}

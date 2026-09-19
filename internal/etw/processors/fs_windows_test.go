@@ -46,8 +46,7 @@ func TestFsProcessor(t *testing.T) {
 		{
 			"process file rundown",
 			&event.Event{
-				Type:     event.FileRundown,
-				Category: event.File,
+				Type: event.FileRundown,
 				Params: event.Params{
 					params.FileObject: {Name: params.FileObject, Type: params.Uint64, Value: uint64(124567380264)},
 					params.FilePath:   {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
@@ -69,9 +68,8 @@ func TestFsProcessor(t *testing.T) {
 		{
 			"process mapped file rundown",
 			&event.Event{
-				PID:      10233,
-				Type:     event.MapFileRundown,
-				Category: event.File,
+				PID:  10233,
+				Type: event.MapViewSectionRundown,
 				Params: event.Params{
 					params.FileKey:             {Name: params.FileKey, Type: params.Uint64, Value: uint64(124567380264)},
 					params.FileViewSize:        {Name: params.FileViewSize, Type: params.Uint64, Value: uint64(3098)},
@@ -99,8 +97,7 @@ func TestFsProcessor(t *testing.T) {
 		{
 			"release file and remove file info",
 			&event.Event{
-				Type:     event.ReleaseFile,
-				Category: event.File,
+				Type: event.ReleaseFile,
 				Params: event.Params{
 					params.FileObject: {Name: params.FileObject, Type: params.Uint64, Value: uint64(18446738026482168384)},
 					params.FileKey:    {Name: params.FileKey, Type: params.Uint64, Value: uint64(14446538026482168384)},
@@ -122,9 +119,8 @@ func TestFsProcessor(t *testing.T) {
 		{
 			"unmap view file",
 			&event.Event{
-				PID:      10233,
-				Type:     event.UnmapViewFile,
-				Category: event.File,
+				PID:  10233,
+				Type: event.UnmapViewOfSection,
 				Params: event.Params{
 					params.FileKey:             {Name: params.FileKey, Type: params.Uint64, Value: uint64(124567380264)},
 					params.FileViewSize:        {Name: params.FileViewSize, Type: params.Uint64, Value: uint64(3098)},
@@ -147,8 +143,7 @@ func TestFsProcessor(t *testing.T) {
 		{
 			"process write file",
 			&event.Event{
-				Type:     event.WriteFile,
-				Category: event.File,
+				Type: event.WriteFile,
 				Params: event.Params{
 					params.FileObject: {Name: params.FileObject, Type: params.Uint64, Value: uint64(18446738026482168384)},
 					params.FileKey:    {Name: params.FileKey, Type: params.Uint64, Value: uint64(14446538026482168384)},
@@ -173,8 +168,7 @@ func TestFsProcessor(t *testing.T) {
 		{
 			"process write file consult handle snapshotter",
 			&event.Event{
-				Type:     event.WriteFile,
-				Category: event.File,
+				Type: event.WriteFile,
 				Params: event.Params{
 					params.FileObject: {Name: params.FileObject, Type: params.Uint64, Value: uint64(18446738026482168384)},
 					params.FileKey:    {Name: params.FileKey, Type: params.Uint64, Value: uint64(14446538026482168384)},
@@ -198,8 +192,7 @@ func TestFsProcessor(t *testing.T) {
 		{
 			"process enum directory",
 			&event.Event{
-				Type:     event.EnumDirectory,
-				Category: event.File,
+				Type: event.EnumDirectory,
 				Params: event.Params{
 					params.FileObject: {Name: params.FileObject, Type: params.Uint64, Value: uint64(18446738026482168384)},
 					params.FileKey:    {Name: params.FileKey, Type: params.Uint64, Value: uint64(14446538026482168384)},

@@ -18,102 +18,99 @@
 
 package event
 
-import (
-	"slices"
-
-	"github.com/rabbitstack/fibratus/pkg/util/hashers"
-)
-
 // Category is the type alias for event categories
-type Category string
+type Category uint8
 
 // Subcategory is the type alias for event subcategories
-type Subcategory string
+type Subcategory uint8
 
 const (
 	// Registry is the category for registry related events
-	Registry Category = "registry"
+	Registry Category = iota + 1
 	// File is the category for file system events
-	File Category = "file"
-	// Net is the category for network events
-	Net Category = "net"
+	File
+	// Network is the category for network events
+	Network
 	// Process is the category for process events
-	Process Category = "process"
+	Process
 	// Thread is the category for thread events
-	Thread Category = "thread"
+	Thread
 	// Module is the category for module (dll, exe, sys) events
-	Module Category = "module"
-	// Driver is the category for driver events
-	Driver Category = "driver"
-	// Mem is the category for memory events
-	Mem Category = "mem"
+	Module
+	// Memory is the category for memory events
+	Memory
 	// Object the category for object manager events
-	Object Category = "object"
+	Object
 	// Other is the category for uncategorized events
-	Other Category = "other"
-	// Unknown is the category for events that couldn't match any of the previous categories
-	Unknown Category = "unknown"
+	Other
+	MaxCategory // sentinel
 )
 
 const (
 	// DNS designates the DNS (Domain Name Service) event subcategory
-	DNS Subcategory = "dns"
-	// None identifies no subcategory
-	None Subcategory = "none"
+	DNS            Subcategory = iota + 1
+	MaxSubcategory             // sentinel
 )
 
-// Hash obtains the hash of the category string.
-func (c Category) Hash() uint32 {
-	return hashers.FnvUint32([]byte(c))
-}
-
-// MaxCategoryIndex designates the maximum category index.
-const MaxCategoryIndex = 11
-
-// Index returns a numerical category index.
-func (c Category) Index() uint8 {
+// String returns the category string representation.
+func (c Category) String() string {
 	switch c {
 	case Registry:
-		return 1
+		return "registry"
 	case File:
-		return 2
-	case Net:
-		return 3
+		return "file"
+	case Network:
+		return "network"
 	case Process:
-		return 4
+		return "process"
 	case Thread:
-		return 5
+		return "thread"
 	case Module:
-		return 6
-	case Driver:
-		return 7
-	case Mem:
-		return 8
+		return "module"
+	case Memory:
+		return "memory"
 	case Object:
-		return 9
+		return "object"
 	case Other:
-		return 10
+		return "other"
 	default:
-		return MaxCategoryIndex
+		return "unknown"
 	}
 }
 
-// Categories returns all available categories.
-func Categories() []string {
-	return []string{
-		string(Registry),
-		string(File),
-		string(Net),
-		string(Process),
-		string(Thread),
-		string(Module),
-		string(Mem),
-		string(Driver),
-		string(Other),
-		string(Unknown),
-		string(Object),
+func (sc Subcategory) String() string {
+	switch sc {
+	case DNS:
+		return "dns"
+	default:
+		return "unknown"
 	}
+}
+
+var categories = map[string]Category{
+	"registry": Registry,
+	"file":     File,
+	"network":  Network,
+	"process":  Process,
+	"thread":   Thread,
+	"module":   Module,
+	"memory":   Memory,
+	"object":   Object,
+	"other":    Other,
+}
+
+// NumCategories returns a total number of recognized categories.
+func NumCategories() int { return len(categories) }
+
+// ParseCategory converts the category from the bare string. Returns
+// the category and the bool indicating if the conversion succeeded.
+func ParseCategory(s string) (Category, bool) {
+	c, ok := categories[s]
+	return c, ok
 }
 
 // IsCategoryKnown indicates if the category is known given its name.
-func IsCategoryKnown(name string) bool { return slices.Contains(Categories(), name) }
+func IsCategoryKnown(s string) (exists bool) {
+	_, exists = ParseCategory(s)
+	return
+}

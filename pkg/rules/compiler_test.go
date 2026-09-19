@@ -44,8 +44,7 @@ func TestCompile(t *testing.T) {
 	assert.Contains(t, rs.UsedEvents, event.CreateProcess)
 	assert.Contains(t, rs.UsedEvents, event.LoadModule)
 	assert.Contains(t, rs.UsedEvents, event.QueryDNS)
-	assert.Contains(t, rs.UsedEvents, event.ConnectTCPv4)
-	assert.Contains(t, rs.UsedEvents, event.ConnectTCPv6)
+	assert.Contains(t, rs.UsedEvents, event.Connect)
 }
 
 func TestCompileMinEngineVersion(t *testing.T) {

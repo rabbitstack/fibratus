@@ -23,229 +23,145 @@ import (
 	"slices"
 )
 
+// Flags represents the event flags
+type Flags uint8
+
+const (
+	// OnlyState indicates the event produces internal state
+	// and is never published to the event stream.
+	OnlyState Flags = 1 << 1
+
+	// StateSnapshot indicates that the event is published once
+	// at startup time and populates the internal state.
+	StateSnapshot Flags = 1 << 2
+
+	// WaitStack indicates that the event awaits the stack walk
+	// event that carries call stack return addresses.
+	WaitStack Flags = 1 << 3
+)
+
 // Info describes the event meta info such as human-readable name, category and description.
 type Info struct {
 	// Name is the human-readable representation of the event (e.g. CreateProcess, DeleteFile).
 	Name string
-	// Category designates the category to which event pertains. (e.g. process, net)
+	// Category designates the category to which event pertains. (e.g. process, network)
 	Category Category
+	// Subcategory designates the event subcategory if any. For example, the network category
+	// can be further subcategorized, such as DNS subcategory.
+	Subcategory Subcategory
+	// Source describes the event source origin for this event. For example, if the was captured
+	// from the NT Kernel Logger or a different event source.
+	Source Source
 	// Description is the short explanation that describes the purpose of the event.
 	Description string
+	// Flags describes additional properties of the event.
+	Flags Flags
 }
 
-var events = map[Type]Info{
-	CreateProcess:            {"CreateProcess", Process, "Creates a new process and its primary thread"},
-	TerminateProcess:         {"TerminateProcess", Process, "Terminates the process and all of its threads"},
-	OpenProcess:              {"OpenProcess", Process, "Opens the process handle"},
-	CreateThread:             {"CreateThread", Thread, "Creates a thread to execute within the virtual address space of the calling process"},
-	TerminateThread:          {"TerminateThread", Thread, "Terminates a thread within the process"},
-	OpenThread:               {"OpenThread", Thread, "Opens the thread handle"},
-	SetThreadContext:         {"SetThreadContext", Thread, "Sets the thread context"},
-	ReadFile:                 {"ReadFile", File, "Reads data from the file or I/O device"},
-	WriteFile:                {"WriteFile", File, "Writes data to the file or I/O device"},
-	CreateFile:               {"CreateFile", File, "Creates or opens a file or I/O device"},
-	CloseFile:                {"CloseFile", File, "Closes the file handle"},
-	DeleteFile:               {"DeleteFile", File, "Removes the file from the file system"},
-	RenameFile:               {"RenameFile", File, "Changes the file name"},
-	SetFileInformation:       {"SetFileInformation", File, "Sets the file meta information"},
-	EnumDirectory:            {"EnumDirectory", File, "Enumerates a directory or dispatches a directory change notification to registered listeners"},
-	RegCreateKey:             {"RegCreateKey", Registry, "Creates a registry key or opens it if the key already exists"},
-	RegOpenKey:               {"RegOpenKey", Registry, "Opens the registry key"},
-	RegCloseKey:              {"RegCloseKey", Registry, "Closes the registry key"},
-	RegSetValue:              {"RegSetValue", Registry, "Sets the data for the value of a registry key"},
-	RegQueryValue:            {"RegQueryValue", Registry, "Reads the data for the value of a registry key"},
-	RegQueryKey:              {"RegQueryKey", Registry, "Enumerates subkeys of the parent key"},
-	RegDeleteKey:             {"RegDeleteKey", Registry, "Removes the registry key"},
-	RegDeleteValue:           {"RegDeleteValue", Registry, "Removes the registry value"},
-	AcceptTCPv4:              {"Accept", Net, "Accepts the connection request from the socket queue"},
-	AcceptTCPv6:              {"Accept", Net, "Accepts the connection request from the socket queue"},
-	SendTCPv4:                {"Send", Net, "Sends data over the wire"},
-	SendTCPv6:                {"Send", Net, "Sends data over the wire"},
-	SendUDPv4:                {"Send", Net, "Sends data over the wire"},
-	SendUDPv6:                {"Send", Net, "Sends data over the wire"},
-	RecvTCPv4:                {"Recv", Net, "Receives data from the socket"},
-	RecvTCPv6:                {"Recv", Net, "Receives data from the socket"},
-	RecvUDPv4:                {"Recv", Net, "Receives data from the socket"},
-	RecvUDPv6:                {"Recv", Net, "Receives data from the socket"},
-	ConnectTCPv4:             {"Connect", Net, "Connects establishes a connection to the socket"},
-	ConnectTCPv6:             {"Connect", Net, "Connects establishes a connection to the socket"},
-	DisconnectTCPv4:          {"Disconnect", Net, "Terminates data reception on the socket"},
-	DisconnectTCPv6:          {"Disconnect", Net, "Terminates data reception on the socket"},
-	ReconnectTCPv4:           {"Reconnect", Net, "Reconnects to the socket"},
-	ReconnectTCPv6:           {"Reconnect", Net, "Reconnects to the socket"},
-	RetransmitTCPv4:          {"Retransmit", Net, "Retransmits unacknowledged TCP segments"},
-	RetransmitTCPv6:          {"Retransmit", Net, "Retransmits unacknowledged TCP segments"},
-	LoadModule:               {"LoadModule", Module, "Loads the module into the address space of the calling process"},
-	UnloadModule:             {"UnloadModule", Module, "Unloads the module from the address space of the calling process"},
-	VirtualAlloc:             {"VirtualAlloc", Mem, "Reserves, commits, or changes the state of a region of memory within the process virtual address space"},
-	VirtualFree:              {"VirtualFree", Mem, "Releases or decommits a region of memory within the process virtual address space"},
-	MapViewFile:              {"MapViewFile", File, "Maps a view of a file mapping into the address space of a calling process"},
-	UnmapViewFile:            {"UnmapViewFile", File, "Unmaps a mapped view of a file from the calling process's address space"},
-	QueryDNS:                 {"QueryDns", Net, "Sends a DNS query to the name server"},
-	ReplyDNS:                 {"ReplyDNS", Net, "Receives the response from the DNS server"},
-	CreateSymbolicLinkObject: {"CreateSymbolicLinkObject", Object, "Creates the symbolic link within the object manager directory"},
-}
+var table = [MaxEvent]Info{
+	CreateProcess:          {Name: "CreateProcess", Category: Process, Source: SystemLogger, Description: "Creates a new process and its primary thread", Flags: WaitStack},
+	TerminateProcess:       {Name: "TerminateProcess", Category: Process, Source: SystemLogger, Description: "Terminates the process and all of its threads"},
+	OpenProcess:            {Name: "OpenProcess", Category: Process, Source: SecurityTelemetryLogger, Description: "Opens the process handle"},
+	ProcessRundown:         {Name: "ProcessRundown", Category: Process, Source: SecurityTelemetryLogger, Description: "Builds the snapshot state of running processes in the system.", Flags: OnlyState | StateSnapshot},
+	CreateProcessInternal:  {Name: "CreateProcessInternal", Category: Process, Source: SystemLogger, Description: "Only purpose of this event is to enrich the process state with some extra attributes. Never published to the event stream", Flags: OnlyState},
+	ProcessRundownInternal: {Name: "ProcessRundownInternal", Category: Process, Source: SecurityTelemetryLogger, Description: "Opens the process handle", Flags: OnlyState | StateSnapshot},
 
-var types = map[string]Type{
-	"CreateProcess":            CreateProcess,
-	"TerminateProcess":         TerminateProcess,
-	"OpenProcess":              OpenProcess,
-	"CreateThread":             CreateThread,
-	"TerminateThread":          TerminateThread,
-	"OpenThread":               OpenThread,
-	"SetThreadContext":         SetThreadContext,
-	"LoadModule":               LoadModule,
-	"UnloadModule":             UnloadModule,
-	"CreateFile":               CreateFile,
-	"CloseFile":                CloseFile,
-	"ReadFile":                 ReadFile,
-	"WriteFile":                WriteFile,
-	"SetFileInformation":       SetFileInformation,
-	"DeleteFile":               DeleteFile,
-	"RenameFile":               RenameFile,
-	"EnumDirectory":            EnumDirectory,
-	"RegCreateKey":             RegCreateKey,
-	"RegOpenKey":               RegOpenKey,
-	"RegSetValue":              RegSetValue,
-	"RegQueryValue":            RegQueryValue,
-	"RegQueryKey":              RegQueryKey,
-	"RegDeleteKey":             RegDeleteKey,
-	"RegDeleteValue":           RegDeleteValue,
-	"RegCloseKey":              RegCloseKey,
-	"AcceptTCP4":               AcceptTCPv4,
-	"AcceptTCP6":               AcceptTCPv6,
-	"SendTCP4":                 SendTCPv4,
-	"SendTCP6":                 SendTCPv6,
-	"SendUDP4":                 SendUDPv4,
-	"SendUDP6":                 SendUDPv6,
-	"RecvTCP4":                 RecvTCPv4,
-	"RecvTCP6":                 RecvTCPv6,
-	"RecvUDP4":                 RecvUDPv4,
-	"RecvUDP6":                 RecvUDPv6,
-	"ConnectTCP4":              ConnectTCPv4,
-	"ConnectTCP6":              ConnectTCPv6,
-	"ReconnectTCP4":            ReconnectTCPv4,
-	"ReconnectTCP6":            ReconnectTCPv6,
-	"DisconnectTCP4":           DisconnectTCPv4,
-	"DisconnectTCP6":           DisconnectTCPv6,
-	"RetransmitTCP4":           RetransmitTCPv4,
-	"RetransmitTCP6":           RetransmitTCPv6,
-	"VirtualAlloc":             VirtualAlloc,
-	"VirtualFree":              VirtualFree,
-	"MapViewFile":              MapViewFile,
-	"UnmapViewFile":            UnmapViewFile,
-	"QueryDns":                 QueryDNS,
-	"ReplyDns":                 ReplyDNS,
-	"CreateSymbolicLinkObject": CreateSymbolicLinkObject,
+	CreateThread:     {Name: "CreateThread", Category: Thread, Source: SystemLogger, Description: "Creates a thread to execute within the virtual address space of the calling process", Flags: WaitStack},
+	TerminateThread:  {Name: "TerminateThread", Category: Thread, Source: SystemLogger, Description: "Terminates a thread within the process", Flags: WaitStack},
+	OpenThread:       {Name: "OpenThread", Category: Thread, Source: SecurityTelemetryLogger, Description: "Opens the thread handle"},
+	SetThreadContext: {Name: "SetThreadContext", Category: Thread, Source: SecurityTelemetryLogger, Description: "Sets the thread context"},
+	StackWalk:        {Name: "StackWalk", Category: Thread, Source: SystemLogger, Description: "Delivers call stack return addresses. Never published to the event stream", Flags: OnlyState},
+	ThreadRundown:    {Name: "ThreadRundown", Category: Thread, Source: SystemLogger, Description: "Builds the snapshot state of running threads in the system", Flags: OnlyState | StateSnapshot},
+
+	UnloadModule:       {Name: "UnloadModule", Category: Module, Source: SystemLogger, Description: "Unloads the module from the address space of the calling process"},
+	LoadModule:         {Name: "LoadModule", Category: Module, Source: SystemLogger, Description: "Loads the module into the address space of the calling process", Flags: WaitStack},
+	LoadModuleInternal: {Name: "LoadModuleInternal", Category: Module, Source: SecurityTelemetryLogger, Description: "Only purpose is to populate the module state. Never published to the event stream", Flags: OnlyState},
+	ModuleRundown:      {Name: "ModuleRundown", Category: Module, Source: SystemLogger, Description: "Builds the snapshot of loaded modules in the system", Flags: OnlyState | StateSnapshot},
+
+	RegCreateKey:        {Name: "RegCreateKey", Category: Registry, Source: SystemLogger, Description: "Creates a registry key or opens it if the key already exists", Flags: WaitStack},
+	RegOpenKey:          {Name: "RegOpenKey", Category: Registry, Source: SystemLogger, Description: "Opens the registry key"},
+	RegDeleteKey:        {Name: "RegDeleteKey", Category: Registry, Source: SystemLogger, Description: "Removes the registry key", Flags: WaitStack},
+	RegQueryKey:         {Name: "RegQueryKey", Category: Registry, Source: SystemLogger, Description: "Enumerates subkeys of the parent key"},
+	RegSetValue:         {Name: "RegSetValue", Category: Registry, Source: SystemLogger, Description: "Sets the data for the value of a registry key", Flags: WaitStack},
+	RegSetValueInternal: {Name: "RegSetValueInternal", Category: Registry, Source: SecurityTelemetryLogger, Description: "Closes the registry key", Flags: OnlyState},
+	RegDeleteValue:      {Name: "RegDeleteValue", Category: Registry, Source: SystemLogger, Description: "Removes the registry value", Flags: WaitStack},
+	RegQueryValue:       {Name: "RegQueryValue", Category: Registry, Source: SystemLogger, Description: "Reads the data for the value of a registry key"},
+	RegCloseKey:         {Name: "RegCloseKey", Category: Registry, Source: SystemLogger, Description: "Closes the registry key"},
+	RegCreateKCB:        {Name: "RegCreateKCB", Category: Registry, Source: SystemLogger, Description: "Create the Key Control Block. Never published to the event stream", Flags: OnlyState},
+	RegDeleteKCB:        {Name: "RegDeleteKCB", Category: Registry, Source: SystemLogger, Description: "Removes the Key Control Block. Never published to the event stream", Flags: OnlyState},
+	RegKCBRundown:       {Name: "RegKCBRundown", Category: Registry, Source: SystemLogger, Description: "Builds the snapshot of existing Key Control Block objects", Flags: OnlyState | StateSnapshot},
+
+	CreateFile:         {Name: "CreateFile", Category: File, Source: SystemLogger, Description: "Creates or opens a new file, directory, I/O device, pipe, console"},
+	CloseFile:          {Name: "CloseFile", Category: File, Source: SystemLogger, Description: "Closes the file handle"},
+	DeleteFile:         {Name: "DeleteFile", Category: File, Source: SystemLogger, Description: "Removes the file from the file system", Flags: WaitStack},
+	RenameFile:         {Name: "RenameFile", Category: File, Source: SystemLogger, Description: "Changes the file name", Flags: WaitStack},
+	SetFileInformation: {Name: "SetFileInformation", Category: File, Source: SystemLogger, Description: "Sets the file meta information"},
+	EnumDirectory:      {Name: "EnumDirectory", Category: File, Source: SystemLogger, Description: "Enumerates a directory or dispatches a directory change notification to registered listeners"},
+	ReadFile:           {Name: "ReadFile", Category: File, Source: SystemLogger, Description: "Reads data from the file or I/O device"},
+	WriteFile:          {Name: "WriteFile", Category: File, Source: SystemLogger, Description: "Writes data to the file or I/O device"},
+	ReleaseFile:        {Name: "ReleaseFile", Category: File, Source: SystemLogger, Description: "Closes the last handle to the file object. Never published to the event stream", Flags: OnlyState},
+	FileRundown:        {Name: "FileRundown", Category: File, Source: SystemLogger, Description: "Builds the snapshot of existing file objects", Flags: OnlyState | StateSnapshot},
+	FileOpEnd:          {Name: "FileOpEnd", Category: File, Source: SystemLogger, Description: "Reports the I/O request packet status. Never published to the event stream", Flags: OnlyState},
+
+	Accept:     {Name: "Accept", Category: Network, Source: SystemLogger, Description: "Accepts the connection request from the socket queue"},
+	Send:       {Name: "Send", Category: Network, Source: SystemLogger, Description: "Sends data over the wire"},
+	Recv:       {Name: "Recv", Category: Network, Source: SystemLogger, Description: "Receives data from the socket"},
+	Connect:    {Name: "Connect", Category: Network, Source: SystemLogger, Description: "Connects establishes a connection to the socket"},
+	Disconnect: {Name: "Disconnect", Category: Network, Source: SystemLogger, Description: "Terminates data reception on the socket"},
+	Reconnect:  {Name: "Reconnect", Category: Network, Source: SystemLogger, Description: "Reconnects to the socket"},
+	Retransmit: {Name: "Retransmit", Category: Network, Source: SystemLogger, Description: "Retransmits unacknowledged TCP segments"},
+
+	VirtualAlloc:          {Name: "VirtualAlloc", Category: Memory, Source: SystemLogger, Description: "Reserves, commits, or changes the state of a region of memory within the process virtual address space", Flags: WaitStack},
+	VirtualFree:           {Name: "VirtualFree", Category: Memory, Source: SystemLogger, Description: "Releases or decommits a region of memory within the process virtual address space"},
+	MapViewOfSection:      {Name: "MapViewOfSection", Category: Memory, Source: SystemLogger, Description: "Maps a view of a file mapping into the address space of a calling process"},
+	UnmapViewOfSection:    {Name: "UnmapViewOfSection", Category: Memory, Source: SystemLogger, Description: "Unmaps a mapped view of a file from the calling process's address space"},
+	MapViewSectionRundown: {Name: "MapViewSectionRundown", Category: Memory, Source: SystemLogger, Description: "Builds the snapshot of existing memory section views", Flags: OnlyState | StateSnapshot},
+
+	QueryDNS: {Name: "QueryDns", Category: Network, Subcategory: DNS, Source: SecurityTelemetryLogger, Description: "Sends a DNS query to the name server"},
+	ReplyDNS: {Name: "ReplyDNS", Category: Network, Subcategory: DNS, Source: SecurityTelemetryLogger, Description: "Receives the response from the DNS server"},
+
+	CreateSymbolicLinkObject: {Name: "CreateSymbolicLinkObject", Category: Object, Source: SecurityTelemetryLogger, Description: "Creates the symbolic link within the object manager directory"},
 }
 
 // All returns all event types.
-func All() []Type {
-	s := make([]Type, 0, len(types))
-	for _, typ := range types {
-		s = append(s, typ)
+func AllTypes() []Type {
+	types := make([]Type, 0)
+	for i := range table {
+		types = append(types, Type(i))
 	}
-	return s
+	return types
 }
 
-// AllWithState returns all event types +
-// event types used for state management.
-func AllWithState() []Type {
-	s := All()
-
-	s = append(s, ProcessRundown)
-	s = append(s, ThreadRundown)
-	s = append(s, ModuleRundown)
-	s = append(s, FileRundown)
-	s = append(s, RegKCBRundown)
-	s = append(s, RegCreateKCB)
-	s = append(s, RegDeleteKCB)
-	s = append(s, FileOpEnd)
-	s = append(s, ReleaseFile)
-	s = append(s, MapFileRundown)
-	s = append(s, StackWalk)
-	s = append(s, CreateProcessInternal)
-	s = append(s, ProcessRundownInternal)
-	s = append(s, LoadModuleInternal)
-	s = append(s, RegSetValueInternal)
-
-	return s
+// GetTypeInfo returns metadata about the specified event type.
+func GetTypeInfo(typ Type) Info {
+	return table[typ]
 }
 
-// MaxTypeID returns the maximum event type (hook id) value.
-func MaxTypeID() uint16 {
-	types := AllWithState()
-	ids := make([]uint16, len(types))
-	for i, t := range types {
-		ids[i] = t.HookID()
-	}
-	return slices.Max(ids)
-}
-
-// TypeToEventInfo maps the event type to the structure storing detailed information about the event.
-func TypeToEventInfo(typ Type) Info {
-	if info, ok := events[typ]; ok {
-		return info
-	}
-	return Info{Name: "N/A", Category: Unknown}
+// GetTypesInfo returns event types metadata excluding only-state events.
+func GetTypesInfo() []Info {
+	t := table[:]
+	t = slices.DeleteFunc(t, func(info Info) bool {
+		return info.Flags&OnlyState != 0
+	})
+	slices.SortFunc(t, func(a, b Info) int {
+		return cmp.Or(cmp.Compare(a.Category, b.Category), cmp.Compare(a.Name, b.Name))
+	})
+	return t
 }
 
 // NameToType converts a human-readable event name to its internal type representation.
-func NameToType(name string) Type {
-	if typ, ok := types[name]; ok {
-		return typ
-	}
-	return UnknownType
-}
-
-// NameToTypes maps the event name to internal type representations, specifically, network
-// events that have multiple internal types for a single event name. For example, the Accept
-// event name has AcceptTCP4 and AcceptTCP6 types.
-func NameToTypes(name string) []Type {
-	switch name {
-	case "Accept":
-		return []Type{AcceptTCPv4, AcceptTCPv6}
-	case "Send":
-		return []Type{SendTCPv4, SendTCPv6, SendUDPv4, SendUDPv6}
-	case "Recv":
-		return []Type{RecvTCPv4, RecvTCPv6, RecvUDPv4, RecvUDPv6}
-	case "Connect":
-		return []Type{ConnectTCPv4, ConnectTCPv6}
-	case "Reconnect":
-		return []Type{ReconnectTCPv4, ReconnectTCPv6}
-	case "Disconnect":
-		return []Type{DisconnectTCPv4, DisconnectTCPv6}
-	case "Retransmit":
-		return []Type{RetransmitTCPv4, RetransmitTCPv6}
-	default:
-		return []Type{NameToType(name)}
-	}
-}
-
-// GetTypesMeta returns event types metadata.
-func GetTypesMeta() []Info {
-	typs := make([]Info, 0)
-outer:
-	for _, ev := range events {
-		for _, typ := range typs {
-			if typ.Name == ev.Name {
-				continue outer
-			}
-		}
-		typs = append(typs, ev)
-	}
-	slices.SortFunc(typs, func(a, b Info) int {
-		return cmp.Or(cmp.Compare(a.Category, b.Category), cmp.Compare(a.Name, b.Name))
+func ParseType(name string) (Type, bool) {
+	i := slices.IndexFunc(table[:], func(info Info) bool {
+		return info.Name == name
 	})
-	return typs
+	if i == -1 {
+		return Unknown, false
+	}
+	return Type(i), true
 }
 
 // IsKnown indicates if the event type is known given the event name.
-func IsKnown(name string) bool {
-	for _, evt := range GetTypesMeta() {
-		if evt.Name == name {
-			return true
-		}
-	}
-	return false
+func IsTypeKnown(name string) (exists bool) {
+	_, exists = ParseType(name)
+	return
 }

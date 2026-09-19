@@ -19,18 +19,19 @@
 package remove
 
 import (
+	"net"
+	"testing"
+
 	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"net"
-	"testing"
 )
 
 func TestTransform(t *testing.T) {
 	evt := &event.Event{
-		Type: event.SendTCPv4,
+		Type: event.Send,
 		Tid:  2484,
 		PID:  859,
 		Params: event.Params{

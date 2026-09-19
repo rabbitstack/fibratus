@@ -26,6 +26,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/sys/windows"
 )
 
 func TestDecodeRegistry(t *testing.T) {
@@ -141,6 +142,7 @@ func TestDecodeFile(t *testing.T) {
 	var tests = []struct {
 		name       string
 		opcode     uint8
+		event      *Event
 		buf        []byte
 		assertions func(t *testing.T, e *Event)
 	}{
@@ -158,6 +160,7 @@ func TestDecodeFile(t *testing.T) {
 				assert.Equal(t, "Success", e.GetParamAsString(params.NTStatus))
 				assert.Contains(t, e.Params, params.Callstack)
 			},
+			event: &Event{Params: make(Params), Type: CreateFile},
 			buf: []byte{
 				200, 7, 94, 150, 141, 215, 255, 255,
 				80, 102, 11, 146, 141, 215, 255, 255,
@@ -196,6 +199,7 @@ func TestDecodeFile(t *testing.T) {
 				assert.Equal(t, uint32(0), e.Params.MustGetUint32(params.NTStatus))
 				assert.Equal(t, uint64(0x28), e.Params.MustGetUint64(params.FileExtraInfo))
 			},
+			event: &Event{Params: make(Params), Type: FileOpEnd},
 			buf: []byte{
 				248, 240, 61, 151, 141, 215, 255, 255,
 				40, 0, 0, 0,
@@ -204,7 +208,7 @@ func TestDecodeFile(t *testing.T) {
 			},
 		},
 		{
-			name: "MapViewFile", opcode: MapViewFileID,
+			name: "MapViewOfSection", opcode: MapViewFileID,
 			assertions: func(t *testing.T, e *Event) {
 				assert.Len(t, e.Params, 7)
 				assert.Equal(t, uint64(0xffffb58b75fb7e10), e.Params.MustGetUint64(params.FileKey))
@@ -215,6 +219,7 @@ func TestDecodeFile(t *testing.T) {
 				assert.Equal(t, uint64(0x191ab210000), e.Params.MustGetUint64(params.FileViewBase))
 				assert.Equal(t, uint64(4096), e.Params.MustGetUint64(params.FileViewSize))
 			},
+			event: &Event{Params: make(Params), Type: MapViewOfSection},
 			buf: []byte{
 				0, 0, 33, 171, 145, 1, 0, 0,
 				16, 126, 251, 117, 139, 181, 255, 255,
@@ -225,7 +230,7 @@ func TestDecodeFile(t *testing.T) {
 			},
 		},
 		{
-			name: "UnmapViewFile", opcode: UnmapViewFileID,
+			name: "UnmapViewOfSection", opcode: UnmapViewFileID,
 			assertions: func(t *testing.T, e *Event) {
 				assert.Len(t, e.Params, 7)
 				assert.Equal(t, uint64(0xffffb58bc1f91010), e.Params.MustGetUint64(params.FileKey))
@@ -236,6 +241,7 @@ func TestDecodeFile(t *testing.T) {
 				assert.Equal(t, uint64(0x1675e410000), e.Params.MustGetUint64(params.FileViewBase))
 				assert.Equal(t, uint64(921600), e.Params.MustGetUint64(params.FileViewSize))
 			},
+			event: &Event{Params: make(Params), Type: UnmapViewOfSection},
 			buf: []byte{
 				0, 0, 65, 94, 103, 1, 0, 0,
 				16, 16, 249, 193, 139, 181, 255, 255,
@@ -256,6 +262,7 @@ func TestDecodeFile(t *testing.T) {
 				assert.Equal(t, uint64(0xffffd78d9b6470f8), e.Params.MustGetUint64(params.FileIrpPtr))
 				assert.Equal(t, uint32(16404), e.Params.MustGetTid())
 			},
+			event: &Event{Params: make(Params), Type: SetFileInformation},
 			buf: []byte{
 				248, 112, 100, 155, 141, 215, 255, 255,
 				128, 55, 64, 118, 141, 215, 255, 255,
@@ -276,6 +283,7 @@ func TestDecodeFile(t *testing.T) {
 				assert.Equal(t, uint64(0xffffd78d7c5860f8), e.Params.MustGetUint64(params.FileIrpPtr))
 				assert.Equal(t, uint32(13656), e.Params.MustGetTid())
 			},
+			event: &Event{Params: make(Params), Type: DeleteFile},
 			buf: []byte{
 				248, 96, 88, 124, 141, 215, 255, 255,
 				128, 125, 108, 155, 141, 215, 255, 255,
@@ -294,6 +302,7 @@ func TestDecodeFile(t *testing.T) {
 				assert.Equal(t, uint64(0xffffd78d7ca0b0f8), e.Params.MustGetUint64(params.FileIrpPtr))
 				assert.Equal(t, uint32(3096), e.Params.MustGetTid())
 			},
+			event: &Event{Params: make(Params), Type: ReleaseFile},
 			buf: []byte{
 				248, 176, 160, 124, 141, 215, 255, 255,
 				176, 82, 69, 155, 141, 215, 255, 255,
@@ -312,6 +321,7 @@ func TestDecodeFile(t *testing.T) {
 				assert.Equal(t, uint64(573440), e.Params.MustGetUint64(params.FileOffset))
 				assert.Equal(t, uint32(1073741824), e.Params.MustGetUint32(params.FileIoSize))
 			},
+			event: &Event{Params: make(Params), Type: WriteFile},
 			buf: []byte{
 				0, 192, 8, 0, 0, 0, 0, 0,
 				8, 106, 120, 154, 141, 215, 255, 255,
@@ -332,6 +342,7 @@ func TestDecodeFile(t *testing.T) {
 				assert.Equal(t, uint64(0xffff8084da3e7788), e.Params.MustGetUint64(params.FileIrpPtr))
 				assert.Equal(t, uint32(12860), e.Params.MustGetTid())
 			},
+			event: &Event{Params: make(Params), Type: EnumDirectory},
 			buf: []byte{
 				136, 119, 62, 218, 132, 128, 255, 255,
 				144, 201, 67, 203, 132, 128, 255, 255,
@@ -347,6 +358,7 @@ func TestDecodeFile(t *testing.T) {
 				assert.Len(t, e.Params, 2)
 				assert.Equal(t, `\Device\HarddiskVolume3\Windows\System32\CatRoot\{F750E6C3-38EE-11D1-85E5-00C04FC295EE}\Microsoft-Windows-TerminalServices-AppServerClient-Opt-WOW64-Package~31bf3856ad364e35~wow64~~10.0.26100.8115.cat`, e.Params.MustGetString(params.FilePath))
 			},
+			event: &Event{Params: make(Params), Type: FileRundown},
 			buf: []byte{
 				80, 71, 18, 158, 139, 181, 255, 255,
 				92, 0, 68, 0, 101, 0, 118, 0,
@@ -407,9 +419,8 @@ func TestDecodeFile(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := initEventRecord(tt.opcode, 0, tt.buf)
-			e := &Event{Params: make(Params)}
-			paramDecoder.DecodeFile(r, e)
-			tt.assertions(t, e)
+			paramDecoder.DecodeFile(r, tt.event)
+			tt.assertions(t, tt.event)
 		})
 	}
 }
@@ -830,18 +841,20 @@ func TestDecodeNetwork(t *testing.T) {
 		name       string
 		opcode     uint8
 		buf        []byte
+		providerID windows.GUID
 		assertions func(t *testing.T, e *Event)
 	}{
 		{
 			name: "SendTCPv4", opcode: SendV4ID,
 			assertions: func(t *testing.T, e *Event) {
-				assert.Len(t, e.Params, 6)
+				assert.Len(t, e.Params, 7)
 				assert.Equal(t, "172.64.148.235", e.GetParamAsString(params.NetDIP))
 				assert.Equal(t, uint16(443), e.Params.MustGetUint16(params.NetDport))
 				assert.Equal(t, "192.168.1.44", e.GetParamAsString(params.NetSIP))
 				assert.Equal(t, uint16(61552), e.Params.MustGetUint16(params.NetSport))
 				assert.Equal(t, uint32(12448), e.Params.MustGetPid())
 				assert.Equal(t, uint32(28), e.Params.MustGetUint32(params.NetSize))
+				assert.Equal(t, "TCP", e.GetParamAsString(params.NetL4Proto))
 			},
 			buf: []byte{
 				160, 48, 0, 0,
@@ -854,17 +867,19 @@ func TestDecodeNetwork(t *testing.T) {
 				0, 0, 0, 0,
 				0, 0, 0, 0,
 			},
+			providerID: NetworkTCPEventGUID,
 		},
 		{
 			name: "ConnectTCPv4", opcode: ConnectTCPv4ID,
 			assertions: func(t *testing.T, e *Event) {
-				assert.Len(t, e.Params, 6)
+				assert.Len(t, e.Params, 7)
 				assert.Equal(t, "151.101.193.91", e.GetParamAsString(params.NetDIP))
 				assert.Equal(t, uint16(443), e.Params.MustGetUint16(params.NetDport))
 				assert.Equal(t, "192.168.1.44", e.GetParamAsString(params.NetSIP))
 				assert.Equal(t, uint16(61931), e.Params.MustGetUint16(params.NetSport))
 				assert.Equal(t, uint32(12448), e.Params.MustGetPid())
 				assert.Equal(t, uint32(0), e.Params.MustGetUint32(params.NetSize))
+				assert.Equal(t, "TCP", e.GetParamAsString(params.NetL4Proto))
 			},
 			buf: []byte{
 				160, 48, 0, 0,
@@ -878,17 +893,19 @@ func TestDecodeNetwork(t *testing.T) {
 				0, 0, 0, 0,
 				0, 0, 0, 0,
 			},
+			providerID: NetworkTCPEventGUID,
 		},
 		{
 			name: "RecvUDPv6", opcode: RecvV6ID,
 			assertions: func(t *testing.T, e *Event) {
-				assert.Len(t, e.Params, 6)
+				assert.Len(t, e.Params, 7)
 				assert.Equal(t, "ff02::c", e.GetParamAsString(params.NetDIP))
 				assert.Equal(t, uint16(1900), e.Params.MustGetUint16(params.NetDport))
 				assert.Equal(t, "fe80::1", e.GetParamAsString(params.NetSIP))
 				assert.Equal(t, uint16(56797), e.Params.MustGetUint16(params.NetSport))
 				assert.Equal(t, uint32(5128), e.Params.MustGetPid())
 				assert.Equal(t, uint32(127), e.Params.MustGetUint32(params.NetSize))
+				assert.Equal(t, "UDP", e.GetParamAsString(params.NetL4Proto))
 			},
 			buf: []byte{
 				8, 20, 0, 0,
@@ -904,12 +921,13 @@ func TestDecodeNetwork(t *testing.T) {
 				221, 221, 0, 0, 0, 0,
 				0, 0, 0, 0,
 			},
+			providerID: NetworkUDPEventGUID,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := initEventRecord(tt.opcode, 0, tt.buf)
+			r := initEventRecord(tt.opcode, 0, tt.buf, withProviderID(tt.providerID))
 			e := &Event{Params: make(Params)}
 			paramDecoder.DecodeNetwork(r, e)
 			tt.assertions(t, e)
@@ -960,10 +978,28 @@ func TestDecodeDNS(t *testing.T) {
 	assert.Equal(t, "AAAA", e.GetParamAsString(params.DNSRR))
 }
 
-func initEventRecord(opcode uint8, id uint16, buf []byte) *etw.EventRecord {
+type option func(*options)
+
+type options struct {
+	providerID windows.GUID
+}
+
+func withProviderID(id windows.GUID) option {
+	return func(o *options) {
+		o.providerID = id
+	}
+}
+
+func initEventRecord(opcode uint8, id uint16, buf []byte, opts ...option) *etw.EventRecord {
+	var options options
+	for _, opt := range opts {
+		opt(&options)
+	}
+
 	return &etw.EventRecord{
 		Header: etw.EventHeader{
-			ProcessID: 13440,
+			ProcessID:  13440,
+			ProviderID: options.providerID,
 			EventDescriptor: etw.EventDescriptor{
 				Opcode: opcode,
 				ID:     id,

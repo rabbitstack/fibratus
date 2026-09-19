@@ -45,9 +45,7 @@ func TestIndirectSyscall(t *testing.T) {
 			PID:       859,
 			CPU:       1,
 			Seq:       2,
-			Name:      "CreateFile",
 			Timestamp: time.Now(),
-			Category:  event.File,
 			Params: event.Params{
 				params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
 				params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
@@ -73,9 +71,7 @@ func TestIndirectSyscall(t *testing.T) {
 			PID:       859,
 			CPU:       1,
 			Seq:       2,
-			Name:      "SetThreadContext",
 			Timestamp: time.Now(),
-			Category:  event.Thread,
 			PS: &pstypes.PS{
 				Modules: []pstypes.Module{
 					{Name: "C:\\Windows\\System32\\ntdll.dll", Size: 32358, Checksum: 23123343, BaseAddress: getNtdllAddress(), DefaultBaseAddress: getNtdllAddress()},
@@ -96,9 +92,7 @@ func TestIndirectSyscall(t *testing.T) {
 			PID:       859,
 			CPU:       1,
 			Seq:       2,
-			Name:      "CreateFile",
 			Timestamp: time.Now(),
-			Category:  event.File,
 			Params: event.Params{
 				params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
 				params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
@@ -115,7 +109,7 @@ func TestIndirectSyscall(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.evt.Name, func(t *testing.T) {
+		t.Run(tt.evt.Name(), func(t *testing.T) {
 			eva := NewIndirectSyscall()
 			matches, err := eva.Eval(tt.evt)
 			require.NoError(t, err)

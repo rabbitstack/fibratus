@@ -125,7 +125,6 @@ func TestScan(t *testing.T) {
 
 				e := &event.Event{
 					Type: event.CreateProcess,
-					Name: "CreateProcess",
 					Tid:  2484,
 					PID:  859,
 					Params: event.Params{
@@ -206,7 +205,6 @@ func TestScan(t *testing.T) {
 
 				e := &event.Event{
 					Type: event.CreateProcess,
-					Name: "CreateProcess",
 					Tid:  2484,
 					PID:  859,
 					Params: event.Params{
@@ -289,7 +287,6 @@ func TestScan(t *testing.T) {
 
 				e := &event.Event{
 					Type: event.LoadModule,
-					Name: "LoadModule",
 					Tid:  2484,
 					PID:  pid,
 					Params: event.Params{
@@ -343,11 +340,9 @@ func TestScan(t *testing.T) {
 				psnap.On("Find", 565).Return(true, proc)
 
 				e := &event.Event{
-					Type:     event.CreateFile,
-					Name:     "CreateFile",
-					Category: event.File,
-					Tid:      2484,
-					PID:      565,
+					Type: event.CreateFile,
+					Tid:  2484,
+					PID:  565,
 					Params: event.Params{
 						params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "notepad.exe")},
 						params.FileOperation: {Name: params.FileOperation, Type: params.Uint32, Value: uint32(windows.FILE_CREATE)},
@@ -396,11 +391,9 @@ func TestScan(t *testing.T) {
 				psnap.On("Find", 565).Return(true, proc)
 
 				e := &event.Event{
-					Type:     event.CreateFile,
-					Name:     "CreateFile",
-					Category: event.File,
-					Tid:      2484,
-					PID:      565,
+					Type: event.CreateFile,
+					Tid:  2484,
+					PID:  565,
 					Params: event.Params{
 						params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "cmd.exe")},
 						params.FileOperation: {Name: params.FileOperation, Type: params.Uint32, Value: uint32(windows.FILE_CREATE)},
@@ -447,11 +440,9 @@ func TestScan(t *testing.T) {
 				psnap.On("Find", 565).Return(true, proc)
 
 				e := &event.Event{
-					Type:     event.CreateFile,
-					Name:     "CreateFile",
-					Category: event.File,
-					Tid:      2484,
-					PID:      565,
+					Type: event.CreateFile,
+					Tid:  2484,
+					PID:  565,
 					Params: event.Params{
 						params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "splwow64.xml")},
 						params.FileOperation: {Name: params.FileOperation, Type: params.Uint32, Value: uint32(windows.FILE_CREATE)},
@@ -495,11 +486,9 @@ func TestScan(t *testing.T) {
 				psnap.On("Find", 565).Return(true, proc)
 
 				e := &event.Event{
-					Type:     event.CreateFile,
-					Name:     "CreateFile",
-					Category: event.File,
-					Tid:      2484,
-					PID:      565,
+					Type: event.CreateFile,
+					Tid:  2484,
+					PID:  565,
 					Params: event.Params{
 						params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "System32", "cmd.exe")},
 						params.FileOperation: {Name: params.FileOperation, Type: params.Uint32, Value: uint32(windows.FILE_CREATE)},
@@ -557,11 +546,9 @@ func TestScan(t *testing.T) {
 				psnap.On("Find", 565).Return(true, proc)
 
 				e := &event.Event{
-					Type:     event.CreateFile,
-					Name:     "CreateFile",
-					Category: event.File,
-					Tid:      2484,
-					PID:      565,
+					Type: event.CreateFile,
+					Tid:  2484,
+					PID:  565,
 					Params: event.Params{
 						params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: ads},
 						params.FileOperation: {Name: params.FileOperation, Type: params.Uint32, Value: uint32(windows.FILE_CREATE)},
@@ -640,11 +627,9 @@ func TestScan(t *testing.T) {
 				psnap.On("Find", pid).Return(true, proc)
 
 				e := &event.Event{
-					Type:     event.VirtualAlloc,
-					Name:     "VirtualAlloc",
-					Category: event.Mem,
-					Tid:      2484,
-					PID:      565,
+					Type: event.VirtualAlloc,
+					Tid:  2484,
+					PID:  565,
 					Params: event.Params{
 						params.ProcessID:      {Name: params.ProcessID, Type: params.PID, Value: pid},
 						params.MemBaseAddress: {Name: params.MemBaseAddress, Type: params.Address, Value: uint64(0x7ffe0000)},
@@ -724,11 +709,9 @@ func TestScan(t *testing.T) {
 				psnap.On("Find", pid).Return(true, proc)
 
 				e := &event.Event{
-					Type:     event.MapViewFile,
-					Name:     "MapViewFile",
-					Category: event.File,
-					Tid:      2484,
-					PID:      565,
+					Type: event.MapViewOfSection,
+					Tid:  2484,
+					PID:  565,
 					Params: event.Params{
 						params.ProcessID:    {Name: params.ProcessID, Type: params.PID, Value: pid},
 						params.FileViewBase: {Name: params.FileViewBase, Type: params.Address, Value: uint64(0x7ffe0000)},
@@ -778,11 +761,9 @@ func TestScan(t *testing.T) {
 				psnap.On("Find", uint32(321321)).Return(true, proc)
 
 				e := &event.Event{
-					Type:     event.MapViewFile,
-					Name:     "MapViewFile",
-					Category: event.File,
-					Tid:      2484,
-					PID:      321321,
+					Type: event.MapViewOfSection,
+					Tid:  2484,
+					PID:  321321,
 					Params: event.Params{
 						params.ProcessID:    {Name: params.ProcessID, Type: params.PID, Value: uint32(321321)},
 						params.FileViewBase: {Name: params.FileViewBase, Type: params.Address, Value: uint64(0x7ffe0000)},
@@ -827,11 +808,9 @@ func TestScan(t *testing.T) {
 				psnap.On("Find", 1123).Return(true, proc)
 
 				e := &event.Event{
-					Type:     event.MapViewFile,
-					Name:     "MapViewFile",
-					Category: event.File,
-					Tid:      2484,
-					PID:      565,
+					Type: event.MapViewOfSection,
+					Tid:  2484,
+					PID:  565,
 					Params: event.Params{
 						params.ProcessID:    {Name: params.ProcessID, Type: params.PID, Value: uint32(1123)},
 						params.FilePath:     {Name: params.FilePath, Type: params.UnicodeString, Value: filepath.Join(os.Getenv("windir"), "regedit.exe")},
@@ -883,11 +862,9 @@ func TestScan(t *testing.T) {
 
 				data := []byte{0x6F, 0x66, 0x74, 0x2E, 0x4E, 0x6F, 0x74, 0x65, 0x70, 0x61, 0x64, 0x00, 0x13, 0x00, 0x01, 0x1A}
 				e := &event.Event{
-					Type:     event.RegSetValue,
-					Name:     "RegSetValue",
-					Category: event.Registry,
-					Tid:      2484,
-					PID:      565,
+					Type: event.RegSetValue,
+					Tid:  2484,
+					PID:  565,
 					Params: event.Params{
 						params.RegValueType: {Name: params.RegValueType, Type: params.Uint32, Value: uint32(registry.BINARY)},
 						params.RegData:      {Name: params.RegValue, Type: params.Binary, Value: data},
@@ -949,7 +926,7 @@ func TestScan(t *testing.T) {
 				assert.Contains(t, e.Metadata, event.YaraMatchesKey)
 			}
 
-			if e.IsCreateProcess() || e.IsLoadModule() || e.IsVirtualAlloc() || e.IsMapViewFile() {
+			if e.IsCreateProcess() || e.IsLoadModule() || e.IsVirtualAlloc() || e.IsMapViewOfSection() {
 				// cleanup
 				proc, err := windows.OpenProcess(windows.PROCESS_TERMINATE, false, e.Params.MustGetPid())
 				if err == nil {

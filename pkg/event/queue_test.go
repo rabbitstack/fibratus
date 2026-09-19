@@ -70,9 +70,7 @@ func TestQueuePush(t *testing.T) {
 				PID:       859,
 				CPU:       1,
 				Seq:       2,
-				Name:      "CreateFile",
 				Timestamp: time.Now(),
-				Category:  File,
 				Params: Params{
 					params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
 					params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
@@ -97,9 +95,7 @@ func TestQueuePush(t *testing.T) {
 				PID:       859,
 				CPU:       1,
 				Seq:       2,
-				Name:      "CreateFile",
 				Timestamp: time.Now(),
-				Category:  File,
 				Params: Params{
 					params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
 					params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
@@ -124,9 +120,7 @@ func TestQueuePush(t *testing.T) {
 				PID:       859,
 				CPU:       1,
 				Seq:       2,
-				Name:      "CreateFile",
 				Timestamp: time.Now(),
-				Category:  File,
 				Params: Params{
 					params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
 					params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},
@@ -152,9 +146,7 @@ func TestQueuePush(t *testing.T) {
 				PID:       859,
 				CPU:       1,
 				Seq:       2,
-				Name:      "CreateFile",
 				Timestamp: time.Now(),
-				Category:  File,
 				Params: Params{
 					params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
 					params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "C:\\Windows\\system32\\user32.dll"},

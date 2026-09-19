@@ -267,8 +267,8 @@ func (a Alert) MarshalJSON() ([]byte, error) {
 				Ancestors      []string `json:"ancestors"`
 			} `json:"proc,omitempty"`
 		}{
-			Name:      e.Name,
-			Category:  string(e.Category),
+			Name:      e.Name(),
+			Category:  e.Category().String(),
 			Timestamp: e.Timestamp,
 			Params:    make(map[string]any),
 			Callstack: make([]string, 0, len(e.Callstack)),

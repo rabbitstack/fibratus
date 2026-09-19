@@ -64,6 +64,9 @@ const ImageKeyword = 0x40
 // SetValueKeyword enables registry key value set events for Microsoft Windows Kernel Registry provider
 const SetValueKeyword = 0x100
 
+// CaptureRegistryValue is the undocumented ETW feature to enable captured data in RegSetValue events
+var CaptureRegistryValue = 0x2
+
 const (
 	// EventHeaderExtTypeStackTrace64 indicates that the extended data contains the call stack if the event is captured on a 64-bit host
 	EventHeaderExtTypeStackTrace64 uint16 = 0x0006
@@ -559,6 +562,11 @@ type ClassicEventID struct {
 	_    [7]uint8 // reserved
 }
 
+// IsEmpty indicates if event id has been initialized.
+func (e ClassicEventID) IsEmpty() bool {
+	return (e.GUID.Data1 == 0 && e.GUID.Data2 == 0 && e.GUID.Data3 == 0 && len(e.GUID.Data4[:]) == 0) || e.Type == 0
+}
+
 // EventFilterDescriptor defines the filter data that
 // a session passes to the provider's enable callback.
 type EventFilterDescriptor struct {
@@ -672,32 +680,6 @@ func NewClassicEventID(guid windows.GUID, typ uint16) ClassicEventID {
 // Version returns the version of the event schema.
 func (e *EventRecord) Version() uint8 {
 	return e.Header.EventDescriptor.Version
-}
-
-// HookID returns either the opcode or the event ID.
-func (e *EventRecord) HookID() uint16 {
-	if e.Header.EventDescriptor.Opcode > 0 {
-		return uint16(e.Header.EventDescriptor.Opcode)
-	}
-	return e.Header.EventDescriptor.ID
-}
-
-// ID is an unsigned integer that uniquely
-// identifies the event. Handy for bitmask
-// operations.
-func (e *EventRecord) ID() uint {
-	d1 := e.Header.ProviderID.Data1
-	d2 := e.Header.ProviderID.Data2
-
-	id := uint(byte(d1>>24))<<56 |
-		uint(byte(d1>>16))<<48 |
-		uint(byte(d1>>8))<<40 |
-		uint(byte(d1))<<32 |
-		uint(byte(d2>>8))<<24 |
-		uint(byte(d2))<<16 |
-		uint(e.HookID())
-
-	return id
 }
 
 // Clone makes a copy of this event record and returns the

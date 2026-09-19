@@ -22,7 +22,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
-	"golang.org/x/sys/windows"
 )
 
 // StackExtensions manages stack tracing enablement
@@ -39,15 +38,8 @@ func NewStackExtensions(config config.EventSourceConfig) *StackExtensions {
 
 // AddStackTracing enables stack tracing for the specified event type.
 func (s *StackExtensions) AddStackTracing(typ event.Type) {
-	if !s.config.TestDropMask(typ) {
-		s.ids = append(s.ids, etw.NewClassicEventID(typ.GUID(), typ.HookID()))
-	}
-}
-
-// AddStackTracingWith enables stack tracing for the specified provider GUID and event hook id.
-func (s *StackExtensions) AddStackTracingWith(guid windows.GUID, hookID uint16) {
-	if !s.config.TestDropMask(event.TypeFromParts(guid, hookID)) {
-		s.ids = append(s.ids, etw.NewClassicEventID(guid, hookID))
+	if !s.config.TestDropMask(typ) && !typ.EventID().IsEmpty() {
+		s.ids = append(s.ids, typ.EventID())
 	}
 }
 
@@ -69,7 +61,7 @@ func (s *StackExtensions) EnableProcessCallstack() {
 		s.AddStackTracing(event.TerminateThread)
 	}
 	if s.config.EnableModuleEvents {
-		s.AddStackTracingWith(event.ProcessEventGUID, event.LoadModule.HookID())
+		s.AddStackTracing(event.LoadModule)
 	}
 }
 

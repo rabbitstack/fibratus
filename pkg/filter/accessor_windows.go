@@ -76,7 +76,7 @@ type psAccessor struct {
 func (psAccessor) SetFields([]Field)            {}
 func (psAccessor) SetSegments([]fields.Segment) {}
 func (psAccessor) IsFieldAccessible(e *event.Event) bool {
-	return e.PS != nil || e.Category == event.Process
+	return e.PS != nil || e.Category() == event.Process
 }
 
 func newPSAccessor(psnap psnap.Snapshotter) Accessor { return &psAccessor{psnap: psnap} }
@@ -475,7 +475,7 @@ type threadAccessor struct{}
 func (threadAccessor) SetFields([]Field)            {}
 func (threadAccessor) SetSegments([]fields.Segment) {}
 func (threadAccessor) IsFieldAccessible(e *event.Event) bool {
-	return !e.Callstack.IsEmpty() || e.Category == event.Thread
+	return !e.Callstack.IsEmpty() || e.Category() == event.Thread
 }
 
 func newThreadAccessor() Accessor {
@@ -676,7 +676,9 @@ type fileAccessor struct{}
 func (fileAccessor) SetFields(fields []Field)     {}
 func (fileAccessor) SetSegments([]fields.Segment) {}
 
-func (fileAccessor) IsFieldAccessible(e *event.Event) bool { return e.Category == event.File }
+func (fileAccessor) IsFieldAccessible(e *event.Event) bool {
+	return e.Category() == event.File || e.Category() == event.Memory
+}
 
 func newFileAccessor() Accessor {
 	return &fileAccessor{}
@@ -770,7 +772,7 @@ func (moduleAccessor) SetFields(fields []Field)     {}
 func (moduleAccessor) SetSegments([]fields.Segment) {}
 
 func (moduleAccessor) IsFieldAccessible(e *event.Event) bool {
-	return e.Category == event.Module
+	return e.Category() == event.Module
 }
 
 func newModuleAccessor() Accessor {
@@ -868,7 +870,7 @@ type registryAccessor struct{}
 func (registryAccessor) SetFields([]Field)            {}
 func (registryAccessor) SetSegments([]fields.Segment) {}
 func (registryAccessor) IsFieldAccessible(e *event.Event) bool {
-	return e.Category == event.Registry
+	return e.Category() == event.Registry
 }
 
 func newRegistryAccessor() Accessor {
@@ -920,7 +922,7 @@ func (n *networkAccessor) SetFields(flds []Field) {
 func (networkAccessor) SetSegments([]fields.Segment) {}
 
 func (networkAccessor) IsFieldAccessible(e *event.Event) bool {
-	return e.Category == event.Net
+	return e.Category() == event.Network
 }
 
 func newNetworkAccessor() Accessor { return &networkAccessor{} }
@@ -1205,7 +1207,7 @@ type memAccessor struct{}
 
 func (memAccessor) SetFields([]Field)                     {}
 func (memAccessor) SetSegments([]fields.Segment)          {}
-func (memAccessor) IsFieldAccessible(e *event.Event) bool { return e.Category == event.Mem }
+func (memAccessor) IsFieldAccessible(e *event.Event) bool { return e.Category() == event.Memory }
 
 func newMemAccessor() Accessor {
 	return &memAccessor{}
@@ -1236,7 +1238,7 @@ type dnsAccessor struct{}
 func (dnsAccessor) SetFields([]Field)            {}
 func (dnsAccessor) SetSegments([]fields.Segment) {}
 func (dnsAccessor) IsFieldAccessible(e *event.Event) bool {
-	return e.Type.Subcategory() == event.DNS
+	return e.Subcategory() == event.DNS
 }
 
 func newDNSAccessor() Accessor {

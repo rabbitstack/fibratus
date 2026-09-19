@@ -67,16 +67,13 @@ func TestWrite(t *testing.T) {
 
 	for i := 0; i < 100; i++ {
 		evt := &event.Event{
-			Type:        event.CreateFile,
-			Tid:         2484,
-			PID:         859,
-			CPU:         uint8(i / 2),
-			Seq:         uint64(i + 1),
-			Name:        "CreateFile",
-			Timestamp:   time.Now(),
-			Category:    event.File,
-			Host:        "archrabbit",
-			Description: "Creates or opens a new file, directory, I/O device, pipe, console",
+			Type:      event.CreateFile,
+			Tid:       2484,
+			PID:       859,
+			CPU:       uint8(i / 2),
+			Seq:       uint64(i + 1),
+			Timestamp: time.Now(),
+			Host:      "archrabbit",
 			Params: event.Params{
 				params.FileObject:    {Name: params.FileObject, Type: params.Uint64, Value: uint64(12456738026482168384)},
 				params.FilePath:      {Name: params.FilePath, Type: params.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\user32.dll"},

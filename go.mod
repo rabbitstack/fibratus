@@ -4,7 +4,6 @@ require (
 	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/Microsoft/go-winio v0.4.14
 	github.com/antchfx/htmlquery v1.2.5
-	github.com/bits-and-blooms/bitset v1.13.0
 	github.com/briandowns/spinner v1.12.0
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/dustin/go-humanize v1.0.0
