@@ -25,8 +25,8 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/bits-and-blooms/bitset"
 	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/util/bitmap"
 
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
 	"github.com/spf13/viper"
@@ -97,7 +97,7 @@ type EventSourceConfig struct {
 	// ExcludedImages are process image names that will be rejected if they generate a kernel event.
 	ExcludedImages []string `json:"blacklist.images" yaml:"blacklist.images"`
 
-	dropMasks bitset.BitSet
+	dropBitmap bitmap.Bitmap[event.Type]
 
 	excludedImages map[string]bool
 }
@@ -124,7 +124,7 @@ func (c *EventSourceConfig) initFromViper(v *viper.Viper) {
 
 	for _, name := range c.ExcludedEvents {
 		if typ, ok := event.ParseType(name); ok {
-			c.dropMasks.Set(typ.Uint())
+			c.dropBitmap.Set(typ)
 		}
 	}
 
@@ -139,7 +139,7 @@ func (c *EventSourceConfig) Init() {
 
 	for _, name := range c.ExcludedEvents {
 		if typ, ok := event.ParseType(name); ok {
-			c.dropMasks.Set(typ.Uint())
+			c.dropBitmap.Set(typ)
 		}
 	}
 
@@ -152,19 +152,19 @@ func (c *EventSourceConfig) Init() {
 // instruct the given event type should be dropped from
 // the event stream.
 func (c *EventSourceConfig) SetDropMask(typ event.Type) {
-	c.dropMasks.Set(typ.Uint())
+	c.dropBitmap.Set(typ)
 }
 
 // TestDropMask checks if the specified event type has
 // the drop mask in the bitset.
 func (c *EventSourceConfig) TestDropMask(typ event.Type) bool {
-	return c.dropMasks.Test(typ.Uint())
+	return c.dropBitmap.Has(typ)
 }
 
 // ExcludeEvent determines whether the event type is declared
 // in the exclusion list.
 func (c *EventSourceConfig) ExcludeEvent(typ event.Type) bool {
-	return c.dropMasks.Test(typ.Uint())
+	return c.dropBitmap.Has(typ)
 }
 
 // ExcludeImage determines whether the process generating event is present in the

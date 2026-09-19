@@ -25,9 +25,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bits-and-blooms/bitset"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
+	"github.com/rabbitstack/fibratus/pkg/util/bitmap"
 
 	"github.com/rabbitstack/fibratus/pkg/filter/ql/functions"
 )
@@ -289,8 +289,8 @@ type SequenceExpr struct {
 	// Alias represents the sequence expression alias when bound fields are used.
 	Alias string
 
-	categoryMask bitset.BitSet
-	eventMask    bitset.BitSet
+	eventBitmap    bitmap.Bitmap[event.Type]
+	categoryBitmap bitmap.Bitmap[event.Category]
 
 	types []event.Type
 }
@@ -356,13 +356,13 @@ func (e *SequenceExpr) walk() {
 					continue
 				}
 				e.types = append(e.types, typ)
-				e.eventMask.Set(typ.Uint())
+				e.eventBitmap.Set(typ)
 			case fields.EvtCategory:
 				category, ok := event.ParseCategory(v)
 				if !ok {
 					continue
 				}
-				e.categoryMask.Set(category.Uint())
+				e.categoryBitmap.Set(category)
 			}
 		}
 	}
@@ -373,7 +373,7 @@ func (e *SequenceExpr) walk() {
 // to be evaluated when the incoming event type, ID, or category pertains to the one
 // defined in the field literal.
 func (e *SequenceExpr) IsEvaluable(evt *event.Event) bool {
-	return e.eventMask.Test(evt.Type.Uint()) || e.categoryMask.Test(evt.Category().Uint())
+	return e.eventBitmap.Has(evt.Type) || e.categoryBitmap.Has(evt.Category())
 }
 
 // HasBoundFields determines if this sequence expression references any bound field.
