@@ -146,3 +146,39 @@ func TestSucceededHelper(t *testing.T) {
 	evt.Params.Append(params.Retval, params.Int64, int64(-2))
 	assert.False(t, succeeded(evt))
 }
+
+// The first argument of kill is a pid_t whose sign selects the scope of the
+// signal, so it must survive the conversion to an event parameter.
+func TestSignalTargetKeepsPidSign(t *testing.T) {
+	var tests = []struct {
+		name string
+		arg0 uint64
+		want int64
+	}{
+		{"single process", 4242, 4242},
+		{"caller process group", 0, 0},
+		{"every permitted process", uint64(^uint32(0)), -1},
+		{"process group", uint64(uint32(0xFFFFEF6E)), -4242},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			evt := rawEvent{Type: uint32(event.Kill), Arg0: tt.arg0, Arg1: 9}.toEvent()
+			target, err := evt.Params.GetInt64(params.TargetProcessID)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, target)
+		})
+	}
+}
+
+func TestPtraceAndProcessVMTargetsAreSigned(t *testing.T) {
+	ptrace := rawEvent{Type: uint32(event.Ptrace), Arg0: 16, Arg1: 4242}.toEvent()
+	target, err := ptrace.Params.GetInt64(params.TargetProcessID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(4242), target)
+
+	vmread := rawEvent{Type: uint32(event.ProcessVMRead), Arg0: 4242}.toEvent()
+	target, err = vmread.Params.GetInt64(params.TargetProcessID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(4242), target)
+}

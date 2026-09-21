@@ -164,16 +164,16 @@ func (r rawEvent) toEvent() *event.Event {
 		evt.Params.Append(params.FD, params.Int64, int64(r.Arg3))
 		evt.Params.Append(params.MmapOffset, params.Uint64, r.Arg0)
 	case event.ProcessVMRead, event.ProcessVMWrite:
-		evt.Params.Append(params.TargetProcessID, params.PID, uint64(uint32(r.Arg0)))
+		evt.Params.Append(params.TargetProcessID, params.Int64, int64(int32(r.Arg0)))
 		evt.Params.Append(params.MemBaseAddress, params.Address, r.Arg2)
 		evt.Params.Append(params.MemRegionSize, params.Uint64, r.Arg3)
 		evt.Params.Append(params.MmapFlags, params.Uint64, r.Flags)
 	case event.Kill:
-		evt.Params.Append(params.TargetProcessID, params.PID, uint64(uint32(r.Arg0)))
+		evt.Params.Append(params.TargetProcessID, params.Int64, int64(int32(r.Arg0)))
 		evt.Params.Append(params.Signal, params.Int32, int32(r.Arg1))
 	case event.Ptrace:
 		evt.Params.Append(params.PtraceRequest, params.Int64, int64(r.Arg0))
-		evt.Params.Append(params.TargetProcessID, params.PID, uint64(uint32(r.Arg1)))
+		evt.Params.Append(params.TargetProcessID, params.Int64, int64(int32(r.Arg1)))
 		evt.Params.Append(params.PtraceAddr, params.Address, r.Arg2)
 		evt.Params.Append(params.PtraceData, params.Uint64, r.Arg3)
 	case event.Prctl:
