@@ -36,12 +36,13 @@ func testConfig() *config.Config {
 	cfg.EventSource.EnableNetEvents = true
 	cfg.EventSource.EnableMemEvents = true
 	cfg.EventSource.Init()
+	cfg.Filters = &config.Filters{}
 	return cfg
 }
 
 func TestStartupReplayAndLateSnapshot(t *testing.T) {
 	cfg := testConfig()
-	es := NewEventSource(ps.NewSnapshotter(), cfg, nil).(*EventSource)
+	es := NewEventSource(ps.NewSnapshotter(), cfg, nil, nil).(*EventSource)
 
 	hot := sampleExecve()
 	hot.PID = 42
@@ -91,7 +92,7 @@ func TestStartupReplayAndLateSnapshot(t *testing.T) {
 
 func TestPIDReuseKeepsDistinctUUIDs(t *testing.T) {
 	cfg := testConfig()
-	es := NewEventSource(ps.NewSnapshotter(), cfg, nil).(*EventSource)
+	es := NewEventSource(ps.NewSnapshotter(), cfg, nil, nil).(*EventSource)
 	es.live.Store(true)
 
 	first := sampleExecve()

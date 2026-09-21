@@ -39,8 +39,9 @@ func NewEventSourceControl(
 	psnap ps.Snapshotter,
 	cfg *config.Config,
 	compiler *config.RulesCompileResult,
+	plan *filter.ApproverPlan,
 ) *EventSourceControl {
-	return &EventSourceControl{evs: libebpf.NewEventSource(psnap, cfg, compiler)}
+	return &EventSourceControl{evs: libebpf.NewEventSource(psnap, cfg, compiler, plan)}
 }
 
 func (s *EventSourceControl) Open(cfg *config.Config) error {
