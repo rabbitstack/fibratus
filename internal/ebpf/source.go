@@ -50,8 +50,11 @@ type EventSource struct {
 	evts      chan *event.Event
 	errs      chan error
 
-	filter    filter.Filter
-	listeners []event.Listener
+	filter     filter.Filter
+	rulesPlan  *filter.ApproverPlan
+	cliPlan    *filter.ApproverPlan
+	approverMu sync.Mutex
+	listeners  []event.Listener
 
 	loader *loader
 	reader *ringReader
@@ -67,9 +70,7 @@ type EventSource struct {
 }
 
 // NewEventSource constructs the Linux eBPF event source.
-func NewEventSource(psnap ps.Snapshotter, cfg *config.Config, _ *config.RulesCompileResult) source.EventSource {
-	// Startup replay pushes queued events before the aggregator starts
-	// consuming, so the channel must be able to absorb a full pending queue.
+func NewEventSource(psnap ps.Snapshotter, cfg *config.Config, _ *config.RulesCompileResult, plan *filter.ApproverPlan) source.EventSource {
 	evts := make(chan *event.Event, defaultPendingCap)
 	return &EventSource{
 		psnap:      psnap,
@@ -82,6 +83,7 @@ func NewEventSource(psnap ps.Snapshotter, cfg *config.Config, _ *config.RulesCom
 		pendingCap: defaultPendingCap,
 		stop:       make(chan struct{}),
 		done:       make(chan struct{}),
+		rulesPlan:  plan,
 	}
 }
 
@@ -111,7 +113,11 @@ func (e *EventSource) Open(cfg *config.Config) error {
 
 	if err := ldr.setEnabledTypes(&e.config.EventSource); err != nil {
 		_ = ldr.Close()
+		e.loader = nil
 		return err
+	}
+	if err := e.reloadApprovers(); err != nil {
+		log.Warnf("approver population failed, default-allow: %v", err)
 	}
 
 	rd, err := newRingReader(ldr.eventsMap())
@@ -135,9 +141,19 @@ func (e *EventSource) Open(cfg *config.Config) error {
 
 	time.Sleep(startupDrain)
 	e.finishBaseline()
-	ringbufDrops.Add(int64(ldr.dropCount()))
+	e.sampleCounters()
 	log.Infof("eBPF process source is live; %s", e.startupSummary())
 	return nil
+}
+
+// sampleCounters mirrors the cumulative kernel-side counters into expvars. The
+// maps hold running totals, so this reads them rather than accumulating.
+func (e *EventSource) sampleCounters() {
+	if e.loader == nil {
+		return
+	}
+	ringbufDrops.Set(int64(e.loader.dropCount()))
+	approverDrops.Set(int64(e.loader.approverRejects()))
 }
 
 func (e *EventSource) Close() error {
@@ -149,6 +165,7 @@ func (e *EventSource) Close() error {
 			_ = e.reader.Close()
 		}
 		if e.loader != nil {
+			e.sampleCounters()
 			err = e.loader.Close()
 		}
 		if started {
@@ -168,7 +185,24 @@ func (e *EventSource) Errors() <-chan error { return e.errs }
 
 func (e *EventSource) Events() <-chan *event.Event { return e.q.Events() }
 
-func (e *EventSource) SetFilter(f filter.Filter) { e.filter = f }
+func (e *EventSource) SetFilter(f filter.Filter) {
+	e.filter = f
+	e.approverMu.Lock()
+	e.cliPlan = filter.PlanFromFilter(f)
+	e.approverMu.Unlock()
+	if err := e.reloadApprovers(); err != nil {
+		log.Warnf("approver reload failed, keeping previous policy: %v", err)
+	}
+}
+
+func (e *EventSource) reloadApprovers() error {
+	e.approverMu.Lock()
+	defer e.approverMu.Unlock()
+	if e.loader == nil {
+		return nil
+	}
+	return e.loader.populateApprovers(filter.Union(e.rulesPlan, e.cliPlan))
+}
 
 func (e *EventSource) RegisterEventListener(lis event.Listener) {
 	e.listeners = append(e.listeners, lis)
@@ -310,6 +344,6 @@ func (e *EventSource) dispatch(evt *event.Event) {
 }
 
 func (e *EventSource) startupSummary() string {
-	return fmt.Sprintf("pending_queued=%d pending_dropped=%d replay_applied=%d snapshot_upserts=%d",
-		pendingQueued.Value(), pendingDropped.Value(), replayApplied.Value(), snapshotUpserts.Value())
+	return fmt.Sprintf("pending_queued=%d pending_dropped=%d replay_applied=%d snapshot_upserts=%d approver_drops=%d",
+		pendingQueued.Value(), pendingDropped.Value(), replayApplied.Value(), snapshotUpserts.Value(), approverDrops.Value())
 }

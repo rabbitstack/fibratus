@@ -34,7 +34,7 @@ import (
 
 func TestLiveProcessSource(t *testing.T) {
 	cfg := testConfig()
-	es := NewEventSource(ps.NewSnapshotter(), cfg, nil).(*EventSource)
+	es := NewEventSource(ps.NewSnapshotter(), cfg, nil, nil).(*EventSource)
 	if err := es.Open(cfg); err != nil {
 		t.Fatalf("opening process source: %v", err)
 	}
@@ -86,7 +86,7 @@ func execLookPath() string {
 
 func TestLiveSyscallTelemetry(t *testing.T) {
 	cfg := testConfig()
-	es := NewEventSource(ps.NewSnapshotter(), cfg, nil).(*EventSource)
+	es := NewEventSource(ps.NewSnapshotter(), cfg, nil, nil).(*EventSource)
 	if err := es.Open(cfg); err != nil {
 		t.Fatalf("opening process source: %v", err)
 	}

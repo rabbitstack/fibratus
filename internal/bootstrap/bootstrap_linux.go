@@ -95,6 +95,7 @@ func NewApp(cfg *config.Config, options ...Option) (*App, error) {
 
 	var engine *rules.Engine
 	var rs *config.RulesCompileResult
+	var plan *filter.ApproverPlan
 	if cfg.Filters != nil && cfg.Filters.Rules.Enabled && !cfg.ForwardMode && !cfg.IsCaptureSet() && !cfg.IsFilamentSet() {
 		engine = rules.NewEngine(psnap, cfg)
 		var err error
@@ -102,6 +103,7 @@ func NewApp(cfg *config.Config, options ...Option) (*App, error) {
 		if err != nil {
 			return nil, err
 		}
+		plan = engine.ApproverPlan()
 		if rs != nil {
 			log.Infof("rules compile summary: %s", rs)
 		}
@@ -111,7 +113,7 @@ func NewApp(cfg *config.Config, options ...Option) (*App, error) {
 
 	return &App{
 		config:  cfg,
-		evs:     NewEventSourceControl(psnap, cfg, rs),
+		evs:     NewEventSourceControl(psnap, cfg, rs, plan),
 		engine:  engine,
 		psnap:   psnap,
 		signals: sigs,
