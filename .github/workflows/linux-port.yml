@@ -35,7 +35,7 @@ jobs:
           clang --version
       - name: Check generation drift
         run: |
-          make ebpf
+          make -B ebpf
           git diff --exit-code -- internal/ebpf/bpf
       - name: Unit tests
         run: go test ./internal/ebpf ./internal/bootstrap ./pkg/event ./pkg/ps ./pkg/api ./pkg/util/signals
