@@ -298,8 +298,8 @@ func (e *Engine) processActions() error {
 		for _, act := range actions {
 			switch t := act.(type) {
 			case config.KillAction:
-				log.Infof("executing kill action: pids=%v rule=%s", m.ctx.UniquePids(), f.Name)
-				if err := action.Kill(m.ctx.UniquePids()); err != nil {
+				log.Infof("executing kill action: rule=%s", f.Name)
+				if err := action.Kill(m.ctx); err != nil {
 					return ErrRuleAction(f.Name, err)
 				}
 			case config.IsolateAction:
