@@ -214,7 +214,7 @@ func (a *psAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 		}
 		return int64(sig), nil
 	case fields.PsTargetPID:
-		return e.Params.GetUint64(params.TargetProcessID)
+		return e.Params.GetInt64(params.TargetProcessID)
 	case fields.PsPtraceRequest:
 		return e.Params.GetInt64(params.PtraceRequest)
 	case fields.PsPrctlOption:
@@ -308,7 +308,7 @@ func (*memAccessor) Get(f Field, e *event.Event) (params.Value, error) {
 	case fields.MemMmapOffset:
 		return e.Params.GetUint64(params.MmapOffset)
 	case fields.MemTargetPID:
-		return e.Params.GetUint64(params.TargetProcessID)
+		return e.Params.GetInt64(params.TargetProcessID)
 	default:
 		return nil, nil
 	}

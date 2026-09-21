@@ -204,9 +204,32 @@ func TestProcFilter(t *testing.T) {
 		PID:      4242,
 		PS:       ps,
 		Params: event.Params{
-			params.TargetProcessID: {Name: params.TargetProcessID, Type: params.PID, Value: uint64(99)},
+			params.TargetProcessID: {Name: params.TargetProcessID, Type: params.Int64, Value: int64(99)},
 			params.Signal:          {Name: params.Signal, Type: params.Int32, Value: int32(9)},
 			params.Retval:          {Name: params.Retval, Type: params.Int64, Value: int64(0)},
+		},
+	}
+	// kill accepts a pid_t whose sign selects the scope of the signal
+	broadcastKill := &event.Event{
+		Type:     event.Kill,
+		Category: event.Process,
+		Name:     "kill",
+		PID:      4242,
+		PS:       ps,
+		Params: event.Params{
+			params.TargetProcessID: {Name: params.TargetProcessID, Type: params.Int64, Value: int64(-1)},
+			params.Signal:          {Name: params.Signal, Type: params.Int32, Value: int32(9)},
+		},
+	}
+	groupKill := &event.Event{
+		Type:     event.Kill,
+		Category: event.Process,
+		Name:     "kill",
+		PID:      4242,
+		PS:       ps,
+		Params: event.Params{
+			params.TargetProcessID: {Name: params.TargetProcessID, Type: params.Int64, Value: int64(-4242)},
+			params.Signal:          {Name: params.Signal, Type: params.Int32, Value: int32(9)},
 		},
 	}
 	ptrace := &event.Event{
@@ -217,7 +240,7 @@ func TestProcFilter(t *testing.T) {
 		PS:       ps,
 		Params: event.Params{
 			params.PtraceRequest:   {Name: params.PtraceRequest, Type: params.Int64, Value: int64(16)},
-			params.TargetProcessID: {Name: params.TargetProcessID, Type: params.PID, Value: uint64(99)},
+			params.TargetProcessID: {Name: params.TargetProcessID, Type: params.Int64, Value: int64(99)},
 		},
 	}
 	prctl := &event.Event{
@@ -272,6 +295,11 @@ func TestProcFilter(t *testing.T) {
 		{execve, `evt.arg[exe] = '/bin/bash'`, true},
 		{kill, `ps.signal = 9`, true},
 		{kill, `ps.target.pid = 99`, true},
+		{kill, `ps.target.pid > 0`, true},
+		{kill, `ps.target.pid < 0`, false},
+		{broadcastKill, `ps.target.pid < 0`, true},
+		{broadcastKill, `ps.target.pid > 0`, false},
+		{groupKill, `ps.target.pid < 0`, true},
 		{ptrace, `ps.ptrace.request = 16`, true},
 		{ptrace, `ps.target.pid = 99`, true},
 		{prctl, `ps.prctl.option = 15`, true},
@@ -413,7 +441,7 @@ func TestMemFilter(t *testing.T) {
 		Name:     "process_vm_readv",
 		PID:      4242,
 		Params: event.Params{
-			params.TargetProcessID: {Name: params.TargetProcessID, Type: params.PID, Value: uint64(99)},
+			params.TargetProcessID: {Name: params.TargetProcessID, Type: params.Int64, Value: int64(99)},
 			params.MemBaseAddress:  {Name: params.MemBaseAddress, Type: params.Address, Value: uint64(4096)},
 			params.MemRegionSize:   {Name: params.MemRegionSize, Type: params.Uint64, Value: uint64(16)},
 		},
@@ -424,7 +452,7 @@ func TestMemFilter(t *testing.T) {
 		Name:     "process_vm_writev",
 		PID:      4242,
 		Params: event.Params{
-			params.TargetProcessID: {Name: params.TargetProcessID, Type: params.PID, Value: uint64(77)},
+			params.TargetProcessID: {Name: params.TargetProcessID, Type: params.Int64, Value: int64(77)},
 			params.MemBaseAddress:  {Name: params.MemBaseAddress, Type: params.Address, Value: uint64(4096)},
 		},
 	}
@@ -541,8 +569,8 @@ func TestEveryLinuxEventType(t *testing.T) {
 		{&event.Event{Type: event.Connect, Category: event.Net, Name: "connect", PS: ps, Params: event.Params{params.NetDport: {Name: params.NetDport, Type: params.Port, Value: uint16(443)}}}, `net.dport = 443`},
 		{&event.Event{Type: event.Accept, Category: event.Net, Name: "accept", PS: ps, Params: event.Params{params.NetSport: {Name: params.NetSport, Type: params.Port, Value: uint16(80)}}}, `net.sport = 80`},
 		{&event.Event{Type: event.Mmap, Category: event.Mem, Name: "mmap", PS: ps, Params: event.Params{params.MemRegionSize: {Name: params.MemRegionSize, Type: params.Uint64, Value: uint64(4096)}}}, `mem.size = 4096`},
-		{&event.Event{Type: event.ProcessVMRead, Category: event.Mem, Name: "process_vm_readv", PS: ps, Params: event.Params{params.TargetProcessID: {Name: params.TargetProcessID, Type: params.PID, Value: uint64(9)}}}, `mem.target.pid = 9`},
-		{&event.Event{Type: event.ProcessVMWrite, Category: event.Mem, Name: "process_vm_writev", PS: ps, Params: event.Params{params.TargetProcessID: {Name: params.TargetProcessID, Type: params.PID, Value: uint64(8)}}}, `mem.target.pid = 8`},
+		{&event.Event{Type: event.ProcessVMRead, Category: event.Mem, Name: "process_vm_readv", PS: ps, Params: event.Params{params.TargetProcessID: {Name: params.TargetProcessID, Type: params.Int64, Value: int64(9)}}}, `mem.target.pid = 9`},
+		{&event.Event{Type: event.ProcessVMWrite, Category: event.Mem, Name: "process_vm_writev", PS: ps, Params: event.Params{params.TargetProcessID: {Name: params.TargetProcessID, Type: params.Int64, Value: int64(8)}}}, `mem.target.pid = 8`},
 		{&event.Event{Type: event.Kill, Category: event.Process, Name: "kill", PS: ps, Params: event.Params{params.Signal: {Name: params.Signal, Type: params.Int32, Value: int32(9)}}}, `ps.signal = 9`},
 		{&event.Event{Type: event.Ptrace, Category: event.Process, Name: "ptrace", PS: ps, Params: event.Params{params.PtraceRequest: {Name: params.PtraceRequest, Type: params.Int64, Value: int64(16)}}}, `ps.ptrace.request = 16`},
 		{&event.Event{Type: event.Prctl, Category: event.Process, Name: "prctl", PS: ps, Params: event.Params{params.PrctlOption: {Name: params.PrctlOption, Type: params.Int64, Value: int64(15)}}}, `ps.prctl.option = 15`},
