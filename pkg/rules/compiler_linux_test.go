@@ -26,6 +26,7 @@ import (
 	"testing"
 
 	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/stretchr/testify/require"
 )
@@ -51,9 +52,35 @@ condition: evt.name = 'execve' and ps.name = 'bash'
 	require.True(t, result.HasProcEvents)
 }
 
+func TestCompilerExtractableApproverPlan(t *testing.T) {
+	rule := filepath.Join(t.TempDir(), "openat.yml")
+	require.NoError(t, os.WriteFile(rule, []byte(`name: Temporary file open
+id: 7c1c2d3e-4f5a-6789-abcd-ef0123456789
+version: 1.0.0
+min-engine-version: 3.0.0
+condition: evt.name = 'openat' and file.path startswith '/tmp'
+`), 0o600))
+
+	cfg := &config.Config{
+		EventSource: config.EventSourceConfig{EnableFileIOEvents: true},
+		Filters: &config.Filters{
+			Rules: config.Rules{FromPaths: []string{rule}},
+		},
+	}
+	c := newCompiler(ps.NewSnapshotter(), cfg)
+	_, result, err := c.compile()
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	pol := c.ApproverPlan().Policy(event.Openat)
+	require.False(t, pol.DefaultAllow)
+	require.True(t, pol.RequireFilename)
+	require.Equal(t, []string{"/tmp"}, pol.FilePrefix)
+}
+
 func TestCompilerShippedLinuxRules(t *testing.T) {
 	cfg := newLinuxConfig(filepath.Join("..", "..", "rules", "linux", "*.yml"))
-	filters, result, err := newCompiler(ps.NewSnapshotter(), cfg).compile()
+	c := newCompiler(ps.NewSnapshotter(), cfg)
+	filters, result, err := c.compile()
 	require.NoError(t, err)
 	require.NotEmpty(t, filters)
 	require.NotNil(t, result)
@@ -66,6 +93,45 @@ func TestCompilerShippedLinuxRules(t *testing.T) {
 			require.True(t, f.HasLabel(label), "%s is missing the %s label", f.Name, label)
 		}
 	}
+
+	plan := c.ApproverPlan()
+	require.True(t, plan.Policy(event.Execve).DefaultAllow)
+	require.True(t, plan.Policy(event.Connect).DefaultAllow)
+	require.True(t, plan.Policy(event.Ptrace).DefaultAllow)
+	require.True(t, plan.Policy(event.Kill).DefaultAllow)
+}
+
+// The approver scopes a sequence rule to the event names and categories in its
+// string fields, on the assumption that the engine indexes the sequence by that
+// same set and so never evaluates a stage against any other type. Pin it here:
+// if indexing ever widens, the approver would under-block and drop events a
+// sequence stage needs.
+func TestEngineIndexesSequenceByStringFieldTypes(t *testing.T) {
+	rule := filepath.Join(t.TempDir(), "sequence.yml")
+	require.NoError(t, os.WriteFile(rule, []byte(`name: Execve then unscoped stage
+id: 8e2f1a5b-3c4d-4e6f-8a9b-0c1d2e3f4a5b
+version: 1.0.0
+min-engine-version: 3.0.0
+condition: >
+  sequence
+  maxspan 1m
+    |evt.name = 'execve'|
+    |ps.pid = 5|
+`), 0o600))
+
+	cfg := newLinuxConfig(rule)
+	e := NewEngine(ps.NewSnapshotter(), cfg)
+	_, err := e.Compile()
+	require.NoError(t, err)
+
+	require.Len(t, e.filters.types[event.Execve], 1, "sequence must be indexed under execve")
+	for _, typ := range event.All() {
+		if typ == event.Execve {
+			continue
+		}
+		require.Empty(t, e.filters.types[typ], "sequence must not be indexed under %s", typ)
+	}
+	require.Empty(t, e.filters.categories, "sequence names no category")
 }
 
 func TestCompilerSharedSemanticFixtures(t *testing.T) {
