@@ -146,6 +146,16 @@ func NewEngine(psnap ps.Snapshotter, config *config.Config) *Engine {
 	return e
 }
 
+// ApproverPlan returns the conservative in-kernel prefilter derived from the
+// compiled ruleset. RulesCompileResult stays a usage summary and is not used
+// as predicate data.
+func (e *Engine) ApproverPlan() *filter.ApproverPlan {
+	if e == nil || e.compiler == nil {
+		return filter.AllowAllPlan()
+	}
+	return e.compiler.ApproverPlan()
+}
+
 func (e *Engine) gcSequences() {
 	for {
 		<-e.scavenger.C
