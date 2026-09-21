@@ -85,6 +85,7 @@ func TestCompileEventCategoryFieldNames(t *testing.T) {
 		{"_fixtures/field_values/incorrect_event_name_in_operator.yml", ErrUnknownEventName("match https connections", "CreateProc")},
 		{"_fixtures/field_values/correct_category_name_field.yml", nil},
 		{"_fixtures/field_values/incorrect_category_name_field.yml", ErrUnknownCategoryName("match https connections", "network")},
+		{"_fixtures/shared/*.yml", nil},
 	}
 
 	for _, tt := range tests {
