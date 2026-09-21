@@ -1,0 +1,26 @@
+name: Process terminated via SIGKILL
+id: cada79b8-9cfe-4ee9-8240-d3550e0859a7
+version: 1.0.0
+description: |
+  Identifies a process sending SIGKILL to a different process.
+  Adversaries use SIGKILL to stop security agents, terminate forensic
+  tools, or disrupt services that cannot catch the signal. Requests denied
+  by the kernel also match, since a blocked attempt carries the same intent.
+labels:
+  tactic.id: TA0040
+  tactic.name: Impact
+  tactic.ref: https://attack.mitre.org/tactics/TA0040/
+  technique.id: T1489
+  technique.name: Service Stop
+  technique.ref: https://attack.mitre.org/techniques/T1489/
+references:
+  - https://man7.org/linux/man-pages/man2/kill.2.html
+
+condition: >
+  sigkill and ps.target.pid != 0 and ps.target.pid != evt.pid
+
+output: >
+  %ps.name sent SIGKILL to process %ps.target.pid
+
+severity: medium
+min-engine-version: 3.0.0
