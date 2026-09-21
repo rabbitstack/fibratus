@@ -21,9 +21,28 @@
 package ebpf
 
 const (
-	eventsMapName      = "events"
-	dropCountMapName   = "drop_count"
-	scratchMapName     = "scratch"
-	scratchHeapMapName = "scratch_heap"
-	enabledMapName     = "enabled"
+	eventsMapName         = "events"
+	dropCountMapName      = "drop_count"
+	scratchMapName        = "scratch"
+	scratchHeapMapName    = "scratch_heap"
+	enabledMapName        = "enabled"
+	approverGenMapName    = "approver_gen"
+	approverModeMapName   = "approver_mode"
+	approverPIDMapName    = "approver_pid"
+	approverPortMapName   = "approver_port"
+	approverFileEqMapName = "approver_file_eq"
+	approverFilePre0Name  = "approver_file_pre_0"
+	approverFilePre1Name  = "approver_file_pre_1"
+	approverFileHeapName  = "approver_file_heap"
+	approverLPMHeapName   = "approver_lpm_heap"
+	approverRejectMapName = "approver_reject"
+)
+
+// Mirrors APPR_REQ_* and EVT_TYPE_MAX in c/common/approvers.h. Both sides index
+// the mode array as generation*approverTypeMax+type, so the values must agree.
+const (
+	approverReqPID  = 1 << 0
+	approverReqFile = 1 << 1
+	approverReqPort = 1 << 2
+	approverTypeMax = 32
 )

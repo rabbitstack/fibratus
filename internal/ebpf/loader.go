@@ -95,13 +95,7 @@ func loadCollections() (*loader, error) {
 		return nil, fmt.Errorf("loading execve objects: %w", err)
 	}
 
-	replacements := map[string]*ebpf.Map{
-		eventsMapName:      execObjs.Events,
-		dropCountMapName:   execObjs.DropCount,
-		scratchMapName:     execObjs.Scratch,
-		scratchHeapMapName: execObjs.ScratchHeap,
-		enabledMapName:     execObjs.Enabled,
-	}
+	replacements := sharedMaps(&execObjs)
 	opts := &ebpf.CollectionOptions{MapReplacements: replacements}
 
 	var exitObjs bpf.ExitObjects
