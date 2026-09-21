@@ -60,9 +60,21 @@ build:
 fmt:
 	$(GOFMT) -e -s -l -w pkg cmd internal
 
+TEST_PKGS := \
+	./internal/ebpf \
+	./internal/bootstrap \
+	./pkg/api \
+	./pkg/config \
+	./pkg/event \
+	./pkg/filter \
+	./pkg/ps \
+	./pkg/rules \
+	./pkg/rules/action \
+	./pkg/util/signals
+
 .PHONY: test
 test:
-	$(GO) test ./internal/ebpf ./internal/bootstrap ./pkg/event ./pkg/ps ./pkg/api ./pkg/util/signals ./pkg/filter ./pkg/rules
+	$(GO) test $(TEST_PKGS)
 
 .PHONY: clean
 clean:
