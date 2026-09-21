@@ -13,6 +13,34 @@ import (
 	"github.com/cilium/ebpf"
 )
 
+type ExecveApproverFileKey struct {
+	_    structs.HostLayout
+	Gen  uint32
+	Type uint32
+	Path [256]uint8
+}
+
+type ExecveApproverLpmKey struct {
+	_         structs.HostLayout
+	Prefixlen uint32
+	Path      [256]uint8
+}
+
+type ExecveApproverPidKey struct {
+	_    structs.HostLayout
+	Gen  uint32
+	Type uint32
+	Pid  uint64
+}
+
+type ExecveApproverPortKey struct {
+	_    structs.HostLayout
+	Gen  uint32
+	Type uint32
+	Port uint16
+	Pad  uint16
+}
+
 type ExecveScratchValue struct {
 	_         structs.HostLayout
 	Arg0      uint64
@@ -78,11 +106,21 @@ type ExecveProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type ExecveMapSpecs struct {
-	DropCount   *ebpf.MapSpec `ebpf:"drop_count"`
-	Enabled     *ebpf.MapSpec `ebpf:"enabled"`
-	Events      *ebpf.MapSpec `ebpf:"events"`
-	Scratch     *ebpf.MapSpec `ebpf:"scratch"`
-	ScratchHeap *ebpf.MapSpec `ebpf:"scratch_heap"`
+	ApproverFileEq   *ebpf.MapSpec `ebpf:"approver_file_eq"`
+	ApproverFileHeap *ebpf.MapSpec `ebpf:"approver_file_heap"`
+	ApproverFilePre0 *ebpf.MapSpec `ebpf:"approver_file_pre_0"`
+	ApproverFilePre1 *ebpf.MapSpec `ebpf:"approver_file_pre_1"`
+	ApproverGen      *ebpf.MapSpec `ebpf:"approver_gen"`
+	ApproverLpmHeap  *ebpf.MapSpec `ebpf:"approver_lpm_heap"`
+	ApproverMode     *ebpf.MapSpec `ebpf:"approver_mode"`
+	ApproverPid      *ebpf.MapSpec `ebpf:"approver_pid"`
+	ApproverPort     *ebpf.MapSpec `ebpf:"approver_port"`
+	ApproverReject   *ebpf.MapSpec `ebpf:"approver_reject"`
+	DropCount        *ebpf.MapSpec `ebpf:"drop_count"`
+	Enabled          *ebpf.MapSpec `ebpf:"enabled"`
+	Events           *ebpf.MapSpec `ebpf:"events"`
+	Scratch          *ebpf.MapSpec `ebpf:"scratch"`
+	ScratchHeap      *ebpf.MapSpec `ebpf:"scratch_heap"`
 }
 
 // ExecveVariableSpecs contains global variables before they are loaded into the kernel.
@@ -111,15 +149,35 @@ func (o *ExecveObjects) Close() error {
 //
 // It can be passed to LoadExecveObjects or ebpf.CollectionSpec.LoadAndAssign.
 type ExecveMaps struct {
-	DropCount   *ebpf.Map `ebpf:"drop_count"`
-	Enabled     *ebpf.Map `ebpf:"enabled"`
-	Events      *ebpf.Map `ebpf:"events"`
-	Scratch     *ebpf.Map `ebpf:"scratch"`
-	ScratchHeap *ebpf.Map `ebpf:"scratch_heap"`
+	ApproverFileEq   *ebpf.Map `ebpf:"approver_file_eq"`
+	ApproverFileHeap *ebpf.Map `ebpf:"approver_file_heap"`
+	ApproverFilePre0 *ebpf.Map `ebpf:"approver_file_pre_0"`
+	ApproverFilePre1 *ebpf.Map `ebpf:"approver_file_pre_1"`
+	ApproverGen      *ebpf.Map `ebpf:"approver_gen"`
+	ApproverLpmHeap  *ebpf.Map `ebpf:"approver_lpm_heap"`
+	ApproverMode     *ebpf.Map `ebpf:"approver_mode"`
+	ApproverPid      *ebpf.Map `ebpf:"approver_pid"`
+	ApproverPort     *ebpf.Map `ebpf:"approver_port"`
+	ApproverReject   *ebpf.Map `ebpf:"approver_reject"`
+	DropCount        *ebpf.Map `ebpf:"drop_count"`
+	Enabled          *ebpf.Map `ebpf:"enabled"`
+	Events           *ebpf.Map `ebpf:"events"`
+	Scratch          *ebpf.Map `ebpf:"scratch"`
+	ScratchHeap      *ebpf.Map `ebpf:"scratch_heap"`
 }
 
 func (m *ExecveMaps) Close() error {
 	return _ExecveClose(
+		m.ApproverFileEq,
+		m.ApproverFileHeap,
+		m.ApproverFilePre0,
+		m.ApproverFilePre1,
+		m.ApproverGen,
+		m.ApproverLpmHeap,
+		m.ApproverMode,
+		m.ApproverPid,
+		m.ApproverPort,
+		m.ApproverReject,
 		m.DropCount,
 		m.Enabled,
 		m.Events,
