@@ -43,7 +43,7 @@ var fields = platformFields(map[Field]FieldInfo{
 	PsParentUsername: {PsParentUsername, "parent process username", platformString(), []string{"ps.parent.username = 'root'"}, nil, nil},
 	PsParentEnvs:     {PsParentEnvs, "parent process environment variables", params.Slice, []string{"ps.parent.envs in ('PATH:/usr/bin')"}, nil, nil},
 	PsSignal:         {PsSignal, "POSIX signal number", params.Int64, []string{"ps.signal = 9"}, nil, nil},
-	PsTargetPID:      {PsTargetPID, "target process identifier of kill, ptrace, or process_vm operations", params.Uint64, []string{"ps.target.pid = 4242"}, nil, nil},
+	PsTargetPID:      {PsTargetPID, "target process identifier of kill, ptrace, or process_vm operations. Signal targets keep the pid_t sign, where zero is the caller process group, -1 is every permitted process, and any other negative value is the process group of its absolute value", params.Int64, []string{"ps.target.pid = 4242", "ps.target.pid < 0"}, nil, nil},
 	PsPtraceRequest:  {PsPtraceRequest, "ptrace request code", params.Int64, []string{"ps.ptrace.request = 16"}, nil, nil},
 	PsPrctlOption:    {PsPrctlOption, "prctl option code", params.Int64, []string{"ps.prctl.option = 15"}, nil, nil},
 	PsCloneFlags:     {PsCloneFlags, "clone flags bitmask", params.Uint64, []string{"ps.clone_flags = 0"}, nil, nil},
@@ -69,7 +69,7 @@ var fields = platformFields(map[Field]FieldInfo{
 	MemMmapFlags:     {MemMmapFlags, "mmap flags bitmask", params.Uint64, []string{"mem.mmap.flags = 1"}, nil, nil},
 	MemMmapFD:        {MemMmapFD, "file descriptor backing a mapping", params.Int64, []string{"mem.mmap.fd = 3"}, nil, nil},
 	MemMmapOffset:    {MemMmapOffset, "file offset of a memory mapping", params.Uint64, []string{"mem.mmap.offset = 0"}, nil, nil},
-	MemTargetPID:     {MemTargetPID, "target process identifier of a process_vm operation", params.Uint64, []string{"mem.target.pid = 4242"}, nil, nil},
+	MemTargetPID:     {MemTargetPID, "target process identifier of a process_vm operation", params.Int64, []string{"mem.target.pid = 4242"}, nil, nil},
 	ThreadTID:        {ThreadTID, "thread identifier", params.Uint64, []string{"thread.tid = 1024"}, nil, nil},
 	ThreadPID:        {ThreadPID, "thread group identifier of the thread", params.Uint64, []string{"thread.pid = 1024"}, nil, nil},
 })

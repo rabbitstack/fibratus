@@ -159,7 +159,7 @@ func TestRunLinuxDetectionRules(t *testing.T) {
 		Params: event.Params{
 			params.ProcessID:       {Name: params.ProcessID, Type: params.PID, Value: uint64(4242)},
 			params.PtraceRequest:   {Name: params.PtraceRequest, Type: params.Int64, Value: int64(16)},
-			params.TargetProcessID: {Name: params.TargetProcessID, Type: params.PID, Value: uint64(99)},
+			params.TargetProcessID: {Name: params.TargetProcessID, Type: params.Int64, Value: int64(99)},
 		},
 		Metadata: make(map[event.MetadataKey]any),
 	}
@@ -175,7 +175,7 @@ func TestRunLinuxDetectionRules(t *testing.T) {
 		Params: event.Params{
 			params.ProcessID:       {Name: params.ProcessID, Type: params.PID, Value: uint64(4242)},
 			params.Signal:          {Name: params.Signal, Type: params.Int32, Value: int32(9)},
-			params.TargetProcessID: {Name: params.TargetProcessID, Type: params.PID, Value: uint64(99)},
+			params.TargetProcessID: {Name: params.TargetProcessID, Type: params.Int64, Value: int64(99)},
 		},
 		Metadata: make(map[event.MetadataKey]any),
 	}
@@ -191,7 +191,7 @@ func TestRunLinuxDetectionRules(t *testing.T) {
 		Params: event.Params{
 			params.ProcessID:       {Name: params.ProcessID, Type: params.PID, Value: uint64(4242)},
 			params.Signal:          {Name: params.Signal, Type: params.Int32, Value: int32(9)},
-			params.TargetProcessID: {Name: params.TargetProcessID, Type: params.PID, Value: uint64(4242)},
+			params.TargetProcessID: {Name: params.TargetProcessID, Type: params.Int64, Value: int64(4242)},
 		},
 		Metadata: make(map[event.MetadataKey]any),
 	}
