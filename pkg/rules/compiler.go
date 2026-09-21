@@ -61,6 +61,7 @@ type compiler struct {
 	psnap     ps.Snapshotter
 	config    *config.Config
 	approvers config.Approvers
+	plan      *filter.ApproverPlan
 }
 
 func newCompiler(psnap ps.Snapshotter, cfg *config.Config) *compiler {
@@ -151,6 +152,7 @@ func (c *compiler) compile() (map[*config.FilterConfig]filter.Filter, *config.Ru
 	}
 
 	if len(filters) == 0 {
+		c.plan = filter.AllowAllPlan()
 		return filters, nil, nil
 	}
 
@@ -159,7 +161,32 @@ func (c *compiler) compile() (map[*config.FilterConfig]filter.Filter, *config.Ru
 		r.Approvers = c.approvers
 	}
 
+	providers := make([]filter.Filter, 0, len(filters))
+	for _, fltr := range filters {
+		if !isApproverScoped(fltr) {
+			continue
+		}
+		providers = append(providers, fltr)
+	}
+	c.plan = filter.BuildApproverPlan(providers)
+
 	return filters, r, nil
+}
+
+func isApproverScoped(f filter.Filter) bool {
+	for name := range f.GetStringFields() {
+		if name == fields.EvtName || name == fields.EvtCategory {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *compiler) ApproverPlan() *filter.ApproverPlan {
+	if c == nil || c.plan == nil {
+		return filter.AllowAllPlan()
+	}
+	return c.plan
 }
 
 func (c *compiler) visitApproverPredicates(node ql.Node) {
