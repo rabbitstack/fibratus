@@ -50,3 +50,64 @@ condition: evt.name = 'execve' and ps.name = 'bash'
 	require.NotNil(t, result)
 	require.True(t, result.HasProcEvents)
 }
+
+func TestCompilerShippedLinuxRules(t *testing.T) {
+	cfg := newLinuxConfig(filepath.Join("..", "..", "rules", "linux", "*.yml"))
+	filters, result, err := newCompiler(ps.NewSnapshotter(), cfg).compile()
+	require.NoError(t, err)
+	require.NotEmpty(t, filters)
+	require.NotNil(t, result)
+	require.True(t, result.HasProcEvents)
+	require.True(t, result.HasNetworkEvents)
+
+	// every shipped rule carries the labels the rule validator warns about
+	for f := range filters {
+		for _, label := range []string{"tactic.id", "tactic.name", "tactic.ref", "technique.id", "technique.name", "technique.ref"} {
+			require.True(t, f.HasLabel(label), "%s is missing the %s label", f.Name, label)
+		}
+	}
+}
+
+func TestCompilerSharedSemanticFixtures(t *testing.T) {
+	cfg := newLinuxConfig("_fixtures/shared/*.yml")
+	filters, result, err := newCompiler(ps.NewSnapshotter(), cfg).compile()
+	require.NoError(t, err)
+	require.Len(t, filters, 2)
+	require.NotNil(t, result)
+}
+
+func TestCompilerRejectsWindowsEventNames(t *testing.T) {
+	rule := filepath.Join(t.TempDir(), "windows.yml")
+	require.NoError(t, os.WriteFile(rule, []byte(`name: Windows process execution
+id: 5d17dc44-cc9f-4f13-9a31-23c6529ff46e
+version: 1.0.0
+min-engine-version: 3.0.0
+condition: evt.name = 'CreateProcess'
+`), 0o600))
+
+	cfg := &config.Config{
+		Filters: &config.Filters{
+			Rules: config.Rules{FromPaths: []string{rule}},
+		},
+	}
+	_, _, err := newCompiler(ps.NewSnapshotter(), cfg).compile()
+	require.EqualError(t, err, ErrUnknownEventName("Windows process execution", "CreateProcess").Error())
+}
+
+func TestCompilerRejectsDeprecatedFields(t *testing.T) {
+	rule := filepath.Join(t.TempDir(), "kevt.yml")
+	require.NoError(t, os.WriteFile(rule, []byte(`name: Deprecated field
+id: 6d17dc44-cc9f-4f13-9a31-23c6529ff46e
+version: 1.0.0
+min-engine-version: 3.0.0
+condition: kevt.name = 'execve'
+`), 0o600))
+
+	cfg := &config.Config{
+		Filters: &config.Filters{
+			Rules: config.Rules{FromPaths: []string{rule}},
+		},
+	}
+	_, _, err := newCompiler(ps.NewSnapshotter(), cfg).compile()
+	require.Error(t, err)
+}

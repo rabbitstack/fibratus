@@ -182,6 +182,33 @@ func TestRunSimpleRules(t *testing.T) {
 	}
 }
 
+func TestSharedSemanticRuleFixtures(t *testing.T) {
+	e := NewEngine(new(ps.SnapshotterMock), newConfig("_fixtures/shared/*.yml"))
+	compileRules(t, e)
+
+	proc := &event.Event{
+		Type:     event.CreateProcess,
+		Name:     "CreateProcess",
+		Category: event.Process,
+		PID:      859,
+		Params:   event.Params{},
+		Metadata: make(map[event.MetadataKey]any),
+	}
+	netevt := &event.Event{
+		Type:     event.RecvTCPv4,
+		Name:     "Recv",
+		Category: event.Net,
+		PID:      859,
+		Params: event.Params{
+			params.NetDport: {Name: params.NetDport, Type: params.Uint16, Value: uint16(443)},
+		},
+		Metadata: make(map[event.MetadataKey]any),
+	}
+
+	require.True(t, wrapProcessEvent(proc, e.ProcessEvent))
+	require.True(t, wrapProcessEvent(netevt, e.ProcessEvent))
+}
+
 func TestRunSequenceRule(t *testing.T) {
 	log.SetLevel(log.DebugLevel)
 
