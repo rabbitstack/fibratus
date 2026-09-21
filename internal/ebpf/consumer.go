@@ -42,6 +42,7 @@ var (
 	lateSnapshots   = expvar.NewInt("ebpf.startup.snapshot.late")
 	enrichmentMiss  = expvar.NewInt("ebpf.enrichment.miss")
 	ringbufDrops    = expvar.NewInt("ebpf.ringbuf.drops")
+	approverDrops   = expvar.NewInt("ebpf.approver.drops")
 )
 
 func applyProcessState(psnap ps.Snapshotter, evt *event.Event) {
