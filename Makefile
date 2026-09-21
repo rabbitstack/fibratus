@@ -1,25 +1,33 @@
 .DEFAULT_GOAL := build
 
-SHELL=bash -o pipefail -e
+SHELL := /bin/bash
+.SHELLFLAGS := -euo pipefail -c
 
 BPF2GO_VERSION := v0.20.0
 
 # Specifies a list of build flags
-TAGS ?= ""
+TAGS ?=
 
 BPF_DIR := internal/ebpf
+BPF_OUT := $(BPF_DIR)/bpf
+
+CLANG ?= clang
+GO ?= go
+GOFMT ?= gofmt
+BPF2GO ?= go run github.com/cilium/ebpf/cmd/bpf2go@$(BPF2GO_VERSION)
 
 BPF_FLAGS := \
 	-go-package bpf \
-	-output-dir $(BPF_DIR)/bpf \
-	-cc clang \
+	-output-dir $(BPF_OUT) \
+	-cc $(CLANG) \
 	-target bpfel,bpfeb \
 	-tags linux
 
+# Production headers first; spike/c is only the vmlinux.h fallback.
 BPF_CFLAGS := \
-	-I./$(BPF_DIR)/spike/c \
 	-I./$(BPF_DIR)/c \
 	-I./$(BPF_DIR)/c/common \
+	-I./$(BPF_DIR)/spike/c \
 	-O2 \
 	-g \
 	-D__TARGET_ARCH_x86
@@ -28,30 +36,33 @@ BPF_CFLAGS := \
 BPF_SOURCES := $(wildcard $(BPF_DIR)/c/*.bpf.c)
 BPF_NAMES := $(patsubst $(BPF_DIR)/c/%.bpf.c,%,$(BPF_SOURCES))
 BPF_TARGETS := $(foreach name,$(BPF_NAMES), \
-	$(BPF_DIR)/$(name)_bpfel.go \
-	$(BPF_DIR)/$(name)_bpfeb.go)
+	$(BPF_OUT)/$(name)_bpfel.go \
+	$(BPF_OUT)/$(name)_bpfeb.go)
 
-CLANG ?= clang
-GO ?= go
-GOFMT ?= gofmt
-BPF2GO ?= go run github.com/cilium/ebpf/cmd/bpf2go@$(BPF2GO_VERSION)
+titlecase = $(shell printf '%s' '$(1)' | awk '{print toupper(substr($$0,1,1)) substr($$0,2)}')
 
 .PHONY: ebpf
 ebpf: $(BPF_TARGETS)
-$(BPF_DIR)/%_bpfel.go $(BPF_DIR)/%_bpfeb.go &: $(BPF_DIR)/c/%.bpf.c
-	$(BPF2GO) $(BPF_FLAGS) -output-stem $* $(shell echo $* | sed 's/^./\U&/') $(BPF_DIR)/c/$*.bpf.c -- $(BPF_CFLAGS)
+$(BPF_OUT)/%_bpfel.go $(BPF_OUT)/%_bpfeb.go &: $(BPF_DIR)/c/%.bpf.c
+	$(BPF2GO) $(BPF_FLAGS) -output-stem $* $(call titlecase,$*) $(BPF_DIR)/c/$*.bpf.c -- $(BPF_CFLAGS)
+
+ifeq ($(strip $(TAGS)),)
+BUILD_TAGS :=
+else
+BUILD_TAGS := -tags $(TAGS)
+endif
 
 .PHONY: build
 build:
-	$(GO) build -tags $(TAGS) -o ./cmd/fibratus/fibratus ./cmd/fibratus/
+	$(GO) build $(BUILD_TAGS) -o ./cmd/fibratus/fibratus ./cmd/fibratus/
 
 .PHONY: fmt
 fmt:
-	$(GOFMT) -e -s -l -w pkg cmd
+	$(GOFMT) -e -s -l -w pkg cmd internal
 
 .PHONY: test
 test:
-	$(GO) test ./...
+	$(GO) test ./internal/ebpf ./internal/bootstrap ./pkg/event ./pkg/ps ./pkg/api ./pkg/util/signals ./pkg/filter ./pkg/rules
 
 .PHONY: clean
 clean:
