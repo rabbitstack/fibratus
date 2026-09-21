@@ -38,6 +38,12 @@ jobs:
           make -B ebpf
           git diff --exit-code -- internal/ebpf/bpf
       - name: Unit tests
-        run: go test ./internal/ebpf ./internal/bootstrap ./pkg/event ./pkg/ps ./pkg/api ./pkg/util/signals
+        run: make test
+      - name: Validate rules
+        run: |
+          make build
+          ./cmd/fibratus/fibratus rules validate \
+            --filters.rules.from-paths="rules/linux/*.yml" \
+            --filters.macros.from-paths="rules/linux/macros/*.yml"
       - name: Privileged process source
         run: sudo -E env "PATH=$PATH" go test -tags ebpf_integration -count=1 ./internal/ebpf

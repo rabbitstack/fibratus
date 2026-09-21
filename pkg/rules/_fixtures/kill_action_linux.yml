@@ -1,0 +1,7 @@
+name: Kill process executed from a temporary directory
+id: 33333333-3333-4333-8333-333333333333
+version: 1.0.0
+condition: evt.name = 'execve' and ps.exe imatches '/tmp/*'
+action:
+  - name: kill
+min-engine-version: 3.0.0
