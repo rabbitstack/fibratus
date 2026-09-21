@@ -138,6 +138,8 @@ struct {
 	__type(value, u8);
 } enabled SEC(".maps");
 
+#include "approvers.h"
+
 static __always_inline void account_drop(void)
 {
 	u32 key = 0;
@@ -256,8 +258,25 @@ static __always_inline int submit_from_scratch(u32 type, long ret, u32 syscall_i
 	u64 key = bpf_get_current_pid_tgid();
 	struct scratch_value *val;
 	struct syscall_event *e;
+	u16 port = 0;
+	u32 truncated = 0;
 
 	if (!type_enabled(type)) {
+		bpf_map_delete_elem(&scratch, &key);
+		return 0;
+	}
+
+	val = bpf_map_lookup_elem(&scratch, &key);
+	if (val) {
+		truncated = val->truncated;
+		if (type == EVT_TYPE_CONNECT)
+			port = sockaddr_dport(val->aux);
+		stash_filename(val->filename);
+	} else {
+		stash_filename(NULL);
+	}
+	if (!event_approved(type, port, truncated)) {
+		account_approver_reject();
 		bpf_map_delete_elem(&scratch, &key);
 		return 0;
 	}
@@ -318,6 +337,11 @@ static __always_inline int submit_args(u32 type, long ret, u32 syscall_id,
 
 	if (!type_enabled(type))
 		return 0;
+	stash_filename(NULL);
+	if (!event_approved(type, 0, 0)) {
+		account_approver_reject();
+		return 0;
+	}
 
 	e = reserve_event();
 	if (!e)

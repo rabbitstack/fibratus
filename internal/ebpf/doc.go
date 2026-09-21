@@ -19,6 +19,8 @@
 // Package ebpf hosts the Linux eBPF instrumentation backend. The event
 // source loads CO-RE programs, captures process, file, network, memory,
 // and process-control syscalls, and reconciles live events against an
-// iter/task baseline. The spike subdirectory remains as a feasibility
-// prototype.
+// iter/task baseline. Optional in-kernel approvers drop events that cannot
+// match compiled rules or the CLI filter, using only positive equality,
+// list, and prefix predicates. The spike subdirectory remains as a
+// feasibility prototype.
 package ebpf
