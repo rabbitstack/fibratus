@@ -1,0 +1,57 @@
+- macro: execve
+  expr: evt.name = 'execve' and evt.retval = 0
+  description: |
+    Matches a successful program execution. Failed execve calls are excluded
+    because no new program image is mapped.
+
+- macro: ptrace
+  expr: evt.name = 'ptrace'
+  description: |
+    Matches a ptrace request, whether or not the kernel permitted it.
+
+- macro: ptrace_attach
+  expr: ptrace and (ps.ptrace.request = 16 or ps.ptrace.request = 16902)
+  description: |
+    Matches a PTRACE_ATTACH (16) or PTRACE_SEIZE (16902) request. Denied
+    attempts are in scope because they reveal the same intent.
+
+- macro: send_signal
+  expr: evt.name = 'kill'
+  description: |
+    Matches a kill syscall, whether or not the signal was delivered.
+
+- macro: sigkill
+  expr: send_signal and ps.signal = 9
+  description: |
+    Matches a SIGKILL request. Denied attempts are in scope because they
+    reveal the same intent.
+
+- macro: connect
+  expr: evt.name = 'connect'
+  description: |
+    Matches a socket connect syscall. Refused and unreachable destinations
+    are in scope because they still indicate outbound intent.
+
+- macro: world_writable_exec_paths
+  list:
+    - '/tmp/*'
+    - '/var/tmp/*'
+    - '/dev/shm/*'
+  description: |
+    Common world-writable directories used to stage and execute payloads.
+
+- macro: script_interpreters
+  list:
+    - bash
+    - sh
+    - dash
+    - zsh
+    - python
+    - python3
+    - perl
+    - php
+    - ruby
+    - node
+    - lua
+  description: |
+    Script interpreter process names commonly used for staging outbound access.
