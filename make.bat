@@ -21,6 +21,7 @@ set GOBIN=%USERPROFILE%\go\bin
 set GOTEST=go test -timeout=10m -v -gcflags=all=-d=checkptr=0
 set GOFMT=gofmt -e -s -l -w
 set GOLINT=%GOBIN%\golangci-lint
+set GOBENCH=go test ./... -run='^$' -bench=Benchmark -benchmem
 
 if NOT DEFINED VERSION (
     set VERSION="0.0.0"
@@ -56,6 +57,7 @@ if "%~1"=="install" goto install
 if "%~1"=="deps" goto deps
 if "%~1"=="rsrc" goto rsrc
 if "%~1"=="mc" goto mc
+if "%~1"=="bench" goto bench
 
 :build
 :: set PKG_CONFIG_PATH=pkg-config
@@ -95,6 +97,11 @@ goto :EOF
 :: Generate eventlog message compiler input file
 go generate github.com/rabbitstack/fibratus/pkg/util/eventlog
 windmc -c -r pkg/util/eventlog/mc pkg/util/eventlog/mc/fibratus.mc
+if errorlevel 1 goto fail
+goto :EOF
+
+:bench
+%GOBENCH%
 if errorlevel 1 goto fail
 goto :EOF
 
