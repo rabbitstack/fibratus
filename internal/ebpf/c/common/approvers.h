@@ -15,6 +15,13 @@
 #define APPR_GENS 2
 #define APPR_MODE_MAX (EVT_TYPE_MAX * APPR_GENS)
 
+/* There is no in-kernel glob matcher. A backtracking matcher forks a verifier
+ * path at every byte comparison, and even two patterns over 64 steps exhausts
+ * the 1M instruction budget. Userspace instead rewrites the patterns it can
+ * prove equivalent to a prefix into the LPM trie below, and leaves the rest
+ * default-allow.
+ */
+
 struct approver_pid_key {
 	u32 gen;
 	u32 type;
@@ -38,6 +45,7 @@ struct approver_lpm_key {
 	u32 prefixlen;
 	u8 path[EVT_FILENAME_LEN];
 };
+
 
 struct {
 	__uint(type, BPF_MAP_TYPE_ARRAY);
@@ -110,6 +118,7 @@ struct {
 	__type(key, u32);
 	__type(value, u64);
 } approver_reject SEC(".maps");
+
 
 static __always_inline void account_approver_reject(void)
 {
@@ -214,6 +223,9 @@ static __always_inline int event_approved(u32 type, u16 port, u32 truncated)
 	if (*mode & APPR_REQ_PID) {
 		pkey.gen = gen;
 		pkey.type = type;
+		/* The init-namespace tgid, which is also what fill_current_ids puts on
+		 * the event, so a ps.pid predicate compares like with like.
+		 */
 		pkey.pid = bpf_get_current_pid_tgid() >> 32;
 		if (!bpf_map_lookup_elem(&approver_pid, &pkey))
 			return 0;
