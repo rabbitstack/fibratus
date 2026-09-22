@@ -371,7 +371,28 @@ func extractFilenames(ex *Extraction, expr *ql.BinaryExpr) {
 			}
 			ex.FilePrefix = append(ex.FilePrefix, name)
 		}
+	case ql.Matches:
+		names, ok := rhsStrings(expr.RHS)
+		if !ok {
+			ex.Unsupported = true
+			return
+		}
+		for _, name := range names {
+			literal, prefix, ok := globAsPrefix(name)
+			if !ok {
+				ex.Unsupported = true
+				return
+			}
+			switch {
+			case literal != "":
+				ex.FileExact = append(ex.FileExact, literal)
+			case prefix != "":
+				ex.FilePrefix = append(ex.FilePrefix, prefix)
+			}
+		}
 	default:
+		// imatches stays out: case folding the path in the kernel would have to
+		// agree with unicode.ToLower on every rune userspace folds.
 		ex.Unsupported = true
 	}
 }
@@ -485,6 +506,56 @@ func clonePlan(p *ApproverPlan) *ApproverPlan {
 		out.policies[typ] = pol
 	}
 	return out
+}
+
+// globAsPrefix rewrites a matches pattern into the exact or prefix form the
+// kernel can already evaluate. There is no in-kernel glob matcher because a
+// backtracking one is not verifiable, so only patterns provably equivalent to
+// one of those two forms are accepted:
+//
+//	/etc/passwd -> exact, no wildcard at all
+//	/tmp/*      -> prefix, since '*' spans every remaining byte including '/'
+//	*           -> vacuous, matches everything and constrains nothing
+//
+// A '*' anywhere but the end, or any '?', reports false and leaves the event
+// type default-allow. Callers must pass the pattern through collapseStars so
+// /tmp/** reaches here as /tmp/*.
+func globAsPrefix(pattern string) (literal, prefix string, ok bool) {
+	pattern = collapseStars(pattern)
+	if strings.ContainsRune(pattern, '?') {
+		return "", "", false
+	}
+	switch strings.Count(pattern, "*") {
+	case 0:
+		return pattern, "", true
+	case 1:
+		if !strings.HasSuffix(pattern, "*") {
+			return "", "", false
+		}
+		return "", strings.TrimSuffix(pattern, "*"), true
+	default:
+		return "", "", false
+	}
+}
+
+// collapseStars rewrites runs of '*' as a single '*'. The two are equivalent to
+// matchCaseSensitive, which only ever remembers the most recent star position.
+func collapseStars(pattern string) string {
+	if !strings.Contains(pattern, "**") {
+		return pattern
+	}
+	var b strings.Builder
+	b.Grow(len(pattern))
+	var prevStar bool
+	for i := range len(pattern) {
+		c := pattern[i]
+		if c == '*' && prevStar {
+			continue
+		}
+		prevStar = c == '*'
+		b.WriteByte(c)
+	}
+	return b.String()
 }
 
 func matchFilename(pol TypePolicy, path string) bool {

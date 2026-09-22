@@ -43,36 +43,45 @@ func TestApproverDecisionsMatchLoadedPrograms(t *testing.T) {
 	require.NoError(t, os.WriteFile(allowed, []byte("x"), 0o600))
 
 	cfg := testConfig()
+	// Written as a matches pattern rather than startswith so the rewrite into
+	// the LPM trie is covered too.
 	plan := filter.PlanFromFilter(mustCompile(t,
-		"evt.name = 'openat' and file.path startswith '"+dir+"'"))
+		"evt.name = 'openat' and file.path matches '"+dir+"/*'"))
 
 	es := NewEventSource(ps.NewSnapshotter(), cfg, nil, plan).(*EventSource)
 	require.NoError(t, es.Open(cfg))
 	t.Cleanup(func() { _ = es.Close() })
 
 	before := es.loader.approverRejects()
-
-	// Inside the approved prefix, so the kernel must let this one through.
-	fd, err := os.Open(allowed)
-	require.NoError(t, err)
-	_ = fd.Close()
-
-	// Outside it, so the kernel must reject these without reserving ringbuf space.
-	for range 20 {
-		if f, err := os.Open("/etc/hostname"); err == nil {
+	touch := func(path string) {
+		if f, err := os.Open(path); err == nil {
 			_ = f.Close()
 		}
 	}
 
-	deadline := time.Now().Add(5 * time.Second)
+	// Keep generating attempts while draining. Correlating sys_enter_openat
+	// with its exit goes through a bounded LRU map, so on a loaded machine any
+	// single open can lose its scratch entry and arrive with no path at all.
+	// Retrying makes the assertion about the approver rather than about that.
+	attempts := time.NewTicker(100 * time.Millisecond)
+	defer attempts.Stop()
+	touch(allowed)
+	touch("/etc/hostname")
+
+	deadline := time.Now().Add(30 * time.Second)
 	var sawAllowed, sawRejectedPath bool
+	seen := make([]string, 0, 16)
 	for time.Now().Before(deadline) && !sawAllowed {
 		select {
 		case evt := <-es.Events():
 			if evt.Type != event.Openat {
 				continue
 			}
-			switch evt.GetParamAsString(params.FilePath) {
+			path := evt.GetParamAsString(params.FilePath)
+			if len(seen) < cap(seen) {
+				seen = append(seen, path)
+			}
+			switch path {
 			case allowed:
 				sawAllowed = true
 			case "/etc/hostname":
@@ -80,12 +89,16 @@ func TestApproverDecisionsMatchLoadedPrograms(t *testing.T) {
 			}
 		case err := <-es.Errors():
 			t.Fatalf("event source error: %v", err)
-		case <-time.After(50 * time.Millisecond):
+		case <-attempts.C:
+			touch(allowed)
+			touch("/etc/hostname")
 		}
 	}
 
-	require.True(t, sawAllowed, "openat inside the approved prefix was dropped in the kernel")
-	require.False(t, sawRejectedPath, "openat outside the approved prefix reached userspace")
+	require.True(t, sawAllowed,
+		"openat matching the approved pattern never reached userspace; wanted %q, saw %q, rejects %d -> %d",
+		allowed, seen, before, es.loader.approverRejects())
+	require.False(t, sawRejectedPath, "openat outside the approved pattern reached userspace")
 	require.Greater(t, es.loader.approverRejects(), before, "approver reject counter did not advance")
 }
 
