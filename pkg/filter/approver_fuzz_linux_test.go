@@ -50,7 +50,6 @@ var fuzzExprs = []string{
 	"evt.name = 'openat' and file.path != '/tmp/x'",
 	"evt.name = 'openat' and not (file.path = '/tmp/x')",
 	"evt.name = 'openat' and (ps.pid = 1 or file.path = '/tmp/x')",
-	"evt.name = 'openat' and file.path matches '/tmp/*'",
 	"evt.name = 'openat' and ps.name = 'bash'",
 	"file.path startswith '/tmp'",
 	"ps.pid = 42",

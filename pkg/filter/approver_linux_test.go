@@ -64,31 +64,40 @@ func TestExtractPortList(t *testing.T) {
 }
 
 func TestExtractUnsupportedShapesDefaultAllow(t *testing.T) {
-	cases := []string{
+	for _, expr := range []string{
 		"evt.name = 'openat' and file.path != '/etc/passwd'",
 		"evt.name = 'openat' and not (file.path = '/etc/passwd')",
 		"evt.name = 'openat' and (ps.pid = 1 or file.path = '/tmp/x')",
-		"evt.name = 'openat' and file.path matches '/tmp/*'",
 		"evt.name = 'openat' and ps.pid > 1",
 		"evt.name = 'openat' and lower(file.path) = '/tmp/x'",
-		`sequence
-|evt.name = 'execve'|
-|evt.name = 'connect'|`,
+	} {
+		plan := PlanFromFilter(compileApprover(t, expr))
+		assert.True(t, plan.Policy(event.Openat).DefaultAllow, expr)
 	}
-	for _, expr := range cases {
-		f := compileApprover(t, expr)
-		plan := PlanFromFilter(f)
-		assert.True(t, plan.Policy(event.Openat).DefaultAllow || plan.Policy(event.Connect).DefaultAllow || plan.Policy(event.Execve).DefaultAllow, expr)
-	}
-
-	orPlan := PlanFromFilter(compileApprover(t, "evt.name = 'openat' and (ps.pid = 1 or file.path = '/tmp/x')"))
-	assert.True(t, orPlan.Policy(event.Openat).DefaultAllow)
 
 	seqPlan := PlanFromFilter(compileApprover(t, `sequence
 |evt.name = 'execve'|
 |evt.name = 'connect'|`))
 	assert.True(t, seqPlan.Policy(event.Execve).DefaultAllow)
 	assert.True(t, seqPlan.Policy(event.Connect).DefaultAllow)
+}
+
+// A list of literal paths needs no wildcard machinery: every element is an
+// exact key, so the whole condition resolves in the kernel's hash lookup.
+func TestExtractFilePathList(t *testing.T) {
+	f := compileApprover(t, "evt.name = 'openat' and file.path in ('/etc/passwd', '/etc/shadow')")
+	ex := f.(ApproverProvider).ApproverExtraction()
+	require.False(t, ex.Unsupported)
+	assert.Equal(t, []string{"/etc/passwd", "/etc/shadow"}, ex.FileExact)
+	assert.Empty(t, ex.FilePrefix)
+
+	plan := PlanFromFilter(f)
+	pol := plan.Policy(event.Openat)
+	require.False(t, pol.DefaultAllow)
+	assert.True(t, pol.RequireFilename)
+	assert.True(t, plan.Allows(Sample{Type: event.Openat, Filename: "/etc/passwd"}))
+	assert.True(t, plan.Allows(Sample{Type: event.Openat, Filename: "/etc/shadow"}))
+	assert.False(t, plan.Allows(Sample{Type: event.Openat, Filename: "/etc/hosts"}))
 }
 
 // ps.name is snapshot state while the kernel can only read the live task comm,

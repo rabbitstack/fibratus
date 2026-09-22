@@ -21,7 +21,9 @@
 package ebpf
 
 import (
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -42,64 +44,98 @@ func TestApproverDecisionsMatchLoadedPrograms(t *testing.T) {
 	allowed := filepath.Join(dir, "allowed.txt")
 	require.NoError(t, os.WriteFile(allowed, []byte("x"), 0o600))
 
-	cfg := testConfig()
+	// Establish first that the capture path reports this exact open with no
+	// approver installed. If that fails, the problem is the enter/exit
+	// correlation rather than the prefilter, and the second phase would
+	// otherwise blame the approver for it.
+	baseline := watchOpens(t, nil, allowed)
+	require.True(t, baseline.sawAllowed,
+		"capture never reported the open with no approver installed; pid=%d selfOpens=%d saw %q",
+		os.Getpid(), baseline.selfOpens, baseline.seen)
+
 	// Written as a matches pattern rather than startswith so the rewrite into
 	// the LPM trie is covered too.
 	plan := filter.PlanFromFilter(mustCompile(t,
 		"evt.name = 'openat' and file.path matches '"+dir+"/*'"))
+	got := watchOpens(t, plan, allowed)
 
+	require.True(t, got.sawAllowed,
+		"openat matching the approved pattern never reached userspace; wanted %q, selfOpens=%d saw %q, rejects %d -> %d",
+		allowed, got.selfOpens, got.seen, got.rejectsBefore, got.rejectsAfter)
+	require.False(t, got.sawDenied, "openat outside the approved pattern reached userspace")
+	require.Greater(t, got.rejectsAfter, got.rejectsBefore, "approver reject counter did not advance")
+}
+
+type openWatch struct {
+	sawAllowed    bool
+	sawDenied     bool
+	seen          []string
+	selfOpens     int
+	rejectsBefore uint64
+	rejectsAfter  uint64
+}
+
+const deniedPath = "/etc/hostname"
+
+// watchOpens repeatedly opens allowed and a denied path while draining events,
+// returning what reached userspace. Correlating sys_enter_openat with its exit
+// goes through a bounded LRU map, so on a loaded machine any single open can
+// lose its scratch entry and arrive with no path at all. Retrying keeps the
+// assertions about the approver rather than about that.
+func watchOpens(t *testing.T, plan *filter.ApproverPlan, allowed string) openWatch {
+	t.Helper()
+	cfg := testConfig()
 	es := NewEventSource(ps.NewSnapshotter(), cfg, nil, plan).(*EventSource)
 	require.NoError(t, es.Open(cfg))
-	t.Cleanup(func() { _ = es.Close() })
+	defer func() { _ = es.Close() }()
 
-	before := es.loader.approverRejects()
-	touch := func(path string) {
-		if f, err := os.Open(path); err == nil {
-			_ = f.Close()
-		}
-	}
+	w := openWatch{seen: make([]string, 0, 16), rejectsBefore: es.loader.approverRejects()}
 
-	// Keep generating attempts while draining. Correlating sys_enter_openat
-	// with its exit goes through a bounded LRU map, so on a loaded machine any
-	// single open can lose its scratch entry and arrive with no path at all.
-	// Retrying makes the assertion about the approver rather than about that.
-	attempts := time.NewTicker(100 * time.Millisecond)
+	attempts := time.NewTicker(200 * time.Millisecond)
 	defer attempts.Stop()
-	touch(allowed)
-	touch("/etc/hostname")
+	touch := func() { openFromChild(t, allowed) }
+	touch()
 
-	deadline := time.Now().Add(30 * time.Second)
-	var sawAllowed, sawRejectedPath bool
-	seen := make([]string, 0, 16)
-	for time.Now().Before(deadline) && !sawAllowed {
+	deadline := time.Now().Add(20 * time.Second)
+	for time.Now().Before(deadline) && !w.sawAllowed {
 		select {
 		case evt := <-es.Events():
 			if evt.Type != event.Openat {
 				continue
 			}
 			path := evt.GetParamAsString(params.FilePath)
-			if len(seen) < cap(seen) {
-				seen = append(seen, path)
+			if evt.PID == uint64(os.Getpid()) {
+				w.selfOpens++
+			}
+			if len(w.seen) < cap(w.seen) {
+				w.seen = append(w.seen, fmt.Sprintf("pid=%d sys=%d %s",
+					evt.PID, evt.GetParamAsUint32(params.SyscallID), path))
 			}
 			switch path {
 			case allowed:
-				sawAllowed = true
-			case "/etc/hostname":
-				sawRejectedPath = true
+				w.sawAllowed = true
+			case deniedPath:
+				w.sawDenied = true
 			}
 		case err := <-es.Errors():
 			t.Fatalf("event source error: %v", err)
 		case <-attempts.C:
-			touch(allowed)
-			touch("/etc/hostname")
+			touch()
 		}
 	}
+	w.rejectsAfter = es.loader.approverRejects()
+	return w
+}
 
-	require.True(t, sawAllowed,
-		"openat matching the approved pattern never reached userspace; wanted %q, saw %q, rejects %d -> %d",
-		allowed, seen, before, es.loader.approverRejects())
-	require.False(t, sawRejectedPath, "openat outside the approved pattern reached userspace")
-	require.Greater(t, es.loader.approverRejects(), before, "approver reject counter did not advance")
+// openFromChild opens the two paths from a short-lived child rather than from
+// the test process. Syscall tracepoints did not report this process's own opens
+// on every runner, while child processes are reported reliably, which is also
+// how the other privileged tests here drive syscalls.
+func openFromChild(t *testing.T, allowed string) {
+	t.Helper()
+	cmd := exec.Command("/bin/sh", "-c", "cat -- \"$1\" >/dev/null 2>&1; cat -- \"$2\" >/dev/null 2>&1",
+		"sh", allowed, deniedPath)
+	_ = cmd.Run()
 }
 
 func TestApproverGenerationFlipAndFailedReload(t *testing.T) {
