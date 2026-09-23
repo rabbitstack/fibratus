@@ -1,0 +1,44 @@
+[Unit]
+Description=Fibratus
+Documentation=https://www.fibratus.io
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/fibratus run
+Restart=on-failure
+RestartSec=5s
+
+# Fibratus starts as root because attaching a syscall tracepoint reads its id
+# from /sys/kernel/tracing, which is root-only on stock distributions. The
+# bounding set is what actually constrains it: everything below is dropped, so
+# the process keeps only what the backend and the kill action need.
+#
+#   CAP_BPF         load programs, create and update maps
+#   CAP_PERFMON     attach to tracepoints
+#   CAP_SYS_PTRACE  read /proc/<pid>/exe and cmdline of other users' processes
+#   CAP_KILL        signal a target, needed only by the kill rule action
+#
+# CAP_BPF and CAP_PERFMON were split out of CAP_SYS_ADMIN in 5.8. On a kernel
+# that predates the split, replace both with CAP_SYS_ADMIN.
+CapabilityBoundingSet=CAP_BPF CAP_PERFMON CAP_SYS_PTRACE CAP_KILL
+AmbientCapabilities=CAP_BPF CAP_PERFMON CAP_SYS_PTRACE CAP_KILL
+NoNewPrivileges=yes
+
+# full rather than strict: strict would also mount /run read-only and the API
+# socket lives there.
+ProtectSystem=full
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+
+# Process enrichment reads other processes' procfs entries, so this must stay
+# permissive. Hiding them would silently empty ps.exe and ps.cmdline.
+ProtectProc=default
+
+[Install]
+WantedBy=multi-user.target

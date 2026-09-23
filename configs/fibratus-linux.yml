@@ -1,0 +1,132 @@
+# Fibratus configuration for Linux.
+#
+# Only the settings that apply to the eBPF backend are listed here. Windows-only
+# sections, such as filaments, PE introspection, YARA scanning, and handle or
+# evasion telemetry, have no effect on this platform and are left out rather
+# than shipped inert.
+
+# =============================== Event source =========================================
+
+eventsource:
+  # Process telemetry is always collected. Execve, exit, and clone build the
+  # process state every other event is correlated against, so they cannot be
+  # disabled.
+
+  # Collects openat, unlink, and rename. This is the highest-volume family by a
+  # wide margin on a busy host.
+  enable-fileio: true
+
+  # Collects connect and accept.
+  enable-net: true
+
+  # Collects mmap, process_vm_readv, and process_vm_writev.
+  enable-mem: true
+
+  # Drops events before they reach the aggregator, by event name or by the
+  # image name of the process that produced them.
+  #blacklist:
+  #  events:
+  #    - openat
+  #  images:
+  #    - fibratus
+
+# =============================== Aggregator ===========================================
+
+aggregator:
+  # Determines the flush period that triggers the flushing of the event batches to output sinks
+  flush-period: 500ms
+
+  # Represents the max time to wait before announcing failed flushing of enqueued events when fibratus
+  # is stopped
+  flush-timeout: 4s
+
+# =============================== Filters and rules ====================================
+
+filters:
+  rules:
+    # Enables the rule engine. With no rules loaded every event reaches the
+    # outputs; with rules loaded only matching events do.
+    enabled: true
+
+    # Rule definitions. The package installs the shipped Linux rules here.
+    from-paths:
+      - /etc/fibratus/rules/*.yml
+
+  macros:
+    from-paths:
+      - /etc/fibratus/rules/macros/*.yml
+
+# =============================== API ==================================================
+
+api:
+  # The transport for the API HTTP server. A unix:// path keeps the API off the
+  # network and leaves access to the socket's filesystem permissions. A host:port
+  # value exposes it over TCP instead, e.g. 192.168.1.32:8084.
+  transport: unix:///var/run/fibratus.sock
+
+  # Represents the timeout interval for the HTTP server responses.
+  timeout: 5s
+
+# =============================== Logging ==============================================
+
+logging:
+  # Specifies the minimum allowed log level. Anything logged below this log level will
+  # not get dumped to a file or stdout stream
+  level: info
+
+  # Represents the log file format
+  #formatter: json
+
+  # Under systemd, logging to stdout routes through the journal
+  log-stdout: true
+
+  # Alternative directory for log files
+  #path: /var/log/fibratus
+
+# =============================== Outputs ==============================================
+
+output:
+  # Console output writes the event to the standard output stream.
+  console:
+    enabled: true
+
+    # Indicates if the console output is colorized
+    colorize: true
+
+    # The "pretty" format replaces specifiers in the template, "json" emits the
+    # event as a raw JSON string
+    format: pretty
+
+  # Elasticsearch output indexes event bulks into Elasticsearch clusters.
+  elasticsearch:
+    enabled: false
+    #servers:
+    #  - http://localhost:9200
+
+  # HTTP output posts event batches to an HTTP endpoint.
+  http:
+    enabled: false
+    #endpoint: http://localhost:8081
+
+  # AMQP output publishes events to a message broker.
+  amqp:
+    enabled: false
+    #url: amqp://localhost:5672
+
+# =============================== Alert senders ========================================
+
+alertsenders:
+  mail:
+    enabled: false
+    #host: smtp.gmail.com
+    #port: 587
+
+  slack:
+    enabled: false
+    #url: https://hooks.slack.com/services/...
+
+# =============================== General ==============================================
+
+# Forwards events to the output sinks without running the rule engine or
+# building the full process state.
+forward: false

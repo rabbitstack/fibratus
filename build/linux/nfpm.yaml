@@ -1,0 +1,46 @@
+name: fibratus
+arch: amd64
+platform: linux
+version: ${VERSION}
+section: admin
+priority: optional
+maintainer: Nedim Sabic Sabic <https://fibratus.io>
+description: |
+  Security sensor for realtime threat detection and protection
+vendor: Fibratus
+homepage: https://fibratus.io
+license: Apache-2.0
+
+# The BPF objects are embedded in the binary at compile time, so there is
+# nothing to ship alongside it.
+contents:
+  - src: ./cmd/fibratus/fibratus
+    dst: /usr/bin/fibratus
+
+  - src: ./configs/fibratus-linux.yml
+    dst: /etc/fibratus/fibratus.yml
+    type: config|noreplace
+
+  - src: ./rules/linux/*.yml
+    dst: /etc/fibratus/rules/
+
+  - src: ./rules/linux/macros/macros.yml
+    dst: /etc/fibratus/rules/macros/macros.yml
+
+  - src: ./build/linux/fibratus.service
+    dst: /lib/systemd/system/fibratus.service
+
+overrides:
+  rpm:
+    contents:
+      - src: ./cmd/fibratus/fibratus
+        dst: /usr/bin/fibratus
+      - src: ./configs/fibratus-linux.yml
+        dst: /etc/fibratus/fibratus.yml
+        type: config|noreplace
+      - src: ./rules/linux/*.yml
+        dst: /etc/fibratus/rules/
+      - src: ./rules/linux/macros/macros.yml
+        dst: /etc/fibratus/rules/macros/macros.yml
+      - src: ./build/linux/fibratus.service
+        dst: /usr/lib/systemd/system/fibratus.service
