@@ -2,6 +2,64 @@
 
 On Linux, Fibratus collects telemetry through eBPF CO-RE programs attached to syscall and scheduler tracepoints, instead of ETW. The rule engine, filters, actions, and outputs are the same on both platforms.
 
+## Installing
+
+Packages are built for `x86_64` and carry the binary, a configuration, the shipped rules, and a systemd unit. The BPF objects are compiled into the binary, so there is nothing else to install and no compiler is needed on the host.
+
+```
+# Debian, Ubuntu
+sudo dpkg -i fibratus_<version>_amd64.deb
+
+# RHEL, Fedora, Rocky, openSUSE
+sudo rpm -i fibratus-<version>-1.x86_64.rpm
+```
+
+| Path | Contents |
+| --- | --- |
+| `/usr/bin/fibratus` | The binary |
+| `/etc/fibratus/fibratus.yml` | Configuration, preserved across upgrades |
+| `/etc/fibratus/rules/` | Shipped detection rules |
+| `/etc/fibratus/rules/macros/` | Macros the rules expand |
+| `/lib/systemd/system/fibratus.service` | Service unit, `/usr/lib/...` on RPM distributions |
+
+## Quick start
+
+Check the host before starting anything. This refuses to run and names every unmet requirement at once, rather than failing later inside the capture:
+
+```
+sudo fibratus rules validate
+```
+
+Run in the foreground to see events as they arrive:
+
+```
+sudo fibratus run
+```
+
+Narrow it with a filter expression, using the same language the rules use:
+
+```
+sudo fibratus run "evt.name = 'openat' and file.path startswith '/etc'"
+```
+
+Then run it as a service:
+
+```
+sudo systemctl enable --now fibratus
+sudo systemctl status fibratus
+sudo journalctl -u fibratus -f
+```
+
+The unit logs to the journal. With the rule engine enabled, only events matching a rule reach the outputs, so an idle host is expected to be quiet; drop the rules or set `filters.rules.enabled` to `false` to see the raw stream.
+
+Inspect a running instance over the API socket:
+
+```
+sudo fibratus config    # the configuration as loaded
+sudo fibratus stats     # capture, drop, and rule engine counters
+sudo fibratus list events
+```
+
 ## Runtime prerequisites
 
 These are hard requirements. Fibratus probes each one at startup and refuses to run if any is missing, rather than degrading to partial telemetry.
@@ -19,7 +77,7 @@ Nothing needs to be compiled at install time. The BPF objects are generated ahea
 
 ## Capabilities
 
-Running as root works. To run unprivileged, grant:
+The packaged unit starts Fibratus as root, because attaching a syscall tracepoint reads its id from `/sys/kernel/tracing`, which is root-only on stock distributions. What limits it is the bounding set in the unit, which drops everything except the four capabilities below. Granting these to an unprivileged invocation works too, provided tracefs is readable:
 
 | Capability | Needed for |
 | --- | --- |
@@ -80,7 +138,8 @@ Counters are exported as expvars and available through `fibratus stats`.
 Ordinary builds consume the committed objects:
 
 ```
-make
+make          # the binary
+make pkg      # deb and rpm into build/pkg
 ```
 
 Regenerating them needs clang, pinned to the major the committed objects were built with, because clang records its version in BTF and a different major rewrites every object:
