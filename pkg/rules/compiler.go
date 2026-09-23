@@ -21,8 +21,6 @@ package rules
 import (
 	"expvar"
 	"fmt"
-	"slices"
-	"strings"
 
 	semver "github.com/hashicorp/go-version"
 	"github.com/rabbitstack/fibratus/pkg/config"
@@ -247,71 +245,6 @@ func (c *compiler) visitApproverPredicates(node ql.Node) {
 	ql.WalkFunc(node, walk)
 }
 
-func (c *compiler) containsEventTypes(root ql.Node, types ...event.Type) bool {
-	var contains bool
-	ql.WalkFunc(root, func(n ql.Node) {
-		expr, ok := n.(*ql.BinaryExpr)
-		if !ok {
-			return
-		}
-		lhs, ok := expr.LHS.(*ql.FieldLiteral)
-		if !ok || lhs.Field != fields.EvtName {
-			return
-		}
-
-		vals, ok := rhsToStrings(expr.RHS)
-		if !ok {
-			return
-		}
-
-		evts := make([]event.Type, 0, len(vals))
-		for _, v := range vals {
-			evts = append(evts, event.NameToType(v))
-		}
-
-		for _, typ := range types {
-			if slices.Contains(evts, typ) {
-				contains = true
-				return
-			}
-		}
-	})
-	return contains
-}
-
-func (c *compiler) containsFieldMatch(root ql.Node, field fields.Field, op ql.Token, val string) bool {
-	var contains bool
-	ql.WalkFunc(root, func(n ql.Node) {
-		expr, ok := n.(*ql.BinaryExpr)
-		if !ok {
-			return
-		}
-
-		lhs, ok := expr.LHS.(*ql.FieldLiteral)
-		if !ok || lhs.Field != field {
-			return
-		}
-
-		if expr.Op != op {
-			return
-		}
-
-		values, ok := rhsToStrings(expr.RHS)
-		if !ok {
-			return
-		}
-		for _, v := range values {
-			if strings.EqualFold(v, val) {
-				contains = true
-				return
-			}
-		}
-	})
-	return contains
-}
-
-// isNegated walks up the AST to check if the given node
-// is a direct child of a NOT unary expression.
 func (c *compiler) isNegated(root ql.Node, node ql.Node) bool {
 	negated := false
 	ql.WalkFunc(root, func(n ql.Node) {

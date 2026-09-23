@@ -35,9 +35,8 @@ func (noopAccessor) SetFields([]Field)                             {}
 func (noopAccessor) SetSegments([]fields.Segment)                  {}
 func (noopAccessor) IsFieldAccessible(*event.Event) bool           { return false }
 
-func newModuleAccessor() Accessor     { return noopAccessor{} }
-func newRegistryAccessor() Accessor   { return noopAccessor{} }
-func newHandleAccessor() Accessor     { return noopAccessor{} }
-func newPEAccessor() Accessor         { return noopAccessor{} }
-func newDNSAccessor() Accessor        { return noopAccessor{} }
-func newThreadpoolAccessor() Accessor { return noopAccessor{} }
+func newModuleAccessor() Accessor   { return noopAccessor{} }
+func newRegistryAccessor() Accessor { return noopAccessor{} }
+func newHandleAccessor() Accessor   { return noopAccessor{} }
+func newPEAccessor() Accessor       { return noopAccessor{} }
+func newDNSAccessor() Accessor      { return noopAccessor{} }
