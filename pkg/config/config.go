@@ -273,7 +273,7 @@ func (c *Config) addFlags() {
 		c.flags.String(filamentPath, defaultFilamentPath(), "Denotes the directory where filaments are located")
 	}
 	if c.opts.run || c.opts.replay || c.opts.capture || c.opts.stats {
-		c.flags.String(transport, "localhost:8080", "Specifies the underlying transport protocol for the API HTTP server")
+		c.flags.String(transport, defaultTransport(), "Specifies the underlying transport protocol for the API HTTP server")
 		c.flags.Duration(timeout, 15*time.Second, "Determines the timeout for the API server responses")
 	}
 	c.Log.AddFlags(c.flags)
