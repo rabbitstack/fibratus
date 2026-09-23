@@ -21,6 +21,7 @@ BPF_DIR := internal/ebpf
 BPF_OUT := $(BPF_DIR)/bpf
 
 CLANG ?= clang
+LLVM_STRIP ?= llvm-strip
 GO ?= go
 GOFMT ?= gofmt
 BPF2GO ?= go run github.com/cilium/ebpf/cmd/bpf2go@$(BPF2GO_VERSION)
@@ -29,6 +30,7 @@ BPF_FLAGS := \
 	-go-package bpf \
 	-output-dir $(BPF_OUT) \
 	-cc $(CLANG) \
+	-strip $(LLVM_STRIP) \
 	-target bpfel,bpfeb \
 	-tags linux
 
@@ -59,6 +61,12 @@ $(BPF_OUT)/%_bpfel.go $(BPF_OUT)/%_bpfeb.go &: $(BPF_DIR)/c/%.bpf.c
 check-clang:
 	@command -v $(CLANG) >/dev/null 2>&1 || { \
 		echo "$(CLANG) not found. Generating the eBPF objects needs clang $(CLANG_VERSION)."; \
+		exit 1; \
+	}
+	@command -v $(LLVM_STRIP) >/dev/null 2>&1 || { \
+		echo "$(LLVM_STRIP) not found. Versioned llvm packages ship llvm-strip-$(CLANG_VERSION)"; \
+		echo "without the unversioned name bpf2go looks for."; \
+		echo "Point LLVM_STRIP at it, e.g. make ebpf LLVM_STRIP=llvm-strip-$(CLANG_VERSION)."; \
 		exit 1; \
 	}
 	@have=$$($(CLANG) --version | sed -n 's/.*clang version \([0-9]*\).*/\1/p' | head -1); \
