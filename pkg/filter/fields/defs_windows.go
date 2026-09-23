@@ -29,6 +29,17 @@ import (
 func platformString() params.Type     { return params.UnicodeString }
 func platformAnsiString() params.Type { return params.AnsiString }
 
+// isNumber is the field argument validation function that
+// returns true if all characters are digits.
+var isNumber = func(s string) bool {
+	for _, c := range s {
+		if !unicode.IsNumber(c) {
+			return false
+		}
+	}
+	return true
+}
+
 var fields = platformFields(map[Field]FieldInfo{
 	EvtPID:          {EvtPID, "process identifier generating the event", params.Uint32, []string{"evt.pid = 6"}, nil, nil},
 	EvtTID:          {EvtTID, "thread identifier generating the event", params.Uint32, []string{"evt.tid = 1024"}, nil, nil},
