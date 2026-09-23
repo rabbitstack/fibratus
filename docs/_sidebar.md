@@ -2,6 +2,7 @@
   * [Installation](setup/installation.md)
   * [Quick Start](setup/quick-start.md)
   * [Configuration](setup/configuration.md)
+  * [Linux](setup/linux.md)
 * ---
 * [Architecture](architecture.md)
 * ---
