@@ -64,3 +64,9 @@ jobs:
         run: sudo -E env "PATH=$PATH" go test -tags ebpf_integration -count=1 -run TestPrerequisitesAreMet -v ./internal/ebpf
       - name: Privileged process source
         run: sudo -E env "PATH=$PATH" make test-integration
+      - name: Package
+        run: make pkg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fibratus-linux-packages
+          path: build/pkg/*
