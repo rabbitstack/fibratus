@@ -5,6 +5,7 @@ SHELL := /bin/bash
 
 BPF2GO_VERSION := v0.20.0
 GOLANGCI_LINT_VERSION := v2.9.0
+NFPM_VERSION := v2.43.0
 
 # The committed objects are byte-compared in CI, and clang encodes its version
 # into BTF, so generating with a different major produces a spurious diff.
@@ -138,6 +139,17 @@ LINT_PKGS := \
 lint:
 	golangci-lint run $(LINT_PKGS)
 
+VERSION ?= 0.0.0
+PKG_DIR := build/pkg
+NFPM ?= go run github.com/goreleaser/nfpm/v2/cmd/nfpm@$(NFPM_VERSION)
+
+.PHONY: pkg
+pkg: build
+	@mkdir -p $(PKG_DIR)
+	VERSION=$(VERSION) $(NFPM) package --config build/linux/nfpm.yaml --packager deb --target $(PKG_DIR)
+	VERSION=$(VERSION) $(NFPM) package --config build/linux/nfpm.yaml --packager rpm --target $(PKG_DIR)
+
 .PHONY: clean
 clean:
 	rm -f cmd/fibratus/fibratus
+	rm -rf $(PKG_DIR)
