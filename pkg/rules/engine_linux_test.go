@@ -237,8 +237,15 @@ func TestLinuxLifecycleSequence(t *testing.T) {
 		Metadata: make(map[event.MetadataKey]any),
 	}
 
+	require.Len(t, e.sequences, 1)
+	ss := e.sequences[0]
+	require.True(t, ss.isInitialState())
+
 	require.False(t, processEvent(t, e, execve))
+	require.False(t, ss.isInitialState(), "the execve stage should have advanced the machine")
+
 	require.True(t, processEvent(t, e, connect))
+	require.True(t, ss.isInitialState(), "a fired sequence resets for the next match")
 }
 
 func TestSharedSemanticRuleFixtures(t *testing.T) {
