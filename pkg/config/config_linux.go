@@ -44,3 +44,7 @@ func defaultRulesPaths() []string {
 func defaultMacrosPaths() []string {
 	return []string{filepath.Join("/etc", "fibratus", "rules", "macros", "*")}
 }
+
+// defaultTransport keeps the API off the network unless someone asks for it.
+// Filesystem permissions on the socket then decide who can reach it.
+func defaultTransport() string { return "unix:///var/run/fibratus.sock" }

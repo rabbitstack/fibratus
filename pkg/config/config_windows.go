@@ -131,6 +131,8 @@ func defaultMacrosPaths() []string {
 	return []string{filepath.Join(defaultRulesDir(), "Macros", "*")}
 }
 
+func defaultTransport() string { return "localhost:8080" }
+
 func defaultRulesDir() string {
 	exe, err := os.Executable()
 	if err != nil {
