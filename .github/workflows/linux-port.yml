@@ -12,6 +12,8 @@ concurrency:
 
 env:
   GO_VERSION: 1.26.x
+  GOLANGCI_LINT_VERSION: v2.9.0
+  CLANG_VERSION: 18
 
 jobs:
   ebpf:
@@ -28,22 +30,37 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
+      # Deliberately before clang is installed: a checkout must build from the
+      # committed objects alone.
+      - name: Build without generation tools
+        run: make
       - name: Install clang
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang llvm
-          clang --version
+          sudo apt-get install -y clang-${{ env.CLANG_VERSION }} llvm-${{ env.CLANG_VERSION }}
+          clang-${{ env.CLANG_VERSION }} --version
+      # The versioned packages ship no unversioned symlinks, so name both tools.
       - name: Check generation drift
+        run: make ebpf-drift CLANG=clang-${{ env.CLANG_VERSION }} LLVM_STRIP=llvm-strip-${{ env.CLANG_VERSION }}
+      - name: Install golangci-lint
         run: |
-          make -B ebpf
-          git diff --exit-code -- internal/ebpf/bpf
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin ${{ env.GOLANGCI_LINT_VERSION }}
+      - name: Lint
+        run: |
+          export PATH=$(go env GOPATH)/bin:$PATH
+          make lint
       - name: Unit tests
         run: make test
+      - name: Race tests
+        run: make test-race
       - name: Validate rules
         run: |
-          make build
           ./cmd/fibratus/fibratus rules validate \
             --filters.rules.from-paths="rules/linux/*.yml" \
             --filters.macros.from-paths="rules/linux/macros/*.yml"
+      # Fails, rather than skips, when the runner cannot host the backend, so a
+      # green integration run always means programs actually loaded.
+      - name: Probe eBPF prerequisites
+        run: sudo -E env "PATH=$PATH" go test -tags ebpf_integration -count=1 -run TestPrerequisitesAreMet -v ./internal/ebpf
       - name: Privileged process source
-        run: sudo -E env "PATH=$PATH" go test -tags ebpf_integration -count=1 ./internal/ebpf
+        run: sudo -E env "PATH=$PATH" make test-integration
