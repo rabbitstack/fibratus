@@ -31,32 +31,8 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// ProviderInfo describes ETW provider metadata.
-type ProviderInfo struct {
-	// GUID is the globally unique identifier for the
-	// ETW provider for which the session is started.
-	GUID windows.GUID
-	// Keywords is the bitmask of keywords that determine
-	// the categories of events for the provider to emit.
-	// The provider typically writes an event if the event's
-	// keyword bits match any of the bits set in this value
-	// or if the event has no keyword bits set. Only relevant
-	// for providers that are enabled via etw.EnableProvider
-	// API.
-	Keywords uint64
-	// EnableStacks indicates if callstacks are enabled for
-	// this provider.
-	EnableStacks bool
-	// CaptureState requests that the provider log its state
-	// information, such as rundown events.
-	CaptureState bool
-	//eventFilterDescriptors stores the provider-specific filters.
-	eventFilterDescriptors []etw.EventFilterDescriptor
-}
-
-func (p *ProviderInfo) HasEventFilterDescriptors() bool {
-	return len(p.eventFilterDescriptors) > 0
-}
+// EventCallback is the function alias for ETW callback.
+type EventCallback func(*etw.EventRecord) error
 
 // Trace is the essential building block for controlling
 // trace sessions and configuring event consumers. Such
@@ -83,7 +59,7 @@ type Trace interface {
 	// statistics for each buffer ETW flushes. ETW calls this callback after
 	// it delivers all the events in the buffer. The second callback function
 	// that ETW calls for each event in the buffer.
-	Open(*Consumer, chan error) error
+	Open() error
 
 	// Close closes a trace processing session that was initiated
 	// with the etw.OpenTrace function. This method should be called
@@ -96,8 +72,9 @@ type Trace interface {
 	// to newest. In certain cases, events might deliver events out of order.
 	// The current thread is blocked upon calling this method, so be sure
 	// to spawn a dedicated goroutine and use the provided error channel to
-	// stream any errors.
-	Process(chan error)
+	// stream any errors. When the native ETW event loop offloads the event
+	// record it is forwarded to the specified event callback function.
+	Process(EventCallback, chan error)
 
 	// Flush causes an event tracing session to immediately deliver
 	// buffered events for the specified session. By default, an event
@@ -144,13 +121,15 @@ type trace struct {
 	// trace processing function to consume events
 	// from the real-time tracing session.
 	traceHandle etw.TraceHandle
+
 	// config represents global configuration store
 	config *config.Config
-	// consumer is the instance of the event consumer
-	// responsible for processing events for the trace
-	consumer *Consumer
+
 	// errs receives event consumer errors
 	errs chan error
+
+	// callback is callback function invoked on each ETW event
+	callback EventCallback
 }
 
 func (t *trace) Name() string            { return t.name }
@@ -166,10 +145,7 @@ func (t *trace) Flush() error {
 	return etw.FlushTrace(t.name, t.guid)
 }
 
-func (t *trace) Open(consumer *Consumer, errs chan error) error {
-	t.consumer = consumer
-	t.errs = errs
-
+func (t *trace) Open() error {
 	logfile := etw.NewEventTraceLogfile(t.name)
 	logfile.SetEventCallback(windows.NewCallback(t.processEventCallback))
 	logfile.SetBufferCallback(windows.NewCallback(t.bufferStatsCallback))
@@ -182,14 +158,27 @@ func (t *trace) Open(consumer *Consumer, errs chan error) error {
 	return nil
 }
 
+func (t *trace) Process(callback EventCallback, errs chan error) {
+	if callback == nil {
+		panic("event callback must be provided")
+	}
+	if errs == nil {
+		panic("error channel must be provided")
+	}
+	t.errs = errs
+	t.callback = callback
+	t.errs <- etw.ProcessTrace(t.traceHandle)
+}
+
+func (t *trace) Close() error {
+	return etw.CloseTrace(t.traceHandle)
+}
+
 // processEventCallback is the event callback function signature that is called each time
 // a new event is available on the session buffer. It does the heavy lifting of parsing incoming
 // ETW events from raw data buffers, building the state machine, and pushing events to the channel.
-func (t *trace) processEventCallback(ev *etw.EventRecord) uintptr {
-	if t.consumer == nil {
-		panic("consumer is nil")
-	}
-	if err := t.consumer.ProcessEvent(ev); err != nil {
+func (t *trace) processEventCallback(r *etw.EventRecord) uintptr {
+	if err := t.callback(r); err != nil {
 		t.errs <- err
 		eventsFailed.Add(err.Error(), 1)
 	}
@@ -203,14 +192,6 @@ func (t *trace) bufferStatsCallback(logfile *etw.EventTraceLogfile) uintptr {
 	return callbackNext
 }
 
-func (t *trace) Process(ch chan error) {
-	ch <- etw.ProcessTrace(t.traceHandle)
-}
-
-func (t *trace) Close() error {
-	return etw.CloseTrace(t.traceHandle)
-}
-
 // KernelTrace is responsible for starting and processing
 // events from the global NT Kernel Logger session.
 type KernelTrace struct {
@@ -218,7 +199,8 @@ type KernelTrace struct {
 	// stackExtensions manages stack tracing enablement.
 	// For each event present in the stack identifiers,
 	// the StackWalk event is published by the provider.
-	stackExtensions *StackExtensions
+	stackExtensions  *StackExtensions
+	kernelEventFlags etw.EventTraceFlags
 }
 
 // UserTrace is responsible for starting a private tracing
@@ -232,9 +214,11 @@ type UserTrace struct {
 	// keywords and other parameters can be specified.
 	Providers []ProviderInfo
 }
+
 type opts struct {
 	keywords               uint64
 	captureState           bool
+	captureCallstack       bool
 	eventFilterDescriptors []etw.EventFilterDescriptor
 }
 
@@ -257,6 +241,12 @@ func WithCaptureState() Option {
 	}
 }
 
+func WithCallstack(capture bool) Option {
+	return func(o *opts) {
+		o.captureCallstack = capture
+	}
+}
+
 // WithEventFilterDescriptors assigns filters to be passed
 // to the provider's enable callback function.
 func WithEventFilterDescriptors(descriptors ...etw.EventFilterDescriptor) Option {
@@ -267,12 +257,14 @@ func WithEventFilterDescriptors(descriptors ...etw.EventFilterDescriptor) Option
 
 // NewKernelTrace creates a new NT Kernel Logger trace.
 func NewKernelTrace(config *config.Config) *KernelTrace {
-	t := &KernelTrace{trace: trace{guid: etw.KernelTraceControlGUID, name: etw.KernelLoggerSession, config: config}, stackExtensions: NewStackExtensions(config.EventSource)}
+	t := &KernelTrace{trace: trace{guid: etw.KernelTraceControlGUID, name: etw.KernelLoggerSession, config: config}, stackExtensions: NewStackExtensions(config.ProbeConfig)}
 
 	t.stackExtensions.EnableProcessCallstack()
 	t.stackExtensions.EnableRegistryCallstack()
 	t.stackExtensions.EnableFileCallstack()
 	t.stackExtensions.EnableMemoryCallstack()
+
+	t.kernelEventFlags = enabledKernelFlags(config.ProbeConfig)
 
 	return t
 }
@@ -280,25 +272,30 @@ func NewKernelTrace(config *config.Config) *KernelTrace {
 // NewTrace creates a new trace that can host various ETW provider sessions.
 // The providers to be run inside the session can be given in the last argument
 // or added by the AddProvider method.
-func NewUserTrace(name string, config *config.Config, providers ...ProviderInfo) *UserTrace {
-	t := &UserTrace{trace: trace{name: name, config: config}, Providers: make([]ProviderInfo, 0)}
+func NewUserTrace(config *config.Config, providers ...ProviderInfo) *UserTrace {
+	t := &UserTrace{trace: trace{name: etw.SecurityTelemetrySession, config: config}, Providers: make([]ProviderInfo, 0)}
 	t.Providers = providers
 	return t
 }
 
 // AddProvider adds a new provider to the multi trace session
 // with optional parameters that influence the provider.
-func (t *UserTrace) AddProvider(guid windows.GUID, enableStacks bool, options ...Option) {
+func (t *UserTrace) AddProvider(guid windows.GUID, options ...Option) {
 	var opts opts
 
 	for _, opt := range options {
 		opt(&opts)
 	}
 
-	t.Providers = append(
-		t.Providers,
-		ProviderInfo{GUID: guid, Keywords: opts.keywords, EnableStacks: enableStacks, CaptureState: opts.captureState, eventFilterDescriptors: opts.eventFilterDescriptors},
-	)
+	p := ProviderInfo{
+		GUID:                   guid,
+		Keywords:               opts.keywords,
+		EnableStacks:           opts.captureCallstack,
+		CaptureState:           opts.captureState,
+		eventFilterDescriptors: opts.eventFilterDescriptors,
+	}
+
+	t.Providers = append(t.Providers, p)
 }
 
 // HasProviders determines if this trace contains providers.
@@ -309,11 +306,10 @@ func (t *KernelTrace) Start() error {
 		return fmt.Errorf("trace name [%s] is too long", t.name)
 	}
 
-	props := initEventTraceProps(t.config.EventSource)
-	flags := enableFlagsDynamically(t.config.EventSource)
+	props := initEventTraceProps(t.config.ProbeConfig)
 
-	props.EnableFlags = flags
 	props.Wnode.GUID = t.guid
+	props.EnableFlags = t.kernelEventFlags
 
 	log.Debugf("starting kernel trace with %q event flags", props.EnableFlags)
 
@@ -342,14 +338,18 @@ func (t *KernelTrace) Start() error {
 		return nil
 	}
 	// enable stack enrichment
-	if t.config.EventSource.StackEnrichment {
+	if t.config.ProbeConfig.StackEnrichment {
 		if err := etw.EnableStackTracing(handle, t.stackExtensions.EventIds()); err != nil {
 			return fmt.Errorf("fail to enable kernel callstack tracing: %v", err)
 		}
 	}
 	// call again to enable all kernel events
-	sysTraceFlags[0] = flags
+	sysTraceFlags[0] = t.kernelEventFlags
 	return etw.SetTraceSystemFlags(handle, sysTraceFlags)
+}
+
+func (t *KernelTrace) SetKernelEventFlags(flags etw.EventTraceFlags) {
+	t.kernelEventFlags = flags
 }
 
 func (*KernelTrace) CaptureState() error { return nil }
@@ -359,7 +359,7 @@ func (t *UserTrace) Start() error {
 		return fmt.Errorf("trace name [%s] is too long", t.name)
 	}
 
-	props := initEventTraceProps(t.config.EventSource)
+	props := initEventTraceProps(t.config.ProbeConfig)
 
 	log.Debug("starting user trace session")
 
@@ -416,7 +416,7 @@ func (t *UserTrace) CaptureState() error {
 // initEventTraceProps builds the trace properties descriptor which
 // influences the behaviour of event publishing to the trace session
 // buffers.
-func initEventTraceProps(c config.EventSourceConfig) etw.EventTraceProperties {
+func initEventTraceProps(c config.ProbeConfig) etw.EventTraceProperties {
 	bufferSize := min(c.BufferSize, maxBufferSize)
 
 	// validate min/max buffers. The minimal
@@ -449,46 +449,4 @@ func initEventTraceProps(c config.EventSourceConfig) etw.EventTraceProperties {
 		MaximumBuffers: maxBuffers,
 		FlushTimer:     uint32(flushTimer.Seconds()),
 	}
-}
-
-// enableFlagsDynamically crafts the system logger event mask
-// depending on the compiled rules result or the config state.
-// System logger flags is a bitmask that indicates which kernel events
-// are delivered to the consumer when system logger session is
-// started. At minimum, process events are published to the trace
-// session as they represent the foundation for building the state
-// machine. Note these flags are relevant to system logger traces
-// and initializing the EnableFlags field of the etw.EventTraceProperties
-// structure for non-system logger providers will result in an error.
-func enableFlagsDynamically(config config.EventSourceConfig) etw.EventTraceFlags {
-	var flags etw.EventTraceFlags
-
-	flags |= etw.Process
-
-	if config.EnableThreadEvents {
-		flags |= etw.Thread
-	}
-	if config.EnableModuleEvents {
-		flags |= etw.Module
-	}
-	if config.EnableNetEvents {
-		flags |= etw.NetTCPIP
-	}
-	if config.EnableRegistryEvents {
-		flags |= etw.Registry
-	}
-	if config.EnableFileIOEvents {
-		flags |= etw.DiskFileIO | etw.FileIO | etw.FileIOInit
-	}
-	if config.EnableVAMapEvents {
-		flags |= etw.VaMap
-	}
-	if config.EnableMemEvents {
-		flags |= etw.VirtualAlloc
-	}
-	if config.EnableRegistryEvents {
-		flags |= etw.Registry
-	}
-
-	return flags
 }

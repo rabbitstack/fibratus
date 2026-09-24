@@ -453,10 +453,10 @@ func TestNewTypeFromEventRecord(t *testing.T) {
 				},
 			}
 
-			got := NewTypeFromEventRecord(r)
+			got := TypeFromEventRecord(r)
 
 			if got != tt.want {
-				t.Fatalf("NewTypeFromEventRecord() = %v, want %v", got, tt.want)
+				t.Fatalf("TypeFromEventRecord() = %v, want %v", got, tt.want)
 			}
 		})
 	}

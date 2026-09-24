@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 by Nedim Sabic Sabic
+ * Copyright 2019-2026 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -16,5 +16,13 @@
  * limitations under the License.
  */
 
-// Package source defines the contract all event sources have to satisfy.
-package source
+package probe
+
+import "github.com/rabbitstack/fibratus/pkg/event"
+
+const (
+	ringCapacity = 1 << 16
+	ringMask     = ringCapacity - 1
+)
+
+var ring [ringCapacity]*event.Event

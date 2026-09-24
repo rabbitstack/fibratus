@@ -69,6 +69,7 @@ var (
 // Config exposes the platform configuration options.
 type Config struct {
 	BaseConfig
+
 	// PE contains the settings that influences the behaviour of the PE (Portable Executable) reader.
 	PE pe.Config `json:"pe" yaml:"pe"`
 

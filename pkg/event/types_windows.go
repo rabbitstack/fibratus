@@ -200,14 +200,14 @@ const (
 	StackWalkID uint8 = 32
 )
 
-// NewTypeFromEventRecord derives the event type from the Data1 member of the provider GUID
+// TypeFromEventRecord derives the event type from the Data1 member of the provider GUID
 // and the opcode/event ID integer.
 // Go only jump-tables switches over integer types and only when case values are reasonably
 // dense. A switch over provider ID which is GUID struct compiles to a sequential chain of
 // struct-equality compares instead of a jump table.
 // So we split the GUID into a fast-reject key and switch on that instead. The first member of
 // the GUID (Data1) is a dense uint32 integer and is certainly unique across all providers.
-func NewTypeFromEventRecord(r *etw.EventRecord) Type {
+func TypeFromEventRecord(r *etw.EventRecord) Type {
 	switch r.Header.ProviderID.Data1 {
 	case RegistryEventGUID.Data1:
 		switch r.Header.EventDescriptor.Opcode {
@@ -362,7 +362,7 @@ func (t Type) String() string { return table[t].Name }
 // OnlyState determines whether the event type is solely used for state management.
 func (t Type) OnlyState() bool { return table[t].Flags&OnlyState != 0 }
 
-// IsRundown indicates if this type represents a rundown event that seeds the state.
+// StateSnapshot indicates if this type represents a rundown event that seeds the state.
 func (t Type) StateSnapshot() bool { return table[t].Flags&StateSnapshot != 0 }
 
 // WaitStack determines if the event waits for call stack return addresses.
