@@ -19,13 +19,14 @@
 package config
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestConfigPrint(t *testing.T) {
 	c := NewWithOpts(WithRun())
-	err := c.flags.Parse([]string{"--eventsource.enable-thread=false", "--config-file=_fixtures/fibratus.yml"})
+	err := c.flags.Parse([]string{"--filters.match-all=false", "--config-file=_fixtures/fibratus.yml"})
 	require.NoError(t, c.viper.BindPFlags(c.flags))
 	require.NoError(t, err)
 	require.NoError(t, c.TryLoadFile(c.GetConfigFile()))

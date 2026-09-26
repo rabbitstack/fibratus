@@ -21,17 +21,13 @@ package ql
 import (
 	"fmt"
 	"maps"
-	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
 
 	"github.com/rabbitstack/fibratus/pkg/callstack"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
-	"github.com/rabbitstack/fibratus/pkg/pe"
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
-	"github.com/rabbitstack/fibratus/pkg/util/signature"
-	"golang.org/x/sys/windows"
 
 	"github.com/rabbitstack/fibratus/pkg/filter/ql/functions"
 )
@@ -70,7 +66,6 @@ var funcs = map[string]FunctionDef{
 	functions.SubstrFn.String():       &functions.Substr{},
 	functions.EntropyFn.String():      &functions.Entropy{},
 	functions.RegexFn.String():        functions.NewRegex(),
-	functions.IsMinidumpFn.String():   &functions.IsMinidump{},
 	functions.BaseFn.String():         &functions.Base{},
 	functions.DirFn.String():          &functions.Dir{},
 	functions.SymlinkFn.String():      &functions.Symlink{},
@@ -78,7 +73,6 @@ var funcs = map[string]FunctionDef{
 	functions.GlobFn.String():         &functions.Glob{},
 	functions.IsAbsFn.String():        &functions.IsAbs{},
 	functions.VolumeFn.String():       &functions.Volume{},
-	functions.GetRegValueFn.String():  &functions.GetRegValue{},
 	functions.YaraFn.String():         &functions.Yara{},
 	functions.ForeachFn.String():      &Foreach{},
 	functions.CountFn.String():        &functions.Count{},
@@ -221,65 +215,19 @@ func (f *Foreach) Call(args []interface{}) (interface{}, bool) {
 				return true, true
 			}
 		}
-	case []pstypes.Module:
-		for _, mod := range elems {
-			if f.evalExpr(e, useCallValuer, f.moduleMapValuer(segments, mod), valuer) {
-				return true, true
-			}
-		}
-	case map[uint32]pstypes.Thread:
-		for _, thread := range elems {
-			if f.evalExpr(e, useCallValuer, f.threadMapValuer(segments, thread), valuer) {
-				return true, true
-			}
-		}
 	case []pstypes.Mmap:
 		for _, mmap := range elems {
 			if f.evalExpr(e, useCallValuer, f.mmapMapValuer(segments, mmap), valuer) {
 				return true, true
 			}
 		}
-	case []pe.Sec:
-		for _, sec := range elems {
-			if f.evalExpr(e, useCallValuer, f.sectionMapValuer(segments, sec), valuer) {
-				return true, true
-			}
-		}
 	case callstack.Callstack:
-		var pid uint32
-		var proc windows.Handle
-		var err error
-
-		if !elems.IsEmpty() {
-			pid = elems.FrameAt(0).PID
+		if ok, matched := f.foreachCallstack(elems, segments, e, useCallValuer, valuer); ok {
+			return matched, true
 		}
-
-		// open process handle with required access mask
-		var desiredAccess uint32
-	loop:
-		for _, seg := range segments {
-			switch seg.Segment {
-			case fields.CallsiteLeadingAssemblySegment, fields.CallsiteTrailingAssemblySegment:
-				// break on broader access rights
-				desiredAccess = windows.PROCESS_QUERY_INFORMATION | windows.PROCESS_VM_READ
-				break loop
-			case fields.AllocationSizeSegment, fields.ProtectionSegment:
-				desiredAccess = windows.PROCESS_QUERY_INFORMATION
-			}
-		}
-		if desiredAccess != 0 {
-			proc, err = windows.OpenProcess(desiredAccess, false, pid)
-			if err != nil {
-				return false, false
-			}
-			defer windows.Close(proc)
-		}
-
-		for _, frame := range elems {
-			if f.evalExpr(e, useCallValuer, f.callstackMapValuer(segments, frame, proc), valuer) {
-				return true, true
-			}
-		}
+		return false, false
+	default:
+		return f.foreachPlatform(elems, segments, e, useCallValuer, valuer)
 	}
 
 	return false, false
@@ -442,27 +390,6 @@ func (f *Foreach) stringMapValuer(v *BareBoundVariableLiteral, s string) MapValu
 	return MapValuer{v.Value: s}
 }
 
-// moduleMapValuer returns the map valuer with process module attributes.
-func (f *Foreach) moduleMapValuer(segments []*BoundSegmentLiteral, mod pstypes.Module) MapValuer {
-	var valuer = MapValuer{}
-	for _, seg := range segments {
-		key := seg.Value
-		switch seg.Segment {
-		case fields.PathSegment:
-			valuer[key] = mod.Name
-		case fields.NameSegment:
-			valuer[key] = filepath.Base(mod.Name)
-		case fields.AddressSegment:
-			valuer[key] = mod.BaseAddress.String()
-		case fields.SizeSegment:
-			valuer[key] = mod.Size
-		case fields.ChecksumSegment:
-			valuer[key] = mod.Checksum
-		}
-	}
-	return valuer
-}
-
 // procMapValuer returns the map valuer with process attributes.
 func (f *Foreach) procMapValuer(segments []*BoundSegmentLiteral, proc *pstypes.PS) MapValuer {
 	var valuer = MapValuer{}
@@ -481,45 +408,11 @@ func (f *Foreach) procMapValuer(segments []*BoundSegmentLiteral, proc *pstypes.P
 			valuer[key] = proc.Args
 		case fields.CwdSegment:
 			valuer[key] = proc.Cwd
-		case fields.SIDSegment:
-			valuer[key] = proc.SID
-		case fields.SessionIDSegment:
-			valuer[key] = proc.SessionID
 		case fields.UsernameSegment:
 			valuer[key] = proc.Username
-		case fields.DomainSegment:
-			valuer[key] = proc.Domain
-		case fields.TokenIntegrityLevelSegment:
-			valuer[key] = proc.TokenIntegrityLevel
-		case fields.TokenIsElevatedSegment:
-			valuer[key] = proc.IsTokenElevated
-		case fields.TokenElevationTypeSegment:
-			valuer[key] = proc.TokenElevationType
 		}
 	}
-	return valuer
-}
-
-// threadMapValuer returns the map valuer with thread information.
-func (f *Foreach) threadMapValuer(segments []*BoundSegmentLiteral, thread pstypes.Thread) MapValuer {
-	var valuer = MapValuer{}
-	for _, seg := range segments {
-		key := seg.Value
-		switch seg.Segment {
-		case fields.TidSegment:
-			valuer[key] = thread.Tid
-		case fields.StartAddressSegment:
-			valuer[key] = thread.StartAddress.String()
-		case fields.UserStackBaseSegment:
-			valuer[key] = thread.UstackBase.String()
-		case fields.UserStackLimitSegment:
-			valuer[key] = thread.UstackLimit.String()
-		case fields.KernelStackBaseSegment:
-			valuer[key] = thread.KstackBase.String()
-		case fields.KernelStackLimitSegment:
-			valuer[key] = thread.KstackLimit.String()
-		}
-	}
+	addPlatformProcessValues(segments, proc, valuer)
 	return valuer
 }
 
@@ -539,76 +432,6 @@ func (f *Foreach) mmapMapValuer(segments []*BoundSegmentLiteral, mmap pstypes.Mm
 			valuer[key] = mmap.Type
 		case fields.PathSegment:
 			valuer[key] = mmap.File
-		}
-	}
-	return valuer
-}
-
-// callstackMapValuer returns map valuer with thread stack frame data.
-func (f *Foreach) callstackMapValuer(segments []*BoundSegmentLiteral, frame callstack.Frame, proc windows.Handle) MapValuer {
-	var valuer = MapValuer{}
-	for _, seg := range segments {
-		key := seg.Value
-		switch seg.Segment {
-		case fields.AddressSegment:
-			valuer[key] = frame.Addr.String()
-		case fields.OffsetSegment:
-			valuer[key] = frame.Offset
-		case fields.IsUnbackedSegment:
-			valuer[key] = frame.IsUnbacked()
-		case fields.ModuleSegment:
-			valuer[key] = frame.Module
-		case fields.SymbolSegment:
-			valuer[key] = frame.Module + "!" + frame.Symbol
-		case fields.AllocationSizeSegment:
-			valuer[key] = frame.AllocationSize(proc)
-		case fields.ProtectionSegment:
-			valuer[key] = frame.Protection(proc)
-		case fields.CallsiteTrailingAssemblySegment:
-			valuer[key] = frame.CallsiteAssembly(proc, false)
-		case fields.CallsiteLeadingAssemblySegment:
-			valuer[key] = frame.CallsiteAssembly(proc, true)
-		case fields.ModuleSignatureExistsSegment, fields.ModuleSignatureTrustedSegment,
-			fields.ModuleSignatureIssuerSegment, fields.ModuleSignatureSubjectSegment:
-
-			sign := signature.GetSignatures().DoRequest(signature.MakeKey(frame.Module, 0, 0, 0))
-			if sign == nil {
-				continue
-			}
-
-			switch seg.Segment {
-			case fields.ModuleSignatureExistsSegment:
-				valuer[key] = sign.Exists()
-			case fields.ModuleSignatureTrustedSegment:
-				valuer[key] = sign.IsTrusted()
-			case fields.ModuleSignatureIssuerSegment:
-				if sign.HasCertificate() {
-					valuer[key] = sign.Cert().Issuer
-				}
-			case fields.ModuleSignatureSubjectSegment:
-				if sign.HasCertificate() {
-					valuer[key] = sign.Cert().Subject
-				}
-			}
-		}
-	}
-	return valuer
-}
-
-// sectionMapValuer returns map valuer with PE section data.
-func (f *Foreach) sectionMapValuer(segments []*BoundSegmentLiteral, section pe.Sec) MapValuer {
-	var valuer = MapValuer{}
-	for _, seg := range segments {
-		key := seg.Value
-		switch seg.Segment {
-		case fields.NameSegment:
-			valuer[key] = section.Name
-		case fields.SizeSegment:
-			valuer[key] = section.Size
-		case fields.EntropySegment:
-			valuer[key] = section.Entropy
-		case fields.MD5Segment:
-			valuer[key] = section.Md5
 		}
 	}
 	return valuer

@@ -19,29 +19,25 @@
 package event
 
 import (
+	"fmt"
 	"strconv"
+
+	"github.com/rabbitstack/fibratus/pkg/util/colorizer"
 )
+
+func init() {
+	fields[sid] = true
+	fields[pe] = true
+}
 
 // Format applies the template on the provided event.
 func (f *Formatter) Format(evt *Event) []byte {
 	if evt == nil {
 		return []byte{}
 	}
-	values := map[string]interface{}{
-		ts:         evt.Timestamp.String(),
-		pid:        strconv.FormatUint(uint64(evt.PID), 10),
-		tid:        strconv.FormatUint(uint64(evt.Tid), 10),
-		seq:        strconv.FormatUint(evt.Seq, 10),
-		cpu:        strconv.FormatUint(uint64(evt.CPU), 10),
-		typ:        evt.Name(),
-		cat:        evt.Category(),
-		desc:       evt.Description(),
-		host:       evt.Host,
-		meta:       evt.Metadata.String(),
-		parameters: evt.Params.String(),
-	}
 
-	// add process metadata
+	values := f.eventMap(evt)
+
 	ps := evt.PS
 	if ps != nil {
 		values[proc] = ps.Name
@@ -51,27 +47,114 @@ func (f *Formatter) Format(evt *Event) []byte {
 		values[cmd] = ps.Cmdline
 		values[sid] = ps.SID
 		parent := ps.Parent
+
 		if parent != nil {
 			values[pproc] = parent.Name
 			values[pexe] = parent.Exe
 			values[pcmd] = parent.Cmdline
 		}
+
 		if ps.PE != nil {
 			values[pe] = ps.PE.String()
 		}
 	}
-	// add callstack summary
+
 	if !evt.Callstack.IsEmpty() {
 		values[cstack] = evt.Callstack.String()
 	}
 
 	if f.expandParamsDot {
-		// expand all parameters into the map, so we can ask
-		// for specific parameter names in the template
 		for _, par := range evt.Params {
 			values[".Params."+caser.String(par.Name)] = par.String()
 		}
 	}
 
 	return f.t.ExecuteString(values)
+}
+
+// colourTag maps a bare tag name to its coloured string representation.
+func (f *ColorFormatter) colourTag(tag string, e *Event) string {
+	switch tag {
+	case seq:
+		// sequence number is ok to render as dim gray
+		return colorizer.SpanDim(colorizer.Span(colorizer.Gray, strconv.FormatUint(e.Seq, 10)))
+	case ts:
+		return f.colourTimestamp(e)
+	case cpu:
+		return colorizer.Span(colorizer.Yellow, strconv.FormatUint(uint64(e.CPU), 10))
+	case proc:
+		// render process name with bold green as it is the most important
+		// identity anchor on the line. Analysts scan for it first.
+		ps := e.PS
+		if ps == nil {
+			return colorizer.Span(colorizer.Gray, "N/A")
+		}
+		return colorizer.SpanBold(colorizer.Green, ps.Name)
+	case pid:
+		return colorizer.Span(colorizer.Green, strconv.FormatUint(uint64(e.PID), 10))
+	case ppid:
+		ps := e.PS
+		if ps == nil {
+			return colorizer.Span(colorizer.Gray, "N/A")
+		}
+		return colorizer.Span(colorizer.Green, strconv.FormatUint(uint64(ps.Ppid), 10))
+	case tid:
+		return colorizer.Span(colorizer.Green, strconv.FormatUint(uint64(e.Tid), 10))
+	case exe:
+		ps := e.PS
+		if ps == nil {
+			return colorizer.Span(colorizer.Gray, "N/A")
+		}
+		return colorizer.Span(colorizer.White, ps.Exe)
+	case pexe:
+		ps := e.PS
+		if ps == nil || ps.Parent == nil {
+			return colorizer.Span(colorizer.Gray, "N/A")
+		}
+		return colorizer.Span(colorizer.White, ps.Parent.Exe)
+	case cmd:
+		ps := e.PS
+		if ps == nil {
+			return colorizer.Span(colorizer.Gray, "N/A")
+		}
+		return colorizer.Span(colorizer.White, ps.Cmdline)
+	case pcmd:
+		ps := e.PS
+		if ps == nil || ps.Parent == nil {
+			return colorizer.Span(colorizer.Gray, "N/A")
+		}
+		return colorizer.Span(colorizer.White, ps.Parent.Cmdline)
+	case cwd:
+		ps := e.PS
+		if ps == nil {
+			return colorizer.Span(colorizer.Gray, "N/A")
+		}
+		return colorizer.Span(colorizer.White, ps.Cwd)
+	case pproc:
+		ps := e.PS
+		if ps == nil || ps.Parent == nil {
+			return colorizer.Span(colorizer.Gray, "N/A")
+		}
+		return colorizer.Span(colorizer.Green, ps.Parent.Name)
+	case sid:
+		if e.PS == nil {
+			return colorizer.Span(colorizer.Gray, "N/A")
+		}
+		return colorizer.Span(colorizer.Gray, e.PS.SID)
+	case pe:
+		if e.PS == nil || e.PS.PE == nil {
+			return colorizer.Span(colorizer.Gray, "N/A")
+		}
+		return colorizer.Span(colorizer.Magenta, e.PS.PE.String())
+	case typ:
+		return e.Type.color()
+	case cat:
+		return colorizer.Span(colorizer.Magenta, e.Category().String())
+	case parameters:
+		return e.Params.Colorize()
+	case cstack:
+		return fmt.Sprintf("\n%s", e.Callstack.Colorize())
+	}
+
+	return ""
 }

@@ -24,7 +24,6 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/rabbitstack/fibratus/internal/evasion"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
@@ -37,7 +36,7 @@ var (
 
 // Accessor dictates the behaviour of the field accessors. One of the main responsibilities of the accessor is
 // to extract the underlying parameter for the field given in the filter expression. It can also produce a value
-// from the non-params constructs such as process' state or PE metadata.
+// from the non-params constructs such as process' state.
 type Accessor interface {
 	// Get fetches the parameter value for the specified filter field.
 	Get(f Field, evt *event.Event) (params.Value, error)
@@ -66,7 +65,7 @@ func newEventAccessor() Accessor {
 const timeFmt = "15:04:05"
 const dateFmt = "2006-01-02"
 
-func (*evtAccessor) Get(f Field, evt *event.Event) (params.Value, error) {
+func (*evtAccessor) get(f Field, evt *event.Event) (params.Value, error) {
 	switch f.Name {
 	case fields.EvtSeq, fields.KevtSeq:
 		return evt.Seq, nil
@@ -138,12 +137,7 @@ func (*evtAccessor) Get(f Field, evt *event.Event) (params.Value, error) {
 		default:
 			return evt.GetParamAsString(name), nil
 		}
-	case fields.EvtIsDirectSyscall:
-		return evt.Evasions&uint32(evasion.DirectSyscall) != 0, nil
-	case fields.EvtIsIndirectSyscall:
-		return evt.Evasions&uint32(evasion.IndirectSyscall) != 0, nil
 	}
-
 	return nil, nil
 }
 
@@ -152,75 +146,7 @@ func (*evtAccessor) Get(f Field, evt *event.Event) (params.Value, error) {
 // as a regular LHS/RHS component, used as a function parameter or
 // referenced in the bound field.
 func (f *filter) narrowAccessors() {
-	var (
-		removeEvtAccessor      = true
-		removePsAccessor       = true
-		removeThreadAccessor   = true
-		removeModuleAccessor   = true
-		removeFileAccessor     = true
-		removeRegistryAccessor = true
-		removeNetworkAccessor  = true
-		removePEAccessor       = true
-		removeMemAccessor      = true
-		removeDNSAccessor      = true
-	)
-
-	for _, field := range f.fields {
-		switch {
-		case field.Name.IsEvtField() || field.Name.IsKevtField():
-			removeEvtAccessor = false
-		case field.Name.IsPeField():
-			removePEAccessor = false
-		case field.Name.IsPsField():
-			removePsAccessor = false
-		case field.Name.IsThreadField():
-			removeThreadAccessor = false
-		case field.Name.IsImageField() || field.Name.IsModuleField():
-			removeModuleAccessor = false
-		case field.Name.IsFileField():
-			removeFileAccessor = false
-		case field.Name.IsRegistryField():
-			removeRegistryAccessor = false
-		case field.Name.IsNetworkField():
-			removeNetworkAccessor = false
-		case field.Name.IsMemField():
-			removeMemAccessor = false
-		case field.Name.IsDNSField():
-			removeDNSAccessor = false
-		}
-	}
-
-	if removeEvtAccessor {
-		f.removeAccessor(&evtAccessor{})
-	}
-	if removePsAccessor {
-		f.removeAccessor(&psAccessor{})
-	}
-	if removeThreadAccessor {
-		f.removeAccessor(&threadAccessor{})
-	}
-	if removeModuleAccessor {
-		f.removeAccessor(&moduleAccessor{})
-	}
-	if removeFileAccessor {
-		f.removeAccessor(&fileAccessor{})
-	}
-	if removeRegistryAccessor {
-		f.removeAccessor(&registryAccessor{})
-	}
-	if removeNetworkAccessor {
-		f.removeAccessor(&networkAccessor{})
-	}
-	if removePEAccessor {
-		f.removeAccessor(&peAccessor{})
-	}
-	if removeMemAccessor {
-		f.removeAccessor(&memAccessor{})
-	}
-	if removeDNSAccessor {
-		f.removeAccessor(&dnsAccessor{})
-	}
-
+	f.pruneUnusedAccessors()
 	for _, accessor := range f.accessors {
 		accessor.SetFields(f.fields)
 		accessor.SetSegments(f.segments)

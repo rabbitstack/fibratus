@@ -20,14 +20,23 @@ package action
 
 import (
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/util/multierror"
-	"golang.org/x/sys/windows"
 	"os"
 	"syscall"
+
+	"github.com/rabbitstack/fibratus/pkg/config"
+	"github.com/rabbitstack/fibratus/pkg/util/multierror"
+	log "github.com/sirupsen/logrus"
+	"golang.org/x/sys/windows"
 )
 
-// Kill terminates all processes with specified pids.
-func Kill(pids []uint32) error {
+// Kill terminates all processes referenced by the action context.
+func Kill(ctx *config.ActionContext) error {
+	if ctx == nil {
+		return nil
+	}
+	pids := ctx.UniquePids()
+	log.Infof("killing pids=%v", pids)
+
 	errs := make([]error, 0)
 	for _, pid := range pids {
 		err := terminate(pid)

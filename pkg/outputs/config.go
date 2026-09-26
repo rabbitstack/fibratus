@@ -20,13 +20,40 @@ package outputs
 
 import (
 	"fmt"
+
+	"github.com/rabbitstack/fibratus/pkg/util/mapdecoder"
 	"github.com/spf13/pflag"
 )
+
+// ConfigLoader decodes raw config for a single output type when the output is enabled.
+type ConfigLoader func(any) (Config, error)
+
+// ConfigLoaders is the registry of configured outputs.
+type ConfigLoaders map[Type]ConfigLoader
 
 // Config contains the output configuration.
 type Config struct {
 	Type   Type
-	Output interface{}
+	Output any
+}
+
+// Register registers a new output config loader.
+func (loaders ConfigLoaders) Register(typ Type, loader ConfigLoader) {
+	if _, ok := loaders[typ]; ok {
+		panic(fmt.Sprintf("output loader %q is already registered", typ))
+	}
+	loaders[typ] = loader
+}
+
+// LoadFromConfig builds an output loader for a config type T, decoding raw into it.
+func LoadFromConfig[T any](typ Type) ConfigLoader {
+	return func(raw any) (Config, error) {
+		var cfg T
+		if err := mapdecoder.Decode(raw, &cfg); err != nil {
+			return Config{}, err
+		}
+		return Config{Type: typ, Output: cfg}, nil
+	}
 }
 
 // TLSConfig stores the client TLS parameters.

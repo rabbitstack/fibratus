@@ -19,27 +19,28 @@
 package event
 
 import (
+	"testing"
+
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestParams(t *testing.T) {
 	pars := Params{
-		params.FileObject:        {Name: params.FileObject, Type: params.Uint64, Value: uint64(18446738026482168384)},
-		params.ThreadID:          {Name: params.ThreadID, Type: params.Uint32, Value: uint32(1484)},
-		params.FileCreateOptions: {Name: params.FileCreateOptions, Type: params.Uint32, Value: uint32(1223456)},
-		params.FilePath:          {Name: params.FilePath, Type: params.UnicodeString, Value: "\\Device\\HarddiskVolume2\\Windows\\system32\\kernel32.dll"},
-		params.FileShareMask:     {Name: params.FileShareMask, Type: params.Uint32, Value: uint32(5)},
+		params.FileObject: {Name: params.FileObject, Type: params.Uint64, Value: uint64(18446738026482168384)},
+		params.ThreadID:   {Name: params.ThreadID, Type: params.Uint32, Value: uint32(1484)},
+		params.FileOffset: {Name: params.FileOffset, Type: params.Uint64, Value: uint64(1223456)},
+		params.FilePath:   {Name: params.FilePath, Type: params.Path, Value: "/usr/bin/bash"},
+		params.ProcessID:  {Name: params.ProcessID, Type: params.Uint32, Value: uint32(5)},
 	}
 
 	assert.True(t, pars.Contains(params.FileObject))
-	assert.False(t, pars.Contains(params.FileOffset))
+	assert.False(t, pars.Contains(params.ProcessName))
 
 	filename, err := pars.GetString(params.FilePath)
 	require.NoError(t, err)
-	assert.Equal(t, "\\Device\\HarddiskVolume2\\Windows\\system32\\kernel32.dll", filename)
+	assert.Equal(t, "/usr/bin/bash", filename)
 
 	_, err = pars.GetString(params.FileObject)
 	require.Error(t, err)
@@ -51,10 +52,10 @@ func TestParams(t *testing.T) {
 	assert.False(t, pars.Contains(params.ThreadID))
 	assert.Equal(t, 4, pars.Len())
 
-	require.NoError(t, pars.Set(params.FileShareMask, uint32(5), params.Enum))
+	require.NoError(t, pars.Set(params.ProcessID, uint32(5), params.Enum))
 
-	require.NoError(t, pars.SetValue(params.FilePath, "\\Device\\HarddiskVolume2\\Windows\\system32\\KERNEL32.dll"))
+	require.NoError(t, pars.SetValue(params.FilePath, "/usr/bin/zsh"))
 	filename1, err := pars.GetString(params.FilePath)
 	require.NoError(t, err)
-	assert.Equal(t, "\\Device\\HarddiskVolume2\\Windows\\system32\\KERNEL32.dll", filename1)
+	assert.Equal(t, "/usr/bin/zsh", filename1)
 }

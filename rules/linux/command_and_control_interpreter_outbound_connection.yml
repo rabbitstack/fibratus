@@ -1,0 +1,32 @@
+name: Interpreter established an outbound connection
+id: bf1a30dc-8e54-46c7-9b9c-28c3b7169129
+version: 1.0.0
+description: |
+  Identifies a script interpreter that executes and then opens an outbound
+  IP connection. This sequence is commonly used for reverse shells and
+  follow-on command and control after a dropper runs under bash, python,
+  or a similar interpreter. The socket families are AF_INET and AF_INET6,
+  so local UNIX domain sockets are out of scope.
+labels:
+  tactic.id: TA0011
+  tactic.name: Command and Control
+  tactic.ref: https://attack.mitre.org/tactics/TA0011/
+  technique.id: T1071
+  technique.name: Application Layer Protocol
+  technique.ref: https://attack.mitre.org/techniques/T1071/
+references:
+  - https://attack.mitre.org/techniques/T1071/
+
+condition: >
+  sequence
+  maxspan 30s
+  by ps.uuid
+    |execve and ps.name in script_interpreters|
+    |connect and net.family in (2, 10) and net.dport != 0|
+
+
+output: >
+  %1.ps.name connected to %2.net.dip:%2.net.dport after execution
+
+severity: high
+min-engine-version: 3.0.0

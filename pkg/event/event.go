@@ -95,8 +95,7 @@ type Event struct {
 	// PS represents process' metadata and its allocated resources such as handles, DLLs, etc.
 	PS *pstypes.PS `json:"ps,omitempty"`
 	// Callstack represents the call stack for the thread that generated the event.
-	Callstack callstack.Callstack `json:"callstack"`
-
+	Callstack callstack.Callstack `json:"callstack,omitempty"`
 	// mmux guards the metadata map
 	mmux sync.RWMutex
 }

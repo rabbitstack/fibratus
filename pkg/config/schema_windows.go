@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 by Nedim Sabic Sabic
+ * Copyright 2019-2026 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -18,15 +18,7 @@
 
 package config
 
-import (
-	_ "embed"
-)
+import _ "embed"
 
-//go:embed config.schema.json
+//go:embed schemas/config.schema.windows.json
 var configSchema string
-
-//go:embed rules.schema.json
-var rulesSchema string
-
-//go:embed macros.schema.json
-var macrosSchema string

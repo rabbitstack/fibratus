@@ -1,6 +1,3 @@
-//go:build windows
-// +build windows
-
 /*
  * Copyright 2019-2020 by Nedim Sabic Sabic
  * https://www.fibratus.io
@@ -22,49 +19,11 @@
 package api
 
 import (
-	"context"
-	"fmt"
 	"net"
-	"strings"
-
-	"github.com/Microsoft/go-winio"
 )
 
-// MakePipeListener produces a new listener for receiving requests over a named pipe.
-func MakePipeListener(pipePath, descriptor string) (net.Listener, error) {
-	npipe := transformPipePath(pipePath)
-	l, err := winio.ListenPipe(npipe, &winio.PipeConfig{SecurityDescriptor: descriptor})
-	if err != nil {
-		return nil, fmt.Errorf("fail to listen on the %q pipe: %v", pipePath, err)
-	}
-	return l, nil
-}
-
-// makeTCPListener produces a new listener for receiving requests over TCP.
-func makeTCPListener(addr string) (net.Listener, error) {
+// MakeTCPListener produces a new listener for receiving requests over TCP.
+func MakeTCPListener(addr string) (net.Listener, error) {
 	//nolint:noctx
 	return net.Listen("tcp", addr)
-}
-
-// DialPipe creates a dialer to be used with the http.Client to connect to a named pipe.
-func DialPipe(pipePath string) func(context.Context, string, string) (net.Conn, error) {
-	npipe := transformPipePath(pipePath)
-	return func(ctx context.Context, _, _ string) (net.Conn, error) {
-		return winio.DialPipeContext(ctx, npipe)
-	}
-}
-
-// transformPipePath takes an input type name defined as a URI like `npipe:///hello` and transform it into
-// `\\.\pipe\hello`. Borrowed from https://github.com/elastic/beats/blob/master/libbeat/api/npipe/listener_windows.go
-func transformPipePath(name string) string {
-	if strings.HasPrefix(name, "npipe:///") {
-		path := strings.TrimPrefix(name, "npipe:///")
-		return `\\.\pipe\` + path
-	}
-
-	if strings.HasPrefix(name, `\\.\pipe\`) {
-		return name
-	}
-
-	return name
 }

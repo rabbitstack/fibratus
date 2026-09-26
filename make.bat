@@ -117,7 +117,7 @@ copy /y ".\cmd\fibratus\fibratus.ico" "%RELEASE_DIR%\Bin"
 copy /y ".\configs\fibratus.yml" "%RELEASE_DIR%\Config\fibratus.yml"
 
 robocopy ".\filaments" "%RELEASE_DIR%\Filaments" /E /S /XF *.md /XD __pycache__ .idea
-robocopy ".\rules" "%RELEASE_DIR%\Rules" /E /S /XF *.md *.png
+robocopy ".\rules" "%RELEASE_DIR%\Rules" /E /S /XF *.md *.png /XD linux
 
 :: Download the embedded Python distribution
 echo Downloading Python %PYTHON_VER%...
@@ -175,7 +175,7 @@ copy /y ".\cmd\systray\fibratus-systray.exe" "%RELEASE_DIR%\Bin"
 copy /y ".\cmd\fibratus\fibratus.ico" "%RELEASE_DIR%\Bin"
 copy /y ".\configs\fibratus.yml" "%RELEASE_DIR%\Config\fibratus.yml"
 
-robocopy ".\rules" "%RELEASE_DIR%\Rules" /E /S /XF *.md *.png
+robocopy ".\rules" "%RELEASE_DIR%\Rules" /E /S /XF *.md *.png /XD linux
 
 :: Copy Debug Help DLL
 copy %SystemRoot%\System32\dbghelp.dll "%RELEASE_DIR%\Bin"

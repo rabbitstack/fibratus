@@ -1,0 +1,27 @@
+name: Process traced via ptrace
+id: 992bc26b-b4c2-47d8-bf76-e7fb895caa1e
+version: 1.0.0
+description: |
+  Identifies a process attaching to another process with ptrace.
+  PTRACE_ATTACH and PTRACE_SEIZE are used to inspect or modify another
+  process, including for injection and credential theft. Requests denied
+  by the kernel also match, since a blocked attempt carries the same intent
+  and often precedes a privilege escalation attempt.
+labels:
+  tactic.id: TA0005
+  tactic.name: Defense Evasion
+  tactic.ref: https://attack.mitre.org/tactics/TA0005/
+  technique.id: T1055
+  technique.name: Process Injection
+  technique.ref: https://attack.mitre.org/techniques/T1055/
+references:
+  - https://man7.org/linux/man-pages/man2/ptrace.2.html
+
+condition: >
+  ptrace_attach and ps.target.pid != 0 and ps.target.pid != evt.pid
+
+output: >
+  %ps.name attached to process %ps.target.pid via ptrace
+
+severity: high
+min-engine-version: 3.0.0

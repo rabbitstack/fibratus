@@ -1,8 +1,6 @@
-//go:build windows
-// +build windows
-
 /*
  * Copyright 2019-2020 by Nedim Sabic Sabic
+ * Copyright 2026 by Mostafa Moradian
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -22,129 +20,41 @@
 package config
 
 import (
-	"runtime"
-	"time"
-
 	"github.com/rabbitstack/fibratus/pkg/event"
-	"github.com/rabbitstack/fibratus/pkg/util/bitmap"
-
 	pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
-	"github.com/spf13/viper"
+	"github.com/rabbitstack/fibratus/pkg/util/bitmap"
 )
 
-const (
-	enableThreadEvents   = "eventsource.enable-thread"
-	enableRegistryEvents = "eventsource.enable-registry"
-	enableNetEvents      = "eventsource.enable-net"
-	enableFileIOEvents   = "eventsource.enable-fileio"
-	enableVAMapEvents    = "eventsource.enable-vamap"
-	enableModuleEvents   = "eventsource.enable-module"
-	enableMemEvents      = "eventsource.enable-mem"
-	enableAuditAPIEvents = "eventsource.enable-audit-api"
-	enableDNSEvents      = "eventsource.enable-dns"
-	stackEnrichment      = "eventsource.stack-enrichment"
-	bufferSize           = "eventsource.buffer-size"
-	minBuffers           = "eventsource.min-buffers"
-	maxBuffers           = "eventsource.max-buffers"
-	flushInterval        = "eventsource.flush-interval"
+const excludedEvents = "eventsource.blacklist.events"
+const excludedProcesses = "eventsource.blacklist.images"
 
-	excludedEvents = "eventsource.blacklist.events"
-	excludedImages = "eventsource.blacklist.images"
+// EventFilter defines the dropped event types bitmap and the processes exclusion map.
+type EventFilter struct {
+	Types     bitmap.Bitmap[event.Type]
+	Processes map[string]bool
+}
 
-	maxBufferSize = uint32(512)
-)
-
-var (
-	defaultMinBuffers    = uint32(runtime.NumCPU() * 2)
-	defaultMaxBuffers    = uint32(runtime.NumCPU() * 8)
-	defaultFlushInterval = time.Second
-)
-
-// EventSourceConfig stores different configuration options for fine-tuning the event source.
-type EventSourceConfig struct {
-	// EnableThreadEvents indicates if thread events are collected by the ETW provider.
-	EnableThreadEvents bool `json:"enable-thread" yaml:"enable-thread"`
-	// EnableRegistryEvents indicates if registry events are collected by the ETW provider.
-	EnableRegistryEvents bool `json:"enable-registry" yaml:"enable-registry"`
-	// EnableNetEvents determines whether network (TCP/UDP) events are collected by the ETW provider.
-	EnableNetEvents bool `json:"enable-net" yaml:"enable-net"`
-	// EnableFileIOEvents indicates if file I/O events are collected by the ETW provider.
-	EnableFileIOEvents bool `json:"enable-fileio" yaml:"enable-fileio"`
-	// EnableVAMapEvents indicates if VA map/unmap events are collected by the ETW provider.
-	EnableVAMapEvents bool `json:"enable-vamap" yaml:"enable-vamap"`
-	// EnableModuleEvents indicates if module events are collected by the ETW provider.
-	EnableModuleEvents bool `json:"enable-image" yaml:"enable-module"`
-	// EnableMemEvents indicates whether memory manager events are enabled.
-	EnableMemEvents bool `json:"enable-memory" yaml:"enable-memory"`
-	// EnableAuditAPIEvents indicates if kernel audit API calls events are enabled
-	EnableAuditAPIEvents bool `json:"enable-audit-api" yaml:"enable-audit-api"`
-	// EnableDNSEvents indicates if DNS client events are enabled
-	EnableDNSEvents bool `json:"enable-dns" yaml:"enable-dns"`
-	// StackEnrichment indicates if stack enrichment is enabled for eligible events.
-	StackEnrichment bool `json:"stack-enrichment" yaml:"stack-enrichment"`
-	// BufferSize represents the amount of memory allocated for each event tracing session buffer, in kilobytes.
-	// The buffer size affects the rate at which buffers fill and must be flushed (small buffer size requires
-	// less memory, but it increases the rate at which buffers must be flushed).
-	BufferSize uint32 `json:"buffer-size" yaml:"buffer-size"`
-	// MinBuffers determines the minimum number of buffers allocated for the event tracing session's buffer pool.
-	MinBuffers uint32 `json:"min-buffers" yaml:"min-buffers"`
-	// MaxBuffers is the maximum number of buffers allocated for the event tracing session's buffer pool.
-	MaxBuffers uint32 `json:"max-buffers" yaml:"max-buffers"`
-	// FlushTimer specifies how often the trace buffers are forcibly flushed.
-	FlushTimer time.Duration `json:"flush-interval" yaml:"flush-interval"`
+// BaseEventSourceConfig contains platform-neutral event source configuration.
+type BaseEventSourceConfig struct {
+	EventFilter
 	// ExcludedEvents are kernel event names that will be dropped from the kernel event stream.
 	ExcludedEvents []string `json:"blacklist.events" yaml:"blacklist.events"`
-	// ExcludedImages are process image names that will be rejected if they generate a kernel event.
-	ExcludedImages []string `json:"blacklist.images" yaml:"blacklist.images"`
-
-	dropBitmap bitmap.Bitmap[event.Type]
-
-	excludedImages map[string]bool
+	// ExcludedProcesses are process image names that will be rejected if they generate a kernel event.
+	ExcludedProcesses []string `json:"blacklist.images" yaml:"blacklist.images"`
 }
 
-func (c *EventSourceConfig) initFromViper(v *viper.Viper) {
-	c.EnableThreadEvents = v.GetBool(enableThreadEvents)
-	c.EnableRegistryEvents = v.GetBool(enableRegistryEvents)
-	c.EnableNetEvents = v.GetBool(enableNetEvents)
-	c.EnableFileIOEvents = v.GetBool(enableFileIOEvents)
-	c.EnableVAMapEvents = v.GetBool(enableVAMapEvents)
-	c.EnableModuleEvents = v.GetBool(enableModuleEvents)
-	c.EnableMemEvents = v.GetBool(enableMemEvents)
-	c.EnableAuditAPIEvents = v.GetBool(enableAuditAPIEvents)
-	c.EnableDNSEvents = v.GetBool(enableDNSEvents)
-	c.StackEnrichment = v.GetBool(stackEnrichment)
-	c.BufferSize = uint32(v.GetInt(bufferSize))
-	c.MinBuffers = uint32(v.GetInt(minBuffers))
-	c.MaxBuffers = uint32(v.GetInt(maxBuffers))
-	c.FlushTimer = v.GetDuration(flushInterval)
-	c.ExcludedEvents = v.GetStringSlice(excludedEvents)
-	c.ExcludedImages = v.GetStringSlice(excludedImages)
-
-	c.excludedImages = make(map[string]bool)
+// Init initializes event and process exclusion rules.
+func (c *BaseEventSourceConfig) Init() {
+	c.EventFilter.Processes = make(map[string]bool)
 
 	for _, name := range c.ExcludedEvents {
 		if typ, ok := event.ParseType(name); ok {
-			c.dropBitmap.Set(typ)
+			c.EventFilter.Types.Set(typ)
 		}
 	}
 
-	for _, name := range c.ExcludedImages {
-		c.excludedImages[name] = true
-	}
-}
-
-// Init is an exported method to allow initializing exclusion maps from external modules.
-func (c *EventSourceConfig) Init() {
-	c.excludedImages = make(map[string]bool)
-
-	for _, name := range c.ExcludedEvents {
-		if typ, ok := event.ParseType(name); ok {
-			c.dropBitmap.Set(typ)
-		}
-	}
-
-	for _, name := range c.ExcludedImages {
-		c.excludedImages[name] = true
+	for _, name := range c.ExcludedProcesses {
+		c.EventFilter.Processes[name] = true
 	}
 }
 
@@ -152,30 +62,23 @@ func (c *EventSourceConfig) Init() {
 // instruct the given event type should be dropped from
 // the event stream.
 func (c *EventSourceConfig) SetDropMask(typ event.Type) {
-	c.dropBitmap.Set(typ)
+	c.EventFilter.Types.Set(typ)
 }
 
 // TestDropMask checks if the specified event type has
 // the drop mask in the bitset.
 func (c *EventSourceConfig) TestDropMask(typ event.Type) bool {
-	return c.dropBitmap.Has(typ)
+	return c.EventFilter.Types.Has(typ)
 }
 
 // ExcludeEvent determines whether the event type is declared
 // in the exclusion list.
 func (c *EventSourceConfig) ExcludeEvent(typ event.Type) bool {
-	return c.dropBitmap.Has(typ)
+	return c.EventFilter.Types.Has(typ)
 }
 
-// ExcludeImage determines whether the process generating event is present in the
-// list of excluded images. If the hit occurs, the event associated with the process
-// is dropped.
-func (c *EventSourceConfig) ExcludeImage(ps *pstypes.PS) bool {
-	if len(c.excludedImages) == 0 {
-		return false
-	}
-	if ps == nil {
-		return false
-	}
-	return c.excludedImages[ps.Name]
+// ExcludeProcess determines whether the event is excluded by the
+// originating process name.
+func (c *EventSourceConfig) ExcludeProcess(ps *pstypes.PS) bool {
+	return ps != nil && c.EventFilter.Processes[ps.Name]
 }
