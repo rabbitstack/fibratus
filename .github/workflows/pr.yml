@@ -12,9 +12,10 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: 1.26.x
+  GO_VERSION: 1.27.x
   WIX_VERSION: 5.0.0
   PYTHON_VERSION: 3.7.9
+  GOLANGCI_LINT_VERSION: 2.14.0
 
 jobs:
   build:
@@ -214,11 +215,10 @@ jobs:
           cd yara
           make install
       - name: Install golangci-lint
-        shell: bash
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin $GOLANGCI_LINT_VER
-        env:
-          GOLANGCI_LINT_VER: v2.9.0
+        uses: golangci/golangci-lint-action@v9
+        with:
+          install-only: true
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
       - name: Lint
         shell: bash
         run: |
