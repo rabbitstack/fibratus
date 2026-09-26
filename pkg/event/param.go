@@ -99,32 +99,11 @@ type Param struct {
 	Enum ParamEnum `json:"enum"`
 }
 
-// NewParam creates a parameter and normalizes its value for the current platform.
-func NewParam(name string, typ params.Type, value params.Value, options ...ParamOption) *Param {
-	var opts paramOpts
-	for _, opt := range options {
-		opt(&opts)
-	}
-	return &Param{
-		Name:  name,
-		Type:  typ,
-		Value: normalizeParamValue(typ, value),
-		Flags: opts.flags,
-		Enum:  opts.enum,
-	}
-}
-
-// String returns the string representation of the parameter value.
-func (p Param) String() string {
-	if p.Value == nil {
-		return ""
-	}
-	if value, ok := formatPlatformParam(p); ok {
-		return value
-	}
+// Stringify returns the string representation of the parameter value that is platform-agnostic.
+func (p Param) Stringify() string {
 	switch p.Type {
 	case params.Path:
-		return fmt.Sprintf("%v", p.Value)
+		return p.Value.(string)
 	case params.Address:
 		v, ok := p.Value.(uint64)
 		if !ok {
@@ -142,7 +121,7 @@ func (p Param) String() string {
 	case params.Uint32:
 		return strconv.FormatUint(uint64(p.Value.(uint32)), 10)
 	case params.PID, params.TID:
-		return formatPlatformID(p.Value)
+		return strconv.FormatUint(uint64(p.Value.(uint32)), 10)
 	case params.Int32:
 		return strconv.Itoa(int(p.Value.(int32)))
 	case params.Uint64:
@@ -189,23 +168,15 @@ func (p Param) String() string {
 		}
 	case params.Binary:
 		return string(p.Value.([]byte))
+	default:
+		return fmt.Sprintf("%v", p.Value)
 	}
-	return fmt.Sprintf("%v", p.Value)
 }
 
 // IsNumber determines if the parameter stores the integer value type.
 func (p Param) IsNumber() bool {
 	return p.Type == params.Int8 || p.Type == params.Int16 || p.Type == params.Int32 || p.Type == params.Int64 ||
 		p.Type == params.Uint8 || p.Type == params.Uint16 || p.Type == params.Uint32 || p.Type == params.Uint64
-}
-
-// CaptureType returns the event type saved inside the capture file.
-// Captures usually override the type of the parameter to provide
-// consistent replay experience. For example, the file path param
-// type is converted to string param type, as drive mapping is performed
-// on the target where the capture is being taken.
-func (p Param) CaptureType() params.Type {
-	return captureParamType(p.Type)
 }
 
 // Params is the type that represents the sequence of event parameters
@@ -718,7 +689,7 @@ func (pars Params) findParam(name string) (*Param, error) {
 
 // Colorize renders the full parameter list for the {{.Params}} tag.
 // Each entry is formatted as: key <separator> value, with the key in
-// amber, the seperator dim, and the value semantically coloured.
+// amber, the separator dim, and the value semantically coloured.
 func (pars Params) Colorize() string {
 	if len(pars) == 0 {
 		return ""
@@ -744,43 +715,4 @@ func (pars Params) Colorize() string {
 	}
 
 	return b.String()
-}
-
-// color applies a semantic colour to a single parameter value based
-// on its type and for string types its content.
-func (p *Param) color() string {
-	if color, ok := platformParamColor(p); ok {
-		return color
-	}
-	switch p.Type {
-	case params.Address:
-		return colorizer.SpanDim(colorizer.Span(colorizer.Gray, "0x"+p.String()))
-
-	case params.Int8, params.Int16, params.Int32, params.Int64,
-		params.Uint8, params.Uint16, params.Uint32, params.Uint64,
-		params.Float, params.Double:
-		return colorizer.Span(colorizer.Yellow, p.String())
-
-	case params.Bool:
-		b, ok := p.Value.(bool)
-		if !ok {
-			return colorizer.Span(colorizer.Coral, p.String())
-		}
-		if b {
-			return colorizer.Span(colorizer.Green, p.String())
-		}
-		return colorizer.Span(colorizer.Coral, p.String())
-
-	case params.IPv4, params.IPv6:
-		return colorizer.Span(colorizer.Blue, p.String())
-
-	case params.Port:
-		return colorizer.Span(colorizer.Cyan, p.String())
-
-	case params.PID, params.TID:
-		return colorizer.Span(colorizer.Green, p.String())
-
-	default:
-		return colorizer.Span(colorizer.White, p.String())
-	}
 }

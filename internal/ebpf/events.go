@@ -78,18 +78,14 @@ func (r rawEvent) filename() string { return cString(r.Filename[:]) }
 func (r rawEvent) aux() string      { return cString(r.Aux[:]) }
 
 func (r rawEvent) eventType() event.Type {
-	typ := event.Type(r.Type)
-	if typ.Exists() {
-		return typ
-	}
-	return event.UnknownType
+	return event.Type(r.Type)
 }
 
-func (r rawEvent) processID() uint64 {
+func (r rawEvent) processID() uint32 {
 	if r.PID != 0 {
-		return uint64(r.PID)
+		return r.PID
 	}
-	return uint64(r.TGID)
+	return r.TGID
 }
 
 // toEvent converts the raw eBPF record into an event. The sequence number is
@@ -97,22 +93,18 @@ func (r rawEvent) processID() uint64 {
 // the sequencer only for events that pass exclusion and filtering.
 func (r rawEvent) toEvent() *event.Event {
 	typ := r.eventType()
-	info := event.TypeToEventInfo(typ)
 	evt := &event.Event{
-		PID:         r.processID(),
-		Tid:         uint64(r.TID),
-		Type:        typ,
-		Name:        info.Name,
-		Category:    info.Category,
-		Description: info.Description,
-		Host:        hostname.Get(),
-		Timestamp:   time.Unix(0, int64(r.TimestampNs)),
-		Params:      event.Params{},
-		Metadata:    make(event.Metadata),
+		PID:       r.processID(),
+		Tid:       r.TID,
+		Type:      typ,
+		Host:      hostname.Get(),
+		Timestamp: time.Unix(0, int64(r.TimestampNs)),
+		Params:    event.Params{},
+		Metadata:  make(event.Metadata),
 	}
 	evt.Params.Append(params.ProcessID, params.PID, evt.PID)
 	evt.Params.Append(params.ThreadID, params.TID, evt.Tid)
-	evt.Params.Append(params.ProcessParentID, params.PID, uint64(r.PPID))
+	evt.Params.Append(params.ProcessParentID, params.PID, r.PPID)
 	evt.Params.Append(params.ProcessName, params.String, r.comm())
 	evt.Params.Append(params.UID, params.Uint32, r.UID)
 	evt.Params.Append(params.GID, params.Uint32, r.GID)

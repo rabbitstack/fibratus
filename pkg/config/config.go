@@ -56,10 +56,8 @@ const (
 	forwardMode = "forward"
 )
 
-// Config stores configuration options for fine-tuning the behaviour of Fibratus.
-type Config struct {
-	platformConfig
-
+// BaseConfig stores configuration options that are platform-neutral.
+type BaseConfig struct {
 	// EventSource stores options for fine-tuning the event source.
 	EventSource EventSourceConfig `json:"eventsource" yaml:"eventsource"`
 	// Filament contains filament settings.
@@ -119,8 +117,8 @@ func WithStats() Option { return func(o *Options) { o.stats = true } }
 // WithValidate determines whether the validate command is executed.
 func WithValidate() Option { return func(o *Options) { o.validate = true } }
 
-// NewWithOpts builds a new configuration store from files, environment variables, and flags.
-func NewWithOpts(options ...Option) *Config {
+// newWithOpts builds a new base configuration store from files, environment variables, and flags.
+func newWithOpts(options ...Option) *BaseConfig {
 	opts := &Options{}
 	for _, option := range options {
 		option(opts)
@@ -130,17 +128,16 @@ func NewWithOpts(options ...Option) *Config {
 	v.AutomaticEnv()
 	v.SetEnvKeyReplacer(strings.NewReplacer("-", "_", ".", "_"))
 
-	c := &Config{
-		platformConfig: newPlatformConfig(),
-		EventSource:    EventSourceConfig{},
-		Filament:       FilamentConfig{},
-		API:            APIConfig{},
-		Aggregator:     aggregator.Config{},
-		Log:            log.Config{},
-		Filters:        &Filters{},
-		flags:          new(pflag.FlagSet),
-		viper:          v,
-		opts:           opts,
+	c := &BaseConfig{
+		EventSource: EventSourceConfig{},
+		Filament:    FilamentConfig{},
+		API:         APIConfig{},
+		Aggregator:  aggregator.Config{},
+		Log:         log.Config{},
+		Filters:     &Filters{},
+		flags:       new(pflag.FlagSet),
+		viper:       v,
+		opts:        opts,
 	}
 
 	if opts.run || opts.replay {
@@ -159,12 +156,12 @@ func NewWithOpts(options ...Option) *Config {
 	}
 
 	c.addFlags()
-	c.addPlatformFlags()
+
 	return c
 }
 
 // MustViperize adds the configuration flags to the Cobra command.
-func (c *Config) MustViperize(cmd *cobra.Command) {
+func (c *BaseConfig) MustViperize(cmd *cobra.Command) {
 	cmd.PersistentFlags().AddFlagSet(c.flags)
 	if err := c.viper.BindPFlags(cmd.PersistentFlags()); err != nil {
 		panic(err)
@@ -176,8 +173,29 @@ func (c *Config) MustViperize(cmd *cobra.Command) {
 	}
 }
 
-// Init initializes the configuration state from Viper.
-func (c *Config) Init() error {
+// init initializes the configuration state from Viper and
+// loads/decodes output, transformer and alert sender configs.
+func (c *BaseConfig) init() error {
+	c.initFromViper()
+
+	if !c.opts.run && !c.opts.replay {
+		return nil
+	}
+
+	if err := c.TryLoadOutput(); err != nil {
+		return err
+	}
+	if err := c.TryLoadTransformers(); err != nil {
+		return err
+	}
+	if err := c.TryLoadAlertSenders(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *BaseConfig) initFromViper() {
 	c.EventSource.initFromViper(c.viper)
 	c.Filament.initFromViper(c.viper)
 	c.API.initFromViper(c.viper)
@@ -186,43 +204,36 @@ func (c *Config) Init() error {
 	c.Filters.initFromViper(c.viper)
 	c.ForwardMode = c.viper.GetBool(forwardMode)
 	c.CapFile = c.viper.GetString(capFile)
-	c.initPlatform()
-
-	if c.opts.run || c.opts.replay {
-		if err := c.tryLoadOutput(); err != nil {
-			return err
-		}
-		if err := c.tryLoadTransformers(); err != nil {
-			return err
-		}
-		if err := c.tryLoadAlertSenders(); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
-func (c *Config) GetConfigFile() string { return c.viper.GetString(configFile) }
+// GetConfigFile gets the path of the configuration file from Viper value.
+func (c *BaseConfig) GetConfigFile() string { return c.viper.GetString(configFile) }
 
-func (c *Config) GetFilters() []*FilterConfig {
+// GetFilters returns all rule filters loaded into the engine.
+func (c *BaseConfig) GetFilters() []*FilterConfig {
 	if c.Filters == nil {
 		return nil
 	}
 	return c.Filters.filters
 }
 
-func (c *Config) TryLoadFile(file string) error {
+// TryLoadFile attempts to load the configuration file from specified path on the file system.
+func (c *BaseConfig) TryLoadFile(file string) error {
 	c.viper.SetConfigFile(file)
 	return c.viper.ReadInConfig()
 }
 
-func (c *Config) validateConfig() error {
+// Validate ensures that all configuration options provided by user have the expected values. It returns
+// a list of validation errors prefixed with the offending configuration property/flag.
+func (c *BaseConfig) Validate() error {
+	// we'll first validate the structure and values of the config file
 	file := c.viper.GetString(configFile)
-	var out interface{}
+	var out any
 	b, err := os.ReadFile(file)
 	if err != nil {
 		return err
 	}
+
 	switch filepath.Ext(file) {
 	case ".yaml", ".yml":
 		err = yaml.Unmarshal(b, &out)
@@ -234,32 +245,37 @@ func (c *Config) validateConfig() error {
 	if err != nil {
 		return fmt.Errorf("couldn't read the config file: %v", err)
 	}
+
+	// validate config file content
 	valid, errs := validate(configSchema, out)
 	if !valid || len(errs) > 0 {
 		return fmt.Errorf("invalid config: %v", multierror.Wrap(errs...))
 	}
+
+	// now validate the Viper config flags
 	valid, errs = validate(configSchema, c.viper.AllSettings())
 	if !valid || len(errs) > 0 {
 		return fmt.Errorf("invalid config: %v", multierror.Wrap(errs...))
 	}
+
 	return nil
 }
 
-func (c *Config) IsCaptureSet() bool  { return c.CapFile != "" }
-func (c *Config) IsFilamentSet() bool { return c.Filament.Name != "" }
-func (c *Config) ConfigExists() bool  { _, err := os.Stat(c.File()); return err == nil }
-func (c *Config) File() string        { return c.viper.GetString(configFile) }
+func (c *BaseConfig) IsCaptureSet() bool  { return c.CapFile != "" }
+func (c *BaseConfig) IsFilamentSet() bool { return c.Filament.Name != "" }
+func (c *BaseConfig) ConfigExists() bool  { _, err := os.Stat(c.File()); return err == nil }
+func (c *BaseConfig) File() string        { return c.viper.GetString(configFile) }
 
-func (c *Config) addFlags() {
-	c.flags.String(configFile, defaultConfigFile(), "Indicates the location of the configuration file")
+func (c *BaseConfig) addFlags() {
+	c.flags.String(configFile, configFilePath, "Indicates the location of the configuration file")
 	if c.opts.run {
 		c.flags.Bool(forwardMode, false, "Designates if event forwarding mode is engaged")
 	}
 	if c.opts.run || c.opts.replay || c.opts.validate {
 		c.flags.StringP(filamentName, "f", "", "Specifies the filament to execute")
 		c.flags.Bool(rulesEnabled, true, "Indicates if the rule engine is enabled and rules loaded")
-		c.flags.StringSlice(rulesFromPaths, defaultRulesPaths(), "Comma-separated list of rules files")
-		c.flags.StringSlice(macrosFromPaths, defaultMacrosPaths(), "Comma-separated list of macro files")
+		c.flags.StringSlice(rulesFromPaths, rulesPaths, "Comma-separated list of rules files")
+		c.flags.StringSlice(macrosFromPaths, macrosPaths, "Comma-separated list of macro files")
 		c.flags.StringSlice(rulesFromURLs, nil, "Comma-separated list of rules URL resources")
 		c.flags.Bool(matchAll, true, "Indicates if the match all strategy is enabled for the rule engine")
 	}
@@ -270,11 +286,12 @@ func (c *Config) addFlags() {
 		c.flags.StringP(capFile, "k", "", "The path of the input cap file")
 	}
 	if c.opts.run || c.opts.replay || c.opts.list || c.opts.validate {
-		c.flags.String(filamentPath, defaultFilamentPath(), "Denotes the directory where filaments are located")
+		c.flags.String(filamentPath, filamentsPaths, "Denotes the directory where filaments are located")
 	}
 	if c.opts.run || c.opts.replay || c.opts.capture || c.opts.stats {
-		c.flags.String(transport, defaultTransport(), "Specifies the underlying transport protocol for the API HTTP server")
+		c.flags.String(transport, apiTransport, "Specifies the underlying transport protocol for the API HTTP server")
 		c.flags.Duration(timeout, 15*time.Second, "Determines the timeout for the API server responses")
 	}
 	c.Log.AddFlags(c.flags)
+	c.EventSource.AddFlags(c.flags)
 }

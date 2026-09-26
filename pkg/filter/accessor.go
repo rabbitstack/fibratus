@@ -24,7 +24,6 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/rabbitstack/fibratus/internal/evasion"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/filter/fields"
@@ -37,7 +36,7 @@ var (
 
 // Accessor dictates the behaviour of the field accessors. One of the main responsibilities of the accessor is
 // to extract the underlying parameter for the field given in the filter expression. It can also produce a value
-// from the non-params constructs such as process' state or PE metadata.
+// from the non-params constructs such as process' state.
 type Accessor interface {
 	// Get fetches the parameter value for the specified filter field.
 	Get(f Field, evt *event.Event) (params.Value, error)
@@ -66,7 +65,7 @@ func newEventAccessor() Accessor {
 const timeFmt = "15:04:05"
 const dateFmt = "2006-01-02"
 
-func (*evtAccessor) Get(f Field, evt *event.Event) (params.Value, error) {
+func (*evtAccessor) get(f Field, evt *event.Event) (params.Value, error) {
 	switch f.Name {
 	case fields.EvtSeq, fields.KevtSeq:
 		return evt.Seq, nil
@@ -138,13 +137,8 @@ func (*evtAccessor) Get(f Field, evt *event.Event) (params.Value, error) {
 		default:
 			return evt.GetParamAsString(name), nil
 		}
-	case fields.EvtIsDirectSyscall:
-		return evt.Evasions&uint32(evasion.DirectSyscall) != 0, nil
-	case fields.EvtIsIndirectSyscall:
-		return evt.Evasions&uint32(evasion.IndirectSyscall) != 0, nil
 	}
-
-	return platformEvtValue(f, evt)
+	return nil, nil
 }
 
 // narrowAccessors dynamically disables filter accessors by walking

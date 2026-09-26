@@ -20,12 +20,119 @@
 
 package event
 
-import pstypes "github.com/rabbitstack/fibratus/pkg/ps/types"
+import (
+	"fmt"
+	"strconv"
 
-func addPlatformFormatValues(_ *Event, _ map[string]interface{}) {}
+	"github.com/rabbitstack/fibratus/pkg/util/colorizer"
+)
 
-func addPlatformProcessFormatValues(_ *pstypes.PS, _ map[string]interface{}) {}
+// Format applies the template on the provided event.
+func (f *Formatter) Format(evt *Event) []byte {
+	if evt == nil {
+		return []byte{}
+	}
 
-func colourPlatformTag(_ string, _ *Event) string { return "" }
+	values := f.eventMap(evt)
 
-func colourPlatformProcessTag(_ string, _ *Event) (string, bool) { return "", false }
+	ps := evt.PS
+	if ps != nil {
+		values[proc] = ps.Name
+		values[ppid] = strconv.FormatUint(uint64(ps.Ppid), 10)
+		values[cwd] = ps.Cwd
+		values[exe] = ps.Exe
+		values[cmd] = ps.Cmdline
+		parent := ps.Parent
+
+		if parent != nil {
+			values[pproc] = parent.Name
+			values[pexe] = parent.Exe
+			values[pcmd] = parent.Cmdline
+		}
+	}
+
+	if f.expandParamsDot {
+		for _, par := range evt.Params {
+			values[".Params."+caser.String(par.Name)] = par.String()
+		}
+	}
+
+	return f.t.ExecuteString(values)
+}
+
+// colourTag maps a bare tag name to its coloured string representation.
+func (f *ColorFormatter) colourTag(tag string, e *Event) string {
+	switch tag {
+	case seq:
+		// sequence number is ok to render as dim gray
+		return colorizer.SpanDim(colorizer.Span(colorizer.Gray, strconv.FormatUint(e.Seq, 10)))
+	case ts:
+		return f.colourTimestamp(e)
+	case cpu:
+		return colorizer.Span(colorizer.Yellow, strconv.FormatUint(uint64(e.CPU), 10))
+	case proc:
+		// render process name with bold green as it is the most important
+		// identity anchor on the line. Analysts scan for it first.
+		ps := e.PS
+		if ps == nil {
+			return colorizer.Span(colorizer.Gray, "N/A")
+		}
+		return colorizer.SpanBold(colorizer.Green, ps.Name)
+	case pid:
+		return colorizer.Span(colorizer.Green, strconv.FormatUint(uint64(e.PID), 10))
+	case ppid:
+		ps := e.PS
+		if ps == nil {
+			return colorizer.Span(colorizer.Gray, "N/A")
+		}
+		return colorizer.Span(colorizer.Green, strconv.FormatUint(uint64(ps.Ppid), 10))
+	case tid:
+		return colorizer.Span(colorizer.Green, strconv.FormatUint(uint64(e.Tid), 10))
+	case exe:
+		ps := e.PS
+		if ps == nil {
+			return colorizer.Span(colorizer.Gray, "N/A")
+		}
+		return colorizer.Span(colorizer.White, ps.Exe)
+	case pexe:
+		ps := e.PS
+		if ps == nil || ps.Parent == nil {
+			return colorizer.Span(colorizer.Gray, "N/A")
+		}
+		return colorizer.Span(colorizer.White, ps.Parent.Exe)
+	case cmd:
+		ps := e.PS
+		if ps == nil {
+			return colorizer.Span(colorizer.Gray, "N/A")
+		}
+		return colorizer.Span(colorizer.White, ps.Cmdline)
+	case pcmd:
+		ps := e.PS
+		if ps == nil || ps.Parent == nil {
+			return colorizer.Span(colorizer.Gray, "N/A")
+		}
+		return colorizer.Span(colorizer.White, ps.Parent.Cmdline)
+	case cwd:
+		ps := e.PS
+		if ps == nil {
+			return colorizer.Span(colorizer.Gray, "N/A")
+		}
+		return colorizer.Span(colorizer.White, ps.Cwd)
+	case pproc:
+		ps := e.PS
+		if ps == nil || ps.Parent == nil {
+			return colorizer.Span(colorizer.Gray, "N/A")
+		}
+		return colorizer.Span(colorizer.Green, ps.Parent.Name)
+	case typ:
+		return e.Type.color()
+	case cat:
+		return colorizer.Span(colorizer.Magenta, e.Category().String())
+	case parameters:
+		return e.Params.Colorize()
+	case cstack:
+		return fmt.Sprintf("\n%s", e.Callstack.Colorize())
+	}
+
+	return ""
+}

@@ -36,8 +36,8 @@ func snapshotFromRaw(r rawEvent, exe, cmdline string) *pstypes.PS {
 	}
 	args := splitCmdline(cmdline)
 	return &pstypes.PS{
-		PID:           uint64(r.TGID),
-		Ppid:          uint64(r.PPID),
+		PID:           r.TGID,
+		Ppid:          r.PPID,
 		Name:          name,
 		Cmdline:       cmdline,
 		Exe:           exe,
@@ -45,7 +45,7 @@ func snapshotFromRaw(r rawEvent, exe, cmdline string) *pstypes.PS {
 		StartBootTime: r.StartBootTime,
 		UID:           r.UID,
 		GID:           r.GID,
-		Threads:       make(map[uint64]pstypes.Thread),
+		Threads:       make(map[uint32]pstypes.Thread),
 	}
 }
 

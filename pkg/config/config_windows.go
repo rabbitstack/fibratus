@@ -44,30 +44,80 @@ const (
 
 	serializeThreads = "event.serialize-threads"
 	serializeModules = "event.serialize-modules"
+	serializeEnvs    = "event.serialize-envs"
 	serializeHandles = "event.serialize-handles"
 	serializePE      = "event.serialize-pe"
-	serializeEnvs    = "event.serialize-envs"
 )
 
-type platformConfig struct {
-	PE                       pe.Config      `json:"pe" yaml:"pe"`
-	InitHandleSnapshot       bool           `json:"init-handle-snapshot" yaml:"init-handle-snapshot"`
-	EnumerateHandles         bool           `json:"enumerate-handles" yaml:"enumerate-handles"`
-	SymbolPaths              string         `json:"symbol-paths" yaml:"symbols-paths"`
-	SymbolizeKernelAddresses bool           `json:"symbolize-kernel-addresses" yaml:"symbolize-kernel-addresses"`
-	DebugPrivilege           bool           `json:"debug-privilege" yaml:"debug-privilege"`
-	Yara                     yara.Config    `json:"yara" yaml:"yara"`
-	Evasion                  evasion.Config `json:"evasion" yaml:"evasion"`
+var (
+	// configFilePath defines the default value for the configuration file path
+	configFilePath = filepath.Join(os.Getenv("PROGRAMFILES"), "fibratus", "config", "fibratus.yml")
+
+	// filamentsPaths defines the default directory containing filament scripts
+	filamentsPaths = filepath.Join(os.Getenv("PROGRAMFILES"), "fibratus", "filaments")
+
+	// rulesPaths defines default rule paths
+	rulesPaths = []string{filepath.Join(rulesDir(), "*")}
+
+	// macrosPaths defines default macro paths
+	macrosPaths = []string{filepath.Join(rulesDir(), "Macros", "*")}
+
+	// apiTransport defines the default transport protocol for the API server
+	apiTransport = "http://localhost:8482"
+)
+
+// Config exposes the platform configuration options.
+type Config struct {
+	*BaseConfig
+	// PE contains the settings that influences the behaviour of the PE (Portable Executable) reader.
+	PE pe.Config `json:"pe" yaml:"pe"`
+
+	// InitHandleSnapshot indicates whether initial handle snapshot is built
+	InitHandleSnapshot bool `json:"init-handle-snapshot" yaml:"init-handle-snapshot"`
+
+	// EnumerateHandles indicates if process handles are collected during startup or
+	// when a new process is spawn
+	EnumerateHandles bool `json:"enumerate-handles" yaml:"enumerate-handles"`
+
+	// SymbolPaths designates the path or a series of paths separated by a semicolon
+	// that is used to search for symbols files.
+	SymbolPaths string `json:"symbol-paths" yaml:"symbols-paths"`
+
+	// SymbolizeKernelAddresses determines if kernel stack addresses are symbolized.
+	SymbolizeKernelAddresses bool `json:"symbolize-kernel-addresses" yaml:"symbolize-kernel-addresses"`
+
+	// DebugPrivilege dictates if the SeDebugPrivilege is injected into
+	// Fibratus process' access token.
+	DebugPrivilege bool `json:"debug-privilege" yaml:"debug-privilege"`
+
+	// Yara contains configuration that influences the behaviour of the Yara engine
+	Yara yara.Config `json:"yara" yaml:"yara"`
+
+	// Evasion controls the detection of evasion behaviours.
+	Evasion evasion.Config `json:"evasion" yaml:"evasion"`
 }
 
-func newPlatformConfig() platformConfig {
-	return platformConfig{
-		PE:   pe.Config{},
-		Yara: yara.Config{},
+// NewWithOpts builds a new platform configuration store.
+func NewWithOpts(options ...Option) *Config {
+	c := &Config{
+		BaseConfig: newWithOpts(options...),
+		PE:         pe.Config{},
+		Yara:       yara.Config{},
 	}
+
+	c.addFlags()
+
+	return c
 }
 
-func (c *Config) addPlatformFlags() {
+// Init initializes the config state.
+func (c *Config) Init() error {
+	c.initFromViper()
+	return c.BaseConfig.init()
+}
+
+// addFlags populates the platform flags set.
+func (c *Config) addFlags() {
 	if c.opts.run || c.opts.replay {
 		systray.AddFlags(c.flags)
 		eventlog.AddFlags(c.flags)
@@ -75,7 +125,6 @@ func (c *Config) addPlatformFlags() {
 	}
 	if c.opts.run || c.opts.capture {
 		pe.AddFlags(c.flags)
-		c.EventSource.AddFlags(c.flags)
 	}
 	if c.opts.run {
 		evasion.AddFlags(c.flags)
@@ -94,7 +143,7 @@ func (c *Config) addPlatformFlags() {
 	}
 }
 
-func (c *Config) initPlatform() {
+func (c *Config) initFromViper() {
 	c.PE.InitFromViper(c.viper)
 	c.Yara.InitFromViper(c.viper)
 	c.InitHandleSnapshot = c.viper.GetBool(initHandleSnapshot)
@@ -112,28 +161,7 @@ func (c *Config) initPlatform() {
 	}
 }
 
-// Validate validates the configuration file and merged Viper settings against the schema.
-func (c *Config) Validate() error { return c.validateConfig() }
-
-func defaultConfigFile() string {
-	return filepath.Join(os.Getenv("PROGRAMFILES"), "fibratus", "config", "fibratus.yml")
-}
-
-func defaultFilamentPath() string {
-	return filepath.Join(os.Getenv("PROGRAMFILES"), "fibratus", "filaments")
-}
-
-func defaultRulesPaths() []string {
-	return []string{filepath.Join(defaultRulesDir(), "*")}
-}
-
-func defaultMacrosPaths() []string {
-	return []string{filepath.Join(defaultRulesDir(), "Macros", "*")}
-}
-
-func defaultTransport() string { return "localhost:8080" }
-
-func defaultRulesDir() string {
+func rulesDir() string {
 	exe, err := os.Executable()
 	if err != nil {
 		exe = filepath.Join(os.Getenv("ProgramFiles"), "Fibratus", "Bin", "fibratus.exe")

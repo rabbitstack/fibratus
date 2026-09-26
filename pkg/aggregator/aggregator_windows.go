@@ -22,7 +22,7 @@
 package aggregator
 
 import (
-	// initialize Windows-only outputs and alert senders
+	// initialize Windows-only alert senders
+	_ "github.com/rabbitstack/fibratus/pkg/alertsender/eventlog"
 	_ "github.com/rabbitstack/fibratus/pkg/alertsender/systray"
-	_ "github.com/rabbitstack/fibratus/pkg/outputs/eventlog"
 )

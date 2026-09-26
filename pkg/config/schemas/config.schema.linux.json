@@ -131,37 +131,6 @@
                 }
               },
               "additionalProperties": false
-            },
-            "systray": {
-              "type": "object",
-              "properties": {
-                "enabled": {
-                  "type": "boolean"
-                },
-                "sound": {
-                  "type": "boolean"
-                },
-                "quiet-mode": {
-                  "type": "boolean"
-                }
-              },
-              "additionalProperties": false
-            },
-            "eventlog": {
-              "type": "object",
-              "properties": {
-                "enabled": {
-                  "type": "boolean"
-                },
-                "verbose": {
-                  "type": "boolean"
-                },
-                "format": {
-                  "type": "string",
-                  "enum": ["pretty", "json"]
-                }
-              },
-              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -186,29 +155,8 @@
     "config-file": {
       "type": "string"
     },
-    "debug-privilege": {
-      "type": "boolean"
-    },
     "forward": {
       "type": "boolean"
-    },
-    "symbol-paths": {
-      "type": "string"
-    },
-    "symbolize-kernel-addresses": {
-      "type": "boolean"
-    },
-    "handle": {
-      "type": "object",
-      "properties": {
-        "init-snapshot": {
-          "type": "boolean"
-        },
-        "enumerate-handles": {
-          "type": "boolean"
-        }
-      },
-      "additionalProperties": false
     },
     "cap": {
       "type": "object",
@@ -296,34 +244,10 @@
       },
       "additionalProperties": false
     },
-    "evasion": {
-      "type": "object",
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "enable-direct-syscall": {
-          "type": "boolean"
-        },
-        "enable-indirect-syscall": {
-          "type": "boolean"
-        }
-      },
-      "additionalProperties": false
-    },
     "event": {
       "type": "object",
       "properties": {
         "serialize-threads": {
-          "type": "boolean"
-        },
-        "serialize-modules": {
-          "type": "boolean"
-        },
-        "serialize-handles": {
-          "type": "boolean"
-        },
-        "serialize-pe": {
           "type": "boolean"
         },
         "serialize-envs": {
@@ -338,16 +262,7 @@
         "enable-thread": {
           "type": "boolean"
         },
-        "enable-module": {
-          "type": "boolean"
-        },
-        "enable-registry": {
-          "type": "boolean"
-        },
         "enable-fileio": {
-          "type": "boolean"
-        },
-        "enable-vamap": {
           "type": "boolean"
         },
         "enable-net": {
@@ -355,31 +270,6 @@
         },
         "enable-mem": {
           "type": "boolean"
-        },
-        "enable-audit-api": {
-          "type": "boolean"
-        },
-        "enable-dns": {
-          "type": "boolean"
-        },
-        "stack-enrichment": {
-          "type": "boolean"
-        },
-        "min-buffers": {
-          "type": "integer",
-          "minimum": 1
-        },
-        "max-buffers": {
-          "type": "integer",
-          "minimum": 2
-        },
-        "buffer-size": {
-          "type": "integer"
-        },
-        "flush-interval": {
-          "type": "string",
-          "minLength": 2,
-          "pattern": "[0-9]+s"
         },
         "blacklist": {
           "type": "object",
@@ -389,46 +279,8 @@
               "items": {
                 "type": "string",
                 "enum": [
-                  "execve",
-                  "exit",
-                  "clone",
-                  "CreateThread",
-                  "TerminateThread",
-                  "OpenProcess",
-                  "OpenThread",
-                  "SetThreadContext",
-                  "LoadModule",
-                  "UnloadModule",
-                  "CreateFile",
-                  "CloseFile",
-                  "ReadFile",
-                  "WriteFile",
-                  "DeleteFile",
-                  "RenameFile",
-                  "SetFileInformation",
-                  "EnumDirectory",
-                  "MapViewFile",
-                  "UnmapViewFile",
-                  "RegCreateKey",
-                  "RegOpenKey",
-                  "RegSetValue",
-                  "RegQueryValue",
-                  "RegQueryKey",
-                  "RegDeleteKey",
-                  "RegDeleteValue",
-                  "RegCloseKey",
-                  "Accept",
-                  "Send",
-                  "Recv",
-                  "Connect",
-                  "Disconnect",
-                  "Reconnect",
-                  "Retransmit",
-                  "QueryDns",
-                  "ReplyDns",
-                  "VirtualAlloc",
-                  "VirtualFree",
-                  "CreateSymbolicLinkObject"
+                  "openat",
+                  "mmap"
                 ]
               }
             },
@@ -750,32 +602,6 @@
         }
       ]
     },
-    "pe": {
-      "type": "object",
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "read-resources": {
-          "type": "boolean"
-        },
-        "read-symbols": {
-          "type": "boolean"
-        },
-        "read-sections": {
-          "type": "boolean"
-        },
-        "excluded-images": {
-          "type": "array",
-          "items": [
-            {
-              "type": "string"
-            }
-          ]
-        }
-      },
-      "additionalProperties": false
-    },
     "transformers": {
       "type": "object",
       "anyOf": [
@@ -1015,101 +841,6 @@
           "additionalProperties": false
         }
       ]
-    },
-    "yara": {
-      "type": "object",
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "rule": {
-          "type": "object",
-          "anyOf": [
-            {
-              "properties": {
-                "paths": {
-                  "type": "array",
-                  "items": [
-                    {
-                      "type": "object",
-                      "properties": {
-                        "path": {
-                          "type": "string"
-                        },
-                        "namespace": {
-                          "type": "string"
-                        }
-                      },
-                      "if": {
-                        "properties": {
-                          "enabled": {
-                            "$ref": "#yara",
-                            "const": true
-                          }
-                        }
-                      },
-                      "then": {
-                        "properties": {
-                          "path": {
-                            "minLength": 0
-                          }
-                        }
-                      },
-                      "additionalProperties": false
-                    }
-                  ]
-                },
-                "strings": {
-                  "type": "array"
-                }
-              },
-              "additionalProperties": false
-            }
-          ]
-        },
-        "alert-template": {
-          "type": "string"
-        },
-        "fastscan": {
-          "type": "boolean"
-        },
-        "skip-files": {
-          "type": "boolean"
-        },
-        "skip-allocs": {
-          "type": "boolean"
-        },
-        "skip-mmaps": {
-          "type": "boolean"
-        },
-        "skip-registry": {
-          "type": "boolean"
-        },
-        "scan-timeout": {
-          "type": "string",
-          "minLength": 2,
-          "pattern": "[0-9]+s"
-        },
-        "excluded-files": {
-          "type": "array",
-          "items": [
-            {
-              "type": "string",
-              "minLength": 1
-            }
-          ]
-        },
-        "excluded-procs": {
-          "type": "array",
-          "items": [
-            {
-              "type": "string",
-              "minLength": 1
-            }
-          ]
-        }
-      },
-      "additionalProperties": false
     }
   },
   "additionalProperties": false

@@ -26,7 +26,7 @@ import (
 	"strings"
 )
 
-func (c *Config) printArray(arr []interface{}) string {
+func (c *BaseConfig) printArray(arr []interface{}) string {
 	var buffer bytes.Buffer
 	for v := range arr {
 		buffer.WriteString(fmt.Sprintf("%v;", v))
@@ -34,7 +34,7 @@ func (c *Config) printArray(arr []interface{}) string {
 	return buffer.String()
 }
 
-func (c *Config) printMap(m map[string]interface{}) string {
+func (c *BaseConfig) printMap(m map[string]interface{}) string {
 	var buffer bytes.Buffer
 	buffer.WriteString("[")
 	for k, v := range m {
@@ -54,7 +54,7 @@ func (c *Config) printMap(m map[string]interface{}) string {
 	return buffer.String()
 }
 
-func (c *Config) print(value interface{}) string {
+func (c *BaseConfig) print(value interface{}) string {
 	t := reflect.TypeOf(value)
 	switch t.Kind() {
 	case reflect.Array:
@@ -66,7 +66,7 @@ func (c *Config) print(value interface{}) string {
 	}
 }
 
-func (c *Config) printLine(buffer *bytes.Buffer, maxLength int, key string, value string) {
+func (c *BaseConfig) printLine(buffer *bytes.Buffer, maxLength int, key string, value string) {
 	if value != "" {
 		buffer.WriteString("\n\t")
 		buffer.WriteString(key)
@@ -78,7 +78,7 @@ func (c *Config) printLine(buffer *bytes.Buffer, maxLength int, key string, valu
 }
 
 // Print returns the string with all the config options pretty-printed.
-func (c *Config) Print() string {
+func (c *BaseConfig) Print() string {
 	opts := c.viper.AllSettings()
 
 	var buffer bytes.Buffer

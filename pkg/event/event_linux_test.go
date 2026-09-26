@@ -26,9 +26,10 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sys/unix"
 )
 
-func TestLinuxParamBasics(t *testing.T) {
+func TestParamBasics(t *testing.T) {
 	p := NewParam(params.ProcessID, params.PID, uint64(42))
 	require.NotNil(t, p)
 	assert.Equal(t, "42", p.String())
@@ -38,12 +39,11 @@ func TestLinuxParamBasics(t *testing.T) {
 	assert.Equal(t, "bash", pars.MustGetString(params.ProcessName))
 }
 
-func TestLinuxEventTypeHelpers(t *testing.T) {
+func TestEventTypeHelpers(t *testing.T) {
 	e := &Event{Type: Execve, PID: 1}
 	assert.False(t, e.IsCreateProcess())
-	assert.Equal(t, RawSyscallTracepoint, e.Type.Source())
-	assert.Equal(t, Process, e.Type.Category())
-	assert.Equal(t, uint(Execve), e.Type.ID())
+	assert.Equal(t, Process, e.Category())
+	assert.Equal(t, Execve, e.Type)
 
 	processClone := &Event{Type: Clone, Params: Params{}}
 	processClone.Params.Append(params.CloneFlags, params.Uint64, uint64(0))
@@ -51,7 +51,7 @@ func TestLinuxEventTypeHelpers(t *testing.T) {
 	assert.False(t, processClone.IsCreateThread())
 
 	threadClone := &Event{Type: Clone, Params: Params{}}
-	threadClone.Params.Append(params.CloneFlags, params.Uint64, cloneThread)
+	threadClone.Params.Append(params.CloneFlags, params.Uint64, unix.CLONE_THREAD)
 	assert.False(t, threadClone.IsCreateProcess())
 	assert.True(t, threadClone.IsCreateThread())
 }

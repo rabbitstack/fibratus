@@ -30,9 +30,20 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/aggregator/transformers/trim"
 )
 
-var errTransformerConfig = func(t string, err error) error { return fmt.Errorf("%s transformer invalid config: %v", t, err) }
+var ErrTransformerConfig = func(t string, err error) error { return fmt.Errorf("%s transformer invalid config: %v", t, err) }
 
-func (c *Config) tryLoadTransformers() error {
+var trans = transformers.ConfigLoaders{}
+
+func init() {
+	trans.Register(transformers.Remove, transformers.LoadFromConfig[remove.Config](transformers.Remove, func(c remove.Config) bool { return c.Enabled }))
+	trans.Register(transformers.Rename, transformers.LoadFromConfig[rename.Config](transformers.Rename, func(c rename.Config) bool { return c.Enabled }))
+	trans.Register(transformers.Replace, transformers.LoadFromConfig[replace.Config](transformers.Replace, func(c replace.Config) bool { return c.Enabled }))
+	trans.Register(transformers.Trim, transformers.LoadFromConfig[trim.Config](transformers.Trim, func(c trim.Config) bool { return c.Enabled }))
+	trans.Register(transformers.Tags, transformers.LoadFromConfig[tags.Config](transformers.Tags, func(c tags.Config) bool { return c.Enabled }))
+}
+
+// TryLoadTransformers attempts to load all registered transformer configs.
+func (c *BaseConfig) TryLoadTransformers() error {
 	transforms := c.viper.AllSettings()["transformers"]
 	if transforms == nil {
 		return nil
@@ -42,80 +53,20 @@ func (c *Config) tryLoadTransformers() error {
 		return fmt.Errorf("expected map[string]interface{} type for transformers but found %s", reflect.TypeOf(transforms))
 	}
 
-	configs := make([]transformers.Config, 0)
-
-	for typ, config := range mapping {
-		switch typ {
-		case "remove":
-			var removeConfig remove.Config
-			if err := decode(config, &removeConfig); err != nil {
-				return errTransformerConfig(typ, err)
-			}
-			if !removeConfig.Enabled {
-				continue
-			}
-			config := transformers.Config{
-				Type:        transformers.Remove,
-				Transformer: removeConfig,
-			}
-			configs = append(configs, config)
-
-		case "rename":
-			var renameConfig rename.Config
-			if err := decode(config, &renameConfig); err != nil {
-				return errTransformerConfig(typ, err)
-			}
-			if !renameConfig.Enabled {
-				continue
-			}
-			config := transformers.Config{
-				Type:        transformers.Rename,
-				Transformer: renameConfig,
-			}
-			configs = append(configs, config)
-
-		case "replace":
-			var replaceConfig replace.Config
-			if err := decode(config, &replaceConfig); err != nil {
-				return errTransformerConfig(typ, err)
-			}
-			if !replaceConfig.Enabled {
-				continue
-			}
-			config := transformers.Config{
-				Type:        transformers.Replace,
-				Transformer: replaceConfig,
-			}
-			configs = append(configs, config)
-
-		case "trim":
-			var trimConfig trim.Config
-			if err := decode(config, &trimConfig); err != nil {
-				return errTransformerConfig(typ, err)
-			}
-			if !trimConfig.Enabled {
-				continue
-			}
-			config := transformers.Config{
-				Type:        transformers.Trim,
-				Transformer: trimConfig,
-			}
-			configs = append(configs, config)
-
-		case "tags":
-			var tagsConfig tags.Config
-			if err := decode(config, &tagsConfig); err != nil {
-				return errTransformerConfig(typ, err)
-			}
-			if !tagsConfig.Enabled {
-				continue
-			}
-			config := transformers.Config{
-				Type:        transformers.Tags,
-				Transformer: tagsConfig,
-			}
-			configs = append(configs, config)
+	configs := make([]transformers.Config, 0, len(mapping))
+	for typ, raw := range mapping {
+		loader, ok := trans[transformers.TypeFromString(typ)]
+		if !ok {
+			return fmt.Errorf("unknown transformer type %q", typ)
 		}
+		cfg, enabled, err := loader(raw)
+		if err != nil {
+			return ErrTransformerConfig(typ, err)
+		}
+		if !enabled {
+			continue
+		}
+		configs = append(configs, cfg)
 	}
 
 	c.Transformers = configs

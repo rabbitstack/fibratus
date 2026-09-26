@@ -21,7 +21,6 @@
 package config
 
 import (
-	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
@@ -30,18 +29,13 @@ const (
 	enableFileIOEvents = "eventsource.enable-fileio"
 	enableNetEvents    = "eventsource.enable-net"
 	enableMemEvents    = "eventsource.enable-mem"
-	excludedEvents     = "eventsource.blacklist.events"
-	excludedImages     = "eventsource.blacklist.images"
 )
 
 type EventSourceConfig struct {
-	eventSourceConfig
-
-	ExcludedEvents     []string `json:"blacklist.events" yaml:"blacklist.events"`
-	ExcludedImages     []string `json:"blacklist.images" yaml:"blacklist.images"`
-	EnableFileIOEvents bool     `json:"enable-fileio" yaml:"enable-fileio"`
-	EnableNetEvents    bool     `json:"enable-net" yaml:"enable-net"`
-	EnableMemEvents    bool     `json:"enable-mem" yaml:"enable-mem"`
+	BaseEventSourceConfig
+	EnableFileIOEvents bool `json:"enable-fileio" yaml:"enable-fileio"`
+	EnableNetEvents    bool `json:"enable-net" yaml:"enable-net"`
+	EnableMemEvents    bool `json:"enable-mem" yaml:"enable-mem"`
 }
 
 func (c *EventSourceConfig) AddFlags(flags *pflag.FlagSet) {
@@ -49,7 +43,7 @@ func (c *EventSourceConfig) AddFlags(flags *pflag.FlagSet) {
 	flags.Bool(enableNetEvents, true, "Determines whether network events are collected")
 	flags.Bool(enableMemEvents, true, "Determines whether memory events are collected")
 	flags.StringSlice(excludedEvents, nil, "A list of event names to drop")
-	flags.StringSlice(excludedImages, nil, "A list of image names to drop")
+	flags.StringSlice(excludedProcesses, nil, "A list of image names to drop")
 }
 
 func (c *EventSourceConfig) initFromViper(v *viper.Viper) {
@@ -57,8 +51,6 @@ func (c *EventSourceConfig) initFromViper(v *viper.Viper) {
 	c.EnableNetEvents = v.GetBool(enableNetEvents)
 	c.EnableMemEvents = v.GetBool(enableMemEvents)
 	c.ExcludedEvents = v.GetStringSlice(excludedEvents)
-	c.ExcludedImages = v.GetStringSlice(excludedImages)
+	c.ExcludedProcesses = v.GetStringSlice(excludedProcesses)
 	c.Init()
 }
-
-func platformEventTypes() []event.Type { return event.All() }

@@ -115,46 +115,8 @@ const (
 	ModuleCertNotBefore = "cert_not_before"
 	// ModuleCertNotAfter is the end of the module certificate validity period.
 	ModuleCertNotAfter = "cert_not_after"
-	// HandleID identifies the handle.
-	HandleID = "handle_id"
-	// HandleSourceID identifies the source handle.
-	HandleSourceID = "handle_source_id"
-	// HandleObject identifies the kernel object backing the handle.
-	HandleObject = "handle_object"
-	// HandleObjectName is the handle object name.
-	HandleObjectName = "handle_name"
-	// HandleObjectTypeID is the handle object type identifier.
-	HandleObjectTypeID = "type_id"
-	// ThreadpoolPoolID identifies the thread pool.
-	ThreadpoolPoolID = "pool_id"
-	// ThreadpoolTaskID identifies the thread pool task.
-	ThreadpoolTaskID = "task_id"
-	// ThreadpoolCallback is the thread pool callback address.
-	ThreadpoolCallback = "callback"
-	// ThreadpoolCallbackSymbol is the thread pool callback symbol.
-	ThreadpoolCallbackSymbol = "callback_symbol"
-	// ThreadpoolCallbackModule is the module containing the callback.
-	ThreadpoolCallbackModule = "callback_module"
-	// ThreadpoolContext is the thread pool callback context.
-	ThreadpoolContext = "context"
-	// ThreadpoolContextRip is the instruction pointer in the callback context.
-	ThreadpoolContextRip = "context_rip"
-	// ThreadpoolContextRipSymbol is the symbol for the context instruction pointer.
-	ThreadpoolContextRipSymbol = "context_rip_symbol"
-	// ThreadpoolContextRipModule is the module containing the context instruction pointer.
-	ThreadpoolContextRipModule = "context_rip_module"
-	// ThreadpoolSubprocessTag is the thread pool subprocess tag.
-	ThreadpoolSubprocessTag = "subprocess_tag"
-	// ThreadpoolTimerDuetime is the timer due time.
-	ThreadpoolTimerDuetime = "duetime"
-	// ThreadpoolTimerSubqueue is the timer subqueue.
-	ThreadpoolTimerSubqueue = "subqueue"
-	// ThreadpoolTimer identifies the timer.
-	ThreadpoolTimer = "timer"
-	// ThreadpoolTimerPeriod is the timer period.
-	ThreadpoolTimerPeriod = "period"
-	// ThreadpoolTimerWindow is the timer window.
-	ThreadpoolTimerWindow = "window"
-	// ThreadpoolTimerAbsolute indicates whether the timer due time is absolute.
-	ThreadpoolTimerAbsolute = "absolute"
+	// LinkSource identifies the parameter that represents the source symbolic link object or other kernel object
+	LinkSource = "source"
+	// LinkTarget identifies the parameter that represents the target symbolic link object or other kernel object
+	LinkTarget = "target"
 )

@@ -20,10 +20,36 @@
 
 package event
 
-type queuePlatform struct{}
+type Queue struct {
+	queue
+}
 
-func (q *Queue) initPlatform() {}
+// NewQueue constructs a new queue with the given channel size.
+func NewQueue(size int, stackEnrichment bool, enqueueAlways bool) *Queue {
+	return &Queue{
+		queue: queue{
+			q:               make(chan *Event, size),
+			listeners:       make([]Listener, 0),
+			stackEnrichment: stackEnrichment,
+			enqueueAlways:   enqueueAlways,
+		},
+	}
+}
 
-func (q *Queue) closePlatform() {}
+// NewQueueWithChannel constructs a new queue with a custom channel.
+func NewQueueWithChannel(ch chan *Event, stackEnrichment bool, enqueueAlways bool) *Queue {
+	return &Queue{
+		queue: queue{
+			q:               ch,
+			listeners:       make([]Listener, 0),
+			stackEnrichment: stackEnrichment,
+			enqueueAlways:   enqueueAlways,
+		},
+	}
+}
 
-func (q *Queue) pushPlatform(_ *Event) (bool, error) { return false, nil }
+func (q *Queue) Push(e *Event) error {
+	return q.push(e)
+}
+
+func (q *Queue) Close() {}

@@ -22,42 +22,70 @@ package event
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/util/colorizer"
 )
 
-func normalizeParamValue(_ params.Type, value params.Value) params.Value { return value }
-
-func formatPlatformParam(p Param) (string, bool) {
-	if p.Type != params.String {
-		return "", false
+// NewParam creates a new event parameter.
+func NewParam(name string, typ params.Type, value params.Value, options ...ParamOption) *Param {
+	var opts paramOpts
+	for _, opt := range options {
+		opt(&opts)
 	}
-	value, ok := p.Value.(string)
-	if !ok {
-		return fmt.Sprintf("%v", p.Value), true
-	}
-	return value, true
+	return &Param{Name: name, Type: typ, Value: value, Flags: opts.flags, Enum: opts.enum}
 }
 
-func formatPlatformID(value params.Value) string {
-	return strconv.FormatUint(value.(uint64), 10)
-}
-
-func captureParamType(typ params.Type) params.Type { return typ }
-
-func platformParamColor(p *Param) (string, bool) {
+func (p *Param) String() string {
+	if p.Value == nil {
+		return ""
+	}
 	switch p.Type {
 	case params.String:
-		return colorizer.Span(colorizer.White, p.String()), true
+		return p.Value.(string)
+	default:
+		return p.Stringify()
+	}
+}
+
+func (p Param) CaptureType() params.Type {
+	return p.Type
+}
+
+// color applies a semantic colour to a single parameter value based
+// on its type and for string types its content.
+func (p *Param) color() string {
+	switch p.Type {
+	case params.String:
+		return colorizer.Span(colorizer.White, p.String())
 	case params.Status:
 		if p.String() == "0" {
-			return colorizer.Span(colorizer.Green, p.String()), true
+			return colorizer.Span(colorizer.Green, p.String())
 		}
-		return colorizer.Span(colorizer.Red, p.String()), true
+		return colorizer.Span(colorizer.Red, p.String())
+	case params.Address:
+		return colorizer.SpanDim(colorizer.Span(colorizer.Gray, "0x"+p.String()))
+	case params.Int8, params.Int16, params.Int32, params.Int64,
+		params.Uint8, params.Uint16, params.Uint32, params.Uint64,
+		params.Float, params.Double:
+		return colorizer.Span(colorizer.Yellow, p.String())
+	case params.Bool:
+		b, ok := p.Value.(bool)
+		if !ok {
+			return colorizer.Span(colorizer.Coral, p.String())
+		}
+		if b {
+			return colorizer.Span(colorizer.Green, p.String())
+		}
+		return colorizer.Span(colorizer.Coral, p.String())
+	case params.IPv4, params.IPv6:
+		return colorizer.Span(colorizer.Blue, p.String())
+	case params.Port:
+		return colorizer.Span(colorizer.Cyan, p.String())
+	case params.PID, params.TID:
+		return colorizer.Span(colorizer.Green, p.String())
 	default:
-		return "", false
+		return colorizer.Span(colorizer.White, p.String())
 	}
 }
 
@@ -67,12 +95,12 @@ func NewParamFromCapture(name string, typ params.Type, value params.Value, _ Typ
 }
 
 // GetPid returns the process identifier.
-func (pars Params) GetPid() (uint64, error) {
+func (pars Params) GetPid() (uint32, error) {
 	return pars.getID(params.ProcessID, params.PID)
 }
 
 // MustGetPid returns the process identifier or panics.
-func (pars Params) MustGetPid() uint64 {
+func (pars Params) MustGetPid() uint32 {
 	id, err := pars.GetPid()
 	if err != nil {
 		panic(err)
@@ -81,12 +109,12 @@ func (pars Params) MustGetPid() uint64 {
 }
 
 // GetPpid returns the parent process identifier.
-func (pars Params) GetPpid() (uint64, error) {
+func (pars Params) GetPpid() (uint32, error) {
 	return pars.getID(params.ProcessParentID, params.PID)
 }
 
 // MustGetPpid returns the parent process identifier or panics.
-func (pars Params) MustGetPpid() uint64 {
+func (pars Params) MustGetPpid() uint32 {
 	id, err := pars.GetPpid()
 	if err != nil {
 		panic(err)
@@ -95,12 +123,12 @@ func (pars Params) MustGetPpid() uint64 {
 }
 
 // GetTid returns the thread identifier.
-func (pars Params) GetTid() (uint64, error) {
+func (pars Params) GetTid() (uint32, error) {
 	return pars.getID(params.ThreadID, params.TID)
 }
 
 // MustGetTid returns the thread identifier or panics.
-func (pars Params) MustGetTid() uint64 {
+func (pars Params) MustGetTid() uint32 {
 	id, err := pars.GetTid()
 	if err != nil {
 		panic(err)
@@ -108,7 +136,7 @@ func (pars Params) MustGetTid() uint64 {
 	return id
 }
 
-func (pars Params) getID(name string, typ params.Type) (uint64, error) {
+func (pars Params) getID(name string, typ params.Type) (uint32, error) {
 	param, err := pars.findParam(name)
 	if err != nil {
 		return 0, err
@@ -116,9 +144,9 @@ func (pars Params) getID(name string, typ params.Type) (uint64, error) {
 	if param.Type != typ {
 		return 0, fmt.Errorf("%q parameter has unexpected identifier type", name)
 	}
-	value, ok := param.Value.(uint64)
+	value, ok := param.Value.(uint32)
 	if !ok {
-		return 0, fmt.Errorf("unable to type cast %q parameter to uint64 identifier", name)
+		return 0, fmt.Errorf("unable to type cast %q parameter to uint32 identifier", name)
 	}
 	return value, nil
 }

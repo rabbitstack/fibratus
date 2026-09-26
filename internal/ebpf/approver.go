@@ -96,7 +96,7 @@ func (l *loader) writePlan(gen uint32, plan *filter.ApproverPlan) error {
 }
 
 func policyMode(pol filter.TypePolicy, typ event.Type) uint8 {
-	if filter.AlwaysAllowed(typ) || !typ.Exists() || pol.DefaultAllow {
+	if filter.AlwaysAllowed(typ) || pol.DefaultAllow {
 		return 0
 	}
 	var mode uint8

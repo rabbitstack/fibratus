@@ -60,6 +60,7 @@ type App struct {
 	agg      *aggregator.BufferedAggregator
 	signals  chan struct{}
 	instance net.Listener
+	server   *api.Server
 }
 
 // Option enables changing the behaviour of the bootstrap application.
@@ -111,12 +112,18 @@ func NewApp(cfg *config.Config, options ...Option) (*App, error) {
 		log.Info("rule engine is disabled")
 	}
 
+	server, err := api.NewServer(cfg)
+	if err != nil {
+		return nil, err
+	}
+
 	return &App{
 		config:  cfg,
 		evs:     NewEventSourceControl(psnap, cfg, rs, plan),
 		engine:  engine,
 		psnap:   psnap,
 		signals: sigs,
+		server:  server,
 	}, nil
 }
 
@@ -164,7 +171,8 @@ func (f *App) Run(args []string) error {
 	if err != nil {
 		return err
 	}
-	return api.StartServer(cfg)
+	f.server.Start()
+	return nil
 }
 
 // Wait waits for the app to receive the termination signal.
@@ -192,7 +200,7 @@ func (f *App) Shutdown() error {
 			errs = append(errs, err)
 		}
 	}
-	if err := api.CloseServer(); err != nil {
+	if err := f.server.Stop(context.Background()); err != nil {
 		errs = append(errs, err)
 	}
 	if err := alertsender.ShutdownAll(); err != nil {

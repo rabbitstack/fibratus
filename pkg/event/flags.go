@@ -35,17 +35,22 @@ type ParamFlags []ParamFlag
 
 // String returns the names of all flags in the bitmask, separated by pipes.
 func (flags ParamFlags) String(value uint64) string {
-	var (
-		names     strings.Builder
-		separator string
-	)
+	if value == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	b.Grow(64) // rough estimate
+
 	for _, flag := range flags {
 		if flag.eval(value) {
-			names.WriteString(separator)
-			names.WriteString(flag.Name)
-			separator = "|"
+			if b.Len() > 0 {
+				b.WriteByte('|')
+			}
+			b.WriteString(flag.Name)
 			value &= ^flag.Value
 		}
 	}
-	return names.String()
+
+	return b.String()
 }

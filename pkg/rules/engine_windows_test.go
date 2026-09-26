@@ -182,17 +182,13 @@ func TestSharedSemanticRuleFixtures(t *testing.T) {
 
 	proc := &event.Event{
 		Type:     event.CreateProcess,
-		Name:     "CreateProcess",
-		Category: event.Process,
 		PID:      859,
 		Params:   event.Params{},
 		Metadata: make(map[event.MetadataKey]any),
 	}
 	netevt := &event.Event{
-		Type:     event.RecvTCPv4,
-		Name:     "Recv",
-		Category: event.Net,
-		PID:      859,
+		Type: event.Recv,
+		PID:  859,
 		Params: event.Params{
 			params.NetDport: {Name: params.NetDport, Type: params.Uint16, Value: uint16(443)},
 		},

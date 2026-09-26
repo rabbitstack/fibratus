@@ -20,31 +20,43 @@
 
 package config
 
-import "path/filepath"
+import (
+	"path/filepath"
+)
 
-type platformConfig struct{}
+var (
+	// configFilePath defines the default value for the configuration file path
+	configFilePath = filepath.Join("/etc", "fibratus", "fibratus.yml")
 
-func newPlatformConfig() platformConfig { return platformConfig{} }
+	// filamentsPaths defines the default directory containing filament scripts
+	filamentsPaths = filepath.Join("/usr", "share", "fibratus", "filaments")
 
-func (c *Config) addPlatformFlags() {
-	c.EventSource.AddFlags(c.flags)
+	// rulesPaths defines default rule paths
+	rulesPaths = []string{filepath.Join("/etc", "fibratus", "rules", "*")}
+
+	// macrosPaths defines default macro paths
+	macrosPaths = []string{filepath.Join("/etc", "fibratus", "rules", "macros", "*")}
+
+	// apiTransport apiTransport defines the default transport protocol for
+	// the API server. It keeps the API off the network unless someone asks
+	// for it. Filesystem permissions on the socket then decide who can reach it.
+	apiTransport = "unix:///var/run/fibratus.sock"
+)
+
+// Config exposes the platform configuration options.
+type Config struct {
+	*BaseConfig
 }
 
-func (c *Config) initPlatform() {}
-
-func (c *Config) Validate() error { return c.validateConfig() }
-
-func defaultConfigFile() string { return filepath.Join("/etc", "fibratus", "fibratus.yml") }
-func defaultFilamentPath() string {
-	return filepath.Join("/usr", "share", "fibratus", "filaments")
-}
-func defaultRulesPaths() []string {
-	return []string{filepath.Join("/etc", "fibratus", "rules", "*")}
-}
-func defaultMacrosPaths() []string {
-	return []string{filepath.Join("/etc", "fibratus", "rules", "macros", "*")}
+// NewWithOpts builds a new platform configuration store.
+func NewWithOpts(options ...Option) *Config {
+	c := &Config{
+		BaseConfig: newWithOpts(options...),
+	}
+	return c
 }
 
-// defaultTransport keeps the API off the network unless someone asks for it.
-// Filesystem permissions on the socket then decide who can reach it.
-func defaultTransport() string { return "unix:///var/run/fibratus.sock" }
+// Init initializes the config state.
+func (c *Config) Init() error {
+	return c.BaseConfig.init()
+}

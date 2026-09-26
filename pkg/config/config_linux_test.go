@@ -40,7 +40,7 @@ func TestLinuxDefaults(t *testing.T) {
 	// nothing beyond what socket permissions allow.
 	assert.Equal(t, "unix:///var/run/fibratus.sock", c.API.Transport)
 
-	assert.Equal(t, filepath.Join("/etc", "fibratus", "fibratus.yml"), defaultConfigFile())
-	assert.Equal(t, []string{filepath.Join("/etc", "fibratus", "rules", "*")}, defaultRulesPaths())
-	assert.Equal(t, []string{filepath.Join("/etc", "fibratus", "rules", "macros", "*")}, defaultMacrosPaths())
+	assert.Equal(t, filepath.Join("/etc", "fibratus", "fibratus.yml"), configFilePath)
+	assert.Equal(t, []string{filepath.Join("/etc", "fibratus", "rules", "*")}, rulesPaths)
+	assert.Equal(t, []string{filepath.Join("/etc", "fibratus", "rules", "macros", "*")}, macrosPaths)
 }

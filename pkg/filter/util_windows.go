@@ -24,9 +24,9 @@ package filter
 import "github.com/rabbitstack/fibratus/pkg/event"
 
 // framePID returns the process identifier associated with the stack frame.
-func framePID(e *event.Event) event.PID {
+func framePID(e *event.Event) uint32 {
 	if !e.Callstack.IsEmpty() && e.Callstack.FrameAt(0).PID != 0 {
-		return event.PID(e.Callstack.FrameAt(0).PID)
+		return e.Callstack.FrameAt(0).PID
 	}
 	return e.PID
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 by Nedim Sabic Sabic
+ * Copyright 2019-2026 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -16,15 +16,17 @@
  * limitations under the License.
  */
 
-package config
+package mapdecoder
 
 import (
-	"github.com/mitchellh/mapstructure"
 	"net"
 	"reflect"
+
+	"github.com/mitchellh/mapstructure"
 )
 
-func decode(input, output interface{}) error {
+// Decode decodes the input type to output type.
+func Decode(input, output any) error {
 	var decoderConfig = &mapstructure.DecoderConfig{
 		Metadata:         nil,
 		Result:           output,
@@ -43,10 +45,10 @@ func decode(input, output interface{}) error {
 }
 
 func ipSliceDecodeHook() mapstructure.DecodeHookFunc {
-	return func(from reflect.Type, to reflect.Type, data interface{}) (interface{}, error) {
+	return func(from reflect.Type, to reflect.Type, data any) (any, error) {
 		if to.Kind() == reflect.Slice && to.Elem() == reflect.TypeOf(net.IP(nil)) {
 			switch v := data.(type) {
-			case []interface{}:
+			case []any:
 				var ips []net.IP
 				for _, s := range v {
 					ip, ok := s.(string)

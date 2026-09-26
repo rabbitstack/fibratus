@@ -156,7 +156,7 @@ func buildPS(evt *event.Event, psnap ps.Snapshotter) *pstypes.PS {
 	}
 	ps := &pstypes.PS{
 		PID:           evt.PID,
-		Ppid:          evt.GetParamAsUint64(params.ProcessParentID),
+		Ppid:          evt.GetParamAsUint32(params.ProcessParentID),
 		Name:          name,
 		Cmdline:       cmdline,
 		Exe:           exe,
@@ -164,7 +164,7 @@ func buildPS(evt *event.Event, psnap ps.Snapshotter) *pstypes.PS {
 		StartBootTime: evt.GetParamAsUint64(params.StartBootTime),
 		UID:           evt.GetParamAsUint32(params.UID),
 		GID:           evt.GetParamAsUint32(params.GID),
-		Threads:       make(map[uint64]pstypes.Thread),
+		Threads:       make(map[uint32]pstypes.Thread),
 	}
 	if ok && existing != nil && existing.StartBootTime == ps.StartBootTime && existing.Threads != nil {
 		ps.Threads = existing.Threads

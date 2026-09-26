@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 by Mostafa Moradian
+ * Copyright 2019-2026 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -16,6 +16,19 @@
  * limitations under the License.
  */
 
-package event
+package api
 
-func typeBitIndex(typ Type) uint { return uint(typ.HookID()) }
+import (
+	"context"
+	"net"
+
+	"github.com/Microsoft/go-winio"
+)
+
+// DialLocalTransport creates a dialer to be used with the http.Client to connect to a named pipe.
+func DialLocalTransport(path string) func(context.Context, string, string) (net.Conn, error) {
+	npipe := transformPipePath(path)
+	return func(ctx context.Context, _, _ string) (net.Conn, error) {
+		return winio.DialPipeContext(ctx, npipe)
+	}
+}

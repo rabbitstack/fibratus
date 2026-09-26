@@ -20,8 +20,6 @@
 
 package callstack
 
-import "strings"
-
 // Callstack is a sequence of stack frames.
 type Callstack []Frame
 
@@ -53,18 +51,7 @@ func (s *Callstack) Depth() int { return len(*s) }
 func (s *Callstack) IsEmpty() bool { return s.Depth() == 0 }
 
 func (s Callstack) String() string {
-	if len(s) == 0 {
-		return ""
-	}
-	parts := make([]string, 0, len(s))
-	for _, f := range s {
-		if f.Symbol != "" {
-			parts = append(parts, f.Symbol)
-			continue
-		}
-		parts = append(parts, f.Module)
-	}
-	return strings.Join(parts, " < ")
+	return ""
 }
 
 // Colorize returns a plain string representation on Linux.

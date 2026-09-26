@@ -20,6 +20,7 @@ package transformers
 
 import (
 	"fmt"
+
 	"github.com/rabbitstack/fibratus/pkg/event"
 )
 
@@ -42,6 +43,7 @@ const (
 	Trim
 	// Tags represents the tags transformer type. This transformer appends tags to the event's metadata.
 	Tags
+	None
 )
 
 // String returns the type human-readable name.
@@ -59,6 +61,24 @@ func (typ Type) String() string {
 		return "tags"
 	default:
 		return "unknown"
+	}
+}
+
+// TypeFromString converts the string representation of the transformer to its corresponding type.
+func TypeFromString(s string) Type {
+	switch s {
+	case "remove":
+		return Remove
+	case "rename":
+		return Rename
+	case "replace":
+		return Replace
+	case "trim":
+		return Trim
+	case "tags":
+		return Tags
+	default:
+		return None
 	}
 }
 

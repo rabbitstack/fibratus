@@ -28,7 +28,7 @@ import "github.com/rabbitstack/fibratus/pkg/event"
 // Mirrored by the leading check in event_approved in c/common/approvers.h.
 func AlwaysAllowed(t event.Type) bool {
 	switch t {
-	case event.Execve, event.Exit, event.Clone, event.UnknownType:
+	case event.Execve, event.Exit, event.Clone, event.Unknown:
 		return true
 	default:
 		return false

@@ -23,19 +23,19 @@ package alertsender
 import "github.com/rabbitstack/fibratus/pkg/event"
 
 type alertProcess struct {
-	PID       event.PID `json:"pid"`
-	TID       event.TID `json:"tid"`
-	PPID      event.PID `json:"ppid"`
-	Name      string    `json:"name"`
-	Exe       string    `json:"exe"`
-	Cmdline   string    `json:"cmdline,omitempty"`
-	Pname     string    `json:"parent_name,omitempty"`
-	Pcmdline  string    `json:"parent_cmdline,omitempty"`
-	Cwd       string    `json:"cwd,omitempty"`
-	UID       uint32    `json:"uid"`
-	GID       uint32    `json:"gid"`
-	Username  string    `json:"username"`
-	Ancestors []string  `json:"ancestors"`
+	PID       uint32   `json:"pid"`
+	TID       uint32   `json:"tid"`
+	PPID      uint32   `json:"ppid"`
+	Name      string   `json:"name"`
+	Exe       string   `json:"exe"`
+	Cmdline   string   `json:"cmdline,omitempty"`
+	Pname     string   `json:"parent_name,omitempty"`
+	Pcmdline  string   `json:"parent_cmdline,omitempty"`
+	Cwd       string   `json:"cwd,omitempty"`
+	UID       uint32   `json:"uid"`
+	GID       uint32   `json:"gid"`
+	Username  string   `json:"username"`
+	Ancestors []string `json:"ancestors"`
 }
 
 func newAlertProcess(e *event.Event) *alertProcess {

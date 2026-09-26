@@ -58,6 +58,6 @@ func TestEventSourceConfig(t *testing.T) {
 
 	assert.False(t, c.EventSource.ExcludeEvent(event.CreateProcess))
 
-	assert.True(t, c.EventSource.ExcludeImage(&pstypes.PS{Name: "svchost.exe"}))
-	assert.False(t, c.EventSource.ExcludeImage(&pstypes.PS{Name: "explorer.exe"}))
+	assert.True(t, c.EventSource.ExcludeProcess(&pstypes.PS{Name: "svchost.exe"}))
+	assert.False(t, c.EventSource.ExcludeProcess(&pstypes.PS{Name: "explorer.exe"}))
 }

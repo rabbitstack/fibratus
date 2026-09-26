@@ -113,15 +113,14 @@ func encodeRaw(t *testing.T, ev rawEvent) []byte {
 
 type golden struct {
 	Name   string            `json:"name"`
-	PID    uint64            `json:"pid"`
-	Tid    uint64            `json:"tid"`
+	PID    uint32            `json:"pid"`
+	Tid    uint32            `json:"tid"`
 	Seq    uint64            `json:"seq"`
 	Params map[string]string `json:"params"`
 }
 
 func goldenEvent(evt *event.Event) golden {
 	g := golden{
-		Name:   evt.Name,
 		PID:    evt.PID,
 		Tid:    evt.Tid,
 		Seq:    evt.Seq,

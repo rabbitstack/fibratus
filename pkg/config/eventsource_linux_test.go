@@ -30,7 +30,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestEventSourceConfigLinux(t *testing.T) {
+func TestEventSourceConfig(t *testing.T) {
 	c := NewWithOpts(WithRun())
 	require.NoError(t, c.flags.Parse([]string{
 		"--eventsource.enable-fileio=false",
@@ -41,14 +41,11 @@ func TestEventSourceConfigLinux(t *testing.T) {
 	require.NoError(t, c.Init())
 
 	require.False(t, c.EventSource.EnableFileIOEvents)
-	require.True(t, c.EventSource.ExcludeEvent(event.Execve.ID()))
-	require.True(t, c.EventSource.ExcludeImage(&pstypes.PS{Name: "systemd"}))
-	for _, typ := range event.All() {
-		require.True(t, c.EventSource.EventExists(typ.ID()))
-	}
+	require.True(t, c.EventSource.ExcludeEvent(event.Execve))
+	require.True(t, c.EventSource.ExcludeProcess(&pstypes.PS{Name: "systemd"}))
 }
 
-func TestValidateLinuxEventSource(t *testing.T) {
+func TestValidateEventSource(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "fibratus.yml")
 	require.NoError(t, os.WriteFile(file, []byte(`eventsource:
   enable-fileio: true

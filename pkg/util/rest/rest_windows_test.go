@@ -23,7 +23,6 @@ package rest
 import (
 	"net/http"
 	"net/http/httptest"
-	"os/user"
 	"testing"
 
 	"github.com/rabbitstack/fibratus/pkg/api"
@@ -32,10 +31,7 @@ import (
 )
 
 func TestGetPipe(t *testing.T) {
-	usr, err := user.Current()
-	require.NoError(t, err)
-	descriptor := "D:P(A;;GA;;;" + usr.Uid + ")"
-	listener, err := api.MakePipeListener(`npipe:///fibratus`, descriptor)
+	listener, err := api.MakeListener(`npipe:///fibratus`)
 	require.NoError(t, err)
 
 	mux := http.NewServeMux()

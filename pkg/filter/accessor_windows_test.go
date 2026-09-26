@@ -71,7 +71,7 @@ func TestNarrowAccessors(t *testing.T) {
 	assert.Len(t, pea.fields, 2)
 }
 
-func eventWithCallstack(typ event.Type, category event.Category) *event.Event {
+func eventWithCallstack(typ event.Type) *event.Event {
 	e := &event.Event{Type: typ}
 	e.Callstack = []callstack.Frame{{
 		Addr:   0x7ffb5c1d0396,
@@ -115,22 +115,22 @@ func TestIsFieldAccessible(t *testing.T) {
 		},
 		{
 			newThreadAccessor(),
-			eventWithCallstack(event.CreateProcess, event.Process),
+			eventWithCallstack(event.CreateProcess),
 			true,
 		},
 		{
 			newThreadAccessor(),
-			eventWithCallstack(event.RegSetValue, event.Registry),
+			eventWithCallstack(event.RegSetValue),
 			true,
 		},
 		{
 			newRegistryAccessor(),
-			eventWithCallstack(event.RegSetValue, event.Registry),
+			eventWithCallstack(event.RegSetValue),
 			true,
 		},
 		{
 			newNetworkAccessor(),
-			eventWithCallstack(event.RegSetValue, event.Registry),
+			eventWithCallstack(event.RegSetValue),
 			false,
 		},
 		{

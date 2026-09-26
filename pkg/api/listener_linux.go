@@ -2,6 +2,7 @@
 
 /*
  * Copyright 2026 by Mostafa Moradian
+ * Copyright 2026 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -21,15 +22,39 @@
 package api
 
 import (
-	"context"
+	"fmt"
 	"net"
+	"os"
 	"strings"
 )
 
-// DialLocalTransport creates a dialer for the Linux UNIX domain socket transport.
-func DialLocalTransport(path string) func(context.Context, string, string) (net.Conn, error) {
-	path = strings.TrimPrefix(path, "unix://")
-	return func(ctx context.Context, _, _ string) (net.Conn, error) {
-		return (&net.Dialer{}).DialContext(ctx, "unix", path)
+// MakeListener builds a new listener that either accepts traffic over UNIX domain socket or TCP.
+func MakeListener(transport string) (net.Listener, error) {
+	if strings.HasPrefix(transport, "unix://") {
+		path := strings.TrimPrefix(transport, "unix://")
+		return makeUNIXSocketListener(path)
 	}
+	return MakeTCPListener(transport)
+}
+
+// makeUNIXSocketListener produces a new listener for receiving requests over a UNIX domain socket.
+func makeUNIXSocketListener(path string) (net.Listener, error) {
+	// remove any stale socket file left behind by a previous run.
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return nil, fmt.Errorf("failed to remove stale socket %q: %v", path, err)
+	}
+
+	l, err := net.Listen("unix", path)
+	if err != nil {
+		return nil, fmt.Errorf("fail to listen on the %q socket: %v", path, err)
+	}
+
+	// restrict the socket to the owning user only, mirroring the
+	// single-user access granted to the named pipe on Windows.
+	if err := os.Chmod(path, 0600); err != nil {
+		l.Close()
+		return nil, fmt.Errorf("failed to set permissions on the %q socket: %v", path, err)
+	}
+
+	return l, nil
 }
