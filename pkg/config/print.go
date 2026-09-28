@@ -29,7 +29,7 @@ import (
 func (c *Config) printArray(arr []interface{}) string {
 	var buffer bytes.Buffer
 	for v := range arr {
-		buffer.WriteString(fmt.Sprintf("%v;", v))
+		fmt.Fprintf(&buffer, "%v;", v)
 	}
 	return buffer.String()
 }
