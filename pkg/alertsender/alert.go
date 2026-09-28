@@ -136,7 +136,7 @@ func (a Alert) String(verbose bool) string {
 			b.WriteString("System event involved in this alert:\n\n")
 		}
 		for n, evt := range a.Events {
-			b.WriteString(fmt.Sprintf("\tEvent #%d:\n", n+1))
+			fmt.Fprintf(&b, "\tEvent #%d:\n", n+1)
 			b.WriteString(strings.TrimSuffix(evt.StringShort(), "\t"))
 		}
 		if a.Text == "" {

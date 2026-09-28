@@ -35,7 +35,33 @@ linters:
           - nolintlint
           - staticcheck
           - noctx
+          - goconst
+          - unparam
         path: _test\.go
+      - linters:
+          - goconst
+        path: pkg/util/ports/iana_ports.go
+      - linters:
+          - goconst
+        path: pkg/event/flags.go
+      - linters:
+          - goconst
+        path: pkg/filter/ql/functions/(.+)\.go
+      - linters:
+          - goconst
+        path: pkg/filter/ql/parser.go
+      - linters:
+          - goconst
+        path: pkg/filter/ql/function.go
+      - linters:
+          - goconst
+        path: pkg/filter/fields/fields_windows.go
+      - linters:
+          - goconst
+        path: cmd/fibratus/app/list/list.go
+      - linters:
+          - goconst
+        path: cmd/fibratus/app/rules/list.go
     paths:
       - third_party$
       - builtin$
@@ -53,3 +79,4 @@ formatters:
       - third_party$
       - builtin$
       - examples$
+

@@ -16,6 +16,8 @@ set PYTHON_URL=https://www.python.org/ftp/python/%PYTHON_VER%/python-%PYTHON_VER
 
 set WIX_VERSION=5.0.0
 
+set GOLANGCI_LINT_VERSION=2.14.0
+
 set GOBIN=%USERPROFILE%\go\bin
 
 set GOTEST=go test -timeout=10m -v -gcflags=all=-d=checkptr=0
@@ -80,7 +82,7 @@ goto :EOF
 goto :EOF
 
 :deps
-go get -v -u github.com/golangci/golangci-lint/cmd/golangci-lint@v1.52.2
+go get -v -u github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v%GOLANGCI_LINT_VERSION%
 goto :EOF
 
 :rsrc
