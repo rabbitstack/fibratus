@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 by Nedim Sabic Sabic
+ * Copyright 2020-2026 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -19,38 +19,63 @@
 package api
 
 import (
+	"context"
+	"errors"
 	"expvar"
-	"github.com/rabbitstack/fibratus/pkg/api/handler"
-	"github.com/rabbitstack/fibratus/pkg/config"
-	log "github.com/sirupsen/logrus"
 	"net"
 	"net/http"
 	"net/http/pprof"
 	"runtime/debug"
 	"strings"
+
+	"github.com/rabbitstack/fibratus/pkg/api/handler"
+	"github.com/rabbitstack/fibratus/pkg/config"
+	log "github.com/sirupsen/logrus"
 )
 
-func setupServer(lis net.Listener, c *config.Config) {
+// Server wraps http.Server and owns the router lifecycle.
+type Server struct {
+	http *http.Server
+	lis  net.Listener
+}
+
+// NewServer builds a Server bound to the given listener, wired
+// with the config, debug/vars and pprof endpoints.
+func NewServer(c *config.Config) (*Server, error) {
 	mux := http.NewServeMux()
 	mux.Handle("/config", handler.Config(c))
 	mux.Handle("/debug/vars", expvar.Handler())
 
 	mux.HandleFunc("/debug/pprof/", pprof.Index)
 	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-	mux.HandleFunc("/debug/freemem", func(writer http.ResponseWriter, request *http.Request) {
+	mux.HandleFunc("/debug/freemem", func(w http.ResponseWriter, r *http.Request) {
 		debug.FreeOSMemory()
 	})
 
-	srv := &http.Server{
-		Handler: mux,
+	lis, err := MakeListener(c.API.Transport)
+	if err != nil {
+		return nil, err
 	}
 
+	return &Server{
+		lis:  lis,
+		http: &http.Server{Handler: mux},
+	}, nil
+}
+
+// Start begins serving in the background. It does not block.
+func (s *Server) Start() {
 	go func() {
-		if err := srv.Serve(lis); err != nil && err != http.ErrServerClosed {
+		if err := s.http.Serve(s.lis); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			if strings.Contains(err.Error(), "use of closed network connection") {
 				return
 			}
 			log.Errorf("unable to bind the API server: %v", err)
 		}
 	}()
+}
+
+// Stop gracefully shuts down the server.
+func (s *Server) Stop(ctx context.Context) error {
+	return s.http.Shutdown(ctx)
 }

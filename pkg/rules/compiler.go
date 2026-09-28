@@ -21,8 +21,6 @@ package rules
 import (
 	"expvar"
 	"fmt"
-	"slices"
-	"strings"
 
 	semver "github.com/hashicorp/go-version"
 	"github.com/rabbitstack/fibratus/pkg/config"
@@ -61,6 +59,7 @@ type compiler struct {
 	psnap     ps.Snapshotter
 	config    *config.Config
 	approvers config.Approvers
+	plan      *filter.ApproverPlan
 }
 
 func newCompiler(psnap ps.Snapshotter, cfg *config.Config) *compiler {
@@ -151,6 +150,7 @@ func (c *compiler) compile() (map[*config.FilterConfig]filter.Filter, *config.Ru
 	}
 
 	if len(filters) == 0 {
+		c.plan = filter.AllowAllPlan()
 		return filters, nil, nil
 	}
 
@@ -159,7 +159,32 @@ func (c *compiler) compile() (map[*config.FilterConfig]filter.Filter, *config.Ru
 		r.Approvers = c.approvers
 	}
 
+	providers := make([]filter.Filter, 0, len(filters))
+	for _, fltr := range filters {
+		if !isApproverScoped(fltr) {
+			continue
+		}
+		providers = append(providers, fltr)
+	}
+	c.plan = filter.BuildApproverPlan(providers)
+
 	return filters, r, nil
+}
+
+func isApproverScoped(f filter.Filter) bool {
+	for name := range f.GetStringFields() {
+		if name == fields.EvtName || name == fields.EvtCategory {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *compiler) ApproverPlan() *filter.ApproverPlan {
+	if c == nil || c.plan == nil {
+		return filter.AllowAllPlan()
+	}
+	return c.plan
 }
 
 func (c *compiler) visitApproverPredicates(node ql.Node) {
@@ -220,100 +245,6 @@ func (c *compiler) visitApproverPredicates(node ql.Node) {
 	ql.WalkFunc(node, walk)
 }
 
-// referencesTargetEvents checks whether the rule AST contains
-// an event type filter for high-volume events we want to approve.
-func (c *compiler) referencesApproverEvents(root ql.Node) bool {
-	var found bool
-	ql.WalkFunc(root, func(n ql.Node) {
-		expr, ok := n.(*ql.BinaryExpr)
-		if !ok {
-			return
-		}
-
-		// direct event match. We also include SetFileInformation
-		// to approve any paths referenced in the condition
-		if c.containsEventTypes(expr, event.RegOpenKey, event.OpenThread, event.OpenProcess, event.SetFileInformation) {
-			found = true
-			return
-		}
-
-		// for file events require open file operation
-		if expr.Op == ql.And {
-			if c.containsEventTypes(expr, event.CreateFile) && c.containsFieldMatch(expr, fields.FileOperation, ql.Eq, "OPEN") {
-				found = true
-			}
-		}
-	})
-	return found
-}
-
-func (c *compiler) containsEventTypes(root ql.Node, types ...event.Type) bool {
-	var contains bool
-	ql.WalkFunc(root, func(n ql.Node) {
-		expr, ok := n.(*ql.BinaryExpr)
-		if !ok {
-			return
-		}
-		lhs, ok := expr.LHS.(*ql.FieldLiteral)
-		if !ok || lhs.Field != fields.EvtName {
-			return
-		}
-
-		vals, ok := rhsToStrings(expr.RHS)
-		if !ok {
-			return
-		}
-
-		evts := make([]event.Type, 0, len(vals))
-		for _, v := range vals {
-			typ, ok := event.ParseType(v)
-			if !ok {
-				continue
-			}
-			evts = append(evts, typ)
-		}
-
-		for _, typ := range types {
-			if slices.Contains(evts, typ) {
-				contains = true
-				return
-			}
-		}
-	})
-	return contains
-}
-
-func (c *compiler) containsFieldMatch(root ql.Node, field fields.Field, op ql.Token, val string) bool {
-	var contains bool
-	ql.WalkFunc(root, func(n ql.Node) {
-		expr, ok := n.(*ql.BinaryExpr)
-		if !ok {
-			return
-		}
-
-		lhs, ok := expr.LHS.(*ql.FieldLiteral)
-		if !ok || lhs.Field != field {
-			return
-		}
-
-		if expr.Op != op {
-			return
-		}
-
-		values, ok := rhsToStrings(expr.RHS)
-		if !ok {
-			return
-		}
-		for _, v := range values {
-			if strings.EqualFold(v, val) {
-				contains = true
-				return
-			}
-		}
-	})
-	return contains
-}
-
 // isNegated walks up the AST to check if the given node
 // is a direct child of a NOT unary expression.
 func (c *compiler) isNegated(root ql.Node, node ql.Node) bool {
@@ -367,13 +298,6 @@ func (c *compiler) buildCompileResult(filters map[*config.FilterConfig]filter.Fi
 					if info.Subcategory == event.DNS {
 						rs.HasDNSEvents = true
 					}
-					if typ == event.MapViewOfSection || typ == event.UnmapViewOfSection {
-						rs.HasVAMapEvents = true
-					}
-					if typ == event.OpenProcess || typ == event.OpenThread || typ == event.SetThreadContext ||
-						typ == event.CreateSymbolicLinkObject {
-						rs.HasAuditAPIEvents = true
-					}
 
 					if m[typ] {
 						continue
@@ -381,6 +305,8 @@ func (c *compiler) buildCompileResult(filters map[*config.FilterConfig]filter.Fi
 
 					events = append(events, typ)
 					m[typ] = true
+
+					updatePlatformCompileResult(rs, typ)
 				}
 			}
 		}

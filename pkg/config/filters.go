@@ -34,6 +34,7 @@ import (
 	"github.com/Masterminds/sprig/v3"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/util/convert"
+	"github.com/rabbitstack/fibratus/pkg/util/mapdecoder"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -79,7 +80,7 @@ func (f FilterConfig) DecodeActions() ([]any, error) {
 	actions := make([]any, 0, len(f.Action))
 
 	dec := func(m map[string]any, o any) error {
-		err := decode(m, &o)
+		err := mapdecoder.Decode(m, &o)
 		if err != nil {
 			return err
 		}

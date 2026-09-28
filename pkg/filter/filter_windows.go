@@ -20,6 +20,7 @@ package filter
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/rabbitstack/fibratus/pkg/config"
@@ -133,4 +134,42 @@ func NewFromCLIWithAllAccessors(args []string) (Filter, error) {
 		return nil, fmt.Errorf("bad filter:\n %v", err)
 	}
 	return filter, nil
+}
+
+// Accessor finds exactly one accessor that can serve the bound field.
+func (b *BoundField) Accessor(f *filter) Accessor {
+	if b.accessor != nil {
+		return b.accessor
+	}
+	switch {
+	case b.Field.Name.IsKevtField(), b.Field.Name.IsEvtField():
+		b.accessor = newEventAccessor()
+	case b.Field.Name.IsPsField():
+		for _, accessor := range f.accessors {
+			if reflect.TypeOf(accessor) == reflect.TypeOf(&psAccessor{}) {
+				b.accessor = accessor
+				break
+			}
+		}
+		if b.accessor == nil {
+			b.accessor = newPSAccessor(nil)
+		}
+	case b.Field.Name.IsThreadField():
+		b.accessor = newThreadAccessor()
+	case b.Field.Name.IsImageField():
+		b.accessor = newModuleAccessor()
+	case b.Field.Name.IsFileField():
+		b.accessor = newFileAccessor()
+	case b.Field.Name.IsRegistryField():
+		b.accessor = newRegistryAccessor()
+	case b.Field.Name.IsNetworkField():
+		b.accessor = newNetworkAccessor()
+	case b.Field.Name.IsPeField():
+		b.accessor = newPEAccessor()
+	case b.Field.Name.IsMemField():
+		b.accessor = newMemAccessor()
+	case b.Field.Name.IsDNSField():
+		b.accessor = newDNSAccessor()
+	}
+	return b.accessor
 }

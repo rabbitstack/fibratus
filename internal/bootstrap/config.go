@@ -19,10 +19,11 @@
 package bootstrap
 
 import (
+	"os"
+
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/util/log"
 	"github.com/sirupsen/logrus"
-	"os"
 )
 
 // InitConfigAndLogger initializes the configuration and sets up the logger.

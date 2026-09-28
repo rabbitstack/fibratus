@@ -26,11 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rabbitstack/fibratus/pkg/fs"
-	"github.com/rabbitstack/fibratus/pkg/network"
 	"github.com/rabbitstack/fibratus/pkg/util/colorizer"
-	"github.com/rabbitstack/fibratus/pkg/util/key"
-	"github.com/rabbitstack/fibratus/pkg/util/ntstatus"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -108,69 +104,8 @@ func (p Param) IsNumber() bool {
 		p.Type == params.Uint8 || p.Type == params.Uint16 || p.Type == params.Uint32 || p.Type == params.Uint64
 }
 
-// CaptureType returns the event type saved inside the capture file.
-// Captures usually override the type of the parameter to provide
-// consistent replay experience. For example, the file path param
-// type is converted to string param type, as drive mapping is performed
-// on the target where the capture is being taken.
-func (p Param) CaptureType() params.Type {
-	switch p.Type {
-	case params.HandleType, params.DOSPath, params.Key:
-		return params.UnicodeString
-	default:
-		return p.Type
-	}
-}
-
 // Params is the type that represents the sequence of event parameters
 type Params map[string]*Param
-
-// NewParamFromCapture builds a parameter instance from the restored capture state.
-func NewParamFromCapture(name string, typ params.Type, value params.Value, etype Type) *Param {
-	var enum ParamEnum
-	var flags ParamFlags
-	switch name {
-	case params.FileOperation:
-		enum = fs.FileCreateDispositions
-	case params.FileCreateOptions:
-		flags = FileCreateOptionsFlags
-	case params.FileAttributes:
-		flags = FileAttributeFlags
-	case params.FileShareMask:
-		flags = FileShareModeFlags
-	case params.FileInfoClass:
-		enum = fs.FileInfoClasses
-	case params.FileType:
-		enum = fs.FileTypes
-	case params.NetL4Proto:
-		enum = network.ProtoNames
-	case params.RegValueType:
-		enum = key.RegistryValueTypes
-	case params.MemAllocType:
-		flags = MemAllocationFlags
-	case params.FileViewSectionType:
-		enum = ViewSectionTypes
-	case params.DNSOpts:
-		flags = DNSOptsFlags
-	case params.DNSRR:
-		enum = DNSRecordTypes
-	case params.DNSRcode:
-		enum = DNSResponseCodes
-	case params.DesiredAccess:
-		if etype == OpenProcess {
-			flags = PsAccessRightFlags
-		} else {
-			flags = ThreadAccessRightFlags
-		}
-	case params.MemProtect:
-		if etype == VirtualAlloc || etype == VirtualFree {
-			flags = MemProtectionFlags
-		} else {
-			flags = ViewProtectionFlags
-		}
-	}
-	return &Param{Name: name, Type: typ, Value: value, Enum: enum, Flags: flags}
-}
 
 // Append adds a new parameter with the specified name, type and value.
 func (pars Params) Append(name string, typ params.Type, value params.Value, opts ...ParamOption) Params {
@@ -255,83 +190,6 @@ func (pars Params) MustGetString(name string) string {
 		panic(err)
 	}
 	return s
-}
-
-// GetPid returns the pid from the parameter.
-func (pars Params) GetPid() (uint32, error) {
-	return pars.getPid(params.ProcessID)
-}
-
-// MustGetPid returns the pid parameter. It panics if
-// an error occurs while trying to get the pid parameter.
-func (pars Params) MustGetPid() uint32 {
-	pid, err := pars.GetPid()
-	if err != nil {
-		panic(err)
-	}
-	return pid
-}
-
-// GetPpid returns the parent pid from the parameter.
-func (pars Params) GetPpid() (uint32, error) {
-	return pars.getPid(params.ProcessParentID)
-}
-
-// MustGetPpid returns the parent pid parameter. It panics if
-// an error occurs while trying to get the pid parameter.
-func (pars Params) MustGetPpid() uint32 {
-	ppid, err := pars.GetPpid()
-	if err != nil {
-		panic(err)
-	}
-	return ppid
-}
-
-func (pars Params) getPid(name string) (uint32, error) {
-	par, err := pars.findParam(name)
-	if err != nil {
-		return uint32(0), err
-	}
-	if par.Type != params.PID {
-		return uint32(0), fmt.Errorf("%q parameter is not a PID", name)
-	}
-	v, ok := par.Value.(uint32)
-	if !ok {
-		return uint32(0), fmt.Errorf("unable to type cast %q parameter to uint32 value from pid", name)
-	}
-	return v, nil
-}
-
-// GetTid returns the thread id from the parameter.
-func (pars Params) GetTid() (uint32, error) {
-	par, err := pars.findParam(params.ThreadID)
-	if err != nil {
-		return uint32(0), err
-	}
-	if par.Type != params.TID {
-		return uint32(0), fmt.Errorf("%q parameter is not a TID", params.ThreadID)
-	}
-	v, ok := par.Value.(uint32)
-	if !ok {
-		return uint32(0), fmt.Errorf("unable to type cast %q parameter to uint32 value from tid", params.ThreadID)
-	}
-	return v, nil
-}
-
-// MustGetTid returns the thread id from the parameter or panics if an error occurs.
-func (pars Params) MustGetTid() uint32 {
-	par, err := pars.findParam(params.ThreadID)
-	if err != nil {
-		panic(err)
-	}
-	if par.Type != params.TID {
-		panic(fmt.Errorf("%q parameter is not a TID", params.ThreadID))
-	}
-	v, ok := par.Value.(uint32)
-	if !ok {
-		panic(fmt.Errorf("unable to type cast %q parameter to uint32 value from tid", params.ThreadID))
-	}
-	return v
 }
 
 // GetUint8 returns the underlying uint8 value from the parameter.
@@ -756,7 +614,7 @@ func (pars Params) findParam(name string) (*Param, error) {
 
 // Colorize renders the full parameter list for the {{.Params}} tag.
 // Each entry is formatted as: key <separator> value, with the key in
-// amber, the seperator dim, and the value semantically coloured.
+// amber, the separator dim, and the value semantically coloured.
 func (pars Params) Colorize() string {
 	if len(pars) == 0 {
 		return ""
@@ -782,51 +640,4 @@ func (pars Params) Colorize() string {
 	}
 
 	return b.String()
-}
-
-// color applies a semantic colour to a single parameter value based
-// on its type and for string types its content.
-func (p *Param) color() string {
-	switch p.Type {
-	case params.Address:
-		return colorizer.SpanDim(colorizer.Span(colorizer.Gray, "0x"+p.String()))
-
-	case params.Status:
-		v := p.String()
-
-		if v == ntstatus.Success {
-			return colorizer.Span(colorizer.Green, v)
-		}
-		return colorizer.Span(colorizer.Red, v)
-
-	case params.Int8, params.Int16, params.Int32, params.Int64,
-		params.Uint8, params.Uint16, params.Uint32, params.Uint64,
-		params.Float, params.Double:
-		return colorizer.Span(colorizer.Yellow, p.String())
-
-	case params.Bool:
-		b, ok := p.Value.(bool)
-		if !ok {
-			return colorizer.Span(colorizer.Coral, p.String())
-		}
-		if b {
-			return colorizer.Span(colorizer.Green, p.String())
-		}
-		return colorizer.Span(colorizer.Coral, p.String())
-
-	case params.UnicodeString, params.AnsiString, params.SID:
-		return colorizer.Span(colorizer.White, p.String())
-
-	case params.IPv4, params.IPv6:
-		return colorizer.Span(colorizer.Blue, p.String())
-
-	case params.Port:
-		return colorizer.Span(colorizer.Cyan, p.String())
-
-	case params.PID, params.TID:
-		return colorizer.Span(colorizer.Green, p.String())
-
-	default:
-		return colorizer.Span(colorizer.White, p.String())
-	}
 }

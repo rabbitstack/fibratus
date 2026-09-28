@@ -23,9 +23,6 @@ import (
 	"slices"
 )
 
-// Flags represents the event flags
-type Flags uint8
-
 const (
 	// OnlyState indicates the event produces internal state
 	// and is never published to the event stream.
@@ -39,24 +36,6 @@ const (
 	// event that carries call stack return addresses.
 	WaitStack Flags = 1 << 3
 )
-
-// Info describes the event meta info such as human-readable name, category and description.
-type Info struct {
-	// Name is the human-readable representation of the event (e.g. CreateProcess, DeleteFile).
-	Name string
-	// Category designates the category to which event pertains. (e.g. process, network)
-	Category Category
-	// Subcategory designates the event subcategory if any. For example, the network category
-	// can be further subcategorized, such as DNS subcategory.
-	Subcategory Subcategory
-	// Source describes the event source origin for this event. For example, if it was captured
-	// from the NT Kernel Logger or a different event source.
-	Source Source
-	// Description is the short explanation that describes the purpose of the event.
-	Description string
-	// Flags describes additional properties of the event.
-	Flags Flags
-}
 
 var table = [MaxEvent]Info{
 	CreateProcess:          {Name: "CreateProcess", Category: Process, Source: SystemLogger, Description: "Creates a new process and its primary thread", Flags: WaitStack},
@@ -122,23 +101,6 @@ var table = [MaxEvent]Info{
 	CreateSymbolicLinkObject: {Name: "CreateSymbolicLinkObject", Category: Object, Source: SecurityTelemetryLogger, Description: "Creates the symbolic link within the object manager directory"},
 }
 
-// All returns all event types.
-func AllTypes() []Type {
-	types := make([]Type, 0)
-	for i := range table {
-		if Type(i) == Unknown {
-			continue
-		}
-		types = append(types, Type(i))
-	}
-	return types
-}
-
-// GetTypeInfo returns metadata about the specified event type.
-func GetTypeInfo(typ Type) Info {
-	return table[typ]
-}
-
 // GetTypesInfo returns event types metadata excluding only-state events.
 func GetTypesInfo() []Info {
 	t := table[:]
@@ -149,21 +111,4 @@ func GetTypesInfo() []Info {
 		return cmp.Or(cmp.Compare(a.Category, b.Category), cmp.Compare(a.Name, b.Name))
 	})
 	return t
-}
-
-// NameToType converts a human-readable event name to its internal type representation.
-func ParseType(s string) (Type, bool) {
-	i := slices.IndexFunc(table[:], func(info Info) bool {
-		return info.Name == s
-	})
-	if i == -1 {
-		return Unknown, false
-	}
-	return Type(i), true
-}
-
-// IsKnown indicates if the event type is known given the event name.
-func IsTypeKnown(s string) (exists bool) {
-	_, exists = ParseType(s)
-	return
 }

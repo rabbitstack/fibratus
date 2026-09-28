@@ -1,15 +1,25 @@
+# Binaries
 cmd/fibratus/fibratus.exe
 cmd/fibratus/fibratus.syso
-
+cmd/fibratus/fibratus
 cmd/systray/fibratus-systray.exe
 cmd/systray/fibratus-systray.syso
 
+# Resource message table
 pkg/util/eventlog/mc/*
 !pkg/util/eventlog/mc/gen.go
 
+# Windows MSI package
 build/msi/fibratus-*
 build/msi/*.wixpdb
 build/msi/*.msi
 
+# IDE
 .idea
+.vscode
+
+# Python bytecode cache
 filaments/__pycache__
+
+# Linux packages
+build/pkg/

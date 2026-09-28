@@ -1,8 +1,8 @@
 version: "2"
-run:
-  build-tags:
-    - cap
-    - filament
+# run:
+#   build-tags:
+#     - cap
+#     - filament
 
 linters:
   default: none
@@ -43,7 +43,7 @@ linters:
         path: pkg/util/ports/iana_ports.go
       - linters:
           - goconst
-        path: pkg/event/flags.go
+        path: pkg/event/flags_windows.go
       - linters:
           - goconst
         path: pkg/filter/ql/functions/(.+)\.go
@@ -56,6 +56,9 @@ linters:
       - linters:
           - goconst
         path: pkg/filter/fields/fields_windows.go
+      - linters:
+          - goconst
+        path: pkg/filter/fields/defs_windows.go
       - linters:
           - goconst
         path: cmd/fibratus/app/list/list.go

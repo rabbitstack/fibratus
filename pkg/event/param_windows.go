@@ -30,8 +30,10 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	htypes "github.com/rabbitstack/fibratus/pkg/handle/types"
+	"github.com/rabbitstack/fibratus/pkg/network"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
+	"github.com/rabbitstack/fibratus/pkg/util/colorizer"
 	"github.com/rabbitstack/fibratus/pkg/util/ip"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
 	"github.com/rabbitstack/fibratus/pkg/util/ntstatus"
@@ -39,7 +41,6 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// unknownKeysCount counts the number of times the registry key failed to convert from native format
 var unknownKeysCount = expvar.NewInt("registry.unknown.keys.count")
 
 // NewParam creates a new event parameter. Since the parameter type is already categorized,
@@ -63,7 +64,6 @@ func NewParam(name string, typ params.Type, value params.Value, options ...Param
 	return &Param{Name: name, Type: typ, Value: v, Flags: opts.flags, Enum: opts.enum}
 }
 
-// String returns the string representation of the parameter value.
 func (p Param) String() string {
 	if p.Value == nil {
 		return ""
@@ -164,19 +164,136 @@ func (p Param) String() string {
 		}
 	case params.Binary:
 		return string(p.Value.([]byte))
+	default:
+		return fmt.Sprintf("%v", p.Value)
 	}
-	return fmt.Sprintf("%v", p.Value)
 }
 
-// GetSID returns the raw SID (Security Identifier) parameter as
-// typed representation on which various operations can be performed,
-// such as converting the SID to string or resolving username/domain.
+// CaptureType returns the event type saved inside the capture file.
+// Captures usually override the type of the parameter to provide
+// consistent replay experience. For example, the file path param
+// type is converted to string param type, as drive mapping is performed
+// on the target where the capture is being taken.
+func (p Param) CaptureType() params.Type {
+	switch p.Type {
+	case params.HandleType, params.DOSPath, params.Key:
+		return params.UnicodeString
+	default:
+		return p.Type
+	}
+}
+
+// NewParamFromCapture builds a parameter from restored capture state.
+func NewParamFromCapture(name string, typ params.Type, value params.Value, etype Type) *Param {
+	var enum ParamEnum
+	var flags ParamFlags
+	switch name {
+	case params.FileOperation:
+		enum = fs.FileCreateDispositions
+	case params.FileCreateOptions:
+		flags = FileCreateOptionsFlags
+	case params.FileAttributes:
+		flags = FileAttributeFlags
+	case params.FileShareMask:
+		flags = FileShareModeFlags
+	case params.FileInfoClass:
+		enum = fs.FileInfoClasses
+	case params.FileType:
+		enum = fs.FileTypes
+	case params.NetL4Proto:
+		enum = network.ProtoNames
+	case params.RegValueType:
+		enum = key.RegistryValueTypes
+	case params.MemAllocType:
+		flags = MemAllocationFlags
+	case params.FileViewSectionType:
+		enum = ViewSectionTypes
+	case params.DNSOpts:
+		flags = DNSOptsFlags
+	case params.DNSRR:
+		enum = DNSRecordTypes
+	case params.DNSRcode:
+		enum = DNSResponseCodes
+	case params.DesiredAccess:
+		if etype == OpenProcess {
+			flags = PsAccessRightFlags
+		} else {
+			flags = ThreadAccessRightFlags
+		}
+	case params.MemProtect:
+		if etype == VirtualAlloc || etype == VirtualFree {
+			flags = MemProtectionFlags
+		} else {
+			flags = ViewProtectionFlags
+		}
+	}
+	return &Param{Name: name, Type: typ, Value: value, Enum: enum, Flags: flags}
+}
+
+// GetPid returns the process identifier.
+func (pars Params) GetPid() (uint32, error) {
+	return pars.getID(params.ProcessID, params.PID)
+}
+
+// MustGetPid returns the process identifier or panics.
+func (pars Params) MustGetPid() uint32 {
+	id, err := pars.GetPid()
+	if err != nil {
+		panic(err)
+	}
+	return id
+}
+
+// GetPpid returns the parent process identifier.
+func (pars Params) GetPpid() (uint32, error) {
+	return pars.getID(params.ProcessParentID, params.PID)
+}
+
+// MustGetPpid returns the parent process identifier or panics.
+func (pars Params) MustGetPpid() uint32 {
+	id, err := pars.GetPpid()
+	if err != nil {
+		panic(err)
+	}
+	return id
+}
+
+// GetTid returns the thread identifier.
+func (pars Params) GetTid() (uint32, error) {
+	return pars.getID(params.ThreadID, params.TID)
+}
+
+// MustGetTid returns the thread identifier or panics.
+func (pars Params) MustGetTid() uint32 {
+	id, err := pars.GetTid()
+	if err != nil {
+		panic(err)
+	}
+	return id
+}
+
+func (pars Params) getID(name string, typ params.Type) (uint32, error) {
+	param, err := pars.findParam(name)
+	if err != nil {
+		return 0, err
+	}
+	if param.Type != typ {
+		return 0, fmt.Errorf("%q parameter has unexpected identifier type", name)
+	}
+	value, ok := param.Value.(uint32)
+	if !ok {
+		return 0, fmt.Errorf("unable to type cast %q parameter to uint32 identifier", name)
+	}
+	return value, nil
+}
+
+// GetSID returns the raw Windows security identifier parameter.
 func (pars Params) GetSID() (*windows.SID, error) {
-	par, err := pars.findParam(params.UserSID)
+	param, err := pars.findParam(params.UserSID)
 	if err != nil {
 		return nil, err
 	}
-	return getSID(par)
+	return getSID(param)
 }
 
 func getSID(param *Param) (*windows.SID, error) {
@@ -187,17 +304,14 @@ func getSID(param *Param) (*windows.SID, error) {
 	if sid == nil {
 		return nil, fmt.Errorf("sid linked to parameter %s is empty", param.Name)
 	}
-	b := uintptr(unsafe.Pointer(&sid[0]))
+	pointer := uintptr(unsafe.Pointer(&sid[0]))
 	if param.Type == params.WbemSID {
-		// a WBEM SID is actually a TOKEN_USER structure followed
-		// by the SID, so we have to double the pointer size
-		b += uintptr(8 * 2)
+		pointer += uintptr(8 * 2)
 	}
-	return (*windows.SID)(unsafe.Pointer(b)), nil
+	return (*windows.SID)(unsafe.Pointer(pointer)), nil
 }
 
-// MustGetSID returns the SID (Security Identifier) event parameter
-// or panics if an error occurs.
+// MustGetSID returns the Windows security identifier or panics.
 func (pars Params) MustGetSID() *windows.SID {
 	sid, err := pars.GetSID()
 	if err != nil {
@@ -208,10 +322,6 @@ func (pars Params) MustGetSID() *windows.SID {
 
 var paramDecoder = &ParamDecoder{}
 
-// decodeParams parses the event binary layout to extract
-// the parameters. Each event is annotated with the schema
-// version number which helps us determine when the event
-// schema changes in order to parse new fields.
 func (e *Event) decodeParams(r *etw.EventRecord) {
 	switch r.Header.ProviderID.Data1 {
 	case RegistryEventGUID.Data1:
@@ -252,5 +362,42 @@ func (e *Event) decodeParams(r *etw.EventRecord) {
 		case LoadModuleInternalID:
 			paramDecoder.DecodeModuleInternal(r, e)
 		}
+	}
+}
+
+// color applies a semantic colour to a single parameter value based
+// on its type and for string types its content.
+func (p *Param) color() string {
+	switch p.Type {
+	case params.UnicodeString, params.AnsiString, params.SID:
+		return colorizer.Span(colorizer.White, p.String())
+	case params.Status:
+		if p.String() == ntstatus.Success {
+			return colorizer.Span(colorizer.Green, p.String())
+		}
+		return colorizer.Span(colorizer.Red, p.String())
+	case params.Address:
+		return colorizer.SpanDim(colorizer.Span(colorizer.Gray, "0x"+p.String()))
+	case params.Int8, params.Int16, params.Int32, params.Int64,
+		params.Uint8, params.Uint16, params.Uint32, params.Uint64,
+		params.Float, params.Double:
+		return colorizer.Span(colorizer.Yellow, p.String())
+	case params.Bool:
+		b, ok := p.Value.(bool)
+		if !ok {
+			return colorizer.Span(colorizer.Coral, p.String())
+		}
+		if b {
+			return colorizer.Span(colorizer.Green, p.String())
+		}
+		return colorizer.Span(colorizer.Coral, p.String())
+	case params.IPv4, params.IPv6:
+		return colorizer.Span(colorizer.Blue, p.String())
+	case params.Port:
+		return colorizer.Span(colorizer.Cyan, p.String())
+	case params.PID, params.TID:
+		return colorizer.Span(colorizer.Green, p.String())
+	default:
+		return colorizer.Span(colorizer.White, p.String())
 	}
 }

@@ -142,7 +142,7 @@ func (e *EventSource) Open(config *config.Config) error {
 				continue
 			}
 			if typ == event.CreateProcess || typ == event.TerminateProcess ||
-				typ == event.LoadModule || typ == event.UnloadModule {
+				typ == event.TerminateThread || typ == event.LoadModule || typ == event.UnloadModule {
 				// always allow fundamental events
 				continue
 			}

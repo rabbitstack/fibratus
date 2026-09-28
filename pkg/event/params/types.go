@@ -24,4 +24,4 @@ const (
 )
 
 // Value defines the container for parameter values
-type Value interface{}
+type Value any

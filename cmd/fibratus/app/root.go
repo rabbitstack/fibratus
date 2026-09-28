@@ -20,15 +20,9 @@ package app
 
 import (
 	"errors"
-	"github.com/rabbitstack/fibratus/cmd/fibratus/app/capture"
-	"github.com/rabbitstack/fibratus/cmd/fibratus/app/config"
-	"github.com/rabbitstack/fibratus/cmd/fibratus/app/list"
-	"github.com/rabbitstack/fibratus/cmd/fibratus/app/replay"
-	"github.com/rabbitstack/fibratus/cmd/fibratus/app/rules"
-	"github.com/rabbitstack/fibratus/cmd/fibratus/app/service"
-	"github.com/rabbitstack/fibratus/cmd/fibratus/app/stats"
-	"github.com/spf13/cobra"
 	"runtime"
+
+	"github.com/spf13/cobra"
 )
 
 // RootCmd is the entrance to Fibratus CLI
@@ -44,8 +38,8 @@ var RootCmd = &cobra.Command{
 	`,
 	SilenceUsage: true,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		if runtime.GOOS != "windows" {
-			return errors.New("fibratus can only be run on Windows operating systems")
+		if runtime.GOOS != "windows" && runtime.GOOS != "linux" {
+			return errors.New("fibratus can only be run on Windows or Linux operating systems")
 		}
 		if runtime.GOARCH == "386" {
 			return errors.New("fibratus can't be run on 32-bits Windows operating systems")
@@ -55,14 +49,5 @@ var RootCmd = &cobra.Command{
 }
 
 func init() {
-	RootCmd.AddCommand(capture.Command)
-	RootCmd.AddCommand(replay.Command)
-	RootCmd.AddCommand(service.Command)
-	RootCmd.AddCommand(stats.Command)
-	RootCmd.AddCommand(config.Command)
-	RootCmd.AddCommand(list.Command)
-	RootCmd.AddCommand(rules.Command)
-	RootCmd.AddCommand(runCmd)
-	RootCmd.AddCommand(docsCmd)
-	RootCmd.AddCommand(versionCmd)
+	registerCommands()
 }

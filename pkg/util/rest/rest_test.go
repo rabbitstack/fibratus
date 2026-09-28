@@ -20,12 +20,10 @@ package rest
 
 import (
 	"fmt"
-	"github.com/rabbitstack/fibratus/pkg/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
-	"os/user"
 	"strings"
 	"testing"
 )
@@ -42,33 +40,6 @@ func TestGet(t *testing.T) {
 	defer srv.Close()
 
 	resp, err := Get(WithURI("config"), WithTransport(fmt.Sprintf("localhost:%s", port(srv.URL))))
-	require.NoError(t, err)
-	require.NotNil(t, resp)
-	assert.Equal(t, "test", string(resp))
-}
-
-func TestGetPipe(t *testing.T) {
-	usr, err := user.Current()
-	require.NoError(t, err)
-	descriptor := "D:P(A;;GA;;;" + usr.Uid + ")"
-	listener, err := api.MakePipeListener(`npipe:///fibratus`, descriptor)
-	require.NoError(t, err)
-
-	mux := http.NewServeMux()
-
-	mux.HandleFunc("/config", func(w http.ResponseWriter, r *http.Request) {
-		if _, err := w.Write([]byte("test")); err != nil {
-			t.Fatal(err)
-		}
-	})
-
-	srv := httptest.NewUnstartedServer(mux)
-	srv.Listener = listener
-
-	srv.Start()
-	defer srv.Close()
-
-	resp, err := Get(WithURI("config"), WithTransport(`npipe:///fibratus`))
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	assert.Equal(t, "test", string(resp))

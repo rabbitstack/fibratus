@@ -1,0 +1,5 @@
+name: match destination port
+id: 22222222-2222-4222-8222-222222222222
+version: 1.0.0
+condition: evt.category = 'net' and net.dport = 443
+min-engine-version: 2.0.0

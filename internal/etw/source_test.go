@@ -273,12 +273,12 @@ func TestEventSourceEnableFlagsDynamicallyWithYaraEnabled(t *testing.T) {
 			EnableMemEvents:      true,
 		},
 		Filters: &config.Filters{},
-		Yara: yara.Config{
-			Enabled:    true,
-			SkipFiles:  false,
-			SkipMmaps:  true,
-			SkipAllocs: false,
-		},
+	}
+	cfg.Yara = yara.Config{
+		Enabled:    true,
+		SkipFiles:  false,
+		SkipMmaps:  true,
+		SkipAllocs: false,
 	}
 
 	cfg.EventSource.Init()
@@ -1130,7 +1130,7 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 		BufferSize:           1024,
 		MinBuffers:           uint32(runtime.NumCPU() * 2),
 		MaxBuffers:           uint32((runtime.NumCPU() * 2) + 20),
-		ExcludedImages:       []string{"System"},
+		ExcludedProcesses:    []string{"System"},
 		ExcludedEvents:       []string{"WriteFile", "ReadFile", "RegOpenKey", "RegCloseKey", "CloseFile"},
 		FlushTimer:           1,
 	}
@@ -1138,10 +1138,10 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 	evsConfig.Init()
 
 	cfg := &config.Config{
-		EventSource:              evsConfig,
-		Filters:                  &config.Filters{},
-		SymbolizeKernelAddresses: true,
+		EventSource: evsConfig,
+		Filters:     &config.Filters{},
 	}
+	cfg.SymbolizeKernelAddresses = true
 
 	evs := NewEventSource(psnap, hsnap, cfg, nil)
 	symbolizer := symbolize.NewSymbolizer(symbolize.NewDebugHelpResolver(cfg), psnap, cfg, true)

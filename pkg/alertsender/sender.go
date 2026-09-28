@@ -20,6 +20,7 @@ package alertsender
 
 import (
 	"fmt"
+
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 )
 
@@ -93,6 +94,8 @@ func ToType(s string) Type {
 		return Noop
 	case "systray":
 		return Systray
+	case "eventlog":
+		return Eventlog
 	default:
 		return None
 	}

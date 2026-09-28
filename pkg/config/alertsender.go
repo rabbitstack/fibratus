@@ -1,5 +1,6 @@
 /*
  * Copyright 2019-2020 by Nedim Sabic Sabic
+ * Copyright 2026 by Mostafa Moradian
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -21,95 +22,58 @@ package config
 import (
 	"errors"
 	"fmt"
+	"reflect"
+
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
-	"github.com/rabbitstack/fibratus/pkg/alertsender/eventlog"
 	"github.com/rabbitstack/fibratus/pkg/alertsender/mail"
 	"github.com/rabbitstack/fibratus/pkg/alertsender/slack"
-	"github.com/rabbitstack/fibratus/pkg/alertsender/systray"
-	"reflect"
 )
 
-var errNoAlertsendersSection = errors.New("no alertsenders section in config")
+var ErrNoAlertsendersSection = errors.New("no alertsenders section in config")
 
-var errAlertsenderConfig = func(sender string, err error) error {
+var ErrAlertsenderConfig = func(sender string, err error) error {
 	return fmt.Errorf("%s alert sender invalid config: %v", sender, err)
 }
 
-func (c *Config) tryLoadAlertSenders() error {
+var senders = alertsender.ConfigLoaders{}
+
+func init() {
+	senders.Register(alertsender.Mail, alertsender.LoadFromConfig(alertsender.Mail, func(c mail.Config) bool { return c.Enabled }))
+	senders.Register(alertsender.Slack, alertsender.LoadFromConfig(alertsender.Slack, func(c slack.Config) bool { return c.Enabled }))
+}
+
+// TryLoadAlertSenders loads configs for all registered alert senders.
+func (c *BaseConfig) TryLoadAlertSenders() error {
 	if c.ForwardMode || c.IsCaptureSet() {
 		// In event forwarding mode or capture control, alert senders are useless
 		return nil
 	}
 
-	configs := make([]alertsender.Config, 0)
 	alertsenders := c.viper.AllSettings()["alertsenders"]
 	if alertsenders == nil {
-		return errNoAlertsendersSection
+		return ErrNoAlertsendersSection
 	}
 
-	mapping, ok := alertsenders.(map[string]interface{})
+	mapping, ok := alertsenders.(map[string]any)
 	if !ok {
 		return fmt.Errorf("expected map[string]interface{} type for alertsenders but found %s", reflect.TypeOf(alertsenders))
 	}
 
-	for typ, config := range mapping {
-		switch typ {
-		case "mail":
-			var mailConfig mail.Config
-			if err := decode(config, &mailConfig); err != nil {
-				return errAlertsenderConfig(typ, err)
-			}
-			if !mailConfig.Enabled {
-				continue
-			}
-			config := alertsender.Config{
-				Type:   alertsender.Mail,
-				Sender: mailConfig,
-			}
-			configs = append(configs, config)
-		case "slack":
-			var slackConfig slack.Config
-			if err := decode(config, &slackConfig); err != nil {
-				return errAlertsenderConfig(typ, err)
-			}
-			if !slackConfig.Enabled {
-				continue
-			}
-			config := alertsender.Config{
-				Type:   alertsender.Slack,
-				Sender: slackConfig,
-			}
-			configs = append(configs, config)
-		case "systray":
-			var systrayConfig systray.Config
-			if err := decode(config, &systrayConfig); err != nil {
-				return errAlertsenderConfig(typ, err)
-			}
-			if !systrayConfig.Enabled {
-				continue
-			}
-			config := alertsender.Config{
-				Type:   alertsender.Systray,
-				Sender: systrayConfig,
-			}
-			configs = append(configs, config)
-
-		case "eventlog":
-			var eventlogConfig eventlog.Config
-			if err := decode(config, &eventlogConfig); err != nil {
-				return errAlertsenderConfig(typ, err)
-			}
-			if !eventlogConfig.Enabled {
-				continue
-			}
-			config := alertsender.Config{
-				Type:   alertsender.Eventlog,
-				Sender: eventlogConfig,
-			}
-			configs = append(configs, config)
+	configs := make([]alertsender.Config, 0, len(mapping))
+	for name, raw := range mapping {
+		loader, ok := senders[alertsender.ToType(name)]
+		if !ok {
+			return fmt.Errorf("unknown alertsender type %q", name)
 		}
+		cfg, enabled, err := loader(raw)
+		if err != nil {
+			return ErrAlertsenderConfig(name, err)
+		}
+		if !enabled {
+			continue
+		}
+		configs = append(configs, cfg)
 	}
-
 	c.Alertsenders = configs
 
 	return nil

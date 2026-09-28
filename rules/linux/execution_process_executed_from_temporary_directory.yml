@@ -1,0 +1,25 @@
+name: Process executed from a temporary directory
+id: 640b10f4-e9ad-487d-a04a-917595ab93c4
+version: 1.0.0
+description: |
+  Identifies programs executed from world-writable temporary directories.
+  Adversaries stage payloads in /tmp, /var/tmp, or /dev/shm to avoid writing
+  into more tightly controlled filesystem locations.
+labels:
+  tactic.id: TA0002
+  tactic.name: Execution
+  tactic.ref: https://attack.mitre.org/tactics/TA0002/
+  technique.id: T1059
+  technique.name: Command and Scripting Interpreter
+  technique.ref: https://attack.mitre.org/techniques/T1059/
+references:
+  - https://attack.mitre.org/techniques/T1059/
+
+condition: >
+  execve and ps.exe matches world_writable_exec_paths
+
+output: >
+  %ps.name executed %ps.exe from a world-writable directory
+
+severity: high
+min-engine-version: 3.0.0

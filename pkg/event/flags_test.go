@@ -21,19 +21,23 @@ package event
 import "testing"
 
 func TestParamFlags(t *testing.T) {
-	var tests = []struct {
+	flags := ParamFlags{
+		{Name: "ALL", Value: 0x3},
+		{Name: "READ", Value: 0x1},
+		{Name: "WRITE", Value: 0x2},
+	}
+	tests := []struct {
 		flag     uint64
-		flags    ParamFlags
 		expected string
 	}{
-		{0x1fffff, PsAccessRightFlags, "ALL_ACCESS"},
-		{0x1400, PsAccessRightFlags, "QUERY_INFORMATION|QUERY_LIMITED_INFORMATION"},
-		{0x1800, ThreadAccessRightFlags, "QUERY_LIMITED_INFORMATION"},
-		{0x00000002, PsCreationFlags, "WOW64"},
+		{0x3, "ALL"},
+		{0x1, "READ"},
+		{0x2, "WRITE"},
+		{0, ""},
 	}
 
 	for i, tt := range tests {
-		s := tt.flags.String(tt.flag)
+		s := flags.String(tt.flag)
 		if s != tt.expected {
 			t.Errorf("%d. %q flag mismatch: exp=%s got=%s", i, tt.expected, tt.expected, s)
 		}
