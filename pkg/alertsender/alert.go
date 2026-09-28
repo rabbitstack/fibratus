@@ -200,7 +200,7 @@ func (a Alert) MarshalJSON() ([]byte, error) {
 	for _, e := range a.Events {
 		evt := alertJSONEvent{
 			Name:      e.Name(),
-			Category:  e.Category.String(),
+			Category:  e.Category().String(),
 			Timestamp: e.Timestamp,
 			Params:    make(map[string]any),
 			Callstack: alertCallstack(e),

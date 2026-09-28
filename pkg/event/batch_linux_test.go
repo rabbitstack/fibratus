@@ -27,7 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestLinuxBatchMarshalJSON(t *testing.T) {
+func TestBatchMarshalJSON(t *testing.T) {
 	batch := NewBatch(&Event{PID: 42, Type: Execve}, &Event{PID: 43, Type: Exit})
 	require.EqualValues(t, 2, batch.Len())
 

@@ -28,8 +28,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestLinuxMarshalJSON(t *testing.T) {
-	event := &Event{PID: 42, Tid: 43, Type: Execve, Name: Execve.String(), Category: Process}
+func TestMarshalJSON(t *testing.T) {
+	event := &Event{PID: 42, Tid: 43, Type: Execve}
 	var decoded map[string]interface{}
 	require.NoError(t, json.Unmarshal(event.MarshalJSON(), &decoded))
 	assert.Equal(t, float64(42), decoded["pid"])

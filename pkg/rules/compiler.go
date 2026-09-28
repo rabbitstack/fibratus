@@ -245,6 +245,8 @@ func (c *compiler) visitApproverPredicates(node ql.Node) {
 	ql.WalkFunc(node, walk)
 }
 
+// isNegated walks up the AST to check if the given node
+// is a direct child of a NOT unary expression.
 func (c *compiler) isNegated(root ql.Node, node ql.Node) bool {
 	negated := false
 	ql.WalkFunc(root, func(n ql.Node) {
@@ -296,13 +298,6 @@ func (c *compiler) buildCompileResult(filters map[*config.FilterConfig]filter.Fi
 					if info.Subcategory == event.DNS {
 						rs.HasDNSEvents = true
 					}
-					if typ == event.MapViewOfSection || typ == event.UnmapViewOfSection {
-						rs.HasVAMapEvents = true
-					}
-					if typ == event.OpenProcess || typ == event.OpenThread || typ == event.SetThreadContext ||
-						typ == event.CreateSymbolicLinkObject {
-						rs.HasAuditAPIEvents = true
-					}
 
 					if m[typ] {
 						continue
@@ -312,7 +307,6 @@ func (c *compiler) buildCompileResult(filters map[*config.FilterConfig]filter.Fi
 					m[typ] = true
 
 					updatePlatformCompileResult(rs, typ)
-
 				}
 			}
 		}

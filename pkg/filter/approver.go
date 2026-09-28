@@ -109,7 +109,7 @@ func BuildApproverPlan(filters []Filter) *ApproverPlan {
 	for _, f := range filters {
 		provider, ok := f.(ApproverProvider)
 		if !ok {
-			for _, typ := range event.All() {
+			for _, typ := range event.AllTypes() {
 				blocked[typ] = true
 			}
 			continue
@@ -127,7 +127,7 @@ func BuildApproverPlan(filters []Filter) *ApproverPlan {
 		}
 	}
 
-	for _, typ := range event.All() {
+	for _, typ := range event.AllTypes() {
 		if blocked[typ] || len(byType[typ]) == 0 {
 			plan.policies[typ] = TypePolicy{DefaultAllow: true}
 			continue
@@ -149,7 +149,7 @@ func Union(plans ...*ApproverPlan) *ApproverPlan {
 			out = clonePlan(p)
 			continue
 		}
-		for _, typ := range event.All() {
+		for _, typ := range event.AllTypes() {
 			out.policies[typ] = unionPolicy(out.Policy(typ), p.Policy(typ))
 		}
 	}
@@ -215,15 +215,20 @@ func (f *filter) ApproverExtraction() Extraction {
 func typesFromStringFields(stringFields map[fields.Field][]string) []event.Type {
 	var types []event.Type
 	for _, name := range stringFields[fields.EvtName] {
-		types = append(types, event.NameToTypes(name)...)
-	}
-	for _, name := range stringFields[fields.EvtCategory] {
-		if !event.IsCategoryKnown(name) {
+		typ, ok := event.ParseType(name)
+		if !ok {
 			continue
 		}
-		cat := event.Category(name)
-		for _, typ := range event.All() {
-			if typ.Category() == cat {
+		types = append(types, typ)
+	}
+	for _, name := range stringFields[fields.EvtCategory] {
+		cat, ok := event.ParseCategory(name)
+		if !ok {
+			continue
+		}
+		for _, typ := range event.AllTypes() {
+			info := event.GetTypeInfo(typ)
+			if info.Category == cat {
 				types = append(types, typ)
 			}
 		}
@@ -305,8 +310,8 @@ func extractEventNames(ex *Extraction, expr *ql.BinaryExpr) {
 	}
 	ex.TypesScoped = true
 	for _, name := range names {
-		typ := event.NameToType(name)
-		if typ == event.UnknownType {
+		typ, ok := event.ParseType(name)
+		if !ok {
 			continue
 		}
 		ex.Types = append(ex.Types, typ)
@@ -325,12 +330,13 @@ func extractCategories(ex *Extraction, expr *ql.BinaryExpr) {
 	}
 	ex.TypesScoped = true
 	for _, name := range names {
-		if !event.IsCategoryKnown(name) {
+		cat, ok := event.ParseCategory(name)
+		if !ok {
 			continue
 		}
-		cat := event.Category(name)
-		for _, typ := range event.All() {
-			if typ.Category() == cat {
+		for _, typ := range event.AllTypes() {
+			info := event.GetTypeInfo(typ)
+			if info.Category == cat {
 				ex.Types = append(ex.Types, typ)
 			}
 		}
@@ -429,7 +435,7 @@ func scopedTypes(ex Extraction) []event.Type {
 	if ex.TypesScoped {
 		return nil
 	}
-	return event.All()
+	return event.AllTypes()
 }
 
 func policyFromClauses(clauses []Extraction) TypePolicy {

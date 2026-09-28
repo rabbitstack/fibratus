@@ -25,9 +25,38 @@ const (
 	String Type = 1
 )
 
-func platformTypeString(t Type) string {
-	if t == String {
+// String returns the type name.
+func (t Type) String() string {
+	switch t {
+	case String:
 		return "string"
+	case Int8:
+		return "int8"
+	case Uint8:
+		return "uint8"
+	case Int16:
+		return "int16"
+	case Uint16:
+		return "uint16"
+	case Int32:
+		return "int32"
+	case Uint32:
+		return "uint32"
+	case Int64:
+		return "int64"
+	case Uint64:
+		return "uint64"
+	case TID:
+		return "tid"
+	case PID:
+		return "pid"
+	case Port:
+		return "port"
+	case IPv6:
+		return "ipv6"
+	case IPv4:
+		return "ipv4"
+	default:
+		return "unknown"
 	}
-	return ""
 }

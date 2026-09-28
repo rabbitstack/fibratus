@@ -30,14 +30,9 @@ import (
 // SerializeEnvs indicates if environment variables are serialized with process state.
 var SerializeEnvs bool
 
-func serializationOptions() serializationConfig {
-	return serializationConfig{envs: SerializeEnvs}
-}
-
 // MarshalJSON serializes the event to JSON.
 func (e *Event) MarshalJSON() []byte {
-	type plainEvent Event
-	b, err := json.Marshal((*plainEvent)(e))
+	b, err := json.Marshal(e)
 	if err != nil {
 		return []byte("{}")
 	}
@@ -46,5 +41,5 @@ func (e *Event) MarshalJSON() []byte {
 
 // UnmarshalRaw recovers an event from a capture buffer.
 func (e *Event) UnmarshalRaw(_ []byte, _ capver.Version) error {
-	return fmt.Errorf("event capture unmarshalling is not implemented on Linux")
+	return fmt.Errorf("event capture is not implemented on Linux")
 }

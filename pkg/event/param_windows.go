@@ -21,7 +21,10 @@ package event
 import (
 	"expvar"
 	"fmt"
+	"net"
 	"strconv"
+	"strings"
+	"time"
 	"unsafe"
 
 	"github.com/rabbitstack/fibratus/pkg/event/params"
@@ -34,86 +37,149 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/ip"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
 	"github.com/rabbitstack/fibratus/pkg/util/ntstatus"
+	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
 )
 
 var unknownKeysCount = expvar.NewInt("registry.unknown.keys.count")
 
-func normalizeParamValue(typ params.Type, value params.Value) params.Value {
+// NewParam creates a new event parameter. Since the parameter type is already categorized,
+// we can coerce the value to the appropriate representation (e.g. hex, IP address)
+func NewParam(name string, typ params.Type, value params.Value, options ...ParamOption) *Param {
+	var opts paramOpts
+	for _, opt := range options {
+		opt(&opts)
+	}
+	var v params.Value
 	switch typ {
 	case params.IPv4:
-		return ip.ToIPv4(value.(uint32))
+		v = ip.ToIPv4(value.(uint32))
 	case params.IPv6:
-		return ip.ToIPv6(value.([]byte))
+		v = ip.ToIPv6(value.([]byte))
 	case params.Port:
-		return windows.Ntohs(value.(uint16))
+		v = windows.Ntohs(value.(uint16))
 	default:
-		return value
+		v = value
 	}
+	return &Param{Name: name, Type: typ, Value: v, Flags: opts.flags, Enum: opts.enum}
 }
 
-func formatPlatformParam(p Param) (string, bool) {
+func (p Param) String() string {
+	if p.Value == nil {
+		return ""
+	}
 	switch p.Type {
 	case params.UnicodeString, params.AnsiString, params.Path:
-		return p.Value.(string), true
+		return p.Value.(string)
 	case params.SID, params.WbemSID:
 		sid, err := getSID(&p)
 		if err != nil {
-			return "", true
+			return ""
 		}
 		if p.Name == params.ProcessTokenIntegrityLevel {
-			return sys.RidToString(sid), true
+			return sys.RidToString(sid)
 		}
-		return sid.String(), true
+		return sid.String()
 	case params.DOSPath:
-		return fs.GetDevMapper().Convert(p.Value.(string)), true
+		return fs.GetDevMapper().Convert(p.Value.(string))
 	case params.Key:
 		rootKey, keyName := key.Format(p.Value.(string))
 		if keyName != "" && rootKey != key.Invalid {
-			return rootKey.String() + "\\" + keyName, true
+			return rootKey.String() + "\\" + keyName
 		}
 		if rootKey != key.Invalid {
-			return rootKey.String(), true
+			return rootKey.String()
 		}
 		unknownKeysCount.Add(1)
-		return keyName, true
+		return keyName
 	case params.HandleType:
-		return htypes.ConvertTypeIDToName(p.Value.(uint16)), true
+		return htypes.ConvertTypeIDToName(p.Value.(uint16))
 	case params.Status:
-		value, ok := p.Value.(uint32)
+		v, ok := p.Value.(uint32)
 		if !ok {
-			return "", true
+			return ""
 		}
-		return ntstatus.FormatMessage(value), true
+		return ntstatus.FormatMessage(v)
+	case params.Address:
+		v, ok := p.Value.(uint64)
+		if !ok {
+			return ""
+		}
+		return va.Address(v).String()
+	case params.Int8:
+		return strconv.Itoa(int(p.Value.(int8)))
+	case params.Uint8:
+		return strconv.Itoa(int(p.Value.(uint8)))
+	case params.Int16:
+		return strconv.Itoa(int(p.Value.(int16)))
+	case params.Uint16, params.Port:
+		return strconv.Itoa(int(p.Value.(uint16)))
+	case params.Uint32, params.PID, params.TID:
+		return strconv.Itoa(int(p.Value.(uint32)))
+	case params.Int32:
+		return strconv.Itoa(int(p.Value.(int32)))
+	case params.Uint64:
+		return strconv.FormatUint(p.Value.(uint64), 10)
+	case params.Int64:
+		return strconv.Itoa(int(p.Value.(int64)))
+	case params.IPv4, params.IPv6:
+		return p.Value.(net.IP).String()
+	case params.Bool:
+		return strconv.FormatBool(p.Value.(bool))
+	case params.Float:
+		return strconv.FormatFloat(float64(p.Value.(float32)), 'f', 6, 32)
+	case params.Double:
+		return strconv.FormatFloat(p.Value.(float64), 'f', 6, 64)
+	case params.Time:
+		return p.Value.(time.Time).String()
+	case params.Enum:
+		if p.Enum == nil {
+			return ""
+		}
+		e := p.Value
+		v, ok := e.(uint32)
+		if !ok {
+			return ""
+		}
+		return p.Enum[v]
+	case params.Flags, params.Flags64:
+		if p.Flags == nil {
+			return ""
+		}
+		f := p.Value
+		switch v := f.(type) {
+		case uint32:
+			return p.Flags.String(uint64(v))
+		case uint64:
+			return p.Flags.String(v)
+		default:
+			return ""
+		}
+	case params.Slice:
+		switch slice := p.Value.(type) {
+		case []string:
+			return strings.Join(slice, ",")
+		default:
+			return fmt.Sprintf("%v", slice)
+		}
+	case params.Binary:
+		return string(p.Value.([]byte))
 	default:
-		return "", false
+		return fmt.Sprintf("%v", p.Value)
 	}
 }
 
-func formatPlatformID(value params.Value) string {
-	return strconv.FormatUint(uint64(value.(uint32)), 10)
-}
-
-func captureParamType(typ params.Type) params.Type {
-	switch typ {
+// CaptureType returns the event type saved inside the capture file.
+// Captures usually override the type of the parameter to provide
+// consistent replay experience. For example, the file path param
+// type is converted to string param type, as drive mapping is performed
+// on the target where the capture is being taken.
+func (p Param) CaptureType() params.Type {
+	switch p.Type {
 	case params.HandleType, params.DOSPath, params.Key:
 		return params.UnicodeString
 	default:
-		return typ
-	}
-}
-
-func platformParamColor(p *Param) (string, bool) {
-	switch p.Type {
-	case params.UnicodeString, params.AnsiString, params.SID:
-		return colorizer.Span(colorizer.White, p.String()), true
-	case params.Status:
-		if p.String() == ntstatus.Success {
-			return colorizer.Span(colorizer.Green, p.String()), true
-		}
-		return colorizer.Span(colorizer.Red, p.String()), true
-	default:
-		return "", false
+		return p.Type
 	}
 }
 
@@ -296,5 +362,42 @@ func (e *Event) decodeParams(r *etw.EventRecord) {
 		case LoadModuleInternalID:
 			paramDecoder.DecodeModuleInternal(r, e)
 		}
+	}
+}
+
+// color applies a semantic colour to a single parameter value based
+// on its type and for string types its content.
+func (p *Param) color() string {
+	switch p.Type {
+	case params.UnicodeString, params.AnsiString, params.SID:
+		return colorizer.Span(colorizer.White, p.String())
+	case params.Status:
+		if p.String() == ntstatus.Success {
+			return colorizer.Span(colorizer.Green, p.String())
+		}
+		return colorizer.Span(colorizer.Red, p.String())
+	case params.Address:
+		return colorizer.SpanDim(colorizer.Span(colorizer.Gray, "0x"+p.String()))
+	case params.Int8, params.Int16, params.Int32, params.Int64,
+		params.Uint8, params.Uint16, params.Uint32, params.Uint64,
+		params.Float, params.Double:
+		return colorizer.Span(colorizer.Yellow, p.String())
+	case params.Bool:
+		b, ok := p.Value.(bool)
+		if !ok {
+			return colorizer.Span(colorizer.Coral, p.String())
+		}
+		if b {
+			return colorizer.Span(colorizer.Green, p.String())
+		}
+		return colorizer.Span(colorizer.Coral, p.String())
+	case params.IPv4, params.IPv6:
+		return colorizer.Span(colorizer.Blue, p.String())
+	case params.Port:
+		return colorizer.Span(colorizer.Cyan, p.String())
+	case params.PID, params.TID:
+		return colorizer.Span(colorizer.Green, p.String())
+	default:
+		return colorizer.Span(colorizer.White, p.String())
 	}
 }

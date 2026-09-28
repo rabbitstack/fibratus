@@ -28,7 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestLinuxFields(t *testing.T) {
+func TestFields(t *testing.T) {
 	require.True(t, IsField(string(EvtName)))
 	require.True(t, IsField(string(PsName)))
 	require.True(t, IsField(string(PsParentExe)))
@@ -55,12 +55,12 @@ func TestLinuxFields(t *testing.T) {
 	require.Equal(t, params.Uint32, MemProtection.Type())
 }
 
-func TestLinuxExcludesWindowsOnlyFields(t *testing.T) {
+func TestExcludesWindowsOnlyFields(t *testing.T) {
 	unavailable := []Field{
 		KevtPID, KevtTID, KevtSeq, KevtName, KevtArg, KevtCPU, KevtHost,
 		PsComm, PsSID, PsDomain, PsIsWOW64Field, PsPeNumSections,
-		RegistryPath, PeEntrypoint, HandleName, ImagePath, ModulePath, DllPath,
-		DNSName, ThreadpoolPoolID, FileObject, FileOperation, FileIsDLL,
+		RegistryPath, PeEntrypoint, ImagePath, ModulePath, DllPath,
+		DNSName, FileObject, FileOperation, FileIsDLL,
 		MemPageType, MemAllocType, MemProtectionMask, ThreadTEB,
 		EvtIsDirectSyscall, EvtIsIndirectSyscall,
 	}

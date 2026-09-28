@@ -27,32 +27,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/alertsender/systray"
 )
 
-func (c *Config) loadPlatformAlertSender(typ string, config interface{}, configs *[]alertsender.Config) error {
-	switch typ {
-	case "systray":
-		var systrayConfig systray.Config
-		if err := decode(config, &systrayConfig); err != nil {
-			return errAlertsenderConfig(typ, err)
-		}
-		if !systrayConfig.Enabled {
-			return nil
-		}
-		*configs = append(*configs, alertsender.Config{
-			Type:   alertsender.Systray,
-			Sender: systrayConfig,
-		})
-	case "eventlog":
-		var eventlogConfig eventlog.Config
-		if err := decode(config, &eventlogConfig); err != nil {
-			return errAlertsenderConfig(typ, err)
-		}
-		if !eventlogConfig.Enabled {
-			return nil
-		}
-		*configs = append(*configs, alertsender.Config{
-			Type:   alertsender.Eventlog,
-			Sender: eventlogConfig,
-		})
-	}
-	return nil
+func init() {
+	senders.Register(alertsender.Eventlog, alertsender.LoadFromConfig(alertsender.Eventlog, func(c eventlog.Config) bool { return c.Enabled }))
+	senders.Register(alertsender.Systray, alertsender.LoadFromConfig(alertsender.Systray, func(c systray.Config) bool { return c.Enabled }))
 }

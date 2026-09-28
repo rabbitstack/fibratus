@@ -1,7 +1,5 @@
-//go:build linux
-
 /*
- * Copyright 2026 by Mostafa Moradian
+ * Copyright 2019-2026 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -20,8 +18,7 @@
 
 package config
 
-import "github.com/rabbitstack/fibratus/pkg/alertsender"
+import _ "embed"
 
-func (c *Config) loadPlatformAlertSender(_ string, _ interface{}, _ *[]alertsender.Config) error {
-	return nil
-}
+//go:embed schemas/config.schema.linux.json
+var configSchema string

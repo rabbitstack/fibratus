@@ -23,6 +23,7 @@
 package api_test
 
 import (
+	"context"
 	"encoding/json"
 	"net"
 	"os"
@@ -67,8 +68,10 @@ func TestServerServesBothTransports(t *testing.T) {
 	} {
 		t.Run(transport, func(t *testing.T) {
 			cfg := newConfig(t, transport)
-			require.NoError(t, api.StartServer(cfg))
-			t.Cleanup(func() { require.NoError(t, api.CloseServer()) })
+			srv, err := api.NewServer(cfg)
+			require.NoError(t, err)
+			srv.Start()
+			t.Cleanup(func() { require.NoError(t, srv.Stop(context.Background())) })
 
 			body, err := rest.Get(rest.WithTransport(transport), rest.WithURI("debug/vars"))
 			require.NoError(t, err)
@@ -94,8 +97,10 @@ func TestServerReplacesStaleSocket(t *testing.T) {
 	require.NoError(t, os.WriteFile(socket, nil, 0o600))
 
 	cfg := newConfig(t, "unix://"+socket)
-	require.NoError(t, api.StartServer(cfg))
-	t.Cleanup(func() { require.NoError(t, api.CloseServer()) })
+	srv, err := api.NewServer(cfg)
+	require.NoError(t, err)
+	srv.Start()
+	t.Cleanup(func() { require.NoError(t, srv.Stop(context.Background())) })
 
 	body, err := rest.Get(rest.WithTransport("unix://"+socket), rest.WithURI("debug/vars"))
 	require.NoError(t, err)

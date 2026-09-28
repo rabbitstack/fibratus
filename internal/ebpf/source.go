@@ -242,11 +242,7 @@ func (e *EventSource) handleRecord(raw []byte) {
 		return
 	}
 	typ := rec.eventType()
-	if typ == event.UnknownType {
-		eventsUnknown.Add(1)
-		return
-	}
-	if e.config != nil && !e.config.EventSource.EventExists(typ.ID()) {
+	if typ == event.Unknown {
 		eventsUnknown.Add(1)
 		return
 	}
@@ -267,7 +263,7 @@ func (e *EventSource) handleSnapshot(rec rawEvent) {
 		lateSnapshots.Add(1)
 		return
 	}
-	exe, cmdline, err := enrichFromProc(uint64(rec.TGID))
+	exe, cmdline, err := enrichFromProc(rec.TGID)
 	if err != nil {
 		enrichmentMiss.Add(1)
 	}
@@ -318,11 +314,11 @@ func (e *EventSource) dispatch(evt *event.Event) {
 	eventsProcessed.Add(1)
 
 	if e.config != nil {
-		if e.config.EventSource.ExcludeEvent(evt.Type.ID()) {
+		if e.config.EventSource.ExcludeEvent(evt.Type) {
 			eventsExcluded.Add(1)
 			return
 		}
-		if e.config.EventSource.ExcludeImage(evt.PS) {
+		if e.config.EventSource.ExcludeProcess(evt.PS) {
 			eventsExcluded.Add(1)
 			return
 		}

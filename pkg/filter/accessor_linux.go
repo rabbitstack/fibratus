@@ -44,16 +44,20 @@ func GetAccessors() []Accessor {
 	}
 }
 
-// platformEvtValue resolves evt fields available only on Linux.
-func platformEvtValue(f Field, evt *event.Event) (params.Value, error) {
+func (e *evtAccessor) Get(f Field, evt *event.Event) (params.Value, error) {
+	v, err := e.get(f, evt)
+	if v != nil {
+		return v, err
+	}
+
 	switch f.Name {
 	case fields.EvtRetval:
 		return evt.Params.GetInt64(params.Retval)
 	case fields.EvtSyscallID:
 		return evt.Params.GetUint32(params.SyscallID)
-	default:
-		return nil, nil
 	}
+
+	return nil, err
 }
 
 func getParentPs(e *event.Event) *pstypes.PS {
@@ -70,7 +74,7 @@ type psAccessor struct {
 func (psAccessor) SetFields([]Field)            {}
 func (psAccessor) SetSegments([]fields.Segment) {}
 func (psAccessor) IsFieldAccessible(e *event.Event) bool {
-	return e.PS != nil || e.Category == event.Process
+	return e.PS != nil || e.Category() == event.Process
 }
 
 func newPSAccessor(psnap ps.Snapshotter) Accessor { return &psAccessor{psnap: psnap} }
@@ -230,7 +234,7 @@ type fileAccessor struct{}
 
 func (fileAccessor) SetFields([]Field)                     {}
 func (fileAccessor) SetSegments([]fields.Segment)          {}
-func (fileAccessor) IsFieldAccessible(e *event.Event) bool { return e.Category == event.File }
+func (fileAccessor) IsFieldAccessible(e *event.Event) bool { return e.Category() == event.File }
 func newFileAccessor() Accessor                            { return &fileAccessor{} }
 
 func (*fileAccessor) Get(f Field, e *event.Event) (params.Value, error) {
@@ -262,7 +266,7 @@ type networkAccessor struct{}
 
 func (networkAccessor) SetFields([]Field)                     {}
 func (networkAccessor) SetSegments([]fields.Segment)          {}
-func (networkAccessor) IsFieldAccessible(e *event.Event) bool { return e.Category == event.Net }
+func (networkAccessor) IsFieldAccessible(e *event.Event) bool { return e.Category() == event.Network }
 func newNetworkAccessor() Accessor                            { return &networkAccessor{} }
 
 func (*networkAccessor) Get(f Field, e *event.Event) (params.Value, error) {
@@ -290,7 +294,7 @@ type memAccessor struct{}
 
 func (memAccessor) SetFields([]Field)                     {}
 func (memAccessor) SetSegments([]fields.Segment)          {}
-func (memAccessor) IsFieldAccessible(e *event.Event) bool { return e.Category == event.Mem }
+func (memAccessor) IsFieldAccessible(e *event.Event) bool { return e.Category() == event.Memory }
 func newMemAccessor() Accessor                            { return &memAccessor{} }
 
 func (*memAccessor) Get(f Field, e *event.Event) (params.Value, error) {

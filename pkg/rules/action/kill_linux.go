@@ -30,7 +30,6 @@ import (
 	"strconv"
 
 	"github.com/rabbitstack/fibratus/pkg/config"
-	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	log "github.com/sirupsen/logrus"
@@ -46,13 +45,13 @@ const userHZ = uint64(100)
 const nsecPerTick = uint64(1_000_000_000) / userHZ
 
 type processInstance struct {
-	pid           event.PID
+	pid           uint32
 	startBootTime uint64
 }
 
 type killer struct {
-	open           func(pid event.PID) (int, error)
-	readStartTicks func(pid event.PID) (uint64, error)
+	open           func(pid uint32) (int, error)
+	readStartTicks func(pid uint32) (uint64, error)
 	signal         func(fd int, sig unix.Signal) error
 	closeFD        func(fd int) error
 }
@@ -132,7 +131,7 @@ func (k killer) killInstance(inst processInstance) error {
 // Clone events already carry the child identity, so the event process
 // identifier always designates the process the rule fired for.
 func processInstances(ctx *config.ActionContext) []processInstance {
-	seen := make(map[event.PID]processInstance, len(ctx.Events))
+	seen := make(map[uint32]processInstance, len(ctx.Events))
 	for _, e := range ctx.Events {
 		if e == nil {
 			continue
@@ -153,16 +152,16 @@ func processInstances(ctx *config.ActionContext) []processInstance {
 	return instances
 }
 
-func pids(instances []processInstance) []event.PID {
-	p := make([]event.PID, 0, len(instances))
+func pids(instances []processInstance) []uint32 {
+	p := make([]uint32, 0, len(instances))
 	for _, inst := range instances {
 		p = append(p, inst.pid)
 	}
 	return p
 }
 
-func openPidfd(pid event.PID) (int, error) {
-	if pid > uint64(^uint32(0)>>1) {
+func openPidfd(pid uint32) (int, error) {
+	if pid > (^uint32(0) >> 1) {
 		return 0, fmt.Errorf("pid %d is out of range", pid)
 	}
 	return unix.PidfdOpen(int(pid), 0)
@@ -172,7 +171,7 @@ func sendSignal(fd int, sig unix.Signal) error {
 	return unix.PidfdSendSignal(fd, sig, nil, 0)
 }
 
-func readProcStartTicks(pid event.PID) (uint64, error) {
+func readProcStartTicks(pid uint32) (uint64, error) {
 	data, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
 	if err != nil {
 		return 0, err

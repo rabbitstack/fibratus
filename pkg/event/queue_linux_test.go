@@ -26,7 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestLinuxQueuePush(t *testing.T) {
+func TestQueuePush(t *testing.T) {
 	queue := NewQueue(1, false, false)
 	t.Cleanup(queue.Close)
 

@@ -1,7 +1,5 @@
-//go:build windows
-
 /*
- * Copyright 2026 by Mostafa Moradian
+ * Copyright 2019-2026 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -18,10 +16,18 @@
  * limitations under the License.
  */
 
-package event
+package api
 
-// PID is the process identifier type on Windows.
-type PID = uint32
+import (
+	"context"
+	"net"
+	"strings"
+)
 
-// TID is the thread identifier type on Windows.
-type TID = uint32
+// DialLocalTransport creates a dialer for the Linux UNIX domain socket transport.
+func DialLocalTransport(path string) func(context.Context, string, string) (net.Conn, error) {
+	path = strings.TrimPrefix(path, "unix://")
+	return func(ctx context.Context, _, _ string) (net.Conn, error) {
+		return (&net.Dialer{}).DialContext(ctx, "unix", path)
+	}
+}

@@ -28,24 +28,24 @@ import (
 )
 
 type alertProcess struct {
-	PID            event.PID `json:"pid"`
-	TID            event.TID `json:"tid"`
-	PPID           event.PID `json:"ppid"`
-	Name           string    `json:"name"`
-	Exe            string    `json:"exe"`
-	Cmdline        string    `json:"cmdline,omitempty"`
-	Pname          string    `json:"parent_name,omitempty"`
-	Pcmdline       string    `json:"parent_cmdline,omitempty"`
-	Cwd            string    `json:"cwd,omitempty"`
-	SID            string    `json:"sid"`
-	Username       string    `json:"username"`
-	Domain         string    `json:"domain"`
-	SessionID      uint32    `json:"session_id"`
-	IntegrityLevel string    `json:"integrity_level"`
-	IsWOW64        bool      `json:"is_wow64"`
-	IsPackaged     bool      `json:"is_packaged"`
-	IsProtected    bool      `json:"is_protected"`
-	Ancestors      []string  `json:"ancestors"`
+	PID            uint32   `json:"pid"`
+	TID            uint32   `json:"tid"`
+	PPID           uint32   `json:"ppid"`
+	Name           string   `json:"name"`
+	Exe            string   `json:"exe"`
+	Cmdline        string   `json:"cmdline,omitempty"`
+	Pname          string   `json:"parent_name,omitempty"`
+	Pcmdline       string   `json:"parent_cmdline,omitempty"`
+	Cwd            string   `json:"cwd,omitempty"`
+	SID            string   `json:"sid"`
+	Username       string   `json:"username"`
+	Domain         string   `json:"domain"`
+	SessionID      uint32   `json:"session_id"`
+	IntegrityLevel string   `json:"integrity_level"`
+	IsWOW64        bool     `json:"is_wow64"`
+	IsPackaged     bool     `json:"is_packaged"`
+	IsProtected    bool     `json:"is_protected"`
+	Ancestors      []string `json:"ancestors"`
 }
 
 func newAlertProcess(e *event.Event) *alertProcess {

@@ -64,7 +64,6 @@ func syscallMatrix() []matrixRow {
 func TestSyscallEventMatrix(t *testing.T) {
 	seen := map[event.Type]bool{}
 	for _, row := range syscallMatrix() {
-		assert.True(t, row.typ.Exists(), row.name)
 		assert.Equal(t, row.name, row.typ.String())
 		assert.NotEmpty(t, row.syscalls)
 		assert.NotEmpty(t, row.hook)
@@ -87,7 +86,7 @@ func TestSyscallEventMatrix(t *testing.T) {
 			assert.NoErrorf(t, err, "%s missing param %s", row.name, name)
 		}
 	}
-	for _, typ := range event.All() {
+	for _, typ := range event.AllTypes() {
 		assert.Truef(t, seen[typ], "event type %s missing from the syscall matrix", typ)
 	}
 }
@@ -119,7 +118,7 @@ func TestParseSockaddr(t *testing.T) {
 
 func TestMmapUpdatesProcessState(t *testing.T) {
 	snap := ps.NewSnapshotter()
-	ps := &pstypes.PS{PID: 9, Name: "target", StartBootTime: 1, Threads: map[uint64]pstypes.Thread{}}
+	ps := &pstypes.PS{PID: 9, Name: "target", StartBootTime: 1, Threads: map[uint32]pstypes.Thread{}}
 	snap.Put(ps)
 
 	raw := rawEvent{Type: uint32(event.Mmap), PID: 9, TGID: 9, Retval: 0x1000, Arg0: 4096, Arg1: 8192, Arg2: 3, Arg3: 3, Flags: 0}
@@ -135,7 +134,7 @@ func TestMmapUpdatesProcessState(t *testing.T) {
 
 func TestAnonymousMmapSkipped(t *testing.T) {
 	snap := ps.NewSnapshotter()
-	ps := &pstypes.PS{PID: 9, Name: "target", StartBootTime: 1, Threads: map[uint64]pstypes.Thread{}}
+	ps := &pstypes.PS{PID: 9, Name: "target", StartBootTime: 1, Threads: map[uint32]pstypes.Thread{}}
 	snap.Put(ps)
 
 	raw := rawEvent{Type: uint32(event.Mmap), PID: 9, TGID: 9, Retval: 0x1000, Arg1: 8192, Arg2: 3, Arg3: ^uint64(0), Flags: 0x20}

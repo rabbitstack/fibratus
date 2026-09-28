@@ -20,11 +20,8 @@ package config
 
 import _ "embed"
 
-//go:embed config.schema.json
-var configSchema string
-
-//go:embed rules.schema.json
+//go:embed schemas/rules.schema.json
 var rulesSchema string
 
-//go:embed macros.schema.json
+//go:embed schemas/macros.schema.json
 var macrosSchema string

@@ -1130,7 +1130,7 @@ func testCallstackEnrichment(t *testing.T, hsnap handle.Snapshotter, psnap ps.Sn
 		BufferSize:           1024,
 		MinBuffers:           uint32(runtime.NumCPU() * 2),
 		MaxBuffers:           uint32((runtime.NumCPU() * 2) + 20),
-		ExcludedImages:       []string{"System"},
+		ExcludedProcesses:    []string{"System"},
 		ExcludedEvents:       []string{"WriteFile", "ReadFile", "RegOpenKey", "RegCloseKey", "CloseFile"},
 		FlushTimer:           1,
 	}

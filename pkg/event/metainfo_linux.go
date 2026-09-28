@@ -2,6 +2,7 @@
 
 /*
  * Copyright 2026 by Mostafa Moradian
+ * Copyright 2026 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -20,54 +21,35 @@
 
 package event
 
-import "slices"
+import (
+	"cmp"
+	"slices"
+)
 
-var events map[Type]Info
-var types map[string]Type
-
-func init() {
-	all := All()
-	events = make(map[Type]Info, len(all))
-	types = make(map[string]Type, len(all))
-	for _, typ := range all {
-		events[typ] = Info{Name: typ.String(), Category: typ.Category(), Description: typ.Description()}
-		types[typ.String()] = typ
-	}
+var table = [MaxEvent]Info{
+	Execve:         {Name: "execve", Category: Process, Source: RawSyscallTracepoint, Description: "Executes a program"},
+	Exit:           {Name: "exit", Category: Process, Source: RawSyscallTracepoint, Description: "Exit all threads in a process"},
+	Openat:         {Name: "openat", Category: File, Source: RawSyscallTracepoint, Description: "Opens or creates a file"},
+	Unlink:         {Name: "unlink", Category: File, Source: RawSyscallTracepoint, Description: "Removes a directory entry"},
+	Rename:         {Name: "rename", Category: File, Source: RawSyscallTracepoint, Description: "Renames a file or directory"},
+	Connect:        {Name: "connect", Category: Network, Source: RawSyscallTracepoint, Description: "Initiates a socket connection"},
+	Accept:         {Name: "accept", Category: Network, Source: RawSyscallTracepoint, Description: "Accepts a socket connection"},
+	Mmap:           {Name: "mmap", Category: Memory, Source: RawSyscallTracepoint, Description: "Maps files or devices into memory"},
+	ProcessVMRead:  {Name: "process_vm_read", Category: Memory, Source: RawSyscallTracepoint, Description: "Reads memory from another process"},
+	ProcessVMWrite: {Name: "process_vm_write", Category: Memory, Source: RawSyscallTracepoint, Description: "Writes memory into another process"},
+	Kill:           {Name: "kill", Category: Process, Source: RawSyscallTracepoint, Description: "Sends a signal to a process"},
+	Ptrace:         {Name: "ptrace", Category: Process, Source: RawSyscallTracepoint, Description: "Traces or controls another process"},
+	Prctl:          {Name: "prctl", Category: Process, Source: RawSyscallTracepoint, Description: "Performs a process-control operation"},
 }
 
-// All returns all Linux event types.
-func All() []Type {
-	return []Type{
-		Execve, Exit, Clone,
-		Openat, Unlink, Rename,
-		Connect, Accept,
-		Mmap, ProcessVMRead, ProcessVMWrite,
-		Kill, Ptrace, Prctl,
-	}
-}
-
-// MaxTypeID returns the largest Linux event type identifier.
-func MaxTypeID() uint16 {
-	return uint16(slices.Max(All()))
-}
-
-// TypeToEventInfo returns metadata for an event type.
-func TypeToEventInfo(typ Type) Info {
-	if info, ok := events[typ]; ok {
-		return info
-	}
-	return Info{Name: "N/A", Category: Unknown}
-}
-
-// NameToType converts an event name to its type.
-func NameToType(name string) Type {
-	if typ, ok := types[name]; ok {
-		return typ
-	}
-	return UnknownType
-}
-
-// NameToTypes converts an event name to its possible internal types.
-func NameToTypes(name string) []Type {
-	return []Type{NameToType(name)}
+// GetTypesInfo returns event types metadata.
+func GetTypesInfo() []Info {
+	t := table[:]
+	t = slices.DeleteFunc(t, func(info Info) bool {
+		return info.Name == ""
+	})
+	slices.SortFunc(t, func(a, b Info) int {
+		return cmp.Or(cmp.Compare(a.Category, b.Category), cmp.Compare(a.Name, b.Name))
+	})
+	return t
 }

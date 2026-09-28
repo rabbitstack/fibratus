@@ -68,9 +68,11 @@ const (
 var (
 	// tmplRegexp defines the regular expression for parsing template fields.
 	tmplRegexp = regexp.MustCompile(`({{2}.*?}{2})`)
+
 	// tmplNormRegepx defines the regular expression for normalizing the template. This basically consists in removing
 	// the brackets and trailing/leading spaces from the field name.
 	tmplNormRegexp = regexp.MustCompile(`({{2}\s*([A-Za-z.]+)\s*}{2})`)
+
 	// tmplExpandParamsRegexp determines whether Params. fields are expanded
 	tmplExpandParamsRegexp = regexp.MustCompile(`{{\s*.Params.\S+}}`)
 )
@@ -87,7 +89,6 @@ var fields = map[string]bool{
 	exe:        true,
 	cmd:        true,
 	tid:        true,
-	sid:        true,
 	proc:       true,
 	cat:        true,
 	desc:       true,
@@ -96,7 +97,6 @@ var fields = map[string]bool{
 	parameters: true,
 	meta:       true,
 	host:       true,
-	pe:         true,
 	cstack:     true,
 }
 
@@ -109,13 +109,14 @@ func hintFields() string {
 	return strings.Join(s, " ")
 }
 
-// Formatter deals with producing event's output that is dictated by the template.
+// Formatter contains the core functionality substituting template tags
+// with the corresponding values from the map and returning the result.
 type Formatter struct {
 	t               *fasttemplate.Template
 	expandParamsDot bool
 }
 
-// NewFormatter builds a new instance of event's formatter.
+// NewFormatter builds a new instance of the event formatter.
 func NewFormatter(template string) (*Formatter, error) {
 	// check basic template format and ensure all fields
 	// defined in the template are known to us
@@ -143,8 +144,9 @@ func NewFormatter(template string) (*Formatter, error) {
 		}
 	}
 
-	// user might define the tag such as `{{ .Seq }}` or {{ .Seq}}`. We have to make sure
-	// inner spaces are removed before building the fast template instance
+	// user might define the tag such as `{{ .Seq }}` or {{ .Seq}}`.
+	// We have to make sure inner spaces are removed before building
+	// the fast template instance
 	norm := normalizeTemplate(template)
 	t, err := fasttemplate.NewTemplate(norm, startTag, endTag)
 	if err != nil {
@@ -157,12 +159,9 @@ func NewFormatter(template string) (*Formatter, error) {
 	}, nil
 }
 
-// Format applies the template on the provided event.
-func (f *Formatter) Format(evt *Event) []byte {
-	if evt == nil {
-		return []byte{}
-	}
-	values := map[string]interface{}{
+// eventMap returns the map populated with canonical event fields.
+func (f *Formatter) eventMap(evt *Event) map[string]any {
+	return map[string]any{
 		ts:         evt.Timestamp.String(),
 		pid:        strconv.FormatUint(uint64(evt.PID), 10),
 		tid:        strconv.FormatUint(uint64(evt.Tid), 10),
@@ -175,34 +174,6 @@ func (f *Formatter) Format(evt *Event) []byte {
 		meta:       evt.Metadata.String(),
 		parameters: evt.Params.String(),
 	}
-
-	// add process metadata
-	ps := evt.PS
-	if ps != nil {
-		values[proc] = ps.Name
-		values[ppid] = strconv.FormatUint(uint64(ps.Ppid), 10)
-		values[cwd] = ps.Cwd
-		values[exe] = ps.Exe
-		values[cmd] = ps.Cmdline
-		values[sid] = ps.SID
-		parent := ps.Parent
-		if parent != nil {
-			values[pproc] = parent.Name
-			values[pexe] = parent.Exe
-			values[pcmd] = parent.Cmdline
-		}
-		addPlatformProcessFormatValues(ps, values)
-	}
-
-	addPlatformFormatValues(evt, values)
-
-	if f.expandParamsDot {
-		for _, par := range evt.Params {
-			values[".Params."+caser.String(par.Name)] = par.String()
-		}
-	}
-
-	return f.t.ExecuteString(values)
 }
 
 // ColorFormatter wraps a Formatter and re-renders each template tag with
@@ -249,86 +220,6 @@ func (f *ColorFormatter) Format(e *Event) []byte {
 	})
 
 	return bytes.TrimRight(b.Bytes(), "\n")
-}
-
-// colourTag maps a bare tag name to its coloured string representation.
-func (f *ColorFormatter) colourTag(tag string, e *Event) string {
-	if value, ok := colourPlatformProcessTag(tag, e); ok {
-		return value
-	}
-	switch tag {
-	case seq:
-		// sequence number is ok to render as dim gray
-		return colorizer.SpanDim(colorizer.Span(colorizer.Gray, strconv.FormatUint(e.Seq, 10)))
-	case ts:
-		return f.colourTimestamp(e)
-	case cpu:
-		return colorizer.Span(colorizer.Yellow, strconv.FormatUint(uint64(e.CPU), 10))
-	case proc:
-		// render process name with bold green as it is the most important
-		// identity anchor on the line. Analysts scan for it first.
-		ps := e.PS
-		if ps == nil {
-			return colorizer.Span(colorizer.Gray, "N/A")
-		}
-		return colorizer.SpanBold(colorizer.Green, ps.Name)
-	case pid:
-		return colorizer.Span(colorizer.Green, strconv.FormatUint(uint64(e.PID), 10))
-	case ppid:
-		ps := e.PS
-		if ps == nil {
-			return colorizer.Span(colorizer.Gray, "N/A")
-		}
-		return colorizer.Span(colorizer.Green, strconv.FormatUint(uint64(ps.Ppid), 10))
-	case tid:
-		return colorizer.Span(colorizer.Green, strconv.FormatUint(uint64(e.Tid), 10))
-	case exe:
-		ps := e.PS
-		if ps == nil {
-			return colorizer.Span(colorizer.Gray, "N/A")
-		}
-		return colorizer.Span(colorizer.White, ps.Exe)
-	case pexe:
-		ps := e.PS
-		if ps == nil || ps.Parent == nil {
-			return colorizer.Span(colorizer.Gray, "N/A")
-		}
-		return colorizer.Span(colorizer.White, ps.Parent.Exe)
-	case cmd:
-		ps := e.PS
-		if ps == nil {
-			return colorizer.Span(colorizer.Gray, "N/A")
-		}
-		return colorizer.Span(colorizer.White, ps.Cmdline)
-	case pcmd:
-		ps := e.PS
-		if ps == nil || ps.Parent == nil {
-			return colorizer.Span(colorizer.Gray, "N/A")
-		}
-		return colorizer.Span(colorizer.White, ps.Parent.Cmdline)
-	case cwd:
-		ps := e.PS
-		if ps == nil {
-			return colorizer.Span(colorizer.Gray, "N/A")
-		}
-		return colorizer.Span(colorizer.White, ps.Cwd)
-	case pproc:
-		ps := e.PS
-		if ps == nil || ps.Parent == nil {
-			return colorizer.Span(colorizer.Gray, "N/A")
-		}
-		return colorizer.Span(colorizer.Green, ps.Parent.Name)
-	case typ:
-		return e.Type.color()
-	case cat:
-		return colorizer.Span(colorizer.Magenta, e.Category().String())
-	case parameters:
-		return e.Params.Colorize()
-	case cstack:
-		return colourPlatformTag(tag, e)
-	}
-
-	return ""
 }
 
 // colourTimestamp renders the timestamp tag with:

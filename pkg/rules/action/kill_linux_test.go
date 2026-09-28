@@ -39,7 +39,7 @@ import (
 )
 
 const (
-	testPID        = event.PID(4242)
+	testPID        = 4242
 	testStartNs    = uint64(1_234_500_000_000)
 	testStartTicks = testStartNs / nsecPerTick
 	testPidfd      = 7
@@ -47,15 +47,15 @@ const (
 
 // recorder captures what a killer attempted so tests never signal a real process.
 type recorder struct {
-	opened   []event.PID
+	opened   []uint32
 	signaled []int
 	signals  []unix.Signal
 	closed   []int
 }
 
-func (r *recorder) killer(ticks func(pid event.PID) (uint64, error)) killer {
+func (r *recorder) killer(ticks func(pid uint32) (uint64, error)) killer {
 	return killer{
-		open: func(pid event.PID) (int, error) {
+		open: func(pid uint32) (int, error) {
 			r.opened = append(r.opened, pid)
 			return testPidfd, nil
 		},
@@ -72,16 +72,14 @@ func (r *recorder) killer(ticks func(pid event.PID) (uint64, error)) killer {
 	}
 }
 
-func constTicks(ticks uint64) func(event.PID) (uint64, error) {
-	return func(event.PID) (uint64, error) { return ticks, nil }
+func constTicks(ticks uint64) func(uint32) (uint64, error) {
+	return func(uint32) (uint64, error) { return ticks, nil }
 }
 
-func killEvent(pid event.PID, startNs uint64) *event.Event {
+func killEvent(pid uint32, startNs uint64) *event.Event {
 	return &event.Event{
-		Type:     event.Execve,
-		Name:     "execve",
-		Category: event.Process,
-		PID:      pid,
+		Type: event.Execve,
+		PID:  pid,
 		PS: &pstypes.PS{
 			PID:           pid,
 			Name:          "malware",
@@ -117,11 +115,11 @@ func TestParseProcStatStartTicks(t *testing.T) {
 }
 
 func TestReadProcStartTicks(t *testing.T) {
-	ticks, err := readProcStartTicks(event.PID(os.Getpid()))
+	ticks, err := readProcStartTicks(uint32(os.Getpid()))
 	require.NoError(t, err)
 	assert.Greater(t, ticks, uint64(0))
 
-	_, err = readProcStartTicks(event.PID(1 << 30))
+	_, err = readProcStartTicks(uint32(1 << 30))
 	require.Error(t, err)
 	assert.True(t, isGone(err))
 }
@@ -131,7 +129,7 @@ func TestKillSignalsMatchingInstance(t *testing.T) {
 	k := r.killer(constTicks(testStartTicks))
 
 	require.NoError(t, k.kill(killContext(killEvent(testPID, testStartNs))))
-	assert.Equal(t, []event.PID{testPID}, r.opened)
+	assert.Equal(t, []uint32{testPID}, r.opened)
 	assert.Equal(t, []int{testPidfd}, r.signaled)
 	assert.Equal(t, []unix.Signal{unix.SIGKILL}, r.signals)
 	assert.Equal(t, []int{testPidfd}, r.closed)
@@ -140,7 +138,7 @@ func TestKillSignalsMatchingInstance(t *testing.T) {
 func TestKillPinsProcessBeforeRevalidating(t *testing.T) {
 	r := &recorder{}
 	var openedBeforeRead bool
-	k := r.killer(func(event.PID) (uint64, error) {
+	k := r.killer(func(uint32) (uint64, error) {
 		openedBeforeRead = len(r.opened) == 1
 		return testStartTicks, nil
 	})
@@ -163,7 +161,7 @@ func TestKillRefusesReusedPID(t *testing.T) {
 func TestKillMissingProcessIsSuccess(t *testing.T) {
 	r := &recorder{}
 	k := r.killer(constTicks(testStartTicks))
-	k.open = func(event.PID) (int, error) { return 0, unix.ESRCH }
+	k.open = func(uint32) (int, error) { return 0, unix.ESRCH }
 
 	require.NoError(t, k.kill(killContext(killEvent(testPID, testStartNs))))
 	assert.Empty(t, r.signaled)
@@ -171,7 +169,7 @@ func TestKillMissingProcessIsSuccess(t *testing.T) {
 
 func TestKillProcessExitingDuringRevalidationIsSuccess(t *testing.T) {
 	r := &recorder{}
-	k := r.killer(func(event.PID) (uint64, error) { return 0, os.ErrNotExist })
+	k := r.killer(func(uint32) (uint64, error) { return 0, os.ErrNotExist })
 
 	require.NoError(t, k.kill(killContext(killEvent(testPID, testStartNs))))
 	assert.Empty(t, r.signaled)
@@ -208,7 +206,7 @@ func TestKillUsesEventStartBootTimeWhenPSMissing(t *testing.T) {
 	evt := killEvent(testPID, testStartNs)
 	evt.PS = nil
 	require.NoError(t, k.kill(killContext(evt)))
-	assert.Equal(t, []event.PID{testPID}, r.opened)
+	assert.Equal(t, []uint32{testPID}, r.opened)
 }
 
 // Clone events carry the child identity, so the event pid designates the
@@ -219,12 +217,11 @@ func TestKillResolvesCloneChildPid(t *testing.T) {
 
 	clone := killEvent(testPID, testStartNs)
 	clone.Type = event.Clone
-	clone.Name = "clone"
 	clone.Params.Append(params.CloneFlags, params.Uint64, uint64(0))
 	require.True(t, clone.IsCreateProcess())
 
 	require.NoError(t, k.kill(killContext(clone)))
-	assert.Equal(t, []event.PID{testPID}, r.opened)
+	assert.Equal(t, []uint32{testPID}, r.opened)
 }
 
 func TestKillDeduplicatesAndOrdersPids(t *testing.T) {
@@ -237,7 +234,7 @@ func TestKillDeduplicatesAndOrdersPids(t *testing.T) {
 		killEvent(90, testStartNs),
 	))
 	require.NoError(t, err)
-	assert.Equal(t, []event.PID{12, 90}, r.opened)
+	assert.Equal(t, []uint32{12, 90}, r.opened)
 }
 
 func TestKillNilContext(t *testing.T) {
@@ -247,7 +244,7 @@ func TestKillNilContext(t *testing.T) {
 // TestKillTerminatesLiveProcess exercises the real pidfd and procfs path end to
 // end, including the refusal branch when the captured start time disagrees.
 func TestKillTerminatesLiveProcess(t *testing.T) {
-	start := func(t *testing.T) (event.PID, *exec.Cmd, uint64) {
+	start := func(t *testing.T) (uint32, *exec.Cmd, uint64) {
 		t.Helper()
 		cmd := exec.Command("sleep", "300")
 		require.NoError(t, cmd.Start())
@@ -255,7 +252,7 @@ func TestKillTerminatesLiveProcess(t *testing.T) {
 			_ = cmd.Process.Kill()
 			_, _ = cmd.Process.Wait()
 		})
-		pid := event.PID(cmd.Process.Pid)
+		pid := uint32(cmd.Process.Pid)
 		ticks, err := readProcStartTicks(pid)
 		require.NoError(t, err)
 		return pid, cmd, ticks * nsecPerTick
@@ -285,7 +282,7 @@ func TestKillTerminatesLiveProcess(t *testing.T) {
 }
 
 func TestOpenPidfdRejectsOutOfRangePid(t *testing.T) {
-	_, err := openPidfd(event.PID(1) << 40)
+	_, err := openPidfd(uint32(1) << 30)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "out of range")
 }
@@ -293,7 +290,7 @@ func TestOpenPidfdRejectsOutOfRangePid(t *testing.T) {
 func TestKillReportsUnexpectedOpenError(t *testing.T) {
 	r := &recorder{}
 	k := r.killer(constTicks(testStartTicks))
-	k.open = func(event.PID) (int, error) { return 0, fmt.Errorf("boom") }
+	k.open = func(uint32) (int, error) { return 0, fmt.Errorf("boom") }
 
 	err := k.kill(killContext(killEvent(testPID, testStartNs)))
 	require.Error(t, err)

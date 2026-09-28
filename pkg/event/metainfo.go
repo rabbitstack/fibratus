@@ -18,37 +18,59 @@
 
 package event
 
-import (
-	"cmp"
-	"slices"
-)
+import "slices"
 
-// Info describes an event's human-readable name, category, and purpose.
+// Flags represents the event flags
+type Flags uint8
+
+// Info describes the event meta info such as human-readable name, category and description.
 type Info struct {
-	Name        string
-	Category    Category
+	// Name is the human-readable representation of the event (e.g. CreateProcess, DeleteFile).
+	Name string
+	// Category designates the category to which event pertains. (e.g. process, network)
+	Category Category
+	// Subcategory designates the event subcategory if any. For example, the network category
+	// can be further subcategorized, such as DNS subcategory.
+	Subcategory Subcategory
+	// Source describes the event source origin for this event. For example, if it was captured
+	// from the NT Kernel Logger or eBPF raw syscall tracepoint.
+	Source Source
+	// Description is the short explanation that describes the purpose of the event.
 	Description string
+	// Flags describes additional properties of the event.
+	Flags Flags
 }
 
-// GetTypesMeta returns event type metadata without duplicate display names.
-func GetTypesMeta() []Info {
-	infos := make([]Info, 0, len(events))
-outer:
-	for _, info := range events {
-		for _, existing := range infos {
-			if existing.Name == info.Name {
-				continue outer
-			}
+// All returns all event types.
+func AllTypes() []Type {
+	types := make([]Type, 0)
+	for i := range table {
+		if Type(i) == Unknown {
+			continue
 		}
-		infos = append(infos, info)
+		types = append(types, Type(i))
 	}
-	slices.SortFunc(infos, func(a, b Info) int {
-		return cmp.Or(cmp.Compare(a.Category, b.Category), cmp.Compare(a.Name, b.Name))
-	})
-	return infos
+	return types
 }
 
-// IsKnown reports whether the event name is registered.
-func IsKnown(name string) bool {
-	return NameToType(name) != UnknownType
+// GetTypeInfo returns metadata about the specified event type.
+func GetTypeInfo(typ Type) Info {
+	return table[typ]
+}
+
+// NameToType converts a human-readable event name to its internal type representation.
+func ParseType(s string) (Type, bool) {
+	i := slices.IndexFunc(table[:], func(info Info) bool {
+		return info.Name == s
+	})
+	if i == -1 {
+		return Unknown, false
+	}
+	return Type(i), true
+}
+
+// IsKnown indicates if the event type is known given the event name.
+func IsTypeKnown(s string) (exists bool) {
+	_, exists = ParseType(s)
+	return
 }

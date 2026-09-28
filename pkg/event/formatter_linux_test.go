@@ -28,7 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestLinuxFormatter(t *testing.T) {
+func TestFormatter(t *testing.T) {
 	formatter, err := NewFormatter("{{.Type}} pid={{.Pid}} tid={{.Tid}}")
 	require.NoError(t, err)
 
@@ -37,8 +37,6 @@ func TestLinuxFormatter(t *testing.T) {
 		PID:       42,
 		Tid:       43,
 		Type:      Execve,
-		Name:      Execve.String(),
-		Category:  Process,
 	}
 	assert.Equal(t, "execve pid=42 tid=43", string(formatter.Format(event)))
 }

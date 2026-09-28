@@ -1,7 +1,5 @@
-//go:build linux
-
 /*
- * Copyright 2026 by Mostafa Moradian
+ * Copyright 2019-2026 by Nedim Sabic Sabic
  * https://www.fibratus.io
  * All Rights Reserved.
  *
@@ -18,17 +16,9 @@
  * limitations under the License.
  */
 
-package event
+package config
 
-import (
-	"testing"
+import _ "embed"
 
-	"github.com/stretchr/testify/assert"
-)
-
-func TestLinuxBitSets(t *testing.T) {
-	bitsets := &BitSets{}
-	bitsets.SetBit(TypeBitSet, Execve)
-	assert.True(t, bitsets.IsBitSet(&Event{Type: Execve}))
-	assert.False(t, bitsets.IsBitSet(&Event{Type: Exit}))
-}
+//go:embed schemas/config.schema.windows.json
+var configSchema string

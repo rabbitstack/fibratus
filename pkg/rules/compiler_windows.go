@@ -56,7 +56,7 @@ func (c *compiler) referencesApproverEvents(root ql.Node) bool {
 }
 
 func updatePlatformCompileResult(rs *config.RulesCompileResult, typ event.Type) {
-	if typ == event.MapViewFile || typ == event.UnmapViewFile {
+	if typ == event.MapViewOfSection || typ == event.UnmapViewOfSection {
 		rs.HasVAMapEvents = true
 	}
 	if typ == event.OpenProcess || typ == event.OpenThread || typ == event.SetThreadContext ||
@@ -84,7 +84,11 @@ func (c *compiler) containsEventTypes(root ql.Node, types ...event.Type) bool {
 
 		evts := make([]event.Type, 0, len(vals))
 		for _, v := range vals {
-			evts = append(evts, event.NameToType(v))
+			typ, ok := event.ParseType(v)
+			if !ok {
+				continue
+			}
+			evts = append(evts, typ)
 		}
 
 		for _, typ := range types {
@@ -127,6 +131,3 @@ func (c *compiler) containsFieldMatch(root ql.Node, field fields.Field, op ql.To
 	})
 	return contains
 }
-
-// isNegated walks up the AST to check if the given node
-// is a direct child of a NOT unary expression.

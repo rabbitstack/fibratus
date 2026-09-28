@@ -28,7 +28,7 @@ import (
 
 // enrichFromProc best-effort reads /proc/<pid>/{exe,cmdline}. Failures leave
 // fields empty and never replace the iterator baseline scan.
-func enrichFromProc(pid uint64) (exe string, cmdline string, err error) {
+func enrichFromProc(pid uint32) (exe string, cmdline string, err error) {
 	exe, err = os.Readlink(fmt.Sprintf("/proc/%d/exe", pid))
 	if err != nil {
 		exe = ""

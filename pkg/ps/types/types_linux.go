@@ -34,13 +34,13 @@ import (
 type PS struct {
 	sync.RWMutex
 	// PID is the thread group identifier. It is also the thread identifier of the main thread.
-	PID uint64 `json:"pid"`
+	PID uint32 `json:"pid"`
 	// Ppid is the thread group identifier of the parent process.
-	Ppid uint64 `json:"ppid"`
+	Ppid uint32 `json:"ppid"`
 	// Name is the process name.
 	Name string `json:"name"`
 	// Cmdline is the full process command line.
-	Cmdline string `json:"comm"`
+	Cmdline string `json:"cmdline"`
 	// Exe is the full path to the process executable.
 	Exe string `json:"exe"`
 	// Cwd is the current working directory of the process.
@@ -62,16 +62,16 @@ type PS struct {
 	// Parent references the parent process state when it is available.
 	Parent *PS `json:"parent"`
 	// Threads contains the threads that belong to this process.
-	Threads map[uint64]Thread `json:"-"`
+	Threads map[uint32]Thread `json:"-"`
 	// Mmaps contains the process memory mappings, including shared objects.
 	Mmaps []Mmap `json:"mmaps"`
 }
 
 // UUID returns a stable identifier for this process instance.
 func (ps *PS) UUID() uint64 {
-	var key [16]byte
-	binary.LittleEndian.PutUint64(key[:8], ps.PID)
-	binary.LittleEndian.PutUint64(key[8:], ps.StartBootTime)
+	var key [12]byte
+	binary.LittleEndian.PutUint32(key[:4], ps.PID)
+	binary.LittleEndian.PutUint64(key[4:], ps.StartBootTime)
 	h := fnv.New64a()
 	_, _ = h.Write(key[:])
 	return h.Sum64()
@@ -99,9 +99,9 @@ func (ps *PS) Ancestors() []string {
 // Thread stores identifiers for a Linux thread.
 type Thread struct {
 	// Tid is the thread identifier.
-	Tid uint64
+	Tid uint32
 	// Pid is the thread group identifier to which the thread belongs.
-	Pid uint64
+	Pid uint32
 }
 
 // Mmap stores information about a process memory mapping.
@@ -128,13 +128,13 @@ func (ps *PS) AddThread(thread Thread) {
 	ps.Lock()
 	defer ps.Unlock()
 	if ps.Threads == nil {
-		ps.Threads = make(map[uint64]Thread)
+		ps.Threads = make(map[uint32]Thread)
 	}
 	ps.Threads[thread.Tid] = thread
 }
 
 // RemoveThread removes a thread from the process state.
-func (ps *PS) RemoveThread(tid uint64) {
+func (ps *PS) RemoveThread(tid uint32) {
 	ps.Lock()
 	defer ps.Unlock()
 	delete(ps.Threads, tid)

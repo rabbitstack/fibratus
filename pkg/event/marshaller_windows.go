@@ -51,16 +51,6 @@ var (
 	SerializeEnvs bool
 )
 
-func serializationOptions() serializationConfig {
-	return serializationConfig{
-		handles: SerializeHandles,
-		threads: SerializeThreads,
-		modules: SerializeModules,
-		envs:    SerializeEnvs,
-		pe:      SerializePE,
-	}
-}
-
 // unmarshalTimestampErrors counts timestamp unmarshal errors
 var unmarshalTimestampErrors = expvar.NewInt("event.timestamp.unmarshal.errors")
 

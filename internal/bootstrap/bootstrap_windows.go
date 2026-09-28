@@ -67,6 +67,7 @@ type App struct {
 	writer     cap.Writer
 	reader     cap.Reader
 	signals    chan struct{}
+	server     *api.Server
 }
 
 // Option enables changing the behaviour of the bootstrap application.
@@ -126,6 +127,10 @@ func NewApp(cfg *config.Config, options ...Option) (*App, error) {
 		sigs = signals.Install()
 	}
 	if opts.isCaptureReplay {
+		server, err := api.NewServer(cfg)
+		if err != nil {
+			return nil, err
+		}
 		reader, err := cap.NewReader(cfg.CapFile, cfg)
 		if err != nil {
 			return nil, err
@@ -134,6 +139,7 @@ func NewApp(cfg *config.Config, options ...Option) (*App, error) {
 			config:  cfg,
 			reader:  reader,
 			signals: sigs,
+			server:  server,
 		}
 		return app, nil
 	}
@@ -163,6 +169,11 @@ func NewApp(cfg *config.Config, options ...Option) (*App, error) {
 
 	evs := NewEventSourceControl(psnap, hsnap, cfg, rs)
 
+	server, err := api.NewServer(cfg)
+	if err != nil {
+		return nil, err
+	}
+
 	app := &App{
 		config:  cfg,
 		evs:     evs,
@@ -170,6 +181,7 @@ func NewApp(cfg *config.Config, options ...Option) (*App, error) {
 		hsnap:   hsnap,
 		psnap:   psnap,
 		signals: sigs,
+		server:  server,
 	}
 
 	return app, nil
@@ -275,8 +287,8 @@ func (f *App) Run(args []string) error {
 			return err
 		}
 	}
-	// start the HTTP server
-	return api.StartServer(cfg)
+	f.server.Start()
+	return nil
 }
 
 // WriteCapture writes the event stream to the capture file.
@@ -310,7 +322,10 @@ func (f *App) WriteCapture(args []string) error {
 			log.Warnf("fail to write event to capture: %v", err)
 		}
 	}()
-	return api.StartServer(f.config)
+
+	f.server.Start()
+
+	return nil
 }
 
 // ReadCapture reconstructs the event stream from the capture file.
@@ -367,8 +382,8 @@ func (f *App) ReadCapture(ctx context.Context, args []string) error {
 			return err
 		}
 	}
-
-	return api.StartServer(f.config)
+	f.server.Start()
+	return nil
 }
 
 // Wait waits for the app to receive the termination signal.
@@ -422,7 +437,7 @@ func (f *App) Shutdown() error {
 	if err := handle.CloseTimeout(); err != nil {
 		errs = append(errs, err)
 	}
-	if err := api.CloseServer(); err != nil {
+	if err := f.server.Stop(context.Background()); err != nil {
 		errs = append(errs, err)
 	}
 	if err := alertsender.ShutdownAll(); err != nil {

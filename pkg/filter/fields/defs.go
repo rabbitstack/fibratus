@@ -433,15 +433,6 @@ const (
 	// KevtArg represents the field sequence for generic argument access
 	KevtArg Field = "kevt.arg"
 
-	// HandleID represents the handle identifier within the process address space
-	HandleID Field = "handle.id"
-	// HandleObject represents the handle object address
-	HandleObject Field = "handle.object"
-	// HandleName represents the handle name
-	HandleName Field = "handle.name"
-	// HandleType represents the handle type (e.g. file)
-	HandleType Field = "handle.type"
-
 	// NetDIP represents network destination IP address
 	NetDIP Field = "net.dip"
 	// NetSIP represents the source IP address
@@ -694,39 +685,6 @@ const (
 	DNSAnswers Field = "dns.answers"
 	// DNSRcode identifies the field that represents the DNS response code
 	DNSRcode Field = "dns.rcode"
-
-	// ThreadpoolPoolID identifies the field that represents the thread pool identifier
-	ThreadpoolPoolID = "threadpool.id"
-	// ThreadpoolTaskID identifies the field that represents the thread pool task identifier
-	ThreadpoolTaskID = "threadpool.task.id"
-	// ThreadpoolCallbackAddress identifies the field that represents the address of the callback function
-	ThreadpoolCallbackAddress = "threadpool.callback.address"
-	// ThreadpoolCallbackSymbol identifies the field that represents the callback symbol
-	ThreadpoolCallbackSymbol = "threadpool.callback.symbol"
-	// ThreadpoolCallbackModule identifies the field that represents the module containing the callback symbol
-	ThreadpoolCallbackModule = "threadpool.callback.module"
-	// ThreadpoolCallbackContext identifies the field that represents the address of the callback context
-	ThreadpoolCallbackContext = "threadpool.callback.context"
-	// ThreadpoolCallbackContextRip identifies the field that represents the value of instruction pointer contained in the callback context
-	ThreadpoolCallbackContextRip = "threadpool.callback.context.rip"
-	// ThreadpoolCallbackContextRipSymbol identifies the field that represents the symbol name associated with the instruction pointer in callback context
-	ThreadpoolCallbackContextRipSymbol = "threadpool.callback.context.rip.symbol"
-	// ThreadpoolCallbackContextRipModule identifies the field that represents the module name associated with the instruction pointer in callback context
-	ThreadpoolCallbackContextRipModule = "threadpool.callback.context.rip.module"
-	// ThreadpoolSubprocessTag identifies the field that represents the service identifier associated with the thread pool
-	ThreadpoolSubprocessTag = "threadpool.subprocess_tag"
-	// ThreadpoolTimerDuetime identifies the field that represents the timer due time
-	ThreadpoolTimerDuetime = "threadpool.timer.duetime"
-	// ThreadpoolTimerSubqueue identifies the field that represents the memory address of the timer subqueue
-	ThreadpoolTimerSubqueue = "threadpool.timer.subqueue"
-	// ThreadpoolTimer identifies the field that represents the memory address of the timer object
-	ThreadpoolTimer = "threadpool.timer.address"
-	// ThreadpoolTimerPeriod identifies the field that represents the period of the timer
-	ThreadpoolTimerPeriod = "threadpool.timer.period"
-	// ThreadpoolTimerWindow identifies the field that represents the timer tolerate period
-	ThreadpoolTimerWindow = "threadpool.timer.window"
-	// ThreadpoolTimerAbsolute identifies the field that indicates if the timer is absolute or relative
-	ThreadpoolTimerAbsolute = "threadpool.timer.is_absolute"
 )
 
 // String casts the field type to string.
@@ -743,16 +701,14 @@ func (f Field) IsImageField() bool    { return strings.HasPrefix(string(f), "ima
 func (f Field) IsFileField() bool     { return strings.HasPrefix(string(f), "file.") }
 func (f Field) IsRegistryField() bool { return strings.HasPrefix(string(f), "registry.") }
 func (f Field) IsNetworkField() bool  { return strings.HasPrefix(string(f), "net.") }
-func (f Field) IsHandleField() bool   { return strings.HasPrefix(string(f), "handle.") }
 func (f Field) IsPeField() bool {
 	return strings.HasPrefix(string(f), "pe.") || strings.HasPrefix(string(f), "ps.pe.") || strings.HasPrefix(string(f), "ps.signature.")
 }
 func (f Field) IsModuleField() bool {
 	return strings.HasPrefix(string(f), "module.") || strings.HasPrefix(string(f), "dll.")
 }
-func (f Field) IsMemField() bool        { return strings.HasPrefix(string(f), "mem.") }
-func (f Field) IsDNSField() bool        { return strings.HasPrefix(string(f), "dns.") }
-func (f Field) IsThreadpoolField() bool { return strings.HasPrefix(string(f), "threadpool.") }
+func (f Field) IsMemField() bool { return strings.HasPrefix(string(f), "mem.") }
+func (f Field) IsDNSField() bool { return strings.HasPrefix(string(f), "dns.") }
 
 func (f Field) IsPeSection() bool { return f == PeNumSections || f == PsPeNumSections }
 func (f Field) IsPeSymbol() bool {
@@ -948,13 +904,15 @@ func IsPseudoField(f Field) bool {
 
 func (f Field) IsPeSectionsPseudo() bool { return f == PeSections || f == PsPeSections }
 
-var commonFields = map[Field]FieldInfo{
+var fields = map[Field]FieldInfo{
+	EvtPID:         {EvtPID, "process identifier generating the event", params.Uint32, []string{"evt.pid = 6"}, nil, nil},
+	EvtTID:         {EvtTID, "thread identifier generating the event", params.Uint32, []string{"evt.tid = 1024"}, nil, nil},
 	EvtSeq:         {EvtSeq, "event sequence number", params.Uint64, []string{"evt.seq > 666"}, nil, nil},
 	EvtCPU:         {EvtCPU, "logical processor core where the event was generated", params.Uint8, []string{"evt.cpu = 2"}, nil, nil},
-	EvtName:        {EvtName, "symbolical event name", platformAnsiString(), []string{"evt.name = 'CreateThread'"}, nil, nil},
-	EvtCategory:    {EvtCategory, "event category", platformAnsiString(), []string{"evt.category = 'registry'"}, nil, nil},
-	EvtDesc:        {EvtDesc, "event description", platformAnsiString(), []string{"evt.desc contains 'Creates a new process'"}, nil, nil},
-	EvtHost:        {EvtHost, "host name on which the event was produced", platformString(), []string{"evt.host contains 'kitty'"}, nil, nil},
+	EvtName:        {EvtName, "symbolical event name", params.String, []string{"evt.name = 'CreateThread'"}, nil, nil},
+	EvtCategory:    {EvtCategory, "event category", params.String, []string{"evt.category = 'registry'"}, nil, nil},
+	EvtDesc:        {EvtDesc, "event description", params.String, []string{"evt.desc contains 'Creates a new process'"}, nil, nil},
+	EvtHost:        {EvtHost, "host name on which the event was produced", params.String, []string{"evt.host contains 'kitty'"}, nil, nil},
 	EvtTime:        {EvtTime, "event timestamp as a time string", params.Time, []string{"evt.time = '17:05:32'"}, nil, nil},
 	EvtTimeHour:    {EvtTimeHour, "hour within the day on which the event occurred", params.Time, []string{"evt.time.h = 23"}, nil, nil},
 	EvtTimeMin:     {EvtTimeMin, "minute offset within the hour on which the event occurred", params.Time, []string{"evt.time.m = 54"}, nil, nil},
@@ -964,9 +922,9 @@ var commonFields = map[Field]FieldInfo{
 	EvtDateDay:     {EvtDateDay, "day of the month on which the event occurred", params.Time, []string{"evt.date.d = 12"}, nil, nil},
 	EvtDateMonth:   {EvtDateMonth, "month of the year on which the event occurred", params.Time, []string{"evt.date.m = 11"}, nil, nil},
 	EvtDateYear:    {EvtDateYear, "year on which the event occurred", params.Uint32, []string{"evt.date.y = 2020"}, nil, nil},
-	EvtDateTz:      {EvtDateTz, "time zone associated with the event timestamp", platformAnsiString(), []string{"evt.date.tz = 'UTC'"}, nil, nil},
+	EvtDateTz:      {EvtDateTz, "time zone associated with the event timestamp", params.String, []string{"evt.date.tz = 'UTC'"}, nil, nil},
 	EvtDateWeek:    {EvtDateWeek, "week number within the year on which the event occurred", params.Uint8, []string{"evt.date.week = 2"}, nil, nil},
-	EvtDateWeekday: {EvtDateWeekday, "week day on which the event occurred", platformAnsiString(), []string{"evt.date.weekday = 'Monday'"}, nil, nil},
+	EvtDateWeekday: {EvtDateWeekday, "week day on which the event occurred", params.String, []string{"evt.date.weekday = 'Monday'"}, nil, nil},
 	EvtNparams:     {EvtNparams, "number of parameters", params.Int8, []string{"evt.nparams > 2"}, nil, nil},
 	EvtArg: {EvtArg, "event parameter", params.Object, []string{"evt.arg[cmdline] istartswith 'C:\\Windows'"}, nil, &Argument{Optional: false, Pattern: "[a-z0-9_]+", ValidationFunc: func(s string) bool {
 		for _, c := range s {
@@ -980,27 +938,16 @@ var commonFields = map[Field]FieldInfo{
 		}
 		return true
 	}}},
-	PsName:          {PsName, "process image name including the file extension", platformString(), []string{"ps.name contains 'firefox'"}, nil, nil},
-	PsCmdline:       {PsCmdline, "process command line", platformString(), []string{"ps.cmdline contains 'java'"}, nil, nil},
-	PsExe:           {PsExe, "full name of the process' executable", platformString(), []string{"ps.exe = 'C:\\Windows\\system32\\cmd.exe'"}, nil, nil},
+	PsName:          {PsName, "process image name including the file extension", params.String, []string{"ps.name contains 'firefox'"}, nil, nil},
+	PsCmdline:       {PsCmdline, "process command line", params.String, []string{"ps.cmdline contains 'java'"}, nil, nil},
+	PsExe:           {PsExe, "full name of the process' executable", params.String, []string{"ps.exe = 'C:\\Windows\\system32\\cmd.exe'"}, nil, nil},
 	PsArgs:          {PsArgs, "process command line arguments", params.Slice, []string{"ps.args in ('/cdir', '/-C')"}, nil, nil},
-	PsCwd:           {PsCwd, "process current working directory", platformString(), []string{"ps.cwd = 'C:\\Users\\Default'"}, nil, nil},
-	PsUsername:      {PsUsername, "process username", platformString(), []string{"ps.username contains 'system'"}, nil, nil},
+	PsCwd:           {PsCwd, "process current working directory", params.String, []string{"ps.cwd = 'C:\\Users\\Default'"}, nil, nil},
+	PsUsername:      {PsUsername, "process username", params.String, []string{"ps.username contains 'system'"}, nil, nil},
 	PsEnvs:          {PsEnvs, "process environment variables", params.Slice, []string{"ps.envs in ('SystemRoot:C:\\WINDOWS')", "ps.envs[windir] = 'C:\\WINDOWS'"}, nil, &Argument{Optional: true, ValidationFunc: func(arg string) bool { return true }}},
-	PsParentName:    {PsParentName, "parent process image name including the file extension", platformString(), []string{"ps.parent.name contains 'cmd.exe'"}, nil, nil},
-	PsParentCmdline: {PsParentCmdline, "parent process command line", platformString(), []string{"ps.parent.cmdline contains 'java'"}, nil, nil},
-	PsParentExe:     {PsParentExe, "full name of the parent process' executable", platformString(), []string{"ps.parent.exe = 'C:\\Windows\\system32\\explorer.exe'"}, nil, nil},
-}
-
-func platformFields(platform map[Field]FieldInfo) map[Field]FieldInfo {
-	fields := make(map[Field]FieldInfo, len(commonFields)+len(platform))
-	for field, info := range commonFields {
-		fields[field] = info
-	}
-	for field, info := range platform {
-		fields[field] = info
-	}
-	return fields
+	PsParentName:    {PsParentName, "parent process image name including the file extension", params.String, []string{"ps.parent.name contains 'cmd.exe'"}, nil, nil},
+	PsParentCmdline: {PsParentCmdline, "parent process command line", params.String, []string{"ps.parent.cmdline contains 'java'"}, nil, nil},
+	PsParentExe:     {PsParentExe, "full name of the parent process' executable", params.String, []string{"ps.parent.exe = 'C:\\Windows\\system32\\explorer.exe'"}, nil, nil},
 }
 
 // ArgumentOf returns argument data for the specified field.

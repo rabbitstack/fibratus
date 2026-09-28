@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rabbitstack/fibratus/internal/evasion"
 	"github.com/rabbitstack/fibratus/pkg/callstack"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/network"
@@ -68,8 +69,21 @@ func getParentPs(e *event.Event) *pstypes.PS {
 	return e.PS.Parent
 }
 
-// platformEvtValue resolves evt fields available only on other platforms.
-func platformEvtValue(Field, *event.Event) (params.Value, error) { return nil, nil }
+func (e *evtAccessor) Get(f Field, evt *event.Event) (params.Value, error) {
+	v, err := e.get(f, evt)
+	if v != nil {
+		return v, err
+	}
+
+	switch f.Name {
+	case fields.EvtIsDirectSyscall:
+		return evt.Evasions&uint32(evasion.DirectSyscall) != 0, nil
+	case fields.EvtIsIndirectSyscall:
+		return evt.Evasions&uint32(evasion.IndirectSyscall) != 0, nil
+	}
+
+	return nil, err
+}
 
 // psAccessor extracts process's state or event specific values.
 type psAccessor struct {

@@ -135,7 +135,7 @@ func (c *Consumer) ProcessEvent(r *etw.EventRecord) error {
 	// the filter is evaluated on the event to
 	// decide whether it should get dropped
 	if (evt.IsDropped(c.config.IsCaptureSet()) ||
-		c.config.EventSource.ExcludeImage(evt.PS)) && !evt.IsStackWalk() {
+		c.config.EventSource.ExcludeProcess(evt.PS)) && !evt.IsStackWalk() {
 		eventsExcluded.Add(1)
 		return nil
 	}

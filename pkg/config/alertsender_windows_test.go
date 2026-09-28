@@ -22,8 +22,10 @@ import (
 	"testing"
 
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
+	"github.com/rabbitstack/fibratus/pkg/alertsender/eventlog"
 	"github.com/rabbitstack/fibratus/pkg/alertsender/mail"
 	"github.com/rabbitstack/fibratus/pkg/alertsender/slack"
+	"github.com/rabbitstack/fibratus/pkg/alertsender/systray"
 	"github.com/stretchr/testify/require"
 )
 
@@ -43,13 +45,17 @@ func TestAlertSenders(t *testing.T) {
 	})
 
 	require.NoError(t, c.TryLoadAlertSenders())
-	require.Len(t, c.Alertsenders, 2)
+	require.Len(t, c.Alertsenders, 4)
 	for _, sender := range c.Alertsenders {
 		switch sender.Type {
 		case alertsender.Mail:
 			require.IsType(t, mail.Config{}, sender.Sender)
 		case alertsender.Slack:
 			require.IsType(t, slack.Config{}, sender.Sender)
+		case alertsender.Systray:
+			require.IsType(t, systray.Config{}, sender.Sender)
+		case alertsender.Eventlog:
+			require.IsType(t, eventlog.Config{}, sender.Sender)
 		default:
 			require.Failf(t, "unexpected sender", "%v", sender.Type)
 		}
