@@ -55,8 +55,8 @@ type Probe struct {
 
 	psnap ps.Snapshotter
 
-	rulesCompileResult *config.RulesCompileResult
-	dropMask           bitmap.Bitmap[event.Type] // discarded events bit mask
+	rs       *config.RulesCompileResult
+	dropMask bitmap.Bitmap[event.Type] // discarded events bit mask
 
 	wg         sync.WaitGroup
 	ctx        context.Context
@@ -68,9 +68,9 @@ type Probe struct {
 }
 
 func (p *Probe) Init() error {
-	if p.rulesCompileResult != nil {
+	if p.rs != nil {
 		if p.config.ProbeConfig.EnableThreadEvents {
-			p.config.ProbeConfig.EnableThreadEvents = p.compileResult.HasThreadEvents
+			p.config.ProbeConfig.EnableThreadEvents = p.rs.HasThreadEvents
 		}
 		// config.EventSource.EnableModuleEvents = config.EventSource.EnableModuleEvents && e.r.HasModuleEvents
 		// config.EventSource.EnableNetEvents = config.EventSource.EnableNetEvents && e.r.HasNetworkEvents
@@ -81,8 +81,11 @@ func (p *Probe) Init() error {
 		// config.EventSource.EnableDNSEvents = config.EventSource.EnableDNSEvents && e.r.HasDNSEvents
 		// config.EventSource.EnableAuditAPIEvents = config.EventSource.EnableAuditAPIEvents && e.r.HasAuditAPIEvents
 	}
-
-	if p.compileResult != nil {
+	func dropSet(all []event.Type, keep eventPredicate) []event.Type {
+	return slices.DeleteFunc(slices.Clone(all), keep) // removes kept ones, leaving the drops
+	}
+}
+	if p.rs != nil {
 		for _, typ := range event.AllTypes() {
 			if typ.OnlyState() || typ.StateSnapshot() {
 				continue
@@ -236,7 +239,12 @@ func (p *Probe) handleEvent(evt *event.Event) error {
 func (p *Probe) Handle(lower, upper int64) {
 	for seq := lower; seq <= upper; seq++ {
 		e := ring[seq&ringMask]
-		p.handleEvent(e)
+		if err := p.handleEvent(e); err != nil {
+			p.errs <- err
+		}
+
+		// dispatch to event listeners
+		// dispatch to consumers
 	}
 }
 

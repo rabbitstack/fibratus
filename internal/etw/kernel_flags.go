@@ -23,7 +23,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 )
 
-// enabledKernelFlags crafts the system logger event mask from the
+// enableKernelFlags crafts the system logger event mask from the
 // probe config state.
 // System logger flags is a bitmask that indicates which kernel events
 // are delivered to the consumer when system logger session is
@@ -32,7 +32,7 @@ import (
 // machine. Note these flags are relevant to system logger traces
 // and initializing the EnableFlags field of the etw.EventTraceProperties
 // structure for non-system logger providers will result in an error.
-func enabledKernelFlags(config config.ProbeConfig) etw.EventTraceFlags {
+func enableKernelFlags(config config.ProbeConfig) etw.EventTraceFlags {
 	var flags etw.EventTraceFlags
 
 	flags |= etw.Process

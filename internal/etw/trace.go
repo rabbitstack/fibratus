@@ -264,7 +264,7 @@ func NewKernelTrace(config *config.Config) *KernelTrace {
 	t.stackExtensions.EnableFileCallstack()
 	t.stackExtensions.EnableMemoryCallstack()
 
-	t.kernelEventFlags = enabledKernelFlags(config.ProbeConfig)
+	t.kernelEventFlags = enableKernelFlags(config.ProbeConfig)
 
 	return t
 }
