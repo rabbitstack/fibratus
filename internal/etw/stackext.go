@@ -1,3 +1,5 @@
+//go:build windows
+
 /*
  * Copyright 2021-2022 by Nedim Sabic Sabic
  * https://www.fibratus.io
@@ -38,7 +40,7 @@ func NewStackExtensions(config config.EventSourceConfig) *StackExtensions {
 
 // AddStackTracing enables stack tracing for the specified event type.
 func (s *StackExtensions) AddStackTracing(typ event.Type) {
-	if !s.config.TestDropMask(typ) && !typ.EventID().IsEmpty() {
+	if !s.config.HasDropType(typ) && !typ.EventID().IsEmpty() {
 		s.ids = append(s.ids, typ.EventID())
 	}
 }

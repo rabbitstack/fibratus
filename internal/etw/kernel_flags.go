@@ -1,3 +1,5 @@
+//go:build windows
+
 /*
  * Copyright 2021-2026 by Nedim Sabic Sabic
  * https://www.fibratus.io
@@ -26,13 +28,13 @@ import (
 // enableKernelFlags crafts the system logger event mask from the
 // probe config state.
 // System logger flags is a bitmask that indicates which kernel events
-// are delivered to the consumer when system logger session is
-// started. At minimum, process events are published to the trace
-// session as they represent the foundation for building the state
-// machine. Note these flags are relevant to system logger traces
-// and initializing the EnableFlags field of the etw.EventTraceProperties
-// structure for non-system logger providers will result in an error.
-func enableKernelFlags(config config.ProbeConfig) etw.EventTraceFlags {
+// are delivered to the consumer when system logger session is started.
+// At minimum, process events are published to the trace session as they
+// represent the foundation for building the state machine.
+// Note these flags are relevant to system logger traces and initializing
+// the EnableFlags field of the etw.EventTraceProperties structure for any
+// non-system logger providers will result in an error.
+func enableKernelFlags(config config.EventSourceConfig) etw.EventTraceFlags {
 	var flags etw.EventTraceFlags
 
 	flags |= etw.Process

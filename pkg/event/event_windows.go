@@ -50,26 +50,37 @@ var (
 
 // New constructs a fresh event instance with basic fields and parameters
 // from the raw ETW event record.
-func New(r *etw.EventRecord) *Event {
+func New(rec *etw.EventRecord) *Event {
 	var (
-		pid = r.Header.ProcessID
-		tid = r.Header.ThreadID
-		cpu = *(*uint8)(unsafe.Pointer(&r.BufferContext.ProcessorIndex[0]))
-		ts  = filetime.ToEpoch(r.Header.Timestamp)
+		pid = rec.Header.ProcessID
+		tid = rec.Header.ThreadID
+		cpu = *(*uint8)(unsafe.Pointer(&rec.BufferContext.ProcessorIndex[0]))
+		ts  = filetime.ToEpoch(rec.Header.Timestamp)
 	)
 
 	e := &Event{
 		PID:       pid,
 		Tid:       tid,
 		CPU:       cpu,
-		Type:      TypeFromEventRecord(r),
+		Type:      TypeFromEventRecord(rec),
 		Params:    make(map[string]*Param),
 		Timestamp: ts,
 		Host:      hostname.Get(),
 	}
 
-	e.decodeParams(r)
+	e.decodeParams(rec)
 	e.adjustPID()
+
+	return e
+}
+
+// NewWithParams constructs a new event with an optional parameter list.
+func NewWithParams(rec *etw.EventRecord, params ...*Param) *Event {
+	e := New(rec)
+
+	for _, param := range params {
+		e.Params[param.Name] = param
+	}
 
 	return e
 }

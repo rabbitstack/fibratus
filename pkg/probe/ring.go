@@ -18,11 +18,32 @@
 
 package probe
 
-import "github.com/rabbitstack/fibratus/pkg/event"
+import (
+	"errors"
+
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/smarty/go-disruptor"
+)
 
 const (
 	ringCapacity = 1 << 16
 	ringMask     = ringCapacity - 1
 )
 
-var ring [ringCapacity]*event.Event
+var ErrInsufficentRingSlots = errors.New("ring: insufficent slots")
+
+// ringCommit attempts to reserve a single slot. If the
+// slot is available, the event is written and commited
+// to it. Otherwise, ErrInsufficentRingSlots error is returned.
+func (p *Probe) ringCommit(evt *event.Event) error {
+	seq := p.disruptor.TryReserve(1)
+	if seq == disruptor.ErrCapacityUnavailable {
+		return ErrInsufficentRingSlots
+	}
+
+	p.ring[seq&ringMask] = evt
+
+	p.disruptor.Commit(seq, seq)
+
+	return nil
+}

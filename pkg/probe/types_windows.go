@@ -20,18 +20,13 @@ package probe
 
 import (
 	"github.com/rabbitstack/fibratus/pkg/fs"
-	"github.com/rabbitstack/fibratus/pkg/sys/etw"
-	"github.com/rabbitstack/fibratus/pkg/util/va"
 )
 
 // FileInfo stores file information obtained from event state.
 type FileInfo struct {
-	Name string
-	Type fs.FileType
-}
+	// Path represents the full file path in object manager format (e.g. \Device\HarddiskDevice1\)
+	Path string
 
-type irp struct {
-	rec       *etw.EventRecord // keeps the original event record
-	buf       []byte           // keeps the data buffer alive
-	callstack va.Callstack     // CreateFile stack return addresses
+	// Type indicates the file type derived from the I/O operation.
+	Type fs.FileType
 }

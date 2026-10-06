@@ -68,6 +68,9 @@ var (
 	debugHelpFallbacks = expvar.NewInt("symbolizer.debughelp.fallbacks")
 )
 
+// eventHandlerID identifies the symbolizer event handler
+const eventHandlerID = "symbolizer"
+
 // parsePeFile wraps the PE parsing function to permit
 // overriding the function in unit tests.
 var parsePeFile = func(name string, option ...pe.Option) (*pe.PE, error) {
@@ -143,14 +146,12 @@ type Symbolizer struct {
 	purger  *time.Ticker
 
 	quit chan struct{}
-
-	enqueue bool
 }
 
 // NewSymbolizer builds a new instance of address symbolizer.
 // It performs the initialization of symbol options, symbols
 // handlers and modules for kernel address symbolization.
-func NewSymbolizer(r Resolver, psnap ps.Snapshotter, config *config.Config, enqueue bool) *Symbolizer {
+func NewSymbolizer(r Resolver, psnap ps.Snapshotter, config *config.Config) *Symbolizer {
 	sym := &Symbolizer{
 		config:  config,
 		procs:   make(map[uint32]*process),
@@ -159,7 +160,6 @@ func NewSymbolizer(r Resolver, psnap ps.Snapshotter, config *config.Config, enqu
 		cleaner: time.NewTicker(time.Second * 2),
 		purger:  time.NewTicker(time.Minute * 5),
 		quit:    make(chan struct{}, 1),
-		enqueue: enqueue,
 		exps:    NewExportsDirectoryCache(psnap),
 		drivers: initDriverStore(),
 		r:       r,
@@ -184,7 +184,7 @@ func NewSymbolizer(r Resolver, psnap ps.Snapshotter, config *config.Config, enqu
 	return sym
 }
 
-func (s *Symbolizer) CanEnqueue() bool { return s.enqueue }
+func (Symbolizer) ID() string { return eventHandlerID }
 
 func (s *Symbolizer) Close() {
 	s.cleaner.Stop()
@@ -199,7 +199,7 @@ func (s *Symbolizer) Close() {
 	}
 }
 
-func (s *Symbolizer) ProcessEvent(e *event.Event) (bool, error) {
+func (s *Symbolizer) HandleEvent(e *event.Event) error {
 	if e.IsTerminateProcess() {
 		// release symbol handler and process handle
 		pid := e.Params.MustGetPid()
@@ -212,12 +212,12 @@ func (s *Symbolizer) ProcessEvent(e *event.Event) (bool, error) {
 		symCachedSymbols.Add(-int64(len(s.symbols[pid])))
 		proc, ok := s.procs[pid]
 		if !ok {
-			return true, nil
+			return nil
 		}
 		s.r.Cleanup(proc.handle)
 		_ = windows.CloseHandle(proc.handle)
 		delete(s.procs, pid)
-		return true, nil
+		return nil
 	}
 
 	if e.IsLoadModule() || e.IsUnloadModule() {
@@ -254,7 +254,7 @@ func (s *Symbolizer) ProcessEvent(e *event.Event) (bool, error) {
 	}
 
 	if !e.Params.Contains(params.Callstack) {
-		return true, nil
+		return nil
 	}
 	defer e.Params.Remove(params.Callstack)
 
@@ -263,7 +263,7 @@ func (s *Symbolizer) ProcessEvent(e *event.Event) (bool, error) {
 		callstackProcessErrors.Add(1)
 	}
 
-	return true, nil
+	return nil
 }
 
 // syncModules reconciles the state of loaded modules.

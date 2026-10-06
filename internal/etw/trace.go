@@ -1,3 +1,5 @@
+//go:build windows
+
 /*
  * Copyright 2021-2022 by Nedim Sabic Sabic
  * https://www.fibratus.io
@@ -19,6 +21,7 @@
 package etw
 
 import (
+	"errors"
 	"fmt"
 	"runtime"
 	"time"
@@ -29,6 +32,20 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
+)
+
+// callbackNext is the return callback value which indicates that callback execution should progress
+const callbackNext = uintptr(1)
+
+const (
+	// maxBufferSize specifies the maximum buffer size for event tracing session buffer
+	maxBufferSize = 1024
+
+	maxLoggerNameSize  = 128
+	maxLogfileNameSize = 1024
+
+	// maxTracePropsSize must make room for logger name and log file name
+	maxTracePropsSize = 2 * (maxLoggerNameSize + maxLogfileNameSize)
 )
 
 // EventCallback is the function alias for ETW callback.
@@ -179,16 +196,17 @@ func (t *trace) Close() error {
 // ETW events from raw data buffers, building the state machine, and pushing events to the channel.
 func (t *trace) processEventCallback(r *etw.EventRecord) uintptr {
 	if err := t.callback(r); err != nil {
-		t.errs <- err
-		eventsFailed.Add(err.Error(), 1)
+		select {
+		case t.errs <- err:
+		default:
+		}
 	}
 	return callbackNext
 }
 
 // bufferStatsCallback is periodically triggered by ETW subsystem for the purpose of reporting
-// buffer statistics, such as the number of buffers processed.
+// buffer statistics, such as the number of processed buffers.
 func (t *trace) bufferStatsCallback(logfile *etw.EventTraceLogfile) uintptr {
-	buffersRead.Add(int64(logfile.BuffersRead))
 	return callbackNext
 }
 
@@ -257,14 +275,14 @@ func WithEventFilterDescriptors(descriptors ...etw.EventFilterDescriptor) Option
 
 // NewKernelTrace creates a new NT Kernel Logger trace.
 func NewKernelTrace(config *config.Config) *KernelTrace {
-	t := &KernelTrace{trace: trace{guid: etw.KernelTraceControlGUID, name: etw.KernelLoggerSession, config: config}, stackExtensions: NewStackExtensions(config.ProbeConfig)}
+	t := &KernelTrace{trace: trace{guid: etw.KernelTraceControlGUID, name: etw.KernelLoggerSession, config: config}, stackExtensions: NewStackExtensions(config.EventSource)}
 
 	t.stackExtensions.EnableProcessCallstack()
 	t.stackExtensions.EnableRegistryCallstack()
 	t.stackExtensions.EnableFileCallstack()
 	t.stackExtensions.EnableMemoryCallstack()
 
-	t.kernelEventFlags = enableKernelFlags(config.ProbeConfig)
+	t.kernelEventFlags = enableKernelFlags(config.EventSource)
 
 	return t
 }
@@ -306,7 +324,7 @@ func (t *KernelTrace) Start() error {
 		return fmt.Errorf("trace name [%s] is too long", t.name)
 	}
 
-	props := initEventTraceProps(t.config.ProbeConfig)
+	props := initEventTraceProps(t.config.EventSource)
 
 	props.Wnode.GUID = t.guid
 	props.EnableFlags = t.kernelEventFlags
@@ -318,6 +336,24 @@ func (t *KernelTrace) Start() error {
 		t.name,
 		props,
 	)
+	if err != nil {
+		if errors.Is(err, errs.ErrTraceAlreadyRunning) {
+			log.Debugf("%s trace is already running. Trying to restart...", t.Name())
+			if err := t.Stop(); err != nil {
+				return err
+			}
+			time.Sleep(time.Millisecond * 100)
+
+			props = initEventTraceProps(t.config.EventSource)
+			props.Wnode.GUID = t.guid
+			props.EnableFlags = t.kernelEventFlags
+
+			t.controlHandle, err = etw.StartTrace(
+				t.name,
+				props,
+			)
+		}
+	}
 	if err != nil {
 		return err
 	}
@@ -337,12 +373,14 @@ func (t *KernelTrace) Start() error {
 		log.Warnf("unable to set empty system flags: %v", err)
 		return nil
 	}
+
 	// enable stack enrichment
-	if t.config.ProbeConfig.StackEnrichment {
+	if t.config.EventSource.StackEnrichment {
 		if err := etw.EnableStackTracing(handle, t.stackExtensions.EventIds()); err != nil {
 			return fmt.Errorf("fail to enable kernel callstack tracing: %v", err)
 		}
 	}
+
 	// call again to enable all kernel events
 	sysTraceFlags[0] = t.kernelEventFlags
 	return etw.SetTraceSystemFlags(handle, sysTraceFlags)
@@ -359,7 +397,7 @@ func (t *UserTrace) Start() error {
 		return fmt.Errorf("trace name [%s] is too long", t.name)
 	}
 
-	props := initEventTraceProps(t.config.ProbeConfig)
+	props := initEventTraceProps(t.config.EventSource)
 
 	log.Debug("starting user trace session")
 
@@ -368,6 +406,20 @@ func (t *UserTrace) Start() error {
 		t.name,
 		props,
 	)
+	if err != nil {
+		if errors.Is(err, errs.ErrTraceAlreadyRunning) {
+			log.Debugf("%s trace is already running. Trying to restart...", t.Name())
+			if err := t.Stop(); err != nil {
+				return err
+			}
+			time.Sleep(time.Millisecond * 100)
+			props = initEventTraceProps(t.config.EventSource)
+			t.controlHandle, err = etw.StartTrace(
+				t.name,
+				props,
+			)
+		}
+	}
 	if err != nil {
 		return err
 	}
@@ -416,7 +468,7 @@ func (t *UserTrace) CaptureState() error {
 // initEventTraceProps builds the trace properties descriptor which
 // influences the behaviour of event publishing to the trace session
 // buffers.
-func initEventTraceProps(c config.ProbeConfig) etw.EventTraceProperties {
+func initEventTraceProps(c config.EventSourceConfig) etw.EventTraceProperties {
 	bufferSize := min(c.BufferSize, maxBufferSize)
 
 	// validate min/max buffers. The minimal

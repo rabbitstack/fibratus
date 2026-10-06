@@ -56,34 +56,48 @@ var (
 // EventSourceConfig stores different configuration options for fine-tuning the event source.
 type EventSourceConfig struct {
 	BaseEventSourceConfig
+
 	// EnableThreadEvents indicates if thread events are collected by the ETW provider.
 	EnableThreadEvents bool `json:"enable-thread" yaml:"enable-thread"`
+
 	// EnableRegistryEvents indicates if registry events are collected by the ETW provider.
 	EnableRegistryEvents bool `json:"enable-registry" yaml:"enable-registry"`
+
 	// EnableNetEvents determines whether network (TCP/UDP) events are collected by the ETW provider.
 	EnableNetEvents bool `json:"enable-net" yaml:"enable-net"`
+
 	// EnableFileIOEvents indicates if file I/O events are collected by the ETW provider.
 	EnableFileIOEvents bool `json:"enable-fileio" yaml:"enable-fileio"`
+
 	// EnableVAMapEvents indicates if VA map/unmap events are collected by the ETW provider.
 	EnableVAMapEvents bool `json:"enable-vamap" yaml:"enable-vamap"`
+
 	// EnableModuleEvents indicates if module events are collected by the ETW provider.
 	EnableModuleEvents bool `json:"enable-image" yaml:"enable-module"`
+
 	// EnableMemEvents indicates whether memory manager events are enabled.
 	EnableMemEvents bool `json:"enable-memory" yaml:"enable-memory"`
+
 	// EnableAuditAPIEvents indicates if kernel audit API calls events are enabled
 	EnableAuditAPIEvents bool `json:"enable-audit-api" yaml:"enable-audit-api"`
+
 	// EnableDNSEvents indicates if DNS client events are enabled
 	EnableDNSEvents bool `json:"enable-dns" yaml:"enable-dns"`
+
 	// StackEnrichment indicates if stack enrichment is enabled for eligible events.
 	StackEnrichment bool `json:"stack-enrichment" yaml:"stack-enrichment"`
+
 	// BufferSize represents the amount of memory allocated for each event tracing session buffer, in kilobytes.
 	// The buffer size affects the rate at which buffers fill and must be flushed (small buffer size requires
 	// less memory, but it increases the rate at which buffers must be flushed).
 	BufferSize uint32 `json:"buffer-size" yaml:"buffer-size"`
+
 	// MinBuffers determines the minimum number of buffers allocated for the event tracing session's buffer pool.
 	MinBuffers uint32 `json:"min-buffers" yaml:"min-buffers"`
+
 	// MaxBuffers is the maximum number of buffers allocated for the event tracing session's buffer pool.
 	MaxBuffers uint32 `json:"max-buffers" yaml:"max-buffers"`
+
 	// FlushTimer specifies how often the trace buffers are forcibly flushed.
 	FlushTimer time.Duration `json:"flush-interval" yaml:"flush-interval"`
 }

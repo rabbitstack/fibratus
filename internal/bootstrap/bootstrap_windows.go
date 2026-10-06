@@ -25,7 +25,6 @@ import (
 	"errors"
 	"os"
 
-	"github.com/rabbitstack/fibratus/internal/evasion"
 	"github.com/rabbitstack/fibratus/pkg/aggregator"
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	"github.com/rabbitstack/fibratus/pkg/api"
@@ -35,6 +34,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/filter"
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/handle"
+	"github.com/rabbitstack/fibratus/pkg/probe"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/rules"
 	"github.com/rabbitstack/fibratus/pkg/symbolize"
@@ -43,7 +43,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/util/signals"
 	"github.com/rabbitstack/fibratus/pkg/util/signature"
 	"github.com/rabbitstack/fibratus/pkg/util/version"
-	"github.com/rabbitstack/fibratus/pkg/yara"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
 )
@@ -57,7 +56,7 @@ var ErrAlreadyRunning = errors.New("an instance of Fibratus process is already r
 // to the output sinks.
 type App struct {
 	config     *config.Config
-	evs        *EventSourceControl
+	probe      *probe.Probe
 	symbolizer *symbolize.Symbolizer
 	engine     *rules.Engine
 	hsnap      handle.Snapshotter
@@ -167,16 +166,19 @@ func NewApp(cfg *config.Config, options ...Option) (*App, error) {
 		log.Info("rule engine is disabled")
 	}
 
-	evs := NewEventSourceControl(psnap, hsnap, cfg, rs)
-
 	server, err := api.NewServer(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	probe, err := probe.New(context.Background(), psnap, cfg)
 	if err != nil {
 		return nil, err
 	}
 
 	app := &App{
 		config:  cfg,
-		evs:     evs,
+		probe:   probe,
 		engine:  engine,
 		hsnap:   hsnap,
 		psnap:   psnap,
@@ -192,9 +194,6 @@ func NewApp(cfg *config.Config, options ...Option) (*App, error) {
 // spin up a filament or set up the aggregator to start forwarding events
 // to the rule engine and output sinks.
 func (f *App) Run(args []string) error {
-	if f.evs == nil {
-		panic("event source is nil")
-	}
 	cfg := f.config
 
 	if !f.isSingleInstance() {
@@ -206,14 +205,16 @@ func (f *App) Run(args []string) error {
 
 	// build the filter from the CLI argument. If we got
 	// a valid expression the filter is attached to the
-	// event consumer
+	// the eval event handler
 	fltr, err := filter.NewFromCLI(args, cfg)
 	if err != nil {
 		return err
 	}
-	if fltr != nil {
-		f.evs.SetFilter(fltr)
+
+	if err := f.probe.Init(); err != nil {
+		return err
 	}
+
 	// user can either instruct to bootstrap a filament or
 	// start a regular run. We'll set up the corresponding
 	// components accordingly to what we got from the CLI options.
@@ -230,54 +231,52 @@ func (f *App) Run(args []string) error {
 			return err
 		}
 		if f.filament.Filter() != nil {
-			f.evs.SetFilter(f.filament.Filter())
+			//f.evs.SetFilter(f.filament.Filter())
 		}
-		err = f.evs.Open(cfg)
-		if err != nil {
-			return multierror.Wrap(err, f.evs.Close())
-		}
+
 		// load alert senders so emitting alerts is possible from filaments
 		err = alertsender.LoadAll(cfg.Alertsenders)
 		if err != nil {
 			log.Warnf("couldn't load alertsenders: %v", err)
 		}
+
 		go func() {
-			err = f.filament.Run(f.evs.Events(), f.evs.Errors())
-			if err != nil {
-				log.Errorf("filament failed: %v", err)
-				f.stop()
-			}
+			// err = f.filament.Run(f.evs.Events(), f.evs.Errors())
+			// if err != nil {
+			// 	log.Errorf("filament failed: %v", err)
+			// 	f.stop()
+			// }
 		}()
 	} else {
-		// register stack symbolizer
+		// add symbolizer event handler
 		if cfg.EventSource.StackEnrichment {
-			f.symbolizer = symbolize.NewSymbolizer(symbolize.NewDebugHelpResolver(cfg), f.psnap, cfg, false)
-			f.evs.RegisterEventListener(f.symbolizer)
+			f.symbolizer = symbolize.NewSymbolizer(symbolize.NewDebugHelpResolver(cfg), f.psnap, cfg)
+			f.probe.AddEventHandler(f.symbolizer)
 		}
 		// register evasion scanner
 		if cfg.Evasion.Enabled {
-			f.evs.RegisterEventListener(evasion.NewScanner(cfg.Evasion))
+			//f.evs.RegisterEventListener(evasion.NewScanner(cfg.Evasion))
 		}
+		// add filter eval event handler
+		if fltr != nil {
+			f.probe.AddEventHandler(filter.NewEvalEventHandler(fltr))
+		}
+
 		// register rule engine
 		if f.engine != nil {
-			f.evs.RegisterEventListener(f.engine)
+			//	f.evs.RegisterEventListener(f.engine)
 		}
 		// register YARA scanner
 		if cfg.Yara.Enabled {
-			scanner, err := yara.NewScanner(f.psnap, cfg.Yara)
-			if err != nil {
-				return err
-			}
-			f.evs.RegisterEventListener(scanner)
+			// scanner, err := yara.NewScanner(f.psnap, cfg.Yara)
+			// if err != nil {
+			// 	return err
+			// }
+			//f.evs.RegisterEventListener(scanner)
 		}
-		err = f.evs.Open(cfg)
-		if err != nil {
-			return multierror.Wrap(err, f.evs.Close())
-		}
-		// set up the aggregator that forwards events to outputs
+
+		// set up the aggregator consuimer that forwards events to output sinks
 		f.agg, err = aggregator.NewBuffered(
-			f.evs.Events(),
-			f.evs.Errors(),
 			cfg.Aggregator,
 			cfg.Output,
 			cfg.Transformers,
@@ -286,42 +285,45 @@ func (f *App) Run(args []string) error {
 		if err != nil {
 			return err
 		}
+		f.probe.AddEventConsumer(f.agg)
 	}
+
 	f.server.Start()
-	return nil
+
+	return f.probe.Start()
 }
 
 // WriteCapture writes the event stream to the capture file.
 func (f *App) WriteCapture(args []string) error {
-	if f.evs == nil {
-		panic("event source is nil")
-	}
+	// if f.evs == nil {
+	// 	panic("event source is nil")
+	// }
 
-	if !f.isSingleInstance() {
-		return ErrAlreadyRunning
-	}
+	// if !f.isSingleInstance() {
+	// 	return ErrAlreadyRunning
+	// }
 
-	fltr, err := filter.NewFromCLI(args, f.config)
-	if err != nil {
-		return err
-	}
-	if fltr != nil {
-		f.evs.SetFilter(fltr)
-	}
-	err = f.evs.Open(f.config)
-	if err != nil {
-		return err
-	}
-	f.writer, err = cap.NewWriter(f.config.CapFile, f.psnap, f.hsnap)
-	if err != nil {
-		return err
-	}
-	errsChan := f.writer.Write(f.evs.Events(), f.evs.Errors())
-	go func() {
-		for err := range errsChan {
-			log.Warnf("fail to write event to capture: %v", err)
-		}
-	}()
+	// fltr, err := filter.NewFromCLI(args, f.config)
+	// if err != nil {
+	// 	return err
+	// }
+	// if fltr != nil {
+	// 	f.evs.SetFilter(fltr)
+	// }
+	// err = f.evs.Open(f.config)
+	// if err != nil {
+	// 	return err
+	// }
+	// f.writer, err = cap.NewWriter(f.config.CapFile, f.psnap, f.hsnap)
+	// if err != nil {
+	// 	return err
+	// }
+	// errsChan := f.writer.Write(f.evs.Events(), f.evs.Errors())
+	// go func() {
+	// 	for err := range errsChan {
+	// 		log.Warnf("fail to write event to capture: %v", err)
+	// 	}
+	// }()
 
 	f.server.Start()
 
@@ -369,18 +371,16 @@ func (f *App) ReadCapture(ctx context.Context, args []string) error {
 		}
 		// use the channels where events are read
 		// from the capture as aggregator source
-		evts, errs := f.reader.Read(ctx)
-		f.agg, err = aggregator.NewBuffered(
-			evts,
-			errs,
-			f.config.Aggregator,
-			f.config.Output,
-			f.config.Transformers,
-			f.config.Alertsenders,
-		)
-		if err != nil {
-			return err
-		}
+		// _, errs := f.reader.Read(ctx)
+		// f.agg, err = aggregator.NewBuffered(
+		// 	f.config.Aggregator,
+		// 	f.config.Output,
+		// 	f.config.Transformers,
+		// 	f.config.Alertsenders,
+		// )
+		// if err != nil {
+		// 	return err
+		// }
 	}
 	f.server.Start()
 	return nil
@@ -399,11 +399,14 @@ func (f *App) Shutdown() error {
 	if f.symbolizer != nil {
 		f.symbolizer.Close()
 	}
-	if f.evs != nil {
-		if err := f.evs.Close(); err != nil {
-			errs = append(errs, err)
-		}
+	if f.probe != nil {
+		f.probe.Close()
 	}
+	// if f.evs != nil {
+	// 	if err := f.evs.Close(); err != nil {
+	// 		errs = append(errs, err)
+	// 	}
+	// }
 	if f.hsnap != nil {
 		if err := f.hsnap.Close(); err != nil {
 			errs = append(errs, err)

@@ -63,7 +63,7 @@ var (
 	macrosPaths = []string{filepath.Join(rulesDir(), "Macros", "*")}
 
 	// apiTransport defines the default transport protocol for the API server
-	apiTransport = "http://localhost:8482"
+	apiTransport = "localhost:8482"
 )
 
 // Config exposes the platform configuration options.
