@@ -20,6 +20,7 @@ package event
 
 import (
 	"fmt"
+	"maps"
 	"strings"
 	"sync"
 	"time"
@@ -118,6 +119,78 @@ func (e *Event) Subcategory() Subcategory {
 // Description is the short explanation that describes the purpose of the event.
 func (e *Event) Description() string {
 	return table[e.Type].Description
+}
+
+// Reset clears the event for reuse while keeping the backing arrays where possible.
+func (e *Event) Reset() {
+	e.Seq = 0
+	e.Timestamp = time.Time{}
+	e.PID, e.Tid, e.Evasions, e.CPU = 0, 0, 0, 0
+	e.Type = 0
+	e.Host = ""
+	clear(e.Params)
+	clear(e.Metadata)
+	e.PS = nil
+	clear(e.Callstack)
+	e.Callstack = e.Callstack[:0]
+}
+
+// MoveFrom transfers the content of src into e without copying the heavy
+// fields: slices and the map are swapped, so src is left holding e's previous
+// (empty) backing storage and can be reused as a ring slot immediately.
+//
+// e must have been Reset (or be freshly allocated). src is left in a reset
+// state with respect to every field that can pin memory.
+func (e *Event) MoveFrom(src *Event) {
+	e.Seq, e.Timestamp = src.Seq, src.Timestamp
+	e.PID, e.Tid, e.Evasions, e.CPU = src.PID, src.Tid, src.Evasions, src.CPU
+	e.Type = src.Type
+	e.Host = src.Host
+	e.PS = src.PS
+
+	e.Params, src.Params = src.Params, e.Params
+	e.Callstack, src.Callstack = src.Callstack, e.Callstack[:0]
+	e.Metadata, src.Metadata = src.Metadata, e.Metadata
+	if len(src.Metadata) != 0 { // dst was not reset: don't leak its tags into the slot
+		clear(src.Metadata)
+	}
+
+	src.PS = nil
+	src.Host = ""
+}
+
+// Clone returns a deep copy that is safe to retain after the pipeline has
+// recycled the original (sequence rules, async sinks, anything that outlives
+// the handler call). PS is shared by design as it belongs to the state store.
+func (e *Event) Clone() *Event {
+	c := &Event{
+		Seq:       e.Seq,
+		Timestamp: e.Timestamp,
+		PID:       e.PID,
+		Tid:       e.Tid,
+		Evasions:  e.Evasions,
+		Type:      e.Type,
+		CPU:       e.CPU,
+		Host:      e.Host,
+		PS:        e.PS,
+	}
+
+	if len(e.Params) > 0 {
+		c.Params = make(map[string]*Param, len(e.Params))
+		maps.Copy(c.Params, e.Params)
+	}
+
+	if len(e.Callstack) > 0 {
+		c.Callstack = append(make([]callstack.Frame, 0, len(e.Callstack)), e.Callstack...)
+	}
+
+	e.mmux.RLock()
+	if len(e.Metadata) > 0 {
+		c.Metadata = make(map[MetadataKey]any, len(e.Metadata))
+		maps.Copy(c.Metadata, e.Metadata)
+	}
+	e.mmux.RUnlock()
+	return c
 }
 
 // String returns event's string representation.

@@ -63,7 +63,7 @@ func New(rec *etw.EventRecord) *Event {
 		Tid:       tid,
 		CPU:       cpu,
 		Type:      TypeFromEventRecord(rec),
-		Params:    make(map[string]*Param),
+		Params:    make(map[string]*Param, 10),
 		Timestamp: ts,
 		Host:      hostname.Get(),
 	}
@@ -72,6 +72,26 @@ func New(rec *etw.EventRecord) *Event {
 	e.adjustPID()
 
 	return e
+}
+
+func (e *Event) Parse(rec *etw.EventRecord) {
+	var (
+		pid = rec.Header.ProcessID
+		tid = rec.Header.ThreadID
+		cpu = *(*uint8)(unsafe.Pointer(&rec.BufferContext.ProcessorIndex[0]))
+		ts  = filetime.ToEpoch(rec.Header.Timestamp)
+	)
+
+	e.PID = pid
+	e.Tid = tid
+	e.CPU = cpu
+	e.Type = TypeFromEventRecord(rec)
+	e.Timestamp = ts
+	e.Host = hostname.Get()
+	e.Params = make(map[string]*Param, 10)
+
+	e.decodeParams(rec)
+	e.adjustPID()
 }
 
 // NewWithParams constructs a new event with an optional parameter list.

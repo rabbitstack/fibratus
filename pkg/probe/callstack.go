@@ -91,25 +91,6 @@ type callstackLinker struct {
 	probe *Probe
 }
 
-// newCallstackLinker creates a new callstack linker which receives
-// the downstream event queue. Events that outlive the maximum stack
-// wait period are evicted to the queue without the callstack.
-func newCallstackLinker(probe *Probe) *callstackLinker {
-	l := &callstackLinker{
-		probe:        probe,
-		buckets:      make(map[uint64]*event.Event),
-		procs:        make(map[uint32]*event.Event),
-		reservations: make(map[uint64]reservedStack),
-		stacks:       make(map[uint64]reservedStack),
-		flusher:      time.NewTicker(evictInterval),
-		done:         make(chan struct{}),
-	}
-
-	go l.flushLoop()
-
-	return l
-}
-
 // Put registers an event that is eligible for stack enrichment. If its
 // stack walk has already arrived the callstack is attached and the event
 // is returned for publishing. Otherwise, the event is parked until splice
@@ -147,7 +128,7 @@ func (l *callstackLinker) put(e *event.Event) *event.Event {
 	}
 
 	// park the event indexed by timestamp
-	l.buckets[ts] = e
+	l.buckets[ts] = e.Clone()
 
 	return nil
 }

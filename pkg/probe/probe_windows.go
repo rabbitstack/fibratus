@@ -21,6 +21,7 @@ package probe
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -36,6 +37,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/filter"
 	"github.com/rabbitstack/fibratus/pkg/fs"
+	"github.com/rabbitstack/fibratus/pkg/pipeline"
 	"github.com/rabbitstack/fibratus/pkg/ps"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
@@ -43,8 +45,6 @@ import (
 	"golang.org/x/sys/windows"
 
 	log "github.com/sirupsen/logrus"
-
-	"github.com/smarty/go-disruptor"
 )
 
 const maxEnqueuedIORequests = 200
@@ -78,6 +78,8 @@ type Probe struct {
 	cancelFunc context.CancelFunc
 
 	errs chan error
+
+	pipeline *pipeline.Pipeline
 
 	linker *callstackLinker
 }
@@ -197,16 +199,16 @@ func (p *Probe) Start() error {
 	p.wg.Add(1)
 	go func() {
 		defer p.wg.Done()
-		p.userTrace.Process(func(r *etw.EventRecord) error {
-			return p.processEvent(r)
+		p.userTrace.Process(func(rec *etw.EventRecord) error {
+			return p.processEvent(0, rec)
 		}, p.errs)
 	}()
 
 	p.wg.Add(1)
 	go func() {
 		defer p.wg.Done()
-		p.kernelTrace.Process(func(r *etw.EventRecord) error {
-			return p.processEvent(r)
+		p.kernelTrace.Process(func(rec *etw.EventRecord) error {
+			return p.processEvent(1, rec)
 		}, p.errs)
 	}()
 
@@ -240,7 +242,7 @@ func (p *Probe) Start() error {
 	p.wg.Add(1)
 	go func() {
 		defer p.wg.Done()
-		p.disruptor.Listen()
+		p.pipeline.Start()
 	}()
 
 	for _, pc := range p.consumers {
@@ -277,9 +279,7 @@ func (p *Probe) Close() error {
 		errs = append(errs, err)
 	}
 
-	if err := p.disruptor.Close(); err != nil {
-		errs = append(errs, err)
-	}
+	p.pipeline.Close()
 	p.linker.close()
 
 	p.cancelFunc()
@@ -292,7 +292,7 @@ func (p *Probe) Close() error {
 // producer. Depending on the event type, the record is either committed to the
 // ring buffer, parked until a related event arrives, used for state management
 // or discarded.
-func (p *Probe) processEvent(rec *etw.EventRecord) error {
+func (p *Probe) processEvent(sessionID int, rec *etw.EventRecord) error {
 	eventType := event.TypeFromEventRecord(rec)
 
 	if p.config.EventSource.HasDropType(eventType) {
@@ -301,43 +301,60 @@ func (p *Probe) processEvent(rec *etw.EventRecord) error {
 
 	switch eventType {
 	case event.CreateFile:
-		return p.initIORequest(rec)
+		//return p.initIORequest(rec)
+		return nil
 	case event.CloseFile:
 		object := rec.ReadUint64(8)
 		delete(p.filePathResolver, object)
+		return nil
 	case event.FileRundown:
 		object := rec.ReadUint64(0)
 		path := rec.ConsumeUTF16String(8)
 		p.filePathResolver[object] = FileInfo{Path: path, Type: fs.GetFileType(path, 0)}
+		return nil
 	case event.DeleteFile, event.SetFileInformation, event.RenameFile, event.EnumDirectory, event.ReadFile, event.WriteFile:
-		return p.resolveFilePointerPath(rec)
+		//return p.resolveFilePointerPath(rec)
+		return nil
 	case event.MapViewOfSection, event.UnmapViewOfSection, event.MapViewSectionRundown:
-		return p.resolveFilePointerPath(rec)
+		//return p.resolveFilePointerPath(rec)
 	case event.StackWalk:
-		p.processStackWalk(rec)
+		//p.processStackWalk(rec)
+		return nil
 	case event.FileOpEnd:
 		return p.completeIORequest(rec)
 	case event.RegKCBRundown, event.RegCreateKCB:
 		kcb := rec.ReadUint64(16)
 		path := rec.ConsumeUTF16String(24)
+
 		p.kcbLock.Lock()
+		defer p.kcbLock.Unlock()
 		p.kcbPathResolver[kcb] = path
-		p.kcbLock.Unlock()
+		return nil
 	case event.RegDeleteKCB:
 		kcb := rec.ReadUint64(16)
 		p.kcbLock.Lock()
+		defer p.kcbLock.Unlock()
 		delete(p.kcbPathResolver, kcb)
-		p.kcbLock.Unlock()
+		return nil
 	case event.RegOpenKey:
 		// allow/deny
-		p.ringCommit(event.New(rec))
+		//p.ringCommit(event.New(rec))
 	case event.OpenProcess, event.OpenThread:
-		return p.ringCommit(event.New(rec))
+		//return p.ringCommit(event.New(rec))
 	case event.Unknown:
 		return nil
-	default:
-		return p.ringCommit(event.New(rec))
 	}
+
+	producer := p.pipeline.Producer(sessionID)
+
+	event := producer.Acquire(eventType)
+	if event == nil {
+		fmt.Println("shed")
+		return nil
+	}
+	event.Parse(rec)
+
+	producer.Publish()
 
 	return nil
 }
@@ -368,6 +385,7 @@ func (p *Probe) completeIORequest(rec *etw.EventRecord) error {
 		// Inherit caller's create disposition
 	} else {
 		disposition = uint32(rec.ReadUint64(8))
+		disposition |= 2
 	}
 
 	// Dequeue the pending I/O packet
@@ -388,12 +406,13 @@ func (p *Probe) completeIORequest(rec *etw.EventRecord) error {
 	opts &= 0xFFFFFF
 	p.filePathResolver[object] = FileInfo{Path: path, Type: fs.GetFileType(path, opts)}
 
-	evt := event.NewWithParams(
-		req.rec,
-		&event.Param{Name: params.NTStatus, Type: params.Status, Value: status},
-		&event.Param{Name: params.FileOperation, Type: params.Enum, Value: disposition, Enum: fs.FileCreateDispositions},
-	)
-	return p.ringCommit(evt)
+	// evt := event.NewWithParams(
+	// 	req.rec,
+	// 	&event.Param{Name: params.NTStatus, Type: params.Status, Value: status},
+	// 	&event.Param{Name: params.FileOperation, Type: params.Enum, Value: disposition, Enum: fs.FileCreateDispositions},
+	// )
+	return nil
+	//return p.ringCommit(evt)
 }
 
 // resolveFilePointerToPath tries FileObject first  as authoritative, always populated on Create/
@@ -428,12 +447,14 @@ func (p *Probe) resolveFilePointerPath(rec *etw.EventRecord) error {
 		file, _ = p.fcbPathResolver.Get(key)
 	}
 
-	evt := event.NewWithParams(
-		rec,
-		&event.Param{Name: params.FilePath, Type: params.Path, Value: file.Path},
-		&event.Param{Name: params.FileType, Type: params.Enum, Value: uint32(file.Type), Enum: fs.FileTypes},
-	)
-	return p.ringCommit(evt)
+	// evt := event.NewWithParams(
+	// 	rec,
+	// 	&event.Param{Name: params.FilePath, Type: params.Path, Value: file.Path},
+	// 	&event.Param{Name: params.FileType, Type: params.Enum, Value: uint32(file.Type), Enum: fs.FileTypes},
+	// )
+	return nil
+	//return evt
+	//return p.ringCommit(evt)
 }
 
 // resolveKCBPath obeys a straightforward algorithm to connect relative
@@ -531,22 +552,22 @@ func (p *Probe) handleEvent(evt *event.Event) error {
 	}
 
 	if p.config.EventSource.StackEnrichment && evt.Type.WaitStack() {
-		if event := p.linker.put(evt); event != nil {
-			return p.dispatchEvent(event)
-		}
+		// if event := p.linker.put(evt); event != nil {
+		// 	return p.dispatchEvent(event)
+		// }
 	}
 
 	return p.dispatchEvent(evt)
 }
 
 func (p *Probe) dispatchEvent(evt *event.Event) error {
-	if err := p.sendEventToHandlers(evt); err != nil {
-		return err
-	}
+	// if err := p.sendEventToHandlers(evt); err != nil {
+	// 	return err
+	// }
 
-	if err := p.sendEventToConsumers(evt); err != nil {
-		return err
-	}
+	// if err := p.sendEventToConsumers(evt); err != nil {
+	// 	return err
+	// }
 
 	return nil
 }
@@ -648,20 +669,11 @@ readValue:
 	// }
 }
 
-func (p *Probe) Handle(lower, upper int64) {
-	for seq := lower; seq <= upper; seq++ {
-		idx := seq & ringMask
-		e := p.ring[idx]
-
-		// Remove the reference from the ring as soon as we're done
-		// with the event.
-		p.ring[idx] = nil
-
-		if err := p.handleEvent(e); err != nil {
-			select {
-			case p.errs <- err:
-			default:
-			}
+func (p *Probe) Handle(evt *event.Event) {
+	if err := p.handleEvent(evt); err != nil {
+		select {
+		case p.errs <- err:
+		default:
 		}
 	}
 }
@@ -685,17 +697,31 @@ func New(ctx context.Context, psnap ps.Snapshotter, config *config.Config) (*Pro
 		enqueuedRegSetValues: expirable.NewLRU[setValueKey, *event.Event](50, nil, time.Second*5),
 	}
 
+	pipeConfig := pipeline.DefaultConfig(2)
+	pipeConfig.RingSize = 1 << 16 / 2
+	pipeConfig.IdleTimeout = time.Hour // keep the example independent of wall-clock timing
+	//pipeConfig.Classify = classify
+	pipeConfig.Handler = p
+
 	var err error
-	p.disruptor, err = disruptor.New(
-		disruptor.Options.BufferCapacity(ringCapacity),
-		disruptor.Options.WriterCount(2), // two session threads write concurrently
-		disruptor.Options.NewHandlerGroup(p),
-	)
+	p.pipeline, err = pipeline.New(pipeConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	p.linker = newCallstackLinker(p)
+	if config.EventSource.StackEnrichment {
+		p.linker = &callstackLinker{
+			probe:        p,
+			buckets:      make(map[uint64]*event.Event),
+			procs:        make(map[uint32]*event.Event),
+			reservations: make(map[uint64]reservedStack),
+			stacks:       make(map[uint64]reservedStack),
+			flusher:      time.NewTicker(evictInterval),
+			done:         make(chan struct{}),
+		}
+
+		go p.linker.flushLoop()
+	}
 
 	return p, nil
 }

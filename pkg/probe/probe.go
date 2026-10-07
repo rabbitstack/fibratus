@@ -25,7 +25,6 @@ import (
 	"sync/atomic"
 
 	"github.com/rabbitstack/fibratus/pkg/event"
-	"github.com/smarty/go-disruptor"
 )
 
 const (
@@ -60,10 +59,6 @@ type PlatformProbe struct {
 	consumers      []*EventConsumer
 	eventHandlers  []EventHandler                       // listen all events
 	eventConsumers [event.MaxEvent + 1][]*EventConsumer // listen all or specific events
-
-	disruptor disruptor.Disruptor
-
-	ring [ringCapacity]*event.Event
 }
 
 // AddEventConsumer sets a probe event consumer
