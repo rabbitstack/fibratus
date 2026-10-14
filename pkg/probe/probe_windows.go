@@ -24,7 +24,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"sync"
 	"time"
 	"unsafe"
@@ -41,6 +40,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
+	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
 
 	log "github.com/sirupsen/logrus"
@@ -58,9 +58,7 @@ type Probe struct {
 
 	filePathResolver map[uint64]FileInfo              // maps file object pointer to file info
 	fcbPathResolver  *expirable.LRU[uint64, FileInfo] // maps FCB (File Control Block) pointer to file info
-
-	kcbPathResolver map[uint64]string // maps KCB (Key Control Block) pointer to registry path
-	kcbLock         sync.RWMutex
+	kcbPathResolver  map[uint64]string                // maps KCB (Key Control Block) pointer to registry path
 
 	// stores pending I/O request packets
 	enqueuedIORequests map[uint64]ioRequest
@@ -161,10 +159,16 @@ func (p *Probe) Init() error {
 	// modified value. This data is used to attach various parameters
 	// to the RegSetValue event published by the NT Kernel Logger
 	if p.config.EventSource.EnableRegistryEvents {
-		p.userTrace.AddProvider(etw.WindowsKernelRegistryGUID, libetw.WithKeywords(etw.SetValueKeyword), libetw.WithEventFilterDescriptors(etw.EventFilterDescriptor{
-			Ptr:  uintptr(unsafe.Pointer(&etw.CaptureRegistryValue)),
+		// p.userTrace.AddProvider(etw.WindowsKernelRegistryGUID, libetw.WithKeywords(etw.SetValueKeyword), libetw.WithEventFilterDescriptors(etw.EventFilterDescriptor{
+		// 	Ptr:  uintptr(unsafe.Pointer(&etw.CaptureRegistryValue)),
+		// 	Size: 4,
+		// }))
+		val := 0x2
+		eventFilterDescriptor := etw.EventFilterDescriptor{
+			Ptr:  uintptr(unsafe.Pointer(&val)),
 			Size: 4,
-		}))
+		}
+		p.userTrace.AddProvider(etw.WindowsKernelRegistryGUID, libetw.WithKeywords(etw.SetValueKeyword), libetw.WithEventFilterDescriptors(eventFilterDescriptor))
 	}
 
 	if p.config.EventSource.EnableDNSEvents {
@@ -300,7 +304,9 @@ func (p *Probe) Close() error {
 // or discarded.
 func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecord) error {
 	eventType := event.TypeFromEventRecord(rec)
-
+	if eventType == event.RegSetValueInternal {
+		panic(rec)
+	}
 	if p.config.EventSource.HasDropType(eventType) {
 		return nil
 	}
@@ -319,40 +325,31 @@ func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecor
 		return nil
 	case event.StackWalk:
 		var (
-			ts  = rec.ReadUint64(0)
-			pid = rec.ReadUint32(8)
-			tid = rec.ReadUint32(12)
-			//callstack va.Callstack = rec.ReadCallstackInto(16, va.GetCallstack())
-			callstack = rec.ReadCallstack(16)
+			ts        = rec.ReadUint64(0)
+			pid       = rec.ReadUint32(8)
+			tid       = rec.ReadUint32(12)
+			callstack = rec.ReadCallstackInto(16, va.GetCallstack())
 		)
-
 		// Links the callstack carried by a StackWalk event with the
 		// event that triggered it. If the CreateFile event is still
 		// pending, it claims the callstack when it is published to
 		// the ring buffer
 		if p.isIOEnqueued(ts) {
 			p.linker.reserve(ts, pid, tid, callstack)
-			//callstack.ReleasePool()
 			return nil
 		}
 		p.linker.Link(ts, pid, tid, callstack)
-		//callstack.ReleasePool()
 		return nil
 	case event.RegKCBRundown, event.RegCreateKCB:
 		kcb := rec.ReadUint64(16)
 		path := rec.ConsumeUTF16String(24)
-
-		p.kcbLock.Lock()
-		defer p.kcbLock.Unlock()
 		p.kcbPathResolver[kcb] = path
 		return nil
 	case event.RegDeleteKCB:
 		kcb := rec.ReadUint64(16)
-		p.kcbLock.Lock()
-		defer p.kcbLock.Unlock()
 		delete(p.kcbPathResolver, kcb)
 		return nil
-	case event.RegOpenKey:
+	case event.RegOpenKey, event.RegQueryKey:
 
 	case event.OpenProcess, event.OpenThread:
 
@@ -372,13 +369,32 @@ func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecor
 		return nil
 	case event.MapViewOfSection, event.UnmapViewOfSection, event.MapViewSectionRundown, event.DeleteFile, event.SetFileInformation, event.RenameFile, event.EnumDirectory, event.ReadFile, event.WriteFile:
 		fileinfo, found := p.resolveFileInfo(rec)
+		evt, producer, err := p.pipeline.AcquireEvent(producerID, eventType)
+		if err != nil {
+			return err
+		}
+		evt.Parse(rec)
+		if found {
+			evt.AppendParam(params.FilePath, params.Path, fileinfo.Path)
+			evt.AppendEnum(params.FileType, uint32(fileinfo.Type), fs.FileTypes)
+		}
+		producer.Publish()
+		return nil
+	case event.RegOpenKey, event.RegCreateKey, event.RegDeleteKey, event.RegQueryKey, event.RegQueryValue, event.RegSetValue, event.RegDeleteValue:
+		path := p.resolveKCBPath(rec)
+		if path == "" {
+			break
+		}
 
-		return p.publishPipeline(eventType, producerID, rec, func(evt *event.Event) {
-			if found {
-				evt.AppendParam(params.FilePath, params.Path, fileinfo.Path)
-				evt.AppendEnum(params.FileType, uint32(fileinfo.Type), fs.FileTypes)
-			}
-		})
+		evt, producer, err := p.pipeline.AcquireEvent(producerID, eventType)
+		if err != nil {
+			return err
+		}
+		evt.Parse(rec)
+		_ = evt.Params.SetValue(params.RegPath, path)
+
+		producer.Publish()
+		return nil
 	}
 
 	producer := p.pipeline.Producer(producerID)
@@ -387,22 +403,11 @@ func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecor
 		return pipeline.ErrRingNoSlots
 	}
 	evt.Parse(rec)
+	if evt.IsRegSetValueInternal() {
+		panic(evt)
+	}
 
 	producer.Publish()
-
-	return nil
-}
-
-func (p *Probe) publishPipeline(eventType event.Type, producerID pipeline.ProducerID, rec *etw.EventRecord, fn func(*event.Event)) error {
-	producer := p.pipeline.Producer(producerID)
-
-	evt := producer.Acquire(eventType)
-	if evt == nil {
-		return pipeline.ErrRingNoSlots
-	}
-
-	evt.Parse(rec)
-	fn(evt)
 
 	return nil
 }
@@ -453,10 +458,9 @@ func (p *Probe) completeIORequest(producerID pipeline.ProducerID, eventType even
 	}
 
 	// Publish the completed I/O request
-	producer := p.pipeline.Producer(producerID)
-	evt := producer.Acquire(eventType)
-	if evt == nil {
-		return true, pipeline.ErrRingNoSlots
+	evt, producer, err := p.pipeline.AcquireEvent(producerID, eventType)
+	if err != nil {
+		return true, err
 	}
 	evt.Parse(req.rec)
 
@@ -508,16 +512,15 @@ func (p *Probe) resolveFileInfo(rec *etw.EventRecord) (FileInfo, bool) {
 // full key name and don't have to go further resolving the missing part.
 // Otherwise, we have to lookup existing KCBs to try find the matching base
 // key name and concatenate its relative path.
-func (p *Probe) resolveKCBPath(evt *event.Event) string {
-	kcb := evt.Params.MustGetUint64(params.RegKCB)
+func (p *Probe) resolveKCBPath(rec *etw.EventRecord) string {
+	kcb := rec.ReadUint64(16)
 	if kcb == 0 {
 		return ""
 	}
 
-	p.kcbLock.RLock()
-	defer p.kcbLock.RUnlock()
 	if baseKey, exists := p.kcbPathResolver[kcb]; exists {
-		return key.ConcatPaths(baseKey, evt.Params.MustGetString(params.RegPath))
+		path := rec.ConsumeUTF16String(24)
+		return key.ConcatPaths(baseKey, path)
 	}
 
 	return ""
@@ -554,8 +557,8 @@ func (p *Probe) handleEvent(evt *event.Event) error {
 	case event.TerminateThread:
 	case event.LoadModule, event.ModuleRundown, event.LoadModuleInternal:
 	case event.UnloadModule:
-	case event.RegOpenKey, event.RegCreateKey, event.RegDeleteKey, event.RegQueryKey, event.RegQueryValue, event.RegSetValue, event.RegSetValueInternal, event.RegDeleteValue:
-		//p.handleRegEvent(evt)
+	case event.RegSetValue, event.RegSetValueInternal:
+		//p.handleRegSetValue(evt)
 	case event.VirtualAlloc:
 	case event.VirtualFree:
 	case event.Accept, event.Connect, event.Send, event.Recv, event.Reconnect, event.Disconnect, event.Retransmit:
@@ -611,58 +614,51 @@ func (p *Probe) handleCreateProcess(evt *event.Event) error {
 	return nil
 }
 
-func (p *Probe) handleRegEvent(evt *event.Event) {
+func (p *Probe) handleRegSetValue(evt *event.Event) {
 	if evt.IsRegSetValueInternal() {
 		// Park the internal RegSetValue event until the public
 		// RegSetValue event for the same pid/value shows up
 		path := evt.Params.MustGetString(params.RegPath)
 		k := regValueKey{evt.PID, filepath.Base(path)}
-		p.enqueuedRegSetValues.Add(k, evt)
+		panic(k)
+		p.enqueuedRegSetValues.Add(k, evt.Clone())
 		return
 	}
 
-	// Resolve the full KCB path
-	path := p.resolveKCBPath(evt)
-	if path != "" {
-		_ = evt.Params.SetValue(params.RegPath, path)
+	// Returns and removes the parked internal event
+	// matching e, or nil if there is none (or it already expired).
+	// previously stored RegSetValueInternal event
+	// is popped from the queue. RegSetValue can
+	// be enriched with registry value type/data
+	k := regValueKey{evt.PID, filepath.Base("")}
+	e, ok := p.enqueuedRegSetValues.Peek(k)
+	if !ok {
+		// Try to read captured data from userspace
+		//goto readValue
+	}
+	p.enqueuedRegSetValues.Remove(k)
+
+	// Enrich the event with value data/type parameters
+	valueType, err := e.Params.GetUint32(params.RegValueType)
+	if err == nil {
+		evt.AppendEnum(params.RegValueType, valueType, key.RegistryValueTypes)
 	}
 
-	if evt.IsRegSetValue() {
-		// Returns and removes the parked internal event
-		// matching e, or nil if there is none (or it already expired).
-		// previously stored RegSetValueInternal event
-		// is popped from the queue. RegSetValue can
-		// be enriched with registry value type/data
-		k := regValueKey{evt.PID, filepath.Base(path)}
-		e, ok := p.enqueuedRegSetValues.Peek(k)
-		if !ok {
-			// Try to read captured data from userspace
-			goto readValue
-		}
-		p.enqueuedRegSetValues.Remove(k)
-
-		// Enrich the event with value data/type parameters
-		valueType, err := e.Params.GetUint32(params.RegValueType)
-		if err == nil {
-			evt.AppendEnum(params.RegValueType, valueType, key.RegistryValueTypes)
-		}
-
-		valueData, err := e.Params.Get(params.RegData)
-		if err == nil {
-			evt.AppendParam(params.RegData, valueData.Type, valueData.Value)
-		}
-		return
+	valueData, err := e.Params.Get(params.RegData)
+	if err == nil {
+		evt.AppendParam(params.RegData, valueData.Type, valueData.Value)
 	}
+	return
 
-readValue:
-	if !evt.IsRegSetValue() || !evt.IsSuccess() {
+	//readValue:
+	if !evt.IsSuccess() {
 		return
 	}
 
 	// Values within hidden keys cannot be read
-	if strings.HasSuffix(path, "\\") {
-		return
-	}
+	// if strings.HasSuffix(path, "\\") {
+	// 	return
+	// }
 
 	// get the type/value of the registry key and append to parameters
 	// rootkey, subkey := key.Format(path)

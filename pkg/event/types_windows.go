@@ -352,6 +352,11 @@ func TypeFromEventRecord(r *etw.EventRecord) Type {
 		case ThreadRundownID:
 			return ThreadRundown
 		}
+	case RegistryKernelEventGUID.Data1:
+		switch r.Header.EventDescriptor.ID {
+		case RegSetValueInternalID:
+			return RegSetValueInternal
+		}
 	}
 	return Unknown
 }

@@ -60,11 +60,23 @@ type Config struct {
 	// out of timestamp order.
 	Slack time.Duration
 
+	// Lag is the longest an event can sit before it is delivered to the reorderer.
 	Lag time.Duration
 
 	// IdleSleep is the consumer's sleep when it has nothing to do (after a
 	// short spin and a few yields).
 	IdleSleep time.Duration
+
+	// FreeListSize caps how many empty events are kept for reuse. Default
+	// is 4096. 0 means the default, while negative value means unbounded.
+	FreeListSize int
+
+	// RecycleMaxParams and RecycleMaxFrames stop one outlier from pinning
+	// memory forever: a recycled event whose params exceeded RecycleMaxParams
+	// (default 32) or whose call stack capacity exceeds RecycleMaxFrames
+	// (default 64) gives that storage back instead of keeping it.
+	RecycleMaxParams int
+	RecycleMaxFrames int
 
 	Classifier Classifier
 	Handler    Handler
@@ -79,14 +91,17 @@ type Config struct {
 // DefaultConfig returns a configuration to start tuning from.
 func DefaultConfig(producers int) Config {
 	return Config{
-		Producers:  producers,
-		RingSize:   1 << 16,
-		MaxPending: 1 << 16,
-		BatchSize:  256,
-		Lag:        2650 * time.Millisecond,
-		Slack:      100 * time.Millisecond,
-		IdleSleep:  50 * time.Microsecond,
-		Shed:       DefaultShedConfig(),
+		Producers:        producers,
+		RingSize:         1 << 16,
+		MaxPending:       1 << 16,
+		BatchSize:        256,
+		FreeListSize:     4096,
+		Lag:              2650 * time.Millisecond,
+		Slack:            100 * time.Millisecond,
+		IdleSleep:        50 * time.Microsecond,
+		Shed:             DefaultShedConfig(),
+		RecycleMaxParams: 12,
+		RecycleMaxFrames: 64,
 	}
 }
 
@@ -102,6 +117,8 @@ func (c *Config) validate() error {
 		return errors.New("pipeline: BatchSize must be >= 1")
 	case c.Slack < 0 || c.IdleSleep < 0:
 		return errors.New("pipeline: Slack and IdleSleep must be >= 0")
+	case c.Lag < c.Slack:
+		return fmt.Errorf("reorderer lag (%s) must not be smaller than slack (%s)", c.Lag, c.Slack)
 	}
 	if err := c.Shed.validate(); err != nil {
 		return fmt.Errorf("shed config: %w", err)
@@ -113,6 +130,14 @@ func (c *Config) validate() error {
 type Stats struct {
 	Producers []ProducerStats
 	Reorder   ReorderStats
+	Free      FreeStats
+}
+
+// FreeStats describes the event free list.
+type FreeStats struct {
+	Len     int    // empty events currently held for reuse
+	Dropped uint64 // events released to the GC because the list was full
+	Trimmed uint64 // recycled events that gave back oversized params or call stack
 }
 
 // Pipeline owns the rings, the reorderer and the consumer goroutine.
@@ -131,12 +156,28 @@ type Pipeline struct {
 	stop    atomic.Bool
 	done    chan struct{}
 	pending atomic.Int64
+
+	freeLen     atomic.Int64
+	freeDropped atomic.Uint64
+	freeTrimmed atomic.Uint64
 }
 
 // New builds a pipeline. Call Start to launch the consumer.
 func New(cfg Config) (*Pipeline, error) {
 	if err := cfg.validate(); err != nil {
 		return nil, err
+	}
+	switch {
+	case cfg.FreeListSize == 0:
+		cfg.FreeListSize = 4096
+	case cfg.FreeListSize < 0:
+		cfg.FreeListSize = math.MaxInt
+	}
+	if cfg.RecycleMaxParams <= 0 {
+		cfg.RecycleMaxParams = 32
+	}
+	if cfg.RecycleMaxFrames <= 0 {
+		cfg.RecycleMaxFrames = 64
 	}
 	clock := cfg.Clock
 	if clock == nil {
@@ -162,15 +203,21 @@ func New(cfg Config) (*Pipeline, error) {
 
 	p.ro = NewReorderer(cfg.Producers, int64(cfg.Slack), int64(cfg.Lag), cfg.MaxPending)
 
-	p.ro.SetLateHook(func(producerID int, behind, delay int64) {
-		fmt.Println(producerID, behind, delay)
-	})
 	return p, nil
 }
 
 // Producer returns the producer at index i. Hand it to the goroutine that
 // runs that event collection. It must not be shared between goroutines.
 func (p *Pipeline) Producer(i ProducerID) *Producer { return p.prods[i] }
+
+func (p *Pipeline) AcquireEvent(i ProducerID, t event.Type) (*event.Event, *Producer, error) {
+	producer := p.Producer(i)
+	evt := producer.Acquire(t)
+	if evt == nil {
+		return nil, producer, ErrRingNoSlots
+	}
+	return evt, producer, nil
+}
 
 // Start launches the consumer loop. Calling it more than once is a no-op.
 func (p *Pipeline) Start() {
@@ -192,6 +239,7 @@ func (p *Pipeline) Close() {
 func (p *Pipeline) Stats() Stats {
 	s := Stats{Reorder: p.ro.Stats()}
 	s.Reorder.Pending = int(p.pending.Load())
+	s.Free = FreeStats{Len: int(p.freeLen.Load()), Dropped: p.freeDropped.Load(), Trimmed: p.freeTrimmed.Load()}
 	for _, prod := range p.prods {
 		s.Producers = append(s.Producers, prod.Stats())
 	}
@@ -290,10 +338,27 @@ func (p *Pipeline) dispatch(ev *event.Event) {
 	p.handler.Handle(ev)
 
 	ev.Reset()
+	p.recycle(ev, len(ev.Params) > p.cfg.RecycleMaxParams)
+}
 
-	if len(p.free) < 8192 {
-		p.free = append(p.free, ev)
+// recycle returns an empty event to the free list, within the cap, after
+// letting go of storage an outlier grew.
+func (p *Pipeline) recycle(ev *event.Event, bigParams bool) {
+	if len(p.free) >= p.cfg.FreeListSize {
+		p.freeDropped.Add(1)
+		return
 	}
+	trimmed := false
+	if bigParams {
+		ev.Params, trimmed = nil, true
+	}
+	if cap(ev.Callstack) > p.cfg.RecycleMaxFrames {
+		ev.Callstack, trimmed = nil, true
+	}
+	if trimmed {
+		p.freeTrimmed.Add(1)
+	}
+	p.free = append(p.free, ev)
 }
 
 func (p *Pipeline) get() *event.Event {

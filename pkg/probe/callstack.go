@@ -48,7 +48,7 @@ var maxReservedStackWait = time.Second * 2
 // it belongs to.
 type reservedStack struct {
 	pid, tid uint32
-	addrs    []va.Address
+	addrs    va.Callstack
 }
 
 // CallstackLinker splices callstack return addresses into the
@@ -138,7 +138,7 @@ func (l *CallstackLinker) Put(e *event.Event) *event.Event {
 // the originating events are then decorated with callstack return
 // addresses and dispatchers to consumers/listeners. If the originating
 // event hasn't arrived yet, the stack walk is parked.
-func (l *CallstackLinker) Link(ts uint64, pid, tid uint32, addrs []va.Address) {
+func (l *CallstackLinker) Link(ts uint64, pid, tid uint32, addrs va.Callstack) {
 	l.mu.Lock()
 
 	l.advance(ts)
@@ -165,7 +165,7 @@ func (l *CallstackLinker) Link(ts uint64, pid, tid uint32, addrs []va.Address) {
 	if evt.IsCreateRemoteThread() {
 		pid := evt.Params.MustGetPid()
 		if ev, ok := l.procs[pid]; ok {
-			ev.AppendParam(params.Callstack, params.Slice, addrs)
+			ev.AppendParam(params.Callstack, params.Slice, addrs.Clone())
 			delete(l.procs, pid)
 			delete(l.buckets, ev.RawTimestamp())
 			evts = append(evts, ev)
@@ -183,7 +183,7 @@ func (l *CallstackLinker) Link(ts uint64, pid, tid uint32, addrs []va.Address) {
 // is stored until the caller picks it up with Claim. Reserve must be called
 // before the event is set aside. If the stack walk has already arrived and
 // was parked, it is moved to the claimable store right away.
-func (l *CallstackLinker) reserve(ts uint64, pid, tid uint32, addrs []va.Address) {
+func (l *CallstackLinker) reserve(ts uint64, pid, tid uint32, addrs va.Callstack) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.advance(ts)
@@ -193,7 +193,10 @@ func (l *CallstackLinker) reserve(ts uint64, pid, tid uint32, addrs []va.Address
 func (l *CallstackLinker) releaseReservation(id uint64) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	delete(l.reservations, id)
+	if reservation, exists := l.reservations[id]; exists {
+		reservation.addrs.ReleasePool()
+		delete(l.reservations, id)
+	}
 }
 
 // Close stops the eviction loop. It is safe to call it more than once.
@@ -260,15 +263,17 @@ func (l *CallstackLinker) evictExpired() {
 // that outlived the maximum reserved stack wait period. The caller must
 // hold the mutex.
 func (l *CallstackLinker) expireReservations() {
-	for ts := range l.reservations {
+	for ts, s := range l.reservations {
 		if l.expired(ts, maxReservedStackWait) {
+			s.addrs.ReleasePool()
 			delete(l.reservations, ts)
 		}
 	}
 	// stack walks are parked for any event, including ones that never
 	// reach Put, so they use the shorter wait
-	for ts := range l.stacks {
+	for ts, s := range l.stacks {
 		if l.expired(ts, maxStackWait) {
+			s.addrs.ReleasePool()
 			delete(l.stacks, ts)
 		}
 	}

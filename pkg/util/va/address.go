@@ -64,6 +64,10 @@ func GetCallstack() Callstack {
 	return (*callstackPool.Get().(*Callstack))[:0]
 }
 
+func (c Callstack) Clone() Callstack {
+	return append(GetCallstack(), c...)
+}
+
 func (c Callstack) ReleasePool() {
 	if cap(c) > callstackDepthHint*4 {
 		return // drop outlier-sized buffers rather than pooling them permanently

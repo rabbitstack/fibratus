@@ -26,9 +26,9 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/event"
 )
 
-// entry is one pending event in the reorder heap. n is the arrival counter,
+// node is one pending event in the reorder heap. n is the arrival counter,
 // which keeps the order stable for equal timestamps.
-type entry struct {
+type node struct {
 	key int64
 	n   uint64
 	ev  *event.Event
@@ -36,7 +36,7 @@ type entry struct {
 
 // eventHeap is a hand-rolled min-heap: container/heap would box every entry
 // into an interface value.
-type eventHeap []entry
+type eventHeap []node
 
 func (h eventHeap) less(i, j int) bool {
 	if h[i].key != h[j].key {
@@ -45,7 +45,7 @@ func (h eventHeap) less(i, j int) bool {
 	return h[i].n < h[j].n
 }
 
-func (h *eventHeap) push(e entry) {
+func (h *eventHeap) push(e node) {
 	*h = append(*h, e)
 	s := *h
 	i := len(s) - 1
@@ -59,12 +59,12 @@ func (h *eventHeap) push(e entry) {
 	}
 }
 
-func (h *eventHeap) pop() entry {
+func (h *eventHeap) pop() node {
 	s := *h
 	top := s[0]
 	last := len(s) - 1
 	s[0] = s[last]
-	s[last] = entry{} // don't pin the event
+	s[last] = node{} // don't pin the event
 	s = s[:last]
 	*h = s
 	i := 0
@@ -133,7 +133,6 @@ type Reorderer struct {
 	h          eventHeap
 	slack      int64
 	lag        int64
-	maxHold    int64
 	maxPending int
 
 	// maxTS is the maximum timestamp observed for each producer.
@@ -160,8 +159,8 @@ func NewReorderer(producers int, slack, lag int64, maxPending int) *Reorderer {
 		panic("pipeline: producers must be positive")
 	case slack < 0:
 		panic("pipeline: slack must be non-negative")
-	case lag < 0:
-		panic("pipeline: lag must be non-negative")
+	case lag <= 0:
+		panic("pipeline: lag must be greater than zero")
 	case maxPending <= 0:
 		panic("pipeline: maxPending must be positive")
 	}
@@ -202,17 +201,13 @@ func (r *Reorderer) Add(producerID int, ev *event.Event, now int64) {
 		panic(fmt.Sprintf("pipeline: invalid producer index %d", producerID))
 	}
 	if ev == nil {
-		panic("pipeline: cannot reorder a nil event")
+		return
 	}
 
 	key := ev.Timestamp.UnixNano()
 
-	if r.n == math.MaxUint64 {
-		panic("pipeline: arrival sequence exhausted")
-	}
 	r.n++
-
-	r.h.push(entry{key: key, n: r.n, ev: ev})
+	r.h.push(node{key: key, n: r.n, ev: ev})
 	r.pending.Add(1)
 
 	if !r.initialized[producerID] || key > r.maxTS[producerID] {
@@ -233,8 +228,7 @@ func (r *Reorderer) Add(producerID int, ev *event.Event, now int64) {
 // session frontier is clamped to at least now-lag, because anything not yet
 // delivered by a session is newer than that. A quiet session therefore cannot
 // hold the watermark back past now-lag, and it cannot be declared complete
-// beyond it either. ok is always true; it is kept so callers of Next do not
-// change.
+// beyond it either.
 func (r *Reorderer) Watermark(now int64) (wm int64) {
 	floor := saturatingSub(now, r.lag)
 	wm = math.MaxInt64

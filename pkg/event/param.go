@@ -559,9 +559,9 @@ func (pars Params) MustGetSlice(name string) params.Value {
 
 // MustGetSliceAddrs returns the slice of addresses or panics if the parameter
 // is not found, or either a parameter is not a slice of addresses.
-func (pars Params) MustGetSliceAddrs(name string) []va.Address {
+func (pars Params) MustGetSliceAddrs(name string) va.Callstack {
 	val := pars.MustGetSlice(name)
-	addrs, ok := val.([]va.Address)
+	addrs, ok := val.(va.Callstack)
 	if !ok {
 		panic("must be a slice of addresses")
 	}

@@ -776,28 +776,30 @@ func (e *EventRecord) ReadSID(offset uint16, isWbemSid bool) ([]byte, uint16) {
 }
 
 // ReadCallstack reads callstack return addresses at the given offset.
-func (e *EventRecord) ReadCallstack(offset uint16) []va.Address {
+func (e *EventRecord) ReadCallstack(offset uint16) va.Callstack {
 	return e.ReadCallstackInto(offset, nil)
 }
 
 // ReadCallstackInto reads callstack return addresses at the given offset,
 // appending into v. If v has sufficient capacity, no allocation occurs.
-func (e *EventRecord) ReadCallstackInto(offset uint16, v va.Callstack) []va.Address {
-	var n uint16
-	m := offset
-	frames := (e.BufferLen - offset) / 8
+func (e *EventRecord) ReadCallstackInto(offset uint16, v va.Callstack) va.Callstack {
+	if offset >= e.BufferLen {
+		return v[:0] // guards uint16 underflow in BufferLen - offset
+	}
 
-	if v != nil {
-		v = v[:0]
+	frames := int(e.BufferLen-offset) / 8
+
+	if v == nil {
+		v = make(va.Callstack, 0, frames)
 	} else {
-		v = make([]va.Address, 0, frames)
+		v = v[:0]
 	}
 
-	for n < frames {
-		v = append(v, va.Address(e.ReadUint64(m)))
-		m += 8
-		n++
+	for range frames {
+		v = append(v, va.Address(e.ReadUint64(offset)))
+		offset += 8
 	}
+
 	return v
 }
 
@@ -830,7 +832,7 @@ func (e *EventRecord) HasStackTrace() bool {
 
 // Callstack collects the event stack trace for
 // events emitted by non-system logger providers.
-func (e *EventRecord) Callstack() []va.Address {
+func (e *EventRecord) Callstack() va.Callstack {
 	if e.ExtendedDataCount == 0 {
 		return nil
 	}
@@ -845,10 +847,15 @@ func (e *EventRecord) Callstack() []va.Address {
 		}
 		// number of return addresses
 		length := (n.DataSize - 8) / 8
-		addrs := make([]va.Address, length)
+		addrs := va.GetCallstack()
+		if addrs == nil {
+			addrs = make(va.Callstack, 0, length)
+		} else {
+			addrs = addrs[:0]
+		}
 		addresses := unsafe.Slice(&s.Address[0], length)
-		for i, addr := range addresses {
-			addrs[i] = va.Address(addr)
+		for _, addr := range addresses {
+			addrs = append(addrs, va.Address(addr))
 		}
 		return addrs
 	}

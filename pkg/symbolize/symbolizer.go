@@ -256,7 +256,6 @@ func (s *Symbolizer) HandleEvent(e *event.Event) error {
 	if !e.Params.Contains(params.Callstack) {
 		return nil
 	}
-	defer e.Params.Remove(params.Callstack)
 
 	err := s.processCallstack(e)
 	if err != nil {
@@ -302,6 +301,9 @@ func (s *Symbolizer) syncModules(e *event.Event) error {
 
 func (s *Symbolizer) processCallstack(e *event.Event) error {
 	addrs := e.Params.MustGetSliceAddrs(params.Callstack)
+	e.Params.Remove(params.Callstack)
+	defer addrs.ReleasePool()
+
 	e.Callstack.Init(len(addrs))
 
 	s.mu.Lock()
