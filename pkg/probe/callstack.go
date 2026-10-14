@@ -21,7 +21,6 @@
 package probe
 
 import (
-	"os"
 	"sync"
 	"time"
 
@@ -43,7 +42,7 @@ var evictInterval = time.Millisecond * 250
 // callstack waiting to be claimed, can reside in the linker. It must cover
 // the time the caller keeps the event aside, e.g. the span between the
 // CreateFile event and the FileOpEnd event that completes the same IRP.
-var maxReservedStackWait = time.Second * 10
+var maxReservedStackWait = time.Second * 2
 
 // reservedStack is a callstack parked under the timestamp of the event
 // it belongs to.
@@ -67,13 +66,14 @@ type reservedStack struct {
 // the linker, and the caller picks it up with Claim once the event is
 // released, without the event ever residing in the linker.
 type CallstackLinker struct {
-	// buckets holds events waiting for their stack walk,
-	// and stack walks waiting for their event
+	// buckets holds events waiting for their stack walk and stack walks waiting for their event
 	buckets map[uint64]*event.Event
 	mu      sync.Mutex
 
 	flusher *time.Ticker
-	clock   uint64
+
+	// clock is the monotonic clock
+	clock uint64
 
 	procs map[uint32]*event.Event // stores CreateProcess events with surrogate parent
 
@@ -102,10 +102,6 @@ func (l *CallstackLinker) Put(e *event.Event) *event.Event {
 	defer l.mu.Unlock()
 
 	l.advance(ts)
-
-	if e.PID == uint32(os.Getpid()) {
-		return nil
-	}
 
 	// the stack walk arrived ahead of the event
 	if stack, ok := l.stacks[ts]; ok {
@@ -151,9 +147,7 @@ func (l *CallstackLinker) Link(ts uint64, pid, tid uint32, addrs []va.Address) {
 	evt, ok := l.buckets[ts]
 	if !ok {
 		// park the stack walk, the event hasn't reached put yet
-		// if pid != uint32(os.Getpid()) {
-		// 	l.stacks[ts] = reservedStack{pid: pid, tid: tid, addrs: addrs}
-		// }
+		l.stacks[ts] = reservedStack{pid: pid, tid: tid, addrs: addrs}
 		l.mu.Unlock()
 		return
 	}
@@ -193,9 +187,6 @@ func (l *CallstackLinker) reserve(ts uint64, pid, tid uint32, addrs []va.Address
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.advance(ts)
-	if pid == uint32(os.Getpid()) {
-		return
-	}
 	l.reservations[ts] = reservedStack{pid: pid, tid: tid, addrs: addrs}
 }
 

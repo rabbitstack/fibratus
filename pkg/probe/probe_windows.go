@@ -41,7 +41,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
-	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
 
 	log "github.com/sirupsen/logrus"
@@ -320,10 +319,11 @@ func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecor
 		return nil
 	case event.StackWalk:
 		var (
-			ts                     = rec.ReadUint64(0)
-			pid                    = rec.ReadUint32(8)
-			tid                    = rec.ReadUint32(12)
-			callstack va.Callstack = rec.ReadCallstackInto(16, va.GetCallstack())
+			ts  = rec.ReadUint64(0)
+			pid = rec.ReadUint32(8)
+			tid = rec.ReadUint32(12)
+			//callstack va.Callstack = rec.ReadCallstackInto(16, va.GetCallstack())
+			callstack = rec.ReadCallstack(16)
 		)
 
 		// Links the callstack carried by a StackWalk event with the
@@ -331,7 +331,7 @@ func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecor
 		// pending, it claims the callstack when it is published to
 		// the ring buffer
 		if p.isIOEnqueued(ts) {
-			//p.linker.reserve(ts, pid, tid, callstack)
+			p.linker.reserve(ts, pid, tid, callstack)
 			//callstack.ReleasePool()
 			return nil
 		}
@@ -578,9 +578,9 @@ func (p *Probe) handleEvent(evt *event.Event) error {
 	}
 
 	if p.config.EventSource.StackEnrichment && evt.Type.WaitStack() {
-		// if event := p.linker.Put(evt); event != nil {
-		// 	return p.dispatchEvent(event)
-		// }
+		if event := p.linker.Put(evt); event != nil {
+			return p.dispatchEvent(event)
+		}
 	}
 
 	return p.dispatchEvent(evt)

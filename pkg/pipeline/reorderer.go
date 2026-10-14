@@ -19,6 +19,7 @@
 package pipeline
 
 import (
+	"fmt"
 	"math"
 	"sync/atomic"
 
@@ -93,129 +94,190 @@ type ReorderStats struct {
 	Pending int    // events currently held back
 }
 
-// Reorderer restores a total timestamp order across event sources.
+// LateHook is invoked from Add when an event arrives behind the released
+// stream. behind is how far (ns) its timestamp is below the last emitted
+// timestamp, and delay is the delivery delay (ns), i.e. now - event timestamp.
+// The p99.9 of delay per session is the value to use for lag.
+type LateHook func(producerID int, behind, delay int64)
+
+// Reorderer restores a total timestamp order across sessions.
 //
-// Every source delivers its own events in (roughly) increasing time, so the
-// smallest pending timestamp is safe to release once every source has shown
-// that it has moved past it. For each source the reorderer tracks the highest
+// Every session delivers its own events in (roughly) increasing time, so the
+// smallest pending timestamp is safe to release once every session has shown
+// that it has moved past it. For each session the reorderer tracks the highest
 // timestamp seen (its frontier). The watermark is the minimum frontier minus
 // Slack, and everything at or below it is released in order.
 //
-// A source that goes quiet would freeze the watermark, so a source that has
-// delivered nothing for IdleTimeout is treated as caught up to "now".
+// A quiet session would freeze the watermark, so no frontier is allowed to lag
+// behind now-lag. lag is the longest an event can sit in an ETW buffer before
+// it is delivered: the largest FlushTimer among the sessions plus scheduling
+// jitter. A session that has delivered nothing is therefore assumed to hold,
+// at most, events newer than now-lag, instead of being declared caught up to
+// "now": anything generated in the last FlushTimer interval may still be
+// sitting in a buffer that has not been flushed yet.
 //
-// Slack absorbs skew inside a source. An event that still arrives behind the
-// released stream is emitted immediately and counted in Late.
+// Slack absorbs skew inside a session (ETW delivers per-CPU buffers on a
+// timer). An event that still arrives behind the released stream is emitted
+// immediately and counted in Late: use that counter, and the LateHook, to tune
+// lag and Slack.
+//
+// Worst-case emission latency is about lag + slack.
+//
+// maxPending must be at least the peak event rate multiplied by (lag + slack),
+// otherwise the forced path pops events before the watermark and causes the
+// same inversions.
 //
 // Timestamps and the clock must be in the same domain (system time derived
 // from QPC, for example). The reorderer is not safe for concurrent use.
 type Reorderer struct {
 	h          eventHeap
 	slack      int64
-	idle       int64
+	lag        int64
 	maxHold    int64
 	maxPending int
 
-	maxTS    []int64
-	seen     []bool
-	lastSeen []int64
+	// maxTS is the maximum timestamp observed for each producer.
+	maxTS []int64
+	// initialized distinguishes an unseen producer from a timestamp of zero.
+	initialized []bool
 
 	n           uint64
 	lastEmitted int64
 
+	onLate LateHook
+
 	emitted atomic.Uint64
 	late    atomic.Uint64
 	forced  atomic.Uint64
+	pending atomic.Int64
 }
 
-// NewReorderer creates a reorderer for the given number of producers. now is
-// the current time in the event time domain. Producers count as active from it.
-func NewReorderer(producers int, slack, idle, maxHold int64, maxPending int, now int64) *Reorderer {
+// NewReorderer creates a best-effort timestamp reorderer. for the given number of producers. slack and
+// lag are expressed in nanoseconds.
+func NewReorderer(producers int, slack, lag int64, maxPending int) *Reorderer {
+	switch {
+	case producers <= 0:
+		panic("pipeline: producers must be positive")
+	case slack < 0:
+		panic("pipeline: slack must be non-negative")
+	case lag < 0:
+		panic("pipeline: lag must be non-negative")
+	case maxPending <= 0:
+		panic("pipeline: maxPending must be positive")
+	}
+
 	r := &Reorderer{
 		slack:       slack,
-		idle:        idle,
-		maxHold:     maxHold,
+		lag:         lag,
 		maxPending:  maxPending,
 		maxTS:       make([]int64, producers),
-		seen:        make([]bool, producers),
-		lastSeen:    make([]int64, producers),
+		initialized: make([]bool, producers),
 		lastEmitted: math.MinInt64,
-	}
-	for i := range r.lastSeen {
-		r.lastSeen[i] = now
 	}
 	r.h = make(eventHeap, 0, min(maxPending, 1<<12))
 	return r
 }
 
+// saturatingSub returns a-b, saturating at the int64 limits on overflow.
+func saturatingSub(a, b int64) int64 {
+	if b > 0 && a < math.MinInt64+b {
+		return math.MinInt64
+	}
+	if b < 0 && a > math.MaxInt64+b {
+		return math.MaxInt64
+	}
+	return a - b
+}
+
+// SetLateHook registers a callback for events that arrive behind the released
+// stream. It is meant for tuning lag and slack. Pass nil to remove it.
+func (r *Reorderer) SetLateHook(h LateHook) { r.onLate = h }
+
 // Len returns the number of pending events.
 func (r *Reorderer) Len() int { return len(r.h) }
 
 // Add inserts an event that arrived from the given producer at time now.
-func (r *Reorderer) Add(producer int, ev *event.Event, now int64) {
-	key := ev.Timestamp.UnixNano()
-	r.n++
-	r.h.push(entry{key: key, n: r.n, ev: ev})
-	if !r.seen[producer] || key > r.maxTS[producer] {
-		r.maxTS[producer] = key
-		r.seen[producer] = true
+func (r *Reorderer) Add(producerID int, ev *event.Event, now int64) {
+	if producerID < 0 || producerID >= len(r.maxTS) {
+		panic(fmt.Sprintf("pipeline: invalid producer index %d", producerID))
 	}
-	r.lastSeen[producer] = now
+	if ev == nil {
+		panic("pipeline: cannot reorder a nil event")
+	}
+
+	key := ev.Timestamp.UnixNano()
+
+	if r.n == math.MaxUint64 {
+		panic("pipeline: arrival sequence exhausted")
+	}
+	r.n++
+
+	r.h.push(entry{key: key, n: r.n, ev: ev})
+	r.pending.Add(1)
+
+	if !r.initialized[producerID] || key > r.maxTS[producerID] {
+		r.maxTS[producerID] = key
+	}
+	r.initialized[producerID] = true
+
+	if key < r.lastEmitted && r.onLate != nil {
+		r.onLate(
+			producerID,
+			saturatingSub(r.lastEmitted, key),
+			saturatingSub(now, key),
+		)
+	}
 }
 
-// Watermark returns the timestamp up to which events can be released. ok is
-// false while some producer has neither delivered anything nor been idle long
-// enough to be ignored.
-func (r *Reorderer) Watermark(now int64) (wm int64, ok bool) {
+// Watermark returns the timestamp up to which events can be released. Every
+// session frontier is clamped to at least now-lag, because anything not yet
+// delivered by a session is newer than that. A quiet session therefore cannot
+// hold the watermark back past now-lag, and it cannot be declared complete
+// beyond it either. ok is always true; it is kept so callers of Next do not
+// change.
+func (r *Reorderer) Watermark(now int64) (wm int64) {
+	floor := saturatingSub(now, r.lag)
 	wm = math.MaxInt64
-	for s := range r.maxTS {
-		f, known := r.maxTS[s], r.seen[s]
-		if now-r.lastSeen[s] >= r.idle { // quiet producer: treat as caught up
-			if !known || now > f {
-				f, known = now, true
-			}
+
+	for i, ts := range r.maxTS {
+		frontier := floor
+		if r.initialized[i] && ts > frontier {
+			frontier = ts
 		}
-		if !known {
-			// a producer has never delivered: don't freeze release,
-			// fall back to the hold floor only
-			return now - r.maxHold, r.maxHold > 0
-		}
-		if f < wm {
-			wm = f
+		if frontier < wm {
+			wm = frontier
 		}
 	}
-	wm -= r.slack
-	if r.maxHold > 0 {
-		if floor := now - r.maxHold; wm < floor {
-			wm = floor
-		}
-	}
-	return wm, true
+
+	return saturatingSub(wm, r.slack)
 }
 
 // Next releases the oldest pending event if it is at or below the watermark.
-// If the heap is full it releases the oldest event regardless and counts it
-// as forced.
-func (r *Reorderer) Next(wm int64, ok bool) (*event.Event, bool) {
+// If the heap is full it releases the oldest event regardless (bounded memory
+// beats strict order) and counts it as forced.
+func (r *Reorderer) Next(wm int64) (*event.Event, bool) {
 	if len(r.h) == 0 {
 		return nil, false
 	}
-	forced := false
-	if !ok || r.h[0].key > wm {
-		if len(r.h) < r.maxPending {
-			return nil, false
-		}
-		forced = true
+
+	forced := r.h[0].key > wm
+	if forced && len(r.h) < r.maxPending {
+		return nil, false
 	}
+
 	e := r.h.pop()
+	r.pending.Add(-1)
+
 	if forced {
 		r.forced.Add(1)
 	}
+
 	if e.key < r.lastEmitted {
 		r.late.Add(1)
 	} else {
 		r.lastEmitted = e.key
 	}
+
 	r.emitted.Add(1)
 	return e.ev, true
 }
@@ -229,40 +291,4 @@ func (r *Reorderer) Stats() ReorderStats {
 		Forced:  r.forced.Load(),
 		Pending: len(r.h),
 	}
-}
-
-// passthrough is a diagnostic stand-in for Reorderer. It is a plain FIFO:
-// no heap, no watermark, no slack. Events are released in arrival order on
-// the next emit pass, so pending is at most one ingest batch per producer.
-type passthrough struct {
-	q       []*event.Event
-	head    int
-	emitted atomic.Uint64
-}
-
-func newPassthrough() *passthrough { return &passthrough{} }
-
-func (r *passthrough) Len() int { return len(r.q) - r.head }
-
-func (r *passthrough) Add(_ int, ev *event.Event, _ int64) {
-	r.q = append(r.q, ev)
-}
-
-// Watermark is ignored by Next, but keep the signature identical.
-func (r *passthrough) Watermark(int64) (int64, bool) { return 0, true }
-
-func (r *passthrough) Next(int64, bool) (*event.Event, bool) {
-	if r.head == len(r.q) {
-		r.q, r.head = r.q[:0], 0 // reuse the backing array
-		return nil, false
-	}
-	ev := r.q[r.head]
-	r.q[r.head] = nil // don't pin the event
-	r.head++
-	r.emitted.Add(1)
-	return ev, true
-}
-
-func (r *passthrough) Stats() ReorderStats {
-	return ReorderStats{Emitted: r.emitted.Load(), Pending: r.Len()}
 }

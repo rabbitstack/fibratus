@@ -134,20 +134,16 @@ func (e *Event) Reset() {
 		clear(e.Callstack)
 		e.Callstack = e.Callstack[:0]
 	}
-	if len(e.Params) > 32 {
-		e.Params = nil
-	} else {
-		clear(e.Params)
-	}
+	clear(e.Params)
 	clear(e.Metadata)
 	e.PS = nil
-	// clear(e.Callstack)
-	// e.Callstack = e.Callstack[:0]
 }
 
 // MoveFrom transfers the content of src into e without copying the heavy
 // fields: slices and the map are swapped, so src is left holding e's previous
 // (empty) backing storage and can be reused as a ring slot immediately.
+// Callstack slice is not swapped because producers never fill it, and swapping
+// would leave a pooled array parked in every ring slot.
 //
 // e must have been Reset (or be freshly allocated). src is left in a reset
 // state with respect to every field that can pin memory.
@@ -159,7 +155,6 @@ func (e *Event) MoveFrom(src *Event) {
 	e.PS = src.PS
 
 	e.Params, src.Params = src.Params, e.Params
-	e.Callstack, src.Callstack = src.Callstack, e.Callstack[:0]
 	e.Metadata, src.Metadata = src.Metadata, e.Metadata
 	if len(src.Metadata) != 0 { // dst was not reset: don't leak its tags into the slot
 		clear(src.Metadata)

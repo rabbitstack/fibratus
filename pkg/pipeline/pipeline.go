@@ -51,24 +51,19 @@ type Config struct {
 	// events alive). Memory is bounded by RingSize*Producers + MaxPending.
 	MaxPending int
 
-	// MaxHold bounds how long the reorderer may keep an event pending. The
-	// watermark never trails the clock by more than MaxHold, so a stalled or
-	// lagging producer cannot hold back the other sources indefinitely.
-	MaxHold time.Duration
-
 	// BatchSize is the maximum number of slots claimed per ring per pass.
 	BatchSize int
 
 	// Slack is the skew the reorderer tolerates before declaring an event
-	// late.
+	// late. The larger the slack, the more conservative the reorderer is:
+	// it waits longer, but has a better chance of catching events delivered
+	// out of timestamp order.
 	Slack time.Duration
 
-	// IdleTimeout is how long a silent producer may hold the watermark.
-	IdleTimeout time.Duration
+	Lag time.Duration
 
 	// IdleSleep is the consumer's sleep when it has nothing to do (after a
-	// short spin and a few yields). On Windows the effective granularity can
-	// be around a millisecond; that only matters when the system is idle.
+	// short spin and a few yields).
 	IdleSleep time.Duration
 
 	Classifier Classifier
@@ -84,15 +79,14 @@ type Config struct {
 // DefaultConfig returns a configuration to start tuning from.
 func DefaultConfig(producers int) Config {
 	return Config{
-		Producers:   producers,
-		RingSize:    1 << 16,
-		MaxPending:  1 << 16,
-		BatchSize:   256,
-		Slack:       5 * time.Millisecond,
-		IdleTimeout: 20 * time.Millisecond,
-		IdleSleep:   50 * time.Microsecond,
-		MaxHold:     100 * time.Millisecond,
-		Shed:        DefaultShedConfig(),
+		Producers:  producers,
+		RingSize:   1 << 16,
+		MaxPending: 1 << 16,
+		BatchSize:  256,
+		Lag:        2650 * time.Millisecond,
+		Slack:      100 * time.Millisecond,
+		IdleSleep:  50 * time.Microsecond,
+		Shed:       DefaultShedConfig(),
 	}
 }
 
@@ -108,10 +102,6 @@ func (c *Config) validate() error {
 		return errors.New("pipeline: BatchSize must be >= 1")
 	case c.Slack < 0 || c.IdleSleep < 0:
 		return errors.New("pipeline: Slack and IdleSleep must be >= 0")
-	case c.IdleTimeout <= 0:
-		return errors.New("pipeline: IdleTimeout must be > 0")
-	case c.MaxHold > 0 && c.MaxHold <= c.Slack+c.IdleTimeout:
-		return fmt.Errorf("pipeline: MaxHold (%v) must exceed Slack+IdleTimeout (%v)", c.MaxHold, c.Slack+c.IdleTimeout)
 	}
 	if err := c.Shed.validate(); err != nil {
 		return fmt.Errorf("shed config: %w", err)
@@ -131,7 +121,7 @@ type Pipeline struct {
 	clock   func() int64
 	rings   []*Ring[event.Event]
 	prods   []*Producer
-	ro      *passthrough
+	ro      *Reorderer
 	handler Handler
 
 	free    []*event.Event // recycled events that are touched only by the consumer goroutine
@@ -170,8 +160,11 @@ func New(cfg Config) (*Pipeline, error) {
 		p.prods = append(p.prods, prod)
 	}
 
-	//p.ro = NewReorderer(cfg.Producers, int64(cfg.Slack), int64(cfg.IdleTimeout), int64(cfg.MaxHold), cfg.MaxPending, clock())
-	p.ro = &passthrough{}
+	p.ro = NewReorderer(cfg.Producers, int64(cfg.Slack), int64(cfg.Lag), cfg.MaxPending)
+
+	p.ro.SetLateHook(func(producerID int, behind, delay int64) {
+		fmt.Println(producerID, behind, delay)
+	})
 	return p, nil
 }
 
@@ -267,10 +260,10 @@ func (p *Pipeline) take(s int, slot *event.Event, now int64) {
 
 // emit releases every event the watermark allows through the handler chain.
 func (p *Pipeline) emit(now int64) int {
-	wm, ok := p.ro.Watermark(now)
+	wm := p.ro.Watermark(now)
 	n := 0
 	for {
-		ev, more := p.ro.Next(wm, ok)
+		ev, more := p.ro.Next(wm)
 		if !more {
 			return n
 		}
@@ -282,7 +275,7 @@ func (p *Pipeline) emit(now int64) int {
 // flush releases everything that is left, in order, ignoring the watermark.
 func (p *Pipeline) flush() {
 	for {
-		ev, more := p.ro.Next(math.MaxInt64, true)
+		ev, more := p.ro.Next(math.MaxInt64)
 		if !more {
 			return
 		}

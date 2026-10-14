@@ -26,7 +26,6 @@ import (
 	"sync"
 	"unsafe"
 
-	"github.com/rabbitstack/fibratus/pkg/callstack"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/network"
 	"github.com/rabbitstack/fibratus/pkg/sys"
@@ -67,7 +66,6 @@ func New(rec *etw.EventRecord) *Event {
 		Params:    make(map[string]*Param, 8),
 		Timestamp: ts,
 		Host:      hostname.Get(),
-		Callstack: make(callstack.Callstack, 64),
 	}
 
 	e.decodeParams(rec)
@@ -93,7 +91,7 @@ func (e *Event) Parse(rec *etw.EventRecord) {
 	e.Host = hostname.Get()
 
 	if e.Params == nil {
-		e.Params = make(map[string]*Param, 10)
+		e.Params = make(map[string]*Param, 6)
 	}
 
 	e.decodeParams(rec)
