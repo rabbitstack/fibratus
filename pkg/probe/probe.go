@@ -114,7 +114,7 @@ func (p *PlatformProbe) sendEventToConsumers(event *event.Event) error {
 
 	for _, pc := range p.eventConsumers[event.Type] {
 		select {
-		case pc.eventCh <- event:
+		case pc.eventCh <- event.Clone():
 		default:
 			pc.eventDropped.Add(1)
 		}

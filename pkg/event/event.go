@@ -128,11 +128,21 @@ func (e *Event) Reset() {
 	e.PID, e.Tid, e.Evasions, e.CPU = 0, 0, 0, 0
 	e.Type = 0
 	e.Host = ""
-	clear(e.Params)
+	if cap(e.Callstack) > 64 {
+		e.Callstack = nil
+	} else {
+		clear(e.Callstack)
+		e.Callstack = e.Callstack[:0]
+	}
+	if len(e.Params) > 32 {
+		e.Params = nil
+	} else {
+		clear(e.Params)
+	}
 	clear(e.Metadata)
 	e.PS = nil
-	clear(e.Callstack)
-	e.Callstack = e.Callstack[:0]
+	// clear(e.Callstack)
+	// e.Callstack = e.Callstack[:0]
 }
 
 // MoveFrom transfers the content of src into e without copying the heavy

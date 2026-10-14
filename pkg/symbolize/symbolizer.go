@@ -184,7 +184,7 @@ func NewSymbolizer(r Resolver, psnap ps.Snapshotter, config *config.Config) *Sym
 	return sym
 }
 
-func (Symbolizer) ID() string { return eventHandlerID }
+func (*Symbolizer) ID() string { return eventHandlerID }
 
 func (s *Symbolizer) Close() {
 	s.cleaner.Stop()

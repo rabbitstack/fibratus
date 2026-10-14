@@ -1,3 +1,21 @@
+/*
+ * Copyright 2019-2026 by Nedim Sabic Sabic
+ * https://www.fibratus.io
+ * All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package pipeline
 
 import (
@@ -75,20 +93,19 @@ type ReorderStats struct {
 	Pending int    // events currently held back
 }
 
-// Reorderer restores a total timestamp order across sessions.
+// Reorderer restores a total timestamp order across event sources.
 //
-// Every session delivers its own events in (roughly) increasing time, so the
-// smallest pending timestamp is safe to release once every session has shown
-// that it has moved past it. For each session the reorderer tracks the highest
+// Every source delivers its own events in (roughly) increasing time, so the
+// smallest pending timestamp is safe to release once every source has shown
+// that it has moved past it. For each source the reorderer tracks the highest
 // timestamp seen (its frontier). The watermark is the minimum frontier minus
 // Slack, and everything at or below it is released in order.
 //
-// A session that goes quiet would freeze the watermark, so a session that has
+// A source that goes quiet would freeze the watermark, so a source that has
 // delivered nothing for IdleTimeout is treated as caught up to "now".
 //
-// Slack absorbs skew inside a session (ETW delivers per-CPU buffers on a
-// timer). An event that still arrives behind the released stream is emitted
-// immediately and counted in Late: use that counter to tune Slack.
+// Slack absorbs skew inside a source. An event that still arrives behind the
+// released stream is emitted immediately and counted in Late.
 //
 // Timestamps and the clock must be in the same domain (system time derived
 // from QPC, for example). The reorderer is not safe for concurrent use.
@@ -96,6 +113,7 @@ type Reorderer struct {
 	h          eventHeap
 	slack      int64
 	idle       int64
+	maxHold    int64
 	maxPending int
 
 	maxTS    []int64
@@ -110,16 +128,17 @@ type Reorderer struct {
 	forced  atomic.Uint64
 }
 
-// NewReorderer creates a reorderer for the given number of sessions. now is
-// the current time in the event time domain. Sessions count as active from it.
-func NewReorderer(sessions int, slack, idle int64, maxPending int, now int64) *Reorderer {
+// NewReorderer creates a reorderer for the given number of producers. now is
+// the current time in the event time domain. Producers count as active from it.
+func NewReorderer(producers int, slack, idle, maxHold int64, maxPending int, now int64) *Reorderer {
 	r := &Reorderer{
 		slack:       slack,
 		idle:        idle,
+		maxHold:     maxHold,
 		maxPending:  maxPending,
-		maxTS:       make([]int64, sessions),
-		seen:        make([]bool, sessions),
-		lastSeen:    make([]int64, sessions),
+		maxTS:       make([]int64, producers),
+		seen:        make([]bool, producers),
+		lastSeen:    make([]int64, producers),
 		lastEmitted: math.MinInt64,
 	}
 	for i := range r.lastSeen {
@@ -132,43 +151,51 @@ func NewReorderer(sessions int, slack, idle int64, maxPending int, now int64) *R
 // Len returns the number of pending events.
 func (r *Reorderer) Len() int { return len(r.h) }
 
-// Add inserts an event that arrived from the given session at time now.
-func (r *Reorderer) Add(session int, ev *event.Event, now int64) {
+// Add inserts an event that arrived from the given producer at time now.
+func (r *Reorderer) Add(producer int, ev *event.Event, now int64) {
 	key := ev.Timestamp.UnixNano()
 	r.n++
 	r.h.push(entry{key: key, n: r.n, ev: ev})
-	if !r.seen[session] || key > r.maxTS[session] {
-		r.maxTS[session] = key
-		r.seen[session] = true
+	if !r.seen[producer] || key > r.maxTS[producer] {
+		r.maxTS[producer] = key
+		r.seen[producer] = true
 	}
-	r.lastSeen[session] = now
+	r.lastSeen[producer] = now
 }
 
 // Watermark returns the timestamp up to which events can be released. ok is
-// false while some session has neither delivered anything nor been idle long
+// false while some producer has neither delivered anything nor been idle long
 // enough to be ignored.
 func (r *Reorderer) Watermark(now int64) (wm int64, ok bool) {
 	wm = math.MaxInt64
 	for s := range r.maxTS {
 		f, known := r.maxTS[s], r.seen[s]
-		if now-r.lastSeen[s] >= r.idle { // quiet session: treat as caught up
+		if now-r.lastSeen[s] >= r.idle { // quiet producer: treat as caught up
 			if !known || now > f {
 				f, known = now, true
 			}
 		}
 		if !known {
-			return 0, false
+			// a producer has never delivered: don't freeze release,
+			// fall back to the hold floor only
+			return now - r.maxHold, r.maxHold > 0
 		}
 		if f < wm {
 			wm = f
 		}
 	}
-	return wm - r.slack, true
+	wm -= r.slack
+	if r.maxHold > 0 {
+		if floor := now - r.maxHold; wm < floor {
+			wm = floor
+		}
+	}
+	return wm, true
 }
 
 // Next releases the oldest pending event if it is at or below the watermark.
-// If the heap is full it releases the oldest event regardless (bounded memory
-// beats strict order) and counts it as forced.
+// If the heap is full it releases the oldest event regardless and counts it
+// as forced.
 func (r *Reorderer) Next(wm int64, ok bool) (*event.Event, bool) {
 	if len(r.h) == 0 {
 		return nil, false
@@ -202,4 +229,40 @@ func (r *Reorderer) Stats() ReorderStats {
 		Forced:  r.forced.Load(),
 		Pending: len(r.h),
 	}
+}
+
+// passthrough is a diagnostic stand-in for Reorderer. It is a plain FIFO:
+// no heap, no watermark, no slack. Events are released in arrival order on
+// the next emit pass, so pending is at most one ingest batch per producer.
+type passthrough struct {
+	q       []*event.Event
+	head    int
+	emitted atomic.Uint64
+}
+
+func newPassthrough() *passthrough { return &passthrough{} }
+
+func (r *passthrough) Len() int { return len(r.q) - r.head }
+
+func (r *passthrough) Add(_ int, ev *event.Event, _ int64) {
+	r.q = append(r.q, ev)
+}
+
+// Watermark is ignored by Next, but keep the signature identical.
+func (r *passthrough) Watermark(int64) (int64, bool) { return 0, true }
+
+func (r *passthrough) Next(int64, bool) (*event.Event, bool) {
+	if r.head == len(r.q) {
+		r.q, r.head = r.q[:0], 0 // reuse the backing array
+		return nil, false
+	}
+	ev := r.q[r.head]
+	r.q[r.head] = nil // don't pin the event
+	r.head++
+	r.emitted.Add(1)
+	return ev, true
+}
+
+func (r *passthrough) Stats() ReorderStats {
+	return ReorderStats{Emitted: r.emitted.Load(), Pending: r.Len()}
 }

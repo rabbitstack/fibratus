@@ -413,6 +413,7 @@ func (t *UserTrace) Start() error {
 				return err
 			}
 			time.Sleep(time.Millisecond * 100)
+
 			props = initEventTraceProps(t.config.EventSource)
 			t.controlHandle, err = etw.StartTrace(
 				t.name,

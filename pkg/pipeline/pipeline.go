@@ -1,3 +1,21 @@
+/*
+ * Copyright 2019-2026 by Nedim Sabic Sabic
+ * https://www.fibratus.io
+ * All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package pipeline
 
 import (
@@ -11,42 +29,52 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/event"
 )
 
-// Handler is one stage of the processing chain. Stages run sequentially on the
-// pipeline goroutine, in order, for every event.
+// Handler is entrypoint to the processing chain. It can contain multiple stages
+// that run sequentially on the pipeline goroutine, in order, for every event.
 //
-// The event is recycled as soon as the last handler returns. A handler that
-// keeps it (sequence rules holding partial matches, async sinks, anything
-// handed to another goroutine) must Clone it first.
+// The event is recycled as soon as the handler returns. A stage that keeps the
+// event (sequence rules holding partial matches, async sinks, anything handed
+// to another goroutine) must clone the event first.
 type Handler interface {
 	Handle(*event.Event)
 }
 
 // Config configures a Pipeline. Start from DefaultConfig.
 type Config struct {
-	// Sessions is the number of ETW sessions, i.e. of rings and producers.
-	Sessions int
-	// RingSize is the slot count of each session's ring (rounded up to a
+	// Producers is the number of rings and producers.
+	Producers int
+	// RingSize is the slot count of each producer's ring (rounded up to a
 	// power of two).
 	RingSize int
+
 	// MaxPending bounds the events held by the reorderer (and so the pooled
-	// events alive). Memory is bounded by RingSize*Sessions + MaxPending.
+	// events alive). Memory is bounded by RingSize*Producers + MaxPending.
 	MaxPending int
+
+	// MaxHold bounds how long the reorderer may keep an event pending. The
+	// watermark never trails the clock by more than MaxHold, so a stalled or
+	// lagging producer cannot hold back the other sources indefinitely.
+	MaxHold time.Duration
+
 	// BatchSize is the maximum number of slots claimed per ring per pass.
 	BatchSize int
 
 	// Slack is the skew the reorderer tolerates before declaring an event
-	// late. IdleTimeout is how long a silent session may hold the watermark.
-	Slack       time.Duration
+	// late.
+	Slack time.Duration
+
+	// IdleTimeout is how long a silent producer may hold the watermark.
 	IdleTimeout time.Duration
+
 	// IdleSleep is the consumer's sleep when it has nothing to do (after a
 	// short spin and a few yields). On Windows the effective granularity can
 	// be around a millisecond; that only matters when the system is idle.
 	IdleSleep time.Duration
 
-	Classify Classifier
-	Shed     ShedConfig
+	Classifier Classifier
+	Handler    Handler
 
-	Handler Handler
+	Shed ShedConfig
 
 	// Clock returns the current time in the same domain as Event.Timestamp
 	// (UnixNano). Defaults to time.Now.
@@ -54,23 +82,24 @@ type Config struct {
 }
 
 // DefaultConfig returns a configuration to start tuning from.
-func DefaultConfig(sessions int) Config {
+func DefaultConfig(producers int) Config {
 	return Config{
-		Sessions:    sessions,
+		Producers:   producers,
 		RingSize:    1 << 16,
 		MaxPending:  1 << 16,
 		BatchSize:   256,
 		Slack:       5 * time.Millisecond,
 		IdleTimeout: 20 * time.Millisecond,
 		IdleSleep:   50 * time.Microsecond,
+		MaxHold:     100 * time.Millisecond,
 		Shed:        DefaultShedConfig(),
 	}
 }
 
 func (c *Config) validate() error {
 	switch {
-	case c.Sessions < 1:
-		return errors.New("pipeline: Sessions must be >= 1")
+	case c.Producers < 1:
+		return errors.New("pipeline: Producers must be >= 1")
 	case c.RingSize < 2:
 		return errors.New("pipeline: RingSize must be >= 2")
 	case c.MaxPending < 1:
@@ -81,6 +110,8 @@ func (c *Config) validate() error {
 		return errors.New("pipeline: Slack and IdleSleep must be >= 0")
 	case c.IdleTimeout <= 0:
 		return errors.New("pipeline: IdleTimeout must be > 0")
+	case c.MaxHold > 0 && c.MaxHold <= c.Slack+c.IdleTimeout:
+		return fmt.Errorf("pipeline: MaxHold (%v) must exceed Slack+IdleTimeout (%v)", c.MaxHold, c.Slack+c.IdleTimeout)
 	}
 	if err := c.Shed.validate(); err != nil {
 		return fmt.Errorf("shed config: %w", err)
@@ -100,7 +131,7 @@ type Pipeline struct {
 	clock   func() int64
 	rings   []*Ring[event.Event]
 	prods   []*Producer
-	ro      *Reorderer
+	ro      *passthrough
 	handler Handler
 
 	free    []*event.Event // recycled events that are touched only by the consumer goroutine
@@ -121,28 +152,32 @@ func New(cfg Config) (*Pipeline, error) {
 	if clock == nil {
 		clock = func() int64 { return time.Now().UnixNano() }
 	}
+
 	p := &Pipeline{
 		cfg:     cfg,
 		clock:   clock,
 		handler: cfg.Handler,
 		done:    make(chan struct{}),
 	}
-	for i := 0; i < cfg.Sessions; i++ {
+
+	for i := 0; i < cfg.Producers; i++ {
 		r := NewRing[event.Event](cfg.RingSize)
-		prod, err := NewProducer(r, cfg.Classify, cfg.Shed)
+		prod, err := NewProducer(r, cfg.Classifier, cfg.Shed)
 		if err != nil {
 			return nil, err
 		}
 		p.rings = append(p.rings, r)
 		p.prods = append(p.prods, prod)
 	}
-	p.ro = NewReorderer(cfg.Sessions, int64(cfg.Slack), int64(cfg.IdleTimeout), cfg.MaxPending, clock())
+
+	//p.ro = NewReorderer(cfg.Producers, int64(cfg.Slack), int64(cfg.IdleTimeout), int64(cfg.MaxHold), cfg.MaxPending, clock())
+	p.ro = &passthrough{}
 	return p, nil
 }
 
-// Producer returns the producer of session i. Hand it to the goroutine that
-// runs that session's ETW callback. It must not be shared between goroutines.
-func (p *Pipeline) Producer(i int) *Producer { return p.prods[i] }
+// Producer returns the producer at index i. Hand it to the goroutine that
+// runs that event collection. It must not be shared between goroutines.
+func (p *Pipeline) Producer(i ProducerID) *Producer { return p.prods[i] }
 
 // Start launches the consumer loop. Calling it more than once is a no-op.
 func (p *Pipeline) Start() {
@@ -152,8 +187,7 @@ func (p *Pipeline) Start() {
 }
 
 // Close drains the rings, flushes the reorderer in timestamp order through the
-// handlers and stops the consumer. Stop the ETW sessions (so that no producer
-// is running) before calling it. Safe to call more than once.
+// stages and stops the consumer. Safe to call more than once.
 func (p *Pipeline) Close() {
 	p.stop.Store(true)
 	if p.started.Load() {
@@ -263,7 +297,10 @@ func (p *Pipeline) dispatch(ev *event.Event) {
 	p.handler.Handle(ev)
 
 	ev.Reset()
-	p.free = append(p.free, ev)
+
+	if len(p.free) < 8192 {
+		p.free = append(p.free, ev)
+	}
 }
 
 func (p *Pipeline) get() *event.Event {

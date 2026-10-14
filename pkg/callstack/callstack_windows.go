@@ -191,7 +191,7 @@ type Callstack []Frame
 
 // Init allocates the initial callstack capacity.
 func (s *Callstack) Init(n int) {
-	*s = make(Callstack, 0, n)
+	//*s = make(Callstack, 0, n)
 }
 
 // PushFrame pushes a new from to the call stack.

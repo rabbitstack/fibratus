@@ -26,6 +26,7 @@ import (
 	"sync"
 	"unsafe"
 
+	"github.com/rabbitstack/fibratus/pkg/callstack"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/network"
 	"github.com/rabbitstack/fibratus/pkg/sys"
@@ -63,9 +64,10 @@ func New(rec *etw.EventRecord) *Event {
 		Tid:       tid,
 		CPU:       cpu,
 		Type:      TypeFromEventRecord(rec),
-		Params:    make(map[string]*Param, 10),
+		Params:    make(map[string]*Param, 8),
 		Timestamp: ts,
 		Host:      hostname.Get(),
+		Callstack: make(callstack.Callstack, 64),
 	}
 
 	e.decodeParams(rec)
@@ -74,6 +76,7 @@ func New(rec *etw.EventRecord) *Event {
 	return e
 }
 
+// Parse constructs the event from the reused ring buffer instance.
 func (e *Event) Parse(rec *etw.EventRecord) {
 	var (
 		pid = rec.Header.ProcessID
@@ -88,21 +91,13 @@ func (e *Event) Parse(rec *etw.EventRecord) {
 	e.Type = TypeFromEventRecord(rec)
 	e.Timestamp = ts
 	e.Host = hostname.Get()
-	e.Params = make(map[string]*Param, 10)
+
+	if e.Params == nil {
+		e.Params = make(map[string]*Param, 10)
+	}
 
 	e.decodeParams(rec)
 	e.adjustPID()
-}
-
-// NewWithParams constructs a new event with an optional parameter list.
-func NewWithParams(rec *etw.EventRecord, params ...*Param) *Event {
-	e := New(rec)
-
-	for _, param := range params {
-		e.Params[param.Name] = param
-	}
-
-	return e
 }
 
 // RawTimestamp returns the raw event record system timestamp.

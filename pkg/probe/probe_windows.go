@@ -21,7 +21,6 @@ package probe
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -42,12 +41,15 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
+	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
 
 	log "github.com/sirupsen/logrus"
 )
 
 const maxEnqueuedIORequests = 200
+
+const ringSize = 1 << 16
 
 type Probe struct {
 	PlatformProbe
@@ -65,7 +67,7 @@ type Probe struct {
 	enqueuedIORequests map[uint64]ioRequest
 
 	// enqueuedRegSetValues keeps temporarily RegSetValue internal events by pid and base value name
-	enqueuedRegSetValues *expirable.LRU[setValueKey, *event.Event]
+	enqueuedRegSetValues *expirable.LRU[regValueKey, *event.Event]
 
 	config *config.Config
 
@@ -81,7 +83,7 @@ type Probe struct {
 
 	pipeline *pipeline.Pipeline
 
-	linker *callstackLinker
+	linker *CallstackLinker
 }
 
 // ioRequest acts as a scratch area for the pending IRP request
@@ -94,8 +96,8 @@ type ioRequest struct {
 	buf []byte           // keeps the data buffer alive
 }
 
-// setValueKey identifies a pending internal RegSetValue event.
-type setValueKey struct {
+// regValueKey identifies a pending internal RegSetValue event.
+type regValueKey struct {
 	pid  uint32
 	name string // base name of the registry value
 }
@@ -196,19 +198,33 @@ func (p *Probe) Start() error {
 		return err
 	}
 
+	handlePanic := func() {
+		if r := recover(); r != nil {
+			buf := make([]byte, 1<<20)
+			n := runtime.Stack(buf, true)
+			log.Fatalf("panic in trace processing goroutine: %v\n%s", r, buf[:n])
+
+			time.Sleep(5 * time.Second)
+
+			os.Exit(1)
+		}
+	}
+
 	p.wg.Add(1)
 	go func() {
 		defer p.wg.Done()
+		defer handlePanic()
 		p.userTrace.Process(func(rec *etw.EventRecord) error {
-			return p.processEvent(0, rec)
+			return p.processEvent(pipeline.ProducerUser, rec)
 		}, p.errs)
 	}()
 
 	p.wg.Add(1)
 	go func() {
 		defer p.wg.Done()
+		defer handlePanic()
 		p.kernelTrace.Process(func(rec *etw.EventRecord) error {
-			return p.processEvent(1, rec)
+			return p.processEvent(pipeline.ProducerKernel, rec)
 		}, p.errs)
 	}()
 
@@ -216,18 +232,6 @@ func (p *Probe) Start() error {
 	go func() {
 		defer p.wg.Done()
 		for {
-			defer func() {
-				if r := recover(); r != nil {
-					buf := make([]byte, 1<<20)
-					n := runtime.Stack(buf, true)
-					log.Fatalf("panic in event processing goroutine: %v\n%s", r, buf[:n])
-
-					time.Sleep(5 * time.Second)
-
-					os.Exit(1)
-				}
-			}()
-
 			select {
 			case <-p.ctx.Done():
 				return
@@ -280,7 +284,10 @@ func (p *Probe) Close() error {
 	}
 
 	p.pipeline.Close()
-	p.linker.close()
+
+	if p.linker != nil {
+		p.linker.close()
+	}
 
 	p.cancelFunc()
 	p.wg.Wait()
@@ -292,7 +299,7 @@ func (p *Probe) Close() error {
 // producer. Depending on the event type, the record is either committed to the
 // ring buffer, parked until a related event arrives, used for state management
 // or discarded.
-func (p *Probe) processEvent(sessionID int, rec *etw.EventRecord) error {
+func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecord) error {
 	eventType := event.TypeFromEventRecord(rec)
 
 	if p.config.EventSource.HasDropType(eventType) {
@@ -301,8 +308,7 @@ func (p *Probe) processEvent(sessionID int, rec *etw.EventRecord) error {
 
 	switch eventType {
 	case event.CreateFile:
-		//return p.initIORequest(rec)
-		return nil
+		return p.initIORequest(rec)
 	case event.CloseFile:
 		object := rec.ReadUint64(8)
 		delete(p.filePathResolver, object)
@@ -312,16 +318,26 @@ func (p *Probe) processEvent(sessionID int, rec *etw.EventRecord) error {
 		path := rec.ConsumeUTF16String(8)
 		p.filePathResolver[object] = FileInfo{Path: path, Type: fs.GetFileType(path, 0)}
 		return nil
-	case event.DeleteFile, event.SetFileInformation, event.RenameFile, event.EnumDirectory, event.ReadFile, event.WriteFile:
-		//return p.resolveFilePointerPath(rec)
-		return nil
-	case event.MapViewOfSection, event.UnmapViewOfSection, event.MapViewSectionRundown:
-		//return p.resolveFilePointerPath(rec)
 	case event.StackWalk:
-		//p.processStackWalk(rec)
+		var (
+			ts                     = rec.ReadUint64(0)
+			pid                    = rec.ReadUint32(8)
+			tid                    = rec.ReadUint32(12)
+			callstack va.Callstack = rec.ReadCallstackInto(16, va.GetCallstack())
+		)
+
+		// Links the callstack carried by a StackWalk event with the
+		// event that triggered it. If the CreateFile event is still
+		// pending, it claims the callstack when it is published to
+		// the ring buffer
+		if p.isIOEnqueued(ts) {
+			//p.linker.reserve(ts, pid, tid, callstack)
+			//callstack.ReleasePool()
+			return nil
+		}
+		p.linker.Link(ts, pid, tid, callstack)
+		//callstack.ReleasePool()
 		return nil
-	case event.FileOpEnd:
-		return p.completeIORequest(rec)
 	case event.RegKCBRundown, event.RegCreateKCB:
 		kcb := rec.ReadUint64(16)
 		path := rec.ConsumeUTF16String(24)
@@ -337,24 +353,56 @@ func (p *Probe) processEvent(sessionID int, rec *etw.EventRecord) error {
 		delete(p.kcbPathResolver, kcb)
 		return nil
 	case event.RegOpenKey:
-		// allow/deny
-		//p.ringCommit(event.New(rec))
+
 	case event.OpenProcess, event.OpenThread:
-		//return p.ringCommit(event.New(rec))
+
 	case event.Unknown:
 		return nil
 	}
 
-	producer := p.pipeline.Producer(sessionID)
-
-	event := producer.Acquire(eventType)
-	if event == nil {
-		fmt.Println("shed")
+	switch eventType {
+	case event.FileOpEnd:
+		completed, err := p.completeIORequest(producerID, eventType, rec)
+		if err != nil {
+			return err
+		}
+		if !completed {
+			return nil
+		}
 		return nil
+	case event.MapViewOfSection, event.UnmapViewOfSection, event.MapViewSectionRundown, event.DeleteFile, event.SetFileInformation, event.RenameFile, event.EnumDirectory, event.ReadFile, event.WriteFile:
+		fileinfo, found := p.resolveFileInfo(rec)
+
+		return p.publishPipeline(eventType, producerID, rec, func(evt *event.Event) {
+			if found {
+				evt.AppendParam(params.FilePath, params.Path, fileinfo.Path)
+				evt.AppendEnum(params.FileType, uint32(fileinfo.Type), fs.FileTypes)
+			}
+		})
 	}
-	event.Parse(rec)
+
+	producer := p.pipeline.Producer(producerID)
+	evt := producer.Acquire(eventType)
+	if evt == nil {
+		return pipeline.ErrRingNoSlots
+	}
+	evt.Parse(rec)
 
 	producer.Publish()
+
+	return nil
+}
+
+func (p *Probe) publishPipeline(eventType event.Type, producerID pipeline.ProducerID, rec *etw.EventRecord, fn func(*event.Event)) error {
+	producer := p.pipeline.Producer(producerID)
+
+	evt := producer.Acquire(eventType)
+	if evt == nil {
+		return pipeline.ErrRingNoSlots
+	}
+
+	evt.Parse(rec)
+	fn(evt)
 
 	return nil
 }
@@ -374,31 +422,22 @@ func (p *Probe) initIORequest(rec *etw.EventRecord) error {
 
 // completeIORequest completes the pending CreateFile request identified
 // by the IRP address and commits the resulting event to the ring buffer.
-func (p *Probe) completeIORequest(rec *etw.EventRecord) error {
+func (p *Probe) completeIORequest(producerID pipeline.ProducerID, eventType event.Type, rec *etw.EventRecord) (bool, error) {
 	var (
 		disposition uint32
 		status      uint32
 	)
 
-	status = rec.ReadUint32(16)
-	if windows.NTStatus(status) == windows.STATUS_REPARSE {
-		// Inherit caller's create disposition
-	} else {
-		disposition = uint32(rec.ReadUint64(8))
-		disposition |= 2
-	}
-
 	// Dequeue the pending I/O packet
 	irp := rec.ReadUint64(0)
 	req, enqueued := p.enqueuedIORequests[irp]
 	if !enqueued || req.rec.Header.Timestamp > rec.Header.Timestamp {
-		return nil
+		return false, nil
 	}
+	defer req.rec.ReleasePool()
 	delete(p.enqueuedIORequests, irp)
-	defer func() {
-		req.rec.ReleasePool()
-	}()
 
+	// Drive the state management of active files
 	object := req.rec.ReadUint64(8)
 	opts := req.rec.ReadUint32(20)
 	path := req.rec.ConsumeUTF16String(32)
@@ -406,19 +445,34 @@ func (p *Probe) completeIORequest(rec *etw.EventRecord) error {
 	opts &= 0xFFFFFF
 	p.filePathResolver[object] = FileInfo{Path: path, Type: fs.GetFileType(path, opts)}
 
-	// evt := event.NewWithParams(
-	// 	req.rec,
-	// 	&event.Param{Name: params.NTStatus, Type: params.Status, Value: status},
-	// 	&event.Param{Name: params.FileOperation, Type: params.Enum, Value: disposition, Enum: fs.FileCreateDispositions},
-	// )
-	return nil
-	//return p.ringCommit(evt)
+	status = rec.ReadUint32(16)
+	if windows.NTStatus(status) == windows.STATUS_REPARSE {
+		// Inherit caller's create disposition
+	} else {
+		disposition = uint32(rec.ReadUint64(8))
+	}
+
+	// Publish the completed I/O request
+	producer := p.pipeline.Producer(producerID)
+	evt := producer.Acquire(eventType)
+	if evt == nil {
+		return true, pipeline.ErrRingNoSlots
+	}
+	evt.Parse(req.rec)
+
+	// Attach create disposition and NT status parameters
+	evt.AppendParam(params.NTStatus, params.Status, status)
+	evt.AppendEnum(params.FileOperation, disposition, fs.FileCreateDispositions)
+
+	producer.Publish()
+
+	return true, nil
 }
 
-// resolveFilePointerToPath tries FileObject first  as authoritative, always populated on Create/
+// resolveFileInfo tries FileObject first  as authoritative, always populated on Create/
 // Rundown and then falls back to FileKey works even if you missed the Create,
 // e.g. mid-session attach, as long as some later op event backfilled it.
-func (p *Probe) resolveFilePointerPath(rec *etw.EventRecord) error {
+func (p *Probe) resolveFileInfo(rec *etw.EventRecord) (FileInfo, bool) {
 	var key uint64
 	var object uint64
 
@@ -444,17 +498,9 @@ func (p *Probe) resolveFilePointerPath(rec *etw.EventRecord) error {
 		}
 	}
 	if !found {
-		file, _ = p.fcbPathResolver.Get(key)
+		return p.fcbPathResolver.Get(key)
 	}
-
-	// evt := event.NewWithParams(
-	// 	rec,
-	// 	&event.Param{Name: params.FilePath, Type: params.Path, Value: file.Path},
-	// 	&event.Param{Name: params.FileType, Type: params.Enum, Value: uint32(file.Type), Enum: fs.FileTypes},
-	// )
-	return nil
-	//return evt
-	//return p.ringCommit(evt)
+	return file, found
 }
 
 // resolveKCBPath obeys a straightforward algorithm to connect relative
@@ -475,26 +521,6 @@ func (p *Probe) resolveKCBPath(evt *event.Event) string {
 	}
 
 	return ""
-}
-
-// processStackWalk links the callstack carried by a StackWalk event with the
-// event that triggered it.
-func (p *Probe) processStackWalk(rec *etw.EventRecord) {
-	var (
-		ts        = rec.ReadUint64(0)
-		pid       = rec.ReadUint32(8)
-		tid       = rec.ReadUint32(12)
-		callstack = rec.ReadCallstack(16)
-	)
-
-	// If the CreateFile event is still pending, it claims the callstack
-	// when it is published to the ring buffer. Otherwise, splice the
-	// callstack into the event that was already published.
-	if p.isIOEnqueued(ts) {
-		p.linker.reserve(ts, pid, tid, callstack)
-		return
-	}
-	p.linker.splice(ts, pid, tid, callstack)
 }
 
 func (p *Probe) isIOEnqueued(ts uint64) bool {
@@ -529,7 +555,7 @@ func (p *Probe) handleEvent(evt *event.Event) error {
 	case event.LoadModule, event.ModuleRundown, event.LoadModuleInternal:
 	case event.UnloadModule:
 	case event.RegOpenKey, event.RegCreateKey, event.RegDeleteKey, event.RegQueryKey, event.RegQueryValue, event.RegSetValue, event.RegSetValueInternal, event.RegDeleteValue:
-		p.handleRegEvent(evt)
+		//p.handleRegEvent(evt)
 	case event.VirtualAlloc:
 	case event.VirtualFree:
 	case event.Accept, event.Connect, event.Send, event.Recv, event.Reconnect, event.Disconnect, event.Retransmit:
@@ -552,7 +578,7 @@ func (p *Probe) handleEvent(evt *event.Event) error {
 	}
 
 	if p.config.EventSource.StackEnrichment && evt.Type.WaitStack() {
-		// if event := p.linker.put(evt); event != nil {
+		// if event := p.linker.Put(evt); event != nil {
 		// 	return p.dispatchEvent(event)
 		// }
 	}
@@ -561,13 +587,13 @@ func (p *Probe) handleEvent(evt *event.Event) error {
 }
 
 func (p *Probe) dispatchEvent(evt *event.Event) error {
-	// if err := p.sendEventToHandlers(evt); err != nil {
-	// 	return err
-	// }
+	if err := p.sendEventToHandlers(evt); err != nil {
+		return err
+	}
 
-	// if err := p.sendEventToConsumers(evt); err != nil {
-	// 	return err
-	// }
+	if err := p.sendEventToConsumers(evt); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -590,7 +616,7 @@ func (p *Probe) handleRegEvent(evt *event.Event) {
 		// Park the internal RegSetValue event until the public
 		// RegSetValue event for the same pid/value shows up
 		path := evt.Params.MustGetString(params.RegPath)
-		k := setValueKey{evt.PID, filepath.Base(path)}
+		k := regValueKey{evt.PID, filepath.Base(path)}
 		p.enqueuedRegSetValues.Add(k, evt)
 		return
 	}
@@ -607,7 +633,7 @@ func (p *Probe) handleRegEvent(evt *event.Event) {
 		// previously stored RegSetValueInternal event
 		// is popped from the queue. RegSetValue can
 		// be enriched with registry value type/data
-		k := setValueKey{evt.PID, filepath.Base(path)}
+		k := regValueKey{evt.PID, filepath.Base(path)}
 		e, ok := p.enqueuedRegSetValues.Peek(k)
 		if !ok {
 			// Try to read captured data from userspace
@@ -694,13 +720,12 @@ func New(ctx context.Context, psnap ps.Snapshotter, config *config.Config) (*Pro
 		kcbPathResolver:  make(map[uint64]string),
 
 		enqueuedIORequests:   make(map[uint64]ioRequest),
-		enqueuedRegSetValues: expirable.NewLRU[setValueKey, *event.Event](50, nil, time.Second*5),
+		enqueuedRegSetValues: expirable.NewLRU[regValueKey, *event.Event](50, nil, time.Second*5),
 	}
 
 	pipeConfig := pipeline.DefaultConfig(2)
-	pipeConfig.RingSize = 1 << 16 / 2
-	pipeConfig.IdleTimeout = time.Hour // keep the example independent of wall-clock timing
-	//pipeConfig.Classify = classify
+	pipeConfig.RingSize = ringSize
+	pipeConfig.Classifier = classifyEvent
 	pipeConfig.Handler = p
 
 	var err error
@@ -710,18 +735,29 @@ func New(ctx context.Context, psnap ps.Snapshotter, config *config.Config) (*Pro
 	}
 
 	if config.EventSource.StackEnrichment {
-		p.linker = &callstackLinker{
-			probe:        p,
-			buckets:      make(map[uint64]*event.Event),
-			procs:        make(map[uint32]*event.Event),
-			reservations: make(map[uint64]reservedStack),
-			stacks:       make(map[uint64]reservedStack),
-			flusher:      time.NewTicker(evictInterval),
-			done:         make(chan struct{}),
-		}
-
-		go p.linker.flushLoop()
+		p.linker = NewCallstackLinker(p)
 	}
 
 	return p, nil
+}
+
+// classifyEvent assigns the shedding priority of an event type. Events that
+// build or tear down state (process, thread, module, the rundowns that seed
+// them, and the internal RegSetValue that enriches the public one) must never
+// be shed, or the process snapshot drifts and every later lookup misses.
+// Everything else is ClassNormal. Once their volume is measured, move the
+// high-volume types (file, registry, network) to pipeline.ClassNoisy so they
+// are the first to go under pressure.
+func classifyEvent(t event.Type) pipeline.ShedClass {
+	switch t {
+	case event.CreateProcess, event.CreateProcessInternal, event.ProcessRundown, event.ProcessRundownInternal, event.TerminateProcess,
+		event.CreateThread, event.ThreadRundown, event.TerminateThread,
+		event.LoadModule, event.ModuleRundown, event.LoadModuleInternal, event.UnloadModule,
+		event.RegSetValueInternal:
+		return pipeline.ClassState
+	}
+	if t == event.CreateFile || t == event.RegOpenKey {
+		return pipeline.ClassNoisy
+	}
+	return pipeline.ClassNormal
 }
