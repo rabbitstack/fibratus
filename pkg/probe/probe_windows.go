@@ -58,7 +58,8 @@ type Probe struct {
 
 	filePathResolver map[uint64]FileInfo              // maps file object pointer to file info
 	fcbPathResolver  *expirable.LRU[uint64, FileInfo] // maps FCB (File Control Block) pointer to file info
-	kcbPathResolver  map[uint64]string                // maps KCB (Key Control Block) pointer to registry path
+
+	kcbPathResolver map[uint64]string // maps KCB (Key Control Block) pointer to registry path
 
 	// stores pending I/O request packets
 	enqueuedIORequests map[uint64]ioRequest
@@ -159,16 +160,10 @@ func (p *Probe) Init() error {
 	// modified value. This data is used to attach various parameters
 	// to the RegSetValue event published by the NT Kernel Logger
 	if p.config.EventSource.EnableRegistryEvents {
-		// p.userTrace.AddProvider(etw.WindowsKernelRegistryGUID, libetw.WithKeywords(etw.SetValueKeyword), libetw.WithEventFilterDescriptors(etw.EventFilterDescriptor{
-		// 	Ptr:  uintptr(unsafe.Pointer(&etw.CaptureRegistryValue)),
-		// 	Size: 4,
-		// }))
-		val := 0x2
-		eventFilterDescriptor := etw.EventFilterDescriptor{
-			Ptr:  uintptr(unsafe.Pointer(&val)),
+		p.userTrace.AddProvider(etw.WindowsKernelRegistryGUID, libetw.WithKeywords(etw.SetValueKeyword), libetw.WithEventFilterDescriptors(etw.EventFilterDescriptor{
+			Ptr:  uintptr(unsafe.Pointer(&etw.CaptureRegistryValue)),
 			Size: 4,
-		}
-		p.userTrace.AddProvider(etw.WindowsKernelRegistryGUID, libetw.WithKeywords(etw.SetValueKeyword), libetw.WithEventFilterDescriptors(eventFilterDescriptor))
+		}))
 	}
 
 	if p.config.EventSource.EnableDNSEvents {
@@ -304,9 +299,7 @@ func (p *Probe) Close() error {
 // or discarded.
 func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecord) error {
 	eventType := event.TypeFromEventRecord(rec)
-	if eventType == event.RegSetValueInternal {
-		panic(rec)
-	}
+
 	if p.config.EventSource.HasDropType(eventType) {
 		return nil
 	}
@@ -323,12 +316,14 @@ func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecor
 		path := rec.ConsumeUTF16String(8)
 		p.filePathResolver[object] = FileInfo{Path: path, Type: fs.GetFileType(path, 0)}
 		return nil
+	case event.RenameFile:
+		//TODO: update fcbPathResolver
 	case event.StackWalk:
 		var (
 			ts        = rec.ReadUint64(0)
 			pid       = rec.ReadUint32(8)
 			tid       = rec.ReadUint32(12)
-			callstack = rec.ReadCallstackInto(16, va.GetCallstack())
+			callstack = rec.ReadCallstackInto(16, va.GetCallstackFromPool())
 		)
 		// Links the callstack carried by a StackWalk event with the
 		// event that triggered it. If the CreateFile event is still
@@ -349,10 +344,6 @@ func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecor
 		kcb := rec.ReadUint64(16)
 		delete(p.kcbPathResolver, kcb)
 		return nil
-	case event.RegOpenKey, event.RegQueryKey:
-
-	case event.OpenProcess, event.OpenThread:
-
 	case event.Unknown:
 		return nil
 	}
@@ -375,7 +366,12 @@ func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecor
 		}
 		evt.Parse(rec)
 		if found {
-			evt.AppendParam(params.FilePath, params.Path, fileinfo.Path)
+			path := fileinfo.Path
+			if evt.IsEnumDirectory() {
+				// Concatenate file name or wildcard characters
+				path = filepath.Join(path, evt.GetParamAsString(params.FilePath))
+			}
+			evt.AppendParam(params.FilePath, params.Path, path)
 			evt.AppendEnum(params.FileType, uint32(fileinfo.Type), fs.FileTypes)
 		}
 		producer.Publish()
@@ -395,6 +391,8 @@ func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecor
 
 		producer.Publish()
 		return nil
+	case event.OpenProcess, event.OpenThread:
+
 	}
 
 	producer := p.pipeline.Producer(producerID)
@@ -403,9 +401,6 @@ func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecor
 		return pipeline.ErrRingNoSlots
 	}
 	evt.Parse(rec)
-	if evt.IsRegSetValueInternal() {
-		panic(evt)
-	}
 
 	producer.Publish()
 
@@ -421,7 +416,6 @@ func (p *Probe) initIORequest(rec *etw.EventRecord) error {
 	clone, buf := rec.Clone()
 	irp := rec.ReadUint64(0)
 	p.enqueuedIORequests[irp] = ioRequest{rec: clone, buf: buf}
-
 	return nil
 }
 
@@ -558,7 +552,7 @@ func (p *Probe) handleEvent(evt *event.Event) error {
 	case event.LoadModule, event.ModuleRundown, event.LoadModuleInternal:
 	case event.UnloadModule:
 	case event.RegSetValue, event.RegSetValueInternal:
-		//p.handleRegSetValue(evt)
+		p.handleRegSetValue(evt)
 	case event.VirtualAlloc:
 	case event.VirtualFree:
 	case event.Accept, event.Connect, event.Send, event.Recv, event.Reconnect, event.Disconnect, event.Retransmit:
@@ -620,7 +614,6 @@ func (p *Probe) handleRegSetValue(evt *event.Event) {
 		// RegSetValue event for the same pid/value shows up
 		path := evt.Params.MustGetString(params.RegPath)
 		k := regValueKey{evt.PID, filepath.Base(path)}
-		panic(k)
 		p.enqueuedRegSetValues.Add(k, evt.Clone())
 		return
 	}
@@ -630,11 +623,12 @@ func (p *Probe) handleRegSetValue(evt *event.Event) {
 	// previously stored RegSetValueInternal event
 	// is popped from the queue. RegSetValue can
 	// be enriched with registry value type/data
-	k := regValueKey{evt.PID, filepath.Base("")}
+	k := regValueKey{evt.PID, filepath.Base(evt.GetParamAsString(params.RegPath))}
 	e, ok := p.enqueuedRegSetValues.Peek(k)
 	if !ok {
 		// Try to read captured data from userspace
 		//goto readValue
+		return
 	}
 	p.enqueuedRegSetValues.Remove(k)
 
@@ -712,7 +706,7 @@ func New(ctx context.Context, psnap ps.Snapshotter, config *config.Config) (*Pro
 		userTrace:        libetw.NewUserTrace(config),
 		errs:             make(chan error, 200),
 		filePathResolver: make(map[uint64]FileInfo),
-		fcbPathResolver:  expirable.NewLRU[uint64, FileInfo](2500, nil, 0),
+		fcbPathResolver:  expirable.NewLRU[uint64, FileInfo](3000, nil, time.Minute*10),
 		kcbPathResolver:  make(map[uint64]string),
 
 		enqueuedIORequests:   make(map[uint64]ioRequest),

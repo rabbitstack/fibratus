@@ -146,7 +146,7 @@ func (l *CallstackLinker) Link(ts uint64, pid, tid uint32, addrs va.Callstack) {
 
 	evt, ok := l.buckets[ts]
 	if !ok {
-		// park the stack walk, the event hasn't reached put yet
+		// park the stack walk, the event hasn't reached Put yet
 		l.stacks[ts] = reservedStack{pid: pid, tid: tid, addrs: addrs}
 		l.mu.Unlock()
 		return

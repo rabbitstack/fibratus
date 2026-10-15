@@ -847,7 +847,7 @@ func (e *EventRecord) Callstack() va.Callstack {
 		}
 		// number of return addresses
 		length := (n.DataSize - 8) / 8
-		addrs := va.GetCallstack()
+		addrs := va.GetCallstackFromPool()
 		if addrs == nil {
 			addrs = make(va.Callstack, 0, length)
 		} else {

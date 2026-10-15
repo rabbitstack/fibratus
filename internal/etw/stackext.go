@@ -21,6 +21,8 @@
 package etw
 
 import (
+	"fmt"
+
 	"github.com/rabbitstack/fibratus/pkg/config"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
@@ -40,9 +42,16 @@ func NewStackExtensions(config config.EventSourceConfig) *StackExtensions {
 
 // AddStackTracing enables stack tracing for the specified event type.
 func (s *StackExtensions) AddStackTracing(typ event.Type) {
-	if !s.config.HasDropType(typ) && !typ.EventID().IsEmpty() {
-		s.ids = append(s.ids, typ.EventID())
+	if s.config.HasDropType(typ) {
+		return
 	}
+	if typ.WaitStack() && typ.EventID().IsEmpty() {
+		panic(fmt.Sprintf("event type %s waits for stack but its event ID is empty", typ))
+	}
+	if !typ.EventID().IsEmpty() && !typ.WaitStack() {
+		panic(fmt.Sprintf("event type %s doesn't wait for stack but defines the event ID", typ))
+	}
+	s.ids = append(s.ids, typ.EventID())
 }
 
 // EventIds returns all event types eligible for stack tracing.
@@ -75,6 +84,7 @@ func (s *StackExtensions) EnableFileCallstack() {
 		s.AddStackTracing(event.CreateFile)
 		s.AddStackTracing(event.DeleteFile)
 		s.AddStackTracing(event.RenameFile)
+		s.AddStackTracing(event.SetFileInformation)
 	}
 }
 

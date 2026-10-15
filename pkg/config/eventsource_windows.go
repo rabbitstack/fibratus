@@ -117,7 +117,7 @@ func (c *EventSourceConfig) AddFlags(flags *pflag.FlagSet) {
 	flags.Int(minBuffers, int(defaultMinBuffers), "Determines the minimum trace buffer count")
 	flags.Int(maxBuffers, int(defaultMaxBuffers), "Determines the maximum trace buffer count")
 	flags.Duration(flushInterval, defaultFlushInterval, "Specifies how often trace buffers are flushed")
-	flags.StringSlice(excludedEvents, nil, "A list of event names to drop")
+	flags.StringSlice(excludedEvents, []string{"RegCloseKey"}, "A list of event names to drop")
 	flags.StringSlice(excludedProcesses, nil, "A list of image names to drop")
 }
 

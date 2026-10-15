@@ -100,8 +100,8 @@ func DefaultConfig(producers int) Config {
 		Slack:            100 * time.Millisecond,
 		IdleSleep:        50 * time.Microsecond,
 		Shed:             DefaultShedConfig(),
-		RecycleMaxParams: 12,
-		RecycleMaxFrames: 64,
+		RecycleMaxParams: 10,
+		RecycleMaxFrames: 80,
 	}
 }
 

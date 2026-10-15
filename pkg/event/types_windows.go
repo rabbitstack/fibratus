@@ -172,7 +172,7 @@ const (
 	RegDeleteKCBID        uint8  = 23
 	RegKCBRundownID       uint8  = 25
 	RegCloseKeyID         uint8  = 27
-	RegSetValueInternalID uint16 = 36
+	RegSetValueInternalID uint16 = 5
 
 	AcceptTCPv4ID     uint8 = 15
 	AcceptTCPv6ID     uint8 = 31
