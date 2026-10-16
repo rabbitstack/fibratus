@@ -176,6 +176,10 @@ func NewApp(cfg *config.Config, options ...Option) (*App, error) {
 		return nil, err
 	}
 
+	if err := probe.Init(rs); err != nil {
+		return nil, err
+	}
+
 	app := &App{
 		config:  cfg,
 		probe:   probe,
@@ -208,10 +212,6 @@ func (f *App) Run(args []string) error {
 	// the eval event handler
 	fltr, err := filter.NewFromCLI(args, cfg)
 	if err != nil {
-		return err
-	}
-
-	if err := f.probe.Init(); err != nil {
 		return err
 	}
 
@@ -264,8 +264,9 @@ func (f *App) Run(args []string) error {
 
 		// register rule engine
 		if f.engine != nil {
-			//	f.evs.RegisterEventListener(f.engine)
+			f.probe.AddEventHandler(f.engine)
 		}
+
 		// register YARA scanner
 		if cfg.Yara.Enabled {
 			// scanner, err := yara.NewScanner(f.psnap, cfg.Yara)
@@ -285,7 +286,7 @@ func (f *App) Run(args []string) error {
 		if err != nil {
 			return err
 		}
-		f.probe.AddEventConsumer(f.agg)
+		//f.probe.AddEventConsumer(f.agg)
 	}
 
 	f.server.Start()

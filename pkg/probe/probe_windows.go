@@ -40,6 +40,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
+	"github.com/rabbitstack/fibratus/pkg/util/signature"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
 
@@ -100,7 +101,7 @@ type regValueKey struct {
 	name string // base name of the registry value
 }
 
-func (p *Probe) Init() error {
+func (p *Probe) Init(rs *config.RulesCompileResult) error {
 	if p.rs != nil {
 		if p.config.EventSource.EnableThreadEvents {
 			p.config.EventSource.EnableThreadEvents = p.rs.HasThreadEvents
@@ -143,9 +144,9 @@ func (p *Probe) Init() error {
 			// 	continue
 			// }
 
-			// if !e.r.ContainsEvent(typ) {
-			// 	config.EventSource.SetDropMask(typ)
-			// }
+			if !p.rs.ContainsEvent(typ) {
+				p.config.EventSource.AddDropType(typ)
+			}
 		}
 	}
 
@@ -360,12 +361,17 @@ func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecor
 		return nil
 	case event.MapViewOfSection, event.UnmapViewOfSection, event.MapViewSectionRundown, event.DeleteFile, event.SetFileInformation, event.RenameFile, event.EnumDirectory, event.ReadFile, event.WriteFile:
 		fileinfo, found := p.resolveFileInfo(rec)
+
 		evt, producer, err := p.pipeline.AcquireEvent(producerID, eventType)
 		if err != nil {
 			return err
 		}
 		evt.Parse(rec)
-		if found {
+
+		if !found {
+			evt.AppendParam(params.FilePath, params.Path, "")
+			evt.AppendEnum(params.FileType, uint32(fs.Other), fs.FileTypes)
+		} else {
 			path := fileinfo.Path
 			if evt.IsEnumDirectory() {
 				// Concatenate file name or wildcard characters
@@ -374,6 +380,7 @@ func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecor
 			evt.AppendParam(params.FilePath, params.Path, path)
 			evt.AppendEnum(params.FileType, uint32(fileinfo.Type), fs.FileTypes)
 		}
+
 		producer.Publish()
 		return nil
 	case event.RegOpenKey, event.RegCreateKey, event.RegDeleteKey, event.RegQueryKey, event.RegQueryValue, event.RegSetValue, event.RegDeleteValue:
@@ -387,7 +394,11 @@ func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecor
 			return err
 		}
 		evt.Parse(rec)
-		_ = evt.Params.SetValue(params.RegPath, path)
+
+		if err := evt.Params.SetValue(params.RegPath, path); err != nil {
+			producer.Publish()
+			return err
+		}
 
 		producer.Publish()
 		return nil
@@ -544,13 +555,19 @@ func (p *Probe) handleEvent(evt *event.Event) error {
 			return err
 		}
 	case event.TerminateProcess:
-		if err := p.psnap.Remove(evt); err != nil {
+		if err := p.removeProcess(evt); err != nil {
 			return err
 		}
 	case event.CreateThread, event.ThreadRundown:
 	case event.TerminateThread:
 	case event.LoadModule, event.ModuleRundown, event.LoadModuleInternal:
+		if err := p.handleLoadModule(evt); err != nil {
+			return err
+		}
 	case event.UnloadModule:
+		if err := p.removeModule(evt); err != nil {
+			return err
+		}
 	case event.RegSetValue, event.RegSetValueInternal:
 		p.handleRegSetValue(evt)
 	case event.VirtualAlloc:
@@ -608,6 +625,51 @@ func (p *Probe) handleCreateProcess(evt *event.Event) error {
 	return nil
 }
 
+func (p *Probe) removeProcess(evt *event.Event) error {
+	if err := p.psnap.Remove(evt); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *Probe) handleLoadModule(evt *event.Event) error {
+	if evt.IsLoadModuleInternal() {
+		return p.psnap.AddModule(evt)
+	}
+
+	typ := signature.Type(evt.Params.MustGetUint32(params.ModuleSignatureType))
+	lvl := signature.Level(evt.Params.MustGetUint32(params.ModuleSignatureLevel))
+
+	// Code Integrity successfully validated the file's trust chain.
+	// The signature level WINDOWS and WINDOWS_TCB describes the trust
+	// level assigned after verification.
+	// A file can reach the WINDOWS signing level through either an embedded PE
+	// Authenticode signature or a catalog signature where the file hash lives
+	// in a trusted .cat file.
+	// Trusted signatures are automatically pushed to the store. On the contrary,
+	// signature verification is delegated to the async workers
+	key := evt.SignatureKey()
+	if signature.IsTrusted(typ, lvl) {
+		signature.GetSignatures().PutSignature(key, typ, lvl)
+	} else {
+		signature.GetSignatures().DoRequestAsync(key)
+	}
+
+	// request module file metadata by queueing async work
+	fs.GetMetadataStore().DoRequestAsync(evt.GetParamAsString(params.ModulePath), evt.IsModuleRundown())
+
+	return p.psnap.AddModule(evt)
+}
+
+func (p *Probe) removeModule(evt *event.Event) error {
+	pid := evt.Params.MustGetPid()
+	addr := evt.Params.TryGetAddress(params.ModuleBase)
+	if pid == 0 {
+		pid = evt.PID
+	}
+	return p.psnap.RemoveModule(pid, addr)
+}
+
 func (p *Probe) handleRegSetValue(evt *event.Event) {
 	if evt.IsRegSetValueInternal() {
 		// Park the internal RegSetValue event until the public
@@ -619,15 +681,15 @@ func (p *Probe) handleRegSetValue(evt *event.Event) {
 	}
 
 	// Returns and removes the parked internal event
-	// matching e, or nil if there is none (or it already expired).
-	// previously stored RegSetValueInternal event
+	// matching e, or nil if there is none to grab.
+	// Previously stored RegSetValueInternal event
 	// is popped from the queue. RegSetValue can
 	// be enriched with registry value type/data
 	k := regValueKey{evt.PID, filepath.Base(evt.GetParamAsString(params.RegPath))}
 	e, ok := p.enqueuedRegSetValues.Peek(k)
 	if !ok {
 		// Try to read captured data from userspace
-		//goto readValue
+		populateRegistryData(evt)
 		return
 	}
 	p.enqueuedRegSetValues.Remove(k)
@@ -642,47 +704,6 @@ func (p *Probe) handleRegSetValue(evt *event.Event) {
 	if err == nil {
 		evt.AppendParam(params.RegData, valueData.Type, valueData.Value)
 	}
-	return
-
-	//readValue:
-	if !evt.IsSuccess() {
-		return
-	}
-
-	// Values within hidden keys cannot be read
-	// if strings.HasSuffix(path, "\\") {
-	// 	return
-	// }
-
-	// get the type/value of the registry key and append to parameters
-	// rootkey, subkey := key.Format(path)
-	// if rootkey == key.Invalid {
-	// 	return
-	// }
-
-	//readValueOps.Add(1)
-	// typ, val, err := rootkey.ReadValue(subkey)
-	// if err != nil {
-	// 	errno, ok := err.(windows.Errno)
-	// 	if ok && (errno.Is(os.ErrNotExist) || err == windows.ERROR_ACCESS_DENIED) {
-	// 		return e, nil
-	// 	}
-	// 	return e, ErrReadValue(rootkey.String(), path, err)
-	// }
-	// e.AppendEnum(params.RegValueType, typ, key.RegistryValueTypes)
-
-	// switch typ {
-	// case registry.SZ, registry.EXPAND_SZ:
-	// 	e.AppendParam(params.RegData, params.UnicodeString, val)
-	// case registry.MULTI_SZ:
-	// 	e.AppendParam(params.RegData, params.Slice, val)
-	// case registry.BINARY:
-	// 	e.AppendParam(params.RegData, params.Binary, val)
-	// case registry.QWORD:
-	// 	e.AppendParam(params.RegData, params.Uint64, val)
-	// case registry.DWORD:
-	// 	e.AppendParam(params.RegData, params.Uint32, uint32(val.(uint64)))
-	// }
 }
 
 func (p *Probe) Handle(evt *event.Event) {

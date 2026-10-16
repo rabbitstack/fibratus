@@ -19,7 +19,11 @@
 package probe
 
 import (
+	"github.com/rabbitstack/fibratus/pkg/event"
+	"github.com/rabbitstack/fibratus/pkg/event/params"
 	"github.com/rabbitstack/fibratus/pkg/fs"
+	"github.com/rabbitstack/fibratus/pkg/util/key"
+	"golang.org/x/sys/windows/registry"
 )
 
 // FileInfo stores file information obtained from event state.
@@ -29,4 +33,34 @@ type FileInfo struct {
 
 	// Type indicates the file type derived from the I/O operation.
 	Type fs.FileType
+}
+
+func populateRegistryData(evt *event.Event) {
+	path := evt.GetParamAsString(params.RegPath)
+
+	// Get the type/value of the registry key and append to parameters
+	rootkey, subkey := key.Format(path)
+	if rootkey == key.Invalid {
+		return
+	}
+
+	typ, val, err := rootkey.ReadValue(subkey)
+	if err != nil {
+		return
+	}
+
+	evt.AppendEnum(params.RegValueType, typ, key.RegistryValueTypes)
+
+	switch typ {
+	case registry.SZ, registry.EXPAND_SZ:
+		evt.AppendParam(params.RegData, params.UnicodeString, val)
+	case registry.MULTI_SZ:
+		evt.AppendParam(params.RegData, params.Slice, val)
+	case registry.BINARY:
+		evt.AppendParam(params.RegData, params.Binary, val)
+	case registry.QWORD:
+		evt.AppendParam(params.RegData, params.Uint64, val)
+	case registry.DWORD:
+		evt.AppendParam(params.RegData, params.Uint32, uint32(val.(uint64)))
+	}
 }
