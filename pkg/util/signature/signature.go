@@ -169,7 +169,10 @@ func newSignatures() *Signatures {
 		stop:       make(chan struct{}),
 	}
 
-	workerCount := max(runtime.NumCPU()/2, 4)
+	workerCount := 2
+	if runtime.NumCPU() >= 16 {
+		workerCount = 4
+	}
 	for range workerCount {
 		go sigs.runWorker()
 	}
