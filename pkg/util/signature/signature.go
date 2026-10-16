@@ -197,7 +197,7 @@ func (s *Signatures) DoRequest(key Key) *Signature {
 		// queue full: fall back to inline check rather than
 		// dropping a decision that has a security consequence.
 		signatureAsyncRequestDrops.Add(1)
-		return s.getOrCheck(key)
+		return s.resolve(key)
 	}
 	r := <-ch
 	return r
@@ -286,13 +286,26 @@ func (s *Signatures) get(key Key) *Signature {
 	return sig
 }
 
+// peek looks up the signature without touching the access timestamp
+// or the hit counter.
+func (s *Signatures) peek(key Key) *Signature {
+	s.mux.RLock()
+	sig := s.signatures[key]
+	s.mux.RUnlock()
+	return sig
+}
+
 // contains returns true if the signature with the given key exists in the store.
 // If the signature doesn't exist, this method returns false.
 func (s *Signatures) contains(key Key) bool {
 	return s.get(key) != nil
 }
 
-func (s *Signatures) getOrCheck(key Key) *Signature {
+// resolve returns the cached signature for the key, or verifies the
+// module and stores the result. Concurrent callers for the same key
+// share a single verification. The call blocks until the result is
+// available.
+func (s *Signatures) resolve(key Key) *Signature {
 	if sig := s.get(key); sig != nil {
 		return sig
 	}
@@ -301,27 +314,28 @@ func (s *Signatures) getOrCheck(key Key) *Signature {
 	// concurrently, only one of them does the PE/catalog work, while the
 	// rest block and share the result. This is critical during process
 	// startup when many threads load the same DLL simultaneously
-	v, err := s.group.Do(key.String(), func() (any, error) {
+	v, _ := s.group.Do(key.String(), func() (any, error) {
+		// previous flight may have finished just before this one started
+		if sig := s.peek(key); sig != nil {
+			return sig, nil
+		}
+
 		sig := newUncheckedSignature(key.Path)
 		if err := sig.check(); err != nil {
-			return sig, err
+			signatureCheckErrors.Add(err.Error(), 1)
 		}
+
+		// store and count once per check, not once per sharer
+		s.mux.Lock()
+		s.signatures[key] = sig
+		s.mux.Unlock()
+		signatureCount.Add(1)
+		signatureCacheMisses.Add(1)
+
 		return sig, nil
 	})
 
-	if err != nil {
-		signatureCheckErrors.Add(err.Error(), 1)
-	}
-
-	// put the signature in the store
-	s.mux.Lock()
-	sign := v.(*Signature)
-	s.signatures[key] = sign
-	s.mux.Unlock()
-	signatureCount.Add(1)
-	signatureCacheMisses.Add(1)
-
-	return sign
+	return v.(*Signature)
 }
 
 func (s *Signatures) runWorker() {
@@ -347,7 +361,7 @@ func (s *Signatures) runWorker() {
 }
 
 func (s *Signatures) processRequest(req Request) {
-	sign := s.getOrCheck(req.Key)
+	sign := s.resolve(req.Key)
 	if req.Response != nil {
 		req.Response <- sign
 	}
