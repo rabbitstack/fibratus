@@ -76,6 +76,8 @@ const (
 	WtdStateActionClose = 0x00000002
 	// WtdSaferFlag is the trust provider flag
 	WtdSaferFlag = 0x100
+	// WtdCacheOnlyURLRetrieval use only the local cache for revocation checks. Prevents revocation checks over the network.
+	WtdCacheOnlyURLRetrieval = 0x1000
 )
 
 const (
@@ -155,7 +157,7 @@ func NewWintrustData(choice uint32) *WintrustData {
 		UIChoice:         WtdUINone,
 		RevocationChecks: WtdRevokeNone,
 		StateAction:      WtdStateActionVerify,
-		ProviderFlags:    WtdSaferFlag,
+		ProviderFlags:    WtdSaferFlag | WtdCacheOnlyURLRetrieval,
 	}
 }
 
