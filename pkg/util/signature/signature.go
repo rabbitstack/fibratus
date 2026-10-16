@@ -199,8 +199,11 @@ func (s *Signatures) DoRequest(key Key) *Signature {
 	} else {
 		// hot path returns immediately if the signature is already resolved
 		if sig := s.get(key); sig != nil {
-			if sig.IsTrusted() && !sig.HasCertificate() {
-				s.parseCertificate(sig)
+			if sig.IsTrusted() && !sig.HasCertificate() && !sig.certTried.Load() {
+				select {
+				case s.certs <- Request{Key: key}:
+				default:
+				}
 			}
 			return sig
 		}
@@ -447,6 +450,9 @@ func (s *Signatures) gcSignatures() {
 }
 
 func (s *Signatures) parseCertificate(sig *Signature) {
+	if sig == nil || !sig.certTried.CompareAndSwap(false, true) {
+		return
+	}
 	cert, err := sig.parseCertificate(false)
 	if err != nil {
 		signatureCertParseErrors.Add(err.Error(), 1)
