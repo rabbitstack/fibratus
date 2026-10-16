@@ -60,9 +60,6 @@ func enableKernelFlags(config config.EventSourceConfig) etw.EventTraceFlags {
 	if config.EnableMemEvents {
 		flags |= etw.VirtualAlloc
 	}
-	if config.EnableRegistryEvents {
-		flags |= etw.Registry
-	}
 
 	return flags
 }

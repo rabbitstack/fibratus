@@ -210,13 +210,20 @@ func New(cfg Config) (*Pipeline, error) {
 // runs that event collection. It must not be shared between goroutines.
 func (p *Pipeline) Producer(i ProducerID) *Producer { return p.prods[i] }
 
-func (p *Pipeline) AcquireEvent(i ProducerID, t event.Type) (*event.Event, *Producer, error) {
+// Publish acquires a slot, lets mut populate the event, and publishes it.
+// mut owns everything source-specific: parsing the raw record (ETW, eBPF, ...)
+// and any augmentation. The pipeline never sees the raw record.
+func (p *Pipeline) Publish(i ProducerID, t event.Type, mut func(*event.Event)) error {
 	producer := p.Producer(i)
 	evt := producer.Acquire(t)
 	if evt == nil {
-		return nil, producer, ErrRingNoSlots
+		return ErrRingNoSlots
 	}
-	return evt, producer, nil
+	if mut != nil {
+		mut(evt)
+	}
+	producer.Publish()
+	return nil
 }
 
 // Start launches the consumer loop. Calling it more than once is a no-op.

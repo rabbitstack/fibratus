@@ -276,7 +276,7 @@ func (f *App) Run(args []string) error {
 			//f.evs.RegisterEventListener(scanner)
 		}
 
-		// set up the aggregator consuimer that forwards events to output sinks
+		// set up the aggregator consumer that forwards events to output sinks
 		f.agg, err = aggregator.NewBuffered(
 			cfg.Aggregator,
 			cfg.Output,
@@ -286,7 +286,9 @@ func (f *App) Run(args []string) error {
 		if err != nil {
 			return err
 		}
-		//f.probe.AddEventConsumer(f.agg)
+		if cfg.ForwardMode || cfg.IsCaptureSet() {
+			f.probe.AddEventConsumer(f.agg)
+		}
 	}
 
 	f.server.Start()

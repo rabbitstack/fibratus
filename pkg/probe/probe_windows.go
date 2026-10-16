@@ -40,7 +40,7 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
-	"github.com/rabbitstack/fibratus/pkg/util/signature"
+	"github.com/rabbitstack/fibratus/pkg/util/pair"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
 
@@ -66,13 +66,11 @@ type Probe struct {
 	enqueuedIORequests map[uint64]ioRequest
 
 	// enqueuedRegSetValues keeps temporarily RegSetValue internal events by pid and base value name
-	enqueuedRegSetValues *expirable.LRU[regValueKey, *event.Event]
+	enqueuedRegSetValues *expirable.LRU[pair.Pair[uint32, string], *event.Event]
 
 	config *config.Config
 
 	psnap ps.Snapshotter
-
-	rs *config.RulesCompileResult
 
 	wg         sync.WaitGroup
 	ctx        context.Context
@@ -95,31 +93,46 @@ type ioRequest struct {
 	buf []byte           // keeps the data buffer alive
 }
 
-// regValueKey identifies a pending internal RegSetValue event.
-type regValueKey struct {
-	pid  uint32
-	name string // base name of the registry value
-}
-
 func (p *Probe) Init(rs *config.RulesCompileResult) error {
-	if p.rs != nil {
-		if p.config.EventSource.EnableThreadEvents {
-			p.config.EventSource.EnableThreadEvents = p.rs.HasThreadEvents
+	var enableDNS bool
+	var enableRegistry bool
+	var enableAuditAPI bool
+
+	if rs != nil {
+		enableDNS = rs.HasDNSEvents
+		enableRegistry = rs.HasRegistryEvents
+		enableAuditAPI = rs.HasAuditAPIEvents
+
+		kernelEventFlags := etw.Process | etw.Module | etw.Thread
+
+		if rs.HasNetworkEvents {
+			kernelEventFlags |= etw.NetTCPIP
 		}
-		// config.EventSource.EnableModuleEvents = config.EventSource.EnableModuleEvents && e.r.HasModuleEvents
-		// config.EventSource.EnableNetEvents = config.EventSource.EnableNetEvents && e.r.HasNetworkEvents
-		// config.EventSource.EnableRegistryEvents = config.EventSource.EnableRegistryEvents && (e.r.HasRegistryEvents || (config.Yara.Enabled && !config.Yara.SkipRegistry))
-		// config.EventSource.EnableFileIOEvents = config.EventSource.EnableFileIOEvents && (e.r.HasFileEvents || (config.Yara.Enabled && !config.Yara.SkipFiles))
-		// config.EventSource.EnableVAMapEvents = config.EventSource.EnableVAMapEvents && (e.r.HasVAMapEvents || (config.Yara.Enabled && !config.Yara.SkipMmaps))
-		// config.EventSource.EnableMemEvents = config.EventSource.EnableMemEvents && (e.r.HasMemEvents || (config.Yara.Enabled && !config.Yara.SkipAllocs))
-		// config.EventSource.EnableDNSEvents = config.EventSource.EnableDNSEvents && e.r.HasDNSEvents
-		// config.EventSource.EnableAuditAPIEvents = config.EventSource.EnableAuditAPIEvents && e.r.HasAuditAPIEvents
+		if rs.HasRegistryEvents {
+			kernelEventFlags |= etw.Registry
+		}
+		if rs.HasFileEvents {
+			kernelEventFlags |= etw.DiskFileIO | etw.FileIO | etw.FileIOInit
+		}
+		if rs.HasVAMapEvents {
+			kernelEventFlags |= etw.VaMap
+		}
+		if rs.HasMemEvents {
+			kernelEventFlags |= etw.VirtualAlloc
+		}
+
+		p.kernelTrace.SetKernelEventFlags(kernelEventFlags)
+	} else {
+		enableDNS = p.config.EventSource.EnableDNSEvents
+		enableRegistry = p.config.EventSource.EnableRegistryEvents
+		enableAuditAPI = p.config.EventSource.EnableAuditAPIEvents
 	}
+
 	// 	func dropSet(all []event.Type, keep eventPredicate) []event.Type {
 	// 	return slices.DeleteFunc(slices.Clone(all), keep) // removes kept ones, leaving the drops
 	// 	}
 	// }
-	if p.rs != nil {
+	if rs != nil {
 		for _, typ := range event.AllTypes() {
 			if typ.OnlyState() || typ.StateSnapshot() {
 				continue
@@ -144,7 +157,7 @@ func (p *Probe) Init(rs *config.RulesCompileResult) error {
 			// 	continue
 			// }
 
-			if !p.rs.ContainsEvent(typ) {
+			if !rs.ContainsEvent(typ) {
 				p.config.EventSource.AddDropType(typ)
 			}
 		}
@@ -160,18 +173,18 @@ func (p *Probe) Init(rs *config.RulesCompileResult) error {
 	// the RegSetValue event with the full captured data for the
 	// modified value. This data is used to attach various parameters
 	// to the RegSetValue event published by the NT Kernel Logger
-	if p.config.EventSource.EnableRegistryEvents {
+	if enableRegistry {
 		p.userTrace.AddProvider(etw.WindowsKernelRegistryGUID, libetw.WithKeywords(etw.SetValueKeyword), libetw.WithEventFilterDescriptors(etw.EventFilterDescriptor{
 			Ptr:  uintptr(unsafe.Pointer(&etw.CaptureRegistryValue)),
 			Size: 4,
 		}))
 	}
 
-	if p.config.EventSource.EnableDNSEvents {
+	if enableDNS {
 		p.userTrace.AddProvider(etw.DNSClientGUID)
 	}
 
-	if p.config.EventSource.EnableAuditAPIEvents {
+	if enableAuditAPI {
 		p.userTrace.AddProvider(etw.KernelAuditAPICallsGUID, libetw.WithCallstack(p.config.EventSource.StackEnrichment))
 	}
 
@@ -351,7 +364,7 @@ func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecor
 
 	switch eventType {
 	case event.FileOpEnd:
-		completed, err := p.completeIORequest(producerID, eventType, rec)
+		completed, err := p.completeIORequest(producerID, rec)
 		if err != nil {
 			return err
 		}
@@ -361,17 +374,11 @@ func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecor
 		return nil
 	case event.MapViewOfSection, event.UnmapViewOfSection, event.MapViewSectionRundown, event.DeleteFile, event.SetFileInformation, event.RenameFile, event.EnumDirectory, event.ReadFile, event.WriteFile:
 		fileinfo, found := p.resolveFileInfo(rec)
-
-		evt, producer, err := p.pipeline.AcquireEvent(producerID, eventType)
-		if err != nil {
-			return err
-		}
-		evt.Parse(rec)
-
-		if !found {
-			evt.AppendParam(params.FilePath, params.Path, "")
-			evt.AppendEnum(params.FileType, uint32(fs.Other), fs.FileTypes)
-		} else {
+		return p.pipeline.Publish(producerID, eventType, func(evt *event.Event) {
+			evt.Parse(rec)
+			if !found {
+				return
+			}
 			path := fileinfo.Path
 			if evt.IsEnumDirectory() {
 				// Concatenate file name or wildcard characters
@@ -379,29 +386,16 @@ func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecor
 			}
 			evt.AppendParam(params.FilePath, params.Path, path)
 			evt.AppendEnum(params.FileType, uint32(fileinfo.Type), fs.FileTypes)
-		}
-
-		producer.Publish()
-		return nil
+		})
 	case event.RegOpenKey, event.RegCreateKey, event.RegDeleteKey, event.RegQueryKey, event.RegQueryValue, event.RegSetValue, event.RegDeleteValue:
 		path := p.resolveKCBPath(rec)
 		if path == "" {
 			break
 		}
-
-		evt, producer, err := p.pipeline.AcquireEvent(producerID, eventType)
-		if err != nil {
-			return err
-		}
-		evt.Parse(rec)
-
-		if err := evt.Params.SetValue(params.RegPath, path); err != nil {
-			producer.Publish()
-			return err
-		}
-
-		producer.Publish()
-		return nil
+		return p.pipeline.Publish(producerID, eventType, func(evt *event.Event) {
+			evt.Parse(rec)
+			_ = evt.Params.SetValue(params.RegPath, path)
+		})
 	case event.OpenProcess, event.OpenThread:
 
 	}
@@ -432,7 +426,7 @@ func (p *Probe) initIORequest(rec *etw.EventRecord) error {
 
 // completeIORequest completes the pending CreateFile request identified
 // by the IRP address and commits the resulting event to the ring buffer.
-func (p *Probe) completeIORequest(producerID pipeline.ProducerID, eventType event.Type, rec *etw.EventRecord) (bool, error) {
+func (p *Probe) completeIORequest(producerID pipeline.ProducerID, rec *etw.EventRecord) (bool, error) {
 	var (
 		disposition uint32
 		status      uint32
@@ -462,20 +456,12 @@ func (p *Probe) completeIORequest(producerID pipeline.ProducerID, eventType even
 		disposition = uint32(rec.ReadUint64(8))
 	}
 
-	// Publish the completed I/O request
-	evt, producer, err := p.pipeline.AcquireEvent(producerID, eventType)
-	if err != nil {
-		return true, err
-	}
-	evt.Parse(req.rec)
-
-	// Attach create disposition and NT status parameters
-	evt.AppendParam(params.NTStatus, params.Status, status)
-	evt.AppendEnum(params.FileOperation, disposition, fs.FileCreateDispositions)
-
-	producer.Publish()
-
-	return true, nil
+	return true, p.pipeline.Publish(producerID, event.CreateFile, func(evt *event.Event) {
+		evt.Parse(req.rec)
+		// Attach create disposition and NT status parameters
+		evt.AppendParam(params.NTStatus, params.Status, status)
+		evt.AppendEnum(params.FileOperation, disposition, fs.FileCreateDispositions)
+	})
 }
 
 // resolveFileInfo tries FileObject first  as authoritative, always populated on Create/
@@ -637,26 +623,26 @@ func (p *Probe) handleLoadModule(evt *event.Event) error {
 		return p.psnap.AddModule(evt)
 	}
 
-	typ := signature.Type(evt.Params.MustGetUint32(params.ModuleSignatureType))
-	lvl := signature.Level(evt.Params.MustGetUint32(params.ModuleSignatureLevel))
+	// typ := signature.Type(evt.Params.MustGetUint32(params.ModuleSignatureType))
+	// lvl := signature.Level(evt.Params.MustGetUint32(params.ModuleSignatureLevel))
 
-	// Code Integrity successfully validated the file's trust chain.
-	// The signature level WINDOWS and WINDOWS_TCB describes the trust
-	// level assigned after verification.
-	// A file can reach the WINDOWS signing level through either an embedded PE
-	// Authenticode signature or a catalog signature where the file hash lives
-	// in a trusted .cat file.
-	// Trusted signatures are automatically pushed to the store. On the contrary,
-	// signature verification is delegated to the async workers
-	key := evt.SignatureKey()
-	if signature.IsTrusted(typ, lvl) {
-		signature.GetSignatures().PutSignature(key, typ, lvl)
-	} else {
-		signature.GetSignatures().DoRequestAsync(key)
-	}
+	// // Code Integrity successfully validated the file's trust chain.
+	// // The signature level WINDOWS and WINDOWS_TCB describes the trust
+	// // level assigned after verification.
+	// // A file can reach the WINDOWS signing level through either an embedded PE
+	// // Authenticode signature or a catalog signature where the file hash lives
+	// // in a trusted .cat file.
+	// // Trusted signatures are automatically pushed to the store. On the contrary,
+	// // signature verification is delegated to the async workers
+	// key := evt.SignatureKey()
+	// if signature.IsTrusted(typ, lvl) {
+	// 	signature.GetSignatures().PutSignature(key, typ, lvl)
+	// } else {
+	// 	signature.GetSignatures().DoRequestAsync(key)
+	// }
 
-	// request module file metadata by queueing async work
-	fs.GetMetadataStore().DoRequestAsync(evt.GetParamAsString(params.ModulePath), evt.IsModuleRundown())
+	// // request module file metadata by queueing async work
+	// fs.GetMetadataStore().DoRequestAsync(evt.GetParamAsString(params.ModulePath), evt.IsModuleRundown())
 
 	return p.psnap.AddModule(evt)
 }
@@ -675,7 +661,7 @@ func (p *Probe) handleRegSetValue(evt *event.Event) {
 		// Park the internal RegSetValue event until the public
 		// RegSetValue event for the same pid/value shows up
 		path := evt.Params.MustGetString(params.RegPath)
-		k := regValueKey{evt.PID, filepath.Base(path)}
+		k := pair.New(evt.PID, filepath.Base(path))
 		p.enqueuedRegSetValues.Add(k, evt.Clone())
 		return
 	}
@@ -685,7 +671,7 @@ func (p *Probe) handleRegSetValue(evt *event.Event) {
 	// Previously stored RegSetValueInternal event
 	// is popped from the queue. RegSetValue can
 	// be enriched with registry value type/data
-	k := regValueKey{evt.PID, filepath.Base(evt.GetParamAsString(params.RegPath))}
+	k := pair.New(evt.PID, filepath.Base(evt.GetParamAsString(params.RegPath)))
 	e, ok := p.enqueuedRegSetValues.Peek(k)
 	if !ok {
 		// Try to read captured data from userspace
@@ -731,7 +717,7 @@ func New(ctx context.Context, psnap ps.Snapshotter, config *config.Config) (*Pro
 		kcbPathResolver:  make(map[uint64]string),
 
 		enqueuedIORequests:   make(map[uint64]ioRequest),
-		enqueuedRegSetValues: expirable.NewLRU[regValueKey, *event.Event](50, nil, time.Second*5),
+		enqueuedRegSetValues: expirable.NewLRU[pair.Pair[uint32, string], *event.Event](50, nil, time.Second*10),
 	}
 
 	pipeConfig := pipeline.DefaultConfig(2)
