@@ -37,6 +37,10 @@ import (
 // requestQueueSize is the signature request input channel size
 const requestQueueSize = 2048
 
+// maxInlineChecks bounds the number of signature checks that can run
+// concurrently on caller goroutines when the request queue is saturated.
+const maxInlineChecks = 2
+
 var signatureAsyncRequestDrops = expvar.NewInt("signature.async.request.drops")
 
 var signatureCiCount = expvar.NewInt("signature.ci.count")
@@ -121,6 +125,9 @@ type Signatures struct {
 
 	group singleflight.Group
 
+	// inline bounds concurrent checks run on caller goroutines.
+	inline chan struct{}
+
 	stop chan struct{}
 }
 
@@ -153,6 +160,7 @@ func newSignatures() *Signatures {
 		purger:     time.NewTicker(time.Minute),
 		requests:   make(chan Request, requestQueueSize),
 		certs:      make(chan Request, requestQueueSize),
+		inline:     make(chan struct{}, maxInlineChecks),
 		stop:       make(chan struct{}),
 	}
 
@@ -196,7 +204,14 @@ func (s *Signatures) DoRequest(key Key) *Signature {
 	default:
 		// queue full: fall back to inline check rather than
 		// dropping a decision that has a security consequence.
+		// Also, bound concurrent inline checks with a semaphore
 		signatureAsyncRequestDrops.Add(1)
+		select {
+		case s.inline <- struct{}{}:
+			defer func() { <-s.inline }()
+		case <-s.stop:
+			return newUncheckedSignature(key.Path)
+		}
 		return s.resolve(key)
 	}
 	r := <-ch
