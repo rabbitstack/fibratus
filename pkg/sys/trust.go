@@ -21,16 +21,22 @@
 package sys
 
 import (
+	libytes "bytes"
+	"crypto/x509"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
-	"reflect"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 	"unsafe"
 
+	"github.com/golang/groupcache/singleflight"
+	"github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/rabbitstack/fibratus/pkg/util/bytes"
 	"github.com/rabbitstack/fibratus/pkg/util/format"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
@@ -394,71 +400,123 @@ func (c *Cat) Verify(filename string) (SignatureStatus, error) {
 	return trust.VerifyCatalog(c.file.Fd(), filename, c.admin, c.catalogInfo, c.hash, c.size)
 }
 
-// ParseCertificate parses the catalog certificate.
-func (c *Cat) ParseCertificate() (*Cert, error) {
-	f, err := os.Open(c.catalogInfo.CatalogFile())
+// certKey is the cache key for parsed cert per catalog file. Keyed by path, size and modification time.
+type certKey struct {
+	path        string
+	size, mtime int64
+}
+
+// certEntry is the outcome of parsing a catalog certificate.
+type certEntry struct {
+	cert    *Cert
+	err     error
+	expires time.Time // zero for successes, which only age out of the LRU
+}
+
+const (
+	certsLRUSize = 1024
+	// certErrTTL bounds how long a failure to parse a catalog is remembered.
+	certErrTTL = 5 * time.Minute
+)
+
+var (
+	catalogGroup     singleflight.Group
+	catalogCertCache = expirable.NewLRU[certKey, *certEntry](certsLRUSize, nil, time.Hour)
+
+	pkcs7ParseMu sync.Mutex
+)
+
+// parsePKCS7 parses the DER/BER encoded PKCS#7 package. It is a goroutine-safe
+// wrapper around pkcs7.Parse. Always use it instead of calling pkcs7.Parse
+// directly.
+func parsePKCS7(data []byte) (*pkcs7.PKCS7, error) {
+	pkcs7ParseMu.Lock()
+	defer pkcs7ParseMu.Unlock()
+	return pkcs7.Parse(data)
+}
+
+func lookupCert(k certKey) (*certEntry, bool) {
+	e, ok := catalogCertCache.Get(k)
+	if !ok {
+		return nil, false
+	}
+	// failures carry a deadline shorter than the LRU TTL
+	if !e.expires.IsZero() && time.Now().After(e.expires) {
+		catalogCertCache.Remove(k)
+		return nil, false
+	}
+	return e, true
+}
+
+func parseCatalogCert(path string) (*Cert, error) {
+	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
+
 	crt, err := io.ReadAll(f)
 	if err != nil {
 		return nil, err
 	}
-	pkcs, err := pkcs7.Parse(crt)
+	pkcs, err := parsePKCS7(crt)
 	if err != nil {
 		return nil, err
 	}
 
-	certInfo := &Cert{}
-	serialNumber := pkcs.Signers[0].IssuerAndSerialNumber.SerialNumber
-	for _, cert := range pkcs.Certificates {
-		if !reflect.DeepEqual(cert.SerialNumber, serialNumber) {
-			continue
-		}
-
-		certInfo.SerialNumber = hex.EncodeToString(cert.SerialNumber.Bytes())
-
-		certInfo.NotAfter = cert.NotAfter
-		certInfo.NotBefore = cert.NotBefore
-
-		// issuer information
-		if len(cert.Issuer.Country) > 0 {
-			certInfo.Issuer = cert.Issuer.Country[0]
-		}
-
-		if len(cert.Issuer.Province) > 0 {
-			certInfo.Issuer += ", " + cert.Issuer.Province[0]
-		}
-
-		if len(cert.Issuer.Locality) > 0 {
-			certInfo.Issuer += ", " + cert.Issuer.Locality[0]
-		}
-
-		certInfo.Issuer += ", " + cert.Issuer.CommonName
-
-		// subject information
-		if len(cert.Subject.Country) > 0 {
-			certInfo.Subject = cert.Subject.Country[0]
-		}
-
-		if len(cert.Subject.Province) > 0 {
-			certInfo.Subject += ", " + cert.Subject.Province[0]
-		}
-
-		if len(cert.Subject.Locality) > 0 {
-			certInfo.Subject += ", " + cert.Subject.Locality[0]
-		}
-
-		if len(cert.Subject.Organization) > 0 {
-			certInfo.Subject += ", " + cert.Subject.Organization[0]
-		}
-
-		certInfo.Subject += ", " + cert.Subject.CommonName
-
-		break
+	if len(pkcs.Signers) == 0 {
+		return nil, errors.New("catalog has no signers")
 	}
-	return certInfo, nil
+	signer := pkcs.Signers[0].IssuerAndSerialNumber
+	if signer.SerialNumber == nil {
+		return nil, errors.New("catalog signer has no serial number")
+	}
+
+	for _, cert := range pkcs.Certificates {
+		if cert.SerialNumber != nil &&
+			cert.SerialNumber.Cmp(signer.SerialNumber) == 0 &&
+			libytes.Equal(cert.RawIssuer, signer.IssuerName.FullBytes) {
+			return NewCert(cert), nil
+		}
+	}
+	return nil, errors.New("catalog signer certificate not found")
+}
+
+// ParseCertificate parses the catalog certificate.
+func (c *Cat) ParseCertificate() (*Cert, error) {
+	path := c.catalogInfo.CatalogFile()
+	fi, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+
+	size := fi.Size()
+	mtime := fi.ModTime().Unix()
+	key := certKey{strings.ToLower(path), size, mtime}
+
+	if e, ok := lookupCert(key); ok {
+		return e.cert, e.err
+	}
+
+	v, _ := catalogGroup.Do(fmt.Sprint(key), func() (any, error) {
+		if e, ok := lookupCert(key); ok {
+			return e.cert, e.err
+		}
+		cert, err := parseCatalogCert(path)
+		e := &certEntry{cert: cert, err: err}
+		if err != nil {
+			var pathErr *fs.PathError
+			if errors.As(err, &pathErr) {
+				return e, nil // I/O failure is not cached
+			}
+			e.expires = time.Now().Add(certErrTTL)
+		}
+		catalogCertCache.Add(key, e)
+		return e, nil
+	})
+
+	e := v.(*certEntry)
+	return e.cert, e.err
 }
 
 func (c *Cat) Close() error {
@@ -497,6 +555,51 @@ type Cert struct {
 	// CAs MUST force the serialNumber to be a non-negative integer.
 	// For convenience, we convert the big int to string.
 	SerialNumber string `json:"serial_number"`
+}
+
+// NewCert builds the certificate info from the X.509 certificate.
+func NewCert(cert *x509.Certificate) *Cert {
+	certInfo := &Cert{
+		SerialNumber: hex.EncodeToString(cert.SerialNumber.Bytes()),
+		NotAfter:     cert.NotAfter,
+		NotBefore:    cert.NotBefore,
+	}
+
+	// issuer information
+	if len(cert.Issuer.Country) > 0 {
+		certInfo.Issuer = cert.Issuer.Country[0]
+	}
+
+	if len(cert.Issuer.Province) > 0 {
+		certInfo.Issuer += ", " + cert.Issuer.Province[0]
+	}
+
+	if len(cert.Issuer.Locality) > 0 {
+		certInfo.Issuer += ", " + cert.Issuer.Locality[0]
+	}
+
+	certInfo.Issuer += ", " + cert.Issuer.CommonName
+
+	// subject information
+	if len(cert.Subject.Country) > 0 {
+		certInfo.Subject = cert.Subject.Country[0]
+	}
+
+	if len(cert.Subject.Province) > 0 {
+		certInfo.Subject += ", " + cert.Subject.Province[0]
+	}
+
+	if len(cert.Subject.Locality) > 0 {
+		certInfo.Subject += ", " + cert.Subject.Locality[0]
+	}
+
+	if len(cert.Subject.Organization) > 0 {
+		certInfo.Subject += ", " + cert.Subject.Organization[0]
+	}
+
+	certInfo.Subject += ", " + cert.Subject.CommonName
+
+	return certInfo
 }
 
 // Marshal writes certificate info into a raw buffer.
