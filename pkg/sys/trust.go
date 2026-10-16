@@ -205,7 +205,7 @@ func (t *WintrustData) VerifyCatalog(
 	fd uintptr,
 	filename string,
 	catalogAdmin windows.Handle,
-	catalog CatalogInfo,
+	catalog *CatalogInfo,
 	hash []byte,
 	hashSize uint32,
 ) (SignatureStatus, error) {
@@ -296,7 +296,7 @@ type CatalogInfo struct {
 }
 
 // CatalogFile returns the full path to the catalog file.
-func (c CatalogInfo) CatalogFile() string {
+func (c *CatalogInfo) CatalogFile() string {
 	n := len(c.Name) / 2
 	p := unsafe.Slice((*uint16)(unsafe.Pointer(&c.Name[0])), n)
 	return windows.UTF16ToString(p)
@@ -327,7 +327,7 @@ type Cat struct {
 	admin       windows.Handle
 	catalog     windows.Handle
 	file        *os.File
-	catalogInfo CatalogInfo
+	catalogInfo *CatalogInfo
 
 	hash []byte
 	size uint32
@@ -336,8 +336,8 @@ type Cat struct {
 const initialHashBufSize uint32 = 32 // SHA-1 is 20, SHA-256 is 32; start at 32
 
 // NewCatalog creates an instance of the catalog with default hash size.
-func NewCatalog() Cat {
-	return Cat{size: initialHashBufSize, hash: make([]byte, initialHashBufSize)}
+func NewCatalog() *Cat {
+	return &Cat{size: initialHashBufSize, hash: make([]byte, initialHashBufSize)}
 }
 
 // Open opens the catalog and acquires the hash for the given file. If the
@@ -384,7 +384,7 @@ func (c *Cat) Open(filename string) error {
 		c.size, 0, nil,
 	)
 	c.catalogInfo.Size = uint32(unsafe.Sizeof(c.catalogInfo))
-	return CryptCatalogInfoFromContext(c.catalog, &c.catalogInfo, 0)
+	return CryptCatalogInfoFromContext(c.catalog, c.catalogInfo, 0)
 }
 
 // IsCatalogSigned determines if the file is catalog-signed.

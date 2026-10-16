@@ -270,7 +270,7 @@ func (s *Signature) verifyFile() error {
 }
 
 // verifyCatalog verifies the catalog-based file signature.
-func (s *Signature) verifyCatalog(catalog sys.Cat) error {
+func (s *Signature) verifyCatalog(catalog *sys.Cat) error {
 	status, err := catalog.Verify(s.Path)
 	s.setStatus(status)
 	return err
