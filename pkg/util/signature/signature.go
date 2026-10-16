@@ -59,6 +59,8 @@ var signatureInvalidations = expvar.NewMap("signature.invalidations")
 
 var signatureCertParseErrors = expvar.NewMap("signature.cert.parse.errors")
 
+var signatureAsyncRequestDeduped = expvar.NewInt("signature.async.request.deduped")
+
 // Key stores the attributes used for mapping the executable/DLL to its signature info.
 type Key struct {
 	// Path is the normalized NT device path of the executable/DLL file.
@@ -125,8 +127,11 @@ type Signatures struct {
 
 	group singleflight.Group
 
-	// inline bounds concurrent checks run on caller goroutines.
+	// inline bounds concurrent checks run on caller goroutines
 	inline chan struct{}
+
+	// pending tracks keys that are enqueued or being checked
+	pending sync.Map
 
 	stop chan struct{}
 }
@@ -226,9 +231,16 @@ func (s *Signatures) DoRequestAsync(key Key) {
 	if s.contains(key) {
 		return
 	}
+
+	if _, loaded := s.pending.LoadOrStore(key, struct{}{}); loaded {
+		signatureAsyncRequestDeduped.Add(1)
+		return
+	}
+
 	select {
 	case s.requests <- Request{Key: key}:
 	default:
+		s.pending.Delete(key) // release the claim so a later event can retry
 		// drop rather than block the event processing thread
 		signatureAsyncRequestDrops.Add(1)
 	}
@@ -279,6 +291,7 @@ func (s *Signatures) PutSignature(key Key, sigType Type, sigLevel Level) {
 	s.mux.Lock()
 	s.signatures[key] = newSignature(key.Path, sigType, sigLevel)
 	s.mux.Unlock()
+	s.pending.Delete(key)
 	signatureCount.Add(1)
 	signatureCiCount.Add(1)
 
@@ -322,6 +335,7 @@ func (s *Signatures) contains(key Key) bool {
 // available.
 func (s *Signatures) resolve(key Key) *Signature {
 	if sig := s.get(key); sig != nil {
+		s.pending.Delete(key)
 		return sig
 	}
 
@@ -347,6 +361,7 @@ func (s *Signatures) resolve(key Key) *Signature {
 		signatureCount.Add(1)
 		signatureCacheMisses.Add(1)
 
+		s.pending.Delete(key)
 		return sig, nil
 	})
 
