@@ -383,7 +383,7 @@ func (s *Signatures) runWorker() {
 			s.processRequest(req)
 		case req := <-s.certs:
 			sig := s.get(req.Key)
-			if sig != nil {
+			if sig == nil {
 				continue
 			}
 			s.parseCertificate(sig)
