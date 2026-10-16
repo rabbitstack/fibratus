@@ -27,10 +27,13 @@ import (
 	"os"
 	"reflect"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 	"unsafe"
 
+	"github.com/golang/groupcache/singleflight"
+	"github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/rabbitstack/fibratus/pkg/util/bytes"
 	"github.com/rabbitstack/fibratus/pkg/util/format"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
@@ -394,6 +397,17 @@ func (c *Cat) Verify(filename string) (SignatureStatus, error) {
 	return trust.VerifyCatalog(c.file.Fd(), filename, c.admin, c.catalogInfo, c.hash, c.size)
 }
 
+// certk is the cache key for parsed cert per catalog file. Keyed by path, size and modification time.
+type certk struct {
+	path        string
+	size, mtime int64
+}
+
+var (
+	certGroup singleflight.Group
+	certsLRU  = expirable.NewLRU[certk, *Cert](150, nil, time.Hour)
+)
+
 // ParseCertificate parses the catalog certificate.
 func (c *Cat) ParseCertificate() (*Cert, error) {
 	f, err := os.Open(c.catalogInfo.CatalogFile())
@@ -401,64 +415,93 @@ func (c *Cat) ParseCertificate() (*Cert, error) {
 		return nil, err
 	}
 	defer f.Close()
-	crt, err := io.ReadAll(f)
+
+	fi, err := f.Stat()
 	if err != nil {
 		return nil, err
 	}
-	pkcs, err := pkcs7.Parse(crt)
+
+	// Check if the cert exists in the cache
+	k := certk{strings.ToLower(c.catalogInfo.CatalogFile()), fi.Size(), fi.ModTime().UnixNano()}
+	certInfo, ok := certsLRU.Get(k)
+	if ok {
+		return certInfo, nil
+	}
+
+	// Deduplicate concurrent parses
+	cert, err := certGroup.Do(fmt.Sprint(k), func() (any, error) {
+		certInfo, ok := certsLRU.Get(k)
+		if ok {
+			return certInfo, nil
+		}
+
+		crt, err := io.ReadAll(f)
+		if err != nil {
+			return nil, err
+		}
+		pkcs, err := pkcs7.Parse(crt)
+		if err != nil {
+			return nil, err
+		}
+
+		certInfo = &Cert{}
+		serialNumber := pkcs.Signers[0].IssuerAndSerialNumber.SerialNumber
+		for _, cert := range pkcs.Certificates {
+			if !reflect.DeepEqual(cert.SerialNumber, serialNumber) {
+				continue
+			}
+
+			certInfo.SerialNumber = hex.EncodeToString(cert.SerialNumber.Bytes())
+
+			certInfo.NotAfter = cert.NotAfter
+			certInfo.NotBefore = cert.NotBefore
+
+			// issuer information
+			if len(cert.Issuer.Country) > 0 {
+				certInfo.Issuer = cert.Issuer.Country[0]
+			}
+
+			if len(cert.Issuer.Province) > 0 {
+				certInfo.Issuer += ", " + cert.Issuer.Province[0]
+			}
+
+			if len(cert.Issuer.Locality) > 0 {
+				certInfo.Issuer += ", " + cert.Issuer.Locality[0]
+			}
+
+			certInfo.Issuer += ", " + cert.Issuer.CommonName
+
+			// subject information
+			if len(cert.Subject.Country) > 0 {
+				certInfo.Subject = cert.Subject.Country[0]
+			}
+
+			if len(cert.Subject.Province) > 0 {
+				certInfo.Subject += ", " + cert.Subject.Province[0]
+			}
+
+			if len(cert.Subject.Locality) > 0 {
+				certInfo.Subject += ", " + cert.Subject.Locality[0]
+			}
+
+			if len(cert.Subject.Organization) > 0 {
+				certInfo.Subject += ", " + cert.Subject.Organization[0]
+			}
+
+			certInfo.Subject += ", " + cert.Subject.CommonName
+
+			break
+		}
+
+		certsLRU.Add(k, certInfo)
+		return certInfo, nil
+	})
+
 	if err != nil {
 		return nil, err
 	}
 
-	certInfo := &Cert{}
-	serialNumber := pkcs.Signers[0].IssuerAndSerialNumber.SerialNumber
-	for _, cert := range pkcs.Certificates {
-		if !reflect.DeepEqual(cert.SerialNumber, serialNumber) {
-			continue
-		}
-
-		certInfo.SerialNumber = hex.EncodeToString(cert.SerialNumber.Bytes())
-
-		certInfo.NotAfter = cert.NotAfter
-		certInfo.NotBefore = cert.NotBefore
-
-		// issuer information
-		if len(cert.Issuer.Country) > 0 {
-			certInfo.Issuer = cert.Issuer.Country[0]
-		}
-
-		if len(cert.Issuer.Province) > 0 {
-			certInfo.Issuer += ", " + cert.Issuer.Province[0]
-		}
-
-		if len(cert.Issuer.Locality) > 0 {
-			certInfo.Issuer += ", " + cert.Issuer.Locality[0]
-		}
-
-		certInfo.Issuer += ", " + cert.Issuer.CommonName
-
-		// subject information
-		if len(cert.Subject.Country) > 0 {
-			certInfo.Subject = cert.Subject.Country[0]
-		}
-
-		if len(cert.Subject.Province) > 0 {
-			certInfo.Subject += ", " + cert.Subject.Province[0]
-		}
-
-		if len(cert.Subject.Locality) > 0 {
-			certInfo.Subject += ", " + cert.Subject.Locality[0]
-		}
-
-		if len(cert.Subject.Organization) > 0 {
-			certInfo.Subject += ", " + cert.Subject.Organization[0]
-		}
-
-		certInfo.Subject += ", " + cert.Subject.CommonName
-
-		break
-	}
-	return certInfo, nil
+	return cert.(*Cert), nil
 }
 
 func (c *Cat) Close() error {
