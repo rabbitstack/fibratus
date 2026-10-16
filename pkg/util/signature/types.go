@@ -306,9 +306,9 @@ cat:
 	}
 	// parse catalog certificate
 	catalog := sys.NewCatalog()
+	defer catalog.Close()
 	if err := catalog.Open(s.Path); err != nil {
 		return nil, err
 	}
-	defer catalog.Close()
 	return catalog.ParseCertificate()
 }

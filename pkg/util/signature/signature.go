@@ -442,10 +442,10 @@ func (s *Signature) check() error {
 
 	// maybe the signature is in the catalog?
 	catalog := sys.NewCatalog()
+	defer catalog.Close()
 	if err := catalog.Open(s.Path); err != nil {
 		return ErrNoSignature
 	}
-	defer catalog.Close()
 
 	if !catalog.IsCatalogSigned() {
 		return ErrNoSignature
