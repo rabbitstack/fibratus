@@ -76,7 +76,8 @@ const (
 	WtdStateActionClose = 0x00000002
 	// WtdSaferFlag is the trust provider flag
 	WtdSaferFlag = 0x100
-	// WtdCacheOnlyURLRetrieval use only the local cache for revocation checks. Prevents revocation checks over the network.
+	// WtdCacheOnlyURLRetrieval use only the local cache for revocation checks. Prevents revocation
+	// checks over the network.
 	WtdCacheOnlyURLRetrieval = 0x1000
 )
 
@@ -130,6 +131,10 @@ func (s SignatureStatus) String() string {
 // WintrustActionGenericVerifyV2 is the action that indicates the file or object should be verified by using the Authenticode policy provider.
 var WintrustActionGenericVerifyV2 = windows.GUID{Data1: 0xaac56b, Data2: 0xcd44, Data3: 0x11d0, Data4: [8]byte{0x8c, 0xc2, 0x0, 0xc0, 0x4f, 0xc2, 0x95, 0xee}}
 
+// wintrustDataSize covers only the C-visible prefix of WintrustData
+var wintrustDataStructSize = uint32(unsafe.Offsetof(WintrustData{}.SignatureSettings) +
+	unsafe.Sizeof(uintptr(0)))
+
 // WintrustData structure is used when calling WinVerifyTrust
 // to pass necessary information into the trust providers.
 type WintrustData struct {
@@ -146,13 +151,18 @@ type WintrustData struct {
 	ProviderFlags                 uint32
 	UIContext                     uint32
 	SignatureSettings             *WintrustSignatureSettings
+
+	// keep every object that is referenced through a uintptr field reachable until Close
+	fileInfo *WintrustFileInfo
+	catInfo  *WintrustCatalogInfo
+	pins     []any
 }
 
 // NewWintrustData creates a new instance of WintrustData prepared
 // to verify file or catalog trust.
 func NewWintrustData(choice uint32) *WintrustData {
 	return &WintrustData{
-		Size:             uint32(unsafe.Sizeof(WintrustData{})),
+		Size:             wintrustDataStructSize,
 		UnionChoice:      choice,
 		UIChoice:         WtdUINone,
 		RevocationChecks: WtdRevokeNone,
@@ -188,16 +198,16 @@ func (t *WintrustData) verifyTrust() (SignatureStatus, error) {
 // This is achieved by providing INVALID_HANDLE_VALUE as a first parameter
 // in the WinVerifyTrust call.
 func (t *WintrustData) VerifyFile(filename string) (SignatureStatus, error) {
-	fileinfo := &WintrustFileInfo{
-		Size:     uint32(unsafe.Sizeof(WintrustFileInfo{})),
-		FilePath: windows.StringToUTF16Ptr(filename),
+	p, err := windows.UTF16PtrFromString(filename)
+	if err != nil {
+		return SignatureNotTrusted, err
 	}
-	t.Union = uintptr(unsafe.Pointer(fileinfo))
-
-	status, err := t.verifyTrust()
-	runtime.KeepAlive(fileinfo)
-
-	return status, err
+	t.fileInfo = &WintrustFileInfo{
+		Size:     uint32(unsafe.Sizeof(WintrustFileInfo{})),
+		FilePath: p,
+	}
+	t.Union = uintptr(unsafe.Pointer(t.fileInfo))
+	return t.verifyTrust()
 }
 
 // VerifyCatalog verifies the trust of the file signed by catalog-based certificate.
@@ -205,20 +215,29 @@ func (t *WintrustData) VerifyCatalog(
 	fd uintptr,
 	filename string,
 	catalogAdmin windows.Handle,
-	catalog *CatalogInfo,
+	catalogFile string,
 	hash []byte,
 	hashSize uint32,
 ) (SignatureStatus, error) {
-	// convert strings to UTF-16 and hold explicit Go references.
-	// Converting directly to uintptr in the struct literal would
-	// allow the GC to collect these before WinVerifyTrust reads them
-	s := format.BytesToHex(hash[:hashSize])
-	tag := windows.StringToUTF16Ptr(s)
-	path := windows.StringToUTF16Ptr(filename)
+	if hashSize == 0 || int(hashSize) > len(hash) {
+		return SignatureNotTrusted, errors.New("invalid catalog member hash")
+	}
+	tag, err := windows.UTF16PtrFromString(format.BytesToHex(hash[:hashSize]))
+	if err != nil {
+		return SignatureNotTrusted, err
+	}
+	path, err := windows.UTF16PtrFromString(filename)
+	if err != nil {
+		return SignatureNotTrusted, err
+	}
+	catPath, err := windows.UTF16PtrFromString(catalogFile)
+	if err != nil {
+		return SignatureNotTrusted, err
+	}
 
 	catinfo := &WintrustCatalogInfo{
 		Size:            uint32(unsafe.Sizeof(WintrustCatalogInfo{})),
-		CatalogFilePath: uintptr(unsafe.Pointer(&catalog.Name[0])),
+		CatalogFilePath: uintptr(unsafe.Pointer(catPath)),
 		MemberFilePath:  uintptr(unsafe.Pointer(path)),
 		MemberFile:      windows.Handle(fd),
 		MemberTag:       uintptr(unsafe.Pointer(tag)),
@@ -226,25 +245,17 @@ func (t *WintrustData) VerifyCatalog(
 		FileHashSize:    hashSize,
 		CatalogAdmin:    catalogAdmin,
 	}
+
+	// everything the native side reads through a uintptr stays reachable until Close
+	t.pins = []any{tag, path, catPath, hash}
 	t.Union = uintptr(unsafe.Pointer(catinfo))
 
-	status, err := t.verifyTrust()
-
-	// KeepAlive pins every object whose address was passed into
-	// WinVerifyTrust via a uintptr field. Without these, the GC
-	// is permitted to collect them as soon as their last Go-visible
-	// use is seenm which may be before verifyTrust returns
-	runtime.KeepAlive(tag)
-	runtime.KeepAlive(path)
-	runtime.KeepAlive(hash)
-	runtime.KeepAlive(catalog)
-	runtime.KeepAlive(catinfo)
-
-	return status, err
+	return t.verifyTrust()
 }
 
-// Close disposes state data by specifying the corresponding action
+// Close disposes state data by specifying the corresponding action.
 func (t *WintrustData) Close() error {
+	defer t.release()
 	t.StateAction = WtdStateActionClose
 	status, err := WinVerifyTrust(windows.InvalidHandle, &WintrustActionGenericVerifyV2, t)
 	if err != nil {
@@ -254,6 +265,11 @@ func (t *WintrustData) Close() error {
 		return windows.GetLastError()
 	}
 	return nil
+}
+
+func (t *WintrustData) release() {
+	t.Union = 0
+	t.fileInfo, t.catInfo, t.pins = nil, nil, nil
 }
 
 // WintrustSignatureSettings structure can be used to specify the signatures on a file.
@@ -327,7 +343,7 @@ type Cat struct {
 	admin       windows.Handle
 	catalog     windows.Handle
 	file        *os.File
-	catalogInfo *CatalogInfo
+	catalogInfo CatalogInfo
 
 	hash []byte
 	size uint32
@@ -384,7 +400,7 @@ func (c *Cat) Open(filename string) error {
 		c.size, 0, nil,
 	)
 	c.catalogInfo.Size = uint32(unsafe.Sizeof(c.catalogInfo))
-	return CryptCatalogInfoFromContext(c.catalog, c.catalogInfo, 0)
+	return CryptCatalogInfoFromContext(c.catalog, &c.catalogInfo, 0)
 }
 
 // IsCatalogSigned determines if the file is catalog-signed.
@@ -394,12 +410,15 @@ func (c *Cat) IsCatalogSigned() bool {
 
 // Verify verifies the signature of the given file against the catalog.
 func (c *Cat) Verify(filename string) (SignatureStatus, error) {
+	if c.file == nil {
+		return SignatureNotTrusted, errors.New("catalog is not opened")
+	}
+	defer runtime.KeepAlive(c.file)
 	trust := NewWintrustData(WtdChoiceCatalog)
 	defer trust.Close()
-	if c.file == nil {
-		panic("catalog is not opened")
-	}
-	return trust.VerifyCatalog(c.file.Fd(), filename, c.admin, c.catalogInfo, c.hash, c.size)
+	return trust.VerifyCatalog(
+		c.file.Fd(), filename, c.admin, c.catalogInfo.CatalogFile(), c.hash, c.size,
+	)
 }
 
 // certKey is the cache key for parsed cert per catalog file. Keyed by path, size and modification time.

@@ -24,7 +24,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/rabbitstack/fibratus/pkg/pe"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 )
 
@@ -295,8 +294,8 @@ func (s *Signature) parseCertificate(skipEmbedded bool) (*sys.Cert, error) {
 
 	if !skipEmbedded {
 		// parse PE certificate
-		if f, err := pe.ParseFile(s.Path, pe.WithSecurity()); err == nil && f.Cert != nil {
-			return f.Cert, nil
+		if _, cert, err := parseSecurityDirectory(s.Path); err == nil && cert != nil {
+			return cert, nil
 		}
 	}
 

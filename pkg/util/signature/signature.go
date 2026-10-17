@@ -29,7 +29,6 @@ import (
 	"time"
 
 	"github.com/golang/groupcache/singleflight"
-	"github.com/rabbitstack/fibratus/pkg/pe"
 	"github.com/rabbitstack/fibratus/pkg/sys"
 	log "github.com/sirupsen/logrus"
 )
@@ -474,15 +473,15 @@ func (s *Signature) check() error {
 	}
 
 	// check if the signature is embedded in PE
-	f, err := pe.ParseFile(s.Path, pe.WithSecurity())
+	signed, cert, err := parseSecurityDirectory(s.Path)
 	if err != nil {
 		return err
 	}
 
-	if f.IsSigned() {
+	if signed {
 		s.setExists()
 		s.setType(TypeEmbedded)
-		s.setCert(f.Cert)
+		s.setCert(cert)
 		if !sys.IsWintrustFound() {
 			return ErrWintrustUnavailable
 		}
@@ -509,7 +508,7 @@ func (s *Signature) check() error {
 	if err := s.verifyCatalog(catalog); err != nil {
 		return err
 	}
-	cert, err := catalog.ParseCertificate()
+	cert, err = catalog.ParseCertificate()
 	if err != nil {
 		signatureCertParseErrors.Add(err.Error(), 1)
 		return err
