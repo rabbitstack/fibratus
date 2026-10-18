@@ -39,10 +39,6 @@ var eventRecordPool = sync.Pool{
 	New: func() any { return &EventRecord{} },
 }
 
-var fileExtDataPool = sync.Pool{
-	New: func() any { return &FileExtendedDataItems{} },
-}
-
 func getBuf(n int) []byte {
 	bp := bufPool.Get().(*[]byte)
 	b := *bp
@@ -62,15 +58,6 @@ func releaseBuf(b []byte) {
 
 func getEventRecord() *EventRecord {
 	return eventRecordPool.Get().(*EventRecord)
-}
-
-func getFileExtendedDataItems() *FileExtendedDataItems {
-	return fileExtDataPool.Get().(*FileExtendedDataItems)
-}
-
-func (f *FileExtendedDataItems) ReleasePool() {
-	f.callstack = nil // release reference, don't let pool retain a stale slice
-	fileExtDataPool.Put(f)
 }
 
 // ReleasePool returns both the record and its backing buffer to their pools.

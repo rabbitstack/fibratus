@@ -1,6 +1,7 @@
 name: Embedded script execution via shortcut file
 id: 2d94a68b-03fe-4ece-9a99-f4de8ff7261d
 version: 1.0.2
+enabled: false
 description: |
   Detects execution of embedded scripts delivered via Windows shortcut (.lnk) files.
   Adversaries can exploit the attack chain where a shortcut file is accessed by a

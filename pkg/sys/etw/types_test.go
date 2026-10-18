@@ -414,10 +414,6 @@ func TestExtendedDataBounds(t *testing.T) {
 	assert.NotPanics(t, func() {
 		assert.Equal(t, false, ev.HasStackTrace())
 		assert.Nil(t, ev.Callstack())
-		assert.Nil(t, ev.ReadEventHeaderFileExtendedDataItemsCallstack())
-		d, s := ev.ReadEventHeaderFileExtendedDataItems()
-		assert.Equal(t, uint32(0), d)
-		assert.Equal(t, uint32(0), s)
 	})
 
 	// stack trace item: match id followed by two return addresses
@@ -453,21 +449,6 @@ func TestExtendedDataBounds(t *testing.T) {
 	null.DataPtr = 0
 	ev = &EventRecord{ExtendedDataCount: 1, ExtendedData: &null}
 	assert.NotPanics(t, func() { assert.Nil(t, ev.Callstack()) })
-
-	// custom file extended data items
-	callstack := []va.Address{0x1000, 0x2000, 0x3000}
-	ev = &EventRecord{}
-	f := AppendEventHeaderFileExtendedDataItems(ev, 2, 0xC0000022, callstack)
-	assert.Equal(t, callstack, ev.ReadEventHeaderFileExtendedDataItemsCallstack())
-	disposition, status := ev.ReadEventHeaderFileExtendedDataItems()
-	assert.Equal(t, uint32(2), disposition)
-	assert.Equal(t, uint32(0xC0000022), status)
-	runtime.KeepAlive(f)
-
-	// callstack item pointing nowhere
-	f.items[2].DataPtr = 0
-	ev.ExtendedData, ev.ExtendedDataCount = &f.items[2], 1
-	assert.NotPanics(t, func() { assert.Nil(t, ev.ReadEventHeaderFileExtendedDataItemsCallstack()) })
 }
 
 func TestClassicEventIDIsEmpty(t *testing.T) {

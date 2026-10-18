@@ -49,6 +49,8 @@ var (
 	}
 )
 
+const ruleHandlerID = "rules"
+
 // Engine asserts the full-fledged system event against
 // the collection of compiled filters that are derived
 // from the loaded ruleset.
@@ -229,15 +231,15 @@ func (e *Engine) RegisterMatchFunc(fn RuleMatchFunc) {
 	e.matchFunc = fn
 }
 
-func (*Engine) CanEnqueue() bool { return true }
+func (*Engine) ID() string { return ruleHandlerID }
 
 // ProcessEvent processes the system event against compiled filters.
 // Filter is the internal lingo that designates a rule condition.
 // Filters can be simple direct-event matchers or sequence states that
 // track an ordered series of events over a short period of time.
-func (e *Engine) ProcessEvent(evt *event.Event) (bool, error) {
+func (e *Engine) HandleEvent(evt *event.Event) error {
 	if e.filters.empty() {
-		return true, nil
+		return nil
 	}
 
 	if evt.IsTerminateProcess() {
@@ -256,7 +258,6 @@ func (e *Engine) ProcessEvent(evt *event.Event) (bool, error) {
 	defer valuer.Release()
 
 	// assert event against compiled ruleset
-	var matches bool
 	for _, f := range filters {
 		match := f.eval(evt, valuer)
 		if !match {
@@ -274,13 +275,12 @@ func (e *Engine) ProcessEvent(evt *event.Event) (bool, error) {
 		}
 		switch {
 		case e.config.Filters.MatchAll:
-			matches = true
 		default:
-			return true, nil
+			return nil
 		}
 	}
 
-	return matches, nil
+	return nil
 }
 
 // processActions executes rule actions

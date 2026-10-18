@@ -28,8 +28,8 @@ import (
 const excludedEvents = "eventsource.blacklist.events"
 const excludedProcesses = "eventsource.blacklist.images"
 
-// EventFilter defines the dropped event types bitmap and the processes exclusion map.
-type EventFilter struct {
+// EventDroppingConfig defines the dropped event types bitmap and the processes exclusion map.
+type EventDroppingConfig struct {
 	// Types is the bitmap with dropped event masks.
 	Types bitmap.Bitmap[event.Type]
 
@@ -40,7 +40,7 @@ type EventFilter struct {
 
 // BaseEventSourceConfig contains platform-neutral event source configuration.
 type BaseEventSourceConfig struct {
-	EventFilter
+	EventDroppingConfig
 	// ExcludedEvents are kernel event names that will be dropped from the kernel event stream.
 	ExcludedEvents []string `json:"blacklist.events" yaml:"blacklist.events"`
 	// ExcludedProcesses are process image names that will be rejected if they generate a kernel event.
@@ -62,27 +62,35 @@ func (c *BaseEventSourceConfig) Init() {
 	}
 }
 
-// SetDropMask inserts the event mask in the bitset to
+// AddDropType inserts the event mask in the bitset to
 // instruct the given event type should be dropped from
 // the event stream.
-func (c *EventSourceConfig) SetDropMask(typ event.Type) {
+func (c *EventSourceConfig) AddDropType(typ event.Type) {
 	c.Types.Set(typ)
 }
 
-// TestDropMask checks if the specified event type has
-// the drop mask in the bitset.
-func (c *EventSourceConfig) TestDropMask(typ event.Type) bool {
+// AddDropTypes inserts the event mask in the bitset to
+// instruct the given set of event types should be dropped
+// from the event stream.
+func (c *EventSourceConfig) AddDropTypes(types ...event.Type) {
+	for _, typ := range types {
+		c.AddDropType(typ)
+	}
+}
+
+// RemoveDropType clears the event mask in the bitset to
+// instruct the given event type should be allowed.
+func (c *EventSourceConfig) RemoveDropType(typ event.Type) {
+	c.Types.Clear(typ)
+}
+
+// HasDropType reports whether event type is configured to be dropped.
+func (c *EventSourceConfig) HasDropType(typ event.Type) bool {
 	return c.Types.Has(typ)
 }
 
-// ExcludeEvent determines whether the event type is declared
-// in the exclusion list.
-func (c *EventSourceConfig) ExcludeEvent(typ event.Type) bool {
-	return c.Types.Has(typ)
-}
-
-// ExcludeProcess determines whether the event is excluded by the
+// HasDropProcess determines whether the event is excluded by the
 // originating process name.
-func (c *EventSourceConfig) ExcludeProcess(ps *pstypes.PS) bool {
+func (c *EventSourceConfig) HasDropProcess(ps *pstypes.PS) bool {
 	return ps != nil && c.Processes[ps.Name]
 }

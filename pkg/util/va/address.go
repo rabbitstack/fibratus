@@ -29,7 +29,8 @@ type Address uint64
 // Callstack is the type alias for callstack return addresses
 type Callstack []Address
 
-const callstackDepthHint = 60
+const callstackDepthHint = 80
+const callstackDepthCap = 160
 
 var callstackPool = sync.Pool{
 	New: func() any {
@@ -60,12 +61,16 @@ func (a Address) Dec(offset uint64) Address {
 // The kernel preferentially uses these two ranges to load DLLs at shared addresses.
 func (a Address) InSystemRange() bool { return a >= 0xfffff80000000000 && a < 0xffffffffffffffff }
 
-func GetCallstack() Callstack {
+func GetCallstackFromPool() Callstack {
 	return (*callstackPool.Get().(*Callstack))[:0]
 }
 
+func (c Callstack) Clone() Callstack {
+	return append(GetCallstackFromPool(), c...)
+}
+
 func (c Callstack) ReleasePool() {
-	if cap(c) > callstackDepthHint*4 {
+	if cap(c) > callstackDepthCap {
 		return // drop outlier-sized buffers rather than pooling them permanently
 	}
 	c = c[:0]

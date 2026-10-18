@@ -168,12 +168,6 @@ func (d *ParamDecoder) DecodeFile(r *etw.EventRecord, e *Event) {
 		e.AppendParam(params.FileAttributes, params.Flags, r.ReadUint32(24), WithFlags(FileAttributeFlags))
 		e.AppendParam(params.FileShareMask, params.Flags, r.ReadUint32(28), WithFlags(FileShareModeFlags))
 		e.AppendParam(params.FilePath, params.DOSPath, r.ConsumeUTF16String(32))
-
-		// read create disposition, status, and callstack from extended data items
-		disposition, status := r.ReadEventHeaderFileExtendedDataItems()
-		e.AppendParam(params.NTStatus, params.Status, status)
-		e.AppendEnum(params.FileOperation, disposition, fs.FileCreateDispositions)
-		e.AppendParam(params.Callstack, params.Slice, r.ReadEventHeaderFileExtendedDataItemsCallstack())
 	case FileOpEnd:
 		// typedef struct _PERFINFO_FILE_OPERATION_END {
 		//     ULONG_PTR Irp;

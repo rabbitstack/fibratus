@@ -150,7 +150,7 @@ func (s *sequenceState) events() []*event.Event {
 	defer s.mmu.RUnlock()
 	events := make([]*event.Event, 0, len(s.matches))
 	for _, e := range s.matches {
-		events = append(events, e)
+		events = append(events, e.Clone())
 	}
 	sort.Slice(events, func(i, j int) bool { return events[i].Timestamp.Before(events[j].Timestamp) })
 	return events
@@ -338,7 +338,7 @@ func (s *sequenceState) addPartial(seqID int, e *event.Event, isOOO bool) {
 	}
 	log.Debugf("adding partial to sequence [%s] slot [%d] for expression %q, ooo: %t: %s", s.name, seqID, s.expr(seqID), isOOO, e)
 	partialsPerSequence.Add(s.name, 1)
-	s.partials[seqID] = append(s.partials[seqID], e)
+	s.partials[seqID] = append(s.partials[seqID], e.Clone())
 	sort.Slice(s.partials[seqID], func(n, m int) bool { return s.partials[seqID][n].Timestamp.Before(s.partials[seqID][m].Timestamp) })
 }
 

@@ -58,6 +58,9 @@ const (
 // String returns the event type string representation.
 func (t Type) String() string { return table[t].Name }
 
+// OnlyState determines whether the event type is solely used for state management.
+func (t Type) OnlyState() bool { return false }
+
 func (t Type) color() string {
 	return colorizer.SpanBold(colorizer.White, t.String())
 }

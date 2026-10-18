@@ -70,7 +70,7 @@ var table = [MaxEvent]Info{
 	RegDeleteKCB:        {Name: "RegDeleteKCB", Category: Registry, Source: SystemLogger, Description: "Removes the Key Control Block. Never published to the event stream", Flags: OnlyState},
 	RegKCBRundown:       {Name: "RegKCBRundown", Category: Registry, Source: SystemLogger, Description: "Builds the snapshot of existing Key Control Block objects", Flags: OnlyState | StateSnapshot},
 
-	CreateFile:         {Name: "CreateFile", Category: File, Source: SystemLogger, Description: "Creates or opens a new file, directory, I/O device, pipe, console"},
+	CreateFile:         {Name: "CreateFile", Category: File, Source: SystemLogger, Description: "Creates or opens a new file, directory, I/O device, pipe, console", Flags: WaitStack},
 	ReleaseFile:        {Name: "ReleaseFile", Category: File, Source: SystemLogger, Description: "Closes the last handle to the file object. Never published to the event stream", Flags: OnlyState},
 	CloseFile:          {Name: "CloseFile", Category: File, Source: SystemLogger, Description: "Closes the file handle. Never published to the event stream", Flags: OnlyState},
 	ReadFile:           {Name: "ReadFile", Category: File, Source: SystemLogger, Description: "Reads data from the file or I/O device"},

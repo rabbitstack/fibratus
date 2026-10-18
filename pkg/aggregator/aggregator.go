@@ -27,7 +27,6 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/alertsender"
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/outputs"
-	log "github.com/sirupsen/logrus"
 
 	// initialize outputs
 	_ "github.com/rabbitstack/fibratus/pkg/outputs/amqp"
@@ -51,6 +50,8 @@ import (
 var (
 	// eventsDequeued counts the number of dequeued events
 	eventsDequeued = expvar.NewInt("aggregator.events.dequeued")
+	// eventsDropped counts the number of dropped events
+	eventsDropped = expvar.NewInt("aggregator.events.dropped")
 	// flushesCount computes the total count of aggregator flushes
 	flushesCount = expvar.NewInt("aggregator.flushes.count")
 	// batchEvents represents the overall number of processed batches
@@ -61,39 +62,50 @@ var (
 	eventsErrors = expvar.NewInt("aggregator.event.errors")
 )
 
-// BufferedAggregator collects events from the inbound channel and produces batches on regular intervals. The batches
-// are pushed to the work queue from which load-balanced configured workers consume the batches and publish to the outputs.
+const (
+	// consumerID represents the name of the aggregator event consumer
+	consumerID = "aggregator"
+
+	// consumerChannelSize is the channel size of the aggregator event consumer
+	consumerChannelSize = 800
+
+	// aggregatorChannelSize is the size of the aggregator internal channel used
+	// to fan out dequeued events to the submitter work queue
+	aggregatorChannelSize = 500
+)
+
+// BufferedAggregator collects receives events from the consumer and produces batches
+// on regular intervals. The batches are pushed to the work queue from which load-balanced
+// configured workers consume the batches and publish to the outputs.
 type BufferedAggregator struct {
-	evtsc   <-chan *event.Event
-	errsc   <-chan error
-	stop    chan struct{}
+	evtsc chan *event.Event
+	stop  chan struct{}
+
 	flusher *time.Ticker
+
 	// queue of inbound events
 	evts []*event.Event
+
 	// work queue that forwarder passes to outputs
 	wq         queue
 	submitter  *submitter
 	transforms []transformers.Transformer
-	c          Config
+
+	c Config
 }
 
 // NewBuffered creates a new instance of the event aggregator.
 func NewBuffered(
-	evts <-chan *event.Event,
-	errs <-chan error,
 	aggConfig Config,
 	outputConfig outputs.Config,
 	transformerConfigs []transformers.Config,
 	alertsenderConfigs []alertsender.Config,
 ) (*BufferedAggregator, error) {
-	flushInterval := aggConfig.FlushPeriod
-	if flushInterval < time.Millisecond*250 {
-		flushInterval = time.Millisecond * 250
-	}
+	flushInterval := max(aggConfig.FlushPeriod, time.Millisecond*250)
+
 	agg := &BufferedAggregator{
-		evtsc:   evts,
+		evtsc:   make(chan *event.Event, aggregatorChannelSize),
 		evts:    make([]*event.Event, 0),
-		errsc:   errs,
 		stop:    make(chan struct{}, 1),
 		flusher: time.NewTicker(flushInterval),
 		wq:      make(chan *event.Batch),
@@ -119,6 +131,29 @@ func NewBuffered(
 
 	return agg, nil
 }
+
+func (BufferedAggregator) ID() string { return consumerID }
+
+func (BufferedAggregator) ChanSize() int { return consumerChannelSize }
+
+func (agg *BufferedAggregator) HandleEvent(evt *event.Event) error {
+	for _, transform := range agg.transforms {
+		if err := transform.Transform(evt); err != nil {
+			transformerErrors.Add(err.Error(), 1)
+			return err
+		}
+	}
+
+	select {
+	case agg.evtsc <- evt:
+	default:
+		eventsDropped.Add(1)
+	}
+
+	return nil
+}
+
+func (BufferedAggregator) EventTypes() []event.Type { return event.AllTypes() }
 
 // Stop flushes pending event batches and instructs the aggregator to stop processing events.
 func (agg *BufferedAggregator) Stop() error {
@@ -175,18 +210,9 @@ func (agg *BufferedAggregator) run() {
 			// clear the queue
 			agg.evts = nil
 		case evt := <-agg.evtsc:
-			for _, transform := range agg.transforms {
-				err := transform.Transform(evt)
-				if err != nil {
-					transformerErrors.Add(err.Error(), 1)
-				}
-			}
 			// push the event to the queue
 			agg.evts = append(agg.evts, evt)
 			eventsDequeued.Add(1)
-		case err := <-agg.errsc:
-			eventsErrors.Add(1)
-			log.Errorf("event processing failure: %v", err)
 		}
 	}
 }

@@ -56,8 +56,12 @@ func TestEventSourceConfig(t *testing.T) {
 	assert.False(t, c.EventSource.EnableModuleEvents)
 	assert.False(t, c.EventSource.EnableFileIOEvents)
 
-	assert.False(t, c.EventSource.ExcludeEvent(event.CreateProcess))
+	assert.False(t, c.EventSource.HasDropType(event.CreateProcess))
+	assert.True(t, c.EventSource.HasDropType(event.CloseFile))
 
-	assert.True(t, c.EventSource.ExcludeProcess(&pstypes.PS{Name: "svchost.exe"}))
-	assert.False(t, c.EventSource.ExcludeProcess(&pstypes.PS{Name: "explorer.exe"}))
+	assert.True(t, c.EventSource.HasDropProcess(&pstypes.PS{Name: "svchost.exe"}))
+	assert.False(t, c.EventSource.HasDropProcess(&pstypes.PS{Name: "explorer.exe"}))
+
+	c.EventSource.RemoveDropType(event.CloseFile)
+	assert.False(t, c.EventSource.HasDropType(event.CloseFile))
 }

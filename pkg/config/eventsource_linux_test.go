@@ -41,8 +41,8 @@ func TestEventSourceConfig(t *testing.T) {
 	require.NoError(t, c.Init())
 
 	require.False(t, c.EventSource.EnableFileIOEvents)
-	require.True(t, c.EventSource.ExcludeEvent(event.Execve))
-	require.True(t, c.EventSource.ExcludeProcess(&pstypes.PS{Name: "systemd"}))
+	require.True(t, c.EventSource.HasDropType(event.Execve))
+	require.True(t, c.EventSource.HasDropProcess(&pstypes.PS{Name: "systemd"}))
 }
 
 func TestValidateEventSource(t *testing.T) {
