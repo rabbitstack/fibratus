@@ -50,29 +50,52 @@ var (
 
 // New constructs a fresh event instance with basic fields and parameters
 // from the raw ETW event record.
-func New(seq uint64, r *etw.EventRecord, typ Type) *Event {
+func New(rec *etw.EventRecord) *Event {
 	var (
-		pid = r.Header.ProcessID
-		tid = r.Header.ThreadID
-		cpu = *(*uint8)(unsafe.Pointer(&r.BufferContext.ProcessorIndex[0]))
-		ts  = filetime.ToEpoch(r.Header.Timestamp)
+		pid = rec.Header.ProcessID
+		tid = rec.Header.ThreadID
+		cpu = *(*uint8)(unsafe.Pointer(&rec.BufferContext.ProcessorIndex[0]))
+		ts  = filetime.ToEpoch(rec.Header.Timestamp)
 	)
 
 	e := &Event{
-		Seq:       seq,
 		PID:       pid,
 		Tid:       tid,
 		CPU:       cpu,
-		Type:      typ,
-		Params:    make(map[string]*Param),
+		Type:      TypeFromEventRecord(rec),
+		Params:    make(map[string]*Param, 8),
 		Timestamp: ts,
 		Host:      hostname.Get(),
 	}
 
-	e.decodeParams(r)
+	e.decodeParams(rec)
 	e.adjustPID()
 
 	return e
+}
+
+// Parse constructs the event from the reused ring buffer instance.
+func (e *Event) Parse(rec *etw.EventRecord) {
+	var (
+		pid = rec.Header.ProcessID
+		tid = rec.Header.ThreadID
+		cpu = *(*uint8)(unsafe.Pointer(&rec.BufferContext.ProcessorIndex[0]))
+		ts  = filetime.ToEpoch(rec.Header.Timestamp)
+	)
+
+	e.PID = pid
+	e.Tid = tid
+	e.CPU = cpu
+	e.Type = TypeFromEventRecord(rec)
+	e.Timestamp = ts
+	e.Host = hostname.Get()
+
+	if e.Params == nil {
+		e.Params = make(map[string]*Param, 6)
+	}
+
+	e.decodeParams(rec)
+	e.adjustPID()
 }
 
 // RawTimestamp returns the raw event record system timestamp.

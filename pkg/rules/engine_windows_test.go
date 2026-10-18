@@ -107,12 +107,12 @@ func compileRules(t *testing.T, e *Engine) {
 	require.NotNil(t, rs)
 }
 
-func wrapProcessEvent(e *event.Event, fn func(*event.Event) (bool, error)) bool {
-	match, err := fn(e)
+func wrapProcessEvent(e *event.Event, fn func(*event.Event) error) error {
+	err := fn(e)
 	if err != nil {
 		panic(err)
 	}
-	return match
+	return err
 }
 
 func fireRules(t *testing.T, c *config.Config) bool {
@@ -130,7 +130,7 @@ func fireRules(t *testing.T, c *config.Config) bool {
 		Metadata: make(map[event.MetadataKey]any),
 	}
 	compileRules(t, e)
-	return wrapProcessEvent(evt, e.ProcessEvent)
+	return wrapProcessEvent(evt, e.HandleEvent)
 }
 
 func TestCompileIndexableFilters(t *testing.T) {

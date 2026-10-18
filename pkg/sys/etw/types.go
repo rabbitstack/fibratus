@@ -575,103 +575,6 @@ type EventFilterDescriptor struct {
 	Type uint32
 }
 
-const (
-	// ExtTypeDisposition represents a custom extended item type for the file disposition.
-	ExtTypeDisposition = 0x8000
-	// ExtTypeStatus represents a custom extended item type for the file system status.
-	ExtTypeStatus = 0x8001
-	// ExtTypeCallstack represents a customer extended item type for the file system event callstack.
-	ExtTypeCallstack = 0x8002
-)
-
-// FileExtendedDataItems stores file extended data items.
-type FileExtendedDataItems struct {
-	status      uint32
-	disposition uint32
-	callstack   []va.Address
-	items       [3]EventHeaderExtendedDataItem
-}
-
-// AppendEventHeaderFileExtendedDataItems appends custom file extendeed data items to the event record.
-func AppendEventHeaderFileExtendedDataItems(r *EventRecord, disposition uint64, status uint32, callstack []va.Address) *FileExtendedDataItems {
-	f := getFileExtendedDataItems()
-	f.disposition, f.status, f.callstack = uint32(disposition), status, callstack
-
-	f.items[0] = EventHeaderExtendedDataItem{
-		ExtType:  ExtTypeDisposition,
-		DataSize: 4,
-		DataPtr:  uint64(uintptr(unsafe.Pointer(&f.disposition))),
-	}
-	f.items[1] = EventHeaderExtendedDataItem{
-		ExtType:  ExtTypeStatus,
-		DataSize: 4,
-		DataPtr:  uint64(uintptr(unsafe.Pointer(&f.status))),
-	}
-	if len(f.callstack) > 0 {
-		f.items[2] = EventHeaderExtendedDataItem{
-			ExtType:  ExtTypeCallstack,
-			DataSize: uint16(len(f.callstack) * 8),
-			DataPtr: uint64(
-				uintptr(unsafe.Pointer(&f.callstack[0])),
-			),
-		}
-	} else {
-		f.items[2] = EventHeaderExtendedDataItem{} // clear stale entry from a prior pooled use
-	}
-
-	r.ExtendedDataCount = uint16(len(f.items))
-	r.ExtendedData = &f.items[0]
-
-	return f
-}
-
-// ReadEventHeaderFileExtendedDataItems reads the custom file extended data items from the event record.
-func (r *EventRecord) ReadEventHeaderFileExtendedDataItems() (uint32, uint32) {
-	if r.ExtendedData == nil {
-		return 0, 0
-	}
-
-	items := unsafe.Slice(r.ExtendedData, r.ExtendedDataCount)
-
-	var disposition uint32
-	var status uint32
-
-	for _, item := range items {
-		switch item.ExtType {
-		case ExtTypeDisposition:
-			if item.DataSize == 4 && item.DataPtr != 0 {
-				disposition = *(*uint32)(unsafe.Pointer(uintptr(item.DataPtr)))
-			}
-		case ExtTypeStatus:
-			if item.DataSize == 4 && item.DataPtr != 0 {
-				status = *(*uint32)(unsafe.Pointer(uintptr(item.DataPtr)))
-			}
-		}
-	}
-
-	return disposition, status
-}
-
-// ReadEventHeaderFileExtendedDataItems reads the callstack from the custom file extended data items.
-func (r *EventRecord) ReadEventHeaderFileExtendedDataItemsCallstack() []va.Address {
-	if r.ExtendedData == nil {
-		return nil
-	}
-
-	items := unsafe.Slice(r.ExtendedData, r.ExtendedDataCount)
-	for _, item := range items {
-		if item.ExtType != ExtTypeCallstack {
-			continue
-		}
-
-		n := int(item.DataSize) / 8
-
-		return unsafe.Slice((*va.Address)(unsafe.Pointer(uintptr(item.DataPtr))), n)
-	}
-
-	return nil
-}
-
 // NewClassicEventID creates a new instance of classic event identifier.
 func NewClassicEventID(guid windows.GUID, typ uint16) ClassicEventID {
 	return ClassicEventID{GUID: guid, Type: uint8(typ)}
@@ -873,28 +776,30 @@ func (e *EventRecord) ReadSID(offset uint16, isWbemSid bool) ([]byte, uint16) {
 }
 
 // ReadCallstack reads callstack return addresses at the given offset.
-func (e *EventRecord) ReadCallstack(offset uint16) []va.Address {
+func (e *EventRecord) ReadCallstack(offset uint16) va.Callstack {
 	return e.ReadCallstackInto(offset, nil)
 }
 
 // ReadCallstackInto reads callstack return addresses at the given offset,
 // appending into v. If v has sufficient capacity, no allocation occurs.
-func (e *EventRecord) ReadCallstackInto(offset uint16, v va.Callstack) []va.Address {
-	var n uint16
-	m := offset
-	frames := (e.BufferLen - offset) / 8
+func (e *EventRecord) ReadCallstackInto(offset uint16, v va.Callstack) va.Callstack {
+	if offset >= e.BufferLen {
+		return v[:0] // guards uint16 underflow in BufferLen - offset
+	}
 
-	if v != nil {
-		v = v[:0]
+	frames := int(e.BufferLen-offset) / 8
+
+	if v == nil {
+		v = make(va.Callstack, 0, frames)
 	} else {
-		v = make([]va.Address, 0, frames)
+		v = v[:0]
 	}
 
-	for n < frames {
-		v = append(v, va.Address(e.ReadUint64(m)))
-		m += 8
-		n++
+	for range frames {
+		v = append(v, va.Address(e.ReadUint64(offset)))
+		offset += 8
 	}
+
 	return v
 }
 
@@ -927,7 +832,7 @@ func (e *EventRecord) HasStackTrace() bool {
 
 // Callstack collects the event stack trace for
 // events emitted by non-system logger providers.
-func (e *EventRecord) Callstack() []va.Address {
+func (e *EventRecord) Callstack() va.Callstack {
 	if e.ExtendedDataCount == 0 {
 		return nil
 	}
@@ -942,10 +847,15 @@ func (e *EventRecord) Callstack() []va.Address {
 		}
 		// number of return addresses
 		length := (n.DataSize - 8) / 8
-		addrs := make([]va.Address, length)
+		addrs := va.GetCallstackFromPool()
+		if addrs == nil {
+			addrs = make(va.Callstack, 0, length)
+		} else {
+			addrs = addrs[:0]
+		}
 		addresses := unsafe.Slice(&s.Address[0], length)
-		for i, addr := range addresses {
-			addrs[i] = va.Address(addr)
+		for _, addr := range addresses {
+			addrs = append(addrs, va.Address(addr))
 		}
 		return addrs
 	}

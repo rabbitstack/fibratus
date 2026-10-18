@@ -257,12 +257,7 @@ func (p Approvers) String() string {
 }
 
 func (r RulesCompileResult) ContainsEvent(e event.Type) bool {
-	for _, typ := range r.UsedEvents {
-		if typ == e {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(r.UsedEvents, e)
 }
 
 func (r RulesCompileResult) String() string {
