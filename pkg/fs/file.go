@@ -336,7 +336,7 @@ func (s *FileMetadataStore) DoRequest(path string) *FileInfo {
 	default:
 		// queue full: fall back to inline check rather than
 		// dropping a decision that has a security consequence.
-		return s.getOrParse(r)
+		return s.resolve(r)
 	}
 	f := <-ch
 	return f
@@ -456,7 +456,7 @@ func (s *FileMetadataStore) gc() {
 }
 
 func (s *FileMetadataStore) processRequest(r Request) {
-	f := s.getOrParse(r)
+	f := s.resolve(r)
 	if r.Response != nil {
 		r.Response <- f
 	}
@@ -489,33 +489,33 @@ func (s *FileMetadataStore) get(path string) *FileInfo {
 	return f
 }
 
-func (s *FileMetadataStore) getOrParse(r Request) *FileInfo {
+func (s *FileMetadataStore) resolve(r Request) *FileInfo {
 	path := r.Path
 	if f := s.get(path); f != nil {
 		return f
 	}
 
 	v, err := s.group.Do(path, func() (any, error) {
-		pe, err := s.parsePE(path, r.IsSeed)
+		if f := s.get(path); f != nil { // a previous flight may have filled it
+			return f, nil
+		}
+		parsed, err := s.parsePE(path, r.IsSeed)
 		if err != nil {
 			return nil, err
 		}
-		return pe, nil
+		f := &FileInfo{
+			IsDLL: parsed.IsDLL, IsDriver: parsed.IsDriver,
+			IsExecutable: parsed.IsExecutable, IsDotnet: parsed.IsDotnet,
+		}
+		s.add(r.Path, f)
+		fsMetadataCacheMisses.Add(1)
+		return f, nil
 	})
 
 	if err != nil {
 		return nil
 	}
-
-	p := v.(*pe.PE)
-
-	f := &FileInfo{}
-	f.keepalive()
-	f.IsDLL, f.IsDriver, f.IsExecutable, f.IsDotnet = p.IsDLL, p.IsDriver, p.IsExecutable, p.IsDotnet
-	s.AddFile(path, f)
-	fsMetadataCacheMisses.Add(1)
-
-	return f
+	return v.(*FileInfo)
 }
 
 func (s *FileMetadataStore) parsePE(path string, isSeed bool) (*pe.PE, error) {
