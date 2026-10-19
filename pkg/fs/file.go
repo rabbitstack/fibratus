@@ -22,6 +22,8 @@
 package fs
 
 import (
+	"encoding/binary"
+	"errors"
 	"expvar"
 	"fmt"
 	"os"
@@ -61,6 +63,9 @@ const (
 // metadataStoreQueueSize is the capacity of the async request channel.
 const metadataStoreQueueSize = 1500
 
+const negativeTTL = time.Minute // cache TTL for negative (non-PE) entries
+const maxEntries = 50000        // negative entries are not added beyond this
+
 var fsMetadataAsyncRequestDrops = expvar.NewInt("fs.metadata.async.request.drops")
 
 var fsMetadataCount = expvar.NewInt("fs.metadata.count")
@@ -81,6 +86,12 @@ var onceMetadataStore sync.Once
 
 // metadataTTL is the maximum age of an untouched cache entry before the GC evicts it.
 var metadataTTL = 10 * time.Minute
+
+var (
+	errNotPE       = errors.New("not a PE file")
+	errShortFile   = errors.New("file too short to classify")
+	errRateLimited = errors.New("rate-limited for PE parsing")
+)
 
 // windowsUpdateWildcards lists system directories commonly touched during
 // updates, servicing, recovery, and component store operations.
@@ -131,6 +142,8 @@ type FileInfo struct {
 	IsDriver     bool
 	IsDotnet     bool
 
+	negative bool
+
 	// accessed is updated on every cache lookup to drive TTL-based eviction.
 	accessed atomic.Int64
 }
@@ -140,6 +153,14 @@ func (f *FileInfo) keepalive() {
 	if now-f.accessed.Load() > int64(time.Second) {
 		f.accessed.Store(now)
 	}
+}
+
+func (f *FileInfo) expired(now time.Time) bool {
+	ttl := metadataTTL
+	if f.negative {
+		ttl = negativeTTL
+	}
+	return now.Sub(f.lastAccessed()) > ttl
 }
 
 func (f *FileInfo) lastAccessed() time.Time {
@@ -314,7 +335,7 @@ func newFileMetadataStore() *FileMetadataStore {
 // in the field accessors.
 func (s *FileMetadataStore) DoRequest(path string) *FileInfo {
 	p := s.normalizePath(path)
-	if f := s.get(p); f != nil {
+	if f, ok := s.lookup(p); ok {
 		return f
 	}
 
@@ -382,6 +403,9 @@ func (s *FileMetadataStore) add(path string, f *FileInfo) {
 	f.keepalive()
 	s.mux.Lock()
 	defer s.mux.Unlock()
+	if f.negative && len(s.files) >= maxEntries {
+		return
+	}
 	if _, ok := s.files[path]; !ok {
 		fsMetadataCount.Add(1)
 	}
@@ -430,7 +454,7 @@ func (s *FileMetadataStore) gc() {
 	s.mux.RLock()
 	var paths []string
 	for path, file := range s.files {
-		if now.Sub(file.lastAccessed()) > metadataTTL {
+		if file.expired(now) {
 			paths = append(paths, path)
 		}
 	}
@@ -445,7 +469,7 @@ func (s *FileMetadataStore) gc() {
 		file := s.files[path]
 		// re-check under the write lock: the entry may have been
 		// refreshed between the RUnlock above and this Lock
-		if file != nil && now.Sub(file.lastAccessed()) > metadataTTL {
+		if file != nil && file.expired(now) {
 			log.Debugf("evicting file metadata for %s", path)
 			fsMetadataCount.Add(-1)
 			fsMetadataEvictions.Add(1)
@@ -462,8 +486,24 @@ func (s *FileMetadataStore) processRequest(r Request) {
 	}
 }
 
+func (s *FileMetadataStore) lookup(path string) (*FileInfo, bool) {
+	s.mux.RLock()
+	f := s.files[path]
+	s.mux.RUnlock()
+	if f == nil {
+		return nil, false
+	}
+	fsMetadataCacheHits.Add(1)
+	f.keepalive()
+	if f.negative {
+		return nil, true
+	}
+	return f, true
+}
+
 func (s *FileMetadataStore) contains(path string) bool {
-	return s.get(path) != nil
+	_, contains := s.lookup(path)
+	return contains
 }
 
 func (s *FileMetadataStore) addDLL(path string) *FileInfo {
@@ -491,16 +531,27 @@ func (s *FileMetadataStore) get(path string) *FileInfo {
 
 func (s *FileMetadataStore) resolve(r Request) *FileInfo {
 	path := r.Path
-	if f := s.get(path); f != nil {
+	if f, ok := s.lookup(r.Path); ok {
 		return f
 	}
 
-	v, err := s.group.Do(path, func() (any, error) {
-		if f := s.get(path); f != nil { // a previous flight may have filled it
-			return f, nil
+	v, err := s.group.Do(path, func() (res any, err error) {
+		defer func() { // a malformed PE must not kill the worker or hang callers
+			if rec := recover(); rec != nil {
+				err = fmt.Errorf("panic parsing PE %s: %v", r.Path, rec)
+			}
+		}()
+
+		if f, ok := s.lookup(r.Path); ok {
+			return f, nil // a previous flight may have filled it
 		}
+
 		parsed, err := s.parsePE(path, r.IsSeed)
-		if err != nil {
+		switch {
+		case errors.Is(err, errNotPE), errors.Is(err, sys.ErrFileSkipped):
+			s.add(r.Path, &FileInfo{negative: true})
+			return (*FileInfo)(nil), nil
+		case err != nil:
 			return nil, err
 		}
 		f := &FileInfo{
@@ -518,29 +569,66 @@ func (s *FileMetadataStore) resolve(r Request) *FileInfo {
 	return v.(*FileInfo)
 }
 
-func (s *FileMetadataStore) parsePE(path string, isSeed bool) (*pe.PE, error) {
-	if !isSeed && !s.limiter.Allow() {
-		return nil, fmt.Errorf("path %s rate-limited for PE parsing", path)
+func errDesc(err error) string {
+	var pathErr *os.PathError
+	if errors.As(err, &pathErr) {
+		err = pathErr.Err
+	}
+	return err.Error()
+}
+
+func (s *FileMetadataStore) parsePE(path string, noLimit bool) (*pe.PE, error) {
+	accept := func(head []byte) error {
+		if err := isPE(head); err != nil {
+			return err
+		}
+		// the limiter only guards the expensive full read
+		if !noLimit && !s.limiter.Allow() {
+			return errRateLimited
+		}
+		return nil
 	}
 
 	const size = 8 * 1024 * 1024 // 8MB
-	data, err := sys.ReadFile(path, size, time.Millisecond*500)
-	if err != nil {
-		fsMetadataFileParseErrors.Add(err.Error(), 1)
+	data, err := sys.ReadFileWithPredicate(path, size, 1024, time.Millisecond*500, accept)
+	switch {
+	case err == nil:
+	case errors.Is(err, errNotPE), errors.Is(err, errShortFile),
+		errors.Is(err, errRateLimited), errors.Is(err, sys.ErrFileSkipped):
+		return nil, err
+	default:
+		fsMetadataFileParseErrors.Add(errDesc(err), 1)
 		return nil, err
 	}
 
-	pe, err := pe.ParseBytes(data, pe.WithSections(), pe.WithSymbols(), pe.WithCLR())
+	parsed, err := pe.ParseBytes(data, pe.WithSections(), pe.WithSymbols(), pe.WithCLR())
 	if err != nil {
-		fsMetadataFileParseErrors.Add(err.Error(), 1)
+		fsMetadataFileParseErrors.Add(errDesc(err), 1)
 		return nil, err
 	}
-
-	return pe, err
+	return parsed, nil
 }
 
 func (s *FileMetadataStore) normalizePath(path string) string {
 	return strings.ToLower(path)
+}
+
+// isPE validates the DOS and NT signatures from the first 1KB.
+func isPE(h []byte) error {
+	if len(h) < 64 {
+		return errShortFile // file may not be written yet
+	}
+	if h[0] != 'M' || h[1] != 'Z' {
+		return errNotPE
+	}
+	off := binary.LittleEndian.Uint32(h[0x3c:0x40])
+	if uint64(off)+4 > uint64(len(h)) {
+		return nil // NT header beyond the probe size
+	}
+	if string(h[off:off+4]) != "PE\x00\x00" {
+		return errNotPE
+	}
+	return nil
 }
 
 // GetFileType returns the underlying file type. The opts parameter corresponds to the NtCreateFile CreateOptions argument
