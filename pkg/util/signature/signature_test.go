@@ -19,6 +19,8 @@
 package signature
 
 import (
+	"expvar"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -32,6 +34,25 @@ import (
 
 func systemDir(path string) string {
 	return filepath.Join(os.Getenv("windir"), "system32", path)
+}
+
+// delta returns a function reporting how much the counter grew since the call.
+func delta(v *expvar.Int) func() int64 {
+	before := v.Value()
+	return func() int64 { return v.Value() - before }
+}
+
+func mapTotal(m *expvar.Map) (n int64) {
+	m.Do(func(kv expvar.KeyValue) {
+		if v, ok := kv.Value.(*expvar.Int); ok {
+			n += v.Value()
+		}
+	})
+	return n
+}
+
+func missingModule(name string) Key {
+	return MakeKey(`c:\fibratus-test\missing\`+name+`.dll`, 0x1000, 0xABCD, 0x12345678)
 }
 
 // wellKnownDLLs are catalog-signed system DLLs present on every
@@ -662,6 +683,306 @@ func TestDoRequestAsyncDropsWhenQueueFull(t *testing.T) {
 	dropsAfter := signatureAsyncRequestDrops.Value()
 	if dropsAfter <= dropsBefore {
 		t.Error("DoRequestAsync must increment drop counter when queue is full")
+	}
+}
+
+// bareStore builds a store without workers or the GC loop, so a test decides
+// what is consumed from the queues and when. The signature checks run against
+// paths that don't exist: the check fails fast, and the result is still stored
+// and counted, which is all these tests need.
+func bareStore(t *testing.T, queueSize int) *Signatures {
+	t.Helper()
+	s := &Signatures{
+		signatures: make(map[Key]*Signature),
+		purger:     time.NewTicker(time.Hour),
+		requests:   make(chan Request, queueSize),
+		certs:      make(chan Request, queueSize),
+		inline:     make(chan struct{}, maxInlineChecks),
+		stop:       make(chan struct{}),
+	}
+	t.Cleanup(s.purger.Stop)
+	return s
+}
+
+func TestGetOrCheckRunsOneCheckPerKey(t *testing.T) {
+	s := bareStore(t, 1)
+	checks := delta(signatureCacheMisses)
+	stored := delta(signatureCount)
+
+	// Every round is a new key hit by concurrent callers released together.
+	// A check that is repeated because a caller missed the cache after the
+	// singleflight call finished, but before the result was stored, shows up
+	// as more than one check per key.
+	const rounds, callers = 200, 16
+	for r := 0; r < rounds; r++ {
+		key := missingModule(fmt.Sprintf("round%d", r))
+
+		var wg sync.WaitGroup
+		start := make(chan struct{})
+		results := make([]*Signature, callers)
+		for i := 0; i < callers; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				<-start
+				results[i] = s.resolve(key)
+			}()
+		}
+		close(start)
+		wg.Wait()
+
+		for i, sig := range results {
+			if sig == nil || sig != results[0] {
+				t.Fatalf("round %d: caller %d got a different signature than caller 0", r, i)
+			}
+		}
+	}
+
+	if got := checks(); got != rounds {
+		t.Errorf("ran %d checks for %d keys, want one per key", got, rounds)
+	}
+	if got := stored(); got != rounds {
+		t.Errorf("signature count grew by %d, want %d", got, rounds)
+	}
+	if len(s.signatures) != rounds {
+		t.Errorf("store holds %d signatures, want %d", len(s.signatures), rounds)
+	}
+}
+
+func TestGetOrCheckOnlyCountsRealCacheHits(t *testing.T) {
+	s := bareStore(t, 1)
+	key := missingModule("hits")
+	hits := delta(signatureCacheHits)
+
+	first := s.resolve(key)
+	// the internal re-check inside the singleflight callback is not a hit
+	if got := hits(); got != 0 {
+		t.Fatalf("a first lookup produced %d cache hits, want 0", got)
+	}
+
+	if second := s.resolve(key); second != first {
+		t.Fatal("the second lookup must return the stored signature")
+	}
+	if got := hits(); got != 1 {
+		t.Fatalf("got %d cache hits after the second lookup, want 1", got)
+	}
+}
+
+func TestDoRequestAsyncDedupesPendingKeys(t *testing.T) {
+	s := bareStore(t, 8)
+	key := missingModule("async")
+	deduped := delta(signatureAsyncRequestDeduped)
+
+	const goroutines = 32
+	var wg sync.WaitGroup
+	for i := 0; i < goroutines; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			s.DoRequestAsync(key)
+		}()
+	}
+	wg.Wait()
+
+	if got := len(s.requests); got != 1 {
+		t.Fatalf("%d requests were enqueued for the same key, want 1", got)
+	}
+	if got := deduped(); got != goroutines-1 {
+		t.Errorf("deduped %d requests, want %d", got, goroutines-1)
+	}
+	if _, ok := s.pending.Load(key); !ok {
+		t.Error("the key must stay claimed while its request is queued")
+	}
+
+	// the worker finishes the request: the result is stored and the claim released
+	s.processRequest(<-s.requests)
+
+	if s.peek(key) == nil {
+		t.Fatal("the signature must be stored after the request is processed")
+	}
+	if _, ok := s.pending.Load(key); ok {
+		t.Error("the claim must be released once the signature is stored")
+	}
+
+	// a resolved module is answered from the store, nothing is enqueued
+	s.DoRequestAsync(key)
+	if got := len(s.requests); got != 0 {
+		t.Errorf("a resolved key was enqueued again (%d queued)", got)
+	}
+}
+
+func TestDoRequestAsyncReleasesClaimWhenQueueIsFull(t *testing.T) {
+	s := bareStore(t, 1)
+	drops := delta(signatureAsyncRequestDrops)
+
+	first, second := missingModule("first"), missingModule("second")
+	s.DoRequestAsync(first) // fills the queue
+	s.DoRequestAsync(second)
+
+	if got := drops(); got != 1 {
+		t.Errorf("got %d drops, want 1", got)
+	}
+	if _, ok := s.pending.Load(second); ok {
+		t.Fatal("a dropped request must not keep its key claimed, or the module is never checked again")
+	}
+
+	// once the queue has room, a later event for the same module goes through
+	<-s.requests
+	s.DoRequestAsync(second)
+	if got := len(s.requests); got != 1 {
+		t.Errorf("the retry was not enqueued (%d queued)", got)
+	}
+}
+
+func TestPutSignatureReleasesPendingClaim(t *testing.T) {
+	s := bareStore(t, 8)
+	key := missingModule("put")
+
+	s.DoRequestAsync(key)
+	if _, ok := s.pending.Load(key); !ok {
+		t.Fatal("the key should be claimed")
+	}
+
+	s.PutSignature(key, TypeEmbedded, LevelWindows)
+
+	if _, ok := s.pending.Load(key); ok {
+		t.Error("PutSignature must release the claim")
+	}
+	if sig := s.peek(key); sig == nil || !sig.IsTrusted() {
+		t.Error("PutSignature must store a trusted signature")
+	}
+}
+
+func TestDoRequestInlineFallbackIsBounded(t *testing.T) {
+	// an unbuffered queue without a reader is always full
+	s := bareStore(t, 0)
+	key := missingModule("inline")
+	drops := delta(signatureAsyncRequestDrops)
+
+	// all the inline slots are taken
+	for i := 0; i < maxInlineChecks; i++ {
+		s.inline <- struct{}{}
+	}
+
+	done := make(chan *Signature, 1)
+	go func() { done <- s.DoRequest(key) }()
+
+	select {
+	case <-done:
+		t.Fatal("the caller ran a check while every inline slot was taken")
+	case <-time.After(100 * time.Millisecond):
+	}
+	if s.peek(key) != nil {
+		t.Fatal("no check must have run while the caller waits for a slot")
+	}
+
+	<-s.inline // free one slot
+
+	select {
+	case sig := <-done:
+		if sig == nil || sig.Path != key.Path {
+			t.Fatalf("unexpected signature %+v", sig)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the caller did not proceed after a slot was freed")
+	}
+	if s.peek(key) == nil {
+		t.Error("the inline check must store its result")
+	}
+	if got := len(s.inline); got != maxInlineChecks-1 {
+		t.Errorf("%d slots are taken, want %d: the caller must give its slot back", got, maxInlineChecks-1)
+	}
+	if drops() < 1 {
+		t.Error("the full queue must be counted as a drop")
+	}
+}
+
+func TestDoRequestInlineFallbackGivesUpOnClose(t *testing.T) {
+	s := bareStore(t, 0)
+	key := missingModule("closing")
+	for i := 0; i < maxInlineChecks; i++ {
+		s.inline <- struct{}{}
+	}
+
+	done := make(chan *Signature, 1)
+	go func() { done <- s.DoRequest(key) }()
+	time.Sleep(50 * time.Millisecond)
+	close(s.stop)
+
+	select {
+	case sig := <-done:
+		if sig == nil || sig.Path != key.Path || sig.Exists() || sig.Type() != TypeNone {
+			t.Fatalf("a caller released by shutdown must get an unchecked signature, got %+v", sig)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the caller stayed blocked after the store was closed")
+	}
+	if s.peek(key) != nil {
+		t.Error("an unchecked placeholder must not be cached")
+	}
+}
+
+func TestDoRequestInlineFallbackUnderLoad(t *testing.T) {
+	s := bareStore(t, 0)
+	checks := delta(signatureCacheMisses)
+
+	const keys = 64
+	var wg sync.WaitGroup
+	for i := 0; i < keys; i++ {
+		key := missingModule(fmt.Sprintf("load%d", i%keys))
+		// two callers per key
+		for j := 0; j < 2; j++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				if sig := s.DoRequest(key); sig == nil {
+					t.Error("DoRequest returned nil")
+				}
+			}()
+		}
+	}
+	wg.Wait()
+
+	if got := checks(); got != keys {
+		t.Errorf("ran %d checks for %d keys", got, keys)
+	}
+	if got := len(s.inline); got != 0 {
+		t.Errorf("%d inline slots leaked", got)
+	}
+}
+
+func TestWorkerParsesCertificatesOfPutSignatures(t *testing.T) {
+	s := bareStore(t, 8)
+	t.Cleanup(func() { close(s.stop) })
+
+	total := mapTotal(signatureCertParseErrors)
+	nilErrs := int64(0)
+	if v, ok := signatureCertParseErrors.Get(ErrNilSignature.Error()).(*expvar.Int); ok {
+		nilErrs = v.Value()
+	}
+
+	// a cert request whose signature is gone from the store (evicted or
+	// invalidated) must be skipped, not parsed as a nil signature
+	s.certs <- Request{Key: missingModule("evicted")}
+	// a request for a stored signature must be parsed. The module doesn't
+	// exist, so the parse fails and lands in the error map
+	s.PutSignature(missingModule("stored"), TypeEmbedded, LevelWindows)
+
+	go s.runWorker()
+
+	// the only worker handles the requests in order, so once the stored one
+	// has been parsed, the evicted one is behind us
+	deadline := time.Now().Add(5 * time.Second)
+	for mapTotal(signatureCertParseErrors) == total && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
+	time.Sleep(50 * time.Millisecond)
+
+	if v, ok := signatureCertParseErrors.Get(ErrNilSignature.Error()).(*expvar.Int); ok && v.Value() != nilErrs {
+		t.Error("the worker parsed the certificate of a signature that is not in the store")
+	}
+	if got := mapTotal(signatureCertParseErrors) - total; got != 1 {
+		t.Errorf("got %d certificate parse attempts, want exactly 1, for the stored signature", got)
 	}
 }
 
