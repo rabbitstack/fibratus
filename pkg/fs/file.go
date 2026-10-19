@@ -136,7 +136,10 @@ type FileInfo struct {
 }
 
 func (f *FileInfo) keepalive() {
-	f.accessed.Store(time.Now().UnixNano())
+	now := time.Now().UnixNano()
+	if now-f.accessed.Load() > int64(time.Second) {
+		f.accessed.Store(now)
+	}
 }
 
 func (f *FileInfo) lastAccessed() time.Time {
