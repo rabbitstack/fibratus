@@ -325,6 +325,11 @@ func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecor
 		return nil
 	}
 
+	pid := rec.Header.ProcessID
+	if event.IsCurrentProcDropped(pid) && rec.Header.ProviderID != etw.WindowsKernelProcessGUID {
+		return nil
+	}
+
 	switch eventType {
 	case event.CreateFile:
 		return p.initIORequest(rec)
@@ -344,6 +349,9 @@ func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecor
 			tid       = rec.ReadUint32(12)
 			callstack = rec.ReadCallstackInto(16, va.GetCallstackFromPool())
 		)
+		if event.IsCurrentProcDropped(pid) {
+			return nil
+		}
 		// Links the callstack carried by a StackWalk event with the
 		// event that triggered it. If the CreateFile event is still
 		// pending, it claims the callstack when it is published to
@@ -471,18 +479,17 @@ func (p *Probe) completeIORequest(producerID pipeline.ProducerID, rec *etw.Event
 	status = rec.ReadUint32(16)
 	if windows.NTStatus(status) == windows.STATUS_REPARSE {
 		// Inherit caller's create disposition
+		disposition = opts >> 24
 	} else {
 		disposition = uint32(rec.ReadUint64(8))
 	}
 
-	if !p.isFilePathApproved(path, disposition) && !p.isFileBaseApproved(path, disposition) &&
-		!p.isFileExtApproved(path, disposition) {
+	if !p.isFileApproved(path, disposition) {
 		if p.linker != nil {
 			p.linker.releaseReservation(req.rec.Header.Timestamp)
 		}
 		return nil
 	}
-
 	return p.pipeline.Publish(producerID, event.CreateFile, func(evt *event.Event) {
 		evt.Parse(req.rec)
 		// Attach create disposition and NT status parameters
@@ -579,6 +586,16 @@ func (p *Probe) handleEvent(evt *event.Event) error {
 		}
 	case event.CreateThread, event.ThreadRundown:
 	case event.TerminateThread:
+	case event.OpenProcess, event.OpenThread:
+		pid, err := evt.Params.GetPid()
+		if err != nil {
+			return err
+		}
+		proc := p.psnap.FindAndPut(pid)
+		if proc != nil {
+			evt.AppendParam(params.Exe, params.Path, proc.Exe)
+			evt.AppendParam(params.ProcessName, params.AnsiString, proc.Name)
+		}
 	case event.LoadModule, event.ModuleRundown, event.LoadModuleInternal:
 		if err := p.handleLoadModule(evt); err != nil {
 			return err

@@ -164,7 +164,7 @@ func (d *ParamDecoder) DecodeFile(r *etw.EventRecord, e *Event) {
 		e.AppendParam(params.FileIrpPtr, params.Address, r.ReadUint64(0))
 		e.AppendParam(params.FileObject, params.Address, r.ReadUint64(8))
 		e.AppendParam(params.ThreadID, params.TID, r.ReadUint32(16))
-		e.AppendParam(params.FileCreateOptions, params.Flags, r.ReadUint32(20), WithFlags(FileCreateOptionsFlags))
+		e.AppendParam(params.FileCreateOptions, params.Flags, r.ReadUint32(20)&0xFFFFFF, WithFlags(FileCreateOptionsFlags))
 		e.AppendParam(params.FileAttributes, params.Flags, r.ReadUint32(24), WithFlags(FileAttributeFlags))
 		e.AppendParam(params.FileShareMask, params.Flags, r.ReadUint32(28), WithFlags(FileShareModeFlags))
 		e.AppendParam(params.FilePath, params.DOSPath, r.ConsumeUTF16String(32))
