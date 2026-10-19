@@ -22,6 +22,11 @@
 package fs
 
 import (
+	"bytes"
+	"encoding/binary"
+	"errors"
+	"expvar"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -31,6 +36,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/time/rate"
 )
 
 func sysRoot(t *testing.T) string {
@@ -243,7 +249,7 @@ func TestFileMetadataStoreGetKeepsAlive(t *testing.T) {
 	f := s.get(path)
 	old := f.lastAccessed()
 
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(1005 * time.Millisecond)
 	f2 := s.get(path)
 	if !f2.lastAccessed().After(old) {
 		t.Error("expected lastAccessed to advance on repeated get()")
@@ -566,6 +572,442 @@ func TestCloseStopsWorkersAndPurger(t *testing.T) {
 	if !s.contains(path) {
 		t.Error("fast-path cache writes should still work after Close()")
 	}
+}
+
+func cachedEntry(s *FileMetadataStore, path string) (*FileInfo, bool) {
+	s.mux.RLock()
+	defer s.mux.RUnlock()
+	f, ok := s.files[s.normalizePath(path)]
+	return f, ok
+}
+
+func parseErrorTotal() (n int64) {
+	fsMetadataFileParseErrors.Do(func(kv expvar.KeyValue) {
+		if v, ok := kv.Value.(*expvar.Int); ok {
+			n += v.Value()
+		}
+	})
+	return n
+}
+
+func writeTestFile(t *testing.T, name string, content []byte) string {
+	t.Helper()
+	p := filepath.Join(t.TempDir(), name)
+	if err := os.WriteFile(p, content, 0644); err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+// realPE returns the bytes of a genuine PE shipped with Windows.
+func realPE(t *testing.T) []byte {
+	t.Helper()
+	root := os.Getenv("SystemRoot")
+	if root == "" {
+		root = `C:\Windows`
+	}
+	b, err := os.ReadFile(filepath.Join(root, "System32", "cmd.exe"))
+	if err != nil {
+		t.Skipf("cannot read cmd.exe: %v", err)
+	}
+	return b
+}
+
+// header builds an n-byte buffer with an MZ magic, e_lfanew=lfanew and, if
+// sig is non-empty and fits, sig written at lfanew.
+func header(n int, lfanew uint32, sig string) []byte {
+	b := make([]byte, n)
+	b[0], b[1] = 'M', 'Z'
+	binary.LittleEndian.PutUint32(b[0x3c:], lfanew)
+	if sig != "" && uint64(lfanew)+uint64(len(sig)) <= uint64(n) {
+		copy(b[lfanew:], sig)
+	}
+	return b
+}
+
+// --- checkPEHeader ---
+
+func TestCheckPEHeader(t *testing.T) {
+	const pesig = "PE\x00\x00"
+	notMZ := make([]byte, 1024)
+	wrongMagic := header(1024, 0x80, pesig)
+	wrongMagic[0], wrongMagic[1] = 'Z', 'M'
+
+	var tests = []struct {
+		name string
+		h    []byte
+		err  error
+	}{
+		{"nil", nil, errShortFile},
+		{"empty", []byte{}, errShortFile},
+		{"63 bytes", make([]byte, 63), errShortFile},
+		{"64 zero bytes", make([]byte, 64), errNotPE},
+		{"zeros", notMZ, errNotPE},
+		{"swapped magic", wrongMagic, errNotPE},
+		{"valid PE signature", header(1024, 0x80, pesig), nil},
+		{"valid, header exactly 64 bytes with sig beyond", header(64, 0x80, pesig), nil},
+		{"bad NT signature", header(1024, 0x80, "XXXX"), errNotPE},
+		{"e_lfanew points inside the DOS header", header(1024, 0, ""), errNotPE},
+		{"NT header beyond probe is undecidable", header(1024, 0x2000, ""), nil},
+		{"e_lfanew 0xFFFFFFFF does not overflow", header(1024, 0xFFFFFFFF, ""), nil},
+		{"sig ends exactly at probe end, valid", header(1024, 1020, pesig), nil},
+		{"sig ends exactly at probe end, invalid", header(1024, 1020, "XXXX"), errNotPE},
+		{"sig straddles probe end", header(1024, 1021, ""), nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := isPE(tt.h)
+			if !errors.Is(err, tt.err) {
+				t.Fatalf("got %v, want %v", err, tt.err)
+			}
+		})
+	}
+}
+
+func TestFileInfoExpired(t *testing.T) {
+	now := time.Now()
+	age := func(d time.Duration, negative bool) *FileInfo {
+		f := &FileInfo{negative: negative}
+		f.accessed.Store(now.Add(-d).UnixNano())
+		return f
+	}
+
+	if age(30*time.Second, true).expired(now) {
+		t.Error("negative entry younger than negativeTTL must not be expired")
+	}
+	if !age(negativeTTL+time.Second, true).expired(now) {
+		t.Error("negative entry older than negativeTTL must be expired")
+	}
+	if age(negativeTTL+time.Second, false).expired(now) {
+		t.Error("positive entry must use metadataTTL, not negativeTTL")
+	}
+	if !age(metadataTTL+time.Second, false).expired(now) {
+		t.Error("positive entry older than metadataTTL must be expired")
+	}
+}
+
+func TestLookup(t *testing.T) {
+	s := newTestStore()
+	defer s.Close()
+
+	if f, ok := s.lookup(`c:\missing`); f != nil || ok {
+		t.Errorf("missing: got (%v, %v), want (nil, false)", f, ok)
+	}
+
+	pos := &FileInfo{IsDLL: true}
+	s.add(`c:\pos.dll`, pos)
+	if f, ok := s.lookup(`c:\pos.dll`); f != pos || !ok {
+		t.Errorf("positive: got (%v, %v)", f, ok)
+	}
+
+	s.add(`c:\neg.txt`, &FileInfo{negative: true})
+	if f, ok := s.lookup(`c:\neg.txt`); f != nil || !ok {
+		t.Errorf("negative must be (nil, true), got (%v, %v)", f, ok)
+	}
+	if !s.contains(`c:\neg.txt`) {
+		t.Error("contains must be true for a negative entry so async requests are skipped")
+	}
+}
+
+func TestAddNegativeSkippedAtCapacity(t *testing.T) {
+	s := newTestStore()
+	defer s.Close()
+
+	s.mux.Lock()
+	for i := 0; i < maxEntries; i++ {
+		s.files[fmt.Sprintf(`c:\fill\%d`, i)] = &FileInfo{}
+	}
+	s.mux.Unlock()
+
+	s.add(`c:\over\neg.txt`, &FileInfo{negative: true})
+	if _, ok := cachedEntry(s, `c:\over\neg.txt`); ok {
+		t.Error("negative entry must not be added once the map is at maxEntries")
+	}
+
+	s.add(`c:\over\pos.dll`, &FileInfo{IsDLL: true})
+	if _, ok := cachedEntry(s, `c:\over\pos.dll`); !ok {
+		t.Error("positive entries must still be added at capacity")
+	}
+}
+
+func TestGCEvictsNegativeEntriesEarlier(t *testing.T) {
+	s := newTestStore()
+	defer s.Close()
+
+	old := time.Now().Add(-(negativeTTL + 30*time.Second)).UnixNano()
+
+	neg, pos := &FileInfo{negative: true}, &FileInfo{IsDLL: true}
+	s.add(`c:\gc\neg.txt`, neg)
+	s.add(`c:\gc\pos.dll`, pos)
+	neg.accessed.Store(old)
+	pos.accessed.Store(old)
+
+	s.gc()
+
+	if _, ok := cachedEntry(s, `c:\gc\neg.txt`); ok {
+		t.Error("negative entry past negativeTTL should be evicted")
+	}
+	if _, ok := cachedEntry(s, `c:\gc\pos.dll`); !ok {
+		t.Error("positive entry younger than metadataTTL must survive")
+	}
+}
+
+func TestDoRequestNonPECachedNegative(t *testing.T) {
+	s := newTestStore()
+	defer s.Close()
+
+	p := writeTestFile(t, "data.log", bytes.Repeat([]byte("x"), 4096))
+	errsBefore := parseErrorTotal()
+
+	if f := s.DoRequest(p); f != nil {
+		t.Fatalf("non-PE file must return nil, got %+v", f)
+	}
+	e, ok := cachedEntry(s, p)
+	if !ok || !e.negative {
+		t.Fatalf("expected negative cache entry, got (%+v, %v)", e, ok)
+	}
+	if got := parseErrorTotal(); got != errsBefore {
+		t.Errorf("non-PE must not count as a parse error, delta=%d", got-errsBefore)
+	}
+}
+
+func TestDoRequestBadNTSignatureCachedNegative(t *testing.T) {
+	s := newTestStore()
+	defer s.Close()
+
+	p := writeTestFile(t, "fake.dll", header(512, 0x80, "XXXX"))
+	if f := s.DoRequest(p); f != nil {
+		t.Fatalf("MZ with bad NT signature must return nil, got %+v", f)
+	}
+	if e, ok := cachedEntry(s, p); !ok || !e.negative {
+		t.Fatalf("expected negative cache entry, got (%+v, %v)", e, ok)
+	}
+}
+
+func TestNegativeEntryServedUntilInvalidated(t *testing.T) {
+	s := newTestStore()
+	defer s.Close()
+
+	pe := realPE(t)
+	p := writeTestFile(t, "later.bin", bytes.Repeat([]byte("x"), 256))
+
+	if f := s.DoRequest(p); f != nil {
+		t.Fatalf("first request: expected nil, got %+v", f)
+	}
+
+	if err := os.WriteFile(p, pe, 0644); err != nil {
+		t.Fatal(err)
+	}
+	if f := s.DoRequest(p); f != nil {
+		t.Fatal("negative entry should still be served from cache before invalidation")
+	}
+
+	s.RemoveFile(p)
+
+	f := s.DoRequest(p)
+	if f == nil {
+		t.Fatal("after RemoveFile the PE must be re-read and classified")
+	}
+	if !f.IsExecutable || f.negative {
+		t.Errorf("unexpected classification: %+v", f)
+	}
+}
+
+func TestShortFilesNotCached(t *testing.T) {
+	pe := realPE(t)
+
+	for _, tt := range []struct {
+		name    string
+		content []byte
+	}{
+		{"1 byte", []byte("M")},
+		{"63 bytes", bytes.Repeat([]byte("x"), 63)},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			s := newTestStore()
+			defer s.Close()
+
+			p := writeTestFile(t, "growing.exe", tt.content)
+			errsBefore := parseErrorTotal()
+
+			if f := s.DoRequest(p); f != nil {
+				t.Fatalf("expected nil, got %+v", f)
+			}
+			if _, ok := cachedEntry(s, p); ok {
+				t.Fatal("short file must not be cached, positively or negatively")
+			}
+			if got := parseErrorTotal(); got != errsBefore {
+				t.Errorf("short file must not count as parse error, delta=%d", got-errsBefore)
+			}
+
+			// the writer finishes: no RemoveFile needed because nothing was cached
+			if err := os.WriteFile(p, pe, 0644); err != nil {
+				t.Fatal(err)
+			}
+			if f := s.DoRequest(p); f == nil || !f.IsExecutable {
+				t.Fatalf("completed file should classify, got %+v", f)
+			}
+		})
+	}
+}
+
+func TestEmptyFileNotCachedNorCounted(t *testing.T) {
+	s := newTestStore()
+	defer s.Close()
+
+	p := writeTestFile(t, "empty.exe", nil)
+
+	if f := s.DoRequest(p); f != nil {
+		t.Fatalf("expected nil, got %+v", f)
+	}
+	if _, ok := cachedEntry(s, p); ok {
+		t.Error("empty file must not be cached")
+	}
+}
+
+func TestMissingFileCountedNotCached(t *testing.T) {
+	s := newTestStore()
+	defer s.Close()
+
+	p := filepath.Join(t.TempDir(), "gone.dll")
+	errsBefore := parseErrorTotal()
+
+	if f := s.DoRequest(p); f != nil {
+		t.Fatalf("expected nil, got %+v", f)
+	}
+	if _, ok := cachedEntry(s, p); ok {
+		t.Error("open failures are transient and must not be cached")
+	}
+	if got := parseErrorTotal(); got != errsBefore+1 {
+		t.Errorf("open failure should count once, delta=%d", got-errsBefore)
+	}
+}
+
+func TestParseErrorKeyDoesNotContainPath(t *testing.T) {
+	s := newTestStore()
+	defer s.Close()
+
+	p := filepath.Join(t.TempDir(), "unique-marker-gone.dll")
+	s.DoRequest(p)
+
+	fsMetadataFileParseErrors.Do(func(kv expvar.KeyValue) {
+		if bytes.Contains([]byte(kv.Key), []byte("unique-marker-gone")) {
+			t.Errorf("expvar key leaks the file path: %q", kv.Key)
+		}
+	})
+}
+
+func TestConcurrentRequestsShareOneParse(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		content  func(t *testing.T) []byte
+		negative bool
+	}{
+		{"PE", realPE, false},
+		{"non-PE", func(*testing.T) []byte { return bytes.Repeat([]byte("x"), 4096) }, true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			s := newTestStore()
+			defer s.Close()
+
+			p := writeTestFile(t, "shared.bin", tt.content(t))
+			missesBefore := fsMetadataCacheMisses.Value()
+
+			const n = 32
+			results := make([]*FileInfo, n)
+			var wg sync.WaitGroup
+			start := make(chan struct{})
+			for i := 0; i < n; i++ {
+				wg.Add(1)
+				go func(i int) {
+					defer wg.Done()
+					<-start
+					results[i] = s.DoRequest(p)
+				}(i)
+			}
+			close(start)
+			wg.Wait()
+
+			for i := 1; i < n; i++ {
+				if results[i] != results[0] {
+					t.Fatalf("caller %d got a different *FileInfo than caller 0", i)
+				}
+			}
+			if tt.negative {
+				if results[0] != nil {
+					t.Fatalf("expected nil, got %+v", results[0])
+				}
+				return
+			}
+			if results[0] == nil {
+				t.Fatal("expected non-nil result")
+			}
+			if got := fsMetadataCacheMisses.Value() - missesBefore; got != 1 {
+				t.Errorf("cache misses = %d, want 1 (one parse for all callers)", got)
+			}
+		})
+	}
+}
+
+func TestRateLimiterGuardsOnlyTheFullRead(t *testing.T) {
+	pe := realPE(t)
+	exhausted := func(s *FileMetadataStore) { s.limiter = rate.NewLimiter(0, 0) }
+
+	t.Run("async PE is rate limited and not cached", func(t *testing.T) {
+		s := newTestStore()
+		defer s.Close()
+		exhausted(s)
+
+		p := writeTestFile(t, "a.exe", pe)
+		errsBefore := parseErrorTotal()
+
+		if f := s.resolve(Request{Path: s.normalizePath(p)}); f != nil {
+			t.Fatalf("expected nil when rate limited, got %+v", f)
+		}
+		if _, ok := cachedEntry(s, p); ok {
+			t.Error("rate-limited result must not be cached, the next event should retry")
+		}
+		if got := parseErrorTotal(); got != errsBefore {
+			t.Errorf("rate limiting is not a parse error, delta=%d", got-errsBefore)
+		}
+	})
+
+	t.Run("async non-PE is still classified because the probe is not limited", func(t *testing.T) {
+		s := newTestStore()
+		defer s.Close()
+		exhausted(s)
+
+		p := writeTestFile(t, "a.txt", bytes.Repeat([]byte("x"), 512))
+		s.resolve(Request{Path: s.normalizePath(p)})
+
+		if e, ok := cachedEntry(s, p); !ok || !e.negative {
+			t.Fatalf("non-PE should be cached negative even when limiter is empty, got (%+v, %v)", e, ok)
+		}
+	})
+
+	t.Run("sync request bypasses the limiter", func(t *testing.T) {
+		s := newTestStore()
+		defer s.Close()
+		exhausted(s)
+
+		p := writeTestFile(t, "b.exe", pe)
+		f := s.resolve(Request{Path: s.normalizePath(p), Sync: true})
+		if f == nil || !f.IsExecutable {
+			t.Fatalf("sync request must not be rate limited, got %+v", f)
+		}
+	})
+
+	t.Run("seed request bypasses the limiter", func(t *testing.T) {
+		s := newTestStore()
+		defer s.Close()
+		exhausted(s)
+
+		p := writeTestFile(t, "c.exe", pe)
+		f := s.resolve(Request{Path: s.normalizePath(p), IsSeed: true})
+		if f == nil || !f.IsExecutable {
+			t.Fatalf("seed request must not be rate limited, got %+v", f)
+		}
+	})
 }
 
 func TestGetFileType(t *testing.T) {
