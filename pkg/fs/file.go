@@ -320,12 +320,10 @@ func (s *FileMetadataStore) DoRequest(path string) *FileInfo {
 	}
 
 	if s.wellKnownDLLs.Accept(p) {
-		s.addDLL(p)
-		return s.get(p)
+		return s.addDLL(p)
 	}
 	if s.wellKnownExecutables.Accept(p) {
-		s.addExecutable(p)
-		return s.get(p)
+		return s.addExecutable(p)
 	}
 
 	ch := make(chan *FileInfo, 1)
@@ -352,11 +350,11 @@ func (s *FileMetadataStore) DoRequestAsync(path string, isSeed bool) {
 	}
 
 	if s.wellKnownDLLs.Accept(p) {
-		s.addDLL(p)
+		_ = s.addDLL(p)
 		return
 	}
 	if s.wellKnownExecutables.Accept(p) {
-		s.addExecutable(p)
+		_ = s.addExecutable(p)
 		return
 	}
 
@@ -374,9 +372,16 @@ func (s *FileMetadataStore) Close() {
 }
 
 func (s *FileMetadataStore) AddFile(path string, f *FileInfo) {
+	s.add(s.normalizePath(path), f)
+}
+
+func (s *FileMetadataStore) add(path string, f *FileInfo) {
+	f.keepalive()
 	s.mux.Lock()
 	defer s.mux.Unlock()
-	fsMetadataCount.Add(1)
+	if _, ok := s.files[path]; !ok {
+		fsMetadataCount.Add(1)
+	}
 	s.files[path] = f
 }
 
@@ -384,8 +389,10 @@ func (s *FileMetadataStore) RemoveFile(path string) {
 	p := s.normalizePath(path)
 	s.mux.Lock()
 	defer s.mux.Unlock()
-	delete(s.files, p)
-	fsMetadataCount.Add(-1)
+	if _, ok := s.files[p]; ok {
+		delete(s.files, p)
+		fsMetadataCount.Add(-1)
+	}
 }
 
 func (s *FileMetadataStore) runWorker() {
@@ -456,14 +463,16 @@ func (s *FileMetadataStore) contains(path string) bool {
 	return s.get(path) != nil
 }
 
-func (s *FileMetadataStore) addDLL(path string) {
+func (s *FileMetadataStore) addDLL(path string) *FileInfo {
 	f := &FileInfo{IsDLL: true}
-	s.AddFile(path, f)
+	s.add(path, f)
+	return f
 }
 
-func (s *FileMetadataStore) addExecutable(path string) {
+func (s *FileMetadataStore) addExecutable(path string) *FileInfo {
 	f := &FileInfo{IsExecutable: true}
-	s.AddFile(path, f)
+	s.add(path, f)
+	return f
 }
 
 func (s *FileMetadataStore) get(path string) *FileInfo {
