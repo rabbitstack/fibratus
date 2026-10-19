@@ -168,9 +168,9 @@ func (f *FileInfo) lastAccessed() time.Time {
 }
 
 type Request struct {
-	Path     string
-	Response chan *FileInfo
-	IsSeed   bool // request originated from the initial rundown
+	Path   string
+	IsSeed bool // request originated from the initial rundown
+	Sync   bool // caller is invoking a sync resolution
 }
 
 func GetMetadataStore() *FileMetadataStore {
@@ -200,12 +200,15 @@ type FileMetadataStore struct {
 
 	requests chan Request
 
-	stop  chan struct{}
-	group singleflight.Group
+	stop      chan struct{}
+	closeOnce sync.Once
+	group     singleflight.Group
 
 	purger *time.Ticker
 
 	limiter *rate.Limiter
+
+	pending sync.Map
 
 	windowsUpdateWildcards windowsUpdateWildcards
 	wellKnownDLLs          moduleWildcards
@@ -350,17 +353,7 @@ func (s *FileMetadataStore) DoRequest(path string) *FileInfo {
 		return s.addExecutable(p)
 	}
 
-	ch := make(chan *FileInfo, 1)
-	r := Request{Path: p, Response: ch}
-	select {
-	case s.requests <- r:
-	default:
-		// queue full: fall back to inline check rather than
-		// dropping a decision that has a security consequence.
-		return s.resolve(r)
-	}
-	f := <-ch
-	return f
+	return s.resolve(Request{Path: p, Sync: true})
 }
 
 func (s *FileMetadataStore) DoRequestAsync(path string, isSeed bool) {
@@ -382,17 +375,24 @@ func (s *FileMetadataStore) DoRequestAsync(path string, isSeed bool) {
 		return
 	}
 
+	if _, loaded := s.pending.LoadOrStore(p, struct{}{}); loaded {
+		return
+	}
+
 	select {
 	case s.requests <- Request{Path: p, IsSeed: isSeed}:
 	default:
+		s.pending.Delete(p)
 		// queue is full
 		fsMetadataAsyncRequestDrops.Add(1)
 	}
 }
 
 func (s *FileMetadataStore) Close() {
-	s.purger.Stop()
-	close(s.stop)
+	s.closeOnce.Do(func() {
+		s.purger.Stop()
+		close(s.stop)
+	})
 }
 
 func (s *FileMetadataStore) AddFile(path string, f *FileInfo) {
@@ -480,10 +480,8 @@ func (s *FileMetadataStore) gc() {
 }
 
 func (s *FileMetadataStore) processRequest(r Request) {
-	f := s.resolve(r)
-	if r.Response != nil {
-		r.Response <- f
-	}
+	_ = s.resolve(r)
+	s.pending.Delete(r.Path)
 }
 
 func (s *FileMetadataStore) lookup(path string) (*FileInfo, bool) {
@@ -546,7 +544,7 @@ func (s *FileMetadataStore) resolve(r Request) *FileInfo {
 			return f, nil // a previous flight may have filled it
 		}
 
-		parsed, err := s.parsePE(path, r.IsSeed)
+		parsed, err := s.parsePE(path, r.IsSeed || r.Sync)
 		switch {
 		case errors.Is(err, errNotPE), errors.Is(err, sys.ErrFileSkipped):
 			s.add(r.Path, &FileInfo{negative: true})
