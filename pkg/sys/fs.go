@@ -126,7 +126,7 @@ func ReadFile(path string, size int, timeout time.Duration) ([]byte, error) {
 	handle, err := windows.CreateFile(
 		pathUTF16,
 		windows.GENERIC_READ,
-		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE,
+		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
 		nil,
 		windows.OPEN_EXISTING,
 		windows.FILE_FLAG_OVERLAPPED,
