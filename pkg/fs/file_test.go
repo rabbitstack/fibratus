@@ -36,6 +36,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/time/rate"
 )
 
 func sysRoot(t *testing.T) string {
@@ -946,6 +947,67 @@ func TestConcurrentRequestsShareOneParse(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRateLimiterGuardsOnlyTheFullRead(t *testing.T) {
+	pe := realPE(t)
+	exhausted := func(s *FileMetadataStore) { s.limiter = rate.NewLimiter(0, 0) }
+
+	t.Run("async PE is rate limited and not cached", func(t *testing.T) {
+		s := newTestStore()
+		defer s.Close()
+		exhausted(s)
+
+		p := writeTestFile(t, "a.exe", pe)
+		errsBefore := parseErrorTotal()
+
+		if f := s.resolve(Request{Path: s.normalizePath(p)}); f != nil {
+			t.Fatalf("expected nil when rate limited, got %+v", f)
+		}
+		if _, ok := cachedEntry(s, p); ok {
+			t.Error("rate-limited result must not be cached, the next event should retry")
+		}
+		if got := parseErrorTotal(); got != errsBefore {
+			t.Errorf("rate limiting is not a parse error, delta=%d", got-errsBefore)
+		}
+	})
+
+	t.Run("async non-PE is still classified because the probe is not limited", func(t *testing.T) {
+		s := newTestStore()
+		defer s.Close()
+		exhausted(s)
+
+		p := writeTestFile(t, "a.txt", bytes.Repeat([]byte("x"), 512))
+		s.resolve(Request{Path: s.normalizePath(p)})
+
+		if e, ok := cachedEntry(s, p); !ok || !e.negative {
+			t.Fatalf("non-PE should be cached negative even when limiter is empty, got (%+v, %v)", e, ok)
+		}
+	})
+
+	t.Run("sync request bypasses the limiter", func(t *testing.T) {
+		s := newTestStore()
+		defer s.Close()
+		exhausted(s)
+
+		p := writeTestFile(t, "b.exe", pe)
+		f := s.resolve(Request{Path: s.normalizePath(p), Sync: true})
+		if f == nil || !f.IsExecutable {
+			t.Fatalf("sync request must not be rate limited, got %+v", f)
+		}
+	})
+
+	t.Run("seed request bypasses the limiter", func(t *testing.T) {
+		s := newTestStore()
+		defer s.Close()
+		exhausted(s)
+
+		p := writeTestFile(t, "c.exe", pe)
+		f := s.resolve(Request{Path: s.normalizePath(p), IsSeed: true})
+		if f == nil || !f.IsExecutable {
+			t.Fatalf("seed request must not be rate limited, got %+v", f)
+		}
+	})
 }
 
 func TestGetFileType(t *testing.T) {
