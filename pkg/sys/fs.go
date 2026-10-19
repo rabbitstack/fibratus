@@ -21,8 +21,8 @@
 package sys
 
 import (
-	"fmt"
-	"syscall"
+	"errors"
+	"runtime"
 	"time"
 
 	"golang.org/x/sys/windows"
@@ -113,23 +113,37 @@ func GetMappedFile(process windows.Handle, addr uintptr) string {
 // elapsed, and the object's state is nonsignaled.
 const WaitTimeout = 0x00000102
 
+// ErrSkipped signals the file is offline or a cloud placeholder and was not read.
+var ErrFileSkipped = errors.New("file is offline or a cloud placeholder")
+
+// ErrTimeout signals that the timeout elapsed while trying to read the file.
+var ErrFileTimeout = errors.New("timeout reading file")
+
 // ReadFile reads the file asynchronously with the specified number
 // of bytes to read and the timeout after which the I/O operation
 // is cancelled.
 func ReadFile(path string, size int, timeout time.Duration) ([]byte, error) {
-	pathUTF16, err := syscall.UTF16PtrFromString(path)
+	return ReadFileWithPredicate(path, size, 0, timeout, nil)
+}
+
+// ReadFileWithPredicate opens the file once and reads its first probeSize bytes. If
+// accept predicate is non-nil and returns an error, the read stops there and that
+// error is returned. Otherwise the rest of the file is read, up to size bytes in total.
+// The buffer is never larger than the file.
+func ReadFileWithPredicate(path string, size, probeSize int, timeout time.Duration, accept func(head []byte) error) ([]byte, error) {
+	p, err := windows.UTF16PtrFromString(path)
 	if err != nil {
 		return nil, err
 	}
 
 	// open file asynchronously
 	handle, err := windows.CreateFile(
-		pathUTF16,
+		p,
 		windows.GENERIC_READ,
-		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE,
+		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
 		nil,
 		windows.OPEN_EXISTING,
-		windows.FILE_FLAG_OVERLAPPED,
+		windows.FILE_FLAG_OVERLAPPED|windows.FILE_FLAG_OPEN_NO_RECALL,
 		0,
 	)
 	if err != nil {
@@ -138,51 +152,96 @@ func ReadFile(path string, size int, timeout time.Duration) ([]byte, error) {
 	//nolint:errcheck
 	defer windows.CloseHandle(handle)
 
-	event, err := windows.CreateEvent(nil, 1, 0, nil)
+	var info windows.ByHandleFileInformation
+	if err := windows.GetFileInformationByHandle(handle, &info); err != nil {
+		return nil, err
+	}
+	if info.FileAttributes&(windows.FILE_ATTRIBUTE_OFFLINE|windows.FILE_ATTRIBUTE_RECALL_ON_OPEN|windows.FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS) != 0 {
+		return nil, ErrFileSkipped
+	}
+	fsize := int64(info.FileSizeHigh)<<32 | int64(info.FileSizeLow)
+	total := size
+	if fsize < int64(total) {
+		total = int(fsize)
+	}
+	if total == 0 {
+		return []byte{}, nil
+	}
+
+	ev, err := windows.CreateEvent(nil, 1, 0, nil)
 	if err != nil {
 		return nil, err
 	}
 	//nolint:errcheck
-	defer windows.CloseHandle(event)
+	defer windows.CloseHandle(ev)
 
-	var overlapped windows.Overlapped
-	overlapped.HEvent = event
-
-	buf := make([]byte, size) // chunk size
-	var n uint32
-
-	err = windows.ReadFile(handle, buf, &n, &overlapped)
-	if err != nil && err != windows.ERROR_IO_PENDING {
-		return nil, err
-	}
-	// synchronous completion
-	if err == nil && int(n) <= size {
-		return buf[:n], nil
+	first := total
+	if accept != nil && probeSize > 0 && probeSize < first {
+		first = probeSize
 	}
 
-	// wait for I/O operation to complete
-	wait, err := windows.WaitForSingleObject(event, uint32(timeout.Milliseconds()))
-	switch wait {
-	case windows.WAIT_FAILED:
-		return nil, err
-	case WaitTimeout:
-		// cancel the I/O
-		_ = windows.CancelIoEx(handle, &overlapped)
-
-		// must wait until cancellation completes
-		_, _ = windows.WaitForSingleObject(event, 1000)
-		err = windows.GetOverlappedResult(handle, &overlapped, &n, false)
-		if err == windows.ERROR_OPERATION_ABORTED {
-			return nil, fmt.Errorf("timeout reading file %s", path)
-		}
-		return nil, err
-	}
-
-	// get the result
-	err = windows.GetOverlappedResult(handle, &overlapped, &n, false)
+	head := make([]byte, first)
+	n, err := readFileAt(handle, ev, head, 0, timeout)
 	if err != nil {
 		return nil, err
 	}
 
-	return buf[:n], nil
+	head = head[:n]
+	if accept != nil {
+		if err := accept(head); err != nil {
+			return nil, err
+		}
+	}
+	if total <= first || n < first {
+		return head, nil
+	}
+
+	buf := make([]byte, total)
+	copy(buf, head)
+	m, err := readFileAt(handle, ev, buf[n:], uint64(n), timeout)
+	if err != nil {
+		return nil, err
+	}
+	return buf[:n+m], nil
+}
+
+// readFileAt performs one overlapped read. It never returns while the kernel can
+// still write into buf.
+func readFileAt(h, ev windows.Handle, buf []byte, off uint64, timeout time.Duration) (int, error) {
+	var ov windows.Overlapped
+	ov.HEvent = ev
+	ov.Offset = uint32(off)
+	ov.OffsetHigh = uint32(off >> 32)
+	_ = windows.ResetEvent(ev)
+
+	var n uint32
+	err := windows.ReadFile(h, buf, &n, &ov)
+	switch err {
+	case nil:
+		return int(n), nil
+	case windows.ERROR_HANDLE_EOF:
+		return 0, nil
+	case windows.ERROR_IO_PENDING:
+	default:
+		return 0, err
+	}
+
+	wait, werr := windows.WaitForSingleObject(ev, uint32(timeout.Milliseconds()))
+	if wait != windows.WAIT_OBJECT_0 {
+		_ = windows.CancelIoEx(h, &ov)
+		// block until the kernel is done with buf
+		_ = windows.GetOverlappedResult(h, &ov, &n, true)
+		runtime.KeepAlive(buf)
+		if wait == WaitTimeout {
+			return 0, ErrFileTimeout
+		}
+		return 0, werr
+	}
+	if err := windows.GetOverlappedResult(h, &ov, &n, false); err != nil {
+		if err == windows.ERROR_HANDLE_EOF {
+			return 0, nil
+		}
+		return 0, err
+	}
+	return int(n), nil
 }
