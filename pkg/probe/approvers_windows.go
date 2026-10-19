@@ -27,6 +27,19 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+func (p *Probe) isFileApproved(path string, disposition uint32) bool {
+	if p.isFilePathApproved(path, disposition) {
+		return true
+	}
+	if p.isFileBaseApproved(path, disposition) {
+		return true
+	}
+	if p.isFileExtApproved(path, disposition) {
+		return true
+	}
+	return false
+}
+
 func (p *Probe) isFilePathApproved(path string, disposition uint32) bool {
 	if p.rs == nil || len(p.rs.Approvers.Paths) == 0 {
 		return true
@@ -35,7 +48,6 @@ func (p *Probe) isFilePathApproved(path string, disposition uint32) bool {
 	if disposition != windows.FILE_OPEN {
 		return true
 	}
-
 	return p.matchesApprover(p.rs.Approvers.Paths, path)
 }
 
