@@ -794,11 +794,9 @@ func (e *EventRecord) ConsumeRawUTF16String(offset uint16) []uint16 {
 	if int(offset) >= len(b) {
 		return nil
 	}
-	n := (len(b) - int(offset)) / 2
-	if n == 0 {
-		return nil
-	}
-	return unsafe.Slice((*uint16)(unsafe.Pointer(&b[offset])), n)
+	length := e.BufferLen - offset
+	ptr := (*uint16)(unsafe.Pointer(e.Buffer + uintptr(offset)))
+	return unsafe.Slice(ptr, length/2-1)
 }
 
 // ReadSID reads the security identifier from the event buffer. Returns nil

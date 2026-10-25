@@ -21,7 +21,7 @@ package probe
 import (
 	"context"
 	"errors"
-	"os"
+	"fmt"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -38,10 +38,17 @@ import (
 	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/pipeline"
 	"github.com/rabbitstack/fibratus/pkg/ps"
+	"github.com/rabbitstack/fibratus/pkg/sys"
 	"github.com/rabbitstack/fibratus/pkg/sys/etw"
+	"github.com/rabbitstack/fibratus/pkg/util/cmdline"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
 	"github.com/rabbitstack/fibratus/pkg/util/multierror"
 	"github.com/rabbitstack/fibratus/pkg/util/pair"
+	"github.com/rabbitstack/fibratus/pkg/util/periodical"
+	"github.com/rabbitstack/fibratus/pkg/util/ports"
+	"github.com/rabbitstack/fibratus/pkg/util/signature"
+	"github.com/rabbitstack/fibratus/pkg/util/stringcache"
+	"github.com/rabbitstack/fibratus/pkg/util/utf16"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 	"golang.org/x/sys/windows"
 
@@ -51,6 +58,14 @@ import (
 const maxEnqueuedIORequests = 200
 
 const ringSize = 1 << 16
+
+// maxPendingIOWait is how long a CreateFile may wait for its FileOpEnd before
+// it is considered lost and evicted. Normal completions take microseconds, so
+// this is deliberately generous.
+var maxPendingIOWait = 5 * time.Second
+
+// ioSweepInterval throttles the stale-request sweep.
+const ioSweepInterval = time.Second
 
 type Probe struct {
 	PlatformProbe
@@ -62,6 +77,9 @@ type Probe struct {
 	fcbPathResolver  *expirable.LRU[uint64, FileInfo] // maps FCB (File Control Block) pointer to file info
 
 	kcbPathResolver map[uint64]string // maps KCB (Key Control Block) pointer to registry path
+
+	filePathStringCache *stringcache.StringCache
+	kcbPathStringCache  *stringcache.StringCache
 
 	// stores pending I/O request packets
 	enqueuedIORequests map[uint64]ioRequest
@@ -84,6 +102,11 @@ type Probe struct {
 	pipeline *pipeline.Pipeline
 
 	linker *CallstackLinker
+
+	// periodics keeps a list of periodical runners per pipeline producer ID
+	periodics [pipeline.ProducerMax + 1][]periodical.Periodic
+
+	regionProber *va.RegionProber
 }
 
 // ioRequest acts as a scratch area for the pending IRP request
@@ -92,8 +115,9 @@ type Probe struct {
 // the callback returns. Any state that needs to outlive the
 // buffer lifetime must copy it safely.
 type ioRequest struct {
-	rec *etw.EventRecord // keeps the original CreateFile event record
-	buf []byte           // keeps the data buffer alive
+	rec   *etw.EventRecord // keeps the original CreateFile event record
+	buf   []byte           // keeps the data buffer alive
+	stack va.Callstack     // claimed CreateFile call stack addresses
 }
 
 func (p *Probe) Init(rs *config.RulesCompileResult) error {
@@ -103,15 +127,11 @@ func (p *Probe) Init(rs *config.RulesCompileResult) error {
 	p.rs = rs
 
 	if rs != nil {
-		enableDNS = rs.HasDNSEvents
-		enableRegistry = rs.HasRegistryEvents
-		enableAuditAPI = rs.HasAuditAPIEvents
-
 		// Configure drop types if the rule engine is enabled, which is
 		// the default for sensor mode. For any event not present in the
 		// rule set, the bitmap rejects it is offloaded from the session
 		// buffers
-		drops := slices.DeleteFunc(event.AllTypes(), func(t event.Type) bool {
+		p.config.EventSource.AddDropTypes(slices.DeleteFunc(slices.Clone(event.AllTypes()), func(t event.Type) bool {
 			if t.OnlyState() || t.StateSnapshot() {
 				// State events are always accepted
 				return true
@@ -138,10 +158,13 @@ func (p *Probe) Init(rs *config.RulesCompileResult) error {
 			}
 
 			return rs.ContainsEvent(t)
-		})
+		})...)
 
-		p.config.EventSource.AddDropTypes(drops...)
 		p.kernelTrace.SetKernelEventFlags(p.toKernelEventFlags(rs))
+
+		enableDNS = rs.HasDNSEvents
+		enableRegistry = rs.HasRegistryEvents
+		enableAuditAPI = rs.HasAuditAPIEvents
 	} else {
 		enableDNS = p.config.EventSource.EnableDNSEvents
 		enableRegistry = p.config.EventSource.EnableRegistryEvents
@@ -154,7 +177,7 @@ func (p *Probe) Init(rs *config.RulesCompileResult) error {
 	// from the snapshotter
 	p.userTrace.AddProvider(etw.WindowsKernelProcessGUID, libetw.WithKeywords(etw.ProcessKeyword|etw.ImageKeyword), libetw.WithCaptureState())
 
-	// in a similar vein, Windows Kernel Registry provider publishes
+	// In a similar vein, Windows Kernel Registry provider publishes
 	// the RegSetValue event with the full captured data for the
 	// modified value. This data is used to attach various parameters
 	// to the RegSetValue event published by the NT Kernel Logger
@@ -222,10 +245,6 @@ func (p *Probe) Start() error {
 			buf := make([]byte, 1<<20)
 			n := runtime.Stack(buf, true)
 			log.Fatalf("panic in trace processing goroutine: %v\n%s", r, buf[:n])
-
-			time.Sleep(5 * time.Second)
-
-			os.Exit(1)
 		}
 	}
 
@@ -304,10 +323,6 @@ func (p *Probe) Close() error {
 
 	p.pipeline.Close()
 
-	if p.linker != nil {
-		p.linker.close()
-	}
-
 	p.cancelFunc()
 	p.wg.Wait()
 
@@ -321,12 +336,11 @@ func (p *Probe) Close() error {
 func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecord) error {
 	eventType := event.TypeFromEventRecord(rec)
 
-	if p.config.EventSource.HasDropType(eventType) {
+	if event.IsCurrentProcDropped(rec) {
 		return nil
 	}
 
-	pid := rec.Header.ProcessID
-	if event.IsCurrentProcDropped(pid) && rec.Header.ProviderID != etw.WindowsKernelProcessGUID {
+	if p.config.EventSource.HasDropType(eventType) {
 		return nil
 	}
 
@@ -338,30 +352,19 @@ func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecor
 		delete(p.filePathResolver, object)
 		return nil
 	case event.FileRundown:
+		totalRundownFiles.Add(1)
 		object := rec.ReadUint64(0)
-		path := rec.ConsumeUTF16String(8)
+		path := fs.GetDevMapper().Convert(rec.ConsumeUTF16String(8))
 		p.filePathResolver[object] = FileInfo{Path: path, Type: fs.GetFileType(path, 0)}
 		return nil
 	case event.StackWalk:
-		var (
-			ts        = rec.ReadUint64(0)
-			pid       = rec.ReadUint32(8)
-			tid       = rec.ReadUint32(12)
-			callstack = rec.ReadCallstackInto(16, va.GetCallstackFromPool())
-		)
-		if event.IsCurrentProcDropped(pid) {
+		// CreateFile is held aside until FileOpEnd, so its callstack is parked on
+		// the pending request instead of becoming a pipeline event per CreateFile.
+		// The pending requests are only touched by the kernel trace goroutine.
+		if producerID == pipeline.ProducerKernel && p.claimIORequestStack(rec) {
 			return nil
 		}
-		// Links the callstack carried by a StackWalk event with the
-		// event that triggered it. If the CreateFile event is still
-		// pending, it claims the callstack when it is published to
-		// the ring buffer
-		if p.isIOEnqueued(ts) {
-			p.linker.reserve(ts, pid, tid, callstack)
-			return nil
-		}
-		p.linker.Link(ts, pid, tid, callstack)
-		return nil
+		return p.pipeline.Publish(producerID, eventType, func(evt *event.Event) { evt.Parse(rec) })
 	case event.RegKCBRundown, event.RegCreateKCB:
 		kcb := rec.ReadUint64(16)
 		path := rec.ConsumeUTF16String(24)
@@ -381,19 +384,7 @@ func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecor
 	case event.MapViewOfSection, event.UnmapViewOfSection, event.MapViewSectionRundown, event.DeleteFile, event.SetFileInformation, event.RenameFile, event.EnumDirectory, event.ReadFile, event.WriteFile:
 		return p.pipeline.Publish(producerID, eventType, func(evt *event.Event) {
 			evt.Parse(rec)
-
-			fileinfo, found := p.resolveFileInfo(rec)
-			if !found {
-				return
-			}
-
-			path := fileinfo.Path
-			if evt.IsEnumDirectory() {
-				// Concatenate file name or wildcard characters
-				path = filepath.Join(path, evt.GetParamAsString(params.FilePath))
-			}
-			evt.AppendParam(params.FilePath, params.Path, path)
-			evt.AppendEnum(params.FileType, uint32(fileinfo.Type), fs.FileTypes)
+			p.addFileInfoFromFCB(rec, evt)
 		})
 	case event.RegOpenKey, event.RegCreateKey, event.RegDeleteKey, event.RegQueryKey, event.RegQueryValue, event.RegSetValue, event.RegDeleteValue:
 		path := p.resolveKCBPath(rec)
@@ -405,7 +396,7 @@ func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecor
 		if rootkey != key.Invalid {
 			root := rootkey.String()
 			if subkey != "" {
-				path = key.ConcatPaths(root, subkey)
+				path = root + `\` + subkey
 			} else {
 				path = root
 			}
@@ -413,8 +404,11 @@ func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecor
 
 		if (eventType == event.RegOpenKey || eventType == event.RegQueryKey || eventType == event.RegQueryValue) &&
 			!p.isRegPathApproved(path) {
+			registryApproverRejections.Add(1)
 			return nil
 		}
+
+		registryApproverApprovals.Add(1)
 
 		return p.pipeline.Publish(producerID, eventType, func(evt *event.Event) {
 			evt.Parse(rec)
@@ -423,8 +417,10 @@ func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecor
 	case event.OpenProcess, event.OpenThread:
 		pid := rec.ReadUint32(0)
 		if !p.isExecutablePathApproved(pid, eventType == event.OpenThread && rec.Header.ProcessID != pid) {
+			procApproverRejections.Add(1)
 			return nil
 		}
+		procApproverApprovals.Add(1)
 	}
 
 	producer := p.pipeline.Producer(producerID)
@@ -433,8 +429,14 @@ func (p *Probe) processEvent(producerID pipeline.ProducerID, rec *etw.EventRecor
 		return pipeline.ErrRingNoSlots
 	}
 	evt.Parse(rec)
+	timestamp := evt.Timestamp.UnixNano()
 
 	producer.Publish()
+
+	// Run periodical tasks driven by monotonic event-time clock
+	for _, periodic := range p.periodics[producerID] {
+		periodic.RunPeriodic(timestamp)
+	}
 
 	return nil
 }
@@ -455,8 +457,12 @@ func (p *Probe) initIORequest(rec *etw.EventRecord) error {
 // by the IRP address and commits the resulting event to the ring buffer.
 func (p *Probe) completeIORequest(producerID pipeline.ProducerID, rec *etw.EventRecord) error {
 	var (
-		disposition uint32
-		status      uint32
+		disposition     uint32
+		status          uint32
+		isReparse       bool
+		isRemount       bool
+		isReparseGlobal bool
+		reparseTag      uint32
 	)
 
 	// Dequeue the pending I/O packet
@@ -471,36 +477,121 @@ func (p *Probe) completeIORequest(producerID pipeline.ProducerID, rec *etw.Event
 	// Drive the state management of active files
 	object := req.rec.ReadUint64(8)
 	opts := req.rec.ReadUint32(20)
-	path := fs.GetDevMapper().Convert(req.rec.ConsumeUTF16String(32))
 
-	opts &= 0xFFFFFF
-	p.filePathResolver[object] = FileInfo{Path: path, Type: fs.GetFileType(path, opts)}
+	pathUTF16 := req.rec.ConsumeRawUTF16String(32)
+	path, ok := p.filePathStringCache.Lookup(pathUTF16)
+	if !ok {
+		n := utf16.Decode(pathUTF16)
+		path = fs.GetDevMapper().Convert(n)
+		p.filePathStringCache.Add(pathUTF16, path)
+	}
 
 	status = rec.ReadUint32(16)
+	ioStatus := uint32(rec.ReadUint64(8))
 	if windows.NTStatus(status) == windows.STATUS_REPARSE {
 		// Inherit caller's create disposition
 		disposition = opts >> 24
+		switch ioStatus {
+		case sys.IoReparse:
+		case sys.IoRemount:
+		case sys.IoReparseGlobal:
+		default:
+			reparseTag = ioStatus
+		}
 	} else {
-		disposition = uint32(rec.ReadUint64(8))
+		disposition = ioStatus
 	}
 
+	f := FileInfo{
+		Path:            path,
+		Type:            fs.GetFileType(path, opts&0xFFFFFF),
+		IsReparse:       isReparse,
+		IsRemount:       isRemount,
+		IsReparseGlobal: isReparseGlobal,
+		ReparseTag:      reparseTag,
+	}
+	p.filePathResolver[object] = f
+
 	if !p.isFileApproved(path, disposition) {
-		if p.linker != nil {
-			p.linker.releaseReservation(req.rec.Header.Timestamp)
+		fsApproverRejections.Add(1)
+		if req.stack != nil {
+			req.stack.ReleasePool()
 		}
 		return nil
 	}
+
+	fsApproverApprovals.Add(1)
+
 	return p.pipeline.Publish(producerID, event.CreateFile, func(evt *event.Event) {
 		evt.Parse(req.rec)
 		// Attach create disposition and NT status parameters
 		evt.AppendParam(params.NTStatus, params.Status, status)
 		evt.AppendEnum(params.FileOperation, disposition, fs.FileCreateDispositions)
+		// The callstack arrived while the request was pending. The event now
+		// owns the return addresses and skips the linker
+		if req.stack != nil {
+			evt.AppendParam(params.Callstack, params.Slice, req.stack)
+		}
 	})
 }
 
-// resolveFileInfo tries FileObject first  as authoritative, always populated on Create/
-// Rundown and then falls back to FileKey works even if you missed the Create,
-// e.g. mid-session attach, as long as some later op event backfilled it.
+// claimIORequestStack parks the callstack carried by a StackWalk record on the
+// pending CreateFile request it belongs to. It reports whether such a request
+// exists. The stack walk is matched on the time stamp and the thread, because
+// the time stamp alone isn't unique.
+func (p *Probe) claimIORequestStack(rec *etw.EventRecord) bool {
+	var ts = rec.ReadUint64(0)
+	for irp, req := range p.enqueuedIORequests {
+		if req.rec == nil || req.rec.Header.Timestamp != ts {
+			continue
+		}
+		// a repeated stack walk replaces the previous one
+		req.stack = rec.ReadCallstackInto(16, va.GetCallstackFromPool())
+		p.enqueuedIORequests[irp] = req
+		return true
+	}
+	return false
+}
+
+func (p *Probe) addFileInfoFromFCB(rec *etw.EventRecord, evt *event.Event) {
+	fileinfo, found := p.resolveFileInfo(rec)
+	if !found {
+		fileObjectMisses.Add(1)
+		return
+	}
+	path := fileinfo.Path
+	if evt.IsEnumDirectory() {
+		path = filepath.Join(path, evt.GetParamAsString(params.FilePath))
+	}
+	evt.AppendParam(params.FilePath, params.Path, path)
+	evt.AppendEnum(params.FileType, uint32(fileinfo.Type), fs.FileTypes)
+}
+
+// linkCallstack hands the callstack carried by a StackWalk event over to the
+// linker, which connects it with the event that triggered it. The stack walk
+// itself is never dispatched. The linker owns the return addresses from now on,
+// because the pipeline recycles the event once the handler returns.
+func (p *Probe) linkCallstack(ew *event.Event) error {
+	if p.linker == nil {
+		return nil
+	}
+	param, err := ew.Params.Get(params.Callstack)
+	if err != nil {
+		return nil
+	}
+	addrs, ok := param.Value.(va.Callstack)
+	if !ok {
+		return nil
+	}
+	ts := ew.Params.MustGetUint64(params.CallstackTimestamp)
+	tid := ew.Params.MustGetTid()
+	p.linker.Link(ts, 0, tid, addrs)
+	return nil
+}
+
+// resolveFileInfo tries FileObject first as authoritative, always populated on Create/
+// Rundown and then falls back to file key works even if you missed the Create, as long
+// as some later op event backfilled it.
 func (p *Probe) resolveFileInfo(rec *etw.EventRecord) (FileInfo, bool) {
 	var key uint64
 	var object uint64
@@ -518,20 +609,17 @@ func (p *Probe) resolveFileInfo(rec *etw.EventRecord) (FileInfo, bool) {
 
 	file, found := p.filePathResolver[object]
 	if found {
-		// backfill the FCB map opportunistically. FileKey
-		// never appears on Create/Rundown, only on op events — so this is
-		// the only place it can be populated. Only write once so we don't
-		// keep overwriting with (possibly reused) later resolutions.
-		if rec.Header.EventDescriptor.Opcode == event.RenameFileID {
-			if p.fcbPathResolver.Contains(key) {
-				p.fcbPathResolver.Remove(key)
-			}
+		// Backfill the FCB map opportunistically. File key never appears
+		// on Create/Rundown but only on op events, so this is the only place
+		// it can be populated. Only write once so we don't keep overwriting
+		// with possibly reused later resolutions
+		if rec.Header.EventDescriptor.Opcode == event.RenameFileID || p.fcbPathResolver.Contains(key) {
+			p.fcbPathResolver.Remove(key)
 			p.fcbPathResolver.Add(key, file)
 		} else if !p.fcbPathResolver.Contains(key) {
 			p.fcbPathResolver.Add(key, file)
 		}
 	}
-
 	if !found {
 		return p.fcbPathResolver.Get(key)
 	}
@@ -551,33 +639,31 @@ func (p *Probe) resolveKCBPath(rec *etw.EventRecord) string {
 
 	if baseKey, exists := p.kcbPathResolver[kcb]; exists {
 		path := rec.ConsumeUTF16String(24)
-		return key.ConcatPaths(baseKey, path)
+		return baseKey + `\` + path
 	}
 
 	return ""
 }
 
-func (p *Probe) isIOEnqueued(ts uint64) bool {
-	for _, req := range p.enqueuedIORequests {
-		if req.rec.Header.Timestamp == ts {
-			return true
-		}
-	}
-	return false
-}
-
 func (p *Probe) handleEvent(evt *event.Event) error {
+	var pid uint32
 	switch evt.Type {
+	case event.CreateFile:
+		p.handleCreateFile(evt)
+	case event.DeleteFile, event.RenameFile:
+		p.handleModifyFile(evt)
+	case event.StackWalk:
+		return p.linkCallstack(evt)
 	case event.MapViewSectionRundown, event.MapViewOfSection:
-		// if err := p.handleMapViewSection(evt); err != nil {
-		// 	return err
-		// }
+		if err := p.addMmap(evt); err != nil {
+			return err
+		}
 	case event.UnmapViewOfSection:
-		// if err := p.handleUnmapViewSection(evt); err != nil {
-		// 	return err
-		// }
+		if err := p.removeMmap(evt); err != nil {
+			return err
+		}
 	case event.CreateProcess, event.CreateProcessInternal, event.ProcessRundown, event.ProcessRundownInternal:
-		if err := p.handleCreateProcess(evt); err != nil {
+		if err := p.addProcess(evt); err != nil {
 			return err
 		}
 	case event.TerminateProcess:
@@ -585,19 +671,19 @@ func (p *Probe) handleEvent(evt *event.Event) error {
 			return err
 		}
 	case event.CreateThread, event.ThreadRundown:
-	case event.TerminateThread:
-	case event.OpenProcess, event.OpenThread:
-		pid, err := evt.Params.GetPid()
-		if err != nil {
+		pid = evt.Params.MustGetPid()
+		if err := p.addThread(evt); err != nil {
 			return err
 		}
-		proc := p.psnap.FindAndPut(pid)
-		if proc != nil {
-			evt.AppendParam(params.Exe, params.Path, proc.Exe)
-			evt.AppendParam(params.ProcessName, params.AnsiString, proc.Name)
+	case event.TerminateThread:
+		pid = evt.Params.MustGetPid()
+		if err := p.removeThread(evt); err != nil {
+			return err
 		}
+	case event.OpenProcess, event.OpenThread:
+		pid = evt.Params.MustGetPid()
 	case event.LoadModule, event.ModuleRundown, event.LoadModuleInternal:
-		if err := p.handleLoadModule(evt); err != nil {
+		if err := p.addModule(evt); err != nil {
 			return err
 		}
 	case event.UnloadModule:
@@ -607,8 +693,12 @@ func (p *Probe) handleEvent(evt *event.Event) error {
 	case event.RegSetValue, event.RegSetValueInternal:
 		p.handleRegSetValue(evt)
 	case event.VirtualAlloc:
+		p.handleVirtualAlloc(evt)
+		pid = evt.Params.MustGetPid()
 	case event.VirtualFree:
+		pid = evt.Params.MustGetPid()
 	case event.Accept, event.Connect, event.Send, event.Recv, event.Reconnect, event.Disconnect, event.Retransmit:
+		p.resolvePortName(evt)
 	}
 
 	// Associate process' state with the event.
@@ -627,10 +717,24 @@ func (p *Probe) handleEvent(evt *event.Event) error {
 		evt.PS = proc
 	}
 
-	if p.config.EventSource.StackEnrichment && evt.Type.WaitStack() {
-		if event := p.linker.Put(evt); event != nil {
-			return p.dispatchEvent(event)
+	if p.config.EventSource.HasDropProcess(proc) {
+		return nil
+	}
+
+	if pid != 0 {
+		if proc := p.psnap.FindAndPut(pid); proc != nil {
+			evt.AppendParam(params.Exe, params.Path, proc.Exe)
+			evt.AppendParam(params.ProcessName, params.AnsiString, proc.Name)
 		}
+	}
+
+	if p.config.EventSource.StackEnrichment && evt.Type.WaitStack() && !evt.Params.Contains(params.Callstack) {
+		if paired := p.linker.Put(evt); paired != nil {
+			return p.dispatchEvent(paired)
+		}
+		// The linker dispatches it when its stack walk arrives
+		// or without the callstack when the wait interval expires
+		return nil
 	}
 
 	return p.dispatchEvent(evt)
@@ -648,27 +752,51 @@ func (p *Probe) dispatchEvent(evt *event.Event) error {
 	return nil
 }
 
-func (p *Probe) dispatchEvents(evts ...*event.Event) {
-	for _, evt := range evts {
-		p.dispatchEvent(evt)
+func (p *Probe) addProcess(evt *event.Event) error {
+	if evt.IsCreateProcessInternal() || evt.IsProcessRundownInternal() {
+		return nil
 	}
-}
 
-func (p *Probe) handleCreateProcess(evt *event.Event) error {
-	if err := p.psnap.Write(evt); err != nil {
-		return err
+	cmndline := cmdline.New(evt.GetParamAsString(params.Cmdline)).
+		// get rid of leading/trailing quotes in the executable path
+		CleanExe().
+		// expand all variations of the SystemRoot environment variable
+		ExpandSystemRoot().
+		// some system processes are reported without the path in the command line,
+		// but we can expand the path from the SystemRoot environment variable
+		CompleteSysProc(evt.GetParamAsString(params.ProcessName))
+
+	// append executable path parameter
+	exe := cmndline.Exeline()
+	if exe == "" {
+		exe = evt.GetParamAsString(params.ProcessName)
 	}
-	return nil
+	evt.AppendParam(params.Exe, params.Path, exe)
+
+	evt.AppendParam(params.StartTime, params.Time, evt.Timestamp)
+
+	return p.psnap.Write(evt)
 }
 
 func (p *Probe) removeProcess(evt *event.Event) error {
+	p.regionProber.Remove(evt.Params.MustGetPid())
 	if err := p.psnap.Remove(evt); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (p *Probe) handleLoadModule(evt *event.Event) error {
+func (p *Probe) addThread(evt *event.Event) error {
+	return p.psnap.AddThread(evt)
+}
+
+func (p *Probe) removeThread(evt *event.Event) error {
+	pid := evt.Params.MustGetPid()
+	tid := evt.Params.MustGetTid()
+	return p.psnap.RemoveThread(pid, tid)
+}
+
+func (p *Probe) addModule(evt *event.Event) error {
 	if evt.IsLoadModuleInternal() {
 		return p.psnap.AddModule(evt)
 	}
@@ -704,6 +832,37 @@ func (p *Probe) removeModule(evt *event.Event) error {
 		pid = evt.PID
 	}
 	return p.psnap.RemoveModule(pid, addr)
+}
+
+func (p *Probe) addMmap(evt *event.Event) error {
+	totalMapRundownFiles.Add(1)
+	return p.psnap.AddMmap(evt)
+}
+
+func (p *Probe) removeMmap(evt *event.Event) error {
+	totalMapRundownFiles.Add(-1)
+	addr := evt.Params.TryGetAddress(params.FileViewBase)
+	return p.psnap.RemoveMmap(evt.PID, addr)
+}
+
+func (p *Probe) handleCreateFile(evt *event.Event) {
+	// Invalidate signature cache / file metadata
+	if evt.IsOverwriteDisposition() {
+		fs.GetMetadataStore().RemoveFile(evt.GetParamAsString(params.FilePath))
+		signature.GetSignatures().RemoveSignature(evt.GetParamAsString(params.FilePath))
+	}
+	// Start async file metadata resolution
+	if evt.IsCreateDisposition() && evt.IsSuccess() {
+		fs.GetMetadataStore().DoRequestAsync(evt.GetParamAsString(params.FilePath), false)
+	}
+}
+
+func (p *Probe) handleModifyFile(evt *event.Event) {
+	path := evt.GetParamAsString(params.FilePath)
+	if path != "" {
+		fs.GetMetadataStore().RemoveFile(path)
+		signature.GetSignatures().RemoveSignature(path)
+	}
 }
 
 func (p *Probe) handleRegSetValue(evt *event.Event) {
@@ -742,6 +901,47 @@ func (p *Probe) handleRegSetValue(evt *event.Event) {
 	}
 }
 
+func (p *Probe) handleVirtualAlloc(evt *event.Event) {
+	// retrieve info about the range of pages and enrich the event
+	// with allocation protection options and the type of pages in
+	// the allocated region. If the region is mapped, we try to find
+	// the backing file name
+	addr := evt.Params.MustGetUint64(params.MemBaseAddress)
+	region := p.regionProber.Query(evt.Params.MustGetPid(), addr)
+	if region != nil {
+		if region.IsMapped() {
+			evt.AppendParam(params.FilePath, params.DOSPath, region.GetMappedFile())
+		}
+		evt.AppendEnum(params.MemPageType, region.Type, event.MemPageTypes)
+		evt.AppendFlags(params.MemProtect, region.Protect, event.MemProtectionFlags)
+		evt.AppendParam(params.MemProtectMask, params.AnsiString, region.ProtectMask())
+	}
+}
+
+// resolvePortName resolves the IANA service name for the particular port and transport protocol as
+// per https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.xhtml.
+func (*Probe) resolvePortName(evt *event.Event) {
+	dport := evt.Params.TryGetUint16(params.NetDport)
+	sport := evt.Params.TryGetUint16(params.NetSport)
+
+	if evt.IsNetworkTCP() {
+		if name, ok := ports.TCPPortNames[dport]; ok {
+			evt.Params.Append(params.NetDportName, params.AnsiString, name)
+		}
+		if name, ok := ports.TCPPortNames[sport]; ok {
+			evt.Params.Append(params.NetSportName, params.AnsiString, name)
+		}
+		return
+	}
+
+	if name, ok := ports.UDPPortNames[dport]; ok {
+		evt.Params.Append(params.NetDportName, params.AnsiString, name)
+	}
+	if name, ok := ports.UDPPortNames[sport]; ok {
+		evt.Params.Append(params.NetSportName, params.AnsiString, name)
+	}
+}
+
 func (p *Probe) Handle(evt *event.Event) {
 	if err := p.handleEvent(evt); err != nil {
 		select {
@@ -749,6 +949,36 @@ func (p *Probe) Handle(evt *event.Event) {
 		default:
 		}
 	}
+}
+
+func (p *Probe) AddPeriodic(producerID pipeline.ProducerID, periodic periodical.Periodic) error {
+	if producerID >= pipeline.ProducerMax {
+		return fmt.Errorf("producer ID (%d) not allowed", producerID)
+	}
+
+	p.periodics[producerID] = append(p.periodics[producerID], periodic)
+
+	return nil
+}
+
+// classifyEvent assigns the shedding priority of an event type. Events that
+// build or tear down state (process, thread, module, the rundowns that seed
+// them, and the internal RegSetValue that enriches the public one) must never
+// be shed, or the process snapshot drifts and every later lookup misses.
+// Everything else is ClassNormal. Once their volume is measured, move the
+// high-volume types (file, registry, network) to pipeline.ClassNoisy so they
+// are the first to go under pressure.
+func classifyEvent(t event.Type) pipeline.ShedClass {
+	switch t {
+	case event.CreateProcess, event.CreateProcessInternal, event.ProcessRundown, event.ProcessRundownInternal,
+		event.TerminateProcess, event.CreateThread, event.ThreadRundown, event.TerminateThread,
+		event.LoadModule, event.ModuleRundown, event.LoadModuleInternal, event.UnloadModule,
+		event.RegSetValueInternal, event.StackWalk:
+		return pipeline.ClassState
+	case event.CreateFile, event.RegOpenKey, event.RegQueryKey, event.RegQueryValue, event.OpenProcess:
+		return pipeline.ClassNoisy
+	}
+	return pipeline.ClassNormal
 }
 
 func New(ctx context.Context, psnap ps.Snapshotter, config *config.Config) (*Probe, error) {
@@ -766,8 +996,13 @@ func New(ctx context.Context, psnap ps.Snapshotter, config *config.Config) (*Pro
 		fcbPathResolver:  expirable.NewLRU[uint64, FileInfo](3000, nil, time.Minute*10),
 		kcbPathResolver:  make(map[uint64]string),
 
+		filePathStringCache: stringcache.New(),
+		kcbPathStringCache:  stringcache.New(),
+
 		enqueuedIORequests:   make(map[uint64]ioRequest),
 		enqueuedRegSetValues: expirable.NewLRU[pair.Pair[uint32, string], *event.Event](50, nil, time.Second*10),
+
+		regionProber: va.NewRegionProber(),
 	}
 
 	pipeConfig := pipeline.DefaultConfig(2)
@@ -783,28 +1018,10 @@ func New(ctx context.Context, psnap ps.Snapshotter, config *config.Config) (*Pro
 
 	if config.EventSource.StackEnrichment {
 		p.linker = NewCallstackLinker(p)
+		if err := p.AddPeriodic(pipeline.ProducerKernel, p.linker); err != nil {
+			return nil, err
+		}
 	}
 
 	return p, nil
-}
-
-// classifyEvent assigns the shedding priority of an event type. Events that
-// build or tear down state (process, thread, module, the rundowns that seed
-// them, and the internal RegSetValue that enriches the public one) must never
-// be shed, or the process snapshot drifts and every later lookup misses.
-// Everything else is ClassNormal. Once their volume is measured, move the
-// high-volume types (file, registry, network) to pipeline.ClassNoisy so they
-// are the first to go under pressure.
-func classifyEvent(t event.Type) pipeline.ShedClass {
-	switch t {
-	case event.CreateProcess, event.CreateProcessInternal, event.ProcessRundown, event.ProcessRundownInternal, event.TerminateProcess,
-		event.CreateThread, event.ThreadRundown, event.TerminateThread,
-		event.LoadModule, event.ModuleRundown, event.LoadModuleInternal, event.UnloadModule,
-		event.RegSetValueInternal:
-		return pipeline.ClassState
-	}
-	if t == event.CreateFile || t == event.RegOpenKey {
-		return pipeline.ClassNoisy
-	}
-	return pipeline.ClassNormal
 }

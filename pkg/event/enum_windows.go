@@ -32,6 +32,13 @@ var ViewSectionTypes = ParamEnum{
 	va.SectionPhysical:       "PHYSICAL",
 }
 
+// MemPageTypes represents the type of the pages in the allocated region.
+var MemPageTypes = ParamEnum{
+	va.MemImage:   "IMAGE",
+	va.MemMapped:  "MAPPED",
+	va.MemPrivate: "PRIVATE",
+}
+
 // DNSRecordTypes describes DNS record type values.
 var DNSRecordTypes = ParamEnum{
 	windows.DNS_TYPE_A:       "A",

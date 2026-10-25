@@ -21,19 +21,9 @@ package probe
 import (
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
-	"github.com/rabbitstack/fibratus/pkg/fs"
 	"github.com/rabbitstack/fibratus/pkg/util/key"
 	"golang.org/x/sys/windows/registry"
 )
-
-// FileInfo stores file information obtained from event state.
-type FileInfo struct {
-	// Path represents the full file path in object manager format (e.g. \Device\HarddiskDevice1\)
-	Path string
-
-	// Type indicates the file type derived from the I/O operation.
-	Type fs.FileType
-}
 
 func populateRegistryData(evt *event.Event) {
 	path := evt.GetParamAsString(params.RegPath)

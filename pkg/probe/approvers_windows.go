@@ -28,6 +28,10 @@ import (
 )
 
 func (p *Probe) isFileApproved(path string, disposition uint32) bool {
+	if p.rs == nil {
+		return true
+	}
+
 	if p.isFilePathApproved(path, disposition) {
 		return true
 	}
@@ -37,14 +41,11 @@ func (p *Probe) isFileApproved(path string, disposition uint32) bool {
 	if p.isFileExtApproved(path, disposition) {
 		return true
 	}
+
 	return false
 }
 
 func (p *Probe) isFilePathApproved(path string, disposition uint32) bool {
-	if p.rs == nil || len(p.rs.Approvers.Paths) == 0 {
-		return true
-	}
-
 	if disposition != windows.FILE_OPEN {
 		return true
 	}
@@ -52,26 +53,16 @@ func (p *Probe) isFilePathApproved(path string, disposition uint32) bool {
 }
 
 func (p *Probe) isFileBaseApproved(path string, disposition uint32) bool {
-	if p.rs == nil || len(p.rs.Approvers.Bases) == 0 {
-		return true
-	}
-
 	if disposition != windows.FILE_OPEN {
 		return true
 	}
-
 	return p.matchesApprover(p.rs.Approvers.Bases, filepath.Base(path))
 }
 
 func (p *Probe) isFileExtApproved(path string, disposition uint32) bool {
-	if p.rs == nil || len(p.rs.Approvers.Extensions) == 0 {
-		return true
-	}
-
 	if disposition != windows.FILE_OPEN {
 		return true
 	}
-
 	return p.matchesApprover(p.rs.Approvers.Extensions, filepath.Ext(path))
 }
 
@@ -79,7 +70,6 @@ func (p *Probe) isRegPathApproved(path string) bool {
 	if p.rs == nil || len(p.rs.Approvers.Keys) == 0 {
 		return true
 	}
-
 	return p.matchesApprover(p.rs.Approvers.Keys, path)
 }
 
@@ -99,7 +89,6 @@ func (p *Probe) isExecutablePathApproved(pid uint32, remote bool) bool {
 	if !ok || ps == nil || ps.Exe == "" {
 		return true
 	}
-
 	return p.matchesApprover(p.rs.Approvers.Executables, ps.Exe)
 }
 
@@ -116,13 +105,21 @@ func (*Probe) matchesApprover(m map[string][]string, v string) bool {
 					return true
 				}
 			case ql.Eq.String(), ql.In.String():
-				return v == pattern
+				if v == pattern {
+					return true
+				}
 			case ql.IEq.String(), ql.IIn.String():
-				return strings.EqualFold(v, pattern)
+				if strings.EqualFold(v, pattern) {
+					return true
+				}
 			case ql.IStartswith.String():
-				return strings.HasPrefix(strings.ToLower(v), pattern)
+				if strings.HasPrefix(strings.ToLower(v), pattern) {
+					return true
+				}
 			case ql.IEndswith.String():
-				return strings.HasSuffix(strings.ToLower(v), pattern)
+				if strings.HasSuffix(strings.ToLower(v), pattern) {
+					return true
+				}
 			}
 		}
 	}

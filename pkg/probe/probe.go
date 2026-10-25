@@ -59,7 +59,7 @@ func (p *EventConsumer) Start(ctx context.Context, wg *sync.WaitGroup) {
 type PlatformProbe struct {
 	consumers      []*EventConsumer
 	eventHandlers  []EventHandler                       // listen all events
-	eventConsumers [event.MaxEvent + 1][]*EventConsumer // listen all or specific events
+	eventConsumers [event.MaxEvent + 1][]*EventConsumer // listen specific events
 }
 
 // AddEventConsumer adds a new event consumer to the probe's consumers.

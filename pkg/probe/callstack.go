@@ -21,28 +21,44 @@
 package probe
 
 import (
+	"expvar"
 	"sync"
 	"time"
 
 	"github.com/rabbitstack/fibratus/pkg/event"
 	"github.com/rabbitstack/fibratus/pkg/event/params"
+	"github.com/rabbitstack/fibratus/pkg/util/filetime"
+	"github.com/rabbitstack/fibratus/pkg/util/periodical"
 	"github.com/rabbitstack/fibratus/pkg/util/va"
 )
 
 // maxStackWait specifies the maximum period an entry (an event
 // waiting for its stack walk, or a stack walk waiting for its
 // event) can reside in the pending map before it is evicted.
-var maxStackWait = time.Millisecond * 500
+var maxStackWait = time.Second * 2
 
 // evictInterval specifies the interval at which the pending
 // map is scanned for expired entries.
-var evictInterval = time.Millisecond * 250
+var evictInterval = time.Millisecond * 500
 
-// maxReservedStackWait specifies the maximum period a reservation, or a
-// callstack waiting to be claimed, can reside in the linker. It must cover
-// the time the caller keeps the event aside, e.g. the span between the
-// CreateFile event and the FileOpEnd event that completes the same IRP.
-var maxReservedStackWait = time.Second * 2
+// stackwalkFlushes computes overall flushes for unmatched stackwalk events
+var stackwalkFlushes = expvar.NewInt("stackwalk.flushes")
+
+// stackwalkFlushesProcs computes overall flushes for unmatched stackwalk events per process
+var stackwalkFlushesProcs = expvar.NewMap("stackwalk.flushes.procs")
+
+// stackwalkFlushesEvents computes overall flushes for unmatched stackwalks per event type
+var stackwalkFlushesEvents = expvar.NewMap("stackwalk.flushes.events")
+
+// stackwalkUnordered counts the unordered stackwalk matches
+var stackwalkUnorderedMatches = expvar.NewInt("stackwalk.unordered.matches")
+
+// stackwalkUnorderedEnqueued counts enqueued unordered stackwalk matches
+var stackwalkUnorderedEnqueued = expvar.NewInt("stackwalk.unordered.enqueued")
+
+// stackwalkSurrogateProcessHits counts the number of hits where the callstack is attributed from
+// the surrogate thread creation event
+var stackwalkSurrogateProcessHits = expvar.NewInt("stackwalk.surrogate.process.hits")
 
 // reservedStack is a callstack parked under the timestamp of the event
 // it belongs to.
@@ -58,35 +74,17 @@ type reservedStack struct {
 // an early stack walk is parked in the same map until its event shows
 // up. Once paired, the event is decorated with the return addresses
 // which are later subject to symbolization.
-//
-// Some events, such as CreateFile, are kept aside by the caller until a
-// later event completes them (FileOpEnd for the same IRP), so they are
-// never held here. For these, the caller reserves the stack id up front
-// with Reserve. When the stack walk arrives, the callstack is stored in
-// the linker, and the caller picks it up with Claim once the event is
-// released, without the event ever residing in the linker.
 type CallstackLinker struct {
 	// buckets holds events waiting for their stack walk and stack walks waiting for their event
 	buckets map[uint64]*event.Event
 	mu      sync.Mutex
 
-	flusher *time.Ticker
-
-	// clock is the monotonic clock
-	clock uint64
+	periodical *periodical.Periodical
 
 	procs map[uint32]*event.Event // stores CreateProcess events with surrogate parent
 
-	done      chan struct{}
-	closeOnce sync.Once
-
-	// stacks holds the stack walks that arrived for reserved events and
-	// are waiting to be claimed
+	// stacks holds the stack walks that arrived for reserved events and are waiting to be claimed
 	stacks map[uint64]reservedStack
-
-	// reservations holds the stack ids of the events the caller keeps aside and
-	// will claim the callstack for later
-	reservations map[uint64]reservedStack
 
 	probe *Probe
 }
@@ -97,11 +95,8 @@ type CallstackLinker struct {
 // is parked until splice receives the stack walk.
 func (l *CallstackLinker) Put(e *event.Event) *event.Event {
 	ts := e.RawTimestamp()
-
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	l.advance(ts)
+	// l.mu.Lock()
+	// defer l.mu.Unlock()
 
 	// the stack walk arrived ahead of the event
 	if stack, ok := l.stacks[ts]; ok {
@@ -120,13 +115,6 @@ func (l *CallstackLinker) Put(e *event.Event) *event.Event {
 		l.procs[e.Params.MustGetPid()] = e.Clone()
 	}
 
-	// CreateFile claims the callstack reserved by its stack walk
-	if stack, reserved := l.reservations[ts]; reserved {
-		delete(l.reservations, ts)
-		e.AppendParam(params.Callstack, params.Slice, stack.addrs)
-		return e
-	}
-
 	// park the event indexed by timestamp
 	l.buckets[ts] = e.Clone()
 
@@ -139,18 +127,16 @@ func (l *CallstackLinker) Put(e *event.Event) *event.Event {
 // addresses and dispatchers to consumers/listeners. If the originating
 // event hasn't arrived yet, the stack walk is parked.
 func (l *CallstackLinker) Link(ts uint64, pid, tid uint32, addrs va.Callstack) {
-	l.mu.Lock()
-
-	l.advance(ts)
-	var evts []*event.Event
+	// l.mu.Lock()
+	// defer l.mu.Unlock()
 
 	evt, ok := l.buckets[ts]
 	if !ok {
 		// park the stack walk, the event hasn't reached Put yet
 		l.stacks[ts] = reservedStack{pid: pid, tid: tid, addrs: addrs}
-		l.mu.Unlock()
 		return
 	}
+
 	delete(l.buckets, ts)
 	l.removeSurrogate(evt)
 
@@ -168,114 +154,41 @@ func (l *CallstackLinker) Link(ts uint64, pid, tid uint32, addrs va.Callstack) {
 			ev.AppendParam(params.Callstack, params.Slice, addrs.Clone())
 			delete(l.procs, pid)
 			delete(l.buckets, ev.RawTimestamp())
-			evts = append(evts, ev)
+			l.probe.dispatchEvent(ev)
 		}
 	}
-	l.mu.Unlock()
 
-	// publish without holding the mutex
-	l.probe.dispatchEvents(evts...)
-}
-
-// reserve announces an event that the caller keeps aside and releases on
-// its own, such as CreateFile, which waits for FileOpEnd. The event is not
-// held in the linker. Instead, when its stack walk arrives, the callstack
-// is stored until the caller picks it up with Claim. Reserve must be called
-// before the event is set aside. If the stack walk has already arrived and
-// was parked, it is moved to the claimable store right away.
-func (l *CallstackLinker) reserve(ts uint64, pid, tid uint32, addrs va.Callstack) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.advance(ts)
-	l.reservations[ts] = reservedStack{pid: pid, tid: tid, addrs: addrs}
-}
-
-func (l *CallstackLinker) releaseReservation(id uint64) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	if reservation, exists := l.reservations[id]; exists {
-		reservation.addrs.ReleasePool()
-		delete(l.reservations, id)
-	}
-}
-
-// Close stops the eviction loop. It is safe to call it more than once.
-func (l *CallstackLinker) close() {
-	l.closeOnce.Do(func() { close(l.done) })
-}
-
-// flushLoop periodically evicts expired entries until the linker is closed.
-func (l *CallstackLinker) flushLoop() {
-	defer l.flusher.Stop()
-	for {
-		select {
-		case <-l.flusher.C:
-			l.evictExpired()
-		case <-l.done:
-			return
-		}
-	}
-}
-
-// advance moves the linker clock forward to the newest timestamp seen.
-// The mark never moves backwards, so a single far-future timestamp from
-// a different clock base would expire everything. The caller must hold
-// the mutex before advancing the clock.
-func (l *CallstackLinker) advance(ts uint64) {
-	if ts > l.clock {
-		l.clock = ts
-	}
-}
-
-// expired reports whether the entry stamped with ts is older than ttl
-// relative to the linker clock. The timestamps are in nanoseconds. The
-// caller must hold the mutex.
-func (l *CallstackLinker) expired(ts uint64, ttl time.Duration) bool {
-	return l.clock > ts && l.clock-ts >= uint64(ttl)
+	l.probe.dispatchEvent(evt)
 }
 
 // evictExpired removes entries that have been pending longer than the
 // maximum stack wait period. Events are published without the callstack,
 // while orphaned stack walks are discarded.
 func (l *CallstackLinker) evictExpired() {
-	l.mu.Lock()
+	// l.mu.Lock()
+	// defer l.mu.Unlock()
 
-	l.expireReservations()
-
-	var expired []*event.Event
-
-	for ts, evt := range l.buckets {
-		if !l.expired(ts, maxStackWait) {
+	for ts, s := range l.stacks {
+		if !l.expired(filetime.Nanoseconds(ts)) {
 			continue
 		}
-		expired = append(expired, evt)
+		s.addrs.ReleasePool()
+		delete(l.stacks, ts)
+	}
+
+	for ts, evt := range l.buckets {
+		if !l.expired(filetime.Nanoseconds(ts)) {
+			continue
+		}
 		delete(l.buckets, ts)
 		l.removeSurrogate(evt)
-	}
+		l.probe.dispatchEvent(evt)
 
-	l.mu.Unlock()
-
-	// publish without holding the mutex
-	l.probe.dispatchEvents(expired...)
-}
-
-// expireReservations drops the reservations and the parked stack walks
-// that outlived the maximum reserved stack wait period. The caller must
-// hold the mutex.
-func (l *CallstackLinker) expireReservations() {
-	for ts, s := range l.reservations {
-		if l.expired(ts, maxReservedStackWait) {
-			s.addrs.ReleasePool()
-			delete(l.reservations, ts)
+		stackwalkFlushes.Add(1)
+		if evt.PS != nil {
+			stackwalkFlushesProcs.Add(evt.PS.Name, 1)
 		}
-	}
-	// stack walks are parked for any event, including ones that never
-	// reach Put, so they use the shorter wait
-	for ts, s := range l.stacks {
-		if l.expired(ts, maxStackWait) {
-			s.addrs.ReleasePool()
-			delete(l.stacks, ts)
-		}
+		stackwalkFlushesEvents.Add(evt.Name(), 1)
 	}
 }
 
@@ -287,21 +200,26 @@ func (s *CallstackLinker) removeSurrogate(e *event.Event) {
 	}
 }
 
+// RunPeriodic advances the event-time clock and evicts the expired entries once per
+// eviction interval.
+func (l *CallstackLinker) RunPeriodic(ts int64) { l.periodical.Do(ts, l.evictExpired) }
+
+// expired reports whether an entry parked at the given clock reading has
+// waited longer than maxStackWait.
+func (l *CallstackLinker) expired(at int64) bool {
+	return l.periodical.Clock()-at >= int64(maxStackWait)
+}
+
 // NewCallstackLinker creates a new callstack linker which receives
 // the probe. Events that outlive the maximum stack wait period are
 // evicted to the handlers/consumers without the callstack.
 func NewCallstackLinker(probe *Probe) *CallstackLinker {
 	l := &CallstackLinker{
-		probe:        probe,
-		buckets:      make(map[uint64]*event.Event),
-		procs:        make(map[uint32]*event.Event),
-		reservations: make(map[uint64]reservedStack),
-		stacks:       make(map[uint64]reservedStack),
-		flusher:      time.NewTicker(evictInterval),
-		done:         make(chan struct{}),
+		probe:      probe,
+		periodical: periodical.New(evictInterval),
+		buckets:    make(map[uint64]*event.Event),
+		procs:      make(map[uint32]*event.Event),
+		stacks:     make(map[uint64]reservedStack),
 	}
-
-	go l.flushLoop()
-
 	return l
 }

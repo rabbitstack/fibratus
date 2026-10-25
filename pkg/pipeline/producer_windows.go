@@ -24,4 +24,6 @@ const (
 
 	// ProducerKernel is the procuer ID for the kernel trace
 	ProducerKernel
+
+	ProducerMax
 )

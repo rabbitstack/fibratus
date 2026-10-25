@@ -167,12 +167,24 @@ func (e *Event) IsDropped(capture bool) bool {
 	if e.IsRundown() && e.IsRundownProcessed() {
 		return true
 	}
-	return IsCurrentProcDropped(e.PID)
+	return DropCurrentProc && e.PID == currentPid
 }
 
-// IsCurrentProcDropped determines if the event originated from the
-// current process is dropped.
-func IsCurrentProcDropped(pid uint32) bool { return DropCurrentProc && pid == currentPid }
+// IsCurrentProcDropped determines if the event originated from the current process is dropped.
+func IsCurrentProcDropped(rec *etw.EventRecord) bool {
+	var pid uint32
+	if rec.Header.ProviderID == StackWalkEventGUID && rec.Header.EventDescriptor.Opcode == StackWalkID {
+		pid = rec.ReadUint32(8)
+	} else {
+		pid = rec.Header.ProcessID
+	}
+	return DropCurrentProc && pid == currentPid && rec.Header.ProviderID != etw.WindowsKernelProcessGUID
+}
+
+// IsCurrentPIDDropped similar to IsCurrentProcDropped but receives the pid value instead of event record.
+func IsCurrentPIDDropped(pid uint32) bool {
+	return DropCurrentProc && currentPid == pid
+}
 
 // IsNetworkTCP determines whether the event pertains to network TCP events.
 func (e *Event) IsNetworkTCP() bool {
