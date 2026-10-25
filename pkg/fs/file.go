@@ -28,6 +28,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -323,7 +324,10 @@ func newFileMetadataStore() *FileMetadataStore {
 		},
 	}
 
-	const numWorkers = 6
+	numWorkers := 2
+	if runtime.NumCPU() >= 16 {
+		numWorkers = 4
+	}
 	for range numWorkers {
 		go s.runWorker()
 	}
