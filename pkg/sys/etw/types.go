@@ -22,6 +22,8 @@
 package etw
 
 import (
+	"bytes"
+	"encoding/binary"
 	"strings"
 	"unsafe"
 
@@ -564,7 +566,7 @@ type ClassicEventID struct {
 
 // IsEmpty indicates if event id has been initialized.
 func (e ClassicEventID) IsEmpty() bool {
-	return (e.GUID.Data1 == 0 && e.GUID.Data2 == 0 && e.GUID.Data3 == 0 && len(e.GUID.Data4[:]) == 0) || e.Type == 0
+	return e.GUID == (windows.GUID{}) || e.Type == 0
 }
 
 // EventFilterDescriptor defines the filter data that
@@ -627,16 +629,10 @@ func AppendEventHeaderFileExtendedDataItems(r *EventRecord, disposition uint64, 
 
 // ReadEventHeaderFileExtendedDataItems reads the custom file extended data items from the event record.
 func (r *EventRecord) ReadEventHeaderFileExtendedDataItems() (uint32, uint32) {
-	if r.ExtendedData == nil {
-		return 0, 0
-	}
-
-	items := unsafe.Slice(r.ExtendedData, r.ExtendedDataCount)
-
 	var disposition uint32
 	var status uint32
 
-	for _, item := range items {
+	for _, item := range r.extendedData() {
 		switch item.ExtType {
 		case ExtTypeDisposition:
 			if item.DataSize == 4 && item.DataPtr != 0 {
@@ -654,22 +650,29 @@ func (r *EventRecord) ReadEventHeaderFileExtendedDataItems() (uint32, uint32) {
 
 // ReadEventHeaderFileExtendedDataItems reads the callstack from the custom file extended data items.
 func (r *EventRecord) ReadEventHeaderFileExtendedDataItemsCallstack() []va.Address {
-	if r.ExtendedData == nil {
-		return nil
-	}
-
-	items := unsafe.Slice(r.ExtendedData, r.ExtendedDataCount)
-	for _, item := range items {
+	for _, item := range r.extendedData() {
 		if item.ExtType != ExtTypeCallstack {
 			continue
 		}
 
 		n := int(item.DataSize) / 8
+		if n == 0 || item.DataPtr == 0 {
+			return nil
+		}
 
 		return unsafe.Slice((*va.Address)(unsafe.Pointer(uintptr(item.DataPtr))), n)
 	}
 
 	return nil
+}
+
+// extendedData returns the extended data items attached to the event
+// record, or nil if there are none.
+func (e *EventRecord) extendedData() []EventHeaderExtendedDataItem {
+	if e.ExtendedData == nil || e.ExtendedDataCount == 0 {
+		return nil
+	}
+	return unsafe.Slice(e.ExtendedData, int(e.ExtendedDataCount))
 }
 
 // NewClassicEventID creates a new instance of classic event identifier.
@@ -691,185 +694,230 @@ func (r *EventRecord) Clone() (*EventRecord, []byte) {
 	*c = *r
 
 	buf := getBuf(int(r.BufferLen))
-	copy(buf, unsafe.Slice((*byte)(unsafe.Pointer(r.Buffer)), r.BufferLen))
+	if len(buf) == 0 {
+		// events without payload have nothing to copy, and
+		// taking the address of the first element would panic
+		c.Buffer = 0
+		return c, buf
+	}
+	copy(buf, r.buf())
 	c.Buffer = uintptr(unsafe.Pointer(&buf[0]))
 
 	return c, buf
 }
 
-// ReadByte reads the byte from the buffer at the specified offset.
-func (e *EventRecord) ReadByte(offset uint16) byte {
-	if offset > e.BufferLen {
-		return 0
-	}
-	return *(*byte)(unsafe.Pointer(e.Buffer + uintptr(offset)))
-}
-
-// ReadBytes reads a contiguous block of bytes from the buffer.
-func (e *EventRecord) ReadBytes(offset uint16, count uint16) []byte {
-	if offset > e.BufferLen {
+// buf returns a view over the raw event payload. The view aliases the ETW
+// buffer, so it is only valid for as long as the buffer is alive. All the
+// Read* and Consume* methods go through it, so every access is bounds-checked
+// against BufferLen by the runtime instead of relying on pointer arithmetic.
+func (e *EventRecord) buf() []byte {
+	if e.Buffer == 0 || e.BufferLen == 0 {
 		return nil
 	}
-	return (*[1<<30 - 1]byte)(unsafe.Pointer(e.Buffer + uintptr(offset)))[:count:count]
+	return unsafe.Slice((*byte)(unsafe.Pointer(e.Buffer)), int(e.BufferLen))
+}
+
+// end returns the offset one past the last byte of the payload. String readers
+// return it as the next offset when the requested offset is out of range, so
+// chained reads fail closed rather than wrapping around to the payload start.
+func (e *EventRecord) end() uint16 { return e.BufferLen }
+
+// utf16Units returns the UTF-16 code units starting at offset, up to but not
+// including the first null terminator, and reports whether a terminator was found.
+// If there is no terminator, the units run to the end of the payload. A trailing
+// odd byte is ignored. The returned slice aliases the payload.
+func (e *EventRecord) utf16Units(offset uint16) ([]uint16, bool) {
+	b := e.buf()
+	if int(offset) >= len(b) {
+		return nil, false
+	}
+	n := (len(b) - int(offset)) / 2
+	if n == 0 {
+		return nil, false
+	}
+	u := unsafe.Slice((*uint16)(unsafe.Pointer(&b[offset])), n)
+	for i, c := range u {
+		if c == 0 {
+			return u[:i:i], true
+		}
+	}
+	return u, false
+}
+
+// ReadByte reads the byte from the buffer at the specified offset.
+// Returns zero if the offset is out of range.
+func (e *EventRecord) ReadByte(offset uint16) byte {
+	b := e.buf()
+	if int(offset) >= len(b) {
+		return 0
+	}
+	return b[offset]
+}
+
+// ReadBytes reads a contiguous block of bytes from the buffer. The returned
+// slice aliases the event buffer, so callers that need the data to outlive
+// the buffer must copy it. Returns nil if the requested range is out of bounds.
+func (e *EventRecord) ReadBytes(offset uint16, count uint16) []byte {
+	b := e.buf()
+	end := int(offset) + int(count)
+	if end > len(b) {
+		return nil
+	}
+	return b[offset:end:end]
 }
 
 // ReadUint16 reads the uint16 value from the buffer at the specified offset.
+// Returns zero if the value doesn't fit in the buffer.
 func (e *EventRecord) ReadUint16(offset uint16) uint16 {
-	if offset > e.BufferLen {
+	b := e.buf()
+	if int(offset)+2 > len(b) {
 		return 0
 	}
-	return *(*uint16)(unsafe.Pointer(e.Buffer + uintptr(offset)))
+	return binary.LittleEndian.Uint16(b[offset:])
 }
 
 // ReadUint32 reads the uint32 value from the buffer at the specified offset.
+// Returns zero if the value doesn't fit in the buffer.
 func (e *EventRecord) ReadUint32(offset uint16) uint32 {
-	if offset > e.BufferLen {
+	b := e.buf()
+	if int(offset)+4 > len(b) {
 		return 0
 	}
-	return *(*uint32)(unsafe.Pointer(e.Buffer + uintptr(offset)))
+	return binary.LittleEndian.Uint32(b[offset:])
 }
 
 // ReadUint64 reads the uint64 value from the buffer at the specified offset.
+// Returns zero if the value doesn't fit in the buffer.
 func (e *EventRecord) ReadUint64(offset uint16) uint64 {
-	if offset > e.BufferLen {
+	b := e.buf()
+	if int(offset)+8 > len(b) {
 		return 0
 	}
-	return *(*uint64)(unsafe.Pointer(e.Buffer + uintptr(offset)))
+	return binary.LittleEndian.Uint64(b[offset:])
 }
 
 // ReadAnsiString reads the ANSI string from the buffer at the specified offset.
-// Returns the UTF-8 string and the number of bytes read from the string.
+// Returns the UTF-8 string and the offset right after the null terminator. If the
+// string is not terminated, the remainder of the buffer is consumed. When the
+// offset is out of range, an empty string and the end of the buffer are returned.
 func (e *EventRecord) ReadAnsiString(offset uint16) (string, uint16) {
-	if offset > e.BufferLen {
-		return "", 0
+	b := e.buf()
+	if int(offset) >= len(b) {
+		return "", e.end()
 	}
 
-	b := make([]byte, e.BufferLen)
-	var i uint16
-	for i < e.BufferLen {
-		c := *(*byte)(unsafe.Pointer(e.Buffer + uintptr(offset) + uintptr(i)))
-		if c == 0 {
-			break // null terminator
-		}
-		b[i] = c
-		i++
+	rest := b[offset:]
+	n := bytes.IndexByte(rest, 0)
+	switch {
+	case n < 0:
+		return string(rest), e.end()
+	case n == 0:
+		return "", offset + 1 // null terminator size
+	default:
+		// offset+n is an index inside the buffer, so the
+		// terminator offset can't overflow the uint16
+		return string(rest[:n]), offset + uint16(n) + 1
 	}
-
-	if i == 0 {
-		return "", offset + 1
-	}
-
-	if int(i) > len(b) {
-		return string(b[:len(b)-1]), uint16(len(b)) + offset
-	}
-
-	return string(b[:i]), i + 1 + offset
 }
 
 // ReadUTF16String reads the UTF-16 string from the buffer at the specified offset.
-// Returns the UTF-8 string and the number of bytes read from the string + the offset.
+// Returns the UTF-8 string and the offset right after the null terminator. If the
+// string is not terminated, the remainder of the buffer is consumed. When the
+// offset is out of range, an empty string and the end of the buffer are returned.
 func (e *EventRecord) ReadUTF16String(offset uint16) (string, uint16) {
-	if offset > e.BufferLen {
-		return "", 0
-	}
+	units, terminated := e.utf16Units(offset)
 
-	// we're reading the leading string. First, calculate
-	// the length of the null-terminated UTF16 string
-	i := offset
-	var length uint16
-	for i < e.BufferLen {
-		c := *(*uint16)(unsafe.Pointer(e.Buffer + uintptr(i)))
-		if c == 0 {
-			break // null terminator
+	if len(units) == 0 {
+		if terminated {
+			return "", offset + 2 // null terminator size
 		}
-		length += 2
-		i += 2
+		return "", e.end()
 	}
 
-	if length == 0 {
-		return "", offset + 2 // null terminator size
+	next := e.end()
+	if terminated {
+		next = offset + uint16((len(units)+1)*2)
 	}
 
-	b := (*[1<<30 - 1]uint16)(unsafe.Pointer(e.Buffer + uintptr(offset)))[:length:length]
-	s := b[:len(b)/2]
-
-	return utf16.Decode(s), uint16((len(s)+1)*2) + offset
+	return utf16.Decode(units), next
 }
 
 // ReadNTUnicodeString reads the native Unicode string at the given offset.
+// Returns the UTF-8 string and the offset of the string null terminator.
 func (e *EventRecord) ReadNTUnicodeString(offset uint16) (string, uint16) {
-	if offset > e.BufferLen {
-		return "", 0
-	}
+	units, terminated := e.utf16Units(offset)
 
-	i := offset
-	var length uint16
-	for i < e.BufferLen {
-		c := *(*uint16)(unsafe.Pointer(e.Buffer + uintptr(i)))
-		if c == 0 {
-			break // null terminator
+	if len(units) == 0 {
+		if terminated {
+			return "", offset + 2 // null terminator size
 		}
-		length += 2
-		i += 2
+		return "", e.end()
 	}
 
-	if length == 0 {
-		return "", offset + 2 // null terminator size
-	}
-
-	b := (*[1<<30 - 1]byte)(unsafe.Pointer(e.Buffer + uintptr(offset)))[:length:length]
-
+	size := uint16(len(units) * 2)
 	s := windows.NTUnicodeString{
-		Length:        uint16(len(b)),
-		MaximumLength: uint16(len(b)),
-		Buffer:        (*uint16)(unsafe.Pointer(&b[0])),
+		Length:        size,
+		MaximumLength: size,
+		Buffer:        &units[0],
 	}
 
-	return s.String(), s.Length + offset
+	return s.String(), size + offset
 }
 
 // ConsumeUTF16String reads the byte slice with UTF16-encoded string
-// when the UTF16 string is located at the end of the buffer.
+// when the UTF16 string is located at the end of the buffer. The last
+// code unit is assumed to be the null terminator and is dropped.
 func (e *EventRecord) ConsumeUTF16String(offset uint16) string {
-	if offset > e.BufferLen {
+	s := e.ConsumeRawUTF16String(offset)
+	if len(s) < 2 {
 		return ""
 	}
-	s := (*[1<<30 - 1]uint16)(unsafe.Pointer(e.Buffer + uintptr(offset)))[: e.BufferLen-offset : e.BufferLen-offset]
-	return utf16.Decode(s[:len(s)/2-1])
+	return utf16.Decode(s[:len(s)-1])
 }
 
-// ConsumeRawUTF16String reads the byte slice for the UTF16-encoded string.
+// ConsumeRawUTF16String returns the UTF-16 code units from the given offset to the end
+// of the buffer, including the trailing null terminator if present. The slice aliases the
+// event buffer and holds exactly (BufferLen-offset)/2 elements. A trailing odd byte is ignored.
 func (e *EventRecord) ConsumeRawUTF16String(offset uint16) []uint16 {
-	if offset > e.BufferLen {
+	b := e.buf()
+	if int(offset) >= len(b) {
 		return nil
 	}
-	return (*[1<<30 - 1]uint16)(unsafe.Pointer(e.Buffer + uintptr(offset)))[: e.BufferLen-offset : e.BufferLen-offset]
+	n := (len(b) - int(offset)) / 2
+	if n == 0 {
+		return nil
+	}
+	return unsafe.Slice((*uint16)(unsafe.Pointer(&b[offset])), n)
 }
 
-// ReadSID reads the security identifier from the event buffer.
+// ReadSID reads the security identifier from the event buffer. Returns nil
+// if the SID is null or if it doesn't fit in the buffer.
 func (e *EventRecord) ReadSID(offset uint16, isWbemSid bool) ([]byte, uint16) {
+	b := e.buf()
+
 	// this is a Security Token which can be null and takes 4 bytes.
 	// Otherwise, it is an 8 byte structure (TOKEN_USER) followed by SID,
 	// which is variable size depending on the 2nd byte in the SID
-	sid := e.ReadUint32(offset)
-	if sid == 0 {
-		return nil, offset + 4
+	if e.ReadUint32(offset) == 0 {
+		return nil, uint16(min(int(offset)+4, len(b)))
 	}
 
-	var tokenSize uint16
+	var tokenSize int
 	if isWbemSid {
 		tokenSize = 16 // TOKEN_USER size
 	}
 
-	authorities := e.ReadByte(offset + (tokenSize + 1))
-	end := offset + tokenSize + 8 + 4*uint16(authorities)
-	b := make([]byte, end-offset)
-	i := offset
-	for i < end {
-		b[i-offset] = *(*byte)(unsafe.Pointer(e.Buffer + uintptr(i)))
-		i++
+	start := int(offset)
+	authorities := int(e.ReadByte(uint16(min(start+tokenSize+1, len(b)))))
+	end := start + tokenSize + 8 + 4*authorities
+	if end > len(b) {
+		return nil, e.end()
 	}
-	return b, end
+
+	sid := make([]byte, end-start)
+	copy(sid, b[start:end])
+
+	return sid, uint16(end)
 }
 
 // ReadCallstack reads callstack return addresses at the given offset.
@@ -880,9 +928,12 @@ func (e *EventRecord) ReadCallstack(offset uint16) []va.Address {
 // ReadCallstackInto reads callstack return addresses at the given offset,
 // appending into v. If v has sufficient capacity, no allocation occurs.
 func (e *EventRecord) ReadCallstackInto(offset uint16, v va.Callstack) []va.Address {
-	var n uint16
-	m := offset
-	frames := (e.BufferLen - offset) / 8
+	b := e.buf()
+
+	var frames int
+	if int(offset) < len(b) {
+		frames = (len(b) - int(offset)) / 8
+	}
 
 	if v != nil {
 		v = v[:0]
@@ -890,10 +941,8 @@ func (e *EventRecord) ReadCallstackInto(offset uint16, v va.Callstack) []va.Addr
 		v = make([]va.Address, 0, frames)
 	}
 
-	for n < frames {
-		v = append(v, va.Address(e.ReadUint64(m)))
-		m += 8
-		n++
+	for i := 0; i < frames; i++ {
+		v = append(v, va.Address(binary.LittleEndian.Uint64(b[int(offset)+i*8:])))
 	}
 	return v
 }
@@ -913,11 +962,7 @@ type EventExtendedItemStackTrace64 struct {
 
 // HasStackTrace determines if the event has the stack trace extended item.
 func (e *EventRecord) HasStackTrace() bool {
-	if e.ExtendedDataCount == 0 {
-		return false
-	}
-	data := (*[1 << 23]EventHeaderExtendedDataItem)(unsafe.Pointer(e.ExtendedData))[:e.ExtendedDataCount:e.ExtendedDataCount]
-	for _, n := range data {
+	for _, n := range e.extendedData() {
 		if n.ExtType == EventHeaderExtTypeStackTrace64 {
 			return true
 		}
@@ -928,20 +973,20 @@ func (e *EventRecord) HasStackTrace() bool {
 // Callstack collects the event stack trace for
 // events emitted by non-system logger providers.
 func (e *EventRecord) Callstack() []va.Address {
-	if e.ExtendedDataCount == 0 {
-		return nil
-	}
-	data := (*[1 << 23]EventHeaderExtendedDataItem)(unsafe.Pointer(e.ExtendedData))[:e.ExtendedDataCount:e.ExtendedDataCount]
-	for _, n := range data {
+	for _, n := range e.extendedData() {
 		if n.ExtType != EventHeaderExtTypeStackTrace64 {
 			continue
 		}
-		s := (*EventExtendedItemStackTrace64)(unsafe.Pointer(uintptr(n.DataPtr)))
-		if s == nil {
+		// the item carries the 8-byte match id followed by the return
+		// addresses, so anything smaller is malformed. Subtracting from
+		// a smaller size would wrap around the uint16 and read far past
+		// the end of the item
+		if n.DataPtr == 0 || n.DataSize < 8 {
 			continue
 		}
+		s := (*EventExtendedItemStackTrace64)(unsafe.Pointer(uintptr(n.DataPtr)))
 		// number of return addresses
-		length := (n.DataSize - 8) / 8
+		length := int(n.DataSize-8) / 8
 		addrs := make([]va.Address, length)
 		addresses := unsafe.Slice(&s.Address[0], length)
 		for i, addr := range addresses {

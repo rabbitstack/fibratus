@@ -61,7 +61,7 @@ func newRegistryApprover(r *config.RulesCompileResult) Approver {
 func hashKeyPath(r string, u []uint16) uint64 {
 	var h xxh3.Hasher
 
-	b := unsafe.Slice((*byte)(unsafe.Pointer(unsafe.SliceData(u))), len(u))
+	b := unsafe.Slice((*byte)(unsafe.Pointer(unsafe.SliceData(u))), len(u)*2)
 	_, _ = h.Write(b)
 	if r != "" {
 		k := unsafe.Slice(unsafe.StringData(r), len(r))
@@ -109,7 +109,7 @@ func (r *registry) Approve(rec *etw.EventRecord) (*etw.EventRecord, bool) {
 		// KCB object address references a key
 		// we can use to reconstruct the full
 		// registry path
-		path = utf16.Decode(s[:len(s)/2-1])
+		path = utf16.Decode(s[:max(len(s)-1, 0)]) // drop the null terminator
 		if kcb != 0 {
 			path = key.ConcatPaths(r.kcbs[kcb], path)
 		}
