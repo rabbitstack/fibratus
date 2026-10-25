@@ -85,7 +85,7 @@ type fs struct {
 }
 
 func hashFilePath(u []uint16) uint64 {
-	b := unsafe.Slice((*byte)(unsafe.Pointer(unsafe.SliceData(u))), len(u))
+	b := unsafe.Slice((*byte)(unsafe.Pointer(unsafe.SliceData(u))), len(u)*2)
 	return xxh3.Hash(b)
 }
 
@@ -178,7 +178,7 @@ func (f *fs) Approve(r *etw.EventRecord) (*etw.EventRecord, bool) {
 		h := hashFilePath(s)
 		path, ok := f.pathLRUCache.Get(h)
 		if !ok {
-			n := utf16.Decode(s[:len(s)/2-1])
+			n := utf16.Decode(s[:max(len(s)-1, 0)]) // drop the null terminator
 			path = devmapper.GetDevMapper().Convert(n)
 			f.pathLRUCache.Add(h, path)
 		}
