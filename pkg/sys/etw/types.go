@@ -935,15 +935,24 @@ func (e *EventRecord) ReadCallstackInto(offset uint16, v va.Callstack) []va.Addr
 		frames = (len(b) - int(offset)) / 8
 	}
 
-	if v != nil {
-		v = v[:0]
-	} else {
-		v = make([]va.Address, 0, frames)
+	if frames == 0 {
+		if v != nil {
+			return v[:0]
+		}
+		return []va.Address{}
 	}
 
-	for i := 0; i < frames; i++ {
-		v = append(v, va.Address(binary.LittleEndian.Uint64(b[int(offset)+i*8:])))
+	// size the destination without reallocating when the caller
+	// handed us a pooled callstack with sufficient capacity
+	if cap(v) >= frames {
+		v = v[:frames]
+	} else {
+		v = make(va.Callstack, frames)
 	}
+
+	// the return addresses are laid out as consecutive little-endian
+	// uint64 values, which is the in-memory representation of va.Address
+	copy(unsafe.Slice((*byte)(unsafe.Pointer(unsafe.SliceData(v))), frames*8), b[offset:int(offset)+frames*8])
 	return v
 }
 
@@ -987,11 +996,11 @@ func (e *EventRecord) Callstack() []va.Address {
 		s := (*EventExtendedItemStackTrace64)(unsafe.Pointer(uintptr(n.DataPtr)))
 		// number of return addresses
 		length := int(n.DataSize-8) / 8
-		addrs := make([]va.Address, length)
-		addresses := unsafe.Slice(&s.Address[0], length)
-		for i, addr := range addresses {
-			addrs[i] = va.Address(addr)
+		if length == 0 {
+			return nil
 		}
+		addrs := make([]va.Address, length)
+		copy(addrs, unsafe.Slice((*va.Address)(unsafe.Pointer(&s.Address[0])), length))
 		return addrs
 	}
 	return nil
