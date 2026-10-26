@@ -382,6 +382,15 @@ func TestReadCallstackBounds(t *testing.T) {
 	got := ev.ReadCallstackInto(0, cs)
 	assert.Equal(t, []va.Address{1, 2}, got)
 	assert.Equal(t, 8, cap(got))
+
+	// the result must be a copy, not a view over the event payload
+	got[0] = 0xDEAD
+	assert.Equal(t, uint64(1), ev.ReadUint64(0))
+	assert.Equal(t, []va.Address{1, 2}, ev.ReadCallstack(0))
+
+	// a callstack with too little capacity is grown
+	small := make(va.Callstack, 0, 1)
+	assert.Equal(t, []va.Address{1, 2}, ev.ReadCallstackInto(0, small))
 }
 
 func TestCloneEmptyPayload(t *testing.T) {
